@@ -49,7 +49,7 @@
 
 ## 步驟
 
-- [ ] **1. 檢查腳本與 CI**（被擋於：D1、D2）
+- [x] **1. 檢查腳本與 CI**（被擋於：D1、D2）
   - 範圍：新增 `scripts/check-agents-md.py`（只用標準函式庫）：對 `git ls-files '*AGENTS.md'` 逐檔檢查層級（根目錄、子專案、`backend/internal/modules/*`、`packages/*`）的大小上限（bytes）與單行長度上限（字元），數值依 D1；`nextjs-agent-rules` 區塊不計入（由 `next dev` 維護）。例外清單寫在腳本裡，每項附「由第幾步清掉」；建立時列入所有超限的檔。附 `scripts/test_check_agents_md.py`（`unittest`，repo 目前沒有 Python 測試，不引入 pytest）。在 `.github/workflows/repo-hygiene.yml` 加兩步：`python3 scripts/check-agents-md.py` 與 `python3 -m unittest scripts/test_check_agents_md.py`。
   - 消費端：`.github/workflows/repo-hygiene.yml`；`rg -n "check-agents-md" .`
   - 不能動：其他 hygiene 檢查。
@@ -119,7 +119,7 @@
 
 | 步驟 | 狀態 | 已跑的驗收 | 未跑的驗收與原因 | commit |
 |---|---|---|---|---|
-| 1 檢查腳本與 CI | 未開始 | | | |
+| 1 檢查腳本與 CI | 程式完成待驗收 | 本機：`python3 scripts/check-agents-md.py` exit 0；`python3 -m unittest scripts/test_check_agents_md.py` 8 項 OK；mutation：media 加長到 9,947 bytes 與 600 字元的一行 → exit 1；例外清單放不超限的 buyer-app → exit 1；`actionlint` 通過 | repo-hygiene 在 CI 的兩步：還沒 push | e495fe3 |
 | 2 ADR 與模組模板 | 未開始 | | | |
 | 3 根目錄與子專案 | 未開始 | | | |
 | 4 非 seller 的模組 | 未開始 | | | |
