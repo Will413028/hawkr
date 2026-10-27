@@ -1,1 +1,4 @@
 node_modules/
+
+# Python 的位元組碼快取（scripts/ 的檢查腳本與測試）
+__pycache__/

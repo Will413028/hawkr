@@ -3,6 +3,7 @@ name: repo hygiene
 # 跨專案、秒級的靜態檢查，不設 path 條件：
 # - actionlint：workflow 檔本身（expression、steps.<id>、action 輸入）。shellcheck 整合關掉，
 #   只看 actionlint 自己的檢查。
+# - AGENTS.md 的大小與單行長度：每一層的上限在 scripts/check-agents-md.py（ADR 2026-10-28-agents-md-layering）。
 # - shell 變數緊接全形字元：`$var，` 會被 bash 吃成變數名（set -u 下直接中止），掃全 repo 的
 #   版控 shell 腳本，規則在 scripts/check-fullwidth-var-expansion.sh。
 
@@ -31,3 +32,9 @@ jobs:
       - name: shell 變數緊接全形字元
         if: always()
         run: bash scripts/check-fullwidth-var-expansion.sh
+      - name: AGENTS.md 大小與單行長度
+        if: always()
+        run: python3 scripts/check-agents-md.py
+      - name: AGENTS.md 檢查的單元測試
+        if: always()
+        run: python3 -m unittest scripts/test_check_agents_md.py
