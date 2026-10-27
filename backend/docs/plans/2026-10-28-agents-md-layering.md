@@ -56,7 +56,7 @@
   - 驗收：`python3 scripts/check-agents-md.py` 在建立時的 HEAD 通過；`python3 -m unittest scripts/test_check_agents_md.py` 通過；mutation：把一個不在例外清單的檔加長到超過上限，腳本要失敗；在例外清單放一個已經不超限的檔，腳本要失敗（例外只能縮小）；push 後 repo-hygiene 的這兩步在 CI 的 job 紀錄裡有執行。
 
 - [ ] **2. 修訂單體 ADR 與模組模板**（被擋於：D2）
-  - 範圍：依 ADR 修訂流程修訂 `docs/adr/2026-09-24-go-modular-monolith.md` 第 41 行：模組 `AGENTS.md` 是「改這個模組前必須知道的規則」，固定節為 D2 的模組節；行為規格的唯一來源依 D3。D3 選 A 時，`backend/AGENTS.md`「契約規則」的 SSOT 優先序裡「設計書」一層加上 `docs/modules/`，並在步驟 4、6 碰到的每份舊設計書檔頭標明「單體模組的現行規格見 `docs/modules/<模組>.md`」。改 `cmd/new-module/templates/module/AGENTS.md.tmpl`、`main.go` 與 `main_test.go`。`backend/AGENTS.md` 單體規則 2 的最後一句改成新的節名（若 D2 改了節名）。
+  - 範圍：依 ADR 修訂流程修訂 `docs/adr/2026-09-24-go-modular-monolith.md` 第 41 行：模組 `AGENTS.md` 是「改這個模組前必須知道的規則」，固定節為 D2 的模組節；行為規格的唯一來源依 D3。D3 選 A 時，`backend/AGENTS.md`「契約規則」的 SSOT 優先序裡「設計書」一層加上 `docs/modules/`，並在步驟 4、6 碰到的每份舊設計書檔頭標明「單體模組的現行規格見 `docs/modules/<模組>.md`」。改 `cmd/new-module/templates/module/AGENTS.md.tmpl`、`main.go` 與 `main_test.go`。`docs/開發規範/設計文件治理規範.md` §1 的文件 taxonomy 加一列「模組規格」（`docs/modules/`，與詳細設計書同樣的 PURE SPEC 規則）。單體 ADR 的修訂已在 ADR 拍板時寫好（2026-10-28）。`backend/AGENTS.md` 單體規則 2 的最後一句改成新的節名（若 D2 改了節名）。
   - 消費端：`rg -n "AGENTS\.md" backend/cmd backend/internal/arch backend/docs/adr`；`main.go` 約第 66 行與模板第 3 行對 content 模組的引用。
   - 不能動：「沿用盤點」放 `CARRYOVER.md` 的規則與 `modules_test.go` 的檢查。
   - 驗收：`cd backend && GOWORK=off go test ./cmd/new-module/ ./cmd/hawkr/`；`main_test.go` 改成斷言 D2 的固定節；mutation：模板加回 D2 不允許的節（例如「## 已知限制」），`main_test.go` 要失敗；刪掉一個固定節，也要失敗。
@@ -88,30 +88,30 @@
 
 ## 決定
 
-- **D1 大小與單行上限**（狀態：未決；擋住步驟：1、3、4、6；需要的事實：無）
+- **D1 大小與單行上限**（狀態：已決 2026-10-28，Will；擋住步驟：1、3、4、6；需要的事實：無）
   - 大小一律以 bytes 計（中文一字 3 bytes），單行以字元計。
   - A：根目錄 12,000 bytes、子專案 10,000、模組與 `packages/*` 6,000；單行 500 字元。依據：去掉對齊空白的根目錄約 11,216 bytes；最大的子專案 backend 14,456 收斂後可到 10,000；模組固定節各一段約 4,000–6,000。在最深的路徑（根目錄＋backend＋模組）合計 28,000 bytes 以內：Claude Code 每次碰模組要載入的量有上限；若 Codex 文件的 32KiB 上限屬實（未實測），也落在其內。（建議）
   - B：統一 8KB、單行 400 字元——更嚴，根目錄的契約表要大幅外移到 ADR，backend 的單體規則要拆檔。
   - C：只限模組（6KB），根目錄與子專案不設限——工作量小，但根目錄與子專案會再長回去。
-  - 結論：
-- **D2 各層的內容界線**（狀態：未決；擋住步驟：1、2、3、4、6）
+  - 結論：A。ADR：`docs/adr/2026-10-28-agents-md-layering.md`。
+- **D2 各層的內容界線**（狀態：已決 2026-10-28，Will；擋住步驟：1、2、3、4、6）
   - A：根目錄＝專案地圖、跨專案契約、共通規則；子專案＝指令、技術慣例、該子專案特有的坑；模組＝固定七節：職責（一段）、擁有的資料、發布的讀取介面（`pub_*`）、模組內部結構（依賴圖的唯一來源與 `Deps`，`main_test.go` 現在就要求）、不變量（每條一句＋守門測試＋規格位置）、不負責、決策紀錄（只有一行指向 `CARRYOVER.md` 與相關 ADR）。讀取模型併入「擁有的資料」一行；已知限制與特性測試不在模組 `AGENTS.md`（前者進規格位置，後者進 `CARRYOVER.md`）。（建議）
   - B：模組保留現在的節，只限大小——不改 ADR，但規格仍會寫進來，靠上限硬擋。
-  - 結論：
-- **D3 模組行為規格搬去哪裡**（狀態：未決；擋住步驟：4、6）
+  - 結論：A。ADR：`docs/adr/2026-10-28-agents-md-layering.md`。
+- **D3 模組行為規格搬去哪裡**（狀態：已決 2026-10-28，Will；擋住步驟：4、6）
   - 現況對照（取自各模組 `AGENTS.md` 開頭的引用）：buyer → 39、59；content → 25、54；delegation → 56；identity → 44；media → 08；seller → 32、44（另有 18、46 相關）；accountdeletion、agent、discovery、reviewqueue、social 的開頭沒有引用設計書。這些設計書多是公司時期為微服務寫的（例：08 是多媒體微服務），內容和單體的現況有落差。
   - A：每個模組新增 `backend/docs/modules/<模組>.md`，作為單體模組行為規格的唯一來源，舊設計書只當歷史參考、在檔頭標明；SSOT 優先序裡「設計書」一層改指向它。規格只有一個家，而且是為單體寫的，不混進舊服務文件。（建議）
   - B：寫進既有的詳細設計書，加一節「單體的現行不變量」；沒有設計書的模組新增一份——不新增目錄，但同一份文件混著舊微服務的設計與單體的現況，讀的人分不清哪段有效。
   - C：Go 的 package doc（`doc.go`）——在程式旁邊，但不適合長篇規格，也不在設計書的引用體系裡。
-  - 結論：
-- **D4 seller 瘦身後仍超過模組上限時怎麼辦**（狀態：未決；擋住步驟：6、7）
+  - 結論：A。ADR：`docs/adr/2026-10-28-agents-md-layering.md`。
+- **D4 seller 瘦身後仍超過模組上限時怎麼辦**（狀態：已決 2026-10-28，Will；擋住步驟：6、7）
   - 事實：seller 的 `AGENTS.md` 168,637 bytes、`CARRYOVER.md` 約 283KB；職責涵蓋治理、潛在賣家、KYC、協議等多個子領域，搬走規格後是否能到 6,000 bytes 未知。
   - A：把「seller 拆成多個模組」排進本計畫成為步驟 6d，收尾時例外清單必須為空——治本，但拆模組是架構變更（依賴表、schema、事件），規模遠大於本計畫。
   - B：seller 拆模組另立一份階段計畫；本計畫收尾時 seller 是例外清單的唯一一項，該項寫明「由拆模組計畫清掉」，拆模組計畫的完成定義包含把它移出例外清單。例外有擁有者與關閉條件，不是無主的債。（建議）
   - C：放寬模組上限到 seller 塞得下——等於沒有上限。
-  - 結論：
+  - 結論：B。ADR：`docs/adr/2026-10-28-agents-md-layering.md`。
 
-拍板順序：D2 → D1 → D3 → D4 可以一次交出；都不需要 spike 的事實。
+拍板：2026-10-28 Will 四題照建議。
 
 ## 進度
 

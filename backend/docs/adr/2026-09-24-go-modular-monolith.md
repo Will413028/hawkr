@@ -365,3 +365,7 @@
 
 規則 6 的例外：曾有「模組的程式碼生成器建立的 plpgsql 函式」一條（`migrate.Module.Generated`），2026-10-23 已刪除（social 的「計入」改成只參照自己的表的 `BEGIN ATOMIC` 函式，見 `2026-09-27-module-internal-structure.md` 最後一則修訂）；規則 6 只剩 `RETURNS trigger` 的例外。
 
+
+## 修訂：模組 `AGENTS.md` 的角色（2026-10-28，Will）
+
+原決策「說明：自己的 `AGENTS.md`，寫明職責、擁有的資料、不變量、讀取模型、不負責什麼」改為：模組 `AGENTS.md` 只放改這個模組前必須知道的規則（固定七節，每條不變量一句規則加守門測試與規格位置），大小上限 6,000 bytes；行為規格的唯一來源是 `docs/modules/<模組>.md`。原決策段保留歷史。理由與否決的方案見 ADR `2026-10-28-agents-md-layering.md`。
