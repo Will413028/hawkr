@@ -29,7 +29,7 @@ type Config struct {
 	// 讓它啟動失敗。注入來源：dev = k8s/values/*.yaml、prod = overlays/prod/common.yaml、
 	// 本機 = docker-compose-local.yml。
 	MediaBaseURL string
-	// WebBaseURL 是賣家公開頁（行銷站）的域名，跟 seller-service 的 WEB_BASE_URL
+	// WebBaseURL 是賣家公開頁（買家與賣家網頁）的域名，跟 seller-service 的 WEB_BASE_URL
 	// 語意相同、各自獨立設定（非跨服務共享）。目前唯一用途：admin 審核頁算平台
 	// 生成頁 fallback URL 顯示用，見 handler.Holder.WebBaseURL 的說明。
 	WebBaseURL string

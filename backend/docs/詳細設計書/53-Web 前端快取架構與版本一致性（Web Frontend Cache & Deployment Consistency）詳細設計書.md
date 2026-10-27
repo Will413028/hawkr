@@ -14,7 +14,7 @@
 
 ### 1.1 文件定位
 
-本文件描述 `hawkr-website`（行銷官網，Next.js on Cloudflare Workers）的**前端快取
+本文件描述 `hawkr-website`（買家與賣家網頁，Next.js on Cloudflare Workers）的**前端快取
 分層架構**與**部署版本一致性**現行契約。標【推斷】者為缺可觀測手段的估計。
 
 **架構定位**：官網為**純 ISR**（Incremental Static Regeneration），
