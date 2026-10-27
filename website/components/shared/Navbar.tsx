@@ -108,6 +108,9 @@ const SITE_NAV_INNER = cn(
 	// 2-layer gold ring — its non-media dark rule must still win at this width).
 	"[@media(max-width:768px)]:h-[56px] [@media(max-width:768px)]:min-h-[56px] [@media(max-width:768px)]:p-[8px_10px] [@media(max-width:768px)]:rounded-none",
 	"[@media(max-width:768px)]:[box-shadow:var(--page-nav-pill-shadow-mobile)]",
+	// 最窄的手機（393px）上，登入後的 rail 加品牌比可用寬度多 4px，nav 會裁掉最右邊的帳號選單
+	// （navbar-narrow-reach）；只在這個寬度收窄左右留白。
+	"[@media(max-width:420px)]:px-[6px]",
 );
 
 const SITE_NAV_CENTER =
