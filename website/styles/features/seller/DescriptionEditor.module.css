@@ -9,7 +9,7 @@
 		var(--theme-text-muted) 72%,
 		transparent
 	);
-	--desc-editor-hover: color-mix(in srgb, var(--hkui-primary) 9%, transparent);
+	--desc-editor-hover: color-mix(in srgb, var(--hkui-primary) 5%, transparent);
 	--desc-editor-shell-bg: color-mix(
 		in srgb,
 		var(--theme-surface-card) 94%,

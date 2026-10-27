@@ -1107,7 +1107,7 @@
 
 .coupon-sheet__row {
 	--coupon-content-opacity: 1;
-	--coupon-tag-background: rgb(var(--color-brand-primary-rgb) / 0.12);
+	--coupon-tag-background: rgb(var(--color-brand-primary-rgb) / 0.06);
 	--coupon-tag-color: var(--color-brand-primary-strong);
 	--coupon-discount-color: var(--cart-danger);
 	display: grid;
