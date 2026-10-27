@@ -101,7 +101,7 @@ class SellerOrderFilterIT {
         jdbc.update("DELETE FROM order_items");
         jdbc.update("DELETE FROM orders");
 
-        order(1L, "O100000001", STORE_ID, 501L, "陳小明", "2026-08-01 02:00:00+00");
+        order(1L, "O100000001", STORE_ID, 501L, "林小明", "2026-08-01 02:00:00+00");
         item(11L, "O100000001", "有機蘋果", "一箱 5kg");
 
         order(2L, "O200000002", STORE_ID, 502L, "陳大文", "2026-08-10 02:00:00+00");

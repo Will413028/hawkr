@@ -872,7 +872,7 @@ func TestKYCSwitchingSellerTypeClearsTheOtherTypesFields(t *testing.T) {
 	ctx := context.Background()
 	accountID, _ := f.open(t)
 	d := f.savedDraft(t, companyDraft(accountID, idRep, taxIDOne, bankAcct))
-	if *d.TaxID != taxIDOne || *d.RepIDCardNoMasked != "H2******10" || d.IDCardNoMasked != nil {
+	if *d.TaxID != taxIDOne || *d.RepIDCardNoMasked != "X2******89" || d.IDCardNoMasked != nil {
 		t.Fatalf("company draft=%+v", d)
 	}
 	if _, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: d.Version, IDCardNo: ptr(idA)}); apperr.KindOf(err) != apperr.KindInvalidInput {

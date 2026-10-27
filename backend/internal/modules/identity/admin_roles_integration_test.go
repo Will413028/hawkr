@@ -52,7 +52,7 @@ func TestGrantAndRevokeAdminRoleWriteEventsAndTakeEffectImmediately(t *testing.T
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	id, tok := f.admin(t, "user_ops", "Ops@Gmail.com")
+	id, tok := f.admin(t, "user_ops", "Ops@Example.com")
 	if roles := f.adminRoles(t, tok); len(roles) != 0 {
 		t.Fatalf("新管理員的角色 = %v", roles)
 	}
@@ -137,7 +137,7 @@ func TestAdminRoleChangeFindsExistingAdminsOnly(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	id, tok := f.admin(t, "user_ops", "Ops@Gmail.com")
+	id, tok := f.admin(t, "user_ops", "Ops@Example.com")
 	byEmail := change(0)
 	byEmail.Email = "ops@example.com"
 	if res, err := f.m.GrantAdminRole(ctx, byEmail); err != nil || res.AdminID != id {
