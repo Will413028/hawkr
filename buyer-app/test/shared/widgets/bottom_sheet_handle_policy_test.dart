@@ -12,7 +12,6 @@ void main() {
     'lib/features/home/presentation/home_screen.dart': [false],
     'lib/features/home/presentation/home_widget/product_add_to_cart_sheet.dart':
         [true],
-    'lib/features/product/presentation/search_screen.dart': [false],
     'lib/features/order/presentation/order_card_widgets/retry_payment_sheet.dart':
         [false],
     'lib/features/order/presentation/order_card_widgets/atm_info_sheet.dart': [
@@ -30,7 +29,6 @@ void main() {
     'lib/features/seller/presentation/widgets/merchant_home_tab.dart': [false],
     'lib/features/address/presentation/address_management_screen.dart': [false],
     'lib/features/category/presentation/category_screen.dart': [
-      false,
       false,
       false,
       false,
@@ -69,7 +67,7 @@ void main() {
     );
   });
 
-  test('23 個 bottom sheet 入口只顯示一個已盤點的拖曳把手', () {
+  test('21 個 bottom sheet 入口只顯示一個已盤點的拖曳把手', () {
     var auditedCallCount = 0;
     for (final entry in auditedPolicies.entries) {
       final source = File(entry.key).readAsStringSync();
@@ -77,7 +75,7 @@ void main() {
       auditedCallCount += actual.length;
       expect(actual, entry.value, reason: '拖曳把手分類錯誤：${entry.key}');
     }
-    expect(auditedCallCount, 23);
+    expect(auditedCallCount, 21);
   });
 }
 
