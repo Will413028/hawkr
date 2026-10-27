@@ -94,17 +94,17 @@ env:
 
 jobs:
   e2e:
-    name: Playwright e2e (${{ matrix.shard }}/4)
+    name: Playwright e2e (${{ matrix.shard }}/8)
     runs-on: ubuntu-24.04
     # 官方映像已含瀏覽器與系統相依套件，省掉每次 apt 安裝（實測在 runner 上會卡十幾分鐘）。
     container: mcr.microsoft.com/playwright:v1.59.1-noble
     timeout-minutes: 30
-    # 596 個測試在單一 worker 約需數小時：以 --shard 切成 4 份，每份是獨立 job（自己 build、自己的 server）。
+    # 596 個測試在單一 worker 約需數小時：以 --shard 切成 8 份，每份是獨立 job（自己 build、自己的 server）。
     # 測試之間沒有共用狀態（每個 test 一個 browser context，伺服器回應全由 page.route 攔截），可以任意切分。
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/pnpm-install
@@ -120,15 +120,15 @@ jobs:
             echo "present=true" >> "$GITHUB_OUTPUT"
           else
             echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::找不到視覺基準，本次以 --update-snapshots 產生並上傳 artifact（website-visual-baseline-<shard>，四份合起來才是完整基準）"
+            echo "::notice::找不到視覺基準，本次以 --update-snapshots 產生並上傳 artifact（website-visual-baseline-<shard>，八份合起來才是完整基準）"
           fi
       # @live 的 spec 會打外部服務，不跑。
       - name: e2e（比對基準）
         if: steps.baseline.outputs.present == 'true'
-        run: pnpm run test:e2e:hermetic --shard=${{ matrix.shard }}/4
+        run: pnpm run test:e2e:hermetic --shard=${{ matrix.shard }}/8
       - name: e2e（產生基準）
         if: steps.baseline.outputs.present != 'true'
-        run: pnpm run test:e2e:hermetic --update-snapshots --shard=${{ matrix.shard }}/4
+        run: pnpm run test:e2e:hermetic --update-snapshots --shard=${{ matrix.shard }}/8
       - name: 上傳視覺基準
         if: steps.baseline.outputs.present != 'true' && always()
         uses: actions/upload-artifact@v4
