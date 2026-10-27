@@ -83,7 +83,12 @@ type FaqNavigationGeometry = {
 
 function watchRuntimeErrors(page: Page) {
 	const errors: string[] = [];
-	page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
+	page.on("pageerror", (error) => {
+		// hermetic CI 沒有 Clerk 的前端服務（publishable key 指向假網域），訪客頁載不到
+		// clerk-js 是環境造成的，不是這頁的程式錯誤；其他 pageerror 照算。
+		if (error.message.startsWith("Clerk: Failed to load Clerk JS")) return;
+		errors.push(`pageerror: ${error.message}`);
+	});
 	page.on("console", (message) => {
 		if (message.type() !== "error") return;
 		// A failed subresource load (image/font/tracking beacon from an

@@ -127,7 +127,7 @@
 				"transform": "matrix(1, 0, 0, 1, 0, -1)"
 			},
 			"cta": {
-				"backgroundColor": "rgb(38, 58, 11)",
+				"backgroundColor": "rgb(143, 51, 21)",
 				"color": "rgb(255, 255, 255)",
 				"transform": "matrix(1, 0, 0, 1, 0, -1)"
 			},
@@ -266,7 +266,7 @@
 				"transform": "matrix(1, 0, 0, 1, 0, -1)"
 			},
 			"cta": {
-				"backgroundColor": "rgb(38, 58, 11)",
+				"backgroundColor": "rgb(143, 51, 21)",
 				"color": "rgb(232, 239, 226)",
 				"transform": "matrix(1, 0, 0, 1, 0, -1)"
 			},
