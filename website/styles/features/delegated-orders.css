@@ -1,0 +1,642 @@
+/**
+ * 代行工作區・訂單面（56 號 §6.1.10、mockup image8）。
+ *
+ * 版面骨架全部沿用賣家中心既有的 `.seller-card` / `.seller-table` / `.seller-status`
+ * ——「視覺套 website 現有 design system」在這裡的具體意思就是：表格不新寫一套。
+ * 本檔只放 mockup 上真正是新東西的三塊：金色權限提示條、履約鎖定卡、訂單時間軸，
+ * 以及列表 / 抽屜的少量排版。
+ *
+ * 色值與 `delegated-operations.css` 同一條判準：引用語意 token 之前先確認它
+ * light/dark 兩邊是同一個色相，不是的就自己定兩套（`--theme-primary-*` 在 light
+ * 是綠、dark 才是金，直接用會讓金色提示條在 light 變綠底）。
+ */
+
+/* ============================================================
+ * 金色權限提示條（mockup §4.8.2）
+ * ============================================================ */
+
+.adm-orders__notice {
+	--adm-notice-bg: rgb(var(--color-brand-secondary-soft-rgb) / 0.34);
+	--adm-notice-border: var(--theme-border-warm);
+	--adm-notice-fg: var(--color-brand-primary-strong);
+
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-height: 56px;
+	padding: 12px 16px;
+	border: 1px solid var(--adm-notice-border);
+	border-radius: 12px;
+	background: var(--adm-notice-bg);
+	color: var(--adm-notice-fg);
+	font-size: 0.8125rem;
+	line-height: 1.6;
+}
+
+[data-theme="dark"] .adm-orders__notice {
+	--adm-notice-bg: rgb(241 205 112 / 0.14);
+	--adm-notice-fg: var(--theme-text-accent);
+}
+
+.adm-orders__notice svg {
+	flex: none;
+}
+
+/* ============================================================
+ * 列表
+ * ============================================================ */
+
+.adm-orders__stats {
+	display: grid;
+	/* 「全部」＋四個狀態＝五張；欄數跟著卡片數走，不寫死。 */
+	grid-template-columns: repeat(5, minmax(0, 1fr));
+	gap: 16px;
+}
+
+@media (max-width: 1200px) {
+	.adm-orders__stats {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 900px) {
+	.adm-orders__stats {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+.adm-orders__filters {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 12px;
+	padding: 16px;
+	border: 1px solid var(--border-soft);
+	border-radius: 16px;
+	background: var(--theme-surface-card);
+}
+
+.adm-orders__filter-label {
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: var(--ink-soft);
+}
+
+.adm-orders__select {
+	height: 36px;
+	padding: 0 12px;
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-hk-pill);
+	background: var(--theme-surface-card);
+	color: var(--ink-body);
+	font-size: 0.8125rem;
+}
+
+/* 日期輸入沿用 `.adm-orders__select` 的尺寸與色票（同一列的訂單狀態下拉就是它），
+   只補瀏覽器對 date 控制項的兩個預設差異：內建日曆圖示的顏色、以及 iOS Safari 會
+   給 date input 一個比 select 高的 intrinsic height。 */
+.adm-orders__select[type="date"] {
+	min-height: 36px;
+	color-scheme: light;
+}
+
+[data-theme="dark"] .adm-orders__select[type="date"] {
+	color-scheme: dark;
+}
+
+.adm-orders__clear {
+	height: 36px;
+	/* 這一顆與重新整理一起靠右：`margin-left: auto` 吃掉左邊的剩餘空間，重新整理
+	   自己的 auto 於是沒有空間可吃、緊貼在它右邊。沒有這一顆時，重新整理的 auto
+	   照舊生效。 */
+	margin-left: auto;
+	padding: 0 14px;
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-hk-pill);
+	background: transparent;
+	color: var(--ink-soft);
+	font-size: 0.8125rem;
+	cursor: pointer;
+}
+
+.adm-orders__clear:hover {
+	color: var(--ink-body);
+	background: var(--theme-surface-card);
+}
+
+.adm-orders__refresh {
+	display: inline-grid;
+	place-items: center;
+	width: 36px;
+	height: 36px;
+	margin-left: auto;
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-hk-pill);
+	background: var(--theme-surface-card);
+	color: var(--ink-body);
+	cursor: pointer;
+}
+
+.adm-orders__refresh:disabled {
+	opacity: 0.5;
+	cursor: progress;
+}
+
+/* 選中列（右側抽屜正開著這一筆）：mockup 的淡金左邊框 ＋ 淡底。 */
+.adm-orders__row--active > td:first-child {
+	box-shadow: inset 3px 0 0 0 var(--color-brand-secondary);
+}
+
+.adm-orders__row--active > td {
+	background: rgb(var(--color-brand-secondary-soft-rgb) / 0.2);
+}
+
+[data-theme="dark"] .adm-orders__row--active > td {
+	background: rgb(241 205 112 / 0.1);
+}
+
+/* 訂單編號與時間各佔一行：`.seller-table__id` 是 inline，不換行會與下一欄疊在一起。 */
+.adm-orders__no {
+	display: block;
+	font-weight: 700;
+	color: var(--ink-heading);
+}
+
+.adm-orders__time {
+	display: block;
+	margin-top: 2px;
+}
+
+.adm-orders__actions {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 2px;
+}
+
+.adm-orders__buyer {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.adm-orders__buyer-avatar {
+	display: grid;
+	place-items: center;
+	flex: none;
+	width: 32px;
+	height: 32px;
+	border-radius: var(--radius-hk-pill);
+	background: var(--theme-primary-subtle);
+	color: var(--theme-text-accent-on-tint);
+	font-size: 0.8125rem;
+	font-weight: 700;
+}
+
+[data-theme="dark"] .adm-orders__buyer-avatar {
+	color: var(--theme-text-heading);
+}
+
+/* 層 1 的正面表達：不畫出貨 CTA，改畫「為什麼沒有」。 */
+.adm-orders__locked-hint {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 0.6875rem;
+	font-weight: 500;
+	color: var(--ink-soft);
+	white-space: nowrap;
+}
+
+.adm-orders__pagination {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 12px;
+	padding-top: 16px;
+	font-size: 0.8125rem;
+	color: var(--ink-body);
+}
+
+.adm-orders__pagination-range {
+	margin-left: auto;
+}
+
+.adm-orders__page-button {
+	display: inline-grid;
+	place-items: center;
+	min-width: 32px;
+	height: 32px;
+	padding: 0 8px;
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-hk-md);
+	background: var(--theme-surface-card);
+	color: var(--ink-body);
+	font-size: 0.8125rem;
+	cursor: pointer;
+}
+
+.adm-orders__page-button:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.adm-orders__page-current {
+	min-width: 32px;
+	height: 32px;
+	display: inline-grid;
+	place-items: center;
+	border-radius: var(--radius-hk-md);
+	background: var(--color-brand-primary-strong);
+	color: var(--color-neutral-white);
+	font-size: 0.8125rem;
+	font-weight: 600;
+}
+
+/* ============================================================
+ * 詳情（抽屜與獨立頁共用同一份內容元件）
+ * ============================================================ */
+
+.adm-order-detail {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+}
+
+.adm-order-detail__head {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.adm-order-detail__no {
+	font-family: var(--hkui-font-display);
+	font-size: 0.9375rem;
+	font-weight: 700;
+	color: var(--ink-heading);
+}
+
+.adm-order-detail__section {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.adm-order-detail__section-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.adm-order-detail__section-title {
+	font-size: 0.875rem;
+	font-weight: 700;
+	color: var(--ink-heading);
+}
+
+.adm-order-detail__reveal {
+	border: 0;
+	background: none;
+	padding: 0;
+	color: var(--color-brand-primary-strong);
+	font-size: 0.8125rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.adm-order-detail__reveal:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+[data-theme="dark"] .adm-order-detail__reveal {
+	color: var(--theme-text-accent);
+}
+
+.adm-order-detail__lines {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	font-size: 0.8125rem;
+	line-height: 1.7;
+	color: var(--ink-body);
+}
+
+.adm-order-detail__row {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 16px;
+	font-size: 0.8125rem;
+	color: var(--ink-body);
+}
+
+.adm-order-detail__row strong {
+	font-family: var(--hkui-font-display);
+	color: var(--ink-heading);
+}
+
+/* 時間軸：後端只送真的發生過的節點，所以這裡每一點都是實心；最後一點是當下狀態，
+   用色調與「目前狀態」標籤把它與已經走過的節點分開 —— 顏色沿用列表 chip 的
+   `.seller-status--*` 四個色調，同一筆訂單在兩個地方看到的顏色才會一致。 */
+.adm-order-timeline {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.adm-order-timeline__item {
+	position: relative;
+	padding: 0 0 16px 24px;
+	font-size: 0.8125rem;
+	color: var(--ink-body);
+}
+
+.adm-order-timeline__item::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	top: 4px;
+	width: 10px;
+	height: 10px;
+	border-radius: var(--radius-hk-pill);
+	background: var(--color-brand-secondary);
+}
+
+.adm-order-timeline__item::after {
+	content: "";
+	position: absolute;
+	left: 4px;
+	top: 16px;
+	bottom: 0;
+	width: 2px;
+	background: var(--border-soft);
+}
+
+.adm-order-timeline__item:last-child {
+	padding-bottom: 0;
+}
+
+.adm-order-timeline__item:last-child::after {
+	display: none;
+}
+
+.adm-order-timeline__label {
+	font-weight: 600;
+	color: var(--ink-heading);
+}
+
+.adm-order-timeline__time {
+	display: block;
+	font-size: 0.75rem;
+	color: var(--ink-soft);
+}
+
+/* 當下狀態：放大節點並改色，讓時間軸與標題那顆 chip 講同一件事。 */
+.adm-order-timeline__item--current::before {
+	left: -2px;
+	top: 2px;
+	width: 14px;
+	height: 14px;
+	background: var(--adm-timeline-dot, var(--color-brand-secondary));
+	box-shadow: 0 0 0 4px var(--adm-timeline-ring, transparent);
+}
+
+.adm-order-timeline__item--current .adm-order-timeline__label {
+	color: var(--adm-timeline-fg, var(--ink-heading));
+}
+
+.adm-order-timeline__item--current.is-pending {
+	--adm-timeline-dot: #d8b457;
+	--adm-timeline-ring: rgba(216, 180, 87, 0.18);
+	--adm-timeline-fg: var(--hkui-warning-700);
+}
+
+.adm-order-timeline__item--current.is-shipping {
+	--adm-timeline-dot: var(--color-brand-primary-strong);
+	--adm-timeline-ring: rgb(var(--color-brand-primary-rgb) / 0.16);
+	--adm-timeline-fg: var(--color-brand-primary-strong);
+}
+
+.adm-order-timeline__item--current.is-complete {
+	--adm-timeline-dot: var(--color-brand-primary-strong);
+	--adm-timeline-ring: rgb(var(--color-ink-400-rgb) / 0.18);
+	--adm-timeline-fg: var(--hkui-success, var(--color-brand-primary-strong));
+}
+
+.adm-order-timeline__item--current.is-cancelled {
+	--adm-timeline-dot: #c13838;
+	--adm-timeline-ring: rgba(193, 56, 56, 0.14);
+	--adm-timeline-fg: var(--hkui-danger-700, #8e2800);
+}
+
+[data-theme="dark"] .adm-order-timeline__item--current.is-pending {
+	--adm-timeline-dot: #d6c27e;
+	--adm-timeline-fg: #d6c27e;
+}
+
+[data-theme="dark"] .adm-order-timeline__item--current.is-shipping {
+	--adm-timeline-dot: var(--color-ink-200);
+	--adm-timeline-fg: var(--color-ink-200);
+}
+
+[data-theme="dark"] .adm-order-timeline__item--current.is-complete {
+	--adm-timeline-dot: var(--color-ink-200);
+	--adm-timeline-fg: rgb(var(--color-ink-100-rgb) / 0.86);
+}
+
+[data-theme="dark"] .adm-order-timeline__item--current.is-cancelled {
+	--adm-timeline-dot: #e6b8a6;
+	--adm-timeline-fg: #e6b8a6;
+}
+
+/* 「目前狀態」小標。文字本身就是說明，不用色塊搶走節點的注意力。 */
+.adm-order-timeline__now {
+	margin-left: 8px;
+	font-size: 0.6875rem;
+	font-weight: 600;
+	color: var(--ink-soft);
+}
+
+/* 取消原因：終態節點的內容本身。與賣家中心詳情頁的那一行是同一句話。
+   顏色掛在 `--current` 那一層而不是本身，與上面的 label 同形——單靠元素自己的
+   class 選到的色會被 dark 的既有規則蓋掉（實測 computed color 落回 --ink-body）。 */
+.adm-order-timeline__note {
+	display: block;
+	margin-top: 2px;
+	font-size: 0.75rem;
+	line-height: 1.6;
+}
+
+.adm-order-timeline__item--current .adm-order-timeline__note {
+	color: var(--adm-timeline-fg, var(--ink-body));
+}
+
+.adm-order-items {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.adm-order-items__item {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.adm-order-items__thumb {
+	flex: none;
+	width: 48px;
+	height: 48px;
+	border-radius: var(--radius-hk-md);
+	object-fit: cover;
+	background: var(--theme-surface-glass);
+}
+
+.adm-order-items__body {
+	min-width: 0;
+	flex: 1 1 auto;
+	font-size: 0.8125rem;
+	color: var(--ink-body);
+}
+
+.adm-order-items__name {
+	display: block;
+	font-weight: 600;
+	color: var(--ink-heading);
+}
+
+.adm-order-items__meta {
+	display: block;
+	font-size: 0.75rem;
+	color: var(--ink-soft);
+}
+
+/* 履約鎖定卡（mockup §4.8.7）。三行文案都有機械保證撐著，可以照抄。 */
+.adm-order-lock {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 6px;
+	padding: 20px 16px;
+	border: 1px solid var(--theme-border-warm);
+	border-radius: 12px;
+	background: rgb(var(--color-brand-secondary-soft-rgb) / 0.34);
+	color: var(--color-brand-primary-strong);
+	text-align: center;
+}
+
+[data-theme="dark"] .adm-order-lock {
+	background: rgb(241 205 112 / 0.14);
+	color: var(--theme-text-accent);
+}
+
+.adm-order-lock__title {
+	font-size: 0.875rem;
+	font-weight: 700;
+}
+
+.adm-order-lock__body {
+	font-size: 0.75rem;
+	line-height: 1.7;
+}
+
+/* ============================================================
+ * 平台異常處置的交接入口（mockup 底部第二顆全寬鈕）
+ *
+ * 它是一條跨 host 連結，所以用 `<a>` 的外觀而不是 Button 元件：按鈕承諾
+ * 「按下去這裡會發生事情」，這一顆承諾的是「你會離開這裡」。
+ * ============================================================ */
+
+.adm-order-handoff {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	padding: 12px 16px;
+	border: 1px solid var(--theme-border-warm);
+	border-radius: 12px;
+	background: transparent;
+	color: var(--color-brand-primary-strong);
+	text-align: center;
+	text-decoration: none;
+}
+
+.adm-order-handoff:hover {
+	background: rgb(var(--color-brand-secondary-soft-rgb) / 0.2);
+}
+
+.adm-order-handoff__label {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 0.875rem;
+	font-weight: 700;
+}
+
+.adm-order-handoff__note {
+	font-size: 0.75rem;
+	line-height: 1.7;
+	color: var(--ink-body);
+}
+
+[data-theme="dark"] .adm-order-handoff {
+	color: var(--theme-text-accent);
+}
+
+[data-theme="dark"] .adm-order-handoff:hover {
+	background: rgb(241 205 112 / 0.1);
+}
+
+/* ============================================================
+ * 揭露理由 modal
+ * ============================================================ */
+
+.adm-reveal-form {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.adm-reveal-form__hint {
+	font-size: 0.8125rem;
+	line-height: 1.7;
+	color: var(--ink-body);
+}
+
+.adm-reveal-form__input {
+	width: 100%;
+	min-height: 84px;
+	padding: 10px 12px;
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-hk-md);
+	background: var(--theme-surface-card);
+	color: var(--ink-body);
+	font-size: 0.875rem;
+	line-height: 1.6;
+	resize: vertical;
+}
+
+.adm-reveal-form__counter {
+	align-self: flex-end;
+	font-size: 0.75rem;
+	color: var(--ink-soft);
+	font-variant-numeric: tabular-nums;
+}
+
+.adm-reveal-form__counter--over {
+	color: var(--hkui-danger-700, #8e2800);
+}
+
+.adm-reveal-form__error {
+	font-size: 0.8125rem;
+	color: var(--hkui-danger-700, #8e2800);
+}

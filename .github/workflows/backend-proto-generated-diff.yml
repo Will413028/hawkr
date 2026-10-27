@@ -1,0 +1,143 @@
+name: backend proto generated diff
+
+# 守住 proto 同步流程：`api/proto/**` 是唯一修改位置，改完必須一起帶上
+#   (1) Go 生成檔 `pkg/proto/**`（scripts/gen-go-proto.sh）
+#   (2) Java 端 proto 副本 `services/java/shared/java-proto/src/main/proto/`（scripts/gen-java-proto.sh）
+# 做法：在權威 image 內重新生成全部 proto，與 repo 內的生成檔逐位元組對拍；
+# repo 以 :ro 唯讀掛載進容器，工作樹全程零寫入。
+# 由 backend/.github/workflows/proto-generated-diff.yml 搬來。
+
+on:
+  pull_request:
+    paths: &proto_paths
+      - 'backend/api/proto/**'
+      - 'backend/pkg/proto/**'
+      - 'backend/services/java/shared/java-proto/src/main/proto/**'
+      - 'backend/scripts/gen-go-proto.sh'
+      - 'backend/scripts/gen-java-proto.sh'
+      - 'backend/scripts/proto/**'
+      - '.github/workflows/backend-proto-generated-diff.yml'
+  push:
+    branches: [main]
+    paths: *proto_paths
+  workflow_dispatch:
+
+concurrency:
+  group: backend-proto-generated-diff-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  proto-generated-diff:
+    name: proto 生成檔 regenerate + diff
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      # image tag 由 scripts/proto/Dockerfile 的內容雜湊算出（見 scripts/proto/image-tag.sh 檔頭）。
+      - name: 讀取權威版本設定（SSOT = scripts/proto/Dockerfile）
+        id: cfg
+        run: |
+          set -euo pipefail
+          IMAGE=$(bash scripts/proto/image-tag.sh)
+          MODULE=$(sed -n 's/^MODULE="\(.*\)"$/\1/p' scripts/gen-go-proto.sh | head -1)
+          if [ -z "$IMAGE" ] || [ -z "$MODULE" ]; then
+            echo "::error::解析不出 IMAGE / MODULE（IMAGE=[$IMAGE] MODULE=[$MODULE]）"
+            echo "  scripts/gen-go-proto.sh 的變數寫法改了 → 同步改這支 workflow 的 sed"
+            exit 1
+          fi
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          echo "module=$MODULE" >> "$GITHUB_OUTPUT"
+          echo ">>> image=$IMAGE module=$MODULE"
+
+      - name: 準備 protoc image
+        run: |
+          set -euo pipefail
+          IMAGE="${{ steps.cfg.outputs.image }}"
+          # 與 gen-go-proto.sh 同樣的 cache 判斷；hosted runner 每次都是乾淨的，實際上都會 build。
+          if docker image inspect "$IMAGE" >/dev/null 2>&1; then
+            echo ">>> $IMAGE 已存在，跳過 build"
+          else
+            echo ">>> build $IMAGE"
+            docker build -t "$IMAGE" scripts/proto
+          fi
+
+      # 唯讀掛載 + 容器內 /out + 容器內 diff：工作樹全程零寫入。
+      - name: 重新生成 Go proto 並與 repo 對拍
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "$PWD:/work:ro" -w /work \
+            -e MODULE="${{ steps.cfg.outputs.module }}" \
+            "${{ steps.cfg.outputs.image }}" \
+            sh -c '
+              set -eu
+              mkdir -p /out
+              find api/proto -name "*.proto" | sort | while read -r f; do
+                protoc --proto_path=api/proto \
+                       --go_out=/out --go_opt=module="$MODULE" \
+                       --go-grpc_out=/out --go-grpc_opt=module="$MODULE" \
+                       "$f"
+              done
+              echo "重新生成 $(find /out -name "*.pb.go" | wc -l | tr -d " ") 個檔；repo 內有 $(find /work/pkg/proto -name "*.pb.go" | wc -l | tr -d " ") 個"
+              # 左 = repo 現況，右 = 剛生成的權威結果。
+              # 「Only in /work/pkg/proto」= repo 有多餘/孤兒生成檔（proto 已刪或改名）。
+              diff -ru /work/pkg/proto /out/proto
+            ' && exit 0
+
+          echo ""
+          echo "::error::pkg/proto 的 Go 生成檔與 api/proto 不同步"
+          cat <<'EOF'
+
+            上面的 diff：`---` 那側是 repo 現況，`+++` 那側是用權威 image 重新生成的結果。
+            出現「Only in /work/pkg/proto: ...」= repo 裡有孤兒生成檔（對應的 .proto 已刪或改名）。
+
+            修法（本機跑，只需要 docker；protoc 與 plugin 版本都鎖在 scripts/proto/Dockerfile，
+            不依賴本機裝了什麼 protoc，也不需要調整 PATH）：
+
+                ./scripts/gen-go-proto.sh
+                git add pkg/proto && git commit
+
+            改了 proto 的完整同步流程見 10 檔 §3——Go 生成檔只是第一步，Java 端還要：
+
+                ./scripts/gen-java-proto.sh      # rsync api/proto → java-proto + mvn install
+
+            以及移除欄位前先 grep 全部 Go caller。
+
+          EOF
+          exit 1
+
+      # Java 端不是「生成」而是整包 rsync（protobuf-maven-plugin 在 build 時才生成
+      # Java 類別），所以只要比對這份副本與 api/proto 是否逐檔相同即可，不需要 docker。
+      # 漏同步的後果一樣嚴重：Java 微服務會拿舊的 message 定義編譯，wire 對不上。
+      - name: Java 端 proto 副本與 api/proto 對拍
+        if: always()
+        run: |
+          set -uo pipefail
+          JAVA_PROTO="services/java/shared/java-proto/src/main/proto"
+          # .DS_Store 是本機 Finder 產物（已 gitignore，CI checkout 不會有），排除以免本機跑時假紅
+          if diff -r -x '.DS_Store' api/proto "$JAVA_PROTO"; then
+            echo "✓ Java 端 proto 副本與 api/proto 一致"
+            exit 0
+          fi
+          echo ""
+          echo "::error::$JAVA_PROTO 與 api/proto 不同步"
+          cat <<'EOF'
+
+            Java 微服務透過 proto-common JAR 取得 proto（10 檔 §3：禁止服務本地 src/main/proto），
+            這份副本落後 = 所有 Java 服務都在用舊的 message 定義編譯。
+
+            修法：
+
+                ./scripts/gen-java-proto.sh
+                git add services/java/shared/java-proto/src/main/proto && git commit
+
+          EOF
+          exit 1

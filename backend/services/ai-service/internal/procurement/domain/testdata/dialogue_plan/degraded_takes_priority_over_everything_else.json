@@ -1,0 +1,44 @@
+{
+  "input": {
+    "Current": {},
+    "Next": {},
+    "Missing": null,
+    "Ready": false,
+    "Rejected": null,
+    "HasRejected": true,
+    "Degraded": true,
+    "Recorded": null,
+    "CropDisambiguationPending": false,
+    "CropDisambiguationCandidates": null,
+    "Question": null,
+    "PricePreviewAvailable": false,
+    "RfqConfirmationState": 0
+  },
+  "output": {
+    "schemaVersion": "dialogue-plan.v1",
+    "actCode": "EXTRACTION_DEGRADED",
+    "stateVersion": "",
+    "readinessGate": "INTAKE_READY",
+    "salientFactRefs": [],
+    "artifactRefs": [],
+    "allowedClaimCodes": [
+      "EXTRACTION_DEGRADED"
+    ],
+    "forbiddenClaimCodes": [
+      "SEARCH_STARTED",
+      "SEARCH_COMPLETED",
+      "RFQ_PUBLISHED",
+      "SELLER_NOTIFIED",
+      "DEAL_CREATED",
+      "ORDER_CREATED",
+      "PAYMENT_PROCESSED"
+    ],
+    "toneHints": {
+      "verbosity": "CONCISE"
+    },
+    "maxSentences": 2,
+    "policyVersion": "phase3-v1",
+    "templateVersion": "phase2-v1",
+    "planHash": ""
+  }
+}

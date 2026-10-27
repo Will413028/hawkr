@@ -1,0 +1,134 @@
+server:
+  port: 9912
+
+# gRPC Server Configuration
+grpc:
+  server:
+    port: ${GRPC_PORT:9913}
+    reflection-service-enabled: true
+
+spring:
+  autoconfigure:
+    exclude:
+      - net.devh.boot.grpc.client.autoconfigure.GrpcClientAutoConfiguration
+      - net.devh.boot.grpc.client.autoconfigure.GrpcClientHealthAutoConfiguration
+  application:
+    name: product-service
+  cloud:
+    nacos:
+      discovery:
+        enabled: ${NACOS_ENABLED:false}
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+        metadata:
+          grpc-port: ${GRPC_PORT:9913}
+          version: 1.0.0
+  rabbitmq:
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_POOL_PORT:5432}/${DB_NAME:hawkr_product}?sslmode=${DB_SSLMODE:disable}&prepareThreshold=0
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      minimum-idle: 2            # 閒置時最少保持的連線數
+      maximum-pool-size: 10      # 連線池上限（含閒置+使用中）
+      connection-timeout: 30000  # 取得連線的最長等待時間（毫秒），超時拋 SQLException
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      # 商品 / 分類快取為純效能優化（DB 為 SSOT），redis 失聯時須快速失敗以降級走 DB（02 §2.7.3）。
+      # 與正常 redis 延遲（同叢集 < 5ms）相比有大量餘裕；過長 timeout 會讓失聯時多次堆疊
+      # 超出 Gateway 請求 deadline（30s）→ 503，無法達成 graceful degradation 回 200。
+      # timeout = command timeout（涵蓋 docker pause 凍結連線）；
+      # connect-timeout = 建立連線逾時（涵蓋 redis 節點被殺 / 連線拒絕 / 需重建連線的場景，
+      #   Lettuce 預設約 10s，未設會撞 Gateway deadline）。兩者皆設短才能涵蓋所有失聯模式。
+      timeout: 500ms
+      connect-timeout: 500ms
+  flyway:
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:hawkr_product}?sslmode=${DB_SSLMODE:disable}
+    user: ${DB_USER}
+    password: ${DB_PASSWORD}
+    enabled: ${FLYWAY_ENABLED:true}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+
+mybatis-plus:
+  mapper-locations: classpath:/mapper/**/*.xml
+  global-config:
+    db-config:
+      # 注意：不使用 ASSIGN_UUID，因為它生成 String 類型與 java.util.UUID 不兼容
+      # 使用 UUID 類型時，Entity 必須明確指定 @TableId(type = IdType.INPUT) 並手動 setId(UUID.randomUUID())
+      id-type: INPUT
+      # 邏輯刪除：僅對 Entity 中有 deletedAt 欄位的表生效（如 ProductEntity），無此欄位則走物理刪除
+      logic-delete-field: deletedAt
+      logic-delete-value: "NOW()"        # 刪除時 SET deleted_at = NOW()
+      logic-not-delete-value: "null"     # 查詢時自動加 WHERE deleted_at IS NULL
+  configuration:
+    map-underscore-to-camel-case: true
+  type-handlers-package: io.github.will413028.hawkr.product.config.typehandler
+
+# Hawkr Observability 配置
+hawkr:
+  obs:
+    service: product-service
+    grpc:
+      targets:
+        media:
+          host: ${MEDIA_SERVICE_HOST:127.0.0.1}
+          port: ${MEDIA_SERVICE_GRPC_PORT:9937}
+          plaintext: true
+        seller:
+          host: ${SELLER_SERVICE_HOST:127.0.0.1}
+          port: ${SELLER_SERVICE_GRPC_PORT:9941}
+          plaintext: true
+        shipping:
+          host: ${SHIPPING_SERVICE_HOST:127.0.0.1}
+          port: ${SHIPPING_SERVICE_GRPC_PORT:9931}
+          plaintext: true
+        # 02 §4.2.4 — /public/products?followed_product_only / followed_seller_only 透過 ListFavoritedProductIds / ListSubscribedSellerIds 取 ID 列表
+        buyer:
+          host: ${BUYER_SERVICE_HOST:127.0.0.1}
+          port: ${BUYER_SERVICE_GRPC_PORT:9941}
+          plaintext: true
+  tsid:
+    enabled: true
+    node-id-base: 200  # Product Service: 200-299
+    pod-index: ${POD_INDEX:0}
+  # 農業部開放資料 API
+  gov-api:
+    api-key1: ${GOV_API_KEY_1:}
+    connect-timeout: 5000
+    read-timeout: 10000
+    # 背景查驗專用（設計書 19 §8.7）：3702 實測 33–82 秒，70 秒會讓多數樣本逾時
+    background-read-timeout: 90000
+    cache-ttl-exists: 604800      # VALID：7天（秒）
+    cache-ttl-not-exists: 3600    # NOT_FOUND：1小時（秒）
+    cache-ttl-invalid: 86400      # EXPIRED / TERMINATED / SUSPENDED：1天（秒）
+  # 媒體 URL 配置已由 common-core MediaUrlAutoConfiguration 統一提供
+  # 如需覆蓋預設值，取消下方註解：
+  # media:
+  #   base-url: ${MEDIA_BASE_URL:}   # 不填預設域名：dev=test-media / prod=media，見 backend#2283
+
+# OTel / Actuator / Tracing 配置已統一至 observability-common（observability-defaults.properties）
+
+# 排程清理配置
+product:
+  cleanup:
+    idempotency:
+      enabled: ${CLEANUP_IDEMPOTENCY_ENABLED:true}
+      cron: "0 0 2 * * ?"  # 每日凌晨 02:00
+
+logging:
+  level:
+    io.github.will413028.hawkr: ${LOG_LEVEL:INFO}
+    org.flywaydb: INFO

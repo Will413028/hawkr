@@ -1,0 +1,123 @@
+/* Product quick-view modal (intercepted /products/[id]). Full-screen overlay
+   over the still-mounted page; scales out of / into the tapped card. */
+
+.product-modal {
+	position: fixed;
+	inset: 0;
+	/* Above the floating nav (--z-nav: 250) so the modal's close button and the
+	   product page's own 返回 aren't covered by the navbar; below toasts (700). */
+	z-index: var(--z-modal, 400);
+}
+
+.product-modal[hidden] {
+	display: none;
+}
+
+.product-modal[data-pending="true"] {
+	cursor: wait;
+}
+
+.product-modal__backdrop {
+	position: absolute;
+	inset: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: var(--theme-overlay, rgb(var(--color-ink-950-rgb) / 0.42));
+	opacity: 0;
+	transition: opacity 0.22s ease;
+	cursor: pointer;
+}
+.product-modal[data-open="true"] .product-modal__backdrop {
+	opacity: 1;
+}
+.product-modal[data-pending="true"] .product-modal__backdrop {
+	cursor: wait;
+}
+
+.product-modal__panel {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	background: var(--theme-surface-page, #f8f6ef);
+	transform: scale(0.35);
+	opacity: 0;
+	transform-origin: center center;
+	transition:
+		transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+		opacity 0.2s ease;
+	will-change: transform, opacity;
+}
+.product-modal[data-open="true"] .product-modal__panel {
+	transform: scale(1);
+	opacity: 1;
+}
+
+/* The pending skeleton already completed the card-to-viewport zoom. During
+   the first paint of real product content, preserve that exact full-size
+   geometry without replaying the panel transition. The handoff attribute is
+   removed on the following frame while data-open remains true, so closing can
+   still use the normal scale-down transition. */
+.product-modal[data-handoff="true"] .product-modal__backdrop,
+.product-modal[data-handoff="true"] .product-modal__panel {
+	transition: none;
+}
+.product-modal[data-handoff="true"] .product-modal__backdrop {
+	opacity: 1;
+}
+.product-modal[data-handoff="true"] .product-modal__panel {
+	transform: scale(1);
+	opacity: 1;
+}
+
+.product-modal__scroll {
+	height: 100%;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	-webkit-overflow-scrolling: touch;
+}
+
+/* The bordered glass card is useful on the standalone PDP, where the whole
+ * document can establish its silhouette. Inside the independently scrolling
+ * quick-view it is taller than the viewport, so its lower edge is clipped
+ * until the user reaches the end and reads as a broken frame. Let the modal
+ * panel be the frame and keep the product sections visually continuous. */
+.product-modal__scroll > section > .glass-card {
+	border-color: transparent;
+	background: transparent;
+	-webkit-backdrop-filter: none;
+	backdrop-filter: none;
+	box-shadow: none;
+}
+
+.product-modal .route-loading-skeleton--page {
+	min-height: 100%;
+}
+
+/* Phones present the quick-view as a floating card rather than a full-bleed
+ * sheet, matching the post viewer and the buyer app's preview window. Desktop
+ * keeps `inset: 0` — there the modal IS the reading surface, and insetting it
+ * would just add a cosmetic frame around an already-windowed layout. */
+@media (max-width: 900px) {
+	.product-modal__panel {
+		inset: var(--hkui-card-inset);
+		border-radius: var(--hkui-card-radius);
+		box-shadow: 0 18px 48px -12px rgb(var(--color-ink-950-rgb) / 0.28);
+	}
+	@supports (corner-shape: squircle) {
+		.product-modal__panel {
+			corner-shape: squircle;
+		}
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.product-modal__panel,
+	.product-modal__backdrop {
+		transition: opacity 0.12s ease;
+		transform: none;
+	}
+	.product-modal[data-open="true"] .product-modal__panel {
+		transform: none;
+	}
+}

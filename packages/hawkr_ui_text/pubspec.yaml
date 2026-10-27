@@ -1,0 +1,21 @@
+name: hawkr_ui_text
+description: 共用文案目錄（契約值到使用者面文字）的 Dart 生成物與 UiLocale，buyer-app 與 seller-app 共用。文字的唯一來源是 backend/internal/platform/uitext/catalog，生成器是 backend/cmd/uitext-gen。
+publish_to: none
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  connectrpc: 2.0.0
+  hawkr_api:
+    path: ../hawkr_api
+  # plural 呼叫 Intl.pluralLogic（ADR 2026-10-17-multi-locale-architecture D2）。釘 0.20.2：Flutter 3.41.2 的
+  # flutter_localizations 釘這一版，兩支 App 都解析到它，套件的測試就跑 App 實際用的版本。
+  intl: 0.20.2
+
+dev_dependencies:
+  # 守門工具 tool/check_enum_text.dart 用；版本與兩支 App 的 pubspec.lock 相同。
+  analyzer: 8.4.0
+  # 測試用：造出生成 enum 不認得的值（protobuf 版本與 hawkr_api 相同）。
+  protobuf: 6.1.0
+  test: 1.26.3

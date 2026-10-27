@@ -1,0 +1,79 @@
+diff --git a/dist/components/map.js b/dist/components/map.js
+index 3ce9f841ea6c389df5d2f12ed723d7868c90b573..9cdd29f21c51a167864b76924c0b0d7d885249e5 100644
+--- a/dist/components/map.js
++++ b/dist/components/map.js
+@@ -17,7 +17,8 @@ function _Map(props, ref) {
+         let maplibre;
+         Promise.resolve(mapLib || import('maplibre-gl'))
+             .then((module) => {
+-            if (!isMounted) {
++            const container = containerRef.current;
++            if (!isMounted || !container) {
+                 return;
+             }
+             if (!module) {
+@@ -29,10 +30,10 @@ function _Map(props, ref) {
+             }
+             setGlobals(mapboxgl, props);
+             if (props.reuseMaps) {
+-                maplibre = Maplibre.reuse(props, containerRef.current);
++                maplibre = Maplibre.reuse(props, container);
+             }
+             if (!maplibre) {
+-                maplibre = new Maplibre(mapboxgl.Map, props, containerRef.current);
++                maplibre = new Maplibre(mapboxgl.Map, props, container);
+             }
+             contextValue.map = createRef(maplibre);
+             contextValue.mapLib = mapboxgl;
+diff --git a/dist/index.cjs b/dist/index.cjs
+index fec033a2d88aa76b6d2d5630bededb6d52f896ae..2ce92c9cefb3a40949f4b543ef7a29b29363fb0c 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -779,7 +779,8 @@ function _Map(props, ref) {
+     let isMounted = true;
+     let maplibre;
+     Promise.resolve(mapLib || import("maplibre-gl")).then((module2) => {
+-      if (!isMounted) {
++      const container = containerRef.current;
++      if (!isMounted || !container) {
+         return;
+       }
+       if (!module2) {
+@@ -791,10 +792,10 @@ function _Map(props, ref) {
+       }
+       setGlobals(mapboxgl, props);
+       if (props.reuseMaps) {
+-        maplibre = maplibre_default.reuse(props, containerRef.current);
++        maplibre = maplibre_default.reuse(props, container);
+       }
+       if (!maplibre) {
+-        maplibre = new maplibre_default(mapboxgl.Map, props, containerRef.current);
++        maplibre = new maplibre_default(mapboxgl.Map, props, container);
+       }
+       contextValue.map = createRef(maplibre);
+       contextValue.mapLib = mapboxgl;
+diff --git a/src/components/map.tsx b/src/components/map.tsx
+index 1300d12008091c8b924bb6184002891cd34aaffd..c4c8afe1c237638d3641f46ffc90e4adcceb20f4 100644
+--- a/src/components/map.tsx
++++ b/src/components/map.tsx
+@@ -49,6 +49,7 @@ function _Map(props: MapProps, ref: React.Ref<MapRef>) {
+     Promise.resolve(mapLib || import('maplibre-gl'))
+       .then((module: MapLib | {default: MapLib}) => {
+-        if (!isMounted) {
++        const container = containerRef.current;
++        if (!isMounted || !container) {
+           return;
+         }
+         if (!module) {
+@@ -62,9 +63,9 @@ function _Map(props: MapProps, ref: React.Ref<MapRef>) {
+         setGlobals(mapboxgl, props);
+         if (props.reuseMaps) {
+-          maplibre = Maplibre.reuse(props, containerRef.current);
++          maplibre = Maplibre.reuse(props, container);
+         }
+         if (!maplibre) {
+-          maplibre = new Maplibre(mapboxgl.Map, props, containerRef.current);
++          maplibre = new Maplibre(mapboxgl.Map, props, container);
+         }
+         contextValue.map = createRef(maplibre);
+         contextValue.mapLib = mapboxgl;

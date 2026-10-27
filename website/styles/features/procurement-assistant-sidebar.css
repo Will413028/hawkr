@@ -1,0 +1,314 @@
+/* biome-ignore-all lint/complexity/noImportantStyles: compatibility copy preserves the established menu cascade */
+/* Hawkr Agent additions to the shared Messages conversation sidebar.
+ *
+ * The buyer messages layout owns this file. Keeping it separate prevents the
+ * full procurement workspace stylesheet from becoming global just to style
+ * the Agent tab, history rows, and their loading/management controls.
+ * Rules are a compatibility copy of the sidebar section in
+ * procurement-assistant.css; values and selector order intentionally match.
+ */
+
+/* ── Hawkr Agent 對話列（B-244 多對話側欄）────────────────────────────
+ * 密度沿用 .chat-sidebar__item（不是 hero 卡）；「更多」鈕是 Link 的絕對
+ * 定位兄弟節點，避免巢狀互動元素。Agent identity 已收斂到清單上方分頁。 */
+/* 分頁化之後 agent 區段是「被選到時佔滿剩餘高度」的主區，不再是釘在
+ * 人類列表上方的 `flex-shrink: 0` 區塊——那個寫法沒有高度上限，對話一多
+ * 就把人類列表壓到 0px，而且它在捲動容器外面，捲也捲不到賣家訊息。 */
+.chat-sidebar__agent {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 0;
+	min-height: 0;
+}
+
+/* 常駐的「開新對話」是 Agent 分頁的 quiet primary action。Edit 圖示表達
+ * 開始撰寫，不把已移除的方框 Plus 帶回來；淡綠面和歷史列的 active tint 是同一
+ * 家族，但固定的圖示與動作文字讓它不會被誤認成對話。 */
+.chat-sidebar__new-chat {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	width: calc(100% - 2 * var(--hkui-space-3));
+	margin: var(--hkui-space-2) var(--hkui-space-3) 0;
+	/* 命中區 44px（DESIGN.md §觸控）：11+18+11 = 40，補 min-height。 */
+	min-height: 44px;
+	box-sizing: border-box;
+	padding: 10px 12px;
+	border: 1px solid var(--theme-primary-border);
+	border-radius: var(--hkui-radius-lg);
+	background: var(--theme-primary-subtle);
+	color: var(--theme-text-accent-on-tint);
+	font: inherit;
+	font-weight: 700;
+	text-align: left;
+	cursor: pointer;
+	transition:
+		background 160ms ease,
+		border-color 160ms ease;
+}
+.chat-sidebar__new-chat:hover {
+	border-color: var(--theme-primary-border);
+	background: color-mix(in srgb, var(--theme-text-accent) 18%, transparent);
+}
+.chat-sidebar__new-chat:focus-visible {
+	outline: none;
+	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
+}
+.chat-sidebar__new-chat-icon {
+	display: grid;
+	width: 30px;
+	height: 30px;
+	place-items: center;
+	flex: 0 0 30px;
+	border-radius: var(--radius-circle);
+	background: var(--hkui-content1);
+	color: var(--theme-text-accent);
+}
+
+.chat-sidebar__list--agent {
+	padding-top: var(--hkui-space-2);
+	margin-top: 2px;
+}
+
+.chat-sidebar__agent-row {
+	position: relative;
+}
+
+/* 每筆歷史對話用其權威大分類顯示圖示；分類不明時走同一尺寸的中性圓底，
+ * 版面不跳動。 */
+.chat-sidebar__category-marble {
+	display: inline-grid;
+	position: relative;
+	place-items: center;
+	flex: 0 0 auto;
+	overflow: visible;
+	background: transparent;
+	transition: transform 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.chat-sidebar__agent-row:hover .chat-sidebar__category-marble {
+		transform: translateY(-1px) scale(1.045);
+	}
+}
+
+.chat-sidebar__agent-row:focus-within .chat-sidebar__category-marble {
+	transform: translateY(-1px) scale(1.045);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.chat-sidebar__category-marble,
+	.chat-sidebar__agent-row:hover .chat-sidebar__category-marble,
+	.chat-sidebar__agent-row:focus-within .chat-sidebar__category-marble {
+		transition: none;
+		transform: none;
+	}
+}
+
+.chat-sidebar__agent-row .chat-sidebar__item {
+	/* 預留右側動作鈕的位置，標題不壓到它。 */
+	padding-right: 40px;
+}
+
+/* 預覽那一行也要讓開兩顆動作鈕。
+ *
+ * 標題那一行右側本來就有時間戳佔位（hover 時它只是淡出、不讓出空間），所以
+ * 標題永遠壓不到鈕；預覽行沒有這個佔位物，`padding-right: 40px` 只擋得住 40px，
+ * 而兩顆 34px 鈕加 10px 間距從 right:8 一路長到 right:86——中間 46px 就是預覽
+ * 文字被蓋住的那一段。刻意常駐保留而不是 hover 才加：hover 時才改 padding 會
+ * 讓整行文字跳動。 */
+.chat-sidebar__agent-row .chat-sidebar__preview {
+	padding-right: 46px;
+}
+
+/* 刪除＋更多兩顆鈕。絕對定位覆蓋在時間戳那一塊上（hover 時時間戳淡出），
+ * 這樣非 hover 態的版面完全不變、也不會為了兩顆鈕永久壓縮標題寬度。 */
+.chat-sidebar__agent-actions {
+	position: absolute;
+	top: 50%;
+	right: 8px;
+	transform: translateY(-50%);
+	display: flex;
+	align-items: center;
+	/* 兩顆 34px 鈕各自用 ::before inset:-5px 撐到 44px 命中區。gap 必須
+	 * ≥ 10px，否則兩個命中區會重疊（34+2 的間距下重疊 8px），重疊帶裡後面
+	 * 的兄弟贏，垃圾桶的右緣會靜默開啟 ⋯ 選單。 */
+	gap: 10px;
+}
+
+.chat-sidebar__agent-action {
+	position: relative;
+	display: grid;
+	place-items: center;
+	width: 34px;
+	height: 34px;
+	padding: 0;
+	border: 0;
+	border-radius: var(--radius-circle);
+	background: transparent;
+	color: var(--hkui-foreground-soft);
+	cursor: pointer;
+	opacity: 0;
+	transition:
+		opacity var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease),
+		background-color var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease),
+		color var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease);
+}
+
+/* 觸控目標擴到 44px（design-system §觸控），視覺維持 34px。 */
+.chat-sidebar__agent-action::before {
+	content: "";
+	position: absolute;
+	inset: -5px;
+}
+
+.chat-sidebar__agent-row:hover .chat-sidebar__agent-action,
+.chat-sidebar__agent-action:focus-visible {
+	opacity: 1;
+}
+
+/* 兩顆鈕浮出時把時間戳讓出來——不改版面，只換誰可見。 */
+.chat-sidebar__agent-row:hover .chat-sidebar__item-head small,
+.chat-sidebar__agent-row:focus-within .chat-sidebar__item-head small {
+	opacity: 0;
+	transition: opacity var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease);
+}
+
+/* 觸控裝置沒有 hover，動作鈕只能常駐——但「常駐一顆無確認的刪除鈕，就貼在
+ * 你要點開的那一列旁邊」是這個介面最危險的一件事。⋯ 選單裡本來就有刪除，
+ * 所以觸控上只留 ⋯：不少任何功能，卻拿掉了誤刪路徑。
+ * （對照：ChatGPT／Meta AI／XChat／BeReal 的刪除都有確認步驟。） */
+@media (hover: none) {
+	.chat-sidebar__agent-action {
+		opacity: 1;
+	}
+	.chat-sidebar__agent-action--delete {
+		display: none;
+	}
+	.chat-sidebar__agent-row .chat-sidebar__item {
+		padding-right: 44px;
+	}
+	.chat-sidebar__agent-row:hover .chat-sidebar__item-head small {
+		opacity: 1;
+	}
+}
+
+.chat-sidebar__agent-action:hover {
+	background: color-mix(in srgb, var(--hkui-primary) 10%, transparent);
+	color: var(--hkui-primary);
+}
+
+/* 刪除是破壞性動作——hover 才轉成 danger 語意，靜置時不製造紅色噪音。 */
+.chat-sidebar__agent-action--delete:hover {
+	background: color-mix(in srgb, var(--hkui-danger) 10%, transparent);
+	color: var(--hkui-danger);
+}
+
+.chat-sidebar__agent-action:focus-visible {
+	outline: none;
+	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
+}
+
+/* ⋯ 的彈出選單。就地錨在觸發鈕下方（右對齊），視覺語彙與 seller-orders
+ * 的列動作選單同源——同一個互動語意不長出第二種外觀。 */
+.chat-sidebar__agent-menu {
+	position: relative;
+	display: inline-flex;
+}
+
+/* fixed 而非 absolute：側欄 overflow:hidden、列表 overflow-y:auto，
+ * absolute 子層會被裁掉（實機上第二個項目被切掉）。座標由 JS 依觸發鈕
+ * 的 rect 決定（right/top 或 right/bottom）。 */
+.chat-sidebar__agent-menu-list {
+	position: fixed;
+	z-index: 60;
+	min-width: 148px;
+	padding: 4px;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	background: var(--hkui-content1);
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-md);
+	box-shadow: var(--shadow-md);
+}
+
+.chat-sidebar__agent-menu-list button {
+	display: flex;
+	align-items: center;
+	gap: var(--hkui-space-2, 8px);
+	width: 100%;
+	padding: 8px 10px;
+	border: 0;
+	border-radius: var(--radius-sm);
+	background: transparent;
+	color: var(--hkui-foreground);
+	font-size: var(--hkui-text-small);
+	text-align: left;
+	cursor: pointer;
+}
+
+.chat-sidebar__agent-menu-list button:hover,
+.chat-sidebar__agent-menu-list button:focus-visible {
+	outline: none;
+	background: color-mix(in srgb, var(--hkui-primary) 10%, transparent);
+	color: var(--hkui-primary);
+}
+
+.chat-sidebar__agent-menu-item--danger:hover,
+.chat-sidebar__agent-menu-item--danger:focus-visible {
+	background: color-mix(
+		in srgb,
+		var(--hkui-danger) 10%,
+		transparent
+	) !important;
+	color: var(--hkui-danger) !important;
+}
+
+/* 就地改名：輸入框佔住標題那一格，列高不變（避免編輯時整列跳動）。 */
+.chat-sidebar__rename-input {
+	min-width: 0;
+	width: 100%;
+	padding: 4px 8px;
+	border: 1px solid var(--hkui-primary-200, var(--hkui-primary));
+	border-radius: var(--radius-sm);
+	background: var(--hkui-content1);
+	color: var(--hkui-foreground);
+	font-size: var(--hkui-text-small);
+	font-weight: 600;
+	outline: none;
+}
+
+.chat-sidebar__rename-input:focus-visible {
+	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
+}
+
+/* 收合 icon-rail（960–1199px）：區段標籤與動作鈕一併隱藏；
+ * 列本身沿用 .chat-sidebar__item 的收合規則（只剩 mark）。 */
+@media (min-width: 960px) and (max-width: 1199px) {
+	.chat-shell[data-sidebar-collapsed="true"] .chat-sidebar__section-label,
+	.chat-shell[data-sidebar-collapsed="true"] .chat-sidebar__agent-actions {
+		display: none;
+	}
+	.chat-shell[data-sidebar-collapsed="true"]
+		.chat-sidebar__agent-row
+		.chat-sidebar__item {
+		padding-right: 0;
+	}
+}
+
+@media (min-width: 960px) and (max-width: 1199px) {
+	.chat-shell[data-sidebar-collapsed="true"] .chat-sidebar__new-chat {
+		width: 44px;
+		height: 44px;
+		min-height: 44px;
+		justify-content: center;
+		gap: 0;
+		margin: var(--hkui-space-2) auto 0;
+		padding: 7px;
+	}
+
+	.chat-shell[data-sidebar-collapsed="true"] .chat-sidebar__new-chat-label {
+		display: none;
+	}
+}

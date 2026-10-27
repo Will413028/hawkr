@@ -1,0 +1,9 @@
+storefront.read =
+storefront.write = storefront.read
+products.read =
+products.write = products.read
+products.publish = products.read, products.write
+posts.read =
+posts.write = posts.read
+posts.publish = posts.read, posts.write
+orders.read =

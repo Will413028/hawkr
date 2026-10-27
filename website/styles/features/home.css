@@ -1,0 +1,1899 @@
+/* =====================================================================
+   Hawkr · Homepage styles (Hawkr Home Design)
+   Everything is scoped under `.hkh-page` so the design's bare class
+   names (.hero / .categories / .prod / .post-card / etc) don't leak
+   into other routes. Tokens are also home-scoped.
+   ===================================================================== */
+
+.hkh-page {
+	/* ---------- Brand / Surface ---------- */
+	/* Home is a warm, light-only canvas. Re-pin the semantic tokens locally so
+	   Tailwind token utilities inside the homepage keep the compact design's
+	   cream surfaces even when the global site theme is dark. */
+	--theme-surface-page: #fcfaf4;
+	--theme-surface-card: #ffffff;
+	--theme-surface-muted: #f5f2e8;
+	--theme-surface-panel: #faf6ec;
+	--theme-surface-elevated: #ffffff;
+	--theme-surface-glass: rgba(255, 255, 255, 0.78);
+	--theme-surface-glass-hover: rgb(var(--color-ink-300-rgb) / 0.08);
+	--theme-text-heading: #3a2a1a;
+	--theme-text-body: rgba(58, 42, 26, 0.7);
+	--theme-text-muted: rgba(58, 42, 26, 0.56);
+	--theme-text-faint: rgba(58, 42, 26, 0.42);
+	--theme-text-accent: var(--color-brand-primary-strong);
+	--theme-text-accent-on-tint: var(--color-brand-primary-deep);
+	--theme-text-inverse: #ffffff;
+	--theme-action-primary: var(--color-brand-primary-strong);
+	--theme-action-primary-hover: var(--color-brand-primary-deep);
+	--theme-primary-subtle: rgb(var(--color-brand-primary-strong-rgb) / 0.1);
+	--theme-primary-border: rgb(var(--color-brand-primary-strong-rgb) / 0.35);
+	--theme-border-subtle: rgba(58, 42, 26, 0.07);
+	--theme-border-soft: rgba(58, 42, 26, 0.1);
+	--theme-border-strong: rgba(58, 42, 26, 0.18);
+	--theme-border-warm: rgba(58, 42, 26, 0.12);
+	--theme-border-input: rgba(58, 42, 26, 0.14);
+
+	--color-surface: var(--color-ink-50);
+	--color-surface-alt: var(--color-ink-50);
+	--color-card: #ffffff;
+	--color-card-inset: var(--color-ink-50);
+	--color-cream: #f5f2e8;
+	--color-divider: #eeeeee;
+	--color-border-soft: rgba(86, 86, 86, 0.2);
+
+	/* ---------- Brand scale (names kept for the existing home selectors) ---------- */
+	--color-home-accent-700: var(--color-brand-primary-strong);
+	--color-home-accent-600: var(--color-brand-primary);
+	--color-home-accent-500: var(--color-brand-primary-strong);
+	--color-home-accent-300: var(--color-brand-secondary);
+	--color-home-accent-100: var(--color-brand-primary-soft);
+	--color-home-accent-050: var(--color-brand-secondary-soft);
+
+	/* ---------- Accent ---------- */
+	--color-accent-500: var(--color-brand-secondary);
+	--color-accent-400: #d8c36d;
+
+	/* ---------- Semantic ---------- */
+	--color-success: var(--color-status-success);
+	--color-success-deep: var(--color-status-success);
+	--color-warning: #e5d169;
+	--color-warning-fill: #f9db96;
+	--color-danger: #7b1517;
+
+	/* ---------- Text ---------- */
+	--color-ink: #0a0a0a;
+	--color-ink-2: #222222;
+	--color-fg: #565656;
+	--color-fg-muted: rgba(86, 86, 86, 0.6);
+	--color-fg-disabled: rgba(86, 86, 86, 0.5);
+	--color-on-primary: #ffffff;
+
+	/* ---------- Display face ----------
+	   jf-openhuninn 2.0 (subsetted ~365 KB woff2, see lib/fonts/openhuninn.ts)
+	   is the single source of truth for the home page — Latin, digits AND
+	   every CJK glyph go through it. Routing the entire headline through
+	   one webfont is the only way to guarantee uniform stroke weight
+	   across platforms.
+
+	   Why not put Zen Maru Gothic first (as we tried at first): next/font
+	   declares its `@font-face` for Zen Maru Gothic with a Latin-only
+	   unicode-range, so CJK chars get rejected from the web subset.
+	   But the family name "Zen Maru Gothic" is still in the cascade,
+	   and any developer / designer who installed the full Zen Maru
+	   Gothic Black locally (via Google Fonts download) will see the
+	   browser fall through to that local copy for CJK. The local face
+	   doesn't cover every char (e.g. 每), so a single character drops
+	   to openhuninn while its neighbours stay on the heavier local Zen
+	   Maru — visibly broken stroke weight. Putting openhuninn first
+	   bypasses the trap entirely.
+
+	   Zen Maru Gothic stays in the chain after openhuninn as a Latin
+	   safety net: its hash-named web @font-face (Latin unicode-range)
+	   still gets picked when openhuninn happens to be missing a glyph,
+	   without re-triggering the local-name lookup for CJK ranges. */
+	--font-body:
+		var(--font-openhuninn),
+		var(--font-zen-maru),
+		"Hiragino Maru Gothic ProN", "Hiragino Maru Gothic Pro",
+		"ヒラギノ丸ゴ ProN W4", "ヒラギノ丸ゴ Pro W4",
+		"Yuanti TC", "Yuanti SC", "圓體-繁",
+		"Noto Sans TC", "PingFang TC", "Microsoft JhengHei",
+		system-ui, -apple-system, sans-serif;
+
+	/* Pull the home canvas upward through the floating navbar slot, then
+	   pad the content back down. This makes `.hkh-page`'s own background
+	   start at the viewport top without changing the hero's visual y
+	   position. */
+	--home-top-offset: calc(
+		var(--floating-nav-height, 84px) +
+		var(--floating-nav-top-gap, 16px)
+	);
+	--home-section-width: min(1440px, calc(100% - 48px));
+	--home-section-gap: 12px;
+
+	/* All routes using this frame expose the one application background. */
+	background: transparent;
+	min-height: 100vh;
+	color: var(--color-fg);
+	font-family: var(--font-primary);
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
+	position: relative;
+	margin-top: calc(var(--home-top-offset) * -1);
+	padding-top: var(--home-top-offset);
+	/* Mint canvas extends past the last postcard so the dark footer
+	   doesn't sit flush against the rounded bottom edge. */
+	padding-bottom: clamp(56px, 6vw, 96px);
+	/* `overflow-x: hidden` here would promote the homepage into its own
+	   scroll container, which silently breaks `position: sticky` on the
+	   process section (the brand-story fan-out). `overflow-x: clip`
+	   trims horizontal overflow without creating a scroll container, so
+	   the sticky stage + window-scroll listener keep working. */
+	overflow-x: clip;
+}
+
+@media (max-width: 768px) {
+	.hkh-page {
+		--home-section-width: calc(100% - 20px);
+	}
+}
+
+.hkh-page,
+.hkh-page *,
+.hkh-page *::before,
+.hkh-page *::after {
+	box-sizing: border-box;
+}
+
+.hkh-page .home-fixed-section {
+	width: var(--home-section-width);
+	max-width: var(--home-section-width);
+	margin: var(--home-section-gap) auto 0;
+}
+
+/* Small tablets have enough width for two complete category rows, but not for
+   the desktop rail. Avoid leaving a clipped half-chip at the right edge: flow
+   the shortcuts into two rows while retaining horizontal drag as a fallback
+   for translated labels and browser zoom. */
+@media (min-width: 841px) and (max-width: 1023px) {
+	.hkh-page .home-category-rail {
+		display: grid;
+		grid-template-columns: repeat(7, max-content);
+		grid-auto-flow: row;
+		align-items: center;
+		justify-content: start;
+		column-gap: 4px;
+		row-gap: 2px;
+		scroll-snap-type: x proximity;
+	}
+
+	.hkh-page .home-category-rail > * {
+		scroll-snap-align: start;
+	}
+}
+
+/* Client-owned home data fallback. It stays in normal document flow and uses
+   the shared shimmer atoms, so a slow refresh cannot collapse the page to an
+   empty background or cover the persistent navbar / bottom tabs. */
+.hkh-page .home-shelf-skeleton {
+	display: grid;
+	gap: var(--space-4, 16px);
+}
+
+.hkh-page .home-compact-empty-state {
+	border-color: var(--theme-border-soft);
+	border-radius: 22px;
+	background: #fff;
+	box-shadow: var(--theme-shadow-brand-soft);
+	color: var(--theme-text-body);
+}
+
+.hkh-page .home-compact-empty-state > p:first-of-type {
+	color: var(--theme-text-heading);
+	font-size: 1rem;
+	font-weight: var(--weight-black);
+}
+
+.hkh-page .home-compact-empty-state > p:last-of-type {
+	max-width: 360px;
+	color: var(--theme-text-muted);
+	font-size: 0.8125rem;
+	font-weight: 700;
+	line-height: 1.75;
+}
+
+[data-theme="dark"] .hkh-page .home-compact-empty-state {
+	border-color: rgb(245 222 165 / 0.14);
+	background:
+		linear-gradient(
+			145deg,
+			rgb(var(--color-ink-900-rgb) / 0.82),
+			rgb(var(--color-ink-950-rgb) / 0.78)
+		),
+		rgb(var(--color-ink-950-rgb) / 0.72);
+	box-shadow:
+		inset 0 1px 0 rgb(255 255 255 / 0.04),
+		0 18px 38px rgb(0 0 0 / 0.22);
+	color: rgb(var(--color-ink-100-rgb) / 0.72);
+	-webkit-backdrop-filter: blur(12px) saturate(110%);
+	backdrop-filter: blur(12px) saturate(110%);
+}
+
+[data-theme="dark"] .hkh-page .home-compact-empty-state > div:first-child {
+	background:
+		radial-gradient(circle, rgb(202 177 92 / 0.1), transparent 66%),
+		rgb(255 253 247 / 0.035);
+	opacity: 0.78;
+	filter: saturate(0.82) brightness(0.88);
+}
+
+[data-theme="dark"] .hkh-page .home-compact-empty-state > p:first-of-type {
+	color: rgb(245 222 165 / 0.72);
+}
+
+[data-theme="dark"] .hkh-page .home-compact-empty-state > p:last-of-type {
+	color: rgb(var(--color-ink-100-rgb) / 0.42);
+}
+
+/* The global .site-nav container (styles/legacy/prd-v2-commerce.css:9)
+   paints a cream rgba(248,246,239,0.9) over the full fixed bar — the
+   thin strip seen above the navbar pill on the home page. On the home
+   route we want the bar transparent so the .page-bg illustration +
+   mint canvas show through; the pill itself (.site-nav__inner) keeps
+   its own frosted-cream background so the pill stays legible. */
+body:has(.hkh-page) .site-nav {
+	background: transparent;
+	border-bottom: none;
+	-webkit-backdrop-filter: none;
+	backdrop-filter: none;
+}
+
+/* Compatibility guard for older compiled chunks: the live component CSS
+   now keeps the mega backdrop transparent globally. */
+
+/* All page content sits above the background */
+.hkh-page > header,
+.hkh-page > section,
+.hkh-page > footer {
+	position: relative;
+	z-index: 2;
+}
+
+/* While HomeContent streams, the Suspense fallback (RouteLoadingSkeleton
+   --page) would otherwise paint its opaque --surface-page sheet from just
+   below the search bar down, slicing the .page-bg illustration with a hard
+   horizontal seam (peach sky above, flat cream below). The home canvas
+   already supplies the surface — let the placeholder blocks float on it,
+   same treatment as the --workspace variant. */
+.hkh-page .route-loading-skeleton--page {
+	background: transparent;
+}
+
+/* =====================================================================
+   TYPOGRAPHY HELPERS
+   ===================================================================== */
+.hkh-page .eyebrow {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	font-family: var(--font-body);
+	font-weight: 700;
+	font-size: 0.75rem;
+	letter-spacing: 0.26em;
+	color: var(--color-home-accent-700);
+	padding: 8px 16px;
+	background: rgba(255, 255, 255, 0.7);
+	border-radius: 100px;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+.hkh-page .eyebrow .eb-dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 100px;
+	background: var(--color-accent-500);
+}
+.hkh-page .eyebrow.eyebrow--on-dark {
+	background: rgba(255, 255, 255, 0.12);
+	color: #fcfaf4;
+}
+
+.hkh-page .sect-head {
+	display: flex;
+	justify-content: space-between;
+	align-items: end;
+	gap: 32px;
+	max-width: 1280px;
+	margin: 0 auto 56px;
+	padding: 0 6vw;
+}
+.hkh-page .sect-head h2 {
+	font-family: var(--font-body);
+	font-weight: var(--weight-black);
+	font-size: clamp(2.125rem, 4.4vw, 3.75rem);
+	line-height: 1.05;
+	letter-spacing: -0.02em;
+	color: #3a2a1a;
+	margin: 16px 0 12px;
+}
+.hkh-page .sect-head h2 em {
+	font-style: normal;
+	color: var(--color-home-accent-700);
+}
+.hkh-page .sect-head p {
+	font-family: var(--font-primary);
+	font-size: 1rem;
+	line-height: 1.6;
+	color: rgba(58, 42, 26, 0.65);
+	margin: 0;
+	max-width: 36ch;
+}
+
+/* =====================================================================
+   BUTTONS
+   ===================================================================== */
+.hkh-page .btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 14px 24px;
+	border-radius: 100px;
+	font-family: var(--font-primary);
+	font-weight: 700;
+	font-size: 0.9375rem;
+	text-decoration: none;
+	border: none;
+	cursor: pointer;
+	transition:
+		transform 0.2s ease,
+		background 0.2s ease,
+		color 0.2s ease;
+	white-space: nowrap;
+}
+.hkh-page .btn:hover {
+	transform: translateY(-1px);
+}
+.hkh-page .btn-primary {
+	background: var(--color-home-accent-500);
+	color: #fff;
+}
+.hkh-page .btn-primary:hover {
+	background: var(--color-ink-400);
+}
+.hkh-page .btn-ghost {
+	background: transparent;
+	color: #3a2a1a;
+	border: 1.5px solid rgba(58, 42, 26, 0.22);
+}
+.hkh-page .btn-ghost:hover {
+	border-color: #3a2a1a;
+}
+.hkh-page .btn-ghost--on-dark {
+	background: rgba(252, 250, 244, 0.94);
+	color: var(--color-ink-800);
+	border-color: rgba(252, 250, 244, 0.94);
+}
+.hkh-page .btn-ghost--on-dark:hover {
+	background: #fffdf7;
+	border-color: #fffdf7;
+	color: var(--color-ink-900);
+}
+.hkh-page .btn-lg {
+	padding: 18px 30px;
+	font-size: 1rem;
+}
+
+/* =====================================================================
+   POSTCARD LAYOUT
+   Sections sit on the mint + illustration canvas as rounded postcards
+   with margins. Fills run at 80% opacity (rgba) so .page-bg's mint and
+   illustration still read faintly through each card — the postcard
+   tones blend with the canvas instead of blocking it.
+   ===================================================================== */
+.hkh-page .hero,
+.hkh-page .categories,
+.hkh-page .this-week,
+.hkh-page .merchants,
+.hkh-page .demo,
+.hkh-page .story-trail,
+.hkh-page .updates {
+	margin-left: auto;
+	margin-right: auto;
+	width: var(--home-section-width);
+	max-width: var(--home-section-width);
+	border-radius: 32px;
+	overflow: hidden;
+	box-shadow: 0 24px 50px -28px rgb(var(--color-ink-700-rgb) / 0.18);
+	background-clip: padding-box;
+	-webkit-backdrop-filter: none;
+	backdrop-filter: none;
+	border: none;
+}
+
+.hkh-page .hero {
+	background: rgba(250, 246, 236, 0.8);
+	margin-top: 24px;
+}
+.hkh-page .categories {
+	background: rgba(250, 246, 236, 0.8);
+	margin-top: 18px;
+}
+.hkh-page .demo {
+	background: rgba(255, 255, 255, 0.55);
+	-webkit-backdrop-filter: blur(16px) saturate(1.05);
+	backdrop-filter: blur(16px) saturate(1.05);
+	margin-top: 18px;
+}
+.hkh-page .story-trail {
+	background: rgba(243, 237, 220, 0.8);
+	margin-top: 18px;
+}
+.hkh-page .updates {
+	background: rgba(250, 246, 236, 0.8);
+	margin-top: 18px;
+}
+
+@media (max-width: 1520px) {
+	.hkh-page .hero,
+	.hkh-page .categories,
+	.hkh-page .this-week,
+	.hkh-page .merchants,
+	.hkh-page .demo,
+	.hkh-page .story-trail,
+	.hkh-page .updates {
+		margin-left: auto;
+		margin-right: auto;
+	}
+}
+@media (max-width: 640px) {
+	.hkh-page .hero,
+	.hkh-page .categories,
+	.hkh-page .this-week,
+	.hkh-page .merchants,
+	.hkh-page .demo,
+	.hkh-page .story-trail,
+	.hkh-page .updates {
+		margin-left: auto;
+		margin-right: auto;
+		border-radius: 24px;
+	}
+}
+.hkh-page .demo {
+	padding: 100px 6vw 80px;
+}
+.hkh-page .story-trail {
+	padding: 100px 6vw 120px;
+}
+.hkh-page .updates {
+	padding: 80px 6vw;
+}
+
+@media (max-width: 980px) {
+	.hkh-page .categories,
+	.hkh-page .this-week,
+	.hkh-page .merchants,
+	.hkh-page .demo,
+	.hkh-page .updates,
+	.hkh-page .story-trail {
+		padding-top: 60px;
+		padding-bottom: 60px;
+	}
+}
+
+/* =====================================================================
+   HERO
+   ===================================================================== */
+.hkh-page .hero {
+	position: relative;
+	padding: 0;
+	min-height: 80vh;
+}
+.hkh-page .hero-grid {
+	position: relative;
+	z-index: 2;
+	max-width: 1280px;
+	margin: 0 auto;
+	display: grid;
+	grid-template-columns: minmax(0, 640px);
+	align-items: start;
+	min-height: 80vh;
+	padding: 88px 6vw 200px;
+}
+.hkh-page .hero-copy {
+	align-self: center;
+	background: transparent;
+	padding: 0;
+	border: none;
+	box-shadow: none;
+	max-width: 720px;
+}
+.hkh-page .hero-copy h1 {
+	font-family: var(--font-body);
+	font-weight: var(--weight-black);
+	font-size: clamp(3rem, 6.4vw, 5.75rem);
+	line-height: 0.98;
+	letter-spacing: -0.025em;
+	color: #3a2a1a;
+	margin: 18px 0 24px;
+	text-wrap: balance;
+}
+.hkh-page .hero-copy h1 em {
+	font-style: normal;
+	color: var(--color-home-accent-700);
+	position: relative;
+	display: inline-block;
+}
+.hkh-page .hero-copy .lede {
+	font-family: var(--font-primary);
+	font-size: 1.0625rem;
+	line-height: 1.7;
+	color: rgba(58, 42, 26, 0.75);
+	margin: 0 0 32px;
+	max-width: 38ch;
+}
+.hkh-page .hero-ctas {
+	display: flex;
+	gap: 12px;
+	margin-bottom: 32px;
+	flex-wrap: wrap;
+}
+.hkh-page .hero-trust {
+	display: flex;
+	gap: 18px;
+	flex-wrap: wrap;
+	font-family: var(--font-primary);
+	font-size: 0.8125rem;
+	color: rgba(58, 42, 26, 0.6);
+	font-weight: 500;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.hkh-page .hero-trust li {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+.hkh-page .hero-trust i {
+	width: 14px;
+	height: 14px;
+	border-radius: 100px;
+	background: var(--color-home-accent-300);
+	display: inline-block;
+	position: relative;
+	flex-shrink: 0;
+}
+.hkh-page .hero-trust i::after {
+	content: "✓";
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 0.5625rem;
+	font-weight: var(--weight-black);
+	color: var(--color-home-accent-700);
+}
+
+/* =====================================================================
+   CATEGORIES
+   ===================================================================== */
+.hkh-page .categories {
+	padding: 100px 6vw 80px;
+}
+.hkh-page .cat-grid {
+	max-width: 1280px;
+	margin: 0 auto;
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 20px;
+	padding: 18px 0 24px;
+	overflow: visible;
+}
+.hkh-page .cat-card {
+	position: relative;
+	background: #fff;
+	border-radius: 20px;
+	padding: 26px 56px 26px 152px;
+	min-height: 144px;
+	display: flex;
+	align-items: center;
+	gap: 20px;
+	text-decoration: none;
+	color: inherit;
+	box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.05);
+	border: 1px solid rgba(58, 42, 26, 0.06);
+	transition:
+		transform 0.2s ease,
+		box-shadow 0.2s ease,
+		border-color 0.2s;
+	overflow: visible;
+	isolation: isolate;
+}
+.hkh-page .cat-card::before {
+	content: "";
+	position: absolute;
+	left: 28px;
+	top: 50%;
+	width: 84px;
+	height: 84px;
+	border-radius: 24px;
+	background: var(--cat-tile, var(--color-ink-50));
+	transform: translateY(-50%);
+	opacity: 0.95;
+	z-index: 0;
+}
+.hkh-page .cat-card:hover {
+	transform: translateY(-3px);
+	box-shadow: 0 14px 28px -8px rgba(76, 50, 20, 0.18);
+	border-color: var(--color-home-accent-300);
+}
+.hkh-page .cat-sticker-wrap {
+	position: absolute;
+	left: -6px;
+	top: 50%;
+	width: 148px;
+	height: 148px;
+	z-index: 2;
+	pointer-events: none;
+	filter: drop-shadow(0 16px 18px rgba(68, 45, 23, 0.16));
+	transform: translateY(-52%) rotate(var(--sticker-rotate, -4deg));
+	transition: transform 0.22s ease;
+}
+.hkh-page .cat-sticker {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+.hkh-page .cat-card:hover .cat-sticker-wrap {
+	transform: translateY(-58%) rotate(var(--sticker-hover-rotate, 0deg))
+		scale(1.05);
+}
+.hkh-page .cat-vege {
+	--cat-tile: var(--color-ink-100);
+	--sticker-rotate: -7deg;
+	--sticker-hover-rotate: -2deg;
+}
+.hkh-page .cat-fruit {
+	--cat-tile: #fce7cc;
+	--sticker-rotate: 5deg;
+	--sticker-hover-rotate: 1deg;
+}
+.hkh-page .cat-egg {
+	--cat-tile: #f9db96;
+	--sticker-rotate: -3deg;
+	--sticker-hover-rotate: -7deg;
+}
+.hkh-page .cat-fish {
+	--cat-tile: #d8e7f5;
+	--sticker-rotate: 4deg;
+	--sticker-hover-rotate: 8deg;
+}
+.hkh-page .cat-meat {
+	--cat-tile: #f2d6cf;
+	--sticker-rotate: -5deg;
+	--sticker-hover-rotate: -1deg;
+}
+.hkh-page .cat-proc {
+	--cat-tile: #f5f2e8;
+	--sticker-rotate: 5deg;
+	--sticker-hover-rotate: 1deg;
+}
+.hkh-page .cat-body {
+	position: relative;
+	z-index: 3;
+	min-width: 0;
+}
+.hkh-page .cat-body h3 {
+	font-family: var(--font-body);
+	font-weight: var(--weight-black);
+	font-size: 1.375rem;
+	color: #3a2a1a;
+	margin: 0 0 4px;
+}
+.hkh-page .cat-body p {
+	font-family: var(--font-primary);
+	font-size: 0.8125rem;
+	color: rgba(58, 42, 26, 0.65);
+	line-height: 1.5;
+	margin: 0 0 8px;
+}
+.hkh-page .cat-meta {
+	font-family: "Roboto", var(--font-body);
+	font-size: 0.6875rem;
+	letter-spacing: 0.06em;
+	color: var(--color-home-accent-700);
+	font-weight: 700;
+}
+.hkh-page .cat-arrow {
+	position: absolute;
+	right: 22px;
+	top: 22px;
+	z-index: 3;
+	font-size: 1.125rem;
+	color: rgba(58, 42, 26, 0.4);
+	transition:
+		transform 0.2s,
+		color 0.2s;
+}
+.hkh-page .cat-card:hover .cat-arrow {
+	transform: translate(2px, -2px);
+	color: var(--color-accent-500);
+}
+
+/* =====================================================================
+   THIS WEEK'S NEW — wraps the real <MarketProductCard /> grid
+   ===================================================================== */
+
+/* Tone real product cards to the design's surface treatment when
+   they land inside .prod-rail (rounded card + hover lift). */
+
+/* =====================================================================
+   MERCHANTS — uses the real <MarketSellerCard /> grid variant. Card
+   visuals come from styles/features/market.css (.market-seller-card);
+   this section only owns the grid layout + the hover lift that the
+   design's postcard rhythm expects.
+   ===================================================================== */
+
+/* =====================================================================
+   DEMO — 3-step phone walkthrough
+   ===================================================================== */
+.hkh-page .demo .sect-head h2 em {
+	font-style: normal;
+	color: var(--color-home-accent-700);
+}
+.hkh-page .demo-grid {
+	max-width: 1280px;
+	margin: 0 auto;
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 32px;
+	position: relative;
+}
+.hkh-page .demo-grid::before {
+	content: "";
+	position: absolute;
+	top: 220px;
+	left: 14%;
+	right: 14%;
+	height: 2px;
+	background: repeating-linear-gradient(
+		90deg,
+		rgb(var(--color-ink-500-rgb) / 0.35) 0 12px,
+		transparent 12px 22px
+	);
+	z-index: 0;
+}
+.hkh-page .demo-step {
+	position: relative;
+	z-index: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 28px;
+}
+.hkh-page .phone {
+	position: relative;
+	width: 260px;
+	height: 540px;
+	background: var(--color-ink-900);
+	border-radius: 38px;
+	padding: 10px;
+	box-shadow:
+		0 30px 60px -20px rgba(58, 42, 26, 0.35),
+		0 0 0 1px rgba(0, 0, 0, 0.06),
+		inset 0 0 0 1.5px rgba(252, 250, 244, 0.06);
+	transition: transform 0.3s ease;
+}
+.hkh-page .phone:hover {
+	transform: translateY(-6px);
+}
+.hkh-page .phone--bare {
+	background: transparent;
+	padding: 0;
+	box-shadow: 0 30px 60px -28px rgb(var(--color-ink-700-rgb) / 0.28);
+	height: auto;
+	aspect-ratio: 13 / 27;
+	overflow: visible;
+}
+.hkh-page .phone--bare .phone-screen {
+	display: block;
+	width: 100%;
+	height: auto;
+	border-radius: 38px;
+}
+.hkh-page .phone-tag {
+	position: absolute;
+	background: #fff;
+	border: 1px solid rgba(58, 42, 26, 0.08);
+	border-radius: 100px;
+	padding: 6px 12px;
+	font-family: var(--font-body);
+	font-weight: 700;
+	font-size: 0.6875rem;
+	color: #3a2a1a;
+	box-shadow: 0 8px 18px -6px rgba(76, 50, 20, 0.2);
+	white-space: nowrap;
+	z-index: 10;
+}
+.hkh-page .phone-tag.pt-1 {
+	top: 64px;
+	left: -38px;
+}
+.hkh-page .phone-tag.pt-2 {
+	bottom: 90px;
+	right: -40px;
+}
+.hkh-page .phone--tilt-r .phone-tag.pt-1 {
+	left: auto;
+	right: -38px;
+}
+.hkh-page .phone--tilt-r .phone-tag.pt-2 {
+	right: auto;
+	left: -40px;
+}
+.hkh-page .step-meta {
+	text-align: center;
+	max-width: 280px;
+}
+.hkh-page .step-num {
+	display: inline-block;
+	font-family: "Roboto", var(--font-body);
+	font-weight: var(--weight-black);
+	font-size: 0.875rem;
+	letter-spacing: 0.16em;
+	color: var(--color-home-accent-700);
+	background: rgb(var(--color-ink-300-rgb) / 0.18);
+	padding: 6px 14px;
+	border-radius: 100px;
+	margin-bottom: 10px;
+}
+.hkh-page .step-meta h3 {
+	font-family: var(--font-body);
+	font-weight: var(--weight-black);
+	font-size: 1.5rem;
+	color: #3a2a1a;
+	margin: 0 0 10px;
+}
+.hkh-page .step-meta p {
+	font-family: var(--font-primary);
+	font-size: 0.875rem;
+	line-height: 1.65;
+	color: rgba(58, 42, 26, 0.7);
+	margin: 0;
+}
+@media (max-width: 980px) {
+	.hkh-page .demo-grid {
+		grid-template-columns: 1fr;
+		gap: 56px;
+	}
+	.hkh-page .demo-grid::before {
+		display: none;
+	}
+	.hkh-page .step-meta {
+		max-width: 360px;
+	}
+}
+
+/* =====================================================================
+   STORY TRAIL
+   ===================================================================== */
+.hkh-page .story-trail {
+	position: relative;
+	overflow: hidden;
+}
+.hkh-page .trail-head {
+	max-width: 1180px;
+	margin: 0 auto 56px;
+	text-align: center;
+}
+.hkh-page .trail-head h2 {
+	font-family: var(--font-body);
+	font-weight: var(--weight-black);
+	font-size: clamp(2.125rem, 4.4vw, 3.75rem);
+	line-height: 1.05;
+	letter-spacing: -0.02em;
+	color: #3a2a1a;
+	margin: 16px 0 0;
+}
+.hkh-page .trail-head h2 em {
+	font-style: normal;
+	color: var(--color-home-accent-700);
+}
+.hkh-page .story-trail-inner {
+	max-width: 1180px;
+	margin: 0 auto;
+	position: relative;
+}
+.hkh-page .story-trail-path {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	pointer-events: none;
+	z-index: 0;
+}
+.hkh-page .story-trail-path path {
+	fill: none;
+	stroke: rgb(var(--color-ink-500-rgb) / 0.4);
+	stroke-width: 2;
+	stroke-dasharray: 4 8;
+	stroke-linecap: round;
+}
+.hkh-page .trail-stop {
+	position: relative;
+	z-index: 1;
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 80px;
+	align-items: center;
+	padding: 56px 0;
+}
+.hkh-page .trail-stop:nth-child(even) {
+	direction: rtl;
+}
+.hkh-page .trail-stop:nth-child(even) > * {
+	direction: ltr;
+}
+.hkh-page .trail-illus-wrap {
+	position: relative;
+}
+.hkh-page .trail-illus {
+	position: relative;
+	width: 100%;
+	aspect-ratio: 1 / 0.78;
+	background-size: cover;
+	background-position: center;
+	background-repeat: no-repeat;
+	-webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 312'><path fill='%23fff' d='M 60 40 C 30 90 10 140 20 200 C 30 260 90 290 160 295 C 230 300 310 285 360 240 C 400 195 400 130 370 80 C 340 30 280 10 220 12 C 160 14 100 0 60 40 Z'/></svg>");
+	mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 312'><path fill='%23fff' d='M 60 40 C 30 90 10 140 20 200 C 30 260 90 290 160 295 C 230 300 310 285 360 240 C 400 195 400 130 370 80 C 340 30 280 10 220 12 C 160 14 100 0 60 40 Z'/></svg>");
+	-webkit-mask-size: 100% 100%;
+	mask-size: 100% 100%;
+}
+.hkh-page .trail-illus--field {
+	background-image: url("/placeholders/scene-sunrise.svg");
+}
+.hkh-page .trail-illus--orchard {
+	background-image: url("/placeholders/scene-orchard.svg");
+}
+.hkh-page .trail-illus--wheat {
+	background-image: url("/placeholders/scene-sunset.svg");
+}
+.hkh-page .trail-mascot {
+	position: absolute;
+	width: 42%;
+	aspect-ratio: 1;
+	pointer-events: none;
+	z-index: 3;
+	filter: drop-shadow(0 12px 20px rgb(var(--color-ink-700-rgb) / 0.18));
+}
+.hkh-page .trail-mascot--field {
+	right: 8%;
+	bottom: 6%;
+	transform: rotate(-2deg);
+}
+.hkh-page .trail-mascot--orchard {
+	left: 6%;
+	bottom: 4%;
+	transform: rotate(2deg);
+	width: 36%;
+}
+.hkh-page .trail-mascot--wheat {
+	right: 6%;
+	bottom: 10%;
+	transform: rotate(-2deg);
+}
+.hkh-page .trail-mascot--portrait {
+	width: min(420px, 100%);
+	aspect-ratio: 420 / 520;
+}
+.hkh-page .trail-copy h3 {
+	font-family: var(--font-body);
+	font-weight: var(--weight-black);
+	font-size: clamp(1.875rem, 3.6vw, 2.75rem);
+	line-height: 1.2;
+	letter-spacing: -0.01em;
+	color: #3a2a1a;
+	margin: 0 0 14px;
+}
+.hkh-page .trail-copy h3 em {
+	font-style: normal;
+	color: var(--color-home-accent-700);
+}
+.hkh-page .trail-copy p {
+	font-family: var(--font-primary);
+	font-size: 1rem;
+	line-height: 1.8;
+	color: rgba(58, 42, 26, 0.7);
+	max-width: 32ch;
+	margin: 0;
+}
+@media (max-width: 880px) {
+	.hkh-page .trail-stop {
+		grid-template-columns: 1fr;
+		gap: 28px;
+		padding: 36px 0;
+	}
+	.hkh-page .trail-stop:nth-child(even) {
+		direction: ltr;
+	}
+	.hkh-page .story-trail-path {
+		display: none;
+	}
+}
+
+/* =====================================================================
+   PROCESS STORY — scroll-driven fan-out
+   ===================================================================== */
+.hkh-page .stage-head {
+	/* Positioning is owned by a flex centerer in the JSX; the rule keeps
+	 * the visual chrome only (no abs positioning, no -50% translate). */
+	text-align: center;
+	background: rgba(250, 246, 236, 0.78);
+	-webkit-backdrop-filter: blur(22px) saturate(1.15);
+	backdrop-filter: blur(22px) saturate(1.15);
+	border: 1px solid rgba(255, 255, 255, 0.6);
+	border-radius: 28px;
+	padding: 22px 36px 26px;
+	box-shadow:
+		0 20px 40px -20px rgba(76, 50, 20, 0.18),
+		0 0 0 1px rgba(255, 255, 255, 0.4) inset;
+	transform-origin: top center;
+}
+.hkh-page .stage-head .eyebrow {
+	display: inline-flex;
+}
+.hkh-page .stage-head h1 {
+	margin: 14px 0 0;
+	font-family: var(--font-body);
+	font-weight: var(--weight-black);
+	font-size: clamp(2.25rem, 5.4vw, 4.75rem);
+	line-height: 1.05;
+	letter-spacing: -0.01em;
+	color: #3a2a1a;
+}
+.hkh-page .stage-head h1 em {
+	font-style: normal;
+	color: var(--color-home-accent-700);
+}
+.hkh-page .stage-head .hint {
+	margin-top: 14px;
+	font-family: var(--font-primary);
+	font-size: 0.8125rem;
+	font-weight: 500;
+	color: rgba(58, 42, 26, 0.55);
+	letter-spacing: 0.04em;
+}
+.hkh-page .process-card {
+	position: absolute;
+	width: clamp(260px, 22vw, 320px);
+	height: clamp(400px, 58vh, 540px);
+	background: #fcfaf4;
+	-webkit-backdrop-filter: none;
+	backdrop-filter: none;
+	border: 1px solid rgba(76, 50, 20, 0.08);
+	border-radius: 22px;
+	box-shadow:
+		0 30px 50px -20px rgba(76, 50, 20, 0.25),
+		0 8px 16px -8px rgba(76, 50, 20, 0.12);
+	padding: 36px 32px 28px;
+	display: flex;
+	flex-direction: column;
+	transform-origin: 50% 60%;
+	will-change: transform;
+	overflow: hidden;
+	z-index: 5;
+}
+.hkh-page .process-card::before {
+	content: "流程 · PROCESS";
+	position: absolute;
+	top: -22px;
+	left: 50%;
+	transform: translateX(-50%);
+	background: #fcfaf4;
+	color: var(--color-accent-500);
+	font-family: "Roboto", var(--font-body);
+	font-weight: 700;
+	font-size: 0.6875rem;
+	letter-spacing: 0.22em;
+	padding: 8px 14px 22px;
+	border-radius: 8px 8px 0 0;
+	box-shadow: 0 -6px 14px -8px rgba(76, 50, 20, 0.15);
+}
+.hkh-page .process-card .headline {
+	font-family: var(--font-body);
+	font-weight: var(--weight-black);
+	font-size: 2.75rem;
+	line-height: 0.95;
+	letter-spacing: -0.02em;
+	color: #3a2a1a;
+	margin: 0;
+	word-break: break-word;
+}
+.hkh-page .process-card .headline .en {
+	display: block;
+	font-family: "Roboto", var(--font-body);
+	font-size: 0.875rem;
+	font-weight: var(--weight-black);
+	letter-spacing: 0.18em;
+	color: rgba(58, 42, 26, 0.45);
+	margin-top: 10px;
+	line-height: 1.2;
+}
+.hkh-page .process-card .num {
+	font-family: "Roboto", var(--font-body);
+	font-weight: var(--weight-black);
+	font-size: 4.875rem;
+	line-height: 1;
+	color: #3a2a1a;
+	margin-top: auto;
+	letter-spacing: -0.04em;
+}
+.hkh-page .process-card .desc {
+	font-family: var(--font-primary);
+	font-size: 0.8125rem;
+	line-height: 1.55;
+	color: rgba(58, 42, 26, 0.7);
+	margin: 14px 0 0;
+	max-width: 22ch;
+}
+.hkh-page .process-card .illus {
+	margin-top: 18px;
+	border-radius: 14px;
+	height: 130px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 4.25rem;
+	line-height: 1;
+	position: relative;
+	overflow: hidden;
+}
+.hkh-page .process-card .process-glyph {
+	position: relative;
+	z-index: 1;
+	display: block;
+	filter: drop-shadow(0 10px 16px rgb(var(--color-ink-700-rgb) / 0.16));
+}
+.hkh-page .process-card .illus .stamp {
+	position: absolute;
+	font-family: "Roboto", var(--font-body);
+	font-weight: var(--weight-black);
+	font-size: 0.6875rem;
+	letter-spacing: 0.18em;
+	color: rgba(58, 42, 26, 0.4);
+	bottom: 12px;
+	right: 14px;
+}
+.hkh-page .process-card[data-i="1"] .illus {
+	background: var(--color-ink-50);
+}
+.hkh-page .process-card[data-i="2"] .illus {
+	background: #f5f2e8;
+}
+.hkh-page .process-card[data-i="3"] .illus {
+	background: var(--color-ink-100);
+}
+.hkh-page .process-card[data-i="4"] .illus {
+	background: #fce7cc;
+}
+[data-theme="dark"] .hkh-page .process-card .process-glyph {
+	filter: drop-shadow(0 10px 18px rgb(var(--color-ink-200-rgb) / 0.22));
+}
+[data-theme="dark"] .hkh-page .process-card .illus .stamp {
+	color: rgba(252, 250, 244, 0.58);
+}
+[data-theme="dark"] .hkh-page .process-card[data-i="1"] .illus {
+	background: rgb(var(--color-ink-850-rgb) / 0.82);
+}
+[data-theme="dark"] .hkh-page .process-card[data-i="2"] .illus {
+	background: rgba(58, 44, 26, 0.78);
+}
+[data-theme="dark"] .hkh-page .process-card[data-i="3"] .illus {
+	background: rgb(var(--color-ink-850-rgb) / 0.82);
+}
+[data-theme="dark"] .hkh-page .process-card[data-i="4"] .illus {
+	background: rgba(72, 46, 24, 0.78);
+}
+.hkh-page .stage-cta {
+	position: absolute;
+	right: 7vw;
+	bottom: 8vh;
+	z-index: 6;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	text-decoration: none;
+	background: var(--color-accent-500);
+	color: #fff;
+	font-family: "Roboto", var(--font-body);
+	font-weight: var(--weight-black);
+	font-size: 0.9375rem;
+	letter-spacing: 0.18em;
+	padding: 18px 28px;
+	border-radius: 100px;
+	box-shadow: 0 14px 30px -10px rgb(var(--color-brand-secondary-rgb) / 0.56);
+	transition:
+		transform 0.3s cubic-bezier(0.2, 0.7, 0.2, 1),
+		background 0.2s;
+}
+.hkh-page .stage-cta:hover {
+	transform: translateY(-2px);
+	background: #b99f45;
+}
+.hkh-page .stage-cta .pip {
+	width: 8px;
+	height: 8px;
+	border-radius: 100px;
+	background: #fff;
+}
+.hkh-page .progress-rail {
+	position: absolute;
+	left: 7vw;
+	bottom: 9vh;
+	z-index: 5;
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	font-family: "Roboto", var(--font-body);
+	font-weight: 700;
+	font-size: 0.6875rem;
+	letter-spacing: 0.22em;
+	color: rgba(58, 42, 26, 0.7);
+	background: rgba(250, 246, 236, 0.82);
+	-webkit-backdrop-filter: blur(16px) saturate(1.15);
+	backdrop-filter: blur(16px) saturate(1.15);
+	padding: 10px 18px;
+	border-radius: 100px;
+	border: 1px solid rgba(255, 255, 255, 0.6);
+	box-shadow: 0 12px 22px -14px rgba(76, 50, 20, 0.22);
+}
+.hkh-page .progress-rail .track {
+	width: 220px;
+	height: 4px;
+	background: rgba(58, 42, 26, 0.12);
+	border-radius: 100px;
+	overflow: hidden;
+}
+.hkh-page .progress-rail .bar {
+	height: 100%;
+	background: var(--color-home-accent-500);
+	border-radius: 100px;
+	width: 0%;
+	transition: width 0.1s linear;
+}
+/* Dark mode: the light cream rail + white hairline glared on the night canvas.
+   Match the dark .eyebrow pill — subtle glass fill, gold-tinted hairline, cream
+   text — so the STEP indicator reads as the same family. */
+[data-theme="dark"] .hkh-page .progress-rail {
+	color: rgba(255, 253, 247, 0.78);
+	background: rgba(255, 255, 255, 0.06);
+	border-color: rgba(245, 222, 165, 0.14);
+}
+
+/* =====================================================================
+   DAILY UPDATES
+   ===================================================================== */
+/* Daily updates use the real <PostCardV2 /> — visuals live in
+   styles/features/feed-components.css under .hkui-feed-card. The
+   homepage only owns the grid layout above. */
+
+/* =====================================================================
+   SELLER CTA
+   ===================================================================== */
+.hkh-page .seller-cta {
+	background:
+		radial-gradient(
+			900px 600px at 85% -10%,
+			rgb(var(--color-brand-secondary-rgb) / 0.16),
+			transparent 60%
+		),
+		linear-gradient(
+			180deg,
+			var(--color-ink-300) 0%,
+			var(--color-ink-500) 55%,
+			var(--color-ink-700) 100%
+		);
+	color: #fcfaf4;
+	padding: 130px 6vw 110px;
+	margin-top: 80px;
+	position: relative;
+	overflow: hidden;
+	-webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 800' preserveAspectRatio='none'><path fill='%23fff' d='M0 80 C 200 30 420 110 640 80 S 1060 20 1280 70 S 1440 60 1440 60 V 800 H 0 Z'/></svg>");
+	mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 800' preserveAspectRatio='none'><path fill='%23fff' d='M0 80 C 200 30 420 110 640 80 S 1060 20 1280 70 S 1440 60 1440 60 V 800 H 0 Z'/></svg>");
+	-webkit-mask-size: 100% 100%;
+	mask-size: 100% 100%;
+}
+.hkh-page .seller-cta::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background-image: none;
+	pointer-events: none;
+}
+.hkh-page .seller-cta::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 720' fill='none'><g fill='%23FCFAF4' opacity='0.07'><circle cx='160' cy='220' r='110'/><circle cx='1280' cy='180' r='140'/><circle cx='220' cy='560' r='90'/><circle cx='1180' cy='600' r='120'/><circle cx='620' cy='90' r='70'/><circle cx='880' cy='650' r='80'/></g><g stroke='%23FCFAF4' stroke-width='1.6' opacity='0.10' fill='none'><circle cx='420' cy='340' r='180'/><circle cx='1020' cy='380' r='220'/><circle cx='720' cy='240' r='160'/><circle cx='780' cy='520' r='200'/></g></svg>");
+	background-size: cover;
+	background-position: center;
+	pointer-events: none;
+}
+.hkh-page .seller-inner {
+	position: relative;
+	z-index: 2;
+	max-width: 1100px;
+	margin: 0 auto;
+	text-align: center;
+}
+.hkh-page .seller-inner h2 {
+	font-family: var(--font-body);
+	font-weight: var(--weight-black);
+	font-size: clamp(2.25rem, 5vw, 4.5rem);
+	line-height: 1.05;
+	letter-spacing: -0.02em;
+	margin: 22px 0 18px;
+	color: #fcfaf4;
+}
+.hkh-page .seller-inner h2 em {
+	font-style: normal;
+	color: var(--color-accent-500);
+}
+.hkh-page .seller-inner p {
+	font-family: var(--font-primary);
+	font-size: 1.0625rem;
+	line-height: 1.7;
+	color: rgba(252, 250, 244, 0.75);
+	max-width: 600px;
+	margin: 0 auto 36px;
+}
+.hkh-page .seller-row {
+	display: inline-flex;
+	gap: 14px;
+	flex-wrap: wrap;
+	justify-content: center;
+}
+/* =====================================================================
+   RESPONSIVE
+   ===================================================================== */
+@media (max-width: 980px) {
+	.hkh-page .cat-grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}
+@media (min-width: 1400px) and (max-height: 980px) {
+	.hkh-page .stage-head {
+		top: clamp(34px, 4.5vh, 48px);
+		padding: 18px 32px 22px;
+	}
+	.hkh-page .stage-head h1 {
+		font-size: clamp(2.25rem, 4.4vw, 4rem);
+		line-height: 1.04;
+	}
+	.hkh-page .process-card {
+		width: clamp(260px, 18vw, 320px);
+		height: clamp(360px, 50vh, 470px);
+		padding: 30px 28px 24px;
+	}
+	.hkh-page .process-card .headline {
+		font-size: 2.375rem;
+	}
+	.hkh-page .process-card .num {
+		font-size: 4rem;
+	}
+	.hkh-page .process-card .illus {
+		height: 108px;
+		font-size: 3.625rem;
+	}
+}
+@media (max-width: 640px) {
+	.hkh-page .hero-grid {
+		padding: 60px 24px 120px;
+	}
+	.hkh-page .hero-copy h1 {
+		font-size: 3rem;
+	}
+	.hkh-page .cat-grid {
+		grid-template-columns: 1fr;
+	}
+	.hkh-page .cat-card {
+		min-height: 132px;
+		padding: 24px 48px 24px 136px;
+	}
+	.hkh-page .cat-card::before {
+		left: 24px;
+		width: 76px;
+		height: 76px;
+		border-radius: 22px;
+	}
+	.hkh-page .cat-sticker-wrap {
+		left: -2px;
+		width: 128px;
+		height: 128px;
+	}
+
+	/* Cards below ~165px (phones narrower than ~360px on a 2-col
+	 * layout) start clipping the stats line + buttons. Collapse to a
+	 * single column so each card has room to breathe. */
+	@media (max-width: 420px) {
+		.hkh-page .cat-card {
+			padding-left: 122px;
+		}
+		.hkh-page .cat-card::before {
+			left: 18px;
+			width: 70px;
+			height: 70px;
+		}
+		.hkh-page .cat-sticker-wrap {
+			left: -6px;
+			width: 116px;
+			height: 116px;
+		}
+	}
+	.hkh-page .sect-head {
+		flex-direction: column;
+		align-items: start;
+	}
+	.hkh-page .stage-head {
+		position: relative;
+		top: auto;
+		left: auto;
+		width: 100%;
+		transform: none;
+		margin: 0 0 18px;
+		padding: 18px 16px 20px;
+		border-radius: 24px;
+		background: #fcfaf4;
+		opacity: 1;
+	}
+	.hkh-page .stage-head h1 {
+		font-size: clamp(2rem, 9.6vw, 2.625rem);
+		line-height: 1.04;
+	}
+	.hkh-page .stage-head .hint {
+		font-size: 0.75rem;
+		line-height: 1.5;
+		letter-spacing: 0.02em;
+	}
+	.hkh-page .process-card {
+		position: relative;
+		left: auto;
+		top: auto;
+		width: 100%;
+		height: auto;
+		min-height: 0;
+		padding: 26px 22px 20px;
+		transform: none;
+	}
+	.hkh-page .process-card .headline {
+		font-size: clamp(1.875rem, 8.8vw, 2.375rem);
+		line-height: 1;
+	}
+	.hkh-page .process-card .headline .en {
+		font-size: 0.75rem;
+		letter-spacing: 0.16em;
+	}
+	.hkh-page .process-card .desc {
+		max-width: none;
+		font-size: 0.875rem;
+		line-height: 1.65;
+	}
+	.hkh-page .process-card .num {
+		margin-top: 20px;
+		font-size: 3.25rem;
+	}
+	.hkh-page .process-card .illus {
+		height: 104px;
+		margin-top: 12px;
+	}
+	.hkh-page .process-card .process-glyph {
+		transform: scale(0.86);
+	}
+	.hkh-page .stage-cta {
+		position: relative;
+		right: auto;
+		bottom: auto;
+		width: fit-content;
+		margin: 24px auto 0;
+		transform: none;
+		padding: 14px 22px;
+		font-size: 0.8125rem;
+	}
+	.hkh-page .stage-cta:hover {
+		transform: translateY(-2px);
+	}
+	.hkh-page .progress-rail {
+		display: none;
+	}
+}
+
+/* =====================================================================
+   PHASE 2 HOMEPAGE — compact hero, promo banners, finale
+   ===================================================================== */
+.hkh-page .hero.hero--compact {
+	min-height: 0;
+	margin-top: 24px;
+	padding: 0;
+}
+.hkh-page .hero.hero--compact .hero-grid {
+	display: block;
+	grid-template-columns: none;
+	align-items: stretch;
+	max-width: 980px;
+	min-height: 0;
+	margin: 0 auto;
+	padding: 80px 6vw 72px;
+	text-align: center;
+}
+.hkh-page .hero.hero--compact .hero-copy {
+	max-width: 100%;
+	text-align: center;
+}
+.hkh-page .hero.hero--compact .hero-copy h1 {
+	max-width: none;
+	margin: 16px 0 32px;
+	font-size: clamp(2.25rem, 5vw, 3.5rem);
+	line-height: 1.15;
+	text-align: center;
+}
+.hkh-page .hero.hero--compact .hero-copy h1 em {
+	display: inline;
+}
+
+.hkh-page .banner-a,
+.hkh-page .banner-c {
+	position: relative;
+	z-index: 2;
+}
+.hkh-page .ba-eyebrow,
+.hkh-page .fc-eyebrow {
+	font-family: "Roboto", var(--font-body);
+	font-size: 0.75rem;
+	font-weight: 800;
+	letter-spacing: 0.22em;
+	text-transform: uppercase;
+}
+
+/* =====================================================================
+   Compact category nav — chip icons get a gentle breathing pulse on
+   hover (slow, infinite) and a one-shot pop on click. Keyframes live
+   here so HomeCompactCategoryNav stays presentational and any future
+   chip surface can opt in by adding `home-chip` + `home-chip-icon`.
+   ===================================================================== */
+.home-chip-icon {
+	transition: transform 200ms ease;
+	transform-origin: center;
+	will-change: transform;
+}
+.home-chip:hover .home-chip-icon,
+.home-chip:focus-visible .home-chip-icon {
+	animation: home-chip-breathe 1.6s ease-in-out infinite;
+}
+.home-chip:active .home-chip-icon {
+	animation: home-chip-pop 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Seasonal taxonomy chips are food-only posters. Their small transform uses a
+ * transition instead of a keyframe so pointer-out naturally returns to rest. */
+.home-chip[data-seasonal-category] .home-chip-icon {
+	transition: transform 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+.home-chip[data-seasonal-category]:hover,
+.home-chip[data-seasonal-category]:focus-visible,
+.home-chip[data-seasonal-category]:active {
+	translate: 0;
+}
+.home-chip[data-seasonal-category]:hover .home-chip-icon {
+	animation: none;
+	transform: none;
+}
+.home-chip[data-seasonal-category]:focus-visible .home-chip-icon {
+	animation: none;
+	transform: translateY(-1px) scale(1.05);
+}
+@media (hover: hover) and (pointer: fine) {
+	.home-chip[data-seasonal-category]:hover .home-chip-icon {
+		transform: translateY(-1px) scale(1.05);
+	}
+}
+.home-chip[data-seasonal-category]:active .home-chip-icon {
+	animation: none;
+	transform: scale(0.98);
+}
+@keyframes home-chip-breathe {
+	0%,
+	100% {
+		transform: scale(1);
+	}
+	50% {
+		transform: scale(1.1);
+	}
+}
+@keyframes home-chip-pop {
+	0% {
+		transform: scale(1);
+	}
+	45% {
+		transform: scale(1.2);
+	}
+	100% {
+		transform: scale(1);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.home-chip[data-seasonal-category],
+	.home-chip[data-seasonal-category]:hover,
+	.home-chip[data-seasonal-category]:focus-visible,
+	.home-chip[data-seasonal-category]:active {
+		transform: none;
+		translate: 0;
+		transition: none;
+	}
+	.home-chip[data-seasonal-category] .home-chip-icon,
+	.home-chip[data-seasonal-category]:hover .home-chip-icon,
+	.home-chip[data-seasonal-category]:focus-visible .home-chip-icon,
+	.home-chip[data-seasonal-category]:active .home-chip-icon,
+	.home-chip:hover .home-chip-icon,
+	.home-chip:focus-visible .home-chip-icon,
+	.home-chip:active .home-chip-icon {
+		animation: none;
+		transform: none;
+		transition: none;
+	}
+}
+
+/* Quick-link icon chips (本週新品 / 特惠商品 / 產地). Each circular frame
+   carries a distinct brand accent tint so chips read as their own colour even
+   when the glyph is single-tone. */
+.home-chip-frame {
+	transition: background-color 200ms ease;
+}
+.home-chip-frame--gold {
+	background-color: rgb(var(--color-brand-secondary-rgb) / 0.18);
+}
+.home-chip-frame--primary {
+	background-color: rgb(var(--color-brand-primary-rgb) / 0.16);
+}
+/* Dark mode: base primary tints sit too dark on the now-dark rail, so
+   lift to the brighter values the dark theme uses (matches the glyphs,
+   which use the brighter primary and secondary dark palette). */
+[data-theme="dark"] .home-chip-frame--gold {
+	background-color: rgb(241 205 112 / 0.22);
+}
+[data-theme="dark"] .home-chip-frame--primary {
+	background-color: rgb(var(--color-ink-200-rgb) / 0.18);
+}
+
+[data-theme="dark"] .hkh-page {
+	background: transparent;
+
+	/* The base .hkh-page block re-pins these tokens to light values to keep the
+	   home a "light-only canvas". In dark mode we re-pin them again — mirroring
+	   the global [data-theme="dark"] palette (styles/foundation/00-color-config)
+	   — so the compact home components, which render via Tailwind token
+	   utilities (bg-hk-surface-card / text-hk-heading / …), darken to match the
+	   rest of the site instead of staying cream. */
+	--theme-surface-page: var(--color-ink-900);
+	--theme-surface-card: var(--color-ink-850);
+	--theme-surface-muted: var(--color-dark-muted);
+	--theme-surface-panel: var(--color-dark-panel);
+	--theme-surface-elevated: var(--color-dark-elevated);
+	--theme-surface-glass: rgb(255 255 255 / 0.05);
+	--theme-surface-glass-hover: rgb(255 255 255 / 0.08);
+	--theme-text-heading: var(--color-brand-ink-on-dark);
+	--theme-text-body: rgb(var(--color-brand-ink-on-dark-rgb) / 0.82);
+	--theme-text-muted: rgb(var(--color-brand-ink-on-dark-rgb) / 0.66);
+	--theme-text-faint: rgb(var(--color-brand-ink-on-dark-rgb) / 0.48);
+	--theme-text-accent: var(--color-brand-secondary);
+	--theme-text-accent-on-tint: color-mix(
+		in srgb,
+		var(--color-brand-secondary) 70%,
+		var(--color-neutral-white)
+	);
+	--theme-text-inverse: var(--color-neutral-ink, #191c18);
+	--theme-action-primary: var(--color-brand-secondary);
+	--theme-action-primary-hover: color-mix(
+		in srgb,
+		var(--color-brand-secondary) 82%,
+		var(--color-neutral-white)
+	);
+	--theme-primary-subtle: rgb(var(--color-brand-secondary-rgb) / 0.18);
+	--theme-primary-border: rgb(var(--color-brand-secondary-rgb) / 0.5);
+	--theme-border-subtle: rgb(245 222 165 / 0.12);
+	--theme-border-soft: rgb(245 222 165 / 0.16);
+	--theme-border-strong: rgb(245 222 165 / 0.24);
+	--theme-border-warm: rgb(241 205 112 / 0.28);
+	--theme-border-input: rgb(var(--color-ink-100-rgb) / 0.16);
+
+	/* Home-local palette → dark equivalents (used by the classic sections and a
+	   few compact bits that read --color-* directly). */
+	--color-surface: var(--color-ink-950);
+	--color-surface-alt: var(--color-ink-950);
+	--color-card: var(--color-ink-900);
+	--color-card-inset: var(--color-ink-850);
+	--color-cream: var(--color-ink-900);
+	--color-divider: rgb(var(--color-ink-100-rgb) / 0.12);
+	--color-border-soft: rgb(var(--color-ink-100-rgb) / 0.2);
+	--color-home-accent-100: var(--color-ink-850);
+	--color-home-accent-050: var(--color-ink-900);
+	--color-ink: var(--color-brand-ink-on-dark);
+	--color-ink-2: var(--color-ink-100);
+	--color-fg: rgb(var(--color-ink-100-rgb) / 0.78);
+	--color-fg-muted: rgb(var(--color-ink-100-rgb) / 0.55);
+	--color-fg-disabled: rgb(var(--color-ink-100-rgb) / 0.4);
+
+	/* Global --color-hk-home-* tokens (styles/globals.css) are cream/dark-text
+	   with no dark variant. The compact home reads them directly (e.g. the
+	   MarketStage panels use bg-hk-home-paper). Re-pin to dark here so those
+	   panels darken; the brand scale already reads fine on dark and is left as-is. */
+	--color-hk-home-paper: var(--color-ink-900);
+	--color-hk-home-cream: var(--color-ink-850);
+	--color-hk-home-ink: var(--color-brand-ink-on-dark);
+	--color-hk-home-fg: rgb(var(--color-ink-100-rgb) / 0.7);
+	--color-hk-home-accent-100: var(--color-ink-850);
+}
+/* The homepage owns content only; its canvas lives outside this route. */
+.hkh-page.home-page {
+	background: transparent;
+}
+[data-theme="dark"] .hkh-page .hero,
+[data-theme="dark"] .hkh-page .categories,
+[data-theme="dark"] .hkh-page .merchants,
+[data-theme="dark"] .hkh-page .updates {
+	background: rgb(var(--color-ink-950-rgb) / 0.82);
+}
+[data-theme="dark"] .hkh-page .sect-head h2,
+[data-theme="dark"] .hkh-page .hero-copy h1,
+[data-theme="dark"] .hkh-page .cat-body h3 {
+	color: var(--color-hk-cream, #fffdf7);
+}
+[data-theme="dark"] .hkh-page .sect-head p,
+[data-theme="dark"] .hkh-page .cat-body p {
+	color: rgba(255, 253, 247, 0.68);
+}
+[data-theme="dark"] .hkh-page .eyebrow,
+[data-theme="dark"] .hkh-page .hero-chips,
+[data-theme="dark"] .hkh-page .cat-card {
+	border-color: rgba(245, 222, 165, 0.14);
+	background: rgba(255, 255, 255, 0.06);
+	color: rgba(255, 253, 247, 0.78);
+}
+[data-theme="dark"] .hkh-page .cat-card::before {
+	opacity: 0.82;
+	filter: saturate(0.8) brightness(0.92);
+}
+[data-theme="dark"] .hkh-page .finale-card--shop {
+	background: linear-gradient(
+		135deg,
+		var(--color-ink-800) 0%,
+		var(--color-ink-850) 100%
+	);
+}
+[data-theme="dark"] .hkh-page .demo,
+[data-theme="dark"] .hkh-page .story-trail {
+	background: rgb(var(--color-ink-950-rgb) / 0.82);
+}
+/* The story-trail copy and the hero lede hard-code warm dark ink (#3a2a1a)
+   + olive emphasis in the base styles. Those sit on the dark trail/hero
+   surfaces and vanish, so lift headings to cream, emphasis to sage and body
+   to soft light — readable without glaring. */
+[data-theme="dark"] .hkh-page .trail-head h2,
+[data-theme="dark"] .hkh-page .trail-copy h3 {
+	color: #f5e9c3;
+}
+[data-theme="dark"] .hkh-page .trail-head h2 em,
+[data-theme="dark"] .hkh-page .trail-copy h3 em,
+[data-theme="dark"] .hkh-page .hero-copy h1 em {
+	color: var(--color-ink-200);
+}
+[data-theme="dark"] .hkh-page .trail-copy p {
+	color: rgb(var(--color-ink-100-rgb) / 0.72);
+}
+[data-theme="dark"] .hkh-page .hero-copy .lede {
+	color: rgb(var(--color-ink-100-rgb) / 0.78);
+}
+/* Ghost button: base is dark ink + dark hairline, invisible on a dark hero. */
+[data-theme="dark"] .hkh-page .btn-ghost {
+	color: rgb(var(--color-ink-100-rgb) / 0.86);
+	border-color: rgba(245, 222, 165, 0.28);
+}
+[data-theme="dark"] .hkh-page .btn-ghost:hover {
+	border-color: rgba(245, 222, 165, 0.6);
+}
+/* The --on-dark variant is a solid near-white button (it rides a coloured band
+   in light mode). On the deepened dark CTA that white glares — and the rule
+   above would also flip its text light onto the white fill (invisible). Make it
+   a translucent cream ghost so it reads as a calm secondary on the dark band. */
+[data-theme="dark"] .hkh-page .btn-ghost--on-dark {
+	background: rgba(255, 253, 247, 0.1);
+	border-color: rgba(255, 253, 247, 0.42);
+	color: #fffdf7;
+}
+[data-theme="dark"] .hkh-page .btn-ghost--on-dark:hover {
+	background: rgba(255, 253, 247, 0.18);
+	border-color: rgba(255, 253, 247, 0.62);
+	color: #fffdf7;
+}
+/* Demo (3-step walkthrough) step copy: base is dark ink + olive accent that
+   vanish on the dark .demo surface. Lift to the cream / sage pairing. */
+[data-theme="dark"] .hkh-page .step-meta h3 {
+	color: #f5e9c3;
+}
+[data-theme="dark"] .hkh-page .step-meta p {
+	color: rgb(var(--color-ink-100-rgb) / 0.72);
+}
+[data-theme="dark"] .hkh-page .step-num {
+	color: var(--color-ink-200);
+	background: rgb(var(--color-ink-300-rgb) / 0.2);
+}
+[data-theme="dark"] .hkh-page .demo .sect-head h2 em {
+	color: var(--color-ink-200);
+}
+[data-theme="dark"] .hkh-page .stage-head {
+	background: rgb(var(--color-ink-950-rgb) / 0.78);
+	border-color: rgba(245, 222, 165, 0.14);
+	box-shadow:
+		0 20px 40px -20px rgba(0, 0, 0, 0.5),
+		0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+}
+[data-theme="dark"] .hkh-page .stage-head h1 {
+	color: #f5e9c3;
+}
+[data-theme="dark"] .hkh-page .stage-head .hint {
+	color: rgb(var(--color-ink-100-rgb) / 0.55);
+}
+[data-theme="dark"] .hkh-page .process-card,
+[data-theme="dark"] .hkh-page .process-card::before {
+	background: var(--color-ink-900);
+	border-color: rgba(245, 222, 165, 0.12);
+}
+[data-theme="dark"] .hkh-page .process-card .headline,
+[data-theme="dark"] .hkh-page .process-card .num {
+	color: #f5e9c3;
+}
+[data-theme="dark"] .hkh-page .process-card .headline .en {
+	color: rgb(var(--color-ink-100-rgb) / 0.5);
+}
+[data-theme="dark"] .hkh-page .process-card .desc {
+	color: rgb(var(--color-ink-100-rgb) / 0.7);
+}
+[data-theme="dark"] .hkh-page .phone-tag {
+	background: var(--color-ink-850);
+	border-color: rgba(245, 222, 165, 0.16);
+	color: #f5e9c3;
+	box-shadow: 0 8px 18px -6px rgba(0, 0, 0, 0.5);
+}
+
+/* Compact home sections ported from the design-system index_compact page.
+   These wrappers keep the visible cream boxes aligned with the new product
+   rails while preserving the existing seller cards. */
+.hkh-page .updates {
+	margin-top: var(--home-section-gap);
+}
+/* One opaque outer surface keeps every homepage section the same color,
+   independent of the moving canvas. Inner cards, media and actions keep
+   their own semantic surfaces and interaction states. */
+[data-theme="dark"] .hkh-page.home-page .home-section-surface {
+	background: var(--color-hk-home-postcard-dark);
+	-webkit-backdrop-filter: none;
+	backdrop-filter: none;
+}
+
+@media (max-width: 1520px) {
+	.hkh-page .banner-a {
+		margin-left: auto;
+		margin-right: auto;
+	}
+}
+@media (max-width: 640px) {
+	.hkh-page .hero.hero--compact .hero-grid {
+		padding: 56px 24px 48px;
+	}
+	.hkh-page .banner-a {
+		margin-right: auto;
+		margin-left: auto;
+	}
+}

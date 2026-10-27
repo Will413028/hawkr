@@ -1,0 +1,59 @@
+/* Catalog-only layout; production components keep the production cascade. */
+@source "../stories";
+@font-face {
+	font-family: "Roboto";
+	src: url("../lib/fonts/files/roboto-latin.woff2") format("woff2");
+	font-weight: 100 900;
+	font-display: optional;
+}
+:root {
+	--font-roboto: "Roboto", sans-serif;
+}
+body {
+	background: var(--surface-page);
+	color: var(--ink-body);
+}
+.catalog-stack {
+	display: grid;
+	gap: var(--space-6, 24px);
+	max-width: 720px;
+}
+.catalog-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-4, 16px);
+}
+.catalog-field {
+	width: 100%;
+	max-width: 420px;
+}
+.catalog-note {
+	color: var(--ink-body);
+	font-size: 14px;
+	line-height: 1.7;
+}
+.catalog-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+	gap: 24px;
+}
+.catalog-swatch {
+	border: 1px solid var(--border-soft);
+	border-radius: var(--brand-radius-md);
+	overflow: hidden;
+}
+.catalog-swatch > div {
+	height: 88px;
+}
+.catalog-swatch > p {
+	margin: 0;
+	padding: 12px;
+	overflow-wrap: anywhere;
+}
+.catalog-app-frame {
+	width: 100%;
+	border: 1px solid var(--border-soft);
+	border-radius: var(--brand-radius-lg);
+	background: var(--surface-card);
+}

@@ -1,0 +1,81 @@
+# 整合測試配置（連接本機 PostgreSQL + RabbitMQ，完整串聯服務）
+server:
+  port: 0
+
+grpc:
+  server:
+    port: -1
+
+spring:
+  application:
+    name: payment-service-test
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:hawkr_payment}
+    username: ${DB_USER:dbadmin}
+    password: ${DB_PASSWORD:Hawkr2024Admin}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    virtual-host: ${RABBITMQ_VHOST:/}
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration
+
+mybatis-plus:
+  mapper-locations: classpath:/mapper/**/*.xml
+  global-config:
+    db-config:
+      id-type: INPUT
+  configuration:
+    map-underscore-to-camel-case: true
+  type-handlers-package: io.github.will413028.hawkr.payment.infrastructure.persistence.typehandler
+
+hawkr:
+  obs:
+    service: payment-service-test
+  tsid:
+    enabled: true
+    node-id-base: 0
+    pod-index: 0
+
+payuni:
+  agent:
+    key: ${PAYUNI_AGENT_KEY:TestOnlyFakeHashKey0123456789AB1}
+    iv: ${PAYUNI_AGENT_IV:TestOnlyFakeIV00}
+  api:
+    base-url: http://localhost:9999
+  callback:
+    notify-url: http://localhost/webhook/payuni/notify
+    return-url: http://localhost/return
+
+payment:
+  outbox:
+    max-retries: 5
+  default-expire-days: 3
+  cleanup:
+    enabled: false
+
+otel:
+  sdk:
+    disabled: true
+
+management:
+  tracing:
+    enabled: false
+
+logging:
+  level:
+    io.github.will413028.hawkr: DEBUG

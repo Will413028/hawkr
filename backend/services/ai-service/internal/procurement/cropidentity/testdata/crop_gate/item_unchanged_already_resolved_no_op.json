@@ -1,0 +1,42 @@
+{
+  "resolverNil": false,
+  "resolveResult": {
+    "NeedsDisambiguation": false,
+    "CropCode": null,
+    "GroupCode": null,
+    "CommodityCode": null,
+    "FallbackGroupCode": null,
+    "Label": "",
+    "Candidates": null,
+    "Unavailable": false
+  },
+  "before": {
+    "item": "芭樂",
+    "item_resolution": {
+      "kind": "CROP",
+      "code": "CROP-GUAVA",
+      "label": "芭樂",
+      "category_id": "category-guava",
+      "provenance": "SYSTEM"
+    }
+  },
+  "after": {
+    "item": "芭樂",
+    "item_resolution": {
+      "kind": "CROP",
+      "code": "CROP-GUAVA",
+      "label": "芭樂",
+      "category_id": "category-guava",
+      "provenance": "SYSTEM"
+    }
+  },
+  "result": {
+    "item": "芭樂",
+    "resolution": null,
+    "pending": false,
+    "candidates": null,
+    "pendingReason": "",
+    "evaluated": false,
+    "factsAsOfSet": false
+  }
+}

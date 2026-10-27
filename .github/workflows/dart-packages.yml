@@ -1,0 +1,62 @@
+name: Dart packages
+
+# 兩支 App 共用、不是 API 生成物的 Dart 套件（packages/hawkr_api 在 api-contract.yml）：analyze、format、test。
+# hawkr_app_update 與 hawkr_ui_text 以 path 依賴 packages/hawkr_api，Dart 套件（packages/hawkr_*）改動時一併重跑。
+# TS 套件 packages/hawkr-api-ts 不在這裡（在 api-contract.yml）；底線與連字號不同，下面的 glob 不會匹配它。
+
+on:
+  pull_request:
+    paths: &package_paths
+      - 'packages/hawkr_*/**'
+      - '.github/workflows/dart-packages.yml'
+  push:
+    branches: [main]
+    paths: *package_paths
+  workflow_dispatch:
+
+concurrency:
+  group: dart-packages-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: ${{ matrix.package }}：analyze、format、test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [hawkr_app_update, hawkr_auth, hawkr_twaddr, hawkr_ui_text]
+    defaults:
+      run:
+        working-directory: packages/${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: 讀取 Flutter 的版本
+        id: versions
+        run: echo "flutter=$(jq -r .flutter .fvmrc)" >> "$GITHUB_OUTPUT"
+      # 套件自己的 .fvmrc；要和兩支 App 的 Flutter 相容（App 以 path 依賴它）。
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ steps.versions.outputs.flutter }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+
+      - name: dart analyze
+        if: always()
+        run: dart analyze
+
+      - name: dart format
+        if: always()
+        run: |
+          dirs=(lib test)
+          if [ -d tool ]; then dirs+=(tool); fi
+          dart format --output=none --set-exit-if-changed "${dirs[@]}"
+
+      - name: package test
+        if: always()
+        run: ${{ matrix.package == 'hawkr_auth' && 'flutter test' || 'dart test' }}

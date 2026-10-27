@@ -1,0 +1,23 @@
+{
+	"compilerOptions": {
+		"target": "ES2017",
+		"lib": ["esnext"],
+		"types": ["node"],
+		"jsx": "react-jsx",
+		"skipLibCheck": true,
+		"strict": true,
+		"noEmit": true,
+		"esModuleInterop": true,
+		"module": "esnext",
+		"moduleResolution": "bundler",
+		"resolveJsonModule": true,
+		"isolatedModules": true
+	},
+	"include": [
+		"src/**/*.ts",
+		"src/**/*.tsx",
+		"tests/**/*.ts",
+		"tests/**/*.tsx",
+		"tools/**/*.ts"
+	]
+}

@@ -1,0 +1,27 @@
+{
+  "schema": "hawkr.parity-calendar/v1",
+  "note": "傳給 forecast_seven_days 的三個休市／日曆輸入，逐字對應 closed_dates_by_market / closed_dates_by_market_category / verified_calendar_market_categories 三個參數。複合鍵用 list-of-object 表示（JSON 的 key 不能是 tuple）。沒有這份資料，Go 端的編排層 parity test 就只能對 not_applicable（休市）case 驗形狀，驗不到休市判定本身——而這個 case 恰好是 (market, category) 兩層鍵的關鍵證據：moa:109:A1 是 N05、moa:109:LA1 是 N04，同市場同一天 2026-07-21 只有 N04 休市。",
+  "origin": "2026-07-18T23:45:00+08:00",
+  "closed_by_market": {},
+  "closed_by_market_category": [
+    {
+      "market_id": "moa:109",
+      "category_code": "N04",
+      "dates": [
+        "2026-07-21"
+      ]
+    }
+  ],
+  "verified_calendar": [
+    {
+      "market_id": "moa:109",
+      "category_code": "N04",
+      "year": 2026
+    },
+    {
+      "market_id": "moa:109",
+      "category_code": "N05",
+      "year": 2026
+    }
+  ]
+}

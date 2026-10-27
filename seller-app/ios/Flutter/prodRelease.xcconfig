@@ -1,0 +1,14 @@
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.release-prod.xcconfig"
+#include "Generated.xcconfig"
+
+ASSET_PREFIX=prod
+BUNDLE_NAME=Hawkr 賣家
+BUNDLE_DISPLAY_NAME=Hawkr 賣家
+GOOGLESERVICE_INFO_PLIST=${PROJECT_DIR}/Runner/config/prod/GoogleService-Info.plist
+
+// Code signing — managed here, NOT pbxproj.
+CODE_SIGN_IDENTITY = Apple Distribution
+CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution
+CODE_SIGN_STYLE = Manual
+DEVELOPMENT_TEAM = V2H73DN9FP
+PROVISIONING_PROFILE_SPECIFIER = match AppStore io.github.will413028.hawkr.seller

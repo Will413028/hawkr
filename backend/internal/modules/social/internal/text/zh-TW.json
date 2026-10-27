@@ -1,0 +1,262 @@
+{
+  "default": {
+    "block.store_blocked_buyer": {
+      "message": "這家店已限制你在此互動，無法留言、發言或按讚",
+      "description": "買家被這家店封鎖，在這家店的貼文或討論區留言、編輯、發言或按讚（店家封鎖只擋寫入，公開內容照常讀得到）。"
+    },
+    "caller.buyer_required": {
+      "message": "需要買家身分",
+      "description": "呼叫者不是買家（沒有買家身分）。"
+    },
+    "caller.login_required": {
+      "message": "需要登入",
+      "description": "呼叫者沒有登入（沒有買家 ID）。"
+    },
+    "comment.delete_author_or_store_only": {
+      "message": "只有作者或貼文所屬的店家能刪除留言",
+      "description": "非作者也非貼文所屬店家刪除留言。"
+    },
+    "comment.edit_author_only": {
+      "message": "只有作者能修改留言",
+      "description": "非作者修改留言或討論區留言。"
+    },
+    "comment.edit_hidden": {
+      "message": "這則留言已被隱藏，不能修改",
+      "description": "作者修改已被管理員隱藏的留言或討論區留言。"
+    },
+    "comment.not_found": {
+      "message": "找不到這則留言",
+      "description": "留言不存在或呼叫者看不到。"
+    },
+    "comment.reply_store_only": {
+      "message": "只有貼文所屬的店家能回覆留言",
+      "description": "非貼文所屬的店家回覆留言（回覆是店家專屬的產品規則）。"
+    },
+    "comment_body.community_rules": {
+      "message": "留言不符社群守則",
+      "description": "留言命中髒字詞典（textfilter）。"
+    },
+    "comment_body.invalid_text": {
+      "message": "留言不是有效的文字",
+      "description": "留言不是有效的 UTF-8。"
+    },
+    "comment_body.required": {
+      "message": "留言必填",
+      "description": "留言去頭尾空白後是空的。"
+    },
+    "comment_body.too_long": {
+      "message": "留言不可超過 {max} 個字",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "留言超過字數上限（以字元計）。max 是上限。"
+    },
+    "forum.delete_author_or_store_only": {
+      "message": "只有作者或該店能刪除討論區留言",
+      "description": "非作者也非該店刪除討論區留言。"
+    },
+    "forum.entry_not_found": {
+      "message": "找不到這則討論區留言",
+      "description": "討論區留言不存在或呼叫者看不到。"
+    },
+    "forum.store_not_found": {
+      "message": "找不到這家店的討論區",
+      "description": "討論區所屬的店家不存在或不開放。"
+    },
+    "hashtag.empty": {
+      "message": "標籤不可是空的",
+      "description": "標籤正規化後是空的。"
+    },
+    "hashtag.invalid_chars": {
+      "message": "標籤只接受中文、英文與數字，不可含空白、井字號、emoji 或標點",
+      "description": "標籤含有不接受的字元。"
+    },
+    "hashtag.length": {
+      "message": "每個標籤須為 1 到 {max} 個字元",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "標籤長度不在 1 到上限之間。max 是 hashtag.MaxLength。"
+    },
+    "hashtag.too_many": {
+      "message": "每篇貼文最多 {max} 個標籤",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "去重後的標籤數超過上限。max 是 hashtag.MaxCount。"
+    },
+    "post.image_replace_and_clear": {
+      "message": "不能同時換圖與清圖",
+      "description": "修改貼文同時要求換圖與清圖。"
+    },
+    "post.image_unusable": {
+      "message": "圖片無法使用，請重新上傳",
+      "description": "圖片 token 被 media 拒絕（過期、已用過或不屬於呼叫者）。"
+    },
+    "post.not_found": {
+      "message": "找不到這篇貼文",
+      "description": "貼文不存在、不是呼叫者可見的，或不屬於呼叫者的店家。"
+    },
+    "post.product_invalid": {
+      "message": "商品不合法",
+      "description": "貼文掛的商品不存在或不屬於這家店。"
+    },
+    "post.product_not_available": {
+      "message": "商品不存在或沒有上架",
+      "description": "貼文掛的商品不存在，或沒有上架。"
+    },
+    "post.product_not_owned": {
+      "message": "只能帶自己店裡的商品",
+      "description": "貼文掛的商品不屬於這家店。"
+    },
+    "post.product_unverifiable": {
+      "message": "暫時無法確認商品，請稍後再試",
+      "description": "確認商品的服務暫時失敗，不能當成商品不存在。"
+    },
+    "post.publish_body_required": {
+      "message": "發布的貼文內文必填",
+      "description": "發布貼文時內文是空的。"
+    },
+    "post.publish_etag_required": {
+      "message": "發布貼文必須帶讀取時的版本（etag）",
+      "description": "發布貼文沒有帶 etag。"
+    },
+    "post.publish_image_required": {
+      "message": "發布的貼文需要 1 張照片",
+      "description": "發布貼文時沒有照片。"
+    },
+    "post.status_invalid": {
+      "message": "貼文狀態不合法",
+      "description": "貼文狀態不是已知的值。"
+    },
+    "post.unpublish_draft": {
+      "message": "草稿還沒發布，不能下架",
+      "description": "對草稿貼文下架。"
+    },
+    "post.unpublish_etag_required": {
+      "message": "下架貼文必須帶讀取時的版本（etag）",
+      "description": "下架貼文沒有帶 etag。"
+    },
+    "post.update_etag_required": {
+      "message": "修改貼文必須帶讀取時的版本（etag）",
+      "description": "修改貼文沒有帶 etag。"
+    },
+    "post.version_conflict": {
+      "message": "這篇貼文已被其他人修改，請對照最新的內容後再送出",
+      "description": "貼文的 etag 版本與資料庫不同（樂觀鎖衝突）。"
+    },
+    "post_body.community_rules": {
+      "message": "內文不符社群守則",
+      "description": "內文命中髒字詞典（textfilter）。"
+    },
+    "post_body.invalid_text": {
+      "message": "內文不是有效的文字",
+      "description": "內文不是有效的 UTF-8。"
+    },
+    "post_body.required": {
+      "message": "內文必填",
+      "description": "內文去頭尾空白後是空的。"
+    },
+    "post_body.too_long": {
+      "message": "內文不可超過 {max} 個字",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "內文超過字數上限（以字元計）。max 是上限。"
+    },
+    "query.count_negative": {
+      "message": "筆數不可為負數",
+      "description": "查詢的筆數上限是負數。"
+    },
+    "query.window_order": {
+      "message": "結束時間必須晚於開始時間",
+      "description": "熱門查詢的時間範圍結束不晚於開始。"
+    },
+    "query.window_too_long": {
+      "message": "時間範圍最長 {days} 天",
+      "params": {
+        "days": {
+          "type": "integer"
+        }
+      },
+      "description": "熱門查詢的時間範圍超過上限。days 是上限天數（model.MaxTrendingWindow）。"
+    },
+    "reply.parent_required": {
+      "message": "回覆的對象要帶父留言",
+      "description": "回覆沒有帶父留言（留言與討論區留言共用）。"
+    },
+    "reply.same_thread_only": {
+      "message": "只能回覆同一串裡看得到的留言",
+      "description": "回覆的對象不在同一串或看不到（留言與討論區留言共用）。"
+    }
+  },
+  "staff": {
+    "hide.admin_required": {
+      "message": "缺少管理員",
+      "description": "隱藏或還原沒有管理員 ID。"
+    },
+    "hide.content_not_found": {
+      "message": "找不到這則內容",
+      "description": "隱藏的對象不存在。"
+    },
+    "hide.not_hidden": {
+      "message": "這則內容目前沒有被隱藏",
+      "description": "還原一則沒有被隱藏的內容。"
+    },
+    "hide.reason_category_invalid": {
+      "message": "理由的類別不合法",
+      "description": "隱藏、處分的理由類別不是社群可判定的類別（policy.CommunityAssessable）。"
+    },
+    "hide.reason_too_long": {
+      "message": "理由不可超過 {max} 個字",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "隱藏理由超過上限。max 是 model.MaxHideReasonRunes。"
+    },
+    "hide.restore_reason": {
+      "message": "還原的原因必填，不可超過 {max} 個字",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "還原沒有給原因或超過上限。max 是 model.MaxHideReasonRunes。"
+    },
+    "hide.source_ref_too_long": {
+      "message": "來源參照不可超過 {max} 個字",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "來源參照超過上限。max 是 model.MaxSourceRefRunes。"
+    },
+    "hide.store_content": {
+      "message": "店家身分寫的內容走內容下架措施，不能隱藏",
+      "description": "對象是店家身分寫的內容。"
+    },
+    "hide.target_kind_invalid": {
+      "message": "對象的種類不合法",
+      "description": "隱藏的對象種類不認得。"
+    },
+    "hide.target_not_hideable": {
+      "message": "只有留言與討論區留言能隱藏；貼文與店家的內容走內容下架措施",
+      "description": "對象是貼文或店家內容，不能用隱藏。"
+    },
+    "sanction.buyer_required": {
+      "message": "缺少買家",
+      "description": "警告沒有買家 ID。"
+    }
+  }
+}

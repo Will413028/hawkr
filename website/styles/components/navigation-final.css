@@ -1,0 +1,378 @@
+/* Extracted from styles/globals.css.
+ * Final PRD v2 navigation overrides.
+ * Keep import order in styles/globals.css unless intentionally changing cascade.
+ */
+
+/* Final PRD v2 navigation overrides. Kept last so legacy nav rules cannot win.
+ *
+ * Buyer-navbar HOST styles migrated to inline Tailwind (子刀 4, PR-B) — see
+ * components/shared/Navbar.tsx. The base `.site-nav*`/`.nav-item`/
+ * `.site-nav-action`/`.site-nav-login` host rules and their dark
+ * text/hover/border overrides are now expressed as utilities and deleted here
+ * so they no longer shadow them. Retained: the `.auto-nav` dark surface reset
+ * (子刀 1 wrapper), the dark `.site-nav-user__name` colour + user-menu panel
+ * (子刀 5), `.site-nav .brand-logo` lockup sizing, and the icon/label
+ * descendant + sr-only machinery further down. */
+
+/* Dark mode: kill every surface paint on the sticky `.auto-nav` wrapper so the
+ * 84px reserve + the gap above the floating pill stay transparent over the
+ * starry midnight body. Only the pill itself (`.site-nav__inner`) carries the
+ * dark ink surface. */
+[data-theme="dark"] body .auto-nav {
+	background: transparent;
+	background-image: none;
+	border: 0;
+	border-bottom: 0;
+	box-shadow: none;
+	-webkit-backdrop-filter: none;
+	backdrop-filter: none;
+}
+/* Dark `.site-nav-user__name` + user-menu panel/item/footer colours migrated to
+ * inline Tailwind (步驟 6) — see Navbar.tsx / navUserMenu.ts. */
+
+/* Lockup sizing consumed by BrandLogo (drives the gate's lockup height).
+ * Kept — it is brand-logo sizing, not host chrome. */
+body .site-nav .brand-logo {
+	--brand-logo-render-height: 46px;
+}
+
+/* Preserve the full lockup on desktop/mobile, but use the square brand mark in
+ * the 841–1023px in-between range where the lockup would crowd navigation,
+ * search, and the action rail. These selectors intentionally live outside
+ * Tailwind layers: the shared `.brand-logo { display:inline-flex }` rule is
+ * also unlayered and otherwise wins over a utility class. */
+body .site-nav .site-nav-logo--tablet {
+	display: none;
+}
+
+@media (min-width: 841px) and (max-width: 1023px) {
+	body .site-nav .site-nav-logo--full {
+		display: none;
+	}
+
+	body .site-nav .site-nav-logo--tablet {
+		display: inline-flex;
+	}
+}
+
+body .site-nav-action.notif-bell {
+	position: relative;
+}
+
+body .site-nav-action span,
+body .site-nav-login span {
+	position: static;
+	display: inline;
+	width: auto;
+	height: auto;
+	overflow: visible;
+	clip: auto;
+	white-space: nowrap;
+}
+
+body .site-nav-action .notif-bell__inner {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	width: auto;
+	height: auto;
+	overflow: visible;
+	clip: auto;
+	line-height: 1;
+	white-space: nowrap;
+}
+
+/* #374：>1280 的 action pill 裡是「圖示 + 文字標籤」，徽章釘在 pill 右上角
+ * （原 right: 3px）就正好蓋在標籤最後一個字上。徽章屬於鈴鐺而不是整顆 pill，
+ * 改成把徽章右緣對齊圖示右緣 —— 位置與 ≤1280 的圖示 pill 一致，而且未讀數
+ * 變寬（99+）時往圖示方向長，永遠不會壓到右側標籤。
+ * 37px = pill 左內距 13px（Navbar.tsx `SITE_NAV_ACTION` 的 px-[13px]）
+ *      + 圖示方框 24px（本檔 `.site-nav-action__icon`）。 */
+body .site-nav-action .notif-bell__badge {
+	position: absolute;
+	top: 3px;
+	right: calc(100% - 37px);
+	display: inline-grid;
+	place-items: center;
+	min-width: 18px;
+	height: 18px;
+	padding: 0 5px;
+	border-color: var(--surface-card);
+	box-sizing: border-box;
+	font-size: 0.625rem;
+	line-height: 1;
+	z-index: 1;
+}
+
+body .site-nav-action > svg,
+body .site-nav-action .notif-bell__inner > svg,
+body .site-nav-login > svg {
+	width: 20px;
+	height: 20px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+body .site-nav-login .site-nav-login__icon {
+	display: inline-grid;
+	place-items: center;
+	width: 24px;
+	height: 24px;
+	flex: 0 0 24px;
+	overflow: hidden;
+	line-height: 0;
+}
+
+body .site-nav-action .site-nav-action__icon {
+	display: inline-grid;
+	place-items: center;
+	width: 24px;
+	height: 24px;
+	flex: 0 0 24px;
+	overflow: hidden;
+	line-height: 0;
+}
+
+body .site-nav-login .site-nav-login__icon > div,
+body .site-nav-login .site-nav-login__icon svg,
+body .site-nav-action .site-nav-action__icon > span,
+body .site-nav-action .site-nav-action__icon > div,
+body .site-nav-action .site-nav-action__icon svg {
+	position: static;
+	display: block;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	margin: 0;
+	overflow: visible;
+	clip: auto;
+	white-space: normal;
+}
+
+/* Awkward in-between range — center nav is still shown (only hides at
+ * ≤840 per the prd-v2-commerce legacy rule), but the full set of right
+ * icons + label text + user name + chevron overflows the pill at
+ * ~1024–1280px viewports and the avatar gets clipped at the rounded
+ * edge. The label spans get force-hidden because the base rule in this
+ * file (line ~144) renders them as `position: static; display: inline`
+ * (the 購物車/訊息/通知 text next to each icon), making every action
+ * button ~80–100px wide. Lives here, not navigation-shell.css, because
+ * that file loads first and its rules are overridden by this one. */
+@media (max-width: 1280px) {
+	/* Host collapse (site-nav/inner padding, center/right gap, action/login →
+	 * 40px icon pill) migrated to `max-[1280px]:` utilities in Navbar.tsx. The
+	 * descendant sr-only label-hide + icon/notif/svg rules below stay. */
+	body .site-nav-action
+		> span:not(.site-nav-action__icon):not(.notif-bell__inner):not(
+			.notif-bell__badge
+		),
+	body .site-nav-login > span:not(.site-nav-login__icon) {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
+	}
+	body .site-nav-action .site-nav-action__icon,
+	body .site-nav-action .notif-bell__inner,
+	body .site-nav-login .site-nav-login__icon {
+		position: static;
+		display: inline-grid;
+		place-items: center;
+		width: 24px;
+		height: 24px;
+		clip: auto;
+	}
+	body .site-nav-action > span.notif-bell__inner {
+		position: relative;
+		display: inline-grid;
+		place-items: center;
+		width: 24px;
+		height: 24px;
+		overflow: visible;
+		clip: auto;
+		line-height: 0;
+		white-space: normal;
+	}
+	body
+		.site-nav-action
+		> .notif-bell__inner
+		> span:not(.site-nav-action__icon):not(.notif-bell__badge) {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
+	}
+	body .site-nav-action .notif-bell__badge {
+		top: 2px;
+		right: 2px;
+		min-width: 18px;
+		height: 18px;
+		padding: 0 4px;
+		border-width: 2px;
+	}
+	body .site-nav-action svg,
+	body .site-nav-login svg {
+		width: 22px;
+		height: 22px;
+	}
+	/* `.site-nav-user__trigger` ≤1280 collapse (padding/gap) + name/chev hide
+	 * migrated to `[@media(max-width:1280px)]:` utilities in Navbar.tsx (步驟 6). */
+}
+
+/* 本 repo 的「840px」是兩個**不同**的條件，不是筆誤，改動前先確認自己要對齊哪一個：
+ *   - `Navbar.tsx`（頂部導覽列）用 `[@media(max-width:840px)]:`
+ *       → `@media (max-width: 840px)`，**含** 840
+ *   - `MobileBottomNav.tsx`（底部導覽列）用 `max-[840px]:`
+ *       → `@media not (min-width: 840px)`，**不含** 840
+ * 本區塊是前者的 CSS 對應，故維持 `max-width: 840px`；底部導覽列的變數與它所需的
+ * 內容淨空另立區塊（見下方 `@media not (min-width: 840px)`）。 */
+@media (max-width: 840px) {
+	:root {
+		--nav-height: 56px;
+	}
+
+	/* Host tablet rules (site-nav/inner box-model, center+login hide, right rail
+	 * shift, action → 40px) migrated to `max-[840px]:`/`max-[1280px]:` utilities
+	 * in Navbar.tsx. The :root nav-height vars above + the descendant sr-only /
+	 * notif / icon rules below stay. */
+	body .site-nav-action
+		> span:not(.site-nav-action__icon):not(.notif-bell__inner):not(
+			.notif-bell__badge
+		) {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
+	}
+
+	body .site-nav-action > span.notif-bell__inner {
+		position: relative;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 24px;
+		height: 24px;
+		overflow: visible;
+		clip: auto;
+		white-space: normal;
+	}
+
+	body
+		.site-nav-action
+		> .notif-bell__inner
+		> span:not(.site-nav-action__icon):not(.notif-bell__badge) {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
+	}
+
+	body .site-nav-action .site-nav-action__icon {
+		position: static;
+		width: 24px;
+		height: 24px;
+		overflow: hidden;
+		clip: auto;
+	}
+
+	[data-theme="dark"]
+		body
+		.site-nav__right
+		> .site-nav-action
+		.site-nav-action__icon--message,
+	[data-theme="dark"]
+		body
+		.site-nav__right
+		> .site-nav-action
+		.site-nav-action__icon--notification {
+		filter: brightness(1.55) saturate(1.25);
+		opacity: 1;
+	}
+
+	body .site-nav .brand-logo {
+		--brand-logo-render-height: 34px;
+	}
+
+	/* padding-bottom 的預設是 0：底部導覽列只在 `not (min-width: 840px)` 出現，
+	 * 下方那個區塊才把淨空加回去。這裡必須顯式寫 0 而不是留空 —— `styles/legacy/
+	 * prd-v2-commerce.css` 的 `@media (max-width: 840px) .page-content` 仍有一份
+	 * 遷移前的 `padding-bottom: 74px`，它一直被本檔更高權重的 `body .page-content`
+	 * 遮住；不補這個 0，正好 840px（導覽列已 display:none）就會露出那 74px 空位。 */
+	body .page-content {
+		padding-top: 0;
+		padding-bottom: 0;
+	}
+}
+
+/* 底部導覽列（`MobileBottomNav.tsx`）的幾何鏡像，以及它所需的內容淨空。
+ *
+ * 條件寫成 `not (min-width: 840px)` 而非 `max-width: 840px`：這是 Tailwind v4 為元件
+ * 上的 `max-[840px]:grid` 產生的**同一句** media query（實測編譯輸出），兩者因此在
+ * 任何瀏覽器上同真同假。寫成 `max-width: 840px` 會在**正好 840px** 時多含一個像素寬
+ * 的區間，替一個 `display:none` 的元件保留 94px 空位。
+ *
+ * ⚠️ 這兩個變數是元件實際渲染幾何的「鏡像」，不是它的成因。元件已遷 Tailwind
+ * （`fixed bottom-2.5 p-2`，高度由內容決定），CSS 這側無法反過來決定它的尺寸；
+ * 一旦元件的 padding / icon 尺寸 / 標籤字級 / bottom 位移改動，這裡必須同步。
+ *
+ * 之所以不改成 JS 動態量測：量測結果只能在 client 端量完才寫回，首屏會拿不到值
+ * → `.page-content` 的 padding-bottom 與 toast offset 會在水合後跳動（CLS）。
+ * 拿一個技術債換一個 UX 缺陷不划算。
+ *
+ * 「靠人記得」不是防線，所以由測試釘住（值再漂會紅，不是等人發現）：
+ *   - tests/mobile-bottom-nav-geometry.spec.ts — 實際渲染幾何 vs 本檔宣告值（真瀏覽器）
+ *   - tests/mobile-bottom-nav-tokens.test.ts   — 本檔宣告值 vs AppToaster fallback，
+ *                                                 以及本區塊條件 vs 元件的 `max-[840px]:`
+ *
+ * 值的來源（2026-07-30 實測，360 / 393 / 700 / 839 四種寬度量到同一個數，與 DPR 無關）：
+ *   height 67.5px = 1px 上框 + 8px padding + 49.5px item（30px icon + 3px gap
+ *                   + 16.5px 的 11px 標籤行高）+ 8px padding + 1px 下框 → 宣告 68px
+ *   bottom 10px   = 元件的 `bottom-2.5`（固定值）
+ *
+ * bottom 不得寫成 `max(10px, env(safe-area-inset-bottom))`：元件從未套用 safe-area，
+ * `bottom-2.5` 就是全部。env() 只會讓變數在有安全區的機種上比實際多讓 24px 以上，
+ * 而瀏覽器模擬環境永遠量到 0、測不出來 —— 純 px 常數這件事由 tokens 測試擋著。 */
+@media not (min-width: 840px) {
+	:root {
+		--mobile-bottom-nav-bottom: 10px;
+		--mobile-bottom-nav-height: 68px;
+	}
+
+	body .page-content {
+		padding-bottom: calc(
+			var(--mobile-bottom-nav-height) +
+			var(--mobile-bottom-nav-bottom) +
+			16px
+		);
+	}
+
+	/* z-index 決策：本檔曾有 7 個規則區塊 / 9 個選擇器針對 `.mobile-bottom-nav*`，
+	 * 其中 `z-index: calc(var(--z-toast) + 1)`（=701）意圖讓底部導覽列蓋住 toast。
+	 * 那組規則**從未生效過**，也不是遷移殘留：`bf58143c`（2026-05-28 10:18）把元件
+	 * 遷成 Tailwind utilities 時，已同步把本檔的 `.mobile-bottom-nav*` 刪到 0 命中；
+	 * 上面兩個變數與那 9 個選擇器，是同日 20:44 的 `53f189f2`（`bf58143c` 的後裔）
+	 * 新增的 —— 寫進來的當下 DOM 裡已經沒有這個 class，因此它們從第一天起描述的就是
+	 * 一個從未被渲染的元件（`git log -S mobile-bottom-nav` 可覆核）。實際生效的疊放
+	 * 順序一直是元件上的 `z-[200]`，低於 sonner 的 `--z-toast: 700`。
+	 *
+	 * 該意圖**不予恢復**：sonner 手機版已改停底部並以
+	 * `calc(var(--mobile-bottom-nav-height) + var(--mobile-bottom-nav-bottom) + 12px)`
+	 * 讓開導覽列，兩者在垂直方向不相交，疊放順序沒有可觀察的差別（已實測，見
+	 * tests/mobile-bottom-nav-geometry.spec.ts 的淨空斷言）。若日後 toast 改回會與
+	 * 導覽列重疊的位置，要改的是元件上那個 `z-[200]`（唯一生效處），不是這裡。 */
+}

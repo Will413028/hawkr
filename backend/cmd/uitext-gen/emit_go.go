@@ -1,0 +1,381 @@
+package main
+
+import (
+	"bytes"
+	"fmt"
+	"go/format"
+	"strconv"
+	"strings"
+
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext/icu"
+)
+
+const generatedHeader = "由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。"
+
+// goParams 描述一則訊息在 Go 裡怎麼取參數。
+type goParams struct {
+	byName map[string]Param
+	// access 回參數在函式裡的運算式（字串、整數的變數名稱）。
+	access func(name string) string
+	// nounVar 回名詞參數解出文字後放的區域變數名稱。
+	nounVar func(name string) string
+}
+
+type goGen struct {
+	needStrconv bool
+	// qual 是引用 uitext 套件符號的前綴：目錄本身是空字串，模組句子是 "uitext."。
+	qual string
+}
+
+func (g *goGen) compile(nodes []icu.Node, loc string, ps goParams) string {
+	if len(nodes) == 0 {
+		return `""`
+	}
+	parts := make([]string, 0, len(nodes))
+	for _, n := range nodes {
+		switch n := n.(type) {
+		case icu.Text:
+			parts = append(parts, strconv.Quote(n.Value))
+		case icu.Arg:
+			p := ps.byName[n.Name]
+			switch p.Kind { //nolint:exhaustive // 其餘種類走預設分支
+			case ParamInteger:
+				g.needStrconv = true
+				parts = append(parts, "strconv.Itoa("+ps.access(n.Name)+")")
+			case ParamNoun:
+				parts = append(parts, ps.nounVar(n.Name))
+			default:
+				parts = append(parts, ps.access(n.Name))
+			}
+		case icu.Select:
+			p := ps.byName[n.Name]
+			var b strings.Builder
+			fmt.Fprintf(&b, "func() string {\nswitch %s {\n", ps.access(n.Name))
+			var other string
+			for _, br := range n.Branches {
+				body := g.compile(br.Body, loc, ps)
+				if br.Selector == "other" {
+					other = body
+					continue
+				}
+				fmt.Fprintf(&b, "case %s:\nreturn %s\n", strconv.Quote(strings.TrimPrefix(br.Selector, p.Enum.Prefix)), body)
+			}
+			fmt.Fprintf(&b, "default:\nreturn %s\n}\n}()", other)
+			parts = append(parts, b.String())
+		case icu.Plural:
+			var other string
+			var others []icu.Branch
+			for _, br := range n.Branches {
+				if br.Selector == "other" {
+					other = g.compile(br.Body, loc, ps)
+				} else {
+					others = append(others, br)
+				}
+			}
+			if len(others) == 0 {
+				parts = append(parts, other)
+				continue
+			}
+			var b strings.Builder
+			fmt.Fprintf(&b, "func() string {\nswitch %sPluralCategory(%s%s, %s) {\n", g.qual, g.qual, localeConst(loc), ps.access(n.Name))
+			for _, br := range others {
+				fmt.Fprintf(&b, "case %s:\nreturn %s\n", strconv.Quote(br.Selector), g.compile(br.Body, loc, ps))
+			}
+			fmt.Fprintf(&b, "default:\nreturn %s\n}\n}()", other)
+			parts = append(parts, b.String())
+		}
+	}
+	return strings.Join(parts, " + ")
+}
+
+// goSignature 回函式的參數列（不含接收者）。
+func goParamList(f *Func) string {
+	var parts []string
+	if f.Kind == FuncNoun || f.Kind == FuncVariant {
+		parts = append(parts, "v string")
+	}
+	if f.Kind == FuncError {
+		parts = append(parts, "code string")
+	}
+	for _, p := range f.Params {
+		t := "string"
+		if p.Kind == ParamInteger {
+			t = "int"
+		}
+		parts = append(parts, p.Name+" "+t)
+	}
+	return strings.Join(parts, ", ")
+}
+
+func goHasNounParams(f *Func) bool {
+	for _, p := range f.Params {
+		if p.Kind == ParamNoun {
+			return true
+		}
+	}
+	return false
+}
+
+// goReturnsOK 是函式是否回 (string, bool)：有值要查（可能沒有文字）或有名詞參數。
+func goReturnsOK(f *Func) bool {
+	switch f.Kind { //nolint:exhaustive // 其餘種類走預設分支
+	case FuncUnknown:
+		return false
+	case FuncSentence:
+		return goHasNounParams(f)
+	}
+	return true
+}
+
+// blocks 把 f 的有效訊息依（受眾、語系）分組，給 Go 與 Dart 的 emitter 用。
+type block struct {
+	cond  string // Go 條件；空字串是最後的預設區塊
+	cases []blockCase
+}
+
+type blockCase struct {
+	c    *Case
+	msg  *Msg // nil 表示明確的「沒有文字」
+	loc  string
+	aud  Audience
+	omit bool
+}
+
+func (m *Model) goBlocks(f *Func) []block {
+	var out []block
+	if f.HasStaff {
+		b := block{cond: "t.staff"}
+		for _, c := range f.Cases {
+			if f.omitted(AudStaff, c.Value) {
+				b.cases = append(b.cases, blockCase{c: c, omit: true, loc: staffLocale, aud: AudStaff})
+				continue
+			}
+			if msg := c.Msgs[AudStaff][staffLocale]; msg != nil {
+				b.cases = append(b.cases, blockCase{c: c, msg: msg, loc: staffLocale, aud: AudStaff})
+			}
+		}
+		out = append(out, b)
+	}
+	for _, loc := range m.Config.Locales {
+		if loc == m.Config.SourceLocale {
+			continue
+		}
+		b := block{cond: "t.Locale() == " + localeConst(loc)}
+		for _, c := range f.Cases {
+			if f.omitted(AudDefault, c.Value) {
+				continue
+			}
+			if msg := c.Msgs[AudDefault][loc]; msg != nil {
+				b.cases = append(b.cases, blockCase{c: c, msg: msg, loc: loc, aud: AudDefault})
+			}
+		}
+		if len(b.cases) > 0 {
+			out = append(out, b)
+		}
+	}
+	b := block{}
+	for _, c := range f.Cases {
+		if f.omitted(AudDefault, c.Value) {
+			continue
+		}
+		if msg := c.Msgs[AudDefault][m.Config.SourceLocale]; msg != nil {
+			b.cases = append(b.cases, blockCase{c: c, msg: msg, loc: m.Config.SourceLocale, aud: AudDefault})
+		}
+	}
+	out = append(out, b)
+	return out
+}
+
+// EmitGo 生成 catalog_gen.go。
+func (m *Model) EmitGo() ([]byte, error) {
+	g := &goGen{}
+	var body strings.Builder
+	for _, f := range m.Funcs {
+		m.goFunc(g, &body, f)
+	}
+	var out strings.Builder
+	fmt.Fprintf(&out, "// Code generated by backend/cmd/uitext-gen; DO NOT EDIT.\n// %s\n\npackage uitext\n\n", generatedHeader)
+	if g.needStrconv {
+		out.WriteString("import \"strconv\"\n\n")
+	}
+	out.WriteString(body.String())
+	return format.Source([]byte(out.String()))
+}
+
+func (m *Model) goFunc(g *goGen, b *strings.Builder, f *Func) {
+	name := pascal(f.ID)
+	ret := "string"
+	if goReturnsOK(f) {
+		ret = "(string, bool)"
+	}
+	if f.Kind == FuncError {
+		ret = "(Message, bool)"
+	}
+	fmt.Fprintf(b, "// %s 是 %s 的文案。\n", name, f.ID)
+	if f.Kind == FuncError {
+		b.WriteString("// 回傳的 Message.Locale 是實際使用的語系（缺字時是來源語系）；不認得的 code 回 (Message{}, false)，伺服器不顯示「未知」。\n")
+	} else if goReturnsOK(f) {
+		b.WriteString("// 不認得的值、UNSPECIFIED、沒有文字的值回 (\"\", false)；伺服器不顯示「未知」。\n")
+	}
+	fmt.Fprintf(b, "func (t Text) %s(%s) %s {\n", name, goParamList(f), ret)
+	ps := goParams{
+		byName:  map[string]Param{},
+		access:  func(n string) string { return n },
+		nounVar: func(n string) string { return n + "Text" },
+	}
+	for _, p := range f.Params {
+		ps.byName[p.Name] = p
+		if p.Kind == ParamNoun {
+			fmt.Fprintf(b, "%sText, ok := t.%s(%s)\nif !ok {\nreturn \"\", false\n}\n", p.Name, pascal(p.Enum.Path), p.Name)
+		}
+	}
+	single := f.Kind == FuncSentence || f.Kind == FuncUnknown
+	fail := `return "", false`
+	if f.Kind == FuncError {
+		fail = `return Message{}, false`
+	}
+	if !goReturnsOK(f) {
+		fail = `return ""`
+	}
+	retExpr := func(expr, loc string) string {
+		if f.Kind == FuncError {
+			return "return " + g.qual + "Message{Text: " + expr + ", Locale: " + g.qual + localeConst(loc) + "}, true"
+		}
+		if goReturnsOK(f) {
+			return "return " + expr + ", true"
+		}
+		return "return " + expr
+	}
+	for _, blk := range m.goBlocks(f) {
+		if len(blk.cases) == 0 && blk.cond != "t.staff" {
+			continue
+		}
+		if blk.cond != "" {
+			fmt.Fprintf(b, "if %s {\n", blk.cond)
+		}
+		switch {
+		case single:
+			if len(blk.cases) > 0 {
+				bc := blk.cases[0]
+				b.WriteString(retExpr(g.compile(bc.msg.AST.Nodes, bc.loc, ps), bc.loc) + "\n")
+			}
+		default:
+			b.WriteString("switch " + switchSubject(f) + " {\n")
+			for _, bc := range blk.cases {
+				fmt.Fprintf(b, "case %s:\n", strconv.Quote(goValue(f, bc.c.Value)))
+				if bc.omit {
+					b.WriteString(fail + "\n")
+					continue
+				}
+				b.WriteString(retExpr(g.compile(bc.msg.AST.Nodes, bc.loc, ps), bc.loc) + "\n")
+			}
+			b.WriteString("}\n")
+		}
+		if blk.cond == "t.staff" {
+			// staff 受眾每個值都有（或明確沒有文字），不退回預設受眾。
+			if !single {
+				b.WriteString(fail + "\n")
+			}
+		}
+		if blk.cond != "" {
+			b.WriteString("}\n")
+		}
+	}
+	if !single {
+		b.WriteString(fail + "\n")
+	}
+	b.WriteString("}\n\n")
+}
+
+func switchSubject(f *Func) string {
+	if f.Kind == FuncError {
+		return "code"
+	}
+	return "v"
+}
+
+// goValue 是 Go 的 API 看到的值：enum 值名去掉型別前綴；Connect code 維持 proto 名。
+func goValue(f *Func, value string) string {
+	if f.Enum != nil {
+		return strings.TrimPrefix(value, f.Enum.Prefix)
+	}
+	return value
+}
+
+// gofmtCheck 供測試確認輸出是合法且已格式化的 Go。
+func gofmtCheck(src []byte) error {
+	out, err := format.Source(src)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(out, src) {
+		return fmt.Errorf("輸出沒有經過 gofmt")
+	}
+	return nil
+}
+
+// EmitModule 生成模組 text/ 目錄的 text_gen.go（package text）。
+func (m *Model) EmitModule(mm *ModuleModel) ([]byte, error) {
+	g := &goGen{qual: "uitext."}
+	var body strings.Builder
+	for _, k := range mm.Keys {
+		name := pascal(k.Key)
+		ps := goParams{
+			byName:  map[string]Param{},
+			access:  func(n string) string { return "a." + upperFirst(n) },
+			nounVar: func(n string) string { return n },
+		}
+		for _, p := range k.Params {
+			ps.byName[p.Name] = p
+		}
+		sig := "l uitext.Locale"
+		if k.Staff {
+			sig = ""
+		}
+		if len(k.Params) > 0 {
+			if sig != "" {
+				sig += ", "
+			}
+			sig += "a " + name + "Args"
+			fmt.Fprintf(&body, "// %sArgs 是 %s 的參數。\ntype %sArgs struct {\n", name, name, name)
+			for _, p := range k.Params {
+				t := "string"
+				if p.Kind == ParamInteger {
+					t = "int"
+				}
+				fmt.Fprintf(&body, "%s %s\n", upperFirst(p.Name), t)
+			}
+			body.WriteString("}\n\n")
+		}
+		msg := func(loc string) string {
+			return "uitext.Message{Text: " + g.compile(k.Msgs[loc].AST.Nodes, loc, ps) + ", Locale: uitext." + localeConst(loc) + "}"
+		}
+		if k.Staff {
+			fmt.Fprintf(&body, "// %s 是後台員工受眾的模組句子 %s（只有 %s）。\nfunc %s(%s) uitext.Message {\nreturn %s\n}\n\n", name, k.Key, staffLocale, name, sig, msg(m.Config.SourceLocale))
+			continue
+		}
+		fmt.Fprintf(&body, "// %s 是模組句子 %s；Message.Locale 是實際使用的語系（該語系缺字時是 %s）。\nfunc %s(%s) uitext.Message {\n", name, k.Key, m.Config.SourceLocale, name, sig)
+		var locs []string
+		for _, loc := range m.Config.Locales {
+			if loc != m.Config.SourceLocale && k.Msgs[loc] != nil {
+				locs = append(locs, loc)
+			}
+		}
+		if len(locs) > 0 {
+			body.WriteString("switch l {\n")
+			for _, loc := range locs {
+				fmt.Fprintf(&body, "case uitext.%s:\nreturn %s\n", localeConst(loc), msg(loc))
+			}
+			body.WriteString("}\n")
+		}
+		fmt.Fprintf(&body, "return %s\n}\n\n", msg(m.Config.SourceLocale))
+	}
+	var out strings.Builder
+	fmt.Fprintf(&out, "// Code generated by backend/cmd/uitext-gen; DO NOT EDIT.\n// %s\n\npackage text\n\nimport (\n", generatedHeader)
+	if g.needStrconv {
+		out.WriteString("\"strconv\"\n\n")
+	}
+	out.WriteString("\"github.com/Will413028/hawkr/backend/internal/platform/uitext\"\n)\n\n")
+	out.WriteString(body.String())
+	return format.Source([]byte(out.String()))
+}

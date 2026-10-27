@@ -1,0 +1,188 @@
+server:
+  port: 9914
+
+# gRPC Server Configuration
+grpc:
+  server:
+    port: ${GRPC_PORT:9915}
+    reflection-service-enabled: true
+
+spring:
+  autoconfigure:
+    exclude:
+      - net.devh.boot.grpc.client.autoconfigure.GrpcClientAutoConfiguration
+      - net.devh.boot.grpc.client.autoconfigure.GrpcClientHealthAutoConfiguration
+  application:
+    name: order-service
+  cloud:
+    nacos:
+      discovery:
+        enabled: ${NACOS_ENABLED:false}
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+        metadata:
+          grpc-port: ${GRPC_PORT:9915}
+          version: 1.0.0
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_POOL_PORT:5432}/${DB_NAME:hawkr_order}?sslmode=${DB_SSLMODE:disable}&prepareThreshold=0
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      minimum-idle: 2            # 閒置時最少保持的連線數
+      maximum-pool-size: 10      # 連線池上限（含閒置+使用中）
+      connection-timeout: 30000  # 取得連線的最長等待時間（毫秒），超時拋 SQLException
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 5000ms
+  rabbitmq:
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
+    virtual-host: ${RABBITMQ_VHOST:/}
+  flyway:
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:hawkr_order}?sslmode=${DB_SSLMODE:disable}
+    user: ${DB_USER}
+    password: ${DB_PASSWORD}
+    enabled: ${FLYWAY_ENABLED:true}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+
+mybatis-plus:
+  mapper-locations: classpath:/mapper/**/*.xml
+  global-config:
+    db-config:
+      id-type: INPUT
+  configuration:
+    map-underscore-to-camel-case: true
+  type-handlers-package: io.github.will413028.hawkr.order.config.typehandler
+
+# Hawkr Observability 配置
+hawkr:
+  obs:
+    service: order-service
+    grpc:
+      targets:
+        product:
+          host: ${PRODUCT_SERVICE_HOST:127.0.0.1}
+          port: ${PRODUCT_SERVICE_GRPC_PORT:9913}
+          plaintext: true
+        cart:
+          host: ${CART_SERVICE_HOST:127.0.0.1}
+          port: ${CART_SERVICE_GRPC_PORT:9927}
+          plaintext: true
+        payment:  # 目前 Order↔Payment 走 RabbitMQ，此 target 為未來直接 gRPC 呼叫預留
+          host: ${PAYMENT_SERVICE_HOST:127.0.0.1}
+          port: ${PAYMENT_SERVICE_GRPC_PORT:9925}
+          plaintext: true
+        coupon:
+          host: ${COUPON_SERVICE_HOST:127.0.0.1}
+          port: ${COUPON_SERVICE_GRPC_PORT:9951}
+          plaintext: true
+        seller:
+          host: ${SELLER_SERVICE_HOST:127.0.0.1}
+          port: ${SELLER_SERVICE_GRPC_PORT:9941}
+          plaintext: true
+        buyer:
+          host: ${BUYER_SERVICE_HOST:127.0.0.1}
+          port: ${BUYER_SERVICE_GRPC_PORT:9941}
+          plaintext: true
+        shipping:
+          host: ${SHIPPING_SERVICE_HOST:127.0.0.1}
+          port: ${SHIPPING_SERVICE_GRPC_PORT:9929}
+          plaintext: true
+        media:
+          host: ${MEDIA_SERVICE_HOST:127.0.0.1}
+          port: ${MEDIA_SERVICE_GRPC_PORT:9937}
+          plaintext: true
+        aftersales:
+          host: ${AFTERSALES_SERVICE_HOST:127.0.0.1}
+          port: ${AFTERSALES_SERVICE_GRPC_PORT:9923}
+          plaintext: true
+        # 58 號 §6.2.4「order-service ①」。checkout preview／confirm 的兩支 internal RPC
+        # （ResolveOrderInvoiceModeInternal／ValidateOrderInvoiceInputInternal）都走這個 target。
+        # GrpcChannelRegistry.getOrCreate 是 lazy 的：target 沒宣告時**第一次呼叫**才拋
+        # IllegalArgumentException，而那個「第一次」就是買家按下結帳的那一刻。
+        # port 取自 k8s/values/invoice-service.yaml 的 GRPC_PORT=10041（HTTP 是 10040、
+        # PDF 通道是 10042，三個不同的 port 不可共用一個變數）。
+        invoice:
+          host: ${INVOICE_SERVICE_HOST:127.0.0.1}
+          port: ${INVOICE_SERVICE_GRPC_PORT:10041}
+          plaintext: true
+  order:
+    payment-deadline-seconds: ${PAYMENT_DEADLINE_SECONDS:86400}  # 付款期限（秒），預設 24 小時
+    # 64 號 §6.4.11：RFQ 成交建單的付款期限 = 建單 +12h，與結帳路徑刻意不同
+    rfq-payment-deadline-seconds: ${RFQ_PAYMENT_DEADLINE_SECONDS:43200}
+    # backend#3262 撥款閘門：無時間界 hold（售後進行中 / 申訴審理中）與 aftersales 反查失敗時的重問間隔（秒）
+    payout-hold-recheck-seconds: ${ORDER_PAYOUT_HOLD_RECHECK_SECONDS:600}
+    auto-complete-hours: ${AUTO_COMPLETE_HOURS:60}          # 送達後自動完成小時數（03 §5.4，生鮮保鮮期短）
+    auto-complete-interval-ms: ${AUTO_COMPLETE_INTERVAL_MS:3600000}  # 自動完成掃描間隔（毫秒）
+    auto-complete-batch-size: ${AUTO_COMPLETE_BATCH_SIZE:100}        # 每批次處理數量
+    cancel-scan-interval-ms: ${CANCEL_SCAN_INTERVAL_MS:15000}      # 付款超時掃描間隔（毫秒），預設 15 秒
+    outbox-publish-interval-ms: ${ORDER_OUTBOX_PUBLISH_INTERVAL_MS:5000}        # order.paid Outbox 輪詢間隔（03 §8.10）
+    shipment-backstop-enabled: ${ORDER_SHIPMENT_BACKSTOP_ENABLED:true}          # 付款後建單兜底開關（03 §8.11）
+    shipment-backstop-interval-ms: ${ORDER_SHIPMENT_BACKSTOP_INTERVAL_MS:300000} # 建單兜底掃描間隔（毫秒），預設 5 分鐘
+    shipment-backstop-grace-minutes: ${ORDER_SHIPMENT_BACKSTOP_GRACE_MINUTES:30} # 付款後寬限期（分），首次重試前緩衝
+    shipment-backstop-max-attempts: ${ORDER_SHIPMENT_BACKSTOP_MAX_ATTEMPTS:5}    # 重試上限，超過取消退款
+    # issue #2294 H4：本值同時是 give-up 分支（重試上限耗盡 → 送取消+退款）的「租約」長度。
+    # 那是租約不是「已放棄」旗標：取消一旦生效訂單就離開 PAID、自然退出候選；
+    # 只有「取消沒生效」或「publish 靜默失敗」時才會在租約到期後再送一次（可觀測 > 不可觀測）。
+    # ⚠️ 曾另有 shipment-backstop-give-up-lease-minutes（1440）—— 已移除：
+    #    那個租約同時是「publish 靜默失敗後的救援窗口」，24 小時 = 買家已付款卻無單無退款無告警 24 小時。
+    #    上界＝本重試節奏（終局救援不得比非終局的重試更慢），推導見 ShipmentCreationBackstopScheduler javadoc。
+    shipment-backstop-backoff-minutes: ${ORDER_SHIPMENT_BACKSTOP_BACKOFF_MINUTES:30} # 重試間隔（分）＋ give-up 租約
+  tsid:
+    enabled: true
+    node-id-base: 300  # Order Service: 300-399
+    pod-index: ${POD_INDEX:0}
+
+# OTel / Actuator / Tracing 配置已統一至 observability-common（observability-defaults.properties）
+
+# Resilience4j Circuit Breaker（詳見 21 §3.2、§8.3）
+# 唯一實際使用點：ShippingFeeGrpcFetcher.fetchAll → shipping-service.GetShippingFeeConfigs
+resilience4j:
+  circuitbreaker:
+    instances:
+      shipping-fee-service:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50           # 失敗率 50% 以上開路
+        wait-duration-in-open-state: 30s     # 開路 30 秒後試半開
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        # 故意不註冊 health indicator：CB 開路時不應讓 readiness 失敗，
+        # 整個 lazy + stale fallback 的目的就是 shipping-service 短暫掛掉時 order-service 仍可服務。
+        # CB 狀態仍可從 Prometheus / actuator/metrics 觀察。
+        register-health-indicator: false
+        record-exceptions:
+          - io.grpc.StatusRuntimeException
+          - java.lang.RuntimeException
+
+# 排程清理配置
+order:
+  cleanup:
+    enabled: ${CLEANUP_ENABLED:true}
+    cron: "0 0 2 * * SUN"      # 每週日凌晨 02:00
+    task-retention-days: 30      # 已完成任務保留天數
+    bank-info-retention-days: 14  # 退款銀行資訊保留天數（DONE 後 14 天清除）
+
+# PayUni 代理商 MerID（多賣家和單代收）
+# 詳見 20 設計書 §4.13 和單與 paymentMerId 決策
+# 空字串時 CheckoutPreview 接到 consolidated=true 會拒絕請求
+payuni:
+  agent:
+    mer-id: ${PAYUNI_AGENT_MER_ID:}
+
+logging:
+  level:
+    io.github.will413028.hawkr: ${LOG_LEVEL:INFO}
+    org.flywaydb: INFO

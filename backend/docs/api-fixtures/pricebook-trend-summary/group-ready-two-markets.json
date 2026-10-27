@@ -1,0 +1,40 @@
+{
+  "request": "GET /api/v1/app/sellers/pricebook/trend-summary?groupCode=trend-grp-GB1&from=2026-07-06&to=2026-07-06&granularity=day",
+  "response": {
+    "code": 0,
+    "message": "success",
+    "data": {
+      "selectionKind": "group",
+      "granularity": "day",
+      "timezone": "Asia/Taipei",
+      "points": [
+        {
+          "periodStart": "2026-07-06",
+          "periodEnd": "2026-07-06",
+          "status": "ready",
+          "observedAverageTwdPerKg": 40,
+          "volumeKg": 150,
+          "sampleCount": 1,
+          "observedMarketCount": 2,
+          "aggregationMethod": "volume_weighted/v1",
+          "qualityReasonCodes": []
+        }
+      ],
+      "comparisons": [],
+      "dataMeta": {
+        "snapshotId": "sha256:digest-2026-07-06",
+        "source": "MOA_WHOLESALE_DAILY",
+        "sourceDataAsOf": "2026-07-06T15:59:59Z",
+        "maxFeatureAvailableAt": "2026-07-06T01:00:00Z",
+        "generatedAt": "2026-08-07T17:11:16Z",
+        "freshnessStatus": "unavailable",
+        "usabilityStatus": "unusable",
+        "qualityReasonCodes": [],
+        "datasetDigest": "sha256:digest-2026-07-06",
+        "schemaVersion": "hawkr.pricebook/v1",
+        "currency": "TWD",
+        "unit": "kg"
+      }
+    }
+  }
+}

@@ -1,0 +1,7 @@
+/* Search owns the cross-result suppression rule because it coordinates two
+ * separate AssistantEntryLink render sites. The link's visual mark stays with
+ * HawkrAgentMark instead of pulling the full Agent workspace stylesheet here. */
+.search-page:has([data-search-empty] [data-hawkr-agent-entry])
+.search-page__agent-entry {
+	display: none;
+}

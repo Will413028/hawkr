@@ -1,0 +1,3 @@
+*.csv text eol=lf
+# 商品匯入的實際匯出樣本：記錄以 CRLF 結尾、儲存格內的換行是 LF，保留原始位元組。
+backend/docs/補充資料/product_import_e2e_sample.csv -text

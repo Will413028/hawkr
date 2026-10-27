@@ -1,0 +1,264 @@
+{
+  "buyer": {
+    "Gender": {
+      "GENDER_FEMALE": "女性",
+      "GENDER_MALE": "男性",
+      "GENDER_OTHER": "其他"
+    },
+    "Profile": {
+      "gender_unset": "尚未設定"
+    }
+  },
+  "common": {
+    "PolicyCategory": {
+      "POLICY_CATEGORY_COUNTERFEIT": "仿冒商品",
+      "POLICY_CATEGORY_FAKE_CERTIFICATION": "假認證",
+      "POLICY_CATEGORY_FOOD_SAFETY": "食品安全",
+      "POLICY_CATEGORY_FRAUD": "詐欺或操縱交易",
+      "POLICY_CATEGORY_HARASSMENT": "騷擾或霸凌",
+      "POLICY_CATEGORY_HATE": "仇恨或歧視言論",
+      "POLICY_CATEGORY_IMPERSONATION": "冒用或誤導交易主體",
+      "POLICY_CATEGORY_IP_INFRINGEMENT": "侵害智慧財產權",
+      "POLICY_CATEGORY_MISLEADING_INFO": "不實或誤導資訊",
+      "POLICY_CATEGORY_OFF_PLATFORM_TRADE": "繞過平台交易",
+      "POLICY_CATEGORY_OTHER": "其他",
+      "POLICY_CATEGORY_PLATFORM_ABUSE": "干擾或濫用平台",
+      "POLICY_CATEGORY_PRIVACY": "不當使用個人資料",
+      "POLICY_CATEGORY_PROHIBITED_GOODS": "違法或禁售商品",
+      "POLICY_CATEGORY_SPAM": "垃圾訊息",
+      "POLICY_CATEGORY_UNLICENSED_SALE": "未經許可販售"
+    },
+    "error": {
+      "ABORTED": "資源衝突",
+      "ALREADY_EXISTS": "資源衝突",
+      "DATA_LOSS": "系統錯誤",
+      "DEADLINE_EXCEEDED": "服務暫時不可用",
+      "FAILED_PRECONDITION": "資源衝突",
+      "INTERNAL": "系統錯誤",
+      "INVALID_ARGUMENT": "參數錯誤",
+      "NOT_FOUND": "資源不存在",
+      "OUT_OF_RANGE": "參數錯誤",
+      "PERMISSION_DENIED": "無權操作",
+      "RESOURCE_EXHAUSTED": "操作過於頻繁，請稍後再試",
+      "UNAUTHENTICATED": "未登入",
+      "UNAVAILABLE": "服務暫時不可用",
+      "UNIMPLEMENTED": "功能暫不支援",
+      "UNKNOWN": "系統錯誤"
+    },
+    "unknown": "未知"
+  },
+  "seller": {
+    "FoodRegistration": {
+      "kyc_pending_note": "平台會在商家認證通過後進行審核。",
+      "status_approved": "已登錄：{number}",
+      "status_pending": "審核中：{number}（{date} 送出）",
+      "status_rejected": "未通過：{reason}。請確認字號與食藥署登錄資料一致後重新送出。",
+      "status_revoked": "已被平台撤銷：{number}。理由：{reason}。請確認字號與食藥署登錄資料一致後重新送出審核。"
+    },
+    "FoodRegistrationState": {
+      "FOOD_REGISTRATION_STATE_APPROVED": "已通過",
+      "FOOD_REGISTRATION_STATE_ENDED": "已結束",
+      "FOOD_REGISTRATION_STATE_PENDING": "審核中",
+      "FOOD_REGISTRATION_STATE_REJECTED": "未通過"
+    },
+    "KYCField": {
+      "KYC_FIELD_BANK_ACCOUNT": "銀行帳號",
+      "KYC_FIELD_BANK_BOOK": "存摺封面",
+      "KYC_FIELD_BANK_CODE": "銀行代碼",
+      "KYC_FIELD_BANK_NAME": "銀行名稱",
+      "KYC_FIELD_BIRTH_DATE": "出生日期",
+      "KYC_FIELD_BUSINESS_COMPANY_ADDRESS": "公司地址",
+      "KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS": "補充文件",
+      "KYC_FIELD_BUSINESS_COMPANY_NAME": "公司名稱",
+      "KYC_FIELD_BUSINESS_COMPANY_PHONE": "公司電話",
+      "KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE": "設立日期",
+      "KYC_FIELD_BUSINESS_REP_ID_CARD_NO": "負責人身分證字號",
+      "KYC_FIELD_BUSINESS_TAX_ID": "統一編號",
+      "KYC_FIELD_ENGLISH_NAME": "英文姓名",
+      "KYC_FIELD_ID_CARD_BACK": "身分證反面照",
+      "KYC_FIELD_ID_CARD_FRONT": "身分證正面照",
+      "KYC_FIELD_ID_CARD_ISSUE_DATE": "發證日期",
+      "KYC_FIELD_ID_CARD_ISSUE_LOCATION": "發證地點",
+      "KYC_FIELD_ID_CARD_ISSUE_TYPE": "發證類型",
+      "KYC_FIELD_INDIVIDUAL_ID_CARD_NO": "身分證字號",
+      "KYC_FIELD_PRODUCT_TYPE": "主要商品類型",
+      "KYC_FIELD_REAL_NAME": "真實姓名",
+      "KYC_FIELD_WEBSITE_URL": "官方網站"
+    },
+    "KYCFlowStatus": {
+      "KYC_FLOW_STATUS_APPROVED": "已通過",
+      "KYC_FLOW_STATUS_BINDING": "PayUni 審核中",
+      "KYC_FLOW_STATUS_BIND_FAILED": "PayUni 建檔失敗，處理中",
+      "KYC_FLOW_STATUS_DRAFT": "填寫中",
+      "KYC_FLOW_STATUS_FORWARDED": "PayUni 審核中",
+      "KYC_FLOW_STATUS_NOT_STARTED": "待認證",
+      "KYC_FLOW_STATUS_PAYUNI_REJECTED": "PayUni 審核未通過",
+      "KYC_FLOW_STATUS_PENDING_INFO": "需補件",
+      "KYC_FLOW_STATUS_REJECTED": "未通過",
+      "KYC_FLOW_STATUS_SUBMITTED": "平台審核中",
+      "KYC_FLOW_STATUS_UNDER_REVIEW": "PayUni 審核中",
+      "action": {
+        "KYC_FLOW_STATUS_BINDING": "查看進度",
+        "KYC_FLOW_STATUS_BIND_FAILED": "查看進度",
+        "KYC_FLOW_STATUS_DRAFT": "開始認證",
+        "KYC_FLOW_STATUS_FORWARDED": "查看進度",
+        "KYC_FLOW_STATUS_NOT_STARTED": "開始認證",
+        "KYC_FLOW_STATUS_PAYUNI_REJECTED": "前往補件",
+        "KYC_FLOW_STATUS_PENDING_INFO": "前往補件",
+        "KYC_FLOW_STATUS_REJECTED": "前往補件",
+        "KYC_FLOW_STATUS_SUBMITTED": "查看進度",
+        "KYC_FLOW_STATUS_UNDER_REVIEW": "查看進度"
+      },
+      "banner_description": {
+        "KYC_FLOW_STATUS_APPROVED": "可開始正式收款、提領與配送設定。",
+        "KYC_FLOW_STATUS_DRAFT": "完成認證後才能正式收款、提領與配送設定。",
+        "KYC_FLOW_STATUS_NOT_STARTED": "完成認證後才能正式收款、提領與配送設定。",
+        "KYC_FLOW_STATUS_REJECTED": "請查看退件原因並編輯後重新送出。",
+        "KYC_FLOW_STATUS_SUBMITTED": "審核通過後將自動送出至 PayUni 進行金流審核。"
+      },
+      "banner_title": {
+        "KYC_FLOW_STATUS_APPROVED": "商家認證已通過",
+        "KYC_FLOW_STATUS_DRAFT": "尚未開始商家認證",
+        "KYC_FLOW_STATUS_NOT_STARTED": "尚未開始商家認證",
+        "KYC_FLOW_STATUS_REJECTED": "認證未通過",
+        "KYC_FLOW_STATUS_SUBMITTED": "平台審核中"
+      },
+      "gate_heading": {
+        "KYC_FLOW_STATUS_APPROVED": "尚未通過商家認證",
+        "KYC_FLOW_STATUS_DRAFT": "尚未通過商家認證",
+        "KYC_FLOW_STATUS_NOT_STARTED": "尚未通過商家認證",
+        "KYC_FLOW_STATUS_REJECTED": "商家認證需要補件",
+        "KYC_FLOW_STATUS_SUBMITTED": "商家認證審核中"
+      },
+      "gate_message": {
+        "KYC_FLOW_STATUS_APPROVED": "請先完成商家認證，才能{subject}。",
+        "KYC_FLOW_STATUS_DRAFT": "請先完成商家認證，才能{subject}。",
+        "KYC_FLOW_STATUS_NOT_STARTED": "請先完成商家認證，才能{subject}。",
+        "KYC_FLOW_STATUS_REJECTED": "認證未通過，請修改資料後重新送審。",
+        "KYC_FLOW_STATUS_SUBMITTED": "你的商家認證平台審核中，通過後將自動送出至 PayUni 進行金流審核，完成後就能{subject}。"
+      }
+    },
+    "Measure": {
+      "appeal_deadline": "申覆期限：{deadline}",
+      "meta_kind": "措施：{kind}",
+      "meta_severity": "嚴重程度：{severity}",
+      "meta_termination_ground": "事由：{ground}",
+      "rejection_cooldown_warning": "{days, plural, other {若本次經駁回，將於 {days} 日內不得再提出解除請求}}",
+      "suspension_active_open": "停權中（未定結束時間，平台定期複審）",
+      "suspension_active_until": "停權中（至 {end}）",
+      "suspension_ended": "已於 {end} 結束",
+      "termination_effective": "終止生效：{start}",
+      "termination_effective_ended": "終止生效：{start}，合作已於 {end} 結束",
+      "termination_notice": "平台已通知將於 {start} 終止合作。在此之前店家照常營業；如有異議，可提出申覆。",
+      "title_fallback": "措施紀錄",
+      "title_risk": "風險：{ground}",
+      "title_risk_fallback": "風險措施"
+    },
+    "MeasureBasis": {
+      "MEASURE_BASIS_CONTRACT": "契約條款",
+      "MEASURE_BASIS_RISK": "風險",
+      "MEASURE_BASIS_VIOLATION": "違規認定"
+    },
+    "MeasureKind": {
+      "MEASURE_KIND_SUSPENSION": "停權",
+      "MEASURE_KIND_TERMINATION": "終止合作",
+      "MEASURE_KIND_WARNING": "警告"
+    },
+    "MeasureRequest": {
+      "reply_note": "平台回覆：{reason}"
+    },
+    "MeasureRequestKind": {
+      "MEASURE_REQUEST_KIND_APPEAL": "申覆",
+      "MEASURE_REQUEST_KIND_REMEDIATION": "解除請求",
+      "submitted_note": {
+        "MEASURE_REQUEST_KIND_APPEAL": "已提交申覆，請等候平台複核。",
+        "MEASURE_REQUEST_KIND_REMEDIATION": "已提交解除請求，請等候平台複核。"
+      }
+    },
+    "MeasureRequestState": {
+      "MEASURE_REQUEST_STATE_ACCEPTED": "已通過",
+      "MEASURE_REQUEST_STATE_CLOSED": "已結案",
+      "MEASURE_REQUEST_STATE_PENDING": "審核中",
+      "MEASURE_REQUEST_STATE_REJECTED": "已駁回",
+      "with_kind": {
+        "MEASURE_REQUEST_STATE_ACCEPTED": "{kind, select, MEASURE_REQUEST_KIND_APPEAL {申覆已通過} MEASURE_REQUEST_KIND_REMEDIATION {解除請求已通過} other {請求已通過}}",
+        "MEASURE_REQUEST_STATE_PENDING": "{kind, select, MEASURE_REQUEST_KIND_APPEAL {申覆審核中} MEASURE_REQUEST_KIND_REMEDIATION {解除請求審核中} other {請求審核中}}",
+        "MEASURE_REQUEST_STATE_REJECTED": "{kind, select, MEASURE_REQUEST_KIND_APPEAL {申覆已駁回} MEASURE_REQUEST_KIND_REMEDIATION {解除請求已駁回} other {請求已駁回}}"
+      }
+    },
+    "MeasureState": {
+      "MEASURE_STATE_ACTIVE": "{kind, select, MEASURE_KIND_TERMINATION {合作已終止} other {停權中}}",
+      "MEASURE_STATE_ENDED": "已結束",
+      "MEASURE_STATE_ISSUED": "已發出",
+      "MEASURE_STATE_REVOKED": "已撤銷",
+      "MEASURE_STATE_SCHEDULED": "預定生效"
+    },
+    "PayUniState": {
+      "PAY_UNI_STATE_APPROVED": "PayUni 收款已啟用",
+      "PAY_UNI_STATE_CONTACT_SUPPORT": "PayUni 申請未通過",
+      "PAY_UNI_STATE_FIXABLE": "PayUni 需要補件",
+      "PAY_UNI_STATE_FIX_VIA_SUPPORT": "PayUni 需要補件",
+      "PAY_UNI_STATE_PENDING_INFO": "PayUni 需要補件",
+      "PAY_UNI_STATE_RETRY_LATER": "PayUni 暫時無法處理",
+      "PAY_UNI_STATE_REVIEWING": "PayUni 審核中",
+      "PAY_UNI_STATE_TERMINATED": "PayUni 收款帳戶已終止"
+    },
+    "RevokeReason": {
+      "REVOKE_REASON_ADMIN_CORRECTION": "平台更正",
+      "REVOKE_REASON_APPEAL_ACCEPTED": "申覆成立",
+      "REVOKE_REASON_EXTERNAL_DECISION": "主管機關或法院的決定",
+      "REVOKE_REASON_FINDING_REVOKED": "依據的認定已撤銷",
+      "REVOKE_REASON_OTHER": "其他",
+      "REVOKE_REASON_SOURCE_REVOKED": "關聯的終止已撤銷"
+    },
+    "RiskGround": {
+      "RISK_GROUND_EXTERNAL_ORDER": "主管機關或司法機關的要求",
+      "RISK_GROUND_FOOD_SAFETY": "食品安全",
+      "RISK_GROUND_FRAUD": "詐欺",
+      "RISK_GROUND_FULFILLMENT": "履約",
+      "RISK_GROUND_INFRINGEMENT": "侵權",
+      "RISK_GROUND_PERSONAL_DATA": "個人資料",
+      "RISK_GROUND_SECURITY": "資安",
+      "RISK_GROUND_TRANSACTION": "交易風險"
+    },
+    "SellerPayUni": {
+      "fix_fields_heading": "請修正以下資料",
+      "reason_heading": "PayUni 的審核意見"
+    },
+    "SellerRequirement": {
+      "SELLER_REQUIREMENT_KYC_APPROVED": "商家認證已通過",
+      "SELLER_REQUIREMENT_LOGO": "logo",
+      "SELLER_REQUIREMENT_NOT_PENDING_DELETION": "店家未在刪除中",
+      "SELLER_REQUIREMENT_NOT_SUSPENDED": "帳號未停權",
+      "SELLER_REQUIREMENT_STORE_ACTIVE": "店家未關閉",
+      "SELLER_REQUIREMENT_STORE_NAME": "店名",
+      "SELLER_REQUIREMENT_TOWN_CODE": "所在地"
+    },
+    "StoreField": {
+      "STORE_FIELD_ADDRESS": "店家地址",
+      "STORE_FIELD_CONTACT_MOBILE": "聯絡人手機",
+      "STORE_FIELD_CONTACT_NAME": "聯絡人姓名",
+      "STORE_FIELD_CONTACT_PHONE": "商店電話",
+      "STORE_FIELD_SUPPORT_EMAIL": "客服電子信箱"
+    },
+    "TerminationGround": {
+      "TERMINATION_GROUND_BANKRUPTCY": "破產",
+      "TERMINATION_GROUND_CEASED_BUSINESS": "停業",
+      "TERMINATION_GROUND_DISSOLUTION": "解散",
+      "TERMINATION_GROUND_FOOD_SAFETY_INCIDENT": "重大食安事件",
+      "TERMINATION_GROUND_FRAUD": "詐欺事件",
+      "TERMINATION_GROUND_LICENSE_REVOKED": "必要許可遭撤銷",
+      "TERMINATION_GROUND_LINKED_ACCOUNT": "關聯帳號",
+      "TERMINATION_GROUND_MATERIAL_BREACH": "重大違約未改善",
+      "TERMINATION_GROUND_NOTICE": "預告終止（第 21.2 條）",
+      "TERMINATION_GROUND_OTHER_SERIOUS": "其他嚴重影響履約的情形",
+      "TERMINATION_GROUND_PLATFORM_SECURITY": "危害平台安全"
+    },
+    "ViolationSeverity": {
+      "VIOLATION_SEVERITY_CRITICAL": "嚴重",
+      "VIOLATION_SEVERITY_HIGH": "高",
+      "VIOLATION_SEVERITY_LOW": "低",
+      "VIOLATION_SEVERITY_MEDIUM": "中"
+    }
+  }
+}

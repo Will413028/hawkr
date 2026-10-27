@@ -1,0 +1,285 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "Hawkr - 評估哪個服務需要 load balance：跨服務比較 + per-pod 流量分佈",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "panels": [],
+      "title": "🎯 跨服務 Load Balance 評估",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": { "type": "auto" },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "QPS" }, "properties": [{ "id": "unit", "value": "reqps" }] },
+          { "matcher": { "id": "byName", "options": "P95 (s)" }, "properties": [{ "id": "unit", "value": "s" }] },
+          { "matcher": { "id": "byName", "options": "P99 (s)" }, "properties": [{ "id": "unit", "value": "s" }] },
+          { "matcher": { "id": "byName", "options": "Error Rate" }, "properties": [{ "id": "unit", "value": "percentunit" }] },
+          { "matcher": { "id": "byName", "options": "Replicas" }, "properties": [{ "id": "unit", "value": "short" }] }
+        ]
+      },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 1 },
+      "id": 3,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "QPS" }]
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total[5m])) by (job) or sum(rate(grpc_server_requests_total[5m])) by (job) or sum(rate(http_server_requests_seconds_count{uri!~\"/actuator.*\"}[5m])) by (job) or sum(rate(calls_total{span_kind=\"SPAN_KIND_SERVER\",job!=\"hawkr-gateway\"}[5m])) by (job)",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (job, le)) or histogram_quantile(0.95, sum(rate(grpc_server_request_duration_seconds_bucket[5m])) by (job, le)) or histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{uri!~\"/actuator.*\"}[5m])) by (job, le)) or (histogram_quantile(0.95, sum(rate(duration_milliseconds_bucket{span_kind=\"SPAN_KIND_SERVER\",job!=\"hawkr-gateway\"}[5m])) by (job, le)) / 1000)",
+          "format": "table",
+          "instant": true,
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (job, le)) or histogram_quantile(0.99, sum(rate(grpc_server_request_duration_seconds_bucket[5m])) by (job, le)) or histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{uri!~\"/actuator.*\"}[5m])) by (job, le)) or (histogram_quantile(0.99, sum(rate(duration_milliseconds_bucket{span_kind=\"SPAN_KIND_SERVER\",job!=\"hawkr-gateway\"}[5m])) by (job, le)) / 1000)",
+          "format": "table",
+          "instant": true,
+          "refId": "C"
+        },
+        {
+          "expr": "(sum(rate(http_requests_total{status=~\"5..\"}[5m])) by (job) or 0 * sum(rate(http_requests_total[5m])) by (job) or sum(rate(grpc_server_requests_total{code=~\"Internal|Unavailable|DataLoss|Unknown|DeadlineExceeded|ResourceExhausted\"}[5m])) by (job) or 0 * sum(rate(grpc_server_requests_total[5m])) by (job) or sum(rate(http_server_requests_seconds_count{uri!~\"/actuator.*\",status=~\"5..\"}[5m])) by (job) or 0 * sum(rate(http_server_requests_seconds_count{uri!~\"/actuator.*\"}[5m])) by (job) or sum(rate(calls_total{span_kind=\"SPAN_KIND_SERVER\",job!=\"hawkr-gateway\",rpc_response_status_code=~\"INTERNAL|UNAVAILABLE|DATA_LOSS|UNKNOWN|DEADLINE_EXCEEDED|RESOURCE_EXHAUSTED\"}[5m])) by (job) or 0 * sum(rate(calls_total{span_kind=\"SPAN_KIND_SERVER\",job!=\"hawkr-gateway\"}[5m])) by (job)) / (sum(rate(http_requests_total[5m])) by (job) or sum(rate(grpc_server_requests_total[5m])) by (job) or sum(rate(http_server_requests_seconds_count{uri!~\"/actuator.*\"}[5m])) by (job) or sum(rate(calls_total{span_kind=\"SPAN_KIND_SERVER\",job!=\"hawkr-gateway\"}[5m])) by (job))",
+          "format": "table",
+          "instant": true,
+          "refId": "D"
+        },
+        {
+          "expr": "count(up) by (job)",
+          "format": "table",
+          "instant": true,
+          "refId": "E"
+        }
+      ],
+      "title": "跨服務 Triage 表（依 QPS 排序）",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": { "byField": "job", "mode": "outer" }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "Time 1": true, "Time 2": true, "Time 3": true, "Time 4": true, "Time 5": true },
+            "indexByName": {},
+            "renameByName": {
+              "Value #A": "QPS",
+              "Value #B": "P95 (s)",
+              "Value #C": "P99 (s)",
+              "Value #D": "Error Rate",
+              "Value #E": "Replicas"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 11 },
+      "id": 4,
+      "panels": [],
+      "title": "🔍 單一服務 Drill-down（選擇 $job）",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "reqps" }
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 12 },
+      "id": 5,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{job=~\"$job\"}[5m])) by (job) or sum(rate(grpc_server_requests_total{job=~\"$job\"}[5m])) by (job) or sum(rate(http_server_requests_seconds_count{job=~\"$job\",uri!~\"/actuator.*\"}[5m])) by (job) or sum(rate(calls_total{job=~\"$job\",span_kind=\"SPAN_KIND_SERVER\",job!=\"hawkr-gateway\"}[5m])) by (job)",
+          "legendFormat": "QPS",
+          "refId": "A"
+        }
+      ],
+      "title": "$job - 請求速率 (QPS)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "s" }
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 12 },
+      "id": 6,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=~\"$job\"}[5m])) by (job, le)) or histogram_quantile(0.95, sum(rate(grpc_server_request_duration_seconds_bucket{job=~\"$job\"}[5m])) by (job, le)) or histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{job=~\"$job\",uri!~\"/actuator.*\"}[5m])) by (job, le)) or (histogram_quantile(0.95, sum(rate(duration_milliseconds_bucket{job=~\"$job\",span_kind=\"SPAN_KIND_SERVER\",job!=\"hawkr-gateway\"}[5m])) by (job, le)) / 1000)",
+          "legendFormat": "P95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=~\"$job\"}[5m])) by (job, le)) or histogram_quantile(0.99, sum(rate(grpc_server_request_duration_seconds_bucket{job=~\"$job\"}[5m])) by (job, le)) or histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{job=~\"$job\",uri!~\"/actuator.*\"}[5m])) by (job, le)) or (histogram_quantile(0.99, sum(rate(duration_milliseconds_bucket{job=~\"$job\",span_kind=\"SPAN_KIND_SERVER\",job!=\"hawkr-gateway\"}[5m])) by (job, le)) / 1000)",
+          "legendFormat": "P99",
+          "refId": "B"
+        }
+      ],
+      "title": "$job - 延遲 (P95/P99)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "percentunit", "max": 1, "min": 0 }
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 12 },
+      "id": 7,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "expr": "(sum(rate(http_requests_total{job=~\"$job\",status=~\"5..\"}[5m])) by (job) or 0 * sum(rate(http_requests_total{job=~\"$job\"}[5m])) by (job) or sum(rate(grpc_server_requests_total{job=~\"$job\",code=~\"Internal|Unavailable|DataLoss|Unknown|DeadlineExceeded|ResourceExhausted\"}[5m])) by (job) or 0 * sum(rate(grpc_server_requests_total{job=~\"$job\"}[5m])) by (job) or sum(rate(http_server_requests_seconds_count{job=~\"$job\",uri!~\"/actuator.*\",status=~\"5..\"}[5m])) by (job) or 0 * sum(rate(http_server_requests_seconds_count{job=~\"$job\",uri!~\"/actuator.*\"}[5m])) by (job) or sum(rate(calls_total{job=~\"$job\",span_kind=\"SPAN_KIND_SERVER\",job!=\"hawkr-gateway\",rpc_response_status_code=~\"INTERNAL|UNAVAILABLE|DATA_LOSS|UNKNOWN|DEADLINE_EXCEEDED|RESOURCE_EXHAUSTED\"}[5m])) by (job) or 0 * sum(rate(calls_total{job=~\"$job\",span_kind=\"SPAN_KIND_SERVER\",job!=\"hawkr-gateway\"}[5m])) by (job)) / (sum(rate(http_requests_total{job=~\"$job\"}[5m])) by (job) or sum(rate(grpc_server_requests_total{job=~\"$job\"}[5m])) by (job) or sum(rate(http_server_requests_seconds_count{job=~\"$job\",uri!~\"/actuator.*\"}[5m])) by (job) or sum(rate(calls_total{job=~\"$job\",span_kind=\"SPAN_KIND_SERVER\",job!=\"hawkr-gateway\"}[5m])) by (job))",
+          "legendFormat": "Error Rate",
+          "refId": "A"
+        }
+      ],
+      "title": "$job - 錯誤率",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 20 },
+      "id": 8,
+      "panels": [],
+      "title": "⚖️ 同服務 Per-Pod 流量分佈（$job 副本間比較）",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 2, "w": 24, "x": 0, "y": 21 },
+      "id": 9,
+      "options": {
+        "code": { "language": "plaintext", "showLineNumbers": false, "showMiniMap": false },
+        "content": "`pod` label 已於 2026-08-20 confirm 生效（SSH 進監控機直查 Prometheus `label/pod/values` 有實際 pod name）；**只有 1 條線** = `$job` 確實只有 1 個 replica，不是資料異常。prod 目前僅 gateway / cart-service / payment-service / payuni-webhook-service / order-service 是多副本。**Java job 這兩張圖仍會空白**：Java 的資料源是 spanmetrics（remote-write 進來，沒有 `pod` label），尚未接上這裡。",
+        "mode": "markdown"
+      },
+      "title": "",
+      "type": "text"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "reqps" }
+      },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 23 },
+      "id": 10,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{job=~\"$job\",pod!=\"\"}[5m])) by (pod) or sum(rate(grpc_server_requests_total{job=~\"$job\",pod!=\"\"}[5m])) by (pod) or sum(rate(http_server_requests_seconds_count{job=~\"$job\",pod!=\"\",uri!~\"/actuator.*\"}[5m])) by (pod)",
+          "legendFormat": "{{ pod }}",
+          "refId": "A"
+        }
+      ],
+      "title": "$job - Per-Pod 請求速率",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "s" }
+      },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 23 },
+      "id": 11,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=~\"$job\",pod!=\"\"}[5m])) by (pod, le)) or histogram_quantile(0.99, sum(rate(grpc_server_request_duration_seconds_bucket{job=~\"$job\",pod!=\"\"}[5m])) by (pod, le)) or histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{job=~\"$job\",pod!=\"\",uri!~\"/actuator.*\"}[5m])) by (pod, le))",
+          "legendFormat": "{{ pod }}",
+          "refId": "A"
+        }
+      ],
+      "title": "$job - Per-Pod P99 延遲",
+      "type": "timeseries"
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["hawkr", "load-balance"],
+  "templating": {
+    "list": [
+      {
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "filters": [
+          { "condition": "", "key": "env", "operator": "=", "value": "prod" }
+        ],
+        "hide": 0,
+        "label": "環境",
+        "name": "adhoc_env",
+        "type": "adhoc"
+      },
+      {
+        "current": { "selected": true, "text": "gateway", "value": "gateway" },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "definition": "label_values(up, job)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Service",
+        "multi": false,
+        "name": "job",
+        "options": [],
+        "query": "label_values(up, job)",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "Asia/Taipei",
+  "title": "Hawkr - Load Balance 評估",
+  "uid": "hawkr-load-balance",
+  "version": 1
+}

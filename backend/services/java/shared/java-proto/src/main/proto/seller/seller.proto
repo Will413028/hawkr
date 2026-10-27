@@ -1,0 +1,2224 @@
+syntax = "proto3";
+
+package hawkr.seller;
+
+import "common/delegation.proto";
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/seller";
+option java_multiple_files = true;
+option java_package = "io.github.will413028.hawkr.seller.grpc";
+option java_outer_classname = "SellerProto";
+
+// Seller Service - 商家服務
+service SellerService {
+    // 獲取商家信息
+    rpc GetSeller(GetSellerRequest) returns (SellerResponse);
+
+    // 輕量版 store_id → account_id 解析：只回 account_id，不像 GetSeller(store_id=x)
+    // 要組整份 profile。供 gateway admin 端點吃 :store_id path param、但下游呼叫
+    // 仍是 account_id-keyed（如手動停權 gRPC 系列）時使用。查無此 store_id 回
+    // gRPC NotFound（本 RPC 回應無 code/message 欄位，錯誤走真實 gRPC status）。
+    rpc ResolveSellerAccountID(ResolveSellerAccountIDRequest) returns (ResolveSellerAccountIDResponse);
+
+    rpc GetCurrentStoreID(GetCurrentStoreIDRequest) returns (GetCurrentStoreIDResponse);
+
+    // 根據會員ID獲取商家
+    rpc GetSellerByMemberId(GetSellerByMemberIdRequest) returns (SellerResponse);
+
+    // 根據 UserID 獲取商家
+    rpc GetSellerByUserId(GetSellerByUserIdRequest) returns (SellerResponse);
+
+    // 批量獲取商家
+    rpc GetSellerBatch(GetSellerBatchRequest) returns (SellerBatchResponse);
+
+    // 驗證商家狀態
+    rpc ValidateSeller(ValidateSellerRequest) returns (ValidateSellerResponse);
+
+    // 獲取商家統計
+    rpc GetSellerStats(GetSellerStatsRequest) returns (SellerStatsResponse);
+
+    // ========== PAYUNi 金流整合 ==========
+    // 觸發 PAYUNi 商家註冊
+    rpc RegisterPayuni(RegisterPayuniRequest) returns (PayuniStatusResponse);
+
+    // 查詢 PAYUNi 註冊狀態
+    rpc GetPayuniStatus(GetPayuniStatusRequest) returns (PayuniStatusResponse);
+
+    // 重試 PAYUNi 註冊
+    rpc RetryPayuniRegistration(RetryPayuniRequest) returns (PayuniStatusResponse);
+
+    // 手動刷新 PAYUNi 審核狀態
+    rpc RefreshPayuniStatus(RefreshPayuniStatusRequest) returns (PayuniStatusResponse);
+
+    // 更新商家 PAYUNi 聯絡/地址資料（issue #2806 Phase 2 deny-by-default allowlist）
+    rpc UpdateMerchantProfile(UpdateMerchantProfileRequest) returns (UpdateMerchantProfileResponse);
+
+    // 獲取商家 PAYUNi 配置（供 payment-service 使用）
+    rpc GetSellerPayuniConfig(GetSellerPayuniConfigRequest) returns (SellerPayuniConfigResponse);
+
+    // 判斷政府查驗回的「業者名稱」是否屬於這個賣家（19 號設計書 §8.5.1，供 product-service 使用）。
+    //
+    // 🔴 比對在本服務內部完成，只回布林與命中欄位名：real_name 是 PII
+    //    （18 號設計書列為明文保留欄），不得跨服務傳輸。
+    rpc MatchCertificateHolder(MatchCertificateHolderRequest) returns (MatchCertificateHolderResponse);
+
+    // 創建商家 (Apply)
+    rpc CreateSeller(CreateSellerRequest) returns (SellerResponse);
+
+    // 更新商家
+    rpc UpdateSeller(UpdateSellerRequest) returns (SellerResponse);
+    rpc UpdateSellerSEO(UpdateSellerSEORequest) returns (UpdateSellerSEOResponse);
+    rpc UpdateSellerFoodRegistration(UpdateSellerFoodRegistrationRequest) returns (UpdateSellerFoodRegistrationResponse);
+
+    // 完成 Onboarding（填寫或略過）
+    rpc CompleteOnboarding(CompleteOnboardingRequest) returns (SellerResponse);
+
+    // 更新商家 logo（透過 staged token）
+    rpc UpdateLogo(UpdateLogoRequest) returns (UpdateLogoResponse);
+
+    // 更新商家封面圖片（透過 staged token）
+    rpc UpdateCover(UpdateCoverRequest) returns (UpdateCoverResponse);
+
+    // ========== Certification: Old API (Deprecated) ==========
+    rpc GetCertificationDraft(GetDraftRequest) returns (CertificationDraftResponse);
+    rpc SaveCertificationDraft(SaveDraftRequest) returns (CertificationDraftResponse);
+    rpc SubmitCertification(SubmitCertificationRequest) returns (CertificationDraftResponse);
+
+    // ========== Certification: New API ==========
+    // Draft management
+    rpc CreateCertificationDraft(CreateCertificationDraftRequest) returns (CertificationApplicationResponse);
+    rpc SaveCertificationProgress(SaveCertificationProgressRequest) returns (CertificationApplicationResponse);
+    rpc CancelCertification(CancelCertificationRequest) returns (CertificationApplicationResponse);
+
+    // Submission
+    rpc SubmitCertificationApplication(SubmitCertificationApplicationRequest) returns (CertificationApplicationResponse);
+
+    // Query
+    rpc GetCertificationApplication(GetCertificationApplicationRequest) returns (CertificationApplicationResponse);
+
+    // 統一編號查詢（GCIS 經濟部商業司公開資料，autofill 公司資料用）
+    rpc LookupBusinessRegistration(LookupBusinessRegistrationRequest) returns (LookupBusinessRegistrationResponse);
+
+    // 地址模糊搜尋 / 驗證（proxy 至 Google Maps，透過 pkg/geocode ACL；賣家門市地址用）
+    rpc SuggestAddress(SuggestAddressRequest) returns (SuggestAddressResponse);
+    rpc ValidateAddress(ValidateAddressRequest) returns (ValidateAddressResponse);
+
+    // Review operations (for admin backend)
+    rpc ApproveCertification(ApproveCertificationRequest) returns (ReviewResponse);
+    rpc RejectCertification(RejectCertificationRequest) returns (ReviewResponse);
+    rpc GetCertificationReviews(GetCertificationReviewsRequest) returns (CertificationReviewsResponse);
+
+    // ========== Admin: Seller Management ==========
+    rpc ListSellersForAdmin(ListSellersForAdminRequest) returns (ListSellersForAdminResponse);
+    // 賣家統計走獨立 RPC，不內嵌在列表回應裡：這五個數字是全站聚合、不隨分頁
+    // 改變，內嵌等於每次翻頁都重算五個全表 COUNT，且前端要拿統計就得先發一個
+    // ?page=1&limit=1 的假查詢。與 GetAccountStatsForAdmin / GetBuyerStatsForAdmin 同形。
+    rpc GetSellerStatsForAdmin(GetSellerStatsForAdminRequest) returns (GetSellerStatsForAdminResponse);
+
+    // ========== Admin: Certification Management ==========
+    rpc ListCertificationsForAdmin(ListCertificationsForAdminRequest) returns (ListCertificationsForAdminResponse);
+    // Admin certification detail — returns the FULL id_card_no (§5.1 角色分離；
+    // 賣家 GetCertificationApplication 回遮蔽值，admin 走此 RPC 回完整值, #608)。
+    rpc GetCertificationApplicationForAdmin(GetCertificationApplicationForAdminRequest) returns (CertificationApplicationResponse);
+
+    // ========== Cross-Service: Seller Meta ==========
+    // 批量獲取商家元資料（輕量：名稱+Logo+狀態），回傳 Map<account_id, SellerMeta>
+    rpc BatchGetSellerMeta(BatchGetSellerMetaRequest) returns (BatchGetSellerMetaResponse);
+
+    // 公開商品城市篩選用：只回符合城市且可公開販售之 current store ids，不暴露賣家 PII。
+    rpc ListPublicStoreIDsByCity(ListPublicStoreIDsByCityRequest) returns (ListPublicStoreIDsByCityResponse);
+    // 一次回傳 canonical 22 縣市與完整 public store ids，供 product 聚合；不含 PII。
+    rpc ListPublicStoresByCity(ListPublicStoresByCityRequest) returns (ListPublicStoresByCityResponse);
+
+    // ========== Cross-Role Guards: Principal Resolution ==========
+    // 解析 store_id → 登入 principal account_id（Plan 2b，供 order/cart/coupon/im/social 5 個 cross-role
+    // guard 用）。只解析存活（沒有關閉）的店家；其餘的 id（已關閉或不存在）不在 principals 裡，只出現在 unresolved_ids。
+    rpc ResolvePrincipals(ResolvePrincipalsRequest) returns (ResolvePrincipalsResponse);
+
+    // ========== Cross-Service: Historical Stint Enumeration (internal-use only) ==========
+    // 回傳該帳號名下「所有」store_id stint（不論 is_current，含已關閉）。唯一用途：
+    // account.deleted/buyer.deleted PII 清除 consumer（im-service）逐一枚舉歷史
+    // store_id 清 messages.sender_id（買家 store-stint rekey W2/W3 D8）。不透過
+    // gateway 暴露，僅供服務間 gRPC 呼叫。
+    rpc ListStoreIDsByAccount(ListStoreIDsByAccountRequest) returns (ListStoreIDsByAccountResponse);
+
+    // ========== Cross-Service: Shipping Profile ==========
+    // 取得賣家寄件資訊（Shipping Service 建立物流單用）
+    rpc GetSellerShippingProfile(GetSellerShippingProfileRequest) returns (GetSellerShippingProfileResponse);
+
+    // ========== Store Visitors ==========
+    // 記錄訪客（買家瀏覽賣家商店頁時 fire-and-forget 呼叫）
+    rpc RecordStoreVisit(RecordStoreVisitRequest) returns (RecordStoreVisitResponse);
+
+    // 取得商店訪客列表（賣家查看誰來看過）
+    rpc GetStoreVisitors(GetStoreVisitorsRequest) returns (StoreVisitorListResponse);
+
+    // ========== Product View Stats ==========
+    // 記錄商品被瀏覽（網頁匿名路徑，APP 路徑走 MQ）
+    rpc RecordProductView(RecordProductViewRequest) returns (RecordProductViewResponse);
+    // 取得賣家旗下所有商品總瀏覽數與週環比（Dashboard 用）
+    rpc GetProductViewStats(GetProductViewStatsRequest) returns (ProductViewStatsResponse);
+
+    // ========== Recommended Sellers ==========
+    // 取得推薦商家列表（依營收排名，組合 Order Service 資料）
+    rpc GetRecommendedSellers(GetRecommendedSellersRequest) returns (GetRecommendedSellersResponse);
+
+    // ========== Self-Service: Account Deletion ==========
+    // 賣家自行申請刪除帳號（或管理員代刪）
+    rpc DeleteSellerAccount(DeleteSellerAccountRequest) returns (DeleteSellerAccountResponse);
+
+    // ========== B-169 Governance: 商家違規 / 食安通報 / 申訴 (issue #722) ==========
+
+    // 登入端商家違規檢舉（買家 / 賣家）
+    rpc CreateViolationReport(CreateViolationReportRequest) returns (CreateViolationReportResponse);
+    // 檢舉者查自己提交的檢舉
+    rpc ListMyViolationReports(ListMyViolationReportsRequest) returns (ListMyViolationReportsResponse);
+
+    // 公開無登入食安通報（gateway 走 anonymous 路由，雙層 IP rate limit）
+    rpc CreateFoodSafetyReport(CreateFoodSafetyReportRequest) returns (CreateFoodSafetyReportResponse);
+
+    // 賣家側
+    rpc SellerListMyViolations(SellerListMyViolationsRequest) returns (SellerListMyViolationsResponse);
+    rpc SellerSubmitAppeal(SellerSubmitAppealRequest) returns (SellerSubmitAppealResponse);
+    rpc SellerGetAppeal(SellerGetAppealRequest) returns (SellerGetAppealResponse);
+
+    // 公開賣家頁查詢過去 90 天 high+ 違規（D8 Redis cache）
+    rpc GetPublicSellerViolations(GetPublicSellerViolationsRequest) returns (GetPublicSellerViolationsResponse);
+
+    // Admin 治理
+    rpc AdminListViolationReports(AdminListViolationReportsRequest) returns (AdminListViolationReportsResponse);
+    rpc AdminPatchSellerViolationReportStatus(AdminPatchReportStatusRequest) returns (AdminPatchReportStatusResponse);
+    rpc AdminPatchFoodSafetyReportStatus(AdminPatchReportStatusRequest) returns (AdminPatchReportStatusResponse);
+    rpc AdminAcknowledgeFoodSafetyReport(AdminAcknowledgeRequest) returns (AdminAcknowledgeResponse);
+    rpc AdminGenerateFDAReport(AdminGenerateFDAReportRequest) returns (AdminGenerateFDAReportResponse);
+    rpc AdminMarkFDAReported(AdminMarkFDAReportedRequest) returns (AdminMarkFDAReportedResponse);
+    rpc AdminNotifySeller(AdminNotifySellerRequest) returns (AdminNotifySellerResponse);
+    rpc AdminCreateViolation(AdminCreateViolationRequest) returns (AdminCreateViolationResponse);
+    // Admin 決議申訴前查看 violation 詳情（含 appeal_evidence_asset_ids，issue #1516）
+    rpc AdminGetViolation(AdminGetViolationRequest) returns (AdminGetViolationResponse);
+    rpc AdminUpdateViolation(AdminUpdateViolationRequest) returns (AdminUpdateViolationResponse);
+    rpc AdminRevokeViolation(AdminRevokeViolationRequest) returns (AdminRevokeViolationResponse);
+    rpc AdminDecideAppeal(AdminDecideAppealRequest) returns (AdminDecideAppealResponse);
+
+    // ========== Admin 手動停權（不服勸導，32 §13 / 46 §5） ==========
+    rpc SuspendSellerForAdmin(SuspendSellerForAdminRequest) returns (SuspendSellerForAdminResponse);
+    rpc LiftSellerSuspensionForAdmin(LiftSellerSuspensionForAdminRequest) returns (LiftSellerSuspensionForAdminResponse);
+    rpc ListSellerSuspensionsForAdmin(ListSellerSuspensionsForAdminRequest) returns (ListSellerSuspensionsForAdminResponse);
+    rpc GetActiveSellerSuspensionForAdmin(GetActiveSellerSuspensionForAdminRequest) returns (GetActiveSellerSuspensionForAdminResponse);
+
+    // ========== Admin 賣家會員分級方案（子系統 1）==========
+    rpc AssignSellerMembershipPlan(AssignSellerMembershipPlanRequest) returns (SellerMembershipPlanResponse);
+    rpc GetSellerMembershipPlan(GetSellerMembershipPlanRequest) returns (SellerMembershipPlanResponse);
+    // Admin：方案目錄本身（cap/price/is_purchasable）的讀寫，比照買家 membership_plans
+    // 目錄的 ListMembershipPlans/UpdateMembershipPlan 慣例。tier_rank 不開放編輯——它
+    // 決定 candidate_platform_lane.go 的 AI 排序權重，風險層級與 cap/price 不同。
+    rpc ListSellerMembershipPlans(ListSellerMembershipPlansRequest) returns (ListSellerMembershipPlansResponse);
+    rpc UpdateSellerMembershipPlan(UpdateSellerMembershipPlanRequest) returns (UpdateSellerMembershipPlanResponse);
+
+    // ========== 站外業者主檔（招商名單） ==========
+    // 供 ai-service 的 EXTERNAL lane 與舊「AI 找貨」工具查詢站外業者。
+    //
+    // 🔴 一列即一業者：呼叫端不得再做任何去重。已入駐（CONVERTED）與已封存
+    //    （ARCHIVED）的業者由本服務端過濾掉——已入駐者出現在「找平台外的
+    //    業者」本來就是錯的，那不是去重問題。
+    //
+    // 相關性分數不在本 RPC 計算：回傳命中的 facet 旗標與可評分的文字欄位，
+    // 由呼叫端自行加權排序（procurement 的 tier 加權與曝光門檻屬 ai-service）。
+    rpc SearchSellerProspects(SearchSellerProspectsRequest) returns (SearchSellerProspectsResponse);
+
+    // 建立一筆站外業者。識別鍵的正規化與分層比對一律發生在本服務端——
+    // 呼叫端（一次性遷移腳本、階段二的 admin console）只送原始欄位。
+    rpc CreateSellerProspect(CreateSellerProspectRequest) returns (CreateSellerProspectResponse);
+
+    // ========== 站外業者主檔 — Admin console（階段二） ==========
+    // 與上面兩支的差別在投影：這一組回 AdminSellerProspectItem（含 status、
+    // tax_id、稽核欄位），呼叫端只有 gateway 的 /admin namespace。
+    // 不共用 SellerProspectItem——那個型別的消費端包含 ai-service，而
+    // toProspectSearchItemPB 的窄投影清單不能繼續成長。
+    rpc AdminListSellerProspects(AdminListSellerProspectsRequest) returns (AdminListSellerProspectsResponse);
+    rpc AdminGetSellerProspect(AdminGetSellerProspectRequest) returns (AdminGetSellerProspectResponse);
+    rpc AdminUpdateSellerProspect(AdminUpdateSellerProspectRequest) returns (AdminGetSellerProspectResponse);
+    rpc AdminArchiveSellerProspect(AdminArchiveSellerProspectRequest) returns (AdminGetSellerProspectResponse);
+    rpc AdminListDuplicateProspects(AdminListDuplicateProspectsRequest) returns (AdminListDuplicateProspectsResponse);
+    rpc AdminMergeSellerProspects(AdminMergeSellerProspectsRequest) returns (AdminMergeSellerProspectsResponse);
+    rpc AdminConvertSellerProspect(AdminConvertSellerProspectRequest) returns (AdminGetSellerProspectResponse);
+    // 換一張品牌圖片。kind 決定 logo 還是 cover，兩者各自獨立一組欄位。
+    // 回應與 AdminGetSellerProspect 同型別：Admin 收到後會逐項核對 key／version／
+    // source_url 才認定存檔成功，少回欄位等同存檔失敗。
+    rpc AdminUpdateSellerProspectMedia(AdminUpdateSellerProspectMediaRequest) returns (AdminGetSellerProspectResponse);
+    rpc AdminListProspectTaxIdMatches(AdminListProspectTaxIdMatchesRequest) returns (AdminListProspectTaxIdMatchesResponse);
+    rpc AdminCreateProspectInvite(AdminCreateProspectInviteRequest) returns (AdminCreateProspectInviteResponse);
+    rpc AdminRevokeProspectInvite(AdminRevokeProspectInviteRequest) returns (AdminRevokeProspectInviteResponse);
+
+    // ========== Vendor Portal (#2539 E1) ==========
+
+    // 建立或重取一個 RFQ 收件人的邀請，回明文 secret（只此一次）。結果：
+    //   - 成功：invite_id（邀請的 UUID）、secret、invited_email。
+    //   - InvalidArgument：prospect_id、rfq_recipient_id 不是十進位正整數，expires_at 不是 RFC3339 或不在允許範圍內（要晚於現在且不超過
+    //     上限），或這個 rfq_recipient_id 的邀請已屬於別的業者。
+    //   - NotFound：業者不存在。
+    //   - AlreadyExists：這張邀請的 secret 已標記寄出（不帶 reason）。
+    //   - FailedPrecondition，ErrorInfo.reason 是 VendorPortalInviteErrorReason 的名稱：
+    //     INVITE_REVOKED（邀請已撤銷）、PROSPECT_NOT_ACTIVE（業者不是進行中）、NO_DELIVERABLE_EMAIL（沒有可寄送的 email）。
+    //   - 其他錯誤：Internal。
+    rpc EnsureVendorPortalInvite(EnsureVendorPortalInviteRequest) returns (EnsureVendorPortalInviteResponse);
+
+    // 記下 secret 對應的信已寄出。結果：
+    //   - 成功：code 0；同一把 secret 重複標記冪等。
+    //   - InvalidArgument：invite_id 不是 UUID，或 secret 是空字串或格式不正確。
+    //   - NotFound：邀請不存在。
+    //   - Aborted，ErrorInfo.reason 是 INVITE_SECRET_SUPERSEDED：secret 已被之後的 Ensure 換掉，標記不生效，寄出的連結已失效。
+    //   - 其他錯誤：Internal。
+    rpc MarkVendorPortalInviteSecretDelivered(MarkVendorPortalInviteSecretDeliveredRequest) returns (MarkVendorPortalInviteSecretDeliveredResponse);
+}
+
+// ========== Certification Messages ==========
+
+message GetDraftRequest {
+    int64 account_id = 1;
+}
+
+message CertificationDraftResponse {
+    int32 code = 1;
+    string message = 2;
+    CertificationDraft data = 3;
+}
+
+message CertificationDraft {
+    string id = 1;
+    string account_id = 2;
+    int32 current_step = 3;
+    int32 total_steps = 4;
+    string step_data_json = 5;
+    string status = 6;
+    string review_comment = 7;
+}
+
+message SaveDraftRequest {
+    int64 account_id = 1;
+    int32 current_step = 2;
+    int32 total_steps = 3;
+    string step_data_json = 4;
+}
+
+message SubmitCertificationRequest {
+    int64 account_id = 1;
+}
+
+message GetSellerRequest {
+    int64 account_id = 1;
+    reserved 2;
+    // ② store re-key：> 0 時改用 PK sellers.store_id 查（public
+    // /sellers/:id namespace）。與 account_id 互斥；account_id 保留
+    // current-stint（/app/sellers/me）語意。
+    int64 store_id = 3;
+    hawkr.common.DelegationContext delegation = 100;
+}
+
+message ResolveSellerAccountIDRequest {
+    int64 store_id = 1;
+}
+
+message ResolveSellerAccountIDResponse {
+    int64 account_id = 1;
+}
+
+message GetSellerBatchRequest {
+    // store_id 命名債正名（Phase 2 campaign Task 3）：一律承載 seller_account_id
+    // surrogate（sellers PK），欄位名 account_ids 是歷史誤稱。之前因「rename 需跨
+    // gateway/im/buyer 多 caller 原子改」而暫緩，本次連同呼叫端一次改完（monorepo
+    // 內 proto rename 是 wire 相容的，field number 不變）。
+    // Class-3 historical-surrogate API：PK lookup、無 is_current / deleted_at
+    // 過濾 — 已關閉 stint 也解析（tombstone 顯示依賴）。
+    repeated int64 store_ids = 1;
+    reserved 2;
+}
+
+message SellerResponse {
+    int32 code = 1;
+    string message = 2;
+    SellerInfo data = 3;
+}
+
+message SellerBatchResponse {
+    int32 code = 1;
+    string message = 2;
+    // data[i].store_id 是 batch map key；account_id 維持登入 principal 語意。
+    repeated SellerInfo data = 3;
+}
+
+message SellerInfo {
+    int64 account_id = 1;
+    string name = 2;
+    string logo_key = 3;  // 商家 logo objectKey（49 §6.6 GW組：Gateway 組 logoUrl）
+    string description = 4;
+    string contact_phone = 5;
+    reserved 6;  // was: address
+    double rating = 7;
+    int32 status = 8;  // 0: 禁用, 1: 正常, 2: 審核中
+    int64 created_at = 9;
+    string cover_key = 10;  // 商家封面 objectKey（49 §6.6 GW組：Gateway 組 coverUrl）
+    string prize = 11;
+    string city = 12;
+    string district = 13;
+    string address_detail = 14;
+    string postal_code = 15;
+    bool onboarding_completed = 16;
+    string nickname = 17;
+    string avatar_key = 18;  // 頭像 objectKey（49 §6.6 S2+GW組：Gateway 組 avatarUrl；http 值 passthrough）
+    string email = 19;
+    reserved 20;
+    int32 account_type = 21;
+    string phone = 22;
+    string seller_type = 23;
+    string overall_certification_status = 24;
+    string birthday = 25;
+    string gender = 26;
+    string current_certification_id = 27;  // TSID 字串（§4，AdminSellerItem 版已 string）
+    reserved 28;  // was: display_name (removed: unified to store_name)
+    string seo_title = 29;
+    string seo_description = 30;
+    bool is_processed_food = 31;
+    string food_business_reg_no = 32;
+    // ② 賣家聚合 re-key：現任 store surrogate（TSID 數字字串）。grandfather：
+    // 目前 == account_id；店關閉後 re-onboard 會分岔。gateway sellerid resolver 用。
+    string store_id = 33;
+    // 生命週期值：active / suspended / suspended_governance / pending_deletion（隨帳號刪除等待未結訂單結束，單體新增的值，
+    // 不是 active 的呼叫方一律不放行）/ closed（reshape 前的舊列可能仍為 deleted）。im read-only tombstone 判斷用。
+    string lifecycle_status = 34;
+    // 46 §7.2：停權原因碼（SellerSuspensionReason CodeMeta：9601=違反平台規範 /
+    // 9602=屢勸不改 / 9603=其他）。僅 lifecycle_status=="suspended" 且有 active
+    // suspension 時非空；供賣家自身 GET /app/sellers/me 撈原因碼顯示停權公告頁，對稱
+    // admin 版 SellerSuspension.reason_code（無 admin 身分不查該 message）。
+    string suspension_reason_code = 35;
+    // 賣家自訂官網 URL；空字串代表未設定，MerURL/公開頁 fallback 平台生成頁。
+    string website_url = 36;
+    // 對外顯示碼（YY+8 位亂數，10 碼），2026-07-21 起取代直接曝露 store_id。
+    string store_code = 37;
+    // 樂觀鎖版本（數字字串）；每次成功寫入 +1（56 設計書 §6.2.3）。
+    string version = 38;
+}
+
+message ValidateSellerRequest {
+    int64 account_id = 1;
+    reserved 2;
+}
+
+message ValidateSellerResponse {
+    int32 code = 1;
+    string message = 2;
+    bool valid = 3;
+    int32 status = 4;
+}
+
+message GetSellerStatsRequest {
+    int64 account_id = 1;
+    reserved 2;
+    // ② store re-key：> 0 時以 PK sellers.store_id 解析（public
+    // /sellers/:id/stats|rating）。與 account_id 互斥。
+    int64 store_id = 3;
+}
+
+message SellerStatsResponse {
+    int32 code = 1;
+    string message = 2;
+    SellerStats data = 3;
+}
+
+message SellerStats {
+    // store_id 命名債正名（Phase 2 campaign Task 3）：值一直是 store surrogate，
+    // 欄位本身叫 account_id 純屬歷史誤稱（gateway GetSellerRating/GetSellerStats
+    // 早已把它組進回應的 StoreID/store_id，只有這個 proto 欄位名沒跟上）。
+    string store_id = 1;
+    int32 total_products = 2;
+    int32 total_orders = 3;
+    double total_sales = 4;
+    double rating = 5;
+    int32 followers = 6;
+    int32 review_count = 7;
+    reserved 20;
+}
+
+message GetSellerByMemberIdRequest {
+    int64 member_id = 1;
+}
+
+message GetSellerByUserIdRequest {
+    int64 user_id = 1;
+}
+
+message CreateSellerRequest {
+    int64 user_id = 1;
+    string name = 2;
+    reserved 3;  // was: logo（入站死欄位，usecase 一律拒非空；logo 只能走 UpdateLogo staged-token flow，欄位移除）
+    string description = 4;
+    string contact_phone = 5;
+    reserved 6;  // was: address
+    reserved 7;  // was: cover_url（#1660：入站死欄位，封面設定走 UpdateCover staged-token 流程，欄位移除）
+    string prize = 8;
+    string city = 9;
+    string district = 10;
+    string address_detail = 11;
+    reserved 12;  // was: display_name (removed: unified to store_name)
+    // 站外業者邀請信帶來的歸因憑證。可空。
+    // 🔴 只做歸因，不授予任何權限：帶不帶這個值，賣家認證流程完全相同。
+    // 無效／過期／已消費一律只記 log，不得讓建店失敗。
+    string prospect_invite_token = 13;
+}
+
+message UpdateSellerRequest {
+    int64 account_id = 1;
+    string name = 2;
+    reserved 3;  // was: logo（入站死欄位，usecase 一律拒非空；logo 只能走 UpdateLogo staged-token flow，欄位移除）
+    string description = 4;
+    string contact_phone = 5;
+    reserved 6;  // was: address
+    reserved 7;  // was: cover_url（#1660：入站死欄位，封面設定走 UpdateCover staged-token 流程，欄位移除）
+    string prize = 8;
+    string city = 9;
+    string district = 10;
+    string address_detail = 11;
+    string birthday = 12;
+    string gender = 13;
+    string website_url = 14;
+    string expected_version = 15;
+    // ② store re-key：> 0 時直接鎖定 PK sellers.store_id（代行路徑）。與 account_id
+    // 互斥，語意與 GetSellerRequest.store_id 相同 —— account_id 保留「解析該帳號的
+    // current stint」語意（/app/sellers/me），store_id 則指名一個 stint。
+    //
+    // 代行路徑必須填這一欄：account_id 是登入 principal、store_id 是營運鍵，兩者在
+    // re-onboard 過的賣家上不相等（44 號 §3.1），把 store_id 填進 account_id 會讓
+    // 寫入落到「account_id 恰好等於該 store_id」的另一家店，且回 code: 0。
+    int64 store_id = 16;
+    reserved 20;
+    hawkr.common.DelegationContext delegation = 100;
+}
+
+message UpdateSellerSEORequest {
+    int64 account_id = 1;
+    string seo_title = 2;
+    string seo_description = 3;
+}
+
+message UpdateSellerSEOResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+message UpdateSellerFoodRegistrationRequest {
+    int64 account_id = 1;
+    bool is_processed_food = 2;
+    string food_business_reg_no = 3;
+}
+
+message UpdateSellerFoodRegistrationResponse {
+    int32 code = 1;
+    string message = 2;
+    bool is_processed_food = 3;
+    string food_business_reg_no = 4;
+    string updated_at = 5;  // unix seconds (string per §6)
+}
+
+message CompleteOnboardingRequest {
+    int64 account_id = 1;
+}
+
+// ========== UpdateLogo Messages ==========
+
+message UpdateLogoRequest {
+    int64 account_id = 1;
+    string staged_token = 2;
+    string expected_version = 3;
+    // ② store re-key：語意同 UpdateSellerRequest.store_id（代行路徑必填、與
+    // account_id 互斥）。
+    int64 store_id = 4;
+    hawkr.common.DelegationContext delegation = 100;
+}
+
+message UpdateLogoResponse {
+    int32 code = 1;
+    string message = 2;
+    LogoData data = 3;
+}
+
+message LogoData {
+    string logo_key = 1;  // 更新後 logo objectKey（49 §6.6 GW組：Gateway 組 logoUrl）
+    reserved 2;  // was: preview_key（服務端從未賦值的死欄位，與 logo_key 同值語意重複）
+    // 寫入成功後的新版本（數字字串，語意同 SellerInfo.version）。每個代行 mutation
+    // 的回應都要帶新版本、稽核列的 resource_version_after 也取自它（56 §1.8）；
+    // 缺了它，換完圖之後工作區手上的版本立刻過期，下一次 storefront 寫入必然 9266。
+    string version = 3;
+}
+
+// ========== UpdateCover Messages ==========
+
+message UpdateCoverRequest {
+    int64 account_id = 1;
+    string staged_token = 2;
+    string expected_version = 3;
+    // ② store re-key：語意同 UpdateSellerRequest.store_id（代行路徑必填、與
+    // account_id 互斥）。
+    int64 store_id = 4;
+    hawkr.common.DelegationContext delegation = 100;
+}
+
+message UpdateCoverResponse {
+    int32 code = 1;
+    string message = 2;
+    CoverData data = 3;
+}
+
+message CoverData {
+    string cover_key = 1;  // 更新後封面 objectKey（49 §6.6 GW組：Gateway 組 coverUrl）
+    string version = 2;    // 寫入成功後的新版本，語意與理由同 LogoData.version
+}
+
+message RegisterPayuniRequest {
+    int64 user_id = 1;  // 會員ID (從JWT取得)
+}
+
+message GetPayuniStatusRequest {
+    int64 user_id = 1;
+}
+
+message RetryPayuniRequest {
+    int64 user_id = 1;
+}
+
+message RefreshPayuniStatusRequest {
+    int64 user_id = 1;
+}
+
+message UpdateMerchantProfileRequest {
+    int64 account_id = 1;           // login principal — store_id is resolved server-side from this, never client-supplied
+    string idempotency_key = 2;
+    string expected_version = 3;    // numeric string, parsed via pkg/delegation.ParseExpectedVersion
+    string contact_name = 4;
+    string contact_mobile = 5;
+    string contact_tel = 6;
+    string mer_email = 7;
+    string mer_addr = 8;
+    string mer_addr_post = 9;
+    string mer_tel = 10;
+}
+
+message UpdateMerchantProfileResponse {
+    int32 code = 1;
+    string message = 2;
+    string merchant_profile_version = 3;
+}
+
+message PayuniStatusResponse {
+    int32 code = 1;
+    string message = 2;
+    PayuniStatus data = 3;
+}
+
+message PayuniStatus {
+    string account_id = 20;             // seller account_id
+    string payuni_mer_id = 2;           // PAYUNi 商店代號 (如 DAIL0001)
+    string payuni_status = 3;           // unregistered, pending, active, failed
+    string mer_status = 4;              // PAYUNi 原始商店狀態
+    string member_status = 5;           // PAYUNi 會員狀態
+    string credit_status = 6;           // 信用卡支付狀態
+    string applepay_status = 7;         // Apple Pay 狀態
+    string googlepay_status = 8;        // Google Pay 狀態
+    string atm_status = 9;              // ATM 狀態
+    string error_message = 10;          // 錯誤訊息
+    int64 registered_at = 11;           // 註冊時間 (Unix timestamp)
+    int64 approved_at = 12;             // 審核通過時間
+    int64 last_synced_at = 13;          // 最後同步時間
+    string approval_status = 14;        // Hawkr 審核狀態: pending, approved, rejected
+    string payuni_mer_status = 15;      // PAYUNi 商戶狀態
+    string overall_status = 16;         // 綜合認證狀態
+    string reason = 17;                 // PayUni 商店審核未通過/待補件原因（≤200 字），無則為空字串
+    string freshness = 18;              // fresh | stale | very_stale | not_applicable（非 pending 狀態一律 not_applicable）。
+                                         // 反映最後一次同步「嘗試」（ClaimForSync CAS lease 取得時）而非最後一次「成功」：
+                                         // lease 在實際呼叫 PAYUni API 之前就寫入 last_synced_at，若取得 lease 後
+                                         // API 呼叫失敗，freshness 仍會前進，與呼叫成功時無法區分（Phase 1 已知限制）。
+    repeated string allowed_actions = 19; // "resync"（pending 且逾同步間隔）｜"edit_merchant_profile"（active）
+    // 以下 8 個欄位（issue #2806 Phase 2）鏡射 payuni_registrations 的聯絡/地址
+    // 欄位與樂觀鎖版本號，供 Web 端開啟編輯表單前先 GET 取得目前值與版本號
+    // （之後 PATCH /app/sellers/me/payuni/merchant_profile 的 If-Match）。
+    // 未曾設定值時為空字串；merchant_profile_version 未有註冊紀錄時為空字串。
+    string merchant_profile_version = 21; // 數字字串，語意與型別同 UpdateMerchantProfileResponse.merchant_profile_version
+    string contact_name = 22;
+    string contact_mobile = 23;
+    string contact_tel = 24;
+    string mer_email = 25;
+    string mer_addr = 26;
+    string mer_addr_post = 27;
+    string mer_tel = 28;
+    // 以下 4 個欄位（2026-09-10 賣家可讀錯誤目錄）：賣家被 PayUni 拒絕／退件時的
+    // 結構化原因。error_message（tag 10）仍是這支 internal gRPC message 的欄位，
+    // 服務間呼叫仍會傳遞；「不下發給賣家」是 gateway 的 JSON 邊界保證，不是這裡
+    // 的欄位定義本身——由 gateway/internal/handler/seller_test.go 的
+    // TestGetSellerPayuniStatus_ErrorMessageAbsent 鎖住，proto 層未做任何刪減。
+    string error_code = 29;             // AGENT 碼或 MER_*/MEMBER_* 合成碼；無錯誤時空字串
+    string error_display_message = 30;  // 賣家可讀文案：PayUni Reason 優先，否則 CodeMeta 目錄文案
+    string error_remedy = 31;           // SELLER_FIX | CONTACT_SUPPORT | RETRY_LATER
+    string retry_step = 32;             // idCard | bankBook | companyInfo | otherInfo | start；非 SELLER_FIX 為空
+}
+
+// ========== 商家 PAYUNi 配置查詢（供 payment-service 使用）==========
+
+message GetSellerPayuniConfigRequest {
+    int64 account_id = 1;
+    reserved 2;
+}
+
+message SellerPayuniConfigResponse {
+    int32 code = 1;
+    string message = 2;
+    SellerPayuniConfig data = 3;
+}
+
+message SellerPayuniConfig {
+    string account_id = 20;              // seller account_id
+    string payuni_mer_id = 2;            // PAYUNi 商店代號 (如 DAIL0001)
+    bool is_enabled = 3;                 // PAYUNi 是否已啟用 (status=1)
+    bool credit_enabled = 4;             // 信用卡支付是否啟用
+    bool applepay_enabled = 5;           // Apple Pay 是否啟用
+    bool googlepay_enabled = 6;          // Google Pay 是否啟用
+    bool atm_enabled = 7;                // ATM 是否啟用
+    string seller_name = 8;              // 商家名稱（用於交易描述）
+}
+// ========== New Certification Messages ==========
+
+message CreateCertificationDraftRequest {
+    int64 account_id = 1;
+    string seller_type = 2; // "individual" or "business"
+}
+
+message SaveCertificationProgressRequest {
+    string application_id = 1;  // path TSID 字串（§4）
+    int32 current_step = 2;
+    string step_data = 3; // JSON string
+}
+
+message CancelCertificationRequest {
+    string application_id = 1;  // path TSID 字串（§4）
+    string reason = 2;
+}
+
+message SubmitCertificationApplicationRequest {
+    string application_id = 1;  // path TSID 字串（§4）
+
+    // Basic info
+    string real_name = 2;
+    string id_card_no = 3;
+    string birth_date = 4;
+    string id_card_issue_date = 5;
+    string id_card_issue_type = 6;
+    string id_card_issue_location = 7;
+    string english_name = 8;
+
+    // Document asset IDs (finalized by frontend via Media Service)
+    string id_card_front_asset_id = 9;
+    string id_card_back_asset_id = 10;
+    string bank_book_asset_id = 11;
+
+    // Bank info
+    string bank_name = 12;
+    string bank_account = 13;
+    string bank_code = 27; // 金融機構代碼（3 碼，如 004 / 005 / 700）
+
+    // Business info (for business type)
+    string company_type = 14;
+    string company_name = 15;
+    string tax_id = 16;
+    string company_register_date = 17;
+    string company_city = 18;          // 縣市 (例如: 台北市, 新北市)
+    string company_district = 19;      // 區域 (例如: 中山區, 板橋區)
+    string company_address_detail = 20; // 詳細地址 (例如: 中山路1號)
+    string company_email = 21;
+    string company_phone = 22;
+    string product_type = 23;
+    bool is_processed_food = 24;
+    repeated string document_asset_ids = 25;
+    string food_business_reg_no = 26;
+}
+
+message GetCertificationApplicationRequest {
+    string application_id = 1;  // path TSID 字串（§4）
+}
+
+
+// Review messages
+message ApproveCertificationRequest {
+    string application_id = 1;  // path TSID 字串（§4）
+    int64 reviewer_id = 2;
+    string reviewer_name = 3;
+    string comment = 4;
+    repeated string required_fields = 5;
+    // 審核時 admin 覆寫的 PayUni 送審網址；空字串＝不覆寫，沿用賣家 website_url。
+    string payuni_website_url = 6;
+}
+
+message RejectCertificationRequest {
+    string application_id = 1;  // path TSID 字串（§4）
+    int64 reviewer_id = 2;
+    string reviewer_name = 3;
+    string rejection_reason = 4;
+    string comment = 5;
+    repeated string required_fields = 6;
+}
+
+// Response messages
+message CertificationApplicationResponse {
+    int32 code = 1;
+    string message = 2;
+    CertificationApplicationData data = 3;
+}
+
+message CertificationApplicationData {
+    string id = 1;
+    string account_id = 2;
+    string application_no = 3;
+    string status = 4;
+    string seller_type = 5;
+
+    // Basic info
+    string real_name = 6;
+    string id_card_no = 7;
+    string birth_date = 8;
+
+    // Document asset IDs (use /api/v1/media/secure-download/{assetId} or /api/v1/admin/media/secure-download/{assetId} to access)
+    string id_card_front_asset_id = 9;
+    string id_card_back_asset_id = 10;
+    string bank_book_asset_id = 11;
+
+    // Bank info
+    string bank_name = 13;
+    string bank_account = 14;
+    string bank_code = 47; // 金融機構代碼（3 碼，如 004 / 005 / 700）
+
+    // Business info
+    string company_name = 15;
+    string tax_id = 16;
+    string company_city = 35;          // 縣市
+    string company_district = 36;      // 區域
+    string company_address_detail = 37; // 詳細地址
+    string company_type = 38;          // 公司設立類型
+    string company_register_date = 39; // 公司登記日期 (民國年 YYY/MM/DD)
+    string company_email = 40;         // 公司電子信箱
+    string company_phone = 41;         // 公司電話
+    string product_type = 42;          // 主要商品類型
+
+    // ID card issue info
+    string id_card_issue_date = 43;     // 身分證發證日期 (民國年 YYY/MM/DD)
+    string id_card_issue_type = 44;     // 發證類型 (初發/補發/換發)
+    string id_card_issue_location = 45; // 發證地點
+    string food_business_reg_no = 46;   // 食品業者登錄字號
+    // 審核核准時 admin 實際送出給 PayUni 的網址覆寫值；空字串代表未覆寫過。
+    string payuni_website_url = 48;
+
+    // Extra document asset IDs
+    repeated string document_asset_ids = 17;
+
+    // Progress
+    int32 current_step = 20;
+    int32 total_steps = 21;
+    string step_data_json = 22;
+
+    // Timestamps
+    string submitted_at = 30;
+    reserved 31;
+    string rejected_at = 32;
+    string created_at = 33;
+    string updated_at = 34;
+}
+
+
+message ReviewResponse {
+    int32 code = 1;
+    string message = 2;
+    ReviewData data = 3;
+}
+
+message ReviewData {
+    string id = 1;
+    string application_id = 2;
+    string action = 3;
+    string result = 4;
+    string comment = 5;
+    string created_at = 6;
+}
+
+message GetCertificationReviewsRequest {
+    string application_id = 1;  // path TSID 字串（§4）
+}
+
+message CertificationReviewsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated CertificationReviewData reviews = 3;
+}
+
+message CertificationReviewData {
+    string id = 1;
+    string application_id = 2;
+    string reviewer_id = 3;
+    string reviewer_name = 4;
+    string action = 5;
+    string result = 6;
+    string comment = 7;
+    string rejection_reason = 8;
+    string created_at = 9;
+    repeated string required_fields = 10;
+}
+
+// ========== Admin Merchant Management Messages ==========
+
+message ListSellersForAdminRequest {
+    int32 page = 1;
+    int32 limit = 2;
+    string approval_status = 3;  // pending, approved, rejected, or empty for all
+    string keyword = 4;          // search by store_name or contact_phone
+    // sellers.status 生命週期篩選：active / suspended / suspended_governance
+    //（closed 亦為合法列值；空字串 = 不篩選）。admin 停權管理 UI 用。
+    string lifecycle_status = 5;
+}
+
+message ListSellersForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    AdminSellerListData data = 3;
+}
+
+message AdminSellerListData {
+    reserved 5;  // was: stats（已拆為獨立 RPC GetSellerStatsForAdmin）
+    repeated AdminSellerItem list = 1;
+    int64 total = 2;
+    int32 page = 3;
+    int32 limit = 4;
+}
+
+message AdminSellerItem {
+    reserved 20;  // was: merchant_id (payuni_mer_id string)
+    string account_id = 2;
+    string store_name = 3;
+    string logo = 4;
+    string contact_phone = 5;
+    reserved 6;  // was: address
+    int32 status = 7;
+    double rating = 8;
+    string seller_type = 9;
+    string payuni_mer_status = 10;  // PAYUNi 商戶狀態
+    string approval_status = 11;
+    string certified_at = 13;
+    string created_at = 14;
+    string updated_at = 15;
+    string city = 16;
+    string district = 17;
+    string address_detail = 18;
+    string postal_code = 19;
+    string current_certification_id = 21;
+    string overall_certification_status = 22;
+    string seo_title = 23;
+    string seo_description = 24;
+    string description = 25;
+    string cover_key = 26;  // 商家封面 objectKey（#1660：原 cover_url 存裸 key，§25 違規已修；Gateway 組 coverUrl）
+    // sellers.status 生命週期值：active / suspended / suspended_governance / closed。
+    // admin 列表停權 badge / 篩選用（詳情走 SellerInfo.lifecycle_status）。
+    string lifecycle_status = 27;
+    // sellers.email 登入信箱。admin 列表唯一能區分同名商店的識別欄位——
+    // 缺這欄時 admin 只看得到店名，同名店無從分辨會直接刪錯帳號。
+    string email = 28;
+    // 對外顯示碼（YY+8 位亂數，10 碼），2026-07-21 起取代直接曝露 store_id。
+    string store_code = 29;
+    // ② 賣家聚合 re-key：現任 store surrogate（sellers.store_id，TSID 數字字串）。
+    // grandfather 下 == account_id，重開店後分岔——admin 面的 store 業務鍵一律用它，
+    // 不可拿 account_id 代替。admin console 送 store surrogate 的入口（券的
+    // applicableStoreId、/admin/seller_shipment_settings?store_id=）都只認這個值，
+    // 而賣家名冊先前只給 account_id + store_code，兩邊接不起來。
+    string store_id = 30;
+    // mer_status/member_status: PayUni 原碼直傳（issue #2806 Phase 1），取代
+    // payuni_mer_status（field 10，7 值 relabel enum）成為 admin client 的
+    // canonical 顯示來源；field 10 保留供既有消費者相容，不刪除。
+    string mer_status = 31;
+    string member_status = 32;
+}
+
+// §4：對外數字一律 string（與 hawkr.account.AdminAccountStats、
+// hawkr.buyer.AdminBuyerStats 對稱）。
+message AdminSellerStats {
+    string total = 1;
+    string pending = 2;
+    string approved = 3;
+    string rejected = 4;
+    string monthly_new = 5;
+}
+
+message GetSellerStatsForAdminRequest {}
+
+message GetSellerStatsForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    AdminSellerStats data = 3;
+}
+
+// ========== Admin Certification Management Messages ==========
+
+message ListCertificationsForAdminRequest {
+    int32 page = 1;
+    int32 limit = 2;
+    string status = 3;    // submitted, approved, rejected, or empty for all
+    string keyword = 4;   // search by real_name or application_no
+}
+
+message ListCertificationsForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    AdminCertificationListData data = 3;
+}
+
+message AdminCertificationListData {
+    repeated AdminCertificationItem list = 1;
+    int64 total = 2;
+    int32 page = 3;
+    int32 limit = 4;
+    AdminCertificationStats stats = 5;
+}
+
+message AdminCertificationItem {
+    string id = 1;
+    string account_id = 2;
+    string application_no = 3;
+    string status = 4;
+    string seller_type = 5;
+    string real_name = 6;
+    string store_name = 7;
+    int32 current_step = 8;
+    int32 total_steps = 9;
+    string submitted_at = 10;
+    reserved 11;
+    string rejected_at = 12;
+    string created_at = 13;
+    string updated_at = 14;
+
+    // 圖片資料
+    string id_card_front_url = 15;         // 身份證正面
+    string id_card_back_url = 16;          // 身份證背面
+    string bank_book_url = 17;             // 銀行存摺
+    repeated string document_urls = 18;    // 其他文件 URLs
+    string overall_certification_status = 19;
+}
+
+message AdminCertificationStats {
+    int64 total = 1;
+    int64 submitted = 2;
+    int64 approved = 3;
+    int64 rejected = 4;
+}
+
+// ========== Cross-Service: Seller Meta ==========
+
+message BatchGetSellerMetaRequest {
+    // Store-stint surrogate ids (sellers.store_id, the PK). Historical
+    // ids from closed/retired stints resolve too — no is_current filter (§3.1 class 3).
+    repeated int64 store_ids = 1;
+}
+
+message SellerMeta {
+    int64 account_id = 1;   // principal login account.id of the stint (audit / FCM boundary mapping)
+    reserved 5;             // was: merchant_id (payuni_mer_id string)
+    string seller_name = 2; // 店家名稱
+    string logo_key = 3;    // 商家 logo objectKey（49 §6.6 GW組：內部欄，product 端經 Gateway 組 logoUrl）
+    reserved 4;             // was: status (PAYUNi mer_status raw value)
+    string zip_code = 6;    // 賣家郵遞區號（運費路線推導用）
+    string payuni_mer_id = 7; // PayUni 商家編號（該 stint 自己的 MerID — 歷史 stint 回歷史值）
+    // 店家此刻是否可以公開曝光、結帳可以下單（單體的 seller.pub_exposable_stores，經 exposure.Classify：營運中、沒有停權、KYC 流程核准含 PayUni、店名、logo 與
+    // 鄉鎮市區代碼齊全；ADR 2026-10-05-store-exposure-to-legacy 決策 3）。給 order-service 的結帳閘（9241）。
+    bool can_accept_orders = 8;
+    string city = 9;         // 賣家城市（如「台北市」，商品列表/詳情用）
+    string district = 10;    // 賣家地區（如「大安區」，商品列表/詳情用）
+    string store_id = 11; // 賣家目前的 store-stint surrogate（② re-key；grandfather 期間 = account_id，delete+re-onboard 後與 account_id 分岔；數字字串，§6 響應側禁 int64，protonumericlint gate）
+    string store_code = 12; // 對外顯示碼（YY+8 位亂數，10 碼），2026-07-21 起取代直接曝露 store_id
+    // 店家此刻是否可以管理商品、把商品轉成 ACTIVE（單體的 CapProductManage：營運中且沒有停權，不要求 KYC 或 PayUni 核准，
+    // 賣家可以在可曝光之前先準備商品；ADR 2026-10-05-store-exposure-to-legacy 決策 3）。給 product-service 的上架閘（9240）。
+    bool can_manage_products = 13;
+    // 店家是否曾經公開過、有公開的店家卡片：first_exposed_at 有值，或此刻可以公開曝光（與單體 seller.StoreCards 的同一條規則；
+    // 暫停中與已關閉的店只要曾經公開過就是 true）。給 social 與 gateway 判斷聊天對象（決策簡報 docs/plans/2026-09-29-a3-buyer-seller/step10d-decision-brief.md D2）；公開內容的可見性看店家此刻是否可公開曝光，不看它。
+    bool has_public_card = 14;
+}
+
+message BatchGetSellerMetaResponse {
+    int32 code = 1;
+    string message = 2;
+    // Keyed by store_id (store-stint surrogate). Pre-reshape this was
+    // keyed by account_id — identical values for all grandfathered rows.
+    map<int64, SellerMeta> sellers = 3;
+}
+
+message ResolvePrincipalsRequest {
+    repeated int64 ids = 1;
+}
+
+message ResolvePrincipalsResponse {
+    int32 code = 1;
+    string message = 2;
+    map<int64, int64> principals = 3;
+    // 請求的 ids 裡沒有存活店家列的（已關閉或不存在）。這些 id 不會出現在 principals 裡（沒有值可以回：單體的 store_id 與 account_id
+    // 是兩個獨立的序列，原樣回吐一定是錯的 account_id）；呼叫方以 key 不存在或出現在這裡判斷為未解析，並依用途 fail-closed 或降級。
+    repeated int64 unresolved_ids = 4;
+}
+
+message ListStoreIDsByAccountRequest {
+    int64 account_id = 1;
+}
+
+message ListStoreIDsByAccountResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated int64 store_ids = 3;
+}
+
+// ========== Cross-Service: Shipping Profile Messages ==========
+
+message GetSellerShippingProfileRequest {
+    // 登入 account_id。名字原為 seller_account_id，2026-08-05 正名 —— 值一直都是
+    // login account_id（不是 store surrogate），但 seller_account_id 這個名字在本
+    // repo 的歷史意義正好相反（sellers.seller_account_id 欄位已於 migration
+    // 20260711155335 更名為 store_id），是整份 proto 裡最容易接錯線的欄位。
+    // 現況：全 monorepo 零生產端 —— 唯一呼叫者 shipping-service SellerGrpcClient
+    // 只設 store_id，所以這個欄位實際上永遠是 0，server 端一律走 store_id 分支。
+    int64 account_id = 1;
+    // ② store re-key：> 0 時改用 PK sellers.store_id 查。與 account_id 互斥。
+    int64 store_id = 2;
+}
+
+message GetSellerShippingProfileResponse {
+    int32 code = 1;
+    string message = 2;
+    SellerShippingProfile data = 3;
+}
+
+message SellerShippingProfile {
+    string store_id = 1;            // 數字字串
+    string sender_name = 2;         // 寄件人名稱（= 商家名稱）
+    string sender_phone = 3;        // 寄件人電話
+    string city = 4;                // 城市
+    string district = 5;            // 區域
+    string address_detail = 6;      // 詳細地址
+    string zip_code = 7;            // 郵遞區號
+    string mer_id = 8;              // PayUni 商家編號（建立物流單用）
+    string contact_email = 9;       // 聯絡人信箱
+}
+
+// ========== Store Visitor Messages ==========
+
+message RecordStoreVisitRequest {
+    int64 store_id         = 1;
+    int64 visitor_buyer_id = 2;
+}
+
+message RecordStoreVisitResponse {
+    int32 code    = 1;
+    string message = 2;
+}
+
+message GetStoreVisitorsRequest {
+    int64 store_id = 1;
+    int32 page              = 2;
+    int32 page_size         = 3;
+}
+
+message StoreVisitorItem {
+    string visitor_buyer_id = 1;
+    int32 visit_count       = 2;
+    int64 last_visited_at   = 3; // Unix timestamp
+    string nickname         = 4; // Enriched
+    string avatar_key       = 5; // Enriched（49 §6.6 S2+GW組：objectKey；Gateway 組 avatarUrl）
+}
+
+message StoreVisitorListResponse {
+    int32  code     = 1;
+    string message  = 2;
+    StoreVisitorListData data = 3;
+}
+
+message StoreVisitorListData {
+    repeated StoreVisitorItem records  = 1;
+    int64 total                        = 2;
+    int32 page                         = 3;
+    int32 page_size                    = 4;
+}
+
+// ========== Recommended Sellers Messages ==========
+
+message GetRecommendedSellersRequest {
+    int32 limit = 1; // 回傳筆數上限，預設 10，最大 50
+}
+
+message GetRecommendedSellersResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated RecommendedSeller sellers = 3;
+}
+
+message RecommendedSeller {
+    string store_id    = 1; // store_id 命名債正名（Phase 2 campaign Task 3）：實際一直承載 seller_account_id（店家代理鍵）；gateway 早已手動組成 JSON key "store_id"（campaign Batch E 6a），只有這個 proto 欄位名沒跟上
+    string name        = 2;
+    string logo_key    = 3;  // 商家 logo objectKey（49 §6.6 GW組：Gateway 組 logoUrl）
+    string cover_key   = 4;  // 商家封面 objectKey（49 §6.6 GW組：Gateway 組 coverUrl）
+    string description = 5;
+    double rating      = 6;
+    int32  order_count = 7; // 近期訂單數（不暴露營收金額）
+    string city        = 8; // 商家城市（如「台北市」）
+    string district    = 9; // 商家地區（如「大安區」）
+    int32  followers   = 10; // 訂閱數
+    string store_code  = 11; // 對外顯示碼（YY+8 位亂數，10 碼），前端賣家頁 canonical 連結用
+}
+
+// ========== Product View Stats ==========
+
+message RecordProductViewRequest {
+    string product_id = 1;  // TSID 字串（§4）
+}
+
+message RecordProductViewResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+message GetProductViewStatsRequest {
+    int64 store_id = 1; // 店家 ID（Gateway JWT 注入，resolver 解析後的 store surrogate）
+    reserved 2;
+    reserved "period_days";
+}
+
+message ProductViewStatsResponse {
+    int32 code = 1;
+    string message = 2;
+    int64 view_count = 3;  // 本期商品總瀏覽次數
+    int32 growth_pct = 4;  // 環比百分比
+}
+
+// ========== Self-Service: Account Deletion Messages ==========
+
+// DeleteActor 區分自刪與管理員代刪；admin 才可帶 override_active_orders。
+enum DeleteActor {
+    DELETE_ACTOR_SELF  = 0;  // 預設：使用者自刪
+    DELETE_ACTOR_ADMIN = 1;  // 管理員代刪
+}
+
+message DeleteSellerAccountRequest {
+    int64 account_id = 1;
+    DeleteActor actor = 2;
+    int64 operator_id = 3;             // actor=ADMIN 時為操作 admin 的 account id（audit 用）
+    bool override_active_orders = 4;   // 只在 actor=ADMIN 有效；繞過 9205 訂單擋
+    string reason = 5;                 // override / admin 刪除理由（audit 用）
+}
+
+message DeleteSellerAccountResponse {
+    int32  code    = 1;
+    string message = 2;
+}
+
+// ========== B-169 Governance Messages (issue #722) ==========
+
+// 統一錯誤包封 (失敗時 code != 0；duplicate / silent drop 路徑用特定 code)
+//   - code=0: success
+//   - code=4001: invalid input (phone format / missing field / penalty 互斥)
+//   - code=4030: forbidden (非 own violation 申訴)
+//   - code=4040: not found
+//   - code=4090: conflict (duplicate / status transition / already acked)
+
+// ----- 共用 -----
+
+// 食安通道 + 登入端報告共用 status enum (string carrying)
+//   pending / investigating / verified / dismissed
+// food_safety severity 不存 DB，固定 'critical'。
+
+// ----- Create Reports -----
+
+message CreateViolationReportRequest {
+    int64  reporter_account_id     = 1;
+    string target_seller_id        = 2;  // TSID 字串（§4）
+    string target_product_id       = 3; // optional, TSID 字串（§4）
+    string target_post_id          = 4; // optional, TSID 字串（§4）
+    string target_order_no         = 5; // optional
+    string category                = 6; // food_safety / fake_certification / ...
+    string severity                = 7; // low / medium / high / critical
+    string description             = 8;
+    repeated string evidence_asset_ids = 9; // media-service two-step asset_ids
+}
+
+message CreateViolationReportResponse {
+    int32  code      = 1;
+    string message   = 2;
+    string report_id = 3;
+    bool   duplicate = 4; // D13 calendar-day partial unique 觸發回 既有 id
+}
+
+message CreateFoodSafetyReportRequest {
+    string target_seller_id    = 1; // optional, TSID 字串（§4）
+    string target_product_id   = 2; // optional, TSID 字串（§4）
+    string target_order_no     = 3; // optional
+    string reporter_phone      = 4; // 必填，台灣手機 09xxxxxxxx / +886... / 等可被 NormalizePhone 接受
+    string reporter_email      = 5; // optional
+    string reporter_name       = 6; // optional
+    string description         = 7; // 必填
+    repeated string evidence_asset_ids = 8; // anonymous upload 取得
+}
+
+message CreateFoodSafetyReportResponse {
+    int32  code              = 1;
+    string message           = 2;
+    string report_id         = 3;
+    int64  ack_estimated_at  = 4; // unix ms — admin 應在此時間前 ack
+}
+
+// ----- ListMyViolationReports -----
+
+message ListMyViolationReportsRequest {
+    int64 reporter_account_id = 1;
+    int64 since_ms            = 2; // optional unix ms (default 90d ago)
+    int32 limit               = 3;
+    int32 offset              = 4;
+}
+
+message ListMyViolationReportsResponse {
+    int32 code    = 1;
+    string message = 2;
+    repeated SellerViolationReport reports = 3;
+}
+
+// SellerViolationReport message — admin / 賣家自助共用 view (含 reporter / status)
+message SellerViolationReport {
+    string id                       = 1;
+    string target_seller_id         = 2;
+    string target_product_id        = 3;
+    string target_post_id           = 4;
+    string target_order_no          = 5;
+    string reporter_account_id      = 6;
+    string category                 = 7;
+    string severity                 = 8;
+    string description              = 9;
+    repeated string evidence_asset_ids = 10;
+    string status                   = 11;
+    int64  investigating_at_ms      = 12;
+    int64  resolved_at_ms           = 13;
+    string admin_resolution_summary = 14;
+    int64  created_at_ms            = 15;
+}
+
+// FoodSafetyReport message — admin 用 view
+message FoodSafetyReport {
+    string id                       = 1;
+    string target_seller_id         = 2;
+    string target_product_id        = 3;
+    string target_order_no          = 4;
+    string reporter_phone           = 5; // admin 可看完整；公開查詢不暴露
+    string reporter_email           = 6;
+    string reporter_name            = 7;
+    string description              = 8;
+    repeated string evidence_asset_ids = 9;
+    string status                   = 10;
+    int64  acknowledged_at_ms       = 11;
+    string acknowledged_by_admin_id = 12;
+    int64  investigating_at_ms      = 13;
+    int64  resolved_at_ms           = 14;
+    string admin_resolution_summary = 15;
+    int64  fda_reported_at_ms       = 16;
+    string fda_report_channel       = 17;
+    string fda_reference_no         = 18;
+    int64  created_at_ms            = 19;
+}
+
+// SellerViolation message — admin / 賣家自助共用 view
+message SellerViolation {
+    string id                          = 1;
+    string seller_id                   = 2;
+    string source_seller_report_id     = 3;
+    string source_food_safety_report_id = 4;
+    string category                    = 5;
+    string severity                    = 6;
+    string penalty_type                = 7;
+    int64  penalty_amount_cents        = 8;
+    string description                 = 9;
+    string public_summary              = 10;
+    int64  effective_at_ms             = 11;
+    int64  expires_at_ms               = 12;
+    string status                      = 13; // enforced / revoked
+    int64  revoked_at_ms               = 14;
+    string revoked_reason              = 15;
+    bool   appealed                    = 16;
+    string appeal_reason               = 17;
+    repeated string appeal_evidence_asset_ids = 18;
+    string appeal_status               = 19; // pending / accepted / rejected (if appealed)
+    int64  appeal_submitted_at_ms      = 20;
+    int64  appeal_decided_at_ms        = 21;
+    string appeal_decision_reason      = 22;
+    string appeal_decided_by_admin_id  = 23;
+    string created_by_admin_id         = 24;
+    int64  created_at_ms               = 25;
+}
+
+// PublicSellerViolation 對外公開賣家頁顯示用（D8 嚴格白名單）
+message PublicSellerViolation {
+    string id                = 1;
+    string category          = 2;
+    string severity          = 3;
+    string penalty_type      = 4;
+    string public_summary    = 5;
+    int64  effective_at_ms   = 6;
+    int64  expires_at_ms     = 7;
+}
+
+// ----- Seller-side -----
+
+message SellerListMyViolationsRequest {
+    int64 seller_id = 1;
+    int32 limit     = 2;
+    int32 offset    = 3;
+}
+
+message SellerListMyViolationsResponse {
+    int32 code    = 1;
+    string message = 2;
+    repeated SellerViolation violations = 3;
+}
+
+message SellerSubmitAppealRequest {
+    string violation_id              = 1;  // path TSID 字串（§4）
+    int64  seller_id                 = 2;  // JWT 注入（§4.1 例外①）
+    string appeal_reason             = 3;
+    repeated string appeal_evidence_asset_ids = 4;
+}
+
+message SellerSubmitAppealResponse {
+    int32  code    = 1;
+    string message = 2;
+    SellerViolation violation = 3;
+}
+
+message SellerGetAppealRequest {
+    string violation_id = 1;  // path TSID 字串（§4）
+    int64  seller_id    = 2;  // JWT 注入（§4.1 例外①）
+}
+
+message SellerGetAppealResponse {
+    int32  code    = 1;
+    string message = 2;
+    SellerViolation violation = 3;
+}
+
+// ----- Public seller-page violations (D8) -----
+
+message GetPublicSellerViolationsRequest {
+    string seller_id = 1;  // path TSID 字串（§4）。② 起承載 seller_account_id；服務端以 store surrogate 解析（per-store clean-slate — re-onboard 不帶舊 violations；Will 2026-07-11 override，非 person-level carry-over）
+}
+
+message GetPublicSellerViolationsResponse {
+    int32 code    = 1;
+    string message = 2;
+    repeated PublicSellerViolation violations = 3;
+}
+
+// ----- Admin: List Reports (合併兩張 source 表) -----
+
+message AdminListViolationReportsRequest {
+    string source   = 1; // ""(both) / seller_violation_reports / food_safety_reports
+    string status   = 2; // optional filter
+    string severity = 3; // optional filter
+    int64  since_ms = 4; // optional filter
+    int32  limit    = 5;
+    int32  offset   = 6;
+}
+
+// UnionReportRow admin list 合併結果 — admin UI 依 source 組正確 PATCH URL.
+message UnionReportRow {
+    string source                          = 1; // seller_violation_reports / food_safety_reports
+    string severity                        = 2; // food_safety 一律 'critical'
+    int64  created_at_ms                   = 3;
+    SellerViolationReport seller_report    = 4; // present iff source=seller_violation_reports
+    FoodSafetyReport      food_safety      = 5; // present iff source=food_safety_reports
+}
+
+message AdminListViolationReportsResponse {
+    int32 code    = 1;
+    string message = 2;
+    repeated UnionReportRow rows = 3;
+}
+
+// ----- Admin: Patch Status (兩張 source 表共用 message — service 端 RPC 拆兩條) -----
+
+message AdminPatchReportStatusRequest {
+    string report_id                = 1;  // path TSID 字串（§4）
+    string status                   = 2; // investigating / verified / dismissed
+    string admin_resolution_summary = 3;
+}
+
+message AdminPatchReportStatusResponse {
+    int32 code    = 1;
+    string message = 2;
+    SellerViolationReport seller_report = 3; // present iff RPC 為 PatchSellerViolationReport
+    FoodSafetyReport      food_safety   = 4; // present iff RPC 為 PatchFoodSafetyReport
+}
+
+// ----- Admin: Acknowledge Food Safety -----
+
+message AdminAcknowledgeRequest {
+    string report_id = 1;  // path TSID 字串（§4）
+    int64  admin_id  = 2;  // JWT 注入（§4.1 例外①）
+}
+
+message AdminAcknowledgeResponse {
+    int32 code    = 1;
+    string message = 2;
+    FoodSafetyReport report = 3;
+    int64 ack_latency_ms    = 4; // ack_at - created_at
+    bool  sla_met           = 5; // < 4h
+}
+
+// ----- Admin: FDA Export / Mark FDA Reported -----
+
+message AdminGenerateFDAReportRequest {
+    string report_id = 1;  // path TSID 字串（§4）
+}
+
+message AdminGenerateFDAReportResponse {
+    int32  code     = 1;
+    string message  = 2;
+    string markdown = 3; // admin 客戶端下載成 .md
+}
+
+message AdminMarkFDAReportedRequest {
+    string report_id           = 1;  // path TSID 字串（§4）
+    string fda_report_channel  = 2; // 1919_hotline / online_form / fax_health_dept / in_person / other
+    string fda_reference_no    = 3; // 可填 'n/a'
+}
+
+message AdminMarkFDAReportedResponse {
+    int32 code    = 1;
+    string message = 2;
+    FoodSafetyReport report = 3;
+}
+
+// ----- Admin: Notify Seller (D20) -----
+
+message AdminNotifySellerRequest {
+    string report_id    = 1; // food_safety_reports.id, TSID 字串（§4）
+    int64  admin_id     = 2;  // JWT 注入（§4.1 例外①）
+    string template_key = 3; // assist_investigation / temporary_takedown_self_check
+}
+
+message AdminNotifySellerResponse {
+    int32 code    = 1;
+    string message = 2;
+    string log_id   = 3;
+}
+
+// ----- Admin: Violations CRUD + Appeal Decide -----
+
+message AdminCreateViolationRequest {
+    string seller_id                       = 1;  // TSID 字串（§4）
+    string source_seller_report_id         = 2; // 互斥 — 至多一個, TSID 字串（§4）
+    string source_food_safety_report_id    = 3;  // TSID 字串（§4）
+    string category                        = 4;
+    string severity                        = 5;
+    string penalty_type                    = 6; // Phase 1: warning / full_suspension
+    int64  penalty_amount_cents            = 7; // fine 用 (Phase 2+)
+    string description                     = 8;
+    string public_summary                  = 9; // 為空時違規不公開
+    int64  expires_at_ms                   = 10; // full_suspension 必填
+    int64  created_by_admin_id             = 11;
+}
+
+message AdminCreateViolationResponse {
+    int32 code    = 1;
+    string message = 2;
+    SellerViolation violation = 3;
+    bool   severity_auto_escalated = 4; // D6: 近 90 天 medium ≥ 3 → 自動升 high
+    string original_severity      = 5;
+    string applied_severity       = 6;
+}
+
+// AdminGetViolationRequest/Response — admin 決議申訴前查看詳情（issue #1516：補上缺失的
+// GET /admin/violations/{id}，決議前唯一能看到 appeal_evidence_asset_ids 的入口）。
+message AdminGetViolationRequest {
+    string id = 1;  // path TSID 字串（§4）
+}
+
+message AdminGetViolationResponse {
+    int32 code    = 1;
+    string message = 2;
+    SellerViolation violation = 3;
+}
+
+message AdminUpdateViolationRequest {
+    string id              = 1;  // path TSID 字串（§4）
+    string description     = 2;
+    string public_summary  = 3;
+    int64  expires_at_ms   = 4;
+}
+
+message AdminUpdateViolationResponse {
+    int32 code    = 1;
+    string message = 2;
+    SellerViolation violation = 3;
+}
+
+message AdminRevokeViolationRequest {
+    string id              = 1;  // path TSID 字串（§4）
+    string revoked_reason  = 2; // appeal_accepted / admin_correction / external_decision / other
+    int64  admin_id        = 3;
+}
+
+message AdminRevokeViolationResponse {
+    int32 code    = 1;
+    string message = 2;
+    SellerViolation violation = 3;
+}
+
+message AdminDecideAppealRequest {
+    string violation_id    = 1;  // path TSID 字串（§4）
+    int64  admin_id        = 2;  // JWT 注入（§4.1 例外①）
+    bool   accept          = 3;
+    string decision_reason = 4; // reject 必填
+}
+
+message AdminDecideAppealResponse {
+    int32 code    = 1;
+    string message = 2;
+    SellerViolation violation = 3;
+}
+
+// ========== Admin 手動停權（不服勸導，32 §13 / 46 §5） ==========
+//
+// account_id 為被停權的登入帳號（非 store surrogate）— admin 手動停權是對「人」的懲罰，
+// 需跨越 close→re-onboard 的店鋪世代持續生效，與 seller_violations 的 store-scope 不同
+// （見 07-方案設計.md §6.2；Redis key `seller:suspended:<accountId>` / MQ payload
+// accountId 均以此為準，46 §4.2 / §5）。
+
+message SellerSuspension {
+    string id                     = 1;  // TSID 字串（§4）— 即 suspensionId，隨 MQ payload 傳給下游
+    string account_id             = 2;  // TSID 字串（§4）
+    string reason_code            = 3;  // SellerSuspensionReason CodeMeta
+    string reason_detail          = 4;
+    string status                 = 5;  // active / lifted
+    string suspended_by_admin_id  = 6;
+    string suspended_at           = 7;  // ISO 8601 UTC（YYYY-MM-DDTHH:mm:ssZ，§6 response 欄位禁數字型別）
+    string lifted_by_admin_id     = 8;  // 空字串 = 尚未解除
+    string lifted_at              = 9;  // ISO 8601 UTC；空字串 = 尚未解除
+    string created_at             = 10; // ISO 8601 UTC
+}
+
+message SuspendSellerForAdminRequest {
+    string account_id    = 1;  // path {sellerId}，TSID 字串（§4）
+    string reason_code   = 2;  // SellerSuspensionReason CodeMeta（9601=違反平台規範 / 9602=屢勸不改 / 9603=其他）
+    string reason_detail = 3;
+    int64  admin_id      = 4;  // JWT 注入（§4.1 例外①）
+}
+
+message SuspendSellerForAdminResponse {
+    int32  code              = 1;
+    string message           = 2;
+    SellerSuspension suspension = 3;
+    bool   already_suspended = 4;  // 冪等：uq_seller_suspensions_active 擋第二筆 active 時 true
+}
+
+message LiftSellerSuspensionForAdminRequest {
+    string account_id = 1;  // path {sellerId}，TSID 字串（§4）
+    string id         = 2;  // path {id}，suspension TSID 字串（§4）
+    int64  admin_id   = 3;  // JWT 注入（§4.1 例外①）
+}
+
+message LiftSellerSuspensionForAdminResponse {
+    int32  code              = 1;
+    string message           = 2;
+    SellerSuspension suspension = 3;
+    bool   already_lifted    = 4;  // 冪等：重複解除 no-op 時 true
+}
+
+message ListSellerSuspensionsForAdminRequest {
+    string account_id = 1;  // path {sellerId}，TSID 字串（§4）
+    int32  limit       = 2;
+    int32  offset      = 3;
+}
+
+message ListSellerSuspensionsForAdminResponse {
+    int32 code    = 1;
+    string message = 2;
+    repeated SellerSuspension suspensions = 3;
+}
+
+message GetActiveSellerSuspensionForAdminRequest {
+    string account_id = 1;  // path {sellerId}，TSID 字串（§4）
+}
+
+message GetActiveSellerSuspensionForAdminResponse {
+    int32 code    = 1;
+    string message = 2;
+    SellerSuspension suspension = 3;  // id 為空字串 = 無 active 停權
+}
+
+// ========== Admin 賣家會員分級方案（子系統 1）==========
+
+message AssignSellerMembershipPlanRequest {
+    string store_id = 1;
+    string plan_code = 2;
+    string reason = 3;
+    string granted_by_account_id = 4;
+    string request_id = 5;
+    hawkr.common.DelegationContext delegation = 100;
+}
+
+message GetSellerMembershipPlanRequest {
+    string store_id = 1;
+    hawkr.common.DelegationContext delegation = 100;
+}
+
+message SellerMembershipPlanData {
+    string store_id = 1;
+    string plan_code = 2;
+    string display_name = 3;
+    string tier_rank = 4;
+    string monthly_order_cap = 5;
+    string effective_at = 6;
+}
+
+message SellerMembershipPlanResponse {
+    int32 code = 1;
+    string message = 2;
+    SellerMembershipPlanData data = 3;
+}
+
+message ListSellerMembershipPlansRequest {
+}
+
+message SellerMembershipPlanCatalogEntry {
+    string plan_code = 1;
+    string display_name = 2;
+    string tier_rank = 3;
+    string monthly_order_cap = 4;
+    string monthly_price_twd = 5;
+    bool is_purchasable = 6;
+    string created_at = 7;   // RFC3339 UTC
+    string updated_at = 8;   // RFC3339 UTC
+}
+
+message ListSellerMembershipPlansResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated SellerMembershipPlanCatalogEntry plans = 3;
+}
+
+// UpdateSellerMembershipPlanRequest 是方案目錄本身（seller_membership_plans）的
+// partial update。plan_code 是 identity，走路徑參數不可變；display_name／tier_rank
+// 這輪不開放（tier_rank 決定 AI 排序權重，風險層級與 cap/price 不同）。has_* 顯式
+// 旗標比照買家 UpdateMembershipPlanRequest 慣例：未帶入的欄位維持原值，不是被覆寫
+// 成零值。
+message UpdateSellerMembershipPlanRequest {
+    string plan_code = 1;
+    string monthly_order_cap = 2;
+    string monthly_price_twd = 3;
+    bool is_purchasable = 4;
+    bool has_monthly_order_cap = 5;
+    bool has_monthly_price_twd = 6;
+    bool has_is_purchasable = 7;
+}
+
+message UpdateSellerMembershipPlanResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+// ========== Business Registration (GCIS 統一編號查詢) ==========
+
+message LookupBusinessRegistrationRequest {
+    string ban = 1; // 統一編號（8 位數字）
+}
+
+// BusinessRegistrationData 公司登記資料。found=false 表示 GCIS 可連線但查無此統編
+// （definitive not-found）；上游逾時 / 連線失敗回 gRPC error（transient，由 caller fail-soft）。
+message BusinessRegistrationData {
+    bool   found               = 1;
+    string ban                 = 2;
+    string business_nm         = 3;
+    string business_address    = 4;
+    string business_setup_date = 5; // 西元 YYYY-MM-DD
+    string business_type       = 6; // 股份有限公司 / 有限公司 …
+    string capital_amount      = 7; // §6：response 數值欄位用 string，gRPC boundary 轉換
+}
+
+message LookupBusinessRegistrationResponse {
+    int32  code = 1;
+    string message = 2;
+    BusinessRegistrationData data = 3;
+}
+
+// ========== Address Geocode (賣家門市地址查詢/驗證) ==========
+
+message SuggestAddressRequest {
+    string county = 1;
+    string district = 2;
+    string query = 3;
+}
+
+message AddressSuggestionData {
+    string full_address = 1;
+    string county = 2;
+    string district = 3;
+    string detail = 4;
+}
+
+message SuggestAddressResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated AddressSuggestionData data = 3;
+}
+
+message ValidateAddressRequest {
+    string address = 1;
+}
+
+message AddressValidationData {
+    string full_address = 1;
+    string county = 2;
+    string district = 3;
+    string detail = 4;
+    string lat = 5;
+    string lng = 6;
+    bool valid = 7;
+}
+
+message ValidateAddressResponse {
+    int32 code = 1;
+    string message = 2;
+    AddressValidationData data = 3;
+}
+
+// Admin-only certification detail request (#608). Separate RPC from the seller
+// GetCertificationApplication so admin can receive the unmasked id_card_no.
+// Placed at end of file so protoc message-index assignment does not shift
+// existing generated indices (minimal generated-code churn).
+message GetCertificationApplicationForAdminRequest {
+    string application_id = 1;  // path TSID 字串（§4）
+}
+
+// Appended to keep all existing protoc message indices stable.
+message ListPublicStoreIDsByCityRequest {
+    string city = 1; // 台灣 22 縣市；接受台/臺別名，server 正規化
+}
+
+message ListPublicStoreIDsByCityResponse {
+    int32 code = 1;
+    string message = 2;
+    string city = 3;               // canonical city
+    repeated string store_ids = 4; // 數字字串，供 product store_ids filter 使用
+    string city_code = 5;          // ISO 3166-2:TW
+}
+
+message ListPublicStoresByCityRequest {}
+
+message ListPublicStoresByCityResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated PublicCityStores cities = 3; // 固定 22 筆，含零商家城市
+}
+
+message PublicCityStores {
+    string city_code = 1;                  // ISO 3166-2:TW，例如 TW-TPE
+    string city_name = 2;                  // canonical 中文名稱，例如台北市
+    repeated string store_ids = 3;         // 完整 store ids，供 server-side filter/count
+    repeated string preview_store_ids = 4; // 前 6 筆 deterministic preview；不得作完整 filter
+}
+
+message GetCurrentStoreIDRequest {
+    int64 account_id = 1;
+}
+
+message GetCurrentStoreIDResponse {
+    int64 store_id = 1;
+}
+
+// 業者名稱歸屬比對（19 號 §8.5.1）——自動核准前確認「這張證書是不是這個賣家的」。
+message MatchCertificateHolderRequest {
+    // 內部呼叫、前端不可控 ⇒ 適用型別規範 §4.1 例外 1，用原生數值
+    int64 store_id = 1;
+    // 政府查驗回的業者名稱，原樣送出（正規化在本服務內做）
+    string holder_name = 2;
+}
+
+message MatchCertificateHolderResponse {
+    // 任一名稱匹配即 true
+    bool matched = 1;
+    // "REAL_NAME" / "COMPANY_NAME" / "NONE"——稽核用，不含名稱本身
+    string matched_field = 2;
+    // 該賣家是否有任何可比對的名稱；false ⇒ 無從判斷，呼叫端應轉人工而非放行
+    bool has_reference = 3;
+}
+
+// ========== 站外業者主檔（招商名單） ==========
+
+message SearchSellerProspectsRequest {
+    string category = 1;
+    string region = 2;
+    string keywords = 3;
+    // category_ids 是平台分類樹的節點 id，呼叫端（ai-service）已把買家要的節點
+    // 展開成祖先鏈。業者掛的分類落在其中任一個就算命中，語意與上面三個條件同為
+    // 加權 OR。為空時這個述詞恆為 false，行為與加這個欄位之前逐位元相同。
+    repeated string category_ids = 5;
+    // 服務端安全上限，不是「回傳幾筆」的意思——相關性排序與最終截斷交給呼叫端
+    // （ai-service 的 CandidateSearchUseCase.Search，見該檔註解）在算完分數之後
+    // 做，DB 這一側只需要保證單次查詢不會把整份名單（634 筆量級）全撈回來造成
+    // 過量傳輸。0 表示採用服務端預設（500）。
+    int32 limit = 4;
+}
+
+// SellerProspectItem 是一家站外業者的對外投影。
+// id 依 API/Proto 規範以字串承載（避免 JavaScript 精度問題）。
+message SellerProspectItem {
+    string id = 1;
+    string display_name = 2;
+    string vendor_type = 3;
+    string category = 4;
+    string region = 5;
+    string product_summary = 6;
+    string positioning = 7;
+    string research_summary = 8;
+    string priority_letter = 9;
+    // 星等以字串承載：repo 的 proto-lint-numeric 把「計數」型欄位一律要求字串
+    // （CLAUDE.md §4）。0–3 的星等本身沒有 JS 精度風險，但規則是機械式的，
+    // 而在 allowlist 加一筆新例外會把一份「既有豁免」清單變成常態出口。
+    string priority_stars = 10;
+    string public_email = 11;
+    string public_phone = 12;
+    string public_website = 13;
+    string public_social = 14;
+    // 這一列的事實截止時間（呼叫端寫進候選快照的 facts_as_of）。
+    string updated_at = 15; // ISO 8601 UTC
+
+    // 站外業者的品牌素材 objectKey（顯示 URL 由 Gateway 組，49 §6.6）。
+    // **這不是平台賣家身分**——站外業者沒有 store，這兩欄純粹是「這家業者
+    // 自己的品牌圖長什麼樣」，不得被消費端當成已入駐或已驗證的訊號。
+    // 素材來源與使用許可狀態見 seller_prospects.{logo,cover}_source_url。
+    string logo_key = 16;
+    string cover_key = 17;
+}
+
+// SellerProspectHit 是命中列 ＋ 命中了哪些 facet。
+message SellerProspectHit {
+    SellerProspectItem prospect = 1;
+    bool hit_category = 2;
+    bool hit_region = 3;
+    bool hit_keywords = 4;
+    // hit_category_ids 說這筆是靠結構化分類標籤命中的，不是靠字串比對。
+    // 呼叫端用它把「命中理由」標給買家看，也是排序訊號。
+    bool hit_category_ids = 5;
+}
+
+message SearchSellerProspectsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated SellerProspectHit data = 3;
+}
+
+message CreateSellerProspectRequest {
+    string display_name = 1;
+    string vendor_type = 2; // individual | business
+    string tax_id = 3;      // 可空；有值時必須是 8 碼數字
+    string public_email = 4;
+    string public_phone = 5;
+    string public_website = 6;
+    string public_social = 7;
+    string category = 8;
+    string region = 9;
+    string product_summary = 10;
+    string positioning = 11;
+    string research_summary = 12;
+    string priority_letter = 13;
+    // 與 SellerProspectItem.priority_stars 同型別：同一個概念在請求與回應上
+    // 用兩種 wire 型別，讀的人一定會踩到。
+    string priority_stars = 14;
+    // 操作者的登入 principal（admin operator）。遷移腳本送 0。
+    string created_by_account_id = 15;
+    // true 時只回比對結果、不寫入。遷移的 dry-run 與階段二 admin 表單的
+    // 即時查重都走這個旗標。
+    bool dry_run = 16;
+    // 這筆事實原本成立的時間點（ISO 8601 UTC），只給 candidate_leads 的一次性
+    // 遷移腳本用（scripts/migrate_candidate_leads_to_prospects.go 讀
+    // candidate_leads.imported_at 帶進來）：候選卡把 seller_prospects.updated_at
+    // 呈現成 facts_as_of（可驗證來源證據），若遷移當下沒有這個欄位、一律蓋成
+    // 遷移執行日，8 月做的研究會謊報成遷移當天才查證。階段二 admin 建檔不送
+    // 這個欄位，交由伺服器端用 now()。空字串或解析失敗 ⇒ 伺服器端一律退回 now()。
+    string facts_as_of = 17;
+}
+
+// ProspectMatchCandidate 是「這筆輸入看起來跟既有哪幾列是同一家」。
+// tier 只會是 T1_TAX_ID 或 T2_CONTACT——名稱模糊比對永不自動合併，
+// 因此不會出現在這個回應裡。
+message ProspectMatchCandidate {
+    SellerProspectItem prospect = 1;
+    string tier = 2;       // T1_TAX_ID | T2_CONTACT
+    string matched_on = 3; // tax_id | email | phone | domain | social
+}
+
+message CreateSellerProspectResponse {
+    int32 code = 1;
+    string message = 2;
+    // dry_run=true 時為空；實際建立成功時帶新列。
+    SellerProspectItem data = 3;
+    // 比對到的既有列——比對對象是這次呼叫當下 seller_prospects 裡「已經寫入」
+    // 的資料，不多不少。dry_run=true 與 dry_run=false 都可能非空：dry_run 不
+    // 寫入，所以只能比到呼叫之前就已存在的列；而遷移腳本要在真正套用前看到
+    // 「這批輸入互相之間」的重複，必須先用一次真寫入的 staging pass 累積起來
+    // （見 scripts/migrate_candidate_leads_to_prospects.go 檔頭），這種情況下
+    // 即使 dry_run=false，non-empty matches 一樣可能只代表「跟同一批稍早那筆」
+    // 撞上，不是跟既有正式資料撞上。呼叫端不能只看「非空」就假設對象是既有
+    // 正式資料，必須自己知道自己在哪個階段呼叫。
+    repeated ProspectMatchCandidate matches = 4;
+}
+
+// ========== 站外業者主檔 — Admin messages ==========
+
+// AdminSellerProspectItem 是給 admin console 的完整投影。與
+// SellerProspectItem 的差別是識別鍵與狀態欄位——那些刻意不出現在
+// ai-service 消費的那個型別上。數字一律字串過線。
+message AdminSellerProspectItem {
+    string id = 1;
+    string display_name = 2;
+    string vendor_type = 3;
+    string status = 4;                    // ACTIVE | ARCHIVED | CONVERTED
+    string outreach_status = 5;
+    string tax_id = 6;                    // 空字串表示未填
+    string converted_store_id = 7;        // 空字串表示未歸因
+    string converted_at = 8;              // ISO 8601 UTC，空字串表示未歸因
+    string merged_into_prospect_id = 9;   // 空字串表示未被合併
+    string category = 10;
+    string region = 11;
+    string product_summary = 12;
+    string positioning = 13;
+    string research_summary = 14;
+    string priority_letter = 15;
+    string priority_stars = 16;
+    string public_email = 17;
+    string public_phone = 18;
+    string public_website = 19;
+    string public_social = 20;
+    string created_by_account_id = 21;
+    string updated_by_account_id = 22;
+    string created_at = 23;               // ISO 8601 UTC
+    string updated_at = 24;               // ISO 8601 UTC
+
+    // 品牌圖片。key 是 media-service 轉正後的 objectKey；顯示 URL 由 Gateway 組，
+    // 不在這裡回——同 SellerInfo.logo_key（49 §6.6 GW組）。
+    string logo_key = 25;
+    string cover_key = 26;
+    // 「這張圖是從哪個公開頁面找到的」。稽核欄位，後端只驗格式不下載；
+    // 填了網址不代表已取得使用許可。
+    string logo_source_url = 27;
+    string cover_source_url = 28;
+    // 圖片專屬的樂觀鎖版本（數字字串），與文字主檔的編輯分開計。每次換圖遞增，
+    // Admin 以它作為下一次寫入的 expected 基準。
+    string media_version = 29;
+}
+
+message AdminListSellerProspectsRequest {
+    string status = 1;           // 空 ⇒ 只回 ACTIVE（admin 的日常工作面）
+    string outreach_status = 2;
+    string vendor_type = 3;
+    string category = 4;
+    string region = 5;
+    string keyword = 6;          // 比對 display_name／product_summary／positioning／research_summary
+    string page = 7;             // 從 1 起；空或解析失敗 ⇒ 1
+    string page_size = 8;        // 上限 500；空或解析失敗 ⇒ 20
+}
+
+message AdminListSellerProspectsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated AdminSellerProspectItem data = 3;
+    string total = 4;
+    string page = 5;
+    string page_size = 6;
+}
+
+// ProspectInviteItem 是一筆邀請的對外投影。token 只在建立當下回一次
+// （AdminCreateProspectInviteResponse.token），列表不回——邀請歷史是給
+// BD 看漏斗的，不是給人重新取得憑證的地方。
+message ProspectInviteItem {
+    string id = 1;
+    string prospect_id = 2;
+    string expires_at = 3;   // ISO 8601 UTC
+    string sent_at = 4;      // 空字串表示未寄送
+    string clicked_at = 5;   // 空字串表示未點擊（T17 之前恆為空）
+    string consumed_at = 6;  // 空字串表示未消費
+    string revoked_at = 7;   // 空字串表示未撤銷
+    string created_at = 8;
+}
+
+message AdminGetSellerProspectRequest {
+    string id = 1;
+}
+
+message AdminGetSellerProspectResponse {
+    int32 code = 1;
+    string message = 2;
+    AdminSellerProspectItem data = 3;
+    repeated ProspectInviteItem invites = 4;
+}
+
+message AdminUpdateSellerProspectRequest {
+    string id = 1;
+    string display_name = 2;
+    string vendor_type = 3;
+    string outreach_status = 4;
+    string tax_id = 5;
+    string public_email = 6;
+    string public_phone = 7;
+    string public_website = 8;
+    string public_social = 9;
+    string category = 10;
+    string region = 11;
+    string product_summary = 12;
+    string positioning = 13;
+    string research_summary = 14;
+    string priority_letter = 15;
+    string priority_stars = 16;
+    // 操作者的登入 principal，寫進 updated_by_account_id。
+    string operator_account_id = 17;
+}
+
+message AdminArchiveSellerProspectRequest {
+    string id = 1;
+    // true ⇒ ARCHIVED；false ⇒ 還原成 ACTIVE。
+    // 帶 merged_into_prospect_id 的列不可還原——那要求同時撤銷一次合併。
+    bool archived = 2;
+    string operator_account_id = 3;
+}
+
+// AdminProspectDuplicatePair 是一對疑似重複。matched_on 由服務端的
+// matchedOn() 計算，與遷移報告用同一份優先序。
+message AdminProspectDuplicatePair {
+    AdminSellerProspectItem left = 1;
+    AdminSellerProspectItem right = 2;
+    string matched_on = 3;  // email | social | phone | domain
+}
+
+message AdminListDuplicateProspectsRequest {}
+
+message AdminListDuplicateProspectsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated AdminProspectDuplicatePair data = 3;
+    // 服務端硬上限 500 對；true 表示還有沒回的。
+    bool truncated = 4;
+}
+
+message AdminMergeSellerProspectsRequest {
+    string winner_id = 1;
+    string loser_id = 2;
+    string operator_account_id = 3;
+}
+
+message AdminMergeSellerProspectsResponse {
+    int32 code = 1;
+    string message = 2;
+    AdminSellerProspectItem data = 3;  // 合併後的 winner
+}
+
+message AdminConvertSellerProspectRequest {
+    string id = 1;
+    string store_id = 2;
+    string operator_account_id = 3;
+}
+
+// AdminUpdateSellerProspectMediaRequest 走 staged-token flow：bytes 由 Admin 直傳
+// media-service，這裡只帶轉正用的 token。刻意沒有「直接給圖片 URL」的欄位——
+// 外部網址會過期（研究來源有 64% 是帶簽章與 oe 到期參數的 CDN 連結），存進來的
+// 顯示欄位三天後就是壞圖。
+message AdminUpdateSellerProspectMediaRequest {
+    string id = 1;
+    // logo | cover。兩個角色各自獨立，換 logo 不動 cover 的 key 與 source_url。
+    string kind = 2;
+    string staged_token = 3;
+    // 樂觀鎖基準：必須等於目前的 media_version，否則回衝突讓 Admin 重新讀取。
+    // 缺值不視為「不在意版本」——那會讓兩個 admin 的換圖互相覆蓋。
+    string expected_media_version = 4;
+    // 公開 HTTPS 頁面網址。服務端自己再驗一次，不信前端驗過。
+    string source_url = 5;
+    string operator_account_id = 6;
+}
+
+// AdminProspectTaxIdMatch 是「這筆 prospect 的統編對得上一個已入駐賣家」。
+message AdminProspectTaxIdMatch {
+    AdminSellerProspectItem prospect = 1;
+    string store_id = 2;
+    string store_name = 3;
+    string certification_company_name = 4;
+    string certification_status = 5;
+}
+
+message AdminListProspectTaxIdMatchesRequest {}
+
+message AdminListProspectTaxIdMatchesResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated AdminProspectTaxIdMatch data = 3;
+}
+
+message AdminCreateProspectInviteRequest {
+    string prospect_id = 1;
+    // 有效天數；空或解析失敗 ⇒ 服務端預設 30。
+    string valid_days = 2;
+    string operator_account_id = 3;
+}
+
+message AdminCreateProspectInviteResponse {
+    int32 code = 1;
+    string message = 2;
+    ProspectInviteItem data = 3;
+    // token 只在這裡回一次。它不授予任何權限（spec §5.3），但仍是憑證，
+    // 不放進列表回應。
+    string token = 4;
+}
+
+message AdminRevokeProspectInviteRequest {
+    string prospect_id = 1;
+    string invite_id = 2;
+    string operator_account_id = 3;
+}
+
+message AdminRevokeProspectInviteResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+// ========== Vendor Portal (#2539 E1) ==========
+
+message EnsureVendorPortalInviteRequest {
+    string prospect_id = 1;
+    string rfq_recipient_id = 2;
+    string expires_at = 3;
+}
+
+message EnsureVendorPortalInviteResponse {
+    string invite_id = 1;
+    string secret = 2;
+    string invited_email = 3;
+}
+
+// EnsureVendorPortalInvite 與 MarkVendorPortalInviteSecretDelivered 以 ErrorInfo.reason（domain 是 "hawkr"）回報的結果；
+// reason 字串就是這個列舉的名稱（enum 的 String()），呼叫端據此分辨，不得另寫字串。UNSPECIFIED 不是有效的 reason。
+enum VendorPortalInviteErrorReason {
+    VENDOR_PORTAL_INVITE_ERROR_REASON_UNSPECIFIED = 0;
+    VENDOR_PORTAL_INVITE_ERROR_REASON_INVITE_REVOKED = 1;
+    VENDOR_PORTAL_INVITE_ERROR_REASON_PROSPECT_NOT_ACTIVE = 2;
+    VENDOR_PORTAL_INVITE_ERROR_REASON_NO_DELIVERABLE_EMAIL = 3;
+    VENDOR_PORTAL_INVITE_ERROR_REASON_INVITE_SECRET_SUPERSEDED = 4;
+}
+
+message MarkVendorPortalInviteSecretDeliveredRequest {
+    string invite_id = 1;
+    // Ensure 回傳、寄進信件的那一把明文 secret。
+    string secret = 2;
+}
+
+message MarkVendorPortalInviteSecretDeliveredResponse {
+    int32 code = 1;
+    string message = 2;
+}

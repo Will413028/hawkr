@@ -1,0 +1,49 @@
+name: commit messages
+
+# commit message 的 Conventional Commits 檢查。本機由 pre-commit 在 commit 時擋下
+# （.pre-commit-config.yaml）；這支是後備：沒裝 hook 的 clone、GitHub 網頁上的編輯，
+# 都在這裡被發現。規則與本機相同，都在 scripts/check-commit-msg.py。
+# 直接 push 到 main 時，這裡只能事後回報，擋不住已經推上去的 commit。
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: commit-messages-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Conventional Commits
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: check-commit-msg
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "pull_request" ]; then
+            range="$PR_BASE..$PR_HEAD"
+          elif [ "$EVENT" = "push" ] && [ -n "$BEFORE" ] &&
+               ! echo "$BEFORE" | grep -qE '^0+$' &&
+               git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            range="$BEFORE..$SHA"
+          else
+            # 新分支、手動觸發或 before 不存在時，只檢查這一個 commit。
+            range="$SHA^!"
+          fi
+          python3 scripts/check-commit-msg.py --range "$range"

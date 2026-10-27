@@ -1,0 +1,4 @@
+data: {"type":"RUN_STARTED","threadId":"thread-golden","runId":"run-golden"}
+
+data: {"type":"RUN_ERROR","message":"上游服務暫時無法使用","code":"14"}
+

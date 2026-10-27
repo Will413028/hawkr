@@ -1,0 +1,12 @@
+# 故意違規的 fixture：query 參照別的模組的 schema，`sqlc generate` 必須失敗。
+# CI（backend-monolith 的 sqlc 步驟）確認它失敗；它通過就代表 query 的隔離檢查失效了。
+version: "2"
+sql:
+  - engine: "postgresql"
+    schema: "schema.sql"
+    queries: "queries/"
+    gen:
+      go:
+        package: "store"
+        out: "out"
+        sql_package: "pgx/v5"

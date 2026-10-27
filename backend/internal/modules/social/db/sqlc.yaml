@@ -1,0 +1,46 @@
+# 改完 schema.sql、objects.sql 或 queries/ 之後，在本目錄執行 `sqlc generate`。
+#
+# 讀本模組的 schema.sql 與 objects.sql，加依賴表允許的 buyer 的 pub.sql（每日對帳核對 inactive_authors 與 buyer.pub_inactive_buyers）：靜態的 query
+# （寫入、鎖、清除、媒體引用、作者與店主的讀取）參照別的模組的內部表時，sqlc generate 就會失敗（ADR 2026-09-24-go-modular-monolith D3 的機械檢查；
+# CI 重新生成並比對）。需要別的模組的 pub_* 的讀取（公開可讀、店家可曝光）是 go-jet 建的，在 internal/reads，邊界由 internal/arch 的 CheckQuerySQL 檢查。
+version: "2"
+sql:
+  - engine: "postgresql"
+    schema: ["schema.sql", "objects.sql", "../../buyer/db/pub.sql"]
+    queries: "queries/"
+    gen:
+      go:
+        package: "store"
+        out: "../internal/store"
+        sql_package: "pgx/v5"
+        emit_empty_slices: true
+        emit_pointers_for_null_types: true
+        overrides:
+          # 實體的主鍵（UUIDv7）用 Go 1.27 標準庫的 uuid.UUID；不用 pgtype.UUID，模組與呼叫方只有一種 ID 型別。
+          - db_type: "uuid"
+            go_type:
+              import: "uuid"
+              type: "UUID"
+          - db_type: "uuid"
+            nullable: true
+            go_type:
+              import: "uuid"
+              type: "UUID"
+              pointer: true
+          - db_type: "timestamptz"
+            go_type: "time.Time"
+          - db_type: "timestamptz"
+            nullable: true
+            go_type:
+              import: "time"
+              type: "Time"
+              pointer: true
+          # DATE 是日曆日（沒有時區），Go 端以 UTC 午夜的 time.Time 表示。
+          - db_type: "date"
+            go_type: "time.Time"
+          - db_type: "date"
+            nullable: true
+            go_type:
+              import: "time"
+              type: "Time"
+              pointer: true

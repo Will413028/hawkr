@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "exceptions": [
+    {
+      "rule": "presentation-direct-dio",
+      "path": "lib/features/cart/presentation/widgets/checkout_payment_sheet.dart",
+      "owner": "Buyer checkout maintainers / issue #66 follow-up",
+      "rationale": "The payment sheet still owns checkout transport while the cart state migration is reviewed separately.",
+      "removalCondition": "Remove when checkout submission and payment bootstrap are exposed as typed cart controller commands."
+    },
+    {
+      "rule": "presentation-direct-dio",
+      "path": "lib/features/category/presentation/category_landing_screen.dart",
+      "owner": "Buyer category maintainers / issue #68",
+      "rationale": "Category marketplace aggregation is being migrated under its dedicated performance issue.",
+      "removalCondition": "Remove after all category landing requests use the category repository and controller introduced by #68."
+    },
+    {
+      "rule": "presentation-direct-dio",
+      "path": "lib/features/home/presentation/home_screen.dart",
+      "owner": "Buyer home maintainers / issue #64",
+      "rationale": "Home product pagination is owned by the dedicated lazy-sliver migration; unrelated home commands remain during that review.",
+      "removalCondition": "Remove after the remaining home commands are routed through the home repositories and controllers without changing #64 behavior."
+    },
+    {
+      "rule": "presentation-direct-dio",
+      "path": "lib/features/product/presentation/search_screen.dart",
+      "owner": "Buyer architecture maintainers / issue #69 Batch A2",
+      "rationale": "Search currently combines product, recommendation, and request-epoch logic inside one legacy screen.",
+      "removalCondition": "Remove after search services and a typed SearchState preserve IME, debounce, and request-order behavior."
+    },
+    {
+      "rule": "presentation-direct-dio",
+      "path": "lib/features/seller/presentation/merchant_screen.dart",
+      "owner": "Buyer architecture maintainers / issue #69 Batch C2",
+      "rationale": "Merchant header enrichment and shop prefetch remain coupled to the legacy tab state.",
+      "removalCondition": "Remove when a MerchantState controller owns seller info, stats, following, and shop prefetch."
+    },
+    {
+      "rule": "presentation-direct-dio",
+      "path": "lib/features/seller/presentation/widgets/merchant_chat_tab.dart",
+      "owner": "Buyer architecture maintainers / issue #69 Batch C2",
+      "rationale": "Merchant chat tab commands have not yet been moved behind the merchant repository boundary.",
+      "removalCondition": "Remove after chat-tab reads and mutations are controller commands with typed immutable state."
+    },
+    {
+      "rule": "presentation-direct-dio",
+      "path": "lib/features/seller/presentation/widgets/merchant_home_tab.dart",
+      "owner": "Buyer architecture maintainers / issue #69 Batch C2",
+      "rationale": "Merchant home tab still performs legacy seller and post requests directly.",
+      "removalCondition": "Remove after merchant-home data and engagement commands use the merchant repository and controller."
+    },
+    {
+      "rule": "presentation-direct-dio",
+      "path": "lib/features/seller/presentation/widgets/merchant_shop_tab.dart",
+      "owner": "Buyer architecture maintainers / issue #69 Batch C2",
+      "rationale": "Merchant shop tab still owns product and image fallback requests alongside local scroll state.",
+      "removalCondition": "Remove after product loading, images, and cart commands are repository-backed controller operations."
+    }
+  ]
+}

@@ -1,0 +1,195 @@
+name: Flutter quality (reusable)
+
+# buyer-app / seller-app 共用的品質檢查，由 buyer-ci.yml、seller-ci.yml 呼叫。
+
+on:
+  workflow_call:
+    inputs:
+      app:
+        description: App 目錄（buyer-app / seller-app）
+        required: true
+        type: string
+      check-generated:
+        description: 是否驗證 build_runner 產物已 commit
+        required: false
+        type: boolean
+        default: false
+      test-args:
+        description: 額外傳給 flutter test 的參數
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  static-checks:
+    name: Static checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: ${{ inputs.app }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Read Flutter version from .fvmrc
+        id: fvmrc
+        run: echo "flutter_version=$(jq -r .flutter .fvmrc)" >> "$GITHUB_OUTPUT"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ steps.fvmrc.outputs.flutter_version }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+
+      - name: Check Dart formatting
+        id: format
+        continue-on-error: true
+        run: dart format --output=none --set-exit-if-changed lib test integration_test tool
+      - name: Analyze Dart and Flutter sources
+        id: analyze
+        continue-on-error: true
+        run: flutter analyze
+      - name: Run custom lints
+        id: custom_lint
+        continue-on-error: true
+        run: dart run custom_lint
+      - name: Enforce dependency, dead-code, and asset ratchets
+        id: hygiene
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          bash scripts/deadcode.sh | tee deadcode-report.txt
+      - name: Guard catalog enum text (rule E)
+        id: enum_text
+        continue-on-error: true
+        working-directory: packages/hawkr_ui_text
+        run: |
+          flutter pub get
+          dart run tool/check_enum_text.dart ../../${{ inputs.app }}/lib
+      - name: Upload dead-code report
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.app }}-dead-code-report
+          path: ${{ inputs.app }}/deadcode-report.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Fail if any static check failed
+        if: >-
+          steps.format.outcome == 'failure' ||
+          steps.analyze.outcome == 'failure' ||
+          steps.custom_lint.outcome == 'failure' ||
+          steps.hygiene.outcome == 'failure' ||
+          steps.enum_text.outcome == 'failure'
+        run: |
+          echo "One or more static checks failed:"
+          echo "  format:      ${{ steps.format.outcome }}"
+          echo "  analyze:     ${{ steps.analyze.outcome }}"
+          echo "  custom_lint: ${{ steps.custom_lint.outcome }}"
+          echo "  hygiene:     ${{ steps.hygiene.outcome }}"
+          echo "  enum_text:   ${{ steps.enum_text.outcome }}"
+          exit 1
+
+  tests:
+    name: Unit and widget tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: ${{ inputs.app }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Read Flutter version from .fvmrc
+        id: fvmrc
+        run: echo "flutter_version=$(jq -r .flutter .fvmrc)" >> "$GITHUB_OUTPUT"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ steps.fvmrc.outputs.flutter_version }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+
+      - name: Run unit and widget tests with coverage
+        env:
+          TEST_ARGS: ${{ inputs.test-args }}
+        run: |
+          python3 scripts/test_ci_flutter_test.py
+          # TEST_ARGS 刻意不加引號，讓多個參數各自展開。
+          # shellcheck disable=SC2086
+          exec bash scripts/ci-flutter-test.sh --no-pub \
+            --exclude-tags hermetic-integration \
+            --coverage \
+            --coverage-path coverage/lcov.info \
+            $TEST_ARGS
+
+      # hermetic 測試排除在覆蓋率那次之外（baseline 綁定該指令），所以另開一步執行，不收覆蓋率。
+      - name: Run hermetic integration tests
+        run: bash scripts/ci-flutter-test.sh --no-pub --tags hermetic-integration
+
+      # PR 以 base branch 上的 baseline 當下限，避免 PR 自己把 baseline 調低。
+      - name: Resolve immutable base-branch coverage floor
+        env:
+          APP: ${{ inputs.app }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          mkdir -p coverage
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch --depth=1 origin "$BASE_REF"
+          fi
+          if [[ "${{ github.event_name }}" == "pull_request" ]] &&
+             git cat-file -e "origin/${BASE_REF}:${APP}/tool/coverage_baseline.json" 2>/dev/null; then
+            git show "origin/${BASE_REF}:${APP}/tool/coverage_baseline.json" > coverage/base-baseline.json
+          else
+            cp tool/coverage_baseline.json coverage/base-baseline.json
+          fi
+
+      - name: Enforce coverage ratchet
+        run: >-
+          dart run tool/coverage_ratchet.dart
+          --lcov coverage/lcov.info
+          --baseline tool/coverage_baseline.json
+          --floor-baseline coverage/base-baseline.json
+          --summary coverage/coverage-summary.json
+
+      - name: Upload coverage evidence
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.app }}-coverage
+          path: |
+            ${{ inputs.app }}/coverage/lcov.info
+            ${{ inputs.app }}/coverage/coverage-summary.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  generated-code:
+    name: Generated code
+    if: inputs.check-generated
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: ${{ inputs.app }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Read Flutter version from .fvmrc
+        id: fvmrc
+        run: echo "flutter_version=$(jq -r .flutter .fvmrc)" >> "$GITHUB_OUTPUT"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ steps.fvmrc.outputs.flutter_version }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Regenerate source files
+        # 新的 checkout 沒有 .dart_tool/build，已 commit 的生成檔都算「既有輸出」；舊版 build_runner 在非互動環境
+        # 遇到它們會提示後崩潰（seller-app），所以一律先刪再生成，下一步的 diff 仍然比對得出漂移。
+        run: dart run build_runner build --delete-conflicting-outputs
+      - name: Verify generated files are committed
+        run: git diff --exit-code -- .

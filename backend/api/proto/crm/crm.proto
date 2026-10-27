@@ -1,0 +1,199 @@
+syntax = "proto3";
+
+package hawkr.crm;
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/crm";
+option java_multiple_files = true;
+option java_package = "io.github.will413028.hawkr.crm.grpc";
+option java_outer_classname = "CrmProto";
+
+// CRM Service - 客戶關係管理服務（多租戶）
+service CrmService {
+    // ========== CRM: Customer Management ==========
+    rpc GetCustomerList(GetCustomerListRequest) returns (CustomerListResponse);
+    rpc GetCustomerStats(GetCustomerStatsRequest) returns (CustomerStatsResponse);
+    rpc UpdateCustomerStatus(UpdateCustomerStatusRequest) returns (CrmResponse);
+
+    // ========== CRM: Tag Management ==========
+    rpc CreateTag(CreateTagRequest) returns (TagResponse);
+    rpc ListTags(ListTagsRequest) returns (TagListResponse);
+    rpc UpdateTag(UpdateTagRequest) returns (CrmResponse);
+    rpc DeleteTag(DeleteTagRequest) returns (CrmResponse);
+
+    // ========== CRM: Customer Tags ==========
+    rpc AddCustomerTags(AddCustomerTagsRequest) returns (CrmResponse);
+    rpc RemoveCustomerTag(RemoveCustomerTagRequest) returns (CrmResponse);
+    rpc GetCustomerTags(GetCustomerTagsRequest) returns (TagListResponse);
+
+    // 依多標籤搜尋目標客戶（AND 邏輯，需同時擁有所有標籤）
+    rpc SearchCustomersByTags(SearchCustomersByTagsRequest) returns (SearchCustomersByTagsResponse);
+
+    // 批次查詢買家在多個賣家的 VIP 狀態（buyer-service 用）
+    rpc GetBuyerVipStatuses(GetBuyerVipStatusesRequest) returns (GetBuyerVipStatusesResponse);
+}
+
+// ========== Common ==========
+
+message CrmResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+// ========== CRM: Customer Messages ==========
+
+message GetCustomerListRequest {
+    string store_id = 1;     // 賣家店家代理鍵（sellers.store_id）
+    int32 page = 2;
+    int32 page_size = 3;
+    string keyword = 4;
+    string customer_type = 5;  // "" for all, "normal" / "vip" / "blocklist"
+    string tag_id = 6;
+    string sort_by = 7;
+    string sort_order = 8;
+}
+
+message CustomerListResponse {
+    int32 code = 1;
+    string message = 2;
+    CustomerListData data = 3;
+}
+
+message CustomerListData {
+    string total = 1;
+    repeated CrmCustomer list = 2;
+}
+
+message CrmCustomer {
+    string id = 1;
+    string store_id = 2;             // 賣家店家代理鍵（sellers.store_id）
+    string buyer_id = 3;             // 買家 buyers.buyer_id（per-stint PK，與登入帳號主鍵不同值）
+    string customer_type = 4;       // "normal" / "vip" / "blocklist"
+    string total_spent = 6;
+    string order_count = 7;
+    reserved 8, 9, 10;                         // removed: first_order_at, last_order_at, remark
+    string nickname = 11;               // cache in DB + enriched from account-service
+    string avatar_key = 12;             // 買家頭像 objectKey（49 §6.6 S9：enrich 自 buyer 透傳 key；Gateway 組 avatarUrl；http 值 passthrough）
+    repeated Tag tags = 13;             // Enriched from crm tags
+    string phone = 14;                  // cache in DB + enriched from account-service
+    string address = 15;                // Enriched from account-service
+    string email = 16;                  // Enriched from account-service
+    string coupon_count = 17;           // Enriched from marketing-service
+    repeated string frequent_categories = 18; // Enriched from order-service
+}
+
+message GetCustomerStatsRequest {
+    string store_id = 1;
+    string buyer_id = 2;
+}
+
+message CustomerStatsResponse {
+    int32 code = 1;
+    string message = 2;
+    CrmCustomer data = 3;
+}
+
+message UpdateCustomerStatusRequest {
+    string store_id = 1;
+    string buyer_id = 2;
+    string customer_type = 3;  // "normal" / "vip" / "blocklist"
+}
+
+// ========== CRM: Tag Messages ==========
+
+message Tag {
+    string id = 1;
+    string store_id = 2;
+    string name = 3;
+}
+
+message CreateTagRequest {
+    string store_id = 1;
+    string name = 2;
+}
+
+message TagResponse {
+    int32 code = 1;
+    string message = 2;
+    Tag data = 3;
+}
+
+message ListTagsRequest {
+    string store_id = 1;
+}
+
+message TagListResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated Tag data = 3;
+}
+
+message UpdateTagRequest {
+    string store_id = 1;
+    string tag_id = 2;
+    string name = 3;
+}
+
+message DeleteTagRequest {
+    string store_id = 1;
+    string tag_id = 2;
+}
+
+message AddCustomerTagsRequest {
+    string store_id = 1;
+    string buyer_id = 2;
+    repeated string tag_names = 3;  // find-or-create by name
+}
+
+message RemoveCustomerTagRequest {
+    string store_id = 1;
+    string buyer_id = 2;
+    string tag_id = 3;
+}
+
+message GetCustomerTagsRequest {
+    string store_id = 1;
+    string buyer_id = 2;
+}
+
+// ========== SearchCustomersByTags ==========
+
+message SearchCustomersByTagsRequest {
+    string store_id = 1;             // 賣家店家代理鍵（Gateway 經 sellerid resolver 注入 CURRENT store_id）
+    repeated string tag_ids = 2;    // 標籤 ID 列表（AND 邏輯）
+}
+
+message SearchCustomersByTagsResponse {
+    int32 code = 1;
+    string message = 2;
+    SearchCustomersByTagsData data = 3;
+}
+
+message SearchCustomersByTagsData {
+    string total = 1;
+    repeated MatchedCustomer customers = 2;
+}
+
+message MatchedCustomer {
+    string buyer_id = 1;
+    string nickname = 2;
+    string phone = 3;
+    string avatar_key = 4;  // 買家頭像 objectKey（49 §6.6 S9：enrich 自 buyer 透傳 key；Gateway 組 avatarUrl；http 值 passthrough）
+}
+
+// ========== GetBuyerVipStatuses（buyer-service 內部呼叫）====================
+
+message GetBuyerVipStatusesRequest {
+    string buyer_id = 1;
+    repeated string store_ids = 2;
+}
+
+message BuyerVipStatus {
+    string store_id = 1;
+    string customer_type = 2;  // "normal" / "vip" / "blocklist"
+}
+
+message GetBuyerVipStatusesResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated BuyerVipStatus data = 3;
+}

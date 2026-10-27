@@ -1,0 +1,56 @@
+{
+  "input": {
+    "Current": {
+      "item": "蘋果"
+    },
+    "Next": {
+      "item": "富士蘋果"
+    },
+    "Missing": null,
+    "Ready": true,
+    "Rejected": null,
+    "HasRejected": false,
+    "Degraded": false,
+    "Recorded": [
+      {
+        "key": "item",
+        "label": "",
+        "value": "富士蘋果"
+      }
+    ],
+    "CropDisambiguationPending": false,
+    "CropDisambiguationCandidates": null,
+    "Question": null,
+    "PricePreviewAvailable": false,
+    "RfqConfirmationState": 0
+  },
+  "output": {
+    "schemaVersion": "dialogue-plan.v1",
+    "actCode": "CORRECTION_APPLIED",
+    "stateVersion": "",
+    "readinessGate": "PRICE_PREVIEW_READY",
+    "salientFactRefs": [
+      "request.item"
+    ],
+    "artifactRefs": [],
+    "allowedClaimCodes": [
+      "CORRECTION_APPLIED"
+    ],
+    "forbiddenClaimCodes": [
+      "SEARCH_STARTED",
+      "SEARCH_COMPLETED",
+      "RFQ_PUBLISHED",
+      "SELLER_NOTIFIED",
+      "DEAL_CREATED",
+      "ORDER_CREATED",
+      "PAYMENT_PROCESSED"
+    ],
+    "toneHints": {
+      "verbosity": "CONCISE"
+    },
+    "maxSentences": 2,
+    "policyVersion": "phase3-v1",
+    "templateVersion": "phase2-v1",
+    "planHash": ""
+  }
+}

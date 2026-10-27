@@ -1,0 +1,20 @@
+{
+	"name": "@hawkr/twaddr",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"description": "內政部 8 碼鄉鎮市區代碼表與查詢（縣市、鄉鎮市區、郵遞區號、組地址），website 與 admin 共用。資料檔由 backend/internal/platform/twaddr 的 CSV 生成。只發佈 TS 原始碼。",
+	"exports": {
+		"./lookup": "./src/lookup.ts"
+	},
+	"scripts": {
+		"lint": "tsc --noEmit && biome check .",
+		"test": "vitest run"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "catalog:",
+		"@types/node": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	}
+}

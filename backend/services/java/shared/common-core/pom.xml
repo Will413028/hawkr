@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>io.github.will413028.hawkr</groupId>
+    <artifactId>common-core</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+    <name>Hawkr Common Core</name>
+    <description>Common utilities, base classes, and response wrappers</description>
+
+    <properties>
+        <java.version>21</java.version>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <spring-boot.version>3.2.1</spring-boot.version>
+        <mybatis-plus.version>3.5.5</mybatis-plus.version>
+        <resilience4j.version>2.4.0</resilience4j.version>
+    </properties>
+
+    <dependencies>
+        <!-- Spring Boot -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+            <version>${spring-boot.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- MyBatis Plus -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+            <version>${mybatis-plus.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Validation -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+            <version>${spring-boot.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.36</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Jackson -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.16.1</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Jackson Java 8 Time Module（LocalDateTime 序列化支援） -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+            <version>2.16.1</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Spring Data Redis -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+            <version>${spring-boot.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Spring AMQP (RabbitMQ) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+            <version>${spring-boot.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- TSID Creator -->
+        <dependency>
+            <groupId>com.github.f4b6a3</groupId>
+            <artifactId>tsid-creator</artifactId>
+            <version>5.2.6</version>
+        </dependency>
+
+        <!-- gRPC API（供 GrpcAuthServerInterceptor / GrpcAuthContext 使用） -->
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-api</artifactId>
+            <version>1.60.0</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Proto 生成碼（供 GrpcAuthContext.requireSellerOrDelegated 取用 DelegationContext；
+             common/delegation.proto 的 java_package 就是 io.github.will413028.hawkr.common.grpc）。
+             observability-common 依賴 common-core，proto-common 不依賴任何內部模組，故無環。 -->
+        <dependency>
+            <groupId>io.github.will413028.hawkr</groupId>
+            <artifactId>proto-common</artifactId>
+            <version>1.0.0</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- gRPC Server Spring Boot Starter（供 @GrpcGlobalServerInterceptor 註解使用） -->
+        <dependency>
+            <groupId>net.devh</groupId>
+            <artifactId>grpc-server-spring-boot-starter</artifactId>
+            <version>3.1.0.RELEASE</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- ICU4J（簡繁中文偵測） -->
+        <dependency>
+            <groupId>com.ibm.icu</groupId>
+            <artifactId>icu4j</artifactId>
+            <version>75.1</version>
+        </dependency>
+
+        <!-- JUnit 5（測試用） -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.1</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            Mockito（測試用，供 MqErrorHandlerTest mock com.rabbitmq.client.Channel）。
+            common-core 沒有繼承 spring-boot-starter-parent，直接帶版本引用此 starter，
+            跟上面 spring-boot-starter-web 的做法一致。
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <version>${spring-boot.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            MqErrorHandlerMetricsAutoConfigurationTest 以 Spring Boot 的 Metrics 自動設定驗證載入順序；
+            執行期的 actuator 由各服務自己提供，此處只供測試。
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+            <version>${spring-boot.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            強制對齊 byte-buddy 版本：spring-boot-starter-test 傳遞帶進 mockito-core 5.7.0
+            要的 byte-buddy 1.14.10（支援 Java 21）與 assertj-core 3.24.2 要的 byte-buddy
+            1.12.21（不支援 Java 21，mock interface 會噴 "Java 21 is not supported"）同深度，
+            Maven mediation 選到後者。直接宣告贏過 transitive mediation，強制對齊前者。
+        -->
+        <dependency>
+            <groupId>net.bytebuddy</groupId>
+            <artifactId>byte-buddy</artifactId>
+            <version>1.14.10</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            Resilience4j Spring Boot 3 starter
+            供所有微服務的 gRPC client 透過 @CircuitBreaker 等註解整合 Spring Boot Actuator + Micrometer。
+            目前實際使用點：order-service ShippingFeeGrpcFetcher（詳見 20 §4.9）。
+            其他服務未使用 @CircuitBreaker 時不會建立 CB 實例，零執行期成本。
+        -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot3</artifactId>
+            <version>${resilience4j.version}</version>
+            <exclusions>
+                <!-- Resilience4j 2.4.0 帶 slf4j-api 1.7.30:runtime 會蓋掉 Spring Boot 3.2.1 的 slf4j 2.x:provided -->
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-micrometer</artifactId>
+            <version>${resilience4j.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <release>${java.version}</release>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>1.18.36</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <!--
+                common-core 沒有 <parent>spring-boot-starter-parent</parent>，reactor 預設
+                解析到的 maven-surefire-plugin 3.2.5 在 Java 21 上會讓 Mockito 的 inline mock
+                maker（MqErrorHandlerTest mock com.rabbitmq.client.Channel 用到）壞掉。跟
+                shared/payuni-java-client 同款做法，pin 到已知在這個 reactor 上可用的版本。
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.3</version>
+            </plugin>
+        </plugins>
+    </build>
+</project>

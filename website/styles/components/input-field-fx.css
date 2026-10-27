@@ -1,0 +1,154 @@
+/* =============================================================
+   INPUT FIELD FX — single rotating gradient frame (hover/focus)
+   =============================================================
+ * ONE frame, not two. At rest the field shows its normal border. When the
+ * pointer moves over it (or it gains focus) that border is replaced by a
+ * rotating brand gradient — "整段綠,一段黃" (green all the way round with a
+ * single gold band that orbits the loop like a train, 捷運繞圈). Hover and
+ * focus look identical: there is no extra, darker focus ring and no second
+ * inset frame.
+ *
+ * The frame lives on the wrapper <div data-slot="input-wrapper"> because an
+ * <input>/<textarea>/<select> can't host ::before. It sits at inset:0 and is
+ * masked to a ring exactly the border's thickness, so it overlays (replaces)
+ * the border rather than adding a line inside it.
+ */
+
+@property --hkui-ring-angle {
+	syntax: "<angle>";
+	inherits: false;
+	initial-value: 0deg;
+}
+
+@keyframes hkui-ring-spin {
+	to {
+		--hkui-ring-angle: 360deg;
+	}
+}
+
+[data-slot="input-wrapper"] {
+	isolation: isolate;
+}
+
+/* The single rotating frame — masked to a 2px ring over the border line. */
+[data-slot="input-wrapper"]:not([data-variant="bordered"])::before {
+	content: "";
+	position: absolute;
+	/* An absolutely-positioned pseudo is laid out against the wrapper's PADDING
+	 * box (inside its border). inset:0 would therefore park the gradient ring
+	 * INSIDE the border, leaving the border itself visible as a separate outer
+	 * line = two frames. Pull the ring out by the border width so it sits exactly
+	 * ON the border region instead (one frame). Default −2px for bordered (2px
+	 * border); flat/faded override below (1px). */
+	inset: -2px;
+	border-radius: inherit;
+	padding: 2px;
+	/* Straight from the Hawkr logo: brick (primary-strong), orange (primary),
+	 * amber (secondary) and its soft tint. The brick half undulates
+	 * brick↔orange so it reads as a living line instead of a flat dead one; the
+	 * warm accent eases amber→soft→amber (organic) rather than a hard near-white
+	 * spike. Uneven stop spacing keeps it natural. */
+	background: conic-gradient(
+		from var(--hkui-ring-angle),
+		var(--color-brand-primary-strong) 0deg,
+		var(--color-brand-primary) 84deg,
+		var(--color-brand-primary-strong) 162deg,
+		var(--color-brand-primary) 236deg,
+		var(--color-brand-secondary) 298deg,
+		var(--color-brand-secondary-soft) 325deg,
+		var(--color-brand-secondary) 347deg,
+		var(--color-brand-primary-strong) 360deg
+	);
+	-webkit-mask:
+		linear-gradient(#000 0 0) content-box,
+		linear-gradient(#000 0 0);
+	-webkit-mask-composite: xor;
+	mask-composite: exclude;
+	/* a soft glow that hugs the frame itself (not a separate ring) */
+	filter: drop-shadow(0 0 3px rgb(var(--color-brand-secondary-rgb) / 0.4));
+	opacity: 0;
+	transition: opacity 0.3s var(--hkui-ease, ease);
+	pointer-events: none;
+	z-index: 1;
+}
+
+/* flat / faded carry a 1px border, so their ring only needs to pull out 1px. */
+[data-slot="input-wrapper"][data-variant="flat"]::before,
+[data-slot="input-wrapper"][data-variant="faded"]::before {
+	inset: -1px;
+}
+
+/* Hover OR focus = the same rotating frame. */
+[data-slot="input-wrapper"]:not([data-variant="bordered"]):hover::before,
+[data-slot="input-wrapper"]:not([data-variant="bordered"])[data-focus]::before {
+	opacity: 1;
+	animation: hkui-ring-spin 8s linear infinite;
+}
+
+/* While the frame is active the gradient ring IS the border, so blank the
+ * wrapper's own border (no dark line peeking at the corners) and drop the
+ * component's focus halo. One frame, outer colour unchanged hover↔focus. */
+[data-slot="input-wrapper"]:not([data-variant="bordered"]):hover,
+[data-slot="input-wrapper"]:not([data-variant="bordered"])[data-focus] {
+	box-shadow: none;
+	border-color: transparent;
+}
+
+/* The wrapper's rotating frame is the ONLY focus indicator. The global
+ * `:focus-visible { outline: 2px solid green; offset: 2px }` reset rule would
+ * otherwise paint a dark green ring offset from the inner control — a second,
+ * inset frame on focus. Suppress it (and any focus border/shadow) on the shared
+ * component's inner control so focus looks exactly like hover: one frame, outer
+ * colour unchanged. Specificity (0,2,0) beats the global :focus-visible (0,1,0);
+ * unlayered so it also wins the layer order. */
+[data-slot="input-wrapper"] :is(input, textarea, select):focus,
+[data-slot="input-wrapper"] :is(input, textarea, select):focus-visible,
+[data-slot="control"]:focus,
+[data-slot="control"]:focus-visible,
+[data-slot="textarea"]:focus,
+[data-slot="textarea"]:focus-visible {
+	outline: none !important;
+	outline-offset: 0 !important;
+	box-shadow: none;
+	border-color: transparent;
+}
+
+/* Don't paint the brand frame over a field that's flagging an error. */
+[data-slot="input-wrapper"]:has([aria-invalid="true"])::before {
+	display: none;
+}
+
+/* The App-style outline owns its normal/focus/error/disabled strokes in
+ * inputWrapperClasses. It never receives the rotating frame above. */
+[data-slot="input-wrapper"][data-variant="bordered"]::before {
+	display: none;
+}
+
+/* App labels and supporting copy use the same spacing as the field content.
+ * Keep these rules on the shared field, including Select/Dropdown/DatePicker. */
+[data-slot="field"]:has(> [data-variant="bordered"]) > [data-slot="label"] {
+	font-size: var(--text-base);
+	line-height: 1.5;
+	font-weight: 600;
+}
+
+[data-slot="field"]:has(> [data-variant="bordered"])
+	> :is([data-slot="hint"], [data-slot="error"]) {
+	margin-inline: calc(var(--hkui-space-4) / var(--hk-text-scale, 1));
+	font-size: var(--text-sm);
+	line-height: 1.5;
+}
+
+[data-slot="input-wrapper"][data-variant="bordered"] :is(input, textarea) {
+	caret-color: var(--theme-text-accent);
+}
+
+/* Reduced-motion: show the frame, hold it still. */
+@media (prefers-reduced-motion: reduce) {
+	[data-slot="input-wrapper"]:not([data-variant="bordered"]):hover::before,
+	[data-slot="input-wrapper"]:not(
+		[data-variant="bordered"]
+	)[data-focus]::before {
+		animation: none;
+	}
+}

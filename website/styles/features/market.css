@@ -1,0 +1,583 @@
+/* Extracted from styles/globals.css.
+ * Market overview, market products, seller cards, and origin map styles.
+ * Keep import order in styles/globals.css unless intentionally changing cascade.
+ */
+
+/* Market v2: products and sellers.
+ * `.market-product-grid` layout is owned by the JS <MasonryGrid> component.
+ * These rules select its responsive SSR fallback before the first client
+ * measurement, so phones never paint desktop columns during hydration. */
+[data-masonry-grid] {
+	--masonry-fallback-track: var(--masonry-track-wide);
+	--masonry-fallback-gap: var(--masonry-gap-wide);
+}
+@media (max-width: 1120px) {
+	[data-masonry-grid] {
+		--masonry-fallback-track: var(--masonry-track-lg);
+		--masonry-fallback-gap: var(--masonry-gap-lg);
+	}
+}
+@media (max-width: 840px) {
+	[data-masonry-grid] {
+		--masonry-fallback-track: var(--masonry-track-md);
+		--masonry-fallback-gap: var(--masonry-gap-md);
+	}
+}
+@media (max-width: 680px) {
+	[data-masonry-grid] {
+		--masonry-fallback-track: var(--masonry-track-sm);
+		--masonry-fallback-gap: var(--masonry-gap-sm);
+	}
+}
+@media (max-width: 360px) {
+	[data-masonry-grid] {
+		--masonry-fallback-track: var(--masonry-track-xs);
+		--masonry-fallback-gap: var(--masonry-gap-xs);
+	}
+}
+
+/* The full-card link inherits the card radius so its inset focus ring never
+ * collides with the clipped 24px/16px shell. This unlayered rule also wins over
+ * the global reset's 8px focus radius and removes the duplicate outer outline. */
+.market-product-card > [data-market-product-primary-link]:focus-visible {
+	outline: none;
+	outline-offset: 0;
+	border-radius: inherit;
+}
+
+/* === App-parity additions: hashtag overlay + sale strikethrough === */
+
+/* Hashtag chips overlay — bottom-left of the media, App style.
+ * Resets the absolute-positioning the legacy `__tags` rule above
+ * gave the single-span variant, then re-positions as a flex row
+ * along the bottom edge so multiple chips wrap nicely. */
+.market-product-card__media .market-product-card__tags {
+	position: absolute;
+	left: 22px;
+	right: 22px;
+	bottom: 22px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	min-height: 0;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	border-radius: 0;
+	background: transparent;
+	pointer-events: none;
+}
+.market-product-card__tag {
+	display: inline-flex;
+	align-items: center;
+	height: 22px;
+	padding: 0 9px;
+	border-radius: 11px;
+	border: 0.5px solid rgba(0, 0, 0, 0.22);
+	/* Higher opacity + darker primary text gives the chip enough
+	 * contrast over both bright product photos and dimmed-down dark-
+	 * mode images. primary was washing out on dark photos. */
+	background: rgba(255, 255, 255, 0.94);
+	color: var(--color-brand-primary-strong);
+	font-size: 0.6875rem;
+	font-weight: 700;
+	letter-spacing: 0.01em;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 100%;
+	-webkit-backdrop-filter: blur(2px);
+	backdrop-filter: blur(2px);
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22);
+}
+
+/* Dark-mode chip — flip to dark glass with light cream text. The
+ * 0.94-white pill was reading as a bright blob over the dim midnight
+ * page, blasting the eye; with the dark plate + brand gold border
+ * the chip blends with the rest of the dark-mode UI and the cream
+ * text stays legible over any product photo behind it. */
+[data-theme="dark"] .market-product-card__tag {
+	background: rgb(var(--color-ink-950-rgb) / 0.72);
+	border-color: rgba(245, 222, 165, 0.32);
+	color: var(--color-neutral-cream, #fffdf7);
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Price row — current price + strikethrough original price side by
+ * side, with the original price in a muted gray. The legacy `b`
+ * rule (line 168) is hoisted into this row via the flex layout. */
+.market-product-card__price-row {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	margin-top: 10px;
+	flex-wrap: wrap;
+}
+.market-product-card__price-row b {
+	margin-top: 0;
+}
+.market-product-card__price-original {
+	color: rgb(var(--color-neutral-500-rgb, 136 136 136) / 0.85);
+	font-size: 0.8125rem;
+	font-weight: 500;
+	text-decoration: line-through;
+	text-decoration-thickness: 1.2px;
+}
+
+/* Cart button text/icon swap — when the card narrows past the point
+ * where "加入購物車" can fit on one line (multi-column grids on wide
+ * displays), drop the label and show the shopping-bag-check icon
+ * instead. Container query keys off the buy-row so this is purely a
+ * function of the card's own width, independent of viewport. */
+.market-product-card__buy-row {
+	container-type: inline-size;
+	container-name: market-card-buy;
+}
+
+.market-product-card__cart-btn-icon {
+	display: none;
+}
+
+/* Below 260px the cart label "加入購物車" can't fit alongside the stepper,
+ * so we drop the label and switch the cart to a square icon-only chip
+ * (40x40, same height as the stepper). flex:none on the JSX keeps the
+ * cart from being squeezed by the flex:1 stepper next to it; this rule
+ * just locks the chip to its intended square footprint. */
+@container market-card-buy (max-width: 260px) {
+	.market-product-card__cart-btn {
+		width: 2.5rem; /* 40px = h-10 */
+		padding: 0;
+		gap: 0;
+	}
+	.market-product-card__cart-btn-label {
+		display: none;
+	}
+	/* The pending state follows the idle state: once the chip is a 40px square
+	 * there is no room for "加入中…" / "設定補貨通知中…", so drop the text and let
+	 * the loader glyph alone carry the state. This also collapses Button's idle
+	 * width reservation — it renders the same label node — so the chip reserves
+	 * its own 40px instead of the text's ~78px. */
+	.market-product-card__cart-btn .hkui-button__loading-label {
+		display: none;
+	}
+	.market-product-card__cart-btn-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+	}
+}
+
+/* Stepper survives mobile / multi-column desktop grids by shrinking
+ * to a 32px row height. The -/+ cells and counter keep the same
+ * 1:1.6:1 column ratio as the base layout so the proportions stay
+ * consistent across breakpoints; the cells scale down with the card
+ * instead of overflowing the overflow-hidden pill. Cart chip matches
+ * the 32px height so all three controls line up. */
+@container market-card-buy (max-width: 220px) {
+	.market-product-card__qty {
+		grid-template-columns: 1fr 1.6fr 1fr;
+		height: 32px;
+	}
+	.market-product-card__qty button {
+		font-size: 0.9375rem;
+	}
+	.market-product-card__qty output {
+		font-size: 0.875rem;
+	}
+	.market-product-card__cart-btn {
+		height: 2rem; /* 32px */
+		width: 2rem;
+	}
+}
+
+.market-layout--sellers {
+	grid-template-columns: 220px minmax(0, 1fr) 280px;
+}
+
+/* ============================================================
+   Market seller card — used on /market/sellers (list variant),
+   home 推薦商家 row (grid variant), and the seller landing page.
+   Two main visual moves vs the legacy card:
+   1) Location pin moves OUT of the body into a frosted chip on
+      the cover (top-left), freeing vertical rhythm for the name.
+   2) Cover gains a bottom gradient veil so the chip + the avatar
+      that overlaps the cover stay legible on bright photos.
+   ============================================================ */
+.market-seller-card {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	border: 1px solid var(--border-soft);
+	border-radius: 20px;
+	background: var(--surface-card);
+	color: inherit;
+	text-decoration: none;
+	box-shadow:
+		inset 0 1px 0 rgb(255 255 255 / 0.5),
+		0 2px 6px rgb(var(--color-ink-900-rgb) / 0.04),
+		0 12px 28px -12px rgb(var(--color-ink-900-rgb) / 0.1);
+	transition:
+		transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+		box-shadow 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.market-seller-card:hover {
+	transform: translateY(-2px);
+	box-shadow:
+		inset 0 1px 0 rgb(255 255 255 / 0.5),
+		0 6px 14px rgb(var(--color-ink-900-rgb) / 0.06),
+		0 20px 38px -12px rgb(var(--color-ink-900-rgb) / 0.16);
+}
+
+.market-seller-card--list {
+	display: grid;
+	grid-template-columns: 240px minmax(0, 1fr);
+}
+
+.market-seller-card__cover-link {
+	position: relative;
+	display: block;
+	overflow: hidden;
+	background: var(--surface-panel);
+}
+
+.market-seller-card__cover {
+	width: 100%;
+	aspect-ratio: 16 / 10;
+	object-fit: cover;
+	background: var(--surface-panel);
+	transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.market-seller-card:hover .market-seller-card__cover {
+	transform: scale(1.035);
+}
+
+.market-seller-card--list .market-seller-card__cover {
+	height: 100%;
+	min-height: 180px;
+	aspect-ratio: auto;
+}
+
+/* Veil at the bottom of the cover so the avatar that overlaps the
+   image (grid variant) and the location chip never get lost on
+   bright produce photography. */
+.market-seller-card__cover-link::after {
+	content: "";
+	position: absolute;
+	inset: auto 0 0 0;
+	height: 44%;
+	background: linear-gradient(
+		to bottom,
+		rgb(var(--color-ink-950-rgb) / 0) 0%,
+		rgb(var(--color-ink-950-rgb) / 0.28) 100%
+	);
+	pointer-events: none;
+}
+
+.market-seller-card__location-chip {
+	position: absolute;
+	top: 10px;
+	left: 10px;
+	z-index: 1;
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	max-width: calc(100% - 20px);
+	padding: 4px 9px 4px 7px;
+	border: 0.5px solid rgb(0 0 0 / 0.16);
+	border-radius: var(--radius-pill);
+	background: rgb(255 255 255 / 0.94);
+	color: var(--color-brand-primary-strong);
+	font-size: 0.6875rem;
+	font-weight: 800;
+	letter-spacing: 0.01em;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	-webkit-backdrop-filter: blur(4px);
+	backdrop-filter: blur(4px);
+	box-shadow: 0 1px 4px rgb(0 0 0 / 0.18);
+}
+
+.market-seller-card__location-chip svg {
+	flex: 0 0 auto;
+}
+
+[data-theme="dark"] .market-seller-card__location-chip {
+	background: rgb(var(--color-ink-950-rgb) / 0.72);
+	border-color: rgb(245 222 165 / 0.32);
+	color: var(--color-neutral-cream, #fffdf7);
+	box-shadow: 0 1px 4px rgb(0 0 0 / 0.5);
+}
+
+.market-seller-card__body {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	padding: 10px 14px 12px;
+}
+
+.market-seller-card__avatar {
+	width: 64px;
+	height: 64px;
+	margin-top: -44px;
+	border: 3px solid var(--surface-card);
+	border-radius: var(--radius-circle);
+	object-fit: cover;
+	background: var(--surface-card);
+	box-shadow:
+		0 1px 2px rgb(0 0 0 / 0.06),
+		0 8px 18px -4px rgb(var(--color-ink-900-rgb) / 0.24);
+}
+
+.market-seller-card--list .market-seller-card__avatar {
+	margin-top: 0;
+	width: 56px;
+	height: 56px;
+}
+
+/* The legacy DOM rendered the location as a bare <span> right after
+   the avatar. The new structure surfaces it as a chip on the cover,
+   so any remaining bare span fallback should be hidden. */
+.market-seller-card__body > span {
+	display: none;
+}
+
+.market-seller-card__name-link {
+	display: block;
+}
+
+.market-seller-card__name,
+.market-seller-card h2,
+.market-seller-card h3 {
+	/* Store name is user-entered → system body stack, not the brand subset. */
+	font-family: var(--font-primary);
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	margin: 4px 0 2px;
+	color: var(--ink-heading);
+	font-size: 0.9375rem;
+	line-height: 1.35;
+	font-weight: 800;
+	letter-spacing: 0;
+}
+
+.market-seller-card__name-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	min-width: 0;
+}
+
+/* Real-name verification tick — sits inline with the store name,
+   coloured via --icon-accent (ink light / primary dark). */
+.market-seller-card__verified {
+	flex: 0 0 auto;
+	display: inline-flex;
+	vertical-align: middle;
+	color: var(--icon-accent);
+}
+
+.market-seller-card a {
+	color: inherit;
+	text-decoration: none;
+}
+
+.market-seller-card p {
+	display: -webkit-box;
+	overflow: hidden;
+	margin: 0;
+	color: var(--ink-body);
+	font-size: 0.75rem;
+	line-height: 1.5;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+}
+
+/* Stats: small label + bold value pair, separated by tiny dots so
+   the row reads as one continuous line instead of four orphan tags. */
+.market-seller-card__stats {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0;
+	margin: 6px 0 0;
+	padding: 0;
+	list-style: none;
+	color: var(--ink-soft);
+	font-size: 0.6875rem;
+}
+
+.market-seller-card__stats li {
+	position: relative;
+	display: inline-flex;
+	align-items: baseline;
+	gap: 3px;
+	padding: 0 8px;
+}
+
+.market-seller-card__stats li:first-child {
+	padding-left: 0;
+}
+
+.market-seller-card__stats li + li::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	top: 50%;
+	width: 3px;
+	height: 3px;
+	border-radius: 50%;
+	background: currentColor;
+	opacity: 0.32;
+	transform: translateY(-50%);
+}
+
+.market-seller-card__stats li b {
+	color: var(--ink-heading);
+	font-weight: 800;
+	font-size: 0.75rem;
+	font-variant-numeric: tabular-nums;
+}
+
+.market-seller-card__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-top: auto;
+	padding-top: 10px;
+}
+
+.market-seller-card__follow,
+.market-seller-card__view {
+	flex: 1 1 auto;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 0;
+	min-height: 32px;
+	padding: 0 12px;
+	border-radius: var(--radius-pill);
+	font-size: 0.75rem;
+	font-weight: 800;
+	letter-spacing: 0.02em;
+	white-space: nowrap;
+	transition:
+		background 0.2s ease,
+		border-color 0.2s ease,
+		color 0.2s ease,
+		transform 0.2s ease,
+		box-shadow 0.2s ease;
+}
+
+.market-seller-card__follow {
+	border: 0;
+	background: var(--color-brand-primary-strong);
+	color: var(--color-neutral-cream, #fffdf7);
+	cursor: pointer;
+	box-shadow:
+		inset 0 1px 0 rgb(255 255 255 / 0.16),
+		0 6px 14px -4px rgb(var(--color-ink-900-rgb) / 0.32);
+}
+
+.market-seller-card__follow:hover {
+	background: var(--color-brand-primary-deep);
+	transform: translateY(-1px);
+	box-shadow:
+		inset 0 1px 0 rgb(255 255 255 / 0.18),
+		0 10px 20px -6px rgb(var(--color-ink-900-rgb) / 0.4);
+}
+
+/* Followed state — flipped to outlined ghost so the active CTA reads
+   as "already done" instead of yelling for the next click. */
+.market-seller-card__follow[aria-pressed="true"] {
+	background: rgb(var(--color-ink-400-rgb) / 0.16);
+	color: var(--color-brand-primary-strong);
+	box-shadow: inset 0 0 0 1px rgb(var(--color-ink-900-rgb) / 0.24);
+}
+
+.market-seller-card__follow[aria-pressed="true"]:hover {
+	background: rgb(var(--color-ink-400-rgb) / 0.24);
+	transform: translateY(-1px);
+}
+
+.market-seller-card__view {
+	border: 1px solid var(--border-soft);
+	background: transparent;
+	color: var(--ink-heading);
+}
+
+.market-seller-card__view:hover {
+	border-color: var(--color-brand-primary-strong);
+	background: rgb(var(--color-brand-primary-strong-rgb) / 0.06);
+	color: var(--color-brand-primary-strong);
+	transform: translateY(-1px);
+}
+
+@media (max-width: 1120px) {
+	.market-layout--sellers {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.market-layout--sellers .market-filter {
+		display: none;
+	}
+}
+
+@media (max-width: 840px) {
+	/* Mobile waterfall — JS masonry handles column count + gap at this
+	 * breakpoint (see DEFAULT_BREAKPOINTS in MasonryGrid.tsx). Card
+	 * chrome / typography / CTA shrink via container queries so the
+	 * cards still feel balanced at the narrower per-cell width. */
+
+	.market-seller-card--list {
+		grid-template-columns: 1fr;
+	}
+
+	.market-seller-card--list .market-seller-card__cover {
+		min-height: 0;
+		aspect-ratio: 16 / 9;
+	}
+
+	/* When the list variant collapses to single-column on mobile the
+	   cover sits on top of the body, so the avatar should overlap the
+	   cover just like the grid variant does. */
+	.market-seller-card--list .market-seller-card__avatar {
+		margin-top: -44px;
+		width: 64px;
+		height: 64px;
+	}
+}
+
+/* Market origins: interactive Taiwan origin map */
+
+/* Daily Market uses a dense masonry feed on mobile. Keep the search page's
+ * existing compact product cards untouched, but give the market stepper a
+ * full 40px row height so tapping -/+ does not feel fiddly. Columns keep
+ * the 1:1.6:1 ratio so the counter stays visibly wider than the buttons. */
+@media (max-width: 680px) {
+	.market-page .market-product-card__buy-row {
+		gap: 8px;
+	}
+
+	.market-page .market-product-card__qty {
+		grid-template-columns: 1fr 1.6fr 1fr;
+		height: 40px;
+	}
+
+	.market-page .market-product-card__qty button {
+		min-width: 0;
+		font-size: 1.125rem;
+	}
+
+	.market-page .market-product-card__qty output {
+		font-size: 1rem;
+	}
+
+	.market-page .market-product-card__cart-btn {
+		width: 40px;
+		height: 40px;
+	}
+}

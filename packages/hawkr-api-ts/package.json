@@ -1,0 +1,32 @@
+{
+	"name": "@hawkr/api",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"description": "對外 API（api/ 的 Protobuf＋Connect）的 TypeScript 生成碼與 Connect 執行期（錯誤分類、重試）與手寫的 google.type.Date、update_mask helper、伺服器文字長度規則，website 與 admin 共用。只發佈 TS 原始碼。",
+	"exports": {
+		"./gen/*": "./src/gen/*.ts",
+		"./connect/errors": "./src/connect/errors.ts",
+		"./connect/retry": "./src/connect/retry.ts",
+		"./connect/submit": "./src/connect/submit.ts",
+		"./proto/date": "./src/proto/date.ts",
+		"./proto/field-mask": "./src/proto/field-mask.ts",
+		"./text/server-text": "./src/text/server-text.ts"
+	},
+	"scripts": {
+		"gen:api": "../../api/generate.sh buf.gen.yaml",
+		"lint": "tsc --noEmit && biome check .",
+		"test": "vitest run"
+	},
+	"dependencies": {
+		"@bufbuild/protobuf": "catalog:",
+		"@connectrpc/connect": "catalog:"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "catalog:",
+		"@bufbuild/protoc-gen-es": "catalog:",
+		"@types/node": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	}
+}

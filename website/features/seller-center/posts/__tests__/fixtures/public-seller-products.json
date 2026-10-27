@@ -1,0 +1,151 @@
+[
+	{
+		"seller": {
+			"name": "陳記",
+			"logoKey": "public/seller_logo/2685914682/20260805/3f47a6bf-e8f4-4459-8737-91215b0050ea.png",
+			"logoUrl": "https://test-media.example.com/i/original/public/seller_logo/2685914682/20260805/3f47a6bf-e8f4-4459-8737-91215b0050ea.png",
+			"address": "桃園市中壢區",
+			"city": "桃園市",
+			"district": "中壢區",
+			"storeCode": "2685914682",
+			"storeId": "2685914682"
+		},
+		"priceMax": "450",
+		"imageKey": "public/product/2685914682/20260719/cd527201-0b42-417d-8476-98d780c92a47.jpg",
+		"imageUrl": "https://test-media.example.com/i/original/public/product/2685914682/20260719/cd527201-0b42-417d-8476-98d780c92a47.jpg",
+		"name": "[範例] 快樂農夫 三地門 40年老欉 土芒果青",
+		"origin": "屏東三地門",
+		"status": "4004",
+		"categoryId": "135",
+		"categoryName": "芒果",
+		"categoryLv2Name": "芒果",
+		"priceMin": "320",
+		"id": "866542675787809994",
+		"rating": "0",
+		"createdAt": "1784436673",
+		"reviewCount": "0",
+		"storeId": "2685914682",
+		"sellerName": "陳記",
+		"sellerLogoKey": "public/seller_logo/2685914682/20260805/3f47a6bf-e8f4-4459-8737-91215b0050ea.png",
+		"sellerLogoUrl": "https://test-media.example.com/i/original/public/seller_logo/2685914682/20260805/3f47a6bf-e8f4-4459-8737-91215b0050ea.png",
+		"categoryLv2Id": "135",
+		"imageKeys": [
+			"public/product/2685914682/20260719/cd527201-0b42-417d-8476-98d780c92a47.jpg",
+			"public/product/2685914682/20260719/13b2d528-3679-4ab7-b548-99c023392f21.jpg",
+			"public/product/2685914682/20260719/c42e4ff8-ce60-4551-be03-3aab7dbeb4a6.jpg"
+		],
+		"imageUrls": [
+			"https://test-media.example.com/i/original/public/product/2685914682/20260719/cd527201-0b42-417d-8476-98d780c92a47.jpg",
+			"https://test-media.example.com/i/original/public/product/2685914682/20260719/13b2d528-3679-4ab7-b548-99c023392f21.jpg",
+			"https://test-media.example.com/i/original/public/product/2685914682/20260719/c42e4ff8-ce60-4551-be03-3aab7dbeb4a6.jpg"
+		],
+		"hashtags": [
+			{
+				"name": "屏東三地門芒果青產地直銷",
+				"displayName": "屏東三地門芒果青產地直銷",
+				"productCount": "1"
+			}
+		],
+		"deliveryTemp": null,
+		"stock": "",
+		"favoriteCount": "",
+		"isFavorited": false,
+		"isRestockSubscribed": false
+	},
+	{
+		"seller": {
+			"name": "陳記",
+			"logoKey": "public/seller_logo/2685914682/20260805/3f47a6bf-e8f4-4459-8737-91215b0050ea.png",
+			"logoUrl": "https://test-media.example.com/i/original/public/seller_logo/2685914682/20260805/3f47a6bf-e8f4-4459-8737-91215b0050ea.png",
+			"address": "桃園市中壢區",
+			"city": "桃園市",
+			"district": "中壢區",
+			"storeCode": "2685914682",
+			"storeId": "2685914682"
+		},
+		"priceMax": "320",
+		"imageKey": "public/product/2685914682/20260719/33a61c98-d1a5-46bb-851a-f9ec416d593c.jpg",
+		"imageUrl": "https://test-media.example.com/i/original/public/product/2685914682/20260719/33a61c98-d1a5-46bb-851a-f9ec416d593c.jpg",
+		"name": "[範例] 盛花園 台中梨山高麗菜 1.2-1.5kg",
+		"origin": "台中梨山",
+		"status": "4004",
+		"categoryId": "10",
+		"categoryName": "包心白",
+		"categoryLv2Name": "包心白",
+		"priceMin": "320",
+		"id": "866542665692119688",
+		"rating": "0",
+		"createdAt": "1784436671",
+		"reviewCount": "0",
+		"storeId": "2685914682",
+		"sellerName": "陳記",
+		"sellerLogoKey": "public/seller_logo/2685914682/20260805/3f47a6bf-e8f4-4459-8737-91215b0050ea.png",
+		"sellerLogoUrl": "https://test-media.example.com/i/original/public/seller_logo/2685914682/20260805/3f47a6bf-e8f4-4459-8737-91215b0050ea.png",
+		"categoryLv2Id": "10",
+		"imageKeys": [
+			"public/product/2685914682/20260719/33a61c98-d1a5-46bb-851a-f9ec416d593c.jpg",
+			"public/product/2685914682/20260719/9fc6122f-2732-49a9-8992-ede91b102513.jpg",
+			"public/product/2685914682/20260719/2d5f26ba-ead3-4476-9530-37a51ed37446.jpg"
+		],
+		"imageUrls": [
+			"https://test-media.example.com/i/original/public/product/2685914682/20260719/33a61c98-d1a5-46bb-851a-f9ec416d593c.jpg",
+			"https://test-media.example.com/i/original/public/product/2685914682/20260719/9fc6122f-2732-49a9-8992-ede91b102513.jpg",
+			"https://test-media.example.com/i/original/public/product/2685914682/20260719/2d5f26ba-ead3-4476-9530-37a51ed37446.jpg"
+		],
+		"hashtags": [
+			{
+				"name": "梨山高麗菜盛花園",
+				"displayName": "梨山高麗菜盛花園",
+				"productCount": "1"
+			}
+		],
+		"deliveryTemp": null,
+		"stock": "",
+		"favoriteCount": "",
+		"isFavorited": false,
+		"isRestockSubscribed": false
+	},
+	{
+		"seller": {
+			"name": "陳記",
+			"logoKey": "public/seller_logo/2685914682/20260805/3f47a6bf-e8f4-4459-8737-91215b0050ea.png",
+			"logoUrl": "https://test-media.example.com/i/original/public/seller_logo/2685914682/20260805/3f47a6bf-e8f4-4459-8737-91215b0050ea.png",
+			"address": "桃園市中壢區",
+			"city": "桃園市",
+			"district": "中壢區",
+			"storeCode": "2685914682",
+			"storeId": "2685914682"
+		},
+		"priceMax": "120",
+		"imageKey": "public/product/2685914682/20260718/f8d18047-9b3a-4c1b-8a21-7b8f2fdabecc.png",
+		"imageUrl": "https://test-media.example.com/i/original/public/product/2685914682/20260718/f8d18047-9b3a-4c1b-8a21-7b8f2fdabecc.png",
+		"name": "R8-01 媒體回歸測試商品（陳記）",
+		"status": "4004",
+		"categoryId": "10",
+		"categoryName": "包心白",
+		"categoryLv2Name": "包心白",
+		"priceMin": "120",
+		"id": "866353737479521547",
+		"rating": "5.00",
+		"createdAt": "1784391627",
+		"reviewCount": "1",
+		"storeId": "2685914682",
+		"sellerName": "陳記",
+		"sellerLogoKey": "public/seller_logo/2685914682/20260805/3f47a6bf-e8f4-4459-8737-91215b0050ea.png",
+		"sellerLogoUrl": "https://test-media.example.com/i/original/public/seller_logo/2685914682/20260805/3f47a6bf-e8f4-4459-8737-91215b0050ea.png",
+		"categoryLv2Id": "10",
+		"imageKeys": [
+			"public/product/2685914682/20260718/f8d18047-9b3a-4c1b-8a21-7b8f2fdabecc.png",
+			"public/product/2685914682/20260718/28808f32-ba14-4005-92dd-a8446d794cf0.png"
+		],
+		"imageUrls": [
+			"https://test-media.example.com/i/original/public/product/2685914682/20260718/f8d18047-9b3a-4c1b-8a21-7b8f2fdabecc.png",
+			"https://test-media.example.com/i/original/public/product/2685914682/20260718/28808f32-ba14-4005-92dd-a8446d794cf0.png"
+		],
+		"deliveryTemp": null,
+		"stock": "",
+		"favoriteCount": "",
+		"isFavorited": false,
+		"isRestockSubscribed": false
+	}
+]

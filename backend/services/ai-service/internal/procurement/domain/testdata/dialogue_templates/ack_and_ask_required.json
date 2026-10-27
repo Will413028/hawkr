@@ -1,0 +1,19 @@
+{
+  "act": "ACK_AND_ASK_REQUIRED",
+  "emptyArgsBlocks": [
+    {
+      "kind": "UNDERSTOOD",
+      "text": "已收到你的訊息。"
+    }
+  ],
+  "populatedArgsBlocks": [
+    {
+      "kind": "UNDERSTOOD",
+      "text": "已記錄：品項：寶島梨"
+    },
+    {
+      "kind": "NEXT_STEP",
+      "text": "還想請你補充：配送城市、數量"
+    }
+  ]
+}

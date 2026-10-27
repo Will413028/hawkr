@@ -1,0 +1,5428 @@
+/* Hawkr Agent Phase 1 — buyer procurement assistant inside the Messages shell.
+ *
+ * The conversation is the narrative spine; typed artifacts hold reviewable
+ * facts and actions. All colours, radii, typography and spacing stay on the
+ * Hawkr semantic token layer so this surface follows light/dark themes.
+ */
+
+/* ── Hawkr Agent 對話列（B-244 多對話側欄）────────────────────────────
+ * 密度沿用 .chat-sidebar__item（不是 hero 卡）；「更多」鈕是 Link 的絕對
+ * 定位兄弟節點，避免巢狀互動元素。Agent identity 已收斂到清單上方分頁。 */
+/* 分頁化之後 agent 區段是「被選到時佔滿剩餘高度」的主區，不再是釘在
+ * 人類列表上方的 `flex-shrink: 0` 區塊——那個寫法沒有高度上限，對話一多
+ * 就把人類列表壓到 0px，而且它在捲動容器外面，捲也捲不到賣家訊息。 */
+.chat-sidebar__agent {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 0;
+	min-height: 0;
+}
+
+/* 常駐的「開新對話」是 Agent 分頁的 quiet primary action。Edit 圖示表達
+ * 開始撰寫，不把已移除的方框 Plus 帶回來；淡綠面和歷史列的 active tint 是同一
+ * 家族，但固定的圖示與動作文字讓它不會被誤認成對話。 */
+.chat-sidebar__new-chat {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	width: calc(100% - 2 * var(--hkui-space-3));
+	margin: var(--hkui-space-2) var(--hkui-space-3) 0;
+	/* 命中區 44px（DESIGN.md §觸控）：11+18+11 = 40，補 min-height。 */
+	min-height: 44px;
+	box-sizing: border-box;
+	padding: 10px 12px;
+	border: 1px solid var(--theme-primary-border);
+	border-radius: var(--hkui-radius-lg);
+	background: var(--theme-primary-subtle);
+	color: var(--theme-text-accent-on-tint);
+	font: inherit;
+	font-weight: 700;
+	text-align: left;
+	cursor: pointer;
+	transition:
+		background 160ms ease,
+		border-color 160ms ease;
+}
+.chat-sidebar__new-chat:hover {
+	border-color: var(--theme-primary-border);
+	background: color-mix(in srgb, var(--theme-text-accent) 18%, transparent);
+}
+.chat-sidebar__new-chat:focus-visible {
+	outline: none;
+	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
+}
+.chat-sidebar__new-chat-icon {
+	display: grid;
+	width: 30px;
+	height: 30px;
+	place-items: center;
+	flex: 0 0 30px;
+	border-radius: var(--radius-circle);
+	background: var(--hkui-content1);
+	color: var(--theme-text-accent);
+}
+
+.chat-sidebar__list--agent {
+	padding-top: var(--hkui-space-2);
+	margin-top: 2px;
+}
+
+.chat-sidebar__agent-row {
+	position: relative;
+}
+
+/* 每筆歷史對話用其權威大分類顯示圖示；分類不明時走同一尺寸的中性圓底，
+ * 版面不跳動。 */
+.chat-sidebar__category-marble {
+	display: inline-grid;
+	position: relative;
+	place-items: center;
+	flex: 0 0 auto;
+	overflow: visible;
+	background: transparent;
+	transition: transform 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.chat-sidebar__agent-row:hover .chat-sidebar__category-marble {
+		transform: translateY(-1px) scale(1.045);
+	}
+}
+
+.chat-sidebar__agent-row:focus-within .chat-sidebar__category-marble {
+	transform: translateY(-1px) scale(1.045);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.chat-sidebar__category-marble,
+	.chat-sidebar__agent-row:hover .chat-sidebar__category-marble,
+	.chat-sidebar__agent-row:focus-within .chat-sidebar__category-marble {
+		transition: none;
+		transform: none;
+	}
+}
+
+.chat-sidebar__agent-row .chat-sidebar__item {
+	/* 預留右側動作鈕的位置，標題不壓到它。 */
+	padding-right: 40px;
+}
+
+/* 預覽那一行也要讓開兩顆動作鈕。
+ *
+ * 標題那一行右側本來就有時間戳佔位（hover 時它只是淡出、不讓出空間），所以
+ * 標題永遠壓不到鈕；預覽行沒有這個佔位物，`padding-right: 40px` 只擋得住 40px，
+ * 而兩顆 34px 鈕加 10px 間距從 right:8 一路長到 right:86——中間 46px 就是預覽
+ * 文字被蓋住的那一段。刻意常駐保留而不是 hover 才加：hover 時才改 padding 會
+ * 讓整行文字跳動。 */
+.chat-sidebar__agent-row .chat-sidebar__preview {
+	padding-right: 46px;
+}
+
+/* 刪除＋更多兩顆鈕。絕對定位覆蓋在時間戳那一塊上（hover 時時間戳淡出），
+ * 這樣非 hover 態的版面完全不變、也不會為了兩顆鈕永久壓縮標題寬度。 */
+.chat-sidebar__agent-actions {
+	position: absolute;
+	top: 50%;
+	right: 8px;
+	transform: translateY(-50%);
+	display: flex;
+	align-items: center;
+	/* 兩顆 34px 鈕各自用 ::before inset:-5px 撐到 44px 命中區。gap 必須
+	 * ≥ 10px，否則兩個命中區會重疊（34+2 的間距下重疊 8px），重疊帶裡後面
+	 * 的兄弟贏，垃圾桶的右緣會靜默開啟 ⋯ 選單。 */
+	gap: 10px;
+}
+
+.chat-sidebar__agent-action {
+	position: relative;
+	display: grid;
+	place-items: center;
+	width: 34px;
+	height: 34px;
+	padding: 0;
+	border: 0;
+	border-radius: var(--radius-circle);
+	background: transparent;
+	color: var(--hkui-foreground-soft);
+	cursor: pointer;
+	opacity: 0;
+	transition:
+		opacity var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease),
+		background-color var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease),
+		color var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease);
+}
+
+/* 觸控目標擴到 44px（design-system §觸控），視覺維持 34px。 */
+.chat-sidebar__agent-action::before {
+	content: "";
+	position: absolute;
+	inset: -5px;
+}
+
+.chat-sidebar__agent-row:hover .chat-sidebar__agent-action,
+.chat-sidebar__agent-action:focus-visible {
+	opacity: 1;
+}
+
+/* 兩顆鈕浮出時把時間戳讓出來——不改版面，只換誰可見。 */
+.chat-sidebar__agent-row:hover .chat-sidebar__item-head small,
+.chat-sidebar__agent-row:focus-within .chat-sidebar__item-head small {
+	opacity: 0;
+	transition: opacity var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease);
+}
+
+/* 觸控裝置沒有 hover，動作鈕只能常駐——但「常駐一顆無確認的刪除鈕，就貼在
+ * 你要點開的那一列旁邊」是這個介面最危險的一件事。⋯ 選單裡本來就有刪除，
+ * 所以觸控上只留 ⋯：不少任何功能，卻拿掉了誤刪路徑。
+ * （對照：ChatGPT／Meta AI／XChat／BeReal 的刪除都有確認步驟。） */
+@media (hover: none) {
+	.chat-sidebar__agent-action {
+		opacity: 1;
+	}
+	.chat-sidebar__agent-action--delete {
+		display: none;
+	}
+	.chat-sidebar__agent-row .chat-sidebar__item {
+		padding-right: 44px;
+	}
+	.chat-sidebar__agent-row:hover .chat-sidebar__item-head small {
+		opacity: 1;
+	}
+}
+
+.chat-sidebar__agent-action:hover {
+	background: color-mix(in srgb, var(--hkui-primary) 10%, transparent);
+	color: var(--hkui-primary);
+}
+
+/* 刪除是破壞性動作——hover 才轉成 danger 語意，靜置時不製造紅色噪音。 */
+.chat-sidebar__agent-action--delete:hover {
+	background: color-mix(in srgb, var(--hkui-danger) 10%, transparent);
+	color: var(--hkui-danger);
+}
+
+.chat-sidebar__agent-action:focus-visible {
+	outline: none;
+	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
+}
+
+/* ⋯ 的彈出選單。就地錨在觸發鈕下方（右對齊），視覺語彙與 seller-orders
+ * 的列動作選單同源——同一個互動語意不長出第二種外觀。 */
+.chat-sidebar__agent-menu {
+	position: relative;
+	display: inline-flex;
+}
+
+/* fixed 而非 absolute：側欄 overflow:hidden、列表 overflow-y:auto，
+ * absolute 子層會被裁掉（實機上第二個項目被切掉）。座標由 JS 依觸發鈕
+ * 的 rect 決定（right/top 或 right/bottom）。 */
+.chat-sidebar__agent-menu-list {
+	position: fixed;
+	z-index: 60;
+	min-width: 148px;
+	padding: 4px;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	background: var(--hkui-content1);
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-md);
+	box-shadow: var(--shadow-md);
+}
+
+.chat-sidebar__agent-menu-list button {
+	display: flex;
+	align-items: center;
+	gap: var(--hkui-space-2, 8px);
+	width: 100%;
+	padding: 8px 10px;
+	border: 0;
+	border-radius: var(--radius-sm);
+	background: transparent;
+	color: var(--hkui-foreground);
+	font-size: var(--hkui-text-small);
+	text-align: left;
+	cursor: pointer;
+}
+
+.chat-sidebar__agent-menu-list button:hover,
+.chat-sidebar__agent-menu-list button:focus-visible {
+	outline: none;
+	background: color-mix(in srgb, var(--hkui-primary) 10%, transparent);
+	color: var(--hkui-primary);
+}
+
+.chat-sidebar__agent-menu-item--danger:hover,
+.chat-sidebar__agent-menu-item--danger:focus-visible {
+	background: color-mix(
+		in srgb,
+		var(--hkui-danger) 10%,
+		transparent
+	) !important;
+	color: var(--hkui-danger) !important;
+}
+
+/* 就地改名：輸入框佔住標題那一格，列高不變（避免編輯時整列跳動）。 */
+.chat-sidebar__rename-input {
+	min-width: 0;
+	width: 100%;
+	padding: 4px 8px;
+	border: 1px solid var(--hkui-primary-200, var(--hkui-primary));
+	border-radius: var(--radius-sm);
+	background: var(--hkui-content1);
+	color: var(--hkui-foreground);
+	font-size: var(--hkui-text-small);
+	font-weight: 600;
+	outline: none;
+}
+
+.chat-sidebar__rename-input:focus-visible {
+	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
+}
+
+/* 收合 icon-rail（960–1199px）：區段標籤與動作鈕一併隱藏；
+ * 列本身沿用 .chat-sidebar__item 的收合規則（只剩 mark）。 */
+@media (min-width: 960px) and (max-width: 1199px) {
+	.chat-shell[data-sidebar-collapsed="true"] .chat-sidebar__section-label,
+	.chat-shell[data-sidebar-collapsed="true"] .chat-sidebar__agent-actions {
+		display: none;
+	}
+	.chat-shell[data-sidebar-collapsed="true"]
+		.chat-sidebar__agent-row
+		.chat-sidebar__item {
+		padding-right: 0;
+	}
+}
+
+/* Hawkr Agent 識別記號的外圈：尺寸由這裡決定，Hawkr 標誌填滿它。 */
+.assistant-mark {
+	position: relative;
+	display: inline-grid;
+	place-items: center;
+	flex: 0 0 auto;
+	width: 46px;
+	height: 46px;
+	border-radius: var(--radius-circle);
+	background: transparent;
+}
+
+/* 搜尋／首頁入口用的小尺寸（原本是 AssistantEntryLink 手抄的 size-9）。
+ * 不加 box-shadow：記號是入口卡內的元素，陰影由卡片本身負責，記號再帶
+ * 一層會變成「卡中卡」的層級噪音（design-system §9.2）。 */
+.assistant-mark--sm {
+	width: 36px;
+	height: 36px;
+}
+
+.assistant-mark--sm small {
+	min-width: 20px;
+	height: 14px;
+	right: -4px;
+	bottom: -4px;
+	font-size: 0.5625rem;
+}
+
+/* AI 標一律用 <small>，不用 `.assistant-mark span`。 */
+.assistant-mark small {
+	position: absolute;
+	right: -3px;
+	bottom: -2px;
+	display: inline-grid;
+	place-items: center;
+	min-width: 22px;
+	height: 16px;
+	padding: 0 4px;
+	/* 角標的白邊只是把它從底下的圖形切開，1px 就夠——2px 在 32px 的記號上
+	 * 會粗到跟金色本體同重量。 */
+	border: 1px solid var(--hkui-content1);
+	border-radius: var(--radius-pill);
+	background: var(--accent-gold);
+	color: var(--color-neutral-ink);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-weight: 900;
+	line-height: 1;
+	letter-spacing: 0.04em;
+}
+
+@media (min-width: 960px) and (max-width: 1199px) {
+	.chat-shell[data-sidebar-collapsed="true"] .chat-sidebar__new-chat {
+		width: 44px;
+		height: 44px;
+		min-height: 44px;
+		justify-content: center;
+		gap: 0;
+		margin: var(--hkui-space-2) auto 0;
+		padding: 7px;
+	}
+
+	.chat-shell[data-sidebar-collapsed="true"] .chat-sidebar__new-chat-label {
+		display: none;
+	}
+}
+
+/* 搜尋頁：0 結果時，Hawkr Agent 入口只留空態那一顆 --------------------------
+ * SearchForm（搜尋框下方）與 SearchResultsClient 的空態各自渲染一顆入口，
+ * 查無結果時兩顆會同屏出現——同一個 CTA 重複兩次，而且空態那顆才是使用者
+ * 視線落點與語意正確的位置（「找不到合適商品時，直接問 Hawkr Agent」）。
+ * 用 :has() 讓上面那顆讓位，沿用 messages.css 既有的 sibling 抑制手法，
+ * 不需要把結果數往上抬成共享 state。 */
+.search-page:has([data-search-empty] [data-hawkr-agent-entry])
+.search-page__agent-entry {
+	display: none;
+}
+
+/* Workspace shell ------------------------------------------------------- */
+.assistant-route-state.thread-page {
+	display: grid;
+	place-items: center;
+	align-content: center;
+	gap: 14px;
+	padding: 32px;
+	background: transparent;
+	text-align: center;
+}
+
+.assistant-route-state__mark {
+	display: grid;
+	place-items: center;
+	width: 52px;
+	height: 52px;
+	border-radius: var(--radius-circle);
+	background: color-mix(
+		in srgb,
+		var(--theme-action-primary) 12%,
+		var(--hkui-content1)
+	);
+	color: var(--theme-action-primary);
+}
+
+.assistant-route-state h1,
+.assistant-route-state p {
+	margin: 0;
+}
+
+.assistant-route-state h1 {
+	font-family: var(--font-brand);
+	font-size: 1.5rem;
+}
+
+.assistant-route-state p {
+	max-width: 54ch;
+	color: var(--hkui-foreground-muted);
+	line-height: 1.65;
+}
+
+.assistant-route-state__actions {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 10px;
+	margin-top: 6px;
+}
+
+.assistant-route-state__actions a {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 44px;
+	padding: 0 16px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-pill);
+	color: var(--theme-action-primary);
+	font-weight: 700;
+	text-decoration: none;
+}
+
+.assistant-route-state__actions a:first-child {
+	border-color: var(--theme-action-primary);
+	background: var(--theme-action-primary);
+	color: var(--hkui-primary-foreground);
+}
+
+.assistant-invalidated {
+	display: flex;
+	gap: 12px;
+	padding: 14px 16px;
+	border: 1px solid
+		color-mix(in srgb, var(--hkui-warning) 40%, var(--hkui-divider));
+	border-radius: var(--radius-md);
+	background: color-mix(in srgb, var(--hkui-warning) 9%, var(--hkui-content1));
+}
+
+.assistant-invalidated > svg {
+	color: var(--hkui-warning);
+	flex: 0 0 auto;
+}
+
+.assistant-invalidated strong,
+.assistant-invalidated p {
+	margin: 0;
+}
+
+.assistant-invalidated p {
+	margin-top: 4px;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-small, 0.875rem);
+	line-height: 1.55;
+}
+
+/* Typed artifacts ------------------------------------------------------ */
+.assistant-artifact {
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-lg);
+	background: var(--hkui-content1);
+}
+
+.assistant-candidate__select input {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.assistant-review__actions button {
+	min-height: 44px;
+}
+
+.assistant-artifact__head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 20px 22px;
+	border-bottom: 1px solid var(--hkui-divider);
+}
+
+.assistant-artifact__head h2,
+.assistant-artifact__head h3,
+.assistant-artifact__head p {
+	margin: 0;
+}
+
+.assistant-artifact__head h2,
+.assistant-artifact__head h3 {
+	color: var(--hkui-foreground);
+	font-family: var(--font-brand);
+	font-size: var(--hkui-text-large);
+	line-height: 1.3;
+}
+
+.assistant-artifact__head h2:focus:not(:focus-visible),
+.assistant-artifact__head h3:focus:not(:focus-visible) {
+	outline: none;
+}
+
+.assistant-artifact__head h2:focus-visible,
+.assistant-artifact__head h3:focus-visible {
+	border-radius: var(--radius-sm);
+	outline: 2px solid var(--theme-action-primary);
+	outline-offset: 4px;
+}
+
+.assistant-artifact__head p {
+	margin-top: 5px;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-small, 0.875rem);
+	line-height: 1.5;
+}
+
+.assistant-review__actions {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 20px;
+	padding: 18px 22px 22px;
+}
+
+.assistant-review__actions p {
+	max-width: 420px;
+	margin: 0;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	line-height: 1.5;
+}
+
+.assistant-progress__list {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0 24px;
+	margin: 0;
+	padding: 8px 22px 18px;
+	list-style: none;
+}
+
+.assistant-progress__list li {
+	display: grid;
+	grid-template-columns: 22px minmax(0, 1fr);
+	gap: 9px;
+	padding: 13px 0;
+	border-bottom: 1px solid var(--hkui-divider);
+}
+
+.assistant-progress__list li > svg {
+	margin-top: 1px;
+	color: var(--hkui-success);
+}
+
+.assistant-progress__list li[data-status="current"] > svg {
+	color: var(--theme-action-primary);
+}
+
+.assistant-progress__list li > div {
+	display: grid;
+	gap: 4px;
+}
+
+.assistant-progress__list strong {
+	color: var(--hkui-foreground);
+	font-size: var(--hkui-text-small, 0.875rem);
+}
+
+.assistant-progress__list span {
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	line-height: 1.5;
+}
+
+/* Candidate lanes ------------------------------------------------------ */
+.assistant-candidates {
+	overflow: clip;
+}
+
+/* lane 分頁＝實心膠囊。`Tabs` 的 solid variant 只把選中的分頁換成 elevated 表面，
+ * 在這個工作台裡跟未選中幾乎分不出來——這兩顆是「要看哪一批候選」的主要切換，
+ * 選中態要用主色實心承擔。選擇器帶了兩層元素，特異度高過 variant 那些
+ * `data-[selected=true]:` utility，不需要 !important。 */
+.assistant-candidates > div > div[role="tablist"] {
+	gap: 6px;
+	margin-inline: 22px;
+	padding: 5px;
+	border-radius: var(--radius-pill);
+	background: var(--hkui-content2);
+}
+
+.assistant-candidates > div > div[role="tablist"] button {
+	min-height: 44px;
+	border-radius: var(--radius-pill);
+	color: var(--hkui-foreground-soft);
+	font-weight: 750;
+}
+
+.assistant-candidates > div > div[role="tablist"] button[data-selected="true"] {
+	background: var(--theme-action-primary);
+	color: var(--hkui-primary-foreground);
+	box-shadow: none;
+}
+
+.assistant-candidates > div > div[role="tabpanel"] {
+	padding-top: 0;
+}
+
+.assistant-tab-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+}
+
+.assistant-tab-label b {
+	display: inline-grid;
+	place-items: center;
+	min-width: 22px;
+	height: 20px;
+	padding-inline: 6px;
+	border-radius: var(--radius-pill);
+	background: var(--hkui-content1);
+	color: var(--hkui-foreground);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.assistant-lane {
+	display: grid;
+	gap: 18px;
+	padding: 18px 22px 22px;
+}
+
+.assistant-lane__intro {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 20px;
+}
+
+.assistant-lane__intro > div {
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+	white-space: nowrap;
+}
+
+.assistant-lane__intro strong {
+	font-size: var(--hkui-text-small, 0.875rem);
+}
+
+.assistant-lane__intro span,
+.assistant-lane__intro p {
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.assistant-lane__intro p {
+	max-width: 430px;
+	margin: 0;
+	line-height: 1.5;
+	text-align: right;
+}
+
+.assistant-lane__filter {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	min-height: 46px;
+	padding: 0 12px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-md);
+	background: var(--hkui-content2);
+	color: var(--hkui-foreground-muted);
+}
+
+.assistant-lane__filter:focus-within {
+	border-color: var(--theme-action-primary);
+	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
+}
+
+.assistant-lane__filter input {
+	min-width: 0;
+	min-height: 44px;
+	flex: 1;
+	border: 0;
+	outline: 0;
+	background: transparent;
+	color: var(--hkui-foreground);
+	font: inherit;
+	font-size: max(1rem, var(--hkui-text-small, 0.875rem));
+}
+
+.assistant-lane__filter button {
+	min-width: 44px;
+	min-height: 44px;
+	border: 0;
+	background: transparent;
+	color: var(--theme-action-primary);
+	font: inherit;
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.assistant-lane__empty {
+	display: grid;
+	justify-items: center;
+	gap: 7px;
+	min-height: 220px;
+	padding: 28px 20px;
+	border: 1px dashed var(--hkui-divider);
+	border-radius: var(--radius-md);
+	background: var(--hkui-content2);
+	text-align: center;
+}
+
+.assistant-lane__empty > svg {
+	color: var(--theme-action-primary);
+}
+
+.assistant-lane__empty strong,
+.assistant-lane__empty p {
+	margin: 0;
+}
+
+.assistant-lane__empty p {
+	max-width: 46ch;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-small, 0.875rem);
+	line-height: 1.55;
+}
+
+/* Candidate results are a comparison workspace, not a gallery. The server DTO
+ * currently exposes candidate facts rather than a verified seller identity, so
+ * every column stays grounded in those fields and never infers supply/fulfilment. */
+.assistant-candidate-table {
+	--candidate-table-columns: 48px minmax(0, 1.05fr) minmax(0, 1.25fr)
+		minmax(0, 1.05fr) minmax(84px, 0.68fr) 100px 112px;
+	width: 100%;
+	overflow: hidden;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-md);
+	border-collapse: separate;
+	border-spacing: 0;
+	background: var(--hkui-content1);
+	table-layout: fixed;
+}
+
+.assistant-candidate-table__head,
+.assistant-candidate-table__body {
+	display: block;
+}
+
+.assistant-candidate-table__head tr,
+.assistant-candidate-row {
+	display: grid;
+	grid-template-columns: var(--candidate-table-columns);
+}
+
+.assistant-candidate-table__head tr {
+	align-items: center;
+	min-height: 44px;
+	background: var(--hkui-content2);
+}
+
+.assistant-candidate-table__head th {
+	padding: 10px 12px;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-weight: 750;
+	line-height: 1.35;
+	text-align: left;
+}
+
+.assistant-candidate-row {
+	min-width: 0;
+	align-items: stretch;
+	border-top: 1px solid var(--hkui-divider);
+	transition: background-color var(--hkui-dur-fast, 160ms)
+		var(--hkui-ease, ease);
+}
+
+.assistant-candidate-row:hover,
+.assistant-candidate-row[data-selected] {
+	background: color-mix(in srgb, var(--hkui-primary) 6%, var(--hkui-content1));
+}
+
+.assistant-candidate-row[data-selected] {
+	box-shadow: inset 3px 0 0 var(--hkui-primary);
+}
+
+.assistant-candidate-row td {
+	display: grid;
+	min-width: 0;
+	align-content: start;
+	gap: 6px;
+	padding: 14px 12px;
+	color: var(--hkui-foreground-soft);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	line-height: 1.45;
+	text-align: left;
+}
+
+.assistant-candidate-row__select {
+	place-items: start center;
+}
+
+.assistant-candidate-row__select-control {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 44px;
+	height: 44px;
+	padding: 0;
+	border-radius: var(--radius-pill);
+	background: transparent;
+	cursor: pointer;
+	box-shadow: none;
+}
+
+.assistant-candidate-row__select-control input {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.assistant-candidate-row__select-control:has(input:focus-visible) {
+	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
+}
+
+.assistant-candidate-row__selection-mark {
+	display: grid;
+	flex: 0 0 20px;
+	place-items: center;
+	width: 20px;
+	height: 20px;
+	border: 1.5px solid var(--hkui-foreground-muted);
+	border-radius: var(--radius-circle);
+	color: var(--hkui-primary);
+	pointer-events: none;
+}
+
+.assistant-candidate-row__selection-mark[data-selected] {
+	border-color: transparent;
+}
+
+/* ---- B-246 / #2377：候選收斂成商家 ---- */
+
+/* 兩種列（單一候選／收斂後的商家）共用同一個身分區塊。原本只有商家列有頭像，
+ * 站外業者那一列左邊是空的，兩條 lane 在卡片上長得一樣。 */
+.assistant-candidate-identity {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+}
+
+.assistant-candidate-identity__avatar {
+	display: inline-grid;
+	flex: none;
+	place-items: center;
+	width: 34px;
+	height: 34px;
+	overflow: hidden;
+	border-radius: var(--radius-circle);
+	background: color-mix(in srgb, var(--hkui-primary) 10%, var(--hkui-content2));
+	color: var(--hkui-primary);
+}
+
+/* lane 代號同時用顏色分：平台賣家走品牌色，站外業者走 warning 色階——與底下
+ * lane badge 同一套色，卡片上「圖示＋badge」講的是同一件事。 */
+.assistant-candidate-identity[data-lane="EXTERNAL"]
+.assistant-candidate-identity__avatar {
+	background: color-mix(in srgb, var(--hkui-warning) 14%, var(--hkui-content2));
+	color: var(--hkui-warning-700, var(--hkui-warning));
+}
+
+.assistant-candidate-identity__avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+/* 部分勾選：checkbox 的 indeterminate 只改變原生外觀，而這裡的勾選標記是自繪的，
+ * 所以要自己畫出「部分」的樣子——少了這條，部分勾選在視覺上與完全未選一模一樣。 */
+.assistant-candidate-row__selection-mark[data-partial] {
+	border-color: var(--hkui-primary);
+}
+
+.assistant-candidate-row__selection-mark[data-partial]::after {
+	content: "";
+	width: 10px;
+	height: 2px;
+	border-radius: 1px;
+	background: var(--hkui-primary);
+}
+
+.assistant-candidate-row__identity strong {
+	overflow-wrap: anywhere;
+	color: var(--hkui-foreground);
+	font-size: var(--hkui-text-small, 0.875rem);
+	line-height: 1.4;
+}
+
+.assistant-candidate-row__identity > span,
+.assistant-candidate-row__date time,
+.assistant-candidate-row__empty {
+	color: var(--hkui-foreground-muted);
+}
+
+/* Public candidate facts come from the server and may contain an unbroken
+ * token. Keep every data cell shrinkable so the comparison pane never grows
+ * wider than its container. */
+.assistant-candidate-row__facts span,
+.assistant-candidate-row__pending span,
+.assistant-candidate-row__date time {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+/* meta 這一層在寬版只是把原本一整串文字拆成三個具名 span，視覺必須跟拆之前
+ * 逐字相同——分隔點用 ::before 生成而不是寫進 JSX，窄版才能各自重新定位而不必
+ * 在標記裡留下一個只為某個寬度存在的「·」。 */
+.assistant-candidate-row__meta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 4px;
+}
+
+.assistant-candidate-row__meta > * + *::before {
+	content: "·";
+	margin-right: 4px;
+	color: var(--hkui-foreground-muted);
+}
+
+/* lane badge 與比對分數方塊在**所有**寬度都成立。
+ * 這兩塊原本只寫在下面 `@container (max-width: 620px)` 裡，於是寬版的候選表把 lane
+ * 印成一段沒有顏色的裸文字——同一個資訊在兩種寬度下講法不一致。顏色鍵在 badge
+ * 自己的 `data-lane` 上，不鍵在祖先的 lane 面板上：判準的來源是那一列候選本身。 */
+.assistant-candidate-row__lane {
+	padding: 2px 8px;
+	border-radius: var(--radius-pill);
+	background: color-mix(in srgb, var(--hkui-primary) 12%, transparent);
+	color: var(--hkui-primary);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-weight: 750;
+}
+
+/* 外部業者用 warning 色階跟平台賣家分開——兩條 lane 的可信度不同
+ * （站外業者只有公開商務資訊），這個差異要一眼看得出來。 */
+.assistant-candidate-row__lane[data-lane="EXTERNAL"] {
+	background: color-mix(in srgb, var(--hkui-warning) 16%, transparent);
+	color: var(--hkui-warning-700, var(--hkui-warning));
+}
+
+.assistant-candidate-row__score {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 4px;
+}
+
+.assistant-candidate-row__score b {
+	font-weight: 750;
+}
+
+/* 選取狀態的文字（已選／選取／更新中）。寬版只給螢幕閱讀器——那一欄的視覺由
+ * checkbox 本身承擔；窄版把同一個 span 現形當按鈕文字，看到的字與唸出來的字
+ * 因此保證同源，不會各自維護一份。 */
+.assistant-candidate-row__select-text {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.assistant-candidate-row__actions {
+	place-items: start stretch;
+}
+
+.assistant-candidate-row__details {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	width: fit-content;
+	min-width: 44px;
+	min-height: 44px;
+	margin-left: -8px;
+	padding: 0 8px;
+	border: 0;
+	border-radius: var(--radius-sm);
+	background: transparent;
+	color: var(--theme-action-primary);
+	font: inherit;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.assistant-candidate-row__details:hover {
+	background: color-mix(in srgb, var(--hkui-primary) 8%, transparent);
+}
+
+.assistant-candidate-row__details:focus-visible {
+	outline: none;
+	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
+}
+
+.assistant-candidate-row__facts ul,
+.assistant-candidate-row__pending ul {
+	display: grid;
+	gap: 6px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.assistant-candidate-row__facts li,
+.assistant-candidate-row__pending li {
+	display: grid;
+	grid-template-columns: 16px minmax(0, 1fr);
+	align-items: start;
+	gap: 5px;
+}
+
+.assistant-candidate-row__facts svg {
+	color: var(--hkui-success);
+}
+
+.assistant-candidate-row__pending svg {
+	color: var(--hkui-warning-700, var(--hkui-warning));
+}
+
+.assistant-candidate-row__status {
+	align-items: start;
+}
+
+.assistant-candidate-row__mobile-label {
+	display: none;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-weight: 750;
+}
+
+/* The canvas can be a narrow split pane at 1200px. Below a useful comparison
+ * width the same semantic rows become compact fact cards, with no x-scroll. */
+@container (max-width: 620px) {
+	.assistant-candidate-table {
+		overflow: visible;
+		border: 0;
+		background: transparent;
+	}
+
+	.assistant-candidate-table__head {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+
+	.assistant-candidate-table__body {
+		display: grid;
+		gap: 12px;
+	}
+
+	.assistant-candidate-row {
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		grid-template-areas:
+			"identity identity"
+			"facts facts"
+			"pending pending"
+			"date date"
+			"status status"
+			"select actions";
+		border: 1px solid var(--hkui-divider);
+		border-radius: var(--radius-md);
+		background: var(--hkui-content1);
+	}
+
+	/* 底部兩顆等寬按鈕。checkbox 本體不換成 <button>——indeterminate 表達
+	 * 部分勾選是既有的刻意設計，換掉就得自己重造那個狀態；這裡只把它的
+	 * label 撐成 pill，語意與鍵盤行為原封不動。 */
+	.assistant-candidate-row__select {
+		grid-area: select;
+		justify-items: stretch;
+		padding-right: 6px;
+	}
+
+	.assistant-candidate-row__actions {
+		grid-area: actions;
+		padding-left: 6px;
+	}
+
+	.assistant-candidate-row__select,
+	.assistant-candidate-row__actions {
+		border-top: 1px solid var(--hkui-divider);
+	}
+
+	.assistant-candidate-row__select-control {
+		display: flex;
+		gap: 6px;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		min-height: 44px;
+		box-sizing: border-box;
+		padding: 0 12px;
+		border: 1px solid var(--hkui-divider);
+		border-radius: var(--radius-md);
+		background: var(--hkui-content1);
+		font-size: var(--hkui-text-tiny, 0.75rem);
+		font-weight: 750;
+		white-space: nowrap;
+	}
+
+	.assistant-candidate-row__select-control:has(input:disabled) {
+		cursor: not-allowed;
+		opacity: 0.6;
+	}
+
+	.assistant-candidate-row__select-control:has(input:checked) {
+		border-color: color-mix(in srgb, var(--hkui-primary) 40%, transparent);
+		background: color-mix(
+			in srgb,
+			var(--hkui-primary) 8%,
+			var(--hkui-content1)
+		);
+		color: var(--hkui-primary);
+	}
+
+	/* 現形成按鈕文字。寬版那份 visually-hidden 的宣告要逐條抵銷，
+	 * 少抵銷任何一條（clip／clip-path／position）文字都不會出現。 */
+	.assistant-candidate-row__select-text {
+		position: static;
+		width: auto;
+		height: auto;
+		overflow: visible;
+		clip: auto;
+		clip-path: none;
+		white-space: nowrap;
+	}
+
+	.assistant-candidate-row__details {
+		width: 100%;
+		min-height: 44px;
+		margin-left: 0;
+		box-sizing: border-box;
+		border: 1px solid var(--hkui-divider);
+		border-radius: var(--radius-md);
+		white-space: nowrap;
+	}
+
+	/* 卡片頭部：左邊是身分（名稱／lane／符合筆數），右邊是比對分數方框。
+	 * `__meta` 設 display: contents 讓它的三個子元素直接成為 identity 的 grid
+	 * item——這樣分數才貼得到右欄。span 沒有隱含 role，contents 不會從
+	 * accessibility tree 拿掉任何語意（同一招不可以用在 <td> 上）。 */
+	.assistant-candidate-row__identity {
+		grid-area: identity;
+		grid-template-columns: minmax(0, 1fr) auto;
+		grid-template-areas:
+			"name score"
+			"lane score"
+			"matches score";
+		align-items: start;
+		column-gap: 10px;
+	}
+
+	.assistant-candidate-row__identity > .assistant-candidate-identity {
+		grid-area: name;
+	}
+
+	.assistant-candidate-row__meta {
+		display: contents;
+	}
+
+	/* 拆開之後各自定位，寬版那顆分隔點在這裡不能留。 */
+	.assistant-candidate-row__meta > * + *::before {
+		content: none;
+	}
+
+	/* 外觀（膠囊、顏色）已在容器查詢外定義，這裡只負責把它放進卡片的 grid。 */
+	.assistant-candidate-row__lane {
+		grid-area: lane;
+		justify-self: start;
+	}
+
+	.assistant-candidate-row__match-count {
+		grid-area: matches;
+	}
+
+	.assistant-candidate-row__score {
+		display: grid;
+		grid-area: score;
+		align-self: start;
+		justify-items: center;
+		gap: 0;
+		min-width: 64px;
+		padding: 6px 10px;
+		border-radius: var(--radius-md);
+		background: var(--hkui-content2);
+		color: var(--hkui-foreground-muted);
+		font-size: var(--hkui-text-tiny, 0.75rem);
+		line-height: 1.2;
+	}
+
+	/* 「94」與「分」要留在同一列——分數方塊只有兩列：標籤在上、數值在下。 */
+	.assistant-candidate-row__score-value {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 3px;
+	}
+
+	.assistant-candidate-row__score b {
+		color: var(--hkui-primary);
+		font-size: var(--hkui-text-large, 1.125rem);
+		font-weight: 750;
+	}
+
+	.assistant-candidate-row__facts {
+		grid-area: facts;
+	}
+
+	.assistant-candidate-row__pending {
+		grid-area: pending;
+	}
+
+	.assistant-candidate-row__date {
+		grid-area: date;
+	}
+
+	.assistant-candidate-row__status {
+		grid-area: status;
+	}
+
+	.assistant-candidate-row__facts,
+	.assistant-candidate-row__pending,
+	.assistant-candidate-row__date,
+	.assistant-candidate-row__status {
+		grid-template-columns: minmax(76px, 0.32fr) minmax(0, 1fr);
+		border-top: 1px solid var(--hkui-divider);
+	}
+
+	.assistant-candidate-row__mobile-label {
+		display: block;
+	}
+}
+
+.assistant-candidate-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+	gap: 14px;
+}
+
+.assistant-candidate {
+	min-width: 0;
+	overflow: clip;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-md);
+	background: var(--hkui-content2);
+	transition: border-color var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease);
+}
+
+.assistant-candidate:hover,
+.assistant-candidate[data-selected] {
+	border-color: color-mix(
+		in srgb,
+		var(--hkui-primary) 56%,
+		var(--hkui-divider)
+	);
+}
+
+.assistant-candidate[data-selected] {
+	box-shadow: inset 0 0 0 1px var(--hkui-primary);
+}
+
+.assistant-candidate__media {
+	position: relative;
+	width: 100%;
+	min-width: 0;
+	min-height: 148px;
+	overflow: clip;
+	background: var(--hkui-default-100);
+}
+
+.assistant-candidate__media::after {
+	content: "";
+	position: absolute;
+	inset: 45% 0 0;
+	pointer-events: none;
+	background: linear-gradient(
+		transparent,
+		rgb(var(--color-neutral-ink-rgb) / 0.42)
+	);
+}
+
+.assistant-candidate__media--icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--hkui-foreground-muted);
+}
+
+.assistant-candidate__source {
+	position: absolute;
+	top: 10px;
+	left: 10px;
+	z-index: 1;
+}
+
+.assistant-candidate__select {
+	position: absolute;
+	right: 10px;
+	bottom: 10px;
+	z-index: 1;
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	min-height: 44px;
+	padding: 0 11px;
+	border-radius: var(--radius-pill);
+	background: var(--hkui-content1);
+	color: var(--hkui-foreground);
+	font-size: var(--hkui-text-small, 0.875rem);
+	font-weight: 700;
+	cursor: pointer;
+	box-shadow: var(--shadow-sm);
+}
+
+.assistant-candidate__select:has(input:focus-visible) {
+	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
+}
+
+.assistant-candidate__selection-mark {
+	display: grid;
+	place-items: center;
+	width: 18px;
+	height: 18px;
+	border: 1.5px solid var(--hkui-foreground-muted);
+	border-radius: var(--radius-circle);
+	color: var(--hkui-primary);
+	pointer-events: none;
+}
+
+.assistant-candidate__selection-mark[data-selected] {
+	border-color: transparent;
+}
+
+.assistant-candidate__body {
+	display: grid;
+	gap: 9px;
+	width: 100%;
+	min-height: 190px;
+	padding: 15px;
+	color: inherit;
+}
+
+.assistant-candidate__name-row,
+.assistant-candidate__body li {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+}
+
+.assistant-candidate__name-row {
+	justify-content: space-between;
+}
+
+.assistant-candidate__name-row h4 {
+	margin: 0;
+	overflow: hidden;
+	color: var(--hkui-foreground);
+	font-size: var(--text-base, 1rem);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.assistant-candidate__body ul {
+	display: grid;
+	gap: 6px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.assistant-candidate__body li {
+	align-items: flex-start;
+	color: var(--hkui-foreground-soft);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	line-height: 1.45;
+}
+
+.assistant-candidate__body li > svg {
+	margin-top: 1px;
+	color: var(--hkui-success);
+	flex: 0 0 auto;
+}
+
+.assistant-candidate__footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	align-self: end;
+}
+
+.assistant-candidate__footer > small {
+	color: var(--hkui-foreground-muted);
+	font-size: var(--text-xs, 0.75rem);
+	line-height: 1.4;
+}
+
+.assistant-candidate__details {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	min-width: 44px;
+	min-height: 44px;
+	padding: 0 8px;
+	border: 0;
+	border-radius: var(--radius-sm);
+	background: transparent;
+	color: var(--theme-action-primary);
+	font: inherit;
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.assistant-candidate__details:hover {
+	background: color-mix(in srgb, var(--hkui-primary) 8%, transparent);
+}
+
+.assistant-candidate__details:focus-visible {
+	outline: none;
+	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
+}
+
+/* Drawers -------------------------------------------------------------- */
+.assistant-candidate-sheet {
+	max-width: 460px;
+}
+
+.assistant-rfq-action-bar {
+	position: sticky;
+	z-index: 2;
+	bottom: -16px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--hkui-space-4, 16px);
+	margin-top: 4px;
+	padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+	border-top: 1px solid var(--hkui-divider);
+	background: color-mix(in srgb, var(--hkui-content1) 94%, transparent);
+	box-shadow: 0 -12px 28px
+		color-mix(in srgb, var(--hkui-background) 82%, transparent);
+	backdrop-filter: blur(14px);
+}
+
+.assistant-rfq-action-bar__count {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+}
+
+.assistant-rfq-action-bar__count > span {
+	display: grid;
+	place-items: center;
+	width: 34px;
+	height: 34px;
+	border-radius: var(--radius-circle);
+	background: color-mix(in srgb, var(--hkui-primary) 13%, var(--hkui-content2));
+	color: var(--hkui-primary);
+	font-weight: 800;
+}
+
+.assistant-rfq-action-bar__count > div {
+	display: grid;
+	gap: 2px;
+	min-width: 0;
+}
+
+.assistant-rfq-action-bar__count strong,
+.assistant-rfq-action-bar__count small {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.assistant-rfq-action-bar__count strong {
+	font-size: var(--hkui-text-small, 0.875rem);
+}
+
+.assistant-rfq-action-bar__count small {
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+@media (max-width: 640px) {
+	.assistant-rfq-action-bar {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.assistant-rfq-action-bar > button {
+		width: 100%;
+	}
+}
+
+/* RFQ front-end draft --------------------------------------------------
+ * Real workspace continuation after candidate selection. The final publish
+ * action intentionally remains blocked until a backend contract exists. */
+.assistant-rfq-draft {
+	display: flex;
+	min-height: 100%;
+	flex-direction: column;
+	color: var(--hkui-foreground);
+}
+
+.assistant-rfq-draft__intro {
+	display: grid;
+	gap: 6px;
+	padding: 4px 4px 18px;
+}
+
+.hawkr-agent-canvas__draft-state {
+	width: fit-content;
+	padding: 4px 9px;
+	border-radius: var(--radius-pill);
+	background: color-mix(in srgb, var(--hkui-primary) 12%, var(--hkui-content2));
+	color: var(--hkui-primary);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-weight: 750;
+}
+
+.assistant-rfq-draft__intro > small {
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.assistant-rfq-draft__intro h2,
+.assistant-rfq-draft__intro p {
+	margin: 0;
+}
+
+.assistant-rfq-draft__intro h2 {
+	font-family: var(--font-brand);
+	font-size: var(--hkui-text-large, 1.125rem);
+	line-height: 1.25;
+	letter-spacing: -0.02em;
+	text-wrap: balance;
+}
+
+.assistant-rfq-draft__intro p {
+	max-width: 54ch;
+	color: var(--hkui-foreground-soft);
+	font-size: var(--hkui-text-small, 0.875rem);
+	line-height: 1.6;
+	text-wrap: pretty;
+}
+
+.assistant-rfq-draft__steps {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	margin-bottom: 18px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-md);
+	background: var(--hkui-content2);
+}
+
+.assistant-rfq-draft__steps button {
+	position: relative;
+	display: grid;
+	justify-items: start;
+	gap: 5px;
+	min-width: 0;
+	min-height: 64px;
+	padding: 10px 12px;
+	border: 0;
+	border-right: 1px solid var(--hkui-divider);
+	background: transparent;
+	color: var(--hkui-foreground-muted);
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.assistant-rfq-draft__steps button:first-child {
+	border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+.assistant-rfq-draft__steps button:last-child {
+	border-right: 0;
+	border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+.assistant-rfq-draft__steps button > span {
+	display: grid;
+	place-items: center;
+	width: 20px;
+	height: 20px;
+	border: 1px solid var(--hkui-divider-strong, var(--hkui-divider));
+	border-radius: var(--radius-circle);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-weight: 700;
+}
+
+.assistant-rfq-draft__steps button > strong {
+	max-width: 100%;
+	overflow: hidden;
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.assistant-rfq-draft__steps button[aria-current="step"] {
+	background: color-mix(in srgb, var(--hkui-primary) 8%, var(--hkui-content1));
+	color: var(--hkui-primary);
+}
+
+.assistant-rfq-draft__steps button[aria-current="step"] > span,
+.assistant-rfq-draft__steps button[data-complete] > span {
+	border-color: var(--hkui-primary);
+	background: var(--hkui-primary);
+	color: var(--hkui-primary-foreground);
+}
+
+.assistant-rfq-draft__steps button:disabled {
+	cursor: default;
+	opacity: 0.56;
+}
+
+.assistant-rfq-draft__steps button:focus-visible {
+	z-index: 1;
+	outline: none;
+	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
+}
+
+.assistant-rfq-draft__content {
+	flex: 1 1 auto;
+}
+
+.assistant-rfq-draft__form,
+.assistant-rfq-draft__recipient-view,
+.assistant-rfq-draft__review {
+	display: grid;
+	gap: 14px;
+}
+
+.assistant-rfq-draft__section,
+.assistant-rfq-draft__review-card,
+.assistant-rfq-draft__readiness,
+.assistant-rfq-guidance,
+.assistant-rfq-snapshot {
+	overflow: clip;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-lg);
+	background: var(--hkui-content1);
+	box-shadow: inset 0 0 0 0.5px
+		color-mix(in srgb, var(--hkui-foreground) 4%, transparent);
+}
+
+.assistant-rfq-draft__section > header {
+	display: flex;
+	align-items: center;
+	gap: 11px;
+	padding: 15px 16px;
+	border-bottom: 1px solid var(--hkui-divider);
+	background: color-mix(in srgb, var(--hkui-primary) 3%, var(--hkui-content2));
+}
+
+.assistant-rfq-draft__section > header > div {
+	min-width: 0;
+	flex: 1;
+}
+
+.assistant-rfq-draft__section > header h3,
+.assistant-rfq-draft__section > header p {
+	margin: 0;
+}
+
+.assistant-rfq-draft__section > header h3 {
+	font-size: var(--hkui-text-small, 0.875rem);
+	line-height: 1.4;
+}
+
+.assistant-rfq-draft__section > header p {
+	margin-top: 2px;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	line-height: 1.45;
+}
+
+.assistant-rfq-draft__section > header > button {
+	min-width: 44px;
+	min-height: 44px;
+	padding: 0 8px;
+	border: 0;
+	border-radius: var(--radius-sm);
+	background: transparent;
+	color: var(--hkui-primary);
+	font: inherit;
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-weight: 750;
+	cursor: pointer;
+}
+
+.assistant-rfq-draft__section > header > button:hover {
+	background: color-mix(in srgb, var(--hkui-primary) 8%, transparent);
+}
+
+.assistant-rfq-draft__section-icon,
+.assistant-rfq-draft__recipient-mark {
+	display: grid;
+	place-items: center;
+	width: 36px;
+	height: 36px;
+	border-radius: var(--radius-circle);
+	background: color-mix(in srgb, var(--hkui-primary) 10%, var(--hkui-content1));
+	color: var(--hkui-primary);
+	flex: 0 0 auto;
+}
+
+.assistant-rfq-draft__fields {
+	display: grid;
+	gap: 14px;
+	padding: 16px;
+}
+
+.assistant-rfq-draft__fields label {
+	display: grid;
+	gap: 7px;
+	min-width: 0;
+	color: var(--hkui-foreground-soft);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-weight: 650;
+}
+
+.assistant-rfq-draft__field-row {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.assistant-rfq-draft__fields input,
+.assistant-rfq-draft__fields textarea {
+	width: 100%;
+	min-width: 0;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-md);
+	outline: 0;
+	background: var(--hkui-content2);
+	color: var(--hkui-foreground);
+	font: inherit;
+	font-size: max(1rem, var(--hkui-text-small, 0.875rem));
+	font-weight: 450;
+}
+
+.assistant-rfq-draft__fields input {
+	min-height: 46px;
+	padding: 0 12px;
+}
+
+.assistant-rfq-draft__fields textarea {
+	min-height: 94px;
+	padding: 11px 12px;
+	line-height: 1.55;
+	resize: vertical;
+}
+
+.assistant-rfq-draft__fields input:focus,
+.assistant-rfq-draft__fields textarea:focus {
+	border-color: var(--hkui-primary);
+	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
+}
+
+.assistant-rfq-draft__fields input::placeholder,
+.assistant-rfq-draft__fields textarea::placeholder {
+	color: var(--hkui-foreground-muted);
+}
+
+.assistant-rfq-draft__fields input[readonly],
+.assistant-rfq-draft__fields textarea[readonly] {
+	cursor: default;
+	background: color-mix(
+		in srgb,
+		var(--hkui-content2) 72%,
+		var(--hkui-content1)
+	);
+}
+
+.assistant-rfq-draft__readonly-help {
+	margin: 0;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-weight: 500;
+	line-height: 1.6;
+}
+
+.assistant-rfq-draft__recipients {
+	display: grid;
+}
+
+.assistant-rfq-draft__recipients article {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 11px;
+	min-height: 70px;
+	padding: 12px 16px;
+	border-bottom: 1px solid var(--hkui-divider);
+}
+
+.assistant-rfq-draft__recipients article:last-child {
+	border-bottom: 0;
+}
+
+.assistant-rfq-draft__recipients article > div {
+	display: grid;
+	gap: 3px;
+	min-width: 0;
+}
+
+.assistant-rfq-draft__recipients article strong,
+.assistant-rfq-draft__recipients article span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.assistant-rfq-draft__recipients article strong {
+	font-size: var(--hkui-text-small, 0.875rem);
+}
+
+.assistant-rfq-draft__recipients article > div > span {
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.assistant-rfq-draft__plain-check {
+	display: grid;
+	place-items: center;
+	color: var(--hkui-success);
+	flex: 0 0 auto;
+}
+
+.assistant-rfq-draft__notice {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	padding: 13px 14px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-md);
+	background: var(--hkui-content2);
+}
+
+.assistant-rfq-draft__notice > svg {
+	margin-top: 1px;
+	color: var(--hkui-primary);
+	flex: 0 0 auto;
+}
+
+.assistant-rfq-draft__notice[data-tone="warning"] > svg {
+	color: var(--hkui-warning);
+}
+
+.assistant-rfq-draft__notice strong,
+.assistant-rfq-draft__notice p {
+	margin: 0;
+}
+
+.assistant-rfq-draft__notice strong {
+	font-size: var(--hkui-text-small, 0.875rem);
+}
+
+.assistant-rfq-draft__notice p {
+	margin-top: 4px;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	line-height: 1.55;
+}
+
+/* V6 pricing guidance -------------------------------------------------
+	* Pricebook values and confirmation evidence are server-owned. The browser
+	* renders the typed projection but never derives a price basis or publication. */
+.assistant-rfq-guidance__head,
+.assistant-rfq-snapshot > header {
+	display: flex;
+	align-items: flex-start;
+	gap: 11px;
+	padding: 16px;
+	border-bottom: 1px solid var(--hkui-divider);
+	background: color-mix(in srgb, var(--hkui-primary) 3%, var(--hkui-content2));
+}
+
+.assistant-rfq-guidance__head > div,
+.assistant-rfq-snapshot > header > div {
+	min-width: 0;
+	flex: 1;
+}
+
+.assistant-rfq-guidance__head h3,
+.assistant-rfq-guidance__head p,
+.assistant-rfq-snapshot h3,
+.assistant-rfq-snapshot header p {
+	margin: 0;
+}
+
+.assistant-rfq-guidance__head h3,
+.assistant-rfq-snapshot h3 {
+	font-size: var(--hkui-text-small, 0.875rem);
+	line-height: 1.4;
+}
+
+.assistant-rfq-guidance__head p,
+.assistant-rfq-snapshot header p {
+	margin-top: 3px;
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	line-height: 1.55;
+}
+
+.assistant-rfq-guidance__state,
+.assistant-rfq-snapshot__state {
+	width: fit-content;
+	padding: 4px 8px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-pill);
+	background: var(--hkui-content1);
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.assistant-rfq-guidance__state[data-mode="LEGACY_P50_ONLY"] {
+	border-color: var(--theme-primary-border);
+	background: var(--theme-primary-subtle);
+	color: var(--theme-text-accent-on-tint);
+}
+
+.assistant-rfq-guidance__state[data-mode="NO_REFERENCE"] {
+	border-color: color-mix(
+		in srgb,
+		var(--hkui-warning) 36%,
+		var(--hkui-divider)
+	);
+	background: color-mix(in srgb, var(--hkui-warning) 8%, var(--hkui-content1));
+	color: var(--hkui-foreground);
+}
+
+.assistant-rfq-guidance__state[data-mode="success"],
+.assistant-rfq-snapshot__state {
+	border-color: var(--theme-primary-border);
+	background: var(--theme-primary-subtle);
+	color: var(--theme-text-accent-on-tint);
+}
+
+.assistant-rfq-guidance__modes {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 10px;
+	min-width: 0;
+	margin: 0;
+	padding: 16px;
+	border: 0;
+	border-bottom: 1px solid var(--hkui-divider);
+}
+
+.assistant-rfq-guidance__modes legend {
+	width: 100%;
+	margin-bottom: 9px;
+	color: var(--hkui-foreground-soft);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-weight: 700;
+}
+
+.assistant-rfq-guidance__modes label {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	align-items: start;
+	gap: 10px;
+	min-height: 64px;
+	padding: 11px 12px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-md);
+	background: var(--hkui-content2);
+	cursor: pointer;
+}
+
+.assistant-rfq-guidance__modes label:has(input:checked) {
+	border-color: var(--theme-primary-border);
+	background: var(--theme-primary-subtle);
+}
+
+.assistant-rfq-guidance__modes input {
+	width: 18px;
+	height: 18px;
+	margin: 2px 0 0;
+	accent-color: var(--hkui-primary);
+}
+
+.assistant-rfq-guidance__modes label > span {
+	display: grid;
+	gap: 3px;
+}
+
+.assistant-rfq-guidance__modes label small {
+	line-height: 1.45;
+}
+
+.assistant-rfq-guidance__modes label:has(input:focus-visible) {
+	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
+}
+
+.assistant-rfq-guidance__modes label:has(input:disabled) {
+	opacity: 0.68;
+	cursor: not-allowed;
+}
+
+.assistant-rfq-guidance__row,
+.assistant-rfq-guidance__price,
+.assistant-rfq-guidance__desired,
+.assistant-rfq-guidance__temperature {
+	padding: 16px;
+	border-bottom: 1px solid var(--hkui-divider);
+}
+
+.assistant-rfq-guidance__temperature {
+	border-bottom: 0;
+}
+
+.assistant-rfq-guidance__loading,
+.assistant-rfq-guidance__error,
+.assistant-rfq-guidance__server-range {
+	padding: 14px 16px;
+	border-bottom: 1px solid var(--hkui-divider);
+}
+
+.assistant-rfq-guidance__loading {
+	color: var(--hkui-foreground-soft);
+	font-size: var(--hkui-text-small, 0.875rem);
+}
+
+.assistant-rfq-guidance__error {
+	display: grid;
+	gap: 8px;
+	background: color-mix(in srgb, var(--hkui-warning) 7%, var(--hkui-content1));
+}
+
+.assistant-rfq-guidance__error h3,
+.assistant-rfq-guidance__error p {
+	margin: 0;
+}
+
+.assistant-rfq-guidance__error h3 {
+	font-size: var(--hkui-text-small, 0.875rem);
+}
+
+.assistant-rfq-guidance__error > div {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.assistant-rfq-guidance__server-range {
+	display: grid;
+	grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.8fr) auto;
+	align-items: center;
+	gap: 12px;
+	background: var(--hkui-content2);
+}
+
+.assistant-rfq-guidance__server-range > div {
+	display: grid;
+	gap: 4px;
+}
+
+/* 稿 03 市場價格參考的出處揭露：資料截至 ／ 計價基準 兩欄 ＋ 一行免責。 */
+.assistant-rfq-guidance__market-basis {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 8px 12px;
+	padding: 14px 16px;
+	border-bottom: 1px solid var(--hkui-divider);
+	background: color-mix(in srgb, var(--hkui-warning) 7%, var(--hkui-content1));
+}
+
+.assistant-rfq-guidance__market-basis > div {
+	display: grid;
+	gap: 4px;
+	min-width: 0;
+}
+
+.assistant-rfq-guidance__market-basis p {
+	grid-column: 1 / -1;
+	margin: 0;
+	color: var(--hkui-foreground-soft);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.assistant-rfq-guidance__market-basis[data-freshness="stale"] p,
+.assistant-rfq-guidance__market-basis[data-freshness="unavailable"] p {
+	color: var(--hkui-warning);
+	font-weight: 600;
+}
+
+/* 稿 03 詢價總額區間。quoteTotalRange 為 null 時整張卡不渲染（元件層早退）。 */
+.assistant-rfq-guidance__quote-total {
+	padding: 14px 16px;
+	border-bottom: 1px solid var(--hkui-divider);
+	background: color-mix(in srgb, var(--hkui-success) 8%, var(--hkui-content1));
+}
+
+.assistant-rfq-guidance__quote-total > div {
+	display: grid;
+	gap: 4px;
+	min-width: 0;
+}
+
+.assistant-rfq-guidance__quote-total strong {
+	font-size: var(--hkui-text-medium, 1rem);
+}
+
+.assistant-rfq-guidance__row {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	align-items: start;
+	gap: 12px;
+}
+
+.assistant-rfq-guidance__row-icon,
+.assistant-rfq-guidance__temperature-label > span {
+	display: grid;
+	place-items: center;
+	width: 36px;
+	height: 36px;
+	border-radius: var(--radius-circle);
+	background: color-mix(in srgb, var(--hkui-warning) 10%, var(--hkui-content2));
+	color: var(--hkui-foreground-soft);
+	flex: 0 0 auto;
+}
+
+.assistant-rfq-guidance__row > div:last-child,
+.assistant-rfq-guidance__price-copy,
+.assistant-rfq-guidance__desired > div:first-child,
+.assistant-rfq-guidance__temperature-label > div {
+	display: grid;
+	gap: 4px;
+	min-width: 0;
+}
+
+.assistant-rfq-guidance small {
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.assistant-rfq-guidance strong {
+	font-size: var(--hkui-text-small, 0.875rem);
+	line-height: 1.45;
+}
+
+.assistant-rfq-guidance p {
+	margin: 0;
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	line-height: 1.6;
+}
+
+.assistant-rfq-guidance__price {
+	display: grid;
+	gap: 14px;
+}
+
+/* 稿 P-01 的參考區間數線：下限靠左、中位置中放大、上限靠右，下方一條軌道把
+   中位畫在它於區間裡的相對位置上。金額在上、標籤在下（dd/dt 用 order 對調）。 */
+.assistant-rfq-guidance__reference {
+	display: grid;
+	gap: 10px;
+	padding: 14px 14px 12px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-md);
+	background: var(--hkui-content2);
+}
+
+.assistant-rfq-guidance__reference-values {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr);
+	align-items: end;
+	gap: 8px;
+	margin: 0;
+}
+
+.assistant-rfq-guidance__reference-values > div {
+	display: grid;
+	gap: 3px;
+	min-width: 0;
+}
+
+.assistant-rfq-guidance__reference-values > div[data-edge="mid"] {
+	justify-items: center;
+	text-align: center;
+}
+
+.assistant-rfq-guidance__reference-values > div[data-edge="upper"] {
+	justify-items: end;
+	text-align: end;
+}
+
+.assistant-rfq-guidance__reference-values dt {
+	order: 2;
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.assistant-rfq-guidance__reference-values dd {
+	order: 1;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0 3px;
+	margin: 0;
+	overflow-wrap: anywhere;
+	color: var(--hkui-foreground);
+	font-size: var(--hkui-text-small, 0.875rem);
+	font-weight: 750;
+}
+
+.assistant-rfq-guidance__reference-values dd small {
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-weight: 600;
+}
+
+.assistant-rfq-guidance__reference-values > div[data-primary] dd {
+	color: var(--hkui-primary);
+	font-size: var(--hkui-text-medium, 1rem);
+}
+
+.assistant-rfq-guidance__reference-axis {
+	position: relative;
+	height: 12px;
+	margin: 0 3px;
+}
+
+.assistant-rfq-guidance__reference-axis::before,
+.assistant-rfq-guidance__reference-axis::after {
+	position: absolute;
+	top: 50%;
+	width: 2px;
+	height: 10px;
+	border-radius: var(--radius-pill);
+	background: var(--hkui-divider);
+	content: "";
+	transform: translateY(-50%);
+}
+
+.assistant-rfq-guidance__reference-axis::before {
+	left: 0;
+}
+
+.assistant-rfq-guidance__reference-axis::after {
+	right: 0;
+}
+
+.assistant-rfq-guidance__reference-track {
+	position: absolute;
+	top: 50%;
+	right: 0;
+	left: 0;
+	height: 2px;
+	border-radius: var(--radius-pill);
+	background: var(--hkui-divider);
+	transform: translateY(-50%);
+}
+
+.assistant-rfq-guidance__reference-mark {
+	position: absolute;
+	top: 50%;
+	width: 11px;
+	height: 11px;
+	border: 2px solid var(--hkui-content2);
+	border-radius: var(--radius-circle);
+	background: var(--hkui-primary);
+	transform: translate(-50%, -50%);
+}
+
+.assistant-rfq-guidance__desired {
+	display: grid;
+	gap: 14px;
+}
+
+/* 稿 P-01：希望下限、希望上限與「重新試算」同一列，按鈕靠右。 */
+.assistant-rfq-guidance__desired-fields {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+	align-items: end;
+	gap: 8px;
+}
+
+.assistant-rfq-guidance__desired-fields > button {
+	min-height: 46px;
+}
+
+.assistant-rfq-guidance__desired-fields > label {
+	display: grid;
+	gap: 7px;
+	min-width: 0;
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-weight: 650;
+}
+
+.assistant-rfq-guidance__money-input {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	align-items: center;
+	min-height: 46px;
+	overflow: hidden;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-md);
+	background: var(--hkui-content2);
+	color: var(--hkui-foreground-soft);
+}
+
+.assistant-rfq-guidance__money-input:focus-within {
+	border-color: var(--hkui-primary);
+	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
+}
+
+.assistant-rfq-guidance__money-input > span {
+	padding-left: 11px;
+	font-size: var(--hkui-text-small, 0.875rem);
+	font-weight: 750;
+}
+
+.assistant-rfq-guidance__money-input input {
+	width: 100%;
+	min-width: 0;
+	min-height: 44px;
+	padding: 0 11px 0 8px;
+	border: 0;
+	border-radius: 0;
+	outline: 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--hkui-foreground);
+	font: inherit;
+	font-size: max(1rem, var(--hkui-text-small, 0.875rem));
+}
+
+.assistant-rfq-guidance__money-input input:focus-visible {
+	border-radius: 0;
+	outline: 0;
+	box-shadow: none;
+}
+
+.assistant-rfq-guidance__money-input:has(input[aria-invalid="true"]) {
+	border-color: var(--hkui-danger);
+}
+
+.assistant-rfq-guidance__range-help[data-error] {
+	color: var(--hkui-danger-600);
+	font-weight: 650;
+}
+
+[data-theme="dark"] .assistant-rfq-guidance__range-help[data-error] {
+	color: var(--hkui-danger-200);
+}
+
+.assistant-rfq-guidance__temperature {
+	display: grid;
+	gap: 12px;
+}
+
+.assistant-rfq-guidance__temperature-label {
+	display: flex;
+	align-items: center;
+	gap: 11px;
+}
+
+/* 色帶只有這一處來源：容器上的 data-band，由 server 回的 band 決定。
+   ⛔ 不得把軌道畫成 0/20/50/100 的漸層——那等於把 BANDS_V1 的門檻抄進前端，
+   server 改 bandVersion 之後畫面會與它回的 band 靜默牴觸。 */
+.assistant-rfq-guidance__temperature[data-band="COLD"] {
+	--rfq-band-color: var(--hkui-foreground-soft);
+}
+
+.assistant-rfq-guidance__temperature[data-band="WARM"] {
+	--rfq-band-color: var(--hkui-warning);
+}
+
+.assistant-rfq-guidance__temperature[data-band="HOT"] {
+	--rfq-band-color: var(--hkui-primary);
+}
+
+.assistant-rfq-guidance__temperature-head {
+	display: grid;
+	grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+	align-items: center;
+	gap: 14px;
+}
+
+.assistant-rfq-guidance__temperature[data-status="available"]
+	.assistant-rfq-guidance__temperature-label
+	strong {
+	color: var(--rfq-band-color, var(--hkui-foreground));
+	font-size: var(--hkui-text-large, 1.25rem);
+	font-weight: 800;
+	letter-spacing: -0.01em;
+}
+
+.assistant-rfq-guidance__temperature-label em {
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-style: normal;
+}
+
+.assistant-rfq-guidance__temperature-gauge {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 9px;
+}
+
+.assistant-rfq-guidance__temperature-axis {
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.assistant-rfq-guidance__temperature-track {
+	position: relative;
+	height: 7px;
+	border-radius: var(--radius-pill);
+	background: var(--hkui-divider);
+}
+
+.assistant-rfq-guidance__temperature-fill {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	border-radius: var(--radius-pill);
+	background: color-mix(
+		in srgb,
+		var(--rfq-band-color, var(--hkui-foreground-soft)) 45%,
+		transparent
+	);
+}
+
+.assistant-rfq-guidance__temperature-point {
+	position: absolute;
+	top: 50%;
+	width: 12px;
+	height: 12px;
+	border: 2px solid var(--hkui-content1);
+	border-radius: var(--radius-circle);
+	background: var(--rfq-band-color, var(--hkui-foreground-soft));
+	transform: translate(-50%, -50%);
+}
+
+.assistant-rfq-guidance__temperature ul {
+	display: grid;
+	gap: 3px;
+	margin: 0;
+	padding-left: 18px;
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.assistant-rfq-snapshot__facts {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.assistant-rfq-snapshot__facts > div {
+	display: grid;
+	gap: 4px;
+	padding: 13px 16px calc(13px + env(safe-area-inset-bottom, 0px));
+	border-right: 1px solid var(--hkui-divider);
+	border-bottom: 1px solid var(--hkui-divider);
+}
+
+.assistant-rfq-snapshot__facts > div:nth-child(2n) {
+	border-right: 0;
+}
+
+.assistant-rfq-snapshot__facts > div:nth-last-child(-n + 2) {
+	border-bottom: 0;
+}
+
+.assistant-rfq-snapshot__facts small {
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.assistant-rfq-snapshot__facts strong {
+	overflow-wrap: anywhere;
+	font-size: var(--hkui-text-small, 0.875rem);
+}
+
+.assistant-rfq-snapshot__note {
+	display: grid;
+	gap: 6px;
+	padding: 14px 16px;
+	border-top: 1px solid var(--hkui-divider);
+	background: var(--hkui-content2);
+	color: var(--theme-text-body);
+}
+
+.assistant-rfq-snapshot__note label {
+	display: grid;
+	gap: 3px;
+}
+
+.assistant-rfq-snapshot__note strong {
+	font-size: var(--hkui-text-small, 0.875rem);
+}
+
+.assistant-rfq-snapshot__note small {
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.assistant-rfq-snapshot__note textarea {
+	width: 100%;
+	min-height: 72px;
+	padding: 8px 10px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: 8px;
+	background: var(--hkui-content1);
+	color: var(--theme-text-body);
+	font: inherit;
+	font-size: var(--hkui-text-small, 0.875rem);
+	resize: vertical;
+}
+
+.assistant-rfq-snapshot__note textarea:disabled {
+	opacity: 0.6;
+}
+
+.assistant-rfq-snapshot__note-count {
+	margin: 0;
+	justify-self: end;
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-variant-numeric: tabular-nums;
+}
+
+.assistant-rfq-snapshot__confirmation {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	align-items: start;
+	gap: 10px;
+	padding: 14px 16px;
+	border-top: 1px solid var(--hkui-divider);
+	background: var(--hkui-content2);
+	color: var(--theme-text-body);
+}
+
+.assistant-rfq-snapshot__confirmation input {
+	width: 18px;
+	height: 18px;
+	margin: 2px 0 0;
+	accent-color: var(--hkui-primary);
+}
+
+.assistant-rfq-snapshot__confirmation > span {
+	display: grid;
+	gap: 3px;
+}
+
+.assistant-rfq-snapshot__confirmation strong {
+	font-size: var(--hkui-text-small, 0.875rem);
+}
+
+.assistant-rfq-snapshot__confirmation small {
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	line-height: 1.5;
+}
+
+.assistant-rfq-snapshot__confirmed {
+	display: grid;
+	gap: 4px;
+	padding: 14px 16px;
+	border-top: 1px solid var(--hkui-divider);
+	background: var(--theme-primary-subtle);
+	color: var(--theme-text-accent-on-tint);
+}
+
+.assistant-rfq-snapshot__confirmed strong {
+	font-size: var(--hkui-text-small, 0.875rem);
+}
+
+.assistant-rfq-snapshot__confirmed small {
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	overflow-wrap: anywhere;
+}
+
+.assistant-rfq-draft__readiness li[data-status="neutral"] > svg {
+	color: var(--hkui-foreground-muted);
+}
+
+.assistant-rfq-draft__review-card > header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 17px 16px;
+	border-bottom: 1px solid var(--hkui-divider);
+}
+
+.assistant-rfq-draft__review-card h3,
+.assistant-rfq-draft__review-card small {
+	margin: 0;
+}
+
+.assistant-rfq-draft__review-card h3 {
+	margin-top: 4px;
+	font-size: var(--hkui-text-medium, 1rem);
+	line-height: 1.35;
+}
+
+.assistant-rfq-draft__review-card small {
+	color: var(--hkui-foreground-muted);
+}
+
+.assistant-rfq-draft__review-card > header > span {
+	padding: 4px 8px;
+	border-radius: var(--radius-pill);
+	background: var(--hkui-default-100);
+	color: var(--hkui-foreground-soft);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	white-space: nowrap;
+}
+
+.assistant-rfq-draft__review-card dl {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	margin: 0;
+}
+
+.assistant-rfq-draft__review-card dl > div {
+	display: grid;
+	gap: 5px;
+	padding: 13px 16px;
+	border-right: 1px solid var(--hkui-divider);
+	border-bottom: 1px solid var(--hkui-divider);
+}
+
+.assistant-rfq-draft__review-card dl > div:nth-child(2n) {
+	border-right: 0;
+}
+
+.assistant-rfq-draft__review-card dl > div:nth-last-child(-n + 2) {
+	border-bottom: 0;
+}
+
+.assistant-rfq-draft__review-card dt {
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.assistant-rfq-draft__review-card dd {
+	margin: 0;
+	font-size: var(--hkui-text-small, 0.875rem);
+	font-weight: 650;
+}
+
+.assistant-rfq-draft__review-card dd [data-pending] {
+	color: var(--hkui-warning);
+	font-weight: 600;
+}
+
+.assistant-rfq-draft__readiness {
+	padding: 16px;
+}
+
+.assistant-rfq-draft__readiness h3 {
+	margin: 0 0 10px;
+	font-size: var(--hkui-text-small, 0.875rem);
+}
+
+.assistant-rfq-draft__readiness ul {
+	display: grid;
+	gap: 9px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.assistant-rfq-draft__readiness li {
+	display: grid;
+	grid-template-columns: 20px minmax(0, 1fr);
+	align-items: center;
+	gap: 8px;
+	color: var(--hkui-foreground-soft);
+	font-size: var(--hkui-text-small, 0.875rem);
+}
+
+.assistant-rfq-draft__readiness li[data-status="missing"] > svg {
+	color: var(--hkui-warning);
+}
+
+.assistant-rfq-draft__footer {
+	position: sticky;
+	z-index: 3;
+	bottom: -16px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin: 20px -16px -16px;
+	padding: 13px 16px;
+	border-top: 1px solid var(--hkui-divider);
+	background: color-mix(in srgb, var(--hkui-content1) 94%, transparent);
+	box-shadow: 0 -12px 28px
+		color-mix(in srgb, var(--hkui-background) 82%, transparent);
+	backdrop-filter: blur(14px);
+}
+
+.assistant-rfq-draft__footer > div:first-child {
+	display: grid;
+	gap: 2px;
+	min-width: 0;
+}
+
+.assistant-rfq-draft__footer strong,
+.assistant-rfq-draft__footer small {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.assistant-rfq-draft__footer strong {
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.assistant-rfq-draft__footer small {
+	overflow: visible;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	line-height: 1.4;
+	text-overflow: clip;
+	white-space: normal;
+}
+
+.assistant-rfq-draft__footer-actions {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+/* 成果側欄實測寬 430px（稿 P-01 假設的右欄約 600px），所以數線、量表與輸入列
+   的斷點不跟上面那組共用的 640px 走——那會讓它們在正常桌面寬度就整組退化成
+   舊的堆疊卡。這裡只在真的塞不下時才收。 */
+@container (max-width: 390px) {
+	.assistant-rfq-guidance__reference-values,
+	.assistant-rfq-guidance__temperature-head,
+	.assistant-rfq-guidance__market-basis,
+	.assistant-rfq-guidance__desired-fields {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	/* 三個數字疊成一欄之後就不是一條線了，數線一併收起來，不留一條對不上任何
+	   刻度的軌道。 */
+	.assistant-rfq-guidance__reference-axis {
+		display: none;
+	}
+
+	.assistant-rfq-guidance__reference-values > div[data-edge="mid"],
+	.assistant-rfq-guidance__reference-values > div[data-edge="upper"] {
+		justify-items: start;
+		text-align: start;
+	}
+}
+
+@container (max-width: 640px) {
+	.assistant-rfq-draft__field-row,
+	.assistant-rfq-draft__review-card dl,
+	.assistant-rfq-snapshot__facts,
+	.assistant-rfq-guidance__modes,
+	.assistant-rfq-guidance__server-range {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.assistant-rfq-guidance__head,
+	.assistant-rfq-snapshot > header {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr);
+	}
+
+	.assistant-rfq-guidance__state,
+	.assistant-rfq-snapshot__state {
+		grid-column: 2;
+		justify-self: start;
+		margin-left: 0;
+	}
+
+	.assistant-rfq-snapshot__facts > div,
+	.assistant-rfq-snapshot__facts > div:nth-child(2n),
+	.assistant-rfq-snapshot__facts > div:nth-last-child(-n + 2) {
+		border-right: 0;
+		border-bottom: 1px solid var(--hkui-divider);
+	}
+
+	.assistant-rfq-snapshot__facts > div:last-child {
+		border-bottom: 0;
+	}
+
+	.assistant-rfq-draft__review-card dl > div,
+	.assistant-rfq-draft__review-card dl > div:nth-child(2n),
+	.assistant-rfq-draft__review-card dl > div:nth-last-child(-n + 2) {
+		border-right: 0;
+		border-bottom: 1px solid var(--hkui-divider);
+	}
+
+	.assistant-rfq-draft__review-card dl > div:last-child {
+		border-bottom: 0;
+	}
+
+	.assistant-rfq-draft__footer {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.assistant-rfq-draft__footer-actions {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.assistant-rfq-draft__footer-actions > button {
+		width: 100%;
+	}
+
+	.assistant-rfq-draft__footer-actions > button:nth-of-type(3) {
+		grid-column: 1 / -1;
+	}
+}
+
+.assistant-candidate-sheet > button[aria-label="關閉"] {
+	width: 44px;
+	height: 44px;
+}
+
+.assistant-candidate-detail {
+	display: grid;
+	gap: 18px;
+}
+
+.assistant-candidate-detail__status {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-small, 0.875rem);
+}
+
+.assistant-candidate-detail > p {
+	margin: 0;
+	color: var(--hkui-foreground-soft);
+	line-height: 1.65;
+}
+
+.assistant-candidate-detail section {
+	display: grid;
+	gap: 10px;
+}
+
+.assistant-candidate-detail h3 {
+	margin: 0;
+	font-size: var(--hkui-text-medium);
+}
+
+.assistant-candidate-detail ul {
+	display: grid;
+	gap: 9px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.assistant-candidate-detail li {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	color: var(--hkui-foreground-soft);
+	font-size: var(--hkui-text-small, 0.875rem);
+	line-height: 1.5;
+}
+
+.assistant-candidate-detail li > svg {
+	margin-top: 2px;
+	color: var(--hkui-success);
+	flex: 0 0 auto;
+}
+
+.assistant-candidate-detail__matches li[data-status="pending"] > svg {
+	color: var(--hkui-warning);
+}
+
+.assistant-candidate-detail__matches li[data-status="mismatch"] > svg {
+	color: var(--hkui-danger);
+}
+
+.assistant-candidate-detail__matches li > div {
+	display: grid;
+	min-width: 0;
+	gap: 4px;
+	flex: 1;
+}
+
+.assistant-candidate-detail__matches li span {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.assistant-candidate-detail__matches li b {
+	color: var(--hkui-success);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.assistant-candidate-detail__matches li[data-status="pending"] b {
+	color: var(--hkui-warning-700);
+}
+
+.assistant-candidate-detail__matches li[data-status="mismatch"] b {
+	color: var(--hkui-danger);
+}
+
+.assistant-candidate-detail__matches li p {
+	margin: 0;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	line-height: 1.5;
+}
+
+.assistant-candidate-detail > small {
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+@media (max-width: 959px) {
+	.assistant-progress__list,
+	.assistant-candidate-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.assistant-artifact__head,
+	.assistant-lane {
+		padding-left: 16px;
+		padding-right: 16px;
+	}
+
+	.assistant-review__actions,
+	.assistant-lane__intro {
+		display: grid;
+		grid-template-columns: 1fr;
+	}
+
+	.assistant-review__actions {
+		padding: 16px;
+	}
+
+	.assistant-review__actions > button {
+		width: 100%;
+	}
+
+	.assistant-lane__intro {
+		gap: 8px;
+	}
+
+	.assistant-lane__intro p {
+		max-width: none;
+		text-align: left;
+	}
+
+	.assistant-candidates > div > div[role="tablist"] {
+		margin-inline: 16px;
+	}
+
+	.assistant-candidate__media {
+		min-height: 180px;
+	}
+
+	.assistant-candidate__body {
+		min-height: 166px;
+	}
+
+	.assistant-candidate-sheet {
+		max-width: none;
+	}
+}
+
+@media (max-width: 420px) {
+	.assistant-artifact__head {
+		display: grid;
+		gap: 10px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.assistant-candidate {
+		transition: none;
+	}
+}
+
+/* Both Hawkr Agent modes use the exact Messages thread shell. The Phase 1
+ * preview only widens typed artifacts inside the conversation; it does not
+ * replace the shared header, transcript, bubbles, notice or composer. */
+.hawkr-agent-phase1-thread .thread-page__list {
+	gap: 12px;
+}
+
+/* Messenger-familiar conversation rhythm, adapted to the Hawkr shell:
+ * the speaker identity sits outside the bubble so the eye can scan who said
+ * what without repeating a heavy name row inside every message. Only the Agent
+ * thread opts into this layout; human-to-human Messages keeps its existing
+ * compact Telegram-style bubbles. */
+.hawkr-agent-message-row,
+.hawkr-agent-typing-row,
+.hawkr-agent-question-row,
+.hawkr-agent-task-row {
+	align-self: flex-start;
+	display: grid;
+	grid-template-columns: 32px minmax(0, auto);
+	align-items: end;
+	gap: 10px;
+	max-width: min(88%, 620px);
+}
+
+.hawkr-agent-message-row.is-mine {
+	align-self: flex-end;
+	grid-template-columns: minmax(0, auto) 32px;
+}
+
+.hawkr-agent-message-row .thread-page__bubble {
+	align-self: auto;
+	max-width: 100%;
+}
+
+.hawkr-agent-message-avatar {
+	display: grid;
+	width: 32px;
+	height: 32px;
+	place-items: center;
+	flex: 0 0 32px;
+	border-radius: var(--radius-circle);
+	object-fit: cover;
+}
+
+.hawkr-agent-message-avatar--buyer {
+	border: 2px solid color-mix(in srgb, var(--hkui-content1) 88%, transparent);
+	background: var(--hkui-content2);
+	box-shadow: 0 8px 18px -13px rgb(var(--color-brand-ink-rgb) / 0.62);
+	color: var(--hkui-primary);
+	font-size: var(--hkui-text-small);
+	font-weight: 750;
+}
+
+.hawkr-agent-message-avatar--agent.assistant-mark {
+	width: 32px;
+	height: 32px;
+	background: transparent;
+}
+
+.hawkr-agent-phase1-thread
+	.hawkr-agent-message-avatar--agent.assistant-mark
+	small {
+	right: -3px;
+	bottom: -2px;
+	min-width: 18px;
+	height: 14px;
+	padding: 0 2px;
+	border-width: 1px;
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.hawkr-agent-message__facts {
+	display: flex;
+	clear: both;
+	flex-wrap: wrap;
+	gap: var(--hkui-space-2, 8px);
+	margin: 12px 0 2px;
+	padding: 0;
+	list-style: none;
+}
+
+.hawkr-agent-message__facts li {
+	display: flex;
+	min-width: 0;
+	max-width: 100%;
+	min-height: 46px;
+	box-sizing: border-box;
+	align-items: center;
+	gap: var(--hkui-space-2, 8px);
+	padding: 6px 13px 6px 7px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-pill);
+	/* 實色先作不支援 color-mix／backdrop-filter／高對比環境的可讀 fallback。 */
+	background: var(--hkui-content1);
+	-webkit-backdrop-filter: blur(14px) saturate(90%);
+	backdrop-filter: blur(14px) saturate(90%);
+	color: var(--hkui-foreground);
+}
+
+.hawkr-agent-message__fact-icon {
+	display: grid;
+	flex: 0 0 30px;
+	place-items: center;
+	width: 30px;
+	height: 30px;
+	/* 30px 圓底加上左側 7px inset，圓心正好對齊 46px pill 的端帽圓心。 */
+	border-radius: var(--radius-circle);
+	background: var(--hkui-content2);
+	color: var(--theme-action-primary);
+}
+
+@supports (background: color-mix(in srgb, white 50%, transparent)) {
+	.hawkr-agent-message__facts li {
+		border-color: color-mix(
+			in srgb,
+			var(--theme-action-primary) 18%,
+			var(--hkui-content1)
+		);
+		/* 只有支援混色的瀏覽器才讓背景透出，形成暖白霧面毛玻璃。 */
+		background: color-mix(in srgb, var(--hkui-content1) 84%, transparent);
+	}
+
+	.hawkr-agent-message__fact-icon {
+		background: color-mix(
+			in srgb,
+			var(--theme-action-primary) 10%,
+			var(--hkui-content1)
+		);
+	}
+}
+
+.hawkr-agent-message__fact-copy {
+	display: flex;
+	min-width: 0;
+	align-items: baseline;
+	flex: 1 1 auto;
+	flex-wrap: wrap;
+	column-gap: 4px;
+	line-height: 1.35;
+}
+
+.hawkr-agent-message__fact-label {
+	min-width: 0;
+	max-width: 100%;
+	flex: 0 1 auto;
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+
+.hawkr-agent-message__fact-value {
+	min-width: 0;
+	max-width: 100%;
+	color: var(--hkui-foreground);
+	font-size: var(--hkui-text-small, 0.875rem);
+	font-variant-numeric: tabular-nums;
+	font-weight: 700;
+	overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+	.hawkr-agent-message__facts li {
+		background: var(--hkui-content1);
+		-webkit-backdrop-filter: none;
+		backdrop-filter: none;
+	}
+
+	.hawkr-agent-message__fact-icon {
+		background: var(--hkui-content2);
+	}
+}
+
+.hawkr-agent-message__rejected {
+	display: grid;
+	grid-template-columns: 20px minmax(0, 1fr);
+	clear: both;
+	gap: 9px;
+	margin-top: 10px;
+	padding: 10px 11px;
+	border-radius: var(--radius-md);
+	background: color-mix(in srgb, var(--hkui-warning) 9%, var(--hkui-content2));
+	color: var(--hkui-foreground-muted);
+}
+
+.hawkr-agent-message__rejected > svg {
+	margin-top: 1px;
+	color: var(--hkui-warning);
+}
+
+.hawkr-agent-message__rejected strong {
+	display: block;
+	color: var(--hkui-foreground);
+	font-size: var(--hkui-text-small);
+	line-height: 1.4;
+}
+
+.hawkr-agent-message__rejected ul {
+	display: grid;
+	gap: 4px;
+	margin: 5px 0 0;
+	padding: 0;
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	line-height: 1.45;
+	list-style: none;
+}
+
+.hawkr-agent-message__rejected li {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	gap: 6px;
+}
+
+.hawkr-agent-message__rejected li span:first-child {
+	color: var(--hkui-foreground);
+	font-weight: 650;
+}
+
+.hawkr-agent-phase1__system-note {
+	align-self: center;
+	padding: 4px 10px;
+	color: var(--hkui-foreground-soft);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	text-align: center;
+}
+
+.thread-page__bubble--card.hawkr-agent-phase1__artifact-bubble {
+	width: min(92%, 760px);
+	max-width: min(92%, 760px);
+	margin-top: 2px;
+}
+
+.thread-page__bubble--card.hawkr-agent-phase1__candidate-bubble {
+	width: min(100%, 920px);
+	max-width: min(100%, 920px);
+}
+
+.hawkr-agent-phase1__artifact-bubble p {
+	display: block;
+}
+
+.hawkr-agent-phase1__artifact-bubble small {
+	float: none;
+	margin: 0;
+	padding: 0;
+	color: var(--hkui-foreground-muted);
+	user-select: auto;
+	pointer-events: auto;
+}
+
+/* Draft-too-long warning shares the compose-surface notice slot (the
+ * disclaimer line sits directly above it, so both stack borderless via
+ * the shared `notice + notice` rule) — only the colour changes. */
+.thread-page__notice.hawkr-agent-phase1__compose-alert {
+	color: var(--hkui-danger-700);
+	font-weight: 650;
+}
+
+[data-theme="dark"] .thread-page__notice.hawkr-agent-phase1__compose-alert {
+	color: var(--hkui-danger-200);
+}
+
+/* Live Activity Rail（設計書 v6 §V.10.6、圖 00-B）。
+ *
+ * 伺服器推來幾個不同的 public step 就顯示幾列，heartbeat 只更新原列；step
+ * 完成只完成那一列並保留，只有 run terminal 才由父層把整軌換成正式回覆。
+ * DOM 裡沒有任何模型推理內容，也沒有事後回放。
+ *
+ * 版面刻意是**線性垂直軌**：§V.10.6-2 禁止把 steps 畫成假的 DAG、分支或推理圖。
+ * 左側細 spine 由 icon 之間的偽元素串起來，讓一列一列讀起來是同一條進度。 */
+/* 固定頭像那一欄拿掉了：進度的識別現在長在**每一列自己**的前導 icon 上，
+ * 旁邊再放一顆常駐標誌會變成同一畫面裡兩顆。 */
+.hawkr-agent-rail {
+	align-self: flex-start;
+	display: block;
+	max-width: min(88%, 620px);
+	padding-block: 2px;
+}
+
+/* 還沒收到第一個 step 時（ProcurementClarifyChat 的等待列）仍用這顆。 */
+.hawkr-agent-rail__sprite {
+	width: 32px;
+	height: 32px;
+}
+
+/* 正在跑那一列的前導標誌。尺寸與 AppIcon glyph 的視覺重量對齊，換過去時
+ * 文字不會左右跳動。 */
+.hawkr-agent-rail__row-sprite {
+	width: 24px;
+	height: 24px;
+}
+
+.hawkr-agent-rail__list {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+/* 前導 icon 用固定 24px 欄而不是 flex：標誌與 AppIcon 尺寸不同，靠 flex 排會
+ * 讓文字在「跑完換 icon」的那一刻左右位移。固定欄寬也讓底下的 spine 有一個
+ * 穩定的中心線可以對齊。 */
+.hawkr-agent-rail__row {
+	position: relative;
+	display: grid;
+	grid-template-columns: 24px minmax(0, 1fr) auto auto;
+	min-width: 0;
+	min-height: 32px;
+	align-items: start;
+	gap: 10px;
+	padding: 4px;
+	animation: hawkr-agent-rail-row-enter 180ms cubic-bezier(0.2, 0, 0, 1);
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-small);
+	font-weight: 650;
+	line-height: 1.5;
+}
+
+.hawkr-agent-rail__row > svg,
+.hawkr-agent-rail__row-sprite {
+	justify-self: center;
+}
+
+.hawkr-agent-rail__row > svg {
+	margin-top: 3px;
+}
+
+.hawkr-agent-rail__copy {
+	min-width: 0;
+	overflow-wrap: anywhere;
+	white-space: normal;
+}
+
+/* T23 起一列是 <li class="group"> 包一個 .row，子列再包一層 <ol>。所以
+ * 「還有下一步」問的是 group 而不是 row——掛在 row 上的 :last-child 在新結構下
+ * 恆為真（row 永遠是 group 的第一個子節點），整條 spine 會消失。 */
+.hawkr-agent-rail__group {
+	position: relative;
+	min-width: 0;
+	list-style: none;
+}
+
+/* 細垂直 spine：串在 icon 中心線上，最後一組不畫（沒有下一步可接）。
+ *
+ * 掛在 group 而不是 row 上：group 的高度含子列，spine 才會一路串過兩條 lane。
+ * 掛在 row 上只有那一列的高度，子列會看起來像脫離父列的獨立項目。 */
+.hawkr-agent-rail__group:not(:last-child)::before {
+	content: "";
+	position: absolute;
+	/* 4px padding ＋ 24px 欄的中心 = 16px。 */
+	left: 16px;
+	top: 27px;
+	bottom: -10px;
+	width: 1px;
+	background: var(--hkui-divider);
+	transform: translateX(-50%);
+}
+
+/* 子列自己不再往下畫 spine——巢狀層裡再畫一條會變成兩條平行線。 */
+.hawkr-agent-rail__children .hawkr-agent-rail__group::before {
+	content: none;
+}
+
+/* 兩條 lane 子列。縮排對齊父列的文字欄（24px icon 欄 ＋ 10px gap），讓子列的
+ * icon 起點落在父列文字的起點——一眼看得出從屬關係，不必畫框。 */
+.hawkr-agent-rail__children {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	padding-inline-start: 34px;
+	list-style: none;
+}
+
+/* 這一列找到幾家。灰階、字重比列身低一階——它是註腳不是標題。 */
+.hawkr-agent-rail__count {
+	color: var(--hkui-foreground-muted);
+	font-weight: 550;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+@keyframes hawkr-agent-rail-row-enter {
+	from {
+		transform: translateY(2px);
+	}
+}
+
+.hawkr-agent-rail__row svg {
+	flex: 0 0 auto;
+	color: var(--hkui-foreground-muted);
+}
+
+/* ⚠️ 以下選擇器比對的 data-status 字面值現在兩條分支同源：兩者都把 backend 的
+ * ProcurementStepStatus 字面值未經轉換寫進 data-status。（T23 之前 activity
+ * 分支是依 event.text 是否為空自己合成 "RUNNING"／"SUCCEEDED" 兩個值——那個推導
+ * 對沒有 narrator 的候選搜尋 run 恆為 RUNNING，已經移除。）
+ *
+ * 值域是 7 個而不是 4 個：PENDING／WAITING_FOR_INPUT／CANCELLED 目前沒有專屬
+ * 樣式，落到未加樣式的預設外觀（狀態字仍然畫得出來，見 .hawkr-agent-rail__state），
+ * 這是刻意的降級而不是遺漏。
+ *
+ * 這條 CSS → DOM 的管線沒有任何自動化把關——`styles/` 不在 package.json
+ * 的 biome 檢查路徑清單裡，tsc 也看不到 CSS，e2e 不斷言樣式。backend 的
+ * ProcurementStepStatus 改名，或前端把 activity 分支那兩個合成字面值改名，
+ * 這裡漏改都不會有任何東西變紅。
+ *
+ * SUCCEEDED 是契約凍結後唯一的成功終態（見 features/procurement-assistant/steps.ts
+ * 的 AgentStepStatus）。改名前的舊值 DONE 已隨 backend 一起移除。
+ *
+ * 完成的那一列收斂成安靜的既成事實；進行中的一列才用品牌色帶起注意力。
+ * 狀態不只靠顏色——完成列的字重也降一階（§V.11.1 Accessibility）。 */
+.hawkr-agent-rail__row[data-status="SUCCEEDED"],
+.hawkr-agent-rail__row[data-status="SKIPPED"] {
+	font-weight: 550;
+	opacity: 0.72;
+}
+
+.hawkr-agent-rail__row[data-status="RUNNING"] {
+	color: var(--hkui-foreground);
+}
+
+/* 等待中的列是「還沒輪到」，比已完成更退後一階——已完成是既成事實，等待中
+ * 連事實都還沒有。 */
+.hawkr-agent-rail__row[data-status="PENDING"] {
+	font-weight: 550;
+	opacity: 0.55;
+}
+
+.hawkr-agent-rail__row[data-status="RUNNING"] svg {
+	color: var(--theme-action-primary);
+}
+
+/* step-level FAILED 只標這一列，不得冒充 run terminal（§V.10.6-3）。 */
+.hawkr-agent-rail__row[data-status="FAILED"] {
+	color: var(--hkui-warning);
+}
+
+.hawkr-agent-rail__row[data-status="FAILED"] svg {
+	color: var(--hkui-warning);
+}
+
+.hawkr-agent-typing-row .thread-page__typing {
+	align-self: auto;
+	min-height: 32px;
+	padding: 0 4px;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.hawkr-agent-rail__row,
+	.hawkr-agent-typing-row .thread-page__typing span {
+		animation: none;
+	}
+}
+
+/* One question is a single typed artifact, not a second page dropped inside
+ * the chat. Options are real 44px+ actions laid out as a stable grid; "other"
+ * and "skip" stay visibly secondary to the canonical server choices. */
+.hawkr-agent-question-row {
+	width: min(92%, 760px);
+	max-width: min(92%, 760px);
+	grid-template-columns: 32px minmax(0, 1fr);
+	align-items: start;
+	margin-top: 2px;
+}
+
+.hawkr-agent-question-card {
+	min-width: 0;
+	overflow: hidden;
+	border: 1px solid
+		color-mix(in srgb, var(--hkui-primary) 14%, var(--hkui-divider));
+	border-radius: var(--radius-lg);
+	background: color-mix(
+		in srgb,
+		var(--hkui-content1) 96%,
+		var(--hkui-content2)
+	);
+	box-shadow: 0 16px 36px -28px rgb(var(--color-brand-ink-rgb) / 0.54);
+}
+
+.hawkr-agent-question-card__head {
+	padding: 18px 18px 14px;
+}
+
+.hawkr-agent-question-card__head h2 {
+	margin: 0;
+	color: var(--hkui-foreground);
+	font-size: var(--text-lg);
+	font-weight: 750;
+	line-height: 1.45;
+	text-wrap: pretty;
+}
+
+.hawkr-agent-question-card__head p {
+	margin: 5px 0 0;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-small);
+	line-height: 1.5;
+}
+
+.hawkr-agent-question-card__controls {
+	padding: 0 18px 16px;
+}
+
+.hawkr-agent-question-card__options {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+	gap: 9px;
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+.hawkr-agent-question-card__option {
+	display: flex;
+	min-width: 0;
+	min-height: 46px;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 6px 9px 6px 13px;
+	/* 三個幾何 token 與共用輸入框的 `bordered` 對齊（見
+	 * components/ui/inputWrapperClasses.ts）：2px 邊框、--hkui-radius-md 圓角、
+	 * --hkui-input-border 邊色。padding 少 1px 補回加粗的邊，命中區維持 46px。
+	 * 這裡仍是自有實作（Chip 沒有可點擊型態，見 issue 討論），對齊的是 token
+	 * 不是複製設計——共用元件哪天改了 token，這裡跟著動。 */
+	border: 2px solid var(--hkui-input-border);
+	border-radius: var(--hkui-radius-md, 12px);
+	background: var(--hkui-content2);
+	color: var(--hkui-foreground);
+	font: inherit;
+	font-size: var(--hkui-text-small);
+	font-weight: 650;
+	line-height: 1.35;
+	text-align: left;
+	cursor: pointer;
+	transition:
+		background-color var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease),
+		border-color var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease),
+		color var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease),
+		transform var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease),
+		box-shadow var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease);
+}
+
+.hawkr-agent-question-card__option:hover {
+	/* hover 邊色用共用 bordered 的同一條（primary 55%），底色與字色維持這張
+	 * 卡原本的 primary wash——那是「這是可選的答案」的語意，輸入框沒有。 */
+	border-color: rgb(var(--color-brand-primary-rgb) / 0.55);
+	background: var(--theme-primary-subtle);
+	color: var(--hkui-primary);
+	transform: translateY(-1px);
+}
+
+.hawkr-agent-question-card__option:active {
+	transform: translateY(0);
+}
+
+/* focus 用輸入框那圈 halo（--hkui-input-focus-ring），不是通用的
+ * --hkui-focus-ring：同一張卡裡選項與輸入框相鄰，兩種不同的 focus 圈
+ * 併排看得出來。邊色一併轉 primary，與 bordered 的 focused 態一致。 */
+.hawkr-agent-question-card__option:focus-visible,
+.hawkr-agent-question-card__skip:focus-visible {
+	outline: none;
+	box-shadow: var(--hkui-input-focus-ring, var(--shadow-focus-ring));
+}
+
+/* 邊色只給 option——skip 是 `border: 0` 的文字按鈕，設了也沒有邊可染。 */
+.hawkr-agent-question-card__option:focus-visible {
+	border-color: var(--hkui-primary);
+}
+
+.hawkr-agent-question-card__option:disabled,
+.hawkr-agent-question-card__skip:disabled {
+	cursor: not-allowed;
+	opacity: 0.58;
+	transform: none;
+}
+
+/* 單位 chip：一到三個字的短標籤。沿用 __option 的邊框／圓角／focus token，
+ * 只把版面換成「內容寬、置中、可換行」——132px 的等寬格子配上「盒」這種標籤，
+ * 會變成標籤貼左、圈選標記貼右，中間一大片空白。
+ *
+ * 必須排在 __option 之後：同分特異性下後定義者勝，放前面的話 min-width 會被
+ * __option 的 `min-width: 0` 蓋掉（實測 chip 只剩 40px）。 */
+.hawkr-agent-question-card__options--units {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	/* 與上方的數量輸入框分開。__controls 沒有 gap，而 --custom 的 margin-top
+	 * 只在「有 canonical options」時才掛得上——複合數量卡沒有 options，少了這
+	 * 一條單位 chip 會直接黏在輸入框下緣。 */
+	margin-top: 12px;
+}
+
+.hawkr-agent-question-card__option--unit {
+	min-width: 4.5rem;
+	/* 44px＝DESIGN.md 的觸控命中區下限。 */
+	min-height: 44px;
+	justify-content: center;
+	padding: 6px 16px;
+	text-align: center;
+}
+
+.hawkr-agent-question-card__option-mark {
+	display: grid;
+	width: 25px;
+	height: 25px;
+	place-items: center;
+	flex: 0 0 25px;
+	border: 1px solid
+		color-mix(in srgb, var(--hkui-primary) 24%, var(--hkui-divider));
+	border-radius: var(--radius-circle);
+	background: var(--hkui-content1);
+	color: var(--hkui-foreground-soft);
+	transition:
+		background-color var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease),
+		border-color var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease),
+		color var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease);
+}
+
+.hawkr-agent-question-card__option-mark svg {
+	opacity: 0;
+	transform: scale(1.35);
+	transition: opacity var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease);
+}
+
+.hawkr-agent-question-card__option:hover
+	.hawkr-agent-question-card__option-mark {
+	border-color: var(--hkui-primary);
+	background: var(--hkui-primary);
+	color: var(--hkui-primary-foreground);
+}
+
+.hawkr-agent-question-card__option:hover
+	.hawkr-agent-question-card__option-mark
+	svg,
+.hawkr-agent-question-card__option:focus-visible
+	.hawkr-agent-question-card__option-mark
+	svg {
+	opacity: 1;
+}
+
+.hawkr-agent-question-card__option--other {
+	border-style: dashed;
+	background: transparent;
+	color: var(--hkui-foreground-muted);
+}
+
+.hawkr-agent-question-card__option--other > svg {
+	flex: 0 0 auto;
+	color: var(--hkui-foreground-soft);
+}
+
+/* 外框、圓角、背景、focus halo 全部來自共用的 `inputWrapperClasses`
+ * （bordered / lg，與同一張卡裡的 DatePicker、全站 Input 同一份），這裡
+ * 只補它沒有涵蓋的：送出鈕並排、以及 textarea 的高度上下限。
+ *
+ * `--bare` 是日期題：外框由 DatePicker 自己畫，這個 form 只當版面容器，
+ * 否則會是雙框。 */
+/* 只補共用 wrapper 沒有的東西。
+ *
+ * 這裡刻意不再寫 display/align-items/gap：那三個共用 wrapper（bordered/lg）
+ * 已經給了（flex / items-center / gap-2.5），而 feature CSS 是無 layer 的，
+ * 會蓋掉 Tailwind 的 layered utilities——先前寫死 `align-items: flex-end` 的
+ * 結果就是文字貼著框底、和全站其他輸入框看起來不一樣。 */
+.hawkr-agent-question-card__free-text-form--bare {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	background: transparent;
+	border: 0;
+	padding: 0;
+}
+
+/* 外框做成長圓形，讓它的弧度與內嵌那顆 44px 圓形送出鈕平行。
+ *
+ * 共用 wrapper（bordered/lg）給的是 12px 方角圓，圓形按鈕嵌在方角框裡兩條弧線
+ * 不同心，看起來像兩個不相干的元件疊在一起。底部 composer 的 .thread-page__field
+ * 使用 --hkui-radius-2xl（28px），問題卡這個欄位是唯一的例外——這裡對齊它。
+ *
+ * 只覆蓋 border-radius，其餘度量（高度、邊框、focus halo）仍由共用 wrapper 決定；
+ * 也刻意不改 inputWrapperClasses 的 SIZE_RADIUS，那會把全站每個 Input/Select/
+ * DatePicker 都變成藥丸。 */
+.hawkr-agent-question-card__free-text-form:not(
+	.hawkr-agent-question-card__free-text-form--bare
+) {
+	/* --radius-pill (999px)，不是 --radius-circle (50%)：後者套在寬矩形上會變成
+	 * 橢圓，只有正方形（頭像、圓點）才是圓。 */
+	border-radius: var(--radius-pill);
+	/* 右內距收成 1px，讓 44px 圓形送出鈕與 48px 外框的內容區貼合，
+	 * 同時讓右端兩條弧線維持平行。
+	 *
+	 * 共用 wrapper 的 `px-4`（左右各 16px）會把按鈕往內推 16px，於是右邊留
+	 * 16px、上下只有 1px，看起來像按鈕沒對準。收成 1px 後與 44px 控制一致；
+	 * 左側維持 16px 給文字呼吸。 */
+	padding-right: 1px;
+}
+
+.hawkr-agent-question-card__free-text-form--custom {
+	margin-top: 12px;
+}
+
+/* 自訂品項是同一題裡的表單；單一「其他」直接填寫，複數候選保留選項。 */
+.hawkr-agent-question-card[data-crop-disambiguation="true"] {
+	container-type: inline-size;
+	background: var(--theme-surface-card);
+	box-shadow: var(--hkui-shadow-sm);
+}
+
+.hawkr-agent-question-card[data-crop-disambiguation="true"]
+	.hawkr-agent-question-card__head {
+	padding: var(--hkui-space-5) var(--hkui-space-5) var(--hkui-space-4);
+}
+
+.hawkr-agent-question-card[data-crop-disambiguation="true"]
+	.hawkr-agent-question-card__head
+	h2 {
+	font-weight: 700;
+}
+
+.hawkr-agent-question-card[data-crop-disambiguation="true"]
+	.hawkr-agent-question-card__head
+	p {
+	margin-top: var(--hkui-space-2);
+	color: var(--theme-text-body);
+}
+
+.hawkr-agent-question-card[data-crop-disambiguation="true"]
+	.hawkr-agent-question-card__controls {
+	padding: 0 var(--hkui-space-5) var(--hkui-space-5);
+}
+
+.hawkr-agent-question-card__option[data-selected="true"] {
+	border-color: var(--theme-text-accent);
+	background: var(--theme-primary-subtle);
+}
+
+.hawkr-agent-question-card__option[data-selected="true"]
+	.hawkr-agent-question-card__option-mark {
+	border-color: var(--theme-text-accent);
+	background: var(--hkui-content1);
+	color: var(--theme-text-accent);
+}
+
+.hawkr-agent-question-card__option[data-selected="true"]
+	.hawkr-agent-question-card__option-mark
+	svg {
+	opacity: 1;
+}
+
+.hawkr-agent-question-card__crop-form {
+	display: grid;
+	gap: var(--hkui-space-5);
+	margin-top: var(--hkui-space-5);
+}
+
+.hawkr-agent-question-card__crop-form
+	[data-slot="field"]
+	> [data-slot="label"] {
+	color: var(--theme-text-heading);
+}
+
+.hawkr-agent-question-card[data-crop-other-only="true"]
+	.hawkr-agent-question-card__crop-form {
+	margin-top: 0;
+}
+
+.hawkr-agent-question-card__crop-description-meta {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	gap: var(--hkui-space-2);
+}
+
+.hawkr-agent-question-card__crop-description-meta > :last-child {
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+}
+
+.hawkr-agent-question-card__crop-actions {
+	display: flex;
+	align-items: flex-end;
+	gap: var(--hkui-space-4);
+	padding-top: var(--hkui-space-4);
+	border-top: 1px solid var(--theme-border-subtle);
+}
+
+.hawkr-agent-question-card__crop-price {
+	flex: 1;
+	min-width: 0;
+}
+
+.hawkr-agent-question-card__crop-unit {
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-small);
+	white-space: nowrap;
+}
+
+.hawkr-agent-question-card__crop-submit {
+	flex: 0 0 auto;
+}
+
+/* 依卡片可用空間重排，兼顧側欄開啟與手機，而非只依整頁寬度。 */
+@container (max-width: 440px) {
+	.hawkr-agent-question-card[data-crop-disambiguation="true"]
+		.hawkr-agent-question-card__options {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.hawkr-agent-question-card[data-crop-disambiguation="true"]
+		.hawkr-agent-question-card__head,
+	.hawkr-agent-question-card[data-crop-disambiguation="true"]
+		.hawkr-agent-question-card__controls {
+		padding-inline: calc(var(--hkui-space-4) / var(--hk-text-scale, 1));
+	}
+
+	.hawkr-agent-question-card__crop-actions {
+		flex-direction: column;
+		align-items: stretch;
+	}
+}
+
+/* 共用 wrapper 的 padding 是給單行控制項算的；這裡是可長高的 textarea，
+ * 補上高度上下限（一行起跳、最多約四行後自己捲）。 */
+.hawkr-agent-question-card__free-text-form textarea {
+	/* 高度交給共用 wrapper 的 lg 度量（min-h-12＝48px）；這裡只把 textarea
+	 * 本身收成一行，不再自己撐高，否則整個 box 會比全站其他輸入框高一截。 */
+	height: 1lh;
+	max-height: 112px;
+	overflow-y: auto;
+	/* 共用 TEXTAREA_RESET 給的是 `resize-y`（表單裡可以拉大很合理），但這裡
+	 * 是聊天答題欄，右下角多一個拖曳把手只是視覺雜訊。 */
+	resize: none;
+}
+
+/* 問題卡與底部 composer 共用 44px 觸控尺寸。外框 48px 高扣除 2px 邊框後
+ * 內容正好 44px；搭配 form 的 1px 右內距，按鈕不貼邊且維持平行弧線。 */
+.hawkr-agent-question-card__free-text-send.thread-page__send {
+	width: 44px;
+	height: 44px;
+	flex: 0 0 44px;
+}
+
+.hawkr-agent-question-card__input-error {
+	margin: 7px 2px 0;
+	color: var(--hkui-danger-700);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-weight: 650;
+	line-height: 1.45;
+}
+
+[data-theme="dark"] .hawkr-agent-question-card__input-error {
+	color: var(--hkui-danger-200);
+}
+
+.hawkr-agent-question-card__footer {
+	display: flex;
+	min-height: 44px;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-top: 12px;
+	padding-top: 10px;
+	border-top: 1px solid var(--hkui-divider);
+	color: var(--hkui-foreground-soft);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.hawkr-agent-question-card__skip {
+	min-height: 44px;
+	padding: 0 12px;
+	border: 0;
+	border-radius: var(--radius-md);
+	background: transparent;
+	color: var(--hkui-foreground-muted);
+	font: inherit;
+	font-size: var(--hkui-text-small);
+	font-weight: 650;
+	cursor: pointer;
+}
+
+.hawkr-agent-question-card__skip:hover {
+	background: var(--theme-primary-subtle);
+	color: var(--hkui-primary);
+}
+
+/* REQUIREMENT_READY hands off one real task to the agent. It stays in the
+ * message rhythm, but the explicit scope and action make it read as an
+ * assignment rather than another speech bubble. */
+.hawkr-agent-task-row {
+	width: min(92%, 760px);
+	max-width: min(92%, 760px);
+	grid-template-columns: 32px minmax(0, 1fr);
+	align-items: start;
+	margin-top: 2px;
+}
+
+.hawkr-agent-task-card {
+	min-width: 0;
+	overflow: hidden;
+	border: 1px solid
+		color-mix(in srgb, var(--hkui-primary) 18%, var(--hkui-divider));
+	border-radius: var(--radius-lg);
+	background: var(--hkui-content1);
+}
+
+.hawkr-agent-task-card__head {
+	display: grid;
+	grid-template-columns: 40px minmax(0, 1fr) auto;
+	align-items: start;
+	gap: 12px;
+	padding: 18px;
+}
+
+.hawkr-agent-task-card__icon {
+	display: grid;
+	width: 40px;
+	height: 40px;
+	place-items: center;
+	border-radius: var(--radius-md);
+	background: var(--theme-primary-subtle);
+	color: var(--theme-text-accent-on-tint);
+}
+
+.hawkr-agent-task-card__head h2,
+.hawkr-agent-task-card__head p {
+	margin: 0;
+}
+
+.hawkr-agent-task-card__head h2 {
+	color: var(--hkui-foreground);
+	font-size: var(--text-lg);
+	font-weight: 750;
+	line-height: 1.35;
+}
+
+.hawkr-agent-task-card__head p {
+	margin-top: 4px;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-small);
+	line-height: 1.5;
+}
+
+.hawkr-agent-task-card__status {
+	min-height: 28px;
+	padding: 5px 10px;
+	border-radius: var(--radius-pill);
+	background: var(--theme-primary-subtle);
+	color: var(--theme-text-accent-on-tint);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-weight: 700;
+	line-height: 18px;
+	white-space: nowrap;
+}
+
+.hawkr-agent-task-card__scope {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 18px;
+	margin: 0;
+	padding: 0 18px 16px 70px;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-small);
+	list-style: none;
+}
+
+.hawkr-agent-task-card__scope li,
+.hawkr-agent-task-card__footer > span {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+}
+
+.hawkr-agent-task-card__scope svg {
+	color: var(--theme-action-primary);
+}
+
+.hawkr-agent-task-card__footer {
+	display: flex;
+	min-height: 68px;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 12px 18px;
+	border-top: 1px solid var(--hkui-divider);
+	background: var(--hkui-content2);
+}
+
+.hawkr-agent-task-card__footer > span {
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	line-height: 1.45;
+}
+
+.hawkr-agent-task-card__footer > span svg {
+	flex: 0 0 auto;
+	color: var(--hkui-success);
+}
+
+.hawkr-agent-task-card__footer > button {
+	min-height: 44px;
+	flex: 0 0 auto;
+}
+
+.hawkr-agent-phase1-thread .thread-page__field:has(textarea:disabled) {
+	opacity: 0.78;
+}
+
+.hawkr-agent-phase1-thread .thread-page__compose textarea:disabled {
+	color: var(--hkui-foreground-muted);
+	-webkit-text-fill-color: var(--hkui-foreground-muted);
+	cursor: not-allowed;
+}
+
+.hawkr-agent-phase1-thread
+	.thread-page__compose
+	textarea:disabled::placeholder {
+	color: var(--hkui-foreground-muted);
+	opacity: 1;
+}
+
+@media (min-width: 700px) {
+	.hawkr-agent-phase1-thread .assistant-candidate-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.hawkr-agent-phase1-thread .assistant-candidate {
+		display: grid;
+		grid-template-columns: 180px minmax(0, 1fr);
+	}
+
+	.hawkr-agent-phase1-thread .assistant-candidate__media {
+		min-height: 100%;
+	}
+
+	.hawkr-agent-phase1-thread .assistant-candidate__body {
+		min-height: 174px;
+	}
+}
+
+@media (max-width: 699px) {
+	.hawkr-agent-message-row,
+	.hawkr-agent-typing-row,
+	.hawkr-agent-rail {
+		max-width: 94%;
+	}
+
+	.hawkr-agent-question-row {
+		width: 100%;
+		max-width: 100%;
+	}
+
+	.hawkr-agent-task-row {
+		width: 100%;
+		max-width: 100%;
+	}
+
+	.hawkr-agent-task-card__head {
+		grid-template-columns: 40px minmax(0, 1fr);
+	}
+
+	.hawkr-agent-task-card__status {
+		grid-column: 2;
+		justify-self: start;
+	}
+
+	.hawkr-agent-task-card__scope {
+		padding-left: 70px;
+	}
+
+	.hawkr-agent-task-card__footer {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.hawkr-agent-task-card__footer > button {
+		width: 100%;
+	}
+
+	.thread-page__bubble--card.hawkr-agent-phase1__artifact-bubble,
+	.thread-page__bubble--card.hawkr-agent-phase1__candidate-bubble {
+		width: 100%;
+		max-width: 100%;
+	}
+}
+
+@media (max-width: 420px) {
+	.hawkr-agent-question-card__options {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.hawkr-agent-question-card__head {
+		padding: 16px 14px 12px;
+	}
+
+	.hawkr-agent-question-card__controls {
+		padding: 0 14px 14px;
+	}
+
+	.hawkr-agent-question-card__footer > span {
+		display: none;
+	}
+
+	.hawkr-agent-question-card__footer {
+		justify-content: flex-end;
+	}
+}
+
+/* 320px 搭配 200% 文字縮放時，32px agent mark 若仍佔獨立欄，任務卡只剩
+ * 約 150px；scope 的 70px 對齊縮排與 Button 的 nowrap 會再把中文壓成逐字
+ * 直排、裁掉 CTA。極窄寬度改成上下排列，保留身份標記與完整動作文字。 */
+@media (max-width: 360px) {
+	.chat-page:has(.hawkr-agent-phase1-thread),
+	.hawkr-agent-phase1-thread .thread-page__head,
+	.hawkr-agent-phase1-thread .thread-page__body,
+	.hawkr-agent-phase1-thread .thread-page__compose {
+		padding-inline: min(var(--hkui-space-3, 12px), 12px);
+	}
+
+	.hawkr-agent-task-row {
+		grid-template-columns: minmax(0, 1fr);
+		gap: var(--hkui-space-2, 8px);
+	}
+
+	.hawkr-agent-question-row:has([data-crop-disambiguation="true"]) {
+		width: 100%;
+		max-width: 100%;
+		grid-template-columns: minmax(0, 1fr);
+		gap: var(--hkui-space-2);
+	}
+
+	.hawkr-agent-task-card {
+		width: 100%;
+	}
+
+	.hawkr-agent-task-card__head,
+	.hawkr-agent-task-card__footer {
+		padding-inline: var(--hkui-space-3, 12px);
+	}
+
+	.hawkr-agent-task-card__scope {
+		padding-inline: var(--hkui-space-3, 12px);
+	}
+
+	.hawkr-agent-task-card__footer > button {
+		min-width: 0;
+		height: auto;
+		padding: var(--hkui-space-2, 8px) var(--hkui-space-3, 12px);
+		white-space: normal;
+		overflow-wrap: anywhere;
+	}
+
+	.hawkr-agent-task-card__footer > button > span,
+	.hawkr-agent-task-card__footer > button > span > span,
+	.hawkr-agent-task-card__footer > button .hkui-button__loading-label {
+		min-width: 0;
+		max-width: 100%;
+		white-space: normal;
+		overflow-wrap: anywhere;
+	}
+
+	.hawkr-agent-task-card__footer > button > span > span {
+		flex-wrap: wrap;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.hawkr-agent-question-card__option {
+		transition: none;
+	}
+}
+
+/* Agent avatar and live seller-candidate payloads are the only other
+ * surface-specific pieces layered onto the shared Messages components. */
+.hawkr-agent-thread__head-avatar,
+.hawkr-agent-thread__intro-avatar {
+	display: grid;
+	place-items: center;
+	overflow: visible;
+}
+
+.hawkr-agent-thread__head-avatar .assistant-mark,
+.hawkr-agent-thread__intro-avatar .assistant-mark {
+	width: 100%;
+	height: 100%;
+}
+
+.hawkr-agent-thread .thread-page__head-status[data-state="assistant"]::before {
+	display: none;
+}
+
+.hawkr-agent-thread__alert {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--hkui-space-3);
+}
+
+.hawkr-agent-thread__alert button {
+	min-height: 44px;
+	padding: 0 var(--hkui-space-4);
+	border: 1px solid currentColor;
+	border-radius: var(--hkui-radius-md);
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.hawkr-agent-thread__alert button:focus-visible,
+.hawkr-agent-candidate__link:focus-visible {
+	outline: none;
+	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
+}
+
+.hawkr-agent-candidate {
+	width: min(340px, 100%);
+}
+
+.hawkr-agent-candidate__initial {
+	background: color-mix(in srgb, var(--hkui-primary) 12%, var(--hkui-content2));
+	color: var(--hkui-primary);
+	font-size: var(--hkui-text-large);
+	font-weight: 800;
+}
+
+.hawkr-agent-candidate__meta {
+	margin: 0;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny);
+	line-height: 1.4;
+}
+
+.hawkr-agent-candidate .chat-card__status {
+	align-self: flex-start;
+	letter-spacing: 0;
+}
+
+.hawkr-agent-candidate__evidence {
+	display: grid;
+	gap: 6px;
+	padding: 0 13px 11px;
+}
+
+.hawkr-agent-candidate__evidence p {
+	margin: 0;
+	color: inherit;
+	font-size: var(--hkui-text-small);
+	line-height: 1.5;
+}
+
+.hawkr-agent-candidate__evidence p + p {
+	padding-top: 6px;
+	border-top: 1px solid var(--hkui-divider);
+}
+
+.hawkr-agent-candidate__link {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	text-decoration: none;
+}
+
+.hawkr-agent-candidate__link span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.hawkr-agent-thread__stop svg {
+	pointer-events: none;
+}
+
+[data-theme="dark"] .hawkr-agent-candidate__initial {
+	background: rgb(var(--color-brand-secondary-rgb) / 0.12);
+	color: var(--color-brand-secondary);
+}
+
+[data-theme="dark"] .hawkr-agent-candidate__meta {
+	color: var(--hkui-foreground-soft);
+}
+
+@media (max-width: 959px) {
+	.hawkr-agent-thread__alert {
+		margin-inline: var(--hkui-space-4);
+	}
+}
+
+/* ── 右側畫布（B-244 最終候選）────────────────────────────────────
+ * ChatGPT／lev8 式：對話留在左邊，候選資料攤在右邊固定面板，兩邊各自
+ * 捲動。刻意做在 workspace 內部而不是把 .chat-shell 加成三欄——畫布只屬於
+ * Hawkr Agent，人類聊天室沒有這個概念，加在 shell 上會讓每個聊天室都背著一
+ * 個永遠用不到的欄位。
+ *
+ * 高度約束要一路傳下去：.thread-page 的內部捲動依賴祖先鏈都有確定高度，
+ * 中間多一層 wrapper 若沒有 minmax(0,1fr) 就會讓 body 長過格子、內層的
+ * overflow-y 永遠不觸發。 */
+.hawkr-agent-workspace {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	grid-template-rows: minmax(0, 1fr);
+	min-height: 0;
+	height: 100%;
+}
+
+.hawkr-agent-workspace > .thread-page {
+	min-width: 0;
+}
+
+/* 沒有成果時仍維持適合閱讀的對話行寬；成果展開後跟隨主區縮放。 */
+.hawkr-agent-workspace .thread-page__list {
+	width: 100%;
+	max-width: 760px;
+	margin-inline: auto;
+}
+
+.hawkr-agent-workspace .thread-page__compose {
+	justify-content: center;
+}
+
+.hawkr-agent-workspace .thread-page__field {
+	max-width: 760px;
+}
+
+@media (min-width: 1200px) {
+	/* 只有成果打開才分欄，主對話保留 55%；窄成果以容器查詢切換候選卡。 */
+	.hawkr-agent-workspace[data-panel="open"] {
+		grid-template-columns: minmax(0, 55fr) minmax(320px, 45fr);
+	}
+}
+
+.hawkr-agent-canvas {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+	overflow: hidden;
+	border-left: 1px solid var(--hkui-divider);
+	container-type: inline-size;
+}
+
+/* 窄視窗塞不下兩欄：畫布蓋掉對話（ChatGPT 手機版的 canvas 也是這樣），
+ * 由標頭的關閉鈕回到對話。不做「上下堆疊」——兩個各自捲動的區塊上下排，
+ * 使用者會不知道自己在捲哪一個。 */
+@media (max-width: 1199px) {
+	.hawkr-agent-workspace[data-panel="open"] > .thread-page {
+		display: none;
+	}
+	.hawkr-agent-canvas {
+		border-left: 0;
+	}
+}
+
+.hawkr-agent-canvas__head {
+	display: flex;
+	align-items: center;
+	gap: var(--hkui-space-2, 8px);
+	padding: var(--hkui-space-3, 12px) var(--hkui-space-4, 16px);
+	border-bottom: 1px solid var(--hkui-divider);
+}
+
+.hawkr-agent-canvas__title {
+	margin: 0;
+	/* 不換行、寧可截斷：標題折成兩行會把模式分頁擠窄（實測 420px 面板下
+	 * 「候選資料 · 3」就會折行），分頁是操作、標題只是標籤。 */
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	font-size: var(--hkui-text-small);
+	font-weight: 650;
+	color: var(--hkui-foreground);
+}
+
+.hawkr-agent-canvas__back {
+	display: grid;
+	place-items: center;
+	width: 44px;
+	height: 44px;
+	padding: 0;
+	border: 0;
+	border-radius: var(--radius-circle);
+	background: transparent;
+	color: var(--hkui-foreground-soft);
+	cursor: pointer;
+}
+
+.hawkr-agent-canvas__back:hover {
+	background: color-mix(in srgb, var(--hkui-primary) 10%, transparent);
+	color: var(--hkui-primary);
+}
+
+.hawkr-agent-canvas__back:focus-visible {
+	outline: none;
+	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
+}
+
+.hawkr-agent-canvas__back:disabled {
+	opacity: 0.5;
+	cursor: wait;
+}
+
+.hawkr-agent-canvas__back:disabled:hover {
+	background: transparent;
+	color: var(--hkui-foreground-soft);
+}
+
+/* Tabs 的根帶 Tailwind 的 `w-full`（width: 100%），在 flex 容器裡 flex-basis
+ * auto 就解析成 100% → 吃掉整條標頭，標題被 shrink 成 0（量出來：wrapper
+ * 387px／標題 0px）。所以要覆寫寬度，不是只約束內層的 tablist。 */
+.hawkr-agent-canvas__modes {
+	width: auto;
+	flex: 0 0 auto;
+}
+
+.hawkr-agent-canvas__modes [role="tablist"] {
+	width: max-content;
+}
+
+.hawkr-agent-canvas__body {
+	flex: 1 1 0;
+	min-height: 0;
+	overflow-y: auto;
+	padding: var(--hkui-space-4, 16px) var(--hkui-space-4, 16px)
+		calc(var(--hkui-space-4, 16px) + env(safe-area-inset-bottom, 0px));
+}
+
+.hawkr-agent-canvas__body > div[hidden] {
+	display: none;
+}
+
+/* 候選檢視回到「詢價已建立」的路。中性色而不是警示色：這是一條可走的路，
+ * 不是一則要人處理的警告（.assistant-invalidated 才是後者）。 */
+.hawkr-agent-canvas__resume {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: var(--hkui-space-4, 16px);
+	padding: 14px 16px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-md);
+	background: var(--hkui-content2, var(--hkui-content1));
+}
+
+.hawkr-agent-canvas__resume > svg {
+	flex: 0 0 auto;
+	color: var(--theme-action-primary, var(--hkui-primary));
+}
+
+/* 文字塊吃掉剩下的寬度，CTA 才會被推到最右邊；窄容器下 flex-wrap 讓它整顆換行
+ * 而不是把按鈕壓成兩三個字一行。 */
+.hawkr-agent-canvas__resume > div {
+	flex: 1 1 12rem;
+	min-width: 0;
+}
+
+.hawkr-agent-canvas__resume strong,
+.hawkr-agent-canvas__resume p {
+	margin: 0;
+}
+
+.hawkr-agent-canvas__resume p {
+	margin-top: 4px;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-small, 0.875rem);
+	line-height: 1.55;
+}
+
+.hawkr-agent-canvas__resume button {
+	flex: 0 0 auto;
+	min-height: 44px;
+}
+
+/* 畫布裡的候選卡沿用 .assistant-candidates，但不要它的卡片外框——
+ * 畫布本身就是那個容器，兩層框線是視覺噪音。 */
+.hawkr-agent-canvas__body .assistant-artifact {
+	border: 0;
+	background: transparent;
+	padding: 0;
+}
+
+/* 成果已由外層面板定義邊界；內容與來源篩選只需一層內距。 */
+.hawkr-agent-canvas__body .assistant-candidates > .assistant-artifact__head {
+	padding: 0 0 var(--hkui-space-4, 16px);
+	border-bottom: 0;
+}
+
+.hawkr-agent-canvas__body .assistant-candidates > div > div[role="tablist"] {
+	margin-inline: 0;
+}
+
+.hawkr-agent-canvas__body .assistant-lane {
+	padding-inline: 0;
+}
+
+@container (max-width: 620px) {
+	.assistant-lane__intro {
+		flex-direction: column;
+		gap: var(--hkui-space-2, 8px);
+	}
+
+	.assistant-lane__intro p {
+		text-align: left;
+	}
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+ * Hawkr Agent 新對話中央入口（設計書 v6 §V.11.0 Screen Contract 00，圖 00-A）
+ *
+ * 這一區只在「procurement route ＋ 尚無 conversation」時存在；首送後整塊
+ * 收合、composer 移到 thread 底部。所以它刻意**不**沿用 .thread-page 的
+ * header/body/compose 三段格線——設計書的 anti-goals 明列 ENTRY 不得出現
+ * thread header、固定 transcript pane、底部小型 composer 或空白 Artifact 欄。
+ * ══════════════════════════════════════════════════════════════════════ */
+
+.hawkr-agent-entry {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--hkui-space-5, 20px);
+	width: 100%;
+	min-width: 0;
+	/* 主內容自己捲，不把整頁撐長——Messages shell 的側欄要留在原地。 */
+	height: 100%;
+	min-height: 0;
+	overflow-y: auto;
+	padding: clamp(24px, 6vh, 64px) var(--hkui-space-5, 20px)
+		var(--hkui-space-6, 24px);
+	text-align: center;
+}
+
+/* 入口標誌的尺寸走 CSS 而不是 inline style——§V.11.0 要求 <768px 縮到
+ * 52–56px，inline 寬高會壓過 media query。 */
+.hawkr-agent-entry__sprite {
+	width: 120px;
+	height: 120px;
+}
+
+.hawkr-agent-entry__hero {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--hkui-space-3, 12px);
+	max-width: 640px;
+}
+
+.hawkr-agent-entry__hero h1 {
+	margin: 0;
+	font-family: var(--font-brand, inherit);
+	font-size: clamp(1.5rem, 3.2vw, 2.125rem);
+	font-weight: 900;
+	line-height: 1.25;
+	color: var(--hkui-foreground);
+}
+
+.hawkr-agent-entry__lede {
+	margin: 0;
+	max-width: 46ch;
+	font-size: var(--hkui-text-small, 0.875rem);
+	line-height: 1.7;
+	color: var(--hkui-foreground-muted);
+}
+
+/* ── Capability chips ────────────────────────────────────────────────
+ * §V.11.0：chip 只把 prompt starter 帶進 composer 並移動焦點，不自動送出、
+ * 不建案件、不觸發任何 side effect。所以它們讀作「可以請 Hawkr 做什麼」的宣告，
+ * 視覺重量必須低於 composer——composer 才是第一視覺焦點。 */
+.hawkr-agent-entry__chips {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: var(--hkui-space-3, 12px);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.hawkr-agent-entry__chips > li {
+	display: flex;
+}
+
+.hawkr-agent-entry__chip {
+	/* 命中區 44px（DESIGN.md §觸控）。 */
+	min-height: 44px;
+	padding: 0 var(--hkui-space-4, 16px);
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-pill);
+	background: var(--hkui-content1);
+	color: var(--hkui-foreground-soft);
+	font: inherit;
+	font-size: var(--hkui-text-small, 0.875rem);
+	font-weight: 600;
+	cursor: pointer;
+	transition:
+		background var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease),
+		border-color var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease),
+		color var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease);
+}
+
+/* 三個主要能力維持簡潔 pill：24px 動畫只在文字前提供語意提示，不把 chip
+ * 放大成插畫卡；整顆仍是一個 button，圖示不是第二個互動點。 */
+.hawkr-agent-entry__chip[data-has-icon="true"] {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	width: auto;
+	min-height: 44px;
+	padding: 0 16px 0 12px;
+	border-radius: var(--radius-pill);
+	line-height: 1.2;
+}
+
+.hawkr-agent-entry__capability-icon {
+	position: relative;
+	display: grid;
+	flex: 0 0 24px;
+	place-items: center;
+	width: 24px;
+	height: 24px;
+	overflow: hidden;
+	color: var(--hkui-primary);
+	pointer-events: none;
+	transform-origin: center;
+	transition: transform var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease);
+}
+
+.hawkr-agent-entry__chip-label {
+	font-weight: 700;
+	color: inherit;
+	white-space: nowrap;
+}
+
+.hawkr-agent-entry__chip-description {
+	margin-top: 5px;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-weight: 500;
+	line-height: 1.35;
+	overflow-wrap: anywhere;
+}
+
+.hawkr-agent-entry__chip:hover {
+	border-color: var(--hkui-primary);
+	background: var(--theme-primary-subtle);
+	color: var(--hkui-primary);
+}
+
+.hawkr-agent-entry__chip:focus-visible {
+	outline: none;
+	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
+}
+
+/* 給 24px 圖示一個快速、可逆的進場回饋。 */
+.hawkr-agent-entry__chip:focus-visible .hawkr-agent-entry__capability-icon {
+	transform: translateY(-1px) scale(1.04);
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.hawkr-agent-entry__chip:hover .hawkr-agent-entry__capability-icon {
+		transform: translateY(-1px) scale(1.04);
+	}
+}
+
+/* 「再按一次取代目前輸入」的待確認態——不是錯誤，是一個等你決定的動作。 */
+.hawkr-agent-entry__chip[data-confirm="replace"] {
+	border-color: var(--hkui-warning);
+	color: var(--hkui-warning);
+}
+
+.hawkr-agent-entry__chip[data-confirm="replace"]
+	.hawkr-agent-entry__chip-description {
+	color: currentColor;
+	opacity: 0.78;
+}
+
+/* ── 中央 composer ───────────────────────────────────────────────────
+ * 入口與對話沿用同一個可增高輸入框；長需求自然換行，入口仍跟隨內容定位。 */
+.hawkr-agent-entry__composer {
+	width: 100%;
+	min-width: 0;
+	max-width: 960px;
+}
+
+.hawkr-agent-entry__composer .thread-page__compose {
+	width: 100%;
+	min-width: 0;
+	padding: 0;
+	border-top: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+.hawkr-agent-entry__composer .thread-page__field {
+	align-items: flex-end;
+	min-width: 0;
+	border-radius: var(--hkui-radius-2xl);
+	background: var(--hkui-content1);
+	box-shadow: var(--hkui-shadow-sm);
+}
+
+.hawkr-agent-entry__composer textarea {
+	min-width: 0;
+	min-height: 44px;
+	text-align: left;
+	font-size: var(--hkui-text-base, 1rem);
+	line-height: 1.4;
+}
+
+.hawkr-agent-entry__composer .thread-page__send {
+	align-self: flex-end;
+	flex: 0 0 44px;
+}
+
+.thread-page__compose textarea.hawkr-agent-composer__input {
+	min-height: 44px;
+	max-height: 120px;
+	overflow-x: hidden;
+	overflow-y: auto;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	font-size: max(1rem, var(--hkui-text-base, 1rem));
+	line-height: 1.5;
+	caret-color: var(--theme-action-primary);
+}
+
+/* 中尺寸桌機的 Messages sidebar 會壓縮主 pane。輸入列可借用 entry 自己的
+ * 12px × 2 安全 gutter，但仍由 960px 封頂；手機保留完整 16px gutter。 */
+@media (min-width: 768px) {
+	.hawkr-agent-entry__composer {
+		width: calc(100% + var(--hkui-space-6, 24px));
+	}
+}
+
+/* <768px：標誌 52–56px、標題約 24px、chips 可換行、composer 全寬、
+ * 任務卡單欄（§V.11.0 Responsive）。 */
+@media (max-width: 767px) {
+	.hawkr-agent-entry {
+		padding: var(--hkui-space-5, 20px) var(--hkui-space-4, 16px)
+			var(--hkui-space-6, 24px);
+	}
+
+	.hawkr-agent-entry__sprite {
+		width: 56px;
+		height: 56px;
+	}
+
+	.hawkr-agent-entry__hero h1 {
+		font-size: 1.5rem;
+	}
+
+	.hawkr-agent-entry__chips {
+		display: flex;
+		flex-wrap: wrap;
+		width: 100%;
+		gap: 6px;
+	}
+
+	.hawkr-agent-entry__chips > li {
+		min-width: 0;
+	}
+
+	.hawkr-agent-entry__chip[data-has-icon="true"] {
+		gap: 6px;
+		width: auto;
+		min-width: 0;
+		min-height: 44px;
+		padding: 0 10px 0 8px;
+		border-radius: var(--radius-pill);
+		font-size: 0.8125rem;
+	}
+
+	.hawkr-agent-entry__capability-icon {
+		width: 24px;
+		height: 24px;
+	}
+
+	.hawkr-agent-entry__chip-description {
+		max-width: 12ch;
+		font-size: var(--hkui-text-tiny, 0.75rem);
+		line-height: 1.3;
+	}
+
+	/* Entry 不是 `.thread-page`，所以 messages.css 的 keyboard-open body/footer
+	 * guard 不會命中。以同一個 root signal 補齊，避免 iOS focus-scroll 把 footer
+	 * 拉到 composer 與鍵盤之間。 */
+	:root[data-keyboard-open] body:has(.page-content .hawkr-agent-entry) {
+		overflow: hidden;
+	}
+
+	:root[data-keyboard-open]
+		.page-wrapper:has(.page-content .hawkr-agent-entry)
+		.hk-footer {
+		display: none;
+	}
+
+	:root[data-keyboard-open] .hawkr-agent-entry {
+		min-height: 0;
+		overscroll-behavior: contain;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.hawkr-agent-entry__chip {
+		transition: none;
+	}
+
+	.hawkr-agent-entry__capability-icon {
+		transition: none;
+	}
+
+	.hawkr-agent-entry__chip:hover .hawkr-agent-entry__capability-icon,
+	.hawkr-agent-entry__chip:focus-visible .hawkr-agent-entry__capability-icon {
+		transform: none;
+	}
+}
+
+/* ── Public Narrative（設計書 v6 §V.10.6-4、圖 00-B／00-C）──────────────
+ * assistant 的完成回覆是**無泡泡正文**：沒有氣泡底色、沒有邊框，也不重複
+ * Agent avatar（識別只在側欄的 Agent 分頁出現一次）。每個語意 block 左側配置一枚
+ * allowlisted AppIcon，icon 只標示公開語意，不是狀態 truth。
+ *
+ * 買家訊息維持氣泡——已核准的 00-A/B/C 三張圖裡它就是右側綠色氣泡，一問一答
+ * 的方向感靠它。 */
+.hawkr-agent-narrative {
+	align-self: flex-start;
+	display: block;
+	max-width: min(88%, 620px);
+	padding: 2px 0;
+	color: var(--hkui-foreground);
+}
+
+.hawkr-agent-narrative > p {
+	margin: 0;
+	line-height: 1.75;
+	overflow-wrap: anywhere;
+	white-space: pre-wrap;
+}
+
+.hawkr-agent-narrative__block {
+	display: grid;
+	grid-template-columns: 18px minmax(0, 1fr);
+	align-items: start;
+	gap: 10px;
+}
+
+.hawkr-agent-narrative__block + .hawkr-agent-narrative__block {
+	margin-top: var(--hkui-space-2, 8px);
+}
+
+.hawkr-agent-narrative__block svg {
+	/* 對齊第一行文字的視覺中心，而不是方塊頂端。 */
+	margin-top: 4px;
+	color: var(--theme-action-primary);
+}
+
+.hawkr-agent-narrative__block > p {
+	margin: 0;
+	line-height: 1.75;
+	overflow-wrap: anywhere;
+	white-space: pre-wrap;
+}
+
+/* #2549 Phase 3：只有剛完成那一輪的 block 套用交錯淡入，animation-delay 由
+ * ProcurementClarifyChat.tsx inline style 依 block index 動態帶入，這裡只定義
+ * 動畫本身與時長。歷史／重播的 turn 不加這個 class，維持既有靜態顯示。 */
+@keyframes hawkr-agent-narrative-block-fade-in {
+	from {
+		opacity: 0;
+		transform: translateY(4px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.hawkr-agent-narrative__block--stagger-in {
+	animation: hawkr-agent-narrative-block-fade-in 240ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.hawkr-agent-narrative__block--stagger-in {
+		animation: none;
+	}
+}
+
+/* 已記下／未採用兩塊沿用原本的樣式，只是不再坐在氣泡裡，所以自己補上內縮
+ * 讓它們對齊正文而不是 icon。 */
+.hawkr-agent-narrative .hawkr-agent-message__facts,
+.hawkr-agent-narrative .hawkr-agent-message__rejected {
+	margin-left: 28px;
+}
+
+/* ── 進行中列的非色彩線索與「停止處理」（§V.11.1）───────────────────── */
+.hawkr-agent-rail__state {
+	flex: 0 0 auto;
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-style: normal;
+	font-weight: 700;
+	color: var(--theme-action-primary);
+}
+
+.hawkr-agent-rail__stop {
+	display: flex;
+	align-items: center;
+	gap: var(--hkui-space-2, 8px);
+	margin: var(--hkui-space-2, 8px) 0 0;
+}
+
+.hawkr-agent-rail__stop button {
+	/* 命中區先備好 44×44（DESIGN.md §觸控）：接上 cancel command 時只要拿掉
+	 * disabled，不必再回來調幾何。 */
+	min-height: 44px;
+	padding: 0 var(--hkui-space-3, 12px);
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-pill);
+	background: transparent;
+	color: var(--hkui-foreground-muted);
+	font: inherit;
+	font-size: var(--hkui-text-small, 0.875rem);
+	font-weight: 600;
+}
+
+.hawkr-agent-rail__stop button:disabled {
+	cursor: not-allowed;
+	opacity: 0.55;
+}
+
+.hawkr-agent-rail__stop > span {
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	color: var(--hkui-foreground-muted);
+}
+
+/* §V.11.4 Delivery truth 的界線句。刻意比主標小一階但不淡到看不見——它是
+ * 「已建立」與「已送達」之間唯一的分界，不是註腳。 */
+.assistant-quote-summary__delivery {
+	margin: var(--hkui-space-1, 4px) 0 0;
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	color: var(--hkui-foreground-muted);
+}
+
+/* ── 主對話中的處理進度，與正式回覆分層 ───────────────────────────── */
+
+.hawkr-agent-processing {
+	align-self: flex-start;
+	width: 100%;
+	max-width: 680px;
+	min-width: 0;
+	padding-block: var(--hkui-space-2, 8px);
+	color: var(--hkui-foreground-soft);
+}
+
+.hawkr-agent-processing .hawkr-agent-rail {
+	max-width: 100%;
+}
+
+.hawkr-agent-processing__waiting {
+	display: flex;
+	align-items: center;
+	gap: var(--hkui-space-2, 8px);
+	font-size: var(--hkui-text-small, 0.875rem);
+	line-height: 1.5;
+}
+
+.hawkr-agent-processing > .assistant-progress {
+	border: 0;
+	background: transparent;
+}
+
+.hawkr-agent-processing .assistant-artifact__head {
+	padding: 0 0 var(--hkui-space-2, 8px);
+	border-bottom: 0;
+}
+
+.hawkr-agent-processing .assistant-artifact__head h2,
+.hawkr-agent-processing .assistant-artifact__head h3 {
+	font-family: inherit;
+	font-size: var(--hkui-text-small, 0.875rem);
+	font-weight: 600;
+}
+
+.hawkr-agent-processing .assistant-progress__list {
+	padding: 0;
+}
+
+/* ── 右欄只呈現成果，標頭與關閉鈕跨尺寸共用 ───────────────────────── */
+
+.hawkr-agent-panel {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+	overflow: hidden;
+	border-left: 1px solid var(--hkui-divider);
+	container-type: inline-size;
+}
+
+.hawkr-agent-panel__header {
+	display: flex;
+	flex: 0 0 auto;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--hkui-space-3, 12px);
+	min-height: 60px;
+	padding: var(--hkui-space-2, 8px) var(--hkui-space-4, 16px);
+	border-bottom: 1px solid var(--hkui-divider);
+}
+
+.hawkr-agent-panel__header h2 {
+	margin: 0;
+	color: var(--hkui-foreground);
+	font-size: var(--hkui-text-base, 1rem);
+	font-weight: 650;
+}
+
+/* 唯一捲動區留在 CandidateCanvas，避免巢狀捲動與 sticky 動作列擋住候選。 */
+.hawkr-agent-panel__content {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: hidden;
+	padding: 0;
+}
+
+.hawkr-agent-panel__content > * {
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+/* 面板已經有左邊界，畫布不要再畫一條。 */
+.hawkr-agent-panel__content > .hawkr-agent-canvas {
+	border-left: 0;
+}
+
+.hawkr-agent-panel__close {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--hkui-space-1, 4px);
+	min-width: 44px;
+	min-height: 44px;
+	padding: 0 var(--hkui-space-2, 8px);
+	border: 0;
+	border-radius: var(--radius-md);
+	background: transparent;
+	color: var(--hkui-foreground-soft);
+	font-size: var(--hkui-text-small);
+	cursor: pointer;
+}
+
+.hawkr-agent-panel__close:hover {
+	background: var(--hkui-content2);
+}
+
+.hawkr-agent-panel__close:focus-visible {
+	outline: none;
+	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
+}
+
+/* 設計稿 01 的「執行中」段標題。只在 run 還活著時渲染（AgentTaskPanel），
+   所以這裡不處理「已完成」的樣子。 */
+.hawkr-agent-rail__heading {
+	margin: 0 0 var(--hkui-space-2, 8px);
+	font-size: var(--hkui-text-small);
+	font-weight: 600;
+	color: var(--hkui-foreground-muted);
+}
+
+@media (max-width: 1199px) {
+	.hawkr-agent-panel {
+		border-left: 0;
+	}
+}
+
+/* 成果入口跨尺寸都能重開已收起的面板。 */
+.hawkr-agent-phase1__panel-open {
+	flex: 0 0 auto;
+	min-height: 44px;
+	padding: 0 var(--hkui-space-3, 12px);
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-pill, 999px);
+	background: transparent;
+	color: var(--hkui-foreground-soft);
+	font-size: var(--hkui-text-small);
+	cursor: pointer;
+}
+
+/* 無進度事件時的簡短等待提示。 */
+.hawkr-agent-typing-row__label {
+	min-width: 0;
+	overflow: hidden;
+	color: var(--hkui-foreground-soft);
+	font-size: var(--hkui-text-small);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   稿 R-01「重新確認 RFQ 快照」。買家在這一屏做的是**發布前的第二道確認**，不是
+   再固定一次價格——所以它跟 .assistant-rfq-snapshot（價格確認）刻意長得不一樣：
+   五個編號區塊平鋪，讓「需求／價格／溫度／受眾／可追溯性」同屏可比，而不是一條
+   由上往下的表單。稿上左上那顆「快照版本」badge 不實作（ADR 2026-09-12）。
+   ─────────────────────────────────────────────────────────────────────────── */
+.assistant-rfq-reconfirm {
+	display: grid;
+	gap: 14px;
+	padding: 16px;
+}
+
+.assistant-rfq-reconfirm__intro {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.assistant-rfq-reconfirm__intro h3 {
+	margin: 0;
+	font-size: var(--hkui-text-medium, 1rem);
+	line-height: 1.4;
+}
+
+.assistant-rfq-reconfirm__state {
+	padding: 3px 9px;
+	border-radius: var(--radius-full, 999px);
+	background: color-mix(in srgb, var(--hkui-warning) 14%, var(--hkui-content2));
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.assistant-rfq-reconfirm__grid {
+	display: grid;
+	gap: 12px;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* 快照追蹤是等寬鍵值表，欄位名較長，佔滿整行比擠在三欄裡好讀。 */
+.assistant-rfq-reconfirm__block--trace {
+	grid-column: 1 / -1;
+}
+
+.assistant-rfq-reconfirm__block {
+	display: grid;
+	align-content: start;
+	gap: 10px;
+	padding: 14px 15px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-lg);
+	background: var(--hkui-content1);
+}
+
+.assistant-rfq-reconfirm__block h4 {
+	margin: 0;
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-small, 0.875rem);
+	line-height: 1.4;
+}
+
+.assistant-rfq-reconfirm__block dl {
+	display: grid;
+	gap: 7px;
+	margin: 0;
+}
+
+.assistant-rfq-reconfirm__block dl > div {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	gap: 12px;
+	align-items: baseline;
+}
+
+.assistant-rfq-reconfirm__block dt {
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.assistant-rfq-reconfirm__block dd {
+	margin: 0;
+	overflow-wrap: anywhere;
+	text-align: right;
+	font-size: var(--hkui-text-small, 0.875rem);
+}
+
+.assistant-rfq-reconfirm__block dd small {
+	margin-left: 3px;
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.assistant-rfq-reconfirm__block > p {
+	margin: 0;
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	line-height: 1.5;
+}
+
+/* pricingMode 是 wire 上的列舉值，原樣呈現不翻譯——它是買家回報問題時要講得出
+   口的那個字，翻成中文反而對不上後端與客服看到的東西。 */
+.assistant-rfq-reconfirm__badge {
+	padding: 2px 7px;
+	border-radius: var(--radius-sm, 6px);
+	background: var(--hkui-content2);
+	font-family: var(--font-mono, ui-monospace, monospace);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.assistant-rfq-reconfirm__audience {
+	display: grid;
+	gap: 8px;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.assistant-rfq-reconfirm__audience label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 11px 12px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-md, 10px);
+	cursor: pointer;
+	font-size: var(--hkui-text-small, 0.875rem);
+}
+
+.assistant-rfq-reconfirm__audience label:has(input:checked) {
+	border-color: var(--hkui-primary);
+	background: color-mix(in srgb, var(--hkui-primary) 6%, transparent);
+}
+
+.assistant-rfq-reconfirm__audience label:has(input:disabled) {
+	cursor: not-allowed;
+	opacity: 0.55;
+}
+
+.assistant-rfq-reconfirm__confirmation {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	align-items: start;
+	gap: 10px;
+	padding: 13px 15px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-lg);
+	background: var(--hkui-content2);
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-small, 0.875rem);
+	cursor: pointer;
+}
+
+/* 回覆期限是 R-01 上唯一可輸入的欄位。外框沿用底下那張確認卡的規格（同一組
+   邊框／圓角／底色），讓「這兩格才是要買家動手的地方」在視覺上成為一組，與
+   上面五個唯讀事實區塊分開。 */
+.assistant-rfq-reconfirm__deadline {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 6px 12px;
+	padding: 13px 15px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-lg);
+	background: var(--hkui-content2);
+	color: var(--theme-text-body);
+}
+
+.assistant-rfq-reconfirm__deadline label {
+	display: grid;
+	gap: 3px;
+	font-size: var(--hkui-text-small, 0.875rem);
+}
+
+.assistant-rfq-reconfirm__deadline label small {
+	color: var(--theme-text-caption);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	line-height: 1.5;
+}
+
+.assistant-rfq-reconfirm__deadline input {
+	min-height: 44px;
+	padding: 0 11px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-md);
+	background: var(--hkui-content1);
+	color: var(--hkui-foreground);
+	font: inherit;
+	font-size: max(1rem, var(--hkui-text-small, 0.875rem));
+}
+
+.assistant-rfq-reconfirm__deadline input:focus-visible {
+	border-color: var(--hkui-primary);
+	outline: 0;
+	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
+}
+
+.assistant-rfq-reconfirm__deadline input[aria-invalid="true"] {
+	border-color: var(--hkui-danger);
+}
+
+.assistant-rfq-reconfirm__deadline input:disabled {
+	cursor: not-allowed;
+	opacity: 0.55;
+}
+
+/* 錯誤訊息橫跨兩欄。⚠️ 沒有錯誤時**不能**把它 `display: none`——那會把 aria-live
+   容器從無障礙樹上拿掉，第一次出現錯誤時螢幕閱讀器就播不到（live region 必須在
+   內容變動之前就存在）。空的 <p> 本來就沒有行框、高度為零，留著不佔版面。與
+   `.assistant-rfq-guidance__range-help` 同一個處理方式。 */
+.assistant-rfq-reconfirm__deadline > p {
+	grid-column: 1 / -1;
+	margin: 0;
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	line-height: 1.5;
+}
+
+.assistant-rfq-reconfirm__deadline > p[data-error] {
+	color: var(--hkui-danger-600);
+	font-weight: 650;
+}
+
+[data-theme="dark"] .assistant-rfq-reconfirm__deadline > p[data-error] {
+	color: var(--hkui-danger-200);
+}
+
+.assistant-rfq-reconfirm__approval,
+.assistant-rfq-reconfirm__published {
+	display: grid;
+	gap: 8px;
+	padding: 13px 15px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-lg);
+	background: var(--hkui-content2);
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-small, 0.875rem);
+}
+
+.assistant-rfq-reconfirm__approval > p,
+.assistant-rfq-reconfirm__published > p {
+	margin: 0;
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	line-height: 1.5;
+}
+
+.assistant-rfq-reconfirm__approval dl,
+.assistant-rfq-reconfirm__published dl {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+	gap: 8px 16px;
+	margin: 0;
+}
+
+.assistant-rfq-reconfirm__approval dt,
+.assistant-rfq-reconfirm__published dt {
+	color: var(--theme-text-caption);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.assistant-rfq-reconfirm__approval dd,
+.assistant-rfq-reconfirm__published dd {
+	margin: 0;
+	color: var(--theme-text-body);
+	word-break: break-all;
+}
+
+/* docx §V 圖說要求這句固定貼在 CTA 下方，所以它跟著 footer 走而不是跟著區塊。 */
+.assistant-rfq-draft__footer-meaning {
+	margin: 8px 0 0;
+	color: var(--theme-text-body);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+	.assistant-rfq-reconfirm__grid,
+	.assistant-rfq-reconfirm__audience,
+	.assistant-rfq-reconfirm__deadline {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}

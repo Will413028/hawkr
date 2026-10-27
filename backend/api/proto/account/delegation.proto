@@ -1,0 +1,1001 @@
+syntax = "proto3";
+
+package hawkr.account;
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/account";
+option java_multiple_files = true;
+option java_package = "io.github.will413028.hawkr.account.grpc";
+option java_outer_classname = "DelegationServiceProto";
+
+// DelegationService - ADM 代行營運工作階段與稽核服務（account-service）
+//
+// 全部 RPC 皆為 **internal-only**：唯一合法呼叫方是 Gateway，
+// 不對前端暴露、不經任何 public/app namespace。
+service DelegationService {
+
+    // 判定某位管理員此刻能否對某店家開始代行，並回傳可用 scope / reason 選項 / TTL。
+    // **必須唯讀且可安全重複呼叫**（前端每 30 秒、focus 與每次 create 前都會呼叫）。
+    //    不得寫入任何資料、不得產生稽核列、不得消耗冪等額度。
+    rpc Preflight (PreflightRequest) returns (PreflightResponse);
+
+    // 建立短效代行工作階段，回傳 handoff code 與安全摘要；credential 只在兌換時簽發。
+    // 冪等鍵為 (actor_admin_id, idempotency_key)；同 key 重放回同一個 session，
+    //    並改簽一把新的 handoff code、覆蓋舊 hash。
+    rpc CreateSession (CreateSessionRequest) returns (CreateSessionResponse);
+
+    // 兌換一次性 handoff code，取回該工作階段的 operation credential
+    //    （A29／設計書 §4.5「憑證跨 host 傳遞」；Gateway 側是 S6）。
+    // **唯一呼叫方是 Gateway 的 S6 端點**，而 S6 既不要 ADM session cookie、
+    //    也不要 operation credential —— 授權完全由 handoff code 自己承擔。
+    //    ⇒ 四道防護全部落在本 RPC 的實作內，一道都不得推給呼叫端。
+    // **必須是單句 CAS**：
+    //    UPDATE … SET handoff_code_hash = NULL, credential_hash = :new_hash
+    //     WHERE handoff_code_hash = $1 AND handoff_expires_at > now()
+    //       AND status = 'active' AND ended_at IS NULL
+    //       AND now() < expires_at                                  -- session hard 到期
+    //       AND now() < last_active_at + make_interval(secs => $2)  -- session idle 到期
+    //     RETURNING …            （$2 = DELEGATION_SESSION_IDLE_SECONDS）
+    //    rows = 0 一律回 9282（DELEGATION_HANDOFF_INVALID，四種成因共用同一個碼）。
+    // ⚠️ **述詞恰為六個，最後兩個不可省**：DB 的 status 沒有 expired 值
+    //    （到期是讀取時推導，設計書 §7.5.1 順位 2／3）⇒ 一個 hard 或 idle
+    //    已到期的 session，status 仍然是 'active'。少了它們，過期工作階段
+    //    照樣兌換得出 credential 並回 200，而四道防護的第 ④ 道只做到一半。
+    //    handoff 窗口與 session 窗口**互不蘊含**（DELEGATION_HANDOFF_TTL_SECONDS
+    //    與 DELEGATION_SESSION_* 之間沒有任何不等式關係，§8.5.1）。
+    //    **禁止先 SELECT 再 UPDATE** —— 那是兩個人同時兌換同一把 code 時
+    //    各拿到一份 credential 的形狀。
+    // 兌換在同一句寫入隨機 credential 的 SHA-256 hash；不寫稽核列、
+    //    不順延 last_active_at、不 bump revision —— 兌換不是代行操作。
+    rpc RedeemHandoff (RedeemHandoffRequest) returns (RedeemHandoffResponse);
+
+    // 由 credential 反查當前工作階段摘要。
+    // **不得 bump revision、不得延長 expires_at、不得更新 issued_at**——
+    //    連續兩次呼叫必須回傳位元等價的摘要，否則前端永遠進不了工作區。
+    // **counts_as_activity=false 時完全唯讀**（GET /current 端點恆走這一側，每 30 秒被輪詢）；
+    //    counts_as_activity=true 時**只多順延 last_active_at 一欄**（閒置逾時，§6.2.4a／A23），
+    //    回應內容不因此改變——last_active_at 不進 DTO、不進九欄對帳。
+    rpc GetCurrentSession (GetCurrentSessionRequest) returns (GetCurrentSessionResponse);
+
+    // 結束工作階段（＝立刻到期）。冪等：已 ended/expired/revoked 仍回成功。
+    // credential 查無對應列時也回成功（見設計書 §6.1.5 的理由）。
+    rpc EndSession (EndSessionRequest) returns (EndSessionResponse);
+
+    // 撤銷工作階段（ADM 治理動作，非代行能力）。即時 fail-closed，revision + 1。
+    // 已 expired 者仍可撤銷以留下治理痕跡；revoked 為終態。
+    rpc RevokeSession (RevokeSessionRequest) returns (RevokeSessionResponse);
+
+    // ADM 登出連動：撤銷該管理員名下**所有進行中**的代行工作階段（§4.5 auth.go 條目、
+    //    §12.4 ① 的等效 SQL）。呼叫端是 Gateway 的登出 handler。
+    // **不收 revoke_reason**：本 RPC 的存在本身就決定了它是 'admin_logout'，
+    //    由服務端寫入固定字面值。收一個字串參數就是給呼叫端一個寫錯它的機會，
+    //    而稽核的四種撤銷來源全靠這一欄機械區分（與 §6.1.15 端點 6 的連帶撤銷同理）。
+    // `revoked_by_admin_id` 一律 ＝ actor 自己：登出是他自己的動作，不是第三方介入，
+    //    §12.4 ① 正是以「兩者相同」來判讀這一類撤銷。
+    // 冪等：述詞是「進行中」，重放一次撤不到任何列，回成功 ＋ 空陣列，
+    //    因此不收 idempotency_key。
+    rpc RevokeSessionsByActor (RevokeSessionsByActorRequest) returns (RevokeSessionsByActorResponse);
+
+    // 兩階段稽核的第一階段：在**任何** domain write 之前寫入 PENDING 稽核列。
+    // 寫入失敗即 fail-closed，呼叫方不得進行 domain write。
+    rpc RecordAuditIntent (RecordAuditIntentRequest) returns (RecordAuditIntentResponse);
+
+    // 兩階段稽核的第二階段：把 PENDING 更新為 SUCCEEDED / FAILED，
+    // 並在同一個交易內寫入 outbox 列（Outbox 保 MQ 必發，§22 例外 2）。
+    // 呼叫方必須同步有限重試 3 次（指數退避，總計 < 2 秒）；仍失敗才留 PENDING。
+    rpc ConfirmAuditResult (ConfirmAuditResultRequest) returns (ConfirmAuditResultResponse);
+
+    // 上兩支的批次版，供 §7.2.8 的批次端點使用。
+    // **語意完全等同於「呼叫 N 次單筆版」**，差別只在跳數與交易邊界：
+    //    仍然寫 N 列稽核、仍然逐項 idempotency_key、仍然逐項回 audit_log_id。
+    //    存在的理由是「Gateway 的跳數不得與 items 筆數成正比」（§7.2.8）。
+    // RecordAuditIntentBatch 是**逐項成敗**：某一項寫不進去只讓該項以 9279 收尾，
+    //    其餘照跑（§7.2.8 讀法 6）。實作必須逐項 SAVEPOINT —— PostgreSQL 交易內
+    //    任一句 SQL 失敗即整個交易 aborted（25P02），不設 SAVEPOINT 做不到部分成功。
+    rpc RecordAuditIntentBatch (RecordAuditIntentBatchRequest)
+        returns (RecordAuditIntentBatchResponse);
+
+    // ConfirmAuditResultBatch 相反，是 **all-or-nothing**：N 列 UPDATE 與 N′ 列 outbox
+    //    INSERT 在同一個交易內，失敗即 N 列一起停在 PENDING（寬度分析見 §7.3.3 視窗 A）。
+    //    重試次數與退避沿用單筆版的裁決，每次的 deadline 與總預算另有參數（§8.5.1 (B)）。
+    rpc ConfirmAuditResultBatch (ConfirmAuditResultBatchRequest)
+        returns (ConfirmAuditResultBatchResponse);
+
+    // 稽核時間線查詢（UI 的「代行紀錄」頁）。唯讀。
+    rpc ListAuditLogs (ListAuditLogsRequest) returns (ListAuditLogsResponse);
+
+    // 結束摘要（UI 的「結束本次代行？」modal）。唯讀。
+    // fulfillment_action_count / finance_action_count 結構上恆為 "0"。
+    // **兩支 HTTP 端點共用這一支 RPC，差別只在 session_id 從哪裡來**（§6.1.11）：
+    //    GET .../{sessionId}/summary  → ADM session 授權，session_id 取自 URL（可查任意工作階段）
+    //    GET .../current/summary      → operation credential 授權，session_id 由 Gateway 反查（只回自己那一個）
+    //    **不新增第二支 RPC**：兩者的回應形狀與計算規則完全相同，分開會讓「零出貨零財務」有兩個實作。
+    rpc GetSessionSummary (GetSessionSummaryRequest) returns (GetSessionSummaryResponse);
+
+    // ==================== 跨工作階段治理查詢（§11.3 P1） ====================
+    // 兩支都是治理回看：ListSessions 答「這段期間誰代行了哪些店」，ListAllAuditLogs
+    //    答「這家店／這位操作者跨工作階段做過什麼」。唯讀。
+    // 兩者刻意**不帶 actor_admin_id**，與上面兩支查詢 RPC 一致：身分由 Gateway 的
+    //    requireAdmin 承擔，這一層不做第二道判定。加一個用不到的 actor 欄位會讓下一個
+    //    人以為它是授權閘門，而它不是——真正的閘門在 Gateway。
+    // 也刻意**不吃 admin_accounts.delegation_enabled**：那把尺管的是「誰可以發起代行」，
+    //    回看已經發生的事是稽核，兩者不同問題。綁在一起會讓稽核角色查不到東西。
+    rpc ListSessions (ListSessionsRequest) returns (ListSessionsResponse);
+    rpc ListAllAuditLogs (ListAllAuditLogsRequest) returns (ListAllAuditLogsResponse);
+
+    // ==================== 代行授權列（治理設定） ====================
+    // 逐店授權（seller_delegation_authorizations）的維護介面，償還 §11.1 技術債償還
+    //    路徑②「使用頻率高到讓人開始手寫 SQL 出錯時做 admin 維護頁」。
+    // 以下六支的共同前提：actor 必須通過 admin_accounts.delegation_enabled（與 Preflight
+    //    同一把尺），未通過一律 9288。實作**收斂成單一具名述詞**，不得在六支各寫一次
+    //    `if !acct.DelegationEnabled` —— 日後治理政策若要求「授權者 ≠ 操作者」，
+    //    要改的是那一個述詞而不是六個散落的分支。
+    // ⚠️ 六支都是**治理設定**動作，不是代行操作：不開工作階段、不消耗 capability、
+    //    也**不得**寫進 admin_operation_audit_logs（該表 session_id NOT NULL REFERENCES
+    //    delegated_operation_sessions，而授權的建立與撤銷發生在任何工作階段之前，
+    //    結構上就填不進去；造一個假 session 來填會污染稽核時間線與結束摘要統計）。
+    //    留痕走獨立的 delegation_authorization_audit_logs，與授權列**同一個交易**。
+
+    // 授權列表（治理總覽）。唯讀。
+    // status 只有 ""／effective／ineffective 三值。{active, revoked, expired} 那種分類
+    //    會漏掉 effective_from 落在未來的列（維運 SQL 仍可能建），那些列不屬於任何一類
+    //    ⇒ 篩選時靜默消失。二分是全覆蓋的；畫面要說明「為什麼無效」時讀該列的
+    //    revoked_at／effective_until 自己判斷。
+    // effective 由伺服端以 now() 逐列評估後放進投影，**前端不得自行從三個時間欄推導**。
+    rpc ListDelegationAuthorizations (ListDelegationAuthorizationsRequest)
+        returns (ListDelegationAuthorizationsResponse);
+
+    // 單店授權詳情（商家詳情頁的「代行授權」面板）。唯讀。
+    // 查無授權列**不是錯誤**：回 code=0 ＋ data.exists=false（照 seller.proto 的
+    //    GetActiveSellerSuspensionForAdmin「查無即空投影」慣例）。用 9286 表示「尚未開通」
+    //    會讓「這家店還沒開通」與「上游掛了」在前端長得一模一樣。
+    // ⚠️ **只查 store 級那一列，不得回落全域列**：全域列存在時會遮蔽所有店，治理畫面
+    //    若把它當成「這家店的設定」顯示，管理員會對著一列不屬於該店的授權按下撤回。
+    //    account-service 側要用 store 級專用查詢，**不要沿用工作階段建立路徑那一支**
+    //    （那支「不過濾有效性、含全域回落」是刻意的，改它會動到 Preflight 的判定）。
+    rpc GetDelegationAuthorization (GetDelegationAuthorizationRequest)
+        returns (GetDelegationAuthorizationResponse);
+
+    // 開通或重新開通一家店的代行授權。
+    // ⚠️ **uq_sda_store 的述詞是 WHERE target_store_id IS NOT NULL，不含 revoked_at
+    //    ⇒ 每店終生一列**。因此復權只能 UPDATE 同一列，**不得 INSERT 第二列**；本 RPC
+    //    同時承載「首建」與「復權」，兩者在維運語意上本來就同義（都是重設
+    //    effective_from／approved_at／approved_by_admin_id ＝ 一次全新的授權）。
+    //    實際走了哪一條由回應的 outcome 回報，**不由呼叫方以旗標指定**。
+    // CAS（單句，rows 數即判定）：
+    //    INSERT … ON CONFLICT (target_store_id) WHERE target_store_id IS NOT NULL
+    //      DO UPDATE SET … WHERE seller_delegation_authorizations.revoked_at IS NOT NULL
+    //      RETURNING *
+    //    rows = 0 ⇒ 已存在有效授權 → 9285（不是例外、不是重試訊號）。
+    // ⚠️ **禁止先 SELECT 再決定 INSERT 或 UPDATE** —— 那是兩個管理員同時開通同一家店時
+    //    一個靜默覆蓋另一個的形狀。
+    // ⚠️ **也禁止「讓 DB 拋唯一鍵錯再 catch」** —— PostgreSQL 交易內任一句 SQL 失敗即
+    //    整個交易 aborted（25P02），catch 得到例外，但後續任何一句 SELECT 都會炸成 500。
+    // 授權列的寫入與稽核列的 INSERT **必須同一個交易**：分開就會出現「授權變了但沒有人
+    //    知道是誰改的」，而那正是本組 RPC 存在的理由。
+    // 不接受 effective_from，一律 now()：未來生效會長出「已建立但尚未生效」的第三態，
+    //    preflight／告警／UI 全部要跟著長，而沒有任何營運需求要它（DB 仍保留該能力給維運 SQL）。
+    // target_store_id 必填，**不開放由本 RPC 建立全域列**（uq_sda_global 那一列營運上禁建，
+    //    Runbook 把它列為「查到就要追查來源」的異常）。
+    rpc GrantDelegationAuthorization (GrantDelegationAuthorizationRequest)
+        returns (GrantDelegationAuthorizationResponse);
+
+    // 調整既有有效授權的範圍／依據／期限。**全量取代，不是 partial update**：
+    //    granted_capabilities 送什麼就是什麼，未送的欄位不會沿用舊值。
+    // CAS：UPDATE … WHERE target_store_id = $1 AND revoked_at IS NULL RETURNING *
+    //    rows = 0 時再以一句唯讀 SELECT 分辨成因：該列不存在 → 9286；已撤回 → 9264。
+    //    **不得把兩者合併成同一個模糊錯誤**——前者要引導去「開通」，後者要引導去「復權」。
+    // ⚠️ **與 Grant 分開是刻意的，不要合成一支 upsert**：兩者的 CAS 述詞恰好相反
+    //    （revoked_at IS NOT NULL vs IS NULL）。合成之後，管理員對著一張過時分頁按下
+    //    「調整範圍」，會把一個因故撤回的店**靜默復權**，而且沒有任何錯誤訊號。分開之後
+    //    這條路徑在 SQL 層就不可能發生 —— 這也是本組 RPC 不需要 revision 樂觀鎖的理由。
+    rpc UpdateDelegationAuthorization (UpdateDelegationAuthorizationRequest)
+        returns (UpdateDelegationAuthorizationResponse);
+
+    // 撤回一家店的代行授權。
+    // CAS：UPDATE … SET revoked_at = now(), revoked_by_admin_id = $2, revoke_reason = $3
+    //        WHERE target_store_id = $1 AND revoked_at IS NULL RETURNING *
+    //    rows = 0 且該列存在 ⇒ 早已撤回，回**成功**且 already_revoked = true（照
+    //    RevokeSession「對已終態者仍回成功」）；該列不存在才是 9286。
+    // ⚠️ **冪等成功不得補寫第二列稽核**：稽核列記的是「發生了什麼」，第二次撤回什麼都
+    //    沒發生。同理 revoked_at／revoked_by_admin_id／revoke_reason 一律保留第一次的值。
+    // **同一個交易內連帶撤銷該店所有進行中的工作階段**，被撤銷的 id 回在 revoked_session_ids。
+    //    理由：Runbook 明定「撤回授權不會中止進行中的工作階段，須另走人工撤銷，兩者都做
+    //    才是完整的撤回」——把一個已知會被忘記的人工第二步留到 API 時代，等於交付一個
+    //    半殘的治理動作。⚠️ 這一段**必須與授權列同交易**：分開就留下「授權已撤回但代行
+    //    還在跑」的窗口，而那正是本欄要消除的東西。
+    //    revoked_session_ids 恆為陣列（無工作階段時為空陣列，不是 null）。
+    rpc RevokeDelegationAuthorization (RevokeDelegationAuthorizationRequest)
+        returns (RevokeDelegationAuthorizationResponse);
+
+    // 單店的授權變更歷程（delegation_authorization_audit_logs）。唯讀。
+    // 這張表存在的理由：uq_sda_store 每店一列 ⇒ 復權會就地覆蓋前一次撤回的
+    //    revoked_at／revoked_by_admin_id／revoke_reason，「這家店曾經被撤回過」在授權列上
+    //    不留任何痕跡。手寫 SQL 時代靠「source_reference 指向的依據文件能追溯前一次撤回」
+    //    勉強撐住，那是**人的流程保證**；有了介面之後改授權變成一次點擊，該保證失效。
+    // ⚠️ append-only：本表沒有任何 UPDATE／DELETE 路徑（連 updated_at 都不設）。
+    // 從未開通過的店回 9286，**不是空清單** —— 「查無此店的授權」與「有授權但沒改過」是
+    //    兩件事，而後者不可能發生：開通本身就會留下第一列 GRANT。
+    rpc ListDelegationAuthorizationHistory (ListDelegationAuthorizationHistoryRequest)
+        returns (ListDelegationAuthorizationHistoryResponse);
+}
+
+// ==================== 共用資料結構 ====================
+
+message DelegationTarget {
+    string store_id = 1;             // store surrogate（數字字串）
+    string seller_account_id = 2;    // 登入 principal（數字字串）
+    string store_name = 3;           // 1–160 字，已 trim
+}
+
+message DelegationActor {
+    string admin_id = 1;             // admin_accounts.id（數字字串）
+    string display_name = 2;         // 1–160 字，已 trim
+}
+
+message DelegationReason {
+    string code = 1;                       // DelegationReasonCode Value（小寫 snake）
+    string label = 2;                      // 1–160 字
+    bool case_reference_required = 3;
+}
+
+message ReasonOption {
+    string code = 1;
+    string label = 2;
+    bool case_reference_required = 3;
+}
+
+// OperationSessionSummary 是對外唯一的工作階段投影。
+// 絕不得包含 operation credential、seller token、access/refresh token。
+message OperationSessionSummary {
+    string session_id = 1;                       // TSID 數字字串
+    string display_code = 2;                     // OPS- ＋ base36(id) 左補零至 13 碼（完整值不截斷），見 §5.1.1
+    DelegationTarget target = 3;
+    DelegationActor actor = 4;
+    DelegationReason reason = 5;
+    // case_reference 未設定時必須輸出 JSON null，不可省略。
+    //    Go 端 DTO 用 *string 且**不得**加 omitempty；Java 端不得用 NON_NULL。
+    //    proto3 以 optional 標記，讓 Gateway 能區分「空字串」與「未設定」。
+    optional string case_reference = 6;
+    repeated string capabilities = 7;            // 9 個封閉列舉的子集，非空、去重
+    string issued_at = 8;                        // ISO 8601 UTC，秒精度，Z 結尾
+    string expires_at = 9;                       // 同上；一經核發永不變動
+    string status = 10;                          // active | expired | revoked（小寫）
+    // §4 數字對外 string 的例外（值域安全）：前端以 Number.isSafeInteger 驗證。
+    int64 revision = 11;
+}
+
+message ChangedField {
+    string field = 1;      // 程式欄位名
+    string label = 2;      // 中文顯示名（UI 三欄表的第一欄）
+    string before = 3;     // 已遮罩／已 allow-list 的顯示值
+    string after = 4;
+}
+
+message AuditLogEntry {
+    string audit_log_id = 1;
+    string created_at = 2;                 // ISO 8601 UTC 秒精度
+    optional string confirmed_at = 3;      // PENDING 時為 null
+    string action = 4;                     // DelegationAuditAction Value
+    string action_label = 5;
+    string risk_level = 6;                 // low | medium | high
+    string capability = 7;
+    string resource_type = 8;              // storefront | product | post | order
+    string resource_id = 9;
+    string resource_name = 10;
+    string resource_image_key = 11;        // objectKey，非 URL（49 號設計書）
+    string operation_reason = 12;
+    optional string case_reference = 13;
+    string result = 14;                    // PENDING | SUCCEEDED | FAILED
+    int32 biz_code = 15;                   // 沿用 §4.1 例外 2（Response int32 code）
+    string resource_version_before = 16;
+    string resource_version_after = 17;
+    repeated ChangedField changed_fields = 18;
+    string correlation_id = 19;
+    string request_id = 20;
+    string idempotency_key = 21;
+    reserved 22;
+    reserved "client_ip";
+    string user_agent = 23;
+    // 語意 = 「代行完成事件已發布至 MQ 的時刻」，不是「賣家已收到」。
+    //    本期沒有 notification-service 回寫投遞結果的路徑，因此**不提供**
+    //    notification_status／notification_channels —— 回一個恆為 DELIVERED
+    //    的假值會讓稽核紀錄在爭議時反過來咬人。notify_seller=false 時為 null。
+    optional string notified_at = 24;
+    // 發起形態：interactive（操作者當下互動）／scheduled（代行期間設定的排程稍後自動執行）。
+    // 排程執行時工作階段通常已結束，授權事實只能靠 session_id ＋ 本欄一起舉證，故查詢面必須帶出。
+    string origin = 25;
+    // 逐列快照，**不由 GetSessionSummary 推導**（§6.1.11）：這裡的名稱是 intent 當下的值，
+    //    與 session 建立當下的快照可能不同（中途改名）；且 §11.3 P1 的跨 session 稽核端點
+    //    沿用本 message，那支端點的每一列 actor／target 必然互不相同。
+    DelegationActor actor = 26;
+    DelegationTarget target = 27;
+    // 刻意**沒有** before_snapshot_json／after_snapshot_json：兩欄無任何 API 出口（§6.1.11 定版），
+    //    完整比對走維運 SQL。加回來會同時破壞體積上界與「快照白名單 ≠ DTO allow-list」那條禁令。
+}
+
+// ==================== Preflight ====================
+
+message PreflightRequest {
+    string actor_admin_id = 1;      // Gateway 由 ADM session 解析後填入，前端不可控
+    string target_store_id = 2;
+    reserved 3;
+    reserved "client_ip";
+    string user_agent = 4;
+}
+
+message PreflightResponse {
+    int32 code = 1;
+    string message = 2;
+    PreflightData data = 3;
+}
+
+message PreflightData {
+    bool allowed = 1;
+    DelegationTarget target = 2;
+    DelegationActor actor = 3;
+    // 以下兩欄 **allowed=false 時同樣必須非空**（回「無阻擋時會核發的集合」）：
+    //    前端 parser 在 allowed 分支之前就對它們做非空校驗，空陣列 → 502，
+    //    連 denied_code 都會被丟掉。見設計書 §6.1.2。
+    repeated ReasonOption reason_options = 4;
+    repeated string capabilities = 5;
+    // §4 數字對外 string 的例外（值域安全）：1–1800 的安全整數。
+    int32 ttl_seconds = 6;
+    bool case_reference_required = 7;
+    int32 denied_code = 8;                      // allowed=false 時的業務碼；allowed=true 時為 0
+    string denied_label = 9;
+    // 閒置逾時窗口（秒），設定值 DELEGATION_SESSION_IDLE_SECONDS 的下發（A23、設計書 §6.1.2）。
+    //    僅供建立 modal 渲染「閒置 N 分鐘後自動結束」；不進 session summary、不進九欄對帳。
+    //    同為 §4 的值域安全例外：60–1800 的安全整數。
+    int32 idle_seconds = 10;
+}
+
+// ==================== CreateSession ====================
+
+message CreateSessionRequest {
+    string actor_admin_id = 1;
+    string actor_display_name = 2;
+    string target_store_id = 3;
+    string reason_code = 4;
+    optional string case_reference = 5;          // 顯式未設定 = null
+    repeated string requested_capabilities = 6;
+    int32 requested_ttl_seconds = 7;
+    string idempotency_key = 8;
+    string request_id = 9;
+    string correlation_id = 10;
+    reserved 11;
+    reserved "client_ip";
+    string user_agent = 12;
+}
+
+message CreateSessionResponse {
+    int32 code = 1;
+    string message = 2;
+    CreateSessionData data = 3;
+}
+
+message CreateSessionData {
+    reserved 1;
+    reserved "operation_credential";
+    OperationSessionSummary session = 2;
+
+    // 一次性 handoff 兌換碼明文（48 字元，`dhof_` ＋ base64url，字元集與 credential 同，
+    //    §8.1.6）。DB 只存 SHA-256 hash，
+    //    絕不得進 log／Sentry／metric label。
+    // 由 CreateSession **在同一個交易內**簽發（IssueHandoff），有效期
+    //    DELEGATION_HANDOFF_TTL_SECONDS（60 秒，§8.5.1），單次兌換即作廢。
+    // ⚠️ **它唯一合法的去處是 ADM create route 組出的 303 Location**
+    //    （`{WEB_ORIGIN}/adm/enter?code=…`，A29／§4.5）；credential 本身
+    //    **絕不得**進 URL —— 兩者的差別正是 A29 否決「credential 進導向 URL」的理由。
+    // 同 key 重放改簽新 code 並覆蓋 handoff_code_hash／handoff_expires_at，舊 code
+    //    當場失效；DB 不留明文。若既有 code 已兌換，再兌換新 code 時新 credential
+    //    的 hash 覆蓋舊 hash，因此同一個 session 至多一把有效 credential。
+    string handoff_code = 3;
+}
+
+// ==================== GetCurrentSession ====================
+
+message GetCurrentSessionRequest {
+    // credential 明文，由 Gateway 從 X-HK-Operation-Session header 取得。
+    // 不接受 store_id 參數：目標店家只能由工作階段快照決定。
+    string operation_credential = 1;
+
+    // 本次呼叫是否算作「操作者的活動」（閒置逾時用，設計書 §6.2.4a／A23）。
+    //   true  ＝ 呼叫方是**代行資源路由**（經 delegatedHandle 註冊，讀寫皆然）
+    //            → account-service 以同一句 UPDATE … RETURNING 順延 last_active_at
+    //   false ＝ 呼叫方是**六支 session 端點**（preflight／create／current／end／current-summary／revoke）
+    //            → 純唯讀，一個位元都不寫
+    // ⚠️ 本欄由 Gateway 依**路由註冊在哪個 middleware 下**填入，不是逐個 handler 手寫，
+    //    更不是從 HTTP request 讀（瀏覽器無從指定；它一旦可控就等於把 idle 關掉）。
+    // ⚠️ proto3 的 bool 預設是 false ⇒ **漏填 = 不順延 = 操作者做到一半被閒置踢掉**，
+    //    這個方向是刻意的（fail-closed）：漏填會被人反映，反過來預設 true 則是靜默失效。
+    bool counts_as_activity = 2;
+}
+
+message GetCurrentSessionResponse {
+    int32 code = 1;
+    string message = 2;
+    OperationSessionSummary data = 3;
+}
+
+// ==================== EndSession ====================
+
+message EndSessionRequest {
+    string operation_credential = 1;
+    string request_id = 2;
+}
+
+message EndSessionResponse {
+    int32 code = 1;
+    string message = 2;
+    EndSessionData data = 3;
+}
+
+message EndSessionData {
+    bool ended = 1;    // 恆為 true
+}
+
+// ==================== RevokeSession ====================
+
+message RevokeSessionRequest {
+    string session_id = 1;
+    string actor_admin_id = 2;     // 執行撤銷的管理員（可與工作階段 actor 不同）
+    string revoke_reason = 3;      // 1–200 字
+    string idempotency_key = 4;
+    string request_id = 5;
+}
+
+message RevokeSessionResponse {
+    int32 code = 1;
+    string message = 2;
+    RevokeSessionData data = 3;
+}
+
+message RevokeSessionData {
+    string session_id = 1;
+    string status = 2;             // 恆為 "revoked"
+    int64 revision = 3;
+    string revoked_at = 4;         // ISO 8601 UTC 秒精度
+}
+
+// ==================== RevokeSessionsByActor（ADM 登出連動） ====================
+
+message RevokeSessionsByActorRequest {
+    // 登出的那位管理員自己（admin_accounts.id）。revoked_by_admin_id 也填這個值。
+    string actor_admin_id = 1;
+    string request_id = 2;
+}
+
+message RevokeSessionsByActorResponse {
+    int32 code = 1;
+    string message = 2;
+    RevokeSessionsByActorData data = 3;
+}
+
+message RevokeSessionsByActorData {
+    // 本次真的被撤銷的工作階段（恆為陣列，沒有進行中的工作階段時為 []）。
+    // 供呼叫端記錄用；登出的成敗不取決於它（登出必須 idempotent，§4.5）。
+    repeated string revoked_session_ids = 1;
+}
+
+// ==================== RedeemHandoff（A29／§4.5） ====================
+
+message RedeemHandoffRequest {
+    // handoff code 明文，由 Gateway 從 S6 的 body `handoffCode` 取得。
+    // **不接受 session_id、store_id 或任何其他參數**：兌換得出哪一個工作階段，
+    //    只能由 code 自己決定（四道防護③）。多收一個參數就多一個可被指定的目標。
+    string handoff_code = 1;
+    string request_id = 2;
+}
+
+message RedeemHandoffResponse {
+    int32 code = 1;
+    string message = 2;
+    RedeemHandoffData data = 3;
+}
+
+message RedeemHandoffData {
+    // 明文 credential 的唯一出口；兌換時由 crypto/rand 產生至少 256 bit，DB 只存 SHA-256 hash。
+    string operation_credential = 1;
+    // 與 GetCurrentSession 回的**完全相同**那份摘要（§4.5 S6 規格）：
+    //    型別共用同一個 message，禁止為兌換另立一份精簡版 —— website 側
+    //    要用它決定導向哪個 storeId，欄位一旦不同就會導去錯的店。
+    OperationSessionSummary session = 2;
+}
+
+// ==================== RecordAuditIntent ====================
+
+message RecordAuditIntentRequest {
+    string session_id = 1;
+    string capability = 2;
+    string action = 3;                       // DelegationAuditAction Value
+    string resource_type = 4;
+    string resource_id = 5;                  // 建立類操作時為空字串（confirm 階段補寫）
+    string resource_name = 6;
+    // 三態（§6.1.0 的表是 SSOT，本欄與 §5.1.3 的欄位可空性同源）：
+    //   寫入類 mutation → 必填；PII 揭露 → 必填；
+    //   讀取被拒絕而落的稽核列（STOREFRONT_READ／PRODUCT_READ／POST_READ／ORDER_READ）
+    //   → 唯一可空的情境，傳空字串，稽核表存 NULL。
+    // 除上述第三態外，account-service 收到空字串一律回 INVALID_ARGUMENT，
+    //    不得靜默存成 NULL —— 稽核列少一個理由，事後就再也補不回來。
+    string operation_reason = 7;
+    string resource_version_before = 8;
+    string before_snapshot_json = 9;         // allow-list 後的 JSON 字串；禁 token/PII
+    // GET 類（PII 揭露）刻意不去重，此欄留空；稽核表的唯一索引是
+    //    partial WHERE idempotency_key IS NOT NULL。
+    string idempotency_key = 10;
+    string request_id = 11;
+    string correlation_id = 12;
+    reserved 13;
+    reserved "client_ip";
+    string user_agent = 14;
+    // 請求 payload 的 SHA-256（allow-list 後）。GET 類無 payload 時留空；
+    // 有 payload 時必填 —— 「同一把 key 配不同 payload」只能靠它判定。
+    string payload_hash = 15;
+    // 「通知賣家」勾選狀態。在 intent 當下就已知，必須在這裡寫入；
+    //    ConfirmAuditResult 只讀不寫，否則本欄永遠只能是 true。
+    // proto3 scalar：「未設定」與 false 在 wire 上不可區分。寫入類端點
+    //    一律由 Gateway 顯式填 true（body 缺席時也填 true，§6.1.0），漏填
+    //    就是 false ⇒ W5 一列 outbox 都不建、賣家零通知且零錯誤訊號。
+    //    ORDER_PII_REVEAL 與 AUDIT_CORRECTION 反向：一律顯式填 false。
+    bool notify_seller = 16;
+    // interactive | scheduled。排程觸發的發布走 scheduled，
+    // §7.6 的排程授權模型依賴本欄區分兩者。
+    string origin = 17;
+}
+
+message RecordAuditIntentResponse {
+    int32 code = 1;
+    string message = 2;
+    RecordAuditIntentData data = 3;
+}
+
+message RecordAuditIntentData {
+    string audit_log_id = 1;
+    // 同 idempotency_key 重放時為 true，呼叫方據此決定是否重跑 domain write。
+    bool replayed = 2;
+    string result = 3;                       // 重放時回既有列的 result
+}
+
+// ==================== ConfirmAuditResult ====================
+
+message ConfirmAuditResultRequest {
+    string audit_log_id = 1;
+    string result = 2;                       // SUCCEEDED | FAILED
+    int32 biz_code = 3;
+    string resource_id = 4;                  // 建立類操作在此補上（可更新白名單內）
+    string resource_version_after = 5;
+    string after_snapshot_json = 6;          // allow-list 後的 JSON 字串
+    repeated ChangedField changed_fields = 7;
+    // 刻意**沒有** notify_seller：它在 RecordAuditIntent 就已寫入，
+    //    本階段只從稽核列讀出來決定要不要寫 outbox 列（false = 不寫，稽核照寫）。
+}
+
+message ConfirmAuditResultResponse {
+    int32 code = 1;
+    string message = 2;
+    ConfirmAuditResultData data = 3;
+}
+
+message ConfirmAuditResultData {
+    string audit_log_id = 1;
+    string result = 2;
+}
+
+// ==================== 批次版（§7.2.8） ====================
+
+message RecordAuditIntentBatchRequest {
+    // 1–50 筆。逐項欄位語意與單筆版**完全相同**，不另立一套。
+    repeated RecordAuditIntentRequest items = 1;
+}
+
+message RecordAuditIntentItemResult {
+    string resource_id = 1;          // 與請求同序對位用；建立類為空字串時以序位對位
+    bool ok = 2;
+    int32 biz_code = 3;              // 失敗時為 9279（沿用 §4.1 例外 2）
+    RecordAuditIntentData data = 4;  // ok=true 時帶 audit_log_id／replayed／result
+}
+
+message RecordAuditIntentBatchResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated RecordAuditIntentItemResult results = 3;   // 與 items 同序、同長度
+}
+
+message ConfirmAuditResultBatchRequest {
+    // 1–50 筆。只放**已成功寫入 intent** 的項；intent 階段就失敗的項不進來
+    //    （它們的稽核列已是終態 FAILED，再 confirm 一次是 no-op 但語意混淆）。
+    repeated ConfirmAuditResultRequest items = 1;
+}
+
+message ConfirmAuditResultBatchResponse {
+    int32 code = 1;
+    string message = 2;
+    // all-or-nothing：本欄要嘛是完整的 N 筆回音，要嘛整支 RPC 失敗而 N 列全停在 PENDING。
+    //    這裡**不存在**「部分 confirm 成功」的狀態。
+    repeated ConfirmAuditResultData results = 3;
+}
+
+// ==================== ListAuditLogs ====================
+
+message ListAuditLogsRequest {
+    string session_id = 1;
+    string action_filter = 2;         // 空字串 = 不篩選
+    string resource_type_filter = 3;
+    string result_filter = 4;
+    string date_from = 5;             // ISO 8601 UTC；空字串 = 不篩選
+    string date_to = 6;
+    string page = 7;                  // 數字字串
+    string page_size = 8;             // 數字字串
+}
+
+message ListAuditLogsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated AuditLogEntry records = 3;
+    string total = 4;
+    string page = 5;
+    string page_size = 6;
+}
+
+// ==================== GetSessionSummary ====================
+
+message GetSessionSummaryRequest {
+    string session_id = 1;
+}
+
+message GetSessionSummaryResponse {
+    int32 code = 1;
+    string message = 2;
+    SessionSummaryData data = 3;
+}
+
+message SessionSummaryData {
+    string session_id = 1;
+    string display_code = 2;
+    DelegationTarget target = 3;
+    DelegationActor actor = 4;
+    string issued_at = 5;
+    optional string ended_at = 6;
+    string duration_seconds = 7;
+    string status = 8;                       // active | expired | revoked
+    string operation_count = 9;
+    string risk_operation_count = 10;        // risk_level=high 的筆數
+    string pending_audit_count = 11;         // result=PENDING 的筆數
+    bool notified_seller = 12;
+    // 以下兩者結構上恆為 "0"；非零 = 三層鎖定被打穿，P0 事故訊號。
+    string fulfillment_action_count = 13;
+    string finance_action_count = 14;
+    // DELEGATION_AUDIT_RETENTION_DAYS 的下發（單位：天）。UI 的「保留原則」一行據此渲染，
+    //    前端不得寫死「2 年」——改 env 即改顯示，見 §6.1.11 與 §8.5.1。
+    string audit_retention_days = 15;
+    // 撤銷四件套（#2483 A9）。命名與 optional 用法與 DelegationAuthorization 的同名四欄
+    //    逐字相同，讓兩個面共用同一份前端 parser。status='revoked' 時恆為非 null。
+    // ⚠️ 撤銷理由在 UI 是**必填**的，卻從來沒有回顯過——強制收集一個永遠不會被讀出來的
+    //    欄位，只會訓練操作者亂填，而它正是日後爭議時唯一能舉證「為什麼中止」的字串。
+    optional string revoked_at = 16;
+    optional string revoked_by_admin_id = 17;
+    // 同 DelegationAuthorization：admin_accounts **沒有顯示名欄位**，這裡填的是 email。
+    //    不要另外發明一個「名字」欄位，也不要拿 id 冒充。
+    optional string revoked_by_admin_display_name = 18;
+    optional string revoke_reason = 19;
+    // 完整工作階段投影，供 ADM 以自己的身分按 session ID 對帳；不含 credential。
+    OperationSessionSummary session = 20;
+}
+
+// ==================== 跨工作階段治理查詢（§11.3 P1） ====================
+
+// DelegatedOperationSessionRecord 是跨工作階段列表的逐列投影。
+// 欄位集合＝OperationSessionSummary 的子集 ＋ 撤銷四件套，兩處的同名欄位語意逐字相同。
+// **刻意沒有 revision**：樂觀鎖是工作區那一側的東西，治理列表拿到它只會被誤讀成版本號。
+// **絕不得包含** credential_hash／handoff_code_hash／idempotency_key —— 前兩者是憑證本體，
+//    第三者是可預測的重放鍵，三者都不是「這次代行做了什麼」的一部分。
+message DelegatedOperationSessionRecord {
+    string session_id = 1;                       // TSID 數字字串
+    string display_code = 2;
+    DelegationTarget target = 3;
+    DelegationActor actor = 4;
+    DelegationReason reason = 5;
+    optional string case_reference = 6;
+    repeated string capabilities = 7;
+    string issued_at = 8;                        // ISO 8601 UTC 秒精度
+    string expires_at = 9;
+    optional string ended_at = 10;
+    // active | expired | revoked。與 OperationSessionSummary.status 同一個推導
+    //    （§7.5.1 四條順位），由伺服端以 now() 逐列評估——DB 的 status 只有兩個值。
+    string status = 11;
+    optional string revoked_at = 12;
+    optional string revoked_by_admin_id = 13;
+    optional string revoked_by_admin_display_name = 14;
+    optional string revoke_reason = 15;
+}
+
+// ListSessionsRequest 的每一個篩選欄位都是「空字串 = 不篩選」，值域由呼叫端先驗，
+//    不合法一律 9260、不得靜默忽略（靜默忽略會讓前端以為篩選生效而拿到全集）。
+// 篩選集合就是 §11.3 P1 定版的四項，**不含 status**：DB 只存 active／revoked，
+//    expired 是讀取當下推導出來的，把它寫進 WHERE 等於讓同一條規則有兩份實作，
+//    而它們分岔時沒有任何東西會轉紅。要看已到期的列請讀回應的 status。
+message ListSessionsRequest {
+    string actor_admin_id = 1;        // 精確比對；數字字串
+    string target_store_id = 2;       // 精確比對；數字字串
+    string display_code = 3;          // 精確比對（uq_dos_display_code），OPS- 開頭
+    string date_from = 4;             // ISO 8601 UTC，比對 issued_at
+    string date_to = 5;
+    string page = 6;                  // 數字字串
+    string page_size = 7;
+}
+
+// 扁平分頁，形狀與 ListAuditLogsResponse 一致（records/total/page/page_size 四欄平鋪），
+//    同一個 Gateway 分頁 helper 才能共用。
+message ListSessionsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated DelegatedOperationSessionRecord records = 3;
+    string total = 4;
+    string page = 5;
+    string page_size = 6;
+}
+
+// ListAllAuditLogsRequest 是 ListAuditLogsRequest 的跨 session 版：把 session_id 這個
+//    必填軸換成 actor／store 兩個選填軸，其餘篩選逐字相同。
+// 回應列**沿用 AuditLogEntry**（§6.1.11 已為此把 actor／target 逐列下發，不由摘要推導）
+//    —— 另立一套列形狀會讓同一份稽核資料有兩個 DTO，而它們的欄位集合遲早分岔。
+message ListAllAuditLogsRequest {
+    string actor_admin_id = 1;        // "" = 不篩選
+    string target_store_id = 2;       // "" = 不篩選
+    string action_filter = 3;
+    string resource_type_filter = 4;
+    string result_filter = 5;
+    string date_from = 6;             // ISO 8601 UTC，比對 created_at
+    string date_to = 7;
+    string page = 8;
+    string page_size = 9;
+}
+
+message ListAllAuditLogsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated AuditLogEntry records = 3;
+    string total = 4;
+    string page = 5;
+    string page_size = 6;
+}
+
+// ==================== 代行授權列（seller_delegation_authorizations） ====================
+
+// DelegationAuthorization 是授權列對外的唯一投影。
+// 可空欄位一律以 proto3 optional 標記（與 case_reference／confirmed_at／ended_at 同一條
+//    規則）：Gateway 的 DTO 對它們是 *string 且輸出 JSON null，用空字串當哨兵會讓
+//    「未撤回」與「撤回時間是空字串」在 wire 上無法區分，也讓漏填變成靜默的合法值。
+message DelegationAuthorization {
+    string id = 1;                                  // TSID 數字字串
+    // 本期恆非空：全域列（target_store_id IS NULL）營運上禁建，也不由本組 RPC 產生。
+    string target_store_id = 2;
+    string source = 3;                              // contract | ticket | platform_policy
+    // 4–200 字且至少含一個數字（chk_sda_source_reference）。它是「憑什麼授權」的依據
+    //    編號（合約號／工單號／政策文號），不是自由文字說明。
+    string source_reference = 4;
+    // 封閉九值的子集，1–9 個、去重。⚠️ 空陣列會讓「session capabilities 必須是它的子集」
+    //    恆為真 ＝ 整個授權表失效，故 DB 的 cardinality 下界是 1 不是 0。
+    repeated string granted_capabilities = 5;
+    string effective_from = 6;                      // ISO 8601 UTC 秒精度，恆非空
+    optional string effective_until = 7;            // null ＝ 無期限
+    string approved_by_admin_id = 8;
+    // 由 account-service 讀取時 join admin_accounts 解析（現況投影，不落庫）。
+    // ⚠️ admin_accounts **沒有顯示名欄位**，這裡填的是 email——與 Preflight 的
+    //    DisplayName 同一個來源，不要另外發明一個「名字」欄位或拿 id 冒充。
+    //    approved_by_admin_id 是 NOT NULL REFERENCES admin_accounts ⇒ 恆解析得出。
+    string approved_by_admin_display_name = 9;
+    string approved_at = 10;
+    optional string revoked_at = 11;                // null ＝ 未撤回
+    optional string revoked_by_admin_id = 12;
+    optional string revoked_by_admin_display_name = 13;   // 同 9 的解析方式
+    optional string revoke_reason = 14;
+    // 伺服端以 now() 評估的結果：未撤回 且 effective_from <= now 且
+    //    （effective_until 為 null 或 > now）。**前端不得自行推導**——三個時間欄的
+    //    邊界條件（含 effective_from 落在未來）在客戶端重算一次就會出現兩套答案。
+    bool effective = 15;
+    string created_at = 16;
+    string updated_at = 17;
+}
+
+message ListDelegationAuthorizationsRequest {
+    string actor_admin_id = 1;      // Gateway 由 ADM session 解析後填入，前端不可控
+    // "" ＝ 不篩選 | effective | ineffective（全覆蓋二分，理由見 RPC 註解）
+    string status = 2;
+    string target_store_id = 3;     // "" ＝ 不篩選；有值時為精確比對
+    string page = 4;                // 數字字串
+    string page_size = 5;           // 數字字串
+    string request_id = 6;
+    string correlation_id = 7;
+}
+
+// 扁平分頁，形狀與 ListAuditLogsResponse 一致（records/total/page/page_size 四欄平鋪，
+//    不包一層 data）——同一個 Gateway 分頁 helper 才能兩支共用。
+message ListDelegationAuthorizationsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated DelegationAuthorization records = 3;
+    string total = 4;
+    string page = 5;
+    string page_size = 6;
+}
+
+message GetDelegationAuthorizationRequest {
+    string actor_admin_id = 1;
+    string target_store_id = 2;
+    string request_id = 3;
+    string correlation_id = 4;
+}
+
+message GetDelegationAuthorizationResponse {
+    int32 code = 1;
+    string message = 2;
+    GetDelegationAuthorizationData data = 3;
+}
+
+message GetDelegationAuthorizationData {
+    // false ＝ 這家店從未開通過（正常狀態，不是錯誤）。此時 authorization 不設定。
+    bool exists = 1;
+    DelegationAuthorization authorization = 2;
+    // 該店此刻進行中的代行工作階段數（數字字串，無工作階段時為 "0"）。
+    // ⚠️ **撤回對話框的二次確認靠它**：撤回會在同一個交易內連帶中止這些工作階段，
+    //    畫面必須先講「此操作將同時中止 N 個進行中的代行工作階段」。前端不得自己
+    //    另打一支工作階段列表端點去數 —— 那會與撤回看到的不是同一個瞬間。
+    // 與 exists 正交：曾經開通後被撤回的店仍可能有殘留的進行中工作階段。
+    string active_session_count = 3;
+}
+
+message GrantDelegationAuthorizationRequest {
+    string actor_admin_id = 1;
+    string target_store_id = 2;      // 必填，不接受空值（全域列不由本 RPC 建立）
+    string source = 3;
+    string source_reference = 4;
+    repeated string granted_capabilities = 5;
+    // 未設定 ＝ 無期限。⚠️ **不是「沿用舊值」**：本 RPC 是一次全新授權，復權時舊列的
+    //    effective_until 一律被本欄取代（含取代成 NULL）。
+    optional string effective_until = 6;
+    // 本次治理動作的理由，1–200 字，**必填**，只寫進稽核列。
+    // 它與 source_reference 不同：後者是「授權的依據編號」（會存進授權列、可被下一次
+    //    復權覆蓋），前者是「這一次為什麼按下這個按鈕」（append-only，永不覆蓋）。
+    string operation_reason = 7;
+    string idempotency_key = 8;
+    string request_id = 9;
+    string correlation_id = 10;
+    reserved 11;
+    reserved "client_ip";
+    string user_agent = 12;
+}
+
+message GrantDelegationAuthorizationResponse {
+    int32 code = 1;
+    string message = 2;
+    GrantDelegationAuthorizationData data = 3;
+}
+
+message GrantDelegationAuthorizationData {
+    DelegationAuthorization authorization = 1;
+    // created ＝ 這家店此前沒有任何授權列；reinstated ＝ 覆寫了一列已撤回的授權。
+    // 由伺服端依實際走到的 CAS 分支填入，供 UI 的成功訊息與稽核 action
+    //    （GRANT / REINSTATE）區分，**不是**呼叫方的輸入。
+    string outcome = 2;
+}
+
+// 全量取代語意：每個欄位都是「授權變成什麼」，不是「要改哪些欄位」。
+// 欄位刻意與 GrantDelegationAuthorizationRequest 逐項相同 —— 兩者的差別只在 CAS 述詞，
+//    形狀一旦分歧，前端就會需要兩套表單狀態。
+message UpdateDelegationAuthorizationRequest {
+    string actor_admin_id = 1;
+    string target_store_id = 2;
+    string source = 3;
+    string source_reference = 4;
+    repeated string granted_capabilities = 5;
+    optional string effective_until = 6;      // 未設定 ＝ 改為無期限（會清掉原有期限）
+    string operation_reason = 7;
+    string idempotency_key = 8;
+    string request_id = 9;
+    string correlation_id = 10;
+    reserved 11;
+    reserved "client_ip";
+    string user_agent = 12;
+}
+
+message UpdateDelegationAuthorizationResponse {
+    int32 code = 1;
+    string message = 2;
+    UpdateDelegationAuthorizationData data = 3;
+}
+
+message UpdateDelegationAuthorizationData {
+    DelegationAuthorization authorization = 1;
+}
+
+message RevokeDelegationAuthorizationRequest {
+    string actor_admin_id = 1;
+    string target_store_id = 2;
+    // 1–200 字，**必填**。撤回三欄（revoked_at／revoked_by_admin_id／revoke_reason）
+    //    同生同滅，少一個就是一筆解釋不了的撤回。
+    string revoke_reason = 3;
+    string idempotency_key = 4;
+    string request_id = 5;
+    string correlation_id = 6;
+    reserved 7;
+    reserved "client_ip";
+    string user_agent = 8;
+}
+
+message RevokeDelegationAuthorizationResponse {
+    int32 code = 1;
+    string message = 2;
+    RevokeDelegationAuthorizationData data = 3;
+}
+
+message RevokeDelegationAuthorizationData {
+    // 撤回後的授權列。冪等重放時回的是**第一次**撤回的值（revoked_at 不被覆蓋）。
+    DelegationAuthorization authorization = 1;
+    // true ＝ 本次呼叫抵達時該列已經是撤回狀態，沒有任何欄位被改動、沒有寫稽核列，
+    //    也沒有工作階段被中止（revoked_session_ids 必為空陣列）。
+    bool already_revoked = 2;
+    // 本次連帶中止的進行中工作階段 id。恆為陣列，沒有時是空陣列而不是 null。
+    // ⚠️ UI 要拿它回報「已同時中止 N 個工作階段」；筆數可能與撤回前 GET 拿到的
+    //    active_session_count 不同（中間有人自行結束），以**本欄**為準。
+    repeated string revoked_session_ids = 3;
+}
+
+// ==================== 授權治理稽核（delegation_authorization_audit_logs） ====================
+
+// 一列授權治理動作的紀錄。append-only，欄位皆為**寫入當下的快照**。
+// ⚠️ 它與 AuditLogEntry 是兩種不同的稽核：AuditLogEntry 記「代行期間對店家做了什麼」
+//    （綁 session），本 message 記「誰改了這家店的代行授權」（發生在任何 session 之前）。
+//    兩者不共用表、不共用 message，也不要為了「統一」而合併 —— 合併會逼 session_id 變成
+//    可空，而它 NOT NULL 正是代行稽核不可偽造的支點。
+message DelegationAuthorizationAuditEntry {
+    string id = 1;                          // TSID 數字字串
+    string authorization_id = 2;
+    // 刻意冗餘於 authorization_id：稽核列必須能在**不 join 可變表**的情況下回答
+    //    「當時對哪一家店做了什麼」，而它同時是本表列表查詢的主要述詞。
+    string target_store_id = 3;
+    string action = 4;                      // DelegationAuthorizationAction Value
+    // 顯示用中文標籤，由後端下發。前端**不得**自建 action → 標籤對照表：那會是
+    //    CodeMeta 的第二份副本，且改碼時不會有任何東西轉紅。
+    string action_label = 5;
+    string actor_admin_id = 6;
+    // 寫入時快照（NOT NULL），照 admin_operation_audit_logs.actor_display_name 的範式。
+    // ⚠️ 這裡**不能**改成讀取時 join：稽核是歷史事實，管理員日後改了 email 不該回溯
+    //    修改「當時是誰做的」。授權列那兩個同名欄位反過來是現況投影，兩者刻意不同。
+    string actor_display_name = 7;
+    string operation_reason = 8;            // 1–200 字，NOT NULL
+    // REVOKE 不改動這兩欄，故未設定；GRANT／REINSTATE／UPDATE 記本次寫入的值。
+    optional string source = 9;
+    optional string source_reference = 10;
+    // 變更前後的能力集合。⚠️ **空陣列 ＝ 該列此前不存在**（只可能出現在 action=GRANT）；
+    //    授權列的 cardinality 下界是 1，所以「有列但零能力」不是合法狀態，兩者不會混淆。
+    // 刻意**不加**封閉九值 CHECK：稽核列是歷史事實，日後 capability 若改名或移除，
+    //    加了約束會讓歷史列變成不可寫入（或被迫改寫歷史）。
+    repeated string capabilities_before = 11;
+    repeated string capabilities_after = 12;
+    // 未設定有兩種成因：該列此前不存在（僅 GRANT）、或當時就是無期限。要區分請看
+    //    capabilities_before 是否為空 —— 兩欄一起讀才是完整的「變更前狀態」。
+    optional string effective_until_before = 13;
+    optional string effective_until_after = 14;
+    string created_at = 15;                 // ISO 8601 UTC 秒精度
+}
+
+message ListDelegationAuthorizationHistoryRequest {
+    string actor_admin_id = 1;
+    string target_store_id = 2;     // 必填：本端點是單店歷程，不做跨店掃描
+    string page = 3;                // 數字字串
+    string page_size = 4;           // 數字字串
+    string request_id = 5;
+    string correlation_id = 6;
+}
+
+message ListDelegationAuthorizationHistoryResponse {
+    int32 code = 1;
+    string message = 2;
+    // 依 created_at 由新到舊。同一毫秒內的多列以 id 遞減次序穩定排序 ——
+    //    TSID 單調遞增，缺了第二排序鍵時分頁會在邊界重複或漏列。
+    repeated DelegationAuthorizationAuditEntry records = 3;
+    string total = 4;
+    string page = 5;
+    string page_size = 6;
+}

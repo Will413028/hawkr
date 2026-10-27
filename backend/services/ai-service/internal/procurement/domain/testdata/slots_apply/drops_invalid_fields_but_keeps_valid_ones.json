@@ -1,0 +1,33 @@
+{
+  "before": {},
+  "patch": {
+    "item": "寶島梨禮盒",
+    "quantity": 0,
+    "unit": "箱子",
+    "delivery_city": "不存在市",
+    "delivery_date": "2026-08-01"
+  },
+  "now": "2026-08-07T00:00:00Z",
+  "after": {
+    "item": "寶島梨禮盒",
+    "exact_match_required": true
+  },
+  "rejected": [
+    {
+      "key": "quantity",
+      "reason": "數量需介於 1 與 1000000 之間"
+    },
+    {
+      "key": "unit",
+      "reason": "單位不在允許清單內：KG/CATTY/GRAM"
+    },
+    {
+      "key": "delivery_city",
+      "reason": "不是可辨識的縣市名稱"
+    },
+    {
+      "key": "delivery_date",
+      "reason": "到貨日不可早於今天"
+    }
+  ]
+}

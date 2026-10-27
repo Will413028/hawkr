@@ -1,0 +1,76 @@
+# payment outbox_events 積壓／DEAD 告警（36 §3.3.1 Outbox persisted exchange，WP1）。
+#
+# 反面案例是本檔的重點：門檻 900 秒是從**最長正常重試鏈**推導出來的
+# （5+15+45+135+405＝605 秒，max-retries=5），所以「605 秒以內不得觸發」這一支
+# 才是證明門檻選對的那一支。少了它，把門檻寫成 > 0 也會讓觸發案例全綠。
+rule_files:
+  - ../rules/business-alerts.yml
+evaluation_interval: 1m
+tests:
+  # ── PaymentOutboxBacklogStuck ────────────────────────────────────────────
+  # 卡住 20 分鐘（1200s > 900s）且持續超過 for:5m → 觸發。
+  - interval: 1m
+    input_series:
+      - series: 'payment_outbox_oldest_backlog_age_seconds{env="dev"}'
+        values: '1200+0x20'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: PaymentOutboxBacklogStuck
+        exp_alerts: []          # for:5m 還沒滿足
+      - eval_time: 10m
+        alertname: PaymentOutboxBacklogStuck
+        exp_alerts:
+          - exp_labels: {env: dev, severity: warning, channel: business}
+            exp_annotations:
+              summary: "env=dev：payment outbox_events 最舊待派送已卡住超過 15 分鐘"
+              description: "env=dev：payment_outbox_oldest_backlog_age_seconds 超過 900 秒，已超過最長正常重試鏈（5+15+45+135+405＝605 秒）加緩衝，該筆 outbox_events row 疑似卡住。請查 payment-service（可能原因包含 OutboxEventPublisherScheduler 未運行、DB 不可用、RabbitMQ 不可用、或該列的 exchange 無效而反覆 fail-closed）。查法：SELECT id, exchange, routing_key, status, retry_count, last_error FROM outbox_events WHERE status IN ('8221','8223') ORDER BY created_at LIMIT 20;"
+
+  # 🔴 鑑別力關鍵：600 秒仍在最長正常重試鏈（605s）之內 → **不得**觸發。
+  # 這一支證明門檻不是恆真；沒有它，把 900 改成 0 也不會有任何測試轉紅。
+  - interval: 1m
+    input_series:
+      - series: 'payment_outbox_oldest_backlog_age_seconds{env="dev"}'
+        values: '600+0x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: PaymentOutboxBacklogStuck
+        exp_alerts: []
+
+  # 完全沒有積壓（collector 保證這條 series 恆存在且為 0）→ 不得觸發。
+  # 它同時證明「輸出 0 不輸出空集合」不會造成誤報。
+  - interval: 1m
+    input_series:
+      - series: 'payment_outbox_oldest_backlog_age_seconds{env="dev"}'
+        values: '0+0x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: PaymentOutboxBacklogStuck
+        exp_alerts: []
+
+  # ── PaymentOutboxDeadRows ────────────────────────────────────────────────
+  # for:0m ⇒ 一出現 DEAD 列就告警，並帶出是哪個 exchange。
+  - interval: 1m
+    input_series:
+      - series: 'payment_outbox_dead_rows{env="dev",exchange="hawkr.shipping"}'
+        values: '0 0 1+0x10'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: PaymentOutboxDeadRows
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: PaymentOutboxDeadRows
+        exp_alerts:
+          - exp_labels: {env: dev, exchange: hawkr.shipping, severity: warning, channel: business}
+            exp_annotations:
+              summary: "env=dev：payment outbox_events 出現 DEAD 列（exchange=hawkr.shipping）"
+              description: "env=dev：payment_outbox_dead_rows{exchange=\"hawkr.shipping\"} 大於 0，代表某筆事件已耗盡重試次數進入 DEAD（8224）。DEAD 是無人推走的終態——候選述詞 status IN ('8221','8223') 不含它，不會有任何程式路徑再碰它，**該事件等於永久遺失**。請查 last_error 判斷原因（常見：exchange 無效被 fail-closed 擋下、routing key 無 binding 而 unroutable）。處置完成（補發或註記後清除該列）前本告警會持續 firing，這是刻意的。查法：SELECT id, exchange, routing_key, retry_count, last_error, created_at FROM outbox_events WHERE status = '8224' ORDER BY created_at;"
+
+  # 零 DEAD（collector 恆輸出 0 值 series）→ 不得觸發。
+  - interval: 1m
+    input_series:
+      - series: 'payment_outbox_dead_rows{env="dev",exchange="payment.events"}'
+        values: '0+0x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: PaymentOutboxDeadRows
+        exp_alerts: []

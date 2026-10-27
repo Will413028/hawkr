@@ -1,0 +1,57 @@
+rule_files:
+  - ../rules/business-alerts.yml
+evaluation_interval: 1m
+tests:
+  # 高失敗率 ＋ 量足夠：應觸發。兩條序列同形，比率剛好 0.5。
+  - interval: 1m
+    input_series:
+      - series: 'vendor_portal_invite_email_total{env="dev",result="accepted"}'
+        values: '0+1x90'
+      - series: 'vendor_portal_invite_email_total{env="dev",result="permanent"}'
+        values: '0+1x90'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: VendorPortalInviteEmailPermanentFailureRatioHigh
+        exp_alerts: []
+      - eval_time: 80m
+        alertname: VendorPortalInviteEmailPermanentFailureRatioHigh
+        exp_alerts:
+          - exp_labels: {env: dev, severity: warning, channel: business}
+            exp_annotations:
+              summary: "env=dev：站外業者邀請信 permanent 失敗率 50%"
+              description: "env=dev：過去 1 小時站外業者邀請信有超過 20% 被 Resend 判定為 permanent（不可重試，通常是硬退信），且該小時寄送量達到 10 封以上。example.com 同時是訂單信與發票信的寄送網域，兩者都沒有替代管道——先查 notification-service 的 vendor invite consumer log 找出集中退信的收件網域，確認是否為網域信譽被標記的早期訊號。"
+
+  # 低量：1 封信全退 → 比率 100%，但不足 10 封，不得觸發。
+  # 這是加上量門檻的理由：dev 與 prod 初期單封硬退信會讓純比率告警必然誤報。
+  - interval: 1m
+    input_series:
+      - series: 'vendor_portal_invite_email_total{env="dev",result="accepted"}'
+        values: '0+0x90'
+      - series: 'vendor_portal_invite_email_total{env="dev",result="permanent"}'
+        values: '0 1+0x89'
+    alert_rule_test:
+      - eval_time: 80m
+        alertname: VendorPortalInviteEmailPermanentFailureRatioHigh
+        exp_alerts: []
+
+  # 量足但比率低（約 9%）：不得觸發。
+  - interval: 1m
+    input_series:
+      - series: 'vendor_portal_invite_email_total{env="dev",result="accepted"}'
+        values: '0+10x90'
+      - series: 'vendor_portal_invite_email_total{env="dev",result="permanent"}'
+        values: '0+1x90'
+    alert_rule_test:
+      - eval_time: 80m
+        alertname: VendorPortalInviteEmailPermanentFailureRatioHigh
+        exp_alerts: []
+
+  # 零流量：分母 0 → NaN，不得觸發。
+  - interval: 1m
+    input_series:
+      - series: 'vendor_portal_invite_email_total{env="dev",result="accepted"}'
+        values: '0+0x90'
+    alert_rule_test:
+      - eval_time: 80m
+        alertname: VendorPortalInviteEmailPermanentFailureRatioHigh
+        exp_alerts: []

@@ -1,0 +1,17 @@
+name = "image-gateway"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+
+# 本機開發與測試用的設定：R2 與 Images 都由 wrangler dev / miniflare 模擬。
+# 部署環境（bucket 名稱、custom domain 路由）等選定 demo 部署目標時再加；
+# 公司時期的 dev / production 環境與路由已刪除。
+
+[observability]
+enabled = true
+
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "media-local"
+
+[images]
+binding = "IMAGES"

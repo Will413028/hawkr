@@ -1,0 +1,43 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "hawkr-website",
+	"main": ".open-next/worker.js",
+	// 2025-08-16+ 是 Sentry server SDK 在 workerd 的硬需求（才有 https.request，transport
+	// 才送得出）。舊值會讓 init 後 per-request CPU 燒爆 → 1102 exceededCpu。同 hawkr-admin 教訓。
+	"compatibility_date": "2025-08-16",
+	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+	// Dashboard 手動開的 Observability 會被下次 wrangler deploy 沖銷回預設值（disabled）；
+	// 寫進 config 才是 config-as-code、每次 deploy 都保持開啟。
+	"observability": { "enabled": true },
+	"assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+	"vars": { "NEXT_CACHE_DO_PURGE_BUFFER_TIME_IN_SECONDS": "5" },
+	// 革新自呼叫（revalidation self-call）用；service 名必須等於 worker 名，打錯會靜默 hang。
+	"services": [
+		{ "binding": "WORKER_SELF_REFERENCE", "service": "hawkr-website" }
+	],
+	// incrementalCache(R2)；本機 preview 由 miniflare 模擬，bucket 名稱只是本機名。
+	"r2_buckets": [
+		{
+			"binding": "NEXT_INC_CACHE_R2_BUCKET",
+			"bucket_name": "web-cache-local"
+		}
+	],
+	// tagCache（DOShardedTagCache）的 DO migration；SQLite-backed，吃免費額度。
+	// 部署環境（env.*、R2 bucket、secrets、observability 目的地）等選定 demo 部署目標時再加；
+	// 公司時期的 dev / production 環境已刪除。
+	"durable_objects": {
+		"bindings": [
+			{ "name": "NEXT_CACHE_DO_QUEUE", "class_name": "DOQueueHandler" },
+			{
+				"name": "NEXT_TAG_CACHE_DO_SHARDED",
+				"class_name": "DOShardedTagCache"
+			},
+			{ "name": "NEXT_CACHE_DO_PURGE", "class_name": "BucketCachePurge" }
+		]
+	},
+	"migrations": [
+		{ "tag": "v1", "new_sqlite_classes": ["DOShardedTagCache"] },
+		{ "tag": "v2", "new_sqlite_classes": ["DOQueueHandler"] },
+		{ "tag": "v3", "new_sqlite_classes": ["BucketCachePurge"] }
+	]
+}

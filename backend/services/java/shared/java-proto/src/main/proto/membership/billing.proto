@@ -1,0 +1,94 @@
+syntax = "proto3";
+
+package hawkr.membership.billing.v1;
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/membershipbilling";
+option java_package = "io.github.will413028.hawkr.membership.billing.grpc";
+option java_multiple_files = true;
+
+import "membership/entitlement.proto";
+
+// MembershipBillingService is an internal service. Only buyer-service and
+// seller-service control planes may call it; Gateway/App clients never supply
+// commercial terms directly.
+service MembershipBillingService {
+  // Errors are returned as a non-OK gRPC status. The status details contain
+  // google.rpc.ErrorInfo with domain "hawkr.membership.billing" and
+  // reason equal to a MembershipBillingErrorCode value. Clients must branch
+  // on ErrorInfo.reason, never on the human-readable status message.
+  rpc CreateMembershipSubscription(CreateMembershipSubscriptionRequest)
+      returns (CreateMembershipSubscriptionResponse);
+  rpc SuspendMembershipSubscription(MembershipSubscriptionActionRequest)
+      returns (MembershipSubscriptionActionResponse);
+  rpc RestartMembershipSubscription(MembershipSubscriptionActionRequest)
+      returns (MembershipSubscriptionActionResponse);
+  rpc EndMembershipSubscription(MembershipSubscriptionActionRequest)
+      returns (MembershipSubscriptionActionResponse);
+}
+
+message CreateMembershipSubscriptionRequest {
+  hawkr.membership.v1.SubjectRef subject = 1;
+  string membership_id = 2;
+  string membership_change_request_id = 3;
+  BillingQuote billing_quote = 4; // server-issued commercial snapshot
+  string request_id = 5;          // idempotency key
+}
+
+message BillingQuote {
+  string quote_id = 1;
+  string offer_id = 2;
+  string offer_version_no = 3;
+  string unit_amount_minor = 4;
+  string currency = 5;
+  string interval_unit = 6;  // e.g. MONTH
+  string interval_count = 7; // numeric as string
+  string provider_account_ref = 8;
+  string first_period_date = 9; // RFC3339 UTC; provider verified
+  string expires_at = 10;       // RFC3339 UTC
+  string snapshot_hash = 11;   // canonical SHA-256
+}
+
+message CreateMembershipSubscriptionResponse {
+  string period_subscription_id = 1; // payment-side TSID as string
+  string provider_subscription_id = 2;
+  string redirect_url = 3; // hosted checkout when required
+  string mer_trade_no = 4;
+  string status = 5; // PENDING | ACTIVE
+}
+
+message MembershipSubscriptionActionRequest {
+  string period_subscription_id = 1;
+  string request_id = 2; // idempotency key
+  string reason = 3;
+}
+
+message MembershipSubscriptionActionResponse {
+  string period_subscription_id = 1;
+  string provider_subscription_id = 2;
+  string status = 3;
+}
+
+// ProviderChargeResultData is placed directly in
+// MembershipEventEnvelope.data as a versioned google.protobuf.Any.
+message ProviderChargeResultData {
+  string provider = 1;
+  string provider_account_ref = 2;
+  string provider_subscription_id = 3;
+  string provider_period_id = 4;
+  string period_subscription_id = 5;
+  string period_order_no = 6;
+  string trade_no = 7;
+  string amount_minor = 8;
+  string currency = 9;
+  string this_period = 10;
+  string status = 11; // SUCCEEDED | FAILED | CONFLICT
+  string res_code = 12;
+  string res_code_msg = 13;
+  string valid_from = 14; // provider-confirmed RFC3339 UTC
+  string valid_until = 15;
+  string cycle_started_at = 16;
+  string cycle_until = 17;
+  bool is_initial_authorization = 18;
+  string billing_quote_id = 19;
+  string quote_snapshot_hash = 20;
+}

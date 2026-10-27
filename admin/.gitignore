@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.next/
+*.tsbuildinfo
+
+# Rust build
+cloud-services-api/target/
+hawkr-admin-api/target/
+
+# Python
+scripts/__pycache__/
+
+# OS files
+.DS_Store
+
+# Wrangler
+.wrangler/
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env.dev
+.env.prod
+
+# Submodule (legacy)
+hawkr-admin
+
+# Unrelated workers
+cloudflare-workers/
+
+# OpenAPI spec (dev reference only)
+*.openapi.json
+
+# Claude settings (contains tokens) 與本機驗證產物
+.claude/
+
+# OpenNext
+.open-next/
+.dev.vars
+cloudflare-env.d.ts
+
+.worktrees/
+
+# 本機驗證用的截圖與腳本（vcs.useIgnoreFile=false，故 biome.json 需另行排除）
+.claude-verify/
+output/

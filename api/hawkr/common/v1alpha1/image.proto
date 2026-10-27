@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package hawkr.common.v1alpha1;
+
+// Image 是對外 API 裡的一張圖（ADR 2026-09-25-api-image-uri-template）。只出現在回應；
+// 換圖時在各資源的 *_staged_token 帶 media 上傳完成後拿到的 staged token。
+message Image {
+  // 取圖的 URI 樣板（RFC 6570 Level 1）：恰好一個變數 {preset}，或沒有變數（外部圖片）。
+  // client 把 {preset} 換成 preset 名稱（image gateway 的白名單）後直接使用，不解析、不改寫其他部分，
+  // 也不自己組網址。
+  string uri_template = 1;
+}

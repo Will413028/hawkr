@@ -1,0 +1,26 @@
+# 對外 API 的契約（Protobuf＋Connect）。三個生成端各自用自己目錄的 buf.gen.yaml 生成：
+#   backend/buf.gen.connect.yaml、packages/hawkr-api-ts/buf.gen.yaml（website 與 admin 共用）、packages/hawkr_api/buf.gen.yaml
+# 外掛一律在本機執行，版本固定在各消費端的 go.mod、package.json、pubspec.yaml；buf CLI 的版本在 .buf-version。
+# 慣例：backend/docs/開發規範/API 設計規範（Connect）.md；決策：backend/docs/adr/2026-09-26-external-contract-protobuf-connect.md。
+version: v2
+# field_behavior（AIP-203）的註記。版本與消費端生成 google/rpc/error_details.proto 的 commit 相同，
+# 鎖在 buf.lock；API contract CI 檢查四處一致。
+deps:
+  - buf.build/googleapis/googleapis:c17df5b2beca46928cc87d5656bd5343
+lint:
+  use:
+    - STANDARD
+  # 唯一的例外：ErrorReason 的值名就是 google.rpc.ErrorInfo.reason 的字串，不加 ERROR_REASON_ 前綴
+  # （AIP-193 的 reason 格式；googleapis 的 google/api/error_reason.proto 同樣如此）。
+  ignore_only:
+    ENUM_VALUE_PREFIX:
+      - hawkr/common/v1alpha1/error_reason.proto
+breaking:
+  # WIRE_JSON：保護已發布的 App 與 web 的 wire 與 proto3 JSON 相容（Buf 文件對 Connect 的建議）。
+  # 四個消費端都在 monorepo，生成物由 drift CI 在同一個 commit 更新，所以不需要 FILE 的原始碼相容。
+  # 它不擋 message 改名；錯誤的 details 用 google.rpc 的標準型別，type URL 不隨本專案的 package 改變。
+  use:
+    - WIRE_JSON
+  # 上線前的 package 一律是 v1alpha1（Google AIP-185 的 alpha），breaking 不檢查它們：系統還沒上線，
+  # 契約可以直接改。上線時一次改名成 v1，之後 breaking 才生效。
+  ignore_unstable_packages: true

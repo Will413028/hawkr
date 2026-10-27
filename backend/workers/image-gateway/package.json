@@ -1,0 +1,25 @@
+{
+  "name": "image-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Image Gateway Worker：全平台圖片唯一公開出口（preset 白名單 → R2 取檔 → Images binding 轉換）",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "pretest": "npm run cf-typegen",
+    "test": "vitest run",
+    "pretypecheck": "npm run cf-typegen",
+    "typecheck": "tsc --noEmit",
+    "cf-typegen": "wrangler types",
+    "verify:motion": "node scripts/verify-motion-preset.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.18.4",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.110.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,111 @@
+# =============================================================================
+# 本機的基礎設施：Postgres、Redis、RabbitMQ、OTel collector
+# =============================================================================
+# 單體只需要這個檔，不需要 .env：
+#   make infra-up && make migrate && make serve
+# docker-compose-local.yml（舊服務，入口 ./dev.sh）以 include 引入本檔，兩邊共用同一組容器。
+#
+# 帳號密碼都是本機專用的固定值，只在這台機器上有意義；單體連線用的值在 Makefile。
+# RabbitMQ 只在過渡期存在：舊服務之間的事件，以及單體 internal/legacy 的 adapter（ADR D6、D8）。
+# =============================================================================
+
+services:
+
+
+  # 單體（database hawkr，每個模組一個 schema）與舊服務各自的 database 都在這一個
+  # Postgres；清單在 scripts/init-databases.sh。主版本與單體的 testdb 相同（18）。
+  #
+  # 18 的 image 把資料放在 /var/lib/postgresql/<主版本>/docker，掛載點因此是
+  # /var/lib/postgresql。它拒絕啟動在 17 的 volume 上，所以 volume 改名為 postgres18_data；
+  # 舊的 backend_postgres_data 沒有要保留的資料，可以 docker volume rm。
+  postgres:
+    image: postgres:18-alpine
+    container_name: hawkr-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: dbadmin
+      POSTGRES_PASSWORD: Hawkr2024Admin
+      POSTGRES_DB: postgres
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=150"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "effective_cache_size=768MB"
+      - "-c"
+      - "work_mem=4MB"
+    volumes:
+      - postgres18_data:/var/lib/postgresql
+      - ./scripts/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dbadmin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hawkr-network
+
+  redis:
+    image: redis:8-alpine
+    container_name: hawkr-redis
+    restart: unless-stopped
+    command: redis-server --requirepass HawkrRedis2026 --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "HawkrRedis2026", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hawkr-network
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: hawkr-rabbitmq
+    restart: unless-stopped
+    command: bash -c "rabbitmq-plugins enable --offline rabbitmq_prometheus && rabbitmq-server"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hawkr-network
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: hawkr-otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otel-config.yaml"]
+    volumes:
+      - ./monitoring/otel-collector/otel-config-local.yaml:/etc/otel-config.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    networks:
+      - hawkr-network
+
+networks:
+  hawkr-network:
+    driver: bridge
+
+volumes:
+  postgres18_data:
+  redis_data:
+  rabbitmq_data:

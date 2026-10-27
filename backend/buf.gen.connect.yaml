@@ -1,0 +1,24 @@
+# 對外 API（根目錄 api/ 的 Protobuf＋Connect）的 Go 生成設定；在 backend/ 執行 `make connect`。
+# 外掛由 go.mod 的 tool 固定版本，不依賴全域安裝或 BSR 的遠端外掛。
+# 內部 gRPC（api/proto，階段 C 刪除）的生成設定是同目錄的 buf.gen.yaml，兩者無關。
+version: v2
+# 生成前清空每個外掛的 out 目錄，刪掉的 proto 才不會留下孤兒檔。
+clean: true
+managed:
+  enabled: true
+  # googleapis（field_behavior）維持自己的 go_package，import genproto 的 annotations：同一個 full name
+  # 在 Go 的 registry 只能註冊一次，所以不自己生成（ADR 2026-09-25-api-error-model 的後果）。
+  disable:
+    - module: buf.build/googleapis/googleapis
+  override:
+    - file_option: go_package_prefix
+      value: github.com/Will413028/hawkr/backend/internal/httpapi/gen
+plugins:
+  - local: [go, tool, protoc-gen-go]
+    out: internal/httpapi/gen
+    opt: paths=source_relative
+  - local: [go, tool, protoc-gen-connect-go]
+    out: internal/httpapi/gen
+    opt: paths=source_relative
+inputs:
+  - directory: ../api

@@ -1,0 +1,381 @@
+# Proto numeric-field allowlist — grandfathered §6 violations (ratchet).
+#
+# Each line is a response-exposed proto field that still uses int64/int32/double,
+# in violation of `docs/開發規範/Proto 管理規範.md` §6.1. They are tolerated only
+# because they predate the gate; `protonumericlint` (pkg/cmd/protonumericlint) blocks
+# any NEW violation and FAILS if a line here is no longer a violation (stale).
+#
+# This is the live Track 1 / Track 2 backlog. When a field is migrated to `string`
+# (proto + gRPC-boundary conversion per §6.3), DELETE its line here — the gate then
+# guarantees it can never regress.
+#
+# Format: fully-qualified field name (package.Message.field), one per line.
+# Regenerate the raw set with: buf build api/proto -o - | go run github.com/Will413028/hawkr/go-pkg/cmd/protonumericlint -dump
+hawkr.account.AccountInfo.account_id
+hawkr.account.AccountInfo.account_type
+hawkr.account.AccountInfo.created_at
+hawkr.account.AccountInfo.updated_at
+hawkr.account.AuthData.account_type
+# §6.2 #3 exception — gateway-internal SSOT RPC (issue #1592, SSOT since #2014 →
+# PR #2022): GetWebSession is called only by the gateway's own web-session lookup,
+# on every Redis miss or error; the response never crosses into an
+# HTTP-facing gateway response, so account_id/account_type/login_role are kept
+# native int64/int32 end-to-end (mirrors hawkr.buyer.ResolvePrincipalsResponse
+# and hawkr.seller.ListStoreIDsByAccountResponse). NOT Track-1 backlog.
+hawkr.account.GetWebSessionResponse.account_id
+hawkr.account.GetWebSessionResponse.account_type
+hawkr.account.GetWebSessionResponse.login_role
+hawkr.account.LinkConfirmResponse.account_type
+hawkr.account.RefreshTokenResponse.expires_in
+# §6.2 exception — 56 號 ADM 代行營運（DelegationService）. Two distinct grounds,
+# both spelled out in the design doc, so these are NOT Track-1 backlog:
+#   (a) §4.1 例外 2「Response int32 code」— biz_code / denied_code are business codes,
+#       identical in kind to the `int32 code = 1` every response envelope already carries.
+#   (b) §4「數字對外 string」的值域安全例外 — revision (monotonic counter) and
+#       ttl_seconds / idle_seconds (bounded 1–1800 / 60–1800) are safe integers;
+#       the frontend validates with Number.isSafeInteger. Turning them into strings
+#       would break the nine-field create↔current reconciliation (§7.2.1 B1), which
+#       compares revision numerically.
+hawkr.account.AuditLogEntry.biz_code
+hawkr.account.OperationSessionSummary.revision
+hawkr.account.PreflightData.denied_code
+hawkr.account.PreflightData.idle_seconds
+hawkr.account.PreflightData.ttl_seconds
+hawkr.account.RecordAuditIntentItemResult.biz_code
+hawkr.account.RevokeSessionData.revision
+hawkr.aftersales.AfterSaleCaseDetailView.process_deadline_hours
+hawkr.aftersales.HasActiveCaseResponse.active_count
+hawkr.ai.RecommendedProduct.price
+hawkr.ai.RecommendedProduct.price_max
+hawkr.ai.RecommendedProduct.price_min
+hawkr.ai.RecommendedProduct.rating
+hawkr.ai.RecommendedProduct.score
+hawkr.buyer.BatchGetSubscriberCountsResponse.counts
+# §6.2 #3 exception — internal-only cross-service batch profile lookup;
+# buyer_id is the native int64 map key and never crosses an HTTP response boundary.
+hawkr.buyer.BuyerMeta.buyer_id
+hawkr.buyer.FavoriteCountResponse.count
+hawkr.buyer.FavoriteInfo.created_at
+hawkr.buyer.FavoriteInfo.list_price_max
+hawkr.buyer.FavoriteInfo.list_price_min
+hawkr.buyer.FavoriteInfo.price_max
+hawkr.buyer.FavoriteInfo.price_min
+hawkr.buyer.FavoriteInfo.rating_x10
+hawkr.buyer.FavoriteInfo.sale_price_max
+hawkr.buyer.FavoriteInfo.sale_price_min
+hawkr.buyer.FavoriteListResponse.total
+hawkr.buyer.ListFavoritedProductIdsResponse.product_ids
+# §6.2 #3 exception — internal-only cross-service RPC (im-service → buyer),
+# never gateway-exposed; map value is an account_id kept int64 end-to-end.
+# NOT Track-1 backlog; keep as native numeric (mirrors seller-service's
+# already-grandfathered hawkr.seller.ResolvePrincipalsResponse.principals).
+hawkr.buyer.ResolvePrincipalsResponse.principals
+# §6.2 #3 exception — same internal-only RPC/message as .principals above
+# (2026-08-05 added field); unresolved_ids echoes the caller's own buyer_id
+# input values back for membership-checking, never gateway-exposed. Kept
+# native int64 for the same reason as .principals, not separate backlog.
+hawkr.buyer.ResolvePrincipalsResponse.unresolved_ids
+hawkr.buyer.SubscriberDashboardStatsResponse.growth_pct
+hawkr.buyer.SubscriberDashboardStatsResponse.total
+hawkr.buyer.SubscriberInfo.buyer_id
+hawkr.buyer.SubscriberInfo.id
+hawkr.buyer.SubscriberInfo.subscribed_at
+hawkr.buyer.SubscribersListResponse.total
+hawkr.buyer.SubscriptionItem.rating
+hawkr.buyer.SubscriptionItem.subscribed_at
+hawkr.buyer.SubscriptionListResponse.total
+hawkr.buyer.VisitListResponse.total
+hawkr.buyer.VisitOperationResponse.affected
+hawkr.content.BannerItem.display_order
+hawkr.order.GetSellerOrderStatusCountsResponse.aftersales_count
+hawkr.order.GetSellerOrderStatusCountsResponse.completed_count
+hawkr.order.GetSellerOrderStatusCountsResponse.in_progress_count
+hawkr.order.GetSellerOrderStatusCountsResponse.pending_shipment_count
+hawkr.order.SellerRevenue.order_count
+hawkr.order.SellerRevenue.total_revenue
+# §6.2 #3 exception — price/volume metrics kept double end-to-end (not
+# IDs/counts subject to JS Number precision loss at 2^53). Originally
+# justified as "never gateway-exposed" (ai-service → pricebook-service
+# only); that changed with the P6+P7 seller market lookup work adding a
+# gateway route for GetObservedPrice — rationale updated accordingly, still
+# NOT Track-1 backlog.
+hawkr.pricebook.PriceObservation.avg_price
+hawkr.pricebook.PriceObservation.upper_price
+hawkr.pricebook.PriceObservation.middle_price
+hawkr.pricebook.PriceObservation.lower_price
+hawkr.pricebook.PriceObservation.volume_kg
+# §6.2 #3 exception — same rationale as PriceObservation above: pure
+# service-to-service RPC, no gateway route exists yet. NOT Track-1 backlog.
+hawkr.pricebook.GetEstimatedItemPriceResponse.low
+hawkr.pricebook.GetEstimatedItemPriceResponse.median
+hawkr.pricebook.GetEstimatedItemPriceResponse.high
+hawkr.review.OrderReviewInfo.rating
+hawkr.review.ProductReviewsResponse.page
+hawkr.review.ProductReviewsResponse.page_size
+hawkr.review.ProductReviewsResponse.total
+hawkr.review.ReviewInfo.like_count
+hawkr.review.ReviewInfo.rating
+hawkr.review.ReviewInfo.reply_count
+hawkr.review.ReviewStats.average_rating
+hawkr.review.ReviewStats.rating_1_count
+hawkr.review.ReviewStats.rating_2_count
+hawkr.review.ReviewStats.rating_3_count
+hawkr.review.ReviewStats.rating_4_count
+hawkr.review.ReviewStats.rating_5_count
+hawkr.review.ReviewStats.total_count
+hawkr.review.ReviewStats.with_images_count
+hawkr.seller.AdminAcknowledgeResponse.ack_latency_ms
+hawkr.seller.AdminCertificationItem.current_step
+hawkr.seller.AdminCertificationItem.total_steps
+hawkr.seller.AdminCertificationListData.limit
+hawkr.seller.AdminCertificationListData.page
+hawkr.seller.AdminCertificationListData.total
+hawkr.seller.AdminCertificationStats.approved
+hawkr.seller.AdminCertificationStats.rejected
+hawkr.seller.AdminCertificationStats.submitted
+hawkr.seller.AdminCertificationStats.total
+hawkr.seller.AdminSellerItem.rating
+hawkr.seller.AdminSellerItem.status
+hawkr.seller.AdminSellerListData.limit
+hawkr.seller.AdminSellerListData.page
+hawkr.seller.AdminSellerListData.total
+hawkr.seller.CertificationApplicationData.current_step
+hawkr.seller.CertificationApplicationData.total_steps
+hawkr.seller.CertificationDraft.current_step
+hawkr.seller.CertificationDraft.total_steps
+hawkr.seller.CreateFoodSafetyReportResponse.ack_estimated_at
+hawkr.seller.FoodSafetyReport.acknowledged_at_ms
+hawkr.seller.FoodSafetyReport.created_at_ms
+hawkr.seller.FoodSafetyReport.fda_reported_at_ms
+hawkr.seller.FoodSafetyReport.investigating_at_ms
+hawkr.seller.FoodSafetyReport.resolved_at_ms
+# §6.2 #3 exception — pure seller-service<->gateway internal RPC (issue #2266):
+# GetCurrentStoreID backs gateway's storeid.Resolver only, deliberately with no
+# business-code envelope (see resolver.go's SellerGetter doc). The int64
+# result is consumed internally by the resolver and re-formatted to string
+# wherever it eventually surfaces in an HTTP response; it never crosses the
+# Gateway boundary as this field. Same shape as ResolveSellerAccountIDResponse
+# below. NOT Track-1 backlog; keep as native numeric.
+hawkr.seller.GetCurrentStoreIDResponse.store_id
+# §6.2 #3 exception — internal-use-only cross-service RPC (im-service
+# PII-purge sweep only; buyer-store-stint rekey W2/W3 D8), never
+# gateway-exposed; store_id list kept int64 end-to-end. NOT Track-1 backlog.
+hawkr.seller.ListStoreIDsByAccountResponse.store_ids
+hawkr.seller.PayuniStatus.approved_at
+hawkr.seller.PayuniStatus.last_synced_at
+hawkr.seller.PayuniStatus.registered_at
+hawkr.seller.ProductViewStatsResponse.growth_pct
+hawkr.seller.ProductViewStatsResponse.view_count
+hawkr.seller.PublicSellerViolation.effective_at_ms
+hawkr.seller.PublicSellerViolation.expires_at_ms
+hawkr.seller.RecommendedSeller.followers
+hawkr.seller.RecommendedSeller.order_count
+hawkr.seller.RecommendedSeller.rating
+# §6.2 #3 exception — internal-only cross-service RPC (im/social → seller), never gateway-exposed;
+# map value is an account_id kept int64 end-to-end. NOT Track-1 backlog; keep as native numeric.
+hawkr.seller.ResolvePrincipalsResponse.principals
+# §6.2 #3 exception — same internal-only RPC/message as .principals above
+# (2026-08-29 added field, mirrors hawkr.buyer.ResolvePrincipalsResponse
+# .unresolved_ids); unresolved_ids echoes the caller's own store_id input
+# values back for membership-checking, never gateway-exposed. Kept native
+# int64 for the same reason as .principals, not separate backlog.
+hawkr.seller.ResolvePrincipalsResponse.unresolved_ids
+# §6.2 #3 exception — pure seller-service<->gateway internal RPC (account_id
+# naming-debt Phase 3 Task 1, 2026-08-03): backs 6 admin gateway handlers that
+# resolve :store_id -> account_id before an account_id-keyed downstream call;
+# the int64 result is consumed internally and re-formatted to string wherever
+# it eventually surfaces in an HTTP response (e.g. AdminSellerProfile.AccountID
+# via strconv.FormatInt), so it never crosses the Gateway boundary as this
+# field. Same shape as ListStoreIDsByAccountResponse.store_ids above. NOT
+# Track-1 backlog; keep as native numeric.
+hawkr.seller.ResolveSellerAccountIDResponse.account_id
+hawkr.seller.SellerInfo.account_id
+hawkr.seller.SellerInfo.account_type
+hawkr.seller.SellerInfo.created_at
+hawkr.seller.SellerInfo.rating
+hawkr.seller.SellerInfo.status
+hawkr.seller.SellerMeta.account_id
+hawkr.seller.SellerStats.followers
+hawkr.seller.SellerStats.rating
+hawkr.seller.SellerStats.review_count
+hawkr.seller.SellerStats.total_orders
+hawkr.seller.SellerStats.total_products
+hawkr.seller.SellerStats.total_sales
+hawkr.seller.SellerViolation.appeal_decided_at_ms
+hawkr.seller.SellerViolation.appeal_submitted_at_ms
+hawkr.seller.SellerViolation.created_at_ms
+hawkr.seller.SellerViolation.effective_at_ms
+hawkr.seller.SellerViolation.expires_at_ms
+hawkr.seller.SellerViolation.penalty_amount_cents
+hawkr.seller.SellerViolation.revoked_at_ms
+hawkr.seller.SellerViolationReport.created_at_ms
+hawkr.seller.SellerViolationReport.investigating_at_ms
+hawkr.seller.SellerViolationReport.resolved_at_ms
+hawkr.seller.StoreVisitorItem.last_visited_at
+hawkr.seller.StoreVisitorItem.visit_count
+hawkr.seller.StoreVisitorListData.page
+hawkr.seller.StoreVisitorListData.page_size
+hawkr.seller.StoreVisitorListData.total
+hawkr.seller.UnionReportRow.created_at_ms
+hawkr.seller.ValidateSellerResponse.status
+hawkr.social.AdminPostListItem.created_at
+hawkr.social.AdminPostListItem.latest_report_at
+hawkr.social.AdminPostListItem.report_count
+hawkr.social.AdminPostListResponse.page
+hawkr.social.AdminPostListResponse.page_size
+hawkr.social.AdminPostListResponse.total
+hawkr.social.CommentInfo.created_at
+hawkr.social.CommentInfo.like_count
+hawkr.social.CommentInfo.reply_count
+hawkr.social.CommentInfo.actor_kind
+hawkr.social.CommentListResponse.page
+hawkr.social.CommentListResponse.page_size
+hawkr.social.CommentListResponse.total
+hawkr.social.ForumEntryInfo.created_at
+hawkr.social.ForumEntryInfo.reply_count
+# §6.2 #3 exception — never gateway-exposed: actor_kind only drives
+# enrichForumUserInfo's buyer-vs-store lookup routing inside social-service,
+# before the response leaves the service; gateway's toForumRecord (REST DTO)
+# has no actor kind field, so it never crosses into a JSON response.
+hawkr.social.ForumEntryInfo.actor_kind
+hawkr.social.ForumListResponse.page
+hawkr.social.ForumListResponse.page_size
+hawkr.social.ForumListResponse.total
+hawkr.social.PostDetailInfo.comment_count
+hawkr.social.PostDetailInfo.created_at
+hawkr.social.PostDetailInfo.like_count
+hawkr.social.PostDetailInfo.share_count
+hawkr.social.PostDetailInfo.view_count
+hawkr.social.PostListItem.comment_count
+hawkr.social.PostListItem.created_at
+hawkr.social.PostListItem.hidden_at
+hawkr.social.PostListItem.like_count
+hawkr.social.PostListItem.share_count
+hawkr.social.PostListItem.view_count
+hawkr.social.PostListResponse.page
+hawkr.social.PostListResponse.page_size
+hawkr.social.PostListResponse.total
+hawkr.social.Report.create_time_ms
+hawkr.social.Report.resolved_at_ms
+hawkr.social.Report.resolved_by
+hawkr.social.SharePostResponse.share_count
+hawkr.social.UserBlock.create_time_ms
+# §6.2 #3 exception — gateway-exposed forecast bands (TWD/kg), added
+# alongside GetObservedPrice's own gateway route in the P6+P7 seller
+# market lookup work. Not an ID/count subject to JS Number precision loss
+# (max safe integer 2^53) — a TWD/kg price band never approaches that
+# magnitude. NOT Track-1 backlog.
+hawkr.pricebook.ForecastCurvePoint.p10
+hawkr.pricebook.ForecastCurvePoint.p50
+hawkr.pricebook.ForecastCurvePoint.p90
+# §6.2 #3 exception — horizon_days (1-7 range) is a count, not an ID
+# subject to JS Number precision loss (2^53); part of gateway-exposed
+# forecast curve added in P6+P7 seller market lookup work. NOT Track-1 backlog.
+hawkr.pricebook.ForecastCurvePoint.horizon_days
+# §6.2 #3 exception — same rationale as ForecastCurvePoint.p10/p50/p90
+# above: gateway-exposed forecast price (TWD/kg), added in the v2 seller
+# market lookup work (cross-market comparison panel). Not an ID/count
+# subject to JS Number precision loss. NOT Track-1 backlog.
+hawkr.pricebook.MarketComparisonEntry.p50
+# §6.2 #3 exception — gateway-exposed trend-summary series (issue #2249
+# Slice B, GetTrendSummary RPC): TWD/kg price/volume fields, same rationale
+# as ForecastCurvePoint.p10/p50/p90 and MarketComparisonEntry.p50 above (not
+# an ID/count subject to JS Number precision loss at 2^53). sample_count and
+# observed_market_count are small bounded counts, same rationale as
+# ForecastCurvePoint.horizon_days above. NOT Track-1 backlog.
+hawkr.pricebook.TrendPoint.observed_average_twd_per_kg
+hawkr.pricebook.TrendPoint.volume_kg
+hawkr.pricebook.TrendPoint.sample_count
+hawkr.pricebook.TrendPoint.observed_market_count
+hawkr.pricebook.TrendComparisonEntry.current_value_twd_per_kg
+hawkr.pricebook.TrendComparisonEntry.baseline_value_twd_per_kg
+hawkr.pricebook.TrendComparisonEntry.change_amount_twd_per_kg
+hawkr.pricebook.TrendComparisonEntry.change_percent
+# §6.2 #3 exception — gateway-exposed spatial surface (issue #2248,
+# GetSpatialSurface RPC). Same rationale as ForecastCurvePoint.p10/p50/p90
+# and TrendPoint above: TWD/kg prices, colour-scale break values and small
+# bounded counts, none of them an ID subject to JS Number precision loss at
+# 2^53. These are also the numbers a MapLibre client feeds straight into
+# colour ramps and axis maths — stringifying them would only move the parse
+# to the browser. (The four *_geojson fields are google.protobuf.Struct, so
+# their RFC 7946 coordinates never reach this gate at all; keeping the
+# sibling scalars numeric keeps one consistent numeric contract across the
+# whole response.) NOT Track-1 backlog.
+hawkr.pricebook.GetSpatialSurfaceResponse.horizon_days
+hawkr.pricebook.PriceScaleInfo.breaks
+hawkr.pricebook.SpatialMarketPrice.p10
+hawkr.pricebook.SpatialMarketPrice.p50
+hawkr.pricebook.SpatialMarketPrice.p90
+hawkr.pricebook.SpatialMarketPrice.recent_volume_kg
+hawkr.pricebook.SpatialStatistics.priced_market_count
+hawkr.pricebook.SpatialStatistics.closed_market_count
+hawkr.pricebook.SpatialStatistics.total_market_count
+hawkr.pricebook.SpatialStatistics.surface_cell_count
+hawkr.pricebook.SpatialStatistics.contour_segment_count
+# §6.2 #3 exception — same GetSpatialSurfaceResponse RPC and rationale as
+# the spatial-surface block above: TWD/kg cross-market prices (issue #2248
+# follow-up, 2026-08-08), same category as SpatialMarketPrice.p10/p50/p90.
+# NOT Track-1 backlog.
+hawkr.pricebook.SpatialStatistics.p50
+hawkr.pricebook.SpatialStatistics.minimum_p50
+hawkr.pricebook.SpatialStatistics.maximum_p50
+# §6.2 #3 exception — same GetSpatialSurfaceResponse RPC and rationale as
+# the spatial-surface block above (issue #2248's boundary/land-area-ratio
+# addition): supported_land_area_ratio is a 0-1 fraction, not an ID subject
+# to JS Number precision loss at 2^53. bbox_wgs84 is the
+# [minLon, minLat, maxLon, maxLat] WGS84 envelope the MapLibre client feeds
+# straight into fitBounds() — same "number the client does axis maths with"
+# category as PriceScaleInfo.breaks above, stringifying would only move the
+# parse to the browser. NOT Track-1 backlog.
+hawkr.pricebook.GetSpatialSurfaceResponse.supported_land_area_ratio
+hawkr.pricebook.SpatialBoundary.bbox_wgs84
+# §6.2 #3 exception — issue #2249 Slice C, GetRegionalComparison RPC (per-
+# county price comparison table). This proto-only commit has no handler or
+# Gateway route wired yet (Task 5/6 of the same plan), but Task 6 already
+# specifies `GET /pricebook/regional-comparison` serializing this response
+# straight to JSON, so these fields do cross the gateway boundary once that
+# lands. horizon_days is a small bounded count (1-7), same rationale as
+# GetSpatialSurfaceResponse.horizon_days/ForecastCurvePoint.horizon_days
+# above. p10/p50/p90 are TWD/kg price-band values, same rationale as
+# SpatialMarketPrice.p10/p50/p90/ForecastCurvePoint.p10/p50/p90 above.
+# supporting_market_count is a small bounded count (number of markets
+# assigned to one county), not an ID subject to JS Number precision loss at
+# 2^53, same category as SpatialStatistics.priced_market_count above. NOT
+# Track-1 backlog.
+hawkr.pricebook.GetRegionalComparisonResponse.horizon_days
+hawkr.pricebook.RegionalComparisonRegion.p10
+hawkr.pricebook.RegionalComparisonRegion.p50
+hawkr.pricebook.RegionalComparisonRegion.p90
+hawkr.pricebook.RegionalComparisonRegion.supporting_market_count
+# §6.2 #3 exception — GetCategoryPriceRollup RPC (category price rollup
+# read API, foundation plan Task 10). level is a bounded tree-depth enum
+# (1|2|3), not an ID subject to JS Number precision loss at 2^53.
+# source_group_count is a small bounded count (number of L3 groups feeding
+# this category's rollup), same category as
+# RegionalComparisonRegion.supporting_market_count /
+# SpatialStatistics.priced_market_count above. NOT Track-1 backlog.
+hawkr.pricebook.GetCategoryPriceRollupResponse.level
+hawkr.pricebook.GetCategoryPriceRollupResponse.source_group_count
+# §6.2 #3 exception — GetCategoryPriceRollup RPC (category L1/L2 forecast curves,
+# foundation plan Task 1). horizon_days (1-7 range) is a small bounded count, not
+# an ID subject to JS Number precision loss at 2^53, same category as
+# ForecastCurvePoint.horizon_days / GetRegionalComparisonResponse.horizon_days
+# above. NOT Track-1 backlog.
+hawkr.pricebook.CategoryForecastPoint.horizon_days
+# §6.2 #3 exception — gateway-exposed StreamEvent oneof member (AIAssistantService
+# SellerChat, BuyerChat, etc. return stream StreamEvent directly; StepEvent is a
+# oneof case). seq is a small sequence number (1-N range), not an ID subject to
+# JS Number precision loss at 2^53. duration_ms (elapsed milliseconds) would take
+# ~285,616 years to overflow 2^53, same safety category as small bounded counts.
+# NOT Track-1 backlog.
+hawkr.ai.StepEvent.seq
+hawkr.ai.StepEvent.duration_ms
+# §6.2 #3 exception — gateway-exposed AIProcurementService messages (TurnResult,
+# SnapshotResponse, etc. returned from SubmitTurn/SubmitAnswer/Rewind/GetSnapshot
+# and other buyer-facing procurement RPCs). Step.duration_ms (elapsed milliseconds)
+# is identical in kind to StepEvent.duration_ms above — would take ~285,616 years
+# to overflow 2^53. CandidateItem.score is a recommendation confidence/scoring
+# metric (0-1 range or similar), not an ID subject to JS Number precision loss at
+# 2^53. NOT Track-1 backlog.
+hawkr.ai.Step.duration_ms
+hawkr.ai.CandidateItem.score

@@ -1,0 +1,307 @@
+syntax = "proto3";
+
+// 主管機關來函（step10e-reports-brief R5、step10e-3cb-design §1.4）：主管機關給平台的公文（限制或移除商品、調取資料、暫停帳號等），是獨立的收件，
+// 不是通報：不走通報的去重、限流與事件。來函登記機關、文號、收文時間（管理員填）、種類、內容摘要、期限與指名的對象（任何帳號，選填店家與商品）；
+// 完成時記處理摘要與每個對象的告知（DSA 9(5)、10(5) 的基準：被指名者要被告知，機關要求時可以暫不告知）；保存期限讓被指名者在 seller 的個資不被
+// 關店後的清理刪除（預設收文後 184 天，只能延長，每次延長留下前後值與原因，完成不解除保存）。保存只涵蓋 seller 的資料（店家聯絡、KYC 與登錄字號等）；
+// 買家與帳號資料的保存尚未支援（AuthorityOrderTarget.no_seller_data）。指令（CreateAuthorityOrder、ListAuthorityOrders、GetAuthorityOrder、
+// CompleteAuthorityOrder、ExtendAuthorityOrderHold、RecordAuthorityTargetNotice、RevokeAuthorityOrder）在 SellerGovernanceAdminService（governance.proto）。
+// 來函建立後不能改（文號、種類、對象）；登記錯了：在完成之前撤銷登記（RevokeAuthorityOrder，附原因、解除保存、紀錄保留），再登記正確的一筆。
+package hawkr.admin.seller.v1alpha1;
+
+import "hawkr/common/v1alpha1/deadline.proto";
+import "google/api/field_behavior.proto";
+import "google/api/field_info.proto";
+import "google/protobuf/timestamp.proto";
+import "google/rpc/error_details.proto";
+import "google/type/date.proto";
+
+// AuthorityOrderKind 是來函要平台做的事。
+enum AuthorityOrderKind {
+  AUTHORITY_ORDER_KIND_UNSPECIFIED = 0;
+  // 限制或移除商品（食安法草案第 43-1 條、食藥署請下架）。商品限制措施在 B4；在那之前處理方式寫在完成的處理摘要。
+  AUTHORITY_ORDER_KIND_RESTRICT_PRODUCT = 1;
+  // 調取資料（詐欺犯罪危害防制條例第 37 條第 2 項：三日內提供，並保存六個月）。
+  AUTHORITY_ORDER_KIND_DATA_REQUEST = 2;
+  // 暫停帳號（同條例第 36 條第 3 項）。
+  AUTHORITY_ORDER_KIND_SUSPEND_ACCOUNT = 3;
+  AUTHORITY_ORDER_KIND_OTHER = 4;
+}
+
+// AuthorityOrderState 由伺服器推導（完成時間有沒有值）。
+enum AuthorityOrderState {
+  AUTHORITY_ORDER_STATE_UNSPECIFIED = 0;
+  // 處理中。
+  AUTHORITY_ORDER_STATE_OPEN = 1;
+  // 已完成（終態；保存期限不因完成而解除）。
+  AUTHORITY_ORDER_STATE_COMPLETED = 2;
+  // 已撤銷登記（登記錯誤，終態）：保存解除，不在處理中，不能再當作措施的來源；紀錄保留。
+  AUTHORITY_ORDER_STATE_REVOKED = 3;
+}
+
+// AuthorityOrderUnavailableReason 是此刻不能對來函（或它的一個對象）做某個動作的原因（AuthorityOrderUnavailability.reason），依優先序排列。
+enum AuthorityOrderUnavailableReason {
+  AUTHORITY_ORDER_UNAVAILABLE_REASON_UNSPECIFIED = 0;
+  // 來函已撤銷登記。
+  AUTHORITY_ORDER_UNAVAILABLE_REASON_REVOKED = 1;
+  // 來函已完成。
+  AUTHORITY_ORDER_UNAVAILABLE_REASON_COMPLETED = 2;
+  // 這個對象目前不是暫不告知（來函還沒完成所以還沒有告知，或已經告知、由措施告知）。
+  AUTHORITY_ORDER_UNAVAILABLE_REASON_NOTICE_NOT_WITHHELD = 3;
+}
+
+// AuthorityOrderUnavailability 是此刻不能做某個動作的一個原因；message 與該方法被拒絕時錯誤的 LocalizedMessage 是同一句（同一個 Go 函式）。
+message AuthorityOrderUnavailability {
+  AuthorityOrderUnavailableReason reason = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.rpc.LocalizedMessage message = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// AuthorityStoreCoverage 是保存對指名範圍內某一家店的涵蓋狀態（伺服器推導，逐家列出，不聚合）。
+enum AuthorityStoreCoverage {
+  AUTHORITY_STORE_COVERAGE_UNSPECIFIED = 0;
+  // 保存中：保存期限還沒到，這家店的個資不會被清理。
+  AUTHORITY_STORE_COVERAGE_HELD = 1;
+  // 登記當下（伺服器鎖住店家列之後讀到）這家店的個資已依保留期限清除：登記太晚，要回覆機關「資料已依保留期限刪除」。
+  AUTHORITY_STORE_COVERAGE_PURGED_BEFORE_REGISTRATION = 2;
+  // 保存期限已過，這家店的個資還沒被清理（個資清掉之後不會是這個值）。
+  AUTHORITY_STORE_COVERAGE_HOLD_ENDED = 3;
+  // 登記之後、保存期限已過時，這家店的個資已依保留期限清除；之後即使延長保存，清掉的資料也回不來，所以與目前的保存是否有效無關。
+  AUTHORITY_STORE_COVERAGE_PURGED_AFTER_HOLD_ENDED = 4;
+  // 來函已撤銷登記，保存在撤銷時解除（保存期限可能還沒到，所以不是「保存期限已過」）；與個資是否已清理無關，只有登記當下就已清理的店家仍是 PURGED_BEFORE_REGISTRATION。
+  AUTHORITY_STORE_COVERAGE_HOLD_RELEASED_BY_REVOCATION = 5;
+}
+
+// AuthorityHoldExtensionCause 是保存期限被延長的原因。
+enum AuthorityHoldExtensionCause {
+  AUTHORITY_HOLD_EXTENSION_CAUSE_UNSPECIFIED = 0;
+  // 管理員延長（例如進入訴訟，延長到裁判確定後 3 個月）。
+  AUTHORITY_HOLD_EXTENSION_CAUSE_ADMIN = 1;
+  // 調取資料的來函完成時，依提供資料的時間自動延到「提供之後 6 個月」（取收文與提供兩者較晚的）。
+  AUTHORITY_HOLD_EXTENSION_CAUSE_DATA_PROVIDED = 2;
+}
+
+// AuthorityTargetNoticeKind 是被指名者的告知方式（DSA 9(5)、10(5) 的基準，機關要求時可以延後告知）。
+enum AuthorityTargetNoticeKind {
+  AUTHORITY_TARGET_NOTICE_KIND_UNSPECIFIED = 0;
+  // 已告知：必填 notify_time（告知的時間，收文之後、不晚於現在），note 寫方式。
+  AUTHORITY_TARGET_NOTICE_KIND_NOTIFIED = 1;
+  // 機關要求暫不告知（例如偵查不公開）：必填 recheck_date（向機關確認能否告知的日期），到期進待辦「告知被指名者」；之後以
+  // RecordAuthorityTargetNotice 改成 NOTIFIED 或寫新的 recheck_date（每次改變留歷史）。
+  AUTHORITY_TARGET_NOTICE_KIND_WITHHELD = 2;
+  // 由措施告知：只限「暫停帳號」「限制或移除商品」的來函，而且完成（或改告知）時這個對象已有這筆來函導出的措施
+  // （伺服器以 ListMeasures(source_authority_order_id) 的同一個定義驗證）；措施的理由書就是告知。「調取資料」與「其他」不能選。
+  AUTHORITY_TARGET_NOTICE_KIND_MEASURE_IS_NOTICE = 3;
+}
+
+// AuthorityOrder 是主管機關的一份來函。
+message AuthorityOrder {
+  reserved 8;
+  reserved "due_time";
+
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 機關名稱，1 到 100 字。
+  string agency = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 文號，1 到 100 字。
+  string document_no = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 收文時間（管理員填）；期限與保存都從它起算。
+  google.protobuf.Timestamp receive_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  AuthorityOrderKind kind = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 來函內容摘要，1 到 4000 字。
+  string summary = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated AuthorityOrderTarget targets = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  AuthorityOrderState state = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp complete_time = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string completed_by_admin_id = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 處理摘要，1 到 4000 字。
+  string resolution_summary = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 保存期限：被指名者在 seller 的個資到這時之前不清理（預設收文後 184 天；只能延長）。
+  google.protobuf.Timestamp hold_until = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 現在早於 hold_until。
+  bool hold_active = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string registered_by_admin_id = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 來函的版本；完成、延長保存與記下告知都讓它前進。
+  string etag = 17;
+  bool can_complete = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_extend_hold = 19 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 保存期限的延長歷史，舊到新；只有 GetAuthorityOrder 帶。
+  repeated AuthorityHoldExtension hold_extensions = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 只在 REVOKED：撤銷登記的時間、管理員與原因（1 到 2000 字）。
+  google.protobuf.Timestamp revoke_time = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string revoked_by_admin_id = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string revoke_reason = 23 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 此刻能不能撤銷登記（還沒完成、還沒撤銷）；等於 revoke_unavailabilities 是空的。
+  bool can_revoke = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 不能撤銷登記的原因，依優先序；第一個的句子就是 RevokeAuthorityOrder 被拒絕時的訊息。
+  repeated AuthorityOrderUnavailability revoke_unavailabilities = 25 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 處理來函的期限，只在 OPEN 時設（義務還在時才輸出）：開始時間是 receive_time，期限是登記時存下的 due_at。
+  hawkr.common.v1alpha1.Deadline deadline = 26 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// AuthorityOrderTarget 是來函指名的對象：帳號（任何帳號，不一定是賣家），選填店家與商品。
+message AuthorityOrderTarget {
+  // 被指名的帳號；建立時必須存在（identity 驗證）。
+  string account_id = 1;
+  // 選填：只指名這個店家（必須屬於帳號）；空字串＝帳號全部的店家。指定時只算那一家，同帳號的新 stint 不在指名內。
+  string store_id = 2;
+  // 店名；個資已清理的店家是空字串。
+  string store_name = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 選填：指名的商品（限制或移除商品的來函），最多 50 個。
+  repeated string product_ids = 4;
+  // 保存涵蓋的範圍，逐家列出，不聚合；帳號在 seller 沒有店家時是空的，並且 no_seller_data 為 true。
+  repeated AuthorityTargetStore covered_stores = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 這個帳號在 seller 沒有店家資料：買家與帳號資料的保存尚未支援（照樣登記、照樣進待辦）。
+  bool no_seller_data = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 告知；完成前不設。
+  AuthorityTargetNotice notice = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 此刻能不能對這個對象 RecordAuthorityTargetNotice（來函已完成、沒有撤銷，而且目前的告知是暫不告知）；等於 record_notice_unavailabilities 是空的。
+  bool can_record_notice = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 不能記下告知的原因，依優先序；第一個的句子就是 RecordAuthorityTargetNotice 被拒絕時的訊息。
+  repeated AuthorityOrderUnavailability record_notice_unavailabilities = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// AuthorityTargetStore 是被指名範圍內的一家店與保存對它的涵蓋狀態。
+message AuthorityTargetStore {
+  string store_id = 1;
+  // 店名；個資已清理的店家是空字串。
+  string store_name = 2;
+  AuthorityStoreCoverage coverage = 3;
+  // 此刻能不能從這份來函對這家店建立警告、停權或風險措施（與 CreateMeasure 同一份規則：店家還沒關閉）；來函已撤銷登記時一律不行。
+  bool can_create_measure = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 此刻能不能從這份來函對這家店所屬的帳號建立終止合作（與 GetStoreResponse.can_create_termination 同一份規則：開著的店可以；已關閉的店只有帳號最近的一個
+  // 可以建立第 21.3 條的事由）；來函已撤銷登記時一律不行。可以建立的事由與生效時機讀 GetStore 的 available_terminations。
+  bool can_create_termination = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// AuthorityHoldExtension 是保存期限的一次延長。
+message AuthorityHoldExtension {
+  google.protobuf.Timestamp from_time = 1;
+  google.protobuf.Timestamp to_time = 2;
+  AuthorityHoldExtensionCause cause = 3;
+  // 原因，只有 ADMIN 才有，1 到 2000 字。
+  string reason = 4;
+  // DATA_PROVIDED 是完成來函的管理員。
+  string admin_id = 5;
+  google.protobuf.Timestamp create_time = 6;
+}
+
+// AuthorityTargetNotice 是一個對象的告知狀態。
+message AuthorityTargetNotice {
+  AuthorityTargetNoticeKind kind = 1;
+  // 只在 NOTIFIED：告知的時間。
+  google.protobuf.Timestamp notify_time = 2;
+  // 告知的方式或說明，最多 2000 字。
+  string note = 3;
+  // 只在 WITHHELD：向機關確認能否告知的日期（台北）。
+  google.type.Date recheck_date = 4;
+  // 記進系統的時間。
+  google.protobuf.Timestamp record_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string recorded_by_admin_id = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message CreateAuthorityOrderRequest {
+  string agency = 1 [(google.api.field_behavior) = REQUIRED];
+  string document_no = 2 [(google.api.field_behavior) = REQUIRED];
+  // 不晚於現在、不早於 1 年前。
+  google.protobuf.Timestamp receive_time = 3 [(google.api.field_behavior) = REQUIRED];
+  AuthorityOrderKind kind = 4 [(google.api.field_behavior) = REQUIRED];
+  string summary = 5 [(google.api.field_behavior) = REQUIRED];
+  // 1 到 20 個；同一個 (帳號, 店家) 不可重複；同一個帳號已經整個列為對象（不指定店家）時，不能再列它的店家（重疊，invalid_argument）；
+  // 帳號必須存在（identity），店家必須屬於帳號。
+  repeated AuthorityOrderTarget targets = 6 [(google.api.field_behavior) = REQUIRED];
+  // 選填：來函自訂的期限，收文後 1 小時到 30 天。不設時依種類：限制或移除商品、暫停帳號 48 小時；調取資料、其他 72 小時。
+  google.protobuf.Timestamp due_time = 7;
+  // 選填，UUIDv4（AIP-155）：同一位管理員以同一個 request_id 重送回原本那一筆；內容不同回 invalid_argument。範圍是（登記的管理員, request_id），同 CreateMeasure。
+  string request_id = 8 [(google.api.field_info).format = UUID4];
+}
+
+message CreateAuthorityOrderResponse {
+  AuthorityOrder order = 1;
+}
+
+message ListAuthorityOrdersRequest {
+  // 每頁筆數：0 用預設值 20，上限 100。
+  int32 page_size = 1;
+  string page_token = 2;
+  // OPEN 依期限舊到新；COMPLETED、REVOKED 依收文時間新到舊；UNSPECIFIED 不篩選，依收文時間新到舊。
+  AuthorityOrderState state = 3;
+  // 只列指名這個帳號的來函；空字串不篩選。
+  string account_id = 4;
+}
+
+message ListAuthorityOrdersResponse {
+  // 清單的來函帶對象與涵蓋狀態，不帶延長歷史（GetAuthorityOrder 才有）。
+  repeated AuthorityOrder orders = 1;
+  string next_page_token = 2;
+}
+
+message GetAuthorityOrderRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetAuthorityOrderResponse {
+  AuthorityOrder order = 1;
+}
+
+message CompleteAuthorityOrderRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 處理摘要，1 到 4000 字。
+  string resolution_summary = 2 [(google.api.field_behavior) = REQUIRED];
+  // 讀到的來函 etag。
+  string etag = 3 [(google.api.field_behavior) = REQUIRED];
+  // 選填：實際提供資料的時間（只給調取資料的來函，其他種類帶了回 invalid_argument；不設時是現在）；必須在 [收文時間, 現在] 之內。
+  // 調取資料完成時保存期限延到 max(目前, 提供時間＋184 天)，記一列 DATA_PROVIDED。
+  google.protobuf.Timestamp provide_time = 4;
+  // 必填：每個對象一筆（依 targets 的位置），不可缺漏、不可重複。
+  repeated TargetNoticeInput target_notices = 5 [(google.api.field_behavior) = REQUIRED];
+}
+
+// TargetNoticeInput 是完成來函時一個對象的告知。
+message TargetNoticeInput {
+  // 對象在 AuthorityOrder.targets 的位置（從 0 起）。
+  int32 target_position = 1;
+  AuthorityTargetNotice notice = 2;
+}
+
+message CompleteAuthorityOrderResponse {
+  AuthorityOrder order = 1;
+}
+
+message ExtendAuthorityOrderHoldRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 必須晚於目前的 hold_until。
+  google.protobuf.Timestamp hold_until = 2 [(google.api.field_behavior) = REQUIRED];
+  // 例如「進入訴訟，延長到裁判確定後 3 個月」，1 到 2000 字，存在延長的那一列。
+  string reason = 3 [(google.api.field_behavior) = REQUIRED];
+  string etag = 4 [(google.api.field_behavior) = REQUIRED];
+}
+
+message ExtendAuthorityOrderHoldResponse {
+  AuthorityOrder order = 1;
+}
+
+message RecordAuthorityTargetNoticeRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  int32 target_position = 2;
+  // 只能是 NOTIFIED 或新的 WITHHELD（寫新的 recheck_date），而且對象目前的告知必須是 WITHHELD（來函完成之後才能記）。
+  AuthorityTargetNotice notice = 3 [(google.api.field_behavior) = REQUIRED];
+  string etag = 4 [(google.api.field_behavior) = REQUIRED];
+}
+
+message RecordAuthorityTargetNoticeResponse {
+  AuthorityOrder order = 1;
+}
+
+message RevokeAuthorityOrderRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 撤銷的原因（例如哪裡登記錯了），1 到 2000 字。
+  string reason = 2 [(google.api.field_behavior) = REQUIRED];
+  // 讀到的來函 etag。
+  string etag = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message RevokeAuthorityOrderResponse {
+  AuthorityOrder order = 1;
+  // 這份來函之前已由同一位管理員撤銷：order 是目前的紀錄，這次的輸入沒有寫入。
+  bool already_revoked = 2;
+}

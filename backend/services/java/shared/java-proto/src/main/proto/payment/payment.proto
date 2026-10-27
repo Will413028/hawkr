@@ -1,0 +1,1753 @@
+syntax = "proto3";
+
+// 必須與 Java payment-service 的 proto package 一致，gRPC 才能正確路由
+package io.github.will413028.hawkr.payment.grpc;
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/payment";
+option java_package = "io.github.will413028.hawkr.payment.grpc";
+option java_multiple_files = true;
+
+// Payment Service - 支付服務 gRPC 接口（與 Java payment-service 同步）
+service PaymentService {
+  // 建立支付交易
+  rpc CreatePayment(CreatePaymentRequest) returns (CreatePaymentResponse);
+
+  // 查詢支付詳情
+  rpc GetPayment(GetPaymentRequest) returns (GetPaymentResponse);
+
+  // §2A.3.6 / §2A.6 查詢同 order_id 的所有付款嘗試（含 CLOSED_BY_SWITCH / 副 row）
+  rpc GetPaymentHistory(GetPaymentHistoryRequest) returns (GetPaymentHistoryResponse);
+
+  // #2501 賣家視角付款歷程：由 Gateway 解出的現任 store_id 驗店家歸屬（一般 GetPaymentHistory 已收斂為 buyer-only）
+  rpc GetSellerPaymentHistory(GetSellerPaymentHistoryRequest) returns (GetSellerPaymentHistoryResponse);
+
+  // 查詢付款狀態（公開，免驗證 — 供付款結果回調頁面使用）
+  rpc GetPublicPaymentStatus(GetPublicPaymentStatusRequest) returns (GetPublicPaymentStatusResponse);
+
+  // 同步查詢支付狀態（呼叫 PayUni Query API）
+  rpc SyncPaymentStatus(SyncPaymentStatusRequest) returns (SyncPaymentStatusResponse);
+
+  // 關閉交易
+  rpc ClosePayment(ClosePaymentRequest) returns (ClosePaymentResponse);
+
+  // 依訂單編號關閉付款交易（Order Service 取消訂單時呼叫，內部 RPC）
+  rpc ClosePaymentByOrderNo(ClosePaymentByOrderNoRequest) returns (ClosePaymentByOrderNoResponse);
+
+  // 依訂單編號反查活躍/最終付款狀態（internal-only，Order Service 逾期取消前守門用）
+  // 免權限（isInternalCall()）；以 order_no 為鍵回傳該訂單 canonical 交易的付款狀態
+  rpc GetActivePaymentStatusByOrderNo(GetActivePaymentStatusByOrderNoRequest) returns (GetActivePaymentStatusByOrderNoResponse);
+
+  // 建立退款
+  rpc CreateRefund(CreateRefundRequest) returns (CreateRefundResponse);
+
+  // 查詢退款詳情
+  rpc GetRefund(GetRefundRequest) returns (GetRefundResponse);
+
+  // 查詢交易的所有退款
+  rpc GetRefundsByTradeNo(GetRefundsByTradeNoRequest) returns (GetRefundsByTradeNoResponse);
+
+  // 取得付款結果回調頁面（含 HTML + Deep Link，供 Gateway 透傳）
+  rpc GetPaymentReturnPage(GetPaymentReturnPageRequest) returns (GetPaymentReturnPageResponse);
+
+  // 以 opaque redirect_id 取回付款中轉表單 canonical 欄位（Gateway GET /payment/redirect?id= 用，一次性消費，#1394 反射 XSS 修復）
+  rpc GetPaymentRedirectForm(GetPaymentRedirectFormRequest) returns (GetPaymentRedirectFormResponse);
+
+  // 發動撥款指示（代理商模式：買家確認收貨後，由 Order Service 呼叫）
+  rpc GrantPayment(GrantPaymentRequest) returns (GrantPaymentResponse);
+
+  // ATM 退款頁面版 URL 組裝（AfterSales Service 呼叫）
+  rpc GetRefundPageUrl(GetRefundPageUrlRequest) returns (GetRefundPageUrlResponse);
+
+  // 批次查詢付款 provider 狀態（Order 聚合用，收斂規範 §6.3）
+  rpc BatchGetProviderStatusByOrderIds(BatchGetProviderStatusByOrderIdsRequest) returns (BatchGetProviderStatusByOrderIdsResponse);
+
+  // 批次查詢退款 provider 狀態 by case_ids（AfterSales 聚合用）
+  rpc BatchGetRefundProviderStatusByCaseIds(BatchGetRefundProviderStatusByCaseIdsRequest) returns (BatchGetRefundProviderStatusResponse);
+
+  // 批次查詢退款 provider 狀態 by order_ids（Order 聚合用，取每個 order 最新一筆 payment_refunds）
+  rpc BatchGetRefundProviderStatusByOrderIds(BatchGetRefundProviderStatusByOrderIdsRequest) returns (BatchGetRefundProviderStatusResponse);
+
+  // 信用卡付款 Return 處理（Gateway 接收 PayUni Form POST 後呼叫）
+  // 解密 + 驗簽 + 更新交易狀態 + 組裝 Deep Link
+  rpc HandlePaymentPageReturn(HandlePaymentPageReturnRequest) returns (HandlePaymentPageReturnResponse);
+
+  // ── 多功能收付（agent_fee，代理商級別 API）──────────────────────────────
+  //
+  // 🔴 **本 RPC 目前零呼叫端**（2026-09-12 實查）。原本規劃的唯一 caller 是一個獨立的
+  // Go 服務，而架構裁決 DEC-20260912-184025 已把該 domain 併進 payment-service ⇒
+  // 內部收款直接注入 AgentFeeService，**不得自己 call 自己的 gRPC**（裁決第 5 條）。
+  // ⚠️ 它因此是一支孤兒 RPC（10 檔 §5.3），留著只會讓下一個人以為有人在用。
+  // 與 GrantPayment 是**方向相反的兩件事**：
+  // 撥款是平台付錢給賣家，本組是平台**向賣家收**物流服務費。
+
+  // 送出多功能收付。
+  // 🔴 呼叫端必須**先落地 trade_no** 才呼叫本 RPC（70 §3.3 pre-commit）；
+  // 🔴 **本 RPC 不負責去重**——PayUni 官方三處逐字標 TradeNo「可重複」，
+  //    去重只能由呼叫端的 DB UNIQUE 保證。
+  rpc SubmitAgentFee(SubmitAgentFeeRequest) returns (SubmitAgentFeeResponse);
+
+  // 查詢多功能收付的撥款結果（agent_fee_query）。
+  // 回 FundDate 與實際 Fee —— 那是「平台到底收到多少」的唯一來源。
+  rpc QueryAgentFee(QueryAgentFeeRequest) returns (QueryAgentFeeResponse);
+
+  // PayUni 加密資料通用解密（供其他微服務呼叫，如 AfterSales ATM 退款回調）
+  rpc DecryptPayUniResult(DecryptPayUniResultRequest) returns (DecryptPayUniResultResponse);
+
+  // Apple Pay on Web Merchant Validation：對 Apple validationURL 取 merchantSession
+  // 使用 Apple Pay Merchant Identity Certificate (PEM + Key) 進行 mTLS POST，原樣透傳 Apple 回應
+  // 詳見 05 號設計書 §5.11
+  rpc ValidateApplePayMerchant(ValidateApplePayMerchantRequest) returns (ValidateApplePayMerchantResponse);
+
+  // ATM 退款頁面版受理成功確認（收斂規範 §4.4 雙階段 sync 階段 → PROCESSING + estimated_refund_date）
+  // AfterSales 解密 PayUni 回頁面 payload 後呼叫
+  rpc AckAtmRefundAccepted(AckAtmRefundAcceptedRequest) returns (AckAtmRefundAcceptedResponse);
+
+  // ==================== Admin 異常查詢 API（§29 Admin 異常訂單管理）====================
+
+  // 列付款異常（FAILED / EXPIRED / CONFLICT 或 rescue_action 有值）
+  rpc ListPaymentTransactionsForAdmin(ListPaymentTransactionsForAdminRequest) returns (ListPaymentTransactionsForAdminResponse);
+
+  // 取付款詳情（Admin 對帳用，含 grant_* 撥款欄位、rescue、重複付款等）
+  rpc GetPaymentTransactionForAdmin(GetPaymentTransactionForAdminRequest) returns (GetPaymentTransactionForAdminResponse);
+
+  // 列退款異常（FAILED 或處理超時 24h）
+  rpc ListRefundsForAdmin(ListRefundsForAdminRequest) returns (ListRefundsForAdminResponse);
+
+  // 取退款詳情
+  rpc GetRefundForAdmin(GetRefundForAdminRequest) returns (GetRefundForAdminResponse);
+
+  // 列撥款異常（grant_status 非成功）
+  rpc ListGrantsForAdmin(ListGrantsForAdminRequest) returns (ListGrantsForAdminResponse);
+
+  // ==== 服務間：發票日期與金額所需的付款事實（58 號 §7.1.2 步驟 5 ②、註 2）====
+  // invoice-service 的 order.paid consumer 專用；唯讀，**不改支付服務任何狀態機**。
+  // 走 52 號 HMAC 內部授權四 header，client deadline 3s。
+  // 既有的 AdminPaymentTransactionDetail 雖然也帶 provider_paid_at，但那是 admin 面 DTO，
+  // 服務間直用違反角色分離（Proto 管理規範 §5.1）。
+  rpc GetPaymentFactsInternal(GetPaymentFactsInternalRequest) returns (GetPaymentFactsInternalResponse);
+
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LogisticsFinanceService —— 物流財務（線 B）的對外出口
+// ══════════════════════════════════════════════════════════════════════════════
+//
+// 🔴 **為什麼是獨立的 service 而不是掛在 PaymentService 底下**：gRPC 一個 service name
+//    只能有一個實作 bean。掛進 PaymentService 就必須把十支 RPC 塞進已經 1900 行的
+//    PaymentGrpcService，而那支的每個方法都帶著自己的授權與遮蔽規則——混進去之後
+//    「這支 RPC 的授權軸是什麼」要逐行讀才知道。獨立 service ＝ 獨立 bean ＝
+//    授權規則看一眼就成立（對照：MembershipBillingService 同一個理由）。
+//    ⚠️ 它與 PaymentService 共用同一個 gRPC channel／port，不新增任何服務或部署單元。
+service LogisticsFinanceService {
+  // ==================== 物流財務（線 B：賣家物流應收 / 收款 / 對帳）====================
+  //
+  // V9 的九張表在本波之前**零對外出口**：賣家看不到自己被收了多少物流費，Admin 查不到
+  // 任何一筆應收、收款或對帳差額。以下兩組 RPC 就是那個出口。
+  //
+  // 🔴 **全部唯讀**。寫入路徑只有兩條且都已存在：送達事件建應收、scheduler 送出／查詢／
+  //    對帳。在這裡開寫入 RPC 等於開一條繞過 idempotency key 與 lease 的第二路徑
+  //    （CLAUDE.md §22：不在 application code 建補償入口）。
+  //
+  // 🔴 **賣家面與 Admin 面是兩組獨立 RPC**（Proto 管理規範 §5.1）：不得以 flag、特殊值
+  //    或「同一支 RPC 看 account_type 分流」實作。賣家面的 store_id 由 Gateway 的
+  //    sellerid resolver 解出後注入，服務端強制以它過濾，**不接受呼叫端指定任何 store**。
+  //
+  // 🔴 **十一個維度（ADR-008 §1）各自是獨立欄位，不得合併或互相抵銷。** 最容易犯的是
+  //    把「賣家欠平台」與「平台欠賣家」合成一個帶正負的淨額——那兩個是兩個科目，
+  //    合成之後 ADR-008「永久可追蹤」的保證就失效了，而帳面上看起來一切正常。
+
+  // 賣家面：一間店（可選期間）的物流財務總覽，十一個維度逐一具名。
+  rpc GetSellerLogisticsFinanceSummary(GetSellerLogisticsFinanceSummaryRequest) returns (GetSellerLogisticsFinanceSummaryResponse);
+
+  // 賣家面：自己的應收明細（分頁）。每一筆帶同樣十一個維度的單筆值。
+  rpc ListSellerLogisticsReceivables(ListSellerLogisticsReceivablesRequest) returns (ListSellerLogisticsReceivablesResponse);
+
+  // 賣家面：自己的物流帳本流水（雙分錄表頭 ＋ 分錄）。
+  rpc ListSellerLogisticsLedgerEntries(ListSellerLogisticsLedgerEntriesRequest) returns (ListSellerLogisticsLedgerEntriesResponse);
+
+  // Admin 面：應收列表／單筆詳情（含收款嘗試、調整單、帳本、該賣家帳戶餘額）。
+  rpc ListLogisticsReceivablesForAdmin(ListLogisticsReceivablesForAdminRequest) returns (ListLogisticsReceivablesForAdminResponse);
+  rpc GetLogisticsReceivableForAdmin(GetLogisticsReceivableForAdminRequest) returns (GetLogisticsReceivableForAdminResponse);
+
+  // Admin 面：PayUni 收款嘗試（gross / actual fee / net proceeds / residual）。
+  rpc ListLogisticsCollectionsForAdmin(ListLogisticsCollectionsForAdminRequest) returns (ListLogisticsCollectionsForAdminResponse);
+
+  // Admin 面：責任／對帳調整單。
+  rpc ListLogisticsAdjustmentsForAdmin(ListLogisticsAdjustmentsForAdminRequest) returns (ListLogisticsAdjustmentsForAdminResponse);
+
+  // Admin 面：provider 帳單（彙總）與單份帳單的全部明細列。
+  rpc ListProviderStatementsForAdmin(ListProviderStatementsForAdminRequest) returns (ListProviderStatementsForAdminResponse);
+  rpc GetProviderStatementForAdmin(GetProviderStatementForAdminRequest) returns (GetProviderStatementForAdminResponse);
+
+  // Admin 面：維運例外案件佇列（含人工覆核提案，manual review）。
+  rpc ListFulfillmentExceptionCasesForAdmin(ListFulfillmentExceptionCasesForAdminRequest) returns (ListFulfillmentExceptionCasesForAdminResponse);
+
+  // Admin 面：單一例外案件詳情（65 §6.1.1 A-2）。
+  //
+  // 🔴 **與 List 分開是刻意的**：List 是佇列視圖（分頁、篩選、SLA 齡），Detail 要帶
+  //    responsibility 軸的完整決策脈絡（凍結的 event context、maker 主張的成因、
+  //    影響預覽快照、提案歷程）。把它們做成同一支 RPC 靠 flag 分流，就是 Proto 管理
+  //    規範 §5.1 禁止的那個形狀。
+  //
+  // ⚠️ 它仍然是**讀**，所以留在這支唯讀 service；寫入路徑在
+  //    FulfillmentResponsibilityService（見該 service 的說明）。
+  rpc GetFulfillmentExceptionCaseForAdmin(GetFulfillmentExceptionCaseForAdminRequest) returns (GetFulfillmentExceptionCaseForAdminResponse);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FulfillmentResponsibilityService —— 責任判定 maker-checker 的**寫入**出口（WP2B）
+// ══════════════════════════════════════════════════════════════════════════════
+//
+// 🔴 **為什麼不掛在 LogisticsFinanceService 底下**：那支 service 的檔頭逐字寫著
+//    「**全部唯讀**。寫入路徑只有兩條且都已存在……在這裡開寫入 RPC 等於開一條繞過
+//    idempotency key 與 lease 的第二路徑」。那句話針對的是**應收與收款**軸，而它是對的
+//    ——本 service 不碰 logistics_receivables 一個欄位。
+//    把責任判定的寫入塞進去，會讓那句「全部唯讀」變成假的，而**一句被推翻的不變式
+//    比沒有不變式更危險**：下一個人讀到它會以為那支 service 不會寫任何東西。
+//    ⇒ 獨立 service ＝ 獨立 bean ＝ 授權與寫入邊界看一眼就成立
+//      （與 LogisticsFinanceService／MembershipBillingService 同一個判準）。
+//    ⚠️ 共用同一個 gRPC channel／port（payment-service 9925），不新增服務或部署單元。
+//
+// 🔴 **本 service 只做「責任判定」這一種 resolution_type**（`RESPONSIBILITY_ATTRIBUTE`）。
+//    `chk_fcr_type` 另外六個型別（CLAIM_SETTLE／CLAIM_DISMISS／SHIPMENT_CANCEL／
+//    SHIPMENT_CANCEL_CONFIRM／SHIPMENT_CANCEL_AND_REFUND／ANOMALY_RESUME）的副作用
+//    全部落在 shipping-service 的配送軸狀態邊上（65 §6.4.2 對照表），本波不實作。
+//    ⇒ 對它們一律 **fail-closed 拒絕**（9571），**不是**先收下來再說——收下一個沒有人
+//      會執行副作用的提案，等於製造一張永遠結不了的案件。
+//    ⚠️ URL 形狀與雙人約束刻意對齊 65 §6.1.1 的 A-4／A-5，讓後續波次直接擴充同一組端點，
+//      而不是另開一套（「同一個機制長成兩種形狀」是 65 §6.1.2 明令要避免的）。
+service FulfillmentResponsibilityService {
+  // A-4 maker：提出責任判定提案（附 server 端算出的影響預覽快照）。
+  //
+  // 🔴 成因（responsibility_cause）是**提案的標的物**，不是覆核時才補的欄位：
+  //    它決定買家拿不拿得到退款（BUYER_CAUSED ⇒ refund = 0）。若成因在 approve 當下
+  //    才第一次出現，雙人制保證的就只剩「有兩個人碰過這張單」，而不是「第二個人批准了
+  //    第一個人提的那一件事」——覆核者可以獨自決定不退款，而帳面上雙人制完全成立。
+  rpc ProposeResponsibilityResolutionForAdmin(ProposeResponsibilityResolutionForAdminRequest) returns (ProposeResponsibilityResolutionForAdminResponse);
+
+  // A-5 checker：覆核（APPROVE／REJECT）。
+  //
+  // 🔴 request **刻意只有 decision ＋ comment**：覆核者能表達的只有「批准或駁回**這一筆
+  //    提案**」。成因取自 maker 的提案列、事件 context 取自建案當下凍結的案件列、
+  //    覆核者身分取自 GrpcAuthContext ——三者皆非呼叫端可指定。
+  //    ⚠️ 不得為了「方便前端」把 responsibility_cause／order_no／shipment_id／
+  //      shipping_method／refund_amount 任何一欄加進本 request。
+  rpc ReviewResponsibilityResolutionForAdmin(ReviewResponsibilityResolutionForAdminRequest) returns (ReviewResponsibilityResolutionForAdminResponse);
+}
+
+// ==================== 枚舉已移除 ====================
+// PaymentType, TransactionStatus, RefundStatus 改為 string（存 CodeMeta value）
+
+// ==================== 建立支付 ====================
+
+message CreatePaymentRequest {
+  string order_no = 1;            // 訂單編號（必填，Payment Service 從 Order Service 查詢 mer_id + amount）
+  string payment_type = 2;        // 支付方式 value（2001=信用卡, 2002=ApplePay, 2003=GooglePay, 2004=ATM）
+  string expire_days = 3;        // ATM 繳費期限天數（數字字串）
+  string apple_pay_token = 4;    // Apple Pay payment token
+  string google_pay_token = 5;   // Google Pay payment token
+  string bank_type = 6;          // ATM 銀行代碼
+  string user_email = 7;         // 使用者信箱（付款通知用）
+  int64 buyer_id = 8;             // Gateway 已解析為現任 buyer_id 後注入（見 gateway payment.go resolvePaymentBuyerID；E.5.5 例外 #1，2026-08-02 由 account_id 改名，值本來就是 buyer_id）
+  string client_type = 9;        // CodeMeta ClientType value（MOBILE_APP / WEB_BROWSER）；空字串視為 MOBILE_APP（向下相容）。決定 §5.9 PayUni 回調最終出口
+  string app_type = 10;          // CodeMeta AppType value（BUYER / SELLER）；空字串視為 BUYER（向下相容）。Gateway 由 JWT AccountType 推導後注入，禁止寫死字串字面量
+  // mer_id、amount、product_name 由 Payment Service 從 Order Service 查詢，不由前端傳入
+}
+
+message CreatePaymentResponse {
+  int32 code = 1;             // 0=成功
+  string message = 2;
+  PaymentResult data = 3;
+}
+
+message PaymentResult {
+  string trade_no = 1;
+  string order_id = 2;
+  string payment_type = 3;     // 支付方式 value
+  string amount = 4;          // 金額（新台幣元，數字字串格式）
+  string status = 5;          // 交易狀態 value（0=INIT, 1=PAID, 2=FAILED, 3=EXPIRED, 4=CONFLICT, 5=CLOSED）
+
+  // 信用卡 UPP 表單資料（前端需組裝 form POST 到 PayUni）
+  UppFormData upp_form_data = 6;
+
+  // ATM 專用
+  string atm_bank_code = 7;
+  string atm_virtual_account = 8;
+  string atm_expire_date = 9;
+
+  // 保留欄位編號 10, 11（已移除 CVS 相關欄位）
+  reserved 10, 11;
+
+  string expire_at = 12;      // Unix timestamp 毫秒（數字字串）
+
+  // 完整的 WebView 開啟 URL（含 base64 編碼表單資料，由 Payment Service 組裝）
+  string redirect_url = 13;
+}
+
+// UPP 整合式支付頁 Form POST 資料
+// 前端收到後需建立 hidden form 並 POST 到 action_url
+message UppFormData {
+  string action_url = 1;      // https://api.payuni.com.tw/api/upp
+  string mer_id = 2;        // MerID（PayUni 子商家代號）
+  string version = 3;         // 固定 2.0
+  string encrypt_info = 4;    // AES 加密字串
+  string hash_info = 5;       // SHA256 簽章
+  string is_platform = 6;     // 代理商模式固定 "1"
+}
+
+// ==================== 查詢支付 ====================
+
+message GetPaymentRequest {
+  string trade_no = 1;
+}
+
+message GetPaymentResponse {
+  int32 code = 1;             // 0=成功
+  string message = 2;
+  PaymentDetail data = 3;
+}
+
+message PaymentDetail {
+  string trade_no = 1;
+  string order_id = 2;
+  string mer_id = 3;
+  string buyer_id = 4;         // 買家 buyer_id（2026-08-02 由 account_id 改名，值本來就是 buyer_id）
+  string payment_type = 5;     // 支付方式 value
+  string amount = 6;          // 金額（新台幣元，數字字串格式）
+  string product_name = 7;
+  string status = 8;          // 交易狀態 value
+  string provider_trade_no = 9;
+  string provider_status = 10;
+  string provider_message = 11;
+  string atm_bank_code = 12;
+  string atm_virtual_account = 13;
+  string atm_expire_date = 14;
+  string pay_time = 15;       // Unix timestamp 毫秒（數字字串）
+  string closed_at = 16;      // Unix timestamp 毫秒（數字字串）
+  string expire_at = 17;      // Unix timestamp 毫秒（數字字串）
+  string created_at = 18;     // Unix timestamp 毫秒（數字字串）
+  string updated_at = 19;     // Unix timestamp 毫秒（數字字串）
+  // §2A.6 重複付款顯示欄位
+  bool is_duplicate = 20;     // 是否為重複付款副 row
+  string duplicate_sequence = 21; // 重複付款序號（1, 2, 3...），主 row 為空字串
+  // 撥款欄位（收斂規範 §2.3 / §6.2：僅 Admin API 暴露，App DTO 必須過濾）
+  string granted_at = 22;     // 撥款成功時間（ISO 8601，Admin only）
+  string grant_status = 23;   // PayUni 撥款狀態碼（Admin only）
+  string grant_message = 24;  // PayUni 撥款訊息（Admin only）
+}
+
+// ==================== §2A.3.6 / §2A.6 付款歷程查詢 ====================
+
+message GetPaymentHistoryRequest {
+  string order_id = 1;            // 原始訂單編號（如 O382716459），查詢該訂單所有付款嘗試
+  int64 account_id = 2;           // Gateway JWT 注入，僅能查自己的訂單
+}
+
+message GetPaymentHistoryResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated PaymentDetail records = 3;  // 依 created_at DESC 排序，含 CLOSED_BY_SWITCH / 副 row
+}
+
+// #2501 賣家視角付款歷程查詢。store_id 由 Gateway 從賣家 JWT 的 account_id 解出的
+// 現任 store_id（信任 actor context，非 client 自填）；payment-service 仍會以
+// canonical order 反解的 store_id 再次比對，跨店與查無訂單一律回同形 NOT_FOUND。
+message GetSellerPaymentHistoryRequest {
+  string order_id = 1;            // 原始訂單編號（如 O382716459）
+  int64 store_id = 2;             // Gateway 解出的呼叫端現任 store_id
+}
+
+// 賣家視角回應：records 與買家版同型，但 payment-service 已遮蔽 buyer_id /
+// atm_virtual_account / provider_trade_no 等買家 PII（#2501）。
+message GetSellerPaymentHistoryResponse {
+  int32 code = 1;
+  string message = 2;
+  repeated PaymentDetail records = 3;  // 依 created_at DESC 排序，含 CLOSED_BY_SWITCH / 副 row
+}
+
+// ==================== 公開查詢付款狀態（免驗證） ====================
+
+message GetPublicPaymentStatusRequest {
+  string trade_no = 1;
+}
+
+message GetPublicPaymentStatusResponse {
+  int32 code = 1;               // 0=成功
+  string message = 2;
+  PublicPaymentStatus data = 3;
+}
+
+// 僅回傳最小資訊，不含敏感欄位（buyer_id、mer_id 等）
+message PublicPaymentStatus {
+  string trade_no = 1;
+  string order_id = 2;
+  string amount = 3;            // 金額（新台幣元，數字字串）
+  string status = 4;           // 交易狀態 value
+}
+
+// ==================== 付款結果回調頁面 ====================
+
+message GetPaymentReturnPageRequest {
+  string trade_no = 1;          // 交易編號
+}
+
+message GetPaymentReturnPageResponse {
+  string html_content = 1;      // 完整 HTML 頁面（含 Deep Link 導向，由 Payment Service 組裝）
+}
+
+// 以 opaque redirect_id 取回付款中轉表單 canonical 欄位（#1394）
+message GetPaymentRedirectFormRequest {
+  string redirect_id = 1;       // 不可猜的 opaque id（後端產生，一次性消費）
+}
+
+message GetPaymentRedirectFormResponse {
+  string action_url = 1;        // PayUni Form POST action URL
+  string mer_id = 2;            // 商店代號（HAWK）
+  string version = 3;           // API 版本
+  string encrypt_info = 4;      // AES 加密字串
+  string hash_info = 5;         // SHA256 簽章
+  bool is_platform = 6;         // 是否平台商店（非數字語意，保持 bool）
+}
+
+// ==================== 同步支付狀態 ====================
+
+message SyncPaymentStatusRequest {
+  string trade_no = 1;
+}
+
+message SyncPaymentStatusResponse {
+  int32 code = 1;             // 0=成功
+  string message = 2;
+  PaymentDetail data = 3;
+}
+
+// ==================== 關閉交易 ====================
+
+message ClosePaymentRequest {
+  string trade_no = 1;
+}
+
+message ClosePaymentResponse {
+  int32 code = 1;             // 0=成功
+  string message = 2;
+}
+
+// ==================== 依訂單編號關閉交易（內部 RPC） ====================
+
+message ClosePaymentByOrderNoRequest {
+  string order_no = 1;        // 訂單編號
+}
+
+message ClosePaymentByOrderNoResponse {
+  int32 code = 1;             // 0=成功
+  string message = 2;
+}
+
+// ==================== 依訂單編號反查付款狀態（內部 RPC） ====================
+
+message GetActivePaymentStatusByOrderNoRequest {
+  string order_no = 1;        // 訂單編號
+}
+
+message GetActivePaymentStatusByOrderNoResponse {
+  int32 code = 1;             // 0=成功
+  string message = 2;
+  // 該訂單 canonical 交易的付款狀態；查無交易時 data 為空、code 仍 0（訂單未建立付款交易屬正常情況）
+  PaymentDetail data = 3;
+}
+
+// ==================== 建立退款 ====================
+
+message CreateRefundRequest {
+  string trade_no = 1;
+  string amount = 2;          // 退款金額（新台幣元，數字字串格式）
+  string reason = 3;
+  // field 4~7 已移除（ATM 改用 PayUni 頁面版，平台不接觸銀行機敏資訊）
+  reserved 4, 5, 6, 7;
+  string refund_no = 8;       // 冪等鍵（AfterSales 傳入 case_no 或 cancel_id）
+}
+
+message CreateRefundResponse {
+  int32 code = 1;             // 0=成功
+  string message = 2;
+  RefundDetail data = 3;
+}
+
+message RefundDetail {
+  string refund_no = 1;
+  string trade_no = 2;
+  string order_id = 3;
+  string amount = 4;          // 退款金額（新台幣元，數字字串格式）
+  string status = 5;           // 退款狀態 value（0=REQUESTED, 1=PROCESSING, 2=SUCCEEDED, 3=FAILED）
+  string reason = 6;
+  string provider_refund_no = 7;
+  string provider_status = 8;     // 收斂規範 §4.4：sync 寫 response.Status；async webhook 寫 inner RefundStatus（1/2）
+  string provider_message = 9;
+  string completed_at = 10;   // Unix timestamp 毫秒（數字字串）
+  string created_at = 11;     // Unix timestamp 毫秒（數字字串）
+  string estimated_refund_date = 12; // ATM sync success：PayUni EstimatedRefundDate（YYYY-MM-DD，空字串代表無值）
+  string bank_date = 13;      // ATM async RefundStatus=1：webhook BankDate（YYYY-MM-DD，空字串代表無值）
+}
+
+// ==================== 批次 provider 狀態聚合（收斂規範 §6.3）====================
+
+message ProviderStatusEntry {
+  string provider_status = 1;
+  string provider_message = 2;
+}
+
+message BatchGetProviderStatusByOrderIdsRequest {
+  repeated string order_ids = 1;   // 建議單次 ≤ 100
+}
+message BatchGetProviderStatusByOrderIdsResponse {
+  int32 code = 1;
+  string message = 2;
+  map<string, ProviderStatusEntry> entries = 3;  // key = order_id；無資料則省略
+}
+
+message BatchGetRefundProviderStatusByCaseIdsRequest {
+  repeated string case_ids = 1;
+}
+message BatchGetRefundProviderStatusByOrderIdsRequest {
+  repeated string order_ids = 1;
+}
+message BatchGetRefundProviderStatusResponse {
+  int32 code = 1;
+  string message = 2;
+  map<string, ProviderStatusEntry> entries = 3;  // key = case_id 或 order_id
+}
+
+// ==================== 查詢退款 ====================
+
+message GetRefundRequest {
+  string refund_no = 1;
+}
+
+message GetRefundResponse {
+  int32 code = 1;             // 0=成功
+  string message = 2;
+  RefundDetail data = 3;
+}
+
+// ==================== 查詢交易的所有退款 ====================
+
+message GetRefundsByTradeNoRequest {
+  string trade_no = 1;
+}
+
+message GetRefundsByTradeNoResponse {
+  int32 code = 1;             // 0=成功
+  string message = 2;
+  repeated RefundDetail refunds = 3;
+}
+
+// ==================== 撥款指示（代理商專用） ====================
+
+message GrantPaymentRequest {
+  string order_no = 1;          // 訂單編號（Payment Service 用 order_no 查詢對應的已付款交易）
+}
+
+message GrantPaymentResponse {
+  int32 code = 1;               // 0=成功
+  string message = 2;
+  GrantPaymentResult data = 3;
+  string grant_outcome = 4;     // 撥款結果語意（僅 code=0 時有值）：GRANTED=指示成功發動；PROVIDER_TOOK_OVER=PayUni 已對退款交易接管撥款（不需也不受理補發指示，05 §5.6.1 / 03 §3.11.2）
+}
+
+message GrantPaymentResult {
+  string trade_no = 1;          // 系統交易編號
+  string order_id = 2;          // 訂單編號
+  string provider_trade_no = 3; // PayUni UNi序號
+  string amount = 4;            // 撥款金額（新台幣元，數字字串）
+  string granted_at = 5;        // 撥款指示時間（ISO 8601）
+}
+
+// ==================== ATM 退款頁面版 ====================
+
+message GetRefundPageUrlRequest {
+  string trade_no = 1;          // Payment trade_no
+  string amount = 2;            // 退款金額
+  string return_url = 3;        // PayUni 完成後導回 URL
+}
+
+message GetRefundPageUrlResponse {
+  int32 code = 1;
+  string message = 2;
+  RefundPageData data = 3;
+}
+
+message RefundPageData {
+  string redirect_url = 1;      // 組裝好的 redirect URL（含加密參數）
+}
+
+// ==================== 信用卡付款 Return 處理 ====================
+
+message HandlePaymentPageReturnRequest {
+  string encrypt_info = 1;      // PayUni Form POST 的 EncryptInfo（AES 加密）
+  string hash_info = 2;         // PayUni Form POST 的 HashInfo（SHA256 簽章）
+  reserved 3;                   // 原 app_type 已移除：service 端從 payment_transactions DB lookup 取得 client_type / app_type（SoT 在 DB），詳見設計書 05 §5.9
+}
+
+message HandlePaymentPageReturnResponse {
+  int32 code = 1;
+  string message = 2;
+  string redirect_url = 3;      // 完整 Deep Link URL（Gateway 302 redirect 用）
+}
+
+// ==================== PayUni 加密資料通用解密 ====================
+
+message DecryptPayUniResultRequest {
+  string encrypt_info = 1;      // PayUni 加密資料
+  string hash_info = 2;         // PayUni 簽章
+}
+
+message DecryptPayUniResultResponse {
+  int32 code = 1;
+  string message = 2;
+  DecryptedPayUniData data = 3;
+}
+
+message DecryptedPayUniData {
+  string status = 1;                    // PayUni Status（SUCCESS / 錯誤代碼）
+  string mer_trade_no = 2;              // 商店訂單編號
+  string trade_no = 3;                  // PayUni UNi 序號
+  string refund_amt = 4;               // 退款金額
+  string payment_type = 5;             // 支付工具（2=ATM, 3=超商代碼）
+  string estimated_refund_date = 6;    // 預計扣款日期（YYYY-MM-DD）
+  string error_message = 7;            // 失敗時的錯誤訊息
+}
+
+// ==================== ATM 退款頁面受理確認（收斂規範 §4.4） ====================
+
+message AckAtmRefundAcceptedRequest {
+  string refund_no = 1;                // payment_refunds.refund_no（AfterSales 從 refund_tasks.external_ref_id 取得）
+  string provider_status = 2;          // PayUni 同步 Status（通常 "SUCCESS"）
+  string provider_message = 3;         // PayUni 同步 Message（空字串允許）
+  string estimated_refund_date = 4;    // PayUni 回頁面 EstimatedRefundDate（YYYY-MM-DD，允許空字串）
+}
+
+message AckAtmRefundAcceptedResponse {
+  int32 code = 1;
+  string message = 2;
+}
+
+// ==================== Admin 異常查詢 Messages（§29 Admin 異常訂單管理）====================
+
+// ---- P1：列付款異常 ----
+
+message ListPaymentTransactionsForAdminRequest {
+  int64 account_id = 1;                 // Gateway 注入（admin 身份）
+  string page = 2;
+  string page_size = 3;
+  bool abnormal_only = 4;
+  string provider_status = 5;
+  string status = 6;                     // 平台 status value，可多值逗號分隔
+  string order_no = 7;
+  // 已由 gateway 解析完成的現任 buyer_id（不是 admin 傳進來的 account_id）：
+  // gateway 收 ?buyer_account_id= 這個 raw account_id，經
+  // resolveOptionalBuyerFilterQuery 解析後才填進本欄，下游直接對
+  // payment_transactions.buyer_id 做字串比對，禁止再解析一次。
+  // 哨兵值 "-1"：該 account 沒有現任買家 stint，保證查無結果（不是「略過篩選」）。
+  // 本欄原名 buyer_account_id，2026-08-05 正名（field number 8 不變，wire 相容）。
+  string buyer_id = 8;
+  string payment_type = 9;               // PaymentType value
+  string created_from = 10;              // ISO 8601 UTC
+  string created_to = 11;
+  string sort = 12;                       // updated_at_desc 等
+}
+
+message ListPaymentTransactionsForAdminResponse {
+  int32 code = 1;
+  string message = 2;
+  ListPaymentTransactionsForAdminData data = 3;
+}
+
+message ListPaymentTransactionsForAdminData {
+  repeated AdminPaymentTransactionSummary records = 1;
+  string total = 2;
+  string page = 3;
+  string page_size = 4;
+}
+
+message AdminPaymentTransactionSummary {
+  string trade_no = 1;
+  string order_no = 2;
+  string buyer_id = 3;                   // 買家 buyer_id（2026-08-02 由 account_id 改名，值本來就是 buyer_id）
+  string mer_id = 4;
+  string amount = 5;                     // 整數字串（元）
+  string payment_type = 6;               // PaymentType value
+  string status = 7;                     // PaymentTransactionStatus value
+  string provider_status = 8;
+  string provider_message = 9;
+  string provider_trade_no = 10;
+  string created_at = 11;
+  string updated_at = 12;
+}
+
+// ---- P2：付款詳情 ----
+
+message GetPaymentTransactionForAdminRequest {
+  int64 account_id = 1;
+  string trade_no = 2;
+}
+
+message GetPaymentTransactionForAdminResponse {
+  int32 code = 1;
+  string message = 2;
+  AdminPaymentTransactionDetail data = 3;
+}
+
+message AdminPaymentTransactionDetail {
+  string trade_no = 1;
+  string order_no = 2;
+  string buyer_id = 3;                   // 買家 buyer_id（2026-08-02 由 account_id 改名，值本來就是 buyer_id）
+  string mer_id = 4;
+  string amount = 5;
+  string payment_type = 6;
+  string product_name = 7;
+  string status = 8;
+  string provider_status = 9;
+  string provider_message = 10;
+  string provider_trade_no = 11;
+  string atm_bank_code = 12;
+  string atm_virtual_account = 13;
+  string atm_expire_date = 14;
+  string pay_time = 15;
+  string provider_create_at = 16;
+  string provider_paid_at = 17;
+  string expire_at = 18;
+  string closed_at = 19;
+  // 撥款（grant，收斂規範 §9.1 新增）
+  string granted_at = 20;
+  string grant_status = 21;
+  string grant_message = 22;
+  // 重複付款
+  string is_duplicate = 23;
+  string duplicate_of_payment_id = 24;
+  string duplicate_sequence = 25;
+  // L2 rescue
+  string rescued_at = 26;
+  string rescue_action = 27;
+  string created_at = 28;
+  string updated_at = 29;
+}
+
+// ---- P3：列退款異常 ----
+
+message ListRefundsForAdminRequest {
+  int64 account_id = 1;
+  string page = 2;
+  string page_size = 3;
+  bool abnormal_only = 4;
+  string provider_status = 5;
+  string status = 6;
+  string trade_no = 7;
+  string order_no = 8;
+  string created_from = 9;
+  string created_to = 10;
+  string sort = 11;
+}
+
+message ListRefundsForAdminResponse {
+  int32 code = 1;
+  string message = 2;
+  ListRefundsForAdminData data = 3;
+}
+
+message ListRefundsForAdminData {
+  repeated AdminPaymentRefundSummary records = 1;
+  string total = 2;
+  string page = 3;
+  string page_size = 4;
+}
+
+message AdminPaymentRefundSummary {
+  string refund_no = 1;
+  string trade_no = 2;
+  string order_no = 3;
+  string amount = 4;
+  string status = 5;                     // RefundStatus value
+  string provider_status = 6;
+  string provider_message = 7;
+  string provider_refund_no = 8;
+  string reason = 9;
+  string completed_at = 10;
+  string created_at = 11;
+  string updated_at = 12;
+}
+
+// ---- P4：退款詳情（直接 reuse Summary）----
+
+message GetRefundForAdminRequest {
+  int64 account_id = 1;
+  string refund_no = 2;
+}
+
+message GetRefundForAdminResponse {
+  int32 code = 1;
+  string message = 2;
+  AdminPaymentRefundSummary data = 3;
+}
+
+// ---- P5：列撥款異常 ----
+
+message ListGrantsForAdminRequest {
+  int64 account_id = 1;
+  string page = 2;
+  string page_size = 3;
+  bool abnormal_only = 4;                // true：grant_status 非成功；false：所有 grant_status 非空
+  string grant_status = 5;
+  string order_no = 6;
+  string granted_from = 7;                // granted_at 時間範圍起
+  string granted_to = 8;
+  string sort = 9;
+}
+
+message ListGrantsForAdminResponse {
+  int32 code = 1;
+  string message = 2;
+  ListGrantsForAdminData data = 3;
+}
+
+message ListGrantsForAdminData {
+  repeated AdminGrantSummary records = 1;
+  string total = 2;
+  string page = 3;
+  string page_size = 4;
+}
+
+message AdminGrantSummary {
+  string trade_no = 1;
+  string order_no = 2;
+  string amount = 3;                     // 撥款金額（元）
+  string grant_status = 4;
+  string grant_message = 5;
+  string granted_at = 6;                 // ISO 8601
+  string provider_trade_no = 7;
+  string created_at = 8;
+  string updated_at = 9;
+}
+
+// ==================== Apple Pay Web Merchant Validation（05 號設計書 §5.11）====================
+
+message ValidateApplePayMerchantRequest {
+  string validation_url = 1;  // Apple 提供的一次性 validationURL（host 限 *.apple.com 且 path 開頭 /paymentservices/）
+  string domain_name = 2;     // 前端發起付款的網域（如 web-dev.example.com），必須在 allowlist 內
+  string display_name = 3;    // Apple Pay sheet 顯示的商家名稱
+}
+
+message ValidateApplePayMerchantResponse {
+  int32 code = 1;
+  string message = 2;
+  string merchant_session_json = 3;  // Apple 回應原文 JSON，前端原樣傳入 completeMerchantValidation()
+}
+
+
+// ==================== 服務間：付款事實（58 號 §6.2.4／§7.1.2 註 2）====================
+//
+// 【型別】數值一律 `string`、時間一律 ISO 8601 UTC（`YYYY-MM-DDTHH:mm:ssZ`），與本檔一致。
+// ⚠️ 刻意**不用** §4.1 例外 ③ 的原生 int64：`protonumericlint` 走訪的是「任何 RPC
+// **output type** 可達的 message」、不區分該 RPC 是否對外 ⇒ response 側用 int64 會被
+// `make proto-lint-numeric` 擋下，只能加進 numeric-allowlist，而那份清單只准縮不准長。
+
+message GetPaymentFactsInternalRequest {
+  string order_no = 1;
+}
+
+message GetPaymentFactsInternalResponse {
+  int32 code = 1;
+  string message = 2;
+  // 查無該訂單的 canonical 交易 ⇒ 回**非 0** 業務碼，不得回 code=0 ＋ 空 data。
+  // 呼叫端唯一安全的行為是 fail-loud（order.paid 重試三次進 DLQ）：空 data 會讓
+  // 發票日期退回本地時鐘、金額對帳失去基準。
+  PaymentFactsData data = 3;
+}
+
+message PaymentFactsData {
+  string order_no = 1;
+  // canonical 交易的 trade_no（= orderNo + 3 位序號）。
+  // 一張訂單可有多筆 payment_transactions，本 RPC 只回 **is_duplicate = FALSE** 的那筆：
+  // 重複付款不產生第二張發票也不產生折讓，那筆錢由 payment 側 rescue 退還，
+  // 退的是從未被開票的金額（58 號 §7.1.2 註 3、M7）。
+  string trade_no = 2;
+
+  // PayUni 回報的真實付款時間，ISO 8601 UTC（卡片取 AuthDay+AuthTime、ATM 取 PaymentDay）。
+  //
+  // 🔴 **必須用 optional 表達三態**，不得改成裸 string：
+  //   欄位未設（Go nil / Java hasProviderPaidAt()==false） ＝ payment 端本來就沒有這個值
+  //     （ATM webhook 常為 NULL，這是**設計上的合法值**）
+  //   欄位已設 ＝ 真實付款時間
+  // 這一欄決定 invoice_date ＝ 法定存證期限與所有告警的基準。若「拿不到」與「本來就沒有」
+  // 在 wire 上分不開，invoice-service 的 PaidAt() 會靜默改用我方 webhook 收單時間，
+  // 而那個 fallback 沒有任何訊號——那正是 58 號 §6.2.4 標紅的失效模式。
+  // 呼叫端取 COALESCE(provider_paid_at, pay_time)（58 號 §5.3.4）。
+  optional string provider_paid_at = 3;
+
+  // 我方 webhook 寫入當下的 nowUtc，ISO 8601 UTC。PAID 交易必為非空。
+  string pay_time = 4;
+  // 交易金額（元整數的數字字串）。每日對帳斷言
+  // invoice_documents.total_amount == 此值（不是所有交易加總，58 號 §7.1.2 註 3）。
+  string trade_amt = 5;
+  // PaymentMethod 的 CodeMeta value（如 ZERO_AMOUNT=2900 不經 PayUni）。
+  string payment_type = 6;
+  // 重複付款副 row 旗標。本 RPC 回的恆為 false 的那筆；保留本欄供呼叫端斷言，
+  // 收到 true 時代表 payment 端選錯了 canonical 交易 ⇒ 呼叫端應 fail-loud。
+  bool is_duplicate = 7;
+}
+
+// ── 多功能收付（agent_fee）──────────────────────────────────────────────
+
+message SubmitAgentFeeRequest {
+  // 被扣款／收款的合作商店代號（`HAWK` + store_id）。
+  // 🔴 與 agent_mer_id 是**兩個 merchant 識別，不得混用**。
+  string mer_id = 1;
+
+  // 🔴 代理商自訂單號，由**呼叫端**生成並保證唯一。
+  // PayUni 官方標「可重複」且查詢回單筆結構非陣列 ⇒ 真的送重複了，用官方 API 也對不出有幾筆。
+  string trade_no = 2;
+
+  // 🔴 **Collection Target Net**：呼叫端要讓平台**淨收**多少（元整數的數字字串）。
+  //
+  // 這**不是**要送給通道的金額。gross-up 由本服務的 adapter 依 verified fee policy 反推
+  // （ADR-011）——domain 不得知道費率，而本 RPC 的邊界就是那條界線。
+  // ⚠️ 呼叫端傳 gross 進來，等於把費率知識搬回 domain，那正是 ADR-005 禁止的形狀。
+  string target_net_amount = 3;
+
+  // FeeType 的 PayUni 碼值（物流＝4）。string 以符合 §4 型別規範。
+  string fee_type = 4;
+
+  // BalType：1＝正向（向賣家收）、2＝負向（退還賣家）。
+  // 🔴 PayUni 的 Amt 值域是 1~9999999 的正整數、不接受 0 或負數
+  //    ⇒ **正負號只能由本欄表達**，金額欄永遠是正整數。
+  string bal_type = 5;
+
+  // 代理商出入帳商店代號（選填）。未帶則依平台預設。
+  optional string agent_mer_id = 6;
+}
+
+message SubmitAgentFeeResponse {
+  // 統一 envelope：code/message 是**我方**的業務碼，不是 PayUni 的 Status。
+  // 🔴 兩者混在同一欄的話，「PayUni 拒絕」與「我方參數錯誤」在呼叫端分不開，
+  //    而前者該進退避重送、後者該進人工。
+  int32 code = 1;
+  string message = 2;
+  SubmitAgentFeeData data = 3;
+}
+
+message SubmitAgentFeeData {
+  // 🔴 PayUni 的回傳**只有 Status／Message 兩欄**（無單號、無受理序號）。
+  //    **不得自造「受理單號」欄位**——造一個出來會讓呼叫端以為可以用它對帳。
+  string provider_status = 1;
+  string provider_message = 2;
+
+  // 🔴 adapter 實際送出的 Amt（AgentFee Gross Amount，元整數數字字串）。
+  //    呼叫端要把它存進 logistics_collection_attempts.gross_amount：
+  //    **賣家銀行帳上看到的是它**，而不是我方帳上的應收。
+  string gross_amount = 3;
+
+  // 反推 gross_amount 時採用的費率政策識別（供事後對帳說明「當時用的是哪一版費率」）。
+  // 🔴 沒有它，費率調整之後就再也解釋不了歷史那幾筆為什麼是那個金額。
+  string fee_policy_version = 4;
+
+  // true ＝ PayUni 明確受理或明確拒絕；
+  // false ＝ 逾時／連線失敗 ⇒ 🔴 **呼叫端不得視為失敗**（可能已經受理），
+  // 必須走「不確定窗口」的處置而不是自動重送。
+  bool provider_responded = 5;
+
+  // 依**預估**費率算出的手續費（元整數數字字串）。
+  // 🔴 **不是事後帳務憑據**——真正的手續費只有 agent_fee_query 的 Fee 說了算，
+  //    兩者的差就是 residual 要吸收的東西。
+  string estimated_fee = 6;
+}
+
+message QueryAgentFeeRequest {
+  string mer_id = 1;
+  string trade_no = 2;
+  // 查詢的 key 是 (MerID, TradeNo, Amt) 三元組 ⇒ 這裡要帶**當初送出的 gross_amount**，
+  // 不是 target_net。
+  string gross_amount = 3;
+}
+
+message QueryAgentFeeResponse {
+  int32 code = 1;
+  string message = 2;
+  QueryAgentFeeData data = 3;
+}
+
+message QueryAgentFeeData {
+  string mer_id = 1;
+  string trade_no = 2;
+  string gross_amount = 3;
+  string fee_type = 4;
+  string bal_type = 5;
+  // 建立日期（PayUni 原值）。
+  string trade_date = 6;
+
+  // 🔴 撥款日。PayUni 用 `0000-00-00` 表示尚未撥款
+  //    ⇒ **一律映成未設（optional 不設值），不得回字面值**。
+  //    ⚠️ 「還沒到次日」與「次日執行失敗」在 PayUni 這裡長得一模一樣（唯一訊號就是本欄的
+  //    有無），所以呼叫端必須靠 expected_fund_date ＋ 寬限期把兩者分開。
+  optional string fund_date = 7;
+
+  // 🔴 實際手續費（元整數數字字串）。**不得用預估值（含 1%）冒充**——
+  //    它是「平台到底收到多少」的唯一來源，而 net_proceeds = gross − 本欄。
+  optional string actual_fee = 8;
+
+  optional string agent_mer_id = 9;
+
+  // 🔴 查無此筆（帶錯 trade_no／amt，或 PayUni 根本沒受理）與「尚未撥款」是**兩件事**：
+  //    前者 found=false、後者 found=true 且 fund_date 未設。
+  //    混在一起的話，呼叫端會把「沒受理」誤讀成「還沒到次日」而一直等下去。
+  bool found = 10;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 物流財務（線 B）—— 全部唯讀
+// ══════════════════════════════════════════════════════════════════════════════
+//
+// 【型別】金額一律「元」整數的**數字字串**（10 檔 §4）。`protonumericlint` 走訪的是
+// 「任何 RPC output type 可達的 message」而不看該 RPC 是否對外 ⇒ response 側寫 int64
+// 會被 `make proto-lint-numeric` 擋下。時間一律 ISO 8601 UTC（`YYYY-MM-DDTHH:mm:ssZ`）。
+//
+// 【`optional` 的用途】V9 有一批欄位 **NULL 不是 0**，混在一起會讓「還沒算出來」被讀成
+// 「算出來是 0」：
+//   actual_cost   NULL = 尚未對帳          net_proceeds / actual_fee / residual  NULL = 尚未查詢
+// 這些一律用 proto3 `optional` 表達三態（同本檔既有的 `provider_paid_at` / `fund_date`）。
+//
+// 【狀態值域】一律沿用既有來源，**本波不新增任何碼值**：
+//   應收狀態        CodeMeta LogisticsReceivableStatus（7 值）
+//   責任成因        CodeMeta ResponsibilityCause（4 值）
+//   帳單費用類型    CodeMeta ProviderFeeType（5 值）
+//   帳單對帳狀態    V9 `chk_provsettle_recon`：UNMATCHED / MATCHED / DISPUTED / WRITTEN_OFF
+//   調整單種類      V9 `chk_logadj_kind`：RESPONSIBILITY / RECONCILIATION
+//   例外案件狀態    V9 `chk_exc_status`：OPEN / IN_PROGRESS / RESOLVED / DISMISSED
+//   處置提案狀態    V9 `chk_fcr_status`：AWAITING_REVIEW / APPROVED / REJECTED（＝ manual review）
+
+// ── 賣家面 ────────────────────────────────────────────────────────────────────
+
+message GetSellerLogisticsFinanceSummaryRequest {
+  // 🔴 Gateway 的 sellerid resolver 解出的**現任 store_id**，非呼叫端自填
+  //    （§4.1 例外 ①：僅限 Request、Gateway 注入、前端不可控）。
+  //    服務端以它強制過濾；<= 0 一律 UNAUTHENTICATED（Gateway 接線錯誤要 fail loud，
+  //    不得塌成空結果——空結果看起來就像「這家店沒有物流費」）。
+  int64 store_id = 1;
+  // 期間下界／上界，ISO 8601 UTC。兩者皆可空（＝全期）。比對的是 created_at。
+  string created_from = 2;
+  string created_to = 3;
+}
+
+message GetSellerLogisticsFinanceSummaryResponse {
+  int32 code = 1;
+  string message = 2;
+  SellerLogisticsFinanceSummary data = 3;
+}
+
+// 十一個維度的**彙總**值。欄位順序即 W6-3 清單順序，序號註記 n/11 讓「少一個維度」
+// 在 review 時看得見。
+message SellerLogisticsFinanceSummary {
+  string store_id = 1;
+  string created_from = 2;
+  string created_to = 3;
+
+  // 1/11 Estimated Provider Cost：送達當下的暫估 provider 成本合計。
+  string estimated_provider_cost = 4;
+  // 2/11 Actual Provider Cost：**只加總已對帳的筆數**。尚未對帳的不以 0 計入，
+  //      缺口由 unreconciled_count 顯性表達——否則「還沒對帳」會被讀成「成本是 0」。
+  string actual_provider_cost = 5;
+  string unreconciled_count = 6;
+
+  // 3/11 Seller Logistics Charge：賣家實際被收的物流費合計（＝ Σ target_net）。
+  string seller_logistics_charge = 7;
+
+  // 4/11 PayUni Collection Fee：**實際**手續費合計（agent_fee_query 的 Fee）。
+  //      🔴 不得用預估值（含 1%）冒充。尚未查到的由 pending_fee_query_count 顯性表達。
+  string payuni_collection_fee = 8;
+  string pending_fee_query_count = 9;
+
+  // 5/11 Platform Subsidy：平台吸收的補貼合計。
+  string platform_subsidy = 10;
+  // 6/11 Seller Subsidy：賣家對**買家**的運費補貼（線 A）。
+  //      🔴 未設 ＝ **payment-service 不是這個維度的來源**（V9 九張表沒有任何欄位存它，
+  //      它在 LogisticsReconciliationService 是 true-up 的瞬時輸入）。回 0 會讓
+  //      「查不到」長得跟「真的是 0」一樣，而它們的後續處置完全不同。
+  //      🔴 它**永遠不得**與 platform_subsidy 合併：後者抵得掉賣家應收，前者一毛都不抵
+  //      （W4-4：賣家替買家出運費，不會讓 provider 少收平台一毛錢）。
+  optional string seller_subsidy = 11;
+
+  // 7/11 Responsibility Adjustment：kind=RESPONSIBILITY 的調整單合計（可負）。
+  string responsibility_adjustment = 12;
+  // 8/11 Reconciliation Adjustment：kind=RECONCILIATION 的調整單合計（可負）。
+  //      🔴 與 7/11 分開列：一個是「這筆錢算誰的」，一個是「帳單與我方暫估差多少」。
+  string reconciliation_adjustment = 13;
+
+  // 9/11 Collection status：依應收狀態分組的筆數。
+  repeated LogisticsCollectionStatusCount collection_status_counts = 14;
+
+  // 10/11 Collection Residual：target_net − net_proceeds 的合計（可正可負）。
+  //       正 ＝ 尚未收足（併入下期）；負 ＝ 多收（走貸記）。
+  string collection_residual = 15;
+
+  // 11/11 Seller Credit：平台**欠賣家**的貸記餘額（seller_logistics_accounts.credit_balance）。
+  string seller_credit = 16;
+  // 🔴 賣家**欠平台**的餘額。與 seller_credit 是**兩個科目**，不是一個欄位的正負：
+  //    兩者可以同時存在（這期欠、上期多收）。合成淨額 ⇒ ADR-008 第 1 條
+  //    「永久可追蹤」失效，而帳面上看起來一切正常。**永遠不得合併成一個帶正負的欄位。**
+  string receivable_balance = 17;
+
+  // 帳齡階梯的錨（V9 §5）。🔴 錨是 last_activity_at 而**不是**「餘額為正」——
+  // 費率估不準時會留下小額殘差，那是機制的正常產物不是欠款訊號。
+  string last_activity_at = 18;
+  string aging_days = 19;
+  // 該賣家在本服務有沒有帳戶列。false ⇒ 上面兩個餘額是 "0" 但那是「還沒有帳戶」不是
+  // 「結清了」。
+  bool has_account = 20;
+}
+
+message LogisticsCollectionStatusCount {
+  // CodeMeta LogisticsReceivableStatus value。
+  string status = 1;
+  // 該碼值的中文顯示名，取自 CodeMeta enum 的 label()。
+  // 🔴 不是第二份碼表：它由生成的 enum 讀出來，不在任何地方硬寫。
+  string status_label = 2;
+  string count = 3;
+}
+
+message ListSellerLogisticsReceivablesRequest {
+  // 🔴 同 GetSellerLogisticsFinanceSummaryRequest.store_id。
+  int64 store_id = 1;
+  string page = 2;
+  string page_size = 3;
+  // CodeMeta LogisticsReceivableStatus value，可多值逗號分隔。空 ＝ 不篩。
+  string status = 4;
+  string created_from = 5;
+  string created_to = 6;
+}
+
+message ListSellerLogisticsReceivablesResponse {
+  int32 code = 1;
+  string message = 2;
+  ListSellerLogisticsReceivablesData data = 3;
+}
+
+message ListSellerLogisticsReceivablesData {
+  repeated SellerLogisticsReceivableRecord records = 1;
+  string total = 2;
+  string page = 3;
+  string page_size = 4;
+}
+
+// 十一個維度的**單筆**值（欄位語意與 SellerLogisticsFinanceSummary 逐一對應）。
+message SellerLogisticsReceivableRecord {
+  string receivable_no = 1;
+  string order_no = 2;
+  string shipment_id = 3;
+  // CodeMeta ShippingMethod value（'3003' …），與帳本 owner_ref_id 同口徑。
+  string provider = 4;
+  string provider_delivery_ref = 5;
+
+  // 1/11
+  string estimated_provider_cost = 6;
+  // 2/11 🔴 未設 ＝ 尚未對帳，**不是 0**。
+  optional string actual_provider_cost = 7;
+  // 3/11
+  string seller_logistics_charge = 8;
+  // 4/11 🔴 未設 ＝ 尚未查詢 agent_fee_query，**不是 0**。
+  optional string payuni_collection_fee = 9;
+  // 5/11
+  string platform_subsidy = 10;
+  // 6/11 🔴 未設 ＝ payment-service 不是這個維度的來源（線 A）。
+  optional string seller_subsidy = 11;
+  // 7/11
+  string responsibility_adjustment = 12;
+  // 8/11
+  string reconciliation_adjustment = 13;
+  // 9/11
+  string collection_status = 14;
+  string collection_status_label = 15;
+  // 10/11 🔴 未設 ＝ 尚未查詢，**不是 0**。
+  optional string collection_residual = 16;
+  // 11/11 本筆產生的貸記本金（residual < 0 時 ＝ |residual|，否則 "0"）。
+  // 🔴 貸記本金不得被通道手續費侵蝕（負向撥款是足額給賣家，通道成本由平台承擔）。
+  string seller_credit = 17;
+
+  // 本筆 target_net 內含的前期收款殘差（可負）。
+  // ⚠️ **不是「上期的手續費」**，是「上期預估與實際的差」，費率估準時為 0。
+  string carried_residual = 18;
+  // 凍結當下的計費依據時間；之後政策改了不回溯本列。
+  string charge_basis_frozen_at = 19;
+  // 58 號憑證關聯（方向二：平台 → 賣家）。空字串 ＝ 尚未開立。
+  string invoice_document_id = 20;
+  // 對帳到的帳單明細列。空字串 ＝ 尚未對帳。
+  string statement_line_id = 21;
+  string created_at = 22;
+  string updated_at = 23;
+  // 自 created_at 起算、尚未進終態（CLOSED／WRITTEN_OFF）的天數；終態一律 "0"。
+  string aging_days = 24;
+}
+
+message ListSellerLogisticsLedgerEntriesRequest {
+  // 🔴 同上，Gateway 注入。
+  int64 store_id = 1;
+  string page = 2;
+  string page_size = 3;
+}
+
+message ListSellerLogisticsLedgerEntriesResponse {
+  int32 code = 1;
+  string message = 2;
+  ListSellerLogisticsLedgerEntriesData data = 3;
+}
+
+message ListSellerLogisticsLedgerEntriesData {
+  repeated LogisticsLedgerTxnRecord records = 1;
+  string total = 2;
+  string page = 3;
+  string page_size = 4;
+}
+
+message LogisticsLedgerTxnRecord {
+  string txn_no = 1;
+  // CodeMeta LedgerTxnType value。
+  string txn_type = 2;
+  string order_no = 3;
+  // 'YYYYMM'（UTC 曆月）。
+  string settlement_period = 4;
+  string source_type = 5;
+  string source_ref = 6;
+  string posted_at = 7;
+  repeated LogisticsLedgerEntryRecord entries = 8;
+}
+
+message LogisticsLedgerEntryRecord {
+  string line_seq = 1;
+  // CodeMeta LedgerAccountCode value。
+  string account_code = 2;
+  // CodeMeta LedgerOwnerType value：PLATFORM / SELLER / PROVIDER。
+  string owner_type = 3;
+  string owner_ref_id = 4;
+  // DEBIT / CREDIT。🔴 金額恆為正，正負由本欄表達——不得把它折成一個帶正負的數字。
+  string direction = 5;
+  string amount = 6;
+  string memo = 7;
+}
+
+// ── Admin 面：應收 ────────────────────────────────────────────────────────────
+
+message ListLogisticsReceivablesForAdminRequest {
+  string page = 1;
+  string page_size = 2;
+  // 賣家業務鍵（store_id）。🔴 **不是 account_id**——Gateway 收到 account_id 時必須
+  // 先經 sellerid resolver 解析，這裡只收解析後的值。空 ＝ 不篩。
+  string store_id = 3;
+  // CodeMeta LogisticsReceivableStatus value，可多值逗號分隔。
+  string status = 4;
+  // CodeMeta ShippingMethod value。
+  string provider = 5;
+  string order_no = 6;
+  string provider_delivery_ref = 7;
+  string created_from = 8;
+  string created_to = 9;
+  // 只列「尚未進終態且已存在 N 天以上」的（W6-4 的 overdue 格）。空或 "0" ＝ 不篩。
+  string min_aging_days = 10;
+  // true ＝ 只列尚未對帳的（actual_cost IS NULL）。
+  bool unreconciled_only = 11;
+}
+
+message ListLogisticsReceivablesForAdminResponse {
+  int32 code = 1;
+  string message = 2;
+  ListLogisticsReceivablesForAdminData data = 3;
+}
+
+message ListLogisticsReceivablesForAdminData {
+  repeated AdminLogisticsReceivableSummary records = 1;
+  string total = 2;
+  string page = 3;
+  string page_size = 4;
+}
+
+message AdminLogisticsReceivableSummary {
+  string receivable_no = 1;
+  string store_id = 2;
+  string order_no = 3;
+  string shipment_id = 4;
+  string provider = 5;
+  string provider_delivery_ref = 6;
+  string estimated_cost = 7;
+  // 🔴 未設 ＝ 尚未對帳，**不是 0**。
+  optional string actual_cost = 8;
+  string platform_subsidy = 9;
+  string target_net = 10;
+  string carried_residual = 11;
+  string status = 12;
+  string status_label = 13;
+  string statement_line_id = 14;
+  string invoice_document_id = 15;
+  string charge_basis_frozen_at = 16;
+  string created_at = 17;
+  string updated_at = 18;
+  string aging_days = 19;
+  // 租約欄的可觀測面（10 檔 §29）：非空代表目前被某個 pod 的提交租約壓住。
+  // 🔴 它**不是**「已送出」旗標；把它讀成已送出會讓 ADM 以為錢已經在收了。
+  string submit_lease_until = 20;
+}
+
+message GetLogisticsReceivableForAdminRequest {
+  string receivable_no = 1;
+}
+
+message GetLogisticsReceivableForAdminResponse {
+  int32 code = 1;
+  string message = 2;
+  AdminLogisticsReceivableDetail data = 3;
+}
+
+message AdminLogisticsReceivableDetail {
+  AdminLogisticsReceivableSummary receivable = 1;
+  // 這筆應收的全部收款嘗試（新到舊）。多筆 ＝ 曾退回 PENDING 重送。
+  repeated AdminLogisticsCollectionRecord collections = 2;
+  // 掛在這筆應收上的調整單。
+  repeated AdminLogisticsAdjustmentRecord adjustments = 3;
+  // 該賣家的帳戶餘額（兩個科目分開，見下方 message 註解）。
+  AdminSellerLogisticsAccount seller_account = 4;
+}
+
+message AdminSellerLogisticsAccount {
+  string store_id = 1;
+  // 賣家欠平台（含前期結轉殘差）。
+  string receivable_balance = 2;
+  // 🔴 平台欠賣家。與上一欄是**兩個科目**，不是一個欄位的正負——兩者可以同時存在，
+  //    合成淨額之後 ADR-008 第 1 條（永久可追蹤）就失效了。
+  //    🔴 它**永不過期、不因賣家無後續交易而清零**（ADR-008 第 2、3 條）。
+  string credit_balance = 3;
+  string last_activity_at = 4;
+  string aging_days = 5;
+  // false ⇒ 上面兩個餘額是 "0"，但那是「還沒有帳戶」不是「結清了」。
+  bool exists = 6;
+}
+
+// ── Admin 面：PayUni 收款 ─────────────────────────────────────────────────────
+
+message ListLogisticsCollectionsForAdminRequest {
+  string page = 1;
+  string page_size = 2;
+  string receivable_no = 3;
+  string trade_no = 4;
+  string store_id = 5;
+  // CodeMeta PayUniSubmitStatus value。空 ＝ 不篩。
+  string submit_status = 6;
+  // true ＝ 只列尚未查到 FundDate 的（W6-4 的 failed collection / 待確認格）。
+  bool pending_fund_date_only = 7;
+  // true ＝ 只列 residual != 0 的（收多了或沒收足）。
+  bool residual_only = 8;
+  string created_from = 9;
+  string created_to = 10;
+}
+
+message ListLogisticsCollectionsForAdminResponse {
+  int32 code = 1;
+  string message = 2;
+  ListLogisticsCollectionsForAdminData data = 3;
+}
+
+message ListLogisticsCollectionsForAdminData {
+  repeated AdminLogisticsCollectionRecord records = 1;
+  string total = 2;
+  string page = 3;
+  string page_size = 4;
+}
+
+message AdminLogisticsCollectionRecord {
+  string collection_no = 1;
+  string receivable_no = 2;
+  string store_id = 3;
+  // 🔴 我方生成並保證唯一（PayUni 官方三處逐字標 TradeNo「可重複」）。
+  string trade_no = 4;
+  // 實際送出的 Amt（依費率反推的 gross-up 值）。
+  string gross_amount = 5;
+  // 🔴 未設 ＝ 尚未查詢，**不是 0**（0 代表查到了而且真的一毛沒收到）。
+  optional string net_proceeds = 6;
+  // 🔴 未設 ＝ 尚未查詢。residual = target_net − net_proceeds，可負。
+  optional string residual = 7;
+  // 🔴 未設 ＝ 尚未查詢。**不得用預估值（含 1%）冒充**。
+  optional string actual_fee = 8;
+  // CodeMeta PayUniSubmitStatus value。
+  string submit_status = 9;
+  string submit_message = 10;
+  string submitted_at = 11;
+  // 送出日 ＋ 1 個工作日。UNCONFIRMED 判定的錨。
+  string expected_fund_date = 12;
+  // 🔴 未設 ＝ 尚未撥款。PayUni 的 '0000-00-00' 一律映成未設，不得回字面值。
+  //    ⚠️「還沒到次日」與「次日執行失敗」在 PayUni 長得一模一樣，唯一訊號就是本欄的有無。
+  optional string fund_date = 13;
+  // 租約欄的可觀測面。🔴 **不是「已查過」旗標**。
+  string query_lease_until = 14;
+  string created_at = 15;
+  string updated_at = 16;
+}
+
+// ── Admin 面：調整單 ──────────────────────────────────────────────────────────
+
+message ListLogisticsAdjustmentsForAdminRequest {
+  string page = 1;
+  string page_size = 2;
+  string store_id = 3;
+  string receivable_no = 4;
+  // V9 chk_logadj_kind：RESPONSIBILITY / RECONCILIATION。空 ＝ 不篩。
+  string kind = 5;
+  // CodeMeta ResponsibilityCause value。
+  string responsibility_cause = 6;
+  string statement_line_id = 7;
+  string created_from = 8;
+  string created_to = 9;
+}
+
+message ListLogisticsAdjustmentsForAdminResponse {
+  int32 code = 1;
+  string message = 2;
+  ListLogisticsAdjustmentsForAdminData data = 3;
+}
+
+message ListLogisticsAdjustmentsForAdminData {
+  repeated AdminLogisticsAdjustmentRecord records = 1;
+  string total = 2;
+  string page = 3;
+  string page_size = 4;
+}
+
+message AdminLogisticsAdjustmentRecord {
+  string adjustment_no = 1;
+  // 空字串 ＝ 無母單（未送達不建 receivable，但 provider 的取消費仍然發生）。
+  string receivable_no = 2;
+  string store_id = 3;
+  string provider_delivery_ref = 4;
+  // RESPONSIBILITY / RECONCILIATION。
+  string kind = 5;
+  // ⚠️ **允許負數**（與帳本 entries.amount 恆正相反）：這裡是業務調整單，正負是它的語意。
+  string amount = 6;
+  // CodeMeta ResponsibilityCause value；kind=RECONCILIATION 時為空字串。
+  string responsibility_cause = 7;
+  string statement_line_id = 8;
+  // ADM 操作者的 account_id；系統產生時為空字串。⚠️ 不是 store_id。
+  string created_by = 9;
+  string reason = 10;
+  string created_at = 11;
+}
+
+// ── Admin 面：Provider 對帳 ───────────────────────────────────────────────────
+
+message ListProviderStatementsForAdminRequest {
+  string page = 1;
+  string page_size = 2;
+  // CodeMeta ShippingMethod value（'3003' / '3004'）。
+  string provider = 3;
+  // 'YYYY-MM'。
+  string statement_period = 4;
+  // 只列還有未結清明細列的帳單（UNMATCHED 或 DISPUTED > 0）。
+  bool unsettled_only = 5;
+}
+
+message ListProviderStatementsForAdminResponse {
+  int32 code = 1;
+  string message = 2;
+  ListProviderStatementsForAdminData data = 3;
+}
+
+message ListProviderStatementsForAdminData {
+  repeated AdminProviderStatementSummary records = 1;
+  string total = 2;
+  string page = 3;
+  string page_size = 4;
+}
+
+// 一份帳單（provider ＋ statement_ref）的彙總。
+//
+// 🔴 W6-4「Provider Reconciliation」六格與本 message 的對應，寫在這裡而不是靠讀的人推：
+//    provider statement → 本 message／AdminProviderStatementDetail
+//    matched            → matched_count
+//    unresolved         → unmatched_count（V9 的 UNMATCHED ＝「尚未比對」）
+//    dispute            → disputed_count
+//    mismatch           → mismatch_count（⚠️ **推導值，不是 recon_status 的碼值**：
+//                         V9 的 chk_provsettle_recon 只有四值，沒有 MISMATCH。
+//                         「金額對不上」在本模型裡的落點是 kind=RECONCILIATION 的調整單
+//                         （logistics_adjustments.statement_line_id 指回帳單列）⇒
+//                         本欄 ＝ 該帳單有對帳調整單的明細列數，mismatch_amount ＝ 其金額合計。
+//                         這是刻意不發明新碼值：值域住在 V9，多一個值就是第二份碼表。）
+//    manual review      → AdminProviderStatementDetail.awaiting_review_count
+//                         （fulfillment_case_resolutions.status = AWAITING_REVIEW）
+message AdminProviderStatementSummary {
+  string provider = 1;
+  string statement_ref = 2;
+  string statement_period = 3;
+  string line_count = 4;
+  string total_amount = 5;
+  string matched_count = 6;
+  string unmatched_count = 7;
+  string disputed_count = 8;
+  string written_off_count = 9;
+  // 推導值，見本 message 的 header 註解。
+  string mismatch_count = 10;
+  string mismatch_amount = 11;
+  string first_imported_at = 12;
+  string last_imported_at = 13;
+}
+
+message GetProviderStatementForAdminRequest {
+  // 帳單編號（provider_settlement_lines.statement_ref）。
+  string statement_ref = 1;
+  // CodeMeta ShippingMethod value。🔴 必填：statement_ref 只在同一個 provider 內唯一
+  //（uq_provsettle_line 的第一欄就是 provider），不帶會跨 provider 撈到別人的帳單。
+  string provider = 2;
+}
+
+message GetProviderStatementForAdminResponse {
+  int32 code = 1;
+  string message = 2;
+  AdminProviderStatementDetail data = 3;
+}
+
+message AdminProviderStatementDetail {
+  AdminProviderStatementSummary statement = 1;
+  repeated AdminProviderSettlementLineRecord lines = 2;
+  // manual review：這份帳單牽動的例外案件中，尚有待覆核提案的件數。
+  string awaiting_review_count = 3;
+}
+
+message AdminProviderSettlementLineRecord {
+  string line_id = 1;
+  string provider = 2;
+  string statement_ref = 3;
+  string statement_period = 4;
+  // 對帳關聯鍵（↔ logistics_receivables.provider_delivery_ref）。彙總列可為空字串。
+  string provider_shipment_ref = 5;
+  string order_no = 6;
+  // CodeMeta ProviderFeeType value。
+  string fee_type = 7;
+  // 恆為正（chk_provsettle_amount）。
+  string amount = 8;
+  // V9 chk_provsettle_recon：UNMATCHED / MATCHED / DISPUTED / WRITTEN_OFF。
+  string recon_status = 9;
+  // 🔴 MATCHED ⇔ 本欄非空（chk_provsettle_ledger 是雙向等式）。
+  string ledger_txn_no = 10;
+  string exception_case_id = 11;
+  // ADM actor 的 account_id。⚠️ 不是 store_id。
+  string imported_by = 12;
+  string imported_at = 13;
+  // 推導值：本列有沒有 kind=RECONCILIATION 的調整單（＝ mismatch），與其金額合計。
+  bool has_reconciliation_adjustment = 14;
+  string reconciliation_adjustment_amount = 15;
+}
+
+// ── Admin 面：例外案件（含 manual review）──────────────────────────────────────
+
+message ListFulfillmentExceptionCasesForAdminRequest {
+  string page = 1;
+  string page_size = 2;
+  // V9 chk_exc_status：OPEN / IN_PROGRESS / RESOLVED / DISMISSED，可多值逗號分隔。
+  string status = 3;
+  // V9 chk_exc_severity：P0 / P1 / P2。
+  string severity = 4;
+  // CodeMeta FulfillmentExceptionCategory（⚠️ 該 enum 本波尚未落進 CodeMeta，
+  // V9 也刻意沒有 chk_exc_category ⇒ 這裡只做 exact match 透傳，不驗值域）。
+  string category = 5;
+  // V9 chk_exc_subject：ORDER / SHIPMENT / SHIPMENT_BATCH / CONFIG。
+  string subject_type = 6;
+  string subject_ref = 7;
+  string store_id = 8;
+  // 只列尚有待覆核提案（AWAITING_REVIEW）的案件。W6-4 的 manual review 格。
+  bool awaiting_review_only = 9;
+}
+
+message ListFulfillmentExceptionCasesForAdminResponse {
+  int32 code = 1;
+  string message = 2;
+  ListFulfillmentExceptionCasesForAdminData data = 3;
+}
+
+message ListFulfillmentExceptionCasesForAdminData {
+  repeated AdminFulfillmentExceptionCaseRecord records = 1;
+  string total = 2;
+  string page = 3;
+  string page_size = 4;
+}
+
+message AdminFulfillmentExceptionCaseRecord {
+  string case_no = 1;
+  string case_id = 2;
+  // V9 chk_exc_source：shipping / order / payment。
+  string source_service = 3;
+  string category = 4;
+  string severity = 5;
+  string subject_type = 6;
+  string subject_ref = 7;
+  string store_id = 8;
+  string status = 9;
+  string status_entered_at = 10;
+  // 🔴 離開 OPEN ⇒ 必有承辦人（chk_exc_owner）。OPEN 時為空字串。
+  string owner_account_id = 11;
+  string owner_assigned_at = 12;
+  string resolution_code = 13;
+  string resolution_note = 14;
+  string resolved_by_account_id = 15;
+  string resolved_at = 16;
+  // 來源端發生時間（事件帶進來），🔴 不得與 created_at 混用。
+  string occurred_at = 17;
+  string created_at = 18;
+  // 這張案件的處置提案（manual review 的載體）。
+  repeated AdminFulfillmentCaseResolutionRecord resolutions = 19;
+
+  // ── 責任判定軸的 immutable event context（V14）──────────────────────────
+  //
+  // 🔴 **建案當下凍結，此後不可改**。N17（unresolved）與 N16（finalized）都從**同一列**
+  //    取這三欄，呼叫端在 finalize 時無從指定——兩筆事件因此不可能帶不同的 order_no。
+  //    order_no 正是 order-service 把訂單從 SHIPPING_ABNORMAL(35) 推到
+  //    DELIVERY_FAILED_NO_REFUND(54) 的 CAS 錨（36 §3.3.1）；對不上時那道 CAS 永遠
+  //    rows=0，而**全鏈路沒有任何錯誤訊息**。
+  //
+  // ⚠️ 三欄都可能是空字串：generic exception case（理賠／對帳未匹配…）本來就沒有它們
+  //    （V14 的 CHECK 只對責任判定 category 要求 order_no 與 shipping_method 非空）。
+  //    shipment_id 連責任案件都可能沒有——建單失敗（CREATE_FAILED 990）也是一種履約失敗，
+  //    而那時 shipment 還不存在。
+  string order_no = 20;
+  string shipment_id = 21;
+  // ShippingMethod 碼值（'3003'…）。🔴 provider-neutral：責任判定不限 Uber。
+  string shipping_method = 22;
+}
+
+message AdminFulfillmentCaseResolutionRecord {
+  string resolution_id = 1;
+  // V9 chk_fcr_type 六值。
+  string resolution_type = 2;
+  string reason = 3;
+  // V9 chk_fcr_status：AWAITING_REVIEW / APPROVED / REJECTED。
+  string status = 4;
+  // 🔴 只有 ANOMALY_RESUME 免覆核（chk_fcr_review_required）。
+  bool requires_review = 5;
+  // ⚠️ 皆為 ADM 操作者的 account_id，不是 store_id。
+  string proposed_by_account_id = 6;
+  string proposed_at = 7;
+  // 🔴 覆核者不得為提案者（chk_fcr_two_person）。
+  string reviewed_by_account_id = 8;
+  string review_comment = 9;
+  string reviewed_at = 10;
+
+  // ── 責任判定軸（V13）────────────────────────────────────────────────────
+  //
+  // 🔴 maker 主張的成因。approve 時會**原封不動**寫進 case.resolution_code 並成為 N16 的
+  //    responsibility_cause ⇒ 覆核者改不了它（chk_fcr_proposed_cause_binding ＋ _domain）。
+  //    值域：BUYER_CAUSED / SELLER_CAUSED / PROVIDER_CAUSED / PLATFORM_CAUSED。
+  //    🔴 **不存在 SYSTEM_CAUSED**（平台／系統原因一律 PLATFORM_CAUSED）；
+  //    RESPONSIBILITY_UNRESOLVED 是 case 的 category 不是成因，不得出現在這裡。
+  //    ⚠️ 非責任判定型別的提案此欄為空字串（該型別不得夾帶成因）。
+  string proposed_responsibility_cause = 11;
+
+  // 提案當下 server 算出的影響預覽快照。
+  //
+  // 🔴 **只有退款金額一個維度**。65 §6.4.2 原列的 platformFeeDelta／sellerNetDelta
+  //    在現行商流下沒有 canonical 算法且語意不成立（訂單層沒有平台代收）
+  //    ⇒ 它們不是 0，而是**不屬於本 contract**；填 0 會讓覆核者看到一個
+  //    「平台與賣家都不受影響」的假結論，比不顯示更糟。**不得加回來。**
+  //
+  // 🔴 **由 backend 算，不收呼叫端給的金額**：算式的兩個輸入都不是 client 說了算——
+  //    成因來自剛驗過的 maker 主張，退款基準來自 order-service 的
+  //    orders.total_actual_amount。
+  //
+  // 金額為「元」的整數字串（CLAUDE.md §4：對外 JSON 的金額一律 string）。
+  string impact_preview_refund_amount = 12;
+  // 快照計算時間（ISO 8601 UTC）。⚠️ **不參與 stale 比較**——重算必然產生新時間戳，
+  // 納入比較會讓每次覆核都判 stale，那道守衛就永遠是狼來了。
+  string impact_computed_at = 13;
+}
+
+// ── Admin 面：單一例外案件詳情（A-2）─────────────────────────────────────────
+
+message GetFulfillmentExceptionCaseForAdminRequest {
+  // 🔴 以 case_no 定位而不是 case_id：case_no 是對外的業務單號（uq_exc_no），
+  //    ADM 佇列與稽核紀錄引用的都是它；case_id 是 TSID 內部主鍵。
+  //    ⚠️ 與 /admin/logistics/receivables/:receivable_no 的既有形狀一致。
+  string case_no = 1;
+}
+
+message GetFulfillmentExceptionCaseForAdminResponse {
+  int32 code = 1;
+  string message = 2;
+  // 🔴 查無案件時 code = 9570（EXCEPTION_CASE_NOT_FOUND）且 data 不設值。
+  AdminFulfillmentExceptionCaseRecord data = 3;
+}
+
+// ── Admin 面：責任判定 maker-checker（A-4／A-5）──────────────────────────────
+
+message ProposeResponsibilityResolutionForAdminRequest {
+  string case_no = 1;
+  // 🔴 只接受 'RESPONSIBILITY_ATTRIBUTE'。其餘六個 chk_fcr_type 值的副作用落在
+  //    shipping-service 的配送軸，本波不實作 ⇒ fail-closed 回 9571。
+  //    ⚠️ 保留這個欄位（而不是寫死）是為了讓後續波次擴充同一支端點，
+  //      且讓「送了一個本波不支援的型別」得到一個說得清楚的業務碼而不是靜默成功。
+  string resolution_type = 2;
+  // 🔴 maker 主張的責任成因，四個 resolved 值之一。這是提案的標的物。
+  string responsibility_cause = 3;
+  // 提案理由（稽核必要，不得空白）。
+  string reason = 4;
+
+  // 🔴 **刻意沒有 impact_preview**：由 server 依 responsibility_cause ＋
+  //    orders.total_actual_amount 算出並持久化。client 給金額 ＝ 讓被覆核的數字
+  //    由被覆核者自己決定。
+  // 🔴 **刻意沒有 proposed_by_account_id**：取自 GrpcAuthContext.getAccountId()。
+  //    由 request 讀等於讓呼叫端宣稱自己是誰，chk_fcr_two_person 就形同虛設。
+}
+
+message ProposeResponsibilityResolutionForAdminResponse {
+  int32 code = 1;
+  string message = 2;
+  ProposeResponsibilityResolutionForAdminData data = 3;
+}
+
+message ProposeResponsibilityResolutionForAdminData {
+  // 新建提案的 TSID（字串）。覆核時要帶回來。
+  string resolution_id = 1;
+  string case_no = 2;
+  // 案件在本次提案後的狀態（OPEN → IN_PROGRESS，承辦人同時被指派為提案者）。
+  string case_status = 3;
+  // server 算出的影響預覽（元的整數字串 ＋ ISO 8601 UTC）。
+  string impact_preview_refund_amount = 4;
+  string impact_computed_at = 5;
+}
+
+message ReviewResponsibilityResolutionForAdminRequest {
+  string case_no = 1;
+  string resolution_id = 2;
+  // 🔴 只有兩個值：'APPROVE' / 'REJECT'。
+  string decision = 3;
+  // 覆核意見。APPROVE 時會寫進 case.resolution_note（結案留痕）。
+  string review_comment = 4;
+
+  // 🔴 **刻意沒有 responsibility_cause**：取自 maker 的提案列
+  //    （fulfillment_case_resolutions.proposed_responsibility_cause，V13）。
+  // 🔴 **刻意沒有 order_no／shipment_id／shipping_method**：取自建案當下凍結的
+  //    案件列（V14）。由呼叫端再傳一次 ⇒ N17 與 N16 可以帶不同的 order_no。
+  // 🔴 **刻意沒有 reviewed_by_account_id**：取自 GrpcAuthContext.getAccountId()。
+  // ⚠️ payment-service 有一支反射契約測試釘住 FinalizeCommand 不得長回這些欄位。
+}
+
+message ReviewResponsibilityResolutionForAdminResponse {
+  int32 code = 1;
+  string message = 2;
+  ReviewResponsibilityResolutionForAdminData data = 3;
+}
+
+message ReviewResponsibilityResolutionForAdminData {
+  string case_no = 1;
+  string resolution_id = 2;
+  // 提案的新狀態：APPROVED / REJECTED。
+  string resolution_status = 3;
+  // 案件的新狀態：APPROVE ⇒ RESOLVED；REJECT ⇒ 維持 IN_PROGRESS（可再提案）。
+  string case_status = 4;
+  // 🔴 只有 APPROVE 才有值 ＝ 寫進 case.resolution_code 並成為 N16 的
+  //    responsibility_cause。REJECT 時為空字串。
+  string responsibility_cause = 5;
+  // 🔴 APPROVE 是否真的排出了 N16。
+  //    ⚠️ false 代表這一次是**重送**（案件或提案已 final ⇒ CAS rows=0 ⇒ 不發第二筆），
+  //      那是冪等的正常結果，**不是**失敗；呼叫端不得把它當成「沒做到」而重試到底。
+  bool n16_enqueued = 6;
+}

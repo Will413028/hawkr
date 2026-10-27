@@ -1,0 +1,2174 @@
+/* ============================================================
+   Hawkr × HeroUI — UI Kit
+   Scoped under .hkui-* / [data-hkui] to avoid collision with
+   the legacy globals.css system.
+
+   Spec source: HeroUI V3 Figma Kit + HeroUI public docs
+   Token base: Tailwind 4px scale
+   Brand colors: Hawkr tokens (primary / secondary / ink)
+   ============================================================ */
+
+:root {
+	/* --- Tailwind spacing scale (HeroUI base) --- */
+	--hkui-space-0: 0;
+	--hkui-space-px: 1px;
+	--hkui-space-0_5: 0.125rem; /* 2px  */
+	--hkui-space-1: 0.25rem; /* 4px  */
+	--hkui-space-1_5: 0.375rem; /* 6px  */
+	--hkui-space-2: 0.5rem; /* 8px  */
+	--hkui-space-2_5: 0.625rem; /* 10px */
+	--hkui-space-3: 0.75rem; /* 12px */
+	--hkui-space-3_5: 0.875rem; /* 14px */
+	--hkui-space-4: 1rem; /* 16px */
+	--hkui-space-5: 1.25rem; /* 20px */
+	--hkui-space-6: 1.5rem; /* 24px */
+	--hkui-space-7: 1.75rem; /* 28px */
+	--hkui-space-8: 2rem; /* 32px */
+	--hkui-space-10: 2.5rem; /* 40px */
+	--hkui-space-12: 3rem; /* 48px */
+	--hkui-space-14: 3.5rem; /* 56px */
+	--hkui-space-16: 4rem; /* 64px */
+	--hkui-space-20: 5rem; /* 80px */
+	--hkui-space-24: 6rem; /* 96px */
+
+	/* --- Typography scale (HeroUI Tailwind) --- */
+	--hkui-text-tiny: 0.75rem; /* 12px */
+	--hkui-text-small: 0.875rem; /* 14px */
+	--hkui-text-medium: 1rem; /* 16px */
+	--hkui-text-large: 1.125rem; /* 18px */
+
+	--hkui-line-tiny: 1rem;
+	--hkui-line-small: 1.25rem;
+	--hkui-line-medium: 1.5rem;
+	--hkui-line-large: 1.75rem;
+
+	/* Display sizes (for hero/CTA headings) */
+	--hkui-display-sm: 1.5rem; /* 24px */
+	--hkui-display-md: 1.875rem; /* 30px */
+	--hkui-display-lg: 2.25rem; /* 36px */
+	--hkui-display-xl: 3rem; /* 48px */
+	--hkui-display-2xl: 3.75rem; /* 60px */
+
+	/* Tracking */
+	--hkui-tracking-tighter: -0.04em;
+	--hkui-tracking-tight: -0.02em;
+	--hkui-tracking-normal: 0;
+	--hkui-tracking-wide: 0.02em;
+
+	/* Weights */
+	--hkui-weight-regular: 400;
+	--hkui-weight-medium: 500;
+	--hkui-weight-semibold: 600;
+	--hkui-weight-bold: 700;
+
+	/* --- Radius --- */
+	/* Existing -sm / -md / -lg / -xl unchanged so legacy components don't
+	 * suddenly bloat. New tokens 2xl / 3xl / 4xl are the 260509 "card",
+	 * "card medium" and "card large" radii — used by product cards,
+	 * dashboard cards, and modals respectively. */
+	--hkui-radius-none: 0;
+	--hkui-radius-sm: 8px;
+	--hkui-radius-md: 12px;
+	--hkui-radius-lg: 14px;
+	--hkui-radius-xl: 20px;
+	--hkui-radius-2xl: 28px;
+	--hkui-radius-3xl: 36px; /* 260509 product / dashboard cards */
+	--hkui-radius-4xl: 45px; /* 260509 modals / hero panels */
+	--hkui-radius-full: 9999px;
+
+	/* --- Mobile card shell (post viewer / product quick-view) -------------
+	 * On phones both overlays present as a floating card over a scrimmed page
+	 * rather than a full-bleed sheet, mirroring the buyer app's post-preview
+	 * window (`PostPreviewLayout`, 8px edge inset).
+	 *
+	 * When a box IS inset inside one of these cards, its radius must be
+	 * `--hkui-card-radius` MINUS that inset, or the two curves splay apart
+	 * instead of running parallel — derive it with `calc()` at the call site so
+	 * it tracks the card radius. Nothing needs it today: the post viewer's
+	 * reader is deliberately flush with the card, and the product page's inner
+	 * boxes still carry hardcoded radii (pending migration). */
+	--hkui-card-inset: 8px;
+	/* Per-side inset for the post card, i.e. 10% off both dimensions. Done as
+	 * layout rather than `transform: scale(.85)` on purpose: scaling would drag
+	 * the 14px caption down to 11.9px and soften every glyph, whereas insetting
+	 * keeps type at full size and still lets the scrimmed page read around the
+	 * card. */
+	--hkui-card-shrink: 5%;
+	--hkui-card-radius: var(--hkui-radius-2xl);
+
+	/* --- Shadow — centralized through foundation/00-color-config.css. */
+	--hkui-shadow-sm: 0 2px 8px rgb(var(--color-brand-ink-rgb) / 0.06);
+	--hkui-shadow-md:
+		0 4px 20px rgb(var(--color-brand-ink-rgb) / 0.06),
+		0 2px 8px rgb(var(--color-neutral-black-rgb) / 0.04);
+	--hkui-shadow-lg:
+		0 12px 32px rgb(var(--color-brand-ink-rgb) / 0.1),
+		0 4px 12px rgb(var(--color-neutral-black-rgb) / 0.06);
+	--hkui-shadow-deep: 0 8px 32px rgb(var(--color-brand-ink-rgb) / 0.15);
+	--hkui-shadow-glass: 0 40px 80px rgb(var(--color-brand-ink-rgb) / 0.18);
+
+	/* --- Form-control treatment (single source of truth) ---
+	 * The brand input look: a soft ink-tinted idle border + a 3px
+	 * translucent primary focus glow. Consumed by the global bare-control
+	 * baseline (foundation/02-reset-layout.css) AND mirrored by the shared
+	 * <Input>/<Textarea>/<Select> component (components/ui/inputWrapperClasses.ts)
+	 * so raw and component-driven fields read as one system. */
+	--hkui-input-border: rgb(var(--color-brand-ink-rgb) / 0.1);
+	--hkui-input-focus-ring: 0 0 0 3px
+		rgb(var(--color-brand-primary-strong-rgb) / 0.13);
+	/* App-aligned outlined fields; aliases follow the existing theme roles. */
+	--hkui-input-surface: var(--theme-surface-card);
+	--hkui-input-disabled-border: color-mix(
+		in srgb,
+		var(--theme-text-heading) 38%,
+		transparent
+	);
+
+	/* --- Motion --- */
+	--hkui-ease: cubic-bezier(0.22, 1, 0.36, 1);
+	--hkui-dur-fast: 120ms;
+	--hkui-dur-base: 200ms;
+	--hkui-dur-slow: 320ms;
+
+	/* --- Control sizing (260519 HeroUI minimal × Hawkr)
+	 * Single source of truth for the height ladder shared by:
+	 *   Button (<Button> component, sm/md/lg)
+	 *   Input wrapper (data-variant sm/md/lg)  → Select & Dropdown reuse this
+	 *   Filter (.hkui-filter--sm/md/lg) → toolbar / segmented row
+	 *   Calendar (.hkui-calendar--sm/md/lg) → cell height + header height
+	 *
+	 * HeroUI's minimal aesthetic = generous-but-not-fat hit area, soft
+	 * radius, low-contrast borders. The 32 / 40 / 48 ladder is the
+	 * HeroUI default and matches what the existing buttons already use.
+	 * Don't override per-component — change the token here and the
+	 * whole row of controls stays in lockstep.
+	 *
+	 *   h-*      control height (input/button/filter row)
+	 *   px-*     horizontal padding inside that control
+	 *   gap-*    inline gap between control children (icon ↔ label, etc.)
+	 *   font-*   default label / value font size at this size
+	 *   radius-* corner radius applied at this size
+	 *   stack-*  vertical gap between stacked rows (label↑field, field↑hint)
+	 *   field-gap-* horizontal gap between fields in a filter row
+	 */
+	--hkui-control-h-sm: 2rem; /* 32px — chips, table filters, compact actions */
+	--hkui-control-h-md: 2.5rem; /* 40px — default body field & button */
+	--hkui-control-h-lg: 3rem; /* 48px — hero CTA, primary form, modals */
+
+	--hkui-control-px-sm: var(--hkui-space-3); /* 12px */
+	--hkui-control-px-md: var(--hkui-space-4); /* 16px */
+	--hkui-control-px-lg: var(--hkui-space-6); /* 24px */
+
+	/* inputs sit slightly tighter than buttons so 40-character placeholders
+	 * still breathe. Buttons pick px-md/px-lg; inputs pick ctrl-px-md/lg. */
+	--hkui-ctrl-px-sm: var(--hkui-space-3); /* 12px */
+	--hkui-ctrl-px-md: var(--hkui-space-3); /* 12px */
+	--hkui-ctrl-px-lg: var(--hkui-space-4); /* 16px */
+
+	--hkui-control-gap-sm: var(--hkui-space-1_5); /* 6px  — icon ↔ label */
+	--hkui-control-gap-md: var(--hkui-space-2); /* 8px */
+	--hkui-control-gap-lg: var(--hkui-space-2_5); /* 10px */
+
+	--hkui-control-font-sm: var(--hkui-text-tiny); /* 12px */
+	--hkui-control-font-md: var(--hkui-text-small); /* 14px */
+	--hkui-control-font-lg: var(--hkui-text-medium); /* 16px */
+
+	--hkui-control-radius-sm: var(--hkui-radius-sm); /* 8px */
+	--hkui-control-radius-md: var(--hkui-radius-md); /* 12px */
+	--hkui-control-radius-lg: var(
+		--hkui-radius-md
+	); /* 12px — keep cohesive at 48 */
+
+	/* Field stack (vertical rhythm inside a form column)
+	 * label → field → hint/error
+	 * Keep tight: 6 / 8 / 10. HeroUI never uses 16px between label & field. */
+	--hkui-stack-sm: var(--hkui-space-1_5); /* 6px */
+	--hkui-stack-md: var(--hkui-space-2); /* 8px */
+	--hkui-stack-lg: var(--hkui-space-2_5); /* 10px */
+
+	/* Filter row horizontal gap between adjacent fields/buttons.
+	 * Smaller than column padding so the row visually reads as one unit. */
+	--hkui-filter-gap-sm: var(--hkui-space-2); /* 8px  */
+	--hkui-filter-gap-md: var(--hkui-space-3); /* 12px */
+	--hkui-filter-gap-lg: var(--hkui-space-4); /* 16px */
+
+	/* Filter row outer container padding (when the toolbar is a card)
+	 * — set to 0 for transparent inline use, or use the *-pad-* tokens
+	 * via the .hkui-filter--card modifier. */
+	--hkui-filter-pad-sm: var(--hkui-space-2_5) var(--hkui-space-3);
+	--hkui-filter-pad-md: var(--hkui-space-3) var(--hkui-space-4);
+	--hkui-filter-pad-lg: var(--hkui-space-4) var(--hkui-space-5);
+
+	/* Calendar cell height per size variant — header buttons inherit
+	 * the same control height ladder above. */
+	--hkui-calendar-cell-sm: 2.25rem; /* 36px — popover / inline date picker */
+	--hkui-calendar-cell-md: 2.75rem; /* 44px — sidebar standalone */
+	--hkui-calendar-cell-lg: clamp(3rem, 9vw, 4.5rem); /* hero / booking page */
+
+	/* --- Semantic colors → Hawkr brand --- */
+	/* default = neutral surface */
+	--hkui-default-50: #fafaf7;
+	--hkui-default-100: var(--color-neutral-whisper);
+	--hkui-default-200: var(--color-neutral-panel);
+	--hkui-default-300: #c9c6b8;
+	--hkui-default-400: #9d9a8c;
+	--hkui-default-500: #6f6e64;
+	--hkui-default-600: #4f4e47;
+	--hkui-default-700: #2f2f2b;
+	--hkui-default-800: #1f1f1c;
+	--hkui-default-900: #0f0f0e;
+	--hkui-default-foreground: var(--color-neutral-ink);
+
+	/* primary = Hawkr primary: interactive controls use primary-strong */
+	--hkui-primary-50: #fdf3f0;
+	--hkui-primary-100: #fbe6e0;
+	--hkui-primary-200: #f6c9bc;
+	--hkui-primary-300: #f0a38c;
+	--hkui-primary-400: var(--color-brand-primary);
+	--hkui-primary: var(--color-brand-primary-strong);
+	--hkui-primary-600: #a43c1a;
+	--hkui-primary-700: var(--color-brand-primary-deep);
+	--hkui-primary-800: #67250f;
+	--hkui-primary-900: #481a0a;
+	--hkui-primary-foreground: var(--color-neutral-white);
+
+	/* secondary = Hawkr ink (a dark neutral that takes white text) */
+	--hkui-secondary-50: #f4f4f5;
+	--hkui-secondary-100: #e6e7e9;
+	--hkui-secondary-200: #ced0d2;
+	--hkui-secondary-300: #aaaeb1;
+	--hkui-secondary-400: #797f85;
+	--hkui-secondary: var(--color-brand-ink);
+	--hkui-secondary-600: #1a232b;
+	--hkui-secondary-700: #161d24;
+	--hkui-secondary-800: #11171c;
+	--hkui-secondary-900: #0c1014;
+	--hkui-secondary-foreground: var(--color-neutral-white);
+
+	/* accent = Hawkr secondary */
+	--hkui-accent-50: #fdebd9;
+	--hkui-accent-100: #fbcd99;
+	--hkui-accent-200: #f6ac63;
+	--hkui-accent-300: #f29e58;
+	--hkui-accent: var(--color-brand-secondary);
+	--hkui-accent-600: #d77f3a;
+	--hkui-accent-700: #b56629;
+	--hkui-accent-foreground: var(--color-neutral-ink);
+
+	/* info = cold-chain blue — "frozen" / "in transit" */
+	--hkui-info-50: #e3eff8;
+	--hkui-info-100: #b8d3eb;
+	--hkui-info-200: #7eaedb;
+	--hkui-info-300: var(--color-status-info);
+	--hkui-info: var(--color-status-info);
+	--hkui-info-700: var(--color-status-info-strong);
+	--hkui-info-foreground: var(--color-neutral-white);
+
+	/* success = medium green */
+	--hkui-success-50: #e8f5ee;
+	--hkui-success-100: #c3e6d1;
+	--hkui-success-200: #88cca3;
+	--hkui-success-300: #4db376;
+	--hkui-success: var(--color-status-success);
+	--hkui-success-600: #246e42;
+	--hkui-success-700: #1b5733;
+	--hkui-success-foreground: var(--color-neutral-white);
+
+	/* warning = harvest gold */
+	--hkui-warning-50: #fbf4e1;
+	--hkui-warning-100: #f4e4b0;
+	--hkui-warning-200: #ecce76;
+	--hkui-warning-300: #e2bb48;
+	--hkui-warning: var(--color-status-warning);
+	--hkui-warning-600: #b5963f;
+	--hkui-warning-700: #876f2d;
+	--hkui-warning-foreground: var(--color-neutral-ink);
+
+	/* danger = red orange */
+	--hkui-danger-50: #fce6da;
+	--hkui-danger-100: #f8c0a2;
+	--hkui-danger-200: #f2906a;
+	--hkui-danger-300: #ed6334;
+	--hkui-danger: var(--color-status-danger);
+	--hkui-danger-600: #bd3500;
+	--hkui-danger-700: #8e2800;
+	--hkui-danger-foreground: var(--color-neutral-white);
+	/* Error copy needs 4.5:1 at 12px. Keep the status danger swatch
+	 * for status accents; use its existing deeper rung for readable text. */
+	--hkui-danger-text: var(--hkui-danger-600);
+
+	/* surfaces / content (260509 keeps the cream warmth but adds a
+	 * dedicated "soft sage wash" for feature blocks) */
+	--hkui-background: var(--theme-surface-page);
+	--hkui-surface: var(--theme-surface-card);
+	--hkui-border: var(--theme-border-soft);
+	--hkui-content1: var(--theme-surface-elevated);
+	--hkui-content2: var(--color-ink-50);
+	--hkui-content3: #ece7d4;
+	--hkui-content4: #ddd7c2;
+	--hkui-foreground: var(--theme-text-heading);
+	--hkui-foreground-muted: var(--theme-text-body);
+	--hkui-foreground-soft: var(--theme-text-muted);
+	/* Small field hints/placeholders remain informative on the page canvas,
+	 * where the decorative muted swatch is below 4.5:1. Follow body ink in
+	 * each theme instead of darkening the shared brand/neutral palette. */
+	--hkui-field-copy: var(--theme-text-body);
+	--hkui-divider: rgb(var(--color-neutral-500-rgb) / 0.08);
+	--hkui-overlay: var(--theme-overlay);
+
+	/* focus ring */
+	--hkui-focus: var(--hkui-primary-400);
+	--hkui-focus-ring:
+		0 0 0 2px var(--hkui-background), 0 0 0 4px var(--hkui-focus);
+
+	/* fonts (reuse what layout.tsx already loads) */
+	--hkui-font-sans: var(--font-chinese);
+	--hkui-font-display: var(--font-primary);
+}
+
+/* ============================================================
+   1. TYPOGRAPHY UTILITIES
+   ============================================================ */
+.hkui-text-tiny {
+	font-size: var(--hkui-text-tiny);
+	line-height: var(--hkui-line-tiny);
+}
+.hkui-text-small {
+	font-size: var(--hkui-text-small);
+	line-height: var(--hkui-line-small);
+}
+.hkui-text-medium {
+	font-size: var(--hkui-text-medium);
+	line-height: var(--hkui-line-medium);
+}
+.hkui-text-large {
+	font-size: var(--hkui-text-large);
+	line-height: var(--hkui-line-large);
+}
+
+.hkui-display-sm {
+	font-size: var(--hkui-display-sm);
+	line-height: 1.25;
+	letter-spacing: var(--hkui-tracking-tight);
+	font-weight: 700;
+}
+
+.hk-cta-primary {
+	background: var(--theme-action-primary);
+	color: var(--theme-text-inverse) !important;
+}
+
+.hk-cta-primary:hover {
+	background: var(--theme-action-primary-hover);
+	color: var(--theme-text-inverse) !important;
+}
+
+.bg-hk-primary.text-hk-inverse {
+	color: var(--theme-text-inverse) !important;
+}
+
+/* Shared spin keyframe — still used by feed-components.css loading spinner. */
+@keyframes hkui-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* ============================================================
+   3. INPUT / TEXTAREA / SELECT
+   variants: flat bordered faded underlined
+   sizes: sm md lg
+   ============================================================ */
+
+/* ============================================================
+ *   3b. DROPDOWN (custom listbox — port of App app_dropdown.dart)
+ *   Trigger reuses the input-wrapper variants; menu is a fixed overlay.
+ * ============================================================ */
+
+/* 非 floating：trigger 自帶 padding，wrapper 歸零避免雙重內距。
+ * floating：保留 wrapper 的 Tailwind px-*（trigger padding 為 0），值文字
+ * 才會跟 <Input> 的字落在同一個 x（不會貼著邊框）。 */
+.hkui-dropdown__trigger-wrap:not([data-floating]):not(
+	[data-variant="bordered"]
+) {
+	padding: 0;
+}
+.hkui-dropdown__trigger-wrap {
+	cursor: pointer;
+}
+.hkui-dropdown__trigger {
+	all: unset;
+	box-sizing: border-box;
+	display: inline-flex;
+	align-items: center;
+	justify-content: space-between;
+	width: 100%;
+	padding: var(--hkui-space-2) var(--hkui-space-3);
+	gap: var(--hkui-space-2);
+	font-family: inherit;
+	font-size: inherit;
+	color: var(--hkui-foreground);
+	cursor: pointer;
+	min-height: inherit;
+}
+.hkui-dropdown__trigger-wrap[data-floating] .hkui-dropdown__trigger {
+	/* Floating label 會浮到欄位頂端（2026-09-10 拍板），欄位上緣的留白由
+	 * `inputWrapperClasses` 加在 `.hkui-dropdown__value` 上，chevron 才會維持
+	 * 對齊整個欄位的垂直中線。wrapper 已有 min-h + px，trigger 不再自帶
+	 * padding，否則空值時被 min-h 撐住看不出來、選到值後行高一加整個框
+	 * 就比同列的 Input 高一截（「選完變高」bug）。 */
+	padding: 0;
+	min-height: 0;
+}
+.hkui-dropdown__trigger:focus-visible {
+	outline: none;
+}
+.hkui-dropdown__trigger[disabled] {
+	cursor: not-allowed;
+	opacity: 0.6;
+}
+/* Outlined fields own their padding and minimum height on the wrapper.
+ * Stretch the trigger through its content box without counting borders twice. */
+.hkui-dropdown__trigger-wrap[data-variant="bordered"] .hkui-dropdown__trigger {
+	align-self: stretch;
+	padding: 0;
+	min-height: 0;
+	color: inherit;
+	opacity: 1;
+}
+.hkui-dropdown__value {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	text-align: left;
+}
+.hkui-dropdown__value.is-placeholder {
+	color: var(--hkui-field-copy);
+}
+.hkui-dropdown__chevron {
+	display: inline-flex;
+	color: var(--hkui-foreground-soft);
+	transition: transform var(--hkui-dur-base) var(--hkui-ease);
+	flex-shrink: 0;
+}
+[data-focus] .hkui-dropdown__chevron,
+.hkui-dropdown__trigger[aria-expanded="true"] .hkui-dropdown__chevron {
+	transform: rotate(180deg);
+	color: var(--hkui-foreground);
+}
+
+.hkui-dropdown__menu {
+	position: fixed;
+	z-index: 80;
+	background: var(--page-dropdown-menu-bg);
+	border-radius: 12px;
+	border: 1px solid var(--page-dropdown-border);
+	box-shadow:
+		0 4px 14px rgb(var(--color-ink-950-rgb) / 0.12),
+		0 1px 3px rgb(var(--color-ink-950-rgb) / 0.08);
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+	overflow: hidden;
+	font-family: var(--hkui-font-sans);
+	animation: hkui-dropdown-pop 120ms var(--hkui-ease);
+}
+
+@keyframes hkui-dropdown-pop {
+	from {
+		opacity: 0;
+		transform: translateY(-4px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.hkui-dropdown__menu {
+		animation: none;
+	}
+}
+
+.hkui-dropdown__search {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 8px;
+	padding: 6px 12px;
+	background: var(--page-dropdown-search-bg);
+	border: 1px solid var(--page-dropdown-search-border);
+	border-radius: var(--hkui-control-radius-lg, 12px);
+	color: var(--page-dropdown-search-fg);
+}
+.hkui-dropdown__search-input {
+	all: unset;
+	flex: 1;
+	min-width: 0;
+	font-size: 0.875rem;
+	color: var(--hkui-foreground);
+	font-family: inherit;
+}
+.hkui-dropdown__search-input::placeholder {
+	color: var(--hkui-field-copy);
+}
+
+.hkui-dropdown__list {
+	list-style: none;
+	margin: 0;
+	padding: 4px 6px 6px;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	/* 1px 的列距等於相鄰目標幾乎相黏；4px + 更高的列高把誤觸壓下來。 */
+	gap: 4px;
+	scrollbar-width: thin;
+}
+
+.hkui-dropdown__item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	/* 6px 上下內距 ≈ 33px 一列；10px 讓桌機列高到 ~40px，觸控再補到 44。 */
+	padding: 10px 12px;
+	border-radius: var(--hkui-control-radius-lg, 12px);
+	font-size: 0.9375rem;
+	line-height: 1.35;
+	color: var(--page-dropdown-item-fg);
+	cursor: pointer;
+	transition:
+		background var(--hkui-dur-fast) var(--hkui-ease),
+		color var(--hkui-dur-fast) var(--hkui-ease);
+	letter-spacing: 0.04em;
+}
+@media (pointer: coarse) {
+	.hkui-dropdown__item {
+		min-height: 44px;
+	}
+}
+.hkui-dropdown__item.is-selected {
+	background: var(--page-dropdown-item-selected-bg);
+	color: var(--page-dropdown-item-selected-fg);
+	font-weight: var(--hkui-weight-semibold);
+}
+/* `.is-active` = 鍵盤游標（aria-activedescendant 指到的那一列）；
+ * `.is-hover` = 純滑鼠停留。兩者外觀相同，但滑鼠移動不再搬動鍵盤游標，
+ * 讀屏也就不會收到假的「已移到某選項」宣告。 */
+.hkui-dropdown__item.is-active,
+.hkui-dropdown__item.is-hover:not(.is-disabled) {
+	background: var(--page-dropdown-item-active-bg);
+	color: var(--page-dropdown-item-active-fg);
+}
+.hkui-dropdown__item.is-active.is-selected,
+.hkui-dropdown__item.is-hover.is-selected:not(.is-disabled) {
+	background: var(--page-dropdown-item-active-selected-bg);
+	color: var(--page-dropdown-item-active-fg);
+}
+.hkui-dropdown__item.is-disabled {
+	color: var(--hkui-foreground-soft);
+	cursor: not-allowed;
+	opacity: 0.5;
+}
+.hkui-dropdown__item-label {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.hkui-dropdown__item-desc {
+	font-size: 0.75rem;
+	color: var(--hkui-field-copy);
+	margin-left: 8px;
+	max-width: 60%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.hkui-dropdown__item.is-active .hkui-dropdown__item-desc,
+.hkui-dropdown__item.is-hover:not(.is-disabled) .hkui-dropdown__item-desc {
+	color: color-mix(
+		in srgb,
+		var(--page-dropdown-item-active-fg) 85%,
+		transparent
+	);
+}
+.hkui-dropdown__item-check {
+	display: inline-flex;
+	color: var(--color-brand-primary-strong);
+	flex-shrink: 0;
+}
+.hkui-dropdown__item.is-active .hkui-dropdown__item-check,
+.hkui-dropdown__item.is-hover:not(.is-disabled) .hkui-dropdown__item-check {
+	color: var(--page-dropdown-item-active-fg);
+}
+
+.hkui-dropdown__empty {
+	padding: 24px 16px;
+	text-align: center;
+	color: var(--hkui-field-copy);
+	font-size: 0.875rem;
+}
+
+/* ============================================================
+   8. NAVBAR (Header)
+   ============================================================ */
+.hkui-navbar {
+	position: sticky;
+	top: 0;
+	z-index: 50;
+	width: 100%;
+	background: var(--hkui-content1);
+	border-bottom: 1px solid var(--hkui-divider);
+	font-family: var(--hkui-font-sans);
+}
+.hkui-navbar--blurred {
+	background: rgba(255, 253, 247, 0.72);
+	-webkit-backdrop-filter: saturate(160%) blur(14px);
+	backdrop-filter: saturate(160%) blur(14px);
+}
+.hkui-navbar__inner {
+	display: flex;
+	align-items: center;
+	gap: var(--hkui-space-6);
+	height: 4rem;
+	max-width: 1320px;
+	padding: 0 var(--hkui-space-6);
+	margin: 0 auto;
+}
+.hkui-navbar__brand {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--hkui-space-2);
+	font-weight: var(--hkui-weight-bold);
+	color: var(--hkui-foreground);
+	text-decoration: none;
+}
+.hkui-navbar__content {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--hkui-space-2);
+}
+.hkui-navbar__content--center {
+	flex: 1;
+	justify-content: center;
+}
+.hkui-navbar__content--end {
+	margin-left: auto;
+}
+.hkui-navbar__item {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--hkui-space-1_5);
+	height: 2.25rem;
+	padding: 0 var(--hkui-space-3);
+	border-radius: var(--hkui-radius-sm);
+	color: var(--hkui-foreground-muted);
+	text-decoration: none;
+	font-size: var(--hkui-text-small);
+	font-weight: var(--hkui-weight-medium);
+	transition:
+		color var(--hkui-dur-fast) var(--hkui-ease),
+		background var(--hkui-dur-fast) var(--hkui-ease);
+}
+.hkui-navbar__item:hover {
+	color: var(--hkui-foreground);
+	background: var(--hkui-default-100);
+}
+.hkui-navbar__item[aria-current="page"],
+.hkui-navbar__item--active {
+	color: var(--hkui-primary);
+}
+.hkui-navbar__item[aria-current="page"]::after,
+.hkui-navbar__item--active::after {
+	content: "";
+	position: absolute;
+	left: var(--hkui-space-3);
+	right: var(--hkui-space-3);
+	bottom: -0.5rem;
+	height: 2px;
+	background: var(--hkui-primary);
+	border-radius: 2px;
+}
+@media (max-width: 768px) {
+	.hkui-navbar__inner {
+		padding: 0 var(--hkui-space-4);
+		gap: var(--hkui-space-3);
+	}
+	.hkui-navbar__content--center {
+		display: none;
+	}
+}
+
+/* ============================================================
+   9. CTA SECTION
+   ============================================================ */
+.hkui-cta {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	gap: var(--hkui-space-5);
+	padding: clamp(var(--hkui-space-10), 6vw, var(--hkui-space-16))
+		var(--hkui-space-6);
+	border-radius: var(--hkui-radius-xl);
+	background: linear-gradient(
+		135deg,
+		var(--hkui-primary) 0%,
+		var(--hkui-primary-700) 100%
+	);
+	color: var(--hkui-primary-foreground);
+	font-family: var(--hkui-font-sans);
+	overflow: hidden;
+	isolation: isolate;
+}
+.hkui-cta--soft {
+	background: linear-gradient(
+		135deg,
+		var(--hkui-content2) 0%,
+		var(--hkui-content3) 100%
+	);
+	color: var(--hkui-foreground);
+}
+.hkui-cta--warm {
+	background: linear-gradient(
+		135deg,
+		var(--hkui-warning-50) 0%,
+		var(--hkui-warning-100) 100%
+	);
+	color: var(--hkui-foreground);
+}
+.hkui-cta--banner {
+	flex-direction: row;
+	text-align: left;
+	gap: var(--hkui-space-8);
+	align-items: center;
+	padding: var(--hkui-space-8);
+}
+.hkui-cta--banner > .hkui-cta__copy {
+	flex: 1;
+	align-items: flex-start;
+}
+
+.hkui-cta__copy {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--hkui-space-3);
+}
+.hkui-cta--banner .hkui-cta__copy {
+	align-items: flex-start;
+}
+.hkui-cta__eyebrow {
+	font-size: var(--hkui-text-tiny);
+	font-weight: var(--hkui-weight-semibold);
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	opacity: 0.8;
+}
+.hkui-cta__title {
+	font-size: clamp(var(--hkui-display-md), 4vw, var(--hkui-display-xl));
+	line-height: 1.1;
+	letter-spacing: var(--hkui-tracking-tight);
+	font-weight: 700;
+	margin: 0;
+}
+.hkui-cta__subtitle {
+	font-size: var(--hkui-text-medium);
+	line-height: var(--hkui-line-medium);
+	opacity: 0.92;
+	max-width: 56ch;
+	margin: 0;
+}
+.hkui-cta__actions {
+	display: inline-flex;
+	gap: var(--hkui-space-3);
+	flex-wrap: wrap;
+	justify-content: center;
+}
+.hkui-cta--banner .hkui-cta__actions {
+	justify-content: flex-start;
+}
+
+@media (max-width: 768px) {
+	.hkui-cta--banner {
+		flex-direction: column;
+		text-align: center;
+		padding: var(--hkui-space-8) var(--hkui-space-5);
+	}
+	.hkui-cta--banner > .hkui-cta__copy {
+		align-items: center;
+	}
+	.hkui-cta--banner .hkui-cta__actions {
+		justify-content: center;
+	}
+}
+
+/* ============================================================
+   10. UTILITY: Stack / divider / spinner
+   ============================================================ */
+.hkui-divider {
+	height: 1px;
+	width: 100%;
+	background: var(--hkui-divider);
+	border: none;
+	margin: 0;
+}
+.hkui-divider--vertical {
+	width: 1px;
+	height: 100%;
+}
+
+/* ============================================================
+   11. APPLE-SMOOTH SCROLL UTILITIES
+   （全域 html smooth 已移除 — 理由見 foundation/02-reset-layout.css；
+   平滑捲動由需要的容器/呼叫點自行宣告）
+   ============================================================ */
+
+[data-scroll-fade] {
+	opacity: 0;
+	transform: translate3d(0, 24px, 0);
+	transition:
+		opacity 700ms cubic-bezier(0.16, 1, 0.3, 1) var(--hkui-fade-delay, 0ms),
+		transform 700ms cubic-bezier(0.16, 1, 0.3, 1) var(--hkui-fade-delay, 0ms);
+	will-change: opacity, transform;
+}
+[data-scroll-fade].is-in-view {
+	opacity: 1;
+	transform: translate3d(0, 0, 0);
+}
+@media (prefers-reduced-motion: reduce) {
+	[data-scroll-fade] {
+		opacity: 1;
+		transform: none;
+		transition: none;
+	}
+}
+
+/* ============================================================
+   12. CATEGORY NAV (icon grid)
+   ============================================================ */
+
+/* ============================================================
+   13b. SELLER SHARE CARD
+   ============================================================ */
+/* Keep the third-party support launcher from covering modal actions on narrow
+ * screens. Dialog.tsx owns this body attribute for every active overlay. */
+body[data-hk-overlay-open="true"] .tsqd-open-btn-container {
+	opacity: 0;
+	visibility: hidden;
+	pointer-events: none;
+}
+
+/* Shared Dialog / Sheet motion. OverlayRoot keeps the portal mounted through
+ * the closed pose, so open and close are the same interruptible transition. */
+[data-hk-overlay-root] {
+	opacity: 0;
+	transition: opacity var(--hkui-dur-base) var(--hkui-ease);
+}
+
+[data-hk-overlay-root][data-hk-overlay-state="open"] {
+	opacity: 1;
+}
+
+[data-hk-overlay-root][data-hk-overlay-state="closed"] {
+	pointer-events: none;
+}
+
+[data-hk-overlay-motion-layer] {
+	transform: translate3d(0, 0, 0);
+	transform-origin: var(--hk-overlay-transform-origin, center);
+	transition: transform var(--hk-overlay-duration, var(--hkui-dur-base))
+		var(--hkui-ease);
+	will-change: transform;
+}
+
+[data-hk-overlay-root][data-hk-overlay-state="open"]
+	[data-hk-overlay-motion-layer] {
+	transform: translate3d(0, 0, 0) scale(1);
+}
+
+[data-hk-overlay-root][data-hk-overlay-state="closed"]
+	[data-hk-overlay-motion-layer] {
+	transform: var(--hk-overlay-closed-transform, translate3d(0, 0, 0));
+}
+
+[data-hk-overlay-root][data-hk-overlay-motion="dialog-center"] {
+	--hk-overlay-closed-transform: translate3d(0, 8px, 0) scale(0.96);
+	--hk-overlay-transform-origin: center;
+}
+
+[data-hk-overlay-root][data-hk-overlay-motion="dialog-top"] {
+	--hk-overlay-closed-transform: translate3d(0, -8px, 0) scale(0.98);
+	--hk-overlay-transform-origin: top center;
+}
+
+[data-hk-overlay-root][data-hk-overlay-motion="dialog-bottom"] {
+	--hk-overlay-closed-transform: translate3d(0, 8px, 0) scale(0.98);
+	--hk-overlay-transform-origin: bottom center;
+}
+
+[data-hk-overlay-root][data-hk-overlay-motion^="sheet-"] {
+	--hk-overlay-duration: var(--hkui-dur-slow);
+	transition-duration: var(--hkui-dur-slow);
+}
+
+[data-hk-overlay-root][data-hk-overlay-motion="sheet-bottom"] {
+	--hk-overlay-closed-transform: translate3d(0, 24px, 0);
+	--hk-overlay-transform-origin: bottom center;
+}
+
+[data-hk-overlay-root][data-hk-overlay-motion="sheet-right"] {
+	--hk-overlay-closed-transform: translate3d(24px, 0, 0);
+	--hk-overlay-transform-origin: center right;
+}
+
+[data-hk-overlay-root][data-hk-overlay-motion="sheet-left"] {
+	--hk-overlay-closed-transform: translate3d(-24px, 0, 0);
+	--hk-overlay-transform-origin: center left;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	[data-hk-overlay-root] {
+		transition: opacity var(--hkui-dur-fast) var(--hkui-ease);
+	}
+
+	[data-hk-overlay-root][data-hk-overlay-state] [data-hk-overlay-motion-layer] {
+		transform: none;
+		transition: none;
+	}
+}
+
+.hk-heroui-brand-scope {
+	--accent: var(--theme-action-primary);
+	--accent-foreground: var(--theme-text-inverse);
+	--accent-soft: var(--theme-primary-subtle);
+	--accent-soft-foreground: var(--theme-text-accent);
+	--accent-soft-hover: color-mix(
+		in oklab,
+		var(--theme-action-primary) 16%,
+		transparent
+	);
+	--default: var(--theme-surface-muted);
+	--default-foreground: var(--theme-text-body);
+	--default-hover: var(--theme-surface-glass-hover);
+	--focus: var(--theme-action-secondary);
+}
+/* ============================================================
+   14. APP DOWNLOAD BANNER V2 — compact, unbroken copy
+   ============================================================ */
+.hkui-app-banner {
+	display: flex;
+	align-items: center;
+	gap: var(--hkui-space-2_5);
+	padding: 8px var(--hkui-space-3);
+	margin: var(--hkui-space-3) auto;
+	max-width: 1300px;
+	border-radius: var(--hkui-radius-md);
+	background: var(--hkui-content2);
+	border: 1px solid var(--hkui-divider);
+	font-family: var(--hkui-font-sans);
+}
+.hkui-app-banner__icon {
+	flex-shrink: 0;
+	width: 28px;
+	height: 28px;
+	border-radius: var(--hkui-radius-sm);
+	background: var(--hkui-content1);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 1rem;
+}
+.hkui-app-banner__copy {
+	flex: 1;
+	min-width: 0;
+	display: inline-flex;
+	align-items: baseline;
+	gap: 6px;
+	overflow: hidden;
+}
+.hkui-app-banner__copy strong {
+	font-size: var(--hkui-text-small);
+	font-weight: var(--hkui-weight-semibold);
+	color: var(--hkui-foreground);
+	white-space: nowrap;
+}
+.hkui-app-banner__copy span {
+	font-size: var(--hkui-text-tiny);
+	color: var(--hkui-foreground-soft);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.hkui-app-banner__actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	flex-shrink: 0;
+}
+.hkui-app-banner__cta {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	height: 28px;
+	padding: 0 var(--hkui-space-2_5);
+	background: var(--hkui-primary);
+	color: var(--hkui-primary-foreground);
+	border: none;
+	border-radius: var(--hkui-radius-full);
+	font-family: inherit;
+	font-size: var(--hkui-text-tiny);
+	font-weight: var(--hkui-weight-semibold);
+	cursor: pointer;
+	transition:
+		background var(--hkui-dur-fast) var(--hkui-ease),
+		transform var(--hkui-dur-fast) var(--hkui-ease);
+}
+.hkui-app-banner__cta:hover {
+	background: var(--hkui-primary-600);
+}
+.hkui-app-banner__cta:active {
+	transform: scale(0.97);
+}
+.hkui-app-banner__dismiss {
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	border: none;
+	background: transparent;
+	color: var(--hkui-foreground-soft);
+	cursor: pointer;
+	font-size: 0.875rem;
+	transition: background var(--hkui-dur-fast) var(--hkui-ease);
+}
+.hkui-app-banner__dismiss:hover {
+	background: rgba(0, 0, 0, 0.06);
+	color: var(--hkui-foreground);
+}
+@media (max-width: 640px) {
+	.hkui-app-banner {
+		gap: var(--hkui-space-1);
+		padding-inline: var(--hkui-space-1_5);
+	}
+	.hkui-app-banner__copy {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0;
+	}
+	.hkui-app-banner__copy span {
+		white-space: nowrap;
+	}
+	.hkui-app-banner__actions {
+		gap: 0;
+	}
+	.hkui-app-banner .hkui-app-banner__cta {
+		position: relative;
+		flex-shrink: 0;
+		min-width: max-content;
+		min-height: 36px;
+		height: 36px;
+		padding-inline: var(--hkui-space-2);
+		white-space: nowrap;
+	}
+	.hkui-app-banner__cta::before {
+		content: "";
+		position: absolute;
+		inset-block: -4px;
+		inset-inline: 0;
+	}
+	.hkui-app-banner__dismiss {
+		flex-shrink: 0;
+		width: 44px;
+		height: 44px;
+	}
+}
+@media (max-width: 360px) {
+	.hkui-app-banner {
+		display: grid;
+		grid-template-columns: 28px minmax(0, 1fr) auto;
+		row-gap: 0;
+	}
+	.hkui-app-banner__icon {
+		grid-column: 1;
+		grid-row: 1;
+	}
+	.hkui-app-banner__copy {
+		display: contents;
+	}
+	.hkui-app-banner__copy strong {
+		grid-column: 2;
+		grid-row: 1;
+		align-self: center;
+	}
+	.hkui-app-banner__copy span {
+		grid-column: 2 / -1;
+		grid-row: 2;
+		max-width: 100%;
+	}
+	.hkui-app-banner__actions {
+		grid-column: 3;
+		grid-row: 1;
+	}
+}
+
+/* Sellers page filter button (替換掉 sidebar 裡 "所在地" 文字 link) */
+.market-filter__btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	padding: 10px 14px;
+	border: 1px solid var(--hkui-divider);
+	background: var(--hkui-content1);
+	border-radius: var(--hkui-radius-md);
+	font-family: var(--hkui-font-sans);
+	font-size: var(--hkui-text-small);
+	color: var(--hkui-foreground-muted);
+	cursor: pointer;
+	text-align: left;
+	transition:
+		background var(--hkui-dur-fast) var(--hkui-ease),
+		border-color var(--hkui-dur-fast) var(--hkui-ease),
+		color var(--hkui-dur-fast) var(--hkui-ease);
+}
+.market-filter__btn:hover {
+	background: var(--hkui-default-100);
+	color: var(--hkui-foreground);
+}
+.market-filter__btn svg {
+	color: var(--hkui-primary);
+	flex-shrink: 0;
+}
+.market-filter__btn em {
+	font-style: normal;
+	margin-left: auto;
+	font-weight: var(--hkui-weight-semibold);
+	color: var(--hkui-primary);
+	font-size: var(--hkui-text-tiny);
+}
+.market-filter__btn--active {
+	border-color: var(--hkui-primary);
+	background: var(--hkui-primary-50);
+	color: var(--hkui-primary-700);
+}
+
+/* Active filter chip (above seller list) */
+
+/* ============================================================
+   APP DOWNLOAD — CTA + QR modal
+   A portal modal (backdrop + centred panel + close button) whose body
+   layout is QR-driven rather than a form. The sibling LoginRequiredModal
+   that once shared this lineage now lives entirely in Tailwind utilities.
+   ============================================================ */
+.hkui-app-cta {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--hkui-space-2);
+	border: 1px solid var(--hkui-divider);
+	background: var(--hkui-content1);
+	color: var(--hkui-foreground);
+	font-family: inherit;
+	font-weight: var(--hkui-weight-semibold);
+	text-decoration: none;
+	cursor: pointer;
+	transition:
+		background var(--hkui-dur-fast) var(--hkui-ease),
+		border-color var(--hkui-dur-fast) var(--hkui-ease),
+		color var(--hkui-dur-fast) var(--hkui-ease);
+}
+.hkui-app-cta:hover {
+	background: var(--hkui-content2);
+	border-color: var(--hkui-primary);
+	color: var(--hkui-primary);
+}
+.hkui-app-cta--compact {
+	height: 36px;
+	padding: 0 var(--hkui-space-3);
+	border-radius: var(--hkui-radius-full);
+	font-size: var(--hkui-text-tiny);
+}
+
+@media (max-width: 1280px) {
+	.site-nav .site-nav-app-cta.hkui-app-cta {
+		display: none;
+	}
+}
+
+.hkui-app-cta--pill {
+	height: 44px;
+	padding: 0 var(--hkui-space-5);
+	border-radius: var(--hkui-radius-full);
+	font-size: var(--hkui-text-small);
+	border-color: transparent;
+	background: var(--hkui-primary);
+	color: var(--hkui-primary-foreground);
+}
+.hkui-app-cta--pill:hover {
+	background: var(--hkui-primary-600);
+	border-color: transparent;
+	color: var(--hkui-primary-foreground);
+}
+
+/* Shared auth-style hints also used by cart, checkout and addresses.
+ * LoginShell owns the full auth surface in styles/features/auth-login.css.
+ */
+.hkui-login__hint {
+	font-size: var(--hkui-text-tiny);
+	color: var(--hkui-foreground-soft);
+}
+.hkui-login__hint--error {
+	color: var(--hkui-danger);
+}
+
+/* Empty state */
+
+/* Calendar */
+.hkui-calendar {
+	width: min(100%, 640px);
+	padding: var(--hkui-space-5);
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--hkui-radius-3xl);
+	background: var(--hkui-content1);
+	color: var(--hkui-foreground);
+	font-family: var(--hkui-font-sans);
+	box-shadow: var(--hkui-shadow-md);
+}
+.hkui-calendar__header {
+	display: grid;
+	grid-template-columns: 44px 1fr 44px;
+	align-items: center;
+	gap: var(--hkui-space-3);
+	margin-bottom: var(--hkui-space-6);
+}
+.hkui-calendar__title {
+	margin: 0;
+	color: var(--hkui-foreground);
+	font-size: var(--hkui-display-sm);
+	font-weight: var(--hkui-weight-bold);
+	line-height: 1;
+	text-align: center;
+}
+/* Year + month jump pickers — replace the static title when the calendar
+ * needs to span more than a few years (birthday, expiry, scheduled report).
+ * Visually styled as two compact pill-selects with a faint hover wash so
+ * they read as "tap to jump" without competing with the prev/next arrows. */
+.hkui-calendar__jump {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--hkui-space-1_5);
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+.hkui-calendar__jump.is-minguo {
+	gap: 0.375rem;
+}
+.hkui-calendar__jump-flag {
+	display: inline-grid;
+	place-items: center;
+	width: 24px;
+	height: 24px;
+	flex: 0 0 24px;
+	overflow: hidden;
+	border-radius: var(--hkui-radius-full);
+	background-color: color-mix(
+		in srgb,
+		var(--hkui-content1, #fff) 82%,
+		transparent
+	);
+	color: var(--hkui-primary, var(--color-brand-primary-strong));
+	box-shadow:
+		0 0 0 1px
+		color-mix(
+			in srgb,
+			var(--hkui-primary, var(--color-brand-primary-strong)) 12%,
+			transparent
+		),
+		0 5px 12px
+		color-mix(
+			in srgb,
+			var(--hkui-primary, var(--color-brand-primary-strong)) 12%,
+			transparent
+		);
+}
+.hkui-calendar__jump-select {
+	appearance: none;
+	-webkit-appearance: none;
+	background: var(--hkui-default-100)
+		url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='currentColor' stroke-width='1.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+		no-repeat right 10px center;
+	background-size: 10px 6px;
+	border: 0;
+	border-radius: var(--hkui-radius-md);
+	color: var(--hkui-foreground);
+	font-family: inherit;
+	font-size: var(--hkui-text-small);
+	font-weight: var(--hkui-weight-semibold);
+	line-height: 1;
+	height: 2rem;
+	padding: 0 calc(var(--hkui-space-3) + 14px) 0 var(--hkui-space-3);
+	cursor: pointer;
+	transition:
+		background-color var(--hkui-dur-fast) var(--hkui-ease),
+		color var(--hkui-dur-fast) var(--hkui-ease);
+	min-width: 0;
+}
+.hkui-calendar__jump-select:hover {
+	background-color: var(--hkui-default-200);
+}
+.hkui-calendar__jump-select:focus-visible {
+	outline: none;
+	box-shadow: var(--hkui-focus-ring);
+}
+.hkui-calendar__jump-select--year {
+	font-variant-numeric: tabular-nums;
+}
+.hkui-calendar__jump.is-minguo .hkui-calendar__jump-select--year {
+	width: 7rem;
+	padding-right: calc(var(--hkui-space-2) + 14px);
+	padding-left: var(--hkui-space-2);
+}
+.hkui-calendar__jump.is-minguo .hkui-calendar__jump-select--month {
+	width: 4rem;
+	padding-right: calc(var(--hkui-space-2) + 14px);
+	padding-left: var(--hkui-space-2);
+}
+.hkui-calendar__nav {
+	width: 44px;
+	height: 44px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid transparent;
+	border-radius: var(--hkui-radius-full);
+	background: transparent;
+	color: var(--hkui-foreground-muted);
+	cursor: pointer;
+	transition:
+		background var(--hkui-dur-base) var(--hkui-ease),
+		border-color var(--hkui-dur-base) var(--hkui-ease),
+		color var(--hkui-dur-base) var(--hkui-ease),
+		transform var(--hkui-dur-fast) var(--hkui-ease);
+}
+.hkui-calendar__nav:hover {
+	background: var(--hkui-default-100);
+	border-color: var(--hkui-divider);
+	color: var(--hkui-foreground);
+}
+.hkui-calendar__nav:active {
+	transform: scale(0.96);
+}
+.hkui-calendar__nav:focus-visible {
+	outline: none;
+	box-shadow: var(--hkui-focus-ring);
+}
+.hkui-calendar__nav span {
+	width: 16px;
+	height: 16px;
+	border-top: 2px solid currentColor;
+	border-left: 2px solid currentColor;
+	transform: rotate(-45deg);
+}
+.hkui-calendar__nav--next span {
+	transform: rotate(135deg);
+}
+.hkui-calendar__weekdays {
+	display: grid;
+	grid-template-columns: repeat(7, minmax(0, 1fr));
+	gap: var(--hkui-space-1);
+	margin-bottom: var(--hkui-space-3);
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-small);
+	font-weight: var(--hkui-weight-bold);
+	line-height: var(--hkui-line-small);
+	text-align: center;
+	text-transform: uppercase;
+}
+/* `.hkui-calendar__grid` is the ARIA rowgroup; each `.hkui-calendar__row`
+ * holds one week. The 7-column track moved from the grid to the row so the
+ * DOM can carry role="row" without `display: contents` (which browsers still
+ * drop from the accessibility tree in places). Visual output is identical. */
+.hkui-calendar__grid {
+	display: flex;
+	flex-direction: column;
+	gap: var(--hkui-space-1);
+}
+.hkui-calendar__row {
+	display: grid;
+	grid-template-columns: repeat(7, minmax(0, 1fr));
+	gap: var(--hkui-space-1);
+}
+.hkui-calendar__day {
+	position: relative;
+	min-width: 0;
+	min-height: clamp(48px, 9vw, 72px);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--hkui-radius-lg);
+	background: var(--hkui-background);
+	color: var(--hkui-foreground);
+	font-family: inherit;
+	font-size: var(--hkui-display-sm);
+	font-weight: var(--hkui-weight-medium);
+	line-height: 1;
+	cursor: pointer;
+	transition:
+		background var(--hkui-dur-base) var(--hkui-ease),
+		border-color var(--hkui-dur-base) var(--hkui-ease),
+		color var(--hkui-dur-base) var(--hkui-ease),
+		transform var(--hkui-dur-fast) var(--hkui-ease);
+}
+.hkui-calendar__day:hover:not(:disabled) {
+	background: var(--hkui-primary-50);
+	border-color: color-mix(in srgb, var(--hkui-primary) 26%, transparent);
+	color: var(--hkui-primary-700);
+}
+.hkui-calendar__day:active:not(:disabled) {
+	transform: scale(0.98);
+}
+.hkui-calendar__day:focus-visible {
+	z-index: 1;
+	outline: none;
+	box-shadow: var(--hkui-focus-ring);
+}
+.hkui-calendar__day--outside {
+	color: var(--hkui-foreground-muted);
+}
+.hkui-calendar__day--today::after {
+	position: absolute;
+	right: 10px;
+	bottom: 8px;
+	width: 6px;
+	height: 6px;
+	border-radius: var(--hkui-radius-full);
+	background: var(--hkui-accent);
+	content: "";
+}
+.hkui-calendar__day--selected {
+	background: var(--hkui-primary);
+	border-color: var(--hkui-primary);
+	color: var(--hkui-primary-foreground);
+	box-shadow: var(--hkui-shadow-sm);
+}
+.hkui-calendar__day--selected:hover:not(:disabled) {
+	background: var(--hkui-primary-600);
+	color: var(--hkui-primary-foreground);
+}
+.hkui-calendar__day:disabled {
+	color: var(--hkui-foreground-soft);
+	cursor: default;
+	opacity: 0.42;
+}
+
+@media (max-width: 560px) {
+	.hkui-calendar {
+		padding: var(--hkui-space-4);
+		border-radius: var(--hkui-radius-2xl);
+	}
+	.hkui-calendar__header {
+		grid-template-columns: 40px 1fr 40px;
+		margin-bottom: var(--hkui-space-4);
+	}
+	.hkui-calendar__nav {
+		width: 40px;
+		height: 40px;
+	}
+	.hkui-calendar__title {
+		font-size: var(--hkui-text-large);
+	}
+	.hkui-calendar__weekdays {
+		font-size: var(--hkui-text-tiny);
+	}
+	.hkui-calendar__day {
+		min-height: 44px;
+		border-radius: var(--hkui-radius-md);
+		font-size: var(--hkui-text-large);
+	}
+}
+
+/* ============================================================
+ * Calendar — size variants (sm / md / lg)
+ *
+ * Default `.hkui-calendar` keeps the existing large hero layout for
+ * backward compat. Add `.hkui-calendar--sm` / `--md` to constrain the
+ * widget for popovers, sidebars, and dense booking views.
+ *
+ *   sm — date-picker popover under an input (32px nav, 36px cells)
+ *   md — sidebar / inline date filter           (40px nav, 44px cells)
+ *   lg — hero "select pickup date" booking page (current default)
+ *
+ * Sizing flows from the same control tokens used by button/input so
+ * a popover's nav buttons match the surrounding form fields exactly.
+ * ============================================================ */
+.hkui-calendar--sm,
+.hkui-calendar--md {
+	width: 100%;
+	max-width: 22rem;
+	padding: var(--hkui-space-4);
+	border-radius: var(--hkui-radius-2xl);
+	box-shadow: var(--hkui-shadow-sm);
+}
+.hkui-calendar--sm .hkui-calendar__header,
+.hkui-calendar--md .hkui-calendar__header {
+	margin-bottom: var(--hkui-space-3);
+}
+.hkui-calendar--sm .hkui-calendar__header {
+	grid-template-columns:
+		var(--hkui-control-h-sm) 1fr
+		var(--hkui-control-h-sm);
+	gap: var(--hkui-space-2);
+}
+.hkui-calendar--md .hkui-calendar__header {
+	grid-template-columns:
+		var(--hkui-control-h-md) 1fr
+		var(--hkui-control-h-md);
+}
+.hkui-calendar--sm .hkui-calendar__nav {
+	width: var(--hkui-control-h-sm);
+	height: var(--hkui-control-h-sm);
+}
+.hkui-calendar--md .hkui-calendar__nav {
+	width: var(--hkui-control-h-md);
+	height: var(--hkui-control-h-md);
+}
+.hkui-calendar--sm .hkui-calendar__nav span,
+.hkui-calendar--md .hkui-calendar__nav span {
+	width: 10px;
+	height: 10px;
+}
+.hkui-calendar--sm .hkui-calendar__title {
+	font-size: var(--hkui-text-small);
+}
+.hkui-calendar--md .hkui-calendar__title {
+	font-size: var(--hkui-text-medium);
+}
+.hkui-calendar--sm .hkui-calendar__weekdays,
+.hkui-calendar--md .hkui-calendar__weekdays {
+	font-size: var(--hkui-text-tiny);
+	margin-bottom: var(--hkui-space-2);
+}
+.hkui-calendar--sm .hkui-calendar__day {
+	min-height: var(--hkui-calendar-cell-sm);
+	border-radius: var(--hkui-radius-md);
+	font-size: var(--hkui-text-small);
+}
+.hkui-calendar--md .hkui-calendar__day {
+	min-height: var(--hkui-calendar-cell-md);
+	border-radius: var(--hkui-radius-md);
+	font-size: var(--hkui-text-medium);
+}
+/* lg = explicit alias for the legacy hero size, in case a consumer
+ * wants to be explicit about which variant they're picking. */
+.hkui-calendar--lg .hkui-calendar__day {
+	min-height: var(--hkui-calendar-cell-lg);
+}
+
+/* 觸控裝置：sm 尺寸（date-picker popover）的日期格與年月跳轉 select 是主要
+ * 操作目標，桌機保持原本的緊密視覺，指標為 coarse 時才長到 44px。 */
+@media (pointer: coarse) {
+	:root {
+		--hkui-calendar-cell-sm: 2.75rem;
+	}
+	.hkui-calendar__jump-select {
+		height: 2.75rem;
+	}
+	/* popover 內的日期格是固定 36×36 置中，直接放大成 44 會撐破 18rem 的面板。
+	 * 面板一起長到 22rem，格子改成「填滿欄寬、上限 44」，視窗更窄時（面板受
+	 * max-width 夾住）格子跟著縮而不是溢出。手機全螢幕 modal 分支在檔案後面
+	 * 把 .hkui-calendar 改回 width:100%，那條仍然贏（同 specificity、順序在後）。 */
+	.hkui-datepicker__popover .hkui-calendar {
+		width: 22rem;
+	}
+	.hkui-datepicker__popover .hkui-calendar__day {
+		width: 100%;
+		max-width: var(--hkui-calendar-cell-sm);
+	}
+}
+
+/* ============================================================
+ * 11. FILTER BAR — `.hkui-filter`
+ *
+ * Toolbar primitive for product list filters, dashboard query rows,
+ * and "sort + view" controls. Three sizes match the button/input
+ * height ladder so a filter row drops in next to any combination of
+ * controls with no vertical jitter:
+ *
+ *   sm — table filters, dense admin panels    (32px controls)
+ *   md — buyer market / product list filters  (40px controls — default)
+ *   lg — hero "search & filter" booking page  (48px controls)
+ *
+ * Layout: flex row with wrap (rows reflow on narrow viewports),
+ *         vertical alignment to end so a label-above-input field
+ *         shares the baseline with a buttons that has no label.
+ *
+ * Variants:
+ *   .hkui-filter--card  → wraps the row in a card surface (border +
+ *                          padding + radius). Use on dashboard pages
+ *                          where the filter row is a visual section.
+ *   .hkui-filter--inline → fully transparent toolbar (default — sits
+ *                          directly above a list).
+ *   .hkui-filter--stacked → labels on top of controls instead of inline.
+ *
+ * Children:
+ *   .hkui-filter__group   → a labeled column (label + control stacked)
+ *   .hkui-filter__label   → small uppercase eyebrow above a field
+ *   .hkui-filter__divider → 1px vertical rule between groups
+ *   .hkui-filter__spacer  → flex-1 to push trailing actions to the right
+ *   .hkui-filter__actions → right-aligned action row (apply / reset)
+ * ============================================================ */
+
+/* Card surface — only enabled when the consumer adds `--card`. The
+ * default toolbar is fully transparent so it can sit directly on the
+ * page surface without painting a redundant block. */
+
+/* Stacked layout puts the label *above* the field (default behavior).
+ * Inline puts the label on the same line, useful for dense admin rows. */
+
+/* A "group" is one labeled column. Default = stacked (label on top). */
+
+/* Width helpers — pick a column width tier instead of hardcoding px.
+ * narrow = single-word selects (sort, status). xs = numbers / short
+ * codes. sm/md/lg/xl scale with the rest of the kit. */
+
+/* Vertical divider — sit at the same height as the controls above */
+
+/* Right-pushed action group — keep "Apply / Reset" on the right edge */
+
+/* ============================================================
+ * Dark-mode token overrides — MUST live in ui-kit.css *after* the
+ * `:root` block above. Both `:root` (default light) and
+ * `[data-theme="dark"]` have the same CSS specificity, so the cascade
+ * winner is whichever comes later in the loaded stylesheets. The
+ * original dark block lives in styles/globals.css:229 which is
+ * imported BEFORE this file — meaning `:root`'s light values were
+ * silently winning and any element relying on `var(--hkui-content1)`
+ * etc. rendered as light surfaces in dark mode (the login panel was
+ * the most visible casualty).
+ *
+ * This duplicate re-declares the critical `--hkui-*` tokens here at
+ * end-of-file so they actually win. The block intentionally only
+ * overrides `--hkui-*` tokens; the legacy `--surface-*` / `--ink-*`
+ * tokens in globals.css don't need re-declaring because ui-kit.css
+ * never re-asserts them in `:root`.
+ * ============================================================ */
+[data-theme="dark"] {
+	color-scheme: dark;
+	--hkui-input-surface: var(--hkui-content1);
+	--hkui-danger-text: var(--hkui-danger-200);
+	--hkui-background: var(--theme-surface-page);
+	--hkui-foreground: var(--color-brand-ink-on-dark);
+	--hkui-foreground-soft: rgb(var(--color-brand-ink-on-dark-rgb) / 0.78);
+	--hkui-foreground-muted: rgb(var(--color-brand-ink-on-dark-rgb) / 0.66);
+	--hkui-content1: var(--theme-surface-card);
+	--hkui-content2: var(--theme-surface-panel);
+	--hkui-content3: var(--theme-surface-elevated);
+	--hkui-default-50: rgb(var(--color-ink-800-rgb) / 0.5);
+	--hkui-default-100: rgb(var(--color-ink-800-rgb) / 0.65);
+	--hkui-default-200: rgb(var(--color-ink-600-rgb) / 0.7);
+	--hkui-default-300: rgb(var(--color-ink-500-rgb) / 0.7);
+	--hkui-default-400: rgb(var(--color-ink-400-rgb) / 0.7);
+	--hkui-divider: rgb(var(--color-ink-100-rgb) / 0.12);
+}
+
+/* ============================================================
+ * DatePicker — HeroUI-style trigger + popover calendar.
+ *
+ * Trigger is a regular input-wrapper (bordered, floating-label) with a
+ * calendar icon button slotted into endContent. Popover floats below
+ * the trigger and contains a constrained .hkui-calendar--sm plus
+ * optional time row + footer actions.
+ * ============================================================ */
+.hkui-datepicker {
+	position: relative;
+	display: block;
+}
+.hkui-datepicker [data-slot="control"] {
+	cursor: pointer;
+}
+/* 視覺仍是 28px 的圓形圖示鈕，但可點區域撐到 44×44（負 margin 吸收多出來的
+ * 16px，欄位高度與圖示位置都不變）。背景只畫在內層的 28px 上，所以 hover 的
+ * 色塊大小也維持原樣。 */
+.hkui-datepicker__trigger {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	width: 44px;
+	height: 44px;
+	padding: 0;
+	margin: -12px -12px -12px -8px;
+	border: 0;
+	border-radius: var(--radius-pill);
+	background: transparent;
+	color: var(--hkui-foreground-muted, var(--ink-soft));
+	cursor: pointer;
+	transition:
+		background var(--hkui-dur-fast) var(--hkui-ease),
+		color var(--hkui-dur-fast) var(--hkui-ease);
+}
+.hkui-datepicker__trigger::before {
+	position: absolute;
+	width: 28px;
+	height: 28px;
+	border-radius: var(--radius-pill);
+	background: transparent;
+	transition: background var(--hkui-dur-fast) var(--hkui-ease);
+	content: "";
+}
+.hkui-datepicker__trigger:hover:not(:disabled)::before,
+.hkui-datepicker.is-open .hkui-datepicker__trigger::before {
+	background: var(--hkui-primary-50);
+}
+.hkui-datepicker__trigger:hover:not(:disabled),
+.hkui-datepicker.is-open .hkui-datepicker__trigger {
+	color: var(--hkui-primary);
+}
+.hkui-datepicker__trigger svg {
+	position: relative;
+}
+.hkui-datepicker__trigger:focus-visible {
+	outline: none;
+}
+.hkui-datepicker__trigger:focus-visible::before {
+	box-shadow: var(--hkui-focus-ring);
+}
+.hkui-datepicker__trigger:disabled {
+	cursor: not-allowed;
+	opacity: 0.5;
+}
+
+/* 桌機 popover 一律 portal 到 body 並用量出來的 fixed 座標（見 DatePicker.tsx
+ * 的 desktopPos 註解）：inline + absolute 會被任何捲動祖先裁掉。`top`/`left`
+ * 由行內樣式提供，這裡不再寫 top/right。 */
+.hkui-datepicker__popover[data-portalled="desktop"] {
+	position: fixed;
+	top: auto;
+	right: auto;
+}
+
+.hkui-datepicker__popover {
+	position: absolute;
+	top: calc(100% + 6px);
+	/* Anchor to the trigger's right edge so the popover opens leftward.
+	 * The calendar icon sits at the right end of the input, and inputs
+	 * frequently land in the right column of a 2-up grid — anchoring
+	 * `left: 0` from a wide wrapper pushes the popover off-screen.
+	 * Below the mobile breakpoint we switch to a centered fixed modal
+	 * (see media query below). */
+	right: 0;
+	z-index: 60;
+	min-width: 18rem;
+	max-width: calc(100vw - 24px);
+	background: var(--hkui-content1);
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--hkui-radius-2xl, 20px);
+	box-shadow: var(--hkui-shadow-lg);
+	overflow: hidden;
+	animation: hkui-datepicker-pop 160ms var(--hkui-ease, ease-out) both;
+}
+
+.hkui-datepicker__scrim {
+	display: none;
+}
+@keyframes hkui-datepicker-fade {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+@keyframes hkui-datepicker-modal {
+	from {
+		opacity: 0;
+		transform: translate(-50%, -46%) scale(0.96);
+	}
+	to {
+		opacity: 1;
+		transform: translate(-50%, -50%) scale(1);
+	}
+}
+.hkui-datepicker__popover .hkui-calendar {
+	border: 0;
+	box-shadow: none;
+	border-radius: 0;
+	padding: var(--hkui-space-4);
+	width: 18rem;
+	max-width: 100%;
+}
+.hkui-datepicker__popover .hkui-calendar--minguo-picker {
+	width: 22rem;
+}
+.hkui-datepicker__popover .hkui-calendar__header {
+	grid-template-columns:
+		var(--hkui-control-h-sm) 1fr
+		var(--hkui-control-h-sm);
+	margin-bottom: var(--hkui-space-3);
+}
+.hkui-datepicker__popover .hkui-calendar--minguo-picker .hkui-calendar__header {
+	margin-bottom: var(--hkui-space-6);
+}
+.hkui-datepicker__popover .hkui-calendar__title {
+	font-size: var(--hkui-text-small);
+	font-weight: var(--hkui-weight-semibold);
+}
+.hkui-datepicker__popover .hkui-calendar__grid,
+.hkui-datepicker__popover .hkui-calendar__row {
+	gap: 2px;
+}
+.hkui-datepicker__popover .hkui-calendar__day {
+	min-height: 0;
+	width: var(--hkui-calendar-cell-sm);
+	height: var(--hkui-calendar-cell-sm);
+	margin: 0 auto;
+	border: 0;
+	border-radius: var(--hkui-radius-md, 10px);
+	background: transparent;
+	font-size: var(--hkui-text-small);
+	font-weight: var(--hkui-weight-medium);
+}
+.hkui-datepicker__popover .hkui-calendar__day:hover:not(:disabled) {
+	background: var(--hkui-primary-50);
+	color: var(--hkui-primary);
+}
+.hkui-datepicker__popover .hkui-calendar__day--selected {
+	background: var(--hkui-primary);
+	color: var(--hkui-primary-foreground);
+}
+.hkui-datepicker__popover
+	.hkui-calendar__day--today:not(.hkui-calendar__day--selected) {
+	box-shadow: inset 0 0 0 1.5px var(--hkui-primary);
+	color: var(--hkui-primary);
+}
+
+.hkui-datepicker__time {
+	display: flex;
+	align-items: center;
+	gap: var(--hkui-space-3);
+	padding: 0 var(--hkui-space-4) var(--hkui-space-3);
+	border-top: 1px solid var(--hkui-divider);
+	padding-top: var(--hkui-space-3);
+	margin-top: -1px;
+}
+.hkui-datepicker__time label {
+	font-size: var(--hkui-text-small);
+	color: var(--hkui-foreground-muted);
+}
+/* 時間欄的外觀改由 inputWrapperClasses（與 Input 家族同一套 Tailwind 樣式）
+ * 提供，這裡不再自己寫一份會蓋過它的規則。 */
+
+.hkui-datepicker__footer {
+	display: flex;
+	justify-content: space-between;
+	gap: var(--hkui-space-2);
+	padding: var(--hkui-space-3) var(--hkui-space-4);
+	border-top: 1px solid var(--hkui-divider);
+	background: var(--hkui-content2, rgb(var(--color-ink-950-rgb) / 0.02));
+}
+.hkui-datepicker__action {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 44px;
+	padding: 6px 14px;
+	border-radius: var(--hkui-radius-md, 10px);
+	border: 0;
+	font-size: var(--hkui-text-small);
+	font-weight: var(--hkui-weight-medium);
+	cursor: pointer;
+	transition: background var(--hkui-dur-fast) var(--hkui-ease);
+}
+.hkui-datepicker__action--ghost {
+	background: transparent;
+	color: var(--hkui-foreground-muted);
+}
+.hkui-datepicker__action--ghost:hover {
+	background: var(--hkui-default-100);
+	color: var(--hkui-foreground);
+}
+.hkui-datepicker__action--primary {
+	background: var(--hkui-primary);
+	color: var(--hkui-primary-foreground);
+}
+.hkui-datepicker__action--primary:hover {
+	background: var(--hkui-primary-600);
+}
+
+@keyframes hkui-datepicker-pop {
+	from {
+		opacity: 0;
+		transform: translateY(-4px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* Mobile: render the calendar as a centered modal instead of a
+ * trigger-relative popover. The trigger can sit anywhere on the page
+ * (right column, bottom of a scrolled form, inside a sticky bar) and
+ * the calendar needs ~320-360px just for the 7-column grid + nav —
+ * absolute positioning from the trigger can't guarantee that fits.
+ * Switching to `position: fixed` + center transform sidesteps all the
+ * overflow/clipping math and gives the user a touch-friendly target.
+ *
+ * NOTE: this @media block MUST live after all the desktop
+ * `.hkui-datepicker__popover .hkui-calendar { ... }` overrides above —
+ * those rules have the same specificity, so the cascade decides the
+ * winner. The desktop block pins the calendar to `width: 18rem`; if
+ * the mobile override sits earlier in the file, the calendar stays at
+ * 288px and renders left-aligned inside the 360px modal. */
+@media (max-width: 768px) {
+	.hkui-datepicker__scrim {
+		display: block;
+		position: fixed;
+		inset: 0;
+		z-index: 59;
+		background: rgb(var(--color-neutral-ink-rgb) / 0.45);
+		animation: hkui-datepicker-fade 160ms var(--hkui-ease, ease-out) both;
+	}
+	.hkui-datepicker__popover {
+		position: fixed;
+		top: 50%;
+		left: 50%;
+		right: auto;
+		transform: translate(-50%, -50%);
+		min-width: 0;
+		width: min(360px, calc(100vw - 32px));
+		max-width: none;
+		max-height: calc(100dvh - 32px);
+		overflow-y: auto;
+		box-shadow: var(--hkui-shadow-glass, var(--hkui-shadow-lg));
+		animation: hkui-datepicker-modal 200ms var(--hkui-ease, ease-out) both;
+	}
+	/* Calendar inside the modal fills the modal width so the 7 day-columns
+	 * get equal share (~47px each at 360px modal width) instead of
+	 * shrinking to 288px and hugging the left edge. The day buttons stay
+	 * 36px wide but `margin: 0 auto` centers them inside the wider cells. */
+	.hkui-datepicker__popover .hkui-calendar {
+		width: 100%;
+	}
+}
+[data-theme="dark"] .hkui-datepicker__popover {
+	background: rgba(255, 255, 255, 0.04);
+	border-color: rgba(245, 222, 165, 0.14);
+	-webkit-backdrop-filter: blur(12px) saturate(120%);
+	backdrop-filter: blur(12px) saturate(120%);
+}
+
+/* 三個 datepicker keyframes（pop / fade / modal）都會位移或縮放；沒有全域
+ * reduced-motion reset，所以在這裡自己關掉。必須排在上面的 @media
+ * (max-width: 768px) 之後 —— 同 specificity，晚出現的才贏。手機 modal 的
+ * 置中是靠 transform，所以只停 animation，不能連 transform 一起停。 */
+@media (prefers-reduced-motion: reduce) {
+	.hkui-datepicker__popover,
+	.hkui-datepicker__scrim {
+		animation: none;
+	}
+}
+
+/* ============================================================
+   14. TOP TOASTS
+   Compact top-center feedback shared by Sonner action results and the
+   app notification stack. Status colors stay on the icon/progress only;
+   the surface follows the Hawkr light-white / dark-ink theme.
+   ============================================================ */
+.hk-sonner-toaster[data-sonner-toaster] {
+	--width: min(380px, calc(100vw - 24px));
+	--border-radius: 14px;
+	z-index: var(--z-toast) !important;
+	font-family: var(--font-primary), sans-serif;
+	/* 通知堆疊出現/消失時 offset（含 --hk-notif-toast-h）變化，緩衝下移/回彈
+	   避免瞬跳（AppToaster.tsx 佔位協調）。 */
+	transition: top 280ms ease;
+}
+
+.hk-sonner-toast[data-sonner-toast][data-styled="true"],
+.hk-notification-toast {
+	border-color: var(--theme-border-soft) !important;
+	background: rgb(var(--color-neutral-white-rgb) / 0.97) !important;
+	color: var(--theme-text-heading) !important;
+	box-shadow:
+		inset 0 1px 0 rgb(var(--color-neutral-white-rgb) / 0.9),
+		0 16px 38px -20px rgb(var(--color-brand-ink-rgb) / 0.34),
+		0 4px 12px -8px rgb(var(--color-brand-ink-rgb) / 0.16) !important;
+	-webkit-backdrop-filter: blur(18px) saturate(115%);
+	backdrop-filter: blur(18px) saturate(115%);
+}
+
+.hk-sonner-toast[data-sonner-toast][data-styled="true"] {
+	min-height: 48px;
+	padding: 10px 38px 10px 12px;
+	gap: 10px;
+	font-size: 0.84375rem;
+	transition:
+		transform 280ms cubic-bezier(0.16, 1, 0.3, 1),
+		opacity 220ms ease,
+		height 280ms cubic-bezier(0.16, 1, 0.3, 1),
+		box-shadow 180ms ease;
+}
+
+.hk-sonner-toast__content[data-content] {
+	min-width: 0;
+	gap: 2px !important;
+}
+
+.hk-sonner-toast__title[data-title] {
+	color: var(--theme-text-heading);
+	font-size: 0.84375rem;
+	font-weight: 650 !important;
+	line-height: 1.35 !important;
+}
+
+.hk-sonner-toast__description[data-description] {
+	color: var(--theme-text-muted) !important;
+	font-size: 0.75rem;
+	line-height: 1.45 !important;
+}
+
+.hk-sonner-toast__icon[data-icon] {
+	width: 22px !important;
+	height: 22px !important;
+	margin: 0 !important;
+	color: var(--color-brand-primary-strong);
+}
+
+.hk-sonner-toast__icon[data-icon] > svg {
+	width: 19px;
+	height: 19px;
+	margin: 0 !important;
+}
+
+.hk-sonner-toast[data-type="success"] .hk-sonner-toast__icon {
+	color: var(--color-status-success);
+}
+
+.hk-sonner-toast[data-type="error"] .hk-sonner-toast__icon {
+	color: var(--color-status-danger);
+}
+
+.hk-sonner-toast[data-type="warning"] .hk-sonner-toast__icon {
+	color: var(--color-status-warning);
+}
+
+.hk-sonner-toast[data-type="info"] .hk-sonner-toast__icon {
+	color: var(--color-status-info-strong);
+}
+
+.hk-sonner-toast__close[data-close-button] {
+	top: 50% !important;
+	right: 8px !important;
+	left: auto !important;
+	width: 26px !important;
+	height: 26px !important;
+	transform: translateY(-50%) !important;
+	border: 0 !important;
+	background: transparent !important;
+	color: var(--theme-text-muted) !important;
+	opacity: 0.58;
+	transition:
+		opacity 160ms ease,
+		background-color 160ms ease;
+}
+
+.hk-sonner-toast__close[data-close-button]:hover,
+.hk-sonner-toast__close[data-close-button]:focus-visible {
+	background: var(--theme-surface-glass-hover) !important;
+	opacity: 1;
+}
+
+.hk-sonner-toast__action[data-button],
+.hk-sonner-toast__cancel[data-cancel] {
+	height: 28px !important;
+	border-radius: 8px !important;
+	padding-inline: 10px !important;
+	font-size: 0.75rem !important;
+	font-weight: 650 !important;
+}
+
+.hk-sonner-toast__action[data-button] {
+	background: var(--theme-action-primary) !important;
+	color: var(--theme-text-inverse) !important;
+}
+
+.hk-sonner-toast__cancel[data-cancel] {
+	background: var(--theme-surface-muted) !important;
+	color: var(--theme-text-body) !important;
+}
+
+[data-theme="dark"] .hk-sonner-toast[data-sonner-toast][data-styled="true"],
+[data-theme="dark"] .hk-notification-toast {
+	border-color: var(--theme-border-strong) !important;
+	background: color-mix(
+		in srgb,
+		var(--theme-surface-elevated) 88%,
+		var(--color-brand-primary-strong)
+	) !important;
+	color: var(--theme-text-heading) !important;
+	box-shadow:
+		inset 0 1px 0 rgb(var(--color-neutral-white-rgb) / 0.06),
+		0 18px 42px -18px rgb(var(--color-neutral-black-rgb) / 0.62),
+		0 5px 14px -8px rgb(var(--color-neutral-black-rgb) / 0.42) !important;
+}
+
+[data-theme="dark"] .hk-sonner-toast__icon[data-icon] {
+	color: var(--color-brand-secondary);
+}
+
+[data-theme="dark"]
+	.hk-sonner-toast[data-type="success"]
+	.hk-sonner-toast__icon {
+	color: var(--color-brand-primary);
+}
+
+[data-theme="dark"] .hk-sonner-toast[data-type="error"] .hk-sonner-toast__icon {
+	color: var(--color-brand-secondary);
+}
+
+[data-theme="dark"]
+	.hk-sonner-toast[data-type="warning"]
+	.hk-sonner-toast__icon {
+	color: var(--color-brand-secondary);
+}
+
+[data-theme="dark"] .hk-sonner-toast[data-type="info"] .hk-sonner-toast__icon {
+	color: var(--color-status-info-soft);
+}
+
+@media (max-width: 600px) {
+	.hk-sonner-toast[data-sonner-toast][data-styled="true"] {
+		min-height: 46px;
+		padding-block: 9px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.hk-sonner-toast[data-sonner-toast] {
+		transition: opacity 120ms ease !important;
+	}
+}
+
+@media (prefers-reduced-transparency: reduce) {
+	.hk-sonner-toast[data-sonner-toast][data-styled="true"],
+	.hk-notification-toast {
+		background: var(--color-neutral-white) !important;
+		-webkit-backdrop-filter: none;
+		backdrop-filter: none;
+	}
+
+	[data-theme="dark"] .hk-sonner-toast[data-sonner-toast][data-styled="true"],
+	[data-theme="dark"] .hk-notification-toast {
+		background: var(--theme-surface-elevated) !important;
+	}
+}

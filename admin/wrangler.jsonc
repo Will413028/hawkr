@@ -1,0 +1,21 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "hawkr-admin",
+	"main": ".open-next/worker.js",
+	// 2025-08-16+ 是 Sentry 在 workerd 的硬需求：才有 https.request，@sentry/nextjs
+	// server SDK 的 transport 才送得出 data。舊值 2024-12-30 → 送不出 → init 後
+	// per-request CPU 燒爆 → 1102 exceededCpu。
+	"compatibility_date": "2025-08-16",
+	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+	// Dashboard 手動開的 Observability 會被下次 wrangler deploy 沖銷回預設值（disabled）；
+	// 寫進 config 才是 config-as-code、每次 deploy 都保持開啟。
+	//
+	// 關掉 Workers 的 invocation logs：它記完整的請求網址（含 query string），而 admin 的 Connect 讀取走
+	// GET，網址會帶出業者與申請人的查詢條件。自訂 log 與例外照常輸出。
+	"observability": {
+		"enabled": true,
+		"logs": { "enabled": true, "invocation_logs": false }
+	},
+	"assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+	"services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "hawkr-admin" }]
+}

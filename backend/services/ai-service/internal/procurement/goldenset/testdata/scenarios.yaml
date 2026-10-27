@@ -1,0 +1,97 @@
+# 多輪情境 corpus。驗的是**跨輪次的狀態關係**，不是單句的品項身分
+# （後者在同目錄的 golden_queries.yaml）。
+#
+# ⛔ capability 只描述現在的能力。把還不支援的寫成 supported，離線測試會綠而
+# 買家仍然踩雷。status=known_gap 必須指向真實追蹤項，否則會變成永久豁免。
+#
+# ⛔ stub_patch 是固定的外部抽取回應，不是期待結果。expect.slots 要由 production
+# 的 apply 跑完之後再比。
+schema_version: 1
+scenarios:
+  - id: guava-city-correction
+    tags: [multi-turn, correction, slot-retention]
+    capability: supported
+    fixture: guava-resolved
+    frozen_at: "2026-09-19T00:00:00Z"
+    status: active
+    turns:
+      - op: turn
+        message: "我要芭樂，桃園市，按公斤"
+        stub_patch: { item: "芭樂", delivery_city: "桃園市", unit: "KG" }
+        expect:
+          slots: { item: "芭樂", delivery_city: "桃園市", unit: "KG" }
+          missing_required: []
+          no_publication: true
+      - op: turn
+        message: "送貨改新北市，其他不變"
+        stub_patch: { delivery_city: "新北市" }
+        expect:
+          # 關係：只換掉被修正的欄位，其餘已填且未衝突的條件不得遺失。
+          slots: { item: "芭樂", delivery_city: "新北市", unit: "KG" }
+          missing_required: []
+          no_publication: true
+
+  - id: guava-incremental-fill
+    tags: [multi-turn, incremental]
+    capability: supported
+    fixture: guava-resolved
+    frozen_at: "2026-09-19T00:00:00Z"
+    status: active
+    turns:
+      - op: turn
+        message: "我要芭樂"
+        stub_patch: { item: "芭樂" }
+        expect:
+          slots: { item: "芭樂" }
+          no_publication: true
+      - op: turn
+        message: "桃園市"
+        stub_patch: { delivery_city: "桃園市" }
+        expect:
+          slots: { item: "芭樂", delivery_city: "桃園市" }
+          no_publication: true
+      - op: turn
+        message: "按公斤算"
+        stub_patch: { unit: "KG" }
+        expect:
+          # 關係：逐輪補充的最終語意，要與「完整一句」那條等價。
+          slots: { item: "芭樂", delivery_city: "桃園市", unit: "KG" }
+          missing_required: []
+          no_publication: true
+
+  - id: guava-item-change-clears-identity
+    tags: [multi-turn, correction, identity]
+    capability: supported
+    fixture: guava-resolved
+    frozen_at: "2026-09-19T00:00:00Z"
+    status: active
+    turns:
+      - op: turn
+        message: "我要芭樂，桃園市，按公斤"
+        stub_patch: { item: "芭樂", delivery_city: "桃園市", unit: "KG" }
+        expect:
+          slots: { item: "芭樂", delivery_city: "桃園市", unit: "KG" }
+          no_publication: true
+      - op: turn
+        message: "改成高麗菜"
+        stub_patch: { item: "高麗菜" }
+        expect:
+          # 關係：換品項要清掉舊的品項身分，其餘不因此失效的條件保留。
+          slots: { item: "高麗菜", delivery_city: "桃園市", unit: "KG" }
+          no_publication: true
+
+  - id: two-items-in-one-sentence
+    tags: [multi-turn, multi-item]
+    capability: not_modeled
+    fixture: guava-resolved
+    frozen_at: "2026-09-19T00:00:00Z"
+    status: known_gap
+    tracked_by: "私人封存的 agent-runtime-pipeline-plan（多品項）"
+    turns:
+      - op: turn
+        message: "我要芭樂跟香蕉"
+        stub_patch: { item: "芭樂" }
+        expect:
+          # 單一 item slot 結構上表達不了兩個品項。這裡只釘住「不得冒充完成」：
+          # 不得靜默只收一個品項卻表現得像兩個都收了。
+          no_publication: true

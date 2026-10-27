@@ -1,0 +1,98 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ["alertname", "env"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: "discord"
+  routes:
+    # ⚠️ 必須排第一（first-match wins）：Watchdog 是一條恆為 firing 的告警，
+    # 存在目的是讓監控棧**外部**的觀察者確認告警管線還活著
+    # （prometheus/rules/watchdog.yml ＋ .github/workflows/monitoring-watchdog.yml）。
+    # 它不是異常訊號，送進任何 Discord 頻道等於每 4 小時一則假告警。
+    - match:
+        alertname: Watchdog
+      receiver: "blackhole"
+      # repeat_interval 對 blackhole 沒有意義，但寫著避免有人以為漏了。
+      repeat_interval: 24h
+    # 業務正確性告警（channel=business，如 ATM 退款卡單 #1353 / 假日資料覆蓋 #898）
+    # → 依 env 分流到業務頻道 dev-警報 / prod-警報。須排在下方 env-only 規則之前（first-match wins）。
+    #
+    # 🔴 下面兩條各自帶一個 `cadence: daily` 子 route。子 route **不指定 receiver**，
+    #    Alertmanager 的 route 屬性是繼承的 ⇒ 它沿用父的頻道，只覆蓋 repeat_interval。
+    #    刻意不寫成第三、第四條平行的 top-level route：那會把「哪個 env 去哪個頻道」
+    #    複製成兩份，而平行清單的典型死法就是只更新其中一份
+    #    （10-engineering-contracts.md §14.5.2 第三種形狀）。
+    #
+    #    為什麼需要它：`repeat_interval` 的預設值是為「需要立刻處理的業務異常」訂的
+    #    （ATM 退款卡單那種，要一直催到有人動手）。但 business 告警裡有另一類——
+    #    **狀態型**：它描述的是「有一件事一直沒做」，在那件事做完之前恆為 firing，
+    #    而「那件事」常常在我方單方面控制之外（等第三方申請、等人排班）。
+    #    拿 30m 去催一個要等數週的外部申請，產出是 48 則/天的洗版，而同一個頻道
+    #    還要承載 InvoiceEventDeadLettered 這類 critical ⇒ 真訊號被蓋掉。
+    #
+    #    ⚠️ 這**不是靜音**：告警照樣 firing、Grafana 照樣看得到、resolved 照樣即時
+    #    通知（send_resolved 走 group_interval，不受 repeat_interval 影響）。
+    #    改的只有「重複提醒」的間隔。那些規則裡寫著「不得靜音」的條目仍然成立。
+    #
+    #    ⚠️ 貼 `cadence` 的門檻由 scripts/check-alert-cadence.py 守（必須有 open issue
+    #    追蹤）。**不得改用 alertname 白名單降頻**——那道 gate 會擋下來，理由見腳本檔頭。
+    - match:
+        channel: business
+        env: dev
+      receiver: "discord-dev-alert"
+      repeat_interval: 2h
+      routes:
+        - match:
+            cadence: daily
+          repeat_interval: 24h
+    - match:
+        channel: business
+        env: prod
+      receiver: "discord-prod-alert"
+      repeat_interval: 30m
+      routes:
+        - match:
+            cadence: daily
+          repeat_interval: 24h
+    # infra 系統告警（無 channel label）→ 既有 monitor-alert 頻道
+    #
+    # 這兩條同樣各帶一個 cadence 子 route，理由與上面的 business 兩條相同：
+    # infra 側也有「狀態型」告警——`RabbitMQQueuePendingConsumerImplementation`
+    # 說的是「這個 queue 的 consumer 還沒有人實作」（backend#3365），那在功能做完
+    # 之前恆為 firing，拿 30m 去催沒有意義。
+    - match:
+        env: dev
+      receiver: "discord"
+      repeat_interval: 2h
+      routes:
+        - match:
+            cadence: daily
+          repeat_interval: 24h
+    - match:
+        env: prod
+      receiver: "discord"
+      repeat_interval: 30m
+      routes:
+        - match:
+            cadence: daily
+          repeat_interval: 24h
+
+receivers:
+  # 刻意沒有任何 webhook_configs：Alertmanager 對沒有 receiver 設定的 route
+  # 就是丟棄。Watchdog 專用。
+  - name: "blackhole"
+  - name: "discord"
+    webhook_configs:
+      - url: "http://discord-webhook-gateway:8080/alert"
+        send_resolved: true
+  - name: "discord-dev-alert"
+    webhook_configs:
+      - url: "http://discord-webhook-gateway:8080/alert/dev-alert"
+        send_resolved: true
+  - name: "discord-prod-alert"
+    webhook_configs:
+      - url: "http://discord-webhook-gateway:8080/alert/prod-alert"
+        send_resolved: true

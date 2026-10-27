@@ -1,0 +1,30 @@
+{
+	"name": "@hawkr/icons",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"description": "Material Symbols（Apache-2.0）的 SVG 圖形與繪製元件，website 與 admin 共用。圖形資料由 tools/gen.ts 從 @material-symbols/svg-400 生成。只發佈 TS 原始碼。",
+	"exports": {
+		"./material-symbol": "./src/material-symbol.tsx"
+	},
+	"scripts": {
+		"gen": "tsx tools/gen.ts",
+		"lint": "tsc --noEmit && biome check .",
+		"test": "vitest run"
+	},
+	"peerDependencies": {
+		"react": "catalog:"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "catalog:",
+		"@material-symbols/svg-400": "0.48.1",
+		"@types/node": "catalog:",
+		"@types/react": "catalog:",
+		"@types/react-dom": "catalog:",
+		"react": "catalog:",
+		"react-dom": "catalog:",
+		"tsx": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	}
+}

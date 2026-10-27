@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package hawkr.gateway;
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/gateway";
+
+// Gateway BFF response messages. These describe the EXACT HTTP wire shape
+// (protojson camelCase via response.ProtoToRaw), keeping proto the single
+// source of truth for proto->TS codegen. Reshape/enrich/aggregate endpoints
+// add their response message here as they migrate (Track 2 Phase 2+).
+//
+// Gateway-only: no downstream gRPC service, no Java mirror.
+//
+// Placeholder so buf generates the package + import path during Phase 0.
+// Replace with real BFF messages as endpoints migrate; delete when the first
+// real message lands.
+message Placeholder {
+  string note = 1;
+}

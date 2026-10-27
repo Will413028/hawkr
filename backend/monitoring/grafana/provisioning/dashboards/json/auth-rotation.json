@@ -1,0 +1,567 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "refresh token 輪替、重放偵測與監測模式滑動續期的天級趨勢（issue #1544 L2）。刻意不設告警，見面板內說明。",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "# 認證輪替（refresh token L2，issue #1544）\n\n**判準是天級的累積趨勢，不是小時級的尖峰**——每個使用者在自己「最後登入 +14 天」那一刻才會 refresh，時刻散在兩週裡，而 `AccessTokenTTL` 7 天讓 refresh 流量天生稀疏。所以本面板預設 30 天視窗、按天聚合。\n\n| 要看的 | 期望 |\n|---|---|\n| `legacy_upgraded` | 隨舊版 App 被取代而下降；**2026-09-21 之後不該再有新增**（＝prod 上線 2026-09-07 +14 天，pre-L2 凍結 JWT 的硬終點）。之後仍有新增 ⇒ 對「凍結憑證」的判斷有誤。 |\n| `rotated` | 隨 `legacy_upgraded` 下降而上升＝client 真的把輪替後的 token 存下來了 |\n| `reuse_monitored` | **開 `REFRESH_REUSE_ENFORCE` 之前必須是 0。** 非 0 代表還有不保存輪替結果的舊版 client 在重放，一開 enforce 就會把他們登出 |\n| `auth_refresh_extend_total{result=\"noop\"}` | 長期近零。持續走高＝一批 family 已被釘在 90 天絕對期上限（最早一批 **2026-12-06**），滑動續期救不了他們，即將被迫重登 |\n| `auth_family_revoke_total{result=\"not_found\"}` | 應為 0。非 0 是**資料異常**（合法簽章的 access token 的 `fid` 指向不存在／已撤銷的 family），不是預期情況 |\n\n刻意**不設告警**：`not_found` 與 `noop` 都混合了「正常」與「資料異常」兩種成因，門檻訂不出來，先觀察形狀。環境用上方 `環境` adhoc filter 切換（預設 prod）。\n\n指標無 series 時面板顯示 No data——那本身是訊號：該路徑自計數器起算以來一次都沒被走過。",
+        "mode": "markdown"
+      },
+      "pluginVersion": "10.3.3",
+      "type": "text"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 11
+      },
+      "id": 2,
+      "panels": [],
+      "title": "📈 四條天級趨勢",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "rotated / legacy_upgraded / reuse_monitored / unavailable / expired / absolute_expired / leeway / revoked / unknown_token",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": [
+            "sum",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(auth_refresh_total[1d])) by (result)",
+          "legendFormat": "{{ result }}",
+          "refId": "A"
+        }
+      ],
+      "title": "refresh 結果——每日新增（按 result）",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 21
+      },
+      "id": 4,
+      "panels": [],
+      "title": "🔎 近 24 小時關鍵值",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "舊版 client 走 legacy shim 的次數。2026-09-21 之後應為 0。",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 22
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(auth_refresh_total{result=\"legacy_upgraded\"}[24h]))",
+          "refId": "A"
+        }
+      ],
+      "title": "legacy_upgraded（近 24h）",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "正常輪替。與 legacy_upgraded 反向消長＝client 真的在持久化新 token。",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 22
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(auth_refresh_total{result=\"rotated\"}[24h]))",
+          "refId": "A"
+        }
+      ],
+      "title": "rotated（近 24h）",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "監測模式下的重放命中。非 0 時翻開 REFRESH_REUSE_ENFORCE 會把這些人登出。",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 22
+      },
+      "id": 7,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(auth_refresh_total{result=\"reuse_monitored\"}[24h]))",
+          "refId": "A"
+        }
+      ],
+      "title": "reuse_monitored（近 24h，開 enforce 前須為 0）",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "後端無法回答 refresh（503）。持續非 0 代表依賴不穩，不是使用者問題。",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 22
+      },
+      "id": 8,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(auth_refresh_total{result=\"unavailable\"}[24h]))",
+          "refId": "A"
+        }
+      ],
+      "title": "unavailable（近 24h）",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 26
+      },
+      "id": 9,
+      "panels": [],
+      "title": "🔄 滑動續期與 family 撤銷",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "result = ok | noop | error。fail-open，所以這是它唯一的訊號。",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 27
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [
+            "sum",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(auth_refresh_extend_total[1d])) by (result)",
+          "legendFormat": "{{ result }}",
+          "refId": "A"
+        }
+      ],
+      "title": "滑動續期——每日新增（noop 走高＝90 天絕對期成為約束）",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "best-effort，失敗不會回報給呼叫端，所以這是它唯一的訊號。",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 27
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": [
+            "sum",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(auth_family_revoke_total[1d])) by (op, result)",
+          "legendFormat": "{{ op }} / {{ result }}",
+          "refId": "A"
+        }
+      ],
+      "title": "family 撤銷——每日新增（按 op／result）",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "合法 access token 的 fid 指向不存在／已撤銷的 family。",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 35
+      },
+      "id": 12,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(auth_family_revoke_total{result=\"not_found\"}[24h]))",
+          "refId": "A"
+        }
+      ],
+      "title": "family 撤銷 not_found（近 24h，資料異常）",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 35
+      },
+      "id": 13,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(auth_refresh_extend_total{result=\"error\"}[24h]))",
+          "refId": "A"
+        }
+      ],
+      "title": "滑動續期 error（近 24h）",
+      "type": "stat"
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": [
+    "hawkr",
+    "auth",
+    "refresh-token"
+  ],
+  "templating": {
+    "list": [
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "filters": [
+          {
+            "condition": "",
+            "key": "env",
+            "operator": "=",
+            "value": "prod"
+          }
+        ],
+        "hide": 0,
+        "label": "環境",
+        "name": "adhoc_env",
+        "type": "adhoc"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Hawkr - 認證輪替（refresh token L2）",
+  "uid": "hawkr-auth-rotation",
+  "version": 1
+}

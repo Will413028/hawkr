@@ -1,0 +1,30 @@
+{
+  "Info": [
+    {
+      "IsSuccess": "True",
+      "InAddress": "臺北市大安區忠孝東路四段999號",
+      "InSRS": "EPSG:4326",
+      "InFuzzyType": "最近門牌號機制",
+      "InFuzzyBuffer": "0",
+      "InIsOnlyFullMatch": "True",
+      "InIsSupportPast": "False",
+      "InIsShowCodeBase": "False",
+      "InIsLockCounty": "False",
+      "InIsLockTown": "False",
+      "InIsLockVillage": "False",
+      "InIsLockRoadSection": "False",
+      "InIsLockLane": "False",
+      "InIsLockAlley": "False",
+      "InIsLockArea": "False",
+      "InIsSameNumber_SubNumber": "False",
+      "InCanIgnoreVillage": "True",
+      "InCanIgnoreNeighborhood": "True",
+      "InReturnMaxCount": "1",
+      "OutTotal": "0",
+      "OutMatchType": "模糊比對",
+      "OutMatchCode": "[臺北市]\tFULL:0",
+      "OutTraceInfo": "[臺北市]\t { 完全比對 } 找不到符合的門牌地址"
+    }
+  ],
+  "AddressList": []
+}

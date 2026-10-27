@@ -1,0 +1,34 @@
+{
+  "default": {
+    "buyer.Gender.GENDER_FEMALE": {
+      "message": "Female"
+    },
+    "buyer.Gender.GENDER_MALE": {
+      "message": "Male"
+    },
+    "buyer.Gender.GENDER_OTHER": {
+      "message": "Other"
+    },
+    "buyer.Profile.gender_unset": {
+      "message": "Not set"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_HARASSMENT": {
+      "message": "Harassment or bullying"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_HATE": {
+      "message": "Hate or discriminatory speech"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_SPAM": {
+      "message": "Spam"
+    },
+    "seller.Measure.suspension_active_open": {
+      "message": "Suspended (no end date; under periodic review by the platform)"
+    },
+    "seller.Measure.suspension_active_until": {
+      "message": "Suspended until {end}"
+    },
+    "seller.Measure.suspension_ended": {
+      "message": "Ended on {end}"
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+	"name": "@hawkr/ui-text",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"description": "共用文案目錄（契約值到使用者面文字）的 TypeScript 生成物與少量手寫的格式化，website 與 admin 共用。文字的唯一來源是 backend/internal/platform/uitext/catalog，生成器是 backend/cmd/uitext-gen。只發佈 TS 原始碼。",
+	"exports": {
+		"./keys": "./src/keys.gen.ts",
+		"./format": "./src/format.ts",
+		"./messages/zh-TW": "./src/messages/zh-TW.gen.json",
+		"./messages/en": "./src/messages/en.gen.json",
+		"./zh-TW": "./src/zh-tw.gen.ts",
+		"./manifest": "./src/enum-manifest.gen.json"
+	},
+	"scripts": {
+		"check-enum-text": "tsx tools/check-enum-text.ts",
+		"lint": "tsc --noEmit && biome check .",
+		"test": "vitest run"
+	},
+	"dependencies": {
+		"@connectrpc/connect": "catalog:",
+		"@hawkr/api": "workspace:*"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "catalog:",
+		"@types/node": "catalog:",
+		"tsx": "catalog:",
+		"typescript": "catalog:",
+		"typescript-compiler-api": "catalog:",
+		"use-intl": "catalog:",
+		"vitest": "catalog:"
+	}
+}

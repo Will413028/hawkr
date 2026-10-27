@@ -1,0 +1,476 @@
+{
+    "annotations": {
+        "list": []
+    },
+    "description": "Hawkr 微服務詳細監控",
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 1,
+    "id": null,
+    "links": [],
+    "panels": [
+        {
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 0
+            },
+            "id": 1,
+            "panels": [],
+            "title": "📊 請求監控",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "unit": "reqps"
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 1
+            },
+            "id": 2,
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "mean",
+                        "max"
+                    ],
+                    "displayMode": "table",
+                    "placement": "bottom"
+                },
+                "tooltip": {
+                    "mode": "multi"
+                }
+            },
+            "targets": [
+                {
+                    "expr": "sum(rate(http_server_requests_seconds_count{job=~\"$job\",uri!~\"/actuator.*\"}[5m])) by (uri)",
+                    "legendFormat": "Java: {{ uri }}",
+                    "refId": "A"
+                },
+                {
+                    "expr": "sum(rate(http_requests_total{job=~\"$job\"}[5m])) by (path)",
+                    "legendFormat": "Go: {{ path }}",
+                    "refId": "B"
+                }
+            ],
+            "title": "$job - 請求速率",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "unit": "s"
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 1
+            },
+            "id": 3,
+            "options": {
+                "legend": {
+                    "calcs": [
+                        "mean",
+                        "max"
+                    ],
+                    "displayMode": "table",
+                    "placement": "bottom"
+                }
+            },
+            "targets": [
+                {
+                    "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{job=~\"$job\",uri!~\"/actuator.*\"}[5m])) by (le))",
+                    "legendFormat": "Java P95",
+                    "refId": "A"
+                },
+                {
+                    "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=~\"$job\"}[5m])) by (le))",
+                    "legendFormat": "Go P95",
+                    "refId": "B"
+                }
+            ],
+            "title": "$job - 響應時間 P95",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 0.01
+                            },
+                            {
+                                "color": "red",
+                                "value": 0.05
+                            }
+                        ]
+                    },
+                    "unit": "percentunit"
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 0,
+                "y": 9
+            },
+            "id": 4,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "auto"
+            },
+            "targets": [
+                {
+                    "expr": "sum(rate(http_server_requests_seconds_count{job=~\"$job\",uri!~\"/actuator.*\",status=~\"5..\"}[5m])) / sum(rate(http_server_requests_seconds_count{job=~\"$job\",uri!~\"/actuator.*\"}[5m]))",
+                    "legendFormat": "Error Rate",
+                    "refId": "A"
+                }
+            ],
+            "title": "錯誤率 (Java)",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 0.01
+                            },
+                            {
+                                "color": "red",
+                                "value": 0.05
+                            }
+                        ]
+                    },
+                    "unit": "percentunit"
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 6,
+                "y": 9
+            },
+            "id": 5,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "auto"
+            },
+            "targets": [
+                {
+                    "expr": "sum(rate(http_requests_total{job=~\"$job\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{job=~\"$job\"}[5m]))",
+                    "legendFormat": "Error Rate",
+                    "refId": "A"
+                }
+            ],
+            "title": "錯誤率 (Go)",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    },
+                    "unit": "short"
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 18,
+                "y": 9
+            },
+            "id": 7,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "auto"
+            },
+            "targets": [
+                {
+                    "expr": "sum(rate(http_server_requests_seconds_count{job=~\"$job\",uri!~\"/actuator.*\"}[5m])) by (job) or sum(rate(http_requests_total{job=~\"$job\"}[5m])) by (job) or sum(rate(grpc_server_requests_total{job=~\"$job\"}[5m])) by (job)",
+                    "legendFormat": "Total RPS",
+                    "refId": "A"
+                }
+            ],
+            "title": "總 RPS",
+            "type": "stat"
+        },
+        {
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 13
+            },
+            "id": 8,
+            "panels": [],
+            "title": "📈 資源使用",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "unit": "decbytes"
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 14
+            },
+            "id": 9,
+            "targets": [
+                {
+                    "expr": "jvm_memory_used_bytes{job=~\"$job\",area=\"heap\"}",
+                    "legendFormat": "JVM Heap {{ job }}",
+                    "refId": "A"
+                },
+                {
+                    "expr": "go_memstats_alloc_bytes{job=~\"$job\"}",
+                    "legendFormat": "Go Alloc {{ job }}",
+                    "refId": "B"
+                },
+                {
+                    "expr": "process_resident_memory_bytes{job=~\"$job\"}",
+                    "legendFormat": "RSS {{ job }}",
+                    "refId": "C"
+                }
+            ],
+            "title": "$job - 記憶體使用",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "unit": "percent"
+                }
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 14
+            },
+            "id": 10,
+            "targets": [
+                {
+                    "expr": "rate(process_cpu_seconds_total{job=~\"$job\"}[5m]) * 100",
+                    "legendFormat": "CPU {{ job }}",
+                    "refId": "A"
+                }
+            ],
+            "title": "$job - CPU 使用率",
+            "type": "timeseries"
+        },
+        {
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 22
+            },
+            "id": 11,
+            "panels": [],
+            "title": "📝 日誌",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "loki",
+                "uid": "loki"
+            },
+            "gridPos": {
+                "h": 10,
+                "w": 24,
+                "x": 0,
+                "y": 23
+            },
+            "id": 12,
+            "options": {
+                "dedupStrategy": "none",
+                "enableLogDetails": true,
+                "prettifyLogMessage": false,
+                "showCommonLabels": false,
+                "showLabels": false,
+                "showTime": true,
+                "sortOrder": "Descending",
+                "wrapLogMessage": true
+            },
+            "targets": [
+                {
+                    "expr": "{container_name=~\"hawkr-$job.*\"} |= ``",
+                    "legendFormat": "",
+                    "refId": "A"
+                }
+            ],
+            "title": "$job - 即時日誌",
+            "type": "logs"
+        }
+    ],
+    "schemaVersion": 39,
+    "tags": [
+        "hawkr",
+        "services"
+    ],
+    "templating": {
+        "list": [
+            {
+                "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                },
+                "filters": [
+                    {
+                        "condition": "",
+                        "key": "env",
+                        "operator": "=",
+                        "value": "prod"
+                    }
+                ],
+                "hide": 0,
+                "label": "環境",
+                "name": "adhoc_env",
+                "type": "adhoc"
+            },
+            {
+                "current": {
+                    "selected": true,
+                    "text": "gateway",
+                    "value": "gateway"
+                },
+                "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                },
+                "definition": "label_values(up, job)",
+                "hide": 0,
+                "includeAll": false,
+                "label": "Service",
+                "multi": false,
+                "name": "job",
+                "options": [],
+                "query": "label_values(up, job)",
+                "refresh": 1,
+                "regex": "",
+                "skipUrlSync": false,
+                "sort": 1,
+                "type": "query"
+            }
+        ]
+    },
+    "time": {
+        "from": "now-1h",
+        "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "Asia/Taipei",
+    "title": "Hawkr - 微服務詳情",
+    "uid": "hawkr-services",
+    "version": 2
+}

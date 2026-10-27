@@ -1,0 +1,169 @@
+packages:
+  - website
+  - admin
+  - packages/hawkr-api-ts
+  - packages/hawkr-icons-ts
+  - packages/hawkr-twaddr-ts
+  - packages/hawkr-ui-text-ts
+
+autoInstallPeers: false
+
+# 兩個 app 共用的依賴版本（取 website 原有版本）。
+# typescript-compiler-api 是 npm:@typescript/typescript6 的別名（TypeScript 7 沒有穩定的 JS compiler API，website、admin 與 @hawkr/ui-text 的測試／檢查工具用）。
+catalog:
+  "@biomejs/biome": ^2.4.13
+  "@bufbuild/protobuf": 2.15.0
+  "@bufbuild/protoc-gen-es": 2.15.0
+  "@connectrpc/connect": 2.2.0
+  "@connectrpc/connect-query": 2.3.1
+  "@connectrpc/connect-web": 2.2.0
+  "@types/node": ^26.0.0
+  "@types/react": 19.2.18
+  "@types/react-dom": 19.2.4
+  next: 16.3.6
+  next-intl: 4.13.0
+  react: 19.2.8
+  react-dom: 19.2.8
+  tsx: ^4.22.4
+  typescript: 7.0.2
+  typescript-compiler-api: npm:@typescript/typescript6@6.0.2
+  use-intl: 4.13.0
+  vitest: ^4.1.8
+
+# minimumReleaseAge (pnpm 11 default: 24h) needs a live round-trip to
+# registry.npmjs.org per lockfile entry to read its publish date. That
+# round-trip has been failing specifically for @react-aria/color's metadata
+# from this CI's Node/pnpm client — 9/9 attempts across 13 minutes on
+# 2026-08-11 (PR #462/#463/#465), while a plain `curl` to the identical URL
+# succeeded every time in the same window. This is the verification mechanism
+# being unreachable for one entry, not the policy doing its job.
+#
+# Independently verified via `curl https://registry.npmjs.org/@react-aria%2Fcolor`
+# that 3.2.0 was published 2026-04-14 — four months before this exclude was
+# added, nowhere near the 24h threshold minimumReleaseAge exists to enforce.
+# REMOVE-WHEN: a dependency bump moves off exactly 3.2.0 (version-pinned, so
+# this stops applying on its own — no audit needed to retire it).
+minimumReleaseAgeExclude:
+  - "@react-aria/color@3.2.0"
+
+# Every entry below is a security floor we impose on a TRANSITIVE dependency
+# we do not control. Each one is checked by the scripts/check-dependency-overrides.ts
+# (wired into the root `pnpm run check:deps`), which enforces four things:
+#   1. the entry carries a machine-readable `REMOVE-WHEN: requesters-demand >=X`
+#   2. the range is BOUNDED — never `>=x` / `*` (see fast-uri below for why)
+#   3. the entry is still load-bearing; once every upstream requester declares a
+#      floor at or above the REMOVE-WHEN version, the gate turns RED and tells
+#      you to delete the entry. That is what stops these from living forever.
+#   4. if the forced range falls OUTSIDE what a requester declares, the entry
+#      names that requester in `EXCEEDS-UPSTREAM:`. Upstream has not tested the
+#      version we are handing it, so that has to be a stated exception rather
+#      than a silent one. The gate checks the list both ways, so it cannot be
+#      used to wave the check through: overshoot somebody unlisted and it turns
+#      red; list somebody we no longer overshoot and it turns red too.
+overrides:
+  # GHSA-r28c-9q8g-f849 + GHSA-fxqj-rqcc-2cmp: attacker-controlled
+  # sourceMappingURL reads arbitrary .map files when `from` is unset. The
+  # second advisory is the incomplete-fix follow-up; patched >=8.5.23.
+  # next 16.3.2 now pins the safe version 8.5.23 exactly. Other requesters still
+  # admit older vulnerable releases, so this workspace-wide security floor stays.
+  # `^8.5.23` is broader than Next's exact pin even though both stay in the
+  # patched 8.5.x line, so the deliberate range overshoot remains explicit.
+  # EXCEEDS-UPSTREAM: next — the override range is broader than its exact 8.5.23 pin
+  # REMOVE-WHEN: requesters-demand >=8.5.23
+  postcss: ^8.5.23
+  # GHSA-rgw5-rvv9-x895 (supersedes GHSA-mh99-v99m-4gvg / GHSA-3jxr-9vmj-r5cp):
+  # DoS via unbounded intermediate arrays. Only the 5.x line is affected, and
+  # minimatch 3.x/8.x still legitimately sit on 1.x/2.x — so this is scoped to
+  # the 5.x resolution rather than a blanket override. Scoped by `^5.0.0` (not
+  # by the exact resolved version, which changes every time upstream moves).
+  # 2026-10-04：GHSA-q2hr-2g5m-vwhr 等新一批 advisory 把修補線推到 >=5.0.12，
+  # 經 @sentry/nextjs>@sentry/bundler-plugin-core>glob>minimatch 進 --prod。
+  # REMOVE-WHEN: requesters-demand >=5.0.12
+  brace-expansion@^5.0.0: ^5.0.12
+  # GHSA fast-uri host confusion (patched >=3.1.4) and GHSA-7p8r-x3mc-p8w7
+  # (4.0.0 <=v< 4.1.2). ajv declares `^3.0.1`, so we stay INSIDE the major it
+  # actually tests against; 3.x is still maintained upstream (dist-tag `three`)
+  # and is unaffected by the 4.x advisory.
+  # This entry used to read `>=3.1.4`, which is unbounded: pnpm floated it to
+  # 4.1.1 — a major nobody asked for — and that borrowed major is precisely
+  # what acquired GHSA-7p8r-x3mc-p8w7 and broke the deploy gate on 2026-08-03.
+  # An unbounded override does not pin a dependency, it subscribes to one.
+  # 2026-09-03：新一批 advisory（host confusion via skipped IDN canonicalization
+  # on scheme-relative references + SSRF）把 3.x 的修補線推到 >=3.1.6，先前的
+  # ^3.1.5 解析到 3.1.5 正好落在受影響區間 >=3.1.3 <3.1.6，deploy gate 因此在
+  # 這天對每一個 PR 轉紅。抬高下限、仍留在 ajv 宣告的 ^3.0.1 之內（3.x 上游
+  # 維護中、不受 4.x 的 GHSA-7p8r-x3mc-p8w7 影響），所以不需要 EXCEEDS-UPSTREAM。
+  # 2026-10-04：GHSA-hrr3-gc8f-f4qj 等新一批 advisory 把 3.x 修補線推到 >=3.1.8
+  # （經 @sentry/nextjs>@sentry/webpack-plugin>webpack>schema-utils>ajv 進 --prod），
+  # 同樣抬高下限、仍在 ajv 宣告的 ^3.0.1 之內，不需要 EXCEEDS-UPSTREAM。
+  # REMOVE-WHEN: requesters-demand >=3.1.8
+  fast-uri: ^3.1.8
+  # GHSA-2v37-7h3g-55p8: custom generators loop indefinitely when size is
+  # zero. postcss declares `^3.3.16`, so the patched release remains inside the
+  # declared range and no EXCEEDS-UPSTREAM marker is needed.
+  # REMOVE-WHEN: requesters-demand >=3.3.18
+  nanoid: ^3.3.18
+  # GHSA-73wf-gq98-2v4g: `normalizeStats` writes through to Object.prototype and
+  # crashes uncaught on an untrusted `browserslist-stats.json`. Patched >=4.28.7;
+  # the tree resolved 4.28.2 through three @sentry/nextjs paths (bundler-plugin-core
+  # >@babel/core and webpack), which is why it is a --prod finding and not a devDep one.
+  # No requester declares anything narrower than update-browserslist-db's
+  # `>= 4.21.0`, so `^4.28.7` stays inside every declared range — no
+  # EXCEEDS-UPSTREAM marker needed. Bounded to the 4.x line on purpose (see the
+  # fast-uri entry: an unbounded `>=` is a subscription, not a pin).
+  # REMOVE-WHEN: requesters-demand >=4.28.7
+  browserslist: ^4.28.7
+  # CVE-2026-96889 (GHSA-wq5f-xc86-pv6w)：sharp 內建的 librsvg 有漏洞，修補線 >=0.35.5。
+  # next 宣告 `^0.35.4`（含 0.35.5），miniflare 4.x／5.x 則各自把 sharp 釘死在
+  # 0.34.5／0.35.2（只在開發與 build 工具鏈，不進 prod 執行期）。0.x 的 caret 只允許
+  # 同一個 minor，所以 `^0.35.5` 有界；website 的派生圖腳本鎖定同一個版本。
+  # EXCEEDS-UPSTREAM: miniflare — 兩個 miniflare 版本都以精確版本釘住較舊的 sharp
+  # REMOVE-WHEN: requesters-demand >=0.35.5
+  sharp: ^0.35.5
+  # GHSA-jp82-f5mq-hwhp 等（critical＋high）：seroval <=1.6.2。只經 admin 的
+  # @tanstack/react-query-devtools>@tanstack/query-devtools>@kobalte/core>…>solid-js
+  # 進 --prod；solid-js 1.9.15（latest）宣告 `~1.5.4`，沒有可升的上游，故以有界 override
+  # 留在 1.x 內。
+  # EXCEEDS-UPSTREAM: solid-js — 宣告 ~1.5.4，這裡提高到 ^1.6.3
+  # REMOVE-WHEN: requesters-demand >=1.6.3
+  seroval: ^1.6.3
+  # GHSA-68fv-2mgg-jv7q：source-map-js <1.2.2 的 indexed source-map 可造成 event-loop DoS。
+  # postcss 宣告 `^1.2.1`，修補版 1.2.2 仍在宣告範圍內，不需要 EXCEEDS-UPSTREAM。
+  # REMOVE-WHEN: requesters-demand >=1.2.2
+  source-map-js: ^1.2.2
+  # 以下為 admin 原有、併入根目錄的條目（根目錄一份 workspace，同一批 override 作用到兩個 app）。
+  # Only the 1.x line of brace-expansion is reached through --prod
+  # (minimatch 3.x via glob 7 / rimraf). The selector keeps
+  # the override inside the major its requester declares (`^1.1.7`).
+  # REMOVE-WHEN: requesters-demand >=1.1.21
+  brace-expansion@^1.0.0: ^1.1.21
+  # form-data / ws carried over from the previous
+  # package.json `pnpm.overrides`, now bounded and with an exit condition.
+  # REMOVE-WHEN: requesters-demand >=4.0.6
+  form-data@^4.0.0: ^4.0.6
+  # miniflare pins exactly 8.21.0 (the patched release); the range only admits
+  # newer 8.x patch releases. The floor is 8.21.1 because storybook declares
+  # `^8.21.1` and the override must stay inside that range.
+  # EXCEEDS-UPSTREAM: miniflare — the range is broader than its exact pin
+  # REMOVE-WHEN: requesters-demand >=8.21.0
+  ws@^8.0.0: ^8.21.1
+
+# pnpm 11+ requires explicit approval for dependencies that run install
+# scripts. 只列目前依賴樹裡實際存在、且跑 install script 的套件；
+# 不在樹上的項目由 scripts/check-dependency-overrides.ts 擋下。
+allowBuilds:
+  "@parcel/watcher": true
+  "@sentry/cli": true
+  "@swc/core": true
+  canvas: true
+  esbuild: true
+  msw: true
+  sharp: true
+  workerd: true
+
+# 決定 T1：next 的 patch 也作用到 admin 的 next（兩個 app 同一個 next 版本，刻意）。
+patchedDependencies:
+  '@editorjs/editorjs': patches/@editorjs__editorjs.patch
+  '@opennextjs/cloudflare': patches/@opennextjs__cloudflare.patch
+  '@vis.gl/react-maplibre@8.1.2': patches/@vis.gl__react-maplibre@8.1.2.patch
+  next: patches/next.patch

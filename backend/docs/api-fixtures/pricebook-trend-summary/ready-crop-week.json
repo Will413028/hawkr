@@ -1,0 +1,49 @@
+{
+  "request": "GET /api/v1/app/sellers/pricebook/trend-summary?cropCode=A1&marketCode=109&from=2026-07-27&to=2026-08-02&granularity=week&comparisons=wow",
+  "response": {
+    "code": 0,
+    "message": "success",
+    "data": {
+      "selectionKind": "crop",
+      "granularity": "week",
+      "timezone": "Asia/Taipei",
+      "points": [
+        {
+          "periodStart": "2026-07-27",
+          "periodEnd": "2026-08-02",
+          "status": "ready",
+          "observedAverageTwdPerKg": 42.5,
+          "volumeKg": 700,
+          "sampleCount": 7,
+          "observedMarketCount": 1,
+          "aggregationMethod": "volume_weighted/v1",
+          "qualityReasonCodes": []
+        }
+      ],
+      "comparisons": [
+        {
+          "kind": "wow",
+          "status": "ready",
+          "currentValueTwdPerKg": 42.5,
+          "baselineValueTwdPerKg": 40,
+          "changeAmountTwdPerKg": 2.5,
+          "changePercent": 6.25
+        }
+      ],
+      "dataMeta": {
+        "snapshotId": "sha256:d9ca4eb4def900b14f822d05c7e5465f576b9573b4f42a03a45092c1d2f1a7eb",
+        "source": "MOA_WHOLESALE_DAILY",
+        "sourceDataAsOf": "2026-08-02T15:59:59Z",
+        "maxFeatureAvailableAt": "2026-08-02T01:00:00Z",
+        "generatedAt": "2026-08-07T16:21:38Z",
+        "freshnessStatus": "unavailable",
+        "usabilityStatus": "unusable",
+        "qualityReasonCodes": [],
+        "datasetDigest": "sha256:d9ca4eb4def900b14f822d05c7e5465f576b9573b4f42a03a45092c1d2f1a7eb",
+        "schemaVersion": "hawkr.pricebook/v1",
+        "currency": "TWD",
+        "unit": "kg"
+      }
+    }
+  }
+}

@@ -1,0 +1,231 @@
+/* Migrated unchanged from ui-kit.css. LoginShell owns this auth-only
+ * stylesheet synchronously, including SSR. Keep selectors unlayered and
+ * ordered until an independently verified Tailwind migration is complete.
+ * Shared hint defaults remain in ui-kit.css for cart/checkout/address users.
+ */
+
+/* ============================================================
+   17. LOGIN FLOW
+   ============================================================ */
+.hkui-login {
+	min-height: calc(100vh - 140px);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: var(--hkui-space-8) var(--hkui-space-4);
+	background: transparent;
+	font-family: var(--hkui-font-sans);
+}
+.hkui-login__panel {
+	width: min(440px, 100%);
+	background: var(--hkui-content1);
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--hkui-radius-xl);
+	padding: var(--hkui-space-6) var(--hkui-space-6) var(--hkui-space-5);
+	box-shadow: var(--hkui-shadow-md);
+}
+.hkui-login__eyebrow {
+	display: block;
+	font-size: var(--hkui-text-tiny);
+	font-weight: var(--hkui-weight-semibold);
+	color: var(--hkui-foreground-soft);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	margin-bottom: var(--hkui-space-2);
+}
+
+/* Hero slot for the panel — key glyph sits centered inside a
+ * tinted circle. */
+.hkui-login__hero {
+	display: flex;
+	justify-content: center;
+	margin: 0 0 var(--hkui-space-4);
+}
+.hkui-login__hero-mark {
+	display: grid;
+	place-items: center;
+	width: 112px;
+	height: 112px;
+	border-radius: var(--radius-pill);
+	border: 0;
+	color: var(--hkui-primary);
+	background: var(--hkui-primary-50);
+	box-shadow: inset 0 0 0 1px rgb(var(--color-ink-900-rgb) / 0.16);
+}
+.hkui-login__title {
+	margin: 0 0 var(--hkui-space-2);
+	font-size: var(--hkui-display-md);
+	line-height: 1.2;
+	letter-spacing: var(--hkui-tracking-tight);
+	font-weight: var(--hkui-weight-bold);
+	color: var(--hkui-foreground);
+}
+.hkui-login__subtitle {
+	margin: 0 0 var(--hkui-space-5);
+	font-size: var(--hkui-text-small);
+	line-height: 1.6;
+	color: var(--hkui-foreground-muted);
+}
+.hkui-login__subtitle strong {
+	font-weight: var(--hkui-weight-semibold);
+	color: var(--hkui-foreground);
+}
+.hkui-login__body {
+	display: flex;
+	flex-direction: column;
+	gap: var(--hkui-space-4);
+}
+.hkui-login__footer {
+	margin-top: var(--hkui-space-5);
+	text-align: center;
+	font-size: var(--hkui-text-small);
+	color: var(--hkui-foreground-soft);
+}
+.hkui-login__footer a {
+	color: var(--hkui-primary);
+	font-weight: var(--hkui-weight-semibold);
+	text-decoration: none;
+}
+.hkui-login__footer a:hover {
+	text-decoration: underline;
+}
+.hkui-login__field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--hkui-space-1_5);
+}
+.hkui-login__label {
+	font-size: var(--hkui-text-small);
+	font-weight: var(--hkui-weight-medium);
+	color: var(--hkui-foreground);
+}
+
+.hkui-login__link {
+	background: none;
+	border: none;
+	padding: 8px;
+	font-family: inherit;
+	font-size: var(--hkui-text-small);
+	color: var(--hkui-primary);
+	cursor: pointer;
+	text-align: center;
+}
+.hkui-login__link:hover {
+	text-decoration: underline;
+}
+.hkui-login__link:disabled {
+	color: var(--hkui-foreground-soft);
+	cursor: not-allowed;
+	text-decoration: none;
+}
+
+.hkui-login__divider {
+	display: flex;
+	align-items: center;
+	gap: var(--hkui-space-3);
+	color: var(--hkui-foreground-soft);
+	font-size: var(--hkui-text-tiny);
+	margin: var(--hkui-space-2) 0;
+}
+.hkui-login__divider::before,
+.hkui-login__divider::after {
+	content: "";
+	flex: 1;
+	height: 1px;
+	background: var(--hkui-divider);
+}
+
+.hkui-login__oauth {
+	display: flex;
+	flex-direction: column;
+	gap: var(--hkui-space-2);
+}
+.hkui-login__oauth--big .hkui-login__oauth-btn {
+	height: 52px;
+	font-size: var(--hkui-text-medium);
+}
+.hkui-login__oauth-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--hkui-space-2);
+	height: 44px;
+	padding: 0 var(--hkui-space-4);
+	border: 1.5px solid var(--hkui-default-300);
+	background: var(--hkui-content1);
+	color: var(--hkui-foreground);
+	border-radius: var(--hkui-radius-md);
+	font-family: inherit;
+	font-size: var(--hkui-text-small);
+	font-weight: var(--hkui-weight-semibold);
+	cursor: pointer;
+	transition:
+		background var(--hkui-dur-fast) var(--hkui-ease),
+		border-color var(--hkui-dur-fast) var(--hkui-ease);
+}
+.hkui-login__oauth-btn:hover {
+	background: var(--hkui-default-100);
+	border-color: var(--hkui-default-400);
+}
+
+.hkui-login__terms {
+	margin: var(--hkui-space-2) 0 0;
+	font-size: var(--hkui-text-tiny);
+	color: var(--hkui-foreground-soft);
+	line-height: 1.5;
+	text-align: center;
+}
+.hkui-login__terms a {
+	color: var(--hkui-primary);
+	text-decoration: none;
+}
+.hkui-login__terms a:hover {
+	text-decoration: underline;
+}
+
+/* ============================================================
+ * Login surface — dark mode
+ *
+ * Most internals already consume `--hkui-*` tokens (panel surface,
+ * text, dividers), so the dark palette flip handles them
+ * for free. This block targets the handful of rules that bake in
+ * light-only values: the hero button's `primary-50` fill, the OAuth buttons that share
+ * `--hkui-content1` with the panel and so would disappear, and the
+ * role-tab avatar's hardcoded white circle.
+ * ============================================================ */
+[data-theme="dark"] .hkui-login {
+	/* Keep the shared site background as the single route canvas. */
+	background: transparent;
+}
+[data-theme="dark"] .hkui-login__hero-mark {
+	background: rgb(var(--color-brand-primary-strong-rgb) / 0.14);
+	box-shadow: inset 0 0 0 1px rgb(var(--color-ink-900-rgb) / 0.32);
+}
+[data-theme="dark"] .hkui-login__oauth-btn {
+	background: var(--hkui-content2);
+	border-color: var(--hkui-divider);
+	color: var(--hkui-foreground);
+}
+[data-theme="dark"] .hkui-login__oauth-btn:hover {
+	background: var(--hkui-content3);
+	border-color: rgb(var(--color-ink-100-rgb) / 0.2);
+}
+[data-theme="dark"] .hkui-login__panel {
+	/* Token already flips, but explicit shadow keeps the panel reading
+	 * as "elevated" against the dark sky. */
+	box-shadow:
+		0 12px 32px rgba(0, 0, 0, 0.42),
+		0 2px 8px rgba(0, 0, 0, 0.28);
+}
+/* Role tabs — pill bg + active tab share dark tokens automatically;
+ * the avatar circle inside hardcodes a white fill that we need to
+ * flip to a dark surface so the brand-coloured icon reads cleanly. */
+
+@media (max-width: 480px) {
+	.hkui-login__panel {
+		padding: var(--hkui-space-5) var(--hkui-space-4);
+	}
+	.hkui-login__title {
+		font-size: var(--hkui-display-sm);
+	}
+}

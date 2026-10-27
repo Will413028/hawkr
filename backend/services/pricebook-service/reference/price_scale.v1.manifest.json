@@ -1,0 +1,11 @@
+{
+  "schema": "hawkr.price-scale/v1",
+  "file": "price_scale.v1.csv",
+  "sha256": "b958316d60488be6e2ffb4279bfff43672739819aa22a4b57c8e87545ca3c4cd",
+  "row_count": 3,
+  "sources": [
+    "Hawkr raw wholesale MOA/AFA archive 2012-01-01..2022-08-11 (10,415,116 rows post-dedup, SHA256 7379406ddc24706578d90cc6ca7faea658ba341c8caba49a1be538a35a6d942d), Jenks natural breaks per category_code (N04/N05/N06)",
+    "internal/domain/forecast/calendar.go (N04/N05/N06 <-> V/F/L category code mapping)",
+    "Human approval: Will, 2026-08-08 (N06 unit basis unconfirmed, see note column)"
+  ]
+}

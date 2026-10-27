@@ -1,0 +1,126 @@
+diff --git a/dist/esm/server/app-render/cache-signal.js b/dist/esm/server/app-render/cache-signal.js
+index 8d570750e90a9f2df882743ee75c5712f1d9a744..465fe7995042e71fb4edce33747214d60298c8e0 100644
+--- a/dist/esm/server/app-render/cache-signal.js
++++ b/dist/esm/server/app-render/cache-signal.js	
+@@ -165,7 +165,16 @@ function scheduleImmediateAndTimeoutWithCleanup(cb) {
+         clearPending = clearTimeout.bind(null, timeout);
+     });
+     clearPending = clearImmediate.bind(null, immediate);
+-    return ()=>clearPending();
++    return ()=>{
++        // workerd forbids touching I/O objects across requests: the module-loading
++        // CacheSignal is an isolate-wide singleton, so a timer scheduled by another
++        // request cannot be cleared here (IoContext error). A failed clear means the
++        // timer already died with its request; both call sites reset or reschedule
++        // pendingTimeoutCleanup right after, so ignoring is safe.
++        try {
++            clearPending();
++        } catch {}
++    };
+ }
+ 
+ //# sourceMappingURL=cache-signal.js.map
+\ No newline at end of file
+diff --git a/dist/esm/server/node-environment-extensions/fast-set-immediate.external.js b/dist/esm/server/node-environment-extensions/fast-set-immediate.external.js
+index 7f1b7c9ad871f500c933618f5f9bbdf679cfceae..b9c27f8b60e4b28af723f46467e572d2818a3392 100644
+--- a/dist/esm/server/node-environment-extensions/fast-set-immediate.external.js
++++ b/dist/esm/server/node-environment-extensions/fast-set-immediate.external.js	
+@@ -34,6 +34,17 @@ function install() {
+         globalThis.setImmediate = nodeTimers.setImmediate = // Workaround for missing __promisify__ which is not a real property
+         patchedSetImmediate;
+         globalThis.clearImmediate = nodeTimers.clearImmediate = patchedClearImmediate;
++        // Cross-request cleanup from the bundled CacheSignal copies can also land
++        // in clearTimeout (once their immediate has fired and armed the timeout) —
++        // same workerd IoContext restriction, same safe-to-ignore reasoning as
++        // patchedClearImmediate above.
++        const originalClearTimeout = globalThis.clearTimeout;
++        const patchedClearTimeout = (timeout)=>{
++            try {
++                return originalClearTimeout(timeout);
++            } catch {}
++        };
++        globalThis.clearTimeout = nodeTimers.clearTimeout = patchedClearTimeout;
+         const nodeTimersPromises = require('node:timers/promises');
+         nodeTimersPromises.setImmediate = patchedSetImmediatePromise;
+         process.nextTick = patchedNextTick;
+@@ -529,7 +540,16 @@ const patchedClearImmediate = (immediateObject)=>{
+         ;
+         immediateObject[Symbol.dispose]();
+     } else {
+-        originalClearImmediate(immediateObject);
++        // workerd (OpenNext/Cloudflare) forbids touching timers across requests:
++        // the module-loading CacheSignal singleton in the PRE-BUNDLED next-server
++        // runtimes (dist/compiled/next-server/*.runtime.prod.js) carries its own
++        // copy of scheduleImmediateAndTimeoutWithCleanup that the cache-signal.js
++        // hunks of this patch cannot reach, and its cross-request cleanup lands
++        // here through the global clearImmediate. A timer that cannot be cleared
++        // already died with its own request, so dropping the clear is safe.
++        try {
++            originalClearImmediate(immediateObject);
++        } catch {}
+     }
+ };
+ //========================================================
+diff --git a/dist/server/app-render/cache-signal.js b/dist/server/app-render/cache-signal.js
+index 2c453189a38fe4b8b253b6a7a9ed9fb66f5a2f84..281b872346f7ca02687b747b7909140adf35fd55 100644
+--- a/dist/server/app-render/cache-signal.js
++++ b/dist/server/app-render/cache-signal.js	
+@@ -175,7 +175,16 @@ function scheduleImmediateAndTimeoutWithCleanup(cb) {
+         clearPending = clearTimeout.bind(null, timeout);
+     });
+     clearPending = clearImmediate.bind(null, immediate);
+-    return ()=>clearPending();
++    return ()=>{
++        // workerd forbids touching I/O objects across requests: the module-loading
++        // CacheSignal is an isolate-wide singleton, so a timer scheduled by another
++        // request cannot be cleared here (IoContext error). A failed clear means the
++        // timer already died with its request; both call sites reset or reschedule
++        // pendingTimeoutCleanup right after, so ignoring is safe.
++        try {
++            clearPending();
++        } catch {}
++    };
+ }
+ 
+ //# sourceMappingURL=cache-signal.js.map
+\ No newline at end of file
+diff --git a/dist/server/node-environment-extensions/fast-set-immediate.external.js b/dist/server/node-environment-extensions/fast-set-immediate.external.js
+index eeaa0ae5f90b5037836954f50e671e073ef73718..5fa63338e850561336f2f90ee7b158b3aedc34fc 100644
+--- a/dist/server/node-environment-extensions/fast-set-immediate.external.js
++++ b/dist/server/node-environment-extensions/fast-set-immediate.external.js	
+@@ -60,6 +60,17 @@ function install() {
+         globalThis.setImmediate = nodeTimers.setImmediate = // Workaround for missing __promisify__ which is not a real property
+         patchedSetImmediate;
+         globalThis.clearImmediate = nodeTimers.clearImmediate = patchedClearImmediate;
++        // Cross-request cleanup from the bundled CacheSignal copies can also land
++        // in clearTimeout (once their immediate has fired and armed the timeout) —
++        // same workerd IoContext restriction, same safe-to-ignore reasoning as
++        // patchedClearImmediate above.
++        const originalClearTimeout = globalThis.clearTimeout;
++        const patchedClearTimeout = (timeout)=>{
++            try {
++                return originalClearTimeout(timeout);
++            } catch {}
++        };
++        globalThis.clearTimeout = nodeTimers.clearTimeout = patchedClearTimeout;
+         const nodeTimersPromises = require('node:timers/promises');
+         nodeTimersPromises.setImmediate = patchedSetImmediatePromise;
+         process.nextTick = patchedNextTick;
+@@ -487,7 +498,16 @@ const patchedClearImmediate = (immediateObject)=>{
+         ;
+         immediateObject[Symbol.dispose]();
+     } else {
+-        originalClearImmediate(immediateObject);
++        // workerd (OpenNext/Cloudflare) forbids touching timers across requests:
++        // the module-loading CacheSignal singleton in the PRE-BUNDLED next-server
++        // runtimes (dist/compiled/next-server/*.runtime.prod.js) carries its own
++        // copy of scheduleImmediateAndTimeoutWithCleanup that the cache-signal.js
++        // hunks of this patch cannot reach, and its cross-request cleanup lands
++        // here through the global clearImmediate. A timer that cannot be cleared
++        // already died with its own request, so dropping the clear is safe.
++        try {
++            originalClearImmediate(immediateObject);
++        } catch {}
+     }
+ };
+ //========================================================

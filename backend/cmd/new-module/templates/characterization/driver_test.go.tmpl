@@ -1,0 +1,19 @@
+// Package characterization 是 {{.Name}} 對外 API 的特性測試（ADR 2026-09-24-go-modular-monolith D8 的第一層
+// 安全網、ADR 2026-09-26-external-contract-protobuf-connect D4），共用的部分在 internal/httpapi/characterize。
+//
+// 情境只寫一次（scenarios_test.go），透過 Driver 操作：{{if .Legacy}}REST driver 經 gateway 打舊的 {{.Legacy}}、{{end}}Connect driver 打單體。
+// 兩種執行：
+//   - 直接打單體（monolith_integration_test.go，build tag integration，CI 跑），並以突變確認情境抓得到錯的資料
+//     （照 content 的 TestScenariosCatchWrongData 寫）。
+//   - 經本機的 gateway（gateway_test.go，build tag gateway，scripts/characterize.sh {{.Name}} 起服務後執行）。
+//
+// 兩個 driver 的 wire 不同，情境只看業務上的結果：ID 當成不透明的字串、錯誤只比 characterize 的分類。與舊實作
+// 刻意的差異（模組 CARRYOVER.md「與舊服務的差異」）不寫成共用的情境。{{if .Legacy}}{{.Legacy}} 刪除時，REST driver、legacy.sh
+// 與 TestLegacy 一起刪除。{{end}}
+package characterization
+
+// Driver 是情境操作 {{.Name}} 的方式：每個對外操作一個方法，參數與回傳值是業務上的型別（不是 wire 的型別），
+// 錯誤對應到 characterize 的分類，例如
+//
+//	GetX(ctx context.Context, c ch.Caller, id string) (X, error)
+type Driver interface{}

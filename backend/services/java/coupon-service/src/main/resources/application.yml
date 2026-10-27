@@ -1,0 +1,105 @@
+server:
+  port: 9950
+
+grpc:
+  server:
+    port: ${GRPC_PORT:9951}
+    reflection-service-enabled: true
+
+spring:
+  autoconfigure:
+    exclude:
+      - net.devh.boot.grpc.client.autoconfigure.GrpcClientAutoConfiguration
+      - net.devh.boot.grpc.client.autoconfigure.GrpcClientHealthAutoConfiguration
+  application:
+    name: coupon-service
+  cloud:
+    nacos:
+      discovery:
+        enabled: ${NACOS_ENABLED:false}
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+        metadata:
+          grpc-port: ${GRPC_PORT:9951}
+          version: 1.0.0
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_POOL_PORT:5432}/${DB_NAME:hawkr_coupon}?sslmode=${DB_SSLMODE:disable}&prepareThreshold=0
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      minimum-idle: 2
+      maximum-pool-size: 10
+      connection-timeout: 30000
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 5000ms
+  rabbitmq:
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
+  flyway:
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:hawkr_coupon}?sslmode=${DB_SSLMODE:disable}
+    user: ${DB_USER}
+    password: ${DB_PASSWORD}
+    enabled: ${FLYWAY_ENABLED:true}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+
+mybatis-plus:
+  mapper-locations: classpath:/mapper/**/*.xml
+  global-config:
+    db-config:
+      id-type: INPUT
+  configuration:
+    map-underscore-to-camel-case: true
+
+hawkr:
+  obs:
+    service: coupon-service
+    grpc:
+      targets:
+        seller:
+          host: ${SELLER_SERVICE_HOST:127.0.0.1}
+          port: ${SELLER_SERVICE_GRPC_PORT:9941}
+          plaintext: true
+        account:
+          host: ${ACCOUNT_SERVICE_HOST:127.0.0.1}
+          port: ${ACCOUNT_SERVICE_GRPC_PORT:9941}
+          plaintext: true
+        order:
+          host: ${ORDER_SERVICE_HOST:127.0.0.1}
+          port: ${ORDER_SERVICE_GRPC_PORT:9915}
+          plaintext: true
+        buyer:
+          host: ${BUYER_SERVICE_HOST:127.0.0.1}
+          port: ${BUYER_SERVICE_GRPC_PORT:9941}
+          plaintext: true
+  tsid:
+    enabled: true
+    node-id-base: 500
+    pod-index: ${POD_INDEX:0}
+
+coupon:
+  scheduler:
+    auto-release:
+      enabled: ${AUTO_RELEASE_ENABLED:true}
+      cron: "0 * * * * ?"
+    auto-expire:
+      enabled: ${AUTO_EXPIRE_ENABLED:true}
+      cron: "0 */5 * * * ?"
+  notification:
+    admin-fallback-image-key: ${COUPON_ADMIN_FALLBACK_IMAGE_KEY:public/system/coupon-default.png}
+
+logging:
+  level:
+    io.github.will413028.hawkr: ${LOG_LEVEL:INFO}
+    org.flywaydb: INFO

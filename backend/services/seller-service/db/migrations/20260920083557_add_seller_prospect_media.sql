@@ -1,0 +1,2 @@
+-- Modify "seller_prospects" table
+ALTER TABLE "seller_prospects" ADD COLUMN "logo_key" character varying(500) NOT NULL DEFAULT '', ADD COLUMN "cover_key" character varying(500) NOT NULL DEFAULT '', ADD COLUMN "logo_source_url" character varying(2048) NOT NULL DEFAULT '', ADD COLUMN "cover_source_url" character varying(2048) NOT NULL DEFAULT '', ADD COLUMN "media_version" bigint NOT NULL DEFAULT 0;

@@ -1,0 +1,1595 @@
+syntax = "proto3";
+
+package hawkr.ai;
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/ai";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+// AIImageService 是賣家面的 AI 修圖表面。所有方法 store-scoped：store 身分只從
+// Gateway 注入的 x-store-id metadata 解出（method-policy 登記為 ActorSeller），
+// request message 結構上不帶身分欄位——呼叫端無從指定「打誰的額度」。
+service AIImageService {
+    rpc TransformImage(TransformImageRequest) returns (TransformImageResponse);
+    rpc ListAiStyles(ListAiStylesRequest) returns (ListAiStylesResponse);
+}
+
+// AIAdminService 是平台管理者面。⚠️ 額度那批的 store_id 是路徑參數（打誰的額度
+// 由參數決定），授權完全靠 method-policy 的 ActorAdmin。
+service AIAdminService {
+    rpc ListAiStylesForAdmin(ListAiStylesForAdminRequest) returns (ListAiStylesForAdminResponse);
+    rpc CreateAiStyle(CreateAiStyleRequest) returns (AiStyleResponse);
+    rpc UpdateAiStyle(UpdateAiStyleRequest) returns (AiStyleResponse);
+    rpc DeleteAiStyle(DeleteAiStyleRequest) returns (AiStyleResponse);
+    rpc GetAiQuota(GetAiQuotaRequest) returns (AiQuotaResponse);
+    rpc UpdateAiQuota(UpdateAiQuotaRequest) returns (AiQuotaResponse);
+    rpc DeleteAiQuota(DeleteAiQuotaRequest) returns (AiQuotaResponse);
+}
+
+// RecommendationService 是匿名推薦。身分欄位是 user_id，現行唯一呼叫端
+// 傳字面 0——這支是 public、無 JWT 的端點，本來就沒有任何身分可傳，不是
+// 「user_id 剛好是 0」（gateway/internal/handler/recommendation.go:62）。
+service RecommendationService {
+    rpc PersonalizedRecommend(PersonalizedRequest) returns (PersonalizedRecommendResponse);
+}
+
+// ==================== AIAssistantService（Phase A 新增） ====================
+
+message AssistantRequest {
+    string session_id = 1;
+    string message = 2;
+    string image_url = 3;
+}
+
+message TextEvent {
+    string text = 1;
+}
+
+message DoneEvent {
+    string session_id = 1;
+}
+
+message ErrorEvent {
+    int32 code = 1;
+    string message = 2;
+}
+
+message DraftPatchEvent {
+    string patch_json = 1; // update_draft tool 的 patch 內容，原樣透傳的 JSON 字串
+}
+
+message ToolResultEvent {
+    string result_json = 1; // order_list / seller_candidates 等 tool_result 內容，原樣透傳的 JSON 字串
+}
+
+message StepEvent {
+    string turn_id = 1;
+    int32 seq = 2;
+    string code = 3;
+    string status = 4;
+    string label = 5;
+    int64 duration_ms = 6;
+    // safe_args：前端動態文案模板要用的一小撮 slots 值（見 domain.Step.SafeArgs），
+    // 只在少數 code 上非空。additive 欄位，舊消費端忽略不影響既有行為。
+    map<string, string> safe_args = 7;
+    // text：這一步「實際發生了什麼」的一句話，由 StepNarrator（LLM）產生，
+    // 例如「甘藍條件有效，無拒絕欄位。」——跟固定的 label 是兩回事。
+    // additive 欄位；narrator 逾時或被 guard 擋下時為空，消費端要能退回 label。
+    string text = 8;
+}
+
+message MessageEvent {
+    // reasoning：#2447 BE-01A 停產下架（provider 停開 thinking、全鏈欄位移除），
+    // 本次一併 reserved 化。號碼與名字都保留，讓「重新加回同名欄位」變成 protoc
+    // 編譯錯誤——比任何測試都早一步擋下。
+    reserved 3;
+    reserved "reasoning";
+    string turn_id = 1;
+    string reply = 2;
+}
+
+// RunAccepted 承載 run ledger（doc 57 §5.1 claim transaction）為這次命令建立的
+// run 身分。claim 交易 commit 之後、背景執行開始之前無條件送出，一定是
+// SubmitTurnStream 串流的第一筆事件（見欄位 9 run_accepted 的註解）。
+//
+// 存在的理由是 doc 57 §6 落差 2：gateway 目前拿 `trace_id` 當 AG-UI 的 `runId`，
+// 跟 ledger 的 run_id 是兩個不同的值；而 AG-UI 的 `RUN_STARTED` 必須在拿到真正的
+// run_id 之後才能寫出去。把 run_id 放在一個獨立的、先於任何 step／message 的
+// 事件裡，gateway 才有辦法「收到第一個事件之後才寫 RUN_STARTED」。
+message RunAccepted {
+    string run_id = 1;
+}
+
+message ActivityEvent {
+    bytes data_json = 1;
+}
+
+message StreamEvent {
+    oneof payload {
+        TextEvent text = 1;
+        DoneEvent done = 2;
+        ErrorEvent error = 3;
+        DraftPatchEvent draft_patch = 4;
+        ToolResultEvent tool_result = 5;
+        StepEvent step = 6;
+        MessageEvent message = 7;
+        // turn_result 是 AIProcurementService.SubmitTurnStream 的終端事件。Gateway
+        // 把它轉成 AG-UI 的 STATE_SNAPSHOT + RUN_FINISHED 兩個 frame 寫出（PR #2474
+        // 起皆為純 `data:` 行，沒有 `event:` 事件名）。DoneEvent 只帶 session_id，
+        // 承載不了 SubmitTurn 同一份 TurnResult——串流版與同步版必須交出同一份結果，
+        // 否則前端在串流路徑拿到的是空殼。TurnResult 定義在本檔 AIProcurementService
+        // 區段（proto 不要求宣告順序）。
+        TurnResult turn_result = 8;
+        // run_accepted 一定是這條串流的第一個事件——gateway 從第一個事件取
+        // runId（見 gateway/internal/proxy/ai_assistant_stream.go 的 serve
+        // loop），拿不到就退回 trace_id。activity（欄位 10）永遠排在它之後。
+        // （原註解提到的 PROCUREMENT_DURABLE_RUN_ENABLED 已於 T12 移除。）
+        RunAccepted run_accepted = 9;
+        // Graph 路徑的 Activity 內容，與 GET replay 端點的 CUSTOM
+        // name="activity" 同一份 payload（doc57 §2.1：兩條路送同一種 frame）。
+        // data_json 逐字透傳，形狀為
+        // {rowId, attempt, maxAttempts, retryGroupKey, code, label, text,
+        //  status, parentRowId?, count?}，其中 rowId／retryGroupKey／
+        // parentRowId／count 都是十進位字串（id 與計數依 Proto 管理規範 §6）。
+        //
+        // label 是 server 端固定字串（domain.StepLabels），恆非空；text 是
+        // StepNarrator 產生的「這一次實際發生了什麼」，可為空——空的時候
+        // consumer 顯示 label，不是反過來。
+        //
+        // status 是 codemeta.ProcurementStepStatus（PENDING／RUNNING／
+        // SUCCEEDED／FAILED…），恆非空。失敗住這一軸，code 軸沒有 FAILED。
+        //
+        // parentRowId 只在巢狀子列出現（設計稿 01 的兩條 lane 掛在「搜尋候選
+        // 供應商」底下），count 只在該列真的有計數概念時出現——兩者缺席與
+        // 帶零值是不同的意思，不得互相代換。
+        //
+        // consumer 一律 merge-by-rowId：同一個 rowId 的後續事件就地更新該列。
+        // 一定排在 run_accepted 之後（見該欄位註解）。
+        ActivityEvent activity = 10;
+    }
+}
+
+message LatestSessionRequest {
+}
+
+message LatestSessionMessage {
+    string role = 1;
+    string text = 2;
+    string timestamp = 3;
+}
+
+message LatestSessionResponse {
+    string session_id = 1;
+    repeated LatestSessionMessage messages = 2;
+}
+
+message CategoryCandidate {
+    string catalog_id = 1;
+    string path = 2;
+    string confidence = 3;
+}
+
+message SkuDraft {
+    string sku_name = 1;
+    string price = 2;
+    string unit = 3;
+}
+
+message ProductDraft {
+    string name = 1;
+    string origin = 2;
+    string description = 3;
+    repeated CategoryCandidate category_candidates = 4;
+    repeated SkuDraft skus = 5;
+    repeated string tags = 6;
+    repeated string warnings = 7;
+}
+
+message SellerProductAutofillRequest {
+    string text = 1;
+    string image_url = 2;
+}
+
+message SellerProductAutofillResponse {
+    ProductDraft data = 1;
+}
+
+service AIAssistantService {
+    // 賣家
+    rpc SellerChat(AssistantRequest) returns (stream StreamEvent);
+    rpc SellerOrders(AssistantRequest) returns (stream StreamEvent);
+    rpc SellerInventory(AssistantRequest) returns (stream StreamEvent);
+    rpc SellerPayment(AssistantRequest) returns (stream StreamEvent);
+    rpc SellerPrice(AssistantRequest) returns (stream StreamEvent);
+    rpc SellerProductListingChat(AssistantRequest) returns (stream StreamEvent);
+    rpc SellerProductAutofill(SellerProductAutofillRequest) returns (SellerProductAutofillResponse);
+    rpc SellerLatestSession(LatestSessionRequest) returns (LatestSessionResponse);
+
+    // 買家
+    rpc BuyerOrders(AssistantRequest) returns (stream StreamEvent);
+    rpc BuyerTracking(AssistantRequest) returns (stream StreamEvent);
+    rpc BuyerReturnPolicy(AssistantRequest) returns (stream StreamEvent);
+    rpc BuyerSeasonal(AssistantRequest) returns (stream StreamEvent);
+    rpc BuyerSellerMatch(AssistantRequest) returns (stream StreamEvent);
+    rpc BuyerChat(AssistantRequest) returns (stream StreamEvent);
+    rpc BuyerLatestSession(LatestSessionRequest) returns (LatestSessionResponse);
+}
+
+message PersonalizedRequest {
+    int64 user_id = 1;
+    string scene = 2;           // home, cart, checkout, etc.
+    int32 limit = 3;
+    repeated int64 exclude_ids = 4;
+}
+
+message RecommendedProduct {
+    string id = 1;
+    string name = 2;
+    string image_key = 3; // 商品圖 objectKey（49 §6.6；Gateway 組顯示 URL）
+    double price = 4;
+    double score = 5;           // 推薦分數
+    string reason = 6;          // 推薦原因
+    int64 price_min = 7;
+    int64 price_max = 8;
+    double rating = 9;
+    string seller_name = 10;
+    string seller_logo_key = 11; // 賣家 logo objectKey（49 §6.6 S9；Gateway 組顯示 URL）
+}
+
+message PersonalizedSection {
+    string title = 1;
+    string type = 2;
+    repeated RecommendedProduct products = 3;
+}
+
+message PersonalizedRecommendResult {
+    repeated PersonalizedSection sections = 1;
+    string model_version = 2;
+}
+
+message PersonalizedRecommendResponse {
+    int32 code = 1;
+    string message = 2;
+    PersonalizedRecommendResult data = 3;
+}
+
+// ==================== AI 風格管理 ====================
+
+message AiStyleItem {
+    string id = 1;
+    string name = 2;
+    string label = 3;
+    string prompt = 4;
+    string thumbnail_key = 5; // 縮圖 objectKey（49 §6.6；Gateway 組顯示 URL）
+    string sort_order = 6;
+}
+
+message AiStyleAdminItem {
+    string id = 1;
+    string name = 2;
+    string label = 3;
+    string prompt = 4;
+    string thumbnail_key = 5; // 縮圖 objectKey（49 §6.6；Gateway 組顯示 URL）
+    string sort_order = 6;
+    string created_at = 7;
+    string updated_at = 8;
+    bool is_default = 9;
+    bool enabled = 10;
+    string category = 11;
+}
+
+message ListAiStylesRequest {
+    // store_id：#3519 移除。store 身分改由 Gateway 注入的 x-store-id metadata
+    // 承載，method-policy 的 ActorSeller 在 handler 執行前解析完成（見
+    // AIImageService 的註解）。號碼與名字都保留，讓「重新加回同名欄位」變成
+    // protoc 編譯錯誤——那個欄位正是 A2「打誰的額度由參數決定」的漏洞本身。
+    reserved 1;
+    reserved "store_id";
+    string category = 2;        // "product" | "post"，缺漏或不合法時 ai-service 端 fallback 為 product
+}
+
+message ListAiStylesResponse {
+    int32 code = 1;
+    string message = 2;
+    AiStyleListData data = 3;
+}
+
+message AiStyleListData {
+    string default_prompt = 1;
+    string weekly_usage = 2;
+    string weekly_limit = 3;
+    repeated AiStyleItem styles = 4;
+}
+
+message ListAiStylesForAdminRequest {
+    string category = 1;        // 空字串 = 不篩選，回傳全部分類
+}
+
+message ListAiStylesForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated AiStyleAdminItem data = 3;
+}
+
+message CreateAiStyleRequest {
+    string name = 1;
+    string label = 2;
+    string prompt = 3;
+    string thumbnail_key = 4; // 縮圖 objectKey（49 §6.6；保留原圖時帶入裸 key）
+    string sort_order = 5;
+    bool is_default = 6;
+    bool enabled = 7;
+    optional string thumbnail_staged_token = 8;
+    string category = 9;        // "product" | "post"，必填
+}
+
+message UpdateAiStyleRequest {
+    string id = 1;
+    string label = 2;
+    string prompt = 3;
+    string thumbnail_key = 4; // 縮圖 objectKey（49 §6.6；保留原圖時帶入裸 key）
+    string sort_order = 5;
+    bool enabled = 6;
+    bool is_default = 7;
+    bool has_label = 8;
+    bool has_prompt = 9;
+    bool has_thumbnail_key = 10;
+    bool has_sort_order = 11;
+    bool has_enabled = 12;
+    bool has_is_default = 13;
+    optional string thumbnail_staged_token = 14;
+}
+
+message DeleteAiStyleRequest {
+    string id = 1;
+}
+
+message AiStyleResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+// ==================== AI 額度管理 ====================
+
+message GetAiQuotaRequest {
+    string store_id = 1;        // Gateway 已解析為現任 store_id 才傳入（account_id 命名債正名）
+}
+
+message UpdateAiQuotaRequest {
+    string store_id = 1;        // 同上
+    string weekly_limit = 2;
+    string memo = 3;
+}
+
+message DeleteAiQuotaRequest {
+    string store_id = 1;        // 同上
+}
+
+message AiQuotaResponse {
+    int32 code = 1;
+    string message = 2;
+    AiQuotaData data = 3;
+}
+
+message AiQuotaData {
+    string store_id = 1;        // account_id 命名債正名（ai_quotas 表本身已於 2026-07-13 rename）
+    string weekly_limit = 2;
+    string weekly_usage = 3;
+    string memo = 4;
+    string updated_at = 5;
+    bool is_custom = 6;
+}
+
+// AI 圖片轉換
+message TransformImageRequest {
+    // store_id：#3519 移除，理由同 ListAiStylesRequest。
+    reserved 1;
+    reserved "store_id";
+    bytes image_data = 2;       // 圖片 bytes
+    string mime_type = 3;       // image/jpeg, image/png 等
+    string prompt = 4;          // 修圖提示詞
+}
+
+message TransformImageResponse {
+    int32 code = 1;
+    string message = 2;
+    TransformImageData data = 3;
+}
+
+message TransformImageData {
+    string image_base64 = 1;    // Gemini 回傳的 base64 圖片
+    string mime_type = 2;
+    string weekly_usage = 3;    // 轉換後的本週使用量
+    string weekly_limit = 4;    // 本週上限
+}
+
+// ==================== AIProcurementService（procurement gRPC 化＋Gateway 切流） ====================
+
+message QuestionOption {
+    string option_id = 1;
+    string label = 2;
+    string value = 3;
+}
+
+message ClarifyQuestion {
+    string slot_key = 1;
+    string prompt = 2;
+    repeated QuestionOption options = 3;
+    repeated QuestionOption unit_options = 4;
+    bool allow_free_text = 5;
+    string source = 6;
+    bool can_skip = 7;
+}
+
+message Step {
+    string code = 1;
+    string status = 2;
+    string label = 3;
+    int64 duration_ms = 4;
+    // safe_args：見 StepEvent.safe_args 的說明，語意相同。
+    map<string, string> safe_args = 5;
+    // text：這一步「實際發生了什麼」的一句話，由 StepNarrator（LLM）產生，
+    // 例如「甘藍條件有效，無拒絕欄位。」——跟固定的 label 是兩回事。
+    // additive 欄位；narrator 逾時或被 guard 擋下時為空，消費端要能退回 label。
+    string text = 6;
+}
+
+message RecordedField {
+    string key = 1;
+    string label = 2;
+    string value = 3;
+}
+
+message RejectedField {
+    string key = 1;
+    string reason = 2;
+}
+
+message Slots {
+    reserved 2;
+    reserved "spec";
+    optional string item = 1;
+    optional string quantity = 3;
+    optional string unit = 4;
+    optional string packaging = 5;
+    optional string budget_per_unit = 6;
+    optional string delivery_city = 7;
+    optional string delivery_date = 8;
+    optional bool exact_match_required = 9;
+    // 品項的解析結果，與 item 原話同一個 revision（ADR
+    // 2026-09-04-crop-resolution-into-slots）。尚未解析時不帶。
+    optional ItemResolution item_resolution = 10;
+}
+
+// ItemResolution 是買家原話（Slots.item）被判定成 Pricebook 分類體系裡的哪一層，
+// 以及那個判定是誰做的。它決定報價的價格基準（同一大類內品種間實測差 2.96 倍），
+// 因此必須對買家可見且可更正——存在後端當內部狀態等於讓買家為看不見的東西付錢。
+message ItemResolution {
+    // CROP｜GROUP｜SELF_PRICED，三者互斥。字串而非 enum，同本檔
+    // price_availability／pricing_mode 的既有慣例。
+    string kind = 1;
+    // kind 對應的識別碼：CROP 是 crop_code、GROUP 是 group_code。
+    // SELF_PRICED 沒有 code（品項本來就不在分類體系內），恆為空。
+    optional string code = 2;
+    // 分類名稱（「甘藍-初秋」「甘藍」）。SELF_PRICED 時為空。
+    string label = 3;
+    // SYSTEM（檢索只命中一個候選，系統直接定案，買家沒有被問過）｜
+    // BUYER_CHOICE（買家在消歧卡上親自挑的，含自填價逃生艙）。
+    // 前端據此分流呈現：SYSTEM 要提示可更正，BUYER_CHOICE 是已確認態。
+    string provenance = 4;
+    // 只在 kind == SELF_PRICED 時有值；新台幣元／公斤，字串（CLAUDE.md §4：
+    // 對外金額一律字串）。
+    optional string price_per_kg = 5;
+    // 伺服器組好的顯示字串（「甘藍-初秋」／「甘藍（整個大類）」／「自訂品項，
+    // 單價 95 元／公斤」）。**前端不得自己用 kind＋label 重拼**：那會讓 slots 面板
+    // 與 recordedThisTurn 的 chip 出現兩套文案，而 chip 用的就是這個值。同
+    // SlotLabels／StepLabels 的既有結構性防呆。
+    string display_value = 6;
+}
+
+message CropDisambiguationOption {
+    string label = 1;
+    optional string crop_code = 2;
+    optional string group_code = 3;
+}
+
+// BusinessError 是 procurement RPC 透過 status.WithDetails() 附掛的機器可讀錯誤細節
+// （AIP-193：reason 跟 message 分開，不黏成一句字串再讓 caller 切割還原）。
+message BusinessError {
+    string reason = 1;  // UPPER_SNAKE_CASE，例如 "QUOTE_NOT_READY"
+    string message = 2; // 純人看文字，不含代碼前綴
+    string remaining = 3; // only set when reason == AGENT_MONTHLY_QUOTA_EXCEEDED; "" otherwise
+    string reset_at = 4;  // only set when reason == AGENT_MONTHLY_QUOTA_EXCEEDED; RFC3339 UTC
+}
+
+message TurnRequest {
+    string request_id = 1;         // "" 表新建
+    string message = 2;
+    string client_request_id = 3;
+}
+
+// Block 是 PublicAgentMessageV1 的敘述段落單元（issue #2549 §F，doc57 §14 D1）。
+// kind 的合法值見 domain.BlockKind：UNDERSTOOD/CONTEXT/RATIONALE/WARNING/NEXT_STEP/COMPLETE。
+message Block {
+    string kind = 1;
+    string text = 2;
+}
+
+// EvidenceRef 是輔助佐證連結（#2447 BE-01B 併入 #2549 Phase 2）。url 必須通過
+// pkg/urlsafety 的 https-only／no-userinfo／no-private-ip 驗證才會出現在這裡。
+message EvidenceRef {
+    string url = 1;
+    string label = 2;
+}
+
+// DialoguePlanSummary 是 domain.DialoguePlanV1 對外可見的最小子集——不含
+// AllowedClaimCodes/ForbiddenClaimCodes/ToneHints/MaxSentences/SalientFactRefs/
+// ArtifactRefs/ReadinessGate/StateVersion，那些是 Phase 3 semantic validator
+// 與內部 replay 用的，不對外曝露。
+message DialoguePlanSummary {
+    string act_code = 1;
+    string plan_hash = 2;
+    string policy_version = 3;
+    string render_mode = 4; // "TEMPLATE"（Phase 2 恆值）｜"MODEL"（保留給 Phase 3）
+    string template_version = 5;
+}
+
+message TurnResult {
+    // reasoning：#2447 BE-01A 下架後 reserved 化，理由同 MessageEvent。
+    reserved 13;
+    reserved "reasoning";
+    string request_id = 1;
+    string conversation_id = 2;
+    string revision_id = 3;
+    Slots slots = 4;
+    repeated RejectedField rejected = 5;
+    repeated string missing_required = 6;
+    repeated RecordedField recorded_this_turn = 7;
+    bool degraded = 8;
+    string degraded_reason = 9;
+    string reply = 10;
+    repeated Step steps = 11;
+    ClarifyQuestion question = 12; // message 型別天生可為空（proto3 field presence），不需要額外包一層
+    // next_action：給前端的下一步提示（issue #2403 Slice 4，Task 11/13）。空字串
+    // 表示無提示；目前唯一取值是 REQUIREMENT_READY 且尚未有 price preview 記錄時的
+    // "REVIEW_PRICE_PREVIEW"，導引買家去呼叫報價試算端點。additive 新欄位，不影響
+    // 既有消費端。
+    string next_action = 14;
+    // ---- #2549 Phase 2：PublicAgentMessageV1 wire 化，additive ----
+    DialoguePlanSummary dialogue_plan = 15;
+    repeated Block blocks = 16;
+    string text_fallback = 17;
+    repeated EvidenceRef evidence_refs = 18;
+    string message_id = 19;
+    string created_at = 20; // ISO 8601 UTC
+    // ---- doc 57 Slice F（run ledger）：additive。原註解提到的
+    // `PROCUREMENT_DURABLE_RUN_ENABLED` 已隨 procurement graph cutover 移除
+    // （PR #2998），durable dispatch 是唯一路徑 ⇒ run_id 不再有「flag 關閉就一律
+    // 空字串」這回事；interrupt_id／interrupt_kind 的空與非空一直取決於這一輪的
+    // 終態是不是 WAITING_FOR_INPUT，與該 flag 無關。 ----
+    //
+    // run_id 是 ledger（procurement_agent_runs）的 run 身分，供 gateway 用它取代
+    // 目前拿來充當 AG-UI `runId` 的 `trace_id`（doc 57 §6 落差 2）。unary 的
+    // SubmitTurn 直接回 TurnResult、拿不到 StreamEvent，所以 run_id 必須也出現在
+    // 這裡，兩個入口才有同一份 run 身分可交出。
+    string run_id = 21;
+    // interrupt_id／interrupt_kind 非空時，這一輪的終態是 WAITING_FOR_INPUT
+    // （v1 唯一觸發者是品項消歧待選，spec §10.1），不是一般完成——gateway 據此組出
+    // AG-UI `RUN_FINISHED.outcome.type=="interrupt"`，前端不得把它當成串流中斷而
+    // 降級重送。刻意放在 TurnResult 本身而不是新增一個 StreamEvent oneof case：
+    // unary 的 SubmitTurn 只回 TurnResult，oneof case 到不了它，兩個入口就會變成
+    // 兩種形狀。
+    string interrupt_id = 22;
+    // interrupt_kind 對映 procurement_agent_run_interrupts.interrupt_kind；v1 唯一
+    // 會出現的值是 CLARIFICATION（品項消歧）。尚未在 CodeMeta 登記成獨立值域——
+    // 只有一個值時登記一組 registry 是空殼，等第二個 kind（#2450 商務線）出現時
+    // 再依 CodeMeta 流程補登。
+    string interrupt_kind = 23;
+    // doc 59 買家會員分級：與上面 Slice F 欄位各自 additive，互不相關——field
+    // number 21-23 已被 run ledger 佔用（同時間並行開發，非同一次規劃），quota 因
+    // 此接在 24。
+    AgentQuotaSnapshot quota = 24;
+}
+
+// AgentQuotaSnapshot 是買家會員分級的月配額快照，供前端呈現剩餘量與重置時間。
+message AgentQuotaSnapshot {
+    string plan_code = 1;
+    string remaining = 2;
+    string limit = 3;
+    string reset_at = 4;   // RFC3339 UTC — start of next period
+}
+
+message GetSnapshotRequest {
+    string request_id = 1;
+}
+
+message CropResolution {
+    optional string resolved_crop_code = 1;
+    optional string resolved_group_code = 2;
+    repeated CropDisambiguationOption candidates = 3;
+}
+
+// AgentRunSummary is one row of the run ledger for a conversation (Task 15,
+// doc57 §5.6) — enough for the website to render a run history strip and
+// know each run's replay boundary (last_seq_id/min_available_seq_id) without
+// a second round trip to WatchRunEvents.
+message AgentRunSummary {
+    string run_id = 1;
+    string run_type = 2;
+    string status = 3;
+    string last_seq_id = 4;
+    string min_available_seq_id = 5;
+    bool terminal = 6;
+
+    // version 是 CancelRun 的 CAS token（doc57 §5.4）在呼叫端唯一的讀路徑。
+    //
+    // 🔴 在這個欄位存在之前，`POST /runs/{runId}/cancel` 的必填
+    // expected_run_version 對瀏覽器**沒有任何來源**：空字串被 handler 的
+    // ParseInt 判 InvalidArgument，"0" 因 procurement_agent_runs.version
+    // NOT NULL DEFAULT 1 必然 CAS 落空。version 當時只出現在 cancel 自己的
+    // **回應**裡——那是呼叫之後才拿得到的值，解不了「呼叫之前要填什麼」。
+    // ⇒ 停止鈕在契約上做不出來，不是前端還沒接。
+    //
+    // 型別是 string 而非 int64：與本檔其餘 ID／版本欄位同一個 wire 慣例
+    // （JSON number 在 JS 端有 53-bit 精度上限，整條線一律用字串）。
+    string version = 7;
+}
+
+// AgentRunOpenConfirmation mirrors one unresolved row of
+// procurement_agent_run_interrupts (resolved_by_child_run_id IS NULL,
+// status='PENDING') — lets the website restore a pending interrupt's UI and
+// initiate resume after a page reload (doc57 §5.6, spec §10.1 2026-08-27
+// update). Field names align with Task 17's existing openConfirmation
+// consumer shape (interruptId/confirmationKind/expiresAt);
+// confirmation_kind is the wire name for the DB interrupt_kind column.
+message AgentRunOpenConfirmation {
+    string interrupt_id = 1;
+    string confirmation_kind = 2;
+    string expires_at = 3; // ISO 8601 UTC; empty string means no expiry (v1 interrupts don't expire, Task 14b M6)
+    // Server-authored pending question, including opaque options and free-text
+    // capability. Restores the exact category-selection stage after reload.
+    ClarifyQuestion question = 4;
+}
+
+message PublishedRfqPublication {
+    string publication_id = 1;
+    string version = 2;
+    string published_at = 3;
+}
+
+message SnapshotResponse {
+    string request_id = 1;
+    string revision_id = 2;
+    string status = 3;
+    Slots slots = 4;
+    repeated string missing_required = 5;
+    CropResolution crop_resolution = 6;
+    // runs/active_run_id/open_confirmation are additive (Task 15, doc57
+    // §5.6): every run tied to this request's conversation, which one (if
+    // any) is still active, and — only when that active run is
+    // WAITING_FOR_INPUT — its open confirmation. active_run_id is empty and
+    // open_confirmation is unset when there is no active run.
+    repeated AgentRunSummary runs = 7;
+    string active_run_id = 8;
+    AgentRunOpenConfirmation open_confirmation = 9;
+    PublishedRfqPublication published_publication = 10;
+}
+
+// ==================== #2538 賣家回價與買家接受 ====================
+//
+// 全部欄位為 string：64-bit ID 與 TWD 金額一律 decimal string，時間 RFC3339 UTC。
+// 身分不進 request 欄位——買家走 WithBuyerID、平台賣家走 WithStoreID；invite_id 是
+// EXTERNAL 專用，gateway 已先做過 session 相等檢查。
+
+message OfferedQuality {
+    string grade = 1;
+    string inspection_notes = 2;
+}
+
+message UnitBasis {
+    string quantity = 1;
+    string unit = 2;
+}
+
+message SellerQuotePayload {
+    string response_type = 1;          // MANUAL_QUOTE | ACCEPT_NON_PRICE_TERMS_WITH_QUOTE
+    OfferedQuality offered_quality = 2; // 必填；⛔ 不得由平台、LLM 或 Pricebook 代填
+    UnitBasis unit_basis = 3;
+    string offered_quantity = 4;
+    string offered_quantity_unit = 5;
+    string conversion_basis = 6;
+    string currency = 7;                // v1 恆為 TWD
+    string goods_amount = 8;
+    string shipping_amount = 9;
+    string tax_amount = 10;
+    string tax_inclusion_basis = 11;    // TAX_INCLUDED | TAX_EXCLUDED
+    string total_amount = 12;           // server 驗 = goods + shipping + tax
+    string lead_time_days = 13;
+    string promised_delivery_at = 14;
+    string valid_until = 15;
+    string terms_note = 16;
+    string deviation_disclosure = 17;
+}
+
+message SubmitSellerResponseRequest {
+    string publication_id = 1;
+    string invite_id = 2;                            // EXTERNAL 專用；PLATFORM 為空字串
+    string client_request_id = 3;                    // gateway 從 Idempotency-Key 正規化而來
+    string expected_publication_version = 4;
+    string expected_seller_facing_payload_hash = 5;
+    string expected_seller_response_version = 6;     // "" = 尚無正式回價
+    SellerQuotePayload quote = 7;
+}
+
+message SellerResponseVersionResponse {
+    string seller_response_id = 1;
+    string seller_response_version = 2;
+    string publication_id = 3;
+    string status = 4;                  // ACTIVE | SUPERSEDED | WITHDRAWN | EXPIRED
+    string payload_hash = 5;
+    string submitted_at = 6;
+    string superseded_by_version = 7;   // 空字串 = 目前仍是最新版
+    bool outside_buyer_requested_range = 8; // 只標示，⛔ 不得篡改賣家金額
+    SellerQuotePayload quote = 9;
+    bool replayed = 10;
+}
+
+message WithdrawSellerResponseRequest {
+    string publication_id = 1;
+    string invite_id = 2;
+    string seller_response_id = 3;
+    string client_request_id = 4;
+    string expected_seller_response_version = 5;
+    string reason_code = 6;
+}
+
+message DeclineRfqPublicationRequest {
+    string publication_id = 1;
+    string invite_id = 2;
+    string client_request_id = 3;
+    string reason_code = 4;
+}
+
+message SellerResponseClosureResponse {
+    string seller_response_id = 1;
+    string publication_id = 2;
+    string latest_version = 3;
+    string withdrawn_version = 4;   // 空字串 = 未撤回
+    string write_closed_at = 5;     // 空字串 = 仍可寫入
+    string write_closed_reason = 6;
+}
+
+message UpsertSellerResponseDraftRequest {
+    string publication_id = 1;
+    string invite_id = 2;
+    string expected_draft_version = 3;  // "" = 建立第一版
+    SellerQuotePayload draft = 4;       // ⛔ 草稿不驗金額恆等式，也不得被買家讀到
+}
+
+message SellerResponseDraftResponse {
+    string draft_version = 1;
+    string updated_at = 2;
+    SellerQuotePayload draft = 3;
+}
+
+// 站外業者（vendor portal）的草稿讀寫，ActorNone。
+message GetVendorPortalResponseDraftRequest {
+    string rfq_recipient_id = 1;
+}
+
+message UpsertVendorPortalResponseDraftRequest {
+    string rfq_recipient_id = 1;
+    string expected_draft_version = 2;
+    SellerQuotePayload draft = 3;
+}
+
+// 站外業者身分的驗證紀錄：入口驗過 vendor portal session 與 Google 身分後帶進來，
+// ai 原樣存進送出的報價版本與撤回、婉拒的指令紀錄。四個欄位缺一不可。
+message VendorPortalVerification {
+    string method = 1;                          // 目前只有 GOOGLE
+    string email = 2;
+    google.protobuf.Timestamp verified_at = 3;
+    string session_id = 4;
+}
+
+// 站外業者（vendor portal）的**正式送出／撤回／婉拒**，ActorNone。
+//
+// ⛔ **不是把 SubmitSellerResponse 等三支的 method policy 放寬**——那會讓平台賣家
+// 那一側一起失去身分檢查。另開 ActorNone 的變體是既有 draft pair 的形狀
+// （見上方 UpsertVendorPortalResponseDraftRequest），兩側共用同一個 usecase：
+// `sellerPrincipalFromContext` 早就有 `inviteID != "" ⇒ EXTERNAL` 的分支，
+// `procurement_seller_response_versions` 也早就有 `prospect_id` 欄。
+//
+// 🔴 **這三支要求 `verification`（入口帶來的 Google 驗證紀錄）完整**：缺任何一個
+// 欄位，ai 以 PERMISSION_DENIED 擋下（gateway 的 middleware 也守，但 ai 不信任它）。
+// 送出產生的 `sellerResponseVersion` 是 immutable，買家接受 exact version 即商務
+// award ⇒ 不可撤回的商務承諾不能只靠一條七天有效的邀請連結。草稿可覆寫，所以草稿
+// 那兩支不要求驗證紀錄。送出的驗證紀錄存在報價版本列，撤回與婉拒的存在只追加的指令紀錄。
+//
+// ⚠️ 逐欄語意與對應的賣家版相同，差別只有身分鍵：賣家版帶
+// `publication_id` ＋ `invite_id`，這裡帶 `rfq_recipient_id`（vendor portal session
+// 的鍵，站外業者不知道 publication id），publication 由 usecase 從 invite 解出。
+message SubmitVendorPortalResponseRequest {
+    string rfq_recipient_id = 1;
+    string client_request_id = 2;                    // gateway 從 Idempotency-Key 正規化而來
+    string expected_publication_version = 3;
+    // 4 空著：賣家版有 expected_seller_facing_payload_hash，站外版**刻意沒有**。
+    // 理由見 RfqPublicationInviteSellerViewResponse.publication_version 的註解：
+    // 那個 hash 不對站外方暴露，而 server 拿自己的 hash 跟自己比是恆真式、證明不了
+    // 任何事 ⇒ 與其留一個永遠是空字串的欄位誤導呼叫端，不如讓它不存在。
+    reserved 4;
+    string expected_seller_response_version = 5;     // "" = 尚無正式回價
+    SellerQuotePayload quote = 6;
+    VendorPortalVerification verification = 7;
+}
+
+message WithdrawVendorPortalResponseRequest {
+    string rfq_recipient_id = 1;
+    string seller_response_id = 2;
+    string client_request_id = 3;
+    string expected_seller_response_version = 4;
+    string reason_code = 5;
+    VendorPortalVerification verification = 6;
+}
+
+message DeclineVendorPortalRfqPublicationRequest {
+    string rfq_recipient_id = 1;
+    string client_request_id = 2;
+    string reason_code = 3;
+    VendorPortalVerification verification = 4;
+}
+
+message ListSellerPublicationsRequest {
+    string limit = 1;
+}
+
+message SellerPublicationSummary {
+    string publication_id = 1;
+    string publication_version = 2;
+    string invite_id = 3;
+    string lane = 4;
+    string seller_facing_payload_hash = 5;
+    string delivery_state = 6;
+    string published_at = 7;
+}
+
+// SellerPublicationListItem 與 SellerPublicationDetailResponse 同形：發布摘要 ＋
+// 需求內容。清單只回這兩段（不含賣家自己的草稿與版本，那是詳情才需要的），但
+// 「publication 巢狀、需求內容平行」這個形狀兩支端點一致，前端一套解析器兩邊用。
+message SellerPublicationListItem {
+    SellerPublicationSummary publication = 1;
+    RfqPublicationInviteSellerViewResponse seller_facing_payload = 2;
+    string latest_response_status = 3;
+    bool has_draft = 4;
+}
+
+message ListSellerPublicationsResponse {
+    repeated SellerPublicationListItem publications = 1;
+}
+
+message GetSellerPublicationRequest {
+    string publication_id = 1;
+    string invite_id = 2;
+}
+
+// SellerPublicationDetailResponse 是賣家詳情：發布摘要，加上**這個賣家自己**的
+// 草稿與目前正式版本。後兩者是填 CAS 欄位的唯一來源——少了它們，賣家端湊不出
+// expected_draft_version 與 expected_seller_response_version。
+//
+// ⛔ 只投影呼叫端自己的回價，不含其他賣家的任何內容。
+message SellerPublicationDetailResponse {
+    SellerPublicationSummary publication = 1;
+    SellerResponseDraftResponse draft = 2;          // 未存過草稿時 unset
+    SellerResponseVersionResponse latest_response = 3; // 尚無正式回價時 unset
+    // seller_facing_payload 是賣家在報什麼價——沒有它，回價表單是一張空白表。
+    // 重用 vendor portal 已上線的同一個九欄白名單型別：兩邊看到的內容必須一致，
+    // 各定義一份就是讓它們有機會分家。
+    RfqPublicationInviteSellerViewResponse seller_facing_payload = 4;
+}
+
+message ListSellerResponsesRequest {
+    string request_id = 1;
+    string publication_id = 2;
+}
+
+message ListSellerResponsesResponse {
+    repeated BuyerFacingSellerResponse responses = 1;
+}
+
+// ⛔ 只有可公開的身分投影：不得帶站外業者 email、KYC 狀態、prospect 聯絡方式。
+message SellerIdentityView {
+    string display_name = 1;
+    string party_type = 2;
+    string store_code = 3;
+}
+
+message BuyerFacingSellerResponse {
+    string seller_response_id = 1;
+    string seller_response_version = 2;
+    string status = 3;
+    string payload_hash = 4;
+    string submitted_at = 5;
+    SellerIdentityView seller = 6;
+    SellerQuotePayload quote = 7;
+    bool outside_buyer_requested_range = 8;
+    bool shortlisted = 9;
+    string acceptability = 10;  // ACCEPTABLE | EXPIRED | WITHDRAWN | SUPERSEDED | INELIGIBLE
+}
+
+message ShortlistEntryRequest {
+    string request_id = 1;
+    string seller_response_id = 2;
+    string seller_response_version = 3;
+}
+
+message ShortlistEntryResponse {
+    string seller_response_id = 1;
+    string seller_response_version = 2;
+    bool present = 3;
+}
+
+message BuyerQuoteAcceptanceRequest {
+    string request_id = 1;
+    string client_request_id = 2;                 // gateway 從 Idempotency-Key 正規化而來
+    string seller_response_id = 3;
+    string expected_seller_response_version = 4;
+    string expected_rfq_snapshot_hash = 5;
+}
+
+message BuyerQuoteAcceptanceResponse {
+    string buyer_acceptance_id = 1;
+    string seller_response_id = 2;
+    string seller_response_version = 3;
+    string accepted_deal_price = 4;      // server-side copy，來源只有被接受的那一版
+    string currency = 5;
+    string accepted_at = 6;
+    string order_provisioning_state = 7; // CREATING_ORDER | ORDER_CREATED | ORDER_FAILED
+    string order_no = 8;                 // 空字串直到 ORDER_CREATED
+    string payment_deadline = 9;         // 空字串直到 ORDER_CREATED
+    bool replayed = 10;
+}
+
+message GetRuntimeSnapshotRequest {
+    string conversation_id = 1;
+}
+
+// AgentRunArtifactView 是 doc 57 §5.6 artifacts[] 的一列：每個 artifact_id 的最新一版。
+message AgentRunArtifactView {
+    string artifact_id = 1;
+    string run_id = 2;
+    string artifact_type = 3;
+    string version = 4;
+    string status = 5;
+    string data_json = 6;       // 原樣透傳的 JSON 字串
+    string checksum = 7;
+    string domain_ref_type = 8;
+    string domain_ref_id = 9;
+    string as_of = 10;
+    string created_at = 11;
+}
+
+// RuntimeSnapshotResponse 是 doc 57 §5.6 的 thread 重建權威 public projection。
+message RuntimeSnapshotResponse {
+    string conversation_id = 1;
+    string request_id = 2;
+    string status = 3;
+    string title = 4;
+    repeated ConversationMessage messages = 5;
+    repeated AgentRunSummary runs = 6;
+    string active_run_id = 7;
+    repeated AgentRunArtifactView artifacts = 8;
+    AgentRunOpenConfirmation open_confirmation = 9;
+}
+
+message StartCandidateSearchRequest {
+    string request_id = 1;
+}
+
+message StartCandidateSearchResponse {
+    string request_id = 1;
+
+    // run_id ＝**這次執行**的身分；candidate_set_id ＝**這批候選**的身分。設計書 57
+    // §1.2-3 禁止一個 ID 同時代表兩者。
+    //
+    // ⚠️ 過渡期（expand 波）run_id 仍回 candidate set id，見 ai-service
+    // internal/grpc/procurement_handler.go 的 wireRunID 註解：拆波是為了讓部署 surge
+    // 視窗內尚未下線的舊 pod 仍解析得到前端送回來的值。stop-using 波後兩者才會不同。
+    string run_id = 2;
+    string status = 3;
+
+    // candidate_set_id 是 §5.3 要求的 allowlisted domainRef：RunAccepted envelope 要指出
+    // 這次 run 產出的是哪一批候選。少了它，前端在 accept 當下只有 runId。
+    string candidate_set_id = 4;
+}
+
+message GetCandidateSearchRequest {
+    string request_id = 1;
+
+    // run_id 是 `GET .../candidate-searches/{runId}` 的路徑參數。expand 波起，ai-service
+    // 先用 run_id 欄位查、查不到再用 candidate set id 查一次，所以新舊兩種值都解析得到
+    // （見 repository 的 GetCandidateSetRunWithCandidates）。
+    string run_id = 2;
+}
+
+message CandidateItem {
+    string candidate_id = 1;
+    string source_id = 2;
+    string lane = 3;
+    string display_name = 4;
+    double score = 5;
+    string matched_facts_json = 6;      // 原樣透傳的 JSON 字串（保證陣列非 null）
+    string unverifiable_facts_json = 7; // 同上
+    string facts_as_of = 8;             // RFC3339 UTC
+    bool selected = 9;
+
+    // 10–13 是 issue #2377 的**賣家身分快照**（facts_as_of 當下的事實），讓官網把候選
+    // 呈現成「找到哪幾家商家」。EXTERNAL lane 沒有平台賣家（來源是站外名單），四欄一律
+    // 空字串，不偽造平台 seller identity。
+    //
+    // 命名用 store_id 不用 seller_id：這個值是 store-stint surrogate（sellers.store_id），
+    // 不是登入 principal。本檔既有的 6 個 store_id 欄位就是上一輪「account_id 命名債正名」
+    // 的結果，新欄位跟著同一套，不再開第三個名字。
+    //
+    // 刻意不加商品層的圖片與標價：候選的單位是**收件人**不是品項（本票是 #2450
+    // DIRECT_RECIPIENTS 的前置），EXTERNAL lane 也根本沒有平台商品。價格尤其不放這裡——
+    // 設計書 57 §1.1-2 只認四種價格事實，商品標價不在其中；買家該看到的是 Pricebook 對
+    // 該品項的參考價區間（referencePriceRange，屬 #2403）。
+    //
+    // ⛔ store_id **不是授權判準**：商品可以移店，快照會過期。要判斷「這個商品現在屬於
+    //    誰」一律重新問 product-service（services/ai-service/internal/procurement/usecase/
+    //    quote_confirm.go 的 ConfirmByID）。
+    string store_id = 10;   // 商家的 store-stint surrogate 數字字串；空 = EXTERNAL lane
+    string seller_name = 11;
+    string logo_key = 12;   // 商家 logo objectKey（49 §6.6：Gateway 組 URL）
+    string store_code = 13; // 賣家頁 canonical 短碼；空字串時消費端不得退回 store_id 組連結
+
+    // 14–15 是**站外業者的品牌素材**，與上面 10–13 的平台賣家身分快照是兩回事，
+    // 刻意不共用 logo_key：那一欄的語意是「平台商家的 logo」，EXTERNAL 填進去
+    // 就是在偽造平台 seller identity（見 10–13 的註解）。這兩欄只說「這家站外
+    // 業者自己的品牌圖長什麼樣」，**不表示平台已驗證、已認證或已入駐**——
+    // 同一張卡上恆有 ExternalLaneDisclosure（「外部名單，供應能力未經平台驗證，
+    // 以賣家回覆為準」）才是這個呈現成立的前提（G7／doc 57 §1.6）。
+    //
+    // 與 logo_key 同為 facts_as_of 當下的快照：站外業者換圖後，舊候選集仍指著
+    // 舊 objectKey，而被取代的資產會由 media GC 回收 ⇒ 舊卡片的圖會消失。這與
+    // PLATFORM 的 logo_key 是同一個既有取捨，不另做讀取時回查。
+    string brand_logo_key = 14;
+    string brand_cover_key = 15;
+}
+
+message CandidateLanes {
+    repeated CandidateItem platform = 1;
+    repeated CandidateItem external = 2;
+}
+
+message CandidateSetResponse {
+    string request_id = 1;
+    string run_id = 2;
+    string candidate_set_id = 3;
+    // status / lane status 的值域 SSOT 是 CodeMeta 的 ProcurementRunStatus、
+    // ProcurementLaneStatus（issue #2446 契約凍結）。
+    string status = 4;
+    string platform_lane_status = 5;
+    string external_lane_status = 6;
+    // failure_reason：run 為何進入 FAILED 的機器可讀原因（ProcurementRunFailureReason），
+    // 非 FAILED 時為空字串。原名 error_code，於 #2446 改名——**field number 7 不變**，
+    // 所以 binary wire 相容：rolling update 期間新舊 gateway／ai-service 互打都讀得到同一份
+    // 資料（欄位號相同，名字只影響 JSON 序列化，而這條路徑是純 binary gRPC）。
+    // 因為號碼沒有被釋出，不需要 reserved。
+    string failure_reason = 7;
+    CandidateLanes candidates = 8;
+}
+
+message ToggleSelectionRequest {
+    string request_id = 1;
+    string candidate_set_id = 2;
+    string lane = 3;
+    string candidate_id = 4;
+    bool selected = 5;
+}
+
+message ToggleSelectionResponse {
+    string request_id = 1;
+    string candidate_set_id = 2;
+    string lane = 3;
+    string candidate_id = 4;
+    bool selected = 5;
+}
+
+message SubmitAnswerRequest {
+    string request_id = 1;
+    string slot_key = 2;
+    string option_id = 3;
+    string free_text = 4;
+    string unit_option_id = 5; // quantity 複合欄位專用（#2457），其餘 slot 不使用
+    bool skip = 6;
+    string expected_revision_id = 7;
+    string client_request_id = 8;
+    // self_entered_price_amount 只在 slot_key=="crop_disambiguation" 且
+    // option_id=="crop-other" 時使用（品項落在 Pricebook 分類設計書 §5）。
+    // 字串（金額欄位一律字串慣例），空字串表示未提供。
+    string self_entered_price_amount = 9;
+}
+
+message RewindRequest {
+    string request_id = 1;
+    string slot_key = 2;
+    string client_request_id = 3;
+}
+
+message ListConversationsRequest {
+    string cursor_id = 1;
+    string page_size = 2;
+}
+
+message ConversationSummary {
+    string conversation_id = 1;
+    string title = 2;
+    string last_message_preview = 3;
+    string updated_at = 4;
+}
+
+message ListConversationsResponse {
+    repeated ConversationSummary records = 1;
+    bool has_more = 2;
+    string next_cursor_id = 3;
+}
+
+message GetConversationMessagesRequest {
+    string conversation_id = 1;
+}
+
+message ConversationMessage {
+    // reasoning：#2447 BE-01A 下架後 reserved 化，理由同 MessageEvent。
+    reserved 6;
+    reserved "reasoning";
+    string id = 1;
+    string role = 2;
+    string text = 3;
+    repeated Step steps = 4;
+    repeated RecordedField recorded_this_turn = 5;
+    string created_at = 7;
+}
+
+message ConversationMessagesResponse {
+    string conversation_id = 1;
+    string request_id = 2;
+    string status = 3;
+    string title = 4;
+    repeated ConversationMessage records = 5;
+}
+
+message RenameConversationRequest {
+    string conversation_id = 1;
+    string title = 2;
+    string client_request_id = 3;
+}
+
+message DeleteConversationRequest {
+    string conversation_id = 1;
+    string client_request_id = 2;
+}
+
+// BuyerRequestedRange 同時是 RfqPricePreviewRequest 的輸入（買家自己給的範圍，
+// 第一次呼叫可省略）與 RfqPricePreviewResponse 的輸出（Server 回顯，PRICEBOOK_GUIDED
+// 且買家未給時以參考區間下上界預填——見 usecase.PreviewRfqPriceUseCase.PreviewRfqPrice）。
+message BuyerRequestedRange {
+    string currency = 1;
+    string price_component = 2;
+    string lower_bound_amount = 3;
+    string upper_bound_amount = 4;
+    // basis_quantity/basis_unit：這個價格是「每多少單位的什麼單位」——例如 GRAM
+    // 計價的品項固定 "1000"/"GRAM"（Pricebook 以每 1000 克計價避免四捨五入到
+    // 趨近零），其餘情況 "1"/<unit>（見 usecase.BuyerRequestedRange 與
+    // usecase.PreviewRfqPriceUseCase.PreviewRfqPrice）。只在 RESPONSE 方向由
+    // Server 計算並回填；買家送出 REQUEST 時不會（也不需要）帶這兩個欄位，
+    // Server 也不讀取 request 方向的這兩個欄位。
+    string basis_quantity = 5;
+    string basis_unit = 6;
+}
+
+message RfqPricePreviewRequest {
+    string request_id = 1;
+    string expected_revision_id = 2;
+    string client_request_id = 3;
+    string pricing_mode = 4;
+    string delivery_city = 5;
+    BuyerRequestedRange buyer_requested_range = 6;
+}
+
+// ReferencePriceRange 只在 PRICEBOOK_GUIDED 且 mapping 可靠時存在
+// （usecase.PricePreviewResult.ReferenceAvailability=="AVAILABLE"）；
+// BUYER_ENTERED_NO_REFERENCE 時 RfqPricePreviewResponse 不設這個欄位（null）。
+message ReferencePriceRange {
+    string lower_bound_amount = 1;
+    string midpoint_amount = 2;
+    string upper_bound_amount = 3;
+    // basis_quantity/basis_unit：這三個金額是「每多少單位的什麼單位」的價格，
+    // 語意與計算方式跟 BuyerRequestedRange 的同名欄位完全一致（同一支
+    // usecase.referenceBasis 產出，不是第二套規則）。Server 端一律回填，
+    // 讓 client 拿到金額的同時就拿到它的計價基準，不必自己從
+    // buyer_requested_range 推導、也不必自己乘任何換算係數
+    // （v6 設計稿 03「計價基準」那一行）。
+    string basis_quantity = 4;
+    string basis_unit = 5;
+}
+
+// DealTemperature 是成交溫度計 v1：買家希望詢價區間涵蓋 Pricebook 預測分布多少
+// 質量（docs/詳細設計書/64 §2-5）。兩個機率都是
+// 關於市場價格，不是關於賣家會不會回應——後者需要歷史 outcome，屬
+// outcomeDefinitionVersion 2。
+//
+// status == "UNKNOWN" 時 3–9 號欄位一律空字串；status == "AVAILABLE" 時 3–9 必須
+// 全部有值，缺任一欄即由讀取端 fail closed。
+message DealTemperature {
+    string status = 1;
+    string reason_code = 2;
+    string probability_lower_bps = 3;        // 嚴格界：落在買家區間內
+    string probability_upper_bps = 4;        // 寬鬆界：不超過買家上限
+    string band = 5;                         // COLD | WARM | HOT
+    string outcome_definition = 6;
+    string outcome_definition_version = 7;
+    string policy_version = 8;
+    string band_version = 9;
+}
+
+// MarketPriceBasis 揭露「這組參考價是從哪一份市場資料算出來的」（v6 設計稿 03
+// 市場價格參考區塊的「資料截至」與「計價基準」兩行）。與 reference_price_range
+// 同生同滅——只在 reference_availability=="AVAILABLE" 時存在，
+// BUYER_ENTERED_NO_REFERENCE 完全不查 Pricebook，這個欄位為 null。
+//
+// 值全部原樣來自 pricebook-service 的 GetRegionalComparisonResponse，不由
+// ai-service 重算或補值（見 usecase.PreviewRfqPriceUseCase.PreviewRfqPrice）。
+message MarketPriceBasis {
+    // region_name 是實際命中的 Pricebook 縣市名，不是買家送出的 delivery_city
+    // 原文——兩者要經 domain.NormalizeCityName 消除「臺／台」雙寫差異後才比對
+    // 得中，所以這裡回實際採用的那一個，讓買家看得到自己被對到哪個區域。
+    string region_name = 1;
+    // supporting_market_count 是這個縣市底下實際貢獻資料的批發市場家數，
+    // 對應 pricebook.proto RegionalComparisonRegion.supporting_market_count
+    // （那支是 service 之間的內部 RPC，用 int32；這裡是對外曝露面，依 Proto
+    // 管理規範 §6 計數一律 string，轉換發生在 gRPC 邊界）。
+    string supporting_market_count = 2;
+    // source_data_as_of 是這份行情資料涵蓋到的最後交易日（RFC3339 UTC），取自
+    // GetRegionalComparisonResponse.lineage.source_data_as_of。pricebook-service
+    // 在沒有底層資料時本來就會省略它，因此這裡是 optional，不得補成空字串或
+    // 當下時間假裝資料是新的。
+    optional string source_data_as_of = 3;
+    // freshness_status：fresh | stale | unavailable，pricebook-service 既有值域
+    // （這個縣市底下貢獻資料的市場中最差的新鮮度）。
+    //
+    // 純揭露，不參與 reference_availability 的判定——PreviewRfqPrice 的
+    // mapping 可靠性只看 status=="ready" 且 p50 非 nil，stale 資料照樣算出參考
+    // 價（與 /quote-batches 既有的 domain.MatchRegionPrice 一致，那裡也是照樣
+    // 取價、只把 availability 降級成 MARKET_STALE）。本欄位讓前端有辦法對買家
+    // 標示「行情資料較舊」，而不是把資料整批擋掉。
+    string freshness_status = 4;    // scope：REGION（這份行情對應到某一個縣市）或 NATIONAL（全國單一行情，
+    // 沒有區域維度）。多來源之後不是每條序列都有區域維度——白肉雞、雞蛋、
+    // 鴨鵝的來源一天只回一列。用明確的 scope 而不是「region_name 空的就當
+    // 全國」：後者讓「全國行情」與「區域比對失敗」在 wire 上長得一樣。
+    string scope = 5;
+    // price_layer：wholesale_auction｜farmgate｜live_animal｜retail｜
+    // wholesale_bulk。空字串代表既有的蔬果批發路徑。
+    //
+    // 🔴 這不是附加資訊。毛豬回的是活體拍賣均價，不是豬肉分切零售價，兩者
+    // 水平差數倍——把參考價給買家卻不說它是哪一個層級，買家會照著它出價。
+    // client 必須與金額一起顯示。
+    string price_layer = 6;
+}
+
+// QuoteTotalRange 是伺服器依「買家這次的單價範圍」與「需求數量」算出的詢價總額
+// 區間（v6 設計稿 03 明寫「由伺服器依本次單價範圍計算」）。刻意由 Server 算：
+// 單價的計價基準是 basis_quantity/basis_unit（GRAM 品項是每 1000 公克），前端
+// 自己乘會在 GRAM 這一類品項上錯 1000 倍。
+//
+// 需求數量是選填 slot（domain.requiredSlots 只含 item／delivery_city／unit），
+// 沒填數量就算不出總額——這時整個欄位為 null，不得回 0 或把單價當總額。
+message QuoteTotalRange {
+    string currency = 1;
+    string lower_bound_amount = 2;
+    string upper_bound_amount = 3;
+    // quantity/quantity_unit 是這次計算實際採用的數量與單位（來自 request 已
+    // 持久化的 slots，不是 client 送來的值），一併回傳讓買家能自行核對
+    // 「幾箱 × 單價」這一行，不必再打一次 snapshot 端點。
+    string quantity = 4;
+    string quantity_unit = 5;
+}
+
+message RfqPricePreviewResponse {
+    string price_preview_id = 1;
+    string version = 2;
+    string pricing_mode = 3;
+    string reference_availability = 4;
+    ReferencePriceRange reference_price_range = 5;
+    BuyerRequestedRange buyer_requested_range = 6;
+    DealTemperature deal_temperature = 7;
+    string payload_hash = 8;
+    // market_price_basis／quote_total_range 是 v6 設計稿 03 市場價格參考區塊的
+    // 兩個純附加欄位，各自可為 null（條件見兩個 message 自己的註解）。
+    MarketPriceBasis market_price_basis = 9;
+    QuoteTotalRange quote_total_range = 10;
+    // 空字串＝本欄加入前建立的 preview，呼叫端當「未知」處理，不得補值。
+    string quality_knowledge_state = 11;
+}
+
+// RfqConfirmationRequest is the body of POST .../rfq-confirmations (issue
+// #2403 Slice 3): a CAS on a specific RfqPricePreviewResponse
+// (price_preview_id/price_preview_version/payload_hash) plus the same
+// expected_revision_id optimistic-concurrency guard PreviewRfqPrice uses —
+// see usecase.ConfirmRfqSnapshotUseCase.ConfirmRfqSnapshot.
+message RfqConfirmationRequest {
+    string request_id = 1;
+    string client_request_id = 2;
+    string expected_revision_id = 3;
+    string price_preview_id = 4;
+    string price_preview_version = 5;
+    string payload_hash = 6;
+    // buyer_note 是買家自己打字、原文轉呈給供應商的補充說明（選填，最多 500 字）。
+    // ⛔ 它不是品相欄位：伺服器不解析、不用它做候選比對、不由它推導任何等級
+    // （v6.0 Part V：品相知識只能從供應商那側進入系統）。2026-08-17 移除的 spec
+    // slot 是被 LLM 抽取的結構化欄位，本欄刻意不是那種東西。
+    // 空字串＝沒有補充說明，此時 canonical payload 完全不含這個鍵，payload_hash
+    // 與本欄加入前逐位元相同。
+    string buyer_note = 7;
+}
+
+message RfqConfirmationResponse {
+    string confirmed_rfq_snapshot_id = 1;
+    string payload_hash = 2;
+    // snapshot 自己的到期（RFC3339 UTC）。空字串＝本欄加入前建立的 snapshot。
+    string expires_at = 3;
+}
+
+// RfqPublicationPreviewRequest 是 POST .../rfq-publications/preview 的 body
+// （#2450 Scope 1）。⛔ body 只能帶參照，不得重送 subject／quantity／unit／budget／
+// range／price／quality／candidate facts 或任何 free-form RFQ 內容——伺服器從
+// confirmed snapshot 編譯 canonical seller-facing payload。
+message RfqPublicationPreviewRequest {
+    string request_id = 1;
+    string preview_client_request_id = 2;
+    string expected_revision_id = 3;
+    string confirmed_rfq_snapshot_id = 4;
+    string audience_mode = 5;                    // WISH_POOL | DIRECT_RECIPIENTS
+    string candidate_set_id = 6;                 // DIRECT_RECIPIENTS 必填
+    repeated string selected_candidate_ids = 7;  // DIRECT_RECIPIENTS 必填，順序有意義
+    optional string response_deadline = 8;       // publication 屬性（doc 64 §3.1），YYYY-MM-DD
+}
+
+// RfqPublicationPreviewResponse 一定要吐 approval_id ＋ approval_version：
+// execute 以這兩者做 CAS，回應是呼叫端唯一的來源。既有
+// POST .../runs/{runId}/cancel 就是反面教材——它必填 expected_run_version，但
+// run_version 只出現在 cancel 自己的回應裡，呼叫之前無處可讀。
+message RfqPublicationPreviewResponse {
+    string approval_id = 1;
+    string approval_version = 2;
+    string audience_hash = 3;
+    string seller_facing_payload_hash = 4;
+    string seller_facing_payload_json = 5;
+    string expires_at = 6;
+    string deal_temperature_status = 7; // #2537 完成前恆為 UNKNOWN
+
+    // audience policy 的身分要吐回去，買家介面才講得出「這會發給誰」。
+    // v1 的 WISH_POOL 是 WISH_POOL_ALL_ACTIVE_SELLERS_V1 / 1 ＝ 全站未停權賣家，
+    // 沒有分類、地區或分級維度——**typed 地說「無限制」，不是讓欄位消失**。
+    // DIRECT_RECIPIENTS 兩欄為空字串／"0"，改由 recipient_count 表達受眾大小。
+    string audience_policy_id = 8;
+    string audience_policy_version = 9;
+    string recipient_count = 10; // DIRECT 為選定家數；WISH_POOL 恆為 "0"（無名單是本模式的定義）
+}
+
+// RfqPublicationExecuteRequest 是 POST .../rfq-publications 的 body（#2450 Scope 4）。
+// ⛔ body 只能帶參照與 CAS token，不得接受任何 browser-side 的 RFQ／price／audience
+// override——伺服器要發什麼、發給誰，全部從 approval 讀。
+message RfqPublicationExecuteRequest {
+    string request_id = 1;
+    string client_request_id = 2;      // 與 preview 的 previewClientRequestId 是不同的鍵
+    string approval_id = 3;
+    string approval_version = 4;
+    string expected_revision_id = 5;
+    string payload_hash = 6;           // = preview 回應的 sellerFacingPayloadHash
+}
+
+// RfqPublicationExecuteResponse。⛔ state = PUBLISHED 只代表 server transaction
+// 完成，不代表已投遞或已被看到（Scope 9）——前端文案必須是「已建立發布，正在處理」。
+message RfqPublicationExecuteResponse {
+    string publication_id = 1;
+    string publication_version = 2;
+    string state = 3;
+    string audience_mode = 4;
+    string audience_hash = 5;
+    string seller_facing_payload_hash = 6;
+    string published_at = 7;
+    bool replayed = 8;                 // true = 冪等回放，未建立新的 publication
+}
+
+// 站外賣家 RFQ 摘要讀取（Vendor Portal E1 Task 5b）。
+message GetRfqPublicationInviteSellerViewRequest {
+    string invite_id = 1;
+}
+
+message SellerFacingReferenceRange {
+    string lower_bound_amount = 1;
+    string upper_bound_amount = 2;
+    string basis_quantity = 3;
+    string basis_unit = 4;
+}
+
+message SellerFacingRequestedRange {
+    string currency = 1;
+    string price_component = 2;
+    string basis_quantity = 3;
+    string basis_unit = 4;
+    string lower_bound_amount = 5;
+    string upper_bound_amount = 6;
+}
+
+message RfqPublicationInviteSellerViewResponse {
+    // 空字串＝本欄加入前建立的 approval，呼叫端當「未知」處理，不得補值。
+    string quality_knowledge_state = 9;
+    string item = 1;
+    string item_label = 2;
+    string quantity = 3;
+    string unit = 4;
+    string packaging = 5;
+    string delivery_city = 6;
+    string delivery_date = 7;
+    string response_deadline = 8;
+    // 空字串＝買家沒有補充說明（或這張 approval 建立於本欄加入前）。原文照登，
+    // 伺服器不解析也不驗證內容。
+    string buyer_note = 10;
+    SellerFacingReferenceRange reference_price_range = 11;
+    SellerFacingRequestedRange buyer_requested_range = 12;
+    // 這張 publication 的版本（十進位字串）。站外業者正式送出報價時原樣帶回來做
+    // CAS，把報價綁在「他當時看到的那一版 RFQ」上——業者從 email 連結進來，可能隔
+    // 好幾天才回來填，期間買家改過 RFQ 的機率比站內賣家高。
+    //
+    // ⛔ **`seller_facing_payload_hash` 刻意不在這個白名單裡**：它是我方的內部完整性
+    // 摘要，交給站外的不受信任方只會多一個可被比對／重放的內部值，而它的驗證者本來
+    // 就該是 server。代價要明說——CAS 因此退化成 version-only：擋得住「買家改版後
+    // 業者才送出」，擋不住「payload 變了但 version 沒 bump」，而後者本身是 producer
+    // 端的 bug，不是這條 lane 的風險面。
+    string publication_version = 13;
+}
+
+// WatchRunEventsRequest 是 doc57 §2.5 replay 演算法的輸入：run_id 決定訂閱哪個
+// run，after_seq 是十進位字串 cursor（空字串代表從頭開始），與既有 SSE 慣例的
+// Last-Event-ID 同一個語意，只是換了 transport。
+message WatchRunEventsRequest {
+    string run_id = 1;
+    string request_id = 2;
+    string after_seq = 3; // 十進位字串 cursor；空字串代表從頭開始
+}
+
+// RunEvent 是 WatchRunEvents 串流上的單筆 ledger event——欄位對齊
+// repository.RunEvent，data_json 是該 event 的 public payload（doc57 §4.2 值域），
+// 不是 domain/DB row 的直接序列化。
+message RunEvent {
+    string event_id = 1;
+    string run_id = 2;
+    string seq = 3;
+    string type = 4;
+    string occurred_at = 5;
+    bytes data_json = 6;
+    // conversation_id 是這個 run 所屬的對話（procurement_agent_runs.conversation_id，
+    // 每一種 run type 都有：TURN／ANSWER／REWIND 由 ClaimRun 解析，CANDIDATE_SEARCH
+    // 由 CreateLedgerRunForCandidateSearch 從 set.RequestID 解析，doc57 §5.6）。
+    //
+    // 存在的理由只有一個：gateway 把原生 RUN_STARTED／RUN_FINISHED 投影成 AG-UI
+    // frame 時需要 `threadId`，而官方 schema 把它列為必填。producer 端的
+    // public payload 恆為字面 `{}`（見 candidate_search.go／turn.go／answer.go／
+    // rewind.go 的 terminalPayload），所以這個值必須跟 run_id 一樣由 event 自帶、
+    // 不能寄望 payload 剛好有。零值（run 沒有掛在任何對話上）在 wire 上是空字串，
+    // 不是 "0"——缺席與「id 為 0 的對話」不是同一件事。
+    string conversation_id = 7;
+}
+
+// CancelRunRequest 是 doc57 §5.4 cancel 命令的輸入：run_id 來自 URL path，
+// expected_run_version 是 CAS 欄位（repository.CancelRunInput.ExpectedVersion）。
+// client_request_id／reason 目前只在 wire 上保留（doc57 §5.3 端點形狀），
+// repository.CancelRun（Task 4）本身沒有把它們用在冪等判斷或終態文案上——取消
+// 命令的冪等性完全來自 CAS＋disposition 值域本身（重複取消同一個 run 自然回
+// ALREADY_CANCELLED，不需要另一把冪等鍵）。
+message CancelRunRequest {
+    string run_id = 1;
+    string client_request_id = 2;
+    string expected_run_version = 3;
+    string reason = 4;
+}
+
+// CancelRunResponse 對映 doc57 §5.4 四值 cancel_disposition
+// （REQUESTED／ALREADY_CANCELLED／ALREADY_TERMINAL／TOO_LATE，不得新增）。
+message CancelRunResponse {
+    string run_id = 1;
+    string run_status = 2;
+    string cancel_disposition = 3;
+    string run_version = 4;
+}
+
+// ResumeRunRequest 是 doc57 §5.5 resume 命令的輸入：interrupt_id 決定要 resolve
+// 哪一筆 procurement_agent_run_interrupts，response_payload 是買家對該中斷的
+// 回覆（crop 消歧待選等，schema 由 interrupt_kind 決定，這裡不做結構化解析）。
+message ResumeRunRequest {
+    string interrupt_id = 1;
+    string client_request_id = 2;
+    bytes response_payload = 3;
+}
+
+message ResumeRunResponse {
+    string run_id = 1;
+    string run_status = 2;
+    // 這一輪 resume 實際產生的 TurnResult，與 SubmitTurn／SubmitAnswer／Rewind
+    // 同一個 serializer。child run 真的跑完才有值；冪等重播（同一組
+    // buyer_id + client_request_id 重送）只回現況、不重跑 pipeline，那條路徑
+    // 不帶 result，client 需自行回讀 snapshot。
+    TurnResult result = 3;
+}
+
+service AIProcurementService {
+    // 買家：需求輸入
+    rpc SubmitTurn(TurnRequest) returns (TurnResult);
+    rpc SubmitTurnStream(TurnRequest) returns (stream StreamEvent);
+    rpc GetSnapshot(GetSnapshotRequest) returns (SnapshotResponse);
+
+    // 買家：候選搜尋（async-poll，兩支對稱，不合併）
+    rpc StartCandidateSearch(StartCandidateSearchRequest) returns (StartCandidateSearchResponse);
+    rpc GetCandidateSearch(GetCandidateSearchRequest) returns (CandidateSetResponse);
+    rpc ToggleSelection(ToggleSelectionRequest) returns (ToggleSelectionResponse);
+
+    // 買家：引導式問答
+    rpc SubmitAnswer(SubmitAnswerRequest) returns (TurnResult);
+    rpc Rewind(RewindRequest) returns (TurnResult);
+
+    // 買家：RFQ 報價預覽（Pricebook 參考區間，issue #2403 Slice 2）
+    rpc PreviewRfqPrice(RfqPricePreviewRequest) returns (RfqPricePreviewResponse);
+
+    // 買家：RFQ 報價確認（對某次 price preview 產生不可變確認快照，issue #2403 Slice 3）
+    rpc ConfirmRfqSnapshot(RfqConfirmationRequest) returns (RfqConfirmationResponse);
+
+    // 買家：RFQ 發布預覽（產生不可變的 publication approval，issue #2450 Slice 1）
+    // ⛔ 只建立 approval，不建立 publication／invite／outbox／projection，也不發任何對外通知。
+    rpc PreviewRfqPublication(RfqPublicationPreviewRequest) returns (RfqPublicationPreviewResponse);
+
+    // 買家：RFQ 發布執行（對 publication approval 做 CAS 執行，issue #2450 Slice 2a）
+    // ⛔ state = PUBLISHED 只代表 server transaction 完成，不代表已投遞或已被賣家看到
+    // （Scope 9）——本 slice 不建 invite／outbox／projection，也不發任何對外通知。
+    rpc ExecuteRfqPublication(RfqPublicationExecuteRequest) returns (RfqPublicationExecuteResponse);
+
+    // 站外賣家：依 invite id 讀取 RFQ 摘要（Vendor Portal E1 Task 5b）
+    rpc GetRfqPublicationInviteSellerView(GetRfqPublicationInviteSellerViewRequest) returns (RfqPublicationInviteSellerViewResponse);
+
+    // 買家：對話管理
+    rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
+    rpc GetConversationMessages(GetConversationMessagesRequest) returns (ConversationMessagesResponse);
+    rpc GetRuntimeSnapshot(GetRuntimeSnapshotRequest) returns (RuntimeSnapshotResponse);
+
+    // 平台賣家：回價（#2538）。EXTERNAL 半邊的 wire 形狀同樣凍在這裡（invite_id）。
+    // ⚠️ 站外業者走的是下方的 VendorPortal 變體（ActorNone），不是這三支。
+    rpc ListSellerPublications(ListSellerPublicationsRequest) returns (ListSellerPublicationsResponse);
+    rpc GetSellerPublication(GetSellerPublicationRequest) returns (SellerPublicationDetailResponse);
+    rpc UpsertSellerResponseDraft(UpsertSellerResponseDraftRequest) returns (SellerResponseDraftResponse);
+    rpc GetVendorPortalResponseDraft(GetVendorPortalResponseDraftRequest) returns (SellerResponseDraftResponse);
+    rpc UpsertVendorPortalResponseDraft(UpsertVendorPortalResponseDraftRequest) returns (SellerResponseDraftResponse);
+    // 站外業者的三支正式寫入（要求 assurance = GOOGLE_VERIFIED，見上方 message 註解）。
+    rpc SubmitVendorPortalResponse(SubmitVendorPortalResponseRequest) returns (SellerResponseVersionResponse);
+    rpc WithdrawVendorPortalResponse(WithdrawVendorPortalResponseRequest) returns (SellerResponseClosureResponse);
+    rpc DeclineVendorPortalRfqPublication(DeclineVendorPortalRfqPublicationRequest) returns (SellerResponseClosureResponse);
+    rpc SubmitSellerResponse(SubmitSellerResponseRequest) returns (SellerResponseVersionResponse);
+    rpc WithdrawSellerResponse(WithdrawSellerResponseRequest) returns (SellerResponseClosureResponse);
+    rpc DeclineRfqPublication(DeclineRfqPublicationRequest) returns (SellerResponseClosureResponse);
+
+    // 買家：比較、shortlist 與接受 exact version（#2538）
+    rpc ListSellerResponses(ListSellerResponsesRequest) returns (ListSellerResponsesResponse);
+    rpc PutShortlistEntry(ShortlistEntryRequest) returns (ShortlistEntryResponse);
+    rpc DeleteShortlistEntry(ShortlistEntryRequest) returns (ShortlistEntryResponse);
+    rpc AcceptSellerQuote(BuyerQuoteAcceptanceRequest) returns (BuyerQuoteAcceptanceResponse);
+    rpc RenameConversation(RenameConversationRequest) returns (google.protobuf.Empty);
+    rpc DeleteConversation(DeleteConversationRequest) returns (google.protobuf.Empty);
+
+    // 買家：Run ledger 即時訂閱／replay（Task 11，doc57 §2.5 replay 演算法落地）
+    rpc WatchRunEvents(WatchRunEventsRequest) returns (stream RunEvent);
+
+    // 買家：Run 取消／恢復（Task 14，doc57 §5.4／§5.5）
+    rpc CancelRun(CancelRunRequest) returns (CancelRunResponse);
+    rpc ResumeRun(ResumeRunRequest) returns (ResumeRunResponse);
+}

@@ -1,0 +1,11 @@
+{
+	"$schema": "https://unpkg.com/knip@6/schema.json",
+	"entry": [
+		"scripts/*.ts",
+		"lighthouserc.*.cjs",
+		"playwright*.config.ts",
+		"tests/**/*.{test,spec}.ts",
+		"tests/e2e/**/*.{ts,tsx}"
+	],
+	"project": ["{app,components,features,lib,design-system,types}/**/*.{ts,tsx}"]
+}

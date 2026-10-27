@@ -1,0 +1,164 @@
+server:
+  port: 9924
+
+# gRPC Server Configuration
+grpc:
+  server:
+    port: ${GRPC_PORT:9925}
+    reflection-service-enabled: true
+
+spring:
+  application:
+    name: payment-service
+  cloud:
+    nacos:
+      discovery:
+        enabled: ${NACOS_ENABLED:false}
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+        metadata:
+          grpc-port: ${GRPC_PORT:9925}
+          version: 1.0.0
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_POOL_PORT:5432}/${DB_NAME:hawkr_payment}?sslmode=${DB_SSLMODE:disable}&prepareThreshold=0
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      minimum-idle: 2            # 閒置時最少保持的連線數
+      maximum-pool-size: 10      # 連線池上限（含閒置+使用中）
+      connection-timeout: 30000  # 取得連線的最長等待時間（毫秒），超時拋 SQLException
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 5000ms
+  rabbitmq:
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
+    virtual-host: ${RABBITMQ_VHOST:/}
+  flyway:
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:hawkr_payment}?sslmode=${DB_SSLMODE:disable}
+    user: ${DB_USER}
+    password: ${DB_PASSWORD}
+    enabled: ${FLYWAY_ENABLED:true}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+
+mybatis-plus:
+  mapper-locations: classpath:/mapper/**/*.xml
+  global-config:
+    db-config:
+      id-type: INPUT
+  configuration:
+    map-underscore-to-camel-case: true
+  type-handlers-package: io.github.will413028.hawkr.payment.infrastructure.persistence.typehandler
+
+# Hawkr Observability 配置
+hawkr:
+  web:
+    # §5.9 WEB_BROWSER client_type 用於組 redirect_url 的網頁前端 base URL
+    frontend-url: ${WEB_FRONTEND_URL:http://localhost:3000}
+  obs:
+    service: payment-service
+    grpc:
+      targets:
+        order:
+          host: ${ORDER_SERVICE_HOST:127.0.0.1}
+          port: ${ORDER_SERVICE_GRPC_PORT:9915}
+          plaintext: true
+  tsid:
+    enabled: true
+    node-id-base: 0  # Payment Service: 0-99
+    pod-index: ${POD_INDEX:0}
+  # L2 補救路徑：待付款交易補收排程
+  # 🔴 多功能收付（agent_fee）的費率政策 —— ADR-011 的 gross-up 輸入。
+  #
+  # **四個值全部沒有預設，這是刻意的**（70 §10.3 EV-P6）：
+  #   給 1% 當預設 ⇒「未確認」變成一個看不見的狀態，而金額會照樣送出去
+  #   取整方向猜錯 ⇒ 整數制下會**系統性**短收或多收，不是偶爾差一元
+  #   gross／net 語意搞反 ⇒「扣 1% 後撥款」與「另外收 1%」差一個 1/(1−r)
+  #
+  # 缺任一項時 AgentFeeGrossUp.solve() 直接拋（fail-closed），送不出任何一筆。
+  # ⚠️ 這是 **Enablement Blocker 不是 Implementation Blocker**：schema／狀態機／
+  #    對帳／residual 機制全部可以先做完，缺的只是「可以自動送出」這個開關。
+  #    拿到 PayUni 書面費率契約後才填這四個值。
+  payment:
+    agent-fee:
+      rate:
+        rate-numerator: ${PAYUNI_AGENT_FEE_RATE_NUMERATOR:}
+        rate-denominator: ${PAYUNI_AGENT_FEE_RATE_DENOMINATOR:}
+        # UP / DOWN / HALF_UP
+        rounding: ${PAYUNI_AGENT_FEE_ROUNDING:}
+        min-fee: ${PAYUNI_AGENT_FEE_MIN:}
+        max-fee: ${PAYUNI_AGENT_FEE_MAX:}
+        version: ${PAYUNI_AGENT_FEE_POLICY_VERSION:}
+    reconcile:
+      pending:
+        enabled: ${RECONCILE_PENDING_ENABLED:true}
+        fixed-delay-ms: ${RECONCILE_PENDING_FIXED_DELAY_MS:300000}
+        batch-size: ${RECONCILE_PENDING_BATCH_SIZE:50}
+        initial-delay-minutes: ${RECONCILE_PENDING_INITIAL_DELAY_MIN:3}
+        retry-interval-minutes: ${RECONCILE_PENDING_RETRY_INTERVAL_MIN:5}
+        grace-minutes: ${RECONCILE_PENDING_GRACE_MIN:30}
+        per-item-sleep-ms: ${RECONCILE_PENDING_PER_ITEM_SLEEP_MS:100}
+    # Apple Pay on Web Merchant Validation（05 號設計書 §5.11）
+    apple-pay:
+      merchant-id: ${APPLE_PAY_MERCHANT_ID:}
+      display-name: ${APPLE_PAY_DISPLAY_NAME:Hawkr}
+      merchant-cert-path: ${APPLE_PAY_MERCHANT_CERT_PATH:}
+      merchant-key-path: ${APPLE_PAY_MERCHANT_KEY_PATH:}
+      domain-allowlist: ${APPLE_PAY_DOMAIN_ALLOWLIST:}
+      connect-timeout-seconds: ${APPLE_PAY_CONNECT_TIMEOUT_SEC:5}
+      request-timeout-seconds: ${APPLE_PAY_REQUEST_TIMEOUT_SEC:10}
+
+gateway:
+  url: ${GATEWAY_URL:}
+
+# PayUni 金流配置（代理商模式）
+payuni:
+  agent:
+    id: ${PAYUNI_AGENT_ID:HAWK}  # 代理商前綴字（4碼大寫，撥款 API 使用）
+    key: ${PAYUNI_AGENT_KEY}  # 代理商 Key（加解密用）
+    iv: ${PAYUNI_AGENT_IV}  # 代理商 IV（加解密用）
+    # 代理商出入帳商店代號（agent_fee 的 AgentMerID，條件必填）。
+    # 🔴 **留空與未設定是同一件事，而那正確**：官方標「未帶則依平台預設」，
+    #    而空字串塞進 EncryptInfo 等於指定一個不存在的商店 ⇒ AgentFeeService 會略過它。
+    mer-id: ${PAYUNI_AGENT_MER_ID:}
+  api:
+   #  base-url: ${PAYUNI_API_URL:https://api.payuni.com.tw}
+   base-url: ${PAYUNI_API_URL:https://sandbox-api.payuni.com.tw}
+  callback:
+    # 空值 = 不帶給 PayUni，由 PayUni 後台設定生效；本地開發時填 ngrok URL 可覆蓋後台設定
+    notify-url: ${PAYUNI_NOTIFY_URL:}
+    # PayUni 付款完成後導回的 URL（瀏覽器 redirect）
+    return-url: ${PAYUNI_RETURN_URL:http://localhost:8080/payment/return}
+
+# Payment Service 業務配置
+payment:
+  outbox:
+    max-retries: 5
+  default-expire-days: ${ATM_DEFAULT_EXPIRE_DAYS:1}
+  # 排程清理配置
+  cleanup:
+    enabled: ${CLEANUP_ENABLED:true}
+    cron: "0 30 2 * * ?"           # 每日凌晨 02:30
+    log-retention-days: 90          # INFO/WARNING 日誌保留天數
+    error-log-retention-days: 365   # ERROR 日誌保留天數
+    webhook-retention-days: 90      # 已處理 Webhook 保留天數
+    outbox-sent-retention-days: 7   # 已發送 Outbox 保留天數
+    outbox-dead-retention-days: 30  # 死信 Outbox 保留天數
+
+# OTel / Actuator / Tracing 配置已統一至 observability-common（observability-defaults.properties）
+
+logging:
+  level:
+    io.github.will413028.hawkr: ${LOG_LEVEL:INFO}
+    org.flywaydb: INFO

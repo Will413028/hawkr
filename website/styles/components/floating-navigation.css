@@ -1,0 +1,187 @@
+/* Extracted from styles/globals.css.
+ * Floating navbar, auto-nav reveal, and modern hero/nav surface overrides.
+ * Keep import order in styles/globals.css unless intentionally changing cascade.
+ */
+
+/* ============================================================
+   Mastercard-style floating capsule nav
+   (overrides earlier flat treatment; keep at the end of file)
+   ============================================================ */
+
+/* 1. Reserve scrollbar gutter so opening/closing the mega panel
+ *    never removes the scrollbar → no horizontal page jitter. */
+html {
+	scrollbar-gutter: stable;
+}
+
+body {
+	-webkit-user-select: none;
+	user-select: none;
+	--floating-nav-height: 84px;
+	--floating-nav-top-gap: 16px;
+	--floating-nav-panel-gap: 8px;
+	--page-start-gap: 6px;
+}
+
+/*
+ * RootLayout streams the pathname-aware navbar through a Suspense boundary.
+ * Reserve its exact normal-flow slot both while the boundary is pending and
+ * during the brief commit where `.auto-nav` exists before its child navbar has
+ * acquired height. The reservation is geometry-only (no loading surface), and
+ * uses the same responsive variables as the real navbar.
+ */
+.root-nav-layout-reservation,
+.auto-nav {
+	min-height: calc(
+		var(--floating-nav-height, 84px) +
+		var(--floating-nav-top-gap, 16px)
+	);
+}
+
+input,
+textarea,
+select,
+[contenteditable="true"],
+[contenteditable=""],
+[role="textbox"] {
+	-webkit-user-select: text;
+	user-select: text;
+}
+
+/* 2. Outer wrapper: transparent (lets the hero / page bg show through so the
+ *    inner pill looks like it's floating), 84px tall, 24px side padding.
+ *    Migrated to inline Tailwind on `.site-nav` in Navbar.tsx (子刀 4, PR-B). */
+
+/* The sticky `.auto-nav` remains in normal document flow, so pages should
+ * not reserve another navbar-height above their content. This late rule
+ * intentionally beats older mobile/legacy `.page-content` offsets. */
+body .page-content {
+	padding-top: 0;
+}
+
+/* 3. Inner pill + buyer nav-item/action/login dark text/hover migrated to inline
+ *    Tailwind in Navbar.tsx (步驟 4 PR-B). The dark `.site-nav-user__name` colour
+ *    also moved to a utility (步驟 6). Retained: the dark logo brand-logo colour
+ *    (brand-logo concern, not host chrome). */
+html[data-theme="dark"] body .site-nav__logo .brand-logo {
+	color: var(--theme-text-heading);
+}
+
+/* ============================================================
+ *           Page-wrapper backgrounds — unified dark mode
+ *
+ * In dark mode the cream page-wrapper blocks go transparent so the
+ * body's starry midnight shows through and vertical scroll reads as
+ * one continuous sky. Cards (collection / seller-story) instead get
+ * the same frosted glass as buyer cards elsewhere.
+ * ============================================================ */
+
+/* Page wrappers paint a cream block that beats child transparency
+ * rules unless flattened here. */
+[data-theme="dark"] .market-page,
+[data-theme="dark"] .search-page,
+[data-theme="dark"] .market-content-page,
+[data-theme="dark"] .addresses-page,
+[data-theme="dark"] .orders-page {
+	background: transparent;
+}
+
+/* mc-hero scoop — was a cream half-disc that blended into the next
+ * cream section. In dark mode there's no cream below, so the scoop
+ * needs to match the body sky to avoid a visible cream lip. */
+/* mc-hero itself stays dark in both modes (it's an editorial dark
+ * block by design); just deepen its top radial so it sits on the
+ * starry sky cleanly. */
+
+/* Collection / seller-story cards — same subtle frosted glass as the
+ * main card surfaces. */
+[data-theme="dark"] .collection-card,
+[data-theme="dark"] .seller-story-card {
+	background: var(--theme-surface-glass);
+	-webkit-backdrop-filter: blur(12px) saturate(120%);
+	backdrop-filter: blur(12px) saturate(120%);
+	border-color: var(--theme-border-subtle);
+	color: var(--hk-text-body);
+}
+
+/* Stop the page from horizontally jumping when the mega menu is shown.
+ *  Together with `scrollbar-gutter: stable` on <html>, this guarantees
+ *  the body's render width never changes regardless of overflow state. */
+html,
+body {
+	overflow-x: clip;
+}
+
+/* The sticky/fixed nav already has space — give the page just a touch
+ * more top padding so content never tucks under the capsule. */
+@media (min-width: 769px) {
+	body {
+		--effective-nav: calc(var(--site-nav-inner-height) + 28px);
+	}
+}
+
+/* Mobile: fall back to flat top bar (capsule looks awkward on narrow
+ * screens; the hover state doesn't apply on touch anyway). */
+@media (max-width: 768px) {
+	body {
+		--floating-nav-height: var(--nav-height, 56px);
+		--floating-nav-top-gap: 0px;
+		--page-start-gap: var(--hkui-space-4, 16px);
+	}
+
+	/* Mobile flat-bar swap (site-nav → 56px/no-padding, inner → square corners +
+	 * 8px/10px gutter + single hairline shadow) migrated to `max-[768px]:`
+	 * utilities in Navbar.tsx (子刀 4, PR-B). The --floating-nav-height var above
+	 * still feeds the sticky `.auto-nav` wrapper. */
+}
+
+/* ============================================================
+   Mastercard-style hero
+   ============================================================ */
+
+/* Outer wrapper — dark editorial surface that the floating capsule
+ * navbar sits on top of. Full bleed; the bottom edge curves into the
+ * next section via a large border-radius pseudo-element. */
+
+/* The signature Mastercard arc: a cream "scoop" rises from the bottom
+ * of the hero, blending into the next cream section. Sits on the hero
+ * itself so the curve is visible against the dark backdrop. */
+
+/* Copy column — entrance animation: each row fades up + slides 12px,
+ * delay driven by inline --mc-delay (set per row in the component). */
+@keyframes mc-rise {
+	from {
+		opacity: 0;
+		transform: translate3d(0, 12px, 0);
+	}
+	to {
+		opacity: 1;
+		transform: translate3d(0, 0, 0);
+	}
+}
+
+/* CTA pill — Mastercard's "Apply for a card" button: high-contrast
+ * white pill with body text + tiny arrow icon that nudges on hover. */
+
+/* Photo column — circular ring decoration overlapping a rounded photo.
+ * The ring is an inline SVG using currentColor so its tone tracks the
+ * hero. Photo gets a soft radial vignette on hover. */
+
+/* Reduce motion preference: kill all hero entrance animations. */
+
+/* ============================================================
+   Auto-hide navbar shell
+   ============================================================
+   The shell wrapper (.auto-nav) and its reveal edge are styled with
+   Tailwind utilities on the component itself
+   (components/shared/AutoHideNavShell.tsx). Only this descendant hook
+   remains: the wrapper carries a transform, which makes it the containing
+   block for positioned descendants, so the navbars are pinned
+   `position: relative` to keep their absolutely-positioned children
+   (dropdowns, badges) resolving against the navbar rather than the
+   translated shell. Folds into the navbars when knives 4/5 migrate
+   .site-nav / .seller-header to Tailwind. */
+.auto-nav .site-nav,
+.auto-nav .seller-header {
+	position: relative;
+}

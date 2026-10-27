@@ -1,0 +1,2 @@
+data: {"type":"CUSTOM","name":"activity","value":{"attempt":1,"code":"EXTRACT_SLOTS","label":"抓出品項、數量和交期","maxAttempts":3,"retryGroupKey":"7489","rowId":"7489","status":"SUCCEEDED","text":"整理你的採購條件"}}
+

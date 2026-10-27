@@ -1,0 +1,332 @@
+syntax = "proto3";
+
+package hawkr.im;
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/im";
+option java_package = "io.github.will413028.hawkr.im.grpc";
+option java_multiple_files = true;
+
+// IM Service - 即時通訊服務
+service IMService {
+    // 發送消息給用戶
+    rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+
+    // 廣播消息
+    rpc BroadcastMessage(BroadcastRequest) returns (BroadcastResponse);
+
+    // 檢查用戶在線狀態
+    rpc IsUserOnline(UserOnlineRequest) returns (UserOnlineResponse);
+
+    // 獲取連接統計
+    rpc GetConnectionStats(EmptyRequest) returns (ConnectionStatsResponse);
+
+    // 強制斷開用戶連接
+    rpc DisconnectUser(DisconnectRequest) returns (DisconnectResponse);
+
+    // 獲取未讀消息數量
+    rpc GetUnreadCount(GetUnreadCountRequest) returns (GetUnreadCountResponse);
+
+    // 獲取聊天歷史
+    rpc GetChatHistory(GetChatHistoryRequest) returns (GetChatHistoryResponse);
+
+    // 獲取對話列表
+    rpc GetConversations(GetConversationsRequest) returns (GetConversationsResponse);
+
+    // 標記消息已讀
+    rpc MarkMessagesRead(MarkMessagesReadRequest) returns (MarkMessagesReadResponse);
+
+    // 標記整個對話已讀
+    rpc MarkConversationRead(MarkConversationReadRequest) returns (MarkConversationReadResponse);
+
+    // 標記所有消息已讀
+    rpc MarkAllRead(MarkAllReadRequest) returns (MarkAllReadResponse);
+
+    // ==================== B-135: 內容審核（admin 內部 RPC）====================
+    // Admin 將聊天訊息隱藏 — 由 social-service AdminResolveReport 呼叫
+    rpc HideMessage(HideMessageRequest) returns (HideMessageResponse);
+
+    // Gateway ↔ IM 的長連線 chat transport。第一個 client message 必須是
+    // ChatStreamOpen；後續只承載 sync/presence/typing/read_receipt/ping 等
+    // ephemeral frame，chat persistence 仍走 SendMessage unary RPC。
+    rpc ChatStream(stream ChatStreamRequest) returns (stream ChatStreamResponse);
+}
+
+message HideMessageRequest {
+    int64  message_id    = 1;
+    string hidden_reason = 2;
+}
+
+message HideMessageResponse {
+    int32  code    = 1;
+    string message = 2;
+}
+
+message EmptyRequest {}
+
+// 消息類型
+enum MessageType {
+    MESSAGE_TYPE_UNSPECIFIED = 0;
+    MESSAGE_TYPE_TEXT = 1;
+    MESSAGE_TYPE_IMAGE = 2;
+}
+
+// 發送消息請求
+message SendMessageRequest {
+    // ② chat identity：role=seller 時承載 CURRENT seller_account_id（店家代理鍵），非登入 account_id；買家側承載 CURRENT buyer_id（buyer_id rekey Phase 3 起，stint-scoped，非登入 account_id）。target 為賣家時同理。
+    string from_user_id = 1;
+    // ② chat identity：role=seller 時承載 CURRENT seller_account_id（店家代理鍵），非登入 account_id；買家側承載 CURRENT buyer_id（buyer_id rekey Phase 3 起，stint-scoped，非登入 account_id）。target 為賣家時同理。
+    string to_user_id = 2;
+    MessageType type = 3;
+    string content = 4;
+    map<string, string> extra = 5;  // 附加數據
+    string account_type = 6;        // "1"=BUYER, "2"=SELLER, "3"=SELLER_AND_BUYER
+}
+
+message SendMessageResponse {
+    int32 code = 1;
+    string message = 2;
+    bool delivered = 3;  // 是否已送達 (用戶在線)
+    string message_id = 4;
+    string timestamp = 5;
+    string seq_id = 6;    // 房間內序號，用於前端去重與排序
+    string content = 7;   // 最終訊息內容（image 時為 CDN URL）
+}
+
+// 廣播請求
+message BroadcastRequest {
+    // ② chat identity：role=seller 時承載 CURRENT seller_account_id（店家代理鍵），非登入 account_id；買家側承載 CURRENT buyer_id（buyer_id rekey Phase 3 起，stint-scoped，非登入 account_id）。target 為賣家時同理。
+    string from_user_id = 1;
+    MessageType type = 2;
+    string content = 3;
+    repeated string exclude_users = 4;  // 排除的用戶
+}
+
+message BroadcastResponse {
+    int32 code = 1;
+    string message = 2;
+    string sent_count = 3;
+}
+
+// 用戶在線狀態
+message UserOnlineRequest {
+    // ② chat identity：role=seller 時承載 CURRENT seller_account_id（店家代理鍵），非登入 account_id；買家側承載 CURRENT buyer_id（buyer_id rekey Phase 3 起，stint-scoped，非登入 account_id）。target 為賣家時同理。
+    string user_id = 1;
+}
+
+message UserOnlineResponse {
+    int32 code = 1;
+    bool online = 2;
+    string last_active = 3;  // 最後活躍時間
+}
+
+// 連接統計
+message ConnectionStatsResponse {
+    int32 code = 1;
+    string total_connections = 2;
+    string active_connections = 3;
+    string uptime_seconds = 4;
+    string messages_sent = 5;
+    string messages_received = 6;
+}
+
+// 斷開連接
+message DisconnectRequest {
+    // ② chat identity：role=seller 時承載 CURRENT seller_account_id（店家代理鍵），非登入 account_id；買家側承載 CURRENT buyer_id（buyer_id rekey Phase 3 起，stint-scoped，非登入 account_id）。target 為賣家時同理。
+    string user_id = 1;
+    string reason = 2;
+}
+
+message DisconnectResponse {
+    int32 code = 1;
+    string message = 2;
+    bool success = 3;
+}
+
+// 獲取未讀消息數量
+message GetUnreadCountRequest {
+    // ② chat identity：role=seller 時承載 CURRENT seller_account_id（店家代理鍵），非登入 account_id；買家側承載 CURRENT buyer_id（buyer_id rekey Phase 3 起，stint-scoped，非登入 account_id）。target 為賣家時同理。
+    string user_id = 1;
+    string account_type = 2; // "1"=BUYER, "2"=SELLER, "3"=SELLER_AND_BUYER
+}
+
+message GetUnreadCountResponse {
+    int32 code = 1;
+    string unread_count = 2;
+}
+
+// 聊天消息
+message ChatMessage {
+    string id = 1;
+    // ② chat identity：role=seller 時承載 CURRENT seller_account_id（店家代理鍵），非登入 account_id；買家側承載 CURRENT buyer_id（buyer_id rekey Phase 3 起，stint-scoped，非登入 account_id）。target 為賣家時同理。
+    string from_user_id = 2;
+    // ② chat identity：role=seller 時承載 CURRENT seller_account_id（店家代理鍵），非登入 account_id；買家側承載 CURRENT buyer_id（buyer_id rekey Phase 3 起，stint-scoped，非登入 account_id）。target 為賣家時同理。
+    string to_user_id = 3;
+    MessageType type = 4;
+    string content = 5;
+    string timestamp = 6;
+    bool is_read = 7;
+    map<string, string> extra = 8;
+    string seq_id = 9;    // 房間內序號，用於前端去重與排序
+}
+
+// 獲取聊天歷史
+message GetChatHistoryRequest {
+    // ② chat identity：role=seller 時承載 CURRENT seller_account_id（店家代理鍵），非登入 account_id；買家側承載 CURRENT buyer_id（buyer_id rekey Phase 3 起，stint-scoped，非登入 account_id）。target 為賣家時同理。
+    string user_id = 1;
+    // ② chat identity：role=seller 時承載 CURRENT seller_account_id（店家代理鍵），非登入 account_id；買家側承載 CURRENT buyer_id（buyer_id rekey Phase 3 起，stint-scoped，非登入 account_id）。target 為賣家時同理。
+    string target_id = 2;
+    int32 page = 3;
+    int32 page_size = 4;
+    string before_id = 5;  // 用於分頁，獲取此ID之前的消息
+    string account_type = 6; // "1"=BUYER, "2"=SELLER, "3"=SELLER_AND_BUYER
+}
+
+// 聊天參與者資訊
+message ChatParticipant {
+    // ② chat identity：role=seller 時承載 CURRENT seller_account_id（店家代理鍵），非登入 account_id；買家側承載 CURRENT buyer_id（buyer_id rekey Phase 3 起，stint-scoped，非登入 account_id）。值由 room_id（b{buyerID}_s{storeID}）兩側拆出，與同訊息的 from_user_id/to_user_id 同一個 id 空間。
+    string user_id = 1;
+    string role = 2;          // "buyer" 或 "seller"
+    string display_name = 3;  // 店名（seller）或暱稱（buyer）
+    string avatar_key = 4;    // logo/頭像 objectKey 或外部 URL（49 §6.6 S2/S4；Gateway REST 組、WS 帶 key）
+}
+
+message GetChatHistoryResponse {
+    int32 code = 1;
+    repeated ChatMessage messages = 2;
+    string total = 3;
+    bool has_more = 4;
+    repeated ChatParticipant participants = 5;  // 對話參與者 profile
+}
+
+// 對話摘要
+message Conversation {
+    string target_user_id = 1;
+    string target_nickname = 2;
+    string target_avatar_key = 3; // 對象頭像 objectKey 或外部 URL（49 §6.6 S2/S4；Gateway REST 組）
+    string last_message = 4;
+    MessageType last_message_type = 5;
+    string last_message_time = 6;
+    string unread_count = 7;
+    string store_name = 8;   // 店鋪名稱（target 為賣家時才有值）
+    string logo_key = 9;     // 品牌 logo objectKey（target 為賣家時才有值；49 §6.6；Gateway REST 組）
+    // 賣家 canonical 短碼（sellers.store_code）；target_user_id 於賣家側是
+    // store_id（內部代理鍵），賣家頁 canonical 網址走 store_code。與 store_name /
+    // logo_key 同源自 GetSellerBatch，target 為買家或查不到時為空字串。
+    string store_code = 10;
+}
+
+// 獲取對話列表
+message GetConversationsRequest {
+    // ② chat identity：role=seller 時承載 CURRENT seller_account_id（店家代理鍵），非登入 account_id；買家側承載 CURRENT buyer_id（buyer_id rekey Phase 3 起，stint-scoped，非登入 account_id）。target 為賣家時同理。
+    string user_id = 1;
+    int32 page = 2;
+    int32 page_size = 3;
+    string account_type = 4; // "1"=BUYER, "2"=SELLER, "3"=SELLER_AND_BUYER
+}
+
+message GetConversationsResponse {
+    int32 code = 1;
+    repeated Conversation conversations = 2;
+    string total = 3;
+}
+
+// 標記消息已讀
+message MarkMessagesReadRequest {
+    // ② chat identity：role=seller 時承載 CURRENT seller_account_id（店家代理鍵），非登入 account_id；買家側承載 CURRENT buyer_id（buyer_id rekey Phase 3 起，stint-scoped，非登入 account_id）。target 為賣家時同理。
+    string user_id = 1;
+    repeated string message_ids = 2;
+}
+
+message MarkMessagesReadResponse {
+    int32 code = 1;
+    string message = 2;
+    string updated_count = 3;
+}
+
+// 標記對話已讀
+message MarkConversationReadRequest {
+    // ② chat identity：role=seller 時承載 CURRENT seller_account_id（店家代理鍵），非登入 account_id；買家側承載 CURRENT buyer_id（buyer_id rekey Phase 3 起，stint-scoped，非登入 account_id）。target 為賣家時同理。
+    string user_id = 1;
+    // ② chat identity：role=seller 時承載 CURRENT seller_account_id（店家代理鍵），非登入 account_id；買家側承載 CURRENT buyer_id（buyer_id rekey Phase 3 起，stint-scoped，非登入 account_id）。target 為賣家時同理。
+    string target_id = 2;
+    string account_type = 3; // "1"=BUYER, "2"=SELLER, "3"=SELLER_AND_BUYER
+}
+
+message MarkConversationReadResponse {
+    int32 code = 1;
+    string message = 2;
+    string updated_count = 3;
+}
+
+// 標記所有已讀
+message MarkAllReadRequest {
+    // ② chat identity：role=seller 時承載 CURRENT seller_account_id（店家代理鍵），非登入 account_id；買家側承載 CURRENT buyer_id（buyer_id rekey Phase 3 起，stint-scoped，非登入 account_id）。target 為賣家時同理。
+    string user_id = 1;
+    string account_type = 2; // "1"=BUYER, "2"=SELLER, "3"=SELLER_AND_BUYER
+}
+
+message MarkAllReadResponse {
+    int32 code = 1;
+    string message = 2;
+    string updated_count = 3;
+}
+
+// ChatStreamRequest is intentionally typed instead of carrying opaque JSON.
+// IDs are strings because the public JSON contract must preserve 64-bit TSIDs
+// above JavaScript's safe integer range.
+message ChatStreamRequest {
+    oneof payload {
+        ChatStreamOpen open = 1;
+        ChatStreamClientFrame frame = 2;
+    }
+}
+
+// ChatStreamOpen is sent exactly once and must be the first stream message.
+// user_id is the resolved chat wire identity (buyer_id/store_id), not the raw
+// login account ID. login_role is 0 (both), 1 (buyer), or 2 (seller).
+message ChatStreamOpen {
+    string user_id = 1;
+    int32 login_role = 2;
+}
+
+// ChatStreamClientFrame carries receive-only ephemeral operations. The
+// Gateway maps the existing public JSON fields into this message; IM applies
+// the same whitelist and authorization rules as its legacy WebSocket path.
+// A frame with type="chat" is never accepted for persistence.
+message ChatStreamClientFrame {
+    string type = 1;
+    map<string, string> conversations = 2; // room_id -> last_seq_id
+    string room_id = 3;
+    string to_user_id = 4;
+    int32 peer_role = 5;
+    string message_id = 6;
+    string seq_id = 7;
+    string content = 8;
+}
+
+// ChatStreamResponse wraps one server-side domain event. Optional fields keep
+// the distinction between an absent value and an explicit false/zero value,
+// which is required for presence and unread notifications.
+message ChatStreamResponse {
+    ChatStreamServerFrame frame = 1;
+}
+
+message ChatStreamServerFrame {
+    string type = 1;
+    string room_id = 2;
+    string from_user_id = 3;
+    string to_user_id = 4;
+    string message_id = 5;
+    string seq_id = 6;
+    string content = 7;
+    string timestamp = 8;
+    string last_seen_at = 9;
+    string msg_type = 10;
+    string peer_role = 11;
+    optional bool online = 12;
+    bool has_more = 13;
+    string sender_name = 14;
+    string sender_avatar = 15;
+    optional string unread_count = 16;
+    string role = 17;
+}

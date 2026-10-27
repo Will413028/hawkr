@@ -1,0 +1,253 @@
+/* 商品農產品認證審核（佇列 + 詳情）。
+ *
+ * ⚠️ 本檔刻意「一個 hex 色值都沒有」：顏色一律引用 AdminVisualRefresh.css 的
+ * semantic tokens。tests/admin-color-ratchet.test.ts 會擋 baseline 以外的新 hex，
+ * 而在這裡新增一個「看起來很像 --admin-warning-soft」的近似色，正是那支測試要防的事。
+ */
+
+.cert-filters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: flex-end;
+	margin-bottom: 16px;
+}
+
+.cert-filter-field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 160px;
+}
+
+.cert-filter-field > span {
+	font-size: 12px;
+	color: var(--admin-muted-aa);
+}
+
+.cert-filter-field input,
+.cert-filter-field select {
+	min-height: 44px;
+	padding: 8px 12px;
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-control);
+	background: var(--admin-control);
+	color: var(--admin-ink);
+	font-size: 14px;
+}
+
+.cert-filter-actions {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.cert-cell-sub {
+	display: block;
+	font-size: 12px;
+	color: var(--admin-muted-aa);
+}
+
+/* 「商品已不在平台上」的提示。認證申請結構上會指向已軟刪商品（19 §9.2），
+ * 補回商品名之後必須有東西把這件事講明白，否則審核者會核准一個已經不存在的商品。
+ * 一個 hex 都不寫——沿用 AdminVisualRefresh.css 的 semantic token（見檔頭）。 */
+.cert-cell-warn {
+	color: var(--admin-danger);
+	font-weight: 600;
+}
+
+.cert-gone-pill {
+	display: inline-flex;
+	align-items: center;
+	padding: 2px 10px;
+	border-radius: 999px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--admin-danger);
+	background: var(--admin-danger-soft);
+	border: 1px solid var(--admin-danger);
+}
+
+.cert-pagination {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 12px;
+	margin-top: 16px;
+}
+
+/* ---- 詳情：政府查驗結果 ---- */
+
+.cert-detail-stack {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+}
+
+.cert-kv-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	gap: 16px;
+}
+
+.cert-kv {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 12px 14px;
+	background: var(--admin-cream);
+	border-radius: var(--admin-radius-control);
+}
+
+.cert-kv-label {
+	font-size: 12px;
+	color: var(--admin-muted-aa);
+}
+
+.cert-kv-value {
+	font-size: 14px;
+	color: var(--admin-ink);
+	word-break: break-word;
+}
+
+.cert-note {
+	display: flex;
+	gap: 10px;
+	align-items: flex-start;
+	padding: 14px 16px;
+	border-radius: var(--admin-radius-control);
+	border: 1px solid transparent;
+	font-size: 14px;
+	line-height: 1.6;
+}
+
+.cert-note svg {
+	flex: none;
+	font-size: 18px;
+	line-height: 1.4;
+}
+
+.cert-note--warning {
+	background: var(--admin-warning-soft);
+	border-color: var(--admin-warning);
+	color: var(--admin-ink);
+}
+
+.cert-note--danger {
+	background: var(--admin-danger-soft);
+	border-color: var(--admin-danger);
+	color: var(--admin-ink);
+}
+
+.cert-note--info {
+	background: var(--admin-info-soft);
+	border-color: var(--admin-info);
+	color: var(--admin-ink);
+}
+
+.cert-note--muted {
+	background: var(--admin-cream);
+	border-color: var(--admin-border);
+	color: var(--admin-muted-aa);
+}
+
+.cert-raw-excerpt {
+	margin: 0;
+	padding: 12px 14px;
+	max-height: 320px;
+	overflow: auto;
+	background: var(--admin-cream);
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-control);
+	font-size: 12px;
+	line-height: 1.5;
+	white-space: pre-wrap;
+	word-break: break-word;
+	color: var(--admin-ink);
+}
+
+.cert-raw-summary {
+	cursor: pointer;
+	font-size: 13px;
+	color: var(--admin-muted-aa);
+	margin-bottom: 8px;
+}
+
+/* ---- 詳情：審核事件流水 ---- */
+
+.cert-audit-empty {
+	padding: 24px;
+	text-align: center;
+	color: var(--admin-muted-aa);
+}
+
+.cert-actor-system {
+	font-size: 12px;
+	color: var(--admin-muted-aa);
+}
+
+/* ---- 裁決對話框 ---- */
+
+.cert-decision-option {
+	display: flex;
+	gap: 10px;
+	align-items: flex-start;
+	padding: 10px 12px;
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-control);
+	margin-bottom: 8px;
+	cursor: pointer;
+}
+
+.cert-decision-option strong {
+	display: block;
+	color: var(--admin-ink);
+}
+
+.cert-decision-option span {
+	display: block;
+	font-size: 13px;
+	color: var(--admin-muted-aa);
+}
+
+.cert-field {
+	display: block;
+	margin-top: 16px;
+}
+
+.cert-field > span {
+	display: block;
+	margin-bottom: 6px;
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--admin-ink);
+}
+
+.cert-field select,
+.cert-field textarea {
+	width: 100%;
+	padding: 10px 12px;
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-control);
+	background: var(--admin-control);
+	color: var(--admin-ink);
+	font-size: 14px;
+	font-family: inherit;
+}
+
+.cert-field textarea {
+	min-height: 88px;
+	resize: vertical;
+}
+
+.cert-field-hint {
+	margin-top: 6px;
+	font-size: 12px;
+	color: var(--admin-muted-aa);
+}
+
+@media (max-width: 768px) {
+	.cert-filter-field {
+		min-width: 100%;
+	}
+}

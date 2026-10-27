@@ -1,0 +1,5 @@
+# Fallback empty directory for docker-compose-local.yml `${APPLE_PAY_CERT_DIR:-./infra/apple-pay-empty}`.
+#
+# 對沒設定 APPLE_PAY_CERT_DIR 的開發者，container 內 /secrets/apple-pay/ 會 mount 這個空目錄
+# （而非宿主機 /tmp）— ApplePayMerchantValidator lazy-load 時找不到 cert/key 回 8029，
+# 不影響其他結帳流程（信用卡 / ATM 仍正常）。

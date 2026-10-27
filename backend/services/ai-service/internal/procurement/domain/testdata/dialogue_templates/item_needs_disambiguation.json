@@ -1,0 +1,15 @@
+{
+  "act": "ITEM_NEEDS_DISAMBIGUATION",
+  "emptyArgsBlocks": [
+    {
+      "kind": "NEXT_STEP",
+      "text": "找到幾個相符的品項，麻煩選一下你要的是哪一個。"
+    }
+  ],
+  "populatedArgsBlocks": [
+    {
+      "kind": "NEXT_STEP",
+      "text": "需要指定包裝方式嗎？"
+    }
+  ]
+}

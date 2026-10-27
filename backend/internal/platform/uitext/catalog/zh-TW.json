@@ -1,0 +1,1075 @@
+{
+  "default": {
+    "buyer.Gender.GENDER_FEMALE": {
+      "message": "女性",
+      "description": "Gender 是買家自填的性別。（值 GENDER_FEMALE）"
+    },
+    "buyer.Gender.GENDER_MALE": {
+      "message": "男性",
+      "description": "Gender 是買家自填的性別。（值 GENDER_MALE）"
+    },
+    "buyer.Gender.GENDER_OTHER": {
+      "message": "其他",
+      "description": "Gender 是買家自填的性別。（值 GENDER_OTHER）"
+    },
+    "buyer.Profile.gender_unset": {
+      "message": "尚未設定",
+      "description": "買家沒有填性別時，性別欄位顯示的文字；也是選單裡清除性別的那一項。"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_COUNTERFEIT": {
+      "message": "仿冒商品",
+      "description": "冒用他人商標或外觀的商品本身（第十六條第 1 款）。入口：檢舉人、平台判定與認定。"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_FAKE_CERTIFICATION": {
+      "message": "假認證",
+      "description": "不實的認證、檢驗或標章（第十六條第 2 款的一種）。入口：檢舉人、平台判定與認定。"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_FOOD_SAFETY": {
+      "message": "食品安全",
+      "description": "有健康風險或疑似食物中毒，或未揭露安全疑慮的商品（條款第十一條、第十六條第 1 款）。入口：檢舉人、平台判定與認定。"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_FRAUD": {
+      "message": "詐欺或操縱交易",
+      "description": "偽造交易、洗錢、詐欺、濫用優惠、操縱評價或規避風險控管（第十六條第 2 款）。入口：檢舉人、平台判定與認定。"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_HARASSMENT": {
+      "message": "騷擾或霸凌",
+      "description": "社群內容的騷擾或霸凌：針對特定的人或店家的辱罵、威脅或持續打擾（社群，A7）。入口：社群內容的平台判定與認定。"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_HATE": {
+      "message": "仇恨或歧視言論",
+      "description": "社群內容的仇恨或歧視言論：以身分、族群或特徵攻擊他人（社群，A7）。入口：社群內容的平台判定與認定。"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_IMPERSONATION": {
+      "message": "冒用或誤導交易主體",
+      "description": "冒用平台名義、未經授權的保證，或讓買家誤認交易主體（第十六條第 8 款）。入口：檢舉人、平台判定與認定。"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_IP_INFRINGEMENT": {
+      "message": "侵害智慧財產權",
+      "description": "侵害他人商標、著作權、專利、營業秘密、肖像或其他權利的使用（第十六條第 5 款），例如店名或商品標題用了別人的商標；仿冒商品本身是 COUNTERFEIT。入口：檢舉人、平台判定與認定。"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_MISLEADING_INFO": {
+      "message": "不實或誤導資訊",
+      "description": "虛假資料、標示不實或誤導的商品或店家資訊（第十六條第 2 款）。入口：檢舉人、平台判定與認定。"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_OFF_PLATFORM_TRADE": {
+      "message": "繞過平台交易",
+      "description": "引導買家繞過平台付款，或規避平台服務費（第十六條第 3 款）。入口：檢舉人、平台判定與認定。"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_OTHER": {
+      "message": "其他",
+      "description": "檢舉人無法歸類時選。理由要指到條款，所以分案時要改判成有依據的類別，或直接設定結果。入口：只有檢舉人。"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_PLATFORM_ABUSE": {
+      "message": "干擾或濫用平台",
+      "description": "干擾、探測或破壞平台與資訊安全，或以爬蟲、自動化不當取得資料（第十六條第 6、7 款）。入口：只有平台判定與認定。"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_PRIVACY": {
+      "message": "不當使用個人資料",
+      "description": "未經授權蒐集、利用、揭露或出售買家個人資料（第十六條第 4 款）。入口：檢舉人、平台判定與認定。"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_PROHIBITED_GOODS": {
+      "message": "違法或禁售商品",
+      "description": "違法、違禁或來源不明，而沒有健康風險的商品（第十六條第 1 款）。入口：檢舉人、平台判定與認定。"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_SPAM": {
+      "message": "垃圾訊息",
+      "description": "社群內容的垃圾訊息：重複、無關或以廣告洗版的貼文、留言與討論區留言（社群，A7）。入口：社群內容的平台判定與認定。"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_UNLICENSED_SALE": {
+      "message": "未經許可販售",
+      "description": "依法應有的登錄、許可或資格沒有完成就販售（第十一條第 2 項）。入口：檢舉人、平台判定與認定。"
+    },
+    "common.error.ABORTED": {
+      "message": "資源衝突",
+      "description": "Connect code ABORTED 的預設文字：伺服器沒有附 LocalizedMessage 時顯示。"
+    },
+    "common.error.ALREADY_EXISTS": {
+      "message": "資源衝突",
+      "description": "Connect code ALREADY_EXISTS 的預設文字：伺服器沒有附 LocalizedMessage 時顯示。"
+    },
+    "common.error.DATA_LOSS": {
+      "message": "系統錯誤",
+      "description": "Connect code DATA_LOSS 的預設文字：伺服器沒有附 LocalizedMessage 時顯示。"
+    },
+    "common.error.DEADLINE_EXCEEDED": {
+      "message": "服務暫時不可用",
+      "description": "Connect code DEADLINE_EXCEEDED 的預設文字：伺服器沒有附 LocalizedMessage 時顯示。"
+    },
+    "common.error.FAILED_PRECONDITION": {
+      "message": "資源衝突",
+      "description": "Connect code FAILED_PRECONDITION 的預設文字：伺服器沒有附 LocalizedMessage 時顯示。"
+    },
+    "common.error.INTERNAL": {
+      "message": "系統錯誤",
+      "description": "Connect code INTERNAL 的預設文字：伺服器沒有附 LocalizedMessage 時顯示。"
+    },
+    "common.error.INVALID_ARGUMENT": {
+      "message": "參數錯誤",
+      "description": "Connect code INVALID_ARGUMENT 的預設文字：伺服器沒有附 LocalizedMessage 時顯示。"
+    },
+    "common.error.NOT_FOUND": {
+      "message": "資源不存在",
+      "description": "Connect code NOT_FOUND 的預設文字：伺服器沒有附 LocalizedMessage 時顯示。"
+    },
+    "common.error.OUT_OF_RANGE": {
+      "message": "參數錯誤",
+      "description": "Connect code OUT_OF_RANGE 的預設文字：伺服器沒有附 LocalizedMessage 時顯示。"
+    },
+    "common.error.PERMISSION_DENIED": {
+      "message": "無權操作",
+      "description": "Connect code PERMISSION_DENIED 的預設文字：伺服器沒有附 LocalizedMessage 時顯示。"
+    },
+    "common.error.RESOURCE_EXHAUSTED": {
+      "message": "操作過於頻繁，請稍後再試",
+      "description": "Connect code RESOURCE_EXHAUSTED 的預設文字：伺服器沒有附 LocalizedMessage 時顯示。"
+    },
+    "common.error.UNAUTHENTICATED": {
+      "message": "未登入",
+      "description": "Connect code UNAUTHENTICATED 的預設文字：伺服器沒有附 LocalizedMessage 時顯示。"
+    },
+    "common.error.UNAVAILABLE": {
+      "message": "服務暫時不可用",
+      "description": "Connect code UNAVAILABLE 的預設文字：伺服器沒有附 LocalizedMessage 時顯示。"
+    },
+    "common.error.UNIMPLEMENTED": {
+      "message": "功能暫不支援",
+      "description": "Connect code UNIMPLEMENTED 的預設文字：伺服器沒有附 LocalizedMessage 時顯示。"
+    },
+    "common.error.UNKNOWN": {
+      "message": "系統錯誤",
+      "description": "Connect code UNKNOWN 的預設文字：伺服器沒有附 LocalizedMessage 時顯示。"
+    },
+    "common.unknown": {
+      "message": "未知",
+      "description": "不認得的值與 UNSPECIFIED 一律顯示這個字。"
+    },
+    "seller.FoodRegistration.kyc_pending_note": {
+      "message": "平台會在商家認證通過後進行審核。",
+      "description": "食品業者登錄送出後、商家認證還沒通過時的說明。"
+    },
+    "seller.FoodRegistration.status_approved": {
+      "message": "已登錄：{number}",
+      "params": {
+        "number": {
+          "type": "string"
+        }
+      },
+      "description": "食品業者登錄已通過。number 是登錄字號。"
+    },
+    "seller.FoodRegistration.status_pending": {
+      "message": "審核中：{number}（{date} 送出）",
+      "params": {
+        "date": {
+          "type": "string"
+        },
+        "number": {
+          "type": "string"
+        }
+      },
+      "description": "食品業者登錄審核中。number 是登錄字號，date 是送出日期（台北，YYYY/MM/DD）。"
+    },
+    "seller.FoodRegistration.status_rejected": {
+      "message": "未通過：{reason}。請確認字號與食藥署登錄資料一致後重新送出。",
+      "params": {
+        "reason": {
+          "type": "string"
+        }
+      },
+      "description": "食品業者登錄未通過。reason 是駁回理由（平台人員輸入的文字）。"
+    },
+    "seller.FoodRegistration.status_revoked": {
+      "message": "已被平台撤銷：{number}。理由：{reason}。請確認字號與食藥署登錄資料一致後重新送出審核。",
+      "params": {
+        "number": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "description": "食品業者登錄被平台撤銷。number 是登錄字號，reason 是撤銷理由（平台人員輸入的文字）。"
+    },
+    "seller.FoodRegistrationState.FOOD_REGISTRATION_STATE_APPROVED": {
+      "message": "已通過",
+      "description": "核准中：店面與商品頁公開的字號只讀這一筆。"
+    },
+    "seller.FoodRegistrationState.FOOD_REGISTRATION_STATE_ENDED": {
+      "message": "已結束",
+      "description": "核准後結束；賣家看得到的只有被平台撤銷的（end_time 與 end_reason 有值）。"
+    },
+    "seller.FoodRegistrationState.FOOD_REGISTRATION_STATE_PENDING": {
+      "message": "審核中",
+      "description": "等平台核對。"
+    },
+    "seller.FoodRegistrationState.FOOD_REGISTRATION_STATE_REJECTED": {
+      "message": "未通過",
+      "description": "平台退回；賣家確認字號與食藥署的登錄資料一致後可以重新送出。"
+    },
+    "seller.KYCField.KYC_FIELD_BANK_ACCOUNT": {
+      "message": "銀行帳號",
+      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_BANK_ACCOUNT）"
+    },
+    "seller.KYCField.KYC_FIELD_BANK_BOOK": {
+      "message": "存摺封面",
+      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_BANK_BOOK）"
+    },
+    "seller.KYCField.KYC_FIELD_BANK_CODE": {
+      "message": "銀行代碼",
+      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_BANK_CODE）"
+    },
+    "seller.KYCField.KYC_FIELD_BANK_NAME": {
+      "message": "銀行名稱",
+      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_BANK_NAME）"
+    },
+    "seller.KYCField.KYC_FIELD_BIRTH_DATE": {
+      "message": "出生日期",
+      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_BIRTH_DATE）"
+    },
+    "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_ADDRESS": {
+      "message": "公司地址",
+      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_BUSINESS_COMPANY_ADDRESS）"
+    },
+    "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS": {
+      "message": "補充文件",
+      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS）"
+    },
+    "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME": {
+      "message": "公司名稱",
+      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_BUSINESS_COMPANY_NAME）"
+    },
+    "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_PHONE": {
+      "message": "公司電話",
+      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_BUSINESS_COMPANY_PHONE）"
+    },
+    "seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE": {
+      "message": "設立日期",
+      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE）"
+    },
+    "seller.KYCField.KYC_FIELD_BUSINESS_REP_ID_CARD_NO": {
+      "message": "負責人身分證字號",
+      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_BUSINESS_REP_ID_CARD_NO）"
+    },
+    "seller.KYCField.KYC_FIELD_BUSINESS_TAX_ID": {
+      "message": "統一編號",
+      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_BUSINESS_TAX_ID）"
+    },
+    "seller.KYCField.KYC_FIELD_ENGLISH_NAME": {
+      "message": "英文姓名",
+      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_ENGLISH_NAME）"
+    },
+    "seller.KYCField.KYC_FIELD_ID_CARD_BACK": {
+      "message": "身分證反面照",
+      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_ID_CARD_BACK）"
+    },
+    "seller.KYCField.KYC_FIELD_ID_CARD_FRONT": {
+      "message": "身分證正面照",
+      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_ID_CARD_FRONT）"
+    },
+    "seller.KYCField.KYC_FIELD_ID_CARD_ISSUE_DATE": {
+      "message": "發證日期",
+      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_ID_CARD_ISSUE_DATE）"
+    },
+    "seller.KYCField.KYC_FIELD_ID_CARD_ISSUE_LOCATION": {
+      "message": "發證地點",
+      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_ID_CARD_ISSUE_LOCATION）"
+    },
+    "seller.KYCField.KYC_FIELD_ID_CARD_ISSUE_TYPE": {
+      "message": "發證類型",
+      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_ID_CARD_ISSUE_TYPE）"
+    },
+    "seller.KYCField.KYC_FIELD_INDIVIDUAL_ID_CARD_NO": {
+      "message": "身分證字號",
+      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_INDIVIDUAL_ID_CARD_NO）"
+    },
+    "seller.KYCField.KYC_FIELD_PRODUCT_TYPE": {
+      "message": "主要商品類型",
+      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_PRODUCT_TYPE）"
+    },
+    "seller.KYCField.KYC_FIELD_REAL_NAME": {
+      "message": "真實姓名",
+      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_REAL_NAME）"
+    },
+    "seller.KYCField.KYC_FIELD_WEBSITE_URL": {
+      "message": "官方網站",
+      "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_WEBSITE_URL）"
+    },
+    "seller.KYCFlowStatus.KYC_FLOW_STATUS_APPROVED": {
+      "message": "已通過",
+      "description": "PayUni 核准，可以收款。"
+    },
+    "seller.KYCFlowStatus.KYC_FLOW_STATUS_BINDING": {
+      "message": "PayUni 審核中",
+      "description": "管理員核准，正在向 PayUni 註冊。"
+    },
+    "seller.KYCFlowStatus.KYC_FLOW_STATUS_BIND_FAILED": {
+      "message": "PayUni 建檔失敗，處理中",
+      "description": "向 PayUni 註冊失敗，等管理員處理。"
+    },
+    "seller.KYCFlowStatus.KYC_FLOW_STATUS_DRAFT": {
+      "message": "填寫中",
+      "description": "KYCFlowStatus 是 KYC 與 PayUni 兩條軸合成的流程狀態，給畫面顯示。（值 KYC_FLOW_STATUS_DRAFT）"
+    },
+    "seller.KYCFlowStatus.KYC_FLOW_STATUS_FORWARDED": {
+      "message": "PayUni 審核中",
+      "description": "已向 PayUni 註冊，還沒有審核結果。"
+    },
+    "seller.KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED": {
+      "message": "待認證",
+      "description": "沒有申請，或申請已取消。"
+    },
+    "seller.KYCFlowStatus.KYC_FLOW_STATUS_PAYUNI_REJECTED": {
+      "message": "PayUni 審核未通過",
+      "description": "KYCFlowStatus 是 KYC 與 PayUni 兩條軸合成的流程狀態，給畫面顯示。（值 KYC_FLOW_STATUS_PAYUNI_REJECTED）"
+    },
+    "seller.KYCFlowStatus.KYC_FLOW_STATUS_PENDING_INFO": {
+      "message": "需補件",
+      "description": "KYCFlowStatus 是 KYC 與 PayUni 兩條軸合成的流程狀態，給畫面顯示。（值 KYC_FLOW_STATUS_PENDING_INFO）"
+    },
+    "seller.KYCFlowStatus.KYC_FLOW_STATUS_REJECTED": {
+      "message": "未通過",
+      "description": "KYCFlowStatus 是 KYC 與 PayUni 兩條軸合成的流程狀態，給畫面顯示。（值 KYC_FLOW_STATUS_REJECTED）"
+    },
+    "seller.KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED": {
+      "message": "平台審核中",
+      "description": "KYCFlowStatus 是 KYC 與 PayUni 兩條軸合成的流程狀態，給畫面顯示。（值 KYC_FLOW_STATUS_SUBMITTED）"
+    },
+    "seller.KYCFlowStatus.KYC_FLOW_STATUS_UNDER_REVIEW": {
+      "message": "PayUni 審核中",
+      "description": "KYCFlowStatus 是 KYC 與 PayUni 兩條軸合成的流程狀態，給畫面顯示。（值 KYC_FLOW_STATUS_UNDER_REVIEW）"
+    },
+    "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_BINDING": {
+      "message": "查看進度",
+      "description": "開店進度卡與認證入口引導賣家做哪一步。（值 KYC_FLOW_STATUS_BINDING）"
+    },
+    "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_BIND_FAILED": {
+      "message": "查看進度",
+      "description": "開店進度卡與認證入口引導賣家做哪一步。（值 KYC_FLOW_STATUS_BIND_FAILED）"
+    },
+    "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_DRAFT": {
+      "message": "開始認證",
+      "description": "開店進度卡與認證入口引導賣家做哪一步。（值 KYC_FLOW_STATUS_DRAFT）"
+    },
+    "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_FORWARDED": {
+      "message": "查看進度",
+      "description": "開店進度卡與認證入口引導賣家做哪一步。（值 KYC_FLOW_STATUS_FORWARDED）"
+    },
+    "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_NOT_STARTED": {
+      "message": "開始認證",
+      "description": "開店進度卡與認證入口引導賣家做哪一步。（值 KYC_FLOW_STATUS_NOT_STARTED）"
+    },
+    "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_PAYUNI_REJECTED": {
+      "message": "前往補件",
+      "description": "開店進度卡與認證入口引導賣家做哪一步。（值 KYC_FLOW_STATUS_PAYUNI_REJECTED）"
+    },
+    "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_PENDING_INFO": {
+      "message": "前往補件",
+      "description": "開店進度卡與認證入口引導賣家做哪一步。（值 KYC_FLOW_STATUS_PENDING_INFO）"
+    },
+    "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_REJECTED": {
+      "message": "前往補件",
+      "description": "開店進度卡與認證入口引導賣家做哪一步。（值 KYC_FLOW_STATUS_REJECTED）"
+    },
+    "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_SUBMITTED": {
+      "message": "查看進度",
+      "description": "開店進度卡與認證入口引導賣家做哪一步。（值 KYC_FLOW_STATUS_SUBMITTED）"
+    },
+    "seller.KYCFlowStatus.action.KYC_FLOW_STATUS_UNDER_REVIEW": {
+      "message": "查看進度",
+      "description": "開店進度卡與認證入口引導賣家做哪一步。（值 KYC_FLOW_STATUS_UNDER_REVIEW）"
+    },
+    "seller.KYCFlowStatus.banner_description.KYC_FLOW_STATUS_APPROVED": {
+      "message": "可開始正式收款、提領與配送設定。",
+      "description": "商家認證狀態橫幅的說明。（值 KYC_FLOW_STATUS_APPROVED）"
+    },
+    "seller.KYCFlowStatus.banner_description.KYC_FLOW_STATUS_DRAFT": {
+      "message": "完成認證後才能正式收款、提領與配送設定。",
+      "description": "商家認證狀態橫幅的說明。（值 KYC_FLOW_STATUS_DRAFT）"
+    },
+    "seller.KYCFlowStatus.banner_description.KYC_FLOW_STATUS_NOT_STARTED": {
+      "message": "完成認證後才能正式收款、提領與配送設定。",
+      "description": "商家認證狀態橫幅的說明。（值 KYC_FLOW_STATUS_NOT_STARTED）"
+    },
+    "seller.KYCFlowStatus.banner_description.KYC_FLOW_STATUS_REJECTED": {
+      "message": "請查看退件原因並編輯後重新送出。",
+      "description": "商家認證狀態橫幅的說明。（值 KYC_FLOW_STATUS_REJECTED）"
+    },
+    "seller.KYCFlowStatus.banner_description.KYC_FLOW_STATUS_SUBMITTED": {
+      "message": "審核通過後將自動送出至 PayUni 進行金流審核。",
+      "description": "商家認證狀態橫幅的說明。（值 KYC_FLOW_STATUS_SUBMITTED）"
+    },
+    "seller.KYCFlowStatus.banner_title.KYC_FLOW_STATUS_APPROVED": {
+      "message": "商家認證已通過",
+      "description": "商家認證狀態橫幅的標題。（值 KYC_FLOW_STATUS_APPROVED）"
+    },
+    "seller.KYCFlowStatus.banner_title.KYC_FLOW_STATUS_DRAFT": {
+      "message": "尚未開始商家認證",
+      "description": "商家認證狀態橫幅的標題。（值 KYC_FLOW_STATUS_DRAFT）"
+    },
+    "seller.KYCFlowStatus.banner_title.KYC_FLOW_STATUS_NOT_STARTED": {
+      "message": "尚未開始商家認證",
+      "description": "商家認證狀態橫幅的標題。（值 KYC_FLOW_STATUS_NOT_STARTED）"
+    },
+    "seller.KYCFlowStatus.banner_title.KYC_FLOW_STATUS_REJECTED": {
+      "message": "認證未通過",
+      "description": "商家認證狀態橫幅的標題。（值 KYC_FLOW_STATUS_REJECTED）"
+    },
+    "seller.KYCFlowStatus.banner_title.KYC_FLOW_STATUS_SUBMITTED": {
+      "message": "平台審核中",
+      "description": "商家認證狀態橫幅的標題。（值 KYC_FLOW_STATUS_SUBMITTED）"
+    },
+    "seller.KYCFlowStatus.gate_heading.KYC_FLOW_STATUS_APPROVED": {
+      "message": "尚未通過商家認證",
+      "description": "認證閘門卡片（認證前的錢包、物流設定）的標題。（值 KYC_FLOW_STATUS_APPROVED）"
+    },
+    "seller.KYCFlowStatus.gate_heading.KYC_FLOW_STATUS_DRAFT": {
+      "message": "尚未通過商家認證",
+      "description": "認證閘門卡片（認證前的錢包、物流設定）的標題。（值 KYC_FLOW_STATUS_DRAFT）"
+    },
+    "seller.KYCFlowStatus.gate_heading.KYC_FLOW_STATUS_NOT_STARTED": {
+      "message": "尚未通過商家認證",
+      "description": "認證閘門卡片（認證前的錢包、物流設定）的標題。（值 KYC_FLOW_STATUS_NOT_STARTED）"
+    },
+    "seller.KYCFlowStatus.gate_heading.KYC_FLOW_STATUS_REJECTED": {
+      "message": "商家認證需要補件",
+      "description": "認證閘門卡片（認證前的錢包、物流設定）的標題。（值 KYC_FLOW_STATUS_REJECTED）"
+    },
+    "seller.KYCFlowStatus.gate_heading.KYC_FLOW_STATUS_SUBMITTED": {
+      "message": "商家認證審核中",
+      "description": "認證閘門卡片（認證前的錢包、物流設定）的標題。（值 KYC_FLOW_STATUS_SUBMITTED）"
+    },
+    "seller.KYCFlowStatus.gate_message.KYC_FLOW_STATUS_APPROVED": {
+      "message": "請先完成商家認證，才能{subject}。",
+      "params": {
+        "subject": {
+          "type": "string"
+        }
+      },
+      "description": "認證閘門卡片的說明。subject 是 client 的動作名稱，接在句尾。（值 KYC_FLOW_STATUS_APPROVED）"
+    },
+    "seller.KYCFlowStatus.gate_message.KYC_FLOW_STATUS_DRAFT": {
+      "message": "請先完成商家認證，才能{subject}。",
+      "params": {
+        "subject": {
+          "type": "string"
+        }
+      },
+      "description": "認證閘門卡片的說明。subject 是 client 的動作名稱，接在句尾。（值 KYC_FLOW_STATUS_DRAFT）"
+    },
+    "seller.KYCFlowStatus.gate_message.KYC_FLOW_STATUS_NOT_STARTED": {
+      "message": "請先完成商家認證，才能{subject}。",
+      "params": {
+        "subject": {
+          "type": "string"
+        }
+      },
+      "description": "認證閘門卡片的說明。subject 是 client 的動作名稱，接在句尾。（值 KYC_FLOW_STATUS_NOT_STARTED）"
+    },
+    "seller.KYCFlowStatus.gate_message.KYC_FLOW_STATUS_REJECTED": {
+      "message": "認證未通過，請修改資料後重新送審。",
+      "description": "認證閘門卡片的說明。subject 是 client 的動作名稱，接在句尾。（值 KYC_FLOW_STATUS_REJECTED）"
+    },
+    "seller.KYCFlowStatus.gate_message.KYC_FLOW_STATUS_SUBMITTED": {
+      "message": "你的商家認證平台審核中，通過後將自動送出至 PayUni 進行金流審核，完成後就能{subject}。",
+      "params": {
+        "subject": {
+          "type": "string"
+        }
+      },
+      "description": "認證閘門卡片的說明。subject 是 client 的動作名稱，接在句尾。（值 KYC_FLOW_STATUS_SUBMITTED）"
+    },
+    "seller.Measure.appeal_deadline": {
+      "message": "申覆期限：{deadline}",
+      "params": {
+        "deadline": {
+          "type": "string"
+        }
+      },
+      "description": "終止合作的申覆期限。deadline 是台北時間（YYYY/MM/DD HH:mm）。"
+    },
+    "seller.Measure.meta_kind": {
+      "message": "措施：{kind}",
+      "params": {
+        "kind": {
+          "noun": "seller.MeasureKind"
+        }
+      },
+      "description": "措施資訊列的一段：措施的種類。kind 是措施種類的名詞。"
+    },
+    "seller.Measure.meta_severity": {
+      "message": "嚴重程度：{severity}",
+      "params": {
+        "severity": {
+          "noun": "seller.ViolationSeverity"
+        }
+      },
+      "description": "措施資訊列的一段：認定的嚴重程度。severity 是嚴重程度的名詞。"
+    },
+    "seller.Measure.meta_termination_ground": {
+      "message": "事由：{ground}",
+      "params": {
+        "ground": {
+          "noun": "seller.TerminationGround"
+        }
+      },
+      "description": "措施資訊列的一段：終止合作的事由。ground 是終止事由的名詞。"
+    },
+    "seller.Measure.rejection_cooldown_warning": {
+      "message": "{days, plural, other {若本次經駁回，將於 {days} 日內不得再提出解除請求}}",
+      "params": {
+        "days": {
+          "type": "integer"
+        }
+      },
+      "description": "送出前的冷卻警告。days 是整天數，不足一天進位為一天。"
+    },
+    "seller.Measure.suspension_active_open": {
+      "message": "停權中（未定結束時間，平台定期複審）",
+      "description": "停權生效中、沒有結束時間時的效果行（由平台定期複審，不是永久）。"
+    },
+    "seller.Measure.suspension_active_until": {
+      "message": "停權中（至 {end}）",
+      "params": {
+        "end": {
+          "type": "string"
+        }
+      },
+      "description": "停權生效中、有結束時間時的效果行（seller-app 措施列表）。end 是台北時間（YYYY/MM/DD HH:mm）。"
+    },
+    "seller.Measure.suspension_ended": {
+      "message": "已於 {end} 結束",
+      "params": {
+        "end": {
+          "type": "string"
+        }
+      },
+      "description": "有結束時間的停權已結束時的效果行。end 同上。"
+    },
+    "seller.Measure.termination_effective": {
+      "message": "終止生效：{start}",
+      "params": {
+        "start": {
+          "type": "string"
+        }
+      },
+      "description": "終止合作的生效時間行。start 是台北時間（YYYY/MM/DD HH:mm）。"
+    },
+    "seller.Measure.termination_effective_ended": {
+      "message": "終止生效：{start}，合作已於 {end} 結束",
+      "params": {
+        "end": {
+          "type": "string"
+        },
+        "start": {
+          "type": "string"
+        }
+      },
+      "description": "預告終止因店家關閉而結束時的期間行。start、end 是台北時間（YYYY/MM/DD HH:mm）。"
+    },
+    "seller.Measure.termination_notice": {
+      "message": "平台已通知將於 {start} 終止合作。在此之前店家照常營業；如有異議，可提出申覆。",
+      "params": {
+        "start": {
+          "type": "string"
+        }
+      },
+      "description": "預告終止的橫幅文字。start 是台北時間（YYYY/MM/DD HH:mm）。"
+    },
+    "seller.Measure.title_fallback": {
+      "message": "措施紀錄",
+      "description": "措施標題的後備：沒有主要認定類別、也不認得依據時顯示。"
+    },
+    "seller.Measure.title_risk": {
+      "message": "風險：{ground}",
+      "params": {
+        "ground": {
+          "noun": "seller.RiskGround"
+        }
+      },
+      "description": "依據是風險類型的措施的標題。ground 是風險類型的名詞（同語系、同受眾）。"
+    },
+    "seller.Measure.title_risk_fallback": {
+      "message": "風險措施",
+      "description": "依據是風險類型、但風險類型不認得時的標題。"
+    },
+    "seller.MeasureBasis.MEASURE_BASIS_CONTRACT": {
+      "message": "契約條款",
+      "description": "終止合作依據賣家合作條款第 21 條，沒有認定也沒有風險類型。"
+    },
+    "seller.MeasureBasis.MEASURE_BASIS_RISK": {
+      "message": "風險",
+      "description": "MeasureBasis 是措施的依據：VIOLATION 依據違規的認定（有固定期間的處分），RISK 依據條款第 17.1 條的風險類型或第 17.5 條\n的外部要求（沒有固定期間時由平台定期複審），CONTRACT 依據契約條款（只配終止合作，無過錯或與認定無關）。（值 MEASURE_BASIS_RISK）"
+    },
+    "seller.MeasureBasis.MEASURE_BASIS_VIOLATION": {
+      "message": "違規認定",
+      "description": "MeasureBasis 是措施的依據：VIOLATION 依據違規的認定（有固定期間的處分），RISK 依據條款第 17.1 條的風險類型或第 17.5 條\n的外部要求（沒有固定期間時由平台定期複審），CONTRACT 依據契約條款（只配終止合作，無過錯或與認定無關）。（值 MEASURE_BASIS_VIOLATION）"
+    },
+    "seller.MeasureKind.MEASURE_KIND_SUSPENSION": {
+      "message": "停權",
+      "description": "帳號在期間內被限制。"
+    },
+    "seller.MeasureKind.MEASURE_KIND_TERMINATION": {
+      "message": "終止合作",
+      "description": "終止賣家合作條款（第二十一條）。生效時（period.start_time）店家暫停營業，未結訂單完成後店家關閉；沒有固定結束時間，\n也沒有解除請求、複審或結束，只能由撤銷、申覆成立解除。事由看 Measure.termination_ground；申覆期間到 appeal_deadline_time 為止。"
+    },
+    "seller.MeasureKind.MEASURE_KIND_WARNING": {
+      "message": "警告",
+      "description": "沒有限制，也沒有期間。"
+    },
+    "seller.MeasureRequest.reply_note": {
+      "message": "平台回覆：{reason}",
+      "params": {
+        "reason": {
+          "type": "string"
+        }
+      },
+      "description": "已裁定請求的說明行。reason 是裁定理由（平台人員輸入的文字）。"
+    },
+    "seller.MeasureRequestKind.MEASURE_REQUEST_KIND_APPEAL": {
+      "message": "申覆",
+      "description": "對措施本身的決定提出異議；接受時措施撤銷、效果解除。"
+    },
+    "seller.MeasureRequestKind.MEASURE_REQUEST_KIND_REMEDIATION": {
+      "message": "解除請求",
+      "description": "完成補救後請求解除（只有 RISK 依據的措施）；接受時措施結束（state 變 ENDED、期間結束在接受的當下），不是撤銷，\n措施的依據與認定都不變，仍可申覆。"
+    },
+    "seller.MeasureRequestKind.submitted_note.MEASURE_REQUEST_KIND_APPEAL": {
+      "message": "已提交申覆，請等候平台複核。",
+      "description": "請求已提交、等候平台複核的說明行。（值 MEASURE_REQUEST_KIND_APPEAL）"
+    },
+    "seller.MeasureRequestKind.submitted_note.MEASURE_REQUEST_KIND_REMEDIATION": {
+      "message": "已提交解除請求，請等候平台複核。",
+      "description": "請求已提交、等候平台複核的說明行。（值 MEASURE_REQUEST_KIND_REMEDIATION）"
+    },
+    "seller.MeasureRequestState.MEASURE_REQUEST_STATE_ACCEPTED": {
+      "message": "已通過",
+      "description": "MeasureRequestState 是措施上請求（申覆與解除請求）的狀態；由伺服器推導（措施已不在生效中而仍待處理的解除請求是 CLOSED，見\nMeasureRequestCloseCause）。ACCEPTED 的效果看 MeasureRequest.kind。（值 MEASURE_REQUEST_STATE_ACCEPTED）"
+    },
+    "seller.MeasureRequestState.MEASURE_REQUEST_STATE_CLOSED": {
+      "message": "已結案",
+      "description": "請求沒有經裁定就結案，原因看 MeasureRequest.close_cause。"
+    },
+    "seller.MeasureRequestState.MEASURE_REQUEST_STATE_PENDING": {
+      "message": "審核中",
+      "description": "MeasureRequestState 是措施上請求（申覆與解除請求）的狀態；由伺服器推導（措施已不在生效中而仍待處理的解除請求是 CLOSED，見\nMeasureRequestCloseCause）。ACCEPTED 的效果看 MeasureRequest.kind。（值 MEASURE_REQUEST_STATE_PENDING）"
+    },
+    "seller.MeasureRequestState.MEASURE_REQUEST_STATE_REJECTED": {
+      "message": "已駁回",
+      "description": "MeasureRequestState 是措施上請求（申覆與解除請求）的狀態；由伺服器推導（措施已不在生效中而仍待處理的解除請求是 CLOSED，見\nMeasureRequestCloseCause）。ACCEPTED 的效果看 MeasureRequest.kind。（值 MEASURE_REQUEST_STATE_REJECTED）"
+    },
+    "seller.MeasureRequestState.with_kind.MEASURE_REQUEST_STATE_ACCEPTED": {
+      "message": "{kind, select, MEASURE_REQUEST_KIND_APPEAL {申覆已通過} MEASURE_REQUEST_KIND_REMEDIATION {解除請求已通過} other {請求已通過}}",
+      "params": {
+        "kind": {
+          "enum": "seller.MeasureRequestKind"
+        }
+      },
+      "description": "請求的種類與狀態合成的狀態標籤。（值 MEASURE_REQUEST_STATE_ACCEPTED）"
+    },
+    "seller.MeasureRequestState.with_kind.MEASURE_REQUEST_STATE_PENDING": {
+      "message": "{kind, select, MEASURE_REQUEST_KIND_APPEAL {申覆審核中} MEASURE_REQUEST_KIND_REMEDIATION {解除請求審核中} other {請求審核中}}",
+      "params": {
+        "kind": {
+          "enum": "seller.MeasureRequestKind"
+        }
+      },
+      "description": "請求的種類與狀態合成的狀態標籤。（值 MEASURE_REQUEST_STATE_PENDING）"
+    },
+    "seller.MeasureRequestState.with_kind.MEASURE_REQUEST_STATE_REJECTED": {
+      "message": "{kind, select, MEASURE_REQUEST_KIND_APPEAL {申覆已駁回} MEASURE_REQUEST_KIND_REMEDIATION {解除請求已駁回} other {請求已駁回}}",
+      "params": {
+        "kind": {
+          "enum": "seller.MeasureRequestKind"
+        }
+      },
+      "description": "請求的種類與狀態合成的狀態標籤。（值 MEASURE_REQUEST_STATE_REJECTED）"
+    },
+    "seller.MeasureState.MEASURE_STATE_ACTIVE": {
+      "message": "{kind, select, MEASURE_KIND_TERMINATION {合作已終止} other {停權中}}",
+      "params": {
+        "kind": {
+          "enum": "seller.MeasureKind"
+        }
+      },
+      "description": "停權生效中。終止合作生效後（含店家已關閉）也是 ACTIVE。\nkind 是同一筆措施的 MeasureKind。",
+      "note": "kind 是同一筆措施的 MeasureKind。"
+    },
+    "seller.MeasureState.MEASURE_STATE_ENDED": {
+      "message": "已結束",
+      "description": "停權已結束（到期或平台結束）。"
+    },
+    "seller.MeasureState.MEASURE_STATE_ISSUED": {
+      "message": "已發出",
+      "description": "警告，未撤銷（不是「生效中」，沒有限制）。"
+    },
+    "seller.MeasureState.MEASURE_STATE_REVOKED": {
+      "message": "已撤銷",
+      "description": "措施已撤銷。"
+    },
+    "seller.MeasureState.MEASURE_STATE_SCHEDULED": {
+      "message": "預定生效",
+      "description": "已建立、還沒到開始時間（period.start_time 在未來）；目前只有預告終止（TerminationGround.NOTICE）。此時帳號不受限制。\n預告期內店家關閉，措施直接變 ENDED，不會變 ACTIVE。"
+    },
+    "seller.PayUniState.PAY_UNI_STATE_APPROVED": {
+      "message": "PayUni 收款已啟用",
+      "description": "可以收款。"
+    },
+    "seller.PayUniState.PAY_UNI_STATE_CONTACT_SUPPORT": {
+      "message": "PayUni 申請未通過",
+      "description": "沒有賣家能修正的資料，賣家要聯絡客服，不能自己重新送出。"
+    },
+    "seller.PayUniState.PAY_UNI_STATE_FIXABLE": {
+      "message": "PayUni 需要補件",
+      "description": "申請的資料有問題，賣家修正申請後自己重新送出。"
+    },
+    "seller.PayUniState.PAY_UNI_STATE_FIX_VIA_SUPPORT": {
+      "message": "PayUni 需要補件",
+      "description": "店家設定的資料有問題，賣家修正後由平台重新處理，不能自己重新送出。"
+    },
+    "seller.PayUniState.PAY_UNI_STATE_PENDING_INFO": {
+      "message": "PayUni 需要補件",
+      "description": "PayUni 要求補件，賣家依 PayUni 的通知信處理。"
+    },
+    "seller.PayUniState.PAY_UNI_STATE_RETRY_LATER": {
+      "message": "PayUni 暫時無法處理",
+      "description": "PayUni 暫時無法處理，等平台重新送出。"
+    },
+    "seller.PayUniState.PAY_UNI_STATE_REVIEWING": {
+      "message": "PayUni 審核中",
+      "description": "綁定中或 PayUni 審核中，賣家等結果。"
+    },
+    "seller.PayUniState.PAY_UNI_STATE_TERMINATED": {
+      "message": "PayUni 收款帳戶已終止",
+      "description": "PayUni 端的商店已是終止狀態，同一個店家無法再綁定。"
+    },
+    "seller.RevokeReason.REVOKE_REASON_ADMIN_CORRECTION": {
+      "message": "平台更正",
+      "description": "平台更正誤判。"
+    },
+    "seller.RevokeReason.REVOKE_REASON_APPEAL_ACCEPTED": {
+      "message": "申覆成立",
+      "description": "接受申覆；只由裁定申覆寫入。"
+    },
+    "seller.RevokeReason.REVOKE_REASON_EXTERNAL_DECISION": {
+      "message": "主管機關或法院的決定",
+      "description": "主管機關或法院的決定。"
+    },
+    "seller.RevokeReason.REVOKE_REASON_FINDING_REVOKED": {
+      "message": "依據的認定已撤銷",
+      "description": "措施引用的認定被撤銷，措施連帶撤銷；只由連帶撤銷寫入。"
+    },
+    "seller.RevokeReason.REVOKE_REASON_OTHER": {
+      "message": "其他",
+      "description": "其他原因。"
+    },
+    "seller.RevokeReason.REVOKE_REASON_SOURCE_REVOKED": {
+      "message": "關聯的終止已撤銷",
+      "description": "關聯帳號的終止（TerminationGround.LINKED_ACCOUNT）所依據的來源終止被撤銷，連帶撤銷；只由連帶撤銷寫入。"
+    },
+    "seller.RiskGround.RISK_GROUND_EXTERNAL_ORDER": {
+      "message": "主管機關或司法機關的要求",
+      "description": "主管機關或司法機關的要求（第 17.5 條）。"
+    },
+    "seller.RiskGround.RISK_GROUND_FOOD_SAFETY": {
+      "message": "食品安全",
+      "description": "食品安全風險。"
+    },
+    "seller.RiskGround.RISK_GROUND_FRAUD": {
+      "message": "詐欺",
+      "description": "詐欺風險。"
+    },
+    "seller.RiskGround.RISK_GROUND_FULFILLMENT": {
+      "message": "履約",
+      "description": "履約風險。"
+    },
+    "seller.RiskGround.RISK_GROUND_INFRINGEMENT": {
+      "message": "侵權",
+      "description": "侵權風險。"
+    },
+    "seller.RiskGround.RISK_GROUND_PERSONAL_DATA": {
+      "message": "個人資料",
+      "description": "個人資料風險。"
+    },
+    "seller.RiskGround.RISK_GROUND_SECURITY": {
+      "message": "資安",
+      "description": "資安風險。"
+    },
+    "seller.RiskGround.RISK_GROUND_TRANSACTION": {
+      "message": "交易風險",
+      "description": "交易風險。"
+    },
+    "seller.SellerPayUni.fix_fields_heading": {
+      "message": "請修正以下資料",
+      "description": "賣家此刻能修正的欄位清單（SellerPayUni.fix_fields、fix_store_fields）的小標題；清單為空時整段不出現。"
+    },
+    "seller.SellerPayUni.reason_heading": {
+      "message": "PayUni 的審核意見",
+      "description": "PayUni 的審核意見原文（SellerPayUni.reason）的小標題；reason 為空時整段不出現。"
+    },
+    "seller.SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED": {
+      "message": "商家認證已通過",
+      "description": "商家認證（含 PayUni 審核）已核准。"
+    },
+    "seller.SellerRequirement.SELLER_REQUIREMENT_LOGO": {
+      "message": "logo",
+      "description": "有 logo。"
+    },
+    "seller.SellerRequirement.SELLER_REQUIREMENT_NOT_PENDING_DELETION": {
+      "message": "店家未在刪除中",
+      "description": "店家沒有正在隨帳號刪除。"
+    },
+    "seller.SellerRequirement.SELLER_REQUIREMENT_NOT_SUSPENDED": {
+      "message": "帳號未停權",
+      "description": "帳號沒有生效中的停權。"
+    },
+    "seller.SellerRequirement.SELLER_REQUIREMENT_STORE_ACTIVE": {
+      "message": "店家未關閉",
+      "description": "店家沒有關閉。"
+    },
+    "seller.SellerRequirement.SELLER_REQUIREMENT_STORE_NAME": {
+      "message": "店名",
+      "description": "有店名。"
+    },
+    "seller.SellerRequirement.SELLER_REQUIREMENT_TOWN_CODE": {
+      "message": "所在地",
+      "description": "有鄉鎮市區。"
+    },
+    "seller.StoreField.STORE_FIELD_ADDRESS": {
+      "message": "店家地址",
+      "description": "店家地址（鄉鎮市區與地址明細）。"
+    },
+    "seller.StoreField.STORE_FIELD_CONTACT_MOBILE": {
+      "message": "聯絡人手機",
+      "description": "StoreField 是店家上的一個欄位，值與 Store 的欄位一對一。送出 KYC 之前還缺的店家欄位\n（KYCApplication.missing_store_fields）與 PayUni 問題要賣家補的店家欄位（PayUniProblem.store_fields）都用這一套。（值 STORE_FIELD_CONTACT_MOBILE）"
+    },
+    "seller.StoreField.STORE_FIELD_CONTACT_NAME": {
+      "message": "聯絡人姓名",
+      "description": "StoreField 是店家上的一個欄位，值與 Store 的欄位一對一。送出 KYC 之前還缺的店家欄位\n（KYCApplication.missing_store_fields）與 PayUni 問題要賣家補的店家欄位（PayUniProblem.store_fields）都用這一套。（值 STORE_FIELD_CONTACT_NAME）"
+    },
+    "seller.StoreField.STORE_FIELD_CONTACT_PHONE": {
+      "message": "商店電話",
+      "description": "商店電話。"
+    },
+    "seller.StoreField.STORE_FIELD_SUPPORT_EMAIL": {
+      "message": "客服電子信箱",
+      "description": "StoreField 是店家上的一個欄位，值與 Store 的欄位一對一。送出 KYC 之前還缺的店家欄位\n（KYCApplication.missing_store_fields）與 PayUni 問題要賣家補的店家欄位（PayUniProblem.store_fields）都用這一套。（值 STORE_FIELD_SUPPORT_EMAIL）"
+    },
+    "seller.TerminationGround.TERMINATION_GROUND_BANKRUPTCY": {
+      "message": "破產",
+      "description": "第 21.3 條，立即生效。"
+    },
+    "seller.TerminationGround.TERMINATION_GROUND_CEASED_BUSINESS": {
+      "message": "停業",
+      "description": "第 21.3 條，立即生效。"
+    },
+    "seller.TerminationGround.TERMINATION_GROUND_DISSOLUTION": {
+      "message": "解散",
+      "description": "第 21.3 條，立即生效。"
+    },
+    "seller.TerminationGround.TERMINATION_GROUND_FOOD_SAFETY_INCIDENT": {
+      "message": "重大食安事件",
+      "description": "第 21.3 條，立即生效。"
+    },
+    "seller.TerminationGround.TERMINATION_GROUND_FRAUD": {
+      "message": "詐欺事件",
+      "description": "第 21.3 條，立即生效。"
+    },
+    "seller.TerminationGround.TERMINATION_GROUND_LICENSE_REVOKED": {
+      "message": "必要許可遭撤銷",
+      "description": "第 21.3 條，立即生效。"
+    },
+    "seller.TerminationGround.TERMINATION_GROUND_LINKED_ACCOUNT": {
+      "message": "關聯帳號",
+      "description": "與另一個帳號的終止（來源措施）使用同一個身分證明文件或統一編號，立即生效；來源措施撤銷時一併撤銷\n（RevokeReason.SOURCE_REVOKED）。賣家可對這筆單獨申覆。"
+    },
+    "seller.TerminationGround.TERMINATION_GROUND_MATERIAL_BREACH": {
+      "message": "重大違約未改善",
+      "description": "第 21.3 條第 1 款，立即生效。依據是 VIOLATION，至少引用一筆已存在 7 日以上、未撤銷的認定。"
+    },
+    "seller.TerminationGround.TERMINATION_GROUND_NOTICE": {
+      "message": "預告終止（第 21.2 條）",
+      "description": "甲方預告終止，建立後 30 日生效（period.start_time）；預告期間店家照常營業，賣家可申覆。無過錯，\n依據是 CONTRACT；不禁止賣家日後重新申請開店，不取身分快照。"
+    },
+    "seller.TerminationGround.TERMINATION_GROUND_OTHER_SERIOUS": {
+      "message": "其他嚴重影響履約的情形",
+      "description": "第 21.3 條，立即生效。"
+    },
+    "seller.TerminationGround.TERMINATION_GROUND_PLATFORM_SECURITY": {
+      "message": "危害平台安全",
+      "description": "第 21.3 條，立即生效。"
+    },
+    "seller.ViolationSeverity.VIOLATION_SEVERITY_CRITICAL": {
+      "message": "嚴重",
+      "description": "ViolationSeverity 是認定套用的嚴重度，也是案件的嚴重度（開案時決定，之後只經 ChangeCaseSeverity 修改）。（值 VIOLATION_SEVERITY_CRITICAL）"
+    },
+    "seller.ViolationSeverity.VIOLATION_SEVERITY_HIGH": {
+      "message": "高",
+      "description": "ViolationSeverity 是認定套用的嚴重度，也是案件的嚴重度（開案時決定，之後只經 ChangeCaseSeverity 修改）。（值 VIOLATION_SEVERITY_HIGH）"
+    },
+    "seller.ViolationSeverity.VIOLATION_SEVERITY_LOW": {
+      "message": "低",
+      "description": "ViolationSeverity 是認定套用的嚴重度，也是案件的嚴重度（開案時決定，之後只經 ChangeCaseSeverity 修改）。（值 VIOLATION_SEVERITY_LOW）"
+    },
+    "seller.ViolationSeverity.VIOLATION_SEVERITY_MEDIUM": {
+      "message": "中",
+      "description": "ViolationSeverity 是認定套用的嚴重度，也是案件的嚴重度（開案時決定，之後只經 ChangeCaseSeverity 修改）。（值 VIOLATION_SEVERITY_MEDIUM）"
+    }
+  },
+  "staff": {
+    "seller.KYCFlowStatus.KYC_FLOW_STATUS_APPROVED": {
+      "message": "已核准",
+      "description": "PayUni 核准，可以收款。\n受眾：後台員工"
+    },
+    "seller.KYCFlowStatus.KYC_FLOW_STATUS_BINDING": {
+      "message": "PayUni 綁定中",
+      "description": "管理員核准，正在向 PayUni 註冊。\n受眾：後台員工"
+    },
+    "seller.KYCFlowStatus.KYC_FLOW_STATUS_BIND_FAILED": {
+      "message": "待重新綁定",
+      "description": "向 PayUni 註冊失敗，等管理員處理。\n受眾：後台員工"
+    },
+    "seller.KYCFlowStatus.KYC_FLOW_STATUS_DRAFT": {
+      "message": "填寫中",
+      "description": "KYCFlowStatus 是 KYC 與 PayUni 兩條軸合成的流程狀態，給畫面顯示。（值 KYC_FLOW_STATUS_DRAFT）\n受眾：後台員工"
+    },
+    "seller.KYCFlowStatus.KYC_FLOW_STATUS_FORWARDED": {
+      "message": "PayUni 審核中",
+      "description": "已向 PayUni 註冊，還沒有審核結果。\n受眾：後台員工"
+    },
+    "seller.KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED": {
+      "message": "尚未申請",
+      "description": "沒有申請，或申請已取消。\n受眾：後台員工"
+    },
+    "seller.KYCFlowStatus.KYC_FLOW_STATUS_PAYUNI_REJECTED": {
+      "message": "PayUni 審核未通過",
+      "description": "KYCFlowStatus 是 KYC 與 PayUni 兩條軸合成的流程狀態，給畫面顯示。（值 KYC_FLOW_STATUS_PAYUNI_REJECTED）\n受眾：後台員工"
+    },
+    "seller.KYCFlowStatus.KYC_FLOW_STATUS_PENDING_INFO": {
+      "message": "PayUni 待補件",
+      "description": "KYCFlowStatus 是 KYC 與 PayUni 兩條軸合成的流程狀態，給畫面顯示。（值 KYC_FLOW_STATUS_PENDING_INFO）\n受眾：後台員工"
+    },
+    "seller.KYCFlowStatus.KYC_FLOW_STATUS_REJECTED": {
+      "message": "已退回",
+      "description": "KYCFlowStatus 是 KYC 與 PayUni 兩條軸合成的流程狀態，給畫面顯示。（值 KYC_FLOW_STATUS_REJECTED）\n受眾：後台員工"
+    },
+    "seller.KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED": {
+      "message": "待審核",
+      "description": "KYCFlowStatus 是 KYC 與 PayUni 兩條軸合成的流程狀態，給畫面顯示。（值 KYC_FLOW_STATUS_SUBMITTED）\n受眾：後台員工"
+    },
+    "seller.KYCFlowStatus.KYC_FLOW_STATUS_UNDER_REVIEW": {
+      "message": "PayUni 審核中",
+      "description": "KYCFlowStatus 是 KYC 與 PayUni 兩條軸合成的流程狀態，給畫面顯示。（值 KYC_FLOW_STATUS_UNDER_REVIEW）\n受眾：後台員工"
+    },
+    "seller.MeasureRequestState.MEASURE_REQUEST_STATE_ACCEPTED": {
+      "message": "成立",
+      "description": "MeasureRequestState 是措施上請求（申覆與解除請求）的狀態；由伺服器推導（措施已不在生效中而仍待處理的解除請求是 CLOSED，見\nMeasureRequestCloseCause）。ACCEPTED 的效果看 MeasureRequest.kind。（值 MEASURE_REQUEST_STATE_ACCEPTED）\n受眾：後台員工"
+    },
+    "seller.MeasureRequestState.MEASURE_REQUEST_STATE_CLOSED": {
+      "message": "已結案",
+      "description": "請求沒有經裁定就結案，原因看 MeasureRequest.close_cause。\n受眾：後台員工"
+    },
+    "seller.MeasureRequestState.MEASURE_REQUEST_STATE_PENDING": {
+      "message": "待裁定",
+      "description": "MeasureRequestState 是措施上請求（申覆與解除請求）的狀態；由伺服器推導（措施已不在生效中而仍待處理的解除請求是 CLOSED，見\nMeasureRequestCloseCause）。ACCEPTED 的效果看 MeasureRequest.kind。（值 MEASURE_REQUEST_STATE_PENDING）\n受眾：後台員工"
+    },
+    "seller.MeasureRequestState.MEASURE_REQUEST_STATE_REJECTED": {
+      "message": "駁回",
+      "description": "MeasureRequestState 是措施上請求（申覆與解除請求）的狀態；由伺服器推導（措施已不在生效中而仍待處理的解除請求是 CLOSED，見\nMeasureRequestCloseCause）。ACCEPTED 的效果看 MeasureRequest.kind。（值 MEASURE_REQUEST_STATE_REJECTED）\n受眾：後台員工"
+    },
+    "seller.MeasureRequestState.with_kind.MEASURE_REQUEST_STATE_ACCEPTED": {
+      "message": "{kind, select, MEASURE_REQUEST_KIND_APPEAL {申覆成立} MEASURE_REQUEST_KIND_REMEDIATION {解除請求成立} other {請求成立}}",
+      "description": "請求的種類與狀態合成的狀態標籤。（值 MEASURE_REQUEST_STATE_ACCEPTED）\n受眾：後台員工"
+    },
+    "seller.MeasureRequestState.with_kind.MEASURE_REQUEST_STATE_CLOSED": {
+      "message": "{kind, select, MEASURE_REQUEST_KIND_APPEAL {申覆已結案} MEASURE_REQUEST_KIND_REMEDIATION {解除請求已結案} other {請求已結案}}",
+      "params": {
+        "kind": {
+          "enum": "seller.MeasureRequestKind"
+        }
+      },
+      "description": "請求的種類與狀態合成的狀態標籤。（值 MEASURE_REQUEST_STATE_CLOSED）\n受眾：後台員工"
+    },
+    "seller.MeasureRequestState.with_kind.MEASURE_REQUEST_STATE_PENDING": {
+      "message": "{kind, select, MEASURE_REQUEST_KIND_APPEAL {申覆待裁定} MEASURE_REQUEST_KIND_REMEDIATION {解除請求待裁定} other {請求待裁定}}",
+      "description": "請求的種類與狀態合成的狀態標籤。（值 MEASURE_REQUEST_STATE_PENDING）\n受眾：後台員工"
+    },
+    "seller.MeasureRequestState.with_kind.MEASURE_REQUEST_STATE_REJECTED": {
+      "message": "{kind, select, MEASURE_REQUEST_KIND_APPEAL {申覆駁回} MEASURE_REQUEST_KIND_REMEDIATION {解除請求駁回} other {請求駁回}}",
+      "description": "請求的種類與狀態合成的狀態標籤。（值 MEASURE_REQUEST_STATE_REJECTED）\n受眾：後台員工"
+    }
+  },
+  "variants": {
+    "seller.KYCFlowStatus.action": {
+      "omit": {
+        "default": [
+          "KYC_FLOW_STATUS_APPROVED"
+        ]
+      },
+      "description": "開店進度卡與認證入口引導賣家做哪一步。"
+    },
+    "seller.KYCFlowStatus.banner_description": {
+      "omit": {
+        "default": [
+          "KYC_FLOW_STATUS_BINDING",
+          "KYC_FLOW_STATUS_BIND_FAILED",
+          "KYC_FLOW_STATUS_FORWARDED",
+          "KYC_FLOW_STATUS_UNDER_REVIEW",
+          "KYC_FLOW_STATUS_PENDING_INFO",
+          "KYC_FLOW_STATUS_PAYUNI_REJECTED"
+        ]
+      },
+      "description": "商家認證狀態橫幅的說明。"
+    },
+    "seller.KYCFlowStatus.banner_title": {
+      "omit": {
+        "default": [
+          "KYC_FLOW_STATUS_BINDING",
+          "KYC_FLOW_STATUS_BIND_FAILED",
+          "KYC_FLOW_STATUS_FORWARDED",
+          "KYC_FLOW_STATUS_UNDER_REVIEW",
+          "KYC_FLOW_STATUS_PENDING_INFO",
+          "KYC_FLOW_STATUS_PAYUNI_REJECTED"
+        ]
+      },
+      "description": "商家認證狀態橫幅的標題。"
+    },
+    "seller.KYCFlowStatus.gate_heading": {
+      "omit": {
+        "default": [
+          "KYC_FLOW_STATUS_BINDING",
+          "KYC_FLOW_STATUS_BIND_FAILED",
+          "KYC_FLOW_STATUS_FORWARDED",
+          "KYC_FLOW_STATUS_UNDER_REVIEW",
+          "KYC_FLOW_STATUS_PENDING_INFO",
+          "KYC_FLOW_STATUS_PAYUNI_REJECTED"
+        ]
+      },
+      "description": "認證閘門卡片（認證前的錢包、物流設定）的標題。"
+    },
+    "seller.KYCFlowStatus.gate_message": {
+      "omit": {
+        "default": [
+          "KYC_FLOW_STATUS_BINDING",
+          "KYC_FLOW_STATUS_BIND_FAILED",
+          "KYC_FLOW_STATUS_FORWARDED",
+          "KYC_FLOW_STATUS_UNDER_REVIEW",
+          "KYC_FLOW_STATUS_PENDING_INFO",
+          "KYC_FLOW_STATUS_PAYUNI_REJECTED"
+        ]
+      },
+      "description": "認證閘門卡片的說明。subject 是 client 的動作名稱，接在句尾。"
+    },
+    "seller.MeasureRequestKind.submitted_note": {
+      "description": "請求已提交、等候平台複核的說明行。"
+    },
+    "seller.MeasureRequestState.with_kind": {
+      "omit": {
+        "default": [
+          "MEASURE_REQUEST_STATE_CLOSED"
+        ],
+        "staff": []
+      },
+      "description": "請求的種類與狀態合成的狀態標籤。"
+    }
+  }
+}

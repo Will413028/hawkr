@@ -1,0 +1,28 @@
+{
+  "resolverNil": false,
+  "resolveResult": {
+    "NeedsDisambiguation": false,
+    "CropCode": null,
+    "GroupCode": null,
+    "CommodityCode": null,
+    "FallbackGroupCode": null,
+    "Label": "",
+    "Candidates": null,
+    "Unavailable": true
+  },
+  "before": {
+    "item": "舊品項"
+  },
+  "after": {
+    "item": "查無此物"
+  },
+  "result": {
+    "item": "查無此物",
+    "resolution": null,
+    "pending": true,
+    "candidates": [],
+    "pendingReason": "UNAVAILABLE",
+    "evaluated": true,
+    "factsAsOfSet": true
+  }
+}

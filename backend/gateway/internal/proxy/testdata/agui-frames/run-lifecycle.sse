@@ -1,0 +1,12 @@
+data: {"type":"RUN_STARTED","threadId":"thread-golden","runId":"run-golden"}
+
+data: {"type":"TEXT_MESSAGE_START","messageId":"msg-golden","role":"assistant"}
+
+data: {"type":"TEXT_MESSAGE_CONTENT","messageId":"msg-golden","delta":"嗨"}
+
+data: {"type":"TEXT_MESSAGE_CONTENT","messageId":"msg-golden","delta":"，這是測試"}
+
+data: {"type":"TEXT_MESSAGE_END","messageId":"msg-golden"}
+
+data: {"type":"RUN_FINISHED","threadId":"thread-golden","runId":"run-golden"}
+

@@ -1,0 +1,1852 @@
+syntax = "proto3";
+
+package hawkr.invoice;
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/invoice";
+option java_multiple_files = true;
+option java_package = "io.github.will413028.hawkr.invoice.grpc";
+option java_outer_classname = "InvoiceProto";
+
+// Invoice Service — 電子發票（58 號詳細設計書）
+//
+// 通用 issuer→recipient 模型：issuer ∈ {賣家, 平台}；recipient ∈ {買家, 賣家, 外部對象}；
+// 觸發 ∈ {訂單付款自動, ADM 手動}；品項來源 ∈ {訂單快照, ADM 手填}。
+// Phase 1 只實作「賣家→買家」自動線 ＋ ADM 手動開票，其餘由模型容納但不接觸發器。
+//
+// 約定（全檔適用，不逐 message 重複）：
+//   - 每個 Response 的欄位 1/2 恆為 int32 code = 1; string message = 2;
+//     （Gateway EnvelopeGuardInterceptor 靠 GetCode 判定業務錯誤，漏了會靜默當成功）
+//   - 所有數字（ID/金額/數量/計數/版本/頁碼）一律 string；
+//     例外僅 Request 內由 Gateway 注入的身分欄位（buyer_id / store_id / actor_account_id）用 int64
+//   - 所有時間一律 string，ISO 8601 UTC 秒精度（YYYY-MM-DDTHH:mm:ssZ）
+//   - 狀態/類型碼一律 string，值域見 docs/代碼管理（CodeMeta）/{業務狀態碼,業務類型碼,內部技術碼}.md
+//   - 金額單位「元」的整數字串，禁止 double/decimal
+//   - 本服務不 import common/delegation.proto：發票是 ADM 代行禁區（56 §6.1.1）
+service InvoiceService {
+    // ==================== 買家端（Gateway 注入 buyer_id）====================
+
+    // 常用發票資料（B08）
+    rpc ListBuyerInvoiceProfiles(ListBuyerInvoiceProfilesRequest) returns (ListBuyerInvoiceProfilesResponse);
+    rpc CreateBuyerInvoiceProfile(CreateBuyerInvoiceProfileRequest) returns (BuyerInvoiceProfileResponse);
+    rpc UpdateBuyerInvoiceProfile(UpdateBuyerInvoiceProfileRequest) returns (BuyerInvoiceProfileResponse);
+    rpc DeleteBuyerInvoiceProfile(DeleteBuyerInvoiceProfileRequest) returns (DeleteBuyerInvoiceProfileResponse);
+    rpc SetDefaultBuyerInvoiceProfile(SetDefaultBuyerInvoiceProfileRequest) returns (BuyerInvoiceProfileResponse);
+
+    // 訂單發票（B04/B05）
+    rpc GetOrderInvoice(GetOrderInvoiceRequest) returns (GetOrderInvoiceResponse);
+    rpc GetInvoiceDocument(GetInvoiceDocumentRequest) returns (GetInvoiceDocumentResponse);
+    rpc GetInvoiceDocumentFile(GetInvoiceDocumentFileRequest) returns (GetInvoiceDocumentFileResponse);
+
+    // 買家發票中心（B09，端點 68–69）：跨訂單的文件列表 ＋ document-scoped 詳情。
+    // 這兩支與上面 order-scoped 的 GetOrderInvoice／GetInvoiceDocument 並存而非取代：
+    // §2.3 方向三（平台→買家）的發票不掛在任何訂單底下，order-scoped 的入口取不到它。
+    // 授權述詞是 recipient_type='BUYER' AND recipient_ref_id=當前買家（58A B09「權限與邊界」）
+    // ⇒ 只會回自己是買受人的文件，前端不得再自行過濾。
+    rpc ListBuyerInvoiceDocuments(ListBuyerInvoiceDocumentsRequest) returns (ListBuyerInvoiceDocumentsResponse);
+    // 回既有的 GetInvoiceDocumentResponse（data 同為 InvoiceDocumentDetail）：符合 §6.2.2 決定 2
+    // 的三個共用條件——payload 型別完全相同、語意是「同一份文件的另一種取得方式」、同屬買家角色面。
+    rpc GetBuyerInvoiceDocument(GetBuyerInvoiceDocumentRequest) returns (GetInvoiceDocumentResponse);
+
+    // 付款後修改（B06）
+    rpc CreateInvoiceCorrection(CreateInvoiceCorrectionRequest) returns (InvoiceCorrectionResponse);
+    rpc GetInvoiceCorrection(GetInvoiceCorrectionRequest) returns (InvoiceCorrectionResponse);
+
+    // 未收到發票申訴（B07）
+    rpc CreateInvoiceComplaint(CreateInvoiceComplaintRequest) returns (InvoiceComplaintResponse);
+    rpc ListOrderInvoiceComplaints(ListOrderInvoiceComplaintsRequest) returns (ListInvoiceComplaintsResponse);
+    rpc GetInvoiceComplaint(GetInvoiceComplaintRequest) returns (InvoiceComplaintResponse);
+    // 買家在申訴流程中的三個動作（§7.3.5 K07／K11／K13）。三支都回**轉移後**的單筆，
+    // 前端不必再打一次 GetInvoiceComplaint。K06 的主動半條（買家確認結案）Phase 1 不做，
+    // 見 §6.1.6「為什麼是三支而不是四支」——不要看到 FSM 有四條就自己補第四支 RPC。
+    rpc RejectInvoiceComplaintResponse(RejectInvoiceComplaintResponseRequest) returns (InvoiceComplaintResponse);
+    rpc WithdrawInvoiceComplaint(WithdrawInvoiceComplaintRequest) returns (InvoiceComplaintResponse);
+    rpc ReopenInvoiceComplaint(ReopenInvoiceComplaintRequest) returns (InvoiceComplaintResponse);
+
+    // ==================== 賣家端（Gateway 注入 store_id）====================
+
+    rpc GetSellerInvoiceOverview(GetSellerInvoiceOverviewRequest) returns (GetSellerInvoiceOverviewResponse);
+
+    // 稅務身分（S02）與自行開票責任條款（S04）
+    rpc GetSellerTaxProfile(GetSellerTaxProfileRequest) returns (SellerTaxProfileResponse);
+    rpc SaveSellerTaxProfileDraft(SaveSellerTaxProfileDraftRequest) returns (SellerTaxProfileResponse);
+    rpc SubmitSellerTaxProfile(SubmitSellerTaxProfileRequest) returns (SellerTaxProfileResponse);
+    rpc RequestSellerTaxExtension(RequestSellerTaxExtensionRequest) returns (SellerTaxProfileResponse);
+    rpc GetSelfIssueAttestation(GetSelfIssueAttestationRequest) returns (SelfIssueAttestationResponse);
+    rpc AcceptSelfIssueAttestation(AcceptSelfIssueAttestationRequest) returns (SelfIssueAttestationResponse);
+
+    // AMEGO 憑證與啟用切點（S03）
+    rpc GetSellerProviderAccount(GetSellerProviderAccountRequest) returns (SellerProviderAccountResponse);
+    rpc PutSellerProviderCredentials(PutSellerProviderCredentialsRequest) returns (SellerProviderAccountResponse);
+    rpc VerifySellerProviderAccount(VerifySellerProviderAccountRequest) returns (SellerProviderAccountResponse);
+    rpc ActivateSellerProviderAccount(ActivateSellerProviderAccountRequest) returns (SellerProviderAccountResponse);
+    rpc RotateSellerProviderCredentials(RotateSellerProviderCredentialsRequest) returns (SellerProviderAccountResponse);
+
+    // 免用統一發票與收據授權（S05）
+    rpc GetSellerReceiptAuthorization(GetSellerReceiptAuthorizationRequest) returns (SellerReceiptAuthorizationResponse);
+    rpc ConfirmSellerReceiptAuthorization(ConfirmSellerReceiptAuthorizationRequest) returns (SellerReceiptAuthorizationResponse);
+
+    // 發票紀錄與異常（S06/S07/S08）
+    rpc ListSellerInvoiceDocuments(ListSellerInvoiceDocumentsRequest) returns (ListSellerInvoiceDocumentsResponse);
+    rpc GetSellerInvoiceDocument(GetSellerInvoiceDocumentRequest) returns (GetSellerInvoiceDocumentResponse);
+    // S12 進項分頁（端點 72）：recipient-scoped，與上面 issuer-scoped 的銷項是兩個資料集。
+    // 不能靠同一支 RPC 加 flag 分流——銷項可作廢可折讓、進項是唯讀報稅憑證，法律角色不同。
+    // 停權賣家仍可讀（進項憑證是賣家的財產，與能否營業無關，58A S12「權限」）。
+    rpc ListSellerReceivedInvoiceDocuments(ListSellerReceivedInvoiceDocumentsRequest) returns (ListSellerReceivedInvoiceDocumentsResponse);
+    rpc ResendInvoiceNotification(ResendInvoiceNotificationRequest) returns (ResendInvoiceNotificationResponse);
+    // 端點 71（買家 B05 重寄）。**與賣家版分成兩支是 §5.1 角色分離的硬要求**，
+    //    不是重複：兩者的擁有者述詞不同（賣家用 store_id、買家用 buyer_id），
+    //    而 §8.1.4 的 Tier A 要求「越權與不存在不可區分」＝ 擁有者必須進 WHERE。
+    //    共用一支 request 的話 Gateway 送不出買家身分，服務端只剩兩條路：
+    //    全部拒絕（端點死掉），或忽略擁有者（任何已登入買家可對任意 document_id
+    //    觸發重寄 ＝ IDOR）。ADM 版早就分開了（ResendInvoiceNotificationForAdmin），
+    //    買家版漏掉純粹是遺漏。
+    //    Response 共用是允許的（§6.2.2 決定 2：payload 形狀完全相同）。
+    rpc ResendBuyerInvoiceNotification(ResendBuyerInvoiceNotificationRequest) returns (ResendInvoiceNotificationResponse);
+    rpc GetSellerInvoiceJob(GetSellerInvoiceJobRequest) returns (GetSellerInvoiceJobResponse);
+    // 子路由 62R：端點 62 的前置讀取（order-scoped）。停權賣家唯一取得 job_id / version / can_report_external 的路徑
+    rpc ListOrderExternalIssuances(ListOrderExternalIssuancesRequest) returns (ListOrderExternalIssuancesResponse);
+    // 端點 62：A4 受控人工出口的最後一步，RESOLVED_EXTERNALLY 的唯一入口（§7 J30）
+    rpc ReportExternalIssuance(ReportExternalIssuanceRequest) returns (GetSellerInvoiceJobResponse);
+
+    // 買家申訴（S09/S10）
+    rpc ListSellerInvoiceComplaints(ListSellerInvoiceComplaintsRequest) returns (ListInvoiceComplaintsResponse);
+    rpc GetSellerInvoiceComplaint(GetSellerInvoiceComplaintRequest) returns (InvoiceComplaintResponse);
+    rpc RespondSellerInvoiceComplaint(RespondSellerInvoiceComplaintRequest) returns (InvoiceComplaintResponse);
+
+    // ==================== Admin（Gateway 注入 actor_account_id）====================
+
+    rpc GetInvoiceOverviewForAdmin(GetInvoiceOverviewForAdminRequest) returns (GetInvoiceOverviewForAdminResponse);
+
+    // 稅務身分審核（A02/A03）
+    rpc ListTaxReviewsForAdmin(ListTaxReviewsForAdminRequest) returns (ListTaxReviewsForAdminResponse);
+    rpc GetTaxReviewForAdmin(GetTaxReviewForAdminRequest) returns (GetTaxReviewForAdminResponse);
+    rpc DecideTaxReviewForAdmin(DecideTaxReviewForAdminRequest) returns (DecideTaxReviewForAdminResponse);
+    rpc DecideTaxExtensionForAdmin(DecideTaxExtensionForAdminRequest) returns (DecideTaxReviewForAdminResponse);
+
+    // AMEGO 串接監控（A04/A09）
+    rpc ListProviderAccountsForAdmin(ListProviderAccountsForAdminRequest) returns (ListProviderAccountsForAdminResponse);
+    rpc GetProviderAccountForAdmin(GetProviderAccountForAdminRequest) returns (GetProviderAccountForAdminResponse);
+    rpc HealthCheckProviderAccountForAdmin(HealthCheckProviderAccountForAdminRequest) returns (GetProviderAccountForAdminResponse);
+    rpc DeactivateProviderAccountForAdmin(DeactivateProviderAccountForAdminRequest) returns (DeactivateProviderAccountForAdminResponse);
+    rpc ReactivateProviderAccountForAdmin(ReactivateProviderAccountForAdminRequest) returns (GetProviderAccountForAdminResponse);
+    rpc RevokeProviderAccountForAdmin(RevokeProviderAccountForAdminRequest) returns (RevokeProviderAccountForAdminResponse);
+    rpc ListProviderCutoversForAdmin(ListProviderCutoversForAdminRequest) returns (ListProviderCutoversForAdminResponse);
+
+    // 發票與工作佇列（A05/A06）
+    rpc ListInvoiceDocumentsForAdmin(ListInvoiceDocumentsForAdminRequest) returns (ListInvoiceDocumentsForAdminResponse);
+    rpc GetInvoiceDocumentForAdmin(GetInvoiceDocumentForAdminRequest) returns (GetInvoiceDocumentForAdminResponse);
+    rpc ResendInvoiceNotificationForAdmin(ResendInvoiceNotificationForAdminRequest) returns (ResendInvoiceNotificationResponse);
+    rpc ListInvoiceJobsForAdmin(ListInvoiceJobsForAdminRequest) returns (ListInvoiceJobsForAdminResponse);
+    rpc GetInvoiceJobForAdmin(GetInvoiceJobForAdminRequest) returns (GetInvoiceJobForAdminResponse);
+    rpc RetryInvoiceJobForAdmin(RetryInvoiceJobForAdminRequest) returns (InvoiceJobMutationResponse);
+    rpc CancelInvoiceJobForAdmin(CancelInvoiceJobForAdminRequest) returns (InvoiceJobMutationResponse);
+    // 端點 73：把停在人工出口、而且**沒有任何 operation** 的文件送回自動線。
+    //
+    // 🔴 端點 52 以 job_id 為鍵，而自動線落 AWAITING_MANUAL 時 operation 根本不建
+    // （§7.1.3 的 AM 節點明文）⇒ 那些文件沒有 job_id，端點 52／53／56 全部組不出請求。
+    // 本 RPC 是它們唯一的入口：ResumeFromManual（M1）＋ 補建那件缺席的 ISSUE operation。
+    rpc ResumeInvoiceDocumentForAdmin(ResumeInvoiceDocumentForAdminRequest) returns (InvoiceJobMutationResponse);
+
+    // 受控人工出口（決策 A4：查證 → 雙人確認 → 解鎖 → 回報）
+    rpc RequestManualUnlockForAdmin(RequestManualUnlockForAdminRequest) returns (ManualUnlockResponse);
+    rpc ApproveManualUnlockForAdmin(ApproveManualUnlockForAdminRequest) returns (ManualUnlockResponse);
+    rpc ReportManualResultForAdmin(ReportManualResultForAdminRequest) returns (InvoiceJobMutationResponse);
+
+    // 手動開票（通用 issuer→recipient）
+    rpc CreateManualIssuanceForAdmin(CreateManualIssuanceForAdminRequest) returns (CreateManualIssuanceForAdminResponse);
+
+    // 申訴（A07/A08）與稽核（A10）
+    rpc ListInvoiceComplaintsForAdmin(ListInvoiceComplaintsForAdminRequest) returns (ListInvoiceComplaintsResponse);
+    rpc GetInvoiceComplaintForAdmin(GetInvoiceComplaintForAdminRequest) returns (InvoiceComplaintResponse);
+    rpc ActOnInvoiceComplaintForAdmin(ActOnInvoiceComplaintForAdminRequest) returns (ActOnInvoiceComplaintForAdminResponse);
+    rpc ListInvoiceAuditLogsForAdmin(ListInvoiceAuditLogsForAdminRequest) returns (ListInvoiceAuditLogsForAdminResponse);
+
+    // ==================== 內部服務間（不經 Gateway）====================
+
+    // order-service 在 checkout preview 呼叫：解析該賣家對這一筆訂單的開票模式、
+    // 金額拆解、法定告知與待審接單上限。這支決定 B01 能不能讓買家付款。
+    rpc ResolveOrderInvoiceModeInternal(ResolveOrderInvoiceModeInternalRequest) returns (ResolveOrderInvoiceModeInternalResponse);
+
+    // order-service 在 checkout confirm 呼叫：驗證買家發票輸入（載具/統編/捐贈碼格式與
+    // 三者互斥）＋ 檢查待審接單上限，回傳可持久化的發票快照。
+    rpc ValidateOrderInvoiceInputInternal(ValidateOrderInvoiceInputInternalRequest) returns (ValidateOrderInvoiceInputInternalResponse);
+
+    // seller-service / ADM 查賣家是否已具備開票能力（薄查詢，供其他服務判斷）。
+    rpc GetSellerInvoiceCapabilitySimple(GetSellerInvoiceCapabilitySimpleRequest) returns (GetSellerInvoiceCapabilitySimpleResponse);
+}
+
+// ==================== 共用子 message ====================
+
+// InvoiceProfileInfo 買家常用發票資料（敏感值一律遮罩，明碼不出服務邊界）
+message InvoiceProfileInfo {
+    string profile_id = 1;          // TSID 數字字串
+    string carrier_type = 2;        // InvoiceCarrierType 4 值：MOBILE_BARCODE/CITIZEN_CERT/TAX_ID/DONATION
+    string display_value = 3;       // 遮罩後顯示值
+    string buyer_tax_id = 4;        // 僅 TAX_ID
+    string buyer_name = 5;          // 僅 TAX_ID
+    bool is_default = 6;
+    string label = 7;
+    string created_at = 8;          // ISO 8601 UTC
+    string updated_at = 9;          // ISO 8601 UTC
+}
+
+// InvoiceLine 發票品項行
+message InvoiceLine {
+    string line_type = 1;    // InvoiceLineType：PRODUCT/SHIPPING/DISCOUNT（三值不多不少；BUNDLE_COMPONENT 不登記，§C.2.5）
+    string name = 2;
+    string quantity = 3;     // 正整數字串
+    string unit_price = 4;   // 元，整數字串
+    string net_amount = 5;   // 元，整數字串；DISCOUNT 行為負數（AMEGO 以負數明細表示折抵）
+    string tax_category = 6; // InvoiceTaxCategory：TAXABLE/ZERO_RATED/TAX_EXEMPT
+}
+
+// InvoiceTimelineItem 文件時間軸（append-only，來源 invoice_status_history）
+message InvoiceTimelineItem {
+    string occurred_at = 1;  // ISO 8601 UTC
+    string event = 2;        // CodeMeta InvoiceDocumentTimelineEvent（5 值不多不少）：ISSUED/UPDATED/VOIDED/REISSUED/ALLOWANCE_APPLIED
+                             // 不是 InvoiceEventType（那是 MQ 事件型別，12 值全部 INVOICE_ 開頭、與本欄交集為空）
+    string note = 3;
+}
+
+// InvoiceDocumentSummary 文件摘要（買賣家共用；賣家額外欄位在 SellerInvoiceDocumentDetail）
+message InvoiceDocumentSummary {
+    string document_id = 1;
+    string document_kind = 2;        // InvoiceDocumentKind 三值（§5 chk_invdoc_kind）：B2C/B2B/RECEIPT
+                                     //   沒有 ALLOWANCE——折讓是獨立的 invoice_adjustments（§5 T-B04③）
+    string status = 3;               // InvoiceDocumentStatus
+    string invoice_number = 4;       // 完整值，**不遮罩**。§8.1.3 (b) 把它判為 O 類
+                                     //   （公開／法定應記載資訊）「不遮（追查錨點，且非機密）」，
+                                     //   裁決 1 並逐字推翻 img-05 的遮罩畫法：發票號碼是對獎／
+                                     //   報帳／申訴的唯一憑據，且同時印在發票上、寄在通知信裡、
+                                     //   存在載具裡——遮它保護不到任何人。
+                                     //   ⚠️ 欄名一度叫 invoice_no_masked，與上述裁決直接牴觸
+                                     //   （§8.1.3(d) 裁決 3 禁止「型別上說謊」的欄名）；2026-08-29
+                                     //   在入版控前更名，因此不需要 reserved。
+    string issued_at = 5;            // ISO 8601 UTC
+    string total_amount = 6;         // 含稅總額，元
+    string carrier_summary = 7;      // 遮罩後載具，**或**買受人統編摘要；兩者皆無時為空字串。
+                                     //   🔴 這個欄位裝兩種東西，**單看它分不出裝的是哪一種**
+                                     //   ⇒ 要標籤正確就必須配 carrier_type（欄位 11）一起讀。
+                                     //   ⚠️ 原註解寫「無載具為空字串」，與實作矛盾（實作在無載具
+                                     //   時退回統編），而前端據此把整欄標成「載具」
+                                     //   ⇒ 沒有載具的 B2B 顯示成「載具＝買受人統編」（#3084）。
+                                     //   歧義已於本次消除：語意以本行為準，判別靠 carrier_type。
+    string related_document_id = 8;  // 折讓單指回原發票；重開的新發票指回舊發票
+    bool file_available = 9;         // false = 無可下載 PDF
+    string file_unavailable_reason = 10; // CARRIER_NOT_WON/EXPIRED/NOT_APPLICABLE
+    // carrier_type 是 carrier_summary 的判別欄（#3084 裁決 B）。
+    //
+    // 值域是 InvoiceCarrierType 中**真的是載具**的那兩個：MOBILE_BARCODE／CITIZEN_CERT。
+    // **空字串 ＝ 這張憑證沒有載具**（含打統編、捐贈、收據、以及根本沒選）。
+    //
+    // ⚠️ TAX_ID／DONATION **不會**出現在這裡：它們是買受人身分與捐贈對象，不是載具，
+    // 而且 AMEGO 對這兩種不帶 CarrierType（見 domain/carrier.go 的 CarrierTypeFromAmego：
+    // 空字串刻意回 false，因為反向不是函式）。
+    //
+    // 消費端據此決定標籤：
+    //   非空            → 「載具」，值取 carrier_summary（已依 viewer 遮罩）
+    //   空 ＋ summary 非空 → 「買受人統編」（`chk_invdoc_exclusive` 保證三選一，
+    //                        所以沒有載具時 summary 裝的必然是統編）
+    //   空 ＋ summary 為空 → 「無載具」
+    //
+    // 🔴 **不要用「carrier_summary 看起來像不像統編」去猜**：8 碼數字既可能是統編、
+    // 也可能是遮罩後的載具尾碼，猜錯就是在法定憑證上標錯欄位。
+    //
+    // 🔴 **這個欄位擋不住的**：AMEGO 日後新增載具類型而本服務尚未對映時，
+    // CarrierTypeFromAmego 會回 false ⇒ 這裡回空 ⇒ 前端把載具標成統編。
+    // 守它的是 TestCarrierTypeFromAmegoCoversEveryCarrier（值域覆蓋測試），
+    // 新增類型時忘了對映會轉紅。
+    string carrier_type = 11;
+}
+
+// InvoiceDocumentDetail 文件完整明細（買家可見範圍）
+message InvoiceDocumentDetail {
+    InvoiceDocumentSummary summary = 1;
+    string issuer_name = 2;
+    string issuer_tax_id = 3;         // PLATFORM_RECEIPT 時為免用統一發票標示字串
+    string recipient_name = 4;
+    string recipient_tax_id = 5;
+    string sales_amount = 6;          // 未稅，元
+    string tax_amount = 7;            // 元
+    string total_amount = 8;          // 含稅，元
+    string tax_category = 9;
+    repeated InvoiceLine lines = 10;
+    repeated InvoiceTimelineItem timeline = 11;
+    string invoice_file_key = 12;     // media objectKey（49 §6.1：DB 只存 key，不存 URL）
+}
+
+// SellerIntakeLimit 待審期間接單上限現況（C5：筆數與金額雙重上限，先到者停接新單）
+message SellerIntakeLimit {
+    string order_count_used = 1;
+    string order_count_limit = 2;
+    string amount_used = 3;      // 元
+    string amount_limit = 4;     // 元
+    bool blocked = 5;            // true = 已達上限，confirm 會被拒
+}
+
+// InvoiceAmountBreakdown 發票金額拆解
+message InvoiceAmountBreakdown {
+    string product_amount = 1;   // 商品小計，元
+    string shipping_amount = 2;  // 應稅運費，元
+    string discount_amount = 3;  // 折抵金額（正數），元
+    string invoice_amount = 4;   // 發票總額（含稅）＝ product + shipping − discount
+    string tax_category = 5;
+}
+
+// InvoiceDisclosure 結帳告知（依 invoice_mode 決定要不要顯示、顯示哪一段文案）。
+//
+// 🔴 **2026-08-31 起不再是擋門**（DEC-20260831-210934）：原本 required=true 時
+// 未勾選不得送出 confirm，現在改為**只顯示不強制**——confirm 不檢查任何回填值，
+// 而 InvoiceInputSpec 的 disclosure_accepted／disclosure_version 兩欄已移除（reserved 8,9）。
+//
+// 裁決依據：58 號 L1–L13 法規表查無「付款前必須告知」的法源；競品實查（蝦皮以
+// 「結帳頁有無電子發票欄位」為訊號、momo 寫在規則頁）兩者皆無結帳時的強制確認。
+message InvoiceDisclosure {
+    // required = 這一筆**要不要顯示**告知（不再是「必須勾選」）。
+    bool required = 1;
+    // terms_version 保留：它標明前端顯示的是哪一版文案，供日後對帳。
+    // confirm **不再比對它**（沒有回填對象）。
+    string terms_version = 2;
+    string title = 3;
+    string body = 4;
+}
+
+// RetryPolicy 重試退避參數（T-I12：必須進 job DTO，前端不得自行猜測）
+message RetryPolicy {
+    string initial_interval_seconds = 1;
+    string backoff_multiplier = 2;
+    string max_interval_seconds = 3;
+    string max_attempts = 4;
+}
+
+// ComplaintResponseItem 申訴回覆（追加事件，不覆蓋）
+message ComplaintResponseItem {
+    string response_id = 1;
+    string actor = 2;       // SELLER/ADMIN
+    string action = 3;      // InvoiceComplaintAction 6 值：RESENT/REISSUED/NEED_PLATFORM_HELP/REMINDED/DECIDED_RESOLVED/DECIDED_VIOLATION（系統自動事件為空）
+    string note = 4;
+    string occurred_at = 5; // ISO 8601 UTC
+}
+
+// InvoiceComplaintInfo 未收到發票申訴案件
+message InvoiceComplaintInfo {
+    string complaint_id = 1;
+    string case_no = 2;
+    string order_no = 3;
+    string store_id = 4;                     // Response 內必須是 string（§4 例外①只適用 Request）
+    string status = 5;                       // InvoiceComplaintStatus（7 值，§5 chk_invcomp_status）：
+                                             //   OPEN/SELLER_RESPONDED/OVERDUE/ESCALATED_TO_ADM/RESOLVED/VIOLATION_CONFIRMED/WITHDRAWN
+    string expected_doc_kind = 6;
+    string due_at = 7;                       // ISO 8601 UTC，由後端以工作天曆計算
+    string remaining_business_days = 8;      // 可為負（已逾期）
+    string overdue_business_days = 9;
+    string buyer_masked_name = 10;
+    string description = 11;
+    repeated ComplaintResponseItem responses = 12;
+    string version = 13;
+    string created_at = 14;                  // ISO 8601 UTC
+    string reopen_count = 15;                // 重開次數 "0"–"2"。屬性不是狀態（§5 chk_invcomp_reopen 0–2）——
+                                             //   「已重開」由 reopen_count > 0 呈現，InvoiceComplaintStatus 沒有 REOPENED
+    string buyer_review_due_at = 16;         // ISO 8601 UTC。K02 寫的 72h 異議期；端點 63 的窗口與 B07 倒數文案讀它。
+                                             //   非 SELLER_RESPONDED 時為空字串
+    string reopen_allowed_after = 17;        // ISO 8601 UTC。K06/K08/K12 寫的 now+24h；端點 65 的守衛與 B07 重開鍵讀它。
+                                             //   非 RESOLVED 時為空字串
+}
+
+// ==================== 買家端 message ====================
+
+message ListBuyerInvoiceProfilesRequest {
+    int64 buyer_id = 1;   // §4 例外①：Gateway buyerid resolver 注入，前端不可控
+    // 必須有分頁入參：本 RPC 的 Data 回 total/page/page_size，而 9303 定的 profile
+    // 上限是 20 筆、預設 page_size 是 10 ⇒ 沒有入參的話第 11–20 筆永遠取不到，
+    // 而前端會依 total 算出「共 2 頁」卻翻不過去。
+    string page = 2;
+    string page_size = 3;
+}
+message ListBuyerInvoiceProfilesData {
+    repeated InvoiceProfileInfo records = 1;
+    string total = 2;
+    string page = 3;
+    string page_size = 4;
+}
+message ListBuyerInvoiceProfilesResponse {
+    int32 code = 1;
+    string message = 2;
+    ListBuyerInvoiceProfilesData data = 3;
+}
+
+message CreateBuyerInvoiceProfileRequest {
+    int64 buyer_id = 1;
+    string carrier_type = 2;
+    string value = 3;          // 明碼，僅在此入站；服務端加密後儲存，永不回傳
+    string buyer_tax_id = 4;
+    string buyer_name = 5;
+    string label = 6;
+    bool set_default = 7;
+    string idempotency_key = 8;
+}
+message UpdateBuyerInvoiceProfileRequest {
+    int64 buyer_id = 1;
+    string profile_id = 2;
+    string value = 3;
+    string buyer_tax_id = 4;
+    string buyer_name = 5;
+    string label = 6;
+    string idempotency_key = 7;
+}
+message DeleteBuyerInvoiceProfileRequest {
+    int64 buyer_id = 1;
+    string profile_id = 2;
+    string idempotency_key = 3;
+}
+message DeleteBuyerInvoiceProfileResponse {
+    int32 code = 1;
+    string message = 2;
+    bool deleted = 3;
+}
+message SetDefaultBuyerInvoiceProfileRequest {
+    int64 buyer_id = 1;
+    string profile_id = 2;
+    string idempotency_key = 3;
+}
+message BuyerInvoiceProfileResponse {
+    int32 code = 1;
+    string message = 2;
+    InvoiceProfileInfo data = 3;
+}
+
+message GetOrderInvoiceRequest {
+    int64 buyer_id = 1;
+    string order_no = 2;
+}
+message OrderInvoiceData {
+    string order_no = 1;
+    string invoice_mode = 2;               // InvoiceFulfillmentMode：AMEGO_AUTO/SELLER_SELF_ISSUE/PLATFORM_RECEIPT/LEGACY_MANUAL
+    string state = 3;                      // 買家可見**投影**（8 值），不是 InvoiceDocumentStatus 本身、不暴露 provider code：
+                                           //   AWAITING_PAYMENT/PROCESSING/ISSUED/VOIDED/ALLOWANCE_APPLIED/FAILED/
+                                           //   SELLER_WILL_ISSUE/SELLER_SELF_ISSUED（對照表見 §6.1.3）
+    string state_notice = 4;
+    repeated InvoiceDocumentSummary documents = 5;
+    bool can_request_correction = 6;
+    bool can_file_complaint = 7;
+    string complaint_opens_at = 8;         // ISO 8601 UTC；can_file_complaint=false 時給預計開放時間
+    string existing_complaint_id = 9;
+    string notified_email_masked = 10;
+    string shipping_fee_notice = 11;
+    // 這張訂單**最近一次**修改申請的 id（端點 12 的入參）；沒有申請過時為空字串。
+    //
+    // 🔴 它存在的唯一理由是**讓端點 12 拿得到 id**：2026-09-05 第 6 輪稽核實測，
+    // 官網有 `fetchInvoiceCorrection`（端點 12 的 client）卻零呼叫端 —— 因為
+    // 買家端沒有任何管道取得 correction_id（本 message 不給、也沒有 list 端點）
+    // ⇒ 買家送出修改申請、關掉頁面再回來，申請進度與婉拒理由三處都看不到，
+    // 而 `reject_reason_code` 決定他該改走折讓還是申訴。
+    //
+    // ⚠️ **不分狀態取最新一筆**，不是「進行中的那一筆」：被婉拒的那一筆才是
+    // 買家最需要看到的。與 existing_complaint_id（只給進行中案件，因為它的用途是
+    // 擋重複申訴）語意不同，兩者不可互相照抄。
+    string latest_correction_id = 13;
+    string snapshot_version = 12;          // 買家發票資料的內容軸版本（§5 invoice_documents.snapshot_version）。
+                                           //    端點 11 的 expected_snapshot_version 唯一由此取——付款後 B04 是 B06 的入口，
+                                           //    結帳前的 preview 快照離開結帳頁就取不回來。與 issue_attempt_seq 正交。
+    // 買家視角永遠不會有 provider 細節（§8.3.4）。唯一能保證「買家拿不到」的位置是
+    //    買家視角的型別裡沒有那個欄位；Gateway 只做 envelope 轉換、前端過濾等於值已在 body 裡。
+    //    ADM 視角走 ProviderExchangeItem / InvoiceJobInfo，與本 message 不共用、不繼承。
+    reserved 90, 91, 92;
+    reserved "provider_code", "provider_message", "attempt_count";
+}
+message GetOrderInvoiceResponse {
+    int32 code = 1;
+    string message = 2;
+    OrderInvoiceData data = 3;
+}
+
+message GetInvoiceDocumentRequest {
+    int64 buyer_id = 1;
+    string order_no = 2;      // 必須同時驗證 document 屬於此 order，不匹配一律走 not-found 出口
+    string document_id = 3;
+}
+message GetInvoiceDocumentResponse {
+    int32 code = 1;
+    string message = 2;
+    InvoiceDocumentDetail data = 3;
+}
+
+// B09 列表列（端點 68）。六欄逐項對應 58A §B09「欄位（表格 6 欄）」：
+//    開立日期＝summary.issued_at／發票號碼＝summary.invoice_number／開立人＝issuer_name／
+//    類型＝summary.document_kind／金額＝summary.total_amount／狀態＝summary.status。
+//    document_id 由 summary 帶出（點任一列 → B05）。
+// 包法與 SellerInvoiceDocumentItem 一致（都內嵌 InvoiceDocumentSummary），不另開平行欄位：
+//    狀態走 summary.status（CodeMeta InvoiceDocumentStatus，前端 codeLabel 查得到中文），
+//    **不是** OrderInvoiceData.state 那個 8 值投影——後者是「該訂單最新一份主文件」的
+//    order 級 rollup（§6.1.3），逐份文件的列表用它會答錯；且它刻意不納管 CodeMeta（§C.4），
+//    前端拿不到中文，而本頁要的是狀態 Chip。
+message BuyerInvoiceDocumentItem {
+    InvoiceDocumentSummary summary = 1;
+    // 開立人。58A §B09 標為硬需求，使用者指示逐字「清楚標示開立人；付款商、平台與發票
+    //    開立人不能混為一談」⇒ 方向一顯示賣家名稱、方向三顯示平台名稱，
+    //    **不得省略此欄或用「Hawkr」統一填充**。來源＝invoice_documents.issuer_name_snapshot
+    //    （付款當下的快照，不回查現況，§5.1.5）。
+    string issuer_name = 2;
+}
+message ListBuyerInvoiceDocumentsRequest {
+    int64 buyer_id = 1;        // §4 例外①：Gateway buyerid resolver 注入，前端不可控
+    string date_from = 2;      // YYYY-MM-DD（UTC+8 日界），嚴格驗證；格式錯回 400
+    string date_to = 3;
+    string status = 4;         // InvoiceDocumentStatus；空字串＝不篩
+    string document_kind = 5;  // InvoiceDocumentKind；空字串＝不篩
+    string page = 6;
+    string page_size = 7;
+}
+message ListBuyerInvoiceDocumentsData {
+    repeated BuyerInvoiceDocumentItem records = 1;
+    string total = 2;
+    string page = 3;
+    string page_size = 4;
+}
+message ListBuyerInvoiceDocumentsResponse {
+    int32 code = 1;
+    string message = 2;
+    ListBuyerInvoiceDocumentsData data = 3;
+}
+// 端點 69：document-scoped，不帶 order_no（方向三的發票沒有訂單，帶了就填不出來）。
+//    授權述詞與端點 68 同一條；不匹配一律走 not-found 出口（404 ＋ 9301，Tier A）。
+message GetBuyerInvoiceDocumentRequest {
+    int64 buyer_id = 1;
+    string document_id = 2;
+}
+
+message GetInvoiceDocumentFileRequest {
+    int64 buyer_id = 1;
+    string order_no = 2;
+    string document_id = 3;
+    string style = 4;         // 白名單 {0,1,2,3,5}；AMEGO 對此參數無值域驗證，我方必須自驗
+}
+message InvoiceFileData {
+    string document_id = 1;
+    string invoice_file_key = 2;   // 我方 media objectKey；絕不回 AMEGO 的 file_url
+    string file_name = 3;
+    string style = 4;              // 實際採用的版面
+}
+message GetInvoiceDocumentFileResponse {
+    int32 code = 1;
+    string message = 2;
+    InvoiceFileData data = 3;
+}
+
+message InvoiceInputSpec {
+    string profile_id = 1;      // 二擇一：使用既有 profile
+    string carrier_type = 2;    // 二擇一：本次手動輸入
+    string value = 3;
+    string buyer_tax_id = 4;
+    string buyer_name = 5;
+    string email = 6;
+    bool save_as_default = 7;
+
+    // 8／9 原為 disclosure_accepted／disclosure_version。2026-08-31 起法定告知改為
+    // **只顯示不強制勾選**（DEC-20260831-210934），沒有回填對象 ⇒ 移除。
+    //
+    // 保留欄號防重用：舊版 App 若仍送 8／9，新 server 會靜默忽略（proto3 未知欄位
+    // 進 unknown fields）——那是預期行為。反過來把 8／9 給新用途才是災難：
+    // 舊 App 送的 true 會被解讀成新語意。
+    reserved 8, 9;
+    reserved "disclosure_accepted", "disclosure_version";
+}
+
+message CreateInvoiceCorrectionRequest {
+    int64 buyer_id = 1;
+    string order_no = 2;
+    string expected_snapshot_version = 3;
+    InvoiceInputSpec new_invoice = 4;
+    string reason = 5;
+    string idempotency_key = 6;
+}
+message GetInvoiceCorrectionRequest {
+    int64 buyer_id = 1;
+    string order_no = 2;
+    string correction_id = 3;
+}
+message InvoiceCorrectionData {
+    string correction_id = 1;
+    string handling_mode = 2;   // UPDATE_SNAPSHOT/VOID_AND_REISSUE（§5 chk_invcorr_mode 2 值）— 由後端決定，前端不得猜
+                                //   與下一欄 status 的值域零交集：UPDATED_BEFORE_ISSUE 只屬 status
+    string status = 3;          // InvoiceCorrectionStatus：REQUESTED/REJECTED/UPDATED_BEFORE_ISSUE/VOID_REISSUE_IN_PROGRESS/COMPLETED/REISSUE_FAILED（§5 chk_invcorr_status 6 值；無 VOID_FAILED）
+    string status_notice = 4;
+    string created_at = 5;      // ISO 8601 UTC
+    string reject_reason_code = 6;  // status=REJECTED 時必填，其餘空字串。§5 reject_reason_code 6 值
+                                    //   沒有它，那 6 個值只寫不讀；B06 只能顯示「已拒絕」而說不出下一步
+}
+message InvoiceCorrectionResponse {
+    int32 code = 1;
+    string message = 2;
+    InvoiceCorrectionData data = 3;
+}
+
+message CreateInvoiceComplaintRequest {
+    int64 buyer_id = 1;
+    string order_no = 2;
+    string reason_code = 3;   // Phase 1 唯一值 NOT_RECEIVED
+    string description = 4;
+    string idempotency_key = 5;
+}
+message ListOrderInvoiceComplaintsRequest {
+    int64 buyer_id = 1;
+    string order_no = 2;
+    // 同上：Data 是分頁形狀（ListInvoiceComplaintsData 有 total/page/page_size），
+    // 入參缺分頁 ⇒ 契約自相矛盾。對照 ListSellerInvoiceComplaintsRequest:4-5
+    // 與 ListInvoiceComplaintsForAdminRequest 都有這兩欄，這是漏而不是刻意。
+    string page = 3;
+    string page_size = 4;
+}
+message GetInvoiceComplaintRequest {
+    int64 buyer_id = 1;
+    string order_no = 2;
+    string complaint_id = 3;
+}
+// 端點 63（K07 買家不接受）。reason 必填 1–500 字。
+message RejectInvoiceComplaintResponseRequest {
+    int64 buyer_id = 1;
+    string order_no = 2;
+    string complaint_id = 3;
+    string reason = 4;
+    string expected_version = 5;
+    string idempotency_key = 6;
+}
+// 端點 64（K11 買家撤回）。**沒有 reason 欄**——§7 K11 沒有必填理由的守衛，
+// 端點層不自行加嚴。看到別的動作有 reason 就順手補一個，等於改了 §7。
+message WithdrawInvoiceComplaintRequest {
+    int64 buyer_id = 1;
+    string order_no = 2;
+    string complaint_id = 3;
+    string expected_version = 4;
+    string idempotency_key = 5;
+}
+// 端點 65（K13 買家重開）。reason 選填，≤ 500 字。
+message ReopenInvoiceComplaintRequest {
+    int64 buyer_id = 1;
+    string order_no = 2;
+    string complaint_id = 3;
+    string reason = 4;
+    string expected_version = 5;
+    string idempotency_key = 6;
+}
+message InvoiceComplaintResponse {
+    int32 code = 1;
+    string message = 2;
+    InvoiceComplaintInfo data = 3;
+}
+message ListInvoiceComplaintsData {
+    repeated InvoiceComplaintInfo records = 1;
+    string total = 2;
+    string page = 3;
+    string page_size = 4;
+}
+message ListInvoiceComplaintsResponse {
+    int32 code = 1;
+    string message = 2;
+    ListInvoiceComplaintsData data = 3;
+}
+
+// ==================== 賣家端 message ====================
+
+message GetSellerInvoiceOverviewRequest {
+    int64 store_id = 1;   // §4 例外①：Gateway sellerid resolver 解析後注入的 store surrogate
+}
+message SellerInvoiceOverviewData {
+    string tax_review_status = 1;
+    string invoice_mode = 2;
+    string provider_status = 3;
+    string pending_document_count = 4;
+    string open_complaint_count = 5;
+    string overdue_complaint_count = 6;
+    string deadline_at = 7;              // ISO 8601 UTC
+    string extension_count = 8;
+    bool can_request_extension = 9;
+    // 自行開票責任**生效中**（＝ review_status == SELF_ISSUE_PENDING）。S01 的琥珀 pill
+    // 「自行開票責任生效中」與 banner 追加句的唯一資料源。**不是「條款簽過沒」**——
+    // 同 SelfIssueAttestationInfo.effective 的紅字，判準的唯一 owner 是
+    // domain.SellerTaxProfile.SelfIssueEffective。
+    bool self_issue_effective = 10;
+    SellerIntakeLimit intake_limit = 11;
+    repeated InvoiceDocumentSummary recent_documents = 12;
+}
+message GetSellerInvoiceOverviewResponse {
+    int32 code = 1;
+    string message = 2;
+    SellerInvoiceOverviewData data = 3;
+}
+
+message SellerTaxIdentity {
+    string entity_type = 1;      // INDIVIDUAL/FARMER/COMPANY
+    string tax_id = 2;
+    string legal_name = 3;
+    string responsible_name = 4;
+    string address_city = 5;
+    string address_district = 6;
+    string address_detail = 7;
+    string claimed_status = 8;   // 賣家自述，值域＝CodeMeta SellerTaxObligation：REQUIRED/EXEMPT/UNKNOWN（＝§5 chk_stp_obligation 三值）— 只是申請內容，不是核定結果
+}
+message TaxDocumentInfo {
+    string document_id = 1;
+    string kind = 2;         // TAX_REGISTRATION/EXEMPTION_CERT/ID_DOCUMENT/OTHER
+    string file_name = 3;
+    string file_size = 4;    // bytes
+    string file_key = 5;     // media objectKey（SSOT）
+    string uploaded_at = 6;  // ISO 8601 UTC
+    // media asset id（數字字串）。Gateway 用它組賣家的 fileDownloadPath＝
+    // "/api/v1/app/media/secure_download/{id}"（只有上傳者本人讀得到）。
+    // 只回 id 不回 URL；下載路徑由 Gateway 組，與發票 PDF 的 downloadPath 同一個模式（§6.1.4 定版②）。
+    // ADM 不用這個欄位：後台沒有通用的機敏檔下載，稅籍佐證改走 invoice 的
+    // GET /api/v1/admin/invoices/tax_reviews/{store_id}/documents/{document_id}/content
+    // （document_id 是本訊息的 document_id；授權述詞由 invoice 持有）。
+    string file_asset_id = 7;
+}
+message TaxReviewNote {
+    string note_id = 1;
+    string content = 2;
+    string created_at = 3;   // ISO 8601 UTC
+}
+message SelfIssueAttestationInfo {
+    string terms_version = 1;         // **已簽**的版本；未簽為空字串
+    string terms_key = 2;             // 條款全文 media objectKey
+    string accepted_at = 3;           // ISO 8601 UTC
+    string accepted_by_account_id = 4; // Response 必須 string；接受條款是自然人的意思表示
+    // 自行開票責任**是否生效中**（＝ review_status == SELF_ISSUE_PENDING）。
+    //
+    // 🔴 **不是「條款簽過沒」**，那個問題由 terms_version／accepted_at 回答（未簽為空字串）。
+    // 兩者在裁決 C（2026-08-31）之前等價，之後不再：端點 19 的送審在同一句 UPDATE 就寫了
+    // attested_at ⇒ 每個 SUBMITTED 的賣家都已簽，但同刻 ResolveFulfillmentMode 給的是
+    // LEGACY_MANUAL／TAX_PROFILE_NOT_APPROVED、待審接單上限也不適用。拿本欄當「已簽」用，
+    // 畫面就會對賣家做出與後端行為相反的法律告知（58 §7.3.3 的副作用表）。
+    bool effective = 5;
+    // 服務端**當期生效**的條款版本，恆非空。與 terms_version 是兩件事：一個是
+    // 「這個賣家簽了哪一版」（未簽為空），一個是「現在要簽的是哪一版」。
+    //
+    // 端點 22 要求前端原樣回送本欄（不符即 400，58A §S04）⇒ 少了它，未簽過的賣家
+    // 從端點 21 拿到的 terms_version 是空字串，回送必被拒 ⇒ S04 的「同意」按鈕
+    // 對新賣家從來按不成功。S02 的送審勾選框也用本欄顯示版本。
+    string current_terms_version = 6;
+}
+message SellerTaxProfileData {
+    string store_id = 1;                  // Response 內為 string
+    string review_status = 2;             // SellerTaxReviewStatus：10 個 DB 值（§5 chk_stp_review_status）＋ 合成值 NOT_STARTED
+                                          //   DRAFT/SUBMITTED/UNDER_REVIEW/SUPPLEMENT_REQUIRED/SELF_ISSUE_PENDING/
+                                          //   APPROVED_INVOICE_REQUIRED/APPROVED_INVOICE_EXEMPT/REJECTED/EXPIRED/REVOKED
+    string version = 3;
+    string submitted_at = 4;              // ISO 8601 UTC
+    string deadline_at = 5;               // 60 天期限，自送出審核申請起算（C4）
+    string extension_count = 6;           // 採屬性不設 EXTENDED 狀態（T-C02）
+    bool can_request_extension = 7;
+    string reapply_cooldown_until = 8;    // REJECTED/EXPIRED 後 7 天冷卻（C3）
+    SellerTaxIdentity tax_identity = 9;
+    repeated TaxDocumentInfo documents = 10;
+    repeated TaxReviewNote adm_notes = 11;
+    SelfIssueAttestationInfo self_issue_attestation = 12;
+    SellerIntakeLimit intake_limit = 13;
+    // 收據代製授權（S05，端點 29）是否已完成。
+    //
+    // 🔴 ADM 的 A03 決策畫面需要它才按得下「核定免用統一發票」：**它是 T08 的前置
+    // 條件**（未授權 ⇒ 9354）。裁決 DEC-20260905-015836 之後端點 29 的 allowed-from
+    // 含四個「審核進行中」狀態 ＋ APPROVED_INVOICE_EXEMPT ⇒ 賣家在核定**之前**就簽得了，
+    // 死結因此解開。
+    //
+    // ⚠️ 本段在 2026-09-05 之前寫的是相反的話（「授權要等核定之後才簽得了、核定當下
+    // 必然 false、未經裁決不得把它變成阻擋條件」）。那是裁決前的狀態，照它施工會做出
+    // 一個不擋的核定按鈕，而 T08 的守衛本體已經落在 usecase 裡。
+    //
+    // 未授權而被核定為免用統一發票的賣家，其每一筆已付訂單都會落 AWAITING_MANUAL／
+    // RECEIPT_AUTH_MISSING（§7.1.3 決策樹的 RA 節點）—— 那正是 T08 要防的。
+    bool receipt_authorized = 14;
+    string receipt_authorized_at = 15;   // ISO 8601 UTC；未授權為空字串
+
+    // 待裁決的展延申請（S02／A03，端點 20 → 41）。沒有就不帶。
+    //
+    // 🔴 端點 20 只寫一列 invoice_status_history、**不碰 seller_tax_profiles 的任何
+    // 一欄**、不發事件 ⇒ 在本欄出現之前，「賣家申請了展延」沒有任何讀取面出口：
+    // A02 的 filter=UNDER_REVIEW 把申請過與沒申請過的賣家混在同一頁（設計書逐字說
+    // 「都是待 ADM 決策，A02 的手勢不需要分開」），A03 詳情只有 extension_count
+    // （准了幾次）與 can_request_extension（賣家還能不能按），兩者都答不出
+    // 「現在有沒有人在等」。ADM 因此永遠不知道該按那顆「核准展延」，
+    // 而賣家按下去 extension_count 與 deadline_at 都不變、無從判斷送出去了沒。
+    // dev 實測：一筆 2026-09-03 的申請掛了兩天，六個 filter 沒一個標示得出來。
+    TaxExtensionRequestInfo pending_extension_request = 16;
+}
+// TaxExtensionRequestInfo 是一筆尚未被端點 41 裁決的展延申請。
+//
+// 資料源是 invoice_status_history 的 `SELLER_TAX_EXTENSION_REQUESTED` 列，
+// **不反正規化到 seller_tax_profiles**：申請是事件不是狀態，多存一份就是多一個
+// 要與歷程對齊的真相。
+message TaxExtensionRequestInfo {
+    string requested_at = 1;   // ISO 8601 UTC
+    // 賣家送出時填的理由（端點 20 的 reason，必填）。ADM 決定准不准的唯一依據。
+    string reason = 2;
+}
+message SellerTaxProfileResponse {
+    int32 code = 1;
+    string message = 2;
+    SellerTaxProfileData data = 3;
+}
+
+message GetSellerTaxProfileRequest { int64 store_id = 1; }
+message SaveSellerTaxProfileDraftRequest {
+    int64 store_id = 1;
+    SellerTaxIdentity tax_identity = 2;
+    repeated string evidence_object_keys = 3;   // **保留清單**：本次要留下的既有 media objectKey（欄號不動）。後端以「本欄 ∪ evidence_staged_tokens 換發出的新 key」覆蓋 seller_tax_profiles.evidence_object_keys
+    string expected_version = 4;
+    string idempotency_key = 5;
+    repeated string evidence_staged_tokens = 6;  // 本次新上傳的 secure staged token（§6.1.7 換發表）；服務端 FinalizeImages + LinkImages 換成 objectKey 後即丟棄，兩陣列合計 ≤ 10
+    // §4 例外①：Gateway 注入的登入 principal（backend#3048）。
+    //
+    // 稅籍資料（統編、法定名稱、負責人、營業地址）被誰改過，是保存 5 年的稽核軌跡的一部分
+    // （§8.1.3）。少了本欄，SELLER_TAX_DRAFT_CREATED 寫進 invoice_status_history 的是
+    // actor_type='SELLER' ＋ actor_account_id = NULL —— 一個店有多個可登入帳號時對不出人。
+    // 端點 19／22 早就有這個欄位（同形狀），本欄是把同一個模式補到漏掉的這一支。
+    int64 saved_by_account_id = 7;
+}
+message SubmitSellerTaxProfileRequest {
+    int64 store_id = 1;
+    string expected_version = 2;
+    string idempotency_key = 3;
+    // 賣家在送審表單上勾選的「已閱讀並同意自行開票責任條款」。
+    //
+    // 🔴 **不是可選的形式欄位**：false（含未帶）⇒ 9325，且**一筆都不寫**（§6.1.7）。
+    // true ⇒ 服務端在 T02 的**同一句 UPDATE** 裡連同 review_status／submitted_at／
+    // pending_valid_until 一起寫下 attestation_version（服務端當期版本，非前端可控）
+    // ＋ attested_at ⇒ 不變式「送審成功 ⇒ 條款必已簽」由 SQL 保證，不靠呼叫順序。
+    //
+    // 背景：本欄之前不存在，而 §6.1.7／§8 描述的 9325 守衛需要「已 SUBMITTED」才簽得成
+    // （T04 的 allowed-from），造成 DRAFT 的新賣家永遠走不進那個環。裁決 C 用本欄拆環。
+    bool accepted_terms = 4;
+    // §4 例外①：Gateway 注入的登入 principal。
+    //
+    // 🔴 **裁決 C 之後這是絕大多數賣家唯一一次條款簽署動作**，而「審核期間發票由賣家
+    // 自行開立、責任在賣家」這份書面憑據必須答得出「是誰按的」（§6.1.7 對端點 21/22 的
+    // 逐字要求：接受條款是**自然人的意思表示**）。少了本欄，端點 19 寫進
+    // invoice_status_history 的是 actor_type='SELLER' ＋ actor_account_id = NULL ——
+    // 有簽署記錄、查不到簽署人。
+    // ⚠️ 用 account_id 不是 store_id：賣家換手後 store_id 會指向新任賣家，而條款是
+    // 前任那個自然人簽的（與 AcceptSelfIssueAttestationRequest 同一形狀、同一理由）。
+    int64 accepted_by_account_id = 5;   // §4 例外①：Gateway 注入的登入 principal
+}
+message RequestSellerTaxExtensionRequest {
+    int64 store_id = 1;
+    string reason = 2;
+    string expected_version = 3;
+    string idempotency_key = 4;
+    // §4 例外①：Gateway 注入的登入 principal（backend#3048）。
+    //
+    // 申請延長會把平台補件期限往後推（一次最多 30 天，chk_stp_extension 上限 1 次）
+    // ⇒「是誰把期限推掉的」必須留痕。少了本欄，SELLER_TAX_EXTENSION_REQUESTED 的
+    // actor_account_id 恆為 NULL，而它旁邊的 SELLER_TAX_SUBMITTED 記得到 —— 同一份設計
+    // 漏了兩支，不是「本設計不記 actor」。
+    int64 requested_by_account_id = 5;
+}
+message GetSelfIssueAttestationRequest { int64 store_id = 1; }
+message AcceptSelfIssueAttestationRequest {
+    int64 store_id = 1;
+    int64 accepted_by_account_id = 2;   // §4 例外①：Gateway 注入的登入 principal
+    string terms_version = 3;
+    bool accepted = 4;
+    string idempotency_key = 5;
+}
+message SelfIssueAttestationResponse {
+    int32 code = 1;
+    string message = 2;
+    SelfIssueAttestationInfo data = 3;
+}
+
+message SellerProviderAccountData {
+    string provider = 1;                 // 固定 "AMEGO"
+    string status = 2;                   // InvoiceProviderAccountStatus
+    string status_notice = 3;
+    string version = 4;
+    // 🔴 欄名 2026-09-02 由 seller_tax_id_masked 改為 seller_tax_id（#3017，DEC-20260902-163458 選 B）。
+    // field number 不變 ⇒ wire 相容；改的是**名字**。
+    // 值一直都是**完整 8 碼**：58 號 §8.1.3(b) 的資料分級表逐字把它判為 O 類、三端皆完整，
+    // 而賣家統編是公開營業資訊、ADM 核對統編正是 A04 的用途之一。
+    // 舊名帶著 masked 卻回完整值，會讓下游誤以為已經遮過而可以安全轉發。
+    string seller_tax_id = 5;
+    string credential_last4 = 6;
+    string credential_updated_at = 7;    // ISO 8601 UTC
+    string last_verified_at = 8;
+    string automation_cutover_at = 9;    // 以 paid_at 判定適用範圍
+    string consent_version = 10;
+    string last_request_id = 11;
+    string pending_order_count = 12;     // 修改切點前顯示受影響但尚未付款的訂單數（A09）
+    // 這裡沒有、也永遠不會有 app_key 欄位（§8.1.2 層 1）。90 號占住名字，
+    //    讓「不小心把 app_key 加回 Response」變成 `buf build` 失敗而不是靜默外洩明文。
+    //    request 端由獨立 message（PutSellerProviderCredentialsRequest /
+    //    RotateSellerProviderCredentialsRequest）持有 app_key，兩者不共用型別。
+    reserved 90;
+    reserved "app_key";
+    reserved 13;
+    reserved "credential_fingerprint_prefix";
+    // 13 號欄占住不用：`credential_fingerprint_prefix` 依 §8.1.1(f) 的 U2 裁決不對外露出，
+    //    依 Proto 管理規範仍要保留原 field number 並 `reserved`，防止下一個人重用它。
+    //    `reserved` 的意思是「不要重用」，不是「之後會加回來」——要加回來得先推翻
+    //    §8.1.1(f) U2（§12 的同一份交付清單逐字寫「不要加 `credential_fingerprint_prefix`」，
+    //    與本處是同一個裁決的兩個面）。賣家自我確認走 `credential_last4`（6）
+    //    ＋ `credential_updated_at`（7）。
+}
+message SellerProviderAccountResponse {
+    int32 code = 1;
+    string message = 2;
+    SellerProviderAccountData data = 3;
+}
+message GetSellerProviderAccountRequest { int64 store_id = 1; }
+message PutSellerProviderCredentialsRequest {
+    int64 store_id = 1;
+    string provider = 2;
+    string seller_tax_id = 3;
+    string app_key = 4;            // write-only：入站後立即加密，任何 Response 都不回傳
+    string consent_version = 5;
+    string expected_version = 6;
+    string idempotency_key = 7;
+}
+message VerifySellerProviderAccountRequest {
+    int64 store_id = 1;
+    string expected_version = 2;
+    string idempotency_key = 3;
+}
+message ActivateSellerProviderAccountRequest {
+    int64 store_id = 1;
+    string cutover_at = 2;         // ISO 8601 UTC；必須 ≥ now（不接受回溯）
+    string expected_version = 3;
+    string idempotency_key = 4;
+}
+message RotateSellerProviderCredentialsRequest {
+    int64 store_id = 1;
+    string app_key = 2;            // 新 key；驗證失敗則保留原 key，不覆蓋
+    string expected_version = 3;
+    string idempotency_key = 4;
+}
+
+message SellerReceiptAuthorizationData {
+    bool eligible = 1;
+    string ineligible_reason = 2;      // NOT_APPROVED/APPROVAL_REVOKED/APPROVAL_EXPIRED
+    string approval_basis_key = 3;     // media objectKey
+    string approved_at = 4;            // ISO 8601 UTC
+    string approval_valid_until = 5;   // T-C04：核定可被複審推翻
+    string authorized_at = 6;
+    string consent_version = 7;
+    string receipt_template_key = 8;
+    string version = 9;
+    // 核定依據文件（§6.1.9 fail-closed 三態）。approval_basis_key 是 SSOT（objectKey），
+    // asset id 給 Gateway 組 approvalBasisDownloadPath 用。
+    string approval_basis_asset_id = 10;
+    bool approval_basis_available = 11;             // 指名了、且上傳者是本賣家，才為 true
+    string approval_basis_unavailable_reason = 12;  // NOT_DESIGNATED / UPLOADER_NOT_SELLER
+}
+message SellerReceiptAuthorizationResponse {
+    int32 code = 1;
+    string message = 2;
+    SellerReceiptAuthorizationData data = 3;
+}
+message GetSellerReceiptAuthorizationRequest { int64 store_id = 1; }
+message ConfirmSellerReceiptAuthorizationRequest {
+    int64 store_id = 1;
+    string consent_version = 2;
+    bool authorized = 3;
+    string expected_version = 4;
+    string idempotency_key = 5;
+}
+
+message SellerInvoiceDocumentItem {
+    InvoiceDocumentSummary summary = 1;
+    string order_no = 2;
+    string paid_at = 3;          // ISO 8601 UTC
+    string buyer_kind = 4;       // B2C/B2B
+    string invoice_mode = 5;
+    string shipment_status = 6;  // 與發票狀態分開，禁止後端合成綜合狀態
+    string updated_at = 7;
+    // 這份文件最近一次 operation 的 id；沒有任何 operation 時為空字串（不是 null）。
+    //    S06／S07 的「查看異常 → S08」唯一 href 來源。少了它那條 CTA 組不出連結，
+    //    而 S08 是可定址路由（§D.1.2）⇒ 症狀是「看得到異常，點不進去」。
+    string latest_job_id = 8;
+}
+message ListSellerInvoiceDocumentsRequest {
+    int64 store_id = 1;
+    string date_from = 2;     // YYYY-MM-DD（UTC+8 日界），嚴格驗證
+    string date_to = 3;
+    string mode = 4;
+    string status = 5;
+    bool abnormal_only = 6;
+    string order_no = 7;
+    string page = 8;
+    string page_size = 9;
+}
+message ListSellerInvoiceDocumentsData {
+    repeated SellerInvoiceDocumentItem records = 1;
+    string total = 2;
+    string page = 3;
+    string page_size = 4;
+    // true ＝ 這一頁的 shipment_status 沒有取到（shipping-service 不可用／逾時），
+    //    **不是**「這些訂單都還沒出貨」。少了這一欄，兩者在前端塌成同一個畫面：
+    //    每一列都是空字串，而空字串會被讀成「還沒出貨」——那正是 #3019 的原始症狀
+    //    換一個形式重演。降級是**整批**的性質（一次 RPC 涵蓋整頁）⇒ 放在 data 層
+    //    而不是逐列，也因此不必往 shipment_status 的值域裡塞 CodeMeta 以外的哨兵值。
+    bool shipment_status_degraded = 5;
+}
+message ListSellerInvoiceDocumentsResponse {
+    int32 code = 1;
+    string message = 2;
+    ListSellerInvoiceDocumentsData data = 3;
+}
+// S12 進項列表列（端點 72）。六欄逐項對應 58A §S12「進項分頁欄位（6 欄）」：
+//    開立日期＝summary.issued_at／發票號碼＝summary.invoice_number／開立人＝issuer_name／
+//    用途說明＝recipient_note／金額＝summary.total_amount／狀態＝summary.status。
+//    document_id 由 summary 帶出（點列 → S11）。
+// 進項唯讀：賣家對別人開給他的發票沒有作廢的法律地位 ⇒ 不放任何動作相關欄位
+//    （沒有 latest_job_id／can_* 之類；那些是銷項 SellerInvoiceDocumentItem 才有的東西）。
+message SellerReceivedInvoiceItem {
+    InvoiceDocumentSummary summary = 1;
+    string issuer_name = 2;    // 方向三＝平台名稱。同 B09，來源是 issuer_name_snapshot
+    // 用途說明，例「2026 年 8 月平台服務費」。進項是報稅憑證，會計要靠這一欄分辨費用
+    //    科目，只給發票號碼與金額對不出帳。
+    //
+    // **定案（2026-08-29）：不加 DB 欄，由 invoice_document_lines 推導。**
+    //    invoice_documents 沒有 note/purpose/memo 欄（62 欄逐欄查過），而這一欄的內容
+    //    本來就是明細行的品名——加欄等於把同一份資料存兩次，且對方向一的每一份文件
+    //    都留一個永遠是 NULL 的欄位。
+    //
+    //    推導規則：取 line_no 最小那一行的 description；該文件行數 > 1 時後綴「等 N 項」。
+    //    **唯一實作處**＝ db/queries/invoice_documents.sql 的
+    //    ListSellerReceivedInvoiceDocuments。⚠️ 該 query **尚未存在**——本波只落了
+    //    worker／claim 類與三支基本 Get，端點 72 的列表查詢隨 usecase 那一批落地。
+    //    在它落地之前，這一欄沒有任何生產者。
+    //
+    //    ⚠️ 不得回空字串了事：Phase 1 方向二／三／四**只由端點 57（ADM 手動開票）產生**，
+    //    而該路徑走 MANUAL_LINES ⇒ 明細行必有 description（§5A.3）⇒ 推導必有值。
+    //    真的推不出值代表資料有問題，應該讓它顯眼而不是靜默變空白。
+    string recipient_note = 3;
+}
+message ListSellerReceivedInvoiceDocumentsRequest {
+    int64 store_id = 1;        // §4 例外①：Gateway sellerid resolver 解析後注入的 store surrogate
+    string date_from = 2;      // YYYY-MM-DD（UTC+8 日界），嚴格驗證
+    string date_to = 3;
+    string status = 4;         // InvoiceDocumentStatus；空字串＝不篩
+    string page = 5;
+    string page_size = 6;
+}
+message ListSellerReceivedInvoiceDocumentsData {
+    repeated SellerReceivedInvoiceItem records = 1;
+    string total = 2;
+    string page = 3;
+    string page_size = 4;
+}
+message ListSellerReceivedInvoiceDocumentsResponse {
+    int32 code = 1;
+    string message = 2;
+    ListSellerReceivedInvoiceDocumentsData data = 3;
+}
+message GetSellerInvoiceDocumentRequest {
+    int64 store_id = 1;
+    string document_id = 2;
+}
+message SellerInvoiceDocumentDetail {
+    InvoiceDocumentDetail detail = 1;
+    // 三值：SELLER / PLATFORM / UNDETERMINED。推導欄位（資料層不加 funded_by 欄，B5），
+    // 但不得寫成常數——偵測到 created_by=ADMIN 的券時必須回 UNDETERMINED（E4 fail-closed，§3.7 D9a）
+    string funded_by = 2;
+    string created_by = 3;           // SELLER / ADMIN（來源＝coupon 的 created_by）
+    string cutover_version = 4;      // 此訂單依 paid_at 適用的連線版本
+    string provider_request_id = 5;
+    string manual_reason_code = 6;   // status=AWAITING_MANUAL 時必有值（CodeMeta InvoiceManualReason）
+    // 端點 32 的重寄窗口尚未開放時才有值（ISO 8601 UTC）；可重寄時為空字串。
+    //    它在 Go DTO（§6.1.10 端點 31）早已存在——proto 少這一欄，那個欄位就永遠是零值，
+    //    症狀是「按鈕永遠可按、每次都撞 429」，而 429 的 data 恆空、前端拿不到倒數（§6.1.0 (13) 要點②）。
+    string next_resend_available_at = 7;
+    string latest_job_id = 8;        // 同 SellerInvoiceDocumentItem.latest_job_id；S07 的「查看異常」href 來源
+}
+message GetSellerInvoiceDocumentResponse {
+    int32 code = 1;
+    string message = 2;
+    SellerInvoiceDocumentDetail data = 3;
+}
+
+message ResendInvoiceNotificationRequest {
+    int64 store_id = 1;          // 賣家路徑；ADM 路徑用下方 ForAdmin 版本
+    string document_id = 2;
+    string idempotency_key = 3;
+}
+// 端點 71 買家重寄。與上方賣家版的唯一差別是身分鍵，形狀刻意保持一致。
+message ResendBuyerInvoiceNotificationRequest {
+    int64 buyer_id = 1;          // §4 例外①：Gateway buyerid resolver 解析後注入的 buyer surrogate
+    string document_id = 2;
+    string idempotency_key = 3;
+}
+message ResendInvoiceNotificationData {
+    bool resent = 1;
+    string sent_at = 2;          // ISO 8601 UTC
+    string to_masked = 3;
+}
+message ResendInvoiceNotificationResponse {
+    int32 code = 1;
+    string message = 2;
+    ResendInvoiceNotificationData data = 3;
+}
+
+message InvoiceJobInfo {
+    string job_id = 1;
+    string order_no = 2;
+    string store_id = 3;               // Response 內為 string
+    string operation_type = 4;         // InvoiceOperationType 六值（§5 chk_invop_type）：ISSUE/QUERY/VOID/ALLOWANCE/REISSUE/VOID_ALLOWANCE
+                                       //   沒有 RECEIPT——收據是 document_kind 不是 operation_type
+    string status = 5;                 // InvoiceOperationStatus
+    string summary = 6;                // 使用者可理解的摘要，不含 provider code
+    string attempt_count = 7;
+    string max_attempts = 8;
+    string last_attempt_at = 9;        // ISO 8601 UTC
+    string next_retry_at = 10;
+    RetryPolicy retry_policy = 11;
+    string shipment_unaffected_notice = 12;
+    string provider_request_id = 13;
+    string version = 14;
+    bool can_retry = 15;               // 由後端判定；WAITING_CONFIRMATION/FAILED_UNKNOWN 恆為 false
+    bool can_cancel = 16;
+    string manual_reason_code = 17;    // status=AWAITING_MANUAL 時必有值（CodeMeta InvoiceManualReason）
+    bool needs_funding_decision = 18;  // true ⇒ 重試前必須帶 funding_decision（E4，manual_reason_code=PLATFORM_FUNDED_DISCOUNT）
+    // ---- 端點 62（A4 受控人工出口）專用；只有 status=RESOLVED_EXTERNALLY 的 job 有值 ----
+    string external_invoice_no = 19;   // 賣家自行開立的號碼。與 invoice_documents.external_invoice_no 同源；
+                                       //    provider_invoice_no 必須留空（平台不冒充開立人，§7.4 A4）
+    string external_invoice_date = 20; // YYYY-MM-DD（UTC+8 日界）
+    string reported_at = 21;           // ISO 8601 UTC
+    bool can_report_external = 22;     // 後端判定（真值＝status=MANUAL_PROCESS_ALLOWED）；前端不得從 status 推導
+    // document_kind 是 B2B／B2C／RECEIPT（CodeMeta InvoiceDocumentKind）。
+    //
+    // 🔴 賣家中心靠它分辨「這是發票還是收據」——#3066 裁決 B：收據與發票是兩個並列的
+    //    區塊，文案與操作各自為政。免用統一發票的賣家（issuer PLATFORM_RECEIPT）永遠
+    //    不會有發票，對他顯示任何帶「發票」字樣的框架都是錯的，而這一欄是前端唯一
+    //    分得出來的依據 ⇒ **前端不得從 operation_type 推導**（operation_type 沒有
+    //    RECEIPT，見本 message 第 4 欄的註解）。
+    string document_kind = 23;
+}
+message GetSellerInvoiceJobRequest {
+    int64 store_id = 1;
+    string job_id = 2;
+}
+message GetSellerInvoiceJobResponse {
+    int32 code = 1;
+    string message = 2;
+    InvoiceJobInfo data = 3;
+}
+
+// 子路由 62R：本訂單可回報／已回報的自行開立案件（端點 62 的前置讀取）
+message ListOrderExternalIssuancesRequest {
+    int64 store_id = 1;   // Gateway 由 sellerid resolver 注入（§4 例外①，僅限 Request）
+    string order_no = 2;
+    string page = 3;
+    string page_size = 4;
+}
+message ListOrderExternalIssuancesData {
+    // 述詞寫死在 usecase（三表 join，invoice_operations 沒有 store_id／order_no 欄）：
+    //    invoice_issuers.issuer_ref_id = store_id AND invoice_documents.source_ref = order_no
+    //    AND operation.status IN (MANUAL_PROCESS_ALLOWED, RESOLVED_EXTERNALLY)，
+    //    依 statutory_deadline_at ASC NULLS LAST, id ASC。**不接受任何 status query**——
+    //    放寬就退化成 S08 的等價物，而 S08 對停權賣家是 BLOCK（§3 D16）。
+    //    查無與越權一律空 records，不回 9340。
+    repeated InvoiceJobInfo records = 1;
+    string total = 2;
+    string page = 3;
+    string page_size = 4;
+}
+message ListOrderExternalIssuancesResponse {
+    int32 code = 1;
+    string message = 2;
+    ListOrderExternalIssuancesData data = 3;
+}
+
+// 端點 62：賣家回報自行開立的發票號碼（§7.4 A4 → J30 → RESOLVED_EXTERNALLY）
+message ReportExternalIssuanceRequest {
+    int64 store_id = 1;                       // Gateway 由 sellerid resolver 注入（§4 例外①，僅限 Request）
+    string job_id = 2;
+    string invoice_number = 3;                // ^[A-Z]{2}[0-9]{8}$，10 碼；格式不合 → 400（非 9349）
+    string invoice_date = 4;                  // YYYY-MM-DD（UTC+8 日界）
+    repeated string evidence_asset_keys = 5;  // media objectKey，≤ 5 筆。只收 key 不收 URL（《多媒體與圖片 URL 規範》／49 號）
+    string note = 6;                          // ≤ 500 字
+    string expected_version = 7;              // 必填；不符 → 9343
+    string idempotency_key = 8;               // 必填；同鍵同 payload ⇒ 回放原回應（不是 9343）
+}
+
+message ListSellerInvoiceComplaintsRequest {
+    int64 store_id = 1;
+    string status = 2;   // 視圖名不是狀態值：AWAITING_SELLER/SELLER_RESPONDED/CLOSED（述詞見 §6.1.11 端點 34 對照表）
+    string sort = 3;     // due_at_asc（預設）/created_at_desc
+    string page = 4;
+    string page_size = 5;
+}
+message GetSellerInvoiceComplaintRequest {
+    int64 store_id = 1;
+    string complaint_id = 2;
+}
+message RespondSellerInvoiceComplaintRequest {
+    int64 store_id = 1;
+    string complaint_id = 2;
+    string action = 3;    // InvoiceComplaintAction 的賣家可選三值：RESENT/REISSUED/NEED_PLATFORM_HELP
+    string note = 4;
+    string expected_version = 5;
+    string idempotency_key = 6;
+}
+
+// ==================== Admin message ====================
+
+message GetInvoiceOverviewForAdminRequest {
+    int64 actor_account_id = 1;   // §4 例外①：Gateway 注入（admin 身分），僅供稽核
+}
+message InvoiceKpiItem {
+    string key = 1;          // pending_tax_reviews/near_deadline/provider_errors/pending_jobs/needs_manual/open_complaints/overdue_complaints/suspended_sellers
+    string value = 2;
+    string window_label = 3; // 時間範圍與定義（T-I12：每個 KPI 必須寫死口徑）
+    string definition = 4;
+}
+message GetInvoiceOverviewForAdminData {
+    repeated InvoiceKpiItem kpis = 1;
+    repeated InvoiceJobInfo priority_jobs = 2;
+}
+message GetInvoiceOverviewForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    GetInvoiceOverviewForAdminData data = 3;
+}
+
+message TaxReviewItem {
+    string store_id = 1;
+    string store_name = 2;
+    string entity_type = 3;
+    string claimed_status = 4;   // SellerTaxObligation：REQUIRED/EXEMPT/UNKNOWN
+    string review_status = 5;
+    string submitted_at = 6;      // ISO 8601 UTC
+    string deadline_at = 7;
+    string remaining_days = 8;
+    string extension_count = 9;
+    bool self_issue_accepted = 10;
+    repeated string risk_flags = 11;  // TAX_ID_MISMATCH_KYC/REPEAT_APPLICATION/OPEN_COMPLAINTS（封閉列舉，無「其他」）
+
+    // 收據代製授權（S05，端點 29）是否已簽。
+    //
+    // 🔴 A02 佇列需要它才決定得了「這一列現在該做什麼」：裁決 DEC-20260905-015836
+    // 之後賣家在**審核期間**就簽得了，而「核定免用統一發票」（T08）要求已授權
+    // ⇒ 未授權的列點進去只會看到一顆 disabled 的按鈕。沒有這一欄，ADM 要逐一點進
+    // A03 才知道哪些人可以現在核定 —— 佇列的用途就是不必逐一點進去。
+    bool receipt_authorized = 12;
+}
+message ListTaxReviewsForAdminRequest {
+    int64 actor_account_id = 1;
+    string filter = 2;   // 視圖名不是狀態值：NEW/SUPPLEMENT_REQUIRED/UNDER_REVIEW/NEAR_DEADLINE/EXTENDED/EXPIRED（述詞見 §6.1.12 端點 38 對照表）
+    string keyword = 3;
+    string page = 4;
+    string page_size = 5;
+}
+message ListTaxReviewsForAdminData {
+    repeated TaxReviewItem records = 1;
+    string total = 2;
+    string page = 3;
+    string page_size = 4;
+}
+message ListTaxReviewsForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    ListTaxReviewsForAdminData data = 3;
+}
+message GetTaxReviewForAdminRequest {
+    int64 actor_account_id = 1;
+    string store_id = 2;
+}
+message GetTaxReviewForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    SellerTaxProfileData data = 3;
+}
+message DecideTaxReviewForAdminRequest {
+    int64 actor_account_id = 1;
+    string store_id = 2;
+    string decision = 3;              // SellerTaxReviewDecision 的 7 值（8 值全集減 EXTEND，EXTEND 走 DecideTaxExtensionForAdmin）：
+                                      //   APPROVE_INVOICE_REQUIRED/APPROVE_INVOICE_EXEMPT/REQUEST_SUPPLEMENT/
+                                      //   KEEP_UNDER_REVIEW/REJECT/REVOKE/REOPEN_REVIEW
+    string reason = 4;                // 每個決策必填（B4：以強制填理由＋二次確認＋完整稽核取代細粒度 capability）
+    string approval_valid_until = 5;  // 僅 APPROVE_*
+    bool confirmed = 6;               // 僅 APPROVE_INVOICE_EXEMPT 必須 true
+    string expected_version = 7;
+    string idempotency_key = 8;
+    // §6.1.9：核定免用統一發票時**由 ADM 指名**收據代製授權的核定依據文件。
+    //
+    // 🔴 必須是該賣家自己在 S02 上傳的稅籍文件之一（不另外上傳）：media 的授權述詞
+    //    等價於「只有上傳者本人」⇒ 依據文件若由 ADM 上傳，賣家點下載一律 404。
+    //    invoice-service 以 seller_tax_profiles.evidence_object_keys 做這個比對。
+    // 🔴 兩欄**同進同出**（DB `chk_stp_receipt_basis_pair`）：key 是 SSOT（§25 只存
+    //    objectKey），asset id 是前端組下載路徑用的。只給其中一個當場 23514。
+    //    兩者皆空 ＝ 不指名（端點 28 回 approvalBasisAvailable=false ＋ NOT_DESIGNATED）。
+    // ⚠️ 只有 APPROVE_INVOICE_EXEMPT 這個決策會用到它；其餘決策帶了也會被忽略。
+    string approval_basis_key = 9;
+    string approval_basis_asset_id = 10;
+}
+message DecideTaxExtensionForAdminRequest {
+    int64 actor_account_id = 1;
+    string store_id = 2;
+    string decision = 3;      // APPROVE/REJECT
+    string extend_days = 4;   // 僅 APPROVE，預設 "30"
+    string reason = 5;
+    string expected_version = 6;
+    string idempotency_key = 7;
+}
+message DecideTaxReviewForAdminData {
+    string store_id = 1;
+    string review_status = 2;
+    string version = 3;
+    string audit_log_id = 4;
+    string revoked_effective_at = 5;   // 僅 REVOKE：已代製收據不追溯，但要留分界時點（T-C04）
+}
+message DecideTaxReviewForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    DecideTaxReviewForAdminData data = 3;
+}
+
+message ProviderAccountItem {
+    string store_id = 1;
+    string store_name = 2;
+    string seller_tax_id = 3;      // 完整 8 碼（O 類）。2026-09-02 由 seller_tax_id_masked 改名，見 SellerProviderAccountData
+    string status = 4;                  // 含三態判定：NOT_STARTED（查無列）/NOT_CONFIGURED/CONFIG_ERROR
+    string credential_last4 = 5;
+    string last_verified_at = 6;        // ISO 8601 UTC
+    string automation_cutover_at = 7;
+}
+message ListProviderAccountsForAdminRequest {
+    int64 actor_account_id = 1;
+    string status = 2;
+    string keyword = 3;
+    string page = 4;
+    string page_size = 5;
+}
+message ListProviderAccountsForAdminData {
+    repeated ProviderAccountItem records = 1;
+    string total = 2;
+    string page = 3;
+    string page_size = 4;
+}
+message ListProviderAccountsForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    ListProviderAccountsForAdminData data = 3;
+}
+message GetProviderAccountForAdminRequest {
+    int64 actor_account_id = 1;
+    string store_id = 2;
+}
+message GetProviderAccountForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    SellerProviderAccountData data = 3;
+}
+message HealthCheckProviderAccountForAdminRequest {
+    int64 actor_account_id = 1;
+    string store_id = 2;
+    string idempotency_key = 3;
+}
+message DeactivateProviderAccountForAdminRequest {
+    int64 actor_account_id = 1;
+    string store_id = 2;
+    string reason = 3;
+    bool confirmed = 4;          // 必須 true（高風險）
+    string expected_version = 5;
+    string idempotency_key = 6;
+}
+message DeactivateProviderAccountForAdminData {
+    string store_id = 1;
+    string status = 2;
+    string deactivated_at = 3;          // ISO 8601 UTC
+    string affected_scope_notice = 4;   // 由後端產生：只影響切點後付款的訂單
+    string pending_order_count = 5;
+    string audit_log_id = 6;
+}
+message DeactivateProviderAccountForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    DeactivateProviderAccountForAdminData data = 3;
+}
+message ReactivateProviderAccountForAdminRequest {
+    int64 actor_account_id = 1;
+    string store_id = 2;
+    string reason = 3;
+    bool confirmed = 4;          // 必須 true（高風險）
+    string expected_version = 5;
+    string idempotency_key = 6;
+}
+message RevokeProviderAccountForAdminRequest {
+    int64 actor_account_id = 1;
+    string store_id = 2;
+    string reason = 3;
+    bool confirmed = 4;          // 必須 true（不可逆）
+    string expected_version = 5;
+    string idempotency_key = 6;
+}
+message RevokeProviderAccountForAdminData {
+    string store_id = 1;
+    string status = 2;                  // 恆為 REVOKED
+    string revoked_at = 3;              // ISO 8601 UTC
+    string affected_scope_notice = 4;
+    string pending_order_count = 5;
+    string audit_log_id = 6;
+}
+message RevokeProviderAccountForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    RevokeProviderAccountForAdminData data = 3;
+}
+message ProviderCutoverItem {
+    string version = 1;
+    string cutover_at = 2;             // ISO 8601 UTC
+    string deactivated_at = 3;
+    string mode = 4;
+    string created_by_account_id = 5;  // Response 內為 string
+    string created_at = 6;
+    string reason = 7;
+}
+message ListProviderCutoversForAdminRequest {
+    int64 actor_account_id = 1;
+    string store_id = 2;
+    string page = 3;
+    string page_size = 4;
+}
+message ListProviderCutoversForAdminData {
+    repeated ProviderCutoverItem records = 1;
+    string total = 2;
+    string page = 3;
+    string page_size = 4;
+}
+message ListProviderCutoversForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    ListProviderCutoversForAdminData data = 3;
+}
+
+message ListInvoiceDocumentsForAdminRequest {
+    int64 actor_account_id = 1;
+    string store_id = 2;
+    string order_no = 3;
+    string status = 4;
+    string mode = 5;
+    string date_from = 6;    // YYYY-MM-DD，嚴格驗證
+    string date_to = 7;
+    string page = 8;
+    string page_size = 9;
+}
+message ListInvoiceDocumentsForAdminData {
+    repeated SellerInvoiceDocumentItem records = 1;
+    string total = 2;
+    string page = 3;
+    string page_size = 4;
+    // 同 ListSellerInvoiceDocumentsData.shipment_status_degraded（兩支端點共用
+    //    SellerInvoiceDocumentItem，降級語意也必須一致，否則 A12 會靜默退回舊症狀）。
+    bool shipment_status_degraded = 5;
+}
+message ListInvoiceDocumentsForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    ListInvoiceDocumentsForAdminData data = 3;
+}
+message GetInvoiceDocumentForAdminRequest {
+    int64 actor_account_id = 1;
+    string document_id = 2;
+}
+message AdminInvoiceDocumentDetail {
+    SellerInvoiceDocumentDetail seller_view = 1;
+    repeated ProviderExchangeItem provider_exchanges = 2;  // AMEGO request/response 歷程（A06 第 4 層）
+    string idempotency_key = 3;
+    repeated InvoiceJobInfo related_jobs = 4;
+    // document_version 是 invoice_documents.version（樂觀鎖），A13 送 expected_version 用。
+    // 掛在 ADM 專屬 message 而不是共用的 SellerInvoiceDocumentDetail：賣家面沒有任何
+    // 需要帶版本的寫入動作，加在共用型別等於對賣家暴露一個他用不到的內部欄位。
+    string document_version = 5;
+    // can_resume_from_manual ＝「這份文件現在可以由 ADM 送回自動線」（端點 73）。
+    // 🔴 判準與寫端同一支述詞（usecase.CanResumeDocumentFromManual）：分成兩份的後果是
+    // 按鈕亮在一個 CAS 必定 rows=0 的狀態上，而 rows=0 是靜默的（#3031／#3089 第 8 項
+    // 兩次都是讀寫端分家）。true 的條件是 status=AWAITING_MANUAL 且 related_jobs 為空
+    // ——有 operation 的那些走端點 52，入口在 A06。
+    bool can_resume_from_manual = 6;
+}
+message ProviderExchangeItem {
+    string exchange_id = 1;
+    string occurred_at = 2;        // ISO 8601 UTC
+    string endpoint = 3;           // 例 "/json/f0401"
+    string provider_code = 4;      // AMEGO code（數字字串）
+    string provider_message = 5;   // 必須同時保存 msg：AMEGO 的 53 在官方表出現兩次語意不同
+    string request_id = 6;
+    string masked_request_body = 7;   // 遮罩在寫入時完成，不是查詢時
+    string masked_response_body = 8;
+}
+message GetInvoiceDocumentForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    AdminInvoiceDocumentDetail data = 3;
+}
+message ResendInvoiceNotificationForAdminRequest {
+    int64 actor_account_id = 1;
+    string document_id = 2;
+    string reason = 3;
+    string idempotency_key = 4;
+}
+
+message ListInvoiceJobsForAdminRequest {
+    int64 actor_account_id = 1;
+    string tab = 2;        // PENDING/RETRYING/NEEDS_ATTENTION/NEEDS_MANUAL/COMPLETED/CANCELLED（六個，T-I10）
+    string store_id = 3;
+    string order_no = 4;
+    string operation_type = 5;
+    string page = 6;
+    string page_size = 7;
+    // §6.1.14 的兩個額外 query。**upload_status 是「發票開出來了，但財政部端沒收到」
+    // 這一類的唯一入口**——那些 job 落 COMPLETED，與真正完成的混在同一頁，沒有這個
+    // 篩選就沒有任何路徑撈得出來，而症狀是靜默的。
+    string upload_status = 8;   // PENDING/UPLOADED/NOT_FOUND/FAILED；空字串＝不篩
+    string manual_reason = 9;   // CodeMeta InvoiceManualReason；空字串＝不篩
+}
+message ListInvoiceJobsForAdminData {
+    repeated InvoiceJobInfo records = 1;
+    string total = 2;
+    string page = 3;
+    string page_size = 4;
+}
+message ListInvoiceJobsForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    ListInvoiceJobsForAdminData data = 3;
+}
+message GetInvoiceJobForAdminRequest {
+    int64 actor_account_id = 1;
+    string job_id = 2;
+}
+message AdminInvoiceJobDetail {
+    InvoiceJobInfo job = 1;
+    string order_snapshot_json = 2;                     // 不可變付款快照（A06 第 2 層）
+    InvoiceAmountBreakdown amount_breakdown = 3;
+    repeated ProviderExchangeItem provider_exchanges = 4;
+    string idempotency_key = 5;
+    string shipment_status = 6;
+    repeated InvoiceAuditLogItem audit_logs = 7;
+    ManualUnlockInfo manual_unlock = 8;                 // null = 尚無解鎖請求
+    // #3089 第 7 項：shipment_status 在此之前**零賦值恆空**（列表面 S06／A12 有值、
+    // 詳情頁沒接）。接上時必須同時帶降級旗標——A12 逐字寫著「這一欄尤其不能畫：
+    // 空白會被讀成『還沒出貨』」，所以取不到時不能只回空字串。
+    // 語意與 ListSellerInvoiceDocumentsData.shipment_status_degraded 相同（單筆版）。
+    bool shipment_status_degraded = 9;
+}
+message GetInvoiceJobForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    AdminInvoiceJobDetail data = 3;
+}
+message RetryInvoiceJobForAdminRequest {
+    int64 actor_account_id = 1;
+    string job_id = 2;
+    string reason = 3;
+    string expected_version = 4;
+    string idempotency_key = 5;
+    // 僅當文件 status=AWAITING_MANUAL 且 manual_reason_code=PLATFORM_FUNDED_DISCOUNT 時必填。
+    // SELLER_FUNDED=解除 fail-closed 走一般開票；PLATFORM_FUNDED=拒絕重試回 9341，改走手動開票（E4）
+    string funding_decision = 6;
+}
+message CancelInvoiceJobForAdminRequest {
+    int64 actor_account_id = 1;
+    string job_id = 2;
+    string reason_code = 3;      // 值域＝CodeMeta InvoiceCancelReason（§C.5.4，4 值）；ADM 於本 RPC 一律送 ADM_MANUAL，細分類寫進 reason_detail
+    string reason_detail = 4;
+    bool allow_manual_after_cancellation = 5;
+    string expected_version = 6;
+    string idempotency_key = 7;
+}
+message ResumeInvoiceDocumentForAdminRequest {
+    int64 actor_account_id = 1;
+    string document_id = 2;
+    string reason = 3;
+    // expected_version 是 **document** 自己的版本（AdminInvoiceDocumentDetail.document_version），
+    // 不是 job 的：這條路徑上還沒有 job。
+    string expected_version = 4;
+    string idempotency_key = 5;
+    // 僅當 manual_reason_code=PLATFORM_FUNDED_DISCOUNT 時必填，值域與端點 52 同一組。
+    string funding_decision = 6;
+}
+message InvoiceJobMutationData {
+    string job_id = 1;
+    string status = 2;
+    string version = 3;
+    string audit_log_id = 4;
+    string last_provider_check_at = 5;   // 9342 分支帶回：最後一次向 provider 查證的時間
+    string provider_request_id = 6;
+    string next_step = 7;                // 9342 分支帶回：人類可讀的下一步
+}
+message InvoiceJobMutationResponse {
+    int32 code = 1;
+    string message = 2;
+    InvoiceJobMutationData data = 3;
+}
+
+message ManualUnlockInfo {
+    string unlock_id = 1;
+    string status = 2;                       // AWAITING_SECOND_APPROVAL/APPROVED/REJECTED/EXPIRED
+    string requested_by_account_id = 3;      // Response 內為 string
+    string approved_by_account_id = 4;
+    string provider_check_evidence = 5;
+    string provider_checked_at = 6;          // ISO 8601 UTC
+    string requested_at = 7;
+    string expires_at = 8;                   // 發起後 24 小時
+    // 覆核者（第二人）要看得到發起者附的證據種類與檔案，否則他是在對一個
+    // 看不見證據的請求按同意 —— 而 §6.4 的四樣紀律裡「證據」正是其中一樣（#3089 A 組第 2 項）。
+    string cancel_evidence_kind = 9;
+    string cancel_evidence_object_key = 10;
+}
+message RequestManualUnlockForAdminRequest {
+    int64 actor_account_id = 1;
+    string job_id = 2;
+    string provider_check_evidence = 3;   // 1–1000 字：向光貿查證的方式與結果
+    string provider_checked_at = 4;
+    string reason = 5;
+    string expected_version = 6;
+    string idempotency_key = 7;
+    // 以下兩欄服務 J28（CANCEL_BLOCKED_UNKNOWN → CANCELLED_BY_ADMIN，#3089 A 組第 2 項）。
+    //
+    // 🔴 J28 在此之前**沒有任何輸入通道**：ConfirmInvoiceOperationCancel 的 SQL 與
+    // sqlc 生成物都在，但 cancel_evidence_kind 是 arg（必填）而 proto 沒有這個欄位
+    // ⇒ 那條邊零呼叫端 ⇒ CANCEL_BLOCKED_UNKNOWN 與 PROVIDER_STATUS_RECHECK
+    // 之間無限循環，而 §7.5.6 逐字寫著它「**永不自動終結**，唯一出邊是 J28」。
+    //
+    // 值域＝CodeMeta InvoiceCancelEvidenceKind 的四值中**需人判讀**的那兩個
+    // （MOF_PLATFORM_SCREENSHOT／AMEGO_RECONCILE_FILE）——另外兩值是 provider
+    // 自動採信（J24 用），不走雙人確認。
+    // 由 status=CANCEL_BLOCKED_UNKNOWN 的請求必填；CANCELLED_BY_ADMIN 那條路徑不需要
+    // （它的取消已經在 J21→J24 完成過查證）。
+    string cancel_evidence_kind = 8;
+    // 截圖／對帳檔的 media objectKey（§25：只存 key 不存 URL）。選填。
+    // chk_invop_evidence_object_key 只允許它配 MOF_PLATFORM_SCREENSHOT／AMEGO_RECONCILE_FILE。
+    string cancel_evidence_object_key = 9;
+    // ADM 上傳證據檔後拿到的 staged token（#3108）。與 object_key 二擇一：
+    // 前端有檔案就送 token（後端換發成 objectKey），只有 key 就直接送 key。
+    // 兩個都送 ⇒ 400（無法判斷哪個才是這次要存的）。
+    string cancel_evidence_staged_token = 10;
+}
+message ApproveManualUnlockForAdminRequest {
+    int64 actor_account_id = 1;   // 必須 ≠ requested_by_account_id，否則回 9345
+    string job_id = 2;
+    string unlock_id = 3;
+    bool approved = 4;
+    string reason = 5;
+    string expected_version = 6;  // 本 RPC 會把 job.status 推進 MANUAL_PROCESS_ALLOWED ⇒ §6.1.0 (10) 強制帶版本；不符回 9343
+    string idempotency_key = 7;
+}
+message ManualUnlockResponse {
+    int32 code = 1;
+    string message = 2;
+    ManualUnlockInfo data = 3;
+}
+// 端點 56：ADM 代錄賣家自行開立的結果。與 ReportExternalIssuance（端點 62）是**同一件事的兩個入口**，
+//   守衛（MANUAL_PROCESS_ALLOWED）、目標狀態（RESOLVED_EXTERNALLY）、寫入欄位（external_invoice_no）完全相同，
+//   只差 actor 與稽核欄 ⇒ invoice-service 內必須共用同一段 domain 邏輯（見 §6.1.10 端點 62 末的 ）。
+message ReportManualResultForAdminRequest {
+    int64 actor_account_id = 1;
+    string job_id = 2;
+    string invoice_no = 3;      // 賣家自行開立的發票號碼，^[A-Z]{2}[0-9]{8}$（10 碼）
+    string invoice_date = 4;    // YYYY-MM-DD（UTC+8）
+    string total_amount = 5;    // 元
+    string note = 6;
+    string expected_version = 7;
+    string idempotency_key = 8;
+}
+
+message IssuanceIssuer {
+    string kind = 1;      // SELLER/PLATFORM
+    string store_id = 2;  // kind=SELLER 時必填
+}
+message IssuanceRecipient {
+    string kind = 1;           // BUYER/SELLER/EXTERNAL
+    string buyer_id = 2;       // kind=BUYER 時必填（Request 內仍用 string：此值由 ADM 手填，非 Gateway 注入）
+    string store_id = 3;       // kind=SELLER 時必填
+    string name = 4;           // kind=EXTERNAL：以下四欄接受手填（含非會員）
+    string tax_id = 5;
+    string email = 6;
+    string carrier_type = 7;   // InvoiceCarrierType 載具子集：MOBILE_BARCODE/CITIZEN_CERT/DONATION，留空 ＝ 無載具（不是 AMEGO 字面值）
+    string carrier_value = 8;
+}
+message IssuanceSource {
+    string kind = 1;                 // ORDER_SNAPSHOT/MANUAL_LINES
+    string order_no = 2;             // kind=ORDER_SNAPSHOT 時必填
+    repeated InvoiceLine lines = 3;  // kind=MANUAL_LINES 時必填，1–50 行
+}
+message CreateManualIssuanceForAdminRequest {
+    int64 actor_account_id = 1;
+    IssuanceIssuer issuer = 2;
+    IssuanceRecipient recipient = 3;
+    IssuanceSource source = 4;
+    string document_kind = 5;   // B2C/B2B/RECEIPT
+    string reason = 6;
+    bool confirmed = 7;         // 必須 true（高風險二次確認）
+    string idempotency_key = 8;
+}
+message CreateManualIssuanceForAdminData {
+    string job_id = 1;
+    string document_id = 2;
+    string status = 3;
+    string audit_log_id = 4;
+}
+message CreateManualIssuanceForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    CreateManualIssuanceForAdminData data = 3;
+}
+
+message ListInvoiceComplaintsForAdminRequest {
+    int64 actor_account_id = 1;
+    string tab = 2;   // 視圖名不是狀態值：AWAITING_SELLER/SELLER_RESPONDED/ADM_REVIEW/OVERDUE/CLOSED（述詞見 §6.1.16 端點 58 對照表）
+    string store_id = 3;
+    string page = 4;
+    string page_size = 5;
+    // §6.1 端點 58 的另外兩個 query。缺了它們，「依訂單反查申訴」與「逾期案件排序」
+    // 兩件 A07 的核心操作都做不出來。
+    string order_no = 6;
+    string sort = 7;      // 空字串＝服務端預設排序
+}
+message GetInvoiceComplaintForAdminRequest {
+    int64 actor_account_id = 1;
+    string complaint_id = 2;
+}
+message ActOnInvoiceComplaintForAdminRequest {
+    int64 actor_account_id = 1;
+    string complaint_id = 2;
+    string action = 3;    // REMIND_SELLER/REQUEST_REWORK/DECIDE_RESOLVED/DECIDE_VIOLATION/RECOMMEND_SUSPENSION
+    string reason = 4;
+    bool confirmed = 5;   // RECOMMEND_SUSPENSION 必須 true
+    string expected_version = 6;
+    string idempotency_key = 7;
+}
+message SuspensionRecommendation {
+    bool should_suspend = 1;
+    string store_id = 2;
+    string violation_count_in_90_days = 3;   // 只計 DECIDE_VIOLATION，以去重後的訂單數計
+    bool threshold_reached = 4;              // 90 天內 3 次（C1）
+    string suggested_suspend_days = 5;       // 建議 "14"（C2）
+    string suggested_reason = 6;
+    // 7 原為治理端點的路徑字串（值是舊 gateway 的 POST /admin/violations）。該路由已隨措施模型刪除，
+    // 也沒有任何 client 讀它 ⇒ 移除；保留欄號與名稱防重用。發票模組不寫停權狀態：建議只是建議，
+    // 措施由賣家治理模組的 CreateMeasure 建立。
+    reserved 7;
+    reserved "governance_endpoint";
+}
+message ActOnInvoiceComplaintForAdminData {
+    string complaint_id = 1;
+    string status = 2;
+    string version = 3;
+    SuspensionRecommendation recommendation = 4;
+    string audit_log_id = 5;
+}
+message ActOnInvoiceComplaintForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    ActOnInvoiceComplaintForAdminData data = 3;
+}
+
+message InvoiceAuditLogItem {
+    string audit_log_id = 1;
+    string occurred_at = 2;          // ISO 8601 UTC
+    string actor_account_id = 3;     // Response 內為 string
+    string actor_display_name = 4;
+    string operation_type = 5;
+    string target_kind = 6;          // TAX_PROFILE/PROVIDER_ACCOUNT/JOB/DOCUMENT/COMPLAINT
+    string target_id = 7;
+    string before_json = 8;          // 已遮罩（寫入時完成，非查詢時）
+    string after_json = 9;
+    string reason = 10;
+    string request_id = 11;
+    string terms_version = 12;
+    string result = 13;              // SUCCESS/FAILED
+}
+message ListInvoiceAuditLogsForAdminRequest {
+    int64 actor_account_id = 1;
+    string target_actor_account_id = 2;
+    string store_id = 3;
+    string order_no = 4;
+    string document_id = 5;
+    string job_id = 6;
+    string operation_type = 7;
+    string date_from = 8;
+    string date_to = 9;
+    string page = 10;
+    string page_size = 11;
+}
+message ListInvoiceAuditLogsForAdminData {
+    repeated InvoiceAuditLogItem records = 1;
+    string total = 2;
+    string page = 3;
+    string page_size = 4;
+}
+message ListInvoiceAuditLogsForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    ListInvoiceAuditLogsForAdminData data = 3;
+}
+
+// ==================== 內部服務間 message ====================
+
+// ResolveOrderInvoiceModeInternal — order-service 在 checkout preview 呼叫。
+// 這支決定 B01 能不能讓買家付款：回不出可判定的 invoice_mode ⇒ 前端進 invalid 狀態並阻擋付款。
+message ResolveOrderInvoiceModeInternalRequest {
+    string store_id = 1;           // 純服務間欄位仍走 string（本檔不使用 §4 例外③）
+    string buyer_id = 2;
+    string product_amount = 3;     // 元
+    string shipping_amount = 4;
+    string discount_amount = 5;
+    string checkout_id = 6;
+}
+message ResolveOrderInvoiceModeInternalData {
+    string invoice_mode = 1;                 // InvoiceFulfillmentMode
+    string snapshot_version = 2;
+    string preview_expires_at = 3;           // ISO 8601 UTC；由後端給，前端不得自算 TTL
+    InvoiceAmountBreakdown amount = 4;
+    InvoiceDisclosure disclosure = 5;
+    InvoiceProfileInfo default_profile = 6;  // 可為空 message（買家無 profile 且無手機無 email）
+    SellerIntakeLimit intake_limit = 7;      // blocked=true 時 preview 仍回 code 0，阻擋在 confirm
+}
+message ResolveOrderInvoiceModeInternalResponse {
+    int32 code = 1;
+    string message = 2;
+    ResolveOrderInvoiceModeInternalData data = 3;
+}
+
+// ValidateOrderInvoiceInputInternal — order-service 在 checkout confirm 呼叫。
+// 統編／載具／捐贈三者互斥必須在這裡強制：AMEGO 實測不擋（三種違規組合全部通過）。
+message ValidateOrderInvoiceInputInternalRequest {
+    string store_id = 1;
+    string buyer_id = 2;
+    string order_no = 3;
+    InvoiceInputSpec invoice = 4;   // 可為空 message ⇒ 走缺省鏈：預設 profile → 手機 → email → 無載具
+    InvoiceAmountBreakdown amount = 5;
+    string snapshot_version = 6;
+    string idempotency_key = 7;
+}
+message ValidateOrderInvoiceInputInternalData {
+    bool valid = 1;
+    string snapshot_json = 2;        // 可持久化的發票快照（order-service 在付款前保存）
+    string resolved_carrier_type = 3;
+    string resolved_display_value = 4;   // 遮罩後
+    string invoice_mode = 5;
+    SellerIntakeLimit intake_limit = 6;
+}
+message ValidateOrderInvoiceInputInternalResponse {
+    int32 code = 1;
+    string message = 2;
+    ValidateOrderInvoiceInputInternalData data = 3;
+}
+
+message GetSellerInvoiceCapabilitySimpleRequest {
+    string store_id = 1;
+}
+message GetSellerInvoiceCapabilitySimpleData {
+    string store_id = 1;
+    string tax_review_status = 2;
+    string invoice_mode = 3;
+    string provider_status = 4;
+    bool can_issue_automatically = 5;
+    SellerIntakeLimit intake_limit = 6;
+}
+message GetSellerInvoiceCapabilitySimpleResponse {
+    int32 code = 1;
+    string message = 2;
+    GetSellerInvoiceCapabilitySimpleData data = 3;
+}

@@ -1,0 +1,14 @@
+-- issue #2446 契約凍結前置｜設計書 57 §1.2-3：runId 不得同時代表 candidateSetId。
+--
+-- procurement_candidate_sets 一直同時扮演 run 與 candidate set 兩個角色（見 schema 註解），
+-- 而且**連對外識別碼也共用**：GetCandidateSearch 回的 runId 與 candidateSetId 是同一個
+-- set.id。凍結 golden fixtures 之前必須先分開，否則「兩者相等」會變成消費端可以依賴的契約。
+--
+-- 本檔只加欄位（nullable，無 DEFAULT），對尚未下線的舊 pod 完全無害：舊 code 的 INSERT
+-- 不含這一欄，NULL 合法。
+--
+-- **刻意不回填既有列**（第三節判準：新欄位的值不能由同表既有欄位推導）。run_id 是一個全新
+-- 的身分，SQL 端沒有 TSID 產生器，用 id 回填等於把要消滅的那個相等關係寫回去。舊列的
+-- run_id 維持 NULL，讀取端以 CandidateSet.PublicRunID() 退回 candidate set id（見該函式
+-- 註解），contract 波把那條 fallback 與 NULL 一起收掉。
+ALTER TABLE "procurement_candidate_sets" ADD COLUMN "run_id" bigint NULL;

@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "maxSourceAssetsBytes": 10541563,
+  "largeAssetThresholdBytes": 10000000,
+  "largeAssetExceptions": [],
+  "removedPaths": [
+    "assets/fonts/ELEYANGxLukeke-Regular.ttf",
+    "lib/features/chat/presentation/embedded_chat_list_panel.dart",
+    "lib/features/chat/presentation/embedded_chat_thread_panel.dart",
+    "lib/features/dashboard/presentation/dashboard_skeleton.dart",
+    "lib/features/seller/data/seller_model.dart",
+    "lib/features/seller/data/seller_model.freezed.dart",
+    "lib/features/seller/data/seller_model.g.dart",
+    "lib/features/settings/presentation/shipping_settings/widgets/search_dropdown.dart",
+    "lib/shared/icons/seller_center_icon.dart",
+    "test/shared/widgets/seller_center_icon_test.dart"
+  ],
+  "unusedCodeExceptions": [
+    {
+      "symbol": "_HeroVerificationStack",
+      "owner": "Seller Auth",
+      "rationale": "Legacy verification hero retained until the authentication layout parity migration is complete.",
+      "removalCondition": "Delete after the replacement hero passes the auth viewport matrix."
+    },
+    {
+      "symbol": "isLightBackground",
+      "owner": "Storefront",
+      "rationale": "Public helper retained while header contrast policy is consolidated.",
+      "removalCondition": "Delete or wire it when the storefront header contrast migration lands."
+    },
+    {
+      "symbol": "CustomDropdown",
+      "owner": "Shipping Settings",
+      "rationale": "Compatibility widget retained during shipping field migration.",
+      "removalCondition": "Delete after all shipping forms use the typed shared dropdown."
+    },
+    {
+      "symbol": "HeaderChatIcon",
+      "owner": "Design System",
+      "rationale": "Legacy header action retained while green headers move to the shared top bar.",
+      "removalCondition": "Delete after no legacy green-header surface remains."
+    },
+    {
+      "symbol": "OptimizedAssetImage",
+      "owner": "Media Platform",
+      "rationale": "Asset counterpart to OptimizedNetworkImage retained for the media-widget consolidation.",
+      "removalCondition": "Delete if the consolidation confirms no production asset caller."
+    }
+  ],
+  "policyExceptions": [
+    {
+      "policy": "screenUtilFontSize",
+      "maxOccurrences": 836,
+      "owner": "Design System",
+      "rationale": "Legacy Seller screens still bind fontSize to ScreenUtil. Buyer already uses fixed logical pixels; this count is an incremental ratchet and may only decrease.",
+      "removalCondition": "Remove this exception when all Seller text uses the shared fixed logical-pixel type scale."
+    }
+  ],
+  "requiredDocumentationTokens": [
+    "Flutter SDK**: 3.41.2",
+    "Dart 設定區間為 >=3.8.0 <4.0.0"
+  ],
+  "forbiddenDependencies": [
+    "palette_generator"
+  ]
+}

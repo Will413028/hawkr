@@ -1,0 +1,4 @@
+# Next/OpenNext fingerprints every build asset and appends the deployment ID.
+# Keep these immutable in the browser; a new deploy always produces a new URL.
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable

@@ -1,0 +1,132 @@
+syntax = "proto3";
+
+// 對店家的檢舉（檢舉與食安通報同一種資源，ADR 2026-10-18-seller-governance-consolidated、step10e-reports-brief R2、R7）：登入的買家送出與查自己的
+// 檢舉（SellerReportAppService），任何人都能送的匿名食安檢舉（SellerReportPublicService）。這兩個 service 不要求賣家能力：
+// 檢舉人是買家或匿名者，不是店家。後台的分案、設定結果與結案在 hawkr.admin.seller.v1alpha1 的 SellerGovernanceAdminService
+// （後台稱「通報」與「案件」，檢舉人看到的是這裡的「檢舉」與結果）。
+package hawkr.seller.v1alpha1;
+
+import "hawkr/common/v1alpha1/policy_category.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+import "google/rpc/error_details.proto";
+
+// SellerReportAppService 是登入的買家的檢舉。
+service SellerReportAppService {
+  // CreateReport 以呼叫者的買家身分檢舉一家店。店家必須是曾經公開過的店（BatchGetStores 回得到的；已關閉的也可以），否則回
+  // not_found；店家屬於呼叫者的帳號時回 invalid_argument（store_id）。同一個買家對同一家店、同一個類別，一個台北日曆日內、
+  // 還沒有結果的那一筆存在時，這次的內容補充到它（supplemented 為 true，report 是原本那一筆，notice 說明發生了什麼）；原本那一筆
+  // 已經有結果時，這次是新的檢舉。原本那一筆已有 10 則補充時回 failed_precondition。每個帳號 10 分鐘最多 5 次、1 小時最多 10 次，
+  // 超過回 resource_exhausted（帶 RetryInfo）。
+  rpc CreateReport(CreateReportRequest) returns (CreateReportResponse);
+
+  // ListMyReports 列出呼叫者的檢舉，新到舊。
+  rpc ListMyReports(ListMyReportsRequest) returns (ListMyReportsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+// SellerReportPublicService 是不需要登入的檢舉入口。
+service SellerReportPublicService {
+  // SubmitFoodSafetyReport 匿名檢舉食品安全事件，必須留下電話或 email（主管機關可能需要聯絡檢舉人），不收佐證圖片（要附圖請
+  // 登入後以 CreateReport 檢舉）。店家的規則與 CreateReport 相同；呼叫者登入而且店家屬於他的帳號時回 invalid_argument（store_id）。
+  // 同一支電話或同一個 email 對同一家店，一個台北 ISO 週內、還沒有結果的那一筆存在時，這次的內容補充到它（每筆最多 10 則，超過時
+  // 內容不存）；新的檢舉、補充與超過上限的送出回應完全相同（回應沒有內容），不會透露這支電話或 email 用過。每個來源 IP
+  // （登入的呼叫者以帳號計）10 分鐘最多 5 次、1 小時最多 10 次，被拒絕的送出不計；超過回 resource_exhausted（帶 RetryInfo）。
+  // 聯絡方式在「結果設定後 30 天、且不早於送出後 90 天」清除；還沒有結果的檢舉不清除。
+  rpc SubmitFoodSafetyReport(SubmitFoodSafetyReportRequest) returns (SubmitFoodSafetyReportResponse);
+}
+
+// ReportOutcome 是一筆檢舉的結果（step10e-reports-brief R2）。還沒有結果時是 UNSPECIFIED（與 resolve_time 不設同時成立）。
+enum ReportOutcome {
+  REPORT_OUTCOME_UNSPECIFIED = 0;
+  // 平台採取了措施（只會是案件裡的檢舉）。
+  REPORT_OUTCOME_ACTION_TAKEN = 1;
+  // 查過之後沒有違規。
+  REPORT_OUTCOME_NO_VIOLATION = 2;
+  // 內容不足，無法判斷。
+  REPORT_OUTCOME_INSUFFICIENT = 3;
+  // 與另一筆檢舉重複。
+  REPORT_OUTCOME_DUPLICATE = 4;
+  // 濫用檢舉。
+  REPORT_OUTCOME_ABUSIVE = 5;
+}
+
+// MyReport 是檢舉人看到的自己的檢舉。平台內部的分案（案件、嚴重度、處理的管理員）與轉報主管機關的紀錄不在這裡；
+// 店名與 logo 由 client 以 store_id 呼叫 SellerPublicService.BatchGetStores。
+message MyReport {
+  reserved 7;
+  reserved "status";
+
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  string store_id = 2;
+  // 空字串表示沒有提供。
+  string product_id = 3;
+  // 空字串表示沒有提供。
+  string order_no = 4;
+  // 檢舉人選的類別。
+  hawkr.common.v1alpha1.PolicyCategory category = 5;
+  string description = 6;
+  // 平台給檢舉人的結果說明；還沒有結果或結果沒有說明時是空字串。
+  string resolution_note = 8;
+  google.protobuf.Timestamp create_time = 9;
+  // 結果設定的時間；還沒有結果時不設。
+  google.protobuf.Timestamp resolve_time = 10;
+  // 結果；還沒有結果時是 UNSPECIFIED（處理中）。
+  ReportOutcome outcome = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message CreateReportRequest {
+  // 被檢舉的店家 id（店家卡片的 id，不是 store_code）。
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 檢舉的類別：政策分類中檢舉人可選的值，除了 PLATFORM_ABUSE（只給平台判定與認定）；UNSPECIFIED 與 PLATFORM_ABUSE 回 invalid_argument。
+  hawkr.common.v1alpha1.PolicyCategory category = 2 [(google.api.field_behavior) = REQUIRED];
+  // 檢舉內容，最多 2000 字。
+  string description = 3 [(google.api.field_behavior) = REQUIRED];
+  // 相關的商品 id，最多 64 字；可以不填。
+  string product_id = 4;
+  // 相關的訂單編號，最多 64 字；可以不填。
+  string order_no = 5;
+  // 佐證圖片的 staged token，最多 5 張。
+  repeated string evidence_staged_tokens = 6;
+}
+
+message CreateReportResponse {
+  // 新的檢舉；supplemented 時是原本那一筆（去重的鍵含買家，所以一定是呼叫者自己的）。
+  MyReport report = 1;
+  // 這次的內容補充到同一個台北日、同一家店、同一個類別、還沒有結果的那一筆。
+  bool supplemented = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // supplemented 時給檢舉人看的那一句（伺服器的句子：它說的是伺服器的去重規則）；沒有補充時不設。
+  google.rpc.LocalizedMessage notice = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message ListMyReportsRequest {
+  // 預設 20，上限 100。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListMyReportsResponse {
+  repeated MyReport reports = 1;
+  string next_page_token = 2;
+}
+
+message SubmitFoodSafetyReportRequest {
+  // 被檢舉的店家 id（店家卡片的 id，不是 store_code）。
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 事件的說明，最多 2000 字。
+  string description = 2 [(google.api.field_behavior) = REQUIRED];
+  // 相關的商品 id，最多 64 字；可以不填。
+  string product_id = 3;
+  // 相關的訂單編號，最多 64 字；可以不填。
+  string order_no = 4;
+  // 台灣的電話號碼；phone 與 email 至少填一個。
+  string phone = 5;
+  // phone 與 email 至少填一個，最多 254 字。
+  string email = 6;
+  // 檢舉人的稱呼，最多 100 字；可以不填。
+  string name = 7;
+}
+
+// SubmitFoodSafetyReportResponse 沒有內容：新的檢舉、補充與超過上限而沒有存下的送出回應相同。
+message SubmitFoodSafetyReportResponse {}

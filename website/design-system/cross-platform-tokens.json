@@ -1,0 +1,1917 @@
+{
+	"schemaVersion": 1,
+	"name": "Hawkr cross-platform source contract",
+	"authority": "../DESIGN.md",
+	"scope": "Existing production token declarations, default light theme and nominal text scale only. Not generated runtime tokens, computed browser CSS, or proof that every screen consumes these tokens.",
+	"units": {
+		"dimension": "Nominal CSS px at root font-size 16, compared with Flutter logical px / unscaled sp. Accessibility scaling and viewport layout remain platform responsibilities.",
+		"color": "Lowercase CSS #rrggbb for opaque colors. Dart colors must be fully opaque; alpha is never discarded.",
+		"duration": "milliseconds"
+	},
+	"sources": {
+		"web.colors": {
+			"platform": "web",
+			"path": "styles/foundation/00-color-config.css",
+			"format": "css"
+		},
+		"web.foundation": {
+			"platform": "web",
+			"path": "styles/foundation/01-tokens-theme.css",
+			"format": "css"
+		},
+		"web.ui": {
+			"platform": "web",
+			"path": "styles/components/ui-kit.css",
+			"format": "css"
+		},
+		"buyer.colors": {
+			"platform": "buyer",
+			"path": "buyer-app/lib/core/theme/app_colors.dart",
+			"format": "dart"
+		},
+		"buyer.foundation": {
+			"platform": "buyer",
+			"path": "buyer-app/lib/core/theme/hk_tokens.dart",
+			"format": "dart"
+		},
+		"buyer.typography": {
+			"platform": "buyer",
+			"path": "buyer-app/lib/core/theme/app_typography.dart",
+			"format": "dart"
+		},
+		"seller.colors": {
+			"platform": "seller",
+			"path": "seller-app/lib/core/theme/app_colors.dart",
+			"format": "dart"
+		},
+		"seller.foundation": {
+			"platform": "seller",
+			"path": "seller-app/lib/core/theme/hk_tokens.dart",
+			"format": "dart"
+		},
+		"seller.typography": {
+			"platform": "seller",
+			"path": "seller-app/lib/core/theme/app_typography.dart",
+			"format": "dart"
+		}
+	},
+	"tokens": [
+		{
+			"id": "brand.primary",
+			"type": "color",
+			"value": "#e4572e",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-brand-primary"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.brandPrimary"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.brandPrimary"
+				}
+			]
+		},
+		{
+			"id": "brand.primaryStrong",
+			"type": "color",
+			"value": "#b8441f",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-brand-primary-strong"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.brandPrimaryStrong"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.brandPrimaryStrong"
+				}
+			]
+		},
+		{
+			"id": "brand.primaryDeep",
+			"type": "color",
+			"value": "#8f3315",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-brand-primary-deep"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.brandPrimaryDeep"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.brandPrimaryDeep"
+				}
+			]
+		},
+		{
+			"id": "brand.secondary",
+			"type": "color",
+			"value": "#f2a541",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-brand-secondary"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.brandSecondary"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.brandSecondary"
+				}
+			]
+		},
+		{
+			"id": "brand.ink",
+			"type": "color",
+			"value": "#1f2933",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-brand-ink"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.brandInk"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.brandInk"
+				}
+			]
+		},
+		{
+			"id": "brand.inkOnDark",
+			"type": "color",
+			"value": "#f5f7fa",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-brand-ink-on-dark"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.brandInkOnDark"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.brandInkOnDark"
+				}
+			]
+		},
+		{
+			"id": "brand.primarySoft",
+			"type": "color",
+			"value": "#fcebe6",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-brand-primary-soft"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.brandPrimarySoft"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.brandPrimarySoft"
+				}
+			]
+		},
+		{
+			"id": "brand.secondarySoft",
+			"type": "color",
+			"value": "#fdf1e1",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-brand-secondary-soft"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.brandSecondarySoft"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.brandSecondarySoft"
+				}
+			]
+		},
+		{
+			"id": "ink.50",
+			"type": "color",
+			"value": "#f5f7fa",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-ink-50"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.ink50"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.ink50"
+				}
+			]
+		},
+		{
+			"id": "ink.100",
+			"type": "color",
+			"value": "#e4e7eb",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-ink-100"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.ink100"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.ink100"
+				}
+			]
+		},
+		{
+			"id": "ink.200",
+			"type": "color",
+			"value": "#cbd2d9",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-ink-200"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.ink200"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.ink200"
+				}
+			]
+		},
+		{
+			"id": "ink.300",
+			"type": "color",
+			"value": "#9aa5b1",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-ink-300"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.ink300"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.ink300"
+				}
+			]
+		},
+		{
+			"id": "ink.400",
+			"type": "color",
+			"value": "#7b8794",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-ink-400"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.ink400"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.ink400"
+				}
+			]
+		},
+		{
+			"id": "ink.500",
+			"type": "color",
+			"value": "#616e7c",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-ink-500"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.ink500"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.ink500"
+				}
+			]
+		},
+		{
+			"id": "ink.600",
+			"type": "color",
+			"value": "#52606d",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-ink-600"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.ink600"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.ink600"
+				}
+			]
+		},
+		{
+			"id": "ink.700",
+			"type": "color",
+			"value": "#3e4c59",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-ink-700"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.ink700"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.ink700"
+				}
+			]
+		},
+		{
+			"id": "ink.800",
+			"type": "color",
+			"value": "#323f4b",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-ink-800"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.ink800"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.ink800"
+				}
+			]
+		},
+		{
+			"id": "ink.850",
+			"type": "color",
+			"value": "#28333f",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-ink-850"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.ink850"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.ink850"
+				}
+			]
+		},
+		{
+			"id": "ink.900",
+			"type": "color",
+			"value": "#1f2933",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-ink-900"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.ink900"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.ink900"
+				}
+			]
+		},
+		{
+			"id": "ink.950",
+			"type": "color",
+			"value": "#161c23",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-ink-950"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.ink950"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.ink950"
+				}
+			]
+		},
+		{
+			"id": "neutral.white",
+			"type": "color",
+			"value": "#ffffff",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-neutral-white"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.neutralWhite"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.neutralWhite"
+				}
+			]
+		},
+		{
+			"id": "neutral.cream",
+			"type": "color",
+			"value": "#fffdf7",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-neutral-cream"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.neutralCream"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.neutralCream"
+				}
+			]
+		},
+		{
+			"id": "neutral.page",
+			"type": "color",
+			"value": "#f8f6ef",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-neutral-page"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.neutralPage"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.neutralPage"
+				}
+			]
+		},
+		{
+			"id": "neutral.muted",
+			"type": "color",
+			"value": "#f5f1e8",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-neutral-muted"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.neutralMuted"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.neutralMuted"
+				}
+			]
+		},
+		{
+			"id": "neutral.panel",
+			"type": "color",
+			"value": "#f2e9d6",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-neutral-panel"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.neutralPanel"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.neutralPanel"
+				}
+			]
+		},
+		{
+			"id": "neutral.whisper",
+			"type": "color",
+			"value": "#f0f1ea",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-neutral-whisper"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.neutralWhisper"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.neutralWhisper"
+				}
+			]
+		},
+		{
+			"id": "neutral.ink",
+			"type": "color",
+			"value": "#191c18",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-neutral-ink"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.neutralInk"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.neutralInk"
+				}
+			]
+		},
+		{
+			"id": "neutral.body",
+			"type": "color",
+			"value": "#42493f",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-neutral-body"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.neutralBody"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.neutralBody"
+				}
+			]
+		},
+		{
+			"id": "neutral.muted-text",
+			"type": "color",
+			"value": "#5a6154",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-neutral-muted-text"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.neutralMutedText"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.neutralMutedText"
+				}
+			]
+		},
+		{
+			"id": "neutral.500",
+			"type": "color",
+			"value": "#888888",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-neutral-500"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.neutral500"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.neutral500"
+				}
+			]
+		},
+		{
+			"id": "neutral.300",
+			"type": "color",
+			"value": "#c8c8c8",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-neutral-300"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.neutral300"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.neutral300"
+				}
+			]
+		},
+		{
+			"id": "neutral.black",
+			"type": "color",
+			"value": "#000000",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-neutral-black"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.neutralBlack"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.neutralBlack"
+				}
+			]
+		},
+		{
+			"id": "light.surface.page",
+			"type": "color",
+			"value": "#f8f6ef",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--theme-surface-page"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.surfacePage"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.surfacePage"
+				}
+			]
+		},
+		{
+			"id": "light.surface.card",
+			"type": "color",
+			"value": "#fffdf7",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--theme-surface-card"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.bgCard"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.bgCard"
+				}
+			]
+		},
+		{
+			"id": "light.surface.muted",
+			"type": "color",
+			"value": "#f5f1e8",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--theme-surface-muted"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.surfaceMuted"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.surfaceMuted"
+				}
+			]
+		},
+		{
+			"id": "light.surface.panel",
+			"type": "color",
+			"value": "#f2e9d6",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--theme-surface-panel"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.surfacePanel"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.surfacePanel"
+				}
+			]
+		},
+		{
+			"id": "light.surface.elevated",
+			"type": "color",
+			"value": "#ffffff",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--theme-surface-elevated"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.bgElevated"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.bgElevated"
+				}
+			]
+		},
+		{
+			"id": "light.text.heading",
+			"type": "color",
+			"value": "#191c18",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--theme-text-heading"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.textEmphasis"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.textEmphasis"
+				}
+			]
+		},
+		{
+			"id": "light.text.body",
+			"type": "color",
+			"value": "#42493f",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--theme-text-body"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.textPrimary"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.textPrimary"
+				}
+			]
+		},
+		{
+			"id": "light.text.muted",
+			"type": "color",
+			"value": "#5a6154",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--theme-text-muted"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.textMuted"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.textMuted"
+				}
+			]
+		},
+		{
+			"id": "light.text.inverse",
+			"type": "color",
+			"value": "#fffdf7",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--theme-text-inverse"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.textInverse"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.textInverse"
+				}
+			]
+		},
+		{
+			"id": "light.text.accentOnTint",
+			"type": "color",
+			"value": "#8f3315",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--theme-text-accent-on-tint"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.textAccentOnTint"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.textAccentOnTint"
+				}
+			]
+		},
+		{
+			"id": "light.action.primary",
+			"type": "color",
+			"value": "#b8441f",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--theme-action-primary"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.actionPrimary"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.actionPrimary"
+				}
+			]
+		},
+		{
+			"id": "light.action.primaryHover",
+			"type": "color",
+			"value": "#8f3315",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--theme-action-primary-hover"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.primaryDark"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.primaryDark"
+				}
+			]
+		},
+		{
+			"id": "light.action.secondary",
+			"type": "color",
+			"value": "#b8441f",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--theme-action-secondary"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.secondary"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.secondary"
+				}
+			]
+		},
+		{
+			"id": "light.border.input",
+			"type": "color",
+			"value": "#ded8cb",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--theme-border-input"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.borderInput"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.borderInput"
+				}
+			]
+		},
+		{
+			"id": "status.success",
+			"type": "color",
+			"value": "#2d7f50",
+			"bindings": [
+				{
+					"source": "web.ui",
+					"key": "--hkui-success"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.success"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.success"
+				}
+			]
+		},
+		{
+			"id": "status.warning",
+			"type": "color",
+			"value": "#e0c44c",
+			"bindings": [
+				{
+					"source": "web.ui",
+					"key": "--hkui-warning"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.warning"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.warning"
+				}
+			]
+		},
+		{
+			"id": "status.danger",
+			"type": "color",
+			"value": "#ea6021",
+			"bindings": [
+				{
+					"source": "web.ui",
+					"key": "--hkui-danger"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.danger"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.danger"
+				}
+			]
+		},
+		{
+			"id": "status.info",
+			"type": "color",
+			"value": "#6194d0",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-status-info"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.infoMid"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.infoMid"
+				}
+			]
+		},
+		{
+			"id": "status.infoStrong",
+			"type": "color",
+			"value": "#1e5fab",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-status-info-strong"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.info"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.info"
+				}
+			]
+		},
+		{
+			"id": "status.infoSoft",
+			"type": "color",
+			"value": "#9fccdd",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-status-info-soft"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.infoLight"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.infoLight"
+				}
+			]
+		},
+		{
+			"id": "space.1",
+			"type": "dimension",
+			"value": 4,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--space-1"
+				},
+				{
+					"source": "web.ui",
+					"key": "--hkui-space-1"
+				},
+				{
+					"source": "buyer.foundation",
+					"key": "HkSpace.xs"
+				},
+				{
+					"source": "seller.foundation",
+					"key": "HkSpace.xs"
+				}
+			]
+		},
+		{
+			"id": "space.2",
+			"type": "dimension",
+			"value": 8,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--space-2"
+				},
+				{
+					"source": "web.ui",
+					"key": "--hkui-space-2"
+				},
+				{
+					"source": "buyer.foundation",
+					"key": "HkSpace.sm"
+				},
+				{
+					"source": "seller.foundation",
+					"key": "HkSpace.sm"
+				}
+			]
+		},
+		{
+			"id": "space.3",
+			"type": "dimension",
+			"value": 12,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--space-3"
+				},
+				{
+					"source": "web.ui",
+					"key": "--hkui-space-3"
+				},
+				{
+					"source": "buyer.foundation",
+					"key": "HkSpace.md"
+				},
+				{
+					"source": "seller.foundation",
+					"key": "HkSpace.md"
+				}
+			]
+		},
+		{
+			"id": "space.4",
+			"type": "dimension",
+			"value": 16,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--space-4"
+				},
+				{
+					"source": "web.ui",
+					"key": "--hkui-space-4"
+				},
+				{
+					"source": "buyer.foundation",
+					"key": "HkSpace.lg"
+				},
+				{
+					"source": "seller.foundation",
+					"key": "HkSpace.lg"
+				}
+			]
+		},
+		{
+			"id": "space.5",
+			"type": "dimension",
+			"value": 20,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--space-5"
+				},
+				{
+					"source": "web.ui",
+					"key": "--hkui-space-5"
+				},
+				{
+					"source": "buyer.foundation",
+					"key": "HkSpace.xl"
+				},
+				{
+					"source": "seller.foundation",
+					"key": "HkSpace.xl"
+				}
+			]
+		},
+		{
+			"id": "space.6",
+			"type": "dimension",
+			"value": 24,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--space-6"
+				},
+				{
+					"source": "web.ui",
+					"key": "--hkui-space-6"
+				},
+				{
+					"source": "buyer.foundation",
+					"key": "HkSpace.xxl"
+				},
+				{
+					"source": "seller.foundation",
+					"key": "HkSpace.xxl"
+				}
+			]
+		},
+		{
+			"id": "space.8",
+			"type": "dimension",
+			"value": 32,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--space-8"
+				},
+				{
+					"source": "web.ui",
+					"key": "--hkui-space-8"
+				},
+				{
+					"source": "buyer.foundation",
+					"key": "HkSpace.section"
+				},
+				{
+					"source": "seller.foundation",
+					"key": "HkSpace.section"
+				}
+			]
+		},
+		{
+			"id": "space.10",
+			"type": "dimension",
+			"value": 40,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--space-10"
+				},
+				{
+					"source": "web.ui",
+					"key": "--hkui-space-10"
+				},
+				{
+					"source": "buyer.foundation",
+					"key": "HkSpace.large"
+				},
+				{
+					"source": "seller.foundation",
+					"key": "HkSpace.large"
+				}
+			]
+		},
+		{
+			"id": "space.12",
+			"type": "dimension",
+			"value": 48,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--space-12"
+				},
+				{
+					"source": "web.ui",
+					"key": "--hkui-space-12"
+				},
+				{
+					"source": "buyer.foundation",
+					"key": "HkSpace.control"
+				},
+				{
+					"source": "seller.foundation",
+					"key": "HkSpace.control"
+				}
+			]
+		},
+		{
+			"id": "space.16",
+			"type": "dimension",
+			"value": 64,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--space-16"
+				},
+				{
+					"source": "web.ui",
+					"key": "--hkui-space-16"
+				},
+				{
+					"source": "buyer.foundation",
+					"key": "HkSpace.sectionLarge"
+				},
+				{
+					"source": "seller.foundation",
+					"key": "HkSpace.sectionLarge"
+				}
+			]
+		},
+		{
+			"id": "radius.foundation.xs",
+			"type": "dimension",
+			"value": 6,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--radius-xs"
+				},
+				{
+					"source": "buyer.foundation",
+					"key": "HkRadius.xs"
+				},
+				{
+					"source": "seller.foundation",
+					"key": "HkRadius.xs"
+				}
+			]
+		},
+		{
+			"id": "radius.foundation.sm",
+			"type": "dimension",
+			"value": 8,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--radius-sm"
+				},
+				{
+					"source": "buyer.foundation",
+					"key": "HkRadius.sm"
+				},
+				{
+					"source": "seller.foundation",
+					"key": "HkRadius.sm"
+				}
+			]
+		},
+		{
+			"id": "radius.foundation.md",
+			"type": "dimension",
+			"value": 12,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--radius-md"
+				},
+				{
+					"source": "buyer.foundation",
+					"key": "HkRadius.md"
+				},
+				{
+					"source": "seller.foundation",
+					"key": "HkRadius.md"
+				}
+			]
+		},
+		{
+			"id": "radius.foundation.lg",
+			"type": "dimension",
+			"value": 16,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--radius-lg"
+				},
+				{
+					"source": "buyer.foundation",
+					"key": "HkRadius.lg"
+				},
+				{
+					"source": "seller.foundation",
+					"key": "HkRadius.lg"
+				}
+			]
+		},
+		{
+			"id": "radius.foundation.xl",
+			"type": "dimension",
+			"value": 24,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--radius-xl"
+				},
+				{
+					"source": "buyer.foundation",
+					"key": "HkRadius.xl"
+				},
+				{
+					"source": "seller.foundation",
+					"key": "HkRadius.xl"
+				}
+			]
+		},
+		{
+			"id": "radius.foundation.2xl",
+			"type": "dimension",
+			"value": 32,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--radius-2xl"
+				},
+				{
+					"source": "buyer.foundation",
+					"key": "HkRadius.xxl"
+				},
+				{
+					"source": "seller.foundation",
+					"key": "HkRadius.xxl"
+				}
+			]
+		},
+		{
+			"id": "radius.foundation.pill",
+			"type": "dimension",
+			"value": 999,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--radius-pill"
+				},
+				{
+					"source": "buyer.foundation",
+					"key": "HkRadius.pill"
+				},
+				{
+					"source": "seller.foundation",
+					"key": "HkRadius.pill"
+				}
+			]
+		},
+		{
+			"id": "type.size.xs",
+			"type": "dimension",
+			"value": 12,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--text-xs"
+				},
+				{
+					"source": "web.ui",
+					"key": "--hkui-text-tiny"
+				},
+				{
+					"source": "buyer.typography",
+					"key": "AppTypography.caption",
+					"property": "fontSize"
+				},
+				{
+					"source": "seller.typography",
+					"key": "AppTypography.caption",
+					"property": "fontSize"
+				}
+			]
+		},
+		{
+			"id": "type.size.sm",
+			"type": "dimension",
+			"value": 14,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--text-sm"
+				},
+				{
+					"source": "web.ui",
+					"key": "--hkui-text-small"
+				},
+				{
+					"source": "buyer.typography",
+					"key": "AppTypography.meta",
+					"property": "fontSize"
+				},
+				{
+					"source": "seller.typography",
+					"key": "AppTypography.meta",
+					"property": "fontSize"
+				}
+			]
+		},
+		{
+			"id": "type.size.base",
+			"type": "dimension",
+			"value": 16,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--text-base"
+				},
+				{
+					"source": "web.ui",
+					"key": "--hkui-text-medium"
+				},
+				{
+					"source": "buyer.typography",
+					"key": "AppTypography.body",
+					"property": "fontSize"
+				},
+				{
+					"source": "seller.typography",
+					"key": "AppTypography.body",
+					"property": "fontSize"
+				}
+			]
+		},
+		{
+			"id": "type.size.lg",
+			"type": "dimension",
+			"value": 18,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--text-lg"
+				},
+				{
+					"source": "web.ui",
+					"key": "--hkui-text-large"
+				},
+				{
+					"source": "buyer.typography",
+					"key": "AppTypography.priceTotal",
+					"property": "fontSize"
+				},
+				{
+					"source": "seller.typography",
+					"key": "AppTypography.priceTotal",
+					"property": "fontSize"
+				}
+			]
+		},
+		{
+			"id": "type.size.xl",
+			"type": "dimension",
+			"value": 20,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--text-xl"
+				},
+				{
+					"source": "buyer.typography",
+					"key": "AppTypography.h1",
+					"property": "fontSize"
+				},
+				{
+					"source": "seller.typography",
+					"key": "AppTypography.h1",
+					"property": "fontSize"
+				}
+			]
+		},
+		{
+			"id": "type.size.2xl",
+			"type": "dimension",
+			"value": 24,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--text-2xl"
+				},
+				{
+					"source": "buyer.typography",
+					"key": "AppTypography.display",
+					"property": "fontSize"
+				},
+				{
+					"source": "seller.typography",
+					"key": "AppTypography.display",
+					"property": "fontSize"
+				}
+			]
+		},
+		{
+			"id": "type.weight.body",
+			"type": "number",
+			"value": 400,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--weight-regular"
+				},
+				{
+					"source": "web.ui",
+					"key": "--hkui-weight-regular"
+				},
+				{
+					"source": "buyer.typography",
+					"key": "AppTypography.body",
+					"property": "fontWeight"
+				},
+				{
+					"source": "seller.typography",
+					"key": "AppTypography.body",
+					"property": "fontWeight"
+				}
+			]
+		},
+		{
+			"id": "type.weight.emphasis",
+			"type": "number",
+			"value": 700,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--weight-bold"
+				},
+				{
+					"source": "web.ui",
+					"key": "--hkui-weight-bold"
+				},
+				{
+					"source": "buyer.typography",
+					"key": "AppTypography.productName",
+					"property": "fontWeight"
+				},
+				{
+					"source": "seller.typography",
+					"key": "AppTypography.productName",
+					"property": "fontWeight"
+				}
+			]
+		},
+		{
+			"id": "type.lineHeight.body",
+			"type": "number",
+			"value": 1.5,
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--leading-normal"
+				},
+				{
+					"source": "buyer.typography",
+					"key": "AppTypography.body",
+					"property": "height"
+				},
+				{
+					"source": "seller.typography",
+					"key": "AppTypography.body",
+					"property": "height"
+				}
+			]
+		},
+		{
+			"id": "motion.standard",
+			"type": "cubicBezier",
+			"value": [
+				0.22,
+				1,
+				0.36,
+				1
+			],
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--ease-standard"
+				},
+				{
+					"source": "web.ui",
+					"key": "--hkui-ease"
+				},
+				{
+					"source": "buyer.foundation",
+					"key": "HkMotion.ease"
+				},
+				{
+					"source": "seller.foundation",
+					"key": "HkMotion.ease"
+				}
+			]
+		},
+		{
+			"id": "motion.emphasized",
+			"type": "cubicBezier",
+			"value": [
+				0.16,
+				1,
+				0.3,
+				1
+			],
+			"bindings": [
+				{
+					"source": "web.foundation",
+					"key": "--ease-emphasized"
+				},
+				{
+					"source": "buyer.foundation",
+					"key": "HkMotion.emphasized"
+				},
+				{
+					"source": "seller.foundation",
+					"key": "HkMotion.emphasized"
+				}
+			]
+		},
+		{
+			"id": "motion.uiDuration",
+			"type": "duration",
+			"value": 200,
+			"bindings": [
+				{
+					"source": "web.ui",
+					"key": "--hkui-dur-base"
+				},
+				{
+					"source": "buyer.foundation",
+					"key": "HkMotion.duration"
+				},
+				{
+					"source": "seller.foundation",
+					"key": "HkMotion.duration"
+				}
+			]
+		}
+	],
+	"exceptions": [
+		{
+			"id": "type.sectionTitle",
+			"type": "dimension",
+			"classification": "unresolved-drift",
+			"reason": "Buyer and seller use different section heading size under the same role.",
+			"bindings": [
+				{
+					"source": "buyer.typography",
+					"key": "AppTypography.sectionTitle",
+					"property": "fontSize",
+					"value": 18
+				},
+				{
+					"source": "seller.typography",
+					"key": "AppTypography.sectionTitle",
+					"property": "fontSize",
+					"value": 16
+				}
+			],
+			"migration": "Compare dense seller forms and buyer sections at compact widths and large text before choosing a shared role or explicit density variant."
+		},
+		{
+			"id": "type.appFamily",
+			"type": "string",
+			"classification": "platform-policy",
+			"reason": "Buyer uses platform font inheritance; seller requests Roboto. Web body uses Roboto Latin plus system CJK, and brand headings use jf-openhuninn.",
+			"bindings": [
+				{
+					"source": "buyer.typography",
+					"key": "AppTypography.family",
+					"value": "null"
+				},
+				{
+					"source": "seller.typography",
+					"key": "AppTypography.family",
+					"value": "Roboto"
+				}
+			],
+			"migration": "Preserve native CJK readability. Check actual glyph fallback and bundled fonts before changing font-family; shared size does not prove identical rendering."
+		},
+		{
+			"id": "text.secondaryAlias",
+			"type": "color",
+			"classification": "accessibility-policy",
+			"reason": "Seller source intentionally uses body ink for secondary text to preserve contrast; buyer uses muted ink. Both expose matching textMuted for the muted role.",
+			"bindings": [
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.textSecondary",
+					"value": "#5a6154"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.textSecondary",
+					"value": "#42493f"
+				}
+			],
+			"migration": "Use explicit textPrimary/textMuted roles in new components. Review contrast and text size before changing the legacy textSecondary alias."
+		},
+		{
+			"id": "social.favoriteActive",
+			"type": "color",
+			"classification": "unresolved-drift",
+			"reason": "Web and apps distinguish likes from danger but use different reds.",
+			"bindings": [
+				{
+					"source": "web.colors",
+					"key": "--color-like-heart",
+					"value": "#ff0000"
+				},
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.favoriteActive",
+					"value": "#ff3b4f"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.favoriteActive",
+					"value": "#ff3b4f"
+				}
+			],
+			"migration": "Compare filled-heart stories in light and dark before selecting one social accent; do not replace it with danger orange."
+		},
+		{
+			"id": "radius.componentCard",
+			"type": "dimension",
+			"classification": "component-layer-drift",
+			"reason": "Web shared Card defaults to UI radius-lg=14; both Flutter Material CardTheme definitions use HkRadius.lg=16. Buyer ProductCard separately uses md=12 at compact widths.",
+			"bindings": [
+				{
+					"source": "web.ui",
+					"key": "--hkui-radius-lg",
+					"value": 14
+				},
+				{
+					"source": "buyer.foundation",
+					"key": "HkRadius.lg",
+					"value": 16
+				},
+				{
+					"source": "seller.foundation",
+					"key": "HkRadius.lg",
+					"value": 16
+				}
+			],
+			"migration": "Compare Web Card, Flutter Material Card, and commerce ProductCard separately. Converge matching roles rather than renaming existing foundation radius values."
+		},
+		{
+			"id": "radius.componentDialog",
+			"type": "dimension",
+			"classification": "component-layer-drift",
+			"reason": "Web Dialog uses UI radius-2xl; app dialog radius alias resolves to foundation xl.",
+			"bindings": [
+				{
+					"source": "web.ui",
+					"key": "--hkui-radius-2xl",
+					"value": 28
+				},
+				{
+					"source": "buyer.foundation",
+					"key": "HkRadius.dialog",
+					"value": 24
+				},
+				{
+					"source": "seller.foundation",
+					"key": "HkRadius.dialog",
+					"value": 24
+				}
+			],
+			"migration": "Compare modal and sheet geometry, then update existing production primitives together; do not create another radius scale."
+		},
+		{
+			"id": "temperatureTag.ambient",
+			"type": "color",
+			"classification": "requested-web-legacy-parity",
+			"reason": "This release explicitly aligns both Apps with the current production Web TemperatureTag. These legacy shades are a tracked component exception, not canonical semantic colors; chilled and frozen small text have a known contrast limitation on light surfaces.",
+			"bindings": [
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.temperatureAmbient",
+					"value": "#6b6b6b"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.temperatureAmbient",
+					"value": "#6b6b6b"
+				}
+			],
+			"migration": "Revisit the Web and both App components together when the temperature semantic roles and contrast treatment are redesigned. Keep the explicit labels, text scaling, and separate accessible selection targets; do not propagate these shades into unrelated components."
+		},
+		{
+			"id": "temperatureTag.chilled",
+			"type": "color",
+			"classification": "requested-web-legacy-parity",
+			"reason": "This release explicitly aligns both Apps with the current production Web TemperatureTag. These legacy shades are a tracked component exception, not canonical semantic colors; chilled and frozen small text have a known contrast limitation on light surfaces.",
+			"bindings": [
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.temperatureChilled",
+					"value": "#ee964b"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.temperatureChilled",
+					"value": "#ee964b"
+				}
+			],
+			"migration": "Revisit the Web and both App components together when the temperature semantic roles and contrast treatment are redesigned. Keep the explicit labels, text scaling, and separate accessible selection targets; do not propagate these shades into unrelated components."
+		},
+		{
+			"id": "temperatureTag.frozen",
+			"type": "color",
+			"classification": "requested-web-legacy-parity",
+			"reason": "This release explicitly aligns both Apps with the current production Web TemperatureTag. These legacy shades are a tracked component exception, not canonical semantic colors; chilled and frozen small text have a known contrast limitation on light surfaces.",
+			"bindings": [
+				{
+					"source": "buyer.colors",
+					"key": "AppColors.temperatureFrozen",
+					"value": "#51a2ff"
+				},
+				{
+					"source": "seller.colors",
+					"key": "AppColors.temperatureFrozen",
+					"value": "#51a2ff"
+				}
+			],
+			"migration": "Revisit the Web and both App components together when the temperature semantic roles and contrast treatment are redesigned. Keep the explicit labels, text scaling, and separate accessible selection targets; do not propagate these shades into unrelated components."
+		}
+	],
+	"unmappedPolicies": [
+		{
+			"id": "dark-theme",
+			"reason": "Web has theme-aware semantics; app constant AppColors has no matching theme-indexed source. Light equality must not be claimed as dark parity.",
+			"sources": [
+				"styles/foundation/00-color-config.css",
+				"styles/foundation/01-tokens-theme.css",
+				"buyer-app/lib/core/theme/app_colors.dart",
+				"seller-app/lib/core/theme/app_colors.dart"
+			]
+		},
+		{
+			"id": "touch-targets",
+			"reason": "App HkControl.minTap=48. Web Button source md uses h-11=44 and lg uses h-12=48; UI token --hkui-control-h-md remains 40. Nominal token checks do not measure real hit regions.",
+			"sources": [
+				"components/ui/Button.tsx",
+				"styles/components/ui-kit.css",
+				"buyer-app/lib/core/theme/hk_tokens.dart",
+				"seller-app/lib/core/theme/hk_tokens.dart"
+			]
+		},
+		{
+			"id": "shadow-rendering",
+			"reason": "App HkShadows follows foundation numeric design, but Flutter blurRadius and CSS blur are different rendering APIs. Web Card uses a separate UI shadow ladder. Use rendered comparison before claiming visual equivalence.",
+			"sources": [
+				"styles/components/ui-kit.css",
+				"styles/foundation/01-tokens-theme.css",
+				"buyer-app/lib/core/theme/hk_tokens.dart",
+				"seller-app/lib/core/theme/hk_tokens.dart"
+			]
+		}
+	]
+}

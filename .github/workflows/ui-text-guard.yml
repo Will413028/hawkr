@@ -1,0 +1,62 @@
+name: ui-text guard
+
+# 守門：同一個 proto enum 的「值到文字」對照表在兩個以上 client 各寫一份就失敗（scripts/check-enum-text-cross.sh）。
+# 各 client 自己的規則 E（目錄裡與伺服器擁有的 enum 成員確定成立的分支或資料裡不得產生使用者面文字）在各 client 的 lint 與 CI step：
+#   website／admin 的 lint 末端 `pnpm --filter @hawkr/ui-text check-enum-text`、
+#   兩支 App 的 `_flutter-quality.yml` enum_text step。
+# 工具：packages/hawkr-ui-text-ts/tools/check-enum-text.ts（TS AST）、packages/hawkr_ui_text/tool/check_enum_text.dart（Dart AST），
+# 名稱比對靠 ui-text 生成的 enum manifest（設計 backend/docs/plans/2026-09-29-a3-buyer-seller/enum-text-guard-design.md §1；L′ §5.2）。
+
+on:
+  pull_request:
+    paths: &guard_paths
+      - 'website/**'
+      - 'admin/**'
+      - 'seller-app/lib/**'
+      - 'buyer-app/lib/**'
+      - 'packages/hawkr-api-ts/src/**'
+      - 'packages/hawkr_api/lib/**'
+      - 'packages/hawkr_auth/lib/**'
+      - 'packages/hawkr_app_update/lib/**'
+      - 'packages/hawkr-ui-text-ts/**'
+      - 'packages/hawkr_ui_text/**'
+      - 'scripts/check-enum-text-cross.sh'
+      # 根目錄的 pnpm workspace（TS 工具的依賴與 lockfile）。
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
+      - '.nvmrc'
+      - '.github/actions/pnpm-install/**'
+      - '.github/workflows/ui-text-guard.yml'
+  push:
+    branches: [main]
+    paths: *guard_paths
+  workflow_dispatch:
+
+concurrency:
+  group: ui-text-guard-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  cross-client:
+    name: 跨端：enum 文字表
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/pnpm-install
+
+      - name: 讀取 Flutter 的版本
+        id: versions
+        run: echo "flutter=$(jq -r .flutter packages/hawkr_ui_text/.fvmrc)" >> "$GITHUB_OUTPUT"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ steps.versions.outputs.flutter }}
+          channel: stable
+          cache: true
+
+      - name: 跨端檢查
+        run: bash scripts/check-enum-text-cross.sh

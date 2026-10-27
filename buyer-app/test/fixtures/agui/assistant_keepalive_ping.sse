@@ -1,0 +1,12 @@
+data: {"type":"RUN_STARTED","threadId":"","runId":"0c1ad480a185e9acf03baa8a03e30f65"}
+
+: ping
+
+data: {"type":"TEXT_MESSAGE_START","messageId":"0c1ad480a185e9acf03baa8a03e30f65","role":"assistant"}
+
+data: {"type":"TEXT_MESSAGE_CONTENT","messageId":"0c1ad480a185e9acf03baa8a03e30f65","delta":"哈"}
+
+: ping
+
+data: {"type":"RUN_FINISHED","threadId":"","runId":"0c1ad480a185e9acf03baa8a03e30f65","result":{"sessionId":"11c3bef0-492b-4ff1-87a1-a67e70c3825d"}}
+

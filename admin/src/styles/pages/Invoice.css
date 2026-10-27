@@ -1,0 +1,901 @@
+/*
+ * ADM 發票模組（A01–A13）的頁面樣式。
+ *
+ * ⚠️ 只准用既有 `--admin-*` token，不得出現新 hex —— `tests/admin-color-ratchet.test.ts`
+ * 掃 `src/styles/**`，新色值直接擋住整個 PR。需求書 §3 那三個 Error／Information／
+ * Warning 色碼是 **WEB** 的品牌色，抄進來不只轉紅（本檔的第一版就是被那三個字面值
+ * 擋下的），語意也是錯的：ADM 的 `--admin-delegated-secondary` 綁「代行營運」，拿它當
+ * warning 會讓管理員把「發票待審」讀成「這個賣家正在被代行操作」。warning 一律
+ * `--admin-warning*`、error 一律 `--admin-danger*`、info 一律 `--admin-info*`。
+ *
+ * ⚠️ 卡面一律 `var(--admin-paper)`。ADM 的 `cream`（`--admin-cream`）是**頁底色**，
+ * 拿它當卡面的結果是卡片消失在背景裡，而顏色合法、測試全綠。
+ */
+
+/* ---------- A01 KPI 口徑 ---------- */
+
+/*
+ * 8 張卡的口徑說明。ADM 沒有 tooltip primitive，所以口徑不掛在卡片上，而是整批
+ * 列在卡片列下方——沒有口徑的儀表板數字會讓兩個人看同一個畫面得到不同結論。
+ */
+.invoice-kpi-definitions {
+	margin: 0 0 24px;
+	padding: 16px 20px;
+	background: var(--admin-paper);
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-card);
+	color: var(--admin-muted-aa);
+	font-size: 13px;
+	line-height: 1.7;
+}
+
+.invoice-kpi-definitions dt {
+	font-weight: 700;
+	color: var(--admin-body);
+}
+
+.invoice-kpi-definitions dd {
+	margin: 0 0 8px;
+}
+
+.invoice-kpi-definitions dd:last-child {
+	margin-bottom: 0;
+}
+
+/* ---------- 頁尾次要入口 ---------- */
+
+/*
+ * A12 / A11 的次要入口。放頁尾不放 `.header-actions` 是規格的一部分：
+ * 58 §6.1.14 的固定警示是「請勿以手動開票取代系統工作」，放頁首等於把它
+ * 推薦成常規動作。
+ */
+.adm-page-footer-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	margin-top: 24px;
+	padding-top: 20px;
+	border-top: 1px solid var(--admin-border);
+}
+
+.adm-page-footer-note {
+	flex-basis: 100%;
+	margin: 0;
+	color: var(--admin-muted-aa);
+	font-size: 13px;
+}
+
+/* ---------- 期限分級（整列底色）---------- */
+
+/*
+ * ⚠️ 底色分級**必須配文字**（「剩 3 天」／「已逾期 2 天」）：只靠顏色的狀態
+ * 在色覺障礙與黑白列印下等於沒有標記。文字在 tsx 的期限欄裡。
+ */
+.invoice-row--warning td {
+	background: var(--admin-warning-soft);
+}
+
+.invoice-row--danger td {
+	background: var(--admin-danger-soft);
+}
+
+.invoice-deadline--warning {
+	color: var(--admin-warning);
+	font-weight: 700;
+}
+
+.invoice-deadline--danger {
+	color: var(--admin-danger);
+	font-weight: 700;
+}
+
+/* ---------- 表格內的雜項 ---------- */
+
+.invoice-risk-flags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.invoice-table-actions {
+	display: flex;
+	gap: 8px;
+	white-space: nowrap;
+}
+
+.invoice-filter-bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 24px;
+}
+
+.invoice-filter-bar .filter-search {
+	min-width: 240px;
+	padding: 10px 16px;
+	background: var(--admin-paper);
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-control);
+}
+
+.invoice-kpi-unavailable {
+	color: var(--admin-muted-aa);
+	font-size: 20px;
+}
+
+/* ---------- 分頁 ---------- */
+
+.invoice-pagination {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	gap: 16px;
+	margin-top: 16px;
+	color: var(--admin-muted-aa);
+	font-size: 14px;
+}
+
+/* ---------- 詳情頁：兩欄版型（A03 / A08）---------- */
+
+/*
+ * 桌面兩欄、<1024px 塌成單欄且**決策欄排在最後**（sticky 自然失效）。
+ *
+ * ⚠️ 刻意**不做 Drawer**：ADM 全站只有一處 Drawer，而 `AuditDetailDialog` 已經記過
+ * 「側欄在窄視窗換行到表格下方，使用者看到按了沒反應」那次事故。單欄堆疊沒有那個
+ * 失敗模式。
+ */
+.invoice-detail-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 360px;
+	gap: 24px;
+	align-items: start;
+}
+
+@media (max-width: 1023px) {
+	.invoice-detail-grid {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+.invoice-detail-rail {
+	position: sticky;
+	top: 88px;
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+@media (max-width: 1023px) {
+	.invoice-detail-rail {
+		position: static;
+	}
+}
+
+/* ---------- 詳情頁：Section 與欄位 ---------- */
+
+/*
+ * 詳情頁的 Section 用 class ＋ token，不在 tsx 的 inline style 寫裸 hex（卡面白、邊框灰、
+ * 說明字灰）：色值棘輪只掃 `.css`，tsx 的 inline style 裸 hex **沒有任何機械保證**（§0.6 C06），
+ * 所以搬進 CSS 這件事本身就是把它納入守備範圍。
+ */
+.invoice-section {
+	margin-bottom: 24px;
+	padding: 20px;
+	background: var(--admin-paper);
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-card);
+}
+
+.invoice-section__title {
+	margin: 0 0 16px;
+	font-size: 16px;
+	font-weight: 700;
+	color: var(--admin-ink);
+}
+
+.invoice-section__hint {
+	margin: -8px 0 16px;
+	color: var(--admin-muted-aa);
+	font-size: 13px;
+	line-height: 1.6;
+}
+
+/*
+ * 待裁決的展延申請（A03）。
+ *
+ * ⚠️ 底色分級必須配文字（同 .invoice-row--warning 的紅字）：這一塊的文字是
+ * 「賣家已於 X 申請延長」＋ 賣家原話的理由，兩者都在 tsx 裡，不靠顏色傳達。
+ */
+.invoice-extension-request {
+	margin: -8px 0 16px;
+	padding: 12px 14px;
+	border: 1px solid var(--admin-warning);
+	border-radius: var(--admin-radius-card);
+	background: var(--admin-warning-soft);
+	font-size: 13px;
+	line-height: 1.7;
+	color: var(--admin-ink);
+}
+
+.invoice-extension-request__reason {
+	margin: 6px 0 0;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.invoice-fields {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 16px;
+}
+
+@media (max-width: 640px) {
+	.invoice-fields {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+.invoice-field--full {
+	grid-column: 1 / -1;
+}
+
+.invoice-field__label {
+	margin-bottom: 4px;
+	color: var(--admin-muted-aa);
+	font-size: 12px;
+}
+
+.invoice-field__value {
+	color: var(--admin-body);
+	font-size: 14px;
+	font-weight: 500;
+	line-height: 1.6;
+	word-break: break-word;
+}
+
+.invoice-field__note {
+	margin-top: 4px;
+	color: var(--admin-muted-aa);
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+.invoice-meta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 12px;
+	color: var(--admin-muted-aa);
+	font-size: 13px;
+}
+
+.invoice-header-main {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+}
+
+.invoice-header-titles {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+/* ---------- 「本波不渲染寫入動作」告示 ---------- */
+
+/*
+ * 用 info 而不是 warning：這不是異常，是「功能還沒開放」。用 warning 會讓管理員以為
+ * 這一筆資料有問題。
+ *
+ * ⚠️ 不用 `.audit-notice`：那個 class 的基底在 globals.css 是 danger 底色，而它的
+ * `rejected` 修飾子定義在 `MerchantCertificationDetail.css`（頁面級，只被商家詳情頁
+ * import）⇒ 在別頁用 `audit-notice rejected` 紅色完全不生效也不報錯（§0.6 C07）。
+ */
+.invoice-unavailable-notice {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	margin-bottom: 24px;
+	padding: 16px 20px;
+	background: var(--admin-info-soft);
+	border: 1px solid var(--admin-info);
+	border-radius: var(--admin-radius-card);
+	color: var(--admin-info);
+}
+
+.invoice-unavailable-notice svg {
+	font-size: 20px;
+	line-height: 1.4;
+}
+
+.invoice-unavailable-notice__title {
+	margin: 0 0 4px;
+	font-size: 15px;
+	font-weight: 700;
+}
+
+.invoice-unavailable-notice__text {
+	margin: 0;
+	font-size: 13px;
+	line-height: 1.6;
+}
+
+/* ---------- 頁面級固定資訊條（A05 / A06）---------- */
+
+/*
+ * 「出貨不受影響」那一句。放**頁面級**不逐列重複——逐列重複會讓它變成背景噪音，
+ * 而它要對抗的正是「看到發票紅字就不敢出貨」這個直覺。
+ */
+.invoice-page-notice {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	margin-bottom: 24px;
+	padding: 16px 20px;
+	background: var(--admin-warning-soft);
+	border: 1px solid var(--admin-warning);
+	border-radius: var(--admin-radius-card);
+	color: var(--admin-warning);
+	font-size: 14px;
+	line-height: 1.6;
+}
+
+.invoice-page-notice svg {
+	font-size: 20px;
+	line-height: 1.4;
+}
+
+/* ---------- 時間軸（A03 / A06 / A08 共用）---------- */
+
+.invoice-timeline {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.invoice-timeline__item {
+	display: grid;
+	grid-template-columns: 160px minmax(0, 1fr);
+	gap: 16px;
+	padding: 12px 0;
+	border-bottom: 1px solid var(--admin-border);
+}
+
+.invoice-timeline__item:last-child {
+	border-bottom: none;
+}
+
+@media (max-width: 640px) {
+	.invoice-timeline__item {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 4px;
+	}
+}
+
+.invoice-timeline__time {
+	color: var(--admin-muted-aa);
+	font-size: 13px;
+	font-variant-numeric: tabular-nums;
+}
+
+.invoice-timeline__title {
+	color: var(--admin-ink);
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.invoice-timeline__actor {
+	margin-top: 2px;
+	color: var(--admin-muted-aa);
+	font-size: 13px;
+}
+
+.invoice-timeline__note {
+	margin-top: 4px;
+	color: var(--admin-body);
+	font-size: 13px;
+	line-height: 1.6;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.invoice-timeline__empty {
+	margin: 0;
+	color: var(--admin-muted-aa);
+	font-size: 14px;
+}
+
+/* ---------- 機密／技術內容 ---------- */
+
+/*
+ * AppKey 只顯示後四碼。**完整值永不回顯**——那不是遮罩而是根本不讀：沒有任何 RPC
+ * 回傳明文，型別上就不存在。
+ */
+.invoice-secret {
+	font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+	letter-spacing: 0.05em;
+}
+
+.invoice-code {
+	font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+	font-size: 13px;
+	word-break: break-all;
+}
+
+/*
+ * JSON 原文（訂單快照、AMEGO 送件內容）。
+ *
+ * ⚠️ `overflow-x: auto` 是必要的：不讓長 JSON 把整個 document 撐到橫捲。
+ */
+.invoice-pre {
+	max-height: 360px;
+	margin: 8px 0 0;
+	padding: 12px;
+	overflow: auto;
+	background: var(--admin-control);
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-control);
+	color: var(--admin-body);
+	font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+	font-size: 12px;
+	line-height: 1.6;
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.invoice-details > summary {
+	cursor: pointer;
+	color: var(--admin-body);
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.invoice-details + .invoice-details {
+	margin-top: 12px;
+}
+
+/* ---------- 交換紀錄清單（A06）---------- */
+
+.invoice-exchange {
+	padding: 12px 0;
+	border-bottom: 1px solid var(--admin-border);
+}
+
+.invoice-exchange:last-child {
+	border-bottom: none;
+}
+
+.invoice-exchange__head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 12px;
+	color: var(--admin-body);
+	font-size: 13px;
+}
+
+.invoice-exchange__endpoint {
+	font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+	font-weight: 600;
+}
+
+/* ---------- 表格內的分頁提示與雜項 ---------- */
+
+.invoice-tab-note {
+	flex-basis: 100%;
+	margin: -4px 0 0;
+	color: var(--admin-muted-aa);
+	font-size: 13px;
+	line-height: 1.6;
+}
+
+.invoice-doc-link {
+	color: var(--admin-info);
+	font-weight: 600;
+	text-decoration: underline;
+}
+
+.invoice-empty-hint {
+	margin: 0;
+	color: var(--admin-muted-aa);
+	font-size: 14px;
+	line-height: 1.6;
+}
+
+.invoice-fields--spaced {
+	margin-top: 16px;
+}
+
+/*
+ * 橫幅內的「查看逾期案件」。是 <button> 不是 <a>：它切的是本頁的分頁 state，
+ * 不是導頁——用 <a href> 會讓中鍵開新分頁得到一個沒有 tab 的頁面。
+ */
+.invoice-inline-link {
+	margin-left: 8px;
+	padding: 0;
+	background: none;
+	border: none;
+	color: inherit;
+	font: inherit;
+	font-weight: 700;
+	text-decoration: underline;
+	cursor: pointer;
+}
+
+/* ---------------------------------------------------------------------------
+   A10／A12／A13（第三波）
+   色值一律 var(--admin-*)，本節不引入任何新 hex——`tests/admin-color-ratchet.test.ts`
+   掃 src/styles/** 的新色值，而它連註解都掃。
+   --------------------------------------------------------------------------- */
+
+/* 只給螢幕閱讀器讀的內容（本波的 `<caption>` 用它）。
+   ⚠️ ADM 全站**原本沒有**這個 utility（實查 src/styles 與 globals.css 零命中），
+   所以直接寫 className="sr-only" 而不宣告它，caption 會**照常顯示在表格上方**——
+   一個看得見、卻沒有任何測試會轉紅的版面破口（同 §0.6 C07 的形狀）。
+   宣告在這裡而不是 globals.css：本波只有發票頁用得到，動 globals 會影響全站。 */
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* A13 的 `?from=duplicate` 提示。**tone 是 info 不是 error**：9347 的語意是冪等鍵
+   命中、發票已經開好了，畫成錯誤會讓管理員再送一次而那正是它要防的事。
+   自成一個 class 而不是借 `.adm-authorization-notice`：那一支住在 DelegatedOperations.css
+   （頁面級樣式表），A13 沒有 import 它，借用的結果是完全沒有樣式。 */
+.invoice-duplicate-notice {
+	display: flex;
+	gap: 10px;
+	align-items: flex-start;
+	padding: 12px 16px;
+	margin-bottom: 16px;
+	background: var(--admin-info-soft);
+	border: 1px solid var(--admin-info);
+	border-radius: var(--admin-radius-control);
+	color: var(--admin-ink);
+	font-size: 14px;
+	line-height: 1.6;
+}
+
+.invoice-duplicate-notice svg {
+	color: var(--admin-info);
+	font-size: 18px;
+	line-height: 1.4;
+}
+
+/* 表格內的空集合列。與 `StateRow` 的 `.adm-state-row` 同義，但那一支的樣式
+   co-locate 在 `components/UI/StateRow.css`，只有 import 該元件的頁面拿得到 —— A13 的
+   品項表沒有走 StateRow（它不是查詢結果，是詳情的一部分），借用會拿到零樣式。 */
+.invoice-empty-cell {
+	padding: 24px 16px;
+	text-align: center;
+	color: var(--admin-muted-aa);
+	font-size: 14px;
+}
+
+/* ---------------------------------------------------------------------------
+   A09（AMEGO 啟用切點與版本歷程）／A11（手動開立發票）
+   色值一律 var(--admin-*)，本節不引入任何新 hex。
+   --------------------------------------------------------------------------- */
+
+/* A09 的適用範圍告示。tone 是 info：這不是異常，是「這一頁只能看」的說明。
+   不借 `.audit-notice`：那個 class 的 `rejected` 修飾子住在頁面級的
+   MerchantCertificationDetail.css，本頁沒有 import 它，借用會靜默沒有樣式（§0.6 C07）。 */
+.invoice-scope-notice {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	margin-bottom: 24px;
+	padding: 16px 20px;
+	background: var(--admin-info-soft);
+	border: 1px solid var(--admin-info);
+	border-radius: var(--admin-radius-card);
+	color: var(--admin-info);
+}
+
+.invoice-scope-notice svg {
+	font-size: 20px;
+	line-height: 1.4;
+}
+
+.invoice-scope-notice__title {
+	margin: 0 0 4px;
+	font-size: 15px;
+	font-weight: 700;
+}
+
+.invoice-scope-notice__text {
+	margin: 0;
+	font-size: 13px;
+	line-height: 1.6;
+}
+
+/* A09 時間軸每一列的抬頭元件。 */
+.invoice-cutover-version {
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+}
+
+.invoice-cutover-state {
+	color: var(--admin-muted-aa);
+	font-size: 13px;
+}
+
+.invoice-cutover-state--live {
+	color: var(--admin-success);
+	font-weight: 700;
+}
+
+.invoice-cutover-scope {
+	margin: 0 0 4px;
+}
+
+/* A11 的常駐紅框警示。danger token，不是需求書 §3 的 WEB 品牌色（那三個色碼
+   在 ADM 是語意錯的，而且會被色值棘輪擋住整個 PR）。 */
+.invoice-danger-notice {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	margin-bottom: 24px;
+	padding: 16px 20px;
+	background: var(--admin-danger-soft);
+	border: 1px solid var(--admin-danger);
+	border-radius: var(--admin-radius-card);
+	color: var(--admin-danger);
+	font-size: 14px;
+	line-height: 1.6;
+}
+
+.invoice-danger-notice svg {
+	font-size: 20px;
+	line-height: 1.4;
+}
+
+/* A11 的表單卡。`.card` 的間距是給表格用的，表單卡之間要自己留白。 */
+.invoice-form-card {
+	margin-bottom: 20px;
+}
+
+/* A11 的 radio 群組。<fieldset>/<legend> 是語意需求：切換 issuer/recipient 會整組
+   換掉條件式欄位，沒有 legend 的話螢幕閱讀器讀不出這幾顆 radio 屬於哪一組。 */
+.invoice-radio-group {
+	margin: 0 0 16px;
+	padding: 0;
+	border: 0;
+}
+
+.invoice-radio-group legend {
+	margin-bottom: 8px;
+	color: var(--admin-muted-aa);
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.invoice-radio {
+	margin-bottom: 8px;
+}
+
+.invoice-radio label {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--admin-ink);
+	font-size: 14px;
+}
+
+.invoice-radio input:disabled + span {
+	color: var(--admin-muted-aa);
+}
+
+/* 不可選的原因逐條印出來。只把 radio 變灰而不說原因，使用者會去問「為什麼不能選」
+   ——而答案是既定的，寫出來比讓人問便宜。 */
+.invoice-radio__reason {
+	margin: 2px 0 0 24px;
+	color: var(--admin-muted-aa);
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+/* store_id 輸入框 ＋「查詢店名」鍵並排。 */
+.invoice-inline-field {
+	display: flex;
+	align-items: flex-end;
+	flex-wrap: wrap;
+	gap: 12px;
+}
+
+.invoice-inline-field .form-group {
+	flex: 1 1 240px;
+	margin-bottom: 0;
+}
+
+.invoice-lookup-name {
+	color: var(--admin-ink);
+	font-weight: 700;
+}
+
+/* A11 的即時合計。**刻意沒有稅額與未稅欄**：那兩個由後端算，前端算第二份就是
+   製造第二個真相。 */
+.invoice-amount-summary {
+	margin: 0;
+	padding: 0;
+}
+
+.invoice-amount-summary > div {
+	display: flex;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 6px 0;
+	border-bottom: 1px solid var(--admin-border);
+}
+
+.invoice-amount-summary dt {
+	color: var(--admin-muted-aa);
+	font-size: 13px;
+}
+
+.invoice-amount-summary dd {
+	margin: 0;
+	font-variant-numeric: tabular-nums;
+}
+
+.invoice-amount-summary__total {
+	border-bottom: 0;
+	font-weight: 700;
+}
+
+/* 送不出去的原因清單。逐條列出來，不是把送出鍵變灰就算了。 */
+.invoice-blockers {
+	margin-bottom: 16px;
+	padding: 12px 16px;
+	background: var(--admin-warning-soft);
+	border: 1px solid var(--admin-warning);
+	border-radius: var(--admin-radius-control);
+	color: var(--admin-warning);
+	font-size: 13px;
+	line-height: 1.7;
+}
+
+.invoice-blockers__title {
+	margin: 0 0 4px;
+	font-weight: 700;
+}
+
+.invoice-blockers ul {
+	margin: 0;
+	padding-left: 20px;
+}
+
+/* A11 確認框內的摘要。 */
+.invoice-confirm-summary {
+	margin: 0 0 12px;
+	padding: 0;
+}
+
+.invoice-confirm-row {
+	display: flex;
+	gap: 12px;
+	padding: 5px 0;
+	border-bottom: 1px solid var(--admin-border);
+}
+
+.invoice-confirm-row dt {
+	flex: 0 0 88px;
+	color: var(--admin-muted-aa);
+	font-size: 13px;
+}
+
+.invoice-confirm-row dd {
+	margin: 0;
+	flex: 1 1 auto;
+	color: var(--admin-ink);
+	font-size: 13px;
+	word-break: break-word;
+}
+
+.invoice-confirm-lines {
+	margin-bottom: 12px;
+	font-size: 13px;
+	line-height: 1.7;
+}
+
+.invoice-confirm-lines__caption {
+	margin: 0 0 4px;
+	color: var(--admin-muted-aa);
+}
+
+.invoice-confirm-lines ul {
+	margin: 0;
+	padding-left: 20px;
+}
+
+.invoice-confirm-total {
+	margin: 6px 0 0;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+}
+
+.invoice-confirm-check {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	color: var(--admin-ink);
+	font-size: 14px;
+	line-height: 1.6;
+	cursor: pointer;
+}
+
+/* A11 品項列的刪除鍵。原生 <button>（需要 aria-label，而共用的 `Button` 不轉發
+   aria-*），所以要自己把瀏覽器預設樣式拿掉。 */
+.invoice-line-delete {
+	padding: 4px 8px;
+	background: none;
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-control);
+	color: var(--admin-danger);
+	font-size: 16px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.invoice-line-delete:hover {
+	background: var(--admin-danger-soft);
+}
+
+/* A04 的成功結果橫幅。自成一個 class 而不是借 `.adm-authorization-notice`：
+   那一支住在 DelegatedOperations.css（頁面級樣式表），借用的話只要哪天這一頁不再
+   import 那張表就會靜默變成零樣式（§0.6 C07）。色值全部走既有 token。 */
+.invoice-success-notice {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	margin-bottom: 24px;
+	padding: 16px 20px;
+	background: var(--admin-success-soft);
+	border: 1px solid var(--admin-success);
+	border-radius: var(--admin-radius-card);
+	color: var(--admin-ink);
+	font-size: 14px;
+	line-height: 1.6;
+}
+
+.invoice-success-notice svg {
+	color: var(--admin-success);
+	font-size: 20px;
+	line-height: 1.4;
+}
+
+/* 明文二次確認的勾選框。
+   `DelegatedOperations.css` 的 `.adm-operation-field input`（為文字輸入而寫）會把
+   `width:100%` ／ `min-height:44px` ／ padding ／ border 一起套到 checkbox 上 ⇒ 勾選框被
+   撐成一個 40px 的大方塊、和說明文字分家，而那正是最不該讓人看不懂的一個控制項。
+   這裡把它收回原生尺寸（A04 三支治理框與 A11 的確認框共用同一個 label）。 */
+.invoice-confirm-check input[type="checkbox"] {
+	flex: 0 0 auto;
+	width: auto;
+	min-width: 0;
+	min-height: 0;
+	margin: 3px 0 0;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	accent-color: var(--admin-primary-strong);
+}
+
+/* A03／A06／A08／A13 的治理動作列。
+   一排會換行的按鈕，**沒有任何色值**——每顆鍵的 variant 由 `Button` 決定
+   （`tests/admin-color-ratchet.test.ts` 只掃 .css 的裸 hex，這裡不引入新色）。
+   右欄（`.invoice-detail-rail`）與主欄都會用到，所以寬度交給容器不寫死。 */
+.invoice-decision-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 12px;
+}

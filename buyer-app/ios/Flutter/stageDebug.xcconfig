@@ -1,0 +1,7 @@
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug-stage.xcconfig"
+#include "Generated.xcconfig"
+
+ASSET_PREFIX=stage
+BUNDLE_NAME=Hawkr Stage
+BUNDLE_DISPLAY_NAME=Hawkr Stage
+GOOGLESERVICE_INFO_PLIST=${PROJECT_DIR}/Runner/config/stage/GoogleService-Info.plist

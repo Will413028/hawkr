@@ -1,0 +1,35 @@
+# syntax=docker/dockerfile:1.7
+#
+# 共享 Go 依賴 base image。
+#
+# Tag 來源：hash(GO_VERSION + 所有 go.mod / go.sum / go.work / go.work.sum)
+# 命中 GHCR 既有 tag 時，CI 直接跳過重建；只有 deps 或 Go 版本變動才會觸發。
+#
+# 設計重點：
+# 1. extractor stage 用 find -delete 自動篩出依賴宣告檔，**不列舉服務名**，
+#    新增/刪除服務不需要改本檔。
+# 2. 不使用 --mount=type=cache，刻意讓 `go mod download` 寫進 image filesystem
+#    成為一個實體 layer；下游服務 Dockerfile FROM 後即繼承 /go/pkg/mod，
+#    無需重抓。
+# 3. GO_VERSION 由 CI 從 .go-version 注入；本檔不寫死版本。
+
+ARG GO_VERSION
+
+# === Stage 1: Extractor — 自動篩出 go.mod / go.sum / go.work* ===
+FROM alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce AS extractor
+WORKDIR /build
+COPY . .
+RUN find . -type f \! \( \
+        -name 'go.mod' -o -name 'go.sum' \
+        -o -name 'go.work' -o -name 'go.work.sum' \
+    \) -delete \
+ && find . -type d -empty -delete
+
+# === Stage 2: Base — 下載所有 deps ===
+FROM golang:${GO_VERSION}-alpine@sha256:cf6fca6641884b8433441b2b0652976f975e1d0fdd26d177eaaf8596087f3125
+WORKDIR /workspace
+RUN apk add --no-cache git tzdata
+COPY --from=extractor /build/ .
+
+# workspace 模式：一次下載所有 go.work member 的 deps 聯集
+RUN go mod download all

@@ -1,0 +1,112 @@
+/* Extracted from styles/globals.css.
+ * Route transition and transition-related responsive rules.
+ * Keep import order in styles/globals.css unless intentionally changing cascade.
+ */
+
+/* ===========================================
+   PAGE TRANSITIONS — 瀏覽器原生 View Transitions
+   =========================================== */
+/* 跨頁轉場由 components/shared/Link（next-view-transitions）觸發
+ * document.startViewTransition：舊頁/新頁由合成器截圖過渡，頁面本體
+ * 不再套 transform（早前的 wrapper 進場動畫會劫持 fixed 定位、把整頁
+ * 提升成合成層、縮放時文字重新柵格化 —— 全部是抖動來源）。
+ *
+ * 轉場「型態」由 PageTransition 在導航當下蓋到 <html data-vt>：
+ *   fade  — auth / workspace
+ *   rise  — 列表 / feed / 搜尋 / 店面 /（預設）
+ *   slide — checkout / cart / orders / payment
+ *   zoom  — 商品整頁（快速檢視 modal 走自己的動畫，蓋 none）
+ *   none  — Tab 切換 / persistent shell / 快速檢視 —— 瞬切不播
+ *
+ * 只動畫 `page-content` 這個 named group（<main>），navbar/footer 等
+ * chrome 不參與截圖過渡，切頁時保持完全靜止。
+ * 時長/緩動的字面值鏡射 lib/animation/transitionTokens.ts（200ms /
+ * --ease-emphasized）；::view-transition-* 活在 <html> 下，讀不到
+ * wrapper 上的 --pt-* 變數，故此處用字面值。
+ * 不支援 View Transitions 的瀏覽器沒有這些偽元素，自動降級為直接切頁。 */
+
+.page-content {
+	view-transition-name: page-content;
+}
+
+/* root group 不動畫：chrome（navbar/footer/浮動元素）瞬間交接。 */
+::view-transition-old(root),
+::view-transition-new(root) {
+	animation: none;
+}
+
+/* 行動版底部導覽自成 named group。named group 一律疊在 root 截圖之上：
+ * bar 若留在 root 裡，轉場期間 page-content 的新舊截圖會直接畫在 bar
+ * 上（內容動畫掃過 bar 的區域）—— 就是切頁時 bar 閃爍/抖動的來源。
+ * 自成 group 後 bar 回到內容之上（z-index 200 晚於 main 繪製，group
+ * 疊序跟著繪製順序），group/old/new 全關動畫，切頁全程紋絲不動。 */
+::view-transition-group(mobile-bottom-nav),
+::view-transition-old(mobile-bottom-nav),
+::view-transition-new(mobile-bottom-nav) {
+	animation: none;
+}
+
+::view-transition-old(page-content) {
+	animation: vtFadeOut 200ms var(--ease-emphasized, ease-out) both;
+}
+::view-transition-new(page-content) {
+	animation: vtFadeIn 200ms var(--ease-emphasized, ease-out) both;
+}
+
+html[data-vt="rise"]::view-transition-new(page-content) {
+	animation: vtRiseIn 200ms var(--ease-emphasized, ease-out) both;
+}
+html[data-vt="slide"]::view-transition-new(page-content) {
+	animation: vtSlideIn 200ms var(--ease-emphasized, ease-out) both;
+}
+html[data-vt="zoom"]::view-transition-new(page-content) {
+	animation: vtZoomIn 200ms var(--ease-emphasized, ease-out) both;
+}
+
+/* 瞬切：Tab / persistent shell / 快速檢視。animation:none 讓 View
+ * Transition 在下一幀立即完成，肉眼等同直接切頁。
+ * group 也要關：UA 預設會在新舊幾何間補間 250ms，而 Tab 捲動記憶讓
+ * main 的 viewport 位置差整段捲動量（補間＝內容滑過一大段），瞬切
+ * 必須連幾何一起跳。 */
+html[data-vt="none"]::view-transition-group(page-content),
+html[data-vt="none"]::view-transition-old(page-content),
+html[data-vt="none"]::view-transition-new(page-content) {
+	animation: none;
+}
+
+@keyframes vtFadeOut {
+	to {
+		opacity: 0;
+	}
+}
+@keyframes vtFadeIn {
+	from {
+		opacity: 0;
+	}
+}
+@keyframes vtRiseIn {
+	from {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+}
+@keyframes vtSlideIn {
+	from {
+		opacity: 0;
+		transform: translateX(12px);
+	}
+}
+@keyframes vtZoomIn {
+	from {
+		opacity: 0;
+		transform: scale(0.985);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	::view-transition-group(page-content),
+	::view-transition-old(page-content),
+	::view-transition-new(page-content) {
+		animation: none;
+	}
+}

@@ -1,0 +1,36 @@
+# =============================================================================
+# docker-compose.override.yml.example — 個人本地差異覆蓋範本
+# =============================================================================
+# 用途：docker-compose-local.yml 已入 git、是團隊共用的本地環境基準；個人化的差異
+#       （原始碼掛載 hot-reload、資源上限、額外除錯環境變數…）不應污染共用基準檔，
+#       改放本 override 檔——它在 .gitignore 內，只作用於你這台機器。
+#
+# 啟用：cp docker-compose.override.yml.example docker-compose.override.yml 後編輯。
+#       dev.sh 偵測到 docker-compose.override.yml 存在時，會自動以 `-f` 疊加在 base
+#       之後（同一欄位以 override 為準）；不存在則行為完全不變。也可手動疊加：
+#         docker compose -f docker-compose-local.yml -f docker-compose.override.yml up -d
+#
+# 語義：override 只需列出要覆蓋或新增的欄位，未列出者沿用 base。合併細節（map 合併、
+#       sequence 附加、scalar 取代）以 docker compose 官方 merge 規則為準。
+#
+# 以下皆為註解範例，取消註解並依需求調整即可。服務名須對齊 base 檔的 services key。
+# -----------------------------------------------------------------------------
+
+# services:
+
+  # 範例 1：掛載原始碼做 hot-reload（改完免重建 image；路徑依實際服務調整）
+  # gateway:
+  #   volumes:
+  #     - ./gateway:/app:cached
+
+  # 範例 2：放寬 Java 服務資源上限（本機記憶體充足時加速啟動與編譯）
+  # product-service:
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 2g
+
+  # 範例 3：對單一服務加除錯用環境變數（只影響你本機，不動共用 base）
+  # order-service:
+  #   environment:
+  #     LOG_LEVEL: debug

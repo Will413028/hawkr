@@ -1,0 +1,315 @@
+/* ========== 分類審核頁面樣式 ========== */
+
+.category-audit {
+	font-family: "Inter", system-ui, -apple-system, sans-serif;
+	color: #1b1b1b;
+}
+
+/* 統計卡片列 */
+.category-stats-row {
+	display: flex;
+	gap: 24px;
+	margin-bottom: 24px;
+}
+
+/* 統計卡片選中狀態 */
+.merchant-stat-card.cat-stat-active {
+	border: 2px solid var(--admin-primary-strong);
+	box-shadow: 0 0 0 1px var(--admin-primary-strong);
+}
+
+/* 搜尋列 */
+.category-search-bar {
+	background: white;
+	border: 1px solid #dadada;
+	border-radius: 15px;
+	display: flex;
+	align-items: center;
+	padding: 0 16px;
+	height: 51px;
+	margin-bottom: 24px;
+	gap: 10px;
+}
+
+.category-search-bar input {
+	flex: 1;
+	border: none;
+	outline: none;
+	font-size: 16px;
+	color: #565656;
+	background: transparent;
+}
+
+.category-search-bar input::placeholder {
+	color: rgba(86, 86, 86, 0.5);
+}
+
+.category-search-bar svg {
+	font-size: 20px;
+	color: rgba(86, 86, 86, 0.5);
+}
+
+/* 表格容器 */
+.category-table-container {
+	background: white;
+	border: 1px solid #dadada;
+	border-radius: 15px;
+	box-shadow: 0 4px 4px rgba(0, 0, 0, 0.1);
+	overflow: hidden;
+}
+
+.category-table-container table {
+	width: 100%;
+	border-collapse: collapse;
+	min-width: 900px;
+}
+
+.category-table-container th {
+	background: var(--color-ink-50);
+	padding: 14px 24px;
+	text-align: left;
+	font-size: 14px;
+	font-weight: 700;
+	color: #565656;
+	border-bottom: 1px solid #dadada;
+	white-space: nowrap;
+}
+
+.category-table-container td {
+	padding: 20px 24px;
+	border-bottom: 1px solid #dadada;
+	vertical-align: middle;
+	font-size: 15px;
+	color: #1b1b1b;
+}
+
+.category-table-container tr:last-child td {
+	border-bottom: none;
+}
+
+/* 申請編號 / 時間欄 */
+.cat-app-no {
+	font-size: 13px;
+	color: rgba(86, 86, 86, 0.8);
+	margin-bottom: 4px;
+	letter-spacing: 0.5px;
+}
+
+.cat-app-time {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 15px;
+	color: #565656;
+}
+
+.cat-app-time svg {
+	font-size: 18px;
+	color: #565656;
+}
+
+/* 申請店家欄 */
+.cat-seller-cell {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.cat-seller-avatar {
+	width: 44px;
+	height: 44px;
+	border-radius: 50%;
+	object-fit: cover;
+	background: var(--color-ink-100);
+	flex-shrink: 0;
+}
+
+.cat-seller-avatar-placeholder {
+	width: 44px;
+	height: 44px;
+	border-radius: 50%;
+	background: var(--color-ink-100);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 20px;
+	color: var(--color-ink-500);
+	flex-shrink: 0;
+}
+
+.cat-seller-name {
+	font-size: 16px;
+	font-weight: 500;
+	color: #000;
+	white-space: nowrap;
+}
+
+/* 第一與第二分類路徑 tag */
+.cat-path-badge {
+	display: inline-flex;
+	align-items: center;
+	background: var(--color-ink-100);
+	border-radius: 8px;
+	padding: 4px 8px;
+	font-size: 15px;
+	color: #1b1b1b;
+	white-space: nowrap;
+}
+
+/* 申請分類名稱 */
+.cat-name-cell {
+	font-weight: 700;
+	font-size: 16px;
+	color: #1b1b1b;
+}
+
+/* 狀態欄 */
+.cat-status-pending {
+	display: inline-flex;
+	align-items: center;
+	border: 1.5px solid #e7000b;
+	border-radius: 100px;
+	padding: 2px 10px;
+	font-size: 13px;
+	color: #e7000b;
+	background: white;
+	white-space: nowrap;
+}
+
+.cat-status-approved {
+	display: inline-flex;
+	align-items: center;
+	border: 1.5px solid var(--admin-primary-strong);
+	border-radius: 100px;
+	padding: 2px 10px;
+	font-size: 13px;
+	color: var(--admin-primary-strong);
+	background: white;
+	white-space: nowrap;
+}
+
+.cat-reject-reason {
+	font-size: 14px;
+	color: #565656;
+	line-height: 1.5;
+}
+
+/* 操作欄按鈕 */
+.cat-action-cell {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+}
+
+.btn-cat-reject {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border: 2px solid #e7000b;
+	border-radius: 8px;
+	padding: 6px 12px;
+	font-size: 14px;
+	font-weight: 700;
+	color: #e7000b;
+	background: white;
+	cursor: pointer;
+	white-space: nowrap;
+	transition: background 0.15s;
+}
+
+.btn-cat-reject:hover {
+	background: rgba(231, 0, 11, 0.05);
+}
+
+.btn-cat-approve {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border: none;
+	border-radius: 8px;
+	padding: 6px 12px;
+	font-size: 14px;
+	font-weight: 700;
+	color: white;
+	background: var(--admin-primary-strong);
+	cursor: pointer;
+	white-space: nowrap;
+	transition: background 0.15s;
+}
+
+.btn-cat-approve:hover {
+	background: var(--admin-primary-strong-hover);
+}
+
+.btn-cat-done {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border: 2px solid rgba(86, 86, 86, 0.5);
+	border-radius: 8px;
+	padding: 6px 12px;
+	font-size: 14px;
+	font-weight: 700;
+	color: rgba(86, 86, 86, 0.8);
+	background: white;
+	cursor: default;
+	white-space: nowrap;
+}
+
+.btn-cat-done-primary {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border: 2px solid var(--admin-primary-strong);
+	border-radius: 8px;
+	padding: 6px 12px;
+	font-size: 14px;
+	font-weight: 700;
+	color: var(--admin-primary-strong);
+	background: white;
+	cursor: default;
+	white-space: nowrap;
+}
+
+/* 分頁 */
+.category-pagination {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	gap: 8px;
+	padding: 20px;
+}
+
+.category-pagination button {
+	width: 36px;
+	height: 36px;
+	border-radius: 8px;
+	border: 1px solid #dadada;
+	background: white;
+	font-size: 14px;
+	cursor: pointer;
+	transition: all 0.15s;
+}
+
+.category-pagination button:hover:not(:disabled) {
+	background: var(--color-ink-50);
+	border-color: var(--admin-primary-strong);
+}
+
+.category-pagination button.active {
+	background: var(--admin-primary-strong);
+	border-color: var(--admin-primary-strong);
+	color: white;
+}
+
+.category-pagination button:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+
+/* 空狀態 */
+.category-empty {
+	text-align: center;
+	padding: 60px 20px;
+	color: #9ca3af;
+}

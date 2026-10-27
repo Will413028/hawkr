@@ -1,0 +1,2 @@
+data: {"type":"CUSTOM","name":"step_detail","value":{"turnId":"turn-golden","seq":0,"code":"EXTRACT_SLOTS","status":"SUCCEEDED","label":"抓出品項、數量和交期","durationMs":1234}}
+

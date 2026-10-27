@@ -1,0 +1,419 @@
+/* Geometry follows the production containers, cards and gallery. Keep loading
+ * atoms in route-loading-skeleton.css; no viewport-sized text inside a column. */
+.route-loading-skeleton *,
+.route-product-grid-skeleton *,
+.route-feed-grid-skeleton * {
+	box-sizing: border-box;
+	min-width: 0;
+}
+
+.route-loading-skeleton__title,
+.route-loading-skeleton__copy,
+.route-loading-skeleton__line,
+.route-loading-skeleton__pill,
+.route-loading-skeleton__actions span,
+.route-loading-skeleton__workspace-head > span {
+	display: block;
+	max-width: 100%;
+}
+
+.route-loading-skeleton--feed,
+.route-loading-skeleton--market-list,
+.route-loading-skeleton--search,
+.route-loading-skeleton--seller-storefront {
+	padding-inline: 0;
+}
+
+.route-loading-skeleton__canvas--feed,
+.route-loading-skeleton__canvas--market,
+.route-loading-skeleton__canvas--search,
+.route-loading-skeleton__canvas--storefront {
+	width: min(1440px, calc(100% - 48px));
+}
+
+.route-loading-skeleton--market-list .route-loading-skeleton__market-sidebar {
+	padding: 18px;
+	border-radius: var(--radius-lg);
+}
+
+.route-loading-skeleton--market-list .route-loading-skeleton__market-toolbar {
+	align-items: center;
+	flex-direction: row;
+	flex-wrap: wrap;
+	gap: 12px;
+	padding-block: 6px;
+	margin-bottom: 16px;
+	min-height: 32px;
+}
+
+.route-loading-skeleton--market-list
+	.route-loading-skeleton__market-toolbar
+	.route-loading-skeleton__title {
+	width: 142px;
+	height: 1.25rem;
+}
+
+.route-loading-skeleton--market-list
+	.route-loading-skeleton__market-toolbar
+	div
+	span {
+	height: calc(0.8125rem * 1.5 + 8px);
+}
+
+/* Reserve the real card's invisible border and independent image/body insets. */
+.route-loading-skeleton__product-card {
+	align-self: start;
+	min-width: 0;
+	border: 1px solid transparent;
+}
+
+.route-loading-skeleton__product-media {
+	padding: 12px;
+}
+
+.route-loading-skeleton__product-media .route-loading-skeleton__media {
+	display: block;
+	width: 100%;
+	aspect-ratio: 4 / 3;
+	border-radius: 18px;
+}
+
+.route-loading-skeleton__product-body {
+	padding: 0 16px 16px;
+}
+
+.route-loading-skeleton__product-name {
+	display: grid;
+	align-content: start;
+	gap: 0.3em;
+	min-height: 2.6em;
+	margin: 12px 0 6px;
+	font-size: 1rem;
+	line-height: 1.45;
+}
+
+.route-loading-skeleton__product-name .route-loading-skeleton__line {
+	height: 1em;
+}
+
+.route-loading-skeleton__product-seller {
+	height: 20px;
+}
+
+.route-loading-skeleton__product-rating {
+	height: 1rem;
+	margin-top: 8px;
+}
+
+.route-loading-skeleton__product-price {
+	width: 46%;
+	height: 1.5075rem;
+	margin-top: 10px;
+}
+
+.route-loading-skeleton__product-controls {
+	display: flex;
+	gap: 8px;
+	margin-top: 12px;
+}
+
+.route-loading-skeleton__product-controls .route-loading-skeleton__line {
+	height: 40px;
+	flex: 1;
+}
+
+.route-loading-skeleton__product-controls
+	.route-loading-skeleton__line
+	+ .route-loading-skeleton__line {
+	flex: 0 0 40px;
+}
+
+/* A feed fallback sits either in the route shell or directly in its data slot. */
+.route-loading-skeleton__feed-grid.hkui-feed-grid {
+	width: 100%;
+	margin: 0;
+}
+
+.route-loading-skeleton .route-loading-skeleton__feed-card,
+.route-feed-grid-skeleton .route-loading-skeleton__feed-card {
+	display: flex;
+	flex-direction: column;
+	align-content: start;
+	gap: 0;
+	min-height: 0;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+.route-loading-skeleton__feed-card .route-loading-skeleton__media {
+	display: block;
+	flex: none;
+	border-radius: 16px;
+}
+
+.route-loading-skeleton__feed-card .hkui-feed-card__body {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 12px 4px 4px;
+}
+
+@media (max-width: 1023px) {
+	.route-loading-skeleton__feed-grid.hkui-feed-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 12px;
+	}
+}
+
+@media (min-width: 1440px) {
+	.route-loading-skeleton__feed-grid.hkui-feed-grid {
+		grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+	}
+}
+
+@media (max-width: 480px) {
+	.route-loading-skeleton__feed-grid.hkui-feed-grid {
+		gap: 10px;
+	}
+}
+
+.route-loading-skeleton__feed-card::after,
+.route-story-skeleton img {
+	display: none;
+}
+
+.route-story-skeleton ul > li > button > span:first-child,
+.route-story-skeleton ul > li > button > span:last-child > span {
+	position: relative;
+	overflow: hidden;
+	background: var(--hkui-default-100);
+}
+
+.route-story-skeleton ul > li > button > span:last-child > span {
+	width: 72%;
+	border-radius: var(--radius-pill);
+}
+
+.route-story-skeleton svg {
+	visibility: hidden;
+}
+
+.route-story-skeleton ul > li > button > span:first-child::after,
+.route-story-skeleton ul > li > button > span:last-child > span::after {
+	position: absolute;
+	inset: 0;
+	content: "";
+	background: linear-gradient(
+		100deg,
+		transparent 30%,
+		var(--skeleton-sheen) 50%,
+		transparent 70%
+	);
+	animation: routeLoadingSkeletonShimmer 1.6s cubic-bezier(0.4, 0, 0.2, 1)
+		infinite;
+}
+
+/* ProductDetailLayout owns one 1440px container, including its 24/16px gutter. */
+.route-loading-skeleton.route-loading-skeleton--product-detail {
+	padding: var(--page-start-gap, 6px) 0 60px;
+}
+
+.route-loading-skeleton--product-detail .route-loading-skeleton__canvas--pdp {
+	width: min(1440px, 100%);
+	padding-inline: 24px;
+}
+
+.route-loading-skeleton--product-detail .route-loading-skeleton__breadcrumb {
+	min-height: 44px;
+	margin: 14px 0 26px;
+}
+
+.route-loading-skeleton--product-detail .route-loading-skeleton__pdp-grid {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 48px;
+	padding: 40px;
+	/* public-section-surface / glass-card resolves to a 1px border. */
+	border-width: 1px;
+	border-radius: 36px;
+}
+
+.route-loading-skeleton--product-detail .route-loading-skeleton__hero-media {
+	height: auto;
+	aspect-ratio: 4 / 3;
+	border-radius: 30px;
+}
+
+.route-loading-skeleton--product-detail .route-loading-skeleton__thumb-row {
+	gap: 10px;
+}
+
+.route-loading-skeleton--product-detail
+	.route-loading-skeleton__thumb-row
+	span {
+	aspect-ratio: 4 / 3;
+	border-radius: 20px;
+}
+
+.route-loading-skeleton--product-detail .route-loading-skeleton__purchase {
+	align-content: start;
+	min-height: 0;
+	gap: 12px;
+	padding: 0;
+}
+
+.route-loading-skeleton--product-detail
+	.route-loading-skeleton__purchase
+	.route-loading-skeleton__title {
+	height: 2.925rem;
+}
+
+@media (max-width: 1023px) {
+	.route-loading-skeleton--product-detail .route-loading-skeleton__pdp-grid {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 32px;
+		padding: 28px;
+		border-radius: 28px;
+	}
+	.route-loading-skeleton--product-detail
+		.route-loading-skeleton__purchase
+		.route-loading-skeleton__title {
+		height: 2.275rem;
+	}
+}
+
+@media (max-width: 959px) {
+	.route-loading-skeleton--market-list .route-loading-skeleton__market-layout {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.route-loading-skeleton--market-list .route-loading-skeleton__market-sidebar {
+		display: flex;
+		align-items: center;
+		height: 54px;
+		padding: 14px 18px;
+	}
+	.route-loading-skeleton--market-list
+		.route-loading-skeleton__market-sidebar
+		.route-loading-skeleton__search-bar,
+	.route-loading-skeleton--market-list .route-loading-skeleton__filter-block {
+		display: none;
+	}
+}
+
+/* Card utilities use Tailwind's strict max-[840px], unlike Masonry's
+ * inclusive 840px column-count rule. Do not merge these two boundaries. */
+@media (width < 840px) {
+	.route-loading-skeleton__product-media {
+		padding: 6px;
+	}
+	.route-loading-skeleton__product-media .route-loading-skeleton__media {
+		border-radius: 10px;
+	}
+	.route-loading-skeleton__product-body {
+		padding: 0 8px 10px;
+	}
+	.route-loading-skeleton__product-name {
+		margin: 8px 0 4px;
+		font-size: 0.875rem;
+		line-height: 1.3;
+	}
+	.route-loading-skeleton__product-seller {
+		height: 16px;
+	}
+	.route-loading-skeleton__product-rating {
+		margin-top: 4px;
+		height: 0.928125rem;
+	}
+	.route-loading-skeleton__product-price {
+		margin-top: 6px;
+		height: 1.2rem;
+	}
+	.route-loading-skeleton__product-controls {
+		margin-top: 6px;
+	}
+}
+
+@media (max-width: 768px) {
+	.route-loading-skeleton--market-list .market-story-tabs {
+		display: none;
+	}
+	.route-loading-skeleton__canvas--feed,
+	.route-loading-skeleton__canvas--search,
+	.route-loading-skeleton__canvas--storefront {
+		width: min(680px, calc(100% - 28px));
+	}
+	.route-loading-skeleton--market-list
+		.route-loading-skeleton__market-toolbar
+		> div {
+		display: none;
+	}
+}
+
+@media (width < 768px) {
+	.route-loading-skeleton__canvas--market {
+		width: min(680px, calc(100% - 28px));
+	}
+	.route-loading-skeleton--product-detail .route-loading-skeleton__canvas--pdp {
+		padding-inline: 16px;
+	}
+	.route-loading-skeleton--product-detail .route-loading-skeleton__breadcrumb {
+		margin: 0 0 12px;
+	}
+	.route-loading-skeleton--product-detail .route-loading-skeleton__pdp-grid {
+		padding: 20px;
+		border-width: 1px;
+		border-radius: var(--radius-xl);
+	}
+	.route-loading-skeleton--product-detail .route-loading-skeleton__hero-media {
+		border-radius: 16px;
+	}
+	.route-loading-skeleton--product-detail .route-loading-skeleton__thumb-row {
+		gap: 6px;
+	}
+	.route-loading-skeleton--product-detail
+		.route-loading-skeleton__thumb-row
+		span {
+		border-radius: var(--radius-md);
+	}
+	.route-loading-skeleton--product-detail
+		.route-loading-skeleton__purchase
+		.route-loading-skeleton__title {
+		height: 1.95rem;
+	}
+}
+
+@media (width < 640px) {
+	.route-loading-skeleton--product-detail .route-loading-skeleton__hero-media {
+		border-radius: var(--radius-lg);
+	}
+	.route-loading-skeleton--product-detail .route-loading-skeleton__thumb-row {
+		gap: 4px;
+	}
+	.route-loading-skeleton--product-detail
+		.route-loading-skeleton__thumb-row
+		span {
+		border-radius: 10px;
+	}
+	.route-loading-skeleton--product-detail
+		.route-loading-skeleton__purchase
+		.route-loading-skeleton__title {
+		height: 1.625rem;
+	}
+}
+
+.route-loading-skeleton--scoped .route-loading-skeleton__canvas {
+	width: 100%;
+}
+.route-loading-skeleton--scoped .route-story-skeleton,
+.route-loading-skeleton--scoped.route-loading-skeleton--market-list
+	.route-loading-skeleton__market-sidebar {
+	display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.route-story-skeleton ul > li > button > span:first-child::after,
+	.route-story-skeleton ul > li > button > span:last-child > span::after {
+		animation: none;
+	}
+}

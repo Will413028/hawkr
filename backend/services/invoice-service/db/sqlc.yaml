@@ -1,0 +1,62 @@
+# invoice-service sqlc 設定
+# SSOT：docs/詳細設計書/58-電子發票服務（Invoice Service）詳細設計書.md §5.4.2
+#
+# overrides 每一條對應 schema.sql 的一個 jsonb 欄位（目前 11 個），go_type 一律
+# encoding/json.RawMessage。新增任何 jsonb 欄位時必須同步加一條：漏了不會編譯錯、
+# 不會測試紅，只會在寫入時 runtime 22P02（pgx v5 QueryExecModeExec 跳過 server-side
+# Describe，裸 []byte 會被推成 bytea 而非 jsonb）。守護者 ＝ 不變式 I-44。
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "queries/"
+    schema: "schema/"
+    gen:
+      go:
+        package: "gen"
+        out: "../internal/repository/postgres/gen"
+        sql_package: "pgx/v5"
+        emit_json_tags: true
+        emit_db_tags: true
+        emit_empty_slices: true
+        # 全 repo 11 支既有 Go 服務逐支都有這一行，而 scripts/check-pgx-nullable-boundary.py
+        # 的 docstring 直接把它當前提（「generators use emit_pointers_for_null_types for
+        # ordinary nullable columns，所以 repository 不得重建舊的 pgtype nullable 值」）。
+        # 少了它，本服務大量 nullable timestamptz（租約欄／voided_at／approved_at…）會生成
+        # pgtype.Timestamptz，repository 只能寫 pgtype 字面值 —— 那正是該 gate 擋的形狀。
+        # 設計書 §5.4.2 漏了這一行與底下兩條 timestamptz override（2026-08-29 實查補上）。
+        emit_pointers_for_null_types: true
+        overrides:
+          - db_type: "timestamptz"
+            nullable: true
+            go_type:
+              import: "time"
+              type: "Time"
+              pointer: true
+          - db_type: "pg_catalog.timestamptz"
+            nullable: true
+            go_type:
+              import: "time"
+              type: "Time"
+              pointer: true
+          - column: "seller_tax_profiles.evidence_object_keys"
+            go_type: "encoding/json.RawMessage"
+          - column: "invoice_documents.source_snapshot"
+            go_type: "encoding/json.RawMessage"
+          - column: "invoice_inbox_events.payload"
+            go_type: "encoding/json.RawMessage"
+          - column: "invoice_outbox_events.payload"
+            go_type: "encoding/json.RawMessage"
+          - column: "invoice_correction_requests.before_payload"
+            go_type: "encoding/json.RawMessage"
+          - column: "invoice_correction_requests.after_payload"
+            go_type: "encoding/json.RawMessage"
+          - column: "invoice_complaint_events.attachment_object_keys"
+            go_type: "encoding/json.RawMessage"
+          - column: "invoice_provider_audit_logs.request_masked"
+            go_type: "encoding/json.RawMessage"
+          - column: "invoice_provider_audit_logs.response_masked"
+            go_type: "encoding/json.RawMessage"
+          - column: "invoice_admin_audit_logs.before_state"
+            go_type: "encoding/json.RawMessage"
+          - column: "invoice_admin_audit_logs.after_state"
+            go_type: "encoding/json.RawMessage"

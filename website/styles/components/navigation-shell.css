@@ -1,0 +1,206 @@
+/* Extracted from styles/globals.css.
+ * Buyer/seller navbar shell, user menus, theme toggle, and notification badges.
+ * Keep import order in styles/globals.css unless intentionally changing cascade.
+ */
+
+/* Buyer-navbar HOST styles migrated to inline Tailwind in
+ * components/shared/Navbar.tsx (子刀 4, PR-B). The `.site-nav*`/`.nav-item`/
+ * `.site-nav-action`/`.site-nav-login` host rules that lived here were all
+ * shadowed by navigation-final/floating (later imports) anyway; their live
+ * contribution is now expressed as utilities. The icon/label DESCENDANT rules
+ * below (span sr-only, svg sizing) are intentionally retained — they key off
+ * the kept hook classes and are out of PR-B scope. */
+
+body .site-nav-action span {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
+
+body .site-nav-action svg {
+	width: 24px;
+	height: 24px;
+}
+
+/* Buyer user-menu trigger family + 賣家中心 CTA + the user-menu panel/header/
+ * list/footer CONTAINERS migrated to inline Tailwind (步驟 6): the trigger
+ * family + CTA live in components/shared/Navbar.tsx, the shared dropdown
+ * containers in components/shared/navUserMenu.ts (used by BuyerMenu, SellerMenu
+ * and RoleAwareNavbar's SellerAccountMenu). The ungated leaf rules below
+ * (menu-header strong/span, the menu-list icon spans) are retained — they key
+ * off the kept BEM hooks. Dark overrides were in navigation-final.css. */
+body .site-nav-user__menu-header strong {
+	font-size: 0.9375rem;
+	color: var(--color-neutral-ink);
+}
+body .site-nav-user__menu-header span {
+	font-size: var(--text-xs);
+	color: #888;
+}
+/* Dark panel (--color-ink-900): the near-black name + grey subtitle vanish. Lift the
+   name to cream and the subtitle to a readable muted light. */
+[data-theme="dark"] body .site-nav-user__menu-header strong {
+	color: #f5e9c3;
+}
+[data-theme="dark"] body .site-nav-user__menu-header span {
+	color: rgb(var(--color-ink-100-rgb) / 0.6);
+}
+body .site-nav-user__menu-list span[aria-hidden="true"],
+body .site-nav-user__menu-icon {
+	width: 20px;
+	height: 20px;
+	flex-shrink: 0;
+}
+body .site-nav-user__menu-list span[aria-hidden="true"] {
+	font-size: var(--text-base);
+	text-align: center;
+	line-height: 1;
+}
+body .site-nav-user__menu-icon {
+	color: currentColor;
+	transition: color var(--transition-fast);
+}
+
+/* Seller header dropdown shares site-nav-user__menu styles */
+body .seller-header__user {
+	position: relative;
+}
+body .seller-header__menu {
+	right: 0;
+}
+
+/* Seller-header HOST + children (host/inner/brand/nav/nav-item/actions/cta/
+ * icon-btn/theme-btn/avatar) migrated to inline Tailwind in RoleAwareNavbar.tsx
+ * (子刀 5). The pill SURFACE (bg/border-colour/shadow) lived in seller-center.css
+ * `:has(.seller-shell)` overrides — also migrated. Retained below:
+ * `.seller-header__brand-logo` (lockup sizing), `.seller-header__avatar img`
+ * (descendant), and the `.seller-header__user`/`__menu` dropdown shell (子刀 6).
+ * The seller-center.css `@960` hide (which also hides `.auto-nav`) still keys
+ * off the retained `.seller-header` class. */
+
+body .seller-header__brand-logo {
+	--brand-logo-render-height: 44px;
+	display: inline-flex;
+	width: auto;
+	height: auto;
+	padding: 0;
+	align-items: center;
+	justify-content: flex-start;
+	overflow: visible;
+	flex: 0 0 auto;
+	background: transparent;
+	border-radius: 0;
+}
+
+body .seller-header__avatar img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+/* Notification bell badge base layer → migrated to inline Tailwind in
+ * components/shared/notifBell.ts (NotificationBell / ChatBubble).
+ *
+ * box-sizing stays here: content-box must beat the unlayered `*` reset in
+ * 02-reset-layout.css, which a `@layer utilities` class can't do; forcing it
+ * with `box-content!` would also leak past the host override that intentionally
+ * sets border-box in the buyer nav (navigation-final.css). This 1-rule keeps
+ * the exact prior cascade (beats the reset, loses to the host overrides).
+ * The seller-header host override stays as a hook until the seller knife. */
+body .notif-bell__badge {
+	box-sizing: content-box;
+}
+body .seller-header__icon-btn .notif-bell__badge {
+	border-color: transparent;
+}
+
+@media (max-width: 768px) {
+	body .site-nav-seller-cta,
+	body .site-nav-user__name {
+		display: none;
+	}
+
+	/*
+	 * feed-components.css still carries the retired seller-header mobile rule
+	 * that hides every CTA. Keep the incomplete-account recovery entry visible
+	 * outside onboarding itself, where it becomes a compact icon button.
+	 */
+	body .seller-header:not([data-onboarding="true"]) .seller-header__cta--setup {
+		display: inline-flex;
+		width: 40px;
+		min-width: 40px;
+		padding-inline: 0;
+		justify-content: center;
+		gap: 0;
+	}
+}
+
+/*
+ * Onboarding deliberately keeps a top account escape so a seller can sign
+ * out, but the desktop workspace rail cannot fit on a phone. Collapse it to
+ * brand + account menu and keep the pill inside the viewport.
+ */
+@media (max-width: 640px) {
+	body .seller-header[data-onboarding="true"] {
+		height: 72px;
+		padding-inline: 12px;
+	}
+
+	body .seller-header[data-onboarding="true"] .seller-header__inner {
+		height: 72px;
+		min-height: 72px;
+		gap: 12px;
+		padding-inline: 16px;
+	}
+
+	body .seller-header[data-onboarding="true"] .seller-header__brand-logo {
+		--brand-logo-render-height: 36px;
+	}
+
+	body .seller-header[data-onboarding="true"] .seller-header__nav,
+	body .seller-header[data-onboarding="true"] .seller-header__cta,
+	body .seller-header[data-onboarding="true"] .seller-header__theme-btn {
+		display: none;
+	}
+
+	body .seller-header[data-onboarding="true"] .seller-header__actions {
+		gap: 8px;
+	}
+}
+
+/*
+ * Onboarding deliberately keeps a top account escape so a seller can sign
+ * out, but the desktop workspace rail cannot fit on a phone. Collapse it to
+ * brand + account menu and keep the pill inside the viewport.
+ */
+@media (max-width: 640px) {
+	body .seller-header[data-onboarding="true"] {
+		height: 72px;
+		padding-inline: 12px;
+	}
+
+	body .seller-header[data-onboarding="true"] .seller-header__inner {
+		height: 72px;
+		min-height: 72px;
+		gap: 12px;
+		padding-inline: 16px;
+	}
+
+	body .seller-header[data-onboarding="true"] .seller-header__brand-logo {
+		--brand-logo-render-height: 36px;
+	}
+
+	body .seller-header[data-onboarding="true"] .seller-header__nav,
+	body .seller-header[data-onboarding="true"] .seller-header__cta,
+	body .seller-header[data-onboarding="true"] .seller-header__theme-btn {
+		display: none;
+	}
+
+	body .seller-header[data-onboarding="true"] .seller-header__actions {
+		gap: 8px;
+	}
+}

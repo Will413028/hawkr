@@ -1,0 +1,16 @@
+{
+  "before": {},
+  "patch": {
+    "delivery_city": "新竹"
+  },
+  "now": "2026-08-07T00:00:00Z",
+  "after": {
+    "exact_match_required": true
+  },
+  "rejected": [
+    {
+      "key": "delivery_city",
+      "reason": "不是可辨識的縣市名稱"
+    }
+  ]
+}

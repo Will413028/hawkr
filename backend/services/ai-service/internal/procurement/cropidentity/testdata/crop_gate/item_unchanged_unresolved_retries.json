@@ -1,0 +1,28 @@
+{
+  "resolverNil": false,
+  "resolveResult": {
+    "NeedsDisambiguation": false,
+    "CropCode": null,
+    "GroupCode": null,
+    "CommodityCode": null,
+    "FallbackGroupCode": null,
+    "Label": "",
+    "Candidates": null,
+    "Unavailable": false
+  },
+  "before": {
+    "item": "芭樂"
+  },
+  "after": {
+    "item": "芭樂"
+  },
+  "result": {
+    "item": "芭樂",
+    "resolution": null,
+    "pending": false,
+    "candidates": null,
+    "pendingReason": "",
+    "evaluated": true,
+    "factsAsOfSet": true
+  }
+}

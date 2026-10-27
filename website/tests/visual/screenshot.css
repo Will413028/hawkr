@@ -1,0 +1,12 @@
+/*
+ * Applied before every visual snapshot (playwright.config.ts → expect.toHaveScreenshot.stylePath).
+ *
+ * Hides the Next.js dev-tools indicator (floating logo + issue count + error
+ * toasts). It renders in a fixed corner during `next dev`, is nondeterministic
+ * (issue count / animation state), and doesn't exist in production — so it must
+ * never count toward a migration diff.
+ */
+nextjs-portal {
+	/* biome-ignore lint/complexity/noImportantStyles: must override the Next.js dev-tools portal's own injected styles; this sheet is screenshot-only and never ships to production. */
+	display: none !important;
+}

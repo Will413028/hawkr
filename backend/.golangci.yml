@@ -1,0 +1,71 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - prealloc
+    # error handling — 對應 prompts/go.md
+    - errorlint       # error 比較 / 包裝正確
+    # style
+    - gocritic        # 多種品質檢查
+    # testing
+    - thelper         # t.Helper() 強制
+    - tparallel       # parallel test 正確使用
+    # mod
+    - gomoddirectives # 禁止 replace directive (production)
+  settings:
+    gomoddirectives:
+      replace-allow-list: []
+      replace-local: true
+    gocritic:
+      enabled-checks:
+        - ruleguard
+      settings:
+        ruleguard:
+          # failOn: all turns a ruleguard match into an error (CI gate). The rules
+          # (gateway/ruleguard/rules.go, build-tagged) ban direct gin JSON emitters
+          # in gateway handler/middleware/router/proxy (pkgpath-scoped), so the
+          # response.* convergence can't regress. NOTE: the companion rule that
+          # banned literal success messages via response.OKMsg was removed on
+          # 2026-08-22 (#2704) together with OKMsg itself -- re-introducing an
+          # OKMsg is now a compile error, which is stronger than a lint rule. ${base-path} anchors the rules glob to
+          # the repo root (config dir) regardless of each service's cwd under
+          # `make lint-all`, so services without a local ruleguard/ dir don't error.
+          failOn: all
+          rules: '${base-path}/gateway/ruleguard/*.go'
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+      # Test files set up mock gin handlers / auth stubs that legitimately emit
+      # c.JSON directly; the envelope ruleguard rule targets production handlers.
+      - path: _test\.go
+        linters:
+          - gocritic
+        source: '\.(JSON|IndentedJSON|PureJSON|SecureJSON|AbortWithStatusJSON)\('
+      # SA5011 in tests is a known staticcheck false positive for the standard
+      # `x := f(); if x == nil { t.Fatal(...) }; x.Field` guard: staticcheck does
+      # not treat t.Fatal/t.Fatalf as terminating, so it reports the guarded
+      # dereference as a possible nil deref. The guard is exactly what makes the
+      # code safe, and rewriting it (adding a dead `return` after t.Fatal) would
+      # be cargo-culting around the analyser rather than fixing anything.
+      #
+      # Only in _test.go — in production code SA5011 is a real signal, because
+      # there is no t.Fatal to terminate the path.
+      - path: _test\.go
+        linters:
+          - staticcheck
+        text: 'SA5011'
+
+# gofmt 在這裡而不是只留在 CI（2026-09-06）：CI 的「Go 檢查」job 另跑一道獨立的
+# `git ls-files -z '*.go' | xargs -0 gofmt -l`，而本機 lefthook 跑的是
+# golangci-lint。兩個 gate 的檢查集合原本不一樣，於是「本機 lint 全綠」對 gofmt
+# 毫無保證——PR #3191 就是這樣被 CI 擋下的（import 排序 ＋ doc comment 的方向引號
+# 改寫）。修法是讓本機 gate 追上 CI 的範圍，而不是在本機再長出第三套檢查。
+#
+# 只開 gofmt，不開 gofumpt／goimports：CI 那道 gate 用的就是 gofmt，多開會讓本機
+# 比 CI 嚴，把「本機綠 ⇒ CI 綠」換成另一個方向的不一致。
+formatters:
+  enable:
+    - gofmt

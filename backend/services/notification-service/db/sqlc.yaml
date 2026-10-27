@@ -1,0 +1,42 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "queries/"
+    schema: "schema/"
+    gen:
+      go:
+        package: "gen"
+        out: "../internal/repository/postgres/gen"
+        sql_package: "pgx/v5"
+        emit_json_tags: true
+        emit_db_tags: true
+        emit_empty_slices: true
+        emit_pointers_for_null_types: true
+        rename:
+          # SoftDeleteByIDs 的 @ids 若不覆寫，sqlc 預設會產生 `Ids`（非 `IDs`）——
+          # 這裡保留舊有大寫慣例，讓 repository 呼叫端（IDs: ids）不必跟著改名。
+          ids: IDs
+        overrides:
+          - db_type: "timestamptz"
+            nullable: true
+            go_type:
+              import: "time"
+              type: "Time"
+              pointer: true
+          # pgx v5 QueryExecModeExec (pkg/database/postgres.go) skips server-side
+          # Describe, so parameter OIDs are inferred purely from the Go argument's
+          # dynamic type via pgtype's default TypeMap. A bare []byte defaults to
+          # bytea, NOT jsonb — writing it into a jsonb column corrupts the value
+          # (22P02 invalid input syntax for type json). pgx registers json.RawMessage
+          # specifically to the JSON codec (pgtype_default.go), so these columns need
+          # that exact Go type to round-trip correctly under QueryExecModeExec.
+          # Same root cause class as seller-service's seller_deleted_outbox.payload
+          # fix (commit 2fca1ab47); this occurrence confirmed P1 in dev
+          # (notifications.data write silently failing for push_mode=visible inbox
+          # writes across all event types). #1370 follow-up full-repo audit.
+          - column: "notifications.data"
+            go_type: "encoding/json.RawMessage"
+          - column: "notification_templates.data_fields"
+            go_type: "encoding/json.RawMessage"
+          - column: "notification_templates.payload_filter"
+            go_type: "encoding/json.RawMessage"

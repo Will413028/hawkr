@@ -1,0 +1,20 @@
+{
+  "before": {
+    "unit": "KG",
+    "exact_match_required": true
+  },
+  "patch": {
+    "unit": "BOX"
+  },
+  "now": "2026-08-07T00:00:00Z",
+  "after": {
+    "unit": "KG",
+    "exact_match_required": true
+  },
+  "rejected": [
+    {
+      "key": "unit",
+      "reason": "單位不在允許清單內：KG/CATTY/GRAM"
+    }
+  ]
+}

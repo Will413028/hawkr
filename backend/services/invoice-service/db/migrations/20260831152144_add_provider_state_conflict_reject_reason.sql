@@ -1,0 +1,2 @@
+-- Modify "invoice_correction_requests" table
+ALTER TABLE "invoice_correction_requests" DROP CONSTRAINT "chk_invcorr_reject_reason_code", ADD CONSTRAINT "chk_invcorr_reject_reason_code" CHECK ((reject_reason_code IS NULL) OR ((reject_reason_code)::text = ANY ((ARRAY['ALREADY_REPORTED'::character varying, 'PAST_VOID_DEADLINE'::character varying, 'ALLOWANCE_EXISTS'::character varying, 'TRACK_INSUFFICIENT'::character varying, 'CARRIER_INVALID'::character varying, 'PROVIDER_UNAVAILABLE'::character varying, 'PROVIDER_STATE_CONFLICT'::character varying])::text[])));

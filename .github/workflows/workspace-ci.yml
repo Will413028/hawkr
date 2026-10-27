@@ -1,0 +1,44 @@
+name: workspace CI
+
+# pnpm workspace 層級的檢查（整個 workspace 只有一棵依賴樹，不屬於哪個 app）：
+# `pnpm audit --prod` 與 scripts/check-dependency-overrides.ts，由根 package.json 的 check:deps 一次跑完。
+# 每週一次的 schedule 讓新公告的漏洞不必等到有人改依賴才被發現。
+
+on:
+  pull_request:
+    paths: &workspace_paths
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
+      - '.nvmrc'
+      - 'patches/**'
+      - 'scripts/check-dependency-overrides.ts'
+      - '.github/actions/pnpm-install/**'
+      - '.github/workflows/workspace-ci.yml'
+  push:
+    branches: [main]
+    paths: *workspace_paths
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: workspace-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # app 的 `prepare` 會跑 `lefthook install`，CI 不需要 git hooks。
+  LEFTHOOK: '0'
+
+jobs:
+  deps:
+    name: audit 與 override 檢查
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/pnpm-install
+      - run: pnpm run check:deps

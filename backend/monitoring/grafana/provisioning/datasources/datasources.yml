@@ -1,0 +1,73 @@
+# Grafana Datasources Provisioning
+# Auto-configures Prometheus, Loki, and Tempo
+
+apiVersion: 1
+
+# 先刪後建（#2286）。**不要**只是給既有 datasource 補上 uid ——
+# Grafana 的 provisioning 無法變更既有 datasource 的 uid（uid 是主鍵，補 uid 等於
+# 要求它更新一個查不到的目標），啟動時會直接 `Datasource provisioning error:
+# data source not found` 然後 CrashLoop。2026-08-07 這樣做過一次，dev 監控中斷約 10 分鐘。
+#
+# 為什麼 Prometheus 沒事而這兩個要特別處理：Prometheus 從第一次 provisioning 就帶著
+# uid 建立；Loki 與 Alertmanager 當初是無 uid 建立的，Grafana 依 name 算出確定性 uid
+# （Loki=P8E80F9AEF21F6940、Alertmanager=P7647F508D5F54FCB，本機以同版本重現得到完全
+# 相同的值），之後再補就對不上了。
+#
+# 本機以 grafana:12.3.3 驗證過三個情境：原配置→uid 為上述雜湊值；只加 uid→Exited(1)
+# 重現同一則錯誤；加本區塊→Up、health 200、uid 變成可讀值。
+#
+# ⚠️ 這一段不是冪等的：每次重啟都會刪掉再建一次，datasource 的 internal id 會遞增
+# （實測 4/5 → 6/7）。可以接受——Grafana 內部與 dashboard 都以 uid 定址，而 provisioning
+# 在 HTTP 服務啟動之前就完成，沒有「查詢打進來時 datasource 不存在」的窗口。
+# 刻意不寫成「遷移完就移除」，因為那要靠人記得，而沒人記得的結果就是下一個人再踩一次。
+deleteDatasources:
+  - name: Loki
+    orgId: 1
+  - name: Alertmanager
+    orgId: 1
+
+datasources:
+  # Prometheus - Metrics
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: POST
+      manageAlerts: true
+      prometheusType: Prometheus
+      prometheusVersion: 2.50.0
+
+  # Loki - Logs
+  - name: Loki
+    type: loki
+    uid: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+    jsonData:
+      timeout: 60
+      maxLines: 1000
+      derivedFields:
+        - datasourceUid: tempo
+          matcherRegex: "trace_id.*?([a-f0-9]{32})"
+          name: TraceID
+          url: "$${__value.raw}"
+          urlDisplayLabel: "View Trace"
+
+  # Tempo - 不在 provisioning 中管理
+  # Provisioned datasource (editable: false) 會導致 trace-to-logs 連結不顯示
+  # Tempo 改用 Grafana API 建立，詳見 TROUBLESHOOTING.md #14
+
+  # Alertmanager
+  - name: Alertmanager
+    type: alertmanager
+    uid: alertmanager
+    access: proxy
+    url: http://alertmanager:9093
+    editable: false
+    jsonData:
+      implementation: prometheus

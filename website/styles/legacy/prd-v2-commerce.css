@@ -1,0 +1,206 @@
+/* Extracted from styles/globals.css.
+ * PRD v2 IA, commerce page, search, and legacy navigation styles.
+ * Keep import order in styles/globals.css unless intentionally changing cascade.
+ */
+
+/* ===========================================
+   PRD v2 IA, Navigation, and Commerce Pages
+   =========================================== */
+/* Buyer-navbar rules removed in the 子刀 4 PR-A detangle — they were bare
+ * `.site-nav*`/`.nav-item*` selectors (0,1,0) fully shadowed by
+ * navigation-final.css `body .site-nav*` (0,1,1), with the few live-only
+ * structural/transition/transform props folded into that file. See
+ * navigation-final.css "← detangle" markers. */
+
+.page-content {
+	padding-top: 0;
+}
+
+.market-page,
+.search-page {
+	min-height: 100vh;
+	background: linear-gradient(
+		180deg,
+		rgba(248, 246, 239, 0.98) 0%,
+		rgba(255, 253, 247, 0.96) 48%,
+		rgba(245, 241, 232, 0.98) 100%
+	);
+	color: var(--ink-body);
+}
+
+/* /search + /feed use the persistent public Grainient as their page canvas.
+ * Clear these exact route owners only; no descendant surface is flattened. */
+body .search-page {
+	background: transparent;
+}
+body .page-content:has(.search-page),
+body .page-content:has(.hkui-feed-page) {
+	background: transparent;
+}
+[data-theme="dark"] body .page-content:has(.search-page),
+[data-theme="dark"] body .page-content:has(.hkui-feed-page) {
+	background: transparent;
+}
+
+/* Public PDP major surfaces share the same dark postcard tone as the homepage.
+ * The data attribute exists only on the canonical public detail route, so
+ * seller/delegated/import previews retain their workspace-owned treatment.
+ * Requiring `.page-content` also excludes the body-level quick-view portal,
+ * whose modal panel intentionally owns one continuous transparent surface. */
+[data-theme="dark"]
+	body
+	.page-content
+	.product-detail-layout[data-hk-product-detail-id]
+	.public-section-surface {
+	background: var(--color-hk-home-postcard-dark);
+	/* An opaque panel does not need to repeatedly blur the moving canvas. */
+	backdrop-filter: none;
+}
+
+.market-page {
+	padding-bottom: 86px;
+}
+
+.market-layout {
+	display: grid;
+	grid-template-columns: 210px minmax(0, 1fr);
+	gap: 24px;
+	align-items: start;
+}
+
+.market-filter {
+	position: sticky;
+	top: calc(var(--nav-height) + 24px);
+	padding: 18px;
+	border: 1px solid var(--border-soft);
+	border-radius: var(--brand-radius-lg);
+	background: var(--surface-card);
+	box-shadow: var(--brand-shadow-card);
+}
+
+.market-filter h2 {
+	margin: 0 0 12px;
+	color: var(--ink-heading);
+	font-size: 1.25rem;
+}
+
+.market-filter div {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.market-filter a {
+	min-height: 34px;
+	padding: 8px 10px;
+	border-radius: var(--brand-radius-sm);
+	color: var(--ink-body);
+	font-weight: 700;
+	text-decoration: none;
+}
+
+.market-filter a:hover {
+	background: rgb(var(--color-ink-700-rgb) / 0.08);
+	color: var(--color-brand-primary-strong);
+}
+
+.market-filter a[data-active="true"],
+.market-filter a[aria-current="page"] {
+	background: rgb(var(--color-brand-primary-strong-rgb) / 0.12);
+	color: var(--theme-text-accent-on-tint);
+	font-weight: 800;
+}
+
+.search-page {
+	padding-bottom: 88px;
+}
+
+.search-box {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 10px;
+	max-width: 760px;
+	margin: 24px 0 16px;
+	padding: 8px;
+	border: 1px solid var(--border-soft);
+	border-radius: var(--brand-radius-lg);
+	background: var(--surface-card);
+	box-shadow: var(--brand-shadow-card);
+}
+
+/* Dark-mode search input — translucent without the heavy card outline
+ * the user complained about. */
+[data-theme="dark"] .search-box {
+	background: rgba(255, 255, 255, 0.04);
+	border-color: rgba(245, 222, 165, 0.16);
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.search-box input {
+	min-width: 0;
+	min-height: 48px;
+	border: 0;
+	outline: none;
+	background: transparent;
+	color: var(--ink-heading);
+	font: inherit;
+	font-size: 1.0625rem;
+}
+
+.search-box button {
+	min-height: 48px;
+	padding: 0 22px;
+	border: 0;
+	border-radius: var(--brand-radius-md);
+	background: var(--color-brand-primary-strong);
+	color: var(--surface-card);
+	font-weight: 800;
+	cursor: pointer;
+}
+
+/* Dark-mode 搜尋 button — the solid primary fill + dark surface-card label
+ * left the text nearly unreadable and glared against the dim page. Soften
+ * to a tonal primary glass with a warm cream label so it reads calmly. */
+[data-theme="dark"] .search-box button {
+	background: rgb(var(--color-brand-primary-rgb) / 0.26);
+	border: 1px solid rgb(245 222 165 / 0.24);
+	color: #f5e9c3;
+}
+
+@media (max-width: 840px) {
+	:root {
+		--nav-height: 56px;
+	}
+
+	/* @840 buyer-navbar rules removed in the 子刀 4 PR-A detangle — all were
+	 * dup/shadowed by navigation-final.css @840 (or by floating-navigation.css's
+	 * later-import base pill).
+	 *
+	 * `.page-content` 的 padding 同樣不歸這裡：唯一擁有者是 navigation-final.css
+	 * —— padding-top 在它的 `@media (max-width: 840px)`（對齊 Navbar.tsx），
+	 * padding-bottom 在它的 `@media not (min-width: 840px)`（對齊 MobileBottomNav
+	 * 的 `max-[840px]:`）。此處原有一份 `padding-bottom: 74px`，是底部導覽列遷
+	 * Tailwind 前的舊高度，因權重較低而一直被 `body .page-content` 完全遮住；
+	 * 它唯一會現形的時機，是有人調整上游那兩個區塊的邊界時憑空冒出一塊幽靈空位。
+	 * 要改內容淨空請改 navigation-final.css，不要在這裡加回來。 */
+
+	.market-layout {
+		grid-template-columns: 1fr;
+	}
+
+	.market-filter {
+		position: static;
+	}
+
+	.market-filter {
+		display: none;
+	}
+
+	.search-box {
+		grid-template-columns: 1fr;
+	}
+
+	.search-box button {
+		width: 100%;
+	}
+}

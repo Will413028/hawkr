@@ -1,0 +1,114 @@
+-- Seller notification.announcement identity-migration marker (issue #2707, Task 5
+-- fix round, C1).
+--
+-- `notification.announcement` has NO `notification_templates` row at all — the
+-- seller-side row that used to exist (id 12 in the 20260703130000 baseline) was
+-- deliberately DELETED by 20260822130000_delete_ghost_announcement_broadcast_
+-- templates.sql: it was a ghost (zero publisher ever emitted the MQ event), and the
+-- real writer is `BroadcastAnnouncement` (internal/grpc/server_broadcast.go), which
+-- writes `notifications`/`push_notifications` directly and bypasses the template
+-- engine entirely.
+--
+-- Task 5's dual-identity read routing (db/queries/notifications.sql) treats "no
+-- matching notification_templates row" as "unmigrated ⇒ expect account_id". That
+-- default is wrong for CURRENT and future seller `notification.announcement` rows:
+-- `BroadcastAnnouncement.deliverAnnouncement` writes `user_id` straight from
+-- `device_tokens.user_id` (`t.UserID`, from `GetActiveByUserType`), and gateway's
+-- `resolveNotificationUserID` (issue #2707 Task 1, commit 57cefff9f, same branch)
+-- resolves every NEW seller device-token registration to `Store.CurrentStoreID`
+-- going forward.
+--
+-- This was NOT always true, and this migration's identity_migrated=true does carry
+-- a real historical-row cost, same as Task 4's precedent for newly-migrated
+-- event_types: BEFORE commit 57cefff9f shipped, `resolveNotificationUserID`
+-- unconditionally returned the raw `accountID` for any non-buyer caller — its own
+-- prior doc comment stated this explicitly as "契約本身" (the contract itself), not
+-- a fallback. So every seller `device_tokens` row registered before that deploy,
+-- and every `notification.announcement` row `BroadcastAnnouncement` wrote against
+-- one of those stale tokens, is genuinely in account_id space (23 rows in dev as of
+-- this writing). identity_migrated=true makes those specific historical rows
+-- correctly invisible going forward — an accepted, bounded transitional cost, not a
+-- bug this migration introduces.
+--
+-- Residual risk, not fully closed by this migration: `device_tokens`' unique key is
+-- (user_id, user_type, token) — `uni_device_tokens_user_token` — not `token` alone.
+-- Two DISTINCT causes can leave a seller's device enumerated under more than one
+-- user_id, and `BroadcastAnnouncement`'s `GetActiveByUserType` will pick up either
+-- and write a duplicate/invisible `notification.announcement` row for it:
+--
+-- (a) Pre-Task-1 stale account_id-keyed rows — SELF-HEALING, addressed by this
+--     branch. A row registered before the Task 1 deploy (commit 57cefff9f) that
+--     never rotated its token is still account_id-keyed. This branch's one-time
+--     backfill (issue #2707 task 8,
+--     docs/runbooks/seller-notification-identity-store-id-backfill.md) rewrites
+--     these to the account's current store_id in the same deploy window, before
+--     code deploy; any row it somehow misses still self-heals the old way — the
+--     next natural token rotation re-registers under store_id, since the write
+--     path has been store_id-only since Task 1. Either way this source does not
+--     persist.
+--
+-- (b) Retired-incarnation device tokens on the SAME physical device — NOT
+--     self-healing, no cleanup exists. When a seller closes and reopens their
+--     store (a new `store_id` incarnation) without that device's FCM token
+--     rotating, `UpsertDeviceToken`'s `ON CONFLICT (user_id, user_type, token)`
+--     inserts a NEW row keyed on the new store_id while the OLD store_id's row is
+--     left `is_active = true` — nothing deactivates it. `seller_deleted.go`'s
+--     handler (same fix round) only scrubs/soft-deletes inbox rows on
+--     seller.deleted; it never touches `device_tokens`. That device then keeps
+--     receiving duplicate announcement pushes across incarnation changes
+--     indefinitely, until its token happens to rotate for unrelated reasons. This
+--     is a real, permanent gap — not introduced by this migration, but not closed
+--     by it either — tracked as a follow-up task, not fixed here.
+--
+-- In practice both causes degrade to "one duplicate/invisible row (and possibly a
+-- duplicate push)" rather than a missed announcement — the same low-severity shape
+-- already documented for the buyer side in gateway's `resolveNotificationUserID`
+-- doc comment (prod 2026-08-26: duplicate device_token rows per buyer across
+-- account_id/buyer_id spaces, until logout or token rotation clears the stale one).
+--
+-- Fix: insert a pure migration-state marker row scoped to
+-- (event_type='notification.announcement', target_user_type='seller') with
+-- identity_migrated=true, so the dual-identity EXISTS check in
+-- db/queries/notifications.sql correctly routes these rows to @primary_id
+-- (store_id) instead of falling through to the "no template ⇒ unmigrated" default.
+-- This row is NEVER read or rendered by BroadcastAnnouncement (it doesn't touch
+-- notification_templates at all) and is NOT picked up by the MQ-driven template
+-- worker (there is still no publisher for this event_type — that fact is exactly
+-- why the original row was deleted as a ghost). enabled=false keeps it out of any
+-- "live templates" admin listing/cache-refresh expectation; the cosmetic template
+-- fields (title/body/category/data_type/exchange/routing_key) are carried over
+-- verbatim from the deleted baseline row (id 12) purely for historical
+-- continuity/documentation — they are inert.
+--
+-- target_user_field is deliberately '' (empty), NOT the baseline row's original
+-- 'merchantId': internal/worker/template_contract_test.go's assertIdentitySpace
+-- treats an empty target_user_field as "broadcast template：無 1:1 收件人語意，沒有
+-- 身分欄位可驗" and skips the golden-entry requirement — the exact same escape
+-- hatch the OTHER two broadcast ghosts (ids 101/102, deleted by the same prior
+-- migration) already used with target_user_field=''. This row genuinely has no
+-- 1:1-recipient payload field for the contract test to check (BroadcastAnnouncement
+-- doesn't read target_user_field at all), so '' is the honest value, not a
+-- workaround — using the original 'merchantId' would incorrectly claim this row
+-- still expects a golden contract entry that will never exist.
+--
+-- Audit scope note: a general read-only dev-DB audit for OTHER seller event_types
+-- with no matching notification_templates row at all (same fix-round C1 requirement)
+-- found 8 more candidates (chat_message, comment.liked, merchant.verification.
+-- completed, order.paid, order.placed, order.refund.requested.merchant,
+-- order.shipped.merchant, post.created) — 9 orphans total including
+-- notification.announcement above. All 8 of the others were confirmed DEAD (bounded
+-- historical rows from renamed/removed event_types, zero active producer, verified
+-- against migration history AND dev-DB write timestamps that stop at or before the
+-- migration that superseded each one). None of the 8 need a marker row: their
+-- "unmigrated ⇒ account_id" default is either correct (the rows genuinely were
+-- account_id-space at write time) or moot (there will never be a new row). Full
+-- per-event_type evidence is in the Task 5 fix-round report, not duplicated here.
+INSERT INTO "notification_templates" (
+  "exchange", "routing_key", "event_type", "target_user_type", "target_user_field",
+  "category", "title_template", "body_template", "body_fallback", "data_type",
+  "data_fields", "reference_id_template", "enabled", "push_mode", "identity_migrated"
+) VALUES (
+  'hawkr.notification', 'notification.announcement', 'notification.announcement', 'seller', '',
+  'system', '#{title}', '#{body}', '您有一則系統公告，請開啟應用程式查看。', 'SYSTEM_ANNOUNCEMENT',
+  '{"announcementId": {"field": "announcementId"}}', 'announcement_#{announcementId}_#{merchantId}', false, 'visible', true
+);

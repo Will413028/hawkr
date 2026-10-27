@@ -1,0 +1,9 @@
+storefront.read
+storefront.write
+products.read
+products.write
+products.publish
+posts.read
+posts.write
+posts.publish
+orders.read

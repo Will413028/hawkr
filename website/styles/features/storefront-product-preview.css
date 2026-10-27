@@ -1,0 +1,59 @@
+/* Sheet moves focus to the dialog panel on open. Honour its intended
+ * outline-none treatment and radius instead of inheriting the global 8px
+ * focus reset, which otherwise draws a second green frame around the drawer. */
+.storefront-product-preview-drawer:focus-visible {
+	outline: none;
+	border-radius: var(--hkui-radius-2xl);
+}
+
+.storefront-product-preview-drawer__body {
+	container-name: storefront-product-preview;
+	container-type: inline-size;
+}
+
+/* ProductDetailLayout normally responds to the viewport. Inside a desktop
+ * drawer it must instead collapse against the drawer's own inline size. */
+@container storefront-product-preview (max-width: 1000px) {
+	.storefront-product-preview-drawer__content .product-detail-layout__identity {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 16px;
+	}
+
+	.storefront-product-preview-drawer__content
+		.product-detail-layout__identity
+		aside {
+		max-width: none;
+		padding-top: 14px;
+		border-top: 1px solid rgb(225 219 206 / 0.75);
+	}
+}
+
+@container storefront-product-preview (max-width: 760px) {
+	.storefront-product-preview-drawer__content .product-detail-layout {
+		padding-right: 16px;
+		padding-bottom: 32px;
+		padding-left: 16px;
+	}
+
+	.storefront-product-preview-drawer__content .product-detail-layout__hero {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.storefront-product-preview-drawer__content .product-detail-layout__hero {
+		gap: 32px;
+	}
+}
+
+@container storefront-product-preview (max-width: 520px) {
+	.storefront-product-preview-drawer__content .product-detail-layout__card {
+		padding: 20px;
+		border-width: 2px;
+		border-radius: 24px;
+	}
+}
+
+@media (max-width: 768px) {
+	.storefront-product-preview-drawer:focus-visible {
+		border-radius: 0;
+	}
+}

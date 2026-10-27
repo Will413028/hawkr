@@ -1,0 +1,680 @@
+syntax = "proto3";
+
+package hawkr.social;
+
+import "common/delegation.proto";
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/social";
+option java_multiple_files = true;
+option java_package = "io.github.will413028.hawkr.social.grpc";
+option java_outer_classname = "SocialProto";
+
+// Social Service - Post, Comment & Forum gRPC
+service SocialService {
+    // Post APIs
+    rpc GetPostList(GetPostListRequest) returns (PostListResponse);
+    rpc GetPostDetail(GetPostDetailRequest) returns (PostDetailResponse);
+    rpc CreatePost(CreatePostRequest) returns (PostResponse);
+    rpc UpdatePost(UpdatePostRequest) returns (PostResponse);
+    rpc DeletePost(DeletePostRequest) returns (PostOperationResponse);
+
+    // 賣家更新貼文發布狀態（草稿 ↔ 已發布 ↔ 已下架；支援排程）。
+    // 與 CreatePost/UpdatePost 分離，讓「編輯」與「發布」可以分權（posts.write vs posts.publish）。
+    rpc UpdateSellerPostStatus(UpdateSellerPostStatusRequest) returns (PostResponse);
+
+    rpc TogglePostLike(TogglePostLikeRequest) returns (TogglePostLikeResponse);
+    rpc SharePost(SharePostRequest) returns (SharePostResponse);
+
+    // Post Moderation APIs
+    rpc ReportPost(ReportPostRequest) returns (ReportPostResponse);
+    rpc ListMyPosts(ListMyPostsRequest) returns (PostListResponse);
+    rpc AdminListPosts(AdminListPostsRequest) returns (AdminPostListResponse);
+    rpc AdminModeratePost(AdminModeratePostRequest) returns (PostOperationResponse);
+
+    // Hashtag APIs (B-153)
+    rpc SearchHashtags(SearchHashtagsRequest) returns (SearchHashtagsResponse);
+    rpc GetTrendingHashtags(GetTrendingHashtagsRequest) returns (GetTrendingHashtagsResponse);
+
+    // Comment APIs
+    rpc GetCommentList(GetCommentListRequest) returns (CommentListResponse);
+    rpc CreateComment(CreateCommentRequest) returns (CommentResponse);
+    rpc UpdateComment(UpdateCommentRequest) returns (CommentResponse);
+    rpc DeleteComment(DeleteCommentRequest) returns (CommentOperationResponse);
+    rpc ToggleCommentLike(ToggleCommentLikeRequest) returns (ToggleCommentLikeResponse);
+
+    // Forum APIs
+    rpc GetSellerForum(GetSellerForumRequest) returns (ForumListResponse);
+    rpc GetForumReplies(GetForumRepliesRequest) returns (ForumListResponse);
+    rpc CreateForumComment(CreateForumCommentRequest) returns (ForumCommentResponse);
+    rpc ReplyForumComment(ReplyForumCommentRequest) returns (ForumCommentResponse);
+    rpc UpdateForumComment(UpdateForumCommentRequest) returns (ForumCommentResponse);
+    rpc DeleteForumComment(DeleteForumCommentRequest) returns (ForumOperationResponse);
+
+    // ===== B-135: Content Reporting & User Blocking (Apple Guideline 1.2) =====
+
+    // Buyer / Seller App APIs
+    rpc SubmitReport(SubmitReportRequest) returns (SubmitReportResponse);
+    rpc ListMyReports(ListMyReportsRequest) returns (ListMyReportsResponse);
+    rpc BlockUser(BlockUserRequest) returns (BlockUserResponse);
+    rpc UnblockUser(UnblockUserRequest) returns (UnblockUserResponse);
+    rpc ListBlocks(ListBlocksRequest) returns (ListBlocksResponse);
+
+    // Admin APIs
+    rpc AdminListReports(AdminListReportsRequest) returns (AdminListReportsResponse);
+    rpc AdminGetReport(AdminGetReportRequest) returns (AdminGetReportResponse);
+    rpc AdminResolveReport(AdminResolveReportRequest) returns (AdminResolveReportResponse);
+    rpc AdminReopenReport(AdminReopenReportRequest) returns (AdminReopenReportResponse);
+}
+
+// ==================== B-135 Messages ====================
+
+// target_type 的值域見 CodeMeta `ReportTargetType`（docs/代碼管理（CodeMeta）/業務類型碼.md）。
+// reason_code 的值域見 CodeMeta `ReportReasonCode`（同上）。
+// 兩者刻意不在此重列：這段註解曾列出 HATE / ADULT 兩個 DB CHECK 從未接受的值，
+// 同時漏掉 SEXUAL / FOOD_SAFETY / POLITICAL / FAKE_NEWS——照抄註解就會抄到死值。
+message SubmitReportRequest {
+    int64  reporter_id = 1;
+    string target_type = 2;
+    string  target_id   = 3;
+    string reason_code = 4;
+    string description = 5;
+    repeated string evidence_keys = 6; // objectKey 陣列，max 5（49 §6.6；Gateway 組顯示 URL）
+}
+
+message SubmitReportResponse {
+    string report_id = 1;
+    string status    = 2; // PENDING / DISMISSED (if 24h idempotent hit)
+}
+
+message ListMyReportsRequest {
+    int64 reporter_id = 1;
+    int32 page        = 2;
+    int32 page_size   = 3;
+}
+
+message Report {
+    string id              = 1;
+    string reporter_id     = 2;
+    string target_type     = 3;
+    string target_id       = 4;
+    string reason_code     = 5;
+    string description     = 6;
+    string status          = 7;
+    string resolved_action = 8;
+    int64  resolved_by     = 9;
+    int64  resolved_at_ms  = 10;
+    int64  create_time_ms  = 11;
+    string recent_action_count = 12;  // 近 90 天此 target_owner 被處置次數，唯讀，2026-07 累犯呈現（§6.1：計數欄位一律 string）
+}
+
+message ListMyReportsResponse {
+    repeated Report reports = 1;
+}
+
+message BlockUserRequest {
+    int64 blocker_id = 1;
+    string blocked_id = 2;
+}
+message BlockUserResponse {}
+
+message UnblockUserRequest {
+    int64 blocker_id = 1;
+    string blocked_id = 2;
+}
+message UnblockUserResponse {}
+
+message ListBlocksRequest {
+    int64 blocker_id = 1;
+    int32 page       = 2;
+    int32 page_size  = 3;
+}
+
+message UserBlock {
+    string id            = 1;
+    string blocked_id    = 2;
+    int64 create_time_ms = 3;
+}
+
+message ListBlocksResponse {
+    repeated UserBlock blocks = 1;
+}
+
+message AdminListReportsRequest {
+    string status      = 1;
+    string target_type = 2;
+    string reason_code = 3;
+    int32  page        = 4;
+    int32  page_size   = 5;
+}
+
+message AdminListReportsResponse {
+    repeated Report reports = 1;
+}
+
+message AdminGetReportRequest {
+    string report_id = 1;
+}
+message AdminGetReportResponse {
+    Report report = 1;
+}
+
+// action 的值域見 CodeMeta `ReportResolveAction`（docs/代碼管理（CodeMeta）/業務類型碼.md）。
+// 注意它與稽核 log 的 `ModerationActionType`（內部技術碼）不同軸：後者是前者的嚴格
+// 超集（多 AUTO_REJECT / REOPEN），不得拿來當本欄位的值域。
+message AdminResolveReportRequest {
+    string  report_id   = 1;
+    int64  admin_id    = 2;
+    string action      = 3;
+    string note        = 4;
+}
+
+message AdminResolveReportResponse {
+    Report report = 1;
+}
+
+message AdminReopenReportRequest {
+    string report_id = 1;
+    int64  admin_id   = 2;
+    string note       = 3;
+}
+
+message AdminReopenReportResponse {
+    Report report = 1;
+}
+
+// ==================== Post Messages ====================
+
+message GetPostListRequest {
+    // 觀看者的 buyer_id（0 = 訪客）。貼文讚永遠是本人身分，is_liked 只看這個身分。
+    int64 buyer_id = 1;
+    string seller_id = 2;
+    int32 page = 3;
+    int32 page_size = 4;
+    string tag = 5;                     // B-153: 單 tag 篩選（canonical 或 raw，server normalize）；空字串 = 不篩
+}
+
+message GetPostDetailRequest {
+    // 觀看者的 buyer_id（0 = 訪客）。貼文讚永遠是本人身分，is_liked 只看這個身分。
+    int64 buyer_id = 1;
+    string post_id = 2;
+    // 代行讀取的歸屬鍵（target store surrogate；§4.1 例外 1，Gateway 注入、前端不可控）。
+    // 0 = 非代行路徑，不做歸屬判定。
+    //
+    // 本欄不能省：§6.2.4 的 S4 要求「本次 request 的歸屬鍵」，而 DelegationContext
+    // 刻意不含 target_store_id（S4 只驗存在、Q4 才驗正確）；本 message 原本又只有
+    // user_id（觀看者，用於 is_liked）與 post_id 兩欄。沒有這一欄，Q4
+    // （§7.1.2「資源真的屬於這個 store」）在 GetPostDetail 上**無值可比**——
+    // 而 GetPost 的 SQL 刻意不過濾 seller（留言／檢舉派工／隱藏／詳情四類路徑共用它
+    // 作存在性查詢，過濾會讓草稿無法被治理），於是缺這一欄就等於代行者讀得到任意
+    // 賣家的貼文詳情，且讀取成功不落稽核 ⇒ 零痕跡。
+    // 對應 GetProductListRequest.owner_store_id（§6.2.4 S4 引用的同一個模式）。
+    //
+    // 店主讀取：沒有 delegation 且 owner_store_id != 0（Gateway 的
+    // GET /app/sellers/posts/:id 以 CurrentStoreID 注入）。店主讀自己的貼文，不分發布狀態
+    // 與是否被平台下架；非歸屬的貼文回 NotFound（與不存在相同，不洩漏存在），不加 view_count。
+    // 代行分支不變：非歸屬回 DELEGATION_RESOURCE_NOT_OWNED 並由 Gateway 寫稽核。
+    int64 owner_store_id = 3;
+    hawkr.common.DelegationContext delegation = 100;
+}
+
+message TogglePostLikeRequest {
+    // 呼叫者的 buyer_id。貼文讚永遠是本人身分（actor_kind = buyer），不論呼叫者在哪個工作區。
+    int64 buyer_id = 1;
+    string post_id = 2;
+    // 呼叫者此刻的 store_id（沒有為 0），只用來判斷「店主讚自己的貼文」：這種讚不推 post.liked 通知；
+    // 比對 cms_post.seller_id 代理鍵。
+    int64 store_id = 3;
+}
+
+message PostProduct {
+    string id = 1;
+    string name = 2;
+    string image_key = 3; // 商品圖 objectKey（49 §6.6；Gateway 組顯示 URL）
+    string price = 4;
+}
+
+message PostListItem {
+    string id = 1;
+    reserved 2;         // was: title
+    string image_key = 3; // 貼文圖 objectKey（49 §6.6；Gateway 組顯示 URL）
+    string seller_id = 4;
+    string seller_name = 5;
+    int32 like_count = 6;
+    int32 comment_count = 7;
+    int32 view_count = 8;
+    bool is_liked = 9;
+    reserved 10;         // was: is_saved
+    int64 created_at = 11;
+    string content = 12;
+    int32 share_count = 13;
+    PostProduct product = 14;
+    string seller_logo_key = 15; // 賣家 logo objectKey（49 §6.6；Gateway 組顯示 URL）
+    string hidden_reason = 16;  // 僅 ListMyPosts 回傳，hidden 狀態貼文的下架原因
+    int64 hidden_at = 17;       // unix timestamp，0 表示未下架
+    repeated string tags = 18;  // B-153: canonical hashtag 名稱，依 position 升序
+    string publish_status = 19; // PostPublishStatus 數字碼字串，值域與 Label 見 CodeMeta（不在此重列）
+                                // 與 PostDetailInfo.publish_status 同口徑。列表少了它，前端分不出
+                                // 一則貼文是草稿還是已發布 —— 兩者在列表上長得一樣（草稿沒有任何
+                                // 狀態標記），而代行工作區的管理員正靠列表判斷這家店的經營狀態。
+    string scheduled_publish_at = 20; // 僅 ListMyPosts 回傳；ISO 8601 UTC，排程尚未執行（schedule_state = pending）才有值，其餘空字串
+}
+
+message PostListResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated PostListItem data = 3;
+    int64 total = 4;
+    int32 page = 5;
+    int32 page_size = 6;
+}
+
+message PostDetailInfo {
+    string id = 1;
+    reserved 2;         // was: title
+    string content = 3;
+    reserved 4;         // was: content_type
+    repeated string image_keys = 5; // 貼文圖 objectKey 陣列（49 §6.6；Gateway 組顯示 URL）
+    reserved 6;         // was: video_url
+    string seller_id = 7;
+    string seller_name = 8;
+    string seller_logo_key = 9; // 賣家 logo objectKey（49 §6.6；Gateway 組顯示 URL）
+    repeated PostProduct products = 10;
+    int32 like_count = 11;
+    int32 comment_count = 12;
+    int32 view_count = 13;
+    int32 share_count = 14;
+    bool is_liked = 15;
+    reserved 16;         // was: is_saved
+    int64 created_at = 17;
+    repeated string tags = 18;  // B-153: canonical hashtag 名稱，依 position 升序
+
+    // ==================== 發布狀態與樂觀鎖（56 設計書 §6.2.3 / §5.1.5） ====================
+    string publish_status = 19;           // PostPublishStatus 數字碼字串，值域與 Label 見 CodeMeta（不在此重列），見 §6.5.3；
+                                          // 「已排程」不是本欄的值，由 schedule_state 表達（§5.1.5）
+    string scheduled_publish_at = 20;     // 空字串 = 無排程
+    string published_at = 21;             // 空字串 = 尚未發布
+    string version = 22;                  // 樂觀鎖版本（數字字串）
+
+    // 以下兩欄在賣家自己的讀取（GetPostDetailRequest 的店主分支與代行分支）填；公開路徑空字串。
+    // 可見度由「這筆回不回」控制，不由欄位填不填控制；Gateway 的公開 DTO 不輸出這兩欄。
+    string hidden_at = 23;                // 被平台下架的時間（ISO 8601 UTC）；空字串 = 未下架
+    string hidden_reason = 24;            // 平台下架原因；空字串 = 未下架或沒有原因
+}
+
+message PostDetailResponse {
+    int32 code = 1;
+    string message = 2;
+    PostDetailInfo data = 3;
+}
+
+message TogglePostLikeResponse {
+    int32 code = 1;
+    string message = 2;
+    bool liked = 3;
+}
+
+// ==================== Post CRUD Messages ====================
+
+message CreatePostRequest {
+    int64 seller_id = 1;
+    reserved 2;         // was: title
+    string content = 3;
+    reserved 4;         // was: content_type
+    repeated string staged_tokens = 5;  // media-service staged token（取第一個）
+    reserved 6;         // was: video_url
+    repeated string product_ids = 7;     // 取第一個
+    repeated string tags = 8;           // B-153: 賣家輸入 raw（不含 #），server normalize
+    // 刻意**不加** publish_mode / scheduled_publish_at：建立一律為草稿，
+    //    發布走 UpdateSellerPostStatus（capability posts.publish）。
+    //    詳見 56 設計書 §6.1.9「為什麼拆成兩支」。
+    string idempotency_key = 9;
+    hawkr.common.DelegationContext delegation = 100;
+}
+
+message UpdatePostRequest {
+    string post_id = 1;
+    int64 seller_id = 2;
+    reserved 3;         // was: title
+    string content = 4;
+    reserved 5;         // was: content_type
+    repeated string keep_asset_ids = 6;     // 要保留的現有圖片 asset_id（取第一個）
+    reserved 7;         // was: video_url
+    repeated string product_ids = 8;         // 取第一個
+    repeated string new_staged_tokens = 9;  // 新增圖片的 staged token（取第一個）
+    repeated string tags = 10;              // B-153: PATCH 用，配合 tags_present 區分「沒傳 vs 傳空」
+    bool tags_present = 11;                 // B-153: true → tags 欄位被明確設定（含空陣列）；false → 不動
+    string expected_version = 12;
+    string idempotency_key = 13;
+    hawkr.common.DelegationContext delegation = 100;
+}
+
+message UpdateSellerPostStatusRequest {
+    string post_id = 1;
+    int64 seller_id = 2;                  // store surrogate；Gateway 注入（§4.1 例外 1）
+    // PostPublishStatus 的**數字碼字串**，本欄位只接受 4402 與 4403。
+    // 不接受 4401（未發布）—— 回到未發布不是一個發布命令，本期無此需求。
+    // 此處列碼不列 Label：Label 的唯一來源是 CodeMeta，4401 已被改過一次
+    // （原為「草稿」），任何抄在這裡的中文都不會轉紅、只會從那天起說錯話。
+    // 刻意不用 "PUBLISHED"／"UNPUBLISHED" 這種語意字串：同一個事實在
+    //    PostDetailInfo.publish_status 已經是數字碼字串（§6.2.3），一個 request
+    //    用名字、一個 response 用碼，會逼每個呼叫端自備一份雙向對照表，
+    //    而那份表沒有 SSOT。碼值一律查 CodeMeta 的 PostPublishStatus（§6.5.3）。
+    string target_status = 3;
+    string scheduled_publish_at = 4;      // 非空 = 排程發布，target_status 必須是 "4402"
+    string expected_version = 5;
+    string idempotency_key = 6;
+    hawkr.common.DelegationContext delegation = 100;
+}
+
+message DeletePostRequest {
+    string post_id = 1;
+    int64 seller_id = 2;
+}
+
+message PostResponse {
+    int32 code = 1;
+    string message = 2;
+    PostDetailInfo data = 3;
+}
+
+message PostOperationResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+message SharePostRequest {
+    string post_id = 1;
+    int64 user_id = 2;
+    string platform = 3;
+}
+
+message SharePostResponse {
+    int32 code = 1;
+    string message = 2;
+    int32 share_count = 3;
+}
+
+// ==================== Comment Messages ====================
+
+message CommentInfo {
+    string id = 1;
+    string post_id = 2;
+    reserved 3;  // was: user_id（公開輸出不帶內部身分 ID；是不是呼叫者自己的留言看 is_mine）
+    string user_name = 4;
+    string user_avatar_key = 5; // 頭像 objectKey/外部 URL（49 §6.6 S2；Gateway 組顯示 URL）
+    string content = 6;
+    string parent_id = 7;
+    string reply_to_id = 8;
+    string reply_to_name = 9;
+    int32 like_count = 10;
+    int32 reply_count = 11;
+    bool is_liked = 12;
+    int64 created_at = 13;
+    repeated CommentInfo replies = 14;
+    int32 actor_kind = 15;  // 留言者的身分種類：1=buyer, 2=store
+    bool is_mine = 16;      // 留言者是不是呼叫者此刻的買家或店家身分（伺服器依請求的 buyer_id、store_id 算）
+}
+
+message GetCommentListRequest {
+    string post_id = 1;
+    // 觀看者此刻的 buyer_id、store_id（沒有為 0；兩者都 0 = 訪客）。留言讚與 is_mine 依此推導。
+    int64 buyer_id = 2;
+    int64 store_id = 6;
+    int32 page = 3;
+    int32 page_size = 4;
+    string parent_id = 5;  // Optional: filter by parent comment ID for getting replies
+}
+
+message CommentListResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated CommentInfo data = 3;
+    int64 total = 4;
+    int32 page = 5;
+    int32 page_size = 6;
+}
+
+message CreateCommentRequest {
+    string post_id = 1;
+    // 呼叫者此刻的 buyer_id、store_id（沒有為 0）。互動身分由 social 依貼文歸屬推導：貼文屬於 store_id → 店家；
+    // 否則 → buyer_id（為 0 時拒絕）。
+    int64 buyer_id = 2;
+    reserved 3, 4;  // was: user_name, user_avatar（由 social-service 自行查詢）
+    string content = 5;
+    string parent_id = 6;
+    string reply_to_id = 7;
+    reserved 8;  // was: role（身分由伺服器推導）
+    string client_request_id = 9;  // client 端 UUID，用於 SSE 推回時 dedup optimistic（見 §41 §3.7）
+    int64 store_id = 10;
+}
+
+message UpdateCommentRequest {
+    string comment_id = 1;
+    // 呼叫者此刻的 buyer_id、store_id（沒有為 0）。擁有權比 (actor_kind, id)。
+    int64 buyer_id = 2;
+    string content = 3;
+    int64 store_id = 4;
+}
+
+message DeleteCommentRequest {
+    string comment_id = 1;
+    // 呼叫者此刻的 buyer_id、store_id（沒有為 0）。留言者本人，或貼文所屬的店，可以刪。
+    int64 buyer_id = 2;
+    int64 store_id = 3;
+}
+
+message CommentResponse {
+    int32 code = 1;
+    string message = 2;
+    CommentInfo data = 3;
+}
+
+message CommentOperationResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+message ToggleCommentLikeRequest {
+    string comment_id = 1;
+    // 呼叫者此刻的 buyer_id、store_id（沒有為 0）。留言所在的貼文屬於 store_id → 店家的讚；否則 → buyer_id 的讚。
+    int64 buyer_id = 2;
+    int64 store_id = 3;
+}
+
+message ToggleCommentLikeResponse {
+    int32 code = 1;
+    string message = 2;
+    bool liked = 3;
+}
+
+// ==================== Forum Messages ====================
+
+message ForumEntryInfo {
+    string id = 1;
+    string seller_id = 2;
+    reserved 3;  // was: user_id（公開輸出不帶內部身分 ID；是不是呼叫者自己的留言看 is_mine）
+    string user_name = 4;
+    string user_avatar_key = 5; // 頭像 objectKey/外部 URL（49 §6.6 S2；Gateway 組顯示 URL）
+    string content = 6;
+    string parent_id = 7;
+    string reply_to_id = 8;
+    string reply_to_name = 9;
+    int32 reply_count = 10;
+    int64 created_at = 11;
+    int32 actor_kind = 12;  // 留言者的身分種類：1=buyer, 2=store
+    bool is_mine = 13;      // 留言者是不是呼叫者此刻的買家或店家身分（伺服器依請求的 buyer_id、store_id 算）
+}
+
+message GetSellerForumRequest {
+    string seller_id = 1;
+    int32 page = 2;
+    int32 page_size = 3;
+    int64 buyer_id = 4; // viewer 此刻的 buyer_id（B-135 封鎖過濾、is_mine）
+    int64 store_id = 5; // viewer 此刻的 store_id（沒有為 0）
+}
+
+message GetForumRepliesRequest {
+    string parent_id = 1;
+    int32 page = 2;
+    int32 page_size = 3;
+    int64 buyer_id = 4; // viewer 此刻的 buyer_id（B-135 封鎖過濾、is_mine）
+    int64 store_id = 5; // viewer 此刻的 store_id（沒有為 0）
+}
+
+message ForumListResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated ForumEntryInfo data = 3;
+    int64 total = 4;
+    int32 page = 5;
+    int32 page_size = 6;
+}
+
+message CreateForumCommentRequest {
+    string seller_id = 1;
+    // 呼叫者此刻的 buyer_id、store_id（沒有為 0）。討論區屬於 store_id → 店家身分；否則 → buyer_id（為 0 時拒絕）。
+    int64 buyer_id = 2;
+    string content = 3;
+    int64 store_id = 4;
+    reserved 5;  // was: role（身分由伺服器推導）
+}
+
+message ReplyForumCommentRequest {
+    string parent_id = 1;
+    // 呼叫者此刻的 buyer_id、store_id（沒有為 0）。身分的推導同 CreateForumCommentRequest。
+    int64 buyer_id = 2;
+    string content = 3;
+    int64 store_id = 4;
+    reserved 5;  // was: role（身分由伺服器推導）
+}
+
+message UpdateForumCommentRequest {
+    string entry_id = 1;
+    // 呼叫者此刻的 buyer_id、store_id（沒有為 0）。擁有權比 (actor_kind, id)。
+    int64 buyer_id = 2;
+    string content = 3;
+    int64 store_id = 4;
+}
+
+message DeleteForumCommentRequest {
+    string entry_id = 1;
+    // 呼叫者此刻的 buyer_id、store_id（沒有為 0）。留言者本人，或討論區所屬的店（cms_seller_forum.seller_id），可以刪。
+    int64 buyer_id = 2;
+    int64 store_id = 3;
+}
+
+message ForumCommentResponse {
+    int32 code = 1;
+    string message = 2;
+    ForumEntryInfo data = 3;
+}
+
+message ForumOperationResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+// ==================== Post Moderation Messages ====================
+
+message ReportPostRequest {
+    int64 reporter_id = 1;
+    string post_id = 2;
+    string reason_code = 3;   // SPAM/SEXUAL/POLITICAL/FAKE_NEWS/FOOD_SAFETY/HARASSMENT/OTHER
+    string description = 4;
+}
+
+message ReportPostResponse {
+    int32 code = 1;
+    string message = 2;
+    string report_id = 3;
+    string created_at = 4;    // RFC3339
+}
+
+message ListMyPostsRequest {
+    int64 seller_id = 1;
+    string status = 2;         // "" | "published" | "hidden"
+    int32 page = 3;
+    int32 page_size = 4;
+    hawkr.common.DelegationContext delegation = 100;
+}
+
+message AdminListPostsRequest {
+    string status = 1;         // "" | "published" | "hidden" | "deleted"
+    int32 page = 2;
+    int32 page_size = 3;
+}
+
+message AdminPostListItem {
+    string post_id = 1;
+    // account_id 命名債正名（2026-08-02）：欄位名原叫 seller_account_id，值一直是
+    // p.SellerID（cms_post.seller_id，即 store surrogate），不是登入 account_id。
+    // field number 不變（wire 相容），只改名字。
+    string store_id = 2;
+    string seller_name = 3;
+    string content = 4;
+    repeated string image_keys = 5; // 貼文圖 objectKey 陣列（49 §6.6；Gateway 組顯示 URL）
+    int32 report_count = 6;
+    string latest_report_reason = 7;
+    int64 latest_report_at = 8;  // unix timestamp，0 表示無舉報
+    string status = 9;           // published | hidden | deleted
+    int64 created_at = 10;
+    string hidden_reason = 11;
+}
+
+message AdminPostListResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated AdminPostListItem data = 3;
+    int64 total = 4;
+    int32 page = 5;
+    int32 page_size = 6;
+}
+
+message AdminModeratePostRequest {
+    string post_id = 1;
+    string action = 2;   // "HIDE" | "RESTORE"
+    string reason = 3;
+    int64 operator_id = 4;  // admin account id，2026-07 補 audit trail
+    string reason_code = 5; // HIDE 時的分類（reports.reason_code 8 碼），空/非法值 social 端 fallback OTHER
+}
+
+// ==================== Hashtag Messages (B-153) ====================
+
+enum HashtagSearchMode {
+    HASHTAG_SEARCH_PREFIX = 0;    // LIKE 'q%'，預設
+    HASHTAG_SEARCH_CONTAIN = 1;   // pg_trgm 中間匹配
+}
+
+message SearchHashtagsRequest {
+    string q = 1;                     // 搜尋字串（不含 #），server normalize
+    HashtagSearchMode mode = 2;       // 預設 PREFIX
+    int32 limit = 3;                  // 預設 10，最大 20
+}
+
+message HashtagSuggestItem {
+    string name = 1;                  // canonical 名稱
+    string post_count = 2;            // 對外數字一律 string（docs/開發規範/Java 微服務開發規範.md §2）
+}
+
+message SearchHashtagsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated HashtagSuggestItem data = 3;
+}
+
+message GetTrendingHashtagsRequest {
+    string start_from = 1;            // YYYY-MM-DD，可空
+    string end_to = 2;                // YYYY-MM-DD，可空
+    int32 limit = 3;                  // 預設 20，最大 50
+}
+
+message TrendingHashtagItem {
+    string hashtag = 1;               // canonical 名稱（沿用 product trending 字段命名）
+    string count = 2;                 // 對外數字一律 string
+}
+
+message GetTrendingHashtagsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated TrendingHashtagItem data = 3;
+}

@@ -1,0 +1,17 @@
+-- expand-contract 的收縮步：移除 notification_templates.fcm_topic。
+--
+-- 前一支（20260822130000）刪掉了全表僅有的 2 個非空值並把「讀取端下線」列為本步的
+-- 前置：domain 層的映射已於 #2703 移除並部署完成（genToDomain 兩個方向都不再碰它）。
+-- 本次同批移除 db/queries/notification_templates.sql 的四支 query 與 sqlc 生成的 scan，
+-- 以及 proto NotificationTemplateProto.fcm_topic（reserved 15）與 gateway DTO 的
+-- fcmTopic——那個 key 因為 omitempty ＋ 全表為空，實際上從未出現在任何回應裡。
+--
+-- ⚠️ 已知且刻意接受的窗口：deploy-k8s.yml 的 migrate job 排在 deploy **之前**，所以
+--    本 DDL 生效時舊 pod 還在跑、而它的 query 仍明列 fcm_topic。窗口內舊 pod 會：
+--      - 每 5 分鐘的 template cache refresh 失敗 → panic guard 接住、沿用舊快取
+--        （模板在這幾分鐘內不會變，等同無影響），
+--      - admin 的模板查詢 API 回 500。
+--    兩者都在 rollout 完成時自癒，無資料遺失、無使用者可見影響；MQ consumer 走快取
+--    不打 DB，通知照常送出。要把窗口壓成零得拆成三次部署（queries 先下線再 DROP），
+--    代價與風險不成比例，故不拆。
+ALTER TABLE "notification_templates" DROP COLUMN "fcm_topic";

@@ -1,0 +1,158 @@
+server:
+  port: ${HTTP_PORT:9922}
+
+grpc:
+  server:
+    port: ${GRPC_PORT:9923}
+    reflection-service-enabled: true
+
+spring:
+  application:
+    name: aftersales-service
+  cloud:
+    nacos:
+      discovery:
+        enabled: ${NACOS_ENABLED:false}
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+        metadata:
+          grpc-port: ${GRPC_PORT:9923}
+          version: 1.0.0
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_POOL_PORT:5432}/${DB_NAME:hawkr_aftersales}?sslmode=${DB_SSLMODE:disable}&prepareThreshold=0
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      minimum-idle: 2
+      maximum-pool-size: 10
+      connection-timeout: 30000
+  flyway:
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:hawkr_aftersales}?sslmode=${DB_SSLMODE:disable}
+    user: ${DB_USER}
+    password: ${DB_PASSWORD}
+    enabled: ${FLYWAY_ENABLED:true}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+  rabbitmq:
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
+
+mybatis-plus:
+  global-config:
+    db-config:
+      id-type: INPUT
+  mapper-locations: classpath:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+hawkr:
+  web:
+    frontend-url: ${WEB_FRONTEND_URL:http://localhost:3000}
+  obs:
+    service: aftersales
+    grpc:
+      targets:
+        order:
+          host: ${ORDER_SERVICE_HOST:127.0.0.1}
+          port: ${ORDER_SERVICE_GRPC_PORT:9915}
+          plaintext: true
+        payment:
+          host: ${PAYMENT_SERVICE_HOST:127.0.0.1}
+          port: ${PAYMENT_SERVICE_GRPC_PORT:9925}
+          plaintext: true
+        shipping:
+          host: ${SHIPPING_SERVICE_HOST:127.0.0.1}
+          port: ${SHIPPING_SERVICE_GRPC_PORT:9931}
+          plaintext: true
+        coupon:
+          host: ${COUPON_SERVICE_HOST:127.0.0.1}
+          port: ${COUPON_SERVICE_GRPC_PORT:9951}
+          plaintext: true
+        media:
+          host: ${MEDIA_SERVICE_HOST:127.0.0.1}
+          port: ${MEDIA_SERVICE_GRPC_PORT:9937}
+          plaintext: true
+        buyer:
+          host: ${BUYER_SERVICE_HOST:127.0.0.1}
+          port: ${BUYER_SERVICE_GRPC_PORT:9941}
+          plaintext: true
+        seller:  # §10.6.6 Admin 詳情 API 需查賣家 profile（Seller Service 由其他團隊維護）
+          host: ${SELLER_SERVICE_HOST:127.0.0.1}
+          port: ${SELLER_SERVICE_GRPC_PORT:9941}
+          plaintext: true
+  tsid:
+    enabled: true
+    node-id-base: 700
+    pod-index: ${POD_INDEX:0}
+  # §5.21 RETURN_STUCK 偵測 scheduler（ReturnStuckAlertScheduler）。
+  # 注意：這些屬性掛在 hawkr.* 底下，與本檔最下方的頂層 aftersales.* 是**不同 namespace**，
+  # 兩邊不要互相搬。原本完全沒宣告、只靠 @Value inline default 活著，是本服務唯一一支
+  # 旋鈕不在設定檔裡的 scheduler（2026-08-05 identity-naming triage 補齊）。
+  # ⚠️ 四個 default 與補齊前的 @Value inline default 逐字同值 —— 本次不改任何環境的生效行為；
+  #    k8s values 刻意不宣告這幾個 key，dev / prod 一律維持每天 03:00 UTC。
+  #    需要臨時提頻時用 process 層級覆寫（Spring 的 command-line arg 優先序最高），
+  #    例：--hawkr.aftersales.return-stuck-alert.cron='0 * * * * ?'（見 Task 4）。
+  aftersales:
+    return-stuck-alert:
+      enabled: ${RETURN_STUCK_ALERT_ENABLED:true}
+      cron: ${RETURN_STUCK_SCHEDULER_CRON:0 0 3 * * ?}
+      batch-size: ${RETURN_STUCK_ALERT_BATCH_SIZE:200}
+  shipping:
+    anomaly:
+      return-stuck-days: ${RETURN_STUCK_DAYS:14}
+
+# 可調參數
+aftersales:
+  # 🔴 key 是 case-config 不是 case：欄位名為 AfterSalesProperties.caseConfig，而 Spring 的
+  # relaxed binding 只接受 case-config／caseConfig／case_config，**不接受 case**
+  # ⇒ 這三行從 b2695b1c4 寫下起就沒有綁上過，全部走 Java 欄位預設。
+  # dev 實證（2026-09-08）：11 筆自動駁回的間隔正好 72.00h，只有 1 筆 24h
+  #   ⇒ 跑的是 Java 預設 72，不是這裡寫的 24。
+  # 值一併從 24 改成 72：設計書 09 §「賣家處理期限」逐字寫 72，且那正是現行實際行為
+  #   ⇒ 修綁定 + 對齊值 = 行為零變更。（24 與 Java 的 72 出自同一個 commit，沒有後續政策修訂）
+  # 守它的是 AfterSalesPropertiesBindingTest。
+  case-config:
+    apply-deadline-hours: ${AFTERSALE_APPLY_DEADLINE_HOURS:60}
+    process-deadline-hours: ${AFTERSALE_PROCESS_DEADLINE_HOURS:72}
+    max-evidence-count: ${AFTERSALE_MAX_EVIDENCE_COUNT:3}
+  # §10 申訴與平台裁決參數。deadline-hours 是**風險窗口的寬度**——它決定「case 被駁回
+  # 之後，買家還有多久可以翻案」，而那段時間裡訂單可能已經完成並撥款（backend#3262）。
+  # 調它之前先讀那張票：窗越寬，撥款後才成立退款的機會越大。
+  appeal:
+    deadline-hours: ${AFTERSALE_APPEAL_DEADLINE_HOURS:72}
+    # backend#3262 撥款閘門的安全餘裕（分鐘）：撥款 hold 到「申訴截止 + 本值」。
+    # 不是延長買家的申訴權，是關掉 submitAppeal「A3 通過 → commit」之間的 TOCTOU。
+    # 只要大於該交易最壞耗時 ＋ pod 間時鐘偏移即可；調小到秒級會把那個窗重新打開。
+    payout-hold-grace-minutes: ${AFTERSALE_APPEAL_PAYOUT_HOLD_GRACE_MINUTES:15}
+    max-evidence-count: ${AFTERSALE_APPEAL_MAX_EVIDENCE_COUNT:5}
+    default-page-size: ${AFTERSALE_APPEAL_DEFAULT_PAGE_SIZE:20}
+    max-page-size: ${AFTERSALE_APPEAL_MAX_PAGE_SIZE:100}
+  # 🔴 return-config 不是 return：同 case-config，欄位名是 returnConfig。
+  # 這七行同樣從未綁上過，走的全是 Java 欄位預設——所幸兩邊的預設值逐項相同
+  # （7／0 */10 * * * ?／48／0 */10 * * * ?／72／0 */10 * * * ?／0 */5 * * * ?，
+  # 且 k8s values 與 .env.template 也都是同一組值）⇒ 改對 key 之後行為零變更。
+  return-config:
+    # §5.3.8 買家寄回退貨逾時天數（2026-06-15 政策修訂從 30 → 7）
+    timeout-days: ${AFTERSALE_RETURN_TIMEOUT_DAYS:7}
+    # §5.3.8 ReturnTimeoutWorker cron（2026-06-15 從每小時改為 10 分鐘）
+    timeout-scheduler-cron: ${RETURN_TIMEOUT_SCHEDULER_CRON:0 */10 * * * ?}
+    # §5.3.10.1 確認收貨 48h 自動完成
+    auto-confirm-receipt-hours: ${AUTO_CONFIRM_RECEIPT_HOURS:48}
+    auto-confirm-scheduler-cron: ${AUTO_CONFIRM_SCHEDULER_CRON:0 */10 * * * ?}
+    # §5.3.10.2 超商待取 72h 自動完成（2026-05-22 新增）
+    store-pickup-timeout-hours: ${STORE_PICKUP_TIMEOUT_HOURS:72}
+    store-pickup-scheduler-cron: ${STORE_PICKUP_SCHEDULER_CRON:0 */10 * * * ?}
+    # §5.3.10.3 24h 預警排程（2026-05-22 新增）
+    warn-scheduler-cron: ${WARN_SCHEDULER_CRON:0 */5 * * * ?}
+  refund:
+    worker-interval-ms: ${REFUND_WORKER_INTERVAL_MS:10000}
+    max-retry-count: ${REFUND_MAX_RETRY_COUNT:10}
+  atm-refund:
+    return-url: ${ATM_REFUND_RETURN_URL:http://localhost:8080/atm-refund/return}

@@ -1,0 +1,13 @@
+name: hawkr_app_update
+description: App 版本門檻（設計書 54）的檢查邏輯，buyer-app 與 seller-app 共用；畫面與路由的攔截留在各自的 App。
+publish_to: none
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  hawkr_api:
+    path: ../hawkr_api
+
+dev_dependencies:
+  test: 1.26.3

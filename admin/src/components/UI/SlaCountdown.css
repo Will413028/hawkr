@@ -1,0 +1,25 @@
+/*
+ * SlaCountdown 的樣式。
+ *
+ * 只用 `--admin-*` token，不寫任何 hex：本檔位於 `src/components/UI/`，而色值棘輪
+ * （tests/admin-color-ratchet.test.ts）只掃 `src/styles/**` 與 `src/app/globals.css`
+ * ⇒ 這裡出現裸 hex 不會有任何東西轉紅。與 Button.css / StatusBadge.css 同樣落點。
+ */
+
+.adm-sla {
+	display: inline-block;
+	color: var(--admin-muted-aa);
+	font-size: 13px;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.adm-sla--warning {
+	color: var(--admin-warning);
+	font-weight: 700;
+}
+
+.adm-sla--danger {
+	color: var(--admin-danger);
+	font-weight: 700;
+}

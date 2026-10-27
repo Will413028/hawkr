@@ -1,0 +1,718 @@
+syntax = "proto3";
+
+package hawkr.product_import;
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/product_import";
+option java_package = "io.github.will413028.hawkr.productimport.grpc";
+option java_multiple_files = true;
+option java_outer_classname = "ProductImportProto";
+
+// ============================================================================
+// 商品匯入精靈服務（Product Import Service）gRPC 契約
+//
+// 對應設計書：docs/詳細設計書/40-商品匯入精靈服務（Product Import Service）詳細設計書.md
+//   - §4.2 gRPC Proto 凍結定義
+//   - §4.6 錯誤碼定義
+//   - §8.1 RPC 重驗證在 DB tx 外 pattern
+//
+// 規範：
+//   - 所有數字欄位用 string（docs/開發規範/Java 微服務開發規範.md §2）
+//   - 所有時間用 ISO 8601 UTC 字串（docs/開發規範/Java 微服務開發規範.md §2）
+//   - store_id 例外：Request message 內由 Gateway 從 JWT 注入 resolver 解析後的 store surrogate，allowed int64（docs/開發規範/Java 微服務開發規範.md §2）
+//   - Internal-only RPC（GetCategoryConfirmationToken 為 Gateway 對外）
+// ============================================================================
+
+service ProductImportService {
+    // ===== Job 級 =====
+    rpc CreateImportJob               (CreateImportJobRequest)               returns (CreateImportJobResponse);
+    rpc ReuploadImportJobCsv          (ReuploadImportJobCsvRequest)          returns (ReuploadImportJobCsvResponse);
+    rpc ListImportJobs                (ListImportJobsRequest)                returns (ListImportJobsResponse);
+    rpc GetImportJob                  (GetImportJobRequest)                  returns (GetImportJobResponse);
+    rpc GetImportJobPreviewListing    (GetImportJobPreviewListingRequest)    returns (GetImportJobPreviewListingResponse);
+    rpc CancelImportJob               (CancelImportJobRequest)               returns (CancelImportJobResponse);
+    rpc CommitImportJob               (CommitImportJobRequest)               returns (CommitImportJobResponse);
+
+    // ===== Item 級 =====
+    rpc ListImportItems               (ListImportItemsRequest)               returns (ListImportItemsResponse);
+    rpc GetImportItem                 (GetImportItemRequest)                 returns (GetImportItemResponse);
+    rpc GetImportItemPreview          (GetImportItemPreviewRequest)          returns (GetImportItemPreviewResponse);
+    rpc UpdateImportItem              (UpdateImportItemRequest)              returns (UpdateImportItemResponse);
+    rpc RemoveImportItems             (RemoveImportItemsRequest)             returns (RemoveImportItemsResponse);
+    rpc RestoreImportItems            (RestoreImportItemsRequest)            returns (RestoreImportItemsResponse);
+    rpc RetryImportItemAssets         (RetryImportItemAssetsRequest)         returns (RetryImportItemAssetsResponse);
+
+    // ===== 批次操作 =====
+    rpc BatchUpdateItemsShipping      (BatchUpdateItemsShippingRequest)      returns (BatchUpdateItemsShippingResponse);
+    rpc BatchUpdateItemsTargetStatus  (BatchUpdateItemsTargetStatusRequest)  returns (BatchUpdateItemsTargetStatusResponse);
+    rpc BatchUpdateItemsCategory      (BatchUpdateItemsCategoryRequest)      returns (BatchUpdateItemsCategoryResponse);
+    rpc GetCategoryConfirmationToken  (GetCategoryConfirmationTokenRequest)  returns (GetCategoryConfirmationTokenResponse);
+}
+
+// ============================================================================
+// 共用 message
+// ============================================================================
+
+// CSV / 業務驗證錯誤（L1 / L2 / Layer JOB 共用結構）
+message ValidationError {
+    string csv_line = 1;        // 行號，"0" 表 file-level
+    string field = 2;           // 對應 CSV 欄位名；可空
+    string error_type = 3;      // ImportItemErrorType value（如 REQUIRED_MISSING / ENUM_INVALID）
+    string message = 4;         // 賣家可讀繁中訊息
+    string raw_value = 5;       // 原始值（debug，可截斷）
+}
+
+// 內嵌憑證
+message CertificationDto {
+    string name = 1;            // CertificationType value（ORGANIC / TAP / ...）
+    string cert_no = 2;
+}
+
+// 運送方式 + 溫層
+message ShippingMethodDto {
+    string method = 1;          // ShippingMethod value（TAQBIN / SEVEN_ELEVEN_STORE_PICKUP / UBER_INSTANT）
+    string temperature = 2;     // ShippingTemperature value（AMBIENT / CHILLED / FROZEN）
+}
+
+// 批次運送方式輸入（含 free_threshold 推導 fee_payer）
+message ShippingMethodInput {
+    string type = 1;            // ShippingMethod value
+    string temperature = 2;     // ShippingTemperature value
+    string free_threshold = 3;  // 空 = 不免運；"0" = 永遠免運；正整數 = 滿 X 元免運
+}
+
+// 商城列表 / 詳情共用圖片
+message GalleryItem {
+    string url = 1;
+    string sort_order = 2;
+}
+
+// ImportItem 內嵌錯誤 / 警告
+message ImportItemErrorDto {
+    string error_type = 1;      // ImportItemErrorType value
+    string severity = 2;        // ERROR | WARNING
+    string field = 3;
+    string message = 4;
+    string csv_line = 5;
+}
+
+// ImportItem 內嵌 SKU（顯示用）
+message ImportItemSkuDto {
+    string sku_id = 1;
+    string csv_line = 2;
+    string sku_name = 3;
+    string price = 4;
+    string sale_price = 5;
+    string stock_qty = 6;
+    string weight = 7;
+    string unit = 8;
+    string length_cm = 9;
+    string width_cm = 10;
+    string height_cm = 11;
+    repeated ShippingMethodDto shipping_methods = 12;
+}
+
+// ImportItem 內嵌 Asset
+message ImportItemAssetDto {
+    string asset_id = 1;
+    string usage = 2;           // ImportAssetUsage value（GALLERY / DESCRIPTION）
+    string sort_order = 3;
+    string block_index = 4;     // 描述圖在 description.blocks 的 index（GALLERY 時為空）
+    string source_url = 5;
+    string status = 6;          // ImportAssetLocalStatus value（PENDING / DOWNLOADING / UPLOADED / FAILED / LINKED / ORPHAN）
+    string preview_url = 7;
+    string failure_reason = 8;
+    string failure_detail = 9;
+    string retry_count = 10;
+}
+
+// ============================================================================
+// 4.2.1 CreateImportJob
+// ============================================================================
+
+message CreateImportJobRequest {
+    // 冪等由 content hash 達成，不由呼叫端自帶 key（#2295 第五項）。
+    //
+    // 原本這裡有 `string idempotency_key = 1`，Gateway 也照收照送，但
+    // ImportJobService.createJob 的簽章從來沒有這個參數 —— 送過去就被丟掉。
+    // 實際生效的是 createJob 內的 SHA256(content) + store_id + 24h 窗口
+    // （ImportJobService.java:101-110，命中會回既有 job 並標 dedup_hit）。
+    //
+    // 移除而不是接上：content hash 比呼叫端自產的 key 可靠，它不依賴呼叫端在
+    // 重試時記得送同一個 key。留著那個欄位反而讓人以為「同 key 就冪等」，
+    // 而真正的規則是「同內容才冪等」—— 改一個字元再用同一個 key 送兩次，
+    // 會建出兩個 job，正好與契約的承諾相反。
+    reserved 1;
+    reserved "idempotency_key";
+
+    int64 store_id = 2;                     // Gateway JWT 注入
+    string filename = 3;                    // 原始檔名（純記錄 + 鎖檢查）
+    bytes content = 4;                      // CSV binary
+    string target_status = 5;               // ACTIVE | DRAFT | PENDING_REVIEW（job 級預設，item 可覆蓋）
+}
+
+message CreateImportJobResponse {
+    int32 code = 1;
+    string message = 2;
+    string import_job_id = 3;               // 數字字串；即便 status=CSV_INVALID 也有 job_id
+    string status = 4;                      // PARSING | CSV_INVALID | dedup 命中時為既有 job 當前 status
+    bool dedup_hit = 5;
+    repeated ValidationError validation_errors = 6;  // CSV_INVALID 時填
+}
+
+// ============================================================================
+// 4.2.1a ReuploadImportJobCsv
+// ============================================================================
+
+message ReuploadImportJobCsvRequest {
+    int64 store_id = 1;
+    string import_job_id = 2;
+    string filename = 3;
+    bytes content = 4;
+}
+
+message ReuploadImportJobCsvResponse {
+    int32 code = 1;
+    string message = 2;
+    string import_job_id = 3;
+    string status = 4;                      // PARSING | CSV_INVALID
+    repeated ValidationError validation_errors = 5;
+}
+
+// ============================================================================
+// 4.2.2 ListImportJobs
+// ============================================================================
+
+message ListImportJobsRequest {
+    int64 store_id = 1;
+    repeated string status = 2;             // 多值過濾；空 = 不過濾
+    string page = 3;
+    string page_size = 4;
+}
+
+message ListImportJobsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated ImportJobBrief records = 3;
+    string total = 4;
+    string page = 5;
+    string page_size = 6;
+}
+
+message ImportJobBrief {
+    string import_job_id = 1;
+    string status = 2;                      // ImportJobStatus value
+    string source_filename = 3;
+    string total_items = 4;
+    string committed_count = 5;
+    string failed_count = 6;
+    string pending_count = 7;
+    string created_at = 8;                  // ISO 8601 UTC
+    string expires_at = 9;
+}
+
+// ============================================================================
+// 4.2.3 GetImportJob
+// ============================================================================
+
+message GetImportJobRequest {
+    int64 store_id = 1;
+    string import_job_id = 2;
+}
+
+message GetImportJobResponse {
+    int32 code = 1;
+    string message = 2;
+    ImportJobDetail data = 3;
+}
+
+message ImportJobDetail {
+    string import_job_id = 1;
+    string status = 2;
+    string source_filename = 3;
+    string total_rows = 4;
+    string total_items = 5;
+    ImportJobCounters counters = 6;
+    string target_status = 7;
+    string parse_error = 8;
+    string created_at = 9;
+    string updated_at = 10;
+    string expires_at = 11;
+    string committed_at = 12;
+    string cancelled_at = 13;
+    ImportJobProgress progress = 14;
+    repeated ValidationError validation_errors = 15;  // CSV_INVALID 時填
+}
+
+message ImportJobCounters {
+    // Item 維度
+    string items_total = 1;
+    string items_parsed = 2;
+    string items_asset_downloading = 3;
+    string items_ready = 4;
+    string items_needs_fix = 5;             // status=READY AND blocking_error_count > 0
+    string items_removed = 6;
+    string items_committing = 7;
+    string items_committed = 8;
+    string items_commit_failed = 9;
+    string items_with_warnings = 10;
+    string items_duplicate_existing = 11;   // duplicate_existing_product_id IS NOT NULL
+
+    // Asset 維度
+    string assets_total = 20;
+    string assets_pending = 21;
+    string assets_downloading = 22;
+    string assets_uploaded = 23;
+    string assets_failed = 24;
+    string assets_linked = 25;
+}
+
+message ImportJobProgress {
+    string overall_percentage = 1;          // 0~100
+    string parse_percentage = 2;
+    string asset_download_percentage = 3;
+    string commit_percentage = 4;
+    bool parse_completed = 5;
+    bool asset_download_completed = 6;
+    bool commit_completed = 7;
+}
+
+// ============================================================================
+// 4.2.4 CancelImportJob
+// ============================================================================
+
+message CancelImportJobRequest {
+    int64 store_id = 1;
+    string import_job_id = 2;
+}
+
+message CancelImportJobResponse {
+    int32 code = 1;
+    string message = 2;
+    string status = 3;                      // 應為 CANCELLED
+}
+
+// ============================================================================
+// 4.2.5 CommitImportJob
+// ============================================================================
+
+message CommitImportJobRequest {
+    int64 store_id = 1;
+    string import_job_id = 2;
+    bool retry_failed_only = 3;             // true = 只重試 COMMIT_FAILED 的 item
+    repeated string include_item_ids = 4;   // 可選：只 commit 指定 items（空 = 全部 eligible）
+}
+
+message CommitImportJobResponse {
+    int32 code = 1;
+    string message = 2;
+    string status = 3;                      // 應為 COMMITTING
+    string queued_count = 4;                // 排入 commit queue 的 item 數
+    repeated string skipped_item_ids = 5;   // 被自動剔除的 item id
+    repeated CommitSkipReason skip_reasons = 6;  // 與 skipped_item_ids 1:1 對應（依設計書 §4.2.5）
+    CommitOutcome commit_outcome = 7;       // QUEUED / PARTIAL_SUCCESS / ALL_SKIPPED
+}
+
+enum CommitOutcome {
+    COMMIT_OUTCOME_UNSPECIFIED = 0;
+    QUEUED = 1;                             // 至少 1 筆排入 commit queue，且無 skipped
+    PARTIAL_SUCCESS = 2;                    // 至少 1 筆排入 commit queue，且有 skipped
+    ALL_SKIPPED = 3;                        // 0 筆排入 commit queue，全部回 skipped 明細
+}
+
+message CommitSkipReason {
+    string import_item_id = 1;
+    string reason_code = 2;                 // BLOCKING_ERROR / ALREADY_COMMITTED / REMOVED / NOT_READY
+    string reason_message = 3;              // 中文短描述
+}
+
+// ============================================================================
+// 4.2.6 ListImportItems / GetImportItem
+// ============================================================================
+
+message ListImportItemsRequest {
+    int64 store_id = 1;
+    string import_job_id = 2;
+    repeated string status = 3;
+    bool only_with_errors = 4;
+    bool include_removed = 5;               // 預設 false
+    string page = 6;
+    string page_size = 7;
+}
+
+message ListImportItemsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated ImportItemBrief records = 3;
+    string total = 4;
+    string page = 5;
+    string page_size = 6;
+}
+
+message ImportItemBrief {
+    string import_item_id = 1;
+    string product_key = 2;
+    string status = 3;
+    string name = 4;
+    string cat_l3_name = 5;
+    string sku_count = 6;
+    string price_min = 7;
+    string price_max = 8;
+    string first_image_url = 9;
+    string blocking_error_count = 10;
+    string warning_count = 11;
+    string commit_failed_reason = 12;
+    string formal_product_id = 13;          // COMMITTED 時有值
+    bool needs_fix = 14;                    // = blocking_error_count > 0
+    bool has_duplicate_existing = 15;       // duplicate_existing_product_id IS NOT NULL
+    string commit_revision = 16;            // UI 顯示「賣家編輯了幾次」；**不可**作為 expectedVersion 來源
+    string version = 17;                    // = product_import_item.version 樂觀鎖；前端編輯時必須帶回 expected_version；新建初始 "0"
+    string category_id = 18;                // 葉節點 id（數字字串）；前端編輯頁 form load 時 categoryId state 唯一來源；尚未通過 ValidateLeafCategoryInternal 時為空字串
+    string existing_product_id = 19;            // 同名既有商品 id（has_duplicate_existing=true 時填值）
+    string existing_product_name = 20;          // 同名既有商品 name（DuplicateNameWarning 渲染用）
+    string existing_product_status_label = 21;  // 同名既有商品 status 中文標籤
+    string formal_product_status = 22;          // 正式商品 status code（item.status=COMMITTED 時填）
+    string formal_product_status_label = 23;    // 正式商品 status 中文標籤
+    // ProductPublicationState（4011~4014）；4014 REMOVED = 正式商品已被軟刪。
+    // 與 formal_product_status 正交：那個答「能不能賣」，本欄答「還在不在」。
+    string formal_product_publication_state = 24;
+    // true = **我方查不到**該商品的狀態（對 product-service 的 RPC 失敗，或回應中沒有這一列）。
+    //
+    // 🔴 與 publication_state=4014 是兩件事，不可互相冒充（#2819）：
+    //   4014      ＝ 我們查到了，商品確實已被移除（**確定**）
+    //   unavailable ＝ 我們沒查到，不知道它現在什麼狀態（**不知道**）
+    // 兩者曾經都被壓成空字串，賣家因此無從分辨，而「開啟正式商品」按鈕照樣顯示、
+    // 點下去是 404 / 3023「商品已永久移除」。
+    bool formal_product_status_unavailable = 25;
+}
+
+message GetImportItemRequest {
+    int64 store_id = 1;
+    string import_job_id = 2;
+    string import_item_id = 3;
+}
+
+message GetImportItemResponse {
+    int32 code = 1;
+    string message = 2;
+    ImportItemDetail data = 3;
+}
+
+message ImportItemDetail {
+    ImportItemBrief brief = 1;
+    string description_json = 2;            // JSON 字串
+    repeated ImportItemSkuDto skus = 3;
+    repeated ImportItemAssetDto gallery_assets = 4;     // usage=GALLERY，sort_order 排序
+    repeated ImportItemAssetDto description_assets = 5; // usage=DESCRIPTION
+    repeated ImportItemErrorDto errors = 6;
+    repeated ImportItemErrorDto warnings = 7;
+    string commit_revision = 8;
+    string origin = 9;
+    repeated string hashtags = 10;
+    repeated CertificationDto certifications = 11;
+    string target_status = 12;
+}
+
+// ============================================================================
+// 4.2.7 GetImportItemPreview（商城模擬詳情）
+// ============================================================================
+
+message GetImportItemPreviewRequest {
+    int64 store_id = 1;
+    string import_job_id = 2;
+    string import_item_id = 3;
+}
+
+message GetImportItemPreviewResponse {
+    int32 code = 1;
+    string message = 2;
+    ImportItemPreview data = 3;
+}
+
+message ImportItemPreview {
+    // 外層 metadata
+    string import_job_id = 1;
+    string import_item_id = 2;
+    string import_status = 3;
+    repeated ImportItemErrorDto validation_errors = 4;
+    repeated ImportItemErrorDto warnings = 5;
+    string formal_product_id = 6;
+
+    // 內層 preview_data：與 ProductDetail（GetProduct 回應）契約欄位相容
+    ProductDetailPresentation preview_data = 7;
+}
+
+// 對齊 ProductService.GetProduct.ProductDetail 的展示欄位
+// 不直接 import Product proto，避免領域耦合
+message ProductDetailPresentation {
+    string id = 1;                          // 預覽時為空字串
+    string name = 2;
+    string rating = 3;                      // 預覽固定 "0"
+    string status = 4;                      // 預覽為空，COMMITTED 後寫 product.status
+    string category_id = 5;
+    string origin = 6;
+    string description = 7;                 // JSON 字串
+    repeated GalleryItem gallery = 8;
+    repeated CertificationDto certifications = 9;
+    string price_min = 10;
+    string price_max = 11;
+    repeated ImportItemSkuDto skus = 12;
+    string cat_l1_id = 13;
+    string cat_l1_name = 14;
+    string cat_l2_id = 15;
+    string cat_l2_name = 16;
+    string cat_l3_id = 17;
+    string cat_l3_name = 18;
+}
+
+// ============================================================================
+// 4.2.7a GetImportJobPreviewListing（商城模擬列表）
+// ============================================================================
+
+message GetImportJobPreviewListingRequest {
+    int64 store_id = 1;
+    string import_job_id = 2;
+    string page = 3;                        // 預設 "1"
+    string page_size = 4;                   // 預設 "20"
+    bool include_pending = 5;               // 預設 false；true 才含 ASSET_DOWNLOADING
+}
+
+message GetImportJobPreviewListingResponse {
+    int32 code = 1;
+    string message = 2;
+    GetImportJobPreviewListingData data = 3;
+}
+
+message GetImportJobPreviewListingData {
+    string import_job_id = 1;
+    string total_eligible = 2;              // READY + COMMIT_FAILED + blocking_error_count=0
+    string total_needs_fix = 3;
+    string total_pending = 4;
+    string total_removed = 5;
+    repeated ImportItemPreviewListingRecord records = 6;
+    string total = 7;
+    string page = 8;
+    string page_size = 9;
+}
+
+message ImportItemPreviewListingRecord {
+    string import_item_id = 1;
+    string import_status = 2;
+    ProductListPresentation preview_data = 3;
+}
+
+// 對齊 ProductService.GetProductList.ProductListItem 的展示欄位
+message ProductListPresentation {
+    string id = 1;                          // 預覽時為空
+    string name = 2;
+    string rating = 3;                      // 固定 "0"
+    string category_id = 4;
+    string category_name = 5;               // = cat_l3_name
+    string origin = 6;
+    repeated GalleryItem gallery = 7;
+    string price_min = 8;
+    string price_max = 9;
+    string review_count = 10;               // 固定 "0"
+    string sku_count = 11;
+    string image_url = 12;                  // first_image_url
+}
+
+// ============================================================================
+// 4.2.8 UpdateImportItem
+// ============================================================================
+
+message UpdateImportItemRequest {
+    int64 store_id = 1;
+    string import_job_id = 2;
+    string import_item_id = 3;
+    string expected_version = 4;            // 樂觀鎖（數字字串）
+
+    // *_set 模式：has_xxx_set=true 表示要更新該欄位，避免空字串覆蓋
+    bool name_set = 10;
+    string name = 11;
+
+    bool category_id_set = 12;
+    string category_id = 13;
+
+    bool origin_set = 14;
+    string origin = 15;
+
+    bool target_status_set = 16;
+    string target_status = 17;
+
+    bool description_set = 18;
+    string description = 19;                // 編輯後的 JSON
+
+    bool hashtags_set = 20;
+    repeated string hashtags = 21;
+
+    bool certifications_set = 22;
+    repeated CertificationDto certifications = 23;
+
+    bool gallery_images_set = 24;
+    repeated ImportItemImageInput gallery_images = 25;  // 新圖片列表（順序），index 0 為封面；URL / staged_token 二擇一
+
+    bool skus_set = 26;
+    repeated UpdateSkuInput skus = 27;
+
+    bool allow_duplicate_name_set = 28;
+    bool allow_duplicate_name = 29;
+}
+
+message UpdateSkuInput {
+    string sku_id = 1;                      // 若空 = 新增；非空 = 更新
+    string sku_name = 2;
+    string price = 3;
+    string sale_price = 4;
+    string stock_qty = 5;
+    string weight = 6;
+    string unit = 7;
+    string length_cm = 8;
+    string width_cm = 9;
+    string height_cm = 10;
+    repeated ShippingMethodDto shipping_methods = 11;
+    bool delete = 12;                       // true = 刪除此 SKU
+}
+
+// 圖片輸入（URL / staged_token 二擇一）
+//  - source_url：外部 URL，後端走 AssetDownloadWorker 派工下載
+//  - staged_token：賣家本地上傳取得（Media CompleteUploadSession），後端走 Media BindStagedAsset 同步綁定
+message ImportItemImageInput {
+    string source_url = 1;
+    string staged_token = 2;
+}
+
+message UpdateImportItemResponse {
+    int32 code = 1;
+    string message = 2;
+    ImportItemDetail data = 3;
+}
+
+// ============================================================================
+// 4.2.9 RemoveImportItems / RestoreImportItems
+// ============================================================================
+
+message RemoveImportItemsRequest {
+    int64 store_id = 1;
+    string import_job_id = 2;
+    repeated string import_item_ids = 3;
+}
+
+message RemoveImportItemsResponse {
+    int32 code = 1;
+    string message = 2;
+    string affected_count = 3;
+}
+
+message RestoreImportItemsRequest {
+    int64 store_id = 1;
+    string import_job_id = 2;
+    repeated string import_item_ids = 3;
+}
+
+message RestoreImportItemsResponse {
+    int32 code = 1;
+    string message = 2;
+    string affected_count = 3;
+}
+
+// ============================================================================
+// 4.2.10 RetryImportItemAssets
+// ============================================================================
+
+message RetryImportItemAssetsRequest {
+    int64 store_id = 1;
+    string import_job_id = 2;
+    string import_item_id = 3;
+    repeated string asset_ids = 4;          // 空 = 重試所有 FAILED 資產
+}
+
+message RetryImportItemAssetsResponse {
+    int32 code = 1;
+    string message = 2;
+    string queued_count = 3;
+}
+
+// ============================================================================
+// 4.2.11 BatchUpdateItemsShipping
+// ============================================================================
+
+message BatchUpdateItemsShippingRequest {
+    int64 store_id = 1;
+    string import_job_id = 2;
+    repeated string import_item_ids = 3;
+    bool apply_all = 4;
+    repeated ShippingMethodInput shipping_methods = 5;
+}
+
+message BatchUpdateItemsShippingResponse {
+    int32 code = 1;
+    string message = 2;
+    string affected_items = 3;
+    string affected_skus = 4;
+}
+
+// ============================================================================
+// 4.2.12 BatchUpdateItemsTargetStatus
+// ============================================================================
+
+message BatchUpdateItemsTargetStatusRequest {
+    int64 store_id = 1;
+    string import_job_id = 2;
+    repeated string import_item_ids = 3;
+    bool apply_all = 4;
+    string target_status = 5;               // ACTIVE | DRAFT | PENDING_REVIEW
+}
+
+message BatchUpdateItemsTargetStatusResponse {
+    int32 code = 1;
+    string message = 2;
+    string affected_items = 3;
+}
+
+// ============================================================================
+// 4.2.13 BatchUpdateItemsCategory
+// ============================================================================
+
+message BatchUpdateItemsCategoryRequest {
+    int64 store_id = 1;
+    string import_job_id = 2;
+    repeated string import_item_ids = 3;
+    bool apply_all = 4;
+    string category_id = 5;                 // 葉節點 id
+    string confirmation_token = 6;          // 二次確認 token（GetCategoryConfirmationToken 取得）
+}
+
+message BatchUpdateItemsCategoryResponse {
+    int32 code = 1;
+    string message = 2;
+    string affected_items = 3;
+    string cat_l1_id = 4;
+    string cat_l1_name = 5;
+    string cat_l2_id = 6;
+    string cat_l2_name = 7;
+    string cat_l3_id = 8;
+    string cat_l3_name = 9;
+}
+
+// ============================================================================
+// 4.2.13a GetCategoryConfirmationToken
+// ============================================================================
+
+message GetCategoryConfirmationTokenRequest {
+    int64 store_id = 1;
+    string import_job_id = 2;
+    string category_id = 3;
+}
+
+message GetCategoryConfirmationTokenResponse {
+    int32 code = 1;
+    string message = 2;
+    string confirmation_token = 3;          // 不透明 UUID v4 字串
+    string expires_at = 4;                  // ISO 8601 UTC（TTL = 5 分鐘）
+    string cat_l1_id = 5;
+    string cat_l1_name = 6;
+    string cat_l2_id = 7;
+    string cat_l2_name = 8;
+    string cat_l3_id = 9;
+    string cat_l3_name = 10;
+}

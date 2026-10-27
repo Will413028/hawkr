@@ -1,0 +1,22 @@
+{
+  "before": {},
+  "patch": {
+    "item": "寶島梨禮盒",
+    "quantity": 50,
+    "unit": "KG",
+    "budget_per_unit": 800,
+    "delivery_city": "桃園市",
+    "delivery_date": "2026-08-20"
+  },
+  "now": "2026-08-07T00:00:00Z",
+  "after": {
+    "item": "寶島梨禮盒",
+    "quantity": 50,
+    "unit": "KG",
+    "budget_per_unit": 800,
+    "delivery_city": "桃園市",
+    "delivery_date": "2026-08-20",
+    "exact_match_required": true
+  },
+  "rejected": null
+}

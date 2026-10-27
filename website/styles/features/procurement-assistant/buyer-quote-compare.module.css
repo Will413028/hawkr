@@ -1,0 +1,323 @@
+/*
+ * 買家端報價比較與接受（issue #2538 A8 前半）。
+ *
+ * 用 CSS module 而不是往 styles/features/procurement-assistant.css 疊：那支是
+ * assistant layout 的全域樣式表，這個面板在三區版面定案前不掛在該 layout 底下，
+ * 也不該讓它的 class 名稱進入全域命名空間。
+ *
+ * 比較表在窄螢幕改成堆疊卡片，用的是同一份 DOM（`td[data-label]` 生出欄名）而
+ * 不是「桌機一份表、手機再一份卡」：兩份 DOM 意味著同一筆金額在頁面上出現兩次，
+ * 螢幕閱讀器會唸兩遍，測試也會抓到兩個節點。
+ */
+
+.panel {
+	display: grid;
+	gap: 16px;
+	color: var(--hkui-foreground);
+	font-family: var(--font-primary);
+}
+
+.header {
+	display: grid;
+	gap: 6px;
+}
+
+.header h2 {
+	font-size: var(--hkui-text-large, 1.125rem);
+	font-weight: 600;
+}
+
+.header p,
+.empty {
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-small, 0.875rem);
+	line-height: 1.7;
+}
+
+.empty {
+	margin: 0;
+	padding: 20px;
+	border: 1px dashed var(--hkui-divider);
+	border-radius: var(--radius-md);
+}
+
+.notice {
+	display: flex;
+	gap: 10px;
+	align-items: flex-start;
+	padding: 12px 14px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-md);
+	background: var(--hkui-content1);
+}
+
+.notice[data-tone="warning"] {
+	border-color: color-mix(
+		in srgb,
+		var(--hkui-warning) 46%,
+		var(--hkui-divider)
+	);
+	background: color-mix(in srgb, var(--hkui-warning) 10%, var(--hkui-content1));
+}
+
+.notice[data-tone="warning"] > svg {
+	color: var(--hkui-warning-700);
+}
+
+.notice[data-tone="info"] > svg {
+	color: var(--hkui-primary);
+}
+
+.notice > div {
+	display: grid;
+	gap: 4px;
+}
+
+.notice strong {
+	font-size: var(--hkui-text-small, 0.875rem);
+	font-weight: 600;
+}
+
+.notice p {
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-small, 0.875rem);
+	line-height: 1.7;
+}
+
+.noticeActions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 4px;
+}
+
+.accepted {
+	display: grid;
+	gap: 10px;
+	justify-items: start;
+	padding: 16px;
+	border: 1px solid
+		color-mix(in srgb, var(--hkui-success) 46%, var(--hkui-divider));
+	border-radius: var(--radius-md);
+	background: color-mix(in srgb, var(--hkui-success) 8%, var(--hkui-content1));
+}
+
+.accepted strong {
+	font-size: var(--hkui-text-medium, 1rem);
+	font-weight: 600;
+}
+
+.accepted p {
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-small, 0.875rem);
+	line-height: 1.7;
+}
+
+.accepted dl,
+.detail,
+.confirm dl {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+	gap: 10px 20px;
+	width: 100%;
+	margin: 0;
+}
+
+.accepted dl > div,
+.detail > div,
+.confirm dl > div {
+	display: grid;
+	gap: 2px;
+}
+
+.accepted dt,
+.detail dt,
+.confirm dt {
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.accepted dd,
+.detail dd,
+.confirm dd {
+	margin: 0;
+	font-size: var(--hkui-text-small, 0.875rem);
+	line-height: 1.6;
+	overflow-wrap: anywhere;
+}
+
+.hash {
+	font-family: var(--font-mono, ui-monospace, monospace);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.tableWrap {
+	width: 100%;
+	overflow-x: auto;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-md);
+	background: var(--hkui-content1);
+}
+
+.table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: var(--hkui-text-small, 0.875rem);
+}
+
+.caption {
+	padding: 10px 14px;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	text-align: start;
+}
+
+.table th,
+.table td {
+	padding: 12px 14px;
+	border-top: 1px solid var(--hkui-divider);
+	text-align: start;
+	vertical-align: top;
+}
+
+.table thead th {
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.table tbody tr[data-shortlisted] {
+	background: color-mix(in srgb, var(--hkui-primary) 6%, transparent);
+}
+
+.table td > span {
+	display: block;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	line-height: 1.6;
+}
+
+.table td > strong {
+	font-weight: 600;
+}
+
+.flag {
+	display: inline-block;
+	margin-top: 4px;
+	padding: 2px 8px;
+	border: 1px solid
+		color-mix(in srgb, var(--hkui-warning) 46%, var(--hkui-divider));
+	border-radius: var(--radius-sm, 6px);
+	color: var(--hkui-warning-700);
+}
+
+/*
+ * 可接受性是唯讀的伺服器判定，所以它只有「是／否」兩種底色，沒有依原因分色的
+ * 第三種——分色會讓人以為 UI 在替不同原因做不同的判斷。
+ */
+.acceptability {
+	display: inline-block;
+	padding: 3px 10px;
+	border-radius: var(--radius-sm, 6px);
+	background: color-mix(in srgb, var(--hkui-foreground) 8%, transparent);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.acceptability[data-acceptable] {
+	background: color-mix(in srgb, var(--hkui-success) 16%, transparent);
+	color: var(--hkui-success-700);
+}
+
+.rowActions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.detailRow > td {
+	background: var(--hkui-content2);
+}
+
+.confirm {
+	display: grid;
+	gap: 14px;
+}
+
+.confirm p {
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-small, 0.875rem);
+	line-height: 1.7;
+}
+
+.confirmFootnote {
+	padding-top: 10px;
+	border-top: 1px solid var(--hkui-divider);
+}
+
+.confirmActions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 10px;
+}
+
+/*
+ * 900px 以下把表格列攤成卡片。`display: block` 會讓瀏覽器移除 table 的隱含
+ * ARIA 角色，所以欄名改由 `td::before` 從 `data-label` 印出來，資訊不靠視覺
+ * 欄位對齊也讀得懂。
+ */
+@media (max-width: 900px) {
+	.tableWrap {
+		overflow-x: visible;
+	}
+
+	.table,
+	.table tbody,
+	.table tr,
+	.table td {
+		display: block;
+		width: 100%;
+	}
+
+	.table thead {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+
+	.table tbody tr {
+		padding: 4px 0;
+		border-top: 1px solid var(--hkui-divider);
+	}
+
+	.table td {
+		display: grid;
+		grid-template-columns: minmax(88px, 34%) minmax(0, 1fr);
+		gap: 12px;
+		padding: 8px 14px;
+		border-top: 0;
+	}
+
+	.table td::before {
+		content: attr(data-label);
+		color: var(--hkui-foreground-muted);
+		font-size: var(--hkui-text-tiny, 0.75rem);
+	}
+
+	.detailRow > td {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.detailRow > td::before {
+		content: none;
+	}
+
+	.rowActions {
+		flex-direction: column;
+		align-items: stretch;
+	}
+}

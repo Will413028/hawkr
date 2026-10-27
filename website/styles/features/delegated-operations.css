@@ -1,0 +1,1829 @@
+/**
+ * ADM 代行工作區（56 號）。
+ *
+ * 版面刻意包在賣家中心 `.seller-shell` 之**外**：代行只是在賣家中心外面多一層
+ * ADM 窄欄與情境列，`.seller-shell` 的 grid 一格都不動 —— 那個 grid 是 prod 賣家
+ * 頁面在用的。
+ *
+ * 色彩全部引用既有色票。唯一的新色面是金色情境列，它需要一組區域性變數：
+ * `--theme-primary-subtle` 在 light 是 primary 橘、在 dark 才是金，直接套會讓
+ * light 模式的情境列變成橘底。判準：**引用語意 token 之前先確認它 light/dark
+ * 兩邊是同一個色相**，不是的就自己定兩套。
+ */
+
+.adm-workspace {
+	display: flex;
+	align-items: stretch;
+	min-height: 100dvh;
+	background: transparent;
+}
+
+.adm-workspace__main {
+	flex: 1 1 auto;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+/**
+ * 「結束代行」在 dark 下要拿回警示色。
+ *
+ * `seller-center.css` 的 `[data-theme="dark"] .seller-shell .seller-sidebar__item`
+ * （0-3-0）蓋掉 `.seller-sidebar__item--signout`（0-1-0）的 danger 色，於是本工作區
+ * 唯一「按下去就不可逆終止」的側欄項，在 dark 下與一般選單項同色。
+ *
+ * ⚠️ 刻意只在 `.adm-workspace` 內收斂，不動賣家中心那條規則：賣家的「登出」是可
+ * 復原的動作，而那條規則掛在 prod 賣家頁面上。
+ * danger 本身疊在深色側欄只有 3.54:1，取設計系統既有的 `--hkui-danger-200`
+ * （5.12:1）——同一個色相家族，不是新色。
+ */
+[data-theme="dark"]
+	.adm-workspace
+	.seller-shell
+	.seller-sidebar__item--signout {
+	color: var(--hkui-danger-200);
+}
+
+/* ============================================================
+ * 左側 ADM 窄欄
+ * ============================================================ */
+
+.adm-rail {
+	position: sticky;
+	top: 0;
+	z-index: 30;
+	flex: 0 0 88px;
+	width: 88px;
+	height: 100dvh;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 10px;
+	padding: 20px 8px 16px;
+	background: var(--color-hk-home-primary-deep);
+	color: var(--color-neutral-cream);
+}
+
+.adm-rail__brand {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	padding-bottom: 12px;
+	font-size: 0.6875rem;
+	line-height: 1.2;
+	letter-spacing: 0.04em;
+	text-align: center;
+	color: rgb(var(--color-neutral-white-rgb) / 0.92);
+}
+
+.adm-rail__brand-mark {
+	display: grid;
+	place-items: center;
+	width: 36px;
+	height: 36px;
+	border-radius: var(--radius-hk-pill);
+	background: rgb(var(--color-neutral-white-rgb) / 0.12);
+}
+
+.adm-rail__brand-mark svg {
+	width: 22px;
+	height: 22px;
+}
+
+.adm-rail__link {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	width: 72px;
+	min-height: 64px;
+	padding: 8px 4px;
+	border-radius: var(--radius-hk-md);
+	font-size: 0.75rem;
+	line-height: 1.3;
+	text-align: center;
+	color: rgb(var(--color-neutral-white-rgb) / 0.86);
+	text-decoration: none;
+	transition: background-color 0.15s ease;
+}
+
+.adm-rail__link:hover {
+	background: rgb(var(--color-neutral-white-rgb) / 0.12);
+	color: var(--color-neutral-white);
+}
+
+.adm-rail__link svg {
+	width: 20px;
+	height: 20px;
+}
+
+.adm-rail__spacer {
+	flex: 1 1 auto;
+}
+
+.adm-rail__actor {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	width: 100%;
+	padding-top: 12px;
+	border-top: 1px solid rgb(var(--color-neutral-white-rgb) / 0.18);
+	font-size: 0.6875rem;
+	line-height: 1.3;
+	text-align: center;
+	color: rgb(var(--color-neutral-white-rgb) / 0.86);
+}
+
+.adm-rail__actor-avatar {
+	display: grid;
+	place-items: center;
+	width: 40px;
+	height: 40px;
+	border-radius: var(--radius-hk-pill);
+	background: rgb(var(--color-neutral-white-rgb) / 0.16);
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: var(--color-neutral-white);
+}
+
+/* 窄欄內容寬度只有 72px（88 − 8×2 padding），而 displayName 常常是一組 email。
+   min-width:0 是必要的：flex column 子項的預設 min-width:auto 會讓它撐到內容寬度，
+   overflow 於是從不生效，字串直接畫出欄外被裁掉。完整值在 title 上。 */
+.adm-rail__actor-name {
+	max-width: 100%;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.adm-rail__actor-role {
+	color: rgb(var(--color-neutral-white-rgb) / 0.6);
+}
+
+/* ============================================================
+ * 頂部白色導覽
+ * ============================================================ */
+
+.adm-topnav {
+	display: flex;
+	align-items: center;
+	gap: 24px;
+	min-height: 72px;
+	padding: 12px 44px;
+	background: var(--theme-surface-card);
+	border-bottom: 1px solid var(--border-soft);
+}
+
+.adm-topnav__brand {
+	display: flex;
+	flex-direction: column;
+	font-size: 0.9375rem;
+	font-weight: 700;
+	line-height: 1.1;
+	color: var(--ink-heading);
+}
+
+.adm-topnav__brand small {
+	font-size: 0.625rem;
+	font-weight: 500;
+	letter-spacing: 0.14em;
+	color: var(--ink-soft);
+}
+
+.adm-topnav__nav {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow-x: auto;
+}
+
+.adm-topnav__item {
+	padding: 8px 14px;
+	border-radius: var(--radius-hk-pill);
+	font-size: 0.875rem;
+	white-space: nowrap;
+	color: var(--ink-body);
+	text-decoration: none;
+}
+
+.adm-topnav__item:hover {
+	background: var(--theme-surface-glass-hover);
+}
+
+.adm-topnav__item--active {
+	background: var(--theme-primary-subtle);
+	color: var(--theme-text-accent-on-tint);
+	font-weight: 600;
+}
+
+.adm-topnav__actions {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.adm-topnav__cta {
+	display: inline-flex;
+	align-items: center;
+	height: 40px;
+	padding: 0 18px;
+	border-radius: var(--radius-hk-pill);
+	background: var(--color-brand-primary-strong);
+	color: var(--color-neutral-white);
+	font-size: 0.875rem;
+	font-weight: 600;
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+/* ============================================================
+ * 金色情境列
+ * ============================================================ */
+
+.adm-context-bar {
+	--adm-bar-bg-from: rgb(var(--color-brand-secondary-soft-rgb) / 0.34);
+	--adm-bar-bg-to: rgb(var(--color-brand-secondary-rgb) / 0.26);
+	--adm-bar-border: var(--theme-border-warm);
+	--adm-bar-fg: var(--color-brand-primary-strong);
+	/* 0.72 實測只有 4.01:1（primary 疊在金色薄膜上），管理員名與 Session 碼是
+	 * 要被讀出來核對的，不是裝飾字。0.8 ＝ 4.87:1。 */
+	--adm-bar-fg-muted: rgb(var(--color-brand-ink-rgb) / 0.8);
+	--adm-bar-dot: var(--color-status-success);
+	--adm-bar-chip-bg: var(--color-neutral-white);
+	--adm-bar-chip-fg: var(--color-brand-primary-strong);
+	/* light 的白底 chip 疊在金色薄膜上本來就自成一塊，不需要輪廓。 */
+	--adm-bar-chip-ring: transparent;
+
+	/**
+	 * 設計書叫它 **Persistent** Context Bar（§5.2），§6.3 與 §7.1 各寫一次
+	 * 「固定可見」。它承載的是「你現在是別人」這個持續提醒，以及唯一的中止出口
+	 * （結束代行）—— 兩者都在捲動後才需要，捲走等於在最需要的時候消失。
+	 * 店面設定頁在 1536 寬下整頁 1843px（約 1.8 屏），預覽與儲存區完全看不到它。
+	 *
+	 * z-index 刻意低於 `.adm-rail`（30）：窄欄是外層 ADM chrome，情境列屬於店家
+	 * 工作區內容。桌機兩者分屬左右兩欄不會相碰，≤960px 窄欄轉成 `position: static`
+	 * 的橫條、完全退出堆疊比較 —— 這個排序只在兩者哪天真的重疊時才生效，先訂好
+	 * 免得那天靠預設值決定。
+	 */
+	position: sticky;
+	top: 0;
+	z-index: 20;
+
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px 16px;
+	min-height: 60px;
+	padding: 10px 20px;
+	border: 1px solid var(--adm-bar-border);
+	border-radius: var(--radius-hk-md);
+	/**
+	 * 金色薄膜底下必須墊一層不透明色：貼頂之後表單文字會從它下面捲過去，
+	 * 兩層半透明（light 0.34／0.26、dark 0.14→0.24）擋不住。
+	 *
+	 * 墊的是 `--theme-surface-page` —— `.adm-workspace` 本來就用它上底色，
+	 * 也就是**現在**透出來的那一層。實測反解 dev 截圖
+	 * （`lane-W/W14-storefront-{light,dark}-1536.png`）：light 反推得
+	 * (246~250, 246~249, 237~241) ≒ `#f8f6ef`、dark 反推得 (20,49,38) ＝
+	 * `--color-ink-900`，與該 token 兩個主題的值逐一對上 ⇒ 疊上去是像素同色，
+	 * 上面那些對比度註記（4.87:1 等）不受影響。
+	 */
+	background:
+		linear-gradient(90deg, var(--adm-bar-bg-from), var(--adm-bar-bg-to)),
+		var(--theme-surface-page);
+	color: var(--adm-bar-fg);
+	font-size: 0.8125rem;
+}
+
+[data-theme="dark"] .adm-context-bar {
+	/* 這兩個值就是 dark 的 --theme-primary-subtle / --theme-primary-soft；寫成字面
+	 * 值是因為 light 的同名 token 是綠色，引用會兩邊都錯。 */
+	--adm-bar-bg-from: rgb(241 205 112 / 0.14);
+	--adm-bar-bg-to: rgb(241 205 112 / 0.24);
+	--adm-bar-fg: var(--theme-text-accent);
+	--adm-bar-fg-muted: var(--theme-text-body);
+	/* --color-status-success 疊在 dark 的暖橘黃薄膜＋深色底上幾乎看不見；改用
+	 * dark-safe 的 --icon-accent（暗色為 secondary，~AA on dark surface）。 */
+	--adm-bar-dot: var(--icon-accent);
+	--adm-bar-chip-bg: rgb(var(--color-neutral-white-rgb) / 0.08);
+	--adm-bar-chip-fg: var(--theme-text-heading);
+	/* 0.08 的白薄膜疊在金色薄膜上只跟情境列差 1.25:1，五顆 chip 會連成一條。
+	 * 把界線交給輪廓而不是把底色提亮：提亮到看得出邊界（0.14）會讓 chip 上的
+	 * 文字掉到 4.31:1。輪廓用 outset box-shadow ⇒ 不佔版位，light 不受影響。 */
+	--adm-bar-chip-ring: rgb(241 205 112 / 0.34);
+}
+
+.adm-context-bar__state {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	font-weight: 600;
+}
+
+/* 綠點刻意不做 pulse：它表達的是「代行中」這個持續狀態，而情境列全程可見；
+ * 一個持續 30 分鐘閃爍的元素是干擾不是資訊，倒數本身已經每秒在變。 */
+.adm-context-bar__dot {
+	width: 8px;
+	height: 8px;
+	border-radius: var(--radius-hk-pill);
+	background: var(--adm-bar-dot);
+}
+
+.adm-context-bar__store {
+	font-weight: 700;
+	font-size: 0.875rem;
+}
+
+.adm-context-bar__meta {
+	color: var(--adm-bar-fg-muted);
+}
+
+.adm-context-bar__timer {
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+}
+
+.adm-context-bar__chips {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.adm-chip {
+	display: inline-flex;
+	align-items: center;
+	height: 24px;
+	padding: 0 10px;
+	border-radius: var(--radius-hk-pill);
+	background: var(--adm-bar-chip-bg);
+	box-shadow: 0 0 0 1px var(--adm-bar-chip-ring);
+	color: var(--adm-bar-chip-fg);
+	font-size: 0.75rem;
+	font-weight: 500;
+}
+
+.adm-context-bar__end {
+	margin-left: auto;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 36px;
+	padding: 0 16px;
+	border: 1px solid var(--color-brand-secondary);
+	border-radius: var(--radius-hk-pill);
+	background: var(--color-neutral-white);
+	color: var(--color-brand-primary-strong);
+	font-size: 0.8125rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.adm-context-bar__end:disabled {
+	opacity: 0.6;
+	cursor: progress;
+}
+
+[data-theme="dark"] .adm-context-bar__end {
+	background: rgb(var(--color-neutral-white-rgb) / 0.08);
+	color: var(--theme-text-heading);
+}
+
+/**
+ * 情境列在 dark 下要逐一指定子元素的顏色。
+ *
+ * `01-tokens-theme.css` 的整站深色排版規則直接點名元素
+ * （`[data-theme="dark"] body span/strong/p…`，權重 0-1-2），比 `.adm-context-bar`
+ * 的 0-1-0 高 ⇒ 子元素**不會繼承**情境列設定的 `--adm-bar-fg`，而是各自被指派
+ * body／strong 的通用色。症狀是「店名變成標題米色、狀態與倒數變成內文灰綠」，
+ * 也就是本案最關鍵的兩個資訊（代行中、剩餘時間）被降級成一般文字。
+ *
+ * ⚠️ 情境列**新增任何文字子元素時要一起加進這裡**，否則它會靜默被整站規則接管。
+ */
+[data-theme="dark"] .adm-context-bar__state,
+[data-theme="dark"] .adm-context-bar__store,
+[data-theme="dark"] .adm-context-bar__timer {
+	color: var(--adm-bar-fg);
+}
+
+[data-theme="dark"] .adm-context-bar__meta {
+	color: var(--adm-bar-fg-muted);
+}
+
+[data-theme="dark"] .adm-chip {
+	color: var(--adm-bar-chip-fg);
+}
+
+/* ============================================================
+ * 空狀態／阻擋畫面
+ * ============================================================ */
+
+.adm-panel {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 32px 24px;
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-hk-lg);
+	background: var(--theme-surface-card);
+	color: var(--ink-body);
+}
+
+.adm-panel__title {
+	font-size: 1.0625rem;
+	font-weight: 600;
+	color: var(--ink-heading);
+}
+
+.adm-panel__hint {
+	font-size: 0.8125rem;
+	color: var(--ink-soft);
+}
+
+.adm-blocked {
+	display: grid;
+	place-items: center;
+	min-height: 100dvh;
+	padding: 40px 24px;
+	background: transparent;
+}
+
+.adm-blocked__card {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	width: min(520px, 100%);
+	padding: 32px;
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-hk-lg);
+	background: var(--theme-surface-card);
+	text-align: center;
+}
+
+.adm-blocked__title {
+	font-size: 1.1875rem;
+	font-weight: 700;
+	color: var(--ink-heading);
+}
+
+.adm-blocked__body {
+	font-size: 0.875rem;
+	line-height: 1.7;
+	color: var(--ink-body);
+}
+
+.adm-blocked__link {
+	align-self: center;
+	display: inline-flex;
+	align-items: center;
+	height: 40px;
+	padding: 0 20px;
+	border-radius: var(--radius-hk-pill);
+	background: var(--color-brand-primary-strong);
+	color: var(--color-neutral-white);
+	font-size: 0.875rem;
+	font-weight: 600;
+	text-decoration: none;
+}
+
+/* ============================================================
+ * 窄視窗：ADM 窄欄轉成頂部橫條
+ * ============================================================ */
+
+@media (max-width: 960px) {
+	.adm-workspace {
+		display: block;
+	}
+
+	.adm-rail {
+		position: static;
+		flex: none;
+		width: auto;
+		height: auto;
+		flex-direction: row;
+		align-items: center;
+		gap: 12px;
+		padding: 8px 12px;
+	}
+
+	.adm-rail__brand {
+		padding-bottom: 0;
+	}
+
+	.adm-rail__link {
+		flex-direction: row;
+		width: auto;
+		min-height: 44px;
+	}
+
+	/**
+	 * 橫條上唯一可以被壓縮的是右端這組 displayName（常常是一整串 email）——
+	 * 它本來就有 `text-overflow: ellipsis` ＋ `title` 完整值可看。
+	 */
+	.adm-rail__actor {
+		width: auto;
+		flex: 0 1 auto;
+		min-width: 0;
+		flex-direction: row;
+		gap: 8px;
+		padding-top: 0;
+		border-top: 0;
+	}
+
+	/**
+	 * 品牌與兩個連結一律不換行、不被壓縮。
+	 *
+	 * 這三塊在直立窄欄裡各佔一整列（72px 寬、`text-align: center`），換成橫排之後
+	 * 全部擠進同一列，而 flex 子項預設可以縮到 `min-content` —— 中文的 min-content
+	 * 是**一個字**，於是 375px 實測「Hawkr／ADM」變三行、「返回 ADM」折兩行、
+	 * 「操作紀錄」直排成四行單字（`lane-W/W2-dashboard-375.png`）。
+	 */
+	.adm-rail__brand,
+	.adm-rail__link {
+		flex: none;
+		white-space: nowrap;
+	}
+
+	.adm-topnav {
+		padding: 12px 16px;
+	}
+}
+
+/* ============================================================
+ * 寫入確認抽屜（§3.4 三件必備）與批次下架列
+ * ============================================================ */
+
+.adm-confirm__intent {
+	display: flex;
+	gap: 10px;
+	align-items: flex-start;
+	padding: 12px 14px;
+	border: 1px solid var(--theme-border-warm);
+	border-radius: var(--radius-hk-md);
+	background: linear-gradient(
+		90deg,
+		rgb(var(--color-brand-secondary-soft-rgb) / 0.34),
+		rgb(var(--color-brand-secondary-rgb) / 0.26)
+	);
+	color: var(--color-brand-primary-strong);
+}
+
+[data-theme="dark"] .adm-confirm__intent {
+	background: linear-gradient(
+		90deg,
+		rgb(241 205 112 / 0.14),
+		rgb(241 205 112 / 0.24)
+	);
+	color: var(--theme-text-accent);
+}
+
+.adm-confirm__intent > div {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.adm-confirm__intent strong {
+	font-size: 0.875rem;
+	font-weight: 600;
+}
+
+.adm-confirm__intent span {
+	font-size: 0.75rem;
+	opacity: 0.82;
+}
+
+.adm-confirm__changes h3 {
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: var(--ink-heading);
+}
+
+.adm-confirm__changes p {
+	margin-top: 2px;
+	font-size: 0.75rem;
+	color: var(--ink-soft);
+}
+
+.adm-confirm__changes table {
+	width: 100%;
+	margin-top: 8px;
+	border-collapse: collapse;
+	font-size: 0.8125rem;
+}
+
+.adm-confirm__changes th,
+.adm-confirm__changes td {
+	padding: 8px 6px;
+	text-align: left;
+	vertical-align: top;
+	border-bottom: 1px solid var(--border-soft);
+	color: var(--ink-body);
+	/* 變更值可能很長（商店介紹 5000 字），不換行會把抽屜撐爆版。 */
+	overflow-wrap: anywhere;
+}
+
+.adm-confirm__changes thead th {
+	font-size: 0.75rem;
+	font-weight: 500;
+	color: var(--ink-soft);
+}
+
+.adm-confirm__version {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 10px 12px;
+	border-radius: var(--radius-hk-sm);
+	background: var(--theme-surface-muted);
+	font-size: 0.8125rem;
+	color: var(--ink-body);
+}
+
+/**
+ * 批次寫入的逐項版本。做成可捲清單而不是一次攤開：`items` 上限 50 筆，全攤開會把
+ * 「通知賣家」與確認鈕擠出抽屜之外。
+ */
+.adm-confirm__versions {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 10px 12px;
+	border-radius: var(--radius-hk-sm);
+	background: var(--theme-surface-muted);
+	font-size: 0.8125rem;
+	color: var(--ink-body);
+}
+
+.adm-confirm__versions h3 {
+	margin: 0;
+	font-size: 0.8125rem;
+	font-weight: 600;
+	color: var(--ink-heading);
+}
+
+.adm-confirm__versions ul {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	max-height: 176px;
+	overflow-y: auto;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.adm-confirm__versions li {
+	display: flex;
+	gap: 12px;
+	align-items: baseline;
+	justify-content: space-between;
+}
+
+.adm-confirm__versions li span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--ink-soft);
+}
+
+.adm-confirm__versions li strong {
+	flex: none;
+	font-variant-numeric: tabular-nums;
+}
+
+.adm-confirm__notify {
+	display: flex;
+	gap: 10px;
+	align-items: flex-start;
+	cursor: pointer;
+}
+
+.adm-confirm__notify span {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	font-size: 0.8125rem;
+	color: var(--ink-body);
+}
+
+.adm-confirm__notify small {
+	font-size: 0.75rem;
+	color: var(--ink-soft);
+}
+
+.adm-confirm__audit {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	padding: 10px 12px;
+	border-radius: var(--radius-hk-sm);
+	background: var(--theme-surface-muted);
+	font-size: 0.75rem;
+	color: var(--ink-soft);
+}
+
+.adm-batch-bar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px 16px;
+	border-radius: var(--radius-hk-md);
+	background: rgb(var(--color-brand-primary-rgb) / 0.14);
+	color: var(--theme-text-accent-on-tint);
+}
+
+[data-theme="dark"] .adm-batch-bar {
+	background: rgb(var(--color-brand-primary-rgb) / 0.22);
+	color: var(--theme-text-heading);
+}
+
+.adm-batch-bar__lead,
+.adm-batch-bar__actions {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	font-size: 0.8125rem;
+}
+
+.adm-batch-bar__lead span,
+.adm-batch-bar__actions span {
+	color: var(--ink-soft);
+}
+
+/**
+ * 批次結果列。
+ *
+ * ⚠️ **失敗一定要比成功顯眼。** 這裡曾經只有 `font-size: 0.8125rem; color: var(--ink-body)`
+ * ——「2 筆中 0 成功、2 失敗」是一行純黑小字直接躺在頁面上，而它上方的批次列（成功
+ * 路徑）反而有一整塊綠底框。dev 實測那一行完全讀不出是壞消息。色票沿用結束摘要的
+ * `.adm-end-dialog__alert`（`--hkui-danger-*`），不新增色面。
+ */
+.adm-batch-result {
+	display: flex;
+	gap: 10px;
+	align-items: flex-start;
+	padding: 12px 14px;
+	border-radius: var(--radius-hk-md);
+	background: var(--theme-surface-muted);
+	font-size: 0.8125rem;
+	line-height: 1.6;
+	color: var(--ink-body);
+}
+
+.adm-batch-result svg {
+	margin-top: 2px;
+	color: var(--ink-soft);
+}
+
+.adm-batch-result__text {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+}
+
+.adm-batch-result__failures {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	list-style: none;
+}
+
+.adm-batch-result--failed {
+	background: var(--hkui-danger-50);
+	color: var(--hkui-danger-700);
+}
+
+.adm-batch-result--failed svg {
+	color: var(--hkui-danger-700);
+}
+
+[data-theme="dark"] .adm-batch-result--failed {
+	background: rgb(var(--color-status-danger-rgb) / 0.16);
+	color: var(--hkui-danger-100);
+}
+
+[data-theme="dark"] .adm-batch-result--failed svg {
+	color: var(--hkui-danger-100);
+}
+
+/* ============================================================
+ * 商品管理列表：代行專屬的兩欄（mockup §4.7.7）
+ * ============================================================ */
+
+.adm-products__id {
+	font-variant-numeric: tabular-nums;
+	color: var(--color-brand-primary-strong);
+	text-decoration: none;
+}
+
+.adm-products__id:hover {
+	text-decoration: underline;
+}
+
+.adm-products__actions {
+	display: inline-flex;
+	gap: 10px;
+	align-items: center;
+}
+
+/* ============================================================
+ * 編輯商品（mockup image6）
+ * ============================================================ */
+
+.adm-product-edit__grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 340px;
+	gap: 16px;
+	align-items: start;
+}
+
+.adm-product-edit__col {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	min-width: 0;
+}
+
+.adm-product-edit__card {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	padding: 24px;
+}
+
+.adm-product-edit__card-head h2 {
+	font-size: 1rem;
+	font-weight: 600;
+	color: var(--ink-heading);
+}
+
+.adm-product-edit__card-head p {
+	margin-top: 2px;
+	font-size: 0.75rem;
+	color: var(--ink-soft);
+}
+
+.adm-product-edit__field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.adm-product-edit__label {
+	font-size: 0.8125rem;
+	font-weight: 500;
+	color: var(--ink-body);
+}
+
+.adm-product-edit__images {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	list-style: none;
+}
+
+.adm-product-edit__images > li {
+	position: relative;
+	width: 120px;
+	height: 120px;
+	border-radius: var(--radius-hk-md);
+	overflow: hidden;
+	border: 1px solid var(--border-soft);
+	background: var(--theme-surface-muted);
+}
+
+.adm-product-edit__images img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+/**
+ * 已上傳圖片右上角的「移除這張圖片」小圓鈕。
+ *
+ * ⚠️ `:not(.adm-product-edit__image-add)` 不可省。「新增圖片」那一格也是
+ * `<li>` ＋ 直接子 `<button>`，於是它整顆被這條規則接管（`> li > button` 的
+ * 0-1-2 壓過下面 `.adm-product-edit__image-add > button` 的 0-1-1）：120×120 的
+ * 上傳鈕被縮成右上角 28×28 的絕對定位小圓，按鈕內容（圖示 ＋「新增圖片」）溢出
+ * 後被 `li { overflow: hidden }` 從右邊切掉，畫面上只剩一顆橘色小膠囊寫著
+ * 「新增圖」（`lane-W/W4-create-via-page-button.png` 三張穩定重現）。
+ * 整格的上傳熱區也一併消失 —— 只有那 28px 點得到。
+ */
+.adm-product-edit__images > li:not(.adm-product-edit__image-add) > button {
+	position: absolute;
+	top: 6px;
+	right: 6px;
+	display: grid;
+	place-items: center;
+	width: 28px;
+	height: 28px;
+	border-radius: var(--radius-hk-pill);
+	background: rgb(var(--color-neutral-white-rgb) / 0.86);
+	color: var(--color-status-danger);
+	cursor: pointer;
+}
+
+.adm-product-edit__image-add {
+	border-style: dashed;
+}
+
+/**
+ * 上傳鈕填滿整格。
+ *
+ * ⚠️ 不再宣告 `flex-direction: column`：`Button` 的直接子節點只有一個（它自己的
+ * grid 容器），圖示與文字是**孫節點** —— 下在 `<button>` 上的 flex 方向對它們無效，
+ * 這個宣告從來沒有生效過。與其伸手去排它的內部結構（那份 DOM 隨元件改版就會失效），
+ * 這裡讓圖示與文字沿用 `Button` 自己的橫排；12px 字下整組約 78px，120px 的格子裝得下。
+ */
+.adm-product-edit__image-add > button {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	height: 100%;
+	padding: 0;
+	font-size: 0.75rem;
+	color: var(--ink-soft);
+	cursor: pointer;
+}
+
+.adm-product-edit__facts {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	font-size: 0.8125rem;
+}
+
+.adm-product-edit__facts dt {
+	font-size: 0.75rem;
+	color: var(--ink-soft);
+}
+
+.adm-product-edit__facts dd {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-top: 2px;
+	color: var(--ink-body);
+}
+
+.adm-product-edit__chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	height: 24px;
+	padding: 0 6px 0 10px;
+	border-radius: var(--radius-hk-pill);
+	background: var(--theme-surface-muted);
+	font-size: 0.75rem;
+}
+
+/* 唯讀時整顆 × 不渲染，chip 收回對稱的內距。 */
+.adm-product-edit__chip:not(:has(.adm-product-edit__chip-remove)) {
+	padding: 0 10px;
+}
+
+/* 審核狀態（19 §14.2）。`product.certifications` 是 approved-only 公開投影，所以掛在
+   chip 上的每一筆都已核准 —— 不標出來的話，操作者分不出這是平台認可的標章還是賣家
+   自己填的宣稱，而那正是本次要修掉的誤解。 */
+.adm-product-edit__chip-status {
+	padding: 0 6px;
+	border-radius: var(--radius-hk-pill);
+	background: var(--theme-surface-card);
+	color: var(--ink-soft);
+	font-size: 0.6875rem;
+	line-height: 16px;
+}
+
+/* 掛在自己的 class 上而不是後代選擇器 `.adm-product-edit__chip button`：後者的
+   specificity 低於本檔既有的 `.adm-product-edit__image-add > button`，會踩到
+   noDescendingSpecificity。 */
+.adm-product-edit__chip-remove {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 2px;
+	border: 0;
+	border-radius: var(--radius-hk-pill);
+	background: transparent;
+	color: var(--ink-soft);
+	cursor: pointer;
+}
+
+.adm-product-edit__chip-remove:hover {
+	color: var(--ink-body);
+}
+
+.adm-product-edit__certs {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.adm-product-edit__cert-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.adm-product-edit__cert-empty {
+	font-size: 0.75rem;
+	color: var(--ink-soft);
+}
+
+.adm-product-edit__cert-add {
+	display: grid;
+	gap: 8px;
+	align-items: end;
+	grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.adm-product-edit__note {
+	margin: 0;
+	font-size: 0.75rem;
+	line-height: 1.6;
+	color: var(--ink-soft);
+}
+
+.adm-product-edit__sku {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	padding-bottom: 16px;
+	border-bottom: 1px solid var(--border-soft);
+}
+
+.adm-product-edit__sku:last-child {
+	padding-bottom: 0;
+	border-bottom: 0;
+}
+
+.adm-product-edit__affix {
+	font-size: 0.75rem;
+	color: var(--ink-soft);
+	white-space: nowrap;
+}
+
+.adm-product-edit__status {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: center;
+}
+
+.adm-product-edit__version {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 10px 12px;
+	border-radius: var(--radius-hk-sm);
+	background: var(--theme-surface-muted);
+	font-size: 0.8125rem;
+	color: var(--ink-body);
+}
+
+/* 版本衝突（9266）卡：商品編輯頁與商品列表的單筆上下架**共用同一份**。
+   兩個出口是契約（L5346），兩處各畫一份樣式就會各自演化。 */
+.adm-conflict {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: center;
+	justify-content: space-between;
+	padding: 14px 16px;
+	border: 1px solid var(--color-brand-secondary);
+	border-radius: var(--radius-hk-md);
+	background: rgb(var(--color-brand-secondary-soft-rgb) / 0.24);
+	color: var(--color-brand-primary-strong);
+}
+
+[data-theme="dark"] .adm-conflict {
+	background: rgb(241 205 112 / 0.16);
+	color: var(--theme-text-accent);
+}
+
+.adm-conflict__text {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	flex: 1 1 320px;
+	min-width: 0;
+	font-size: 0.8125rem;
+}
+
+.adm-conflict strong {
+	font-size: 0.875rem;
+	font-weight: 600;
+}
+
+.adm-conflict__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+}
+
+.adm-product-edit__error {
+	font-size: 0.8125rem;
+	color: var(--color-status-danger);
+}
+
+/* 建立商品的前端驗證清單：product-service 逐條驗、第一條失敗就 return，所以缺四欄
+   的表單在後端會換來四次各只講一欄的 400。這裡一次列完。 */
+.adm-product-edit__errors {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin: 0;
+	padding: 12px 16px 12px 32px;
+	border: 1px solid var(--color-status-danger);
+	border-radius: var(--radius-hk-md);
+	list-style: disc;
+	font-size: 0.8125rem;
+	color: var(--color-status-danger);
+}
+
+.adm-product-create__categories {
+	display: grid;
+	gap: 12px;
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.adm-product-create__sku-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	font-size: 0.8125rem;
+	color: var(--ink-soft);
+}
+
+.adm-product-edit__bar {
+	position: sticky;
+	bottom: 0;
+	z-index: 20;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: center;
+	justify-content: space-between;
+	margin-top: 24px;
+	padding: 12px 20px;
+	border-top: 1px solid var(--border-soft);
+	background: var(--theme-surface-card);
+	box-shadow: var(--shadow-hk-lift);
+}
+
+.adm-product-edit__bar-hint {
+	display: inline-flex;
+	gap: 8px;
+	align-items: center;
+	font-size: 0.75rem;
+	color: var(--ink-soft);
+}
+
+.adm-product-edit__bar-actions {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: center;
+}
+
+/* 缺 products.publish 時取代那顆按鈕的說明。按鈕本身不渲染（一顆停用的按鈕仍在
+ * 宣稱「這件事本來做得到」），但少了這一句，畫面會退回「只有一顆按鈕」＝看起來
+ * 沒有選擇，那正是本波要拆掉的隱藏預設。 */
+.adm-product-edit__bar-note,
+.adm-post-compose__bar-note {
+	max-width: 42ch;
+	font-size: 0.75rem;
+	line-height: 1.5;
+	color: var(--ink-soft);
+}
+
+@media (max-width: 1100px) {
+	.adm-product-edit__grid {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+/* ============================================================
+ * 新增貼文（mockup image9）：標籤 chips／預計發布／動態預覽／底部固定條
+ * ============================================================ */
+
+.adm-post-compose .post-compose__split {
+	grid-template-columns:
+		minmax(240px, 300px)
+		minmax(0, 1fr)
+		minmax(0, 360px);
+}
+
+@media (max-width: 1280px) {
+	.adm-post-compose .post-compose__split {
+		grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+	}
+}
+
+@media (max-width: 960px) {
+	.adm-post-compose .post-compose__split {
+		grid-template-columns: 1fr;
+	}
+}
+
+.adm-post-tags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	list-style: none;
+}
+
+.adm-post-tags > li {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	height: 28px;
+	padding: 0 6px 0 12px;
+	border-radius: var(--radius-hk-pill);
+	background: rgb(var(--color-brand-primary-rgb) / 0.16);
+	color: var(--theme-text-accent-on-tint);
+	font-size: 0.75rem;
+}
+
+[data-theme="dark"] .adm-post-tags > li {
+	color: var(--theme-text-heading);
+}
+
+.adm-post-tags > li button {
+	display: grid;
+	place-items: center;
+	width: 18px;
+	height: 18px;
+	border-radius: var(--radius-hk-pill);
+	cursor: pointer;
+}
+
+.adm-post-tags__add {
+	display: flex;
+	gap: 8px;
+	align-items: flex-end;
+}
+
+.adm-post-schedule {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: center;
+}
+
+.adm-post-schedule__option {
+	display: inline-flex;
+	gap: 6px;
+	align-items: center;
+	font-size: 0.8125rem;
+	color: var(--ink-body);
+	cursor: pointer;
+}
+
+.adm-post-preview {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	min-width: 0;
+}
+
+.adm-post-preview__head {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	justify-content: space-between;
+	font-size: 0.875rem;
+	color: var(--ink-heading);
+}
+
+.adm-post-preview__head span {
+	padding: 2px 10px;
+	border-radius: var(--radius-hk-pill);
+	background: var(--theme-surface-muted);
+	font-size: 0.6875rem;
+	color: var(--ink-soft);
+}
+
+.adm-post-preview__card {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 16px;
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-hk-lg);
+	background: var(--theme-surface-card);
+}
+
+.adm-post-preview__author {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+}
+
+.adm-post-preview__author > span:last-child {
+	display: flex;
+	flex-direction: column;
+	font-size: 0.8125rem;
+	color: var(--ink-heading);
+}
+
+.adm-post-preview__author small {
+	font-size: 0.6875rem;
+	color: var(--ink-soft);
+}
+
+.adm-post-preview__avatar {
+	display: grid;
+	place-items: center;
+	width: 40px;
+	height: 40px;
+	border-radius: var(--radius-hk-pill);
+	background: var(--color-brand-primary-strong);
+	color: var(--color-neutral-white);
+	font-size: 0.9375rem;
+	font-weight: 600;
+}
+
+.adm-post-preview__content {
+	font-size: 0.8125rem;
+	line-height: 1.7;
+	color: var(--ink-body);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.adm-post-preview__image {
+	width: 100%;
+	aspect-ratio: 4 / 3;
+	border-radius: var(--radius-hk-md);
+	background: var(--hkui-default-100);
+	object-fit: contain;
+}
+
+.adm-post-preview__tags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	font-size: 0.75rem;
+	color: var(--color-brand-primary-strong);
+}
+
+.adm-post-preview__product {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	padding: 10px;
+	border-radius: var(--radius-hk-md);
+	background: var(--theme-surface-muted);
+}
+
+.adm-post-preview__product img {
+	width: 48px;
+	height: 48px;
+	border-radius: var(--radius-hk-sm);
+	object-fit: cover;
+}
+
+.adm-post-preview__product span {
+	display: flex;
+	flex-direction: column;
+	font-size: 0.8125rem;
+	color: var(--ink-heading);
+}
+
+.adm-post-preview__product small {
+	font-size: 0.75rem;
+	color: var(--color-status-danger);
+}
+
+.adm-post-compose__bar {
+	position: sticky;
+	bottom: 0;
+	z-index: 20;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: center;
+	justify-content: space-between;
+	margin-top: 24px;
+	padding: 12px 20px;
+	border-top: 1px solid var(--border-soft);
+	background: var(--theme-surface-card);
+	box-shadow: var(--shadow-hk-lift);
+}
+
+.adm-post-compose__bar-hint {
+	display: inline-flex;
+	gap: 8px;
+	align-items: center;
+	font-size: 0.75rem;
+	color: var(--ink-soft);
+}
+
+/**
+ * 代行原因（mockup §4.9.5 中段）。它是「儲存，暫不發布」這條路徑的唯一輸入點，
+ * 所以必須跟著底部條一起釘在畫面上——放進表單裡捲走等於讓人按下按鈕才發現少填。
+ */
+.adm-post-compose__bar-reason {
+	display: inline-flex;
+	flex: 1 1 300px;
+	gap: 12px;
+	align-items: center;
+	min-width: 0;
+}
+
+.adm-post-compose__bar-reason > :first-child {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.adm-post-compose__bar-notify {
+	display: inline-flex;
+	gap: 6px;
+	align-items: center;
+	font-size: 0.75rem;
+	color: var(--ink-body);
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.adm-post-compose__bar-actions {
+	display: inline-flex;
+	gap: 12px;
+	align-items: center;
+}
+
+.adm-product-edit__locked {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	padding: 12px 16px;
+	border-radius: var(--radius-hk-md);
+	background: var(--theme-surface-muted);
+	font-size: 0.8125rem;
+	color: var(--ink-body);
+}
+
+/**
+ * 代行的商品表格欄序與賣家中心不同（多了「商品 ID」，少了評分／收藏／上架時間），
+ * 而 `seller-center.css` 的欄寬是用 `nth-child` 配的、表格又是 `table-layout: fixed`
+ * —— 沿用會整組錯位：商品名稱欄會拿到原本「評分」的 96px，名稱被截成一兩個字。
+ * 這裡按代行自己的欄序重配一次（「商品」欄不配寬，吃剩餘空間）。
+ *
+ * ⚠️ 一律從**右邊**數（`nth-last-child`）。勾選欄只在具備 `products.publish` 時才
+ * 渲染（§6.4），從左邊數的話同一張表會有 9 欄與 8 欄兩種樣子，每一條寬度都得寫
+ * 兩個錨點 —— 那是一份會各自演化的平行清單。右起的序號兩種情況完全相同（勾選欄
+ * 是最左邊那一欄），一份清單就夠。
+ */
+.seller-products-table--delegated thead th:nth-last-child(8) {
+	/* 商品 ID 是 TSID 數字字串（最長 19 位）。 */
+	width: 132px;
+}
+
+/**
+ * 少兩欄就少一段底線寬度：賣家版的 1072px 是照它自己的十一欄推導的，沿用會讓
+ * 代行在 1440px 視窗白白多捲一段。固定欄合計 760（44 ＋ 132 ＋ 96 ＋ 116 ＋ 70
+ * ＋ 70 ＋ 104 ＋ 128）＋ 商品欄目標 196 ＝ 956。
+ *
+ * ⚠️ 這個數字的唯一判準是「1440px 視窗剛好不捲動」，而代行的可用寬度比賣家窄兩段：
+ * 1440 − 88（AdmRail）− 88（shell 左右 padding）− 256（側欄）− 24（grid gap）
+ * − 15（垂直捲軸）＝ **969**。賣家版的推導少算了 AdmRail 與捲軸，於是代行實測
+ * 974 > 969、「操作」欄整欄落在裁切線外 —— 而 `overflow-x: auto` 在 macOS 是覆蓋式
+ * 捲軸，畫面上不會留下任何看得出來還有東西的痕跡（1280px 時連「狀態」欄一起消失，
+ * 那一欄的膠囊是單筆上／下架的唯一入口）。
+ */
+.seller-products-table--delegated {
+	min-width: 956px;
+}
+
+@media (min-width: 961px) {
+	.seller-products-table--delegated {
+		min-width: 956px;
+	}
+}
+
+/**
+ * 缺 `products.publish` 時勾選欄整欄不渲染（§6.4），底線少掉它宣告的那 56px
+ * （`.seller-products-table__check`）。沿用 956 會讓這個工作階段白白多捲 56px，
+ * 而下面那條提示會跟著說「表格比畫面寬」—— 一句在此刻不成立的話。
+ */
+.seller-products-table--delegated.seller-products-table--noselect {
+	min-width: calc(956px - 56px);
+}
+
+@media (min-width: 961px) {
+	.seller-products-table--delegated.seller-products-table--noselect {
+		min-width: calc(956px - 56px);
+	}
+}
+
+/**
+ * 比 1440px 更窄的視窗仍然會捲（固定欄已無可壓縮空間），而**捲動本身在 macOS 上是
+ * 看不見的**：覆蓋式捲軸靜止時完全透明，操作者會把「被裁掉的欄」讀成「沒有這個欄」，
+ * 而落在外面的正是單筆上／下架與編輯／預覽。
+ *
+ * ⚠️ 捲軸不能拿來當提示：`scrollbar-width: thin` 在 macOS 仍由系統偏好設定決定是否
+ * 覆蓋式，而同時宣告標準屬性會讓 Chromium 整組忽略 `::-webkit-scrollbar`；只留
+ * `::-webkit-scrollbar` 也不會憑空長出實體捲軸（本機實測 `offsetHeight −
+ * clientHeight` 恆為 0）。所以改用容器查詢直接問「卡片有沒有比表格底線窄」——
+ * 這個判準不依賴任何作業系統設定。
+ */
+.adm-workspace .seller-products__card {
+	container-type: inline-size;
+}
+
+.adm-products__scroll-hint {
+	display: none;
+	gap: 6px;
+	align-items: center;
+	padding: 8px 20px;
+	border-bottom: 1px solid var(--border-soft);
+	font-size: 0.75rem;
+	color: var(--ink-soft);
+}
+
+/* 門檻＝表格底線 − 1。勾選欄不渲染時底線少 56px，門檻跟著降，否則 900–955px 這
+ * 一段會出現一句「表格比畫面寬」而表格其實沒有比畫面寬。 */
+@container (max-width: 955px) {
+	.seller-products__card:not(:has(.seller-products-table--noselect))
+		.adm-products__scroll-hint {
+		display: flex;
+	}
+}
+
+@container (max-width: 899px) {
+	.seller-products__card:has(.seller-products-table--noselect)
+		.adm-products__scroll-hint {
+		display: flex;
+	}
+}
+
+.seller-products-table--delegated thead th:nth-last-child(7) {
+	width: auto;
+}
+
+.seller-products-table--delegated thead th:nth-last-child(6) {
+	width: 96px;
+}
+
+.seller-products-table--delegated thead th:nth-last-child(5) {
+	width: 116px;
+}
+
+.seller-products-table--delegated thead th:nth-last-child(4),
+.seller-products-table--delegated thead th:nth-last-child(3) {
+	width: 70px;
+}
+
+.seller-products-table--delegated thead th:nth-last-child(2) {
+	width: 104px;
+}
+
+.seller-products-table--delegated thead th:last-child {
+	/* 編輯｜預覽 兩個文字連結：2 字 ＋ 10 gap ＋ 2 字 ＝ 62，加左右 12／24 內距 ＝ 98。 */
+	width: 128px;
+}
+
+/**
+ * 「操作」欄釘在右側。
+ *
+ * 上面那條 `min-width: 956px` 的推導假設卡片寬度恆為 969px（1440 視窗），但實際可用
+ * 寬度會被情境列與側欄的實際渲染吃掉：dev 實測 1440 與 1536 兩個視窗下卡片各只有
+ * 851／839px，於是「操作」欄整欄落在裁切線外，畫面上只露出「操」一個字（
+ * `lane-E2E/cache-partition/01-store-A.png`、`lane-W/C-partial-W3-products.png`）。
+ *
+ * 提示列已經在講「請左右捲動」，但那只讓人知道有東西被藏起來 —— 而藏起來的是**單筆
+ * 編輯與預覽的唯一入口**。釘住它讓可用寬度再怎麼變，主要動作都到得了；捲動只影響
+ * 中間那幾個資訊欄。判準與 `seller-center.css` ≤960px 的凍結首欄同一條，色票也沿用
+ * 它的 `--seller-surface`，不新增色面。
+ *
+ * ⚠️ 這一格必須自帶背景（否則捲過去的內容會從底下穿過來），也因此它吃不到
+ * `.seller-orders__row:hover` 的背景 —— 與凍結首欄相同的既知取捨。
+ *
+ * ⚠️ 已知限度：`--seller-surface` 在賣家工作區的 dark 作用域是
+ * `--color-ink-850`（`seller-center.css` 的 `--hkui-content1` 覆寫），所以 dark
+ * 下捲到底層的字仍有約 22% 會透出來成為淡影。**刻意不補一層不透明底**：那張卡在 dark
+ * 本身是 `rgba(255,255,255,0.04)` ＋ backdrop-filter 的玻璃面，硬塞一個不透明基底會讓
+ * 這一格與同列其他格出現看得出來的色差 —— 換成一個更顯眼的問題。凍結首欄同一取捨。
+ *
+ * ⚠️ 排除空狀態那一格：它是 `colSpan` 橫跨整張表的單一 `<td>`，也就是它自己的
+ * `:last-child`。錨點還是第 9 欄時它落不進來，換成 `:last-child` 之後會被打到 ——
+ * 一格本來就佔滿寬度的東西釘不動，只會白得到一條左緣陰影。
+ */
+.seller-products-table--delegated thead th:last-child,
+.seller-products-table--delegated
+	tbody
+	td:last-child:not(.seller-orders__empty) {
+	position: sticky;
+	right: 0;
+	z-index: 2;
+	background: var(--seller-surface);
+	box-shadow: -6px 0 8px -6px rgb(0 0 0 / 0.25);
+}
+
+/**
+ * 表頭那一格要蓋在其他表頭與所有內容之上，且底色要與同列其他表頭一致。
+ *
+ * thead 的底色是半透明的一層 wash（light `--color-ink-50`、dark
+ * `rgba(245,222,165,0.06)`，見 `seller-center.css`）。釘住的那一格自己有 background
+ * 之後就不再吃到 thead 的 wash，所以要把同一層 wash 疊回來 —— 少了它，表頭右端會出現
+ * 一塊看得出來的色差。
+ */
+.seller-products-table--delegated thead th:last-child {
+	z-index: 3;
+	background:
+		linear-gradient(rgb(var(--color-ink-50-rgb) / 0.55), rgb(var(--color-ink-50-rgb) / 0.55)),
+		var(--seller-surface);
+}
+
+[data-theme="dark"] .seller-products-table--delegated thead th:last-child {
+	background:
+		linear-gradient(rgba(245, 222, 165, 0.06), rgba(245, 222, 165, 0.06)),
+		var(--seller-surface);
+}
+
+/* ============================================================
+ * 賣家總覽（§6.1.14 第 1 列）
+ * ============================================================ */
+
+.adm-dashboard__note {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 12px 16px;
+	border: 1px solid var(--border-soft);
+	border-radius: 12px;
+	background: var(--theme-surface-card);
+	color: var(--ink-body);
+	font-size: 0.8125rem;
+	line-height: 1.7;
+}
+
+.adm-dashboard__note svg {
+	flex: none;
+	color: var(--ink-soft);
+}
+
+.adm-dashboard__section {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.adm-dashboard__section-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.adm-dashboard__section-head h2 {
+	font-size: 0.9375rem;
+	font-weight: 700;
+	color: var(--ink-heading);
+}
+
+/** `--ink-soft` 在 light 底只有 4.15:1（13px 內文需要 4.5），所以用 `--ink-body`。 */
+.adm-dashboard__link {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 0.8125rem;
+	font-weight: 600;
+	color: var(--ink-body);
+	text-decoration: none;
+}
+
+.adm-dashboard__link:hover {
+	color: var(--ink-heading);
+}
+
+/**
+ * 欄數固定 5（＝訂單卡的張數），不是 auto-fill：卡片數逐區不同（訂單 5、商品 3、
+ * 動態 1），auto-fill 會讓每一區的卡片寬度都不一樣，而它們是同一組指標。固定欄數
+ * 讓少於 5 張的區塊靠左排、右邊留空，卡片尺寸跨區一致。斷點沿用訂單頁那一組。
+ */
+.adm-dashboard__stats {
+	display: grid;
+	grid-template-columns: repeat(5, minmax(0, 1fr));
+	gap: 16px;
+}
+
+@media (max-width: 1200px) {
+	.adm-dashboard__stats {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 900px) {
+	.adm-dashboard__stats {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+/* ============================================================
+ * 結束摘要對話框
+ *
+ * 這三塊原本用 `bg-success-50` / `bg-danger-50` / `text-danger-700`。那組色階
+ * **只有 light 一套**（`ui-kit.css` 的 `--hkui-*-50` / `-700` 在 dark 沒有覆寫），
+ * 而字色 `--hkui-foreground` 有 ⇒ 同一個元件裡兩個方向的半套 dark，實測綠卡
+ * 1.09:1。它承載的正是本案最重要的安全宣稱，看不見等於沒有。
+ *
+ * 判準（24 號定案 §10 要點 3）：**引用語意 token 前先確認它 light/dark 兩邊都
+ * 有定義**；只有單邊的就在這裡自己定兩套，不要去動全站色階（賣家頁面在用）。
+ * ============================================================ */
+
+.adm-end-dialog__safe,
+.adm-end-dialog__alert {
+	padding: 12px;
+	border-radius: var(--radius-hk-md);
+	font-size: 0.8125rem;
+	line-height: 1.6;
+}
+
+.adm-end-dialog__safe {
+	background: var(--hkui-success-50);
+	color: var(--hkui-foreground);
+}
+
+[data-theme="dark"] .adm-end-dialog__safe {
+	background: rgb(var(--color-status-success-rgb) / 0.22);
+	color: var(--hkui-foreground);
+}
+
+.adm-end-dialog__alert {
+	background: var(--hkui-danger-50);
+	color: var(--hkui-danger-700);
+}
+
+[data-theme="dark"] .adm-end-dialog__alert {
+	background: rgb(var(--color-status-danger-rgb) / 0.16);
+	color: var(--hkui-danger-100);
+}
+
+.adm-end-dialog__error {
+	font-size: 0.8125rem;
+	line-height: 1.6;
+	color: var(--hkui-danger-700);
+}
+
+[data-theme="dark"] .adm-end-dialog__error {
+	color: var(--hkui-danger-100);
+}
+
+/**
+ * 取消／返回類按鈕的 dark 補丁。
+ *
+ * `Button` 的 `bordered`／`light` 預設 `color="primary"`，而 `--hkui-primary`
+ * **刻意兩套主題同值**（常數 brand primary，`globals.css:405` 註解已載明）——
+ * solid 沒事（白字疊 primary），bordered／light 在 dark 下就是 primary 疊
+ * dark，實測 1.39:1。
+ *
+ * ⚠️ 這裡只補代行工作區自己的按鈕，**不動 `--hkui-primary` 也不動 `Button`**：
+ * 那兩個是全站共用，repo 內另有 160 餘處 bordered primary 在賣家與買家頁面上。
+ * 取的兩個值就是 `Button.tsx:199` 給 `bordered.default` 的 dark 值。
+ */
+[data-theme="dark"] .adm-quiet-button {
+	border-color: rgb(245 222 165 / 0.32);
+	color: #f5e9c3;
+}
+
+/**
+ * ⚠️ hover 底色也要一起補，不能只補 border 與 color。
+ *
+ * `bordered.primary` 的 hover 是 `bg-[var(--hkui-primary-50)]`，而那個 token
+ * **沒有 dark 值**（`ui-kit.css:215` = `--color-ink-50`，近白）。上面兩行把文字改成
+ * `#f5e9c3` 之後，hover 就變成米黃字疊近白底 —— dev 實測結束對話框的「返回繼續」
+ * 正是這個狀態（實測底 `--color-ink-50`／字 `rgb(245,233,195)`，約 1.05:1，
+ * 完全讀不出來；`lane-W/W18-end-dialog-sidebar-dark.png`）。
+ *
+ * ⚠️ 賣家中心的 dark 作用域另外把 `--hkui-primary-50` 重指成暖琥珀
+ * （`seller-center.css:12449`），所以工作區**頁面上**的同一顆按鈕沒事；對話框走
+ * portal 掛在 body 底下、拿不到那個作用域，於是只有對話框裡的會現形。修在
+ * `.adm-quiet-button` 上，兩個落點一起蓋到。
+ *
+ * 取值與 `Button.tsx:200` 給 `bordered.default` 的 dark hover 同一個 —— 上面兩行
+ * 取的就是那條規則的另兩個值，這裡只是把漏掉的第三個補齊。
+ */
+[data-theme="dark"] .adm-quiet-button:hover {
+	background: rgb(245 222 165 / 0.1);
+	color: #f5e9c3;
+}

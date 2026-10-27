@@ -1,0 +1,81 @@
+name: backend Java tests
+
+# 全 reactor `services/java/**` 的單元測試，以及 @Tag("integration") 的 testcontainers IT
+# （交易原子性、FOR UPDATE 序列化、partial UNIQUE 並行、CAS 述詞——撥款與退款的錢）。
+# 由 backend/.github/workflows/java-tests.yml 搬來，差異：
+#   - 拿掉 decide job：它是為了 self-hosted runner slot 不足而做的「本次 push 沒動 Java 就 skip」
+#   - 直接從 Docker Hub 拉映像，不再經 ghcr 鏡像與 GHCR_PAT
+#   - 開 setup-java 的 maven cache
+# Java 服務改寫成 Go 單體之後，這支 workflow 隨之退場。
+
+on:
+  pull_request:
+    paths: &java_paths
+      - 'backend/services/java/**'
+      - 'backend/scripts/check-surefire-it-includes.py'
+      - '.github/workflows/backend-java-tests.yml'
+  push:
+    branches: [main]
+    paths: *java_paths
+  workflow_dispatch:
+
+concurrency:
+  group: backend-java-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: backend/services/java
+
+jobs:
+  reactor-test:
+    name: full reactor unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/services/java/**/pom.xml
+      - name: Run full reactor tests
+        run: ./mvnw test -B -fae
+
+  # 與 unit 分開：失敗語意不同（本 job 紅也可能是容器環境問題），時間量級也差一截。
+  integration-test:
+    name: integration tests (testcontainers)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/services/java/**/pom.xml
+      # 擺在跑測試之前：漏 includes 的症狀是「少跑幾支、仍然全綠」。
+      - name: Assert surefire includes cover *IT.java
+        working-directory: backend
+        run: python3 scripts/check-surefire-it-includes.py
+      # -Dgroups=integration 只跑帶 tag 的；-DexcludedGroups= 覆寫各 pom 預設的排除；
+      # -fae 跑完全部再報告。
+      - name: Run @Tag("integration") suites against real PostgreSQL
+        run: ./mvnw test -B -fae -Dgroups=integration -DexcludedGroups=
+      # tag 選取若失效，上一步會「零支測試、綠燈通過」，所以對執行數設下限。
+      - name: Assert the suite actually ran
+        if: always()
+        run: |
+          set -euo pipefail
+          total=$(find . -path '*/target/surefire-reports/*.txt' -exec cat {} + 2>/dev/null \
+                  | grep -oE 'Tests run: [0-9]+' | awk '{s+=$3} END {print s+0}')
+          echo "integration tests executed: $total"
+          if [ "$total" -lt 100 ]; then
+            echo "::error::只跑到 $total 個 integration 測試（下限 100）——@Tag(\"integration\") 的選取失效了。"
+            exit 1
+          fi

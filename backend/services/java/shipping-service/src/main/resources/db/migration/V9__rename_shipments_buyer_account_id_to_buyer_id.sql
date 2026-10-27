@@ -1,0 +1,11 @@
+-- V9: shipments.buyer_account_id 改名為 buyer_id（Phase 2 account_id 命名債稽核，Task 19）。
+-- 值從建立時就是 order-service 已解析的買家 buyer_id（見
+-- CvsShipmentStrategy/HomeShipmentStrategy/UberShipmentStrategy：
+-- entity.setBuyerAccountId(orderInfo.getBuyerId())），從未真正存過登入 principal
+-- account_id——欄位名稱是唯一與語意不符的部分。純 rename，無需 backfill（比照
+-- V4__rename_shipping_seller_account_id_to_store_id.sql 與
+-- V8__rename_buyer_store_pickups_account_id_to_buyer_id.sql 的相同結論）。
+-- 該欄位無專屬 index/constraint（原 idx_shipments_seller 綁在 seller_account_id/
+-- 現 store_id，與本欄位無關；已於 dev 用 information_schema.columns / pg_indexes
+-- 核實）。
+ALTER TABLE shipments RENAME COLUMN buyer_account_id TO buyer_id;

@@ -1,0 +1,29 @@
+# Watchdog —— 一條永遠 firing 的告警，存在的唯一目的是「被外部觀察」。
+#
+# 解決的問題：Prometheus 與 Alertmanager 自己死掉時，沒有任何東西能報告這件事。
+# Prometheus 死了規則不會被評估；Alertmanager 死了告警送不出去。2026-09-10 補的
+# up series 讓監控棧的其他元件被 ServiceDown 蓋到，但這兩個是自我涵蓋不了的。
+#
+# 標準解法是 Dead Man's Snitch 形狀：發一條恆真的告警出去，由**監控棧之外**的
+# 東西檢查「它還在不在」。不在 = 這條鏈上某一段死了。
+# 這裡的外部觀察者是 .github/workflows/monitoring-watchdog.yml（跑在 CI runner
+# VM 203.0.113.20 上，與監控 VM 203.0.113.10 是不同機器）。
+#
+# ⚠️ 這條**不得**送進任何 Discord 頻道——它每 4 小時會 repeat 一次，會變成純噪音。
+# alertmanager/config.yml 的第一條 route 把它導到 blackhole receiver。
+# 改動那條 route 之前先想清楚：把 Watchdog 放進 discord = 每 4 小時一則假告警。
+#
+# 為什麼 `vector(1)` 而不是某個真實指標：watchdog 要驗的是「規則評估管線活著」，
+# 不是任何業務事實。綁到真實指標會讓它在該指標消失時失效，而那正是它該報告的時刻。
+groups:
+  - name: watchdog
+    interval: 30s
+    rules:
+      - alert: Watchdog
+        expr: vector(1)
+        for: 0m
+        labels:
+          severity: none
+        annotations:
+          summary: "Watchdog — 這條告警恆為 firing，用於外部驗證告警管線存活"
+          description: "若外部 watchdog 查不到這條 alert，代表 Prometheus 規則評估或 Alertmanager 有一段已經死了。它本身不代表任何異常。"

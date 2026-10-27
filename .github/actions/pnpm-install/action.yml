@@ -1,0 +1,30 @@
+name: pnpm install
+description: 在根目錄安裝 pnpm workspace 的依賴（pnpm、Node 版本都讀根目錄的檔案，安裝帶重試）。
+
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v4
+      with:
+        package_json_file: package.json
+    - uses: actions/setup-node@v5
+      with:
+        node-version-file: .nvmrc
+        cache: pnpm
+        cache-dependency-path: pnpm-lock.yaml
+    # pnpm 11 的 minimumReleaseAge 每次安裝都要向 registry 查發布時間，
+    # 查詢有自己的短重試預算，registry 抖動就會失敗，所以外層再包重試。
+    # composite 的步驟不繼承 workflow 的 defaults.run，工作目錄明寫成 repo 根目錄。
+    - name: Install dependencies
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        for attempt in 1 2 3; do
+          pnpm install --frozen-lockfile && exit 0
+          if [ "$attempt" -lt 3 ]; then
+            echo "::warning::pnpm install 失敗（第 ${attempt}/3 次），30 秒後重試"
+            sleep 30
+          fi
+        done
+        echo "::error::pnpm install 連續 3 次失敗"
+        exit 1

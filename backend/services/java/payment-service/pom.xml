@@ -1,0 +1,330 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.1</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>io.github.will413028.hawkr</groupId>
+    <artifactId>payment-service</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+    <name>Hawkr Payment Service</name>
+    <description>支付服務 - 整合 PayUni 金流，提供信用卡、ATM、Apple Pay、Google Pay 等支付方式</description>
+
+    <properties>
+        <java.version>21</java.version>
+        <mybatis-plus.version>3.5.5</mybatis-plus.version>
+        <grpc.version>1.71.0</grpc.version>
+        <protobuf.version>3.25.5</protobuf.version>
+        <grpc-spring-boot.version>3.1.0.RELEASE</grpc-spring-boot.version>
+        <spring-cloud.version>2023.0.0</spring-cloud.version>
+        <spring-cloud-alibaba.version>2023.0.0.0-RC1</spring-cloud-alibaba.version>
+        <!-- issue #1504：預設排除 @Tag("integration")；本地/CI 要跑用 -DexcludedGroups= 覆寫（見下方 surefire 註解） -->
+        <excludedGroups>integration</excludedGroups>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.alibaba.cloud</groupId>
+                <artifactId>spring-cloud-alibaba-dependencies</artifactId>
+                <version>${spring-cloud-alibaba.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <!-- Spring Boot Web 框架（Webhook 接收端點） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!-- 健康檢查與監控端點 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <!-- RabbitMQ 訊息佇列（支付事件發佈） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+
+        <!-- Redis（§2A.4 付款建立冷卻機制） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <!-- 共用工具、基礎類別、TSID 產生器 -->
+        <dependency>
+            <groupId>io.github.will413028.hawkr</groupId>
+            <artifactId>common-core</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <!-- gRPC Proto 生成碼（統一由 api/proto 產出） -->
+        <dependency>
+            <groupId>io.github.will413028.hawkr</groupId>
+            <artifactId>proto-common</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <!-- 分散式追蹤與結構化日誌 -->
+        <dependency>
+            <groupId>io.github.will413028.hawkr</groupId>
+            <artifactId>observability-common</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <!-- PayUni 加解密 SDK（共用模組） -->
+        <dependency>
+            <groupId>io.github.will413028.hawkr</groupId>
+            <artifactId>payuni-java-client</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+
+        <!-- Nacos 服務註冊與發現 -->
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
+        </dependency>
+
+        <!-- MyBatis-Plus ORM 框架 -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+            <version>${mybatis-plus.version}</version>
+        </dependency>
+
+        <!-- PostgreSQL 驅動 -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>42.7.2</version>
+        </dependency>
+
+        <!-- Flyway 資料庫版本遷移 -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <!-- Flyway PostgreSQL 方言支援 -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+            <version>10.4.1</version>
+        </dependency>
+
+        <!-- OkHttp HTTP 客戶端（呼叫 PayUni 外部 API） -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>4.12.0</version>
+        </dependency>
+
+        <!-- Lombok 程式碼簡化（@Data, @Builder 等） -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.36</version>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Jackson Java 8+ 時間型別序列化支援 -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+
+        <!-- gRPC Server 自動配置（排除內建 gRPC 依賴，由下方統一管控版本） -->
+        <dependency>
+            <groupId>net.devh</groupId>
+            <artifactId>grpc-server-spring-boot-starter</artifactId>
+            <version>${grpc-spring-boot.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>io.grpc</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!-- gRPC Netty 傳輸層 -->
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-netty-shaded</artifactId>
+            <version>${grpc.version}</version>
+        </dependency>
+        <!-- gRPC Protobuf 序列化 -->
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-protobuf</artifactId>
+            <version>${grpc.version}</version>
+        </dependency>
+        <!-- gRPC Stub 基礎類別 -->
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-stub</artifactId>
+            <version>${grpc.version}</version>
+        </dependency>
+        <!-- gRPC 健康檢查與反射服務（reflection-service-enabled 需要） -->
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-services</artifactId>
+            <version>${grpc.version}</version>
+        </dependency>
+        <!-- Protobuf 核心庫 -->
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+            <version>${protobuf.version}</version>
+        </dependency>
+        <!-- Protobuf JSON printer for the canonical MembershipEventEnvelope outbox payload -->
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java-util</artifactId>
+            <version>${protobuf.version}</version>
+        </dependency>
+        <!-- gRPC 生成碼所需的 @Generated 註解 -->
+        <dependency>
+            <groupId>javax.annotation</groupId>
+            <artifactId>javax.annotation-api</artifactId>
+            <version>1.3.2</version>
+        </dependency>
+
+        <!-- Netty codec-http2 override for CVE-2025-55163 mitigation (MadeYouReset vulnerability) -->
+        <!-- Note: Full patch will be available in future gRPC releases -->
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-codec-http2</artifactId>
+            <version>4.1.115.Final</version>
+        </dependency>
+
+        <!-- 單元測試框架 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- RabbitMQ 整合測試支援 -->
+        <dependency>
+            <groupId>org.springframework.amqp</groupId>
+            <artifactId>spring-rabbit-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- H2 in-memory（H10 disabled flag 測試用，不需要真實 DB） -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Testcontainers PostgreSQL（reconcile 邊界整合測試 H7-H10） -->
+        <!-- 版本由 spring-boot-dependencies 管理（目前 1.19.3） -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <source>21</source>
+                    <target>21</target>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>1.18.36</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                    <layers>
+                        <enabled>true</enabled>
+                    </layers>
+                </configuration>
+            </plugin>
+            <!--
+              docker-java (bundled by testcontainers) defaults to Docker API 1.32;
+              Docker server 29.x rejects (requires >= 1.40). docker-java reads
+              `api.version` system property to override the default, then negotiates with the server.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <systemPropertyVariables>
+                        <api.version>1.45</api.version>
+                    </systemPropertyVariables>
+                    <!--
+                        issue #1504：testcontainers-based *IntegrationTest（ReconcileBoundary /
+                        RefundTotalGuard / GrantSentinelSurvival，@Tag("integration")）需要
+                        Docker + 從 Docker Hub 拉 postgres:17-alpine，self-hosted CI runner 對
+                        Docker Hub 的可達性未驗證（僅 postgres:16-alpine 有鏡像到 ghcr，見
+                        mirror-testcontainers-images.yml）。預設 `mvn test` 排除，本地/未來
+                        CI 要跑用 `-Dgroups=integration -DexcludedGroups=` 顯式覆寫。
+                    -->
+                    <!--
+                        🔴 surefire 的**預設** includes 只有 Test*／*Test／*Tests／*TestCase
+                        ——**不含 `*IT.java`** ⇒ 以 IT 結尾的測試會被靜默跳過，而
+                        「零命中」在 surefire 是**綠燈**。
+
+                        ⚠️ 這個漏洞本機看不出來：`-Dtest=XxxIT` 是顯式指定所以會跑，
+                        而 CI 跑的是 `-Dgroups=integration`，靠 includes 選檔 ⇒ 選不到。
+                        2026-09-17 實測：LogisticsCostFactJoinIT 本機 8 支綠，
+                        CI 的 log 裡 0 命中，而 executed count 與前一輪一模一樣。
+
+                        ⚠️ 下限檢查也擋不住：它防的是「一支都沒跑」，而這裡是
+                        「少跑了 8 支、總數仍遠高於下限」。
+
+                        order／cart／coupon／aftersales 四個模組早就有這段，
+                        payment 是唯一漏掉的——而它現在有 *IT.java 了。
+                    -->
+                    <includes>
+                        <include>**/Test*.java</include>
+                        <include>**/*Test.java</include>
+                        <include>**/*Tests.java</include>
+                        <include>**/*TestCase.java</include>
+                        <include>**/*IT.java</include>
+                    </includes>
+                    <excludedGroups>${excludedGroups}</excludedGroups>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

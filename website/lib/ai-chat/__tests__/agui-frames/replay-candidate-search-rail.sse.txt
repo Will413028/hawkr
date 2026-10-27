@@ -1,0 +1,11 @@
+id: 1
+data: {"type":"CUSTOM","name":"activity","value":{"attempt":1,"code":"SEARCH_CANDIDATES","label":"搜尋候選供應商","maxAttempts":1,"retryGroupKey":"9001","rowId":"9001","status":"RUNNING","text":""}}
+
+id: 2
+data: {"type":"CUSTOM","name":"activity","value":{"attempt":1,"code":"SEARCH_PLATFORM","count":"12","label":"翻平台上的賣家","maxAttempts":1,"parentRowId":"9001","retryGroupKey":"9002","rowId":"9002","status":"SUCCEEDED","text":""}}
+
+: ping
+
+id: 3
+data: {"type":"CUSTOM","name":"activity","value":{"attempt":1,"code":"SUMMARIZE","label":"整理成給你的建議","maxAttempts":1,"retryGroupKey":"9004","rowId":"9004","status":"PENDING","text":""}}
+

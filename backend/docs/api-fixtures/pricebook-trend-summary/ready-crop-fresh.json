@@ -1,0 +1,40 @@
+{
+  "request": "GET /api/v1/app/sellers/pricebook/trend-summary?cropCode=A1&marketCode=109&from=2026-08-06&to=2026-08-07&granularity=week",
+  "response": {
+    "code": 0,
+    "message": "success",
+    "data": {
+      "selectionKind": "crop",
+      "granularity": "week",
+      "timezone": "Asia/Taipei",
+      "points": [
+        {
+          "periodStart": "2026-08-06",
+          "periodEnd": "2026-08-07",
+          "status": "ready",
+          "observedAverageTwdPerKg": 41,
+          "volumeKg": 200,
+          "sampleCount": 2,
+          "observedMarketCount": 1,
+          "aggregationMethod": "volume_weighted/v1",
+          "qualityReasonCodes": []
+        }
+      ],
+      "comparisons": [],
+      "dataMeta": {
+        "snapshotId": "sha256:a71a0eaa1e5cf5e7bd0fdf8a99945da851a0ec180787c73ced17482eebe380c6",
+        "source": "MOA_WHOLESALE_DAILY",
+        "sourceDataAsOf": "2026-08-07T15:59:59Z",
+        "maxFeatureAvailableAt": "2026-08-07T01:00:00Z",
+        "generatedAt": "2026-08-07T16:21:38Z",
+        "freshnessStatus": "fresh",
+        "usabilityStatus": "usable",
+        "qualityReasonCodes": [],
+        "datasetDigest": "sha256:a71a0eaa1e5cf5e7bd0fdf8a99945da851a0ec180787c73ced17482eebe380c6",
+        "schemaVersion": "hawkr.pricebook/v1",
+        "currency": "TWD",
+        "unit": "kg"
+      }
+    }
+  }
+}

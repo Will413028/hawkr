@@ -1,0 +1,983 @@
+# 選出的 EXPLAIN (ANALYZE, BUFFERS)（generic plan，perf/measure.go 輸出；全部情境的表在 README.md）
+
+=== feed 第一頁（ListFeedPosts）p95 5.01 ms
+Limit  (cost=1.27..48479.01 rows=1315 width=341) (actual time=0.160..0.630 rows=50.00 loops=1)
+  Buffers: shared hit=771
+  ->  Nested Loop  (cost=1.27..484852.43 rows=13152 width=341) (actual time=0.159..0.624 rows=50.00 loops=1)
+        Buffers: shared hit=771
+        ->  Nested Loop Semi Join  (cost=0.85..476529.33 rows=13152 width=293) (actual time=0.135..0.489 rows=50.00 loops=1)
+              Buffers: shared hit=571
+              ->  Index Scan using posts_feed on posts p  (cost=0.42..17184.50 rows=26749 width=293) (actual time=0.030..0.053 rows=52.00 loops=1)
+                    Index Cond: (ROW(published_at, id) < ROW($2, $3))
+                    Index Searches: 1
+                    Buffers: shared hit=55
+              ->  Nested Loop Anti Join  (cost=0.43..17.16 rows=1 width=8) (actual time=0.008..0.008 rows=0.96 loops=52)
+                    Buffers: shared hit=516
+                    ->  Index Scan using stores_pkey on stores s_1  (cost=0.29..16.97 rows=1 width=16) (actual time=0.006..0.006 rows=0.98 loops=52)
+                          Index Cond: (store_id = p.store_id)
+                          Filter: ((store_name IS NOT NULL) AND (logo_key IS NOT NULL) AND (town_code IS NOT NULL) AND (status <> 'CLOSED'::text) AND (status <> 'PENDING_DELETION'::text) AND EXISTS(SubPlan 1))
+                          Rows Removed by Filter: 0
+                          Index Searches: 52
+                          Buffers: shared hit=464
+                          SubPlan 1
+                            ->  Nested Loop  (cost=0.57..16.62 rows=1 width=0) (actual time=0.004..0.004 rows=0.98 loops=52)
+                                  Buffers: shared hit=308
+                                  ->  Index Scan using kyc_applications_store on kyc_applications a  (cost=0.29..8.30 rows=1 width=8) (actual time=0.002..0.002 rows=0.98 loops=52)
+                                        Index Cond: (store_id = s_1.store_id)
+                                        Filter: (status = 'APPROVED'::text)
+                                        Index Searches: 52
+                                        Buffers: shared hit=155
+                                  ->  Index Scan using payuni_registrations_pkey on payuni_registrations r  (cost=0.29..8.31 rows=1 width=8) (actual time=0.002..0.002 rows=1.00 loops=51)
+                                        Index Cond: (store_id = s_1.store_id)
+                                        Filter: ((outcome = 'APPROVED'::text) AND (bind_status = 'BOUND'::text))
+                                        Index Searches: 51
+                                        Buffers: shared hit=153
+                    ->  Index Only Scan using measures_enforced_suspension on measures m  (cost=0.14..0.17 rows=1 width=8) (actual time=0.001..0.001 rows=0.02 loops=51)
+                          Index Cond: ((account_id = s_1.account_id) AND (starts_at <= $1))
+                          Filter: ((ends_at IS NULL) OR (ends_at > $1))
+                          Heap Fetches: 0
+                          Index Searches: 51
+                          Buffers: shared hit=52
+        ->  Index Scan using post_stats_pkey on post_stats s  (cost=0.42..0.63 rows=1 width=48) (actual time=0.002..0.002 rows=1.00 loops=50)
+              Index Cond: (post_id = p.id)
+              Index Searches: 50
+              Buffers: shared hit=200
+Planning:
+  Buffers: shared hit=72
+Planning Time: 2.992 ms
+Execution Time: 0.844 ms
+
+=== feed keyset 游標在 90%（ListFeedPosts）p95 2.87 ms
+Limit  (cost=1.27..48479.01 rows=1315 width=341) (actual time=0.983..1.654 rows=50.00 loops=1)
+  Buffers: shared hit=775
+  ->  Nested Loop  (cost=1.27..484852.43 rows=13152 width=341) (actual time=0.982..1.648 rows=50.00 loops=1)
+        Buffers: shared hit=775
+        ->  Nested Loop Semi Join  (cost=0.85..476529.33 rows=13152 width=293) (actual time=0.836..1.317 rows=50.00 loops=1)
+              Buffers: shared hit=575
+              ->  Index Scan using posts_feed on posts p  (cost=0.42..17184.50 rows=26749 width=293) (actual time=0.022..0.083 rows=53.00 loops=1)
+                    Index Cond: (ROW(published_at, id) < ROW($2, $3))
+                    Index Searches: 1
+                    Buffers: shared hit=56
+              ->  Nested Loop Anti Join  (cost=0.43..17.16 rows=1 width=8) (actual time=0.023..0.023 rows=0.94 loops=53)
+                    Buffers: shared hit=519
+                    ->  Index Scan using stores_pkey on stores s_1  (cost=0.29..16.97 rows=1 width=16) (actual time=0.021..0.021 rows=0.96 loops=53)
+                          Index Cond: (store_id = p.store_id)
+                          Filter: ((store_name IS NOT NULL) AND (logo_key IS NOT NULL) AND (town_code IS NOT NULL) AND (status <> 'CLOSED'::text) AND (status <> 'PENDING_DELETION'::text) AND EXISTS(SubPlan 1))
+                          Rows Removed by Filter: 0
+                          Index Searches: 53
+                          Buffers: shared hit=467
+                          SubPlan 1
+                            ->  Nested Loop  (cost=0.57..16.62 rows=1 width=0) (actual time=0.009..0.009 rows=0.98 loops=52)
+                                  Buffers: shared hit=308
+                                  ->  Index Scan using kyc_applications_store on kyc_applications a  (cost=0.29..8.30 rows=1 width=8) (actual time=0.006..0.006 rows=0.98 loops=52)
+                                        Index Cond: (store_id = s_1.store_id)
+                                        Filter: (status = 'APPROVED'::text)
+                                        Index Searches: 52
+                                        Buffers: shared hit=155
+                                  ->  Index Scan using payuni_registrations_pkey on payuni_registrations r  (cost=0.29..8.31 rows=1 width=8) (actual time=0.002..0.002 rows=1.00 loops=51)
+                                        Index Cond: (store_id = s_1.store_id)
+                                        Filter: ((outcome = 'APPROVED'::text) AND (bind_status = 'BOUND'::text))
+                                        Index Searches: 51
+                                        Buffers: shared hit=153
+                    ->  Index Only Scan using measures_enforced_suspension on measures m  (cost=0.14..0.17 rows=1 width=8) (actual time=0.001..0.001 rows=0.02 loops=51)
+                          Index Cond: ((account_id = s_1.account_id) AND (starts_at <= $1))
+                          Filter: ((ends_at IS NULL) OR (ends_at > $1))
+                          Heap Fetches: 0
+                          Index Searches: 51
+                          Buffers: shared hit=52
+        ->  Index Scan using post_stats_pkey on post_stats s  (cost=0.42..0.63 rows=1 width=48) (actual time=0.006..0.006 rows=1.00 loops=50)
+              Index Cond: (post_id = p.id)
+              Index Searches: 50
+              Buffers: shared hit=200
+Planning:
+  Buffers: shared hit=72
+Planning Time: 1.435 ms
+Execution Time: 1.816 ms
+
+=== 店家頁 熱門店 第一頁（ListStorePublicPosts）p95 2.55 ms
+Limit  (cost=1.27..25.82 rows=1 width=341) (actual time=0.288..0.578 rows=50.00 loops=1)
+  Buffers: shared hit=263
+  ->  Nested Loop  (cost=1.27..74.94 rows=3 width=341) (actual time=0.286..0.571 rows=50.00 loops=1)
+        Buffers: shared hit=263
+        ->  Nested Loop Semi Join  (cost=0.85..49.64 rows=3 width=293) (actual time=0.233..0.316 rows=50.00 loops=1)
+              Buffers: shared hit=63
+              ->  Index Scan using posts_store_feed on posts p  (cost=0.42..16.48 rows=3 width=293) (actual time=0.058..0.125 rows=50.00 loops=1)
+                    Index Cond: ((store_id = $2) AND (ROW(published_at, id) < ROW($3, $4)))
+                    Index Searches: 1
+                    Buffers: shared hit=53
+              ->  Materialize  (cost=0.43..33.13 rows=1 width=8) (actual time=0.004..0.004 rows=1.00 loops=50)
+                    Storage: Memory  Maximum Storage: 17kB
+                    Buffers: shared hit=10
+                    ->  Nested Loop Anti Join  (cost=0.43..33.12 rows=1 width=8) (actual time=0.160..0.161 rows=1.00 loops=1)
+                          Buffers: shared hit=10
+                          ->  Index Scan using stores_store_account_key on stores s_1  (cost=0.29..24.93 rows=1 width=16) (actual time=0.095..0.095 rows=1.00 loops=1)
+                                Index Cond: (store_id = $2)
+                                Filter: ((store_name IS NOT NULL) AND (logo_key IS NOT NULL) AND (town_code IS NOT NULL) AND (status <> 'CLOSED'::text) AND (status <> 'PENDING_DELETION'::text) AND EXISTS(SubPlan 1))
+                                Index Searches: 1
+                                Buffers: shared hit=9
+                                SubPlan 1
+                                  ->  Nested Loop  (cost=0.57..16.62 rows=1 width=0) (actual time=0.061..0.061 rows=1.00 loops=1)
+                                        Buffers: shared hit=6
+                                        ->  Index Scan using kyc_applications_store on kyc_applications a  (cost=0.29..8.30 rows=1 width=8) (actual time=0.027..0.027 rows=1.00 loops=1)
+                                              Index Cond: (store_id = s_1.store_id)
+                                              Filter: (status = 'APPROVED'::text)
+                                              Index Searches: 1
+                                              Buffers: shared hit=3
+                                        ->  Index Scan using payuni_registrations_pkey on payuni_registrations r  (cost=0.29..8.31 rows=1 width=8) (actual time=0.032..0.032 rows=1.00 loops=1)
+                                              Index Cond: (store_id = s_1.store_id)
+                                              Filter: ((outcome = 'APPROVED'::text) AND (bind_status = 'BOUND'::text))
+                                              Index Searches: 1
+                                              Buffers: shared hit=3
+                          ->  Index Only Scan using measures_enforced_suspension on measures m  (cost=0.14..4.17 rows=1 width=8) (actual time=0.064..0.064 rows=0.00 loops=1)
+                                Index Cond: ((account_id = s_1.account_id) AND (starts_at <= $1))
+                                Filter: ((ends_at IS NULL) OR (ends_at > $1))
+                                Heap Fetches: 0
+                                Index Searches: 1
+                                Buffers: shared hit=1
+        ->  Index Scan using post_stats_pkey on post_stats s  (cost=0.42..8.44 rows=1 width=48) (actual time=0.005..0.005 rows=1.00 loops=50)
+              Index Cond: (post_id = p.id)
+              Index Searches: 50
+              Buffers: shared hit=200
+Planning:
+  Buffers: shared hit=66
+Planning Time: 1.624 ms
+Execution Time: 0.746 ms
+
+=== hashtag 貼文 熱門標籤 第一頁（ListHashtagPosts）p95 110.08 ms
+Limit  (cost=544.51..544.51 rows=1 width=341) (actual time=104.748..104.761 rows=50.00 loops=1)
+  Buffers: shared hit=168730
+  ->  Sort  (cost=544.51..544.53 rows=6 width=341) (actual time=104.746..104.754 rows=50.00 loops=1)
+        Sort Key: p.published_at DESC, p.id DESC
+        Sort Method: top-N heapsort  Memory: 65kB
+        Buffers: shared hit=168730
+        ->  Nested Loop  (cost=1.69..544.43 rows=6 width=341) (actual time=0.984..101.690 rows=8571.00 loops=1)
+              Buffers: shared hit=168730
+              ->  Nested Loop Semi Join  (cost=1.27..540.64 rows=6 width=309) (actual time=0.939..86.358 rows=8571.00 loops=1)
+                    Buffers: shared hit=134446
+                    ->  Nested Loop  (cost=0.84..351.74 rows=11 width=309) (actual time=0.414..28.871 rows=9097.00 loops=1)
+                          Buffers: shared hit=45461
+                          ->  Index Only Scan Backward using post_hashtags_name on post_hashtags h  (cost=0.42..5.16 rows=42 width=16) (actual time=0.125..1.494 rows=11342.00 loops=1)
+                                Index Cond: (name = $2)
+                                Heap Fetches: 0
+                                Index Searches: 1
+                                Buffers: shared hit=93
+                          ->  Index Scan using posts_pkey on posts p  (cost=0.42..8.25 rows=1 width=293) (actual time=0.002..0.002 rows=0.80 loops=11342)
+                                Index Cond: (id = h.post_id)
+                                Filter: ((deleted_at IS NULL) AND (status = 'PUBLISHED'::text) AND (ROW(published_at, id) < ROW($3, $4)))
+                                Rows Removed by Filter: 0
+                                Index Searches: 11342
+                                Buffers: shared hit=45368
+                    ->  Nested Loop Anti Join  (cost=0.43..17.16 rows=1 width=8) (actual time=0.006..0.006 rows=0.94 loops=9097)
+                          Buffers: shared hit=88985
+                          ->  Index Scan using stores_pkey on stores s_1  (cost=0.29..16.97 rows=1 width=16) (actual time=0.005..0.005 rows=0.96 loops=9097)
+                                Index Cond: (store_id = p.store_id)
+                                Filter: ((store_name IS NOT NULL) AND (logo_key IS NOT NULL) AND (town_code IS NOT NULL) AND (status <> 'CLOSED'::text) AND (status <> 'PENDING_DELETION'::text) AND EXISTS(SubPlan 1))
+                                Rows Removed by Filter: 0
+                                Index Searches: 9097
+                                Buffers: shared hit=80247
+                                SubPlan 1
+                                  ->  Nested Loop  (cost=0.57..16.62 rows=1 width=0) (actual time=0.003..0.003 rows=0.97 loops=9004)
+                                        Buffers: shared hit=52956
+                                        ->  Index Scan using kyc_applications_store on kyc_applications a  (cost=0.29..8.30 rows=1 width=8) (actual time=0.001..0.001 rows=0.97 loops=9004)
+                                              Index Cond: (store_id = s_1.store_id)
+                                              Filter: (status = 'APPROVED'::text)
+                                              Index Searches: 9004
+                                              Buffers: shared hit=26745
+                                        ->  Index Scan using payuni_registrations_pkey on payuni_registrations r  (cost=0.29..8.31 rows=1 width=8) (actual time=0.002..0.002 rows=1.00 loops=8737)
+                                              Index Cond: (store_id = s_1.store_id)
+                                              Filter: ((outcome = 'APPROVED'::text) AND (bind_status = 'BOUND'::text))
+                                              Index Searches: 8737
+                                              Buffers: shared hit=26211
+                          ->  Index Only Scan using measures_enforced_suspension on measures m  (cost=0.14..0.17 rows=1 width=8) (actual time=0.001..0.001 rows=0.02 loops=8737)
+                                Index Cond: ((account_id = s_1.account_id) AND (starts_at <= $1))
+                                Filter: ((ends_at IS NULL) OR (ends_at > $1))
+                                Heap Fetches: 0
+                                Index Searches: 8737
+                                Buffers: shared hit=8738
+              ->  Index Scan using post_stats_pkey on post_stats s  (cost=0.42..0.63 rows=1 width=48) (actual time=0.001..0.001 rows=1.00 loops=8571)
+                    Index Cond: (post_id = p.id)
+                    Index Searches: 8571
+                    Buffers: shared hit=34284
+Planning:
+  Buffers: shared hit=136
+Planning Time: 4.606 ms
+Execution Time: 105.395 ms
+
+=== hashtag 建議 中文前綴 1 字（SuggestHashtags）p95 69.47 ms
+Limit  (cost=22015.40..22015.50 rows=39 width=17) (actual time=66.715..66.718 rows=4.00 loops=1)
+  Buffers: shared hit=91751
+  ->  Sort  (cost=22015.40..22016.39 rows=394 width=17) (actual time=66.714..66.716 rows=4.00 loops=1)
+        Sort Key: (count(*)) DESC, h.name
+        Sort Method: quicksort  Memory: 25kB
+        Buffers: shared hit=91751
+        ->  GroupAggregate  (cost=21991.52..21998.42 rows=394 width=17) (actual time=66.698..66.708 rows=4.00 loops=1)
+              Group Key: h.name
+              Buffers: shared hit=91751
+              ->  Sort  (cost=21991.52..21992.51 rows=394 width=9) (actual time=65.545..66.070 rows=8621.00 loops=1)
+                    Sort Key: h.name
+                    Sort Method: quicksort  Memory: 385kB
+                    Buffers: shared hit=91751
+                    ->  Nested Loop Semi Join  (cost=4127.84..21974.53 rows=394 width=9) (actual time=12.318..64.285 rows=8621.00 loops=1)
+                          Buffers: shared hit=91751
+                          ->  Hash Join  (cost=4127.41..8240.35 rows=801 width=17) (actual time=12.260..28.595 rows=9150.00 loops=1)
+                                Hash Cond: (p.id = h.post_id)
+                                Buffers: shared hit=2243
+                                ->  Index Only Scan using posts_store_feed on posts p  (cost=0.42..3704.12 rows=80248 width=24) (actual time=0.013..7.454 rows=80610.00 loops=1)
+                                      Heap Fetches: 0
+                                      Index Searches: 1
+                                      Buffers: shared hit=623
+                                ->  Hash  (cost=4114.51..4114.51 rows=998 width=25) (actual time=12.222..12.222 rows=11406.00 loops=1)
+                                      Buckets: 16384 (originally 1024)  Batches: 1 (originally 1)  Memory Usage: 774kB
+                                      Buffers: shared hit=1620
+                                      ->  Seq Scan on post_hashtags h  (cost=0.00..4114.51 rows=998 width=25) (actual time=0.010..10.528 rows=11406.00 loops=1)
+                                            Filter: (name ~~ $2)
+                                            Rows Removed by Filter: 188155
+                                            Buffers: shared hit=1620
+                          ->  Nested Loop Anti Join  (cost=0.43..17.14 rows=1 width=8) (actual time=0.004..0.004 rows=0.94 loops=9150)
+                                Buffers: shared hit=89508
+                                ->  Index Scan using stores_pkey on stores s  (cost=0.29..16.94 rows=1 width=16) (actual time=0.003..0.003 rows=0.96 loops=9150)
+                                      Index Cond: (store_id = p.store_id)
+                                      Filter: ((store_name IS NOT NULL) AND (logo_key IS NOT NULL) AND (town_code IS NOT NULL) AND (status <> 'CLOSED'::text) AND (status <> 'PENDING_DELETION'::text) AND EXISTS(SubPlan 1))
+                                      Rows Removed by Filter: 0
+                                      Index Searches: 9150
+                                      Buffers: shared hit=80718
+                                      SubPlan 1
+                                        ->  Nested Loop  (cost=0.57..16.62 rows=1 width=0) (actual time=0.002..0.002 rows=0.97 loops=9056)
+                                              Buffers: shared hit=53268
+                                              ->  Index Scan using kyc_applications_store on kyc_applications a  (cost=0.29..8.30 rows=1 width=8) (actual time=0.001..0.001 rows=0.97 loops=9056)
+                                                    Index Cond: (store_id = s.store_id)
+                                                    Filter: (status = 'APPROVED'::text)
+                                                    Index Searches: 9056
+                                                    Buffers: shared hit=26901
+                                              ->  Index Scan using payuni_registrations_pkey on payuni_registrations r  (cost=0.29..8.31 rows=1 width=8) (actual time=0.001..0.001 rows=1.00 loops=8789)
+                                                    Index Cond: (store_id = s.store_id)
+                                                    Filter: ((outcome = 'APPROVED'::text) AND (bind_status = 'BOUND'::text))
+                                                    Index Searches: 8789
+                                                    Buffers: shared hit=26367
+                                ->  Index Only Scan using measures_enforced_suspension on measures m  (cost=0.14..0.17 rows=1 width=8) (actual time=0.000..0.000 rows=0.02 loops=8789)
+                                      Index Cond: ((account_id = s.account_id) AND (starts_at <= $1))
+                                      Filter: ((ends_at IS NULL) OR (ends_at > $1))
+                                      Heap Fetches: 0
+                                      Index Searches: 8789
+                                      Buffers: shared hit=8790
+Planning:
+  Buffers: shared hit=56
+Planning Time: 2.857 ms
+Execution Time: 66.923 ms
+
+=== hashtag 熱門 近 30 天（TrendingHashtags）p95 37.85 ms
+Limit  (cost=9881.79..9881.88 rows=39 width=17) (actual time=33.362..33.373 rows=50.00 loops=1)
+  Buffers: shared hit=43617
+  ->  Sort  (cost=9881.79..9882.77 rows=393 width=17) (actual time=33.361..33.367 rows=50.00 loops=1)
+        Sort Key: (count(*)) DESC, h.name
+        Sort Method: top-N heapsort  Memory: 29kB
+        Buffers: shared hit=43617
+        ->  GroupAggregate  (cost=9857.97..9864.85 rows=393 width=17) (actual time=31.447..32.984 rows=2672.00 loops=1)
+              Group Key: h.name
+              Buffers: shared hit=43617
+              ->  Sort  (cost=9857.97..9858.96 rows=393 width=9) (actual time=31.438..31.814 rows=6133.00 loops=1)
+                    Sort Key: h.name
+                    Sort Method: quicksort  Memory: 193kB
+                    Buffers: shared hit=43617
+                    ->  Nested Loop  (cost=17.38..9841.04 rows=393 width=9) (actual time=0.675..27.025 rows=6133.00 loops=1)
+                          Buffers: shared hit=43617
+                          ->  Nested Loop Semi Join  (cost=16.96..9051.82 rows=197 width=16) (actual time=0.669..20.646 rows=3072.00 loops=1)
+                                Buffers: shared hit=34400
+                                ->  Bitmap Heap Scan on posts p  (cost=16.53..1197.40 rows=401 width=24) (actual time=0.631..3.313 rows=3297.00 loops=1)
+                                      Recheck Cond: ((published_at >= $2) AND (published_at < $3) AND (status = 'PUBLISHED'::text) AND (deleted_at IS NULL))
+                                      Heap Blocks: exact=2258
+                                      Buffers: shared hit=2283
+                                      ->  Bitmap Index Scan on posts_feed  (cost=0.00..16.43 rows=401 width=0) (actual time=0.393..0.393 rows=3297.00 loops=1)
+                                            Index Cond: ((published_at >= $2) AND (published_at < $3))
+                                            Index Searches: 1
+                                            Buffers: shared hit=25
+                                ->  Nested Loop Anti Join  (cost=0.43..19.58 rows=1 width=8) (actual time=0.005..0.005 rows=0.93 loops=3297)
+                                      Buffers: shared hit=32117
+                                      ->  Index Scan using stores_pkey on stores s  (cost=0.29..19.38 rows=1 width=16) (actual time=0.004..0.004 rows=0.95 loops=3297)
+                                            Index Cond: (store_id = p.store_id)
+                                            Filter: ((store_name IS NOT NULL) AND (logo_key IS NOT NULL) AND (town_code IS NOT NULL) AND (status <> 'CLOSED'::text) AND (status <> 'PENDING_DELETION'::text) AND EXISTS(SubPlan 1))
+                                            Rows Removed by Filter: 0
+                                            Index Searches: 3297
+                                            Buffers: shared hit=28973
+                                            SubPlan 1
+                                              ->  Nested Loop  (cost=0.57..16.62 rows=1 width=0) (actual time=0.003..0.003 rows=0.97 loops=3255)
+                                                    Buffers: shared hit=19082
+                                                    ->  Index Scan using kyc_applications_store on kyc_applications a  (cost=0.29..8.30 rows=1 width=8) (actual time=0.001..0.001 rows=0.97 loops=3255)
+                                                          Index Cond: (store_id = s.store_id)
+                                                          Filter: (status = 'APPROVED'::text)
+                                                          Index Searches: 3255
+                                                          Buffers: shared hit=9653
+                                                    ->  Index Scan using payuni_registrations_pkey on payuni_registrations r  (cost=0.29..8.31 rows=1 width=8) (actual time=0.001..0.001 rows=1.00 loops=3143)
+                                                          Index Cond: (store_id = s.store_id)
+                                                          Filter: ((outcome = 'APPROVED'::text) AND (bind_status = 'BOUND'::text))
+                                                          Index Searches: 3143
+                                                          Buffers: shared hit=9429
+                                      ->  Index Only Scan using measures_enforced_suspension on measures m  (cost=0.14..0.17 rows=1 width=8) (actual time=0.000..0.000 rows=0.02 loops=3143)
+                                            Index Cond: ((account_id = s.account_id) AND (starts_at <= $1))
+                                            Filter: ((ends_at IS NULL) OR (ends_at > $1))
+                                            Heap Fetches: 0
+                                            Index Searches: 3143
+                                            Buffers: shared hit=3144
+                          ->  Index Only Scan using post_hashtags_name_key on post_hashtags h  (cost=0.42..3.99 rows=2 width=25) (actual time=0.002..0.002 rows=2.00 loops=3072)
+                                Index Cond: (post_id = p.id)
+                                Heap Fetches: 0
+                                Index Searches: 3072
+                                Buffers: shared hit=9217
+Planning:
+  Buffers: shared hit=56
+Planning Time: 2.695 ms
+Execution Time: 33.532 ms
+
+=== 計數 單篇貼文（含 stats）熱門（GetPublicPost）p95 1.42 ms
+Nested Loop  (cost=1.27..42.02 rows=1 width=341) (actual time=0.109..0.111 rows=1.00 loops=1)
+  Buffers: shared hit=18
+  ->  Nested Loop Semi Join  (cost=0.85..33.57 rows=1 width=293) (actual time=0.089..0.091 rows=1.00 loops=1)
+        Buffers: shared hit=14
+        ->  Index Scan using posts_pkey on posts p  (cost=0.42..8.44 rows=1 width=293) (actual time=0.025..0.026 rows=1.00 loops=1)
+              Index Cond: (id = $2)
+              Filter: ((deleted_at IS NULL) AND (status = 'PUBLISHED'::text))
+              Index Searches: 1
+              Buffers: shared hit=4
+        ->  Nested Loop Anti Join  (cost=0.43..25.12 rows=1 width=8) (actual time=0.062..0.063 rows=1.00 loops=1)
+              Buffers: shared hit=10
+              ->  Index Scan using stores_current_closure_key on stores s_1  (cost=0.29..24.93 rows=1 width=16) (actual time=0.046..0.046 rows=1.00 loops=1)
+                    Index Cond: (store_id = p.store_id)
+                    Filter: ((store_name IS NOT NULL) AND (logo_key IS NOT NULL) AND (town_code IS NOT NULL) AND (status <> 'CLOSED'::text) AND (status <> 'PENDING_DELETION'::text) AND EXISTS(SubPlan 1))
+                    Index Searches: 1
+                    Buffers: shared hit=9
+                    SubPlan 1
+                      ->  Nested Loop  (cost=0.57..16.62 rows=1 width=0) (actual time=0.027..0.027 rows=1.00 loops=1)
+                            Buffers: shared hit=6
+                            ->  Index Scan using kyc_applications_store on kyc_applications a  (cost=0.29..8.30 rows=1 width=8) (actual time=0.008..0.008 rows=1.00 loops=1)
+                                  Index Cond: (store_id = s_1.store_id)
+                                  Filter: (status = 'APPROVED'::text)
+                                  Index Searches: 1
+                                  Buffers: shared hit=3
+                            ->  Index Scan using payuni_registrations_pkey on payuni_registrations r  (cost=0.29..8.31 rows=1 width=8) (actual time=0.018..0.018 rows=1.00 loops=1)
+                                  Index Cond: (store_id = s_1.store_id)
+                                  Filter: ((outcome = 'APPROVED'::text) AND (bind_status = 'BOUND'::text))
+                                  Index Searches: 1
+                                  Buffers: shared hit=3
+              ->  Index Only Scan using measures_enforced_suspension on measures m  (cost=0.14..0.17 rows=1 width=8) (actual time=0.015..0.015 rows=0.00 loops=1)
+                    Index Cond: ((account_id = s_1.account_id) AND (starts_at <= $1))
+                    Filter: ((ends_at IS NULL) OR (ends_at > $1))
+                    Heap Fetches: 0
+                    Index Searches: 1
+                    Buffers: shared hit=1
+  ->  Index Scan using post_stats_pkey on post_stats s  (cost=0.42..8.44 rows=1 width=48) (actual time=0.018..0.018 rows=1.00 loops=1)
+        Index Cond: (post_id = $2)
+        Index Searches: 1
+        Buffers: shared hit=4
+Planning:
+  Buffers: shared hit=40
+Planning Time: 0.956 ms
+Execution Time: 0.204 ms
+
+=== 計數 熱門貼文重算（RecountPostStats）（RecountPostStats）p95 38.66 ms
+Update on post_stats  (cost=0.42..291.65 rows=1 width=30) (actual time=41.615..41.622 rows=1.00 loops=1)
+  Buffers: shared hit=44331
+  ->  Index Scan using post_stats_pkey on post_stats  (cost=0.42..291.65 rows=1 width=30) (actual time=41.461..41.466 rows=1.00 loops=1)
+        Index Cond: (post_id = $1)
+        Index Searches: 1
+        Buffers: shared hit=44322
+        SubPlan 1
+          ->  Aggregate  (cost=4.75..4.75 rows=1 width=8) (actual time=0.800..0.801 rows=1.00 loops=1)
+                Buffers: shared hit=19
+                ->  Index Only Scan using post_likes_pkey on post_likes l  (cost=0.42..4.71 rows=16 width=0) (actual time=0.283..0.594 rows=3062.00 loops=1)
+                      Index Cond: (post_id = post_stats.post_id)
+                      Heap Fetches: 0
+                      Index Searches: 1
+                      Buffers: shared hit=19
+        SubPlan 2
+          ->  Aggregate  (cost=278.44..278.45 rows=1 width=8) (actual time=40.604..40.606 rows=1.00 loops=1)
+                Buffers: shared hit=44297
+                ->  Nested Loop Anti Join  (cost=1.00..278.40 rows=17 width=0) (actual time=0.120..40.016 rows=7493.00 loops=1)
+                      Buffers: shared hit=44297
+                      ->  Nested Loop Anti Join  (cost=0.71..218.22 rows=17 width=16) (actual time=0.070..31.514 rows=7546.00 loops=1)
+                            Join Filter: (c.actor_kind = 'BUYER'::text)
+                            Rows Removed by Join Filter: 15
+                            Buffers: shared hit=29204
+                            ->  Index Scan using comments_post_id_key on comments c  (cost=0.42..76.74 rows=17 width=30) (actual time=0.043..9.683 rows=7622.00 loops=1)
+                                  Index Cond: (post_id = post_stats.post_id)
+                                  Filter: (deleted_at IS NULL)
+                                  Rows Removed by Filter: 255
+                                  Index Searches: 1
+                                  Buffers: shared hit=6338
+                            ->  Index Scan using buyers_pkey on buyers b  (cost=0.29..8.31 rows=1 width=8) (actual time=0.003..0.003 rows=0.01 loops=7622)
+                                  Index Cond: (buyer_id = c.actor_id)
+                                  Filter: (status <> 'ACTIVE'::text)
+                                  Rows Removed by Filter: 1
+                                  Index Searches: 7622
+                                  Buffers: shared hit=22866
+                      ->  Index Only Scan using hides_active_comment on hides h  (cost=0.28..3.36 rows=1 width=16) (actual time=0.001..0.001 rows=0.01 loops=7546)
+                            Index Cond: (comment_id = c.id)
+                            Heap Fetches: 0
+                            Index Searches: 7546
+                            Buffers: shared hit=15093
+        SubPlan 3
+          ->  Aggregate  (cost=0.00..0.01 rows=1 width=8) (actual time=0.012..0.012 rows=1.00 loops=1)
+                ->  Seq Scan on post_shares sh  (cost=0.00..0.00 rows=1 width=0) (actual time=0.011..0.011 rows=0.00 loops=1)
+                      Filter: (post_id = post_stats.post_id)
+Planning:
+  Buffers: shared hit=9 read=9
+Planning Time: 12.811 ms
+Execution Time: 42.149 ms
+
+=== 留言 熱門貼文頂層 第一頁（含佔位 EXISTS）（ListTopLevelComments）p95 1.86 ms
+Limit  (cost=34.42..157.45 rows=1 width=200) (actual time=0.364..1.213 rows=50.00 loops=1)
+  Buffers: shared hit=1446
+  InitPlan 21
+    ->  Nested Loop Semi Join  (cost=0.85..33.57 rows=1 width=0) (actual time=0.219..0.220 rows=1.00 loops=1)
+          Buffers: shared hit=14
+          ->  Index Scan using posts_pkey on posts cp  (cost=0.42..8.44 rows=1 width=8) (actual time=0.016..0.016 rows=1.00 loops=1)
+                Index Cond: (id = $6)
+                Filter: ((deleted_at IS NULL) AND (status = 'PUBLISHED'::text))
+                Index Searches: 1
+                Buffers: shared hit=4
+          ->  Nested Loop Anti Join  (cost=0.43..25.12 rows=1 width=8) (actual time=0.203..0.203 rows=1.00 loops=1)
+                Buffers: shared hit=10
+                ->  Index Scan using stores_current_closure_key on stores s_1  (cost=0.29..24.93 rows=1 width=16) (actual time=0.189..0.190 rows=1.00 loops=1)
+                      Index Cond: (store_id = cp.store_id)
+                      Filter: ((store_name IS NOT NULL) AND (logo_key IS NOT NULL) AND (town_code IS NOT NULL) AND (status <> 'CLOSED'::text) AND (status <> 'PENDING_DELETION'::text) AND EXISTS(SubPlan 19))
+                      Index Searches: 1
+                      Buffers: shared hit=9
+                      SubPlan 19
+                        ->  Nested Loop  (cost=0.57..16.62 rows=1 width=0) (actual time=0.173..0.174 rows=1.00 loops=1)
+                              Buffers: shared hit=6
+                              ->  Index Scan using kyc_applications_store on kyc_applications a  (cost=0.29..8.30 rows=1 width=8) (actual time=0.163..0.163 rows=1.00 loops=1)
+                                    Index Cond: (store_id = s_1.store_id)
+                                    Filter: (status = 'APPROVED'::text)
+                                    Index Searches: 1
+                                    Buffers: shared hit=3
+                              ->  Index Scan using payuni_registrations_pkey on payuni_registrations r  (cost=0.29..8.31 rows=1 width=8) (actual time=0.010..0.010 rows=1.00 loops=1)
+                                    Index Cond: (store_id = s_1.store_id)
+                                    Filter: ((outcome = 'APPROVED'::text) AND (bind_status = 'BOUND'::text))
+                                    Index Searches: 1
+                                    Buffers: shared hit=3
+                ->  Index Only Scan using measures_enforced_suspension on measures m  (cost=0.14..0.17 rows=1 width=8) (actual time=0.012..0.012 rows=0.00 loops=1)
+                      Index Cond: ((account_id = s_1.account_id) AND (starts_at <= $5))
+                      Filter: ((ends_at IS NULL) OR (ends_at > $5))
+                      Heap Fetches: 0
+                      Index Searches: 1
+                      Buffers: shared hit=1
+  ->  Result  (cost=0.85..246.92 rows=2 width=200) (actual time=0.363..1.203 rows=50.00 loops=1)
+        One-Time Filter: (InitPlan 21).col1
+        Buffers: shared hit=1446
+        ->  Nested Loop  (cost=0.85..129.42 rows=2 width=136) (actual time=0.059..0.532 rows=50.00 loops=1)
+              Buffers: shared hit=492
+              ->  Index Scan using comments_top_level on comments c  (cost=0.42..112.52 rows=2 width=120) (actual time=0.050..0.369 rows=50.00 loops=1)
+                    Index Cond: ((post_id = $4) AND (ROW(created_at, id) > ROW($7, $8)))
+                    Filter: (((deleted_at IS NULL) AND (NOT EXISTS(SubPlan 22)) AND (NOT EXISTS(SubPlan 24))) OR EXISTS(SubPlan 26))
+                    Rows Removed by Filter: 1
+                    Index Searches: 1
+                    Buffers: shared hit=292
+                    SubPlan 22
+                      ->  Index Only Scan using hides_active_comment on hides h_4  (cost=0.28..4.30 rows=1 width=0) (actual time=0.001..0.001 rows=0.00 loops=50)
+                            Index Cond: (comment_id = c.id)
+                            Heap Fetches: 0
+                            Index Searches: 50
+                            Buffers: shared hit=100
+                    SubPlan 24
+                      ->  Result  (cost=0.29..8.31 rows=1 width=0) (actual time=0.003..0.003 rows=0.00 loops=50)
+                            One-Time Filter: (c.actor_kind = 'BUYER'::text)
+                            Buffers: shared hit=135
+                            ->  Index Scan using buyers_pkey on buyers b_5  (cost=0.29..8.31 rows=1 width=0) (actual time=0.003..0.003 rows=0.00 loops=45)
+                                  Index Cond: (buyer_id = c.actor_id)
+                                  Filter: (status <> 'ACTIVE'::text)
+                                  Rows Removed by Filter: 1
+                                  Index Searches: 45
+                                  Buffers: shared hit=135
+                    SubPlan 26
+                      ->  Nested Loop Anti Join  (cost=1.00..74.61 rows=4 width=0) (actual time=0.007..0.008 rows=0.00 loops=1)
+                            Join Filter: (r_1.actor_kind = 'BUYER'::text)
+                            Buffers: shared hit=3
+                            ->  Nested Loop Anti Join  (cost=0.71..41.32 rows=4 width=14) (actual time=0.007..0.007 rows=0.00 loops=1)
+                                  Buffers: shared hit=3
+                                  ->  Index Scan using comments_replies on comments r_1  (cost=0.42..20.10 rows=4 width=30) (actual time=0.007..0.007 rows=0.00 loops=1)
+                                        Index Cond: (parent_id = c.id)
+                                        Index Searches: 1
+                                        Buffers: shared hit=3
+                                  ->  Index Only Scan using hides_active_comment on hides h_5  (cost=0.28..4.30 rows=1 width=16) (never executed)
+                                        Index Cond: (comment_id = r_1.id)
+                                        Heap Fetches: 0
+                                        Index Searches: 0
+                            ->  Index Scan using buyers_pkey on buyers b_6  (cost=0.29..8.31 rows=1 width=8) (never executed)
+                                  Index Cond: (buyer_id = r_1.actor_id)
+                                  Filter: (status <> 'ACTIVE'::text)
+                                  Index Searches: 0
+              ->  Index Scan using comment_stats_pkey on comment_stats s  (cost=0.42..8.44 rows=1 width=32) (actual time=0.003..0.003 rows=1.00 loops=50)
+                    Index Cond: (comment_id = c.id)
+                    Index Searches: 50
+                    Buffers: shared hit=200
+        SubPlan 1
+          ->  Index Only Scan using hides_active_comment on hides h  (cost=0.28..4.30 rows=1 width=0) (actual time=0.001..0.001 rows=0.00 loops=50)
+                Index Cond: (comment_id = c.id)
+                Heap Fetches: 0
+                Index Searches: 50
+                Buffers: shared hit=100
+        SubPlan 3
+          ->  Result  (cost=0.29..8.31 rows=1 width=0) (actual time=0.001..0.001 rows=0.00 loops=50)
+                One-Time Filter: (c.actor_kind = 'BUYER'::text)
+                Buffers: shared hit=135
+                ->  Index Scan using buyers_pkey on buyers b  (cost=0.29..8.31 rows=1 width=0) (actual time=0.001..0.001 rows=0.00 loops=45)
+                      Index Cond: (buyer_id = c.actor_id)
+                      Filter: (status <> 'ACTIVE'::text)
+                      Rows Removed by Filter: 1
+                      Index Searches: 45
+                      Buffers: shared hit=135
+        SubPlan 5
+          ->  Result  (cost=0.29..8.31 rows=1 width=0) (never executed)
+                One-Time Filter: (c.actor_kind = 'BUYER'::text)
+                ->  Index Scan using buyers_pkey on buyers b_1  (cost=0.29..8.31 rows=1 width=0) (never executed)
+                      Index Cond: (buyer_id = c.actor_id)
+                      Filter: (status <> 'ACTIVE'::text)
+                      Index Searches: 0
+        SubPlan 7
+          ->  Index Only Scan using hides_active_comment on hides h_1  (cost=0.28..4.30 rows=1 width=0) (actual time=0.001..0.001 rows=0.00 loops=50)
+                Index Cond: (comment_id = c.id)
+                Heap Fetches: 0
+                Index Searches: 50
+                Buffers: shared hit=100
+        SubPlan 9
+          ->  Result  (cost=0.29..8.31 rows=1 width=0) (actual time=0.001..0.001 rows=0.00 loops=50)
+                One-Time Filter: (c.actor_kind = 'BUYER'::text)
+                Buffers: shared hit=135
+                ->  Index Scan using buyers_pkey on buyers b_2  (cost=0.29..8.31 rows=1 width=0) (actual time=0.001..0.001 rows=0.00 loops=45)
+                      Index Cond: (buyer_id = c.actor_id)
+                      Filter: (status <> 'ACTIVE'::text)
+                      Rows Removed by Filter: 1
+                      Index Searches: 45
+                      Buffers: shared hit=135
+        SubPlan 11
+          ->  Index Only Scan using hides_active_comment on hides h_2  (cost=0.28..4.30 rows=1 width=0) (actual time=0.001..0.001 rows=0.00 loops=50)
+                Index Cond: (comment_id = c.id)
+                Heap Fetches: 0
+                Index Searches: 50
+                Buffers: shared hit=100
+        SubPlan 13
+          ->  Result  (cost=0.29..8.31 rows=1 width=0) (actual time=0.001..0.001 rows=0.00 loops=50)
+                One-Time Filter: (c.actor_kind = 'BUYER'::text)
+                Buffers: shared hit=135
+                ->  Index Scan using buyers_pkey on buyers b_3  (cost=0.29..8.31 rows=1 width=0) (actual time=0.001..0.001 rows=0.00 loops=45)
+                      Index Cond: (buyer_id = c.actor_id)
+                      Filter: (status <> 'ACTIVE'::text)
+                      Rows Removed by Filter: 1
+                      Index Searches: 45
+                      Buffers: shared hit=135
+        SubPlan 15
+          ->  Index Only Scan using hides_active_comment on hides h_3  (cost=0.28..4.30 rows=1 width=0) (actual time=0.001..0.001 rows=0.00 loops=50)
+                Index Cond: (comment_id = c.id)
+                Heap Fetches: 0
+                Index Searches: 50
+                Buffers: shared hit=100
+        SubPlan 17
+          ->  Result  (cost=0.29..8.31 rows=1 width=0) (actual time=0.001..0.001 rows=0.00 loops=50)
+                One-Time Filter: (c.actor_kind = 'BUYER'::text)
+                Buffers: shared hit=135
+                ->  Index Scan using buyers_pkey on buyers b_4  (cost=0.29..8.31 rows=1 width=0) (actual time=0.001..0.001 rows=0.00 loops=45)
+                      Index Cond: (buyer_id = c.actor_id)
+                      Filter: (status <> 'ACTIVE'::text)
+                      Rows Removed by Filter: 1
+                      Index Searches: 45
+                      Buffers: shared hit=135
+Planning:
+  Buffers: shared hit=108
+Planning Time: 3.243 ms
+Execution Time: 1.561 ms
+
+=== 留言 回覆列表（ListReplies）p95 1.18 ms
+Limit  (cost=2.27..59.11 rows=1 width=160) (actual time=0.247..0.296 rows=4.00 loops=1)
+  Buffers: shared hit=99
+  ->  Nested Loop Anti Join  (cost=2.27..59.11 rows=1 width=160) (actual time=0.246..0.295 rows=4.00 loops=1)
+        Join Filter: (c.actor_kind = 'BUYER'::text)
+        Buffers: shared hit=99
+        ->  Nested Loop Anti Join  (cost=1.98..50.79 rows=1 width=128) (actual time=0.223..0.264 rows=4.00 loops=1)
+              Buffers: shared hit=87
+              ->  Nested Loop  (cost=1.70..42.47 rows=1 width=128) (actual time=0.201..0.237 rows=4.00 loops=1)
+                    Buffers: shared hit=79
+                    ->  Nested Loop Semi Join  (cost=1.27..34.03 rows=1 width=112) (actual time=0.163..0.191 rows=4.00 loops=1)
+                          Buffers: shared hit=63
+                          ->  Nested Loop  (cost=0.84..16.88 rows=1 width=120) (actual time=0.055..0.065 rows=4.00 loops=1)
+                                Buffers: shared hit=23
+                                ->  Index Scan using comments_replies on comments c  (cost=0.42..8.45 rows=1 width=112) (actual time=0.019..0.023 rows=4.00 loops=1)
+                                      Index Cond: ((parent_id = $1) AND (ROW(created_at, id) > ROW($3, $4)))
+                                      Index Searches: 1
+                                      Buffers: shared hit=7
+                                ->  Index Scan using posts_pkey on posts p  (cost=0.42..8.44 rows=1 width=24) (actual time=0.010..0.010 rows=1.00 loops=4)
+                                      Index Cond: (id = c.post_id)
+                                      Filter: ((deleted_at IS NULL) AND (status = 'PUBLISHED'::text))
+                                      Index Searches: 4
+                                      Buffers: shared hit=16
+                          ->  Nested Loop Anti Join  (cost=0.43..17.14 rows=1 width=8) (actual time=0.031..0.031 rows=1.00 loops=4)
+                                Buffers: shared hit=40
+                                ->  Index Scan using stores_pkey on stores s_1  (cost=0.29..16.94 rows=1 width=16) (actual time=0.026..0.026 rows=1.00 loops=4)
+                                      Index Cond: (store_id = p.store_id)
+                                      Filter: ((store_name IS NOT NULL) AND (logo_key IS NOT NULL) AND (town_code IS NOT NULL) AND (status <> 'CLOSED'::text) AND (status <> 'PENDING_DELETION'::text) AND EXISTS(SubPlan 1))
+                                      Index Searches: 4
+                                      Buffers: shared hit=36
+                                      SubPlan 1
+                                        ->  Nested Loop  (cost=0.57..16.62 rows=1 width=0) (actual time=0.019..0.019 rows=1.00 loops=4)
+                                              Buffers: shared hit=24
+                                              ->  Index Scan using kyc_applications_store on kyc_applications a  (cost=0.29..8.30 rows=1 width=8) (actual time=0.011..0.011 rows=1.00 loops=4)
+                                                    Index Cond: (store_id = s_1.store_id)
+                                                    Filter: (status = 'APPROVED'::text)
+                                                    Index Searches: 4
+                                                    Buffers: shared hit=12
+                                              ->  Index Scan using payuni_registrations_pkey on payuni_registrations r  (cost=0.29..8.31 rows=1 width=8) (actual time=0.008..0.008 rows=1.00 loops=4)
+                                                    Index Cond: (store_id = s_1.store_id)
+                                                    Filter: ((outcome = 'APPROVED'::text) AND (bind_status = 'BOUND'::text))
+                                                    Index Searches: 4
+                                                    Buffers: shared hit=12
+                                ->  Index Only Scan using measures_enforced_suspension on measures m  (cost=0.14..0.17 rows=1 width=8) (actual time=0.004..0.004 rows=0.00 loops=4)
+                                      Index Cond: ((account_id = s_1.account_id) AND (starts_at <= $2))
+                                      Filter: ((ends_at IS NULL) OR (ends_at > $2))
+                                      Heap Fetches: 0
+                                      Index Searches: 4
+                                      Buffers: shared hit=4
+                    ->  Index Scan using comment_stats_pkey on comment_stats s  (cost=0.42..8.44 rows=1 width=32) (actual time=0.011..0.011 rows=1.00 loops=4)
+                          Index Cond: (comment_id = c.id)
+                          Index Searches: 4
+                          Buffers: shared hit=16
+              ->  Index Only Scan using hides_active_comment on hides h  (cost=0.28..4.30 rows=1 width=16) (actual time=0.006..0.006 rows=0.00 loops=4)
+                    Index Cond: (comment_id = c.id)
+                    Heap Fetches: 0
+                    Index Searches: 4
+                    Buffers: shared hit=8
+        ->  Index Scan using buyers_pkey on buyers b  (cost=0.29..8.31 rows=1 width=8) (actual time=0.007..0.007 rows=0.00 loops=4)
+              Index Cond: (buyer_id = c.actor_id)
+              Filter: (status <> 'ACTIVE'::text)
+              Rows Removed by Filter: 1
+              Index Searches: 4
+              Buffers: shared hit=12
+Planning:
+  Buffers: shared hit=88
+Planning Time: 1.822 ms
+Execution Time: 0.403 ms
+
+=== 討論區 熱門店頂層 第一頁（含佔位 EXISTS）（ListTopLevelForumEntries）p95 2.33 ms
+Limit  (cost=33.96..164.40 rows=1 width=184) (actual time=0.127..0.692 rows=50.00 loops=1)
+  Buffers: shared hit=1450
+  InitPlan 21
+    ->  Nested Loop Anti Join  (cost=0.43..33.12 rows=1 width=0) (actual time=0.030..0.031 rows=1.00 loops=1)
+          Buffers: shared hit=10
+          ->  Index Scan using stores_store_account_key on stores s_1  (cost=0.29..24.93 rows=1 width=8) (actual time=0.023..0.024 rows=1.00 loops=1)
+                Index Cond: (store_id = $6)
+                Filter: ((store_name IS NOT NULL) AND (logo_key IS NOT NULL) AND (town_code IS NOT NULL) AND (status <> 'CLOSED'::text) AND (status <> 'PENDING_DELETION'::text) AND EXISTS(SubPlan 19))
+                Index Searches: 1
+                Buffers: shared hit=9
+                SubPlan 19
+                  ->  Nested Loop  (cost=0.57..16.62 rows=1 width=0) (actual time=0.014..0.014 rows=1.00 loops=1)
+                        Buffers: shared hit=6
+                        ->  Index Scan using kyc_applications_store on kyc_applications a  (cost=0.29..8.30 rows=1 width=8) (actual time=0.007..0.007 rows=1.00 loops=1)
+                              Index Cond: (store_id = s_1.store_id)
+                              Filter: (status = 'APPROVED'::text)
+                              Index Searches: 1
+                              Buffers: shared hit=3
+                        ->  Index Scan using payuni_registrations_pkey on payuni_registrations r  (cost=0.29..8.31 rows=1 width=8) (actual time=0.007..0.007 rows=1.00 loops=1)
+                              Index Cond: (store_id = s_1.store_id)
+                              Filter: ((outcome = 'APPROVED'::text) AND (bind_status = 'BOUND'::text))
+                              Index Searches: 1
+                              Buffers: shared hit=3
+          ->  Index Only Scan using measures_enforced_suspension on measures m  (cost=0.14..4.17 rows=1 width=8) (actual time=0.006..0.006 rows=0.00 loops=1)
+                Index Cond: ((account_id = s_1.account_id) AND (starts_at <= $5))
+                Filter: ((ends_at IS NULL) OR (ends_at > $5))
+                Heap Fetches: 0
+                Index Searches: 1
+                Buffers: shared hit=1
+  ->  Result  (cost=0.83..261.72 rows=2 width=184) (actual time=0.126..0.686 rows=50.00 loops=1)
+        One-Time Filter: (InitPlan 21).col1
+        Buffers: shared hit=1450
+        ->  Nested Loop  (cost=0.83..145.48 rows=2 width=114) (actual time=0.033..0.287 rows=50.00 loops=1)
+              Buffers: shared hit=497
+              ->  Index Scan using forum_entries_top_level on forum_entries c  (cost=0.42..128.59 rows=2 width=106) (actual time=0.026..0.186 rows=50.00 loops=1)
+                    Index Cond: ((store_id = $4) AND (ROW(created_at, id) > ROW($7, $8)))
+                    Filter: (((deleted_at IS NULL) AND (NOT EXISTS(SubPlan 22)) AND (NOT EXISTS(SubPlan 24))) OR EXISTS(SubPlan 26))
+                    Index Searches: 1
+                    Buffers: shared hit=297
+                    SubPlan 22
+                      ->  Index Only Scan using hides_active_forum_entry on hides h_4  (cost=0.12..4.14 rows=1 width=0) (actual time=0.001..0.001 rows=0.00 loops=50)
+                            Index Cond: (forum_entry_id = c.id)
+                            Heap Fetches: 0
+                            Index Searches: 50
+                            Buffers: shared hit=100
+                    SubPlan 24
+                      ->  Result  (cost=0.29..8.31 rows=1 width=0) (actual time=0.002..0.002 rows=0.02 loops=50)
+                            One-Time Filter: (c.actor_kind = 'BUYER'::text)
+                            Buffers: shared hit=135
+                            ->  Index Scan using buyers_pkey on buyers b_5  (cost=0.29..8.31 rows=1 width=0) (actual time=0.002..0.002 rows=0.02 loops=45)
+                                  Index Cond: (buyer_id = c.actor_id)
+                                  Filter: (status <> 'ACTIVE'::text)
+                                  Rows Removed by Filter: 1
+                                  Index Searches: 45
+                                  Buffers: shared hit=135
+                    SubPlan 26
+                      ->  Nested Loop Anti Join  (cost=0.83..24.92 rows=1 width=0) (actual time=0.022..0.022 rows=1.00 loops=1)
+                            Join Filter: (r_1.actor_kind = 'BUYER'::text)
+                            Buffers: shared hit=9
+                            ->  Nested Loop Anti Join  (cost=0.54..16.60 rows=1 width=14) (actual time=0.016..0.016 rows=1.00 loops=1)
+                                  Buffers: shared hit=6
+                                  ->  Index Scan using forum_entries_replies on forum_entries r_1  (cost=0.42..8.44 rows=1 width=30) (actual time=0.007..0.007 rows=1.00 loops=1)
+                                        Index Cond: (parent_id = c.id)
+                                        Index Searches: 1
+                                        Buffers: shared hit=4
+                                  ->  Index Only Scan using hides_active_forum_entry on hides h_5  (cost=0.12..4.14 rows=1 width=16) (actual time=0.008..0.008 rows=0.00 loops=1)
+                                        Index Cond: (forum_entry_id = r_1.id)
+                                        Heap Fetches: 0
+                                        Index Searches: 1
+                                        Buffers: shared hit=2
+                            ->  Index Scan using buyers_pkey on buyers b_6  (cost=0.29..8.31 rows=1 width=8) (actual time=0.005..0.006 rows=0.00 loops=1)
+                                  Index Cond: (buyer_id = r_1.actor_id)
+                                  Filter: (status <> 'ACTIVE'::text)
+                                  Rows Removed by Filter: 1
+                                  Index Searches: 1
+                                  Buffers: shared hit=3
+              ->  Index Scan using forum_entry_stats_pkey on forum_entry_stats s  (cost=0.42..8.44 rows=1 width=24) (actual time=0.002..0.002 rows=1.00 loops=50)
+                    Index Cond: (forum_entry_id = c.id)
+                    Index Searches: 50
+                    Buffers: shared hit=200
+        SubPlan 1
+          ->  Index Only Scan using hides_active_forum_entry on hides h  (cost=0.12..4.14 rows=1 width=0) (actual time=0.001..0.001 rows=0.00 loops=50)
+                Index Cond: (forum_entry_id = c.id)
+                Heap Fetches: 0
+                Index Searches: 50
+                Buffers: shared hit=100
+        SubPlan 3
+          ->  Result  (cost=0.29..8.31 rows=1 width=0) (actual time=0.001..0.001 rows=0.02 loops=50)
+                One-Time Filter: (c.actor_kind = 'BUYER'::text)
+                Buffers: shared hit=135
+                ->  Index Scan using buyers_pkey on buyers b  (cost=0.29..8.31 rows=1 width=0) (actual time=0.001..0.001 rows=0.02 loops=45)
+                      Index Cond: (buyer_id = c.actor_id)
+                      Filter: (status <> 'ACTIVE'::text)
+                      Rows Removed by Filter: 1
+                      Index Searches: 45
+                      Buffers: shared hit=135
+        SubPlan 5
+          ->  Result  (cost=0.29..8.31 rows=1 width=0) (actual time=0.005..0.006 rows=1.00 loops=1)
+                One-Time Filter: (c.actor_kind = 'BUYER'::text)
+                Buffers: shared hit=3
+                ->  Index Scan using buyers_pkey on buyers b_1  (cost=0.29..8.31 rows=1 width=0) (actual time=0.005..0.005 rows=1.00 loops=1)
+                      Index Cond: (buyer_id = c.actor_id)
+                      Filter: (status <> 'ACTIVE'::text)
+                      Index Searches: 1
+                      Buffers: shared hit=3
+        SubPlan 7
+          ->  Index Only Scan using hides_active_forum_entry on hides h_1  (cost=0.12..4.14 rows=1 width=0) (actual time=0.000..0.000 rows=0.00 loops=50)
+                Index Cond: (forum_entry_id = c.id)
+                Heap Fetches: 0
+                Index Searches: 50
+                Buffers: shared hit=100
+        SubPlan 9
+          ->  Result  (cost=0.29..8.31 rows=1 width=0) (actual time=0.001..0.001 rows=0.02 loops=50)
+                One-Time Filter: (c.actor_kind = 'BUYER'::text)
+                Buffers: shared hit=135
+                ->  Index Scan using buyers_pkey on buyers b_2  (cost=0.29..8.31 rows=1 width=0) (actual time=0.001..0.001 rows=0.02 loops=45)
+                      Index Cond: (buyer_id = c.actor_id)
+                      Filter: (status <> 'ACTIVE'::text)
+                      Rows Removed by Filter: 1
+                      Index Searches: 45
+                      Buffers: shared hit=135
+        SubPlan 11
+          ->  Index Only Scan using hides_active_forum_entry on hides h_2  (cost=0.12..4.14 rows=1 width=0) (actual time=0.001..0.001 rows=0.00 loops=50)
+                Index Cond: (forum_entry_id = c.id)
+                Heap Fetches: 0
+                Index Searches: 50
+                Buffers: shared hit=100
+        SubPlan 13
+          ->  Result  (cost=0.29..8.31 rows=1 width=0) (actual time=0.001..0.001 rows=0.02 loops=50)
+                One-Time Filter: (c.actor_kind = 'BUYER'::text)
+                Buffers: shared hit=135
+                ->  Index Scan using buyers_pkey on buyers b_3  (cost=0.29..8.31 rows=1 width=0) (actual time=0.001..0.001 rows=0.02 loops=45)
+                      Index Cond: (buyer_id = c.actor_id)
+                      Filter: (status <> 'ACTIVE'::text)
+                      Rows Removed by Filter: 1
+                      Index Searches: 45
+                      Buffers: shared hit=135
+        SubPlan 15
+          ->  Index Only Scan using hides_active_forum_entry on hides h_3  (cost=0.12..4.14 rows=1 width=0) (actual time=0.000..0.000 rows=0.00 loops=50)
+                Index Cond: (forum_entry_id = c.id)
+                Heap Fetches: 0
+                Index Searches: 50
+                Buffers: shared hit=100
+        SubPlan 17
+          ->  Result  (cost=0.29..8.31 rows=1 width=0) (actual time=0.001..0.001 rows=0.02 loops=50)
+                One-Time Filter: (c.actor_kind = 'BUYER'::text)
+                Buffers: shared hit=135
+                ->  Index Scan using buyers_pkey on buyers b_4  (cost=0.29..8.31 rows=1 width=0) (actual time=0.001..0.001 rows=0.02 loops=45)
+                      Index Cond: (buyer_id = c.actor_id)
+                      Filter: (status <> 'ACTIVE'::text)
+                      Rows Removed by Filter: 1
+                      Index Searches: 45
+                      Buffers: shared hit=135
+Planning:
+  Buffers: shared hit=86
+Planning Time: 1.898 ms
+Execution Time: 0.860 ms
+
+=== 熱門貼文 TopPosts（最新 30 篇取瀏覽最高 5 篇）（TopPosts）p95 55.45 ms
+Limit  (cost=199076.62..199077.01 rows=156 width=341) (actual time=50.043..50.049 rows=5.00 loops=1)
+  Buffers: shared hit=1710
+  ->  Sort  (cost=199076.62..199080.53 rows=1564 width=341) (actual time=16.466..16.471 rows=5.00 loops=1)
+        Sort Key: s.view_count DESC, p.published_at DESC, p.id DESC
+        Sort Method: top-N heapsort  Memory: 28kB
+        Buffers: shared hit=1710
+        ->  Nested Loop Semi Join  (cost=139627.44..198993.64 rows=1564 width=341) (actual time=0.687..16.435 rows=30.00 loops=1)
+              Buffers: shared hit=1710
+              ->  Nested Loop  (cost=139627.01..144451.29 rows=3181 width=341) (actual time=0.625..16.085 rows=30.00 loops=1)
+                    Join Filter: (latest.id = p.id)
+                    Buffers: shared hit=1410
+                    ->  Hash Join  (cost=139626.59..141985.94 rows=3946 width=64) (actual time=0.603..15.917 rows=30.00 loops=1)
+                          Hash Cond: (s.post_id = latest.id)
+                          Buffers: shared hit=1290
+                          ->  Seq Scan on post_stats s  (cost=0.00..1943.28 rows=100428 width=48) (actual time=0.020..7.015 rows=100000.00 loops=1)
+                                Buffers: shared hit=939
+                          ->  Hash  (cost=139577.27..139577.27 rows=3946 width=16) (actual time=0.441..0.444 rows=30.00 loops=1)
+                                Buckets: 4096  Batches: 1  Memory Usage: 34kB
+                                Buffers: shared hit=351
+                                ->  Subquery Scan on latest  (cost=0.85..139577.27 rows=3946 width=16) (actual time=0.097..0.436 rows=30.00 loops=1)
+                                      Buffers: shared hit=351
+                                      ->  Limit  (cost=0.85..139537.81 rows=3946 width=24) (actual time=0.095..0.430 rows=30.00 loops=1)
+                                            Buffers: shared hit=351
+                                            ->  Nested Loop Semi Join  (cost=0.85..1395299.72 rows=39458 width=24) (actual time=0.089..0.421 rows=30.00 loops=1)
+                                                  Buffers: shared hit=351
+                                                  ->  Index Scan using posts_feed on posts p0  (cost=0.42..19344.09 rows=80248 width=32) (actual time=0.019..0.050 rows=32.00 loops=1)
+                                                        Index Searches: 1
+                                                        Buffers: shared hit=35
+                                                  ->  Nested Loop Anti Join  (cost=0.43..17.14 rows=1 width=8) (actual time=0.011..0.011 rows=0.94 loops=32)
+                                                        Buffers: shared hit=316
+                                                        ->  Index Scan using stores_pkey on stores s_2  (cost=0.29..16.94 rows=1 width=16) (actual time=0.010..0.010 rows=0.97 loops=32)
+                                                              Index Cond: (store_id = p0.store_id)
+                                                              Filter: ((store_name IS NOT NULL) AND (logo_key IS NOT NULL) AND (town_code IS NOT NULL) AND (status <> 'CLOSED'::text) AND (status <> 'PENDING_DELETION'::text) AND EXISTS(SubPlan 3))
+                                                              Rows Removed by Filter: 0
+                                                              Index Searches: 32
+                                                              Buffers: shared hit=284
+                                                              SubPlan 3
+                                                                ->  Nested Loop  (cost=0.57..16.62 rows=1 width=0) (actual time=0.006..0.006 rows=0.97 loops=32)
+                                                                      Buffers: shared hit=188
+                                                                      ->  Index Scan using kyc_applications_store on kyc_applications a_1  (cost=0.29..8.30 rows=1 width=8) (actual time=0.003..0.003 rows=0.97 loops=32)
+                                                                            Index Cond: (store_id = s_2.store_id)
+                                                                            Filter: (status = 'APPROVED'::text)
+                                                                            Index Searches: 32
+                                                                            Buffers: shared hit=95
+                                                                      ->  Index Scan using payuni_registrations_pkey on payuni_registrations r_1  (cost=0.29..8.31 rows=1 width=8) (actual time=0.003..0.003 rows=1.00 loops=31)
+                                                                            Index Cond: (store_id = s_2.store_id)
+                                                                            Filter: ((outcome = 'APPROVED'::text) AND (bind_status = 'BOUND'::text))
+                                                                            Index Searches: 31
+                                                                            Buffers: shared hit=93
+                                                        ->  Index Only Scan using measures_enforced_suspension on measures m_1  (cost=0.14..0.17 rows=1 width=8) (actual time=0.001..0.001 rows=0.03 loops=31)
+                                                              Index Cond: ((account_id = s_2.account_id) AND (starts_at <= $1))
+                                                              Filter: ((ends_at IS NULL) OR (ends_at > $1))
+                                                              Heap Fetches: 0
+                                                              Index Searches: 31
+                                                              Buffers: shared hit=32
+                    ->  Index Scan using posts_pkey on posts p  (cost=0.42..0.61 rows=1 width=293) (actual time=0.005..0.005 rows=1.00 loops=30)
+                          Index Cond: (id = s.post_id)
+                          Filter: ((deleted_at IS NULL) AND (status = 'PUBLISHED'::text))
+                          Index Searches: 30
+                          Buffers: shared hit=120
+              ->  Nested Loop Anti Join  (cost=0.43..17.14 rows=1 width=8) (actual time=0.011..0.011 rows=1.00 loops=30)
+                    Buffers: shared hit=300
+                    ->  Index Scan using stores_pkey on stores s_1  (cost=0.29..16.94 rows=1 width=16) (actual time=0.009..0.009 rows=1.00 loops=30)
+                          Index Cond: (store_id = p.store_id)
+                          Filter: ((store_name IS NOT NULL) AND (logo_key IS NOT NULL) AND (town_code IS NOT NULL) AND (status <> 'CLOSED'::text) AND (status <> 'PENDING_DELETION'::text) AND EXISTS(SubPlan 1))
+                          Index Searches: 30
+                          Buffers: shared hit=270
+                          SubPlan 1
+                            ->  Nested Loop  (cost=0.57..16.62 rows=1 width=0) (actual time=0.006..0.006 rows=1.00 loops=30)
+                                  Buffers: shared hit=180
+                                  ->  Index Scan using kyc_applications_store on kyc_applications a  (cost=0.29..8.30 rows=1 width=8) (actual time=0.002..0.002 rows=1.00 loops=30)
+                                        Index Cond: (store_id = s_1.store_id)
+                                        Filter: (status = 'APPROVED'::text)
+                                        Index Searches: 30
+                                        Buffers: shared hit=90
+                                  ->  Index Scan using payuni_registrations_pkey on payuni_registrations r  (cost=0.29..8.31 rows=1 width=8) (actual time=0.003..0.003 rows=1.00 loops=30)
+                                        Index Cond: (store_id = s_1.store_id)
+                                        Filter: ((outcome = 'APPROVED'::text) AND (bind_status = 'BOUND'::text))
+                                        Index Searches: 30
+                                        Buffers: shared hit=90
+                    ->  Index Only Scan using measures_enforced_suspension on measures m  (cost=0.14..0.17 rows=1 width=8) (actual time=0.001..0.001 rows=0.00 loops=30)
+                          Index Cond: ((account_id = s_1.account_id) AND (starts_at <= $3))
+                          Filter: ((ends_at IS NULL) OR (ends_at > $3))
+                          Heap Fetches: 0
+                          Index Searches: 30
+                          Buffers: shared hit=30
+Planning:
+  Buffers: shared hit=152
+Planning Time: 5.735 ms
+JIT:
+  Functions: 78
+  Options: Inlining false, Optimization false, Expressions true, Deforming true
+  Timing: Generation 3.023 ms (Deform 1.416 ms), Inlining 0.000 ms, Optimization 0.872 ms, Emission 32.754 ms, Total 36.649 ms
+Execution Time: 53.301 ms
+
+=== hashtag 熱門 近 30 天（可曝光店家先算一份）（TrendingHashtags）p95 73.12 ms
+Limit  (cost=169702.82..169702.92 rows=42 width=17) (actual time=57.554..57.566 rows=50.00 loops=1)
+  Buffers: shared hit=21687
+  CTE ex
+    ->  Nested Loop Anti Join  (cost=0.14..167444.46 rows=4917 width=8) (actual time=9.929..19.563 rows=9406.00 loops=1)
+          Buffers: shared hit=10187
+          ->  Seq Scan on stores s  (cost=0.00..166607.00 rows=4950 width=16) (actual time=9.906..13.481 rows=9600.00 loops=1)
+                Filter: ((store_name IS NOT NULL) AND (logo_key IS NOT NULL) AND (town_code IS NOT NULL) AND (status <> 'CLOSED'::text) AND (status <> 'PENDING_DELETION'::text) AND (ANY (store_id = (hashed SubPlan 2).col1)))
+                Rows Removed by Filter: 400
+                Buffers: shared hit=586
+                SubPlan 2
+                  ->  Hash Join  (cost=443.67..767.35 rows=9697 width=8) (actual time=3.288..6.350 rows=9697.00 loops=1)
+                        Hash Cond: (a.store_id = r.store_id)
+                        Buffers: shared hit=354
+                        ->  Seq Scan on kyc_applications a  (cost=0.00..298.21 rows=9697 width=8) (actual time=0.072..1.435 rows=9697.00 loops=1)
+                              Filter: (status = 'APPROVED'::text)
+                              Buffers: shared hit=177
+                        ->  Hash  (cost=322.45..322.45 rows=9697 width=8) (actual time=3.167..3.168 rows=9697.00 loops=1)
+                              Buckets: 16384  Batches: 1  Memory Usage: 507kB
+                              Buffers: shared hit=177
+                              ->  Seq Scan on payuni_registrations r  (cost=0.00..322.45 rows=9697 width=8) (actual time=0.010..1.981 rows=9697.00 loops=1)
+                                    Filter: ((outcome = 'APPROVED'::text) AND (bind_status = 'BOUND'::text))
+                                    Buffers: shared hit=177
+          ->  Index Only Scan using measures_enforced_suspension on measures m  (cost=0.14..0.17 rows=1 width=8) (actual time=0.000..0.000 rows=0.02 loops=9600)
+                Index Cond: ((account_id = s.account_id) AND (starts_at <= $1))
+                Filter: ((ends_at IS NULL) OR (ends_at > $1))
+                Heap Fetches: 0
+                Index Searches: 9600
+                Buffers: shared hit=9601
+  ->  Sort  (cost=2258.36..2259.42 rows=424 width=17) (actual time=38.109..38.113 rows=50.00 loops=1)
+        Sort Key: (count(*)) DESC, h.name
+        Sort Method: top-N heapsort  Memory: 29kB
+        Buffers: shared hit=21687
+        ->  GroupAggregate  (cost=2232.44..2239.86 rows=424 width=17) (actual time=36.057..37.729 rows=2672.00 loops=1)
+              Group Key: h.name
+              Buffers: shared hit=21687
+              ->  Sort  (cost=2232.44..2233.50 rows=424 width=9) (actual time=36.036..36.401 rows=6133.00 loops=1)
+                    Sort Key: h.name
+                    Sort Method: quicksort  Memory: 193kB
+                    Buffers: shared hit=21687
+                    ->  Nested Loop  (cost=176.75..2213.94 rows=424 width=9) (actual time=23.681..31.902 rows=6133.00 loops=1)
+                          Buffers: shared hit=21687
+                          ->  Hash Semi Join  (cost=176.33..1360.62 rows=213 width=16) (actual time=23.665..26.291 rows=3072.00 loops=1)
+                                Hash Cond: (p.store_id = ex.store_id)
+                                Buffers: shared hit=12470
+                                ->  Bitmap Heap Scan on posts p  (cost=16.53..1197.40 rows=401 width=24) (actual time=0.621..2.551 rows=3297.00 loops=1)
+                                      Recheck Cond: ((published_at >= $2) AND (published_at < $3) AND (status = 'PUBLISHED'::text) AND (deleted_at IS NULL))
+                                      Heap Blocks: exact=2258
+                                      Buffers: shared hit=2283
+                                      ->  Bitmap Index Scan on posts_feed  (cost=0.00..16.43 rows=401 width=0) (actual time=0.385..0.385 rows=3297.00 loops=1)
+                                            Index Cond: ((published_at >= $2) AND (published_at < $3))
+                                            Index Searches: 1
+                                            Buffers: shared hit=25
+                                ->  Hash  (cost=98.34..98.34 rows=4917 width=8) (actual time=23.022..23.023 rows=9406.00 loops=1)
+                                      Buckets: 16384 (originally 8192)  Batches: 1 (originally 1)  Memory Usage: 496kB
+                                      Buffers: shared hit=10187
+                                      ->  CTE Scan on ex  (cost=0.00..98.34 rows=4917 width=8) (actual time=9.931..21.652 rows=9406.00 loops=1)
+                                            Storage: Memory  Maximum Storage: 422kB
+                                            Buffers: shared hit=10187
+                          ->  Index Only Scan using post_hashtags_name_key on post_hashtags h  (cost=0.42..3.99 rows=2 width=25) (actual time=0.001..0.001 rows=2.00 loops=3072)
+                                Index Cond: (post_id = p.id)
+                                Heap Fetches: 0
+                                Index Searches: 3072
+                                Buffers: shared hit=9217
+Planning:
+  Buffers: shared hit=50
+Planning Time: 2.595 ms
+JIT:
+  Functions: 54
+  Options: Inlining false, Optimization false, Expressions true, Deforming true
+  Timing: Generation 2.613 ms (Deform 0.874 ms), Inlining 0.000 ms, Optimization 0.668 ms, Emission 20.506 ms, Total 23.786 ms
+Execution Time: 60.102 ms

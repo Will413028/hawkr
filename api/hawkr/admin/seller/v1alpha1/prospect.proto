@@ -1,0 +1,412 @@
+syntax = "proto3";
+
+// seller 模組給後台的商家名單 API（BD 的站外業者名單；ADR 2026-10-04-prospect-contact-points-and-matching）：建立（含建立前
+// 的比對）、清單、讀取、部分更新（含 logo 與封面的上傳）、封存與還原、合併、手動轉成店家，以及疑似重複與統編對帳。
+//
+// 識別與比對：統編是權威識別碼，未封存（進行中或已入駐）的業者之間唯一；聯絡方式的比對鍵相同只是比對訊號，確認不是同一家才寫入。建立、改到
+// 聯絡方式的修改與還原撞到比對鍵時回 failed_precondition，ErrorInfo.reason 是 PROSPECT_MATCH_FOUND，metadata 的 prospectIds
+// 是相符的業者（十進位 ID 以逗號連接、由小到大）；管理員確認它們都不是同一家之後，在請求的 confirmed_distinct_prospect_ids
+// 帶上這些 ID 再送一次，才會寫入並記下這些配對；要當成同一家則改用 MergeProspects。統編已被別家持有時，ErrorInfo.reason 是
+// PROSPECT_TAX_ID_HELD，metadata 的 prospectIds 是持有者的 ID；其他衝突（轉成已被認領的店家）只在錯誤訊息裡說明，不帶 reason。
+//
+// 業者的圖片（logo、封面）只在 UpdateProspect 換：建立時沒有圖。管理員只以 ID 記錄，顯示名稱由 client 經 IdentityAdminService
+// 查。上傳 session 在 media 的路由（取得 staged token）。
+package hawkr.admin.seller.v1alpha1;
+
+import "hawkr/common/v1alpha1/image.proto";
+import "hawkr/seller/v1alpha1/seller.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+
+// SellerProspectAdminService 只有管理員能呼叫。
+service SellerProspectAdminService {
+  // ListProspects 是業者清單，新到舊（依 update_time）。清單的業者不帶 contacts 與 category_ids（GetProspect 才有）。
+  rpc ListProspects(ListProspectsRequest) returns (ListProspectsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // CreateProspect 建立業者。display_name 與 vendor_type 必填；outreach_status 沒填是 NOT_CONTACTED，不能是 CONVERTED。
+  // 統編已經被別的未封存業者持有回 already_exists（PROSPECT_TAX_ID_HELD，metadata 的 prospectIds 是持有者的 ID）；聯絡方式的比對鍵與其他未封存業者相同、而且沒有
+  // 標記為不是同一家時回 failed_precondition（PROSPECT_MATCH_FOUND），confirmed_distinct_prospect_ids 涵蓋全部相符的業者
+  // 才建立。建立時不能帶 logo_upload、cover_upload（建立後以 UpdateProspect 換圖）。沒有冪等鍵：重送時，統編或有識別力的聯絡方式
+  // 會撞到第一筆（already_exists 或 PROSPECT_MATCH_FOUND）。
+  rpc CreateProspect(CreateProspectRequest) returns (CreateProspectResponse);
+
+  // PreviewProspect 建立之前的比對，不寫入：回傳可能是同一家的業者與命中的層級（統編相同的會讓建立被拒絕，聯絡方式的
+  // 比對鍵相同的需要確認不是同一家，名稱相同只供人判斷）。
+  rpc PreviewProspect(PreviewProspectRequest) returns (PreviewProspectResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // GetProspect 讀一個業者（任何狀態），含 contacts 與 category_ids。
+  rpc GetProspect(GetProspectRequest) returns (GetProspectResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // UpdateProspect 依 update_mask 部分更新；沒帶 mask 時視為列出所有非零值的欄位，要清空的欄位必須列出來。可以列的是
+  // display_name、vendor_type、outreach_status（不能設成 CONVERTED）、tax_id、contacts、category、region、product_summary、
+  // positioning、research_summary、priority_letter、priority_stars、category_ids、logo_upload、cover_upload；其他欄位是
+  // OUTPUT_ONLY。mask 選到卻沒有值的欄位是清掉（contacts 與 category_ids 是清空）；contacts 與 category_ids 整批替換。
+  // 只有進行中的業者可以改；etag 必填，與目前的版本不符回 aborted（VERSION_CONFLICT），什麼都不寫。沒有任何欄位改變時
+  // 不寫入、etag 不變。
+  // 換圖：logo_upload、cover_upload 帶上傳後的 staged token 與選填、只收 https 的來源網址（只作稽核，後端不會去取）；列進
+  // mask 才換，沒列就沿用目前的圖。文字、聯絡方式與圖片在同一個版本條件的寫入裡，被拒絕的請求不消耗 staged token。
+  // 改到聯絡方式時的比對與 confirmed_distinct_prospect_ids 同 CreateProspect；統編被別的未封存業者持有回
+  // failed_precondition（PROSPECT_TAX_ID_HELD，metadata 的 prospectIds 是持有者的 ID）：持有者是進行中的，該做的是合併；
+  // 持有者是已入駐的，是同一家的話請封存這筆。
+  // update_mask 的 "*" 選到所有可寫的欄位，包含 logo_upload、cover_upload 與 outreach_status：它們都必須有值（上傳要帶
+  // staged_token，圖片沒有清除的操作；outreach_status 不能是 UNSPECIFIED），沒有就回 invalid_argument。只改部分欄位時列出
+  // 那些欄位。
+  rpc UpdateProspect(UpdateProspectRequest) returns (UpdateProspectResponse);
+
+  // ArchiveProspect 封存業者（之後可還原）。etag 必填。etag 不符（包含封存已經生效後再帶舊 etag 送一次）回 aborted（VERSION_CONFLICT），不寫入；
+  // 已經封存而且帶目前 etag 的回傳目前的業者；已轉成店家的回 failed_precondition。封存會釋放圖片。
+  rpc ArchiveProspect(ArchiveProspectRequest) returns (ArchiveProspectResponse);
+
+  // RestoreProspect 還原封存的業者，不帶 etag（依據的是封存這個狀態）。被合併的業者不能還原；封存期間統編被別家拿走回
+  // failed_precondition（PROSPECT_TAX_ID_HELD，metadata 的 prospectIds 是持有者的 ID；是同一家的話不需要還原）；聯絡方式的比對鍵被其他未封存業者佔走、而且沒有標記為不是同一家時回 failed_precondition
+  // （PROSPECT_MATCH_FOUND），confirmed_distinct_prospect_ids 涵蓋全部相符的業者才還原。封存時釋放的圖片不會回來。
+  rpc RestoreProspect(RestoreProspectRequest) returns (RestoreProspectResponse);
+
+  // MergeProspects 把 loser 併進 winner，回傳 winner。兩邊的 etag 都必填；兩邊都必須是進行中的業者。loser 的聯絡方式併入
+  // winner、「不是同一家」的配對與分類改掛 winner、統編在 winner 沒有時搬過去；loser 的詢價連結改由 winner 承接；loser 與
+  // winner 之間的「不是同一家」標記撤銷；loser 封存且不能還原，圖片釋放（不搬給 winner）。任一邊的 etag 不符（包含合併已經生效後再帶舊 etag 送一次）回 aborted（VERSION_CONFLICT），不寫入。不可逆。
+  rpc MergeProspects(MergeProspectsRequest) returns (MergeProspectsResponse);
+
+  // ConvertProspect 把業者手動轉成目前的店家，進度同時變成 CONVERTED。etag 必填。店家必須是目前的（沒有關閉）；只有進行中的
+  // 業者可以轉，轉過、封存與被合併的回 failed_precondition；店家已被別的業者認領回 already_exists。etag 不符（包含轉換已經生效後再帶舊 etag
+  // 送一次）回 aborted（VERSION_CONFLICT），不寫入。不撤銷 vendor portal 的邀請。
+  rpc ConvertProspect(ConvertProspectRequest) returns (ConvertProspectResponse);
+
+  // ListProspectDuplicates 是疑似重複的清單：進行中的業者之間比對鍵相同或名稱相同、而且沒有標記為不是同一家的配對
+  // （ID 小的在 left）。keyset 分頁；永不自動合併，處理方式是 MergeProspects，或帶 confirmed_distinct_prospect_ids 的修改。
+  rpc ListProspectDuplicates(ListProspectDuplicatesRequest) returns (ListProspectDuplicatesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // MarkProspectsDistinct 標記一對業者不是同一家：疑似重複清單的另一種處理方式（另一個是 MergeProspects）。標記之後這一對不再出現在
+  // ListProspectDuplicates，也不再讓建立、修改與還原回 PROSPECT_MATCH_FOUND。決定的是身分、不是內容，所以不帶 etag：業者
+  // 的內容之後怎麼改，這個決定都不變。兩個 ID 不可相同（invalid_argument）；兩個都必須存在（not_found）而且是進行中的業者
+  // （failed_precondition，疑似重複清單只列進行中的業者之間）。已經標記過的重送回傳成功，不改寫第一次的管理員與時間（冪等）。
+  // 這是商家名單的資源，不是業者的欄位：沒有清除標記的方法（明確合併一對標記過的業者會撤銷那個標記）。
+  rpc MarkProspectsDistinct(MarkProspectsDistinctRequest) returns (MarkProspectsDistinctResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // ListProspectTaxIDMatches 是統編對帳：業者的統編對得上目前店家的 KYC 申請、但還沒有連起來的配對（已被其他業者認領的店家
+  // 不列）。處理方式是 ConvertProspect。
+  rpc ListProspectTaxIDMatches(ListProspectTaxIDMatchesRequest) returns (ListProspectTaxIDMatchesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+// ProspectStatus 是業者的狀態。
+enum ProspectStatus {
+  PROSPECT_STATUS_UNSPECIFIED = 0;
+  // 進行中：可操作、可被採購搜尋。
+  PROSPECT_STATUS_ACTIVE = 1;
+  // 封存，或被合併進另一個業者（merged_into_id 有值，不能還原）。
+  PROSPECT_STATUS_ARCHIVED = 2;
+  // 已轉成店家，只供檢視。
+  PROSPECT_STATUS_CONVERTED = 3;
+}
+
+// VendorType 是業者的型態。
+enum VendorType {
+  VENDOR_TYPE_UNSPECIFIED = 0;
+  VENDOR_TYPE_INDIVIDUAL = 1;
+  // 公司或商號。
+  VENDOR_TYPE_BUSINESS = 2;
+}
+
+// OutreachStatus 是招商的進度。
+enum OutreachStatus {
+  OUTREACH_STATUS_UNSPECIFIED = 0;
+  OUTREACH_STATUS_NOT_CONTACTED = 1;
+  OUTREACH_STATUS_INVITED = 2;
+  OUTREACH_STATUS_REPLIED = 3;
+  OUTREACH_STATUS_DECLINED = 4;
+  OUTREACH_STATUS_DO_NOT_CONTACT = 5;
+  // 已轉成店家；只由 ConvertProspect 寫入，管理員不能手動設定。
+  OUTREACH_STATUS_CONVERTED = 6;
+}
+
+// ContactKind 是聯絡方式的類型。
+enum ContactKind {
+  CONTACT_KIND_UNSPECIFIED = 0;
+  CONTACT_KIND_EMAIL = 1;
+  CONTACT_KIND_PHONE = 2;
+  CONTACT_KIND_WEBSITE = 3;
+  // 社群帳號。
+  CONTACT_KIND_SOCIAL = 4;
+}
+
+// ProspectMatchTier 是一次比對命中的信心層級。
+enum ProspectMatchTier {
+  PROSPECT_MATCH_TIER_UNSPECIFIED = 0;
+  // 統編相同（權威識別碼）。
+  PROSPECT_MATCH_TIER_T1_TAX_ID = 1;
+  // 聯絡方式的比對鍵（email、電話、網域、社群帳號）相同。
+  PROSPECT_MATCH_TIER_T2_CONTACT = 2;
+  // 名稱相同，只供人判斷。
+  PROSPECT_MATCH_TIER_T3_NAME = 3;
+}
+
+// ProspectMatchReason 是配對命中的原因：統編相同、名稱相同，或聯絡方式的比對鍵種類相同。
+enum ProspectMatchReason {
+  PROSPECT_MATCH_REASON_UNSPECIFIED = 0;
+  // 統編相同。
+  PROSPECT_MATCH_REASON_TAX_ID = 1;
+  // 名稱相同（忽略大小寫與前後空白）。
+  PROSPECT_MATCH_REASON_NAME = 2;
+  // 電子郵件相同。
+  PROSPECT_MATCH_REASON_EMAIL = 3;
+  // 電話相同。
+  PROSPECT_MATCH_REASON_PHONE = 4;
+  // 網站網域相同。
+  PROSPECT_MATCH_REASON_DOMAIN = 5;
+  // 社群帳號相同。
+  PROSPECT_MATCH_REASON_SOCIAL = 6;
+}
+
+// ProspectContact 是業者的一個聯絡方式。
+message ProspectContact {
+  ContactKind kind = 1 [(google.api.field_behavior) = REQUIRED];
+  // 管理員輸入的原值（顯示用；比對鍵由伺服器另外推導）。去掉前後空白後 1 到 255 字（EMAIL）、50 字（PHONE）、500 字
+  // （WEBSITE、SOCIAL）。
+  string value = 2 [(google.api.field_behavior) = REQUIRED];
+  // 是這個類型的主要聯絡方式：某個類型有多個時必須恰好一個是 true，只有一個時它就是主要的。vendor portal 用主要的 EMAIL，
+  // ai-service 用主要的 WEBSITE。
+  bool primary = 3;
+}
+
+// ProspectImageUpload 是換 logo 或封面的上傳。
+message ProspectImageUpload {
+  // media 的暫存 token（上傳完成後取得）。
+  string staged_token = 1 [(google.api.field_behavior) = REQUIRED];
+  // 素材的來源頁面，只作稽核；選填，只收 https。
+  string source_url = 2;
+}
+
+// Prospect 是一個業者。
+message Prospect {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 業者名稱，1 到 255 字。建立時必填；修改時只在 update_mask 選到才採用。
+  string display_name = 2 [(google.api.field_behavior) = REQUIRED];
+  // 建立時必填；修改時只在 update_mask 選到才採用。
+  VendorType vendor_type = 3 [(google.api.field_behavior) = REQUIRED];
+  ProspectStatus status = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 建立時沒填是 NOT_CONTACTED。
+  OutreachStatus outreach_status = 5;
+  // 統一編號，8 位數字；沒有時是空字串。
+  string tax_id = 6;
+  // 聯絡方式，整批替換；只有 GetProspect 與寫入的回應帶（ListProspects 的清單不帶）。最多 50 個。
+  repeated ProspectContact contacts = 7;
+  // 分類樹的 ID，整批替換；每個 1 到 64 字、最多 100 個；只有 GetProspect 與寫入的回應帶。
+  repeated string category_ids = 8;
+  // 自由文字的分類與地區，最多 100 字；沒有時是空字串。
+  string category = 9;
+  string region = 10;
+  // 以下三段文字最多 10000 字；沒有時是空字串。
+  string product_summary = 11;
+  string positioning = 12;
+  string research_summary = 13;
+  // 優先等級的字母，最多 4 字；沒有時是空字串。
+  string priority_letter = 14;
+  // 優先等級的星數，不可為負數。
+  int32 priority_stars = 15;
+  // logo；沒有圖時不設。換圖用 logo_upload。
+  hawkr.common.v1alpha1.Image logo_image = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 目前這張 logo 的來源網址；沒有時是空字串。
+  string logo_source_url = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 換 logo：只用在 UpdateProspect 的請求，列進 update_mask 才生效。
+  ProspectImageUpload logo_upload = 18 [(google.api.field_behavior) = INPUT_ONLY];
+  hawkr.common.v1alpha1.Image cover_image = 19 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string cover_source_url = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 換封面：同 logo_upload。
+  ProspectImageUpload cover_upload = 21 [(google.api.field_behavior) = INPUT_ONLY];
+  // 轉成的店家（store_id）；沒有轉過時是空字串。
+  string converted_store_id = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 轉成店家的時間；沒有轉過時不設。
+  google.protobuf.Timestamp convert_time = 23 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 被合併進的業者；沒有被合併時是空字串。
+  string merged_into_id = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 建立與最後修改的管理員；沒有紀錄時是空字串。
+  string created_by_admin_id = 25 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string updated_by_admin_id = 26 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 27 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 28 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string etag = 29;
+}
+
+// ProspectMatch 是一筆比對結果；一個業者只出現一次，取最高的層級。
+message ProspectMatch {
+  Prospect prospect = 1;
+  ProspectMatchTier tier = 2;
+  // 為什麼認為是同一家：統編、名稱、命中的比對鍵種類。
+  repeated ProspectMatchReason matched_on = 3;
+}
+
+// ProspectDuplicate 是一對疑似重複的業者。
+message ProspectDuplicate {
+  Prospect left = 1;
+  Prospect right = 2;
+  // 為什麼疑似重複：名稱相同、命中的比對鍵種類；至少一個。
+  repeated ProspectMatchReason matched_on = 3;
+}
+
+// ProspectTaxIDMatch 是統編對得上、但還沒連起來的業者與店家。
+message ProspectTaxIDMatch {
+  Prospect prospect = 1;
+  string store_id = 2;
+  // 店名與 KYC 的公司名稱；沒有時是空字串。
+  string store_name = 3;
+  string company_name = 4;
+  hawkr.seller.v1alpha1.KYCStatus kyc_status = 5;
+}
+
+message ListProspectsRequest {
+  // 每頁筆數：0 用預設值 20，上限 100。
+  int32 page_size = 1;
+  string page_token = 2;
+  // 只列這個狀態的業者；UNSPECIFIED 只列進行中的（ACTIVE）。
+  ProspectStatus status = 3;
+  // 只列這個招商進度；UNSPECIFIED 不篩選。
+  OutreachStatus outreach_status = 4;
+  // 只列這個型態；UNSPECIFIED 不篩選。
+  VendorType vendor_type = 5;
+  // 精確比對；空字串不篩選。
+  string category = 6;
+  string region = 7;
+  // 名稱與三段文字的模糊搜尋；空字串不篩選。
+  string keyword = 8;
+}
+
+message ListProspectsResponse {
+  repeated Prospect prospects = 1;
+  string next_page_token = 2;
+}
+
+message CreateProspectRequest {
+  // etag 與 OUTPUT_ONLY 欄位會被忽略；不能帶 logo_upload、cover_upload（invalid_argument）。
+  Prospect prospect = 1 [(google.api.field_behavior) = REQUIRED];
+  // 管理員確認不是同一家的業者 ID（PROSPECT_MATCH_FOUND 的 prospectIds）；相符的業者全部都在裡面時才建立。
+  repeated string confirmed_distinct_prospect_ids = 2;
+}
+
+message CreateProspectResponse {
+  Prospect prospect = 1;
+}
+
+message PreviewProspectRequest {
+  string display_name = 1;
+  // 沒有統編時留空。
+  string tax_id = 2;
+  repeated ProspectContact contacts = 3;
+}
+
+message PreviewProspectResponse {
+  // 比對到的業者，不含 contacts 與 category_ids。
+  repeated ProspectMatch matches = 1;
+}
+
+message GetProspectRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetProspectResponse {
+  Prospect prospect = 1;
+}
+
+message UpdateProspectRequest {
+  // id 與 etag 必填；只有 update_mask 選到的可寫欄位會被採用。
+  Prospect prospect = 1 [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.FieldMask update_mask = 2;
+  // 同 CreateProspectRequest；只在這次修改改到聯絡方式時用到。
+  repeated string confirmed_distinct_prospect_ids = 3;
+}
+
+message UpdateProspectResponse {
+  Prospect prospect = 1;
+}
+
+message ArchiveProspectRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 讀到的業者的 etag。
+  string etag = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message ArchiveProspectResponse {
+  Prospect prospect = 1;
+}
+
+message RestoreProspectRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 同 CreateProspectRequest；只在聯絡方式的比對鍵被其他未封存業者佔走時用到。
+  repeated string confirmed_distinct_prospect_ids = 2;
+}
+
+message RestoreProspectResponse {
+  Prospect prospect = 1;
+}
+
+message MergeProspectsRequest {
+  // 留下的業者。
+  string winner_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 讀到的 winner 的 etag。
+  string winner_etag = 2 [(google.api.field_behavior) = REQUIRED];
+  // 併入 winner 後封存的業者。
+  string loser_id = 3 [(google.api.field_behavior) = REQUIRED];
+  // 讀到的 loser 的 etag。
+  string loser_etag = 4 [(google.api.field_behavior) = REQUIRED];
+}
+
+message MergeProspectsResponse {
+  // 合併後的 winner。
+  Prospect prospect = 1;
+}
+
+message ConvertProspectRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 目前的店家。
+  string store_id = 2 [(google.api.field_behavior) = REQUIRED];
+  // 讀到的業者的 etag。
+  string etag = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message ConvertProspectResponse {
+  Prospect prospect = 1;
+}
+
+message ListProspectDuplicatesRequest {
+  // 每頁筆數：0 用預設值 50，上限 200。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListProspectDuplicatesResponse {
+  // 兩邊的業者不含 contacts 與 category_ids。
+  repeated ProspectDuplicate duplicates = 1;
+  string next_page_token = 2;
+}
+
+message ListProspectTaxIDMatchesRequest {
+  // 每頁筆數：0 用預設值 50，上限 200。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListProspectTaxIDMatchesResponse {
+  // 業者不含 contacts 與 category_ids。
+  repeated ProspectTaxIDMatch matches = 1;
+  string next_page_token = 2;
+}
+
+message MarkProspectsDistinctRequest {
+  // 兩個業者的順序不影響結果。
+  string first_prospect_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string second_prospect_id = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message MarkProspectsDistinctResponse {}

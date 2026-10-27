@@ -1,0 +1,930 @@
+-- invoice_operations｜對 provider 的一次操作（＝排程 job 表）
+-- SSOT：設計書 58 號 §4.3.3（12 支支數表與逐支說明）＋ §5.2.1（query body 的 SSOT）＋ §7.5.4（鏡射）
+--
+-- 本檔恰好 12 支，不多不少（§4.2.1「一表一檔」表格：`invoice_operations.sql` 是 12 支不是 5 支）：
+--   ①~⑤ INV.op 走 pkg/outbox.Repository[T] 的五方法契約（pkg/outbox/worker.go 的 Repository 介面）
+--   ⑥⑦  INV.rc 自寫 claim 迴圈的候選與搶佔（§4.3.3 定版裁決：INV.rc 不走 pkg/outbox.Worker）
+--   ⑧⑨⑩ INV.rc 的六個落點（J23／J24／J25／J26／J31／J17）——不得沿用 ③④⑤，理由見 §4.3.3
+--   ⑪⑫  INV.op RunOnce 的集合式前置 UPDATE，無外部副作用 ⇒ 不需要 claim
+-- 少寫一支的症狀不是編譯錯，是那條狀態邊沒有任何元件會執行（§4.6 W-01）。
+--
+-- 兩組候選集合共用租約欄 next_attempt_at，狀態集合互斥是**正確性條件**不是風格：
+--   第 1 組（①②）READY / RETRY_SCHEDULED / SENDING            —— 租約 120s，打 AMEGO 寫入類
+--   第 2 組（⑥⑦）WAITING_CONFIRMATION / PROVIDER_STATUS_RECHECK /
+--                 FAILED_UNKNOWN / CANCEL_REQUESTED / CANCEL_BLOCKED_UNKNOWN —— 租約 60s，唯讀對帳
+-- 交集非空 ⇒ 短租約那支會在長租約那支還在打 f0401 的途中合法搶走它 ⇒ 重複開票（I-55 靜態斷言）。
+
+-- name: FetchDueInvoiceOperations :many
+-- ① 候選。述詞必須與 ClaimInvoiceOperation 逐字鏡射（§4.6 W-05）。
+-- 刻意不帶 FOR UPDATE SKIP LOCKED：本查詢在自動提交下跑，SELECT 一回傳鎖就釋放 ⇒ 零保護。
+--    搶佔改由 ClaimInvoiceOperation 的 lease CAS 負責（《多副本排程搶佔規範》§一 規則 ②）。
+-- ORDER BY statutory_deadline_at：法定期限最近的先做（逾期的代價是國稅局記點，不是使用者多等）。
+--    單表排序、不 JOIN invoice_documents——排序鍵在 join 另一邊時索引用不上；本表的
+--    statutory_deadline_at 是建列同交易內複製的反正規化副本（§5.1.8、I-52）。
+-- statutory_deadline_at 只出現在 ORDER BY，不得進 WHERE（§4.6 W-06）：進了 WHERE 會讓逾期的
+--    row 掉出候選集合並永久停止重試。
+-- NULLS LAST 必須逐字寫出來，RECEIPT 的 statutory_deadline_at 是合法的 NULL（§4.6 W-07）。
+SELECT * FROM invoice_operations
+WHERE status IN ('READY', 'RETRY_SCHEDULED', 'SENDING')
+  AND next_attempt_at <= sqlc.arg(now)
+ORDER BY statutory_deadline_at NULLS LAST, next_attempt_at
+LIMIT sqlc.arg(row_limit);
+
+-- name: ClaimInvoiceOperation :execrows
+-- ② 搶佔 —— 把 next_attempt_at 推到未來，rows=1 的副本才做副作用。
+-- 三件不可省（§7.5.4）：
+--   (a) SET status = 'SENDING'：J10–J13 的 allowed-from 全是 SENDING；③ 的守衛、①⑥ 的述詞、
+--       §7.3.1 的 document 轉移（PENDING + ISSUE operation READY→SENDING ⇒ ISSUING）三者都靠它。
+--   (b) 不動 attempt_count（由 pkg/outbox 的 bumpAttempt → UpdateAttempt 統一維護）
+--       也不動 version（那是 ADM expectedVersion 樂觀鎖的欄位，只在業務語意的轉移時 +1）。
+--   (c) sqlc.arg(lease_until) 由呼叫端在 processRow 內以 time.Now.Add(ClaimLease) **逐筆現算**，
+--       不可在批次迴圈外算一次（否則不變式退化成「批次總耗時 < 租約」）。
+-- 候選述詞必須容納 'SENDING'，否則租約到期的 row 永遠回不來——租約回收在 FSM 上是自轉移
+--    （SENDING → SENDING），沒有任何人會去把崩潰者留下的 SENDING 改回 READY。
+-- 一律正面列出要處理的狀態值，禁 <> / NOT IN（規範 §六；失敗形狀見 §8.6 T-27）。
+UPDATE invoice_operations
+SET status = 'SENDING', next_attempt_at = sqlc.arg(lease_until),
+    started_at = COALESCE(started_at, sqlc.arg(now)), updated_at = sqlc.arg(now)
+WHERE id = sqlc.arg(id)
+  AND status IN ('READY', 'RETRY_SCHEDULED', 'SENDING')
+  AND next_attempt_at <= sqlc.arg(claimable_before);
+
+-- name: MarkInvoiceOperationDone :execrows
+-- ③ 完成。`AND status = 'SENDING'` 這道守衛是 §4.5.6 的 P/M 分類能成立的關鍵：
+--    P/M 類的 ProcessFunc 會先在自己的交易內把 status 寫成終態（FAILED_PERMANENT /
+--    SELLER_ACTION_REQUIRED / FAILED_UNKNOWN…）再回 nil，pkg/outbox 收到 nil 之後一定會呼叫
+--    MarkDone。沒有這道守衛，MarkDone 會把「永久失敗」蓋成 SUCCEEDED，而且不報錯、不留痕。
+--    有守衛時它 rows=0，什麼都不做。
+UPDATE invoice_operations
+SET status = 'SUCCEEDED', completed_at = sqlc.arg(now),
+    updated_at = sqlc.arg(now), version = version + 1
+WHERE id = sqlc.arg(id) AND status = 'SENDING';
+
+-- name: MarkInvoiceOperationFailed :execrows
+-- ④ 終結（attempt_count 達 max_attempts 時由 pkg/outbox 呼叫）。同樣守狀態，
+--    不覆蓋 ProcessFunc 已經寫定的終態。
+UPDATE invoice_operations
+SET status = 'FAILED_PERMANENT', last_error = sqlc.arg(last_error),
+    completed_at = sqlc.arg(now), updated_at = sqlc.arg(now), version = version + 1
+WHERE id = sqlc.arg(id) AND status IN ('SENDING', 'RETRY_SCHEDULED');
+
+-- name: MarkInvoiceOperationFailedWithProviderResult :execrows
+-- ④' 終結，**同時保存 provider 的原話**（#3082，DEC-20260904-120527 選 A）。
+--
+-- 🔴 與 ④ 分成兩句而不是把 provider 欄加進 ④：④ 的呼叫者是 pkg/outbox
+--    （重試預算用完），它手上**沒有** provider 回應——那時候硬塞兩個 NULL 進去
+--    會把先前某一次真的有 code 的記錄洗掉。本句給「這一次就是 provider 明確拒絕」
+--    的呼叫者用。
+--
+-- 在此之前 provider_code／provider_message **從未被任何路徑寫入**：
+--    MarkFailed 只寫 last_error，而 MarkOperationProviderResult 那支只服務 J32。
+--    後果是 ADM 的服務商往來看不到碼與訊息，只能去讀 last_error 的自由文字。
+UPDATE invoice_operations
+SET status = 'FAILED_PERMANENT',
+    last_error = sqlc.arg(last_error),
+    provider_code = sqlc.narg(provider_code),
+    provider_message = sqlc.narg(provider_message),
+    completed_at = sqlc.arg(now), updated_at = sqlc.arg(now), version = version + 1
+WHERE id = sqlc.arg(id) AND status IN ('SENDING', 'RETRY_SCHEDULED');
+
+-- name: UpdateInvoiceOperationAttempt :exec
+-- ⑤ 退避重排。這是租約欄 next_attempt_at 的第二個寫入者，而且是刻意的
+--    （《多副本排程搶佔規範》§三 第 7 點已明文承認 backoff 寫入的正當性）：
+--    它只會在本副本仍持有租約時執行，把「租約」換成「下次可執行時間」。
+-- ⚠️ 本句無條件 SET status='RETRY_SCHEDULED'（第 1 組的候選狀態）⇒ INV.rc **絕對不可以**沿用它，
+--    否則一筆「查完仍未確定」的列下一輪就被 INV.op 撈走並真的重送一次 f0401 ⇒ 重複開票
+--    （§4.6 W-03）。INV.rc 的對應落點是 ⑩ UpdateInvoiceRecheckAttempt。
+UPDATE invoice_operations
+SET attempt_count = sqlc.arg(attempt_count),
+    next_attempt_at = sqlc.arg(next_attempt_at),
+    last_error = sqlc.arg(last_error),
+    status = 'RETRY_SCHEDULED',
+    updated_at = sqlc.arg(now),
+    version = version + 1
+WHERE id = sqlc.arg(id);
+
+-- name: FetchPendingInvoiceRechecks :many
+-- ⑥ INV.rc 的候選（同一張表的第二組述詞）。逐字對齊 §5.2.1／§7.5.4，改一邊就要改三邊。
+-- 狀態集合與 FetchDueInvoiceOperations **不相交** —— 那是正確性條件，見本檔頭。
+-- 這一組刻意不含 READY／RETRY_SCHEDULED／SENDING（§7.6 X20）：INV.rc 是唯讀對帳，
+--    它永遠不呼叫寫入類 API（f0401/f0501/g0401）。要重送一律是把列還給 INV.op
+--    （⑧ 的 J25 轉回 RETRY_SCHEDULED），不是自己送。
+-- 'CANCEL_REQUESTED' 在集合裡是刻意的：ADM 的「強制最終查詢」是同步路徑，
+--    那條路徑中途崩潰時該筆會停在 CANCEL_REQUESTED 而沒有任何人接手。
+-- 同樣刻意不帶 FOR UPDATE SKIP LOCKED，理由同 ①。
+SELECT * FROM invoice_operations
+WHERE status IN ('WAITING_CONFIRMATION', 'PROVIDER_STATUS_RECHECK', 'FAILED_UNKNOWN',
+                 'CANCEL_REQUESTED', 'CANCEL_BLOCKED_UNKNOWN')
+  AND next_attempt_at <= sqlc.arg(now)
+ORDER BY statutory_deadline_at NULLS LAST, next_attempt_at
+LIMIT sqlc.arg(row_limit);
+
+-- name: ClaimInvoiceRecheck :execrows
+-- ⑦ INV.rc 的搶佔。租約 60s（≠ INV.op 的 120s；下界 20.3s，成立條件是「一次 claim 只做一次
+--    外部呼叫」，§7.5.4 第 3 條）。租約基準同樣逐筆在 claim 當下取。
+-- 候選述詞含 PROVIDER_STATUS_RECHECK 自己 ⇒ 持有者崩潰時租約到期即自動回收
+--    （與 ① 必須容納 SENDING 完全同理；少了它就是「把永久旗標寫得更像 lease」）。
+-- 本句不動 attempt_count（那是送出路徑的計數，不是查詢路徑的，§7.6 X22），也不動 version。
+-- 這一句 UPDATE 本身就是 M2 的狀態轉移：五個來源狀態逐字對應轉換表的 J15／J16／J20／J22／J27，
+--    ⇒ 它必須走同一個 transition helper（§7.3.0 規則 3），不能繞過去直接 UPDATE。
+--    契約測試把「轉換表中目標為 PROVIDER_STATUS_RECHECK 的來源狀態集合」與本述詞對拍。
+UPDATE invoice_operations
+SET next_attempt_at = sqlc.arg(lease_until), status = 'PROVIDER_STATUS_RECHECK', updated_at = sqlc.arg(now)
+WHERE id = sqlc.arg(id)
+  AND status IN ('WAITING_CONFIRMATION', 'PROVIDER_STATUS_RECHECK', 'FAILED_UNKNOWN',
+                 'CANCEL_REQUESTED', 'CANCEL_BLOCKED_UNKNOWN')
+  AND next_attempt_at <= sqlc.arg(claimable_before);
+
+-- name: MarkInvoiceRecheckResolved :execrows
+-- ⑧ 對帳**有確定結果**的落點（§4.3.3 支數表）：
+--      J23 SUCCEEDED           —— invoice_query code=0 或 invoice_list 比對到，回填號碼
+--      J24 CANCELLED_BY_ADMIN  —— code=71 且有 ADM 取消在途
+--      J25 RETRY_SCHEDULED     —— code=71 且無 ADM 取消在途：確認未開立、可安全補送，把列還給 INV.op
+--    這三個由呼叫端依判別式決定後以 next_status 傳入（§7.5.4 第 2 條：
+--    cancel_requested_at IS NOT NULL AND cancel_confirmed_at IS NULL ⇒ ADM 取消在途）。
+--    ⚠️ 不得沿用 ③ MarkInvoiceOperationDone：它固定寫 SUCCEEDED，會蓋掉另外兩個落點（§4.6 W-04）。
+-- 結果已確定 ⇒ unknown_result / unknown_since 一起清空（chk_invop_unknown_pair 是雙向等式，
+--    只清一個會當場 23514）。J25 的 completed_at 必須傳 NULL（它不是終態）。
+-- recheck_list_page 歸零：invoice_list 的分頁游標在命中或翻到空頁時重設（§7.5.4 第 3 條）。
+-- J24 專屬的兩個欄位（J23／J25 一律傳 NULL）：
+--   cancel_evidence_kind = PROVIDER_QUERY_71 —— chk_invop_admin_cancel_needs_confirm
+--     放行 J24 的**唯一**依據。J24 沒有第二個人（cancel_confirmed_by 恆為 NULL），
+--     不帶這個值就必定 23514。
+--   cancel_confirmed_at —— 不寫的話「ADM 取消在途」判別式
+--     （cancel_requested_at IS NOT NULL AND cancel_confirmed_at IS NULL）永遠成立，
+--     資料上這筆會一直看起來像還沒處理完。
+-- J23 的語意是「取消請求被回絕」⇒ 兩欄傳 NULL 正確：那次取消確實沒有生效。
+-- 🔴 兩欄用 **COALESCE(narg, 原值)** 而不是無條件覆寫：J23／J25 也走這一支，
+--    而端點 54（A4 解鎖）可能已經在 cancel_evidence_kind 上寫了值
+--    ——J27 會把 CANCEL_BLOCKED_UNKNOWN 推回 PROVIDER_STATUS_RECHECK，那之後
+--    J23／J25 都可能發生 ⇒ 無條件覆寫會把那份證據**靜默抹掉**。
+--    「傳 NULL＝不動它」與「傳 NULL＝清空」在這裡是完全不同的兩件事。
+UPDATE invoice_operations
+SET status = sqlc.arg(next_status),
+    next_attempt_at = sqlc.arg(next_attempt_at),
+    unknown_result = false,
+    unknown_since = NULL,
+    recheck_list_page = 0,
+    provider_code = sqlc.narg(provider_code),
+    provider_message = sqlc.narg(provider_message),
+    completed_at = sqlc.narg(completed_at),
+    cancel_evidence_kind = COALESCE(sqlc.narg(cancel_evidence_kind), cancel_evidence_kind),
+    cancel_confirmed_at = COALESCE(sqlc.narg(cancel_confirmed_at), cancel_confirmed_at),
+    updated_at = sqlc.arg(now),
+    version = version + 1
+WHERE id = sqlc.arg(id) AND status = 'PROVIDER_STATUS_RECHECK';
+
+-- name: MarkInvoiceRecheckUnresolved :execrows
+-- ⑨ 對帳**仍不確定**且要換狀態的落點：
+--      J26 CANCEL_BLOCKED_UNKNOWN —— code=51 或再次逾時，且有 ADM 取消在途；永不自動終結
+--      J17 FAILED_UNKNOWN         —— 無 ADM 取消在途且 now − unknown_since > 24h
+-- ⚠️ 刻意不叫 MarkInvoiceRecheckExhausted：INV.rc **沒有「次數耗盡」這條路**，
+--    叫 Exhausted 會誘導實作者去接一個 MaxAttempts（§4.3.3）。
+-- ⚠️ unknown_since **不重寫**（J26「unknown_since 保留」）：它是退避階梯的分桶依據，
+--    而且是事實時間戳——崩潰重來也不會變，這正是不用計數器的理由（§7.5.4 第 1 條）。
+--    unknown_result 同樣維持 true，否則 chk_invop_unknown_pair 與保留下來的 unknown_since 打架。
+-- ⚠️ 也不得沿用 ④ MarkInvoiceOperationFailed：FAILED_PERMANENT 對「查不到」是錯的分類，
+--    會讓一張補得回來的發票停在終態。
+UPDATE invoice_operations
+SET status = sqlc.arg(next_status),
+    next_attempt_at = sqlc.arg(next_attempt_at),
+    recheck_list_page = 0,
+    provider_code = sqlc.narg(provider_code),
+    provider_message = sqlc.narg(provider_message),
+    last_error = sqlc.narg(last_error),
+    updated_at = sqlc.arg(now),
+    version = version + 1
+WHERE id = sqlc.arg(id) AND status = 'PROVIDER_STATUS_RECHECK';
+
+-- name: UpdateInvoiceRecheckAttempt :execrows
+-- ⑩ 仍不確定且**留在重查迴圈**：
+--      J31 WAITING_CONFIRMATION      —— 無 ADM 取消在途且 now − unknown_since <= 24h
+--      自轉移 PROVIDER_STATUS_RECHECK —— 留在原地等下一輪
+-- next_attempt_at 由呼叫端算好傳入：階梯位置由事實時間戳 unknown_since 推導
+--    （30s → 1m → 2m → 5m → 10m → 30m 觸頂；≥24h 之後 +6h／+24h／+7d），**不另設計數器**。
+-- recheck_list_page 由呼叫端傳入：每翻一頁 +1、翻到空頁或命中重設為 0。
+--    這是 60s 租約唯一的成立理由——沒有游標就得在一次 claim 內翻完 N 頁，最壞 N × 20s 無上界。
+-- unknown_since 不重寫（同 ⑨）。
+UPDATE invoice_operations
+SET status = sqlc.arg(next_status),
+    next_attempt_at = sqlc.arg(next_attempt_at),
+    recheck_list_page = sqlc.arg(recheck_list_page),
+    provider_code = sqlc.narg(provider_code),
+    provider_message = sqlc.narg(provider_message),
+    updated_at = sqlc.arg(now),
+    version = version + 1
+WHERE id = sqlc.arg(id) AND status = 'PROVIDER_STATUS_RECHECK';
+
+-- name: ReleaseExpiredInvoiceOperationHolds :execrows
+-- ⑪ HELD 釋放。放在 INV.op 的 RunOnce **前置步驟**，不另開排程、不需要 claim：
+--    集合式單句 UPDATE、無外部副作用（不打 AMEGO、不發 MQ），第二個副本 rows=0。
+-- `held_until = NULL` 不可省：§5.1.8 的 chk_invop_held_pair
+--    CHECK (("status" = 'HELD') = ("held_until" IS NOT NULL)) 是雙向等式 ⇒ 只改 status
+--    不清 held_until，這一句**每一輪都以 23514 整批失敗**——而它跑在候選查詢之前
+--    ⇒ 連帶讓整支 INV.op 該輪一筆都送不出去。
+UPDATE invoice_operations
+SET status = 'READY', held_until = NULL, updated_at = sqlc.arg(now)
+WHERE status = 'HELD' AND held_until <= sqlc.arg(now);
+
+-- name: PromoteDueInvoiceOperationTriggers :execrows
+-- ⑫ AWAITING_TRIGGER 的 promote（J05）。與 ⑪ 同形態：RunOnce 前置、集合式、不需要 claim。
+-- 述詞讀 invoice_documents.issue_not_before（**權威值**，§5.1.5），不讀 operation 自己的
+--    next_attempt_at：後者只是 J03 建列當下複製過去的一份副本。拿副本當觸發條件，任何一條未來
+--    會寫 next_attempt_at 的路徑（延後開票的 ADM 改期、人工調整）都會讓它**提早開票**——而提早
+--    開票在稅務上不可回復。讀權威欄則最壞只是晚一輪（10 秒）。
+-- ⚠️ 這一句 join 不牴觸「候選 SQL 必須在單表上排序」：那條講的是帶 ORDER BY 的
+--    FetchDueInvoiceOperations（排序鍵在 join 另一邊 ⇒ 索引用不上）。本句無 ORDER BY，
+--    且 AWAITING_TRIGGER 在 Phase 1 恆為空集合。
+-- 少了這一支，**J05 沒有任何元件會執行**；Phase 1 因 issue_not_before 恆為即刻而不會顯現
+--    ⇒ 這是潛伏缺陷，一旦啟用「延後開票」，整批訂單靜默不開票。
+UPDATE invoice_operations o
+SET status = 'READY', updated_at = sqlc.arg(now)
+FROM invoice_documents d
+WHERE d.id = o.document_id
+  AND o.status = 'AWAITING_TRIGGER'
+  AND d.issue_not_before <= sqlc.arg(now);
+
+-- ===========================================================================
+-- M2 的**業務**轉移（§7.3.2 J01–J34）。上面 12 支是兩支 worker 的候選／搶佔／落點；
+-- 這一段補的是「排程以外的人」走的邊：建立、同事務判定、ADM 介入、字軌恢復。
+--
+-- 三條貫穿規則：
+--   ① §7.3.2 轉換表的「來源狀態」欄就是 allowed-from 的 SSOT，一律正面列出（禁 <> / NOT IN，
+--      規範 §六；失敗形狀見 §8.6 T-27）。漏一個起點 ＝ rows=0 靜默失敗。
+--   ② 兩條雙向等式 CHECK 決定哪些欄位必須與 status 同一句寫：
+--        chk_invop_held_pair    (status='HELD')          = (held_until IS NOT NULL)
+--        chk_invop_unknown_pair (unknown_result = false) = (unknown_since IS NULL)
+--      **離開** HELD 時要清 held_until，否則 23514（⑪ ReleaseExpiredInvoiceOperationHolds
+--      的檔頭已為這件事寫過一次警語，J06 從 HELD 取消是第二個入口）。
+--   ③ 業務轉移一律 version = version + 1；只有兩支 claim（② ⑦）不碰它，那是 §5.3.6 的
+--      唯一例外——claim 若也 +1，ADM 讀畫面到按下送出之間只要被 worker 掃過一次
+--      （INV.op 每 10 秒一輪）expectedVersion 就失效，帶 CAS 的 ADM 操作永遠用不了。
+-- ===========================================================================
+
+-- name: InsertInvoiceOperation :one
+-- J01 `[*]` → CREATED。operation_key 是 I-22 的冪等鍵：**全域唯一、重試不換鍵**，
+-- 由純函式從 row 推導（usecase/operation.go），本檔沒有任何路徑產生新 key。
+-- ⚠️ ON CONFLICT DO NOTHING 不指名 target：本表有兩個唯一索引（uq_invop_operation_key 與
+--    partial 的 uq_invop_open_adjustment_per_document ＝ I5 序列閘門），指名其一 ⇒ 另一個
+--    衝突時 23505 並讓整個交易 aborted（25P02）。
+--    rows=0 有**兩種**意義，呼叫端必須分辨：同一把 key 重送（冪等，讀既有列即可）vs
+--    序列閘門已被別的調整佔用（要走 BLOCKED_PENDING_CORRECTION，見 M7 G03）。
+--    分辨方式是先讀 operation_key，不是猜。
+-- statutory_deadline_at 是 invoice_documents 同名欄的**反正規化副本**（I-52），必須在建列的
+--    同一交易內複製；它只進 FetchDueInvoiceOperations 的 ORDER BY，不得進 WHERE（W-06）。
+-- chk_invop_adjustment_pair：VOID／ALLOWANCE／VOID_ALLOWANCE 三種必須帶 adjustment_id，
+--    ISSUE／QUERY／REISSUE 必須不帶——雙向等式，傳錯當場 23514。
+INSERT INTO invoice_operations (
+  id, document_id, adjustment_id, operation_type, operation_key, provider_request_no,
+  status, request_snapshot_hash, max_attempts, next_attempt_at,
+  statutory_deadline_at, created_at, updated_at)
+VALUES (
+  sqlc.arg(id), sqlc.arg(document_id), sqlc.narg(adjustment_id),
+  sqlc.arg(operation_type), sqlc.arg(operation_key), sqlc.arg(provider_request_no),
+  'CREATED', sqlc.arg(request_snapshot_hash), sqlc.arg(max_attempts), sqlc.arg(next_attempt_at),
+  sqlc.narg(statutory_deadline_at), sqlc.arg(now), sqlc.arg(now))
+ON CONFLICT DO NOTHING
+RETURNING *;
+
+-- name: PromoteCreatedInvoiceOperation :execrows
+-- J02／J03／J04：CREATED → READY／AWAITING_TRIGGER／NOT_APPLICABLE，**建列的同一事務內判定**。
+-- 三條邊共用一句的條件：來源狀態相同、SET 形狀相同，差別只在目標值與 next_attempt_at：
+--   J02 READY            issue_not_before <= now  ⇒ next_attempt_at = now
+--   J03 AWAITING_TRIGGER issue_not_before >  now  ⇒ next_attempt_at = issue_not_before
+--   J04 NOT_APPLICABLE   決策樹落在四個 reason 之一 ⇒ next_attempt_at 隨便給都不會被撈
+-- ⚠️ J04 的「寫 not_applicable_reason」落在 **invoice_documents**，本表沒有那個欄位。
+-- ⚠️ AWAITING_TRIGGER 不在任何一支 worker 的候選集合裡；把它推回 READY 的唯一執行者是
+--    ⑫ PromoteDueInvoiceOperationTriggers，而它讀的是 invoice_documents.issue_not_before
+--    這個**權威值**，不是本句寫進去的副本。
+UPDATE invoice_operations
+SET status = sqlc.arg(next_status),
+    next_attempt_at = sqlc.arg(next_attempt_at),
+    updated_at = sqlc.arg(now),
+    version = version + 1
+WHERE id = sqlc.arg(id)
+  AND status = 'CREATED';
+
+-- name: HoldInvoiceOperation :execrows
+-- J08 READY／RETRY_SCHEDULED → HELD（買家送出付款後修改，M6 R03 的 `HELD CAS rows=1` 守衛）。
+-- held_until = now + 60s 由呼叫端傳入。chk_invop_held_pair 是雙向等式 ⇒ 兩欄同一句寫。
+-- ⚠️ 述詞刻意**不含 SENDING**：已經在打 AMEGO 的那一筆攔不下來（rows=0 ⇒ R03 不成立，
+--    correction 改走 R04 作廢重開）。這正是 R03「operation 仍可被 HELD」那個守衛的實作。
+-- HELD 不在兩支 worker 的候選集合裡（next_attempt_at 不動），靠 ⑪ 掃回。
+UPDATE invoice_operations
+SET status = 'HELD',
+    held_until = sqlc.arg(held_until),
+    updated_at = sqlc.arg(now),
+    version = version + 1
+WHERE id = sqlc.arg(id)
+  AND status IN ('READY', 'RETRY_SCHEDULED');
+
+-- name: CancelInvoiceOperationBeforeIssue :execrows
+-- J06 CREATED／AWAITING_TRIGGER／READY／RETRY_SCHEDULED／HELD → CANCELLED_BEFORE_ISSUE
+--     （累計退款 = 實付總額）。
+-- ⚠️ CREATED 是「作廢重開全鏈路」那次加的（重開票的 REISSUE operation 停在 CREATED），
+--    而本註解與 domain/fsm 當時都只寫四個 —— 2026-09-04 對帳補回（#3089 T3）。
+-- document 在同一事務內一起轉 CANCELLED_BEFORE_ISSUE（M1 的對應列）。
+-- 🔴 `held_until = NULL` 不可省：四個來源之一是 HELD，而 chk_invop_held_pair 是雙向等式
+--    ⇒ 只改 status 不清 held_until，這一句對 HELD 來源**每次都以 23514 失敗**，
+--    而另外三個來源會成功 —— 那是最難察覺的一種：功能看起來好的，只有「買家正在改發票資料
+--    時剛好全額退款」這條路徑壞掉。
+-- CANCELLED_BEFORE_ISSUE 是終態，且不在 uq_invop_open_adjustment_per_document 的述詞內
+--    ⇒ 取消同時釋放 I5 序列閘門的名額。
+-- 🔴 'CREATED' 於 2026-09-01 加入 allowed-from（#2909 作廢重開）：R04 在同一交易內建的
+--    REISSUE operation 刻意停在 CREATED 等作廢確認，而作廢被拒（R05）時要把它收掉。
+--    在此之前**沒有任何路徑取消得了一筆 CREATED 的 operation** —— 那不只是本次的需要，
+--    它本身就是缺口：任何「建了但沒推進」的列都會永久留在候選集合外而無人能收。
+UPDATE invoice_operations
+SET status = 'CANCELLED_BEFORE_ISSUE',
+    held_until = NULL,
+    cancel_reason_code = sqlc.narg(cancel_reason_code),
+    cancel_reason = sqlc.narg(cancel_reason),
+    completed_at = sqlc.arg(now),
+    updated_at = sqlc.arg(now),
+    version = version + 1
+WHERE id = sqlc.arg(id)
+  AND status IN ('CREATED', 'AWAITING_TRIGGER', 'READY', 'RETRY_SCHEDULED', 'HELD');
+
+-- name: MarkInvoiceOperationWaitingConfirmation :execrows
+-- J13 SENDING → WAITING_CONFIRMATION（逾時／連線中斷／JSON 解析失敗／code 分類 = UNKNOWN）。
+-- chk_invop_unknown_pair 是雙向等式 ⇒ unknown_result 與 unknown_since 必須同一句寫。
+-- unknown_since 是**事實時間戳**，也是重查退避階梯的分桶依據（§7.5.4 第 1 條）——
+--   崩潰重來也不會變，這正是這條路不用計數器的理由。之後 ⑨⑩ 都刻意不重寫它。
+-- ⚠️ **不發 MQ**：invoice.issue.pending_confirmation 不在 §6.3 的 P1–P12 內。發到沒有 binding
+--    的 routing key 會靜默消失、不進 DLQ、不報錯。「結果未明」是純內部觀測面，落點是
+--    invoice_operation_unknown 指標與告警階梯；真的需要通知賣家時走 J17 的 P7。
+-- 轉出後這一列離開 INV.op 的候選集合、落進 INV.rc 的（兩組狀態集合互斥＝I-55）。
+--
+-- 🔴 allowed-from **含 PROVIDER_STATUS_RECHECK**，因為本句有**兩個**進入點：
+--   ① INV.op 送出後結果未明（status=SENDING）—— 原本唯一被考慮到的那個
+--   ② INV.rc 的 ConfirmVoid／ConfirmAllowance 查不到結果、要繼續等（J31）
+--      —— 那時 ClaimInvoiceRecheck 已經把 status 蓋成 PROVIDER_STATUS_RECHECK
+--
+-- 少了 ② 的後果（dev 第 3 輪實測）：scheduleVoidRecheck／scheduleAllowanceRecheck
+-- 呼叫本句必然 rows=0，而呼叫端把 rows 丟給 `_` ⇒ 完全無聲。兩個具體傷害：
+--   (a) **退避階梯整條失效**：狀態沒回到 WAITING_CONFIRMATION、next_attempt_at 也沒被
+--       改成階梯值，那一列只被 ClaimInvoiceRecheck 的 60s 租約推著走
+--       ⇒ 每 60 秒打一次 AMEGO，而設計是 30s→1m→2m→5m→10m→30m 逐步退避
+--       ⇒ 對 provider 的請求量在最壞情況放大約 30 倍。
+--   (b) **unknown_since 從不寫入**（COALESCE 那一句沒被執行到）⇒ 對「沒有經過
+--       SENDING → WAITING_CONFIRMATION 就進 recheck」的列（例如 ADM 取消後從
+--       CANCEL_REQUESTED 被 claim 進來的），`now − unknown_since` 恆為 0
+--       ⇒ **24h give-up 永遠到不了**。實測 operation 7501222107859124224 即此形。
+--
+-- COALESCE 在兩個進入點下都正確：第一次進入未明狀態時起算，之後不重寫
+--   —— 那正是退避階梯與 24h 門檻共用的事實時間戳（⑨⑩ 刻意不重寫它，同源）。
+UPDATE invoice_operations
+SET status = 'WAITING_CONFIRMATION',
+    unknown_result = true,
+    unknown_since = COALESCE(unknown_since, sqlc.arg(now)),
+    next_attempt_at = sqlc.arg(next_attempt_at),
+    provider_code = sqlc.narg(provider_code),
+    provider_message = sqlc.narg(provider_message),
+    last_error = sqlc.narg(last_error),
+    updated_at = sqlc.arg(now),
+    version = version + 1
+WHERE id = sqlc.arg(id)
+  AND status IN ('SENDING', 'PROVIDER_STATUS_RECHECK');
+
+-- name: MarkInvoiceOperationRetryExhausted :execrows
+-- J14 RETRY_SCHEDULED → FAILED_RETRY_EXHAUSTED（attempt_count 達 MaxAttempts）。
+-- 🔴 **不可沿用 ④ MarkInvoiceOperationFailed**：那一句固定寫 FAILED_PERMANENT，而 §7.3.2
+--    把 FAILED_* 拆成三個的唯一理由就是「ADM 按下重試安不安全」必須由狀態本身回答：
+--      FAILED_PERMANENT       重試必然再失敗（統編錯、金額不平）⇒ 要求先修正資料（J18）
+--      FAILED_RETRY_EXHAUSTED 重試是安全的（暫時性錯誤，只是預算用完）⇒ 直接重置計數（J19）
+--    寫錯值 ⇒ 一筆本來按一下就好的失敗，被要求「先修正資料」而其實沒有資料可修。
+-- outbox invoice.issue_failed（P2，failureClass=RETRY_EXHAUSTED；ISSUE 以外的 operation_type
+--    改發 P7）由呼叫端在同一交易內寫進 invoice_outbox_events。
+UPDATE invoice_operations
+SET status = 'FAILED_RETRY_EXHAUSTED',
+    last_error = sqlc.arg(last_error),
+    completed_at = sqlc.arg(now),
+    updated_at = sqlc.arg(now),
+    version = version + 1
+WHERE id = sqlc.arg(id)
+  AND status = 'RETRY_SCHEDULED';
+
+-- name: MarkInvoiceOperationSellerActionRequired :execrows
+-- J32 SENDING → SELLER_ACTION_REQUIRED（PERMANENT 中「賣家法定前置未完成」子類；3040111 字軌不足）。
+-- 與 J11（→ FAILED_PERMANENT）分開是刻意的：兩者的錯誤分類同為 PERMANENT，但一個要通知
+--   賣家去財政部配字軌、一個要通知 ADM 改資料——行動指引完全相反。
+-- SELLER_ACTION_REQUIRED **不在**兩支 worker 的任何候選集合裡（撈起來只會空轉並燒掉 attempt）；
+--   它不是永久旗標的唯一理由是 J33（INV.trk 偵測字軌恢復）與 J34（ADM 重試）兩條出邊
+--   ——刪掉它們，卡住的票就再也回不來，而且無告警。
+-- next_attempt_at 刻意不動（它不在任何候選述詞內，寫了也沒有讀者）。
+UPDATE invoice_operations
+SET status = 'SELLER_ACTION_REQUIRED',
+    provider_code = sqlc.narg(provider_code),
+    provider_message = sqlc.narg(provider_message),
+    last_error = sqlc.narg(last_error),
+    updated_at = sqlc.arg(now),
+    version = version + 1
+WHERE id = sqlc.arg(id)
+  AND status = 'SENDING';
+
+-- name: PromoteSellerActionRequiredOperations :execrows
+-- J33 SELLER_ACTION_REQUIRED → READY（INV.trk 查到該 issuer 字軌餘量恢復）。
+-- **集合式 UPDATE、無外部副作用、不需要 claim**（外部呼叫是 INV.trk 本職的字軌查詢，
+--   已在前一步做完），形態同 ⑪ ReleaseExpiredInvoiceOperationHolds／⑫ PromoteDueInvoiceOperationTriggers
+--   ——《多副本排程搶佔規範》例外 A：推出候選集合的寫入就是狀態轉移本身，第二個副本 rows=0。
+-- ⚠️ invoice_operations **沒有 issuer_id 欄**：operation 的擁有者判定一律經 invoice_documents
+--    join（invoice_documents.sql 檔頭已寫過同一件事）。字軌是 per-issuer 的資源，所以述詞
+--    必須帶 issuer，否則一個賣家配到字軌會把全平台卡住的票一起放行。
+-- attempt_count 歸零：字軌不足期間燒掉的次數不該算在真正的重試預算上。
+-- 本句無 ORDER BY ⇒ 不牴觸「候選 SQL 必須在單表上排序」（那條講的是帶 ORDER BY 的 ①⑥）。
+-- ⚠️ `o.version` 的 alias 不是裝飾：UPDATE ... FROM 的 SET **右手邊**會同時解析 target 與 FROM
+--    兩張表，而 invoice_operations 與 invoice_documents **都有 version 欄** ⇒ 寫成
+--    `version = version + 1` 會在執行時 `column reference "version" is ambiguous`（42702）。
+--    sqlc generate 過、go build 過、單元測試過——只有真的送到 PostgreSQL 才會現形。
+UPDATE invoice_operations o
+SET status = 'READY',
+    attempt_count = 0,
+    next_attempt_at = sqlc.arg(now),
+    updated_at = sqlc.arg(now),
+    version = o.version + 1
+FROM invoice_documents d
+WHERE d.id = o.document_id
+  AND o.status = 'SELLER_ACTION_REQUIRED'
+  AND d.issuer_id = sqlc.arg(issuer_id);
+
+-- name: AdminRetryInvoiceOperationAfterFix :execrows
+-- J18 FAILED_PERMANENT → READY（ADM 修正資料後重試）。
+-- 守衛「**必須帶新的 snapshot_version**」在本表的落點是 request_snapshot_hash（「送出內容的
+--   雜湊，不一樣代表有人改了快照」）。⚠️ 「新的雜湊 ≠ 舊的雜湊」這件事**不在本句裡驗**：
+--   本句只保證狀態與版本，比對留給 usecase（它本來就要先讀出舊列才組得出新快照）。
+--   理由是把 `request_snapshot_hash <> @new` 塞進述詞會讓「ADM 明明改了資料、但改出來的雜湊
+--   碰巧相同」變成一次無聲的 rows=0——與「版本衝突」用同一個訊號回報，呼叫端分不出來。
+-- attempt_count **不歸零**（與 J19／J34 的差異）：資料錯了才走這條，重試預算不該因為改資料
+--   而重新開始；J19／J34 才是「重試是安全的」那一類。
+UPDATE invoice_operations
+SET status = 'READY',
+    request_snapshot_hash = sqlc.arg(request_snapshot_hash),
+    next_attempt_at = sqlc.arg(now),
+    last_error = NULL,
+    completed_at = NULL,
+    updated_at = sqlc.arg(now),
+    version = version + 1
+WHERE id = sqlc.arg(id)
+  AND status = 'FAILED_PERMANENT'
+  AND version = sqlc.arg(expected_version);
+
+-- name: AdminResetInvoiceOperationAttempts :execrows
+-- J19 FAILED_RETRY_EXHAUSTED → READY ＋ J34 SELLER_ACTION_REQUIRED → READY（皆為 ADM 重試）。
+-- 共用一句的依據是 §7.3.2 J34 逐字：「**不要求新的 snapshot_version**（資料沒問題，是外部
+--   前置沒到位）⇒ 守衛與 J19 同形、與 J18 不同」。兩個來源狀態逐字等於那兩列。
+-- attempt_count = 0 是兩條邊共同的副作用。
+UPDATE invoice_operations
+SET status = 'READY',
+    attempt_count = 0,
+    next_attempt_at = sqlc.arg(now),
+    last_error = NULL,
+    completed_at = NULL,
+    updated_at = sqlc.arg(now),
+    version = version + 1
+WHERE id = sqlc.arg(id)
+  AND status IN ('FAILED_RETRY_EXHAUSTED', 'SELLER_ACTION_REQUIRED')
+  AND version = sqlc.arg(expected_version);
+
+-- name: RequestInvoiceOperationCancel :execrows
+-- J21 READY／RETRY_SCHEDULED／FAILED_PERMANENT／FAILED_RETRY_EXHAUSTED／SELLER_ACTION_REQUIRED
+--     → CANCEL_REQUESTED（ADM 取消，端點 53）。五個來源逐字等於轉換表那一列。
+-- 🔴 `next_attempt_at = now` 在**同一句**內不可省：ADM 的強制最終查詢是同步路徑，中途崩潰時
+--    這一筆會停在 CANCEL_REQUESTED 而沒有任何人接手。寫了它，INV.rc 下一輪立刻接手
+--    （CANCEL_REQUESTED 在 ⑥ 的候選述詞內）；不寫，從 RETRY_SCHEDULED 取消的那筆會沿用舊退避，
+--    最壞延遲一整個週期才被接手。
+-- chk_invop_cancel_pair 是雙向等式 (cancel_requested_by IS NULL) = (cancel_requested_at IS NULL)
+--    ⇒ 兩欄同一句寫。
+-- ⚠️ 「ADM 取消在途」的判別式（J17／J24／J25／J26／J31 共用）是
+--    `cancel_requested_at IS NOT NULL AND cancel_confirmed_at IS NULL` ——本句寫的就是那個
+--    判別式的左半。claim 會把來源狀態蓋成 PROVIDER_STATUS_RECHECK，所以落點不能靠來源狀態判。
+UPDATE invoice_operations
+SET status = 'CANCEL_REQUESTED',
+    cancel_requested_by = sqlc.arg(cancel_requested_by),
+    cancel_requested_at = sqlc.arg(now),
+    cancel_reason_code = sqlc.arg(cancel_reason_code),
+    cancel_reason = sqlc.arg(cancel_reason),
+    next_attempt_at = sqlc.arg(now),
+    updated_at = sqlc.arg(now),
+    version = version + 1
+WHERE id = sqlc.arg(id)
+  AND status IN ('READY', 'RETRY_SCHEDULED', 'FAILED_PERMANENT',
+                 'FAILED_RETRY_EXHAUSTED', 'SELLER_ACTION_REQUIRED')
+  AND version = sqlc.arg(expected_version);
+
+-- name: ConfirmInvoiceOperationCancel :execrows
+-- J28 CANCEL_BLOCKED_UNKNOWN → CANCELLED_BY_ADMIN（ADM 雙人確認 ＋ 證據，端點 54→55）。
+-- 兩個 DB 約束在這裡才被滿足：
+--   chk_invop_admin_cancel_needs_confirm  status='CANCELLED_BY_ADMIN' ⇒ cancel_confirmed_by 非空
+--   chk_invop_two_person                  confirmed_by 非空 ⇒ requested_by 非空且兩者不同
+-- ⇒ 「第二人」不是流程禮儀，是 DB 層擋得住的東西：拿同一個 account_id 送兩次會 23514。
+-- cancel_evidence_kind 是 arg 不是 narg：§6.4 要求「至少一項 evidence_kind」，人工出口的
+--   四樣紀律（門檻／證據／出口／回頭路）少了證據那一樣就只剩「兩個人都說沒開」。
+-- 述詞另外把 `cancel_confirmed_at IS NULL` 寫進來：重送同一個確認在 CAS 上是 rows=0（冪等），
+--   而不是把時間戳往後推。
+UPDATE invoice_operations
+SET status = 'CANCELLED_BY_ADMIN',
+    cancel_confirmed_by = sqlc.arg(cancel_confirmed_by),
+    cancel_confirmed_at = sqlc.arg(now),
+    cancel_evidence_kind = sqlc.arg(cancel_evidence_kind),
+    cancel_evidence_object_key = sqlc.narg(cancel_evidence_object_key),
+    completed_at = sqlc.arg(now),
+    updated_at = sqlc.arg(now),
+    version = version + 1
+WHERE id = sqlc.arg(id)
+  AND status = 'CANCEL_BLOCKED_UNKNOWN'
+  AND cancel_requested_at IS NOT NULL
+  AND cancel_confirmed_at IS NULL
+  AND version = sqlc.arg(expected_version);
+
+-- name: AllowInvoiceOperationManualProcess :execrows
+-- J29 CANCELLED_BY_ADMIN → MANUAL_PROCESS_ALLOWED（第二人覆核解鎖）。
+-- 守衛「actor ≠ 取消者」寫進述詞而不是應用層 if：應用層的 if 在兩個分頁同時開著時擋不住。
+-- ⚠️ 本檔唯一的否定運算子（`<>`）就在這裡，而它**不在 I-28 的掃描範圍內**：§5.2.2 把該檢查
+--    限定在 status／review_status／provider_upload_status／disposition 四個欄位，理由是
+--    「值域日後長胖時否定述詞會靜默納入新狀態」——account_id 沒有值域長胖這回事。
+--    NULL 陷阱另外處理：`NULL <> x` 求值為 NULL ⇒ 該列不匹配 ⇒ rows=0（安全側），
+--    而 chk_invop_two_person 已保證本狀態下 cancel_requested_by 非空；`IS NOT NULL`
+--    仍逐字寫出來，讓讀的人不必回去翻 CHECK 才知道這句不會靜默失敗。
+-- 副作用：outbox P7 invoice.operation.review_required，payload 的
+--   review_reason_code = **SELF_ISSUE_AUTHORIZED**。⚠️ 不可填 MANUAL_PROCESS_ALLOWED
+--   ——那是本列的目標**狀態值**，不是 InvoiceManualReason 的值（§6.3.3.3）。
+UPDATE invoice_operations
+SET status = 'MANUAL_PROCESS_ALLOWED',
+    updated_at = sqlc.arg(now),
+    version = version + 1
+WHERE id = sqlc.arg(id)
+  AND status = 'CANCELLED_BY_ADMIN'
+  AND cancel_requested_by IS NOT NULL
+  AND cancel_requested_by <> sqlc.arg(actor_account_id)
+  AND version = sqlc.arg(expected_version);
+
+-- name: MarkInvoiceOperationResolvedExternally :execrows
+-- J30 MANUAL_PROCESS_ALLOWED → RESOLVED_EXTERNALLY（賣家回報號碼，端點 62）。終態。
+-- 守衛「號碼格式合法；provider_invoice_no 必須留空」落在 invoice_documents 那一側
+--   （chk_invdoc_external_no_shape ＋ chk_invdoc_external_excl），本句只守狀態。
+--   兩邊必須同一交易：只轉 operation 不轉 document，賣家 S08 會同時看到「已由賣家開立」
+--   與「處理中」。
+-- 🔴 version CAS 不可省：端點 56／62 的 expectedVersion 是 §6.1.0(10) 的必填欄，而
+--   「必填」只有寫進述詞才是保證。少了它，應用層那句 if 是純 TOCTOU——兩個分頁同時送出
+--   時各自讀到舊版本、各自通過，第二筆才被 status 述詞擋掉（那是巧合不是設計），
+--   而若第一筆改的是別的欄位就完全擋不住。
+--
+-- 🔴 **allowed-from 加 NOT_APPLICABLE，但只限兩個 mode**（2026-09-05，DEC-20260905-221900 選 A）。
+--    這條邊在設計書 §7.3.2 的 J 表裡沒有編號，因為它原本不存在；它是 §7.3.1
+--    「SELLER_SELF_ISSUE / LEGACY_MANUAL 的合法 status 三值」那一列在 operation 側的對應。
+--
+-- ⚠️ 它推翻了 §7.3.2 末段「終態只有四個」裡的 NOT_APPLICABLE 那一個
+--    —— 對這兩個 mode 而言它不再是終態。**但兩處 FailOpen* 的正面清單不需要改**：
+--    那份清單列的是「provider 停用時該被打成 FAILED_PERMANENT 的狀態」，
+--    NOT_APPLICABLE 不在裡面是對的（那些 operation 從來不打 provider）。
+--    885 行那句用 NOT IN 列終態，NOT_APPLICABLE 仍算已了結，也是對的
+--    （回報前它確實沒有待辦）。實查兩處皆不受影響。
+--
+-- 🔴 **mode 條件靠 EXISTS 查 document**，不放在呼叫端：NOT_APPLICABLE 也涵蓋
+--    AMEGO_AUTO 的零元訂單／切點前訂單，那些不該開放回報。守衛放在這一句才擋得住
+--    未來新增的呼叫端。
+UPDATE invoice_operations o
+SET status = 'RESOLVED_EXTERNALLY',
+    completed_at = sqlc.arg(now),
+    updated_at = sqlc.arg(now),
+    version = version + 1
+WHERE o.id = sqlc.arg(id)
+  AND o.version = sqlc.arg(expected_version)
+  AND (
+    o.status = 'MANUAL_PROCESS_ALLOWED'
+    OR (o.status = 'NOT_APPLICABLE' AND EXISTS (
+          SELECT 1 FROM invoice_documents d
+          WHERE d.id = o.document_id
+            AND d.fulfillment_mode IN ('SELLER_SELF_ISSUE', 'LEGACY_MANUAL')))
+  );
+
+-- name: FailOpenInvoiceOperationsForIssuer :execrows
+-- M4 P14（ADM 停用連線，端點 45）與 P16（ADM 撤銷，端點 67）的副作用逐字：
+--   「該 issuer **全部未終態** operation 轉 FAILED_PERMANENT（cancel_reason_code=
+--     PROVIDER_SUSPENDED_BY_ADMIN）＋ 各發一則 outbox invoice.operation.review_required」。
+-- ⚠️ 這條邊在 §7.3.2 的 J01–J34 裡**沒有編號**（見回報的「設計書內部矛盾」欄）：它的來源是
+--    「所有未終態」而不是某個具名狀態，與 J11（SENDING → FAILED_PERMANENT）不同。
+--    在補編號之前，本句的 allowed-from 取「chk_invop_status 的 20 值減掉四個終態」，
+--    並**正面列出**（禁 NOT IN）——那份清單就是 §7.3.2 末段「終態只有四個：SUCCEEDED、
+--    NOT_APPLICABLE、CANCELLED_BEFORE_ISSUE、RESOLVED_EXTERNALLY」的補集。
+-- 🔴 `held_until = NULL` 不可省：HELD 在來源集合內，chk_invop_held_pair 是雙向等式。
+-- ⚠️ 被打成 FAILED_PERMANENT 的這一批在 P15（ADM 恢復連線）之後**不自動復活**——
+--    它們是 M2 的非終態，由 ADM 在 A06 逐筆按端點 52 安全重試（J18／J19）。
+--    自動復活會在憑證仍不對時再打一輪 AMEGO。
+-- ⚠️ 集合式、無外部副作用（outbox 是同一交易內的列，不是網路呼叫）⇒ 不需要 claim。
+-- ⚠️ `o.version` 的 alias 不是裝飾：UPDATE ... FROM 的 SET **右手邊**會同時解析 target 與 FROM
+--    兩張表，而 invoice_operations 與 invoice_documents **都有 version 欄** ⇒ 寫成
+--    `version = version + 1` 會在執行時 `column reference "version" is ambiguous`（42702）。
+--    sqlc generate 過、go build 過、單元測試過——只有真的送到 PostgreSQL 才會現形。
+UPDATE invoice_operations o
+SET status = 'FAILED_PERMANENT',
+    held_until = NULL,
+    cancel_reason_code = sqlc.arg(cancel_reason_code),
+    last_error = sqlc.arg(last_error),
+    completed_at = sqlc.arg(now),
+    updated_at = sqlc.arg(now),
+    version = o.version + 1
+FROM invoice_documents d
+WHERE d.id = o.document_id
+  AND d.issuer_id = sqlc.arg(issuer_id)
+  AND o.status IN ('CREATED','AWAITING_TRIGGER','READY','HELD','SENDING','RETRY_SCHEDULED',
+                   'WAITING_CONFIRMATION','PROVIDER_STATUS_RECHECK','FAILED_PERMANENT',
+                   'FAILED_RETRY_EXHAUSTED','FAILED_UNKNOWN','SELLER_ACTION_REQUIRED',
+                   'CANCEL_REQUESTED','CANCEL_BLOCKED_UNKNOWN','CANCELLED_BY_ADMIN',
+                   'MANUAL_PROCESS_ALLOWED');
+
+-- name: CountOpenInvoiceOperationsForIssuer :one
+-- 端點 45 的回應必須帶「當下的未終態 job 數」（pendingOrderCount），且**與判定同一交易讀出**
+-- （§7.4 C-8）——分兩個交易讀，ADM 看到的數字與實際被打掉的數量不一致。
+-- 述詞逐字等於 FailOpenInvoiceOperationsForIssuer 的 allowed-from，改一邊就要改兩邊。
+SELECT COUNT(*)::bigint
+FROM invoice_operations o
+JOIN invoice_documents d ON d.id = o.document_id
+WHERE d.issuer_id = sqlc.arg(issuer_id)
+  AND o.status IN ('CREATED','AWAITING_TRIGGER','READY','HELD','SENDING','RETRY_SCHEDULED',
+                   'WAITING_CONFIRMATION','PROVIDER_STATUS_RECHECK','FAILED_PERMANENT',
+                   'FAILED_RETRY_EXHAUSTED','FAILED_UNKNOWN','SELLER_ACTION_REQUIRED',
+                   'CANCEL_REQUESTED','CANCEL_BLOCKED_UNKNOWN','CANCELLED_BY_ADMIN',
+                   'MANUAL_PROCESS_ALLOWED');
+
+-- name: GetInvoiceOperationByID :one
+SELECT * FROM invoice_operations WHERE id = sqlc.arg(id);
+
+-- name: GetInvoiceOperationByKey :one
+-- I-22 冪等鍵反查：InsertInvoiceOperation 回 rows=0 時，呼叫端必須用它分辨
+-- 「同一把 key 重送」與「序列閘門被別的調整佔用」——那兩種 rows=0 的正確處置完全不同。
+SELECT * FROM invoice_operations WHERE operation_key = sqlc.arg(operation_key);
+
+-- name: ListInvoiceOperationsByDocument :many
+-- I5 序列閘門的應用面查詢（吃 idx_invop_document）。
+SELECT * FROM invoice_operations
+WHERE document_id = sqlc.arg(document_id)
+ORDER BY created_at DESC;
+
+-- ===========================================================================
+-- 讀取視圖（賣家面 owner-scoped ＋ ADM 分頁）
+--
+-- 🔴 **invoice_operations 沒有 store_id，也沒有 order_no**（§5.1.8）。兩者都掛在
+--    `document_id` 上 ⇒ operation 的擁有者判定與訂單篩選**一律經 invoice_documents
+--    join**，寫成 `op.order_no = ...` 會編不過，而「自行反正規化一個 order_no 欄」
+--    是 §8.1.4(a) 明文禁止的（那會製造第二個真相且沒有東西維護一致性）。
+--    歸屬鍵是 `invoice_issuers.issuer_ref_id`（`issuer_type='SELLER'` 時 ＝ store_id），
+--    訂單鍵是 `invoice_documents.source_ref`（`source_type='ORDER'` 時 ＝ orders.order_no）。
+--
+-- 狀態集合一律由呼叫端以 text[] 傳入（禁硬編碼）：六個 ADM 分頁是
+-- `chk_invop_status` 20 值的**分割**（聯集＝20、兩兩交集＝空，§6.1.14 的機械驗算），
+-- 那份分割表的 SSOT 在 CodeMeta ＋ 設計書，不在本檔。
+-- ===========================================================================
+
+-- name: GetSellerInvoiceOperationByID :one
+-- 端點 33（S08 異常詳情）。三表 join，擁有者述詞在 WHERE 裡（§8.1.4(b) Tier A）：
+-- 越權與不存在同樣回 pgx.ErrNoRows ⇒ 呼叫端一律翻 9340。
+-- 一併帶出 document 的四類欄位——它們在 InvoiceJobInfo 裡但不在 invoice_operations 上：
+--   source_ref        → InvoiceJobInfo.order_no
+--   manual_reason_code→ InvoiceJobInfo.manual_reason_code（status=AWAITING_MANUAL 時必有值）
+--   external_*        → 端點 62 回報後的三欄（只有 RESOLVED_EXTERNALLY 的 job 有值）
+--   document_kind     → InvoiceJobInfo.document_kind（B2B／B2C／RECEIPT）。賣家中心靠它
+--                       分辨這是發票還是收據——#3066 裁決 B：收據與發票在賣家中心是
+--                       兩個並列的區塊，文案與操作各自為政 ⇒ 前端必須拿得到 kind。
+SELECT sqlc.embed(o),
+       d.source_ref            AS document_source_ref,
+       d.manual_reason_code    AS document_manual_reason_code,
+       d.document_kind         AS document_kind,
+       d.status                AS document_status,
+       d.external_invoice_no   AS document_external_invoice_no,
+       d.external_invoice_date AS document_external_invoice_date,
+       d.external_reported_at  AS document_external_reported_at,
+       i.issuer_ref_id         AS issuer_ref_id
+FROM invoice_operations o
+JOIN invoice_documents d ON d.id = o.document_id
+JOIN invoice_issuers   i ON i.id = d.issuer_id
+WHERE o.id = sqlc.arg(id)
+  AND i.issuer_type = 'SELLER'
+  AND i.issuer_ref_id = sqlc.arg(store_id)::bigint;
+
+-- name: ListOrderExternalIssuances :many
+-- 子路由 62R（端點 62 的前置讀取）。**述詞寫死、不接受任何 status query**：
+-- 放寬就退化成 S08 的等價物，而 S08 對停權賣家是 BLOCK（§3 D16）——述詞是這條
+-- 路由的安全邊界，不是效能優化（§6.1.10 該表逐字）。
+-- 允許的 status 集合（MANUAL_PROCESS_ALLOWED／RESOLVED_EXTERNALLY）由呼叫端以
+-- 常數陣列傳入，**呼叫端不得把它接成使用者可控輸入**。
+--
+-- 回清單不回單筆：一張訂單可以同時有兩筆 operation 落到 MANUAL_PROCESS_ALLOWED
+-- （例：ISSUE 結果不明、其後的 VOID 也結果不明），且兩筆的法定期限不同。
+-- 靜默挑一筆的後果是賣家回報了 A 卻以為 B 也結案了。
+--
+-- 排序：`statutory_deadline_at` 可為 NULL ⇒ 必須 `NULLS LAST` 並補一個穩定的第二鍵，
+-- 否則同期限（或全 NULL）時每次翻頁順序都可能不同 ⇒ OFFSET 分頁漏列／重複。
+-- 查無／越權／訂單不存在一律空 records（清單端點上的 Tier A 正確形狀），不回 9340。
+SELECT sqlc.embed(o),
+       d.source_ref            AS document_source_ref,
+       d.manual_reason_code    AS document_manual_reason_code,
+       d.document_kind         AS document_kind,
+       d.status                AS document_status,
+       d.external_invoice_no   AS document_external_invoice_no,
+       d.external_invoice_date AS document_external_invoice_date,
+       d.external_reported_at  AS document_external_reported_at,
+       i.issuer_ref_id         AS issuer_ref_id
+FROM invoice_operations o
+JOIN invoice_documents d ON d.id = o.document_id
+JOIN invoice_issuers   i ON i.id = d.issuer_id
+WHERE i.issuer_type = 'SELLER'
+  AND i.issuer_ref_id = sqlc.arg(store_id)::bigint
+  AND d.source_type = 'ORDER'
+  AND d.source_ref = sqlc.arg(order_no)::text
+  AND o.status = ANY(sqlc.arg(allowed_statuses)::text[])
+ORDER BY o.statutory_deadline_at ASC NULLS LAST, o.id ASC
+LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
+
+-- name: CountOrderExternalIssuances :one
+-- 62R 的 total。述詞與 ListOrderExternalIssuances 逐字相同。
+SELECT COUNT(*)::bigint
+FROM invoice_operations o
+JOIN invoice_documents d ON d.id = o.document_id
+JOIN invoice_issuers   i ON i.id = d.issuer_id
+WHERE i.issuer_type = 'SELLER'
+  AND i.issuer_ref_id = sqlc.arg(store_id)::bigint
+  AND d.source_type = 'ORDER'
+  AND d.source_ref = sqlc.arg(order_no)::text
+  AND o.status = ANY(sqlc.arg(allowed_statuses)::text[]);
+
+-- name: ListInvoiceOperationsForAdmin :many
+-- 端點 50（A05 工作與異常佇列）。
+--
+-- 🔴 `tab` 的述詞是**兩個集合的聯集不是交集**：`AWAITING_MANUAL` 屬於 document
+--    不屬於 job（它是 invoice_documents 的欄位，§6.1.14 逐字）⇒ NEEDS_MANUAL 分頁
+--    ＝「job.status ∈ 七值」**OR**「該 job 所屬 document.status = 'AWAITING_MANUAL'」。
+--    寫成 AND 或只寫前半 ⇒ fail-closed 落點的案件在六個分頁裡都看不到（不是報錯，
+--    是消失）。不要為此在 job 上新增一個平行的 AWAITING_MANUAL 狀態。
+--    `status_filters` 為空陣列 ＝ 不篩 tab（全部）。
+--
+-- `upload_status` 與 `tab` **正交、不是第七個分頁**（做成分頁會破壞聯集／交集驗算）：
+--    它是 provider_upload_status 的四值投影（PENDING／UPLOADED／NOT_FOUND／FAILED），
+--    DB 存 AMEGO 原始整數。PENDING 同時涵蓋 NULL（還沒查過）與在途碼 ⇒ 需要
+--    `upload_status_include_null` 這個獨立旗標，把它併進整數陣列表達不出來。
+--    這是「發票開出來了，但財政部端沒收到」那一類的唯一入口——那些 job 落
+--    COMPLETED，與真正完成的混在同一頁。
+--
+-- 排序用 `o.created_at DESC`（工作佇列的預設是「最近進來的」）。**法定期限排序
+--    只屬於端點 37 的 priority_jobs**，見 ListPriorityInvoiceOperationsForAdmin。
+SELECT sqlc.embed(o),
+       d.source_ref            AS document_source_ref,
+       d.manual_reason_code    AS document_manual_reason_code,
+       d.document_kind         AS document_kind,
+       d.status                AS document_status,
+       d.external_invoice_no   AS document_external_invoice_no,
+       d.external_invoice_date AS document_external_invoice_date,
+       d.external_reported_at  AS document_external_reported_at,
+       i.issuer_ref_id         AS issuer_ref_id
+FROM invoice_operations o
+JOIN invoice_documents d ON d.id = o.document_id
+JOIN invoice_issuers   i ON i.id = d.issuer_id
+WHERE (
+        COALESCE(cardinality(sqlc.arg(status_filters)::text[]), 0) = 0
+        OR o.status = ANY(sqlc.arg(status_filters)::text[])
+        OR (sqlc.arg(include_manual_documents)::boolean
+            AND d.status = ANY(sqlc.arg(manual_document_statuses)::text[]))
+      )
+  AND (NOT sqlc.arg(has_store_id)::boolean
+       OR (i.issuer_type = 'SELLER' AND i.issuer_ref_id = sqlc.arg(store_id)::bigint))
+  AND (sqlc.arg(order_no)::text = ''
+       OR (d.source_type = 'ORDER' AND d.source_ref = sqlc.arg(order_no)::text))
+  AND (sqlc.arg(operation_type_filter)::text = ''
+       OR o.operation_type = sqlc.arg(operation_type_filter)::text)
+  AND (NOT sqlc.arg(has_upload_status)::boolean
+       OR (d.provider_upload_status = ANY(sqlc.arg(upload_status_codes)::smallint[])
+           OR (sqlc.arg(upload_status_include_null)::boolean
+               AND d.provider_upload_status IS NULL)))
+  AND (sqlc.arg(manual_reason_filter)::text = ''
+       OR d.manual_reason_code = sqlc.arg(manual_reason_filter)::text)
+  -- 🔴 只有 NEEDS_MANUAL 分頁排除已收束的 document（#3045）：那一頁的 KPI
+  -- `definition` 逐字寫著「＝ A05 NEEDS_MANUAL 分頁的 job 數」，而實測 KPI=0、
+  -- 這一頁 total=8。其餘分頁不得套用——SUCCEEDED 分頁本來就該看得到已作廢的票。
+  AND (NOT sqlc.arg(exclude_resolved_documents)::boolean
+       OR NOT (d.status = ANY(COALESCE(sqlc.arg(resolved_document_statuses)::text[], ARRAY[]::text[]))))
+ORDER BY o.created_at DESC, o.id DESC
+LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
+
+-- name: CountInvoiceOperationsForAdmin :one
+-- 端點 50 的 total。述詞與 ListInvoiceOperationsForAdmin 逐字相同（改任一支必須同批改）。
+SELECT COUNT(*)::bigint
+FROM invoice_operations o
+JOIN invoice_documents d ON d.id = o.document_id
+JOIN invoice_issuers   i ON i.id = d.issuer_id
+WHERE (
+        COALESCE(cardinality(sqlc.arg(status_filters)::text[]), 0) = 0
+        OR o.status = ANY(sqlc.arg(status_filters)::text[])
+        OR (sqlc.arg(include_manual_documents)::boolean
+            AND d.status = ANY(sqlc.arg(manual_document_statuses)::text[]))
+      )
+  AND (NOT sqlc.arg(has_store_id)::boolean
+       OR (i.issuer_type = 'SELLER' AND i.issuer_ref_id = sqlc.arg(store_id)::bigint))
+  AND (sqlc.arg(order_no)::text = ''
+       OR (d.source_type = 'ORDER' AND d.source_ref = sqlc.arg(order_no)::text))
+  AND (sqlc.arg(operation_type_filter)::text = ''
+       OR o.operation_type = sqlc.arg(operation_type_filter)::text)
+  AND (NOT sqlc.arg(has_upload_status)::boolean
+       OR (d.provider_upload_status = ANY(sqlc.arg(upload_status_codes)::smallint[])
+           OR (sqlc.arg(upload_status_include_null)::boolean
+               AND d.provider_upload_status IS NULL)))
+  AND (sqlc.arg(manual_reason_filter)::text = ''
+       OR d.manual_reason_code = sqlc.arg(manual_reason_filter)::text)
+  -- 🔴 只有 NEEDS_MANUAL 分頁排除已收束的 document（#3045）：那一頁的 KPI
+  -- `definition` 逐字寫著「＝ A05 NEEDS_MANUAL 分頁的 job 數」，而實測 KPI=0、
+  -- 這一頁 total=8。其餘分頁不得套用——SUCCEEDED 分頁本來就該看得到已作廢的票。
+  AND (NOT sqlc.arg(exclude_resolved_documents)::boolean
+       OR NOT (d.status = ANY(COALESCE(sqlc.arg(resolved_document_statuses)::text[], ARRAY[]::text[]))));
+
+-- name: GetInvoiceOperationForAdminByID :one
+-- 端點 51（A06 異常詳情）。ADM 無擁有者述詞（看全平台），但仍需 document 的欄位
+-- 補齊 InvoiceJobInfo ⇒ 與賣家版分開而不是加一個「要不要檢查 store_id」的旗標：
+-- 旗標式授權是 §8.1.4(b) 明文反對的形狀（一個傳錯就整條防線失效）。
+SELECT sqlc.embed(o),
+       d.source_ref            AS document_source_ref,
+       d.manual_reason_code    AS document_manual_reason_code,
+       d.document_kind         AS document_kind,
+       d.status                AS document_status,
+       d.external_invoice_no   AS document_external_invoice_no,
+       d.external_invoice_date AS document_external_invoice_date,
+       d.external_reported_at  AS document_external_reported_at,
+       i.issuer_ref_id         AS issuer_ref_id
+FROM invoice_operations o
+JOIN invoice_documents d ON d.id = o.document_id
+JOIN invoice_issuers   i ON i.id = d.issuer_id
+WHERE o.id = sqlc.arg(id);
+
+-- name: ListPriorityInvoiceOperationsForAdmin :many
+-- 端點 37（A01 總覽）的 priorityJobs。
+-- 🔴 排序鍵是 `statutory_deadline_at` **不是 created_at**：B2C 48 小時、B2B 7 天的
+--    期限一旦錯過就無法補救，而建立時間早不代表期限近（作廢重開的 job 建得晚、
+--    期限卻繼承原發票）。NULL（RECEIPT 無法定期限）排最後。
+-- 候選集合＝「還沒了結」的 job：狀態集合由呼叫端傳入，並聯集 document 的
+-- AWAITING_MANUAL（理由同端點 50）。
+SELECT sqlc.embed(o),
+       d.source_ref            AS document_source_ref,
+       d.manual_reason_code    AS document_manual_reason_code,
+       d.document_kind         AS document_kind,
+       d.status                AS document_status,
+       d.external_invoice_no   AS document_external_invoice_no,
+       d.external_invoice_date AS document_external_invoice_date,
+       d.external_reported_at  AS document_external_reported_at,
+       i.issuer_ref_id         AS issuer_ref_id
+FROM invoice_operations o
+JOIN invoice_documents d ON d.id = o.document_id
+JOIN invoice_issuers   i ON i.id = d.issuer_id
+WHERE (o.status = ANY(sqlc.arg(open_statuses)::text[])
+    OR d.status = ANY(sqlc.arg(manual_document_statuses)::text[]))
+  -- 🔴 已收束的 document 一律不算（#3014／#3045）：與 A01 KPI `needs_manual`
+  -- 逐字同一個否決條件。少了它，KPI 顯示 0 而它正下方的清單列出 11 筆
+  -- （其中 8 筆的原票已作廢或已被重開票取代）——兩個數字互相矛盾，而且那 8 筆
+  -- 仍按 statutory_deadline_at 佔住最前面，把真正有期限壓力的擠到後面。
+  --
+  -- ⚠️ 上面兩個條件必須先括起來：原本是裸的 `A OR B`，直接接 `AND NOT C`
+  -- 會被解析成 `A OR (B AND NOT C)` ⇒ 排除只對 AWAITING_MANUAL 那半邊生效。
+  --
+  -- ⚠️ COALESCE 不是裝飾：`x = ANY(NULL)` 是 NULL 不是 false ⇒ `NOT NULL` 也是 NULL
+  -- ⇒ **整個 WHERE 為 NULL、清單全空**。呼叫端漏傳這個集合時的症狀因此不是
+  -- 「沒有排除」而是「一筆都不剩」，而空清單看起來正好像「沒有待辦」。
+  AND NOT (d.status = ANY(COALESCE(sqlc.arg(resolved_document_statuses)::text[], ARRAY[]::text[])))
+ORDER BY o.statutory_deadline_at ASC NULLS LAST, o.id ASC
+LIMIT sqlc.arg(row_limit);
+
+-- name: CountCrossPeriodPending :one
+-- M20（§8.2.3）：發票日期屬**已結束期別**、且仍有非終態 VOID／ALLOWANCE／
+-- VOID_ALLOWANCE operation 的筆數。唯讀，不改任何狀態（§4.5.10 明訂）。
+--
+-- 🔴 期別以**台北時間**分期（UTC+8 雙月制）：用 UTC 的月份會讓每兩個月的 1 日
+--    00:00–08:00 (UTC) 落到前一期，而那正好是跨期判定最敏感的那八個小時。
+--    這裡把「本期起始日」算在 SQL 內，判定 invoice_date_taipei 是否早於它。
+--
+-- 🔴 非終態集合逐字取自 §7.3.0 規則 1 的六值減掉 ISSUE／QUERY，並用**否定述詞**
+--    列終態：未來新增的任何狀態預設都算「仍未了結」＝安全側。
+SELECT count(*)::bigint
+FROM invoice_operations o
+JOIN invoice_documents d ON d.id = o.document_id
+WHERE o.operation_type IN ('VOID', 'ALLOWANCE', 'VOID_ALLOWANCE')
+  AND o.status NOT IN ('SUCCEEDED', 'NOT_APPLICABLE', 'CANCELLED_BEFORE_ISSUE',
+                       'RESOLVED_EXTERNALLY', 'CANCELLED_BY_ADMIN')
+  AND d.invoice_date_taipei IS NOT NULL
+  AND d.invoice_date_taipei < make_date(
+        EXTRACT(YEAR  FROM (sqlc.arg(now)::timestamptz AT TIME ZONE 'Asia/Taipei'))::int,
+        (((EXTRACT(MONTH FROM (sqlc.arg(now)::timestamptz AT TIME ZONE 'Asia/Taipei'))::int - 1) / 2) * 2 + 1),
+        1);
+
+-- name: ReleaseInvoiceOperationHold :execrows
+-- §7.3.5 R03 的收尾：把 HELD 放回 READY，**同一事務內**，不等租約到期。
+--
+-- 🔴 少了這一句不會報錯、不會有測試紅，只是那張發票有 60 秒開不出去：
+--    HELD 不在兩支 worker 的候選集合裡（見 HoldInvoiceOperation 的註解），
+--    要等 ReleaseExpiredInvoiceOperationHolds 掃回才動得了。
+-- 🔴 held_until = NULL 不可省：chk_invop_held_pair 是雙向等式，只改 status 不清
+--    held_until 會 23514（同 CancelInvoiceOperationBeforeIssue 的教訓）。
+-- next_attempt_at 設為 now：R03 改完快照就該立刻送出，不要沿用 HELD 之前的排程。
+UPDATE invoice_operations
+SET status          = 'READY',
+    held_until      = NULL,
+    next_attempt_at = sqlc.arg(now),
+    updated_at      = sqlc.arg(now),
+    version         = version + 1
+WHERE id = sqlc.arg(id)
+  AND status = 'HELD';

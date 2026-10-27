@@ -1,0 +1,195 @@
+# Compiled class file
+*.class
+
+# Log file
+*.log
+
+# BlueJ files
+*.ctxt
+
+# Mobile Tools for Java (J2ME)
+.mtj.tmp/
+
+# Package Files #
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# virtual machine crash logs
+hs_err_pid*
+replay_pid*
+
+# Maven
+target/
+.m2-local/
+*.lastUpdated
+# .mvn/ 內僅排除 transient 產物，保留 wrapper（mvnw / .mvn/wrapper/ 必須進版控）
+.mvn/timing.properties
+.mvn/maven.buildinfo
+.m2/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+BOOT-INF/
+
+# SQLite databases (development)
+*.db
+
+# Environment files
+.env
+.env.*
+# 本機開發的 dev token 金鑰（make dev-key）
+.dev/
+!.env.template
+*.env.local
+application-local.yml
+services_env.json
+
+# Logs
+logs/
+
+# Temporary files
+tmp/
+temp/
+.sqlc-stage.*/
+*.tmp
+*.bak
+
+# ===== Go =====
+gateway/gateway
+gateway/gateway-*
+gateway/main
+# go build 的預設輸出名＝目錄名，與上面 gateway/main 同類
+monitoring/discord-webhook-gateway/discord-webhook-gateway
+services/*/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# ===== Go Binary Outputs =====
+# These should be built via CI/CD, not committed
+services/*/*.exe
+services/*/target/release/*
+!services/*/target/release/.gitkeep
+
+# ===== Generated Proto Files =====
+# Gateway 的 proto 生成檔案需要保留（因為使用本地模組路徑）
+# 不再全域忽略 *.pb.go，改為在 services 目錄下忽略
+services/**/*.pb.go
+services/**/*_grpc.pb.go
+# 但 shipping-service 的 proto 需要保留
+!services/java/shipping-service/proto/**/*.pb.go
+!services/java/shipping-service/proto/**/*_grpc.pb.go
+
+# ===== Java Build =====
+services/java/shared/*/target/
+services/java/*/target/
+
+# ===== Node =====
+node_modules/
+
+# ===== Python =====
+__pycache__/
+*.pyc
+
+# ===== Firebase Credentials =====
+config/firebase/*.json
+credentials/
+
+# ===== Analysis & Temporary =====
+AC_Analysis/
+
+# ===== Linux Binaries (should be built on server) =====
+*-linux
+services/*-service/*-linux
+
+# ===== Jira Import Scripts =====
+docs/jira-import.sh
+docs/jira_import.py
+docs/*_keys.json
+
+# ===== 本機規劃產物 =====
+docs/superpowers/
+
+# ===== Gateway Swagger 生成物（終端產物，非建置輸入）=====
+# `swag init` 的輸出（swagger.json / swagger.yaml；刻意不產 docs.go，見 gateway/Makefile）。
+# 沒有任何程式讀它：repo 內零 import、Gateway 沒有註冊 Swagger UI 路由、部署不讀，
+# 兩支 Apidog workflow 都是在 runner 內先跑 `make swagger` 再讀剛生成的檔，
+# 從不讀版控副本。唯一消費者是 Apidog。
+# 留在版控只會腐化——沒有「regenerate 後 commit」的義務（刻意不設，swag 版本三處
+# 各自為政），沒有義務就必然過時成一份會騙人的契約（2026-08-05 實測差 24 個
+# definition + 2 個幽靈端點）。要看契約就本地 `make swagger`（輸出被本規則忽略，
+# 不會污染 diff），或直接看 Apidog。詳見 10 檔 §16。
+gateway/docs/
+
+# ===== Local Dev Tools & Tests =====
+tests/*
+!tests/ui-integration/
+!tests/contract/
+tools/*
+!tools/discord-bot/
+tools/discord-bot/node_modules/
+tools/discord-bot/.env
+tools/discord-bot/.env.local
+tools/discord-bot/.env.*.local
+tools/discord-bot/audit.log
+常用指令.md
+
+# ===== Claude Code =====
+.claude/
+# 個人、本機的補充不進版控。版控裡的指令檔只有 AGENTS.md；個人補充放 AGENTS.local.md
+# （已由全域 gitignore 忽略），CLAUDE.local.md 一併忽略。
+CLAUDE.local.md
+# 本機驗證留下的截圖與腳本；沒忽略的話任何一次 git add -A 都會把它們提交進 repo
+.claude-verify/
+builds/
+.comate/*
+
+# ===== Infra Database Volumes =====
+infra/postgresql_data/
+infra/redis_data/
+infra/rabbitmq_data/
+infra/rabbitmq_dev_data/
+infra/rabbitmq_local_data/
+
+# 個人本地覆蓋檔（volume / hot-reload / 資源限制等個人差異），不入 git；範本見 docker-compose.override.yml.example
+docker-compose.override.yml
+.worktrees/
+.serena/
+
+# 本地 secret（TGOS caller key 等，dev 同步，絕不 commit）
+secrets/
+
+# ===== Terraform =====
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+.terraformrc
+terraform.rc
+
+# 架構審查報告：不進版控（2026-09-08 使用者指示）
+docs/review/
+
+# go build 在 cmd 目錄產生的單體執行檔
+/cmd/hawkr/hawkr

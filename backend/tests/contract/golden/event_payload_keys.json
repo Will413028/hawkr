@@ -1,0 +1,1635 @@
+{
+  "aftersales.appeal.submitted.buyer": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.appeal.submitted",
+    "emitted_keys": [
+      "buyer_id",
+      "case_no",
+      "notify_buyer_account_id",
+      "order_no"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "aftersales.appeal.submitted.seller": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.appeal.submitted",
+    "emitted_keys": [
+      "case_no",
+      "order_no",
+      "seller_account_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "aftersales.case.applied.buyer": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.applied",
+    "emitted_keys": [
+      "actor",
+      "buyer_id",
+      "case_no",
+      "notify_buyer_account_id",
+      "order_no"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "aftersales.case.applied.seller": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.applied",
+    "emitted_keys": [
+      "actor",
+      "case_no",
+      "order_no",
+      "seller_account_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "aftersales.case.auto_completed_confirm_receipt_timeout.seller": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.auto_completed_confirm_receipt_timeout",
+    "emitted_keys": [
+      "actor",
+      "auto_complete_reason",
+      "auto_complete_reason_label",
+      "case_no",
+      "order_no",
+      "seller_account_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "aftersales.case.auto_completed_return_pending_timeout.buyer": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.auto_completed_return_pending_timeout",
+    "emitted_keys": [
+      "buyer_id",
+      "case_no",
+      "notify_buyer_account_id"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "aftersales.case.auto_completed_return_pending_timeout.seller": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.auto_completed_return_pending_timeout",
+    "emitted_keys": [
+      "case_no",
+      "order_no",
+      "seller_account_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "aftersales.case.auto_completed_store_pickup_timeout.seller": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.auto_completed_store_pickup_timeout",
+    "emitted_keys": [
+      "actor",
+      "auto_complete_reason",
+      "auto_complete_reason_label",
+      "case_no",
+      "order_no",
+      "seller_account_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "aftersales.case.auto_escalated.buyer": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.auto_escalated",
+    "emitted_keys": [
+      "actor",
+      "buyer_id",
+      "case_no",
+      "notify_buyer_account_id",
+      "order_no",
+      "reason"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "aftersales.case.auto_escalated.seller": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.auto_escalated",
+    "emitted_keys": [
+      "actor",
+      "case_no",
+      "order_no",
+      "original_deadline_hours",
+      "reason",
+      "seller_account_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "aftersales.case.auto_rejected.buyer": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.auto_rejected",
+    "emitted_keys": [
+      "actor",
+      "buyer_id",
+      "case_no",
+      "notify_buyer_account_id",
+      "order_no"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "aftersales.case.cancelled_by_buyer.buyer": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.cancelled_by_buyer",
+    "emitted_keys": [
+      "actor",
+      "buyer_id",
+      "case_no",
+      "notify_buyer_account_id",
+      "order_no"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "aftersales.case.cancelled_by_buyer.seller": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.cancelled_by_buyer",
+    "emitted_keys": [
+      "actor",
+      "case_no",
+      "order_no",
+      "seller_account_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "aftersales.case.cancelled_by_confirm_receipt.seller": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.cancelled_by_confirm_receipt",
+    "emitted_keys": [
+      "actor",
+      "case_no",
+      "order_no",
+      "seller_account_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "aftersales.case.coupon_compensated.buyer": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.coupon_compensated",
+    "emitted_keys": [
+      "actor",
+      "buyer_id",
+      "case_no",
+      "notify_buyer_account_id",
+      "order_no"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "aftersales.case.coupon_compensated.seller": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.coupon_compensated",
+    "emitted_keys": [
+      "actor",
+      "case_no",
+      "order_no",
+      "seller_account_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "aftersales.case.refund_approved.buyer": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.refund_approved",
+    "emitted_keys": [
+      "actor",
+      "buyer_id",
+      "case_no",
+      "notify_buyer_account_id",
+      "order_no"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "aftersales.case.refund_approved.seller": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.refund_approved",
+    "emitted_keys": [
+      "actor",
+      "case_no",
+      "order_no",
+      "seller_account_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "aftersales.case.rejected.buyer": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.rejected",
+    "emitted_keys": [
+      "actor",
+      "buyer_id",
+      "case_no",
+      "notify_buyer_account_id",
+      "order_no"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "aftersales.case.rejected.seller": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.rejected",
+    "emitted_keys": [
+      "actor",
+      "case_no",
+      "order_no",
+      "seller_account_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "aftersales.case.return_approved.buyer": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.return_approved",
+    "emitted_keys": [
+      "actor",
+      "buyer_id",
+      "case_no",
+      "notify_buyer_account_id",
+      "order_no"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "aftersales.case.return_approved.seller": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.return_approved",
+    "emitted_keys": [
+      "actor",
+      "case_no",
+      "order_no",
+      "seller_account_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "aftersales.case.return_at_store.seller": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.return_at_store",
+    "emitted_keys": [
+      "actor",
+      "case_no",
+      "deadline_at",
+      "order_no",
+      "seller_account_id",
+      "shipping_method",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "aftersales.case.return_at_store_24h.seller": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.return_at_store_24h",
+    "emitted_keys": [
+      "actor",
+      "case_no",
+      "deadline_at",
+      "order_no",
+      "seller_account_id",
+      "shipping_method",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "aftersales.case.return_delivered.seller": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.return_delivered",
+    "emitted_keys": [
+      "actor",
+      "case_no",
+      "deadline_at",
+      "order_no",
+      "seller_account_id",
+      "shipping_method",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "aftersales.case.return_delivered_24h.seller": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.return_delivered_24h",
+    "emitted_keys": [
+      "actor",
+      "case_no",
+      "deadline_at",
+      "order_no",
+      "seller_account_id",
+      "shipping_method",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "aftersales.case.return_failed.buyer": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.return_failed",
+    "emitted_keys": [
+      "actor",
+      "buyer_id",
+      "case_no",
+      "notify_buyer_account_id",
+      "order_no"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "aftersales.case.return_failed.seller": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.return_failed",
+    "emitted_keys": [
+      "actor",
+      "case_no",
+      "order_no",
+      "seller_account_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "aftersales.case.return_in_transit.seller": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.return_in_transit",
+    "emitted_keys": [
+      "actor",
+      "case_no",
+      "order_no",
+      "seller_account_id",
+      "shipping_method",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "aftersales.case.return_pending_24h.buyer": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.return_pending_24h",
+    "emitted_keys": [
+      "buyer_id",
+      "case_no",
+      "notify_buyer_account_id"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "aftersales.case.return_received.buyer": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.return_received",
+    "emitted_keys": [
+      "actor",
+      "buyer_id",
+      "case_no",
+      "notify_buyer_account_id",
+      "order_no"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "aftersales.case.return_received.seller": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.case.return_received",
+    "emitted_keys": [
+      "actor",
+      "case_no",
+      "order_no",
+      "seller_account_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "aftersales.platform_decision.made.buyer": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.platform_decision.made",
+    "emitted_keys": [
+      "buyer_id",
+      "case_no",
+      "notify_buyer_account_id",
+      "order_no"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "aftersales.platform_decision.made.seller": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.platform_decision.made",
+    "emitted_keys": [
+      "case_no",
+      "order_no",
+      "seller_account_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "aftersales.refund.awaiting_buyer_page.buyer": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.refund.awaiting_buyer_page",
+    "emitted_keys": [
+      "buyer_id",
+      "case_no",
+      "notify_buyer_account_id",
+      "order_no",
+      "refund_task_id"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "aftersales.refund.completed.buyer": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.refund.completed",
+    "emitted_keys": [
+      "actor",
+      "buyer_id",
+      "case_no",
+      "notify_buyer_account_id",
+      "order_no"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "aftersales.refund.completed.seller": {
+    "publisher": "aftersales-service",
+    "lang": "java",
+    "routing_key": "aftersales.refund.completed",
+    "emitted_keys": [
+      "actor",
+      "case_no",
+      "order_no",
+      "seller_account_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "chat.message.sent": {
+    "publisher": "im-service",
+    "lang": "go",
+    "routing_key": "chat.message.sent",
+    "emitted_keys": [
+      "content_preview",
+      "conversation_id",
+      "message_id",
+      "receiver_id",
+      "receiver_type",
+      "sender_avatar",
+      "sender_id",
+      "sender_name",
+      "sent_at",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "receiver_id": {
+        "buyer": "buyer_id",
+        "seller": "account_id"
+      },
+      "store_id": "store_id"
+    }
+  },
+  "comment.created": {
+    "publisher": "social-service",
+    "lang": "go",
+    "routing_key": "comment.created",
+    "emitted_keys": [
+      "commenterId",
+      "commenterName",
+      "commenterPrincipalId",
+      "contentPreview",
+      "postAuthorId",
+      "postAuthorStoreId",
+      "postAuthorType",
+      "postId"
+    ],
+    "identity_spaces": {
+      "commenterId": "store_id",
+      "commenterPrincipalId": {
+        "buyer": "buyer_id",
+        "seller": "account_id"
+      },
+      "postAuthorId": {
+        "buyer": "buyer_id",
+        "seller": "account_id"
+      },
+      "postAuthorStoreId": "store_id"
+    }
+  },
+  "comment.created.buyer": {
+    "publisher": "social-service",
+    "lang": "go",
+    "routing_key": "comment.created",
+    "emitted_keys": [
+      "commentId",
+      "commenterId",
+      "commenterName",
+      "commenterPrincipalId",
+      "contentPreview",
+      "postAuthorId",
+      "postAuthorType",
+      "postId"
+    ],
+    "identity_spaces": {
+      "commenterPrincipalId": {
+        "buyer": "buyer_id",
+        "seller": "account_id"
+      },
+      "postAuthorId": {
+        "buyer": "buyer_id",
+        "seller": "account_id"
+      }
+    }
+  },
+  "comment.like_changed": {
+    "publisher": "social-service",
+    "lang": "go",
+    "routing_key": "comment.like_changed",
+    "emitted_keys": [
+      "action",
+      "commentAuthorId",
+      "commentAuthorStoreId",
+      "commentAuthorType",
+      "commentId",
+      "likerKind",
+      "likerName",
+      "likerPrincipalId",
+      "postId",
+      "userId"
+    ],
+    "identity_spaces": {
+      "commentAuthorId": {
+        "buyer": "buyer_id",
+        "seller": "account_id"
+      },
+      "commentAuthorStoreId": "store_id",
+      "likerPrincipalId": {
+        "buyer": "buyer_id",
+        "seller": "account_id"
+      },
+      "userId": {
+        "buyer": "buyer_id",
+        "seller": "store_id"
+      }
+    }
+  },
+  "comment.replied.buyer": {
+    "publisher": "social-service",
+    "lang": "go",
+    "routing_key": "comment.replied",
+    "emitted_keys": [
+      "commentId",
+      "contentPreview",
+      "postId",
+      "replierName",
+      "replierPrincipalId",
+      "replyToUserId",
+      "replyToUserType"
+    ],
+    "identity_spaces": {
+      "replierPrincipalId": {
+        "buyer": "buyer_id",
+        "seller": "account_id"
+      },
+      "replyToUserId": {
+        "buyer": "buyer_id",
+        "seller": "account_id"
+      }
+    }
+  },
+  "comment.replied.seller": {
+    "publisher": "social-service",
+    "lang": "go",
+    "routing_key": "comment.replied",
+    "emitted_keys": [
+      "commentId",
+      "contentPreview",
+      "postId",
+      "replierId",
+      "replierName",
+      "replierPrincipalId",
+      "replyToUserId",
+      "replyToUserStoreId",
+      "replyToUserType"
+    ],
+    "identity_spaces": {
+      "replierId": "store_id",
+      "replierPrincipalId": {
+        "buyer": "buyer_id",
+        "seller": "account_id"
+      },
+      "replyToUserId": {
+        "buyer": "buyer_id",
+        "seller": "account_id"
+      },
+      "replyToUserStoreId": "store_id"
+    }
+  },
+  "coupon.expiring": {
+    "publisher": "coupon-service",
+    "lang": "java",
+    "routing_key": "coupon.expiring",
+    "emitted_keys": [
+      "buyer_id",
+      "coupon_image_url",
+      "coupon_instance_id",
+      "coupon_name",
+      "date_key",
+      "event_id",
+      "event_type",
+      "expire_at",
+      "notify_buyer_account_id",
+      "occurred_at"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "coupon.issued": {
+    "publisher": "coupon-service",
+    "lang": "java",
+    "routing_key": "coupon.issued",
+    "emitted_keys": [
+      "buyer_id",
+      "coupon_id",
+      "coupon_image_url",
+      "coupon_name"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "delegation.operation.completed.seller": {
+    "publisher": "account-service",
+    "lang": "go",
+    "routing_key": "delegation.operation.completed",
+    "emitted_keys": [
+      "action",
+      "action_label",
+      "actor_admin_id",
+      "actor_display_name",
+      "audit_log_id",
+      "capability",
+      "case_reference",
+      "correlation_id",
+      "event_id",
+      "event_type",
+      "occurred_at",
+      "operation_reason",
+      "resource_id",
+      "resource_name",
+      "resource_type",
+      "risk_level",
+      "session_display_code",
+      "session_id",
+      "source",
+      "target_seller_account_id",
+      "target_store_id",
+      "timestamp",
+      "version"
+    ],
+    "identity_spaces": {
+      "target_seller_account_id": "account_id",
+      "target_store_id": "store_id"
+    }
+  },
+  "follow.added": {
+    "publisher": "buyer-service",
+    "lang": "go",
+    "routing_key": "follow.added",
+    "emitted_keys": [
+      "follower_id",
+      "follower_name",
+      "merchant_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "merchant_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "invoice.complaint.created.seller": {
+    "publisher": "invoice-service",
+    "lang": "go",
+    "routing_key": "invoice.complaint.created",
+    "emitted_keys": [
+      "buyer_id",
+      "complaint_id",
+      "invoice_document_id",
+      "notification_ref_id",
+      "notify_seller_account_id",
+      "occurred_at",
+      "order_no",
+      "reason_code",
+      "sla_due_at",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "notify_seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "invoice.complaint.responded.buyer": {
+    "publisher": "invoice-service",
+    "lang": "go",
+    "routing_key": "invoice.complaint.responded",
+    "emitted_keys": [
+      "action",
+      "buyer_id",
+      "complaint_id",
+      "invoice_document_id",
+      "notification_ref_id",
+      "notify_seller_account_id",
+      "occurred_at",
+      "order_no",
+      "status",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "invoice.issue_failed.seller": {
+    "publisher": "invoice-service",
+    "lang": "go",
+    "routing_key": "invoice.issue_failed",
+    "emitted_keys": [
+      "buyer_id",
+      "failure_class",
+      "failure_reason_code",
+      "invoice_document_id",
+      "invoice_operation_id",
+      "notification_ref_id",
+      "notify_seller_account_id",
+      "occurred_at",
+      "order_no",
+      "provider_error_code",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "notify_seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "invoice.issued.buyer": {
+    "publisher": "invoice-service",
+    "lang": "go",
+    "routing_key": "invoice.issued",
+    "emitted_keys": [
+      "buyer_id",
+      "document_kind",
+      "has_buyer_tax_id",
+      "has_carrier",
+      "invoice_date",
+      "invoice_document_id",
+      "invoice_no",
+      "notification_ref_id",
+      "notify_seller_account_id",
+      "occurred_at",
+      "order_no",
+      "store_id",
+      "total_amount"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "invoice.issued.seller": {
+    "publisher": "invoice-service",
+    "lang": "go",
+    "routing_key": "invoice.issued",
+    "emitted_keys": [
+      "buyer_id",
+      "document_kind",
+      "has_buyer_tax_id",
+      "has_carrier",
+      "invoice_date",
+      "invoice_document_id",
+      "invoice_no",
+      "notification_ref_id",
+      "notify_seller_account_id",
+      "occurred_at",
+      "order_no",
+      "store_id",
+      "total_amount"
+    ],
+    "identity_spaces": {
+      "notify_seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "invoice.reissued.buyer": {
+    "publisher": "invoice-service",
+    "lang": "go",
+    "routing_key": "invoice.reissued",
+    "emitted_keys": [
+      "buyer_id",
+      "invoice_document_id",
+      "new_invoice_no",
+      "notification_ref_id",
+      "notify_seller_account_id",
+      "occurred_at",
+      "order_no",
+      "store_id",
+      "voided_document_id",
+      "voided_invoice_no"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "invoice.receipt.issued.buyer": {
+    "publisher": "invoice-service",
+    "lang": "go",
+    "routing_key": "invoice.receipt.issued",
+    "emitted_keys": [
+      "buyer_id",
+      "document_kind",
+      "has_buyer_tax_id",
+      "has_carrier",
+      "invoice_date",
+      "invoice_document_id",
+      "invoice_no",
+      "notification_ref_id",
+      "notify_seller_account_id",
+      "occurred_at",
+      "order_no",
+      "store_id",
+      "total_amount"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "invoice.resolved_externally.buyer": {
+    "publisher": "invoice-service",
+    "lang": "go",
+    "routing_key": "invoice.resolved_externally",
+    "emitted_keys": [
+      "buyer_id",
+      "external_invoice_date",
+      "external_invoice_no",
+      "invoice_document_id",
+      "notification_ref_id",
+      "notify_seller_account_id",
+      "occurred_at",
+      "order_no",
+      "reported_at",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "invoice.seller_tax_profile.status_changed.seller": {
+    "publisher": "invoice-service",
+    "lang": "go",
+    "routing_key": "invoice.seller_tax_profile.status_changed",
+    "emitted_keys": [
+      "from_status",
+      "notification_ref_id",
+      "notify_seller_account_id",
+      "occurred_at",
+      "store_id",
+      "tax_profile_id",
+      "to_status"
+    ],
+    "identity_spaces": {
+      "notify_seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "merchant.verification.approved": {
+    "publisher": "seller-service",
+    "lang": "go",
+    "routing_key": "merchant.verification.approved",
+    "emitted_keys": [
+      "merchant_id",
+      "event_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "merchant_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "merchant.verification.forwarded": {
+    "publisher": "seller-service",
+    "lang": "go",
+    "routing_key": "merchant.verification.forwarded",
+    "emitted_keys": [
+      "merchant_id",
+      "event_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "merchant_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "merchant.verification.pending_info": {
+    "publisher": "seller-service",
+    "lang": "go",
+    "routing_key": "merchant.verification.pending_info",
+    "emitted_keys": [
+      "merchant_id",
+      "reason",
+      "event_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "merchant_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "merchant.verification.rejected": {
+    "publisher": "seller-service",
+    "lang": "go",
+    "routing_key": "merchant.verification.rejected",
+    "emitted_keys": [
+      "merchant_id",
+      "event_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "merchant_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "merchant.verification.under_review": {
+    "publisher": "seller-service",
+    "lang": "go",
+    "routing_key": "merchant.verification.under_review",
+    "emitted_keys": [
+      "merchant_id",
+      "event_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "merchant_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "order.cancelled.buyer": {
+    "publisher": "order-service",
+    "lang": "java",
+    "routing_key": "order.cancelled",
+    "emitted_keys": [
+      "buyer_id",
+      "cancel_reason",
+      "notify_buyer_account_id",
+      "notify_seller_account_id",
+      "order_no",
+      "seller_avatar_key",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "order.cancelled.merchant": {
+    "publisher": "order-service",
+    "lang": "java",
+    "routing_key": "order.cancelled",
+    "emitted_keys": [
+      "notify_seller_account_id",
+      "order_no",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "notify_seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "order.cancelled.seller_suspended": {
+    "publisher": "order-service",
+    "lang": "java",
+    "routing_key": "order.cancelled",
+    "emitted_keys": [
+      "buyer_id",
+      "cancel_reason",
+      "notify_buyer_account_id",
+      "notify_seller_account_id",
+      "order_no",
+      "seller_avatar_key",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "order.completed.buyer": {
+    "publisher": "order-service",
+    "lang": "java",
+    "routing_key": "order.completed",
+    "emitted_keys": [
+      "buyer_id",
+      "notify_buyer_account_id",
+      "order_no"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "order.completed.merchant": {
+    "publisher": "order-service",
+    "lang": "java",
+    "routing_key": "order.completed",
+    "emitted_keys": [
+      "order_no",
+      "store_id",
+      "notify_seller_account_id"
+    ],
+    "identity_spaces": {
+      "notify_seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "order.paid": {
+    "publisher": "order-service",
+    "lang": "java",
+    "routing_key": "order.paid",
+    "emitted_keys": [
+      "buyer_avatar_key",
+      "buyer_id",
+      "buyer_nickname",
+      "correlation_id",
+      "event_id",
+      "invoice_snapshot_id",
+      "notify_buyer_account_id",
+      "occurred_at",
+      "order_no",
+      "seller_avatar_key",
+      "seller_name",
+      "shipping_method",
+      "store_id",
+      "total_actual_amount"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "payment.rescue.refund_completed": {
+    "publisher": "payment-service",
+    "lang": "java",
+    "routing_key": "payment.rescue.refund_completed",
+    "emitted_keys": [
+      "amount",
+      "buyer_id",
+      "mer_id",
+      "orderNo",
+      "order_id",
+      "payment_type",
+      "provider_trade_no",
+      "refunded_at",
+      "rescue_reason",
+      "trade_no"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "procurement.rfq_publication_invite.created.seller": {
+    "publisher": "ai-service",
+    "lang": "go",
+    "routing_key": "procurement.rfq_publication_invite.created",
+    "emitted_keys": [
+      "inviteId",
+      "publicationId",
+      "storeId"
+    ],
+    "identity_spaces": {
+      "storeId": "store_id"
+    }
+  },
+  "procurement.rfq_publication_invite.external_created.vendor": {
+    "publisher": "ai-service",
+    "lang": "go",
+    "routing_key": "procurement.rfq_publication_invite.external_created",
+    "emitted_keys": [
+      "expiresAt",
+      "inviteId",
+      "prospectId",
+      "publicationId"
+    ],
+    "identity_spaces": {
+      "prospectId": "prospect_id"
+    }
+  },
+  "payout.completed": {
+    "publisher": "order-service",
+    "lang": "java",
+    "routing_key": "payout.completed",
+    "emitted_keys": [
+      "event_id",
+      "event_type",
+      "granted_at",
+      "notify_seller_account_id",
+      "occurred_at",
+      "order_no",
+      "payout_amount",
+      "store_id",
+      "trade_no"
+    ],
+    "identity_spaces": {
+      "notify_seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "post.created": {
+    "publisher": "social-service",
+    "lang": "go",
+    "routing_key": "post.created",
+    "emitted_keys": [
+      "content_preview",
+      "follower_id",
+      "post_id",
+      "seller_avatar_key",
+      "seller_name",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "follower_id": "buyer_id"
+    }
+  },
+  "post.hidden_by_platform.seller": {
+    "publisher": "social-service",
+    "lang": "go",
+    "routing_key": "post.hidden_by_platform",
+    "emitted_keys": [
+      "post_id",
+      "reason",
+      "seller_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "post.liked": {
+    "publisher": "social-service",
+    "lang": "go",
+    "routing_key": "post.liked",
+    "emitted_keys": [
+      "likerName",
+      "post_id",
+      "seller_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "product.certification.approved.seller": {
+    "publisher": "product-service",
+    "lang": "java",
+    "routing_key": "product.certification.approved",
+    "emitted_keys": [
+      "application_id",
+      "certificate_no",
+      "certification_type",
+      "decided_by",
+      "event_id",
+      "event_type",
+      "occurred_at",
+      "product_id",
+      "product_name",
+      "seller_account_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "product.certification.rejected.seller": {
+    "publisher": "product-service",
+    "lang": "java",
+    "routing_key": "product.certification.rejected",
+    "emitted_keys": [
+      "application_id",
+      "certificate_no",
+      "certification_type",
+      "decided_by",
+      "event_id",
+      "event_type",
+      "occurred_at",
+      "product_id",
+      "product_name",
+      "public_reason",
+      "reason_code",
+      "seller_account_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "product.certification.revoked.seller": {
+    "publisher": "product-service",
+    "lang": "java",
+    "routing_key": "product.certification.revoked",
+    "emitted_keys": [
+      "application_id",
+      "certificate_no",
+      "certification_type",
+      "decided_by",
+      "event_id",
+      "event_type",
+      "occurred_at",
+      "product_id",
+      "product_name",
+      "public_reason",
+      "reason_code",
+      "seller_account_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "product.favorited": {
+    "publisher": "buyer-service",
+    "lang": "go",
+    "routing_key": "buyer.favorite.added",
+    "emitted_keys": [
+      "buyer_name",
+      "product_id",
+      "product_name",
+      "seller_account_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "product.restock.target": {
+    "publisher": "buyer-service",
+    "lang": "go",
+    "routing_key": "product.restock.target",
+    "emitted_keys": [
+      "buyer_id",
+      "deep_link",
+      "image_key",
+      "product_id",
+      "product_name",
+      "subscription_id"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "product.viewed": {
+    "publisher": "buyer-service",
+    "lang": "go",
+    "routing_key": "product.viewed",
+    "emitted_keys": [
+      "product_id",
+      "product_name",
+      "seller_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "review.created": {
+    "publisher": "review-service",
+    "lang": "go",
+    "routing_key": "review.created",
+    "emitted_keys": [
+      "buyer_avatar_key",
+      "buyer_nickname",
+      "notify_seller_account_id",
+      "order_no",
+      "rating",
+      "review_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "notify_seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "seller.suspended.notice": {
+    "publisher": "seller-service",
+    "lang": "go",
+    "routing_key": "seller.suspended",
+    "emitted_keys": [
+      "accountId",
+      "correlation_id",
+      "event_id",
+      "event_type",
+      "reasonCode",
+      "reasonLabel",
+      "source",
+      "store_id",
+      "suspensionId",
+      "timestamp",
+      "version"
+    ],
+    "identity_spaces": {
+      "accountId": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "seller.unsuspended.notice": {
+    "publisher": "seller-service",
+    "lang": "go",
+    "routing_key": "seller.unsuspended",
+    "emitted_keys": [
+      "accountId",
+      "correlation_id",
+      "event_id",
+      "event_type",
+      "source",
+      "store_id",
+      "suspensionId",
+      "timestamp",
+      "version"
+    ],
+    "identity_spaces": {
+      "accountId": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "shipment.anomaly.detected.seller": {
+    "publisher": "shipping-service",
+    "lang": "java",
+    "routing_key": "shipment.anomaly.detected",
+    "emitted_keys": [
+      "anomaly_type",
+      "anomaly_type_label",
+      "order_no",
+      "seller_account_id",
+      "severity",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "shipment.created": {
+    "publisher": "shipping-service",
+    "lang": "java",
+    "routing_key": "shipment.created",
+    "emitted_keys": [
+      "buyer_avatar_key",
+      "buyer_nickname",
+      "order_no",
+      "seller_account_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "shipment.delivered": {
+    "publisher": "shipping-service",
+    "lang": "java",
+    "routing_key": "shipment.delivered",
+    "emitted_keys": [
+      "buyer_id",
+      "notify_buyer_account_id",
+      "order_no",
+      "seller_avatar_key"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "shipment.delivered.seller": {
+    "publisher": "shipping-service",
+    "lang": "java",
+    "routing_key": "shipment.delivered",
+    "emitted_keys": [
+      "order_no",
+      "seller_account_id",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "shipment.status.changed": {
+    "publisher": "shipping-service",
+    "lang": "java",
+    "routing_key": "shipment.status.changed",
+    "emitted_keys": [
+      "buyer_id",
+      "notify_buyer_account_id",
+      "order_no",
+      "seller_avatar_key",
+      "status"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "invoice.voided.buyer": {
+    "publisher": "invoice-service",
+    "lang": "go",
+    "routing_key": "invoice.voided",
+    "emitted_keys": [
+      "buyer_id",
+      "invoice_document_id",
+      "notification_ref_id",
+      "notify_seller_account_id",
+      "occurred_at",
+      "order_no",
+      "store_id",
+      "void_reason_code",
+      "voided_invoice_no"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  },
+  "invoice.operation.review_required.seller": {
+    "publisher": "invoice-service",
+    "lang": "go",
+    "routing_key": "invoice.operation.review_required",
+    "emitted_keys": [
+      "buyer_id",
+      "invoice_document_id",
+      "notification_ref_id",
+      "notify_seller_account_id",
+      "occurred_at",
+      "order_no",
+      "review_reason_code",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "notify_seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "invoice.complaint.overdue.seller": {
+    "publisher": "invoice-service",
+    "lang": "go",
+    "routing_key": "invoice.complaint.overdue",
+    "emitted_keys": [
+      "buyer_id",
+      "complaint_id",
+      "invoice_document_id",
+      "notification_ref_id",
+      "notify_seller_account_id",
+      "occurred_at",
+      "order_no",
+      "sla_due_at",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "notify_seller_account_id": "account_id",
+      "store_id": "store_id"
+    }
+  },
+  "invoice.allowance.issued.buyer": {
+    "publisher": "invoice-service",
+    "lang": "go",
+    "routing_key": "invoice.allowance.issued",
+    "emitted_keys": [
+      "adjustment_id",
+      "allowance_amount",
+      "allowance_number",
+      "buyer_id",
+      "cumulative_allowance_amount",
+      "invoice_document_id",
+      "invoice_no",
+      "notification_ref_id",
+      "notify_seller_account_id",
+      "occurred_at",
+      "order_no",
+      "store_id"
+    ],
+    "identity_spaces": {
+      "buyer_id": "buyer_id"
+    }
+  }
+}

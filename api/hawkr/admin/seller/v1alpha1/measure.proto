@@ -1,0 +1,262 @@
+syntax = "proto3";
+
+// 後台看到的措施（警告、停權與終止合作）、措施依據的認定（違規）與申覆，以及佐證。措施的指令在 SellerGovernanceAdminService
+// （governance.proto），店家詳情帶生效中的措施（seller.proto 的 GetStoreResponse.active_measures），所以這些訊息獨立成
+// 一個檔案，兩邊都 import 它。
+package hawkr.admin.seller.v1alpha1;
+
+import "hawkr/common/v1alpha1/deadline.proto";
+import "hawkr/common/v1alpha1/policy_category.proto";
+import "hawkr/seller/v1alpha1/seller.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+import "google/rpc/error_details.proto";
+
+// Evidence 是一張佐證（圖片或 PDF；詢問回覆的附件也是）。佐證是機敏檔：沒有圖片的 ID 與公開網址，只經 view_uri 讀，每次讀取都記錄。
+message Evidence {
+  // 佐證在這筆通報或申覆裡的順序（從 0 起）。
+  int32 position = 1;
+  // 相對於 API 的網址：通報的佐證是 GET /api/files/admin/seller/reports/{report_id}/evidence/{position}，申覆的佐證是
+  // GET /api/files/admin/seller/measure_requests/{request_id}/evidence/{position}，詢問回覆的附件是
+  // GET /api/files/admin/seller/case_inquiries/{inquiry_id}/evidence/{position}；管理員的驗證與 Connect 方法相同
+  // （Authorization: Bearer；admin 的 BFF 以 /api/bff 為前綴轉送）。回應是檔案本身，Cache-Control: no-store。
+  string view_uri = 2;
+}
+
+// Violation 是措施依據的認定（違規）：只讀。認定只由 CreateMeasure 建立，撤銷認定只經 RevokeMeasure、DecideAppeal 的
+// revoke_findings，所以這裡沒有可修改的欄位。
+message Violation {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  string store_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string account_id = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 成立這個認定的通報，依 id 排序；沒有時是空。
+  repeated string source_report_ids = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 認定的類別：政策分類中平台判定與認定可用的值（不含 OTHER）。
+  hawkr.common.v1alpha1.PolicyCategory category = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 套用的嚴重度。
+  hawkr.seller.v1alpha1.ViolationSeverity severity = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 升級規則提高嚴重度時是原本的嚴重度；沒有升級時是 UNSPECIFIED。
+  hawkr.seller.v1alpha1.ViolationSeverity escalated_from = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.seller.v1alpha1.ViolationStatus status = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 撤銷的原因；生效中時是 UNSPECIFIED。
+  hawkr.seller.v1alpha1.RevokeReason revoke_reason = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 生效中時不設。
+  google.protobuf.Timestamp revoke_time = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 建立這個認定的措施。
+  string origin_measure_id = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// MeasureRevision 是措施的一個版本：賣家看得到的完整內容，與誰、何時寫入。第 1 版在建立措施時寫入，之後每次實際改了
+// statement 或 end_time 就多一版。
+message MeasureRevision {
+  // 從 1 起連號。
+  int32 revision = 1;
+  string statement = 2;
+  // 這一版的結束時間；沒有固定期間（與警告）時不設。預告終止在預告期間內因店家關閉而結束的那一版，結束時間（關店的時間）早於措施的開始時間。
+  google.protobuf.Timestamp end_time = 3;
+  // 寫入這一版的管理員；系統寫入的版本（system_cause 不是 UNSPECIFIED）是空字串。
+  string created_by_admin_id = 4;
+  google.protobuf.Timestamp create_time = 5;
+  // 系統寫入這一版的原因；管理員寫入的是 UNSPECIFIED。
+  MeasureRevisionSystemCause system_cause = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// MeasureRevisionSystemCause 是系統（不是管理員）寫入措施版本的原因。
+enum MeasureRevisionSystemCause {
+  MEASURE_REVISION_SYSTEM_CAUSE_UNSPECIFIED = 0;
+  // 預告終止（TerminationGround.NOTICE）的店家在預告期間內或生效後關閉，措施隨之結束（條款第 21.2 條）。
+  MEASURE_REVISION_SYSTEM_CAUSE_STORE_CLOSED = 1;
+}
+
+// MeasureRequest 是後台看到的賣家請求（申覆或解除請求，看 kind）。state 由伺服器推導：措施已不在生效中而仍待處理的解除請求，
+// state 是 CLOSED、close_cause 是 ENDED、decide_time 是措施的結束時間、decided_by_admin_id 是空字串，與系統結案之後的值相同。
+message MeasureRequest {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  hawkr.seller.v1alpha1.MeasureRequestState state = 2;
+  string reason = 3;
+  google.protobuf.Timestamp submit_time = 4;
+  // 裁定的理由（接受與駁回都有）；待處理或結案時是空字串。
+  string decision_reason = 5;
+  // 待處理時是空字串；因措施撤銷而結案時記執行撤銷的管理員；因措施已結束由系統結案時是空字串。
+  string decided_by_admin_id = 6;
+  // 裁定或結案的時間；待處理時不設。
+  google.protobuf.Timestamp decide_time = 7;
+  // 佐證。
+  repeated Evidence evidence = 8;
+  // 賣家提出請求時措施的那一版（Measure.revisions 的 revision）；之後措施再被修改也不變，裁定時與目前的版本對照。
+  int32 revision = 9;
+  // 結案的原因；只有 state 是 CLOSED 時設，其他是 UNSPECIFIED。
+  hawkr.seller.v1alpha1.MeasureRequestCloseCause close_cause = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 請求的種類；ACCEPTED 的效果依種類而不同：申覆接受是措施撤銷，解除請求接受是措施結束。
+  hawkr.seller.v1alpha1.MeasureRequestKind kind = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 裁定的期限，只在待處理時設（解除請求還要措施在生效中；已不在生效中的解除請求推導為 CLOSED，沒有期限）：開始時間是 submit_time，期限 7 天（申覆與解除請求相同）。
+  hawkr.common.v1alpha1.Deadline decide_deadline = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Measure 是後台看到的措施。只有 statement、end_time 與 etag 可以經 UpdateMeasure 修改；其他欄位都是 OUTPUT_ONLY。
+// 內部註記是另外的只新增時間軸（CreateMeasureNote、ListMeasureNotes），不經 etag。不輸出 request_id。
+message Measure {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  string store_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string account_id = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.seller.v1alpha1.MeasureKind kind = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.seller.v1alpha1.MeasureBasis basis = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // VIOLATION 依據的認定；第一筆是主要依據（建立時由規則決定：有新的認定是新的認定，否則是最嚴重、同嚴重度最新建立的引用認定），其餘依建立時間。
+  // RISK 依據沒有。清單（ListMeasures）也帶。
+  repeated Violation findings = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // RISK 依據的風險類型；VIOLATION 依據是 UNSPECIFIED。
+  hawkr.seller.v1alpha1.RiskGround risk_ground = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 給賣家的理由（目前那一版）；最多 2000 字。
+  string statement = 8;
+  // 結束時間；沒有固定期間（RISK 的開放式措施）與警告時不設。
+  google.protobuf.Timestamp end_time = 9;
+  // RISK 的複審期限；其他不設。只給後台看，賣家看不到。
+  google.protobuf.Timestamp review_by = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.seller.v1alpha1.MeasureState state = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.seller.v1alpha1.RevokeReason revoke_reason = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 生效中時是空字串。
+  string revoked_by_admin_id = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 生效中時不設。
+  google.protobuf.Timestamp revoke_time = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 期間；警告不設。
+  hawkr.seller.v1alpha1.MeasurePeriod period = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+  reserved 16, 30;
+  reserved "appeal", "remediation_requests";
+  string created_by_admin_id = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 19 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 由 version 產生：版本、狀態、複審期限、請求狀態改變時變；寫內部註記不變。
+  string etag = 20;
+  // 目前的版本，是 revisions 裡最後一版的 revision。
+  int32 current_revision = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 全部版本，舊到新；只有單筆讀取與寫入的回應帶，清單不設。
+  repeated MeasureRevision revisions = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 以下 can_* 由伺服器判斷，與對應方法的前置檢查是同一個規則（model/measure.go）。
+  bool can_update_statement = 23 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_extend = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_shorten = 25 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 不看店家是否關閉（措施以帳號為範圍）。
+  bool can_end = 26 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_revoke = 27 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_schedule_review = 28 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_decide_appeal = 29 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 有待處理的解除請求而且措施生效中（DecideRemediation 的前置條件）。措施已結束而仍待處理的解除請求不能裁定（它的 state 已是 CLOSED）。
+  bool can_decide_remediation = 31 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 賣家的解除請求冷卻期的結束時間；只在 RISK 依據、措施生效中而且在冷卻期內設。
+  google.protobuf.Timestamp next_remediation_time = 32 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 措施上賣家的請求（申覆與解除請求，看 MeasureRequest.kind），新到舊，含佐證（單筆讀取與寫入的回應）；清單也帶（佐證除外）。每一筆的 state 由
+  // 伺服器推導（見 MeasureRequest），ListMeasures 的 request_state 篩選用同一個推導。
+  repeated MeasureRequest requests = 33 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 終止合作（kind 是 TERMINATION）的事由；其他種類是 UNSPECIFIED。
+  hawkr.seller.v1alpha1.TerminationGround termination_ground = 34 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 關聯帳號的終止（termination_ground 是 LINKED_ACCOUNT）的來源措施 id：來源撤銷時這筆一併撤銷（revoke_reason 是 SOURCE_REVOKED）；其他是空字串。
+  string source_measure_id = 35 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 終止合作的申覆期限（生效後 184 天，見 hawkr.seller.v1alpha1.Measure.appeal_deadline_time）；其他種類不設。
+  google.protobuf.Timestamp appeal_deadline_time = 36 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 與這筆措施的帳號使用同一個身分證明文件或統一編號的其他帳號（由本措施建立時的身分快照反查）；只有單筆讀取（GetMeasure）帶，清單與寫入的回應
+  // 不設。只有留有身分快照的措施有：停權，以及非預告（NOTICE）的終止合作；快照在措施撤銷時刪除，個資清理之後也取不到新的命中。
+  repeated LinkedAccount linked_accounts = 37 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 店名；空字串表示沒有（個資清理之後也是：一般關店滿保留期（6 個月），終止合作關店要等申覆期滿）。清單與單筆都帶。
+  string store_name = 38 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 不能改給賣家的理由的原因，依優先序排列（結構性的在前）；空表示可以改（can_update_statement 是 true）。
+  repeated MeasureActionUnavailability update_statement_unavailabilities = 39 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 不能延長結束時間的原因；空表示可以延長（can_extend 是 true）。
+  repeated MeasureActionUnavailability extend_unavailabilities = 40 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 不能縮短結束時間的原因；空表示可以縮短（can_shorten 是 true）。
+  repeated MeasureActionUnavailability shorten_unavailabilities = 41 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 不能撤銷的原因；空表示可以撤銷（can_revoke 是 true）。
+  repeated MeasureActionUnavailability revoke_unavailabilities = 42 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 不能結束的原因；空表示可以結束（can_end 是 true）。依據違規認定的停權沒有結束入口，原因是 VIOLATION_BASIS，client 直接顯示它的句子。
+  repeated MeasureActionUnavailability end_unavailabilities = 45 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 撤銷或接受申覆時能不能一併撤銷認定（RevokeMeasureRequest、DecideAppealRequest 的 revoke_findings）：依據是 VIOLATION，而且這個措施自己建立了至少一筆
+  // 尚未撤銷的認定；只引用別的措施建立的認定時是 false。與兩個方法對 revoke_findings 的檢查是同一個規則（model/measure.go）。
+  bool can_revoke_findings = 43 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 複審的期限，只在風險類型（RISK）的措施、生效中、而且已進入 review_by 前 24 小時時設：開始時間是 review_by 前 24 小時，期限是 review_by；
+  // review_by 過了之後仍在，直到措施結束或撤銷。review_by 本身是事實欄位，撤銷後仍輸出。
+  hawkr.common.v1alpha1.Deadline review_deadline = 44 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// MeasureActionUnavailability 是 admin 此刻不能對措施做某個動作（改理由、延長、縮短、結束或撤銷）的一個原因。與對應方法的前置檢查是同一個規則
+// （model/measure.go），message 與該方法被拒絕時錯誤的 LocalizedMessage 是同一份文字（同一個 Go 函式）。
+message MeasureActionUnavailability {
+  // 原因，給 client 依原因分支用（例如申覆待裁定時導向裁定）。伺服器一律設，不會是 UNSPECIFIED。
+  MeasureActionUnavailableReason reason = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 給使用者看的完整一句話（admin RPC 固定 zh-TW，受眾是員工），有主詞、不含 client 的畫面或選單名稱；client 直接顯示，不另建原因對照表，沒有 message 時才顯示通用文字。
+  google.rpc.LocalizedMessage message = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// MeasureActionUnavailableReason 是 admin 此刻不能修改措施（改理由、延長、縮短）、結束或撤銷的原因（MeasureActionUnavailability.reason），依優先序排列；
+// 空表示可以。與對應方法的前置檢查是同一個規則（model/measure.go）。client 用它分支，不用它組顯示文字。
+enum MeasureActionUnavailableReason {
+  MEASURE_ACTION_UNAVAILABLE_REASON_UNSPECIFIED = 0;
+  // 措施已撤銷。
+  MEASURE_ACTION_UNAVAILABLE_REASON_REVOKED = 1;
+  // 措施不在生效中：已結束、已撤銷，或還沒開始（預定生效的停權與終止合作）；延長與縮短時警告也算（警告沒有生效中的期間）。
+  MEASURE_ACTION_UNAVAILABLE_REASON_NOT_ACTIVE = 2;
+  // 警告沒有結束時間可調。
+  MEASURE_ACTION_UNAVAILABLE_REASON_KIND_HAS_NO_END_TIME = 3;
+  // 生效或預定生效（未撤銷）的終止合作沒有可調的結束時間，要改請撤銷後重建；已撤銷的終止合作只有 REVOKED。
+  MEASURE_ACTION_UNAVAILABLE_REASON_TERMINATION_RECREATE = 4;
+  // 賣家提出過申覆（含已裁定），或有待處理的解除請求：給賣家的理由與延長凍結；縮短與撤銷不受影響。
+  MEASURE_ACTION_UNAVAILABLE_REASON_REQUEST_PENDING_FROZEN = 5;
+  // 申覆待裁定時不能撤銷，只經 DecideAppeal。
+  MEASURE_ACTION_UNAVAILABLE_REASON_APPEAL_PENDING = 6;
+  // 結束：依據違規認定的措施沒有結束入口，認定是只讀的，撤銷與申覆裁定都對措施進行。
+  MEASURE_ACTION_UNAVAILABLE_REASON_VIOLATION_BASIS = 7;
+  // 結束：有待處理的解除請求，要先裁定（接受解除請求就是結束）。
+  MEASURE_ACTION_UNAVAILABLE_REASON_REMEDIATION_PENDING = 8;
+}
+
+// LinkedIdentity 是兩個帳號相同的身分類別。
+enum LinkedIdentity {
+  LINKED_IDENTITY_UNSPECIFIED = 0;
+  // 賣家本人的身分證號相同。
+  LINKED_IDENTITY_NATIONAL_ID = 1;
+  // 統一編號相同。
+  LINKED_IDENTITY_UBN = 2;
+  // 企業負責人的身分證號相同。
+  LINKED_IDENTITY_RESPONSIBLE_PERSON_ID = 3;
+}
+
+// LinkedAccount 是措施詳情上「相同身分的其他帳號」的一列。
+message LinkedAccount {
+  string account_id = 1;
+  // 這個帳號目前的店家；沒有目前的店家時是最近的一個 stint。
+  string store_id = 2;
+  string store_code = 3;
+  // 命中的身分類別；同時命中多種時依 NATIONAL_ID、UBN、RESPONSIBLE_PERSON_ID 的順序取第一種。
+  LinkedIdentity matched_identity = 4;
+  // 以本措施為來源、仍生效（未撤銷）的關聯終止；還沒有時是空字串（管理員可以用 CreateMeasure 建立）。
+  string linked_measure_id = 5;
+  // 此刻能不能對這個帳號建立以本措施為來源的關聯終止（CreateMeasure，termination.ground 是 LINKED_ACCOUNT）。由伺服器推導，與 CreateMeasure 的
+  // 前置條件是同一份規則：本措施是仍生效、第 21.3 條事由的終止合作（預告終止與關聯帳號的終止不能當來源；停權不行）、這個帳號還沒有以本措施為來源
+  // 的生效中關聯終止（linked_measure_id 為空），而且這個帳號的店家允許關聯帳號事由。false 時 client 不顯示建立按鈕；已建立的由 linked_measure_id 呈現。
+  bool can_create_linked_termination = 6;
+  // can_create_linked_termination 為 true 時，建立這筆關聯終止的生效時機與給員工的說明句；false 時不設。
+  TerminationOption termination_option = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// TerminationOption 是可以對某個事由建立的終止合作，帶建立之後措施何時生效，以及給員工的那一句說明。生效時間由伺服器依自己的預告期規則算，與 CreateMeasure 排定的
+// period.start_time 是同一個規則（model.TerminationStart）；client 只呈現，不自己推算天數或日期。
+message TerminationOption {
+  hawkr.seller.v1alpha1.TerminationGround ground = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 排程生效（預告終止）時，以讀取當下為建立時間推算的生效時間；立即生效時不設。實際生效時間以建立後措施的 period.start_time 為準。
+  google.protobuf.Timestamp effective_time = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 生效時機與這個事由的建立條件（admin RPC 固定 zh-TW，受眾是員工），一則完整的訊息；排程生效句含預告天數與 effective_time 的台北時間（YYYY/MM/DD HH:mm）。client 直接顯示。
+  google.rpc.LocalizedMessage explanation = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 建立這個事由的終止時，TerminationInput.violation 的需求；與 CreateMeasure 的驗證是同一個規則（model.TerminationGround.ViolationRequirement）。
+  // REQUIRED 時要引用至少一筆認定，條件寫在 explanation。client 只依它顯示與檢查欄位，不顯示它的文字。
+  TerminationViolationRequirement violation_requirement = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// TerminationViolationRequirement 是建立某個事由的終止合作時，依據（TerminationInput.violation）的需求。
+enum TerminationViolationRequirement {
+  TERMINATION_VIOLATION_REQUIREMENT_UNSPECIFIED = 0;
+  // 必須引用至少一筆認定。
+  TERMINATION_VIOLATION_REQUIREMENT_REQUIRED = 1;
+  // 可以帶依據，也可以不帶。
+  TERMINATION_VIOLATION_REQUIREMENT_OPTIONAL = 2;
+  // 不可帶依據：只能依據契約條款。
+  TERMINATION_VIOLATION_REQUIREMENT_FORBIDDEN = 3;
+}

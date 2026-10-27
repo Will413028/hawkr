@@ -1,0 +1,19 @@
+# 對外 API（根目錄 api/ 的 Protobuf＋Connect）的 TypeScript 生成設定；在本目錄執行 `pnpm gen:api`。
+# protoc-gen-es 由 package.json 固定版本（它自帶 TypeScript 5，target=ts 不經過專案的 TS 7）；
+# buf CLI 的版本固定在 ../../api/.buf-version。生成物在 src/gen，不得手改。
+version: v2
+# 生成前清空每個外掛的 out 目錄，刪掉的 proto 才不會留下孤兒檔。
+clean: true
+plugins:
+  - local: [pnpm, exec, protoc-gen-es]
+    out: src/gen
+    opt: target=ts
+    # api/ 的 proto import 的 googleapis（field_behavior）一起生成；版本鎖在 api/buf.lock。
+    include_imports: true
+inputs:
+  - directory: ../../api
+  # 錯誤的 details 用 google.rpc 的標準型別（ADR 2026-09-25-api-error-model）。版本鎖在 BSR 的 commit；
+  # Go 端直接用 genproto 的 errdetails，不生成。
+  - module: buf.build/googleapis/googleapis:c17df5b2beca46928cc87d5656bd5343
+    paths:
+      - google/rpc/error_details.proto

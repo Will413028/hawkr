@@ -1,0 +1,23 @@
+{
+  "act": "PUBLICATION_APPROVAL_REQUIRED",
+  "emptyArgsBlocks": [
+    {
+      "kind": "COMPLETE",
+      "text": "RFQ 快照已經確認好了。"
+    },
+    {
+      "kind": "RATIONALE",
+      "text": "等你核准後才會正式送出給賣家。"
+    }
+  ],
+  "populatedArgsBlocks": [
+    {
+      "kind": "COMPLETE",
+      "text": "RFQ 快照已經確認好了。"
+    },
+    {
+      "kind": "RATIONALE",
+      "text": "等你核准後才會正式送出給賣家。"
+    }
+  ]
+}

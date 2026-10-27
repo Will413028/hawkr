@@ -1,0 +1,999 @@
+/* ============================================================
+   HAWKR COLOR CONFIG
+
+   This is the single entry point for project-wide colors.
+   Page / component CSS should consume semantic tokens from here
+   instead of hardcoding HEX / rgb values.
+
+   Source: docs/design-system-guidelines.md + brand/hawkr/README.md.
+   ============================================================ */
+
+:root {
+	/* Hawkr brand palette (brand/hawkr/README.md).
+	   primary is for the logo, large headings (>= 24px, or >= 18.66px bold) and
+	   decoration; never regular-size white text. Interactive controls use
+	   primary-strong (white text 5.41:1) and primary-deep for hover / pressed.
+	   secondary takes ink text (7.19:1), never white. */
+	--color-brand-primary: #e4572e;
+	--color-brand-primary-rgb: 228 87 46;
+	--color-brand-primary-strong: #b8441f;
+	--color-brand-primary-strong-rgb: 184 68 31;
+	--color-brand-primary-deep: #8f3315;
+	--color-brand-primary-deep-rgb: 143 51 21;
+	--color-brand-secondary: #f2a541;
+	--color-brand-secondary-rgb: 242 165 65;
+	--color-brand-ink: #1f2933;
+	--color-brand-ink-rgb: 31 41 51;
+	--color-brand-ink-on-dark: #f5f7fa;
+	--color-brand-ink-on-dark-rgb: 245 247 250;
+	/* Tints: primary 12% and secondary 16% mixed with white; ink text >= 4.5:1. */
+	--color-brand-primary-soft: #fcebe6;
+	--color-brand-primary-soft-rgb: 252 235 230;
+	--color-brand-secondary-soft: #fdf1e1;
+	--color-brand-secondary-soft-rgb: 253 241 225;
+
+	/* Ink ramp: neutral blue-grey steps around brand-ink (900) and
+	   brand-ink-on-dark (50). Hairlines, washes, shadows and muted text that
+	   need a neutral tint take a step from here instead of a hand-written value. */
+	--color-ink-50: var(--color-brand-ink-on-dark);
+	--color-ink-50-rgb: var(--color-brand-ink-on-dark-rgb);
+	--color-ink-100: #e4e7eb;
+	--color-ink-100-rgb: 228 231 235;
+	--color-ink-200: #cbd2d9;
+	--color-ink-200-rgb: 203 210 217;
+	--color-ink-300: #9aa5b1;
+	--color-ink-300-rgb: 154 165 177;
+	--color-ink-400: #7b8794;
+	--color-ink-400-rgb: 123 135 148;
+	--color-ink-500: #616e7c;
+	--color-ink-500-rgb: 97 110 124;
+	--color-ink-600: #52606d;
+	--color-ink-600-rgb: 82 96 109;
+	--color-ink-700: #3e4c59;
+	--color-ink-700-rgb: 62 76 89;
+	--color-ink-800: #323f4b;
+	--color-ink-800-rgb: 50 63 75;
+	--color-ink-850: #28333f;
+	--color-ink-850-rgb: 40 51 63;
+	--color-ink-900: var(--color-brand-ink);
+	--color-ink-900-rgb: var(--color-brand-ink-rgb);
+	--color-ink-950: #161c23;
+	--color-ink-950-rgb: 22 28 35;
+	/* Dark-theme surface ladder between the ink steps (page = ink-900, card = ink-850). */
+	--color-dark-muted: #242f3a;
+	--color-dark-panel: #2b3642;
+	--color-dark-elevated: #2f3b47;
+
+	/* Status colors: literal values, independent of the brand palette. */
+	--color-status-success: #2d7f50;
+	--color-status-success-rgb: 45 127 80;
+	--color-status-success-soft: #e6f0ea;
+	--color-status-success-soft-rgb: 230 240 234;
+	--color-status-success-light: #6fcf97;
+	--color-status-success-light-rgb: 111 207 151;
+	--color-status-warning: #e0c44c;
+	--color-status-warning-rgb: 224 196 76;
+	--color-status-danger: #ea6021;
+	--color-status-danger-rgb: 234 96 33;
+	--color-status-info: #6194d0;
+	--color-status-info-rgb: 97 148 208;
+	--color-status-info-strong: #1e5fab;
+	--color-status-info-strong-rgb: 30 95 171;
+	--color-status-info-soft: #9fccdd;
+	--color-status-info-soft-rgb: 159 204 221;
+
+	/* Shared Grainient decoration: four tiers of the Hawkr palette, at 25% opacity.
+	   These do not replace product, CTA or status colors. */
+	--site-grainient-color-1: var(--color-brand-primary-strong);
+	--site-grainient-color-2: var(--color-brand-primary);
+	--site-grainient-color-3: var(--color-brand-secondary-soft);
+	--site-grainient-color-4: var(--color-brand-secondary);
+	/* The same solid page token used by the market's --hkui-background. */
+	--site-grainient-base: var(--theme-surface-page);
+	--site-grainient-fallback-1: var(--site-grainient-color-1);
+	--site-grainient-fallback-2: var(--site-grainient-color-2);
+	--site-grainient-fallback-3: var(--site-grainient-color-3);
+	--site-grainient-fallback-4: var(--site-grainient-color-4);
+
+	/* Logo color per background: one approved logo color for each background,
+	 * so call sites never pick their own. Light backgrounds take primary,
+	 * dark backgrounds take ink-on-dark. */
+	--brand-logo-on-light: var(--color-brand-primary);
+	--brand-logo-on-dark: var(--color-brand-ink-on-dark);
+	/* The counter of the full-color mark: ink on light, ink-on-dark on dark. */
+	--brand-logo-counter: var(--color-brand-ink);
+
+	/* Neutral palette */
+	--color-neutral-white: #ffffff;
+	--color-neutral-white-rgb: 255 255 255;
+	--color-neutral-cream: #fffdf7;
+	--color-neutral-cream-rgb: 255 253 247;
+	--color-neutral-page: #f8f6ef;
+	--color-neutral-page-rgb: 248 246 239;
+	--color-neutral-muted: #f5f1e8;
+	--color-neutral-muted-rgb: 245 241 232;
+	--color-neutral-panel: #f2e9d6;
+	--color-neutral-panel-rgb: 242 233 214;
+	--color-neutral-whisper: #f0f1ea;
+	--color-neutral-whisper-rgb: 240 241 234;
+	--color-neutral-ink: #191c18;
+	--color-neutral-ink-rgb: 25 28 24;
+	--color-neutral-body: #42493f;
+	--color-neutral-body-rgb: 66 73 63;
+	--color-neutral-muted-text: #5a6154;
+	--color-neutral-muted-text-rgb: 90 97 84;
+	--color-neutral-500: #888888;
+	--color-neutral-500-rgb: 136 136 136;
+	--color-neutral-300: #c8c8c8;
+	--color-neutral-300-rgb: 200 200 200;
+	--color-neutral-black: #000000;
+	--color-neutral-black-rgb: 0 0 0;
+
+	/* Light mode theme semantics */
+	--theme-surface-page: var(--color-neutral-page);
+	--theme-surface-card: var(--color-neutral-cream);
+	--theme-surface-muted: var(--color-neutral-muted);
+	--theme-surface-panel: var(--color-neutral-panel);
+	--theme-surface-elevated: var(--color-neutral-white);
+	/* Frosted glass surfaces — glass-style rails / panels / controls
+	 * (opaque cream in light, translucent white veil in dark). A distinct
+	 * role from the opaque --theme-surface-* cards. The -subtle/-hover/
+	 * -active rungs are the resting / hover / pressed states for insets
+	 * (list items, tabs). */
+	--theme-surface-glass: var(--color-neutral-cream);
+	--theme-surface-glass-subtle: rgb(var(--color-brand-ink-rgb) / 0.03);
+	--theme-surface-glass-hover: rgb(var(--color-brand-ink-rgb) / 0.07);
+	--theme-surface-glass-active: rgb(var(--color-brand-ink-rgb) / 0.09);
+	--theme-text-heading: var(--color-neutral-ink);
+	--theme-text-body: var(--color-neutral-body);
+	--theme-text-muted: var(--color-neutral-muted-text);
+	/* Fainter than muted (disabled / tertiary copy) */
+	--theme-text-faint: rgb(var(--color-neutral-muted-text-rgb) / 0.72);
+	/* Emphasised active/selected label text (light = primary-strong, dark = warm cream) */
+	--theme-text-accent: var(--color-brand-primary-strong);
+	/* Accent text on tinted or panel surfaces (primary tints, surface-panel):
+	   primary-strong falls below 4.5:1 there, primary-deep passes. */
+	--theme-text-accent-on-tint: var(--color-brand-primary-deep);
+	--theme-text-inverse: var(--color-neutral-cream);
+	--theme-action-primary: var(--color-brand-primary-strong);
+	--theme-action-primary-hover: var(--color-brand-primary-deep);
+	/* Primary action as active/selected state: subtle fill + border.
+	   Light = primary-strong tint; dark = bright secondary (matches border-warm and the
+	   hand-coded active accents being converged). */
+	--theme-primary-subtle: rgb(var(--color-brand-primary-strong-rgb) / 0.1);
+	/* One step up from -subtle: the hover/active fill for surfaces that rest on
+	   -subtle. Named for the Hawkr Agent entry and selected navigation surfaces
+	   previously hard-coded their own color-mix percentages for this exact
+	   state, so the "pressed tint" drifted between them. */
+	--theme-primary-soft: rgb(var(--color-brand-primary-strong-rgb) / 0.18);
+	--theme-primary-border: rgb(var(--color-brand-primary-strong-rgb) / 0.4);
+	--theme-action-secondary: var(--color-brand-primary-strong);
+	--theme-accent-warm: var(--color-brand-secondary);
+	--theme-accent-gold: var(--color-brand-secondary);
+	--theme-accent-cool: var(--color-status-info-soft);
+	/* Hairline ladder: subtle < soft < strong (ink tint in light) */
+	--theme-border-subtle: rgb(var(--color-brand-ink-rgb) / 0.08);
+	--theme-border-soft: rgb(var(--color-brand-ink-rgb) / 0.14);
+	--theme-border-strong: rgb(var(--color-brand-ink-rgb) / 0.24);
+	--theme-border-warm: rgb(var(--color-brand-secondary-rgb) / 0.28);
+	--theme-border-input: #ded8cb;
+	--theme-overlay: rgb(var(--color-brand-ink-rgb) / 0.42);
+
+	/* Site chrome / page background tokens. The light page surface is the
+	 * single `--surface-page` paint on <body> (02-reset-layout.css); the old
+	 * per-page light gradient tokens were removed with their dead body rule
+	 * in 01-tokens-theme.css so the navbar strip and page content can never
+	 * diverge into two stacked surfaces again. */
+	--theme-dark-body-bg:
+		radial-gradient(
+			circle at 18% 14%,
+			rgb(var(--color-ink-400-rgb) / 0.28),
+			rgb(var(--color-ink-500-rgb) / 0) 31%
+		),
+		radial-gradient(
+			circle at 86% 12%,
+			rgb(241 205 112 / 0.14),
+			rgb(241 205 112 / 0) 28%
+		),
+		radial-gradient(
+			circle at 56% 96%,
+			rgb(var(--color-ink-900-rgb) / 0.52),
+			rgb(var(--color-ink-900-rgb) / 0) 43%
+		),
+		radial-gradient(
+			1px 1px at 18px 32px,
+			rgb(255 255 255 / 0.18),
+			transparent 50%
+		),
+		radial-gradient(
+			1px 1px at 142px 88px,
+			rgb(255 255 255 / 0.14),
+			transparent 50%
+		),
+		radial-gradient(
+			1.5px 1.5px at 230px 18px,
+			rgb(255 247 220 / 0.2),
+			transparent 60%
+		),
+		radial-gradient(
+			1px 1px at 310px 140px,
+			rgb(255 255 255 / 0.14),
+			transparent 50%
+		),
+		radial-gradient(
+			1px 1px at 88px 220px,
+			rgb(255 255 255 / 0.12),
+			transparent 50%
+		),
+		radial-gradient(
+			1.5px 1.5px at 380px 280px,
+			rgb(255 240 200 / 0.22),
+			transparent 60%
+		),
+		radial-gradient(
+			1px 1px at 60px 360px,
+			rgb(255 255 255 / 0.14),
+			transparent 50%
+		),
+		radial-gradient(
+			1px 1px at 250px 380px,
+			rgb(255 255 255 / 0.11),
+			transparent 50%
+		),
+		radial-gradient(
+			1px 1px at 195px 60px,
+			rgb(255 255 255 / 0.16),
+			transparent 50%
+		),
+		radial-gradient(
+			1px 1px at 410px 110px,
+			rgb(255 255 255 / 0.13),
+			transparent 50%
+		),
+		radial-gradient(
+			1.5px 1.5px at 30px 440px,
+			rgb(255 240 200 / 0.18),
+			transparent 60%
+		),
+		linear-gradient(
+			165deg,
+			var(--color-ink-900) 0%,
+			var(--color-ink-850) 30%,
+			var(--color-ink-800) 64%,
+			var(--color-ink-850) 100%
+		);
+
+	/* Shared shadow colors */
+	--theme-shadow-brand-soft:
+		0 12px 30px rgb(var(--color-brand-ink-rgb) / 0.07),
+		0 2px 8px rgb(var(--color-neutral-ink-rgb) / 0.04);
+	--theme-shadow-brand-lift:
+		0 18px 42px rgb(var(--color-brand-ink-rgb) / 0.1),
+		0 5px 14px rgb(var(--color-neutral-ink-rgb) / 0.06);
+	--theme-shadow-nav: 0 10px 30px rgb(var(--color-brand-ink-rgb) / 0.08);
+	--theme-shadow-dropdown: 0 12px 24px
+		rgb(var(--color-neutral-black-rgb) / 0.15);
+
+	/* Page-level colors: chat */
+	--page-chat-shell-bg: color-mix(
+		in srgb,
+		var(--hkui-content1) 88%,
+		transparent
+	);
+	--page-chat-search-bg: #f3f3f5;
+	--page-chat-search-placeholder: rgb(var(--color-neutral-500-rgb) / 0.5);
+	--page-chat-card-border: rgb(var(--color-neutral-500-rgb) / 0.12);
+	--page-chat-card-shadow: 0 1px 2px rgb(var(--color-neutral-black-rgb) / 0.06);
+	--page-chat-card-hover-border: rgb(var(--color-brand-primary-rgb) / 0.4);
+	--page-chat-card-hover-shadow: 0 4px 12px
+		rgb(var(--color-neutral-black-rgb) / 0.06);
+	--page-chat-card-active-bg: rgb(var(--color-brand-primary-rgb) / 0.1);
+	--page-chat-card-active-shadow: 0 4px 12px
+		rgb(var(--color-brand-primary-rgb) / 0.18);
+	--page-chat-empty-copy: rgb(var(--color-neutral-500-rgb) / 0.7);
+	/* Empty-state stage — layered cream + primary wash, soft halo,
+	 * three brand-colored sparkles. Light mode pulls from the secondary-soft/primary/
+	 * secondary tokens at low alpha so the panel feels organic, not
+	 * synthetic. Reused by both `.chat-empty-panel` (no thread picked)
+	 * and `.thread-empty` (thread open, no messages yet). */
+	--page-chat-empty-bg-from: rgb(var(--color-brand-secondary-soft-rgb) / 0.34);
+	--page-chat-empty-bg-via: rgb(var(--color-brand-primary-rgb) / 0.05);
+	--page-chat-empty-bg-to: transparent;
+	--page-chat-empty-halo: rgb(var(--color-brand-primary-rgb) / 0.22);
+	--page-chat-empty-halo-edge: rgb(var(--color-brand-primary-rgb) / 0);
+	--page-chat-empty-card-bg: var(--color-neutral-white);
+	--page-chat-empty-card-border: rgb(var(--color-brand-ink-rgb) / 0.08);
+	--page-chat-empty-card-shadow:
+		0 24px 60px -28px rgb(var(--color-brand-ink-rgb) / 0.32),
+		0 8px 24px -16px rgb(var(--color-brand-ink-rgb) / 0.18);
+	--page-chat-empty-dot-1: rgb(var(--color-brand-secondary-rgb) / 0.42);
+	--page-chat-empty-dot-2: rgb(var(--color-brand-primary-rgb) / 0.36);
+	--page-chat-empty-dot-3: rgb(var(--color-brand-secondary-rgb) / 0.32);
+	--page-chat-empty-chip-bg: rgb(var(--color-brand-secondary-soft-rgb) / 0.55);
+	--page-chat-empty-chip-border: rgb(var(--color-brand-ink-rgb) / 0.08);
+	--page-chat-empty-chip-fg: var(--color-brand-primary-strong);
+	--page-chat-empty-chip-hover-bg: rgb(var(--color-brand-primary-rgb) / 0.18);
+	--page-chat-empty-chip-hover-border: rgb(
+		var(--color-brand-primary-rgb) /
+		0.45
+	);
+	--page-chat-thread-header-bg: var(--color-brand-primary-strong);
+	--page-chat-thread-header-fg: var(--color-neutral-white);
+	--page-chat-thread-surface: var(--color-neutral-white);
+	--page-chat-thread-head-bg: rgb(var(--color-neutral-white-rgb) / 0.9);
+	--page-chat-thread-head-border: rgb(var(--color-brand-ink-rgb) / 0.08);
+	--page-chat-bubble-peer-bg: rgb(var(--color-neutral-white-rgb) / 0.96);
+	--page-chat-bubble-peer-border: rgb(var(--color-brand-ink-rgb) / 0.08);
+	--page-chat-bubble-peer-shadow:
+		0 12px 30px -22px rgb(var(--color-brand-ink-rgb) / 0.34),
+		0 2px 8px rgb(var(--color-neutral-black-rgb) / 0.05);
+	--page-chat-bubble-mine-bg: var(--color-brand-primary-strong);
+	--page-chat-bubble-mine-shadow:
+		0 12px 30px -20px rgb(var(--color-brand-primary-rgb) / 0.54),
+		0 2px 8px rgb(var(--color-brand-ink-rgb) / 0.12);
+	--page-chat-bubble-peer-time: rgb(var(--color-neutral-500-rgb) / 0.7);
+	--page-chat-bubble-mine-time: rgb(var(--color-neutral-white-rgb) / 0.78);
+	--page-chat-online: #05df72;
+	--page-chat-online-ring: rgb(5 223 114 / 0.22);
+	--page-chat-reconnecting: #f5d568;
+	--page-chat-compose-bg: rgb(var(--color-neutral-cream-rgb) / 0.88);
+	--page-chat-compose-shadow: 0 -5px 20px
+		rgb(var(--color-neutral-black-rgb) / 0.03);
+	--page-chat-send-hover: var(--color-brand-primary-deep);
+
+	/* Thread body background — soft paper wash. No visible hard pattern;
+	 * bubbles should carry the focus while the surface stays calm. */
+	--page-chat-body-base: #faf8f0;
+	--page-chat-body-wash-from: rgb(var(--color-brand-secondary-soft-rgb) / 0.55);
+	--page-chat-body-wash-via: rgb(var(--color-brand-primary-rgb) / 0.12);
+	--page-chat-body-wash-to: #f4f0e5;
+	--page-chat-body-line: rgb(var(--color-brand-ink-rgb) / 0.035);
+
+	/* Structured-payload chat card (product / order). White surface in
+	 * light mode, primary-strong accent for the price/title, secondary-tinted
+	 * status pill for orders. Buttons reuse the secondary outline +
+	 * primary solid pair already in the design system. */
+	--page-chat-card-bg: var(--color-neutral-white);
+	--page-chat-card-border-strong: rgb(var(--color-brand-ink-rgb) / 0.1);
+	--page-chat-card-divider: rgb(var(--color-brand-ink-rgb) / 0.08);
+	--page-chat-card-elevation:
+		0 8px 24px -16px rgb(var(--color-brand-ink-rgb) / 0.32),
+		0 2px 6px -2px rgb(var(--color-brand-ink-rgb) / 0.1);
+	--page-chat-card-media-bg: rgb(var(--color-brand-secondary-soft-rgb) / 0.4);
+	--page-chat-card-media-border: rgb(var(--color-brand-ink-rgb) / 0.08);
+	--page-chat-card-media-fg: rgb(var(--color-brand-ink-rgb) / 0.42);
+	--page-chat-card-title: var(--color-brand-primary-strong);
+	--page-chat-card-price: var(--color-brand-primary-strong);
+	--page-chat-card-status-bg: rgb(var(--color-brand-secondary-rgb) / 0.16);
+	--page-chat-card-status-fg: var(--color-brand-ink);
+	--page-chat-card-status-border: rgb(var(--color-brand-secondary-rgb) / 0.32);
+
+	/* Icon accents */
+	--icon-accent: var(--color-brand-primary-strong);
+	--icon-accent-secondary: var(--color-brand-secondary);
+	--truck-loading-vehicle-color: var(--color-brand-primary-strong);
+	--truck-loading-vehicle-secondary: var(--color-brand-secondary);
+	--truck-loading-window-color: var(--color-neutral-cream);
+	--truck-loading-wheel-color: var(--color-brand-primary-strong);
+	--truck-loading-wheel-inner-color: var(--color-neutral-white);
+	--truck-loading-road-color: rgb(var(--color-brand-ink-rgb) / 0.42);
+
+	/* Social "liked" affordance — a pure red that sits deliberately outside the
+	   Hawkr palette. The liked heart used to borrow `--hkui-danger`
+	   (orange #ea6021), which reads orange rather than red and overloads a role
+	   that otherwise means "something went wrong". Theme-invariant: the heart
+	   is a filled glyph on both light and dark card surfaces. */
+	--color-like-heart: #ff0000;
+
+	/* Page-level colors: origin / maps */
+	--page-map-selected: var(--color-brand-primary-strong);
+	--page-map-high: var(--color-brand-primary);
+	--page-map-medium: var(--color-brand-secondary);
+	--page-map-light: var(--color-brand-secondary-soft);
+	--page-map-pale: var(--color-brand-primary-soft);
+	--page-map-empty: var(--color-ink-100);
+
+	/* Invalid-field focus halo. The valid halo (--hkui-input-focus-ring) is a
+	 * 3px brand glow; the error state used to get a bare 1px ring, i.e. the
+	 * WEAKER indicator on the state that most needs one. Same geometry as the
+	 * valid halo, painted in 柿橘 (--hkui-danger / --color-status-danger).
+	 * Theme-invariant: both inputs re-resolve per theme on their own. */
+	--page-input-focus-ring-danger:
+		0 0 0 1px var(--hkui-danger),
+		0 0 0 4px rgb(var(--color-status-danger-rgb) / 0.18);
+
+	/* Rating stars. Was hard-coded #F5A623 inside components/ui/Stars.tsx;
+	 * same value in both themes (a filled star reads as gold on cream and on
+	 * the night canvas alike). */
+	--page-rating-star: #f5a623;
+
+	/* Card `isBlurred` hairline over the glass surface. */
+	--page-card-blur-border: rgb(var(--color-neutral-white-rgb) / 0.4);
+
+	/* ── Overlays / carousels / toasts / status pages ──────────────
+	 * Every value below is lifted VERBATIM from the literal it replaced in
+	 * the matching component, so the painted colour is unchanged. Where the
+	 * literal sat in a `var(--x, #fallback)` whose variable already exists,
+	 * the token carries the VARIABLE (the fallback was dead code). */
+
+	/* Small brand marker: carousel dots (active), loading pulse dot, and the
+	 * megamenu placeholder / empty-state glyphs. */
+	--page-accent-marker: var(--action-primary);
+
+	/* Carousel dots (components/shared/CarouselDots.tsx). */
+	--page-carousel-dot-idle: rgb(var(--color-ink-800-rgb) / 0.2);
+	--page-carousel-dot-hover: rgb(var(--color-ink-800-rgb) / 0.45);
+
+	/* Banner carousel + its loading card. */
+	--page-banner-viewport-bg: rgb(var(--color-ink-800-rgb) / 0.06);
+	--page-banner-caption-scrim: rgb(0 0 0 / 0.55);
+	--page-banner-heading-fg: var(--ink-soft);
+
+	/* Megamenu panel (hashtag chips, media placeholder, overlay chips). */
+	--page-mega-tag-bg: rgb(var(--color-ink-600-rgb) / 0.1);
+	--page-mega-tag-hover-bg: rgb(var(--color-ink-600-rgb) / 0.18);
+	--page-mega-tag-fg: var(--color-ink-500);
+	--page-mega-placeholder-bg: linear-gradient(
+		135deg,
+		rgb(var(--color-ink-600-rgb) / 0.12),
+		rgb(241 205 112 / 0.14)
+	);
+	--page-mega-skeleton-bone: rgb(var(--color-ink-800-rgb) / 0.12);
+	--page-mega-empty-fg: var(--ink-soft);
+	--page-mega-empty-disc-bg: rgb(var(--color-ink-600-rgb) / 0.1);
+	--page-mega-scrim: rgb(var(--color-ink-950-rgb) / 0.28);
+	--page-mega-chip-bg: rgb(var(--color-ink-950-rgb) / 0.55);
+
+	/* Login-required modal. */
+	--page-login-modal-glow: rgb(216 180 87 / 0.18);
+	--page-login-modal-disc-border: rgb(225 219 206 / 0.88);
+	--page-login-modal-disc-bg: rgb(255 253 247 / 0.82);
+	--page-login-modal-ghost-bg: rgb(255 253 247 / 0.72);
+	--page-login-modal-ghost-hover-bg: var(--hkui-content1);
+
+	/* Cart snackbar pill (success / refusal tones). */
+	--page-cart-snackbar-success-bg: var(--color-ink-900);
+	--page-cart-snackbar-success-fg: var(--color-neutral-cream);
+	--page-cart-snackbar-success-icon: var(--color-status-success-light);
+	--page-cart-snackbar-success-shadow:
+		0 18px 36px -12px rgb(var(--color-ink-950-rgb) / 0.42),
+		0 6px 14px -6px rgb(var(--color-ink-950-rgb) / 0.32);
+	--page-cart-snackbar-error-bg: #3a1a10;
+	--page-cart-snackbar-error-fg: #ffe9dd;
+	--page-cart-snackbar-error-icon: var(--color-status-danger);
+	--page-cart-snackbar-error-border: rgb(var(--color-status-danger-rgb) / 0.42);
+	--page-cart-snackbar-error-shadow:
+		0 18px 36px -12px rgb(58 26 16 / 0.5), 0 6px 14px -6px rgb(58 26 16 / 0.38);
+	--page-cart-snackbar-cta-bg: #edc24f;
+	--page-cart-snackbar-cta-fg: #1b1305;
+	--page-cart-snackbar-close-fg: rgb(255 254 250 / 0.7);
+	--page-cart-snackbar-close-hover-fg: var(--color-neutral-cream);
+
+	/* Floating favourite heart on product cards. The pill sits on the photo in
+	   BOTH themes, so its glass tones are fixed rather than theme-swapped. */
+	--page-favorite-bg: rgb(var(--color-ink-950-rgb) / 0.72);
+	--page-favorite-bg-hover: rgb(var(--color-ink-950-rgb) / 0.84);
+	--page-favorite-shadow: 0 4px 12px -4px rgb(var(--color-ink-950-rgb) / 0.5);
+	/* The filled heart's rose. Deliberately NOT --color-like-heart (pure red,
+	   the feed's like mark): this one reads on a dark glass pill. */
+	--page-favorite-active-fg: #ff8a98;
+
+	/* 補貨通知 pill — dark-theme skin only; the light skin uses hk-secondary-soft/primary-strong. */
+	--page-restock-fg-on-dark: #f5e9c3;
+	--page-restock-ring-on-dark: rgb(245 222 165 / 0.16);
+	--page-restock-on-bg-on-dark: var(--color-ink-500);
+
+	/* 認證勾選列 (ProductCertificationRow). */
+	--page-cert-tint: rgb(var(--color-ink-600-rgb) / 0.08);
+	--page-cert-ring: rgb(var(--color-ink-600-rgb) / 0.12);
+	--page-cert-accent-on-dark: var(--color-ink-200);
+	--page-cert-tint-on-dark: rgb(var(--color-ink-300-rgb) / 0.22);
+	--page-cert-tint-fade-on-dark: rgb(255 255 255 / 0.05);
+	--page-cert-border-on-dark: rgb(245 222 165 / 0.18);
+	--page-cert-title-on-dark: var(--color-ink-100);
+	--page-cert-error-on-dark: #e6a3a3;
+
+	/* Truck loading overlay. The scrim/message pill are painted the same in both
+	   themes (they sit above the page, not in it), so no dark override. */
+	--page-truck-scrim: rgb(var(--color-ink-950-rgb) / 0.42);
+	--page-truck-message-fg: #f5e9c3;
+	--page-truck-message-bg: rgb(var(--color-ink-950-rgb) / 0.7);
+	--page-truck-message-border: rgb(245 222 165 / 0.18);
+	--page-truck-panel-on-dark: rgb(var(--color-ink-800-rgb) / 0.85);
+	--page-truck-panel-border-on-dark: rgb(245 222 165 / 0.16);
+
+	/* Dropdown menu (components/ui/Dropdown.tsx, styles/components/ui-kit.css).
+	   Values lifted VERBATIM from the literals they replace, so the painted
+	   colour is unchanged. The olive --color-ink-300 here is the App's dropdown
+	   highlight — it is NOT --color-brand-primary-strong, so it needs its
+	   own token rather than a brand alias.
+	   2026-09-10: the夜間 values that used to live as literals in
+	   styles/features/seller-center.css (a `[data-theme="dark"] .hkui-dropdown__*`
+	   patch block) now sit in the `[data-theme="dark"]` block below, so the menu
+	   is themed by tokens instead of by a feature-scoped override. */
+	/* 浮動標籤閒置色（= --hkui-foreground-soft 的 light 值）；dark 值承接原
+	   seller-center.css 對 .seller-shell 的 patch。 */
+	--page-input-floating-label-fg: var(--theme-text-muted);
+	--page-dropdown-menu-bg: var(--color-ink-50);
+	--page-dropdown-border: rgba(86, 86, 86, 0.2);
+	--page-dropdown-item-fg: var(--hkui-foreground);
+	--page-dropdown-item-selected-bg: rgb(var(--color-ink-300-rgb) / 0.18);
+	--page-dropdown-item-selected-fg: var(--hkui-foreground);
+	--page-dropdown-item-active-bg: rgb(var(--color-ink-300-rgb) / 0.7);
+	--page-dropdown-item-active-fg: var(--color-neutral-white);
+	--page-dropdown-item-active-selected-bg: rgb(var(--color-ink-300-rgb) / 0.9);
+	--page-dropdown-search-bg: var(--hkui-content1);
+	--page-dropdown-search-border: var(--page-dropdown-border);
+	--page-dropdown-search-fg: var(--hkui-foreground-soft);
+
+	/* Image uploader tile (components/ui/ImageUploader.tsx). Values lifted
+	   VERBATIM from the literals they replace, so the painted colour is
+	   unchanged. Theme-invariant: none of the three carried a `dark:` variant
+	   in the component, and adding one would be a visual change. */
+	--page-uploader-tile-bg: rgb(var(--color-neutral-white-rgb) / 0.7);
+	--page-uploader-danger-bg: rgba(193, 39, 45, 0.08);
+	/* 待設計端拍板：這是同一個 danger 狀態的第二種紅（錯誤外框底 193 56 56 vs.
+	   移除鍵 hover 193 39 45）。兩個值先各留一個 token，統一與否由設計決定。 */
+	--page-uploader-danger-bg-alt: rgba(193, 56, 56, 0.06);
+
+	/* Image crop editor (components/ui/ImageCropDialog.tsx). Values lifted
+	   VERBATIM from the literals they replace. The editor chrome floats over its
+	   own near-black canvas, so its whites are SURFACE-relative (white in both
+	   themes) rather than theme-relative — only the four tokens repeated in the
+	   dark block below ever flipped. */
+	--page-crop-canvas-bg: var(--color-ink-950);
+	/* 待設計端拍板：貼文取景畫布 (--color-ink-950) 與其他編輯器畫布 (--color-ink-950) 是同一個
+	   概念的兩個近黑；兩個值都先保留。 */
+	--page-crop-canvas-bg-alt: var(--color-ink-950);
+	--page-crop-grid-bg: var(--color-neutral-cream);
+	--page-crop-grid-tile: rgb(var(--color-brand-ink-rgb) / 0.09);
+	--page-crop-inset-shadow: inset 0 0 0 1px
+		rgb(var(--color-brand-ink-rgb) / 0.28);
+	/* A white ring, not --hkui-focus-ring: this control sits on the dark canvas
+	   where the brand ring disappears. */
+	--page-crop-focus-ring: 0 0 0 3px rgb(var(--color-neutral-white-rgb) / 0.55);
+	--page-crop-chrome-fg: #101010;
+	--page-crop-chrome-bg-hover: rgb(var(--color-neutral-white-rgb) / 0.24);
+	--page-crop-chrome-bg-pressed: rgb(var(--color-neutral-white-rgb) / 0.34);
+	--page-crop-chrome-bg-selected-hover: rgb(
+		var(--color-neutral-white-rgb) /
+		0.12
+	);
+	--page-crop-chrome-bg-selected-pressed: rgb(
+		var(--color-neutral-white-rgb) /
+		0.2
+	);
+	--page-crop-lens-border: rgb(var(--color-neutral-white-rgb) / 0.82);
+	--page-crop-lens-shadow:
+		0 1px 0 rgb(var(--color-neutral-white-rgb) / 0.92) inset,
+		0 5px 14px -8px rgb(var(--color-neutral-black-rgb) / 0.38);
+	--page-crop-lens-shell-shadow:
+		0 1px 0 rgb(var(--color-neutral-white-rgb) / 0.72) inset,
+		0 8px 22px -18px rgb(var(--color-neutral-black-rgb) / 0.28);
+
+	/* ── Site navigation chrome (buyer navbar / seller header / mega menu /
+	   theme toggle) ────────────────────────────────────────────────
+	   Literal-for-literal captures of colours that used to be written inline
+	   in the TSX. Values are unchanged — only their home moved — so the
+	   computed styles the navbar visual gates diff stay identical. Tokens
+	   that carry a dark counterpart are redeclared in the dark block below;
+	   the ones suffixed `-dark` are only ever read under a `dark:` variant. */
+	--page-nav-pill-bg: rgba(248, 246, 239, 0.96);
+	--page-nav-pill-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.7) inset,
+		0 0 0 1px rgb(var(--color-ink-950-rgb) / 0.06),
+		0 12px 32px -16px rgb(var(--color-ink-950-rgb) / 0.18),
+		0 4px 12px -6px rgb(var(--color-ink-950-rgb) / 0.08);
+	--page-nav-pill-shadow-mobile: 0 1px 0 rgb(var(--color-ink-950-rgb) / 0.08);
+	--page-nav-pill-gradient-dark: linear-gradient(
+		145deg,
+		rgb(var(--color-ink-850-rgb) / 0.88),
+		rgb(var(--color-ink-950-rgb) / 0.78)
+	);
+	--page-nav-item-hover-bg: rgb(var(--color-ink-700-rgb) / 0.08);
+	--page-nav-item-hover-fg: var(--color-brand-primary-strong);
+	--page-nav-action-hover-bg: var(--surface-card);
+	--page-nav-action-mobile-fg-dark: rgb(245, 233, 195);
+	--page-nav-login-border-dark: rgba(245, 222, 165, 0.32);
+	--page-nav-login-hover-fg-dark: rgb(var(--color-ink-100-rgb) / 0.86);
+	--page-nav-user-trigger-bg: rgb(var(--color-brand-primary-strong-rgb) / 0.06);
+	--page-nav-user-trigger-hover-bg: rgb(
+		var(--color-brand-primary-strong-rgb) /
+		0.12
+	);
+	--page-nav-user-trigger-fg: rgb(85, 85, 85);
+	--page-nav-user-name-fg: rgb(85, 85, 85);
+	--page-nav-user-avatar-bg: var(--color-ink-50);
+	--page-nav-seller-cta-accent: var(--color-brand-primary);
+	--page-nav-seller-cta-fg: var(--color-brand-primary-strong);
+	--page-nav-active-indicator-ring: inset 0 0 0 1px
+		rgb(var(--color-ink-800-rgb) / 0.06);
+	--page-mega-surface-bg: #fdfcf7;
+	--page-mega-surface-border: rgb(var(--color-ink-800-rgb) / 0.08);
+	--page-mega-surface-shadow:
+		0 28px 64px -22px rgb(var(--color-ink-950-rgb) / 0.3),
+		inset 0 1px 0 rgba(255, 255, 255, 0.7);
+	--page-mega-surface-image:
+		radial-gradient(
+			90% 62% at 0% 0%,
+			rgb(var(--color-ink-600-rgb) / 0.055),
+			transparent 56%
+		),
+		radial-gradient(
+			92% 72% at 100% 100%,
+			rgba(241, 205, 112, 0.07),
+			transparent 60%
+		),
+		linear-gradient(
+			180deg,
+			rgba(255, 255, 255, 0.65),
+			rgba(255, 255, 255, 0) 32%
+		);
+	--page-seller-nav-border: rgba(255, 255, 255, 0.6);
+	--page-seller-nav-fg: var(--ink-body);
+	--page-seller-nav-pill-bg: rgba(255, 253, 244, 0.78);
+	--page-seller-nav-pill-gradient: linear-gradient(
+		145deg,
+		rgba(255, 255, 255, 0.92),
+		rgba(255, 253, 244, 0.82)
+	);
+	--page-seller-nav-pill-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.74),
+		0 18px 46px rgb(var(--color-ink-900-rgb) / 0.1),
+		0 4px 14px rgb(var(--color-ink-800-rgb) / 0.05);
+	--page-seller-nav-brand-fg: rgb(25, 28, 24);
+	--page-seller-nav-item-fg: rgb(66, 73, 63);
+	--page-seller-nav-item-hover-bg: rgb(
+		var(--color-brand-primary-strong-rgb) /
+		0.1
+	);
+	--page-seller-nav-item-hover-fg: var(--color-brand-primary-strong);
+	--page-seller-nav-item-active-bg: rgb(
+		var(--color-brand-primary-strong-rgb) /
+		0.1
+	);
+	--page-seller-nav-icon-hover-bg: rgb(
+		var(--color-brand-primary-strong-rgb) /
+		0.1
+	);
+	--page-seller-nav-cta-bg: var(--color-brand-primary-strong);
+	--page-seller-nav-cta-hover-bg: var(--color-brand-primary-deep);
+	--page-seller-nav-cta-fg: rgb(255, 255, 255);
+	--page-seller-nav-cta-shadow: 0 10px 22px rgb(var(--color-ink-900-rgb) / 0.18);
+	--page-seller-nav-avatar-border: rgb(var(--color-ink-300-rgb) / 0.36);
+	--page-seller-nav-avatar-fg: var(--color-brand-primary-strong);
+	--page-seller-nav-avatar-gradient: linear-gradient(
+		135deg,
+		rgba(255, 255, 255, 0.78),
+		rgb(var(--color-ink-50-rgb) / 0.7)
+	);
+	--page-seller-nav-avatar-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+	--page-seller-nav-menu-cta-bg: var(--color-brand-primary-strong);
+	--page-seller-nav-menu-cta-hover-bg: var(--color-brand-primary-deep);
+	--page-seller-nav-menu-cta-fg: rgb(255, 255, 255);
+	--page-theme-toggle-bg: rgba(255, 255, 255, 0.55);
+	--page-theme-toggle-border: rgba(255, 255, 255, 0.7);
+	--page-theme-toggle-hover-bg: rgba(255, 255, 255, 0.78);
+	--page-theme-toggle-fg: var(--hkui-foreground);
+}
+
+[data-theme="dark"] {
+	--brand-logo-counter: var(--color-brand-ink-on-dark);
+	--page-input-floating-label-fg: rgb(var(--color-ink-100-rgb) / 0.6);
+	--theme-surface-page: var(--color-ink-900);
+	/* Keep the original market's solid dark page color. The decorative layer's
+	   12% brightness cap keeps its composite below the opaque public sections. */
+	--site-grainient-fallback-1: color-mix(
+		in srgb,
+		var(--site-grainient-color-1) 12%,
+		black
+	);
+	--site-grainient-fallback-2: color-mix(
+		in srgb,
+		var(--site-grainient-color-2) 12%,
+		black
+	);
+	--site-grainient-fallback-3: color-mix(
+		in srgb,
+		var(--site-grainient-color-3) 12%,
+		black
+	);
+	--site-grainient-fallback-4: color-mix(
+		in srgb,
+		var(--site-grainient-color-4) 12%,
+		black
+	);
+	/* Neutral blue-grey surface ladder around brand-ink (#1f2933), lightest last:
+	   page < muted < card < panel < elevated. Opaque so text contrast is
+	   deterministic (scripts: backend/docs/plans/2026-10-24-portfolio-public/contrast.py). */
+	--theme-surface-muted: var(--color-dark-muted);
+	--theme-surface-card: var(--color-ink-850);
+	--theme-surface-panel: var(--color-dark-panel);
+	--theme-surface-elevated: var(--color-dark-elevated);
+	/* Dark glass veil. -subtle intentionally equals the base rung: rails and
+	 * their inset items share the 0.04 white veil here (the light theme
+	 * distinguishes them via an ink tint); the step appears at hover/active. */
+	--theme-surface-glass: rgb(var(--color-neutral-white-rgb) / 0.025);
+	--theme-surface-glass-subtle: rgb(var(--color-neutral-white-rgb) / 0.025);
+	--theme-surface-glass-hover: rgb(var(--color-neutral-white-rgb) / 0.04);
+	--theme-surface-glass-active: rgb(var(--color-neutral-white-rgb) / 0.055);
+	--theme-text-heading: var(--color-brand-ink-on-dark);
+	--theme-text-body: rgb(var(--color-brand-ink-on-dark-rgb) / 0.82);
+	--theme-text-muted: rgb(var(--color-brand-ink-on-dark-rgb) / 0.66);
+	--theme-text-faint: rgb(var(--color-brand-ink-on-dark-rgb) / 0.42);
+	--theme-text-accent: var(--color-brand-secondary);
+	--theme-text-accent-on-tint: color-mix(
+		in srgb,
+		var(--color-brand-secondary) 70%,
+		var(--color-neutral-white)
+	);
+	--theme-text-inverse: var(--color-neutral-ink);
+	--theme-action-primary: var(--color-brand-secondary);
+	--theme-action-primary-hover: color-mix(
+		in srgb,
+		var(--color-brand-secondary) 82%,
+		var(--color-neutral-white)
+	);
+	--theme-primary-subtle: rgb(var(--color-brand-secondary-rgb) / 0.14);
+	--theme-primary-soft: rgb(var(--color-brand-secondary-rgb) / 0.24);
+	--theme-primary-border: rgb(var(--color-brand-secondary-rgb) / 0.42);
+	--theme-action-secondary: var(--color-brand-secondary);
+	--theme-accent-warm: var(--color-brand-secondary);
+	--theme-accent-gold: var(--color-brand-secondary);
+	--theme-accent-cool: var(--color-status-info);
+	--theme-border-subtle: rgb(245 222 165 / 0.09);
+	--theme-border-soft: rgb(245 222 165 / 0.12);
+	--theme-border-strong: rgb(245 222 165 / 0.18);
+	--theme-border-warm: rgb(241 205 112 / 0.22);
+	--theme-border-input: rgb(var(--color-ink-100-rgb) / 0.13);
+	--theme-overlay: rgb(var(--color-neutral-black-rgb) / 0.62);
+	--theme-shadow-brand-soft:
+		0 12px 30px rgb(var(--color-neutral-black-rgb) / 0.42),
+		0 2px 8px rgb(var(--color-neutral-black-rgb) / 0.28);
+	--theme-shadow-brand-lift:
+		0 18px 42px rgb(var(--color-neutral-black-rgb) / 0.5),
+		0 5px 14px rgb(var(--color-neutral-black-rgb) / 0.32);
+
+	--page-chat-search-bg: rgb(var(--color-neutral-white-rgb) / 0.06);
+	--page-chat-search-placeholder: rgb(var(--color-ink-100-rgb) / 0.4);
+	--page-chat-card-border: rgb(var(--color-ink-100-rgb) / 0.1);
+	--page-chat-card-shadow: 0 1px 2px rgb(var(--color-neutral-black-rgb) / 0.4);
+	--page-chat-card-active-bg: rgb(var(--color-brand-primary-rgb) / 0.18);
+	--page-chat-empty-copy: rgb(var(--color-ink-100-rgb) / 0.6);
+	--page-chat-empty-bg-from: rgb(var(--color-brand-ink-rgb) / 0.42);
+	--page-chat-empty-bg-via: rgb(var(--color-brand-primary-rgb) / 0.1);
+	--page-chat-empty-bg-to: transparent;
+	--page-chat-empty-halo: rgb(var(--color-brand-secondary-rgb) / 0.2);
+	--page-chat-empty-halo-edge: rgb(var(--color-brand-secondary-rgb) / 0);
+	--page-chat-empty-card-bg: rgb(var(--color-ink-800-rgb) / 0.62);
+	--page-chat-empty-card-border: rgb(245 222 165 / 0.14);
+	--page-chat-empty-card-shadow:
+		0 24px 60px -28px rgb(var(--color-neutral-black-rgb) / 0.6),
+		0 8px 24px -16px rgb(var(--color-neutral-black-rgb) / 0.45);
+	--page-chat-empty-dot-1: rgb(var(--color-brand-secondary-rgb) / 0.5);
+	--page-chat-empty-dot-2: rgb(var(--color-brand-primary-rgb) / 0.45);
+	--page-chat-empty-dot-3: rgb(var(--color-brand-secondary-rgb) / 0.4);
+	--page-chat-empty-chip-bg: rgb(var(--color-brand-secondary-rgb) / 0.14);
+	--page-chat-empty-chip-border: rgb(var(--color-brand-secondary-rgb) / 0.28);
+	--page-chat-empty-chip-fg: var(--color-brand-secondary);
+	--page-chat-empty-chip-hover-bg: rgb(var(--color-brand-secondary-rgb) / 0.22);
+	--page-chat-empty-chip-hover-border: rgb(
+		var(--color-brand-secondary-rgb) /
+		0.55
+	);
+	--page-chat-thread-surface: var(--color-ink-950);
+	--page-chat-thread-head-bg: rgb(var(--color-ink-950-rgb) / 0.88);
+	--page-chat-thread-head-border: rgb(245 222 165 / 0.14);
+	--page-chat-bubble-peer-bg: rgb(var(--color-ink-50-rgb) / 0.1);
+	--page-chat-bubble-peer-border: rgb(245 222 165 / 0.14);
+	--page-chat-bubble-peer-shadow:
+		0 16px 36px -24px rgb(var(--color-neutral-black-rgb) / 0.72),
+		inset 0 1px 0 rgb(255 255 255 / 0.04);
+	--page-chat-bubble-mine-bg: var(--color-brand-primary-strong);
+	--page-chat-bubble-mine-shadow:
+		0 16px 36px -24px rgb(var(--color-brand-primary-rgb) / 0.48),
+		inset 0 1px 0 rgb(255 255 255 / 0.08);
+	--page-chat-bubble-peer-time: rgb(var(--color-ink-100-rgb) / 0.5);
+	--page-chat-bubble-mine-time: rgb(255 255 255 / 0.72);
+	--page-chat-compose-bg: rgb(var(--color-ink-950-rgb) / 0.86);
+	--page-chat-compose-shadow: 0 -5px 20px
+		rgb(var(--color-neutral-black-rgb) / 0.45);
+
+	/* Hover/active lifts — light mode tints these with the primary color; on the dim
+	 * body a plain black drop reads better, the primary color stays on the border. */
+	--page-chat-card-hover-border: rgb(var(--color-brand-primary-rgb) / 0.5);
+	--page-chat-card-hover-shadow: 0 4px 12px
+		rgb(var(--color-neutral-black-rgb) / 0.45);
+	--page-chat-card-active-shadow: 0 4px 12px
+		rgb(var(--color-neutral-black-rgb) / 0.5);
+
+	/* Status colours — the light-mode neon green/yellow glare against the
+	 * dark canvas, so both are pulled down a notch. */
+	--page-chat-online: #3ecf7e;
+	--page-chat-online-ring: rgb(62 207 126 / 0.28);
+	--page-chat-reconnecting: var(--color-brand-secondary);
+	--page-chat-send-hover: var(--color-brand-secondary);
+
+	/* Dark thread body — polished dark glass with warm edge light.
+	 * Replaces the old dot-grid, which made the room look muddy. */
+	--page-chat-body-base: var(--color-ink-950);
+	--page-chat-body-wash-from: rgb(var(--color-brand-secondary-rgb) / 0.12);
+	--page-chat-body-wash-via: rgb(var(--color-brand-primary-rgb) / 0.1);
+	--page-chat-body-wash-to: var(--color-ink-950);
+	--page-chat-body-line: rgb(245 222 165 / 0.035);
+
+	/* Dark chat card — slightly lifted dark panel with a warm secondary/
+	 * cream title for high contrast against the dim chat body. */
+	--page-chat-card-bg: rgb(var(--color-ink-800-rgb) / 0.92);
+	--page-chat-card-border-strong: rgb(245 222 165 / 0.18);
+	--page-chat-card-divider: rgb(245 222 165 / 0.14);
+	--page-chat-card-elevation:
+		0 12px 30px -16px rgb(var(--color-neutral-black-rgb) / 0.6),
+		0 2px 8px -2px rgb(var(--color-neutral-black-rgb) / 0.4);
+	--page-chat-card-media-bg: rgb(var(--color-brand-ink-rgb) / 0.55);
+	--page-chat-card-media-border: rgb(245 222 165 / 0.18);
+	--page-chat-card-media-fg: rgb(245 222 165 / 0.45);
+	--page-chat-card-title: #f5e9c3;
+	--page-chat-card-price: var(--color-brand-secondary);
+	--page-chat-card-status-bg: rgb(var(--color-brand-secondary-rgb) / 0.18);
+	--page-chat-card-status-fg: var(--color-brand-secondary);
+	--page-chat-card-status-border: rgb(var(--color-brand-secondary-rgb) / 0.4);
+
+	--icon-accent: var(--color-brand-secondary);
+	--icon-accent-secondary: var(--color-brand-primary);
+	--truck-loading-vehicle-color: var(--color-ink-100);
+	--truck-loading-vehicle-secondary: var(--color-brand-primary);
+	--truck-loading-window-color: rgb(245 222 165 / 0.78);
+	--truck-loading-wheel-color: var(--color-ink-200);
+	--truck-loading-wheel-inner-color: var(--color-ink-850);
+	--truck-loading-road-color: rgb(245 222 165 / 0.34);
+
+	/* Origin map heat scale — the light ramp runs pale → full orange, which
+	 * flattens into one pale blob on the night canvas. Re-ramp by lightness
+	 * (bright = more produce), with amber for the selected region to match the
+	 * dark-mode action colour. */
+	--page-map-selected: var(--color-brand-secondary);
+	--page-map-high: var(--color-brand-primary);
+	--page-map-medium: color-mix(
+		in srgb,
+		var(--color-brand-primary) 62%,
+		var(--color-ink-900)
+	);
+	--page-map-light: color-mix(
+		in srgb,
+		var(--color-brand-primary) 34%,
+		var(--color-ink-900)
+	);
+	--page-map-pale: color-mix(
+		in srgb,
+		var(--color-brand-primary) 16%,
+		var(--color-ink-900)
+	);
+	--page-map-empty: var(--color-ink-900);
+
+	/* Same gold in both themes — see the light block. */
+	--page-rating-star: #f5a623;
+
+	/* A pure-white hairline inverts wrongly on the night canvas; the blurred
+	 * card reuses the theme's own strong border rung instead. */
+	--page-card-blur-border: var(--theme-border-strong);
+
+	/* Dark bordered Button (variant="bordered" color="default"). Values lifted
+	 * verbatim from the three literals that used to sit in Button.tsx. */
+	--page-button-bordered-border: rgb(245 222 165 / 0.32);
+	--page-button-bordered-fg: #f5e9c3;
+	--page-button-bordered-hover-bg: rgb(245 222 165 / 0.1);
+
+	/* Skeleton bone on the night canvas (was a bare `white/8`). */
+	--page-skeleton-bone: rgb(var(--color-neutral-white-rgb) / 0.08);
+
+	/* ── Overlays / carousels / toasts / status pages (dark) ───────
+	 * Dark halves of the light block above; same verbatim-value rule. */
+	--page-accent-marker: #f1cd70;
+
+	--page-carousel-dot-idle: rgb(245 222 165 / 0.18);
+	--page-carousel-dot-hover: rgb(245 222 165 / 0.4);
+
+	--page-banner-viewport-bg: rgb(255 255 255 / 0.04);
+	--page-banner-heading-fg: rgb(var(--color-ink-100-rgb) / 0.6);
+
+	--page-mega-tag-bg: rgb(var(--color-ink-200-rgb) / 0.12);
+	--page-mega-tag-hover-bg: rgb(var(--color-ink-200-rgb) / 0.22);
+	--page-mega-tag-fg: var(--color-ink-200);
+	--page-mega-skeleton-bone: rgb(245 222 165 / 0.14);
+	--page-mega-empty-fg: rgb(var(--color-ink-100-rgb) / 0.55);
+	--page-mega-empty-disc-bg: rgb(245 222 165 / 0.1);
+
+	--page-login-modal-disc-border: rgb(245 222 165 / 0.18);
+	--page-login-modal-disc-bg: rgb(245 222 165 / 0.06);
+	--page-login-modal-ghost-bg: transparent;
+	--page-login-modal-ghost-hover-bg: rgb(245 222 165 / 0.08);
+
+	/* Ghost / secondary link on the dark canvas. Shared by the login modal
+	 * footer and the ErrorState / NotFoundView escape links, which carried
+	 * three verbatim copies of this pair. */
+	--page-status-link-fg: rgb(245 222 165 / 0.78);
+	--page-status-link-hover-fg: #f5e9c3;
+
+	--page-cart-snackbar-success-bg: rgb(var(--color-ink-950-rgb) / 0.96);
+	--page-cart-snackbar-success-fg: #f5e9c3;
+	--page-cart-snackbar-success-icon: rgb(241 205 112 / 0.95);
+	--page-cart-snackbar-success-border: rgb(245 222 165 / 0.18);
+	--page-cart-snackbar-success-shadow:
+		0 24px 48px -16px rgb(0 0 0 / 0.65), 0 8px 20px -8px rgb(0 0 0 / 0.42);
+	--page-cart-snackbar-error-bg: rgb(42 17 9 / 0.96);
+	--page-cart-snackbar-error-fg: #ffe0cf;
+	--page-cart-snackbar-error-icon: #ff8b53;
+	--page-cart-snackbar-error-border: rgb(var(--color-status-danger-rgb) / 0.5);
+	--page-cart-snackbar-error-shadow:
+		0 24px 48px -16px rgb(0 0 0 / 0.7), 0 8px 20px -8px rgb(0 0 0 / 0.45);
+	--page-cart-snackbar-close-fg: rgb(var(--color-ink-100-rgb) / 0.7);
+
+	/* Image crop editor — the only crop chrome that carried a `dark:` variant in
+	   components/ui/ImageCropDialog.tsx. Values lifted VERBATIM. */
+	--page-crop-chrome-fg: #f5f5f5;
+	--page-crop-chrome-bg-hover: rgb(var(--color-neutral-white-rgb) / 0.08);
+	--page-crop-chrome-bg-pressed: rgb(var(--color-neutral-white-rgb) / 0.12);
+	--page-crop-lens-border: rgb(var(--color-neutral-white-rgb) / 0.18);
+	--page-crop-lens-shell-shadow:
+		0 1px 0 rgb(var(--color-neutral-white-rgb) / 0.1) inset,
+		0 8px 22px -18px rgb(var(--color-neutral-black-rgb) / 0.64);
+
+	/* Site navigation chrome — dark counterparts (see the light block). */
+	--page-nav-pill-bg: rgb(var(--color-ink-950-rgb) / 0.85);
+	--page-nav-pill-shadow:
+		0 1px 0 rgba(245, 222, 165, 0.18) inset, 0 0 0 1px rgba(245, 222, 165, 0.22);
+	--page-nav-pill-shadow-mobile:
+		0 1px 0 rgba(245, 222, 165, 0.18) inset, 0 0 0 1px rgba(245, 222, 165, 0.22);
+	--page-nav-item-hover-bg: rgba(245, 222, 165, 0.1);
+	--page-nav-item-hover-fg: rgb(255, 238, 192);
+	--page-nav-action-hover-bg: rgba(245, 222, 165, 0.1);
+	--page-nav-user-name-fg: rgb(var(--color-ink-100-rgb) / 0.86);
+	--page-nav-active-indicator-ring: inset 0 0 0 1px rgba(245, 222, 165, 0.12);
+	--page-mega-surface-bg: rgb(var(--color-ink-950-rgb) / 0.92);
+	--page-mega-surface-border: rgba(245, 222, 165, 0.18);
+	--page-mega-surface-shadow:
+		0 24px 48px -16px rgba(0, 0, 0, 0.65), 0 8px 20px -8px rgba(0, 0, 0, 0.42);
+	--page-seller-nav-border: rgba(245, 222, 165, 0.28);
+	--page-seller-nav-fg: rgb(245, 233, 195);
+	--page-seller-nav-pill-bg: rgb(var(--color-ink-950-rgb) / 0.82);
+	--page-seller-nav-pill-gradient: linear-gradient(
+		145deg,
+		rgb(var(--color-ink-850-rgb) / 0.88),
+		rgb(var(--color-ink-950-rgb) / 0.78)
+	);
+	--page-seller-nav-pill-shadow:
+		inset 0 1px 0 rgba(245, 222, 165, 0.16), 0 18px 46px rgba(0, 0, 0, 0.55),
+		0 4px 14px rgba(0, 0, 0, 0.32);
+	--page-seller-nav-brand-fg: var(--color-ink-100);
+	--page-seller-nav-item-fg: var(--color-ink-100);
+	--page-seller-nav-item-hover-fg: var(--color-ink-100);
+	--page-seller-nav-item-active-bg: rgba(241, 205, 112, 0.2);
+	--page-seller-nav-icon-hover-bg: rgba(245, 222, 165, 0.12);
+	--page-seller-nav-cta-fg: var(--color-ink-100);
+	--page-seller-nav-menu-cta-bg: var(--color-ink-200);
+	--page-seller-nav-menu-cta-hover-bg: var(--color-ink-100);
+	--page-seller-nav-menu-cta-fg: var(--color-ink-950);
+	--page-theme-toggle-bg: rgba(245, 222, 165, 0.16);
+	--page-theme-toggle-border: rgba(245, 222, 165, 0.32);
+	--page-theme-toggle-hover-bg: rgba(245, 222, 165, 0.28);
+	--page-theme-toggle-fg: #f5dea5;
+
+	/* Dropdown menu — night values lifted VERBATIM from the
+	   `[data-theme="dark"] .hkui-dropdown__*` literals that used to live in
+	   styles/features/seller-center.css. Tokenising them keeps the painted
+	   夜間 result identical while removing a feature-file patch on a shared
+	   component (the menu is portalled to <body>, so it was never really
+	   "seller-scoped" anyway). */
+	--page-dropdown-menu-bg: var(--color-ink-850);
+	--page-dropdown-border: rgba(245, 222, 165, 0.24);
+	--page-dropdown-item-fg: rgb(var(--color-ink-100-rgb) / 0.85);
+	--page-dropdown-item-selected-bg: rgba(241, 205, 112, 0.18);
+	--page-dropdown-item-selected-fg: #ffeec0;
+	--page-dropdown-item-active-bg: rgba(241, 205, 112, 0.5);
+	--page-dropdown-item-active-fg: var(--color-ink-950);
+	--page-dropdown-item-active-selected-bg: rgba(241, 205, 112, 0.5);
+	--page-dropdown-search-bg: rgb(var(--color-ink-900-rgb) / 0.7);
+	--page-dropdown-search-border: rgba(245, 222, 165, 0.2);
+	--page-dropdown-search-fg: rgb(var(--color-ink-100-rgb) / 0.78);
+}

@@ -1,0 +1,195 @@
+name: API contract
+
+# 對外 API 的契約（根目錄 api/，Protobuf＋Connect）：buf lint、buf breaking，以及兩支 App 共用的
+# Dart 套件 packages/hawkr_api、website 與 admin 共用的 TS 套件 packages/hawkr-api-ts 的生成物 drift。
+# Go 的生成物 drift 在 backend-monolith 檢查。決策：backend/docs/adr/2026-09-26-external-contract-protobuf-connect.md。
+#
+# buf CLI 的版本固定在 api/.buf-version；外掛由各消費端自己的 lockfile 固定，一律在本機執行。
+
+on:
+  pull_request:
+    paths: &api_paths
+      - 'api/**'
+      - 'packages/hawkr_api/**'
+      - 'packages/hawkr-api-ts/**'
+      # 根目錄的 pnpm workspace（TS 套件的依賴與 lockfile）。
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
+      - '.nvmrc'
+      - 'backend/workers/image-gateway/src/presets.ts'
+      - 'backend/workers/image-gateway/scripts/gen-client-presets.mjs'
+      - 'website/lib/media/image-presets.generated.ts'
+      - 'admin/src/utils/image-presets.generated.ts'
+      - '.github/actions/pnpm-install/**'
+      - '.github/workflows/api-contract.yml'
+  push:
+    branches: [main]
+    paths: *api_paths
+  workflow_dispatch:
+
+concurrency:
+  group: api-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  buf:
+    name: buf lint／breaking
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: 讀取 buf 的版本
+        id: buf
+        run: echo "version=$(cat api/.buf-version)" >> "$GITHUB_OUTPUT"
+      - uses: bufbuild/buf-action@v1
+        with:
+          version: ${{ steps.buf.outputs.version }}
+          setup_only: true
+
+      - name: buf lint
+        run: buf lint api
+
+      - name: googleapis 的版本一致
+        if: always()
+        run: |
+          # api/ 的 deps（field_behavior，鎖在 buf.lock）與 TS、Dart 生成 google/rpc/error_details.proto 的
+          # buf.gen.yaml 用同一個 commit（ADR 2026-09-25-api-error-model 的後果）。
+          # 預期的釘選共 3 處：api/buf.yaml 的 deps 一處，兩個 buf.gen.yaml（TS、Dart）各一處。
+          files=(api/buf.yaml packages/hawkr-api-ts/buf.gen.yaml packages/hawkr_api/buf.gen.yaml)
+          lock=$(awk '/name: buf.build\/googleapis\/googleapis/{f=1; next} f && /commit:/{print $2; exit}' api/buf.lock)
+          pins=$( { grep -ho 'buf.build/googleapis/googleapis:[0-9a-f]*' "${files[@]}" | sed 's/.*://'; echo "$lock"; } | sort -u)
+          count=$(grep -hc 'buf.build/googleapis/googleapis:' "${files[@]}" | awk '{s+=$1} END {print s}')
+          echo "$pins"
+          if [ -z "$lock" ] || [ "$(grep -c . <<<"$pins")" != 1 ] || [ "$count" != 3 ]; then
+            echo "::error::googleapis 的版本不一致或缺少：api/buf.lock 與 ${files[*]}"
+            exit 1
+          fi
+
+      - name: buf breaking
+        if: always()
+        env:
+          # 比對的基準：PR 是 base，push 是推上來之前的 main。
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          # 基準還沒有 api/（第一次加入契約）時沒有東西可比。
+          if [ -z "$BASE" ] || ! git cat-file -e "${BASE}:api/buf.yaml" 2>/dev/null; then
+            echo "基準 ${BASE:-（無）} 沒有 api/，略過 breaking"
+            exit 0
+          fi
+          # 上線前的 v1alpha1 不檢查（api/buf.yaml 的 ignore_unstable_packages）。WKT 這類 import 不是
+          # 我們的契約，不再被任何檔案引用時會從 image 消失，不算破壞性變更。
+          buf breaking api --against ".git#ref=${BASE},subdir=api" --exclude-imports
+
+  dart:
+    name: Dart 套件（packages/hawkr_api）：生成物 drift、analyze、test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: packages/hawkr_api
+    steps:
+      - uses: actions/checkout@v5
+      - name: 讀取 buf 與 Flutter 的版本
+        id: versions
+        working-directory: .
+        run: |
+          echo "buf=$(cat api/.buf-version)" >> "$GITHUB_OUTPUT"
+          echo "flutter=$(jq -r .flutter packages/hawkr_api/.fvmrc)" >> "$GITHUB_OUTPUT"
+      - uses: bufbuild/buf-action@v1
+        with:
+          version: ${{ steps.versions.outputs.buf }}
+          setup_only: true
+      # 套件自己的 .fvmrc；要和兩支 App 的 Flutter 相容（App 以 path 依賴它）。
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ steps.versions.outputs.flutter }}
+          channel: stable
+          cache: true
+      - run: dart pub get
+
+      - name: 生成物 drift
+        run: |
+          ../../api/generate.sh buf.gen.yaml
+          if [ -n "$(git status --porcelain -- .)" ]; then
+            git status --short -- .
+            echo "::error::packages/hawkr_api 與 api/ 不一致，請在本機跑 ../../api/generate.sh buf.gen.yaml 後 commit"
+            exit 1
+          fi
+
+      - name: dart analyze
+        if: always()
+        run: dart analyze
+
+      # 生成物（lib/gen）不檢查：connect 的 Dart 插件的輸出不是 format-clean。
+      - name: dart format
+        if: always()
+        run: find lib test -name '*.dart' -not -path 'lib/gen/*' -print0 | xargs -0 dart format --output=none --set-exit-if-changed
+
+      # 錯誤分派的情境表在 api/testdata，四個 client 共用（ADR 2026-09-25-api-error-model 的 D7）。
+      - name: dart test
+        if: always()
+        run: dart test
+
+  ts:
+    name: TS 套件（packages/hawkr-api-ts）：生成物 drift、tsc、biome、vitest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/pnpm-install
+      - name: 讀取 buf 的版本
+        id: buf
+        run: echo "version=$(cat api/.buf-version)" >> "$GITHUB_OUTPUT"
+      - uses: bufbuild/buf-action@v1
+        with:
+          version: ${{ steps.buf.outputs.version }}
+          setup_only: true
+
+      - name: 生成物 drift
+        run: |
+          pnpm --filter @hawkr/api gen:api
+          if [ -n "$(git status --porcelain -- packages/hawkr-api-ts/src/gen)" ]; then
+            git status --short -- packages/hawkr-api-ts/src/gen
+            echo "::error::packages/hawkr-api-ts/src/gen 與 api/ 不一致，請在本機跑 pnpm --filter @hawkr/api gen:api 後 commit"
+            exit 1
+          fi
+
+      - name: tsc
+        if: always()
+        run: pnpm --filter @hawkr/api exec tsc --noEmit
+
+      - name: biome
+        if: always()
+        run: pnpm --filter @hawkr/api exec biome check .
+
+      # 錯誤分派的情境表在 api/testdata，四個 client 共用（ADR 2026-09-25-api-error-model 的 D7）。
+      - name: vitest
+        if: always()
+        run: pnpm --filter @hawkr/api test
+
+  presets:
+    name: 圖片 preset 常數 drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      # presets.ts 由 Node 直接 import（type stripping，Node 22.18 以上；版本讀根目錄 .nvmrc）。
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+      - name: 由 presets.ts 重新生成並比對
+        run: |
+          node backend/workers/image-gateway/scripts/gen-client-presets.mjs
+          paths=(website/lib/media/image-presets.generated.ts admin/src/utils/image-presets.generated.ts
+            packages/hawkr_api/lib/image_presets.g.dart)
+          if [ -n "$(git status --porcelain -- "${paths[@]}")" ]; then
+            git status --short -- "${paths[@]}"
+            echo "::error::client 的 preset 常數與 backend/workers/image-gateway/src/presets.ts 不一致，請在本機跑 node backend/workers/image-gateway/scripts/gen-client-presets.mjs 後 commit"
+            exit 1
+          fi

@@ -1,0 +1,33 @@
+/* Preserve the outgoing document's height for PageTransition's commit-time
+ * scroll snapshot. Inert is applied by the controller for keyboard/a11y too. */
+html[data-main-tab-pending] main.page-content > .page-transition {
+	visibility: hidden;
+	pointer-events: none;
+}
+
+html[data-main-tab-pending] .auto-nav {
+	transform: translate3d(0, 0, 0);
+	pointer-events: auto;
+	transition: none;
+}
+
+.main-tab-pending {
+	position: fixed;
+	inset: calc(
+			var(--floating-nav-height, 84px) +
+			var(--floating-nav-top-gap, 16px)
+		)
+		0 0;
+	/* Below both persistent navigation bars (mobile = 200, top = 250). */
+	z-index: 150;
+	overflow: hidden;
+	background: var(--surface-page, #fbfaf3);
+	touch-action: none;
+	overscroll-behavior: contain;
+}
+
+.main-tab-pending > .route-loading-skeleton {
+	/* Do not fade the whole destination in: show its structure immediately.
+	 * Individual skeleton highlights retain their compositor-only animation. */
+	animation: none;
+}

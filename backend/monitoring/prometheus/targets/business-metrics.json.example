@@ -1,0 +1,3 @@
+[
+  {"targets": ["<MONITORING_HOST_IP>:9399"], "labels": {"service": "sql-exporter", "env": "dev"}}
+]

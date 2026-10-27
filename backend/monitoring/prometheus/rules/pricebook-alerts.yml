@@ -1,0 +1,30 @@
+groups:
+  - name: pricebook-seller-cleanup
+    interval: 30s
+    rules:
+      # Seller deletion is low-frequency: one failed delivery must be visible.
+      # A result series starts at 1 on its first failure, without a zero sample;
+      # the offset arm catches that first outcome and expires after 10 minutes.
+      - alert: PricebookSellerCleanupFailed
+        expr: |
+          sum by (job, queue) (
+            increase(mq_consume_total{queue="pricebook.seller.deleted",result=~"retry|dlq|requeue"}[10m]) > 0
+            or
+            (
+              mq_consume_total{queue="pricebook.seller.deleted",result=~"retry|dlq|requeue"} > 0
+              unless
+              mq_consume_total{queue="pricebook.seller.deleted",result=~"retry|dlq|requeue"} offset 10m
+            )
+          ) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pricebook seller cleanup failed"
+          description: "Inspect pricebook.seller.deleted consumer logs and retry/DLQ before replaying the seller event."
+      - alert: PricebookSellerCleanupDLQ
+        expr: rabbitmq_detailed_queue_messages_ready{queue="pricebook.seller.deleted.dlq"} > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pricebook seller cleanup dead letter"
+          description: "Seller watch targets may remain; inspect the payload/error and replay after fixing the cause."

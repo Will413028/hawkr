@@ -1,0 +1,1854 @@
+# =============================================================================
+# 本地開發環境（唯一入口 ./dev.sh，容器只跑在 OrbStack）
+# =============================================================================
+# Go 服務 dev container 契約（issue #2025，勿隨意還原）：
+#
+#   Go 服務跑 `target: dev`（Air hot-reload）——go.mod / pkg/ 皆由 bind mount 掛進去、
+#   在容器內即時 `go build`。因此 dev container **必須能連 module proxy**：
+#     • GOPROXY 一律 `https://proxy.golang.org,direct`，**嚴禁 "off"**。
+#       k8s/values/*.yaml 的 `GOPROXY: "off"` 是給 prod builder 用的（go-base image
+#       已含全 monorepo deps、無 egress），不適用本地 dev container；此處刻意與 k8s
+#       不一致，check-compose-k8s-align.sh 白名單已放行 GOPROXY。
+#     • `go-mod-cache:/go/pkg/mod` 具名 volume：module cache 必須活在 volume 而非
+#       image layer，才不會隨 image 老化而過期。
+#   為何（#2025 實測）：dev image 的 /go/pkg/mod 是 build 時 `go mod download` 烘進
+#   layer 的快照，而 `./dev.sh rebuild` 過去只重建 Java 服務 → Go dev image 可放置
+#   數月不動（實測 review/social/buyer 停留在 2026-03-10）。之後 pkg/go.mod 新增任一
+#   依賴（如 miniredis），容器內 go build 就解不了 module graph；GOPROXY=off 使其
+#   無法補抓 → Air build 失敗 → /app/tmp/main 不存在 → exit 127。此時 Air 本身仍活著，
+#   容器維持 `Up`（僅 unhealthy），實測 6 個 Go 服務就這樣「Up 但沒在服務」8~9 天。
+#   對照組：gateway 與 buyer-service 的 image 一樣舊（2026-04-02 / 2026-03-10），
+#   但因 GOPROXY 未關而全程 healthy。
+# =============================================================================
+
+include:
+  # 基礎設施（postgres、redis、rabbitmq、otel-collector）與 network 定義在這裡。
+  - docker-compose-infra.yml
+
+services:
+
+  # ==========================================
+  # API Gateway (9900)
+  # ==========================================
+
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+      target: dev
+      args:
+        GO_VERSION: ${GO_VERSION:?用 ./dev.sh 執行（從 .go-version 帶入）}
+    image: hawkr/gateway:latest
+    container_name: gateway
+    restart: unless-stopped
+    # gateway 只聽 9900（debug 9901、metrics 9902 不對外）。host 的 8080 留給在本機跑的
+    # 單體（HTTP_ADDR 預設 :8080），兩者可以同時跑。
+    ports:
+      - "9900:9900"
+    # Linux 的 Docker Engine 沒有內建 host.docker.internal（Docker Desktop 有），補上才連得到本機的單體。
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      TZ: UTC
+      GIN_MODE: release
+      APP_ENV: local
+      JWT_SECRET: ${JWT_SECRET}
+      GATEWAY_URL: ${GATEWAY_URL:-http://127.0.0.1:9900}
+
+      # 入口是在本機跑的單體（make serve，:8080）：認證、CORS、CSRF 都在單體，gateway 信任單體帶的
+      # 身分 header。這份清單只剩 chat 的 WebSocket upgrade 檢查 Origin 用（handler/chat.go），
+      # 到 IM 搬進單體（遷移計畫 A6）為止。
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3001,http://localhost:3000}
+
+      # Service Discovery (Direct connection for local dev)
+      ACCOUNT_SERVICE_HOST: host.docker.internal
+      ACCOUNT_SERVICE_GRPC_PORT: 9941
+      CART_SERVICE_HOST: cart-service
+      CART_SERVICE_GRPC_PORT: 9927
+      BUYER_SERVICE_HOST: host.docker.internal
+      BUYER_SERVICE_GRPC_PORT: 9941
+      SELLER_SERVICE_HOST: host.docker.internal
+      SELLER_SERVICE_GRPC_PORT: 9941
+      CRM_SERVICE_HOST: crm-service
+      CRM_SERVICE_GRPC_PORT: 10030
+      PRODUCT_SERVICE_HOST: product-service
+      PRODUCT_SERVICE_PORT: 9912
+      ORDER_SERVICE_HOST: order-service
+      ORDER_SERVICE_PORT: 9914
+      SOCIAL_SERVICE_HOST: social-service
+      SOCIAL_SERVICE_GRPC_PORT: 9918
+      COUPON_SERVICE_HOST: coupon-service
+      COUPON_SERVICE_GRPC_PORT: 9951
+      REVIEW_SERVICE_HOST: review-service
+      REVIEW_SERVICE_GRPC_PORT: 10033
+      AFTERSALES_SERVICE_HOST: aftersales-service
+      AFTERSALES_SERVICE_GRPC_PORT: 9923
+      PAYMENT_SERVICE_HOST: payment-service
+      PAYMENT_SERVICE_PORT: 9924
+      SHIPPING_SERVICE_HOST: shipping-service
+      SHIPPING_SERVICE_GRPC_PORT: 9931
+      IM_SERVICE_HOST: im-service
+      IM_SERVICE_GRPC_PORT: 9933
+      IM_CHAT_STREAM_JWT_SECRET: ${IM_CHAT_STREAM_JWT_SECRET:-}
+      IM_CHAT_STREAM_JWT_SECRET_PREV: ${IM_CHAT_STREAM_JWT_SECRET_PREV:-}
+      MEDIA_SERVICE_HOST: media-service
+      MEDIA_SERVICE_PORT: 9936
+      # 圖片 objectKey → 顯示 URL 的域名唯一來源（49 號 §6.1）；Gateway 組 {語意}Url 欄位
+      MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
+      AI_SERVICE_HOST: ai-service
+      AI_SERVICE_GRPC_PORT: 9939
+      # Task 12：doc 57 §13 的 gateway 側 capability flag，gate GET
+      # /app/buyers/me/procurement/runs/:runId/events（run ledger 事件重播／
+      # 即時訂閱 SSE）。預設 false。
+      PROCUREMENT_REPLAY_SSE_ENABLED: ${PROCUREMENT_REPLAY_SSE_ENABLED:-false}
+      PAYUNI_WEBHOOK_SERVICE_HOST: payuni-webhook-service
+      PAYUNI_WEBHOOK_SERVICE_PORT: 9946
+      PRODUCT_IMPORT_SERVICE_HOST: product-import-service
+      PRODUCT_IMPORT_SERVICE_GRPC_PORT: 9961
+      NOTIFICATION_SERVICE_HOST: notification-service
+      NOTIFICATION_SERVICE_GRPC_PORT: 10037
+      PRICEBOOK_SERVICE_HOST: pricebook-service
+      PRICEBOOK_SERVICE_GRPC_PORT: 10039
+      # invoice-service（58 號設計書 §12.1.2 F）。三個 INVOICE_SERVICE_* 必須一起加：
+      # 只漏第三個 ⇒ 發票查得到、PDF 下載不了，其餘全正常。
+      INVOICE_SERVICE_HOST: invoice-service
+      INVOICE_SERVICE_GRPC_PORT: 10041
+      INVOICE_SERVICE_FILE_PORT: 10042
+      INVOICE_GRPC_DEADLINE_MS: 3000
+      # 憑證測試連線要打 AMEGO 一趟；用 3000 會把我方逾時說成賣家的 AppKey 有問題。
+      INVOICE_GRPC_DEADLINE_CREDENTIAL_TEST_MS: 15000
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: HawkrRedis2026
+
+      # RabbitMQ — Gateway SSE platform 首次成為 consumer（41 號設計書 §5.6）
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+
+      # Gateway SSE Hub tunables（41 號設計書 §15）— 未設用預設
+      SSE_HEARTBEAT_INTERVAL: 30s
+      SSE_RING_BUFFER_SIZE: 200
+      SSE_RING_BUFFER_TTL: 5m
+      SSE_BATCH_WINDOW_MS: 50
+      SSE_MAX_CONN_PER_POD: 5000
+      SSE_MAX_CONN_PER_SUBJECT: 5
+      SSE_MAX_CONN_PER_USER: 3
+      SSE_MAX_CONN_LIFETIME: 8m
+      SSE_EVICT_WINDOW: 30s
+
+      # 分層限流（#1416 / #2022 / #2264）— 值等同 k8s/values/gateway.yaml 與 code
+      # default，讓本地重現 dev/prod 的限流行為。各層上限 = 每
+      # RATE_LIMIT_WINDOW_SECONDS 秒、每個「限流身分」允許的請求數（身分不是
+      # client IP，見 01 設計書 §3.2.4）；auth-failure 軸則是 401 次數上限
+      # （0 = 整條軸關閉）。
+      RATE_LIMIT_WINDOW_SECONDS: 60
+      RATE_LIMIT_MODERATE_PER_WINDOW: 600
+      RATE_LIMIT_MODERATE_SSR_PER_WINDOW: 12000
+      RATE_LIMIT_MODERATE_CI_PER_WINDOW: 300
+      RATE_LIMIT_DEFAULT_PER_WINDOW: 300
+      RATE_LIMIT_FALLBACK_CAPACITY: 10000
+      RATE_LIMIT_AUTH_FAILURE_PER_WINDOW: 100
+
+      # ── ADM 代行營運：per-hop gRPC deadline（56 號設計書 §8.5.1 (B)）──
+      # 分組以 §8.5.1 的 (A)(B)(C) 為準、不以名稱前綴為準：
+      # 這裡的 _STORE_STATE_MS 是 Gateway 讀店家狀態的逾時；單體的 DelegationService 讀店家狀態是同行程呼叫 seller 模組，
+      # 沒有逾時設定。
+      # 三環境同值是刻意的——這組是逾時預算，不是環境資源差異的函式。
+      DELEGATION_GRPC_DEADLINE_PREFLIGHT_MS: 3000
+      DELEGATION_GRPC_DEADLINE_CREATE_MS: 2000
+      DELEGATION_GRPC_DEADLINE_CURRENT_MS: 800
+      DELEGATION_GRPC_DEADLINE_STORE_STATE_MS: 800
+      DELEGATION_GRPC_DEADLINE_DOMAIN_READ_MS: 800
+      DELEGATION_GRPC_DEADLINE_AUDIT_INTENT_MS: 800
+      DELEGATION_GRPC_DEADLINE_AUDIT_CONFIRM_MS: 400
+      DELEGATION_GRPC_DEADLINE_DOMAIN_WRITE_MS: 4000
+      DELEGATION_GRPC_DEADLINE_BATCH_DOMAIN_READ_MS: 3000
+      DELEGATION_GRPC_DEADLINE_BATCH_AUDIT_INTENT_MS: 4000
+      DELEGATION_GRPC_DEADLINE_BATCH_DOMAIN_WRITE_MS: 20000
+      DELEGATION_GRPC_DEADLINE_BATCH_AUDIT_CONFIRM_MS: 3000
+      DELEGATION_AUDIT_CONFIRM_BATCH_TOTAL_BUDGET_MS: 10000
+      # confirm 的重試迴圈跑在 Gateway 的 orchestrator；單體的 DelegationService 沒有對應的處理上界
+      DELEGATION_AUDIT_CONFIRM_TOTAL_BUDGET_MS: 2000
+
+      # 來源簽章密鑰（#2264）。本地留空即可 —— 空值 = 停用該把密鑰的簽章驗證，
+      # 請求落回 per-ClientIP，不會啟動失敗。要在本地測 SSR / CI 軸才需要填。
+      ORIGIN_AUTH_SECRET: ${ORIGIN_AUTH_SECRET:-}
+      ORIGIN_AUTH_SECRET_PREV: ${ORIGIN_AUTH_SECRET_PREV:-}
+      ORIGIN_AUTH_CI_SECRET: ${ORIGIN_AUTH_CI_SECRET:-}
+
+      # 文件檢視器 /docs：三個都填才啟用，空值 = 路由不註冊（404）
+      DOCS_USERNAME: ${DOCS_USERNAME:-}
+      DOCS_PASSWORD: ${DOCS_PASSWORD:-}
+      DOCS_SIGN_KEY: ${DOCS_SIGN_KEY:-}
+
+      # Dev Configs
+      NACOS_ENABLED: "false"
+      TRACING_ENABLED: "true"
+      GOPROXY: "https://proxy.golang.org,direct"
+      GONOSUMDB: "*"
+
+      # OpenTelemetry（Go shared pkg/otel 使用 OTLP gRPC）
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+      ENV: ${APP_ENV:-dev}
+
+      # 測試模式：跳過角色檢查（JWT 驗證仍有效）
+      SKIP_ROLE_CHECK: ${SKIP_ROLE_CHECK:-true}
+
+      # Health Check Configuration
+      # Gateway 只負責自身 liveness；各 gRPC-only service 由自己的 gRPC health
+      # probe 驗證，不能再從這裡依賴 service-local management HTTP。
+      HEALTH_SERVICES: >-
+        product-service=http://product-service:9912/actuator/health,
+        order-service=http://order-service:9914/actuator/health,
+        aftersales-service=http://aftersales-service:9922/actuator/health,
+        payment-service=http://payment-service:9924/actuator/health,
+        shipping-service=http://shipping-service:9930/actuator/health,
+        media-service=http://media-service:9936/health
+
+    volumes:
+      - ./gateway:/app/gateway
+      - ./pkg:/app/pkg
+      - ./docs:/app/docs
+      - go-build-cache:/root/.cache/go-build
+      - go-mod-cache:/go/pkg/mod
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9900/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - hawkr-network
+
+  # ==========================================
+  # Product Service (9912/9913)
+  # ==========================================
+
+  product-service:
+    build:
+      context: .
+      dockerfile: services/java/product-service/Dockerfile
+    image: hawkr/product-service:latest
+    container_name: product-service
+    restart: unless-stopped
+    ports:
+      - "9912:9912"
+      - "9913:9913"
+    environment:
+      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
+      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
+      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
+      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
+      MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
+      TZ: UTC
+      SERVER_PORT: 9912
+      GRPC_PORT: 9913
+
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hawkr_product
+      DB_USER: dbadmin
+      DB_PASSWORD: Hawkr2024Admin
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: HawkrRedis2026
+
+      # RabbitMQ
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      RABBITMQ_VHOST: /
+
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-oss}
+      OSS_ENDPOINT: ${OSS_ENDPOINT}
+      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID}
+      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET}
+      OSS_BUCKET_NAME: ${OSS_BUCKET_NAME}
+      OSS_PRIVATE_BUCKET: ${OSS_PRIVATE_BUCKET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+
+      # Dev Configs
+      NACOS_ENABLED: "false"
+      TRACING_ENABLED: "true"
+      MANAGEMENT_OTLP_TRACING_ENABLED: "true"
+      MANAGEMENT_HEALTH_REDIS_ENABLED: "false"
+
+      # OpenTelemetry
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
+
+      # Media Service gRPC（供商品圖片轉正 FinalizeImages + LinkImages）
+      MEDIA_SERVICE_HOST: media-service
+      MEDIA_SERVICE_GRPC_PORT: 9937
+
+      # Shipping Service gRPC（運費計算）
+      SHIPPING_SERVICE_HOST: shipping-service
+      SHIPPING_SERVICE_GRPC_PORT: 9931
+
+      # Seller Service gRPC（賣家元資料）
+      SELLER_SERVICE_HOST: host.docker.internal
+      SELLER_SERVICE_GRPC_PORT: 9941
+
+      # Buyer Service gRPC（subscribed_only filter 取收藏 ID 列表，02 §4.2.4）
+      BUYER_SERVICE_HOST: host.docker.internal
+      BUYER_SERVICE_GRPC_PORT: 9941
+
+      # 農業部開放資料 API Key
+      GOV_API_KEY_1: ${GOV_API_KEY_1}
+
+      # 冪等鍵清理排程（application.yml product.cleanup.idempotency.*）
+      CLEANUP_IDEMPOTENCY_ENABLED: ${CLEANUP_IDEMPOTENCY_ENABLED:-true}
+
+      JAVA_OPTS: ${JAVA_OPTS}
+      SKIP_ACCOUNT_TYPE_CHECK: ${SKIP_ACCOUNT_TYPE_CHECK:-true}
+
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9912/actuator/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    depends_on:
+      media-service:
+        condition: service_healthy
+    networks:
+      - hawkr-network
+
+  # ==========================================
+  # Order Service (9914/9915)
+  # ==========================================
+
+  order-service:
+    build:
+      context: .
+      dockerfile: services/java/order-service/Dockerfile
+    image: hawkr/order-service:latest
+    container_name: order-service
+    restart: unless-stopped
+    ports:
+      - "9914:9914"
+      - "9915:9915"
+    environment:
+      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
+      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
+      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
+      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
+      MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
+      TZ: UTC
+      SERVER_PORT: 9914
+      GRPC_PORT: 9915
+
+      # gRPC clients
+      BUYER_SERVICE_HOST: host.docker.internal
+      BUYER_SERVICE_GRPC_PORT: 9941
+      PRODUCT_SERVICE_HOST: product-service
+      PRODUCT_SERVICE_GRPC_PORT: 9913
+      CART_SERVICE_HOST: cart-service
+      CART_SERVICE_GRPC_PORT: 9927
+      PAYMENT_SERVICE_HOST: payment-service
+      PAYMENT_SERVICE_GRPC_PORT: 9925
+      # 58 號 §6.2.4「order-service ①」：checkout preview／confirm 打 invoice-service。
+      # application.yml 的 default 是 127.0.0.1（供 IDE 直跑），在 compose 網路裡那是
+      # order-service 自己 ⇒ 這兩行必須明列，與同區塊其他 peer 同慣例。
+      INVOICE_SERVICE_HOST: invoice-service
+      INVOICE_SERVICE_GRPC_PORT: 10041
+      SELLER_SERVICE_HOST: host.docker.internal
+      SELLER_SERVICE_GRPC_PORT: 9941
+      COUPON_SERVICE_HOST: coupon-service
+      COUPON_SERVICE_GRPC_PORT: 9951
+      SHIPPING_SERVICE_HOST: shipping-service
+      SHIPPING_SERVICE_GRPC_PORT: 9931
+      MEDIA_SERVICE_HOST: media-service
+      MEDIA_SERVICE_GRPC_PORT: 9937
+      AFTERSALES_SERVICE_HOST: aftersales-service
+      AFTERSALES_SERVICE_GRPC_PORT: 9923
+
+      # §2A.2 訂單最低金額（CheckoutService L1 檢查）
+      PAYMENT_MIN_AMOUNT: ${PAYMENT_MIN_AMOUNT:-15}
+
+      # 代理商 PayUni MerID（多賣家和單代收，20 設計書 §4.13）
+      # 空字串時 CheckoutPreview 接到 consolidated=true 會拒絕（INVALID_PARAM）
+      PAYUNI_AGENT_MER_ID: ${PAYUNI_AGENT_MER_ID:-}
+
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hawkr_order
+      DB_USER: dbadmin
+      DB_PASSWORD: Hawkr2024Admin
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: HawkrRedis2026
+
+      # RabbitMQ
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      RABBITMQ_VHOST: /
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-oss}
+      OSS_ENDPOINT: ${OSS_ENDPOINT}
+      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID}
+      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET}
+      OSS_BUCKET_NAME: ${OSS_BUCKET_NAME}
+      OSS_PRIVATE_BUCKET: ${OSS_PRIVATE_BUCKET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+
+      # Dev Configs
+      NACOS_ENABLED: "false"
+      TRACING_ENABLED: "true"
+      MANAGEMENT_OTLP_TRACING_ENABLED: "true"
+
+      # OpenTelemetry
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
+
+      # 自動完成排程配置
+      AUTO_COMPLETE_INTERVAL_MS: ${AUTO_COMPLETE_INTERVAL_MS:-3600000}
+      AUTO_COMPLETE_BATCH_SIZE: ${AUTO_COMPLETE_BATCH_SIZE:-100}
+
+      # 付款期限與超時掃描（application.yml hawkr.order.*）
+      PAYMENT_DEADLINE_SECONDS: ${PAYMENT_DEADLINE_SECONDS:-86400}
+      # 64 號 §6.4.11：RFQ 成交建單的付款期限 = 建單 +12h，與結帳路徑刻意不同
+      RFQ_PAYMENT_DEADLINE_SECONDS: ${RFQ_PAYMENT_DEADLINE_SECONDS:-43200}
+      CANCEL_SCAN_INTERVAL_MS: ${CANCEL_SCAN_INTERVAL_MS:-15000}
+      # 付款後建單保證：Outbox + Backstop（03 §8.10/§8.11）
+      ORDER_OUTBOX_PUBLISH_INTERVAL_MS: ${ORDER_OUTBOX_PUBLISH_INTERVAL_MS:-5000}
+      ORDER_PAYOUT_HOLD_RECHECK_SECONDS: ${ORDER_PAYOUT_HOLD_RECHECK_SECONDS:-600}
+      ORDER_SHIPMENT_BACKSTOP_ENABLED: ${ORDER_SHIPMENT_BACKSTOP_ENABLED:-true}
+      ORDER_SHIPMENT_BACKSTOP_INTERVAL_MS: ${ORDER_SHIPMENT_BACKSTOP_INTERVAL_MS:-300000}
+      ORDER_SHIPMENT_BACKSTOP_GRACE_MINUTES: ${ORDER_SHIPMENT_BACKSTOP_GRACE_MINUTES:-30}
+      ORDER_SHIPMENT_BACKSTOP_MAX_ATTEMPTS: ${ORDER_SHIPMENT_BACKSTOP_MAX_ATTEMPTS:-5}
+      ORDER_SHIPMENT_BACKSTOP_BACKOFF_MINUTES: ${ORDER_SHIPMENT_BACKSTOP_BACKOFF_MINUTES:-30}
+
+      FLYWAY_ENABLED: "true"
+      JAVA_OPTS: ${JAVA_OPTS}
+      SKIP_ACCOUNT_TYPE_CHECK: ${SKIP_ACCOUNT_TYPE_CHECK:-true}
+
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9914/actuator/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - hawkr-network
+
+  # ==========================================
+  # Aftersales Service (9922/9923)
+  # ==========================================
+
+  aftersales-service:
+    build:
+      context: .
+      dockerfile: services/java/aftersales-service/Dockerfile
+    image: hawkr/aftersales-service:latest
+    container_name: aftersales-service
+    restart: unless-stopped
+    ports:
+      - "9922:9922"
+      - "9923:9923"
+    environment:
+      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
+      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
+      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
+      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
+      MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
+      TZ: UTC
+      SERVER_PORT: 9922
+      GRPC_PORT: 9923
+
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hawkr_aftersales
+      DB_USER: dbadmin
+      DB_PASSWORD: Hawkr2024Admin
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: HawkrRedis2026
+
+      # RabbitMQ
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      RABBITMQ_VHOST: /
+
+      # gRPC 依賴服務
+      ORDER_SERVICE_HOST: order-service
+      ORDER_SERVICE_GRPC_PORT: 9915
+      PAYMENT_SERVICE_HOST: payment-service
+      PAYMENT_SERVICE_GRPC_PORT: 9925
+      SHIPPING_SERVICE_HOST: shipping-service
+      SHIPPING_SERVICE_GRPC_PORT: 9931
+      COUPON_SERVICE_HOST: coupon-service
+      COUPON_SERVICE_GRPC_PORT: 9951
+      MEDIA_SERVICE_HOST: media-service
+      MEDIA_SERVICE_GRPC_PORT: 9937
+      BUYER_SERVICE_HOST: host.docker.internal
+      BUYER_SERVICE_GRPC_PORT: 9941
+      SELLER_SERVICE_HOST: host.docker.internal
+      SELLER_SERVICE_GRPC_PORT: 9941
+
+      # ATM 退款頁面完成導回（本地用 ngrok URL，由 dev.sh 自動更新）
+      ATM_REFUND_RETURN_URL: ${ATM_REFUND_RETURN_URL:-http://localhost:8080/atm-refund/return}
+
+      # 售後 case 可調參數（application.yml aftersales.case.*）
+      AFTERSALE_APPLY_DEADLINE_HOURS: ${AFTERSALE_APPLY_DEADLINE_HOURS:-60}
+      AFTERSALE_PROCESS_DEADLINE_HOURS: ${AFTERSALE_PROCESS_DEADLINE_HOURS:-72}
+      AFTERSALE_MAX_REOPEN_COUNT: ${AFTERSALE_MAX_REOPEN_COUNT:-1}
+      AFTERSALE_MAX_EVIDENCE_COUNT: ${AFTERSALE_MAX_EVIDENCE_COUNT:-3}
+      AFTERSALE_APPEAL_DEADLINE_HOURS: ${AFTERSALE_APPEAL_DEADLINE_HOURS:-72}
+      AFTERSALE_APPEAL_PAYOUT_HOLD_GRACE_MINUTES: ${AFTERSALE_APPEAL_PAYOUT_HOLD_GRACE_MINUTES:-15}
+      AFTERSALE_RETURN_TIMEOUT_DAYS: ${AFTERSALE_RETURN_TIMEOUT_DAYS:-7}
+      AUTO_CONFIRM_RECEIPT_HOURS: ${AUTO_CONFIRM_RECEIPT_HOURS:-48}
+      AUTO_CONFIRM_SCHEDULER_CRON: ${AUTO_CONFIRM_SCHEDULER_CRON:-0 */10 * * * ?}
+      # 2026-05-22 逆物流退貨政策修訂：超商待取 72h + 24h 預警（application.yml aftersales.return.*）
+      STORE_PICKUP_TIMEOUT_HOURS: ${STORE_PICKUP_TIMEOUT_HOURS:-72}
+      STORE_PICKUP_SCHEDULER_CRON: ${STORE_PICKUP_SCHEDULER_CRON:-0 */10 * * * ?}
+      WARN_SCHEDULER_CRON: ${WARN_SCHEDULER_CRON:-0 */5 * * * ?}
+      # §5.21 RETURN_STUCK 偵測（application.yml hawkr.aftersales.return-stuck-alert.*）
+      # 值與 application.yml default 同步，本機 compose 行為不變；k8s 側刻意不宣告這兩個 key。
+      RETURN_STUCK_SCHEDULER_CRON: ${RETURN_STUCK_SCHEDULER_CRON:-0 0 3 * * ?}
+      RETURN_STUCK_DAYS: ${RETURN_STUCK_DAYS:-14}
+      # 退款 worker（application.yml aftersales.refund.*）
+      REFUND_WORKER_INTERVAL_MS: ${REFUND_WORKER_INTERVAL_MS:-10000}
+      REFUND_MAX_RETRY_COUNT: ${REFUND_MAX_RETRY_COUNT:-10}
+
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-oss}
+      OSS_ENDPOINT: ${OSS_ENDPOINT}
+      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID}
+      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET}
+      OSS_BUCKET_NAME: ${OSS_BUCKET_NAME}
+      OSS_PRIVATE_BUCKET: ${OSS_PRIVATE_BUCKET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+
+      # ATM 退款 return URL（本地開發用 ngrok URL，由 dev.sh 注入）
+      ATM_REFUND_RETURN_URL_BASE: ${GATEWAY_URL:-}
+
+      # Web 前端 base URL（client_type=WEB_BROWSER 時組 redirect_url 用，§5.4.2）
+      WEB_FRONTEND_URL: ${WEB_FRONTEND_URL:-}
+
+      FLYWAY_ENABLED: "true"
+      NACOS_ENABLED: "false"
+      TRACING_ENABLED: "true"
+      MANAGEMENT_OTLP_TRACING_ENABLED: "true"
+
+      # OpenTelemetry
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
+
+      JAVA_OPTS: ${JAVA_OPTS}
+
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9922/actuator/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - hawkr-network
+
+  # ==========================================
+  # Payment Service (9924/9925)
+  # ==========================================
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: services/java/payment-service/Dockerfile
+    image: hawkr/payment-service:latest
+    container_name: payment-service
+    restart: unless-stopped
+    ports:
+      - "9924:9924"
+      - "9925:9925"
+    environment:
+      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
+      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
+      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
+      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
+      TZ: UTC
+      SERVER_PORT: 9924
+      GRPC_PORT: 9925
+
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hawkr_payment
+      DB_USER: dbadmin
+      DB_PASSWORD: Hawkr2024Admin
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: HawkrRedis2026
+
+      # RabbitMQ
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      RABBITMQ_VHOST: /
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-oss}
+      OSS_ENDPOINT: ${OSS_ENDPOINT}
+      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID}
+      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET}
+      OSS_BUCKET_NAME: ${OSS_BUCKET_NAME}
+      OSS_PRIVATE_BUCKET: ${OSS_PRIVATE_BUCKET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+
+      # gRPC clients
+      ORDER_SERVICE_HOST: order-service
+      ORDER_SERVICE_GRPC_PORT: 9915
+
+      PAYUNI_AGENT_ID: ${PAYUNI_AGENT_ID}
+      # 代理商出入帳商店代號（agent_fee 的 AgentMerID）。空 ＝ 依平台預設，是官方定義的合法行為。
+      PAYUNI_AGENT_MER_ID: ${PAYUNI_AGENT_MER_ID:-}
+      PAYUNI_AGENT_KEY: ${PAYUNI_AGENT_KEY}
+      PAYUNI_AGENT_IV: ${PAYUNI_AGENT_IV}
+      PAYUNI_SANDBOX: ${PAYUNI_SANDBOX}
+      # 平台自有 PayUni 商家 MerID，供買家訂閱計費（60 號設計書）；值待平台商家帳號核准後填入，
+      # 訂閱計費引擎本身尚未實作，此值目前未被任何程式碼讀取
+      PAYUNI_SUBSCRIPTION_MER_ID: ${PAYUNI_SUBSCRIPTION_MER_ID:-}
+
+      # §2A.2 / §2A.5 金額與 ATM 期限
+      PAYMENT_MIN_AMOUNT: ${PAYMENT_MIN_AMOUNT:-15}
+      PAYMENT_ATM_EXPIRE_DAYS: ${PAYMENT_ATM_EXPIRE_DAYS:-2}
+
+      # Gateway URL（ngrok URL，由 dev.sh 注入）
+      GATEWAY_URL: ${GATEWAY_URL:-}
+
+      # PayUni 回調 URL（從 .env 讀取，本地開發用 ngrok 時只需改 .env）
+      # 帶值 = 覆蓋 PayUni 後台設定，空值 = 使用後台設定
+      PAYUNI_NOTIFY_URL: ${PAYUNI_NOTIFY_URL:-}
+      PAYUNI_RETURN_URL: ${PAYUNI_RETURN_URL:-}
+      PAYUNI_API_URL: ${PAYUNI_API_URL:-https://sandbox-api.payuni.com.tw}
+      PAYUNI_STORE_MAP_RETURN_URL: ${PAYUNI_STORE_MAP_RETURN_URL:-}
+
+      # Web 前端 base URL（client_type=WEB_BROWSER 時組 redirect_url 用，§5.9）
+      WEB_FRONTEND_URL: ${WEB_FRONTEND_URL:-}
+
+      # L2 待付款補收排程（application.yml hawkr.payment.reconcile.pending.*）
+      RECONCILE_PENDING_ENABLED: ${RECONCILE_PENDING_ENABLED:-true}
+      RECONCILE_PENDING_FIXED_DELAY_MS: ${RECONCILE_PENDING_FIXED_DELAY_MS:-300000}
+      RECONCILE_PENDING_BATCH_SIZE: ${RECONCILE_PENDING_BATCH_SIZE:-50}
+      RECONCILE_PENDING_INITIAL_DELAY_MIN: ${RECONCILE_PENDING_INITIAL_DELAY_MIN:-3}
+      RECONCILE_PENDING_RETRY_INTERVAL_MIN: ${RECONCILE_PENDING_RETRY_INTERVAL_MIN:-5}
+      RECONCILE_PENDING_GRACE_MIN: ${RECONCILE_PENDING_GRACE_MIN:-30}
+      RECONCILE_PENDING_PER_ITEM_SLEEP_MS: ${RECONCILE_PENDING_PER_ITEM_SLEEP_MS:-100}
+
+      # Apple Pay on Web Merchant Validation（05 號設計書 §5.11）
+      APPLE_PAY_MERCHANT_ID: ${APPLE_PAY_MERCHANT_ID:-}
+      APPLE_PAY_DISPLAY_NAME: ${APPLE_PAY_DISPLAY_NAME:-Hawkr}
+      APPLE_PAY_MERCHANT_CERT_PATH: ${APPLE_PAY_MERCHANT_CERT_PATH:-}
+      APPLE_PAY_MERCHANT_KEY_PATH: ${APPLE_PAY_MERCHANT_KEY_PATH:-}
+      APPLE_PAY_DOMAIN_ALLOWLIST: ${APPLE_PAY_DOMAIN_ALLOWLIST:-}
+      APPLE_PAY_CONNECT_TIMEOUT_SEC: ${APPLE_PAY_CONNECT_TIMEOUT_SEC:-5}
+      APPLE_PAY_REQUEST_TIMEOUT_SEC: ${APPLE_PAY_REQUEST_TIMEOUT_SEC:-10}
+
+      # OpenTelemetry
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
+      SKIP_ACCOUNT_TYPE_CHECK: ${SKIP_ACCOUNT_TYPE_CHECK:-true}
+
+    volumes:
+      # Apple Pay Merchant Identity Certificate + Private Key（mount 整個目錄保留原檔名）
+      # 未設定 APPLE_PAY_CERT_DIR 時 fallback 到 repo 內空目錄（避免暴露宿主機 /tmp，
+      # validator lazy-load 時找不到 cert/key 回 8029，不影響其他結帳流程）
+      - "${APPLE_PAY_CERT_DIR:-./infra/apple-pay-empty}:/secrets/apple-pay:ro"
+
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "-O", "/dev/null", "http://localhost:9924/actuator/health"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - hawkr-network
+
+  # ==========================================
+  # Shipping Service (9930/9931) — Java/Spring Boot
+  # Host ports 9930/9931 避免與 inventory-service(9928/9929) 衝突
+  # 本地開發不走 Docker 時使用 application.yml 預設 9928/9929
+  # ==========================================
+
+  shipping-service:
+    build:
+      context: .
+      dockerfile: services/java/shipping-service/Dockerfile
+    image: hawkr/shipping-service:latest
+    container_name: shipping-service
+    restart: unless-stopped
+    ports:
+      - "9930:9930"
+      - "9931:9931"
+    environment:
+      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
+      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
+      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
+      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
+      TZ: UTC
+      SERVER_PORT: 9930
+      GRPC_PORT: 9931
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hawkr_shipping
+      DB_USER: dbadmin
+      DB_PASSWORD: Hawkr2024Admin
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: HawkrRedis2026
+
+      # RabbitMQ
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      RABBITMQ_VHOST: /
+
+      # gRPC clients
+      ORDER_SERVICE_HOST: order-service
+      ORDER_SERVICE_GRPC_PORT: 9915
+      SELLER_SERVICE_HOST: host.docker.internal
+      SELLER_SERVICE_GRPC_PORT: 9941
+      MEDIA_SERVICE_HOST: media-service
+      MEDIA_SERVICE_GRPC_PORT: 9937
+      BUYER_SERVICE_HOST: host.docker.internal
+      BUYER_SERVICE_GRPC_PORT: 9941
+
+      # PayUni
+      PAYUNI_AGENT_KEY: ${PAYUNI_AGENT_KEY}
+      PAYUNI_AGENT_IV: ${PAYUNI_AGENT_IV}
+      # ── Uber Direct（66 §8.5）──
+      # 🔴 UBER_ENABLED 本地也維持 false：切成 true 而程式還在上一階段 ＝ 陷阱 A1
+      #    （買家付錢、建出沒人送的單、零告警）。
+      UBER_ENABLED: ${UBER_ENABLED:-false}
+      UBER_BASE_URL: ${UBER_BASE_URL:-https://api.uber.com/v1}
+      UBER_AUTH_URL: ${UBER_AUTH_URL:-https://auth.uber.com/oauth/v2/token}
+      UBER_SCOPE: ${UBER_SCOPE:-eats.deliveries}
+      # 機敏值一律 ${VAR:-}，禁止寫死明文。留空 ＝ Uber 未啟用（fail-closed）。
+      UBER_CLIENT_ID: ${UBER_CLIENT_ID:-}
+      UBER_CLIENT_SECRET: ${UBER_CLIENT_SECRET:-}
+      # 🔴 一組不是一個：JSON map {webhookId: key}
+      UBER_WEBHOOK_SIGNING_KEYS: ${UBER_WEBHOOK_SIGNING_KEYS:-}
+      PAYUNI_API_URL: ${PAYUNI_API_URL:-https://sandbox-api.payuni.com.tw}
+      # 空值 = 使用 PayUni 後台設定；帶值 = 覆蓋後台設定
+      PAYUNI_SHIPPING_NOTIFY_URL: ${PAYUNI_SHIPPING_NOTIFY_URL:-}
+      # 門市地圖
+      PAYUNI_STORE_MAP_MER_ID: ${PAYUNI_STORE_MAP_MER_ID:-HAWK9}
+      PAYUNI_STORE_MAP_RETURN_URL: ${PAYUNI_STORE_MAP_RETURN_URL:-}
+      GATEWAY_URL: ${GATEWAY_URL:-}
+      # §5.14 store_map appType=web 路徑最終 302 出口（與 payment / aftersales 共用同一環境變數值）
+      WEB_FRONTEND_URL: ${WEB_FRONTEND_URL:-}
+
+      # CDN
+      # shipping-service 是 MediaUrlProperties 的四個消費端之一（ShippingAdminQueryService /
+      # BuyerGrpcClient），本機也要有域名才組得出圖片 URL（backend#2283）。
+      MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
+
+      # §5.19 物流貨態補收排程（L2 補救路徑）
+      SHIPPING_RECONCILE_ENABLED: ${SHIPPING_RECONCILE_ENABLED:-true}
+      SHIPPING_RECONCILE_INTERVAL_MS: ${SHIPPING_RECONCILE_INTERVAL_MS:-600000}
+      SHIPPING_RECONCILE_BATCH_SIZE: ${SHIPPING_RECONCILE_BATCH_SIZE:-100}
+      SHIPPING_RECONCILE_MAX_AGE_DAYS: ${SHIPPING_RECONCILE_MAX_AGE_DAYS:-7}
+      SHIPPING_RECONCILE_BACKOFF_MINUTES: ${SHIPPING_RECONCILE_BACKOFF_MINUTES:-15}
+      # §5.2.2 / §5.3.2 批次列印參數
+      SHIPPING_BATCH_MAX_SIZE: ${SHIPPING_BATCH_MAX_SIZE:-50}
+      SHIPPING_HOME_LABEL_CONCURRENCY: ${SHIPPING_HOME_LABEL_CONCURRENCY:-10}
+      # §5.19.3.C 黑貓叫件 REQUESTED 卡死 ops 告警
+      SHIPPING_ALERT_TCAT_STUCK_ENABLED: ${SHIPPING_ALERT_TCAT_STUCK_ENABLED:-true}
+      SHIPPING_ALERT_TCAT_STUCK_INTERVAL_MS: ${SHIPPING_ALERT_TCAT_STUCK_INTERVAL_MS:-600000}
+      SHIPPING_ALERT_TCAT_STUCK_BATCH_SIZE: ${SHIPPING_ALERT_TCAT_STUCK_BATCH_SIZE:-30}
+      SHIPPING_ALERT_TCAT_STUCK_GRACE_MINUTES: ${SHIPPING_ALERT_TCAT_STUCK_GRACE_MINUTES:-3}
+      SHIPPING_ALERT_TCAT_STUCK_MAX_AGE_HOURS: ${SHIPPING_ALERT_TCAT_STUCK_MAX_AGE_HOURS:-24}
+      # §5.19.3.D 建店送審 REQUESTED 卡死 ops 告警
+      SHIPPING_ALERT_SUBMIT_STUCK_ENABLED: ${SHIPPING_ALERT_SUBMIT_STUCK_ENABLED:-true}
+      SHIPPING_ALERT_SUBMIT_STUCK_INTERVAL_MS: ${SHIPPING_ALERT_SUBMIT_STUCK_INTERVAL_MS:-600000}
+      SHIPPING_ALERT_SUBMIT_STUCK_BATCH_SIZE: ${SHIPPING_ALERT_SUBMIT_STUCK_BATCH_SIZE:-20}
+      SHIPPING_ALERT_SUBMIT_STUCK_GRACE_MINUTES: ${SHIPPING_ALERT_SUBMIT_STUCK_GRACE_MINUTES:-5}
+      SHIPPING_ALERT_SUBMIT_STUCK_MAX_AGE_HOURS: ${SHIPPING_ALERT_SUBMIT_STUCK_MAX_AGE_HOURS:-24}
+
+      # Dev Configs
+      NACOS_ENABLED: "false"
+      FLYWAY_ENABLED: "true"
+      JAVA_OPTS: ${JAVA_OPTS}
+      SKIP_ACCOUNT_TYPE_CHECK: ${SKIP_ACCOUNT_TYPE_CHECK:-true}
+
+      # OpenTelemetry
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
+
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9930/actuator/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - hawkr-network
+
+  # ==========================================
+  # PayUni Webhook Service (9946)
+  # ==========================================
+
+  payuni-webhook-service:
+    build:
+      context: .
+      dockerfile: services/java/payuni-webhook-service/Dockerfile
+    image: hawkr/payuni-webhook-service:latest
+    container_name: payuni-webhook-service
+    restart: unless-stopped
+    ports:
+      - "9946:9946"
+    environment:
+      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
+      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
+      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
+      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
+      TZ: UTC
+      SERVER_PORT: 9946
+      GRPC_PORT: 9947
+
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hawkr_webhook
+      DB_USER: dbadmin
+      DB_PASSWORD: Hawkr2024Admin
+
+      # Redis（application.yml 的 spring.data.redis 有引用；缺這些會 fallback 連
+      # 容器內 127.0.0.1 空密碼，連不到 redis 容器。值對齊其他 Java 服務）
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: HawkrRedis2026
+
+      # RabbitMQ
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+
+      # PayUni SDK
+      PAYUNI_AGENT_KEY: ${PAYUNI_AGENT_KEY}
+      PAYUNI_AGENT_IV: ${PAYUNI_AGENT_IV}
+      # 🔴 Uber webhook 驗簽金鑰。ingress 這一側必須有它：驗簽要發生在寫進
+      #    webhook_inbox **之前**，否則未驗簽的偽造事件會先佔住 uq_inbox_event 的鍵位，
+      #    讓真正的 Uber 事件被判為重複而丟棄。
+      UBER_WEBHOOK_SIGNING_KEYS: ${UBER_WEBHOOK_SIGNING_KEYS:-}
+
+      # Shipping gRPC（模擬器查詢 ShipTradeNo 用）
+      SHIPPING_SERVICE_HOST: shipping-service
+      SHIPPING_SERVICE_GRPC_PORT: 9931
+
+      # 環境識別（webhook 模擬器白名單）
+      APP_ENV: ${APP_ENV:-dev}
+
+      # Dev Configs
+      NACOS_ENABLED: "false"
+      FLYWAY_ENABLED: "true"
+      JAVA_OPTS: ${JAVA_OPTS}
+
+      # OpenTelemetry
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
+
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9946/actuator/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - hawkr-network
+
+  # ==========================================
+  # Social Service (gRPC 9918；final architecture，無 HTTP management port)
+  # ==========================================
+
+  social-service:
+    build:
+      context: .
+      dockerfile: services/social-service/Dockerfile
+      target: dev
+      args:
+        GO_VERSION: ${GO_VERSION:?用 ./dev.sh 執行（從 .go-version 帶入）}
+    image: hawkr/social-service:latest
+    container_name: social-service
+    restart: unless-stopped
+    ports:
+      - "9918:9918"
+    volumes:
+      - ./services/social-service:/app/services/social-service
+      - ./pkg:/app/pkg
+      - go-build-cache:/root/.cache/go-build
+      - go-mod-cache:/go/pkg/mod
+    environment:
+      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
+      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
+      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
+      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
+      TZ: UTC
+      BUYER_SERVICE_HOST: host.docker.internal
+      BUYER_SERVICE_GRPC_PORT: 9941
+      SELLER_SERVICE_HOST: host.docker.internal
+      SELLER_SERVICE_GRPC_PORT: 9941
+      GRPC_PORT: 9918
+      MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
+
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hawkr_social
+      DB_USER: dbadmin
+      DB_PASSWORD: Hawkr2024Admin
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: HawkrRedis2026
+
+      # RabbitMQ — social-service 是 producer（41 號設計書 §6.1 / §6.3）
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+
+      # OSS
+
+      # Service Discovery
+      ACCOUNT_SERVICE_HOST: host.docker.internal
+      ACCOUNT_SERVICE_GRPC_PORT: 9941
+      MEDIA_SERVICE_HOST: media-service
+      MEDIA_SERVICE_GRPC_PORT: 9937
+
+      # ── ADM 代行營運：排程貼文發布 worker（56 號設計書 §8.5.1 (C)）──
+      # 全部字面值：這組沒有任何一支是「本機測試會調」的（要調就直接改這裡）。
+      # Config.Validate() 的三條斷言比的是這組彼此之間的不等式，全部吃程式碼預設值時
+      # 三條照樣成立、boot 照樣綠 —— 斷言擋得住「調錯」，擋不住「沒設」，所以要列全。
+      SCHEDULED_POST_PUBLISH_POLL_INTERVAL_SECONDS: 30
+      SCHEDULED_POST_PUBLISH_BATCH_SIZE: 50
+      SCHEDULED_POST_PUBLISH_LEASE_SECONDS: 120
+      SCHEDULED_POST_PUBLISH_MAX_RETRY: 5
+      SCHEDULED_POST_PUBLISH_BACKOFF_BASE_SECONDS: 60
+      SCHEDULED_POST_PUBLISH_BACKOFF_MAX_SECONDS: 1800
+      SCHEDULED_POST_PUBLISH_AUDIT_INTENT_DEADLINE_MS: 800
+      SCHEDULED_POST_PUBLISH_AUDIT_CONFIRM_DEADLINE_MS: 400
+      SCHEDULED_POST_PUBLISH_AUDIT_CONFIRM_MAX_ATTEMPTS: 3
+      SCHEDULED_POST_PUBLISH_AUDIT_CONFIRM_TOTAL_BUDGET_MS: 2000
+      SCHEDULED_POST_PUBLISH_TX_BUDGET_MS: 5000
+      SCHEDULED_POST_PUBLISH_WINDOW_HOURS: 24
+
+      # Dev Configs
+      GOPROXY: "https://proxy.golang.org,direct"   # 見檔頭「Go 服務 dev container 契約」：dev 嚴禁 off
+      GONOSUMDB: "*"
+      TRACING_ENABLED: "true"
+
+      # OpenTelemetry
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
+
+    healthcheck:
+      test: ["CMD-SHELL", "cd /app/services/social-service && go run ./cmd/grpc-healthcheck -addr 127.0.0.1:9918 -service hawkr.social.SocialService"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - hawkr-network
+
+  crm-service:
+    build:
+      context: .
+      dockerfile: services/crm-service/Dockerfile
+      target: dev
+      args:
+        GO_VERSION: ${GO_VERSION:?用 ./dev.sh 執行（從 .go-version 帶入）}
+    image: hawkr/crm-service:latest
+    container_name: crm-service
+    restart: unless-stopped
+    ports:
+      - "10030:10030"
+    volumes:
+      - ./services/crm-service:/app/services/crm-service
+      - ./pkg:/app/pkg
+      - go-build-cache:/root/.cache/go-build
+      - go-mod-cache:/go/pkg/mod
+    environment:
+      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
+      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
+      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
+      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
+      TZ: UTC
+      BUYER_SERVICE_HOST: host.docker.internal
+      BUYER_SERVICE_GRPC_PORT: 9941
+      GRPC_PORT: 10030
+
+      # RabbitMQ（#1625：原缺此變數 → fallback localhost，本地 crm consumer 自 2026-06-28 起靜默斷線）
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hawkr_crm
+      DB_USER: dbadmin
+      DB_PASSWORD: Hawkr2024Admin
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: HawkrRedis2026
+
+      # Dev Configs
+      NACOS_ENABLED: "false"
+      TRACING_ENABLED: "true"
+      GOPROXY: "https://proxy.golang.org,direct"   # 見檔頭「Go 服務 dev container 契約」：dev 嚴禁 off
+      GONOSUMDB: "*"
+
+      # OpenTelemetry
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
+
+    healthcheck:
+      test: ["CMD-SHELL", "cd /app/services/crm-service && go run ./cmd/grpc-healthcheck -addr 127.0.0.1:10030 -service hawkr.crm.CrmService"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - hawkr-network
+
+  # ==========================================
+  # Review Service (gRPC 10033)
+  # ==========================================
+
+  review-service:
+    build:
+      context: .
+      dockerfile: services/review-service/Dockerfile
+      target: dev
+      args:
+        GO_VERSION: ${GO_VERSION:?用 ./dev.sh 執行（從 .go-version 帶入）}
+    image: hawkr/review-service:latest
+    container_name: review-service
+    restart: unless-stopped
+    ports:
+      - "10033:10033"
+    volumes:
+      - ./services/review-service:/app/services/review-service
+      - ./pkg:/app/pkg
+      - go-build-cache:/root/.cache/go-build
+      - go-mod-cache:/go/pkg/mod
+    environment:
+      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
+      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
+      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
+      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
+      TZ: UTC
+      BUYER_SERVICE_HOST: host.docker.internal
+      BUYER_SERVICE_GRPC_PORT: 9941
+      SELLER_SERVICE_HOST: host.docker.internal
+      SELLER_SERVICE_GRPC_PORT: 9941
+      GRPC_PORT: 10033
+      MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
+
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hawkr_review
+      DB_USER: dbadmin
+      DB_PASSWORD: Hawkr2024Admin
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: HawkrRedis2026
+
+      # Order Service
+      ORDER_SERVICE_ADDR: order-service:9915
+
+      # RabbitMQ
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+
+      # Dev Configs
+      NACOS_ENABLED: "false"
+      TRACING_ENABLED: "true"
+      GOPROXY: "https://proxy.golang.org,direct"   # 見檔頭「Go 服務 dev container 契約」：dev 嚴禁 off
+      GONOSUMDB: "*"
+
+      # OpenTelemetry
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
+
+    healthcheck:
+      test: ["CMD-SHELL", "cd /app/services/review-service && go run ./cmd/grpc-healthcheck -addr 127.0.0.1:10033 -service hawkr.review.ReviewService"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - hawkr-network
+
+  # ==========================================
+  # IM Service (gRPC 9933；final architecture，無 service-local HTTP/WS)
+  # ==========================================
+
+  im-service:
+    build:
+      context: .
+      dockerfile: services/im-service/Dockerfile
+      target: dev
+      args:
+        GO_VERSION: ${GO_VERSION:?用 ./dev.sh 執行（從 .go-version 帶入）}
+    image: hawkr/im-service:latest
+    container_name: im-service
+    restart: unless-stopped
+    ports:
+      - "9933:9933"
+    volumes:
+      - ./services/im-service:/app/services/im-service
+      - ./pkg:/app/pkg
+      - go-build-cache:/root/.cache/go-build
+      - go-mod-cache:/go/pkg/mod
+    environment:
+      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
+      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
+      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
+      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
+      IM_CHAT_STREAM_JWT_SECRET: ${IM_CHAT_STREAM_JWT_SECRET:-}
+      IM_CHAT_STREAM_JWT_SECRET_PREV: ${IM_CHAT_STREAM_JWT_SECRET_PREV:-}
+      TZ: UTC
+      BUYER_SERVICE_ADDR: host.docker.internal:9941
+      SELLER_SERVICE_ADDR: host.docker.internal:9941
+      GRPC_PORT: 9933
+      MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
+
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hawkr_im
+      DB_USER: dbadmin
+      DB_PASSWORD: Hawkr2024Admin
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: HawkrRedis2026
+
+      # RabbitMQ
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      RABBITMQ_VHOST: /
+
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-oss}
+      OSS_ENDPOINT: ${OSS_ENDPOINT}
+      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID}
+      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET}
+      OSS_BUCKET_NAME: ${OSS_BUCKET_NAME}
+      OSS_PRIVATE_BUCKET: ${OSS_PRIVATE_BUCKET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+
+      # OpenTelemetry
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
+      GOPROXY: "https://proxy.golang.org,direct"   # 見檔頭「Go 服務 dev container 契約」：dev 嚴禁 off
+      GONOSUMDB: "*"
+
+    healthcheck:
+      test: ["CMD-SHELL", "cd /app/services/im-service && go run ./cmd/grpc-healthcheck -addr 127.0.0.1:9933 -service hawkr.im.IMService"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - hawkr-network
+
+  # ==========================================
+  # Media Service (9936/9937)
+  # ==========================================
+
+  media-service:
+    build:
+      context: .
+      dockerfile: services/java/media-service/Dockerfile
+    image: hawkr/media-service:latest
+    container_name: media-service
+    restart: unless-stopped
+    ports:
+      - "9936:9936"
+      - "9937:9937"
+    environment:
+      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
+      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
+      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
+      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
+      MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
+      TZ: UTC
+      SERVER_PORT: 9936
+      GRPC_PORT: 9937
+      SELLER_SERVICE_HOST: host.docker.internal
+      SELLER_SERVICE_GRPC_PORT: 9941
+
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hawkr_media
+      DB_USER: dbadmin
+      DB_PASSWORD: Hawkr2024Admin
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: HawkrRedis2026
+
+      # RabbitMQ
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      RABBITMQ_VHOST: /
+
+      # 儲存後端 R2（49 號設計書 §8.5）；OSS 將刪除，本地不再依賴。憑證走 ${R2_*}（.env）
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-r2}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_BUCKET_NAME: ${R2_BUCKET_NAME}
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
+      FLYWAY_ENABLED: "true"
+      NACOS_ENABLED: "false"
+
+      # gRPC 訊息上限、token、GC、access log、預覽 TTL（application.yml media.*）
+      GRPC_MAX_INBOUND_MSG_SIZE: ${GRPC_MAX_INBOUND_MSG_SIZE:-10485760}
+      TOKEN_SECRET: ${TOKEN_SECRET:-local-only-media-token-secret-not-for-deploy-48ch}
+      TOKEN_ALLOW_EPHEMERAL: ${TOKEN_ALLOW_EPHEMERAL:-true}
+      GC_ENABLED: ${GC_ENABLED:-true}
+      ACCESS_LOG_SAMPLE_RATE: ${ACCESS_LOG_SAMPLE_RATE:-1.0}
+      MEDIA_PREVIEW_TTL: ${MEDIA_PREVIEW_TTL:-3600}
+
+      JAVA_OPTS: ${JAVA_OPTS}
+
+      # OpenTelemetry
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
+      SKIP_ACCOUNT_TYPE_CHECK: ${SKIP_ACCOUNT_TYPE_CHECK:-true}
+
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9936/actuator/health"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - hawkr-network
+
+  # ==========================================
+  # AI Service (gRPC 9939；final architecture，無 HTTP management port)
+  # ==========================================
+
+  ai-service:
+    build:
+      context: .
+      dockerfile: services/ai-service/Dockerfile
+      target: dev
+      args:
+        GO_VERSION: ${GO_VERSION:?用 ./dev.sh 執行（從 .go-version 帶入）}
+    image: hawkr/ai-service:latest
+    container_name: ai-service
+    restart: unless-stopped
+    ports:
+      - "9939:9939"
+    volumes:
+      - ./services/ai-service:/app/services/ai-service
+      - ./pkg:/app/pkg
+      - go-build-cache:/root/.cache/go-build
+      - go-mod-cache:/go/pkg/mod
+    environment:
+      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
+      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
+      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
+      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
+      TZ: UTC
+      BUYER_SERVICE_HOST: host.docker.internal
+      BUYER_SERVICE_GRPC_PORT: 9941
+      SELLER_SERVICE_HOST: host.docker.internal
+      SELLER_SERVICE_GRPC_PORT: 9941
+      GRPC_PORT: 9939
+      ENV: ${ENV:-development}
+
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hawkr_ai
+      DB_USER: dbadmin
+      DB_PASSWORD: Hawkr2024Admin
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: HawkrRedis2026
+
+      # RabbitMQ
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      RABBITMQ_VHOST: /
+
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-oss}
+      OSS_ENDPOINT: ${OSS_ENDPOINT}
+      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID}
+      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET}
+      OSS_BUCKET_NAME: ${OSS_BUCKET_NAME}
+      OSS_PRIVATE_BUCKET: ${OSS_PRIVATE_BUCKET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+
+      # Gemini AI
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      EXTRACTOR_MODEL: ${EXTRACTOR_MODEL:-}
+
+      # EXTERNAL lane 的訂單賣方 store（doc 64 §6.4.8）。⚠️ 必須是單體的 seller 模組真的查得到的 store，不只是設定值。
+      PROCUREMENT_SETTLEMENT_STORE_ID: ${PROCUREMENT_SETTLEMENT_STORE_ID:-0}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      LLM_TOKEN_BUDGET_PER_MINUTE: ${LLM_TOKEN_BUDGET_PER_MINUTE:-}
+      GOMEMLIMIT: ${GOMEMLIMIT:-460MiB}
+      TRANSFORM_INFLIGHT_BYTES_BUDGET: ${TRANSFORM_INFLIGHT_BYTES_BUDGET:-268435456}
+
+      # OpenTelemetry
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=${ENV:-development}
+      GOPROXY: "https://proxy.golang.org,direct"   # 見檔頭「Go 服務 dev container 契約」：dev 嚴禁 off
+      GONOSUMDB: "*"
+
+    healthcheck:
+      test: ["CMD-SHELL", "cd /app/services/ai-service && go run ./cmd/grpc-healthcheck -addr 127.0.0.1:9939 -service hawkr.ai.AIImageService"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - hawkr-network
+
+  # ==========================================
+  # Cart Service (9926/9927)
+  # ==========================================
+
+  cart-service:
+    build:
+      context: .
+      dockerfile: services/java/cart-service/Dockerfile
+    image: hawkr/cart-service:latest
+    container_name: cart-service
+    restart: unless-stopped
+    ports:
+      - "9926:9926"
+      - "9927:9927"
+    environment:
+      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
+      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
+      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
+      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
+      MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
+      TZ: UTC
+      SERVER_PORT: 9926
+      GRPC_PORT: 9927
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hawkr_cart
+      DB_USER: dbadmin
+      DB_PASSWORD: Hawkr2024Admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: HawkrRedis2026
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      RABBITMQ_VHOST: /
+      PRODUCT_SERVICE_HOST: product-service
+      PRODUCT_SERVICE_GRPC_PORT: 9913
+      SELLER_SERVICE_HOST: host.docker.internal
+      SELLER_SERVICE_GRPC_PORT: 9941
+      BUYER_SERVICE_HOST: host.docker.internal
+      BUYER_SERVICE_GRPC_PORT: 9941
+      FLYWAY_ENABLED: "true"
+      NACOS_ENABLED: "false"
+      # 排程開關與訪客清理（application.yml cart.scheduler.*）
+      UNLOCK_EXPIRED_ENABLED: ${UNLOCK_EXPIRED_ENABLED:-true}
+      GUEST_CLEANUP_ENABLED: ${GUEST_CLEANUP_ENABLED:-true}
+      GUEST_CLEANUP_DAYS: ${GUEST_CLEANUP_DAYS:-30}
+      JAVA_OPTS: ${JAVA_OPTS}
+      SKIP_ACCOUNT_TYPE_CHECK: ${SKIP_ACCOUNT_TYPE_CHECK:-true}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9926/actuator/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - hawkr-network
+
+  # ==========================================
+  # Coupon Service
+  # ==========================================
+
+  coupon-service:
+    build:
+      context: .
+      dockerfile: services/java/coupon-service/Dockerfile
+    image: hawkr/coupon-service:latest
+    container_name: coupon-service
+    restart: unless-stopped
+    ports:
+      - "9950:9950"
+      - "9951:9951"
+    environment:
+      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
+      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
+      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
+      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
+      TZ: UTC
+      SERVER_PORT: 9950
+      GRPC_PORT: 9951
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hawkr_coupon
+      DB_USER: dbadmin
+      DB_PASSWORD: Hawkr2024Admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: HawkrRedis2026
+      # RabbitMQ
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      FLYWAY_ENABLED: "true"
+      NACOS_ENABLED: "false"
+      JAVA_OPTS: ${JAVA_OPTS}
+      SKIP_ACCOUNT_TYPE_CHECK: ${SKIP_ACCOUNT_TYPE_CHECK:-true}
+      SELLER_SERVICE_HOST: host.docker.internal
+      SELLER_SERVICE_GRPC_PORT: 9941
+      ACCOUNT_SERVICE_HOST: host.docker.internal
+      ACCOUNT_SERVICE_GRPC_PORT: 9941
+      ORDER_SERVICE_HOST: order-service
+      ORDER_SERVICE_GRPC_PORT: 9915
+      BUYER_SERVICE_HOST: host.docker.internal
+      BUYER_SERVICE_GRPC_PORT: 9941
+      # 自動釋放 / 到期排程與管理員 fallback 圖（application.yml coupon.*）
+      AUTO_RELEASE_ENABLED: ${AUTO_RELEASE_ENABLED:-true}
+      AUTO_EXPIRE_ENABLED: ${AUTO_EXPIRE_ENABLED:-true}
+      COUPON_ADMIN_FALLBACK_IMAGE_KEY: ${COUPON_ADMIN_FALLBACK_IMAGE_KEY:-public/system/coupon-default.png}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9950/actuator/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - hawkr-network
+
+  # ==========================================
+  # Product Import Service（#40 商品匯入精靈）
+  # ==========================================
+
+  product-import-service:
+    build:
+      context: .
+      dockerfile: services/java/product-import-service/Dockerfile
+    image: hawkr/product-import-service:latest
+    container_name: product-import-service
+    restart: unless-stopped
+    ports:
+      - "9960:9960"
+      - "9961:9961"
+    environment:
+      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
+      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
+      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
+      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
+      TZ: UTC
+      SERVER_PORT: 9960
+      GRPC_PORT: 9961
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hawkr_product_import
+      DB_USER: dbadmin
+      DB_PASSWORD: Hawkr2024Admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: HawkrRedis2026
+      # RabbitMQ
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      FLYWAY_ENABLED: "true"
+      NACOS_ENABLED: "false"
+      JAVA_OPTS: ${JAVA_OPTS}
+      SKIP_ACCOUNT_TYPE_CHECK: ${SKIP_ACCOUNT_TYPE_CHECK:-true}
+      # 下游依賴
+      MEDIA_SERVICE_HOST: media-service
+      MEDIA_SERVICE_GRPC_PORT: 9937
+      PRODUCT_SERVICE_HOST: product-service
+      PRODUCT_SERVICE_GRPC_PORT: 9913
+      SHIPPING_SERVICE_HOST: shipping-service
+      SHIPPING_SERVICE_GRPC_PORT: 9931
+      # 儲存後端 R2（49 號設計書 §8.5）；CSV upload 沿用 media-service 同一 R2 bucket。
+      # 修正歷史 ALIYUN_OSS_* 變數名 drift（application.yml 實際讀 STORAGE_BACKEND / R2_* / OSS_*）
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-r2}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_BUCKET_NAME: ${R2_BUCKET_NAME}
+      # Product Import 配置（設計書 §9.2）
+      PRODUCT_IMPORT_JOB_TTL_DAYS: ${PRODUCT_IMPORT_JOB_TTL_DAYS:-7}
+      PRODUCT_IMPORT_CSV_INVALID_TTL_DAYS: ${PRODUCT_IMPORT_CSV_INVALID_TTL_DAYS:-3}
+      PRODUCT_IMPORT_COMMITTED_RETENTION_DAYS: ${PRODUCT_IMPORT_COMMITTED_RETENTION_DAYS:-7}
+      PRODUCT_IMPORT_EXPIRED_RETENTION_DAYS: ${PRODUCT_IMPORT_EXPIRED_RETENTION_DAYS:-7}
+      PRODUCT_IMPORT_ORPHAN_ASSET_GRACE_HOURS: ${PRODUCT_IMPORT_ORPHAN_ASSET_GRACE_HOURS:-24}
+      PRODUCT_IMPORT_CALLBACK_INBOX_RETENTION_DAYS: ${PRODUCT_IMPORT_CALLBACK_INBOX_RETENTION_DAYS:-14}
+      PRODUCT_IMPORT_MAX_ACTIVE_JOBS_PER_SELLER: ${PRODUCT_IMPORT_MAX_ACTIVE_JOBS_PER_SELLER:-5}
+      PRODUCT_IMPORT_MAX_DAILY_JOBS_PER_SELLER: ${PRODUCT_IMPORT_MAX_DAILY_JOBS_PER_SELLER:-10}
+      PRODUCT_IMPORT_CSV_MAX_FILE_SIZE_BYTES: ${PRODUCT_IMPORT_CSV_MAX_FILE_SIZE_BYTES:-2097152}
+      PRODUCT_IMPORT_CSV_MAX_ROWS: ${PRODUCT_IMPORT_CSV_MAX_ROWS:-500}
+      PRODUCT_IMPORT_ASSET_MAX_CONCURRENT: ${PRODUCT_IMPORT_ASSET_MAX_CONCURRENT:-8}
+      PRODUCT_IMPORT_ASSET_CALLBACK_TIMEOUT_MINUTES: ${PRODUCT_IMPORT_ASSET_CALLBACK_TIMEOUT_MINUTES:-30}
+      PRODUCT_IMPORT_CONFIRMATION_TOKEN_TTL_SECONDS: ${PRODUCT_IMPORT_CONFIRMATION_TOKEN_TTL_SECONDS:-300}
+      PRODUCT_IMPORT_GC_ENABLED: ${PRODUCT_IMPORT_GC_ENABLED:-true}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9960/actuator/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - hawkr-network
+
+  # ==========================================
+  # Notification Service (gRPC 10037；final architecture，無 HTTP management port)
+  # ==========================================
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: services/notification-service/Dockerfile
+      target: dev
+      args:
+        GO_VERSION: ${GO_VERSION:?用 ./dev.sh 執行（從 .go-version 帶入）}
+    image: hawkr/notification-service:latest
+    container_name: notification-service
+    restart: unless-stopped
+    ports:
+      - "10037:10037"
+    volumes:
+      - ./services/notification-service:/app/services/notification-service
+      - ./pkg:/app/pkg
+      - go-build-cache:/root/.cache/go-build
+      - go-mod-cache:/go/pkg/mod
+    environment:
+      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
+      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
+      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
+      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
+      TZ: UTC
+      GRPC_PORT: 10037
+
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hawkr_notification
+      DB_USER: dbadmin
+      DB_PASSWORD: Hawkr2024Admin
+
+      # RabbitMQ
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+
+      # Buyer/Seller Service gRPC（chat-notification PII 清除流程列舉帳號歷史
+      # buyer_id/store_id surrogate；見 internal/client/buyer、internal/client/seller）
+      BUYER_SERVICE_GRPC_ADDR: host.docker.internal:9941
+      SELLER_SERVICE_GRPC_ADDR: host.docker.internal:9941
+
+      # 媒體域名基底（渲染 push imageUrl 時把 objectKey 組顯示 URL；49 §5.3 #10）
+      MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
+
+      # Vendor Portal 邀請信（#2539 E1，pkg/mail）：log provider 不寄真信，只寫 log。
+      MAIL_PROVIDER: ${MAIL_PROVIDER:-log}
+      MAIL_FROM: supports@example.com
+      # 預設留空：log provider 寄不到任何人，不強制政策，維持「本機免設定即可跑」。
+      # 一旦本機把 MAIL_PROVIDER 切成 resend，缺政策就會啟動失敗（這是刻意的）。
+      MAIL_RECIPIENT_POLICY: ${MAIL_RECIPIENT_POLICY:-}
+      MAIL_REDIRECT_TO: ${MAIL_REDIRECT_TO:-}
+      MAIL_ALLOWED_RECIPIENTS: ${MAIL_ALLOWED_RECIPIENTS:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      VENDOR_PORTAL_BASE_URL: http://localhost:3000
+
+      # Firebase（推播用）
+      FIREBASE_CREDENTIALS_JSON: ${FIREBASE_CREDENTIALS_JSON:-}
+
+      # Dev Configs
+      GOPROXY: "https://proxy.golang.org,direct"   # 見檔頭「Go 服務 dev container 契約」：dev 嚴禁 off
+      GONOSUMDB: "*"
+      TRACING_ENABLED: "true"
+
+      # OpenTelemetry
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
+
+    healthcheck:
+      test: ["CMD-SHELL", "cd /app/services/notification-service && go run ./cmd/grpc-healthcheck -addr 127.0.0.1:10037"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - hawkr-network
+
+  # ==========================================
+  # Pricebook Service (gRPC 10039；final architecture，無 HTTP management port)
+  # ==========================================
+  # 農產行情資料層：自農業部 OpenData 拉取行情與休市日曆寫入自己的 DB。
+  # 對內提供 gRPC（行情查詢與管理 RPC，供 gateway/ai-service 呼叫）。
+
+  pricebook-service:
+    build:
+      context: .
+      dockerfile: services/pricebook-service/Dockerfile
+      target: dev
+      args:
+        GO_VERSION: ${GO_VERSION:?用 ./dev.sh 執行（從 .go-version 帶入）}
+    image: hawkr/pricebook-service:latest
+    container_name: pricebook-service
+    restart: unless-stopped
+    ports:
+      - "10039:10039"
+    volumes:
+      - ./services/pricebook-service:/app/services/pricebook-service
+      - ./pkg:/app/pkg
+      - go-build-cache:/root/.cache/go-build
+      - go-mod-cache:/go/pkg/mod
+    environment:
+      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
+      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
+      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
+      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
+      TZ: UTC
+      GRPC_PORT: 10039
+
+      # Downstream gRPC dependencies (key names mirror k8s/values/pricebook-service.yaml + config.go)
+      PRODUCT_SERVICE_HOST: product-service
+      PRODUCT_SERVICE_GRPC_PORT: "9913"
+
+      # 種子表路徑（internal/config.MappingSeedCSVPath 等，Task 4）。
+      # ⚠️ 值刻意跟 k8s/values/pricebook-service.yaml 不同（那邊是
+      # "reference/..."）：dev container 的 WORKDIR 是 /app、bind mount 把
+      # 整個 services/pricebook-service（含 reference/）掛在
+      # /app/services/pricebook-service，但 Air 不會 chdir 到該目錄再啟動
+      # binary（air-verse/air util_unix.go StartCommand 沒有設 cmd.Dir，
+      # 進程 cwd 維持在容器啟動時的 /app）——相對路徑若照抄 k8s 的
+      # "reference/..." 會在 /app/reference 找不到檔案，讓 fx 啟動失敗
+      # （provideMappingSeed 是硬錯誤，見 internal/usecase/di.go）。prod
+      # image 因為 Dockerfile 直接把 reference/ COPY 到 /app/reference，
+      # 用短路徑沒問題；dev 這裡改用相對 /app 的完整路徑對齊實際掛載點。
+      MAPPING_SEED_CSV_PATH: services/pricebook-service/reference/product_crop_seed.csv
+      MAPPING_SEED_MANIFEST_PATH: services/pricebook-service/reference/product_crop_seed.manifest.json
+
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hawkr_pricebook
+      DB_USER: dbadmin
+      DB_PASSWORD: Hawkr2024Admin
+
+      # 農業部 OpenData
+      MOA_API_BASE_URL: https://data.moa.gov.tw/api/v1
+      # 糧價（RicepriceData.aspx）不在 api/v1 之下，是另一棵樹。
+      MOA_OPENDATA_BASE_URL: https://data.moa.gov.tw/Service/OpenData/FromM
+
+      # 推論門檻（internal/config.InferenceConfig，Task 11）。值與 config.go
+      # 的預設相同，跟 k8s/values/pricebook-service.yaml 的 config: 保持一致
+      # （scripts/check-compose-k8s-align.sh 要求 k8s config key ⊆ compose
+      # environment key）。
+      MIN_RIDGE_SAMPLE_COUNT: 100
+      FRESH_WITHIN_HOURS: 36
+      STALE_WITHIN_HOURS: 72
+      GROUP_VOLUME_WINDOW_DAYS: 28
+      OBSERVED_WINDOW_DAYS: 30
+
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+
+      # Dev Configs
+      NACOS_ENABLED: "false"
+      TRACING_ENABLED: "true"
+      GOPROXY: "https://proxy.golang.org,direct"   # 見檔頭「Go 服務 dev container 契約」：dev 嚴禁 off
+      GONOSUMDB: "*"
+
+      # OpenTelemetry
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
+
+    healthcheck:
+      test: ["CMD-SHELL", "cd /app/services/pricebook-service && go run ./cmd/grpc-healthcheck -addr 127.0.0.1:10039"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - hawkr-network
+
+  # ==========================================
+  # Invoice Service (10040 HTTP / 10041 gRPC / 10042 PDF 下載通道)
+  # 58 號設計書：電子發票服務。10042 是獨立的第三個面，不遵守 HTTP = gRPC - 1 的配對慣例。
+  # ==========================================
+
+  invoice-service:
+    build:
+      context: .
+      dockerfile: services/invoice-service/Dockerfile
+      target: dev
+      args:
+        GO_VERSION: ${GO_VERSION:?用 ./dev.sh 執行（從 .go-version 帶入）}
+    image: hawkr/invoice-service:latest
+    container_name: invoice-service
+    restart: unless-stopped
+    ports:
+      - "10040:10040"
+      - "10041:10041"
+      - "10042:10042"
+    volumes:
+      - ./services/invoice-service:/app/services/invoice-service
+      - ./pkg:/app/pkg
+      - go-build-cache:/root/.cache/go-build
+      - go-mod-cache:/go/pkg/mod
+    environment:
+      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗。
+      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
+      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
+      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
+      TZ: UTC
+      HTTP_PORT: 10040
+      GRPC_PORT: 10041
+      # PDF 授權下載通道（§6.1.4）。與 gateway block 的同名變數必須同值。
+      INVOICE_SERVICE_FILE_PORT: 10042
+
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: hawkr_invoice
+      DB_USER: dbadmin
+      DB_PASSWORD: Hawkr2024Admin
+
+      # Redis（不放冪等記錄，見 58 號 §12.1.2 E）
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: HawkrRedis2026
+
+      # RabbitMQ
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+
+      # Downstream peer gRPC（key 名與 k8s/values/invoice-service.yaml + config.go 一致）
+      ORDER_SERVICE_ADDR: order-service:9915
+      SELLER_SERVICE_ADDR: host.docker.internal:9941
+      PAYMENT_SERVICE_ADDR: payment-service:9925
+      BUYER_SERVICE_ADDR: host.docker.internal:9941
+      SHIPPING_SERVICE_ADDR: shipping-service:9931
+      MEDIA_SERVICE_HOST: media-service
+      MEDIA_SERVICE_GRPC_PORT: "9937"
+      MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
+
+      # ── A. 加密與憑證 ──
+      # 機敏值一律 ${VAR:-}，禁止寫死明文。本地要跑起來就在 .env 填
+      # INVOICE_ENCRYPTION_MASTER_KEY / INVOICE_LOOKUP_HMAC_KEY（.env.template 有 local-only 佔位值）；
+      # 留空是刻意的 fail-closed：空金鑰一樣加得動，會讓「憑證有被加密」變成假的。
+      INVOICE_ENCRYPTION_MASTER_KEY: ${INVOICE_ENCRYPTION_MASTER_KEY:-}
+      INVOICE_ENCRYPTION_MASTER_KEY_VERSION: 1
+      INVOICE_ENCRYPTION_MASTER_KEY_PREV: ${INVOICE_ENCRYPTION_MASTER_KEY_PREV:-}
+      INVOICE_ENCRYPTION_MASTER_KEY_PREV_VERSION: ${INVOICE_ENCRYPTION_MASTER_KEY_PREV_VERSION:-}
+      INVOICE_LOOKUP_HMAC_KEY: ${INVOICE_LOOKUP_HMAC_KEY:-}
+
+      # ── B. AMEGO 連線 ──
+      # 本地與 dev 一律 ALLOW_REAL=false ＋ 測試統編：AMEGO 測試與正式共用同一個網域、
+      # 回應無環境標記，打錯環境不會連不上，只會靜默開出真發票。
+      AMEGO_BASE_URL: ${AMEGO_BASE_URL:-https://invoice-api.amego.tw}
+      AMEGO_ALLOW_REAL_INVOICE: "false"
+      AMEGO_TEST_INVOICE: "12345678"
+      AMEGO_PLATFORM_INVOICE: "12345678"
+      AMEGO_PLATFORM_APP_KEY: ${AMEGO_PLATFORM_APP_KEY:-}
+      AMEGO_PROXY_CALLER_KEY_FILE: ${AMEGO_PROXY_CALLER_KEY_FILE:-}
+      AMEGO_HTTP_TIMEOUT_ISSUE_MS: 30000
+      AMEGO_HTTP_TIMEOUT_QUERY_MS: 10000
+      AMEGO_CLIENT_RATE_LIMIT_QPS: 5
+      AMEGO_CB_FAILURE_THRESHOLD: 5
+      AMEGO_CB_TIMEOUT_SECONDS: 10
+      AMEGO_CB_MAX_REQUESTS: 3
+
+      # ── C. 排程與租約（值與 k8s/values/invoice-service.yaml 逐格同值）──
+      INVOICE_ISSUE_POLL_INTERVAL_SECONDS: 10
+      INVOICE_ISSUE_BATCH_SIZE: 50
+      INVOICE_ISSUE_LEASE_SECONDS: 120
+      INVOICE_ISSUE_MAX_RETRY: 13
+      INVOICE_BACKOFF_BASE_SECONDS: 30
+      INVOICE_BACKOFF_MAX_SECONDS: 1800
+      INVOICE_RECHECK_LEASE_SECONDS: 60
+      INVOICE_RECHECK_MAX_ATTEMPTS: 12
+      INVOICE_ROTATION_TIMEOUT_MINUTES: 30
+      INVOICE_PDF_MAX_BYTES: 4194304
+      INVOICE_TRACK_BALANCE_CHECK_HOUR_UTC: 1
+      INVOICE_TRACK_BALANCE_WARN_THRESHOLD: 200
+      INVOICE_MQ_PUBLISH_TIMEOUT_SECONDS: 10
+
+      # ── D. 業務治理參數 ──
+      INVOICE_TAX_REVIEW_GRACE_DAYS: 60
+      INVOICE_TAX_REVIEW_PENDING_MAX_ORDERS: 50
+      INVOICE_TAX_REVIEW_PENDING_MAX_AMOUNT: 100000
+      INVOICE_REAPPLY_COOLDOWN_DAYS: 7
+      INVOICE_COMPLAINT_SLA_WORKING_DAYS: 3
+      INVOICE_VIOLATION_WINDOW_DAYS: 90
+      INVOICE_VIOLATION_SUSPEND_THRESHOLD: 3
+      INVOICE_SUSPENSION_DAYS: 14
+      INVOICE_DOCUMENT_RETENTION_DAYS: 1826
+      INVOICE_AUDIT_RETENTION_DAYS: 1826
+      INVOICE_MANUAL_CAPACITY_PER_DAY: 20
+      INVOICE_TRACK_GROWTH_HEADROOM: "0.5"
+      INVOICE_ALLOWANCE_B2C_SPLIT_TAX: "true"
+
+      # Dev Configs
+      NACOS_ENABLED: "false"
+      TRACING_ENABLED: "true"
+      GOPROXY: "https://proxy.golang.org,direct"   # 見檔頭「Go 服務 dev container 契約」：dev 嚴禁 off
+      GONOSUMDB: "*"
+
+      # OpenTelemetry
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
+
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:10040/health"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - hawkr-network
+
+volumes:
+  go-build-cache:
+  # Go module cache：跨容器共用、跨 image 重建存活（#2025）
+  go-mod-cache:

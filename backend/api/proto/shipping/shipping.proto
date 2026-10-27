@@ -1,0 +1,1664 @@
+syntax = "proto3";
+
+package hawkr.shipping;
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/shipping";
+option java_multiple_files = true;
+option java_package = "io.github.will413028.hawkr.shipping.grpc";
+option java_outer_classname = "ShippingProto";
+
+service ShippingService {
+    // ==================== 賣家端 — 安排出貨（經 Gateway）====================
+
+    // 超商出貨單列印（觸發 PayUni 列印處理，出貨便代碼由 Webhook 回填）
+    rpc PrintCvsLabel(PrintCvsLabelRequest) returns (PrintCvsLabelResponse);
+
+    // 批次超商出貨單列印（觸發 PayUni 列印處理，出貨便代碼由 Webhook 逐筆回填）
+    rpc BatchPrintCvsLabel(BatchPrintCvsLabelRequest) returns (BatchPrintCvsLabelResponse);
+
+    // 產宅配編號並下載託運單 PDF（後端呼叫 PayUni → 上傳 OSS → 回傳 CDN URL）
+    rpc GenerateHomeLabelPdf(GenerateHomeLabelPdfRequest) returns (GenerateHomeLabelPdfResponse);
+
+    // 批次宅配取號 PDF（fan-out 並行；同步等待全部完成；不接受出貨照片）
+    rpc BatchGenerateHomeLabelPdf(BatchGenerateHomeLabelPdfRequest) returns (BatchGenerateHomeLabelPdfResponse);
+
+    // 呼叫黑貓預約取件（背景 API）
+    rpc CallTcat(CallTcatRequest) returns (CallTcatResponse);
+
+    // 超商賣家確認出貨（出貨照片選填，推進訂單到配送中）
+    rpc ConfirmCvsShipment(ConfirmCvsShipmentRequest) returns (ConfirmCvsShipmentResponse);
+
+    // ==================== 服務間呼叫（不對外暴露）====================
+
+    // 查詢物流單（Order Service 用，聚合訂單詳情）
+    rpc GetShipmentByOrderNo(GetShipmentByOrderNoRequest) returns (GetShipmentResponse);
+
+    // 批次查詢物流單（Order Service 賣家列表頁用，避免 N+1）
+    rpc GetShipmentsByOrderNos(GetShipmentsByOrderNosRequest) returns (GetShipmentsByOrderNosResponse);
+
+    // 批次查詢 provider 狀態（Order / AfterSales 聚合異常列表用，遵循收斂規範 §6.3）
+    rpc BatchGetProviderStatusByOrderIds(BatchGetProviderStatusByOrderIdsRequest) returns (BatchGetProviderStatusByOrderIdsResponse);
+
+    // 主動查詢 PayUni 物流狀態（內部 / 賣家「同步」按鈕，以 shipment_no 為 key、無 ownership；補充 Webhook）
+    rpc QueryShipmentStatus(QueryShipmentStatusRequest) returns (GetShipmentResponse);
+
+    // ==================== 買家端 — 物流追蹤（經 Gateway）====================
+
+    // 買家查看訂單物流追蹤（即時同步 PayUni 當前狀態；以 order_no 為 key + buyer ownership）
+    rpc GetShipmentTracking(GetShipmentTrackingRequest) returns (GetShipmentResponse);
+
+    // 賣家查看訂單物流追蹤（與買家同構，以 order_no + is_return 為 key + seller ownership）
+    rpc GetSellerShipmentTracking(GetSellerShipmentTrackingRequest) returns (GetShipmentResponse);
+
+    // ==================== 建店 API（賣家端，經 Gateway）====================
+
+    // 超商 C2C 建店（首次呼叫提交 PayUni；ACTIVE 狀態再送僅更新本地）
+    rpc OnboardCvsShipping(OnboardCvsShippingRequest) returns (OnboardShippingResponse);
+
+    // 宅配建店（首次呼叫提交 PayUni；ACTIVE 狀態再送僅更新本地）
+    rpc OnboardHomeDeliveryShipping(OnboardHomeDeliveryRequest) returns (OnboardShippingResponse);
+
+    // 列出賣家建店設定
+    rpc ListShippingOnboardings(ListShippingOnboardingsRequest) returns (ListShippingOnboardingsResponse);
+
+    // 查詢單一建店設定
+    rpc GetShippingOnboarding(GetShippingOnboardingRequest) returns (GetShippingOnboardingResponse);
+
+    // 切換建店設定啟用/停用（純平台內部，不與 PayUni 溝通）
+    rpc ToggleShippingOnboarding(ToggleShippingOnboardingRequest) returns (OnboardShippingResponse);
+
+    // ==================== 賣家配送方式查詢（經 Gateway）====================
+
+    // 查詢賣家可用配送方式（含建店狀態）
+    rpc ListSellerShippingMethods(ListSellerShippingMethodsRequest) returns (ListSellerShippingMethodsResponse);
+
+    // ==================== 買家常用門市管理（經 Gateway）====================
+
+    // 新增常用門市
+    rpc AddBuyerStorePickup(AddBuyerStorePickupRequest) returns (AddBuyerStorePickupResponse);
+
+    // 修改常用門市
+    rpc UpdateBuyerStorePickup(UpdateBuyerStorePickupRequest) returns (UpdateBuyerStorePickupResponse);
+
+    // 取得常用門市列表
+    rpc ListBuyerStorePickups(ListBuyerStorePickupsRequest) returns (ListBuyerStorePickupsResponse);
+
+    // 刪除常用門市
+    rpc DeleteBuyerStorePickup(DeleteBuyerStorePickupRequest) returns (DeleteBuyerStorePickupResponse);
+
+    // ==================== 超商門市地圖（經 Gateway，買家/賣家共用）====================
+
+    // 取得門市地圖加密參數（前端用此參數開啟 WebView Form POST 到 PayUni）
+    rpc GetStoreMapParams(GetStoreMapParamsRequest) returns (GetStoreMapParamsResponse);
+
+    // 以 opaque redirect_id 取回門市中轉表單 canonical 欄位（Gateway GET /store_map/redirect?id= 用，一次性消費，#1394 反射 XSS 修復）
+    rpc GetStoreMapRedirectForm(GetStoreMapRedirectFormRequest) returns (GetStoreMapRedirectFormResponse);
+
+    // 解密門市選擇結果（PayUni 前景回調後，Gateway 呼叫此 RPC 解密）
+    rpc DecryptStoreMapResult(DecryptStoreMapResultRequest) returns (DecryptStoreMapResultResponse);
+
+    // ==================== 賣家物流設定查詢（服務間呼叫，不對外暴露）====================
+
+    // 查詢賣家物流開通狀態與寄件郵遞區號（供 Order Service / Product Service 使用）
+    rpc GetSellerShippingConfig(GetSellerShippingConfigRequest) returns (GetSellerShippingConfigResponse);
+
+    // ==================== 運費計算（服務間呼叫，不對外暴露）====================
+
+    // 取得全部運費配置（供 Order Service 本地快取）
+    rpc GetShippingFeeConfigs(GetShippingFeeConfigsRequest) returns (GetShippingFeeConfigsResponse);
+
+    // 查詢單一運費（指定 method × temp × zone × dimensionSum）
+    rpc LookupShippingFee(LookupShippingFeeRequest) returns (LookupShippingFeeResponse);
+
+    // 計算可用配送選項與運費（給定包裹尺寸重量，回傳所有可用配送方式）
+    rpc CalculateShippingOptions(CalculateShippingOptionsRequest) returns (CalculateShippingOptionsResponse);
+
+    // 驗證商品配送方式合法性（商品建立/更新時，Product Service 呼叫）
+    rpc ValidateProductShipping(ValidateProductShippingRequest) returns (ValidateProductShippingResponse);
+
+    // ==================== 假日管理 ====================
+
+    // 匯入假日（Admin，傳入政府 CSV URL）
+    rpc ImportHolidays(ImportHolidaysRequest) returns (ImportHolidaysResponse);
+
+    // 匯入假日（Admin，上傳 CSV 檔案內容，顯式年份）
+    rpc ImportHolidaysFromContent(ImportHolidaysFromContentRequest) returns (ImportHolidaysResponse);
+
+    // 查詢假日覆蓋現況（Admin，各年度覆蓋狀態）
+    rpc GetHolidayCoverage(GetHolidayCoverageRequest) returns (GetHolidayCoverageResponse);
+
+    // 查詢可出貨工作天（App，前台日曆元件用）
+    rpc ListBusinessDays(ListBusinessDaysRequest) returns (ListBusinessDaysResponse);
+
+    // 取一段日期區間內的國定假日（服務間，invoice-service 的行事曆鏡像每日同步用）。
+    //
+    // 與上面三支的差別：ListBusinessDays 回的是「未來 7 個可出貨日」（前台日曆），
+    // GetHolidayCoverage 回的是「各年度覆蓋狀態」（ADM 儀表），兩者都給不出
+    // 「[from, to] 這段區間裡有哪些假日」——而那正是工作天曆算式唯一需要的東西。
+    rpc GetHolidaysInternal(GetHolidaysInternalRequest) returns (GetHolidaysInternalResponse);
+
+    // ==================== 退貨物流（AfterSales Service 呼叫）====================
+
+    // 超商 C2C 退貨（交貨便角色對調：買家=寄件人，賣家=收件人）
+    rpc CreateReturnCvsShipment(CreateReturnCvsShipmentRequest) returns (CreateReturnShipmentResponse);
+
+    // 宅配退貨
+    rpc CreateReturnHomeShipment(CreateReturnHomeShipmentRequest) returns (CreateReturnShipmentResponse);
+
+    // 查詢賣家退貨設定
+    rpc GetSellerReturnConfig(GetSellerReturnConfigRequest) returns (GetSellerReturnConfigResponse);
+
+    // 退貨出貨便列印重試（AfterSales ops retry 用，驗證 is_return=true 後非同步觸發 PayUni print_label）
+    rpc RetryReturnPrintLabel(RetryReturnPrintLabelRequest) returns (RetryReturnPrintLabelResponse);
+
+    // ==================== 開發工具（Webhook 模擬器用）====================
+
+    // 依訂單編號查詢 ShipTradeNo（區分正向/退貨）
+    rpc LookupShipTradeNo(LookupShipTradeNoRequest) returns (LookupShipTradeNoResponse);
+
+    // ==================== Admin 異常查詢 API（§29 Admin 異常訂單管理）====================
+
+    // 列物流異常（含正向+退貨）。abnormal_only=true 的判準 = 平台失敗態 OR provider_error_code 非空。
+    // 🔴 判準**不是** provider_status——那欄保存的是物流商原始貨態（含正常軌跡與尚未 mapping 的
+    // 未知值），以「有值」判異常會把每張正常單撈進來（V12 拆欄修正）。
+    rpc ListShipmentsForAdmin(ListShipmentsForAdminRequest) returns (ListShipmentsForAdminResponse);
+
+    // 取單一物流單詳情（Admin 對帳用，含完整 provider_* 與寄收件資訊）
+    rpc GetShipmentForAdmin(GetShipmentForAdminRequest) returns (GetShipmentForAdminResponse);
+
+    // 列建店異常（預設 onboarding_status=REJECTED；可 filter shipping_type / provider_status）
+    rpc ListSellerShipmentSettingsForAdmin(ListSellerShipmentSettingsForAdminRequest) returns (ListSellerShipmentSettingsForAdminResponse);
+
+    // ==================== §5.21 配送異常賣家通知 ====================
+
+    // 列賣家配送異常 dashboard（直接查 shipments 表 LEFT JOIN ack 表，無第二份狀態）
+    rpc ListSellerShipmentAnomalies(ListSellerShipmentAnomaliesRequest) returns (ListSellerShipmentAnomaliesResponse);
+
+    // 賣家配送異常統計（依 anomaly_type / severity 分組計數）
+    rpc GetSellerShipmentAnomalyStats(GetSellerShipmentAnomalyStatsRequest) returns (GetSellerShipmentAnomalyStatsResponse);
+
+    // 賣家標記異常為「已處理」（upsert shipment_anomaly_acknowledgments）
+    rpc AcknowledgeShipmentAnomaly(AcknowledgeShipmentAnomalyRequest) returns (AcknowledgeShipmentAnomalyResponse);
+
+    // 賣家標記異常為「已忽略」
+    rpc IgnoreShipmentAnomaly(IgnoreShipmentAnomalyRequest) returns (IgnoreShipmentAnomalyResponse);
+
+    // Admin 平台級配送異常監控
+    rpc ListShipmentAnomaliesForAdmin(ListShipmentAnomaliesForAdminRequest) returns (ListShipmentAnomaliesForAdminResponse);
+
+    // Admin 標記異常為「已處理」（issue #1327；actor_type='ADMIN'，與賣家 ack 互不覆蓋）
+    rpc AcknowledgeShipmentAnomalyForAdmin(AcknowledgeShipmentAnomalyForAdminRequest) returns (AcknowledgeShipmentAnomalyResponse);
+
+    // Admin 標記異常為「已忽略」（issue #1327）
+    rpc IgnoreShipmentAnomalyForAdmin(IgnoreShipmentAnomalyForAdminRequest) returns (IgnoreShipmentAnomalyResponse);
+
+    // ==================== Uber 即時報價（66 §6.2；Stage 8B W2-2）====================
+    //
+    // 🔴 為什麼不是擴充 CalculateShippingOptions：那支是「靜態費率表查詢」——
+    //    它的 request 連收件地址都不收（只有長寬高重＋store_id），回應也沒有報價 id
+    //    與有效期。Uber 是即時報價：有 quote_id、有 TTL、會過期、要重報。
+    //    把兩種語意塞進同一支，呼叫端會拿到一個「有時候有 expires_at」的回應，
+    //    而那種形狀沒有人擋得住誤用。
+    //
+    // 呼叫方向：order-service → shipping-service（既有通道，不新增跨服務邊）。
+
+    // 取得（或沿用）一筆 Uber 報價。冪等：同一車在 TTL 內重複呼叫回同一個 quote_id。
+    rpc GetUberQuoteForCheckout(GetUberQuoteForCheckoutRequest) returns (GetUberQuoteForCheckoutResponse);
+
+    // confirm（capture 前）重驗 TTL 與購物車一致性；capture 後把報價標成已確認。
+    rpc ValidateUberQuoteForCheckout(ValidateUberQuoteForCheckoutRequest) returns (ValidateUberQuoteForCheckoutResponse);
+
+    // ==================== Uber 配送查詢（66；Stage 8B W6-3 賣家面／W6-4 Admin 面）====================
+    //
+    // 🔴 為什麼是四支獨立 RPC 而不是兩支帶 is_admin 旗標：§5.1 角色分離——
+    //    以特殊值或 boolean 分流角色，會讓「賣家能看到什麼」與「Admin 能看到什麼」
+    //    共用同一條程式路徑，而那兩件事的差別（store_id 強制過濾、raw payload、timeline）
+    //    正是最需要被型別分開的部分。
+    //
+    // 🔴 為什麼不擴充 ListShipmentsForAdmin：那支的 message 沒有 quote／courier／POD／
+    //    provider raw status 這幾組欄位，而它們在其他物流商身上不存在。借用它的形狀
+    //    會讓兩邊的欄位集合互相污染（見 gateway constants.go 的同一段說明）。
+
+    // 賣家列自己的 Uber 配送。🔴 歸屬由服務端以 store_id 強制，不接受呼叫端指定。
+    rpc ListSellerUberDeliveries(ListSellerUberDeliveriesRequest) returns (ListSellerUberDeliveriesResponse);
+
+    // 賣家看單筆 Uber 配送詳情（含 quote／POD／allowed_actions）。
+    rpc GetSellerUberDelivery(GetSellerUberDeliveryRequest) returns (GetSellerUberDeliveryResponse);
+
+    // Admin 列平台全部 Uber 配送（W6-4 Delivery List 的九個篩選維度）。
+    rpc ListUberDeliveriesForAdmin(ListUberDeliveriesForAdminRequest) returns (ListUberDeliveriesForAdminResponse);
+
+    // Admin 看單筆 Uber 配送詳情（再加 timeline 與 provider raw payload）。
+    rpc GetUberDeliveryForAdmin(GetUberDeliveryForAdminRequest) returns (GetUberDeliveryForAdminResponse);
+}
+
+// ==================== 超商出貨單列印（後端處理）====================
+
+message PrintCvsLabelRequest {
+    int64 store_id = 1;             // Gateway JWT 注入（E.5.5 例外）
+    string order_no = 2;            // 訂單編號
+    string ship_date = 3;           // 出貨日期 YYYYMMDD
+}
+
+message PrintCvsLabelResponse {
+    int32 code = 1;
+    string message = 2;
+    CvsLabelData data = 3;
+}
+
+message CvsLabelData {
+    string shipment_no = 1;        // 內部物流單號
+    string partner_id = 2;         // 出貨便母代碼（3 碼，55 秒內 Webhook 回填；超時為空）
+    string odno = 3;               // 出貨單編號（8 碼，55 秒內 Webhook 回填；超時為空）
+    string validation_no = 4;      // C2C 驗證碼（4 碼，55 秒內 Webhook 回填；超時為空）
+    bool webhook_received = 5;     // 是否在等待期內收到 Webhook（true=已收到代碼, false=超時）
+}
+
+// ==================== 批次超商出貨單列印 ====================
+
+message BatchPrintCvsLabelRequest {
+    int64 store_id = 1;             // Gateway JWT 注入（E.5.5 例外）
+    repeated string order_nos = 2;  // 訂單編號列表（最多 50 筆）
+    string ship_date = 3;           // 出貨日期 YYYYMMDD
+}
+
+message BatchPrintCvsLabelResponse {
+    int32 code = 1;
+    string message = 2;
+    BatchCvsLabelData data = 3;
+}
+
+message BatchCvsLabelData {
+    string total_count = 1;                     // 總筆數
+    string success_count = 2;                   // 成功筆數
+    repeated BatchCvsLabelResult results = 3;   // 每筆結果
+}
+
+message BatchCvsLabelResult {
+    string order_no = 1;            // 訂單編號
+    string shipment_no = 2;        // 內部物流單號（成功時才有）
+    bool success = 3;               // 該筆是否成功
+    string message = 4;             // 失敗原因（成功時為空）
+}
+
+// ==================== 宅配取號 PDF ====================
+
+message GenerateHomeLabelPdfRequest {
+    int64 store_id = 1;             // Gateway JWT 注入（E.5.5 例外）
+    string order_no = 2;            // 訂單編號
+    string ship_date = 3;           // 出貨日期 YYYYMMDD（需 > 今日，非週日/國定假日）
+    string delivery_date = 4;       // 配達日期 YYYYMMDD（需 > ship_date）
+    repeated string staged_tokens = 5; // 出貨照片 stageToken（選填）
+}
+
+message GenerateHomeLabelPdfResponse {
+    int32 code = 1;
+    string message = 2;
+    HomeLabelData data = 3;
+}
+
+message HomeLabelData {
+    string label_key = 1;           // 託運單 PDF objectKey（49 §6.6：Gateway 組 labelUrl）
+    string shipment_no = 2;        // 內部物流單號
+}
+
+// ==================== 批次宅配取號 PDF ====================
+
+message BatchGenerateHomeLabelPdfRequest {
+    int64 store_id = 1;                                // Gateway JWT 注入（E.5.5 例外）
+    repeated BatchHomeLabelItem items = 2;             // 待處理項目（單次上限由 SHIPPING_BATCH_MAX_SIZE 控制）
+}
+
+message BatchHomeLabelItem {
+    string order_no = 1;            // 訂單編號
+    string ship_date = 2;           // 出貨日期 YYYYMMDD（每筆獨立）
+    string delivery_date = 3;       // 配達日期 YYYYMMDD（選填，未填=shipDate+1工作天）
+}
+
+message BatchGenerateHomeLabelPdfResponse {
+    int32 code = 1;
+    string message = 2;
+    BatchHomeLabelData data = 3;
+}
+
+message BatchHomeLabelData {
+    string total_count = 1;                              // 總筆數
+    string success_count = 2;                            // 成功筆數
+    repeated BatchHomeLabelResult results = 3;           // 每筆結果（順序與 request items 相同）
+}
+
+message BatchHomeLabelResult {
+    string order_no = 1;            // 訂單編號
+    string shipment_no = 2;        // 內部物流單號（成功時才有）
+    string label_key = 3;           // 託運單 PDF objectKey（49 §6.6：成功時才有）
+    bool success = 4;               // 該筆是否成功
+    string message = 5;             // 失敗原因（成功時為空）
+}
+
+// ==================== 呼叫黑貓 ====================
+
+message CallTcatRequest {
+    int64 store_id = 1;             // Gateway JWT 注入（E.5.5 例外）
+    string order_no = 2;            // 訂單編號
+    string is_contact = 3;          // 是否需要事先電聯 Y/N（選填，預設 Y）
+    string is_trolley = 4;          // 是否需要推車 Y/N（選填，預設 N）
+    string memo = 5;                // 給宅配人員備註（選填，最長 100 位），存入 DB 再傳 PayUni
+}
+
+message CallTcatResponse {
+    int32 code = 1;
+    string message = 2;
+    CallTcatData data = 3;
+}
+
+message CallTcatData {
+    string call_time = 1;           // 呼叫時間（ISO 8601）
+    string shipment_no = 2;        // 內部物流單號
+}
+
+// ==================== 查詢物流單 ====================
+
+message GetShipmentByOrderNoRequest {
+    string order_no = 1;
+}
+
+message GetShipmentsByOrderNosRequest {
+    repeated string order_nos = 1;
+}
+
+message GetShipmentsByOrderNosResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated ShipmentDetailView data = 3;
+}
+
+// ==================== 批次 provider 狀態聚合（收斂規範 §6.3）====================
+
+message BatchGetProviderStatusByOrderIdsRequest {
+    repeated string order_ids = 1;          // 訂單 ID 清單（建議單次 ≤ 100）
+    bool is_return = 2;                     // false = 正向物流；true = 退貨物流（is_return=TRUE）
+}
+
+message BatchGetProviderStatusByOrderIdsResponse {
+    int32 code = 1;
+    string message = 2;
+    map<string, ProviderStatusEntry> entries = 3;  // key = order_id；找不到對應 shipment 則該 key 省略
+}
+
+message ProviderStatusEntry {
+    string provider_status = 1;       // PayUni 原始狀態碼
+    string provider_message = 2;      // PayUni 原始訊息
+}
+
+message GetShipmentResponse {
+    int32 code = 1;
+    string message = 2;
+    ShipmentDetailView data = 3;
+}
+
+message ShipmentDetailView {
+    string shipment_no = 1;
+    string order_no = 2;
+    string shipping_method = 3;      // CONVENIENCE_STORE / HOME_DELIVERY / UBER_INSTANT
+    string status = 4;               // 內部物流狀態碼（數字字串）
+    string provider_status = 5;      // 第三方原始狀態碼（收斂規範 §4.1 SoT）
+    string provider_message = 6;     // 第三方狀態說明 / 錯誤訊息（原 provider_status_desc 改名）
+    string ship_trade_no = 7;        // PayUni 物流序號
+    string recipient_name = 8;
+    string recipient_phone = 9;
+    string recipient_address = 10;
+    // 🔴 store_id(11) 已 reserved：本欄裝的是**超商門市代號**，而同一支 proto 內
+    //    AdminShipmentSummary/AdminShipmentDetail 的 store_id 裝的是**賣家 store 代理鍵**
+    //    ——同名兩種語意。Admin 那組已於命名債整理時改名成 cvs_store_code，本 message 沒有。
+    //    2026-09-10 施工實查：gateway 的 OrderLogisticsResp、賣家追蹤 DTO、order-service 的
+    //    ShippingGrpcClient 皆**沒有**讀 GetStoreId() ⇒ 零外露消費者 ⇒ 可直接移除而不需相容窗口。
+    //    field number 保留、不重用（重用會讓舊版 client 把門市代號讀成賣家鍵）。
+    reserved 11;
+    reserved "store_id";
+    string store_name = 12;
+    string label_key = 13;           // 宅配 PDF objectKey（49 §6.6：Gateway 組 labelUrl；僅宅配使用）
+    string status_time = 14;         // 最新狀態更新時間（ISO 8601）
+    string created_at = 15;          // 建立時間（ISO 8601）
+    string label_print_status = 16;  // 列印狀態機 LabelPrintStatus value（"4101"~"4104"）
+    string tcat_call_status = 17;    // 黑貓叫件狀態機 TcatCallStatus value（"4201"~"4204"）
+    string partner_id = 18;          // 超商出貨便母代碼（3 碼，Webhook 回填）
+    string odno = 19;                // 超商出貨單編號（8 碼，Webhook 回填）
+    string validation_no = 20;       // 超商 C2C 驗證碼（4 碼，Webhook 回填）
+    repeated string shipment_photo_keys = 21; // 出貨照片 objectKey 陣列（49 §6.6：Gateway 組 shipmentPhotoUrls；選填）
+    string status_label = 22;        // 內部物流狀態人類可讀文案（ShippingStatus.label() — CodeMeta SoT，Gateway 純透傳）
+
+    // ── 65 物流履約平台 Shared Foundation ────────────────────────────────
+    string cvs_store_code = 23;      // 超商門市代號（取代語意不誠實的 store_id；對應 shipments.cvs_store_code）
+
+    // 領域動作的可用性。🔴 **前端不得自行從 status 推導可做什麼**——這是唯一出口。
+    // ⚠️ 本欄**不含** href/method：那兩格是路由知識，由 Gateway（唯一對外入口、持有路由表）補上；
+    //    微服務不暴露 HTTP，讓它吐 HTTP 路徑等於把對外路由散進業務層。
+    repeated ActionAvailability allowed_actions = 24;
+}
+
+// 單一領域動作在「當下這一筆配送單」上的可用性（65 §4.4.1a 的兩層模型下層）。
+message ActionAvailability {
+    string action = 1;                  // FulfillmentAction 值域（snake_case，27 值）
+    bool enabled = 2;                   // 這顆按鈕現在能不能按
+    // 🔴 enabled=false 時必填：沒有它前端只能讓按鈕憑空消失，而「不可用要說明原因」是硬要求。
+    // 型別是 string 而非 int32：對外數字一律字串（§4 型別規範）。
+    string disabled_reason_code = 3;    // §6.7 的業務碼（例 "9522"）
+    // 🔴 哪些身分可以執行這個動作：AccountType 值域（"1" 買家／"2" 賣家／"4" 管理員），已排序。
+    // 與 href 不同，actor eligibility 是**業務判斷**不是路由知識——「誰有資格做這件事」
+    // 由領域決定；Gateway 只做兩件事：viewer 在不在這個集合內（純執行）、據 viewer 選 href（純路由）。
+    //
+    // 🔴 **是集合不是單值**（field 4 → 5 的原因）：同一動作買賣家都能做、只是端點不同
+    // （track／view_only；65 §6.1.1 的 cancel 買家 B-3、賣家 S-4 亦然）是常態不是例外。
+    // 單值時 gateway 只能拿它自己的路由表 key 當資格判定（drop 理由字串逐字是
+    // actor_mismatch），於是「哪個 action 屬於誰」有了第二份真相，而領域宣告的那份是死的。
+    //
+    // 少了它，同一份 allowedActions 會原樣出現在買家端與賣家端：QA 實測買家端回三條
+    // 掛 seller capability 的 href，買家跟隨即 403，而賣家在該端點拿不到自己的動作。
+    // 沿用 AccountType 而非另立 enum：gateway 的 x-account-type 用的就是這一組值。
+    reserved 4;
+    reserved "actor_account_type";
+    repeated string actor_account_types = 5;
+}
+
+// ==================== 主動查詢 ====================
+
+message QueryShipmentStatusRequest {
+    string shipment_no = 1;         // 內部物流單號
+}
+
+message GetShipmentTrackingRequest {
+    string order_no = 1;            // 訂單編號（買家手上唯一識別，避免暴露 ship_trade_no serial）
+    int64 buyer_id = 2;              // Gateway 已解析的現任 buyer_id（§4.1 例外 #1，僅 Request 用）；命名債改名，原 buyer_account_id，field number 不變
+}
+
+message GetSellerShipmentTrackingRequest {
+    string order_no = 1;            // 訂單編號
+    int64 store_id = 2;             // Gateway JWT 注入（§4.1 例外 #1，僅 Request 用）
+    bool is_return = 3;             // false=正向單（預設）, true=退貨單
+}
+
+// ==================== 超商 C2C 建店 ====================
+
+message OnboardCvsShippingRequest {
+    int64 store_id = 1;               // Gateway JWT 注入（E.5.5 例外）
+    string goods_type = 2;            // 貨物類型 value: 3201=常溫 / 3203=冷凍
+    string return_store_code = 3;     // 退貨門市代碼（C2C 必填，6 碼）
+    string return_store_name = 4;     // 退貨門市名稱
+    string return_store_address = 5;  // 退貨門市地址
+    string sender_name = 6;          // 退貨聯絡人姓名（必填）
+    string sender_phone = 7;         // 退貨聯絡人電話（必填）
+    // label_company_name 不由前端傳入，後端自動取賣家店名截斷至 10 中文字
+}
+
+// ==================== 宅配建店 ====================
+
+message OnboardHomeDeliveryRequest {
+    int64 store_id = 1;               // Gateway JWT 注入（E.5.5 例外）
+    string product_category = 2;      // 商品類別 Enum code（PayUni ProductTypeId，如 "0001"）
+    string sender_name = 3;          // 寄件人姓名（必填）
+    string sender_phone = 4;         // 寄件人電話（必填）
+    string sender_city = 5;          // 寄件城市（必填）
+    string sender_district = 6;      // 寄件地區（必填）
+    string sender_address_detail = 7; // 寄件詳細地址（必填）
+    string sender_postal_code = 8;   // 寄件郵遞區號（必填）
+    // 退貨地址（可選；未填則後端自動複製寄件地址）
+    string return_name = 9;          // 退貨收件人姓名
+    string return_phone = 10;        // 退貨收件人電話
+    string return_city = 11;         // 退貨城市
+    string return_district = 12;     // 退貨地區
+    string return_address_detail = 13; // 退貨詳細地址
+    string return_postal_code = 14;  // 退貨郵遞區號
+}
+
+// ==================== 建店共用回應 ====================
+
+message OnboardShippingResponse {
+    int32 code = 1;
+    string message = 2;
+    ShippingOnboardingView data = 3;
+}
+
+message ShippingOnboardingView {
+    string onboarding_id = 1;         // 建店設定 ID（TSID 數字字串）
+    string shipping_type = 2;         // CVS_C2C / HOME_DELIVERY
+    string goods_type = 3;            // 貨物類型（超商才有，宅配為空字串）
+    string onboarding_status = 4;     // 建店狀態碼
+    string provider_status = 5;       // PayUni 原始啟用狀態（欄位原名 set_status 已於 PayUni 錯誤回應收斂改造改名）
+    string partner_id = 6;            // PayUni 母代碼
+    string eship_id = 7;              // PayUni 子代碼
+    string return_store_code = 8;     // 退貨門市代碼（超商才有）
+    string product_category = 9;      // 商品類別代碼（宅配才有）
+    string label_company_name = 10;   // 標籤公司名稱（超商才有）
+    string enabled = 11;              // 是否啟用（"true" / "false"）
+    string created_at = 12;           // ISO 8601
+    string updated_at = 13;           // ISO 8601
+    string return_store_name = 14;    // 退貨門市名稱（超商才有）
+    string return_store_address = 15; // 退貨門市地址（超商才有）
+    // 寄件人/退貨資訊（物流設定獨立化）
+    string sender_name = 16;          // 寄件人/退貨聯絡人姓名
+    string sender_phone = 17;         // 寄件人/退貨聯絡人電話
+    string sender_city = 18;          // 寄件城市（宅配用）
+    string sender_district = 19;      // 寄件地區（宅配用）
+    string sender_address_detail = 20; // 寄件詳細地址（宅配用）
+    string sender_postal_code = 21;   // 寄件郵遞區號（宅配用）
+    string return_name = 22;          // 退貨收件人姓名（宅配用）
+    string return_phone = 23;         // 退貨收件人電話（宅配用）
+    string return_city = 24;          // 退貨城市（宅配用）
+    string return_district = 25;      // 退貨地區（宅配用）
+    string return_address_detail = 26; // 退貨詳細地址（宅配用）
+    string return_postal_code = 27;   // 退貨郵遞區號（宅配用）
+    string payuni_submit_status = 28; // 建店送 PayUni 狀態機 PayUniSubmitStatus value（"4301"~"4304"）；前端依 SUCCEEDED 判斷宅配地址 readonly
+    string provider_message = 29;     // PayUni 建店回應訊息（失敗時提供錯誤原因，收斂規範 §4.1 SoT）
+}
+
+// ==================== 列出建店設定 ====================
+
+message ListShippingOnboardingsRequest {
+    int64 store_id = 1;               // Gateway JWT 注入（E.5.5 例外）
+}
+
+message ListShippingOnboardingsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated ShippingOnboardingView onboardings = 3;
+}
+
+// ==================== 查詢建店設定 ====================
+
+message GetShippingOnboardingRequest {
+    int64 store_id = 1;               // Gateway JWT 注入（E.5.5 例外）
+    string onboarding_id = 2;         // 建店設定 ID
+}
+
+message GetShippingOnboardingResponse {
+    int32 code = 1;
+    string message = 2;
+    ShippingOnboardingView data = 3;
+}
+
+// ==================== 切換建店啟用/停用 ====================
+
+message ToggleShippingOnboardingRequest {
+    int64 store_id = 1;               // Gateway JWT 注入（E.5.5 例外）
+    string onboarding_id = 2;         // 建店設定 ID
+    bool enabled = 3;                 // true=啟用, false=停用
+}
+
+// ==================== 賣家配送方式查詢 ====================
+
+message ListSellerShippingMethodsRequest {
+    int64 store_id = 1;              // 店家 ID（Gateway JWT 注入，resolver 解析後的 store surrogate）
+    int32 account_type = 2;          // Gateway JWT 注入（E.5.5 例外）
+}
+
+message ListSellerShippingMethodsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated SellerShippingMethodView methods = 3;
+}
+
+message SellerShippingMethodView {
+    string shipping_method = 1;       // ShippingMethod value（3001=黑貓 / 3002=7-11店到店 / 3003=Uber）
+    string goods_type = 2;            // 超商溫層 value（3201=常溫 / 3203=冷凍），宅配及 Uber 為空
+    string display_name = 3;          // 前端顯示名稱
+    string description = 4;           // 描述
+    bool available = 5;               // 是否可用（onboarding_status=ACTIVE && enabled=true）
+    bool onboarding_required = 6;     // 是否需要建店開通
+    string onboarding_status = 7;     // 建店狀態 value（3602=啟用 / 3601=待審核 / 3603=不通過，未建店為空）
+    string onboarding_id = 8;         // 建店設定 ID，未建店為空
+    string enabled = 9;               // 賣家是否啟用此配送方式（"true" / "false"，未建店為空）
+}
+
+// ==================== 超商門市地圖 ====================
+
+message GetStoreMapParamsRequest {
+    int64 account_id = 1;             // Gateway JWT 注入（E.5.5 例外）
+    string app_type = 2;              // "buyer" 或 "seller"，決定回調時的 Deep Link Scheme
+    string mobile_tag = 3;            // "Y"=手機版(預設), "N"=PC版
+}
+
+message GetStoreMapParamsResponse {
+    int32 code = 1;
+    string message = 2;
+    StoreMapFormData data = 3;
+}
+
+// PayUni 門市地圖 Form POST 所需參數
+message StoreMapFormData {
+    string form_action = 1;           // PayUni 門市地圖 URL
+    string mer_id = 2;                // 平台商店代號（HAWK）
+    string version = 3;               // API 版本（固定 "1.1"）
+    string encrypt_info = 4;          // AES 加密字串
+    string hash_info = 5;             // SHA256 簽章
+    string redirect_url = 6;          // 完整的 WebView 開啟 URL（含 base64 編碼表單資料，由 Shipping Service 組裝）
+}
+
+// 以 opaque redirect_id 取回門市中轉表單 canonical 欄位（#1394）
+message GetStoreMapRedirectFormRequest {
+    string redirect_id = 1;           // 不可猜的 opaque id（後端產生，一次性消費）
+}
+
+message GetStoreMapRedirectFormResponse {
+    string form_action = 1;           // PayUni 門市地圖 Form POST action URL
+    string mer_id = 2;                // 平台商店代號（HAWK）
+    string version = 3;               // API 版本
+    string encrypt_info = 4;          // AES 加密字串
+    string hash_info = 5;             // SHA256 簽章
+}
+
+message DecryptStoreMapResultRequest {
+    string encrypt_info = 1;          // PayUni 回傳的 AES 加密字串
+    string hash_info = 2;             // PayUni 回傳的 SHA256 簽章
+    string app_type = 3;              // "buyer" 或 "seller"，決定 Deep Link Scheme
+}
+
+message DecryptStoreMapResultResponse {
+    int32 code = 1;
+    string message = 2;
+    StoreMapResult data = 3;
+    string redirect_url = 4;          // Deep Link URL（由 Shipping Service 組裝），Gateway 直接 302 redirect
+}
+
+// PayUni MapJson 解密後的門市資訊
+message StoreMapResult {
+    string store_id = 1;              // 門市代碼（6 碼，如 "916712"）
+    string store_name = 2;            // 門市名稱（如 "敦安門市"）
+    string address = 3;               // 門市地址
+    string insular_area = 4;          // "I"=本島, "O"=離島
+    string store_type = 5;            // 門市類型（固定 "SEVEN"）
+}
+
+// ==================== 賣家物流設定查詢（服務間）====================
+
+message GetSellerShippingConfigRequest {
+    int64 store_id = 1;      // 賣家 store_id（內部服務間呼叫）
+}
+
+message GetSellerShippingConfigResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated SellerShippingConfigItem configs = 3;
+}
+
+// 賣家單一配送方式的開通狀態與寄件資訊
+message SellerShippingConfigItem {
+    string shipping_method = 1;       // 3001 / 3002
+    string goods_type = 2;            // 3201 / 3203（宅配為空字串）
+    bool available = 3;               // 是否已開通且啟用（onboarding_status=ACTIVE && enabled=true）
+    string sender_postal_code = 4;    // 寄件郵遞區號（僅宅配有值，供運費路線推導）
+    string sender_city = 5;           // 寄件城市（訂單快照用）
+    string sender_district = 6;       // 寄件地區（訂單快照用）
+}
+
+// ==================== 運費計算 ====================
+
+// --- 取得全部運費配置 ---
+
+message GetShippingFeeConfigsRequest {}
+
+message GetShippingFeeConfigsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated ShippingMethodConfigProto method_configs = 3;  // 配送方式設定清單
+    repeated ShippingFeeTierProto fee_tiers = 4;            // 費率級距清單
+}
+
+message ShippingMethodConfigProto {
+    string shipping_method = 1;         // 配送方式
+    string delivery_temp = 2;           // 配送溫層
+    string max_dimension_sum_cm = 3;    // 材積上限（cm）
+    string max_single_side_cm = 4;      // 最長邊上限（cm）
+    string max_weight_grams = 5;        // 重量上限（g）
+    string estimated_days = 6;          // 預計到貨天數
+    string settlement_days = 7;         // 撥款天期
+    string commission_rate = 8;         // 代收手續費率
+    string commission_min = 9;          // 代收手續費最低金額
+}
+
+message ShippingFeeTierProto {
+    string shipping_method = 1;         // 配送方式
+    string delivery_temp = 2;           // 配送溫層
+    string delivery_zone = 3;           // 配送區域（DOMESTIC / OFFSHORE / INTER_ISLAND）
+    string max_dimension_cm = 4;        // 材積上限（cm），"0" 表示統一價
+    string fee = 5;                     // 運費（元）
+}
+
+// --- 查詢單一運費 ---
+
+message LookupShippingFeeRequest {
+    string shipping_method = 1;         // 配送方式
+    string delivery_temp = 2;           // 配送溫層
+    string delivery_zone = 3;           // 配送區域
+    string dimension_sum = 4;           // 材積總和（cm，數字字串）
+}
+
+message LookupShippingFeeResponse {
+    int32 code = 1;
+    string message = 2;
+    string fee = 3;                     // 運費（元，數字字串），不可用時為空
+    string estimated_days = 4;          // 預計到貨天數
+    string settlement_days = 5;         // 撥款天期
+}
+
+// --- 計算可用配送選項 ---
+
+message CalculateShippingOptionsRequest {
+    string length_cm = 1;           // 包裝長度（cm）
+    string width_cm = 2;            // 包裝寬度（cm）
+    string height_cm = 3;           // 包裝高度（cm）
+    string weight_grams = 4;        // 重量（公克）
+    string delivery_zone = 5;       // 配送區域（DOMESTIC / OFFSHORE / INTER_ISLAND），空字串預設 DOMESTIC
+    int64 store_id = 6;              // 賣家 store 代理鍵（選填；有傳入時只回傳賣家已開通的配送方式）；命名債改名，原 seller_account_id，field number 不變
+}
+
+message CalculateShippingOptionsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated ShippingOptionGroup temperature_groups = 3;  // 依溫層分組的配送選項
+    string weight_grams = 4;        // 轉換後重量（g）
+    string dimension_sum = 5;       // L+W+H 材積總和（cm）
+    string longest_side = 6;        // 最長邊（cm）
+}
+
+message ShippingOptionGroup {
+    string temperature = 1;                         // 溫層 value（3201=常溫 / 3202=冷藏 / 3203=冷凍）
+    string display_name = 2;                        // 溫層顯示名（常溫/冷藏/冷凍）
+    repeated ShippingOptionDetail methods = 3;      // 可用配送方式
+}
+
+message ShippingOptionDetail {
+    string shipping_method = 1;         // 配送方式 value（3001/3002/3003）
+    string display_name = 2;            // 配送方式顯示名
+    string fee = 3;                     // 運費（元）
+    string estimated_days = 4;          // 預計到貨天數
+    string settlement_days = 5;         // 撥款天期
+    string max_dimension_sum = 6;       // 材積上限 L+W+H（cm），"0" 表示無特定限制
+    string max_longest_side = 7;        // 最長邊上限（cm），"0" 表示無特定限制
+    string max_weight_grams = 8;        // 重量上限（g）
+}
+
+// ==================== 商品配送驗證（Product Service 呼叫）====================
+
+message ValidateProductShippingRequest {
+    int64 store_id = 1;                                    // 賣家 store 代理鍵（內部服務呼叫）；命名債改名，原 seller_account_id，field number 不變
+    repeated ValidateShippingItem items = 2;              // 待驗證的 SKU 配送項目
+}
+
+message ValidateShippingItem {
+    string sku_name = 1;              // SKU 名稱（用於錯誤訊息識別）
+    string shipping_method = 2;       // 3001 / 3002 / UBER_INSTANT
+    string temperature = 3;           // AMBIENT / CHILLED / FROZEN
+    string length_cm = 4;
+    string width_cm = 5;
+    string height_cm = 6;
+    string weight_grams = 7;          // 已轉換為公克
+}
+
+message ValidateProductShippingResponse {
+    int32 code = 1;
+    string message = 2;
+    bool all_valid = 3;                                    // 全部通過 = true
+    repeated ValidateShippingResult results = 4;           // 各項目的驗證結果
+}
+
+message ValidateShippingResult {
+    string sku_name = 1;
+    string shipping_method = 2;
+    string temperature = 3;
+    bool valid = 4;
+    string rejection_reason = 5;      // 拒絕原因代碼：NOT_ONBOARDED / METHOD_NOT_SUPPORTED / DIMENSION_SUM_EXCEEDED / SINGLE_SIDE_EXCEEDED / WEIGHT_EXCEEDED
+    string rejection_message = 6;     // 人類可讀的拒絕訊息（繁體中文）
+    string max_dimension_sum_cm = 7;  // 材積上限（L+W+H cm），僅超出時有值
+    string max_single_side_cm = 8;    // 單邊上限（cm），僅超出時有值
+    string max_weight_grams = 9;      // 重量上限（g），僅超出時有值
+}
+
+// ==================== 買家常用門市管理 ====================
+
+message AddBuyerStorePickupRequest {
+    int64 buyer_id = 1;                 // Gateway 已解析的現任 buyer_id（非 raw JWT account_id）
+    string store_code = 2;              // 門市代碼（6 碼）
+    string store_name = 3;              // 門市名稱
+    string store_address = 4;           // 門市地址
+    string receiver_name = 5;           // 收件人姓名
+    string receiver_phone = 6;          // 收件人電話
+    bool is_default = 7;                // 是否設為預設
+}
+
+message AddBuyerStorePickupResponse {
+    int32 code = 1;
+    string message = 2;
+    BuyerStorePickupView data = 3;
+}
+
+message UpdateBuyerStorePickupRequest {
+    int64 buyer_id = 1;                 // Gateway 已解析的現任 buyer_id
+    string store_pickup_id = 2;         // 門市記錄 ID（TSID 數字字串）
+    string store_code = 3;              // 門市代碼
+    string store_name = 4;              // 門市名稱
+    string store_address = 5;           // 門市地址
+    string receiver_name = 6;           // 收件人姓名
+    string receiver_phone = 7;          // 收件人電話
+    bool is_default = 8;                // 是否設為預設
+}
+
+message UpdateBuyerStorePickupResponse {
+    int32 code = 1;
+    string message = 2;
+    BuyerStorePickupView data = 3;
+}
+
+message ListBuyerStorePickupsRequest {
+    int64 buyer_id = 1;                 // Gateway 已解析的現任 buyer_id
+}
+
+message ListBuyerStorePickupsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated BuyerStorePickupView data = 3;
+}
+
+message DeleteBuyerStorePickupRequest {
+    int64 buyer_id = 1;                 // Gateway 已解析的現任 buyer_id
+    string store_pickup_id = 2;         // 門市記錄 ID（TSID 數字字串）
+}
+
+message DeleteBuyerStorePickupResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+// 買家常用門市資訊
+message BuyerStorePickupView {
+    string id = 1;                      // TSID 數字字串
+    string store_code = 2;              // 門市代碼
+    string store_name = 3;              // 門市名稱
+    string store_address = 4;           // 門市地址
+    string receiver_name = 5;           // 收件人姓名
+    string receiver_phone = 6;          // 收件人電話
+    string is_default = 7;              // "true" / "false"
+    string created_at = 8;              // ISO 8601
+    string updated_at = 9;              // ISO 8601
+}
+
+// ==================== 假日管理 ====================
+
+message ImportHolidaysRequest {
+    int64 admin_account_id = 1;         // Gateway JWT 注入（E.5.5 例外）
+    string csv_url = 2;                 // 政府 CSV 下載 URL
+}
+
+message ImportHolidaysResponse {
+    int32 code = 1;
+    string message = 2;
+    ImportHolidaysData data = 3;
+}
+
+message ImportHolidaysData {
+    string year = 1;                    // 匯入年份
+    string imported_count = 2;          // 匯入筆數
+    string deleted_count = 3;           // 刪除舊資料筆數
+}
+
+message ImportHolidaysFromContentRequest {
+    int64 admin_account_id = 1;         // Gateway JWT 注入（E.5.5 例外）
+    string year = 2;                    // 顯式指定年份（前端可控，string）
+    string csv_content = 3;             // CSV 檔案文字內容（前端 FileReader 讀取）
+}
+// Response 重用 ImportHolidaysResponse / ImportHolidaysData
+
+message GetHolidayCoverageRequest {
+    int64 admin_account_id = 1;         // Gateway JWT 注入（E.5.5 例外）
+}
+
+message GetHolidayCoverageResponse {
+    int32 code = 1;
+    string message = 2;
+    HolidayCoverageData data = 3;
+}
+
+message HolidayCoverageData {
+    repeated HolidayYearCoverage years = 1;
+    string coverage_days = 2;           // 距耗盡天數（與 §8 metric 同源公式）；空表 "-1"
+}
+
+message HolidayYearCoverage {
+    string year = 1;                    // 年份
+    string count = 2;                   // 該年筆數
+    string max_holiday_date = 3;        // 該年最大假日日期（YYYY-MM-DD）
+}
+
+message ListBusinessDaysRequest {
+    int64 account_id = 1;              // Gateway JWT 注入（E.5.5 例外）
+}
+
+message ListBusinessDaysResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated BusinessDay business_days = 3;
+}
+
+message BusinessDay {
+    string date = 1;                    // ISO 8601 日期（YYYY-MM-DD）
+    string day_of_week = 2;            // 星期幾（一/二/三/四/五）
+}
+
+message GetHolidaysInternalRequest {
+    string from_date = 1;              // ISO 8601 日期（YYYY-MM-DD），閉區間
+    string to_date = 2;                // ISO 8601 日期（YYYY-MM-DD），閉區間
+}
+
+message GetHolidaysInternalResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated string holiday_dates = 3; // ISO 8601 日期，升冪；區間內沒有假日時為空陣列
+}
+
+// ==================== 超商確認出貨 ====================
+
+message ConfirmCvsShipmentRequest {
+    int64 store_id = 1;                // Gateway JWT 注入（E.5.5 例外）
+    string order_no = 2;               // 訂單編號
+    repeated string staged_tokens = 3; // 出貨照片 stageToken（選填）
+}
+
+message ConfirmCvsShipmentResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+// ==================== 退貨物流 ====================
+
+message CreateReturnCvsShipmentRequest {
+    string order_no = 1;
+    string store_id = 2;
+    string mer_id = 3;
+    string buyer_name = 4;
+    string buyer_phone = 5;
+    string temperature = 6;              // AMBIENT / CHILLED / FROZEN
+    string trade_amt = 7;                // 商品價值（遺失時依此金額認賠，傳退款金額）
+}
+
+message CreateReturnHomeShipmentRequest {
+    string order_no = 1;
+    string store_id = 2;
+    string mer_id = 3;
+    string buyer_name = 4;              // 退貨人姓名（買家，訂單快照）
+    string buyer_phone = 5;             // 退貨人電話
+    string buyer_city = 6;
+    string buyer_district = 7;
+    string buyer_address = 8;
+    string buyer_postal_code = 9;
+    string temperature = 10;            // 配送溫層 value（3201/3202/3203）
+}
+
+message CreateReturnShipmentResponse {
+    int32 code = 1;
+    string message = 2;
+    ReturnShipmentData data = 3;
+}
+
+message ReturnShipmentData {
+    string shipment_no = 1;
+    string tracking_code = 2;
+    string return_store_code = 3;
+    string return_store_name = 4;
+    string estimated_pickup_date = 5;
+    string ship_trade_no = 6;                  // PayUni 物流序號（AfterSales 快照至 aftersale_cases.ship_trade_no，供 retry 使用）
+}
+
+message GetSellerReturnConfigRequest {
+    string store_id = 1;
+    string shipping_type = 2;            // CVS_C2C / HOME_DELIVERY
+}
+
+message GetSellerReturnConfigResponse {
+    int32 code = 1;
+    string message = 2;
+    SellerReturnConfigData data = 3;
+}
+
+message SellerReturnConfigData {
+    string return_store_code = 1;
+    string return_store_name = 2;
+    string return_store_address = 3;
+    string return_name = 4;
+    string return_phone = 5;
+    string return_city = 6;
+    string return_district = 7;
+    string return_address_detail = 8;
+    bool available = 9;
+}
+
+// 退貨出貨便列印重試（§5.3.7）
+message RetryReturnPrintLabelRequest {
+    string ship_trade_no = 1;            // 退貨 shipment 的 PayUni 物流序號
+}
+
+message RetryReturnPrintLabelResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+// ==================== 開發工具（Webhook 模擬器）====================
+
+message LookupShipTradeNoRequest {
+    string order_no = 1;    // 訂單編號
+    bool is_return = 2;     // true=退貨物流, false=正向物流
+}
+
+message LookupShipTradeNoResponse {
+    int32 code = 1;
+    string message = 2;
+    string ship_trade_no = 3;   // PayUni 物流序號
+    string lgs_type = 4;        // 物流類型（HOME/C2C）
+    string ship_type = 5;       // 配送類型
+    string mer_id = 6;          // 商店代號
+}
+
+// ==================== Admin 異常查詢 Messages（§29 Admin 異常訂單管理）====================
+
+// ---- 列物流異常 ----
+
+message ListShipmentsForAdminRequest {
+    int64 account_id = 1;             // Gateway JWT 注入（Admin 身份）
+    string page = 2;                   // 整數字串，預設 "1"
+    string page_size = 3;              // 整數字串，預設 "20"，最大 "100"
+    bool abnormal_only = 4;            // true：僅異常；false：全量（ops 查案）
+    string provider_status = 5;        // PayUni 原始碼 exact match（如 "E001"）
+    string status = 6;                 // 平台 ShippingStatus value；可多值逗號分隔
+    string is_return = 7;              // "" / "true" / "false"
+    string shipping_method = 8;        // TAQBIN / SEVEN_ELEVEN_STORE_PICKUP / UBER_INSTANT
+    string store_id = 9;                // filter 賣家 store 代理鍵；命名債改名，原 seller_account_id，field number 不變
+    string order_no = 10;              // filter 訂單號
+    string created_from = 11;          // ISO 8601 UTC
+    string created_to = 12;
+    string sort = 13;                  // updated_at_desc / updated_at_asc / created_at_desc / created_at_asc
+}
+
+message ListShipmentsForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    ListShipmentsForAdminData data = 3;
+}
+
+message ListShipmentsForAdminData {
+    repeated AdminShipmentSummary records = 1;
+    string total = 2;                  // 整數字串
+    string page = 3;
+    string page_size = 4;
+}
+
+message AdminShipmentSummary {
+    string shipment_id = 1;            // TSID 數字字串
+    string shipment_no = 2;
+    string order_no = 3;
+    string store_id = 4;                // 賣家 store 代理鍵；命名債改名，原 seller_account_id，field number 不變
+    string shipping_method = 5;
+    string is_return = 6;              // "true" / "false"
+    string status = 7;                 // 平台 ShippingStatus value
+    string provider_status = 8;        // PayUni ShipStatus 原始貨態值（正常軌跡證據，不代表異常）
+    string provider_message = 9;       // PayUni 原始貨態訊息
+    string ship_trade_no = 10;
+    string mer_id = 11;
+    string created_at = 12;            // ISO 8601 UTC
+    string updated_at = 13;            // ISO 8601 UTC
+    string provider_error_code = 14;   // 物流商失敗代碼（非空＝provider 層失敗，abnormal_only 的判準）
+    string provider_error_message = 15;// 失敗訊息原文
+}
+
+// ---- 物流詳情 ----
+
+message GetShipmentForAdminRequest {
+    int64 account_id = 1;              // Gateway JWT 注入
+    string shipment_id = 2;            // TSID
+}
+
+message GetShipmentForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    AdminShipmentDetail data = 3;
+}
+
+message AdminShipmentDetail {
+    string shipment_id = 1;
+    string shipment_no = 2;
+    string order_no = 3;
+    string store_id = 4;                // 賣家 store 代理鍵；命名債改名，原 seller_account_id，field number 不變
+    string buyer_id = 5;                 // 命名債改名，原 buyer_account_id，field number 不變
+    string shipping_method = 6;
+    string is_return = 7;
+    string status = 8;
+    string provider_status = 9;        // 原始貨態值（正常軌跡證據，不代表異常）
+    string provider_message = 10;      // 原始貨態訊息
+    string provider_status_time = 11;
+    string provider_error_code = 37;      // 物流商失敗代碼（非空＝provider 層失敗）
+    string provider_error_message = 38;   // 失敗訊息原文
+    string provider_error_at = 39;        // 失敗時間 ISO 8601 UTC
+    string ship_trade_no = 12;
+    string mer_id = 13;
+    string ship_type = 14;
+    string lgs_type = 15;
+    string goods_type = 16;
+    string spec = 17;
+    string trade_amt = 18;
+    string sender_name = 19;
+    string sender_phone = 20;
+    string recipient_name = 21;
+    string recipient_phone = 22;
+    string recipient_address = 23;
+    string cvs_store_code = 24;         // 超商取貨門市代碼；命名債改名，原 store_id（與上方賣家 store 代理鍵純屬巧合同名，DB 早已讓名為 shipments.cvs_store_code，見 V4 migration），field number 不變
+    string store_name = 25;
+    string partner_id = 26;
+    string validation_no = 27;
+    string odno = 28;
+    string label_print_status = 29;    // LabelPrintStatus value: "4101"~"4104"
+    string tcat_call_status = 30;      // TcatCallStatus value: "4201"~"4204"
+    string tcat_call_time = 31;
+    string label_key = 32;                 // 託運單 PDF objectKey（49 §6.6）
+    repeated string shipment_photo_keys = 33; // 出貨照片 objectKey（49 §6.6）
+    string last_reconciled_at = 34;
+    string created_at = 35;
+    string updated_at = 36;
+}
+
+// ---- 列建店異常 ----
+
+message ListSellerShipmentSettingsForAdminRequest {
+    int64 account_id = 1;
+    string page = 2;
+    string page_size = 3;
+    bool abnormal_only = 4;            // true：預設 filter onboarding_status=REJECTED
+    string provider_status = 5;
+    string onboarding_status = 6;      // OnboardingStatus value，可多值逗號分隔
+    string shipping_type = 7;          // CVS_C2C / HOME_DELIVERY
+    string store_id = 8;
+    string created_from = 9;
+    string created_to = 10;
+    string sort = 11;
+}
+
+message ListSellerShipmentSettingsForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    ListSellerShipmentSettingsForAdminData data = 3;
+}
+
+message ListSellerShipmentSettingsForAdminData {
+    repeated AdminSellerShipmentSettingSummary records = 1;
+    string total = 2;
+    string page = 3;
+    string page_size = 4;
+}
+
+message AdminSellerShipmentSettingSummary {
+    string setting_id = 1;             // TSID 數字字串
+    string store_id = 2;
+    string shipping_type = 3;          // CVS_C2C / HOME_DELIVERY
+    string goods_type = 4;             // 僅超商
+    string onboarding_status = 5;      // OnboardingStatus value
+    string provider_status = 6;        // PayUni 原始狀態碼
+    string provider_message = 7;       // PayUni 原始訊息
+    string mer_id = 8;
+    string partner_id = 9;
+    string eship_id = 10;
+    string payuni_submit_status = 11;  // PayUniSubmitStatus value: "4301"~"4304"
+    string enabled = 12;               // "true" / "false"
+    string created_at = 13;
+    string updated_at = 14;
+}
+
+// ==================== §5.21 配送異常賣家通知 message ====================
+
+message ListSellerShipmentAnomaliesRequest {
+    string store_id = 1;                   // Gateway JWT 注入
+    string anomaly_type = 2;               // ShipmentAnomalyType.value，空字串表不 filter
+    string severity = 3;                   // ShipmentAnomalySeverity.value，空字串表不 filter
+    bool show_acknowledged = 4;            // 是否包含已 ack/ignored 的單；預設 false
+    string page = 5;                       // 整數字串，預設 "1"
+    string page_size = 6;                  // 整數字串，預設 "20"
+}
+
+message ListSellerShipmentAnomaliesResponse {
+    int32 code = 1;
+    string message = 2;
+    ListSellerShipmentAnomaliesData data = 3;
+}
+
+message ListSellerShipmentAnomaliesData {
+    repeated ShipmentAnomalyView records = 1;
+    string total = 2;
+    string page = 3;
+    string page_size = 4;
+}
+
+message ShipmentAnomalyView {
+    string shipment_id = 1;                // shipments.id（數字字串）
+    string order_no = 2;
+    string anomaly_type = 3;               // ShipmentAnomalyType.value
+    string anomaly_type_label = 4;         // ShipmentAnomalyType.label（如「黑貓叫件未完成」）
+    string severity = 5;                   // ShipmentAnomalySeverity.value
+    string shipping_method = 6;            // ShippingMethod.value
+    string shipment_status = 7;            // ShippingStatus.value（當前 shipments.status）
+    string detected_at = 8;                // ISO 8601 UTC（推導，shipments 相關時間欄位最大值）
+    string ack_action = 9;                 // ShipmentAnomalyAckAction.value，空字串表未處理
+    string acted_at = 10;                  // ISO 8601 UTC，未處理時為空字串
+}
+
+message GetSellerShipmentAnomalyStatsRequest {
+    string store_id = 1;                   // Gateway JWT 注入
+}
+
+message GetSellerShipmentAnomalyStatsResponse {
+    int32 code = 1;
+    string message = 2;
+    GetSellerShipmentAnomalyStatsData data = 3;
+}
+
+message GetSellerShipmentAnomalyStatsData {
+    string total = 1;                              // 全部異常單數（未 ack）
+    string high_severity_count = 2;                // HIGH 嚴重度數量
+    string medium_severity_count = 3;
+    string low_severity_count = 4;
+    repeated AnomalyTypeCount by_type = 5;         // 依 anomaly_type 分組
+}
+
+message AnomalyTypeCount {
+    string anomaly_type = 1;
+    string anomaly_type_label = 2;
+    string count = 3;                              // 整數字串
+}
+
+message AcknowledgeShipmentAnomalyRequest {
+    string store_id = 1;                   // Gateway JWT 注入
+    string shipment_id = 2;                // shipments.id
+    string anomaly_type = 3;               // ShipmentAnomalyType.value
+}
+
+message AcknowledgeShipmentAnomalyResponse {
+    int32 code = 1;
+    string message = 2;
+    AcknowledgeShipmentAnomalyData data = 3;
+}
+
+message AcknowledgeShipmentAnomalyData {
+    string ack_id = 1;                     // shipment_anomaly_acknowledgments.id（數字字串）
+    string acted_at = 2;                   // ISO 8601 UTC
+}
+
+message IgnoreShipmentAnomalyRequest {
+    string store_id = 1;                   // Gateway JWT 注入
+    string shipment_id = 2;
+    string anomaly_type = 3;
+}
+
+message IgnoreShipmentAnomalyResponse {
+    int32 code = 1;
+    string message = 2;
+    AcknowledgeShipmentAnomalyData data = 3;  // 與 Acknowledge 同結構，重用
+}
+
+message ListShipmentAnomaliesForAdminRequest {
+    string store_id = 1;                    // 可選 filter（空字串表全部）；命名債改名，原 seller_account_id，field number 不變
+    string anomaly_type = 2;               // 可選 filter
+    string severity = 3;                   // 可選 filter
+    bool show_acknowledged = 4;
+    string page = 5;
+    string page_size = 6;
+}
+
+message ListShipmentAnomaliesForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    ListShipmentAnomaliesForAdminData data = 3;
+}
+
+message ListShipmentAnomaliesForAdminData {
+    repeated AdminShipmentAnomalyView records = 1;
+    string total = 2;
+    string page = 3;
+    string page_size = 4;
+}
+
+message AdminShipmentAnomalyView {
+    string shipment_id = 1;
+    string order_no = 2;
+    string store_id = 3;                    // 命名債改名，原 seller_account_id，field number 不變
+    string anomaly_type = 4;
+    string anomaly_type_label = 5;
+    string severity = 6;
+    string shipping_method = 7;
+    string shipment_status = 8;
+    string detected_at = 9;
+    string ack_action = 10;                 // admin 端處置：ACKNOWLEDGED / IGNORED / 空字串（actor_type='ADMIN'）
+    string acted_at = 11;                   // admin 端處置時間（ISO 8601 UTC，未處置為空字串）
+    string seller_ack_action = 12;          // issue #1327：賣家端處置（actor_type='SELLER'），唯讀揭露
+    string seller_acted_at = 13;            // issue #1327：賣家端處置時間（ISO 8601 UTC）
+}
+
+// Admin 標記異常處置（issue #1327）：account_id 為 Gateway 注入的 admin account_id（x-account-id）
+// → 寫入 actor_id、actor_type='ADMIN'。§4.1 例外 1：JWT 注入的身分欄位 Request 允許 int64。
+message AcknowledgeShipmentAnomalyForAdminRequest {
+    int64 account_id = 1;                  // Gateway 注入的 admin account_id（x-account-id）
+    string shipment_id = 2;                // shipments.id（TSID 數字字串）
+    string anomaly_type = 3;               // ShipmentAnomalyType.value
+}
+
+message IgnoreShipmentAnomalyForAdminRequest {
+    int64 account_id = 1;
+    string shipment_id = 2;
+    string anomaly_type = 3;
+}
+
+// ==================== Uber 即時報價（66 §6.2；Stage 8B W2-2）====================
+
+// 🔴 一件待報價的商品。
+//
+// 為什麼要逐項而不是像 CalculateShippingOptions 那樣先聚合成一個長寬高重：
+// Uber 的 manifest_items[] 是逐項的，而分箱（66 §5.1.8）要知道每一件的尺寸才算得出箱數。
+// 聚合之後那些資訊就回不來了。
+message UberQuoteItem {
+    string sku_id = 1;              // 進 manifest_items[].external_id，也是 payload_hash 的排序鍵
+    string name = 2;                // 品名
+    string quantity = 3;            // 件數
+    string length_cm = 4;
+    string width_cm = 5;
+    string height_cm = 6;
+    string weight_gram = 7;
+    string unit_price = 8;          // 單價（元整數）
+}
+
+// 收件地址。
+//
+// 🔴 三個欄位分開傳，**不是**一個字串。
+// 權威來源 hawkr_buyer.shipping_addresses 本來就是 city／district／detail_address
+// 三欄（buyer.proto 的 AddressInfo 原樣暴露）。攤平成字串再讓 shipping 反解，
+// 等於自己製造一個解析率問題——而每一筆解不出來的，就是一個看不到選項的買家。
+message UberQuoteDropoff {
+    string receiver_name = 1;
+    string receiver_phone = 2;
+    string county = 3;              // 第一級行政區（shipping_addresses.city）
+    string district = 4;            // 第二級行政區（shipping_addresses.district）
+    string detail_address = 5;      // 門牌與樓層（shipping_addresses.detail_address）
+}
+
+message GetUberQuoteForCheckoutRequest {
+    int64 buyer_id = 1;             // 業務鍵（buyers PK），不是 account_id
+    int64 seller_store_id = 2;      // 賣家業務鍵（sellers PK），不是 account_id
+    string delivery_temp = 3;       // 溫層 value（3201／3202／3203）
+    UberQuoteDropoff dropoff = 4;
+    repeated UberQuoteItem items = 5;
+}
+
+// 🔴 available=false 時 quote_id／fee 一律為空，理由在 unavailable_reason。
+//    不要用「fee 為 0」表示不可用——0 元運費是一個合法的業務狀態（平台補貼）。
+message UberQuoteData {
+    bool available = 1;
+    string unavailable_reason = 2;  // available=false 時必填，可寫進 UI 的理由碼
+    string quote_id = 3;            // Uber 的報價 id（dqt_ 前綴）
+    string fee_amount = 4;          // 運費（元整數；🔴 string，response 側無原生數值豁免）
+    string currency = 5;
+    string expires_at = 6;          // ISO 8601 UTC。🔴 前端據此判斷要不要重報
+}
+
+message GetUberQuoteForCheckoutResponse {
+    int32 code = 1;
+    string message = 2;
+    UberQuoteData data = 3;
+}
+
+// 🔴 accept=false ⇒ 只重驗不落狀態（preview／confirm 前）；
+//    accept=true  ⇒ capture 成功後把報價標成 CHECKOUT_ACCEPTED，此時 order_no 必填。
+message ValidateUberQuoteForCheckoutRequest {
+    string quote_id = 1;
+    int64 buyer_id = 2;
+    int64 seller_store_id = 3;
+    string delivery_temp = 4;
+    UberQuoteDropoff dropoff = 5;
+    repeated UberQuoteItem items = 6;
+    bool accept = 7;
+    string order_no = 8;            // accept=true 時必填
+}
+
+// 🔴 price_changed=true ⇒ 呼叫端**不得** capture（66 §6.1.4／INV-U1）。
+//    自動接受新價＝補收（違約）；自動用舊價＝我方吃差額且無上限。兩個都不能默默做。
+message ValidateUberQuoteData {
+    bool valid = 1;                 // false ⇒ 看 unavailable_reason 或 price_changed
+    bool price_changed = 2;
+    string unavailable_reason = 3;
+    string quote_id = 4;            // 重驗後應採用的那一筆（可能與送進來的不同）
+    string fee_amount = 5;          // price_changed=true 時，這是 data.newFee
+    string expires_at = 6;
+}
+
+message ValidateUberQuoteForCheckoutResponse {
+    int32 code = 1;
+    string message = 2;
+    ValidateUberQuoteData data = 3;
+}
+
+// ==================== Uber 配送查詢 Messages（66；Stage 8B W6-3／W6-4）====================
+//
+// 資料來源三張表：shipments（normalized 狀態與歸屬的 SSOT）、uber_deliveries（provider 側事實）、
+// uber_quotes／uber_pod_artifacts（報價與送達憑證）。
+//
+// 🔴 **驅動表是 shipments 不是 uber_deliveries**：建單失敗（990）與建單結果未知（991）的單
+//    根本沒有 uber_deliveries 列（66 §5.1.5：建單成功才寫入），而那兩類正是 W6-4 明列要查的
+//    「failure」與「unknown」。以 uber_deliveries 當驅動表 = 最需要被看見的那些單一筆都不在列表裡。
+
+// 一筆 Uber 配送的摘要（列表列，賣家面與 Admin 面共用）。
+message UberDeliverySummary {
+    // 🔴 本列的**可定址鍵**：有 uber_deliveries 列時是 provider delivery id，
+    //    沒有時退回我方 shipment_no。兩個值域不相交（del_／ret_ 前綴 vs SH 前綴），
+    //    而「每一列都打得開」是這個欄位存在的理由——建單失敗的單沒有 delivery_id，
+    //    若以 delivery_id 當唯一鍵，Admin 點不開的正好是他最需要點開的那幾筆。
+    string delivery_no = 1;
+    // provider reference（66 §5.1.5）。建單失敗／結果未知時為空字串。
+    // ⚠️ del_／ret_ 前綴**只用於健全性檢查，不用於分辨 leg**——leg 的真相在 is_return。
+    string delivery_id = 2;
+    string shipment_id = 3;          // shipments.id（TSID 數字字串）
+    string shipment_no = 4;
+    string order_no = 5;
+    string store_id = 6;             // 賣家 store 代理鍵（不是 account_id）
+    string shipping_method = 7;      // 恆 "3003"（ShippingMethod.UBER_INSTANT）
+    string is_return = 8;            // "true" / "false"
+    // 🔴 normalized 狀態，SSOT = shipments.status（ShippingStatus value）。
+    string status = 9;
+    string status_label = 10;        // ShippingStatus.label()，CodeMeta SoT，Gateway 純透傳
+    // 🔴 **raw provider status**：Uber 原生 7 值（pending／pickup／pickup_complete／dropoff／
+    //    delivered／canceled／returned），照抄不映射。與 status 是**兩個不同的欄位**，
+    //    W6-4 明列它們要分開查（66 §7.3.1：未知值 fail-closed，不猜測式映射）。
+    string provider_status = 11;
+    // UberDeliveryOutcome（66 附錄 C.2 ④）：PROVIDER_UNDELIVERABLE／PROVIDER_CANCELED／
+    // SELLER_CANCELED／ADMIN_CANCELED／CREATE_FAILED。
+    // 🔴 它是「41 這一格的錢與責任歸誰」的唯一判準（66 §7.3.4）⇒ W6-3 的 responsibility 一格看它。
+    string outcome = 12;
+    string undeliverable_reason = 13; // Uber 原生值照抄（66 C.4 不納管）
+    string cancelation_reason = 14;   // Uber 原生值照抄；與 delivery_id 同為月結對帳的鍵
+    string eta_dropoff_at = 15;       // ISO 8601 UTC
+    string courier_name = 16;
+    // ⚠️ **boolean 不是狀態**（U-I／66 §7.3.1）：它不映射任何 normalized 值。
+    bool courier_imminent = 17;
+    string provider_error_code = 18;    // 來自 shipments（V12 拆欄）；非空＝provider 層失敗
+    string provider_error_message = 19;
+    string provider_error_at = 20;      // ISO 8601 UTC
+    string quote_id = 21;               // 對應 uber_quotes.quote_id（dqt_ 前綴）
+    // 已抓回的 POD 件數（整數字串）。0 不等於異常：POD 在 delivered 之後才由 P2 抓取。
+    string pod_artifact_count = 22;
+    string created_at = 23;             // shipments.created_at（ISO 8601 UTC）
+    string updated_at = 24;             // shipments.updated_at（ISO 8601 UTC）
+}
+
+// 報價快照（66 §5.1.4）。W6-4 Delivery Detail 的 quote／cost 兩格。
+//
+// ⚠️ 這是**買家被收取的運費**（uber_quotes.fee_amount，INV-U1 永不補收），
+//    不是「我方付給 Uber 的實際成本」——後者只出現在月結帳單（66 §4.5.5 ③），
+//    本 repo 今天沒有承載它的表。兩者不得混為一格。
+message UberDeliveryQuoteView {
+    string quote_id = 1;
+    string fee_amount = 2;              // 元整數字串（🔴 response 側無原生數值豁免）
+    string currency = 3;
+    // CREATED｜CHECKOUT_ACCEPTED｜EXPIRED｜CONSUMED｜SUPERSEDED（66 §5.1.4）
+    string status = 4;
+    string expires_at = 5;              // ISO 8601 UTC
+    string packing_policy_version = 6;  // 整數字串
+    string created_at = 7;              // ISO 8601 UTC
+}
+
+// 送達憑證（66 §5.1.7）。
+//
+// 🔴 **pincode_value 刻意不在本 message**：它是「持有即可領取包裹」的憑證
+//    （§10.3 的判準：憑證問「拿到它能做什麼」而不是「這是誰的個資」）。
+//    賣家與 Admin 都不需要它才能判斷 POD 是否存在，而一旦外露就無法收回。
+message UberPodArtifactView {
+    string artifact_type = 1;   // picture｜signature｜pincode（Uber 原生值照抄）
+    // 🔴 只給 objectKey，**不給 URL**：POD 走 secure/ 前綴（66 §5.1.7），
+    //    拿 media base URL 直接串出來就是陷阱 A6（收件地址與門口實景任何人可取）。
+    //    secure 資產的簽章取用路徑今天不在 Gateway，因此本欄的消費端要走既有機敏資產流程。
+    string object_key = 2;
+    string fetched_at = 3;      // ISO 8601 UTC；空＝尚未抓回
+    string fetch_attempts = 4;  // 整數字串
+    bool available = 5;         // fetched_at 非空且 object_key 非空
+}
+
+// 狀態歷程一筆（shipment_status_logs）。W6-4 的 timeline／callback／raw provider data 三格。
+//
+// 🔴 **Admin 專屬**：raw_payload 是 provider 原封不動的回呼內容，可能含收件人資訊。
+message UberDeliveryTimelineEntry {
+    string from_status = 1;      // ShippingStatus value；首筆可能為空
+    string to_status = 2;        // ShippingStatus value
+    string provider_status = 3;  // 當下的 provider 原生值
+    string provider_message = 4;
+    // 這一步是誰推動的：SYSTEM／ADMIN／SELLER／BUYER／PROVIDER。
+    // 🔴 callback（provider 回呼）與我方主動回查在這一格分得出來——W6-4 要求 callback 可查。
+    string actor_type = 5;
+    string trigger_source = 6;   // 觸發來源字串（webhook／排程／端點名）
+    string correlation_id = 7;
+    string raw_payload = 8;      // provider 原始 payload（JSON 字串）
+    string occurred_at = 9;      // ISO 8601 UTC
+}
+
+// ---- 賣家面：列表 ----
+
+message ListSellerUberDeliveriesRequest {
+    // 🔴 Gateway 的 sellerid resolver 由 JWT account_id 解析後注入（§4.1 例外 1）。
+    //    **服務端以本欄強制過濾歸屬**，呼叫端無法藉任何 query 參數指定別人的 store_id。
+    int64 store_id = 1;
+    string page = 2;                   // 整數字串，預設 "1"
+    string page_size = 3;              // 整數字串，預設 "20"，最大 "100"
+    string status = 4;                 // ShippingStatus value，可多值逗號分隔
+    string provider_status = 5;        // Uber 原生值 exact match
+    string order_no = 6;
+    string is_return = 7;              // "" / "true" / "false"
+    string outcome = 8;                // UberDeliveryOutcome exact match
+    string created_from = 9;           // ISO 8601 UTC
+    string created_to = 10;
+    string sort = 11;                  // updated_at_desc / updated_at_asc / created_at_desc / created_at_asc
+}
+
+message ListSellerUberDeliveriesResponse {
+    int32 code = 1;
+    string message = 2;
+    ListSellerUberDeliveriesData data = 3;
+}
+
+message ListSellerUberDeliveriesData {
+    repeated UberDeliverySummary records = 1;
+    string total = 2;                  // 整數字串
+    string page = 3;
+    string page_size = 4;
+}
+
+// ---- 賣家面：詳情 ----
+
+message GetSellerUberDeliveryRequest {
+    int64 store_id = 1;                // 同上：服務端強制，不接受呼叫端指定
+    // UberDeliverySummary.delivery_no（provider delivery id 或退回的 shipment_no）
+    string delivery_no = 2;
+}
+
+message GetSellerUberDeliveryResponse {
+    int32 code = 1;
+    string message = 2;
+    SellerUberDeliveryDetail data = 3;
+}
+
+message SellerUberDeliveryDetail {
+    UberDeliverySummary summary = 1;
+    // 🔴 **只有遮罩後的值**（66 §5.1.5／§8.6）：Uber 給的是可撥打的臨時號碼，
+    //    原值只在請求生命週期內透傳、不落庫不落 log ⇒ 這裡沒有明碼可回，也不得新增明碼欄位。
+    string courier_phone_masked = 2;
+    string courier_location_json = 3;   // 外送員位置快照（JSON 字串，來源 courier_update）
+    string related_deliveries_json = 4; // 正向 ↔ 逆向 leg 關聯（JSON 字串，66 N2）
+    UberDeliveryQuoteView quote = 5;
+    repeated UberPodArtifactView pod_artifacts = 6;
+    // 🔴 前端不得自行從 status 推導可做什麼。Gateway 依 viewer 過濾並補 href／method。
+    repeated ActionAvailability allowed_actions = 7;
+}
+
+// ---- Admin 面：列表 ----
+
+message ListUberDeliveriesForAdminRequest {
+    int64 account_id = 1;              // Gateway JWT 注入（Admin 身份）
+    string page = 2;
+    string page_size = 3;
+    string order_no = 4;               // W6-4 ①「order」
+    string shipment_no = 5;            // W6-4 ②「shipment」
+    string store_id = 6;               // W6-4 ③「seller」（store 代理鍵）
+    string delivery_id = 7;            // W6-4 ④「provider delivery id」
+    string status = 8;                 // W6-4 ⑤「normalized status」，可多值逗號分隔
+    string provider_status = 9;        // W6-4 ⑥「raw provider status」exact match
+    // W6-4 ⑦「failure」：outcome 非空 OR provider_error_code 非空。
+    // ⚠️ 判準**不是** provider_status 有值——那欄保存的是正常軌跡（同 V12 對 shipments 的修正）。
+    bool failure_only = 10;
+    // W6-4 ⑧「unknown」：建單結果未知（ShippingStatus.CREATE_UNKNOWN "991"）。
+    // 🔴 它**不是** failure 的子集：991 的語意是「可能已經建成功了」，處置是回查不是重建（66 陷阱 A8）。
+    bool unknown_only = 11;
+    string outcome = 12;               // UberDeliveryOutcome exact match
+    string created_from = 13;          // W6-4 ⑨「date」
+    string created_to = 14;
+    string sort = 15;
+}
+
+message ListUberDeliveriesForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    ListUberDeliveriesForAdminData data = 3;
+}
+
+message ListUberDeliveriesForAdminData {
+    repeated UberDeliverySummary records = 1;
+    string total = 2;
+    string page = 3;
+    string page_size = 4;
+}
+
+// ---- Admin 面：詳情 ----
+
+message GetUberDeliveryForAdminRequest {
+    int64 account_id = 1;
+    string delivery_no = 2;
+}
+
+message GetUberDeliveryForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    AdminUberDeliveryDetail data = 3;
+}
+
+message AdminUberDeliveryDetail {
+    UberDeliverySummary summary = 1;
+    string buyer_id = 2;                // 買家 buyer 代理鍵（不是 account_id）
+    string courier_phone_masked = 3;    // 🔴 同賣家面：只有遮罩值，沒有明碼欄位
+    string courier_location_json = 4;
+    string related_deliveries_json = 5;
+    UberDeliveryQuoteView quote = 6;
+    repeated UberPodArtifactView pod_artifacts = 7;
+    repeated ActionAvailability allowed_actions = 8;
+    // 🔴 Admin 專屬：含 provider 原始 payload。timeline 同時承擔 W6-4 的
+    //    timeline／create／callback／raw provider data 四格——它們是同一條軌跡的不同切面。
+    repeated UberDeliveryTimelineEntry timeline = 9;
+    // ⚠️ 收件人資訊刻意**不在本 message**：同一筆的寄收件資料已在
+    //    GetShipmentForAdmin（/admin/shipments/{shipment_id}）暴露一次，
+    //    重複一份等於把同一組 PII 的收斂點變成兩個。以 summary.shipment_id 交叉連結。
+}

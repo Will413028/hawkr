@@ -1,0 +1,1119 @@
+# Business Alert Rules
+# issue #1369：以下業務 metric 已由各服務 export（actuator /actuator/prometheus 或 sql_exporter），
+# 對應告警已啟用（皆 channel=business → dev-警報/prod-警報）：
+#
+# | Metric                                        | 來源                                   | 告警 |
+# |-----------------------------------------------|----------------------------------------|------|
+# | hawkr_orders_created_total               | order-service（Micrometer Counter）    | ZeroOrders |
+# | hawkr_payment_failed_total               | payment-service（Micrometer Counter）  | PaymentFailureSpike |
+# | hawkr_payment_total                      | payment-service（Micrometer Counter）  | PaymentFailureSpike |
+# | hawkr_payment_reconcile_outcome_total    | payment-service（reconcile 排程）      | PaymentReconcileConflict |
+# | hawkr_payment_rescue_manual_pending      | sql_exporter（payment DB）             | PaymentRescueManualPending |
+# | payment_outbox_backlog_rows                   | sql_exporter（payment DB）             | （趨勢用，門檻走 age 那支） |
+# | payment_outbox_oldest_backlog_age_seconds     | sql_exporter（payment DB）             | PaymentOutboxBacklogStuck |
+# | payment_outbox_dead_rows                      | sql_exporter（payment DB）             | PaymentOutboxDeadRows |
+# | hawkr_shipping_provider_status_unknown_total | shipping-service（Micrometer Counter） | ShippingProviderStatusUnknown |
+# | hawkr_shipping_provider_not_status_event_total | shipping-service（正常流量，趨勢用） | （刻意無告警） |
+# | vendor_portal_invite_email_total              | notification-service（promauto Counter）| VendorPortalInviteEmailPermanentFailureRatioHigh |
+# | vendor_portal_invite_exchange_total            | gateway（promauto Counter）             | 無自動告警，result=rejected 供人工排查猜測 token 的訊號 |
+#
+# 尚未 export（未來需求，暫不告警）：hawkr_payuni_errors_total / hawkr_cart_created_total /
+# hawkr_checkout_completed_total / hawkr_inventory_lock_total / hawkr_inventory_lock_failed_total。
+
+groups:
+  # ── ATM 退款終態卡單（issue #1353）─────────────────────────────
+  # 撥款前 ATM 退款走完第一階段後，終態收斂 100% 依賴 PayUni §6.7 退款轉匯結果 webhook；
+  # PayUni 對 ATM 退款無任何查詢 API（見設計書 05 §5.5.4.2），webhook 若遺失則 refund_task
+  # 永久停在 AWAITING_WEBHOOK(15)。§22：偵測歸 observability（metric 由 sql_exporter 產出），
+  # 回復歸維運（runbook：查 PayUni 後台 → 請 PayUni 重送 §6.7）。
+  # 門檻 5 天 > prod §6.7 正常 2-3 工作天，避免正常延遲誤報。channel=business → dev-警報/prod-警報。
+  - name: atm-refund-alerts
+    interval: 300s
+    rules:
+      - alert: AtmRefundStuckAwaitingWebhook
+        expr: hawkr_atm_refund_stuck_total > 0
+        for: 1h
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "有 {{ $value }} 筆 ATM 退款卡在 AWAITING_WEBHOOK 超過 5 天（§6.7 疑遺失）"
+          description: "env={{ $labels.env }}：refund_task 停在 AWAITING_WEBHOOK(15) 逾門檻，PayUni 退款轉匯結果 webhook(§6.7) 疑未送達。處置見 runbook：docs/基礎建設/ATM 退款結果 Webhook 遺失維運處置.md"
+
+  # ── 假日資料覆蓋度（issue #898）─────────────────────────────────
+  # shipping-service HolidayService 依賴 holidays 表（admin 人工從政府 CSV 匯入）。下年度資料未上傳時
+  # generate_home_label 的 shipDate/deliveryDate 驗證會 fail、宅配出貨卡死。metric 由 sql_exporter 查
+  # holidays 表產出：hawkr_holiday_coverage_days = MAX(holiday_date) - CURRENT_DATE（尚有幾天覆蓋）。
+  # §22：偵測歸 observability，補資料本身走 admin import（維運）。channel=business → dev-警報/prod-警報。
+  # 門檻對應 #898 T-60/30/7 倒推：覆蓋剩 <60/<7 天分兩級（tier + repeat 近似其推播節奏）。
+  - name: holiday-coverage-alerts
+    interval: 300s
+    rules:
+      - alert: HolidayDataCoverageLow
+        # 與 Critical(<7) 互斥，避免覆蓋 <7 天時同頻道重複推播
+        expr: hawkr_holiday_coverage_days < 60 and hawkr_holiday_coverage_days >= 7
+        for: 6h
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "假日資料覆蓋僅剩 {{ $value }} 天，下年度資料恐未上傳"
+          description: "env={{ $labels.env }}：holidays 表最大覆蓋日距今 {{ $value }} 天（<60）。請 admin 從政府 CSV 匯入下年度假日（POST /api/v1/admin/holidays/import），否則跨年後宅配 generate_home_label 驗證會 fail。"
+      - alert: HolidayDataCoverageCritical
+        expr: hawkr_holiday_coverage_days < 7
+        for: 1h
+        labels:
+          severity: critical
+          channel: business
+        annotations:
+          summary: "假日資料覆蓋僅剩 {{ $value }} 天（緊急），下年度資料尚未上傳"
+          description: "env={{ $labels.env }}：holidays 覆蓋 <7 天，逼近耗盡。下年度假日未匯入將導致宅配出貨整條卡死，請立即匯入。"
+
+  # ── 訂單歸零（issue #1369）─────────────────────────────────────
+  # order-service 建單成功收斂點 export hawkr_orders_created_total（Micrometer Counter
+  # hawkr_orders_created，Prometheus 自動補 _total）。30 分鐘無任何建單 → 業務鏈路疑異常
+  # （結帳/庫存/建單卡死）。metric 於首筆訂單後才存在 → 服務剛啟動、真的零訂單時不誤報。
+  # channel=business → dev-警報/prod-警報；env label 由 scrape target relabel 提供。
+  - name: order-alerts
+    interval: 60s
+    rules:
+      - alert: ZeroOrders
+        expr: sum(increase(hawkr_orders_created_total[30m])) == 0
+        for: 30m
+        labels:
+          severity: critical
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：過去 30 分鐘無任何訂單建立"
+          description: "env={{ $labels.env }}：hawkr_orders_created_total 30 分鐘增量為 0，結帳/庫存/建單鏈路疑異常，請查 order-service 與上游。"
+
+  # ── 付款失敗率飆高（issue #1369）───────────────────────────────
+  # payment-service 於 outbox 收斂點 export hawkr_payment_failed_total /
+  # hawkr_payment_total（僅計 payment.success + payment.failed 終態）。失敗佔比 >10% 持續
+  # 5 分鐘即告警。channel=business → dev-警報/prod-警報。
+  - name: payment-alerts
+    interval: 60s
+    rules:
+      - alert: PaymentFailureSpike
+        expr: |
+          (
+            sum(rate(hawkr_payment_failed_total[10m]))
+            /
+            sum(rate(hawkr_payment_total[10m]))
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：付款失敗率過高（>10%）"
+          description: "env={{ $labels.env }}：近 10 分鐘 payment.failed / (success+failed) > 0.1，金流疑異常（PayUni 通道/卡別/服務），請查 payment-service。"
+
+  # ── 金流成功但本地未收斂（issue #1369）─────────────────────────
+  # payment-service reconcile 排程 export hawkr_payment_reconcile_outcome_total{outcome=...}。
+  # RESCUE_MANUAL_REQUIRED（ATM rescue 需人工）/ RESCUE_FAILED（rescue 退款失敗）表「PayUni 已扣款
+  # 但本地 EXPIRED，自動補救未完成」，需人工救援。時間窗內出現任一即告警。channel=business。
+  - name: payment-reconcile-alerts
+    interval: 300s
+    rules:
+      - alert: PaymentReconcileConflict
+        expr: sum(increase(hawkr_payment_reconcile_outcome_total{outcome=~"RESCUE_MANUAL_REQUIRED|RESCUE_FAILED"}[15m])) > 0
+        for: 5m
+        labels:
+          severity: critical
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：偵測到金流成功但本地未收斂的 reconcile 衝突"
+          description: "env={{ $labels.env }}：近 15 分鐘 reconcile 出現 RESCUE_MANUAL_REQUIRED / RESCUE_FAILED，PayUni 已成功但本地曾 EXPIRED、自動退款需人工或失敗，請查 payment_transactions.rescue_action 與 rescue 退款狀態。"
+
+  # ── ATM rescue 待人工退款積壓（issue #1369，取代原孤兒事件 payment.rescue.requires_manual）─
+  # sql_exporter 查 payment_transactions.rescue_action='8902'（REFUND_PENDING_MANUAL）且尚無成功退款
+  # 的筆數 → hawkr_payment_rescue_manual_pending。>0 表有 ATM rescue 待人工頁面版完成退款。
+  # channel=business → dev-警報/prod-警報。
+  - name: payment-rescue-alerts
+    interval: 300s
+    rules:
+      - alert: PaymentRescueManualPending
+        expr: hawkr_payment_rescue_manual_pending > 0
+        for: 1h
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：有 {{ $value }} 筆 ATM rescue 退款待人工完成"
+          description: "env={{ $labels.env }}：payment_transactions.rescue_action='8902'（REFUND_PENDING_MANUAL）且無成功退款者 {{ $value }} 筆。ATM rescue 退款需人工於 PayUni 頁面版填銀行資訊完成，請儘速處理。"
+
+  # ── 撥款資格閘門（backend#3262）─────────────────────────────────────
+  # order-service GrantPaymentWorker 在撥款前反查 aftersales「這張訂單還會不會再生出退款」，
+  # 被擋住時發 hawkr_grant_payout_held_total{reason=...}（每次推遲 +1）。
+  #
+  # ⚠️ 本組告警的邊界（誠實標明，別把它當成「撥款一定不會卡住」的保證）：
+  #   - counter 分不出「1 筆訂單被 hold 很久」與「很多筆各被 hold 一次」——兩者都值得看，
+  #     但要判斷是哪一種必須查 grant_payment_tasks（status='0' 且 next_retry_time 在未來、
+  #     last_error LIKE 'payout hold%'）。
+  #   - reason=APPEAL_WINDOW_OPEN 是**正常且預期**的（有時間界，最長 72h+grace 後自動放行），
+  #     刻意不告警——對它告警等於對正確行為告警。
+  #   - reason=APPEAL_IN_FLIGHT 相反：它應該**幾乎不出現**（見下方 GrantPayoutBlockedByInFlightAppeal）。
+  #   - 這裡看得到的是「有沒有在 hold」，看不到「hold 是不是正確的」。後者由單元測試守。
+  - name: payout-hold-alerts
+    interval: 300s
+    rules:
+      # aftersales 反查失敗 ⇒ fail-closed 擋住所有撥款。這是依賴故障，不是業務等待。
+      - alert: GrantPayoutHoldLookupFailing
+        expr: sum by (env) (increase(hawkr_grant_payout_held_total{reason="LOOKUP_FAILED"}[15m])) > 0
+        for: 10m
+        labels:
+          severity: critical
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：撥款資格反查持續失敗，撥款全面停擺"
+          description: "env={{ $labels.env }}：近 15 分鐘 GrantPaymentWorker 有 {{ $value }} 次因 aftersales GetOrderPayoutHold 反查失敗而 fail-closed 推遲撥款。這不是業務等待而是依賴故障——撥款會一直延後直到 aftersales 恢復。請查 aftersales-service 健康與 order→aftersales(9923) 連通性。"
+
+      # 申訴審理中／退款處理中的無時間界 hold 長期不散 ⇒ 多半是某張 case 卡在等 Admin 裁決。
+      # 以 recheck 間隔 600s 推算：一筆訂單被 hold 滿 6 小時約產生 36 次。門檻取 60 次，
+      # 避開「幾筆訂單各 hold 一兩輪」的正常波動。
+      - alert: GrantPayoutHeldIndefinitely
+        expr: sum by (env) (increase(hawkr_grant_payout_held_total{reason="ACTIVE_CASE"}[6h])) > 60
+        for: 30m
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：有撥款被無時間界 hold 長時間未解除"
+          description: "env={{ $labels.env }}：近 6 小時有 {{ $value }} 次撥款因售後案件未終結（申訴審理中 / 退款處理中）而推遲。無時間界的 hold 只有 Admin 裁決或退款完成才會解除。請查 aftersale_cases 是否有 appeal_state='10' 長期未裁決者；SQL：SELECT case_no, order_no, status, appeal_state, appeal_submitted_at FROM aftersale_cases WHERE appeal_state = '10' ORDER BY appeal_submitted_at。"
+
+      # backend#3262 P0 修復（2026-09-09）新增的 reason：撥款窗看似已過，但該 case 正被別的交易
+      # 持鎖（可能是一筆已通過 A3、尚未 commit 的申訴），或持鎖重讀發現快照已過期 ⇒ fail-closed。
+      #
+      # ⚠️ 這一條與上面兩條的性質不同：偶發 1~2 次是**修復正在正確運作**（真的攔到了競態），
+      # 但它代表的窗口只有「一個交易的執行時間」，正常應是秒級 ⇒ **持續出現＝有東西卡著**：
+      # 多半是 submitAppeal 的交易掛在 media gRPC / DB 上把 case row lock 抓著不放
+      # （aftersales MediaGrpcClient.MEDIA_DEADLINE_SEC=20 是該鎖持有時間的主要上界），
+      # 或有別的長交易在寫同一張 case。門檻取「近 1 小時 > 12 次」（recheck 600s ⇒ 約等於
+      # 兩筆訂單各被連續 hold 一小時），低於上面兩條是因為它本來就該罕見。
+      - alert: GrantPayoutBlockedByInFlightAppeal
+        expr: sum by (env) (increase(hawkr_grant_payout_held_total{reason="APPEAL_IN_FLIGHT"}[1h])) > 12
+        for: 15m
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：撥款被『在途申訴』持續擋住，可能有交易抓著 case row lock 不放"
+          description: "env={{ $labels.env }}：近 1 小時有 {{ $value }} 次撥款因偵測到在途申訴（case row 被持鎖或持鎖重讀發現快照過期）而 fail-closed 推遲。偶發表示 backend#3262 的競態防護正常運作；持續出現代表有交易長時間持有 aftersale_cases 的 row lock。請查 aftersales-service 的 pg_stat_activity（state='idle in transaction' 或長時間 active 的 UPDATE/SELECT FOR UPDATE on aftersale_cases），以及 media-service 是否可達（submitAppeal 的 finalizeImages/linkImages 走在該鎖之內）。"
+
+  # ── payment outbox_events 積壓／DEAD 偵測（36 §3.3.1 Outbox persisted exchange，WP1）──
+  # sql_exporter（payment job / payment_outbox collector）export
+  # payment_outbox_backlog_rows{status} / payment_outbox_oldest_backlog_age_seconds /
+  # payment_outbox_dead_rows{exchange}。在此之前這張表**零指標零告警**，而它的 DEAD
+  # 是無人推走的終態（markDeadGuarded 把 next_retry_at 設 NULL、候選述詞不含 8224）。
+  #
+  # 🔴 門檻推導（不是抄來的數字）：afterCommit 即時投遞是秒級；排程兜底 fixedDelay=5s；
+  #    退避序列 5*3^(n-1) 秒 = 5/15/45/135/405，max-retries=5 ⇒ **最長正常重試鏈 605 秒
+  #    （約 10.1 分鐘）**，之後該列轉 DEAD 而離開 backlog 述詞。
+  #    ⇒ backlog 仍在且最舊超過 900 秒 = 已超過最長正常重試鏈 + 緩衝，必定異常。
+  #    （對照：buyer_deleted／seller_deleted 用 3600 秒，因為它們的重試 backoff worst-case 是 30-55 分鐘。
+  #      直接照抄 3600 會讓本表的告警比實際失效晚一個數量級。）
+  #
+  # ⚠️ 與 *OutboxTerminalFailure 那兩組的**語意差異**，不要照抄它們的 expr：
+  #    那兩組的 outbox_failed_total 是應用層 Counter（累計達終態次數）⇒ 用
+  #    increase(...[1h]) > 0，一小時後自然 resolve。
+  #    本組的 payment_outbox_dead_rows 是 sql_exporter 查 DB 得到的 **gauge**（目前有幾列
+  #    卡在 DEAD）⇒ 必須用 > 0。它在有人處理掉那幾列之前會持續 firing，那是**刻意的**：
+  #    DEAD 列代表事件永久遺失且沒有任何程式路徑會再碰它，處置（補發或註記後清除）
+  #    完成前它就該一直叫。
+  - name: payment-outbox-alerts
+    interval: 60s
+    rules:
+      - alert: PaymentOutboxBacklogStuck
+        expr: payment_outbox_oldest_backlog_age_seconds > 900
+        for: 5m
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：payment outbox_events 最舊待派送已卡住超過 15 分鐘"
+          description: "env={{ $labels.env }}：payment_outbox_oldest_backlog_age_seconds 超過 900 秒，已超過最長正常重試鏈（5+15+45+135+405＝605 秒）加緩衝，該筆 outbox_events row 疑似卡住。請查 payment-service（可能原因包含 OutboxEventPublisherScheduler 未運行、DB 不可用、RabbitMQ 不可用、或該列的 exchange 無效而反覆 fail-closed）。查法：SELECT id, exchange, routing_key, status, retry_count, last_error FROM outbox_events WHERE status IN ('8221','8223') ORDER BY created_at LIMIT 20;"
+
+      - alert: PaymentOutboxDeadRows
+        expr: payment_outbox_dead_rows > 0
+        for: 0m
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：payment outbox_events 出現 DEAD 列（exchange={{ $labels.exchange }}）"
+          description: "env={{ $labels.env }}：payment_outbox_dead_rows{exchange=\"{{ $labels.exchange }}\"} 大於 0，代表某筆事件已耗盡重試次數進入 DEAD（8224）。DEAD 是無人推走的終態——候選述詞 status IN ('8221','8223') 不含它，不會有任何程式路徑再碰它，**該事件等於永久遺失**。請查 last_error 判斷原因（常見：exchange 無效被 fail-closed 擋下、routing key 無 binding 而 unroutable）。處置完成（補發或註記後清除該列）前本告警會持續 firing，這是刻意的。查法：SELECT id, exchange, routing_key, retry_count, last_error, created_at FROM outbox_events WHERE status = '8224' ORDER BY created_at;"
+
+  # ── seller_deleted_outbox 積壓／卡住偵測（pkg/outbox 遷移新增）───────
+  # seller-service export outbox_pending_rows / outbox_oldest_pending_age_seconds /
+  # outbox_failed_total，皆帶 outbox_name="seller_deleted" label。
+  - name: seller-deleted-outbox-alerts
+    interval: 60s
+    rules:
+      - alert: SellerDeletedOutboxStuck
+        expr: outbox_oldest_pending_age_seconds{outbox_name="seller_deleted"} > 3600
+        for: 5m
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：seller_deleted_outbox 最舊 pending 已卡住超過 1 小時"
+          description: "env={{ $labels.env }}：outbox_oldest_pending_age_seconds{outbox_name=\"seller_deleted\"} 超過 3600 秒，該筆 seller_deleted_outbox row（seller.deleted/onboarded/suspended/unsuspended 之一）疑似卡住，請查 seller-service（可能原因包含 worker 未啟動、DB 不可用、RabbitMQ 不可用、單體（legacy 的 AccountService）RemoveRole 逾時、或該列本身重試異常）。"
+
+      - alert: SellerDeletedOutboxTerminalFailure
+        expr: increase(outbox_failed_total{outbox_name="seller_deleted"}[1h]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：seller_deleted_outbox 出現終態失敗"
+          description: "env={{ $labels.env }}：outbox_failed_total{outbox_name=\"seller_deleted\"} 過去 1 小時有增量，代表某筆賣家 lifecycle 事件（publish 或 RemoveSellerRole）已耗盡重試次數，需人工檢查該 seller_deleted_outbox row 的 last_error。"
+
+  # ── 電子發票（58 號設計書 §8.2.4 ①–⑯ ＋ ⑳㉑㉒、§9.3.3 ⑰⑱⑲）──────────────
+  # 本 group 共 34 條（2026-09-05 實數；本行原本寫 24，那是條目長大之後沒有回灌的舊值）。
+  # metric 來源三類：invoice-service 自己 promauto、pkg/outbox.NewMetrics（M11）與 pkg/mq（M12）、
+  # sql_exporter 的 invoice job（M6/M7/M8/M17 等）。
+  # ⚠️ **promauto 那一類的指標放在它唯一的觀測點所在的 package**（AMEGO 往返的 M2/M3/M4/M14 在
+  #    internal/client/amego、M13/M15/M16 在 internal/usecase、M1/M5/M22/M25/M26 在 internal/worker）。
+  #    2026-09-05 實測：M3/M4/M14 曾放在 internal/worker 而觀測點在 client 那一側，結果是
+  #    **有註冊、零觀測** —— /metrics 上看得到三行值為 0 的序列，而 ①②⑧ 三條告警永不觸發。
+  # ⚠️ sql_exporter 的 invoice job 漏建 ⇒ ③③④⑥⑨ 五條的 PromQL 回 no data ⇒ 永不觸發，
+  #    而 no data 與「一切正常」在 `> 0` 的表達式上完全一樣（驗收判準是「series 存在」不是「值為 0」）。
+  # 🔴 上面兩種失效（沒有生產者／有生產者但零觀測）現在由 CI 的
+  #    `scripts/check-invoice-metric-producers.py` 兩層檢查守住（static-gates）。
+  #    新增告警時**不必**手動維護任何清單：它從本檔的 expr 反查生產者。
+  # ⚠️ 聚合一律 sum by (env) / max by (env)，禁裸 sum/max：同一台 Prometheus 同時抓 dev 與 prod，
+  #    丟掉 env 會把兩環境加成一個數字，且 annotation 的 {{ $labels.env }} 渲染成空字串。
+  #    本檔既有告警多為裸 sum（pre-existing 形態），本 group 刻意不複製它。
+  # ⚠️ 比率型告警的分母一律 clamp_min(..., 1e-9)：0/0 回 NaN、NaN > 0.1 為 false
+  #    ⇒ 零流量時完全不響，與一切正常長得一樣。
+  - name: invoice-alerts
+    interval: 300s
+    rules:
+      # ① AMEGO 觸頂。只看 source="amego"（收到 code 21）；local 是我方 limiter 的正常行為，
+      #    混在一起會讓這條在尖峰長期紅著而被忽略。AMEGO 未公開 QPS 上限、回應無 Retry-After
+      #    ⇒ code 21 是我方唯一能觀測到的觸頂訊號。
+      - alert: InvoiceAmegoRateLimited
+        expr: increase(invoice_amego_rate_limited_total{source="amego"}[10m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：AMEGO 回了 code 21（已觸對方速率上限）"
+          description: "env={{ $labels.env }}：invoice_amego_rate_limited_total{source=\"amego\"} 近 10 分鐘有增量，代表我方自訂上限訂得比對方真實上限高。處置：比對 invoice_amego_client_rate_limit_qps（M5）與實際 rate(invoice_amego_response_code_total[1m])，調降 AMEGO_CLIENT_RATE_LIMIT_QPS 到觸發時實測 QPS 的一半（走 PR 改 values，不要 SSH 改 configmap），並向光貿書面確認上限。我方與其他串接者共用對方配額，無限重試會連累同 IP 的其他請求。"
+
+      # ② 逼近上限＝用量／上限，兩個 series 缺一算不出來（《硬上限依賴接入治理規範》三件套）。
+      #    這是容量問題不是故障。⚠️ limiter 是行程內的 ⇒ AMEGO_CLIENT_RATE_LIMIT_QPS 是每副本上限；
+      #    replicas 調成 N 時本式的 max by (env) 必須改成 sum by (env)（58 號 §4.3.3 擴容前置清單第 4 條）。
+      - alert: InvoiceAmegoRateNearLimit
+        expr: |
+          sum by (env) (rate(invoice_amego_response_code_total[1m]))
+          / clamp_min(max by (env) (invoice_amego_client_rate_limit_qps), 1e-9)
+          > 0.8
+        for: 15m
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：AMEGO 呼叫速率已達自訂上限的 {{ $value | humanizePercentage }}"
+          description: "env={{ $labels.env }}：用量／上限 > 0.8。先看 invoice_pending_operations 是否同時上升（積壓被限速壓住），再決定調高上限（需先向光貿確認）或分散批次。不得以「調大額度」當唯一修法。"
+
+      # ③ 之下是兩條（逼近／已逾期），刻意分開：門檻與處置完全不同。
+      #    本組唯一與罰款直接相關——逾期是行為罰 2%／2.5%／3%（一年內第 1／2／3 次），
+      #    上限 100 萬，罰的是賣家。門檻取「還剩不到 6 小時」而不是「已逾期」：逾期之後才響就只剩通報功能。
+      - alert: InvoiceStatutoryDeadlineApproaching
+        expr: invoice_statutory_deadline_pending{bucket=~"lt6h|lt2h"} > 0
+        for: 30m
+        labels:
+          severity: critical
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：有 {{ $value }} 張發票距法定上傳期限不到 6 小時（bucket={{ $labels.bucket }}）"
+          description: "env={{ $labels.env }}：法定上傳時限 B2C 開立日次日起 2 日、B2B 7 日，末日不因假日延長。處置見 58 號 §12.5 R4：先看 invoice_amego_request_duration_seconds（M2）與 invoice_amego_response_code_total（M3）判定是我方卡住還是光貿卡住；若是字軌不足（3040111）則重試無效，必須走 ADM 通知賣家到財政部平台配號。剩餘 < 2 小時一律立即人工介入（端點 52 逐筆）。"
+
+      - alert: InvoiceStatutoryDeadlineOverdue
+        expr: invoice_statutory_deadline_pending{bucket="overdue"} > 0
+        for: 5m
+        labels:
+          severity: critical
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：有 {{ $value }} 張發票已逾法定上傳期限"
+          description: "env={{ $labels.env }}：已經逾期，不會自己好——補開仍屬違章。處置：① 立即把票開出來（少開一天少一天）② 保留完整 invoice_provider_audit_logs 作為佐證（唯一可舉證的來源，保存 5 年）③ 主動通知該賣家——罰的是他，他有權知道。🔴 2026-09-08 起這條的角色變了：INV.dl 每 5 分鐘會把逾期的 PENDING／ISSUE_FAILED 自動標成 AWAITING_MANUAL ＋ DEADLINE_MISSED（Issuance.SweepOverdueStatutoryDeadlines），而本規則是 for: 5m ⇒ **正常情況下它來不及 firing 就被清空了**，訊號由 invoice_awaiting_manual_pending 的 M32（for: 15m，同樣 critical）接手，代價是通知延遲從 5 分鐘變成最多約 20 分鐘。⚠️ **所以它響了代表自動分類沒作用**，那才是現在要看的東西：① status=ISSUING 的逾期件（掃描刻意不碰，等 AMEGO 回應）② INV.dl 掛了或 DI 沒接上 sweeper ③ MarkAwaitingManual 一直失敗。先 kubectl logs 查 invoice.deadline.statutory_sweep 的 log 與 invoice_worker_tick_total{worker=\"deadline\"}，再談逐筆處置。排空路徑：開出來（好結果）／掃描自動推走／ADM 端點 52／53 手動推。"
+
+      # ④ 守「MQ 這一整條鏈沒接上」。passive declare 下查不到 queue 是靜默跳過，不會產生任何錯誤 log。
+      #    排除 lt15m 桶：剛付款還沒被 handler 處理是正常的。
+      - alert: InvoicePaidOrdersWithoutOperation
+        expr: sum by (env) (invoice_paid_orders_without_operation{age_bucket!="lt15m"}) > 0
+        for: 30m
+        labels:
+          severity: critical
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：有 {{ $value }} 筆已付款訂單收過 order.paid 卻沒有發票文件"
+          description: "env={{ $labels.env }}：處置見 58 號 §12.5 R6，照順序每一步都能單獨定案：① rabbitmqctl list_queues 確認 invoice.order.paid 的 consumers >= 1 ② list_bindings 確認 binding key 是 order.paid（不是 order.paid.v1）③ kubectl logs 查有無 'skipping queue'（唯一的線索）④ 看 mq_consume_total{queue=~\"invoice\\\\..*\"} 有沒有進來 ⑤ 收到了但沒產生文件 ⇒ 查 invoice_inbox_events 的 disposition／disposition_reason。補救已漏掉的那些不寫 backfill CLI。"
+
+      # ⑤ 開票失敗率。分子分母都用 rate 避免剛啟動時分母為 0；分母另包 clamp_min（0/0 回 NaN、
+      #    NaN > 0.1 為 false ⇒ 零流量時靜默不響）。
+      #    ⚠️ selector 必須逐字照抄 M1 的值域：沒有 unknown（是 unknown_terminal），
+      #       漏 retry_exhausted 則對兩個主要失敗類別永遠 match 不到，且不會有任何錯誤。
+      - alert: InvoiceIssueFailureRateHigh
+        expr: |
+          sum by (env) (rate(invoice_issue_total{result=~"permanent_failed|retry_exhausted|unknown_terminal"}[10m]))
+          / clamp_min(sum by (env) (rate(invoice_issue_total[10m])), 1e-9)
+          > 0.1
+        for: 15m
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：開票終態失敗率 {{ $value | humanizePercentage }}（> 10%）"
+          description: "env={{ $labels.env }}：處置見 58 號 §12.5 R1／R3——看 invoice_amego_response_code_total 的 code 分佈：3040111（字軌不足 ⇒ 重試無效，通知賣家配號）與 3040174／3040177（稅額計算錯誤 ⇒ 我方 bug，停止重試、開 issue）是兩種完全不同的處置。全面故障時不要手動重試整批：逐筆重試只會把 attempt_count 燒到上限，讓本來會自己成功的那些永久失敗。"
+
+      # ⑥ 待開票積壓。門檻取 gt6h 而非 gt1h：INV.op 的完整退避序列（MaxAttempts=13、封頂 30 min）
+      #    覆蓋 ≈4.02 小時，gt6h 才能確保「本來會自己成功」的列已走完全程才亮燈。
+      #    ⚠️ 這兩個數字綁在一起：調大 INVOICE_ISSUE_MAX_RETRY 或 INVOICE_BACKOFF_MAX_SECONDS
+      #       而不動門檻，這條就開始誤報。
+      - alert: InvoicePendingBacklog
+        expr: invoice_pending_operations{age_bucket="gt6h"} > 0
+        for: 1h
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：有 {{ $value }} 筆開票工作積壓超過 6 小時"
+          description: "env={{ $labels.env }}：先判「卡住」還是「來不及」（處置相反，見 58 號 §12.5 R3）。卡住＝invoice_amego_request_duration_seconds_count 完全不增加（最常見成因是 Scheduler.Start 傳錯 ctx：服務健康、/metrics 正常、一張發票都不會開、log 也沒有錯誤）⇒ rollout restart，重啟後仍不增加就是 code bug。來不及＝rate(M3)/max(M5) 佔比高 ⇒ 容量問題。租約被長期持有且持有者已死 ⇒ 什麼都不用做（120 秒到期自動回到候選集合）；禁止手動把 SENDING 改回 READY，那個副本可能還在打 AMEGO，改了就是重複開票。⚠️ **第三種成因與上面兩種的處置完全不同**：桶裡也含 `CANCEL_BLOCKED_UNKNOWN` 與 `CANCELLED_BY_ADMIN`（2026-09-04 補後者），這兩個狀態**沒有自動執行者也不該有**——它們在等兩位管理員。前者的唯一出邊是 ADM 端點 54 發起解鎖（要附取消證據）＋ 端點 55 由另一位覆核（J28→J29 同一交易）；後者是解鎖已發起、等第二個人。先用 `SELECT status FROM invoice_operations WHERE id=...` 分流：是這兩個狀態就去 ADM 做人，**不要查 AMEGO、不要 rollout restart**。"
+
+      # ⑦ 字軌本期快用完。expr 只用 M10（家數）不用 M9（最小值）：
+      #    「剛配到號段但本期尚未取用」的新賣家會把最小值拉低 ⇒ 告警長期紅著 ⇒ 被忽略。
+      - alert: InvoiceTrackBalanceLow
+        expr: invoice_track_low_sellers > 0
+        for: 1h
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：有 {{ $value }} 家賣家的字軌餘量低於警戒門檻"
+          description: "env={{ $labels.env }}：字軌不足重試多久都不會好（AMEGO 回 3040111），且失敗高峰落在期初。處置：ADM 工作台查名單（刻意不在 metric label 裡——store_id 是無界基數）→ 通知賣家到財政部平台配號並匯入光貿。這是賣家的法定前置作業，平台無法代辦。"
+
+      # ⑧ §8.2.1「defer 例外必吞」設計的唯一可見形式：沒有 M14，「例外必吞」就等於「例外消失」。
+      - alert: InvoiceAuditWriteFailing
+        expr: increase(invoice_audit_write_failed_total[15m]) > 0
+        for: 15m
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：provider 稽核寫入失敗 {{ $value }} 次"
+          description: "env={{ $labels.env }}：呼叫本身照常進行（刻意的：稽核寫入失敗永遠不可以讓一次開票失敗），但那些呼叫沒有留下可舉證的紀錄 ⇒ 若其中有爭議案件，我方無法證明送出了什麼。查 DB 可用性與 invoice_provider_audit_logs 的寫入權限。"
+
+      # ⑨ 保留期清理是維運 SQL、沒有任何程式會自動執行它 ⇒ 這條就是「有沒有人記得跑」的唯一機械檢查。
+      #    ⚠️ 閾值 1826 必須與 INVOICE_AUDIT_RETENTION_DAYS 同值；改了 env 沒改這裡＝保留期變成兩個數字。
+      - alert: InvoiceRetentionOverdue
+        expr: invoice_audit_oldest_row_age_days > 1826
+        for: 6h
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：最舊發票稽核列已 {{ $value }} 天，逾保留期 1826 天"
+          description: "env={{ $labels.env }}：invoice_provider_audit_logs 最舊列年齡超過 INVOICE_AUDIT_RETENTION_DAYS（1826）。清理是維運 SQL，沒有任何程式會自動執行它。清理前先確認 58 號 §8.1.7 的未決項已由會計師確認起算點。"
+
+      # ⑮ inbox 裡沒有任何執行者會處理的列（58 §7.2.5 與 §14 C-1 早就載明、但一直沒有實作
+      #    的那條告警）。它同時是 §7.2.2（作廢／折讓 usecase）落地與否的**執行期訊號**：
+      #    在它落地之前，ORDER_REFUND_FINALIZED 的 DEFERRED／FAILED 列沒有自動執行者，
+      #    會在這裡逐日累積並指名 event_type。
+      #    ⚠️ 寫 backfill CLI／reconciliation job 來清它是明令禁止的（CLAUDE.md §22）：
+      #       歷史積壓走一次性維運 SQL（把它們標成 SKIPPED ＋ disposition），
+      #       新增的則靠把 §7.2.2 做完來排空。
+      # 折讓／作廢卡住（#3073）。
+      #
+      # 🔴 這條在 #3073 之前不需要存在：invoice_adjustments 全表零列。折讓執行軸落地
+      #    之後它開始有列，而 ADM 對 invoice_adjustments **零可見性**
+      #    ⇒ 一筆折讓卡住是完全無聲的：錢退了、憑證沒開、沒有人會知道。
+      #
+      # 判準 B「什麼會讓它變回 resolved」：人到 AMEGO 後台對帳之後把該列標掉
+      # ⇒ 需要人工介入，但**不是永久紅候選**（正常情況下這個數字是 0）。
+      #
+      # for: 1h 而非 6h：折讓是法定憑證且對應真實退款，買家的錢已經退了而稅務憑證沒開。
+      # 但也不是 30m —— FAILED_PERMANENT 的處置一定需要人判斷，太吵會讓人關掉它。
+      - alert: InvoiceAdjustmentStuck
+        expr: sum by (env, adjustment_type, status) (invoice_adjustment_stuck_rows) > 0
+        for: 1h
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：{{ $value }} 筆 {{ $labels.adjustment_type }} 調整卡在 {{ $labels.status }}"
+          description: "env={{ $labels.env }}：這些列**沒有自動執行者**。依 status 分流：① FAILED_PERMANENT ⇒ AMEGO 明確拒絕（最常見是 ALLOWANCE_EXCEEDS_INVOICE：累計折讓會超過發票金額，因為上游每開一張新售後單都拿 orders.total_actual_amount 當可退上限、不扣既退），讀 blocked_reason_code 與 invoice_status_history，人工判定該筆退款對應哪張發票 ② FAILED_UNKNOWN ⇒ 送出去了但 allowance_query 查不到結果，**不得重送**（我方自產的折讓單號已經送出，重送會在 AMEGO 端出現第二張同號憑證），到 AMEGO 後台以 allowance_number 對帳 ③ PENDING 超過 24h ⇒ operation 沒被建出來或 INV.op 沒在動，查 invoice_operations 有沒有對應的 allowance:{adjustment_id} 列。🔴 禁止寫 reconciliation job／backfill CLI 清它（CLAUDE.md §22）。"
+
+      - alert: InvoiceCorrectionReissueFailed
+        expr: sum by (env, status) (invoice_correction_stuck_rows) > 0
+        for: 15m
+        labels:
+          severity: critical
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：{{ $value }} 筆付款後修改請求卡在 REISSUE_FAILED"
+          description: "env={{ $labels.env }}：**買家原本持有的合法發票已經作廢、新發票不存在，而那是平台的操作造成的**——58 §7.3.6 稱它為最嚴重的單一狀態，SLA 15 分鐘。處置：① 查 invoice_correction_requests 該列的 document_id，找它的替代票（invoice_documents.original_document_id = 該 document_id）與對應 operation ② 替代票的 operation 若在 FAILED_*，走 ADM 端點 52「安全重試」——那會在同一事務內把 correction 推回 VOID_REISSUE_IN_PROGRESS（R09），重開成功後自動落 COMPLETED ③ 替代票**已經 ISSUED** 而 correction 仍是 REISSUE_FAILED ⇒ 那是收尾漏了，走一次性維運 SQL 補 status／reissued_document_id／completed_at，**同一交易補一列 invoice_status_history**（裸 UPDATE 不留痕會讓下一個人看到假的軌跡）④ 無論哪一支，買家都要收到人話通知，不得沿用「處理中」通用文案。🔴 禁止寫 reconciliation job／backfill CLI 清它（CLAUDE.md §22）。⚠️ 既有的 InvoiceVoidWithoutReissue 守不到這一格：它看文件側，重試成功那一刻就熄滅，而 correction 那一列還卡著。"
+
+      # 行事曆鏡像過期（58 §5.1.14；2026-09-04 補）。
+      #
+      # 🔴 兩個門檻是**兩個不同的失效模式**，不能只設一個：
+      #   -1 ＝ 鏡像空表 ⇒ 同步器從未成功跑過一次（2026-09-04 之前的常態：
+      #        DeleteAll／Insert 零呼叫端）。這是 critical。
+      #   > 48h ＝ 同步器在跑但連兩天失敗（shipping 掛了／NetworkPolicy 被改）。
+      #
+      # 為什麼要告警而不是靠它自己恢復：鏡像過期的後果是**申訴 SLA 悄悄從 3 工作天
+      # 退成 14 自然日**，方向偏晚 ⇒ 不會有賣家來抱怨（對他們是好事），
+      # 也不會有任何錯誤。沒有這條規則，它可以壞上一整年沒人知道。
+      - alert: InvoiceBusinessDayMirrorEmpty
+        expr: min by (env) (invoice_business_day_mirror_age_seconds) < 0
+        for: 30m
+        labels:
+          severity: critical
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：發票服務的工作日行事曆鏡像是空的"
+          description: "env={{ $labels.env }}：`invoice_business_day_mirror` 一列都沒有 ⇒ `BusinessCalendar` 是**零涵蓋**，每一筆新申訴的 `sla_due_at` 都會落在「起算日 + 14 自然日」的硬上限，而不是 §7.3.5 要求的 3 個工作天。**沒有任何錯誤會出現**（`ComplaintSlaDueAt` 恆有回傳值）。查：① invoice-service 的 `invoice.gov.calendar_*` log —— INV.gov 每日 UTC 16:00 跑一次，`calendar_sync_skipped` 代表 wiring 缺依賴、`calendar_fetch_failed` 代表打不到 shipping、`calendar_write_failed` 代表 DB 寫入失敗 ② shipping-service 的 `holidays` 表本身有沒有資料（owner 在那裡，ADM 有匯入介面）③ NetworkPolicy 的 `shipping-service-ingress` 有沒有還列著 invoice-service。修好之後**不必手動補資料**，下一次 INV.gov 會整段覆蓋。🔴 禁止在 invoice-service 加 seed migration 或手動 INSERT（該表的 COMMENT 明令），它是唯讀鏡像。"
+
+      - alert: InvoiceBusinessDayMirrorStale
+        expr: min by (env) (invoice_business_day_mirror_age_seconds) > 172800
+        for: 1h
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：工作日行事曆鏡像已 {{ $value | humanizeDuration }} 沒有更新"
+          description: "env={{ $labels.env }}：INV.gov 每日同步一次，超過 48 小時沒更新代表**連續兩天失敗**。鏡像還在（舊資料比空表準得多，同步器刻意在 RPC 失敗時保留舊值），但涵蓋窗口是以 `max(synced_at)` 推算的 [−30, +400] 天 —— 它會隨時間往後漂出真實範圍，屆時落在窗口外的日期一律被當成假日。診斷步驟與上一條相同（`invoice.gov.calendar_*` log ⇒ shipping ⇒ NetworkPolicy）。"
+
+      - alert: InvoiceInboxStranded
+        expr: sum by (env, event_type, status) (invoice_inbox_stranded_rows) > 0
+        for: 6h
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：invoice inbox 有 {{ $value }} 列 {{ $labels.event_type }}／{{ $labels.status }} 超過 7 天沒有推進"
+          description: "env={{ $labels.env }}：這些列**沒有任何自動執行者**——不是「還在重試」。先看 event_type：① ORDER_PAID ⇒ INV.dl 兜底掃描應該要在動，查 invoice_inbox_events 的 next_attempt_at 與 last_error，以及該 pod 的 invoice.dl.* log ② ORDER_REFUND_FINALIZED ⇒ 58 §7.2.2 的作廢／折讓 usecase 尚未落地，INV.dl 刻意不掃它（AdjustmentApplier 是 Unimplemented），這些列要等該 usecase 上線後重放；cutover 之前的歷史積壓（對應訂單的 ORDER_PAID 從未進過本服務 inbox）走一次性維運 SQL 標 SKIPPED，禁止寫 backfill CLI ③ ORDER_CANCELLED ⇒ **這一格結構上不該出現任何列**：該 handler 全程單交易（58 §6.3.2.4），失敗時 inbox 列與業務寫入一起 rollback ⇒ 它只會是 PROCESSED 或根本不存在。看到它代表那個不變式破了（有人把 handler 拆成兩個交易，或有人手動插了列），先讀 code 再處置，**不要當成一般積壓去重放**。處置全文見 docs/runbooks/invoice-inbox-stranded-runbook.md。"
+
+      # I8｜作廢後沒有重開後繼（58 §7 不變式表 I8，2026-08-31 補）。
+      #
+      # 設計書把 I8 的機制寫成「INV.dl 每 5 分鐘掃描告警（唯讀，不自動補償）」，
+      # 但先前**沒有任何指標也沒有任何告警**——不變式列在表上、卻沒有東西在看。
+      # 見 #2959（那一批「metric 只存在於 alert rule 裡」的反面：這一條是連 rule 都沒有）。
+      #
+      # 判準 B「什麼會讓它變回 resolved」：重開成功時後繼件出現、述詞當場不成立
+      # ⇒ 是會自動發生的事件，**不是永久紅候選**。
+      #
+      # for: 30m 而非 6h：作廢後沒有重開，買家手上那張發票已經失效而沒有替代品，
+      # 這是對外可見的錯誤狀態，不該讓它靜置半天。指標本身已含 15 分鐘寬限期
+      # （REISSUE 是「先作廢再開新件」兩步，中間那段是正常過程），所以這裡不必再加。
+      - alert: InvoiceVoidWithoutReissue
+        expr: invoice_void_without_reissue > 0
+        for: 30m
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：有 {{ $value }} 張發票已作廢但沒有重開後繼（58 I8）"
+          description: "env={{ $labels.env }}：`status='VOIDED'` 且作廢超過 15 分鐘、correction chain 上沒有任何 `ISSUED` 後繼件。買家手上那張發票已經失效而沒有替代品。處置：① 查 `invoice_operations` 該 document 有沒有卡住的 REISSUE（`status` 非終態 ⇒ 看 `last_error` 與 `provider_code`）② 沒有 REISSUE operation ⇒ 作廢當下就沒開後續，讀 `invoice_status_history` 找是誰作廢的、為什麼 ③ 若是跨期（發票日期屬上一期且已過關帳日）⇒ 作廢會被 3050126 擋掉，正解是折讓不是重開，看 InvoiceCrossPeriodWindowClosed。**不要寫 backfill 自動補開**——重開會產生新的發票號碼與法定上傳期限，必須逐筆確認。"
+
+      # #2959 ⑧：document 停在 VOIDING 而沒有任何 worker 會推它。
+      #
+      # 與上面 InvoiceVoidWithoutReissue 的分工（兩支都要，涵蓋的是不同的失效）：
+      #   VoidWithoutReissue   作廢**完成了**（VOIDED），但沒有重開後繼 —— 買家手上沒有憑證
+      #   VoidingOrphaned      作廢**卡在半途**（VOIDING），沒有東西會讓它走完 —— 買家看到「處理中」
+      # 前者買家已經知道出事，後者買家還在等一句永遠不會變的話。
+      #
+      # for: 10m 比姊妹規則的 30m 短：VOIDING 的孤兒判定是**不變式**不是時間門檻
+      # （指標本身已排除所有仍在候選集合內的 operation），所以不需要再用等待時間
+      # 去過濾正常過程 —— 只需要濾掉「指標剛好在轉移瞬間被抓到」的抖動。
+      - alert: InvoiceVoidingOrphaned
+        expr: invoice_documents_voiding_orphaned > 0
+        for: 10m
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：有 {{ $value }} 張發票卡在 VOIDING 而沒有任何排程會推它"
+          description: "env={{ $labels.env }}：`invoice_documents.status='VOIDING'` 但該文件沒有任何 VOID operation 還落在 INV.op 或 INV.rc 的候選集合裡 ⇒ 兩條出邊（→VOIDED、→ISSUED）都不會發生，買家面永遠顯示「處理中」。處置：① 查該 document 的 VOID operation 落在哪個終態 ② 若是 FAILED_PERMANENT／FAILED_RETRY_EXHAUSTED，人工判定該張發票在 AMEGO 端的真實狀態（invoice_query 的 invoice_type）③ 依實況把 document 推回 ISSUED 或推到 VOIDED，**不要**猜。"
+
+      # ⑩ ADM 查看買家個資的頻率。閾值上線首月以實測 P99 校準，校準前不得因為它吵而關掉。
+      - alert: InvoicePiiRevealSpike
+        expr: increase(invoice_admin_pii_reveal_total[15m]) > 20
+        for: 15m
+        labels:
+          severity: info
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：ADM 於 15 分鐘內揭露發票個資 {{ $value }} 次"
+          description: "env={{ $labels.env }}：撈同一時窗的 invoice_admin_audit_logs（action='INVOICE_PII_REVEAL'），依 actor_account_id 分組，逐列核對 reason_code／reason_detail 是否對得上一個真實的申訴／查證情境。⚠️ 它偵測不到走既有訂單端點看同一份資料的旁路 ⇒ 不得據此宣稱「沒有人大量看過買家資料」。"
+
+      # ⑪ 守 §8.1.5(e) 的 asset_reference 是否真的建立了。
+      #    ⚠️ AMEGO 的 invoice_file 只能查 180 天內，超過就再也抓不回來 ⇒ 時效性很硬。
+      - alert: InvoicePdfMissing
+        expr: increase(invoice_documents_pdf_missing_total[1h]) > 0
+        for: 1h
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：有 {{ $value }} 次讀取發票 PDF 時發現物件不存在"
+          description: "env={{ $labels.env }}：最可能的成因是上傳時沒建 asset_reference、7 天後被 media GC 連同 R2 物件刪除。處置：立即確認上傳路徑有無建立 reference，並對近 180 天內的缺件重新抓檔（超過 180 天 AMEGO 也查不到了）。"
+
+      # ⑫ 真實業務異常，不是技術故障。折讓累計已被 clamp 到 invoiced_total（法定不變式），
+      #    折讓本身沒有被擋。哪一筆在同時刻的 Error log 裡（M16 無 label），不在 metric label 裡。
+      - alert: InvoiceRefundExceedsInvoiced
+        expr: increase(invoice_refund_exceeds_invoiced_total[1h]) > 0
+        for: 1h
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：有 {{ $value }} 筆累計退款超過已開票金額"
+          description: "env={{ $labels.env }}：成因通常是同一張訂單開了兩張售後單而 refundable_amount 沒有互扣。處置：查該訂單的 after_sale_cases 與 financial_logs；哪一筆看同時刻的 Error log（event invoice.allowance.refund_exceeds_invoiced，帶 order_no／store_id／operation_id／correlation_id ＋ cumulative_refund_amount／invoiced_total／clamped_to）。"
+
+      # ⑬ 發票事件發不出去 ⇒ 下游通知不會送達。
+      #    本服務只有一張 outbox 表（invoice_outbox_events），expr 仍保留 by (outbox_name)
+      #    因為 pkg/outbox 的該 label 是 worker 名不是表名（本服務共九個名字）。
+      #
+      # 🔴 這條的鑑別力依賴一個**程式面的不變式**：耗盡重試的列走「停泊」而不是
+      #    `SET status='failed'`（internal/worker/outbox_worker.go 的 outboxRepo.MarkFailed
+      #    → domain.OutboxRepository.Park）。outbox_oldest_pending_age_seconds 的來源查詢
+      #    述詞是 status='pending'，所以一旦有人把終態旗標改回去，那一列會在**真正卡死的
+      #    那一刻**退出這個 gauge ⇒ 本告警由 firing 轉 resolved，方向完全相反。
+      #    守它的是 TestOutboxWorker_RetryExhaustionParksInsteadOfFlaggingTerminal。
+      - alert: InvoiceOutboxLag
+        expr: max by (env, outbox_name) (outbox_oldest_pending_age_seconds{outbox_name=~"invoice_.*"}) > 600
+        for: 15m
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：發票 outbox（{{ $labels.outbox_name }}）最舊未派送列已 {{ $value }} 秒"
+          description: "env={{ $labels.env }}：先分兩種。① 還在正常退避（outbox_failed_total 沒有增量）⇒ 一般不需人工解鎖，lease 到期即回到候選集合。② 已耗盡重試而停泊（outbox_failed_total 同步上升）⇒ 那一列每小時重試一次、**修好成因之後會自己排空**，所以要做的是修成因不是動資料：看該列的 last_error（publish 失敗 ⇒ 查 broker 與 infra/mq/topology 有沒有這個 exchange／routing key；notifyrouting unmarshal 失敗 ⇒ payload 落庫時就壞了，走 58 號 §12 的重置 SQL）。⚠️ 這個 gauge 只看得到 status='pending' 的列：若它降下來而問題沒解決，先確認不是有人把耗盡重試改回終態旗標（見本規則上方紅字）。久留不去的列另有 InvoiceOutboxStranded。"
+
+      # ㉔ outbox 裡「沒有任何執行者會完成它」的列（M31）。與 ⑬ 的分工：
+      #    ⑬ 是**時效**告警（積壓多久），15 分鐘就響、成因多半可自癒；
+      #    ㉓ 是**存量**告警（有幾列已經沒救），它不會因為停泊重試而自己消失。
+      #    兩者缺一：只有 ⑬ 的話，一列被維運 SQL 隔離成 'failed' 之後會完全無聲
+      #    （它同時退出 pending 述詞）；只有 ㉓ 的話，broker 短暫不可用要等 7 天才看得到。
+      - alert: InvoiceOutboxStranded
+        expr: sum by (env, event_type, status) (invoice_outbox_stranded_rows) > 0
+        for: 6h
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：invoice outbox 有 {{ $value }} 列 {{ $labels.event_type }}／{{ $labels.status }} 不會再被派送"
+          description: "env={{ $labels.env }}：這些列**沒有任何自動執行者**，不是「還在重試」。先看 status：① failed ⇒ 只可能是維運 SQL 隔離出來的（程式已不再寫這個值），查當初隔離的理由是否已排除，排除了就把它改回 'pending' 並把 next_attempt_at 設成 now，下一輪 5 秒內就會重發 ② pending 且超過 7 天 ⇒ 停泊了一整週還沒好，看 last_error：publish 失敗查 broker 與 infra/mq/topology 的 exchange／routing key 是否存在；notifyrouting 解不開 payload 代表落庫時就壞了，走 58 號 §12 的重置 SQL。⚠️ 禁止寫 backfill CLI／reconciliation job 來清它（CLAUDE.md §22）：能自動化的部分已經是停泊重試本身。"
+
+      # ⑭ 一則訂單付款或退款事件耗盡重試後進 DLQ ＝ 那張訂單沒有開票（或那筆退款沒有折讓）。
+      - alert: InvoiceEventDeadLettered
+        expr: increase(mq_consume_total{queue=~"invoice\\..*",result="dlq"}[5m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：發票 queue {{ $labels.queue }} 有 {{ $value }} 則訊息進入 DLQ"
+          description: "env={{ $labels.env }}：處置見 58 號 §12.5 R7：① 先判定失敗原因，修好之後才重放（直接重放一個必然失敗的訊息只會再進一次 DLQ）② 取 payload 用 management API 且 ackmode=reject_requeue_true 才不會消耗掉 ③ 重放前必須確認去重鍵沒有被清掉——安全性由 invoice_inbox_events 的 uq_invinbox_business_key 保證，有人把整列刪了就會對同一筆退款開出第二張折讓單。"
+
+      # ⑮ 雲端 email 供應商（Phase 2，MAIL_PROVIDER）——與 ①② 是不同的依賴。
+      #    配額是帳戶層級的一個數字 ⇒ 分母用 max by (env)（與 ② 的 max 同理，但與 recording rule
+      #    invoice:amego_rate_utilization:ratio 的 sum 方向相反，不可互相照抄）。
+      - alert: NotificationEmailQuotaNearLimit
+        expr: |
+          sum by (env) (increase(notification_email_sent_total[24h]))
+          / clamp_min(max by (env) (notification_email_quota_limit{window="daily"}), 1e-9)
+          > 0.8
+        for: 30m
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：email 日配額已用 {{ $value | humanizePercentage }}"
+          description: "env={{ $labels.env }}：先確認不是重試風暴（result=\"transport_error\" 是否同步上升），再看 58 號 §9.3.4 的 R6 預算表決定處置。若實際量已超出當初的估算，那是預算錯了不是配額小了 ⇒ 回頭改預算表。不得以「升級付費方案」當唯一修法。"
+
+      # ⑯ 配額用盡時供應商直接拒收，而那個失敗不會讓開票失敗（發票已經開出去了）⇒ 沒有這條就完全靜默。
+      #    症狀會以「未收到發票」申訴的形式落到賣家身上（3 個工作天 SLA、逾期計違規、90 天 3 次停權）
+      #    ——這就是它 severity 是 critical 的理由。
+      - alert: NotificationEmailRejected
+        expr: increase(notification_email_sent_total{result=~"quota_exceeded|rejected"}[15m]) > 0
+        for: 15m
+        labels:
+          severity: critical
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：有 {{ $value }} 封發票通知信被供應商拒收"
+          description: "env={{ $labels.env }}：處置見 58 號 §12.5 R8。查供應商後台的 rejection reason、確認 MAIL_QUOTA_* 與實際方案一致。短期止血改走站內通知並在 ADM 公告——那不是修復，法規要求的是發票送達。同時看申訴佇列：配額事故期間進來的申訴不應計入賣家的違規計數，需要 ADM 在裁決時明確標註。"
+
+      # ⑰ 人工處理量超出負荷。門檻必須與 INVOICE_MANUAL_CAPACITY_PER_DAY 同值。
+      #    selector 與 ⑤ 及 recording rule invoice:issue_bad:increase5m 逐字相同。
+      - alert: InvoiceManualBacklogExceedsCapacity
+        expr: |
+          sum by (env) (increase(invoice_issue_total{
+            result=~"permanent_failed|retry_exhausted|unknown_terminal"}[24h])) > 20
+        for: 1h
+        labels:
+          severity: critical
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：24 小時內有 {{ $value }} 張發票進入需人工處理的終態"
+          description: "env={{ $labels.env }}：超過 INVOICE_MANUAL_CAPACITY_PER_DAY（20）。每一筆都是一張沒開出去的稅務憑證，B2C 法定期限最保守只有 48 小時。處置見 58 號 §12.5 R3／R4：先看 invoice_amego_response_code_total 的 code 分佈判斷是不是單一成因（3040111 ⇒ 通知賣家；3040174/3040177 ⇒ 我方稅額映射 bug，修完可批次重試）。不得以調高門檻作為處置。"
+
+      # ⑱ 下期字軌配額不足。只在雙月的 16 日成立（財政部 18 號開始配號、依本期已取用本數決定，
+      #    調整須在 18 號前申請 ⇒ 留兩天給 ADM 通知賣家）。PromQL 時間函式以 UTC 計，+28800 校正為 UTC+8。
+      # (a) 指標放最左邊：and 保留左手邊的 label 與值，$value 才會是賣家家數
+      # (b) 用 == 不用 == bool：== bool 回 0/1 而樣本仍存在 ⇒ and 只看「有沒有樣本」⇒ 條件永遠成立
+      # (c) 日曆判定寫成 `and on() (<expr>)`：on() 的參數是 label 名清單不是述詞，
+      #     寫成 `and on (<expr>)` 是語法錯（設計書 §9.3.3 的片段即此形，已回報）
+      - alert: InvoiceTrackNextPeriodInsufficient
+        expr: |
+          invoice_track_next_period_insufficient_sellers > 0
+          and on() (day_of_month(timestamp(vector(0)) + 28800) == 16)
+          and on() (month(timestamp(vector(0)) + 28800) % 2 == 0)
+        for: 30m
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：{{ $value }} 家賣家的下期字軌配額不足以支撐目前開票量"
+          description: "env={{ $labels.env }}：下期配到的本數 × 50 < 本期實際開立張數 × (1 + INVOICE_TRACK_GROWTH_HEADROOM)。處置：ADM 工作台取出名單（不在 metric label 內），通知賣家在雙月 18 號前向財政部申請調整配號。過了 18 號只能等下下期，中間那一期會在期中撞 3040111 而重試無效。"
+
+      # ⑲ 排程 worker 飽和。pkg/outbox.Worker 是嚴格序列的，真正的吞吐上界是
+      #    min(FetchBatch/interval, 1/單筆耗時)，遠低於 AMEGO_CLIENT_RATE_LIMIT_QPS
+      #    ⇒ ② 的「速率逼近上限」在單副本時幾乎不可能觸發，先撞到的是這一條。
+      #    比對標籤必須含 env：只 on(worker) 會讓 dev 的耗時去除以 prod 的 interval ⇒ many-to-many 查詢失敗。
+      - alert: InvoiceWorkerTickSaturated
+        expr: |
+          (
+            rate(invoice_worker_tick_duration_seconds_sum[15m])
+            / clamp_min(rate(invoice_worker_tick_duration_seconds_count[15m]), 1e-9)
+          )
+          / on(env, job, instance, worker) invoice_worker_tick_interval_seconds
+          > 0.8
+        for: 30m
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：worker={{ $labels.worker }} 的 tick 耗時已達 interval 的 {{ $value | humanizePercentage }}"
+          description: "env={{ $labels.env }}：tick 耗時逼近 interval 代表已接近吞吐上界，due 的列開始排隊（症狀是延遲不是錯誤，沒有 error log）。處置見 58 號 §9.2.2：先調 FetchBatch，再考慮併發，最後才是 replicas；調 replicas 前必須先處理 limiter 是 per-pod 的問題（② 的 max 要改成 sum）。"
+
+      # ⑳ 跨期關帳窗口將關（關帳日是台北時間跨期後單月 5 日 23:59:59）。
+      #    窗口判定在 M20 產生端依台北時間的日決定，PromQL 不做日曆運算
+      #    （PromQL 沒有時區安全的日曆函式，用 UTC 算會在每兩個月的邊界日剛好錯 8 小時，
+      #     而那正是本指標唯一有意義的那幾天）。
+      - alert: InvoiceCrossPeriodWindowClosing
+        expr: invoice_cross_period_pending{window="closing"} > 0
+        for: 1h
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：有 {{ $value }} 筆跨期調整卡在關帳窗口內（剩不到 3 天）"
+          description: "env={{ $labels.env }}：發票日期屬上一期、且仍有非終態 VOID／ALLOWANCE／VOID_ALLOWANCE operation。過了就只能走折讓或聯繫光貿人工開權限，作廢會被 3050126 擋掉。處置：逐筆看是卡在我方（查 invoice_pending_operations 與 InvoiceIssueFailureRateHigh）還是卡在賣家（字軌不足）。"
+
+      # ㉑ 窗口已關（台北時間單月 6 日起），不會自己好。
+      #    ⚠️ 長期紅著代表「有人一直沒去處理」，不是誤報。
+      - alert: InvoiceCrossPeriodWindowClosed
+        expr: invoice_cross_period_pending{window="closed"} > 0
+        for: 1h
+        labels:
+          severity: critical
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：有 {{ $value }} 筆跨期調整已錯過關帳窗口"
+          description: "env={{ $labels.env }}：作廢已不可行，出路是全額折讓 g0401 或聯繫光貿人工開權限。處置：ADM 逐筆改走折讓；改完 operation 進終態本 series 才歸零。若判定該批確實無法處理，正確做法是把那些 operation 推進終態並在 invoice_admin_audit_logs 留理由，不是把告警靜音。"
+
+      # ㉒ 字軌已用盡。與 ⑦ 是兩件事：⑦ 是「快用完了，去配號」，㉒ 是「已經完全開不出票了」。
+      #    expr 用 M21（家數）不用 M9（最小值），理由同 ⑦。
+      - alert: InvoiceTrackExhausted
+        expr: invoice_track_exhausted_sellers > 0
+        for: 15m
+        labels:
+          severity: critical
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：有 {{ $value }} 家賣家的字軌已完全用盡，一張票都開不出來"
+          description: "env={{ $labels.env }}：remaining == 0 或當期字軌 status ∈ {3 過期, 9 用畢}。AMEGO 回的 3040111 重試多久都不會好 ⇒ operation 轉 SELLER_ACTION_REQUIRED。處置同 ⑦（ADM 查名單 → 通知賣家配號 → 匯入光貿）。⚠️ 同時看 InvoiceStatutoryDeadlineApproaching／Overdue——字軌用盡期間累積的未開立發票，法定期限照樣在倒數。"
+
+      # ㉕ 停在 AWAITING_MANUAL 而**法定上傳期限已到或將到**的文件（M32）。
+      #    與 ③ 的分工是**交棒**不是重疊：ISSUE_FAILED → AWAITING_MANUAL 是合法轉換，
+      #    該列在翻過去的那一刻退出 invoice_statutory_deadline_pending ⇒ 若沒有這一條，
+      #    InvoiceStatutoryDeadlineOverdue 會在票還沒開出去的情況下由 firing 轉 resolved
+      #    （2026-08-31 於真 DB 上以 exporter 查詢原文坐實，見
+      #     internal/repository/postgres/awaiting_manual_blindspot_integration_test.go）。
+      #    ⚠️ 它同時是這一整類的**唯一**訊號：AWAITING_MANUAL 不建 operation ⇒ M6／⑥ 看不到，
+      #       invoice_issue_total 一次都不會加 ⇒ ⑤ 與 ⑰ 也看不到。
+      #    ⚠️ 長期紅著代表「有人一直沒去做判定」，不是誤報（同 ㉑）。排空路徑是三個真實的 ADM
+      #       動作：ResumeFromManual（回自動線）／MarkResolvedExternally（賣家自行開立）／
+      #       CancelBeforeIssue（確認不需開立）。把它靜音等於把一張沒開的稅務憑證藏起來。
+      - alert: InvoiceAwaitingManualDeadlineAtRisk
+        expr: invoice_documents_awaiting_manual{bucket=~"overdue|lt2h|lt6h"} > 0
+        for: 15m
+        labels:
+          severity: critical
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：有 {{ $value }} 張待人工判定的發票已逾或逼近法定上傳期限（bucket={{ $labels.bucket }}）"
+          description: "env={{ $labels.env }}：這些文件**不在自動線上**——沒有 operation、沒有重試、沒有任何程式會推進它們，只有 ADM 做判定才會動。逐筆走 ADM 工作台端點 50 的 NEEDS_MANUAL 分頁——⚠️ **但那一頁看不到零 operation 的那些**（端點 50 是 invoice_operations INNER JOIN invoice_documents，job-first；而自動線落 AWAITING_MANUAL 時 operation 根本不建）。那一類走 A12 文件查詢（端點 47）→ A13 詳情（端點 48）→「送回自動線」（端點 73 `POST /admin/invoices/documents/{id}/manual_resolutions`，它會補建那件缺席的 ISSUE operation）。下面那支名單 SQL 兩類都查得到。依 manual_reason_code 分流：TAX_SPLIT_MISMATCH／B2B_TAX_MISCALC／NEGATIVE_* 這類是**我方 code bug**（修完可批次 ResumeFromManual 回自動線）；CONSOLIDATED_ORDER／PLATFORM_FUNDED_DISCOUNT 是業務規則未定，需要裁決；ISSUER_RETIRED 只能走賣家自行開立回報。名單 SQL：SELECT id, source_ref, manual_reason_code, statutory_deadline_at FROM invoice_documents WHERE status='AWAITING_MANUAL' ORDER BY statutory_deadline_at。⚠️ 逾期是行為罰 2%／2.5%／3%（一年內第 1／2／3 次，上限 100 萬），罰的是賣家，處置同 ③ 的第 ③ 點：主動通知他。"
+
+      # ㉖ 待人工判定的存量（不分期限）。與 ㉕ 的分工同 ㉔／⑬：
+      #    ㉕ 是**時效**（快來不及了），㉖ 是**存量**（積了多少沒人處理）。
+      #    門檻與 ⑰ 的 INVOICE_MANUAL_CAPACITY_PER_DAY（20）同值：兩者一起看才分得出
+      #    「今天進來太多」（⑰，counter）與「一直沒人清」（㉖，gauge）——⑰ 的 24h increase
+      #    會隨時間衰減回 0，而積壓不會。
+      - alert: InvoiceAwaitingManualBacklog
+        expr: sum by (env) (invoice_documents_awaiting_manual) > 20
+        for: 6h
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：有 {{ $value }} 張發票積在待人工判定佇列"
+          description: "env={{ $labels.env }}：超過 INVOICE_MANUAL_CAPACITY_PER_DAY（20）且已持續 6 小時 ⇒ 清的速度追不上進的速度。先看 manual_reason_code 的分佈（名單 SQL 見 ㉕）：集中在單一理由碼代表是一個可批次修的成因，分散代表是容量問題。⚠️ 不得以調高門檻作為處置（同 ⑰）；也不得把它們推進終態來讓數字降下來——CancelBeforeIssue 是「確認本單不需開立」不是「清佇列」，用錯會變成漏開發票。"
+
+      # ㉗ 未結案的買家申訴（M33）。與 ㉕／㉖ 是**同一個 root cause 的第二張表**：
+      #    「在等某個人」的狀態沒有任何指標數得到。2026-08-31 盤點時 `invoice_complaints`
+      #    整張表在 sql_exporter 與本檔的命中數皆為 0。
+      #    ⚠️ 門檻取「建案超過 7 天」而不是各狀態自己的到期欄：SLA 是 3 個工作天
+      #       （sla_due_at），7 天已涵蓋連假；更重要的是 ESCALATED_TO_ADM **連一個時間欄
+      #       都沒有**，用到期欄當判準會讓最需要看見的那一格落進空隙。
+      #    ⚠️ 一則申訴卡住 ＝ 一位買家始終沒拿到法定憑證，而賣家那邊的違規計數
+      #       （90 天 3 次停權）也停在未定 —— 對雙方都不公平，兩邊都要靠這條才看得見。
+      # 賣家稅務資格屆期待複審（#3261 ③ 的告警面，2026-09-09 補）。
+      #
+      # 🔴 為什麼一定要有這條：`approval_valid_until` 屆滿**刻意不改狀態**
+      # （CountApprovalRecheckDue 的 SQL 註解逐字：「DB 就是 SSOT，不需要 worker 改狀態、
+      # 不需要事件、更不需要『已通知』旗標」）⇒ 除了這支指標之外**沒有第二個訊號來源**。
+      # 指標本身在 #3261 才接上（在那之前那支查詢零呼叫端、metric 名全 repo 零命中）。
+      #
+      # 門檻取 > 0 而不是某個家數：資格過期的賣家繼續開票是稅務資格問題，一家也不該放著。
+      # for: 24h 而不是分鐘級——它是「該安排複審了」不是「現在出事了」，而 A03 分頁是
+      # 人每天看的工作台，不需要把人從床上叫起來。
+      #
+      # 判準 B「什麼會讓它變回 resolved」：ADM 完成複審並更新 approval_valid_until
+      # ⇒ 需要人工介入，但**不是永久紅候選**（正常情況下這個數字是 0，dev 實測即 0）。
+      - alert: InvoiceSellerApprovalRecheckDue
+        expr: invoice_seller_approval_recheck_due > 0
+        for: 24h
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：有 {{ $value }} 家賣家的發票稅務資格已屆期待複審"
+          description: "env={{ $labels.env }}：`seller_tax_profiles.approval_valid_until` 已過期而尚未複審。**該欄屆滿不改狀態**（刻意設計），所以除了本告警之外沒有任何東西看得到它——沒有這條規則，資格過期可以無聲地持續一整年。處置：ADM A03「屆期待複審」分頁逐家複審 → 通過就更新 `approval_valid_until`、不通過走既有的資格撤銷流程。⚠️ **不要用「把 approval_valid_until 往後推」來讓數字降下來**：那等於替賣家做了複審，而複審要看的是他的稅籍與字軌現況。名單 SQL：`SELECT issuer_id, review_status, approval_valid_until FROM seller_tax_profiles WHERE approval_valid_until <= now() ORDER BY approval_valid_until`。"
+
+      # 平台 AMEGO 憑證只設了一半（#3269）。severity=warning 而非 critical：它不會讓
+      # 任何一張發票開錯，只是把「載具打錯」的發現時點從輸入當下推遲到付款之後。
+      # for: 15m 而非更短——這是配置狀態，服務重啟後才會變，短視窗只會在每次 rollout
+      # 時抖一下。
+      - alert: InvoicePlatformCredentialIncomplete
+        expr: invoice_platform_credential_incomplete > 0
+        for: 15m
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：平台 AMEGO 憑證只設了一半，手機條碼驗證已靜默停用"
+          description: "env={{ $labels.env }}：`AMEGO_PLATFORM_INVOICE` 有值但 `AMEGO_PLATFORM_APP_KEY` 沒有（後者是 optional secret ⇒ 缺它是**合法啟動狀態**）。後果：買家在常用發票資料送出一個無效的手機條碼時，入口層驗證整段跳過 ⇒ HTTP 200 建立成功、零錯誤、零 log（2026-09-08 dev 實測）。⚠️ **這不是「發票會開錯」**——開票前那一層（PR #3258）仍然有效，錯的載具不會真的開出去；差別是買家要到**付款之後**才知道打錯，而那時只剩「轉人工」。處置：backend#3269——向光貿取得正式 App Key、放進該環境 env 來源後重跑 `k8s/scripts/create-secrets.sh`（宣告已在 `k8s/values/invoice-service.yaml` 的 secretRef 與該腳本的 `optional_literal`）。⚠️ 憑證**填錯字**這一支看不出來（gauge 只驗配對缺一半），那要看 M3 `invoice_amego_response_code_total`。⚠️ 也**不要**把 AppKey 改成必填來讓它消失：prod 現在就缺，改必填會讓 prod 一部署就 boot 失敗——那是把靜默失效換成全服務中斷。"
+
+      # ㉙ M34 的告警面，也是 §4.5.8 把 AMEGO_PLATFORM_INVOICE 放寬成選填的**配套條件**。
+      # 沒有它，放寬的淨效果只是把一個吵鬧的失敗（boot 起不來）換成一個安靜的失敗
+      # ——那正是 06-no-small-tails.md §3.9 第 6 種外殼。
+      #
+      # 🔴 `and ... == 0` 那一段是刻意的：M34＝0 有兩個成因，而「只有一半」已由上面的
+      # InvoicePlatformCredentialIncomplete 以更精確的處置接走 ⇒ 兩條**互斥**，同一個配置
+      # 錯誤不會同時點亮兩條（兩條都響時人只會看其中一條，而那一條不一定是對的）。
+      # 剩給本條的就是「兩半都沒設」那一格 —— #3230 放寬必填後 prod 正好落在這裡。
+      #
+      # ⚠️ 它說的是「買家送的手機條碼沒有被驗過存在性」，**不是**「平台開票停了」：
+      # 平台開票的 AppKey 來自 DB（usecase/submit.go 的 accounts.GetByIssuer +
+      # WithDecryptedCredential），不是這兩個 env。
+      # ⚠️ 憑證補齊之前它會持續紅著，**那是正確的**（同 ㉑／㉕／㉖）：它說的是「有一件事
+      # 一直沒做」而不是誤報 ⇒ 不得靜音。
+      # ⚠️ 它偵測不到「AppKey 填錯字」（兩支指標都會是綠的）⇒ 不得據此宣稱平台憑證是對的，
+      # 那要看 M3 invoice_amego_response_code_total。
+      - alert: InvoiceMobileBarcodeVerifierDisabled
+        expr: max by (env) (invoice_mobile_barcode_verifier_enabled) == 0 and max by (env) (invoice_platform_credential_incomplete) == 0
+        for: 1h
+        labels:
+          severity: warning
+          channel: business
+          # 🔴 投遞節奏，不是嚴重度（#3269）。本條在憑證補齊之前**恆為 firing**，
+          # 而 channel=business + env=prod 的預設 repeat_interval 是 30m ⇒ 48 則/天。
+          # 那不是「提醒」是「洗版」——同一個頻道還要承載 InvoiceEventDeadLettered
+          # 這類 critical，讓一條永遠紅的 warning 以 48 次/天 蓋過它們，比本條沒掛更危險
+          # （02-judgment.md §2.1.2：假的保證排擠掉真的警覺）。
+          # ⚠️ 這**不是**靜音：告警照樣 firing、Grafana 照樣看得到、resolved 照樣即時通知，
+          # 只有「重複提醒」的間隔從 30m 變成 24h。description 的「不得靜音」仍然成立。
+          # ⚠️ 貼這個 label 的門檻見 scripts/check-alert-cadence.py（必須有 open issue 追蹤）。
+          cadence: daily
+        annotations:
+          summary: "env={{ $labels.env }}：手機條碼載具的存在性驗證沒有掛上"
+          description: "env={{ $labels.env }}：`AMEGO_PLATFORM_INVOICE` 與 `AMEGO_PLATFORM_APP_KEY` **兩者都沒設** ⇒ 平台 issuer 未啟用 ⇒ `platformBarcodeVerifier` 沒有掛載（`usecase/di.go` 的第二個 case）。後果：買家在常用發票資料或結帳時送出一個**無效的手機條碼**，入口層不會驗它存在不存在 ⇒ HTTP 200 建立成功、零錯誤、零 log，錯誤要到開票前那一層才會被擋下——而平台尚未開票時那一層也不會執行 ⇒ 永遠不會被發現。⚠️ **這不是「平台開票停了」**：平台自身開票用的 AppKey 來自 DB（`usecase/submit.go` 的 `accounts.GetByIssuer` ＋ `WithDecryptedCredential`），本條為 0 時平台開票可能完全正常。⚠️ 與 `InvoicePlatformCredentialIncomplete` **互斥**：那條管「只設了一半」（配置錯誤），本條管「兩半都沒設」（尚未開通）。處置：要啟用時把 `AMEGO_PLATFORM_INVOICE`（走 `overlays/<env>/invoice-service.yaml`，**不得寫在 base**）與 `AMEGO_PLATFORM_APP_KEY`（走 `hawkr-amego` secret，見 backend#3269）**同批補齊** —— 只補一半會從本條掉進 `InvoicePlatformCredentialIncomplete`。🔴 **這兩個值都不在我方手上**：正式公司的 App Key 官方文件寫的是「請與客服聯絡」（`docs/第三方整合/AMEGO 電子發票 API 總覽.md` §1.1 的正式公司欄），統編那一半要填平台自身 issuer 的**真實統編**。⇒ 本條的處置起點是**向光貿申請**，不是改任何配置檔。⚠️ **不得拿測試公司的憑證（`12345678` / `sHeq7t8G1wiQvhAuIM27`）填 prod 來讓它變綠**：`AMEGO_ALLOW_REAL_INVOICE=true` 配測試統編會被 `config.Validate()` 的雙向檢查擋成 CrashLoop，而那條檢查是刻意的——它防的是在 prod 靜默開出不進任何公司帳的發票（不可逆）。⚠️ 因為它等的是外部申請、會持續紅數週，投遞節奏已由 `cadence: daily` label 降到一天一則（見 labels 區塊註解）；那是降頻不是靜音。"
+
+      - alert: InvoiceComplaintUnresolvedAging
+        expr: sum by (env, status) (invoice_complaints_unresolved{age_bucket="gt7d"}) > 0
+        for: 6h
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：有 {{ $value }} 則買家發票申訴超過 7 天未結案（status={{ $labels.status }}）"
+          description: "env={{ $labels.env }}：先看 status —— ① OPEN 超過 7 天代表賣家沒回覆而 K04／K05 的 SLA 掃描器尚未落地（internal/worker/deadline_worker.go 檔頭列了這件事），需人工把它推進 OVERDUE 並計違規 ② SELLER_RESPONDED 代表買家異議期（72h）早已屆滿而 K06 的自動 RESOLVED 尚未落地 ③ OVERDUE 代表已逾期但沒人升級 ④ ESCALATED_TO_ADM 代表**在等 ADM 裁決**，而這個狀態連一個到期時間欄都沒有，除了本告警之外沒有任何東西看得到它。名單 SQL：SELECT id, document_id, issuer_id, status, created_at, sla_due_at FROM invoice_complaints WHERE status IN ('OPEN','SELLER_RESPONDED','OVERDUE','ESCALATED_TO_ADM') ORDER BY created_at。⚠️ 不得以「把它們推進終態」來讓數字降下來——但**理由不是違規計數**：`CountConfirmedViolationOrders` 的述詞是 `status = 'VIOLATION_CONFIRMED'` 單值，**RESOLVED 不計入**（2026-09-08 實查 SQL＋端點 60 回應的 `violationCountIn90Days` 均證實；本行原本寫「兩者都會寫進違規計數」是錯的，而那個錯會讓人在裁決時高估 DECIDE_RESOLVED 的代價）。真正的理由是：判 RESOLVED 或 VIOLATION_CONFIRMED 都是**替買賣雙方做出實質裁決**（前者等於認定賣家已盡責、買家的申訴到此為止），那是人的判斷，不是為了讓指標歸零。"
+
+  # ── Gateway 業務碼吞碼／逃逸（bizcarrier，2026-08-31）──────────────────
+  #
+  # 背景：EnvelopeGuardInterceptor 對 preserveData 碼（結帳 4001/4091/4092、
+  # 發票 9310/9324/9326/9331/9342/9344/9347）刻意不轉成 gRPC error —— 因為
+  # status.Error 只帶得動一個字串，data 會蒸發。代價是 handler 若不自己檢查
+  # resp.GetCode()，非零業務碼會被寫成 code:0 的成功回應。端點 44 就是這樣讓
+  # AMEGO 憑證驗證失敗（9331）變成「檢測成功」的。
+  #
+  # gateway/internal/bizcarrier 讓 response 層自動改寫，把 71 個「記得寫 if」
+  # 的義務變成 1 個機制。這兩支計數器是它的兩個出口：
+  #   swallowed = 攔下來了（correctness 已保住，但那支 handler 該補守門）
+  #   escaped   = 攔不到（回應根本沒經過 internal/response）
+  #
+  # ⚠️ 兩支都**不預先展開 label**：label 含 c.FullPath()（數百個路由值），
+  # 預展開會 cardinality 爆炸。它們是「不該發生」的計數器，序列出現本身即訊號。
+  # ⚠️ 因此本組偵測不到「gateway 停止被抓取」——那由 up{job=~".*gateway"} 承擔。
+  - name: gateway-bizcode-alerts
+    rules:
+      - alert: GatewayBizCodeEscaped
+        expr: sum by (env, code, path) (increase(gateway_bizcode_escaped_total[10m])) > 0
+        for: 0m
+        labels:
+          severity: critical
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：業務碼 {{ $labels.code }} 從 {{ $labels.path }} 逃逸（回應未經 internal/response）"
+          description: "env={{ $labels.env }}：這條路徑的回應不是任何 response 出口寫的（c.JSON／c.Data／c.Render／直呼 pkg/envelope），所以 carrier 沒有機會改寫它 ⇒ **前端很可能收到 code:0 的假成功**。先看 path 找到 handler，確認它怎麼寫回應；已知的合法形狀只有一種：非 JSON 端點（HTML 導回頁、SSE、檔案下載），那些不該有 preserveData 碼掛著。⚠️ 現成的反例在 internal/handler/pricebook.go 的 writeGzippedIfAccepted —— 它自己組 response.Envelope{Code:0} 再用 c.Data 寫出，兩條 ruleguard lint 都不命中。修法是讓那條路徑在寫出前先問 bizcarrier.Emit(c, 0)。⚠️ 不得靠加 lint pattern 宣告這一格已關閉：lint 只縮小這條路、關不掉它（carrier.go 檔頭失效模式 4 有實測反例）。"
+
+      - alert: GatewayBizCodeSwallowedSustained
+        expr: sum by (env, code, path) (increase(gateway_bizcode_swallowed_total[1h])) > 0
+        for: 30m
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：{{ $labels.path }} 持續讓業務碼 {{ $labels.code }} 走到成功出口（已被 carrier 改寫）"
+          description: "env={{ $labels.env }}：**這不是使用者面的事故** —— carrier 已經把回應改寫成正確的業務碼回應，前端收到的是對的。它是一個**程式碼衛生**訊號：該 handler 拿著非零 code 走到 response.OK/Page/GrpcResult，代表少了 `if resp.GetCode() != 0 { response.Biz(...); return }` 那一段。修法：照 path 找到 handler，補上守門（invoice 三個檔的 71 個呼叫點是現成範例）。⚠️ 這條刻意用 for: 30m 而不是立即告警 —— 一次性的路徑（例如剛上線的新端點）不值得吵醒人，持續出現才代表有人漏寫。⚠️ 若這個數字長期非零而沒人處理，carrier 就從安全網退化成常態依賴，那正是 06 §3.9 外殼 6 的形狀。"
+
+  # ── Pricebook 行情資料完整性（ADR pricebook-ingest-window-resilience-scope D1）──
+  #
+  # D1 原本寫的是「告警 ingest_run 的 Failed/NeedsAttention 狀態」，這裡不那樣做，
+  # 兩個理由：① ingest_run 已被實證會騙人（2026-08-14 記 succeeded、零錯誤訊息，
+  # 而上游 3 個大市場整批空手，見 wiki stale-record-vs-live-state-verification）；
+  # ② 照字面做會天天響——dev 自 2026-08-15 起連續 18 次 NeedsAttention，而永遠亮著
+  # 的告警會在第一週被靜音。
+  #
+  # 🔴 但「資料多舊」也不能單獨拿來告警——這是 2026-09-02 實測校準出來的。MOA 上架
+  # 延遲是長尾的（近 40 天 646 個市場-交易日：42% 當天、28% 落後 1 天、17% 兩天、
+  # 11% 三天，尾巴到 6 天），任一時刻總有一批市場還沒到齊，那是**正常狀態**，而
+  # 分區模型的 pending 狀態正是為了吃它。對「最新資料距今幾天」設門檻，等於對常態
+  # 延遲告警，跟 ① 是同一個病。
+  #
+  # 真正要叫人的是**再也救不回來的缺口**：某一格重試用盡（MaxIngestAttempts=14）
+  # 被標成 abandoned，排程就再也不會撿它，只能人工跑 cmd/pricebook-backfill。
+  # 這正是 D1 的原始關切，而 NeedsAttention 報不出來——
+  # 它報的是長尾（天天有），漏的是永久缺口。
+  # §22：偵測歸 observability，補資料走 cmd/pricebook-backfill（維運）。
+  - name: pricebook-data-integrity-alerts
+    interval: 300s
+    rules:
+      # 健康時恆為 0，所以門檻就是 > 0，不需要猜。for 1h 只為避開部署／scrape 抖動。
+      - alert: PricebookMarketDataGap
+        expr: hawkr_pricebook_market_unrecoverable_gap_days > 0
+        for: 1h
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：{{ $labels.market_name }}（{{ $labels.market_code }}）有 {{ $value }} 個交易日的行情永久缺漏"
+          description: "env={{ $labels.env }}：這些交易日的攝取分區已經用盡 MaxIngestAttempts=14 次嘗試被標成 abandoned（終態），每日排程再也不會去撿它們——不處理就是永久空洞，買家找貨與預測對這些日子只能降級。先用農業部 API 確認上游現在有沒有那幾天的資料（curl AgriProductsTransType 帶 MarketCode 與單日區間），有就跑 cmd/pricebook-backfill 補。**上游真的沒出**時這一格永遠補不回來，這條也就永遠不會自己解除——用 `cmd/pricebook-backfill --accept-gap --market <code> --date <YYYY-MM-DD> --by <你> --reason <查證結果>` 把它標成已接受的缺口（該指令會在寫入前重新向 MOA 查一次，查得到就改成正常寫入並拒絕接受，所以不會誤蓋掉真缺口）。⚠️ 這條跟『資料有點舊』不同——還在重試中的格子是 pending，是 MOA 常態長尾，不會觸發這條。"
+
+      # 多個市場同時出現永久缺口 ⇒ 那幾天整條 ingest 線斷過，不是個別市場的上游問題。
+      # 2026-09-02 實測 dev 就有一例：2026-07-24 全部 21 個市場皆缺。
+      - alert: PricebookDataGapFleetWide
+        expr: count(hawkr_pricebook_market_unrecoverable_gap_days > 0) by (env) >= 11
+        for: 1h
+        labels:
+          severity: critical
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：{{ $value }} 個市場同時有永久缺漏，那段期間 ingest 線疑似整條斷過"
+          description: "env={{ $labels.env }}：21 個 active 市場裡有 {{ $value }} 個同時存在已放棄的缺口。個別市場的上游停更不會長這樣——先查 ingest_run 在那段期間有沒有執行紀錄（缺紀錄 ⇒ 排程沒跑／pod 沒起來），再決定 backfill 的區間。"
+
+      # 🔴 取代 PricebookIngestNotWriting（2026-09-03）。舊條件是「距上一次有
+      # inserted/revised 超過 30 小時」，把寫入量當成活性的代理——在 digest-dedupe
+      # 之下那是錯的代理，最近 10 次排程有 4 次 inserted=0 而完全健康，08-29～08-31
+      # 連兩次 0 寫入會讓它誤報約 42 小時。活性、健康、完整度三件事在這裡拆成三條。
+      - alert: PricebookIngestNotRunning
+        expr: hawkr_pricebook_ingest_last_run_age_hours > 30 or hawkr_pricebook_ingest_last_run_age_hours < 0
+        for: 1h
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：排程 ingest 已 {{ $value }} 小時沒有啟動過"
+          description: "env={{ $labels.env }}：kind=1 的排程匯入距上一次**啟動**已超過 30 小時（-1 = 從未跑過）；每日排程是 20:00 UTC，正常最多 24 小時。這條只問活性，不問寫了多少——排程跑了但上游沒有新資料是常態，不會觸發它。亮了就去看 CronJob／pod 有沒有起來，而不是先看資料。"
+
+      - alert: PricebookIngestLastRunFailed
+        expr: hawkr_pricebook_ingest_last_run_failed > 0
+        for: 1h
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：最近一次排程 ingest 以失敗收場"
+          description: "env={{ $labels.env }}：最新的 kind=1 ingest_run 是 status=3(Failed)，錯誤在該列的 error_message。ingest 是 fail-fast 的，已抓到的段落不回滾、分區狀態由 defer 寫回，所以資料不會半套；但那一輪剩下的市場沒被處理，那些格子留在 pending 等下一輪。連續兩天亮 ⇒ 不是偶發逾時，要查上游或我方。"
+
+      # 早期預警：整條線斷掉時，只靠 abandoned 要 14 天才叫得出人。
+      - alert: PricebookIngestBacklogFleetWide
+        expr: hawkr_pricebook_partition_overdue_markets >= 11
+        for: 2h
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：{{ $value }} 個市場的分區已落後 4 天以上還沒補齊"
+          description: "env={{ $labels.env }}：pending 分區 attempt_count >= 4（已超出實測上架延遲長尾，落後 4 天以上實測只佔 3% 且分散）的市場數達到 {{ $value }}。個別市場的上游延遲不會長這樣——同時這麼多市場落後代表抓取整條線有問題。這條刻意早於 PricebookMarketDataGap：後者要 MaxIngestAttempts=14 次嘗試耗盡才亮，等於斷線 14 天後才叫人。"
+
+      # backfill CLI 中斷後那一列永遠停在 status=Running，沒有東西會收尾它。
+      # dev 上 2026-08-05~07 就留了 18 列。純衛生訊號，不緊急。
+      - alert: PricebookIngestRunStuck
+        expr: hawkr_pricebook_ingest_stuck_running_total > 0
+        for: 1h
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：有 {{ $value }} 筆 ingest_run 卡在 Running 超過 6 小時"
+          description: "env={{ $labels.env }}：ingest_run 有列停在 status=1(Running) 逾 6 小時。通常是 cmd/pricebook-backfill 被中斷後留下的殘骸——沒有任何程式會收尾它，稽核表會愈積愈髒且讓「這次有沒有在跑」變得難判讀。確認該次匯入確實已結束後用維運 SQL 收掉。"
+
+  # ==========================================================================
+  # 物流履約（shipping-service）
+  #
+  # 這個 group 在 2026-09-10 之前是空的：shipping-service 全服務零 micrometer
+  # counter（對照組 order-service 5 個），Prometheus 對它只有 liveness。
+  # Independent QA 的原話：「unknown status 被保存只是第一步；如果沒有任何監控，
+  # 實務上仍是 silent failure」。
+  # ==========================================================================
+  - name: shipping-alerts
+    interval: 300s
+    rules:
+      # 物流商開始回傳我方 adapter 認不得的貨態 —— 通常是對方改了碼表。
+      #
+      # 🔴 這條的意義是**趨勢**不是單筆：單筆已經有 raw 值落在
+      # shipments.provider_status 與 WARN log 裡；沒人看的是「它開始變多了」。
+      #
+      # ⚠️ **兩個 dev 實測出來的陷阱，兩個都已在 code 側修掉，這裡記下判準**：
+      #
+      # ① **不得與「回調不帶貨態欄位」共用 counter**。PayUni 建單結果回報只有
+      #    TradeStatus 沒有 ShipStatus，會走進同一個處置分支，但那是**正常流量**。
+      #    共用時 sum by (env, shipping_method) 會跨 outcome 加總 ⇒ 每次正常建單都告警。
+      #    ⇒ 它有自己的指標 hawkr_shipping_provider_not_status_event_total，不進本條。
+      #
+      # ② **counter 必須在服務啟動時預先展開成 0**（ShippingService 建構子對 5 個配送方式做）。
+      #    Micrometer 的 counter 在第一次觀測前不出現在 /metrics 上，而序列從「不存在」
+      #    跳到 1 **不算 increase** ⇒ 不展開的話，每個 pod 生命週期內的第一筆會靜默，
+      #    而「第一筆」正是最需要被看到的。dev 實測：序列有 22 個取樣點、值恆為 1，
+      #    increase(...[1h]) 求值為空。
+      - alert: ShippingProviderStatusUnknown
+        # 🔴 selector 帶 outcome!="not_a_status_event" 是**跨版本安全**用的，不是冗餘：
+        #    prod 目前跑的是拆指標**之前**的版本（promote 分支在修復 merge 進 dev 之前切出），
+        #    那一版把正常流量（PayUni 建單結果回報只有 TradeStatus）也放進這支 counter 的
+        #    outcome label 裡 ⇒ 不濾掉的話 prod 會被正常建單觸發告警。
+        #    修復版沒有 outcome label，而 Prometheus 對「缺少的 label」視為空字串、
+        #    "" != "not_a_status_event" 成立 ⇒ 同一條 expr 對兩個版本都正確。
+        #    等修復 promote 到 main、prod 跑上新版之後，這個 selector 變成無害的冗餘，
+        #    可以連同本註解一起移除。
+        expr: sum by (env, shipping_method) (increase(hawkr_shipping_provider_status_unknown_total{outcome!="not_a_status_event"}[1h])) > 0
+        for: 15m
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：配送方式 {{ $labels.shipping_method }} 有 {{ $value }} 筆無法辨識的物流商貨態"
+          description: "env={{ $labels.env }}：物流商回了 adapter 認不得的貨態碼，raw 值已保存但狀態機沒有推進——那些單子的平台狀態停在原地，買賣家看到的進度是舊的。診斷：① 撈 raw 值 `SELECT shipment_no, provider_status, provider_message, updated_at FROM shipments WHERE provider_status IS NOT NULL AND updated_at > NOW() - INTERVAL '2 hours' ORDER BY updated_at DESC` ② 對照 log event `ShippingService.providerStatus.unknown` 取 source（WEBHOOK／WEBHOOK_NO_ADAPTER／QUERY）判斷是哪條入口 ③ 拿 raw 值對第三方文件的貨態表，是新增碼就補 ShipmentStatusMapper 的映射、是我方漏 map 就補 adapter ④ 補完後那些卡住的單子要手動推進，映射補上不會回溯。⚠️ 本條**不含** provider_not_status_event（回調不帶貨態欄位）——那是正常流量。"
+
+  # ── 站外業者邀請信網域信譽前哨（Vendor Portal E1 #2539）──
+  - name: vendor-portal-alerts
+    interval: 300s
+    rules:
+      - alert: VendorPortalInviteEmailPermanentFailureRatioHigh
+        expr: |
+          (
+            sum by (env) (increase(vendor_portal_invite_email_total{result="permanent"}[1h]))
+              /
+            sum by (env) (increase(vendor_portal_invite_email_total[1h]))
+            > 0.2
+          )
+          and
+          sum by (env) (increase(vendor_portal_invite_email_total[1h])) >= 10
+        for: 15m
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：站外業者邀請信 permanent 失敗率 {{ $value | humanizePercentage }}"
+          description: "env={{ $labels.env }}：過去 1 小時站外業者邀請信有超過 20% 被 Resend 判定為 permanent（不可重試，通常是硬退信），且該小時寄送量達到 10 封以上。example.com 同時是訂單信與發票信的寄送網域，兩者都沒有替代管道——先查 notification-service 的 vendor invite consumer log 找出集中退信的收件網域，確認是否為網域信譽被標記的早期訊號。"
+
+  # ── 70 號《物流財務結算》線 B｜賣家物流應收卡住（sql_exporter: logistics_finance）──
+  #
+  # 這一組回答的是 70 §3.2.1 那張表的第 ④ 問：「卡住了誰會知道」。在它之前答案是
+  # **沒有人**——logistics_receivables 的七個狀態在 monitoring/ 全域零命中。
+  #
+  # 🔴 為什麼是 business 而不是 infra：卡住的每一列都對應**一筆真實的錢**
+  #    （平台已經替賣家墊付了 provider 的配送成本，正要向賣家收回）。
+  #    處置一律是人看帳，不是重啟服務。
+  #
+  # 🔴 禁止用 reconciliation job／backfill CLI／drift scanner 清這些列（CLAUDE.md §22）。
+  #    一次性的資料修補走維運 SQL，而動手前要先跑 70 §3.2.2 的三問：
+  #    ① 我要寫的這個值有沒有執行者 ② 推走它的那一句 allowed-from 含不含我造出來的組合
+  #    ③ 同一交易要不要補一列狀態歷程（裸 UPDATE 不留痕 ⇒ 下一個人看到的軌跡是假的）。
+  - name: logistics-finance-alerts
+    interval: 300s
+    rules:
+      # 判準 B「什麼會讓它變回 resolved」：對應的 worker 把列推進下一個狀態，或 ADM 處置完畢。
+      # 正常情況下這個數字恆為 0 ⇒ **不是永久紅候選**，所以不需要 cadence 降頻。
+      #
+      # for: 1h 沿用 InvoiceAdjustmentStuck 的取值（同一類：需要人判斷、太吵會讓人關掉它）。
+      # ⚠️ SQL 側已經各自帶了門檻（PENDING 1h／SUBMITTED expected_fund_date+48h／
+      #    FAILED 72h／SETTLED 24h），這裡的 for 是**再加一層**，不是那個門檻本身。
+      - alert: LogisticsReceivableStuck
+        expr: sum by (env, status) (logistics_receivable_stuck_rows) > 0
+        for: 1h
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：{{ $value }} 筆賣家物流應收卡在 {{ $labels.status }}"
+          description: "env={{ $labels.env }}：這些列**沒有執行者在推進**，每一列都對應一筆平台已經墊付、正要向賣家收回的物流成本。依 status 分流：① PENDING 超過 1 小時 ⇒ 提交 worker 沒在動（查該 pod 的 log 與 `SELECT id, submit_lease_until, created_at FROM logistics_receivables WHERE status='PENDING' ORDER BY created_at`；租約全是舊的代表沒有人在 claim，租約一直被刷新代表送出當下在炸）② SUBMITTED 超過 expected_fund_date+48h ⇒ **查詢 worker 沒把它推成 UNCONFIRMED**；特別檢查該列最新一筆 logistics_collection_attempts 的 `expected_fund_date` 是不是 NULL——是的話它對查詢 worker 是永久隱形的（pastGrace() 對 NULL 回 false 且不交給任何人），要人工判定後補值或直接推 UNCONFIRMED ③ FAILED 超過 72 小時 ⇒ 退避重送（1h／6h／24h 至多 3 次）已耗盡，到 ADM 決定重送或 WRITTEN_OFF（強制填理由）④ SETTLED 超過 24 小時且 actual_cost 有值 ⇒ **對帳做了但 true-up 沒做**，`actual > estimated` 的差額永遠不會被收而帳面上看起來一切正常；補 `logistics_adjustments{kind=RECONCILIATION}` 併入下一筆應收，不得由平台默默吸收（70 §6.2）。🔴 禁止寫 reconciliation job／backfill CLI 清它（CLAUDE.md §22）；維運 SQL 動手前先跑 70 §3.2.2 的三問。"
+
+      # 🔴 70 §8 逐字「本書最重要的一條」。
+      #
+      # for: 6h 的語意是「**持續**有未處置的 UNCONFIRMED」，不是「某一列躺了 6 小時」
+      # ——SQL 側刻意沒有時間門檻（UNCONFIRMED 是狀態機裡唯一設計上就沒有自動執行者的
+      # 狀態，出邊三條全是 ADM）。ADM 每小時清掉一筆但新的一直來時它也會響，那是刻意的：
+      # 70 §13 R1 正是「UNCONFIRMED 的人工負擔未知，若發生率高 ADM 會被淹沒」。
+      # ⚠️ 6h 是**起始值**，70 §13 R1 明載要用這支指標本身校準寬限期。
+      #
+      # 為什麼是 warning 不是 critical：處置一定需要人到 PayUni 後台核對，
+      # 沒有可以立刻執行的自動修法。貼 critical 只會讓它被靜音（§2.1.2）。
+      - alert: LogisticsReceivableUnconfirmed
+        expr: sum by (env) (logistics_receivable_unconfirmed_rows) > 0
+        for: 6h
+        labels:
+          severity: warning
+          channel: business
+        annotations:
+          summary: "env={{ $labels.env }}：{{ $value }} 筆賣家物流應收處於 UNCONFIRMED（錢可能收了也可能沒收）"
+          description: "env={{ $labels.env }}：`agent_fee` 已經送出去了，而過了期望撥款日＋寬限期，`agent_fee_query` 回的 `FundDate` 仍是 `0000-00-00`——**「還沒到次日」與「次日執行失敗（最可能是賣家餘額不足）」在 PayUni 的回應上長得一模一樣**，所以這一格代表「錢可能收了也可能沒收」。🔴 **不得自動重送**：PayUni 的 `TradeNo` 官方三處逐字標『可重複』，且 `agent_fee_query` 回單筆結構非陣列 ⇒ 真的送重複了，用官方 API 也對不出有幾筆；自動重送的期望值是把一次不確定變成一次確定的重複扣款（70 §4.1／§4.3 第 3 層）。處置：拿該列最新一筆 `logistics_collection_attempts.trade_no` 到 PayUni 商戶後台核對，三選一（70 §3.2）——① **其實收到了** ⇒ 推 SETTLED，附核對依據與 ADM 留痕（這是最可能的結果）② **確認沒受理** ⇒ 推回 PENDING 並**開一筆新 attempt ＋ 新 trade_no**（原 attempt 留『ADM 判定未受理』理由；用舊 trade_no 重送等於賭 PayUni 真的沒受理）③ **查不出來** ⇒ WRITTEN_OFF，強制填理由。🔴 禁止寫 reconciliation job／backfill CLI（CLAUDE.md §22）；維運 SQL 動手前先跑 70 §3.2.2 的三問。"

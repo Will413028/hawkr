@@ -1,0 +1,2 @@
+-- Modify "invoice_manual_unlocks" table
+ALTER TABLE "invoice_manual_unlocks" ADD CONSTRAINT "chk_invmu_evidence_kind" CHECK ((cancel_evidence_kind IS NULL) OR ((cancel_evidence_kind)::text = ANY ((ARRAY['MOF_PLATFORM_SCREENSHOT'::character varying, 'AMEGO_RECONCILE_FILE'::character varying])::text[]))), ADD CONSTRAINT "chk_invmu_evidence_object_key" CHECK ((cancel_evidence_object_key IS NULL) OR (cancel_evidence_kind IS NOT NULL)), ADD COLUMN "cancel_evidence_kind" character varying(48) NULL, ADD COLUMN "cancel_evidence_object_key" text NULL;

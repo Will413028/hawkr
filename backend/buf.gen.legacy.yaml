@@ -1,0 +1,32 @@
+# 遷移期與舊服務之間的 gRPC stub（單體呼叫它們，或單體替它們提供 account-service 的 gRPC），生成到 internal/legacy/gen；在 backend/ 執行 `make connect`。
+# 用 connect-go 的 gRPC 協定呼叫，單體不依賴 grpc-go 與舊的 go-pkg。只生成單體真的呼叫的 proto
+# （paths）；最後一個 Java 服務改寫後（遷移計畫階段 B）連同 internal/legacy 刪除。
+# 外掛由 go.mod 的 tool 固定版本；buf CLI 的版本見 ../api/.buf-version。
+version: v2
+# 生成前清空每個外掛的 out 目錄，刪掉的 proto 才不會留下孤兒檔。
+clean: true
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: github.com/Will413028/hawkr/backend/internal/legacy/gen
+plugins:
+  - local: [go, tool, protoc-gen-go]
+    out: internal/legacy/gen
+    opt: paths=source_relative
+  - local: [go, tool, protoc-gen-connect-go]
+    out: internal/legacy/gen
+    opt: paths=source_relative
+inputs:
+  - directory: api/proto
+    paths:
+      - api/proto/account/account.proto
+      - api/proto/account/delegation.proto
+      - api/proto/buyer/buyer.proto
+      - api/proto/common/delegation.proto
+      - api/proto/media/media.proto
+      - api/proto/product/product.proto
+      - api/proto/order/order.proto
+      - api/proto/crm/crm.proto
+      - api/proto/seller/seller.proto
+      - api/proto/review/review.proto

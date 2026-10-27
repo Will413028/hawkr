@@ -1,0 +1,4 @@
+data: {"type":"RUN_STARTED","threadId":"9dfe5250-ba33-4d57-bf52-83a809bfeaaf","runId":"5f336a4795433307507428e0235b7a7c"}
+
+data: {"type":"RUN_FINISHED","threadId":"9dfe5250-ba33-4d57-bf52-83a809bfeaaf","runId":"5f336a4795433307507428e0235b7a7c","result":{"sessionId":"9dfe5250-ba33-4d57-bf52-83a809bfeaaf"}}
+

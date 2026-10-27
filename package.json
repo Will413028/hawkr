@@ -1,0 +1,9 @@
+{
+	"name": "hawkr",
+	"private": true,
+	"type": "module",
+	"packageManager": "pnpm@12.15.0",
+	"scripts": {
+		"check:deps": "pnpm audit --prod && node scripts/check-dependency-overrides.ts"
+	}
+}

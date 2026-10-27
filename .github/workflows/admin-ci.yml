@@ -1,0 +1,70 @@
+name: admin CI
+
+on:
+  pull_request:
+    paths:
+      - 'admin/**'
+      - 'api/**'
+      # 共用的 TS 生成碼與 Connect 執行期（import 自 @hawkr/api）。
+      - 'packages/hawkr-api-ts/**'
+      # 共用的鄉鎮市區代碼表與查詢（import 自 @hawkr/twaddr）。
+      - 'packages/hawkr-twaddr-ts/**'
+      # 共用文案目錄（import 自 @hawkr/ui-text）。
+      - 'packages/hawkr-ui-text-ts/**'
+      # 根目錄的 pnpm workspace（兩個 app 共用一份 lockfile 與工具版本）。
+      # workspace 層級的 audit 與 override 檢查在 workspace-ci.yml，不在這裡。
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - 'patches/**'
+      - 'pnpm-lock.yaml'
+      - '.nvmrc'
+      - '.github/actions/pnpm-install/**'
+      - '.github/workflows/admin-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'admin/**'
+      - 'api/**'
+      # 共用的 TS 生成碼與 Connect 執行期（import 自 @hawkr/api）。
+      - 'packages/hawkr-api-ts/**'
+      # 共用的鄉鎮市區代碼表與查詢（import 自 @hawkr/twaddr）。
+      - 'packages/hawkr-twaddr-ts/**'
+      # 共用文案目錄（import 自 @hawkr/ui-text）。
+      - 'packages/hawkr-ui-text-ts/**'
+      # 根目錄的 pnpm workspace（兩個 app 共用一份 lockfile 與工具版本）。
+      # workspace 層級的 audit 與 override 檢查在 workspace-ci.yml，不在這裡。
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - 'patches/**'
+      - 'pnpm-lock.yaml'
+      - '.nvmrc'
+      - '.github/actions/pnpm-install/**'
+      - '.github/workflows/admin-ci.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: admin-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: admin
+
+env:
+  # admin/website 的 `prepare` 會跑 `lefthook install`，CI 不需要 git hooks。
+  LEFTHOOK: '0'
+
+jobs:
+  verify:
+    name: Lint, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/pnpm-install
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build

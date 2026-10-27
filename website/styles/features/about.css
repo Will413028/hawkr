@@ -1,0 +1,128 @@
+/* About keeps the shared Hawkr postcard hero, but gives the brand IP a
+ * real composition role instead of leaving the second half of the canvas idle. */
+.hkh-page .about-hero-grid {
+	grid-template-columns: minmax(0, 640px) minmax(340px, 1fr);
+	grid-template-areas: "content artwork";
+	grid-template-rows: 1fr;
+	align-items: center;
+	column-gap: clamp(32px, 4vw, 64px);
+	max-width: 1320px;
+	padding: 80px 72px 84px;
+	text-align: left;
+}
+
+.hkh-page .about-hero-content {
+	grid-area: content;
+	align-self: center;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.hkh-page .about-hero-heading {
+	max-width: 640px;
+}
+
+.hkh-page .about-hero-body {
+	max-width: 640px;
+}
+
+.hkh-page .about-hero-ip {
+	grid-area: artwork;
+	position: relative;
+	z-index: 1;
+	align-self: center;
+	min-width: 0;
+	height: clamp(420px, 38vw, 520px);
+	display: flex;
+	align-items: flex-end;
+	justify-content: center;
+	isolation: isolate;
+	user-select: none;
+}
+
+.hkh-page .about-hero-ip__image {
+	position: relative;
+	z-index: 2;
+	display: block;
+	width: min(100%, 520px);
+	flex: 0 0 auto;
+	aspect-ratio: 1;
+	pointer-events: none;
+}
+
+.hkh-page .about-hero-ip__glow {
+	position: absolute;
+	left: 50%;
+	z-index: 0;
+	bottom: 4%;
+	width: min(76%, 420px);
+	aspect-ratio: 1.55;
+	border-radius: 50%;
+	background: radial-gradient(
+		ellipse at center,
+		rgba(202, 177, 92, 0.18) 0%,
+		rgb(var(--color-ink-300-rgb) / 0.09) 46%,
+		rgb(var(--color-ink-300-rgb) / 0) 74%
+	);
+	opacity: 0.72;
+	transform: translate3d(-50%, 0, 0);
+	pointer-events: none;
+}
+
+@media (max-width: 980px) {
+	.hkh-page .about-hero-grid {
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-areas:
+			"content"
+			"artwork";
+		grid-template-rows: auto auto;
+		gap: 0;
+		max-width: 760px;
+		min-height: auto;
+		padding: 72px 48px 52px;
+	}
+
+	.hkh-page .about-hero-ip {
+		width: min(100%, 560px);
+		height: 430px;
+		margin: 0 auto;
+	}
+
+	.hkh-page .about-hero-ip__image {
+		width: min(100%, 430px);
+	}
+}
+
+@media (max-width: 640px) {
+	.hkh-page .about-hero-grid {
+		padding: 64px 28px 40px;
+	}
+
+	.hkh-page .about-hero-ip {
+		height: 210px;
+		margin-top: 24px;
+	}
+
+	.hkh-page .about-hero-ip__image {
+		width: min(100%, 210px);
+	}
+
+	.hkh-page .about-hero-body .hero-ctas {
+		gap: 8px;
+		flex-wrap: nowrap;
+	}
+
+	.hkh-page .about-hero-body .hero-ctas .btn {
+		min-width: 0;
+		flex: 1 1 0;
+		padding-inline: 12px;
+		white-space: nowrap;
+	}
+}
+
+@media (forced-colors: active) {
+	.hkh-page .about-hero-ip__glow {
+		display: none;
+	}
+}

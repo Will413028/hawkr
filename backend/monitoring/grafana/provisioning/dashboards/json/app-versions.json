@@ -1,0 +1,448 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "App 版本分佈（設計書 54 §8.2）。資料源＝Gateway access log 的 app_version / app_type 兩欄（Loki）。App 只發 iOS，不分平台（2026-09-26）。用途：破壞性契約變更前，判斷舊版 App 是否已退場到可放行的水位（放行判準見設計書 54 §8.2）。⚠️ Loki 保留期 7 天（monitoring/loki/local-config.yaml retention_period: 168h），時間範圍不可拉超過 7 天，拉超過只會得到被截斷的假象。",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "panels": [],
+      "title": "📱 版本分佈（分母＝本來就帶版本 header 的請求）",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "回答的問題：「$environment 的 $app_type App，各版本的請求量隨時間怎麼變」——新版放量後，舊版那條線是否往下走到接近 0。\n\n分母定義：**只計本來就帶 X-App-Version header 的請求**，也就是兩支 Flutter App 經 dio 發出的一般 HTTP 請求。不帶版本的請求（官網 SSR、server-to-server、health probe、以及設計書 54 §8.2 列的 SSE/WS 握手後訊息、WebView 導航、圖片直取）既不進分子也不進分母，因此本圖是「App HTTP 請求的版本組成」，不是「使用者人數的版本組成」。\n\n⚠️ 已知偏差：重度使用長連線（聊天 WS / SSE）的使用者，其活躍度不會反映在請求數上，會被系統性低估。判斷「舊版是否歸零」時這偏差是安全方向（低估舊版），但判斷「新版是否被採用」時要留意。\n\n⚠️ app_version 已用 semver 白名單 `^[0-9]+\\.[0-9]+\\.[0-9]+$` 過濾：header 是 client 可控輸入，任何人 curl 一個亂數就會多一條 series。被白名單擋掉的值請看下方「資料品質」區。",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 40,
+            "showPoints": "never",
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            }
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "calcs": [
+            "sum",
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (app_version) (count_over_time({container=\"gateway\", environment=\"$environment\"} |= `gateway request` | json | app_type=`$app_type` | app_version =~ `^[0-9]+\\.[0-9]+\\.[0-9]+$` [$__auto]))",
+          "legendFormat": "{{app_version}}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "各版本請求數 — $app_type @ $environment",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "回答的問題：「在目前選定的時間範圍內，$app_type 的請求有多少比例來自哪個版本」——放行判準 ① 舊版佔比 < 1% 就看這裡。\n\n分母同上圖：只計帶版本 header 且版本符合 semver 的請求。百分比是**請求數佔比，不是使用者佔比**。\n\n⚠️ 佔比要和下方「分母樣本數」一起看：分母太小時，1% 這個門檻沒有統計意義（放行判準 ③ 即為此設）。",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "mappings": [],
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 10
+      },
+      "id": 3,
+      "options": {
+        "displayLabels": [
+          "percent"
+        ],
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (app_version) (count_over_time({container=\"gateway\", environment=\"$environment\"} |= `gateway request` | json | app_type=`$app_type` | app_version =~ `^[0-9]+\\.[0-9]+\\.[0-9]+$` [$__range]))",
+          "legendFormat": "{{app_version}}",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "title": "版本佔比（時間範圍內累計）",
+      "type": "piechart"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "回答的問題：「上面那些百分比，是用多少樣本算出來的」——放行判準 ③ 分母 ≥ 10,000 就看這個數字。\n\n這是上方三張圖共用的分母：時間範圍內 $app_type 帶合法 semver 版本的請求總數。\n\n⚠️ **這格是紅的（< 10,000）時，佔比判準不適用**——分母太小會讓「舊版佔比 < 1%」假性達標（例如全部只有 200 筆，舊版 1 筆就是 0.5%）。此時不要拿本 dashboard 放行，改用商店後台的版本分佈當證據。",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 10000
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 10
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum (count_over_time({container=\"gateway\", environment=\"$environment\"} |= `gateway request` | json | app_type=`$app_type` | app_version =~ `^[0-9]+\\.[0-9]+\\.[0-9]+$` [$__range]))",
+          "legendFormat": "分母樣本數（門檻 10,000）",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "title": "分母樣本數 — 放行判準 ③",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "id": 6,
+      "panels": [],
+      "title": "🧪 資料品質（恆應為 0）",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "回答的問題：「有沒有不符合 semver 的 app_version 混進來」。\n\n**這格恆應為 0。非 0 代表下列其中之一：**\n① 有人在灌 header（X-App-Version 是匿名可控輸入，curl 一個亂數就會出現一筆）——若量小且值明顯是亂數，屬噪音，確認來源 IP 後可忽略；\n② Gateway 的截斷邏輯出問題（`logger.go` 的 truncateHeaderValue 限 32 字元）——症狀是出現剛好 32 字元的值；\n③ App 端送錯格式——最典型是把顯示字串 `1.0.3(7)` 當版本送出（設計書 54 §6.5 陷阱），這一種要立刻修，因為它會讓上方所有佔比少算掉一整個版本。\n\n注意本查詢**刻意不依 $app_type 過濾**：灌進來的垃圾請求連 app_type 都可能是亂的，依 app_type 過濾會把它們藏起來。所以本區的數字與上方三張圖的分母沒有從屬關係。\n\n對應告警：`monitoring/loki/rules/fake/app-version.yml` 的 AppVersionGarbageValues（> 0 持續 15m）。",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 0,
+        "y": 19
+      },
+      "id": 7,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum (count_over_time({container=\"gateway\", environment=\"$environment\"} |= `gateway request` | json | app_version != `` | app_version !~ `^[0-9]+\\.[0-9]+\\.[0-9]+$` [$__range]))",
+          "legendFormat": "非法版本值請求數",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "title": "非法 app_version 請求數",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "左格非 0 時看這裡：實際混進來的值長什麼樣，用來分辨是「有人灌 header」（亂數字串）、「截斷邏輯壞掉」（剛好 32 字元）還是「App 送錯格式」（看得出是版本號但帶了 build number 或前綴）。\n\n空表（No data）＝左格為 0，是正常狀態。",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          },
+          "mappings": [],
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 18,
+        "x": 6,
+        "y": 19
+      },
+      "id": 8,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Value"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "sum by (app_version, app_type) (count_over_time({container=\"gateway\", environment=\"$environment\"} |= `gateway request` | json | app_version != `` | app_version !~ `^[0-9]+\\.[0-9]+\\.[0-9]+$` [$__range]))",
+          "format": "table",
+          "legendFormat": "",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "title": "非法 app_version 明細",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            }
+          }
+        }
+      ],
+      "type": "table"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 39,
+  "tags": [
+    "hawkr",
+    "app-version"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": "prod",
+          "value": "prod"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "環境",
+        "multi": false,
+        "name": "environment",
+        "options": [
+          {
+            "selected": true,
+            "text": "prod",
+            "value": "prod"
+          },
+          {
+            "selected": false,
+            "text": "dev",
+            "value": "dev"
+          }
+        ],
+        "query": "prod,dev",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "BUYER",
+          "value": "BUYER"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "App",
+        "multi": false,
+        "name": "app_type",
+        "options": [
+          {
+            "selected": true,
+            "text": "BUYER",
+            "value": "BUYER"
+          },
+          {
+            "selected": false,
+            "text": "SELLER",
+            "value": "SELLER"
+          }
+        ],
+        "query": "BUYER,SELLER",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "Asia/Taipei",
+  "title": "Hawkr - App 版本分佈（App Version Gate）",
+  "uid": "hawkr-app-versions",
+  "version": 1
+}

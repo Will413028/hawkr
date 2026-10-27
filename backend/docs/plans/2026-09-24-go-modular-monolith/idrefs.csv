@@ -1,0 +1,125 @@
+holder_deployable,owner_deployable,id_columns,evidence_path
+account-service,ANY (resource_type: product/coupon/order...),admin_operation_audit_logs.resource_id,services/account-service/db/schema/schema.sql
+account-service,media-service,admin_operation_audit_logs.resource_image_key,services/account-service/db/schema/schema.sql
+account-service,seller-service,admin_operation_audit_logs.target_store_id;delegated_operation_sessions.target_store_id;delegation_authorization_audit_logs.target_store_id;seller_delegation_authorizations.target_store_id,services/account-service/db/schema/schema.sql
+account-service,seller-service|buyer-service (sellers.store_id / buyers.buyer_id),account_roles.source_id,services/account-service/db/schema/schema.sql
+aftersales-service,account-service(admin),aftersale_audit_logs.actor_admin_account_id;aftersale_platform_decisions.decided_by_admin_id,services/java/aftersales-service/src/main/resources/db/migration/
+aftersales-service,buyer-service,aftersale_audit_logs.actor_buyer_id;aftersale_cases.buyer_id;seller_cancel_requests.buyer_id,services/java/aftersales-service/src/main/resources/db/migration/
+aftersales-service,coupon-service,aftersale_resolutions.coupon_template_id,services/java/aftersales-service/src/main/resources/db/migration/
+aftersales-service,media-service,aftersale_case_items.image_object_key;aftersale_evidence.asset_id;aftersale_evidence.object_key,services/java/aftersales-service/src/main/resources/db/migration/
+aftersales-service,order-service,aftersale_case_items.order_item_id;aftersale_cases.order_no;refund_tasks.order_no;seller_cancel_requests.order_no,services/java/aftersales-service/src/main/resources/db/migration/
+aftersales-service,payment-service,aftersale_cases.transaction_id;refund_tasks.transaction_id;seller_cancel_requests.transaction_id,services/java/aftersales-service/src/main/resources/db/migration/
+aftersales-service,payment-service (refund_no),refund_tasks.external_ref_id,services/java/aftersales-service/src/main/resources/db/migration/
+aftersales-service,product-service,aftersale_case_items.sku_id,services/java/aftersales-service/src/main/resources/db/migration/
+aftersales-service,seller-service,aftersale_audit_logs.actor_store_id;aftersale_cases.store_id;seller_cancel_requests.store_id,services/java/aftersales-service/src/main/resources/db/migration/
+aftersales-service,seller-service(payuni_registrations.payuni_mer_id),aftersale_cases.mer_id;refund_tasks.mer_id;seller_cancel_requests.mer_id,services/java/aftersales-service/src/main/resources/db/migration/
+aftersales-service,shipping-service,aftersale_cases.return_shipment_no;aftersale_cases.ship_trade_no,services/java/aftersales-service/src/main/resources/db/migration/
+aftersales-service,shipping-service (copy),aftersale_cases.validation_no,services/java/aftersales-service/src/main/resources/db/migration/
+aftersales-service,shipping-service (return shipment PayUni id copy),aftersale_cases.partner_id,services/java/aftersales-service/src/main/resources/db/migration/
+ai-service,buyer-service,procurement_agent_run_commands.buyer_id;procurement_agent_runs.buyer_id;procurement_answer_patches.buyer_id;procurement_buyer_quote_acceptances.buyer_id;procurement_buyer_shortlist_entries.buyer_id;procurement_candidate_selections.buyer_id;procurement_candidate_sets.buyer_id;procurement_confirmed_rfq_snapshots.buyer_id;procurement_conversation_commands.buyer_id;procurement_conversations.buyer_id;procurement_price_previews.buyer_id;procurement_requests.buyer_id;procurement_rfq_publication_approvals.buyer_id;procurement_rfq_publication_commands.buyer_id;procurement_rfq_publication_invites.buyer_id;procurement_rfq_publications.buyer_id;procurement_seller_responses.buyer_id;procurement_usage.buyer_id;procurement_usage_reservations.buyer_id,services/ai-service/db/schema/ (schema.sql + procurement.sql)
+ai-service,buyer-service (ADK session user_id TEXT; UNVERIFIED),events.user_id;sessions.user_id;user_states.user_id,services/ai-service/db/schema/ (schema.sql + procurement.sql)
+ai-service,media-service,ai_styles.thumbnail_key;procurement_candidates.logo_key;procurement_candidates.brand_logo_key;procurement_candidates.brand_cover_key,services/ai-service/db/schema/ (schema.sql + procurement.sql)
+ai-service,order-service,procurement_buyer_quote_acceptances.order_no,services/ai-service/db/schema/ (schema.sql + procurement.sql)
+ai-service,seller-service,ai_quotas.store_id;ai_usage.store_id;ai_usage_reservations.store_id;procurement_buyer_quote_acceptances.store_id;procurement_buyer_quote_acceptances.prospect_id;procurement_candidates.store_id;procurement_candidates.prospect_id;procurement_rfq_publication_approval_recipients.store_id;procurement_rfq_publication_approval_recipients.prospect_id;procurement_rfq_publication_invites.store_id;procurement_rfq_publication_invites.prospect_id;procurement_seller_responses.store_id;procurement_seller_responses.prospect_id;seller_ranking_facts.store_id,services/ai-service/db/schema/ (schema.sql + procurement.sql)
+buyer-service,ANY (ref_type),notifications.ref_id,services/buyer-service/db/schema/schema.sql
+buyer-service,account-service,buyer_deleted_outbox.account_id;buyer_deletion_audit.account_id;buyers.account_id,services/buyer-service/db/schema/schema.sql
+buyer-service,account-service(admin),buyer_deletion_audit.operator_id,services/buyer-service/db/schema/schema.sql
+buyer-service,product-service,favorites.product_id;restock_event_dedup.product_id;restock_subscription.product_id;visit_history.product_id,services/buyer-service/db/schema/schema.sql
+buyer-service,seller-service,seller_subscriptions.store_id,services/buyer-service/db/schema/schema.sql
+cart-service,buyer-service,cart_items.buyer_id,services/java/cart-service/src/main/resources/db/migration/
+cart-service,media-service,cart_items.image_object_key,services/java/cart-service/src/main/resources/db/migration/
+cart-service,product-service,cart_items.sku_id;cart_items.product_id,services/java/cart-service/src/main/resources/db/migration/
+cart-service,seller-service,cart_items.store_id,services/java/cart-service/src/main/resources/db/migration/
+content-service,media-service,banners.preview_image_key;banners.popup_image_key;recipes.image_key,services/content-service/db/schema/schema.sql
+coupon-service,account-service,coupon_redemption_logs.operator_account_id;coupon_templates.issuer_account_id,services/java/coupon-service/src/main/resources/db/migration/
+coupon-service,buyer-service,coupon_claims.buyer_id;coupon_instances.owner_buyer_id;coupon_redemption_logs.owner_buyer_id;coupon_target_accounts.buyer_id,services/java/coupon-service/src/main/resources/db/migration/
+coupon-service,order-service,coupon_redemption_logs.order_no,services/java/coupon-service/src/main/resources/db/migration/
+coupon-service,seller-service,coupon_instances.applicable_store_id;coupon_templates.applicable_store_id;coupon_templates.issuer_store_id;seller_coupon_quotas.store_id,services/java/coupon-service/src/main/resources/db/migration/
+crm-service,buyer-service,crm_customer_ledger.buyer_id;crm_customer_tags.buyer_id;crm_customers.buyer_id,services/crm-service/db/schema/schema.sql
+crm-service,order-service,crm_customer_ledger.order_no,services/crm-service/db/schema/schema.sql
+crm-service,seller-service,crm_customer_ledger.store_id;crm_customer_tags.store_id;crm_customers.store_id;crm_tags.store_id,services/crm-service/db/schema/schema.sql
+im-service,buyer-service,conversations.buyer_id,services/im-service/db/schema/schema.sql
+im-service,buyer-service|seller-service (buyer_id or store_id),messages.sender_id;messages.receiver_id,services/im-service/db/schema/schema.sql
+im-service,order-service,conversations.order_no,services/im-service/db/schema/schema.sql
+im-service,seller-service,conversations.store_id,services/im-service/db/schema/schema.sql
+invoice-service,account-service,invoice_admin_audit_logs.actor_account_id;invoice_admin_audit_logs.approval_actor_account_id;invoice_complaint_events.actor_account_id;invoice_complaints.decided_by_account_id;invoice_manual_unlocks.requested_by_account_id;invoice_manual_unlocks.approved_by_account_id;invoice_provider_cutovers.created_by_account_id;invoice_status_history.actor_account_id;seller_tax_profiles.attested_by_account_id,services/invoice-service/db/schema/schema.sql
+invoice-service,buyer-service,buyer_invoice_preferences.buyer_id;invoice_cancelled_orders.buyer_id;invoice_complaints.complainant_buyer_id;invoice_correction_requests.requested_by_buyer_id,services/invoice-service/db/schema/schema.sql
+invoice-service,buyer-service|seller-service (recipient_type),invoice_documents.recipient_ref_id,services/invoice-service/db/schema/schema.sql
+invoice-service,media-service,invoice_adjustments.pdf_object_key;invoice_complaint_events.attachment_object_keys;invoice_documents.pdf_object_key;invoice_manual_unlocks.cancel_evidence_object_key;invoice_operations.cancel_evidence_object_key;seller_tax_profiles.evidence_object_keys;seller_tax_profiles.receipt_approval_basis_key;seller_tax_profiles.receipt_approval_basis_asset_id,services/invoice-service/db/schema/schema.sql
+invoice-service,order-service,invoice_cancelled_orders.order_no;invoice_complaints.order_no;invoice_document_lines.order_item_id,services/invoice-service/db/schema/schema.sql
+invoice-service,order-service|payment-service (refund ref = order financial_logs.external_txn_id),invoice_adjustments.refund_no,services/invoice-service/db/schema/schema.sql
+invoice-service,order-service|payment-service (source_type: order_no / logistics receivable),invoice_documents.source_ref,services/invoice-service/db/schema/schema.sql
+invoice-service,product-service,invoice_document_lines.sku_id,services/invoice-service/db/schema/schema.sql
+invoice-service,seller-service (sellers.store_id),invoice_issuers.issuer_ref_id,services/invoice-service/db/schema/schema.sql
+media-service,ANY (product/seller/buyer/post/... by ref_type),asset_reference.ref_id,services/java/media-service/src/main/resources/db/migration/
+media-service,account-service,media_asset.uploader_account_id;upload_session.account_id,services/java/media-service/src/main/resources/db/migration/
+media-service,product-import-service,import_asset.import_job_id;import_asset.import_item_id,services/java/media-service/src/main/resources/db/migration/
+media-service,seller-service,import_asset.store_id;media_asset.import_store_id,services/java/media-service/src/main/resources/db/migration/
+notification-service,ANY (order_no / case_no / ... by template),notifications.reference_id,services/notification-service/db/schema/schema.sql
+notification-service,account-service,system_notification_logs.triggered_by_account_id,services/notification-service/db/schema/schema.sql
+notification-service,account-service (login principal account_id + user_type; per doc 12 target_user_field=*AccountId; UNVERIFIED all rows),device_tokens.user_id;notification_preferences.user_id;notifications.user_id;push_notifications.user_id,services/notification-service/db/schema/schema.sql
+notification-service,media-service,system_notification_logs.image_key,services/notification-service/db/schema/schema.sql
+order-service,account-service(admin),refund_requests.audit_admin_account_id,services/java/order-service/src/main/resources/db/migration/
+order-service,ai-service,orders.acceptance_id,services/java/order-service/src/main/resources/db/migration/
+order-service,buyer-service,cart_cleanup_retry_tasks.buyer_id;coupon_consumption_tasks.buyer_id;orders.buyer_id,services/java/order-service/src/main/resources/db/migration/
+order-service,cart-service (cart_items.checkout_id),cart_cleanup_retry_tasks.checkout_id,services/java/order-service/src/main/resources/db/migration/
+order-service,coupon-service,coupon_consumption_tasks.coupon_instance_id;orders.coupon_instance_id,services/java/order-service/src/main/resources/db/migration/
+order-service,invoice-service,order_invoice_snapshots.buyer_invoice_preference_id,services/java/order-service/src/main/resources/db/migration/
+order-service,media-service,order_items.image_object_key,services/java/order-service/src/main/resources/db/migration/
+order-service,order-service|aftersales-service,financial_logs.source_ref_no,services/java/order-service/src/main/resources/db/migration/
+order-service,payment-service,auto_refund_tasks.transaction_id;orders.transaction_id;payment_event_dedup.transaction_id,services/java/order-service/src/main/resources/db/migration/
+order-service,payment-service (refund/payment external id),financial_logs.external_txn_id,services/java/order-service/src/main/resources/db/migration/
+order-service,product-service,order_items.product_id;order_items.sku_id,services/java/order-service/src/main/resources/db/migration/
+order-service,seller-service,orders.store_id,services/java/order-service/src/main/resources/db/migration/
+order-service,seller-service(payuni_registrations.payuni_mer_id),orders.mer_id,services/java/order-service/src/main/resources/db/migration/
+order-service,shipping-service,orders.shipment_no,services/java/order-service/src/main/resources/db/migration/
+order-service,shipping-service (PayUni logistics partner id copy),orders.partner_id,services/java/order-service/src/main/resources/db/migration/
+order-service,shipping-service (copy),orders.validation_no,services/java/order-service/src/main/resources/db/migration/
+payment-service,account-service,fulfillment_case_resolutions.proposed_by_account_id;fulfillment_case_resolutions.reviewed_by_account_id;fulfillment_exception_cases.owner_account_id;fulfillment_exception_cases.resolved_by_account_id;payment_logs.operator_id,services/java/payment-service/src/main/resources/db/migration/
+payment-service,buyer-service,payment_transactions.buyer_id,services/java/payment-service/src/main/resources/db/migration/
+payment-service,buyer-service|seller-service (buyer_memberships / seller_membership_subscriptions; UNVERIFIED),membership_provider_subscriptions.membership_id,services/java/payment-service/src/main/resources/db/migration/
+payment-service,buyer-service|seller-service (subject_type),billing_commands.subject_id;membership_charge_attempts.subject_id;membership_provider_subscriptions.subject_id,services/java/payment-service/src/main/resources/db/migration/
+payment-service,invoice-service,logistics_receivables.invoice_document_id,services/java/payment-service/src/main/resources/db/migration/
+payment-service,order-service,fulfillment_exception_cases.order_no;ledger_transactions.order_no;logistics_cost_facts.order_no;logistics_receivables.order_no;payment_refunds.order_id;payment_transactions.order_id;provider_settlement_lines.order_no,services/java/payment-service/src/main/resources/db/migration/
+payment-service,order-service|aftersales-service|... (source_type),ledger_transactions.source_ref,services/java/payment-service/src/main/resources/db/migration/
+payment-service,seller-service,fulfillment_exception_cases.store_id;ledger_transactions.store_id;logistics_adjustments.store_id;logistics_cost_facts.store_id;logistics_receivables.store_id;seller_logistics_accounts.store_id,services/java/payment-service/src/main/resources/db/migration/
+payment-service,seller-service(payuni_registrations.payuni_mer_id),payment_transactions.mer_id,services/java/payment-service/src/main/resources/db/migration/
+payment-service,seller-service|buyer-service (owner_type),ledger_entries.owner_ref_id,services/java/payment-service/src/main/resources/db/migration/
+payment-service,shipping-service,fulfillment_exception_cases.shipment_id;logistics_cost_facts.shipment_id;logistics_receivables.shipment_id,services/java/payment-service/src/main/resources/db/migration/
+payment-service,shipping-service (provider ref),provider_settlement_lines.provider_shipment_ref,services/java/payment-service/src/main/resources/db/migration/
+payment-service,shipping-service (uber delivery_id etc.),logistics_adjustments.provider_delivery_ref;logistics_cost_facts.provider_delivery_ref;logistics_receivables.provider_delivery_ref,services/java/payment-service/src/main/resources/db/migration/
+payment-service,shipping-service|order-service (subject_type),fulfillment_exception_cases.subject_ref,services/java/payment-service/src/main/resources/db/migration/
+pricebook-service,account-service,market_watch_target.account_id,services/pricebook-service/db/schema/schema.sql
+pricebook-service,product-service,category_crop_mapping.category_id;category_crop_mapping_crop.category_id;category_price_rollup.category_id,services/pricebook-service/db/schema/schema.sql
+product-import-service,media-service,product_import_item_asset.media_import_asset_id;product_import_item_asset.object_key;product_import_item_asset.finalized_asset_id;product_import_job.source_object_key;product_import_media_callback_inbox.import_asset_id,services/java/product-import-service/src/main/resources/db/migration/
+product-import-service,product-service,product_import_commit_attempt.formal_product_id;product_import_item.category_id;product_import_item.cat_l1_id;product_import_item.cat_l2_id;product_import_item.duplicate_existing_product_id;product_import_item.formal_product_id;product_import_item_error.existing_product_id,services/java/product-import-service/src/main/resources/db/migration/
+product-import-service,seller-service,product_import_item.store_id;product_import_job.store_id,services/java/product-import-service/src/main/resources/db/migration/
+product-service,account-service,product_certification_application.submitted_by_account_id;product_certification_application.reviewed_by_account_id;product_certification_review_event.actor_account_id,services/java/product-service/src/main/resources/db/migration/
+product-service,order-service,sales_count_event_dedup.order_no,services/java/product-service/src/main/resources/db/migration/
+product-service,order-service (stock_tx_records.stock_tx_id),stock_transaction.stock_tx_id,services/java/product-service/src/main/resources/db/migration/
+product-service,product-import-service,product.import_job_id;product.import_item_id,services/java/product-service/src/main/resources/db/migration/
+product-service,seller-service,idempotency_request.store_id;product.store_id;product_certification_application.store_id;product_suspension_snapshot.suspension_id,services/java/product-service/src/main/resources/db/migration/
+review-service,buyer-service,order_item_reviews.buyer_id,services/review-service/db/schema/schema.sql
+review-service,media-service,order_item_reviews.image_keys;order_item_reviews.item_image_key,services/review-service/db/schema/schema.sql
+review-service,order-service,order_item_reviews.order_no;order_item_reviews.order_item_id,services/review-service/db/schema/schema.sql
+review-service,product-service,order_item_reviews.product_id,services/review-service/db/schema/schema.sql
+review-service,seller-service,order_item_reviews.store_id,services/review-service/db/schema/schema.sql
+seller-service,account-service,certification_applications.account_id;merchant_verification_outbox.account_id;payuni_merchant_profile_outbox.account_id;payuni_merchant_profile_updates.account_id;payuni_registrations.account_id;payuni_status_history.account_id;seller_deleted_outbox.account_id;seller_deletion_audit.account_id;seller_prospects.created_by_account_id;seller_prospects.updated_by_account_id;seller_violation_reports.reporter_account_id;sellers.account_id,services/seller-service/db/schema/schema.sql
+seller-service,account-service(admin),certification_reviews.reviewer_id;food_safety_reports.acknowledged_by_admin_id;seller_deletion_audit.operator_id;seller_notification_log.sent_by_admin_id;seller_suspensions.suspended_by_admin_id;seller_suspensions.lifted_by_admin_id;seller_violations.appeal_decided_by_admin_id;seller_violations.created_by_admin_id,services/seller-service/db/schema/schema.sql
+seller-service,ai-service,vendor_portal_invites.rfq_recipient_id,services/seller-service/db/schema/schema.sql
+seller-service,buyer-service,seller_store_visitors.visitor_buyer_id,services/seller-service/db/schema/schema.sql
+seller-service,media-service,certification_applications.id_card_front_asset_id;certification_applications.id_card_back_asset_id;certification_applications.bank_book_asset_id;certification_applications.document_asset_ids;food_safety_reports.evidence_asset_ids;seller_prospects.logo_key;seller_prospects.cover_key;seller_violation_reports.evidence_asset_ids;seller_violations.appeal_evidence_asset_ids;sellers.cover_key,services/seller-service/db/schema/schema.sql
+seller-service,order-service,food_safety_reports.target_order_no;seller_violation_reports.target_order_no,services/seller-service/db/schema/schema.sql
+seller-service,product-service,food_safety_reports.target_product_id;seller_product_view_log.product_id;seller_prospect_categories.category_id;seller_violation_reports.target_product_id,services/seller-service/db/schema/schema.sql
+seller-service,social-service,seller_violation_reports.target_post_id,services/seller-service/db/schema/schema.sql
+shipping-service,account-service,shipment_status_logs.actor_account_id,services/java/shipping-service/src/main/resources/db/migration/
+shipping-service,buyer-service,buyer_store_pickups.buyer_id;shipments.buyer_id;uber_quotes.buyer_id,services/java/shipping-service/src/main/resources/db/migration/
+shipping-service,media-service,shipments.label_object_key;shipments.label_asset_id;uber_pod_artifacts.asset_id;uber_pod_artifacts.object_key,services/java/shipping-service/src/main/resources/db/migration/
+shipping-service,order-service,shipment_anomaly_acknowledgments.order_no;shipments.order_no;uber_quotes.order_no,services/java/shipping-service/src/main/resources/db/migration/
+shipping-service,seller-service,seller_shipment_onboarding_logs.store_id;seller_shipment_settings.store_id;shipments.store_id;uber_organization.store_id;uber_quotes.seller_store_id;uber_store_mapping.seller_store_id,services/java/shipping-service/src/main/resources/db/migration/
+shipping-service,seller-service(payuni_registrations.payuni_mer_id),seller_shipment_settings.mer_id;shipments.mer_id,services/java/shipping-service/src/main/resources/db/migration/
+social-service,account-service(admin),moderation_actions.admin_id,services/social-service/db/schema/schema.sql
+social-service,buyer-service|seller-service (buyer_id or store_id by role),cms_comment.user_id;cms_comment_like.user_id;cms_post_like.user_id;cms_seller_forum.user_id;moderation_actions.affected_user_id;reports.reporter_id;reports.target_owner_id;user_blocks.blocker_id;user_blocks.blocked_id,services/social-service/db/schema/schema.sql
+social-service,media-service,cms_post.image_asset_id,services/social-service/db/schema/schema.sql
+social-service,product-service,cms_post.product_id,services/social-service/db/schema/schema.sql
+social-service,seller-service,cms_post.seller_id;cms_seller_forum.seller_id,services/social-service/db/schema/schema.sql

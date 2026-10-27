@@ -1,0 +1,510 @@
+/* Extracted from styles/globals.css.
+ * Decorations, dialogs, lightbox, content responsive overrides.
+ * Keep import order in styles/globals.css unless intentionally changing cascade.
+ */
+
+.page-wrapper {
+	position: relative;
+	z-index: 1;
+}
+
+/* ===========================================
+   17. INITIAL PAGE LOADER
+   =========================================== */
+
+/* Deployment self-heal: keep the refreshed page visible and use one restrained
+   brand-colour rail as continuity feedback. It is removed as soon as the same
+   home-ready contract that owns the normal splash resolves. */
+.hk-stale-chunk-reload-pending body::after {
+	content: "";
+	position: fixed;
+	top: 0;
+	right: 0;
+	left: 0;
+	z-index: calc(var(--z-toast) + 1);
+	height: 3px;
+	background: linear-gradient(
+		90deg,
+		var(--color-brand-primary-strong),
+		var(--color-brand-primary-strong),
+		var(--color-brand-secondary)
+	);
+	box-shadow: 0 1px 8px rgb(var(--color-ink-700-rgb) / 0.2);
+	transform: scaleX(0.08);
+	transform-origin: left center;
+	animation: stale-chunk-reload-progress 1200ms
+		cubic-bezier(0.22, 0.72, 0.24, 1) forwards;
+	pointer-events: none;
+}
+
+@keyframes stale-chunk-reload-progress {
+	0% {
+		opacity: 0.72;
+		transform: scaleX(0.08);
+	}
+	55% {
+		opacity: 0.92;
+		transform: scaleX(0.68);
+	}
+	100% {
+		opacity: 1;
+		transform: scaleX(0.92);
+	}
+}
+
+.initial-loader {
+	position: fixed;
+	inset: 0;
+	z-index: var(--z-toast);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 18px;
+	min-height: 100vh;
+	padding: 28px;
+	color: var(--color-brand-primary-strong);
+	background:
+		radial-gradient(
+			circle at 34% 28%,
+			rgba(216, 180, 87, 0.26),
+			transparent 28%
+		),
+		radial-gradient(
+			circle at 70% 72%,
+			rgba(180, 215, 232, 0.34),
+			transparent 30%
+		),
+		linear-gradient(135deg, #fbfaf3 0%, var(--color-ink-50) 54%, #f7f0dc 100%);
+	opacity: 1;
+	visibility: visible;
+	/* The splash is visual feedback, never an interaction lock. This makes a
+	   stuck animation unable to swallow mouse, touch or wheel input. */
+	pointer-events: none;
+	transition:
+		opacity 360ms ease,
+		visibility 360ms ease;
+	/* Last line of defence when JavaScript never hydrates. The bootstrap
+	   watchdog uses the same 6s deadline but cannot replace this CSS-only path
+	   when scripts are blocked altogether. */
+	animation: initial-loader-hard-timeout 1ms linear 6s forwards;
+}
+
+/* Authentication entry is an intentional full-document boundary. Its inline
+   bootstrap marks the document before this node is parsed, so login/register
+   never replay the branded first-visit splash or its fade after 登入 is tapped. */
+html.hk-skip-initial-loader .initial-loader {
+	display: none;
+}
+
+/*
+ * Gate convergence (#338): the application tree stays visible and in normal
+ * layout flow at all times. The opaque splash overlay above it is the only
+ * gating surface, and that overlay can never lock content away — it carries
+ * its own CSS-only 6s hard timeout (`initial-loader-hard-timeout`) and stays
+ * pointer-transparent, so the server-rendered tree underneath is reachable
+ * even if React never hydrates or a route marker never arrives.
+ */
+
+@keyframes initial-loader-hard-timeout {
+	to {
+		opacity: 0;
+		visibility: hidden;
+		pointer-events: none;
+	}
+}
+
+.initial-loader::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background-image:
+		linear-gradient(rgb(var(--color-ink-700-rgb) / 0.045) 1px, transparent 1px),
+		linear-gradient(90deg, rgb(var(--color-ink-700-rgb) / 0.045) 1px, transparent 1px);
+	background-size: 28px 28px;
+	mask-image: linear-gradient(
+		to bottom,
+		rgba(0, 0, 0, 0.72),
+		rgba(0, 0, 0, 0.12)
+	);
+	pointer-events: none;
+}
+
+/* Night-mode splash: the boot script paints data-theme before first paint, so
+   this kicks in with no light flash. Same composition, dark palette;
+   the wordmark's grey base layer is brightened so it reads on the dark canvas. */
+[data-theme="dark"] .initial-loader {
+	color: var(--color-brand-secondary);
+	background:
+		radial-gradient(
+			circle at 34% 28%,
+			rgba(241, 205, 112, 0.1),
+			transparent 28%
+		),
+		radial-gradient(
+			circle at 70% 72%,
+			rgba(122, 162, 192, 0.12),
+			transparent 30%
+		),
+		linear-gradient(135deg, var(--color-ink-950) 0%, var(--color-ink-950) 54%, var(--color-ink-950) 100%);
+}
+
+[data-theme="dark"] .initial-loader::before {
+	background-image:
+		linear-gradient(rgba(245, 222, 165, 0.05) 1px, transparent 1px),
+		linear-gradient(90deg, rgba(245, 222, 165, 0.05) 1px, transparent 1px);
+}
+
+[data-theme="dark"] .il-word__base {
+	filter: grayscale(1) brightness(1.7) opacity(0.32);
+}
+
+.initial-loader--leaving,
+.hk-initial-public-content-ready .initial-loader {
+	opacity: 0;
+	visibility: hidden;
+	pointer-events: none;
+	animation: none;
+}
+
+/* Runs from a beforeInteractive document timer outside React's loader
+   mount/effect lifecycle. Pointer blocking ends immediately at the deadline. */
+.hk-initial-loader-timeout .initial-loader {
+	opacity: 0;
+	visibility: hidden;
+	pointer-events: none;
+}
+
+.initial-loader__mark,
+.il-word {
+	position: relative;
+	z-index: 1;
+}
+
+.initial-loader__mark {
+	display: grid;
+	place-items: center;
+}
+
+/* Stacked logo layers: line-art outline + colour fill on top. */
+.il-logo {
+	position: relative;
+	width: 104px;
+	height: 104px;
+}
+
+.il-logo__layer {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
+}
+
+/* Base line art — each blade outlined in its OWN block colour (set per-path
+   via the inline `stroke` attribute), no fill. Always visible underneath the
+   colour blocks as they bloom in. */
+.il-logo__line path {
+	fill: none;
+	stroke-width: 2.4;
+	stroke-opacity: 0.7;
+	stroke-linejoin: round;
+	vector-effect: non-scaling-stroke;
+}
+
+/* Each colour block grows out of the logo's dead centre (shared origin 60,60 in
+   the view box) so the colour blooms from the middle into its outline — one
+   whole block at a time, never an angular slice across blocks. `opacity`
+   (not SVG fill-opacity) lets this continue on the compositor while JS runs. */
+.il-blade {
+	opacity: 0;
+	transform: scale(0.35);
+	transform-box: view-box;
+	transform-origin: 60px 60px;
+}
+
+/* Awning first, then the counter. Each block blooms in its own window of one
+   shared 2.6s loop, both hold as the finished logo, then drain back to line
+   art so the loop restarts cleanly. */
+.il-blade--awning {
+	animation: ilBladeAwning 2.6s cubic-bezier(0.22, 0.8, 0.3, 1) infinite;
+}
+.il-blade--counter {
+	animation: ilBladeCounter 2.6s cubic-bezier(0.22, 0.8, 0.3, 1) infinite;
+}
+
+/* Wordmark: two overlaid copies of the same SVG. The base is desaturated to a
+   faint dark grey; the colour copy is masked so its real two-tone green wipes
+   in left → right like a loading bar, then holds and fades back to grey to
+   loop. */
+.il-word {
+	width: 188px;
+	aspect-ratio: 3129 / 764;
+	overflow: hidden;
+}
+
+.il-word__layer {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+}
+
+.il-word__base {
+	filter: grayscale(1) brightness(0.55) opacity(0.4);
+}
+
+/* Move a fixed mask and counter-move the image by the same pixel distance.
+   The original wipe changes mask-position on every frame, forcing main-thread
+   paint exactly while hydration is busiest. These two transforms preserve the
+   same 250% mask, soft edge and stationary artwork on composited layers. */
+.il-word__reveal {
+	position: absolute;
+	inset: 0;
+	width: 250%;
+	height: 100%;
+	-webkit-mask-image: linear-gradient(to right, #000 0 42%, #0000 54% 100%);
+	mask-image: linear-gradient(to right, #000 0 42%, #0000 54% 100%);
+	-webkit-mask-repeat: no-repeat;
+	mask-repeat: no-repeat;
+	transform: translateX(-60%);
+	animation: ilWordWipe 2.6s ease-in-out infinite;
+}
+
+.il-word__color {
+	width: 40%;
+	transform: translateX(150%);
+	animation: ilWordCounterWipe 2.6s ease-in-out infinite;
+}
+
+@keyframes ilWordWipe {
+	0% {
+		transform: translateX(-60%);
+		opacity: 1;
+	}
+	62%,
+	86% {
+		transform: translateX(0);
+		opacity: 1;
+	}
+	100% {
+		transform: translateX(0);
+		opacity: 0;
+	}
+}
+
+@keyframes ilWordCounterWipe {
+	0% {
+		transform: translateX(150%);
+	}
+	62%,
+	86%,
+	100% {
+		transform: translateX(0);
+	}
+}
+
+/* Per-block bloom: hidden + shrunk to the centre, then a soft pop to full size
+   and opacity in the block's window, hold as part of the finished logo, then
+   all blocks drain back to the centre together to restart the loop. Staggered
+   start %s give the one-by-one sequence. */
+@keyframes ilBladeAwning {
+	0%,
+	6% {
+		opacity: 0;
+		transform: scale(0.35);
+	}
+	20% {
+		opacity: 1;
+		transform: scale(1.04);
+	}
+	26%,
+	86% {
+		opacity: 1;
+		transform: scale(1);
+	}
+	100% {
+		opacity: 0;
+		transform: scale(0.35);
+	}
+}
+@keyframes ilBladeCounter {
+	0%,
+	26% {
+		opacity: 0;
+		transform: scale(0.35);
+	}
+	40% {
+		opacity: 1;
+		transform: scale(1.04);
+	}
+	46%,
+	86% {
+		opacity: 1;
+		transform: scale(1);
+	}
+	100% {
+		opacity: 0;
+		transform: scale(0.35);
+	}
+}
+
+@media (max-width: 640px) {
+	.initial-loader {
+		gap: 16px;
+		padding: 24px;
+	}
+
+	.il-logo {
+		width: 88px;
+		height: 88px;
+	}
+
+	.il-word {
+		width: 158px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.hk-stale-chunk-reload-pending body::after {
+		animation: none;
+		transform: scaleX(0.72);
+	}
+
+	.initial-loader {
+		animation: initial-loader-hard-timeout 1ms linear 6s forwards;
+		transition-duration: 120ms;
+	}
+
+	.initial-loader__mark {
+		animation: none;
+		transition-duration: 120ms;
+	}
+	/* Skip the bloom sequence — show the finished colour logo straight away. */
+	.il-blade {
+		animation: none;
+		opacity: 1;
+		transform: none;
+	}
+	/* Skip the wipe — show the full-colour wordmark, hide the grey base. */
+	.il-word__reveal {
+		animation: none;
+		-webkit-mask-image: none;
+		mask-image: none;
+		transform: none;
+		opacity: 1;
+	}
+	.il-word__color {
+		animation: none;
+		transform: none;
+	}
+	.il-word__base {
+		display: none;
+	}
+}
+
+/* Keep this first-paint override after every normal splash/mobile/motion rule so
+   the technical reload can never reveal one frame of the branded overlay. */
+.hk-stale-chunk-reload .initial-loader {
+	display: none;
+}
+
+.content-center {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 14px;
+	margin-top: 18px;
+	max-width: 1080px;
+	margin-left: auto;
+	margin-right: auto;
+	padding: 0 var(--content-padding-mobile);
+}
+
+/* ===========================================
+   18. RESPONSIVE OVERRIDES
+   =========================================== */
+
+/* --- Large desktop content centering --- */
+@media (min-width: 1441px) {
+	.content-container {
+		max-width: var(--content-width);
+	}
+}
+
+/* --- Below max-width responsive padding --- */
+@media (max-width: 1440px) {
+	.content-container {
+		padding-left: var(--content-padding-tablet);
+		padding-right: var(--content-padding-tablet);
+	}
+}
+
+/* --- Small desktop: 1024-1280px --- */
+@media (max-width: 1280px) and (min-width: 769px) {
+	:root {
+		--site-nav-inner-height: 80px;
+	}
+	/* `.nav-item` + `.site-nav__inner` removed in the 子刀 4 PR-A detangle:
+	 * both were bare (0,1,0) and shadowed by navigation-final.css's base
+	 * `body .nav-item` and floating-navigation.css's base `body .site-nav__inner`
+	 * (0,1,1, no media) at this width — verified zero computed-style change. */
+}
+
+/* --- Mobile: below 768px --- */
+@media (max-width: 768px) {
+	html,
+	body {
+		overflow-x: hidden;
+	}
+
+	.content-container {
+		padding-left: var(--content-padding-mobile);
+		padding-right: var(--content-padding-mobile);
+	}
+
+	.glass-card--lg {
+		border-radius: var(--radius-xl);
+		padding: 24px 20px;
+	}
+
+	.section {
+		padding-top: var(--space-12);
+		padding-bottom: var(--space-12);
+	}
+
+	.page-content {
+		padding-top: 0;
+	}
+
+	/* `.site-nav` + `.site-nav__inner` removed in the 子刀 4 PR-A detangle:
+	 * shadowed by floating-navigation.css @768 `body .site-nav*` (0,1,1) —
+	 * verified zero computed-style change at ≤768. */
+
+	.mobile-nav {
+		display: block;
+		position: fixed;
+		top: 72px;
+		left: 0;
+		right: 0;
+		background: var(--color-white);
+		box-shadow: var(--shadow-dropdown);
+		transform: translateY(-12px);
+		opacity: 0;
+		pointer-events: none;
+		transition:
+			transform var(--transition-base),
+			opacity var(--transition-base);
+		z-index: 19;
+		padding: var(--space-3) 0;
+		max-height: calc(100vh - 72px);
+		overflow-y: auto;
+		border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+	}
+
+	.mobile-nav.show {
+		transform: translateY(0);
+		opacity: 1;
+		pointer-events: auto;
+	}
+}

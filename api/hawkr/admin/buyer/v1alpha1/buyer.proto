@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+// buyer 模組給後台的 API：買家統計與買家會員方案（設計書 59）。前台的 API 在 hawkr.buyer.v1alpha1。
+package hawkr.admin.buyer.v1alpha1;
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+
+// BuyerAdminService 只有管理員能呼叫。
+service BuyerAdminService {
+  // GetBuyerStats 回傳買家的統計（會員管理頁）。
+  rpc GetBuyerStats(GetBuyerStatsRequest) returns (GetBuyerStatsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListMembershipPlans 列出全部會員方案。方案是 migration 建立的固定集合（免費、基本、進階），不分頁。
+  rpc ListMembershipPlans(ListMembershipPlansRequest) returns (ListMembershipPlansResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // UpdateMembershipPlan 修改會員方案（update_mask）。方案不能新增或刪除。
+  rpc UpdateMembershipPlan(UpdateMembershipPlanRequest) returns (UpdateMembershipPlanResponse);
+}
+
+// MembershipPlan 是買家的會員方案，以 plan_code 識別。
+message MembershipPlan {
+  string plan_code = 1 [
+    (google.api.field_behavior) = IDENTIFIER,
+    (google.api.field_behavior) = IMMUTABLE
+  ];
+  // 方案名稱由 migration 決定，不能修改。
+  string display_name = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // AI 助理每月可以回答的次數。
+  int32 monthly_answer_limit = 3;
+  // 月費，新台幣元。
+  int64 monthly_price = 4;
+  // 買家可以購買這個方案。
+  bool purchasable = 5;
+  google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string etag = 8;
+}
+
+message GetBuyerStatsRequest {}
+
+message GetBuyerStatsResponse {
+  // 目前的買家數（不含已刪除的）。
+  int32 total_buyers = 1;
+}
+
+message ListMembershipPlansRequest {}
+
+message ListMembershipPlansResponse {
+  repeated MembershipPlan membership_plans = 1;
+}
+
+message UpdateMembershipPlanRequest {
+  // plan_code 與 etag 必填。
+  MembershipPlan membership_plan = 1 [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+message UpdateMembershipPlanResponse {
+  MembershipPlan membership_plan = 1;
+}

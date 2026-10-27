@@ -1,0 +1,155 @@
+name: website e2e
+
+# website 的 Playwright e2e（tests/e2e 等，server 回應全由 page.route 攔截）與 Storybook 互動測試。
+# 本機不跑瀏覽器測試（AGENTS.local.md），這支是它們唯一的執行位置。
+# admin 沒有 Playwright 或瀏覽器測試（admin/package.json 沒有相關依賴與指令），所以沒有對應的 admin-e2e。
+#
+# 視覺基準（`*-snapshots/` 目錄）不在版控：
+# - 找不到任何基準時，以 --update-snapshots 跑並把產生的基準當 artifact 上傳，由人下載後 commit，此時不以缺基準判失敗。
+# - 有基準時才逐像素比對，失敗時上傳 playwright-report（含差異圖）。
+
+on:
+  pull_request:
+    paths:
+      - 'website/**'
+      - 'api/**'
+      # 共用的 TS 生成碼與 Connect 執行期（import 自 @hawkr/api）。
+      - 'packages/hawkr-api-ts/**'
+      # 共用的鄉鎮市區代碼表與查詢（import 自 @hawkr/twaddr）。
+      - 'packages/hawkr-twaddr-ts/**'
+      # 共用文案目錄（import 自 @hawkr/ui-text）。
+      - 'packages/hawkr-ui-text-ts/**'
+      # website 的測試直接讀 gateway 的 AG-UI golden fixture。
+      - 'backend/gateway/internal/proxy/testdata/agui-frames/**'
+      # design:check 比對兩支 App 的 theme 與 web 的 token 契約。
+      - 'buyer-app/lib/core/theme/**'
+      - 'seller-app/lib/core/theme/**'
+      # 根目錄的 pnpm workspace（兩個 app 共用一份 lockfile 與工具版本）。
+      # workspace 層級的 audit 與 override 檢查在 workspace-ci.yml，不在這裡。
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - 'patches/**'
+      - 'pnpm-lock.yaml'
+      - '.nvmrc'
+      - '.github/actions/pnpm-install/**'
+      - '.github/workflows/website-e2e.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - 'api/**'
+      # 共用的 TS 生成碼與 Connect 執行期（import 自 @hawkr/api）。
+      - 'packages/hawkr-api-ts/**'
+      # 共用的鄉鎮市區代碼表與查詢（import 自 @hawkr/twaddr）。
+      - 'packages/hawkr-twaddr-ts/**'
+      # 共用文案目錄（import 自 @hawkr/ui-text）。
+      - 'packages/hawkr-ui-text-ts/**'
+      # website 的測試直接讀 gateway 的 AG-UI golden fixture。
+      - 'backend/gateway/internal/proxy/testdata/agui-frames/**'
+      # design:check 比對兩支 App 的 theme 與 web 的 token 契約。
+      - 'buyer-app/lib/core/theme/**'
+      - 'seller-app/lib/core/theme/**'
+      # 根目錄的 pnpm workspace（兩個 app 共用一份 lockfile 與工具版本）。
+      # workspace 層級的 audit 與 override 檢查在 workspace-ci.yml，不在這裡。
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - 'patches/**'
+      - 'pnpm-lock.yaml'
+      - '.nvmrc'
+      - '.github/actions/pnpm-install/**'
+      - '.github/workflows/website-e2e.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: website-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: website
+
+env:
+  LEFTHOOK: '0'
+  # 不得連到任何真的主機：未被 page.route 攔截的 SSR 請求打到 loopback 的丟棄埠，漏掉的 mock 會失敗而不是連出去。
+  API_BASE_URL: http://127.0.0.1:9/api/v1
+  # NEXT_PUBLIC_* 在 build 時被字面替換，要與 playwright.config.ts 的 webServer 同源（預設 port 3000）。
+  NEXT_PUBLIC_API_BASE_URL: http://localhost:3000/api/v1
+  PLAYWRIGHT_E2E_API_PROXY: '1'
+  NEXT_PUBLIC_DEV_OVERLAYS: 'off'
+  NEXT_PUBLIC_GOOGLE_CLIENT_ID: e2e-dummy-client-id.apps.googleusercontent.com
+  WEB_PROCUREMENT_RFQ_PRICE_RANGE_V1: 'true'
+  WEB_PROCUREMENT_RFQ_APPROVAL_V1: 'true'
+
+jobs:
+  e2e:
+    name: Playwright e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/pnpm-install
+      - name: 快取 Playwright 瀏覽器
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: playwright-${{ runner.os }}-
+      # 只裝 chromium 的 headless shell（playwright.config.ts 的 chromium 與 mobile 兩個 project 都用它）與系統相依套件。
+      - name: 安裝瀏覽器
+        run: pnpm exec playwright install --with-deps --only-shell chromium
+      # CI 的 webServer 是 `pnpm start`，吃這一步 build 出的產物。
+      - run: pnpm run build
+      - name: 偵測視覺基準
+        id: baseline
+        run: |
+          if [ -n "$(find tests -type d -name '*-snapshots' -print -quit)" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::找不到視覺基準，本次以 --update-snapshots 產生並上傳 artifact（website-visual-baseline）"
+          fi
+      # @live 的 spec 會打外部服務，不跑。
+      - name: e2e（比對基準）
+        if: steps.baseline.outputs.present == 'true'
+        run: pnpm run test:e2e:hermetic
+      - name: e2e（產生基準）
+        if: steps.baseline.outputs.present != 'true'
+        run: pnpm run test:e2e:hermetic --update-snapshots
+      - name: 上傳視覺基準
+        if: steps.baseline.outputs.present != 'true' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-visual-baseline
+          path: website/tests/**/*-snapshots/
+          if-no-files-found: ignore
+          retention-days: 30
+      - name: 上傳 Playwright 報告
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-playwright-report
+          path: |
+            website/playwright-report/
+            website/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  storybook:
+    name: Storybook 互動測試
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/pnpm-install
+      - name: 快取 Playwright 瀏覽器
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: playwright-${{ runner.os }}-
+      - name: 安裝瀏覽器
+        run: pnpm exec playwright install --with-deps --only-shell chromium
+      - run: pnpm run storybook:test

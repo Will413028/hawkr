@@ -1,0 +1,58 @@
+name: backend gateway JSON contract
+
+# gateway 的對外 JSON 與契約一致：
+#   Check A：對外 JSON key 還在用帶角色前綴的 account_id 舊名（刻意保留的登記在 baseline）
+#   Check B：OpenAPI 規格（backend/api/openapi/openapi.yaml）宣告的欄位與 handler 實際吐的 key 對不上
+#   路由覆蓋：gin 註冊的路由都在規格裡，規格裡的端點都有路由（gateway/internal/router/openapi_coverage_test.go）
+# 都是棘輪：只准收緊，修好了要更新 baseline 或清單鎖住新低點。
+# 由 backend/.github/workflows/gateway-json-contract.yml 搬來。
+
+on:
+  pull_request:
+    paths: &gw_paths
+      - 'backend/gateway/**/*.go'
+      - 'backend/scripts/gateway-json-contract-check.py'
+      - 'backend/scripts/gateway-json-contract-baseline.json'
+      - 'backend/api/openapi/openapi.yaml'
+      - '.github/workflows/backend-gateway-json-contract.yml'
+  push:
+    branches: [main]
+    paths: *gw_paths
+  workflow_dispatch:
+
+concurrency:
+  group: backend-gateway-json-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  contract:
+    name: 對外 JSON 與規格一致
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: 安裝 PyYAML（讀規格）
+        run: pip install pyyaml==6.0.2
+      - name: Contract check
+        run: python3 scripts/gateway-json-contract-check.py --stats
+      - uses: actions/setup-go@v6
+        if: always()
+        with:
+          go-version-file: backend/.go-version
+          cache-dependency-path: backend/gateway/go.sum
+      - name: 路由覆蓋
+        if: always()
+        working-directory: backend/gateway
+        env:
+          GOWORK: 'off'
+        run: go test ./internal/router -run TestEveryRouteIsInOpenAPISpec -count=1

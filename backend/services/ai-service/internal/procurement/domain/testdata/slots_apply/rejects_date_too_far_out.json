@@ -1,0 +1,16 @@
+{
+  "before": {},
+  "patch": {
+    "delivery_date": "2028-01-01"
+  },
+  "now": "2026-08-07T00:00:00Z",
+  "after": {
+    "exact_match_required": true
+  },
+  "rejected": [
+    {
+      "key": "delivery_date",
+      "reason": "到貨日不可超過 365 天後"
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+// 案件的詢問（step10e-reports-brief R4、step10e-3cb-design）：平台對案件的賣家的一次要求（提供紀錄或請求說明），有期限、一則回覆、可撤回；
+// 每個案件同時最多一筆還沒結束的詢問。回覆在賣家端的畫面上線（10f）之前只由管理員記下系統外收到的內容。指令（CreateCaseInquiry、
+// ListCaseInquiries、RecordCaseInquiryReply、WithdrawCaseInquiry）與它們的請求、回應在 SellerGovernanceAdminService（governance.proto；
+// 回應帶 Case，所以請求與回應放在那裡，避免兩個檔案互相 import）。
+package hawkr.admin.seller.v1alpha1;
+
+import "hawkr/admin/seller/v1alpha1/measure.proto";
+import "hawkr/common/v1alpha1/deadline.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+
+// CaseInquiryKind 是平台要賣家做的事。
+enum CaseInquiryKind {
+  CASE_INQUIRY_KIND_UNSPECIFIED = 0;
+  // 提供紀錄：賣家合作條款第 11.3 條的來源、批次、效期、進出貨及流向。
+  CASE_INQUIRY_KIND_RECORDS = 1;
+  // 請說明。
+  CASE_INQUIRY_KIND_EXPLANATION = 2;
+}
+
+// CaseInquiryState 由伺服器推導（不儲存）。逾期不是狀態：OPEN 而且現在晚於 reply_deadline.due_time。
+enum CaseInquiryState {
+  CASE_INQUIRY_STATE_UNSPECIFIED = 0;
+  // 等賣家回覆。
+  CASE_INQUIRY_STATE_OPEN = 1;
+  // 已記下回覆（終態）。
+  CASE_INQUIRY_STATE_REPLIED = 2;
+  // 已撤回（終態）。
+  CASE_INQUIRY_STATE_WITHDRAWN = 3;
+}
+
+// CaseInquiryReplyChannel 是回覆怎麼收到的。賣家端畫面上線（10f）時加 SELLER_CENTER（賣家在賣家中心回覆）。
+enum CaseInquiryReplyChannel {
+  CASE_INQUIRY_REPLY_CHANNEL_UNSPECIFIED = 0;
+  CASE_INQUIRY_REPLY_CHANNEL_PHONE = 1;
+  CASE_INQUIRY_REPLY_CHANNEL_EMAIL = 2;
+  // 通訊軟體。
+  CASE_INQUIRY_REPLY_CHANNEL_MESSAGING = 3;
+  CASE_INQUIRY_REPLY_CHANNEL_OTHER = 4;
+}
+
+// CaseInquiryWithdrawCause 是撤回的原因：管理員撤回，或案件結案（決定，或通報都移走）時系統撤回。
+enum CaseInquiryWithdrawCause {
+  CASE_INQUIRY_WITHDRAW_CAUSE_UNSPECIFIED = 0;
+  CASE_INQUIRY_WITHDRAW_CAUSE_ADMIN = 1;
+  CASE_INQUIRY_WITHDRAW_CAUSE_CASE_CLOSED = 2;
+}
+
+// CaseInquiry 是案件上對賣家的一筆詢問。賣家端的畫面上線（10f）之前，系統不會通知賣家；期限從建立起算，10f 改成從出現在賣家中心起算。
+message CaseInquiry {
+  reserved 8;
+  reserved "due_time";
+
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  string case_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string store_id = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  CaseInquiryKind kind = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 給賣家的說明。只寫管理員的轉述：不放通報原文、佐證或通報人。
+  string message = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string created_by_admin_id = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  CaseInquiryState state = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 只在 REPLIED 時設。
+  CaseInquiryReply reply = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 只在 WITHDRAWN 時設。
+  CaseInquiryWithdrawCause withdraw_cause = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp withdraw_time = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 系統撤回（案件結案）時是結案的管理員。
+  string withdrawn_by_admin_id = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_record_reply = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_withdraw = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 記下回覆時最多可以帶的附件數（伺服器的上限，RecordCaseInquiryReply 的 evidence_tokens 超過就回 invalid_argument）；client 以它在上傳之前擋下超過的檔。
+  int32 reply_evidence_max = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 賣家回覆的期限，只在 OPEN 時設（義務還在時才輸出）：開始時間是 create_time，期限是建立時存下的 due_at。
+  hawkr.common.v1alpha1.Deadline reply_deadline = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// CaseInquiryReply 是管理員記下的賣家回覆（系統外收到）。
+message CaseInquiryReply {
+  // 回覆內容（管理員記下的是摘錄或轉錄），1 到 4000 字。
+  string body = 1;
+  // 附件，機敏檔，只經 view_uri 讀（每次讀取都記錄）：GET /api/files/admin/seller/case_inquiries/{inquiry_id}/evidence/{position}。
+  repeated Evidence evidence = 2;
+  CaseInquiryReplyChannel channel = 3;
+  // 收到的時間；案件的「待決定」從它重新起算。
+  google.protobuf.Timestamp receive_time = 4;
+  // 記進系統的時間。
+  google.protobuf.Timestamp record_time = 5;
+  string recorded_by_admin_id = 6;
+}

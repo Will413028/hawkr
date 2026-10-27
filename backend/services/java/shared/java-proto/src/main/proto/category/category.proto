@@ -1,0 +1,165 @@
+syntax = "proto3";
+
+package hawkr.category;
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/category";
+option java_multiple_files = true;
+option java_package = "io.github.will413028.hawkr.product.grpc";
+option java_outer_classname = "CategoryProto";
+
+// Category Service - 商品分類服務
+//
+// 政策摘要（2026-04-25 新政策，舊版審核機制已退場）：
+// - 取消審核機制，新增即生效（status 預設 9004 ACTIVE）
+// - 同名同父自動套用既有 ACTIVE 分類 ID（透明回傳）
+// - 撞到軟刪除（status=9003 INACTIVE）同名同父：回 CATEGORY_NAME_RESERVED
+// - Admin 對分類本身僅可改名 + 軟刪除 + 還原（不可改父類別）
+service CategoryService {
+    // 獲取分類樹（三層結構）
+    // - Public/Seller：僅 ACTIVE
+    // - Admin：預設僅 ACTIVE，include_deleted=true 才顯示軟刪除
+    rpc GetCategoryTree(GetCategoryTreeRequest) returns (GetCategoryTreeResponse);
+
+    // 根據 parent_id 獲取子分類（僅 ACTIVE）
+    rpc GetChildCategories(GetChildCategoriesRequest) returns (GetChildCategoriesResponse);
+
+    // 新增分類（任何層級，自動套用同名同父）- Seller 使用
+    rpc CreateCategory(CreateCategoryRequest) returns (CreateCategoryResponse);
+
+    // === Admin 專屬 RPC ===
+
+    // Admin 新增分類（任何層級，自動套用同名同父）
+    rpc CreateCategoryForAdmin(CreateCategoryForAdminRequest) returns (CreateCategoryForAdminResponse);
+
+    // Admin 修改分類名稱（僅可改 name，不可改 parent_id）
+    rpc UpdateCategoryForAdmin(UpdateCategoryForAdminRequest) returns (UpdateCategoryForAdminResponse);
+
+    // Admin 批次軟刪除（驗證底下無商品+無 ACTIVE 子分類，按拓樸排序執行）
+    rpc BatchSoftDeleteCategoryForAdmin(BatchSoftDeleteCategoryForAdminRequest) returns (BatchSoftDeleteCategoryForAdminResponse);
+
+    // Admin 還原已軟刪除分類（同名同父已 ACTIVE 或父分類已軟刪除則拒絕）
+    rpc RestoreCategoryForAdmin(RestoreCategoryForAdminRequest) returns (RestoreCategoryForAdminResponse);
+}
+
+// ==================== Request ====================
+
+// 獲取分類樹請求
+message GetCategoryTreeRequest {
+    // 狀態篩選（空字串表示不篩選，"active" 表示只返回啟用的分類）
+    string status = 1;
+    reserved 2;
+    // Admin 才會傳；true 時包含軟刪除（INACTIVE）分類，預設 false
+    bool include_deleted = 3;
+}
+
+// 獲取子分類請求
+message GetChildCategoriesRequest {
+    string parent_id = 1;  // 父分類 ID（數字字串）
+}
+
+// 新增分類請求（賣家用）
+message CreateCategoryRequest {
+    string parent_id = 1;   // 父分類 ID（任何層級，數字字串；空字串=新增 L1）
+    string name = 2;         // 分類名稱
+    int64 created_by = 3;    // 建立者 ID（從 JWT 獲取，Gateway 填充）
+}
+
+// Admin 新增分類請求
+message CreateCategoryForAdminRequest {
+    string parent_id = 1;   // 父分類 ID（任何層級，數字字串；空字串=新增 L1）
+    string name = 2;         // 分類名稱
+    int64 created_by = 3;    // 建立者 ID（從 JWT 獲取，Gateway 填充）
+}
+
+// Admin 修改分類名稱請求
+message UpdateCategoryForAdminRequest {
+    string category_id = 1;  // 分類 ID
+    string name = 2;          // 新名稱
+    int64 updated_by = 3;     // 更新者 ID（Gateway 填充）
+}
+
+// Admin 批次軟刪除請求
+message BatchSoftDeleteCategoryForAdminRequest {
+    repeated string category_ids = 1;  // 分類 ID 列表
+    int64 updated_by = 2;              // 更新者 ID（Gateway 填充）
+}
+
+// Admin 還原請求
+message RestoreCategoryForAdminRequest {
+    string category_id = 1;  // 分類 ID
+    int64 updated_by = 2;    // 更新者 ID（Gateway 填充）
+}
+
+// ==================== Response ====================
+
+// 分類樹回應
+message GetCategoryTreeResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated CategoryNode categories = 3;
+}
+
+// 子分類回應
+message GetChildCategoriesResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated CategoryItem categories = 3;
+}
+
+// 新增分類回應（賣家用；自動套用時 response 結構與新建一致）
+message CreateCategoryResponse {
+    int32 code = 1;
+    string message = 2;
+    CategoryItem category = 3;
+}
+
+// Admin 新增分類回應
+message CreateCategoryForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    CategoryItem category = 3;
+}
+
+// Admin 修改分類名稱回應
+message UpdateCategoryForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    CategoryItem category = 3;
+}
+
+// Admin 批次軟刪除回應
+message BatchSoftDeleteCategoryForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated string deleted_ids = 3;  // 成功軟刪除的分類 ID 列表
+}
+
+// Admin 還原回應
+message RestoreCategoryForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    CategoryItem category = 3;
+}
+
+// ==================== Message Types ====================
+
+// 分類節點（樹狀結構，含 children）
+message CategoryNode {
+    string id = 1;             // 分類 ID（數字字串）
+    string name = 2;
+    string parent_id = 3;     // 父分類 ID（數字字串）
+    string parent_name = 4;
+    string status = 5;
+    repeated CategoryNode children = 6;
+    string deleted_at = 7;    // 軟刪除時間（ISO 8601 UTC，僅 admin include_deleted=true 時填充）
+}
+
+// 分類項目（扁平結構，不含 children）
+message CategoryItem {
+    string id = 1;             // 分類 ID（數字字串）
+    string name = 2;
+    string parent_id = 3;     // 父分類 ID（數字字串）
+    string parent_name = 4;
+    string status = 5;
+    string deleted_at = 6;    // 軟刪除時間（ISO 8601 UTC）
+}

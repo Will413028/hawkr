@@ -1,0 +1,62 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - errorlint
+    - nilerr
+    - gocritic
+    - bodyclose
+    - noctx
+    - gosec
+    - exhaustive
+    - forbidigo
+    - depguard
+  settings:
+    gocritic:
+      disable-all: true
+      enabled-tags:
+        - diagnostic
+    forbidigo:
+      analyze-types: true
+      forbid:
+        - pattern: '^time\.Now$'
+          pkg: '^time$'
+          msg: use the module's injected clock
+    depguard:
+      rules:
+        standard-library-log:
+          list-mode: lax
+          files:
+            - $all
+          deny:
+            - pkg: 'log$'
+              desc: use log/slog
+        production-random:
+          list-mode: lax
+          files:
+            - '!$test'
+          deny:
+            - pkg: 'math/rand$'
+              desc: use math/rand/v2 or crypto/rand
+  exclusions:
+    rules:
+      - path-except: '^internal/modules/'
+        linters:
+          - forbidigo
+      - path: '_test\.go$'
+        linters:
+          - forbidigo
+      - path: '_test\.go$'
+        linters:
+          - gosec
+        text: '^G(109|115|122|124|204|301|304|306|703|705):'
+      # go-jet 的 DSL（SELECT、FROM、EXISTS…）設計成 dot import；用 jet 建 query 的套件照它的慣用寫法。
+      - path: '^internal/modules/social/internal/(reads|visibility|counted)/'
+        linters:
+          - staticcheck
+        text: '^ST1001:'
+      - path: '^internal/httpapi/content/convert\.go$'
+        linters:
+          - gosec
+        text: '^G101:'

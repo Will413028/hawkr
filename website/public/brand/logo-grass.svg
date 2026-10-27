@@ -1,0 +1,10 @@
+<svg width="144" height="144" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+<style>
+:root, svg { color: #334C0F; }
+@media (prefers-color-scheme: dark) {
+  :root, svg { color: #F5E9C3; }
+}
+</style>
+<path d="M28 24H92L102 46A10.5 10.5 0 0 1 81 46A10.5 10.5 0 0 1 60 46A10.5 10.5 0 0 1 39 46A10.5 10.5 0 0 1 18 46Z" fill="currentColor"/>
+<path d="M36 60A7 7 0 0 1 43 67V76H77V67A7 7 0 0 1 91 67V101A7 7 0 0 1 77 101V90H43V101A7 7 0 0 1 29 101V67A7 7 0 0 1 36 60Z" fill="currentColor"/>
+</svg>

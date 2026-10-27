@@ -1,0 +1,23 @@
+{
+  "act": "REQUEST_BASICS_READY",
+  "emptyArgsBlocks": [
+    {
+      "kind": "UNDERSTOOD",
+      "text": "好的，需求已經齊全了。"
+    },
+    {
+      "kind": "NEXT_STEP",
+      "text": "我現在就去幫你找找看合適的候選。"
+    }
+  ],
+  "populatedArgsBlocks": [
+    {
+      "kind": "UNDERSTOOD",
+      "text": "好的，需求已經齊全了。"
+    },
+    {
+      "kind": "NEXT_STEP",
+      "text": "我現在就去幫你找找看合適的候選。"
+    }
+  ]
+}

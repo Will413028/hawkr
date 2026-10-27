@@ -1,0 +1,480 @@
+syntax = "proto3";
+
+// buyer 模組給前台的 API：買家的 profile、收貨地址、收藏、追蹤、瀏覽紀錄、補貨通知、會員卡與刪除帳號（設計書 39）。
+// 後台的 API 在 hawkr.admin.buyer.v1alpha1。
+//
+// ID 是不透明的字串；過渡期買家、地址、商品、店家的 ID 是十進位整數字串，client 不解析、不轉數字
+// （ADR 2026-09-25-row-identity-by-data-kind D5）。圖片是 hawkr.common.v1alpha1.Image
+// （ADR 2026-09-25-api-image-uri-template）。
+package hawkr.buyer.v1alpha1;
+
+import "hawkr/common/v1alpha1/image.proto";
+import "hawkr/common/v1alpha1/postal_address.proto";
+import "hawkr/common/v1alpha1/store_card.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+import "google/type/date.proto";
+
+// BuyerAppService 是登入的帳號的方法。以呼叫者的買家身分操作，帳號沒有買家角色時回 permission_denied。
+service BuyerAppService {
+  // GetProfile 回傳呼叫者的買家 profile。
+  rpc GetProfile(GetProfileRequest) returns (GetProfileResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // UpdateProfile 修改 profile 的欄位（update_mask），含頭像（avatar_staged_token）。etag 必填；換頭像與文字欄位在
+  // 同一個版本條件下一起寫入，任何一項失敗都不會寫入；沒有任何欄位改變時不寫入，etag 不變。
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
+
+  // ListAddresses 列出收貨地址，預設地址在最前，其餘依修改時間新到舊。每個買家最多 20 筆（見 CreateAddress），
+  // 預設頁大小等於上限，所以通常一頁就是完整清單；client 仍要照 next_page_token 讀到底，上限調整時不會被截斷。
+  rpc ListAddresses(ListAddressesRequest) returns (ListAddressesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetAddress 回傳一筆收貨地址。
+  rpc GetAddress(GetAddressRequest) returns (GetAddressResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // CreateAddress 新增收貨地址。第一筆地址自動成為預設地址。每個買家最多 20 筆：已有 20 筆時回
+  // failed_precondition（帶 LocalizedMessage），要先刪掉一筆。
+  rpc CreateAddress(CreateAddressRequest) returns (CreateAddressResponse);
+
+  // UpdateAddress 修改收貨地址。default_address 設為 true 時取代原本的預設地址；有地址時一定有一筆預設，
+  // 所以不能把預設地址改成 false，要改選另一筆。
+  rpc UpdateAddress(UpdateAddressRequest) returns (UpdateAddressResponse);
+
+  // DeleteAddress 刪除收貨地址。刪掉的是預設地址時，最近修改的另一筆成為預設。
+  rpc DeleteAddress(DeleteAddressRequest) returns (DeleteAddressResponse);
+
+  // ListFavorites 列出收藏的商品，新到舊。
+  rpc ListFavorites(ListFavoritesRequest) returns (ListFavoritesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // CheckFavorite 回傳商品是否已收藏。
+  rpc CheckFavorite(CheckFavoriteRequest) returns (CheckFavoriteResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // BatchCheckFavorites 回傳畫面上已收藏的商品 ID；一次最多 100 個。
+  rpc BatchCheckFavorites(BatchCheckFavoritesRequest) returns (BatchCheckFavoritesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // AddFavorite 收藏商品；已收藏時也成功。帳號在刪除流程中（等待訂單完成）時回 failed_precondition。
+  rpc AddFavorite(AddFavoriteRequest) returns (AddFavoriteResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // RemoveFavorite 取消收藏；沒有收藏時也成功。
+  rpc RemoveFavorite(RemoveFavoriteRequest) returns (RemoveFavoriteResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // ListFollows 列出追蹤的店家，新到舊。
+  rpc ListFollows(ListFollowsRequest) returns (ListFollowsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // CheckFollow 回傳是否已追蹤店家。
+  rpc CheckFollow(CheckFollowRequest) returns (CheckFollowResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // BatchCheckFollows 回傳畫面上已追蹤的店家 ID；一次最多 100 個。
+  rpc BatchCheckFollows(BatchCheckFollowsRequest) returns (BatchCheckFollowsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // FollowStore 追蹤店家；已追蹤時也成功。店家不存在或不公開時回 not_found，追蹤自己的店回 invalid_argument，
+  // 帳號在刪除流程中時回 failed_precondition。
+  rpc FollowStore(FollowStoreRequest) returns (FollowStoreResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // UnfollowStore 取消追蹤；沒有追蹤時也成功。
+  rpc UnfollowStore(UnfollowStoreRequest) returns (UnfollowStoreResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // ListMemberCards 列出買家消費過的店家與累計消費額（會員卡），消費額高到低。
+  rpc ListMemberCards(ListMemberCardsRequest) returns (ListMemberCardsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListSpendingRecords 列出買家在一個店家的消費紀錄，新到舊。沒有紀錄時回空的清單。
+  rpc ListSpendingRecords(ListSpendingRecordsRequest) returns (ListSpendingRecordsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListVisits 列出瀏覽過的商品，依最後瀏覽時間新到舊。
+  rpc ListVisits(ListVisitsRequest) returns (ListVisitsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // RecordVisit 記錄一次商品瀏覽；每次呼叫都算一次瀏覽，client 不自動重送。
+  rpc RecordVisit(RecordVisitRequest) returns (RecordVisitResponse);
+
+  // ClearVisits 清除全部瀏覽紀錄。
+  rpc ClearVisits(ClearVisitsRequest) returns (ClearVisitsResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // ListRestockSubscriptions 列出等待補貨通知的商品，新到舊。通知送出或取消之後就不在清單上。
+  rpc ListRestockSubscriptions(ListRestockSubscriptionsRequest) returns (ListRestockSubscriptionsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // SubscribeRestock 訂閱商品的補貨通知；已訂閱時也成功。
+  rpc SubscribeRestock(SubscribeRestockRequest) returns (SubscribeRestockResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // UnsubscribeRestock 取消補貨通知；沒有訂閱時也成功。
+  rpc UnsubscribeRestock(UnsubscribeRestockRequest) returns (UnsubscribeRestockResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+}
+
+// BuyerStatus 是買家的狀態。
+enum BuyerStatus {
+  BUYER_STATUS_UNSPECIFIED = 0;
+  BUYER_STATUS_ACTIVE = 1;
+  // 申請刪除帳號，等待未完成的訂單結束。
+  BUYER_STATUS_PENDING_DELETION = 2;
+}
+
+// Gender 是買家自填的性別。
+enum Gender {
+  GENDER_UNSPECIFIED = 0;
+  GENDER_MALE = 1;
+  GENDER_FEMALE = 2;
+  GENDER_OTHER = 3;
+}
+
+// Profile 是買家的個人資料。
+message Profile {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 暱稱，1–100 字。
+  string display_name = 2 [(google.api.field_behavior) = REQUIRED];
+  // 聯絡電話，台灣的手機或市話；空字串表示沒有填。
+  string phone = 3;
+  // 買家自填的性別；沒有填時不設。UpdateProfile 把 gender 列進 update_mask 而沒有設值時清除；不接受 GENDER_UNSPECIFIED。
+  optional Gender gender = 4;
+  google.type.Date birth_date = 5;
+  string city = 6;
+  string job = 7;
+  // 沒有設定時不設，client 顯示預設頭像。
+  hawkr.common.v1alpha1.Image avatar = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  BuyerStatus status = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string etag = 12;
+  // 上傳完成後拿到的 staged token；換頭像時列進 update_mask，沒有列進去就保留目前的頭像。沒有清掉頭像的操作。
+  string avatar_staged_token = 13 [(google.api.field_behavior) = INPUT_ONLY];
+}
+
+// Address 是收貨地址。
+message Address {
+  reserved 2, 5, 6, 7;
+  reserved "label", "city", "district", "detail_address";
+
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  string receiver_name = 3 [(google.api.field_behavior) = REQUIRED];
+  string receiver_phone = 4 [(google.api.field_behavior) = REQUIRED];
+  // 收貨的地點；明細必填（1–255 字）。update_mask 列 postal_address 時整個換成請求的地址。
+  hawkr.common.v1alpha1.PostalAddress postal_address = 12 [(google.api.field_behavior) = REQUIRED];
+  // 是否為預設地址。
+  bool default_address = 8;
+  google.protobuf.Timestamp create_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string etag = 11;
+}
+
+// ProductCard 是清單上的商品卡片。
+message ProductCard {
+  string id = 1;
+  // 商品已經刪除：只有 id，其他欄位不設，client 顯示「商品已不存在」。
+  bool deleted = 2;
+  string name = 3;
+  hawkr.common.v1alpha1.Image image = 4;
+  // 規格中最低與最高的價格，新台幣元。
+  int64 min_price = 5;
+  int64 max_price = 6;
+  // 平均評分 0–5；沒有評價時不設。
+  optional float rating = 7;
+  // 現在可以購買；下架或售完時是 false。
+  bool available = 8;
+  // 呼叫者已訂閱這個商品的補貨通知。
+  bool restock_subscribed = 9;
+  string store_id = 11;
+  // 商品所屬店家的卡片；不設表示這家店不顯示（從沒公開過或不存在）。
+  hawkr.common.v1alpha1.StoreCard store = 10;
+}
+
+// Favorite 是收藏的商品。
+message Favorite {
+  ProductCard product = 1;
+  google.protobuf.Timestamp create_time = 2;
+}
+
+// Follow 是追蹤的店家。
+message Follow {
+  string store_id = 3;
+  // 不設表示這家店不顯示（從沒公開過或不存在）。
+  hawkr.common.v1alpha1.StoreCard store = 1;
+  google.protobuf.Timestamp create_time = 2;
+}
+
+// Visit 是瀏覽過的商品。
+message Visit {
+  ProductCard product = 1;
+  google.protobuf.Timestamp visit_time = 2;
+}
+
+// RestockSubscription 是等待補貨通知的商品。
+message RestockSubscription {
+  ProductCard product = 1;
+  google.protobuf.Timestamp create_time = 2;
+}
+
+// MemberCard 是買家在一個店家的會員卡。
+message MemberCard {
+  string store_id = 4;
+  // 不設表示這家店不顯示（從沒公開過或不存在）。
+  hawkr.common.v1alpha1.StoreCard store = 1;
+  // 累計消費額（扣除退款），新台幣元。
+  int64 total_spent = 2;
+  // 買家是這個店家的 VIP。
+  bool vip = 3;
+}
+
+// SpendingRecord 是一筆訂單的消費紀錄。
+message SpendingRecord {
+  string order_number = 1;
+  // 訂單金額，新台幣元。
+  int64 amount = 2;
+  // 已退款的金額，新台幣元。
+  int64 refunded_amount = 3;
+  // 訂單使用了優惠券。
+  bool coupon_applied = 4;
+  google.protobuf.Timestamp order_time = 5;
+}
+
+message GetProfileRequest {}
+
+message GetProfileResponse {
+  Profile profile = 1;
+}
+
+message UpdateProfileRequest {
+  // etag 必填。換頭像時把 avatar_staged_token 設成上傳完成後拿到的 token，並列進 update_mask。
+  Profile profile = 1 [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+message UpdateProfileResponse {
+  Profile profile = 1;
+}
+
+message ListAddressesRequest {
+  // 預設 20（等於每個買家的地址上限），上限 100。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListAddressesResponse {
+  repeated Address addresses = 1;
+  string next_page_token = 2;
+}
+
+message GetAddressRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetAddressResponse {
+  Address address = 1;
+}
+
+message CreateAddressRequest {
+  Address address = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message CreateAddressResponse {
+  Address address = 1;
+}
+
+message UpdateAddressRequest {
+  // id 與 etag 必填。
+  Address address = 1 [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+message UpdateAddressResponse {
+  Address address = 1;
+}
+
+message DeleteAddressRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 帶了就檢查版本。
+  string etag = 2;
+}
+
+message DeleteAddressResponse {}
+
+message ListFavoritesRequest {
+  // 預設 20，上限 100。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListFavoritesResponse {
+  repeated Favorite favorites = 1;
+  string next_page_token = 2;
+  // 收藏的總數（收藏頁的分頁標籤）。
+  int32 total_size = 3;
+}
+
+message CheckFavoriteRequest {
+  string product_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message CheckFavoriteResponse {
+  bool favorited = 1;
+}
+
+message BatchCheckFavoritesRequest {
+  // 空清單回傳空結果；最多 100 個 ID。
+  repeated string product_ids = 1;
+}
+
+message BatchCheckFavoritesResponse {
+  repeated string favorited_product_ids = 1;
+}
+
+message AddFavoriteRequest {
+  string product_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message AddFavoriteResponse {}
+
+message RemoveFavoriteRequest {
+  string product_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message RemoveFavoriteResponse {}
+
+message ListFollowsRequest {
+  // 預設 20，上限 100。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListFollowsResponse {
+  repeated Follow follows = 1;
+  string next_page_token = 2;
+  // 追蹤的總數（收藏頁的分頁標籤）。
+  int32 total_size = 3;
+}
+
+message CheckFollowRequest {
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message CheckFollowResponse {
+  bool following = 1;
+}
+
+message BatchCheckFollowsRequest {
+  // 空清單回傳空結果；最多 100 個 ID。
+  repeated string store_ids = 1;
+}
+
+message BatchCheckFollowsResponse {
+  repeated string followed_store_ids = 1;
+}
+
+message FollowStoreRequest {
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message FollowStoreResponse {}
+
+message UnfollowStoreRequest {
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UnfollowStoreResponse {}
+
+message ListMemberCardsRequest {
+  // 預設 20，上限 100。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListMemberCardsResponse {
+  repeated MemberCard member_cards = 1;
+  string next_page_token = 2;
+}
+
+message ListSpendingRecordsRequest {
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 預設 20，上限 100。
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListSpendingRecordsResponse {
+  repeated SpendingRecord records = 1;
+  string next_page_token = 2;
+  // 在這個店家的累計消費額與退款額，新台幣元。
+  int64 total_spent = 3;
+  int64 total_refunded = 4;
+}
+
+message ListVisitsRequest {
+  // 預設 20，上限 100。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListVisitsResponse {
+  repeated Visit visits = 1;
+  string next_page_token = 2;
+}
+
+message RecordVisitRequest {
+  string product_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message RecordVisitResponse {}
+
+message ClearVisitsRequest {}
+
+message ClearVisitsResponse {}
+
+message ListRestockSubscriptionsRequest {
+  // 預設 20，上限 100。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListRestockSubscriptionsResponse {
+  repeated RestockSubscription restock_subscriptions = 1;
+  string next_page_token = 2;
+}
+
+message SubscribeRestockRequest {
+  string product_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message SubscribeRestockResponse {}
+
+message UnsubscribeRestockRequest {
+  string product_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UnsubscribeRestockResponse {}

@@ -1,0 +1,5 @@
+-- 案件的結案欄位 CHECK 補上 IS TRUE（A3b 步驟 10e 第 3c-a 刀之三的審查修正）：close_reason 或 decision 是 NULL 時，三種組合裡的比較都是 NULL，CHECK 對 NULL 是放行的，
+-- 所以「有結案時間卻沒有原因」「原因是 DECIDED 卻沒有決定」的列，資料庫不會擋（設計 §2.2 與 TestReportSchemaConstraints 的案例都說要擋）。條件的內容不變，只有 NULL 不再放行；
+-- 合法的列（進行中、DECIDED 帶決定、NO_REPORTS 不帶決定）的式子都是 TRUE，不受影響，不需要轉換資料。
+-- Modify "cases" table
+ALTER TABLE "seller"."cases" DROP CONSTRAINT "cases_close_check", ADD CONSTRAINT "cases_close_check" CHECK ((((closed_at IS NULL) AND (closed_by_admin_id IS NULL) AND (close_reason IS NULL) AND (decision IS NULL) AND (decision_note IS NULL)) OR ((closed_at >= opened_at) AND (closed_by_admin_id > 0) AND (close_reason = 'DECIDED'::text) AND (decision = ANY (ARRAY['ACTION_TAKEN'::text, 'NO_ACTION'::text])) AND ((decision_note IS NULL) OR ((char_length(decision_note) >= 1) AND (char_length(decision_note) <= 2000)))) OR ((closed_at >= opened_at) AND (closed_by_admin_id > 0) AND (close_reason = 'NO_REPORTS'::text) AND (decision IS NULL) AND (decision_note IS NULL))) IS TRUE);

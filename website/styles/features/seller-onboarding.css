@@ -1,0 +1,1397 @@
+/* =====================================================================
+   Hawkr · /seller-onboarding page additions
+   Standalone B2B page. Re-uses .seller-cta and .seller-stats from
+   home.css for the bottom CTA + numbers, and adds a
+   step-by-step process for the application flow.
+   ===================================================================== */
+
+.seller-onboarding {
+	position: relative;
+	z-index: 1;
+	--seller-section-height: clamp(
+		640px,
+		calc(
+			100svh -
+			var(--floating-nav-height, 84px) -
+			var(--floating-nav-top-gap, 16px) -
+			20px
+		),
+		860px
+	);
+}
+
+/*
+ * Every major story beat shares one viewport-sized stage. This is a minimum
+ * rather than a hard height so enlarged text and opened FAQ answers are never
+ * clipped. Lenis Snap owns precision-pointer snapping; touch devices use the
+ * native proximity fallback below.
+ */
+.seller-onboarding .seller-snap-section {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	box-sizing: border-box;
+	min-block-size: var(--seller-section-height);
+	scroll-margin-block-start: calc(var(--floating-nav-height, 84px) + 16px);
+}
+
+html.seller-snap-native {
+	scroll-padding-block-start: calc(var(--floating-nav-height, 84px) + 16px);
+	scroll-snap-type: y proximity;
+}
+
+html.seller-snap-native .seller-onboarding [data-seller-snap] {
+	scroll-snap-align: start;
+	scroll-snap-stop: normal;
+}
+
+.seller-onboarding .seller-snap-beat {
+	min-block-size: var(--seller-section-height);
+	scroll-margin-block-start: calc(var(--floating-nav-height, 84px) + 16px);
+}
+
+@media (max-width: 719px) {
+	.seller-onboarding {
+		--seller-section-height: auto;
+	}
+}
+
+/* `.hkh-page` adds padding-bottom (clamp 56–96px) so the home page's
+   rounded postcards don't sit flush against the dark footer. This page
+   ends instead on the full-bleed green `.seller-cta`, where that gap just
+   exposes the page-bg crate illustration between the CTA and the footer.
+   Zero it so the green band meets the footer directly. The compound
+   selector outranks the bare `.hkh-page` rule regardless of import order. */
+.seller-onboarding.hkh-page {
+	padding-bottom: 0;
+}
+
+/* =====================================================================
+   STATS STRIP — tight horizontal proof band, sits between hero and
+   the next section. No section header, no padding-heavy card chrome, just a
+   row of 4 numbers. Inspired by ding-go's dense layout.
+   ===================================================================== */
+
+/* =====================================================================
+   FAQ — compact accordion, sits before the apply CTA
+   Each <details> is a row with a tight summary; expands to reveal a
+   short answer. Open state gets a subtle orange accent.
+   ===================================================================== */
+.seller-faq {
+	/* Match the floating navbar (max-width 1440 with 20px viewport gutter)
+     so the section card edges line up with the nav pill above. */
+	width: calc(100% - 40px);
+	max-width: 1440px;
+	margin: 24px auto 0;
+	padding: 24px 56px;
+	border-radius: 36px;
+	background: rgba(255, 253, 247, 0.62);
+	-webkit-backdrop-filter: blur(20px) saturate(140%);
+	backdrop-filter: blur(20px) saturate(140%);
+	border: 1px solid rgba(255, 255, 255, 0.7);
+	box-shadow:
+		0 24px 64px -32px rgb(var(--color-ink-700-rgb) / 0.18),
+		0 1px 0 rgba(255, 255, 255, 0.9) inset;
+	box-sizing: border-box;
+}
+.seller-faq .sect-head {
+	margin-bottom: 16px;
+}
+.seller-faq .sect-head h2 em {
+	font-style: normal;
+	color: var(--color-accent-500, #ed954b);
+}
+.faq-list {
+	max-width: 880px;
+	margin: 0 auto;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.faq-item {
+	background: #fffdf7;
+	border: 1px solid rgba(58, 42, 26, 0.1);
+	border-radius: 16px;
+	overflow: hidden;
+	transition:
+		border-color 0.2s,
+		box-shadow 0.2s;
+}
+.faq-item[open] {
+	border-color: rgba(237, 149, 75, 0.55);
+	box-shadow: 0 4px 16px -8px rgba(237, 149, 75, 0.25);
+}
+.faq-item summary {
+	list-style: none;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 14px 24px;
+}
+.faq-item summary::-webkit-details-marker {
+	display: none;
+}
+.faq-q {
+	font-family: "Zen Maru Gothic", "Noto Sans TC", var(--font-body);
+	font-weight: 700;
+	font-size: 1rem;
+	color: #1a1a1a;
+	line-height: 1.5;
+}
+.faq-toggle {
+	flex-shrink: 0;
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	background: rgba(58, 42, 26, 0.06);
+	position: relative;
+	transition:
+		background-color 0.2s,
+		transform 0.25s;
+}
+.faq-toggle::before,
+.faq-toggle::after {
+	content: "";
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	width: 12px;
+	height: 2px;
+	background: #1a1a1a;
+	transform: translate(-50%, -50%);
+	border-radius: 2px;
+}
+.faq-toggle::after {
+	transform: translate(-50%, -50%) rotate(90deg);
+	transition: transform 0.25s;
+}
+.faq-item[open] .faq-toggle {
+	background: var(--color-accent-500, #ed954b);
+}
+.faq-item[open] .faq-toggle::before,
+.faq-item[open] .faq-toggle::after {
+	background: #fff;
+}
+.faq-item[open] .faq-toggle::after {
+	transform: translate(-50%, -50%) rotate(0deg);
+}
+.faq-a {
+	padding: 0 24px 22px;
+}
+.faq-a p {
+	margin: 0;
+	font-family: "Noto Sans TC", sans-serif;
+	font-size: 0.875rem;
+	line-height: 1.8;
+	color: rgba(58, 42, 26, 0.75);
+}
+@media (max-width: 880px) {
+	.seller-faq {
+		width: calc(100% - 24px);
+		max-width: none;
+		padding: 40px 24px;
+		border-radius: 24px;
+	}
+	.faq-item summary {
+		padding: 16px 18px;
+	}
+	.faq-a {
+		padding: 0 18px 18px;
+	}
+	.faq-q {
+		font-size: 0.9375rem;
+	}
+}
+
+/* =====================================================================
+   STORY TRAIL OVERRIDES — re-use the .story-trail look from home.css
+   but match the seller page's centered-container width math.
+   ===================================================================== */
+.seller-onboarding .story-trail {
+	/* Match the floating navbar (max-width 1440 with 20px viewport gutter)
+     so the section card edges line up with the nav pill above. */
+	width: calc(100% - 40px);
+	max-width: 1440px;
+	margin: 28px auto 0;
+	border-radius: 36px;
+	padding: 64px 72px;
+	box-sizing: border-box;
+}
+
+/* Seller story-trail uses its OWN scene backgrounds so it doesn't read
+   identical to /about's WHY HAWKR trail. Mapping mirrors the
+   seller's journey: 種下 → 收成 → 上市
+   - DAY 1   → scene-irrigation (planting + watering)
+   - MONTH 1 → scene-greenhouse (growing produce)
+   - YEAR 1  → scene-market    (marketplace + delivery) */
+.seller-story-trail .trail-illus--field {
+	background-image: url("/placeholders/scene-irrigation.svg");
+}
+.seller-story-trail .trail-illus--orchard {
+	background-image: url("/placeholders/scene-greenhouse.svg");
+}
+.seller-story-trail .trail-illus--wheat {
+	background-image: url("/placeholders/scene-market.svg");
+}
+.seller-onboarding .story-trail-inner {
+	max-width: none;
+}
+@media (max-width: 880px) {
+	.seller-onboarding .story-trail {
+		width: calc(100% - 24px);
+		max-width: none;
+		padding: 64px 28px;
+		border-radius: 24px;
+		margin-top: 28px;
+	}
+}
+
+/* Day-marker label above each trail-copy h3 */
+.trail-day {
+	display: inline-block;
+	font-family: "Roboto", "Noto Sans TC", sans-serif;
+	font-weight: var(--weight-black);
+	font-size: 0.75rem;
+	letter-spacing: 0.18em;
+	color: var(--color-accent-500, #ed954b);
+	padding: 4px 12px;
+	border-radius: var(--radius-pill);
+	background: rgba(237, 149, 75, 0.12);
+	margin-bottom: 14px;
+}
+
+/* HERO — uses .hero/.hero-grid/.hero-copy from home.css; minor overrides.
+   Width math matches a .showcase-row exactly: max-width 1280, with
+   6vw side margin from viewport on the outside, so the cream card
+   lines up with the glass cards below pixel-for-pixel. */
+.seller-hero {
+	position: relative;
+	/* Match the floating navbar (max-width 1440 with 20px viewport gutter)
+     so the section card edges line up with the nav pill above. */
+	width: calc(100% - 40px);
+	max-width: 1440px;
+	margin: 24px auto 0;
+	padding: 72px 72px 64px;
+	background: #faf6ec;
+	border-radius: 32px;
+	overflow: visible;
+	box-sizing: border-box;
+}
+@media (max-width: 880px) {
+	.seller-hero {
+		width: calc(100% - 24px);
+		max-width: none;
+		padding: 48px 28px;
+		border-radius: 24px;
+	}
+}
+
+.seller-hero-inner {
+	max-width: 980px;
+	margin: 0 auto;
+	text-align: left;
+	position: relative;
+	z-index: 2;
+}
+.seller-hero h1 {
+	font-family: "Zen Maru Gothic", "Noto Sans TC", var(--font-body);
+	font-weight: var(--weight-black);
+	font-size: clamp(2.5rem, 6vw, 5rem);
+	line-height: 1.05;
+	color: #3a2a1a;
+	margin: 16px 0 24px;
+	max-width: 16ch;
+}
+.seller-hero h1 em {
+	font-style: normal;
+	color: var(--color-accent-500, #ed954b);
+}
+.seller-hero .lede {
+	font-family: "Zen Maru Gothic", "Noto Sans TC", var(--font-body);
+	font-size: 1.125rem;
+	line-height: 1.7;
+	color: rgba(58, 42, 26, 0.7);
+	max-width: 52ch;
+	margin: 0 0 36px;
+}
+.seller-hero .hero-ctas {
+	margin-bottom: 0;
+}
+
+/* Large Hawkr registration badge in the hero. */
+.seller-hero::after {
+	display: none;
+}
+
+.spin-badge {
+	position: absolute;
+	top: 24px;
+	right: 28px;
+	width: 280px;
+	height: 280px;
+	z-index: 3;
+	pointer-events: none;
+	transform: rotate(-3deg);
+	filter: drop-shadow(0 18px 34px rgb(var(--color-ink-800-rgb) / 0.22));
+}
+@media (max-width: 1100px) {
+	.spin-badge {
+		width: 220px;
+		height: 220px;
+		top: 24px;
+		right: 20px;
+	}
+}
+@media (max-width: 880px) {
+	.spin-badge {
+		display: none;
+	}
+}
+
+.spin-badge__stack,
+.spin-badge__ring {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+}
+
+.spin-badge__stack .ring-outer {
+	fill: #fffaf0;
+}
+.spin-badge__stack .ring-brand {
+	fill: var(--color-brand-primary-strong);
+}
+.spin-badge__stack .ring-gap {
+	fill: #fffaf0;
+}
+.spin-badge__stack .ring-center {
+	fill: #f6f0e6;
+}
+.spin-badge__stack .ring-dashed {
+	fill: none;
+	stroke: #e9bd47;
+	stroke-width: 1.5;
+	stroke-dasharray: 2 5;
+	opacity: 0.9;
+}
+
+.spin-badge__ring {
+	animation: spin-badge-rotate 18s linear infinite;
+}
+.spin-badge__ring text {
+	font-family: "Zen Maru Gothic", "Noto Sans TC", sans-serif;
+	font-size: 0.8375rem;
+	font-weight: var(--weight-black);
+	letter-spacing: 0.08em;
+	fill: #fffaf0;
+}
+
+.spin-badge__center {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	width: 58%;
+	height: 58%;
+	overflow: hidden;
+	border-radius: 50%;
+	transform: translate(-50%, -50%);
+}
+.spin-badge__center img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	object-position: center;
+}
+
+.spin-badge__tag {
+	position: absolute;
+	top: -4px;
+	left: -4px;
+	z-index: 4;
+	padding: 6px 14px;
+	border: 3px solid #fffaf0;
+	border-radius: var(--radius-pill);
+	background: #171a18;
+	color: #fffaf0;
+	font-family: "Roboto", "Noto Sans TC", sans-serif;
+	font-size: 0.8125rem;
+	font-weight: var(--weight-black);
+	letter-spacing: 0.12em;
+	transform: rotate(-16deg);
+}
+
+@keyframes spin-badge-rotate {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* =====================================================================
+   PROCESS STEPS — 1·2·3 how to onboard
+   ===================================================================== */
+.seller-process {
+	/* Match the floating navbar (max-width 1440 with 20px viewport gutter)
+     so the process-glass card edges align with the nav pill and the
+     other seller-landing sections above/below. */
+	width: calc(100% - 40px);
+	max-width: 1440px;
+	margin: 0 auto;
+	padding-block: 10px;
+	box-sizing: border-box;
+}
+.process-glass {
+	padding: 24px clamp(32px, 4vw, 56px);
+	border-radius: 36px;
+	background: rgba(255, 253, 247, 0.62);
+	-webkit-backdrop-filter: blur(20px) saturate(140%);
+	backdrop-filter: blur(20px) saturate(140%);
+	border: 1px solid rgba(255, 255, 255, 0.7);
+	box-shadow:
+		0 24px 64px -32px rgb(var(--color-ink-700-rgb) / 0.18),
+		0 1px 0 rgba(255, 255, 255, 0.9) inset;
+}
+.seller-process .sect-head {
+	margin-bottom: 0;
+}
+
+@media (min-width: 881px) {
+	.seller-process .sect-head > div {
+		display: grid;
+		grid-template-areas:
+			"eyebrow eyebrow"
+			"title body";
+		grid-template-columns: minmax(330px, 0.9fr) minmax(260px, 0.65fr);
+		column-gap: clamp(32px, 5vw, 72px);
+		align-items: end;
+		width: 100%;
+	}
+
+	.seller-process .eyebrow {
+		grid-area: eyebrow;
+		justify-self: start;
+	}
+
+	.seller-process .sect-head h2 {
+		grid-area: title;
+	}
+
+	.seller-process .sect-head p {
+		grid-area: body;
+		padding-bottom: 16px;
+	}
+}
+@media (max-width: 1100px) {
+	.process-glass {
+		padding: 40px;
+		border-radius: 28px;
+	}
+}
+.process-steps {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 24px;
+	margin: 18px 0 0;
+	padding: 0;
+	list-style: none;
+	counter-reset: process;
+}
+.process-step {
+	position: relative;
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	padding: 14px 10px 0;
+	counter-increment: process;
+	--draw: 1; /* JS animates this from 0 → 1 on scroll-in */
+}
+.process-step::before {
+	/* the "border-top" — drawn from left to right via scaleX(var(--draw)) */
+	content: "";
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 2px;
+	background: var(--color-home-accent-500, var(--color-ink-300));
+	transform: scaleX(var(--draw, 1));
+	transform-origin: left center;
+}
+.process-step h3::before {
+	content: counter(process, decimal-leading-zero);
+	font-family: "Roboto", sans-serif;
+	font-weight: var(--weight-black);
+	font-size: 0.875rem;
+	color: var(--color-accent-500, #ed954b);
+	letter-spacing: 0.1em;
+	display: block;
+	margin-bottom: 12px;
+}
+.process-step h3 {
+	font-family: "Zen Maru Gothic", "Noto Sans TC", var(--font-body);
+	font-weight: var(--weight-black);
+	font-size: 1.375rem;
+	color: #3a2a1a;
+	margin: 0 0 12px;
+}
+.process-step__visual {
+	position: relative;
+	width: 100%;
+	aspect-ratio: 16 / 8;
+	margin: 4px 0 12px;
+	overflow: hidden;
+	border: 1px solid var(--theme-border-soft);
+	border-radius: 18px;
+	background: var(--theme-surface-muted);
+	box-shadow:
+		0 18px 32px -26px rgb(var(--color-brand-ink-rgb) / 0.48),
+		inset 0 1px 0 rgb(var(--color-neutral-white-rgb) / 0.74);
+}
+.process-step__image {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+.process-step p {
+	font-family: "Noto Sans TC", sans-serif;
+	font-size: 0.875rem;
+	line-height: 1.7;
+	color: rgba(58, 42, 26, 0.65);
+	margin: 0;
+}
+
+@media (max-width: 880px) {
+	.seller-process {
+		width: calc(100% - 24px);
+		padding-block: 20px;
+	}
+
+	.process-glass {
+		padding: 32px 0 28px;
+		border-radius: 24px;
+	}
+
+	.seller-process .sect-head {
+		padding-inline: 24px;
+	}
+
+	.process-steps {
+		display: flex;
+		gap: 14px;
+		margin-top: 22px;
+		padding: 0 24px 8px;
+		overflow-x: auto;
+		overscroll-behavior-inline: contain;
+		scroll-padding-inline: 24px;
+		scroll-snap-type: x mandatory;
+		scrollbar-width: none;
+		-webkit-overflow-scrolling: touch;
+	}
+
+	.process-steps::-webkit-scrollbar {
+		display: none;
+	}
+
+	.process-step {
+		flex: 0 0 min(84vw, 380px);
+		padding: 20px 4px 0;
+		scroll-snap-align: start;
+	}
+
+	.process-step__visual {
+		order: 3;
+		aspect-ratio: 16 / 9;
+		margin: 0;
+		border-radius: 16px;
+	}
+
+	.process-step p {
+		order: 2;
+		margin-bottom: 14px;
+	}
+}
+
+@media (max-width: 390px), (max-height: 720px) {
+	.process-glass {
+		padding-block: 26px 22px;
+	}
+
+	.seller-process .sect-head h2 {
+		font-size: clamp(2.125rem, 10vw, 3rem);
+	}
+
+	.seller-process .sect-head p {
+		margin-top: 10px;
+	}
+
+	.process-steps {
+		margin-top: 16px;
+	}
+
+	.process-step h3 {
+		font-size: 1.25rem;
+	}
+
+	.process-step p {
+		font-size: 0.8125rem;
+		line-height: 1.6;
+	}
+}
+
+/* =====================================================================
+   APPLY CTA strip — bottom of the page
+   Re-uses .seller-cta from home.css but with seller-page tweaks
+   ===================================================================== */
+.seller-onboarding .seller-cta {
+	margin-top: 18px;
+}
+
+/* ── Dark mode ─────────────────────────────────────────────────────────────
+   By default the seller-landing sections render as light frosted-glass cards
+   (cream veils, a solid cream hero, white FAQ rows). On the night canvas those
+   panels glare and read as a different theme, so we re-skin every surface to
+   the site's ink-glass dark tokens and lift the copy to the cream / sage
+   pairing used elsewhere in dark mode — readable, never bright or dim. The
+   story-trail is intentionally NOT re-skinned here: its surface is already
+   dark (home.css) and its copy is lifted by the shared `.hkh-page` trail
+   rules in home.css. */
+
+/* Panel surfaces — cream veils → ink glass */
+[data-theme="dark"] .seller-onboarding .seller-hero,
+[data-theme="dark"] .seller-onboarding .process-glass,
+[data-theme="dark"] .seller-onboarding .seller-faq {
+	background: var(--theme-surface-card);
+	border-color: var(--theme-border-soft);
+}
+
+/* FAQ rows sit inside the FAQ panel — one rung lighter so they read as insets */
+[data-theme="dark"] .seller-onboarding .faq-item {
+	background: rgba(255, 255, 255, 0.05);
+	border-color: var(--theme-border-soft);
+}
+[data-theme="dark"] .seller-onboarding .faq-item[open] {
+	border-color: rgba(241, 205, 112, 0.45);
+	box-shadow: 0 4px 16px -8px rgba(0, 0, 0, 0.5);
+}
+
+/* Headings → warm cream (not pure white, so it never glares) */
+[data-theme="dark"]
+	.seller-onboarding
+	:where(.seller-hero, .process-glass, .seller-faq)
+	:where(h1, h2, h3, h4, .faq-q) {
+	color: var(--theme-text-heading);
+}
+
+/* Body copy → soft sage: readable, not bright, not dim */
+[data-theme="dark"]
+	.seller-onboarding
+	:where(.seller-hero, .process-glass, .seller-faq)
+	:where(p, .lede, .faq-a p) {
+	color: rgb(var(--color-ink-100-rgb) / 0.74);
+}
+
+/* Emphasis → brand gold (matches the dark CTA + spin badge) */
+[data-theme="dark"]
+	.seller-onboarding
+	:where(.seller-hero, .process-glass, .seller-faq)
+	:where(h1, h2, h3)
+	em {
+	color: var(--color-brand-secondary);
+}
+
+[data-theme="dark"] .seller-onboarding .process-step__visual {
+	border-color: rgb(var(--color-brand-secondary-soft-rgb) / 0.16);
+	background: rgb(var(--color-brand-ink-rgb) / 0.28);
+	box-shadow:
+		0 20px 36px -26px rgb(var(--color-neutral-black-rgb) / 0.78),
+		inset 0 1px 0 rgb(var(--color-neutral-white-rgb) / 0.08);
+}
+
+[data-theme="dark"] .seller-onboarding .process-glass .sect-head h2 em {
+	color: var(--theme-text-accent, #f5dea5);
+}
+
+[data-theme="dark"] .seller-onboarding .trail-day {
+	color: var(--color-accent-500, #ed954b);
+}
+
+/* FAQ toggle — flip the +/- glyph + well from ink to cream on the dark row */
+[data-theme="dark"] .seller-onboarding .faq-toggle {
+	background: rgba(245, 222, 165, 0.12);
+}
+[data-theme="dark"] .seller-onboarding .faq-toggle::before,
+[data-theme="dark"] .seller-onboarding .faq-toggle::after {
+	background: #f5e9c3;
+}
+[data-theme="dark"] .seller-onboarding .faq-item[open] .faq-toggle {
+	background: var(--color-brand-secondary);
+}
+[data-theme="dark"] .seller-onboarding .faq-item[open] .faq-toggle::before,
+[data-theme="dark"] .seller-onboarding .faq-item[open] .faq-toggle::after {
+	background: var(--color-ink-900);
+}
+
+/* CTA band — the default lime→primary gradient glares on the night canvas;
+   deepen it to a rich ink so it reads as a calm brand band. */
+[data-theme="dark"] .seller-onboarding .seller-cta {
+	background:
+		radial-gradient(
+			900px 600px at 85% -10%,
+			rgb(var(--color-brand-secondary-rgb) / 0.12),
+			transparent 60%
+		),
+		linear-gradient(
+			180deg,
+			var(--color-ink-700) 0%,
+			var(--color-ink-800) 55%,
+			var(--color-ink-850) 100%
+		);
+}
+
+/* =====================================================================
+   SELLER FIT — additive partner stories + application preparation
+   Uses the repository's semantic brand tokens sourced from the design-system
+   guidelines. This section intentionally avoids dashboard
+   mockups so the original partnership story remains the page's visual lead.
+   ===================================================================== */
+.seller-fit {
+	width: calc(100% - 40px);
+	max-width: 1440px;
+	margin: 24px auto 0;
+	padding: 28px clamp(28px, 3vw, 44px) 32px;
+	overflow: hidden;
+	border: 1px solid rgba(255, 255, 255, 0.7);
+	border-radius: 36px;
+	background: rgba(255, 253, 247, 0.62);
+	-webkit-backdrop-filter: blur(20px) saturate(140%);
+	backdrop-filter: blur(20px) saturate(140%);
+	box-shadow:
+		0 24px 64px -32px rgb(var(--color-ink-700-rgb) / 0.18),
+		0 1px 0 rgba(255, 255, 255, 0.9) inset;
+	box-sizing: border-box;
+}
+
+.seller-fit .seller-fit__head {
+	margin-bottom: 24px;
+}
+
+.seller-fit__head h2 em {
+	color: var(--theme-text-accent);
+	font-style: normal;
+}
+
+.seller-fit__head p {
+	max-width: 680px;
+	margin-inline: auto;
+}
+
+.seller-fit__grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 20px;
+}
+
+.seller-fit-card {
+	--spotlight-x: 50%;
+	--spotlight-y: 50%;
+	--spotlight-opacity: 0;
+	position: relative;
+	display: grid;
+	grid-template-rows: 220px auto;
+	min-width: 0;
+	overflow: hidden;
+	border: 1px solid var(--theme-border-soft);
+	border-radius: 28px;
+	background: var(--theme-surface-card);
+	box-shadow: var(--theme-shadow-brand-soft);
+	isolation: isolate;
+	transition:
+		transform 220ms ease,
+		border-color 220ms ease,
+		box-shadow 220ms ease;
+}
+
+.seller-fit-card::after {
+	position: absolute;
+	z-index: 4;
+	inset: 0;
+	background: radial-gradient(
+		320px circle at var(--spotlight-x) var(--spotlight-y),
+		rgb(var(--color-brand-secondary-rgb) / 0.18),
+		transparent 64%
+	);
+	content: "";
+	opacity: var(--spotlight-opacity);
+	pointer-events: none;
+	transition: opacity 180ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.seller-fit-card:hover {
+		border-color: var(--theme-primary-border);
+		box-shadow: var(--theme-shadow-brand-lift);
+		transform: translateY(-4px);
+	}
+}
+
+.seller-fit-card__art {
+	position: relative;
+	min-height: 0;
+	overflow: hidden;
+	background: var(--theme-primary-subtle);
+}
+
+.seller-fit-card__art::after {
+	position: absolute;
+	z-index: 1;
+	inset: auto 0 0;
+	height: 42%;
+	background: linear-gradient(
+		to bottom,
+		transparent,
+		rgb(var(--color-brand-ink-rgb) / 0.12)
+	);
+	content: "";
+	pointer-events: none;
+}
+
+.seller-fit-card__scene {
+	object-fit: cover;
+	object-position: center bottom;
+	transform: scale(1.015);
+}
+
+.seller-fit-card__mascot {
+	position: absolute;
+	z-index: 2;
+	right: 4%;
+	bottom: -10%;
+	width: min(48%, 190px);
+	aspect-ratio: 1;
+	filter: drop-shadow(0 16px 18px rgb(var(--color-brand-ink-rgb) / 0.16));
+}
+
+.seller-fit-card__copy {
+	position: relative;
+	z-index: 2;
+	padding: 26px 28px 30px;
+}
+
+.seller-fit-card__meta {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 12px;
+	color: var(--theme-text-muted);
+	font-family: "Roboto", "Noto Sans TC", sans-serif;
+	font-size: 0.75rem;
+	font-weight: var(--weight-bold);
+	letter-spacing: 0.08em;
+}
+
+.seller-fit-card__meta span {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	height: 30px;
+	border-radius: 50%;
+	background: var(--theme-primary-subtle);
+	color: var(--theme-text-accent-on-tint);
+	letter-spacing: 0;
+}
+
+.seller-fit-card h3 {
+	margin: 0;
+	color: var(--theme-text-heading);
+	font-family: "Zen Maru Gothic", "Noto Sans TC", var(--font-body);
+	font-size: clamp(1.25rem, 1.8vw, 1.5625rem);
+	font-weight: var(--weight-black);
+	line-height: 1.38;
+}
+
+.seller-fit-card p {
+	margin: 12px 0 0;
+	color: var(--theme-text-body);
+	font-family: "Noto Sans TC", var(--font-primary);
+	font-size: 0.875rem;
+	line-height: 1.75;
+}
+
+@media (min-width: 720px) and (max-height: 800px) {
+	.seller-fit {
+		padding-block: 8px;
+	}
+}
+
+/* Vanta is a decorative progressive enhancement. The original CTA gradient
+   remains fully visible before loading and whenever WebGL is unavailable. */
+.seller-vanta-atmosphere {
+	position: absolute;
+	z-index: 1;
+	inset: 0;
+	opacity: 0.2;
+	pointer-events: none;
+	mix-blend-mode: soft-light;
+}
+
+@media (max-width: 980px) {
+	.seller-fit__grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.seller-fit-card:last-child {
+		grid-column: 1 / -1;
+		grid-template-columns: minmax(240px, 0.9fr) minmax(0, 1.1fr);
+		grid-template-rows: minmax(280px, auto);
+	}
+
+	.seller-fit-card:last-child .seller-fit-card__copy {
+		align-self: center;
+	}
+}
+
+@media (max-width: 640px) {
+	.seller-fit {
+		width: calc(100% - 24px);
+		margin-top: 56px;
+		padding: 30px 12px 18px;
+		border-radius: 24px;
+	}
+
+	.seller-fit__grid {
+		grid-template-columns: 1fr;
+		gap: 14px;
+	}
+
+	.seller-fit-card,
+	.seller-fit-card:last-child {
+		grid-column: auto;
+		grid-template-columns: 1fr;
+		grid-template-rows: 225px auto;
+		border-radius: 23px;
+	}
+
+	.seller-fit-card__copy {
+		padding: 23px 22px 26px;
+	}
+}
+
+[data-theme="dark"] .seller-onboarding .seller-fit {
+	border-color: var(--theme-border-soft);
+	background: var(--theme-surface-card);
+	box-shadow:
+		0 24px 64px -32px rgb(var(--color-neutral-black-rgb) / 0.64),
+		inset 0 1px 0 rgb(var(--color-neutral-white-rgb) / 0.08);
+}
+
+[data-theme="dark"] .seller-fit__head h2 em {
+	color: var(--theme-text-accent, #f5dea5);
+}
+
+[data-theme="dark"] .seller-fit-card {
+	background: var(--theme-surface-card);
+	border-color: var(--theme-border-soft);
+}
+
+[data-theme="dark"] .seller-fit-card__art {
+	background: var(--theme-surface-muted);
+}
+
+[data-theme="dark"] .seller-fit-card__scene {
+	opacity: 0.78;
+}
+
+[data-theme="dark"] .seller-fit-card__meta span {
+	background: rgb(var(--color-brand-secondary-rgb) / 0.14);
+	color: var(--color-brand-secondary);
+}
+
+[data-theme="dark"] .seller-fit-card h3 {
+	color: var(--theme-text-heading);
+}
+
+[data-theme="dark"] .seller-fit-card p {
+	color: rgb(var(--color-brand-secondary-soft-rgb) / 0.76);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+	.seller-fit {
+		background: rgb(255 253 247 / 0.96);
+		-webkit-backdrop-filter: none;
+		backdrop-filter: none;
+	}
+
+	[data-theme="dark"] .seller-onboarding .seller-fit {
+		background: var(--theme-surface-card);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.seller-fit-card {
+		transition: none;
+	}
+
+	.seller-onboarding .spin-badge__ring {
+		animation: none;
+	}
+
+	.seller-fit-card::after,
+	.seller-vanta-atmosphere {
+		display: none;
+	}
+}
+
+/* =====================================================================
+   WHOLE-PAGE INTERACTION LAYER
+   Motion uses the checked-in Hawkr semantic tokens. Every effect is a
+   progressive enhancement: the original layout and content remain complete
+   when JavaScript, WebGL, hover, or motion are unavailable.
+   ===================================================================== */
+.seller-hero {
+	--seller-pointer-x: 78%;
+	--seller-pointer-y: 18%;
+	isolation: isolate;
+}
+
+.seller-hero::before {
+	position: absolute;
+	z-index: 0;
+	inset: 0;
+	border-radius: inherit;
+	background: radial-gradient(
+		420px circle at var(--seller-pointer-x) var(--seller-pointer-y),
+		rgb(var(--color-brand-secondary-rgb) / 0.2),
+		transparent 68%
+	);
+	content: "";
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 280ms ease;
+}
+
+.seller-onboarding[data-seller-motion="enhanced"] .seller-hero::before {
+	opacity: 1;
+}
+
+.seller-spotlight-card {
+	--seller-tilt-x: 0deg;
+	--seller-tilt-y: 0deg;
+	--seller-card-lift: 0px;
+	transform: perspective(1000px) translate3d(0, var(--seller-card-lift), 0)
+		rotateX(var(--seller-tilt-x)) rotateY(var(--seller-tilt-y));
+	transform-style: preserve-3d;
+}
+
+.seller-onboarding[data-seller-motion="enhanced"] .seller-spotlight-card {
+	transition:
+		transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+		border-color 220ms ease,
+		box-shadow 220ms ease;
+}
+
+.seller-fit-card__scene,
+.seller-fit-card__mascot,
+.process-step h3 {
+	transition:
+		transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+		color 220ms ease,
+		opacity 220ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+
+	.seller-fit-card:hover .seller-fit-card__scene {
+		transform: translate3d(-1%, -1%, 0) scale(1.05);
+	}
+
+	.seller-fit-card:hover .seller-fit-card__mascot {
+		transform: translate3d(7px, -8px, 0) rotate(2deg);
+	}
+
+	.process-step:hover h3 {
+		transform: translateY(-2px);
+	}
+}
+
+.seller-h .char {
+	display: inline-block;
+}
+
+.seller-onboarding .btn {
+	transition:
+		transform 200ms ease,
+		scale 160ms ease,
+		background 200ms ease,
+		color 200ms ease,
+		box-shadow 200ms ease;
+}
+
+.seller-onboarding .btn:active {
+	scale: 0.97;
+}
+
+.seller-onboarding .btn:focus-visible,
+.seller-onboarding .faq-item summary:focus-visible {
+	outline: 3px solid rgb(var(--color-brand-secondary-rgb) / 0.72);
+	outline-offset: 4px;
+}
+
+.seller-onboarding .faq-item summary:focus-visible {
+	border-radius: 14px;
+}
+
+.seller-onboarding .faq-item {
+	transition:
+		border-color 220ms ease,
+		box-shadow 220ms ease,
+		transform 220ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.seller-onboarding .faq-item:not([open]):hover {
+		border-color: rgb(var(--color-brand-ink-rgb) / 0.24);
+		box-shadow: var(--theme-shadow-brand-soft);
+		transform: translateY(-1px);
+	}
+}
+
+.seller-onboarding .seller-cta {
+	isolation: isolate;
+}
+
+.seller-onboarding .seller-cta::before,
+.seller-onboarding .seller-cta::after {
+	z-index: 0;
+}
+
+.seller-onboarding .seller-vanta-atmosphere {
+	z-index: 1;
+	opacity: 0.27;
+}
+
+.seller-onboarding .seller-inner {
+	z-index: 2;
+}
+
+/* Section labels: social-native hashtags without repeated badge chrome. */
+.seller-onboarding .eyebrow {
+	position: relative;
+	isolation: isolate;
+	overflow: hidden;
+	min-height: 50px;
+	max-width: 100%;
+	gap: 14px;
+	padding: 11px 24px;
+	border: 1px solid var(--theme-border-warm);
+	border-radius: var(--radius-pill);
+	background:
+		linear-gradient(
+			135deg,
+			rgb(var(--color-neutral-white-rgb) / 0.74),
+			rgb(var(--color-brand-secondary-soft-rgb) / 0.5)
+		),
+		var(--theme-surface-glass);
+	color: var(--theme-text-accent);
+	box-shadow:
+		0 12px 30px -24px rgb(var(--color-brand-ink-rgb) / 0.42),
+		var(--shadow-inset-top);
+	font-size: clamp(0.75rem, 1.1vw, 0.875rem);
+	line-height: 1.35;
+	letter-spacing: 0.22em;
+	text-wrap: balance;
+	-webkit-backdrop-filter: blur(16px) saturate(135%);
+	backdrop-filter: blur(16px) saturate(135%);
+	transition:
+		border-color 220ms ease,
+		box-shadow 220ms ease,
+		transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.seller-onboarding .eyebrow::after {
+	position: absolute;
+	z-index: -1;
+	top: -80%;
+	left: -38%;
+	width: 34%;
+	height: 260%;
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgb(var(--color-neutral-white-rgb) / 0.72),
+		transparent
+	);
+	content: "";
+	opacity: 0;
+	pointer-events: none;
+	transform: rotate(18deg);
+	transition:
+		left 560ms cubic-bezier(0.22, 1, 0.36, 1),
+		opacity 180ms ease;
+}
+
+.seller-onboarding .eyebrow .eb-dot {
+	flex: 0 0 auto;
+	width: 10px;
+	height: 10px;
+	background: var(--color-brand-secondary);
+	box-shadow:
+		0 0 0 5px rgb(var(--color-brand-secondary-rgb) / 0.12),
+		0 2px 6px rgb(var(--color-brand-ink-rgb) / 0.16);
+	transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.seller-onboarding .eyebrow:hover {
+		border-color: rgb(var(--color-brand-secondary-rgb) / 0.58);
+		box-shadow:
+			0 16px 34px -24px rgb(var(--color-brand-ink-rgb) / 0.52),
+			var(--shadow-inset-top);
+		transform: translateY(-1px);
+	}
+
+	.seller-onboarding .eyebrow:hover::after {
+		left: 112%;
+		opacity: 0.72;
+	}
+
+	.seller-onboarding .eyebrow:hover .eb-dot {
+		transform: scale(1.16);
+	}
+}
+
+.seller-onboarding .eyebrow.eyebrow--on-dark {
+	border-color: rgb(var(--color-brand-secondary-rgb) / 0.34);
+	background:
+		linear-gradient(
+			135deg,
+			rgb(var(--color-brand-secondary-soft-rgb) / 0.16),
+			rgb(var(--color-brand-ink-rgb) / 0.18)
+		),
+		rgb(var(--color-brand-ink-rgb) / 0.24);
+	color: var(--color-neutral-cream);
+	box-shadow:
+		0 14px 34px -24px rgb(var(--color-neutral-black-rgb) / 0.6),
+		inset 0 1px 0 rgb(var(--color-neutral-white-rgb) / 0.18);
+}
+
+[data-theme="dark"] .seller-onboarding .eyebrow:not(.eyebrow--on-dark) {
+	border-color: rgb(var(--color-brand-secondary-rgb) / 0.28);
+	background:
+		linear-gradient(
+			135deg,
+			rgb(var(--color-brand-secondary-soft-rgb) / 0.09),
+			rgb(var(--color-brand-ink-rgb) / 0.2)
+		),
+		var(--theme-surface-glass);
+	color: var(--theme-text-accent);
+}
+
+@media (max-width: 640px) {
+	.seller-onboarding .eyebrow {
+		min-height: 44px;
+		padding: 9px 16px;
+		gap: 11px;
+		font-size: 0.6875rem;
+		letter-spacing: 0.15em;
+		white-space: normal;
+	}
+
+	.seller-onboarding .eyebrow .eb-dot {
+		width: 8px;
+		height: 8px;
+		box-shadow: 0 0 0 4px rgb(var(--color-brand-secondary-rgb) / 0.12);
+	}
+}
+
+.seller-onboarding .eyebrow.eyebrow--hashtags {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	min-height: 0;
+	max-width: 100%;
+	gap: 4px 14px;
+	padding: 0;
+	overflow: visible;
+	border: 0;
+	border-radius: 0;
+	background: none;
+	color: var(--theme-text-accent);
+	box-shadow: none;
+	font-family: "Noto Sans TC", var(--font-primary);
+	font-size: clamp(0.8125rem, 1.08vw, 0.9375rem);
+	font-weight: var(--weight-bold);
+	line-height: 1.55;
+	letter-spacing: 0.035em;
+	text-transform: none;
+	text-wrap: pretty;
+	white-space: normal;
+	-webkit-backdrop-filter: none;
+	backdrop-filter: none;
+	transform: none;
+}
+
+.seller-onboarding .eyebrow.eyebrow--hashtags::after {
+	display: none;
+}
+
+.seller-onboarding .eyebrow--hashtags > span {
+	color: inherit;
+}
+
+.seller-onboarding .eyebrow--hashtags > span + span {
+	color: color-mix(in srgb, currentColor 72%, transparent);
+}
+
+.seller-onboarding .eyebrow.eyebrow--hashtags.eyebrow--on-dark {
+	color: var(--color-neutral-cream);
+}
+
+[data-theme="dark"]
+	.seller-onboarding
+	.eyebrow.eyebrow--hashtags:not(.eyebrow--on-dark) {
+	border-color: transparent;
+	background: none;
+	color: var(--theme-text-accent);
+}
+
+.seller-onboarding .eyebrow.eyebrow--hashtags.eyebrow--on-dark {
+	border-color: transparent;
+	background: none;
+	box-shadow: none;
+}
+
+@media (max-width: 640px) {
+	.seller-onboarding .eyebrow.eyebrow--hashtags {
+		min-height: 0;
+		gap: 3px 10px;
+		padding: 0;
+		font-size: 0.75rem;
+		letter-spacing: 0.025em;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.seller-onboarding .seller-spotlight-card {
+		transform: none;
+		transition: none;
+	}
+
+	.seller-onboarding .seller-fit-card::after,
+	.seller-onboarding .seller-hero::before {
+		display: none;
+	}
+
+	.seller-onboarding .eyebrow,
+	.seller-onboarding .eyebrow::after,
+	.seller-onboarding .eyebrow .eb-dot {
+		transition: none;
+	}
+}

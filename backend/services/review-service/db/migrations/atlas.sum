@@ -1,0 +1,8 @@
+h1:zl+bkgwvI99a1AB+ufp57ycbMRfs1yOTMqP/2vOu4E8=
+20260226145526_initial_schema.sql h1:2ihl8H6CXm2aEEhe8rq4qOzlY0rr2GlhdkurEmEp55E=
+20260226164246_add_product_id.sql h1:NCjdD9r7a5xQjTiCnmGFdGkAMKcw8OBxjk/yQPegyq8=
+20260503000000_b135_review_hidden.sql h1:R+KCL3vK23hkpsF7OaTHsV2AimC5mn1/fbAA1bDLBi0=
+20260628105828_add_review_reply.sql h1:4cn+5p0UtGhdc5A+Va+K4eJkGzJ36lQWBaSM9SpwtM0=
+20260717140411_rename_review_image_cols_to_key.sql h1:ohkHa6z68oef9mjpLDPeEcLsol+gb949l2ze7eGXuCU=
+20260717160039_rename_reviews_seller_account_id_to_store_id.sql h1:bn4rFIUDQqZs4s+IMXnMdLjT97LT3CGpDibzCuSEag0=
+20260718130219_rename_buyer_account_id_to_buyer_id.sql h1:LN/8d+C1+nFT/BnqSdvHvKNSPn83Dgn/qs9m6yqRUNo=

@@ -1,0 +1,116 @@
+server:
+  port: ${SERVER_PORT:9946}
+
+# gRPC Server Configuration（未來擴充用）
+grpc:
+  server:
+    port: ${GRPC_PORT:9947}
+    reflection-service-enabled: true
+
+spring:
+  application:
+    name: payuni-webhook-service
+  cloud:
+    nacos:
+      discovery:
+        enabled: ${NACOS_ENABLED:false}
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+        metadata:
+          grpc-port: ${GRPC_PORT:9947}
+          version: 1.0.0
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_POOL_PORT:5432}/${DB_NAME:hawkr_webhook}?sslmode=${DB_SSLMODE:disable}&prepareThreshold=0
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      minimum-idle: 2
+      maximum-pool-size: 10
+      connection-timeout: 30000
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 5000ms
+  rabbitmq:
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
+    virtual-host: ${RABBITMQ_VHOST:/}
+  flyway:
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:hawkr_webhook}?sslmode=${DB_SSLMODE:disable}
+    user: ${DB_USER}
+    password: ${DB_PASSWORD}
+    enabled: ${FLYWAY_ENABLED:true}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+
+mybatis-plus:
+  mapper-locations: classpath:/mapper/**/*.xml
+  global-config:
+    db-config:
+      id-type: INPUT
+  configuration:
+    map-underscore-to-camel-case: true
+
+# Hawkr Observability 配置
+hawkr:
+  obs:
+    service: payuni-webhook-service
+    grpc:
+      targets:
+        shipping:
+          host: ${SHIPPING_SERVICE_HOST:127.0.0.1}
+          port: ${SHIPPING_SERVICE_GRPC_PORT:9931}
+          plaintext: true
+  tsid:
+    enabled: true
+    node-id-base: 500
+    pod-index: ${POD_INDEX:0}
+
+# PayUni Webhook 業務配置
+payuni:
+  agent:
+    key: ${PAYUNI_AGENT_KEY}
+    iv: ${PAYUNI_AGENT_IV}
+
+webhook:
+  outbox:
+    max-retries: 5
+  cleanup:
+    enabled: ${CLEANUP_ENABLED:true}
+    cron: "0 15 2 * * ?"
+    inbox-retention-days: 90
+    outbox-sent-retention-days: 7
+    outbox-dead-retention-days: 30
+
+# 環境識別（webhook 模擬器白名單：dev/local）
+# fail-secure default: production — 若部署環境忘記注入 APP_ENV,自動落到 production
+# → WebhookSimulatorController.enabled=false → /simulator/* 全 403。
+# dev / local 環境必須在 k8s overlay / docker-compose 顯式注入 APP_ENV=dev or local。
+app:
+  env: ${APP_ENV:production}
+
+logging:
+  level:
+    io.github.will413028.hawkr: ${LOG_LEVEL:INFO}
+    org.flywaydb: INFO
+
+# Uber Direct webhook 驗簽（66 §8.5）
+#
+# 🔴 **一組不是一個**：{webhookId: key} 的 JSON map。只放一把 ⇒ 多註冊一個 webhook
+#    就靜默驗簽失敗，而失敗的下場是我方回 401 ⇒ Uber 不重試 4xx ⇒ 該來源的事件全丟。
+# 🔴 金鑰是 per-webhook signing key，**不是** OAuth client_secret（API 總覽 §6.1）。
+# ⚠️ 未設定時每一則 Uber webhook 都會被拒（fail-closed）。這在「尚未啟用 Uber」的環境
+#    是預期行為；已啟用卻沒設就是事件全數遺失，開機的
+#    webhook_uber_signing_key_count gauge 會是 0。
+uber:
+  webhook:
+    signing-keys: ${UBER_WEBHOOK_SIGNING_KEYS:}

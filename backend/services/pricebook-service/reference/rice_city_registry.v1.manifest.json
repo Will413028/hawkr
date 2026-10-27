@@ -1,0 +1,10 @@
+{
+  "schema": "hawkr.rice-city-registry/v1",
+  "file": "rice_city_registry.v1.csv",
+  "sha256": "cff2fea170fcd674ad79b7277cc5087d0af9ea332a4d85d743b5ef7e1bf826ca",
+  "row_count": 20,
+  "registry_version": "moa-rice-city-registry-2026-09-13-v1",
+  "upstream": "https://data.moa.gov.tw/Service/OpenData/FromM/RicepriceData.aspx",
+  "captured_on": "2026-09-13",
+  "note": "上游只回中文縣市名（name，帶尾隨空白）沒有代碼。market_code 採中華民國地方政府代碼——與毛豬 registry 不同，那裡的 PORK-nn 是我方指派的，因為肉品市場沒有任何官方代碼。代碼來源雙重驗證：(1) 對照農業部同一資料集的 CityName 欄位（20/20 逐筆相符）；(2) 對照地方政府代碼標準（20/20 相符）。"
+}

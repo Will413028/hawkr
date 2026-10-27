@@ -1,0 +1,81 @@
+//go:build integration
+
+package characterization
+
+import (
+	"context"
+	"errors"
+	"io"
+	"log/slog"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"{{.Module}}/internal/httpapi"
+	httpseller "{{.Module}}/internal/httpapi/seller"
+	ch "{{.Module}}/internal/httpapi/characterize"
+	"{{.Module}}/internal/modules/accountdeletion"
+	"{{.Module}}/internal/modules/agent"
+	"{{.Module}}/internal/modules/delegation"
+	"{{.Module}}/internal/modules/discovery"
+	"{{.Module}}/internal/modules/identity"
+	"{{.Module}}/internal/modules/{{.Name}}"
+	"{{.Module}}/internal/modules/reviewqueue"
+	"{{.Module}}/internal/modules/seller"
+	"{{.Module}}/internal/platform/events"
+	"{{.Module}}/internal/platform/jobs"
+	"{{.Module}}/internal/platform/migrate"
+	"{{.Module}}/internal/platform/testdb"
+)
+
+var pg *testdb.Server
+
+func TestMain(m *testing.M) { testdb.Main(m, &pg) }
+
+// monolith 起單體完整的 HTTP 層（自己的空 database）；呼叫者的身分是 identity 發的 session。{{.Name}} 的 Connect
+// service 掛上之後，在 httpapi.Deps 接上模組（照 content 的寫法）。
+func monolith(t *testing.T) *connectDriver {
+	t.Helper()
+	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
+		migrate.Module{Name: "identity", Dir: identity.Migrations()},
+		migrate.Module{Name: "delegation", Dir: delegation.Migrations()},
+		migrate.Module{Name: "{{.Name}}", Dir: {{.Name}}.Migrations()},
+	))
+	jc, err := jobs.NewInsertOnly(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	auth := ch.DevAuth(t)
+	id := identity.New(identity.Deps{
+		DB: d, Events: events.NewBus(), Jobs: jc, Providers: auth.Providers,
+		Now: time.Now, Logger: log,
+	})
+	del := delegation.New(delegation.Deps{DB: d, Identity: id, Seller: seller.NewReader(d, time.Now), Now: time.Now, Logger: log})
+	h, err := httpapi.NewHandler(httpapi.Deps{
+		Ready: d.Ping, Identity: id, Delegation: del, Logger: log,
+		// NewHandler 要求的其他模組：特性測試只打 {{.Name}} 的 service，這些以零值或替身佔位，不會被呼叫。
+		Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}, Discovery: &discovery.Module{},
+		Agent: &agent.Module{}, ReviewQueue: &reviewqueue.Module{}, Stats: ch.Stats(t), WebOrigin: ch.WebOrigin(t), DashboardOrders: noDashboardOrders{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(h)
+	t.Cleanup(srv.Close)
+	return newConnectDriver(srv.Client(), srv.URL, ch.Bearer(auth.Tokens))
+}
+
+func TestMonolith(t *testing.T) {
+	ch.Run[Driver](t, monolith(t), scenarios)
+}
+
+type noDashboardOrders struct{}
+
+func (noDashboardOrders) SalesStats(context.Context, int64, []httpseller.SalesWindow) ([]httpseller.SalesStats, error) {
+	return nil, errors.New("not used")
+}
+
+func (noDashboardOrders) StatusCounts(context.Context, int64) (httpseller.OrderStatusCounts, error) {
+	return httpseller.OrderStatusCounts{}, errors.New("not used")
+}

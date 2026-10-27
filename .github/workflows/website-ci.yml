@@ -1,0 +1,91 @@
+name: website CI
+
+on:
+  pull_request:
+    paths:
+      - 'website/**'
+      - 'api/**'
+      # 共用的 TS 生成碼與 Connect 執行期（import 自 @hawkr/api）。
+      - 'packages/hawkr-api-ts/**'
+      # 共用的鄉鎮市區代碼表與查詢（import 自 @hawkr/twaddr）。
+      - 'packages/hawkr-twaddr-ts/**'
+      # 共用文案目錄（import 自 @hawkr/ui-text）。
+      - 'packages/hawkr-ui-text-ts/**'
+      # website 的測試直接讀 gateway 的 AG-UI golden fixture。
+      - 'backend/gateway/internal/proxy/testdata/agui-frames/**'
+      # design:check 比對兩支 App 的 theme 與 web 的 token 契約。
+      - 'buyer-app/lib/core/theme/**'
+      - 'seller-app/lib/core/theme/**'
+      # 根目錄的 pnpm workspace（兩個 app 共用一份 lockfile 與工具版本）。
+      # workspace 層級的 audit 與 override 檢查在 workspace-ci.yml，不在這裡。
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - 'patches/**'
+      - 'pnpm-lock.yaml'
+      - '.nvmrc'
+      - '.github/actions/pnpm-install/**'
+      - '.github/workflows/website-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - 'api/**'
+      # 共用的 TS 生成碼與 Connect 執行期（import 自 @hawkr/api）。
+      - 'packages/hawkr-api-ts/**'
+      # 共用的鄉鎮市區代碼表與查詢（import 自 @hawkr/twaddr）。
+      - 'packages/hawkr-twaddr-ts/**'
+      # 共用文案目錄（import 自 @hawkr/ui-text）。
+      - 'packages/hawkr-ui-text-ts/**'
+      # website 的測試直接讀 gateway 的 AG-UI golden fixture。
+      - 'backend/gateway/internal/proxy/testdata/agui-frames/**'
+      # design:check 比對兩支 App 的 theme 與 web 的 token 契約。
+      - 'buyer-app/lib/core/theme/**'
+      - 'seller-app/lib/core/theme/**'
+      # 根目錄的 pnpm workspace（兩個 app 共用一份 lockfile 與工具版本）。
+      # workspace 層級的 audit 與 override 檢查在 workspace-ci.yml，不在這裡。
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - 'patches/**'
+      - 'pnpm-lock.yaml'
+      - '.nvmrc'
+      - '.github/actions/pnpm-install/**'
+      - '.github/workflows/website-ci.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: website-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: website
+
+env:
+  # admin/website 的 `prepare` 會跑 `lefthook install`，CI 不需要 git hooks。
+  LEFTHOOK: '0'
+  # 測試與 build 的預先渲染不得連到任何真的主機。API base 沒設時，dev flavor 會落到本機單體
+  # （website/lib/config/env.ts 的 DEV_GATEWAY_HOST，http://localhost:8080），`next build` 的預先渲染就會對它發請求。這裡釘到 loopback
+  # 的丟棄埠：頁面在後端不可用時本來就要能預先渲染（降級），測試另有守衛（website/tests/setup/hermetic.mjs）。
+  API_BASE_URL: http://127.0.0.1:9/api/v1
+  NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:9/api/v1
+
+jobs:
+  verify:
+    name: Lint, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/pnpm-install
+      - run: pnpm run lint
+      - name: 三端 design token 與契約一致
+        run: pnpm run design:check --apps-root ..
+      - run: pnpm run test:unit
+      - run: pnpm test
+      - run: pnpm run build
+      # build 產出的檢查：分享圖在根 layout 之下的頁面是否還在（Next 的 metadata 合併只有 build 之後看得到）。
+      - name: build 產出（分享圖）
+        run: pnpm run test:build-output

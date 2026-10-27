@@ -1,0 +1,93 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.idea
+.vscode
+*.iml
+*.ipr
+*.iws
+
+# Build outputs
+**/target/
+**/build/
+**/bin/
+**/out/
+**/*.class
+**/*.jar
+!**/target/*.jar
+
+# Node modules (if any)
+**/node_modules/
+
+# Logs
+**/*.log
+**/logs/
+
+# Temporary files
+**/*.tmp
+**/*.temp
+**/.DS_Store
+**/Thumbs.db
+
+# Test files
+**/*_test.go
+**/*Test.java
+**/test/
+**/tests/
+**/__tests__/
+
+# Documentation
+**/*.md
+!README.md
+# 根 docs/ **不進 image**。此前 gateway/Dockerfile 的 `COPY docs ./docs` 會把整份內部文件
+# （詳細設計書、開發規範、docs/superpowers/ 的規劃文件，7.9 MB／158 檔）打進對外唯一入口的
+# container，而那個檢視器只在 local/dev 註冊、prod 純粹是夾帶。
+# 本機開發不受影響：docker-compose-local.yml 用 `./docs:/app/docs` bind mount 供檔。
+
+# Dev tooling / CI (not needed in container)
+scripts/
+monitoring/
+# go-base 共用映像的 `go mod download all` 會走過 go.work 列出的每個 module，需要
+# monitoring/discord-webhook-gateway/go.mod 進 build context 才能解析——這個模組本身
+# 不需要進任何服務映像（它有自己獨立的 Dockerfile，不依賴 go-base），只有這一個檔案
+# 需要例外放行。
+!monitoring/discord-webhook-gateway/go.mod
+infra/
+docker/
+.github/
+.claude/
+buf.gen.yaml
+buf.work.yaml
+**/Makefile
+
+# Docker files (avoid recursive)
+**/Dockerfile*
+**/docker-compose*.yml
+**/.docker/
+
+# Environment files
+**/.env
+**/.env.*
+!**/.env.example
+
+# Maven/Gradle
+**/.m2/
+**/.gradle/
+
+# Go
+**/vendor/
+**/*.exe
+
+# Secrets (never include)
+**/*credentials*
+**/*secret*
+!**/client_secret*.go
+**/*firebase*.json
+**/*adminsdk*.json
+**/*.pem
+**/*.key
+services_env_dev.json
+.env copyddd

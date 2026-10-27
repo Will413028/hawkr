@@ -1,0 +1,37 @@
+# repo 管理的本機 git hook。clone 之後執行一次：pre-commit install
+# 既有 clone 要重跑一次，才會裝上 pre-commit 與 pre-push 的 hook type。
+# CI 用同一支腳本檢查推上來的 commit（.github/workflows/commit-messages.yml）。
+default_install_hook_types: [pre-commit, pre-push, commit-msg]
+
+repos:
+  - repo: local
+    hooks:
+      - id: conventional-commit-message
+        name: Conventional Commits
+        entry: python3 scripts/check-commit-msg.py
+        language: system
+        stages: [commit-msg]
+      # 暫時：作品集轉 public 計畫步驟 9 收尾時，與 scripts/check-legacy-endpoints.py 一起移除。
+      - id: legacy-endpoints
+        name: 舊公司端點（整棵樹零容忍）
+        entry: python3 scripts/check-legacy-endpoints.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+      # 暫時：作品集轉 public 計畫步驟 9 收尾時移除。名字詞表在不進版控的本機檔，
+      # 不存在時略過。pre-commit 看暫存內容，pre-push 看整棵樹。
+      - id: denylist-staged
+        name: 名字檢查（暫存內容）
+        entry: python3 backend/docs/plans/2026-10-24-portfolio-public/check-denylist.py --staged
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      - id: denylist-tree
+        name: 名字檢查（整棵樹）
+        entry: python3 backend/docs/plans/2026-10-24-portfolio-public/check-denylist.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

@@ -1,0 +1,1135 @@
+syntax = "proto3";
+
+// seller 模組給後台的商家治理 API（ADR 2026-10-18-seller-governance-consolidated、設計書 32、step10e-reports-brief R2、R3）：
+// 通報與案件分開。一筆通報是一位檢舉人的一次送出（含之後的補充）；同一家店、同一個平台判定類別，同時最多一個進行中的案件。
+// 通報先分案（判定類別並掛到案件，或不開案件直接設定結果），案件再由一次決定結案；食安案件轉報主管機關、記內部註記、
+// 導出措施（警告、停權與終止合作，依據是認定、風險類型或契約條款）。措施與它依據的認定、申覆的訊息在 measure.proto。
+// 檢舉人送出檢舉在 hawkr.seller.v1alpha1 的 SellerReportAppService、SellerReportPublicService；賣家看措施與申覆在 SellerAppService。
+//
+// 狀態的推進是指令（TriageReport、ResolveReport、MoveReport、DecideCase、ChangeCaseSeverity、RecordFDAReferral、WaiveFDAReferral、RecordFDAReferralReply、CreateCaseInquiry、RecordCaseInquiryReply、WithdrawCaseInquiry、CompleteAuthorityOrder、ExtendAuthorityOrderHold、RecordAuthorityTargetNotice），不是改欄位：每個指令只在前置條件成立時
+// 可以做，其餘回 failed_precondition（訊息是第一個原因的句子）；能不能做看回應裡的 can_*、available_outcomes 與 decision_options（同一個函式，
+// 不輸出原因）。處理狀態（ReportState、CaseState）由伺服器推導、不儲存。管理員只以 ID 記錄，顯示名稱由 client 經 IdentityAdminService 查。
+//
+// 版本衝突（aborted、ErrorInfo.reason 是 VERSION_CONFLICT）的 ErrorInfo.metadata 帶 `conflictTarget`（值的定義在 ErrorReason.VERSION_CONFLICT）：
+// `report` 是請求帶的通報 etag 過時，`case` 是案件指令帶的案件 etag 過時，`target_case` 是分案或移動的去處不成立（target.join 的案件版本前進或已關閉），
+// `category_case_opened` 是 target.open_new 的類別剛有了進行中的案件，`authority_order` 是來函指令帶的來函 etag 過時；client 依它顯示是哪一個物件剛被更新。
+package hawkr.admin.seller.v1alpha1;
+
+import "hawkr/admin/seller/v1alpha1/authority_order.proto";
+import "hawkr/admin/seller/v1alpha1/case_inquiry.proto";
+import "hawkr/admin/seller/v1alpha1/measure.proto";
+import "hawkr/admin/seller/v1alpha1/seller.proto";
+import "hawkr/common/v1alpha1/deadline.proto";
+import "hawkr/common/v1alpha1/policy_category.proto";
+import "hawkr/seller/v1alpha1/report.proto";
+import "hawkr/seller/v1alpha1/seller.proto";
+import "google/api/field_behavior.proto";
+import "google/api/field_info.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+import "google/type/date.proto";
+
+// SellerGovernanceAdminService 只有管理員能呼叫。
+service SellerGovernanceAdminService {
+  // ListReports 是通報的清單，可依處理狀態、生效的類別、店家與案件篩選。預設新到舊；state 是 AWAITING_TRIAGE 或指定 case_id 時依建立時間舊到新
+  // （待分案與案件成員的處理順序）。清單的通報不帶 contact、evidence 與 supplements（GetReport 才有）。
+  rpc ListReports(ListReportsRequest) returns (ListReportsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetReport 讀一筆通報，含補充、佐證與 etag；can_* 與 available_outcomes 是此刻能做的動作。
+  rpc GetReport(GetReportRequest) returns (GetReportResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // MarkReportSupplementsSeen 記下管理員看過這筆通報此刻的全部補充（通報頁顯示補充時呼叫；「有新的補充」的已讀標記，GetReport 本身不改任何狀態）。
+  // etag 必填，必須是讀到補充時的 etag（補充讓通報的 etag 前進，所以相符就代表看過的是目前全部的補充；不符回 aborted（VERSION_CONFLICT），不記）。
+  // 只改已看過的補充編號（supplements_seen_seq，不輸出）：**不讓 etag 前進**，所以不會讓別的分頁或對話框裡讀到的 etag 過時、也不會造成衝突。冪等：已經看過、沒有補充或已有結果的通報
+  // 回成功、不寫入。權限是獨立的 seller.reports.mark_supplements_seen（adminauth 一支方法一個權限），目錄裡與 seller.reports.get 一起授予。
+  rpc MarkReportSupplementsSeen(MarkReportSupplementsSeenRequest) returns (MarkReportSupplementsSeenResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // TriageReport 分案：判定平台判定類別，把通報掛到這家店那個類別進行中的案件；沒有進行中的案件就開一個，開新案件必須給嚴重度，
+  // 加入進行中的案件不可以給（嚴重度以案件為準）。只有還沒有案件也沒有結果的通報可以。etag 必填。
+  rpc TriageReport(TriageReportRequest) returns (TriageReportResponse);
+
+  // ResolveReport 設定通報的結果（已採取措施、未違規、內容不足、重複、濫報），結果設定後不能修改。已採取措施只能設在案件裡的通報，而且案件要有
+  // 導出的措施或已有成員的結果是已採取措施；還沒分案的通報可以直接設定其他四個結果。etag 必填。
+  rpc ResolveReport(ResolveReportRequest) returns (ResolveReportResponse);
+
+  // MoveReport 改通報的平台判定類別，通報移到這家店那個類別的案件（沒有進行中的就開一個）。只有進行中案件裡、還沒有結果、不是認定來源的通報
+  // 可以；案件有導出的措施或已記錄轉報時最後一筆不能移走。移走最後一筆時原案件以 NO_REPORTS 自動關閉，不算一次決定。etag 必填。
+  rpc MoveReport(MoveReportRequest) returns (MoveReportResponse);
+
+  // ListCases 列出案件，開案時間新到舊。
+  rpc ListCases(ListCasesRequest) returns (ListCasesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetCase 讀一個案件，含移動紀錄、轉報紀錄與 etag；can_* 與 decision_options 是此刻能做的動作。
+  rpc GetCase(GetCaseRequest) returns (GetCaseResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // DecideCase 決定案件（採取措施或不採取措施），決定即結案，結案是終態。結案時還沒有結果的通報帶入決定的預設結果與給檢舉人的說明。
+  // 還沒結束的詢問在同一個 transaction 由系統撤回（withdraw_cause 是 CASE_CLOSED）。
+  // decision 必須在案件的 decision_options 裡。etag 必填。
+  rpc DecideCase(DecideCaseRequest) returns (DecideCaseResponse);
+
+  // ChangeCaseSeverity 修改案件的嚴重度，必須附原因：原因寫成案件的一則內部註記，改前改後記在那則註記上。只限進行中的案件。etag 必填。
+  rpc ChangeCaseSeverity(ChangeCaseSeverityRequest) returns (ChangeCaseSeverityResponse);
+
+  // RecordFDAReferral 記下食安案件已轉報主管機關（轉報本身在系統外以人工完成）。只限平台判定類別是食安、有通報的案件，只記一次：已經記過時回傳
+  // 原本的紀錄（already_recorded），不覆寫；已標記不轉報回 failed_precondition。不要求先決定。follow_up_date 選填：到這天還沒收到主管機關的回覆就聯絡主管機關，
+  // 不設時是轉報日（台北）加 30 天。不帶 etag。
+  rpc RecordFDAReferral(RecordFDAReferralRequest) returns (RecordFDAReferralResponse);
+
+  // WaiveFDAReferral 標記這個食安案件不轉報（例如主管機關已經介入），必須附原因。它也是一筆轉報紀錄（outcome 為不轉報）：標記之後不能再記錄轉報，
+  // 記錄轉報之後也不能標記不轉報。只限平台判定類別是食安、有通報的案件；已經標記過時回傳原本的紀錄（already_waived），不覆寫。不要求先決定。
+  // 讓案件的 etag 前進。
+  rpc WaiveFDAReferral(WaiveFDAReferralRequest) returns (WaiveFDAReferralResponse);
+
+  // RecordFDAReferralReply 記下主管機關對轉報的回覆（只新增；移送通知與結果通知可以是兩則）。只限已記錄轉報的案件（沒有轉報紀錄或已標記不轉報回
+  // failed_precondition）。收到的日期不早於轉報日（台北）、不晚於今天。追蹤日期依 next_follow_up_date 與 clear_follow_up 更新，兩者都不設時不變。
+  // 讓案件的 etag 前進。不帶 etag（只新增）；request_id 選填（AIP-155）：同一位管理員以同一個 request_id 重送（例如回應遺失後再送一次）不會多記一則，
+  // 回傳案件目前的狀態；內容不同回 invalid_argument。範圍是（記下的管理員, request_id），同 CreateCaseInquiry。
+  rpc RecordFDAReferralReply(RecordFDAReferralReplyRequest) returns (RecordFDAReferralReplyResponse);
+
+  // GetFDAExport 回傳轉報主管機關需要的資料：案件、案件裡結果不是未違規、內容不足或濫報的通報（含補充與佐證的位置，不帶檢舉人的聯絡方式）與被通報的店家
+  // （已關閉的也回傳）。轉報文件的格式由 client 呈現。只限食安案件，其他回 failed_precondition。
+  rpc GetFDAExport(GetFDAExportRequest) returns (GetFDAExportResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // CreateCaseInquiry 對案件的賣家發一筆詢問（提供紀錄或請說明，有期限；詢問只帶管理員轉述的說明，不附通報原文、佐證與檢舉人）。每個案件同時最多
+  // 一筆還沒結束的詢問；案件結案後、店家的個資已依保留期限清除後不能發（關店不擋）。建立讓案件的 etag 前進，案件進入「等賣家」（awaiting_seller），
+  // 不在「待決定」。不帶 etag；request_id 選填（AIP-155）：同一位管理員以同一個 request_id 重送，回傳原本那一筆，內容不同回 invalid_argument。
+  // 賣家端的畫面上線（10f）之前，系統不會通知賣家，請管理員另外聯絡。
+  rpc CreateCaseInquiry(CreateCaseInquiryRequest) returns (CreateCaseInquiryResponse);
+
+  // ListCaseInquiries 列出案件的詢問，舊到新。案件不存在回 not_found。
+  rpc ListCaseInquiries(ListCaseInquiriesRequest) returns (ListCaseInquiriesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // RecordCaseInquiryReply 記下系統外收到的賣家回覆（管道、收到的時間、內容與最多 5 份附件），記下之後這筆詢問就結束；要再問，另發一筆詢問。
+  // 收到的時間不早於詢問建立、不晚於現在；案件的「待決定」從這個時間重新起算。附件是機敏檔（先以機敏上傳取得 staged token）。已經記過時回原本那一則
+  // （already_recorded）；詢問已撤回回 failed_precondition。不帶 etag。
+  rpc RecordCaseInquiryReply(RecordCaseInquiryReplyRequest) returns (RecordCaseInquiryReplyResponse);
+
+  // WithdrawCaseInquiry 撤回還沒回覆的詢問（賣家不必再回覆）。案件因決定或通報都移走而結案時，還沒結束的詢問由系統撤回（withdraw_cause 是 CASE_CLOSED）。
+  // 已經撤回時回 already_withdrawn；已回覆回 failed_precondition。不帶 etag。
+  rpc WithdrawCaseInquiry(WithdrawCaseInquiryRequest) returns (WithdrawCaseInquiryResponse);
+
+  // CreateAuthorityOrder 登記主管機關的一份來函（機關、文號、收文時間、種類、內容摘要、指名的對象、期限）。來函是獨立的收件，不是通報。
+  // 對象是任何帳號（帳號必須存在），選填店家（必須屬於帳號）與商品；整個帳號加上它的店家是重疊，invalid_argument。登記時保存期限定為收文後 184 天：
+  // 指名的帳號或店家在 seller 的個資在這之前不會被關店後的清理刪除（不影響恢復營業）；帳號在 seller 沒有店家時照樣登記，no_seller_data 為 true。
+  // 不帶 etag；request_id 選填（AIP-155），範圍是（登記的管理員, request_id）。
+  rpc CreateAuthorityOrder(CreateAuthorityOrderRequest) returns (CreateAuthorityOrderResponse);
+
+  // ListAuthorityOrders 列出來函：OPEN 依期限舊到新，其餘依收文時間新到舊；可依狀態與指名的帳號篩選。
+  rpc ListAuthorityOrders(ListAuthorityOrdersRequest) returns (ListAuthorityOrdersResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetAuthorityOrder 讀一份來函，含對象逐家的涵蓋狀態、告知與保存期限的延長歷史。
+  rpc GetAuthorityOrder(GetAuthorityOrderRequest) returns (GetAuthorityOrderResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // CompleteAuthorityOrder 標記來函完成並寫處理摘要，同時記下每個對象的告知。調取資料的來函可以帶 provide_time，保存期限延到「提供之後 184 天」
+  // （取收文與提供兩者較晚的）。完成不解除保存。etag 必填。
+  rpc CompleteAuthorityOrder(CompleteAuthorityOrderRequest) returns (CompleteAuthorityOrderResponse);
+
+  // ExtendAuthorityOrderHold 延長保存期限（只能延長，新值必須晚於目前），每次延長留下前後值、原因與管理員。已完成或已到期的來函也能延長。etag 必填。
+  rpc ExtendAuthorityOrderHold(ExtendAuthorityOrderHoldRequest) returns (ExtendAuthorityOrderHoldResponse);
+
+  // RecordAuthorityTargetNotice 記下一個暫不告知（WITHHELD）的對象後來的告知：改成已告知，或寫新的確認日期（每次改變留歷史）。etag 必填。
+  rpc RecordAuthorityTargetNotice(RecordAuthorityTargetNoticeRequest) returns (RecordAuthorityTargetNoticeResponse);
+
+  // RevokeAuthorityOrder 撤銷登記錯誤的來函（例如對象或文號登記錯了）：只在還沒完成時可以（can_revoke），必須附原因。撤銷之後來函的保存解除（不再擋個資清理）、
+  // 不再是處理中，也不能再當作措施的來源；紀錄保留（撤銷的時間、管理員與原因）。正確的來函另外登記。etag 必填；同一位管理員重送（已由他撤銷）回傳原本的結果
+  // （already_revoked），不比較 etag 與原因；已由別的管理員撤銷或已完成回 failed_precondition。
+  rpc RevokeAuthorityOrder(RevokeAuthorityOrderRequest) returns (RevokeAuthorityOrderResponse);
+
+  // CreateMeasure 建立一個措施。措施的種類就是設定的是哪一支輸入（warning、suspension 或 termination，沒有另外的種類欄位）：
+  // 警告依據違規的認定；停權依據違規的認定（VIOLATION，必填 end_time）或條款第 17.1、17.5 條的風險類型（RISK，必填 review_by）；
+  // 終止合作依據條款第 21.2、21.3 條的事由（依據由伺服器依事由推導）。停權在同一個 transaction 讓帳號立即停權；店家必須還沒關閉
+  // （非預告的終止合作可以建在帳號沒有目前店家的最近一個 stint 上，效果只剩禁止入駐）；店家已關閉而不能建立時回 failed_precondition，
+  // 訊息與 GetStoreResponse.create_measure_unavailabilities 的第一句相同。
+  // 終止合作：NOTICE 建立後 30 日生效（SCHEDULED，期間店家照常營業），其餘事由立即生效、店家暫停營業；生效中的終止在沒有未結訂單時關店
+  // （背景工作，closed_by 是 TERMINATION）。終止不接受 end_time 與 review_by。RISK 必填 review_by，落在現在之後、
+  // 30 天以內。來源通報必須是同一家店、而且結果不是未違規、內容不足或濫報（Report.can_cite_as_source）。從案件建立時帶 source_case_id：任何種類與依據都可以，
+  // 之後這個措施算是案件導出的措施。升級規則：帳號 90 天內第 3 次 MEDIUM 升為 HIGH（認定的 severity
+  // 是套用的，escalated_from 是原本的）。同一個 transaction 寫入第 1 版與第一則內部註記（note 必填）。request_id 選填：同一位
+  // 管理員帶同一個 request_id、同樣的內容重送，回傳原本的措施（目前的狀態）；內容不同回 invalid_argument。
+  rpc CreateMeasure(CreateMeasureRequest) returns (CreateMeasureResponse);
+
+  // GetMeasure 讀一筆措施，含全部版本（revisions，舊到新）、依據的認定與申覆的佐證。內部註記不內嵌，用 ListMeasureNotes 讀。
+  rpc GetMeasure(GetMeasureRequest) returns (GetMeasureResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListMeasures 列出措施，新到舊。收件匣的排序，優先序是 review_due 是 true 時依 review_by 舊到新，其次 request_state 是 PENDING
+  // 時依請求（申覆與解除請求合在同一個收件匣）提出時間舊到新；篩選條件可以組合，其餘條件都是 AND。
+  // 清單的措施不帶請求的佐證與 revisions（GetMeasure 才有）。source_case_id 只列某個案件導出的措施，source_report_id 只列依據的認定以某筆通報為來源的措施。
+  rpc ListMeasures(ListMeasuresRequest) returns (ListMeasuresResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // UpdateMeasure 修改措施賣家看得到的 statement 與 end_time（update_mask），其他欄位都是 OUTPUT_ONLY。etag 必填。實際改了
+  // 就產生新的一版（revisions）並讓 etag 改變。end_time 必須晚於現在；比目前晚是延長、比目前早是縮短；只有生效中（ACTIVE）的
+  // 停權可以延長或縮短，警告不能設 end_time，VIOLATION 依據不能清除 end_time；終止合作不接受 end_time（要延後生效請撤銷後重建），statement
+  // 在預定生效與生效中都可以改。提出申覆起措施凍結：不能改 statement、不能延長
+  // （failed_precondition，不帶欄位），只能縮短。沒有任何欄位改變時不寫入，etag 不變。
+  rpc UpdateMeasure(UpdateMeasureRequest) returns (UpdateMeasureResponse);
+
+  // EndMeasure 結束 RISK 措施（風險已排除）：寫一版 end_time = 現在。只限生效中的 RISK 停權；VIOLATION 依據的措施要縮短期間或
+  // 撤銷。etag 必填。
+  rpc EndMeasure(EndMeasureRequest) returns (EndMeasureResponse);
+
+  // RevokeMeasure 撤銷措施並在同一個 transaction 解除它的效果。etag 必填。申覆待裁定時回 failed_precondition（先裁定申覆）；
+  // 已撤銷的回 failed_precondition。revoke_findings 為 true 時撤銷這個措施自己建立的認定，並連帶撤銷引用那些認定的其他措施
+  // （原因 FINDING_REVOKED，待處理的請求以 CLOSED 結案）；只在措施的 can_revoke_findings 為 true 時可以設（否則回 invalid_argument）。reason 不可以是 APPEAL_ACCEPTED、
+  // FINDING_REVOKED 或 SOURCE_REVOKED。撤銷終止合作：同一個 transaction 恢復同一個店家的條件是，店家是因終止合作而關閉的、造成關店的那一筆（在這次撤銷之後）已撤銷、
+  // 撤銷之後帳號沒有仍生效中的終止（預定生效的預告不算）、還沒到保留期（關店後 184 天，與帳號上未撤銷的終止的最晚申覆期限〔生效後 184 天〕，取較晚者）而且沒有被個資清理；
+  // 帳號已另開新店則只撤銷。不符合時只撤銷紀錄與禁止入駐（例如先撤銷造成關店的那一筆、帳號另有生效中的終止時店家仍關閉，等最後一筆也撤銷才恢復）。撤銷來源終止時，以它為來源的關聯終止在同一個
+  // transaction 一併撤銷（SOURCE_REVOKED）。etag 與目前的版本不符一律回 aborted（VERSION_CONFLICT），不寫入。
+  rpc RevokeMeasure(RevokeMeasureRequest) returns (RevokeMeasureResponse);
+
+  // ScheduleMeasureReview 重新排定 RISK 措施的複審期限（落在現在之後、30 天以內），並在同一個 transaction 寫一則內部註記（note
+  // 必填）。只限生效中的 RISK 停權。後台的 etag 改變、賣家的 etag 不變。
+  rpc ScheduleMeasureReview(ScheduleMeasureReviewRequest) returns (ScheduleMeasureReviewResponse);
+
+  // DecideAppeal 裁定措施的申覆：ACCEPTED 在同一個 transaction 撤銷措施並解除效果（revoke_findings 為 true 時一併撤銷認定；終止合作的
+  // 恢復店家與關聯終止的連帶撤銷同 RevokeMeasure）；終止合作期滿前提出的申覆，期滿後仍可裁定；
+  // REJECTED 措施不變。兩者都必須附理由，賣家看得到。只有待處理的申覆可以。etag 必填；etag 不符（包含裁定已經生效後再帶舊
+  // etag 送一次）一律回 aborted（VERSION_CONFLICT），不寫入。
+  rpc DecideAppeal(DecideAppealRequest) returns (DecideAppealResponse);
+
+  // DecideRemediation 裁定措施待處理的解除請求（賣家依條款第 17.4 條檢具事證請求解除，RISK 依據）：ACCEPTED 在同一個 transaction 寫一版
+  // end_time = 現在（作者是裁定的管理員、statement 不變）並重算停權狀態，措施 state 變 ENDED；這不是撤銷，認定與撤銷原因都不動，
+  // 賣家仍可申覆；REJECTED 措施不變，計入冷卻（Measure.next_remediation_time）。兩者都必須附理由，賣家看得到。只有措施生效中而且
+  // 有待處理的解除請求時可以（can_decide_remediation）。不帶 request_id：同一措施同時最多一筆待處理請求，etag 保證裁定的是管理員看到的
+  // 那一筆。etag 必填；ACCEPTED 寫新的一版，賣家與後台的 etag 都變；REJECTED 只改變後台的 etag。etag 不符（包含裁定已經生效後再帶舊
+  // etag 送一次）一律回 aborted（VERSION_CONFLICT），不寫入。
+  rpc DecideRemediation(DecideRemediationRequest) returns (DecideRemediationResponse);
+
+  // CreateMeasureNote 在措施的內部註記時間軸新增一則。註記只新增，不能改也不能刪，更正就再寫一則；不帶 etag，也不改措施的
+  // 任何 etag（註記不是賣家看得到的內容，賣家依舊 etag 的申覆不受影響）。已撤銷或已申覆的措施都可以寫。
+  rpc CreateMeasureNote(CreateMeasureNoteRequest) returns (CreateMeasureNoteResponse);
+
+  // ListMeasureNotes 列出措施的內部註記，舊到新。註記是只新增、不經 etag 的子集合，所以不內嵌在 Measure，獨立分頁讀取。措施
+  // 不存在回 not_found。
+  rpc ListMeasureNotes(ListMeasureNotesRequest) returns (ListMeasureNotesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // CreateCaseNote 在案件的內部註記時間軸新增一則，規則同 CreateMeasureNote：只新增、不帶 etag、不改案件的 etag，已結案的案件也可以寫；案件不存在回 not_found。
+  // note.severity_change 只由 ChangeCaseSeverity 寫入，這裡不採用。
+  rpc CreateCaseNote(CreateCaseNoteRequest) returns (CreateCaseNoteResponse);
+
+  // ListCaseNotes 列出案件的內部註記，舊到新（含改嚴重度時寫的那幾則）。案件不存在回 not_found。
+  rpc ListCaseNotes(ListCaseNotesRequest) returns (ListCaseNotesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetViolation 讀一筆認定（只讀）。
+  rpc GetViolation(GetViolationRequest) returns (GetViolationResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListViolations 列出認定，新到舊。認定只由 CreateMeasure 建立。
+  rpc ListViolations(ListViolationsRequest) returns (ListViolationsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+// FDAChannel 是轉報主管機關的管道。
+enum FDAChannel {
+  FDA_CHANNEL_UNSPECIFIED = 0;
+  // 1919 食安專線。
+  FDA_CHANNEL_HOTLINE_1919 = 1;
+  // 線上表單。
+  FDA_CHANNEL_ONLINE_FORM = 2;
+  // 傳真衛生局。
+  FDA_CHANNEL_FAX_HEALTH_DEPT = 3;
+  // 親自送件。
+  FDA_CHANNEL_IN_PERSON = 4;
+  FDA_CHANNEL_OTHER = 5;
+}
+
+// ReportState 是通報此刻在後台的處理狀態，由伺服器推導（不儲存）。
+enum ReportState {
+  REPORT_STATE_UNSPECIFIED = 0;
+  // 待分案：沒有案件也沒有結果。
+  REPORT_STATE_AWAITING_TRIAGE = 1;
+  // 在進行中的案件裡、還沒有結果。
+  REPORT_STATE_IN_CASE = 2;
+  // 已有結果。
+  REPORT_STATE_RESOLVED = 3;
+}
+
+// CaseState 是案件此刻的狀態，由伺服器推導（不儲存）。
+enum CaseState {
+  CASE_STATE_UNSPECIFIED = 0;
+  // 進行中。
+  CASE_STATE_OPEN = 1;
+  // 已結案（終態）。
+  CASE_STATE_CLOSED = 2;
+}
+
+// CaseCloseReason 是案件結案的原因（儲存的事實）。
+enum CaseCloseReason {
+  CASE_CLOSE_REASON_UNSPECIFIED = 0;
+  // 管理員決定（DecideCase）。
+  CASE_CLOSE_REASON_DECIDED = 1;
+  // 通報都移到其他案件，系統關閉，不是一次決定。
+  CASE_CLOSE_REASON_NO_REPORTS = 2;
+}
+
+// CaseDecision 是案件的決定（儲存的事實），決定即結案。
+enum CaseDecision {
+  CASE_DECISION_UNSPECIFIED = 0;
+  // 採取措施：沒有結果的通報帶入「已採取措施」。
+  CASE_DECISION_ACTION_TAKEN = 1;
+  // 不採取措施：沒有結果的通報帶入「未違規」。
+  CASE_DECISION_NO_ACTION = 2;
+}
+
+// SupplementMatch 是匿名的補充以哪一種聯絡方式比對到原通報；BOTH 是電話與聯絡信箱都相同。
+enum SupplementMatch {
+  SUPPLEMENT_MATCH_UNSPECIFIED = 0;
+  SUPPLEMENT_MATCH_PHONE = 1;
+  SUPPLEMENT_MATCH_EMAIL = 2;
+  SUPPLEMENT_MATCH_BOTH = 3;
+}
+
+// AdminRevokeReason 是管理員撤銷措施時可以選的原因，是 hawkr.seller.v1alpha1.RevokeReason 的子集：
+// 接受申覆只由裁定申覆寫入，連帶撤銷（依據的認定已撤銷、關聯的終止已撤銷）只由撤銷認定或來源終止寫入，
+// 這三個值不在這裡，所以請求表示不出它們。值名去掉前綴就是模組的 RevokeReason 的值。
+enum AdminRevokeReason {
+  ADMIN_REVOKE_REASON_UNSPECIFIED = 0;
+  ADMIN_REVOKE_REASON_ADMIN_CORRECTION = 1;
+  ADMIN_REVOKE_REASON_EXTERNAL_DECISION = 2;
+  ADMIN_REVOKE_REASON_OTHER = 3;
+}
+
+// ReporterContact 是匿名檢舉人的聯絡方式；沒有提供的欄位是空字串。
+message ReporterContact {
+  string phone = 1;
+  string email = 2;
+  string name = 3;
+}
+
+// FDAReferral 是案件轉報主管機關的紀錄。
+message FDAReferral {
+  FDAChannel channel = 1;
+  // 主管機關的案號；空字串表示沒有案號。
+  string reference_no = 2;
+  string reported_by_admin_id = 3;
+  google.protobuf.Timestamp report_time = 4;
+  // 追蹤日期（台北日期）；沒有時不設（不再追蹤，或轉換前就有的紀錄）。到了這天還沒收到主管機關的回覆，就聯絡主管機關。
+  google.type.Date follow_up_date = 5;
+  // 主管機關的回覆，舊到新（依記下的時間）。
+  repeated FDAReferralReply replies = 6;
+  // 追蹤逾期（伺服器在讀取時推導）：有追蹤日期、今天（台北）晚於它，而且設定這個追蹤日期之後還沒有記下主管機關的回覆。記下回覆時換成下一個追蹤日期，
+  // 逾期就以新的日期重新判斷；client 不自己比較日期。
+  bool follow_up_overdue = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// FDAReferralReply 是主管機關對轉報的一則回覆（只新增）。
+message FDAReferralReply {
+  // 回覆內容，1 到 2000 字。
+  string body = 1;
+  // 收到的日期（台北），不早於轉報日、不晚於記下的當天。
+  google.type.Date receive_date = 2;
+  string recorded_by_admin_id = 3;
+  google.protobuf.Timestamp record_time = 4;
+}
+
+// FDAReferralWaiver 是標記不轉報的紀錄。
+message FDAReferralWaiver {
+  // 不轉報的原因，1 到 2000 字。
+  string reason = 1;
+  string waived_by_admin_id = 2;
+  google.protobuf.Timestamp waive_time = 3;
+}
+
+// Report 是後台看到的通報：一位檢舉人的一次送出（含之後併入的補充），有自己的結果；可以掛在案件裡，也可以不開案件直接設定結果。
+message Report {
+  reserved 10 to 15, 19, 21;
+  reserved "status", "severity", "acknowledge_due_time", "acknowledge_time", "acknowledged_by_admin_id", "investigate_time", "fda_referral", "cooperation_requests";
+  reserved 30;
+  reserved "triage_due_time";
+
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  string store_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 店名；個資清理之後沒有店名時是空字串，client 顯示店家 ID。
+  string store_name = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 空字串表示沒有提供。
+  string product_id = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 空字串表示沒有提供。
+  string order_no = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 檢舉人選的類別：政策分類中檢舉人可選的值（不含 PLATFORM_ABUSE）。
+  hawkr.common.v1alpha1.PolicyCategory category = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string description = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 登入的檢舉人（買家 id）；匿名檢舉是空字串。
+  string reporter_buyer_id = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 匿名檢舉人的聯絡方式；登入的檢舉人、聯絡方式已清除時不設。只有 GetReport 帶（ListReports 與 GetFDAExport 不帶個資）。
+  ReporterContact contact = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 匿名檢舉人的聯絡方式被清除的時間；沒有清除時不設。
+  google.protobuf.Timestamp contact_erase_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 此刻的處理狀態。
+  ReportState state = 25 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 所在的案件；沒有案件時是空字串。
+  string case_id = 26 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 平台判定類別，等於案件的類別；沒有案件時是 UNSPECIFIED。
+  hawkr.common.v1alpha1.PolicyCategory assessed_category = 27 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 第一次分案的時間，移動不改；沒有分案過時不設。
+  google.protobuf.Timestamp triage_time = 28 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string triaged_by_admin_id = 29 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 結果；還沒有結果時是 UNSPECIFIED。
+  hawkr.seller.v1alpha1.ReportOutcome outcome = 31 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 結果設定的時間；還沒有結果時不設。
+  google.protobuf.Timestamp resolve_time = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string resolved_by_admin_id = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 給檢舉人的結果說明；沒有時是空字串。
+  string resolution_note = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 佐證，原通報與補充的都在這裡（依位置）；只有 GetReport 與 GetFDAExport 帶。
+  repeated Evidence evidence = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 補充，舊到新；只有 GetReport 與 GetFDAExport 帶。
+  repeated ReportSupplement supplements = 32 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 supplement_count = 33 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 最新一則補充的時間；沒有補充時不設。
+  google.protobuf.Timestamp latest_supplement_time = 34 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 補充已達上限、內容沒有存下的匿名送出次數。
+  int32 discarded_submission_count = 35 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 通報的版本；補充、分案、設定結果與移動都讓它前進。
+  string etag = 36;
+  // 此刻可以分案。
+  bool can_triage = 37 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 此刻可以設定結果；等於 available_outcomes 不為空。
+  bool can_resolve = 38 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 此刻可以設定的結果，順序固定：已採取措施、未違規、內容不足、重複、濫報；每個結果帶設定之後會不會否定這筆通報（client 不自己對應）。
+  repeated OutcomeOption available_outcomes = 39 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 此刻可以移到其他案件。
+  bool can_move = 40 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 此刻可以當認定的來源（結果不是未違規、內容不足或濫報，而且店家沒有關閉）。建立措施的來源通報選項看它，client 不自己看狀態。
+  bool can_cite_as_source = 41 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 生效的類別：在案件裡的是平台判定類別（assessed_category），其他是檢舉人選的類別（category）。ListReports 的 category 篩選用的就是它。
+  hawkr.common.v1alpha1.PolicyCategory effective_category = 42 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 有補充是管理員還沒看過的：這筆通報還沒有結果，而且存在編號比「管理員看過的最新補充」更大的補充（分案、移動與 MarkReportSupplementsSeen 會記下看過的編號；
+  // 比編號不比時間，不依賴時鐘）。有了結果的通報不再提醒。補充不改案件的 etag，所以案件頁與通報頁都看這個標示提醒。
+  // 讀取（GetReport）、設定結果、結案時帶入的預設結果、改案件嚴重度與記錄轉報都不記。
+  bool has_unseen_supplements = 43 [(google.api.field_behavior) = OUTPUT_ONLY];
+  reserved 44;
+  reserved "supplements_seen_time";
+  // 分案與移動時每個平台判定類別的去處，只有 GetReport 帶，而且只在 can_triage 或 can_move 時有值：每個可判定的類別一筆（移動時不含目前的類別），
+  // 順序同政策分類。client 依它顯示「加入案件（嚴重度）」或「開新案件」，並把選的去處原樣放進請求（TriageReportRequest.target、MoveReportRequest.target）。
+  repeated TriageTarget triage_targets = 45 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 23 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 分案的期限，只在待分案時設：開始時間是通報的建立時間，期限依審閱政策（檢舉人選了食安的 4 小時，其他類別 72 小時）。
+  hawkr.common.v1alpha1.Deadline triage_deadline = 46 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// ReportSupplement 是同一位檢舉人在去重期間內再次送出、併入原通報的內容；只新增，每筆通報最多 10 則。
+message ReportSupplement {
+  string id = 1;
+  string description = 2;
+  google.protobuf.Timestamp create_time = 3;
+  // 這則補充帶來的佐證在 Report.evidence 的位置。
+  repeated int32 evidence_positions = 4;
+  // 匿名的補充以哪一種聯絡方式比對到原通報；登入的補充是 UNSPECIFIED。送出者不一定是原檢舉人（只知道電話的人也會補充到同一筆）。
+  SupplementMatch matched_by = 5;
+}
+
+// Case 是後台的案件：同一家店、同一個平台判定類別，同時最多一個進行中的案件。嚴重度在開案時設定，之後只經 ChangeCaseSeverity 修改；
+// 決定即結案；通報都移走時以 NO_REPORTS 自動關閉。
+message Case {
+  reserved 19;
+  reserved "has_new_supplements";
+
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  string store_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 店名；個資清理之後沒有店名時是空字串，client 顯示店家 ID。
+  string store_name = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 案件的類別（平台判定類別）。
+  hawkr.common.v1alpha1.PolicyCategory category = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.seller.v1alpha1.ViolationSeverity severity = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  CaseState state = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 結案的原因；進行中時是 UNSPECIFIED。
+  CaseCloseReason close_reason = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 決定；只在 close_reason 是 DECIDED 時設。
+  CaseDecision decision = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 結案時給檢舉人的結果說明（帶入沒有結果的通報）；沒有時是空字串。
+  string decision_note = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string opened_by_admin_id = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp open_time = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string closed_by_admin_id = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp close_time = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 report_count = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 還沒有結果的通報數：結案時會帶入預設結果的筆數。
+  int32 unresolved_report_count = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 轉報主管機關的紀錄；沒有轉報、或標記不轉報（見 fda_referral_waiver）時不設。
+  FDAReferral fda_referral = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 移入與移出這個案件的移動，舊到新；只有 GetCase 帶。
+  repeated ReportMove moves = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 上一次處理的時間：成員進出、成員有了結果、改嚴重度、記錄轉報、標記不轉報、記下主管機關的回覆、詢問的建立與回覆與撤回、結案。補充、註記與措施的建立或撤銷不改它（它不再用來判斷補充有沒有看過）。
+  google.protobuf.Timestamp update_time = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 案件的版本；成員進出、成員有了結果、改嚴重度、決定、自動關閉、記錄轉報、標記不轉報、記下主管機關的回覆與詢問的建立、記下回覆、撤回都讓它前進，補充、註記與措施不會。
+  string etag = 20;
+  // 此刻可以決定；等於 decision_options 不為空。進行中的案件一定是 true（每個進行中的案件至少有一個可以選的決定）。
+  bool can_decide = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 此刻可以選的決定，順序固定：採取措施、不採取措施。
+  repeated DecisionOption decision_options = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_change_severity = 23 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 案件進行中：新的措施可以記它為來源案件（終止合作的入口另看 GetStore.can_create_termination）。
+  bool can_link_measure = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // can_link_measure 而且店家沒有關閉（警告、停權與風險措施要開著的店）。
+  bool can_create_measure = 25 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_record_fda_referral = 26 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool can_export_fda = 27 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 成員裡有補充還沒被管理員看過的通報數（該成員的 Report.has_unseen_supplements 為 true 的筆數）。補充不改案件的 etag，改由這個數字提醒結案前先看過；
+  // 要知道是哪幾筆看成員通報的 has_unseen_supplements。
+  int32 unseen_supplement_report_count = 28 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 有還沒結束的詢問（等賣家，推導）；這時案件不在「待決定」。結案會撤回它。
+  bool awaiting_seller = 29 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // awaiting_seller 時那一筆詢問的 ID；否則是空字串。
+  string open_inquiry_id = 30 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 此刻可以對賣家發詢問：案件進行中、店家的個資還沒清除、沒有還沒結束的詢問。
+  bool can_create_inquiry = 31 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 標記不轉報的紀錄；沒有時不設。與 fda_referral 至多一個（不轉報也是這個案件唯一的轉報紀錄）。
+  FDAReferralWaiver fda_referral_waiver = 32 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 此刻可以標記不轉報：與 can_record_fda_referral 的條件相同（尚未有轉報紀錄）。
+  bool can_waive_fda_referral = 33 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 此刻可以記下主管機關的回覆：已記錄轉報（不是不轉報）的食安案件。
+  bool can_record_fda_referral_reply = 34 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 決定的期限，只在待決定時設（進行中而且沒有還沒結束的詢問）：開始時間是開案，或最後一筆詢問被回覆或被管理員撤回的時間，期限依嚴重度
+  // （嚴重 24 小時、高 72 小時、中 7 天、低 14 天）。
+  hawkr.common.v1alpha1.Deadline decide_deadline = 35 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 轉報主管機關的期限，只在待轉報時設（食安案件、決定採取措施、還沒有轉報紀錄或標記不轉報）：開始時間是結案，期限 24 小時。
+  hawkr.common.v1alpha1.Deadline fda_referral_deadline = 36 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// OutcomeOption 是一個可以設定的結果；形狀同 DecisionOption：伺服器帶出結果對這筆通報的影響，client 不自己對應。
+message OutcomeOption {
+  hawkr.seller.v1alpha1.ReportOutcome outcome = 1;
+  // 設定這個結果會否定這筆通報（未違規、內容不足或濫報）：之後它不能當認定的來源、不列進轉報資料。
+  bool negates_source = 2;
+}
+
+// TriageTarget 是通報分案或移動到某個平台判定類別時，這家店此刻的去處：加入那個類別進行中的案件，或開新案件。
+message TriageTarget {
+  hawkr.common.v1alpha1.PolicyCategory category = 1;
+  // 會加入的進行中案件；空字串表示這個類別沒有進行中的案件，會開新案件（請求要選嚴重度）。
+  string case_id = 2;
+  // 進行中案件的嚴重度（嚴重度以案件為準）；開新案件時是 UNSPECIFIED。
+  hawkr.seller.v1alpha1.ViolationSeverity severity = 3;
+  // 進行中案件的 etag；開新案件時是空字串。加入時原樣放進 JoinCase.etag。
+  string case_etag = 4;
+  // 進行中案件現有的通報數（說明「會加入哪個案件」用）；開新案件時是 0。
+  int32 case_report_count = 5;
+}
+
+// CaseTarget 是分案或移動的明確意圖：加入這個進行中的案件，或開新案件。伺服器驗證意圖此刻仍然成立（案件已關閉、版本已前進、
+// 或這個類別已經有了進行中的案件，都回版本衝突），所以讀取與送出之間別人的操作會讓使用者重新確認，不會悄悄改變結果。
+message CaseTarget {
+  oneof target {
+    JoinCase join = 1;
+    OpenNewCase open_new = 2;
+  }
+}
+
+// JoinCase 是加入這家店這個類別進行中的案件。
+message JoinCase {
+  // 讀到的 TriageTarget.case_id。
+  string case_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 讀到的 TriageTarget.case_etag。
+  string etag = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+// OpenNewCase 是開新案件。
+message OpenNewCase {
+  // 新案件的嚴重度。
+  hawkr.seller.v1alpha1.ViolationSeverity severity = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// DecisionOption 是一個可以選的決定，帶結案時會帶入沒有結果的通報的結果（client 不自己對應）。
+message DecisionOption {
+  CaseDecision decision = 1;
+  hawkr.seller.v1alpha1.ReportOutcome default_outcome = 2;
+}
+
+// ReportMove 是一次把通報移到其他案件的紀錄（append-only）。
+message ReportMove {
+  string report_id = 1;
+  string from_case_id = 2;
+  string to_case_id = 3;
+  string moved_by_admin_id = 4;
+  google.protobuf.Timestamp move_time = 5;
+}
+
+message ListReportsRequest {
+  reserved 3;
+  reserved "status";
+
+  // 每頁筆數：0 用預設值 20，上限 100。
+  int32 page_size = 1;
+  string page_token = 2;
+  // 只列這個生效的類別的通報：在案件裡的是平台判定類別，其他是檢舉人選的類別；UNSPECIFIED 不篩選。
+  hawkr.common.v1alpha1.PolicyCategory category = 4;
+  // 只列這家店的通報；空字串不篩選。
+  string store_id = 5;
+  // 只列這個處理狀態的通報；UNSPECIFIED 不篩選。
+  ReportState state = 6;
+  // 只列這個案件的通報；空字串不篩選。排序：state 是 AWAITING_TRIAGE 或設了 case_id 時依建立時間舊到新（兩者都設時一樣，結果是交集），其他新到舊。
+  string case_id = 7;
+  // true 時只列此刻可以當認定的來源的通報（Report.can_cite_as_source 為 true）；false 不篩選。建立措施預填來源通報用。
+  bool citable_as_source = 8;
+}
+
+message ListReportsResponse {
+  repeated Report reports = 1;
+  string next_page_token = 2;
+}
+
+message GetReportRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetReportResponse {
+  Report report = 1;
+}
+
+message MarkReportSupplementsSeenRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 讀到補充時的通報 etag。
+  string etag = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+// 回傳的通報與請求的 etag 相同（記下已看過不讓 etag 前進），has_unseen_supplements 是 false。
+message MarkReportSupplementsSeenResponse {
+  Report report = 1;
+}
+
+message TriageReportRequest {
+  reserved 3;
+  reserved "severity";
+
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 平台判定類別：政策分類中平台判定與認定可用的值，OTHER 不行（OTHER 只給檢舉人選）；UNSPECIFIED 與 OTHER 回 invalid_argument。
+  hawkr.common.v1alpha1.PolicyCategory assessed_category = 2 [(google.api.field_behavior) = REQUIRED];
+  // 去處：取自 Report.triage_targets 對應類別的那一筆（有 case_id 就 join，沒有就 open_new 並選嚴重度）。必填；嚴重度以案件為準，要改請用 ChangeCaseSeverity。
+  CaseTarget target = 5 [(google.api.field_behavior) = REQUIRED];
+  // 讀到的通報的 etag。
+  string etag = 4 [(google.api.field_behavior) = REQUIRED];
+}
+
+message TriageReportResponse {
+  Report report = 1;
+}
+
+message ResolveReportRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 必須在 Report.available_outcomes 裡。
+  hawkr.seller.v1alpha1.ReportOutcome outcome = 2 [(google.api.field_behavior) = REQUIRED];
+  // 給檢舉人的結果說明，最多 2000 字；可以不填。
+  string note = 3;
+  // 讀到的通報的 etag。
+  string etag = 4 [(google.api.field_behavior) = REQUIRED];
+}
+
+message ResolveReportResponse {
+  Report report = 1;
+}
+
+message MoveReportRequest {
+  reserved 3;
+  reserved "severity";
+
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 新的平台判定類別，必須和目前的不同；子集同 TriageReportRequest.assessed_category。
+  hawkr.common.v1alpha1.PolicyCategory assessed_category = 2 [(google.api.field_behavior) = REQUIRED];
+  // 規則同 TriageReportRequest.target。
+  CaseTarget target = 5 [(google.api.field_behavior) = REQUIRED];
+  // 讀到的通報的 etag。
+  string etag = 4 [(google.api.field_behavior) = REQUIRED];
+}
+
+message MoveReportResponse {
+  Report report = 1;
+  // 原案件因為通報都移走而關閉（NO_REPORTS）。
+  bool source_case_closed = 2;
+}
+
+message ListCasesRequest {
+  // 每頁筆數：0 用預設值 20，上限 100。依開案時間新到舊。
+  int32 page_size = 1;
+  string page_token = 2;
+  // 只列這個狀態的案件；UNSPECIFIED 不篩選。
+  CaseState state = 3;
+  // 只列這個類別的案件：平台判定與認定可用的值，OTHER 回 invalid_argument。
+  hawkr.common.v1alpha1.PolicyCategory category = 4;
+  // 只列這家店的案件；空字串不篩選。
+  string store_id = 5;
+  // true 只列有還沒結束的詢問的進行中案件（等賣家，Case.awaiting_seller）；和 state = CLOSED 一起設回 invalid_argument。
+  // 它不是 CaseState 的值：等賣家和進行中同時成立。
+  bool awaiting_seller = 6;
+}
+
+message ListCasesResponse {
+  repeated Case cases = 1;
+  string next_page_token = 2;
+}
+
+message GetCaseRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetCaseResponse {
+  Case case = 1;
+}
+
+message DecideCaseRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 必須在 Case.decision_options 裡。
+  CaseDecision decision = 2 [(google.api.field_behavior) = REQUIRED];
+  // 給檢舉人的結果說明，最多 2000 字；可以不填。會帶入還沒有結果的通報，已經有結果的通報不受影響。
+  string note = 3;
+  // 讀到的案件的 etag。
+  string etag = 4 [(google.api.field_behavior) = REQUIRED];
+}
+
+message DecideCaseResponse {
+  Case case = 1;
+}
+
+message ChangeCaseSeverityRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 必須和目前的不同。
+  hawkr.seller.v1alpha1.ViolationSeverity severity = 2 [(google.api.field_behavior) = REQUIRED];
+  // 原因，1 到 2000 字；寫成案件的一則內部註記。
+  string note = 3 [(google.api.field_behavior) = REQUIRED];
+  // 讀到的案件的 etag。
+  string etag = 4 [(google.api.field_behavior) = REQUIRED];
+}
+
+message ChangeCaseSeverityResponse {
+  Case case = 1;
+}
+
+message RecordFDAReferralRequest {
+  string case_id = 1 [(google.api.field_behavior) = REQUIRED];
+  FDAChannel channel = 2 [(google.api.field_behavior) = REQUIRED];
+  // 主管機關的案號，最多 100 字；可以不填。
+  string reference_no = 3;
+  // 選填：追蹤日期（台北日期），不早於今天；不設時是轉報日（台北）加 30 天。
+  google.type.Date follow_up_date = 4;
+}
+
+message RecordFDAReferralResponse {
+  Case case = 1;
+  // 這個案件之前已經記過轉報：case.fda_referral 是原本的紀錄，這次的輸入沒有寫入。
+  bool already_recorded = 2;
+}
+
+message WaiveFDAReferralRequest {
+  string case_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 不轉報的原因，1 到 2000 字。
+  string reason = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message WaiveFDAReferralResponse {
+  Case case = 1;
+  // 這個案件之前已經標記過不轉報：case.fda_referral_waiver 是原本的紀錄，這次的輸入沒有寫入。
+  bool already_waived = 2;
+}
+
+message RecordFDAReferralReplyRequest {
+  string case_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 回覆內容，1 到 2000 字。
+  string body = 2 [(google.api.field_behavior) = REQUIRED];
+  // 收到的日期（台北），不早於轉報日、不晚於今天。
+  google.type.Date receive_date = 3 [(google.api.field_behavior) = REQUIRED];
+  // 下一個追蹤日期（台北日期，不早於今天）：設定時取代原本的；clear_follow_up 為 true 時清掉；兩者都不設時不變。兩者同時設回 invalid_argument。
+  google.type.Date next_follow_up_date = 4;
+  bool clear_follow_up = 5;
+  // 選填，UUIDv4（AIP-155）：範圍是（記下的管理員, request_id）；同一個值、同樣的內容重送不會多記一則，內容不同回 invalid_argument。
+  string request_id = 6 [(google.api.field_info).format = UUID4];
+}
+
+message RecordFDAReferralReplyResponse {
+  Case case = 1;
+}
+
+message GetFDAExportRequest {
+  string case_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetFDAExportResponse {
+  Case case = 1;
+  // 案件裡結果不是未違規、內容不足或濫報的通報（含補充與佐證的位置），舊到新；不帶檢舉人的聯絡方式。
+  repeated Report reports = 2;
+  // 被檢舉的店家（含聯絡電話、地址與食品業者登錄字號；已關閉的也回傳）。
+  Store store = 3;
+}
+
+message CreateCaseInquiryRequest {
+  string case_id = 1 [(google.api.field_behavior) = REQUIRED];
+  CaseInquiryKind kind = 2 [(google.api.field_behavior) = REQUIRED];
+  // 給賣家的說明，1 到 2000 字。要同時要紀錄又要說明，寫在同一則說明裡，種類選主要的那個。
+  string message = 3 [(google.api.field_behavior) = REQUIRED];
+  // 選填：期限。不設時是建立後 72 小時；設定時必須在建立後 24 小時到 14 天之間。
+  google.protobuf.Timestamp due_time = 4;
+  // 選填，UUIDv4（AIP-155）：同一位管理員以同一個 request_id 重送回原本那一筆；內容不同回 invalid_argument。範圍是（建立的管理員, request_id），同 CreateMeasure。
+  string request_id = 5 [(google.api.field_info).format = UUID4];
+}
+
+message CreateCaseInquiryResponse {
+  CaseInquiry inquiry = 1;
+  // 更新後的案件：awaiting_seller、etag 與 decision_options 都因詢問改變。
+  Case case = 2;
+}
+
+message ListCaseInquiriesRequest {
+  string case_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 每頁筆數：0 用預設值 50，上限 100。舊到新。
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListCaseInquiriesResponse {
+  repeated CaseInquiry inquiries = 1;
+  string next_page_token = 2;
+}
+
+message RecordCaseInquiryReplyRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  CaseInquiryReplyChannel channel = 2 [(google.api.field_behavior) = REQUIRED];
+  // 收到的時間：不早於詢問建立、不晚於現在。精確度是秒：與詢問建立同一秒的時間視為建立當下（伺服器記為建立時間），不會因為詢問建立時間有微秒而被擋。
+  google.protobuf.Timestamp receive_time = 3 [(google.api.field_behavior) = REQUIRED];
+  // 回覆內容，1 到 4000 字。
+  string body = 4 [(google.api.field_behavior) = REQUIRED];
+  // 附件的 staged token（機敏上傳），最多 5 份。
+  repeated string evidence_tokens = 5;
+}
+
+message RecordCaseInquiryReplyResponse {
+  CaseInquiry inquiry = 1;
+  Case case = 2;
+  // 這筆詢問之前已經記過回覆：inquiry.reply 是原本那一則，這次的輸入沒有寫入。
+  bool already_recorded = 3;
+}
+
+message WithdrawCaseInquiryRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message WithdrawCaseInquiryResponse {
+  CaseInquiry inquiry = 1;
+  Case case = 2;
+  // 這筆詢問之前已經撤回。
+  bool already_withdrawn = 3;
+}
+
+message CreateMeasureRequest {
+  reserved 3, 5, 6, 8, 9, 10;
+  reserved "kind", "end_time", "review_by", "violation", "risk";
+
+  // 選填，UUIDv4：同一位管理員的重送用它辨識。同樣的 request_id 與同樣的內容回傳原本的措施（目前的狀態與 etag）；內容不同回
+  // invalid_argument。請求的內容在措施建立之後不論店家、認定、期限怎麼變，重送都先於這些檢查。
+  string request_id = 1 [(google.api.field_info).format = UUID4];
+  string store_id = 2 [(google.api.field_behavior) = REQUIRED];
+  // 給賣家的理由，1 到 2000 字。
+  string statement = 4 [(google.api.field_behavior) = REQUIRED];
+  // 第一則內部註記，1 到 2000 字。
+  string note = 7 [(google.api.field_behavior) = REQUIRED];
+  // 措施的種類：設定的是哪一支就是哪一種，必須設定其中一支。各種類專屬的欄位在那一支裡面，所以不會有跨欄位的種類對應。
+  oneof measure {
+    WarningInput warning = 11;
+    SuspensionInput suspension = 12;
+    TerminationInput termination = 13;
+  }
+  // 選填：從案件建立時帶案件 id。任何種類與依據都可以帶；措施的店家必須是案件的店家（invalid_argument），案件必須進行中（failed_precondition）。
+  // 之後這個措施算是案件導出的措施（ListMeasuresRequest.source_case_id）。同一個 request_id 帶不同的案件是不同的請求。
+  string source_case_id = 14;
+  // 選填：從主管機關來函建立時帶來函 id。任何種類與依據都可以帶；來函必須指名這個措施的帳號（invalid_argument；指名店家時只算那一家）。
+  // 來函已完成也可以。之後這個措施算是來函導出的措施（ListMeasuresRequest.source_authority_order_id）。同一個 request_id 帶不同的來函是不同的請求。
+  string source_authority_order_id = 15;
+}
+
+// WarningInput 是警告：依據違規的認定，沒有結束時間。
+message WarningInput {
+  ViolationBasis violation = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// SuspensionInput 是停權：依據違規的認定或風險類型。
+message SuspensionInput {
+  oneof basis {
+    ViolationBasis violation = 1;
+    RiskBasis risk = 2;
+  }
+  // 結束時間，必須晚於現在。VIOLATION 依據的停權必填；RISK 選填（不設是沒有固定期間，由平台定期複審）。
+  google.protobuf.Timestamp end_time = 3;
+  // RISK 必填：複審期限，必須晚於現在、不超過 30 天；VIOLATION 依據不可以設。
+  google.protobuf.Timestamp review_by = 4;
+}
+
+// TerminationInput 是終止合作（賣家合作條款第 21.2、21.3 條）的事由與依據。措施的依據（Measure.basis）由伺服器推導：有 violation 是 VIOLATION，
+// 否則是 CONTRACT（NOTICE 與 LINKED_ACCOUNT 一定是 CONTRACT，不可以帶 violation）。終止沒有 end_time 與 review_by。
+message TerminationInput {
+  hawkr.seller.v1alpha1.TerminationGround ground = 1 [(google.api.field_behavior) = REQUIRED];
+  // 依據的認定。需求依事由而定（TerminationOption.violation_requirement：必填、選填或不可以設），條件寫在該選項的 explanation；
+  // 不符回 invalid_argument 指 termination.violation.cited_finding_ids（必填而沒有引用，或引用的認定不符條件）。
+  ViolationBasis violation = 2;
+  // LINKED_ACCOUNT 必填、其他事由不可以設：來源措施的 id。來源必須是另一個帳號、未撤銷、事由不是 NOTICE 或 LINKED_ACCOUNT 的終止合作，
+  // 而且本措施的帳號與來源的身分快照命中（Measure.linked_accounts 列出命中的帳號，伺服器再驗證一次）；同一個來源對同一個帳號只能有一筆生效中的關聯終止
+  // （already_exists）。來源撤銷時這筆一併撤銷。
+  string source_measure_id = 3;
+}
+
+// ViolationBasis 是措施依據的認定：新的認定與引用的既有認定，合計至少一筆。引用的認定必須是同一個帳號、仍生效的。
+// cited_finding_ids 是集合，順序沒有意義（同一組不論怎麼排都是同一個請求）。主要依據由伺服器的規則決定，不看清單的位置：有新的認定時是新的認定，
+// 否則是引用的認定中最嚴重的（CRITICAL > HIGH > MEDIUM > LOW），同嚴重度取最新建立的。
+message ViolationBasis {
+  NewFinding finding = 1;
+  repeated string cited_finding_ids = 2;
+}
+
+message NewFinding {
+  // 認定的類別：政策分類中平台判定與認定可用的值，OTHER 不行（OTHER 只給檢舉人選）；UNSPECIFIED 與 OTHER 回 invalid_argument。
+  hawkr.common.v1alpha1.PolicyCategory category = 1 [(google.api.field_behavior) = REQUIRED];
+  hawkr.seller.v1alpha1.ViolationSeverity severity = 2 [(google.api.field_behavior) = REQUIRED];
+  // 成立這個認定的通報，最多 20 筆、不可重複，是集合（順序沒有意義）；每一筆都必須是同一家店、而且結果不是未違規、內容不足或濫報
+  // （Report.can_cite_as_source 為 true 的那些）。可以不填。
+  repeated string source_report_ids = 3;
+  // 成立這個認定的主管機關來函，最多 5 筆、不可重複，是集合（順序沒有意義）；每一筆都必須指名這個措施的帳號（指名店家時只算那一家）。可以不填。
+  repeated string source_authority_order_ids = 4;
+}
+
+message RiskBasis {
+  hawkr.seller.v1alpha1.RiskGround ground = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message CreateMeasureResponse {
+  Measure measure = 1;
+}
+
+message GetMeasureRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetMeasureResponse {
+  Measure measure = 1;
+}
+
+message ListMeasuresRequest {
+  // 每頁筆數：0 用預設值 20，上限 100。
+  int32 page_size = 1;
+  string page_token = 2;
+  // 只列這家店的措施；空字串不篩選。
+  string store_id = 3;
+  // 只列這個帳號的措施（含舊店的）；空字串不篩選。
+  string account_id = 4;
+  // 只列此刻是這個狀態的措施；UNSPECIFIED 不篩選。
+  hawkr.seller.v1alpha1.MeasureState state = 5;
+  // 只列這個依據的措施；UNSPECIFIED 不篩選。
+  hawkr.seller.v1alpha1.MeasureBasis basis = 6;
+  reserved 7, 9;
+  reserved "appeal_state", "remediation_state";
+  // true 只列複審中的措施：RISK、生效中、現在不早於 review_by 前 24 小時（與 Measure.review_deadline 同一個定義，review_by 過了之後仍在），依 review_by 舊到新；false 與不設不篩選。
+  bool review_due = 8;
+  // 只列有任一筆請求（申覆或解除請求，一個措施可以有多筆不同狀態的）是這個狀態的措施，狀態是伺服器推導的 MeasureRequest.state：措施已不在
+  // 生效中而仍待處理的解除請求算 CLOSED，不算 PENDING。PENDING 是待處理請求的收件匣，依請求提出時間舊到新（優先序在 review_due 之後）；
+  // UNSPECIFIED 不篩選。
+  hawkr.seller.v1alpha1.MeasureRequestState request_state = 10;
+  // 只列有任一筆這個種類且（有 request_state 時）符合該狀態的請求的措施；UNSPECIFIED 不篩選種類。
+  hawkr.seller.v1alpha1.MeasureRequestKind request_kind = 11;
+  // 只列這個案件導出的措施：source_case_id 是這個案件，或依據的認定（含引用的既有認定）以這個案件的通報為來源；空字串不篩選。
+  string source_case_id = 12;
+  // 只列依據的認定（含引用的既有認定）以這筆通報為來源的措施；空字串不篩選。設定結果的對話框用它提示「這筆通報已是措施的依據來源」。
+  string source_report_id = 13;
+  // 只列這份來函導出的措施：source_authority_order_id 是它，或依據的認定（含引用的既有認定）引用了它；空字串不篩選。
+  string source_authority_order_id = 14;
+}
+
+message ListMeasuresResponse {
+  repeated Measure measures = 1;
+  string next_page_token = 2;
+}
+
+message UpdateMeasureRequest {
+  // id 與 etag 必填；只有 statement、end_time 會被採用。
+  Measure measure = 1 [(google.api.field_behavior) = REQUIRED];
+  // 必填，只能列 statement、end_time。
+  google.protobuf.FieldMask update_mask = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UpdateMeasureResponse {
+  Measure measure = 1;
+}
+
+message EndMeasureRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 讀到的措施的 etag。
+  string etag = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message EndMeasureResponse {
+  Measure measure = 1;
+}
+
+message RevokeMeasureRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 管理員可以選的撤銷原因；不能是 UNSPECIFIED。
+  AdminRevokeReason reason = 2 [(google.api.field_behavior) = REQUIRED];
+  // 是否一併撤銷這個措施自己建立的認定（並連帶撤銷引用它們的其他措施）；只在措施的 can_revoke_findings 為 true 時可以設，否則回 invalid_argument。
+  bool revoke_findings = 3;
+  // 讀到的措施的 etag。
+  string etag = 4 [(google.api.field_behavior) = REQUIRED];
+}
+
+message RevokeMeasureResponse {
+  Measure measure = 1;
+}
+
+message ScheduleMeasureReviewRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 新的複審期限：現在之後、30 天以內。
+  google.protobuf.Timestamp review_by = 2 [(google.api.field_behavior) = REQUIRED];
+  // 內部註記（為什麼延後），1 到 2000 字。
+  string note = 3 [(google.api.field_behavior) = REQUIRED];
+  // 讀到的措施的 etag。
+  string etag = 4 [(google.api.field_behavior) = REQUIRED];
+}
+
+message ScheduleMeasureReviewResponse {
+  Measure measure = 1;
+}
+
+message DecideAppealRequest {
+  // 措施的 id。
+  string measure_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // ACCEPTED 或 REJECTED。
+  hawkr.seller.v1alpha1.MeasureRequestState decision = 2 [(google.api.field_behavior) = REQUIRED];
+  // 裁定的理由，1 到 2000 字；接受與駁回都必填，賣家看得到。
+  string reason = 3 [(google.api.field_behavior) = REQUIRED];
+  // ACCEPTED 時是否一併撤銷這個措施自己建立的認定（並連帶撤銷引用它們的其他措施）；只在措施的 can_revoke_findings 為 true 時可以設，REJECTED 時不可以設，否則回 invalid_argument。
+  bool revoke_findings = 4;
+  // 讀到的措施的 etag。
+  string etag = 5 [(google.api.field_behavior) = REQUIRED];
+}
+
+message DecideAppealResponse {
+  Measure measure = 1;
+}
+
+message DecideRemediationRequest {
+  // 措施的 id。
+  string measure_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // ACCEPTED 或 REJECTED。
+  hawkr.seller.v1alpha1.MeasureRequestState decision = 2 [(google.api.field_behavior) = REQUIRED];
+  // 裁定的理由，1 到 2000 字；接受與駁回都必填，賣家看得到。
+  string reason = 3 [(google.api.field_behavior) = REQUIRED];
+  // 讀到的措施的 etag。
+  string etag = 4 [(google.api.field_behavior) = REQUIRED];
+}
+
+message DecideRemediationResponse {
+  Measure measure = 1;
+}
+
+// GovernanceNote 是措施或案件的一則內部註記：平台人員之間的說明，賣家看不到。只新增，不能改也不能刪。
+message GovernanceNote {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 註記的內容；最多 2000 字。
+  string body = 2 [(google.api.field_behavior) = REQUIRED];
+  string created_by_admin_id = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 這則註記是改嚴重度時寫的：改前與改後。只有案件的註記可能有，措施的註記不設。
+  SeverityChange severity_change = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// SeverityChange 是案件嚴重度的一次修改（改前與改後），記在修改時寫的那則註記上。
+message SeverityChange {
+  hawkr.seller.v1alpha1.ViolationSeverity from_severity = 1;
+  hawkr.seller.v1alpha1.ViolationSeverity to_severity = 2;
+}
+
+message CreateMeasureNoteRequest {
+  // 措施的 id。
+  string measure_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 只有 body 會被採用。
+  GovernanceNote note = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message CreateMeasureNoteResponse {
+  GovernanceNote note = 1;
+}
+
+message ListMeasureNotesRequest {
+  // 措施的 id。
+  string measure_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 每頁筆數：0 用預設值 20，上限 100。
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListMeasureNotesResponse {
+  // 舊到新。
+  repeated GovernanceNote notes = 1;
+  string next_page_token = 2;
+}
+
+message CreateCaseNoteRequest {
+  // 案件的 id。
+  string case_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 只有 body 會被採用。
+  GovernanceNote note = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message CreateCaseNoteResponse {
+  GovernanceNote note = 1;
+}
+
+message ListCaseNotesRequest {
+  // 案件的 id。
+  string case_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 每頁筆數：0 用預設值 20，上限 100。
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListCaseNotesResponse {
+  // 舊到新。
+  repeated GovernanceNote notes = 1;
+  string next_page_token = 2;
+}
+
+message GetViolationRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetViolationResponse {
+  Violation violation = 1;
+}
+
+message ListViolationsRequest {
+  // 每頁筆數：0 用預設值 20，上限 100。
+  int32 page_size = 1;
+  string page_token = 2;
+  // 只列這家店的認定；空字串不篩選。
+  string store_id = 3;
+  // 只列這個帳號的認定；空字串不篩選。
+  string account_id = 4;
+  // 只列這個狀態的認定；UNSPECIFIED 不篩選。
+  hawkr.seller.v1alpha1.ViolationStatus status = 5;
+}
+
+message ListViolationsResponse {
+  repeated Violation violations = 1;
+  string next_page_token = 2;
+}

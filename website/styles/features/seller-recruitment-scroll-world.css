@@ -1,0 +1,858 @@
+/* =====================================================================
+   Hawkr · /seller Scroll World opening
+   A page-isolated Scroll World UI.
+   Every selector is namespaced so the existing seller landing remains intact.
+   ===================================================================== */
+
+.seller-recruitment-world {
+	--srw-paper: #faf6ec;
+	--srw-paper-strong: #fffdf7;
+	--srw-ink: #3a2a1a;
+	--srw-body: rgba(58, 42, 26, 0.72);
+	--srw-muted: rgba(58, 42, 26, 0.56);
+	--srw-ink-800: var(--color-ink-800);
+	--srw-ink-500: var(--color-ink-500);
+	--srw-ink-100: var(--color-ink-100);
+	--srw-gold: #d4b758;
+	--srw-line: rgba(58, 42, 26, 0.13);
+	--srw-top-offset: calc(
+		var(--floating-nav-height, 84px) +
+		var(--floating-nav-top-gap, 16px)
+	);
+	/* 舞台上下的留白。桌機補成 20px，跟 `.seller-showcase`（width:
+	 * calc(100% - 40px) + padding: 20px 0）同一個 20px 內縮盒子，卡片四邊
+	 * 留白才一致；手機維持滿版電影感，只讓開 navbar。 */
+	--srw-stage-gap: 0px;
+	/* 手機底部導覽列佔掉的淨空。**不得再加 `env(safe-area-inset-bottom)`**：
+	 * MobileBottomNav 用的是 `fixed bottom-2.5`（固定 10px），從未套用 safe-area，
+	 * 所以它的上緣不會因安全區而位移，補償一個不存在的位移只會讓這裡多讓出去。
+	 * 而且本站的 viewport（components/shared/RootDocument.tsx）沒有 `viewport-fit: cover`，env() 的
+	 * 安全區值在任何環境（含真機）都解析為 0 —— 沒有 fallback 的 env() 反而讓整條
+	 * calc() 在不支援的瀏覽器上變成無效值。同一個缺陷在 messages.css 已修（web#386），
+	 * 這是第五份（web#409）。 */
+	--srw-mobile-safe-bottom: calc(
+		var(--mobile-bottom-nav-height, 68px) +
+		var(--mobile-bottom-nav-bottom, 10px)
+	);
+	position: relative;
+	z-index: 3;
+	width: 100%;
+	height: 1120vh;
+	margin-top: calc(var(--srw-top-offset) * -1);
+	overflow-x: clip;
+	/* Stage gutters share the persistent site canvas. The authored video
+	 * scenes below retain their own media backgrounds inside .srw-sticky. */
+	background: transparent;
+	color: var(--srw-ink);
+	font-family:
+		var(--font-openhuninn), var(--font-zen-maru), "Noto Sans TC", "PingFang TC",
+		"Microsoft JhengHei", system-ui, sans-serif;
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
+}
+
+.seller-recruitment-world,
+.seller-recruitment-world *,
+.seller-recruitment-world *::before,
+.seller-recruitment-world *::after {
+	box-sizing: border-box;
+}
+
+/* Match the desktop seller Hero glass frame: a 20px minimum gutter and the
+   same 1440px cap. Mobile keeps its full-bleed cinematic treatment. */
+@media (min-width: 881px) {
+	.seller-recruitment-world {
+		--srw-stage-gap: 20px;
+		width: calc(100% - 40px);
+		max-width: 1440px;
+		margin-right: auto;
+		margin-left: auto;
+		border-radius: 32px;
+	}
+
+	.seller-recruitment-world .srw-sticky {
+		border-radius: inherit;
+	}
+}
+
+/* 舞台（影片、文案、章節軌）從 navbar 下緣加一段留白才開始，高度也扣掉
+ * 上下兩段，所以浮動膠囊永遠不會壓到內容，卡片四邊留白也對齊。section 的
+ * 負 margin 仍在，只是被這裡的 top 抵銷掉。JS 的捲動進度是量出來的（見元件
+ * 內 readPinMetrics），改這裡的 top / 高度不會讓影片 scrub 失準。 */
+.seller-recruitment-world .srw-sticky {
+	position: sticky;
+	top: calc(var(--srw-top-offset) + var(--srw-stage-gap));
+	height: calc(100svh - var(--srw-top-offset) - var(--srw-stage-gap) * 2);
+	min-height: 460px;
+	overflow: hidden;
+	isolation: isolate;
+	background: var(--srw-paper);
+}
+
+/* 圓角沿著 `.srw-sticky` 往下傳，最後一幕的毛玻璃邊框才跟得上卡片轉角
+ * （桌機 32px、手機滿版 0）。缺這條的話玻璃邊框會是直角，被 sticky 的
+ * overflow 切掉四個角。 */
+.seller-recruitment-world .srw-stage,
+.seller-recruitment-world .srw-scene,
+.seller-recruitment-world .srw-media {
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+}
+
+.seller-recruitment-world .srw-scene {
+	pointer-events: none;
+	will-change: opacity;
+}
+
+.seller-recruitment-world .srw-scene.is-active {
+	pointer-events: auto;
+}
+
+.seller-recruitment-world .srw-media {
+	overflow: hidden;
+	background: #eee5d4;
+}
+
+.seller-recruitment-world .srw-media-backdrop {
+	position: absolute;
+	inset: -5%;
+	z-index: 0;
+	width: 110%;
+	height: 110%;
+	max-width: none;
+	object-fit: cover;
+	object-position: var(--srw-object-position);
+	filter: blur(34px) saturate(0.84) brightness(0.84);
+	opacity: 0.62;
+	transform: scale(1.08);
+}
+
+.seller-recruitment-world .srw-media-portrait {
+	position: absolute;
+	top: 0;
+	right: clamp(64px, 8vw, 142px);
+	z-index: 2;
+	width: min(46vw, 56.34svh);
+	height: 100%;
+	overflow: hidden;
+	background: #eee5d4;
+	box-shadow: 0 28px 74px -28px rgb(var(--color-ink-800-rgb) / 0.38);
+}
+
+.seller-recruitment-world .srw-poster {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	max-width: none;
+	object-fit: contain;
+	object-position: var(--srw-object-position);
+	z-index: 0;
+	opacity: 1;
+}
+
+.seller-recruitment-world .srw-media::after {
+	position: absolute;
+	inset: 0;
+	z-index: 4;
+	pointer-events: none;
+	background:
+		linear-gradient(
+			90deg,
+			rgba(250, 246, 236, 0.98) 0%,
+			rgba(250, 246, 236, 0.91) 29%,
+			rgba(250, 246, 236, 0.57) 45%,
+			rgba(250, 246, 236, 0.1) 62%,
+			transparent 74%
+		),
+		linear-gradient(
+			0deg,
+			rgb(var(--color-ink-800-rgb) / 0.1) 0%,
+			transparent 20%
+		);
+	content: "";
+}
+
+.seller-recruitment-world .srw-copy {
+	position: absolute;
+	z-index: 10;
+	top: 50%;
+	left: clamp(28px, 7vw, 112px);
+	width: min(560px, 45vw);
+	translate: 0 -50%;
+	color: var(--srw-ink);
+	will-change: opacity, transform;
+}
+
+.seller-recruitment-world .srw-copy[data-placement="top"] {
+	top: 32%;
+}
+
+.seller-recruitment-world .srw-copy[data-placement="bottom"] {
+	top: auto;
+	bottom: 10%;
+	translate: 0 0;
+}
+
+/* 「理解」那一幕的卡片，配方跟本頁 `.seller-faq` / `.process-glass` /
+ * `.seller-fit` 對齊（36px 圓角、rgba(255,253,247,0.62)、白髮絲邊、同一組
+ * 內光與外投影、blur(20px) saturate(140%)），不再自成一格。 */
+.seller-recruitment-world .srw-copy--has-steps {
+	width: min(520px, 44vw);
+	padding: clamp(22px, 2.2vw, 32px);
+	border: 1px solid rgba(255, 255, 255, 0.7);
+	border-radius: 36px;
+	background: rgba(255, 253, 247, 0.62);
+	box-shadow:
+		0 24px 64px -32px rgb(var(--color-ink-700-rgb) / 0.18),
+		inset 0 1px 0 rgba(255, 255, 255, 0.9);
+	-webkit-backdrop-filter: blur(20px) saturate(140%);
+	backdrop-filter: blur(20px) saturate(140%);
+}
+
+.seller-recruitment-world .srw-label,
+.seller-recruitment-world .srw-disclaimer {
+	margin: 0 0 14px;
+	color: var(--srw-ink-500);
+	font-size: clamp(0.75rem, 1vw, 0.875rem);
+	font-weight: 800;
+	line-height: 1.5;
+	letter-spacing: 0.08em;
+}
+
+.seller-recruitment-world .srw-label::before {
+	display: inline-block;
+	width: 18px;
+	height: 2px;
+	margin-right: 9px;
+	vertical-align: 0.22em;
+	border-radius: 999px;
+	background: var(--srw-gold);
+	content: "";
+}
+
+.seller-recruitment-world .srw-disclaimer {
+	margin-bottom: 8px;
+	color: #8a7028;
+	font-size: 0.625rem;
+	letter-spacing: 0.06em;
+}
+
+.seller-recruitment-world .srw-title {
+	max-width: 11.5ch;
+	margin: 0;
+	color: var(--srw-ink);
+	font-family:
+		var(--font-openhuninn), var(--font-zen-maru), "Noto Sans TC", "PingFang TC",
+		"Microsoft JhengHei", system-ui, sans-serif;
+	font-size: clamp(2.875rem, 5.3vw, 4.875rem);
+	font-weight: 900;
+	line-height: 1.05;
+	letter-spacing: -0.035em;
+	text-wrap: balance;
+}
+
+.seller-recruitment-world .srw-copy--has-steps .srw-title {
+	max-width: 13ch;
+	font-size: clamp(2.1875rem, 3.6vw, 3.375rem);
+}
+
+.seller-recruitment-world .srw-body {
+	max-width: 37ch;
+	margin: 18px 0 0;
+	color: var(--srw-body);
+	font-size: clamp(0.9375rem, 1.28vw, 1.125rem);
+	font-weight: 650;
+	line-height: 1.75;
+	text-wrap: pretty;
+}
+
+.seller-recruitment-world .srw-steps {
+	display: grid;
+	max-width: 13em;
+	margin: 18px 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.seller-recruitment-world .srw-steps li {
+	position: relative;
+	width: fit-content;
+	padding: 2px 0 14px;
+	color: var(--srw-ink-800);
+	font-size: clamp(1.0625rem, 1.5vw, 1.4375rem);
+	font-weight: 900;
+	line-height: 1.1;
+}
+
+.seller-recruitment-world .srw-steps li:not(:last-child)::after {
+	position: absolute;
+	bottom: -1px;
+	left: 50%;
+	color: var(--srw-gold);
+	content: "↓";
+	font-size: 0.75rem;
+	transform: translateX(-50%);
+}
+
+.seller-recruitment-world .srw-scene-rail {
+	position: absolute;
+	z-index: 30;
+	top: 50%;
+	right: clamp(22px, 3vw, 52px);
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	translate: 0 -50%;
+}
+
+.seller-recruitment-world .srw-scene-rail button {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 10px;
+	min-width: 92px;
+	padding: 5px 0;
+	border: 0;
+	background: transparent;
+	color: rgba(58, 42, 26, 0.48);
+	font: inherit;
+	font-size: 0.6875rem;
+	font-weight: 800;
+	cursor: pointer;
+	transition:
+		color 180ms ease,
+		transform 180ms ease;
+}
+
+.seller-recruitment-world .srw-scene-rail button:hover,
+.seller-recruitment-world .srw-scene-rail button.is-active {
+	color: var(--srw-ink);
+	transform: translateX(-3px);
+}
+
+.seller-recruitment-world .srw-scene-rail button i {
+	width: 8px;
+	height: 8px;
+	border: 1px solid currentColor;
+	border-radius: 50%;
+	background: transparent;
+	transition:
+		background 180ms ease,
+		box-shadow 180ms ease,
+		transform 180ms ease;
+}
+
+.seller-recruitment-world .srw-scene-rail button.is-active i {
+	background: var(--srw-gold);
+	box-shadow: 0 0 0 5px rgba(212, 183, 88, 0.17);
+	transform: scale(1.12);
+}
+
+.seller-recruitment-world .srw-scene-rail button:focus-visible,
+.seller-recruitment-world .srw-cta:focus-visible {
+	border-radius: 8px;
+	outline: 3px solid rgb(var(--color-ink-500-rgb) / 0.48);
+	outline-offset: 4px;
+}
+
+.seller-recruitment-world .srw-scroll-hint {
+	display: none;
+}
+
+.seller-recruitment-world .srw-endcard {
+	position: absolute;
+	inset: 0;
+	z-index: 5;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-direction: column;
+	overflow: hidden;
+	padding: clamp(88px, 10vw, 150px) clamp(28px, 8vw, 130px);
+	border-radius: inherit;
+	background: var(--srw-paper-strong);
+	color: var(--srw-ink-800);
+	text-align: center;
+	will-change: opacity, transform;
+}
+
+/* 毛玻璃罩：跟本頁 `.seller-faq` / `.process-glass` / `.seller-fit` 同一份配方
+ * （blur(20px) saturate(140%) + rgba(255,253,247,0.62) + 白髮絲邊 + 內光）。
+ * 蓋在色球之上、文案之下，色球才會被磨砂成暈色，而不是硬邊圓形貼在玻璃上面。
+ * 那三塊的外投影在這裡沒有意義：endcard 滿版等於 `.srw-sticky` 的框，外投影
+ * 會被它的 overflow 切掉，所以只留會顯示的內光。 */
+.seller-recruitment-world .srw-endcard::before {
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+	border: 1px solid rgba(255, 255, 255, 0.7);
+	border-radius: inherit;
+	background: rgba(255, 253, 247, 0.62);
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+	-webkit-backdrop-filter: blur(20px) saturate(140%);
+	backdrop-filter: blur(20px) saturate(140%);
+	pointer-events: none;
+	content: "";
+}
+
+.seller-recruitment-world .srw-endcard-logo {
+	--brand-logo-render-height: clamp(56px, 5.4vw, 76px);
+	position: relative;
+	z-index: 3;
+	width: auto;
+}
+
+.seller-recruitment-world .srw-endcard h2 {
+	position: relative;
+	z-index: 3;
+	max-width: 9em;
+	margin: clamp(42px, 6vh, 68px) 0 0;
+	font-family:
+		var(--font-openhuninn), var(--font-zen-maru), "Noto Sans TC", "PingFang TC",
+		"Microsoft JhengHei", system-ui, sans-serif;
+	font-size: clamp(3rem, 7vw, 5.875rem);
+	font-weight: 900;
+	line-height: 1.08;
+	letter-spacing: -0.055em;
+	text-wrap: balance;
+}
+
+.seller-recruitment-world .srw-endcard p {
+	position: relative;
+	z-index: 3;
+	margin: 22px 0 0;
+	color: var(--srw-body);
+	font-size: clamp(0.75rem, 1.2vw, 1rem);
+	font-weight: 750;
+	letter-spacing: 0.07em;
+}
+
+.seller-recruitment-world .srw-cta {
+	position: relative;
+	z-index: 3;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: min(310px, 74vw);
+	margin-top: clamp(38px, 6vh, 62px);
+	padding: 16px 28px;
+	border-radius: 999px;
+	background: var(--srw-ink-800);
+	box-shadow: 0 14px 32px rgb(var(--color-ink-800-rgb) / 0.18);
+	color: #fffdf7;
+	font-size: 0.875rem;
+	font-weight: 850;
+	text-decoration: none;
+	transition:
+		background 180ms ease,
+		transform 180ms ease;
+}
+
+.seller-recruitment-world .srw-cta:hover {
+	background: var(--color-ink-900);
+	transform: translateY(-2px);
+}
+
+.seller-recruitment-world .srw-endcard-orb {
+	position: absolute;
+	z-index: 1;
+	border-radius: 50%;
+	pointer-events: none;
+}
+
+.seller-recruitment-world .srw-endcard-orb--top {
+	top: -15vw;
+	right: -11vw;
+	width: min(44vw, 600px);
+	aspect-ratio: 1;
+	background: #f4e7ae;
+}
+
+.seller-recruitment-world .srw-endcard-orb--bottom {
+	bottom: -18vw;
+	left: -12vw;
+	width: min(42vw, 580px);
+	aspect-ratio: 1;
+	background: #ded8ca;
+}
+
+@media (max-width: 980px) {
+	.seller-recruitment-world .srw-media-portrait {
+		right: 50%;
+		width: min(72vw, 56.34svh);
+		transform: translateX(50%);
+	}
+
+	.seller-recruitment-world .srw-media::after {
+		background:
+			linear-gradient(
+				90deg,
+				rgba(250, 246, 236, 0.98) 0%,
+				rgba(250, 246, 236, 0.86) 40%,
+				rgba(250, 246, 236, 0.2) 70%,
+				transparent 84%
+			),
+			linear-gradient(
+				0deg,
+				rgb(var(--color-ink-800-rgb) / 0.08) 0%,
+				transparent 18%
+			);
+	}
+
+	.seller-recruitment-world .srw-copy {
+		width: min(560px, 61vw);
+	}
+
+	.seller-recruitment-world .srw-copy--has-steps {
+		width: min(500px, 58vw);
+	}
+}
+
+@media (max-width: 640px) {
+	.seller-recruitment-world {
+		height: 1040vh;
+	}
+
+	.seller-recruitment-world .srw-sticky {
+		min-height: 464px;
+	}
+
+	.seller-recruitment-world .srw-media-backdrop {
+		filter: blur(26px) saturate(0.82) brightness(0.82);
+		opacity: 0.72;
+	}
+
+	.seller-recruitment-world .srw-media-portrait {
+		right: 0;
+		width: 100%;
+		transform: none;
+		box-shadow: none;
+	}
+
+	.seller-recruitment-world .srw-media::after {
+		background: none;
+	}
+
+	.seller-recruitment-world .srw-copy,
+	.seller-recruitment-world .srw-copy[data-placement="top"],
+	.seller-recruitment-world .srw-copy[data-placement="center"] {
+		/* 舞台已經從 navbar 下緣起算，這裡只留卡片自己的內縮。 */
+		top: 18px;
+		right: 18px;
+		bottom: auto;
+		left: 18px;
+		width: auto;
+		padding: 17px 19px;
+		translate: 0 0;
+		border: 1px solid rgba(255, 255, 255, 0.76);
+		border-radius: 18px;
+		background: rgba(255, 253, 247, 0.9);
+		box-shadow: 0 18px 44px -26px rgb(var(--color-ink-700-rgb) / 0.36);
+		-webkit-backdrop-filter: blur(16px) saturate(130%);
+		backdrop-filter: blur(16px) saturate(130%);
+	}
+
+	.seller-recruitment-world .srw-copy[data-placement="bottom"] {
+		top: auto;
+		bottom: calc(var(--srw-mobile-safe-bottom) + 20px);
+	}
+
+	.seller-recruitment-world .srw-copy--has-steps {
+		width: auto;
+		padding: 16px 18px;
+		border-radius: 18px;
+	}
+
+	.seller-recruitment-world .srw-label {
+		margin-bottom: 8px;
+		font-size: 0.625rem;
+	}
+
+	.seller-recruitment-world .srw-disclaimer {
+		margin-bottom: 6px;
+		font-size: 0.5625rem;
+	}
+
+	.seller-recruitment-world .srw-title,
+	.seller-recruitment-world .srw-copy--has-steps .srw-title {
+		max-width: 12em;
+		font-size: clamp(1.75rem, 8.8vw, 2.5rem);
+		line-height: 1.08;
+	}
+
+	.seller-recruitment-world .srw-body {
+		margin-top: 10px;
+		font-size: 0.75rem;
+		line-height: 1.62;
+	}
+
+	.seller-recruitment-world .srw-steps {
+		margin-top: 10px;
+	}
+
+	.seller-recruitment-world .srw-steps li {
+		padding-bottom: 10px;
+		font-size: 1rem;
+	}
+
+	.seller-recruitment-world .srw-scene-rail {
+		display: none;
+	}
+
+	.seller-recruitment-world .srw-scroll-hint {
+		position: fixed;
+		z-index: 40;
+		top: 50%;
+		left: 50%;
+		display: flex;
+		min-width: 168px;
+		padding: 14px 18px 16px;
+		translate: -50% -50%;
+		align-items: center;
+		flex-direction: column;
+		gap: 10px;
+		border: 1px solid rgba(255, 255, 255, 0.48);
+		border-radius: 24px;
+		background: rgba(255, 253, 247, 0.82);
+		box-shadow: 0 18px 48px rgb(var(--color-ink-950-rgb) / 0.22);
+		-webkit-backdrop-filter: blur(16px) saturate(135%);
+		backdrop-filter: blur(16px) saturate(135%);
+		color: var(--srw-ink-800);
+		pointer-events: none;
+		animation: srw-scroll-hint-enter 220ms ease-out both;
+	}
+
+	.seller-recruitment-world .srw-scroll-hint-glyph {
+		display: inline-flex;
+		filter: drop-shadow(0 4px 10px rgb(var(--color-ink-950-rgb) / 0.18));
+	}
+
+	.seller-recruitment-world .srw-scroll-hint-label {
+		font-size: 0.8125rem;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		white-space: nowrap;
+	}
+
+	.seller-recruitment-world .srw-endcard {
+		padding: 34px 24px calc(var(--srw-mobile-safe-bottom) + 44px);
+	}
+
+	.seller-recruitment-world .srw-endcard-logo {
+		--brand-logo-render-height: 50px;
+		width: auto;
+	}
+
+	.seller-recruitment-world .srw-endcard h2 {
+		margin-top: 42px;
+		font-size: clamp(2.75rem, 14vw, 4.125rem);
+	}
+
+	.seller-recruitment-world .srw-endcard-orb--top {
+		top: -20vw;
+		right: -22vw;
+		width: 78vw;
+	}
+
+	.seller-recruitment-world .srw-endcard-orb--bottom {
+		bottom: -28vw;
+		left: -30vw;
+		width: 84vw;
+	}
+}
+
+/* Dark mode keeps the video scenes warm, while deepening only the frosted
+   content cards and the final brand stage. Desktop scenes without a card keep
+   their cream scrim so the dark copy remains readable over the artwork. */
+
+[data-theme="dark"] .seller-recruitment-world .srw-copy--has-steps {
+	border-color: rgba(245, 222, 165, 0.16);
+	background:
+		linear-gradient(
+			135deg,
+			rgba(245, 222, 165, 0.07),
+			rgb(var(--color-ink-950-rgb) / 0.03) 58%
+		),
+		rgb(var(--color-ink-950-rgb) / 0.86);
+	box-shadow:
+		0 24px 64px -34px rgba(0, 0, 0, 0.76),
+		inset 0 1px 0 rgba(245, 222, 165, 0.1);
+}
+
+[data-theme="dark"] .seller-recruitment-world .srw-copy--has-steps .srw-title {
+	color: #f5e9c3;
+}
+
+[data-theme="dark"] .seller-recruitment-world .srw-copy--has-steps .srw-body {
+	color: rgb(var(--color-ink-100-rgb) / 0.78);
+}
+
+[data-theme="dark"] .seller-recruitment-world .srw-copy--has-steps .srw-label {
+	color: var(--color-ink-200);
+}
+
+[data-theme="dark"]
+	.seller-recruitment-world
+	.srw-copy--has-steps
+	.srw-disclaimer {
+	color: #dbc777;
+}
+
+[data-theme="dark"]
+	.seller-recruitment-world
+	.srw-copy--has-steps
+	.srw-steps
+	li {
+	color: var(--color-ink-100);
+}
+
+[data-theme="dark"] .seller-recruitment-world .srw-scene-rail button {
+	color: rgb(var(--color-ink-100-rgb) / 0.56);
+}
+
+[data-theme="dark"] .seller-recruitment-world .srw-scene-rail button:hover,
+[data-theme="dark"] .seller-recruitment-world .srw-scene-rail button.is-active {
+	color: #f5e9c3;
+}
+
+[data-theme="dark"] .seller-recruitment-world .srw-scroll-hint {
+	border-color: rgba(245, 222, 165, 0.2);
+	background: rgb(var(--color-ink-950-rgb) / 0.82);
+	box-shadow: 0 18px 52px rgba(0, 0, 0, 0.45);
+	color: var(--color-ink-200);
+}
+
+[data-theme="dark"] .seller-recruitment-world .srw-scroll-hint-label {
+	color: #f5e9c3;
+}
+
+[data-theme="dark"] .seller-recruitment-world .srw-endcard {
+	background:
+		radial-gradient(
+			circle at 50% 38%,
+			rgb(var(--color-ink-600-rgb) / 0.18),
+			transparent 40%
+		),
+		linear-gradient(160deg, var(--color-ink-900) 0%, var(--color-ink-950) 100%);
+	color: #f5e9c3;
+}
+
+/* 深色的玻璃罩沿用本檔既有的森林玻璃語彙（同 `.srw-copy--has-steps` 的深色版），
+ * 底下仍是上面那層森林漸層，色球一樣被磨砂在玻璃之下。透明度比淺色的 0.62 低：
+ * 深色的底已經是深綠、色球本身只有 0.08–0.12，再蓋 0.62 會把整面壓成死板的平色。 */
+[data-theme="dark"] .seller-recruitment-world .srw-endcard::before {
+	border-color: rgba(245, 222, 165, 0.16);
+	background: rgb(var(--color-ink-950-rgb) / 0.42);
+	box-shadow: inset 0 1px 0 rgba(245, 222, 165, 0.1);
+}
+
+[data-theme="dark"] .seller-recruitment-world .srw-endcard h2 {
+	color: #f5e9c3;
+}
+
+[data-theme="dark"] .seller-recruitment-world .srw-endcard p {
+	color: rgb(var(--color-ink-100-rgb) / 0.76);
+}
+
+[data-theme="dark"] .seller-recruitment-world .srw-endcard-orb--top {
+	background: rgba(212, 183, 88, 0.12);
+}
+
+[data-theme="dark"] .seller-recruitment-world .srw-endcard-orb--bottom {
+	background: rgb(var(--color-ink-200-rgb) / 0.08);
+}
+
+[data-theme="dark"] .seller-recruitment-world .srw-cta {
+	border: 1px solid rgba(245, 222, 165, 0.18);
+	background: var(--color-ink-500);
+	box-shadow: 0 14px 32px rgba(0, 0, 0, 0.34);
+	color: #fffdf7;
+}
+
+[data-theme="dark"] .seller-recruitment-world .srw-cta:hover {
+	background: var(--color-ink-600);
+	color: #fffdf7;
+}
+
+[data-theme="dark"]
+	.seller-recruitment-world
+	:is(.srw-scene-rail button, .srw-cta):focus-visible {
+	outline-color: rgba(212, 183, 88, 0.72);
+}
+
+@media (max-width: 640px) {
+	[data-theme="dark"] .seller-recruitment-world .srw-copy,
+	[data-theme="dark"] .seller-recruitment-world .srw-copy[data-placement="top"],
+	[data-theme="dark"]
+		.seller-recruitment-world
+		.srw-copy[data-placement="center"] {
+		border-color: rgba(245, 222, 165, 0.16);
+		background:
+			linear-gradient(
+				135deg,
+				rgba(245, 222, 165, 0.07),
+				rgb(var(--color-ink-950-rgb) / 0.03) 58%
+			),
+			rgb(var(--color-ink-950-rgb) / 0.88);
+		box-shadow:
+			0 18px 44px -26px rgba(0, 0, 0, 0.76),
+			inset 0 1px 0 rgba(245, 222, 165, 0.1);
+	}
+
+	[data-theme="dark"] .seller-recruitment-world .srw-title {
+		color: #f5e9c3;
+	}
+
+	[data-theme="dark"] .seller-recruitment-world .srw-body {
+		color: rgb(var(--color-ink-100-rgb) / 0.78);
+	}
+
+	[data-theme="dark"] .seller-recruitment-world .srw-label {
+		color: var(--color-ink-200);
+	}
+
+	[data-theme="dark"] .seller-recruitment-world .srw-disclaimer {
+		color: #dbc777;
+	}
+
+	[data-theme="dark"] .seller-recruitment-world .srw-steps li {
+		color: var(--color-ink-100);
+	}
+}
+
+@keyframes srw-scroll-hint-enter {
+	from {
+		opacity: 0;
+		translate: -50% calc(-50% + 10px);
+		scale: 0.96;
+	}
+
+	to {
+		opacity: 1;
+		translate: -50% -50%;
+		scale: 1;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.seller-recruitment-world .srw-scroll-hint {
+		animation: none;
+	}
+}
+
+@media (forced-colors: active) {
+	.seller-recruitment-world .srw-copy,
+	.seller-recruitment-world .srw-endcard {
+		border: 1px solid CanvasText;
+		background: Canvas;
+		color: CanvasText;
+	}
+
+	.seller-recruitment-world .srw-cta {
+		border: 1px solid ButtonText;
+		background: ButtonFace;
+		color: ButtonText;
+	}
+}

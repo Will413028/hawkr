@@ -1,0 +1,11 @@
+# 文件裡的公開範例值（gitleaks 指紋：路徑:規則:行號；文件行號變動時要一起改）。
+# 光貿（AMEGO）公開文件的測試 App Key，與 sign_test.go 的 golden 簽章同一個值
+backend/docs/第三方整合/AMEGO 電子發票 API 總覽.md:generic-api-key:225
+backend/docs/第三方整合/AMEGO 電子發票 API 總覽.md:generic-api-key:3286
+backend/docs/第三方整合/AMEGO 電子發票 API 總覽.md:generic-api-key:3363
+backend/docs/第三方整合/AMEGO 電子發票 API 總覽.md:generic-api-key:3400
+# 只有 PEM 檔頭字面的說明文字，沒有金鑰本體
+backend/docs/詳細設計書/05-支付服務（Payment Service）詳細設計書.md:private-key:4057
+# UUID 形式的冪等鍵範例
+backend/docs/詳細設計書/56-ADM 代行營運（Delegated Operations）詳細設計書.md:generic-api-key:2483
+backend/docs/詳細設計書/56-ADM 代行營運（Delegated Operations）詳細設計書.md:generic-api-key:3431

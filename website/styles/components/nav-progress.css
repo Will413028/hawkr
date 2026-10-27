@@ -1,0 +1,126 @@
+/* ============================================================
+   Top navigation progress rail
+   ------------------------------------------------------------
+   Driven by html[data-nav-pending] (lib/loading/nav-pending.ts).
+   Pure CSS so it keeps animating while the main thread renders
+   the destination tree. The 250ms delay keeps fast navigations
+   completely silent — the rail only ever appears on waits long
+   enough to read as "nothing happened".
+   z-index sits above the toast viewport (z-[1100]) so the rail
+   is never occluded by page chrome.
+   ============================================================ */
+
+html[data-nav-pending]::before {
+	/* Brand clover colours (foundation/00-color-config.css): deep primary on
+	   light surfaces, harvest gold on the dark dark palette — one
+	   of the four logo colours per theme, with a same-hue glow so the rail
+	   reads as a lit brand accent rather than a hairline. */
+	--hk-nav-progress-color: var(--color-brand-primary-strong);
+	--hk-nav-progress-color-rgb: var(--color-brand-ink-rgb);
+	content: "";
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 3px;
+	z-index: 1200;
+	pointer-events: none;
+	background: linear-gradient(
+		90deg,
+		rgb(var(--hk-nav-progress-color-rgb) / 0.75),
+		var(--hk-nav-progress-color) 55%,
+		var(--hk-nav-progress-color)
+	);
+	box-shadow:
+		0 0 10px rgb(var(--hk-nav-progress-color-rgb) / 0.55),
+		0 1px 4px rgb(var(--hk-nav-progress-color-rgb) / 0.35);
+	border-radius: 0 3px 3px 0;
+	transform: scaleX(0);
+	transform-origin: left;
+	/* Quick initial surge (perceived acknowledgement), then asymptotic
+	   trickle that never completes on its own. */
+	animation: hk-nav-progress-trickle 10s cubic-bezier(0.13, 0.6, 0.28, 0.95)
+		250ms forwards;
+}
+
+[data-theme="dark"][data-nav-pending]::before {
+	--hk-nav-progress-color: var(--color-brand-secondary);
+	--hk-nav-progress-color-rgb: var(--color-brand-secondary-rgb);
+}
+
+html[data-nav-pending="done"]::before {
+	/* Completion sweep: zip to full width and fade, then the attribute is
+	   removed by nav-pending.ts (~220ms later). nav-pending.ts only enters
+	   this phase when the rail actually became visible — a wait that ends
+	   inside the reveal delay clears silently instead of flashing. */
+	animation: hk-nav-progress-done 200ms ease-out forwards;
+}
+
+html[data-nav-pending="abort"]::before {
+	/* The wait was cut off, not completed (loading-state fuse, poll cap):
+	   freeze the trickle where it is — same animation, paused, so the bar
+	   keeps its current width — and fade out. No completion sweep: the
+	   navigation hasn't actually landed. */
+	animation-play-state: paused;
+	transition: opacity 180ms ease-out;
+	opacity: 0;
+}
+
+/* Desktop nicety: signal busy at the pointer during the wait as well. */
+html[data-nav-pending] body {
+	cursor: progress;
+}
+
+@keyframes hk-nav-progress-trickle {
+	0% {
+		transform: scaleX(0);
+	}
+	6% {
+		transform: scaleX(0.24);
+	}
+	28% {
+		transform: scaleX(0.55);
+	}
+	62% {
+		transform: scaleX(0.78);
+	}
+	100% {
+		transform: scaleX(0.94);
+	}
+}
+
+@keyframes hk-nav-progress-done {
+	0% {
+		transform: scaleX(0.94);
+		opacity: 1;
+	}
+	60% {
+		transform: scaleX(1);
+		opacity: 1;
+	}
+	100% {
+		transform: scaleX(1);
+		opacity: 0;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	/* Keep the (essential) busy feedback but drop the motion: a static
+	   partial rail fades in after the same reveal delay. */
+	html[data-nav-pending]::before {
+		animation: hk-nav-progress-static 1ms linear 250ms forwards;
+	}
+	html[data-nav-pending="done"]::before,
+	html[data-nav-pending="abort"]::before {
+		animation: none;
+		transition: none;
+		opacity: 0;
+	}
+}
+
+@keyframes hk-nav-progress-static {
+	to {
+		transform: scaleX(0.6);
+		opacity: 0.85;
+	}
+}

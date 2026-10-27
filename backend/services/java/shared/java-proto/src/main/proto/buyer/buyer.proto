@@ -1,0 +1,966 @@
+syntax = "proto3";
+
+package hawkr.buyer;
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/buyer";
+option java_multiple_files = true;
+option java_package = "io.github.will413028.hawkr.buyer.grpc";
+option java_outer_classname = "BuyerProto";
+
+// Buyer Service - 買家服務
+service BuyerService {
+    // Profile
+    rpc GetBuyerProfile(GetBuyerProfileRequest) returns (BuyerProfileResponse);
+    // PK（buyer_id）版本的 GetBuyerProfile——理由同 BatchGetBuyerMetaByBuyerIDs。
+    rpc GetBuyerProfileByBuyerID(GetBuyerProfileByBuyerIDRequest) returns (BuyerProfileResponse);
+    rpc GetBuyerProfileBatch(GetBuyerProfileBatchRequest) returns (GetBuyerProfileBatchResponse);
+    rpc UpdateBuyerProfile(UpdateBuyerProfileRequest) returns (BuyerProfileResponse);
+    // EnsureBuyerProfile provisions/revives the buyer profile at role grant (login).
+    // Idempotent: create if absent, revive-to-fresh if soft-deleted, no-op if active.
+    rpc EnsureBuyerProfile(EnsureBuyerProfileRequest) returns (BuyerProfileResponse);
+
+    // Address
+    rpc GetAddressList(GetAddressListRequest) returns (AddressListResponse);
+    rpc GetAddress(GetAddressRequest) returns (GetAddressResponse);
+    rpc AddAddress(AddAddressRequest) returns (AddressOperationResponse);
+    rpc UpdateAddress(UpdateAddressRequest) returns (AddressOperationResponse);
+    rpc DeleteAddress(DeleteAddressRequest) returns (AddressOperationResponse);
+    // 地址模糊搜尋 / 驗證（proxy 至 Google Maps，透過 pkg/geocode ACL）
+    rpc SuggestAddress(SuggestAddressRequest) returns (SuggestAddressResponse);
+    rpc ValidateAddress(ValidateAddressRequest) returns (ValidateAddressResponse);
+
+    // Favorite (收藏)
+    rpc GetFavoriteList(GetFavoriteListRequest) returns (FavoriteListResponse);
+    rpc CheckFavorite(CheckFavoriteRequest) returns (CheckFavoriteResponse);
+    rpc BatchCheckFavorites(BatchCheckFavoritesRequest) returns (BatchCheckFavoritesResponse);
+    rpc AddFavorite(AddFavoriteRequest) returns (FavoriteOperationResponse);
+    rpc RemoveFavorite(RemoveFavoriteRequest) returns (FavoriteOperationResponse);
+    rpc GetFavoriteCount(GetFavoriteCountRequest) returns (FavoriteCountResponse);
+    // 取得使用者所有收藏的 product_id 列表（供 product-service /public/products?followed_product_only=true 使用，見 02 §4.2.4）
+    rpc ListFavoritedProductIds(ListFavoritedProductIdsRequest) returns (ListFavoritedProductIdsResponse);
+    // 取得使用者所有追蹤的 seller_id 列表（供 product-service /public/products?followed_seller_only=true 使用，見 02 §4.2.4）
+    rpc ListSubscribedSellerIds(ListSubscribedSellerIdsRequest) returns (ListSubscribedSellerIdsResponse);
+
+    // Subscription (訂閱賣家)
+    rpc GetSubscriptionList(GetSubscriptionListRequest) returns (SubscriptionListResponse);
+    rpc SubscribeSeller(SubscribeSellerRequest) returns (SubscribeSellerResponse);
+    rpc UnsubscribeSeller(UnsubscribeSellerRequest) returns (UnsubscribeSellerResponse);
+    rpc CheckSubscription(CheckSubscriptionRequest) returns (CheckSubscriptionResponse);
+    rpc GetSubscribersList(GetSubscribersListRequest) returns (SubscribersListResponse);
+    rpc GetSubscriberDashboardStats(GetSubscriberDashboardStatsRequest) returns (SubscriberDashboardStatsResponse);
+
+    // 批次取得多個賣家的訂閱數（內部服務間呼叫）
+    rpc BatchGetSubscriberCounts(BatchGetSubscriberCountsRequest) returns (BatchGetSubscriberCountsResponse);
+
+    // Saved Items（收藏中心聚合讀 API，issue #2362 Phase 1：僅涵蓋 product/seller，貼文/食譜是 non-goal）
+    rpc GetSavedItems(GetSavedItemsRequest) returns (SavedItemsResponse);
+
+    // Visit (瀏覽記錄)
+    rpc GetVisitList(GetVisitListRequest) returns (VisitListResponse);
+    rpc RecordVisit(RecordVisitRequest) returns (VisitOperationResponse);
+    rpc ClearVisitHistory(ClearVisitHistoryRequest) returns (VisitOperationResponse);
+
+
+
+    // Avatar
+    rpc UpdateBuyerAvatar(UpdateBuyerAvatarRequest) returns (UpdateBuyerAvatarResponse);
+
+    // ========== 會員卡 ==========
+    // 查詢買家在各賣家的累計消費金額（會員卡清單）
+    rpc GetMemberCards(GetMemberCardsRequest) returns (GetMemberCardsResponse);
+
+    // 查詢買家在特定賣家的消費紀錄明細
+    rpc GetSpendingRecords(GetSpendingRecordsRequest) returns (GetSpendingRecordsResponse);
+
+    // ========== Cross-Service: Buyer Meta ==========
+    // PK（buyer_id）版本的 BatchGetBuyerMeta。訂單/評論/訊息上持久化的欄位存的
+    // 是 buyer_id（那個時間點的買家身分），不是 account_id——buyer_id 設計上
+    // 永遠不等於 account_id（連第一個 stint 也一樣），把它塞進上面那支
+    // account_id/current-stint 版本一律查無此人靜默回空。任何消費「持久化
+    // buyer_id」的呼叫端都該走這支，即使該帳號已重新註冊產生新 stint 也能
+    // 解析回當時那個 buyer_id 的資料（比照 seller-service GetSellerBatch 的
+    // PK lookup 設計）。回應 map key 與 BuyerMeta.buyer_id 都承載 buyer_id。
+    rpc BatchGetBuyerMetaByBuyerIDs(BatchGetBuyerMetaByBuyerIDsRequest) returns (BatchGetBuyerMetaByBuyerIDsResponse);
+
+    // ========== Cross-Role Guards: Principal Resolution ==========
+    // 解析 buyer_id → 登入 principal account_id（② 買家 store-stint re-key
+    // W2/W3，mirrors seller-service ResolvePrincipals；供 im-service
+    // SendMessage 自我對話防護用）。只解析存活的買家；其餘的 id 不在 principals 裡，只出現在 unresolved_ids。
+    rpc ResolvePrincipals(ResolvePrincipalsRequest) returns (ResolvePrincipalsResponse);
+
+    // ========== Restock Subscription (補貨通知訂閱，2026-06 新增 #942) ==========
+    // 訂閱商品補貨通知（冪等：已有 ACTIVE 行回原 id）
+    rpc SubscribeRestock(SubscribeRestockRequest) returns (SubscribeRestockResponse);
+    // 取消補貨訂閱（UPDATE ACTIVE→CANCELLED；無 ACTIVE 為 no-op）
+    rpc UnsubscribeRestock(UnsubscribeRestockRequest) returns (UnsubscribeRestockResponse);
+    // 我的補貨訂閱清單（分頁 + product enrich）
+    rpc ListRestockSubscriptions(ListRestockSubscriptionsRequest) returns (ListRestockSubscriptionsResponse);
+    // 批次檢查多個 product 是否訂閱（PDP detail / 訂閱列表頁 client-side cache）
+    rpc BatchCheckRestockSubscriptions(BatchCheckRestockSubscriptionsRequest) returns (BatchCheckRestockSubscriptionsResponse);
+
+    // ========== Internal: PII-Purge Historical Stint Lookup (D8, buyer-store-stint-rekey-w2w3) ==========
+    // Returns ALL buyer_id stints ever assigned to this account_id, including
+    // closed ones — unlike GetBuyerProfile/EnsureBuyerProfile, which only ever
+    // resolve the CURRENT stint. INTERNAL USE ONLY: exists solely for the
+    // buyer.deleted/account.deleted PII-purge consumer (im-service) to
+    // enumerate every buyer_id a message's sender_id may have used across
+    // re-registrations, so it can scrub all of them. Do not call this from any
+    // caller-facing feature, authorization check, or display path.
+    rpc ListBuyerIDsByAccount(ListBuyerIDsByAccountRequest) returns (ListBuyerIDsByAccountResponse);
+
+    // ========== Display: Tombstone-safe Name Resolution (#2830) ==========
+    // 解析 buyer_id → **可公開顯示**的名字，已註銷的 stint 也解得出來。
+    //
+    // 🔴 與 BatchGetBuyerMetaByBuyerIDs 的差別，以及為什麼需要兩支：
+    // 那支帶 `deleted_at IS NULL`（`GetBuyersByBuyerIDs`），那是**刻意的 PII 邊界**
+    // ——帳號關閉後不再供應個資，gateway 有測試把它的 404 行為釘成契約。但它的
+    // 副作用是：所有持有歷史 buyer_id 的顯示面（評論作者、訂單買家、對話對象）
+    // 在買家註銷後一律變成空字串，而各前端各自發明了不同的 fallback
+    // （匿名買家／匿名／會員xxxx／顧客／-／買家／欄位直接消失，共七種）。
+    //
+    // 本 RPC 的解法是**在來源就給出可顯示的值**，而不是讓 N 個顯示端各補一次：
+    //   - 未註銷 → 回真實 display_name
+    //   - 已註銷 → **一律回墓碑字串**（與 SetBuyerPIICleared 寫進欄位的同一個常數），
+    //     即使該 stint 的 PII 尚未被 30 天 cron 清掉，**真名也不會離開 DB**
+    //   - avatar_key 對已註銷者恆為空（頭像是個資）
+    //
+    // ⇒ PII 邊界原封不動：已註銷 stint 沒有任何個資經由本 RPC 過線。
+    // ⇒ 「map 有 key ＝ 解析成功／沒有 key ＋ error ＝ 服務不可用」結構上可區分，
+    //    呼叫端不再需要靠空字串去猜是哪一種。
+    rpc BatchGetBuyerDisplayByBuyerIDs(BatchGetBuyerDisplayByBuyerIDsRequest) returns (BatchGetBuyerDisplayByBuyerIDsResponse);
+
+    // ========== Admin: Buyer Statistics ==========
+    rpc GetBuyerStatsForAdmin(GetBuyerStatsForAdminRequest) returns (GetBuyerStatsForAdminResponse);
+
+    rpc GetBuyerEntitlement(GetBuyerEntitlementRequest) returns (BuyerEntitlement);
+    rpc AssignMembership(AssignMembershipRequest) returns (BuyerEntitlement);
+    // Admin: membership_plans 目錄本身的讀寫（doc 59 §6.1 從未定義過的缺口，
+    // 2026-08-28 ADR「子系統 2-4 排序」D1 拉出來獨立先做）。
+    rpc ListMembershipPlans(ListMembershipPlansRequest) returns (ListMembershipPlansResponse);
+    rpc UpdateMembershipPlan(UpdateMembershipPlanRequest) returns (UpdateMembershipPlanResponse);
+}
+
+// ==================== Buyer Profile ====================
+
+message GetBuyerProfileRequest {
+    int64 account_id = 1;
+}
+
+message GetBuyerProfileByBuyerIDRequest {
+    int64 buyer_id = 1;
+}
+
+message EnsureBuyerProfileRequest {
+    int64 account_id = 1;
+    // Display name suggested by the OAuth provider (Google account name /
+    // Apple fullName) at this login. Used only to seed a brand-new profile's
+    // nickname or backfill an existing empty one; ignored once a nickname is
+    // already set. Empty when the provider gave no name — buyer-service then
+    // generates its own default (see EnsureProfile).
+    string suggested_nickname = 2;
+}
+
+message GetBuyerProfileBatchRequest {
+    repeated int64 account_ids = 1;
+}
+
+message GetBuyerProfileBatchResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated BuyerInfo data = 3;
+}
+
+message UpdateBuyerProfileRequest {
+    int64 account_id = 1;
+    // 以下皆 optional：未帶的欄位不更新（partial update），帶空字串代表清空。
+    optional string nickname = 2;
+    // 3 曾是 avatar：buyer-service 從未讀它（toUpdateProfileRequest 不映射），頭像
+    // 一律走 UpdateBuyerAvatar 的 staged token 流程。死欄位已移除，不留相容輸入。
+    reserved 3;
+    reserved "avatar";
+    optional string birth_date = 4;
+    optional string city = 5;
+    optional string job = 6;
+    optional string phone = 7;
+    optional string email = 8;
+    optional string gender = 9;
+}
+
+message BuyerProfileResponse {
+    int32 code = 1;
+    string message = 2;
+    BuyerInfo data = 3;
+}
+
+message BuyerInfo {
+    string id = 1;
+    string account_id = 2;
+    string nickname = 3;
+    string avatar_key = 4;   // 買家頭像 objectKey（49 §6.6 S2；Gateway 組 avatarUrl，http 值 passthrough）
+    string level = 5;
+    reserved 6; reserved "points";
+    string birth_date = 7;
+    string city = 8;
+    string job = 9;
+    string created_at = 10;
+    string updated_at = 11;
+    string email = 12;
+    string phone = 13;
+    string gender = 14;
+    // stint_changed is true only when this EnsureBuyerProfile call performed an
+    // insert-new-stint (buyer role re-grant after a prior close). Gateway uses
+    // this to decide whether to bust the buyerid.Resolver cache — a plain
+    // backfill/no-op login leaves it false so the 60s cache isn't defeated on
+    // every ordinary login.
+    bool stint_changed = 15;
+}
+
+// ==================== Address ====================
+
+message GetAddressListRequest {
+    int64 buyer_id = 1;
+}
+
+message AddressListResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated AddressInfo data = 3;
+}
+
+message GetAddressRequest {
+    int64 buyer_id = 1;
+    int64 address_id = 2;
+}
+
+message GetAddressResponse {
+    int32 code = 1;
+    string message = 2;
+    AddressInfo data = 3;
+}
+
+message AddressInfo {
+    string id = 1;
+    string buyer_id = 2;  // 值是 buyer_id（外部契約已於 2026-08-01 Batch G 正名，這裡補上游 proto 欄位；field number 不變）
+    string receiver_name = 3;
+    string receiver_phone = 4;
+    reserved 5; reserved "province";
+    string city = 6;
+    string district = 7;
+    string detail_address = 8;
+    bool is_default = 9;
+    string label = 10;
+    reserved 11; reserved "label_custom";
+}
+
+message AddAddressRequest {
+    int64 buyer_id = 1;
+    string receiver_name = 2;
+    string receiver_phone = 3;
+    reserved 4; reserved "province";
+    string city = 5;
+    string district = 6;
+    string detail_address = 7;
+    bool is_default = 8;
+    string label = 9;
+}
+
+message UpdateAddressRequest {
+    int64 buyer_id = 1;
+    int64 address_id = 2;
+    string receiver_name = 3;
+    string receiver_phone = 4;
+    reserved 5; reserved "province";
+    string city = 6;
+    string district = 7;
+    string detail_address = 8;
+    bool is_default = 9;
+    string label = 10;
+}
+
+message DeleteAddressRequest {
+    int64 buyer_id = 1;
+    int64 address_id = 2;
+}
+
+message AddressOperationResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+message SuggestAddressRequest {
+    string county = 1;
+    string district = 2;
+    string query = 3;
+}
+
+message AddressSuggestionData {
+    string full_address = 1;
+    string county = 2;
+    string district = 3;
+    string detail = 4;
+}
+
+message SuggestAddressResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated AddressSuggestionData data = 3;
+}
+
+message ValidateAddressRequest {
+    string address = 1;
+}
+
+message AddressValidationData {
+    string full_address = 1;
+    string county = 2;
+    string district = 3;
+    string detail = 4;
+    string lat = 5;
+    string lng = 6;
+    bool valid = 7;
+}
+
+message ValidateAddressResponse {
+    int32 code = 1;
+    string message = 2;
+    AddressValidationData data = 3;
+}
+
+// ==================== Favorite ====================
+
+message GetFavoriteListRequest {
+    int64 buyer_id = 1;
+    int32 page = 2;
+    int32 page_size = 3;
+}
+
+message FavoriteListResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated FavoriteInfo data = 3;
+    int64 total = 4;
+    // page/page_size 是伺服器端正規化（clamp 到上限）後實際查詢用的值，
+    // 不是原樣回顯呼叫端傳入的請求值——呼叫端組回應 envelope 時要用這兩個
+    // 欄位，不要沿用自己解析請求時的本地變數（Gateway 曾經這樣做，導致
+    // 回應宣稱的 pageSize 跟實際查詢用的值對不上）。
+    string page = 5;
+    string page_size = 6;
+}
+
+message FavoriteInfo {
+    string id = 1;
+    string buyer_id = 2;  // 值是 buyer_id（外部契約已於 2026-07-31 Batch F 正名，這裡補上游 proto 欄位；field number 不變）
+    string product_id = 3;
+    string product_name = 4;
+    string product_image_key = 5;  // 商品圖 objectKey（49 §6.6 S9+GW組：Gateway 組 productImageUrl）
+    int64 created_at = 6;
+    int64 price_min = 7;        // 即時 effective price（有特價=sale_price，否則=list_price）
+    int64 price_max = 8;
+    int32 rating_x10 = 9;
+    string seller_id = 10;
+    string seller_name = 11;
+    string seller_logo_key = 12;  // 商家 logo objectKey（49 §6.6 S9+GW組：Gateway 組 sellerLogoUrl）
+    // 商品當下是否可購買（status=4004 ACTIVE 且未軟刪除）。詳見 02 §5.5.1
+    bool available = 13;
+    // ProductStatus value（"4001"/"4002"/"4003"/"4004"）；商品已軟刪除或不存在則為空字串
+    string status_code = 14;
+    // 商品原價（list price）— 02 §2.8；無特價時與 price_min/max 同值；有特價時 list > sale；前端用來畫劃線原價
+    int64 list_price_min = 15;
+    int64 list_price_max = 16;
+    // 商品特價（sale price）— 02 §2.8；無特價時為 0；有特價時 sale <= list
+    int64 sale_price_min = 17;
+    int64 sale_price_max = 18;
+    // 賣家 canonical 短碼（sellers.store_code，bigint NOT NULL + unique）。
+    // seller_id 是 store_id，賣家頁 canonical 網址走 store_code；只帶 store_id
+    // 的消費端只能連非 canonical 路徑。seller-service 取不到時為空字串（此列的
+    // 賣家區塊本來就一併留空，見 favorite.go enrichWithProductInfo 的降級註解）。
+    string store_code = 19;
+    // product-service 取不到這一批商品時為 true：本列的 product_name / 價格 /
+    // rating / available / status_code 全部**不是事實**，只是未載入的零值。
+    // 消費端必須據此區分「商品資訊載不到」與「商品真的已下架」（available=false
+    // 且本旗標為 false 才是後者），否則會把依賴故障演成「你沒有收藏任何東西」。
+    bool product_info_unavailable = 20;
+}
+
+message CheckFavoriteRequest {
+    int64 buyer_id = 1;
+    string product_id = 2;  // TSID 數字字串（§4，>2^53）
+}
+
+message CheckFavoriteResponse {
+    int32 code = 1;
+    string message = 2;
+    bool favorited = 3;
+}
+
+message AddFavoriteRequest {
+    int64 buyer_id = 1;
+    string product_id = 2;  // TSID 數字字串（§4，>2^53）
+}
+
+message RemoveFavoriteRequest {
+    int64 buyer_id = 1;
+    string product_id = 2;  // TSID 數字字串（§4，>2^53）
+}
+
+message BatchCheckFavoritesRequest {
+    int64 buyer_id = 1;
+    repeated string product_ids = 2;  // TSID 數字字串（§4，>2^53）
+}
+
+message BatchCheckFavoritesResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated string favorited_product_ids = 3;  // TSID 數字字串（§4，>2^53）
+}
+
+message FavoriteOperationResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+
+message GetFavoriteCountRequest {
+    int64 buyer_id = 1;
+}
+
+message FavoriteCountResponse {
+    int32 code = 1;
+    string message = 2;
+    int64 count = 3;
+}
+
+// ListFavoritedProductIds — 取得使用者所有收藏的 product_id 列表（02 §4.2.4）
+// 純讀，內部呼叫（product-service）；不分頁（單一買家收藏上限業務面 < 5000）
+message ListFavoritedProductIdsRequest {
+    int64 buyer_id = 1;
+}
+
+message ListFavoritedProductIdsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated int64 product_ids = 3;  // 該帳號所有收藏的 product_id，無序；無收藏回空陣列
+}
+
+// ListSubscribedSellerIds — 取得使用者所有追蹤的 seller_id 列表（02 §4.2.4）
+// 純讀，內部呼叫（product-service）；不分頁（單一買家追蹤賣家上限業務面 < 1000）
+message ListSubscribedSellerIdsRequest {
+    int64 buyer_id = 1;
+}
+
+message ListSubscribedSellerIdsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated string store_ids = 3;  // 該帳號所有追蹤的 store_id（TSID 數字字串），無序；無追蹤回空陣列
+}
+
+// ==================== Subscription ====================
+
+message GetSubscriptionListRequest {
+    int64 buyer_id = 1;
+    int32 page = 2;
+    int32 page_size = 3;
+}
+
+message SubscriptionListResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated SubscriptionItem data = 3;
+    int64 total = 4;
+    // 同 FavoriteListResponse.page/page_size 註解：伺服器端正規化後的實際值。
+    string page = 5;
+    string page_size = 6;
+}
+
+message SubscriptionItem {
+    string id = 1;
+    string store_id = 2;
+    string name = 3;
+    string avatar_key = 4;  // 商家頭像 objectKey（49 §6.6 S2+GW組：Gateway 組 avatarUrl；http 值 passthrough）
+    string city = 5;
+    double rating = 6;
+    int64 subscribed_at = 7;
+    string store_code = 8;
+}
+
+message SubscribeSellerRequest {
+    int64 buyer_id = 1;
+    string store_id = 2;  // TSID 數字字串（§4，>2^53）
+}
+
+message SubscribeSellerResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+message UnsubscribeSellerRequest {
+    int64 buyer_id = 1;
+    string store_id = 2;  // TSID 數字字串（§4，>2^53）
+}
+
+message UnsubscribeSellerResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+message CheckSubscriptionRequest {
+    int64 buyer_id = 1;
+    string store_id = 2;  // TSID 數字字串（§4，>2^53）
+}
+
+message CheckSubscriptionResponse {
+    int32 code = 1;
+    string message = 2;
+    bool subscribed = 3;
+}
+
+message GetSubscribersListRequest {
+    int64 store_id = 1;
+    int32 page = 2;
+    int32 page_size = 3;
+}
+
+message SubscribersListResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated SubscriberInfo data = 3;
+    int64 total = 4;
+    // 同 FavoriteListResponse.page/page_size 註解：伺服器端正規化後的實際值。
+    string page = 5;
+    string page_size = 6;
+}
+
+message SubscriberInfo {
+    int64 id = 1;
+    int64 buyer_id = 2;  // 值是 buyer_id（外部契約已於 2026-07-31 Batch F 正名，這裡補上游 proto 欄位；field number 不變）
+    int64 subscribed_at = 3;
+}
+
+// ==================== Visit ====================
+
+message GetVisitListRequest {
+    int64 buyer_id = 1;
+    int32 page = 2;
+    int32 page_size = 3;
+}
+
+message VisitListResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated VisitInfo data = 3;
+    int64 total = 4;
+    // 同 FavoriteListResponse.page/page_size 註解：伺服器端正規化後的實際值。
+    string page = 5;
+    string page_size = 6;
+}
+
+message VisitInfo {
+    string id = 1;
+    string product_id = 2;
+    string visited_at = 3;      // RFC3339 UTC
+    string product_name = 4;
+    string product_image_key = 5;  // 商品圖 objectKey（49 §6.6 S9+GW組：Gateway 組 productImageUrl）
+    string seller_name = 6;
+    string seller_logo_key = 7;  // 商家 logo objectKey（49 §6.6 S9+GW組：Gateway 組 sellerLogoUrl）
+    string rating = 8;
+    string min_price = 9;       // 即時 effective price（有特價=sale_price，否則=list_price）
+    string max_price = 10;
+    string seller_id = 11;
+    // 商品原價（list price）— 02 §2.8；無特價時與 min_price/max_price 同值；前端用來畫劃線原價
+    string list_price_min = 12;
+    string list_price_max = 13;
+    // 商品特價（sale price）— 02 §2.8；無特價時為空字串；有特價時 sale <= list
+    string sale_price_min = 14;
+    string sale_price_max = 15;
+    // 商品當下是否可購買（status=4004 ACTIVE）；下架/刪除商品（enrich 失敗）= false
+    bool available = 16;
+    // ProductStatus value（"4001"/"4002"/"4003"/"4004"）；下架/刪除商品（enrich 失敗）為空字串
+    string status_code = 17;
+    // 賣家 canonical 短碼（sellers.store_code）；seller_id 是 store_id，賣家頁
+    // canonical 網址走 store_code。與 seller_name/seller_logo_key 同源自
+    // GetSellerBatch，查不到時為空字串。
+    string store_code = 18;
+}
+
+message RecordVisitRequest {
+    int64 buyer_id = 1;
+    string product_id = 2;  // TSID 數字字串（§4，>2^53）
+}
+
+message ClearVisitHistoryRequest {
+    int64 buyer_id = 1;
+}
+
+message VisitOperationResponse {
+    int32 code = 1;
+    string message = 2;
+    int32 affected = 3;
+}
+
+
+
+// ==================== 會員卡 ====================
+
+message GetMemberCardsRequest {
+    // 已由 gateway 解析完成的 buyer_id，不是 JWT 的 account_id。
+    // 這與本檔其餘 RPC（address / favorite / follow / visit…）相反：那些收的是
+    // 原始 account_id，由 buyer-service 內部 buyerLookup.GetByAccountID 自行解析；
+    // 只有會員卡這兩支（GetMemberCards / GetSpendingRecords）是 gateway 先解析
+    // （gateway/internal/handler/member_card.go）再送進來。buyer-service 端一律
+    // 直接透傳、禁止再解析一次——re-resolve 會讓所有 buyer_id != account_id 的
+    // 分岔買家 404「buyer not found」（2026-07-28 live bug 的成因；本欄位原名
+    // account_id 就是那次事故的地雷本體，2026-08-05 正名）。
+    int64 buyer_id = 1;
+    string page = 2;        // 1-based 數字字串
+    string page_size = 3;
+}
+
+message GetMemberCardsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated MemberCardItem records = 3;
+    string total = 4;
+    string page = 5;
+    string page_size = 6;
+}
+
+message MemberCardItem {
+    string seller_id = 1;       // TSID 數字字串
+    string seller_name = 2;
+    string seller_logo_key = 3;  // 商家 logo objectKey（49 §6.6 S9+GW組：Gateway 組 sellerLogoUrl）
+    string total_spending = 4;  // 累計消費金額（整數字串，元）
+    string cover_key = 5;       // 賣家封面 objectKey（49 §6.6 S9+GW組：Gateway 組 coverUrl）
+    bool is_vip = 6;            // 買家是否為此賣家的 VIP
+    // 賣家 canonical 短碼（sellers.store_code）；seller_id 是 store_id，
+    // 賣家頁 canonical 網址走 store_code。seller-service 取不到時為空字串
+    // （同一列的 seller_name / logo 也一併留空，見 member_card.go 降級註解）。
+    string store_code = 7;
+}
+
+message GetSpendingRecordsRequest {
+    int64 buyer_id = 1;     // 已由 gateway 解析完成的 buyer_id；語意與禁止事項同 GetMemberCardsRequest.buyer_id
+    int64 store_id = 2;
+    string page = 3;
+    string page_size = 4;
+}
+
+message GetSpendingRecordsResponse {
+    int32 code = 1;
+    string message = 2;
+    string total_spending = 3;   // 此賣家累計消費總額（毛額，未扣退款）
+    string total_refund = 4;     // 此賣家退回總額（= 同一批訂單的 SUM(orders.refund_total_amount)）
+    repeated SpendingRecordItem records = 5;
+    string total = 6;
+    string page = 7;
+    string page_size = 8;
+}
+
+message SpendingRecordItem {
+    string order_date = 1;    // YYYY/MM/DD（Asia/Taipei）
+    string order_sn = 2;
+    string amount = 3;        // 消費金額（整數字串）
+    string refund = 4;        // 本筆已完成退款金額（整數字串；"0" = 未退款）
+    bool has_coupon = 5;      // 是否使用優惠券
+}
+
+// ==================== Avatar ====================
+
+message UpdateBuyerAvatarRequest {
+    int64 account_id = 1;
+    string staged_token = 2;
+}
+
+message UpdateBuyerAvatarResponse {
+    int32 code = 1;
+    string message = 2;
+    BuyerAvatarData data = 3;
+}
+
+message BuyerAvatarData {
+    string avatar_key = 1;   // 買家頭像 objectKey（49 §6.6 S2；Gateway 組 avatarUrl）
+}
+
+// ==================== Cross-Service: Buyer Meta ====================
+
+message BatchGetBuyerMetaByBuyerIDsRequest {
+    repeated int64 buyer_ids = 1;
+}
+
+message BuyerMeta {
+    int64 buyer_id = 1;      // 買家 buyer_id（buyers PK）
+    string nickname = 2;     // 買家暱稱（= buyers.display_name）
+    string avatar_key = 3;   // 買家頭像 objectKey（49 §6.6 S2+GW組：Gateway 組 avatarUrl；http 值 passthrough=Google 外部頭像）
+}
+
+message BatchGetBuyerMetaByBuyerIDsResponse {
+    int32 code = 1;
+    string message = 2;
+    map<int64, BuyerMeta> buyers = 3;  // key = buyer_id
+}
+
+message BatchGetBuyerDisplayByBuyerIDsRequest {
+    repeated int64 buyer_ids = 1;  // 歷史 buyer_id 亦可（已註銷的 stint 也解得出來）
+}
+
+// 刻意不帶 buyer_id：回應外層是 map<int64, BuyerDisplay>，key 就是 buyer_id，
+// 值裡再放一次是冗餘。（BuyerMeta 帶了一份，那是既存形狀不是可援引的先例——
+// 它同時也是 Proto 管理規範 §6 的 response 側數值型別違規。）
+message BuyerDisplay {
+    // 未註銷 = buyers.display_name；已註銷 = 墓碑字串。**永遠可直接顯示**，
+    // 呼叫端不需要也不應該再補自己的 fallback 文案。
+    string display_name = 1;
+    // 已註銷者恆為空字串（頭像是個資，不隨墓碑一起回）。
+    string avatar_key = 2;
+    // true = 這個 stint 已註銷。
+    // 🔴 顯示端要判斷「是不是已註銷」請讀本欄，**不要拿 display_name 去跟墓碑
+    // 字串做字串比對**——那會在每個顯示端硬編碼一份文案，正是本 RPC 要消滅的東西。
+    bool deleted = 3;
+}
+
+message BatchGetBuyerDisplayByBuyerIDsResponse {
+    int32 code = 1;
+    string message = 2;
+    map<int64, BuyerDisplay> buyers = 3;  // key = buyer_id；查無的 id 不出現
+}
+
+message ResolvePrincipalsRequest {
+    repeated int64 ids = 1;
+}
+
+message ResolvePrincipalsResponse {
+    int32 code = 1;
+    string message = 2;
+    map<int64, int64> principals = 3;
+    // 請求的 ids 裡沒有存活買家列的（已關閉或不存在）。這些 id 不會出現在 principals 裡（單體的 buyer_id 與 account_id 是兩個獨立的
+    // 序列，原樣回吐一定是錯的 account_id）；呼叫方以 key 不存在或出現在這裡判斷為未解析，並依用途 fail-closed 或降級。
+    repeated int64 unresolved_ids = 4;
+}
+
+// ========== Subscriber Dashboard Stats ==========
+
+message GetSubscriberDashboardStatsRequest {
+    int64 store_id = 1;
+    reserved 2;
+    reserved "period_days";
+}
+
+message SubscriberDashboardStatsResponse {
+    int32 code = 1;
+    string message = 2;
+    int64 total = 3;       // 總訂閱者數
+    int32 growth_pct = 4;  // 環比百分比
+}
+
+// ========== Batch Subscriber Counts（內部服務間呼叫）==========
+
+message BatchGetSubscriberCountsRequest {
+    repeated int64 store_ids = 1;
+}
+
+message BatchGetSubscriberCountsResponse {
+    int32 code = 1;
+    string message = 2;
+    map<int64, int64> counts = 3; // key = store_id, value = subscriber count
+}
+
+// ==================== Saved Items（收藏中心聚合，issue #2362 Phase 1）====================
+
+message GetSavedItemsRequest {
+    int64 buyer_id = 1;
+    string target_type = 2;  // "all" | "product" | "seller"；空字串或未知值視為 "all"
+    int32 page = 3;
+    int32 page_size = 4;
+}
+
+message SavedItemsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated SavedItem data = 3;
+    repeated SavedItemTab tabs = 4;
+    // Proto 管理規範 §6：response-exposed 欄位禁止 int64/int32/double，total/page/page_size 一律字串。
+    string total = 5;
+    string page = 6;
+    string page_size = 7;
+}
+
+message SavedItemTab {
+    string target_type = 1;  // "product" | "seller"
+    string count = 2;
+}
+
+message SavedItem {
+    string id = 1;           // "product:{target_id}" / "seller:{target_id}"
+    string target_type = 2;  // "product" | "seller"
+    string target_id = 3;    // product_id 或 store_id（TSID 數字字串）
+    string title = 4;        // 商品名稱 / 賣家名稱
+    string subtitle = 5;     // 商品：賣家名稱；賣家：城市
+    string image_key = 6;    // 商品圖 / 賣家 logo objectKey（Gateway 組 imageUrl）
+    string saved_at = 7;     // Unix 秒數字字串
+    // productClient/sellerClient 取不到這一批資料時為 true：本列除 id/target_type/
+    // target_id 外的所有欄位皆為未載入的零值，不代表商品已下架或賣家資訊消失。
+    bool degraded = 8;
+    // Product-only 欄位；target_type != "product" 時為零值
+    string price_min = 9;
+    string price_max = 10;
+    string rating_x10 = 11;
+    bool available = 12;
+    string status_code = 13;
+    // 賣家 canonical 短碼：product 列是該商品賣家的 store_code；seller 列是自己的 store_code
+    string store_code = 14;
+    // Product-only：該商品賣家的 logo objectKey（Gateway 組 sellerImageUrl）。
+    // seller 列固定空字串——該列自己的頭像就是 image_key，不重複帶。
+    string seller_image_key = 15;
+}
+
+// ==================== Restock Subscription (#942) ====================
+
+message SubscribeRestockRequest {
+    int64 buyer_id = 1;       // Gateway 解析後的 buyer_id
+    string product_id = 2;    // 數字字串
+}
+
+message SubscribeRestockResponse {
+    int32 code = 1;
+    string message = 2;
+    string subscription_id = 3;  // 數字字串
+    string product_id = 4;       // 數字字串
+    string created_at = 5;       // ISO 8601 UTC
+}
+
+message UnsubscribeRestockRequest {
+    int64 buyer_id = 1;
+    string product_id = 2;
+}
+
+message UnsubscribeRestockResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+message ListRestockSubscriptionsRequest {
+    int64 buyer_id = 1;
+    string cursor_id = 2;     // 上一頁最後一筆 subscription_id；"" 或 "0" = 第一頁
+    int32 page_size = 3;      // 預設 20
+}
+
+message RestockSubscriptionInfo {
+    string subscription_id = 1;   // 數字字串
+    string product_id = 2;
+    string product_name = 3;
+    string product_image_key = 4;     // 商品圖 objectKey（49 §6.6 S9+GW組：Gateway 組 productImageUrl）
+    string current_stock_qty = 5; // 數字字串，product-service enrich
+    string product_status = 6;    // ProductStatus value
+    string created_at = 7;        // ISO 8601 UTC
+    bool available = 8;           // status_code == "4004" AND deleted_at IS NULL
+}
+
+message ListRestockSubscriptionsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated RestockSubscriptionInfo records = 3;
+    bool has_more = 4;
+    string next_cursor_id = 5;
+}
+
+message BatchCheckRestockSubscriptionsRequest {
+    int64 buyer_id = 1;
+    repeated string product_ids = 2;   // 數字字串
+}
+
+message BatchCheckRestockSubscriptionsResponse {
+    int32 code = 1;
+    string message = 2;
+    map<string, bool> subscribed = 3;  // key = product_id 數字字串，value = 是否有 ACTIVE 訂閱
+}
+
+// ==================== Internal: PII-Purge Historical Stint Lookup (D8) ====================
+// ListBuyerIDsByAccount* — see the rpc doc comment above for full context.
+// INTERNAL USE ONLY (im-service PII-purge consumer); not a general-purpose
+// buyer lookup.
+
+message ListBuyerIDsByAccountRequest {
+    int64 account_id = 1;
+}
+
+message ListBuyerIDsByAccountResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated string buyer_ids = 3;  // TSID 數字字串（§4，>2^53）；含所有 stint（含已關閉），無序
+}
+
+// ========== Admin: Buyer Statistics Messages ==========
+
+message GetBuyerStatsForAdminRequest {}
+
+message GetBuyerStatsForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    AdminBuyerStats data = 3;
+}
+
+message AdminBuyerStats {
+    string total = 1;  // §4：對外數字一律 string（與 hawkr.account.AdminAccountStats 對稱）
+}
+
+// ========== Membership (doc 59 子系統 1) ==========
+
+message GetBuyerEntitlementRequest {
+    string buyer_id = 1;
+}
+
+message BuyerEntitlement {
+    int32 code = 1;             // 0 = 成功；非 0 時見 message，其餘欄位為零值（§6.2 例外 2 全專案慣例：Response 固定含 int32 code）
+    string message = 2;
+    string plan_code = 3;
+    string monthly_answer_limit = 4;
+    string period_start = 5;    // RFC3339 UTC
+    string period_end = 6;      // RFC3339 UTC
+    string source = 7;          // admin | system_default
+}
+
+message AssignMembershipRequest {
+    string buyer_id = 1;
+    string plan_code = 2;
+    string period_days = 3;              // ""/"0" → server defaults to 30
+    string note = 4;
+    string granted_by_account_id = 5;     // admin 操作者的登入 account_id（維持 account_id——這軸識別操作者本人，不是被指派對象；見 §5.1 note）
+    string request_id = 6;                // 冪等 key
+}
+
+message ListMembershipPlansRequest {
+}
+
+message MembershipPlan {
+    string plan_code = 1;
+    string display_name = 2;
+    string monthly_answer_limit = 3;
+    string monthly_price_twd = 4;
+    bool is_purchasable = 5;
+    string created_at = 6;      // RFC3339 UTC
+    string updated_at = 7;      // RFC3339 UTC
+}
+
+message ListMembershipPlansResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated MembershipPlan plans = 3;
+}
+
+// UpdateMembershipPlanRequest 是 membership_plans 目錄本身的 partial update
+// （plan_code 是 identity，不可變；display_name 這輪不開放，見 doc 59 §6.1
+// 新增段落）。has_* 顯式旗標比照既有 UpdateAiStyleRequest 慣例：未設的欄位維
+// 持原值，不是被覆寫成零值。
+message UpdateMembershipPlanRequest {
+    string plan_code = 1;
+    string monthly_answer_limit = 2;
+    string monthly_price_twd = 3;
+    bool is_purchasable = 4;
+    bool has_monthly_answer_limit = 5;
+    bool has_monthly_price_twd = 6;
+    bool has_is_purchasable = 7;
+}
+
+message UpdateMembershipPlanResponse {
+    int32 code = 1;
+    string message = 2;
+}

@@ -1,0 +1,11 @@
+// Placeholder: lib/core/auth/
+//
+// Intended for shared Firebase Phone verification utilities
+// (e.g., phone number normalization, OTP send/verify helpers).
+//
+// Currently the Firebase Phone auth logic lives inline within:
+//   - lib/features/auth/presentation/auth_screen.dart
+//   - lib/features/auth/presentation/google_verification_screen.dart
+//
+// When those screens are refactored, extract the reusable
+// (non-UI) verification logic here as a FirebasePhoneAuthService.

@@ -1,0 +1,1556 @@
+syntax = "proto3";
+
+package hawkr.order;
+
+import "common/delegation.proto";
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/order";
+option java_multiple_files = true;
+option java_package = "io.github.will413028.hawkr.order.grpc";
+option java_outer_classname = "OrderProto";
+
+// Order Service - 訂單服務（買家/賣家/後台統一入口）
+service OrderService {
+    // ==================== 買家端 ====================
+
+    // 建立訂單
+    rpc CreateOrder(CreateOrderRequest) returns (CreateOrderResponse);
+
+    // EXTERNAL lane RFQ 成交建單（64 號 §6.4）。
+    //
+    // ⛔ 不是 CreateOrder 的變體，也不是它的 lane 分支：本 RPC 刻意不走庫存協調
+    //    路徑（不扣庫存、不寫 stock_tx、不鎖購物車、不進補償 worker）——站外業者
+    //    的貨在站外，平台不持有可售數量。持久化仍共用同一個 TX handler。
+    //    改 createOrder 加分支要動到 @Transactional 與補償路徑內的兩處，那是全平台
+    //    共用的庫存寫入路徑，正是 64 號 §6.2 否決 2PC 時用的同一條理由。
+    //
+    // ⚠️ 只服務 EXTERNAL lane。PLATFORM lane 的 RFQ 成交走現行 CreateOrder
+    //    （有真 SKU 與真庫存，賣方就是那個平台賣家）。
+    //
+    // 冪等鍵＝acceptance_id（orders.acceptance_id 偏唯一索引）：命令由 ai-service 的
+    // outbox worker 投遞，重試必然發生；重送回既有 order_no，不建第二張。
+    rpc CreateRfqOrder(CreateRfqOrderRequest) returns (CreateRfqOrderResponse);
+
+    // 取消訂單（僅限 PENDING_PAYMENT 狀態）
+    rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse);
+
+    // 查詢我的訂單列表
+    rpc GetMyOrders(GetMyOrdersRequest) returns (GetMyOrdersResponse);
+
+    // 查詢買家各狀態訂單筆數（訂單 tab 筆數 rollup，規則見 03 §2.1「買家訂單 Tab 筆數 Rollup（SSOT）」）
+    rpc GetMyOrderStatusCounts(GetMyOrderStatusCountsRequest) returns (GetMyOrderStatusCountsResponse);
+
+    // 查詢訂單詳情（買家視角）
+    rpc GetOrder(GetOrderRequest) returns (GetOrderResponse);
+
+    // 確認收貨（買家手動，物流已送達後操作）
+    rpc ConfirmReceipt(ConfirmReceiptRequest) returns (ConfirmReceiptResponse);
+
+    // ==================== 賣家端 ====================
+
+    // 查詢賣家訂單列表
+    rpc GetSellerOrders(GetSellerOrdersRequest) returns (GetSellerOrdersResponse);
+
+    // 查詢賣家訂單詳情
+    rpc GetSellerOrderDetail(GetSellerOrderDetailRequest) returns (GetSellerOrderDetailResponse);
+
+    // ==================== 服務間呼叫 ====================
+
+    // 根據物流序號查詢訂單（shipping-service 用）
+    rpc GetOrderByShipTradeNo(GetOrderByShipTradeNoRequest) returns (GetOrderByShipTradeNoResponse);
+
+    // 查詢訂單評論資格（review-service 用）
+    rpc GetOrderForReview(GetOrderForReviewRequest) returns (GetOrderForReviewResponse);
+
+    // 取得物流建單所需訂單資訊（shipping-service 用）
+    rpc GetOrderForShipping(GetOrderForShippingRequest) returns (GetOrderForShippingResponse);
+
+    // 查詢買家在各賣家的累計消費總額（buyer-service 用，會員卡清單）
+    rpc GetBuyerMerchantSummary(GetBuyerMerchantSummaryRequest) returns (GetBuyerMerchantSummaryResponse);
+
+    // 查詢買家在特定賣家的消費紀錄（buyer-service 用，消費紀錄明細）
+    rpc GetBuyerOrdersForSeller(GetBuyerOrdersForSellerRequest) returns (GetBuyerOrdersForSellerResponse);
+
+    // 售後用：查詢訂單詳情（含買家地址、金額、送達時間，aftersales-service 用）
+    rpc GetOrderForAfterSales(GetOrderForAfterSalesRequest) returns (GetOrderForAfterSalesResponse);
+
+    // 售後用：內部取消訂單（CAS status IN (0,10,20)，aftersales-service 用）
+    rpc CancelOrderInternal(CancelOrderInternalRequest) returns (CancelOrderInternalResponse);
+
+    // 賣家停權 IM 訂單關聯回填用：反查買賣雙方之間是否存在關聯訂單
+    // （判準 status NOT IN (0,80)，14 號設計書 §6.5.1 路徑②，46 號 §4.4；im-service 用）
+    rpc HasOrderBetween(HasOrderBetweenRequest) returns (HasOrderBetweenResponse);
+
+    // ==================== 結帳模組 ====================
+
+    // 即時驗證（購物車勾選時呼叫，輕量級，預設運費 Grid）
+    rpc CheckoutValidate(CheckoutValidateRequest) returns (CheckoutValidateResponse);
+
+    // 運費精算（選配送方式 + 填地址/選門市後呼叫）
+    rpc CheckoutShippingFee(CheckoutShippingFeeRequest) returns (CheckoutShippingFeeResponse);
+
+    // 結帳預覽（完整驗證 + 精算總額，不建單）
+    rpc CheckoutPreview(CheckoutPreviewRequest) returns (CheckoutPreviewResponse);
+
+    // 確認結帳（建單 + 回傳付款資訊）
+    rpc CheckoutConfirm(CheckoutConfirmRequest) returns (CheckoutConfirmResponse);
+
+    // 取得訂單付款資訊（Payment Service 內部呼叫）
+    rpc GetOrderForPayment(GetOrderForPaymentRequest) returns (GetOrderForPaymentResponse);
+
+    // 快照付款資訊到訂單（CreatePayment 成功後由 Gateway 呼叫）
+    rpc SnapshotPaymentInfo(SnapshotPaymentInfoRequest) returns (SnapshotPaymentInfoResponse);
+
+    // ==================== 管理端 ====================
+
+    // 搜尋訂單（後台）
+    rpc SearchOrders(SearchOrdersRequest) returns (SearchOrdersResponse);
+
+    // 查詢訂單詳情（後台，含資金流水）
+    rpc GetAdminOrderDetail(GetAdminOrderDetailRequest) returns (GetAdminOrderDetailResponse);
+
+    // ==================== 賣家儀表板 ====================
+
+    // 查詢賣家訂單狀態計數（gateway 用，儀表板）
+    rpc GetSellerOrderStatusCounts(GetSellerOrderStatusCountsRequest) returns (GetSellerOrderStatusCountsResponse);
+
+    // ==================== 推薦商家 ====================
+
+    // 查詢近 N 天營收排名前 N 的賣家（gateway 推薦商家用）
+    rpc GetTopSellersByRevenue(GetTopSellersByRevenueRequest) returns (GetTopSellersByRevenueResponse);
+
+    // 查詢近 N 天各店的成立訂單買家數、成立訂單數與賣家取消訂單數（單體 discovery 推薦排行用；
+    // 以 store_id 升冪、keyset 分頁取全集）。成立訂單：已付款、未取消、未全額退款；以付款時間計。
+    // 賣家取消以取消時間計。
+    rpc ListStoreOrderStats(ListStoreOrderStatsRequest) returns (ListStoreOrderStatsResponse);
+
+    // 查詢單一店家在多個時間窗內的成立訂單數、不重複買家數與營收（單體賣家儀表板用）。成立訂單的定義與
+    // ListStoreOrderStats 同一個（已付款、未取消、未全額退款，以付款時間計），營收是實付金額扣掉已退款的金額。
+    rpc GetStorePeriodOrderStats(GetStorePeriodOrderStatsRequest) returns (GetStorePeriodOrderStatsResponse);
+
+    // ==================== Admin：撥款重發（收斂規範 §8.4 人工介入閉環）====================
+    // 重新觸發既有 grant_payment_tasks 的執行；僅 Admin 可用。
+    rpc RetryGrant(RetryGrantRequest) returns (RetryGrantResponse);
+
+    // ==================== §29 Admin 異常訂單列表 ====================
+    // 跨服務異常訂單聚合（依 order.status 批次聚合 provider_* from Payment / Shipping）
+    rpc ListAbnormalOrdersForAdmin(ListAbnormalOrdersForAdminRequest) returns (ListAbnormalOrdersForAdminResponse);
+
+    // ==== 服務間：CRM 訂單聚合 ====
+    rpc GetOrderAggregates(GetOrderAggregatesRequest) returns (GetOrderAggregatesResponse);
+
+    // ==== 服務間：發票開立所需的訂單不可變快照（58 號 §7.1.2 步驟 5 ①）====
+    // invoice-service 的 order.paid consumer 專用；唯讀、不改任何狀態。
+    // 走 52 號 HMAC 內部授權四 header，client deadline 3s（58 號 §7.5「逾時矩陣」）。
+    rpc GetOrderInvoiceSnapshotInternal(GetOrderInvoiceSnapshotInternalRequest) returns (GetOrderInvoiceSnapshotInternalResponse);
+
+    // ==== 服務間：買家於開立前更正發票資料（58 號 §6.2.5、B06／R03）====
+    // order-service 是 snapshot_version 的唯一寫入者（58 號 I-50），invoice-service
+    // 只能複製本 RPC 的回傳值、不得自行 +1。append-only：每次成功都 INSERT 一列新版本。
+    // 走 52 號 HMAC 內部授權四 header。
+    rpc ReviseOrderInvoiceSnapshotInternal(ReviseOrderInvoiceSnapshotInternalRequest) returns (ReviseOrderInvoiceSnapshotInternalResponse);
+
+    // ==================== Uber 即時報價中繼（66 §6.1.3；Stage 8B W2-2）====================
+    //
+    // 🔴 為什麼要經過 order-service 而不是 Gateway 直接打 shipping：
+    //    報價需要「這一車的賣家是誰、每一件的尺寸重量單價是多少」，而那些是
+    //    CheckoutService.resolveItems() 已經在做的事（批次打 product-service）。
+    //    讓 Gateway 直接打 shipping 的話，那段解析要在 Gateway 重寫一份，
+    //    而 Gateway 是 thin proxy、不該持有商品解析邏輯。
+    //
+    // ⚠️ 呼叫端只送 address_id 與 items：賣家由伺服端從 SKU 推導（66 §6.1.3 逐字
+    //    「不收 externalStoreId」）。前端傳賣家 id 等於讓前端決定跟誰叫車。
+    rpc GetUberQuoteForCheckout(OrderUberQuoteRequest) returns (OrderUberQuoteResponse);
+}
+
+// ==================== 共用訊息結構 ====================
+
+message PageRequest {
+    string page = 1;   // 1-based，數字字串
+    string size = 2;
+}
+
+message PageMeta {
+    string current_page = 1;
+    string total_pages = 2;
+    string total_items = 3;
+}
+
+// 訂單摘要（列表用）
+message OrderSummaryView {
+    string order_no = 1;
+    string create_time = 2;       // Unix timestamp (ms)，數字字串
+    string status = 3;            // OrderStatus value，如 "0", "10"
+    string total_actual_amount = 4; // 金額字串，如 "1250"
+    string item_count = 5;       // 數字字串
+    repeated OrderItemView items = 6;
+    // 賣家資訊（即時聚合自 Seller Service）
+    string seller_name = 7;       // 賣家店名
+    string seller_avatar_key = 8; // 賣家頭像 objectKey（49 §6.6 S2+S9：Gateway 組 sellerAvatarUrl；http 值 passthrough）
+    string seller_city = 9;       // 賣家城市（如「台北市」）
+    string seller_district = 10;  // 賣家地區（如「大安區」）
+    string store_id = 11; // 賣家 store_id surrogate（TSID 數字字串）
+    // 賣家 canonical 短碼（sellers.store_code）；store_id 是內部代理鍵，賣家頁
+    // canonical 網址走 store_code。與 seller_name/seller_avatar_key 同源自
+    // batchGetSellerMeta，聚合失敗時為空字串。
+    string store_code = 44;
+    // 配送資訊（訂單快照）
+    string shipping_method = 12;  // 運送方式 value（3001=黑貓 / 3002=7-11店到店 / 3003=Uber）
+    string delivery_temp = 13;    // 配送溫層 value（3201=常溫 / 3202=冷藏 / 3203=冷凍）
+    string pickup_store_name = 14; // 超商取貨門市名稱（僅 7-11店到店(3002) 時有值）
+    // 狀態摘要（後端計算，前端直接渲染）
+    string shipping_status = 15;  // 物流狀態 ShippingStatus value = PayUni 狀態碼（""=未建物流單, "91"=未處理, "92"=處理中, "21"=待出貨, "31"=配送中, "32"=待取貨, "11"=已取貨...）
+    string shipping_status_desc = 29; // 物流狀態描述（PayUni ShipStatusDesc 或 ShippingStatus displayName）
+    string status_time = 16;      // 當前狀態的關鍵時間點（ISO 8601），依 OrderStatus 自動選取
+    string status_summary = 17;   // 狀態摘要文案（後端依 OrderStatus + ShippingStatus 組合產生）
+    // 賣家訂單列表擴充欄位（卡片顯示用）
+    string recipient_name = 18;   // 收件人姓名
+    string shipping_address = 19; // 收件地址（宅配）
+    string buyer_id = 20; // 買家帳號 ID（TSID 數字字串）
+    // 買家資訊（gRPC 聚合自 Buyer Service，僅賣家/管理員視角填充）
+    string buyer_nickname = 21;     // 買家暱稱（空字串表示未設定或聚合失敗）
+    string buyer_avatar_key = 22;   // 買家頭像 objectKey（49 §6.6 S2+S9：Gateway 組 buyerAvatarUrl；http 值 passthrough）
+    // 物流出貨資訊（MQ 事件快照自 Shipping Service）
+    string label_key = 23;          // 宅配託運單 PDF objectKey（49 §6.6：Gateway 組 labelUrl；僅宅配有值）
+    string label_expire_at = 28;    // 宅配託運單 PDF 下載期限（ISO 8601，取號時 NOW()+24h，僅賣家視角）
+    string partner_id = 24;         // 超商出貨便母代碼（3 碼，shipment.label.updated 事件快照）
+    string odno = 25;               // 超商出貨單編號（8 碼，shipment.label.updated 事件快照）
+    string validation_no = 26;      // 超商 C2C 驗證碼（4 碼，shipment.label.updated 事件快照，B2C 時為空）
+    repeated string shipment_photo_keys = 27; // 出貨照片 objectKey 陣列（49 §6.6：Gateway 組 shipmentPhotoUrls；僅賣家視角，選填）
+    bool need_refund_page = 30;               // ATM 退款等待買家前往 PayUni 頁面
+    bool is_reviewed = 31;                    // 該訂單是否已有評論（任一商品已評即 true）
+    string review_deadline = 32;              // 評論截止時間（confirmed_at + 30 天，ISO 8601 UTC，僅 status=50 時有值）
+    bool can_review = 33;                     // 是否可評論（status=50 且未超過評論截止時間）
+    string auto_complete_at = 34;             // 送達後自動完成時間（ISO 8601 UTC，僅 status=40 時有值；送達時 = delivered_at + auto-complete-hours，倒數恢復時 += 累計暫停時長，03 §5.8）
+    string provider_status = 35;              // 聚合 PayUni 原始狀態碼（收斂規範 §6.2；依 order 當下 status 取源）
+    string provider_message = 36;             // 聚合 PayUni 原始訊息
+    string processing_deadline = 37;          // 賣家處理期限（ISO 8601 UTC，09 §5.9）；空字串表示無期限/已處理/已取消/Uber
+    // 取消資訊（僅 status=80 時有值，03 §5.3）
+    string cancel_reason = 38;                // OrderCancelReason value（91xx 系統 / 92xx 賣家）；buyer 自願取消為空字串
+    string cancel_remark = 39;                // 賣家自填備註（OTHER / SUGGEST_SPLIT 場景；其他為空字串）
+    string cancel_by_role = 40;               // OrderCancelByRole value（SYSTEM / SELLER / BUYER）
+    string countdown_paused_at = 41;          // 倒數暫停時刻（ISO 8601 UTC；空字串=倒數中，非空=已暫停，03 §5.8）
+    // 付款期限（03 §8.5；買家列表「待付款倒數」卡片用，免再逐筆打詳情 API）
+    string payment_deadline = 42;             // ISO 8601 UTC，僅 status=0 時有值；建單時 = createdAt + payment-deadline-seconds
+    string payment_method = 43;               // 付款方式 PaymentMethod value（CodeMeta 2001-2004；orders.payment_method 快照，未付款為空字串）
+}
+
+message OrderItemView {
+    string sku_id = 1;           // TSID 數字字串
+    string sku_name = 2;         // 規格名稱
+    string quantity = 3;         // 數字字串
+    string image_key = 4;        // 商品圖片 objectKey（快照；49 §6.6：Gateway 組 imageUrl）
+    string id = 5;               // order_item TSID 數字字串
+    string product_id = 6;       // 商品 ID（TSID 數字字串，快照）
+    string product_name = 7;     // 商品名稱（快照）
+    string list_price = 8;       // 原價快照（永遠 = 下單時 SKU.price，數字字串）
+    string unit_price = 9;       // 實際成交單價快照（無特價=list_price，有特價=當時 sale_price，數字字串）
+}
+
+// 訂單詳情
+message OrderDetailView {
+    string order_no = 1;
+    string create_time = 2;       // Unix timestamp (ms)，數字字串
+    string pay_time = 3;          // Unix timestamp (ms)，未付款時為 "0"
+    string ship_time = 4;         // Unix timestamp (ms)，未發貨時為 "0"
+    string status = 5;            // OrderStatus value，如 "0", "10"
+    string total_original_amount = 6;
+    string total_actual_amount = 7;
+    string shipment_no = 8;
+    string transaction_id = 9;   // Admin/Seller 可見；Buyer 視需求遮罩
+    string buyer_id = 10; // Admin/Seller 可見，TSID 數字字串
+    string store_id = 11; // 賣家 store_id surrogate（TSID 數字字串）
+    repeated OrderItemDetail items = 12;
+    repeated RefundRequestView refund_history = 13;
+    // 配送快照（下單時從商品複製）
+    string delivery_temp = 14;      // 配送溫層 value（3201/3202/3203）
+    string shipping_method = 15;    // 運送方式 value（3001/3002/3003）
+    string shipping_fee = 16;       // 運費快照（新台幣元，數字字串）
+    string shipping_fee_payer = 17; // 運費負擔方 value（3101/3102）
+    // 收件人資訊快照
+    string recipient_name = 18;     // 收件人姓名
+    string recipient_phone = 19;    // 收件人電話
+    string shipping_address = 20;   // 收件地址
+    string shipping_note = 21;      // 配送備註
+    // 超商取貨快照
+    string cvs_store_id = 22;       // 超商門市代號（與賣家 store_id surrogate 無關）
+    string pickup_store_name = 23;  // 超商取貨門市名稱
+    // 結帳模組新增
+    string shipping_area = 24;      // 配送區域 value（3401=本島 / 3402=離島）
+    string coupon_instance_id = 25; // 訂單綁定的優惠券**實例** ID（建單後 reserveCoupon 取得；空字串表示未使用）
+    string discount_amount = 26;    // 優惠券折扣金額（數字字串）
+    // 物流狀態（Shipping Service 引入後新增）
+    string shipping_status = 27;    // 物流狀態碼（ShippingStatus value，數字字串，空字串表示尚未建單）
+    string shipping_status_desc = 46; // 物流狀態描述（PayUni ShipStatusDesc 或 ShippingStatus displayName）
+    string label_key = 28;          // 宅配託運單 PDF objectKey（49 §6.6：Gateway 組 labelUrl；空字串表示無）
+    string label_expire_at = 45;    // 宅配託運單 PDF 下載期限（ISO 8601，僅賣家視角）
+    // 超商出貨便代碼（Shipping Service Webhook 回填，聚合至訂單詳情）
+    string partner_id = 29;         // 出貨便母代碼（3 碼）
+    string odno = 30;               // 出貨單編號（8 碼）
+    string validation_no = 31;      // C2C 驗證碼（4 碼，B2C 時為空）
+    // 付款資訊（Order DB 快照 + Payment Service 聚合）
+    string payment_method = 32;     // 付款方式 value（2001=信用卡 / 2002=ApplePay / 2003=GooglePay / 2004=ATM）
+    string atm_bank_code = 33;      // ATM 銀行代碼（僅 ATM 付款時有值，如 "822"）
+    string atm_virtual_account = 34; // ATM 虛擬帳號（僅 ATM 付款時有值）
+    string atm_expire_date = 35;    // ATM 繳費期限（僅 ATM 付款時有值，格式 "yyyy-MM-dd"）
+    // 賣家資訊（即時聚合自 Seller Service）
+    string seller_name = 36;        // 賣家店名
+    string seller_avatar_key = 37;  // 賣家頭像 objectKey（49 §6.6 S2+S9：Gateway 組 sellerAvatarUrl；http 值 passthrough）
+    string seller_city = 38;        // 賣家城市（如「台北市」）
+    string seller_district = 39;    // 賣家地區（如「大安區」）
+    // 賣家 canonical 短碼（sellers.store_code）；store_id 是內部代理鍵，賣家頁
+    // canonical 網址走 store_code。同源自 batchGetSellerMeta，聚合失敗為空字串。
+    string store_code = 63;
+    // 買家資訊（gRPC 聚合自 Buyer Service，僅賣家/管理員視角填充）
+    string buyer_nickname = 40;     // 買家暱稱（空字串表示未設定或聚合失敗）
+    string buyer_avatar_key = 41;   // 買家頭像 objectKey（49 §6.6 S2+S9：Gateway 組 buyerAvatarUrl；http 值 passthrough）
+    // 取消資訊（賣家取消時填充）
+    string cancel_reason = 42;      // 取消原因（空字串表示非賣家取消）
+    string cancel_remark = 43;      // 取消備註（空字串表示無備註）
+    // 出貨照片（賣家上傳，雙方詳情頁可見，統一從 orders.shipment_photo_urls 快照取）
+    repeated string shipment_photo_keys = 44; // 賣家出貨照片 objectKey 陣列（49 §6.6：Gateway 組 shipmentPhotoUrls；選填）
+    bool need_refund_page = 47;               // ATM 退款等待買家前往 PayUni 頁面
+    // 訂單備註
+    string order_remark = 48;                 // 訂單備註（買家下單時留言給賣家，選填）
+    // 評論狀態
+    bool is_reviewed = 49;                    // 該訂單是否已有評論（任一商品已評即 true）
+    // 收貨照片（買家確認收貨時上傳，雙方詳情頁可見）
+    repeated string receipt_photo_keys = 50;  // 買家收貨照片 objectKey 陣列（49 §6.6：Gateway 組 receiptPhotoUrls；選填）
+    // 評論期限
+    string review_deadline = 51;              // 評論截止時間（confirmed_at + 30 天，ISO 8601 UTC，僅 status=50 時有值）
+    bool can_review = 52;                     // 是否可評論（status=50 且未超過評論截止時間）
+    // 自動完成期限
+    string auto_complete_at = 53;             // 送達後自動完成時間（ISO 8601 UTC，僅 status=40 時有值；送達時 = delivered_at + auto-complete-hours，倒數恢復時 += 累計暫停時長，03 §5.8）
+    // 聚合 PayUni provider 狀態（收斂規範 §6.2 / §9.4）
+    string provider_status = 54;              // 依 order 當下 status 取自 payment_transactions / payment_refunds / shipments
+    string provider_message = 55;             // 聚合 PayUni 原始訊息
+    // 賣家處理期限（09 §5.9）
+    string processing_deadline = 56;          // ISO 8601 UTC；空字串表示無期限/已處理/已取消/Uber
+    // 取消角色（cancel_reason / cancel_remark 已分別在 field 42/43，03 §5.3）
+    string cancel_by_role = 57;               // OrderCancelByRole value（SYSTEM / SELLER / BUYER；僅 status=80 時有值）
+    // 自動完成倒數暫停（03 §5.8）
+    string countdown_paused_at = 58;          // 倒數暫停時刻（ISO 8601 UTC；空字串=倒數中，非空=已暫停）
+    // 付款期限（03 §8.5；買家詳情頁顯示「待付款倒數」用）
+    string payment_deadline = 59;             // ISO 8601 UTC，僅 status=0 時有值；建單時 = createdAt + payment-deadline-seconds
+    // 評論快照（訂單層級單一，取該訂單最近一筆商品評論；未評論時不設定 / null）
+    OrderReviewView review = 60;
+    // 付款 PayUni MerID（= orders.mer_id）— 給 Web/Mobile Google Pay 重試時動態取得 tokenization gatewayMerchantId（20 設計書 §4.13）
+    string payment_mer_id = 61;
+    // 再次付款可用付款方式（依 total_actual_amount 算）。**僅買家 getOrder + status=PENDING_PAYMENT 時填**；賣家/管理員/物流 caller 與非 pending 一律空（per-caller enrich，03 §4.2.1）。型別與規則同結帳預覽（20 §3.4.1）
+    repeated AvailablePaymentMethod available_payment_methods = 62;
+    // 結案節點時間（皆 ISO 8601 UTC，空字串=尚未發生）。訂單時間軸的最後一格靠它們——
+    // 沒有這三欄時只能送空字串，或拿 updated_at 冒充（dev 實測 95 筆取消單有 11 筆漂掉、
+    // 最大漂 22.7 天，故不採用）。
+    //
+    // completed_at 的來源欄是 orders.confirmed_at，兩者刻意不同名：DB 欄記的是「買家確認
+    // 收貨」這個**動作**的時間，而 40→50 的轉換一次寫入 status=COMPLETED 與 confirmed_at
+    // （OrderRepository.completeDeliveredOrderByStatus），所以那個時刻同時就是訂單完成的
+    // 時刻。對外契約用業務語意命名，不把 DB 欄名洩漏出去；改 DB 欄名的成本大於收益。
+    string completed_at = 64;                 // 訂單完成時間（= orders.confirmed_at；僅 status=50 時有值）
+    string cancelled_at = 65;                 // 訂單取消時間（僅 status=80 時有值）
+    string delivered_at = 66;                 // 訂單送達時間（status>=40 時有值）
+}
+
+message OrderItemDetail {
+    string id = 1;               // order_item TSID 數字字串
+    string sku_id = 2;           // TSID 數字字串
+    string sku_name = 3;         // 規格名稱
+    string quantity = 4;         // 數字字串
+    string unit_price = 5;       // **重命名**（原 original_price → unit_price）：實際成交單價快照
+    string actual_pay_amount = 6;
+    string refund_status = 7;     // OrderItemStatus value，如 "0", "20"
+    string share_discount = 8;   // 分攤折扣金額（數字字串）
+    string image_key = 9;        // 商品圖片 objectKey（快照；49 §6.6：Gateway 組 imageUrl）
+    string product_id = 10;      // 商品 ID（TSID 數字字串，快照）
+    string product_name = 11;    // 商品名稱（快照）
+    string list_price = 12;      // **新增**：原價快照（永遠 = 下單時 SKU.price，數字字串）
+}
+
+// 訂單評論快照（訂單層級單一；取該訂單最近一筆商品評論，源自 review.created MQ 事件，凍結快照）
+message OrderReviewView {
+    string rating = 1;               // 評分 1-5（數字字串）
+    string content = 2;              // 評論文字（可空）
+    repeated string image_keys = 3;  // 評論附圖 objectKey（49 §6.6：Gateway 組 imageUrls）
+    string created_at = 4;           // 評論建立時間（ISO 8601 UTC）
+}
+
+message RefundRequestView {
+    string request_no = 1;
+    string order_item_id = 2;    // TSID 數字字串
+    string status = 3;            // RefundRequestStatus value，如 "0", "10"
+    string refund_amount = 4;
+    string reason = 5;
+    string create_time = 6;      // Unix timestamp (ms)，數字字串
+}
+
+// ==================== 買家端訊息 ====================
+
+message CreateOrderRequest {
+    int64 buyer_id = 1;          // Gateway 注入的 buyer_id（原 account_id，已改名對齊語意）
+    string store_id = 2;  // 買家選購的目標店家 store_id surrogate（前端傳入，TSID 數字字串）
+    repeated CreateOrderItem items = 3;
+    string total_original_amount = 4;  // 金額字串，如 "1250"
+    string total_actual_amount = 5;
+    string checkout_id = 6;       // 購物車結帳批次 ID（UUID 字串，非購物車下單可不填）
+    string delivery_temp = 7;     // 配送溫層 value（如 3201、3202、3203）
+    string shipping_method = 8;   // 運送方式 value（如 3001、3002）
+    string shipping_fee = 9;      // 運費（新台幣元，數字字串）
+    string shipping_fee_payer = 10; // 運費負擔方 value（如 3101、3102）
+    // 收件人資訊
+    string recipient_name = 11;    // 收件人姓名
+    string recipient_phone = 12;   // 收件人電話
+    string shipping_address = 13;  // 收件地址（宅配）
+    string shipping_note = 14;     // 配送備註（選填）
+    // 超商取貨資訊
+    string cvs_store_id = 15;      // 超商門市代號（店到店；與賣家 store_id surrogate 無關）
+    string cvs_store_name = 16;    // 超商門市名稱（店到店）
+    // 結帳模組新增
+    string shipping_area = 17;     // 配送區域（MAIN_ISLAND / OFFSHORE_ISLAND）
+    string mer_id = 18;            // PayUni 商家編號（Confirm 時從 Seller Service 取得）
+    string coupon_instance_id = 19; // 訂單綁定的優惠券**實例** ID（空字串表示未使用）
+    string discount_amount = 20;   // 優惠券折扣金額（數字字串，由 Coupon Service 計算）
+}
+
+message CreateRfqOrderRequest {
+    // 冪等鍵：ai-service 的 procurement_buyer_quote_acceptances.id（TSID 數字字串）。
+    string acceptance_id = 1;
+    int64 buyer_id = 2;
+    // 訂單賣方的 store surrogate id（TSID 數字字串）。
+    // `EXTERNAL` ⇒ 平台結算 store（2026-09-07 的建單決策指定的那一筆設定值）；
+    // `PLATFORM` ⇒ 回價那個平台賣家自己的 store。
+    string store_id = 3;
+    // 成交總額 ＝ goods + shipping + tax（賣家那一版的 totalAmount）。
+    // 同時寫進 total_actual_amount 與 total_original_amount：RFQ 沒有優惠券。
+    string total_amount = 4;
+    // 運費。買方負擔（shipping_fee_payer 固定 3101），對帳式因此成立：
+    // sum(order_items.actual_pay_amount) + shipping_fee = total_actual_amount。
+    string shipping_fee = 5;
+    // 一次性 SKU（worker 先向 ProductService 建好才投遞本命令）。
+    string sku_id = 6;
+    // 真實成交品名，**含數量與單位**。⛔ 不得使用 sentinel：退款、售後、發票三條
+    // 下游都吃它。數量與單位寫在名稱裡是因為 order_items.quantity 是 INT，而賣家
+    // 報價的數量是 NUMERIC(14,3)（12.5 公斤是合法報價），小數表達不出來。
+    string sku_name = 7;
+    // 單價 ＝ goods + tax。order_items 恆為一列且 quantity = 1。
+    string unit_price = 8;
+    // 配送溫層 value（選填，如 3201／3202／3203）。
+    string delivery_temp = 9;
+    // 賣方身分 lane：`PLATFORM`（平台賣家自己就是訂單賣方）｜`EXTERNAL`（站外業者，
+    // 賣方記為平台結算 store）。未知值 fail-closed，不猜。
+    //
+    // ⛔ **兩條 lane 都不扣庫存**：賣家回價不綁任何 SKU——
+    // `procurement_seller_response_versions` 與 `procurement_buyer_quote_acceptances`
+    // 對 sku／product 都是零命中，賣家報的是「200 公斤、總價 30000」這種自帶單位基準
+    // 的承諾，不是「買 N 件某商品」。沒有可扣的可售量，要扣就得自己發明一條從報價
+    // 回推候選商品的對應，而候選是探索產物不是契約。
+    //
+    // ⇒ lane 的差別只有兩件事：賣方是誰（store_id）、政策六欄是賣家直營還是 MoR。
+    string lane = 10;
+}
+
+message CreateRfqOrderData {
+    string order_no = 1;
+    // ISO8601。付款期限由 order-service 依既有設定算，呼叫端不得指定。
+    string payment_deadline = 2;
+    // true ＝ 冪等命中，回的是既有那一張，本次沒有建立新訂單。
+    bool replayed = 3;
+}
+
+message CreateRfqOrderResponse {
+    int32 code = 1;
+    string message = 2;
+    CreateRfqOrderData data = 3;
+}
+
+message CreateOrderItem {
+    string sku_id = 1;            // TSID 數字字串
+    string sku_name = 2;          // 規格名稱（快照）
+    string quantity = 3;          // 數字字串
+    string unit_price = 4;        // **重命名**（原 original_price → unit_price）：實際成交單價（金額字串）
+    string product_id = 5;        // 商品 ID（TSID 數字字串）
+    string product_name = 6;      // 商品名稱（快照）
+    string list_price = 7;        // **新增**：原價快照（永遠 = SKU.price，金額字串）
+}
+
+message CreateOrderResponse {
+    int32 code = 1;
+    string message = 2;
+    CreateOrderData data = 3;
+}
+
+message CreateOrderData {
+    string order_no = 1;
+}
+
+message CancelOrderRequest {
+    int64 buyer_id = 1;          // Gateway 注入的 buyer_id（原 account_id，已改名對齊語意）
+    string order_no = 2;
+}
+
+message CancelOrderResponse {
+    int32 code = 1;
+    string message = 2;
+    bool success = 3;
+}
+
+message GetMyOrdersRequest {
+    int64 buyer_id = 1;          // Gateway 注入的 buyer_id（原 account_id，已改名對齊語意）
+    string status_filter = 2;     // OrderStatus value，支援逗號分隔多值（如 "20,30"），空字串表示全部
+    PageRequest page = 3;
+}
+
+message GetMyOrdersResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated OrderSummaryView orders = 3;
+    PageMeta meta = 4;
+}
+
+message GetMyOrderStatusCountsRequest {
+    int64 buyer_id = 1;          // Gateway 注入的 buyer_id（原 account_id，已改名對齊語意）
+}
+
+// 單條「狀態 → 筆數」原始 GROUP BY 結果（不做 tab 分組加總，由前端加總）
+message OrderStatusCount {
+    string status = 1;  // OrderStatus value（數字字串）
+    string count = 2;   // 該狀態訂單筆數（數字字串）
+}
+
+message GetMyOrderStatusCountsResponse {
+    int32 code = 1;
+    string message = 2;
+    // 各 OrderStatus 原始筆數；筆數為 0 的狀態省略，規則見 03 §2.1「買家訂單 Tab 筆數 Rollup（SSOT）」
+    repeated OrderStatusCount counts = 3;
+    string total = 4;   // 全部訂單數（= counts 加總，數字字串；0 筆時為 "0"）
+}
+
+message GetOrderRequest {
+    int64 buyer_id = 1;          // Gateway 注入的 buyer_id（原 account_id，已改名對齊語意）
+    string order_no = 2;
+}
+
+message GetOrderResponse {
+    int32 code = 1;
+    string message = 2;
+    OrderDetailView data = 3;
+}
+
+message ConfirmReceiptRequest {
+    int64 buyer_id = 1;          // Gateway 注入的 buyer_id（原 account_id，已改名對齊語意）
+    string order_no = 2;
+    repeated string staged_tokens = 3; // 買家收貨照片 stagedToken（選填，由 media-service 預上傳產生）
+}
+
+message ConfirmReceiptResponse {
+    int32 code = 1;
+    string message = 2;
+    bool success = 3;
+}
+
+// ==================== 賣家端訊息 ====================
+
+message GetSellerOrdersRequest {
+    int64 store_id = 1;            // Gateway getAccountID 注入（例外）
+    string status_filter = 2;     // 支援逗號分隔多值（如 "20,30"），空字串表示全部
+    PageRequest page = 3;
+    string buyer_id = 4;  // 篩選指定買家，空字串表示不篩選
+    // keyword: 模糊搜尋，空字串 = 不篩選。比對範圍恰為三者：order_no、recipient_name、
+    // 以及 order_items 的 product_name／sku_name（半連接）。
+    // ⚠️ **不得**把 recipient_phone 或完整 shipping_address 加進比對範圍。判準是
+    // 「列表投影看得到的才可以搜」：姓名在代行投影裡未遮罩、列表本來就顯示得出來，
+    // 搜尋只是省去翻頁；而電話列表 RPC 從不回傳、地址只給到縣市區 ⇒ 拿它們當條件
+    // 等於造出一支 oracle——輸入一個值看有沒有命中，就能在完全不揭露該值的前提下
+    // 確認它存在，而且不會觸發 ORDER_PII_REVEAL 稽核（56 號 §8.1.5／A16）。
+    // 訂單編號是 "O" + 9 位數字（不含日期、不遞增）⇒ 只能 ILIKE '%q%'，prefix 無意義。
+    string keyword = 5;
+    // date_from／date_to: 依 created_at 篩選，ISO 8601 UTC，空字串 = 不篩選。
+    // 命名跟 56 號 §6.1.10 與 delegation.proto 的稽核查詢一致；**不要**抄
+    // ListAbnormalOrdersForAdminRequest 的 created_from／created_to（那兩欄 Java 側
+    // 從未被讀取，是靜默無效參數）。
+    string date_from = 6;
+    string date_to = 7;
+    hawkr.common.DelegationContext delegation = 100;
+}
+
+message GetSellerOrdersResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated OrderSummaryView orders = 3;
+    PageMeta meta = 4;
+}
+
+message GetSellerOrderDetailRequest {
+    int64 store_id = 1;            // Gateway getAccountID 注入（例外）
+    string order_no = 2;
+    hawkr.common.DelegationContext delegation = 100;
+
+    // 只有 GET .../orders/{orderNo}/recipient-contact 這一支端點傳 true。
+    // 遮罩的預設值是 false，且 proto3 的 bool 零值就是 false ⇒ 任何忘記填、
+    //    任何舊版 client、任何新的呼叫點，預設都是「遮罩」。這是本欄用
+    //    reveal_*（而不是 mask_*）命名的唯一理由：fail-safe 的方向必須與零值一致。
+    // 本欄只在 delegation 非空時被讀取；賣家本人的呼叫一律看得到自己的訂單，
+    //    不經本欄。order-service 收到 delegation 為空而本欄為 true 時回 INVALID_ARGUMENT。
+    bool reveal_recipient_contact = 101;
+}
+
+message GetSellerOrderDetailResponse {
+    int32 code = 1;
+    string message = 2;
+    OrderDetailView data = 3;
+}
+
+// ==================== 管理端訊息 ====================
+
+message SearchOrdersRequest {
+    string order_no = 1;         // 模糊搜尋
+    string buyer_id = 2; // 管理端查詢，空字串表示不篩選
+    string store_id = 3; // 管理端查詢，空字串表示不篩選
+    string status = 4;            // 空字串表示全部
+    PageRequest page = 5;
+}
+
+message SearchOrdersResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated OrderSummaryView orders = 3;
+    PageMeta meta = 4;
+}
+
+message GetAdminOrderDetailRequest {
+    string order_no = 1;
+}
+
+message GetAdminOrderDetailResponse {
+    int32 code = 1;
+    string message = 2;
+    AdminOrderDetailData data = 3;
+}
+
+message AdminOrderDetailData {
+    OrderDetailView order_info = 1;
+    repeated FinancialLogView logs = 2;
+    // §29 Admin 對帳明細（依 order.status 聚合自 Payment / Shipping SoT）
+    AdminProviderContext provider_context = 3;
+}
+
+// §29 Admin 對帳 provider 資訊
+message AdminProviderContext {
+    string provider_source = 1;         // CodeMeta ProviderSource：PAYMENT / PAYMENT_REFUND / SHIPPING；"" = 無第三方環節可對帳
+    string provider_status = 2;          // PayUni 原始狀態碼
+    string provider_message = 3;         // PayUni 原始訊息
+    string provider_trade_no = 4;        // Payment 相關
+    string provider_refund_no = 5;       // Refund 相關
+    string ship_trade_no = 6;            // Shipping 相關
+}
+
+message FinancialLogView {
+    string type = 1;              // FinancialLogType value，如 "1", "2"
+    string amount = 2;
+    string external_txn_id = 3;
+    string create_time = 4;      // Unix timestamp (ms)，數字字串
+}
+
+// ==================== 服務間呼叫訊息 ====================
+
+message GetOrderByShipTradeNoRequest {
+    string ship_trade_no = 1;     // 物流序號（shipment_no）
+}
+
+message GetOrderByShipTradeNoResponse {
+    int32 code = 1;
+    string message = 2;
+    OrderDetailView data = 3;
+}
+
+// ==================== 物流建單查詢（Shipping Service 內部呼叫）====================
+
+message GetOrderForShippingRequest {
+    string order_no = 1;              // 訂單編號
+    int64 store_id = 2;      // 賣家 store_id surrogate（Shipping Service 內部呼叫傳入所有權檢查用）
+}
+
+message GetOrderForShippingResponse {
+    int32 code = 1;
+    string message = 2;
+    OrderShippingInfo data = 3;
+}
+
+message OrderShippingInfo {
+    string order_no = 1;               // 訂單編號
+    string status = 2;                 // 訂單狀態（OrderStatus value）
+    string store_id = 3;      // 賣家 store_id surrogate（TSID 數字字串）
+    string buyer_id = 4;       // 買家帳號 ID（TSID 數字字串）
+    string total_actual_amount = 5;    // 實付金額（數字字串，新台幣元）
+    string recipient_name = 6;         // 收件人姓名
+    string recipient_phone = 7;        // 收件人電話
+    string shipping_address = 8;       // 收件地址（宅配用）
+    string cvs_store_id = 9;          // 超商門市代號（與賣家 store_id surrogate 無關）
+    string cvs_store_name = 10;        // 超商門市名稱
+    string shipping_method = 11;       // 配送方式 value（3001/3002/3003）
+    string product_name = 12;          // 商品描述（第一筆 sku_name，供物流商顯示）
+    string mer_id = 13;                // PayUni 商家編號（從訂單表取）
+    string delivery_temp = 14;          // 配送溫層 value（3201/3202/3203）
+    string dimension_sum = 15;          // 訂單最大 SKU 材積和（L+W+H cm）
+}
+
+// ==================== 付款查詢訊息（Payment Service 內部呼叫）====================
+
+message GetOrderForPaymentRequest {
+    string order_no = 1;           // 訂單編號
+}
+
+message GetOrderForPaymentResponse {
+    int32 code = 1;
+    string message = 2;
+    OrderPaymentInfo data = 3;
+}
+
+message OrderPaymentInfo {
+    string order_no = 1;           // 訂單編號
+    string mer_id = 2;            // PayUni 商家編號
+    string amount = 3;            // 付款金額（= total_actual_amount，已含運費，數字字串）
+    string buyer_id = 4;  // 買家帳號 ID（TSID 數字字串，身分驗證用）
+    string status = 5;            // 訂單狀態（OrderStatus value）
+    string product_name = 6;      // 商品名稱（第一筆 order_item 的 sku_name）
+    string store_id = 7;          // 賣家 store_id surrogate（TSID 數字字串）；payment-service 用於 seller 付款歷程 store 歸屬驗證（#2501）
+}
+
+// ==================== 結帳模組訊息 ====================
+
+// 結帳商品項目（4 支結帳 API 共用）
+message CheckoutItem {
+    string sku_id = 1;                         // SKU ID（數字字串）
+    string quantity = 2;                       // 數量（數字字串）
+    string product_id = 3;                     // 商品 ID（TSID 數字字串）
+}
+
+// --- CheckoutValidate（即時驗證）---
+
+message CheckoutValidateRequest {
+    int64 buyer_id = 1;                      // Gateway 注入的 buyer_id（E.5.5 int64 例外；原 account_id，已改名對齊語意）
+    repeated CheckoutItem items = 2;           // 當前已勾選的商品
+}
+
+message CheckoutValidateResponse {
+    int32 code = 1;
+    string message = 2;
+    CheckoutValidateData data = 3;
+}
+
+message CheckoutValidateData {
+    bool valid = 1;                                              // 是否可進入結帳 = unavailable_items.isEmpty() && errors.isEmpty()
+    repeated string delivery_temp_intersection = 2;              // 溫層交集 value（如 ["3202"]）
+    repeated AvailableShippingOption available_shipping_options = 3; // 可用配送選項（已排除超限）
+    repeated CheckoutValidationError errors = 4;                 // 整單級錯誤（DIFFERENT_SELLER / TEMP_ZONE_INCOMPATIBLE / ALL_SHIPPING_EXCEEDED / INVALID_ITEM）
+    repeated UnavailableItem unavailable_items = 5;              // row 級不可購買清單（DELISTED / OUT_OF_STOCK / INSUFFICIENT_STOCK / LOOKUP_FAILED）
+}
+
+message CheckoutValidationError {
+    string error_code = 1;                     // 整單級錯誤碼（DIFFERENT_SELLER / TEMP_ZONE_INCOMPATIBLE / ALL_SHIPPING_EXCEEDED / INVALID_ITEM）。注意：row 級「商品不可購買」已廢棄 PRODUCT_UNAVAILABLE，改走 unavailable_items
+    string error_message = 2;                  // 繁體中文錯誤訊息
+}
+
+// row 級不可購買明細（Validate / Preview / Confirm 共用）。Preview / Confirm 非空 → envelope code=4001
+message UnavailableItem {
+    string sku_id = 1;                         // SKU ID（數字字串）
+    string sku_name = 2;                       // 商品名稱（來源：cart_items.sku_name_snapshot；lookup 失敗時前端可 fallback「商品已下架」）
+    string reason = 3;                         // CartItemUnavailableReason value（DELISTED / OUT_OF_STOCK / INSUFFICIENT_STOCK / LOOKUP_FAILED）
+    string requested_qty = 4;                  // 買家本次勾選量（數字字串，承載原 InsufficientStockItem.requested_qty 語意）
+    string available_qty = 5;                  // 即時可購買量；reason=INSUFFICIENT_STOCK 時 0 < available_qty < requested_qty；OUT_OF_STOCK 時 "0"；DELISTED / LOOKUP_FAILED 時空字串
+}
+
+// 可用的配送選項（配送方式 × 溫層 × 運費），前端以 radio button grid 呈現
+message AvailableShippingOption {
+    string shipping_method = 1;                // ShippingMethod value（如 3001）
+    string delivery_temp = 2;                  // ShippingTemperature value（如 3202）
+    string label = 3;                          // 顯示名稱（如「黑貓宅急便（冷藏）」）
+    string fee = 4;                            // 運費（級距查找結果，數字字串；免運時為 "0"）
+    string fee_payer = 5;                      // 運費負擔方 value（3101=買方 / 3102=賣方）
+    string free_shipping_threshold = 6;        // 免運門檻（數字字串，"0" 表示無免運）
+    bool tentative_free_shipping_eligible = 7; // **語意變更**（原 free_shipping_eligible 重命名）：暫定免運判定（基於商品 unit_price × qty，不含優惠券折扣）。最終免運資格須等 CheckoutPreview 階段以折扣後金額重判定（20 設計書 §4.7）
+}
+
+// --- CheckoutShippingFee（運費精算）---
+
+message CheckoutShippingFeeRequest {
+    int64 buyer_id = 1;                      // Gateway 注入的 buyer_id（E.5.5 int64 例外；原 account_id，已改名對齊語意）
+    repeated CheckoutItem items = 2;           // 當前已勾選的商品
+    string shipping_method = 3;                // 已選的配送方式 value（如 3001）
+    string delivery_temp = 4;                  // 已選的配送溫層 value（如 3202）
+    string receiver_zip_code = 5;              // 收件人郵遞區號（宅配必填，如 "880"；店到店可空）
+    string cvs_store_id = 6;                   // 超商門市代號（店到店時填，宅配時空字串）
+}
+
+message CheckoutShippingFeeResponse {
+    int32 code = 1;
+    string message = 2;
+    CheckoutShippingFeeData data = 3;
+}
+
+message CheckoutShippingFeeData {
+    string shipping_method = 1;                // 配送方式（回顯）
+    string delivery_temp = 2;                  // 配送溫層（回顯）
+    string shipping_route = 3;                 // 運費路線（後端推導，如 DOMESTIC / TO_OFFSHORE）
+    string shipping_fee = 4;                   // 精確運費（數字字串；免運時為 "0"）
+    string fee_payer = 5;                      // 運費負擔方 value（3101/3102）
+    bool tentative_free_shipping_eligible = 6; // **語意變更**（原 free_shipping_eligible 重命名）：暫定免運判定（未套優惠券）。20 設計書 §4.7
+    string free_shipping_threshold = 7;        // 免運門檻（數字字串）
+    string order_subtotal = 8;                 // 商品實際成交小計（基於 unit_price 彙總，數字字串）
+    string estimated_total = 9;                // 預估總額 = 小計 + 運費（數字字串）
+}
+
+// --- CheckoutPreview（結帳預覽）---
+
+message CheckoutPreviewRequest {
+    int64 buyer_id = 1;                      // Gateway 注入的 buyer_id（E.5.5 int64 例外；原 account_id，已改名對齊語意）
+    repeated CheckoutItem items = 2;           // 購物車勾選的商品
+    string shipping_method = 3;                // 用戶已選的配送方式 value（如 3001）
+    string delivery_temp = 4;                  // 用戶已選的配送溫層 value（如 3202）
+    string receiver_zip_code = 5;              // 收件人郵遞區號（宅配必填，如 "880"；店到店可空）
+    string cvs_store_id = 6;                   // 超商門市代號（店到店時填）
+    string coupon_template_id = 7;             // 使用者選擇的優惠券**模板** ID（空字串表示不使用）
+    bool consolidated = 8;                     // 是否為和單（多賣家走代理商代收）。default false=單賣家走 seller.payuni_mer_id；true=取 env PAYUNI_AGENT_MER_ID。詳見 20 設計書 §4.13
+
+    // ─── Uber Direct（shipping_method = 3003）專用，其餘配送方式一律空字串 ───
+    //
+    // 🔴 這兩欄是 3003 **唯一**的過關條件。Uber 的資格判定需要「結構化收件地址 ＋
+    // 買家手上那筆報價」，而本 message 原本只有 receiver_zip_code 與一串 shipping_address
+    // ⇒ 組不出 UberQuoteDropoff ⇒ UberOrderEligibilityGuard 依 deny-by-default 回 9503。
+    // 買家在購物車**選得到** Uber 而 preview 一律失敗，就是那個缺口。
+    //
+    // ⚠️ 為什麼不攤平字串讓 shipping 反解：shipping.proto 的 UberQuoteDropoff 逐字禁止，
+    // 每一筆解不出來的就是一個看不到選項的買家。address_id 讓 order-service 走
+    // buyer-service 取回 city／district／detail_address 三欄——與 /app/checkout/uber_quote
+    // 同一個來源，兩邊不會給出不同的答案。
+    string address_id = 9;                     // 買家地址簿的 shipping_addresses.id（TSID 數字字串）
+    string uber_quote_id = 10;                 // 買家手上那筆報價（uber_quotes.quote_id，dqt_ 前綴）；空 ⇒ 重新取價
+}
+
+message CheckoutPreviewResponse {
+    int32 code = 1;
+    string message = 2;
+    CheckoutPreviewData data = 3;
+}
+
+message CheckoutPreviewData {
+    string checkout_id = 1;                        // 結帳批次 ID（後端生成，UUID 格式）
+    repeated OrderGroupPreview order_groups = 2;   // 訂單分組（Phase 1: 1 組）
+    string total_original_amount = 3;              // 所有訂單原價總計（數字字串）
+    string total_shipping_fee = 4;                 // 運費總計（數字字串）
+    string total_discount = 5;                     // 折扣總計（數字字串）
+    string total_actual_amount = 6;                // 實付總計（含運費、扣折扣，數字字串）
+    string payment_mer_id = 7;                     // 本次交易付款對應的 PayUni MerID（top-level，一次交易=一個 merId）。consolidated=false 取 sellerMeta.payuni_mer_id；consolidated=true 取 env PAYUNI_AGENT_MER_ID。前端 Web/Mobile 用此值帶入 Google Pay SDK tokenizationSpec.parameters.gatewayMerchantId
+    repeated UnavailableItem unavailable_items = 8; // row 級不可購買清單。非空 → envelope code=4001 + 前端跳「請先返回購物車移除以下商品」dialog
+    repeated AvailablePaymentMethod available_payment_methods = 9; // 依 total_actual_amount 算出的各付款方式可用性（20 設計書 §3.4.1）。前端據此 render（禁用 + 理由），不自行用金額判斷。total_actual_amount==0（零元）→ 空清單，前端顯示「無需付款」
+
+    // 58 號 §6.2.4 order ②：結帳頁的發票區（B01）所需的一切。
+    //
+    // 由 order-service 在 preview 時呼叫 invoice-service 的
+    // ResolveOrderInvoiceModeInternal 取得後併入。**order 不自行計算任何一欄**——
+    // 開票模式、法定告知文案、待審額度都是發票服務的判定，order 只是傳遞。
+    //
+    // 🔴 snapshot_version 是唯一的例外：I-50 明訂它的唯一寫入者是 order-service，
+    // 而 invoice 那支 RPC 回空字串（它沒有可回聲的值）⇒ **order 必須用自己的值覆蓋**，
+    // 否則前端拿到空字串。設計書 §5821 第 1 項逐字記載這件事。
+    CheckoutInvoicePreview invoice = 10;
+}
+
+// 付款方式可用性（依訂單金額對 PayUni 各方式合法區間判定）。20 設計書 §3.4.1；OrderDetailView 再次付款 surface 共用
+message AvailablePaymentMethod {
+    string payment_type = 1;       // PaymentMethod value（2001 信用卡 / 2002 Apple Pay / 2003 Google Pay / 2004 ATM）
+    bool eligible = 2;             // 金額是否落在該方式合法區間
+    string ineligible_reason = 3;  // PaymentMethodIneligibleReason value（2101 未達下限 / 2102 超過上限）；eligible=true 時為空字串
+}
+
+// 單筆訂單分組預覽
+message OrderGroupPreview {
+    string group_index = 1;                        // 分組序號（"0", "1", ...）
+    string store_id = 2;                  // 賣家 store_id surrogate（TSID 數字字串）
+    string seller_name = 3;                        // 賣家名稱（快照，供前端顯示）
+    string shipping_method = 4;                    // 用戶已選的配送方式（回顯）
+    string delivery_temp = 5;                      // 用戶已選的配送溫層（回顯）
+    string shipping_label = 6;                     // 配送方式顯示名稱（如「黑貓宅急便（冷藏）」）
+    string shipping_fee = 7;                       // 運費（已計算，數字字串；免運時為 "0"）
+    string shipping_fee_payer = 8;                 // 運費負擔方 value（3101/3102）
+    bool free_shipping_eligible = 9;               // **最終免運判定**（基於 unit_price × qty − share_discount，折扣後判定）
+    repeated CheckoutItemPreview items = 10;       // 商品明細
+    string subtotal_original_amount = 11;          // 分組實際成交小計（Σ unit_price × qty，數字字串）
+    string discount_amount = 12;                   // 該分組折扣金額（數字字串）
+    bool tentative_free_shipping_eligible = 13;    // **新增**：未套優惠券前的暫定免運判定。前端比對 `tentative != final` 提示「使用此優惠券將失去免運資格」（20 設計書 §4.7.2）
+    // 賣家 canonical 短碼（sellers.store_code）；store_id 是內部代理鍵，賣家頁
+    // canonical 網址走 store_code。與 seller_name 同源自本次 preview 已呼叫的
+    // getSellerMeta，聚合失敗為空字串。
+    string store_code = 14;
+}
+
+message CheckoutItemPreview {
+    string sku_id = 1;                             // SKU ID（數字字串）
+    string product_id = 2;                         // 商品 ID（TSID 數字字串）
+    string sku_name = 3;                           // SKU 名稱（快照）
+    string quantity = 4;                           // 數量（數字字串）
+    string price = 5;                              // **語意變更**：實際成交單價（有特價=sale_price，否則=list_price，數字字串）
+    string subtotal = 6;                           // 小計 = price × quantity（數字字串）
+    string stock_qty = 7;                          // 當前庫存（供前端提示）
+    string temperature = 8;                        // 該 SKU 的存儲溫層（AMBIENT / CHILLED / FROZEN）
+    string list_price = 9;                         // **新增**：原價快照（永遠 = SKU.price，數字字串）
+    string sale_price = 10;                        // **新增**：特價（無特價=空字串，數字字串）。前端可比對 list_price/sale_price 顯示「省 $XX」
+    string share_discount = 11;                    // **新增**：該品項分攤的優惠券折扣（折扣後免運判定用，數字字串）
+    string actual_pay_amount = 12;                 // **新增**：該品項最終實付（= subtotal − share_discount，數字字串）
+}
+
+// --- CheckoutConfirm（確認結帳 → 建單）---
+
+message CheckoutConfirmRequest {
+    int64 buyer_id = 1;                          // Gateway 注入的 buyer_id（E.5.5 int64 例外；原 account_id，已改名對齊語意）
+    string checkout_id = 2;                        // 結帳批次 ID（Preview 回傳的）
+    repeated CheckoutItem items = 3;               // 商品列表（與 Preview 相同）
+    string shipping_method = 4;                    // 用戶選擇的配送方式 value（3001/3002/3003）
+    string delivery_temp = 5;                      // 用戶選擇的配送溫層 value（3201/3202/3203）
+    string receiver_zip_code = 6;                  // 收件人郵遞區號（宅配必填；店到店可空）
+    // 收件人資訊
+    string recipient_name = 7;                     // 收件人姓名（必填）
+    string recipient_phone = 8;                    // 收件人電話（必填）
+    string shipping_address = 9;                   // 收件地址（宅配必填）
+    string shipping_note = 10;                     // 配送備註（選填）
+    // 超商取貨
+    string cvs_store_id = 11;                      // 超商門市代號（店到店必填）
+    string cvs_store_name = 12;                    // 超商門市名稱（店到店必填）
+    string coupon_template_id = 13;                // 使用者選擇的優惠券**模板** ID（與 Preview 相同，空字串表示不使用）
+    string order_remark = 14;                      // 訂單備註（選填，買家留言給賣家，最長 500 字）
+    // 🔴 **選填**（58 號 §4.1「03 訂單」逐字定案 ＋ §6.1.2(b)）：`hawkr_buyer` 已上架 App
+    // 直接呼叫 /app/checkout/confirm，改成必填會立刻打爛線上結帳。
+    // 整包省略 ⇒ carrier_selection_mode = USE_BUYER_DEFAULT，由 invoice-service 在建立文件時
+    // 依 D6 fallback 鏈解析（買家指定的預設 → 無載具發票），order-service 不在 hot path 打那支 gRPC。
+    CheckoutInvoiceRequest invoice = 15;
+
+    // ─── Uber Direct（shipping_method = 3003）專用，其餘配送方式一律空字串 ───
+    // 語意與欄位來源同 CheckoutPreviewRequest 的同名欄位（見那裡的紅字）。
+    //
+    // 🔴 confirm 是 INV-U1 的收斂點（66 §8「訂單 Uber 運費 ＝ 被 CHECKOUT_ACCEPTED 的那筆
+    // quote 的 fee_amount，永不補收」）：它拿 uber_quote_id 重驗一次拿到運費，
+    // 建單成功後再把同一筆 CAS 成 CHECKOUT_ACCEPTED（66 §9 的
+    // 「確認 → 重驗 TTL>180s ＋ hash → CHECKOUT_ACCEPTED → 收款」）。
+    // 少了 CAS 那一步，建單時 UberDirectAdapter.acceptedQuote() 找不到報價 ⇒
+    // markCreateFailed("UBER_QUOTE_NOT_ACCEPTED") ⇒ 收了錢建不出單。
+    string address_id = 16;
+    string uber_quote_id = 17;
+}
+
+// 結帳時採集的買家發票選擇（58 號 §7.1.2 步驟 1、§6.2.4 order-service ⑤）。
+//
+// 🔴 **本 message 只收「order_invoice_snapshots 存得下」的東西**（58 號 §5.4.3 DDL）：
+// 該表是零 PII 表，載具明碼（手機條碼 3J0002／自然人憑證 CQ0001）一律不落 order-service
+// ⇒ 買家臨櫃輸入的載具值必須先經 invoice-service 的常用發票資料端點（§6.1.1 端點 1–4）
+// 存成 buyer_invoice_preferences 一列，結帳時只帶 profile_id。
+// 設計書 §6.1.2(b) 列的 carrier_type／value／save_as_default／disclosure_accepted／
+// disclosure_version 五欄屬 **invoice-service 那一腿**（ValidateOrderInvoiceInputInternal），
+// 刻意不放進 order 契約：order-service 收了也無處可寫，等於強制收集一個永遠不被使用的欄位。
+// ─── 結帳發票預覽（58 §6.2.4 order ②、58A §B01）────────────────────────
+//
+// 逐欄鏡射 invoice-service 的 ResolveOrderInvoiceModeInternalData，但**不共用**
+// 那份 message：order 的對外契約不承載發票服務的內部型別，兩邊各自演化時
+// 才不會被對方的欄位變更牽動（同 CheckoutInvoiceRequest 與 InvoiceInputSpec 的關係）。
+message CheckoutInvoicePreview {
+    // InvoiceFulfillmentMode：AMEGO_AUTO / PLATFORM_RECEIPT / SELLER_SELF_ISSUE / LEGACY_MANUAL
+    // 🔴 前端必須四值都有分支，缺一即落 invalid 而擋付款（58A §B01）。
+    string invoice_mode = 1;
+    string snapshot_version = 2;          // 由 order-service 覆蓋，見上方紅字
+    string preview_expires_at = 3;        // ISO 8601 UTC；前端不得自算 TTL
+    CheckoutInvoiceAmount amount = 4;
+    CheckoutInvoiceDisclosure disclosure = 5;
+    CheckoutInvoiceProfile default_profile = 6;  // 可為空 message（買家無 profile 且無手機無 email）
+    CheckoutInvoiceIntakeLimit intake_limit = 7; // blocked=true 時 preview 仍回 code 0，阻擋在 confirm
+}
+
+// 發票金額拆解。**四欄逐字對齊 58A §B01 的金額明細列**，前端不得拿右欄的
+// grand_total 充當 invoice_amount（兩者在 Phase 1 相等是業務決策不是恆等式）。
+message CheckoutInvoiceAmount {
+    string product_amount = 1;   // 商品小計，元
+    string shipping_amount = 2;  // 應稅運費，元
+    string discount_amount = 3;  // 折抵金額（正數），元；前端顯示為 −NT$ X
+    string invoice_amount = 4;   // 發票總額（含稅）＝ product + shipping − discount
+    string tax_category = 5;
+}
+
+// 法定告知。
+//
+// ⚠️ required 於 2026-08-31（DEC-20260831-210934）起**只決定要不要顯示**，
+// 不再是付款前置條件：confirm 不檢查任何回填值，9314 已無 emitter。
+// title／body 仍要逐字顯示——免用統一發票的買家得知道自己拿到的是收據。
+message CheckoutInvoiceDisclosure {
+    bool required = 1;
+    string terms_version = 2;
+    string title = 3;
+    string body = 4;
+}
+
+// 買家的預設常用發票資料（B01 的 LockedCard 顯示它）。
+// display_value 是**遮罩後**的字串：DB 存密文，明碼永不出服務邊界。
+message CheckoutInvoiceProfile {
+    string profile_id = 1;
+    string carrier_type = 2;
+    string display_value = 3;
+    string buyer_tax_id = 4;
+    string buyer_name = 5;
+    bool is_default = 6;
+    string label = 7;
+}
+
+// 賣家待審期間的接單額度。blocked=true ⇒ B01 顯示不可下單 banner（9326）。
+message CheckoutInvoiceIntakeLimit {
+    string order_count_used = 1;
+    string order_count_limit = 2;
+    string amount_used = 3;
+    string amount_limit = 4;
+    bool blocked = 5;
+}
+
+message CheckoutInvoiceRequest {
+    // invoice-service buyer_invoice_preferences.id（數字字串）。非空 ⇒ EXPLICIT_PREFERENCE。
+    // 🔴 前端可控、跨服務、無 FK：order-service 只做 fail-fast 形狀驗證，
+    // **歸屬驗證（IDOR，I-47）的收斂點在 invoice-service**，且 buyer_id 只能取自訂單。
+    string profile_id = 1;
+    // 公司統編（8 碼數字）。非空 ⇒ invoice_kind = B2B、carrier_selection_mode = NONE，
+    // 且 buyer_title 必填（chk_ois_b2b）。
+    string buyer_tax_id = 2;
+    // 買方抬頭（AMEGO BuyerName 上限 60 字元）；僅 B2B 有值。
+    string buyer_title = 3;
+    // 捐贈碼（3–7 碼數字）。非空 ⇒ carrier_selection_mode = DONATION。
+    string donation_code = 4;
+    // 發票通知信箱（選填）。留空 ⇒ 快照 notify_email 為 NULL，由 invoice-service 依 D6 解析。
+    string notify_email = 5;
+}
+
+message CheckoutConfirmResponse {
+    int32 code = 1;
+    string message = 2;
+    CheckoutConfirmData data = 3;
+    CheckoutPriceChangedDetail price_changed = 4;  // code=4091 時填充：金額變動明細
+}
+
+message CheckoutConfirmData {
+    string checkout_id = 1;                        // 結帳批次 ID（付款用）
+    repeated string order_nos = 2;                 // 建立的訂單編號（Phase 1: 1 筆）
+    string total_pay_amount = 3;                   // 付款總金額（數字字串）
+    repeated UnavailableItem unavailable_items = 4; // **語意統一**：取代舊 InsufficientStockItem，row 級不可購買 / 庫存不足清單。reason=INSUFFICIENT_STOCK 時帶 available_qty 等同舊欄位
+}
+
+// 金額變動明細（code=4091 時 price_changed 填充）
+message CheckoutPriceChangedDetail {
+    string old_total_amount = 1;                   // Preview 時顯示的實付金額
+    string new_total_amount = 2;                   // Confirm 重算後的實付金額
+    string change_reasons = 3;                     // 變動原因（逗號分隔，如 "PRODUCT_PRICE,SHIPPING_FEE"）
+    string new_subtotal = 4;                       // 重算後商品小計
+    string new_shipping_fee = 5;                   // 重算後運費
+    string new_discount = 6;                       // 重算後折扣
+}
+
+// ==================== GetOrderForReview（review-service 用）====================
+
+message GetOrderForReviewRequest {
+    string order_no = 1;
+}
+
+// 訂單評論資格資訊
+message OrderForReviewData {
+    string order_no = 1;
+    string buyer_id = 2;    // TSID 數字字串
+    string store_id = 3;   // 賣家 store_id surrogate（TSID 數字字串）
+    string status = 4;              // OrderStatus value，如 "40"
+    string completed_at = 5;        // 訂單完成時間（confirmedAt），ISO 8601 UTC 格式
+}
+
+// 訂單中的商品項目（供評論用）
+message OrderItemForReview {
+    string order_item_id = 1;       // TSID 數字字串
+    string sku_name = 2;            // 商品名稱
+    string image_url = 3;           // 商品圖片 URL（相容欄位，值為 Order Service 組好的 CDN URL；新流程改讀 image_object_key）
+    string price = 4;               // 商品單價（數字字串，元）
+    string product_id = 5;          // 商品 ID（TSID 數字字串）
+    string image_object_key = 6;    // 商品圖片 objectKey（review-service 直接落庫，免剝殼；49 §5.3 item_image 回填理想解）
+}
+
+message GetOrderForReviewResponse {
+    int32 code = 1;
+    string message = 2;
+    OrderForReviewData data = 3;
+    repeated OrderItemForReview items = 4;  // 訂單中的商品項目
+}
+
+// ==================== 買家消費彙總（Buyer Service 內部呼叫）====================
+
+message GetBuyerMerchantSummaryRequest {
+    int64 buyer_id = 1;
+}
+
+message GetBuyerMerchantSummaryResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated BuyerMerchantSummaryItem data = 3;
+}
+
+// 買家在某賣家的累計消費摘要
+message BuyerMerchantSummaryItem {
+    string store_id = 1;  // 賣家 store_id surrogate（TSID 數字字串）
+    // 累計消費金額（毛額，未扣退款；計 status ∈ {COMPLETED(50), PARTIALLY_REFUNDED(60)}，數字字串，元）
+    string total_spending = 2;
+    string last_order_time = 3;    // 最近一筆訂單時間（Unix ms 數字字串，供排序用）
+    // 累計退款金額（同一批訂單的 SUM(orders.refund_total_amount)，數字字串，元）。
+    // 淨消費 = total_spending - total_refund；兩者刻意分開回，讓前端能同時顯示毛額與退回。
+    string total_refund = 4;
+}
+
+message GetBuyerOrdersForSellerRequest {
+    int64 buyer_id = 1;
+    int64 store_id = 2;
+    string page = 3;               // 1-based 數字字串
+    string size = 4;
+}
+
+message GetBuyerOrdersForSellerResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated BuyerSellerOrderRecord records = 3;
+    string total = 4;              // 數字字串
+    string page = 5;
+    string page_size = 6;
+}
+
+// 消費紀錄明細列表中的單筆訂單
+message BuyerSellerOrderRecord {
+    string order_no = 1;
+    string create_time = 2;        // Unix ms 數字字串
+    string actual_amount = 3;      // 實付金額（數字字串，元）
+    string discount_amount = 4;    // 優惠券折扣金額（"0" 表示未使用，數字字串）
+    repeated OrderItemDetail items = 5;  // 商品明細
+    string shipping_address = 6;   // 收件地址
+    string recipient_phone = 7;    // 收件人電話
+    string shipping_fee = 8;       // 運費（數字字串，元）
+    // 本筆訂單已完成的退款金額（orders.refund_total_amount，數字字串，元；"0" = 未退款）。
+    // 只在 PARTIALLY_REFUNDED(60) 上會非 0——FULLY_REFUNDED(70) 路徑不維護該欄位
+    // （AfterSalesRefundEventHandler.applyFullRefund 只做狀態 CAS），故 70 不納入本列表。
+    string refund_amount = 9;
+}
+
+// ==================== 賣家儀表板訊息 ====================
+
+message GetSellerOrderStatusCountsRequest {
+    int64 store_id = 1;  // 店家 ID（Gateway JWT 注入，resolver 解析後的 store surrogate）
+}
+
+message GetSellerOrderStatusCountsResponse {
+    int32 code = 1;
+    string message = 2;
+    // 賣家工作台四桶 count，計算規則見 03 §2.1「賣家工作台 Dashboard 狀態卡 Count 規則（SSOT）」；三桶互斥、PENDING_PAYMENT(0) 不計入、疊加售後覆蓋、排除自買單（buyer_id == store_id）
+    int64 pending_shipment_count = 3;  // 待出貨：order.status∈{10,20} 排除售後覆蓋 + 自買單
+    int64 in_progress_count = 4;       // 配送中：order.status∈{30,32,35,40} 排除售後覆蓋
+    // 已結束（賣家無需再處理）：order.status∈{50,60,70,80} + terminal-override 售後（case status∈{33,50}）
+    // ⚠️ 桶內含 CANCELLED(80) 與 FULLY_REFUNDED(70)，**不是成交數**；賣家面標籤一律顯示「已結束」，
+    // 不得寫成「已完成」——那是 CodeMeta OrderStatus 50 單一狀態的 Label（代行面按狀態逐一計數時才成立）。
+    // 欄名 completed_count 為既有 wire 契約（Gateway 對外 JSON key `completedCount` 已被 App 消費）保留，語意以本註解為準。
+    int64 completed_count = 5;
+    int64 aftersales_count = 6;        // 售後處理：active 售後 case 數（本服務聚合 aftersales GetSellerCaseClassification）
+}
+
+// ==================== 推薦商家訊息 ====================
+
+// ==================== 服務間：CRM 訂單聚合（issue #1519，crm-service GetOrderAggregates）====================
+
+message GetOrderAggregatesRequest {
+    int64 store_id = 1;    // 0 = 不篩選（全店家聚合）
+    PageRequest page = 2;
+}
+
+message GetOrderAggregatesResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated OrderAggregateItem data = 3;
+    PageMeta meta = 4;
+}
+
+message OrderAggregateItem {
+    string store_id = 1;          // §6.1：exposed 欄位一律 string，避免 JSON number 精度遺失
+    string buyer_id = 2;
+    string order_count = 3;
+    string total_net_amount = 4;
+}
+
+message GetTopSellersByRevenueRequest {
+    int32 days = 1;   // 計算區間天數（預設 30）
+    int32 limit = 2;  // 回傳筆數上限（預設 10，最大 50）
+}
+
+message GetTopSellersByRevenueResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated SellerRevenue sellers = 3;
+}
+
+message SellerRevenue {
+    string store_id = 1;          // 賣家 store_id（TSID 數字字串，原 int64 store_id）
+    int64 total_revenue = 2;      // 營收加總（新台幣元）
+    int32 order_count = 3;        // 訂單數
+}
+
+message ListStoreOrderStatsRequest {
+    int32 days = 1;                  // 計算區間天數（必填，1–90；成立訂單 pay_time >= now - days，賣家取消 cancelled_at >= now - days）
+    string after_store_id = 2;       // keyset 游標：只回 store_id 大於此值的店；空字串＝從頭（填上一頁的 next_after_store_id）
+    int32 page_size = 3;             // 每頁店數（1–1000；0＝預設 500）
+}
+
+message ListStoreOrderStatsResponse {
+    int32 code = 1;                  // 0＝成功；days 或 page_size 超出範圍為 INVALID_PARAM
+    string message = 2;
+    repeated StoreOrderStats stats = 3;  // 依 store_id 升冪；只含至少有一筆成立訂單或賣家取消訂單的店
+    string next_after_store_id = 4;  // 還有下一頁時為本頁最後一個 store_id；空字串＝已是最後一頁
+}
+
+message StoreOrderStats {
+    string store_id = 1;             // 店家 store_id（TSID 數字字串）
+    int32 distinct_buyers = 2;       // 成立訂單的不重複買家數（以付款時間計的時間窗內）
+    int32 qualifying_orders = 3;     // 成立訂單數：已付款、未取消、未全額退款，以付款時間計（狀態集合同 GetTopSellersByRevenue：已付款到完成、部分退款；部分退款仍是成立的購買，金額不計）
+    int32 seller_cancelled_orders = 4;  // 賣家取消的訂單數（CANCELLED 且 cancel_by_role=SELLER），以取消時間計
+}
+
+message GetStorePeriodOrderStatsRequest {
+    int64 store_id = 1;                       // 店家 store_id（必填，正數）
+    repeated StatsWindow windows = 2;         // 1–4 個時間窗；回應依此順序逐窗回傳
+}
+
+// 左閉右開的時間窗 [start_time, end_time)，以付款時間 pay_time 比對。
+message StatsWindow {
+    string start_time = 1;           // Unix timestamp (ms)，數字字串，含
+    string end_time = 2;             // Unix timestamp (ms)，數字字串，不含；必須晚於 start_time，窗長至多 90 天
+}
+
+message GetStorePeriodOrderStatsResponse {
+    int32 code = 1;                  // 0＝成功；store_id、windows 或任一窗不合法為 INVALID_PARAM
+    string message = 2;
+    repeated StorePeriodOrderStats windows = 3;  // 與請求的 windows 同長、同順序；窗內沒有成立訂單時三個值都是 "0"
+}
+
+message StorePeriodOrderStats {
+    string qualifying_orders = 1;    // 成立訂單數：已付款、未取消、未全額退款，付款時間落在窗內（狀態集合同 ListStoreOrderStats；自買單不排除）
+    string distinct_buyers = 2;      // 成立訂單的不重複買家數
+    string revenue = 3;              // 營收（新台幣元，數字字串）：成立訂單的實付金額（total_actual_amount）減去已完成的退款金額（refund_total_amount）加總；之後才發生的退款會使過去的窗變小
+}
+
+// ==================== 快照付款資訊 ====================
+
+message SnapshotPaymentInfoRequest {
+    string order_no = 1;             // 訂單編號
+    string trade_no = 2;             // 交易編號（Payment Service trade_no）
+    string payment_method = 3;       // 付款方式 value（2001=信用卡 / 2002=ApplePay / 2003=GooglePay / 2004=ATM）
+    string atm_bank_code = 4;        // ATM 銀行代碼（僅 ATM 有值）
+    string atm_virtual_account = 5;  // ATM 虛擬帳號（僅 ATM 有值）
+    string atm_expire_date = 6;      // ATM 繳費期限（僅 ATM 有值，ISO 8601）
+}
+
+message SnapshotPaymentInfoResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+// ==================== 售後用：查詢訂單 ====================
+
+message GetOrderForAfterSalesRequest {
+    string order_no = 1;
+}
+
+message GetOrderForAfterSalesResponse {
+    int32 code = 1;
+    string message = 2;
+    OrderAfterSalesView data = 3;
+}
+
+message OrderAfterSalesView {
+    string order_no = 1;
+    string buyer_id = 2;
+    string store_id = 3;
+    string status = 4;                      // OrderStatus value
+    string total_actual_amount = 5;         // 實際支付「商品」金額（不含運費）
+    string shipping_fee = 6;               // 實際支付「運費」金額
+    string shipping_fee_payer = 7;
+    string payment_method = 8;              // PaymentMethod dbValue
+    string transaction_id = 9;              // Payment trade_no
+    string delivered_at = 10;               // ISO 8601（訂單送達時間）
+    string shipping_method = 11;
+    string delivery_temp = 12;              // 配送溫層
+    string mer_id = 13;
+    repeated OrderItemForAfterSales items = 14;
+    repeated string shipment_photo_keys = 15;  // 出貨照片 objectKey 陣列（49 §6.6：aftersales 透傳、Gateway 組顯示 URL）
+    // 買家收件資訊（退貨物流寄件人用）
+    string buyer_name = 16;
+    string buyer_phone = 17;
+    string buyer_city = 18;
+    string buyer_district = 19;
+    string buyer_address_detail = 20;
+    string buyer_postal_code = 21;
+    bool need_refund_page = 22;
+}
+
+message OrderItemForAfterSales {
+    string id = 1;
+    string sku_id = 2;
+    string sku_name = 3;
+    string quantity = 4;
+    string unit_price = 5;             // **重命名**（原 original_price → unit_price）：實際成交單價快照
+    string actual_pay_amount = 6;       // 退款基準（不變）
+    string refund_status = 7;
+    string image_object_key = 8;
+    string list_price = 9;              // **新增**：原價快照
+}
+
+// ==================== 售後用：內部取消訂單 ====================
+
+message CancelOrderInternalRequest {
+    string order_no = 1;
+    string cancel_reason = 2;
+    string cancel_remark = 3;
+    string cancel_by_role = 4;  // OrderCancelByRole value（SYSTEM / SELLER；buyer 不走此 RPC）
+}
+
+message CancelOrderInternalResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+// 純服務間 gRPC（不經 Gateway 暴露），id 欄位允許原生數值型別（§4.1 例外③）。
+message HasOrderBetweenRequest {
+    int64 buyer_id = 1;
+    int64 store_id = 2;
+}
+
+message HasOrderBetweenResponse {
+    int32 code = 1;
+    string message = 2;
+    bool has_order = 3;
+    string latest_order_no = 4;
+}
+
+// ==================== Admin 撥款重發（收斂規範 §8.4 / §9.6）====================
+
+message RetryGrantRequest {
+    string order_no = 1;        // 訂單編號
+    string operator_id = 2;     // Admin 操作者 ID（稽核用，Gateway 從 JWT 注入）
+    string operator_reason = 3; // 重發原因（選填，稽核用）
+}
+
+message RetryGrantResponse {
+    int32 code = 1;
+    string message = 2;
+    RetryGrantData data = 3;
+}
+
+message RetryGrantData {
+    string order_no = 1;
+    string task_status = 2;      // 重設後 task 狀態（= PENDING）
+    string previous_retry_count = 3;  // 重設前 retry_count 值
+}
+
+// ==================== §29 Admin 異常列表 ====================
+
+message ListAbnormalOrdersForAdminRequest {
+    int64 account_id = 1;                 // Gateway 注入（admin）
+    string page = 2;
+    string page_size = 3;
+    string provider_status = 4;
+    string status = 5;                     // OrderStatus value，可多值逗號分隔
+    string buyer_id = 6;
+    string store_id = 7;
+    string payment_method = 8;
+    string shipping_method = 9;
+    string created_from = 10;
+    string created_to = 11;
+    string sort = 12;                       // updated_at_desc 等
+}
+
+message ListAbnormalOrdersForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    ListAbnormalOrdersForAdminData data = 3;
+}
+
+message ListAbnormalOrdersForAdminData {
+    repeated AdminAbnormalOrderSummary records = 1;
+    string total = 2;
+    string page = 3;
+    string page_size = 4;
+}
+
+message AdminAbnormalOrderSummary {
+    string order_no = 1;
+    string buyer_id = 2;
+    string store_id = 3;
+    string status = 4;                     // OrderStatus value
+    string total_actual_amount = 5;
+    string payment_method = 6;
+    string shipping_method = 7;
+    string provider_status = 8;            // 依 order.status 聚合
+    string provider_message = 9;
+    string provider_source = 10;           // CodeMeta ProviderSource：PAYMENT / PAYMENT_REFUND / SHIPPING；"" = 無第三方環節可對帳
+    string created_at = 11;
+    string updated_at = 12;
+}
+
+
+// ==================== 服務間：發票快照（58 號 §5.4.3／§6.2.4／§7.1.2）====================
+//
+// 角色分離（Proto 管理規範 §5.1）：本組 message 只服務 invoice-service，
+// 不經 Gateway 暴露、不與 app／admin 面的 OrderDetail 共用型別。
+//
+// 【型別】所有數值（TSID、金額、數量、版本號）一律 `string`，時間一律 ISO 8601 UTC
+// （`YYYY-MM-DDTHH:mm:ssZ`），與本檔其餘 response 一致。
+// ⚠️ 這裡刻意**不用** §4.1 例外 ③ 的原生 int64：`protonumericlint`
+// （`pkg/cmd/protonumericlint`）走訪的是「任何 RPC **output type** 可達的 message」，
+// 不區分該 RPC 是否對外——所以 response 側用 int64 會直接被 `make proto-lint-numeric`
+// 擋下，只能靠 `scripts/proto/numeric-allowlist.txt` grandfather，而那份清單只准縮不准長。
+// 例外 ③ 對 request 端仍成立（request message 不在走訪範圍內）。
+
+message GetOrderInvoiceSnapshotInternalRequest {
+    string order_no = 1;
+}
+
+// 買家於開立前更正發票資料（58 號 §6.2.5）。七條定版全文見該節。
+message ReviseOrderInvoiceSnapshotInternalRequest {
+    string order_no = 1;
+    // 樂觀鎖：呼叫端讀到的版本（十進位數字字串）。與 DB 最新版不符 ⇒ 回 9308
+    // INVOICE_SNAPSHOT_VERSION_CONFLICT、不寫入。兩筆更正並行時，沒有它就是後寫的
+    // 靜默覆蓋前者，而兩筆的 correction 都會顯示成功。
+    string expected_snapshot_version = 2;
+
+    // ---- 更正後的買家發票選擇；逐欄語意同 OrderInvoiceSnapshotData ----
+    string invoice_kind = 3;                // B2C / B2B
+    string carrier_selection_mode = 4;      // USE_BUYER_DEFAULT / EXPLICIT_PREFERENCE / NONE / DONATION
+    string buyer_invoice_preference_id = 5; // 數字字串；空字串＝NULL
+    string buyer_tax_id = 6;
+    string buyer_title = 7;
+    string donation_code = 8;
+
+    // 🔴 **刻意沒有 notify_email**（58 號 §6.2.5 定版 7）：snapshot_version 是內容軸，
+    // 只承載發票上會印出來的東西；notify_email 只決定通知寄到哪、不在發票上。讓它遞增
+    // 內容軸，「同內容重開一張票」與「內容真的變了」在冪等鍵上就無法區分——而那正是
+    // issue_attempt_seq 實體軸存在的理由（AMEGO 回 3040171、我方誤判成功 ⇒ 買家手上
+    // 一張發票都沒有）。買家只改通知 Email 時由 invoice-service 就地改自己的
+    // invoice_documents.recipient_email，不呼叫本 RPC。
+
+    // 冪等鍵＝invoice-service 的 correction_id。同鍵重送必須回**同一個**
+    // snapshot_version、不新增列，否則重試會讓版本號與實際更正次數脫鉤。
+    string idempotency_key = 9;
+}
+
+message ReviseOrderInvoiceSnapshotInternalResponse {
+    int32 code = 1;
+    string message = 2;
+    // 新版本（數字字串）。invoice-service 只能從這裡複製（58 號 I-50）。
+    string snapshot_version = 3;
+}
+
+message GetOrderInvoiceSnapshotInternalResponse {
+    int32 code = 1;
+    string message = 2;
+    // 查無此訂單、或該訂單沒有發票快照列 ⇒ 回**非 0** 業務碼，不得回 code=0 ＋ 空 data。
+    // 呼叫端（invoice-service）唯一安全的行為是讓 order.paid 重試三次後進 DLQ；
+    // 空 data 會被當成「這張訂單沒有品項」而開出一張金額為 0 的發票，發票不可回收。
+    OrderInvoiceSnapshotData data = 3;
+}
+
+message OrderInvoiceSnapshotData {
+    string order_no = 1;
+    // order_invoice_snapshots.snapshot_version（數字字串）。
+    // invoice-service 沒有、也不得新增任何遞增它的路徑（58 號 I-50）。
+    string snapshot_version = 2;
+
+    // ---- 買家發票選擇（order_invoice_snapshots，58 號 §5.4.3 DDL）----
+    // 買家在結帳當下宣告的發票種類：B2C / B2B（chk_ois_kind）。
+    string invoice_kind = 3;
+    // USE_BUYER_DEFAULT / EXPLICIT_PREFERENCE / NONE / DONATION（chk_ois_mode）。
+    // USE_BUYER_DEFAULT **不在結帳當下解析**：載具由 invoice-service 建立文件時才依序解析
+    // （買家指定的預設 → 手機 → email → 無載具），故本 message 不帶任何載具值。
+    string carrier_selection_mode = 4;
+    // invoice-service buyer_invoice_preferences.id（數字字串；"" ＝ NULL）。
+    // 🔴 前端可控、跨服務、無 FK ⇒ invoice-service 解析時必須驗歸屬
+    // （`WHERE id = ? AND buyer_id = orders.buyer_id AND deleted_at IS NULL`，58 號 I-47）；
+    // buyer_id 只能取自訂單，不得取自請求。條件不成立要拒絕開票轉 AWAITING_MANUAL，
+    // 不是 fallback 成無載具（後者會把 IDOR 靜默吞掉）。
+    // 非空 ⟺ carrier_selection_mode == "EXPLICIT_PREFERENCE"（chk_ois_pref_pair 保證）。
+    string buyer_invoice_preference_id = 5;
+    // 公司統編（8 碼數字；"" ＝ NULL）。屬公開營業登記資訊，非 PII（18 號同一裁定）。
+    string buyer_tax_id = 6;
+    // 買方抬頭（AMEGO BuyerName 上限 60 字元；"" ＝ NULL）。
+    string buyer_title = 7;
+    // 捐贈碼（3–7 碼數字；"" ＝ NULL）。非空 ⟺ carrier_selection_mode == "DONATION"。
+    string donation_code = 8;
+    // 發票通知 email（買家在結帳採集，58 號 §6.2.4 order-service ⑤、§7.1.2 步驟 1）。
+    // ⚠️ §5.4.3 的 V12 DDL 目前沒有承載此值的欄位——order-service 實作時必須補上，
+    // 否則 invoice_documents.recipient_email 恆為空、開票通知寄不出去（不會報錯）。
+    string notify_email = 9;
+
+    // ---- 金額（orders，元整數的數字字串；58 號 §5A.2）----
+    // Σ order_items.unit_price × quantity（欄名沿用 orders 的既有誤導命名：
+    // 它存的是成交價小計，不是原價；原價在 order_items.list_price）。
+    string total_original_amount = 10;
+    // orders.shipping_fee，買家實際被收的運費；免運成立時為 "0"。
+    string shipping_fee = 11;
+    // orders 的優惠折扣總額。
+    string discount_amount = 12;
+    // orders.total_actual_amount ＝ max(0, 小計 + 運費 − 折扣)，發票總額的唯一權威。
+    // "0" ⇒ 零元訂單，invoice-service 建 NOT_APPLICABLE 文件（reason=ZERO_AMOUNT），不開票。
+    string total_actual_amount = 13;
+    // 這筆折扣是誰出的錢："SELLER" / "PLATFORM" / "" ＝ 判不出來。
+    // 🔴 零值（""）必須被呼叫端當成 **fail-closed**（＝不是賣家負擔 ⇒ 轉 AWAITING_MANUAL
+    // ＋ manual_reason_code=PLATFORM_FUNDED_DISCOUNT），不得當成 "SELLER"：
+    // 把平台補貼的那一段從賣家銷售額扣掉 ＝ 賣家短漏報銷售額，要等國稅局查帳才浮現
+    // （58 號 §5A.2.2、決策 D9a）。判別欄是 coupon_templates.issuer_type，
+    // 而 CouponValidateResult 不帶它（58 號 U-7）⇒ order-service 判不出來時填 ""。
+    string discount_funding = 14;
+
+    // ---- fail-closed 三格中程式推不出來的兩格（58 號 §7.1.3）----
+    // 和單訂單（代理商 MerID 收款）⇒ 開票法源前提不成立，轉 AWAITING_MANUAL。
+    // 第一道防線是 CheckoutConfirm 以 9327 拒絕成單，本欄是第二道。
+    bool is_consolidated_order = 15;
+
+    // ---- 品項（order_items，依 order_items.id 升冪；58 號 §5A.3）----
+    repeated OrderInvoiceSnapshotItem items = 16;
+}
+
+message OrderInvoiceSnapshotItem {
+    // order_items.id（TSID 數字字串）。invoice_document_lines.order_item_id 的來源，
+    // 也是明細行排序鍵（升冪 ＝ 建立順序，line_seq 決定性不得依賴 map 迭代序）。
+    string order_item_id = 1;
+    string sku_id = 2;          // TSID 數字字串
+    string product_name = 3;
+    string sku_name = 4;        // 為空或等於 product_name 時，品名只取 product_name
+    string quantity = 5;        // 正整數的數字字串
+    // order_items.unit_price（元整數的數字字串）＝**含稅成交價**，不是 list_price。
+    // 明細行金額一律由 unit_price × quantity 重建；刻意不回 actual_pay_amount／
+    // share_discount，那兩欄的既有分攤器用浮點四捨五入、尾差歸最後一筆、負值夾 0，
+    // 收了就會有人拿去算發票金額（58 號 domain.OrderItem 的同一條理由）。
+    string unit_price = 6;
+}
+
+// ==================== Uber 即時報價中繼（66 §6.1.3；Stage 8B W2-2）====================
+
+message OrderUberQuoteRequest {
+    int64 buyer_id = 1;                    // Gateway 注入（E.5.5 int64 例外，與 CheckoutValidateRequest 同）
+    string address_id = 2;                 // 買家收件地址 id（buyer-service 的 shipping_addresses.id）
+    repeated CheckoutItem items = 3;       // 當前已勾選的商品，與 CheckoutValidate 同一個型別
+}
+
+// 🔴 形狀與 shipping.UberQuoteData 對齊但**不共用**：跨服務共用 message 會讓
+//    order 與 shipping 的契約綁死，而它們的演進節奏不同（10 檔 §3）。
+//    欄位語意逐字相同，轉換點只有一處（OrderGrpcService）。
+message OrderUberQuoteData {
+    bool available = 1;
+    string unavailable_reason = 2;         // available=false 時必填，可寫進 UI 的理由碼
+    string quote_id = 3;
+    string fee_amount = 4;                 // 運費（元整數；🔴 string）
+    string currency = 5;
+    string expires_at = 6;                 // ISO 8601 UTC
+}
+
+message OrderUberQuoteResponse {
+    int32 code = 1;
+    string message = 2;
+    OrderUberQuoteData data = 3;
+}

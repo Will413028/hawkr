@@ -1,0 +1,36 @@
+{
+  "artifactId": "2001",
+  "type": "CLARIFICATION",
+  "version": 1,
+  "checksum": "sha256:clarification-golden",
+  "status": "READY",
+  "asOf": "2026-08-22T12:00:00Z",
+  "domainRef": "42",
+  "data": {
+    "question": {
+      "slotKey": "quantity",
+      "prompt": "大概需要多少數量？",
+      "options": [],
+      "unitOptions": [
+        {
+          "optionId": "unit-kg",
+          "label": "公斤",
+          "value": "KG"
+        },
+        {
+          "optionId": "unit-catty",
+          "label": "台斤",
+          "value": "CATTY"
+        },
+        {
+          "optionId": "unit-gram",
+          "label": "公克",
+          "value": "GRAM"
+        }
+      ],
+      "allowFreeText": true,
+      "source": "FIXED",
+      "canSkip": false
+    }
+  }
+}

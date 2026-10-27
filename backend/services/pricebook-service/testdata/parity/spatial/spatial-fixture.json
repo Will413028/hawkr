@@ -1,0 +1,2474 @@
+{
+  "config": {
+    "contour_breaks": [
+      15.0,
+      25.0,
+      35.0
+    ],
+    "grid_resolution_m": 2500,
+    "idw_power": 2,
+    "max_support_distance_km": 50,
+    "min_supporting_neighbors": 3
+  },
+  "contours_geojson": {
+    "features": [
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              120.877066,
+              24.067463
+            ],
+            [
+              120.877076,
+              24.067489
+            ]
+          ],
+          "type": "LineString"
+        },
+        "properties": {
+          "level_price_twd_per_kg": 15.0,
+          "surface_region": "test_region"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              120.884185,
+              24.090043
+            ],
+            [
+              120.877076,
+              24.067489
+            ]
+          ],
+          "type": "LineString"
+        },
+        "properties": {
+          "level_price_twd_per_kg": 15.0,
+          "surface_region": "test_region"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              120.910828,
+              24.067487
+            ],
+            [
+              120.907031,
+              24.090058
+            ]
+          ],
+          "type": "LineString"
+        },
+        "properties": {
+          "level_price_twd_per_kg": 15.0,
+          "surface_region": "test_region"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              120.884185,
+              24.090043
+            ],
+            [
+              120.901637,
+              24.098005
+            ]
+          ],
+          "type": "LineString"
+        },
+        "properties": {
+          "level_price_twd_per_kg": 15.0,
+          "surface_region": "test_region"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              120.901637,
+              24.098005
+            ],
+            [
+              120.907031,
+              24.090058
+            ]
+          ],
+          "type": "LineString"
+        },
+        "properties": {
+          "level_price_twd_per_kg": 15.0,
+          "surface_region": "test_region"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              120.926235,
+              24.086301
+            ],
+            [
+              120.924489,
+              24.090068
+            ]
+          ],
+          "type": "LineString"
+        },
+        "properties": {
+          "level_price_twd_per_kg": 25.0,
+          "surface_region": "test_region"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              120.926235,
+              24.086301
+            ],
+            [
+              120.938633,
+              24.0675
+            ]
+          ],
+          "type": "LineString"
+        },
+        "properties": {
+          "level_price_twd_per_kg": 25.0,
+          "surface_region": "test_region"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              120.924489,
+              24.090068
+            ],
+            [
+              120.912308,
+              24.112635
+            ]
+          ],
+          "type": "LineString"
+        },
+        "properties": {
+          "level_price_twd_per_kg": 25.0,
+          "surface_region": "test_region"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              120.912308,
+              24.112635
+            ],
+            [
+              120.904008,
+              24.135203
+            ]
+          ],
+          "type": "LineString"
+        },
+        "properties": {
+          "level_price_twd_per_kg": 25.0,
+          "surface_region": "test_region"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              120.876993,
+              24.153714
+            ],
+            [
+              120.867261,
+              24.157749
+            ]
+          ],
+          "type": "LineString"
+        },
+        "properties": {
+          "level_price_twd_per_kg": 25.0,
+          "surface_region": "test_region"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              120.901606,
+              24.13906
+            ],
+            [
+              120.876993,
+              24.153714
+            ]
+          ],
+          "type": "LineString"
+        },
+        "properties": {
+          "level_price_twd_per_kg": 25.0,
+          "surface_region": "test_region"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              120.901606,
+              24.13906
+            ],
+            [
+              120.904008,
+              24.135203
+            ]
+          ],
+          "type": "LineString"
+        },
+        "properties": {
+          "level_price_twd_per_kg": 25.0,
+          "surface_region": "test_region"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              120.827757,
+              24.178579
+            ],
+            [
+              120.823442,
+              24.180278
+            ]
+          ],
+          "type": "LineString"
+        },
+        "properties": {
+          "level_price_twd_per_kg": 25.0,
+          "surface_region": "test_region"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              120.852378,
+              24.165909
+            ],
+            [
+              120.827757,
+              24.178579
+            ]
+          ],
+          "type": "LineString"
+        },
+        "properties": {
+          "level_price_twd_per_kg": 25.0,
+          "surface_region": "test_region"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              120.852378,
+              24.165909
+            ],
+            [
+              120.867261,
+              24.157749
+            ]
+          ],
+          "type": "LineString"
+        },
+        "properties": {
+          "level_price_twd_per_kg": 25.0,
+          "surface_region": "test_region"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              120.803126,
+              24.195077
+            ],
+            [
+              120.823442,
+              24.180278
+            ]
+          ],
+          "type": "LineString"
+        },
+        "properties": {
+          "level_price_twd_per_kg": 25.0,
+          "surface_region": "test_region"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              120.950825,
+              24.080897
+            ],
+            [
+              120.943949,
+              24.090076
+            ]
+          ],
+          "type": "LineString"
+        },
+        "properties": {
+          "level_price_twd_per_kg": 35.0,
+          "surface_region": "test_region"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              120.975412,
+              24.086399
+            ],
+            [
+              120.950825,
+              24.080897
+            ]
+          ],
+          "type": "LineString"
+        },
+        "properties": {
+          "level_price_twd_per_kg": 35.0,
+          "surface_region": "test_region"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              120.943949,
+              24.090076
+            ],
+            [
+              120.940531,
+              24.112649
+            ]
+          ],
+          "type": "LineString"
+        },
+        "properties": {
+          "level_price_twd_per_kg": 35.0,
+          "surface_region": "test_region"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              120.940531,
+              24.112649
+            ],
+            [
+              120.950808,
+              24.125337
+            ]
+          ],
+          "type": "LineString"
+        },
+        "properties": {
+          "level_price_twd_per_kg": 35.0,
+          "surface_region": "test_region"
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              120.950808,
+              24.125337
+            ],
+            [
+              120.975405,
+              24.118256
+            ]
+          ],
+          "type": "LineString"
+        },
+        "properties": {
+          "level_price_twd_per_kg": 35.0,
+          "surface_region": "test_region"
+        },
+        "type": "Feature"
+      }
+    ],
+    "type": "FeatureCollection"
+  },
+  "points_geojson": {
+    "features": [
+      {
+        "geometry": {
+          "coordinates": [
+            120.85,
+            24.1
+          ],
+          "type": "Point"
+        },
+        "id": "moa:m1",
+        "properties": {
+          "crop_id": "moa:A1",
+          "exclusion_reason": null,
+          "market_id": "moa:m1",
+          "market_name": "M1",
+          "observation_status": "observed_trade",
+          "price_twd_per_kg": 20.0,
+          "series_id": "s1",
+          "surface_region": "test_region",
+          "used_for_surface": true,
+          "volume_kg": 100.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            120.95,
+            24.1
+          ],
+          "type": "Point"
+        },
+        "id": "moa:m2",
+        "properties": {
+          "crop_id": "moa:A1",
+          "exclusion_reason": null,
+          "market_id": "moa:m2",
+          "market_name": "M2",
+          "observation_status": "observed_trade",
+          "price_twd_per_kg": 40.0,
+          "series_id": "s2",
+          "surface_region": "test_region",
+          "used_for_surface": true,
+          "volume_kg": 100.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            120.9,
+            24.2
+          ],
+          "type": "Point"
+        },
+        "id": "moa:m3",
+        "properties": {
+          "crop_id": "moa:A1",
+          "exclusion_reason": null,
+          "market_id": "moa:m3",
+          "market_name": "M3",
+          "observation_status": "observed_trade",
+          "price_twd_per_kg": 30.0,
+          "series_id": "s3",
+          "surface_region": "test_region",
+          "used_for_surface": true,
+          "volume_kg": 100.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            120.9,
+            24.08
+          ],
+          "type": "Point"
+        },
+        "id": "moa:m4",
+        "properties": {
+          "crop_id": "moa:A1",
+          "exclusion_reason": null,
+          "market_id": "moa:m4",
+          "market_name": "M4",
+          "observation_status": "observed_trade",
+          "price_twd_per_kg": 10.0,
+          "series_id": "s4",
+          "surface_region": "test_region",
+          "used_for_surface": true,
+          "volume_kg": 100.0
+        },
+        "type": "Feature"
+      }
+    ],
+    "type": "FeatureCollection"
+  },
+  "region_ring_wgs84": [
+    [
+      120.80173683871388,
+      24.059609797876174
+    ],
+    [
+      120.99840369146078,
+      24.059738206462313
+    ],
+    [
+      120.99840144657048,
+      24.240326230013643
+    ],
+    [
+      120.80145802326098,
+      24.240196736793187
+    ],
+    [
+      120.80173683871388,
+      24.059609797876174
+    ]
+  ],
+  "status": "ready",
+  "surface_geojson": {
+    "features": [
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.803321,
+                24.067386
+              ],
+              [
+                120.827906,
+                24.067416
+              ],
+              [
+                120.827876,
+                24.08999
+              ],
+              [
+                120.803287,
+                24.08996
+              ],
+              [
+                120.803321,
+                24.067386
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 1,
+          "lower_price_twd_per_kg": 15.0,
+          "nearest_distance_km": 5.964,
+          "price_twd_per_kg": 20.1269,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 25.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.827906,
+                24.067416
+              ],
+              [
+                120.852491,
+                24.067442
+              ],
+              [
+                120.852465,
+                24.090015
+              ],
+              [
+                120.827876,
+                24.08999
+              ],
+              [
+                120.827906,
+                24.067416
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 1,
+          "lower_price_twd_per_kg": 15.0,
+          "nearest_distance_km": 4.251,
+          "price_twd_per_kg": 19.5456,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 25.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.852491,
+                24.067442
+              ],
+              [
+                120.877076,
+                24.067463
+              ],
+              [
+                120.877054,
+                24.090037
+              ],
+              [
+                120.852465,
+                24.090015
+              ],
+              [
+                120.852491,
+                24.067442
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 1,
+          "lower_price_twd_per_kg": 15.0,
+          "nearest_distance_km": 3.615,
+          "price_twd_per_kg": 17.4338,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 25.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.877076,
+                24.067463
+              ],
+              [
+                120.90166,
+                24.067481
+              ],
+              [
+                120.901643,
+                24.090055
+              ],
+              [
+                120.877054,
+                24.090037
+              ],
+              [
+                120.877076,
+                24.067463
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 0,
+          "lower_price_twd_per_kg": null,
+          "nearest_distance_km": 2.713,
+          "price_twd_per_kg": 13.7975,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 15.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.90166,
+                24.067481
+              ],
+              [
+                120.926245,
+                24.067495
+              ],
+              [
+                120.926232,
+                24.090069
+              ],
+              [
+                120.901643,
+                24.090055
+              ],
+              [
+                120.90166,
+                24.067481
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 1,
+          "lower_price_twd_per_kg": 15.0,
+          "nearest_distance_km": 3.007,
+          "price_twd_per_kg": 17.4864,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 25.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.926245,
+                24.067495
+              ],
+              [
+                120.95083,
+                24.067505
+              ],
+              [
+                120.950822,
+                24.090079
+              ],
+              [
+                120.926232,
+                24.090069
+              ],
+              [
+                120.926245,
+                24.067495
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 3.6,
+          "price_twd_per_kg": 28.6034,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.95083,
+                24.067505
+              ],
+              [
+                120.975415,
+                24.067511
+              ],
+              [
+                120.975411,
+                24.090084
+              ],
+              [
+                120.950822,
+                24.090079
+              ],
+              [
+                120.95083,
+                24.067505
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 4.43,
+          "price_twd_per_kg": 33.9166,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.803287,
+                24.08996
+              ],
+              [
+                120.827876,
+                24.08999
+              ],
+              [
+                120.827846,
+                24.112563
+              ],
+              [
+                120.803252,
+                24.112533
+              ],
+              [
+                120.803287,
+                24.08996
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 1,
+          "lower_price_twd_per_kg": 15.0,
+          "nearest_distance_km": 4.951,
+          "price_twd_per_kg": 20.3898,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 25.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.827876,
+                24.08999
+              ],
+              [
+                120.852465,
+                24.090015
+              ],
+              [
+                120.852439,
+                24.112589
+              ],
+              [
+                120.827846,
+                24.112563
+              ],
+              [
+                120.827876,
+                24.08999
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 1,
+          "lower_price_twd_per_kg": 15.0,
+          "nearest_distance_km": 2.647,
+          "price_twd_per_kg": 20.0232,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 25.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.852465,
+                24.090015
+              ],
+              [
+                120.877054,
+                24.090037
+              ],
+              [
+                120.877033,
+                24.112611
+              ],
+              [
+                120.852439,
+                24.112589
+              ],
+              [
+                120.852465,
+                24.090015
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 1,
+          "lower_price_twd_per_kg": 15.0,
+          "nearest_distance_km": 3.083,
+          "price_twd_per_kg": 18.9069,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 25.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.877054,
+                24.090037
+              ],
+              [
+                120.901643,
+                24.090055
+              ],
+              [
+                120.901626,
+                24.112628
+              ],
+              [
+                120.877033,
+                24.112611
+              ],
+              [
+                120.877054,
+                24.090037
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 1,
+          "lower_price_twd_per_kg": 15.0,
+          "nearest_distance_km": 3.617,
+          "price_twd_per_kg": 17.094,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 25.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.901643,
+                24.090055
+              ],
+              [
+                120.926232,
+                24.090069
+              ],
+              [
+                120.926219,
+                24.112642
+              ],
+              [
+                120.901626,
+                24.112628
+              ],
+              [
+                120.901643,
+                24.090055
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 1,
+          "lower_price_twd_per_kg": 15.0,
+          "nearest_distance_km": 3.617,
+          "price_twd_per_kg": 22.305,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 25.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.926232,
+                24.090069
+              ],
+              [
+                120.950822,
+                24.090079
+              ],
+              [
+                120.950813,
+                24.112652
+              ],
+              [
+                120.926219,
+                24.112642
+              ],
+              [
+                120.926232,
+                24.090069
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 2.794,
+          "price_twd_per_kg": 33.315,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.950822,
+                24.090079
+              ],
+              [
+                120.975411,
+                24.090084
+              ],
+              [
+                120.975406,
+                24.112658
+              ],
+              [
+                120.950813,
+                24.112652
+              ],
+              [
+                120.950822,
+                24.090079
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 3,
+          "lower_price_twd_per_kg": 35.0,
+          "nearest_distance_km": 2.939,
+          "price_twd_per_kg": 37.0111,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": null
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.803252,
+                24.112533
+              ],
+              [
+                120.827846,
+                24.112563
+              ],
+              [
+                120.827816,
+                24.135137
+              ],
+              [
+                120.803218,
+                24.135107
+              ],
+              [
+                120.803252,
+                24.112533
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 1,
+          "lower_price_twd_per_kg": 15.0,
+          "nearest_distance_km": 6.143,
+          "price_twd_per_kg": 21.0479,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 25.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.827846,
+                24.112563
+              ],
+              [
+                120.852439,
+                24.112589
+              ],
+              [
+                120.852413,
+                24.135162
+              ],
+              [
+                120.827816,
+                24.135137
+              ],
+              [
+                120.827846,
+                24.112563
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 1,
+          "lower_price_twd_per_kg": 15.0,
+          "nearest_distance_km": 4.498,
+          "price_twd_per_kg": 20.7599,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 25.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.852439,
+                24.112589
+              ],
+              [
+                120.877033,
+                24.112611
+              ],
+              [
+                120.877011,
+                24.135184
+              ],
+              [
+                120.852413,
+                24.135162
+              ],
+              [
+                120.852439,
+                24.112589
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 1,
+          "lower_price_twd_per_kg": 15.0,
+          "nearest_distance_km": 4.767,
+          "price_twd_per_kg": 20.8048,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 25.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.877033,
+                24.112611
+              ],
+              [
+                120.901626,
+                24.112628
+              ],
+              [
+                120.901609,
+                24.135202
+              ],
+              [
+                120.877011,
+                24.135184
+              ],
+              [
+                120.877033,
+                24.112611
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 1,
+          "lower_price_twd_per_kg": 15.0,
+          "nearest_distance_km": 6.116,
+          "price_twd_per_kg": 21.7659,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 25.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.901626,
+                24.112628
+              ],
+              [
+                120.926219,
+                24.112642
+              ],
+              [
+                120.926207,
+                24.135216
+              ],
+              [
+                120.901609,
+                24.135202
+              ],
+              [
+                120.901626,
+                24.112628
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 6.116,
+          "price_twd_per_kg": 26.2026,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.926219,
+                24.112642
+              ],
+              [
+                120.950813,
+                24.112652
+              ],
+              [
+                120.950804,
+                24.135226
+              ],
+              [
+                120.926207,
+                24.135216
+              ],
+              [
+                120.926219,
+                24.112642
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 4.589,
+          "price_twd_per_kg": 32.5626,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.950813,
+                24.112652
+              ],
+              [
+                120.975406,
+                24.112658
+              ],
+              [
+                120.975402,
+                24.135232
+              ],
+              [
+                120.950804,
+                24.135226
+              ],
+              [
+                120.950813,
+                24.112652
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 4.679,
+          "price_twd_per_kg": 34.791,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.803218,
+                24.135107
+              ],
+              [
+                120.827816,
+                24.135137
+              ],
+              [
+                120.827785,
+                24.15771
+              ],
+              [
+                120.803183,
+                24.15768
+              ],
+              [
+                120.803218,
+                24.135107
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 1,
+          "lower_price_twd_per_kg": 15.0,
+          "nearest_distance_km": 7.966,
+          "price_twd_per_kg": 22.3353,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 25.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.827816,
+                24.135137
+              ],
+              [
+                120.852413,
+                24.135162
+              ],
+              [
+                120.852387,
+                24.157736
+              ],
+              [
+                120.827785,
+                24.15771
+              ],
+              [
+                120.827816,
+                24.135137
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 1,
+          "lower_price_twd_per_kg": 15.0,
+          "nearest_distance_km": 6.778,
+          "price_twd_per_kg": 22.5271,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 25.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.852413,
+                24.135162
+              ],
+              [
+                120.877011,
+                24.135184
+              ],
+              [
+                120.876989,
+                24.157758
+              ],
+              [
+                120.852387,
+                24.157736
+              ],
+              [
+                120.852413,
+                24.135162
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 1,
+          "lower_price_twd_per_kg": 15.0,
+          "nearest_distance_km": 6.399,
+          "price_twd_per_kg": 23.3405,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 25.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.877011,
+                24.135184
+              ],
+              [
+                120.901609,
+                24.135202
+              ],
+              [
+                120.901591,
+                24.157775
+              ],
+              [
+                120.876989,
+                24.157758
+              ],
+              [
+                120.877011,
+                24.135184
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 1,
+          "lower_price_twd_per_kg": 15.0,
+          "nearest_distance_km": 6.116,
+          "price_twd_per_kg": 24.8782,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 25.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.901609,
+                24.135202
+              ],
+              [
+                120.926207,
+                24.135216
+              ],
+              [
+                120.926194,
+                24.157789
+              ],
+              [
+                120.901591,
+                24.157775
+              ],
+              [
+                120.901609,
+                24.135202
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 6.116,
+          "price_twd_per_kg": 27.2197,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.926207,
+                24.135216
+              ],
+              [
+                120.950804,
+                24.135226
+              ],
+              [
+                120.950796,
+                24.157799
+              ],
+              [
+                120.926194,
+                24.157789
+              ],
+              [
+                120.926207,
+                24.135216
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 6.402,
+          "price_twd_per_kg": 29.8575,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.950804,
+                24.135226
+              ],
+              [
+                120.975402,
+                24.135232
+              ],
+              [
+                120.975398,
+                24.157805
+              ],
+              [
+                120.950796,
+                24.157799
+              ],
+              [
+                120.950804,
+                24.135226
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 6.903,
+          "price_twd_per_kg": 31.2828,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.803183,
+                24.15768
+              ],
+              [
+                120.827785,
+                24.15771
+              ],
+              [
+                120.827755,
+                24.180283
+              ],
+              [
+                120.803149,
+                24.180254
+              ],
+              [
+                120.803183,
+                24.15768
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 1,
+          "lower_price_twd_per_kg": 15.0,
+          "nearest_distance_km": 10.079,
+          "price_twd_per_kg": 23.9352,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 25.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.827785,
+                24.15771
+              ],
+              [
+                120.852387,
+                24.157736
+              ],
+              [
+                120.852361,
+                24.180309
+              ],
+              [
+                120.827755,
+                24.180283
+              ],
+              [
+                120.827785,
+                24.15771
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 1,
+          "lower_price_twd_per_kg": 15.0,
+          "nearest_distance_km": 7.657,
+          "price_twd_per_kg": 24.7737,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 25.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.852387,
+                24.157736
+              ],
+              [
+                120.876989,
+                24.157758
+              ],
+              [
+                120.876968,
+                24.180331
+              ],
+              [
+                120.852361,
+                24.180309
+              ],
+              [
+                120.852387,
+                24.157736
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 6.399,
+          "price_twd_per_kg": 26.1772,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.876989,
+                24.157758
+              ],
+              [
+                120.901591,
+                24.157775
+              ],
+              [
+                120.901574,
+                24.180349
+              ],
+              [
+                120.876968,
+                24.180331
+              ],
+              [
+                120.876989,
+                24.157758
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 5.23,
+          "price_twd_per_kg": 27.6019,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.901591,
+                24.157775
+              ],
+              [
+                120.926194,
+                24.157789
+              ],
+              [
+                120.926181,
+                24.180363
+              ],
+              [
+                120.901574,
+                24.180349
+              ],
+              [
+                120.901591,
+                24.157775
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 5.379,
+          "price_twd_per_kg": 28.4352,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.926194,
+                24.157789
+              ],
+              [
+                120.950796,
+                24.157799
+              ],
+              [
+                120.950787,
+                24.180373
+              ],
+              [
+                120.926181,
+                24.180363
+              ],
+              [
+                120.926194,
+                24.157789
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 6.402,
+          "price_twd_per_kg": 28.9757,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.950796,
+                24.157799
+              ],
+              [
+                120.975398,
+                24.157805
+              ],
+              [
+                120.975394,
+                24.180379
+              ],
+              [
+                120.950787,
+                24.180373
+              ],
+              [
+                120.950796,
+                24.157799
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 7.962,
+          "price_twd_per_kg": 29.4598,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.803149,
+                24.180254
+              ],
+              [
+                120.827755,
+                24.180283
+              ],
+              [
+                120.827725,
+                24.202857
+              ],
+              [
+                120.803114,
+                24.202827
+              ],
+              [
+                120.803149,
+                24.180254
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 10.079,
+          "price_twd_per_kg": 25.2945,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.827755,
+                24.180283
+              ],
+              [
+                120.852361,
+                24.180309
+              ],
+              [
+                120.852335,
+                24.202882
+              ],
+              [
+                120.827725,
+                24.202857
+              ],
+              [
+                120.827755,
+                24.180283
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 7.657,
+          "price_twd_per_kg": 26.4794,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.852361,
+                24.180309
+              ],
+              [
+                120.876968,
+                24.180331
+              ],
+              [
+                120.876946,
+                24.202904
+              ],
+              [
+                120.852335,
+                24.202882
+              ],
+              [
+                120.852361,
+                24.180309
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 5.308,
+          "price_twd_per_kg": 28.055,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.876968,
+                24.180331
+              ],
+              [
+                120.901574,
+                24.180349
+              ],
+              [
+                120.901557,
+                24.202922
+              ],
+              [
+                120.876946,
+                24.202904
+              ],
+              [
+                120.876968,
+                24.180331
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 3.197,
+          "price_twd_per_kg": 29.2788,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.901574,
+                24.180349
+              ],
+              [
+                120.926181,
+                24.180363
+              ],
+              [
+                120.926168,
+                24.202936
+              ],
+              [
+                120.901557,
+                24.202922
+              ],
+              [
+                120.901574,
+                24.180349
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 3.436,
+          "price_twd_per_kg": 29.4558,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.926181,
+                24.180363
+              ],
+              [
+                120.950787,
+                24.180373
+              ],
+              [
+                120.950778,
+                24.202946
+              ],
+              [
+                120.926168,
+                24.202936
+              ],
+              [
+                120.926181,
+                24.180363
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 5.599,
+          "price_twd_per_kg": 29.0792,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.950787,
+                24.180373
+              ],
+              [
+                120.975394,
+                24.180379
+              ],
+              [
+                120.975389,
+                24.202952
+              ],
+              [
+                120.950778,
+                24.202946
+              ],
+              [
+                120.950787,
+                24.180373
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 7.962,
+          "price_twd_per_kg": 28.8812,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.803114,
+                24.202827
+              ],
+              [
+                120.827725,
+                24.202857
+              ],
+              [
+                120.827694,
+                24.22543
+              ],
+              [
+                120.803079,
+                24.2254
+              ],
+              [
+                120.803114,
+                24.202827
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 10.239,
+          "price_twd_per_kg": 26.1307,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.827725,
+                24.202857
+              ],
+              [
+                120.852335,
+                24.202882
+              ],
+              [
+                120.852309,
+                24.225456
+              ],
+              [
+                120.827694,
+                24.22543
+              ],
+              [
+                120.827725,
+                24.202857
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 7.866,
+          "price_twd_per_kg": 27.2602,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.852335,
+                24.202882
+              ],
+              [
+                120.876946,
+                24.202904
+              ],
+              [
+                120.876924,
+                24.225478
+              ],
+              [
+                120.852309,
+                24.225456
+              ],
+              [
+                120.852335,
+                24.202882
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 5.605,
+          "price_twd_per_kg": 28.5542,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.876946,
+                24.202904
+              ],
+              [
+                120.901557,
+                24.202922
+              ],
+              [
+                120.901539,
+                24.225495
+              ],
+              [
+                120.876924,
+                24.225478
+              ],
+              [
+                120.876946,
+                24.202904
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 3.668,
+          "price_twd_per_kg": 29.4573,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.901557,
+                24.202922
+              ],
+              [
+                120.926168,
+                24.202936
+              ],
+              [
+                120.926155,
+                24.225509
+              ],
+              [
+                120.901539,
+                24.225495
+              ],
+              [
+                120.901557,
+                24.202922
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 3.878,
+          "price_twd_per_kg": 29.5236,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.926168,
+                24.202936
+              ],
+              [
+                120.950778,
+                24.202946
+              ],
+              [
+                120.95077,
+                24.225519
+              ],
+              [
+                120.926155,
+                24.225509
+              ],
+              [
+                120.926168,
+                24.202936
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 5.881,
+          "price_twd_per_kg": 29.0728,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      },
+      {
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                120.950778,
+                24.202946
+              ],
+              [
+                120.975389,
+                24.202952
+              ],
+              [
+                120.975385,
+                24.225525
+              ],
+              [
+                120.95077,
+                24.225519
+              ],
+              [
+                120.950778,
+                24.202946
+              ]
+            ]
+          ],
+          "type": "Polygon"
+        },
+        "properties": {
+          "band_index": 2,
+          "lower_price_twd_per_kg": 25.0,
+          "nearest_distance_km": 8.162,
+          "price_twd_per_kg": 28.6765,
+          "supporting_neighbor_count": 4,
+          "surface_region": "test_region",
+          "upper_price_twd_per_kg": 35.0
+        },
+        "type": "Feature"
+      }
+    ],
+    "type": "FeatureCollection"
+  }
+}

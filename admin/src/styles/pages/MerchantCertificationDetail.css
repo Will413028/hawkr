@@ -1,0 +1,1300 @@
+/* ========== Merchant Certification Detail - Figma Design Match ========== */
+
+.certification-detail-page {
+	padding: 0;
+	font-family: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+/* Loading & Error States */
+.loading-container,
+.error-container {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 80px 20px;
+	color: #6b7280;
+}
+
+.loading-spinner {
+	width: 40px;
+	height: 40px;
+	border: 3px solid #e5e7eb;
+	border-top-color: var(--admin-primary-strong);
+	border-radius: 50%;
+	animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.error-container svg {
+	font-size: 48px;
+	color: #ff2e31;
+	margin-bottom: 16px;
+}
+
+/* ========== Header Card ========== */
+.detail-header {
+	display: flex;
+	flex-direction: row;
+	justify-content: space-between;
+	align-items: center;
+	min-height: 120px;
+	height: auto;
+	padding: 20px 33px;
+	background: white;
+	border: 1px solid #dadada;
+	border-radius: 15px;
+	margin-bottom: 20px;
+	box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	gap: 16px;
+}
+
+.merchant-avatar-group {
+	display: flex;
+	align-items: center;
+	gap: 32px;
+}
+
+.btn-back {
+	width: 40px;
+	height: 40px;
+	border-radius: 8px;
+	border: none;
+	background: transparent;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	color: #565656;
+	transition: all 0.2s;
+	flex-shrink: 0;
+}
+
+.btn-back:hover {
+	background: #f3f4f6;
+	color: #374151;
+}
+
+/* Avatar: 80px round per Figma */
+.merchant-avatar {
+	width: 80px;
+	height: 80px;
+	border-radius: 100px;
+	border: 1px solid #dadada;
+	overflow: hidden;
+	background: linear-gradient(135deg, #fef3e2 0%, #fdebd0 100%);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+.merchant-avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.avatar-placeholder {
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 28px;
+	font-weight: 700;
+	color: #b45309;
+}
+
+.header-info {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.header-title-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.merchant-name {
+	font-size: 28px;
+	font-weight: 700;
+	color: black;
+	margin: 0;
+}
+
+/* Header Meta Row */
+.header-meta {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 16px;
+	color: #565656;
+	flex-wrap: wrap;
+}
+
+.header-meta span {
+	display: inline;
+}
+
+.meta-separator {
+	margin: 0 6px;
+	color: #9ca3af;
+}
+
+/* Header Action Buttons - Figma style */
+.header-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 12px;
+	flex-shrink: 0;
+}
+
+/* 左側識別區只拿「剩下的」寬度，不再把溢出推出卡片外。
+ *
+ * `.header-actions` 是 `flex-shrink: 0`（刻意：按鈕不該被壓成兩個字），所以它一旦變寬，
+ * 全部壓力都轉給 `.header-left`；而 `.header-left` 的 flex 自動最小尺寸是 min-content
+ * （約 418px：頭像＋返回鍵＋最長那一欄 meta），撐不下時整個 header 就溢出卡片右緣，
+ * 被切掉的是最右邊的「刪除帳號」。實測：代行失敗的錯誤帶掛進這一列時店名折成
+ * 「十八養／場」、六個 meta 欄各自折行、分隔的「·」孤立成一行，`SOME_UNKNOWN_CODE_XYZ`
+ * 那張連「刪除帳號」整顆都不見。
+ *
+ * `flex: 1 1 0` 把它的 hypothetical main size 從 max-content 降為 0，`min-width: 0`
+ * 解除自動最小尺寸 ⇒ 它永遠恰好等於「容器寬 − 操作列寬」，溢出在結構上不可能發生。
+ * 無錯誤帶時的版面與修前逐像素相同（操作列 flex-shrink: 0 ⇒ 分配結果不變），
+ * 這條只是兜底：真正防止錯誤帶無限變寬的上限在 `DelegatedOperations.css` 的
+ * `.adm-operation-entry`，兩者是一組。
+ *
+ * ⚠️ 不用 flex-wrap 換行：`.header-left` 的 max-content 是那排 meta 攤成一行的寬度
+ * （>1300px），永遠大於容器 ⇒ 換行會**無條件**把操作列踢到第二行，連正常狀態也一起改。
+ *
+ * 選擇器綁 `.certification-detail-page`：`.detail-header` 這個類名在 `globals.css`
+ * 另有一份給商品詳情頁用（那頁子元素叫 `.detail-header-left/-actions`），不該被波及。 */
+.certification-detail-page .header-left {
+	flex: 1 1 0;
+	min-width: 0;
+}
+
+.btn-reject-figma {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	padding: 10px 24px;
+	border-radius: 8px;
+	font-size: 16px;
+	font-weight: 700;
+	cursor: pointer;
+	transition: all 0.2s;
+	background: transparent;
+	color: #ff2e31;
+	border: 2px solid #ff2e31;
+}
+
+.btn-reject-figma:hover {
+	background: #fef2f2;
+}
+
+.btn-reject-figma:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+.btn-approve-figma {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	padding: 10px 24px;
+	border-radius: 8px;
+	font-size: 16px;
+	font-weight: 700;
+	cursor: pointer;
+	transition: all 0.2s;
+	background: var(--admin-primary-strong);
+	color: white;
+	border: none;
+}
+
+.btn-approve-figma:hover {
+	background: var(--admin-primary-strong-hover);
+}
+
+.btn-approve-figma:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+/* ========== Delete Account / Close Store Buttons (destructive outline) ========== */
+.btn-delete-account,
+.btn-close-store {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 16px;
+	height: 36px;
+	border-radius: 100px;
+	font-size: 16px;
+	font-weight: 700;
+	cursor: pointer;
+	transition: all 0.2s;
+	background: transparent;
+	color: #e7000b;
+	border: 2px solid #e7000b;
+	box-sizing: border-box;
+}
+
+.btn-delete-account:hover,
+.btn-close-store:hover {
+	background: #fef2f2;
+}
+
+/* ========== Approved Stats Row ========== */
+.approved-stats-row {
+	display: flex;
+	gap: 24px;
+	margin-bottom: 20px;
+}
+
+.approved-stat-card {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	height: 102px;
+	padding: 21px 24px;
+	background: white;
+	border: 1px solid #dadada;
+	border-radius: 14px;
+	box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.1);
+	box-sizing: border-box;
+}
+
+.approved-stat-icon {
+	width: 45px;
+	height: 45px;
+	min-width: 45px;
+	border-radius: 100px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 22px;
+	background: #f5f2e8;
+}
+
+.approved-stat-icon.primary {
+	color: var(--admin-primary-strong);
+}
+
+.approved-stat-icon.orange {
+	color: #ee964b;
+}
+
+.approved-stat-label {
+	font-size: 18px;
+	font-weight: 700;
+	color: #565656;
+	margin-bottom: 4px;
+}
+
+.approved-stat-value {
+	font-size: 20px;
+	font-weight: 700;
+	color: black;
+}
+
+/* ========== Approved Tabs ========== */
+.approved-tabs {
+	display: flex;
+	gap: 12px;
+	margin-bottom: 20px;
+	background: white;
+	border: 1px solid #dadada;
+	border-radius: 15px;
+	padding: 8px 12px;
+}
+
+.approved-tab {
+	flex: 1;
+	height: 40px;
+	padding: 0;
+	border: none;
+	background: transparent;
+	font-size: 16px;
+	font-weight: 400;
+	color: black;
+	cursor: pointer;
+	transition: all 0.2s;
+	border-radius: 10px;
+}
+
+.approved-tab:hover {
+	color: black;
+	background: rgb(var(--color-ink-100-rgb) / 0.5);
+}
+
+.approved-tab.active {
+	color: black;
+	background: var(--color-ink-100);
+	border-radius: 10px;
+	font-size: 18px;
+	font-weight: 700;
+}
+
+.approved-tab.active:hover {
+	background: var(--color-ink-100);
+	color: black;
+}
+
+/* ========== Audit Notice - Yellow/Orange Banner ========== */
+.audit-notice {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	padding: 16px 20px;
+	background: #fef9e7;
+	border: 1px solid #f7dc6f;
+	border-radius: 12px;
+	margin-bottom: 20px;
+}
+
+.audit-notice-icon {
+	color: #ee964b;
+	font-size: 24px;
+	line-height: 1;
+	flex-shrink: 0;
+}
+
+.audit-notice-icon svg {
+	display: block;
+}
+
+.audit-notice-content {
+	flex: 1;
+}
+
+.audit-notice-title {
+	font-size: 16px;
+	font-weight: 700;
+	color: #ee964b;
+	margin-bottom: 4px;
+}
+
+.audit-notice-text {
+	font-size: 14px;
+	color: #b45309;
+	line-height: 1.5;
+}
+
+.audit-notice-text .highlight {
+	color: #dc2626;
+	font-weight: 600;
+}
+
+/* 審核失敗 - 紅色版本 */
+.audit-notice.rejected {
+	background: #fef2f2;
+	border-color: #fecaca;
+}
+
+.audit-notice.rejected .audit-notice-icon {
+	color: #e7000b;
+}
+
+.audit-notice.rejected .audit-notice-title {
+	color: #e7000b;
+}
+
+.audit-notice.rejected .audit-notice-text {
+	color: #e7000b;
+}
+
+/* ========== Payment Status Card ========== */
+.payment-status-card {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 20px 24px;
+	background: white;
+	border: 1px solid #dadada;
+	border-radius: 15px;
+	margin-bottom: 20px;
+	box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.1);
+}
+
+.payment-left {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	min-width: 0;
+}
+
+.payuni-logo-text {
+	display: inline-flex;
+	align-items: center;
+	height: 28px;
+	flex-shrink: 0;
+	font-size: 16px;
+	font-weight: 700;
+	color: #374151;
+}
+
+.payment-info {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.payment-label {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+	font-size: 14px;
+	font-weight: 500;
+	color: #374151;
+}
+
+.payment-desc {
+	font-size: 13px;
+	color: #6b7280;
+}
+
+.payuni-reason-text {
+	color: #b45309;
+	font-weight: 500;
+	white-space: pre-wrap;
+}
+
+.payuni-sync-meta {
+	color: #9ca3af;
+	font-size: 12px;
+}
+
+.payment-merchant-id {
+	font-size: 12px;
+	color: #9ca3af;
+}
+
+@media (max-width: 640px) {
+	.payment-left {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+}
+
+.btn-account-status {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 8px 16px;
+	border-radius: 8px;
+	font-size: 14px;
+	font-weight: 500;
+	cursor: default;
+	background: white;
+	color: var(--admin-primary-strong);
+	border: 1px solid var(--admin-primary-strong);
+	transition: all 0.2s;
+	flex-shrink: 0;
+}
+
+/* ========== Content Grid ========== */
+.detail-content-grid {
+	display: grid;
+	grid-template-columns: 55% 1fr;
+	gap: 20px;
+}
+
+.detail-left-column,
+.detail-right-column {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+}
+
+/* ========== Detail Card - tokens ========== */
+.detail-card {
+	background: white;
+	border: 1px solid #dadada;
+	border-radius: 16px;
+	overflow: hidden;
+	box-shadow: 0px 2px 20px rgba(0, 0, 0, 0.04);
+}
+
+/* PayUni 聯絡資訊 card 是 detail-content-grid 之外的獨立區塊（跟 payment-status-card
+   同層），不像其他 .detail-card 靠 .detail-left-column 的 flex gap 取得間距，需要
+   自己的 margin-bottom——沿用本頁其他獨立區塊（.payment-status-card）的同一個值。 */
+.payuni-contact-card {
+	margin-bottom: 20px;
+}
+
+/* Section Title - header bar */
+.section-title {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	height: 76px;
+	padding: 0 32px;
+	background: var(--color-ink-50);
+	border-bottom: 1px solid #dadada;
+	border-radius: 15px 15px 0 0;
+	font-size: 24px;
+	font-weight: 700;
+	color: black;
+}
+
+.section-title svg {
+	font-size: 24px;
+	color: black;
+}
+
+.card-body {
+	padding: 16px 24px 24px;
+}
+
+/* ========== Info Grid ========== */
+.info-grid {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 12px;
+}
+
+/* Field Container - tokens */
+.info-field {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 14px 16px;
+	background: white;
+	border-radius: 10px;
+	border: 1px solid #dadada;
+}
+
+.info-field.full-width {
+	grid-column: span 2;
+}
+
+.field-label {
+	font-size: 16px;
+	font-weight: 400;
+	color: #565656;
+}
+
+.field-value {
+	font-size: 20px;
+	font-weight: 400;
+	color: black;
+}
+
+/* ========== ID Card Grid ========== */
+.id-card-grid {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 16px;
+}
+
+.id-card-item {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.id-card-image {
+	width: 100%;
+	aspect-ratio: 1.6;
+	border-radius: 12px;
+	overflow: hidden;
+	background: #f3f4f6;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.id-card-image img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.id-card-placeholder {
+	width: 100%;
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	background: #f3f4f6;
+	color: #9ca3af;
+}
+
+.id-card-placeholder svg {
+	font-size: 32px;
+}
+
+.id-card-placeholder span {
+	font-size: 13px;
+}
+
+.id-card-footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.id-card-label {
+	font-size: 14px;
+	color: #565656;
+	font-weight: 500;
+}
+
+/* ========== Document List ========== */
+.document-list {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.document-item {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	padding: 12px;
+	background: white;
+	border-radius: 10px;
+	border: 1px solid #dadada;
+}
+
+.document-image {
+	width: 120px;
+	height: 80px;
+	border-radius: 10px;
+	overflow: hidden;
+	background: #f3f4f6;
+	flex-shrink: 0;
+}
+
+.document-image img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.document-info {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.document-info-text {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.document-number {
+	font-size: 16px;
+	font-weight: 600;
+	color: #111827;
+}
+
+.document-sub {
+	font-size: 13px;
+	color: #6b7280;
+}
+
+.document-link {
+	font-size: 13px;
+	color: var(--admin-primary-strong);
+	text-decoration: none;
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.document-link:hover {
+	text-decoration: underline;
+}
+
+.document-link svg {
+	font-size: 14px;
+}
+
+/* Empty state for documents */
+.empty-state-small {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 32px 16px;
+	color: #9ca3af;
+	gap: 8px;
+}
+
+.empty-state-small svg {
+	font-size: 32px;
+}
+
+.empty-state-small span {
+	font-size: 14px;
+}
+
+/* 治理操作結果提示（取代原生 alert）。外觀完全沿用 `DelegatedOperations.css` 的
+   `.adm-authorization-notice` / `.adm-operation-error`，這裡只補外距——那兩個 class
+   原本都長在有 `gap` 的 flex/grid 容器裡，換到這兩個位置就沒有間距來源了。 */
+.certification-detail-page > .adm-authorization-notice,
+.certification-detail-page > .adm-operation-error {
+	margin-bottom: 20px;
+}
+
+.form-label {
+	display: block;
+	font-size: 14px;
+	font-weight: 500;
+	color: #374151;
+	margin-bottom: 8px;
+}
+
+.form-label .required {
+	color: #ff2e31;
+}
+
+.form-textarea {
+	width: 100%;
+	padding: 12px 16px;
+	border: 1px solid #dadada;
+	border-radius: 10px;
+	font-size: 14px;
+	color: #111827;
+	resize: vertical;
+	font-family: inherit;
+	box-sizing: border-box;
+}
+
+.form-textarea:focus {
+	outline: none;
+	border-color: var(--admin-primary-strong);
+	box-shadow: 0 0 0 3px rgb(var(--color-ink-900-rgb) / 0.1);
+}
+
+/* ========== Responsive ========== */
+@media (max-width: 1024px) {
+	.detail-content-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.header-meta {
+		flex-wrap: wrap;
+	}
+}
+
+@media (max-width: 768px) {
+	.detail-header {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 16px;
+		height: auto;
+		padding: 20px 24px;
+	}
+
+	.header-actions {
+		width: 100%;
+	}
+
+	.btn-reject-figma,
+	.btn-approve-figma {
+		flex: 1;
+		justify-content: center;
+	}
+
+	.approved-stats-row {
+		flex-wrap: wrap;
+	}
+
+	.approved-stat-card {
+		flex: 1 1 calc(50% - 12px);
+		min-width: 0;
+	}
+
+	.info-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.info-field.full-width {
+		grid-column: span 1;
+	}
+
+	.id-card-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+/* ========== Tab Content Card ========== */
+.tab-content-card {
+	background: white;
+	border: 1px solid #dadada;
+	border-radius: 15px;
+	overflow: hidden;
+	box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* ========== Tab Table ========== */
+.tab-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.tab-table thead tr {
+	background: var(--color-ink-100);
+}
+
+.tab-table th {
+	padding: 14px 16px;
+	font-size: 18px;
+	font-weight: 700;
+	color: #565656;
+	text-align: left;
+	border-bottom: 1px solid #dadada;
+	white-space: nowrap;
+}
+
+.tab-table td {
+	padding: 12px 16px;
+	font-size: 16px;
+	color: black;
+	border-bottom: 1px solid #dadada;
+	vertical-align: middle;
+	height: 80px;
+	box-sizing: border-box;
+}
+
+.tab-table tbody tr:last-child td {
+	border-bottom: none;
+}
+
+/* Product thumbnail in table */
+.product-thumb {
+	width: 80px;
+	height: 60px;
+	border-radius: 8px;
+	object-fit: cover;
+	background: #f3f4f6;
+}
+
+/* Table action buttons */
+.tab-table-actions {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.btn-force-unpublish {
+	border: 1.5px solid #e7000b;
+	color: #e7000b;
+	background: transparent;
+	border-radius: 8px;
+	padding: 4px 10px;
+	font-size: 14px;
+	font-weight: 700;
+	cursor: pointer;
+	transition: all 0.2s;
+	white-space: nowrap;
+}
+
+.btn-force-unpublish:hover {
+	background: #fef2f2;
+}
+
+.btn-view-item {
+	background: var(--admin-primary-strong);
+	color: white;
+	border: none;
+	border-radius: 8px;
+	padding: 4px 10px;
+	font-size: 14px;
+	font-weight: 700;
+	cursor: pointer;
+	transition: all 0.2s;
+	white-space: nowrap;
+}
+
+.btn-view-item:hover {
+	background: var(--admin-primary-strong-hover);
+}
+
+/* ========== Order Buyer Cell ========== */
+.order-buyer {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.order-buyer-avatar {
+	width: 36px;
+	height: 36px;
+	border-radius: 50%;
+	background: linear-gradient(135deg, #fef3e2 0%, #fdebd0 100%);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	flex-shrink: 0;
+	font-size: 14px;
+	font-weight: 700;
+	color: #b45309;
+}
+
+.order-buyer-avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+/* ========== Order Logistics Cell ========== */
+.order-logistics {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.temp-badge {
+	display: inline-block;
+	border: 1.5px solid #ee964b;
+	color: #ee964b;
+	background: white;
+	border-radius: 100px;
+	padding: 2px 8px;
+	font-size: 12px;
+	font-weight: 500;
+	width: fit-content;
+}
+
+/* ========== Order Status Cell ========== */
+.order-status-cell {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.order-status-desc {
+	font-size: 13px;
+	color: #6b7280;
+}
+
+/* ========== Tab Empty State ========== */
+.tab-empty-state {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 80px 20px;
+	gap: 12px;
+}
+
+.tab-empty-state svg {
+	font-size: 48px;
+	color: var(--admin-primary-strong);
+}
+
+.tab-empty-state span {
+	font-size: 16px;
+	color: #565656;
+}
+
+/* ========== Lightbox 圖片放大預覽 ========== */
+.lightbox-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.85);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-direction: column;
+	z-index: 2000;
+	cursor: pointer;
+}
+
+.lightbox-close {
+	position: absolute;
+	top: 20px;
+	right: 20px;
+	width: 44px;
+	height: 44px;
+	border-radius: 50%;
+	border: none;
+	background: rgba(255, 255, 255, 0.15);
+	color: white;
+	font-size: 24px;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: background 0.2s;
+	z-index: 2001;
+}
+
+.lightbox-close:hover {
+	background: rgba(255, 255, 255, 0.3);
+}
+
+.lightbox-image {
+	max-width: 90vw;
+	max-height: 85vh;
+	object-fit: contain;
+	border-radius: 8px;
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+	cursor: default;
+}
+
+.lightbox-caption {
+	color: rgba(255, 255, 255, 0.8);
+	font-size: 14px;
+	margin-top: 16px;
+	text-align: center;
+}
+
+/* ========== 賣家停權（Governance） ========== */
+.btn-suspend-seller {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 16px;
+	height: 36px;
+	border-radius: 100px;
+	font-size: 16px;
+	font-weight: 700;
+	cursor: pointer;
+	transition: all 0.2s;
+	background: #e7000b;
+	color: white;
+	border: 2px solid #e7000b;
+	box-sizing: border-box;
+}
+
+.btn-suspend-seller:hover {
+	background: #c50008;
+	border-color: #c50008;
+}
+
+.btn-suspend-seller:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* 停權狀態卡:沿用 audit-notice.rejected 紅色語彙,右側掛解除按鈕 */
+.suspension-banner {
+	align-items: center;
+}
+
+.suspension-history-card {
+	margin-bottom: 20px;
+}
+
+.form-select {
+	width: 100%;
+	padding: 12px 16px;
+	border: 1px solid #dadada;
+	border-radius: 10px;
+	font-size: 14px;
+	color: #111827;
+	font-family: inherit;
+	box-sizing: border-box;
+	background: white;
+}
+
+.form-select:focus {
+	outline: none;
+	border-color: var(--admin-primary-strong);
+	box-shadow: 0 0 0 3px rgb(var(--color-ink-900-rgb) / 0.1);
+}
+
+.suspension-summary-box {
+	padding: 12px 16px;
+	background: #fef2f2;
+	border: 1px solid #fecaca;
+	border-radius: 10px;
+	font-size: 14px;
+	color: #b91c1c;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin-bottom: 16px;
+}
+
+.suspension-lift-hint {
+	font-size: 13px;
+	color: #6b7280;
+	margin: 0;
+}
+
+/* ========== KYC：顯示全文列、商業登記（GCIS）並列、審核紀錄 ========== */
+.kyc-reveal-bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	flex-wrap: wrap;
+	padding: 12px 20px;
+	margin-bottom: 20px;
+	background: var(--admin-paper);
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-card);
+}
+
+.kyc-reveal-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.kyc-reveal-text {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 14px;
+	color: var(--admin-body);
+}
+
+/* 商業登記（GCIS）並列：沿用 info-grid／info-field，只多一列欄頭與間距。 */
+.kyc-gcis {
+	margin-top: 20px;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.kyc-gcis-head {
+	align-items: start;
+}
+
+.kyc-gcis-col {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	font-size: 14px;
+	color: var(--admin-ink);
+}
+
+.kyc-gcis-summary {
+	font-size: 12px;
+	font-weight: 400;
+	color: var(--admin-muted-aa);
+}
+
+.kyc-gcis-summary--notFound,
+.kyc-gcis-summary--unavailable,
+.kyc-gcis-summary--overdue {
+	color: var(--admin-danger);
+}
+
+.kyc-gcis-requery {
+	margin-top: 8px;
+}
+
+.kyc-document-open {
+	display: block;
+	width: 100%;
+	height: 100%;
+	cursor: zoom-in;
+}
+
+.kyc-review-list {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.kyc-review-item {
+	padding: 12px 16px;
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-control);
+	font-size: 14px;
+	color: var(--admin-body);
+}
+
+.kyc-review-head {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 16px;
+	color: var(--admin-ink);
+}
+
+.kyc-review-reason {
+	margin-top: 6px;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.kyc-review-fields {
+	margin-top: 4px;
+	font-size: 13px;
+	color: var(--admin-muted-aa);
+}
+
+.kyc-issue-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin: 6px 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.kyc-issue-list li {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 10px;
+}
+
+.kyc-issue-message {
+	overflow-wrap: anywhere;
+}
+
+.kyc-issue-form {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	margin: 0 0 16px;
+	padding: 12px 16px;
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-control);
+}
+
+.kyc-issue-form legend {
+	padding: 0 6px;
+	font-size: 13px;
+	font-weight: 700;
+	color: var(--admin-body);
+}
+
+.kyc-review-blocked {
+	max-width: 320px;
+	font-size: 13px;
+	color: var(--admin-warning);
+}

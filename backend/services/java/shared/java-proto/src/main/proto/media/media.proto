@@ -1,0 +1,349 @@
+syntax = "proto3";
+
+package hawkr.media;
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/media";
+option java_multiple_files = true;
+option java_package = "io.github.will413028.hawkr.media.grpc";
+option java_outer_classname = "MediaProto";
+
+// Media Service - 管理靜態資源的生命週期與存取權限
+service MediaService {
+    // 建立上傳會話：回傳 OSS 簽名 URL 或會話 ID
+    rpc CreateUploadSession(CreateUploadSessionRequest) returns (CreateUploadSessionResponse);
+
+    // 完成上傳會話：前端上傳 OSS 完畢後回報，回傳 staged_token
+    rpc CompleteUploadSession(CompleteUploadSessionRequest) returns (CompleteUploadSessionResponse);
+
+    // 轉正圖片：將 Staged Token 轉換為 Asset ID（必須驗證 Token 是否有效且屬於該 Owner）
+    rpc FinalizeImages(FinalizeImagesRequest) returns (FinalizeImagesResponse);
+
+    // 綁定圖片：建立 Asset 與業務 ID 的關聯
+    rpc LinkImages(LinkImagesRequest) returns (LinkImagesResponse);
+
+    // 解除綁定：移除關聯（當 ref_count 為 0 時可由 GC 刪除）
+    rpc UnlinkImages(UnlinkImagesRequest) returns (UnlinkImagesResponse);
+
+    // 釋放引用：依 (ref_type, ref_id) 批次移除關聯，不需 asset_ids
+    // 帳號刪除時由 im-service 呼叫以釋放聊天圖片引用 → 資產變孤兒 → GC 刪除 OSS
+    // 換圖時由業務服務帶 keep_asset_ids 呼叫，原子地只釋放被取代的舊資產
+    rpc ReleaseReferences(ReleaseReferencesRequest) returns (ReleaseReferencesResponse);
+
+    // 後端直傳：上傳二進位檔案 + 自動轉正（服務間呼叫，非前端流程）
+    rpc ServerUploadAndFinalize(ServerUploadAndFinalizeRequest) returns (ServerUploadAndFinalizeResponse);
+
+    // 機敏檔後端直傳並轉正（58 §8.1.5）。與 ServerUploadAndFinalize 的差別是三件事，
+    // 缺任何一件發票 PDF 都不能用它：
+    //   ① objectKey 落 secure/ 前綴（既有那支硬寫 public/）
+    //   ② is_secure=true（既有那支硬寫 false）
+    //   ③ ref_type／ref_id **必填**，且在**同一次呼叫**內建立 asset_reference
+    //      （既有那支的 uploaderAccountId 是 NULL、又沒有引用 ⇒ 授權述詞兩分支都不通，
+    //       且 media GC 第 2 階段會在第 8 天把資產連同 R2 物件刪除；發票文件列還在、
+    //       pdf_object_key 還在，**下載時才 404**，而 AMEGO 只能查 180 天內）
+    rpc ServerUploadSecureAndFinalize(ServerUploadSecureAndFinalizeRequest) returns (ServerUploadSecureAndFinalizeResponse);
+
+    // 機敏檔後端讀回（58 §6.1.4）。與 `secure_download` HTTP 端點的分工是**授權主體不同**：
+    //   - `secure_download` 問「這個**使用者**能不能讀」（uploader 相符或有 asset_reference）
+    //   - 本 RPC 問「這個**服務**能不能讀」——呼叫端必須同時說對 object_key ＋ ref_type ＋ ref_id
+    //
+    // 🔴 為什麼非有它不可：機敏資產在 R2 上是**加密的**，金鑰只有 media 拿得到
+    // ⇒ 上傳者服務事後想拿回自己那份 bytes，除了本 RPC 沒有第二條路
+    // （直接讀 OSS 會拿到密文，且違反「儲存 SDK 只准在 media/product-import」）。
+    // 發票 PDF 由 invoice-service 以服務身分上傳、合法讀者卻有三個（買家／賣家／ADM），
+    // 那三個人的授權述詞在 invoice-service（order_no × buyer_id × document_id），不在 media
+    // ⇒ media 只負責「把 bytes 還給上傳它的那個服務」，誰能看是呼叫端的事。
+    //
+    // 🔴 **只接受內部呼叫**（x-internal-service ＋ HMAC 簽章，52 號設計書）。
+    // 少了這道，任何能打到 media gRPC 面的人只要猜中三元組就能取走機敏檔。
+    rpc ServerReadSecureAsset(ServerReadSecureAssetRequest) returns (ServerReadSecureAssetResponse);
+
+    // 資產中介資料批次查詢（#3031）。回 asset_id／檔名／大小／上傳時間，**不回 bytes**。
+    //
+    // 🔴 為什麼需要它：呼叫端手上只有 object_key（那是它自己存進業務表的東西），
+    // 而畫面要的是「這份附件多大、什麼時候傳的、下載連結怎麼組」。asset_id 是
+    // Gateway 組下載路徑的唯一輸入（`/api/v1/app/media/secure_download/{id}`），
+    // 沒有它前端只能畫一個點不下去的檔名——invoice-service 的稅籍佐證清單
+    // （TaxDocumentInfo）在 2026-09-02 之前正是這個狀態。
+    //
+    // 🔴 它同時補上 media proto 缺的 **object_key → asset_id 反查**：
+    // ReleaseReferences 的 keep 名單認 asset_id，而呼叫端的保留清單存的是 object_key，
+    // 少了反查就只能在「本次有新換發」時才敢呼叫 ReleaseReferences，否則一次純刪除的
+    // 草稿存檔會把所有既有佐證的引用一起釋放掉。
+    //
+    // 授權述詞與 ServerReadSecureAsset **逐字相同**（三元組全等 ＋ 內部呼叫）：
+    // 它回的是中介資料不是內容，但「這個 object_key 存不存在」本身就是資訊
+    // ⇒ 查無與越權必須無法分辨，否則它會變成一個可枚舉的 oracle。
+    rpc BatchGetAssetMetadata(BatchGetAssetMetadataRequest) returns (BatchGetAssetMetadataResponse);
+
+    // ========== Product Import 整合（08 §7）==========
+
+    // 派工外部 URL 下載（async）：RPC 立刻回 DOWNLOADING，實際下載由 Media 內部 worker pool 執行
+    // 完成後 publish MediaImportAssetDownloadedEvent 到 hawkr.media exchange / import.asset.downloaded routing key
+    // 詳見 08 號設計書 §7.2 / §7.2a
+    rpc ImportDownloadAsset(ImportDownloadAssetRequest) returns (ImportDownloadAssetResponse);
+
+    // 將 import_asset 搬到正式 refType 路徑並建立 media_asset
+    // 由 Product Service 在 CreateProductFromImportInternal commit 階段呼叫
+    // 詳見 08 號設計書 §7.3
+    rpc FinalizeImportAsset(FinalizeImportAssetRequest) returns (FinalizeImportAssetResponse);
+
+    // 將賣家本地上傳取得的 staged_token 綁定為 import_asset（同步）
+    // 由 product-import-service 在 UpdateImportItem 階段呼叫
+    // 內部：驗證 staged_token → 由 upload_session OSS path 搬至 import_asset tmp path → INSERT import_asset (status=UPLOADED)
+    // 詳見 40 號設計書 §3.4 / §4.3
+    rpc BindStagedAsset(BindStagedAssetRequest) returns (BindStagedAssetResponse);
+}
+
+// ========== FinalizeImages ==========
+
+// 將暫存圖片轉正請求
+message FinalizeImagesRequest {
+    repeated string staged_tokens = 1;  // 暫存 token 列表
+    string ref_type = 2;               // 資源分類，對應 AssetReferenceType（空值時 fallback 為 OTHER）
+}
+
+// 已轉正的資產資訊
+message FinalizedAsset {
+    string staged_token = 1;    // 回填對應關係（讓呼叫端可 mapping）
+    string asset_id = 2;        // 正式資產 ID（TSID 數字字串）
+    string object_key = 3;      // OSS 最終路徑（Product 可用於自行組 URL）
+    bool is_secure = 4;         // 是否機敏檔案（由 upload_session.is_secure / token claim 反映）
+}
+
+// 將暫存圖片轉正回應
+message FinalizeImagesResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated FinalizedAsset assets = 3;
+}
+
+// ========== LinkImages ==========
+
+// 建立資產引用請求
+message LinkImagesRequest {
+    // 引用類型：一律送 AssetReferenceType 的 **Value**（數字碼字串，如 "7101"=PRODUCT、
+    // "7111"=CERTIFICATION），不是 Code 字面值——media-service 用 isValidValue 驗，
+    // 送 "PRODUCT" 這種字面值會被拒。
+    string ref_type = 1;
+    string ref_id = 2;              // 引用 ID，如商品 UUID
+    repeated string asset_ids = 3;  // 資產 ID 列表
+}
+
+// 建立資產引用回應
+message LinkImagesResponse {
+    int32 code = 1;
+    string message = 2;
+    string linked_count = 3;   // 成功建立數量（數字字串）
+}
+
+// ========== UnlinkImages ==========
+
+// 解除資產引用請求
+message UnlinkImagesRequest {
+    string ref_type = 1;            // 引用類型
+    string ref_id = 2;              // 引用 ID
+    repeated string asset_ids = 3;  // 要解除的資產 ID 列表
+}
+
+// 解除資產引用回應
+message UnlinkImagesResponse {
+    int32 code = 1;
+    string message = 2;
+    string unlinked_count = 3; // 成功解除的數量（數字字串）
+}
+
+// ========== ReleaseReferences ==========
+
+// 釋放引用請求（依 ref_type + ref_id 批次刪除，不需 asset_ids）
+message ReleaseReferencesRequest {
+    string ref_type = 1;            // 引用類型，如 "7107"（CHAT_MESSAGE）
+    repeated string ref_ids = 2;    // 要釋放的引用 ID 列表（如聊天訊息 ID）
+    // 保留名單：這些 asset_id 的引用不會被刪除（單一交易內套用於全部 ref_ids）。
+    // 換圖流程用：先 Link 新資產 → 業務列寫入 → 帶 keep_asset_ids=[新資產] 釋放，
+    // 使「刪舊」與「留新」原子完成，中途失敗只會殘留引用（可回收），
+    // 絕不會出現「業務列指著、卻沒有引用」的資產被 GC 實體刪除。
+    // 空列表 = 釋放該 (ref_type, ref_id) 的全部引用（帳號/實體刪除語意）。
+    repeated string keep_asset_ids = 3;
+}
+
+// 釋放引用回應
+message ReleaseReferencesResponse {
+    int32 code = 1;
+    string message = 2;
+    string released_count = 3;     // 成功釋放的數量（數字字串）
+}
+
+// ========== CreateUploadSession ==========
+
+// 建立上傳會話請求
+message CreateUploadSessionRequest {
+    string filename = 1;        // 檔案名稱
+    string content_type = 2;    // MIME 類型，如 image/jpeg
+    string file_size = 3;       // 檔案大小（位元組，數字字串）
+    bool is_secure = 4;         // 是否機敏檔案
+    int64 account_id = 5;        // 帳號 ID（Gateway 從 JWT 取得後傳入）
+}
+
+// 建立上傳會話回應
+message CreateUploadSessionResponse {
+    int32 code = 1;
+    string message = 2;
+    string session_id = 3;      // 會話 ID（UUID）
+    reserved 4;                 // 已移除 object_key（前端不需要，轉正時才由業務服務取得）
+    string upload_url = 5;      // 簽名上傳 URL（僅公開上傳有值，機敏上傳為空）
+    string expires_in = 6;      // 過期時間（秒，數字字串）
+    bool is_secure = 7;         // 是否機敏檔案
+}
+
+// ========== CompleteUploadSession ==========
+
+// 完成上傳會話請求
+message CompleteUploadSessionRequest {
+    string session_id = 1;      // 會話 ID（UUID）
+    int64 account_id = 2;        // 帳號 ID（Gateway 從 JWT 取得後傳入）
+}
+
+// 完成上傳會話回應
+message CompleteUploadSessionResponse {
+    int32 code = 1;
+    string message = 2;
+    string staged_token = 3;    // 暫存 Token（用於後續 FinalizeImages）
+    string preview_url = 4;     // 預覽 URL（OSS 簽名 URL，供前端預覽，具時效性）
+}
+
+// ========== ServerUploadAndFinalize（後端直傳）==========
+
+message ServerUploadAndFinalizeRequest {
+    bytes file_data = 1;               // 檔案二進位資料
+    string filename = 2;               // 檔案名稱（如 "SHP-20260224-000001.pdf"）
+    string content_type = 3;           // MIME 類型（如 "application/pdf"）
+    string ref_type = 4;              // 資產引用類型（如 "SHIPPING"）
+}
+
+message ServerUploadAndFinalizeResponse {
+    int32 code = 1;
+    string message = 2;
+    string asset_id = 3;              // 正式資產 ID（TSID 數字字串）
+    string object_key = 4;            // OSS 物件路徑（用於組 CDN URL）
+}
+
+message ServerUploadSecureAndFinalizeRequest {
+    bytes file_data = 1;               // 檔案二進位資料
+    string filename = 2;               // 檔案名稱（如 "ZA10068421.pdf"）
+    string content_type = 3;           // MIME 類型（如 "application/pdf"）
+    string ref_type = 4;               // 資產引用類型，**必填**（發票 PDF 用 7120 INVOICE_DOCUMENT）
+    string ref_id = 5;                 // 業務主鍵，**必填**（發票用 invoice_documents.id，不用 order_no）
+}
+
+message ServerUploadSecureAndFinalizeResponse {
+    int32 code = 1;
+    string message = 2;
+    string asset_id = 3;              // 正式資產 ID（TSID 數字字串）
+    string object_key = 4;            // secure/ 前綴的物件路徑
+}
+
+message BatchGetAssetMetadataRequest {
+    // ref_type／ref_id 是授權述詞：呼叫端必須說得出「這批資產綁在哪一筆業務上」，
+    // 而那是它自己寫進 asset_reference 的值。
+    string ref_type = 1;
+    string ref_id = 2;
+    repeated string object_keys = 3;   // 上限 100
+}
+message AssetMetadataItem {
+    string object_key = 1;
+    string asset_id = 2;      // 數字字串（TSID）。Gateway 組下載路徑的唯一輸入
+    // 顯示用檔名：優先為使用者上傳當下的原始檔名；
+    // media 尚未儲存原始檔名的舊資產才回退為 object_key 尾段（並剝去 .attempt-{uuid} 後綴）。
+    string file_name = 3;
+    string size_bytes = 4;    // 數字字串（bytes）
+    string uploaded_at = 5;   // ISO 8601 UTC
+    string mime_type = 6;
+}
+message BatchGetAssetMetadataResponse {
+    int32 code = 1;
+    string message = 2;
+    // 只含**通過授權且存在**的資產；查無與越權一律不出現在這裡（不可分辨）。
+    repeated AssetMetadataItem data = 3;
+}
+
+message ServerReadSecureAssetRequest {
+    // 三個欄位**全部必填**，且必須與上傳當下一致——它們合起來就是這支 RPC 的授權述詞。
+    // 只給 object_key 是不夠的：object_key 會出現在呼叫端的 DB 與 log 裡，
+    // 而 (ref_type, ref_id) 綁的是「這份資產屬於哪一筆業務」。
+    string object_key = 1;             // secure/ 前綴的物件路徑
+    string ref_type = 2;               // 必填，須與 ServerUploadSecureAndFinalize 當時相同
+    string ref_id = 3;                 // 必填，同上
+}
+
+message ServerReadSecureAssetResponse {
+    int32 code = 1;
+    string message = 2;
+    bytes file_data = 3;               // 已解密的原始位元組
+    string content_type = 4;           // 落庫的 MIME 類型
+    // 顯示用檔名（下載／預覽的存檔名）：優先為使用者上傳當下的原始檔名；
+    // media 尚未儲存原始檔名的舊資產才回退為 object_key 尾段（並剝去 .attempt-{uuid} 後綴）。
+    string filename = 5;
+}
+
+// ========== ImportDownloadAsset（async，Product Import 委派下載）==========
+
+message ImportDownloadAssetRequest {
+    string ref_type = 1;                     // PRODUCT_IMPORT_PREVIEW | PRODUCT_IMPORT_PREVIEW_DESC（AssetReferenceType value）
+    // 賣家在 CSV 內原樣填寫的外部 URL：全鏈路都不做正規化（repo 內無任何 normalize 實作），
+    // 消費端不得假設它已被清理——可能帶 query 簽名參數、trailing slash 或百分比編碼。
+    string source_url = 2;
+    int64 store_id = 3;                      // 賣家 store_id（product-import-service 傳入）
+    int64 import_job_id = 4;
+    int64 import_item_id = 5;
+    string idempotency_key = 6;              // SHA256(url) + import_job_id
+    string expires_at = 7;                   // ISO 8601 UTC（建議 ImportJob.expires_at + 1d buffer）
+    int64 callback_correlation_id = 8;       // Import 端 product_import_item_asset.id；callback event 內 echo
+}
+
+message ImportDownloadAssetResponse {
+    int32 code = 1;
+    string message = 2;
+    string import_asset_id = 3;              // UUID（import_asset.id）
+    string status = 4;                       // ImportAssetMediaStatus.value()：DOWNLOADING(9401) / UPLOADED(9402) / FINALIZED(9403) / FAILED(9404) / EXPIRED(9405)
+                                             // 首次 INSERT 一律 DOWNLOADING；dedup 命中時 echo 既有 row 當下 status（含已 settled 終態）
+    string failure_reason = 5;               // (a) 派工本身失敗（罕見：DB INSERT 失敗 / MQ enqueue 失敗），或
+                                             // (b) dedup 命中且 status=FAILED 時 echo 既有 row 的 failure_reason（caller 同步 settle 用）
+    string object_key = 6;                   // dedup 命中且 status ∈ {UPLOADED, FINALIZED} 時填；caller 同步 settle 自己 row 用
+    string preview_url = 7;                  // 同 object_key 條件填；presigned download URL
+    string failure_detail = 8;               // dedup 命中且 status=FAILED 時填；caller 同步 settle 用
+}
+
+// ========== FinalizeImportAsset（Product 端 commit 階段呼叫）==========
+
+message FinalizeImportAssetRequest {
+    string import_asset_id = 1;
+    string target_ref_type = 2;              // PRODUCT | PRODUCT_DESC（不可是 PRODUCT_IMPORT_PREVIEW*）
+    int64 store_id = 3;                      // 現任賣家 store_id（product-service 傳入）
+    int64 product_id = 4;                    // 用於 finalized_object_key 路徑組裝（非 link，link 由 caller 自行 LinkImages）
+}
+
+message FinalizeImportAssetResponse {
+    int32 code = 1;
+    string message = 2;
+    string asset_id = 3;                     // media_asset.id（TSID 數字字串）
+    string object_key = 4;                   // 正式 OSS 路徑
+    string url = 5;                          // CDN URL（CdnProperties.buildUrl(objectKey)）
+}
+
+// ========== BindStagedAsset（sync，UpdateImportItem 階段用） ==========
+
+message BindStagedAssetRequest {
+    string staged_token = 1;                 // 賣家本地上傳取得（CompleteUploadSession 回傳）
+    int64 store_id = 2;                      // 賣家 store_id（product-import-service 傳入）
+    int64 import_job_id = 3;
+    int64 import_item_id = 4;
+    string ref_type = 5;                     // PRODUCT_IMPORT_PREVIEW | PRODUCT_IMPORT_PREVIEW_DESC
+}
+
+message BindStagedAssetResponse {
+    int32 code = 1;
+    string message = 2;
+    string import_asset_id = 3;              // UUID（import_asset.id）
+    string object_key = 4;                   // import_asset tmp OSS 路徑
+    string preview_url = 5;                  // CDN URL 供 UI 預覽
+}

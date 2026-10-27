@@ -1,0 +1,73 @@
+/* Hawkr cart type roles, adapted from Material 3's title/body scales.
+ * Values are nominal at the default 16px root; existing user text settings
+ * continue to scale rem units. No global font or temperature-tag overrides.
+ * Reference and platform mapping: design-system/cart-typography.md. */
+:where(
+		.cart-shell-page,
+		.cart-page__seller-group,
+		.shipping-group,
+		.cart-sheet--buyer-cart,
+		.coupon-dialog,
+		.cart-typography
+	) {
+	--cart-type-page: var(--cart-type-section);
+	--cart-type-section: 1.375rem;
+	--cart-type-total: var(--text-2xl);
+	--cart-type-body: var(--text-base);
+	--cart-type-support: var(--text-sm);
+	--cart-type-quantity: var(--cart-type-body);
+	--cart-weight-body: var(--weight-regular);
+	--cart-weight-emphasis: 600;
+}
+
+.cart-shell-page,
+.cart-typography {
+	font-family: var(--font-primary);
+	font-size: var(--cart-type-body);
+	font-weight: var(--cart-weight-body);
+	line-height: 1.5;
+}
+
+.cart-type-page-title {
+	font-family: var(--font-brand);
+	font-size: var(--cart-type-page);
+	font-weight: var(--cart-weight-emphasis);
+	line-height: calc(28 / 22);
+}
+
+.cart-type-section-title {
+	font-family: var(--font-brand);
+	font-size: var(--cart-type-section);
+	font-weight: var(--cart-weight-emphasis);
+	line-height: calc(28 / 22);
+}
+
+.cart-type-subtitle,
+.cart-type-amount {
+	font-size: var(--cart-type-body);
+	font-weight: var(--cart-weight-emphasis);
+	line-height: 1.5;
+}
+
+.cart-type-body {
+	font-size: var(--cart-type-body);
+	font-weight: var(--cart-weight-body);
+	line-height: 1.5;
+}
+
+.cart-type-support {
+	font-size: var(--cart-type-support);
+	font-weight: var(--cart-weight-body);
+	line-height: calc(20 / 14);
+}
+
+.cart-type-total {
+	font-size: var(--cart-type-total);
+	font-weight: var(--cart-weight-emphasis);
+	line-height: calc(32 / 24);
+}
+
+.cart-type-amount,
+.cart-type-total {
+	font-variant-numeric: tabular-nums;
+}

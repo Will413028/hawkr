@@ -1,0 +1,12 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "sh -c 'cd /app/services/notification-service && go build -o /app/tmp/main ./cmd/notification-service/main.go'"
+bin = "./tmp/main"
+include_dir = ["services/notification-service", "pkg"]
+include_ext = ["go"]
+exclude_dir = ["tmp", "vendor"]
+
+[log]
+time = true

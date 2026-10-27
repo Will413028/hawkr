@@ -1,0 +1,289 @@
+/*
+ * 買家端「詢價已發布」的三區版面（稿 R-02，issue #2538 A8 後半）。
+ *
+ * 用 CSS module 而不是往 styles/features/procurement-assistant.css 疊，理由與
+ * buyer-quote-compare.module.css 同一條：那支是 assistant layout 的全域樣式表，
+ * 這個版面的 class 沒有理由進入全域命名空間。仍在用的全域 class 只剩
+ * `assistant-quote-summary__delivery`（揭露行）；`__footer` 隨舊 footer、
+ * `__invites` 隨 legacy 邀請清單一起移除。本檔只加三個區塊自己的樣式。
+ *
+ * 兩欄是「事實」與「還沒成立的事實」的分界：左欄放已經固定下來的快照與進度，
+ * 右欄整欄都是「目前交易真相」。窄螢幕堆疊時右欄排在最後，因為它是結論。
+ */
+
+.panel {
+	display: grid;
+	gap: 16px;
+	color: var(--hkui-foreground);
+	font-family: var(--font-primary);
+}
+
+.head {
+	display: grid;
+	gap: 6px;
+}
+
+.head h2 {
+	font-size: var(--hkui-text-large, 1.125rem);
+	font-weight: 600;
+}
+
+.head p {
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-small, 0.875rem);
+	line-height: 1.7;
+}
+
+.columns {
+	display: grid;
+	grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+	gap: 16px;
+	align-items: start;
+}
+
+.left {
+	display: grid;
+	gap: 16px;
+	min-width: 0;
+}
+
+.card {
+	display: grid;
+	gap: 12px;
+	padding: 16px 18px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-md);
+	background: var(--hkui-content1);
+}
+
+.card h3 {
+	font-size: var(--hkui-text-medium, 1rem);
+	font-weight: 600;
+}
+
+/* 快照卡：dl/dt/dd（V.11.4 Accessibility 要求 artifact 用 section＋heading 與
+ * dl 結構），欄寬自動塞滿，窄螢幕自然掉成一欄。 */
+.facts {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+	gap: 10px 20px;
+	width: 100%;
+	margin: 0;
+}
+
+.facts > div {
+	display: grid;
+	gap: 2px;
+	min-width: 0;
+}
+
+.facts dt {
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.facts dd {
+	margin: 0;
+	font-size: var(--hkui-text-small, 0.875rem);
+	line-height: 1.6;
+	overflow-wrap: anywhere;
+}
+
+.immutable {
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+}
+
+.note {
+	display: flex;
+	gap: 10px;
+	align-items: flex-start;
+	margin: 0;
+	padding: 10px 12px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-md);
+	background: var(--hkui-content2);
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-small, 0.875rem);
+	line-height: 1.7;
+}
+
+.note > svg {
+	flex: none;
+	margin-top: 2px;
+	color: var(--hkui-primary);
+}
+
+/* 進度：ol，每一步一列。狀態不只靠顏色——序號圈的形狀、右側的狀態字與
+ * aria-current 三者一起表達（V.11.4 Accessibility：warning 不只靠顏色）。 */
+.steps {
+	display: grid;
+	gap: 2px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	counter-reset: rfq-step;
+}
+
+.step {
+	display: grid;
+	grid-template-columns: 26px minmax(0, 1fr) auto;
+	gap: 12px;
+	align-items: center;
+	padding: 9px 10px;
+	border-radius: var(--radius-md);
+}
+
+.step[data-state="current"] {
+	border: 1px solid
+		color-mix(in srgb, var(--hkui-primary) 42%, var(--hkui-divider));
+	padding: 8px 9px;
+	background: color-mix(in srgb, var(--hkui-primary) 6%, transparent);
+}
+
+.marker {
+	display: inline-flex;
+	width: 26px;
+	height: 26px;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid var(--hkui-divider);
+	border-radius: 999px;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	font-variant-numeric: tabular-nums;
+}
+
+.step[data-state="done"] .marker {
+	border-color: color-mix(
+		in srgb,
+		var(--hkui-success) 52%,
+		var(--hkui-divider)
+	);
+	background: color-mix(in srgb, var(--hkui-success) 16%, transparent);
+	color: var(--hkui-success-700);
+}
+
+.step[data-state="current"] .marker {
+	border-color: color-mix(
+		in srgb,
+		var(--hkui-primary) 52%,
+		var(--hkui-divider)
+	);
+	color: var(--hkui-primary);
+}
+
+.step[data-state="failed"] .marker {
+	border-color: color-mix(in srgb, var(--hkui-danger) 52%, var(--hkui-divider));
+	color: var(--hkui-danger-text);
+}
+
+.stepLabel {
+	font-size: var(--hkui-text-small, 0.875rem);
+	line-height: 1.5;
+	overflow-wrap: anywhere;
+}
+
+.step[data-state="pending"] .stepLabel {
+	color: var(--hkui-foreground-muted);
+}
+
+.stepMeta {
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	text-align: end;
+	white-space: nowrap;
+}
+
+.step[data-state="current"] .stepMeta {
+	color: var(--hkui-primary);
+}
+
+.step[data-state="failed"] .stepMeta {
+	color: var(--hkui-danger-text);
+}
+
+/* 目前交易真相：右欄整欄。 */
+.truth {
+	display: grid;
+	gap: 14px;
+	padding: 16px 18px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--radius-md);
+	background: var(--hkui-content1);
+}
+
+.truth h3 {
+	font-size: var(--hkui-text-medium, 1rem);
+	font-weight: 600;
+}
+
+.truthList {
+	display: grid;
+	gap: 10px;
+	margin: 0;
+}
+
+.truthRow {
+	display: flex;
+	gap: 12px;
+	align-items: baseline;
+	justify-content: space-between;
+}
+
+.truthRow dt {
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-small, 0.875rem);
+}
+
+.truthRow dd {
+	margin: 0;
+	font-size: var(--hkui-text-small, 0.875rem);
+	font-weight: 600;
+	text-align: end;
+	overflow-wrap: anywhere;
+}
+
+/* 「尚未成立」「尚未建立」「尚未取得」不是壞消息也不是好消息，所以刻意不上
+ * 語意色——把空狀態染紅會讓買家以為出了問題，染綠則是樂觀文案。 */
+.truthRow dd[data-empty] {
+	color: var(--hkui-foreground-muted);
+	font-weight: 400;
+}
+
+.truthFootnote {
+	margin: 0;
+	padding-top: 12px;
+	border-top: 1px solid var(--hkui-divider);
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	line-height: 1.7;
+}
+
+.actions {
+	display: grid;
+	gap: 8px;
+}
+
+.actionNote {
+	margin: 0;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny, 0.75rem);
+	line-height: 1.6;
+}
+
+@media (max-width: 900px) {
+	.columns {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.step {
+		grid-template-columns: 26px minmax(0, 1fr);
+	}
+
+	.stepMeta {
+		grid-column: 2;
+		text-align: start;
+		white-space: normal;
+	}
+}

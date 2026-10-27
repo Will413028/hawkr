@@ -1,0 +1,58 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+<Meta title="開始使用/Hawkr 元件庫" />
+
+# Hawkr · 共用元件庫
+
+買家 App、賣家 App 與主網站（含賣家中心）的視覺對照入口。
+
+| 目錄 | 內容 |
+| --- | --- |
+| Foundations | 正式品牌色、字級、間距、圓角 |
+| Web | 從正式 `components/ui` 與 shared 元件直接渲染；可切淺／深色、字級及參數 |
+| Apps / Buyer、Seller | 真實 Flutter 編譯結果，可輸入、點擊並切換狀態 |
+| Apps / Buyer API、Seller API | 同步自 App repository 的 Dart imports、建構式與使用規則 |
+| Cross Platform | 同頁比較三端基礎操作 |
+
+新增 UI 前先找到現有元件與狀態。按鈕、輸入、選擇、卡片、載入與空狀態都從正式元件組合；商業範例使用固定資料。
+
+## 檢視方式
+
+Web 工具列可以切換淺色、深色與文字倍率。App 預覽有獨立 `textScale` 控制，使用 App 正式淺色主題。`Compact Large Text` 用 320px 與 1.4 倍字級檢查空間。
+
+Flutter API 文件中的 callback／狀態範例必須由使用端提供實際行為。元件庫的可點擊示範不代表訂單、支付、上架或 API 串接已驗證。
+
+## 日常啟動
+
+```sh
+pnpm install --frozen-lockfile
+pnpm exec playwright install chromium
+pnpm storybook:apps
+pnpm storybook:sync-app-docs
+pnpm storybook
+```
+
+App 不在 monorepo 的 `buyer-app`、`seller-app` 時，先設定 `HAWKR_APPS_ROOT`。未建置 App 時，Web stories 可獨立使用；App 區塊會明確顯示缺少預覽。
+
+## MCP 工作流程
+
+開發伺服器啟動後，MCP 位址為 `http://127.0.0.1:6006/mcp`。
+
+1. `docs-list`：查詢已有元件和 Flutter API 文件。
+2. `docs-show`：讀取實際參數與使用範例。Web imports 以 story 和正式 `@/components/...` 路徑為準，此專案未發布為 npm 套件。
+3. `get-storybook-story-instructions`：取得本版 stories 與互動測試規則。
+4. 修改後執行 `test-run`，用 `stories-preview` 取得預覽連結。
+
+Flutter 原生 widget tests 分別在兩個 App repository 執行。Storybook React 測試不會穿透 Flutter iframe，這些嵌入 stories 已標記 `!test`。
+
+## 一致性維護
+
+共同 token 來源與平台例外記錄在 `design-system/cross-platform-tokens.json`。在 Web 專案執行：
+
+```sh
+pnpm design:check --apps-root ..
+pnpm storybook:typecheck
+pnpm storybook:test
+```
+
+目前 72 個共同 token 有來源比對。卡片、對話框圓角及部分文字角色的既有差異仍明列於 `design-system/cross-platform.md`，請從這個對照頁逐項收斂。

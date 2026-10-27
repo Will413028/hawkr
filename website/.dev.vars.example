@@ -1,0 +1,6 @@
+# wrangler 本地 preview 的 runtime vars（複製成 .dev.vars，已 gitignore）。
+# 本機 preview 用的 vars 與 secrets。
+API_BASE_URL=http://localhost:8080/api/v1
+# REVALIDATE_SECRET=...               # 後端 POST /api/revalidate 驗證用（prod/dev 各一）
+# APPLE_PAY_DOMAIN_ASSOCIATION=...    # Apple Pay domain association route 用
+# ORIGIN_AUTH_SECRET=...              # backend#2264 限流身分簽章（server 端出站才用；沒設＝不簽，行為同今天）

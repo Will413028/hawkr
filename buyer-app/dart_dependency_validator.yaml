@@ -1,0 +1,14 @@
+# dependency_validator 設定
+# 用法：fvm dart run dependency_validator（或 scripts/deadcode.sh）
+#
+# ignore 白名單：以下套件 grep 看似未 import，實為誤報
+#   json_annotation — 由 codegen 使用（@JsonSerializable/@JsonKey，
+#                     透過 freezed_annotation re-export，工具看不懂 codegen 關聯）
+#   cupertino_icons — Flutter 標準模板字型依賴，無直接 import 仍保留
+#   dart_code_linter — 死碼掃描器本身，CLI 工具、刻意不被 lib import
+ignore:
+  - json_annotation
+  - cupertino_icons
+  - dart_code_linter
+  # riverpod_lint is loaded by the custom_lint analyzer plugin.
+  - riverpod_lint

@@ -1,0 +1,124 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - '/etc/prometheus/rules/*.yml'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+scrape_configs:
+  # ── Monitoring 本機服務（container network，不需要外部 IP）────────────
+  - job_name: "otel-collector"
+    static_configs:
+      - targets: ["otel-collector:8888"]
+
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # ── 監控棧自身的存活訊號（2026-09-10）────────────────────────────────
+  #
+  # 為什麼需要：這些容器在此之前**完全沒有 up series**，於是 service-alerts.yml
+  # 的 ServiceDown（up == 0）蓋不到它們；它們又不在 k8s 裡（VM 上的
+  # docker-compose），KubePodNotReady 也蓋不到 ⇒ 掛掉不會有任何東西響。
+  # 2026-09-10 實測 loki／tempo／grafana／alertmanager／promtail 五個 job 各回 0 條。
+  #
+  # 用 static_configs 而非 file_sd 是刻意的：這些是 compose 服務名，在
+  # hawkr-monitoring network 內永遠可解析，而且「target 一直存在」才會在容器
+  # 掛掉時產生 up == 0。file_sd 的 target 若隨 JSON 消失是 absent 不是 0，
+  # ServiceDown 抓不到（app 側同一個坑見 service-alerts.yml 的 ProdServiceAbsent 註解）。
+  #
+  # 不帶 env label：與上面 otel-collector／prometheus 一致。監控棧是單一實例、
+  # 同時服務 dev 與 prod，沒有「哪個 env」可言。代價是帶 env 篩選的 dashboard panel
+  # 看不到它們。
+  #
+  # 這一組**不能自我涵蓋 alertmanager 與 prometheus**：alertmanager 死掉時沒有東西
+  # 能把 ServiceDown 送出去，prometheus 死掉時規則根本不會被評估。那需要 push-based
+  # 的外部 watchdog（Dead Man's Snitch 形狀），本 repo 沒有。仍然把兩者加進來，因為
+  # 「部分故障」抓得到——例如 alertmanager 起得來但 /metrics 回非 200。
+  - job_name: "loki"
+    static_configs:
+      - targets: ["loki:3100"]
+
+  - job_name: "tempo"
+    static_configs:
+      - targets: ["tempo:3200"]
+
+  - job_name: "grafana"
+    static_configs:
+      - targets: ["grafana:3000"]
+
+  - job_name: "alertmanager"
+    static_configs:
+      - targets: ["alertmanager:9093"]
+
+  # promtail 的 http_listen_port 是 9080（promtail/promtail-config.yaml）。
+  # 它掛掉的症狀是 log 靜默停止進來——Loki 還活著、查詢照樣成功、只是沒有新資料，
+  # 是這一組裡最沒有其他徵兆的一個。
+  - job_name: "promtail"
+    static_configs:
+      - targets: ["promtail:9080"]
+
+  # 2026-09-11 補上前一批漏掉的兩個（當時實測是七個容器零 up，只補了五個）。
+  #
+  # discord-webhook-gateway 是**告警鏈的最後一跳**：在它自己有指標之前，
+  # sendDiscordWebhook 失敗只 log 一行然後回 500 給 Alertmanager——沒有任何東西
+  # 會告訴人「告警送不出去」，而那正是最不能靜默的失效（它壞掉的時候，所有其他
+  # 告警也一起送不出去）。它的 /metrics 是手寫 exposition format、零外部依賴，
+  # 除了 up 之外還給出 alerts_received_total / forward_failures_total（依 route）。
+  - job_name: "discord-webhook-gateway"
+    static_configs:
+      - targets: ["discord-webhook-gateway:8080"]
+
+  # ── Hawkr 服務（file_sd_configs，修改 JSON 自動熱載入）──────────
+  #
+  # Target JSON 放在 targets/ 目錄，格式見 targets/*.json.example
+  # Prometheus 每 30 秒掃描一次，新增/修改/刪除 JSON 不需重啟
+  #
+  # 每個 target 必須帶 "service" label（會被 relabel 成 job）
+  # Java 服務需額外帶 "__metrics_path__": "/actuator/prometheus"
+  #
+  - job_name: "hawkr"
+    metrics_path: /metrics
+    file_sd_configs:
+      - files:
+          - '/etc/prometheus/targets/*.json'
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [service]
+        target_label: job
+      - regex: service
+        action: labeldrop
+
+  # ── RabbitMQ per-queue 明細指標（/metrics/detailed）──────────────────
+  #
+  # 為何需要獨立 job（#1625）：RabbitMQ prometheus plugin 的預設 aggregated
+  # endpoint（/metrics，由上方 hawkr job 的 file_sd 抓 15692）是「聚合模式」
+  # ——rabbitmq_queue_messages / rabbitmq_queue_consumers 沒有 queue label
+  # （實測只有 env / instance / job），使 infra-alerts.yml 的 per-queue 告警
+  # （DLQ 堆積 / 無 consumer）selector 永遠 match 不到、形同不存在。
+  # detailed endpoint 提供帶 queue / vhost label 的 rabbitmq_detailed_* 指標，
+  # per-queue 告警才會生效（prod 6 條 queue 因 406 args drift 斷線 5 天無告警）。
+  #
+  # family 參數限定只抓 queue 明細（官方文件 rabbitmq.com/docs/prometheus
+  # #detailed-endpoint 明載，較 per-object 高效）：
+  #   queue_coarse_metrics → rabbitmq_detailed_queue_messages_ready
+  #   queue_consumer_count → rabbitmq_detailed_queue_consumers
+  #
+  # 目標沿用既有 rabbitmq target 的 host（同 IP 同 port 15692，僅 metrics_path
+  # 不同）；IP 依慣例走 gitignored targets/ json（格式同
+  # targets/infra.json.example），env label 對齊 file_sd 慣例。
+  - job_name: "rabbitmq-detailed"
+    metrics_path: /metrics/detailed
+    params:
+      family:
+        - queue_coarse_metrics
+        - queue_consumer_count
+    file_sd_configs:
+      - files:
+          - '/etc/prometheus/targets/detailed/*.json'
+        refresh_interval: 30s

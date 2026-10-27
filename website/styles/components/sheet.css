@@ -1,0 +1,491 @@
+/* Bottom-sheet shell — shared sheet primitive rendered via CartSheetPortal.
+   Lives with the component (imported by CartSheetPortal.tsx) so every
+   consumer route gets the styles. Moved out of features/cart.css. */
+
+.cart-sheet {
+	position: fixed;
+	inset: 0;
+	z-index: var(--z-modal);
+	display: flex;
+	align-items: flex-end;
+	justify-content: center;
+}
+
+.cart-sheet__scrim {
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.4);
+	border: 0;
+	cursor: pointer;
+}
+
+.cart-sheet__panel {
+	position: relative;
+	width: 100%;
+	max-width: 520px;
+	max-height: 86vh;
+	display: flex;
+	flex-direction: column;
+	background: var(--surface-card);
+	border-radius: 24px 24px 0 0;
+	box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.18);
+	animation: cart-sheet-up 0.22s ease;
+}
+
+@keyframes cart-sheet-up {
+	from {
+		transform: translateY(100%);
+	}
+	to {
+		transform: translateY(0);
+	}
+}
+
+.cart-sheet__header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 12px;
+	padding: 16px 18px;
+	border-bottom: 1px solid var(--border-soft);
+}
+
+.cart-sheet__header h2 {
+	margin: 0;
+	font-size: 1.0625rem;
+	font-weight: var(--weight-black);
+	color: var(--ink-heading);
+}
+
+.cart-sheet__close {
+	width: 30px;
+	height: 30px;
+	border: 0;
+	border-radius: var(--radius-circle);
+	background: var(--surface-panel);
+	color: var(--ink-body);
+	font-size: 1.375rem;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.cart-sheet__body {
+	overflow-y: auto;
+	padding: 12px 18px 12px;
+}
+
+.cart-sheet__hint,
+.cart-sheet__empty p {
+	margin: 12px 0;
+	color: var(--ink-soft);
+	text-align: center;
+}
+
+.cart-sheet__empty {
+	padding: 28px 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	align-items: center;
+}
+
+.cart-sheet__list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.cart-sheet__row {
+	display: grid;
+	grid-template-columns: 20px minmax(0, 1fr);
+	gap: 12px;
+	width: 100%;
+	padding: 12px 14px;
+	border: 1px solid var(--border-soft);
+	border-radius: 14px;
+	background: var(--surface-card);
+	color: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.cart-sheet__row:hover {
+	background: var(--surface-panel);
+}
+
+.cart-sheet__row--active {
+	border-color: var(--color-brand-primary-strong);
+	background: rgb(var(--color-brand-primary-rgb) / 0.06);
+}
+
+.cart-sheet__row-radio {
+	width: 20px;
+	height: 20px;
+	border-radius: var(--radius-circle);
+	border: 2px solid var(--border-soft);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.cart-sheet__row-radio span {
+	width: 10px;
+	height: 10px;
+	border-radius: var(--radius-circle);
+	background: transparent;
+	transition: background 0.16s ease;
+}
+
+.cart-sheet__row--active .cart-sheet__row-radio {
+	border-color: var(--color-brand-primary-strong);
+}
+
+.cart-sheet__row--active .cart-sheet__row-radio span {
+	background: var(--color-brand-primary-strong);
+}
+
+.cart-sheet__row-body {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.cart-sheet__row-body strong {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--ink-heading);
+	font-size: var(--text-sm);
+	font-weight: 800;
+}
+
+.cart-sheet__row-body span {
+	color: var(--ink-soft);
+	font-size: var(--text-xs);
+}
+
+.cart-sheet__badge {
+	padding: 2px 8px;
+	border-radius: var(--radius-pill);
+	background: var(--color-brand-primary-strong);
+	color: #fff9e8;
+	font-size: 0.625rem;
+	font-weight: 700;
+}
+
+.cart-sheet__row-body .cart-sheet__badge {
+	color: #fff9e8;
+}
+
+.cart-sheet__footer {
+	padding: 12px 18px;
+	border-top: 1px solid var(--border-soft);
+}
+
+.cart-sheet__add {
+	display: block;
+	width: 100%;
+	padding: 12px;
+	border: 1px dashed var(--color-brand-primary-strong);
+	border-radius: var(--radius-md);
+	background: transparent;
+	color: var(--color-brand-primary-strong);
+	font-weight: 800;
+	text-align: center;
+	cursor: pointer;
+}
+
+.cart-sheet__add--danger {
+	border-color: rgb(var(--cart-danger-rgb) / 0.45);
+	color: var(--cart-danger);
+}
+
+/* Pickup form */
+
+.cart-sheet__form {
+	margin-top: 14px;
+	padding-top: 14px;
+	border-top: 1px dashed var(--border-soft);
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+/* Form taking over the body (no existing-list above it) — drop the
+   dashed separator + top margin so the modal hugs its content. */
+.cart-sheet__form--standalone {
+	margin-top: 0;
+	padding-top: 0;
+	border-top: 0;
+}
+
+.cart-sheet__form label {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	color: var(--ink-heading);
+	font-size: 0.8125rem;
+	font-weight: 800;
+}
+
+.cart-sheet__form input,
+.cart-sheet__form select {
+	padding: 10px 12px;
+	border: 1px solid var(--border-soft);
+	border-radius: 10px;
+	background: var(--surface-page);
+	color: var(--ink-heading);
+	font-size: var(--text-sm);
+	font-weight: 600;
+}
+
+.cart-sheet__form input:focus,
+.cart-sheet__form select:focus {
+	outline: none;
+	border-color: var(--color-brand-primary-strong);
+	box-shadow: 0 0 0 3px rgb(var(--color-brand-primary-rgb) / 0.16);
+}
+
+.cart-sheet__form-check {
+	flex-direction: row;
+	align-items: center;
+	gap: 8px;
+	font-weight: 600;
+	cursor: pointer;
+	user-select: none;
+}
+
+/* The broad `.cart-sheet__form input` rule above paints text-input padding +
+   border onto the 預設 checkbox; reset it so the native control renders clean
+   and aligned with its label. */
+.cart-sheet__form-check input[type="checkbox"] {
+	width: 18px;
+	height: 18px;
+	flex: none;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: none;
+	box-shadow: none;
+	accent-color: var(--color-brand-primary-strong);
+	cursor: pointer;
+}
+
+.cart-sheet__form-actions {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-end;
+}
+
+.cart-sheet__form-required {
+	margin-left: 4px;
+	color: var(--danger, #d23f3f);
+	font-weight: 800;
+}
+
+.cart-sheet__form-hint {
+	margin: 6px 0 0;
+	text-align: right;
+	color: var(--ink-soft);
+	font-size: 0.75rem;
+}
+
+/* PayUni 7-11 map store-pick block */
+
+.cart-sheet__store-pick {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.cart-sheet__store-pick-label {
+	color: var(--ink-heading);
+	font-size: 0.8125rem;
+	font-weight: 800;
+}
+
+.cart-sheet__store-pick-btn {
+	padding: 12px 14px;
+	border: 1px dashed var(--color-brand-primary-strong);
+	border-radius: 10px;
+	background: rgb(var(--color-brand-primary-rgb) / 0.05);
+	color: var(--color-brand-primary-strong);
+	font-size: var(--text-sm);
+	font-weight: 700;
+	cursor: pointer;
+	transition: background 0.15s ease;
+}
+
+.cart-sheet__store-pick-btn:hover:not(:disabled) {
+	background: rgb(var(--color-brand-primary-rgb) / 0.1);
+}
+
+.cart-sheet__store-pick-btn:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+.cart-sheet__store-pick-hint {
+	margin: 0;
+	color: var(--ink-soft);
+	font-size: 0.75rem;
+}
+
+.cart-sheet__store-card {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 12px 14px;
+	border: 1px solid var(--border-soft);
+	border-radius: 10px;
+	background: var(--surface-card);
+}
+
+.cart-sheet__store-card strong {
+	color: var(--ink-heading);
+	font-size: var(--text-sm);
+	font-weight: 800;
+}
+
+.cart-sheet__store-card span {
+	color: var(--ink-soft);
+	font-size: 0.8125rem;
+}
+
+.cart-sheet__store-change {
+	align-self: flex-start;
+	margin-top: 4px;
+	padding: 6px 12px;
+	border: 1px solid var(--color-brand-primary-strong);
+	border-radius: var(--radius-pill);
+	background: transparent;
+	color: var(--color-brand-primary-strong);
+	font-size: 0.8125rem;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.cart-sheet__store-change:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+@media (max-width: 960px) {
+	.cart-sheet__panel {
+		max-width: none;
+		border-radius: 24px 24px 0 0;
+	}
+}
+
+/* Buyer cart controls follow the shared 44px / 48px button hierarchy. */
+.cart-sheet--buyer-cart .cart-sheet__close {
+	display: inline-grid;
+	place-items: center;
+	width: 44px;
+	height: 44px;
+	flex: 0 0 44px;
+}
+
+.cart-sheet--buyer-cart .cart-sheet__header h2 {
+	font-size: var(--cart-type-section);
+	font-weight: var(--cart-weight-emphasis);
+	line-height: calc(28 / 22);
+}
+
+.cart-sheet--buyer-cart .cart-sheet__row-body strong,
+.cart-sheet--buyer-cart .cart-sheet__store-card strong {
+	flex-wrap: wrap;
+	font-size: var(--cart-type-body);
+	font-weight: var(--cart-weight-emphasis);
+	line-height: 1.5;
+}
+
+.cart-sheet--buyer-cart .cart-sheet__row-body span,
+.cart-sheet--buyer-cart .cart-sheet__store-card span,
+.cart-sheet--buyer-cart .cart-sheet__form-hint,
+.cart-sheet--buyer-cart .cart-sheet__store-pick-hint {
+	font-size: var(--cart-type-support);
+	font-weight: var(--cart-weight-body);
+	line-height: calc(20 / 14);
+	color: var(--ink-body);
+	overflow-wrap: anywhere;
+}
+
+.cart-sheet--buyer-cart .cart-sheet__row-body .cart-sheet__badge {
+	color: var(--hkui-primary-foreground);
+	font-size: var(--cart-type-support);
+	font-weight: var(--cart-weight-body);
+	line-height: calc(20 / 14);
+}
+
+.cart-sheet--buyer-cart .cart-sheet__add {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 44px;
+	height: auto;
+	padding: 8px 12px;
+	font-size: var(--cart-type-body);
+	font-weight: var(--cart-weight-emphasis);
+	line-height: 1.5;
+	white-space: normal;
+}
+
+.cart-sheet--buyer-cart .cart-sheet__form label,
+.cart-sheet--buyer-cart .cart-sheet__store-pick-label {
+	font-size: var(--cart-type-support);
+	font-weight: var(--cart-weight-body);
+	line-height: calc(20 / 14);
+}
+
+.cart-sheet--buyer-cart .cart-sheet__form input:not([type="checkbox"]),
+.cart-sheet--buyer-cart .cart-sheet__form select {
+	width: 100%;
+	min-width: 0;
+	min-height: 48px;
+	font-size: var(--cart-type-body);
+	font-weight: var(--cart-weight-body);
+	line-height: 1.5;
+}
+
+.cart-sheet--buyer-cart .cart-sheet__form .cart-sheet__form-check {
+	flex-direction: row;
+	min-height: 44px;
+}
+
+.cart-sheet--buyer-cart .cart-sheet__form-actions {
+	flex-wrap: wrap;
+}
+
+.cart-sheet--buyer-cart .cart-sheet__primary-action,
+.cart-sheet--buyer-cart .cart-sheet__secondary-action {
+	min-height: 48px;
+	height: auto;
+	font-size: var(--cart-type-body);
+	font-weight: var(--cart-weight-emphasis);
+	line-height: 1.5;
+	white-space: normal;
+}
+
+.cart-sheet--buyer-cart .cart-sheet__store-change {
+	min-height: 44px;
+	height: auto;
+	font-size: var(--cart-type-body);
+	font-weight: var(--cart-weight-emphasis);
+	line-height: 1.5;
+}
+
+.cart-sheet--buyer-cart .cart-sheet__footer {
+	padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.cart-sheet--buyer-cart .cart-sheet__panel {
+		animation: none;
+	}
+}

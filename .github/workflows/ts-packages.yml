@@ -1,0 +1,56 @@
+name: TS packages
+
+# website 與 admin 共用、不是 API 生成物的 TS 套件（packages/hawkr-api-ts 在 api-contract.yml）：lint（tsc、biome）、test。
+# 生成物 drift 由各套件的生成來源 workflow 守（packages/hawkr-twaddr-ts 在 twaddr-generated-diff.yml）；
+# packages/hawkr-icons-ts 的生成來源在 node_modules，drift 測試在套件自己的 test（這裡）。
+# website 與 admin 以 workspace 依賴這些套件，TS 套件（packages/hawkr-*-ts）改動時一併重跑。
+# @hawkr/ui-text 的 messages、keys 與 golden 是生成物（backend/cmd/uitext-gen，drift 在 ui-text-generated-diff.yml）；
+# 它依賴 @hawkr/api 的 enum 型別，所以 packages/hawkr-api-ts 改動也重跑。
+# Dart 套件 packages/hawkr_* 不在這裡（在 dart-packages.yml）；底線與連字號不同，下面的 glob 不會匹配它們。
+
+on:
+  pull_request:
+    paths: &package_paths
+      - 'packages/hawkr-icons-ts/**'
+      - 'packages/hawkr-twaddr-ts/**'
+      - 'packages/hawkr-ui-text-ts/**'
+      - 'packages/hawkr-api-ts/**'
+      # 根目錄的 pnpm workspace（一份 lockfile 與工具版本）。
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
+      - '.nvmrc'
+      - '.github/actions/pnpm-install/**'
+      - '.github/workflows/ts-packages.yml'
+  push:
+    branches: [main]
+    paths: *package_paths
+  workflow_dispatch:
+
+concurrency:
+  group: ts-packages-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: ${{ matrix.package }}：lint、test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ['@hawkr/icons', '@hawkr/twaddr', '@hawkr/ui-text']
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/pnpm-install
+
+      - name: lint（tsc、biome）
+        if: always()
+        run: pnpm --filter ${{ matrix.package }} lint
+
+      - name: test
+        if: always()
+        run: pnpm --filter ${{ matrix.package }} test

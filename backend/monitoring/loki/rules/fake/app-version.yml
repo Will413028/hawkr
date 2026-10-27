@@ -1,0 +1,37 @@
+# Loki ruler 告警：App 版本 header 出現非法值（設計書 54 §8.2）
+#
+# X-App-Version 是**匿名可控輸入**（Gateway 只截斷不驗證，logger.go truncateHeaderValue
+# 限 32 字元），任何人 curl 一個亂數就會在 Loki 多出一條 app_version series，
+# 進而污染「各版本請求佔比」的分母（monitoring/grafana/.../app-versions.json）。
+# 非 semver 的值恆應為 0；持續非 0 代表下列其中之一：
+#   ① 有人在持續灌 header
+#   ② 截斷邏輯壞掉（症狀：出現剛好 32 字元的值）
+#   ③ App 端送錯格式，最典型是把顯示字串 "1.0.3(7)" 當版本送出（§6.5 陷阱）
+#      —— 這一種最嚴重：整個版本會從佔比統計中消失，放行判準會據此誤判。
+#
+# ⚠️ 為什麼 count 窗口是 5m 而 for 是 15m（不是兩個都 15m）：
+#   要區分「一次性亂打」與「持續發生」。單筆 curl 只會讓 [5m] 窗口非 0 五分鐘，
+#   撐不滿 for: 15m → 不告警（dev 上就有 3 筆這種歷史殘留：AAAA…／9999…／DIRECT…）。
+#   反之 ①②③ 都是每個請求都中，窗口持續非 0 → 15 分鐘後告警。
+#   兩個都設 15m 的話，一筆 curl 就會 page 人。
+#
+# ⚠️ 刻意不依 app_type 過濾：灌進來的垃圾請求連 app_type 都可能是亂的，
+#   依 app_type 過濾等於把要抓的東西藏起來。
+#
+# ⚠️ LogQL 反引號是 raw string，正則的跳脫點必須是單一 `\.`；寫成 `\\.` 會被解讀成
+#   「反斜線 ＋ 任意字元」而全不匹配 —— 那會讓本規則永遠不觸發（靜默失效）。
+groups:
+  - name: app-version
+    interval: 1m
+    rules:
+      - alert: AppVersionGarbageValues
+        expr: |
+          sum by (environment) (
+            count_over_time({container="gateway"} |= `gateway request` | json | app_version != `` | app_version !~ `^[0-9]+\.[0-9]+\.[0-9]+$` [5m])
+          ) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "App 版本 header 出現非法值 ({{ $labels.environment }})"
+          description: "近 5m 內持續有 app_version 不符 semver 的請求（已持續 15m 以上）。依序排查：① Grafana dashboard `hawkr-app-versions` 的「非法 app_version 明細」表看實際值 ② 值是剛好 32 字元 → Gateway 截斷邏輯 ③ 值看得出是版本號但帶 build number／前綴 → App 端送錯格式（設計書 54 §6.5），此時版本佔比統計已失真，放行判準不可用 ④ 值是亂數且來自單一 IP → 有人在灌 header，確認來源後可忽略。"

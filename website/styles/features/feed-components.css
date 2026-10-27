@@ -1,0 +1,1913 @@
+/* ============================================================
+   Feed (RED / TikTok-inspired) + Role-aware Seller Header
+   Uses hkui-* tokens from styles/components/ui-kit.css
+   ============================================================ */
+
+/* ===== Feed page shell — flat, Pinterest-clean ===== */
+.hkui-feed-page {
+	min-height: 100vh;
+	/* The shared site Grainient owns the public page canvas. Keep this exact
+	 * route root transparent; cards and controls retain their own surfaces. */
+	background: transparent;
+	padding-bottom: var(--hkui-space-16);
+	font-family: var(--hkui-font-sans);
+}
+
+/* Keep the explicit dark declaration as a regression guard if the light route
+ * surface changes independently later. */
+[data-theme="dark"] .hkui-feed-page {
+	background: transparent;
+}
+
+.hkui-feed-page__main {
+	/* Match the floating navbar pill width (1440) so 推薦商家 and the
+	 * post cards align with the navbar's left/right edges instead of
+	 * sitting in a narrower 1320 column. Top padding tightened so the
+	 * gap between the navbar pill and the section starts is minimal. */
+	width: min(1440px, calc(100% - 48px));
+	margin: 0 auto;
+	padding: var(--page-start-gap, 6px) 0 0;
+}
+@media (max-width: 768px) {
+	.hkui-feed-page__main {
+		width: min(100% - 28px, 680px);
+		padding: var(--page-start-gap, var(--hkui-space-4)) 0 0;
+	}
+}
+
+/* ===== Seller tab frame (shared by products / posts / messages / reviews) ===== */
+.seller-tab-frame {
+	width: min(1440px, calc(100% - 48px));
+	margin: 0 auto;
+	padding: 8px 0 32px;
+	font-family: var(--hkui-font-sans);
+}
+
+/* Storefronts and Seller Center previews use the shared application canvas.
+ * This changes only the outer shell, not cards, media or empty states. */
+body .page-content:has(.seller-tab-frame) {
+	background: transparent;
+}
+
+.seller-posts-board {
+	margin-top: 24px;
+}
+
+/* Intentionally NO `.seller-posts-board .hkui-feed-card` overrides here.
+ * The base `.hkui-feed-card` is transparent (background, no border, no
+ * shadow at the root) and puts the shadow on `__media` — earlier overrides
+ * added `box-shadow` + `border-color` to the transparent root, which
+ * produced a phantom rectangle around the card and made seller posts look
+ * heavier / boxier than /feed. Now seller posts inherit /feed exactly. */
+
+.seller-posts-empty {
+	display: grid;
+	place-items: center;
+	min-height: 260px;
+	padding: var(--hkui-space-8) var(--hkui-space-4);
+	border: 1px dashed var(--hkui-divider);
+	border-radius: var(--hkui-radius-lg);
+	background: rgba(255, 253, 247, 0.74);
+	text-align: center;
+}
+
+[data-theme="dark"] .seller-posts-empty {
+	background: rgba(255, 255, 255, 0.045);
+}
+
+.seller-posts-empty h3 {
+	margin: 0 0 var(--hkui-space-2);
+	color: var(--hkui-foreground);
+	font-size: var(--hkui-text-large);
+	font-weight: var(--hkui-weight-bold);
+}
+
+.seller-posts-empty p {
+	max-width: 320px;
+	margin: 0;
+	color: var(--hkui-foreground-soft);
+	font-size: var(--hkui-text-small);
+	line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+	.seller-tab-frame {
+		width: min(100% - 28px, 680px);
+		padding: 8px 0 96px;
+	}
+
+	.seller-posts-board {
+		margin-top: 20px;
+	}
+}
+
+/* ===== Behance-style aligned grid (uniform aspect, even rows) ===== */
+.hkui-feed-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+	gap: var(--hkui-space-4);
+}
+@media (min-width: 1024px) {
+	.hkui-feed-grid {
+		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+		gap: var(--hkui-space-5);
+	}
+}
+@media (min-width: 1440px) {
+	.hkui-feed-grid {
+		grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+	}
+}
+
+/* Phones / tablets — force a 2-up grid (Xiaohongshu-style) so cards
+ * read comfortably on portrait widths instead of squeezing three
+ * cramped columns. The breakpoint runs all the way to 1023px (the
+ * desktop tier `@min-width: 1024` upgrades to auto-fill min-280px
+ * and the chrome can breathe again). Card chrome (typography, badge,
+ * author row) scales down so the text doesn't read as over-large in
+ * narrower cells. */
+@media (max-width: 1023px) {
+	.hkui-feed-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 12px;
+	}
+	.hkui-feed-card__media {
+		border-radius: 12px;
+	}
+	.hkui-feed-card__body {
+		padding: 10px 2px 4px;
+		gap: 6px;
+	}
+	.hkui-feed-card__title {
+		font-size: 0.8125rem;
+		line-height: 1.35;
+	}
+	.hkui-feed-card__author {
+		gap: 6px;
+	}
+	.hkui-feed-card__author-avatar {
+		width: 18px !important;
+		height: 18px !important;
+	}
+	.hkui-feed-card__author-name {
+		font-size: 0.6875rem;
+	}
+	.hkui-feed-card__badge {
+		font-size: 0.625rem;
+		padding: 3px 7px;
+		left: 6px;
+		top: 6px;
+	}
+	.hkui-feed-card__like {
+		font-size: 0.6875rem;
+		padding: 4px 8px;
+		right: 6px;
+		bottom: 6px;
+	}
+	.hkui-feed-card__like svg {
+		width: 12px;
+		height: 12px;
+	}
+}
+
+/* Very narrow phones — push the typography one notch smaller so two
+ * lines of post text + an author row still fit inside a ~110px-wide
+ * cell without overflow. */
+@media (max-width: 480px) {
+	.hkui-feed-grid {
+		gap: 10px;
+	}
+	.hkui-feed-card__body {
+		padding: 8px 2px 4px;
+		gap: 5px;
+	}
+	.hkui-feed-card__title {
+		font-size: 0.75rem;
+	}
+	.hkui-feed-card__author-name {
+		font-size: 0.625rem;
+	}
+	.hkui-feed-card__like {
+		font-size: 0.625rem;
+	}
+}
+
+/* ===== Card — clean, image-first, no surrounding surface ============
+ * The card has no background/border of its own — the photo carries the
+ * weight, with the title/author sitting on the page surface below it.
+ * Matches the Kitchen Stories "Stories" grid: brighter, more
+ * breathable, lets the image do the talking. */
+.hkui-feed-card {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	background: transparent;
+	cursor: pointer;
+	outline: none;
+	font-family: var(--hkui-font-sans);
+}
+
+.hkui-feed-card:focus-visible .hkui-feed-card__media {
+	box-shadow: 0 0 0 3px var(--hkui-primary-200);
+}
+
+.hkui-feed-card__media {
+	position: relative;
+	width: 100%;
+	aspect-ratio: 4 / 3;
+	background: var(--hkui-default-100);
+	overflow: hidden;
+	border-radius: 16px;
+	box-shadow: 0 4px 14px -8px rgb(var(--color-ink-950-rgb) / 0.18);
+	transition:
+		box-shadow var(--hkui-dur-base) var(--hkui-ease),
+		transform var(--hkui-dur-base) var(--hkui-ease);
+}
+.hkui-feed-card:hover .hkui-feed-card__media {
+	transform: translateY(-3px);
+	box-shadow: 0 18px 32px -14px rgb(var(--color-ink-950-rgb) / 0.26);
+}
+[data-theme="dark"] .hkui-feed-card__media {
+	background: rgba(255, 255, 255, 0.04);
+	box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+}
+[data-theme="dark"] .hkui-feed-card:hover .hkui-feed-card__media {
+	box-shadow: 0 20px 38px rgba(0, 0, 0, 0.55);
+}
+.hkui-feed-card__media img {
+	width: 100%;
+	height: 100%;
+	display: block;
+	object-fit: contain;
+}
+
+/* ===== Top-left badge — Kitchen-Stories-style category pill ===== */
+.hkui-feed-card__badge {
+	position: absolute;
+	left: 10px;
+	top: 10px;
+	z-index: 2;
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 5px 11px;
+	border-radius: 8px;
+	background: var(--hkui-content1);
+	color: var(--hkui-primary);
+	font-size: 0.6875rem;
+	font-weight: var(--hkui-weight-bold);
+	letter-spacing: 0.02em;
+	max-width: calc(100% - 20px);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	box-shadow: 0 2px 6px rgb(var(--color-ink-950-rgb) / 0.18);
+}
+[data-theme="dark"] .hkui-feed-card__badge {
+	background: rgb(var(--color-ink-950-rgb) / 0.7);
+	color: #f5e9c3;
+	-webkit-backdrop-filter: blur(8px);
+	backdrop-filter: blur(8px);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+/* Product variant — dark pill with warning dot signals "linked product" */
+.hkui-feed-card__badge--product {
+	background: rgb(var(--color-ink-950-rgb) / 0.78);
+	color: #fff;
+	-webkit-backdrop-filter: blur(6px);
+	backdrop-filter: blur(6px);
+}
+[data-theme="dark"] .hkui-feed-card__badge--product {
+	background: rgb(var(--color-ink-950-rgb) / 0.82);
+	color: #fff;
+}
+.hkui-feed-card__badge-dot {
+	width: 5px;
+	height: 5px;
+	border-radius: 50%;
+	background: var(--hkui-warning);
+	flex-shrink: 0;
+}
+
+/* ===== Heart overlay — bottom-right of image, glassy dark pill ===== */
+.hkui-feed-card__like {
+	position: absolute;
+	right: 10px;
+	bottom: 10px;
+	z-index: 2;
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 5px 10px;
+	background: rgb(var(--color-ink-950-rgb) / 0.72);
+	-webkit-backdrop-filter: blur(8px) saturate(140%);
+	backdrop-filter: blur(8px) saturate(140%);
+	color: #fff;
+	border: none;
+	border-radius: var(--hkui-radius-full);
+	cursor: pointer;
+	font-size: 0.75rem;
+	font-weight: var(--hkui-weight-semibold);
+	font-variant-numeric: tabular-nums;
+	/* The shared Button primitive inflates every `sm` control to a 44px square
+	 * on coarse pointers. Right for a standalone icon button; wrong here — this
+	 * is an overlay chip on a small photo, and at 44px the 12px heart floats in
+	 * the middle of a dark disc that eats the card's whole corner. Keep the pill
+	 * the size this block draws and buy the touch target back below, the way
+	 * `.post-viewer__caption-toggle` already does. */
+	min-width: 0;
+	min-height: 0;
+	transition:
+		background var(--hkui-dur-fast) var(--hkui-ease),
+		color var(--hkui-dur-fast) var(--hkui-ease),
+		transform var(--hkui-dur-fast) var(--hkui-ease);
+}
+/* Invisible reach to 44x44 around the ~34x22 pill, so the chip stays small
+ * without shrinking the target. */
+.hkui-feed-card__like::after {
+	content: "";
+	position: absolute;
+	inset: -11px -6px;
+}
+.hkui-feed-card__like:hover {
+	background: rgb(var(--color-ink-950-rgb) / 0.84);
+}
+.hkui-feed-card__like:active {
+	transform: scale(0.92);
+}
+.hkui-feed-card__like.is-liked {
+	color: #ff8a98;
+	background: rgb(var(--color-ink-950-rgb) / 0.78);
+}
+
+/* ===== Body — title + author, on the page surface =================== */
+.hkui-feed-card__body {
+	padding: 12px 4px 4px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	min-width: 0;
+}
+.hkui-feed-card__title {
+	margin: 0;
+	font-size: 0.9375rem; /* 15px */
+	line-height: 1.4;
+	color: var(--hkui-foreground);
+	font-weight: var(--hkui-weight-semibold);
+	letter-spacing: -0.005em;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	word-break: break-word;
+}
+
+.hkui-hashtag-link {
+	color: var(--hkui-primary);
+	font-weight: var(--hkui-weight-bold);
+	text-decoration: none;
+}
+.hkui-hashtag-link:hover {
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+/* Author row — small avatar + brand-tinted name, Kitchen-Stories style */
+.hkui-feed-card__author {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+}
+.hkui-feed-card__author-avatar {
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	flex-shrink: 0;
+	background: var(--hkui-default-200);
+}
+.hkui-feed-card__author-avatar img {
+	width: 100%;
+	height: 100%;
+	border-radius: 50%;
+	object-fit: cover;
+}
+.hkui-feed-card__author-name {
+	font-size: 0.8125rem; /* 13px */
+	color: var(--hkui-primary);
+	font-weight: var(--hkui-weight-semibold);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	flex: 1;
+	min-width: 0;
+}
+[data-theme="dark"] .hkui-feed-card__author-name {
+	color: #e8c97d;
+}
+
+/* ===== Sentinel + end states ===== */
+.hkui-feed-sentinel,
+.hkui-feed-end {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: var(--hkui-space-8) var(--hkui-space-4);
+	color: var(--hkui-foreground-soft);
+	font-size: var(--hkui-text-small);
+}
+.hkui-feed-end--empty {
+	flex-direction: column;
+	gap: var(--hkui-space-2);
+	min-height: 340px;
+}
+.hkui-feed-sentinel__spinner {
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	border: 3px solid var(--hkui-default-200);
+	border-right-color: var(--hkui-primary);
+	animation: hkui-spin 0.8s linear infinite;
+}
+
+/* ============================================================
+   Post Detail Viewer (TikTok / RED-style fullscreen vertical snap)
+   ============================================================ */
+.post-viewer {
+	position: fixed;
+	inset: 0;
+	z-index: 1000;
+	/* One metric for every inline CTA in the viewer — 查看商家, 查看商品 and
+	 * 查看更多 are the same control class, so they get the same height, padding
+	 * and radius instead of the 30 / 34 / 44px each had grown independently. */
+	--post-cta-height: 34px;
+	--post-cta-padding-x: 14px;
+	/* Theme-aware: light → soft cream stage (matches `--surface-page`,
+	 * the same warm white used by the home page); dark → deep midnight
+	 * that visually blends with the page behind. */
+	background: var(--surface-page);
+	font-family: var(--hkui-font-sans);
+}
+
+.post-viewer__close {
+	position: fixed;
+	top: var(--hkui-space-4);
+	left: var(--hkui-space-4);
+	z-index: 1010;
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	border: none;
+	background: rgba(255, 255, 255, 0.7);
+	-webkit-backdrop-filter: blur(12px);
+	backdrop-filter: blur(12px);
+	color: var(--ink-heading, var(--color-ink-900));
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	transition: background var(--hkui-dur-fast) var(--hkui-ease);
+}
+.post-viewer__close:hover {
+	background: rgba(255, 255, 255, 0.85);
+}
+[data-theme="dark"] .post-viewer__close {
+	background: rgb(var(--color-ink-950-rgb) / 0.6);
+	color: #fff;
+}
+[data-theme="dark"] .post-viewer__close:hover {
+	background: rgb(var(--color-ink-950-rgb) / 0.75);
+}
+
+.post-viewer__counter {
+	position: fixed;
+	top: var(--hkui-space-4);
+	left: calc(var(--hkui-space-4) + 48px);
+	z-index: 1010;
+	height: 40px;
+	padding: 0 14px;
+	border-radius: var(--hkui-radius-full);
+	background: rgba(255, 255, 255, 0.7);
+	-webkit-backdrop-filter: blur(12px);
+	backdrop-filter: blur(12px);
+	color: var(--ink-heading, var(--color-ink-900));
+	font-size: var(--hkui-text-tiny);
+	font-weight: var(--hkui-weight-medium);
+	font-variant-numeric: tabular-nums;
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	pointer-events: none;
+}
+[data-theme="dark"] .post-viewer__counter {
+	background: rgb(var(--color-ink-950-rgb) / 0.6);
+	color: #fff;
+}
+.post-viewer__counter-more {
+	opacity: 0.7;
+	margin-left: 2px;
+}
+
+/* Up/down switch stack sits at the photo's right edge — anchored to
+ * `.post-viewer__media` rather than the viewport so the buttons travel
+ * with the image and read as part of the same surface. Out of flow
+ * (absolute) so the chip stack doesn't compete with the photo for
+ * layout space. */
+.post-viewer__media-nav {
+	position: absolute;
+	top: 50%;
+	right: var(--hkui-space-4);
+	transform: translateY(-50%);
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	z-index: 4;
+}
+.post-viewer__nav {
+	width: 44px;
+	height: 44px;
+	border: none;
+	border-radius: 50%;
+	background: rgb(var(--color-ink-950-rgb) / 0.06);
+	-webkit-backdrop-filter: blur(12px);
+	backdrop-filter: blur(12px);
+	color: var(--ink-heading, var(--color-ink-900));
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	transition:
+		background var(--hkui-dur-fast) var(--hkui-ease),
+		opacity var(--hkui-dur-fast) var(--hkui-ease);
+}
+.post-viewer__nav:hover {
+	background: rgb(var(--color-ink-950-rgb) / 0.12);
+}
+[data-theme="dark"] .post-viewer__nav {
+	background: rgba(255, 255, 255, 0.08);
+	color: #fff;
+}
+[data-theme="dark"] .post-viewer__nav:hover {
+	background: rgba(255, 255, 255, 0.16);
+}
+.post-viewer__nav:disabled {
+	opacity: 0.3;
+	cursor: not-allowed;
+}
+@media (max-width: 768px) {
+	.post-viewer__media-nav {
+		display: none;
+	}
+}
+
+/* === Pager surface ===================================================
+ * The surface fills the viewport and clips the translated track. We
+ * disable native scrolling here because JS drives the page transform
+ * directly — `touch-action: none` stops the browser from claiming the
+ * vertical gesture for its own scroll. The aside re-enables `pan-y`
+ * locally so comments can still scroll natively.
+ */
+.post-viewer__surface {
+	position: relative;
+	height: 100dvh;
+	/* `clip` (not `hidden`): keep the surface out of the CSSOM scrolling-box chain so scrollIntoView can't silently drift `surface.scrollTop` on top of the pager transform. */
+	overflow: clip;
+	touch-action: none;
+	overscroll-behavior: contain;
+	cursor: grab;
+	user-select: none;
+	-webkit-user-select: none;
+}
+.post-viewer__surface[data-dragging] {
+	cursor: grabbing;
+}
+
+/* The track stacks every post vertically and gets translated by
+ * `translate3d(0, -index*100% + dragDelta, 0)` from the React layer.
+ * Transition is applied inline (it switches off while the finger is
+ * down so motion tracks the pointer 1:1).
+ */
+.post-viewer__track {
+	position: relative;
+	width: 100%;
+	height: 100%;
+	will-change: transform;
+	transform: translate3d(0, 0, 0);
+	backface-visibility: hidden;
+	-webkit-backface-visibility: hidden;
+}
+.post-viewer__page-wrap {
+	display: block;
+	width: 100%;
+	height: 100dvh;
+}
+/* Suppress the browser's native "drag image to save" gesture on the
+ * post photo — that drag would intercept our pointer events and
+ * prevent press-drag scroll. Buttons/links inside .post-viewer__aside
+ * keep their default cursor and pointer behaviour. */
+.post-viewer__media,
+.post-viewer__media img {
+	-webkit-user-drag: none;
+	user-select: none;
+	-webkit-user-select: none;
+}
+
+/* === Scroll teaching cue ============================================
+ * One-shot overlay teaching the wheel/drag gesture. It uses a frosted
+ * translucent panel so the cue is legible above bright photos while
+ * still letting the post remain visible underneath.
+ */
+.post-viewer__scroll-hint {
+	position: fixed;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	z-index: 1020;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 10px;
+	min-width: 168px;
+	padding: 14px 18px 16px;
+	border: 1px solid rgba(255, 255, 255, 0.48);
+	border-radius: 24px;
+	background: rgba(255, 255, 255, 0.78);
+	box-shadow: 0 18px 48px rgb(var(--color-ink-950-rgb) / 0.22);
+	-webkit-backdrop-filter: blur(16px) saturate(135%);
+	backdrop-filter: blur(16px) saturate(135%);
+	color: var(--action-primary, var(--color-ink-800));
+	pointer-events: none;
+	animation: post-viewer-hint-enter 220ms ease-out both;
+}
+[data-theme="dark"] .post-viewer__scroll-hint {
+	border-color: rgba(245, 222, 165, 0.2);
+	background: rgb(var(--color-ink-950-rgb) / 0.76);
+	box-shadow: 0 18px 52px rgba(0, 0, 0, 0.45);
+	color: var(--color-ink-200);
+}
+.post-viewer__scroll-hint-glyph {
+	display: inline-flex;
+	filter: drop-shadow(0 4px 10px rgb(var(--color-ink-950-rgb) / 0.18));
+}
+.post-viewer__scroll-hint-label {
+	font-size: var(--hkui-text-small, 0.8125rem);
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	white-space: nowrap;
+}
+[data-theme="dark"] .post-viewer__scroll-hint-label {
+	color: #f5e9c3;
+}
+@keyframes post-viewer-hint-enter {
+	from {
+		opacity: 0;
+		transform: translate(-50%, calc(-50% + 10px)) scale(0.96);
+	}
+	to {
+		opacity: 1;
+		transform: translate(-50%, -50%) scale(1);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.post-viewer__scroll-hint {
+		animation: none;
+	}
+}
+
+.post-viewer__loading {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: 56px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: rgba(255, 255, 255, 0.7);
+	font-size: var(--hkui-text-tiny);
+	pointer-events: none;
+	background: linear-gradient(to top, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0));
+}
+
+/* Per-post page layout */
+.post-viewer__page {
+	display: grid;
+	grid-template-columns: minmax(0, 1.5fr) minmax(360px, 420px);
+	height: 100%;
+	/* Theme-aware: matches the outer viewer surface (light → cream
+	 * stage, dark → midnight) so the post layout blends seamlessly
+	 * with the rest of the dialog. */
+	background: var(--surface-page);
+	color: var(--ink-heading, var(--color-ink-900));
+}
+[data-theme="dark"] .post-viewer__page {
+	color: #f5e9c3;
+}
+.post-viewer__page[data-no-media="true"] {
+	grid-template-columns: minmax(0, 1fr);
+	background: var(--hkui-content1);
+	justify-content: center;
+}
+@media (max-width: 900px) {
+	/* ===== Text-over-photo layer model ================================
+	 * Mirrors the buyer app's `_PostGlassPanel`: the photo is the base
+	 * layer filling the stage, and the reader panel floats over its lower
+	 * edge behind a frosted scrim.
+	 *
+	 * Replaces a two-row split (photo band + `minmax(0, 1fr)` text row)
+	 * that reserved the same share of the height whether the post had two
+	 * lines or twenty — the empty band under short posts was that reserved
+	 * row, not a spacing bug.
+	 *
+	 * The pager is untouched: drags still land on `.post-viewer__surface`,
+	 * and `scrollAreaOf()` still resolves to `.post-viewer__article-scroll`,
+	 * so the scroll-to-boundary-then-page hand-off works exactly as before.
+	 * Collapsed, that element has nothing to scroll, so a swipe pages
+	 * immediately (the app expresses the same rule as
+	 * `NeverScrollableScrollPhysics`). */
+	/* A card has to float over something. The root paints an opaque
+	 * `--surface-page` — correct when the viewer was a full-bleed sheet, but it
+	 * leaves the card sitting on a flat void and hides the feed it came from.
+	 * Swap to the scrim the product modal already uses so the page stays
+	 * legible underneath and the card reads as a card. */
+	.post-viewer {
+		background: var(--theme-overlay, rgb(var(--color-ink-950-rgb) / 0.42));
+	}
+
+	/* The page becomes a floating card inset from the viewport (app parity), so
+	 * the photo letterboxes against the card's own surface instead of bleeding
+	 * into the page background. Positioned rather than margined so the pager's
+	 * percentage transform on the track keeps working off `__page-wrap`. */
+	.post-viewer__page-wrap {
+		position: relative;
+	}
+	.post-viewer__page:not([data-no-media="true"]) {
+		display: block;
+		position: absolute;
+		top: var(--hkui-card-shrink);
+		right: var(--hkui-card-shrink);
+		bottom: var(--hkui-card-shrink);
+		left: var(--hkui-card-shrink);
+		height: auto;
+		border-radius: var(--hkui-card-radius);
+		/* Hairline edge. Without it the card is invisible in dark mode: its
+		 * `--hkui-content1` (--color-ink-900) against a black-62% scrim over
+		 * `--surface-page` (--color-ink-900) is a few points of luminance, and a dark
+		 * shadow on a dark backdrop adds nothing — which is why the reader and
+		 * the action bar looked detached rather than enclosed. `--hkui-divider`
+		 * is a translucent light line in dark and a soft grey in light, so one
+		 * declaration defines the edge in both. */
+		border: 1px solid var(--hkui-divider);
+		overflow: hidden;
+		/* The base rule paints `--surface-page`, i.e. the same cream the viewer
+		 * backdrop uses — as a full-bleed sheet that was invisible, but a card
+		 * needs to separate from what's behind it. Content1 makes the letterbox
+		 * around a `contain`-fitted photo read as the card's own surface. */
+		background: var(--hkui-content1);
+		box-shadow: 0 18px 48px -12px rgb(var(--color-ink-950-rgb) / 0.28);
+	}
+	/* Bias the photo above centre. `contain` must letterbox somewhere and we
+	 * cannot size the card to the photo — the API returns no dimensions, so the
+	 * aspect is unknown until the image decodes (see the imageWidth/imageHeight
+	 * gap). Centring splits the void evenly and lets the reader panel occlude
+	 * the photo's lower edge; pinning to `top` collects the whole void into a
+	 * visible band between photo and panel. This bias keeps the photo clear of
+	 * the card's top corners while pushing most of the void behind the panel. */
+	.post-viewer__page:not([data-no-media="true"]) .post-viewer__media-photo {
+		object-position: center 32%;
+	}
+	/* Apple-style continuous corner. `squircle` keeps curvature continuous
+	 * where `border-radius` snaps from straight edge to circular arc, which is
+	 * what makes a plain rounded rect read slightly pinched at this size.
+	 * Progressive: engines without `corner-shape` keep the arc above. The card
+	 * and its inner panel opt in together so their curves stay the same family
+	 * — mixing squircle with arc would break the parallel far more visibly
+	 * than a few px of radius error. */
+	@supports (corner-shape: squircle) {
+		.post-viewer__page:not([data-no-media="true"]),
+		.post-viewer__page:not([data-no-media="true"]) .post-viewer__aside {
+			corner-shape: squircle;
+		}
+	}
+	/* No photo means nothing to overlay — keep the plain stacked flow. */
+	.post-viewer__page[data-no-media="true"] {
+		grid-template-columns: 1fr;
+		grid-template-rows: minmax(0, 1fr);
+	}
+	.post-viewer__page:not([data-no-media="true"]) .post-viewer__media {
+		position: absolute;
+		inset: 0;
+	}
+	.post-viewer__media {
+		height: 100%;
+	}
+	/* No `object-fit` override here on purpose. The base rule's `contain` is
+	 * the whole point of this pane — "product / food shots must never be
+	 * cropped here" applies to phones too, and this breakpoint used to flip it
+	 * back to `cover`, leaving mobile users with no surface anywhere in the app
+	 * that showed their full upload. Now that the stage is the full viewport
+	 * rather than a clamped band, `contain` also costs far less letterbox than
+	 * it did under the old split. */
+
+	/* The panel's own positioning + frosted scrim live with the rest of the
+	 * mobile aside model further down this file (search
+	 * `three-row fixed frame`) — that block is declared after the desktop
+	 * reader primitives and would otherwise win the `position` cascade. */
+
+	/* Collapsed: one line of caption, matching the app's `maxLines: 1`.
+	 * Tags and the product list belong to the expanded state — one line has
+	 * no room to compete with them. */
+	.post-viewer__aside[data-caption="collapsed"] .post-viewer__content {
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 1;
+		overflow: hidden;
+		/* `-webkit-line-clamp` alone is NOT enough to hide line two here, and
+		 * this is measured, not defensive: `overflow: hidden` clips at the
+		 * PADDING box, so the 16px bottom padding leaves the second line a
+		 * ~14px window to peek through — the stray 「貼文」 under the ellipsis.
+		 * Dropping the bottom padding and capping the box at
+		 * `one line + top padding` (box-sizing is border-box globally) closes
+		 * that window, and holds even where the clamp itself misbehaves. The
+		 * pill below supplies the spacing the padding used to. */
+		padding-bottom: 0;
+		max-height: calc(1.6em + var(--hkui-space-4));
+	}
+	.post-viewer__aside[data-caption="collapsed"] .post-viewer__hashtags,
+	.post-viewer__aside[data-caption="collapsed"] .post-viewer__products {
+		display: none;
+	}
+	/* ONE frame for both states, so the toggle never moves: rows are
+	 * seller / caption / actions and the pill owns a second column beside the
+	 * caption. App parity (`_ExpandableCaption` is a Row of
+	 * `[Expanded(text), pill]`), and because 查看更多 and 收合 occupy the very
+	 * same cell the control stays under the thumb across an open/close cycle
+	 * instead of jumping to a row of its own once expanded. */
+	.post-viewer__page:not([data-no-media="true"]) .post-viewer__aside {
+		grid-template-columns: minmax(0, 1fr) auto;
+		grid-template-rows: auto minmax(0, 1fr) auto;
+	}
+	.post-viewer__page:not([data-no-media="true"]) .post-viewer__seller {
+		grid-area: 1 / 1 / 2 / 3;
+	}
+	.post-viewer__page:not([data-no-media="true"]) .post-viewer__article-scroll {
+		grid-area: 2 / 1 / 3 / 2;
+	}
+	.post-viewer__page:not([data-no-media="true"]) .post-viewer__caption-toggle {
+		grid-area: 2 / 2 / 3 / 3;
+		/* Anchored to the BOTTOM of the caption cell. The drawer grows upward, so
+		 * the cell's top edge is the one thing that moves between states — pin to
+		 * the top (or centre) and the pill travels hundreds of px on open. Its
+		 * bottom edge is fixed against the action bar, so `end` is what keeps
+		 * 查看更多 and 收合說明 on the same screen position and lets the user
+		 * open/close without moving their thumb. */
+		align-self: end;
+		margin: 0 var(--hkui-space-5) 0 0;
+	}
+	.post-viewer__page:not([data-no-media="true"]) .post-viewer__actions {
+		grid-area: 3 / 1 / 4 / 3;
+	}
+	/* Expanded, that shared row stops paying for itself: the pill's column is
+	 * ~250px wide but the pill only occupies the last ~36px of it, so EVERY
+	 * caption line, the hashtag row and the product cards wrap against a phantom
+	 * right edge with a permanently empty gutter beside them. Give the scroll
+	 * area both columns and drop the pill onto the dedicated row this grid
+	 * already declares (rows: seller · caption · pill · actions).
+	 *
+	 * The pill still does not move. In both states its bottom edge sits directly
+	 * on the top of the action bar and its right edge on the same
+	 * `--hkui-space-5` gutter — collapsed via `align-self: end` inside row 2,
+	 * expanded because row 3 is `auto` and sits immediately above the bar. So
+	 * open/close remains a single thumb position, which is what the two-column
+	 * frame above was protecting. */
+	.post-viewer__page:not(
+			[data-no-media="true"]
+		) .post-viewer__aside[data-caption="expanded"]
+		.post-viewer__article-scroll {
+		grid-area: 2 / 1 / 3 / 3;
+	}
+	.post-viewer__page:not([data-no-media="true"])
+		.post-viewer__aside[data-caption="expanded"]
+		.post-viewer__caption-toggle {
+		grid-area: 3 / 1 / 4 / 3;
+		justify-self: end;
+	}
+	.post-viewer__page:not([data-no-media="true"])
+		.post-viewer__aside[data-caption="expanded"]
+		.post-viewer__actions {
+		grid-area: 4 / 1 / 5 / 3;
+	}
+	/* Collapsed the caption is a single line; centre it against the pill so the
+	 * two read as one row. */
+	.post-viewer__aside[data-caption="collapsed"] .post-viewer__article-scroll {
+		align-self: center;
+	}
+	.post-viewer__article-scroll {
+		min-height: 0;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		-webkit-overflow-scrolling: touch;
+		/* The reader pane is the one scroller that never hands its gesture to
+		 * the pager (see `[data-post-viewer-scroll]` in PostDetailViewer), so
+		 * it takes the native pan the surface's `touch-action: none` blocks by
+		 * default. Native means compositor-driven with a real fling — a
+		 * JS `scrollTop` write per `pointermove` stops dead on release and
+		 * rides the main thread. `contain` above keeps the end of the text
+		 * from chaining into the pager or the page behind it. */
+		touch-action: pan-y pinch-zoom;
+	}
+	/* The pill's `display` promotion lives in the later mobile block too — the
+	 * base `display: none` is declared after this one and would win here. */
+	.post-viewer__article-scroll::-webkit-scrollbar {
+		width: 5px;
+	}
+	.post-viewer__article-scroll::-webkit-scrollbar-thumb {
+		border-radius: var(--hkui-radius-full);
+		background: var(--hkui-default-200);
+	}
+}
+
+.post-viewer__media {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	/* Match the page surface in both themes — replaces the hardcoded
+	 * `#000` letterbox so light mode reads as a cream stage rather
+	 * than a black void around the photo. */
+	background: var(--surface-page);
+	overflow: hidden;
+	/* The ambient backdrop and the photo stack against each other and nothing
+	 * else. Without a stacking context of its own the photo's `z-index: 1`
+	 * escapes into the page's context and paints over `.post-viewer__aside` —
+	 * invisible under a `contain` fit (the letterbox is transparent) but the
+	 * img box still swallows every tap meant for the reader. */
+	isolation: isolate;
+}
+.post-viewer__media-photo {
+	/* Fill the media pane (upscaling small derivatives if needed) so the
+	 * photo owns the stage instead of floating at its natural size in a
+	 * sea of cream. `contain` keeps the full photo visible — product /
+	 * food shots must never be cropped here. */
+	position: relative;
+	z-index: 1;
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+	display: block;
+}
+/* The letterbox `contain` leaves is filled by the photo itself rather than
+ * the flat page surface — same ambient-contain treatment as the seller cover
+ * (over-scale, blur, a touch of saturation), held translucent so it stays a
+ * backdrop and never competes with the real photo above it. The scale covers
+ * the transparent fringe `blur()` pulls in at the edges. */
+.post-viewer__media-ambient {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	object-position: center;
+	display: block;
+	transform: scale(1.12);
+	filter: blur(22px) saturate(1.12);
+	opacity: 0.55;
+	pointer-events: none;
+}
+.post-viewer__dots {
+	position: absolute;
+	bottom: var(--hkui-space-4);
+	left: 50%;
+	transform: translateX(-50%);
+	display: flex;
+	gap: 6px;
+	padding: 6px 10px;
+	border-radius: var(--hkui-radius-full);
+	background: rgba(0, 0, 0, 0.4);
+	-webkit-backdrop-filter: blur(8px);
+	backdrop-filter: blur(8px);
+}
+.post-viewer__dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	border: none;
+	background: rgba(255, 255, 255, 0.5);
+	cursor: pointer;
+	transition:
+		background var(--hkui-dur-fast) var(--hkui-ease),
+		width var(--hkui-dur-fast) var(--hkui-ease);
+	padding: 0;
+}
+.post-viewer__dot[data-active="true"] {
+	background: #fff;
+	width: 18px;
+	border-radius: var(--radius-pill);
+}
+
+.post-viewer__aside {
+	display: flex;
+	flex-direction: column;
+	background: var(--hkui-content1);
+	color: var(--hkui-foreground);
+	overflow-y: auto;
+	min-height: 0;
+	/* Pager surface uses `touch-action: none`; the aside re-enables
+	 * `pinch-zoom` only. We deliberately do NOT re-enable vertical
+	 * pan here — JS drives the aside's scrollTop itself so a single
+	 * swipe can both scroll comments AND flip into the pager once the
+	 * aside reaches its boundary. Wheel events still scroll the aside
+	 * natively via the wheel handler. */
+	touch-action: pinch-zoom;
+	overscroll-behavior: contain;
+}
+.post-viewer__aside::-webkit-scrollbar {
+	width: 6px;
+}
+.post-viewer__aside::-webkit-scrollbar-thumb {
+	background: var(--hkui-default-200);
+	border-radius: 3px;
+}
+.post-viewer__page[data-no-media="true"] .post-viewer__aside {
+	max-width: 720px;
+	width: 100%;
+	margin: 0 auto;
+}
+
+.post-viewer__seller {
+	display: flex;
+	align-items: center;
+	gap: var(--hkui-space-3);
+	padding: var(--hkui-space-4) var(--hkui-space-5);
+	border-bottom: 1px solid var(--hkui-divider);
+}
+.post-viewer__seller img {
+	width: 44px;
+	height: 44px;
+	border-radius: 50%;
+	object-fit: cover;
+	background: var(--hkui-default-200);
+}
+.post-viewer__seller-text {
+	flex: 1;
+	min-width: 0;
+}
+.post-viewer__seller-name {
+	font-weight: var(--hkui-weight-semibold);
+	font-size: var(--hkui-text-medium);
+}
+.post-viewer__seller-meta {
+	font-size: var(--hkui-text-tiny);
+	color: var(--hkui-foreground-soft);
+	margin-top: 2px;
+}
+.post-viewer__follow {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: var(--post-cta-height);
+	padding: 0 var(--post-cta-padding-x);
+	border-radius: var(--hkui-radius-full);
+	background: var(--hkui-primary);
+	color: var(--hkui-primary-foreground);
+	font-size: var(--hkui-text-tiny);
+	font-weight: var(--hkui-weight-bold);
+	white-space: nowrap;
+	text-decoration: none;
+	transition: background var(--hkui-dur-fast) var(--hkui-ease);
+}
+.post-viewer__follow:hover {
+	background: var(--hkui-primary-600);
+}
+
+.post-viewer__content {
+	padding: var(--hkui-space-4) var(--hkui-space-5);
+	font-size: var(--hkui-text-small);
+	line-height: 1.6;
+	color: var(--hkui-foreground);
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.post-viewer__article-scroll {
+	min-width: 0;
+}
+
+/* Dismiss target for the open caption drawer — covers the card, sits under the
+ * reader. Transparent on purpose: the drawer's own frosted glass is the visual
+ * cue that a layer is open, so a second tint here would only muddy the photo. */
+.post-viewer__caption-scrim {
+	position: absolute;
+	inset: 0;
+	border: 0;
+	padding: 0;
+	background: transparent;
+	cursor: pointer;
+}
+
+/* Caption expand pill. Hidden by default: it belongs to the mobile
+ * text-over-photo panel, and the desktop two-column layout never clamps the
+ * caption, so there is nothing for it to reveal there. The `@media` block
+ * above promotes it to `inline-flex`. */
+.post-viewer__caption-toggle {
+	display: none;
+	position: relative;
+	align-items: center;
+	justify-content: center;
+	gap: var(--hkui-space-1);
+	min-height: var(--post-cta-height);
+	padding: 0 var(--post-cta-padding-x);
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--hkui-radius-full);
+	background: var(--hkui-content1);
+	color: var(--hkui-primary);
+	font-size: var(--hkui-text-tiny);
+	font-weight: var(--hkui-weight-bold);
+	white-space: nowrap;
+	letter-spacing: 0.5px;
+	cursor: pointer;
+	transition:
+		background var(--hkui-dur-base) var(--hkui-ease),
+		border-color var(--hkui-dur-base) var(--hkui-ease);
+}
+/* Matching 查看商家's 34px costs the 44px minimum tap target, so extend the hit
+ * area past the visual pill instead of growing the pill. Vertical only — the
+ * horizontal neighbours (the caption) must stay tappable. */
+.post-viewer__caption-toggle::after {
+	content: "";
+	position: absolute;
+	inset: calc((44px - var(--post-cta-height)) / -2) 0;
+}
+.post-viewer__caption-toggle:hover {
+	background: var(--hkui-default-100);
+	border-color: var(--hkui-default-300);
+}
+
+.post-viewer__hashtags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	padding: 0 var(--hkui-space-5) var(--hkui-space-4);
+}
+
+.post-viewer__hashtag {
+	display: inline-flex;
+	align-items: center;
+	height: 28px;
+	padding: 0 10px;
+	border-radius: var(--hkui-radius-full);
+	background: color-mix(in srgb, var(--hkui-primary) 10%, var(--hkui-content1));
+	color: var(--color-ink-500);
+	font-size: var(--hkui-text-tiny);
+	font-weight: var(--hkui-weight-bold);
+	text-decoration: none;
+}
+.post-viewer__hashtag:hover {
+	background: color-mix(in srgb, var(--hkui-primary) 16%, var(--hkui-content1));
+}
+
+.post-viewer__products {
+	border-top: 1px solid var(--hkui-divider);
+	padding: var(--hkui-space-4) var(--hkui-space-5) var(--hkui-space-5);
+	background: transparent;
+}
+.post-viewer__products-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--hkui-space-3);
+	margin-bottom: var(--hkui-space-3);
+}
+.post-viewer__section-title {
+	margin: 0;
+	font-size: 0.95rem;
+	font-weight: var(--hkui-weight-bold);
+	letter-spacing: 0.03em;
+	color: var(--hkui-foreground);
+}
+.post-viewer__products-count {
+	flex: none;
+	padding: 4px 9px;
+	border: 1px solid rgb(241 205 112 / 0.22);
+	border-radius: var(--hkui-radius-full);
+	background: rgb(241 205 112 / 0.12);
+	color: var(--hkui-foreground-soft);
+	font-size: 0.7rem;
+	font-weight: var(--hkui-weight-semibold);
+	white-space: nowrap;
+}
+.post-viewer__product {
+	display: flex;
+	align-items: center;
+	gap: var(--hkui-space-3);
+	padding: 10px;
+	margin: 0;
+	border: 1px solid rgb(var(--color-ink-900-rgb) / 0.1);
+	border-radius: 18px;
+	background:
+		linear-gradient(135deg, rgb(255 255 255 / 0.74), rgb(255 253 247 / 0.58)),
+		color-mix(in srgb, var(--hkui-content1) 92%, var(--hkui-primary) 8%);
+	box-shadow:
+		inset 0 1px 0 rgb(255 255 255 / 0.58),
+		0 12px 28px rgb(var(--color-ink-850-rgb) / 0.08);
+	text-decoration: none;
+	color: inherit;
+	transition:
+		border-color var(--hkui-dur-fast) var(--hkui-ease),
+		box-shadow var(--hkui-dur-fast) var(--hkui-ease),
+		transform var(--hkui-dur-fast) var(--hkui-ease);
+}
+.post-viewer__product + .post-viewer__product {
+	margin-top: 10px;
+}
+.post-viewer__product:hover {
+	border-color: rgb(241 205 112 / 0.38);
+	box-shadow:
+		inset 0 1px 0 rgb(255 255 255 / 0.7),
+		0 16px 34px rgb(var(--color-ink-850-rgb) / 0.12),
+		0 0 0 3px rgb(241 205 112 / 0.08);
+	transform: translateY(-1px);
+}
+.post-viewer__product-thumb {
+	display: block;
+	width: 68px;
+	height: 68px;
+	flex: none;
+	border: 1px solid rgb(var(--color-ink-900-rgb) / 0.1);
+	border-radius: 16px;
+	object-fit: cover;
+	background:
+		radial-gradient(circle at 50% 35%, rgb(241 205 112 / 0.22), transparent 48%),
+		var(--hkui-default-100);
+	box-shadow: 0 8px 18px rgb(var(--color-ink-850-rgb) / 0.12);
+}
+.post-viewer__product-thumb--empty {
+	background:
+		radial-gradient(circle at 50% 35%, rgb(241 205 112 / 0.24), transparent 48%),
+		linear-gradient(135deg, rgb(245 222 165 / 0.22), rgb(var(--color-ink-400-rgb) / 0.14));
+}
+.post-viewer__product-info {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.post-viewer__product-name {
+	font-size: 0.95rem;
+	font-weight: var(--hkui-weight-bold);
+	color: var(--hkui-foreground);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.post-viewer__product-price {
+	align-self: flex-start;
+	padding: 3px 8px;
+	border-radius: var(--hkui-radius-full);
+	background: rgb(241 205 112 / 0.14);
+	color: #b15d1a;
+	font-size: 0.78rem;
+	font-weight: var(--hkui-weight-bold);
+	line-height: 1.2;
+}
+.post-viewer__product-cta {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: var(--post-cta-height);
+	padding: 0 var(--post-cta-padding-x);
+	border-radius: var(--hkui-radius-full);
+	background: var(--hkui-primary);
+	color: var(--hkui-primary-foreground);
+	font-size: var(--hkui-text-tiny);
+	font-weight: var(--hkui-weight-bold);
+	white-space: nowrap;
+}
+[data-theme="dark"] .post-viewer__products {
+	border-top-color: rgb(245 222 165 / 0.14);
+	background: transparent;
+}
+[data-theme="dark"] .post-viewer__products-count {
+	border-color: rgb(241 205 112 / 0.28);
+	background: rgb(241 205 112 / 0.14);
+	color: rgb(245 222 165 / 0.82);
+}
+[data-theme="dark"] .post-viewer__product {
+	border-color: rgb(245 222 165 / 0.14);
+	background:
+		radial-gradient(circle at 0% 0%, rgb(241 205 112 / 0.12), transparent 44%),
+		linear-gradient(135deg, rgb(255 255 255 / 0.06), rgb(255 255 255 / 0.026));
+	box-shadow:
+		inset 0 1px 0 rgb(245 222 165 / 0.1),
+		0 12px 28px rgb(0 0 0 / 0.16);
+}
+[data-theme="dark"] .post-viewer__product:hover {
+	border-color: rgb(241 205 112 / 0.42);
+	box-shadow:
+		inset 0 1px 0 rgb(245 222 165 / 0.16),
+		0 0 0 3px rgb(241 205 112 / 0.1),
+		0 18px 34px rgb(0 0 0 / 0.18);
+}
+[data-theme="dark"] .post-viewer__product-thumb {
+	border-color: rgb(245 222 165 / 0.18);
+	box-shadow:
+		0 0 0 1px rgb(241 205 112 / 0.1),
+		0 10px 18px rgb(0 0 0 / 0.18);
+}
+[data-theme="dark"] .post-viewer__product-price {
+	background: rgb(241 205 112 / 0.18);
+	color: #ffe8a3;
+}
+[data-theme="dark"] .post-viewer__product-cta {
+	background: rgb(241 205 112 / 0.16);
+	color: #ffe8a3;
+	box-shadow: inset 0 0 0 1px rgb(241 205 112 / 0.24);
+}
+
+.post-viewer__actions {
+	display: flex;
+	gap: var(--hkui-space-5);
+	padding: var(--hkui-space-3) var(--hkui-space-5);
+	border-top: 1px solid var(--hkui-divider);
+	background: var(--hkui-content1);
+	position: sticky;
+	bottom: 0;
+}
+.post-viewer__notice {
+	margin: 0;
+	padding: 0 var(--hkui-space-5) var(--hkui-space-4);
+	color: var(--hkui-primary);
+	font-size: var(--hkui-text-small);
+	font-weight: var(--hkui-weight-semibold);
+}
+.post-viewer__action {
+	display: inline-flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	background: transparent;
+	border: none;
+	padding: 6px;
+	cursor: pointer;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--hkui-text-tiny);
+	font-weight: var(--hkui-weight-medium);
+	font-variant-numeric: tabular-nums;
+	transition:
+		color var(--hkui-dur-fast) var(--hkui-ease),
+		transform var(--hkui-dur-fast) var(--hkui-ease);
+}
+.post-viewer__action:hover {
+	color: var(--hkui-foreground);
+}
+.post-viewer__action:active {
+	transform: scale(0.92);
+}
+/* Count + label follow the heart glyph's red, so the button never reads half red / half orange. */
+.post-viewer__action.is-liked {
+	color: var(--color-like-heart);
+}
+@media (max-width: 900px) {
+	/* These rules sit after the desktop reader primitives so the mobile pane
+	 * remains a fixed-row frame instead of inheriting aside scrolling.
+	 *
+	 * Rows: seller · caption · expand pill · action bar. The pill row is
+	 * `auto`, so it takes zero height on posts with nothing to reveal (the
+	 * button simply isn't rendered). */
+	.post-viewer__page:not([data-no-media="true"]) .post-viewer__aside,
+	.post-viewer__page[data-no-media="true"] .post-viewer__aside {
+		display: grid;
+		grid-template-rows: auto minmax(0, 1fr) auto auto;
+		overflow: hidden;
+		touch-action: pinch-zoom;
+	}
+	.post-viewer__page[data-no-media="true"] .post-viewer__aside {
+		position: relative;
+	}
+	/* With a photo the panel floats over its lower edge instead of taking its
+	 * own row, so a two-line post no longer reserves the same height as a
+	 * twenty-line one. Height follows content and is capped at the stage. */
+	/* Flush with the card on all three edges and painted in the card's own
+	 * surface: collapsed, the reader is PART of the card, not a panel sitting on
+	 * top of it. Any inset, radius or tint here would read as a second block
+	 * stacked inside the card. Its bottom corners come from the card's own clip.
+	 */
+	.post-viewer__page:not([data-no-media="true"]) .post-viewer__aside {
+		position: absolute;
+		inset: auto 0 0;
+		max-height: 100%;
+		background: var(--hkui-content1);
+	}
+	/* The frosted glass belongs to the OPEN drawer only — it exists to keep the
+	 * expanded caption legible over the photo it now covers. Collapsed there is
+	 * nothing to lift off the photo, so tinting there would just add a seam. */
+	.post-viewer__page:not([data-no-media="true"])
+	.post-viewer__aside[data-caption="expanded"] {
+		background: color-mix(in oklab, var(--hkui-content1) 76%, transparent);
+		-webkit-backdrop-filter: blur(20px);
+		backdrop-filter: blur(20px);
+		border-top-left-radius: var(--hkui-radius-xl);
+		border-top-right-radius: var(--hkui-radius-xl);
+		/* The drawer rises to the photo's top edge and no further, so the photo is
+		 * never pushed out of view. `--post-drawer-max` is measured in
+		 * PostDetailViewer (the painted rect of a `contain`-fitted photo is not
+		 * derivable in CSS); the 50% fallback is the card's mid-line for the
+		 * frames before the image decodes. `__article-scroll` owns the overflow,
+		 * so past this cap the caption scrolls inside the drawer. */
+		max-height: var(--post-drawer-max, 50%);
+	}
+	/* Seams that made the reader read as three stacked blocks: the seller row's
+	 * bottom rule, and the action bar's top rule + lip shadow + own opaque fill.
+	 * Dropping the bar's background is what makes both states cohere — it
+	 * inherits whatever the panel is painting, so it reads white while collapsed
+	 * and frosted once the drawer opens, instead of staying a solid slab against
+	 * the glass. */
+	.post-viewer__page:not([data-no-media="true"]) .post-viewer__seller {
+		border-bottom: 0;
+	}
+	.post-viewer__page:not([data-no-media="true"]) .post-viewer__actions {
+		border-top: 0;
+		box-shadow: none;
+		background: transparent;
+	}
+	/* Only the display promotion lives here — placement and margin come from the
+	 * shared grid frame above, which this block must not re-declare or it would
+	 * win the cascade and drag the pill back out of the caption row. */
+	.post-viewer__caption-toggle {
+		display: inline-flex;
+	}
+	.post-viewer__actions {
+		position: static;
+		justify-content: space-around;
+		gap: var(--hkui-space-2);
+		padding: var(--hkui-space-2) var(--hkui-space-4);
+		box-shadow: 0 -10px 24px rgb(var(--color-ink-950-rgb) / 0.06);
+	}
+	.post-viewer__action {
+		flex: 1 1 0;
+		min-height: 54px;
+		justify-content: center;
+	}
+	.post-viewer__notice {
+		position: absolute;
+		z-index: 2;
+		left: var(--hkui-space-4);
+		right: var(--hkui-space-4);
+		/* 72px = 上方 `.post-viewer__actions` 那條動作列的高度
+		 * （8px padding + 54px min-height + 8px padding + 1px 上框 ≈ 71 → 取 72），
+		 * **不是**底部導覽列常數：本元素是 `position: absolute`，貼在 viewer 面板
+		 * 自己的座標系裡，而 MobileBottomNav 是 viewport 上的另一層 `fixed`，
+		 * 兩者不在同一個容器，`var(--mobile-bottom-nav-*)` 在這裡沒有意義。
+		 * （web#417 的票面把它列為第 2 份漂移常數，實際查證後不成立。） */
+		bottom: 72px;
+		padding: var(--hkui-space-2) var(--hkui-space-3);
+		border-radius: var(--hkui-radius-full);
+		background: color-mix(
+			in srgb,
+			var(--hkui-content1) 92%,
+			var(--hkui-primary) 8%
+		);
+		box-shadow: 0 8px 20px rgb(var(--color-ink-950-rgb) / 0.12);
+		text-align: center;
+	}
+}
+
+/* === Feed comments bottom sheet (mobile) ===========================
+ * Slides up over the viewer to mirror IG Reels' comment UX. Lives in
+ * its own portal under <body> so its scrim isolates pointer events
+ * from the pager surface underneath. z-index sits above the viewer's
+ * close/counter chrome (1010) so dismiss controls remain reachable.
+ */
+.feed-comments-sheet {
+	position: fixed;
+	inset: 0;
+	z-index: 1100;
+	display: flex;
+	align-items: flex-end;
+	justify-content: center;
+}
+.feed-comments-sheet__scrim {
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.45);
+	border: 0;
+	padding: 0;
+	cursor: pointer;
+	animation: feed-comments-sheet-fade 180ms ease-out both;
+}
+.feed-comments-sheet__panel {
+	position: relative;
+	width: 100%;
+	max-width: 560px;
+	height: 85dvh;
+	display: flex;
+	flex-direction: column;
+	background: var(--hkui-content1);
+	color: var(--hkui-foreground);
+	border-radius: 18px 18px 0 0;
+	box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.25);
+	overflow: hidden;
+	animation: feed-comments-sheet-up 240ms cubic-bezier(0.32, 0.72, 0, 1) both;
+	transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1);
+	will-change: transform;
+}
+@keyframes feed-comments-sheet-fade {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+@keyframes feed-comments-sheet-up {
+	from {
+		transform: translateY(100%);
+	}
+	to {
+		transform: translateY(0);
+	}
+}
+.feed-comments-sheet__handle {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 28px;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	cursor: grab;
+	touch-action: none;
+	flex-shrink: 0;
+}
+.feed-comments-sheet__handle:active {
+	cursor: grabbing;
+}
+.feed-comments-sheet__grabber {
+	display: block;
+	width: 40px;
+	height: 4px;
+	border-radius: var(--radius-pill);
+	background: var(--hkui-default-300, rgb(var(--color-ink-950-rgb) / 0.22));
+}
+.feed-comments-sheet__body {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	-webkit-overflow-scrolling: touch;
+}
+
+/* ============================================================
+   Seller Header (replaces site nav when role === 'seller')
+
+   The pill surface, layout, and per-element chrome below were migrated
+   to inline Tailwind in RoleAwareNavbar.tsx; the BEM names are kept only
+   as cascade hooks. The wrapper `.seller-header` must stay TRANSPARENT —
+   it spans the full nav width, so any background/border-bottom here paints
+   a rectangular band + divider line behind the floating pill (the page
+   gradient should show through instead). Hence no `.seller-header { … }`
+   surface rule lives here anymore.
+   ============================================================ */
+.seller-header__inner {
+	display: flex;
+	align-items: center;
+	gap: var(--hkui-space-5);
+	padding: 0 var(--hkui-space-6);
+	height: 64px;
+	max-width: 1440px;
+	margin: 0 auto;
+}
+.seller-header__brand {
+	display: flex;
+	align-items: center;
+	gap: var(--hkui-space-2_5);
+	text-decoration: none;
+	color: var(--hkui-foreground);
+	flex-shrink: 0;
+}
+.seller-header__nav {
+	display: flex;
+	gap: var(--hkui-space-1);
+	margin-left: var(--hkui-space-4);
+	border-left: 1px solid var(--hkui-divider);
+	padding-left: var(--hkui-space-4);
+	flex: 1;
+	overflow-x: auto;
+	scrollbar-width: none;
+}
+.seller-header__nav::-webkit-scrollbar {
+	display: none;
+}
+.seller-header__nav-item {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	height: 36px;
+	padding: 0 var(--hkui-space-3);
+	border-radius: var(--hkui-radius-sm);
+	font-size: var(--hkui-text-small);
+	font-weight: var(--hkui-weight-medium);
+	color: var(--hkui-foreground-muted);
+	text-decoration: none;
+	white-space: nowrap;
+	transition:
+		color var(--hkui-dur-fast) var(--hkui-ease),
+		background var(--hkui-dur-fast) var(--hkui-ease);
+}
+.seller-header__nav-item:hover {
+	color: var(--hkui-foreground);
+	background: var(--hkui-default-100);
+}
+.seller-header__nav-item.is-active {
+	color: var(--hkui-primary);
+	background: var(--hkui-primary-50);
+}
+/* Dark mode: --hkui-primary-50 stays near-white (--color-ink-50) in the night
+ * theme, so the active pill glared bright on the dark header. Lift to the
+ * same warm-amber glass used by the seller sidebar active item. The
+ * [data-theme="dark"] + two-class selector keeps specificity above the
+ * light rule (the Tailwind dark: utility alone couldn't win). */
+[data-theme="dark"] .seller-header__nav-item.is-active {
+	background: rgba(241, 205, 112, 0.18);
+	color: #ffeec0;
+}
+
+.seller-header__actions {
+	display: flex;
+	align-items: center;
+	gap: var(--hkui-space-2);
+	margin-left: auto;
+	flex-shrink: 0;
+}
+.seller-header__cta {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--hkui-space-1_5);
+	height: 36px;
+	padding: 0 var(--hkui-space-4);
+	border-radius: var(--hkui-radius-md);
+	background: var(--hkui-primary);
+	color: var(--hkui-primary-foreground);
+	font-size: var(--hkui-text-small);
+	font-weight: var(--hkui-weight-semibold);
+	text-decoration: none;
+	transition: background var(--hkui-dur-fast) var(--hkui-ease);
+}
+.seller-header__cta:hover {
+	background: var(--hkui-primary-600);
+}
+.seller-header__icon-btn {
+	position: relative;
+	width: 36px;
+	height: 36px;
+	border: none;
+	background: transparent;
+	border-radius: 50%;
+	color: var(--hkui-foreground-muted);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	transition:
+		background var(--hkui-dur-fast) var(--hkui-ease),
+		color var(--hkui-dur-fast) var(--hkui-ease);
+}
+.seller-header__icon-btn:hover {
+	background: var(--hkui-default-100);
+	color: var(--hkui-foreground);
+}
+@media (max-width: 768px) {
+	.seller-header__inner {
+		padding: 0 var(--hkui-space-3);
+		gap: var(--hkui-space-3);
+		height: 56px;
+	}
+	.seller-header__nav {
+		padding-left: var(--hkui-space-3);
+		margin-left: 0;
+	}
+	.seller-header__nav-item {
+		height: 32px;
+		padding: 0 var(--hkui-space-2_5);
+	}
+	.seller-header__cta {
+		display: none;
+	}
+}
+
+/* ============================================================
+   Role Switcher (dev-only floating button, bottom-right)
+   ============================================================ */
+.role-switcher {
+	position: fixed;
+	right: var(--hkui-space-5);
+	bottom: var(--hkui-space-5);
+	z-index: 999;
+	font-family: var(--hkui-font-sans);
+}
+.role-switcher__fab {
+	width: 52px;
+	height: 52px;
+	border-radius: 50%;
+	border: 2px solid var(--hkui-content1);
+	background: var(--hkui-primary);
+	color: var(--hkui-primary-foreground);
+	cursor: pointer;
+	box-shadow: var(--hkui-shadow-lg);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	transition: transform var(--hkui-dur-fast) var(--hkui-ease);
+}
+.role-switcher__fab:hover {
+	transform: scale(1.05);
+}
+.role-switcher__fab:active {
+	transform: scale(0.95);
+}
+.role-switcher__fab-icon {
+	width: 24px;
+	height: 24px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	line-height: 1;
+}
+.role-switcher__fab-icon svg {
+	width: 100%;
+	height: 100%;
+	display: block;
+}
+.role-switcher__panel {
+	position: absolute;
+	right: 0;
+	bottom: 64px;
+	width: 220px;
+	background: var(--hkui-content1);
+	border-radius: var(--hkui-radius-md);
+	box-shadow: var(--hkui-shadow-lg);
+	border: 1px solid var(--hkui-divider);
+	padding: var(--hkui-space-2);
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.role-switcher__title {
+	font-size: 0.625rem;
+	font-weight: var(--hkui-weight-semibold);
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	color: var(--hkui-foreground-soft);
+	padding: var(--hkui-space-1_5) var(--hkui-space-2);
+}
+.role-switcher__option {
+	display: flex;
+	align-items: center;
+	gap: var(--hkui-space-2_5);
+	padding: var(--hkui-space-2) var(--hkui-space-2_5);
+	border: none;
+	background: transparent;
+	border-radius: var(--hkui-radius-sm);
+	font-size: var(--hkui-text-small);
+	color: var(--hkui-foreground);
+	cursor: pointer;
+	text-align: left;
+	font-family: inherit;
+	transition: background var(--hkui-dur-fast) var(--hkui-ease);
+}
+.role-switcher__option:hover {
+	background: var(--hkui-default-100);
+}
+.role-switcher__option[data-active="true"] {
+	background: var(--hkui-primary-50);
+	color: var(--hkui-primary-700);
+	font-weight: var(--hkui-weight-semibold);
+}
+.role-switcher__icon {
+	width: 18px;
+	height: 18px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+}
+.role-switcher__icon svg {
+	width: 100%;
+	height: 100%;
+	display: block;
+}
+.role-switcher__hint {
+	font-size: 0.625rem;
+	color: var(--hkui-foreground-soft);
+	padding: var(--hkui-space-1_5) var(--hkui-space-2) var(--hkui-space-1);
+	border-top: 1px solid var(--hkui-divider);
+	margin-top: var(--hkui-space-1);
+}
+
+/* ============================================================
+   Dev 浮動工具在手機寬度的停靠（web#425）
+   ============================================================
+
+   development 下有**兩顆**右下角 viewport-fixed 浮動鈕：本檔上方的角色切換器
+   （`components/shared/RootDocument.tsx` 掛載）與 TanStack Query Devtools（`AppProviders.tsx` 掛載）。
+   兩者的預設位置實測（Pixel 5 / 393×727）分別是 `bottom:20px right:20px` 52×52
+   與 `bottom:12px right:12px` 48×48 —— 而底部導覽列佔 y 650–718、第 5 格
+  （訪客＝登入／已登入＝設定）佔 x 304–374。**兩顆都整個落在第 5 格上面**，
+   z-index 999 / 100000 都遠高於導覽列的 `z-[200]`。
+
+   後果有兩層，都只發生在 `next dev`（production build 兩顆都不 render）：
+     1. 人在手機寬度下開發時，第 5 格**點不到**
+     2. 本機 E2E 的點擊被攔截，產生「看起來像產品壞掉」的假紅 —— web#425 就是
+        整輪調查花在這上面（CI 同一支 mobile 測試一直是綠的）
+
+   手機寬度沒有任何空著的角落（上緣是 navbar、下緣是底部導覽列），所以不是換一個
+   角落擺，而是**收合**：兩顆一起抬到導覽列上方、縮小、貼右緣藏起來，只露出
+   `--hk-dev-dock-peek` 寬的把手；hover / focus / 展開時才滑出來蓋住內容。
+   收合狀態本身不與導覽列任何一格重疊。
+
+   為什麼不是「合併成一顆」：devtools 的開關鈕由它自己 portal 到 body 下自行渲染，
+   我們拿不到它的 JSX，只能從外面用 CSS 對齊。因此做法是讓兩顆**共用同一條右緣
+   停靠帶**（同一個 right/transform/尺寸，垂直相鄰），視覺上是一條把手而不是兩顆
+   亂飄的球。
+
+   桌機寬度完全不動（本區塊只在導覽列存在的斷點內生效）。 */
+@media not (min-width: 840px) {
+	:root {
+		/* 收合時露出的把手寬度。夠大到摸得到、夠小到幾乎不佔內容可點區。 */
+		--hk-dev-dock-peek: 14px;
+		/* 停靠帶的下緣：導覽列上緣再讓 8px。導覽列幾何的唯一宣告處是
+		 * `styles/components/navigation-final.css`，這裡只能引用，不得抄數字
+		 *（fallback 逐字等於宣告值，由 tests/mobile-bottom-nav-tokens.test.ts 釘住）。 */
+		--hk-dev-dock-bottom: calc(
+			var(--mobile-bottom-nav-height, 68px) +
+			var(--mobile-bottom-nav-bottom, 10px) +
+			8px
+		);
+		/* 停靠帶上每一格的間距（40px 鈕 + 4px 空隙）。 */
+		--hk-dev-dock-step: 44px;
+	}
+
+	.role-switcher {
+		right: 0;
+		bottom: var(--hk-dev-dock-bottom);
+		transform: translateX(calc(100% - var(--hk-dev-dock-peek)));
+		opacity: 0.55;
+		transition:
+			transform var(--hkui-dur-fast) var(--hkui-ease),
+			opacity var(--hkui-dur-fast) var(--hkui-ease);
+	}
+	/* 展開條件三選一：指標懸停、鍵盤焦點、面板已開（觸控只有「點一下把手」這條
+	 * 路徑 —— 那一下同時是 focus 與 toggle，所以點完就是展開狀態）。 */
+	.role-switcher:hover,
+	.role-switcher:focus-within,
+	.role-switcher[data-open="true"] {
+		transform: translateX(0);
+		opacity: 1;
+	}
+	.role-switcher__fab {
+		width: 40px;
+		height: 40px;
+	}
+	.role-switcher__fab-icon {
+		width: 20px;
+		height: 20px;
+	}
+	/* 面板展開時往上開，避免蓋住把手自己（桌機的 64px 是對 52px 鈕算的）。 */
+	.role-switcher__panel {
+		bottom: 48px;
+	}
+
+	/* --- TanStack Query Devtools 的開關鈕 ------------------------------------
+	 * 這是**第三方 DOM**：`@tanstack/react-query-devtools@5.101.0` 把開關鈕 portal
+	 * 到 body 下，class 是 `.tsqd-open-btn-container`（fixed / bottom:12px /
+	 * right:12px / z-index:100000，實測值）與 `.tsqd-open-btn`（40×40）。元件的
+	 * public API 只有 `buttonPosition` 的四個角落＋`relative`，四個角落在手機寬度
+	 * 下都壓到自家固定 chrome（上緣 navbar、下緣底部導覽列），所以只能從外面壓樣式。
+	 *
+	 * 因此這裡刻意耦合到上述版本的 class 名。升級 devtools 若改名，症狀是「鈕又回到
+	 * 右下角壓住第 5 格」—— 這個回歸會被 tests/dev-overlays-gate.test.ts 的 class
+	 * 存在性斷言擋下（它比對本檔宣告的 class 是否仍出現在該套件的產物裡），不會靜靜
+	 * 地壞掉。
+	 *
+	 * 用 `body ` 前綴是為了勝過套件自己注入的 goober class（單一 class，0,1,0）：
+	 * 它的 <style> 在執行期才插進 head，排在本檔之後，同權重會贏，所以必須靠
+	 * 0,1,1 的權重壓過去，而不是靠順序。 */
+	body .tsqd-open-btn-container {
+		right: 0;
+		bottom: calc(var(--hk-dev-dock-bottom) + var(--hk-dev-dock-step));
+		transform: translateX(calc(100% - var(--hk-dev-dock-peek)));
+		opacity: 0.55;
+		transition:
+			transform var(--hkui-dur-fast) var(--hkui-ease),
+			opacity var(--hkui-dur-fast) var(--hkui-ease);
+	}
+	body .tsqd-open-btn-container:hover,
+	body .tsqd-open-btn-container:focus-within {
+		transform: translateX(0);
+		opacity: 1;
+	}
+}

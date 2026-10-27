@@ -1,0 +1,1860 @@
+/* 按鈕在上、錯誤帶在下。
+ *
+ * 原本兩者橫排：錯誤帶是**不定長的上游文字**（未知碼會退回「…（代碼 X）。」，
+ * 碼本身可到 80 字），橫排時它的 max-content 就是這一列的寬度，而商家詳情頁的
+ * `.header-actions` 是 `flex-shrink: 0` ⇒ 壓力全部轉給 `.header-left`：店名折成
+ * 「十八養／場」、meta 六欄各自折行、分隔用的「·」被留在自己一行，右端的
+ * 「刪除帳號」直接被推出可視區。上下排列讓文字自己折行，不去定義工具列的寬度。 */
+.adm-operation-entry {
+	display: inline-flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 8px;
+	min-height: 44px;
+	max-width: 100%;
+}
+
+/* ⚠️ 配套的寬度上限 `.adm-operation-entry .adm-operation-error` 不在這裡，而在
+   `.adm-operation-error` 的定義之後（同一份檔案下方）—— 特異性較高的規則必須排在
+   後面，否則 biome 的 noDescendingSpecificity 會警告，而它警告的正是真實風險。 */
+.adm-merchant-row-actions {
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 8px;
+}
+
+/* 多了「代行營運」按鈕之後這張表在 1440 會溢出，容器因此改成可橫捲。
+   ⚠️ 可橫捲只保證「捲得到」，不保證「看得到」——「操作」欄本身釘在右緣的規則在
+   `MerchantManagement.css`（`.merchant-management .merchant-table td:last-child`），
+   兩者是一組，改一邊要看另一邊。 */
+.merchant-management .merchant-table-container {
+	overflow-x: auto;
+}
+
+.adm-operation-safety-note {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 14px;
+	margin: -4px 0 24px;
+	padding: 14px 16px;
+	border: 1px solid #d9c77f;
+	border-radius: 14px;
+	background: #f8f2d9;
+	color: var(--admin-primary-strong);
+}
+
+.adm-operation-safety-note > svg {
+	display: grid;
+	place-items: center;
+	width: 38px;
+	height: 38px;
+	border-radius: 10px;
+	background: var(--admin-primary-strong);
+	color: #fffdf7;
+	font-size: 20px;
+}
+
+.adm-operation-safety-note strong {
+	display: block;
+	font-size: 14px;
+	font-weight: 800;
+}
+
+.adm-operation-safety-note p {
+	margin: 3px 0 0;
+	color: var(--color-ink-600);
+	font-size: 13px;
+	line-height: 1.55;
+}
+
+.adm-operation-safety-note > span {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	min-height: 36px;
+	padding: 7px 10px;
+	border: 1px solid #d9c77f;
+	border-radius: 9px;
+	background: #fffdf7;
+	font-size: 12px;
+	font-weight: 800;
+	white-space: nowrap;
+}
+
+.adm-operation-entry-skeleton {
+	width: 148px;
+	height: 44px;
+	border-radius: 10px;
+	background: var(--color-ink-100);
+	position: relative;
+	overflow: hidden;
+}
+
+.adm-operation-entry-skeleton::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	transform: translateX(-100%);
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(255, 255, 255, 0.62),
+		transparent
+	);
+	animation: adm-operation-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes adm-operation-shimmer {
+	to {
+		transform: translateX(100%);
+	}
+}
+
+.adm-operation-entry-status {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	min-height: 36px;
+	max-width: 220px;
+	padding: 7px 10px;
+	border-radius: 9px;
+	background: var(--color-ink-50);
+	color: var(--hk-muted-text);
+	font-size: 13px;
+	font-weight: 600;
+	line-height: 1.35;
+}
+
+.adm-operation-entry-status svg {
+	color: var(--hk-body);
+	font-size: 17px;
+}
+
+.adm-operation-trigger {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	min-height: 44px;
+	padding: 9px 16px;
+	border: 1px solid var(--hk-secondary-border);
+	border-radius: 10px;
+	background: var(--hk-secondary-soft);
+	color: var(--hk-primary-strong);
+	font: inherit;
+	font-size: 15px;
+	font-weight: 700;
+	cursor: pointer;
+	transition:
+		background-color 180ms ease-out,
+		border-color 180ms ease-out,
+		transform 180ms ease-out;
+}
+
+.adm-operation-trigger:hover:not(:disabled) {
+	background: #eee2b5;
+	border-color: #8f7724;
+	transform: translateY(-1px);
+}
+
+.adm-operation-trigger:active:not(:disabled) {
+	transform: translateY(0);
+}
+
+/* 不可代行的列上，這顆按鈕的 label 就是原因。停用態必須自己有一組中性色：沿用
+   金色底等於把「說明」畫成「可以按」，而 `disabled` 不改變任何顏色。
+   `:hover` 在停用按鈕上照樣命中（指標事件沒被關掉），所以上面兩條要排除它，
+   否則游標一移過去就浮起來、變回可按的樣子。 */
+.adm-operation-trigger:disabled {
+	border-color: var(--gray-200);
+	background: var(--gray-100);
+	color: var(--gray-600);
+	cursor: not-allowed;
+}
+
+.adm-operation-trigger--compact {
+	min-height: 44px;
+	padding: 6px 10px;
+	border-radius: 8px;
+	font-size: 14px;
+}
+
+.adm-operation-trigger:focus-visible,
+.adm-operation-workspace button:focus-visible {
+	outline: 3px solid var(--hk-focus-ring);
+	outline-offset: 2px;
+}
+
+.adm-operation-preflight-loading,
+.adm-operation-preflight-blocked {
+	display: flex;
+	align-items: flex-start;
+	gap: 14px;
+	min-height: 132px;
+	padding: 22px;
+	border: 1px solid var(--hk-border);
+	border-radius: 14px;
+	background: var(--color-ink-50);
+}
+
+.adm-operation-preflight-loading > svg,
+.adm-operation-preflight-blocked > svg {
+	display: grid;
+	place-items: center;
+	width: 42px;
+	height: 42px;
+	flex: 0 0 auto;
+	border-radius: 12px;
+	background: var(--color-ink-100);
+	color: var(--hk-primary-strong);
+	font-size: 21px;
+}
+
+.adm-operation-preflight-loading > svg {
+	animation: adm-operation-spin 900ms linear infinite;
+}
+
+@keyframes adm-operation-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.adm-operation-preflight-loading strong,
+.adm-operation-preflight-loading span,
+.adm-operation-preflight-blocked strong {
+	display: block;
+}
+
+.adm-operation-preflight-loading strong,
+.adm-operation-preflight-blocked strong {
+	margin-top: 2px;
+	font-size: 16px;
+}
+
+.adm-operation-preflight-loading span,
+.adm-operation-preflight-blocked p {
+	margin: 6px 0 0;
+	color: var(--hk-muted-text);
+	font-size: 13px;
+	line-height: 1.6;
+}
+
+.adm-operation-preflight-blocked {
+	border-color: #dfaaa5;
+	background: var(--hk-danger-soft);
+	color: #771d17;
+}
+
+.adm-operation-preflight-blocked > svg {
+	background: #f4d7d4;
+	color: #771d17;
+}
+
+.adm-operation-identity-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.adm-operation-identity-card {
+	min-width: 0;
+	padding: 15px 16px;
+	border: 1px solid var(--hk-border);
+	border-radius: 13px;
+	background: var(--color-ink-50);
+}
+
+.adm-operation-identity-card--target {
+	border-color: #d9c77f;
+	background: #fbf6df;
+}
+
+.adm-operation-identity-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	margin-bottom: 9px;
+	color: var(--hk-muted-text);
+	font-size: 11px;
+	font-weight: 800;
+	letter-spacing: 0.04em;
+}
+
+.adm-operation-identity-card strong,
+.adm-operation-identity-card > span:not(.adm-operation-identity-label),
+.adm-operation-identity-card em {
+	display: block;
+}
+
+.adm-operation-identity-card strong {
+	margin-bottom: 4px;
+	color: var(--hk-ink);
+	font-size: 16px;
+}
+
+.adm-operation-identity-card > span:not(.adm-operation-identity-label) {
+	color: var(--hk-muted-text);
+	font-size: 12px;
+	line-height: 1.5;
+	overflow-wrap: anywhere;
+}
+
+.adm-operation-identity-card em {
+	margin-top: 7px;
+	color: var(--hk-primary-strong);
+	font-size: 11px;
+	font-style: normal;
+	font-weight: 800;
+}
+
+.adm-operation-reasons {
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+.adm-operation-reasons legend {
+	padding: 0;
+	color: var(--hk-ink);
+	font-size: 15px;
+	font-weight: 800;
+}
+
+.adm-operation-reasons > p {
+	margin: 5px 0 10px;
+	color: var(--hk-muted-text);
+	font-size: 12px;
+	line-height: 1.55;
+}
+
+.adm-operation-reason-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 9px;
+}
+
+.adm-operation-reason-card {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	align-items: center;
+	gap: 10px;
+	min-height: 64px;
+	padding: 11px 13px;
+	border: 1px solid var(--hk-border);
+	border-radius: 11px;
+	background: #fff;
+	cursor: pointer;
+	transition:
+		border-color 160ms ease-out,
+		background-color 160ms ease-out;
+}
+
+.adm-operation-reason-card:hover {
+	border-color: var(--color-ink-300);
+	background: #fafbf8;
+}
+
+.adm-operation-reason-card.is-selected {
+	border-color: var(--hk-primary-strong);
+	background: var(--color-ink-50);
+}
+
+.adm-operation-reason-card:focus-within {
+	outline: 3px solid var(--hk-focus-ring);
+	outline-offset: 2px;
+}
+
+.adm-operation-reason-card input {
+	width: 18px;
+	height: 18px;
+	margin: 0;
+	accent-color: var(--hk-primary-strong);
+}
+
+.adm-operation-reason-card strong,
+.adm-operation-reason-card small {
+	display: block;
+}
+
+.adm-operation-reason-card strong {
+	color: var(--hk-ink);
+	font-size: 13px;
+	line-height: 1.35;
+}
+
+.adm-operation-reason-card small {
+	margin-top: 3px;
+	color: var(--hk-muted-text);
+	font-size: 11px;
+	line-height: 1.4;
+}
+
+.adm-operation-target {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(180px, auto);
+	gap: 18px;
+	padding: 16px 18px;
+	border: 1px solid var(--hk-border);
+	border-radius: 12px;
+	background: var(--color-ink-50);
+}
+
+.adm-operation-target strong,
+.adm-operation-target span {
+	display: block;
+}
+
+.adm-operation-target strong {
+	font-size: 17px;
+	color: var(--hk-ink);
+}
+
+.adm-operation-target span {
+	margin-top: 3px;
+	color: var(--hk-muted-text);
+	font-size: 13px;
+	overflow-wrap: anywhere;
+}
+
+.adm-operation-target-actor {
+	text-align: right;
+}
+
+.adm-operation-section h3 {
+	margin: 0 0 10px;
+	color: var(--hk-ink);
+	font-size: 15px;
+	font-weight: 750;
+}
+
+.adm-operation-section-heading {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 16px;
+	margin-bottom: 10px;
+}
+
+.adm-operation-section-heading h3 {
+	margin-bottom: 0;
+}
+
+.adm-operation-section-heading p {
+	margin: 4px 0 0;
+	color: var(--hk-muted-text);
+	font-size: 12px;
+	line-height: 1.45;
+}
+
+.adm-operation-ttl {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-height: 32px;
+	padding: 5px 9px;
+	border: 1px solid #d9c77f;
+	border-radius: 9px;
+	background: #fbf6df;
+	color: var(--hk-primary-strong);
+	font-size: 12px;
+	font-weight: 800;
+	white-space: nowrap;
+}
+
+.adm-operation-scope-groups {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 10px;
+}
+
+.adm-operation-scope-group {
+	padding: 12px;
+	border: 1px solid var(--hk-border);
+	border-radius: 11px;
+	background: #f7f8f5;
+}
+
+.adm-operation-scope-group--write {
+	border-color: #d9c77f;
+	background: #fbf8e9;
+}
+
+.adm-operation-scope-group > strong {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 9px;
+	color: var(--hk-body);
+	font-size: 12px;
+}
+
+.adm-operation-scope-empty {
+	color: var(--hk-muted-text);
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+.adm-operation-scope-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.adm-operation-scope {
+	display: inline-flex;
+	align-items: center;
+	min-height: 28px;
+	padding: 4px 9px;
+	border-radius: 999px;
+	background: var(--color-ink-100);
+	color: var(--hk-primary-strong);
+	font-size: 12px;
+	font-weight: 700;
+}
+
+.adm-operation-boundary {
+	padding: 14px 16px;
+	border: 1px solid #e4c7c3;
+	border-radius: 12px;
+	background: var(--hk-danger-soft);
+	color: #6f1b16;
+}
+
+.adm-operation-boundary strong {
+	display: block;
+	margin-bottom: 7px;
+	font-size: 14px;
+}
+
+.adm-operation-boundary-heading {
+	display: flex;
+	align-items: flex-start;
+	gap: 9px;
+	margin-bottom: 8px;
+}
+
+.adm-operation-boundary-heading > svg {
+	font-size: 18px;
+}
+
+.adm-operation-boundary-heading strong {
+	margin-bottom: 1px;
+}
+
+.adm-operation-boundary-heading span {
+	display: block;
+	font-size: 11px;
+	opacity: 0.8;
+}
+
+.adm-operation-boundary ul {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 5px 18px;
+	margin: 0;
+	padding-left: 19px;
+	font-size: 13px;
+	line-height: 1.55;
+}
+
+.adm-operation-form {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 16px;
+}
+
+.adm-operation-field {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 7px;
+}
+
+.adm-operation-field--wide {
+	grid-column: 1 / -1;
+}
+
+.adm-operation-field label {
+	color: var(--hk-body);
+	font-size: 13px;
+	font-weight: 700;
+}
+
+.adm-operation-field input,
+.adm-operation-field select,
+.adm-operation-field textarea {
+	width: 100%;
+	min-width: 0;
+	min-height: 44px;
+	padding: 10px 12px;
+	border: 1px solid var(--hk-muted-text);
+	border-radius: 9px;
+	background: #fff;
+	color: var(--hk-ink);
+	font: inherit;
+	font-size: 14px;
+}
+
+.adm-operation-field textarea {
+	min-height: 82px;
+	resize: vertical;
+}
+
+.adm-operation-field input::placeholder,
+.adm-operation-field textarea::placeholder {
+	color: #70786b;
+}
+
+.adm-operation-field-note {
+	color: var(--hk-muted-text);
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+.adm-operation-error {
+	display: flex;
+	align-items: flex-start;
+	gap: 9px;
+	padding: 12px 14px;
+	border: 1px solid #dfaaa5;
+	border-radius: 10px;
+	background: var(--hk-danger-soft);
+	color: #771d17;
+	font-size: 13px;
+	line-height: 1.55;
+}
+
+.adm-operation-error svg {
+	font-size: 18px;
+}
+
+/* 商家頁／列表頁入口內的錯誤帶另有寬度上限：只靠 `.adm-operation-entry` 的上下排列，
+   它仍會以 max-content 撐寬整個入口，而入口所在的 `.header-actions` 是 flex-shrink: 0
+   ⇒ 壓力轉給店名與 meta 那一側（見 `MerchantCertificationDetail.css` 的 `.header-left`）。
+   上限只給這個位置：對話框內、治理頁與撤銷視窗裡的同一個元件是整列寬的告示，該撐滿。 */
+.adm-operation-entry .adm-operation-error {
+	max-width: 34ch;
+}
+
+.adm-operation-trace {
+	display: block;
+	margin-top: 4px;
+	font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+	font-size: 11px;
+	/* 追蹤編號是一整串不含空白的字元（`safeUpstreamError` 收 `[A-Za-z0-9._:-]{1,128}`），
+	   純英數的那種**一個正常換行點都沒有**。它必須在窄容器裡也能斷 —— 這條與上面的
+	   `max-width: 34ch` 是一組：加了上限卻沒讓它斷，128 字的編號會直接穿出錯誤帶
+	   （實測 64 字純十六進位在 1440 下溢出 174.7px、右緣 1453.7 已超出視窗），
+	   等於把「錯誤帶撐爆 header」換成「文字自己跑出去」。
+	   截斷不是選項：追蹤編號存在的唯一目的就是整串拿去查 log。 */
+	overflow-wrap: anywhere;
+}
+
+.adm-operation-workspace-header {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 24px;
+	margin-bottom: 24px;
+}
+
+.adm-operation-workspace-header h1 {
+	margin: 0;
+	color: var(--hk-ink);
+	font-size: clamp(27px, 3vw, 36px);
+	font-weight: 780;
+	line-height: 1.2;
+	letter-spacing: -0.025em;
+}
+
+.adm-operation-workspace-header p {
+	max-width: 68ch;
+	margin: 8px 0 0;
+	color: var(--hk-body);
+	font-size: 15px;
+	line-height: 1.7;
+}
+
+.adm-operation-workspace-layout {
+	display: grid;
+	grid-template-columns: minmax(0, 1.65fr) minmax(280px, 0.75fr);
+	gap: 22px;
+	align-items: start;
+}
+
+.adm-operation-capability-panel {
+	overflow: hidden;
+	border: 1px solid var(--hk-border);
+	border-radius: 14px;
+	background: var(--hk-paper);
+}
+
+.adm-operation-panel-heading {
+	padding: 20px 22px 16px;
+	border-bottom: 1px solid var(--color-ink-100);
+}
+
+.adm-operation-panel-heading h2,
+.adm-operation-boundary-panel h2 {
+	margin: 0;
+	font-size: 19px;
+	font-weight: 780;
+	letter-spacing: -0.015em;
+}
+
+.adm-operation-panel-heading p {
+	margin: 5px 0 0;
+	color: var(--hk-muted-text);
+	font-size: 13px;
+	line-height: 1.55;
+}
+
+.adm-operation-capability-row {
+	display: grid;
+	grid-template-columns: minmax(145px, 0.9fr) minmax(180px, 1.4fr) auto;
+	align-items: center;
+	gap: 18px;
+	min-height: 88px;
+	padding: 16px 22px;
+	border-bottom: 1px solid var(--color-ink-100);
+}
+
+.adm-operation-capability-row:last-child {
+	border-bottom: 0;
+}
+
+.adm-operation-capability-title {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	font-size: 15px;
+	font-weight: 780;
+}
+
+.adm-operation-capability-title svg {
+	display: grid;
+	place-items: center;
+	width: 34px;
+	height: 34px;
+	border-radius: 9px;
+	background: var(--color-ink-100);
+	color: var(--hk-primary-strong);
+	font-size: 18px;
+}
+
+.adm-operation-capability-copy {
+	color: var(--hk-body);
+	font-size: 13px;
+	line-height: 1.55;
+}
+
+.adm-operation-capability-state {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 5px;
+	text-align: right;
+}
+
+.adm-operation-capability-state strong {
+	font-size: 13px;
+	color: var(--hk-primary-strong);
+}
+
+.adm-operation-capability-state span {
+	max-width: 180px;
+	color: var(--hk-muted-text);
+	font-size: 11px;
+	line-height: 1.4;
+}
+
+.adm-operation-readonly-label {
+	display: inline-flex;
+	align-items: center;
+	min-height: 28px;
+	padding: 4px 9px;
+	border-radius: 999px;
+	background: var(--color-ink-100);
+	color: var(--hk-body);
+	font-size: 12px;
+	font-weight: 750;
+}
+
+.adm-operation-boundary-panel {
+	padding: 22px;
+	border-radius: 14px;
+	background: var(--hk-primary-strong);
+	color: #f7f4e8;
+}
+
+.adm-operation-boundary-panel p {
+	margin: 8px 0 0;
+	color: var(--color-ink-100);
+	font-size: 13px;
+	line-height: 1.65;
+}
+
+.adm-operation-boundary-panel ul {
+	display: grid;
+	gap: 9px;
+	margin: 18px 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.adm-operation-boundary-panel li {
+	display: flex;
+	align-items: flex-start;
+	gap: 9px;
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.adm-operation-boundary-panel li svg {
+	margin-top: 1px;
+	color: #eadb9a;
+	font-size: 17px;
+}
+
+@media (max-width: 1180px) {
+	.adm-operation-safety-note {
+		grid-template-columns: auto minmax(0, 1fr);
+	}
+
+	.adm-operation-safety-note > span {
+		grid-column: 2;
+		justify-self: start;
+	}
+
+	.adm-operation-workspace-layout {
+		grid-template-columns: 1fr;
+	}
+
+	.adm-operation-boundary-panel ul {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 760px) {
+	.adm-operation-safety-note {
+		grid-template-columns: auto minmax(0, 1fr);
+		align-items: start;
+	}
+
+	.adm-operation-safety-note > span {
+		grid-column: 1 / -1;
+		white-space: normal;
+	}
+
+	.adm-operation-field--wide {
+		grid-column: auto;
+	}
+
+	.adm-operation-field input,
+	.adm-operation-field select,
+	.adm-operation-field textarea {
+		max-width: 100%;
+	}
+
+	.adm-operation-target,
+	.adm-operation-identity-grid,
+	.adm-operation-reason-grid,
+	.adm-operation-scope-groups,
+	.adm-operation-form,
+	.adm-operation-boundary ul {
+		grid-template-columns: 1fr;
+	}
+
+	.adm-operation-section-heading {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.adm-operation-ttl {
+		align-self: flex-start;
+	}
+
+	.adm-operation-target-actor {
+		text-align: left;
+	}
+
+	.adm-operation-workspace-header {
+		align-items: flex-start;
+		flex-direction: column;
+	}
+
+	.adm-operation-capability-row {
+		grid-template-columns: 1fr;
+		gap: 9px;
+	}
+
+	.adm-operation-capability-state {
+		align-items: flex-start;
+		text-align: left;
+	}
+
+	.adm-operation-boundary-panel ul {
+		grid-template-columns: 1fr;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.adm-operation-entry-skeleton::after {
+		animation: none;
+	}
+
+	.adm-operation-preflight-loading > svg {
+		animation: none;
+	}
+
+	.adm-operation-trigger {
+		transition: none;
+	}
+
+	.adm-operation-trigger:hover {
+		transform: none;
+	}
+}
+
+/* ── 代行紀錄（治理視角）：mockup image11 主區 ＋ 稽核內容面板 ───────────── */
+.adm-audit-console {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+	padding: 24px;
+	color: var(--admin-ink);
+}
+
+.adm-audit-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 16px;
+	flex-wrap: wrap;
+}
+
+.adm-audit-header h1 {
+	margin: 0;
+	font-family: var(--admin-font-display);
+	font-size: 24px;
+	font-weight: 700;
+}
+
+.adm-audit-header p {
+	margin: 6px 0 0;
+	color: var(--admin-muted-aa);
+	font-size: 14px;
+}
+
+.adm-audit-header-actions {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.adm-audit-status {
+	padding: 6px 12px;
+	border-radius: 999px;
+	font-size: 13px;
+	font-weight: 600;
+	background: var(--admin-control);
+	color: var(--admin-body);
+}
+
+.adm-audit-status--active {
+	background: var(--admin-success-soft);
+	color: var(--admin-success);
+}
+
+.adm-audit-status--revoked {
+	background: var(--admin-danger-soft);
+	color: var(--admin-danger);
+}
+
+.adm-audit-notice {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 12px 16px;
+	border-radius: var(--admin-radius-card);
+	background: var(--admin-success-soft);
+	color: var(--admin-success);
+	font-size: 14px;
+}
+
+.adm-audit-summary-cards {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 16px;
+}
+
+/* 工作階段代號是 17 字的 base36，用 KPI 卡的字級會被裁掉；開始時間同理帶日期。
+   兩張改用可換行的較小字級，數字卡維持原樣。 */
+.adm-audit-summary-cards > .stat-card:nth-child(-n + 2) .stat-value {
+	font-size: 18px;
+	line-height: 1.4;
+	white-space: normal;
+	word-break: break-all;
+}
+
+.adm-audit-summary-note {
+	margin: -4px 0 0;
+	color: var(--admin-muted-aa);
+	font-size: 12px;
+}
+
+.adm-audit-close-summary {
+	padding: 20px;
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-panel);
+	background: var(--admin-paper);
+}
+
+.adm-audit-close-summary h2 {
+	margin: 0 0 14px;
+	font-size: 16px;
+	font-weight: 700;
+}
+
+.adm-audit-close-rows {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	gap: 10px;
+	margin: 0;
+	padding: 14px;
+	list-style: none;
+	border-radius: var(--admin-radius-card);
+	background: var(--admin-cream);
+}
+
+.adm-audit-close-rows li {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 8px;
+	font-size: 14px;
+}
+
+/* 三態攤開那一列比其他列長，佔滿整行才不會把數字擠成兩行看不出對應；
+   值改為緊跟標籤左對齊（其餘列的值就在標籤旁邊，靠右會讀成另一欄的資料）。 */
+.adm-audit-close-rows li.adm-audit-close-rows__wide {
+	grid-column: 1 / -1;
+	grid-template-columns: auto auto minmax(0, 1fr);
+}
+
+.adm-audit-close-rows li > span {
+	color: var(--admin-muted-aa);
+}
+
+.adm-audit-close-rows li > strong {
+	font-weight: 600;
+}
+
+.adm-audit-close-rows li > strong.is-pending {
+	color: var(--admin-warning);
+}
+
+.adm-audit-safety {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-top: 14px;
+	padding: 14px 16px;
+	border-radius: var(--admin-radius-card);
+	background: var(--admin-success-soft);
+	color: var(--admin-success);
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.adm-audit-safety--breached {
+	background: var(--admin-danger-soft);
+	color: var(--admin-danger);
+}
+
+/* 撤銷紀錄（誰／何時／為什麼中止這個工作階段）。
+ *
+ * 刻意不像 `.adm-audit-safety--breached` 那樣整塊鋪 danger 底色：撤銷是正常的治理
+ * 動作，整塊紅會與「三層鎖定被打穿」那個 P0 訊號同一個視覺重量。只有左緣、圖示與
+ * 標題吃 danger 色，與右上角「已撤銷」徽章對得上。 */
+.adm-audit-revocation {
+	display: flex;
+	gap: 10px;
+	margin-top: 14px;
+	padding: 14px 16px;
+	border: 1px solid var(--admin-border);
+	border-left: 3px solid var(--admin-danger);
+	border-radius: var(--admin-radius-card);
+	background: var(--admin-cream);
+	font-size: 14px;
+}
+
+.adm-audit-revocation > svg,
+.adm-audit-revocation strong {
+	color: var(--admin-danger);
+}
+
+.adm-audit-revocation strong {
+	font-weight: 700;
+}
+
+.adm-audit-revocation p {
+	margin: 4px 0 0;
+}
+
+.adm-audit-revocation__meta {
+	color: var(--admin-muted-aa);
+}
+
+/* 理由是使用者輸入的自由文字（最長 200 字）。沒有空白的長字串（貼上的工單網址、
+   一整串日文或中文）在預設 `overflow-wrap` 下不會斷行，會把卡片撐寬並讓整頁產生
+   橫向捲動。 */
+.adm-audit-revocation__reason {
+	overflow-wrap: anywhere;
+}
+
+.adm-audit-retention {
+	margin: 12px 0 0;
+	color: var(--admin-muted-aa);
+	font-size: 12px;
+}
+
+/* 主表獨佔整個寬度。稽核內容是 modal（`AuditDetailDialog`），不再是側欄。
+ *
+ * 曾經有過兩版側欄：`grid-template-columns: minmax(0,1fr) 340px`（面板永遠吃掉
+ * 340px，1440 筆電上主欄只剩 673px 而表格 min-content 是 765px ⇒「結果」欄被裁到
+ * 可視區外），以及之後的 `flex-wrap: wrap`（塞不下就換行到表格下方）。後者不裁切，
+ * 但換行之後面板開在畫面外，按「查看前後差異」看起來像沒反應。
+ * 兩版的共同錯誤是讓一個「點某列之後才有內容的下鑽視圖」跟主表搶同一條水平空間。 */
+.adm-audit-main {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	min-width: 0;
+}
+
+.adm-audit-filters {
+	display: flex;
+	align-items: flex-end;
+	gap: 12px;
+	flex-wrap: wrap;
+	padding: 16px;
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-card);
+	background: var(--admin-paper);
+}
+
+.adm-audit-filters .adm-operation-field {
+	min-width: 160px;
+}
+
+.adm-audit-table-wrap {
+	/* 「變更摘要」與「理由」兩欄的下限，都**只宣告在這裡**。
+	   兩者只被表格內的 `.adm-audit-col-summary` / `.adm-audit-col-reason` 讀，而使用
+	   本 wrap 的三張表（治理台稽核表、代行授權歷程）全都包在本 wrap 之下，一份就夠。
+	   ⚠️ 曾經還有第二份 `--adm-audit-summary-min` 宣告在 `.adm-audit-layout` 上，供
+	   側欄版的主欄算換行門檻；稽核內容改成 modal、側欄拆掉之後那份已隨之移除。
+	   別再複製第二份 —— 那等於多一個會漂移的數字（2026-08-19 就是因為某張表拿不到
+	   外層那份，min-width computed 成 auto，240px 下限整條靜默失效）。 */
+	--adm-audit-summary-min: 240px;
+	--adm-audit-reason-min: 200px;
+	overflow-x: auto;
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-card);
+	background: var(--admin-paper);
+}
+
+.adm-audit-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 14px;
+}
+
+.adm-audit-table th,
+.adm-audit-table td {
+	padding: 12px 14px;
+	text-align: left;
+	vertical-align: top;
+	border-bottom: 1px solid var(--admin-border);
+}
+
+.adm-audit-table thead th {
+	background: var(--admin-cream);
+	color: var(--admin-body);
+	font-size: 13px;
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.adm-audit-table tbody tr.is-selected {
+	background: var(--admin-control);
+}
+
+.adm-audit-table td strong {
+	display: block;
+	font-weight: 600;
+}
+
+/* 唯一可換行的欄。兩件事一起做：
+   ① `width: 100%` 讓它吃下所有剩餘寬度（其餘欄都是 nowrap／內容極短，auto layout
+      本來會反過來把剩餘壓力全丟給這一欄，1440 實測被壓到 84.5px 寬 / 911px 高）；
+   ② `min-width` 是下限，連它都給不起時才讓容器橫捲，而不是先把這欄壓扁。
+   ⚠️ 這裡曾寫 `max-width: 520px` 想擋超寬螢幕的長行 —— **那是死碼**：`table-layout:
+   auto` 下瀏覽器依 CSS 2.1 §17.5.2 忽略儲存格的 max-width（實測 computed 回報
+   520px、實際仍量到 595.1px）。要限寬只能包一層 block 容器，不要把它加回這裡。
+   `min-width` 這一半是有效的（1440／1536 兩種情境都量到精準落在 240px）。 */
+.adm-audit-col-summary {
+	width: 100%;
+	min-width: var(--adm-audit-summary-min);
+}
+
+/* 動作欄：唯一既沒有 nowrap 也沒有 min-width 的欄，因此 `.adm-audit-col-summary` 的
+   `width: 100%` 吃掉剩餘寬度之後，壓力全部落在它身上 —— 2026-08-19 在 1440／1600／1920
+   三個寬度實測欄寬**恆為 58.3px**，把「調整授權範圍」壓成一字一行的直排六行，而右側還
+   留著大片空白。時間與理由沒事，是因為 `td:first-child`／`td:last-child` 有 nowrap 守著。
+   ⚠️ 用具名 class 而不是 nth-child：欄位增刪時 nth-child 會靜默指到別欄（同 col-summary）。
+   放不下時退回 `.adm-audit-table-wrap` 的 `overflow-x: auto` 橫捲，不會有東西看不到。 */
+.adm-audit-col-action {
+	white-space: nowrap;
+}
+
+/* 授權歷程「範圍變更」欄的差異列。＋／－ 兩個記號才是可讀的區別，顏色只是加強
+   ——只靠顏色的話，色覺障礙與灰階列印都讀不出增減。 */
+.adm-scope-delta {
+	line-height: 1.6;
+}
+
+.adm-scope-delta--added {
+	color: var(--admin-success);
+}
+
+.adm-scope-delta--removed {
+	color: var(--admin-danger);
+}
+
+.adm-scope-delta--none {
+	color: var(--admin-muted-aa);
+}
+
+.adm-scope-full {
+	margin: 6px 0 0;
+	padding: 8px 10px;
+	border-radius: var(--admin-radius-control);
+	background: var(--admin-control);
+}
+
+.adm-scope-full > div {
+	display: flex;
+	gap: 8px;
+}
+
+.adm-scope-full > div + div {
+	margin-top: 4px;
+}
+
+.adm-scope-full dt {
+	flex: 0 0 auto;
+	color: var(--admin-muted-aa);
+	font-size: 12px;
+}
+
+.adm-scope-full dd {
+	margin: 0;
+	font-size: 12px;
+}
+
+.adm-audit-table td > span {
+	color: var(--admin-muted-aa);
+	font-size: 12px;
+}
+
+.adm-audit-empty {
+	padding: 32px 14px;
+	text-align: center;
+	color: var(--admin-muted-aa);
+}
+
+.adm-audit-result {
+	display: inline-flex;
+	align-items: center;
+	padding: 4px 10px;
+	border-radius: 999px;
+	font-size: 12px;
+	font-weight: 600;
+	background: var(--admin-control);
+	color: var(--admin-body);
+}
+
+.adm-audit-result--succeeded {
+	background: var(--admin-success-soft);
+	color: var(--admin-success);
+}
+
+.adm-audit-result--failed {
+	background: var(--admin-danger-soft);
+	color: var(--admin-danger);
+}
+
+/* PENDING 刻意是中性樣式：既非綠勾也非紅字，它是「還不知道」。 */
+.adm-audit-result--pending {
+	background: var(--admin-control);
+	color: var(--admin-body);
+}
+
+.adm-audit-risk {
+	display: inline-flex;
+	margin-top: 4px;
+	padding: 2px 8px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 600;
+	background: var(--admin-control);
+	color: var(--admin-body);
+}
+
+.adm-audit-table td:first-child,
+.adm-audit-table td:last-child {
+	white-space: nowrap;
+}
+
+/* 理由欄。兩張表的病相反，同一個 class 一起治：
+   ① 稽核台（第 4 欄）—— 全表唯一既沒 nowrap 也沒下限的欄（上面那條只護得到時間與
+      結果），`.adm-audit-col-summary` 的 `width: 100%` 吃掉剩餘寬度後壓力全落在它身
+      上，被壓成一行一兩個字的窄柱；而同列那個吃走大片寬度的「變更摘要」多半只寫著
+      「未寫入」四個字。理由是這張表最該被讀的一欄，下限得由它自己持有。
+   ② 授權歷程表（第 5 欄＝`td:last-child`）—— 反過來吃到上面那條 nowrap，而
+      `operationReason` 上限 200 字（authorization.ts），一則長理由被拉成一整行就
+      把整張表推進橫捲、右端直接被裁掉。
+   ⚠️ 兩件事都是特異性問題，缺一都會靜默失效：
+     · 選擇器必須帶 `td` —— `.adm-audit-table td:last-child` 是 (0,2,1)，只寫
+       `.adm-audit-col-reason`（0,1,0）連比都不用比。
+     · 位置必須在上面那條**之後** —— 兩者同為 (0,2,1)，勝負只由源碼順序決定。
+       2026-08-20 實測：放在前面時 `min-width` 生效（那一半沒有競爭者）而
+       `white-space` computed 仍是 `nowrap`，看起來像修好了一半。 */
+.adm-audit-table th.adm-audit-col-reason,
+.adm-audit-table td.adm-audit-col-reason {
+	min-width: var(--adm-audit-reason-min);
+	white-space: normal;
+}
+
+.adm-audit-result,
+.adm-audit-risk {
+	white-space: nowrap;
+}
+
+.adm-audit-risk--high {
+	background: var(--admin-danger-soft);
+	color: var(--admin-danger);
+}
+
+.adm-audit-detail-trigger {
+	display: block;
+	margin-top: 6px;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--admin-primary-strong);
+	font-size: 12px;
+	text-decoration: underline;
+	cursor: pointer;
+}
+
+/* 授權歷程那一欄的展開鈕不要上面那條的 `display: block` ＋ 6px 上緣：每一列都多一
+   行，等於把靠差異省下來的高度又還回去。改成隨最後一行差異文字流動，塞不下才換行。
+   ⚠️ 必須排在 `.adm-audit-detail-trigger` **之後** —— 兩者同為 (0,1,0)，順序就是勝負。 */
+.adm-scope-full-toggle {
+	display: inline;
+	margin-top: 0;
+	margin-left: 6px;
+}
+
+.adm-audit-pagination {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	flex-wrap: wrap;
+	color: var(--admin-muted-aa);
+	font-size: 13px;
+}
+
+.adm-audit-pagination > div {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.adm-audit-page-indicator {
+	min-width: 56px;
+	text-align: center;
+	font-variant-numeric: tabular-nums;
+}
+
+.adm-audit-detail-placeholder {
+	margin: 0;
+	padding: 18px;
+	color: var(--admin-muted-aa);
+	font-size: 13px;
+	line-height: 1.7;
+}
+
+.adm-audit-detail-row {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.adm-audit-detail-label {
+	color: var(--admin-muted-aa);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.adm-audit-detail-value {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	font-size: 14px;
+	word-break: break-word;
+}
+
+/* badge 在直式 flex 容器裡會被拉成滿寬，看起來像色塊而不是標籤。 */
+.adm-audit-detail-value .adm-audit-result,
+.adm-audit-detail-value .adm-audit-risk {
+	align-self: flex-start;
+	margin-top: 0;
+}
+
+.adm-audit-detail-sub {
+	color: var(--admin-muted-aa);
+	font-size: 12px;
+}
+
+.adm-audit-detail-ua {
+	color: var(--admin-body);
+	font-family: var(--admin-font-ui);
+	font-size: 11px;
+	line-height: 1.6;
+}
+
+.adm-audit-detail-empty {
+	color: var(--admin-muted-aa);
+}
+
+.adm-audit-copyable {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.adm-audit-copyable code {
+	font-size: 12px;
+	word-break: break-all;
+}
+
+/* 選擇器綁在複製鍵自己的類名上，不是綁在 `.adm-audit-copyable` 底下的 button：
+   同一顆鍵現在也掛在摘要卡的值旁邊（工作階段 ID），那裡沒有這層外框。 */
+.adm-audit-copy-button {
+	border: 0;
+	background: none;
+	color: var(--admin-primary-strong);
+	cursor: pointer;
+	line-height: 1;
+}
+
+/* 摘要卡的值是 18px／800（見上方 nth-child 規則），全域 `button { font: inherit }`
+   會讓複製鍵跟著放大到壓過代號本身。 */
+.adm-audit-summary-cards .adm-audit-copy-button {
+	margin-left: 6px;
+	font-size: 14px;
+	font-weight: 400;
+	vertical-align: middle;
+}
+
+/* 摘要列（工作階段 ID）的值是 600 粗體，同一個 `font: inherit` 會讓複製鍵跟著變粗
+   ——同一顆鍵在兩處看起來必須是同一顆，否則讀者會以為它們是不同的動作。 */
+.adm-audit-close-rows .adm-audit-copy-button {
+	margin-left: 6px;
+	font-weight: 400;
+}
+
+.adm-audit-changed h3 {
+	margin: 0 0 8px;
+	font-size: 13px;
+	font-weight: 700;
+}
+
+.adm-audit-changed-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 12px;
+}
+
+.adm-audit-changed-table th,
+.adm-audit-changed-table td {
+	padding: 8px;
+	border: 1px solid var(--admin-border);
+	text-align: left;
+	vertical-align: top;
+	word-break: break-word;
+}
+
+.adm-audit-changed-table thead th {
+	background: var(--admin-cream);
+}
+
+.adm-audit-notify {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--admin-success);
+	font-weight: 600;
+}
+
+.adm-audit-lookup {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 16px;
+	max-width: 520px;
+	padding: 24px;
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-panel);
+	background: var(--admin-paper);
+}
+
+.adm-audit-revoke-target {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 14px 16px;
+	border-radius: var(--admin-radius-card);
+	background: var(--admin-cream);
+	font-size: 13px;
+	color: var(--admin-muted-aa);
+}
+
+.adm-audit-revoke-target strong {
+	color: var(--admin-ink);
+	font-size: 15px;
+}
+
+@media (max-width: 960px) {
+	.adm-audit-summary-cards {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+/* ==========================================================================
+   代行授權（商家詳情頁「代行授權」分頁，backend#2444）
+
+   全部延伸既有 token 與既有 class：狀態底色沿用 `--admin-success` / `--hk-border`
+   一系，卡片與表格直接重用 `.adm-audit-*`。這一區只補「授權面才有」的三件事：
+   能力勾選列、授權事實清單、撤回連帶影響。
+   ========================================================================== */
+.adm-authorization-panel {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+}
+
+.adm-authorization-notice {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	padding: 12px 14px;
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-card);
+	background: var(--admin-cream);
+	color: var(--admin-body);
+	font-size: 13px;
+}
+
+.adm-authorization-notice > svg {
+	color: var(--admin-success);
+	font-size: 18px;
+	line-height: 1.3;
+}
+
+.adm-authorization-empty {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	padding: 24px;
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-panel);
+	background: var(--admin-paper);
+}
+
+.adm-authorization-empty > svg {
+	flex: none;
+	color: var(--admin-muted-aa);
+	font-size: 32px;
+}
+
+.adm-authorization-empty > div {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.adm-authorization-empty strong {
+	display: block;
+	margin-bottom: 4px;
+	color: var(--admin-ink);
+	font-size: 16px;
+}
+
+.adm-authorization-empty p {
+	margin: 0;
+	color: var(--admin-muted-aa);
+	font-size: 13px;
+	line-height: 1.6;
+}
+
+.adm-authorization-summary {
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+	padding: 22px 24px;
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-panel);
+	background: var(--admin-paper);
+}
+
+.adm-authorization-summary-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 12px;
+}
+
+.adm-authorization-state {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 12px;
+	border-radius: 999px;
+	background: var(--admin-cream);
+	color: var(--admin-muted-aa);
+	font-size: 13px;
+	font-weight: 700;
+}
+
+.adm-authorization-state.is-effective {
+	background: var(--admin-success-soft);
+	color: var(--admin-success);
+}
+
+.adm-authorization-state-reason {
+	color: var(--admin-muted-aa);
+	font-size: 13px;
+}
+
+.adm-authorization-facts {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	gap: 14px 20px;
+	margin: 0;
+}
+
+.adm-authorization-facts > div {
+	min-width: 0;
+}
+
+.adm-authorization-facts__wide {
+	grid-column: 1 / -1;
+}
+
+.adm-authorization-facts dt {
+	margin-bottom: 4px;
+	color: var(--admin-muted-aa);
+	font-size: 11px;
+	font-weight: 800;
+	letter-spacing: 0.04em;
+}
+
+.adm-authorization-facts dd {
+	margin: 0;
+	color: var(--admin-ink);
+	font-size: 13px;
+	line-height: 1.6;
+	overflow-wrap: anywhere;
+}
+
+.adm-authorization-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+}
+
+.adm-authorization-history {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 22px 24px;
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-panel);
+	background: var(--admin-paper);
+}
+
+.adm-authorization-history h3 {
+	margin: 0;
+	color: var(--admin-ink);
+	font-size: 15px;
+	font-weight: 700;
+}
+
+.adm-authorization-history > p {
+	margin: 0;
+	color: var(--admin-muted-aa);
+	font-size: 12px;
+	line-height: 1.6;
+}
+
+/* 能力勾選列。停用態是「由別項連帶」而不是「你沒有權限」，所以維持可讀對比、
+   由列內的說明句承載原因 —— 只靠 disabled 暗示授權是 DESIGN.md 明文禁止的。 */
+.adm-authorization-capability-list {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+	gap: 10px;
+}
+
+.adm-authorization-capability {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	min-width: 0;
+	padding: 12px 14px;
+	border: 1px solid var(--hk-border);
+	border-radius: 12px;
+	background: var(--hk-paper);
+	cursor: pointer;
+}
+
+.adm-authorization-capability.is-selected {
+	border-color: var(--hk-primary-strong);
+	background: var(--color-ink-50);
+}
+
+.adm-authorization-capability.is-locked {
+	cursor: not-allowed;
+}
+
+.adm-authorization-capability input {
+	flex: none;
+	width: 16px;
+	height: 16px;
+	margin-top: 2px;
+}
+
+.adm-authorization-capability > span {
+	min-width: 0;
+}
+
+.adm-authorization-capability strong,
+.adm-authorization-capability small,
+.adm-authorization-capability em {
+	display: block;
+}
+
+.adm-authorization-capability strong {
+	color: var(--hk-ink);
+	font-size: 14px;
+}
+
+.adm-authorization-capability small {
+	margin-top: 2px;
+	color: var(--hk-muted-text);
+	font-size: 11px;
+	overflow-wrap: anywhere;
+}
+
+.adm-authorization-capability em {
+	margin-top: 6px;
+	color: var(--hk-primary-strong);
+	font-size: 11px;
+	font-style: normal;
+	font-weight: 700;
+	line-height: 1.5;
+}
+
+.adm-authorization-clear {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 7px 12px;
+	border: 1px solid var(--hk-border);
+	border-radius: 999px;
+	background: transparent;
+	color: var(--hk-muted-text);
+	font-size: 12px;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.adm-authorization-clear:hover:not(:disabled) {
+	border-color: var(--hk-primary-strong);
+	color: var(--hk-primary-strong);
+}
+
+.adm-authorization-clear:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.adm-authorization-scope-hint {
+	margin: 10px 0 0;
+	color: var(--hk-muted-text);
+	font-size: 12px;
+	line-height: 1.6;
+}
+
+.adm-authorization-impact {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	padding: 13px 15px;
+	border: 1px solid var(--hk-border);
+	border-radius: 12px;
+	background: var(--color-ink-50);
+}
+
+.adm-authorization-impact.is-critical {
+	border-color: #dfaaa5;
+	background: var(--hk-danger-soft);
+}
+
+.adm-authorization-impact > svg {
+	flex: none;
+	color: var(--hk-muted-text);
+	font-size: 18px;
+	line-height: 1.3;
+}
+
+.adm-authorization-impact.is-critical > svg {
+	color: #771d17;
+}
+
+.adm-authorization-impact strong {
+	display: block;
+	margin-bottom: 4px;
+	color: var(--hk-ink);
+	font-size: 14px;
+}
+
+.adm-authorization-impact p {
+	margin: 0;
+	color: var(--hk-muted-text);
+	font-size: 12px;
+	line-height: 1.6;
+}
+
+@media (max-width: 720px) {
+	.adm-authorization-empty {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+}

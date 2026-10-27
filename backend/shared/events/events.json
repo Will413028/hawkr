@@ -1,0 +1,885 @@
+{
+  "version": "3.3.0",
+  "description": "Hawkr 消息隊列事件定義 - 含 DLQ、延遲消息、Publisher Confirms、買賣家通知、訂單物流、評價邀請、結算通知",
+  "features": {
+    "publisher_confirms": true,
+    "dead_letter_queue": true,
+    "delayed_messages": true,
+    "idempotency": true
+  },
+  "exchanges": {
+    "hawkr.order": {
+      "type": "topic",
+      "durable": true,
+      "description": "訂單相關事件交換機"
+    },
+    "hawkr.payment": {
+      "type": "topic",
+      "durable": true,
+      "description": "支付相關事件交換機"
+    },
+    "hawkr.payment.delayed": {
+      "type": "direct",
+      "durable": true,
+      "description": "支付延遲消息交換機（TTL+DLX 模式）"
+    },
+    "hawkr.payment.dlx": {
+      "type": "direct",
+      "durable": true,
+      "description": "支付死信交換機"
+    },
+    "hawkr.inventory": {
+      "type": "topic",
+      "durable": true,
+      "description": "庫存相關事件交換機"
+    }
+  },
+  "queues": {
+    "payment.dlq": {
+      "exchange": "hawkr.payment.dlx",
+      "routing_key": "payment.dead",
+      "description": "支付服務死信隊列",
+      "consumer": "payment-service (DLQ handler)",
+      "config": {
+        "x-message-ttl": 604800000,
+        "comment": "消息保留 7 天"
+      }
+    },
+    "order.payment.created": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.created",
+      "description": "訂單服務監聽支付創建事件",
+      "consumer": "order-service",
+      "dlq_enabled": true
+    },
+    "order.payment.success": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.success",
+      "description": "訂單服務監聽支付成功事件",
+      "consumer": "order-service",
+      "dlq_enabled": true,
+      "priority": 5
+    },
+    "order.payment.failed": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.failed",
+      "description": "訂單服務監聽支付失敗事件",
+      "consumer": "order-service",
+      "dlq_enabled": true,
+      "priority": 7
+    },
+    "order.refund.requested": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.refund.requested",
+      "description": "訂單服務監聽退款申請事件",
+      "consumer": "order-service",
+      "dlq_enabled": true
+    },
+    "order.refund.success": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.refund.success",
+      "description": "訂單服務監聽退款成功事件",
+      "consumer": "order-service",
+      "dlq_enabled": true
+    },
+    "im.payment.success": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.success",
+      "description": "IM服務監聽支付成功事件（推送通知）",
+      "consumer": "im-service",
+      "dlq_enabled": true
+    },
+    "im.refund.success": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.refund.success",
+      "description": "IM服務監聽退款成功事件（推送通知）",
+      "consumer": "im-service",
+      "dlq_enabled": true
+    },
+    "im.atm.reminder": {
+      "exchange": "hawkr.payment.delayed",
+      "routing_key": "payment.atm.reminder",
+      "description": "IM服務監聽 ATM 繳款提醒（延遲消息）",
+      "consumer": "im-service",
+      "dlq_enabled": true
+    },
+    "payment.expiry.check": {
+      "exchange": "hawkr.payment.delayed",
+      "routing_key": "payment.expiry.check",
+      "description": "支付服務自消費到期檢查事件（延遲消息）",
+      "consumer": "payment-service",
+      "dlq_enabled": true
+    },
+    "im.seller.payment.success": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.seller.success",
+      "description": "IM服務監聽賣家支付成功通知（有新訂單）",
+      "consumer": "im-service",
+      "dlq_enabled": true,
+      "priority": 5
+    },
+    "im.seller.payment.failed": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.seller.failed",
+      "description": "IM服務監聽賣家支付失敗通知",
+      "consumer": "im-service",
+      "dlq_enabled": true
+    },
+    "im.seller.refund.requested": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.seller.refund.requested",
+      "description": "IM服務監聽賣家退款申請通知",
+      "consumer": "im-service",
+      "dlq_enabled": true
+    },
+    "im.seller.refund.completed": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.seller.refund.completed",
+      "description": "IM服務監聽賣家退款完成通知",
+      "consumer": "im-service",
+      "dlq_enabled": true
+    },
+    "im.seller.order.expired": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.seller.expired",
+      "description": "IM服務監聽賣家訂單超時通知",
+      "consumer": "im-service",
+      "dlq_enabled": true
+    },
+    "im.order.status.updated": {
+      "exchange": "hawkr.order",
+      "routing_key": "order.status.updated",
+      "description": "IM服務監聽訂單狀態變更（通知買賣雙方）",
+      "consumer": "im-service",
+      "dlq_enabled": true
+    },
+    "im.order.shipped": {
+      "exchange": "hawkr.order",
+      "routing_key": "order.shipped",
+      "description": "IM服務監聽訂單已出貨（通知買家）",
+      "consumer": "im-service",
+      "dlq_enabled": true,
+      "priority": 5
+    },
+    "im.order.delivered": {
+      "exchange": "hawkr.order",
+      "routing_key": "order.delivered",
+      "description": "IM服務監聽訂單已送達（通知買賣雙方）",
+      "consumer": "im-service",
+      "dlq_enabled": true
+    },
+    "im.order.pickup.ready": {
+      "exchange": "hawkr.order",
+      "routing_key": "order.pickup.ready",
+      "description": "IM服務監聽超商取貨就緒（通知買家）",
+      "consumer": "im-service",
+      "dlq_enabled": true,
+      "priority": 5
+    },
+    "im.order.completed": {
+      "exchange": "hawkr.order",
+      "routing_key": "order.completed",
+      "description": "IM服務監聽訂單完成（通知賣家）",
+      "consumer": "im-service",
+      "dlq_enabled": true
+    },
+    "im.order.cancelled": {
+      "exchange": "hawkr.order",
+      "routing_key": "order.cancelled",
+      "description": "IM服務監聽訂單取消（通知買賣雙方）",
+      "consumer": "im-service",
+      "dlq_enabled": true,
+      "priority": 7
+    },
+    "im.buyer.payment.failed": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.buyer.failed",
+      "description": "IM服務監聽買家支付失敗通知",
+      "consumer": "im-service",
+      "dlq_enabled": true,
+      "priority": 5
+    },
+    "im.buyer.payment.expired": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.buyer.expired",
+      "description": "IM服務監聽買家支付超時通知",
+      "consumer": "im-service",
+      "dlq_enabled": true
+    },
+    "im.buyer.invoice": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.buyer.invoice",
+      "description": "IM服務監聽買家發票通知",
+      "consumer": "im-service",
+      "dlq_enabled": true
+    },
+    "im.pickup.reminder": {
+      "exchange": "hawkr.order",
+      "routing_key": "order.pickup.reminder",
+      "description": "IM服務監聽取貨到期提醒（延遲消息）",
+      "consumer": "im-service",
+      "dlq_enabled": true,
+      "priority": 5
+    },
+    "im.pickup.returned": {
+      "exchange": "hawkr.order",
+      "routing_key": "order.pickup.returned",
+      "description": "IM服務監聽取貨退回通知（通知買賣雙方）",
+      "consumer": "im-service",
+      "dlq_enabled": true,
+      "priority": 7
+    },
+    "im.review.invitation": {
+      "exchange": "hawkr.order",
+      "routing_key": "order.review.invitation",
+      "description": "IM服務監聽評價邀請（訂單完成後通知買家）",
+      "consumer": "im-service",
+      "dlq_enabled": true
+    },
+    "im.seller.settlement": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.seller.settlement",
+      "description": "IM服務監聽賣家結算/撥款通知",
+      "consumer": "im-service",
+      "dlq_enabled": true,
+      "priority": 5
+    },
+    "im.seller.settlement.failed": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.seller.settlement.failed",
+      "description": "IM服務監聽賣家結算失敗通知",
+      "consumer": "im-service",
+      "dlq_enabled": true,
+      "priority": 7
+    }
+  },
+  "events": {
+    "PaymentCreatedEvent": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.created",
+      "description": "支付創建事件 - 當用戶發起支付請求時發送",
+      "idempotency_key": "create:{payment_id}",
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "PAYMENT_CREATED",
+        "timestamp": "string (ISO8601)",
+        "source": "payment-service",
+        "order_id": "int64",
+        "order_no": "string",
+        "payment_id": "string",
+        "payment_method": "string (APPLE_PAY|GOOGLE_PAY|CREDIT|ATM)",
+        "amount": "decimal",
+        "currency": "string (TWD)",
+        "expire_at": "string (ISO8601, optional)"
+      }
+    },
+    "PaymentSuccessEvent": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.success",
+      "description": "支付成功事件 - 當支付完成時發送",
+      "idempotency_key": "success:{payment_id}:{trade_no}",
+      "priority": 5,
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "PAYMENT_SUCCESS",
+        "timestamp": "string (ISO8601)",
+        "source": "payment-service",
+        "order_id": "int64",
+        "order_no": "string",
+        "payment_id": "string",
+        "trade_no": "string (PAYUNi交易編號)",
+        "payment_method": "string (APPLE_PAY|GOOGLE_PAY|CREDIT|ATM)",
+        "amount": "decimal",
+        "paid_at": "string (ISO8601)"
+      }
+    },
+    "PaymentFailedEvent": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.failed",
+      "description": "支付失敗事件 - 當支付失敗時發送，通知釋放庫存",
+      "idempotency_key": "failed:{payment_id}",
+      "priority": 7,
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "PAYMENT_FAILED",
+        "timestamp": "string (ISO8601)",
+        "source": "payment-service",
+        "order_id": "int64",
+        "order_no": "string",
+        "payment_id": "string",
+        "payment_method": "string",
+        "amount": "decimal",
+        "error_code": "string",
+        "error_message": "string",
+        "failed_at": "string (ISO8601)"
+      }
+    },
+    "PaymentExpiredEvent": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.expired",
+      "description": "支付超時事件 - ATM/超商繳款超時未付款",
+      "idempotency_key": "expired:{payment_id}",
+      "priority": 7,
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "PAYMENT_EXPIRED",
+        "timestamp": "string (ISO8601)",
+        "source": "payment-service",
+        "order_id": "int64",
+        "order_no": "string",
+        "payment_id": "string",
+        "payment_method": "string",
+        "amount": "decimal",
+        "created_at": "string (ISO8601)",
+        "expired_at": "string (ISO8601)"
+      }
+    },
+    "RefundRequestedEvent": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.refund.requested",
+      "description": "退款申請事件 - 當用戶申請退款時發送",
+      "idempotency_key": "refund_req:{refund_id}",
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "REFUND_REQUESTED",
+        "timestamp": "string (ISO8601)",
+        "source": "payment-service",
+        "order_id": "int64",
+        "order_no": "string",
+        "payment_id": "string",
+        "refund_id": "string",
+        "refund_amount": "decimal",
+        "reason": "string",
+        "requested_at": "string (ISO8601)"
+      }
+    },
+    "RefundSuccessEvent": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.refund.success",
+      "description": "退款成功事件",
+      "idempotency_key": "refund_ok:{refund_id}",
+      "priority": 5,
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "REFUND_SUCCESS",
+        "timestamp": "string (ISO8601)",
+        "source": "payment-service",
+        "order_id": "int64",
+        "order_no": "string",
+        "payment_id": "string",
+        "refund_id": "string",
+        "refund_amount": "decimal",
+        "refunded_at": "string (ISO8601)"
+      }
+    },
+    "RefundFailedEvent": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.refund.failed",
+      "description": "退款失敗事件",
+      "idempotency_key": "refund_fail:{refund_id}",
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "REFUND_FAILED",
+        "timestamp": "string (ISO8601)",
+        "source": "payment-service",
+        "order_id": "int64",
+        "order_no": "string",
+        "payment_id": "string",
+        "refund_id": "string",
+        "refund_amount": "decimal",
+        "error_code": "string",
+        "error_message": "string",
+        "failed_at": "string (ISO8601)"
+      }
+    },
+    "AtmReminderEvent": {
+      "exchange": "hawkr.payment.delayed",
+      "routing_key": "payment.atm.reminder",
+      "description": "ATM 繳款提醒事件（延遲消息）",
+      "delayed": true,
+      "idempotency_key": "atm_reminder:{payment_id}:{hours_remaining}",
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "ATM_REMINDER",
+        "timestamp": "string (ISO8601)",
+        "source": "payment-service",
+        "order_id": "int64",
+        "order_no": "string",
+        "payment_id": "string",
+        "amount": "decimal",
+        "bank_code": "string",
+        "virtual_account": "string",
+        "expire_at": "string (ISO8601)",
+        "hours_remaining": "int32 (24|6|1)"
+      }
+    },
+    "PaymentExpiryCheckEvent": {
+      "exchange": "hawkr.payment.delayed",
+      "routing_key": "payment.expiry.check",
+      "description": "支付到期檢查事件（延遲消息，在到期時間觸發）",
+      "delayed": true,
+      "idempotency_key": "expiry_check:{payment_id}",
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "PAYMENT_EXPIRY_CHECK",
+        "timestamp": "string (ISO8601)",
+        "source": "payment-service",
+        "order_id": "int64",
+        "order_no": "string",
+        "payment_id": "string",
+        "payment_method": "string",
+        "amount": "decimal",
+        "created_at": "string (ISO8601)",
+        "expire_at": "string (ISO8601)"
+      }
+    },
+    "OrderCreatedEvent": {
+      "exchange": "hawkr.order",
+      "routing_key": "order.created",
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "ORDER_CREATED",
+        "timestamp": "string (ISO8601)",
+        "source": "string",
+        "order_id": "int64",
+        "user_id": "int64",
+        "items": [
+          {
+            "sku_id": "int64",
+            "quantity": "int32",
+            "price": "decimal"
+          }
+        ],
+        "total_amount": "decimal"
+      }
+    },
+    "InventoryChangedEvent": {
+      "exchange": "hawkr.inventory",
+      "routing_key": "inventory.changed",
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "INVENTORY_CHANGED",
+        "timestamp": "string (ISO8601)",
+        "source": "string",
+        "sku_id": "int64",
+        "product_id": "int64",
+        "old_stock": "int32",
+        "new_stock": "int32",
+        "change_type": "string (DEDUCT|RESTOCK|LOCK|UNLOCK)"
+      }
+    },
+    "SellerPaymentSuccessEvent": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.seller.success",
+      "description": "賣家支付成功通知 - 通知賣家有新訂單付款成功",
+      "idempotency_key": "seller_pay_ok:{seller_id}:{payment_id}",
+      "priority": 5,
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "SELLER_PAYMENT_SUCCESS",
+        "timestamp": "string (ISO8601)",
+        "source": "payment-service",
+        "seller_id": "int64",
+        "order_id": "int64",
+        "order_no": "string",
+        "payment_id": "string",
+        "trade_no": "string",
+        "payment_method": "string",
+        "amount": "decimal",
+        "buyer_name": "string (optional)",
+        "product_summary": "string (optional)",
+        "paid_at": "string (ISO8601)"
+      }
+    },
+    "SellerPaymentFailedEvent": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.seller.failed",
+      "description": "賣家支付失敗通知 - 通知賣家買家付款失敗",
+      "idempotency_key": "seller_pay_fail:{seller_id}:{payment_id}",
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "SELLER_PAYMENT_FAILED",
+        "timestamp": "string (ISO8601)",
+        "source": "payment-service",
+        "seller_id": "int64",
+        "order_id": "int64",
+        "order_no": "string",
+        "payment_id": "string",
+        "payment_method": "string",
+        "amount": "decimal",
+        "error_code": "string",
+        "error_message": "string",
+        "buyer_name": "string (optional)",
+        "product_summary": "string (optional)",
+        "failed_at": "string (ISO8601)"
+      }
+    },
+    "SellerRefundRequestedEvent": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.seller.refund.requested",
+      "description": "賣家退款申請通知 - 通知賣家有退款申請待處理",
+      "idempotency_key": "seller_refund_req:{seller_id}:{refund_id}",
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "SELLER_REFUND_REQUESTED",
+        "timestamp": "string (ISO8601)",
+        "source": "payment-service",
+        "seller_id": "int64",
+        "order_id": "int64",
+        "order_no": "string",
+        "payment_id": "string",
+        "refund_id": "string",
+        "refund_amount": "decimal",
+        "reason": "string",
+        "buyer_name": "string (optional)",
+        "requested_at": "string (ISO8601)"
+      }
+    },
+    "SellerRefundCompletedEvent": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.seller.refund.completed",
+      "description": "賣家退款完成通知 - 通知賣家退款已完成",
+      "idempotency_key": "seller_refund_ok:{seller_id}:{refund_id}",
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "SELLER_REFUND_COMPLETED",
+        "timestamp": "string (ISO8601)",
+        "source": "payment-service",
+        "seller_id": "int64",
+        "order_id": "int64",
+        "order_no": "string",
+        "payment_id": "string",
+        "refund_id": "string",
+        "refund_amount": "decimal",
+        "buyer_name": "string (optional)",
+        "refunded_at": "string (ISO8601)"
+      }
+    },
+    "SellerOrderExpiredEvent": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.seller.expired",
+      "description": "賣家訂單超時通知 - 通知賣家訂單支付超時已取消",
+      "idempotency_key": "seller_expired:{seller_id}:{payment_id}",
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "SELLER_ORDER_EXPIRED",
+        "timestamp": "string (ISO8601)",
+        "source": "payment-service",
+        "seller_id": "int64",
+        "order_id": "int64",
+        "order_no": "string",
+        "payment_id": "string",
+        "payment_method": "string",
+        "amount": "decimal",
+        "buyer_name": "string (optional)",
+        "product_summary": "string (optional)",
+        "expired_at": "string (ISO8601)"
+      }
+    },
+    "OrderStatusUpdatedEvent": {
+      "exchange": "hawkr.order",
+      "routing_key": "order.status.updated",
+      "description": "訂單狀態更新事件 - 通用的狀態變更通知",
+      "idempotency_key": "order_status:{order_id}:{new_status}:{timestamp}",
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "ORDER_STATUS_UPDATED",
+        "timestamp": "string (ISO8601)",
+        "source": "order-service",
+        "order_id": "int64",
+        "order_no": "string",
+        "user_id": "int64",
+        "seller_id": "int64",
+        "old_status": "string (PENDING_PAYMENT|PAID|PREPARING|SHIPPED|IN_TRANSIT|READY_FOR_PICKUP|DELIVERED|COMPLETED|CANCELLED|REFUNDING|REFUNDED)",
+        "new_status": "string",
+        "status_message": "string (optional)",
+        "updated_at": "string (ISO8601)"
+      }
+    },
+    "OrderShippedEvent": {
+      "exchange": "hawkr.order",
+      "routing_key": "order.shipped",
+      "description": "訂單已出貨事件 - 賣家出貨時發送",
+      "idempotency_key": "order_shipped:{order_id}:{tracking_number}",
+      "priority": 5,
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "ORDER_SHIPPED",
+        "timestamp": "string (ISO8601)",
+        "source": "order-service",
+        "order_id": "int64",
+        "order_no": "string",
+        "user_id": "int64",
+        "seller_id": "int64",
+        "logistics_provider": "string (TCAT_HOME|HCT|SEVEN_ELEVEN|FAMILY_MART|HI_LIFE|OK_MART|SELF_PICKUP|OTHER)",
+        "tracking_number": "string",
+        "estimated_delivery": "string (ISO8601, optional)",
+        "product_summary": "string (optional)",
+        "shipped_at": "string (ISO8601)"
+      }
+    },
+    "OrderDeliveredEvent": {
+      "exchange": "hawkr.order",
+      "routing_key": "order.delivered",
+      "description": "訂單已送達事件",
+      "idempotency_key": "order_delivered:{order_id}",
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "ORDER_DELIVERED",
+        "timestamp": "string (ISO8601)",
+        "source": "order-service",
+        "order_id": "int64",
+        "order_no": "string",
+        "user_id": "int64",
+        "seller_id": "int64",
+        "logistics_provider": "string",
+        "tracking_number": "string",
+        "receiver_name": "string (optional)",
+        "delivered_at": "string (ISO8601)"
+      }
+    },
+    "OrderPickupReadyEvent": {
+      "exchange": "hawkr.order",
+      "routing_key": "order.pickup.ready",
+      "description": "超商取貨就緒事件 - 貨物已到達超商門市",
+      "idempotency_key": "order_pickup:{order_id}",
+      "priority": 5,
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "ORDER_PICKUP_READY",
+        "timestamp": "string (ISO8601)",
+        "source": "order-service",
+        "order_id": "int64",
+        "order_no": "string",
+        "user_id": "int64",
+        "seller_id": "int64",
+        "store_type": "string (SEVEN_ELEVEN|FAMILY_MART|HI_LIFE|OK_MART)",
+        "store_name": "string",
+        "store_address": "string",
+        "pickup_deadline": "string (ISO8601)",
+        "pickup_code": "string (optional)",
+        "ready_at": "string (ISO8601)"
+      }
+    },
+    "OrderCompletedEvent": {
+      "exchange": "hawkr.order",
+      "routing_key": "order.completed",
+      "description": "訂單完成事件 - 買家確認收貨或自動完成",
+      "idempotency_key": "order_completed:{order_id}",
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "ORDER_COMPLETED",
+        "timestamp": "string (ISO8601)",
+        "source": "order-service",
+        "order_id": "int64",
+        "order_no": "string",
+        "user_id": "int64",
+        "seller_id": "int64",
+        "amount": "decimal",
+        "auto_completed": "boolean",
+        "completed_at": "string (ISO8601)"
+      }
+    },
+    "OrderCancelledEvent": {
+      "exchange": "hawkr.order",
+      "routing_key": "order.cancelled",
+      "description": "訂單取消事件",
+      "idempotency_key": "order_cancelled:{order_id}",
+      "priority": 7,
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "ORDER_CANCELLED",
+        "timestamp": "string (ISO8601)",
+        "source": "order-service",
+        "order_id": "int64",
+        "order_no": "string",
+        "user_id": "int64",
+        "seller_id": "int64",
+        "amount": "decimal",
+        "cancel_reason": "string",
+        "cancelled_by": "string (BUYER|SELLER|SYSTEM)",
+        "need_refund": "boolean",
+        "cancelled_at": "string (ISO8601)"
+      }
+    },
+    "BuyerPaymentFailedEvent": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.buyer.failed",
+      "description": "買家支付失敗通知 - 通知買家付款失敗並提供重試選項",
+      "idempotency_key": "buyer_pay_fail:{user_id}:{payment_id}",
+      "priority": 5,
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "BUYER_PAYMENT_FAILED",
+        "timestamp": "string (ISO8601)",
+        "source": "payment-service",
+        "user_id": "int64",
+        "order_id": "int64",
+        "order_no": "string",
+        "payment_id": "string",
+        "payment_method": "string",
+        "amount": "decimal",
+        "error_code": "string",
+        "error_message": "string",
+        "user_friendly_message": "string",
+        "can_retry": "boolean",
+        "retry_url": "string (optional)",
+        "failed_at": "string (ISO8601)"
+      }
+    },
+    "BuyerPaymentExpiredEvent": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.buyer.expired",
+      "description": "買家支付超時通知 - 通知買家訂單已因超時取消",
+      "idempotency_key": "buyer_expired:{user_id}:{payment_id}",
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "BUYER_PAYMENT_EXPIRED",
+        "timestamp": "string (ISO8601)",
+        "source": "payment-service",
+        "user_id": "int64",
+        "order_id": "int64",
+        "order_no": "string",
+        "payment_id": "string",
+        "payment_method": "string",
+        "amount": "decimal",
+        "product_summary": "string (optional)",
+        "can_reorder": "boolean",
+        "reorder_url": "string (optional)",
+        "expired_at": "string (ISO8601)"
+      }
+    },
+    "PickupExpiryReminderEvent": {
+      "exchange": "hawkr.order",
+      "routing_key": "order.pickup.reminder",
+      "description": "取貨到期提醒事件（延遲消息）- 提醒買家盡快取貨",
+      "delayed": true,
+      "idempotency_key": "pickup_reminder:{order_id}:{days_remaining}",
+      "priority": 5,
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "PICKUP_EXPIRY_REMINDER",
+        "timestamp": "string (ISO8601)",
+        "source": "order-service",
+        "user_id": "int64",
+        "order_id": "int64",
+        "order_no": "string",
+        "store_type": "string (SEVEN_ELEVEN|FAMILY_MART|HI_LIFE|OK_MART)",
+        "store_name": "string",
+        "store_address": "string",
+        "pickup_deadline": "string (ISO8601)",
+        "days_remaining": "int32 (3|1)",
+        "pickup_code": "string (optional)",
+        "product_summary": "string (optional)"
+      }
+    },
+    "PickupReturnedEvent": {
+      "exchange": "hawkr.order",
+      "routing_key": "order.pickup.returned",
+      "description": "取貨退回事件 - 買家未取貨，商品已退回賣家",
+      "idempotency_key": "pickup_returned:{order_id}",
+      "priority": 7,
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "PICKUP_RETURNED",
+        "timestamp": "string (ISO8601)",
+        "source": "order-service",
+        "user_id": "int64",
+        "seller_id": "int64",
+        "order_id": "int64",
+        "order_no": "string",
+        "store_type": "string (SEVEN_ELEVEN|FAMILY_MART|HI_LIFE|OK_MART)",
+        "store_name": "string",
+        "amount": "decimal",
+        "return_reason": "string (EXPIRED|REJECTED)",
+        "auto_refund": "boolean",
+        "product_summary": "string (optional)",
+        "returned_at": "string (ISO8601)"
+      }
+    },
+    "ReviewInvitationEvent": {
+      "exchange": "hawkr.order",
+      "routing_key": "order.review.invitation",
+      "description": "評價邀請事件 - 訂單完成後邀請買家評價",
+      "idempotency_key": "review_invite:{order_id}",
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "REVIEW_INVITATION",
+        "timestamp": "string (ISO8601)",
+        "source": "order-service",
+        "user_id": "int64",
+        "seller_id": "int64",
+        "order_id": "int64",
+        "order_no": "string",
+        "products": [
+          {
+            "product_id": "int64",
+            "product_name": "string",
+            "product_image": "string (optional)",
+            "quantity": "int32"
+          }
+        ],
+        "seller_name": "string",
+        "review_deadline": "string (ISO8601, optional)",
+        "review_url": "string (optional)",
+        "reward_points": "int32 (optional)"
+      }
+    },
+    "SellerSettlementEvent": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.seller.settlement",
+      "description": "賣家結算通知 - 通知賣家款項已結算/撥款",
+      "idempotency_key": "settlement:{settlement_id}",
+      "priority": 5,
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "SELLER_SETTLEMENT",
+        "timestamp": "string (ISO8601)",
+        "source": "payment-service",
+        "seller_id": "int64",
+        "settlement_id": "string",
+        "settlement_amount": "decimal",
+        "platform_fee": "decimal",
+        "actual_amount": "decimal",
+        "order_count": "int32",
+        "order_nos": ["string"],
+        "period_start": "string (ISO8601)",
+        "period_end": "string (ISO8601)",
+        "bank_account_last4": "string",
+        "expected_arrival_date": "string (ISO8601)",
+        "settled_at": "string (ISO8601)"
+      }
+    },
+    "SellerSettlementFailedEvent": {
+      "exchange": "hawkr.payment",
+      "routing_key": "payment.seller.settlement.failed",
+      "description": "賣家結算失敗通知 - 通知賣家撥款失敗",
+      "idempotency_key": "settlement_fail:{settlement_id}",
+      "priority": 7,
+      "fields": {
+        "event_id": "string (UUID)",
+        "event_type": "SELLER_SETTLEMENT_FAILED",
+        "timestamp": "string (ISO8601)",
+        "source": "payment-service",
+        "seller_id": "int64",
+        "settlement_id": "string",
+        "settlement_amount": "decimal",
+        "failure_reason": "string",
+        "required_action": "string",
+        "support_url": "string (optional)",
+        "failed_at": "string (ISO8601)"
+      }
+    }
+  },
+  "dlq_config": {
+    "max_retry_count": 3,
+    "retry_delay_ms": [1000, 5000, 30000],
+    "alert_on_max_retry": true,
+    "alert_channels": ["log", "slack", "email"]
+  },
+  "idempotency_config": {
+    "key_prefix": "idempotent:mq:",
+    "lock_timeout_secs": 30,
+    "result_ttl_secs": 86400
+  }
+}

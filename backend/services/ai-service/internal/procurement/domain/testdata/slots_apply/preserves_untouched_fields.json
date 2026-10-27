@@ -1,0 +1,17 @@
+{
+  "before": {
+    "item": "寶島梨禮盒",
+    "quantity": 50,
+    "exact_match_required": true
+  },
+  "patch": {
+    "quantity": 80
+  },
+  "now": "2026-08-07T00:00:00Z",
+  "after": {
+    "item": "寶島梨禮盒",
+    "quantity": 80,
+    "exact_match_required": true
+  },
+  "rejected": null
+}

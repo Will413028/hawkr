@@ -1,0 +1,93 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.4.13/schema.json",
+	"vcs": {
+		"enabled": false,
+		"clientKind": "git",
+		"useIgnoreFile": false
+	},
+	"files": {
+		"includes": [
+			"**",
+			"!!**/dist",
+			"!!**/.next",
+			"!!**/node_modules",
+			"!!**/build",
+			"!!**/.worktrees",
+			"!!.playwright-mcp",
+			"!!scripts/card-canonical.html",
+			"!!scripts/card-playground.html",
+			"!!lib/codemeta/generated.ts",
+			"!!lib/media/image-presets.generated.ts",
+			"!!features/legal/documents/*.gen.ts"
+		]
+	},
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab"
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"recommended": true,
+			"correctness": {
+				"useHookAtTopLevel": "error",
+				"noInvalidPositionAtImportRule": "off",
+				"useExhaustiveDependencies": {
+					"level": "error",
+					"options": {
+						"hooks": [{ "name": "useResettableError", "stableResult": [1] }]
+					}
+				}
+			}
+		}
+	},
+	"overrides": [
+		{
+			"includes": [
+				"app/(delegated)/**",
+				"features/delegated-operations/**",
+				"features/seller-center/**",
+				"!features/seller-center/products-import/**"
+			],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"paths": {
+									"@/lib/api/client": {
+										"importNames": ["authedFetch", "apiClient"],
+										"message": "代行工作區與可被代行沿用的元件不得直接取得賣家傳輸層：同一個元件會被 /seller-center 與 /adm 兩條路徑渲染，自己 import 傳輸層就等於寫死打 /app/*。一律經 repo 工廠注入 fetcher（lib/seller-data/scope.tsx，56 號 §4.5 L1054）。apiClient 一併擋是因為 apiClient.authed.* 與 authedFetch 走同一個 dispatch 卻不經過它。"
+									},
+									"../api/client": {
+										"importNames": ["authedFetch", "apiClient"],
+										"message": "同上（相對路徑要各寫一條——Biome 的 paths 是字面比對，lib/ 底下的 repo 用的是 ../api/client）。"
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	],
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "double"
+		}
+	},
+	"css": {
+		"parser": {
+			"tailwindDirectives": true
+		}
+	},
+	"assist": {
+		"enabled": true,
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	}
+}

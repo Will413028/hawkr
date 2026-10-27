@@ -1,0 +1,223 @@
+# spike 結果（spike-trgm.sql）。前半是沒有 pg_trgm 索引的 perf，後半是裝了 pg_trgm 並建 GIN 索引的複本。
+
+## 沒有索引
+== 1. 資料庫的 locale 與 pg_trgm 對漢字的切分（需要 pg_trgm；沒有裝時略過這一節）
+ datcollate |  datctype  | datlocprovider 
+------------+------------+----------------
+ en_US.utf8 | en_US.utf8 | c
+(1 row)
+
+== 2. 正確性：LIKE '%q%' 與 strpos 在 1–4 個漢字、前綴／中段／結尾的子字串上結果相同
+NOTICE:  檢查了 332 個查詢字串，LIKE 與 strpos 全部一致
+DO
+== 3. 各長度的耗時與計畫（只看謂詞本身；完整的建議 query 另見 measure.go）
+查詢字串 严 / 严不 / 严不丵 / 伃乛佳介
+-- 1 個漢字
+                                     QUERY PLAN                                     
+------------------------------------------------------------------------------------
+ Finalize HashAggregate (actual rows=4.00 loops=1)
+   Group Key: name
+   Batches: 1  Memory Usage: 161kB
+   Buffers: shared hit=3223
+   ->  Gather (actual rows=5.00 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=3223
+         ->  Partial HashAggregate (actual rows=1.67 loops=3)
+               Group Key: name
+               Batches: 1  Memory Usage: 161kB
+               Buffers: shared hit=3223
+               Worker 0:  Batches: 1  Memory Usage: 161kB
+               Worker 1:  Batches: 1  Memory Usage: 161kB
+               ->  Parallel Seq Scan on post_hashtags (actual rows=7145.33 loops=3)
+                     Filter: (name ~~ '%严%'::text)
+                     Rows Removed by Filter: 125334
+                     Buffers: shared hit=3223
+ Planning Time: 0.117 ms
+ Execution Time: 16.209 ms
+(20 rows)
+
+-- 2 個漢字
+                                     QUERY PLAN                                     
+------------------------------------------------------------------------------------
+ Finalize HashAggregate (actual rows=1.00 loops=1)
+   Group Key: name
+   Batches: 1  Memory Usage: 161kB
+   Buffers: shared hit=3223
+   ->  Gather (actual rows=1.00 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=3223
+         ->  Partial HashAggregate (actual rows=0.33 loops=3)
+               Group Key: name
+               Batches: 1  Memory Usage: 161kB
+               Buffers: shared hit=3223
+               Worker 0:  Batches: 1  Memory Usage: 161kB
+               Worker 1:  Batches: 1  Memory Usage: 161kB
+               ->  Parallel Seq Scan on post_hashtags (actual rows=7099.33 loops=3)
+                     Filter: (name ~~ '%严不%'::text)
+                     Rows Removed by Filter: 125380
+                     Buffers: shared hit=3223
+ Planning Time: 0.164 ms
+ Execution Time: 15.739 ms
+(20 rows)
+
+-- 3 個漢字
+                                     QUERY PLAN                                     
+------------------------------------------------------------------------------------
+ Finalize HashAggregate (actual rows=1.00 loops=1)
+   Group Key: name
+   Batches: 1  Memory Usage: 161kB
+   Buffers: shared hit=3223
+   ->  Gather (actual rows=1.00 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=3223
+         ->  Partial HashAggregate (actual rows=0.33 loops=3)
+               Group Key: name
+               Batches: 1  Memory Usage: 161kB
+               Buffers: shared hit=3223
+               Worker 0:  Batches: 1  Memory Usage: 161kB
+               Worker 1:  Batches: 1  Memory Usage: 161kB
+               ->  Parallel Seq Scan on post_hashtags (actual rows=7099.33 loops=3)
+                     Filter: (name ~~ '%严不丵%'::text)
+                     Rows Removed by Filter: 125380
+                     Buffers: shared hit=3223
+ Planning Time: 0.122 ms
+ Execution Time: 16.811 ms
+(20 rows)
+
+-- 4 個漢字
+                                 QUERY PLAN                                  
+-----------------------------------------------------------------------------
+ HashAggregate (actual rows=1.00 loops=1)
+   Group Key: name
+   Batches: 1  Memory Usage: 97kB
+   Buffers: shared hit=3223
+   ->  Gather (actual rows=2191.00 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=3223
+         ->  Parallel Seq Scan on post_hashtags (actual rows=730.33 loops=3)
+               Filter: (name ~~ '%伃乛佳介%'::text)
+               Rows Removed by Filter: 131749
+               Buffers: shared hit=3223
+ Planning Time: 0.141 ms
+ Execution Time: 15.923 ms
+(14 rows)
+
+
+## pg_trgm + GIN (name extensions.gin_trgm_ops)
+SET
+== 1. 資料庫的 locale 與 pg_trgm 對漢字的切分（需要 pg_trgm；沒有裝時略過這一節）
+ datcollate |  datctype  | datlocprovider 
+------------+------------+----------------
+ en_US.utf8 | en_US.utf8 | c
+(1 row)
+
+            cjk_2             |                 cjk_3                 |        cjk_1        |                    mixed                     
+------------------------------+---------------------------------------+---------------------+----------------------------------------------
+ {0x9d3cae,0xfe66de,0x610ffd} | {0xf55a16,0xfe66de,0x610ffd,0x7a3b8d} | {0x30e4f7,0x610ffd} | {0x9d3cae,0xe0ebd0,"  a"," ab",abc,0x6f8458}
+(1 row)
+
+== 2. 正確性：LIKE '%q%' 與 strpos 在 1–4 個漢字、前綴／中段／結尾的子字串上結果相同
+psql:<stdin>:42: NOTICE:  檢查了 332 個查詢字串，LIKE 與 strpos 全部一致
+DO
+== 3. 各長度的耗時與計畫（只看謂詞本身；完整的建議 query 另見 measure.go）
+查詢字串 严 / 严不 / 严不丵 / 伃乛佳介
+-- 1 個漢字
+                                     QUERY PLAN                                     
+------------------------------------------------------------------------------------
+ Finalize HashAggregate (actual rows=4.00 loops=1)
+   Group Key: name
+   Batches: 1  Memory Usage: 161kB
+   Buffers: shared hit=3223
+   ->  Gather (actual rows=5.00 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=3223
+         ->  Partial HashAggregate (actual rows=1.67 loops=3)
+               Group Key: name
+               Batches: 1  Memory Usage: 161kB
+               Buffers: shared hit=3223
+               Worker 0:  Batches: 1  Memory Usage: 161kB
+               Worker 1:  Batches: 1  Memory Usage: 161kB
+               ->  Parallel Seq Scan on post_hashtags (actual rows=7145.33 loops=3)
+                     Filter: (name ~~ '%严%'::text)
+                     Rows Removed by Filter: 125334
+                     Buffers: shared hit=3223
+ Planning:
+   Buffers: shared hit=1
+ Planning Time: 0.212 ms
+ Execution Time: 16.278 ms
+(22 rows)
+
+-- 2 個漢字
+                                     QUERY PLAN                                     
+------------------------------------------------------------------------------------
+ Finalize HashAggregate (actual rows=1.00 loops=1)
+   Group Key: name
+   Batches: 1  Memory Usage: 161kB
+   Buffers: shared hit=3223
+   ->  Gather (actual rows=1.00 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=3223
+         ->  Partial HashAggregate (actual rows=0.33 loops=3)
+               Group Key: name
+               Batches: 1  Memory Usage: 161kB
+               Buffers: shared hit=3223
+               Worker 0:  Batches: 1  Memory Usage: 161kB
+               Worker 1:  Batches: 1  Memory Usage: 161kB
+               ->  Parallel Seq Scan on post_hashtags (actual rows=7099.33 loops=3)
+                     Filter: (name ~~ '%严不%'::text)
+                     Rows Removed by Filter: 125380
+                     Buffers: shared hit=3223
+ Planning:
+   Buffers: shared hit=1
+ Planning Time: 0.159 ms
+ Execution Time: 15.922 ms
+(22 rows)
+
+-- 3 個漢字
+                                       QUERY PLAN                                        
+-----------------------------------------------------------------------------------------
+ HashAggregate (actual rows=1.00 loops=1)
+   Group Key: name
+   Batches: 1  Memory Usage: 161kB
+   Buffers: shared hit=186
+   ->  Bitmap Heap Scan on post_hashtags (actual rows=21298.00 loops=1)
+         Recheck Cond: (name ~~ '%严不丵%'::text)
+         Heap Blocks: exact=178
+         Buffers: shared hit=186
+         ->  Bitmap Index Scan on post_hashtags_name_trgm (actual rows=21298.00 loops=1)
+               Index Cond: (name ~~ '%严不丵%'::text)
+               Index Searches: 1
+               Buffers: shared hit=8
+ Planning:
+   Buffers: shared hit=1
+ Planning Time: 0.149 ms
+ Execution Time: 5.059 ms
+(16 rows)
+
+-- 4 個漢字
+                                       QUERY PLAN                                       
+----------------------------------------------------------------------------------------
+ HashAggregate (actual rows=1.00 loops=1)
+   Group Key: name
+   Batches: 1  Memory Usage: 65kB
+   Buffers: shared hit=28
+   ->  Bitmap Heap Scan on post_hashtags (actual rows=2191.00 loops=1)
+         Recheck Cond: (name ~~ '%伃乛佳介%'::text)
+         Heap Blocks: exact=21
+         Buffers: shared hit=28
+         ->  Bitmap Index Scan on post_hashtags_name_trgm (actual rows=2191.00 loops=1)
+               Index Cond: (name ~~ '%伃乛佳介%'::text)
+               Index Searches: 1
+               Buffers: shared hit=7
+ Planning:
+   Buffers: shared hit=1
+ Planning Time: 0.116 ms
+ Execution Time: 0.669 ms
+(16 rows)
+

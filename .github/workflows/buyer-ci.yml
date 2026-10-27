@@ -1,0 +1,41 @@
+name: buyer-app CI
+
+on:
+  pull_request:
+    paths:
+      - 'buyer-app/**'
+      - 'packages/hawkr_api/**'
+      - 'packages/hawkr_auth/**'
+      - 'packages/hawkr_app_update/**'
+      - 'packages/hawkr_twaddr/**'
+      # 共用文案目錄（hawkr_ui_text）。
+      - 'packages/hawkr_ui_text/**'
+      - '.github/workflows/buyer-ci.yml'
+      - '.github/workflows/_flutter-quality.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'buyer-app/**'
+      - 'packages/hawkr_api/**'
+      - 'packages/hawkr_auth/**'
+      - 'packages/hawkr_app_update/**'
+      - 'packages/hawkr_twaddr/**'
+      # 共用文案目錄（hawkr_ui_text）。
+      - 'packages/hawkr_ui_text/**'
+      - '.github/workflows/buyer-ci.yml'
+      - '.github/workflows/_flutter-quality.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: buyer-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    uses: ./.github/workflows/_flutter-quality.yml
+    with:
+      app: buyer-app
+      check-generated: true

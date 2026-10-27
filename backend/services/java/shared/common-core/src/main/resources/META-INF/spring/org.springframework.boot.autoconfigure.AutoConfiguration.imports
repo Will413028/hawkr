@@ -1,0 +1,11 @@
+io.github.will413028.hawkr.common.db.DatabaseBootstrapAutoConfiguration
+io.github.will413028.hawkr.common.config.TsidConfiguration
+io.github.will413028.hawkr.common.grpc.GrpcAuthAutoConfiguration
+io.github.will413028.hawkr.common.config.MediaUrlAutoConfiguration
+io.github.will413028.hawkr.common.config.MyBatisPlusAutoConfiguration
+io.github.will413028.hawkr.common.config.RabbitMqAutoConfiguration
+io.github.will413028.hawkr.common.config.MqErrorHandlerMetricsAutoConfiguration
+io.github.will413028.hawkr.common.config.JacksonAutoConfiguration
+io.github.will413028.hawkr.common.providercall.ProviderCallAutoConfiguration
+io.github.will413028.hawkr.common.safefetch.SafeFetchAutoConfiguration
+io.github.will413028.hawkr.common.cache.RevalidateAutoConfiguration

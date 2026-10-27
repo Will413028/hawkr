@@ -1,0 +1,244 @@
+syntax = "proto3";
+
+package hawkr.review;
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/review";
+option java_multiple_files = true;
+option java_package = "io.github.will413028.hawkr.review.grpc";
+option java_outer_classname = "ReviewProto";
+
+// Review Service - 商品評論服務
+service ReviewService {
+    // 獲取商品評論列表
+    rpc GetProductReviews(GetProductReviewsRequest) returns (ProductReviewsResponse);
+
+    // 獲取單一評論
+    rpc GetReview(GetReviewRequest) returns (ReviewResponse);
+
+    // 回覆評論 (賣家)
+    rpc ReplyReview(ReplyReviewRequest) returns (ReviewResponse);
+
+    // ==================== 訂單體驗評論（買家對整體訂單體驗評分）====================
+
+    // 買家提交訂單體驗評論
+    rpc SubmitOrderReview(SubmitOrderReviewRequest) returns (SubmitOrderReviewResponse);
+
+    // 買家查詢自己的評論歷史
+    rpc ListMyOrderReviews(ListMyOrderReviewsRequest) returns (ListMyOrderReviewsResponse);
+
+    // 賣家查詢收到的評論列表
+    rpc GetSellerOrderReviews(GetSellerOrderReviewsRequest) returns (GetSellerOrderReviewsResponse);
+
+    // 賣家查詢評論統計
+    rpc GetSellerOrderReviewStats(GetSellerOrderReviewStatsRequest) returns (GetSellerOrderReviewStatsResponse);
+
+    // 批次查詢多家店的評論統計（內部呼叫，推薦賣家排行的重算用；不逐店呼叫 GetSellerOrderReviewStats）
+    rpc ListStoreRatingStats(ListStoreRatingStatsRequest) returns (ListStoreRatingStatsResponse);
+
+    // ==================== B-135: 內容審核（admin 內部 RPC）====================
+    // Admin 將評論隱藏（hidden_at + hidden_reason）— 由 social-service AdminResolveReport 呼叫
+    rpc HideReview(HideReviewRequest) returns (HideReviewResponse);
+}
+
+message HideReviewRequest {
+    int64  review_id     = 1;
+    string hidden_reason = 2;
+}
+
+message HideReviewResponse {
+    int32  code    = 1;
+    string message = 2;
+}
+
+// 請求
+message GetProductReviewsRequest {
+    string product_id = 1;  // TSID 字串（§4）
+    int32 rating = 2;          // 篩選評分: 0=全部, 1-5=指定星數
+    bool with_images = 3;      // 是否只顯示有圖評論
+    string sort_by = 4;        // 排序: latest, helpful, rating
+    int32 page = 5;
+    int32 page_size = 6;
+    int64 viewer_id = 7;       // B-135: viewer for block filter (D11: filter list, NOT aggregate stats)
+}
+
+message GetReviewRequest {
+    string review_id = 1;  // path TSID 字串（§4）
+}
+
+message ReplyReviewRequest {
+    string review_id = 1;          // path TSID 字串（§4 前端可控）
+    int64 store_id = 2;            // Gateway JWT 注入（§4.1 例外①）
+    string content = 3;            // 賣家回覆內容（≤1000）
+}
+
+// 評論資訊
+message ReviewInfo {
+    string id = 1;
+    string product_id = 2;
+    string buyer_id = 3;
+    string user_name = 4;
+    string user_avatar_key = 5; // 買家頭像 objectKey/外部 URL（49 §6.6 S2；Gateway 組顯示 URL）
+    string order_id = 6;
+    int32 rating = 7;
+    string content = 8;
+    repeated string image_keys = 9; // 評論圖 objectKey 陣列（49 §6.6；Gateway 組顯示 URL）
+    bool is_anonymous = 10;
+    int32 like_count = 11;
+    int32 reply_count = 12;
+    string created_at = 13;
+    ReplyInfo reply = 14;      // 賣家回覆
+    // true = 這位買家的 stint 已註銷，user_name 是墓碑字串而非真名（#2830）。
+    // 🔴 Gateway 靠本欄決定「要不要遮罩」：墓碑是常數不是個資，遮了只會變成
+    // 「已刪***」這種既不好讀也沒保護到任何人的字串。**不要改用字串比對**。
+    bool user_deleted = 15;
+}
+
+// 賣家回覆
+message ReplyInfo {
+    string id = 1;
+    string content = 2;
+    string created_at = 3;
+}
+
+// 評論統計
+message ReviewStats {
+    int64 total_count = 1;
+    double average_rating = 2;
+    int64 rating_5_count = 3;
+    int64 rating_4_count = 4;
+    int64 rating_3_count = 5;
+    int64 rating_2_count = 6;
+    int64 rating_1_count = 7;
+    int64 with_images_count = 8;
+}
+
+// 回應
+message ProductReviewsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated ReviewInfo reviews = 3;
+    ReviewStats stats = 4;
+    int64 total = 5;
+    int32 page = 6;
+    int32 page_size = 7;
+}
+
+message ReviewResponse {
+    int32 code = 1;
+    string message = 2;
+    ReviewInfo review = 3;
+}
+
+// ==================== 訂單體驗評論 Messages ====================
+
+// 訂單商品評論資訊（一筆 = 對一個商品項目的評論）
+message OrderReviewInfo {
+    string id = 1;              // TSID 數字字串
+    string order_no = 2;
+    string order_item_id = 3;   // 訂單商品項目 ID（TSID 數字字串）
+    string buyer_id = 4;
+    string store_id = 5;
+    int32 rating = 6;           // 商品評分 1-5
+    string content = 7;         // 文字留言（選填）
+    repeated string image_keys = 8;  // 評論圖 objectKey 陣列，最多 4 張（49 §6.6；Gateway 組顯示 URL）
+    string sku_name = 9;        // 商品名稱（快照）
+    string item_image_key = 10; // 商品圖 objectKey（快照；49 §6.6；Gateway 組顯示 URL）
+    string price = 11;          // 商品單價（數字字串，元）
+    string created_at = 12;     // RFC3339 UTC
+    string buyer_name = 13;     // 買家暱稱（由 buyer-service 填充）
+    string buyer_avatar_key = 14;   // 買家頭像 objectKey/外部 URL（49 §6.6 S2；Gateway 組顯示 URL）
+    string product_id = 15;     // 商品 ID（數字字串）— 前端連結商品頁用（#1155）
+    ReplyInfo reply = 16;       // 賣家回覆（#1174；null = 未回覆）
+}
+
+// SubmitOrderReview（每次提交一個商品項目的評論）
+message SubmitOrderReviewRequest {
+    string order_no = 1;
+    string order_item_id = 2;    // 要評論的訂單商品項目 ID，TSID 字串（§4）
+    int64 buyer_id = 3;
+    int32 rating = 4;           // 1-5，必填
+    string content = 5;         // 選填，最多 500 字
+    reserved 6;                              // 已廢棄：原 image_urls（前端改傳 staged_tokens）
+    reserved "image_urls";
+    // 商品資訊快照（由 review-service 從 order-service 取得後儲存）
+    string sku_name = 7;
+    string item_image_key = 8; // 商品圖 objectKey（快照，由 review-service 從 order 取得儲存；49 §6.6）
+    string price = 9;           // 數字字串，元
+    string product_id = 10;      // 商品 ID，TSID 字串（§4）
+    repeated string staged_tokens = 11;      // 評論圖片 staged token（最多 4 個，選填）
+}
+
+message SubmitOrderReviewResponse {
+    int32 code = 1;
+    string message = 2;
+    string review_id = 3;       // TSID 數字字串
+}
+
+// ListMyOrderReviews - 買家查詢自己的評論歷史
+message ListMyOrderReviewsRequest {
+    int64 buyer_id = 1;
+    int32 page = 2;
+    int32 page_size = 3;
+}
+
+message ListMyOrderReviewsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated OrderReviewInfo records = 3;
+    string total = 4;
+    string page = 5;
+    string page_size = 6;
+}
+
+// GetSellerOrderReviews - 賣家查詢收到的評論
+message GetSellerOrderReviewsRequest {
+    string store_id = 1;           // TSID 字串（§4）
+    int32 rating = 2;           // 0=全部, 1-5=指定整體評分
+    int32 page = 3;
+    int32 page_size = 4;
+}
+
+message GetSellerOrderReviewsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated OrderReviewInfo records = 3;
+    string total = 4;
+    string page = 5;
+    string page_size = 6;
+}
+
+// GetSellerOrderReviewStats - 賣家查詢評論統計
+message GetSellerOrderReviewStatsRequest {
+    string store_id = 1;           // TSID 字串（§4）
+}
+
+message GetSellerOrderReviewStatsResponse {
+    int32 code = 1;
+    string message = 2;
+    string total_count = 3;
+    string avg_rating = 4;      // 商品評分平均值
+    string rating_5_count = 5;  // 5 星數量（數字字串）
+    string rating_4_count = 6;  // 4 星數量（數字字串）
+    string rating_3_count = 7;  // 3 星數量（數字字串）
+    string rating_2_count = 8;  // 2 星數量（數字字串）
+    string rating_1_count = 9;  // 1 星數量（數字字串）
+}
+
+// ListStoreRatingStats - 批次查詢多家店的評論統計
+// 統計的定義與 GetSellerOrderReviewStats 的 total_count、avg_rating 相同（排除軟刪除與隱藏的評論，平均四捨五入到小數兩位）。
+message ListStoreRatingStatsRequest {
+    repeated string store_ids = 1;  // TSID 字串（§4）；1 到 100 個，必須是正整數，重複的只算一次
+}
+
+message ListStoreRatingStatsResponse {
+    int32 code = 1;
+    string message = 2;
+    // 只含有評論的店；沒有評論的店不會出現（呼叫端以缺席表示 0 則評論）。順序不保證。
+    repeated StoreRatingStat stats = 3;
+}
+
+message StoreRatingStat {
+    string store_id = 1;     // TSID 字串（§4）
+    string total_count = 2;  // 評論數（數字字串，至少 1）
+    string avg_rating = 3;   // 平均評分，小數兩位
+}

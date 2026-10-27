@@ -1,0 +1,137 @@
+{
+	"data": {
+		"description": {
+			"version": "1.0",
+			"blocks": [
+				{
+					"type": "text",
+					"id": "blk-0",
+					"runs": [
+						{
+							"text": "彰化溪州 在地產地直送 珍珠芭樂。"
+						}
+					],
+					"width": "0",
+					"height": "0"
+				},
+				{
+					"type": "text",
+					"id": "blk-1",
+					"runs": [
+						{
+							"text": "當日現採出貨，皮薄汁多、清脆爽口，富含維生素 C 與膳食纖維。"
+						}
+					],
+					"width": "0",
+					"height": "0"
+				},
+				{
+					"type": "text",
+					"id": "blk-2",
+					"runs": [
+						{
+							"text": "5 斤裝，超商取貨限重 8 斤；大量批發歡迎私訊。"
+						}
+					],
+					"width": "0",
+					"height": "0"
+				}
+			]
+		},
+		"origin": "彰化溪州",
+		"imageKey": "public/product/2685914682/20260719/66909226-d51b-42ca-9d0b-1415a88acda9.jpg",
+		"imageUrl": "https://test-media.example.com/i/original/public/product/2685914682/20260719/66909226-d51b-42ca-9d0b-1415a88acda9.jpg",
+		"categoryLv1Name": "水果",
+		"categoryLv1Id": "2",
+		"categoryLv2Name": "番石榴",
+		"id": "866542657374814537",
+		"categoryLv2Id": "174",
+		"rating": "0",
+		"status": "4003",
+		"categoryId": "829",
+		"categoryLv3Name": "珍珠芭",
+		"name": "[範例] 彰化溪州 在地產地直送 珍珠芭樂",
+		"updatedAt": "1785864265",
+		"priceMin": "350",
+		"priceMax": "350",
+		"listPriceMin": "380",
+		"listPriceMax": "380",
+		"salePriceMin": "350",
+		"salePriceMax": "350",
+		"createdAt": "1784436669",
+		"categoryName": "珍珠芭",
+		"createdBy": "2685914682",
+		"categoryLv3Id": "829",
+		"salesCount": "0",
+		"stock": "30",
+		"favoriteCount": "0",
+		"reviewCount": "0",
+		"gallery": [
+			{
+				"assetId": "866542659890990933",
+				"imageKey": "public/product/2685914682/20260719/66909226-d51b-42ca-9d0b-1415a88acda9.jpg",
+				"imageUrl": "https://test-media.example.com/i/original/public/product/2685914682/20260719/66909226-d51b-42ca-9d0b-1415a88acda9.jpg"
+			},
+			{
+				"assetId": "866542662277548002",
+				"imageKey": "public/product/2685914682/20260719/8970d955-06dd-46c1-aedb-85e4bdc0a319.jpg",
+				"imageUrl": "https://test-media.example.com/i/original/public/product/2685914682/20260719/8970d955-06dd-46c1-aedb-85e4bdc0a319.jpg"
+			},
+			{
+				"assetId": "866542664571831424",
+				"imageKey": "public/product/2685914682/20260719/d1f2a587-1443-47f3-809e-c868eff290cc.jpg",
+				"imageUrl": "https://test-media.example.com/i/original/public/product/2685914682/20260719/d1f2a587-1443-47f3-809e-c868eff290cc.jpg"
+			}
+		],
+		"imageKeys": [
+			"public/product/2685914682/20260719/66909226-d51b-42ca-9d0b-1415a88acda9.jpg",
+			"public/product/2685914682/20260719/8970d955-06dd-46c1-aedb-85e4bdc0a319.jpg",
+			"public/product/2685914682/20260719/d1f2a587-1443-47f3-809e-c868eff290cc.jpg"
+		],
+		"imageUrls": [
+			"https://test-media.example.com/i/original/public/product/2685914682/20260719/66909226-d51b-42ca-9d0b-1415a88acda9.jpg",
+			"https://test-media.example.com/i/original/public/product/2685914682/20260719/8970d955-06dd-46c1-aedb-85e4bdc0a319.jpg",
+			"https://test-media.example.com/i/original/public/product/2685914682/20260719/d1f2a587-1443-47f3-809e-c868eff290cc.jpg"
+		],
+		"shippingMethods": [
+			{
+				"type": "3001",
+				"temperature": "3201",
+				"freeThreshold": "0",
+				"feePayer": "3101"
+			}
+		],
+		"deliveryTemp": ["3201"],
+		"skus": [
+			{
+				"id": "312",
+				"skuName": "珍珠芭樂 5 斤裝",
+				"weight": "3.000",
+				"unit": "3301",
+				"price": "380",
+				"salePrice": "350",
+				"stockQty": "30",
+				"lengthCm": "30.00",
+				"widthCm": "22.00",
+				"heightCm": "15.00",
+				"shippingMethods": [
+					{
+						"type": "3001",
+						"temperature": "3201",
+						"freeThreshold": "0",
+						"feePayer": "3101"
+					}
+				]
+			}
+		],
+		"hashtags": [
+			{
+				"name": "彰化溪州珍珠芭樂在地產地直送",
+				"displayName": "彰化溪州珍珠芭樂在地產地直送",
+				"productCount": "0"
+			}
+		]
+	},
+	"message": "success",
+	"code": 0
+}

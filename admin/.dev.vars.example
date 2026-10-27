@@ -1,0 +1,3 @@
+BACKEND_BASE_URL=http://localhost:8080
+NEXT_PUBLIC_APP_ENV=dev
+WEB_ORIGIN=https://web-dev.example.com

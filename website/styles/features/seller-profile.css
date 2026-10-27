@@ -1,0 +1,799 @@
+/* ============================================================
+   13. SELLER PROFILE V2 — compact horizontal layout (Twitter-style)
+   ============================================================ */
+.hkui-seller-profile {
+	position: relative;
+	z-index: 2;
+	/* Old rule pulled the banner UP with a -88px..-120px margin to
+	 * tuck under the previous 140px navbar clearance. The global
+	 * clearance is now ~5px, so a negative pull just makes the banner
+	 * overlap the floating pill. Reset to a small positive offset. */
+	margin: 0 auto var(--hkui-space-5);
+	max-width: 1440px;
+	font-family: var(--hkui-font-sans);
+}
+
+.hkui-seller-profile__cover {
+	position: relative;
+	width: 100%;
+	height: auto;
+	aspect-ratio: 4 / 1;
+	overflow: hidden;
+	border: 1px solid var(--color-neutral-panel);
+	border-radius: var(--hkui-radius-lg);
+	background: linear-gradient(
+		135deg,
+		var(--hkui-primary-100),
+		var(--hkui-secondary-100)
+	);
+	box-shadow: 0 18px 44px rgb(var(--color-ink-850-rgb) / 0.08);
+}
+.hkui-seller-profile__cover::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background:
+		linear-gradient(180deg, rgb(var(--color-ink-950-rgb) / 0.08), transparent 42%),
+		linear-gradient(0deg, rgba(255, 253, 247, 0.16), transparent 44%);
+}
+.hkui-seller-profile__cover-placeholder {
+	width: 100%;
+	height: 100%;
+	background:
+		radial-gradient(circle at 30% 20%, var(--hkui-primary-100), transparent 50%),
+		radial-gradient(circle at 70% 70%, var(--hkui-warning-100), transparent 50%),
+		var(--hkui-content2);
+}
+.hkui-seller-profile__back {
+	position: absolute;
+	z-index: 1;
+	top: var(--hkui-space-3);
+	left: var(--hkui-space-3);
+}
+
+/* Header row: avatar left, name+meta center, follow CTA right */
+.hkui-seller-profile__head {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	align-items: end;
+	gap: var(--hkui-space-5);
+	padding: 0 var(--hkui-space-8);
+	/* Overlap tuned so the bottom-aligned store name clears the cover by
+	 * ~20px — with `align-items: end`, padding on the title can't move
+	 * the text; this margin is the only lever. */
+	margin-top: -42px;
+}
+.hkui-seller-profile__avatar {
+	position: relative;
+	width: 112px;
+	height: 112px;
+	border-radius: 50%;
+	overflow: hidden;
+	border: 2px solid var(--color-neutral-panel);
+	background: var(--hkui-content1);
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.84) inset,
+		0 14px 30px rgb(var(--color-ink-850-rgb) / 0.14);
+	flex-shrink: 0;
+}
+.hkui-seller-profile__avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+.hkui-seller-profile__avatar-fallback {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	height: 100%;
+	font-size: 2rem;
+	font-weight: var(--hkui-weight-bold);
+	color: var(--hkui-primary);
+	background: var(--hkui-primary-50);
+}
+
+.hkui-seller-profile__title {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding-bottom: var(--hkui-space-2);
+	min-width: 0;
+}
+.hkui-seller-profile__name-row {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	column-gap: var(--hkui-space-2);
+	row-gap: 2px;
+	min-width: 0;
+}
+.hkui-seller-profile__name {
+	margin: 0;
+	font-size: var(--hkui-display-sm);
+	font-weight: var(--hkui-weight-bold);
+	letter-spacing: var(--hkui-tracking-tight);
+	color: var(--hkui-foreground);
+	line-height: 1.2;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+/* 賣家自填獎項（後端 `prize` free-text）— harvest-gold 獎章 pill，
+ * 與評分星星同一 warning 色系；文字過長時單行截斷（title 有全文）。 */
+.hkui-seller-profile__prize {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	min-width: 0;
+	max-width: 100%;
+	padding: 2px 10px 2px 7px;
+	border-radius: var(--hkui-radius-full);
+	background: var(--hkui-warning-50);
+	color: var(--hkui-warning-700);
+	font-size: var(--hkui-text-tiny);
+	font-weight: var(--hkui-weight-semibold);
+	line-height: 1.5;
+}
+.hkui-seller-profile__prize svg {
+	flex-shrink: 0;
+	color: var(--hkui-warning-600);
+}
+.hkui-seller-profile__prize > span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+[data-theme="dark"] .hkui-seller-profile__prize {
+	background: rgba(241, 205, 112, 0.14);
+	color: #f1cd70;
+}
+[data-theme="dark"] .hkui-seller-profile__prize svg {
+	color: #f1cd70;
+}
+.hkui-seller-profile__meta {
+	display: inline-flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: var(--hkui-space-3);
+	font-size: var(--hkui-text-small);
+	color: var(--hkui-foreground-soft);
+}
+.hkui-seller-profile__meta-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+.hkui-seller-profile__meta-item strong {
+	font-weight: var(--hkui-weight-semibold);
+	color: var(--hkui-foreground);
+	font-variant-numeric: tabular-nums;
+}
+.hkui-seller-profile__meta-item--rating svg {
+	color: var(--hkui-warning);
+}
+.hkui-seller-profile__meta-item--location svg {
+	color: var(--hkui-primary);
+}
+.hkui-seller-profile__meta-item--users svg {
+	color: var(--hkui-primary);
+}
+.hkui-seller-profile__meta-item--website {
+	color: var(--hkui-primary);
+	border-radius: var(--hkui-radius-sm);
+	transition: opacity var(--hkui-dur-fast) var(--hkui-ease);
+}
+.hkui-seller-profile__meta-item--website:hover {
+	opacity: 0.7;
+}
+.hkui-seller-profile__meta-dot {
+	display: inline-block;
+	width: 3px;
+	height: 3px;
+	border-radius: 50%;
+	background: var(--hkui-default-300);
+	margin: 0 -4px;
+}
+
+.hkui-seller-profile__cta {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 36px;
+	padding: 0 var(--hkui-space-4);
+	white-space: nowrap;
+	background: var(--hkui-primary);
+	color: var(--hkui-primary-foreground);
+	/* 1px transparent border so toggling between unsubscribed (no border)
+	 * and subscribed (visible sage outline) doesn't shift the layout by
+	 * 2px sideways. */
+	border: 1px solid transparent;
+	border-radius: var(--hkui-radius-full);
+	font-family: inherit;
+	font-size: var(--hkui-text-small);
+	font-weight: var(--hkui-weight-semibold);
+	cursor: pointer;
+	text-decoration: none;
+	transition:
+		background var(--hkui-dur-fast) var(--hkui-ease),
+		color var(--hkui-dur-fast) var(--hkui-ease),
+		border-color var(--hkui-dur-fast) var(--hkui-ease),
+		transform var(--hkui-dur-fast) var(--hkui-ease);
+}
+.hkui-seller-profile__cta:hover {
+	background: var(--hkui-primary-600);
+}
+.hkui-seller-profile__cta:active {
+	transform: scale(0.97);
+}
+.hkui-seller-profile__cta:disabled {
+	cursor: wait;
+	opacity: 0.78;
+	transform: none;
+}
+.hkui-seller-profile__cta--ghost {
+	background: transparent;
+	color: var(--hkui-foreground);
+	border: 1px solid var(--hkui-divider);
+}
+.hkui-seller-profile__cta--ghost:hover {
+	background: var(--hkui-content2);
+	color: var(--hkui-foreground);
+	border-color: var(--hkui-foreground-soft);
+}
+
+/* Subscribed state — colour is the ONLY signal that separates it from the
+ * unsubscribed CTA. The label keeps the same megaphone icon and a fixed
+ * width (see `__subscribe` min-width below), so toggling 訂閱⇄已訂閱 never
+ * reshapes the pill or nudges the chat/名片 buttons beside it. Solid green
+ * call-to-action → soft sage "confirmed status". */
+.hkui-seller-profile__cta[aria-pressed="true"] {
+	background: color-mix(in oklab, var(--hkui-primary) 12%, transparent);
+	color: var(--hkui-primary);
+	border-color: color-mix(in oklab, var(--hkui-primary) 28%, transparent);
+}
+.hkui-seller-profile__cta[aria-pressed="true"]:hover {
+	background: color-mix(in oklab, var(--hkui-primary) 18%, transparent);
+	color: var(--hkui-primary);
+	border-color: color-mix(in oklab, var(--hkui-primary) 38%, transparent);
+}
+.hkui-seller-profile__actions {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--hkui-space-2);
+	align-self: end;
+	justify-self: end;
+}
+.hkui-seller-profile__actions .hkui-seller-profile__subscribe {
+	align-self: auto;
+}
+.hkui-seller-profile__subscribe {
+	position: relative;
+	align-self: end;
+	justify-self: end;
+}
+/* Reserve the wider "已訂閱" footprint and centre the label so the pill keeps
+ * one fixed size across both states — no width jitter on toggle. */
+.hkui-seller-profile__subscribe .hkui-seller-profile__cta {
+	min-width: 104px;
+	justify-content: center;
+}
+.hkui-seller-profile__login-popover {
+	position: absolute;
+	top: calc(100% + 10px);
+	right: 0;
+	z-index: 12;
+	display: grid;
+	gap: var(--hkui-space-2);
+	width: min(276px, calc(100vw - 32px));
+	padding: var(--hkui-space-3);
+	border: 1px solid var(--color-neutral-panel);
+	border-radius: var(--hkui-radius-md);
+	background: rgba(255, 253, 247, 0.98);
+	box-shadow:
+		0 18px 42px rgb(var(--color-ink-850-rgb) / 0.14),
+		0 1px 0 rgba(255, 255, 255, 0.82) inset;
+	color: var(--hkui-foreground);
+	font-size: var(--hkui-text-small);
+	line-height: 1.45;
+}
+.hkui-seller-profile__login-popover::before {
+	content: "";
+	position: absolute;
+	top: -6px;
+	right: 22px;
+	width: 12px;
+	height: 12px;
+	border-top: 1px solid var(--color-neutral-panel);
+	border-left: 1px solid var(--color-neutral-panel);
+	background: rgba(255, 253, 247, 0.98);
+	transform: rotate(45deg);
+}
+.hkui-seller-profile__login-popover strong {
+	position: relative;
+	z-index: 1;
+	font-weight: var(--hkui-weight-semibold);
+}
+.hkui-seller-profile__login-popover a {
+	position: relative;
+	z-index: 1;
+	width: fit-content;
+	color: var(--hkui-primary);
+	font-size: var(--hkui-text-tiny);
+	font-weight: var(--hkui-weight-semibold);
+	text-decoration: none;
+}
+.hkui-seller-profile__login-popover a:hover {
+	text-decoration: underline;
+}
+
+/* Description — two lines, optional, expandable when it overruns.
+ *
+ * `-webkit-line-clamp` is gone on purpose: its ellipsis is painted hard against
+ * the end of the last line, so there is nowhere for a toggle to sit and putting
+ * one on top would simply eat the words underneath. Clipping by height instead
+ * lets a float reserve the tail of the second line, and the toggle drops into
+ * that gap — correct at every width, with no character counting and no opaque
+ * patch over the text. The ellipsis then belongs to the button (see
+ * SellerProfileDescription), not to the browser. */
+.hkui-seller-profile__desc-wrap {
+	position: relative;
+	/* Contains the expanded state's float so the tabs below still clear it. */
+	display: flow-root;
+	margin-top: var(--hkui-space-2);
+}
+.hkui-seller-profile__desc {
+	margin: 0;
+	padding: 0 var(--hkui-space-4);
+	font-size: var(--hkui-text-small);
+	line-height: 1.5;
+	color: var(--hkui-foreground-muted);
+	/* Two lines of `line-height: 1.5`. `em` (not `lh`) so the maths still holds
+	 * on engines without the `lh` unit; whole line boxes clip cleanly. */
+	max-height: calc(2 * 1.5em);
+	overflow: hidden;
+}
+/* The notch the toggle lands in: one line tall, pushed down by one line so it
+ * only bites into the LAST visible line. Width comes from the button's measured
+ * width; the em fallback covers the first paint before that measurement lands.
+ * The extra 0.3em is the gap between the text and the ellipsis. */
+.hkui-seller-profile__desc-wrap[data-expanded="false"]
+.hkui-seller-profile__desc::before {
+	content: "";
+	float: right;
+	width: calc(var(--desc-toggle-w, 5.5em) + 0.3em);
+	height: 1.5em;
+	margin-top: 1.5em;
+}
+/* Block, so a ResizeObserver can watch the un-clipped text: the paragraph
+ * itself is pinned to two lines and never reports a change, and an inline box
+ * reports nothing usable either. Still an ordinary block in the paragraph's
+ * formatting context, so its line boxes keep wrapping around the float. */
+.hkui-seller-profile__desc-text {
+	display: block;
+}
+.hkui-seller-profile__desc-wrap[data-expanded="true"]
+	.hkui-seller-profile__desc {
+	max-height: none;
+	overflow: visible;
+}
+/* Plain text affordance, not the feed viewer's pill: that pill has a border and
+ * a surface because it floats over a photo, whereas this one continues a
+ * sentence. Inheriting the paragraph's size and line-height is what lets
+ * `bottom: 0` land it on the text's own baseline grid. */
+.hkui-seller-profile__desc-toggle {
+	position: absolute;
+	right: var(--hkui-space-4);
+	bottom: 0;
+	display: inline-flex;
+	align-items: baseline;
+	border: 0;
+	padding: 0;
+	background: none;
+	color: var(--hkui-primary);
+	font-size: inherit;
+	font-family: inherit;
+	font-weight: var(--hkui-weight-semibold);
+	line-height: 1.5;
+	white-space: nowrap;
+	cursor: pointer;
+}
+.hkui-seller-profile__desc-toggle > span {
+	color: var(--hkui-foreground-muted);
+	font-weight: var(--hkui-weight-regular);
+}
+/* Expanded there is no clipped line to sit in, so the control follows the text
+ * and keeps the same right-hand column — open and close stay under one thumb. */
+.hkui-seller-profile__desc-wrap[data-expanded="true"]
+.hkui-seller-profile__desc-toggle {
+	position: static;
+	float: right;
+	margin-right: var(--hkui-space-4);
+}
+/* Stretch the ~21px label to a 44px touch target. Asymmetric on purpose: the
+ * description above is inert, the tabs below are not, and `--hkui-space-3`
+ * (12px) is all the clearance there is down there. */
+.hkui-seller-profile__desc-toggle::after {
+	content: "";
+	position: absolute;
+	inset: -13px -6px -10px -10px;
+}
+
+/* Tabs — flush left, tight */
+.hkui-seller-profile__tabs {
+	display: flex;
+	align-items: center;
+	gap: var(--hkui-space-5);
+	margin-top: var(--hkui-space-3);
+	padding: 0 var(--hkui-space-8);
+	border-bottom: 1px solid var(--hkui-divider);
+}
+.hkui-seller-profile__tab {
+	position: relative;
+	padding: var(--hkui-space-2_5) 0;
+	text-decoration: none;
+	font-size: var(--hkui-text-small);
+	font-weight: var(--hkui-weight-medium);
+	color: var(--hkui-foreground-soft);
+	transition: color var(--hkui-dur-base) var(--hkui-ease);
+}
+.hkui-seller-profile__tab:hover {
+	color: var(--hkui-foreground-muted);
+}
+.hkui-seller-profile__tab.is-active {
+	color: var(--hkui-foreground);
+	font-weight: var(--hkui-weight-semibold);
+}
+.hkui-seller-profile__tab.is-active::after {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: -1px;
+	height: 2px;
+	background: var(--hkui-primary);
+	border-radius: 2px 2px 0 0;
+}
+
+@media (max-width: 640px) {
+	.hkui-seller-profile {
+		/* Container units keep the three header CTAs at 60px on the narrowest
+		 * phone and cap them at a compact 80px on wider phones. The cover's
+		 * 返回 control intentionally reuses the public product-detail contract. */
+		container-type: inline-size;
+		--hkui-seller-profile-mobile-action-width: clamp(
+			60px,
+			calc((100cqw - 124px) / 3),
+			80px
+		);
+		--hkui-seller-profile-mobile-action-visual-inline-inset: 4px;
+		--hkui-seller-profile-mobile-head-cover-offset: 38px;
+		--hkui-seller-profile-mobile-cover-action-gap: var(--hkui-space-2);
+		/* Was `margin-top: -48px` — tucked the cover under the sticky
+		 * navbar so the cover image bled to the top of the viewport,
+		 * but it also hid the absolutely-positioned 返回 button (top: 12px
+		 * inside the cover landed under the navbar). Reset to 0 so the
+		 * cover sits cleanly below the nav and the back chip is visible. */
+		margin-top: 0;
+	}
+	.hkui-seller-profile__cover {
+		border-radius: var(--hkui-radius-lg);
+	}
+	.hkui-seller-profile__head {
+		grid-template-columns: auto 1fr;
+		grid-template-areas:
+			"avatar cta"
+			"title  title";
+		gap: var(--hkui-space-2_5);
+		padding: 0 var(--hkui-space-3);
+		margin-top: calc(0px - var(--hkui-seller-profile-mobile-head-cover-offset));
+	}
+	.hkui-seller-profile__avatar {
+		grid-area: avatar;
+		width: 78px;
+		height: 78px;
+	}
+	.hkui-seller-profile__subscribe {
+		/* This wrapper lives INSIDE `__actions` — a 3-col grid with no
+		   named areas — so the old `grid-area: cta` pointed at a line that
+		   doesn't exist here. That spawned a phantom implicit column + a
+		   second row: 聊天/名片 stayed on row 1 (and, pulled up by the
+		   head's negative margin, spilled over the cover) while 訂閱
+		   dropped to row 2 and overflowed right. Flow it as the normal
+		   third column instead. */
+		justify-self: stretch;
+	}
+	.hkui-seller-profile__actions {
+		grid-area: cta;
+		display: grid;
+		grid-template-columns: repeat(
+				3,
+				var(--hkui-seller-profile-mobile-action-width)
+			);
+		justify-content: end;
+		width: 100%;
+		gap: 6px;
+		/* Keep the avatar overlapping the cover, but move the action rail below
+		 * the media edge. Because this margin participates in the grid track,
+		 * the title also clears the lowered buttons instead of overlapping them. */
+		margin-block-start: calc(
+			var(--hkui-seller-profile-mobile-head-cover-offset) +
+			var(--hkui-seller-profile-mobile-cover-action-gap)
+		);
+	}
+	.hkui-seller-profile__actions > * {
+		width: 100%;
+		min-width: 0;
+	}
+	.hkui-seller-profile__title {
+		grid-area: title;
+		padding-bottom: 0;
+		padding-top: var(--hkui-space-1);
+	}
+	.hkui-seller-profile__cta {
+		justify-content: center;
+		width: 100%;
+		min-width: 0;
+		max-width: 100%;
+		height: 44px;
+		min-height: 44px;
+		max-height: 44px;
+		gap: var(--hkui-space-1);
+		padding: 0 var(--hkui-space-1);
+		overflow: hidden;
+		border-radius: var(--hkui-radius-full);
+		font-size: var(--hkui-text-tiny);
+	}
+	.hkui-seller-profile .hkui-seller-profile__cta {
+		--hkui-seller-profile-mobile-action-background: var(--hkui-primary);
+		--hkui-seller-profile-mobile-action-border: transparent;
+		position: relative;
+		background: transparent;
+		border-color: transparent;
+		isolation: isolate;
+		/* The visual surface now lives on ::before. Do not animate the outer
+		 * loading fill back to transparent or it briefly flashes as a 44px pill. */
+		transition:
+			color var(--hkui-dur-fast) var(--hkui-ease),
+			box-shadow var(--hkui-dur-fast) var(--hkui-ease),
+			transform var(--hkui-dur-fast) var(--hkui-ease),
+			opacity var(--hkui-dur-fast) var(--hkui-ease);
+	}
+	.hkui-seller-profile .hkui-seller-profile__cta:hover {
+		--hkui-seller-profile-mobile-action-background: var(--hkui-primary-600);
+		background: transparent;
+		border-color: transparent;
+	}
+	.hkui-seller-profile__cta:focus-visible {
+		outline: 2px solid var(--hkui-focus);
+		outline-offset: 2px;
+	}
+	/* The 3-col grid already equalises the three buttons here, so drop the
+	 * desktop "已訂閱" min-width — otherwise it would widen the subscribe
+	 * track and overflow the row. */
+	.hkui-seller-profile__subscribe .hkui-seller-profile__cta {
+		min-width: 0;
+	}
+	.hkui-seller-profile .hkui-seller-profile__cta[aria-pressed="true"] {
+		--hkui-seller-profile-mobile-action-background: color-mix(
+			in oklab,
+			var(--hkui-primary) 12%,
+			transparent
+		);
+		--hkui-seller-profile-mobile-action-border: color-mix(
+			in oklab,
+			var(--hkui-primary) 28%,
+			transparent
+		);
+		background: transparent;
+		border-color: transparent;
+	}
+	.hkui-seller-profile .hkui-seller-profile__cta[aria-pressed="true"]:hover {
+		--hkui-seller-profile-mobile-action-background: color-mix(
+			in oklab,
+			var(--hkui-primary) 18%,
+			transparent
+		);
+		--hkui-seller-profile-mobile-action-border: color-mix(
+			in oklab,
+			var(--hkui-primary) 38%,
+			transparent
+		);
+		background: transparent;
+		border-color: transparent;
+	}
+	.hkui-seller-profile .hkui-seller-profile__cta--chat {
+		--hkui-seller-profile-mobile-action-background: color-mix(
+			in srgb,
+			var(--hkui-primary) 12%,
+			var(--hkui-content1)
+		);
+		--hkui-seller-profile-mobile-action-border: color-mix(
+			in srgb,
+			var(--hkui-primary) 30%,
+			var(--hkui-divider)
+		);
+		color: var(--hkui-primary);
+	}
+	.hkui-seller-profile .hkui-seller-profile__cta--chat:hover {
+		--hkui-seller-profile-mobile-action-background: color-mix(
+			in srgb,
+			var(--hkui-primary) 18%,
+			var(--hkui-content1)
+		);
+		--hkui-seller-profile-mobile-action-border: color-mix(
+			in srgb,
+			var(--hkui-primary) 42%,
+			var(--hkui-divider)
+		);
+	}
+	.hkui-seller-profile .hkui-seller-profile__cta--card {
+		--hkui-seller-profile-mobile-action-background: color-mix(
+			in srgb,
+			var(--hkui-warning) 14%,
+			var(--hkui-content1)
+		);
+		--hkui-seller-profile-mobile-action-border: color-mix(
+			in srgb,
+			var(--hkui-warning) 38%,
+			var(--hkui-divider)
+		);
+		color: color-mix(
+			in srgb,
+			var(--hkui-warning-700) 88%,
+			var(--hkui-foreground)
+		);
+	}
+	.hkui-seller-profile .hkui-seller-profile__cta--card:hover {
+		--hkui-seller-profile-mobile-action-background: color-mix(
+			in srgb,
+			var(--hkui-warning) 20%,
+			var(--hkui-content1)
+		);
+		--hkui-seller-profile-mobile-action-border: color-mix(
+			in srgb,
+			var(--hkui-warning) 50%,
+			var(--hkui-divider)
+		);
+	}
+	[data-theme="dark"] .hkui-seller-profile .hkui-seller-profile__cta--chat {
+		--hkui-seller-profile-mobile-action-background: color-mix(
+			in srgb,
+			var(--hkui-primary) 28%,
+			var(--hkui-content1)
+		);
+		--hkui-seller-profile-mobile-action-border: color-mix(
+			in srgb,
+			var(--hkui-primary-300) 46%,
+			transparent
+		);
+		color: var(--hkui-primary-100);
+	}
+	[data-theme="dark"] .hkui-seller-profile .hkui-seller-profile__cta--card {
+		--hkui-seller-profile-mobile-action-background: color-mix(
+			in srgb,
+			var(--hkui-warning) 12%,
+			var(--hkui-content1)
+		);
+		--hkui-seller-profile-mobile-action-border: color-mix(
+			in srgb,
+			var(--hkui-warning-200) 30%,
+			transparent
+		);
+		color: var(--hkui-warning-100);
+	}
+	[data-theme="dark"]
+		.hkui-seller-profile
+		.hkui-seller-profile__cta--chat:hover {
+		--hkui-seller-profile-mobile-action-background: color-mix(
+			in srgb,
+			var(--hkui-primary) 36%,
+			var(--hkui-content1)
+		);
+		--hkui-seller-profile-mobile-action-border: color-mix(
+			in srgb,
+			var(--hkui-primary-300) 56%,
+			transparent
+		);
+	}
+	[data-theme="dark"]
+		.hkui-seller-profile
+		.hkui-seller-profile__cta--card:hover {
+		--hkui-seller-profile-mobile-action-background: color-mix(
+			in srgb,
+			var(--hkui-warning) 18%,
+			var(--hkui-content1)
+		);
+		--hkui-seller-profile-mobile-action-border: color-mix(
+			in srgb,
+			var(--hkui-warning-200) 42%,
+			transparent
+		);
+	}
+	.hkui-seller-profile .hkui-seller-profile__cta[aria-busy="true"] {
+		--hkui-seller-profile-mobile-action-background: var(--hkui-default-300);
+		--hkui-seller-profile-mobile-action-border: var(--hkui-default-400);
+		/* Button's loading surface is an important utility-layer declaration,
+		 * so an unlayered transparent override cannot win the cascade. Clip that
+		 * temporary surface to the same visual pill instead; the disabled loading
+		 * control does not need the surrounding hit gutter until it is interactive. */
+		clip-path: inset(
+			2px var(--hkui-seller-profile-mobile-action-visual-inline-inset) round
+				var(--hkui-radius-full)
+		);
+	}
+	.hkui-seller-profile .hkui-seller-profile__cta::before {
+		content: "";
+		position: absolute;
+		z-index: -1;
+		inset-block: 2px;
+		inset-inline: var(--hkui-seller-profile-mobile-action-visual-inline-inset);
+		border: 1px solid var(--hkui-seller-profile-mobile-action-border);
+		border-radius: var(--hkui-radius-full);
+		background: var(--hkui-seller-profile-mobile-action-background);
+		pointer-events: none;
+		transition:
+			background var(--hkui-dur-fast) var(--hkui-ease),
+			border-color var(--hkui-dur-fast) var(--hkui-ease);
+	}
+	.hkui-seller-profile__login-popover {
+		right: 0;
+		width: min(260px, calc(100vw - 28px));
+	}
+	.hkui-seller-profile__name {
+		font-size: var(--hkui-text-large);
+	}
+	.hkui-seller-profile__meta {
+		font-size: var(--hkui-text-tiny);
+		gap: var(--hkui-space-2);
+	}
+	.hkui-seller-profile__desc {
+		padding: 0 var(--hkui-space-3);
+	}
+	.hkui-seller-profile__desc-toggle {
+		right: var(--hkui-space-3);
+	}
+	.hkui-seller-profile__desc-wrap[data-expanded="true"]
+		.hkui-seller-profile__desc-toggle {
+		margin-right: var(--hkui-space-3);
+	}
+	.hkui-seller-profile__tabs {
+		max-width: 100%;
+		padding: 0 var(--hkui-space-3);
+		gap: var(--hkui-space-4);
+		overflow-x: auto;
+		overflow-y: hidden;
+		overscroll-behavior-inline: contain;
+		scrollbar-width: none;
+	}
+	.hkui-seller-profile__tabs::-webkit-scrollbar {
+		display: none;
+	}
+	.hkui-seller-profile__tab {
+		display: inline-flex;
+		min-height: 44px;
+		flex: 0 0 auto;
+		align-items: center;
+		white-space: nowrap;
+	}
+}
+
+@media (max-width: 340px) {
+	.hkui-seller-profile {
+		--hkui-seller-profile-mobile-action-width: 60px;
+		--hkui-seller-profile-mobile-action-visual-inline-inset: 1px;
+	}
+	.hkui-seller-profile__head {
+		padding-inline: var(--hkui-space-2);
+	}
+	.hkui-seller-profile__actions {
+		gap: var(--hkui-space-1);
+	}
+	.hkui-seller-profile__cta {
+		gap: 2px;
+		padding-inline: 0;
+	}
+}

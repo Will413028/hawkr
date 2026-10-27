@@ -1,0 +1,23 @@
+{
+  "act": "INPUT_REJECTED",
+  "emptyArgsBlocks": [
+    {
+      "kind": "WARNING",
+      "text": "有幾個內容我沒辦法直接採用。"
+    },
+    {
+      "kind": "NEXT_STEP",
+      "text": "麻煩再確認一下。"
+    }
+  ],
+  "populatedArgsBlocks": [
+    {
+      "kind": "WARNING",
+      "text": "有幾個內容我沒辦法直接採用：配送城市：不在服務範圍"
+    },
+    {
+      "kind": "NEXT_STEP",
+      "text": "麻煩再確認一下。"
+    }
+  ]
+}

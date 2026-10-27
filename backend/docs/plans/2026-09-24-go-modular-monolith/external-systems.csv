@@ -1,0 +1,40 @@
+deployable,external_system,evidence_path
+account-service,Apple (Sign in with Apple: JWKS / token exchange / revoke),services/account-service/internal/client/apple/verifier.go
+account-service,Apple (Sign in with Apple token revoke worker),services/account-service/internal/applerevoke/apple_client.go
+account-service,Google (Sign-In ID token verification via google.golang.org/api/idtoken),services/account-service/internal/client/google/verifier.go
+account-service,Mitake SMS (smsapi.mitake.com.tw via serverless/egress-proxy on GCP Cloud Run),pkg/sms/client.go
+ai-service,OpenAI-compatible LLM API (default https://api.openai.com/v1; LLM_API_URL),services/ai-service/internal/config/config.go
+ai-service,DeepSeek LLM (api.deepseek.com),services/ai-service/internal/llmprovider/provider.go
+ai-service,OpenRouter (Gemma model),services/ai-service/internal/llmprovider/provider.go
+ai-service,Google Gemini (genai / ADK; gemini-2.5-flash; gemini image generation),services/ai-service/internal/usecase/transform_usecase.go
+buyer-service,TGOS address validation (MOI; via tgos-proxy/egress-proxy Cloud Run relay),services/buyer-service/internal/client/geocode/client.go
+content-service,hawkr web on-demand revalidate (first-party Next.js; not third-party),pkg/revalidate/client.go
+gateway,PayUni (browser redirect / auto-post form only; host allowlist; no server-side call),gateway/internal/handler/payuni_redirect.go
+invoice-service,Amego e-invoice API (invoice-api.amego.tw; optionally via egress-proxy),services/invoice-service/internal/client/amego/client.go
+invoice-service,Amego invoice PDF file_url download,services/invoice-service/internal/usecase/pdf.go
+notification-service,Firebase Cloud Messaging (FCM push),services/notification-service/internal/infrastructure/firebase.go
+notification-service,Resend (transactional email),pkg/mail/resend/resend.go
+pricebook-service,MOA open data (data.moa.gov.tw market / pork / poultry / rice / rest-day),services/pricebook-service/internal/client/moa/client.go
+pricebook-service,Cloudflare R2 (forecast model registry; S3 API),services/pricebook-service/internal/modelregistry/r2.go
+review-service,hawkr web on-demand revalidate (first-party Next.js; not third-party),services/review-service/internal/usecase/di.go
+seller-service,GCIS company registry (data.gcis.nat.gov.tw),services/seller-service/internal/client/gcis/client.go
+seller-service,TGOS address validation (MOI; via tgos-proxy/egress-proxy Cloud Run relay),services/seller-service/internal/client/geocode/client.go
+seller-service,PayUni (sub-merchant bind / update / status),services/seller-service/internal/client/payuni/client.go
+seller-service,hawkr web on-demand revalidate (first-party Next.js; not third-party),services/seller-service/internal/usecase/di.go
+social-service,hawkr web on-demand revalidate (first-party Next.js; not third-party),services/social-service/internal/usecase/di.go
+payment-service,PayUni (UPP payment / refund / agent fee / reconcile),services/java/payment-service/src/main/java/io/github/will413028/hawkr/payment/config/PayUniConfig.java
+payment-service,Apple Pay merchant validation (*.apple.com),services/java/payment-service/src/main/java/io/github/will413028/hawkr/payment/application/service/ApplePayMerchantValidator.java
+shipping-service,PayUni logistics (CVS / home shipment / label download),services/java/shipping-service/src/main/java/io/github/will413028/hawkr/shipping/provider/payuni/AbstractPayUniAdapter.java
+shipping-service,Uber Direct (api.uber.com / auth.uber.com),services/java/shipping-service/src/main/java/io/github/will413028/hawkr/shipping/provider/uber/OkHttpUberTransport.java
+shipping-service,Arbitrary CSV URL (holiday import; URL supplied via RPC),services/java/shipping-service/src/main/java/io/github/will413028/hawkr/shipping/service/HolidayService.java
+payuni-webhook-service,PayUni (inbound webhook; decrypt via payuni-java-client),services/java/payuni-webhook-service/src/main/resources/application.yml
+payuni-webhook-service,Uber Direct (inbound webhook signature verification),services/java/payuni-webhook-service/src/main/java/io/github/will413028/hawkr/webhook/uber/UberWebhookParser.java
+media-service,Cloudflare R2 (S3 API; sole storage backend),services/java/media-service/src/main/java/io/github/will413028/hawkr/media/storage/R2StorageService.java
+media-service,Arbitrary external image URLs (import asset download via SafeFetcher),services/java/media-service/src/main/java/io/github/will413028/hawkr/media/service/ImportAssetService.java
+product-import-service,Cloudflare R2 (S3 API),services/java/product-import-service/src/main/java/io/github/will413028/hawkr/productimport/storage/ProductImportR2Storage.java
+product-import-service,Arbitrary seller web pages (HTML fetch via SafeFetcher + jsoup),services/java/product-import-service/src/main/java/io/github/will413028/hawkr/productimport/service/HtmlFetchService.java
+product-service,MOA open data (organic / traceability / CAS certification lookup),services/java/product-service/src/main/java/io/github/will413028/hawkr/product/service/GovCertificationService.java
+product-service,hawkr web on-demand revalidate (first-party Next.js; not third-party),services/java/product-service/src/main/java/io/github/will413028/hawkr/product/service/ProductRevalidationService.java
+workers/image-gateway,Cloudflare R2 + Cloudflare Images bindings (edge worker; not a merge candidate),workers/image-gateway/README.md
+workers/hawkr-apple-pay-domain,Apple Pay domain verification file (served to Apple; edge worker),workers/hawkr-apple-pay-domain/README.md
+serverless/egress-proxy,Mitake SMS + TGOS upstreams (fixed Taiwan egress IP relay on GCP Cloud Run),serverless/egress-proxy/README.md

@@ -1,0 +1,106 @@
+server:
+  port: 9926
+
+# gRPC Server Configuration
+grpc:
+  server:
+    port: ${GRPC_PORT:9927}
+    reflection-service-enabled: true
+
+spring:
+  autoconfigure:
+    exclude:
+      - net.devh.boot.grpc.client.autoconfigure.GrpcClientAutoConfiguration
+      - net.devh.boot.grpc.client.autoconfigure.GrpcClientHealthAutoConfiguration
+  application:
+    name: cart-service
+  cloud:
+    nacos:
+      discovery:
+        enabled: ${NACOS_ENABLED:false}
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+        metadata:
+          grpc-port: ${GRPC_PORT:9927}
+          version: 1.0.0
+  rabbitmq:
+    # #1426：consume seller.profile.changed evict seller:meta。與其他服務同一實例（§10.8 環境隔離）
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_POOL_PORT:5432}/${DB_NAME:hawkr_cart}?sslmode=${DB_SSLMODE:disable}&prepareThreshold=0
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      minimum-idle: 2            # 閒置時最少保持的連線數
+      maximum-pool-size: 10      # 連線池上限（含閒置+使用中）
+      connection-timeout: 30000  # 取得連線的最長等待時間（毫秒），超時拋 SQLException
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 5000ms
+  flyway:
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:hawkr_cart}?sslmode=${DB_SSLMODE:disable}
+    user: ${DB_USER}
+    password: ${DB_PASSWORD}
+    enabled: ${FLYWAY_ENABLED:true}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+
+mybatis-plus:
+  mapper-locations: classpath:/mapper/**/*.xml
+  global-config:
+    db-config:
+      id-type: INPUT
+  configuration:
+    map-underscore-to-camel-case: true
+
+# Hawkr Observability 配置
+hawkr:
+  obs:
+    service: cart-service
+    grpc:
+      targets:
+        product:
+          host: ${PRODUCT_SERVICE_HOST:127.0.0.1}
+          port: ${PRODUCT_SERVICE_GRPC_PORT:9913}
+          plaintext: true
+        seller:  # Seller Service 由其他團隊維護
+          host: ${SELLER_SERVICE_HOST:127.0.0.1}
+          port: ${SELLER_SERVICE_GRPC_PORT:9941}
+          plaintext: true
+        buyer:
+          host: ${BUYER_SERVICE_HOST:127.0.0.1}
+          port: ${BUYER_SERVICE_GRPC_PORT:9941}
+          plaintext: true
+  tsid:
+    enabled: true
+    node-id-base: 400  # Cart Service: 400-499
+    pod-index: ${POD_INDEX:0}
+
+# OTel / Actuator / Tracing 配置已統一至 observability-common（observability-defaults.properties）
+
+# 排程配置
+cart:
+  scheduler:
+    unlock-expired:
+      enabled: ${UNLOCK_EXPIRED_ENABLED:true}
+      cron: "0 */1 * * * ?"  # 每 1 分鐘掃描過期鎖定（與 LOCK_TTL_MINUTES=2 搭配，最壞等待 ≤ 3 分鐘）
+    guest-cleanup:
+      enabled: ${GUEST_CLEANUP_ENABLED:true}
+      cron: "0 0 3 * * ?"    # 每日凌晨 03:00 清理 30 天前訪客資料
+    guest-cleanup-days: ${GUEST_CLEANUP_DAYS:30}
+
+logging:
+  level:
+    io.github.will413028.hawkr: ${LOG_LEVEL:INFO}
+    org.flywaydb: INFO

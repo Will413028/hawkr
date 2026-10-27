@@ -1,0 +1,47 @@
+name: backend contract tests
+
+# notification template ↔ publisher payload-key 契約：重放全部 migrations 後的
+# notification_templates 逐 row 驗證讀的 payload key 都能對上 publisher 的 golden
+# emitted_keys（tests/contract/golden/）。testcontainers 跑真 postgres。
+# 由 backend/.github/workflows/contract-tests.yml 搬來；hosted runner 直接從
+# Docker Hub 拉映像，不再經 ghcr 鏡像。
+
+on:
+  pull_request:
+    paths: &contract_paths
+      - 'backend/pkg/mq/**'
+      - 'backend/services/notification-service/db/**'
+      - 'backend/services/notification-service/internal/worker/**'
+      - 'backend/services/java/*/src/main/java/**/mq/**'
+      - 'backend/services/java/*/src/main/java/**/domain/event/**'
+      - 'backend/services/java/*/src/main/java/**/service/dto/**'
+      - 'backend/tests/contract/golden/**'
+      - '.github/workflows/backend-contract-tests.yml'
+  push:
+    branches: [main]
+    paths: *contract_paths
+  workflow_dispatch:
+
+concurrency:
+  group: backend-contract-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  template-contract:
+    name: notification template↔payload contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend/services/notification-service
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/.go-version
+          cache-dependency-path: backend/**/go.sum
+      - name: Run template contract test
+        run: make test-integration

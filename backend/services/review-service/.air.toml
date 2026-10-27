@@ -1,0 +1,13 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+# Path from monorepo root (Docker WORKDIR is /app)
+cmd = "sh -c 'cd /app/services/review-service && go build -o /app/tmp/main ./cmd/review-service/main.go'"
+bin = "./tmp/main"
+include_dir = ["services/review-service", "pkg"]
+include_ext = ["go"]
+exclude_dir = ["tmp", "vendor"]
+
+[log]
+time = true

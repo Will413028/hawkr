@@ -1,0 +1,99 @@
+[
+  {
+    "Name": "root imports store",
+    "Packages": [{"ImportPath": "github.com/Will413028/hawkr/backend/internal/modules/alpha", "Imports": ["github.com/Will413028/hawkr/backend/internal/modules/alpha/internal/store"]}],
+    "Graphs": {"alpha": {"Packages": {"model": [], "store": []}}},
+    "Modules": ["alpha"],
+    "Want": "模組根套件不得 import internal/store"
+  },
+  {
+    "Name": "undeclared edge",
+    "Packages": [{"ImportPath": "github.com/Will413028/hawkr/backend/internal/modules/alpha/internal/banner", "Imports": ["github.com/Will413028/hawkr/backend/internal/modules/alpha/internal/store"]}],
+    "Graphs": {"alpha": {"Packages": {"banner": ["model"], "model": [], "store": []}}},
+    "Modules": ["alpha"],
+    "Want": "內部依賴圖不允許此方向"
+  },
+  {
+    "Name": "reverse edge",
+    "Packages": [{"ImportPath": "github.com/Will413028/hawkr/backend/internal/modules/alpha/internal/model", "Imports": ["github.com/Will413028/hawkr/backend/internal/modules/alpha/internal/banner"]}],
+    "Graphs": {"alpha": {"Packages": {"banner": ["model"], "model": []}}},
+    "Modules": ["alpha"],
+    "Want": "內部依賴圖不允許此方向"
+  },
+  {
+    "Name": "internal imports root",
+    "Packages": [{"ImportPath": "github.com/Will413028/hawkr/backend/internal/modules/alpha/internal/model", "Imports": ["github.com/Will413028/hawkr/backend/internal/modules/alpha"]}],
+    "Graphs": {"alpha": {"Packages": {"model": []}}},
+    "Modules": ["alpha"],
+    "Want": "內部 package 不得反向依賴根套件"
+  },
+  {
+    "Name": "cycle",
+    "Packages": [],
+    "Graphs": {"alpha": {"Packages": {"banner": ["model"], "model": ["banner"]}}},
+    "Modules": ["alpha"],
+    "Want": "依賴表有環"
+  },
+  {
+    "Name": "missing graph",
+    "Packages": [],
+    "Graphs": {},
+    "Modules": ["alpha"],
+    "Want": "模組沒有宣告內部依賴圖"
+  },
+  {
+    "Name": "allowed graph",
+    "Packages": [{"ImportPath": "github.com/Will413028/hawkr/backend/internal/modules/alpha/internal/banner", "Imports": ["github.com/Will413028/hawkr/backend/internal/modules/alpha/internal/model"]}],
+    "Graphs": {"alpha": {"Packages": {"banner": ["model"], "model": []}}},
+    "Modules": ["alpha"],
+    "Valid": true
+  },
+  {
+    "Name": "implementation outside internal",
+    "Packages": [{"ImportPath": "github.com/Will413028/hawkr/backend/internal/modules/alpha/admin"}],
+    "Graphs": {"alpha": {"Packages": {"model": []}}},
+    "Modules": ["alpha"],
+    "Want": "模組實作 package 必須放在 internal/",
+    "ExactCount": 1
+  },
+  {
+    "Name": "implementation outside internal with no graph",
+    "Packages": [{"ImportPath": "github.com/Will413028/hawkr/backend/internal/modules/alpha/admin"}],
+    "Graphs": {},
+    "Modules": ["alpha"],
+    "Want": "模組實作 package 必須放在 internal/",
+    "ExactCount": 2
+  },
+  {
+    "Name": "external test imports its own package",
+    "Packages": [{"ImportPath": "github.com/Will413028/hawkr/backend/internal/modules/alpha/internal/widget", "Imports": ["github.com/Will413028/hawkr/backend/internal/modules/alpha/internal/widget"]}],
+    "Graphs": {"alpha": {"Packages": {"widget": []}}},
+    "Modules": ["alpha"],
+    "Valid": true
+  },
+  {
+    "Name": "undeclared package is reported once",
+    "Packages": [{"ImportPath": "github.com/Will413028/hawkr/backend/internal/modules/alpha/internal/rogue", "Imports": ["github.com/Will413028/hawkr/backend/internal/modules/alpha/internal/model"]}],
+    "Graphs": {"alpha": {"Packages": {"model": []}}},
+    "Modules": ["alpha"],
+    "Want": "內部 package 沒有宣告在依賴圖",
+    "ExactCount": 1
+  },
+  {
+    "Name": "declared package missing on disk",
+    "Packages": [],
+    "Graphs": {"alpha": {"Packages": {"model": [], "store": []}}},
+    "Modules": ["alpha"],
+    "MissingNode": "store",
+    "Want": "依賴圖宣告的內部 package 不存在",
+    "ExactCount": 1
+  },
+  {
+    "Name": "declared module missing on disk",
+    "Packages": [],
+    "Graphs": {"alpha": {"Packages": {"model": []}}},
+    "Modules": [],
+    "Want": "依賴圖宣告的模組目錄不存在",
+    "ExactCount": 1
+  }
+]

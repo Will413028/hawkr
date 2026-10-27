@@ -1,0 +1,44 @@
+{
+  "input": {
+    "Current": {},
+    "Next": {},
+    "Missing": null,
+    "Ready": true,
+    "Rejected": null,
+    "HasRejected": false,
+    "Degraded": false,
+    "Recorded": null,
+    "CropDisambiguationPending": false,
+    "CropDisambiguationCandidates": null,
+    "Question": null,
+    "PricePreviewAvailable": false,
+    "RfqConfirmationState": 0
+  },
+  "output": {
+    "schemaVersion": "dialogue-plan.v1",
+    "actCode": "REQUEST_BASICS_READY",
+    "stateVersion": "",
+    "readinessGate": "PRICE_PREVIEW_READY",
+    "salientFactRefs": [],
+    "artifactRefs": [],
+    "allowedClaimCodes": [
+      "BASICS_COMPLETE"
+    ],
+    "forbiddenClaimCodes": [
+      "SEARCH_STARTED",
+      "SEARCH_COMPLETED",
+      "RFQ_PUBLISHED",
+      "SELLER_NOTIFIED",
+      "DEAL_CREATED",
+      "ORDER_CREATED",
+      "PAYMENT_PROCESSED"
+    ],
+    "toneHints": {
+      "verbosity": "CONCISE"
+    },
+    "maxSentences": 2,
+    "policyVersion": "phase3-v1",
+    "templateVersion": "phase2-v1",
+    "planHash": ""
+  }
+}

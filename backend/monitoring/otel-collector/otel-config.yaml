@@ -1,0 +1,138 @@
+# OpenTelemetry Collector Configuration
+# Collects traces, metrics, and logs from all microservices
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  # Filelog receiver to replace Promtail
+  filelog:
+    include:
+      - /var/log/*log
+      - /var/lib/docker/containers/*/*-json.log
+    operators:
+      - type: json_parser
+        id: parser-docker
+        if: 'body matches "^{"'
+    include_file_name: false
+    include_file_path: true
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 1000
+    send_batch_max_size: 1500
+
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 1000
+    spike_limit_mib: 200
+
+  # OTLP application metrics carry the environment on the resource.  Expose
+  # only this low-cardinality identity field as the existing Prometheus `env`
+  # label; do not convert every resource attribute into metric labels.
+  transform/metrics_env_label:
+    error_mode: ignore
+    metric_statements:
+      - set(datapoint.attributes["env"], resource.attributes["deployment.environment"]) where resource.attributes["deployment.environment"] != nil
+
+  # spanmetrics 輸出的 deployment.environment dimension 到這裡還是原始
+  # resource attribute 名稱（含點）；Prometheus 的 dev/prod label 慣例是
+  # `env`（file_sd targets、prometheus-agent external_labels 皆同），改名
+  # 讓 Grafana 的 $adhoc_env 過濾器（固定用 `env` 當 key）也能篩到這條 metric。
+  # 已用本地單獨跑 otel-collector + 灌合成 OTLP trace 驗證過改名前後的
+  # datapoint attributes（rename 前是 "deployment.environment"，rename
+  # 後是 "env"，值不變），不是憑文件假設。
+  transform/spanmetrics_env_label:
+    error_mode: ignore
+    metric_statements:
+      - set(datapoint.attributes["env"], datapoint.attributes["deployment.environment"])
+      - delete_key(datapoint.attributes, "deployment.environment")
+
+connectors:
+  # 從 span 自動算 RED metrics（calls/duration），取代逐 service 手刻 metrics
+  # instrumentation。Phase 1：新增管線與現有直接 scrape 的 metrics 並存，
+  # 待 dev 驗證資料正確後才切換 dashboard 並移除舊 interceptor（Phase 2/3）。
+  # 詳見 docs/superpowers/specs/2026-08-20-grpc-observability-spanmetrics-
+  # consolidation-design.md。
+  #
+  # deployment.environment 維度（2026-08-24 補）：Go（pkg/otel/tracer.go）
+  # 與 Java（OTEL_RESOURCE_ATTRIBUTES）兩側其實都已經在 resource 上帶
+  # deployment.environment，只是這裡沒宣告成 dimension，spanmetrics 產出的
+  # calls_total/duration 完全沒有 env 相關 label——Grafana load-balance
+  # dashboard 的 $adhoc_env 過濾器套用在所有 query 上，凡是用到
+  # calls_total 分支的都會直接零命中，跟 Go/Java 無關。dimensions 的
+  # name 依官方文件會同時查 span attributes 與 resource attributes，故
+  # 只需宣告、不需額外程式改動即可讓兩側都吐出這個維度。
+  spanmetrics:
+    namespace: ""
+    exclude_dimensions: ["span.name"]
+    dimensions:
+      - name: rpc.method
+      - name: rpc.response.status_code
+      - name: deployment.environment
+    histogram:
+      explicit:
+        buckets: [5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2500ms, 5s, 10s, 20s, 30s]
+    metrics_flush_interval: 15s
+    aggregation_temporality: AGGREGATION_TEMPORALITY_CUMULATIVE
+
+exporters:
+  # Export traces to Tempo
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+
+  # Export metrics to Prometheus
+  prometheusremotewrite:
+    endpoint: http://prometheus:9090/api/v1/write
+    tls:
+      insecure: true
+    target_info:
+      enabled: false
+
+  # Export logs to Loki (via OTLP — loki exporter 已從 OTel Collector 0.120+ 移除)
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+
+  # Debug exporter (for troubleshooting)
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/tempo, spanmetrics]
+
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/metrics_env_label, batch]
+      exporters: [prometheusremotewrite]
+
+    metrics/spanmetrics:
+      receivers: [spanmetrics]
+      processors: [transform/spanmetrics_env_label]
+      exporters: [prometheusremotewrite]
+
+    logs:
+      receivers: [otlp, filelog]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/loki]
+
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: "0.0.0.0"
+                port: 8888

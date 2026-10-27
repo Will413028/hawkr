@@ -1,0 +1,118 @@
+syntax = "proto3";
+
+// agent 模組給前台的 API：沒有帳號的供應商以採購詢價（RFQ）的邀請信進入 vendor portal 的存取模型（ADR
+// 2026-10-03-vendor-portal-invite-scoped-access）。
+//
+// ID 是不透明的字串；過渡期 rfq_recipient_id 是十進位整數字串（採購還在舊服務），client 不解析、不轉數字
+// （ADR 2026-09-25-row-identity-by-data-kind D5）。供應商的 session 放在 HttpOnly 的 cookie
+// （API 設計規範（Connect）§二），client 的程式碼讀不到，也不必帶。
+package hawkr.agent.v1alpha1;
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+
+// VendorPortalPublicService 是持有邀請的供應商入口，不需要登入帳號。兩個方法都是 POST：憑證（邀請 secret）放在請求訊息，
+// 不進 URL（API 設計規範（Connect）§三），所以回應一律不可快取。兌換之後的方法在 VendorPortalInviteeService。
+service VendorPortalPublicService {
+  // PreviewInvite 回傳遮罩後的 email 與邀請的到期時間，讓供應商在兌換之前確認這是寄給自己的邀請；沒有副作用，也不發 session。
+  // 邀請不可用（不存在、secret 格式不對、已到期、已撤銷）一律回同一個 not_found，猜 secret 的人分不出原因。
+  // 與 ExchangeInvite 共用同一份額度：每個來源 5 分鐘最多 20 次，超過回 resource_exhausted（帶 RetryInfo）。
+  rpc PreviewInvite(PreviewInviteRequest) returns (PreviewInviteResponse);
+
+  // ExchangeInvite 以邀請 secret 取得這張邀請的 session，並在回應的 Set-Cookie 設上 session 的 cookie（名稱 __Host-hk_vp_<
+  // rfq_recipient_id>；HttpOnly、Secure、SameSite=Lax；Max-Age 是 session 到絕對期限的剩餘秒數，不超過邀請的到期時間）。
+  // 請求已帶這張邀請的有效 session 的 cookie 時沿用它：不發新的 session，回應是那個 session 目前的驗證狀態與 google_nonce；
+  // 沒有 cookie 或 cookie 無效時發新的 session（新的 Set-Cookie 蓋掉舊的）。邀請到期或撤銷之前可以重複兌換；同一張邀請同時
+  // 最多 5 個有效 session，超過時撤銷最舊的未驗證 session，全部都已驗證才撤銷最舊的，本次新發的不在撤銷之列。請求帶的邀請
+  // cookie 超過 20 個時，回應以 Max-Age=0 清掉多出的。錯誤與額度同 PreviewInvite。
+  rpc ExchangeInvite(ExchangeInviteRequest) returns (ExchangeInviteResponse);
+}
+
+// VendorPortalInviteeService 是已經兌換邀請的供應商（受邀供應商）：憑證是 ExchangeInvite 設的 cookie，沒有登入帳號。瀏覽器
+// 可以同時持有多張邀請的 cookie，每個方法以 rfq_recipient_id 指名要用哪一張（cookie 名稱含它）；沒有那張邀請的 cookie、
+// session 無效、已過期、已撤銷時回 unauthenticated。回應一律不可快取（private, no-store），讀取方法可以用 GET。
+service VendorPortalInviteeService {
+  // GetSession 回傳這張邀請的 session 目前的驗證狀態，以及要交給 Google 登入的 google_nonce。client 重新整理之後以它還原狀態。
+  // 每個來源每分鐘最多 300 次，超過回 resource_exhausted（帶 RetryInfo）。
+  rpc GetSession(GetSessionRequest) returns (GetSessionResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // VerifySession 以 Google 登入證明供應商持有邀請的信箱（step-up）：google_id_token 由伺服器驗證，信箱以 Google 驗證過的
+  // 為準，不接受 client 自報；Google 帳號的信箱必須已經驗證，而且與邀請寄出的信箱相同（去前後空白、不分大小寫）。token 的
+  // nonce 必須是這個 session 的 google_nonce，iat 不得早於 10 分鐘前。驗證紀錄綁在 rfq_recipient_id 指名的 session。同一個
+  // session 以相同的信箱重送是冪等的成功。
+  //
+  // Google token 無效、nonce 不符、token 太舊、信箱未驗證、信箱不符、session 已用別的信箱驗證一律回同一個 permission_denied
+  // （同一段訊息），分不出原因。Google 的公鑰暫時問不到時回 unavailable，可以稍後重試。每個來源 10 分鐘最多 10 次，超過回
+  // resource_exhausted（帶 RetryInfo）。
+  rpc VerifySession(VerifySessionRequest) returns (VerifySessionResponse);
+}
+
+// SessionVerificationMethod 是 session 驗證供應商持有邀請信箱的方式。
+enum SessionVerificationMethod {
+  // 沒有值，或這個版本的 client 不認得的方式。
+  SESSION_VERIFICATION_METHOD_UNSPECIFIED = 0;
+  // Google 登入。
+  SESSION_VERIFICATION_METHOD_GOOGLE = 1;
+}
+
+// SessionVerification 是 session 的驗證紀錄。驗證的信箱就是邀請寄出的信箱，這裡不重複回傳。
+message SessionVerification {
+  // 驗證的方式。
+  SessionVerificationMethod method = 1;
+  // 驗證完成的時間。
+  google.protobuf.Timestamp verify_time = 2;
+}
+
+message PreviewInviteRequest {
+  // 邀請信的連結帶的 secret：不透明的字串，client 不解析。
+  string secret = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message PreviewInviteResponse {
+  // 遮罩後的 email（例如 v***@example.com，只留第一個字元與網域）。顯示的文字（例如品牌名稱）由 client 決定，不在這裡。
+  string masked_email = 1;
+  // 邀請的到期時間。
+  google.protobuf.Timestamp expire_time = 2;
+}
+
+message ExchangeInviteRequest {
+  // 邀請信的連結帶的 secret。
+  string secret = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message ExchangeInviteResponse {
+  // 這張邀請對應的 RFQ 收件人 ID（十進位整數字串，不透明）。session 的 token 只在 Set-Cookie，不在回應內容。
+  string rfq_recipient_id = 1;
+  // 這個 session 的驗證紀錄；沿用既有 session 時是它目前的狀態，沒有（新發的 session 或還沒驗證）時不設。
+  SessionVerification verification = 2;
+  // 交給 Google 登入的 nonce（GSI 的 initialize 的 nonce）：VerifySession 收到的 ID token 必須帶它。client 不解析。
+  string google_nonce = 3;
+}
+
+message GetSessionRequest {
+  // 要讀哪一張邀請的 session：RFQ 收件人 ID（十進位整數字串，不透明）。
+  string rfq_recipient_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetSessionResponse {
+  // 這個 session 的驗證紀錄；還沒驗證時不設。
+  SessionVerification verification = 1;
+  // 交給 Google 登入的 nonce，同 ExchangeInviteResponse.google_nonce。
+  string google_nonce = 2;
+}
+
+message VerifySessionRequest {
+  // 要驗證哪一張邀請的 session：RFQ 收件人 ID（十進位整數字串，不透明）。
+  string rfq_recipient_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // Google 登入取得的 ID token（JWT）。
+  string google_id_token = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message VerifySessionResponse {
+  // 這個 session 對應的 RFQ 收件人 ID（十進位整數字串，不透明）。
+  string rfq_recipient_id = 1;
+  // 這個 session 的驗證紀錄。
+  SessionVerification verification = 2;
+}

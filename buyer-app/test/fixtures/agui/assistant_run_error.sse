@@ -1,0 +1,4 @@
+data: {"type":"RUN_STARTED","threadId":"","runId":"ff5313ec34917297ff099271b5d1466f"}
+
+data: {"type":"RUN_ERROR","message":"message is required","code":"3"}
+

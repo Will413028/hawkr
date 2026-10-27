@@ -1,0 +1,20 @@
+/* HeroUI 3 public CSS exports only. Keep the upstream layer/order contract,
+   but include only the component families actually rendered by this app.
+   Add a family's public CSS export here when adopting another HeroUI control;
+   tests/heroui-style-ownership.test.ts guards the runtime import inventory. */
+@layer theme, base, components, utilities;
+
+@import "tw-animate-css";
+@import "@heroui/styles/base" layer(base);
+
+/* Preserve upstream component ordering (individual controls before groups). */
+@import "@heroui/styles/components/toggle-button.css" layer(components);
+@import "@heroui/styles/components/toggle-button-group.css" layer(components);
+@import "@heroui/styles/components/color-swatch.css" layer(components);
+@import "@heroui/styles/components/color-swatch-picker.css" layer(components);
+@import "@heroui/styles/components/slider.css" layer(components);
+@import "@heroui/styles/components/switch.css" layer(components);
+
+@import "@heroui/styles/themes/default" layer(theme);
+@import "@heroui/styles/utilities";
+@import "@heroui/styles/variants";

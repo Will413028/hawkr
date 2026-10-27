@@ -1,0 +1,89 @@
+syntax = "proto3";
+
+// identity 模組給前台的 API：登入的帳號與它的角色（設計書 17）。後台的 API 在 hawkr.admin.identity.v1alpha1。
+//
+// 登入、登出與 session 由 Clerk 處理（ADR 2026-09-27-identity-clerk）：每個請求以 Authorization: Bearer 帶 Clerk SDK
+// 取得的 session token（web 在每次請求前取，App 同樣）；沒有 Bearer 時讀 web 同源的 Clerk `__session` cookie，給瀏覽器
+// 直接導覽的下載用。token 的效期很短，由 SDK 自動換新；收到 unauthenticated 就回到登入。帳號在第一個認證過的請求時建立。
+//
+// 每個帳號都是買家（帳號活著就是買家，ADR 2026-09-30-account-created-provisions-buyer）；角色只有要另外申請的賣家。
+// 買家或賣家「正在看哪個工作區」是 client 的 UI 狀態，Connect 不讀：服務名稱（BuyerAppService、SellerAppService）本身就表示
+// 以哪個身分呼叫，只有賣家能做的事由模組檢查帳號有沒有 ROLE_SELLER（ADR 2026-10-07-connect-without-perspective）。
+package hawkr.identity.v1alpha1;
+
+import "google/api/field_behavior.proto";
+
+// IdentityAppService 是登入的買家、賣家的方法。
+service IdentityAppService {
+  // GetSession 回傳目前登入的帳號；web 以它判斷是否仍在登入。
+  rpc GetSession(GetSessionRequest) returns (GetSessionResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // LinkAppleCredential 交出 Sign in with Apple 的憑證（App Store 審核準則 5.1.1(v)）：App 每次以 Apple 原生登入成功後呼叫。
+  // 伺服器驗證 identity token（簽章、issuer、audience），之後在背景以 authorization code 換成 refresh token；Apple 換 token
+  // 簽發的 ID token 必須與這個 identity token 是同一個身分才加密保存（取代舊的），成功只表示已經排入。帳號最終刪除時
+  // 伺服器自動撤銷保存的 token。可以安全重送。identity token 無效時回 invalid_argument；Apple 沒有設定（本機開發）時回
+  // unavailable。
+  rpc LinkAppleCredential(LinkAppleCredentialRequest) returns (LinkAppleCredentialResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // DeleteAccount 刪除呼叫者的帳號（App Store 審核準則 5.1.1(v)）。沒有未完成的訂單時立即刪除；有的話進入刪除流程，
+  // 最後一筆訂單完成後自動刪除，期間不能新增收藏與追蹤；流程中再呼叫回目前的狀態。帳號還有沒關閉的店家時回
+  // failed_precondition，reason 是 ACCOUNT_HAS_OPEN_STORE：要先關閉店家；其他 failed_precondition 不帶這個 reason。保存的 Apple 授權由伺服器在最後刪除時撤銷，client 不需要任何前置步驟。
+  // 刪除之後 token 不再有效，所以 client 不自動重送：沒收到回應時以 GetSession 確認，unauthenticated 表示已刪除。
+  rpc DeleteAccount(DeleteAccountRequest) returns (DeleteAccountResponse);
+}
+
+// Role 是帳號另外申請的角色。買家不是角色：每個帳號都是買家。
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  // 1 是刪掉的 ROLE_BUYER（買家由「帳號活著」推導，不再存成角色）。
+  reserved 1;
+  reserved "ROLE_BUYER";
+  ROLE_SELLER = 2;
+}
+
+// Account 是登入的帳號。
+message Account {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 帳號另外申請的角色（目前只有 ROLE_SELLER）；沒有時是空的。買家不列出：每個帳號都是買家。
+  repeated Role roles = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 3 是刪掉的 active_role（Role 同時表示擁有的角色與視角，視角之後拆成 roles 與 perspective）。4 是刪掉的 phone（新帳號
+  // 不驗證手機，ADR 2026-09-27-identity-clerk）。5 是刪掉的 perspective（視角是 client 的 UI 狀態，ADR
+  // 2026-10-07-connect-without-perspective）。
+  reserved 3, 4, 5;
+  reserved "active_role", "perspective";
+}
+
+message GetSessionRequest {}
+
+message GetSessionResponse {
+  // 1 是刪掉的 session（token 與期限由 Clerk 管理）。
+  reserved 1;
+  Account account = 2;
+}
+
+message LinkAppleCredentialRequest {
+  // Sign in with Apple 這次給的 identity token：驗證它的簽章與 audience；伺服器之後確認 Apple 換 token 簽發的 ID token 是同一個身分。
+  string id_token = 1 [(google.api.field_behavior) = REQUIRED];
+  // 同一次給的 authorization code，伺服器在背景以它換 refresh token 保存。
+  string authorization_code = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message LinkAppleCredentialResponse {}
+
+message DeleteAccountRequest {}
+
+message DeleteAccountResponse {
+  // DeletionState 是申請之後帳號的狀態。
+  enum DeletionState {
+    DELETION_STATE_UNSPECIFIED = 0;
+    // 帳號已刪除，client 登出。
+    DELETION_STATE_DELETED = 1;
+    // 還有未完成的訂單，最後一筆完成後自動刪除。
+    DELETION_STATE_PENDING_ORDERS = 2;
+  }
+  DeletionState state = 1;
+}

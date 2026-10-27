@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+// discovery 模組給前台的 API：推薦賣家的排行。分數與公式見 ADR 2026-10-03-recommended-sellers-scoring。
+//
+// ID 是不透明的字串；過渡期店家的 ID 是十進位整數字串，client 不解析、不轉數字
+// （ADR 2026-09-25-row-identity-by-data-kind D5）。店家卡片是 hawkr.common.v1alpha1.StoreCard。
+package hawkr.discovery.v1alpha1;
+
+import "hawkr/common/v1alpha1/store_card.proto";
+
+// DiscoveryPublicService 是任何人都能讀的探索資料，不需要登入。
+service DiscoveryPublicService {
+  // SuggestRecommendedSellers 依推薦分數由高到低回傳前幾家可以公開曝光的店家：沒有分頁（排行只取前面幾筆），數量由
+  // max_results 決定。分數是排程每 15 分鐘重算的快照；曝光資格是 seller 的「可公開曝光」規則（營運中、沒有停權、身分認證與
+  // PayUni 審核通過、店名與 logo 與所在地齊全），每次讀取即時檢查，停權立刻生效。店家卡片上的評價統計（review_count、
+  // rating_average）與其他清單上同一家店的卡片一致，是讀取時批次查詢評價的結果，不是排名用的快照；評價讀取失敗時卡片不設
+  // 評價欄位。沒有任何合格的店家時回空清單；排行上的店家若此刻沒有營業中的卡片（資料不一致，或剛好在兩次讀取之間不再可
+  // 曝光）會被略過，所以回傳的家數可能少於 max_results。粉絲數來自別的模組：讀取失敗時該欄位不設，不會是 0。
+  rpc SuggestRecommendedSellers(SuggestRecommendedSellersRequest) returns (SuggestRecommendedSellersResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+message SuggestRecommendedSellersRequest {
+  // 最多回傳幾家，1 到 50；0 表示預設值 10，超過 50 以 50 計（與分頁的 page_size 相同），負數回 invalid_argument。
+  int32 max_results = 1;
+}
+
+message SuggestRecommendedSellersResponse {
+  repeated RecommendedSeller sellers = 1;
+}
+
+// RecommendedSeller 是排行上的一家店。
+message RecommendedSeller {
+  // 店家卡片；清單上的每家店都有營業中（OPEN）的卡片。
+  hawkr.common.v1alpha1.StoreCard store = 1;
+  // 評價數與平均評分由卡片提供（store.review_count、store.rating_average）；排名用的評價只留在快照內。
+  reserved 2, 3;
+  reserved "review_count", "rating_average";
+  // 粉絲數；0 是確實沒有粉絲，讀取失敗時不設。
+  optional int32 follower_count = 4;
+}

@@ -1,0 +1,417 @@
+{
+	"schemaVersion": 2,
+	"generatedAt": "2026-08-07T03:39:29Z",
+	"title": "Design System: Hawkr Admin",
+	"extensions": {
+		"colorMeta": {
+			"primary-strong": {
+				"role": "primary",
+				"displayName": "營運磚橘",
+				"canonical": "#b8441f",
+				"tonalRamp": [
+					"oklch(15% 0.158 37.3)",
+					"oklch(27% 0.158 37.3)",
+					"oklch(39% 0.158 37.3)",
+					"oklch(51% 0.158 37.3)",
+					"oklch(63% 0.158 37.3)",
+					"oklch(75% 0.158 37.3)",
+					"oklch(87% 0.158 37.3)",
+					"oklch(95% 0.158 37.3)"
+				]
+			},
+			"primary": {
+				"role": "secondary",
+				"displayName": "品牌橘",
+				"canonical": "#e4572e",
+				"tonalRamp": [
+					"oklch(15% 0.184 36.5)",
+					"oklch(27% 0.184 36.5)",
+					"oklch(39% 0.184 36.5)",
+					"oklch(51% 0.184 36.5)",
+					"oklch(63% 0.184 36.5)",
+					"oklch(75% 0.184 36.5)",
+					"oklch(87% 0.184 36.5)",
+					"oklch(95% 0.184 36.5)"
+				]
+			},
+			"cream": {
+				"role": "neutral",
+				"displayName": "暖米畫布",
+				"canonical": "#f8f6ef",
+				"tonalRamp": [
+					"#25241f",
+					"#46443d",
+					"#68655d",
+					"#89867d",
+					"#aaa79f",
+					"#cbc9c2",
+					"#e5e2dc",
+					"#f8f6ef"
+				]
+			},
+			"paper": {
+				"role": "neutral",
+				"displayName": "紙張工作面",
+				"canonical": "#fffdf7",
+				"tonalRamp": [
+					"#262520",
+					"#484640",
+					"#6a6861",
+					"#8c8a82",
+					"#aeaca5",
+					"#d0cec8",
+					"#e8e6e0",
+					"#fffdf7"
+				]
+			},
+			"ink": {
+				"role": "neutral",
+				"displayName": "營運墨色",
+				"canonical": "#191c18",
+				"tonalRamp": [
+					"#111310",
+					"#252824",
+					"#3a3d39",
+					"#555853",
+					"#747772",
+					"#999b97",
+					"#c3c5c1",
+					"#eff0ee"
+				]
+			},
+			"muted-aa": {
+				"role": "neutral",
+				"displayName": "AA 輔助文字",
+				"canonical": "#5f675b",
+				"tonalRamp": [
+					"#1d201c",
+					"#30352e",
+					"#484e45",
+					"#5f675b",
+					"#7e857a",
+					"#9fa49b",
+					"#c3c6bf",
+					"#edf0ea"
+				]
+			},
+			"border": {
+				"role": "neutral",
+				"displayName": "安靜邊界",
+				"canonical": "#d9ddd2",
+				"tonalRamp": [
+					"#20231e",
+					"#3c4039",
+					"#5b6057",
+					"#7b8176",
+					"#9ca297",
+					"#bdc3b8",
+					"#d9ddd2",
+					"#f1f3ed"
+				]
+			},
+			"delegated-secondary": {
+				"role": "tertiary",
+				"displayName": "ADM 稽核暖橘黃",
+				"canonical": "#f2a541",
+				"tonalRamp": [
+					"oklch(15% 0.144 69.4)",
+					"oklch(27% 0.144 69.4)",
+					"oklch(39% 0.144 69.4)",
+					"oklch(51% 0.144 69.4)",
+					"oklch(63% 0.144 69.4)",
+					"oklch(75% 0.144 69.4)",
+					"oklch(87% 0.144 69.4)",
+					"oklch(95% 0.144 69.4)"
+				]
+			},
+			"success": {
+				"role": "semantic",
+				"displayName": "成功",
+				"canonical": "#2d7f50",
+				"tonalRamp": [
+					"#102a1c",
+					"#19442b",
+					"#22623d",
+					"#2d7f50",
+					"#569a72",
+					"#83b697",
+					"#b4d4bd",
+					"#e7f3e9"
+				]
+			},
+			"warning": {
+				"role": "semantic",
+				"displayName": "警示琥珀",
+				"canonical": "#8a5a00",
+				"tonalRamp": [
+					"#2d1d00",
+					"#493000",
+					"#684400",
+					"#8a5a00",
+					"#aa7825",
+					"#c79b57",
+					"#e2c58f",
+					"#fff3d6"
+				]
+			},
+			"danger": {
+				"role": "semantic",
+				"displayName": "治理紅",
+				"canonical": "#b3261e",
+				"tonalRamp": [
+					"#3a0b08",
+					"#5e100c",
+					"#861b16",
+					"#b3261e",
+					"#c9534d",
+					"#db837e",
+					"#ebb4b0",
+					"#fce8e6"
+				]
+			},
+			"info": {
+				"role": "semantic",
+				"displayName": "資訊藍",
+				"canonical": "#3f6f9e",
+				"tonalRamp": [
+					"#142435",
+					"#203b55",
+					"#2f5478",
+					"#3f6f9e",
+					"#668caf",
+					"#8fabc6",
+					"#bbcddd",
+					"#eaf2f9"
+				]
+			}
+		},
+		"typographyMeta": {
+			"display": {
+				"displayName": "品牌主標",
+				"purpose": "只用於登入 hero 等少數品牌主標。"
+			},
+			"headline": {
+				"displayName": "頁面標題",
+				"purpose": "每頁唯一 H1。"
+			},
+			"metric": {
+				"displayName": "營運數字",
+				"purpose": "統計值與關鍵數字，使用 tabular numerals。"
+			},
+			"body": {
+				"displayName": "營運正文",
+				"purpose": "說明、表格與表單的預設文字。"
+			},
+			"label": {
+				"displayName": "控制標籤",
+				"purpose": "表頭、欄位標籤與狀態文字。"
+			}
+		},
+		"shadows": [
+			{
+				"name": "low",
+				"value": "0 2px 8px rgba(35, 44, 29, 0.06)",
+				"purpose": "極輕的暫時浮起狀態。"
+			},
+			{
+				"name": "lift",
+				"value": "0 12px 32px rgba(35, 44, 29, 0.12)",
+				"purpose": "登入卡、skip link 或浮動工作面。"
+			},
+			{
+				"name": "dialog",
+				"value": "0 24px 72px rgba(25, 28, 24, 0.24)",
+				"purpose": "Modal、drawer 與阻斷式確認。"
+			},
+			{
+				"name": "delegated-topbar",
+				"value": "0 10px 30px rgba(46, 53, 38, 0.07)",
+				"purpose": "ADM workspace 浮動 topbar。"
+			},
+			{
+				"name": "delegated-context",
+				"value": "0 7px 20px rgba(93, 75, 15, 0.08)",
+				"purpose": "ADM 暖橘黃安全 context 的低幅分離。"
+			}
+		],
+		"motion": [
+			{
+				"name": "control",
+				"value": "150ms ease",
+				"purpose": "按鈕、導覽、卡片的色彩狀態。"
+			},
+			{
+				"name": "drawer",
+				"value": "transform 180ms ease",
+				"purpose": "Admin mobile sidebar。"
+			},
+			{
+				"name": "delegated-control",
+				"value": "180ms ease-out",
+				"purpose": "ADM trigger 與安全操作狀態。"
+			},
+			{
+				"name": "spinner",
+				"value": "1s linear infinite",
+				"purpose": "一般載入 spinner。"
+			},
+			{
+				"name": "skeleton",
+				"value": "1.4s ease-in-out infinite",
+				"purpose": "唯一允許 gradient 的 skeleton shimmer；reduced motion 時停用。"
+			}
+		],
+		"breakpoints": [
+			{
+				"name": "admin-grid",
+				"value": "1280px"
+			},
+			{
+				"name": "delegated-layout",
+				"value": "1180px"
+			},
+			{
+				"name": "delegated-drawer",
+				"value": "980px"
+			},
+			{
+				"name": "admin-drawer",
+				"value": "960px"
+			},
+			{
+				"name": "delegated-dialog",
+				"value": "760px"
+			},
+			{
+				"name": "mobile",
+				"value": "640px"
+			}
+		]
+	},
+	"components": [
+		{
+			"name": "Primary Button",
+			"kind": "button",
+			"refersTo": "button-primary",
+			"description": "主要營運行動，磚橘實心、至少 44px 高。",
+			"html": "<button class=\"ds-btn-primary\">儲存變更</button>",
+			"css": ".ds-btn-primary { min-height: 44px; padding: 10px 16px; border: 1px solid var(--admin-primary-strong, #b8441f); border-radius: 12px; background: var(--admin-primary-strong, #b8441f); color: var(--admin-paper, #fffdf7); font: 700 14px/20px var(--admin-font-ui, sans-serif); transition: background-color 150ms ease, border-color 150ms ease; } .ds-btn-primary:hover { background: var(--admin-primary-strong-hover, #3f5a19); border-color: var(--admin-primary-strong-hover, #3f5a19); } .ds-btn-primary:active { background: var(--admin-primary-strong-pressed, #29400a); } .ds-btn-primary:focus-visible { outline: 3px solid var(--hk-focus-ring, #355e12); outline-offset: 2px; }"
+		},
+		{
+			"name": "Outline Button",
+			"kind": "button",
+			"refersTo": "button-outline",
+			"description": "次要操作，Paper 工作面與安靜邊界。",
+			"html": "<button class=\"ds-btn-outline\">取消</button>",
+			"css": ".ds-btn-outline { min-height: 44px; padding: 10px 16px; border: 1px solid var(--admin-border, #d9ddd2); border-radius: 12px; background: var(--admin-paper, #fffdf7); color: var(--admin-body, #42493f); font: 700 14px/20px var(--admin-font-ui, sans-serif); transition: background-color 150ms ease, border-color 150ms ease; } .ds-btn-outline:hover { background: var(--admin-control, #f0f1ea); border-color: #bdc4b7; } .ds-btn-outline:focus-visible { outline: 3px solid var(--hk-focus-ring, #355e12); outline-offset: 2px; }"
+		},
+		{
+			"name": "Status Badge",
+			"kind": "chip",
+			"refersTo": "status-success",
+			"description": "Soft semantic surface 與同色文字的營運狀態。",
+			"html": "<span class=\"ds-status-success\">已核准</span>",
+			"css": ".ds-status-success { display: inline-flex; align-items: center; min-height: 30px; padding: 5px 11px; border: 1px solid #cce2d1; border-radius: 999px; background: var(--admin-success-soft, #e7f3e9); color: var(--admin-success, #2d7f50); font: 700 13px/20px var(--admin-font-ui, sans-serif); }"
+		},
+		{
+			"name": "Search Field",
+			"kind": "input",
+			"refersTo": "input",
+			"description": "單一可見邊界的 44px 搜尋欄位。",
+			"html": "<label class=\"ds-search\"><span>搜尋</span><input aria-label=\"搜尋賣家\" placeholder=\"搜尋店名或登入信箱\"></label>",
+			"css": ".ds-search { display: flex; min-height: 44px; align-items: center; gap: 8px; padding: 0 13px; border: 1px solid var(--admin-border, #d9ddd2); border-radius: 12px; background: #fbfaf5; color: var(--admin-muted-aa, #5f675b); font: 400 14px/1.5 var(--admin-font-ui, sans-serif); } .ds-search input { min-width: 0; flex: 1; padding: 8px 0; border: 0; outline: 0; background: transparent; color: var(--admin-ink, #191c18); font: inherit; } .ds-search:focus-within { border-color: var(--admin-primary-strong, #b8441f); box-shadow: 0 0 0 3px rgba(51, 76, 15, 0.14); }"
+		},
+		{
+			"name": "Metric Card",
+			"kind": "card",
+			"refersTo": "card",
+			"description": "Border-first、無常駐陰影的營運指標卡。",
+			"html": "<article class=\"ds-metric\"><span>待審核</span><strong>12</strong></article>",
+			"css": ".ds-metric { min-height: 118px; padding: 22px; border: 1px solid var(--admin-border, #d9ddd2); border-radius: 14px; background: var(--admin-paper, #fffdf7); color: var(--admin-ink, #191c18); font-family: var(--admin-font-ui, sans-serif); } .ds-metric span { display: block; color: var(--admin-muted-aa, #5f675b); font-size: 14px; font-weight: 650; line-height: 20px; } .ds-metric strong { display: block; margin-top: 11px; font-size: 34px; font-variant-numeric: tabular-nums; line-height: 1.1; } .ds-metric:hover { border-color: #b9c3b0; background: #fbfcf6; }"
+		},
+		{
+			"name": "Sidebar Navigation Item",
+			"kind": "nav",
+			"description": "深色 Ink sidebar 上的 44px 分組導覽列。",
+			"html": "<a class=\"ds-nav-item\" href=\"#\" aria-current=\"page\">賣家管理 / 審核</a>",
+			"css": ".ds-nav-item { display: flex; min-height: 44px; align-items: center; padding: 10px 12px; border-radius: 10px; background: #b8441f; box-shadow: inset 3px 0 0 #e4572e; color: #fff; font: 750 14px/20px var(--admin-font-ui, sans-serif); text-decoration: none; } .ds-nav-item:hover { background: rgba(255,255,255,0.09); } .ds-nav-item:focus-visible { outline: 3px solid #f5f7fa; outline-offset: 2px; }"
+		},
+		{
+			"name": "Filter Segment",
+			"kind": "chip",
+			"description": "Control surface 上的 Paper 選取分段。",
+			"html": "<div class=\"ds-filter\"><button class=\"is-active\">全部</button><button>待審核</button></div>",
+			"css": ".ds-filter { display: inline-flex; min-height: 52px; align-items: center; gap: 2px; padding: 4px; border-radius: 12px; background: var(--admin-control, #f0f1ea); } .ds-filter button { min-height: 44px; padding: 8px 12px; border: 0; border-radius: 9px; background: transparent; color: var(--admin-muted-aa, #5f675b); font: 400 14px/20px var(--admin-font-ui, sans-serif); } .ds-filter .is-active { background: var(--admin-paper, #fffdf7); color: var(--admin-primary-strong, #b8441f); font-weight: 750; } .ds-filter button:focus-visible { outline: 3px solid var(--hk-focus-ring, #355e12); outline-offset: 1px; }"
+		},
+		{
+			"name": "ADM Safety Context",
+			"kind": "custom",
+			"refersTo": "delegated-context",
+			"description": "持續顯示代行身分與禁止事項的暖橘黃安全 context。",
+			"html": "<aside class=\"ds-adm-context\" aria-label=\"代行營運安全說明\"><strong>受控的 ADM 代行營運</strong><span>訂單履約仍由賣家操作</span></aside>",
+			"css": ".ds-adm-context { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 16px; border: 1px solid var(--hk-secondary-border); border-radius: 14px; background: var(--hk-secondary-soft, #f5edcf); color: var(--hk-primary-strong, #b8441f); font: 400 14px/1.55 var(--admin-font-ui, sans-serif); } .ds-adm-context strong { font-weight: 800; } .ds-adm-context span { padding: 7px 10px; border: 1px solid var(--hk-secondary-border); border-radius: 9px; background: var(--hk-paper, #fffdf7); font-size: 12px; font-weight: 800; }"
+		}
+	],
+	"narrative": {
+		"northStar": "沉穩的生鮮營運台",
+		"overview": "Hawkr Admin 是高頻操作的營運工具，不是行銷落地頁。整體以官網的磚橘、暖米白與正式品牌資產建立可信度，再用清楚層級、緊湊但可掃描的資訊密度，讓管理員快速判斷狀態並安全完成工作。表現應成熟、安靜、明確；品牌存在於色彩、字型、Logo 與細節，而不是裝飾性特效。\n\n本文件是登入頁、Admin shell、所有管理模組與 ADM 代行工作區的通用視覺真相。PRODUCT.md 與功能契約負責產品、安全及授權邊界；.impeccable/surfaces/ 與 docs/superpowers/specs/ 只能補充單一功能，不得覆蓋本文件的通用視覺規則。既有 CSS 中的舊 Figma 註解、legacy aliases 或一次性色碼也不是新畫面的依據。",
+		"keyCharacteristics": [
+			"官網一致的磚橘結構、暖色工作面與正式 SVG 品牌資產。",
+			"清楚、低噪音、適合長時間工作的營運密度。",
+			"邊框與色階優先，陰影只表示真正離開平面的介面。",
+			"狀態色承載語意；暖橘黃只標示 ADM 代行安全情境。",
+			"繁體中文優先、完整鍵盤操作、可縮放且誠實呈現資料狀態。"
+		],
+		"rules": [
+			{
+				"name": "The Website Authority Rule",
+				"body": "Hawkr 官網是品牌資產與核心識別的來源；Admin 可參考外部產品的資訊層級，但不能複製其視覺身分。",
+				"section": "overview"
+			},
+			{
+				"name": "The Brick Is Structure Rule",
+				"body": "磚橘是導航與主要行動的結構色，不應大面積散落成裝飾斑塊。",
+				"section": "colors"
+			},
+			{
+				"name": "The Amber Means Delegation Rule",
+				"body": "看到暖橘黃就應能推斷目前是 ADM 受控代行或唯讀安全情境。一般 Admin 功能不得借用這個語意。",
+				"section": "colors"
+			},
+			{
+				"name": "The Display Font Is Rare Rule",
+				"body": "openhuninn 不進入表格、輸入、按鈕、徽章或密集資料；稀少才保留品牌辨識度。",
+				"section": "typography"
+			},
+			{
+				"name": "The Operations Density Rule",
+				"body": "優先掃描、比較與決策；不要把 Admin 頁做成 marketing hero、巨型留白或卡片拼貼展覽。",
+				"section": "layout"
+			},
+			{
+				"name": "The Flat-By-Default Rule",
+				"body": "一般內容卡使用 border 或 shadow 擇一；只有明確浮動的 chrome 或 overlay 可同時保留弱邊界與陰影。",
+				"section": "elevation"
+			},
+			{
+				"name": "The Calm Corners Rule",
+				"body": "同一層級只使用一種 radius；不要在一張卡內堆疊多個相近但不同的圓角外框。",
+				"section": "shapes"
+			}
+		],
+		"dos": [
+			"Do 先讀本文件，再查看同類既有元件與 src/styles/AdminVisualRefresh.css；優先延伸 tokens 與共用元件。",
+			"Do 使用繁體中文、真實欄位與可恢復的 loading／empty／error／conflict 狀態。",
+			"Do 在 desktop、mobile、keyboard 與 200% zoom 驗證新 UI；確保小字 AA、焦點可見、控制項至少 44px。",
+			"Do 保留 Admin 與 ADM 操作者身分；功能安全與授權依 PRODUCT.md、server contract 與功能 spec。",
+			"Do 在刻意修改通用視覺系統時，同步更新本文件與 .impeccable/design.json。"
+		],
+		"donts": [
+			"Don't 從舊 --color*、--brand-*、頁面 raw hex 或歷史 Figma 註解建立新 palette；它們只供 legacy compatibility。",
+			"Don't 引入裝飾性 gradient、glassmorphism、紫色狀態、粒子、GSAP、Lenis、Vanta 或 React Bits 效果來增加質感。",
+			"Don't 建立雙層輸入框、巢狀卡片外框、普通卡片的常駐大陰影，或 border + shadow 的無理由疊加。",
+			"Don't 放沒有功能的搜尋、通知、設定或假 dashboard 數據；本機 mock／截圖也不能宣稱是 DEV 或 production proof。",
+			"Don't 用切換身分、登入賣家等文案暗示 impersonation，也不能把 client-side hidden／disabled 當成授權。"
+		]
+	}
+}

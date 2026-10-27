@@ -1,0 +1,141 @@
+server:
+  port: 9960
+
+grpc:
+  server:
+    port: ${GRPC_PORT:9961}
+    reflection-service-enabled: true
+
+spring:
+  autoconfigure:
+    exclude:
+      - net.devh.boot.grpc.client.autoconfigure.GrpcClientAutoConfiguration
+      - net.devh.boot.grpc.client.autoconfigure.GrpcClientHealthAutoConfiguration
+  application:
+    name: product-import-service
+  cloud:
+    nacos:
+      discovery:
+        enabled: ${NACOS_ENABLED:false}
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+        metadata:
+          grpc-port: ${GRPC_PORT:9961}
+          version: 1.0.0
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_POOL_PORT:5432}/${DB_NAME:hawkr_product_import}?sslmode=${DB_SSLMODE:disable}&prepareThreshold=0
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      minimum-idle: 2
+      maximum-pool-size: 10
+      connection-timeout: 30000
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 5000ms
+  rabbitmq:
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
+  flyway:
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:hawkr_product_import}?sslmode=${DB_SSLMODE:disable}
+    user: ${DB_USER}
+    password: ${DB_PASSWORD}
+    enabled: ${FLYWAY_ENABLED:true}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+  servlet:
+    multipart:
+      max-file-size: 4MB
+      max-request-size: 8MB
+
+mybatis-plus:
+  mapper-locations: classpath:/mapper/**/*.xml
+  global-config:
+    db-config:
+      id-type: INPUT
+  configuration:
+    map-underscore-to-camel-case: true
+
+hawkr:
+  obs:
+    service: product-import-service
+    grpc:
+      targets:
+        product:
+          host: ${PRODUCT_SERVICE_HOST:127.0.0.1}
+          port: ${PRODUCT_SERVICE_GRPC_PORT:9913}
+          plaintext: true
+        media:
+          host: ${MEDIA_SERVICE_HOST:127.0.0.1}
+          port: ${MEDIA_SERVICE_GRPC_PORT:9937}
+          plaintext: true
+        account:
+          host: ${ACCOUNT_SERVICE_HOST:127.0.0.1}
+          port: ${ACCOUNT_SERVICE_GRPC_PORT:9941}
+          plaintext: true
+        seller:
+          host: ${SELLER_SERVICE_HOST:127.0.0.1}
+          port: ${SELLER_SERVICE_GRPC_PORT:9941}
+          plaintext: true
+        shipping:
+          host: ${SHIPPING_SERVICE_HOST:127.0.0.1}
+          port: ${SHIPPING_SERVICE_GRPC_PORT:9929}
+          plaintext: true
+        notification:
+          host: ${NOTIFICATION_SERVICE_HOST:127.0.0.1}
+          port: ${NOTIFICATION_SERVICE_GRPC_PORT:10030}
+          plaintext: true
+  tsid:
+    enabled: true
+    node-id-base: 800
+    pod-index: ${POD_INDEX:0}
+  product-import:
+    job-ttl-days: ${PRODUCT_IMPORT_JOB_TTL_DAYS:7}
+    csv-invalid-ttl-days: ${PRODUCT_IMPORT_CSV_INVALID_TTL_DAYS:3}
+    committed-retention-days: ${PRODUCT_IMPORT_COMMITTED_RETENTION_DAYS:7}
+    expired-retention-days: ${PRODUCT_IMPORT_EXPIRED_RETENTION_DAYS:7}
+    orphan-asset-grace-hours: ${PRODUCT_IMPORT_ORPHAN_ASSET_GRACE_HOURS:24}
+    callback-inbox-retention-days: ${PRODUCT_IMPORT_CALLBACK_INBOX_RETENTION_DAYS:14}
+    max-active-jobs-per-seller: ${PRODUCT_IMPORT_MAX_ACTIVE_JOBS_PER_SELLER:5}
+    max-daily-jobs-per-seller: ${PRODUCT_IMPORT_MAX_DAILY_JOBS_PER_SELLER:10}
+    csv:
+      max-file-size-bytes: ${PRODUCT_IMPORT_CSV_MAX_FILE_SIZE_BYTES:2097152}
+      max-rows: ${PRODUCT_IMPORT_CSV_MAX_ROWS:500}
+    asset:
+      max-concurrent-downloads-per-job: ${PRODUCT_IMPORT_ASSET_MAX_CONCURRENT:8}
+      callback-timeout-minutes: ${PRODUCT_IMPORT_ASSET_CALLBACK_TIMEOUT_MINUTES:30}
+    confirmation-token:
+      ttl-seconds: ${PRODUCT_IMPORT_CONFIRMATION_TOKEN_TTL_SECONDS:300}
+    gc:
+      enabled: ${PRODUCT_IMPORT_GC_ENABLED:true}
+      cron-daily: "0 0 2 * * ?"
+      cron-callback-timeout: "0 */5 * * * ?"
+    # 儲存後端（49 號 §8.5）：唯一實作 r2；OSS 已於遷移完成後移除，非 r2 值一律 fail-fast
+    storage:
+      backend: ${STORAGE_BACKEND:r2}
+      temp-prefix: ${STORAGE_TEMP_PREFIX:tmp}
+    # R2 配置（唯一儲存後端；S3 相容）
+    r2:
+      account-id: ${R2_ACCOUNT_ID:}
+      access-key-id: ${R2_ACCESS_KEY_ID:}
+      secret-access-key: ${R2_SECRET_ACCESS_KEY:}
+      bucket-name: ${R2_BUCKET_NAME:}
+    html-fetch:
+      max-size-bytes: ${PRODUCT_IMPORT_HTML_MAX_SIZE_BYTES:5242880}
+      connect-timeout-ms: ${PRODUCT_IMPORT_HTML_CONNECT_TIMEOUT_MS:5000}
+      read-timeout-ms: ${PRODUCT_IMPORT_HTML_READ_TIMEOUT_MS:30000}
+
+logging:
+  level:
+    io.github.will413028.hawkr: ${LOG_LEVEL:INFO}
+    org.flywaydb: INFO

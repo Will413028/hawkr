@@ -1,0 +1,589 @@
+@import "tailwindcss" source(none);
+@import "./foundation/heroui.css";
+
+@import "./foundation/00-color-config.css";
+@import "./foundation/fonts.css";
+@import "./foundation/01-tokens-theme.css";
+@import "./components/navigation-shell.css";
+@import "./legacy/prd-v2-commerce.css";
+@import "./foundation/02-reset-layout.css";
+@import "./components/cards-shop.css";
+@import "./components/decorations-overlays.css";
+@import "./components/page-transition.css";
+@import "./components/nav-progress.css";
+@import "./components/navigation-final.css";
+@import "./components/floating-navigation.css";
+
+/* Generate utilities from product code only. Paths are relative to this file,
+   not the repository root: automatic scanning also picks up tooling/docs and
+   can emit their example classes (or invalid placeholder candidates).
+   Keep complete runtime class maps in these roots; register a new runtime
+   source here if its utilities live elsewhere. Imported vendor CSS/@apply
+   remains part of the normal CSS graph, independent of source scanning. */
+@source "../app";
+@source "../components";
+@source "../features";
+@source "../lib";
+@source not "../**/__tests__/**";
+@source not "../**/*.test.*";
+@source not "../**/*.spec.*";
+@source not "../**/*.md";
+@source not "../**/*.mdx";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme {
+	--font-sans: var(--font-primary);
+
+	/* Tailwind v4's whole spacing scale is rem-based: `p-4` compiles to
+	   `calc(var(--spacing) * 4)` with `--spacing: 0.25rem`. The 字體大小 setting
+	   (小 / 中 / 大, styles/foundation/02-reset-layout.css) works by changing the
+	   ROOT font-size — which means without this line it would silently zoom every
+	   padding, gap, width, height and icon box in the product too: 「小」 would
+	   shrink every 44px touch target to 38.5px and 「大」 would blow up every
+	   card's rhythm. That is a zoom control, not a text-size control.
+
+	   Dividing by the same factor cancels the rem change exactly, so
+	   `--spacing` always resolves back to 4 CSS px: `p-4` stays 16px and
+	   `size-11` stays 44px at every setting, while type (rem font sizes,
+	   which are NOT compensated) scales as intended. */
+	--spacing: calc(0.25rem / var(--hk-text-scale, 1));
+
+	--color-hk-primary-strong: var(--color-brand-primary-strong);
+	--color-hk-brand-primary: var(--color-brand-primary);
+	--color-hk-secondary-soft: var(--color-brand-secondary-soft);
+	--color-hk-brand-secondary: var(--color-brand-secondary);
+	--color-hk-primary-deep: var(--color-brand-primary-deep);
+	--color-hk-success-soft: var(--color-status-success-soft);
+	--color-hk-ink-50: var(--color-ink-50);
+	--color-hk-ink-100: var(--color-ink-100);
+	--color-hk-ink-200: var(--color-ink-200);
+	--color-hk-ink-300: var(--color-ink-300);
+	--color-hk-ink-400: var(--color-ink-400);
+	--color-hk-ink-500: var(--color-ink-500);
+	--color-hk-ink-600: var(--color-ink-600);
+	--color-hk-ink-700: var(--color-ink-700);
+	--color-hk-ink-800: var(--color-ink-800);
+	--color-hk-ink-850: var(--color-ink-850);
+	--color-hk-ink-900: var(--color-ink-900);
+	--color-hk-ink-950: var(--color-ink-950);
+	/* Off-white surface tone for dark backgrounds (footer, dark CTAs).
+	   Resolves to #fffdf7 — used with Tailwind opacity modifier as
+	   text-hk-cream/70 / bg-hk-cream/10 / border-hk-cream/15 etc. */
+	--color-hk-cream: var(--color-neutral-cream);
+	--color-hk-success: var(--color-status-success);
+	--color-hk-warning: var(--color-status-warning);
+	--color-hk-danger: var(--color-status-danger);
+	/* Liked heart — NOT the danger role. See --color-like-heart in
+	   styles/foundation/00-color-config.css. */
+	--color-hk-like: var(--color-like-heart);
+
+	/* ---------- Home page warm palette (theme-invariant, light-only) ----------
+	   home is intentionally light-only with a warm aesthetic distinct from the
+	   site's primary-color system; these do NOT cascade in dark. See
+	   docs/superpowers/specs/2026-05-26-home-css-tokenize-migration-design.md
+	   （已從 repo 移除，原文在私人封存） */
+	--color-hk-home-paper: #fcfaf4;
+	--color-hk-home-cream: #f5f2e8;
+	--color-hk-home-ink: #3a2a1a;
+	--color-hk-home-fg: #565656;
+	--color-hk-home-accent-100: var(--color-brand-primary-soft);
+	--color-hk-home-accent-300: var(--color-brand-secondary);
+	--color-hk-home-accent-500: var(--color-brand-primary-strong);
+	--color-hk-home-accent-600: var(--color-brand-primary);
+	--color-hk-home-accent-700: var(--color-brand-primary-strong);
+	--color-hk-home-accent-900: var(--color-brand-primary-deep);
+	--color-hk-home-primary-deep: var(--color-brand-primary-deep);
+	--color-hk-home-deep-ink: var(--color-brand-ink);
+	--color-hk-home-gold-deep: var(--color-brand-secondary);
+	--color-hk-home-tint-peach: #fce7cc;
+	--color-hk-home-tint-blue: #d8e7f5;
+	--color-hk-home-tint-pink: #f2d6cf;
+	--color-hk-home-tint-amber: #f9db96;
+	--color-hk-home-cream-deep: #f3eddc;
+	/* Rounded "postcard" surface behind the home rails (新品上市 / 精選商家).
+	   Flat on purpose: it used to be a 180deg gradient down to #f7f1e3, but
+	   the white cards cover everything except the container's bottom padding,
+	   so the gradient's dark end only ever showed as a hard-edged band under
+	   the last row. */
+	--color-hk-home-postcard: #fcf7eb;
+	--color-hk-home-postcard-dark: var(--color-ink-900);
+
+	--radius-hk-xs: 6px;
+	--radius-hk-sm: 8px;
+	--radius-hk-md: 12px;
+	--radius-hk-lg: 16px;
+	--radius-hk-xl: 24px;
+	--radius-hk-2xl: 32px;
+	--radius-hk-pill: 999px;
+
+	--shadow-hk-xs: var(--shadow-xs);
+	--shadow-hk-sm: var(--shadow-sm);
+	--shadow-hk-card: var(--theme-shadow-brand-soft);
+	--shadow-hk-lift: var(--theme-shadow-brand-lift);
+	--shadow-hk-nav: var(--theme-shadow-nav);
+	--shadow-hk-dropdown: var(--theme-shadow-dropdown);
+
+	--bg-image-bokeh-primary: radial-gradient(
+		circle,
+		var(--action-primary) 0%,
+		rgb(var(--color-brand-primary-strong-rgb) / 0.3) 40%,
+		transparent 70%
+	);
+	--bg-image-bokeh-light: radial-gradient(
+		circle,
+		var(--color-brand-primary-strong) 0%,
+		rgb(var(--color-ink-300-rgb) / 0.3) 40%,
+		transparent 70%
+	);
+	--bg-image-bokeh-warm: radial-gradient(
+		circle,
+		rgba(238, 150, 75, 0.4) 0%,
+		rgba(238, 150, 75, 0.1) 40%,
+		transparent 70%
+	);
+
+	--animate-cart-snackbar-in: cart-snackbar-in 280ms
+		cubic-bezier(0.22, 1, 0.36, 1);
+	--animate-cart-snackbar-out: cart-snackbar-out 200ms ease forwards;
+
+	@keyframes cart-snackbar-in {
+		from {
+			opacity: 0;
+			transform: translateY(20px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+	@keyframes cart-snackbar-out {
+		from {
+			opacity: 1;
+			transform: translateY(0);
+		}
+		to {
+			opacity: 0;
+			transform: translateY(20px);
+		}
+	}
+
+	--animate-seller-web-in: seller-branding-web-in 220ms
+		cubic-bezier(0.16, 1, 0.3, 1) both;
+
+	@keyframes seller-branding-web-in {
+		from {
+			opacity: 0;
+			transform: translateY(6px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
+	--animate-sc-skel-shimmer: sc-skel-shimmer 1.6s ease-in-out infinite;
+
+	@keyframes sc-skel-shimmer {
+		0% {
+			background-position: 220% 0;
+		}
+		100% {
+			background-position: -120% 0;
+		}
+	}
+
+	--animate-sc-skel-in: sc-skel-in 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+
+	@keyframes sc-skel-in {
+		from {
+			opacity: 0;
+			transform: translateY(8px) scale(0.985);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0) scale(1);
+		}
+	}
+
+	--animate-truck-bob: truck-bob 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+	--animate-truck-shake: truck-shake 0.6s ease-in-out infinite;
+	--animate-truck-road: truck-road 0.6s linear infinite;
+	--animate-truck-drive: truck-drive 1.8s linear infinite;
+
+	@keyframes truck-bob {
+		0%,
+		100% {
+			transform: translateY(0) rotate(-1deg);
+		}
+		50% {
+			transform: translateY(-3px) rotate(1deg);
+		}
+	}
+	@keyframes truck-shake {
+		0%,
+		100% {
+			transform: translateX(-50%) translateY(0);
+		}
+		25% {
+			transform: translateX(-50%) translateY(-1px);
+		}
+		75% {
+			transform: translateX(-50%) translateY(1px);
+		}
+	}
+	@keyframes truck-road {
+		from {
+			background-position: 0 0;
+		}
+		to {
+			background-position: -24px 0;
+		}
+	}
+	@keyframes truck-drive {
+		0%,
+		100% {
+			transform: translateX(0) translateY(0);
+		}
+		50% {
+			transform: translateX(70px) translateY(-2px);
+		}
+	}
+
+	--animate-hk-fade-in: hk-fade-in 280ms var(--hkui-ease) both;
+
+	@keyframes hk-fade-in {
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
+	}
+
+	--animate-checkout-pop: checkout-result-pop 320ms var(--hkui-ease) both;
+	--animate-checkout-icon-pop: checkout-result-icon-pop 480ms var(--hkui-ease)
+		both;
+	--animate-checkout-icon-shake: checkout-result-icon-shake 520ms
+		var(--hkui-ease) both;
+	--animate-checkout-draw: checkout-result-draw 520ms 160ms var(--hkui-ease)
+		forwards;
+	--animate-checkout-bounce: checkout-result-bounce 1200ms infinite
+		var(--hkui-ease);
+
+	@keyframes checkout-result-pop {
+		from {
+			opacity: 0;
+			transform: translateY(12px) scale(0.98);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0) scale(1);
+		}
+	}
+	@keyframes checkout-result-icon-pop {
+		0% {
+			transform: scale(0.4);
+			opacity: 0;
+		}
+		60% {
+			transform: scale(1.08);
+			opacity: 1;
+		}
+		100% {
+			transform: scale(1);
+			opacity: 1;
+		}
+	}
+	@keyframes checkout-result-icon-shake {
+		0% {
+			transform: scale(0.6);
+			opacity: 0;
+		}
+		30% {
+			transform: scale(1.05);
+			opacity: 1;
+		}
+		45% {
+			transform: scale(1) translateX(-6px);
+		}
+		60% {
+			transform: scale(1) translateX(6px);
+		}
+		75% {
+			transform: scale(1) translateX(-3px);
+		}
+		100% {
+			transform: scale(1) translateX(0);
+		}
+	}
+	@keyframes checkout-result-draw {
+		to {
+			stroke-dashoffset: 0;
+		}
+	}
+	@keyframes checkout-result-bounce {
+		0%,
+		60%,
+		100% {
+			transform: translateY(0);
+			opacity: 0.5;
+		}
+		30% {
+			transform: translateY(-8px);
+			opacity: 1;
+		}
+	}
+}
+
+/* ============================================================
+   HeroUI (--hkui-*) token bridge
+
+   `@theme inline` so each utility compiles to `var(--hkui-*)` at the use
+   site (not the resolved value). That lets the .account-shell /
+   [data-theme="dark"] scope overrides of the underlying --hkui-* tokens
+   flip these utilities automatically — no per-element dark: variant.
+
+   Spacing and font-size are intentionally NOT bridged: --hkui-space-*
+   and --hkui-text-* already match Tailwind's default scale, so use the
+   built-ins (gap-3, p-4, text-sm/base/lg, text-4xl) directly.
+   ============================================================ */
+@theme inline {
+	/* Theme-semantic colors — bridged INLINE so each utility compiles to
+	 * var(--theme-*) and re-resolves under [data-theme="dark"] at the
+	 * element scope (automatic dark cascade, no per-component dark: variant). */
+	--color-hk-surface-page: var(--theme-surface-page);
+	--color-hk-surface-card: var(--theme-surface-card);
+	--color-hk-surface-muted: var(--theme-surface-muted);
+	--color-hk-surface-panel: var(--theme-surface-panel);
+	--color-hk-surface-elevated: var(--theme-surface-elevated);
+	--color-hk-surface-glass: var(--theme-surface-glass);
+	--color-hk-surface-glass-subtle: var(--theme-surface-glass-subtle);
+	--color-hk-surface-glass-hover: var(--theme-surface-glass-hover);
+	--color-hk-surface-glass-active: var(--theme-surface-glass-active);
+	--color-hk-heading: var(--theme-text-heading);
+	--color-hk-body: var(--theme-text-body);
+	--color-hk-muted: var(--theme-text-muted);
+	--color-hk-faint: var(--theme-text-faint);
+	--color-hk-accent: var(--theme-text-accent);
+	--color-hk-accent-on-tint: var(--theme-text-accent-on-tint);
+	--color-hk-inverse: var(--theme-text-inverse);
+	--color-hk-primary: var(--theme-action-primary);
+	--color-hk-primary-hover: var(--theme-action-primary-hover);
+	--color-hk-primary-subtle: var(--theme-primary-subtle);
+	--color-hk-primary-soft: var(--theme-primary-soft);
+	--color-hk-primary-border: var(--theme-primary-border);
+	--color-hk-secondary: var(--theme-action-secondary);
+	--color-hk-border-subtle: var(--theme-border-subtle);
+	--color-hk-border-soft: var(--theme-border-soft);
+	--color-hk-border-strong: var(--theme-border-strong);
+	--color-hk-border-warm: var(--theme-border-warm);
+	--color-hk-border-input: var(--theme-border-input);
+
+	--color-content1: var(--hkui-content1);
+	--color-content2: var(--hkui-content2);
+	--color-foreground: var(--hkui-foreground);
+	--color-foreground-soft: var(--hkui-foreground-soft);
+	--color-foreground-muted: var(--hkui-foreground-muted);
+	--color-divider: var(--hkui-divider);
+	--color-default-50: var(--hkui-default-50);
+	--color-default-100: var(--hkui-default-100);
+	--color-default-200: var(--hkui-default-200);
+	--color-default-300: var(--hkui-default-300);
+	--color-default-400: var(--hkui-default-400);
+	--color-default-600: var(--hkui-default-600);
+	--color-default-700: var(--hkui-default-700);
+	--color-success: var(--hkui-success);
+	--color-success-50: var(--hkui-success-50);
+	--color-success-700: var(--hkui-success-700);
+	--color-danger: var(--hkui-danger);
+	--color-danger-50: var(--hkui-danger-50);
+	--color-danger-700: var(--hkui-danger-700);
+	--color-warning-50: var(--hkui-warning-50);
+	--color-warning-600: var(--hkui-warning-600);
+	--color-warning-700: var(--hkui-warning-700);
+	--color-info-50: var(--hkui-info-50);
+	--color-info-700: var(--hkui-info-700);
+
+	/* `primary` is taken by the legacy :root --color-primary (action color
+	 * that flips to gold in dark); the HeroUI primary is a constant
+	 * brand-primary-strong, so namespace it under hkui- to avoid divergence. */
+	--color-hkui-primary: var(--hkui-primary);
+	--color-hkui-primary-50: var(--hkui-primary-50);
+	--color-hkui-primary-200: var(--hkui-primary-200);
+	--color-hkui-primary-600: var(--hkui-primary-600);
+	--color-hkui-primary-700: var(--hkui-primary-700);
+	--color-hkui-primary-foreground: var(--hkui-primary-foreground, #fff);
+
+	/* HeroUI radii don't line up with Tailwind's default rounded-* scale. */
+	--radius-hkui-md: var(--hkui-radius-md);
+	--radius-hkui-lg: var(--hkui-radius-lg);
+
+	--font-display: var(--hkui-font-display);
+}
+
+.truck-loading__inline {
+	color: var(--truck-loading-vehicle-color);
+}
+
+.truck-loading__road-line {
+	background-image: repeating-linear-gradient(
+		to right,
+		var(--truck-loading-road-color) 0 12px,
+		transparent 12px 24px
+	);
+	background-size: 24px 4px;
+}
+
+:root {
+	--seller-workspace-background:
+		radial-gradient(
+			circle at 10% 20%,
+			rgb(var(--color-ink-400-rgb) / 0.08),
+			rgb(var(--color-ink-400-rgb) / 0) 30%
+		),
+		radial-gradient(
+			circle at 90% 10%,
+			rgba(241, 205, 112, 0.08),
+			rgba(241, 205, 112, 0) 30%
+		),
+		radial-gradient(
+			circle at 50% 90%,
+			rgba(255, 255, 255, 0.9),
+			rgba(255, 255, 255, 0) 40%
+		),
+		linear-gradient(160deg, #fbfcf9 0%, var(--color-ink-50) 42%, var(--color-ink-50) 100%);
+}
+
+[data-theme="dark"] {
+	--account-workspace-background:
+		radial-gradient(
+			circle at 10% 16%,
+			rgb(var(--color-ink-600-rgb) / 0.24),
+			rgb(var(--color-ink-600-rgb) / 0) 30%
+		),
+		radial-gradient(
+			circle at 86% 14%,
+			rgba(241, 205, 112, 0.1),
+			rgba(241, 205, 112, 0) 30%
+		),
+		radial-gradient(
+			circle at 54% 92%,
+			rgba(6, 12, 18, 0.92),
+			rgba(6, 12, 18, 0) 38%
+		),
+		linear-gradient(160deg, #05090d 0%, #081119 42%, var(--color-ink-950) 100%);
+	--seller-workspace-background:
+		radial-gradient(
+			circle at 11% 18%,
+			rgb(var(--color-ink-600-rgb) / 0.55),
+			rgb(var(--color-ink-600-rgb) / 0) 32%
+		),
+		radial-gradient(
+			circle at 86% 14%,
+			rgba(241, 205, 112, 0.22),
+			rgba(241, 205, 112, 0) 32%
+		),
+		radial-gradient(
+			circle at 54% 92%,
+			rgb(var(--color-ink-900-rgb) / 0.85),
+			rgb(var(--color-ink-900-rgb) / 0) 38%
+		),
+		linear-gradient(160deg, var(--color-ink-950) 0%, var(--color-ink-900) 42%, var(--color-ink-900) 100%);
+}
+
+body .page-wrapper:has(.account-shell) {
+	min-height: 100dvh;
+	background: transparent;
+}
+body .page-wrapper:has(.seller-shell) {
+	min-height: 100dvh;
+	background: transparent;
+}
+body .page-content:has(.account-shell),
+body .page-content:has(.seller-shell) {
+	min-height: 100dvh;
+	background: transparent;
+}
+
+/* Scoped seller-card chrome shared across buyer and seller dashboards */
+.seller-card {
+	background: var(--seller-surface, var(--hkui-content1));
+	border: 1px solid var(--hkui-divider);
+	border-radius: var(--seller-card-radius, 36px);
+	box-shadow: var(--seller-shadow-card, var(--hkui-shadow-md));
+	padding: 24px;
+}
+
+[data-theme="dark"] .seller-card {
+	background: rgb(var(--color-ink-950-rgb) / 0.68);
+	-webkit-backdrop-filter: blur(12px) saturate(120%);
+	backdrop-filter: blur(12px) saturate(120%);
+	border-color: rgba(245, 222, 165, 0.1);
+	box-shadow:
+		inset 0 1px 0 rgba(245, 222, 165, 0.05),
+		0 14px 30px rgba(0, 0, 0, 0.38);
+	color: var(--hkui-foreground);
+}
+
+.seller-card__head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	margin-bottom: 24px;
+}
+.seller-card__head h2 {
+	margin: 0;
+	font-size: 1.125rem;
+	font-weight: 700;
+	color: var(--hkui-foreground);
+}
+.seller-card__head small {
+	display: block;
+	margin-top: 4px;
+	font-size: 0.8125rem;
+	color: var(--hkui-foreground-soft);
+}
+
+.hk-status-icon-disc {
+	--not-found-icon-color: var(--color-brand-primary-strong);
+
+	border: 1px solid var(--color-neutral-panel);
+	background:
+		radial-gradient(
+			circle at 34% 28%,
+			rgb(var(--color-brand-secondary-rgb) / 0.22),
+			transparent 42%
+		),
+		linear-gradient(135deg, #fbfaf3 0%, var(--color-ink-50) 60%, #f7f0dc 100%);
+	box-shadow: 0 18px 44px rgb(var(--color-ink-950-rgb) / 0.16);
+}
+
+[data-theme="dark"] .hk-status-icon-disc {
+	--not-found-icon-color: var(--color-ink-200);
+
+	border-color: rgb(var(--color-brand-secondary-rgb) / 0.24);
+	background:
+		radial-gradient(
+			circle at 34% 28%,
+			rgb(var(--color-brand-secondary-rgb) / 0.18),
+			transparent 44%
+		),
+		radial-gradient(
+			circle at 68% 74%,
+			rgb(var(--color-brand-primary-rgb) / 0.11),
+			transparent 50%
+		),
+		linear-gradient(135deg, var(--color-ink-850) 0%, var(--color-ink-900) 58%, var(--color-ink-950) 100%);
+	box-shadow:
+		inset 0 1px 0 rgb(245 222 165 / 0.14),
+		0 22px 58px rgb(0 0 0 / 0.38);
+}
+
+@keyframes dashdraw {
+	to {
+		stroke-dashoffset: -28;
+	}
+}
+
+/* cache-bust: font unify 1781442270 */

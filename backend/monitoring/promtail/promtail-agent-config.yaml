@@ -1,0 +1,42 @@
+# Promtail agent - 用於 Infra VM 的 Docker Compose 監控棧
+# 收集 Infra VM 上的 Docker container log（PostgreSQL、Redis、RabbitMQ 等）
+# APP_ENV 由 docker-compose 的 environment 注入
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://${MONITORING_VM_IP}:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container_name'
+
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'service'
+
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_project']
+        target_label: 'project'
+
+      # 從 APP_ENV 環境變數讀取（需搭配 --config.expand-env=true）
+      - replacement: '${APP_ENV}'
+        target_label: 'environment'
+
+    pipeline_stages:
+      - docker: {}
+      # 從 log 內容提取 trace_id 作為 structured metadata（高基數，不能當 label）
+      - regex:
+          expression: '"trace_id":\s*"(?P<trace_id>[a-f0-9]+)"'
+      - structured_metadata:
+          trace_id:

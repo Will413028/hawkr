@@ -1,0 +1,328 @@
+syntax = "proto3";
+
+package hawkr.notification;
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/notification";
+
+// NotificationService — 推播通知服務
+service NotificationService {
+    // 取得使用者通知偏好設定
+    rpc GetNotificationPreferences(GetNotificationPreferencesRequest) returns (GetNotificationPreferencesResponse);
+
+    // 更新使用者通知偏好設定
+    rpc UpdateNotificationPreference(UpdateNotificationPreferenceRequest) returns (UpdateNotificationPreferenceResponse);
+
+    // 註冊 FCM device token（登入時 Gateway 呼叫，或 token refresh 時使用）
+    rpc RegisterDeviceToken(RegisterDeviceTokenRequest) returns (RegisterDeviceTokenResponse);
+
+    // 移除 FCM device token（登出時 Gateway 呼叫）
+    rpc RemoveDeviceToken(RemoveDeviceTokenRequest) returns (RemoveDeviceTokenResponse);
+
+    // 立即重載模板快取（Admin 操作）
+    rpc ReloadTemplates(ReloadTemplatesRequest) returns (ReloadTemplatesResponse);
+
+    // 模板唯讀查詢 + enabled 開關（Admin 操作；Create/Update 已移除 — issue #1176 SSOT 政策，變更走 Atlas migration）
+    rpc ListTemplates(ListTemplatesRequest) returns (ListTemplatesResponse);
+    rpc GetTemplate(GetTemplateRequest) returns (GetTemplateResponse);
+    rpc UpdateTemplateEnabled(UpdateTemplateEnabledRequest) returns (UpdateTemplateEnabledResponse);
+
+    // 模板預覽與測試發送（Admin 操作）
+    rpc PreviewTemplate(PreviewTemplateRequest) returns (PreviewTemplateResponse);
+    rpc TestSendTemplate(TestSendTemplateRequest) returns (TestSendTemplateResponse);
+
+    // 系統公告廣播（Admin 操作）
+    rpc BroadcastAnnouncement(BroadcastAnnouncementRequest) returns (BroadcastAnnouncementResponse);
+
+    // 通知收件箱
+    rpc ListNotifications(ListNotificationsRequest) returns (ListNotificationsResponse);
+    rpc GetUnreadCount(GetUnreadCountRequest) returns (GetUnreadCountResponse);
+    rpc MarkAsRead(MarkAsReadRequest) returns (MarkAsReadResponse);
+    rpc MarkAllAsRead(MarkAllAsReadRequest) returns (MarkAllAsReadResponse);
+    rpc DeleteNotifications(DeleteNotificationsRequest) returns (DeleteNotificationsResponse);
+}
+
+// 通知偏好
+message NotificationPreferenceItem {
+    string category = 1;
+    bool enabled = 2;
+    string title = 3;
+    string description = 4;
+    // forced=true 表示後端強制 enabled=true，前端 UI 應 disable 該 toggle。
+    // 賣家對 shipment_anomaly 為 forced。對應 backend `domain.IsForcedCategory(userType, category)`。
+    // 12 §3.1：✓ 可選 / 🔒 forced / — 不開放
+    bool forced = 5;
+}
+
+message GetNotificationPreferencesRequest {
+    string user_id = 1;
+    string user_type = 2;
+}
+
+message GetNotificationPreferencesResponse {
+    int32 code = 1;
+    repeated NotificationPreferenceItem preferences = 2;
+}
+
+message UpdateNotificationPreferenceRequest {
+    string user_id = 1;
+    string user_type = 2;
+    string category = 3;
+    bool enabled = 4;
+}
+
+message UpdateNotificationPreferenceResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+message RegisterDeviceTokenRequest {
+    string user_id = 1;
+    string user_type = 2;       // "buyer" | "merchant"
+    string token = 3;           // FCM device token
+    string platform = 4;        // "ios"（App 只發 iOS）
+}
+
+message RegisterDeviceTokenResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+message RemoveDeviceTokenRequest {
+    string user_id = 1;
+    string user_type = 2;       // "buyer" | "merchant"
+    string token = 3;           // FCM device token
+}
+
+message RemoveDeviceTokenResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+// ─── 模板 ────────────────────────────────────────────────────────────
+
+// FieldSpec 描述 FCM data map 中單一 key 的取值策略。
+// 用 oneof 區分：
+//   - const: 字串常數，直接寫入結果 map（例如 refType="ORDER"）。
+//   - field: payload 欄位名稱，從事件 payload 讀取對應值（例如 orderNo → "O992559076"）。
+// 未來如需加新策略（computed / expr / lookup 等）只要在 spec 內加 case，不影響既有資料。
+message FieldSpec {
+    oneof spec {
+        string const = 1;
+        string field = 2;
+    }
+}
+
+// NotificationTemplateProto 是通知模板的完整資料結構（用於 CRUD 回應）
+message NotificationTemplateProto {
+    // 3 = queue_name，2026-07-26 移除。queue 名稱自 2026-07-25 粒度重構起改由
+    // notification-service 的 notificationQueueByExchange 決定，此欄位不再驅動任何
+    // 基礎設施。保留 reserved 避免 field number 被重用（舊 client 仍可能送出）。
+    reserved 3;
+    reserved "queue_name";
+
+    // 15 = fcm_topic，2026-08-22 移除。廣播分支已從 template_handler.go 下線，全員
+    // 推播的唯一路徑是 BroadcastAnnouncement；DB 欄位同批 DROP（13 號 §3.6）。
+    reserved 15;
+    reserved "fcm_topic";
+
+    string exchange = 1;
+    string routing_key = 2;
+    string event_type = 4;
+    string target_user_type = 5;
+    string target_user_field = 6;
+    string category = 7;
+    string title_template = 8;
+    string body_template = 9;
+    string body_fallback = 10;
+    string data_type = 11;
+    map<string, FieldSpec> data_fields = 12; // fcm_key → 取值策略（const 或 payload field）
+    string schema_url = 13;
+    string reference_id_template = 14;
+    bool enabled = 16;
+    string updated_by = 17;
+    string id = 18;
+    string created_at = 19;
+    string updated_at = 20;
+}
+
+// ─── ReloadTemplates ─────────────────────────────────────────────────
+
+message ReloadTemplatesRequest {}
+
+message ReloadTemplatesResponse {
+    int32 code = 1;
+    string reloaded_count = 2;
+}
+
+// ─── ListTemplates ───────────────────────────────────────────────────
+
+message ListTemplatesRequest {
+    string event_type = 1;        // 可選過濾
+    string target_user_type = 2;  // 可選過濾
+    string enabled = 3;           // "" | "true" | "false"
+}
+
+message ListTemplatesResponse {
+    int32 code = 1;
+    repeated NotificationTemplateProto templates = 2;
+}
+
+// ─── GetTemplate ─────────────────────────────────────────────────────
+
+message GetTemplateRequest {
+    string id = 1;
+}
+
+message GetTemplateResponse {
+    int32 code = 1;
+    NotificationTemplateProto template = 2;
+}
+
+// ─── UpdateTemplateEnabled ───────────────────────────────────────────
+
+message UpdateTemplateEnabledRequest {
+    string id = 1;
+    bool enabled = 2;
+}
+
+message UpdateTemplateEnabledResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+// ─── PreviewTemplate ─────────────────────────────────────────────────
+
+message PreviewTemplateRequest {
+    string id = 1;
+    string sample_payload = 2;   // JSON object 字串
+}
+
+message PreviewTemplateResponse {
+    int32 code = 1;
+    string rendered_title = 2;
+    string rendered_body = 3;
+    map<string, string> rendered_data = 4;
+    string rendered_schema_url = 5;
+    string rendered_reference_id = 6;
+    repeated string missing_fields = 7;
+}
+
+// ─── TestSendTemplate ────────────────────────────────────────────────
+
+message TestSendTemplateRequest {
+    string id = 1;
+    string sample_payload = 2;      // JSON object 字串
+    // 發送目標的 user_id（值語意同其餘 RPC 的 user_id：buyer 對應 buyer_id，
+    // merchant 對應 store 側身份，並非登入帳號 account_id）。
+    // field number 3 沿用舊名 target_account_id 的位置（wire 相容，2026-08-02 改名）。
+    string target_user_id = 3;
+    string target_user_type = 4;    // "buyer" | "merchant"
+}
+
+message TestSendTemplateResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+// ─── 系統公告廣播 ────────────────────────────────────────────────────
+
+message BroadcastAnnouncementRequest {
+    string title = 1;
+    string body = 2;
+    string target_user_type = 3;    // "buyer" | "merchant" | "all"
+    string operator_id = 4;
+}
+
+message BroadcastAnnouncementResponse {
+    int32 code = 1;
+    string message = 2;
+    // 每則公告一個 TSID，同時是 inbox reference_id 與 FCM data.announcementId 的來源；
+    // 回傳它，管理員才追得到自己剛發出去的那一則（13 號 §7）。
+    string broadcast_id = 3;
+    // 實際派送的收件人數。message 原本把它包在中文句子裡，呼叫端要靠字串剖析才拿得到。
+    string recipient_count = 4;
+}
+
+// ─── 通知收件箱 ──────────────────────────────────────────────────────
+
+message NotificationItem {
+    string id = 1;
+    string event_type = 2;         // dot-case (order.paid)
+    string title = 3;
+    string body = 4;
+    string reference_id = 5;
+    bool is_read = 6;
+    string read_at = 7;            // RFC3339 or ""
+    string created_at = 8;         // RFC3339
+    map<string, string> data = 9;  // FCM data payload
+}
+
+message ListNotificationsRequest {
+    string user_id = 1;
+    string user_type = 2;
+    int32 page = 3;        // 已棄用，保留欄位號
+    int32 page_size = 4;
+    string cursor_id = 5;  // cursor-based：上一頁最後一筆 ID，0 = 第一頁
+    string category = 6;   // optional 類別過濾（data.category），"" = 不過濾
+    reserved 7;
+    reserved "legacy_account_id";
+}
+
+message ListNotificationsResponse {
+    int32 code = 1;
+    repeated NotificationItem records = 2;
+    string total = 3;
+    string page = 4;       // 已棄用
+    string page_size = 5;
+    bool has_more = 6;
+}
+
+message GetUnreadCountRequest {
+    string user_id = 1;
+    string user_type = 2;
+    reserved 3;
+    reserved "legacy_account_id";
+}
+
+message GetUnreadCountResponse {
+    int32 code = 1;
+    string count = 2;
+}
+
+message MarkAsReadRequest {
+    string id = 1;
+    string user_id = 2;
+    string user_type = 3;
+    reserved 4;
+    reserved "legacy_account_id";
+}
+
+message MarkAsReadResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+message MarkAllAsReadRequest {
+    string user_id = 1;
+    string user_type = 2;
+    reserved 3;
+    reserved "legacy_account_id";
+}
+
+message MarkAllAsReadResponse {
+    int32 code = 1;
+    string updated = 2;
+}
+
+message DeleteNotificationsRequest {
+    repeated string ids = 1;
+    string user_id = 2;
+    string user_type = 3;
+    reserved 4;
+    reserved "legacy_account_id";
+}
+
+message DeleteNotificationsResponse {
+    int32 code = 1;
+    string deleted = 2;
+}

@@ -1,0 +1,23 @@
+{
+  "act": "PRICE_PREVIEW_AVAILABLE",
+  "emptyArgsBlocks": [
+    {
+      "kind": "CONTEXT",
+      "text": "已經有市場參考價可以看了。"
+    },
+    {
+      "kind": "NEXT_STEP",
+      "text": "要不要先確認一下希望詢價區間？"
+    }
+  ],
+  "populatedArgsBlocks": [
+    {
+      "kind": "CONTEXT",
+      "text": "已經有市場參考價可以看了。"
+    },
+    {
+      "kind": "NEXT_STEP",
+      "text": "要不要先確認一下希望詢價區間？"
+    }
+  ]
+}

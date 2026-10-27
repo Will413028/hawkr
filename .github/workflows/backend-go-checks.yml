@@ -1,0 +1,197 @@
+name: backend Go checks
+
+# gofmt / go vet -tags integration / go test（含未登記 skip 檢查）/ go mod tidy。
+# 由 backend/.github/workflows/go-checks.yml 搬來，差異：
+#   - runner 改 ubuntu-latest，開 setup-go cache
+#   - push 到 main 也跑：base 取 github.event.before，取不到就全模組
+#
+# ⚠️ step 順序是硬性要求：gofmt（唯讀）→ 找模組 / vet / test（唯讀）→ go mod tidy
+# （會改工作樹，必須最後）。失敗用 accumulator + if: always() 讓每項都跑完，
+# 不用 continue-on-error（step 會顯示 success，看 step 清單會看走眼）。
+
+on:
+  pull_request:
+    paths: &go_paths
+      - 'backend/**/*.go'
+      - 'backend/**/go.mod'
+      - 'backend/**/go.sum'
+      - 'backend/go.work'
+      - 'backend/.go-version'
+      - 'backend/gateway/internal/proxy/testdata/agui-frames/*'
+      - 'backend/scripts/check-test-skips.py'
+      - 'backend/scripts/expected-skips.json'
+      - '.github/workflows/backend-go-checks.yml'
+      # 單體（backend/ 根 module）不在這裡檢查：這個 workflow 只 vet／test 舊模組，單體的 gofmt、
+      # vet、test、tidy 由 backend-monolith 負責。只改單體時觸發它，是白跑一次全部舊模組的 tidy。
+      - '!backend/cmd/**'
+      - '!backend/internal/**'
+      - '!backend/go.mod'
+      - '!backend/go.sum'
+  push:
+    branches: [main]
+    paths: *go_paths
+  workflow_dispatch:
+
+concurrency:
+  group: backend-go-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  go-checks:
+    name: Go 檢查（gofmt／vet／test／tidy）
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      # Go 版本以 .go-version 為準（go-base image 也吃它），不用某個 module 的 go.mod。
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/.go-version
+          cache-dependency-path: backend/**/go.sum
+
+      # ── 1. gofmt（唯讀，必須在 go mod tidy 之前）──────────────────────────
+      # -z + xargs -0：repo 有中文路徑，git ls-files 預設會替非 ASCII 路徑加引號。
+      - name: gofmt -l
+        run: |
+          set -e
+          unformatted=$(git ls-files -z '*.go' | xargs -0 gofmt -l)
+          if [ -n "$unformatted" ]; then
+            echo "::error::以下檔案未通過 gofmt，請在本機跑 gofmt -w 後重推："
+            echo "$unformatted"
+            echo ""
+            echo "若其中含 swaggo 註解，改用每行 // @Description 的標準寫法，"
+            echo "不要用懸掛縮排——gofmt 會重排懸掛縮排並改變產出的 API 描述。"
+            exit 1
+          fi
+          echo "全部 $(git ls-files '*.go' | wc -l | tr -d ' ') 個 .go 檔皆符合 gofmt。"
+
+      # ── 2. 找出這次動到的模組，只測那些（動到 pkg 或無法判定 base 時全測）─────
+      - name: 找出被改動的 Go 模組
+        id: mods
+        if: always()
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          all_mods() {
+            for d in gateway pkg services/*/; do
+              d=${d%/}
+              [ -f "$d/go.mod" ] && echo "$d"
+            done
+          }
+
+          base=""
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            # 用 FETCH_HEAD 的實際 SHA，不依賴 checkout 是否更新了 remote-tracking ref。
+            git fetch --no-tags origin "$BASE_REF"
+            base=$(git rev-parse FETCH_HEAD)
+          elif [ "$EVENT_NAME" = "push" ] && [ -n "$BEFORE" ] &&
+               ! echo "$BEFORE" | grep -qE '^0+$' &&
+               git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            base="$BEFORE"
+          fi
+
+          if [ -z "$base" ]; then
+            echo "無可用的 base（$EVENT_NAME），測試全部模組"
+            mods=$(all_mods | tr '\n' ' ')
+          else
+            # --relative：輸出相對於 backend/ 的路徑（monorepo 的 git 頂層在上一層）。
+            # AG-UI golden fixture 不是 .go 檔，但 gateway 的 golden test 逐位元組比對它們。
+            changed=$(git diff --relative --name-only "$base"...HEAD -- \
+              '*.go' 'go.mod' 'go.sum' '**/go.mod' '**/go.sum' go.work .go-version \
+              'gateway/internal/proxy/testdata/agui-frames/*' || true)
+            mods=""
+            for f in $changed; do
+              d=$(dirname "$f")
+              while [ "$d" != "." ] && [ ! -f "$d/go.mod" ]; do d=$(dirname "$d"); done
+              [ -f "$d/go.mod" ] && mods="$mods $d"
+              # go.work / .go-version 影響全部模組
+              case "$f" in go.work|.go-version) mods="$mods pkg" ;; esac
+            done
+            # pkg 是所有服務的共用模組，動到它就等於動到全部。
+            if echo "$mods" | grep -qw "pkg"; then
+              mods=$(all_mods | tr '\n' ' ')
+            fi
+          fi
+
+          # scripts/ 有自己的 go.mod 但刻意不是 go.work 成員，只保留真正的成員。
+          work_mods=$(grep -oE '\./[a-zA-Z0-9/_-]+' go.work | sed 's#^\./##')
+          filtered=""
+          for m in $mods; do
+            if echo "$work_mods" | grep -qxF "$m"; then
+              filtered="$filtered $m"
+            else
+              echo "跳過非 go.work 成員模組：$m"
+            fi
+          done
+          uniq_mods=$(echo "$filtered" | tr ' ' '\n' | grep -v '^$' | sort -u | tr '\n' ' ' || true)
+          echo "modules=$uniq_mods" >> "$GITHUB_OUTPUT"
+          echo "將測試：${uniq_mods:-（無）}"
+
+      # 帶 //go:build integration 的測試檔不會被下面的 go test 編譯；
+      # vet -tags integration 只編譯不執行，讓它們的編譯錯誤在這裡就現形。
+      - name: 帶 tag 的測試檔要編譯得過
+        if: always() && steps.mods.outputs.modules != ''
+        run: |
+          set -uo pipefail
+          exit_code=0
+          for m in ${{ steps.mods.outputs.modules }}; do
+            echo "=== $m (vet -tags integration) ==="
+            (cd "$m" && go vet -tags integration ./...) || exit_code=1
+          done
+          exit $exit_code
+
+      - name: go test（含未登記 skip 檢查）
+        if: always() && steps.mods.outputs.modules != ''
+        run: |
+          set -uo pipefail
+          exit_code=0
+          first=1
+          for m in ${{ steps.mods.outputs.modules }}; do
+            echo "=== $m ==="
+            extra=""
+            if [ "$first" = "1" ]; then extra="--reset"; first=0; fi
+            if ! (cd "$m" && go test -json ./...) \
+                 | python3 scripts/check-test-skips.py --module "$m" $extra; then
+              exit_code=1
+            fi
+          done
+          if [ "$first" = "0" ]; then
+            printf '' | python3 scripts/check-test-skips.py --final || exit_code=1
+          fi
+          exit $exit_code
+
+      # ── 3. go mod tidy（會改工作樹，所以放最後）───────────────────────────
+      - name: go mod tidy（全模組）
+        if: always()
+        run: |
+          set -e
+          for module in \
+              gateway pkg \
+              services/ai-service \
+              services/crm-service services/im-service \
+              services/invoice-service \
+              services/notification-service services/pricebook-service services/review-service \
+              services/seller-service services/social-service; do
+            echo "=== $module ==="
+            (cd "$module" && go mod tidy)
+          done
+
+      - name: tidy drift 檢查
+        if: always()
+        run: |
+          if ! git diff --exit-code -- '**/go.mod' '**/go.sum'; then
+            echo "::error::go mod tidy 偵測到 drift，請本地跑 'go mod tidy' 後 commit go.mod / go.sum"
+            exit 1
+          fi

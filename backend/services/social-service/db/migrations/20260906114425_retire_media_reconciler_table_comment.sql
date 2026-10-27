@@ -1,0 +1,2 @@
+-- Set comment to table: "cms_post"
+COMMENT ON TABLE "cms_post" IS '本表不得硬刪（DELETE FROM）。image_asset_id 是這一列宣告的媒體引用真相，media 的 asset_reference 由寫入路徑同步維持：換圖／清圖時在 commit 之後送 ReleaseReferences 收斂（PostUseCase.UpdatePost）。硬刪之後就沒有任何一列能推導出「這個 ref_id 該掛哪些資產」，而 media 也沒有任何 RPC 能列舉某 ref_type 的全部引用——它在 media 上已建立的引用因此永久留存、事後無跡可循。軟刪保住那一列因而保住這個能力：資產欄位仍指著原資產，引用刻意保留不釋放；代價是軟刪列的資產永遠不會被回收，這是刻意接受的存儲成本，不是待修的洩漏。真正需要清除時由該情境自己的流程先釋放引用，帳號終止走 seller.deleted handler（internal/worker/seller_deleted.go）。見 #2772/#2773/#2774/#2775。';

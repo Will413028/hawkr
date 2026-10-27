@@ -1,0 +1,17 @@
+{
+  "From": {
+    "Email": "supports@example.com",
+    "Name": "範例生鮮"
+  },
+  "To": {
+    "Email": "vendor@example.com",
+    "Name": ""
+  },
+  "Subject": "您有一筆新的採購詢價",
+  "HTML": "\u003cp\u003e您好，Hawkr 平台上有買家想向您採購。\u003c/p\u003e\u003cp\u003e請點擊以下連結查看詳情並回覆：\u003cbr\u003e\u003ca href=\"https://web-dev.example.com/vendor/rfq#invite=000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f\"\u003ehttps://web-dev.example.com/vendor/rfq#invite=000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f\u003c/a\u003e\u003c/p\u003e\u003cp\u003e此連結將於 2026-10-11T15:27:07Z 到期。\u003c/p\u003e",
+  "Text": "您好，Hawkr 平台上有買家想向您採購。\n\n請點擊以下連結查看詳情並回覆：\nhttps://web-dev.example.com/vendor/rfq#invite=000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f\n\n此連結將於 2026-10-11T15:27:07Z 到期。",
+  "IdempotencyKey": "",
+  "Tags": {
+    "rfq_invite_id": "7500000000000000001"
+  }
+}

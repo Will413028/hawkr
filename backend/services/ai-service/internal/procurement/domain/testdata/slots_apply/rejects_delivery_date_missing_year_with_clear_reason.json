@@ -1,0 +1,16 @@
+{
+  "before": {},
+  "patch": {
+    "delivery_date": "8/20"
+  },
+  "now": "2026-08-07T00:00:00Z",
+  "after": {
+    "exact_match_required": true
+  },
+  "rejected": [
+    {
+      "key": "delivery_date",
+      "reason": "缺少西元年份，請補上年份（例如 2026-08-20）"
+    }
+  ]
+}

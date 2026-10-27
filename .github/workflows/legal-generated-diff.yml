@@ -1,0 +1,55 @@
+name: legal generated diff
+
+# 守住賣家入駐文件的單一來源與各端生成物同步：
+#   來源：website/docs/legal/{seller-terms.md,seller-kyc-notice.md,seller-agreements.json}
+#   生成：website/scripts/generate-legal.ts 輸出 website/features/legal/documents/*.gen.ts 與
+#         backend/internal/modules/seller/internal/model/agreement_gen.go（CurrentAgreements）。
+# 重新生成後與工作樹比對，有差異就失敗；不得手改生成檔。
+
+on:
+  pull_request:
+    paths: &legal_paths
+      - 'website/docs/legal/**'
+      - 'website/scripts/generate-legal.ts'
+      - 'website/scripts/legal-markdown.ts'
+      - 'website/features/legal/documents/**'
+      - 'backend/internal/modules/seller/internal/model/agreement_gen.go'
+      - '.github/workflows/legal-generated-diff.yml'
+  push:
+    branches: [main]
+    paths: *legal_paths
+  workflow_dispatch:
+
+concurrency:
+  group: legal-generated-diff-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  legal-generated-diff:
+    name: 賣家入駐文件生成物 regenerate + diff
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/pnpm-install
+
+      - name: 重新生成
+        working-directory: website
+        run: pnpm run gen:legal
+
+      - name: 與已提交的生成物比對
+        run: |
+          set -euo pipefail
+          if ! git diff --exit-code -- \
+            website/features/legal/documents \
+            backend/internal/modules/seller/internal/model/agreement_gen.go; then
+            echo "::error::賣家入駐文件的生成物與正本不同步：在 website 執行 pnpm run gen:legal 後一併提交"
+            exit 1
+          fi
+          if [ -n "$(git ls-files --others --exclude-standard -- website/features/legal/documents backend/internal/modules/seller/internal/model)" ]; then
+            echo "::error::重新生成多出未提交的檔案：在 website 執行 pnpm run gen:legal 後一併提交"
+            exit 1
+          fi

@@ -1,0 +1,11 @@
+{
+  "schema": "hawkr.taiwan-boundary-mirror/v1",
+  "file": "taiwan_boundary.taiwan-atlas-2021.9.20.geojson",
+  "sha256": "974d520735ca20c7dd6af95e579ffb409279adf75520b997b0df312ff83f28b2",
+  "feature_count": 22,
+  "upstream_repo": "<org>/Hawkr_Transformer_Pricebook",
+  "upstream_path": "reference/taiwan_boundary.taiwan-atlas-2021.9.20.geojson",
+  "upstream_commit": "1374695cd071cafd112f244abc68101b7ef555f6",
+  "upstream_contract": "contracts/reference/taiwan_boundary.v1.yaml",
+  "license": "Derived project dkaoster/taiwan-atlas (MIT, Copyright (c) 2020 Daniel Kao); upstream data 內政部國土測繪中心－直轄市、縣市界線（TWD97 經緯度）, 政府資料開放授權條款－第 1 版"
+}

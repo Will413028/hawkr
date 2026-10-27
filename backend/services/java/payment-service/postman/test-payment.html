@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PAYUNi 支付測試</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { background: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-size: 16px; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; }
+        #result { margin-top: 20px; padding: 15px; background: #f5f5f5; border-radius: 4px; white-space: pre-wrap; font-family: monospace; font-size: 12px; max-height: 300px; overflow: auto; }
+        .error { background: #ffe6e6; color: #cc0000; }
+        .success { background: #e6ffe6; color: #006600; }
+    </style>
+</head>
+<body>
+    <h1>PAYUNi 信用卡支付測試</h1>
+
+    <div class="form-group">
+        <label>Gateway URL</label>
+        <input type="text" id="gatewayUrl" value="http://127.0.0.1:9900">
+    </div>
+
+    <div class="form-group">
+        <label>JWT Token (Bearer)</label>
+        <input type="text" id="token" placeholder="貼上你的 JWT Token">
+    </div>
+
+    <div class="form-group">
+        <label>商戶 ID (MerID)</label>
+        <input type="text" id="merchantId" value="HAWK9">
+    </div>
+
+    <div class="form-group">
+        <label>訂單編號</label>
+        <input type="text" id="orderId" value="">
+    </div>
+
+    <div class="form-group">
+        <label>金額 (元)</label>
+        <input type="number" id="amount" value="100">
+    </div>
+
+    <div class="form-group">
+        <label>商品名稱</label>
+        <input type="text" id="productName" value="測試商品">
+    </div>
+
+    <button onclick="createPayment()">1. 建立支付交易</button>
+
+    <div id="result"></div>
+
+    <div id="formContainer" style="margin-top: 20px; display: none;">
+        <h3>收到 UPP 表單資料，點擊下方按鈕跳轉到 PAYUNi</h3>
+        <button onclick="submitToPayuni()" style="background: #28a745;">2. 前往 PAYUNi 付款頁</button>
+    </div>
+
+    <script>
+        let uppFormData = null;
+
+        // 生成隨機訂單編號
+        document.getElementById('orderId').value = 'ORD-' + Date.now();
+
+        async function createPayment() {
+            const gatewayUrl = document.getElementById('gatewayUrl').value;
+            const token = document.getElementById('token').value;
+            const merchantId = document.getElementById('merchantId').value;
+            const orderId = document.getElementById('orderId').value;
+            const amount = parseInt(document.getElementById('amount').value);
+            const productName = document.getElementById('productName').value;
+
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = '';
+            resultDiv.textContent = '請求中...';
+
+            try {
+                const response = await fetch(`${gatewayUrl}/api/v1/payment/create`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        order_id: orderId,
+                        merchant_id: merchantId,
+                        payment_type: 'CREDIT_CARD',
+                        amount: amount,
+                        product_name: productName
+                    })
+                });
+
+                const data = await response.json();
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+
+                // Gateway 回傳 data 欄位（不是 result）
+                if (data.success && data.data && data.data.upp_form_data) {
+                    uppFormData = data.data.upp_form_data;
+                    resultDiv.className = 'success';
+                    document.getElementById('formContainer').style.display = 'block';
+                } else {
+                    resultDiv.className = 'error';
+                    document.getElementById('formContainer').style.display = 'none';
+                }
+            } catch (error) {
+                resultDiv.className = 'error';
+                resultDiv.textContent = '錯誤: ' + error.message;
+                document.getElementById('formContainer').style.display = 'none';
+            }
+        }
+
+        function submitToPayuni() {
+            if (!uppFormData) {
+                alert('請先建立支付交易');
+                return;
+            }
+
+            // 建立 hidden form
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = uppFormData.action_url;
+
+            const fields = {
+                'MerID': uppFormData.merchant_id,
+                'Version': uppFormData.version,
+                'EncryptInfo': uppFormData.encrypt_info,
+                'HashInfo': uppFormData.hash_info,
+                'IsPlatForm': uppFormData.is_platform
+            };
+
+            for (const [name, value] of Object.entries(fields)) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = name;
+                input.value = value;
+                form.appendChild(input);
+            }
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,84 @@
+// 範本：複製到 backend/cmd/mq-capture-<隨機 6 碼>/main.go，填上 exchange 與 routingKeys，在 backend/ 執行
+// `GOWORK=off go run ./cmd/mq-capture-<碼>`；用完刪除整個目錄。見同目錄的 SKILL.md。
+//
+// 宣告一個 exclusive、auto-delete 的暫時 queue 綁到目標 exchange，印出收到的每一則訊息。連線關閉時 RabbitMQ
+// 會刪掉這個 queue，不影響既有的 consumer。
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"time"
+
+	amqp "github.com/rabbitmq/amqp091-go"
+)
+
+func main() {
+	// 填入：從發布端 grep 出來的 exchange 與 routing key。證明「不送」時用 "#" 綁整個 exchange。
+	const exchange = "hawkr.account"
+	routingKeys := []string{"account.deleted"}
+
+	// 監聽多久；逾時就結束，要更久就重跑。
+	const timeout = 6 * time.Minute
+
+	// 預設是 backend/Makefile 的本機 RabbitMQ；連別的 broker 時以 RABBITMQ_URL 覆寫。
+	amqpURL := os.Getenv("RABBITMQ_URL")
+	if amqpURL == "" {
+		amqpURL = "amqp://guest:guest@localhost:5672/"
+	}
+
+	conn, err := amqp.Dial(amqpURL)
+	if err != nil {
+		fail("連線", err)
+	}
+	defer conn.Close()
+
+	ch, err := conn.Channel()
+	if err != nil {
+		fail("開 channel", err)
+	}
+	defer ch.Close()
+
+	q, err := ch.QueueDeclare("", false, true, true, false, nil)
+	if err != nil {
+		fail("宣告 queue", err)
+	}
+	for _, rk := range routingKeys {
+		if err := ch.QueueBind(q.Name, rk, exchange, false, nil); err != nil {
+			fail("綁定 "+rk, err)
+		}
+	}
+
+	msgs, err := ch.Consume(q.Name, "", true, true, false, false, nil)
+	if err != nil {
+		fail("consume", err)
+	}
+
+	fmt.Printf("在 %s 監聽 %s %v\n", q.Name, exchange, routingKeys)
+	deadline := time.After(timeout)
+	for {
+		select {
+		case d, ok := <-msgs:
+			if !ok {
+				fmt.Println("channel 已關閉")
+				return
+			}
+			var body any
+			if json.Unmarshal(d.Body, &body) == nil {
+				out, _ := json.MarshalIndent(body, "", "  ")
+				fmt.Printf("\n=== %s routing_key=%s ===\n%s\n", time.Now().UTC().Format(time.RFC3339), d.RoutingKey, out)
+			} else {
+				fmt.Printf("\n=== %s routing_key=%s（非 JSON）===\n%s\n", time.Now().UTC().Format(time.RFC3339), d.RoutingKey, d.Body)
+			}
+		case <-deadline:
+			fmt.Println("逾時，結束")
+			return
+		}
+	}
+}
+
+func fail(step string, err error) {
+	fmt.Fprintf(os.Stderr, "%s失敗：%v\n", step, err)
+	os.Exit(1)
+}

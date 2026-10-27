@@ -1,0 +1,180 @@
+syntax = "proto3";
+
+// content 模組給後台的 API：banner、App 版本門檻的維護。前台的 API 在 hawkr.content.v1alpha1。
+//
+// 修改以 etag 做樂觀鎖（ADR 2026-09-25-optimistic-concurrency-etag）：Update 必須帶讀到的 etag，
+// 沒帶回 INVALID_ARGUMENT，與目前版本不符回 ABORTED，detail 的 ErrorInfo.reason 是 VERSION_CONFLICT。
+// Delete 的 etag 選填，帶了就同樣檢查。
+//
+// 部分更新用 update_mask（Google AIP-134）：只改列出的欄位；沒帶時視為列出所有非零值的欄位，
+// 所以要清空或改成零值的欄位（例如停用、清掉按鈕文字）必須列出來；"*" 表示所有可修改的欄位。
+// 只支援最上層的欄位。只出現在回應的欄位列進去會被忽略。
+//
+// 圖片是 hawkr.common.v1alpha1.Image，只出現在回應（ADR 2026-09-25-api-image-uri-template）。
+// 換圖時在 *_staged_token 帶 media 上傳完成後拿到的 staged token；沒帶（或空字串）表示沿用目前的圖。
+package hawkr.admin.content.v1alpha1;
+
+import "hawkr/common/v1alpha1/image.proto";
+import "hawkr/content/v1alpha1/content.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+
+// ContentAdminService 只有管理員能呼叫。
+service ContentAdminService {
+  // ListBanners 列出全部 banner（含停用的），依顯示順序排列。
+  rpc ListBanners(ListBannersRequest) returns (ListBannersResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  rpc GetBanner(GetBannerRequest) returns (GetBannerResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // CreateBanner 新增 banner；預覽圖與彈窗圖都必須是新上傳的圖。
+  rpc CreateBanner(CreateBannerRequest) returns (CreateBannerResponse);
+
+  rpc UpdateBanner(UpdateBannerRequest) returns (UpdateBannerResponse);
+
+  // DeleteBanner 刪除 banner，並釋放它的圖片。
+  rpc DeleteBanner(DeleteBannerRequest) returns (DeleteBannerResponse);
+
+  // ListAppVersionGates 列出全部門檻設定。不分頁：每種 AppType 最多一組（App 只發 iOS）。
+  rpc ListAppVersionGates(ListAppVersionGatesRequest) returns (ListAppVersionGatesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // CreateAppVersionGate 建立一組還沒有設定的門檻；那一組已經存在時回 ALREADY_EXISTS，
+  // ErrorInfo.reason 是 VERSION_CONFLICT（有人先建立了，client 與版本衝突一樣處理）。
+  rpc CreateAppVersionGate(CreateAppVersionGateRequest) returns (CreateAppVersionGateResponse);
+
+  // UpdateAppVersionGate 修改一組已經存在的門檻，以 app_type 指定。
+  rpc UpdateAppVersionGate(UpdateAppVersionGateRequest) returns (UpdateAppVersionGateResponse);
+}
+
+// Banner 是首頁的一則 banner（設計書 25），含後台才需要的排程與編輯狀態。
+message Banner {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  string title = 2 [(google.api.field_behavior) = REQUIRED];
+  // 按鈕文字，最多 12 個字；空字串表示不顯示按鈕。
+  string button_text = 3;
+  // 預覽圖。
+  hawkr.common.v1alpha1.Image preview_image = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 換成剛上傳的預覽圖；空字串表示沿用現在的圖。
+  string preview_image_staged_token = 5 [(google.api.field_behavior) = INPUT_ONLY];
+  // 彈窗的大圖。
+  hawkr.common.v1alpha1.Image popup_image = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 換成剛上傳的彈窗圖；空字串表示沿用現在的圖。
+  string popup_image_staged_token = 7 [(google.api.field_behavior) = INPUT_ONLY];
+  // 後台編輯器的畫布狀態，後端不解讀。
+  string canvas_json = 8;
+  // 點擊之後的行為。
+  hawkr.content.v1alpha1.BannerAction action = 9 [(google.api.field_behavior) = REQUIRED];
+  // 顯示順序，小的在前。
+  int32 display_order = 10;
+  // 是否啟用；停用的 banner 前台看不到。啟用中的最多 20 則：超過時新增或改成啟用回 FAILED_PRECONDITION，
+  // 要先停用其他的。
+  bool active = 11;
+  // 顯示期間的開始（含）；沒有值表示立即生效。
+  google.protobuf.Timestamp start_time = 12;
+  // 顯示期間的結束（不含），必須晚於開始；沒有值表示沒有期限。只到某一天為止時，傳隔天的 00:00。
+  google.protobuf.Timestamp end_time = 13;
+  google.protobuf.Timestamp create_time = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 目前的版本，client 當成不透明的字串。修改時帶讀到的值。
+  string etag = 16;
+}
+
+// AppVersionGate 是一支 App 的最低可用版本（設計書 54），以 app_type 識別。App 只發 iOS。
+message AppVersionGate {
+  // 識別一組門檻。
+  hawkr.content.v1alpha1.AppType app_type = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_behavior) = IMMUTABLE
+  ];
+  // 最低可用版本，x.y.z 三段數字；低於它的 App 必須更新。
+  string minimum_version = 3 [(google.api.field_behavior) = REQUIRED];
+  // 前往更新的商店網址，只接受 https://、itms-apps:// 開頭；空字串表示還沒設定。
+  string store_url = 4;
+  // 強制更新畫面的標題。
+  string notice_title = 5;
+  // 強制更新畫面的內文。
+  string notice_body = 6;
+  google.protobuf.Timestamp update_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 目前的版本，client 當成不透明的字串。修改時帶讀到的值。
+  string etag = 8;
+}
+
+message ListBannersRequest {
+  // 每頁最多幾則。0 表示 50；超過 100 時以 100 計；負數回 INVALID_ARGUMENT。
+  int32 page_size = 1;
+  // 上一頁回應的 next_page_token；第一頁留空。其他欄位要與取得這個 token 的請求相同。
+  string page_token = 2;
+}
+
+message ListBannersResponse {
+  repeated Banner banners = 1;
+  // 下一頁的 token；空字串表示這是最後一頁。
+  string next_page_token = 2;
+}
+
+message GetBannerRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetBannerResponse {
+  Banner banner = 1;
+}
+
+message CreateBannerRequest {
+  // 兩個 *_staged_token 都必填。
+  Banner banner = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message CreateBannerResponse {
+  Banner banner = 1;
+}
+
+message UpdateBannerRequest {
+  // id 與 etag 必填。
+  Banner banner = 1 [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+message UpdateBannerResponse {
+  Banner banner = 1;
+}
+
+message DeleteBannerRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 選填；帶了就必須與目前的版本相符。
+  string etag = 2;
+}
+
+message DeleteBannerResponse {}
+
+message ListAppVersionGatesRequest {}
+
+message ListAppVersionGatesResponse {
+  // 依 app_type 排列；還沒設定的不會出現。
+  repeated AppVersionGate app_version_gates = 1;
+}
+
+message CreateAppVersionGateRequest {
+  // 不需要 etag。
+  AppVersionGate app_version_gate = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message CreateAppVersionGateResponse {
+  AppVersionGate app_version_gate = 1;
+}
+
+message UpdateAppVersionGateRequest {
+  // app_type 與 etag 必填。
+  AppVersionGate app_version_gate = 1 [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+message UpdateAppVersionGateResponse {
+  AppVersionGate app_version_gate = 1;
+}

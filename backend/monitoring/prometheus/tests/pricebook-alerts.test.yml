@@ -1,0 +1,49 @@
+rule_files:
+  - ../rules/pricebook-alerts.yml
+evaluation_interval: 30s
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'mq_consume_total{job="pricebook-service",queue="pricebook.seller.deleted",result="retry"}'
+        values: '0 0 1 1 1'
+      - series: 'mq_consume_total{job="other",queue="other.queue",result="retry"}'
+        values: '0 0 10 10 10'
+      - series: 'rabbitmq_detailed_queue_messages_ready{env="dev",queue="pricebook.seller.deleted.dlq",vhost="/"}'
+        values: '0 0 1 1 1'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: PricebookSellerCleanupFailed
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: PricebookSellerCleanupFailed
+        exp_alerts:
+          - exp_labels: {job: pricebook-service, queue: pricebook.seller.deleted, severity: warning}
+            exp_annotations:
+              summary: "Pricebook seller cleanup failed"
+              description: "Inspect pricebook.seller.deleted consumer logs and retry/DLQ before replaying the seller event."
+      - eval_time: 1m
+        alertname: PricebookSellerCleanupDLQ
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: PricebookSellerCleanupDLQ
+        exp_alerts:
+          - exp_labels: {env: dev, queue: pricebook.seller.deleted.dlq, vhost: '/', severity: critical}
+            exp_annotations:
+              summary: "Pricebook seller cleanup dead letter"
+              description: "Seller watch targets may remain; inspect the payload/error and replay after fixing the cause."
+  # The shared metric creates a result series on its first outcome, without a zero.
+  - interval: 1m
+    input_series:
+      - series: 'mq_consume_total{job="pricebook-service",queue="pricebook.seller.deleted",result="dlq"}'
+        values: '1+0x20'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: PricebookSellerCleanupFailed
+        exp_alerts:
+          - exp_labels: {job: pricebook-service, queue: pricebook.seller.deleted, severity: warning}
+            exp_annotations:
+              summary: "Pricebook seller cleanup failed"
+              description: "Inspect pricebook.seller.deleted consumer logs and retry/DLQ before replaying the seller event."
+      - eval_time: 15m
+        alertname: PricebookSellerCleanupFailed
+        exp_alerts: []

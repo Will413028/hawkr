@@ -1,0 +1,676 @@
+syntax = "proto3";
+
+package hawkr.account;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/account";
+option java_multiple_files = true;
+option java_package = "io.github.will413028.hawkr.account.grpc";
+option java_outer_classname = "AccountProto";
+
+// Account Service - 帳號認證服務
+service AccountService {
+    // Google OAuth 登入/註冊
+    rpc GoogleOAuth(GoogleOAuthRequest) returns (AuthResponse);
+    rpc AppleOAuth(AppleOAuthRequest) returns (AuthResponse);
+
+    // 驗證用戶 Token
+    rpc ValidateUser(ValidateUserRequest) returns (ValidateUserResponse);
+
+    // 手機驗證
+    rpc VerifyPhone(VerifyPhoneRequest) returns (VerifyPhoneResponse);
+
+    // 發送手機 OTP 簡訊（後端經三竹發送，51 號設計書）
+    rpc SendOtp(SendOtpRequest) returns (SendOtpResponse);
+
+    // Token 刷新
+    rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
+
+    // 獲取帳號信息
+    rpc GetAccountInfo(GetAccountInfoRequest) returns (AccountInfoResponse);
+
+    // 批量獲取帳號信息
+    rpc GetAccountInfoBatch(GetAccountInfoBatchRequest) returns (AccountInfoBatchResponse);
+
+    // 檢查手機號是否可用
+    rpc CheckPhone(CheckPhoneRequest) returns (CheckPhoneResponse);
+
+    // 依手機號查詢帳號資訊
+    rpc GetAccountByPhone(GetAccountByPhoneRequest) returns (AccountInfoResponse);
+
+    // 綁定賣家
+    rpc BindSeller(BindSellerRequest) returns (BindSellerResponse);
+
+    // 綁定買家角色（buyer-service 建立 buyer row 後補 account_type 的 buyer bit）
+    rpc BindBuyer(BindBuyerRequest) returns (BindBuyerResponse);
+
+    // 管理員帳號密碼登入
+    rpc AdminLogin(AdminLoginRequest) returns (AdminLoginResponse);
+
+    // 管理員 Google SSO 登入（驗 Google idToken + admin_account allowlist）
+    rpc AdminGoogleLogin(AdminGoogleLoginRequest) returns (AdminLoginResponse);
+
+    // 停權帳號（審核處置，區別於軟刪除；不動 deleted_at）。寫 accounts.status
+    // 與 account:blocked:<id> 兩者——後者是前者的衍生快取，同一個 use case 內寫
+    // 完，呼叫端不需要（也不應該）自己碰 Redis。
+    rpc SuspendAccount(SuspendAccountRequest) returns (SuspendAccountResponse);
+
+    // 解除停權（#2053）：DEL account:blocked:<id> 後把 status 寫回 active。
+    // 順序不可顛倒——先寫 status 會產生「SSOT 說 active、衍生快取說 blocked」的
+    // 中間態，帳號各處看起來正常卻每個請求都 401。詳見 17 號設計書
+    //「帳號停權與解除停權」。軟刪帳號不可解除（GetByID 的 deleted_at IS NULL
+    // 即為該防線：軟刪路徑寫的是同一把 key，放行等於清掉「已刪除」的證據）。
+    rpc UnsuspendAccount(UnsuspendAccountRequest) returns (UnsuspendAccountResponse);
+
+    // Admin 會員管理唯讀面（#2053）。以 accounts 為主軸而非 buyers：可施加的
+    // 狀態動作全部 key 在 account_id，且 buyers 含大量已軟刪帳號的殘留 stint。
+    rpc ListAccountsForAdmin(ListAccountsForAdminRequest) returns (ListAccountsForAdminResponse);
+    rpc GetAccountForAdmin(GetAccountForAdminRequest) returns (GetAccountForAdminResponse);
+
+    // RemoveRole removes a single role from an account. If no roles remain,
+    // the account is fully soft-deleted (Apple revoke + Redis blacklist + MQ).
+    rpc RemoveRole(RemoveRoleRequest) returns (RemoveRoleResponse);
+
+    // ==================== Auth Multi-Provider (M3 cutover) ====================
+
+    // LinkConfirm consumes a tempBindToken (issued by Google/Apple OAuth on
+    // 1304 email collision) and atomically links the new (provider, sub_id)
+    // to the existing target account. Returns AuthData on success.
+    rpc LinkConfirm(LinkConfirmRequest) returns (LinkConfirmResponse);
+
+    // ListAuthProviders lists all auth_provider links bound to the calling
+    // account.
+    rpc ListAuthProviders(ListAuthProvidersRequest) returns (ListAuthProvidersResponse);
+
+    // BindAuthProvider binds a new (provider, sub_id) to the calling account
+    // — used by "從個人中心新增登入方式" flow. The server performs token
+    // verification before persisting the link.
+    rpc BindAuthProvider(BindAuthProviderRequest) returns (BindAuthProviderResponse);
+
+    // UnbindAuthProvider removes an auth_provider link from the calling
+    // account. For Apple links, also enqueues an apple_revoke_outbox row.
+    rpc UnbindAuthProvider(UnbindAuthProviderRequest) returns (UnbindAuthProviderResponse);
+
+    // Web session 的持久層（issue #1592 建立，#2014 → PR #2022 起升為 SSOT）：
+    // `web_sessions` row 是 web session 的唯一真實來源，Redis 只是加速層，因此
+    // 每個 Redis miss／error 都會 read-through 打到這組 RPC，不限於 outage。
+    // gateway-internal only，never HTTP-facing.
+    // PersistWebSession 是 MINT：登入時建立這個 token 的 row。
+    rpc PersistWebSession(PersistWebSessionRequest) returns (PersistWebSessionResponse);
+    // TouchWebSession 是 SLIDE：只延長「已存在」的 row，絕不 INSERT。
+    // row 不在 = 該 session 已被撤銷（登出／軟刪／停權），呼叫端必須停止承認它。
+    rpc TouchWebSession(TouchWebSessionRequest) returns (TouchWebSessionResponse);
+    rpc GetWebSession(GetWebSessionRequest) returns (GetWebSessionResponse);
+    rpc DeleteWebSession(DeleteWebSessionRequest) returns (DeleteWebSessionResponse);
+
+    // ==================== 憑證撤銷（stateless JWT，#2035） ====================
+    //
+    // web session 的撤銷＝刪 web_sessions row（上面那組 RPC）。mobile / admin 的
+    // Bearer JWT 沒有任何伺服器端紀錄可刪，所以撤銷必須自己有一張表：
+    // RevokeToken 撤一枚（登出），RevokeAllCredentials 推進帳號的 auth_epoch
+    // 讓它之前簽出的全部作廢（登出全部裝置、角色移除、事故救援）。
+    // CheckCredential 是 gateway 在 Redis 答不出來時的重建路徑——與
+    // #2050 的 blacklist 重建同一個形狀，且同樣 fail-open。
+    rpc RevokeToken(RevokeTokenRequest) returns (RevokeTokenResponse);
+    rpc RevokeAllCredentials(RevokeAllCredentialsRequest) returns (RevokeAllCredentialsResponse);
+    rpc CheckCredential(CheckCredentialRequest) returns (CheckCredentialResponse);
+
+    // ========== Admin: Account Statistics ==========
+    rpc GetAccountStatsForAdmin(GetAccountStatsForAdminRequest) returns (GetAccountStatsForAdminResponse);
+}
+
+// ==================== Auth Messages ====================
+
+message GoogleOAuthRequest {
+    string id_token = 1;     // Google ID Token
+    string phone = 2;        // 手機號 (新用戶第二輪帶 OTP 驗證過的門號)
+    int32 user_type = 3;     // 用戶類型 (新用戶): 1=買家, 2=賣家
+    reserved 4;              // was: firebase_phone_id_token（Firebase Phone Auth 退役，51 號）
+    string fcm_token = 5;    // FCM Token
+    string platform = 6;     // Device Platform
+    string otp_code = 7;     // 手機 OTP 6 位碼（新用戶第二輪；後端經三竹發送，51 號）
+
+    // 本次登入是否需要 bearer 憑證對（access token ＋ refresh token）。
+    //
+    // web 登入路徑（WebGoogleOAuth / WebAppleOAuth / AdminGoogleOAuth）拿到 JWT
+    // 之後整個丟掉、改用 issueWebSession 鑄 opaque cookie session，所以不需要。
+    // 讓意圖寫在呼叫點上，而不是靠 usecase 猜——否則每次 web 登入都會產生一條
+    // 永遠不會被使用的輪替鏈，90 天才自然到期。
+    bool issue_refresh_token = 8;
+}
+
+message AppleOAuthRequest {
+    string identity_token          = 1;  // Apple JWT（必填）
+    string apple_uid               = 2;  // userIdentifier，帳號主鍵（必填）
+    int32  user_type               = 3;  // 1=buyer, 2=seller（必填）
+    reserved 4;                          // was: firebase_phone_id_token（Firebase Phone Auth 退役，51 號）
+    string fcm_token               = 5;  // FCM token
+    string platform                = 6;  // ios（App）/ web
+    string email                   = 7;  // 可為 relay 或空
+    string given_name              = 8;  // fullName.givenName
+    string family_name             = 9;  // fullName.familyName
+    string authorization_code      = 10; // Apple OAuth authorization_code (used to exchange refresh_token for revoke flow); optional
+    string phone                   = 11; // 手機號 (新用戶第二輪帶 OTP 驗證過的門號)
+    string otp_code                = 12; // 手機 OTP 6 位碼（新用戶第二輪；後端經三竹發送，51 號）
+
+    // 本次登入是否需要 bearer 憑證對（access token ＋ refresh token）。見
+    // GoogleOAuthRequest.issue_refresh_token。
+    bool issue_refresh_token       = 13;
+}
+
+message AuthResponse {
+    int32 code = 1;
+    string message = 2;
+    AuthData data = 3;
+    bool need_phone_verification = 4;  // 是否需要手機驗證 (Google OAuth 新用戶)
+}
+
+message AuthData {
+    string token = 1;
+    string refresh_token = 2;
+    string expires_in = 3;
+    string account_id = 4;
+    reserved 5;  // was: account_type (string, now replaced by int32 field 9)
+    reserved 10;  // was: merchant_id (payuni_mer_id string)
+    string nickname = 7;
+    string avatar = 8;
+    int32 account_type = 9;  // 帳號類型 Bitmask: 1=Buyer, 2=Seller, 3=Both
+    string email = 11;
+}
+
+// ==================== Validation Messages ====================
+
+message ValidateUserRequest {
+    string token = 1;
+}
+
+message ValidateUserResponse {
+    int32 code = 1;
+    string message = 2;
+    bool valid = 3;
+    string account_id = 4;
+    string account_type = 5;
+    reserved 10;  // was: merchant_id (payuni_mer_id string)
+}
+
+message VerifyPhoneRequest {
+    int64 account_id = 1;
+    reserved 2;             // was: firebase_token（Firebase Phone Auth 退役，51 號）
+    string phone = 3;
+    string otp_code = 4;    // 手機 OTP 6 位碼（後端經三竹發送，51 號）
+}
+
+message VerifyPhoneResponse {
+    int32 code = 1;
+    string message = 2;
+    bool success = 3;
+    AccountInfo account = 4;
+}
+
+// ==================== OTP Messages（51 號設計書）====================
+
+message SendOtpRequest {
+    string phone = 1;                 // 手機號（前端可控，§4 規範一律 string）
+    string rate_limit_subject = 2;    // Gateway 注入的限流身分 v:<ip> / s:ssr / s:ci（§4.1 exception #1，前端不可控）
+}
+
+message SendOtpResponse {
+    int32 code = 1;                       // 業務碼（0=成功）
+    string message = 2;                   // 文案
+    string resend_cooldown_seconds = 3;   // 前端倒數提示秒數（§4 規範：數字欄位一律 string）
+}
+
+message RefreshTokenRequest {
+    string refresh_token = 1;
+}
+
+message RefreshTokenResponse {
+    int32 code = 1;
+    string message = 2;
+    string token = 3;
+    string refresh_token = 4;
+    int64 expires_in = 5;
+}
+
+// ==================== Account Info Messages ====================
+
+message GetAccountInfoRequest {
+    int64 account_id = 1;
+}
+
+message GetAccountInfoBatchRequest {
+    repeated int64 account_ids = 1;
+}
+
+message AccountInfoResponse {
+    int32 code = 1;
+    string message = 2;
+    AccountInfo data = 3;
+}
+
+message AccountInfoBatchResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated AccountInfo data = 3;
+}
+
+message AccountInfo {
+    int64 account_id = 1;
+    string email = 2;
+    string phone = 3;
+    string status = 4;
+    string firebase_uid = 5;
+    int64 created_at = 6;
+    int64 updated_at = 7;
+    string nickname = 8;
+    string avatar = 9;
+    int32 account_type = 10;
+}
+
+// ==================== Get Account By Phone Messages ====================
+
+message GetAccountByPhoneRequest {
+    string phone = 1;
+}
+
+// ==================== Check Phone Messages ====================
+
+message CheckPhoneRequest {
+    string phone = 1;
+}
+
+message CheckPhoneResponse {
+    int32 code = 1;
+    string message = 2;
+    bool available = 3;
+}
+
+// ==================== Bind Seller Messages ====================
+
+message BindSellerRequest {
+    int64 account_id = 1;
+    reserved 2, 3;  // was: seller_id (int64), merchant_id (string)
+    // source_id 是「造成這次授予的那個實體」——seller 角色填 sellers.store_id
+    // （該次入駐的 stint surrogate）。account-service 把它記在 account_roles 上，
+    // 之後的撤銷必須指名同一個 source_id 才會生效（見 RemoveRoleRequest.source_id）。
+    // 0 = 未歸因（account-service 內部授予）：這種授予任何撤銷都撤得掉。
+    int64 source_id = 4;
+}
+
+message BindSellerResponse {
+    int32 code = 1;
+    string message = 2;
+    bool success = 3;
+}
+
+message BindBuyerRequest {
+    int64 account_id = 1;
+    // 同 BindSellerRequest.source_id；buyer 角色填 buyers.buyer_id。
+    int64 source_id = 2;
+}
+
+message BindBuyerResponse {
+    int32 code = 1;
+    string message = 2;
+    bool success = 3;
+}
+
+// ==================== Admin Login Messages ====================
+
+message AdminLoginRequest {
+    string email    = 1;
+    string password = 2;
+
+    // 本次登入是否需要 bearer 憑證對（access token ＋ refresh token）。見
+    // GoogleOAuthRequest.issue_refresh_token 的欄位語意——但與該欄位不同，
+    // admin 密碼登入唯一的 gateway 呼叫端（account_client.go 的 AdminLogin）
+    // 固定帶 false：admin 前端已改走 AdminGoogleLogin/AdminGoogleOAuth（SSO、
+    // cookie session），密碼登入路徑不需要再開一條輪替鏈；account-service
+    // 的 AdminLogin handler 也不消費這個欄位（issue #1544 L2 Task 3 fix
+    // round 1）。欄位留在 proto 上是為了未來若真的需要 bearer-only admin
+    // client 時不必再加欄位。
+    bool issue_refresh_token = 3;
+}
+
+message AdminGoogleLoginRequest {
+    string id_token = 1;
+}
+
+message AdminLoginResponse {
+    int32    code    = 1;
+    string   message = 2;
+    AuthData data    = 3;
+}
+
+// ==================== Suspend Account Messages ====================
+
+message SuspendAccountRequest {
+    int64 account_id = 1;
+    string reason = 2;
+}
+
+message SuspendAccountResponse {
+    bool success = 1;
+}
+
+message UnsuspendAccountRequest {
+    int64 account_id = 1;
+    string reason = 2;
+}
+
+message UnsuspendAccountResponse {
+    bool success = 1;
+}
+
+// ==================== Admin 會員管理（#2053） ====================
+//
+// 所有數字欄位在 response 側一律 string（10 檔 §4）：account_id 是 10 位數、
+// 統計值會成長，兩者都要跨 gateway 進 JS。request 側的 page/limit 維持原生
+// int32——它們不回傳，沒有 Number.MAX_SAFE_INTEGER 風險。
+
+message AdminAccountItem {
+    string account_id = 1;
+    string email = 2;
+    string phone = 3;
+    // status 為 accounts.status 原值：active / suspended / inactive。
+    string status = 4;
+    // is_buyer / is_seller 由 accounts.account_type bitmask 展開。該 bitmask 是
+    // 反正規化值、已知會與 seller/buyer 表漂移（#1544），**僅供顯示與篩選**，
+    // 不得用來決定是否執行破壞性動作。
+    bool is_buyer = 5;
+    bool is_seller = 6;
+    string created_at = 7;  // ISO 8601 UTC
+    string updated_at = 8;  // ISO 8601 UTC
+}
+
+// AdminAccountStats 是全站統計，**不受列表篩選影響**——admin 頁面的卡片問的是
+// 「平台總共有多少會員」，不是「這一頁有多少」。因此它走獨立端點
+// GetAccountStatsForAdmin，而非內嵌在列表回應裡：內嵌會讓每次翻頁都重算五個
+// 全表 COUNT 聚合，而這些數字根本不隨分頁改變。
+message AdminAccountStats {
+    string total = 1;
+    string active = 2;
+    string suspended = 3;
+    string seller = 4;
+    string buyer = 5;
+}
+
+message AdminAccountListData {
+    repeated AdminAccountItem list = 1;
+    string total = 2;   // 符合篩選條件的總筆數（分頁用）
+    string page = 3;
+    string limit = 4;
+}
+
+message ListAccountsForAdminRequest {
+    int32 page = 1;
+    int32 limit = 2;
+    string status = 3;        // active / suspended / inactive；空字串 = 不篩選
+    string keyword = 4;       // account_id 精確、或 email / phone ILIKE 包含
+    string account_type = 5;  // buyer / seller；空字串 = 不篩選
+}
+
+message ListAccountsForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    AdminAccountListData data = 3;
+}
+
+message GetAccountForAdminRequest {
+    int64 account_id = 1;
+}
+
+message GetAccountForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    AdminAccountItem data = 3;
+}
+
+// ==================== Remove Role Messages ====================
+
+enum Role {
+    ROLE_UNSPECIFIED = 0;
+    ROLE_BUYER       = 1;
+    ROLE_SELLER      = 2;
+}
+
+// 呼叫方對「帳號另一個角色是否還活著」的判定結果。
+// 未帶 / 查詢失敗一律是 UNKNOWN，account-service 據此 fail-closed 不 cascade。
+enum OtherRoleState {
+    OTHER_ROLE_STATE_UNKNOWN = 0;
+    OTHER_ROLE_STATE_ACTIVE  = 1;
+    OTHER_ROLE_STATE_ABSENT  = 2;
+}
+
+message RemoveRoleRequest {
+    int64 account_id = 1;
+    Role  role       = 2;
+    OtherRoleState other_role_state = 3;
+    // source_id 是「授權這次撤銷的那個實體」——seller 角色填被關閉的
+    // sellers.store_id。撤銷只在當前授予正是由同一個 source_id 造成時才生效：
+    //
+    //   UPDATE account_roles ... WHERE revoked_at IS NULL
+    //     AND (source_id IS NULL OR source_id = @source_id)
+    //
+    // 這道柵欄存在的理由是撤銷會延遲執行（seller-service 的 outbox worker 重試
+    // 退避最長數小時），期間帳號可能已經重新入駐並取得一筆**較新**的授予。沒有
+    // 柵欄時，過期的撤銷會蓋掉那筆合法授予，受害者變成「有店、無角色」且無自癒
+    // 路徑。柵欄比對就在那一句 UPDATE 裡，不存在 check-then-act 的競態窗口。
+    //
+    // 0 = 不指名來源：只撤得掉 source_id IS NULL 的未歸因授予。
+    int64 source_id = 4;
+}
+
+message RemoveRoleResponse {
+    int32  code                  = 1;
+    string message               = 2;
+    bool   account_fully_deleted = 3;  // true 表示這次移除導致整 account inactive
+}
+
+// ==================== Auth Multi-Provider Messages (M3) ====================
+
+// LinkConfirmRequest carries the tempBindToken issued by OAuth login when an
+// email collision (1304) was detected.
+message LinkConfirmRequest {
+    string temp_bind_token = 1;
+    // user_type is the session role (1=buyer, 2=seller) the link should
+    // land in. Optional — 0 / out-of-range values default to buyer.
+    // Drives the loginRole claim in the resulting JWT (issue #812).
+    int32  user_type       = 2;
+
+    // 本次登入是否需要 bearer 憑證對（access token ＋ refresh token）。見
+    // GoogleOAuthRequest.issue_refresh_token. gateway 的 LinkConfirm handler
+    // 同時服務 mobile bearer 與 web cookie-session（platform=="web"）兩種
+    // 呼叫，依 platform 決定這個欄位——不是固定 true。
+    bool issue_refresh_token = 3;
+}
+
+// LinkConfirmResponse mirrors AuthData on success. Errors are returned as
+// gRPC status codes (Unauthenticated for token issues, FailedPrecondition
+// with AuthErrorDetail for 1305/1306/1307).
+message LinkConfirmResponse {
+    string token         = 1;
+    string refresh_token = 2;
+    string account_id    = 3;
+    int32  account_type  = 4;  // bitmask 1=buyer, 2=seller, 3=both
+    string expires_in    = 5;  // seconds
+    string email         = 6;
+}
+
+// ListAuthProvidersRequest queries links bound to a specific account.
+// account_id is set by the gateway from the JWT context.
+message ListAuthProvidersRequest {
+    int64 account_id = 1;
+}
+
+// AuthProviderInfo is a sanitized view of an auth_provider link returned to
+// clients. Sensitive fields (raw_payload, provider_sub_id) are omitted.
+message AuthProviderInfo {
+    string                      id            = 1;
+    string                      provider      = 2;  // "google" | "apple" | "line" | "meta"
+    string                      email         = 3;
+    string                      display_name  = 4;
+    google.protobuf.Timestamp   linked_at     = 5;
+    google.protobuf.Timestamp   last_used_at  = 6;
+}
+
+message ListAuthProvidersResponse {
+    repeated AuthProviderInfo providers = 1;
+}
+
+// BindAuthProviderRequest binds a new (provider, sub_id) to account_id. The
+// server verifies id_token (google/apple/line) or access_token (meta) before
+// persisting. account_id is set by the gateway from the JWT context.
+message BindAuthProviderRequest {
+    int64  account_id   = 1;
+    string provider     = 2;  // "google" | "apple" | "line" | "meta"
+    string id_token     = 3;  // for google / apple / line
+    string access_token = 4;  // for meta
+}
+
+// BindAuthProviderResponse returns the new auth_provider link ID on success.
+// Errors are returned as gRPC status:
+//   - FailedPrecondition + AuthErrorDetail{code=1305} when (provider, sub_id)
+//     is bound to a different account
+//   - FailedPrecondition + AuthErrorDetail{code=1306} when already bound to
+//     the calling account
+//   - Unimplemented when provider is line/meta (until #650/#651 land)
+message BindAuthProviderResponse {
+    string id = 1;
+}
+
+// UnbindAuthProviderRequest removes link_id from account_id. account_id is
+// set by the gateway from the JWT context.
+message UnbindAuthProviderRequest {
+    int64 account_id = 1;
+    int64 link_id    = 2;
+}
+
+// UnbindAuthProviderResponse is empty on success. Errors are returned as
+// gRPC status:
+//   - NotFound when link_id does not belong to account_id
+//   - FailedPrecondition + AuthErrorDetail{code=1307} when removing the link
+//     would leave the account with zero auth providers
+message UnbindAuthProviderResponse {}
+
+// AuthErrorDetail carries typed error context across the gRPC boundary for
+// the auth-link error family (1304/1305/1306/1307). Attached as a Status
+// detail on FailedPrecondition errors.
+//
+// Fields are only populated for the codes that need them; e.g. 1304 carries
+// temp_bind_token + existing_account_id + existing_providers + masked_email,
+// while 1306/1307 carry only `code`.
+message AuthErrorDetail {
+    int32           code               = 1;  // 1304 | 1305 | 1306 | 1307
+    string          temp_bind_token    = 2;  // 1304 only
+    int64           existing_account_id = 3; // 1304 only
+    repeated string existing_providers = 4;  // 1304 / 1305 (lowercased: "google" etc.)
+    string          masked_email       = 5;  // 1304 only
+}
+
+message PersistWebSessionRequest {
+    string token_hash = 1;
+    int64 account_id = 2;
+    int32 account_type = 3;
+    int32 login_role = 4;
+    google.protobuf.Timestamp expires_at = 5;
+}
+
+message PersistWebSessionResponse {}
+
+// TouchWebSession extends an EXISTING session row (the gateway's idle-TTL
+// slide) and updates the role fields the session may have changed. It never
+// inserts: a token whose row is gone was revoked, and re-creating it here is
+// exactly how a slide used to undo a logout.
+//
+// account_id is deliberately absent — the row owns its account and the touch
+// must not be able to rewrite it.
+message TouchWebSessionRequest {
+    string token_hash = 1;
+    int32 account_type = 2;
+    int32 login_role = 3;
+    google.protobuf.Timestamp expires_at = 4;
+}
+
+// found=false means no row matched the token hash: the session is revoked and
+// the caller must stop honouring the cached copy it still holds.
+message TouchWebSessionResponse {
+    bool found = 1;
+}
+
+message GetWebSessionRequest {
+    string token_hash = 1;
+}
+
+message GetWebSessionResponse {
+    int64 account_id = 1;
+    int32 account_type = 2;
+    int32 login_role = 3;
+}
+
+message DeleteWebSessionRequest {
+    string token_hash = 1;
+}
+
+message DeleteWebSessionResponse {}
+
+// ==================== 憑證撤銷（#2035） ====================
+//
+// token_hash = sha256(JWT) hex，與 web_sessions.token_hash 同一個推導
+// （pkg/redis.HashToken）。原始 token 不離開 gateway。
+//
+// account_id / account_type 為 int32/int64 原生型別：這幾支是 gateway-internal
+// RPC，欄位由 gateway 從已驗簽的 JWT 注入，前端不可控（10 檔 §4.1 例外 1、例外 3）。
+// account_type 決定 auth_epoch 落在哪張表：4=admin → admin_accounts，其餘 → accounts。
+message RevokeTokenRequest {
+    string token_hash = 1;
+    int64 account_id = 2;
+    int32 account_type = 3;
+    // issued_at 是 JWT 的 iat。保留期取 max(expires_at, issued_at + refresh 寬限期)：
+    // 一枚 token 過了 exp 仍能在寬限期內換新，撤銷紀錄必須活得比那個窗口久，
+    // 否則「登出後拿舊 token 去 refresh」會把撤銷整個繞過去。
+    google.protobuf.Timestamp issued_at = 4;
+    google.protobuf.Timestamp expires_at = 5;
+    // family_id 鏡射 access token 的 additive claim `fid`（issue #1544 L2 §3.3），
+    // 0 為缺席（pre-L2 token、demo_login.go 在 gateway 內自簽的 token）。gateway
+    // 已經為了 account_id/account_type/issued_at/expires_at 解過這枚 JWT，這裡
+    // 多讀一個既有欄位，不需要、也沒有把原始 token 轉發過來——那條界線
+    // （見上方檔頭註解「原始 token 不離開 gateway」）不變。單一裝置登出用它
+    // 定位要連帶作廢的 refresh 輪替鏈；帳號級的 logout-all 走
+    // RevokeAllCredentialsRequest，不需要這個欄位。
+    int64 family_id = 6;
+}
+
+message RevokeTokenResponse {}
+
+message RevokeAllCredentialsRequest {
+    int64 account_id = 1;
+    int32 account_type = 2;
+}
+
+message RevokeAllCredentialsResponse {}
+
+message CheckCredentialRequest {
+    string token_hash = 1;
+    int64 account_id = 2;
+    int32 account_type = 3;
+    google.protobuf.Timestamp issued_at = 4;
+}
+
+// revoked=true 是唯一能讓呼叫端拒絕請求的答案。任何錯誤都不是「已撤銷」的證據，
+// 所以錯誤走 gRPC error 而非 revoked=true——呼叫端據此 fail-open。
+message CheckCredentialResponse {
+    bool revoked = 1;
+}
+
+// ========== Admin: Account Statistics Messages ==========
+
+message GetAccountStatsForAdminRequest {}
+
+message GetAccountStatsForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    AdminAccountStats data = 3;
+}
+

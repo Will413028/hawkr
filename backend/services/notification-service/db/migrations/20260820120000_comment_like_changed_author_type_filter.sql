@@ -1,0 +1,46 @@
+-- comment.like_changed 只有一張 template（id=851819712504397824，
+-- target_user_type='seller'、target_user_field='commentAuthorId'），但**任何人的留言
+-- 都會被按讚**，不只賣家的。
+--
+-- 13 號設計書 §12.1：user_type='seller' 的 inbox 列，user_id 必須是 account_id；
+-- user_type='buyer' 的列必須是當前 buyer_id。而 social-service 的
+-- CommentUseCase.ToggleLike 是依作者角色各自填對應身分空間的值
+-- （賣家作者 store_id → ResolvePrincipal 成 account_id、買家作者維持 buyer_id）。
+-- 沒有 filter 的情況下，買家作者的 buyer_id 會被寫進一列 user_type='seller' 的
+-- notifications ⇒ 賣家收件匣以 account_id 查，這一列**永遠沒有任何人讀得到**，
+-- 且 FCM device token 也是 (user_id, user_type) 索引 ⇒ 推播同時消失，
+-- 沒有任何錯誤訊號（#1626）。
+--
+-- 修法沿用本表既有的「payload_filter 分流共用 routing key」pattern
+-- （20260729130000_comment_dedup_payload_filter.sql 對 comment.created /
+-- comment.replied 用 postAuthorType / replyToUserType 分流）。social-service 原本
+-- 不發作者角色，本次同批在 CommentLikeChangedEvent 補上 commentAuthorType
+-- （"buyer" | "seller"，取自 cms_comment.role，與 comment.replied 的
+-- replyToUserType 同源同慣例），golden fixture 已同步。
+--
+-- ⚠️ 買家作者側**刻意不新增對應 template**，不是漏補：
+--   1. 本事件的文案是賣家專屬語意（'❤️ 買家喜歡你的回覆！你的專業解答讓 … 覺得很
+--      有幫助。'），買家版需要另寫文案 = 產品決策，不由本修復代為假設；
+--   2. 買家端沒有任何前端消費者認得對應的 data.type（buyer App
+--      destination.dart 的 switch 無 COMMENT_LIKED case），現在補一張只會產生
+--      「點了沒反應」的通知。
+-- 要補的話走 13 號 §5.2 的新增流程（先立 data.type ＋ 落地頁，再加 template），
+-- 而不是在這裡塞一張。在那之前，買家作者的按讚**不發通知**——這比現況（寫一列
+-- 沒人讀得到的垃圾列）嚴格更好。
+--
+-- ⚠️ 用 $ne "buyer" 而不是等值 "seller"，是為了**部署順序相容**（expand-contract）：
+-- 這支 migration 由 notification-service 啟動時套用，而發欄位的是 social-service，
+-- 兩者各自 rollout、順序不保證，再加上 5 分鐘 template cache。等值形在
+-- 「migration 已套、social-service 還沒上」的窗口內會讓 commentAuthorType 缺席
+-- ⇒ filter 恆不命中 ⇒ **賣家的按讚通知整條停掉**。matchesFilter 對 $ne 的定義是
+-- 「key 不存在視為必然不等於 ⇒ 通過」（internal/domain/notification_template.go:26-45），
+-- 所以舊 publisher 的訊息維持現況行為、新 publisher 的買家作者被擋掉，兩個方向都安全；
+-- queue 內已積壓的舊訊息同理。
+-- 代價是 fail-open：publisher 哪天不發這個欄位就會退回現況。守它的是 social-service
+-- 的兩支單元測試（TestCommentUC_ToggleLike_SellerAuthor… / …BuyerAuthor…，各自斷言
+-- commentAuthorType 的值）＋ 本表的契約測試（payload_filter key 必須在 golden
+-- emitted_keys 內）。
+UPDATE "notification_templates"
+SET payload_filter = '{"action": "LIKE", "commentAuthorType": {"$ne": "buyer"}}'::jsonb
+WHERE event_type = 'comment.like_changed'
+  AND target_user_type = 'seller';

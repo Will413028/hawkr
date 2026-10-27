@@ -1,0 +1,322 @@
+/* 商務線 demo：買家出價 → 賣家決定 → 買家確認。
+ * 沿用 hkui token，與 procurement-rfq-prototype 的視覺語彙一致但獨立，
+ * 動這裡不會影響那份設計預覽。 */
+
+.shell {
+	max-width: 880px;
+	margin: 0 auto;
+	padding: clamp(20px, 4vw, 48px) clamp(16px, 3vw, 32px) 96px;
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+	color: var(--hkui-foreground);
+	font-family: var(--font-primary);
+}
+
+.head {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding-bottom: 18px;
+	border-bottom: 1px solid var(--hkui-divider);
+}
+
+.head h1 {
+	margin: 4px 0 0;
+	font-size: clamp(1.375rem, 3.4vw, 1.875rem);
+	font-weight: 700;
+	line-height: 1.25;
+	text-wrap: balance;
+}
+
+.eyebrow {
+	margin: 0;
+	font-size: 0.75rem;
+	letter-spacing: 0.08em;
+	color: var(--hkui-foreground-muted, var(--hkui-foreground));
+	opacity: 0.7;
+}
+
+.flag {
+	margin: 0;
+	padding: 10px 12px;
+	border-left: 3px solid var(--hkui-primary, currentColor);
+	background: color-mix(in srgb, var(--surface-page) 92%, transparent);
+	font-size: 0.84375rem;
+	line-height: 1.7;
+}
+
+.steps {
+	list-style: none;
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 10px;
+	margin: 0;
+	padding: 0;
+}
+
+.steps li {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 12px 14px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: 10px;
+	opacity: 0.55;
+}
+
+.steps li[data-done="true"] {
+	opacity: 0.85;
+}
+
+.stepCurrent {
+	opacity: 1 !important;
+	border-color: var(--hkui-primary, currentColor);
+	background: color-mix(in srgb, var(--surface-page) 90%, transparent);
+}
+
+.stepIndex {
+	display: grid;
+	place-items: center;
+	width: 24px;
+	height: 24px;
+	flex: none;
+	border-radius: 50%;
+	border: 1px solid currentColor;
+	font-size: 0.75rem;
+	font-variant-numeric: tabular-nums;
+}
+
+.steps strong {
+	display: block;
+	font-size: 0.875rem;
+	font-weight: 600;
+}
+
+.steps small {
+	font-size: 0.71875rem;
+	opacity: 0.7;
+}
+
+.panel {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	padding: 18px 18px 20px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: 12px;
+	background: color-mix(in srgb, var(--surface-page) 96%, transparent);
+}
+
+.panel h2 {
+	margin: 0;
+	font-size: 1.0625rem;
+	font-weight: 700;
+}
+
+.panelNote {
+	margin: 0;
+	font-size: 0.84375rem;
+	line-height: 1.75;
+	opacity: 0.82;
+}
+
+.fields {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	gap: 12px 18px;
+	margin: 0;
+}
+
+.field dt {
+	font-size: 0.71875rem;
+	letter-spacing: 0.06em;
+	opacity: 0.65;
+	margin-bottom: 3px;
+}
+
+.field dd {
+	margin: 0;
+	font-size: 0.9375rem;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+
+.fieldEmpty {
+	font-weight: 400;
+	opacity: 0.5;
+}
+
+.marketRange {
+	margin: 0;
+	font-size: clamp(1.25rem, 3vw, 1.625rem);
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 12px;
+}
+
+.marketMid {
+	font-size: 0.875rem;
+	font-weight: 500;
+	opacity: 0.7;
+}
+
+.priceGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+	gap: 12px;
+}
+
+.priceGrid label {
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+	font-size: 0.78125rem;
+}
+
+.priceGrid input {
+	padding: 9px 11px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: 8px;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	font-size: 0.9375rem;
+	font-variant-numeric: tabular-nums;
+}
+
+.priceGrid input:focus-visible,
+.demoCta:focus-visible,
+.demoCtaMuted:focus-visible,
+.demoCtaLink:focus-visible {
+	outline: 2px solid var(--hkui-primary, currentColor);
+	outline-offset: 2px;
+}
+
+.recipients {
+	list-style: none;
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	gap: 10px;
+	margin: 0;
+	padding: 0;
+}
+
+.recipients li {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	padding: 11px 13px;
+	border: 1px solid var(--hkui-divider);
+	border-radius: 9px;
+}
+
+.recipients strong {
+	font-size: 0.90625rem;
+	font-weight: 600;
+}
+
+.recipients span {
+	font-size: 0.71875rem;
+	opacity: 0.72;
+}
+
+.recipients small {
+	font-size: 0.75rem;
+	opacity: 0.68;
+	font-variant-numeric: tabular-nums;
+}
+
+.sellerActions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+}
+
+.demoCta,
+.demoCtaMuted,
+.demoCtaLink {
+	font: inherit;
+	font-size: 0.875rem;
+	font-weight: 600;
+	border-radius: 9px;
+	cursor: pointer;
+}
+
+.demoCta {
+	align-self: flex-start;
+	padding: 10px 18px;
+	border: 1px solid var(--hkui-primary, currentColor);
+	background: var(--hkui-primary, transparent);
+	color: var(--hkui-primary-foreground, inherit);
+}
+
+.demoCtaMuted {
+	padding: 10px 18px;
+	border: 1px solid var(--hkui-divider);
+	background: transparent;
+	color: inherit;
+}
+
+.demoCta:disabled,
+.demoCtaMuted:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.demoCtaLink {
+	align-self: flex-start;
+	padding: 4px 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	text-decoration: underline;
+	font-weight: 500;
+	opacity: 0.75;
+}
+
+.boundary {
+	margin: 0;
+	padding: 11px 13px;
+	border: 1px dashed var(--hkui-divider);
+	border-radius: 9px;
+	font-size: 0.8125rem;
+	line-height: 1.75;
+	opacity: 0.85;
+}
+
+.error {
+	margin: 0;
+	font-size: 0.84375rem;
+	font-weight: 600;
+	color: var(--hkui-danger, currentColor);
+}
+
+.loading {
+	margin: 0;
+	font-size: 0.875rem;
+	opacity: 0.75;
+}
+
+.accepted,
+.disputed,
+.declined {
+	margin: 0;
+	font-size: 0.96875rem;
+	font-weight: 600;
+	line-height: 1.6;
+}
+
+.disputed,
+.declined {
+	opacity: 0.85;
+}
+
+@media (max-width: 640px) {
+	.steps {
+		grid-template-columns: 1fr;
+	}
+}

@@ -1,0 +1,766 @@
+{
+	"schemaVersion": 2,
+	"generatedAt": "2026-09-11T23:08:51Z",
+	"title": "Design System: Hawkr",
+	"extensions": {
+		"colorMeta": {
+			"brand-primary": {
+				"role": "primary",
+				"displayName": "Hawkr Orange / 品牌橘",
+				"canonical": "#e4572e",
+				"tonalRamp": [
+					"oklch(15% 0.184 36.5)",
+					"oklch(27% 0.184 36.5)",
+					"oklch(39% 0.184 36.5)",
+					"oklch(51% 0.184 36.5)",
+					"oklch(63% 0.184 36.5)",
+					"oklch(75% 0.184 36.5)",
+					"oklch(87% 0.184 36.5)",
+					"oklch(95% 0.184 36.5)"
+				]
+			},
+			"brand-primary-strong": {
+				"role": "primary",
+				"displayName": "Hawkr Brick / 磚橘",
+				"canonical": "#b8441f",
+				"tonalRamp": [
+					"oklch(15% 0.158 37.3)",
+					"oklch(27% 0.158 37.3)",
+					"oklch(39% 0.158 37.3)",
+					"oklch(51% 0.158 37.3)",
+					"oklch(63% 0.158 37.3)",
+					"oklch(75% 0.158 37.3)",
+					"oklch(87% 0.158 37.3)",
+					"oklch(95% 0.158 37.3)"
+				]
+			},
+			"brand-primary-deep": {
+				"role": "primary",
+				"displayName": "Deep Brick / 深磚橘",
+				"canonical": "#8f3315",
+				"tonalRamp": [
+					"oklch(15% 0.131 37.5)",
+					"oklch(27% 0.131 37.5)",
+					"oklch(39% 0.131 37.5)",
+					"oklch(51% 0.131 37.5)",
+					"oklch(63% 0.131 37.5)",
+					"oklch(75% 0.131 37.5)",
+					"oklch(87% 0.131 37.5)",
+					"oklch(95% 0.131 37.5)"
+				]
+			},
+			"brand-secondary": {
+				"role": "secondary",
+				"displayName": "Hawkr Amber / 暖橘黃",
+				"canonical": "#f2a541",
+				"tonalRamp": [
+					"oklch(15% 0.144 69.4)",
+					"oklch(27% 0.144 69.4)",
+					"oklch(39% 0.144 69.4)",
+					"oklch(51% 0.144 69.4)",
+					"oklch(63% 0.144 69.4)",
+					"oklch(75% 0.144 69.4)",
+					"oklch(87% 0.144 69.4)",
+					"oklch(95% 0.144 69.4)"
+				]
+			},
+			"brand-ink": {
+				"role": "neutral",
+				"displayName": "Hawkr Ink / 墨藍灰",
+				"canonical": "#1f2933",
+				"tonalRamp": [
+					"oklch(15% 0.023 248.7)",
+					"oklch(27% 0.023 248.7)",
+					"oklch(39% 0.023 248.7)",
+					"oklch(51% 0.023 248.7)",
+					"oklch(63% 0.023 248.7)",
+					"oklch(75% 0.023 248.7)",
+					"oklch(87% 0.023 248.7)",
+					"oklch(95% 0.023 248.7)"
+				]
+			},
+			"brand-ink-on-dark": {
+				"role": "neutral",
+				"displayName": "Ink On Dark / 深底墨白",
+				"canonical": "#f5f7fa",
+				"tonalRamp": [
+					"oklch(15% 0.005 258.3)",
+					"oklch(27% 0.005 258.3)",
+					"oklch(39% 0.005 258.3)",
+					"oklch(51% 0.005 258.3)",
+					"oklch(63% 0.005 258.3)",
+					"oklch(75% 0.005 258.3)",
+					"oklch(87% 0.005 258.3)",
+					"oklch(95% 0.005 258.3)"
+				]
+			},
+			"brand-primary-soft": {
+				"role": "primary",
+				"displayName": "Primary Soft / 橘紅淡階",
+				"canonical": "#fcebe6",
+				"tonalRamp": [
+					"oklch(15% 0.02 37)",
+					"oklch(27% 0.02 37)",
+					"oklch(39% 0.02 37)",
+					"oklch(51% 0.02 37)",
+					"oklch(63% 0.02 37)",
+					"oklch(75% 0.02 37)",
+					"oklch(87% 0.02 37)",
+					"oklch(95% 0.02 37)"
+				]
+			},
+			"brand-secondary-soft": {
+				"role": "secondary",
+				"displayName": "Secondary Soft / 橘黃淡階",
+				"canonical": "#fdf1e1",
+				"tonalRamp": [
+					"oklch(15% 0.025 75.3)",
+					"oklch(27% 0.025 75.3)",
+					"oklch(39% 0.025 75.3)",
+					"oklch(51% 0.025 75.3)",
+					"oklch(63% 0.025 75.3)",
+					"oklch(75% 0.025 75.3)",
+					"oklch(87% 0.025 75.3)",
+					"oklch(95% 0.025 75.3)"
+				]
+			},
+			"status-success": {
+				"role": "tertiary",
+				"displayName": "Success / 成功",
+				"canonical": "#2d7f50",
+				"tonalRamp": [
+					"oklch(15% 0.109 154.8)",
+					"oklch(27% 0.109 154.8)",
+					"oklch(39% 0.109 154.8)",
+					"oklch(51% 0.109 154.8)",
+					"oklch(63% 0.109 154.8)",
+					"oklch(75% 0.109 154.8)",
+					"oklch(87% 0.109 154.8)",
+					"oklch(95% 0.109 154.8)"
+				]
+			},
+			"status-warning": {
+				"role": "tertiary",
+				"displayName": "Warning / 警示",
+				"canonical": "#e0c44c",
+				"tonalRamp": [
+					"oklch(15% 0.14 96)",
+					"oklch(27% 0.14 96)",
+					"oklch(39% 0.14 96)",
+					"oklch(51% 0.14 96)",
+					"oklch(63% 0.14 96)",
+					"oklch(75% 0.14 96)",
+					"oklch(87% 0.14 96)",
+					"oklch(95% 0.14 96)"
+				]
+			},
+			"status-danger": {
+				"role": "tertiary",
+				"displayName": "Danger / 危險",
+				"canonical": "#ea6021",
+				"tonalRamp": [
+					"oklch(15% 0.185 41.5)",
+					"oklch(27% 0.185 41.5)",
+					"oklch(39% 0.185 41.5)",
+					"oklch(51% 0.185 41.5)",
+					"oklch(63% 0.185 41.5)",
+					"oklch(75% 0.185 41.5)",
+					"oklch(87% 0.185 41.5)",
+					"oklch(95% 0.185 41.5)"
+				]
+			},
+			"status-info": {
+				"role": "tertiary",
+				"displayName": "Info / 資訊",
+				"canonical": "#6194d0",
+				"tonalRamp": [
+					"oklch(15% 0.106 253.3)",
+					"oklch(27% 0.106 253.3)",
+					"oklch(39% 0.106 253.3)",
+					"oklch(51% 0.106 253.3)",
+					"oklch(63% 0.106 253.3)",
+					"oklch(75% 0.106 253.3)",
+					"oklch(87% 0.106 253.3)",
+					"oklch(95% 0.106 253.3)"
+				]
+			},
+			"status-info-strong": {
+				"role": "tertiary",
+				"displayName": "Info Strong / 深資訊",
+				"canonical": "#1e5fab",
+				"tonalRamp": [
+					"oklch(15% 0.138 255.1)",
+					"oklch(27% 0.138 255.1)",
+					"oklch(39% 0.138 255.1)",
+					"oklch(51% 0.138 255.1)",
+					"oklch(63% 0.138 255.1)",
+					"oklch(75% 0.138 255.1)",
+					"oklch(87% 0.138 255.1)",
+					"oklch(95% 0.138 255.1)"
+				]
+			},
+			"status-info-soft": {
+				"role": "tertiary",
+				"displayName": "Info Soft / 淡資訊",
+				"canonical": "#9fccdd",
+				"tonalRamp": [
+					"oklch(15% 0.053 223)",
+					"oklch(27% 0.053 223)",
+					"oklch(39% 0.053 223)",
+					"oklch(51% 0.053 223)",
+					"oklch(63% 0.053 223)",
+					"oklch(75% 0.053 223)",
+					"oklch(87% 0.053 223)",
+					"oklch(95% 0.053 223)"
+				]
+			},
+			"surface-page": {
+				"role": "neutral",
+				"displayName": "Warm Page / 暖白頁面",
+				"canonical": "#f8f6ef",
+				"tonalRamp": [
+					"oklch(15% 0.010 93.6)",
+					"oklch(27% 0.010 93.6)",
+					"oklch(39% 0.010 93.6)",
+					"oklch(51% 0.010 93.6)",
+					"oklch(63% 0.010 93.6)",
+					"oklch(75% 0.010 93.6)",
+					"oklch(87% 0.010 93.6)",
+					"oklch(95% 0.010 93.6)"
+				]
+			},
+			"surface-card": {
+				"role": "neutral",
+				"displayName": "Cream Card / 奶油卡面",
+				"canonical": "#fffdf7",
+				"tonalRamp": [
+					"oklch(15% 0.008 91.5)",
+					"oklch(27% 0.008 91.5)",
+					"oklch(39% 0.008 91.5)",
+					"oklch(51% 0.008 91.5)",
+					"oklch(63% 0.008 91.5)",
+					"oklch(75% 0.008 91.5)",
+					"oklch(87% 0.008 91.5)",
+					"oklch(95% 0.008 91.5)"
+				]
+			},
+			"surface-muted": {
+				"role": "neutral",
+				"displayName": "Muted Paper / 柔米紙面",
+				"canonical": "#f5f1e8",
+				"tonalRamp": [
+					"oklch(15% 0.013 86.8)",
+					"oklch(27% 0.013 86.8)",
+					"oklch(39% 0.013 86.8)",
+					"oklch(51% 0.013 86.8)",
+					"oklch(63% 0.013 86.8)",
+					"oklch(75% 0.013 86.8)",
+					"oklch(87% 0.013 86.8)",
+					"oklch(95% 0.013 86.8)"
+				]
+			},
+			"surface-panel": {
+				"role": "neutral",
+				"displayName": "Sand Panel / 沙色面板",
+				"canonical": "#f2e9d6",
+				"tonalRamp": [
+					"oklch(15% 0.027 85.7)",
+					"oklch(27% 0.027 85.7)",
+					"oklch(39% 0.027 85.7)",
+					"oklch(51% 0.027 85.7)",
+					"oklch(63% 0.027 85.7)",
+					"oklch(75% 0.027 85.7)",
+					"oklch(87% 0.027 85.7)",
+					"oklch(95% 0.027 85.7)"
+				]
+			},
+			"surface-control": {
+				"role": "neutral",
+				"displayName": "Soft Control / 柔和控制面",
+				"canonical": "#f0f1ea",
+				"tonalRamp": [
+					"oklch(15% 0.009 113.2)",
+					"oklch(27% 0.009 113.2)",
+					"oklch(39% 0.009 113.2)",
+					"oklch(51% 0.009 113.2)",
+					"oklch(63% 0.009 113.2)",
+					"oklch(75% 0.009 113.2)",
+					"oklch(87% 0.009 113.2)",
+					"oklch(95% 0.009 113.2)"
+				]
+			},
+			"ink-heading": {
+				"role": "neutral",
+				"displayName": "Living Ink / 生命墨色",
+				"canonical": "#191c18",
+				"tonalRamp": [
+					"oklch(15% 0.009 137.8)",
+					"oklch(27% 0.009 137.8)",
+					"oklch(39% 0.009 137.8)",
+					"oklch(51% 0.009 137.8)",
+					"oklch(63% 0.009 137.8)",
+					"oklch(75% 0.009 137.8)",
+					"oklch(87% 0.009 137.8)",
+					"oklch(95% 0.009 137.8)"
+				]
+			},
+			"ink-body": {
+				"role": "neutral",
+				"displayName": "Warm Charcoal / 暖炭灰",
+				"canonical": "#42493f",
+				"tonalRamp": [
+					"oklch(15% 0.019 136.2)",
+					"oklch(27% 0.019 136.2)",
+					"oklch(39% 0.019 136.2)",
+					"oklch(51% 0.019 136.2)",
+					"oklch(63% 0.019 136.2)",
+					"oklch(75% 0.019 136.2)",
+					"oklch(87% 0.019 136.2)",
+					"oklch(95% 0.019 136.2)"
+				]
+			},
+			"ink-muted": {
+				"role": "neutral",
+				"displayName": "Quiet Gray / 靜灰",
+				"canonical": "#72796e",
+				"tonalRamp": [
+					"oklch(15% 0.019 133.9)",
+					"oklch(27% 0.019 133.9)",
+					"oklch(39% 0.019 133.9)",
+					"oklch(51% 0.019 133.9)",
+					"oklch(63% 0.019 133.9)",
+					"oklch(75% 0.019 133.9)",
+					"oklch(87% 0.019 133.9)",
+					"oklch(95% 0.019 133.9)"
+				]
+			},
+			"dark-surface-page": {
+				"role": "neutral",
+				"displayName": "Night Surface / 深夜頁面",
+				"canonical": "#1f2933",
+				"tonalRamp": [
+					"oklch(15% 0.026 250)",
+					"oklch(27% 0.026 250)",
+					"oklch(39% 0.026 250)",
+					"oklch(51% 0.026 250)",
+					"oklch(63% 0.026 250)",
+					"oklch(75% 0.026 250)",
+					"oklch(87% 0.026 250)",
+					"oklch(95% 0.026 250)"
+				]
+			},
+			"dark-ink-heading": {
+				"role": "neutral",
+				"displayName": "Ink On Dark / 深底標題",
+				"canonical": "#f5f7fa",
+				"tonalRamp": [
+					"oklch(15% 0.007 255)",
+					"oklch(27% 0.007 255)",
+					"oklch(39% 0.007 255)",
+					"oklch(51% 0.007 255)",
+					"oklch(63% 0.007 255)",
+					"oklch(75% 0.007 255)",
+					"oklch(87% 0.007 255)",
+					"oklch(95% 0.007 255)"
+				]
+			},
+			"dark-ink-body": {
+				"role": "neutral",
+				"displayName": "Soft Light Ink / 柔亮正文",
+				"canonical": "rgb(245 247 250 / 0.82)",
+				"tonalRamp": [
+					"oklch(15% 0.007 255)",
+					"oklch(27% 0.007 255)",
+					"oklch(39% 0.007 255)",
+					"oklch(51% 0.007 255)",
+					"oklch(63% 0.007 255)",
+					"oklch(75% 0.007 255)",
+					"oklch(87% 0.007 255)",
+					"oklch(95% 0.007 255)"
+				]
+			},
+			"white": {
+				"role": "neutral",
+				"displayName": "Pure White / 純白",
+				"canonical": "#ffffff",
+				"tonalRamp": [
+					"oklch(15% 0 0)",
+					"oklch(27% 0 0)",
+					"oklch(39% 0 0)",
+					"oklch(51% 0 0)",
+					"oklch(63% 0 0)",
+					"oklch(75% 0 0)",
+					"oklch(87% 0 0)",
+					"oklch(100% 0 0)"
+				]
+			},
+			"action-primary-hover": {
+				"role": "primary",
+				"displayName": "Theme Brick Hover / Theme 磚橘 Hover",
+				"canonical": "#8f3315",
+				"tonalRamp": [
+					"oklch(15% 0.131 37.5)",
+					"oklch(27% 0.131 37.5)",
+					"oklch(39% 0.131 37.5)",
+					"oklch(51% 0.131 37.5)",
+					"oklch(63% 0.131 37.5)",
+					"oklch(75% 0.131 37.5)",
+					"oklch(87% 0.131 37.5)",
+					"oklch(95% 0.131 37.5)"
+				]
+			},
+			"ui-primary-hover": {
+				"role": "primary",
+				"displayName": "UI Brick Hover / UI 磚橘 Hover",
+				"canonical": "#a43c1a",
+				"tonalRamp": [
+					"oklch(15% 0.145 37.6)",
+					"oklch(27% 0.145 37.6)",
+					"oklch(39% 0.145 37.6)",
+					"oklch(51% 0.145 37.6)",
+					"oklch(63% 0.145 37.6)",
+					"oklch(75% 0.145 37.6)",
+					"oklch(87% 0.145 37.6)",
+					"oklch(95% 0.145 37.6)"
+				]
+			}
+		},
+		"typographyMeta": {
+			"display": {
+				"displayName": "Brand Display / 品牌主標",
+				"purpose": "Page heroes and rare brand moments only."
+			},
+			"headline": {
+				"displayName": "Brand Headline / 品牌章節標",
+				"purpose": "Page and section headings, primarily h1 and h2."
+			},
+			"title": {
+				"displayName": "UI Title / 介面標題",
+				"purpose": "Cards, modules and workspace headings."
+			},
+			"body": {
+				"displayName": "Body / 正文",
+				"purpose": "Long-form copy, product facts and operational UI."
+			},
+			"label": {
+				"displayName": "Label / 操作標籤",
+				"purpose": "Buttons, states and navigation at 600; bordered field labels use 16px at 600."
+			},
+			"input-body": {
+				"displayName": "Input Body",
+				"purpose": "Outlined medium field text at the App-aligned 16px / 24px scale."
+			}
+		},
+		"shadows": [
+			{
+				"name": "foundation-xs",
+				"value": "0 1px 2px rgb(25 28 24 / 0.05)",
+				"purpose": "Barely raised foundation surfaces."
+			},
+			{
+				"name": "foundation-sm",
+				"value": "0 2px 6px rgb(25 28 24 / 0.06)",
+				"purpose": "Small foundation controls."
+			},
+			{
+				"name": "foundation-md",
+				"value": "0 12px 30px rgb(31 41 51 / 0.07), 0 2px 8px rgb(25 28 24 / 0.04)",
+				"purpose": "Foundation sections and legacy layout surfaces."
+			},
+			{
+				"name": "foundation-lg",
+				"value": "0 18px 42px rgb(31 41 51 / 0.1), 0 5px 14px rgb(25 28 24 / 0.06)",
+				"purpose": "Raised foundation overlays."
+			},
+			{
+				"name": "foundation-xl",
+				"value": "0 12px 28px rgb(25 28 24 / 0.14), 0 4px 10px rgb(25 28 24 / 0.06)",
+				"purpose": "High foundation overlays."
+			},
+			{
+				"name": "foundation-2xl",
+				"value": "0 24px 60px rgb(25 28 24 / 0.2), 0 8px 18px rgb(25 28 24 / 0.08)",
+				"purpose": "Maximum foundation depth; use rarely."
+			},
+			{
+				"name": "ui-sm",
+				"value": "0 2px 8px rgb(31 41 51 / 0.06)",
+				"purpose": "Small shared UI elements and restrained hover feedback."
+			},
+			{
+				"name": "ui-md",
+				"value": "0 4px 20px rgb(31 41 51 / 0.06), 0 2px 8px rgb(0 0 0 / 0.04)",
+				"purpose": "Default shared Card elevation."
+			},
+			{
+				"name": "ui-lg",
+				"value": "0 12px 32px rgb(31 41 51 / 0.1), 0 4px 12px rgb(0 0 0 / 0.06)",
+				"purpose": "Interactive cards and dropdowns."
+			},
+			{
+				"name": "ui-deep",
+				"value": "0 8px 32px rgb(31 41 51 / 0.15)",
+				"purpose": "Shared UI surfaces above the page plane."
+			},
+			{
+				"name": "ui-glass",
+				"value": "0 40px 80px rgb(31 41 51 / 0.18)",
+				"purpose": "Dialogs and sheets that leave the page plane."
+			},
+			{
+				"name": "focus-control",
+				"value": "0 0 0 2px var(--hkui-background), 0 0 0 4px var(--hkui-focus)",
+				"purpose": "Keyboard focus on shared buttons, pressable cards, dialog actions and navigation."
+			},
+			{
+				"name": "focus-input",
+				"value": "0 0 0 3px rgb(31 41 51 / 0.13)",
+				"purpose": "Focused flat and bordered input fields."
+			}
+		],
+		"motion": [
+			{
+				"name": "ui-fast",
+				"value": "120ms",
+				"purpose": "Small shared UI state changes."
+			},
+			{
+				"name": "ui-base",
+				"value": "200ms",
+				"purpose": "Default shared component transitions."
+			},
+			{
+				"name": "ui-slow",
+				"value": "320ms",
+				"purpose": "Shared dialogs, sheets and larger state changes."
+			},
+			{
+				"name": "ui-ease",
+				"value": "cubic-bezier(0.22, 1, 0.36, 1)",
+				"purpose": "Shared decelerating UI motion."
+			},
+			{
+				"name": "foundation-fast",
+				"value": "150ms",
+				"purpose": "Foundation and legacy route micro-interactions."
+			},
+			{
+				"name": "foundation-base",
+				"value": "250ms",
+				"purpose": "Foundation and legacy route transitions."
+			},
+			{
+				"name": "foundation-slow",
+				"value": "350ms",
+				"purpose": "Foundation and legacy route large transitions."
+			},
+			{
+				"name": "foundation-standard",
+				"value": "cubic-bezier(0.22, 1, 0.36, 1)",
+				"purpose": "Default foundation state change."
+			},
+			{
+				"name": "foundation-emphasized",
+				"value": "cubic-bezier(0.16, 1, 0.3, 1)",
+				"purpose": "Page and sheet transitions only."
+			},
+			{
+				"name": "foundation-bounce",
+				"value": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+				"purpose": "One-time delight only."
+			},
+			{
+				"name": "foundation-linear-out",
+				"value": "cubic-bezier(0.5, 0, 0.5, 1)",
+				"purpose": "Rare subtle slides."
+			}
+		],
+		"breakpoints": [
+			{
+				"name": "public-nav-tight",
+				"value": "1280px"
+			},
+			{
+				"name": "public-nav-collapse-inclusive",
+				"value": "840px"
+			},
+			{
+				"name": "mobile-bottom-nav-exclusive",
+				"value": "not (min-width: 840px)"
+			},
+			{
+				"name": "public-nav-flat",
+				"value": "768px"
+			}
+		]
+	},
+	"components": [
+		{
+			"name": "Primary Button",
+			"kind": "button",
+			"refersTo": "button-primary",
+			"description": "The default high-priority action; use once per decision area.",
+			"html": "<button class=\"ds-btn-primary\" type=\"button\">查看商品來源</button>",
+			"css": ".ds-btn-primary { height: 40px; padding: 0 16px; border: 1px solid transparent; border-radius: 12px; background: var(--hkui-primary, #b8441f); color: #fff; font: 600 14px/20px var(--font-primary, system-ui, sans-serif); cursor: pointer; transition: background 200ms cubic-bezier(.22,1,.36,1), box-shadow 200ms cubic-bezier(.22,1,.36,1), transform 200ms cubic-bezier(.22,1,.36,1); } .ds-btn-primary:hover { background: var(--hkui-primary-600, #3f5a19); } .ds-btn-primary:active { transform: scale(.97); } .ds-btn-primary:focus-visible { outline: none; box-shadow: var(--hkui-focus-ring, 0 0 0 2px var(--hkui-background, #f8f6ef), 0 0 0 4px var(--hkui-focus, #719244)); }"
+		},
+		{
+			"name": "Secondary Button",
+			"kind": "button",
+			"refersTo": "button-secondary",
+			"description": "A lower-priority bordered action that does not compete with the primary CTA.",
+			"html": "<button class=\"ds-btn-secondary\" type=\"button\">稍後再看</button>",
+			"css": ".ds-btn-secondary { height: 40px; padding: 0 16px; border: 2px solid var(--hkui-primary, #b8441f); border-radius: 12px; background: transparent; color: var(--hkui-primary, #b8441f); font: 600 14px/20px var(--font-primary, system-ui, sans-serif); cursor: pointer; transition: background 200ms cubic-bezier(.22,1,.36,1), box-shadow 200ms cubic-bezier(.22,1,.36,1), transform 200ms cubic-bezier(.22,1,.36,1); } .ds-btn-secondary:hover { background: var(--hkui-primary-50, #fdf3f0); } .ds-btn-secondary:active { transform: scale(.97); } .ds-btn-secondary:focus-visible { outline: none; box-shadow: var(--hkui-focus-ring, 0 0 0 2px var(--hkui-background, #f8f6ef), 0 0 0 4px var(--hkui-focus, #719244)); }"
+		},
+		{
+			"name": "Quiet Button",
+			"kind": "button",
+			"description": "A light, low-emphasis action for nearby utilities; it is not a third primary CTA.",
+			"html": "<button class=\"ds-btn-quiet\" type=\"button\">清除篩選</button>",
+			"css": ".ds-btn-quiet { height: 40px; padding: 0 16px; border: 1px solid transparent; border-radius: 12px; background: transparent; color: var(--hkui-primary, #b8441f); font: 600 14px/20px var(--font-primary, system-ui, sans-serif); cursor: pointer; transition: background 200ms cubic-bezier(.22,1,.36,1), box-shadow 200ms cubic-bezier(.22,1,.36,1); } .ds-btn-quiet:hover { background: var(--hkui-primary-50, #fdf3f0); } .ds-btn-quiet:focus-visible { outline: none; box-shadow: var(--hkui-focus-ring, 0 0 0 2px var(--hkui-background, #f8f6ef), 0 0 0 4px var(--hkui-focus, #719244)); }"
+		},
+		{
+			"name": "Default Input",
+			"kind": "input",
+			"refersTo": "input-default",
+			"description": "The shared bordered medium field: cream surface, 48px minimum height and a single App-aligned focus stroke.",
+			"html": "<label class=\"ds-field\"><span class=\"ds-field-label\">搜尋食品或品牌</span><span class=\"ds-input-frame\"><input class=\"ds-input\" type=\"search\" placeholder=\"例如：有機蔬菜\" aria-describedby=\"ds-input-hint\"></span><span class=\"ds-field-hint\" id=\"ds-input-hint\">輸入食品或品牌名稱。</span></label>",
+			"css": ".ds-field { display: grid; gap: 6px; color: var(--theme-text-heading, #191c18); font-family: var(--font-primary, system-ui, sans-serif); } .ds-field-label { font-size: 16px; line-height: 24px; font-weight: 600; } .ds-input-frame { display: flex; align-items: center; min-height: 46px; padding: 0 16px; border: 1px solid var(--theme-border-input, #ded8cb); border-radius: 12px; background: var(--hkui-input-surface, #fffdf7); transition: border-color 200ms var(--hkui-ease, cubic-bezier(.22,1,.36,1)), box-shadow 200ms var(--hkui-ease, cubic-bezier(.22,1,.36,1)); } .ds-input { width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--hkui-field-copy, #42493f); font: 400 16px/24px var(--font-primary, system-ui, sans-serif); outline: none; } .ds-input::placeholder { color: var(--hkui-field-copy, #42493f); opacity: 1; } .ds-input-frame:focus-within { border-color: var(--theme-text-accent, #b8441f); box-shadow: inset 0 0 0 .5px var(--theme-text-accent, #b8441f); } .ds-input-frame:has(.ds-input[aria-invalid=\"true\"]) { border-color: var(--hkui-danger, #ea6021); } .ds-input-frame:has(.ds-input[aria-invalid=\"true\"]):focus-within { box-shadow: inset 0 0 0 1px var(--hkui-danger, #ea6021); } .ds-input-frame:has(.ds-input:disabled) { border-color: var(--hkui-input-disabled-border, rgb(25 28 24 / .38)); box-shadow: none; cursor: not-allowed; } .ds-input:disabled { color: var(--hkui-field-copy, #42493f); opacity: 1; cursor: not-allowed; } .ds-field-hint, .ds-field-error { padding: 0 16px; font-size: 14px; line-height: 21px; } .ds-field-hint { color: var(--hkui-field-copy, #42493f); } .ds-field-error { color: var(--hkui-danger-text, #bd3500); } @media (prefers-reduced-motion: reduce) { .ds-input-frame { transition: none; } }"
+		},
+		{
+			"name": "Default Card",
+			"kind": "card",
+			"refersTo": "card-default",
+			"description": "A factual content surface with tonal separation, using explicit placeholder copy rather than invented product facts.",
+			"html": "<article class=\"ds-card\"><div class=\"ds-card-body\"><h3>商品資訊</h3><dl><div><dt>產地</dt><dd>尚未提供</dd></div><div><dt>保存</dt><dd>尚未提供</dd></div></dl></div></article>",
+			"css": ".ds-card { width: min(100%, 320px); overflow: hidden; border: 1px solid rgb(31 41 51 / .14); border-radius: 14px; background: var(--theme-surface-card, #fffdf7); color: var(--theme-text-heading, #191c18); box-shadow: var(--hkui-shadow-md, 0 4px 20px rgb(31 41 51 / .06), 0 2px 8px rgb(0 0 0 / .04)); font-family: var(--font-primary, system-ui, sans-serif); } .ds-card-body { padding: 20px; } .ds-card h3 { margin: 0 0 16px; font-size: 18px; line-height: 1.3; } .ds-card dl { display: grid; gap: 10px; margin: 0; } .ds-card dl div { display: flex; justify-content: space-between; gap: 16px; } .ds-card dt { color: var(--theme-text-muted, #72796e); } .ds-card dd { margin: 0; color: var(--theme-text-body, #42493f); font-weight: 600; }"
+		},
+		{
+			"name": "Semantic Chip",
+			"kind": "custom",
+			"description": "A compact status or category label; pair color with readable text and never use it as page navigation.",
+			"html": "<span class=\"ds-chip\"><span class=\"ds-chip-dot\" aria-hidden=\"true\"></span>冷藏配送</span>",
+			"css": ".ds-chip { display: inline-flex; height: 28px; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid transparent; border-radius: 12px; background: var(--hkui-primary-50, #fdf3f0); color: var(--hkui-primary, #b8441f); font: 500 14px/20px var(--font-primary, system-ui, sans-serif); } .ds-chip-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }"
+		},
+		{
+			"name": "Tabs",
+			"kind": "custom",
+			"description": "Peer views inside one workspace; production Tabs owns Arrow, Home and End keyboard behavior.",
+			"html": "<div class=\"ds-tabs\" role=\"tablist\" aria-label=\"商品資訊\"><button id=\"ds-tab-spec\" type=\"button\" role=\"tab\" aria-selected=\"true\" aria-controls=\"ds-panel-spec\" tabindex=\"0\">商品規格</button><button type=\"button\" role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">配送說明</button></div><div id=\"ds-panel-spec\" class=\"ds-tab-panel\" role=\"tabpanel\" aria-labelledby=\"ds-tab-spec\">顯示可核對的規格與保存資訊。</div>",
+			"css": ".ds-tabs { display: inline-flex; gap: 0; padding: 4px; border-radius: 12px; background: var(--theme-surface-muted, #f5f1e8); font-family: var(--font-primary, system-ui, sans-serif); } .ds-tabs button { height: 40px; padding: 0 16px; border: 0; border-radius: 12px; background: transparent; color: var(--theme-text-muted, #72796e); font: 500 14px/20px var(--font-primary, system-ui, sans-serif); cursor: pointer; } .ds-tabs button[aria-selected=\"true\"] { background: var(--theme-surface-elevated, #fffdf7); color: var(--theme-text-heading, #191c18); box-shadow: var(--hkui-shadow-sm, 0 2px 8px rgb(31 41 51 / .06)); } .ds-tabs button:focus-visible { outline: none; box-shadow: var(--hkui-focus-ring, 0 0 0 2px var(--hkui-background, #f8f6ef), 0 0 0 4px var(--hkui-focus, #719244)); } .ds-tab-panel { padding-top: 20px; color: var(--theme-text-body, #42493f); font: 400 14px/21px var(--font-primary, system-ui, sans-serif); }"
+		},
+		{
+			"name": "Searchable Dropdown",
+			"kind": "custom",
+			"description": "A labeled searchable listbox trigger for long option sets; keyboard and popup behavior stays in the production component.",
+			"html": "<label class=\"ds-dropdown\" for=\"ds-dropdown-region\"><span>配送地區</span><button id=\"ds-dropdown-region\" type=\"button\" aria-expanded=\"false\" aria-haspopup=\"listbox\"><span>請選擇地區</span><span class=\"ds-dropdown-chevron\" aria-hidden=\"true\"></span></button></label>",
+			"css": ".ds-dropdown { display: grid; width: min(100%, 300px); gap: 6px; color: var(--theme-text-heading, #191c18); font: 500 14px/20px var(--font-primary, system-ui, sans-serif); } .ds-dropdown button { display: flex; height: 40px; align-items: center; justify-content: space-between; padding: 0 12px; border: 1px solid transparent; border-radius: 12px; background: var(--hkui-default-100, #f0f1ea); color: var(--theme-text-body, #42493f); font-family: inherit; font-size: 14px; font-weight: 400; line-height: 20px; cursor: pointer; } .ds-dropdown-chevron { width: 8px; height: 8px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg) translateY(-2px); } .ds-dropdown button:hover { background: var(--hkui-default-200, #e1dbce); } .ds-dropdown button:focus-visible { outline: none; border-color: var(--hkui-primary, #b8441f); box-shadow: var(--hkui-input-focus-ring, 0 0 0 3px rgb(31 41 51 / .13)); }"
+		},
+		{
+			"name": "Dialog / Sheet Panel",
+			"kind": "custom",
+			"refersTo": "dialog-default",
+			"description": "The shared dialog and responsive sheet surface; focus trap, inert background, dismissal and scroll lock stay in the production component.",
+			"html": "<section class=\"ds-dialog\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"ds-dialog-title\"><header><h2 id=\"ds-dialog-title\">確認配送資訊</h2></header><div class=\"ds-dialog-body\">送出前請再次確認收件地址與溫層。</div><footer><button class=\"ds-dialog-action\" type=\"button\">確認</button></footer></section>",
+			"css": ".ds-dialog { width: min(100%, 512px); overflow: hidden; border: 1px solid rgb(31 41 51 / .14); border-radius: 28px; background: var(--hkui-surface, #fffdf7); color: var(--hkui-foreground, #191c18); box-shadow: var(--hkui-shadow-glass, 0 40px 80px rgb(31 41 51 / .18)); font-family: var(--font-primary, system-ui, sans-serif); } .ds-dialog header, .ds-dialog-body { padding: 20px 24px; } .ds-dialog header { border-bottom: 1px solid rgb(31 41 51 / .14); } .ds-dialog h2 { margin: 0; font-family: var(--font-brand, var(--font-primary, system-ui, sans-serif)); font-size: 24px; line-height: 28px; } .ds-dialog footer { display: flex; justify-content: flex-end; padding: 16px 24px; border-top: 1px solid rgb(31 41 51 / .14); } .ds-dialog-action { height: 40px; padding: 0 16px; border: 0; border-radius: 12px; background: var(--hkui-primary, #b8441f); color: #fff; font-weight: 600; } .ds-dialog-action:hover { background: var(--hkui-primary-600, #3f5a19); } .ds-dialog-action:focus-visible { outline: none; box-shadow: var(--hkui-focus-ring, 0 0 0 2px var(--hkui-background, #f8f6ef), 0 0 0 4px var(--hkui-focus, #719244)); }"
+		},
+		{
+			"name": "Public Navigation Shell",
+			"kind": "nav",
+			"description": "The desktop public-site chrome; the preview inlines the official grass-mark paths, while production uses BrandLogo. It becomes a flat 56px bar on mobile and is not a generic card pattern.",
+			"html": "<nav class=\"ds-nav\" aria-label=\"主要導覽\"><a class=\"ds-brand\" href=\"#\" aria-label=\"Hawkr\"><svg viewBox=\"0 0 144 144\" aria-hidden=\"true\"><path d=\"M66.7861 90.909C66.7861 92.8046 64.308 93.4952 63.3059 91.8703C50.1436 70.5716 26.5678 55.8127.689941 53.5651 1.82743 36.694 4.84719 21.6237 13.5544 13.459 23.7918 2.50494 44.8759.541608 66.7861 0V90.909Z\" fill=\"currentColor\"/><path d=\"M66.7867 132.125V143.986C44.8901 143.417 23.7924 141.468 13.555 130.514 1.76039 119.465.392704 95.7289 0 71.9929.027083 70.5305.0541553 69.0682.0947798 67.6194 25.3091 68.2693 49.9005 83.1094 60.9774 106.141 61.0045 106.195 61.0316 106.263 61.0587 106.317 64.9586 114.347 66.7867 123.216 66.7867 132.125Z\" fill=\"currentColor\"/><path d=\"M139.856 30.7092C132.368 31.6977 125.028 33.661 118.109 36.5721 102.752 42.9766 89.4141 54.1879 80.6933 68.2833 79.7048 69.881 77.2402 69.1499 77.2402 67.2678V0C99.1369.555149 120.235 2.50494 130.472 13.459 134.927 17.6294 137.879 23.6006 139.87 30.6821L139.856 30.7092Z\" fill=\"currentColor\"/><path d=\"M144 72.0067C143.607 95.7427 142.253 119.479 130.445 130.527 120.208 141.482 99.1235 143.445 77.2134 144V109.08C77.2134 102.432 78.1884 95.7968 80.4227 89.5277 81.2217 87.28 82.1425 85.073 83.1852 82.9336 93.9778 60.3621 117.77 45.6168 142.443 44.3982 143.526 53.0639 143.824 62.5421 143.987 72.0202L144 72.0067Z\" fill=\"currentColor\"/></svg></a><div class=\"ds-nav-links\"><a href=\"#\">Hawkr 動態</a><a href=\"#\">Hawkr 市集</a><a href=\"#\">搜尋</a></div><button type=\"button\">登入</button></nav>",
+			"css": ".ds-nav { display: flex; width: min(100%, 1440px); height: 84px; align-items: center; justify-content: space-between; gap: 24px; padding: 8px 36px 8px 24px; border: 0; border-radius: 9999px; background: var(--theme-surface-glass, rgb(248 246 239 / .96)); color: var(--theme-text-heading, #191c18); box-shadow: var(--nav-shell-shadow, 0 1px 0 rgb(255 255 255 / .7) inset, 0 0 0 1px rgb(15 33 15 / .06), 0 12px 32px -16px rgb(15 33 15 / .18), 0 4px 12px -6px rgb(15 33 15 / .08)); font-family: var(--font-primary, system-ui, sans-serif); } .ds-brand { display: inline-flex; align-items: center; color: var(--hkui-primary, #b8441f); text-decoration: none; } .ds-brand svg { width: 44px; height: 44px; } .ds-nav-links { display: flex; gap: 24px; } .ds-nav-links a { color: var(--theme-text-body, #42493f); text-decoration: none; } .ds-nav-links a:hover { color: var(--hkui-primary, #b8441f); } .ds-nav button { height: 40px; padding: 0 16px; border: 0; border-radius: 12px; background: var(--hkui-primary, #b8441f); color: var(--hkui-primary-foreground, #fff); font-weight: 600; } .ds-nav a:focus-visible, .ds-nav button:focus-visible { outline: none; box-shadow: var(--hkui-focus-ring, 0 0 0 2px var(--hkui-background, #f8f6ef), 0 0 0 4px var(--hkui-focus, #719244)); } @media (max-width: 768px) { .ds-nav { height: 56px; padding: 8px 10px; border-radius: 0; box-shadow: 0 1px 0 var(--theme-border-subtle, rgb(15 33 15 / .08)); } .ds-brand svg { width: 40px; height: 40px; } .ds-nav-links { display: none; } }"
+		}
+	],
+	"narrative": {
+		"northStar": "深入職人故事的市集",
+		"overview": "「深入職人故事的市集」是品牌 owner 已確認的現行北極星，不等同對外 slogan。它要求品牌與商品內容讓人理解誰在製作、為何這樣做，以及產品有何具體差異；交易頁仍以規格、價格、溫層、配送與狀態清楚為優先，不為了敘事犧牲操作效率。\n\nHawkr 不是冷調科技平台，也不是只做氛圍的農村風形象站。現行視覺要讓人感到溫暖、可信、日常可親，同時把商品來源、賣家身分、規格、溫層、配送與交易狀態放在裝飾之前。食品與品牌內容是主角，介面負責把它們說清楚。\n\n同一套品牌有四種介面任務：品牌首頁、關於頁與招商頁負責說服（Persuade）；市集、搜尋、購物車、結帳、帳戶、聊天室與賣家中心負責操作（Operate）；FAQ、政策與指南負責閱讀（Read）；少數核准的單頁敘事負責體驗（Experience）。四種模式共用品牌骨架，但資訊密度、構圖與動態強度不同，不應被壓成同一種寬鬆落地頁版型。`/seller` 的 scroll world 屬 route-owned 體驗，不是全站模板。",
+		"keyCharacteristics": [
+			"暖白紙感實色表面，搭配 Hawkr 的橘紅與暖橘黃。",
+			"真實職人、商品、食品影像與商家資料優先；故事要連回可核對的來源與商品資訊。",
+			"品牌頁有呼吸感，交易與後台操作頁保持有效率的資訊密度。",
+			"圓潤但有角色分工；不是每個容器都做成大圓角卡片。",
+			"動態只服務狀態、導引或敘事，不做全站環境裝飾。"
+		],
+		"rules": [
+			{
+				"name": "The One Brand Entry Rule",
+				"body": "新增顏色先接到 `00-color-config.css` 的品牌或 semantic role，再由元件消費；頁面不可另建一套相近但不同的品牌色。",
+				"section": "colors"
+			},
+			{
+				"name": "The Meaning Before Accent Rule",
+				"body": "暖色與藍色只有在能說出狀態意義時才使用，不能為了「更活潑」平均灑在每個區塊。",
+				"section": "colors"
+			},
+			{
+				"name": "The Brand Headline Rule",
+				"body": "圓體負責品牌標題，Roboto 加系統繁中字體負責操作與閱讀；不要再引入 Inter 或另一套網頁中文字型來製造「設計感」。",
+				"section": "typography"
+			},
+			{
+				"name": "The Information Weight Rule",
+				"body": "字級與字重應反映任務優先順序：在操作頁，價格、狀態與下一步可高於品牌句；在閱讀頁，標題層級與段落節奏高於裝飾 eyebrow。",
+				"section": "typography"
+			},
+			{
+				"name": "The Mode-Aware Density Rule",
+				"body": "說服、操作、閱讀、體驗四種頁面共用品牌骨架，不共用同一種 section 高度、置中構圖、卡片數量或動態強度。",
+				"section": "layout"
+			},
+			{
+				"name": "The Content Breakpoint Rule",
+				"body": "以內容何時讀不清、點不到或失去順序來決定重排，不以手機／平板／桌機名稱決定任意數字。",
+				"section": "layout"
+			},
+			{
+				"name": "The Solid-by-Default Rule",
+				"body": "暖白實色是預設材質；模糊玻璃只用於導覽、overlay、dialog 或被明確設計的品牌舞台，不能成為每個 section 的共同皮膚。",
+				"section": "elevation"
+			},
+			{
+				"name": "The Minimum Necessary Depth Rule",
+				"body": "先用 spacing、邊界與 tonal surface 分組；只有當元件真的離開原平面或需要互動回饋時才加陰影與 backdrop。",
+				"section": "elevation"
+			},
+			{
+				"name": "The Role Before Radius Rule",
+				"body": "先判斷元件角色，再選既有半徑；不要把 36px 或 45px 大圓角套到每張卡片，也不要逐頁手寫相近數字。",
+				"section": "shapes"
+			},
+			{
+				"name": "The Nested Curve Rule",
+				"body": "內外曲線必須反映真實容器關係；如果兩層沒有不同的背景、邊界或互動責任，就不需要再包一個圓角殼。",
+				"section": "shapes"
+			},
+			{
+				"name": "The Primitive Before Pattern Rule",
+				"body": "先用現有 primitive 組合真實任務，再抽象重複模式；不要先畫一張泛用卡片，再把所有資料硬塞進去。",
+				"section": "components"
+			}
+		],
+		"dos": [
+			"Do 先讓使用者看懂商品來源、商家、規格、溫層、配送與交易狀態，再加裝飾。",
+			"Do 使用真實商品、食品影像與商家資料；品牌插畫只服務關於、產地或單頁敘事。",
+			"Do 透過 semantic token、共享元件、`BrandLogo` 與現行 spacing scale 建立一致性。",
+			"Do 讓品牌頁有呼吸、操作頁有效率、閱讀頁易掃描；以任務調整密度。",
+			"Do 讓動態對狀態、導引或敘事有明確用途，並提供 reduced-motion 結果。",
+			"Do 先選 Persuade、Operate、Read 或 Experience mode，再決定密度、容器與 motion。",
+			"Do 為 loading、empty、error、disabled、focus、dark mode、200% zoom 與窄 viewport 設計可驗證結果。",
+			"Do 把 route exception、current divergence 與正式 foundation 分開命名，讓下一個人知道什麼可重用、什麼只能維護。"
+		],
+		"donts": [
+			"Don't 使用舊草案的 `#ee964b` 等舊色作為新頁面的品牌主色，也不要新增相近的「另一種品牌色」。",
+			"Don't 把藍紫科技漸層、霓虹、純黑金屬感或滿版 glassmorphism 當成 Hawkr 的品牌語言。",
+			"Don't 用全站飄葉、particles、orbs 或持續漂移的裝飾製造「自然感」。",
+			"Don't 每節都複製 eyebrow／hashtag、置中大標、三張等權卡片與重複 CTA 的 AI 落地頁公式。",
+			"Don't 為了填空在交易、帳戶或賣家工具頁加入通用人物插畫、假儀表板或無來源數字。",
+			"Don't 用「重新定義」、「從產地到餐桌」、「安心、新鮮、永續」等空泛套語填滿 hero，也不要在沒有證據時承諾所有商品新鮮直送、絕對安心或賣家收益；商業與文案真值應另由 `PRODUCT.md` 固定。",
+			"Don't 把 `/seller` 的 scroll world、Vanta、旋轉 badge 或 scrub video 升格成全站元件；它們必須逐項證明對該頁有用。",
+			"Don't 在既有兩套圓角之外新增任意 radius，也不要把每個容器都做成卡片。",
+			"Don't 用 div 模擬 Link、Button、Tab 或 Table，也不要讓整張 Card 的 click handler 取代正確鍵盤語意。",
+			"Don't 用 toast 取代欄位錯誤、致命錯誤或需要重試的持續狀態。",
+			"Don't 把 32px／40px 的視覺高度寫成已符合 44px 觸控命中區；未達標就明列債務或擴大 hit area。",
+			"Don't 從 sidecar preview、舊指南或單一路由抄 literal 色碼、shadow、z-index 與 breakpoint，宣稱它是全站 token。"
+		]
+	}
+}

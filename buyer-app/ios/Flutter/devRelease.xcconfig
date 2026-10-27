@@ -1,0 +1,15 @@
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.release-dev.xcconfig"
+#include "Generated.xcconfig"
+
+ASSET_PREFIX=dev
+BUNDLE_NAME=Hawkr Dev
+BUNDLE_DISPLAY_NAME=Hawkr Dev
+GOOGLESERVICE_INFO_PLIST=${PROJECT_DIR}/Runner/config/dev/GoogleService-Info.plist
+
+// Code signing — managed here, NOT pbxproj. Fastfile no longer mutates pbxproj.
+// Update profile name when match regenerates (filename always AppStore_<bundle>.mobileprovision in cert repo seller branch).
+CODE_SIGN_IDENTITY = Apple Distribution
+CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution
+CODE_SIGN_STYLE = Manual
+DEVELOPMENT_TEAM = V2H73DN9FP
+PROVISIONING_PROFILE_SPECIFIER = match AppStore io.github.will413028.hawkr.buyer.dev 1780594952

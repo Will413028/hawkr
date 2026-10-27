@@ -1,0 +1,61 @@
+/* Product Detail Page — admin 商品詳情頁（唯讀） */
+
+.product-detail-cards {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+}
+
+.info-field {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 14px 16px;
+	background: white;
+	border-radius: 10px;
+	border: 1px solid #dadada;
+}
+
+.field-label {
+	font-size: 16px;
+	font-weight: 400;
+	color: #565656;
+}
+
+.field-value {
+	font-size: 20px;
+	font-weight: 400;
+	color: black;
+}
+
+.product-gallery-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+	gap: 12px;
+}
+
+.product-gallery-thumb {
+	aspect-ratio: 1;
+	border-radius: 10px;
+	border: 1px solid #dadada;
+	overflow: hidden;
+}
+
+.product-gallery-thumb img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.description-block {
+	margin-bottom: 16px;
+}
+
+.description-block:last-child {
+	margin-bottom: 0;
+}
+
+.description-list {
+	padding-left: 24px;
+}

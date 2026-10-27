@@ -1,0 +1,144 @@
+syntax = "proto3";
+
+package hawkr.cart;
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/cart";
+option java_package = "io.github.will413028.hawkr.cart.grpc";
+option java_multiple_files = true;
+
+// Cart Service - 購物車微服務
+service CartService {
+    // 加入購物車（會員/訪客）
+    rpc AddItem (AddItemRequest) returns (AddItemResponse);
+
+    // 查詢購物車（Cache-Aside + Lazy Loading Seller）
+    rpc GetCart (GetCartRequest) returns (GetCartResponse);
+
+    // 合併購物車（登入後：訪客車 → 會員車）
+    rpc MergeCart (MergeCartRequest) returns (MergeCartResponse);
+
+    // 設定商品數量（0 = 刪除）
+    rpc SetItemQuantity (SetItemQuantityRequest) returns (SetItemQuantityResponse);
+
+    // 結帳鎖定（Order Service 呼叫）
+    rpc CheckoutLock (CheckoutLockRequest) returns (CheckoutLockResponse);
+
+    // 解除鎖定（Order Service 呼叫，補償）
+    rpc CheckoutUnlock (CheckoutUnlockRequest) returns (CheckoutUnlockResponse);
+
+    // 依結帳 ID 移除商品（Order Service 呼叫，成功後清理）
+    rpc RemoveItemsByCheckoutId (RemoveItemsByCheckoutIdRequest) returns (RemoveItemsByCheckoutIdResponse);
+}
+
+// ========== AddItem ==========
+
+message AddItemRequest {
+    string guest_id = 1;    // guest flow 必填；member flow 可不填
+    string sku_id = 2;      // 商品 SKU ID（數字字串）
+    string quantity = 3;    // 加入數量（數字字串，E.5.5）
+}
+
+message AddItemResponse {
+    int32 code = 1;
+    string message = 2;        // 若觸發限購截斷，在此提示
+    string total_items = 3;    // 品項數：distinct SKU count（含 NORMAL+LOCKED，數字字串）
+}
+
+// ========== GetCart ==========
+
+message GetCartRequest {
+    string guest_id = 1;    // guest flow 必填；member flow 可不填
+}
+
+message GetCartResponse {
+    int32 code = 1;
+    repeated CartSellerGroup groups = 2;
+    string estimated_total_amount = 3;   // 估算總價（只計 NORMAL，數字字串）
+    string total_items = 4;              // 品項數（含 NORMAL+LOCKED，數字字串）
+}
+
+message CartSellerGroup {
+    string store_id = 1; // 賣家 store ID（數字字串）
+    string seller_name = 2;     // 賣家名稱（Lazy Loaded，可降級為空）
+    repeated CartItemView items = 3;
+    string logo_key = 4;        // 賣家 Logo objectKey（enrich 自 SellerMeta；49 §6.6 S9 GW 組 logoUrl，Lazy Loaded 可降級為空）
+    string seller_city = 5;     // 賣家縣市（如「桃園市」，Lazy Loaded，可降級為空）
+    string seller_district = 6; // 賣家區域（如「桃園區」，Lazy Loaded，可降級為空）
+    string store_code = 7;      // 賣家短碼（enrich 自 SellerMeta，Lazy Loaded 可降級為空）
+}
+
+message CartItemView {
+    string sku_id = 1;          // SKU ID（數字字串）
+    string quantity = 2;        // 數量（數字字串）
+    string name = 3;            // DB snapshot: sku_name_snapshot（商品名稱）
+    string price = 4;           // DB snapshot: **added_unit_price**（實際成交單價，數字字串）
+    string status = 5;          // "NORMAL" 或 "LOCKED"
+    string product_id = 6;      // 商品 ID（數字字串，DB snapshot）
+    string spec_name = 7;       // SKU 規格名稱快照（product_sku.sku_name）
+    string image_key = 8;       // 商品主圖 objectKey（DB 存 objectKey；49 §6.6 GW 組 imageUrl）
+    string stock_qty = 9;       // 即時庫存數量（數字字串，來自 Product Service 即時查詢）
+    repeated string delivery_temps = 10; // SKU 支援的配送溫層 value（如 ["3201","3202","3203"]）
+    string list_price = 11;     // DB snapshot: **added_list_price**（原價，數字字串）。前端可比對 price < list_price 顯示 strike-through
+    bool purchasable = 12;      // 本筆 row 是否可購買（前端據此反灰 / disable checkbox）。true 時 unavailable_reason 為空字串
+    string unavailable_reason = 13; // 不可購買原因（CartItemUnavailableReason value：DELISTED / OUT_OF_STOCK / INSUFFICIENT_STOCK / LOOKUP_FAILED）。purchasable=true 時為空字串
+}
+
+// ========== MergeCart ==========
+
+message MergeCartRequest {
+    string guest_id = 1;    // 要被合併的訪客購物車
+}
+
+message MergeCartResponse {
+    int32 code = 1;
+    // 合併過程中靜默移除的自家商品品項數（distinct SKU count，數字字串）；前端可選擇顯示 toast「已自動移除你上架的 N 項商品」
+    // 詳見 04 設計書 §5.3
+    string removed_self_owned_count = 2;
+}
+
+// ========== SetItemQuantity ==========
+
+message SetItemQuantityRequest {
+    string guest_id = 1;    // guest flow 必填；member flow 可不填
+    string sku_id = 2;      // SKU ID（數字字串）
+    string quantity = 3;    // 數量（數字字串，"0" = 刪除）
+}
+
+message SetItemQuantityResponse {
+    int32 code = 1;
+    string message = 2;
+    string total_items = 3;   // 品項數（數字字串）
+}
+
+// ========== CheckoutLock（Order Service 呼叫） ==========
+
+message CheckoutLockRequest {
+    string checkout_id = 1;         // 前端生成的批次結帳 ID
+    repeated string sku_ids = 2;    // 要結帳的商品 SKU ID
+}
+
+message CheckoutLockResponse {
+    int32 code = 1;
+}
+
+// ========== CheckoutUnlock（Order Service 呼叫，補償） ==========
+
+message CheckoutUnlockRequest {
+    string checkout_id = 1;
+    repeated string sku_ids = 2;    // 可選，若空則解鎖該 checkout_id 下所有 items
+}
+
+message CheckoutUnlockResponse {
+    int32 code = 1;
+}
+
+// ========== RemoveItemsByCheckoutId（Order Service 呼叫，成功後清理） ==========
+
+message RemoveItemsByCheckoutIdRequest {
+    string checkout_id = 1;
+    repeated string sku_ids = 2;    // 可選：支援分批清理
+}
+
+message RemoveItemsByCheckoutIdResponse {
+    int32 code = 1;
+}

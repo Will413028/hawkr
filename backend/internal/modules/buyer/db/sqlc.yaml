@@ -1,0 +1,30 @@
+# 改完 schema.sql 或 queries/ 之後，在本目錄執行 `sqlc generate`。
+#
+# 只讀本模組的 schema.sql 與 objects.sql：query 參照別的模組的表時，sqlc generate 就會失敗
+# （ADR 2026-09-24-go-modular-monolith D3 的機械檢查；CI 重新生成並比對）。
+version: "2"
+sql:
+  - engine: "postgresql"
+    schema: ["schema.sql", "objects.sql"]
+    queries: "queries/"
+    gen:
+      go:
+        package: "store"
+        out: "../internal/store"
+        sql_package: "pgx/v5"
+        emit_empty_slices: true
+        emit_pointers_for_null_types: true
+        overrides:
+          # 實體的主鍵（UUIDv7）用 Go 1.27 標準庫的 uuid.UUID；不用 pgtype.UUID，模組與呼叫方只有一種 ID 型別。
+          - db_type: "uuid"
+            go_type:
+              import: "uuid"
+              type: "UUID"
+          - db_type: "timestamptz"
+            go_type: "time.Time"
+          - db_type: "timestamptz"
+            nullable: true
+            go_type:
+              import: "time"
+              type: "Time"
+              pointer: true

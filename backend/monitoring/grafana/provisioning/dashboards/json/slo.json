@@ -1,0 +1,461 @@
+{
+  "annotations": { "list": [] },
+  "description": "Hawkr SLO 儀表板 — 可用性、延遲、錯誤預算",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "🎯 Gateway SLO（HTTP）",
+      "type": "row"
+    },
+    {
+      "title": "可用性 SLI（目標 99.9%）",
+      "description": "非 5xx 請求佔比，選定時間範圍內",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 1 },
+      "id": 1,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 3,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0.999 },
+              { "color": "green", "value": 0.9995 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "1 - (\n  sum(increase(http_requests_total{job=\"gateway\", status=~\"5..\"}[$__range]))\n  /\n  sum(increase(http_requests_total{job=\"gateway\"}[$__range]))\n)",
+          "legendFormat": "Availability"
+        }
+      ],
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value" }
+    },
+    {
+      "title": "P99 延遲（目標 < 2s）",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 4, "x": 4, "y": 1 },
+      "id": 2,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 2 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=\"gateway\"}[5m])) by (le))",
+          "legendFormat": "P99"
+        }
+      ],
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value" }
+    },
+    {
+      "title": "錯誤預算剩餘（30 天窗口）",
+      "description": "SLO 99.9% = 0.1% 錯誤預算。100% = 預算充足，0% = 預算耗盡",
+      "type": "gauge",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 4, "x": 8, "y": 1 },
+      "id": 3,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0.25 },
+              { "color": "green", "value": 0.5 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "clamp_min(\n  1 - (\n    (\n      sum(increase(http_requests_total{job=\"gateway\", status=~\"5..\"}[30d]))\n      /\n      sum(increase(http_requests_total{job=\"gateway\"}[30d]))\n    ) / 0.001\n  )\n, 0)",
+          "legendFormat": "Budget"
+        }
+      ],
+      "options": { "showThresholdLabels": false, "showThresholdMarkers": true }
+    },
+    {
+      "title": "請求速率",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 4, "x": 12, "y": 1 },
+      "id": 4,
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "decimals": 1 }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{job=\"gateway\"}[5m]))",
+          "legendFormat": "RPS"
+        }
+      ],
+      "options": { "colorMode": "none", "graphMode": "area", "textMode": "value" }
+    },
+    {
+      "title": "5xx 錯誤率",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 4, "x": 16, "y": 1 },
+      "id": 5,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 0.01 },
+              { "color": "red", "value": 0.05 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{job=\"gateway\", status=~\"5..\"}[5m])) / sum(rate(http_requests_total{job=\"gateway\"}[5m]))",
+          "legendFormat": "Error Rate"
+        }
+      ],
+      "options": { "colorMode": "background", "graphMode": "area", "textMode": "value" }
+    },
+    {
+      "title": "In-Flight 請求",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 4, "x": 20, "y": 1 },
+      "id": 6,
+      "fieldConfig": {
+        "defaults": { "unit": "short", "decimals": 0 }
+      },
+      "targets": [
+        {
+          "expr": "sum(grpc_server_requests_in_flight{job=\"gateway\"})",
+          "legendFormat": "In-Flight"
+        }
+      ],
+      "options": { "colorMode": "none", "graphMode": "area", "textMode": "value" }
+    },
+    {
+      "title": "可用性趨勢",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "id": 7,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0.99,
+          "max": 1,
+          "custom": { "lineWidth": 2, "fillOpacity": 10 }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "SLO Target" },
+            "properties": [
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } },
+              { "id": "custom.fillOpacity", "value": 0 }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "1 - (\n  sum(rate(http_requests_total{job=\"gateway\", status=~\"5..\"}[10m]))\n  /\n  sum(rate(http_requests_total{job=\"gateway\"}[10m]))\n)",
+          "legendFormat": "Availability (10m)"
+        },
+        {
+          "expr": "0.999",
+          "legendFormat": "SLO Target"
+        }
+      ]
+    },
+    {
+      "title": "延遲分佈（P50 / P90 / P99）",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "id": 8,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "lineWidth": 2, "fillOpacity": 10 }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Latency SLO" },
+            "properties": [
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } },
+              { "id": "custom.fillOpacity", "value": 0 }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=\"gateway\"}[5m])) by (le))",
+          "legendFormat": "P50"
+        },
+        {
+          "expr": "histogram_quantile(0.90, sum(rate(http_request_duration_seconds_bucket{job=\"gateway\"}[5m])) by (le))",
+          "legendFormat": "P90"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=\"gateway\"}[5m])) by (le))",
+          "legendFormat": "P99"
+        },
+        {
+          "expr": "2",
+          "legendFormat": "Latency SLO"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "id": 101,
+      "title": "🔧 各服務 gRPC SLO",
+      "type": "row"
+    },
+    {
+      "title": "各服務可用性（gRPC OK 率）",
+      "description": "每個服務的 gRPC 成功率，按 job 分組",
+      "type": "table",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "id": 9,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 3,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0.999 },
+              { "color": "green", "value": 0.9995 }
+            ]
+          },
+          "custom": { "displayMode": "color-background-solid" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Service" },
+            "properties": [
+              { "id": "custom.displayMode", "value": "auto" },
+              { "id": "custom.width", "value": 200 }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "1 - (\n  sum by (job) (increase(grpc_server_requests_total{code!=\"OK\"}[$__range]))\n  /\n  sum by (job) (increase(grpc_server_requests_total[$__range]))\n)",
+          "legendFormat": "{{ job }}",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        { "id": "organize", "options": { "renameByName": { "job": "Service", "Value": "Availability" } } }
+      ]
+    },
+    {
+      "title": "各服務 P99 延遲",
+      "type": "table",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+      "id": 10,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 2 }
+            ]
+          },
+          "custom": { "displayMode": "color-background-solid" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Service" },
+            "properties": [
+              { "id": "custom.displayMode", "value": "auto" },
+              { "id": "custom.width", "value": 200 }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum by (job, le) (rate(grpc_server_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{ job }}",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        { "id": "organize", "options": { "renameByName": { "job": "Service", "Value": "P99 Latency" } } }
+      ]
+    },
+    {
+      "title": "gRPC 錯誤率趨勢（各服務）",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+      "id": 11,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": { "lineWidth": 1, "fillOpacity": 10 }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (job) (rate(grpc_server_requests_total{code!=\"OK\"}[5m])) / sum by (job) (rate(grpc_server_requests_total[5m]))",
+          "legendFormat": "{{ job }}"
+        }
+      ]
+    },
+    {
+      "title": "gRPC P99 延遲趨勢（各服務）",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 23 },
+      "id": 12,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "lineWidth": 1, "fillOpacity": 10 }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "SLO" },
+            "properties": [
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } },
+              { "id": "custom.fillOpacity", "value": 0 }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum by (job, le) (rate(grpc_server_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{ job }}"
+        },
+        {
+          "expr": "2",
+          "legendFormat": "SLO"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
+      "id": 102,
+      "title": "🔥 錯誤預算燃燒率",
+      "type": "row"
+    },
+    {
+      "title": "Gateway 錯誤預算燃燒率（1h / 6h）",
+      "description": "燃燒率 > 1 表示錯誤速度超過預算。> 14.4（1h）或 > 6（6h）應立即處理。",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
+      "id": 13,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "lineWidth": 2, "fillOpacity": 10 }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Alert Threshold" },
+            "properties": [
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } },
+              { "id": "custom.fillOpacity", "value": 0 }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "(\n  sum(rate(http_requests_total{job=\"gateway\", status=~\"5..\"}[1h]))\n  /\n  sum(rate(http_requests_total{job=\"gateway\"}[1h]))\n) / 0.001",
+          "legendFormat": "Burn Rate (1h)"
+        },
+        {
+          "expr": "(\n  sum(rate(http_requests_total{job=\"gateway\", status=~\"5..\"}[6h]))\n  /\n  sum(rate(http_requests_total{job=\"gateway\"}[6h]))\n) / 0.001",
+          "legendFormat": "Burn Rate (6h)"
+        },
+        {
+          "expr": "1",
+          "legendFormat": "Alert Threshold"
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["slo", "hawkr"],
+  "templating": {
+    "list": [
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "filters": [
+          {
+            "condition": "",
+            "key": "env",
+            "operator": "=",
+            "value": "prod"
+          }
+        ],
+        "hide": 0,
+        "label": "環境",
+        "name": "adhoc_env",
+        "type": "adhoc"
+      }
+    ]
+  },
+  "time": { "from": "now-24h", "to": "now" },
+  "title": "SLO Dashboard",
+  "uid": "hawkr-slo"
+}

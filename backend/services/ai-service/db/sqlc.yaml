@@ -1,0 +1,125 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "queries/"
+    schema: "schema/"
+    gen:
+      go:
+        package: "gen"
+        out: "../internal/repository/postgres/gen"
+        sql_package: "pgx/v5"
+        emit_json_tags: true
+        emit_db_tags: true
+        emit_empty_slices: true
+        emit_pointers_for_null_types: true
+        overrides:
+          - db_type: "timestamptz"
+            nullable: true
+            go_type:
+              import: "time"
+              type: "Time"
+              pointer: true
+  # procurement 域獨立成自己的 sqlc entry（不共用上面那組 gen output）：procurement
+  # 刻意設計成可整包抽成獨立服務（module.go／schema 註解皆明講，且與既有 AI 表無外鍵），
+  # 若跟其他 domain 共用一個 gen package 會製造耦合。schema 只掃 procurement.sql 一份，
+  # 不是整個 schema/ 目錄。
+  - engine: "postgresql"
+    queries: "queries/procurement/"
+    schema: "schema/procurement.sql"
+    gen:
+      go:
+        package: "gen"
+        out: "../internal/procurement/repository/gen"
+        sql_package: "pgx/v5"
+        emit_json_tags: true
+        emit_db_tags: true
+        emit_empty_slices: true
+        emit_pointers_for_null_types: true
+        overrides:
+          - db_type: "timestamptz"
+            nullable: true
+            go_type:
+              import: "time"
+              type: "Time"
+              pointer: true
+          # pgx v5 QueryExecModeExec（pkg/database/postgres.go，全服務為相容 PgBouncer
+          # transaction pooling 統一設定）跳過 server-side Describe，參數型別純靠 Go 值的
+          # 動態型別推斷；裸 []byte 預設對到 bytea 而非 jsonb，寫入 jsonb 欄位會用錯 OID
+          # 寫壞資料。json.RawMessage 有註冊到 pgx 的 JSON codec 才能正確 round-trip——
+          # 全 repo 已用 sqlc 的服務對每個 jsonb 欄位都做這個 override（同一類 bug 曾在
+          # notification-service 的 notifications.data 踩過一次 P1，commit 2fca1ab47／
+          # issue #1370），這裡不是可省的最佳化，是強制慣例。
+          - column: "procurement_request_revisions.slots_json"
+            go_type: "encoding/json.RawMessage"
+          - column: "procurement_answer_patches.payload_json"
+            go_type: "encoding/json.RawMessage"
+          - column: "procurement_candidates.matched_facts_json"
+            go_type: "encoding/json.RawMessage"
+          - column: "procurement_candidates.unverifiable_facts_json"
+            go_type: "encoding/json.RawMessage"
+          - column: "procurement_conversation_commands.result_json"
+            go_type: "encoding/json.RawMessage"
+          - column: "procurement_quote_outbox.payload"
+            go_type: "encoding/json.RawMessage"
+          - column: "procurement_price_previews.reference_payload_json"
+            go_type: "encoding/json.RawMessage"
+          - column: "procurement_price_previews.buyer_requested_range_json"
+            go_type: "encoding/json.RawMessage"
+          - column: "procurement_price_previews.deal_temperature_json"
+            go_type: "encoding/json.RawMessage"
+          - column: "procurement_price_previews.market_price_basis_json"
+            go_type: "encoding/json.RawMessage"
+          - column: "procurement_price_previews.quote_total_range_json"
+            go_type: "encoding/json.RawMessage"
+          - column: "procurement_confirmed_rfq_snapshots.canonical_payload_json"
+            go_type: "encoding/json.RawMessage"
+          - column: "procurement_rfq_publication_approvals.seller_facing_payload_json"
+            go_type: "encoding/json.RawMessage"
+          - column: "procurement_rfq_publication_outbox.payload"
+            go_type: "encoding/json.RawMessage"
+          - column: "procurement_order_provisioning_outbox.payload"
+            go_type: "encoding/json.RawMessage"
+          - column: "procurement_seller_response_drafts.payload"
+            go_type: "encoding/json.RawMessage"
+          - column: "procurement_agent_run_inputs.input_ref"
+            go_type: "encoding/json.RawMessage"
+          - column: "procurement_agent_run_events.public_payload_json"
+            go_type: "encoding/json.RawMessage"
+          - column: "procurement_agent_run_interrupts.payload_json"
+            go_type: "encoding/json.RawMessage"
+          - column: "procurement_agent_run_artifacts.public_data_json"
+            go_type: "encoding/json.RawMessage"
+          - column: "procurement_agent_run_commands.result_json"
+            go_type: "encoding/json.RawMessage"
+
+          # ADK（Agent Development Kit）自管的四張表：目前沒有任何 sqlc query，
+          # 所以這幾條 override 對生成碼是 no-op。登記的理由是「每個 jsonb 欄位都要有」
+          # 這條規則不留例外——一旦哪天為它們寫了 query，漏 override 的代價是正式
+          # 環境才炸的 22P02。2026-09-11 放寬 check-sqlc-jsonb-override.py 的 parser
+          # 之後才看得見它們（原 regex 寫死 4 空格＋不帶引號，漏掉多個服務）。
+          - column: "app_states.state"
+            go_type: "encoding/json.RawMessage"
+          - column: "events.citation_metadata"
+            go_type: "encoding/json.RawMessage"
+          - column: "events.content"
+            go_type: "encoding/json.RawMessage"
+          - column: "events.custom_metadata"
+            go_type: "encoding/json.RawMessage"
+          - column: "events.grounding_metadata"
+            go_type: "encoding/json.RawMessage"
+          - column: "events.long_running_tool_ids_json"
+            go_type: "encoding/json.RawMessage"
+          - column: "events.node_info_json"
+            go_type: "encoding/json.RawMessage"
+          - column: "events.output_json"
+            go_type: "encoding/json.RawMessage"
+          - column: "events.requested_input_json"
+            go_type: "encoding/json.RawMessage"
+          - column: "events.routes_json"
+            go_type: "encoding/json.RawMessage"
+          - column: "events.usage_metadata"
+            go_type: "encoding/json.RawMessage"
+          - column: "sessions.state"
+            go_type: "encoding/json.RawMessage"
+          - column: "user_states.state"
+            go_type: "encoding/json.RawMessage"

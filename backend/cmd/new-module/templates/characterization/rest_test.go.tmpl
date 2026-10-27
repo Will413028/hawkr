@@ -1,0 +1,13 @@
+package characterization
+
+import (
+	ch "{{.Module}}/internal/httpapi/characterize"
+)
+
+// restDriver 以舊 gateway 的 REST API（統一 envelope）操作舊的 {{.Legacy}}：路徑與 wire 型別照舊 gateway 的
+// handler，r.rest.Do 送出請求並以 ch.RESTKind 分類錯誤；模組的業務碼先在這裡對應。{{.Legacy}} 刪除時一起刪除。
+type restDriver struct {
+	rest ch.REST
+}
+
+var _ Driver = (*restDriver)(nil)

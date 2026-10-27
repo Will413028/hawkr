@@ -1,0 +1,24 @@
+{
+  "before": {},
+  "patch": {
+    "item": "寶島梨禮盒",
+    "quantity": 50,
+    "budget_per_unit": 800,
+    "delivery_city": "桃園",
+    "delivery_date": "8/20"
+  },
+  "now": "2026-08-07T00:00:00Z",
+  "after": {
+    "item": "寶島梨禮盒",
+    "quantity": 50,
+    "budget_per_unit": 800,
+    "delivery_city": "桃園市",
+    "exact_match_required": true
+  },
+  "rejected": [
+    {
+      "key": "delivery_date",
+      "reason": "缺少西元年份，請補上年份（例如 2026-08-20）"
+    }
+  ]
+}

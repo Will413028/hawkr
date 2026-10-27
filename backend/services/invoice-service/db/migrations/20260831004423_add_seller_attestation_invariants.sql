@@ -1,0 +1,2 @@
+-- Modify "seller_tax_profiles" table
+ALTER TABLE "seller_tax_profiles" ADD CONSTRAINT "chk_stp_attestation_pair" CHECK ((attested_at IS NULL) = (attestation_version IS NULL)), ADD CONSTRAINT "chk_stp_attestation_version_nonblank" CHECK ((attestation_version IS NULL) OR (length((attestation_version)::text) >= 1)), ADD CONSTRAINT "chk_stp_attested_when_committed" CHECK (((review_status)::text <> ALL ((ARRAY['SUBMITTED'::character varying, 'SELF_ISSUE_PENDING'::character varying])::text[])) OR ((attestation_version IS NOT NULL) AND (attested_at IS NOT NULL)));

@@ -1,0 +1,6 @@
+data: {"type":"TOOL_CALL_START","toolCallId":"call-golden","toolCallName":"get_my_orders"}
+
+data: {"type":"TOOL_CALL_END","toolCallId":"call-golden"}
+
+data: {"type":"TOOL_CALL_RESULT","messageId":"msg-golden","toolCallId":"call-golden","content":"{\"orders\":[]}"}
+

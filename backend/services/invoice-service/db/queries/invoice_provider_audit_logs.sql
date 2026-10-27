@@ -1,0 +1,36 @@
+-- invoice_provider_audit_logs｜對 provider 的每一次呼叫留證
+-- SSOT：設計書 58 號 §5.1.13＋§5.4.6
+-- 本波放骨架 ＋ 一支 append：它是「我方到底送了什麼給光貿」的唯一證據，在 A4 受控人工出口與
+-- 買家申訴中都是舉證材料 ⇒ 跟著發票一起留 5 年（INVOICE_AUDIT_RETENTION_DAYS = 1826），
+-- **沒有較短的保留期、也沒有清理路徑**。
+-- ⚠️ request_masked／response_masked 必須**先遮罩再落庫**；raw_body_hash 是遮罩前 canonical body
+--    的 SHA-256（不可逆，可比對重送）。
+
+-- name: InsertInvoiceProviderAuditLog :exec
+INSERT INTO invoice_provider_audit_logs (
+  operation_id, issuer_id, provider, endpoint, attempt_seq,
+  request_masked, response_masked, raw_body_hash,
+  http_status, provider_code, provider_message, latency_ms, error_kind, correlation_id, occurred_at)
+VALUES (
+  sqlc.narg(operation_id), sqlc.arg(issuer_id), sqlc.arg(provider), sqlc.arg(endpoint),
+  sqlc.arg(attempt_seq), sqlc.arg(request_masked), sqlc.narg(response_masked), sqlc.arg(raw_body_hash),
+  sqlc.narg(http_status), sqlc.narg(provider_code), sqlc.narg(provider_message), sqlc.narg(latency_ms),
+  sqlc.narg(error_kind), sqlc.narg(correlation_id), sqlc.arg(now));
+
+-- name: ListInvoiceProviderAuditLogsByOperation :many
+SELECT * FROM invoice_provider_audit_logs
+WHERE operation_id = sqlc.arg(operation_id)
+ORDER BY attempt_seq;
+
+-- name: GetLatestProviderAuditCorrelationByIssuer :one
+-- S05 的 last_request_id（#3031）：這位賣家最近一次 AMEGO 往返在我方 log／trace 上的
+-- 識別碼，賣家回報問題時給客服追查用。
+--
+-- 🔴 只取**有 correlation_id 的那一列**，不是「最近一列然後可能是 NULL」：
+-- correlation_id 是 narg，早期或某些路徑寫進來的列是 NULL；取最近一列的話，
+-- 只要最後一次剛好沒帶，這個欄位就變回空字串——而賣家看到的症狀與「從來沒填」相同。
+SELECT correlation_id FROM invoice_provider_audit_logs
+WHERE issuer_id = sqlc.arg(issuer_id)
+  AND correlation_id IS NOT NULL
+ORDER BY occurred_at DESC, id DESC
+LIMIT 1;

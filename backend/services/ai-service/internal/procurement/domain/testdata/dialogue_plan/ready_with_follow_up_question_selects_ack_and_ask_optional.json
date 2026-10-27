@@ -1,0 +1,53 @@
+{
+  "input": {
+    "Current": {},
+    "Next": {},
+    "Missing": null,
+    "Ready": true,
+    "Rejected": null,
+    "HasRejected": false,
+    "Degraded": false,
+    "Recorded": null,
+    "CropDisambiguationPending": false,
+    "CropDisambiguationCandidates": null,
+    "Question": {
+      "slotKey": "quantity",
+      "prompt": "",
+      "options": null,
+      "allowFreeText": false,
+      "source": "",
+      "canSkip": false
+    },
+    "PricePreviewAvailable": false,
+    "RfqConfirmationState": 0
+  },
+  "output": {
+    "schemaVersion": "dialogue-plan.v1",
+    "actCode": "ACK_AND_ASK_OPTIONAL",
+    "stateVersion": "",
+    "readinessGate": "PRICE_PREVIEW_READY",
+    "salientFactRefs": [],
+    "nextQuestionRef": "question.quantity",
+    "artifactRefs": [],
+    "allowedClaimCodes": [
+      "REQUEST_FACT_RECORDED",
+      "NEXT_QUESTION_OPTIONAL"
+    ],
+    "forbiddenClaimCodes": [
+      "SEARCH_STARTED",
+      "SEARCH_COMPLETED",
+      "RFQ_PUBLISHED",
+      "SELLER_NOTIFIED",
+      "DEAL_CREATED",
+      "ORDER_CREATED",
+      "PAYMENT_PROCESSED"
+    ],
+    "toneHints": {
+      "verbosity": "CONCISE"
+    },
+    "maxSentences": 2,
+    "policyVersion": "phase3-v1",
+    "templateVersion": "phase2-v1",
+    "planHash": ""
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema": "hawkr.market-registry-mirror/v1",
+  "file": "market_registry.v1.csv",
+  "sha256": "4d13e4680abb37b9e67de643bc8ad7437d78cbbf8da9e1bac5070f86aa1ef46a",
+  "row_count": 25,
+  "upstream_repo": "<org>/Hawkr_Transformer_Pricebook",
+  "upstream_path": "reference/market_registry.v1.csv",
+  "upstream_commit": "1374695cd071cafd112f244abc68101b7ef555f6",
+  "upstream_snapshot_version": "moa-market-registry-2026-07-18-v1",
+  "upstream_contract": "contracts/reference/market_registry.v1.yaml"
+}

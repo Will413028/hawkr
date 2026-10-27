@@ -1,0 +1,9 @@
+name: hawkr_twaddr
+description: 台灣地址代碼與查詢（內政部 8 碼鄉鎮市區代碼）。
+publish_to: none
+
+environment:
+  sdk: ^3.8.0
+
+dev_dependencies:
+  test: 1.26.3

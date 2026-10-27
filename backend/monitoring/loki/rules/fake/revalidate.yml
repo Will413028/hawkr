@@ -1,0 +1,24 @@
+# Loki ruler 告警：revalidate cache-bust 全失敗偵測
+# backend (review/seller/product/order/product-import/social) 用 pkg/revalidate/client.go
+# fire-and-forget 打 website /api/revalidate。fail-soft（#1189）後，secret 不配對
+# 或 website 打不到 → 靜默 no-op（只 log，不報錯不擋部署）。本規則補回能見度：
+# 某環境「有 error 且零 success」= 全失敗 → 告警。event-driven，平時 both=0 不誤報。
+groups:
+  - name: revalidate
+    interval: 1m
+    rules:
+      - alert: RevalidateAllFailing
+        expr: |
+          sum by (environment) (
+            count_over_time({service_name=~"review-service|seller-service|product-service|order-service|product-import-service|social-service"} |= "revalidate.send.error" [15m])
+          ) > 0
+          unless
+          sum by (environment) (
+            count_over_time({service_name=~"review-service|seller-service|product-service|order-service|product-import-service|social-service"} |= "revalidate.send.success" [15m])
+          ) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "revalidate cache-bust 全失敗 ({{ $labels.environment }})"
+          description: "近 15m backend revalidate 全部失敗、零成功（fail-soft 靜默 no-op）。檢查該環境 WEB_REVALIDATE_SECRET 配對 + website /api/revalidate 可達性。"

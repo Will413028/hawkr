@@ -1,0 +1,185 @@
+name: backend monolith
+
+# Go modular monolith（backend/ 根 module）的檢查：gofmt、vet、race test（含 internal/arch
+# 的依賴方向檢查）、帶 integration tag 的測試（testcontainers 起真的 Postgres，
+# 含每個模組的 schema 隔離與 schema.sql 和 migration 的一致性）、Connect、sqlc、jet、CodeMeta 生成物
+# drift（sqlc 另外確認 query 參照別的模組時生成會失敗）、go mod tidy drift。
+# 遷移計畫：backend/docs/plans/2026-09-24-go-modular-monolith.md。
+#
+# GOWORK=off：單體必須能獨立建置，不能靠 go.work 借用舊服務的 module。
+# 每一步都 if: always()，前面失敗也照跑，一次看到全部問題。
+
+on:
+  pull_request:
+    paths: &monolith_paths
+      - 'backend/go.mod'
+      - 'backend/go.sum'
+      - 'backend/.go-version'
+      - 'backend/.golangci.monolith.yml'
+      - 'backend/cmd/**'
+      - 'backend/internal/**'
+      - 'backend/Makefile'
+      - 'backend/scripts/gen-sqlc.sh'
+      - 'backend/docs/代碼管理（CodeMeta）/**'
+      - 'backend/pkg/media/ref_type.go'
+      - 'website/lib/codemeta/generated.ts'
+      - 'admin/src/lib/codemeta/generated.ts'
+      - 'buyer-app/lib/core/codemeta/code_meta.dart'
+      - 'seller-app/lib/core/codemeta/code_meta.dart'
+      - 'backend/buf.gen.connect.yaml'
+      - 'backend/buf.gen.legacy.yaml'
+      - 'backend/api/proto/media/**'
+      - 'backend/tests/contract/golden/event_payload_keys.json'
+      - 'api/**'
+      - '.github/workflows/backend-monolith.yml'
+  push:
+    branches: [main]
+    paths: *monolith_paths
+  workflow_dispatch:
+
+concurrency:
+  group: backend-monolith-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: backend
+
+env:
+  GOWORK: 'off'
+
+jobs:
+  lint:
+    name: golangci-lint（一般／integration）
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/.go-version
+          cache-dependency-path: backend/go.sum
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9.3.0
+        with:
+          version: v2.13.2
+          working-directory: backend
+          args: --config=.golangci.monolith.yml ./cmd/... ./internal/...
+      - name: golangci-lint（integration tag）
+        if: always()
+        uses: golangci/golangci-lint-action@v9.3.0
+        with:
+          version: v2.13.2
+          working-directory: backend
+          args: --config=.golangci.monolith.yml --build-tags=integration ./cmd/... ./internal/...
+
+  check:
+    name: gofmt／vet／test／tidy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/.go-version
+          cache-dependency-path: backend/go.sum
+
+      - name: gofmt -l
+        run: |
+          unformatted=$(gofmt -l cmd internal)
+          if [ -n "$unformatted" ]; then
+            echo "::error::以下檔案未通過 gofmt，請在本機跑 gofmt -w 後重推："
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go vet（含 integration tag 的測試檔）
+        if: always()
+        run: |
+          go vet ./...
+          go vet -tags integration ./...
+
+      - name: go test -race（含依賴方向檢查）
+        if: always()
+        run: go test -race ./...
+
+      - name: integration test（testcontainers）
+        if: always()
+        run: go test -race -timeout 15m -tags integration ./...
+
+      - name: 讀取 buf 的版本
+        if: always()
+        id: buf
+        run: echo "version=$(cat ../api/.buf-version)" >> "$GITHUB_OUTPUT"
+      - uses: bufbuild/buf-action@v1
+        if: always()
+        with:
+          version: ${{ steps.buf.outputs.version }}
+          setup_only: true
+      - name: Connect 生成物 drift
+        if: always()
+        run: |
+          make connect
+          paths=(internal/httpapi/gen internal/legacy/gen)
+          if [ -n "$(git status --porcelain -- "${paths[@]}")" ]; then
+            git status --short -- "${paths[@]}"
+            echo "::error::internal/httpapi/gen 或 internal/legacy/gen 與 proto 不一致，請在本機跑 make connect 後 commit"
+            exit 1
+          fi
+
+      - name: sqlc 生成物 drift 與 query 隔離
+        if: always()
+        run: |
+          make sqlc
+          if [ -n "$(git status --porcelain -- internal/modules)" ]; then
+            git status --short -- internal/modules
+            echo "::error::模組的 sqlc 生成物與 db/ 不一致，請在本機跑 make sqlc 後 commit"
+            exit 1
+          fi
+          # 故意違規的 fixture：query 參照別的模組的 schema，生成必須失敗（ADR D3 的機械檢查）。
+          image=$(sed -n 's/^IMAGE="\(.*\)"$/\1/p' scripts/gen-sqlc.sh)
+          # 比對錯誤訊息，不只看 exit code：別的原因（例如 image 拉不到）失敗不算數。
+          out=$(docker run --rm -v "$PWD/internal/arch/testdata/sqlc-foreign-schema:/work" -w /work "$image" generate 2>&1 || true)
+          echo "$out"
+          if ! grep -q 'schema "seller" does not exist' <<<"$out"; then
+            echo "::error::參照別的模組 schema 的 query 沒有因為 schema 不存在而失敗，query 隔離檢查失效"
+            exit 1
+          fi
+
+      - name: jet 生成物 drift
+        if: always()
+        run: |
+          make jet
+          if [ -n "$(git status --porcelain -- internal/modules)" ]; then
+            git status --short -- internal/modules
+            echo "::error::模組的 jet 生成物（internal/jet、internal/pubsql）與 db/ 不一致，請在本機跑 make jet 後 commit"
+            exit 1
+          fi
+
+      - name: CodeMeta 生成物 drift
+        if: always()
+        run: |
+          "./docs/代碼管理（CodeMeta）/scripts/generate.sh" --go --go-media --web --admin --flutter
+          paths=(internal/platform/codemeta internal/modules/media pkg/media
+            ../website/lib/codemeta/generated.ts ../admin/src/lib/codemeta/generated.ts
+            ../buyer-app/lib/core/codemeta/code_meta.dart ../seller-app/lib/core/codemeta/code_meta.dart)
+          if [ -n "$(git status --porcelain -- "${paths[@]}")" ]; then
+            git status --short -- "${paths[@]}"
+            git diff --stat -- "${paths[@]}"
+            echo "::error::CodeMeta 生成物與 docs/代碼管理（CodeMeta）不一致，請在本機跑 generate.sh --go --go-media --web --admin --flutter 後 commit"
+            exit 1
+          fi
+
+      - name: go mod tidy drift
+        if: always()
+        run: |
+          go mod tidy
+          if [ -n "$(git status --porcelain -- go.mod go.sum)" ]; then
+            git status --short -- go.mod go.sum
+            git diff -- go.mod go.sum
+            echo "::error::go mod tidy 產生了變更，請在本機跑 go mod tidy 後 commit"
+            exit 1
+          fi

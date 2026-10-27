@@ -1,0 +1,7 @@
+# Environment secrets
+.env
+alertmanager/smtp_password
+
+# Target 檔案含實際 IP，從 *.json.example 複製後填入
+prometheus/targets/*.json
+!prometheus/targets/*.json.example

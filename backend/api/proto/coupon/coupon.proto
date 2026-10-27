@@ -1,0 +1,481 @@
+syntax = "proto3";
+
+package hawkr.coupon;
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/coupon";
+option java_multiple_files = true;
+option java_package = "io.github.will413028.hawkr.coupon.grpc";
+option java_outer_classname = "CouponProto";
+
+// Coupon Service - 優惠券微服務
+service CouponService {
+    // ========== Buyer ==========
+    rpc ListMyCoupons (ListMyCouponsRequest) returns (ListMyCouponsResponse);
+    rpc ListAvailableCoupons (ListAvailableCouponsRequest) returns (ListAvailableCouponsResponse);
+    rpc BuyerClaimCoupon (BuyerClaimCouponRequest) returns (BuyerClaimCouponResponse);
+
+    // ========== Order Service 內部呼叫 ==========
+    rpc ValidateCoupon (ValidateCouponRequest) returns (ValidateCouponResponse);
+    rpc ReserveCoupon (ReserveCouponRequest) returns (ReserveCouponResponse);
+    rpc ConsumeCoupon (ConsumeCouponRequest) returns (ConsumeCouponResponse);
+    rpc ReleaseCoupon (ReleaseCouponRequest) returns (ReleaseCouponResponse);
+
+    // ========== Seller ==========
+    rpc SellerCreateTemplate (SellerCreateTemplateRequest) returns (SellerCreateTemplateResponse);
+    rpc SellerListTemplates (SellerListTemplatesRequest) returns (SellerListTemplatesResponse);
+    rpc SellerGetTemplateDetail (SellerGetTemplateDetailRequest) returns (SellerGetTemplateDetailResponse);
+    rpc SellerRevokeTemplate (SellerRevokeTemplateRequest) returns (SellerRevokeTemplateResponse);
+    rpc ListBuyerCouponsForSeller (ListBuyerCouponsForSellerRequest) returns (ListBuyerCouponsForSellerResponse);
+
+    // ========== Admin ==========
+    rpc AdminCreateTemplate (AdminCreateTemplateRequest) returns (AdminCreateTemplateResponse);
+    rpc AdminPublishTemplate (AdminPublishTemplateRequest) returns (AdminPublishTemplateResponse);
+    rpc AdminDisableTemplate (AdminDisableTemplateRequest) returns (AdminDisableTemplateResponse);
+    rpc AdminIssueCoupons (AdminIssueCouponsRequest) returns (AdminIssueCouponsResponse);
+    rpc AdminDistributeTemplate (AdminDistributeTemplateRequest) returns (AdminDistributeTemplateResponse);
+    rpc AdminGrantCompensationCoupon (AdminGrantCompensationCouponRequest) returns (AdminGrantCompensationCouponResponse);
+    rpc AdminVoidInstance (AdminVoidInstanceRequest) returns (AdminVoidInstanceResponse);
+    rpc AdminUpdateSellerQuota (AdminUpdateSellerQuotaRequest) returns (AdminUpdateSellerQuotaResponse);
+
+    // ========== AfterSales Service 呼叫 ==========
+    rpc GrantSellerCompensationCoupon (GrantSellerCompensationCouponRequest) returns (GrantSellerCompensationCouponResponse);
+}
+
+// ========== 共用資料結構 ==========
+
+message TemplateInfo {
+    string template_id = 1;
+    string title = 2;
+    string type = 3;                            // CouponType: CASH / PERCENT
+    string applicable_store_id = 4;             // 適用商店 store_id surrogate（空字串 = 全平台）
+    string issuer_type = 5;                     // ADMIN / SELLER
+    string issuer_account_id = 6;
+    string threshold_amount = 7;                // 滿額門檻
+    string discount_amount = 8;                 // CASH 折扣額
+    string discount_percent = 9;                // PERCENT 折扣百分比
+    string max_discount_amount = 10;            // PERCENT 折扣上限
+    reserved 11;                                // 曾為 max_shipping_discount（免運券已移除，#1367）
+    reserved "max_shipping_discount";
+    string start_at = 12;                       // ISO 8601
+    string end_at = 13;                         // ISO 8601
+    string usage_limit_per_account = 14;
+    string total_issue_limit = 15;              // "-1" = 無限
+    string issued_count = 16;
+    string status = 17;                         // TemplateStatus
+    string created_at = 18;
+    string seller_name = 19;                    // 商家名稱（由 Seller Service 查詢填入）
+    string seller_avatar_key = 24;              // 商家 logo objectKey（49 §6.6 S9：透傳 seller.logo_key；Gateway 組 sellerAvatarUrl）
+    // 賣家 canonical 短碼（sellers.store_code）；applicable_store_id 是內部代理鍵，
+    // 賣家頁 canonical 網址走 store_code。與 seller_name 同源自 batchGetSellerMeta，
+    // 查不到（全平台券或聚合失敗）為空字串。
+    string store_code = 25;
+    string target_type = 20;                    // CouponTargetType: ALL / MEMBER / DESIGNATED / COMPENSATION
+    repeated TargetAccountInfo target_accounts = 21;  // DESIGNATED/COMPENSATION 時回傳指定帳號（詳情 API 用）
+    bool claim_required = 22;                   // 是否需要領券
+    bool claimed = 23;                          // 當前買家是否已領取（僅 ListMyCoupons 有意義）
+    string issuer_store_id = 26;                // issuer_type=SELLER 時為建立者 store_id；ADMIN 模板為空字串（V6 split, issuer_account_id=6 保持不變）
+}
+
+message TargetAccountInfo {
+    string buyer_id = 1;                        // 買家 buyer_id（coupon_target_accounts.buyer_id）；
+                                                 // nickname/phone 由 AccountGrpcClient.batchGetAccountInfo
+                                                 // 查詢填入，查詢前經 BuyerGrpcClient.resolvePrincipals
+                                                 // reverse-resolve 成目前登入 account_id 再查（分岔買家
+                                                 // 修復，見 CouponGrpcService.sellerGetTemplateDetail）
+    string nickname = 2;                        // 由 Account Service GetAccountInfoBatch 查詢填入
+    string phone = 3;                           // 由 Account Service GetAccountInfoBatch 查詢填入
+}
+
+message InstanceInfo {
+    string instance_id = 1;
+    string template_id = 2;
+    string title = 3;                           // 冗餘自 Template
+    string type = 4;                            // CouponType
+    string applicable_store_id = 5;             // 適用商店 store_id surrogate（空字串 = 全平台）
+    string threshold_amount = 6;
+    string discount_amount = 7;                 // CASH 折扣額
+    string discount_percent = 8;                // PERCENT 折扣百分比
+    string max_discount_amount = 9;
+    reserved 10;                                // 曾為 max_shipping_discount（免運券已移除，#1367）
+    reserved "max_shipping_discount";
+    string start_at = 11;
+    string end_at = 12;
+    string status = 13;                         // InstanceStatus
+    string created_at = 14;
+    string seller_name = 15;                    // 商家名稱（由 Seller Service 查詢填入）
+    string seller_avatar_key = 16;              // 商家 logo objectKey（49 §6.6 S9：透傳 seller.logo_key；Gateway 組 sellerAvatarUrl）
+    // 賣家 canonical 短碼（sellers.store_code）；同源自 batchGetSellerMeta，
+    // 全平台券或聚合失敗為空字串。
+    string store_code = 17;
+}
+
+message AvailableCouponInfo {
+    TemplateInfo template = 1;
+    string estimated_discount = 2;              // 預算折扣金額（數字字串，新台幣元）
+}
+
+// ========== Buyer: ListMyCoupons ==========
+
+message ListMyCouponsRequest {
+    int64 buyer_id = 1;                         // Gateway 解析後的買家 buyer_id（stint-scoped）
+    string status = 2;                          // 篩選狀態（逗號分隔多選：0=未使用,2=已使用，空字串 = 全部）
+    string page = 3;
+    string page_size = 4;
+    int64 account_id = 5;                       // Gateway 原始 JWT account_id（買家分岔時可能 != buyer_id）
+                                                 // -- 供 AccountGrpcClient.getAccountCreatedAt 用（buyer_id
+                                                 // rekey Phase 5 dual-identity threading，Will 確認 2026-07-18）
+}
+
+message ListMyCouponsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated TemplateInfo records = 3;          // 可用券（Template 資格計算）
+    repeated InstanceInfo used_records = 4;     // 已使用券（Instance 查詢）
+    string total = 5;
+    string page = 6;
+    string page_size = 7;
+}
+
+// ========== Buyer: ListAvailableCoupons ==========
+
+message ListAvailableCouponsRequest {
+    int64 buyer_id = 1;                         // Gateway 解析後的買家 buyer_id（stint-scoped）
+    string page = 2;
+    string page_size = 3;
+    string store_id = 4;                        // 必填：當下購入商品的賣家 store_id surrogate
+    string order_amount = 5;                    // 必填：訂單金額（數字字串，新台幣元）
+    int64 account_id = 6;                       // Gateway 原始 JWT account_id -- 供
+                                                 // AccountGrpcClient.getAccountCreatedAt 用（同上）
+}
+
+message ListAvailableCouponsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated AvailableCouponInfo records = 3;
+    string total = 4;
+    string page = 5;
+    string page_size = 6;
+}
+
+// ========== Order Internal: ValidateCoupon ==========
+
+message ValidateCouponRequest {
+    string template_id = 1;                     // 優惠券 Template ID
+    int64 buyer_id = 2;
+    string store_id = 3;                        // 賣家 store_id surrogate
+    string order_amount = 4;                    // 訂單原價小計（數字字串，新台幣元）
+}
+
+message ValidateCouponResponse {
+    int32 code = 1;
+    string message = 2;
+    CouponValidateResult data = 3;
+}
+
+message CouponValidateResult {
+    bool valid = 1;
+    string discount_amount = 2;                 // 折扣金額（數字字串，新台幣元）
+    string discount_type = 3;                   // CouponType（顯示用）
+    string description = 4;                     // 優惠券描述（如「滿500折100」）
+    string template_id = 5;                     // 回傳 template_id 供後續 Reserve 使用
+}
+
+// ========== Order Internal: ReserveCoupon ==========
+
+message ReserveCouponRequest {
+    string template_id = 1;                     // 優惠券 Template ID
+    int64 buyer_id = 2;
+    string order_no = 3;                        // 關聯訂單編號
+}
+
+message ReserveCouponResponse {
+    int32 code = 1;
+    string message = 2;
+    bool success = 3;
+    string instance_id = 4;                     // 新建的 Instance ID
+}
+
+// ========== Order Internal: ConsumeCoupon ==========
+
+message ConsumeCouponRequest {
+    string instance_id = 1;
+    int64 buyer_id = 2;                         // 目前 consumeCoupon handler 未讀取此欄位（dead field，
+                                                 // rename 保留供未來使用）
+    string order_no = 3;
+}
+
+message ConsumeCouponResponse {
+    int32 code = 1;
+    string message = 2;
+    bool success = 3;
+}
+
+// ========== Order Internal: ReleaseCoupon ==========
+
+message ReleaseCouponRequest {
+    string instance_id = 1;
+    string order_no = 2;
+}
+
+message ReleaseCouponResponse {
+    int32 code = 1;
+    string message = 2;
+    bool success = 3;
+}
+
+// ========== Seller: CreateTemplate ==========
+
+message SellerCreateTemplateRequest {
+    int64 store_id = 1;                         // Gateway 已解析的 store_id surrogate
+    string title = 2;
+    string type = 3;                            // CouponType
+    string target_type = 4;                     // CouponTargetType: ALL / MEMBER / DESIGNATED
+    string threshold_amount = 5;                // 滿額門檻
+    string discount_amount = 6;                 // CASH 折扣額
+    string discount_percent = 7;                // PERCENT 折扣百分比
+    string max_discount_amount = 8;             // PERCENT 折扣上限
+    reserved 9;                                 // 曾為 max_shipping_discount（免運券已移除，#1367）
+    reserved "max_shipping_discount";
+    string start_at = 10;                       // ISO 8601
+    string end_at = 11;                         // ISO 8601
+    repeated string buyer_ids = 12;             // DESIGNATED 時必填
+}
+
+message SellerCreateTemplateResponse {
+    int32 code = 1;
+    string message = 2;
+    TemplateInfo data = 3;
+}
+
+// ========== Seller: ListTemplates ==========
+
+message SellerListTemplatesRequest {
+    int64 store_id = 1;                         // Gateway 已解析的 store_id surrogate
+    string status = 2;                          // 篩選狀態（空字串 = 全部）
+    string page = 3;
+    string page_size = 4;
+}
+
+message SellerListTemplatesResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated TemplateInfo records = 3;
+    string total = 4;
+    string page = 5;
+    string page_size = 6;
+    string max_template_count = 7;              // 該賣家上限
+    string current_active_count = 8;            // 目前使用中數量（排除 COMPENSATION）
+}
+
+// ========== Seller: GetTemplateDetail ==========
+
+message SellerGetTemplateDetailRequest {
+    int64 store_id = 1;                         // Gateway 已解析的 store_id surrogate
+    string template_id = 2;
+}
+
+message SellerGetTemplateDetailResponse {
+    int32 code = 1;
+    string message = 2;
+    TemplateInfo data = 3;                      // 含 target_type, target_accounts（DESIGNATED/COMPENSATION 時）
+    string used_count = 4;                      // 已使用張數
+    string reserved_count = 5;                  // 鎖定中張數
+}
+
+// ========== Seller: RevokeTemplate ==========
+
+message SellerRevokeTemplateRequest {
+    int64 store_id = 1;                         // Gateway 已解析的 store_id surrogate
+    string template_id = 2;
+    string reason = 3;
+}
+
+message SellerRevokeTemplateResponse {
+    int32 code = 1;
+    string message = 2;
+    string revoked_instance_count = 3;          // 被收回的 Instance 數量
+}
+
+// ========== Seller: ListBuyerCouponsForSeller ==========
+
+message ListBuyerCouponsForSellerRequest {
+    int64 store_id = 1;                         // Gateway 已解析的 store_id surrogate
+    string buyer_id = 2;                        // 目標買家
+    string status = 3;                          // 篩選狀態（逗號分隔多選，空字串 = 全部）
+    string page = 4;
+    string page_size = 5;
+}
+
+message ListBuyerCouponsForSellerResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated TemplateInfo records = 3;          // 可用券
+    repeated InstanceInfo used_records = 4;     // 已使用券
+    string total = 5;
+    string page = 6;
+    string page_size = 7;
+}
+
+// ========== Admin: CreateTemplate ==========
+
+message AdminCreateTemplateRequest {
+    int64 account_id = 1;                       // Gateway JWT 注入
+    string title = 2;
+    string type = 3;
+    string target_type = 4;                     // CouponTargetType: ALL / MEMBER / DESIGNATED / COMPENSATION
+    string applicable_store_id = 5;             // 適用商店 store_id surrogate（空字串 = 全平台）
+    string threshold_amount = 6;
+    string discount_amount = 7;
+    string discount_percent = 8;
+    string max_discount_amount = 9;
+    reserved 10;                                // 曾為 max_shipping_discount（免運券已移除，#1367）
+    reserved "max_shipping_discount";
+    string start_at = 11;
+    string end_at = 12;
+    string total_issue_limit = 13;              // "-1" = 無限
+    repeated string buyer_ids = 14;             // DESIGNATED / COMPENSATION 時必填
+    bool claim_required = 15;                   // 是否需要領券（預設 true）
+}
+
+message AdminCreateTemplateResponse {
+    int32 code = 1;
+    string message = 2;
+    TemplateInfo data = 3;
+}
+
+// ========== Admin: PublishTemplate ==========
+
+message AdminPublishTemplateRequest {
+    int64 account_id = 1;
+    string template_id = 2;
+}
+
+message AdminPublishTemplateResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+// ========== Admin: DisableTemplate ==========
+
+message AdminDisableTemplateRequest {
+    int64 account_id = 1;
+    string template_id = 2;
+}
+
+message AdminDisableTemplateResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+// ========== Admin: IssueCoupons ==========
+
+message AdminIssueCouponsRequest {
+    int64 account_id = 1;
+    string template_id = 2;
+    repeated string buyer_ids = 3;              // 追加指定買家到 coupon_target_accounts
+    bool immediate_distribute = 4;              // 是否立即代領（預設 false）
+}
+
+message AdminIssueCouponsResponse {
+    int32 code = 1;
+    string message = 2;
+    string issued_count = 3;                    // 追加的帳號數量
+    string distributed_count = 4;               // 代領數量（僅 immediate_distribute=true）
+}
+
+// ========== Admin: GrantCompensationCoupon ==========
+
+message AdminGrantCompensationCouponRequest {
+    int64 account_id = 1;                       // Admin accountId
+    string buyer_id = 2;                        // 接收者
+    string amount = 3;                          // 補償金額（數字字串，新台幣元）
+    string ref_order_no = 4;                    // 關聯訂單編號
+    string applicable_store_id = 5;             // 適用商店 store_id surrogate（必填，空值/格式錯 → INVALID_PARAM）
+    string reason = 6;                          // 補償原因
+}
+
+message AdminGrantCompensationCouponResponse {
+    int32 code = 1;
+    string message = 2;
+    TemplateInfo data = 3;                      // 回傳建立的 Template（非 Instance）
+}
+
+// ========== Admin: VoidInstance ==========
+
+message AdminVoidInstanceRequest {
+    int64 account_id = 1;
+    string instance_id = 2;
+    string reason = 3;
+}
+
+message AdminVoidInstanceResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+// ========== Admin: UpdateSellerQuota ==========
+
+message AdminUpdateSellerQuotaRequest {
+    int64 account_id = 1;                       // Admin accountId（管理員自己的 id，不改）
+    string store_id = 2;                        // 目標賣家 store_id
+    string max_template_count = 3;              // 新上限
+}
+
+message AdminUpdateSellerQuotaResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+// ========== AfterSales: GrantSellerCompensationCoupon ==========
+
+message GrantSellerCompensationCouponRequest {
+    string store_id = 1;                        // 賣家 store_id surrogate
+    string buyer_id = 2;
+    string amount = 3;                          // 面額（新台幣元）
+    string min_order_amount = 4;                // 最低消費門檻
+    string message = 5;                         // 給買家的訊息
+    string ref_case_no = 6;                     // 關聯售後單號（稽核用）
+}
+
+message GrantSellerCompensationCouponResponse {
+    int32 code = 1;
+    string message = 2;
+    SellerCompensationCouponData data = 3;
+}
+
+message SellerCompensationCouponData {
+    string template_id = 1;                     // 建立的 Template ID
+    string amount = 2;
+    string min_order_amount = 3;
+}
+
+// ========== Buyer: ClaimCoupon ==========
+
+message BuyerClaimCouponRequest {
+    int64 buyer_id = 1;                         // Gateway 解析後的買家 buyer_id（stint-scoped）
+    string template_id = 2;
+    int64 account_id = 3;                       // Gateway 原始 JWT account_id -- 供
+                                                 // AccountGrpcClient.getAccountCreatedAt 用（同上）
+}
+
+message BuyerClaimCouponResponse {
+    int32 code = 1;
+    string message = 2;
+    bool success = 3;
+    string claimed_at = 4;                      // ISO 8601
+}
+
+// ========== Admin: DistributeTemplate ==========
+
+message AdminDistributeTemplateRequest {
+    int64 account_id = 1;                       // Gateway JWT 注入
+    string template_id = 2;
+}
+
+message AdminDistributeTemplateResponse {
+    int32 code = 1;
+    string message = 2;
+    string distributed_count = 3;               // 本次代領數
+    string already_claimed_count = 4;           // 已領跳過數
+    string total_target_count = 5;              // 白名單總數
+}

@@ -1,0 +1,111 @@
+syntax = "proto3";
+
+// identity 模組給後台的 API：管理員自己的 session 與會員清單。前台的 API 在 hawkr.identity.v1alpha1。
+//
+// 後台由 Cloudflare Access 保護；BFF 將 Access JWT 以 Authorization: Bearer 轉送單體驗證。
+// Access 白名單開通管理員，第一次認證時以 JWT 的 sub 建立管理員列。
+package hawkr.admin.identity.v1alpha1;
+
+import "hawkr/identity/v1alpha1/identity.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+
+// IdentityAdminService 只有管理員能呼叫。
+service IdentityAdminService {
+  // GetSession 回傳登入的管理員。
+  rpc GetSession(GetSessionRequest) returns (GetSessionResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListAccounts 列出存活的帳號（不含已刪除的），新到舊。
+  rpc ListAccounts(ListAccountsRequest) returns (ListAccountsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetAccount 以 ID 讀一個存活的帳號。已刪除（墓碑）與不存在的帳號都回 not_found，與 ListAccounts 只列存活帳號一致。
+  rpc GetAccount(GetAccountRequest) returns (GetAccountResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // DeleteAccount 刪除整個帳號（連同買家與目前的店家）。帳號與店家沒有未完成的訂單時立即刪除，否則帳號、買家與店家一起進入
+  // 等待，最後一筆訂單完成後自動刪除（state 回報是哪一種）；流程中再呼叫回目前的狀態，每次受理都記管理員與理由。只讓店家退出
+  // （帳號留著）要建立終止合作的措施（SellerGovernanceAdminService.CreateMeasure，帶 termination）；管理員沒有直接關店的方法。管理員也不能
+  // 略過未完成的訂單。
+  rpc DeleteAccount(DeleteAccountRequest) returns (DeleteAccountResponse);
+
+  // SignOut 在管理員登出之前呼叫：撤銷他進行中的代行（設計書 56 §4.5）。登出本身由 Access 處理；沒有進行中的代行時
+  // 也成功。
+  rpc SignOut(SignOutRequest) returns (SignOutResponse);
+}
+
+message GetSessionRequest {}
+
+message GetSessionResponse {
+  Admin admin = 1;
+  // 2 是刪掉的 expire_time（沒有讀取端）。
+  reserved 2;
+}
+
+// Admin 是管理員。
+message Admin {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // Access JWT 的 email，供後台顯示。
+  string email = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  reserved 3, 4;
+  reserved "name", "picture_uri";
+}
+
+message ListAccountsRequest {
+  // 每頁筆數：0 用預設值 10，上限 100。
+  int32 page_size = 1;
+  string page_token = 2;
+  // 只列出有這個角色的帳號；ROLE_UNSPECIFIED 是全部（每個帳號都是買家，所以「買家」就是全部）。
+  hawkr.identity.v1alpha1.Role role = 3;
+  // 帳號 ID 完全相符，或 email 包含這段文字的帳號（不分大小寫）；空字串不篩選。
+  string query = 4;
+  // email 完全相符的帳號（不分大小寫，比對前去掉前後空白）；空字串不篩選。email 不是唯一的（不同帳號可以有相同的 email），
+  // 可能符合多個帳號；後台以信箱找店家時搭配 role 與分頁走完所有符合的帳號。
+  string email = 5;
+}
+
+message ListAccountsResponse {
+  repeated Account accounts = 1;
+  string next_page_token = 2;
+  // 符合篩選的帳號總數（後台以它顯示頁數）。
+  int32 total_size = 3;
+}
+
+message GetAccountRequest {
+  string account_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetAccountResponse {
+  Account account = 1;
+}
+
+// Account 是帳號。
+message Account {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 第一次登入時 Clerk 回報的已驗證 email；沒有時是空字串（例如 LINE 沒有給 email）。
+  string email = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 3 是刪掉的 phone（新帳號不驗證手機）。
+  reserved 3;
+  // 另外申請的角色（目前只有 ROLE_SELLER）；每個帳號都是買家，不列出。
+  repeated hawkr.identity.v1alpha1.Role roles = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool suspended = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message SignOutRequest {}
+
+message SignOutResponse {}
+
+message DeleteAccountRequest {
+  string account_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 刪除的理由，最多 1000 字；記在刪除的申請紀錄。
+  string reason = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message DeleteAccountResponse {
+  hawkr.identity.v1alpha1.DeleteAccountResponse.DeletionState state = 1;
+}

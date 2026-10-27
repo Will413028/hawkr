@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package hawkr.common;
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/common";
+option java_multiple_files = true;
+option java_package = "io.github.will413028.hawkr.common.grpc";
+option java_outer_classname = "DelegationCommonProto";
+
+// DelegationContext 是「ADM 代行營運」語境的**唯一**載體。
+//
+// 使用規則（全平台一致，禁止例外）：
+//   1. **所有被代行觸及的既有賣家 RPC —— 讀取與寫入都算 —— 一律以欄位號 100
+//      加上本 message**，欄位可缺席（proto3 message 欄位天生有 presence，
+//      不需 `optional` 關鍵字）：未帶 = 賣家本人操作、帶了 = 代行操作。
+//      微服務端一律以 requireSellerOrDelegated(store_id, capability) 判定。
+//   2. 禁止任何服務自訂等價 message。
+//   3. 禁止以 gRPC metadata／HTTP header 傳遞同一語意（單一載體原則）。
+//      既有的 HMAC canonical `serviceName\nts\nnonce\naccountIdOrEmpty` **不變**，
+//      零破壞性遷移。
+//   4. 代行的讀取**不走 *ForAdmin 路徑**：*ForAdmin 是「平台跨賣家視角」，
+//      DTO 與語意都和「以賣家視角看自己的資料」不同，而代行工作區與賣家工作區
+//      共用展示層的前提正是同一份 DTO。讀走 admin RPC、寫走賣家 RPC 的雙軌
+//      會長出兩套讀取路徑，是技術債。
+//
+// 信任模型：52 號設計書的 HMAC 內部授權已保證呼叫方是內部服務；delegation 的
+// 真實性由 Gateway 保證，微服務信任之 —— 與既有
+// `SuspendSellerForAdminRequest.admin_id` 完全同一個模型。前提是
+// NetworkPolicy 收斂 ＋ `INTERNAL_AUTH_MODE=enforcing`（見 56 設計書 §8.1）。
+message DelegationContext {
+    // 代行工作階段 ID（TSID 數字字串）。稽核歸屬鍵。
+    string session_id = 1;
+
+    // 執行本次操作的平台管理員 ID（admin_accounts.id，數字字串）。
+    // 這**不是** accounts.id —— admin 帳號在獨立表，兩個 id space 不可互換。
+    string operator_admin_id = 2;
+
+    // 本次操作動用的 admin capability token（如 "products.publish"）。
+    // 微服務端以此比對白名單；不在白名單內一律拒絕。
+    string capability = 3;
+
+    // 單筆操作理由（≤ 100 字，已 trim）。與工作階段層的 reason 是兩層，不可混用。
+    string operation_reason = 4;
+
+    // 稽核列 ID（account-service 於 RecordAuditIntent 先行產生，數字字串）。
+    // 領域服務**不需要**把它回寫進自己的表。domain write 與稽核列的對帳，
+    //    由稽核列自己的 resource_id ＋ resource_version_after 達成
+    //    （版本每次成功寫入 +1，比對得上就是同一次寫入）。
+    //    在 products／sellers／cms_post 各加一欄 audit_log_id 是未經設計的
+    //    schema 擴散，且三個服務都沒有落點，本期明令不做。
+    string audit_log_id = 5;
+
+    // 冪等鍵。當既有 request 已有 `idempotency_key` 欄位時（product 系列），
+    // Gateway 必須把**同一個值**同時填進兩處；微服務端若發現兩者不同，
+    // 一律回 INVALID_ARGUMENT，不得任選其一。
+    string idempotency_key = 6;
+}

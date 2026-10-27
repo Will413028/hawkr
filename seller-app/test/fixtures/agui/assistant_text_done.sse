@@ -1,0 +1,16 @@
+data: {"type":"RUN_STARTED","threadId":"","runId":"0c1ad480a185e9acf03baa8a03e30f65"}
+
+data: {"type":"TEXT_MESSAGE_START","messageId":"0c1ad480a185e9acf03baa8a03e30f65","role":"assistant"}
+
+data: {"type":"TEXT_MESSAGE_CONTENT","messageId":"0c1ad480a185e9acf03baa8a03e30f65","delta":"哈"}
+
+data: {"type":"TEXT_MESSAGE_CONTENT","messageId":"0c1ad480a185e9acf03baa8a03e30f65","delta":"囉！我是你的 Hawkr 購物小幫手😊\n\n我可以協助"}
+
+data: {"type":"TEXT_MESSAGE_CONTENT","messageId":"0c1ad480a185e9acf03baa8a03e30f65","delta":"你：\n*   **查詢訂單**：查訂單清單、看訂單詳情\n*   **追蹤包裹**：查詢配送中訂單的物流狀態\n*   **水果推薦**：推薦"}
+
+data: {"type":"TEXT_MESSAGE_CONTENT","messageId":"0c1ad480a185e9acf03baa8a03e30f65","delta":"當季的美味水果給你\n\n請問有什麼可以為你服務的嗎？"}
+
+data: {"type":"TEXT_MESSAGE_END","messageId":"0c1ad480a185e9acf03baa8a03e30f65"}
+
+data: {"type":"RUN_FINISHED","threadId":"","runId":"0c1ad480a185e9acf03baa8a03e30f65","result":{"sessionId":"11c3bef0-492b-4ff1-87a1-a67e70c3825d"}}
+

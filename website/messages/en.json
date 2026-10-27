@@ -1,0 +1,19 @@
+{
+	"common": {
+		"error": "Something went wrong. Please try again later.",
+		"success": "Done",
+		"loading": "Processing…"
+	},
+	"validation": {
+		"required": "This field is required",
+		"invalidEmail": "Enter a valid email address"
+	},
+	"auth": {
+		"login": "Log in",
+		"logout": "Log out"
+	},
+	"navigation": {},
+	"product": {},
+	"seller": {},
+	"order": {}
+}

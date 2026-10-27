@@ -1,0 +1,33 @@
+name: repo hygiene
+
+# 跨專案、秒級的靜態檢查，不設 path 條件：
+# - actionlint：workflow 檔本身（expression、steps.<id>、action 輸入）。shellcheck 整合關掉，
+#   只看 actionlint 自己的檢查。
+# - shell 變數緊接全形字元：`$var，` 會被 bash 吃成變數名（set -u 下直接中止），掃全 repo 的
+#   版控 shell 腳本，規則在 scripts/check-fullwidth-var-expansion.sh。
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: repo-hygiene-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: workflow 與 shell 靜態檢查
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: actionlint
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color -shellcheck=
+      - name: shell 變數緊接全形字元
+        if: always()
+        run: bash scripts/check-fullwidth-var-expansion.sh

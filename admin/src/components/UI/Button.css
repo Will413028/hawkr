@@ -1,0 +1,127 @@
+/* ========== Button Component ========== */
+.hk-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 44px;
+	gap: 8px;
+	border: none;
+	border-radius: 12px;
+	font-family: var(--admin-font-ui, "Noto Sans TC", system-ui, sans-serif);
+	font-weight: 700;
+	cursor: pointer;
+	transition:
+		background-color 150ms ease,
+		border-color 150ms ease,
+		color 150ms ease;
+	white-space: nowrap;
+}
+
+/* Sizes */
+.hk-btn--sm {
+	min-height: 40px;
+	padding: 8px 14px;
+	font-size: 13px;
+	line-height: 20px;
+}
+
+.hk-btn--md {
+	padding: 10px 16px;
+	font-size: 14px;
+	line-height: 20px;
+}
+
+.hk-btn--lg {
+	min-height: 48px;
+	padding: 12px 18px;
+	font-size: 15px;
+	line-height: 22px;
+}
+
+/* Variants */
+.hk-btn--primary {
+	background: var(--admin-primary-strong);
+	color: white;
+}
+
+.hk-btn--primary:hover {
+	background: var(--admin-primary-strong-hover);
+}
+
+.hk-btn--primary:active {
+	background: var(--admin-primary-strong-pressed);
+}
+
+.hk-btn--danger {
+	background: var(--admin-paper, #fffdf7);
+	color: var(--admin-danger, #b3261e);
+	border: 1px solid var(--admin-danger, #b3261e);
+}
+
+.hk-btn--danger:hover {
+	background: var(--admin-danger-soft, #fce8e6);
+}
+
+.hk-btn--danger:active {
+	background: #f7d6d2;
+}
+
+.hk-btn--outline {
+	background: var(--admin-paper, #fffdf7);
+	color: var(--admin-body, #42493f);
+	border: 1px solid var(--admin-border, var(--color-ink-200));
+}
+
+.hk-btn--outline:hover {
+	background: var(--admin-control, #f0f1ea);
+	border-color: var(--color-ink-200);
+}
+
+.hk-btn--outline:active {
+	background: var(--color-ink-100);
+}
+
+.hk-btn--ghost {
+	background: transparent;
+	color: var(--admin-muted-aa, #5f675b);
+}
+
+.hk-btn--ghost:hover {
+	background: var(--admin-control, #f0f1ea);
+}
+
+.hk-btn:focus-visible {
+	outline: 3px solid rgb(var(--color-ink-900-rgb) / 0.34);
+	outline-offset: 2px;
+}
+
+/* States */
+.hk-btn--disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.hk-btn--loading .hk-btn__spinner {
+	animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* Icon */
+.hk-btn__icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 20px;
+}
+
+.hk-btn__icon svg {
+	font-size: inherit;
+}

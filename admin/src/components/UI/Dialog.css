@@ -1,0 +1,260 @@
+/*
+ * 共用 Dialog 的 `operation` 變體骨架（.adm-operation-dialog-*）。
+ * `Dialog.tsx` 自己 import 這份，所以任何頁面開對話框都不必另外 import 頁面樣式表。
+ * `standard`／`side` 變體（.modal-*）在 AdminVisualRefresh.css。
+ * `.adm-operation-dialog*` 只寫在本檔與 AdminVisualRefresh.css（後者只放與 standard 共用的字型與 warning 色），tests/dialog-skeleton-guard.test.ts 擋頁面樣式表重寫。
+ */
+
+.adm-operation-dialog button:focus-visible,
+.adm-operation-dialog input:focus-visible,
+.adm-operation-dialog select:focus-visible,
+.adm-operation-dialog textarea:focus-visible {
+	outline: 3px solid var(--hk-focus-ring);
+	outline-offset: 2px;
+}
+
+.adm-operation-dialog-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 1000;
+	display: grid;
+	place-items: center;
+	padding: 24px;
+	background: rgba(25, 28, 24, 0.58);
+}
+
+/* 三段式：標題／內容／動作列，**只有內容捲**。
+ *
+ * 原本是整個對話框 `overflow-y: auto`：內容一超過 `max-height`，底部的
+ * 「建立工作階段」就跟著捲出可視區，而 macOS／Chrome 的 overlay 捲軸只在捲動
+ * 當下才現身 ⇒ 1440×1200 這種常見筆電尺寸下畫面停在「可查看／可變更」卡片中段，
+ * 沒有捲軸、沒有遮罩、沒有任何線索說下面還有東西，讀起來像對話框壞了（而唯一
+ * 能完成任務的按鈕就在那下面）。釘住標題與動作列之後，主要動作永遠在畫面上，
+ * 且與內容之間有 `border-top` 這條既有的分界。 */
+.adm-operation-dialog {
+	width: min(680px, 100%);
+	max-height: min(820px, calc(100vh - 48px));
+	display: flex;
+	flex-direction: column;
+	/* 捲動責任下移到 `.adm-operation-dialog-body`；這一層只負責裁掉圓角外的溢出。 */
+	overflow: hidden;
+	border-radius: 16px;
+	background: var(--hk-paper);
+	box-shadow: 0 22px 60px rgba(25, 28, 24, 0.24);
+	color: var(--hk-ink);
+	white-space: normal;
+}
+
+/* 兩支對話框都把 body 與動作列包在 `<form>` 裡（送出必須是原生表單導覽，
+   見 `OperationPreflightDialog` 的檔頭），捲動容器因此要能穿過這一層 ——
+   漏了它，`min-height: 0` 不會傳遞下去，body 又會撐高整個對話框。 */
+.adm-operation-dialog > form {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.adm-operation-dialog--preflight {
+	width: min(780px, 100%);
+}
+
+.adm-operation-dialog-header {
+	display: flex;
+	/* 釘住：預設 `flex-shrink: 1` 會在內容過長時把標題壓扁換行。 */
+	flex: 0 0 auto;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 20px;
+	padding: 26px 28px 18px;
+}
+
+.adm-operation-dialog-header h2 {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	margin: 0;
+	font-size: 24px;
+	font-weight: 750;
+	line-height: 1.3;
+	letter-spacing: -0.02em;
+}
+
+.adm-operation-dialog-header h2 svg {
+	color: var(--hk-primary-strong);
+	font-size: 22px;
+}
+
+.adm-operation-dialog-header p {
+	max-width: 60ch;
+	margin: 7px 0 0;
+	color: var(--hk-body);
+	font-size: 14px;
+	line-height: 1.65;
+}
+
+.adm-operation-dialog-close {
+	width: 44px;
+	height: 44px;
+	border: 0;
+	border-radius: 10px;
+	background: transparent;
+	color: var(--hk-body);
+	font-size: 22px;
+	cursor: pointer;
+}
+
+.adm-operation-dialog-close:hover {
+	background: var(--color-ink-100);
+}
+
+.adm-operation-dialog-body {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 20px;
+	padding: 0 28px 24px;
+	/* 唯一的捲動區。`min-height: 0` 不可省：flex item 的預設最小尺寸是
+	   `auto`（= min-content），沒有它 body 會撐高到內容全高，`overflow-y` 永遠
+	   不會生效，動作列又被推出可視區。 */
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+
+.adm-operation-dialog-actions {
+	display: flex;
+	/* 釘在對話框底部：內容再長，唯一能完成任務的按鈕都在畫面上。 */
+	flex: 0 0 auto;
+	justify-content: flex-end;
+	gap: 10px;
+	padding: 18px 28px 24px;
+	border-top: 1px solid var(--color-ink-100);
+	background: var(--hk-paper);
+}
+
+.adm-operation-dialog-actions .hk-btn {
+	min-height: 44px;
+}
+
+.adm-operation-dialog-actions--preflight {
+	align-items: center;
+	justify-content: space-between;
+}
+
+.adm-operation-dialog-actions--preflight > span {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	max-width: 42ch;
+	color: var(--hk-muted-text);
+	font-size: 11px;
+	line-height: 1.45;
+}
+
+.adm-operation-dialog-actions--preflight > div {
+	display: flex;
+	flex: 0 0 auto;
+	gap: 10px;
+}
+
+.adm-operation-dialog .hk-btn--primary {
+	background: var(--hk-primary-strong);
+	color: #fff;
+}
+
+.adm-operation-dialog .hk-btn--primary:hover {
+	background: var(--color-brand-primary-deep);
+}
+
+.adm-operation-dialog .hk-btn--primary:active {
+	background: var(--color-brand-primary-deep);
+}
+
+.adm-operation-dialog .hk-btn--outline {
+	color: var(--hk-body);
+}
+
+@media (max-width: 760px) {
+	.adm-operation-dialog-overlay {
+		align-items: end;
+		padding: 12px;
+	}
+
+	.adm-operation-dialog {
+		width: 100%;
+		min-width: 0;
+		max-height: calc(100vh - 24px);
+		overflow-x: hidden;
+	}
+
+	.adm-operation-dialog form,
+	.adm-operation-dialog-header > div,
+	.adm-operation-dialog-body,
+	.adm-operation-dialog-body > *,
+	.adm-operation-dialog-actions {
+		min-width: 0;
+		max-width: 100%;
+	}
+
+	.adm-operation-dialog-header > div {
+		flex: 1 1 0;
+		max-width: calc(100% - 64px);
+	}
+
+	.adm-operation-dialog-header h2 {
+		flex-wrap: wrap;
+	}
+
+	.adm-operation-dialog-header p,
+	.adm-operation-dialog-body {
+		overflow-wrap: anywhere;
+	}
+
+	.adm-operation-dialog-header p {
+		width: 100%;
+		min-width: 0;
+	}
+
+	.adm-operation-dialog-header,
+	.adm-operation-dialog-body,
+	.adm-operation-dialog-actions {
+		padding-left: 18px;
+		padding-right: 18px;
+	}
+
+	.adm-operation-dialog-actions--preflight {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.adm-operation-dialog-actions--preflight > span {
+		max-width: none;
+	}
+
+	.adm-operation-dialog-actions--preflight > div {
+		width: 100%;
+		flex-wrap: wrap;
+		justify-content: flex-end;
+	}
+
+	.adm-operation-dialog-actions--preflight > div .hk-btn {
+		flex: 1 1 130px;
+	}
+}
+
+/* 稽核內容對話框。外框、標題列與關閉鍵全部沿用 `.adm-operation-dialog-*`；
+   這裡只調兩件它與其他對話框不同的事：內容比 680px 的表單寬一點才放得下三欄
+   變更表，以及 14 列定義列表用 14px 的行距（`-body` 預設的 20px 是給表單欄位的）。 */
+.adm-operation-dialog--audit {
+	width: min(760px, 100%);
+}
+
+.adm-operation-dialog--audit .adm-operation-dialog-body {
+	gap: 14px;
+}
+
+.adm-operation-dialog--revoke {
+	max-width: 480px;
+}

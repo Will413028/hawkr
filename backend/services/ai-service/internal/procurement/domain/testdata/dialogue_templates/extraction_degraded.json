@@ -1,0 +1,23 @@
+{
+  "act": "EXTRACTION_DEGRADED",
+  "emptyArgsBlocks": [
+    {
+      "kind": "WARNING",
+      "text": "需求解析暫時無法使用。"
+    },
+    {
+      "kind": "CONTEXT",
+      "text": "已保留你目前的需求內容，可以繼續補充或稍後再試。"
+    }
+  ],
+  "populatedArgsBlocks": [
+    {
+      "kind": "WARNING",
+      "text": "需求解析暫時無法使用。"
+    },
+    {
+      "kind": "CONTEXT",
+      "text": "已保留你目前的需求內容，可以繼續補充或稍後再試。"
+    }
+  ]
+}

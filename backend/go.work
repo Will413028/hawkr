@@ -1,0 +1,17 @@
+go 1.27.1
+
+use (
+	.
+	./gateway
+	./monitoring/discord-webhook-gateway
+	./pkg
+	./services/ai-service
+	./services/crm-service
+	./services/im-service
+	./services/invoice-service
+	./services/notification-service
+	./services/pricebook-service
+	./services/review-service
+	./services/seller-service
+	./services/social-service
+)

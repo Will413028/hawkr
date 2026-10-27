@@ -1,0 +1,23 @@
+{
+  "act": "ACK_AND_ASK_OPTIONAL",
+  "emptyArgsBlocks": [
+    {
+      "kind": "UNDERSTOOD",
+      "text": "好的，主要資訊都到齊了。"
+    },
+    {
+      "kind": "NEXT_STEP",
+      "text": "再跟你確認最後一件事。"
+    }
+  ],
+  "populatedArgsBlocks": [
+    {
+      "kind": "UNDERSTOOD",
+      "text": "好的，主要資訊都到齊了。"
+    },
+    {
+      "kind": "NEXT_STEP",
+      "text": "需要指定包裝方式嗎？"
+    }
+  ]
+}

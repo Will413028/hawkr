@@ -1,0 +1,15 @@
+{
+  "act": "CORRECTION_APPLIED",
+  "emptyArgsBlocks": [
+    {
+      "kind": "UNDERSTOOD",
+      "text": "好的，已經幫你更新了。"
+    }
+  ],
+  "populatedArgsBlocks": [
+    {
+      "kind": "UNDERSTOOD",
+      "text": "已經幫你更新：品項：寶島梨"
+    }
+  ]
+}

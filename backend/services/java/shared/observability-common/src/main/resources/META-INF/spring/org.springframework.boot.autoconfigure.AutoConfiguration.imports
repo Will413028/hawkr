@@ -1,0 +1,2 @@
+io.github.will413028.hawkr.common.obs.config.ObsAutoConfiguration
+io.github.will413028.hawkr.common.obs.health.ComponentReadinessAutoConfiguration

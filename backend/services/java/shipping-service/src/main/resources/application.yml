@@ -1,0 +1,157 @@
+server:
+  port: ${SERVER_PORT:9928}
+
+grpc:
+  server:
+    port: ${GRPC_PORT:9929}
+    reflection-service-enabled: true
+
+spring:
+  application:
+    name: shipping-service
+  cloud:
+    nacos:
+      discovery:
+        enabled: ${NACOS_ENABLED:false}
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+        metadata:
+          grpc-port: ${GRPC_PORT:9929}
+          version: 1.0.0
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_POOL_PORT:5432}/${DB_NAME:hawkr_shipping}?sslmode=${DB_SSLMODE:disable}&prepareThreshold=0
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      minimum-idle: 2
+      maximum-pool-size: 10
+      connection-timeout: 30000
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 5000ms
+  rabbitmq:
+    host: ${RABBITMQ_HOST:rabbitmq}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
+    virtual-host: ${RABBITMQ_VHOST:/}
+  flyway:
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:hawkr_shipping}?sslmode=${DB_SSLMODE:disable}
+    user: ${DB_USER}
+    password: ${DB_PASSWORD}
+    enabled: ${FLYWAY_ENABLED:true}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+
+mybatis-plus:
+  global-config:
+    db-config:
+      id-type: INPUT
+  configuration:
+    map-underscore-to-camel-case: true
+
+hawkr:
+  obs:
+    service: shipping-service
+    grpc:
+      targets:
+        order:
+          host: ${ORDER_SERVICE_HOST:127.0.0.1}
+          port: ${ORDER_SERVICE_GRPC_PORT:9915}
+          plaintext: true
+        seller:
+          host: ${SELLER_SERVICE_HOST:127.0.0.1}
+          port: ${SELLER_SERVICE_GRPC_PORT:9941}
+          plaintext: true
+        media:
+          host: ${MEDIA_SERVICE_HOST:127.0.0.1}
+          port: ${MEDIA_SERVICE_GRPC_PORT:9937}
+          plaintext: true
+        buyer:
+          host: ${BUYER_SERVICE_HOST:127.0.0.1}
+          port: ${BUYER_SERVICE_GRPC_PORT:9941}
+          plaintext: true
+  tsid:
+    enabled: true
+    node-id-base: 600
+    pod-index: ${POD_INDEX:0}
+  # §5.19 物流貨態補收排程（L2 補救路徑）
+  shipping:
+    reconcile:
+      enabled: ${SHIPPING_RECONCILE_ENABLED:true}
+      interval-ms: ${SHIPPING_RECONCILE_INTERVAL_MS:600000}
+      batch-size: ${SHIPPING_RECONCILE_BATCH_SIZE:100}
+      max-age-days: ${SHIPPING_RECONCILE_MAX_AGE_DAYS:7}
+      backoff-minutes: ${SHIPPING_RECONCILE_BACKOFF_MINUTES:15}
+    # §5.2.2 / §5.3.2 批次列印參數（超商批次共用 max-size，宅配批次另用 home-label-concurrency）
+    batch:
+      max-size: ${SHIPPING_BATCH_MAX_SIZE:50}
+      home-label-concurrency: ${SHIPPING_HOME_LABEL_CONCURRENCY:10}
+  # §5.14 store_map appType=web 路徑最終 302 出口；與 payment §5.9 / aftersales 共用同一環境變數值
+  web:
+    frontend-url: ${WEB_FRONTEND_URL:http://localhost:3000}
+  # 媒體 URL 配置由 common-core MediaUrlAutoConfiguration 統一提供
+  # 如需覆蓋：hawkr.media.base-url: ${MEDIA_BASE_URL:}（不填預設域名：dev=test-media / prod=media，見 backend#2283）
+
+gateway:
+  url: ${GATEWAY_URL:}
+
+payuni:
+  # 🔴 兩個 placeholder 必須帶預設值（空字串）——backend#3329。
+  #
+  # 沒有 `:` 預設時，PAYUNI_AGENT_KEY 缺席會讓 Spring 在解析 @Value 當下丟
+  # IllegalArgumentException: Could not resolve placeholder 'payuni.agent.key'
+  # ⇒ payUniConfig bean 建不起來 ⇒ **整個 context refresh 失敗** ⇒ shipping-service
+  # 完全起不來，連「運費計算」這條在結帳 hot path 上、完全不碰 PayUni 的路徑一起死。
+  # （實測坐實：ApplicationContextRunner 對 PayUniConfig 回 hasFailed，root cause
+  #  即上述例外。）
+  #
+  # 空值 ＝ PayUni 物流尚未開通，是合法的部署狀態；fail-closed 移到使用點，
+  # 由 PayUniConfig 的 credential-guarded PayUniHttpClient 回 9705。
+  agent:
+    key: ${PAYUNI_AGENT_KEY:}
+    iv: ${PAYUNI_AGENT_IV:}
+  api:
+    base-url: ${PAYUNI_API_URL:https://sandbox-api.payuni.com.tw}
+  shipping:
+    notify-url: ${PAYUNI_SHIPPING_NOTIFY_URL:}
+    store-map-return-url: ${PAYUNI_STORE_MAP_RETURN_URL:}
+    store-map-mer-id: ${PAYUNI_STORE_MAP_MER_ID:HAWK}
+
+# ===== Uber Direct 即時配送（66 §8.5）=====
+# 🔴 每個 placeholder 都必須帶 `:` 預設值，理由與上面的 payuni 區塊逐字相同（backend#3329）：
+#    沒有預設值時，env 缺席 ⇒ Spring 解析 @Value 當下丟 Could not resolve placeholder
+#    ⇒ uberConfig bean 建不起來 ⇒ context refresh 失敗 ⇒ 整個 shipping-service 起不來。
+#    空值 ＝ Uber 尚未開通，是合法的部署狀態；fail-closed 移到使用點（UberOAuthTokenProvider）。
+#
+# 🔴 uber.client-secret 與 uber.webhook.signing-keys 是 **secret**：
+#    值來自 k8s secret `uber-direct-credentials`，**不得**在這裡或 values.yaml 寫明文預設。
+uber:
+  # ⚠️ 切成 true 而程式還在 Phase 1 ＝ 66 陷阱 A1（買家付錢、建出沒人送的單、零告警）。
+  #    上線順序見 66 §12.2。
+  enabled: ${UBER_ENABLED:false}
+  # base 含 /v1：66 §4.5.2 端點表的路徑相對於它
+  base-url: ${UBER_BASE_URL:https://api.uber.com/v1}
+  auth-url: ${UBER_AUTH_URL:https://auth.uber.com/oauth/v2/token}
+  # Direct API 的 scope（官方：Direct API＝eats.deliveries；Org API＝direct.organizations）
+  scope: ${UBER_SCOPE:eats.deliveries}
+  client-id: ${UBER_CLIENT_ID:}
+  client-secret: ${UBER_CLIENT_SECRET:}
+  webhook:
+    # 🔴 **一組不是一個**：JSON map {"<webhookId>": "<key>"}（66 §8.5）。
+    #    只放一把 ⇒ 多註冊一個 webhook 就靜默驗簽失敗 ⇒ 我方回 401
+    #    ⇒ Uber 不重試 4xx ⇒ 該 webhook 的事件全丟（陷阱 C1）。
+    signing-keys: ${UBER_WEBHOOK_SIGNING_KEYS:}
+
+logging:
+  level:
+    io.github.will413028.hawkr: ${LOG_LEVEL:INFO}
+    org.flywaydb: INFO

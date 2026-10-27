@@ -1,0 +1,80 @@
+# OpenTelemetry Collector - 本地開發用簡化配置
+# 僅接收 traces/metrics/logs，不轉發到後端（tempo/loki/prometheus 不在本地運行）
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 1000
+
+  # Keep local debug output aligned with the deployed metrics pipeline: expose
+  # only the low-cardinality environment identity as the `env` label.
+  transform/metrics_env_label:
+    error_mode: ignore
+    metric_statements:
+      - set(datapoint.attributes["env"], resource.attributes["deployment.environment"]) where resource.attributes["deployment.environment"] != nil
+
+  # 跟 otel-config.yaml 同步：spanmetrics 輸出的 deployment.environment
+  # 這時還是原始 resource attribute 名稱（含點），改名成 env 對齊 Prometheus
+  # 慣例。本地沒接 Prometheus，這裡主要是讓 debug exporter 印出的內容跟
+  # 部署版一致，方便本地驗證改動。
+  transform/spanmetrics_env_label:
+    error_mode: ignore
+    metric_statements:
+      - set(datapoint.attributes["env"], datapoint.attributes["deployment.environment"])
+      - delete_key(datapoint.attributes, "deployment.environment")
+
+connectors:
+  # 從 span 自動算 RED metrics（calls/duration），取代逐 service 手刻 metrics
+  # instrumentation。詳見 docs/superpowers/specs/2026-08-20-grpc-observability-
+  # spanmetrics-consolidation-design.md。本地沒有 Prometheus，用 debug exporter
+  # 驗證 pipeline 有沒有正確產生資料。
+  spanmetrics:
+    namespace: ""
+    exclude_dimensions: ["span.name"]
+    dimensions:
+      - name: rpc.method
+      - name: rpc.response.status_code
+      - name: deployment.environment
+    histogram:
+      explicit:
+        buckets: [5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2500ms, 5s, 10s, 20s, 30s]
+    metrics_flush_interval: 15s
+    aggregation_temporality: AGGREGATION_TEMPORALITY_CUMULATIVE
+
+exporters:
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug, spanmetrics]
+
+    metrics:
+      receivers: [otlp]
+      processors: [transform/metrics_env_label, batch]
+      exporters: [debug]
+
+    metrics/spanmetrics:
+      receivers: [spanmetrics]
+      processors: [transform/spanmetrics_env_label]
+      exporters: [debug]
+
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
+
+  telemetry:
+    logs:
+      level: warn

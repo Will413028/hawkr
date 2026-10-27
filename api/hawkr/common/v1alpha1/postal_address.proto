@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package hawkr.common.v1alpha1;
+
+import "google/api/field_behavior.proto";
+
+// PostalAddress 是台灣的地址：內政部的 8 碼鄉鎮市區代碼加上其後的明細（ADR 2026-10-04-address-town-code）。
+// 縣市是代碼的前 5 碼，郵遞區號與中文名稱由 client 以同一份代碼表推導，API 不回傳。兩個欄位一起修改，所以 update_mask 的
+// 路徑是持有它的欄位（例如 address），整個換掉。
+message PostalAddress {
+  // 內政部現行的 8 碼鄉鎮市區代碼；不是現行的代碼回 invalid_argument。
+  string town_code = 1 [(google.api.field_behavior) = REQUIRED];
+  // 縣市與鄉鎮市區之後的地址，最多 255 字。收貨地址一定要有明細（至少 1 字）；店家可以只填鄉鎮市區，沒有明細時是空字串。
+  string address_detail = 2;
+}

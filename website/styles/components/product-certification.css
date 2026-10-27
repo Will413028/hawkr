@@ -1,0 +1,86 @@
+/*
+ * Buyer certification card spotlight.
+ * Interaction reference and license: third_party/react-bits/NOTICE.md
+ */
+
+.product-certification-spotlight-card {
+	--product-cert-spotlight-x: 50%;
+	--product-cert-spotlight-y: 50%;
+	--product-cert-spotlight-opacity: 0;
+	position: relative;
+	isolation: isolate;
+	overflow: hidden;
+	transition: border-color 150ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.product-certification-spotlight-card::before {
+	position: absolute;
+	z-index: 0;
+	inset: 0;
+	pointer-events: none;
+	background: radial-gradient(
+		380px circle at var(--product-cert-spotlight-x)
+			var(--product-cert-spotlight-y),
+		rgb(var(--color-brand-primary-rgb) / 0.16),
+		transparent 68%
+	);
+	content: "";
+	opacity: var(--product-cert-spotlight-opacity);
+	transition: opacity 150ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.product-certification-spotlight-card > * {
+	position: relative;
+	z-index: 1;
+}
+
+.product-certification-spotlight-card:focus-within {
+	border-color: var(--theme-primary-border);
+}
+
+@media (hover: hover) and (pointer: fine) and (
+		prefers-reduced-motion: no-preference
+	) {
+	.product-certification-spotlight-list[data-product-cert-spotlight-mode="enhanced"]
+		.product-certification-spotlight-card:hover {
+		border-color: var(--theme-primary-border);
+	}
+
+	.product-certification-spotlight-list[data-product-cert-spotlight-mode="enhanced"]
+		.product-certification-spotlight-card:focus-within::before {
+		opacity: 0.72;
+	}
+}
+
+:where([data-theme="dark"]) .product-certification-spotlight-card::before {
+	background: radial-gradient(
+		380px circle at var(--product-cert-spotlight-x)
+			var(--product-cert-spotlight-y),
+		rgb(var(--color-brand-secondary-rgb) / 0.14),
+		transparent 68%
+	);
+}
+
+@media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce),
+	(forced-colors: active) {
+	.product-certification-spotlight-card {
+		transition: none;
+	}
+
+	.product-certification-spotlight-card::before {
+		display: none;
+	}
+}
+
+@media (forced-colors: active) {
+	.product-certification-spotlight-card:focus-within {
+		outline: 2px solid Highlight;
+		outline-offset: 2px;
+	}
+}
+
+@media print {
+	.product-certification-spotlight-card::before {
+		display: none;
+	}
+}

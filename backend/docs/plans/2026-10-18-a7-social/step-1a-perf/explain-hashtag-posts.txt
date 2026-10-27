@@ -1,0 +1,57 @@
+=== hashtag 貼文 熱門標籤 第一頁（ListHashtagPosts）p95 5.06 ms
+Limit  (cost=1.69..62.45 rows=1 width=365) (actual time=0.167..1.098 rows=50.00 loops=1)
+  Buffers: shared hit=998
+  ->  Nested Loop  (cost=1.69..305.49 rows=5 width=365) (actual time=0.164..1.090 rows=50.00 loops=1)
+        Buffers: shared hit=998
+        ->  Nested Loop Semi Join  (cost=1.27..302.98 rows=5 width=317) (actual time=0.141..0.877 rows=50.00 loops=1)
+              Buffers: shared hit=798
+              ->  Nested Loop  (cost=0.84..114.37 rows=11 width=317) (actual time=0.058..0.329 rows=56.00 loops=1)
+                    Buffers: shared hit=272
+                    ->  Index Only Scan using post_hashtags_feed on post_hashtags h  (cost=0.42..4.68 rows=13 width=24) (actual time=0.039..0.045 rows=67.00 loops=1)
+                          Index Cond: ((name = $2) AND (ROW(published_at, post_id) < ROW($3, $4)))
+                          Heap Fetches: 0
+                          Index Searches: 1
+                          Buffers: shared hit=4
+                    ->  Index Scan using posts_pkey on posts p  (cost=0.42..8.44 rows=1 width=293) (actual time=0.004..0.004 rows=0.84 loops=67)
+                          Index Cond: (id = h.post_id)
+                          Filter: ((deleted_at IS NULL) AND (status = 'PUBLISHED'::text))
+                          Rows Removed by Filter: 0
+                          Index Searches: 67
+                          Buffers: shared hit=268
+              ->  Nested Loop Anti Join  (cost=0.43..17.14 rows=1 width=8) (actual time=0.009..0.010 rows=0.89 loops=56)
+                    Buffers: shared hit=526
+                    ->  Index Scan using stores_pkey on stores s_1  (cost=0.29..16.94 rows=1 width=16) (actual time=0.008..0.008 rows=0.89 loops=56)
+                          Index Cond: (store_id = p.store_id)
+                          Filter: ((store_name IS NOT NULL) AND (logo_key IS NOT NULL) AND (town_code IS NOT NULL) AND (status <> 'CLOSED'::text) AND (status <> 'PENDING_DELETION'::text) AND EXISTS(SubPlan 1))
+                          Rows Removed by Filter: 0
+                          Index Searches: 56
+                          Buffers: shared hit=476
+                          SubPlan 1
+                            ->  Nested Loop  (cost=0.57..16.62 rows=1 width=0) (actual time=0.006..0.006 rows=0.93 loops=54)
+                                  Buffers: shared hit=308
+                                  ->  Index Scan using kyc_applications_store on kyc_applications a  (cost=0.29..8.30 rows=1 width=8) (actual time=0.003..0.003 rows=0.93 loops=54)
+                                        Index Cond: (store_id = s_1.store_id)
+                                        Filter: (status = 'APPROVED'::text)
+                                        Index Searches: 54
+                                        Buffers: shared hit=158
+                                  ->  Index Scan using payuni_registrations_pkey on payuni_registrations r  (cost=0.29..8.31 rows=1 width=8) (actual time=0.003..0.003 rows=1.00 loops=50)
+                                        Index Cond: (store_id = s_1.store_id)
+                                        Filter: ((outcome = 'APPROVED'::text) AND (bind_status = 'BOUND'::text))
+                                        Index Searches: 50
+                                        Buffers: shared hit=150
+                    ->  Index Only Scan using measures_enforced_suspension on measures m  (cost=0.14..0.17 rows=1 width=8) (actual time=0.001..0.001 rows=0.00 loops=50)
+                          Index Cond: ((account_id = s_1.account_id) AND (starts_at <= $1))
+                          Filter: ((ends_at IS NULL) OR (ends_at > $1))
+                          Heap Fetches: 0
+                          Index Searches: 50
+                          Buffers: shared hit=50
+        ->  Index Scan using post_stats_pkey on post_stats s  (cost=0.42..0.50 rows=1 width=48) (actual time=0.004..0.004 rows=1.00 loops=50)
+              Index Cond: (post_id = p.id)
+              Index Searches: 50
+              Buffers: shared hit=200
+Planning:
+  Buffers: shared hit=144
+Planning Time: 3.188 ms
+Execution Time: 1.333 ms
+
+

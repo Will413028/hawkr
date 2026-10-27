@@ -1,0 +1,12 @@
+{
+  "before": {},
+  "patch": {
+    "delivery_city": "桃園"
+  },
+  "now": "2026-08-07T00:00:00Z",
+  "after": {
+    "delivery_city": "桃園市",
+    "exact_match_required": true
+  },
+  "rejected": null
+}

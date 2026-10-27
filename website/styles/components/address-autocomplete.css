@@ -1,0 +1,238 @@
+/* ============================================================
+   Address autocomplete field (seller-addr-autocomplete)
+   Used by ShippingClient (seller-center) — imported by
+   AddressAutocompleteField.tsx itself so every consumer gets the
+   styles. Extracted verbatim from seller-center.css.
+   ============================================================ */
+/* ============================================================
+ *           Address autocomplete field
+ *  components/seller/AddressAutocompleteField.tsx
+ *
+ *  Sits inside the shipping / certification address rows. The
+ *  "驗證" button to the right is the deliberate way to confirm a
+ *  manually-typed address against TGOS, mirroring the App's
+ *  taqbin_shipping_section behaviour.
+ * ============================================================ */
+
+.seller-addr-autocomplete {
+	position: relative;
+	width: 100%;
+}
+
+.seller-addr-autocomplete__row {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 8px;
+	align-items: stretch;
+}
+
+.seller-addr-autocomplete__input {
+	min-width: 0;
+}
+
+.seller-addr-autocomplete__verify {
+	all: unset;
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 84px;
+	padding: 0 16px;
+	border-radius: var(--radius-md);
+	background: var(--hkui-primary);
+	color: var(--hkui-primary-foreground);
+	font-size: 0.8125rem;
+	font-weight: 700;
+	transition:
+		background 120ms ease,
+		color 120ms ease,
+		opacity 120ms ease;
+}
+
+.seller-addr-autocomplete__verify-label {
+	display: inline-flex;
+	min-width: 42px;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+}
+
+.seller-addr-autocomplete__verify-icon {
+	display: inline-grid;
+	place-items: center;
+	width: 18px;
+	height: 18px;
+	color: inherit;
+}
+
+.seller-addr-autocomplete__verify:hover:not(:disabled) {
+	background: var(--hkui-primary-600, var(--color-ink-400));
+}
+
+.seller-addr-autocomplete__verify:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.seller-addr-autocomplete__verify[data-verified] {
+	background: rgb(var(--color-ink-300-rgb) / 0.4);
+	color: var(--hkui-primary-foreground);
+	cursor: default;
+}
+
+.seller-addr-autocomplete__verify[data-feedback="error"] {
+	--seller-addr-verify-feedback-color: var(--color-neutral-cream, #fffdf7);
+
+	opacity: 1;
+	background: var(--color-brand-secondary);
+	color: var(--seller-addr-verify-feedback-color);
+	cursor: default;
+	animation: seller-addr-feedback-pulse 180ms ease-out;
+}
+
+.seller-addr-autocomplete__verify[data-feedback="error"]:disabled {
+	opacity: 1;
+}
+
+.seller-addr-autocomplete__check {
+	display: inline-grid;
+	place-items: center;
+	width: 28px;
+	height: 28px;
+}
+
+.seller-addr-autocomplete__check > * {
+	width: 100%;
+	height: 100%;
+}
+
+.seller-addr-autocomplete__spinner {
+	display: inline-block;
+	width: 16px;
+	height: 16px;
+	border: 2px solid rgb(var(--color-ink-300-rgb) / 0.3);
+	border-top-color: var(--hkui-primary);
+	border-radius: var(--radius-circle);
+	animation: seller-addr-spin 720ms linear infinite;
+}
+
+@keyframes seller-addr-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@keyframes seller-addr-feedback-pulse {
+	0% {
+		transform: scale(1);
+	}
+	55% {
+		transform: scale(0.97);
+	}
+	100% {
+		transform: scale(1);
+	}
+}
+
+.seller-addr-confirm {
+	display: grid;
+	gap: 14px;
+}
+
+.seller-addr-confirm__block {
+	display: grid;
+	gap: 6px;
+	padding: 12px 14px;
+	border: 1px solid var(--hkui-border);
+	border-radius: var(--radius-md);
+	background: var(--hkui-default-50, rgba(16, 24, 40, 0.03));
+}
+
+.seller-addr-confirm__block--suggested {
+	border-color: rgb(var(--color-ink-300-rgb) / 0.42);
+	background: rgb(var(--color-ink-300-rgb) / 0.12);
+}
+
+.seller-addr-confirm__label {
+	font-size: 0.75rem;
+	font-weight: 800;
+	letter-spacing: 0.04em;
+	color: var(--hkui-foreground-muted);
+}
+
+.seller-addr-confirm__text,
+.seller-addr-confirm__suggestion {
+	margin: 0;
+	color: var(--hkui-foreground);
+	font-size: var(--text-sm);
+	line-height: 1.65;
+	overflow-wrap: anywhere;
+}
+
+.seller-addr-confirm__suggestion {
+	font-weight: 800;
+}
+
+.seller-addr-confirm__alternates {
+	display: grid;
+	gap: 8px;
+}
+
+.seller-addr-confirm__alternate {
+	all: unset;
+	cursor: pointer;
+	display: block;
+	padding: 10px 12px;
+	border: 1px solid var(--hkui-border);
+	border-radius: var(--radius-md);
+	color: var(--hkui-foreground);
+	font-size: var(--text-sm);
+	line-height: 1.55;
+	overflow-wrap: anywhere;
+	transition:
+		background 120ms ease,
+		border-color 120ms ease;
+}
+
+.seller-addr-confirm__alternate:hover,
+.seller-addr-confirm__alternate:focus-visible {
+	border-color: rgb(var(--color-ink-300-rgb) / 0.5);
+	background: rgb(var(--color-ink-300-rgb) / 0.12);
+	outline: none;
+}
+
+.seller-addr-confirm__tips {
+	display: grid;
+	gap: 6px;
+	margin: 0;
+	padding-left: 1.15rem;
+	color: var(--hkui-foreground-muted);
+	font-size: var(--text-sm);
+	line-height: 1.65;
+}
+
+.seller-addr-confirm__tips li::marker {
+	color: var(--hkui-primary);
+}
+
+.seller-addr-confirm__notice {
+	display: grid;
+	gap: 6px;
+	padding: 12px 14px;
+	border: 1px solid rgb(var(--color-ink-300-rgb) / 0.35);
+	border-radius: var(--radius-md);
+	background: rgb(var(--color-ink-300-rgb) / 0.1);
+	color: var(--hkui-foreground);
+	font-size: var(--text-sm);
+	line-height: 1.65;
+}
+
+.seller-addr-confirm__notice strong {
+	font-weight: 800;
+	color: var(--hkui-primary-700, var(--color-ink-600));
+}
+
+.seller-addr-confirm__notice p {
+	margin: 0;
+	color: var(--hkui-foreground-muted);
+}

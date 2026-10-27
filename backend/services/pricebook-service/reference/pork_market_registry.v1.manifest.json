@@ -1,0 +1,10 @@
+{
+  "schema": "hawkr.pork-market-registry/v1",
+  "file": "pork_market_registry.v1.csv",
+  "sha256": "b68385181010396afb44fc050af3573a85c5803aca8ad35172572d469a35bce7",
+  "row_count": 19,
+  "registry_version": "moa-pork-market-registry-2026-09-13-v1",
+  "upstream": "https://data.moa.gov.tw/api/v1/PorkTransType/",
+  "captured_on": "2026-09-13",
+  "note": "上游只回中文 MarketName 沒有代碼，market_code 由本 registry 指派並凍結；新市場取下一個號碼，既有號碼永不重新指派。"
+}

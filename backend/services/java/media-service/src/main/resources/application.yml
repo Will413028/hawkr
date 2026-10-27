@@ -1,0 +1,131 @@
+server:
+  port: ${SERVER_PORT:9936}
+
+# gRPC Server Configuration
+grpc:
+  server:
+    port: ${GRPC_PORT:9937}
+    reflection-service-enabled: true
+    max-inbound-message-size: ${GRPC_MAX_INBOUND_MSG_SIZE:10485760}  # 10 MB，支援 ServerUploadAndFinalize PDF 上傳
+
+spring:
+  application:
+    name: media-service
+  cloud:
+    nacos:
+      discovery:
+        enabled: ${NACOS_ENABLED:false}
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+        metadata:
+          grpc-port: ${GRPC_PORT:9937}
+          version: 1.0.0
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_POOL_PORT:5432}/${DB_NAME:hawkr_media}?sslmode=${DB_SSLMODE:disable}&prepareThreshold=0
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      minimum-idle: 2            # 閒置時最少保持的連線數
+      maximum-pool-size: 10      # 連線池上限（含閒置+使用中）
+      connection-timeout: 30000  # 取得連線的最長等待時間（毫秒），超時拋 SQLException
+  rabbitmq:
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
+    virtual-host: ${RABBITMQ_VHOST:/}
+  flyway:
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:hawkr_media}?sslmode=${DB_SSLMODE:disable}
+    user: ${DB_USER}
+    password: ${DB_PASSWORD}
+    enabled: ${FLYWAY_ENABLED:true}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+  servlet:
+    multipart:
+      max-file-size: 100MB      # SecureMediaController 處理機敏檔案上傳（PUT /secure_upload）需要
+      max-request-size: 100MB   # 單次請求最大容量，需 >= max-file-size
+
+mybatis-plus:
+  mapper-locations: classpath:/mapper/**/*.xml
+  global-config:
+    db-config:
+      # 注意：不使用 ASSIGN_UUID，因為它生成 String 類型與 java.util.UUID 不兼容
+      # 使用 UUID 類型時，Entity 必須明確指定 @TableId(type = IdType.INPUT) 並手動 setId(UUID.randomUUID())
+      id-type: INPUT
+  configuration:
+    map-underscore-to-camel-case: true
+  type-handlers-package: io.github.will413028.hawkr.media.config.typehandler
+
+# Media Service 專屬配置
+media:
+  # objectKey 結構前綴（backend 無關；08 號 §2.2）
+  storage:
+    public-prefix: public
+    secure-prefix: secure
+    temp-prefix: tmp
+  # R2 配置（唯一儲存後端；S3 相容，endpoint=https://{account_id}.r2.cloudflarestorage.com）
+  r2:
+    account-id: ${R2_ACCOUNT_ID:}
+    access-key-id: ${R2_ACCESS_KEY_ID:}
+    secret-access-key: ${R2_SECRET_ACCESS_KEY:}
+    bucket-name: ${R2_BUCKET_NAME:}
+  # 媒體 URL 配置已由 common-core MediaUrlAutoConfiguration 統一提供
+  # Token 配置（#1396：deny-by-default，缺 TOKEN_SECRET 即 fail-closed，不依賴 profile）
+  token:
+    secret: ${TOKEN_SECRET:}
+    issuer: media-service
+    # 僅 local/test 設 true 才允許缺 secret 時用 ephemeral 隨機 key；default false=拒絕啟動
+    allow-ephemeral: ${TOKEN_ALLOW_EPHEMERAL:false}
+  # 上傳配置
+  upload:
+    session-ttl-minutes: 30
+  # AES-256-GCM 流式加密配置（機敏檔案專用）
+  encryption:
+    master-key: ${ENCRYPTION_MASTER_KEY:}  # 256-bit 主密鑰（Base64 編碼），正式環境必須設定
+  # GC 配置
+  gc:
+    enabled: ${GC_ENABLED:true}
+    cron: "0 0 3 * * ?"  # 每日凌晨 3 點執行
+    orphan-asset-days: 7  # 無引用資產保留天數
+    batch-size: 100       # 批次處理大小
+
+# Hawkr Observability 配置
+hawkr:
+  obs:
+    service: media-service
+    access-log:
+      ok-sample-rate: ${ACCESS_LOG_SAMPLE_RATE:1.0}
+      slow-threshold-ms: 1000
+    grpc:
+      targets:
+        seller:
+          host: ${SELLER_SERVICE_HOST:127.0.0.1}
+          port: ${SELLER_SERVICE_GRPC_PORT:9941}
+          plaintext: true
+  tsid:
+    enabled: true
+    node-id-base: 100  # Media Service: 100-199
+    pod-index: ${POD_INDEX:0}
+  media:
+    # 儲存後端（49 號 §8.5）：唯一實作 r2；OSS 已於遷移完成後移除，非 r2 值一律 fail-fast
+    storage:
+      backend: ${STORAGE_BACKEND:r2}
+    preview:
+      ttl: ${MEDIA_PREVIEW_TTL:3600}  # 預覽 URL 有效期（秒），預設 1 小時
+    # 上傳大小上限（49 號 §8.1）
+    upload:
+      max-image-size-bytes: ${MEDIA_MAX_IMAGE_SIZE_BYTES:10485760}    # 一般圖片 10MB，與前端一致
+      max-secure-size-bytes: ${MEDIA_MAX_SECURE_SIZE_BYTES:104857600}  # 機敏檔案 100MB
+
+# OTel / Actuator / Tracing 配置已統一至 observability-common（observability-defaults.properties）
+
+logging:
+  level:
+    io.github.will413028.hawkr: ${LOG_LEVEL:INFO}
+    org.flywaydb: INFO

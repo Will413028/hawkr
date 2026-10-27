@@ -1,0 +1,135 @@
+{
+  "_說明": "Connect 錯誤的分派情境表（ADR backend/docs/adr/2026-09-25-api-error-model.md 的 D7）。四個 client 的分類器都以這份表測試，結果必須相同。input.method.idempotency 是 proto 的 idempotency_level（NO_SIDE_EFFECTS、IDEMPOTENT、UNKNOWN），requestId 表示請求帶了 AIP-155 的 request_id。input.error.noResponse 表示沒有收到伺服器的回應（連線失敗、斷線），由各平台的轉接層判斷。expected.action：ignore、retry、reauthenticate、reason、fields、message；message 為 null 表示顯示該 code 的預設文字。",
+  "scenarios": [
+    {
+      "name": "canceled 不處理",
+      "input": {"method": {"idempotency": "NO_SIDE_EFFECTS", "requestId": false}, "error": {"code": "canceled"}},
+      "expected": {"action": "ignore"}
+    },
+    {
+      "name": "讀取遇到 unavailable 重試",
+      "input": {"method": {"idempotency": "NO_SIDE_EFFECTS", "requestId": false}, "error": {"code": "unavailable", "localizedMessage": "服務暫時無法使用，請稍後再試"}},
+      "expected": {"action": "retry", "retryDelayMs": null}
+    },
+    {
+      "name": "冪等的方法遇到 unavailable 重試",
+      "input": {"method": {"idempotency": "IDEMPOTENT", "requestId": false}, "error": {"code": "unavailable"}},
+      "expected": {"action": "retry", "retryDelayMs": null}
+    },
+    {
+      "name": "非冪等的方法遇到 unavailable 不重試，顯示文字",
+      "input": {"method": {"idempotency": "UNKNOWN", "requestId": false}, "error": {"code": "unavailable", "localizedMessage": "服務暫時無法使用，請稍後再試"}},
+      "expected": {"action": "message", "message": "服務暫時無法使用，請稍後再試"}
+    },
+    {
+      "name": "非冪等但帶 request_id 的方法遇到 unavailable 重試",
+      "input": {"method": {"idempotency": "UNKNOWN", "requestId": true}, "error": {"code": "unavailable"}},
+      "expected": {"action": "retry", "retryDelayMs": null}
+    },
+    {
+      "name": "讀取時沒收到回應（Dart 回 unknown）重試",
+      "input": {"method": {"idempotency": "NO_SIDE_EFFECTS", "requestId": false}, "error": {"code": "unknown", "noResponse": true}},
+      "expected": {"action": "retry", "retryDelayMs": null}
+    },
+    {
+      "name": "非冪等的方法沒收到回應不重試",
+      "input": {"method": {"idempotency": "UNKNOWN", "requestId": false}, "error": {"code": "internal", "noResponse": true}},
+      "expected": {"action": "message", "message": null}
+    },
+    {
+      "name": "有回應的 unknown 不重試",
+      "input": {"method": {"idempotency": "NO_SIDE_EFFECTS", "requestId": false}, "error": {"code": "unknown"}},
+      "expected": {"action": "message", "message": null}
+    },
+    {
+      "name": "限流帶 RetryInfo：讀取照它的時間重試",
+      "input": {"method": {"idempotency": "NO_SIDE_EFFECTS", "requestId": false}, "error": {"code": "resource_exhausted", "localizedMessage": "操作過於頻繁，請稍後再試", "retryDelayMs": 2000}},
+      "expected": {"action": "retry", "retryDelayMs": 2000}
+    },
+    {
+      "name": "限流帶 RetryInfo：非冪等的方法不重試",
+      "input": {"method": {"idempotency": "UNKNOWN", "requestId": false}, "error": {"code": "resource_exhausted", "localizedMessage": "操作過於頻繁，請稍後再試", "retryDelayMs": 2000}},
+      "expected": {"action": "message", "message": "操作過於頻繁，請稍後再試"}
+    },
+    {
+      "name": "resource_exhausted 沒有 RetryInfo（請求太大）不重試",
+      "input": {"method": {"idempotency": "NO_SIDE_EFFECTS", "requestId": false}, "error": {"code": "resource_exhausted"}},
+      "expected": {"action": "message", "message": null}
+    },
+    {
+      "name": "deadline_exceeded 不重試",
+      "input": {"method": {"idempotency": "NO_SIDE_EFFECTS", "requestId": false}, "error": {"code": "deadline_exceeded", "localizedMessage": "服務暫時不可用"}},
+      "expected": {"action": "message", "message": "服務暫時不可用"}
+    },
+    {
+      "name": "unauthenticated 重新取得身分",
+      "input": {"method": {"idempotency": "NO_SIDE_EFFECTS", "requestId": false}, "error": {"code": "unauthenticated", "localizedMessage": "未登入"}},
+      "expected": {"action": "reauthenticate"}
+    },
+    {
+      "name": "版本衝突走 VERSION_CONFLICT 的流程",
+      "input": {"method": {"idempotency": "UNKNOWN", "requestId": false}, "error": {"code": "aborted", "errorInfo": {"reason": "VERSION_CONFLICT", "domain": "hawkr"}, "localizedMessage": "banner 已被其他人修改，請對照最新的內容後再送出"}},
+      "expected": {"action": "reason", "reason": "VERSION_CONFLICT", "message": "banner 已被其他人修改，請對照最新的內容後再送出"}
+    },
+    {
+      "name": "已經有人建立也是 VERSION_CONFLICT",
+      "input": {"method": {"idempotency": "UNKNOWN", "requestId": false}, "error": {"code": "already_exists", "errorInfo": {"reason": "VERSION_CONFLICT", "domain": "hawkr"}, "localizedMessage": "已經有人建立了"}},
+      "expected": {"action": "reason", "reason": "VERSION_CONFLICT", "message": "已經有人建立了"}
+    },
+    {
+      "name": "不認得的 reason 顯示文字",
+      "input": {"method": {"idempotency": "UNKNOWN", "requestId": false}, "error": {"code": "failed_precondition", "errorInfo": {"reason": "SOMETHING_NEW", "domain": "hawkr"}, "localizedMessage": "目前的狀態不能這樣做"}},
+      "expected": {"action": "message", "message": "目前的狀態不能這樣做"}
+    },
+    {
+      "name": "別的 domain 的 reason 不當成我們的",
+      "input": {"method": {"idempotency": "UNKNOWN", "requestId": false}, "error": {"code": "aborted", "errorInfo": {"reason": "VERSION_CONFLICT", "domain": "example.com"}}},
+      "expected": {"action": "message", "message": null}
+    },
+    {
+      "name": "賣家停權（D10）：permission_denied 加 SELLER_SUSPENDED 是認得的 reason",
+      "input": {"method": {"idempotency": "UNKNOWN", "requestId": false}, "error": {"code": "permission_denied", "errorInfo": {"reason": "SELLER_SUSPENDED", "domain": "hawkr"}, "localizedMessage": "您的賣家帳號已停權，無法執行此操作"}},
+      "expected": {"action": "reason", "reason": "SELLER_SUSPENDED", "message": "您的賣家帳號已停權，無法執行此操作"}
+    },
+    {
+      "name": "賣家停權的 reason 在別的 domain 不認得，顯示該 code 的預設文字",
+      "input": {"method": {"idempotency": "UNKNOWN", "requestId": false}, "error": {"code": "permission_denied", "errorInfo": {"reason": "SELLER_SUSPENDED", "domain": "example.com"}}},
+      "expected": {"action": "message", "message": null}
+    },
+    {
+      "name": "欄位錯誤標在欄位上",
+      "input": {"method": {"idempotency": "UNKNOWN", "requestId": false}, "error": {"code": "invalid_argument", "localizedMessage": "標題 必填", "badRequest": [{"field": "banner.title", "message": "標題 必填"}, {"field": "banner.action", "message": "點擊行為必須指定類型（popup、url、product、post）"}]}},
+      "expected": {"action": "fields", "fields": [{"field": "banner.title", "message": "標題 必填"}, {"field": "banner.action", "message": "點擊行為必須指定類型（popup、url、product、post）"}], "message": "標題 必填"}
+    },
+    {
+      "name": "認得的 reason 優先於欄位錯誤",
+      "input": {"method": {"idempotency": "UNKNOWN", "requestId": false}, "error": {"code": "invalid_argument", "errorInfo": {"reason": "VERSION_CONFLICT", "domain": "hawkr"}, "localizedMessage": "已被修改", "badRequest": [{"field": "banner.title", "message": "標題 必填"}]}},
+      "expected": {"action": "reason", "reason": "VERSION_CONFLICT", "message": "已被修改"}
+    },
+    {
+      "name": "只有摘要文字的 invalid_argument",
+      "input": {"method": {"idempotency": "UNKNOWN", "requestId": false}, "error": {"code": "invalid_argument", "localizedMessage": "結束時間不可早於開始時間"}},
+      "expected": {"action": "message", "message": "結束時間不可早於開始時間"}
+    },
+    {
+      "name": "client 的 bug（ID 格式錯）沒有文字",
+      "input": {"method": {"idempotency": "NO_SIDE_EFFECTS", "requestId": false}, "error": {"code": "invalid_argument"}},
+      "expected": {"action": "message", "message": null}
+    },
+    {
+      "name": "permission_denied 顯示文字",
+      "input": {"method": {"idempotency": "NO_SIDE_EFFECTS", "requestId": false}, "error": {"code": "permission_denied", "localizedMessage": "無權操作"}},
+      "expected": {"action": "message", "message": "無權操作"}
+    },
+    {
+      "name": "not_found 顯示文字",
+      "input": {"method": {"idempotency": "NO_SIDE_EFFECTS", "requestId": false}, "error": {"code": "not_found", "localizedMessage": "食譜 0199a1c2-0000-7000-8000-000000000000 不存在"}},
+      "expected": {"action": "message", "message": "食譜 0199a1c2-0000-7000-8000-000000000000 不存在"}
+    },
+    {
+      "name": "internal 沒有文字",
+      "input": {"method": {"idempotency": "NO_SIDE_EFFECTS", "requestId": false}, "error": {"code": "internal"}},
+      "expected": {"action": "message", "message": null}
+    }
+  ]
+}

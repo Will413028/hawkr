@@ -1,0 +1,189 @@
+{
+    "info": {
+        "name": "Payment Service API",
+        "description": "Hawkr 支付服務 API 測試集合 - 支援信用卡、ATM、Apple Pay、Google Pay、超商代碼",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "variable": [
+        {"key": "gateway_url", "value": "http://127.0.0.1:9900"},
+        {"key": "payment_service_url", "value": "http://127.0.0.1:9924"},
+        {"key": "auth_token", "value": ""},
+        {"key": "trade_no", "value": ""}
+    ],
+    "item": [
+        {
+            "name": "健康檢查",
+            "item": [
+                {
+                    "name": "HTTP 健康檢查",
+                    "request": {
+                        "method": "GET",
+                        "url": "{{payment_service_url}}/actuator/health"
+                    }
+                },
+                {
+                    "name": "Webhook 健康檢查",
+                    "request": {
+                        "method": "GET",
+                        "url": "{{payment_service_url}}/webhook/payuni/health"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "建立支付",
+            "item": [
+                {
+                    "name": "建立信用卡支付 (CREDIT_CARD)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Content-Type", "value": "application/json"},
+                            {"key": "Authorization", "value": "Bearer {{auth_token}}"}
+                        ],
+                        "url": "{{gateway_url}}/api/v1/payment/create",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"order_id\": \"ORD-CREDIT-{{$timestamp}}\",\n    \"payment_type\": \"CREDIT_CARD\",\n    \"amount\": 10000,\n    \"product_name\": \"信用卡測試商品\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "建立 ATM 虛擬帳號支付 (ATM)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Content-Type", "value": "application/json"},
+                            {"key": "Authorization", "value": "Bearer {{auth_token}}"}
+                        ],
+                        "url": "{{gateway_url}}/api/v1/payment/create",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"order_id\": \"ORD-ATM-{{$timestamp}}\",\n    \"payment_type\": \"ATM\",\n    \"amount\": 5000,\n    \"product_name\": \"ATM 虛擬帳號測試\",\n    \"expire_days\": 3\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "建立 Apple Pay 支付 (APPLE_PAY)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Content-Type", "value": "application/json"},
+                            {"key": "Authorization", "value": "Bearer {{auth_token}}"}
+                        ],
+                        "url": "{{gateway_url}}/api/v1/payment/create",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"order_id\": \"ORD-APPLE-{{$timestamp}}\",\n    \"payment_type\": \"APPLE_PAY\",\n    \"amount\": 8000,\n    \"product_name\": \"Apple Pay 測試商品\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "建立 Google Pay 支付 (GOOGLE_PAY)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Content-Type", "value": "application/json"},
+                            {"key": "Authorization", "value": "Bearer {{auth_token}}"}
+                        ],
+                        "url": "{{gateway_url}}/api/v1/payment/create",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"order_id\": \"ORD-GOOGLE-{{$timestamp}}\",\n    \"payment_type\": \"GOOGLE_PAY\",\n    \"amount\": 6000,\n    \"product_name\": \"Google Pay 測試商品\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "建立超商代碼支付 (CVS)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Content-Type", "value": "application/json"},
+                            {"key": "Authorization", "value": "Bearer {{auth_token}}"}
+                        ],
+                        "url": "{{gateway_url}}/api/v1/payment/create",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"order_id\": \"ORD-CVS-{{$timestamp}}\",\n    \"payment_type\": \"CVS\",\n    \"amount\": 3000,\n    \"product_name\": \"超商代碼測試商品\",\n    \"expire_days\": 7\n}"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "查詢與操作",
+            "item": [
+                {
+                    "name": "查詢支付詳情",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{auth_token}}"}
+                        ],
+                        "url": "{{gateway_url}}/api/v1/payment/{{trade_no}}"
+                    }
+                },
+                {
+                    "name": "同步支付狀態 (呼叫 PayUni Query)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{auth_token}}"}
+                        ],
+                        "url": "{{gateway_url}}/api/v1/payment/{{trade_no}}/sync"
+                    }
+                },
+                {
+                    "name": "關閉交易",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{auth_token}}"}
+                        ],
+                        "url": "{{gateway_url}}/api/v1/payment/{{trade_no}}/close"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "退款",
+            "item": [
+                {
+                    "name": "申請退款",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Content-Type", "value": "application/json"},
+                            {"key": "Authorization", "value": "Bearer {{auth_token}}"}
+                        ],
+                        "url": "{{gateway_url}}/api/v1/payment/refund",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"trade_no\": \"{{trade_no}}\",\n    \"amount\": 5000,\n    \"reason\": \"客戶取消訂單\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "查詢退款詳情",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{auth_token}}"}
+                        ],
+                        "url": "{{gateway_url}}/api/v1/payment/refund/:refundNo"
+                    }
+                },
+                {
+                    "name": "查詢交易的所有退款",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{auth_token}}"}
+                        ],
+                        "url": "{{gateway_url}}/api/v1/payment/{{trade_no}}/refunds"
+                    }
+                }
+            ]
+        }
+    ]
+}

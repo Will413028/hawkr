@@ -1,0 +1,290 @@
+{
+  "//": "Gateway 對外 JSON 契約 baseline。檢查器：scripts/gateway-json-contract-check.py",
+  "//check_a": "帶角色前綴的 account_id 家族 JSON key 殘留。每一條都是「刻意還沒改」的宣告——沒登記的一律紅。比對鍵＝file+key+direction（行號漂移不算），count 只准下降。",
+  "//direction": "inbound＝請求體欄位（本波正名明文排除）／outbound＝回應欄位（前端照舊名接的風險點）／swagger＝只出現在 @Param/@Success 註解（不再維護）／spec＝OpenAPI 規格的欄位名或參數名（唯一來源）。",
+  "//check_b": "規格（backend/api/openapi/openapi.yaml）與 handler 實際輸出的落差。missing_in_spec＝handler 有吐但規格沒寫；missing_in_handler＝規格寫了但 handler 不吐（前端照規格接會拿到 undefined）。",
+  "//maintenance": "修好一條就跑 `python3 scripts/gateway-json-contract-check.py --update` 鎖住新低點並 commit；留著不動會讓清單腐化成沒人敢刪的墳場。",
+  "check_a": [
+    {
+      "file": "api/openapi/openapi.yaml",
+      "line_hint": 39160,
+      "key": "acceptedByAccountId",
+      "direction": "spec",
+      "count": 1,
+      "reason": "規格描述的是現有 wire，與 invoice_dto.go 登記的同名條目同源、理由相同；那邊改名時一起改規格。"
+    },
+    {
+      "file": "api/openapi/openapi.yaml",
+      "line_hint": 31074,
+      "key": "actorAccountId",
+      "direction": "spec",
+      "count": 2,
+      "reason": "規格描述的是現有 wire，與 admin_product_certification.go、invoice_dto.go 登記的同名條目同源、理由相同；那邊改名時一起改規格。"
+    },
+    {
+      "file": "api/openapi/openapi.yaml",
+      "line_hint": 2750,
+      "key": "actor_account_id",
+      "direction": "spec",
+      "count": 1,
+      "reason": "規格描述的是現有 wire，與 invoice_admin.go 登記的同名條目同源、理由相同；那邊改名時一起改規格。"
+    },
+    {
+      "file": "api/openapi/openapi.yaml",
+      "line_hint": 35553,
+      "key": "approvedByAccountId",
+      "direction": "spec",
+      "count": 1,
+      "reason": "規格描述的是現有 wire，與 invoice_dto.go 登記的同名條目同源、理由相同；那邊改名時一起改規格。"
+    },
+    {
+      "file": "api/openapi/openapi.yaml",
+      "line_hint": 30368,
+      "key": "buyerAccountId",
+      "direction": "spec",
+      "count": 1,
+      "reason": "規格描述的是現有 wire，與 coupon.go 登記的同名條目同源、理由相同；那邊改名時一起改規格。"
+    },
+    {
+      "file": "api/openapi/openapi.yaml",
+      "line_hint": 30469,
+      "key": "buyerAccountIds",
+      "direction": "spec",
+      "count": 2,
+      "reason": "規格描述的是現有 wire，與 coupon.go 登記的同名條目同源、理由相同；那邊改名時一起改規格。"
+    },
+    {
+      "file": "api/openapi/openapi.yaml",
+      "line_hint": 38051,
+      "key": "createdByAccountId",
+      "direction": "spec",
+      "count": 1,
+      "reason": "規格描述的是現有 wire，與 invoice_dto.go 登記的同名條目同源、理由相同；那邊改名時一起改規格。"
+    },
+    {
+      "file": "api/openapi/openapi.yaml",
+      "line_hint": 33216,
+      "key": "issuerAccountId",
+      "direction": "spec",
+      "count": 1,
+      "reason": "規格描述的是現有 wire，與 coupon.go 登記的同名條目同源、理由相同；那邊改名時一起改規格。"
+    },
+    {
+      "file": "api/openapi/openapi.yaml",
+      "line_hint": 30324,
+      "key": "ownerAccountId",
+      "direction": "spec",
+      "count": 1,
+      "reason": "規格描述的是現有 wire，與 logistics_finance.go 登記的同名條目同源、理由相同；那邊改名時一起改規格。"
+    },
+    {
+      "file": "api/openapi/openapi.yaml",
+      "line_hint": 30255,
+      "key": "proposedByAccountId",
+      "direction": "spec",
+      "count": 1,
+      "reason": "規格描述的是現有 wire，與 logistics_finance.go 登記的同名條目同源、理由相同；那邊改名時一起改規格。"
+    },
+    {
+      "file": "api/openapi/openapi.yaml",
+      "line_hint": 35570,
+      "key": "requestedByAccountId",
+      "direction": "spec",
+      "count": 1,
+      "reason": "規格描述的是現有 wire，與 invoice_dto.go 登記的同名條目同源、理由相同；那邊改名時一起改規格。"
+    },
+    {
+      "file": "api/openapi/openapi.yaml",
+      "line_hint": 30338,
+      "key": "resolvedByAccountId",
+      "direction": "spec",
+      "count": 1,
+      "reason": "規格描述的是現有 wire，與 logistics_finance.go 登記的同名條目同源、理由相同；那邊改名時一起改規格。"
+    },
+    {
+      "file": "api/openapi/openapi.yaml",
+      "line_hint": 30279,
+      "key": "reviewedByAccountId",
+      "direction": "spec",
+      "count": 2,
+      "reason": "規格描述的是現有 wire，與 admin_product_certification.go、logistics_finance.go 登記的同名條目同源、理由相同；那邊改名時一起改規格。"
+    },
+    {
+      "file": "api/openapi/openapi.yaml",
+      "line_hint": 33880,
+      "key": "sellerAccountId",
+      "direction": "spec",
+      "count": 2,
+      "reason": "規格描述的是現有 wire，與 admin_delegated_audit.go、admin_delegation.go 登記的同名條目同源、理由相同；那邊改名時一起改規格。"
+    },
+    {
+      "file": "api/openapi/openapi.yaml",
+      "line_hint": 31058,
+      "key": "submittedByAccountId",
+      "direction": "spec",
+      "count": 1,
+      "reason": "規格描述的是現有 wire，與 admin_product_certification.go 登記的同名條目同源、理由相同；那邊改名時一起改規格。"
+    },
+    {
+      "file": "api/openapi/openapi.yaml",
+      "line_hint": 6216,
+      "key": "targetAccountId",
+      "direction": "spec",
+      "count": 1,
+      "reason": "規格描述的是現有 wire，與 admin_notification_template.go 登記的同名條目同源、理由相同；那邊改名時一起改規格。"
+    },
+    {
+      "file": "gateway/internal/handler/admin_delegated_audit.go",
+      "line_hint": 31,
+      "key": "sellerAccountId",
+      "direction": "outbound",
+      "count": 1,
+      "reason": "與同檔案家族的 admin_delegation.go 那條同源：稽核列的 target 物件同樣要同時帶「營運鍵 storeId」與「登入 principal sellerAccountId」。稽核要回答的是「這次代行影響到哪一個人的店」，而賣家換手（store-stint）之後 storeId 不變、sellerAccountId 會變，兩個都留才查得回當時的責任歸屬。改名成 storeId 會讓同一個物件出現兩個同義欄位。"
+    },
+    {
+      "file": "gateway/internal/handler/admin_delegation.go",
+      "line_hint": 72,
+      "key": "sellerAccountId",
+      "direction": "outbound",
+      "count": 1,
+      "reason": "56 號代行營運契約明訂的欄位，語意正確不是漏改：delegated 的 target 同時要帶「營運鍵 storeId」與「登入 principal sellerAccountId」兩個值，前端拿它做 preflight ↔ create ↔ current 三者的逐欄回音比對（九欄對帳其中一欄）。這裡的 sellerAccountId 指的就是 accounts PK，改名成 storeId 會讓同一個物件出現兩個同義欄位、而對帳比的正好是它。"
+    },
+    {
+      "file": "gateway/internal/handler/admin_notification_template.go",
+      "line_hint": 295,
+      "key": "targetAccountId",
+      "direction": "inbound",
+      "count": 1,
+      "reason": "notification 的投遞對象本來就是登入 account（不是買賣家營運鍵），語意正確。列在此處只為讓「所有帶前綴的 account_id key」都有人看過一遍。"
+    },
+    {
+      "file": "gateway/internal/handler/admin_product_certification.go",
+      "line_hint": 193,
+      "key": "actorAccountId",
+      "direction": "outbound",
+      "count": 1,
+      "reason": "19 號設計書 §10.2 的 product_certification_review_event.actor_account_id：審核事件流水裡「這個動作是誰做的」。ADMIN 動作記管理員的 accounts PK、SELLER 動作記賣家本人的 accounts PK、SYSTEM 動作為 null——三種 actor 共用同一欄，而只有 account_id 是三者都有的鍵（系統沒有 store_id，管理員也沒有）。改成 storeId 會讓 ADMIN 與 SYSTEM 兩種 actor 無處可放。語意正確，非漏改。"
+    },
+    {
+      "file": "gateway/internal/handler/admin_product_certification.go",
+      "line_hint": 125,
+      "key": "reviewedByAccountId",
+      "direction": "outbound",
+      "count": 1,
+      "reason": "19 號設計書 §10.2 的 product_certification_application.reviewed_by_account_id：裁決者是 ADM 管理員，管理員只有登入 principal、沒有營運鍵，store_id/buyer_id 在這裡不存在對應值。自動核准時為 null（actor 由審核事件的 SYSTEM 標示）。語意正確，非漏改。"
+    },
+    {
+      "file": "gateway/internal/handler/admin_product_certification.go",
+      "line_hint": 113,
+      "key": "submittedByAccountId",
+      "direction": "outbound",
+      "count": 1,
+      "reason": "19 號設計書 §9.2 明列於 ADM 詳情契約、§10.2 對應 product_certification_application.submitted_by_account_id：送件者的登入 principal。同一物件已經帶了營運鍵 storeId，這一欄回答的是另一個問題——賣家換手（store-stint）之後 storeId 不變而送件者會變，稽核要靠它才查得回「當時是誰送的」。改名成 storeId 會讓同一個物件出現兩個同義欄位並丟掉那個資訊。與 admin_delegation.go 的 sellerAccountId 同源。"
+    },
+    {
+      "file": "gateway/internal/handler/coupon.go",
+      "line_hint": 139,
+      "key": "buyerAccountId",
+      "direction": "inbound",
+      "count": 2,
+      "reason": "請求體欄位（AdminGrantCompensationRequest 與對應 inline var req struct），inbound 排除。"
+    },
+    {
+      "file": "gateway/internal/handler/coupon.go",
+      "line_hint": 83,
+      "key": "buyerAccountIds",
+      "direction": "inbound",
+      "count": 5,
+      "reason": "請求體欄位，inbound 排除。注意它與並存的 buyerIds 是刻意的兩條路：buyerAccountIds 收 account_id 由 Gateway 解析成現任 buyer_id，buyerIds 收呼叫端已握有的 buyer_id（CRM 顧客列表只回得出 buyer_id）。兩者不是重複，刪任一邊都會壞。"
+    },
+    {
+      "file": "gateway/internal/handler/coupon.go",
+      "line_hint": 35,
+      "key": "issuerAccountId",
+      "direction": "outbound",
+      "count": 2,
+      "reason": "CouponTemplateResponse:35 與 templateInfoToMap:1149，值來自 coupon.proto issuer_account_id。填值點 CouponGrpcService.java:1145-1146 直接讀 coupon_templates.issuer_account_id——V6 migration（2026-08-06 issuer identity split）已把原本的語意混雜欄位拆成 issuer_account_id（ADMIN-only）與 issuer_store_id（SELLER-only）兩個互斥欄位，DB 層 CHECK constraint（chk_tpl_issuer_identity）留給後續 contract release 補上，本階段互斥僅由新 code 寫入路徑保證。原條目「保留原名直到 coupon 拆成 issuer_type + 分離鍵」的暫緩條件已滿足：這個名字現在是單一語意下永久正確的名字，不再是待修的設計缺口佔位，繼續留在 baseline 純粹因為 issuerType/issuerAccountId 一組回應欄位仍沿用既有 outbound 命名慣例、非待辦事項。"
+    },
+    {
+      "file": "gateway/internal/handler/invoice_admin.go",
+      "line_hint": 1493,
+      "key": "actor_account_id",
+      "direction": "swagger",
+      "count": 1,
+      "reason": "58 號 §6 端點 61 `/admin/invoices/audit_logs` 的查詢過濾條件，欄名逐字取自 §5.1.13 的 invoice_admin_audit_logs.actor_account_id（設計書 §5320 逐字列出這八個 query）。它過濾的是「哪一個登入帳號做的」，而 ADM 管理員只有 accounts PK、沒有 store_id/buyer_id 可對應。同一支端點另有獨立的 store_id 過濾條件（同一行併列），兩者不是同一個軸。"
+    },
+    {
+      "file": "gateway/internal/handler/invoice_dto.go",
+      "line_hint": 390,
+      "key": "acceptedByAccountId",
+      "direction": "outbound",
+      "count": 1,
+      "reason": "58 號 §6 端點 21／22 條款接受紀錄，設計書逐字：「acceptedByAccountId 用 accountId 而不是 storeId——接受條款是自然人的意思表示，稽核要能回答『是誰按的』」。賣家換手（store-stint）之後 store_id 會指向新任賣家，而條款是前任那個自然人簽的 ⇒ 用營運鍵會讓稽核指向錯的人。"
+    },
+    {
+      "file": "gateway/internal/handler/invoice_dto.go",
+      "line_hint": 108,
+      "key": "actorAccountId",
+      "direction": "outbound",
+      "count": 1,
+      "reason": "InvoiceAuditLogItem 的「這個動作是誰做的」。與同 repo 既有的 admin_product_certification.go actorAccountId 同源同語意。58 號 §4.3 W-3 明訂稽核必須有三個誠實命名的獨立身分軸（actor_kind + actor_admin_id/actor_account_id），逐字禁止「共用單一 operator_id 再靠 type 欄分辨」⇒ 這一欄的存在本身就是設計要求。同物件內另有 actorDisplayName／targetKind 與它配對，改成裸 accountId 會讓配對關係消失。"
+    },
+    {
+      "file": "gateway/internal/handler/invoice_dto.go",
+      "line_hint": 299,
+      "key": "approvedByAccountId",
+      "direction": "outbound",
+      "count": 1,
+      "reason": "ManualUnlockInfo 的雙人確認第二人，與同物件的 requestedByAccountId 成對，理由同上（58 號 §7.3 T14）。DB 側對應 invoice_admin_audit_logs.approval_actor_account_id，且有 chk_invadmaudit_two_person 約束 approval_actor_account_id <> actor_account_id ⇒ 兩者必須是可區分的兩個值，共用一個欄名會讓「雙人確認被繞過」變成看不出來。"
+    },
+    {
+      "file": "gateway/internal/handler/invoice_dto.go",
+      "line_hint": 346,
+      "key": "createdByAccountId",
+      "direction": "outbound",
+      "count": 1,
+      "reason": "賣家開票設定切換紀錄（mode／cutoverAt／deactivatedAt 那一組）的建立者。可能是 ADM 管理員也可能是賣家本人，兩者共通的只有登入 principal；同物件已另帶營運鍵，這一欄回答的是「誰按的」不是「哪一家店」。與既有 admin_product_certification.go submittedByAccountId 同型。"
+    },
+    {
+      "file": "gateway/internal/handler/invoice_dto.go",
+      "line_hint": 298,
+      "key": "requestedByAccountId",
+      "direction": "outbound",
+      "count": 1,
+      "reason": "ManualUnlockInfo 的雙人確認第一人。58 號 §7.3 T14 逐字：「全案唯一真正的雙人機制是 §6 端點 54／55 的人工解鎖（request → approval 兩步、兩個不同 actor_account_id）」⇒ 同一個物件內必須同時出現發起人與覆核人兩個不同欄名，兩者都改成裸 accountId 在結構上不可能。操作者是 ADM 管理員，沒有 store_id/buyer_id。"
+    },
+    {
+      "file": "gateway/internal/handler/logistics_finance.go",
+      "line_hint": 358,
+      "key": "ownerAccountId",
+      "direction": "outbound",
+      "count": 1,
+      "reason": "V9 的 fulfillment_exception_cases / fulfillment_case_resolutions 欄註解逐字標「⚠️ account_id（ADM 操作者），不是 store_id」：例外案件的承辦、提案、覆核、結案四個角色都是 ADM 管理員，而管理員只有登入 principal、沒有營運鍵——store_id / buyer_id 在這裡不存在對應值。 ownerAccountId 對應 fulfillment_exception_cases.owner_account_id：案件離開 OPEN 時必須有承辦人（chk_exc_owner 是那條保證的機械形式），它回答的是「現在誰負責這張案件」。與同一物件的 storeId 不是同義詞——storeId 是案件牽涉到的賣家，承辦人是我方的人。"
+    },
+    {
+      "file": "gateway/internal/handler/logistics_finance.go",
+      "line_hint": 322,
+      "key": "proposedByAccountId",
+      "direction": "outbound",
+      "count": 1,
+      "reason": "V9 的 fulfillment_exception_cases / fulfillment_case_resolutions 欄註解逐字標「⚠️ account_id（ADM 操作者），不是 store_id」：例外案件的承辦、提案、覆核、結案四個角色都是 ADM 管理員，而管理員只有登入 principal、沒有營運鍵——store_id / buyer_id 在這裡不存在對應值。 proposedByAccountId 對應 fulfillment_case_resolutions.proposed_by_account_id：提出處置方案的 ADM 操作者。它與 reviewedByAccountId 共同構成 chk_fcr_two_person（覆核者不得為提案者）那條雙人原則的資料面，改名或合併都會讓那條約束失去可稽核性。"
+    },
+    {
+      "file": "gateway/internal/handler/logistics_finance.go",
+      "line_hint": 362,
+      "key": "resolvedByAccountId",
+      "direction": "outbound",
+      "count": 1,
+      "reason": "V9 的 fulfillment_exception_cases / fulfillment_case_resolutions 欄註解逐字標「⚠️ account_id（ADM 操作者），不是 store_id」：例外案件的承辦、提案、覆核、結案四個角色都是 ADM 管理員，而管理員只有登入 principal、沒有營運鍵——store_id / buyer_id 在這裡不存在對應值。 resolvedByAccountId 對應 fulfillment_exception_cases.resolved_by_account_id：結案者。chk_exc_resolved 要求結案三件套（時間／人／碼）同時有值，這一欄是其中的「人」。"
+    },
+    {
+      "file": "gateway/internal/handler/logistics_finance.go",
+      "line_hint": 324,
+      "key": "reviewedByAccountId",
+      "direction": "outbound",
+      "count": 1,
+      "reason": "V9 的 fulfillment_exception_cases / fulfillment_case_resolutions 欄註解逐字標「⚠️ account_id（ADM 操作者），不是 store_id」：例外案件的承辦、提案、覆核、結案四個角色都是 ADM 管理員，而管理員只有登入 principal、沒有營運鍵——store_id / buyer_id 在這裡不存在對應值。 reviewedByAccountId 對應 fulfillment_case_resolutions.reviewed_by_account_id：覆核者。與 admin_product_certification.go 既有的同名條目同源、同理由（裁決者是 ADM 管理員）。"
+    }
+  ],
+  "check_b": []
+}

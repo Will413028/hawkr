@@ -1,0 +1,22 @@
+-- atlas:txmode none
+-- CREATE INDEX CONCURRENTLY 不能跑在 transaction 內，故本檔關掉 atlas 的自動交易包裹。
+-- 依據：docs/開發規範/DB Migration 相容性規範（expand-contract）.md「加 index 一律用
+-- CREATE INDEX CONCURRENTLY，避免鎖表阻塞線上查詢」。也因為這個限制，index 與前一檔的
+-- ADD COLUMN 拆成兩支——同一檔會讓 ADD COLUMN 一起失去交易保護。
+--
+-- partial index：expand 階段的舊列 run_id 為 NULL。Postgres 的 UNIQUE 本來就容許多個
+-- NULL，寫成 partial 是為了讓「NULL 是刻意排除的舊列」在 schema 上看得出來；contract 波
+-- 拿掉 WHERE 子句即可。
+--
+-- ⚠️ roll-forward（--atomic 只回滾 image，不回滾 schema）：CREATE UNIQUE INDEX
+-- CONCURRENTLY 失敗會留下一個 INVALID index。復原是
+--   DROP INDEX CONCURRENTLY IF EXISTS "uq_procurement_candidate_sets_run_id";
+-- 再重跑本檔，不是回滾。
+--
+-- ⚠️ 這行前面的空行不是排版：atlas 把「註解區塊與語句之間沒有空行」解讀成該註解是這句
+-- 語句的附帶說明，不是 file-level directive，`-- atlas:txmode none` 會被忽略——整檔仍被
+-- 包進 transaction，Postgres 直接拒絕 CONCURRENTLY（`cannot run inside a transaction
+-- block`）。account-service `20260730025548`、seller-service `20260809130245` 兩支既有
+-- CONCURRENTLY migration 都有這行空行，仿它們的排版。
+
+CREATE UNIQUE INDEX CONCURRENTLY "uq_procurement_candidate_sets_run_id" ON "procurement_candidate_sets" ("run_id") WHERE (run_id IS NOT NULL);

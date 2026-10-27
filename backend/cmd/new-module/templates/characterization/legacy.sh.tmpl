@@ -1,0 +1,24 @@
+# shellcheck shell=bash
+# scripts/characterize.sh {{.Name}} 會 source 這個檔，在起 gateway 之前呼叫 legacy_start 起舊的 {{.Legacy}}。
+# 可以用的函式與變數見 scripts/characterize.sh 的說明。{{.Legacy}} 刪除時連同這個檔一起刪除。
+#
+# content-service 當時的寫法（私人封存的 backend/scripts/characterize-legacy-content.sh）：
+#
+#   LEGACY_PORT=19036
+#   require_free_port "$LEGACY_PORT"
+#   create_db content_characterization
+#   atlas migrate apply --dir file://services/content-service/db/migrations \
+#     --url "$(db_url content_characterization)" >"${LOG_DIR}/legacy-migrate.log"
+#   (cd services/content-service && go build -o "${LOG_DIR}/legacy" ./cmd/content-service)
+#   start_bg legacy ENV=development INTERNAL_AUTH_MODE=off \
+#     DB_HOST="$PGHOST" DB_PORT=5432 DB_USER="$PG_USER" DB_PASSWORD="$PG_PASSWORD" DB_NAME=content_characterization \
+#     DB_SSLMODE=disable GRPC_PORT="$LEGACY_PORT" \
+#     MEDIA_SERVICE_HOST=127.0.0.1 MEDIA_SERVICE_GRPC_PORT="$FAKE_MEDIA_PORT" "${LOG_DIR}/legacy"
+#   gateway_env+=(CONTENT_SERVICE_HOST=127.0.0.1 CONTENT_SERVICE_GRPC_PORT="$LEGACY_PORT")
+#
+# Java 的服務以 Flyway 在啟動時套用 migration，建好 database 後直接起服務。
+
+legacy_start() {
+  echo "legacy.sh：還沒寫好 {{.Legacy}} 怎麼起（internal/httpapi/{{.Name}}/characterization/legacy.sh）" >&2
+  exit 1
+}

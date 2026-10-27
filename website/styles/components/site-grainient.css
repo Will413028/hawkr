@@ -1,0 +1,82 @@
+/* One persistent canvas for every route, including auth and workspaces.
+   Page shells are transparent; foreground cards and dialogs own their surfaces.
+   No pathname/DOM allowlist: navigation must never hide or restart the field. */
+.site-grainient {
+	display: block;
+	position: fixed;
+	inset: 0;
+	z-index: 0;
+	pointer-events: none;
+	overflow: clip;
+	opacity: 0.25;
+	background: linear-gradient(
+		135deg,
+		var(--site-grainient-fallback-1),
+		var(--site-grainient-fallback-2),
+		var(--site-grainient-fallback-3),
+		var(--site-grainient-fallback-4)
+	);
+}
+
+body,
+[data-theme="dark"] body {
+	background: var(--site-grainient-base);
+}
+
+.site-grainient__viewport,
+.site-grainient__canvas {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+/* Footer control reserves its size before the deferred renderer arrives. */
+.site-background-control {
+	display: block;
+	margin-top: 8px;
+	min-height: 44px;
+}
+.site-background-control__button {
+	min-width: 96px;
+	min-height: 44px;
+	padding: 8px 12px;
+	border: 1px solid currentColor;
+	border-radius: var(--radius-pill);
+	background: transparent;
+	color: var(--color-neutral-cream);
+	font: inherit;
+	font-size: var(--text-xs);
+	cursor: pointer;
+	touch-action: manipulation;
+}
+.site-background-control__button:hover:not(:disabled) {
+	background: rgb(var(--color-brand-secondary-soft-rgb) / 0.1);
+}
+.site-background-control__button:focus-visible {
+	outline: 2px solid var(--color-brand-secondary);
+	outline-offset: 3px;
+}
+.site-background-control__button:disabled {
+	cursor: default;
+}
+
+/* Minimal in-flow access for standalone pages without a branded footer. */
+.site-background-control--page .site-background-control__button {
+	color: var(--ink-heading);
+	background: var(--surface-card);
+}
+.site-background-footer {
+	padding: 12px 24px max(12px, env(safe-area-inset-bottom));
+	text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce), (forced-colors: active) {
+	.site-grainient__canvas {
+		display: none;
+	}
+}
+@media (forced-colors: active) {
+	.site-grainient {
+		background: Canvas;
+	}
+}

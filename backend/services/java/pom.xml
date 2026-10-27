@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>io.github.will413028.hawkr</groupId>
+    <artifactId>hawkr-backend-aggregator</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+
+    <name>Hawkr Backend (Aggregator)</name>
+    <description>
+        Maven reactor 聚合 pom，用於跨服務一次性編譯。
+        各服務仍各自繼承 spring-boot-starter-parent，本 pom 不影響服務 pom 的繼承鏈。
+        詳見 docs/基礎建設/CI_CD 自動化部署（K8s + Helm）.md §10。
+    </description>
+
+    <modules>
+        <!-- shared modules（4 個） -->
+        <module>shared/common-core</module>
+        <module>shared/java-proto</module>
+        <module>shared/observability-common</module>
+        <module>shared/payuni-java-client</module>
+
+        <!-- microservices（清單以本區塊為準，新增服務時同步追加 module） -->
+        <module>payment-service</module>
+        <module>media-service</module>
+        <module>product-service</module>
+        <module>order-service</module>
+        <module>cart-service</module>
+        <module>coupon-service</module>
+        <module>shipping-service</module>
+        <module>aftersales-service</module>
+        <module>payuni-webhook-service</module>
+        <module>product-import-service</module>
+    </modules>
+</project>

@@ -1,0 +1,1441 @@
+syntax = "proto3";
+
+package hawkr.product;
+
+import "common/delegation.proto";
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/product";
+option java_multiple_files = true;
+option java_package = "io.github.will413028.hawkr.product.grpc";
+option java_outer_classname = "ProductProto";
+
+// Product Service - 商品管理服務
+service ProductService {
+    // 建立商品
+    rpc CreateProduct (CreateProductRequest) returns (CreateProductResponse);
+
+    // 更新商品
+    rpc UpdateProduct (UpdateProductRequest) returns (UpdateProductResponse);
+
+    // 取得商品詳情（含權限檢查，賣家端使用）
+    rpc GetProduct (GetProductRequest) returns (GetProductResponse);
+
+    // 公開商品詳情（PUBLIC / TEMPORARILY_UNAVAILABLE，支援 Redis 快取）
+    rpc GetPublicProduct (GetPublicProductRequest) returns (GetProductResponse);
+
+    // 取得商品列表（禁止 join product_sku）
+    rpc GetProductList (GetProductListRequest) returns (GetProductListResponse);
+
+    // 管理員取得商品詳情（不檢查擁有者，不限狀態，僅限管理員）
+    rpc GetProductForAdmin (GetProductForAdminRequest) returns (GetProductResponse);
+
+    // 管理員更新商品狀態（不檢查擁有者，僅限管理員）
+    rpc UpdateProductStatus (UpdateProductStatusRequest) returns (UpdateProductResponse);
+
+    // 賣家更新商品狀態（含擁有者驗證 + 狀態轉換驗證）
+    rpc UpdateSellerProductStatus (UpdateSellerProductStatusRequest) returns (UpdateProductResponse);
+
+    // 賣家批次更新商品狀態（含擁有者驗證 + 逐筆狀態轉換驗證 + 逐筆樂觀鎖）。
+    // 逐項獨立成敗，禁止用單一交易包住全批 —— 一項版本衝突不得讓其他項回滾。
+    rpc BatchUpdateSellerProductStatus (BatchUpdateSellerProductStatusRequest)
+        returns (BatchUpdateSellerProductStatusResponse);
+
+    // 批次取 before 快照與當前 version（代行批次寫入的第一跳，56 設計書 §7.2.8 步驟 ②）。
+    // 存在的理由是「跳數不得與 items 筆數成正比」：逐項打 GetProduct 會讓
+    //    一次 50 筆的批次多出 50 跳，而 prod 的 account-service 連線池只有 2。
+    // 唯讀；查不到的 product_id 在 results 內以 found=false 回報，不整批失敗
+    //    —— 那一項的失敗要走稽核（intent → FAILED），不能在讀取階段就消失。
+    rpc BatchGetSellerProductsForDelegation (BatchGetSellerProductsForDelegationRequest)
+        returns (BatchGetSellerProductsForDelegationResponse);
+
+    // 清除商品快取
+    rpc PurgeProductCache (PurgeProductCacheRequest) returns (PurgeProductCacheResponse);
+
+    // ==================== 庫存操作（Order Service 呼叫） ====================
+
+    // 原子扣減庫存（不可逐筆部分成功）
+    rpc DeductStock (DeductStockRequest) returns (StockOperationResponse);
+
+    // 原子歸還庫存（補償/取消，冪等）
+    rpc RestoreStock (RestoreStockRequest) returns (StockOperationResponse);
+
+    // 查詢庫存
+    rpc GetStock (GetStockRequest) returns (GetStockResponse);
+
+    // ==================== 輕量查詢（Cart Service 呼叫） ====================
+
+    // 取得商品簡化資訊（驗證 SKU + 取得快照）
+    rpc GetProductSimple (GetProductSimpleRequest) returns (GetProductSimpleResponse);
+
+    // 批次取得 SKU 即時資訊（購物車列表顯示用：庫存+溫層+價格+上架狀態）
+    rpc BatchGetSkuCartInfo (BatchGetSkuCartInfoRequest) returns (BatchGetSkuCartInfoResponse);
+
+    // 結帳鏈路批次商品查詢（Order Service Checkout 呼叫）— **接受 inactive product 不拋例外**，
+    // 回完整 weight / dimension / shipping_method 等結帳必要欄位。詳見 02 設計書 §5.5.2
+    rpc BatchGetProductForCheckout (BatchGetProductForCheckoutRequest) returns (BatchGetProductForCheckoutResponse);
+
+    // 批次取得商品資訊（買家瀏覽紀錄使用）
+    rpc GetProductsByIDs (GetProductsByIDsRequest) returns (GetProductsByIDsResponse);
+
+    // 取得相關商品（同分類、排除自身、僅上架、上限 8 筆）
+    rpc GetRelatedProducts (GetRelatedProductsRequest) returns (GetRelatedProductsResponse);
+
+    // ==================== 賣家商品管理 ====================
+
+    // 軟刪除商品（僅限擁有者，僅草稿(4001)/未上架(4003)狀態）
+    rpc DeleteProduct (DeleteProductRequest) returns (DeleteProductResponse);
+
+    // ==================== 運費計算（賣家建立商品時使用） ====================
+
+    // 計算可用配送選項與運費（依溫層分組）
+    rpc CalculateShippingOptions (CalculateShippingOptionsRequest) returns (CalculateShippingOptionsResponse);
+
+    // ==================== 認證驗證（賣家驗證農業認證編號） ====================
+
+    // 驗證認證編號是否存在於政府開放資料平台 — 僅限 Seller (account_type: 2, 3)
+    rpc VerifyCertification (VerifyCertificationRequest) returns (VerifyCertificationResponse);
+
+    // ==================== 商品認證申請與審核（19 號設計書 §10.1） ====================
+
+    // ---- 賣家（requireSeller(CapProductManage)；非本人商品一律 404）----
+
+    // 送出認證申請；同步階段只讀快取不發外部呼叫，命中「有效」即自動核准
+    rpc SubmitProductCertification (SubmitProductCertificationRequest) returns (ProductCertificationApplicationResponse);
+
+    // 查詢某商品的認證申請列表（賣家視角，不含 gov_verify_payload / internal_note）
+    rpc ListProductCertificationApplications (ListProductCertificationApplicationsRequest) returns (ListProductCertificationApplicationsResponse);
+
+    // 撤回待審申請（樂觀鎖 expected_version）
+    rpc WithdrawProductCertification (WithdrawProductCertificationRequest) returns (ProductCertificationApplicationResponse);
+
+    // ---- Admin（角色分離：一律 *ForAdmin 後綴；禁止用 boolean flag 或特殊值分流角色）----
+
+    // Admin 審核佇列查詢（status / type / store / keyword / 送出時間區間）
+    rpc ListProductCertificationApplicationsForAdmin (ListProductCertificationApplicationsForAdminRequest) returns (ListProductCertificationApplicationsForAdminResponse);
+
+    // Admin 申請詳情；比賣家版多 gov_verify_payload / internal_note / current_approved
+    rpc GetProductCertificationApplicationForAdmin (GetProductCertificationApplicationForAdminRequest) returns (ProductCertificationApplicationAdminResponse);
+
+    // Admin 稽核軌跡（append-only review event；自動核准也必須有事件）
+    rpc ListProductCertificationAuditLogsForAdmin (ListProductCertificationAuditLogsForAdminRequest) returns (ListProductCertificationAuditLogsForAdminResponse);
+
+    // Admin 核准；同 (product, type) 現行有效那筆會被 SUPERSEDE
+    rpc ApproveProductCertificationForAdmin (ReviewProductCertificationForAdminRequest) returns (ProductCertificationApplicationAdminResponse);
+
+    // Admin 駁回（reason_code 必填，缺 → 3028）
+    rpc RejectProductCertificationForAdmin (ReviewProductCertificationForAdminRequest) returns (ProductCertificationApplicationAdminResponse);
+
+    // Admin 撤銷已核准（reason_code 必填）；撤銷後投影必須重算
+    rpc RevokeProductCertificationForAdmin (ReviewProductCertificationForAdminRequest) returns (ProductCertificationApplicationAdminResponse);
+
+    // Admin 重新查驗：有副作用（消耗政府 API 配額 + 寫 DB）故走 POST。
+    // 只更新 gov_verify_state / gov_verify_payload / gov_verified_at，**不改 status、不自動核准**（§9.3）
+    rpc ReverifyProductCertificationForAdmin (ReverifyProductCertificationForAdminRequest) returns (ProductCertificationApplicationAdminResponse);
+
+    // ==================== Admin 分類管理（搭配 CategoryService） ====================
+
+    // 取分類底下所有商品（含分頁，依層級判斷查 category / category_lv2 / category_lv1）
+    rpc ListProductsByCategoryForAdmin (ListProductsByCategoryForAdminRequest) returns (ListProductsByCategoryForAdminResponse);
+
+    // 批次更換商品分類，限 L3→L3。**強制連動更新 product.category / category_lv2 / category_lv1 三欄位**。
+    // 兩種輸入模式（擇一）：(productIds + targetCategoryId) 或 (sourceCategoryId + targetCategoryId)
+    rpc BatchChangeProductCategoryForAdmin (BatchChangeProductCategoryForAdminRequest) returns (BatchChangeProductCategoryForAdminResponse);
+
+    // ==================== Hashtag 自動補全 ====================
+
+    // Hashtag 自動補全（PREFIX/CONTAIN 兩種模式，僅回 product_count > 0，依熱門排序）
+    rpc SearchHashtags (SearchHashtagsRequest) returns (SearchHashtagsResponse);
+
+    // ==================== Hashtag 熱門查詢（33 §5.2） ====================
+
+    // 日期區間熱門 hashtag 查詢，依區間內 distinct ACTIVE 商品數降冪
+    rpc GetPopularHashtags (GetPopularHashtagsRequest) returns (GetPopularHashtagsResponse);
+
+    // ==================== 公開產地聚合（02 §5.13） ====================
+
+    // 公開商品產地聚合：依 ACTIVE 商品 group by origin 回傳產地與商品數列表
+    rpc GetPublicOriginsSummary (GetPublicOriginsSummaryRequest) returns (GetPublicOriginsSummaryResponse);
+    // 商家註冊所在地完整聚合；固定回 22 縣市，count 與列表 filter 共用 seller SSOT。
+    rpc GetPublicSellerCitiesSummary (GetPublicSellerCitiesSummaryRequest) returns (GetPublicSellerCitiesSummaryResponse);
+
+    // ==================== 有公開上架商品的店家（Seller Service 呼叫） ====================
+
+    // 回傳「至少有一件公開上架商品」的 store_id 全集。
+    // 內部 RPC（seller-service 推薦賣家 / marketplace rail 用來濾掉空店），不對前端暴露。
+    // 詳見 02 §5.13c
+    rpc ListStoreIDsWithPublicProductsInternal (ListStoreIDsWithPublicProductsInternalRequest) returns (ListStoreIDsWithPublicProductsInternalResponse);
+
+    // ==================== Product Import 整合（02 §9） ====================
+
+    // 驗證 category_id 為合法葉節點，回傳 cat_l1/l2 反正規化欄位
+    // 內部 RPC（x-internal-service 免身份驗證），不對前端暴露
+    // 詳見 02 §9.1
+    rpc ValidateLeafCategoryInternal (ValidateLeafCategoryInternalRequest) returns (ValidateLeafCategoryInternalResponse);
+
+    // 由 Product Import Service 在 commit 階段呼叫，將暫存 import_item 轉正為 product + product_sku
+    // 內部 RPC，與 CreateProduct 分離以維持權限邊界與審計線索清晰
+    // 詳見 02 §9.2
+    rpc CreateProductFromImportInternal (CreateProductFromImportInternalRequest) returns (CreateProductFromImportInternalResponse);
+
+    // 批次偵測商品名稱是否與賣家既有商品重複（CSV 解析 + UpdateImportItem 時呼叫）
+    // 內部 RPC
+    // 詳見 02 §9.5
+    rpc BatchCheckSellerProductNames (BatchCheckSellerProductNamesRequest) returns (BatchCheckSellerProductNamesResponse);
+
+    // 商品上架完整檢核（雙時機點 validator）；csv 路徑不能繞過任何上架規則
+    // 內部 RPC；由 ProductPublishValidator 執行
+    // 詳見 40 號設計書 §4.3a
+    rpc ValidateProductDraft (ValidateProductDraftRequest) returns (ValidateProductDraftResponse);
+
+    // batch 查多個 product 的 (id, name, status, status_label) 用於 import 端 hydrate
+    // 內部 RPC
+    // 詳見 40 號設計書 §4.3b
+    rpc GetProductsBriefInternal (GetProductsBriefInternalRequest) returns (GetProductsBriefInternalResponse);
+}
+
+// ========== 共用訊息定義 ==========
+
+// 商品圖片（支援暫存 token / 既有資產 / Import 來源三種模式）
+message ProductImage {
+    string id = 1;             // 前端排序或暫時識別用（可選）
+    string staged_token = 2;   // 新增圖片用：UploadSession → FinalizeImages 路徑（與 import_asset_id 互斥）
+    string asset_id = 3;       // 既有圖片用：保留/更新時使用
+    // 4 = object_key（2026-08-05 移除）：前端送進來後一路傳到 ProductImageDTO，但 gallery 組裝
+    // （ProductService.processImages / processImageUpdate）只認 staged_token 與 asset_id，
+    // 全 repo 無任何 reader。objectKey 的 SSOT 一律由 media-service finalize 回傳。
+    reserved 4;
+    reserved "object_key";
+    string import_asset_id = 5;  // Import 來源：FinalizeImportAsset 路徑（02 §9.2 / §9.3，與 staged_token 互斥）
+}
+
+// 商品 SKU（對應 product_sku 表）
+message ProductSku {
+    string id = 1;              // SKU ID (BIGSERIAL)，更新時需要
+    string sku_name = 2;        // SKU 名稱（可以是名稱、標籤或規格等級描述，如「大顆裝 1kg」）
+    string weight = 3;          // 重量（數字字串）
+    string unit = 4;            // 單位（如：公斤、顆）
+    string price = 5;           // 原價（list price，新台幣元，數字字串格式，避免 JS 精度問題）
+    string stock_qty = 6;       // 庫存數量（數字字串）
+    string length_cm = 7;       // 長（cm，數字字串）
+    string width_cm = 8;        // 寬（cm，數字字串）
+    string height_cm = 9;       // 高（cm，數字字串）
+    repeated ShippingMethod shipping_methods = 10; // 運送方式（每個 method×temperature 組合一筆）
+    string sale_price = 11;     // 特價（新台幣元，空字串=無特價，須 < price 且 > 0）。實際成交單價 = sale_price 非空時取 sale_price，否則 = price
+
+    // SKU 樂觀鎖版本（回應方向填，#2545 / 56 §5.4）。product.version 的反正規化寫入路徑
+    // 刻意不 bump（F41 第 11 列），對「表單開著期間發生的扣庫存」失明；SKU 自己這個
+    // version 才擋得住賣家把賣掉的庫存原樣寫回復活。
+    string version = 12;
+
+    // 期望版本（請求方向填，#2545）。空字串 = 不比對（舊 client 的既有行為）。
+    // 與 UpdateProductRequest.expected_version 是兩把不同的鎖，缺一不可：
+    // 前者守 product 的可編輯欄，後者守 SKU 的 stock_qty / price。
+    string expected_version = 13;
+}
+
+// 運送方式（每個 method×temperature 組合一筆）
+message ShippingMethod {
+    string type = 1;            // ShippingMethod value（如 3001、3002、3003）
+    string temperature = 2;     // ShippingTemperature value（如 3201、3202、3203）
+    string free_threshold = 3;  // 免運門檻（新台幣元，數字字串格式，訂單金額 >= 此值則免運）
+    string fee_payer = 4;       // ShippingFeePayer value（如 3101、3102）
+    reserved 5, 6;
+    reserved "type_display_name", "temperature_display_name";
+}
+
+// 商品認證
+message Certification {
+    string name = 1;     // 認證名稱
+    string cert_no = 2;  // 認證編號
+}
+
+// 圖片項目（gallery 內的結構）
+message GalleryItem {
+    string asset_id = 1;    // 資產 ID
+    string object_key = 2;  // objectKey（SSOT；49 §6.6：服務側只填此欄）
+    string url = 3;         // 顯示 URL（49 §6.1/§6.6：由 Gateway 組，服務側不填）
+}
+
+// 商品描述（支援圖文混排）
+message ProductDescription {
+    string version = 1;                      // 版本號
+    repeated DescriptionBlock blocks = 2;    // 區塊列表
+}
+
+// 行內片段（inline run；02 §3.6 inline-run 模型）
+// text block 內容 = runs[]；table cell 內容亦為 runs[]
+message InlineRun {
+    string text = 1;           // 片段純文字（禁 HTML tag）
+    bool bold = 2;             // 行內粗體
+    bool italic = 3;           // 行內斜體
+    bool underline = 4;        // 行內底線
+    string color = 5;          // 行內色碼 #RRGGBB（空=無）
+    string href = 6;           // 行內連結 http(s):// 絕對 URL（空=非連結）
+}
+
+// 描述區塊（text / table / list / image）
+message DescriptionBlock {
+    string type = 1;           // 區塊類型：text / table / list / image
+    string id = 2;             // 區塊識別碼
+
+    // text 類型欄位
+    string content = 3;        // legacy 純文字（唯讀相容；backfill 後 reserved，新寫入用 runs）
+    string style_json = 4;     // 段落級樣式 JSON（fontSize, fontWeight, alignment）
+
+    // image 類型欄位
+    string staged_token = 5;   // 新增圖片用（Finalize 前；與 import_asset_id 互斥）
+    string asset_id = 6;       // 既有圖片用（Finalize 後）
+    string object_key = 7;     // objectKey（SSOT；49 §6.6：服務側只填此欄）
+    string url = 8;            // 顯示 URL（49 §6.1/§6.6：由 Gateway 組，服務側不填）
+    string width = 9;          // 圖片寬度（數字字串）
+    string height = 10;        // 圖片高度（數字字串）
+    string alt = 11;           // 替代文字
+    string import_asset_id = 12; // Import 來源（02 §9.2 / §9.3，與 staged_token 互斥）
+
+    // inline-run 模型欄位（02 §3.6.1）
+    repeated InlineRun runs = 13; // text block 行內 runs（取代 content）
+    string table_json = 14;    // table block 資料（cells 內含 runs 的 JSON 字串，後端 opaque）
+    string list_json = 15;     // list block 資料（items 內含 runs 的 JSON 字串，後端 opaque）
+}
+
+// ========== CreateProduct ==========
+
+message CreateProductRequest {
+    string idempotency_key = 1;              // 冪等鍵（必填）
+    string name = 2;                         // 商品名稱
+    string category_id = 3;                  // 分類 ID（數字字串）
+    ProductDescription description = 4;     // 商品描述（圖文混排）
+    repeated ProductImage images = 5;        // 商品圖片列表（使用 staged_token）
+    repeated ProductSku skus = 6;             // SKU 列表
+    int64 store_id = 7;                      // 店家 ID（Gateway JWT 注入，resolver 解析後的 store surrogate）
+    string origin = 8;                       // 產地
+    repeated Certification certifications = 9;  // 認證列表
+    string status = 10;                      // 狀態 value（CodeMeta ProductStatus：4001=草稿, 4002=審核中, 4003=未上架, 4004=已上架）
+    reserved 11, 12;
+    reserved "delivery_temp", "shipping_methods"; // 配送資訊已移至 ProductSku 內
+    repeated string hashtags = 13;           // Hashtag 字串列表（賣家原始輸入，server normalize；上限 10 個，規則見 02 設計書 §3.9）
+    hawkr.common.DelegationContext delegation = 100;  // 代行語境；未帶 = 賣家本人
+}
+
+message CreateProductResponse {
+    int32 code = 1;
+    string message = 2;
+    ProductDetail data = 3;
+    // 本次未被採用的認證輸入（19 號 §9.5）；product-service 只填 CONCURRENT_CONFLICT，
+    // Gateway 把自己 filter 掉的非法輸入併進同一陣列。無警告時回空陣列，不得省略欄位。
+    repeated CertificationWarning certification_warnings = 4;
+}
+
+// ========== UpdateProduct ==========
+
+message UpdateProductRequest {
+    string idempotency_key = 1;              // 冪等鍵
+    string product_id = 2;                   // 商品 ID (TSID 數字字串)
+    int64 store_id = 3;                      // 用於權限驗證（Gateway JWT 注入，resolver 解析後的 store surrogate）
+    string name = 4;                         // 商品名稱
+    string category_id = 5;                  // 分類 ID（數字字串）
+    ProductDescription description = 6;     // 商品描述（圖文混排）
+    repeated ProductImage images = 7;        // 商品圖片列表（混合清單）
+    repeated ProductSku skus = 8;             // SKU 列表
+    string origin = 9;                       // 產地
+    repeated Certification certifications = 10;  // 認證列表
+    string status = 11;                      // 狀態
+    reserved 12, 13;
+    reserved "delivery_temp", "shipping_methods"; // 配送資訊已移至 ProductSku 內
+    repeated string hashtags = 14;           // Hashtag 字串列表；要更新時必須將 update_hashtags 設 true，否則維持現狀
+    bool update_hashtags = 15;               // true = 本次以 hashtags 全量取代；false/未設 = 不變更 hashtag 集合
+    string expected_version = 16;            // 樂觀鎖，數字字串；不符 → ABORTED
+    bool update_certifications = 17;         // true = 本次以 certifications 全量取代（含清空）；proto3 的 repeated 分不出「空」與「未提供」，沒有這個旗標就永遠清不掉認證。相容期：未設但 certifications 非空仍視為要更新
+    hawkr.common.DelegationContext delegation = 100;
+}
+
+message UpdateProductResponse {
+    int32 code = 1;
+    string message = 2;
+    ProductDetail data = 3;
+    // 同 CreateProductResponse（19 號 §9.5）
+    repeated CertificationWarning certification_warnings = 4;
+}
+
+// ========== GetProductForAdmin ==========
+
+message GetProductForAdminRequest {
+    string product_id = 1;  // 商品 ID (TSID 數字字串)
+}
+
+// ========== UpdateProductStatus ==========
+
+message UpdateProductStatusRequest {
+    string product_id = 1;  // 商品 ID (TSID 數字字串)
+    string status = 2;      // 目標狀態（CodeMeta ProductStatus：4003=未上架, 4004=已上架）
+}
+
+// ========== UpdateSellerProductStatus ==========
+
+message UpdateSellerProductStatusRequest {
+    string product_id = 1;  // 商品 ID (TSID 數字字串)
+    int64 store_id = 2;    // 店家 ID（Gateway JWT 注入，resolver 解析後的 store surrogate）
+    string status = 3;      // 目標狀態碼（CodeMeta ProductStatus：4003=未上架, 4004=已上架）
+    string expected_version = 4;
+    string idempotency_key = 5;
+    hawkr.common.DelegationContext delegation = 100;
+}
+
+// ========== 代行批次（56 設計書 §6.2.3 / §7.2.8） ==========
+
+message BatchProductStatusItem {
+    string product_id = 1;
+    string expected_version = 2;
+    // 該項的稽核列 ID。**由 Gateway 在 RecordAuditIntentBatch 回來之後填入**，
+    //    領域服務只原樣回音到 BatchProductStatusResult.audit_log_id —— 它拿不到這個值，
+    //    稽核列在 account-service。少了本欄，Result 那一欄就是一個永遠填不出來的宣稱（§7.2.8 讀法 5）。
+    // 空字串 = 有人繞過兩階段稽核，領域服務必須拒絕（同 §6.2.1 S1）。
+    string audit_log_id = 3;
+}
+
+message BatchGetSellerProductsForDelegationRequest {
+    int64 store_id = 1;                    // Gateway 注入（§4.1 例外 1）
+    repeated string product_ids = 2;       // 1–50 筆，不可重複
+    hawkr.common.DelegationContext delegation = 100;
+}
+
+message BatchProductSnapshot {
+    string product_id = 1;
+    bool found = 2;                        // false ＝ 不存在或不屬 store_id（不區分，避免探測）
+    string version = 3;                    // 當前樂觀鎖版本（數字字串）
+    string status = 4;                     // 當前狀態碼，供狀態轉換前置判斷
+    string name = 5;                       // 稽核列的 resource_name
+
+    // before_snapshot 的完整投影素材（56 §6.1.11）。
+    //
+    // 送整份 ProductDetail 而不是逐欄列舉那 12 個投影欄，是為了讓 Gateway 走**與單筆
+    // 路徑同一支** productResource()：欄位集合與格式化語意只存在一處，規則表日後長出
+    // 第 13 欄時兩條路徑一起跟上。逐欄列舉會在這裡長出第二份必須手動同步的清單，而漏
+    // 同步的症狀是「批次的稽核少記一欄」——不會編譯錯、不會有測試轉紅。
+    //
+    // ⚠️ seller／reviews 不填：投影用不到，而 buildSellerInfo 是跨服務呼叫，逐項付一次
+    //    會讓這一跳退化成 N 次 seller-service RPC，正是 §7.2.8「跳數與 items 筆數脫鉤」
+    //    要消掉的形狀。found=false 時本欄為空。
+    ProductDetail detail = 6;
+}
+
+message BatchGetSellerProductsForDelegationResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated BatchProductSnapshot results = 3;   // 與 product_ids 同序、同長度
+}
+
+message BatchUpdateSellerProductStatusRequest {
+    int64 store_id = 1;                    // Gateway 注入（§4.1 例外 1）
+    string status = 2;                     // 目標狀態碼；本期只用於下架
+    repeated BatchProductStatusItem items = 3;   // 1–50 筆，product_id 不可重複
+    string idempotency_key = 4;
+    hawkr.common.DelegationContext delegation = 100;
+}
+
+message BatchProductStatusResult {
+    string product_id = 1;
+    bool ok = 2;
+    int32 code = 3;            // 沿用 §4.1 例外 2
+    string message = 4;
+    string version = 5;        // 成功=新版本；失敗=現行版本，供前端直接重試
+    // 每一項都有自己的稽核列 —— 批次是 N 筆稽核，不是一筆。
+    //    少了本欄，前端拿到逐項結果卻無法逐筆對帳。
+    // 本欄是 BatchProductStatusItem.audit_log_id 的**原樣回音**，不是領域服務產生的。
+    string audit_log_id = 6;
+}
+
+message BatchUpdateSellerProductStatusResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated BatchProductStatusResult results = 3;
+    string requested = 4;
+    string succeeded = 5;
+    string failed = 6;
+}
+
+// ========== GetProduct ==========
+
+message GetProductRequest {
+    string product_id = 1;  // 商品 ID (TSID 數字字串)
+    int64 store_id = 2;     // 店家 ID（用於權限判斷，0 表示匿名）（Gateway JWT 注入，resolver 解析後的 store surrogate）
+    hawkr.common.DelegationContext delegation = 100;
+}
+
+message GetProductResponse {
+    int32 code = 1;
+    string message = 2;
+    ProductDetail data = 3;
+}
+
+// ========== GetPublicProduct ==========
+
+message GetPublicProductRequest {
+    string product_id = 1;  // 商品 ID (TSID 數字字串)
+}
+
+// ========== GetProductList ==========
+
+message GetProductListRequest {
+    repeated string category_id = 1;    // 分類 ID 多值聯集；空陣列/含"0"/空字串視為不篩選；支援第一/二/三層自動偵測，server 對每個 id 分組為 lv1/lv2/lv3 後以 OR 串接（02 §5.3.1）；上限 50；任一 id 不存在 → INVALID_ARGUMENT
+    string keyword = 2;        // 關鍵字（多 token 空白分隔；OR 命中；規則見 02 設計書 §5.3.3）
+    string page = 3;           // 頁碼（從 1 開始，數字字串）
+    string page_size = 4;      // 每頁筆數（數字字串）
+    string sort = 5;           // 排序方式 ProductSort Value：LATEST / PRICE_ASC / PRICE_DESC / RATING / SALES（空字串=LATEST，見 35 設計書）
+    string status = 6;         // 狀態篩選
+    int64 owner_store_id = 7;     // 操作者擁有權篩選：不為 0 時 WHERE p.store_id = owner_store_id（gateway resolver 注入 current store surrogate，含 admin 依 owner_id 查詢時一併解析；欄位於 D7 Stage 2 由 seller_account_id 更名為 store_id）；0 = 公開 API。與 store_id（field 9）語意不同：field 9 是公開頁篩選「指定的任意賣家」，本欄位是「呼叫者自己/被查詢帳號的當前 store」，兩者不可合併（見 ProductService.getProductList 的 storeId-優先-fallback-owner_store_id 邏輯）
+    reserved 8;
+    reserved "is_public_api";     // 已移除：accountId == 0 即代表公開 API
+    string store_id = 9;          // 篩選指定賣家的商品（公開 API 用，如 /sellers/:id/products）— 單一賣家頁面語意，與 store_ids（field 15）並存時取交集
+    repeated string hashtags = 10;          // Hashtag 精確篩選（任意大小寫，server normalize 後比對 canonical）
+    HashtagMatchMode hashtag_match_mode = 11; // any (default) / all
+
+    // ===== 公開列表 server-side filter（02 §5.3.4） =====
+    repeated string delivery_temp_filter = 12;  // 配送溫層篩選（ShippingTemperature.value 列表）；EXISTS 子查詢命中任一 SKU 即可
+    string price_min_filter = 13;               // 價格下限（新台幣元，數字字串；空字串=不篩選）
+    string price_max_filter = 14;               // 價格上限（新台幣元，數字字串；空字串=不篩選）
+    repeated string store_ids = 15;             // 多賣家篩選（與 field 9 並存時取交集）
+    bool followed_product_only = 16;            // 僅回登入者收藏的商品（favorites）；true 時必須 viewer_buyer_id > 0；buyer service 不可用時整個查詢失敗
+    // viewer_buyer_id 與 owner_store_id（field 7）語意明確分離：
+    //   owner_store_id：擁有者篩選（賣家管理自己的商品）— 不為 0 時套用 WHERE p.store_id = owner_store_id（gateway resolver 注入 current store surrogate）
+    //   viewer_buyer_id：當前登入觀看者的 buyer_id（由 gateway 解析後傳入）— 僅供 viewer-aware 篩選（followed_product_only / followed_seller_only）使用，**不影響 owner filter**
+    int64 viewer_buyer_id = 17;
+    bool followed_seller_only = 18;             // 僅回登入者追蹤賣家的所有商品（seller_subscriptions）；true 時必須 viewer_buyer_id > 0；buyer service 不可用時整個查詢失敗；service 層解析為 sellerAccountIds 與既有 seller_account_ids 取交集後傳入 SQL
+    repeated string certification_types = 19;   // 商品認證篩選（CertificationType value，如 3701=有機 / 3702=產銷履歷）；比對 certifications[].name，命中任一即可（02 §5.3.4）；name 視為不透明字串，後端不做 enum 轉換
+    string seller_city_code = 20;               // 商家註冊所在地 ISO 3166-2:TW；由 product-service 向 seller SSOT 解析
+    hawkr.common.DelegationContext delegation = 100;
+}
+
+message GetProductListResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated ProductListItem products = 3;
+    string total = 4;          // 總數（數字字串）
+    string page = 5;           // 頁碼（數字字串）
+    string page_size = 6;      // 每頁筆數（數字字串）
+}
+
+// ========== 回應資料結構 ==========
+
+// 商品詳情（完整資料）
+message ProductDetail {
+    string id = 1;                           // 商品 ID (TSID 數字字串)
+    string name = 2;                         // 商品名稱
+    string rating = 3;                       // 評分（數字字串）
+    string status = 4;                       // 狀態
+    string category_id = 5;                  // 分類 ID（數字字串）
+    string origin = 6;                       // 產地
+    ProductDescription description = 7;     // 描述（圖文混排）
+    repeated GalleryItem gallery = 8;        // 圖片集
+    repeated Certification certifications = 9;  // 認證列表
+    string price_min = 10;                   // 最低**實際售價**（新台幣元，數字字串）— 彙總自 SKU effective_price（有特價=sale_price，否則=price）
+    string price_max = 11;                   // 最高實際售價（新台幣元，數字字串）
+    repeated ProductSku skus = 12;            // SKU 列表
+    string created_at = 13;                  // 建立時間（Unix timestamp，數字字串）
+    string updated_at = 14;                  // 更新時間（Unix timestamp，數字字串）
+    string created_by = 15;                  // 建立者 ID（數字字串；audit only，非擁有權 — 擁有權見 SellerInfo.store_id）
+    string category_name = 16;               // 分類名稱（用於前端顯示，向後相容）
+    string image_key = 17;                   // 主圖 objectKey（第一張圖；49 §6.6 GW 組 imageUrl）
+    repeated string image_keys = 18;         // 所有圖片 objectKey 列表（49 §6.6 GW 組 imageUrls）
+
+    // 三層分類（lv3 = product.category 指向的分類，向上查 parent_id）
+    string category_lv3_id = 19;             // 第三層分類 ID（數字字串）
+    string category_lv3_name = 20;           // 第三層分類名稱
+    string category_lv2_id = 21;             // 第二層分類 ID（數字字串）
+    string category_lv2_name = 22;           // 第二層分類名稱
+    string category_lv1_id = 23;             // 第一層分類 ID（數字字串）
+    string category_lv1_name = 24;           // 第一層分類名稱
+
+    // 商家資訊（僅公開 API 填充）
+    SellerInfo seller = 25;
+
+    // 評論預覽（僅公開 API 填充，最多 2 筆）
+    repeated ReviewPreview reviews = 26;
+
+    // 配送資訊（所有 SKU 的聯集聚合，由後端計算）
+    repeated string delivery_temp = 27;              // 配送溫層 value 聯集（如 3201/3202/3203）
+    repeated ShippingMethod shipping_methods = 28;   // 運送方式聯集（含顯示名稱）
+
+    // 評論統計
+    string review_count = 29;                        // 評論數量（數字字串，Review Service 未整合前回傳 "0"）
+
+    reserved 30;
+    reserved "delivery_temps";
+
+    // 自買標記（GetProduct 才填，匿名/Admin 為 false；詳見 02 設計書 §2.2.1）
+    bool self_owned = 31;
+
+    // ==================== 特價支援（02 設計書 §2.8） ====================
+    string list_price_min = 32;              // 最低**原價**（彙總 SKU.price，給前端 strike-through 顯示用，數字字串）
+    string list_price_max = 33;              // 最高原價（數字字串）
+    string sale_price_min = 34;              // 最低**特價**（彙總 SKU.sale_price，數字字串；所有 SKU 皆無特價時為 "0"，不是空字串）
+    string sale_price_max = 35;              // 最高特價（同上規則）
+
+    // ==================== Hashtag（02 設計書 §3.7–§3.9） ====================
+    repeated HashtagItem hashtags = 36;      // 依 product_hashtag.position 升序；含 product_count 即時值
+
+    // ==================== 銷量（35 設計書） ====================
+    string sales_count = 37;                 // 累計銷量（付款成功時 +N，數字字串）
+
+    // ==================== 反正規化欄位（02 §3.2，本期新增） ====================
+    string stock_qty = 38;                   // 即時庫存（總和），對應 product.stock_qty；數字字串
+    string favorite_count = 39;              // 收藏人次，對應 product.favorite_count；數字字串
+    string publication_state = 40;           // ProductPublicationState value；公開生命週期，與 status 分離
+    bool purchasable = 41;                   // publication_state=PUBLIC、status=ACTIVE 且 stock_qty>0
+    // shipping_methods（field 28，既有）改為從 product.shipping_methods 反正規化欄位讀（不再從 SKU 聚合）
+
+    // ==================== 樂觀鎖（56 設計書 §6.2.3） ====================
+    string version = 42;                     // 樂觀鎖版本（數字字串）；每次成功寫入 +1
+}
+
+// 商家資訊（公開商品詳情/列表用）
+message SellerInfo {
+    string store_id = 1;           // 賣家 store 代理鍵（= product.store_id，數字字串；② re-key）
+    string name = 2;               // 店家名稱（Seller Service 提供）
+    string rate = 3;               // 評分（Seller Service 提供）
+    string logo_key = 4;           // 商家 Logo objectKey（enrich 自 Seller；49 §6.6 S9 GW 組 logoUrl）
+    string address = 5;            // 商家地址（city + district 合成，如「台北市大安區」）
+    string city = 6;               // 城市（如「台北市」）；list 與 detail 對稱填充，可空
+    string district = 7;           // 區域（如「大安區」）；list 與 detail 對稱填充，可空
+    string store_code = 8;         // 賣家短碼（enrich 自 Seller，可空）
+}
+
+// 評論預覽（公開商品詳情用，最多 2 筆）
+message ReviewPreview {
+    string review_id = 1;   // 評論 ID（數字字串）
+    string buyer_id = 2;    // 評論者買家 ID（數字字串）
+    string rating = 3;      // 評分（數字字串）
+    string content = 4;     // 評論內容
+    string created_at = 5;  // 建立時間（Unix timestamp，數字字串）
+}
+
+// 商品列表項目（簡化資料，不含 skus）
+message ProductListItem {
+    string id = 1;                           // 商品 ID (TSID 數字字串)
+    string name = 2;                         // 商品名稱
+    string rating = 3;                       // 評分（數字字串）
+    string status = 4;                       // 狀態
+    string category_id = 5;                  // 第二層分類 ID（數字字串，對應 product.category_lv2）
+    string origin = 6;                       // 產地
+    repeated GalleryItem gallery = 7;        // 圖片集（用於顯示縮圖）
+    string price_min = 8;                    // 最低**實際售價**（新台幣元，數字字串）— 彙總自 SKU effective_price
+    string price_max = 9;                    // 最高實際售價（數字字串）
+    string created_at = 10;                  // 建立時間（Unix timestamp，數字字串）
+    string review_count = 11;                // 評論數（數字字串，保留欄位）
+    string store_id = 12;                    // 賣家 store 代理鍵（數字字串）
+    string category_name = 13;               // 第二層分類名稱
+    reserved 14;                             // 舊 sku_count（全鏈路無 setter、恆序列化為 "0" 誤導）已廢止
+    string image_key = 15;                   // 主圖 objectKey（第一張圖；49 §6.6 GW 組 imageUrl）
+    repeated string image_keys = 16;         // 所有圖片 objectKey 列表（49 §6.6 GW 組 imageUrls）
+    reserved 17;                             // 舊「list 層級 delivery_temp（單值）」設計已廢止；同名語意重生於 field 28（聯集聚合）
+    SellerInfo seller = 18;                  // 商家資訊（公開 API 填充：storeId、名稱、Logo）
+    string category_lv2_id = 19;             // 第二層分類 ID（明確命名，與 category_id 相同值）
+    string category_lv2_name = 20;           // 第二層分類名稱（明確命名，與 category_name 相同值）
+    repeated string sku_names = 21;          // SKU 規格名稱列表（如「大顆裝 1kg」「小顆裝 500g」）
+
+    // ==================== 特價支援（02 設計書 §2.8） =====================
+    string list_price_min = 22;              // 最低原價（彙總 SKU.price，數字字串）
+    string list_price_max = 23;              // 最高原價（數字字串）
+    string sale_price_min = 24;              // 最低特價（彙總 SKU.sale_price，數字字串；皆無特價時為 "0"，不是空字串）
+    string sale_price_max = 25;              // 最高特價（同上規則）
+
+    // ==================== Hashtag（02 設計書 §3.7–§3.9） ====================
+    repeated HashtagItem hashtags = 26;      // 依 product_hashtag.position 升序
+
+    // ==================== 銷量（35 設計書） ====================
+    string sales_count = 27;                 // 累計銷量（付款成功時 +N，數字字串）
+
+    // ==================== 配送溫層聚合（02 §5.3.6） ====================
+    repeated string delivery_temp = 28;      // 所有 ACTIVE SKU 的 ShippingTemperature.value 聯集（distinct）；與 ProductDetail.delivery_temp 對稱
+
+    // ==================== 認證列表（02 §5.3.4，本期新增） ====================
+    repeated Certification certifications = 29;  // 與 ProductDetail.certifications 對稱，供商品卡顯示認證 badge；[{name, certNo}]，name 為 CertificationType value
+
+    // ==================== 反正規化欄位（02 §3.2 / §5.13a，本期新增） ====================
+    string stock_qty = 30;                       // 即時庫存（總和），對應 product.stock_qty；數字字串
+    string favorite_count = 31;                  // 收藏人次，對應 product.favorite_count；數字字串
+    repeated ShippingMethod shipping_methods = 32; // 運送方式聯集，對應 product.shipping_methods JSONB；同 (type,temperature) 組合下 free_threshold 取 MIN、fee_payer 取 sku.id ASC 第一筆
+
+    // ==================== 樂觀鎖（56 設計書 §6.2.3） ====================
+    string version = 33;                     // 樂觀鎖版本（數字字串）；列表要能直接帶出 expectedVersion
+}
+
+// GetProductsByIDs — 批次查詢商品（買家瀏覽紀錄 / 收藏列表 enrichment）
+// 詳見 02 §5.5.1
+message GetProductsByIDsRequest {
+    repeated string product_ids = 1;  // 商品 ID 列表（TSID 數字字串）
+    // 是否回傳非 ACTIVE 商品。
+    // false（預設）= 僅回 ACTIVE 且未軟刪除（瀏覽紀錄路徑使用）
+    // true = 回所有未軟刪除商品（含 DRAFT/PENDING_REVIEW/INACTIVE，收藏列表 enrichment 使用）
+    // 軟刪除（deleted_at IS NOT NULL）一律不回，caller 自行推斷
+    bool include_inactive = 2;
+}
+
+message GetProductsByIDsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated ProductListItem products = 3;
+}
+
+// ProductInfo 用於跨服務查詢（簡化版）
+message ProductInfo {
+    string id = 1;             // 商品 ID（數字字串）
+    string name = 2;
+    string price = 3;         // 價格（新台幣元，數字字串格式）
+    string image_key = 4;     // 商品主圖 objectKey（49 §6.6 GW 組 imageUrl）
+    string store_id = 5;             // 賣家 store 代理鍵（= product.store_id，數字字串；② re-key）
+}
+
+message ProductResponse {
+    int32 code = 1;
+    string message = 2;
+    ProductInfo data = 3;
+}
+
+// ========== 賣家商品管理 ==========
+
+message DeleteProductRequest {
+    string product_id = 1;   // 商品 ID（TSID 數字字串）
+    int64 store_id = 2;     // 店家 ID（Gateway JWT 注入，resolver 解析後的 store surrogate）
+}
+
+message DeleteProductResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+// ========== 庫存操作（Order Service 呼叫） ==========
+
+message DeductStockRequest {
+    string stock_tx_id = 1;          // Order Service 生成，用於冪等
+    repeated StockItem items = 2;
+}
+
+message RestoreStockRequest {
+    string stock_tx_id = 1;          // 同一筆下單/取消/補償須一致
+    repeated StockItem items = 2;
+}
+
+message StockItem {
+    string sku_id = 1;               // 對應 product_sku.id（數字字串）
+    string quantity = 2;             // 數量（數字字串）
+}
+
+message StockOperationResponse {
+    string status = 1;                         // StockOperationStatus value
+    string message = 2;
+    repeated InsufficientItem insufficient_items = 3;  // INSUFFICIENT_STOCK 時填充不足明細
+}
+
+message InsufficientItem {
+    string sku_id = 1;               // 庫存不足的 SKU ID（數字字串）
+    string requested_qty = 2;        // 請求數量（數字字串）
+    string available_qty = 3;        // 實際可用庫存（數字字串）
+}
+
+message GetStockRequest {
+    repeated string sku_ids = 1;     // 要查詢的 product_sku.id 列表（數字字串）
+}
+
+message GetStockResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated StockInfo items = 3;
+}
+
+message StockInfo {
+    string sku_id = 1;              // 對應 product_sku.id（數字字串）
+    string stock_qty = 2;           // 當前庫存數量（數字字串）
+}
+
+// ========== PurgeProductCache ==========
+
+message PurgeProductCacheRequest {
+    string scope = 1;         // 清除範圍：all（全部）、detail（商品詳情）、list（列表）
+    string product_id = 2;    // 商品 ID（當 scope=detail 時必填）
+    int64 store_id = 3;       // 賣家 store 代理鍵（當 scope=list 時可選）（Gateway 已解析為現任 store surrogate 才傳入）
+}
+
+message PurgeProductCacheResponse {
+    int32 code = 1;
+    string message = 2;
+    PurgeCacheResult data = 3;
+}
+
+message PurgeCacheResult {
+    string scope = 1;          // 清除範圍
+    string purged_keys = 2;    // 已清除的 key 數量（數字字串）
+    string description = 3;    // 描述
+}
+
+// ========== GetProductSimple（Cart Service 呼叫） ==========
+
+message GetProductSimpleRequest {
+    string sku_id = 1;    // product_sku.id（數字字串）
+}
+
+message GetProductSimpleResponse {
+    int32 code = 1;
+    string message = 2;
+    ProductSimpleInfo data = 3;
+}
+
+// 商品簡化資訊（供 Cart AddItem 驗證與快照使用）
+message ProductSimpleInfo {
+    string sku_id = 1;                // product_sku.id（數字字串）
+    string store_id = 2;              // 賣家 store 代理鍵（= product.store_id，數字字串；② re-key）
+    bool is_active = 3;               // 是否上架可售（product.status == '4004' 且未軟刪除）
+    string name = 4;                  // 商品名稱（product.name）
+    string price = 5;                 // **實際成交單價**（有特價=sale_price，否則=list price，新台幣元，數字字串）。Cart AddItem 寫入 added_unit_price
+    string max_limit = 6;             // 限購上限（= product_sku.stock_qty，當前庫存，數字字串）
+    string product_id = 7;            // 商品 ID（product.id，數字字串）
+    string sku_name = 8;              // SKU 規格名稱（product_sku.sku_name）
+    string image_object_key = 9;      // 商品主圖 objectKey（product.gallery[0].objectKey）
+    repeated string delivery_temps = 10; // SKU 支援的配送溫層 value（如 ["3201","3202"]）
+    string list_price = 11;           // **原價快照**（永遠 = SKU.price，數字字串）。Cart AddItem 寫入 added_list_price
+}
+
+// ========== BatchGetSkuCartInfo（購物車列表即時資訊） ==========
+
+message BatchGetSkuCartInfoRequest {
+    repeated string sku_ids = 1;  // SKU ID 列表（數字字串）
+}
+
+message BatchGetSkuCartInfoResponse {
+    int32 code = 1;
+    string message = 2;
+    map<string, SkuCartInfo> skus = 3;  // key = sku_id（數字字串）
+}
+
+// 購物車列表用的 SKU 即時資訊
+message SkuCartInfo {
+    string stock_qty = 1;                // 即時庫存（數字字串）
+    repeated string delivery_temps = 2;  // 支援的配送溫層 value（如 ["3201","3202"]）
+    string price = 3;                    // 即時**實際成交單價**（有特價=sale_price，否則=list price，數字字串）
+    bool is_active = 4;                  // 是否上架可售
+    string list_price = 5;               // 即時原價（永遠 = SKU.price，數字字串）。供前端比對「商品已調整為特價/新原價」
+}
+
+// ========== BatchGetProductForCheckout（結帳鏈路用，接受 inactive） ==========
+
+message BatchGetProductForCheckoutRequest {
+    repeated string sku_ids = 1;         // 批次查詢的 SKU ID（數字字串，長度 ≤ 100）
+}
+
+message BatchGetProductForCheckoutResponse {
+    int32 code = 1;
+    map<string, ProductForCheckoutInfo> data = 2;  // key = sku_id；**查無此 sku 時 key 缺席**，order-service 視為 LOOKUP_FAILED
+}
+
+// 結帳鏈路用的商品完整資訊（接受 inactive，含 status / weight / dimension / shipping_methods）
+message ProductForCheckoutInfo {
+    string sku_id = 1;                   // SKU ID（數字字串）
+    string product_id = 2;               // 商品 ID（TSID 數字字串）
+    string store_id = 3;                 // 賣家 store 代理鍵（= product.store_id，數字字串；② re-key）
+    bool is_active = 4;                  // product.status == ACTIVE 且 deleted_at IS NULL
+    string price = 5;                    // 實際成交單價（有特價=sale_price，否則=list price，數字字串）
+    string list_price = 6;               // 原價（永遠 = SKU.price）
+    string sale_price = 7;               // 特價（無特價=空字串）
+    string stock_qty = 8;                // 即時庫存
+    string sku_name = 9;                 // SKU 規格名稱
+    string product_name = 10;            // 商品名稱（snapshot 備援用）
+    string image_object_key = 11;        // 商品主圖 objectKey
+    string weight = 12;                  // 重量（數字字串）
+    string unit = 13;                    // WeightUnit Enum value
+    string length_cm = 14;
+    string width_cm = 15;
+    string height_cm = 16;
+    repeated ShippingMethod shipping_methods = 17;  // SKU 層級配送方式 + 免運門檻 + fee_payer
+    string temperature = 18;             // SKU 主要溫層（取 shipping_methods[0].temperature 或 ShippingTemperature value）
+}
+
+// ========== CalculateShippingOptions（運費計算） ==========
+
+// 運費計算請求
+message CalculateShippingOptionsRequest {
+    int64 store_id = 1;        // 賣家 store 代理鍵（Gateway 已解析為現任 store surrogate 才傳入）
+    string length = 2;          // 長 (cm)
+    string width = 3;           // 寬 (cm)
+    string height = 4;          // 高 (cm)
+    string weight = 5;          // 重量值
+    string weight_unit = 6;     // WeightUnit: KG, CATTY, GRAM
+    string sender_area = 7;     // ShippingArea: MAIN_ISLAND, OFFSHORE_ISLAND（由 Product Service 內部透過 Seller Service 的 zip_code 推導，Gateway 不傳）
+    string receiver_area = 8;   // ShippingArea: MAIN_ISLAND, OFFSHORE_ISLAND（固定 MAIN_ISLAND，Gateway 不傳）
+}
+
+// 運費計算回應
+message CalculateShippingOptionsResponse {
+    int32 code = 1;
+    string message = 2;
+    ShippingCalculationData data = 3;
+}
+
+// 運費計算結果
+message ShippingCalculationData {
+    repeated AvailableTemperatureProto available_temperatures = 1;  // 可配送溫層
+    repeated ShippingOptionProto shipping_options = 2;              // 運送方式（每個 method×temperature 組合一筆）
+    string volume_size = 3;      // 材積（L×W×H÷27000，保留兩位小數）
+    string weight_grams = 4;     // 轉換後重量 (g)
+    string dimension_sum = 5;    // L+W+H (cm)
+    string longest_side = 6;     // 最長邊 (cm)
+}
+
+// 可配送溫層
+message AvailableTemperatureProto {
+    string temperature = 1;    // ShippingTemperature value
+    string display_name = 2;   // 溫層顯示名（常溫/冷藏/冷凍）
+}
+
+// 單一運送方式選項（method × temperature 組合）
+message ShippingOptionProto {
+    string shipping_method = 1;        // ShippingMethod value
+    string display_name = 2;           // 配送方式顯示名（黑貓宅急便/7-11店到店）
+    string temperature = 3;            // ShippingTemperature value
+    string fee = 4;                    // 運費 (TWD)
+    string estimated_days = 5;         // 預計到貨天數（暫空）
+    ShippingLimitsProto limits = 6;    // 該組合的尺寸/重量限制
+}
+
+// 配送限制
+message ShippingLimitsProto {
+    string max_dimension_sum = 1;   // 材積上限 L+W+H (cm)，"0" 表示無特定限制
+    string max_longest_side = 2;    // 最長邊上限 (cm)，"0" 表示無特定限制
+    string max_weight_grams = 3;    // 重量上限 (g)
+}
+
+// ========== GetRelatedProducts（相關商品） ==========
+
+message GetRelatedProductsRequest {
+    string product_id = 1;   // 商品 ID（TSID 數字字串）
+    string limit = 2;        // 回傳上限（數字字串，預設 "8"）
+}
+
+message GetRelatedProductsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated ProductListItem products = 3;
+}
+
+// ========== 認證驗證 ==========
+
+message VerifyCertificationRequest {
+    string cert_no = 1;   // 認證編號
+    string type = 2;      // CertificationType.value()（4 位數字字串 3701–3706），非中文標籤、非代碼名稱
+}
+
+message VerifyCertificationResponse {
+    int32 code = 1;
+    string message = 2;
+    // 既有欄位，保留一版供舊版 App 相容：exists = found && validity == VALID。
+    // 新前端一律讀 result.validity —— 「已失效」會讓 exists=false，塌成查無會給出錯誤文案（19 號 §8.6／§9.4）。
+    bool exists = 3;
+    GovVerifyResult result = 4;   // 本期新增（additive）：結構化查驗結果，validity 的唯一載體
+}
+
+// ========== Admin 分類管理：取分類底下所有商品 ==========
+
+message ListProductsByCategoryForAdminRequest {
+    string category_id = 1;  // 分類 ID（任何層級；後端依層級自動選欄位查 category / category_lv2 / category_lv1）
+    string page = 2;          // 頁碼（從 1 起算，預設 "1"）
+    string page_size = 3;     // 每頁筆數（預設 "20"）
+}
+
+message ListProductsByCategoryForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated ProductListItem products = 3;
+    string total = 4;         // 總筆數
+    string page = 5;
+    string page_size = 6;
+}
+
+// ========== Admin 分類管理：批次更換商品分類（限 L3→L3，連動 lv1/lv2） ==========
+
+message BatchChangeProductCategoryForAdminRequest {
+    // 模式 A：商品 ID 列表（與 source_category_id 擇一）
+    repeated string product_ids = 1;
+    // 模式 B：來源分類 ID（與 product_ids 擇一；限 L3）
+    string source_category_id = 2;
+    // 目標分類 ID（限 L3，必填）
+    string target_category_id = 3;
+    int64 updated_by = 4;     // 更新者 ID（Gateway JWT 注入）
+}
+
+message BatchChangeProductCategoryForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    string affected_count = 3;  // 受影響商品筆數
+}
+
+// ========== Hashtag（02 設計書 §3.7–§3.9 / §5.12） ==========
+
+// Hashtag 條目（跨 RPC 共用）
+message HashtagItem {
+    string name = 1;             // canonical 名稱（lower），查詢與比對基準
+    string display_name = 2;     // 顯示名稱（保留原大小寫）；auto-complete 場景填空字串
+    string product_count = 3;    // 引用數量（hashtag.product_count 即時值，字串型別，docs/開發規範/Java 微服務開發規範.md §2.1；見 33 §5.4）
+}
+
+// Hashtag 列表篩選的多值匹配模式
+enum HashtagMatchMode {
+    HASHTAG_MATCH_ANY = 0;       // 預設：商品至少綁定其一即命中（OR）
+    HASHTAG_MATCH_ALL = 1;       // 商品必須綁定全部（AND）
+}
+
+// Hashtag auto-complete 搜尋模式
+enum HashtagSearchMode {
+    HASHTAG_SEARCH_PREFIX = 0;   // 前綴匹配（name LIKE 'prefix%'）
+    HASHTAG_SEARCH_CONTAIN = 1;  // 包含匹配（trgm GIN，IG 風格）
+}
+
+message SearchHashtagsRequest {
+    string prefix = 1;           // 用戶輸入文字（任意大小寫，server normalize 後查詢；空字串回空陣列）
+    HashtagSearchMode mode = 2;  // 預設 PREFIX
+    int32 limit = 3;             // 預設 10，最大 50（超過視為 50）
+}
+
+message SearchHashtagsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated HashtagItem items = 3;  // 僅含 product_count > 0；display_name 為空字串
+}
+
+// ========== Hashtag 熱門查詢（33 §5.2） ==========
+
+message GetPopularHashtagsRequest {
+    string start_from = 1;       // 日期字串 YYYY-MM-DD，可空；空時依 33 §5.2.2 規則計算
+    string end_to = 2;           // 日期字串 YYYY-MM-DD，可空
+    int32 limit = 3;             // 1 ≤ limit ≤ 50；0 或未設視為 50；> 50 視為 50
+}
+
+message GetPopularHashtagsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated PopularHashtagItem records = 3;
+}
+
+// Popular hashtag 條目（與 HashtagItem 不同：count 為區間內 distinct ACTIVE 商品數，非全歷史）
+message PopularHashtagItem {
+    string hashtag = 1;          // 區間內最多 ACTIVE 商品使用的原始大小寫版本（33 §5.2.3）
+    string count = 2;            // 區間內掛上此 hashtag 的 distinct ACTIVE 商品數（字串型別，docs/開發規範/Java 微服務開發規範.md §2.1）
+}
+
+// ========== 公開產地聚合（02 §5.13） ==========
+
+message GetPublicOriginsSummaryRequest {
+    string category_id = 1;  // 分類 ID（可空字串或 "0"=全部；支援第一/二/三層自動偵測，同 §5.3.1）
+    int32 limit = 2;         // 上限（預設 50，最大 100；超過視為 100；最少 1）
+}
+
+message GetPublicOriginsSummaryResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated OriginSummaryItem records = 3;
+}
+
+message OriginSummaryItem {
+    string origin = 1;         // 產地字串（如「台灣」「日本」），永不為空（origin IS NULL / '' 不回）
+    string product_count = 2;  // 該產地下 ACTIVE 商品數（數字字串，docs/開發規範/Java 微服務開發規範.md §2.1）
+}
+
+message GetPublicSellerCitiesSummaryRequest {}
+
+message GetPublicSellerCitiesSummaryResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated SellerCitySummaryItem records = 3; // 固定 22 筆，含零 count 城市
+}
+
+message SellerCitySummaryItem {
+    string city_code = 1;                    // ISO 3166-2:TW，例如 TW-TPE
+    string city_name = 2;                    // 商家註冊所在地 canonical 名稱
+    string product_count = 3;                // 該城市 public 商品完整數量
+    string seller_count = 4;                 // 該城市 public seller 完整數量
+    repeated string preview_store_ids = 5;   // 最多 6 家畫面預覽，不得當完整 filter
+}
+
+// ========== 有公開上架商品的店家（02 §5.13c） ==========
+
+message ListStoreIDsWithPublicProductsInternalRequest {}
+
+message ListStoreIDsWithPublicProductsInternalResponse {
+    int32 code = 1;
+    string message = 2;
+    // 至少有一件公開上架商品（未軟刪、賣家未刪、status=4004）的 store_id 全集，
+    // 數字字串（同 seller.ListPublicStoresByCity 的 store_ids）。
+    // 沒有公開商品的店**不出現**在此列表 —— 呼叫端據此把空店排除，
+    // 「查不到」與「回空集合」語意不同：RPC 失敗時呼叫端一律 fail-open 不過濾。
+    repeated string store_ids = 3;
+}
+
+// ============================================================================
+// Product Import 整合（02 §9）
+// ============================================================================
+
+// ========== ValidateLeafCategoryInternal（02 §9.1） ==========
+
+message ValidateLeafCategoryInternalRequest {
+    string category_id = 1;                  // 葉節點候選 id（數字字串）
+}
+
+message ValidateLeafCategoryInternalResponse {
+    int32 code = 1;
+    string message = 2;
+    bool is_valid = 3;
+    string cat_l3_id = 4;
+    string cat_l3_name = 5;
+    string cat_l2_id = 6;
+    string cat_l2_name = 7;
+    string cat_l1_id = 8;
+    string cat_l1_name = 9;
+    string invalid_reason = 10;              // NOT_FOUND / NOT_LEAF / DISABLED
+}
+
+// ========== CreateProductFromImportInternal（02 §9.2） ==========
+
+// Import 來源的商品圖片（用 import_asset_id 取代 staged_token）
+message ProductImageImport {
+    string import_asset_id = 1;              // Media import_asset.id (UUID)
+    int32 sort_order = 2;
+}
+
+// Import 來源的 SKU（重用既有 SKU 結構但無 sku_id）
+message ProductSkuImport {
+    string sku_name = 1;
+    string price = 2;
+    string sale_price = 3;
+    string stock_qty = 4;
+    string weight = 5;
+    string unit = 6;
+    string length_cm = 7;
+    string width_cm = 8;
+    string height_cm = 9;
+    repeated ShippingMethod shipping_methods = 10;
+}
+
+message CreateProductFromImportInternalRequest {
+    string idempotency_key = 1;             // 由 Import 端組：import:{itemId}:rev:{revision}
+    int64 store_id = 2;                     // 賣家 store 代理鍵（Import Service 上下文已驗證）
+    string import_job_id = 3;               // 純記錄，寫入 product 表審計欄位
+    string import_item_id = 4;
+    string name = 5;
+    string category_id = 6;
+    ProductDescription description = 7;
+    repeated ProductImageImport images = 8;          // 用 import_asset_id 取代 staged_token
+    string origin = 9;
+    repeated Certification certifications = 10;
+    string target_status = 11;              // ACTIVE | DRAFT | PENDING_REVIEW
+    repeated ProductSkuImport skus = 12;
+    repeated string hashtags = 13;
+}
+
+message CreateProductFromImportInternalResponse {
+    int32 code = 1;
+    string message = 2;
+    string product_id = 3;                  // 數字字串
+    string idempotency_status = 4;          // CREATED | DUPLICATED
+}
+
+// ========== BatchCheckSellerProductNames（02 §9.5） ==========
+
+message BatchCheckSellerProductNamesRequest {
+    int64 store_id = 1;                     // 賣家 store_id（由呼叫端 product-import-service 解析後傳入，內部 RPC 免身份驗證）
+    repeated string names = 2;                // 上限 500，超過拋 INVALID_ARGUMENT
+}
+
+message BatchCheckSellerProductNamesResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated ExistingProductByName existing = 3;  // 只回該賣家既有的 product；不存在不出現
+}
+
+message ExistingProductByName {
+    string name = 1;
+    string product_id = 2;                    // 第一筆碰到的 product.id
+    string status = 3;                        // 既有商品的 ProductStatus value
+}
+
+// ========== ValidateProductDraft（40 號 §4.3a） ==========
+
+message ValidateProductDraftRequest {
+    int64 store_id = 1;   // 賣家 store_id（由呼叫端 product-import-service 解析後傳入，內部 RPC 免身份驗證）
+    ProductDraft draft = 2;
+    // 上下文 hint：不同時機點 validator 對 ASSET_NOT_READY 等規則放寬程度不同
+    enum ValidationContext {
+        UNSPECIFIED = 0;
+        CSV_PARSE = 1;          // §5.2 場景
+        IMPORT_UPDATE = 2;      // §5.5 場景
+        IMPORT_COMMIT = 3;      // §5.7 場景
+        PUBLISH = 4;            // 正常商品上架 / 編輯
+    }
+    ValidationContext context = 3;
+}
+
+message ProductDraft {
+    string name = 1;
+    string category_id = 2;
+    string origin = 3;
+    repeated GalleryItem gallery = 4;
+    repeated ProductSkuImport skus = 5;        // reuse import sku 結構
+    repeated Certification certifications = 6;
+    repeated string hashtags = 7;
+    bytes description_json = 8;                 // HTML→JSON 後的 blocks
+    string target_status = 9;
+}
+
+message ValidateProductDraftResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated DraftViolation violations = 3;
+    bool has_blocking_error = 4;
+}
+
+message DraftViolation {
+    string field = 1;                           // 對應 product_import_item_error.field
+    string code = 2;                            // 對應 error_type
+    string severity = 3;                        // ERROR | WARNING
+    string message = 4;                         // 已翻譯中文
+    string raw_value = 5;
+}
+
+// ========== GetProductsBriefInternal（40 號 §4.3b） ==========
+
+message GetProductsBriefInternalRequest {
+    repeated string product_ids = 1;            // 上限 200
+    int64 caller_store_id = 2;                  // 審計 log 用（account_id 命名債正名，Phase 2 Task 16 review 補漏——
+                                                 // 唯一呼叫端 product-import-service 傳入的一律是 store_id，非登入 account_id；
+                                                 // 原設計文件把本欄位歸類進「audit 用途排除」，但排除規則指的是「值本身就是
+                                                 // 登入 account_id」的 created_by/caller_account_id 這類欄位，本欄位的值語意
+                                                 // 其實跟 owner_store_id 一樣，只是「audit 用途」跟「值是 store_id」兩者不衝突）
+}
+
+message GetProductsBriefInternalResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated ProductBriefInternal records = 3;  // 查不到的 id 不出現
+}
+
+message ProductBriefInternal {
+    string product_id = 1;
+    string name = 2;
+    string status = 3;                          // ProductStatus enum value（4001~4004，只答「能不能賣」）
+    string status_label = 4;                    // 上述 status 的中文標籤
+    // ProductPublicationState（4011~4014），與 status 正交：status 答「能不能賣」、
+    // 本欄答「曾不曾公開／還在不在」。4014 REMOVED = 已軟刪。
+    //
+    // 🔴 為什麼不是把 4014 塞進 status（#2819）：ProductStatus 只有 4001~4004，硬塞會讓
+    // ProductStatus.isValidValue 判 false ⇒ status_label 變空字串，用新 bug 換舊 bug。
+    // 底層查詢因此改用不濾 deleted_at 的版本，軟刪商品**會**出現在結果集。
+    string publication_state = 5;
+}
+
+// ==========================================================================
+// 商品認證申請與審核（19 號設計書 §10.2）
+// 型別規範：數字欄位一律 string；唯一例外是 Gateway 注入的身分欄位
+// （account_id／resolver 解析後的 store_id，僅出現在 request）與 response 的 int32 code。
+// ==========================================================================
+
+message ProductCertificationApplication {
+    string id = 1;                          // TSID，字串
+    string product_id = 2;
+    string store_id = 3;
+    string certification_type = 4;          // CertificationType value（3701–3706）
+    string certificate_no = 5;
+    string status = 6;                      // ProductCertificationStatus
+    string source = 7;                      // ProductCertificationSource
+    bool requires_manual_review = 8;        // true ⇒ 永不自動核准
+    string gov_verify_state = 9;            // ProductCertificationGovVerifyState
+    string gov_verified_at = 10;            // ISO 8601 UTC
+    string submitted_at = 11;               // ISO 8601 UTC
+    string reviewed_at = 12;                // ISO 8601 UTC
+    string reviewed_by_account_id = 13;     // 自動核准為空（actor 由 review_event 的 SYSTEM 標示）
+    string reason_code = 14;                // ProductCertificationRejectReason
+    string public_reason = 15;              // 會展示給賣家
+    string version = 16;                    // 樂觀鎖，數字字串
+
+    // ---- 以下 Admin-only：賣家 DTO 不映射（Gateway 側 DTO 隔離，不是靠欄位空值）----
+    GovVerifyResult gov_verify_payload = 17;
+    string internal_note = 18;
+    string submitted_by_account_id = 19;    // LEGACY_MIGRATION 的列為空
+    string product_name = 20;
+    // 同 type 現行有效那筆；首次申請時不設（proto3 message 未設 ⇒ Gateway DTO 輸出 null，不是空物件）。
+    // 刻意用精簡 summary 而非自我遞迴的 ProductCertificationApplication。
+    ProductCertificationSummary current_approved = 21;
+    // 商品的公開生命週期（ProductPublicationState value：4011/4012/4013/4014）。
+    //
+    // 🔴 為什麼 ADM 需要這一欄：認證申請**結構上會指向已軟刪的商品**——V18 legacy
+    // migration 的 INSERT 不濾 deleted_at，賣家也可以在送件後刪掉自己的商品，而
+    // updateCertificationProjection 刻意不濾 deleted_at（ADM 要能對已下架商品撤銷標章）。
+    // 只回 product_name 會讓 ADM 看到一個「看起來還在」的商品並可能核准它；本欄讓
+    // 審核者看得出這筆申請的商品是不是已經不在平台上。
+    //
+    // 值一律由 ProductPublicationPolicy.deriveState 產生，不得在 SQL 或 mapper 內另寫
+    // 「deleted_at != null || seller_deleted_at != null」——那是同一條規則的第二份定義
+    // （該規則的 SSOT 是 ProductPublicationState，CodeMeta 生成）。
+    string product_publication_state = 22;
+}
+
+message ProductCertificationSummary {
+    string id = 1;
+    string certification_type = 2;
+    string certificate_no = 3;
+    string status = 4;                      // 恆為 APPROVED（本欄只回現行有效那筆）
+    string gov_verify_state = 5;
+    string reviewed_at = 6;                 // ISO 8601 UTC
+}
+
+message GovVerifyResult {
+    string cert_type = 1;
+    string cert_no = 2;
+    string queried_at = 3;                  // ISO 8601 UTC
+    bool found = 4;
+    string validity = 5;                    // VALID / EXPIRED / TERMINATED / SUSPENDED / NOT_FOUND / UNKNOWN
+    string status_raw = 6;                  // 3701 才有
+    string expires_on = 7;                  // 3703 沒有
+    string holder_name = 8;
+    string holder_address = 9;
+    string issuer_name = 10;
+    string product_summary = 11;
+    string matched_count = 12;              // 數字字串
+    string raw_excerpt_json = 13;           // 已修剪的 JSON 字串（§8.4 防線 3）
+}
+
+message ProductCertificationReviewEvent {
+    string id = 1;
+    string application_id = 2;
+    string action = 3;                      // ProductCertificationReviewAction
+    string from_status = 4;                 // 建立時為空
+    string to_status = 5;
+    string actor_role = 6;                  // SYSTEM / SELLER / ADMIN
+    string actor_account_id = 7;            // SYSTEM 時為空
+    string certification_type = 8;          // 快照
+    string certificate_no = 9;              // 快照
+    string reason_code = 10;
+    string public_reason = 11;
+    string internal_note = 12;              // Admin-only
+    string application_version = 13;        // 事件當下的 application version
+    string trace_id = 14;
+    string created_at = 15;                 // ISO 8601 UTC
+}
+
+// ---------- 賣家 ----------
+
+message SubmitProductCertificationRequest {
+    string product_id = 1;
+    string certification_type = 2;          // CertificationType value，字串
+    string certificate_no = 3;              // 只 trim，保留前導 0，不轉數字
+    string idempotency_key = 4;
+    int64 account_id = 5;                   // Gateway 注入的 principal（§10.3 例外）
+    int64 store_id = 6;                     // sellerid resolver 解析後的 store surrogate（同上）
+}
+
+message ListProductCertificationApplicationsRequest {
+    string product_id = 1;
+    string status = 2;                      // 選填；空字串 = 不篩
+    string page = 3;                        // 數字字串
+    string page_size = 4;                   // 數字字串
+    int64 account_id = 5;
+    int64 store_id = 6;
+}
+
+message ListProductCertificationApplicationsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated ProductCertificationApplication records = 3;
+    string total = 4;                       // 數字字串（envelope.Page 三欄皆 string，直接透傳）
+    string page = 5;                        // 數字字串
+    string page_size = 6;                   // 數字字串
+}
+
+message WithdrawProductCertificationRequest {
+    string product_id = 1;
+    string application_id = 2;
+    string expected_version = 3;            // 數字字串
+    string idempotency_key = 4;
+    int64 account_id = 5;
+    int64 store_id = 6;
+}
+
+message ProductCertificationApplicationResponse {
+    int32 code = 1;
+    string message = 2;
+    ProductCertificationApplication data = 3;   // 賣家版：不映射 gov_verify_payload / internal_note
+}
+
+// ---------- Admin ----------
+
+message GetProductCertificationApplicationForAdminRequest {
+    string application_id = 1;
+    int64 account_id = 2;                   // Gateway 注入的 principal
+}
+
+message ListProductCertificationApplicationsForAdminRequest {
+    string status = 1;
+    string certification_type = 2;
+    string store_id = 3;                    // 數字字串（前端可控 ⇒ 不套 §10.3 例外）
+    string keyword = 4;                     // 商品名或證號
+    string submitted_from = 5;              // ISO 8601 UTC
+    string submitted_to = 6;                // ISO 8601 UTC
+    string page = 7;                        // 數字字串
+    string page_size = 8;                   // 數字字串
+    int64 account_id = 9;                   // Gateway 注入的 principal
+}
+
+message ListProductCertificationApplicationsForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated ProductCertificationApplication records = 3;
+    string total = 4;                       // 數字字串
+    string page = 5;                        // 數字字串
+    string page_size = 6;                   // 數字字串
+}
+
+message ListProductCertificationAuditLogsForAdminRequest {
+    string application_id = 1;
+    string page = 2;                        // 數字字串
+    string page_size = 3;                   // 數字字串
+    int64 account_id = 4;                   // Gateway 注入的 principal
+}
+
+message ListProductCertificationAuditLogsForAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated ProductCertificationReviewEvent records = 3;
+    string total = 4;                       // 數字字串
+    string page = 5;                        // 數字字串
+    string page_size = 6;                   // 數字字串
+}
+
+message ProductCertificationApplicationAdminResponse {
+    int32 code = 1;
+    string message = 2;
+    ProductCertificationApplication data = 3;   // Admin 版才映射 gov_verify_payload / internal_note / current_approved
+}
+
+// approve / reject / revoke 共用（動作由 RPC 名稱區分，不用 flag 分流）
+message ReviewProductCertificationForAdminRequest {
+    string application_id = 1;
+    string idempotency_key = 2;
+    string expected_version = 3;            // 數字字串
+    string reason_code = 4;                 // reject / revoke 必填（缺 → 3028）
+    string public_reason = 5;
+    string internal_note = 6;               // Admin-only，不得出現在任何賣家／公開 DTO
+    int64 account_id = 7;                   // Gateway 注入的 principal（§10.3 例外）
+}
+
+// 只重新查驗，不改 status ⇒ 不需要 expected_version
+message ReverifyProductCertificationForAdminRequest {
+    string application_id = 1;
+    string idempotency_key = 2;             // 避免連點兩次打兩次政府 API
+    int64 account_id = 3;                   // Gateway 注入的 principal
+}
+
+// ---------- 共用 ----------
+
+// 認證未被採用的提示（每筆對應一個被剔除或被跳過的認證輸入，19 號 §6.3.1／§9.5）
+message CertificationWarning {
+    string certification_type = 1;          // 原樣回送賣家送來的值（可能非法，前端不得假設是合法碼）
+    string certificate_no = 2;              // 同上
+    string reason = 3;                      // INVALID_TYPE / INVALID_CERT_NO / CONCURRENT_CONFLICT
+    string message = 4;                     // 可直接顯示的中文說明
+}

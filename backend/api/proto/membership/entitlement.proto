@@ -1,0 +1,89 @@
+syntax = "proto3";
+
+package hawkr.membership.v1;
+
+option go_package = "github.com/Will413028/hawkr/go-pkg/proto/membership";
+option java_package = "io.github.will413028.hawkr.membership.grpc";
+option java_multiple_files = true;
+
+import "google/protobuf/any.proto";
+
+// SubjectRef is the explicit owner of a membership. BUYER uses buyer_id;
+// SELLER uses store_id. account_id is an actor/audit identity, not a subject.
+message SubjectRef {
+  string subject_type = 1; // BUYER | SELLER
+  string subject_id = 2;   // numeric domain ID encoded as a string
+}
+
+// FeatureValue is the canonical typed entitlement union. New value types must
+// add a contract and validator; arbitrary JSON is not a fallback.
+message FeatureValue {
+  string feature_code = 1;
+  string value_type = 2; // BOOLEAN | INTEGER_VALUE | INTEGER_LIMIT
+  bool enabled = 3;
+  string integer_value = 4; // bigint as string; empty when not applicable
+  string limit_value = 5;   // bigint as string; empty when not applicable
+  bool is_unlimited = 6;
+  string unit = 7;
+}
+
+// EntitlementSnapshot is the canonical read/event representation of the
+// features granted during one membership period.
+message EntitlementSnapshot {
+  SubjectRef subject = 1;
+  string membership_id = 2;
+  string membership_period_id = 3;
+  string plan_id = 4;
+  string plan_code = 5;
+  string offer_id = 6;
+  string entitlement_revision_id = 7;
+  string revision_no = 8;
+  repeated FeatureValue features = 9;
+  string valid_from = 10;       // RFC3339 UTC, inclusive
+  string valid_until = 11;      // RFC3339 UTC, exclusive
+  string cycle_started_at = 12; // RFC3339 UTC
+  string cycle_until = 13;      // RFC3339 UTC
+  string resolved_at = 14;      // RFC3339 UTC
+}
+
+// RequestContext carries command/audit identity without changing business
+// ownership. It is not a replacement for the service-authenticated caller.
+message RequestContext {
+  string command_id = 1;
+  string idempotency_key = 2;
+  string request_hash = 3;
+  string actor_type = 4; // BUYER | SELLER | ADMIN | SYSTEM | PROVIDER
+  string actor_id = 5;
+}
+
+message RequestPlanChange {
+  SubjectRef subject = 1;
+  string target_plan_id = 2;
+  string target_offer_id = 3;
+  string effective_mode = 4; // IMMEDIATE | NEXT_PERIOD
+  RequestContext context = 5;
+  string reason = 6;
+}
+
+// MembershipEventEnvelope is shared by buyer, seller, and payment. Provider
+// or domain data belongs in the single versioned Any payload; consumers must
+// not wrap this message in a second domain-specific envelope.
+message MembershipEventEnvelope {
+  string event_id = 1;
+  string event_type = 2;
+  string schema_version = 3;
+  string producer = 4;
+  SubjectRef subject = 5;
+  string membership_id = 6;
+  string membership_period_id = 7; // empty only for pending billing auth
+  string plan_id = 8;
+  string offer_id = 9;
+  string entitlement_revision_id = 10;
+  string revision_no = 11;
+  string effective_at = 12; // RFC3339 UTC
+  string occurred_at = 13;  // RFC3339 UTC
+  string command_id = 14;
+  string idempotency_key = 15;
+  google.protobuf.Any data = 16;
+  string membership_change_request_id = 17;
+}

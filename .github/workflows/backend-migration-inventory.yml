@@ -1,0 +1,35 @@
+name: backend migration inventory
+
+# 遷移盤點 gate：舊服務刪除時，它的 RPC、事件、副本都必須已經填好 disposition
+# （backend/docs/plans/2026-09-24-go-modular-monolith.md 的「模組完成的定義」）。
+# 刪除舊服務的目錄就是這支要守的事件，所以舊服務與 gateway 的路徑都要觸發。
+
+on:
+  pull_request:
+    paths: &inventory_paths
+      - 'backend/services/**'
+      - 'backend/gateway/**'
+      - 'backend/docs/plans/2026-09-24-go-modular-monolith/**'
+      - 'backend/scripts/check-migration-inventory.py'
+      - '.github/workflows/backend-migration-inventory.yml'
+  push:
+    branches: [main]
+    paths: *inventory_paths
+  workflow_dispatch:
+
+concurrency:
+  group: backend-migration-inventory-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: 舊服務的去向是否齊全
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: check-migration-inventory
+        run: python3 backend/scripts/check-migration-inventory.py

@@ -1,0 +1,263 @@
+{
+  "enums": [
+    {
+      "name": "hawkr.agent.v1alpha1.SessionVerificationMethod",
+      "dartClass": "SessionVerificationMethod",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/agent/v1alpha1/agent.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.buyer.v1alpha1.BuyerStatus",
+      "dartClass": "BuyerStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.buyer.v1alpha1.Gender",
+      "dartClass": "Gender",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.common.v1alpha1.ErrorReason",
+      "dartClass": "ErrorReason",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/common/v1alpha1/error_reason.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": true
+    },
+    {
+      "name": "hawkr.common.v1alpha1.PolicyCategory",
+      "dartClass": "PolicyCategory",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.common.v1alpha1.StoreCardStatus",
+      "dartClass": "StoreCardStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.content.v1alpha1.AppType",
+      "dartClass": "AppType",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/content/v1alpha1/content.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.identity.v1alpha1.DeleteAccountResponse.DeletionState",
+      "dartClass": "DeleteAccountResponse_DeletionState",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.identity.v1alpha1.Role",
+      "dartClass": "Role",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.AgreementKind",
+      "dartClass": "AgreementKind",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.AppealUnavailableReason",
+      "dartClass": "AppealUnavailableReason",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": true
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.FoodRegistrationState",
+      "dartClass": "FoodRegistrationState",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.KYCField",
+      "dartClass": "KYCField",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.KYCFlowStatus",
+      "dartClass": "KYCFlowStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.KYCIssueCode",
+      "dartClass": "KYCIssueCode",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.KYCResubmitUnavailableReason",
+      "dartClass": "KYCResubmitUnavailableReason",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": true
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.KYCStatus",
+      "dartClass": "KYCStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.MeasureBasis",
+      "dartClass": "MeasureBasis",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.MeasureKind",
+      "dartClass": "MeasureKind",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.MeasureRequestCloseCause",
+      "dartClass": "MeasureRequestCloseCause",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.MeasureRequestKind",
+      "dartClass": "MeasureRequestKind",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.MeasureRequestState",
+      "dartClass": "MeasureRequestState",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.MeasureState",
+      "dartClass": "MeasureState",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.PayUniBindStatus",
+      "dartClass": "PayUniBindStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.PayUniState",
+      "dartClass": "PayUniState",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.RemediationUnavailableReason",
+      "dartClass": "RemediationUnavailableReason",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": true
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.ReportOutcome",
+      "dartClass": "ReportOutcome",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/report.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.RevokeReason",
+      "dartClass": "RevokeReason",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.RiskGround",
+      "dartClass": "RiskGround",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.SellerCapability",
+      "dartClass": "SellerCapability",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.SellerRequirement",
+      "dartClass": "SellerRequirement",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.StoreField",
+      "dartClass": "StoreField",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.StoreOpeningUnavailableReason",
+      "dartClass": "StoreOpeningUnavailableReason",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": true
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.StoreStatus",
+      "dartClass": "StoreStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.TerminationGround",
+      "dartClass": "TerminationGround",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.ViolationSeverity",
+      "dartClass": "ViolationSeverity",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.ViolationStatus",
+      "dartClass": "ViolationStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    }
+  ]
+}

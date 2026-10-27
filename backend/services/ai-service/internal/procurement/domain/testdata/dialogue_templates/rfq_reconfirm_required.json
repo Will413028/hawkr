@@ -1,0 +1,23 @@
+{
+  "act": "RFQ_RECONFIRM_REQUIRED",
+  "emptyArgsBlocks": [
+    {
+      "kind": "WARNING",
+      "text": "需求內容有更新，之前確認的 RFQ 快照已經過期。"
+    },
+    {
+      "kind": "NEXT_STEP",
+      "text": "需要重新確認一次。"
+    }
+  ],
+  "populatedArgsBlocks": [
+    {
+      "kind": "WARNING",
+      "text": "需求內容有更新，之前確認的 RFQ 快照已經過期。"
+    },
+    {
+      "kind": "NEXT_STEP",
+      "text": "需要重新確認一次。"
+    }
+  ]
+}

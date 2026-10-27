@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "maxSourceAssetsBytes": 9083190,
+  "largeAssetThresholdBytes": 10000000,
+  "largeAssetExceptions": [],
+  "removedPaths": [
+    "assets/fonts/ELEYANGxLukeke-Regular.ttf",
+    "assets/search_icon/search_b1.png",
+    "assets/search_icon/search_b2.png",
+    "assets/search_icon/search_b3.png",
+    "assets/search_icon/search_b4.png",
+    "lib/features/order/presentation/order_details_delivering_screen.dart",
+    "lib/shared/widgets/category_product_card.dart",
+    "lib/shared/widgets/post_product_card.dart"
+  ],
+  "unusedCodeExceptions": [
+    {
+      "symbol": "resetPurchaseDedupForTest",
+      "owner": "Checkout",
+      "rationale": "Test-only reset seam used outside the production import graph.",
+      "removalCondition": "Remove when purchase dedup state is injected instead of globally retained."
+    },
+    {
+      "symbol": "AddressSectionHeading",
+      "owner": "Buyer Profile",
+      "rationale": "Shared address component retained while the address screens converge.",
+      "removalCondition": "Remove if no address migration imports it by the next UI cleanup."
+    },
+    {
+      "symbol": "MerchantAboutSection",
+      "owner": "Storefront",
+      "rationale": "Storefront section retained for the pending about-tab consolidation.",
+      "removalCondition": "Delete or wire it when the storefront tab architecture task lands."
+    },
+    {
+      "symbol": "HawkrSearchTopBar",
+      "owner": "Design System",
+      "rationale": "Legacy top-bar variant retained while all search surfaces migrate to MainTopBar.",
+      "removalCondition": "Delete after the last search surface is migrated."
+    },
+    {
+      "symbol": "ShippingMethodLabel",
+      "owner": "Orders",
+      "rationale": "Compatibility label retained while buyer and seller shipping status contracts converge.",
+      "removalCondition": "Delete when every order surface consumes the shared backend status presentation."
+    }
+  ],
+  "requiredDocumentationTokens": [
+    "Flutter** 3.41.2",
+    "Dart** SDK ^3.8.0"
+  ],
+  "forbiddenDependencies": []
+}

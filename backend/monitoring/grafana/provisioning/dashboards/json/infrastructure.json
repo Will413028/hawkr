@@ -1,0 +1,664 @@
+{
+    "annotations": {
+        "list": []
+    },
+    "description": "Hawkr \u57fa\u790e\u8a2d\u65bd\u76e3\u63a7",
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 1,
+    "id": null,
+    "links": [],
+    "panels": [
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [
+                        {
+                            "options": {
+                                "0": {
+                                    "color": "red",
+                                    "index": 0,
+                                    "text": "DOWN"
+                                },
+                                "1": {
+                                    "color": "green",
+                                    "index": 1,
+                                    "text": "UP"
+                                }
+                            },
+                            "type": "value"
+                        }
+                    ],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "red",
+                                "value": null
+                            },
+                            {
+                                "color": "green",
+                                "value": 1
+                            }
+                        ]
+                    }
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 24,
+                "x": 0,
+                "y": 0
+            },
+            "id": 99,
+            "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "auto"
+            },
+            "targets": [
+                {
+                    "expr": "up{job=~\"gateway|.*-service\"} or clamp_max(server_start_total, 1)",
+                    "legendFormat": "{{job}}",
+                    "instant": true,
+                    "refId": "A"
+                }
+            ],
+            "description": "\u5b58\u6d3b\u8a0a\u865f\u5728\u672c\u7cfb\u7d71\u6709\u5169\u7a2e\u50b3\u8f38\uff0c\u9019\u500b panel \u5fc5\u9808\u540c\u6642\u53d6\uff1aup\uff08\u6709 /metrics \u53ef\u522e\u7684\u670d\u52d9\u2014\u2014gateway \u8207 11 \u652f Java \u670d\u52d9\uff09\uff0b clamp_max(server_start_total, 1)\uff08gRPC-only \u670d\u52d9\u8d70 OTLP push\uff0c\u6c92\u6709 scrape target\u3001\u56e0\u6b64\u6c38\u9060\u6c92\u6709 up series\uff09\u3002\u26a0\ufe0f \u4e0d\u8981\u7c21\u5316\u6210\u55ae\u4e00 up{...}\uff1a2026-09-10 \u4e4b\u524d\u5c31\u662f\u9019\u6a23\uff0c11 \u652f Go \u670d\u52d9\u5728\u672c panel \u5b8c\u5168\u4e0d\u5b58\u5728\uff0c\u800c panel \u4e0d\u6703\u5831\u932f\u3001\u53ea\u6703\u5c11\u5217\u3002\u5169\u8005\u8a9e\u610f\u6709\u5dee\uff1aup \u639b\u6389\u6642\u662f 0\uff08\u5217\u9084\u5728\u3001\u8b8a\u7d05\uff09\uff0cOTLP \u5074\u639b\u6389\u6642\u662f\u6574\u5217\u6d88\u5931\uff08\u8a72\u60c5\u5883\u7531 service-alerts.yml \u7684 ProdOtlpServiceAbsent \u4ee5 absent() \u627f\u63a5\uff09\u3002",
+            "title": "\u5fae\u670d\u52d9\u5065\u5eb7\u72c0\u614b (Service Health)",
+            "type": "stat"
+        },
+        {
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 5
+            },
+            "id": 1,
+            "panels": [],
+            "title": "\ud83d\udda5\ufe0f \u4e3b\u6a5f\u8cc7\u6e90",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 70
+                            },
+                            {
+                                "color": "red",
+                                "value": 85
+                            }
+                        ]
+                    },
+                    "unit": "percent",
+                    "max": 100
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 8,
+                "x": 0,
+                "y": 6
+            },
+            "id": 2,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "auto"
+            },
+            "targets": [
+                {
+                    "expr": "100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+                    "legendFormat": "",
+                    "refId": "A"
+                }
+            ],
+            "title": "CPU \u4f7f\u7528\u7387",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 70
+                            },
+                            {
+                                "color": "red",
+                                "value": 85
+                            }
+                        ]
+                    },
+                    "unit": "percent",
+                    "max": 100
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 8,
+                "x": 8,
+                "y": 6
+            },
+            "id": 3,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "auto"
+            },
+            "targets": [
+                {
+                    "expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100",
+                    "legendFormat": "",
+                    "refId": "A"
+                }
+            ],
+            "title": "\u8a18\u61b6\u9ad4\u4f7f\u7528\u7387",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 70
+                            },
+                            {
+                                "color": "red",
+                                "value": 85
+                            }
+                        ]
+                    },
+                    "unit": "percent",
+                    "max": 100
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 8,
+                "x": 16,
+                "y": 6
+            },
+            "id": 4,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "auto"
+            },
+            "targets": [
+                {
+                    "expr": "(1 - (node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"})) * 100",
+                    "legendFormat": "",
+                    "refId": "A"
+                }
+            ],
+            "title": "\u78c1\u789f\u4f7f\u7528\u7387",
+            "type": "stat"
+        },
+        {
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 10
+            },
+            "id": 5,
+            "panels": [],
+            "title": "\ud83d\udc18 PostgreSQL",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "unit": "short"
+                }
+            },
+            "gridPos": {
+                "h": 6,
+                "w": 8,
+                "x": 0,
+                "y": 11
+            },
+            "id": 6,
+            "targets": [
+                {
+                    "expr": "sum(pg_stat_activity_count)",
+                    "legendFormat": "Total Connections",
+                    "refId": "A"
+                },
+                {
+                    "expr": "sum(pg_stat_activity_count) by (state)",
+                    "legendFormat": "{{state}}",
+                    "refId": "B"
+                }
+            ],
+            "title": "PostgreSQL \u9023\u63a5\u6578",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "unit": "ops"
+                }
+            },
+            "gridPos": {
+                "h": 6,
+                "w": 8,
+                "x": 8,
+                "y": 11
+            },
+            "id": 7,
+            "targets": [
+                {
+                    "expr": "rate(pg_stat_database_xact_commit[5m])",
+                    "legendFormat": "Commits/s",
+                    "refId": "A"
+                },
+                {
+                    "expr": "rate(pg_stat_database_xact_rollback[5m])",
+                    "legendFormat": "Rollbacks/s",
+                    "refId": "B"
+                }
+            ],
+            "title": "PostgreSQL \u4e8b\u52d9\u901f\u7387",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "unit": "ops"
+                }
+            },
+            "gridPos": {
+                "h": 6,
+                "w": 8,
+                "x": 16,
+                "y": 11
+            },
+            "id": 8,
+            "targets": [
+                {
+                    "expr": "rate(pg_stat_database_tup_fetched[5m])",
+                    "legendFormat": "Fetched",
+                    "refId": "A"
+                },
+                {
+                    "expr": "rate(pg_stat_database_tup_inserted[5m])",
+                    "legendFormat": "Inserted",
+                    "refId": "B"
+                },
+                {
+                    "expr": "rate(pg_stat_database_tup_updated[5m])",
+                    "legendFormat": "Updated",
+                    "refId": "C"
+                },
+                {
+                    "expr": "rate(pg_stat_database_tup_deleted[5m])",
+                    "legendFormat": "Deleted",
+                    "refId": "D"
+                }
+            ],
+            "title": "PostgreSQL \u64cd\u4f5c\u985e\u578b",
+            "type": "timeseries"
+        },
+        {
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 17
+            },
+            "id": 9,
+            "panels": [],
+            "title": "\ud83d\udd34 Redis",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "red",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 0.8
+                            },
+                            {
+                                "color": "green",
+                                "value": 0.9
+                            }
+                        ]
+                    },
+                    "unit": "percentunit"
+                }
+            },
+            "gridPos": {
+                "h": 6,
+                "w": 6,
+                "x": 0,
+                "y": 18
+            },
+            "id": 10,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "auto"
+            },
+            "targets": [
+                {
+                    "expr": "rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))",
+                    "legendFormat": "",
+                    "refId": "A"
+                }
+            ],
+            "title": "Redis \u547d\u4e2d\u7387",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "unit": "decbytes"
+                }
+            },
+            "gridPos": {
+                "h": 6,
+                "w": 9,
+                "x": 6,
+                "y": 18
+            },
+            "id": 11,
+            "targets": [
+                {
+                    "expr": "redis_memory_used_bytes",
+                    "legendFormat": "\u4f7f\u7528\u4e2d",
+                    "refId": "A"
+                },
+                {
+                    "expr": "redis_memory_max_bytes",
+                    "legendFormat": "\u6700\u5927",
+                    "refId": "B"
+                }
+            ],
+            "title": "Redis \u8a18\u61b6\u9ad4",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "unit": "ops"
+                }
+            },
+            "gridPos": {
+                "h": 6,
+                "w": 9,
+                "x": 15,
+                "y": 18
+            },
+            "id": 12,
+            "targets": [
+                {
+                    "expr": "rate(redis_commands_processed_total[5m])",
+                    "legendFormat": "Commands/s",
+                    "refId": "A"
+                }
+            ],
+            "title": "Redis \u547d\u4ee4\u901f\u7387",
+            "type": "timeseries"
+        },
+        {
+            "collapsed": false,
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 24
+            },
+            "id": 13,
+            "panels": [],
+            "title": "\ud83d\udc30 RabbitMQ",
+            "type": "row"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "unit": "short"
+                }
+            },
+            "gridPos": {
+                "h": 6,
+                "w": 12,
+                "x": 0,
+                "y": 25
+            },
+            "id": 14,
+            "targets": [
+                {
+                    "expr": "rabbitmq_queue_messages",
+                    "legendFormat": "{{ queue }}",
+                    "refId": "A"
+                }
+            ],
+            "title": "RabbitMQ \u968a\u5217\u6df1\u5ea6",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "unit": "short"
+                }
+            },
+            "gridPos": {
+                "h": 6,
+                "w": 12,
+                "x": 12,
+                "y": 25
+            },
+            "id": 15,
+            "targets": [
+                {
+                    "expr": "rate(rabbitmq_queue_messages_published_total[5m])",
+                    "legendFormat": "Published",
+                    "refId": "A"
+                },
+                {
+                    "expr": "rate(rabbitmq_queue_messages_delivered_total[5m])",
+                    "legendFormat": "Delivered",
+                    "refId": "B"
+                }
+            ],
+            "title": "RabbitMQ \u6d88\u606f\u901f\u7387",
+            "type": "timeseries"
+        }
+    ],
+    "schemaVersion": 39,
+    "tags": [
+        "hawkr",
+        "infrastructure"
+    ],
+    "templating": {
+        "list": [
+            {
+                "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                },
+                "filters": [
+                    {
+                        "condition": "",
+                        "key": "env",
+                        "operator": "=",
+                        "value": "prod"
+                    }
+                ],
+                "hide": 0,
+                "label": "\u74b0\u5883",
+                "name": "adhoc_env",
+                "type": "adhoc"
+            }
+        ]
+    },
+    "time": {
+        "from": "now-1h",
+        "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "Asia/Taipei",
+    "title": "Hawkr - \u57fa\u790e\u8a2d\u65bd",
+    "uid": "hawkr-infra",
+    "version": 1
+}

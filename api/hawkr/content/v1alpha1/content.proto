@@ -1,0 +1,94 @@
+syntax = "proto3";
+
+// content 模組給前台的 API：首頁 banner、App 版本檢查。後台的 API 在 hawkr.admin.content.v1alpha1。
+//
+// 圖片是 hawkr.common.v1alpha1.Image：伺服器組好 URI 樣板，client 只選 preset
+// （ADR 2026-09-25-api-image-uri-template）。
+package hawkr.content.v1alpha1;
+
+import "hawkr/common/v1alpha1/image.proto";
+import "google/api/field_behavior.proto";
+
+// ContentPublicService 是前台讀取的內容，不需要登入。
+service ContentPublicService {
+  // ListLiveBanners 列出此刻要在首頁顯示的 banner：啟用中、而且在顯示期間 [開始, 結束) 內，依顯示順序排列。
+  // 啟用中的 banner 最多 20 則（寫入時限制），第一頁（預設 50 則）就是全部，client 不必翻頁。
+  rpc ListLiveBanners(ListLiveBannersRequest) returns (ListLiveBannersResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // CheckAppVersion 判斷 App 是否低於最低版本、必須強制更新（設計書 54）。版本比較只在後端做，
+  // App 只看 update_required。App 收到任何錯誤都要放行（fail-open）。
+  rpc CheckAppVersion(CheckAppVersionRequest) returns (CheckAppVersionResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+// Banner 是首頁的一則 banner（設計書 25）。
+message Banner {
+  string id = 1;
+  string title = 2;
+  // 按鈕文字；空字串表示不顯示按鈕。
+  string button_text = 3;
+  // 輪播上的預覽圖。
+  hawkr.common.v1alpha1.Image preview_image = 4;
+  // 彈窗的大圖；點擊行為是 popup 時顯示。
+  hawkr.common.v1alpha1.Image popup_image = 5;
+  // 點擊之後的行為。
+  BannerAction action = 6;
+}
+
+// BannerAction 是點擊 banner 之後的行為，一定是下列之一。
+message BannerAction {
+  // Popup 顯示 banner 的彈窗大圖，不帶其他值。
+  message Popup {}
+
+  oneof kind {
+    Popup popup = 1;
+    // 開啟這個外部網址，只接受 http:// 或 https:// 開頭。
+    string url = 2;
+    // 開啟這個商品的頁面。
+    string product_id = 3;
+    // 開啟這篇貼文的頁面。
+    string post_id = 4;
+  }
+}
+
+message ListLiveBannersRequest {
+  // 每頁最多幾則。0 表示 50；超過 100 時以 100 計；負數回 INVALID_ARGUMENT。
+  int32 page_size = 1;
+  // 上一頁回應的 next_page_token；第一頁留空。其他欄位要與取得這個 token 的請求相同。
+  string page_token = 2;
+}
+
+message ListLiveBannersResponse {
+  repeated Banner banners = 1;
+  // 下一頁的 token；空字串表示這是最後一頁。
+  string next_page_token = 2;
+}
+
+// AppType 是 App 的類型。
+enum AppType {
+  APP_TYPE_UNSPECIFIED = 0;
+  // 買家 App。
+  APP_TYPE_BUYER = 1;
+  // 賣家 App。
+  APP_TYPE_SELLER = 2;
+}
+
+message CheckAppVersionRequest {
+  AppType app_type = 1 [(google.api.field_behavior) = REQUIRED];
+  // App 的版本 x.y.z，不含 build number。格式不對時不要求更新。
+  string client_version = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message CheckAppVersionResponse {
+  // 是否必須更新。沒有設定門檻、或版本格式不對時一律是 false。
+  bool update_required = 1;
+  // 最低可用版本；沒有設定時是空字串。
+  string minimum_version = 2;
+  // 前往更新的商店網址；空字串表示沒有設定，App 隱藏「前往更新」按鈕。
+  string store_url = 3;
+  string notice_title = 4;
+  string notice_body = 5;
+}

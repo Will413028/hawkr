@@ -1,0 +1,55 @@
+name: twaddr generated diff
+
+# 守住鄉鎮市區代碼表的單一來源與各平台生成物同步：
+#   來源：backend/internal/platform/twaddr/{moi-towns,postal-codes}.csv
+#   生成：generate.go 一次輸出 towns_gen.go、packages/hawkr-twaddr-ts/src/twaddr.gen.ts、
+#         packages/hawkr_twaddr/lib/src/twaddr_data.g.dart，只有資料；查詢是手寫的（ADR backend/docs/adr/2026-10-04-address-town-code.md）。
+# 重新生成後與工作樹比對，有差異就失敗；不得手改生成檔。
+# 套件自己的 tsc、biome、vitest 在 ts-packages.yml（Dart 版在 dart-packages.yml）。
+
+on:
+  pull_request:
+    paths: &twaddr_paths
+      - 'backend/internal/platform/twaddr/**'
+      - 'packages/hawkr-twaddr-ts/src/twaddr.gen.ts'
+      - 'packages/hawkr_twaddr/**'
+      - '.github/workflows/twaddr-generated-diff.yml'
+  push:
+    branches: [main]
+    paths: *twaddr_paths
+  workflow_dispatch:
+
+concurrency:
+  group: twaddr-generated-diff-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  twaddr-generated-diff:
+    name: twaddr 生成物 regenerate + diff
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/.go-version
+          cache: false
+
+      - name: 重新生成
+        working-directory: backend/internal/platform/twaddr
+        run: go run generate.go
+
+      - name: 與已提交的生成物比對
+        run: |
+          set -euo pipefail
+          if ! git diff --exit-code -- \
+            backend/internal/platform/twaddr \
+            packages/hawkr-twaddr-ts/src/twaddr.gen.ts \
+            packages/hawkr_twaddr/lib; then
+            echo "::error::twaddr 生成物與 CSV 不同步：在 backend/internal/platform/twaddr 執行 go run generate.go 後一併提交"
+            exit 1
+          fi

@@ -1,0 +1,23 @@
+# 對外 API（根目錄 api/ 的 Protobuf＋Connect）的 Dart 生成設定；在本目錄執行
+# `../../api/generate.sh buf.gen.yaml`。
+# 外掛由 pubspec.yaml 固定版本，以 dart run 執行，不依賴全域安裝或 BSR 的遠端外掛；
+# buf CLI 的版本固定在 ../../api/.buf-version。生成物在 lib/gen，不得手改。
+version: v2
+# 生成前清空每個外掛的 out 目錄，刪掉的 proto 才不會留下孤兒檔。
+clean: true
+plugins:
+  - local: [dart, run, protoc_plugin:protoc_plugin]
+    out: lib/gen
+  - local: [dart, run, connectrpc:protoc-gen-connect-dart]
+    out: lib/gen
+inputs:
+  - directory: ../../api
+    # 後台的 API（hawkr.admin.*）只有 admin 用到，不生成。
+    exclude_paths:
+      - ../../api/hawkr/admin
+  # 錯誤的 details 用 google.rpc 的標準型別（ADR 2026-09-25-api-error-model），日期用 google.type.Date（AIP-142）。
+  # 版本鎖在 BSR 的 commit；Go 端直接用 genproto 的 errdetails 與 date，不生成。
+  - module: buf.build/googleapis/googleapis:c17df5b2beca46928cc87d5656bd5343
+    paths:
+      - google/rpc/error_details.proto
+      - google/type/date.proto

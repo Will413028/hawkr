@@ -1,0 +1,70 @@
+# 電子發票 SLO recording rules（58 號設計書 §9.1.1／§9.6「新檔」）
+#
+# ⚠️ 副檔名必須是 .yml：prometheus.yml 的 rule_files glob 是 `.../rules/*.yml`，
+#    寫成 .yaml 不報錯、只是不載入（＝所有 recording rule 靜默不存在）。
+# ⚠️ 本檔只有 recording rules，沒有 alert：告警一律落在 business-alerts.yml 的 invoice-alerts group
+#    （同一個 group，不另開第二個 rules 檔——兩處並存的後果是「兩邊都以為對方有做」）。
+#
+# 兩條通用約定，違反即靜默失效（§9.1）：
+#   ① 分母一律 clamp_min(..., 1) 或 1e-9：0/0 回 NaN、NaN 的比較恆為 false
+#      ⇒ 零流量時比率型消費者完全不響，與一切正常長得一樣
+#   ② 聚合一律 sum by (env) / max by (env)，禁裸 sum：同一台 Prometheus 同時抓 dev 與 prod
+#
+# 設計約束（§9.1.1）：
+#   - interval 與 increase 窗口同為 300s／[5m]，使相鄰評估窗口不重疊。
+#     不同步的話比率不受影響，但**絕對筆數會錯 N 倍**。
+#   - 禁止改成「先算比率再 avg_over_time」：那會把「一小時 2 張錯 1 張」與
+#     「一小時 2000 張錯 1000 張」算成同值，而起步期長期處於前者。
+groups:
+  - name: invoice-slo-recording
+    interval: 300s
+    rules:
+      # SLO-1 的分母。M1 的語意是「一個 operation 離開自動推進迴圈時恰好 +1」（一輩子一次），
+      # 不是嘗試級計數。
+      - record: invoice:issue_terminal:increase5m
+        expr: sum by (env) (increase(invoice_issue_total[5m]))
+
+      # SLO-1 的分子。⚠️ selector 必須與告警 InvoiceIssueFailureRateHigh（⑤）與
+      # InvoiceManualBacklogExceedsCapacity（⑰）逐字相同，且必須逐值對齊 M1 的 7 值值域：
+      # 值域裡沒有 unknown（是 unknown_terminal），漏 retry_exhausted 則對兩個主要失敗類別
+      # 永遠 match 不到——寫進 M1 不存在的值不會報錯，只會讓下游永遠不響。
+      - record: invoice:issue_bad:increase5m
+        expr: sum by (env) (increase(invoice_issue_total{result=~"permanent_failed|retry_exhausted|unknown_terminal"}[5m]))
+
+      # SLO-1 比率（28 天滾動）。分母 clamp_min 到 1（絕對筆數語意，不用 1e-9）。
+      - record: invoice:issue_success_ratio:28d
+        expr: |
+          1 - (
+            sum_over_time(invoice:issue_bad:increase5m[28d])
+            / clamp_min(sum_over_time(invoice:issue_terminal:increase5m[28d]), 1)
+          )
+
+      # 錯誤預算餘量。⚠️ 0.995 必須與 SLO-1 的目標同值，改一邊沒改另一邊＝兩個 SLO。
+      # 消費判準（§9.1.1）：> 0.5 正常；0.2–0.5 每週檢視 code 分佈；
+      # 0 – 0.2 停止對 invoice-service 上非修復性變更；< 0 同時代表有一批發票需人工處理
+      # ⇒ 走 58 號 §12.5 R3／R4，不是調低 SLO。
+      - record: invoice:issue_error_budget_remaining:28d
+        expr: (invoice:issue_success_ratio:28d - 0.995) / (1 - 0.995)
+
+      # SLO-4：AMEGO 呼叫成功率（傳輸層，7 天）。
+      # ⚠️ 分子刻意含 biz_error：對方回業務錯誤代表往返成功，混進失敗會把我方 bug 記在對方帳上。
+      - record: invoice:amego_success_ratio:7d
+        expr: |
+          sum by (env) (rate(invoice_amego_request_duration_seconds_count{outcome=~"ok|biz_error"}[7d]))
+          / clamp_min(sum by (env) (rate(invoice_amego_request_duration_seconds_count[7d])), 1e-9)
+
+      # AMEGO 速率佔比。limiter 是**行程內**的 ⇒ replicas=N 時實際上限＝N × QPS
+      # ⇒ 分母用 sum by (env)。
+      # ⚠️ 與下一列方向相反，不可互相照抄：email 配額是**帳戶層級的一個數字** ⇒ 分母用 max。
+      # ⚠️ 也與告警 InvoiceAmegoRateNearLimit（②）的 max 不同：② 的門檻是「單一副本有沒有把
+      #    自己的 limiter 打滿」，本列是「全站相對真實上限用到多少」，兩者刻意不同義。
+      - record: invoice:amego_rate_utilization:ratio
+        expr: |
+          sum by (env) (rate(invoice_amego_response_code_total[5m]))
+          / clamp_min(sum by (env) (invoice_amego_client_rate_limit_qps), 1)
+
+      # email 日配額佔比（Phase 2）。分母用 max by (env)，理由見上一列。
+      - record: notification:email_daily_quota_utilization:ratio
+        expr: |
+          sum by (env) (increase(notification_email_sent_total[24h]))
+          / clamp_min(max by (env) (notification_email_quota_limit{window="daily"}), 1)

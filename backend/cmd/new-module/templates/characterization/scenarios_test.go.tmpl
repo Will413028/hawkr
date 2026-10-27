@@ -1,0 +1,9 @@
+package characterization
+
+import (
+	ch "{{.Module}}/internal/httpapi/characterize"
+)
+
+// scenarios 是{{if .Legacy}}舊的 {{.Legacy}} 與單體都要通過的{{end}}情境：每個情境是 func(ctx context.Context, t ch.T, d Driver)，
+// 資料庫可能已經有別的資料，所以只看自己建立的那幾筆（帶 ch.Nonce()）。ch.Run 在清單是空的時候失敗。
+var scenarios = []ch.Scenario[Driver]{}

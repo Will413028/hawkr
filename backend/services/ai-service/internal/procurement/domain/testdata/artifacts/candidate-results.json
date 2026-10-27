@@ -1,0 +1,65 @@
+{
+  "artifactId": "3001",
+  "type": "CANDIDATE_RESULTS",
+  "version": 2,
+  "checksum": "sha256:candidate-results-golden",
+  "status": "READY",
+  "asOf": "2026-08-22T12:00:00Z",
+  "domainRef": "candidate-set-77",
+  "data": {
+    "platformLane": {
+      "status": "SUCCEEDED",
+      "processedCount": 5,
+      "totalCount": 12,
+      "candidates": [
+        {
+          "candidateId": "5001",
+          "sourceId": "sku-5001",
+          "lane": "PLATFORM",
+          "displayName": "陽光小農創意鮮蔬",
+          "score": 0.92,
+          "matchedFacts": [
+            {
+              "key": "item",
+              "label": "品項"
+            },
+            {
+              "key": "delivery_city",
+              "label": "配送城市"
+            }
+          ],
+          "unverifiableFacts": [
+            {
+              "key": "delivery_date",
+              "reason": "賣家未提供到貨時間，需向賣家確認"
+            }
+          ],
+          "factsAsOf": "2026-08-22T12:00:00Z",
+          "selected": false,
+          "storeId": "store-01",
+          "sellerName": "陽光小農",
+          "storeCode": "sunfarm",
+          "logoKey": "sellers/sunfarm/logo.png"
+        }
+      ]
+    },
+    "externalLane": {
+      "status": "RUNNING",
+      "processedCount": null,
+      "totalCount": null,
+      "candidates": [
+        {
+          "candidateId": "6001",
+          "sourceId": "lead-6001",
+          "lane": "EXTERNAL",
+          "displayName": "阿明蔬果行",
+          "score": 0.81,
+          "matchedFacts": [],
+          "unverifiableFacts": [],
+          "factsAsOf": "2026-08-22T12:00:00Z",
+          "selected": false
+        }
+      ]
+    }
+  }
+}

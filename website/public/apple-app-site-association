@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAM_ID.io.github.will413028.hawkr.app",
+        "paths": [
+          "/seller/*"
+        ]
+      }
+    ]
+  }
+}

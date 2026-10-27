@@ -1,0 +1,148 @@
+[
+	{
+		"seller": {
+			"name": "陳記",
+			"logoKey": "public/seller_logo/2685914682/20260805/3f47a6bf-e8f4-4459-8737-91215b0050ea.png",
+			"logoUrl": "https://test-media.example.com/i/original/public/seller_logo/2685914682/20260805/3f47a6bf-e8f4-4459-8737-91215b0050ea.png",
+			"address": "桃園市中壢區",
+			"city": "桃園市",
+			"district": "中壢區",
+			"storeCode": "2685914682",
+			"storeId": "2685914682"
+		},
+		"priceMax": "450",
+		"imageKey": "public/product/2685914682/20260719/cd527201-0b42-417d-8476-98d780c92a47.jpg",
+		"imageUrl": "https://test-media.example.com/i/original/public/product/2685914682/20260719/cd527201-0b42-417d-8476-98d780c92a47.jpg",
+		"name": "[範例] 快樂農夫 三地門 40年老欉 土芒果青",
+		"origin": "屏東三地門",
+		"status": "4004",
+		"categoryId": "135",
+		"categoryName": "芒果",
+		"categoryLv2Name": "芒果",
+		"priceMin": "320",
+		"listPriceMin": "320",
+		"listPriceMax": "480",
+		"salePriceMin": "450",
+		"salePriceMax": "450",
+		"id": "866542675787809994",
+		"rating": "0",
+		"createdAt": "1784436673",
+		"reviewCount": "0",
+		"storeId": "2685914682",
+		"sellerName": "陳記",
+		"sellerLogoKey": "public/seller_logo/2685914682/20260805/3f47a6bf-e8f4-4459-8737-91215b0050ea.png",
+		"sellerLogoUrl": "https://test-media.example.com/i/original/public/seller_logo/2685914682/20260805/3f47a6bf-e8f4-4459-8737-91215b0050ea.png",
+		"salesCount": "0",
+		"categoryLv2Id": "135",
+		"imageKeys": [
+			"public/product/2685914682/20260719/cd527201-0b42-417d-8476-98d780c92a47.jpg",
+			"public/product/2685914682/20260719/13b2d528-3679-4ab7-b548-99c023392f21.jpg",
+			"public/product/2685914682/20260719/c42e4ff8-ce60-4551-be03-3aab7dbeb4a6.jpg"
+		],
+		"imageUrls": [
+			"https://test-media.example.com/i/original/public/product/2685914682/20260719/cd527201-0b42-417d-8476-98d780c92a47.jpg",
+			"https://test-media.example.com/i/original/public/product/2685914682/20260719/13b2d528-3679-4ab7-b548-99c023392f21.jpg",
+			"https://test-media.example.com/i/original/public/product/2685914682/20260719/c42e4ff8-ce60-4551-be03-3aab7dbeb4a6.jpg"
+		],
+		"skuNames": ["土芒果青 3斤裝", "土芒果青 5斤裝"],
+		"hashtags": [
+			{
+				"name": "屏東三地門芒果青產地直銷",
+				"displayName": "屏東三地門芒果青產地直銷",
+				"productCount": "1"
+			}
+		],
+		"deliveryTemp": ["3201"],
+		"stock": "90",
+		"favoriteCount": "0",
+		"shippingMethods": [
+			{
+				"type": "3001",
+				"temperature": "3201",
+				"freeThreshold": "",
+				"feePayer": "BUYER"
+			}
+		],
+		"isFavorited": false,
+		"isRestockSubscribed": false
+	},
+	{
+		"seller": {
+			"name": "南畝王生技",
+			"logoKey": "public/user_avatar/2675237784/20260701/90b069d3-fa0a-407f-ac56-33133bcdbec6.png",
+			"logoUrl": "https://test-media.example.com/i/original/public/user_avatar/2675237784/20260701/90b069d3-fa0a-407f-ac56-33133bcdbec6.png",
+			"address": "台中市南區",
+			"city": "台中市",
+			"district": "南區",
+			"storeCode": "2675237784",
+			"storeId": "2675237784"
+		},
+		"priceMax": "500",
+		"imageKey": "public/product/2675237784/20260714/d0b61221-017a-48b5-ad33-90c4980d3d2a.jpg",
+		"imageUrl": "https://test-media.example.com/i/original/public/product/2675237784/20260714/d0b61221-017a-48b5-ad33-90c4980d3d2a.jpg",
+		"name": "高麗菜",
+		"status": "4004",
+		"categoryId": "10",
+		"categoryName": "包心白",
+		"categoryLv2Name": "包心白",
+		"priceMin": "500",
+		"listPriceMin": "999",
+		"listPriceMax": "999",
+		"salePriceMin": "500",
+		"salePriceMax": "500",
+		"id": "864848566366799085",
+		"rating": "0",
+		"createdAt": "1784032766",
+		"reviewCount": "0",
+		"storeId": "2675237784",
+		"sellerName": "南畝王生技",
+		"sellerLogoKey": "public/user_avatar/2675237784/20260701/90b069d3-fa0a-407f-ac56-33133bcdbec6.png",
+		"sellerLogoUrl": "https://test-media.example.com/i/original/public/user_avatar/2675237784/20260701/90b069d3-fa0a-407f-ac56-33133bcdbec6.png",
+		"salesCount": "3",
+		"categoryLv2Id": "10",
+		"imageKeys": [
+			"public/product/2675237784/20260714/d0b61221-017a-48b5-ad33-90c4980d3d2a.jpg"
+		],
+		"imageUrls": [
+			"https://test-media.example.com/i/original/public/product/2675237784/20260714/d0b61221-017a-48b5-ad33-90c4980d3d2a.jpg"
+		],
+		"skuNames": ["2.5公斤"],
+		"deliveryTemp": ["3201", "3202", "3203"],
+		"stock": "96",
+		"favoriteCount": "1",
+		"shippingMethods": [
+			{
+				"type": "3001",
+				"temperature": "3201",
+				"freeThreshold": "9999",
+				"feePayer": "3102"
+			},
+			{
+				"type": "3001",
+				"temperature": "3202",
+				"freeThreshold": "9999",
+				"feePayer": "3102"
+			},
+			{
+				"type": "3001",
+				"temperature": "3203",
+				"freeThreshold": "9999",
+				"feePayer": "3102"
+			},
+			{
+				"type": "3002",
+				"temperature": "3201",
+				"freeThreshold": "9999",
+				"feePayer": "3102"
+			},
+			{
+				"type": "3002",
+				"temperature": "3203",
+				"freeThreshold": "9999",
+				"feePayer": "3102"
+			}
+		],
+		"isFavorited": false,
+		"isRestockSubscribed": false
+	}
+]

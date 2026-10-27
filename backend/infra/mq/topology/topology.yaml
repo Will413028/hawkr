@@ -1,0 +1,849 @@
+exchanges:
+- name: aftersales.events
+  type: topic
+- name: aftersales.events.dlx
+  type: topic
+- name: hawkr.account
+  type: topic
+- name: hawkr.buyer
+  type: topic
+- name: hawkr.cart.dlx
+  type: topic
+- name: hawkr.content
+  type: topic
+- name: hawkr.coupon.dlx
+  type: topic
+- name: hawkr.delegation
+  type: topic
+- name: hawkr.im
+  type: topic
+- name: hawkr.invoice
+  type: topic
+- name: hawkr.marketing
+  type: topic
+- name: hawkr.media
+  type: topic
+- name: hawkr.media.dlx
+  type: topic
+- name: hawkr.merchant
+  type: topic
+- name: hawkr.notification
+  type: topic
+- name: hawkr.notification.dlx
+  type: topic
+- name: hawkr.order
+  type: topic
+- name: hawkr.order.dlx
+  type: topic
+- name: hawkr.payment
+  type: topic
+- name: hawkr.payment.dlx
+  type: topic
+- name: hawkr.product
+  type: topic
+- name: hawkr.product.dlx
+  type: topic
+- name: hawkr.product.import
+  type: topic
+- name: hawkr.product.import.dlx
+  type: topic
+- name: hawkr.review
+  type: topic
+- name: hawkr.seller
+  type: topic
+- name: hawkr.seller_workspace
+  type: topic
+- name: hawkr.shipping
+  type: topic
+- name: hawkr.shipping.dlx
+  type: topic
+- name: payment.events
+  type: topic
+- name: payment.events.dlx
+  type: topic
+- name: payment.webhook.dlx
+  type: direct
+- name: procurement.events
+  type: topic
+- name: payuni.events
+  type: topic
+- name: seller.events
+  type: topic
+- name: shipping.webhook.dlx
+  type: topic
+queues:
+- name: buyer.membership.payment.result
+  dlq:
+    via: payment.events.dlx
+    routing_key: buyer.membership.payment.result.dlq
+  bindings:
+  - exchange: payment.events
+    key: payment.membership.buyer.success
+  - exchange: payment.events
+    key: payment.membership.buyer.failed
+- name: aftersales.events.dlq
+  bindings:
+  - exchange: aftersales.events.dlx
+    key: dlq
+- name: aftersales.payment.refund.result
+  dlq:
+    via: aftersales.events.dlx
+    queue: aftersales.events.dlq
+    routing_key: dlq
+  bindings:
+  - exchange: payment.events
+    key: refund.failed
+  - exchange: payment.events
+    key: refund.succeeded
+- name: aftersales.payuni.unknown.fallback
+  dlq:
+    via: aftersales.events.dlx
+    queue: aftersales.events.dlq
+    routing_key: dlq
+  bindings:
+  - exchange: payuni.events
+    key: payuni.unknown.fallback
+- name: aftersales.shipment.creation_failed
+  dlq:
+    via: aftersales.events.dlx
+    queue: aftersales.events.dlq
+    routing_key: dlq
+  bindings:
+  - exchange: hawkr.order
+    key: order.shipment.creation_failed
+- name: aftersales.shipment.processing.timeout
+  dlq:
+    via: aftersales.events.dlx
+    queue: aftersales.events.dlq
+    routing_key: dlq
+  bindings:
+  - exchange: hawkr.shipping
+    key: shipment.processing.timeout
+- name: aftersales.shipping.label
+  dlq:
+    via: aftersales.events.dlx
+    queue: aftersales.events.dlq
+    routing_key: dlq
+  bindings:
+  - exchange: hawkr.shipping
+    key: shipment.label.updated
+- name: aftersales.shipping.return.status
+  dlq:
+    via: aftersales.events.dlx
+    queue: aftersales.events.dlq
+    routing_key: dlq
+  bindings:
+  - exchange: hawkr.shipping
+    key: shipment.return.status_changed
+- name: ai_service.order.completed
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.order
+    key: order.completed
+- name: ai_service.seller.membership_changed
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.seller
+    key: seller.membership_changed
+- name: cart.seller.profile.changed
+  dlq:
+    via: hawkr.cart.dlx
+    routing_key: cart.seller.profile.changed.dlq
+  bindings:
+  - exchange: hawkr.seller
+    key: seller.profile.changed
+- name: coupon.buyer.deleted
+  dlq:
+    via: hawkr.coupon.dlx
+    routing_key: coupon.buyer.deleted.dlq
+  bindings:
+  - exchange: hawkr.buyer
+    key: buyer.deleted
+- name: coupon.seller.suspended
+  dlq:
+    via: hawkr.coupon.dlx
+    queue: dlq.coupon.seller.suspended
+    routing_key: dlq.coupon.seller.suspended
+  bindings:
+  - exchange: hawkr.seller
+    key: seller.suspended
+- name: coupon.seller.unsuspended
+  dlq:
+    via: hawkr.coupon.dlx
+    queue: dlq.coupon.seller.unsuspended
+    routing_key: dlq.coupon.seller.unsuspended
+  bindings:
+  - exchange: hawkr.seller
+    key: seller.unsuspended
+- name: crm.aftersales.refund.completed
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: aftersales.events
+    key: aftersales.refund.completed
+- name: crm.order.completed
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.order
+    key: order.completed
+- name: dlq.coupon.seller.suspended
+  bindings:
+  - exchange: hawkr.coupon.dlx
+    key: dlq.coupon.seller.suspended
+- name: dlq.coupon.seller.unsuspended
+  bindings:
+  - exchange: hawkr.coupon.dlx
+    key: dlq.coupon.seller.unsuspended
+- name: dlq.media.import.asset.download.internal
+  bindings:
+  - exchange: hawkr.media.dlx
+    key: dlq.media.import.asset.download.internal
+- name: dlq.media.product.import.callback
+- name: dlq.media.product.import.gc.expire_job
+  bindings:
+  - exchange: hawkr.product.import.dlx
+    key: dlq.media.product.import.gc.expire_job
+- name: dlq.product.import.asset.download
+- name: dlq.product.import.commit
+- name: dlq.product.import.csv.parse
+- name: dlq.product.import.html.fetch
+- name: dlq.product.import.job.commit_finished
+- name: dlq.product.import.job.parsed
+- name: im.account.deleted
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.account
+    key: account.deleted
+- name: im.buyer.deleted
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.buyer
+    key: buyer.deleted
+- name: im.seller.deleted
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.seller
+    key: seller.deleted
+- name: pricebook.seller.deleted
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.seller
+    key: seller.deleted
+- name: im.seller.suspended
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.seller
+    key: seller.suspended
+- name: invoice.order.paid
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.order
+    key: order.paid
+- name: invoice.order.refund.finalized
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.order
+    key: order.refund.finalized
+- name: invoice.order.cancelled
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.order
+    key: order.cancelled
+- name: media.import.asset.download.internal
+  dlq:
+    via: hawkr.media.dlx
+    queue: media.import.asset.download.internal.retry
+    routing_key: media.import.asset.download.internal.retry
+  bindings:
+  - exchange: hawkr.media
+    key: import.asset.download.internal
+- name: media.import.asset.download.internal.retry
+  dlq:
+    via: hawkr.media
+    queue: media.import.asset.download.internal
+    routing_key: import.asset.download.internal
+  bindings:
+  - exchange: hawkr.media.dlx
+    key: media.import.asset.download.internal.retry
+  args_json: true
+  arguments:
+    x-message-ttl: 60000
+- name: media.product.import.gc.expire_job
+  dlq:
+    via: hawkr.product.import.dlx
+    queue: dlq.media.product.import.gc.expire_job
+    routing_key: dlq.media.product.import.gc.expire_job
+  bindings:
+  - exchange: hawkr.product.import
+    key: gc.expire_job
+- name: notification.account.deleted
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.account
+    key: account.deleted
+- name: notification.aftersales
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: aftersales.events
+    key: '#'
+- name: notification.buyer
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.buyer
+    key: '#'
+- name: notification.buyer.deleted
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.buyer
+    key: buyer.deleted
+- name: notification.content
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.content
+    key: '#'
+- name: notification.delegation
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.delegation
+    key: '#'
+- name: notification.im
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.im
+    key: '#'
+- name: notification.invoice
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.invoice
+    key: '#'
+- name: notification.marketing
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.marketing
+    key: '#'
+- name: notification.merchant
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.merchant
+    key: '#'
+- name: notification.order
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.order
+    key: '#'
+- name: notification.procurement
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: procurement.events
+    key: '#'
+- name: notification.payment
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: payment.events
+    key: '#'
+- name: notification.product
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.product
+    key: '#'
+- name: notification.review
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.review
+    key: '#'
+- name: notification.seller
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.seller
+    key: '#'
+- name: notification.seller.deleted
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.seller
+    key: seller.deleted
+- name: notification.shipping
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.shipping
+    key: '#'
+# N16：責任判定 financially final → order-service 驅動 35 → DELIVERY_FAILED_NO_REFUND(54)
+# ＋ 同交易建撥款任務（36 §3.3.1 / 03 §5.7.3）。
+# 🔴 producer 是 payment-service（責任兩張表由它擁有，事件與落列同交易），走它既有的
+#    outbox_events；exchange 是列上持久化的明示值 hawkr.shipping（V11 的 exchange 欄）。
+# 🔴 這條 queue 是 54 的唯一入口：order-service 沒有人工改狀態端點、也沒有補推排程
+#    ⇒ 漏了這個條目，整個終態變成死碼，而 passive declare 讓它不 crash、不進 DLQ、不報錯。
+# ⚠️ dlq 只給 via + routing_key（不帶 queue:）＝ 自帶 DLQ 形狀，與 order.shipping.* 家族一致
+#    ⇒ 展開後 queues +2、bindings +2、exchanges +0。
+- name: order.fulfillment.responsibility_finalized
+  dlq:
+    via: hawkr.order.dlx
+    routing_key: order.fulfillment.responsibility_finalized.dlq
+  bindings:
+  - exchange: hawkr.shipping
+    key: fulfillment.responsibility.finalized
+# N16 的第二個 consumer：payment-service 的 Logistics Finance
+#（settlement counterparty 已 resolved ⇒ 決定該 leg 要不要有賣家應收，70 §3.1.1／§6.3）。
+# 🔴 一條 key、兩條 queue 是刻意的：order 與 payment 對同一件事做兩件**不同**的副作用
+#    （訂單終態轉換 vs receivable 的處置）。合併成一條再由單一 consumer 代打，
+#    會讓其中一邊的失敗把另一邊一起拖進 DLQ。topic exchange 對同一個 routing key
+#    投遞給每一條綁定的 queue，這正是它存在的理由。
+# 🔴 兩條的 dlq via 指向**不同**的 DLX 也是刻意的：DLX 跟著 consumer 服務走，
+#    不跟著 producer、也不跟著來源 exchange ⇒ 每個服務在自己的 DLX 上看齊自己全部的死信。
+#    既有先例：aftersales.payment.refund.result 的 binding 來自 payment.events，
+#    而它的 via 是 aftersales.events.dlx。
+# ⚠️ payment 側用 payment.events.dlx（36 §3.3.1 指定），不是 hawkr.payment.dlx
+#    ——payment-service 兩個 DLX 並存，猜錯的症狀是死信落到另一個 exchange，
+#    而該 queue 的死信查詢會回空的（看起來像「沒有死信」）。
+- name: payment.fulfillment.responsibility_finalized
+  dlq:
+    via: payment.events.dlx
+    routing_key: payment.fulfillment.responsibility_finalized.dlq
+  bindings:
+  - exchange: hawkr.shipping
+    key: fulfillment.responsibility.finalized
+# logistics.cost.incurred —— durable join 的成本側入口（70 §3.1.4、§7.1）。
+# producer 是 shipping-service（成本金額是 shipping domain fact），
+# 但 DLX 走 payment.events.dlx：DLX 跟著 consumer 服務走，不是跟著來源 exchange（36 §6.2 註）。
+- name: payment.logistics.cost_incurred
+  dlq:
+    via: payment.events.dlx
+    routing_key: payment.logistics.cost_incurred.dlq
+  bindings:
+  - exchange: hawkr.shipping
+    key: logistics.cost.incurred
+- name: order.aftersales.awaiting.buyer.page
+  dlq:
+    via: hawkr.order.dlx
+    routing_key: order.aftersales.awaiting.buyer.page.dlq
+  bindings:
+  - exchange: aftersales.events
+    key: aftersales.refund.awaiting_buyer_page
+- name: order.aftersales.cancel.completed
+  dlq:
+    via: hawkr.order.dlx
+    routing_key: order.aftersales.cancel.completed.dlq
+  bindings:
+  - exchange: aftersales.events
+    key: aftersales.cancel.completed
+- name: order.aftersales.countdown
+  dlq:
+    via: hawkr.order.dlx
+    routing_key: order.aftersales.countdown.dlq
+  bindings:
+  - exchange: aftersales.events
+    key: aftersales.appeal.submitted
+  - exchange: aftersales.events
+    key: aftersales.case.applied
+  - exchange: aftersales.events
+    key: aftersales.case.auto_completed_return_pending_timeout
+  - exchange: aftersales.events
+    key: aftersales.case.auto_escalated
+  - exchange: aftersales.events
+    key: aftersales.case.auto_rejected
+  - exchange: aftersales.events
+    key: aftersales.case.cancelled_by_buyer
+  - exchange: aftersales.events
+    key: aftersales.case.coupon_compensated
+  - exchange: aftersales.events
+    key: aftersales.case.rejected
+  - exchange: aftersales.events
+    key: aftersales.platform_decision.made
+- name: order.aftersales.refund.completed
+  dlq:
+    via: hawkr.order.dlx
+    routing_key: order.aftersales.refund.completed.dlq
+  bindings:
+  - exchange: aftersales.events
+    key: aftersales.refund.completed
+- name: order.payment.result
+  dlq:
+    via: hawkr.payment.dlx
+    routing_key: order.payment.result.dlq
+  bindings:
+  - exchange: payment.events
+    key: payment.closed
+  - exchange: payment.events
+    key: payment.conflict
+  - exchange: payment.events
+    key: payment.expired
+  - exchange: payment.events
+    key: payment.failed
+  - exchange: payment.events
+    key: payment.success
+- name: order.refund.result
+  dlq:
+    via: hawkr.payment.dlx
+    routing_key: order.refund.result.dlq
+  bindings:
+  - exchange: payment.events
+    key: refund.failed
+  - exchange: payment.events
+    key: refund.succeeded
+- name: order.review.created
+  dlq:
+    via: hawkr.order.dlx
+    routing_key: order.review.created.dlq
+  bindings:
+  - exchange: hawkr.review
+    key: review.created
+- name: order.seller.suspended
+  dlq:
+    via: hawkr.order.dlx
+    routing_key: order.seller.suspended.dlq
+  bindings:
+  - exchange: hawkr.seller
+    key: seller.suspended
+- name: order.shipment.processing.cleared
+  dlq:
+    via: hawkr.order.dlx
+    routing_key: order.shipment.processing.cleared.dlq
+  bindings:
+  - exchange: hawkr.shipping
+    key: shipment.processing.cleared
+- name: order.shipping.created
+  dlq:
+    via: hawkr.order.dlx
+    routing_key: order.shipping.created.dlq
+  bindings:
+  - exchange: hawkr.shipping
+    key: shipment.created
+- name: order.shipping.delivered
+  dlq:
+    via: hawkr.order.dlx
+    routing_key: order.shipping.delivered.dlq
+  bindings:
+  - exchange: hawkr.shipping
+    key: shipment.delivered
+- name: order.shipping.label
+  dlq:
+    via: hawkr.order.dlx
+    routing_key: order.shipping.label.dlq
+  bindings:
+  - exchange: hawkr.shipping
+    key: shipment.label.updated
+- name: order.shipping.photo
+  dlq:
+    via: hawkr.order.dlx
+    routing_key: order.shipping.photo.dlq
+  bindings:
+  - exchange: hawkr.shipping
+    key: shipment.photo.updated
+- name: order.shipping.status
+  dlq:
+    via: hawkr.order.dlx
+    routing_key: order.shipping.status.dlq
+  bindings:
+  - exchange: hawkr.shipping
+    key: shipment.status.changed
+- name: payment.payuni.refund.accepted
+  dlq:
+    via: payment.webhook.dlx
+    routing_key: payment.payuni.refund.accepted.dlq
+  bindings:
+  - exchange: payuni.events
+    key: payuni.refund.accepted
+- name: payment.payuni.refund.notify
+  dlq:
+    via: payment.webhook.dlx
+    routing_key: payment.payuni.refund.notify.dlq
+  bindings:
+  - exchange: payuni.events
+    key: payuni.refund.notify
+- name: payment.payuni.unknown.fallback
+  dlq:
+    via: payment.webhook.dlx
+    routing_key: payment.payuni.unknown.fallback.dlq
+  bindings:
+  - exchange: payuni.events
+    key: payuni.unknown.fallback
+- name: payment.payuni.webhook
+  dlq:
+    via: payment.webhook.dlx
+    routing_key: payment.payuni.webhook.dlq
+  bindings:
+  - exchange: payuni.events
+    key: payuni.payment.uop
+- name: payment.payuni.membership.recurring
+  dlq:
+    via: payment.webhook.dlx
+    routing_key: payment.payuni.membership.recurring.dlq
+  bindings:
+  - exchange: payuni.events
+    key: payuni.payment.recurring
+- name: seller.membership.payment.result
+  dlq:
+    via: payment.events.dlx
+    routing_key: seller.membership.payment.result.dlq
+  bindings:
+  - exchange: payment.events
+    key: payment.membership.seller.success
+  - exchange: payment.events
+    key: payment.membership.seller.failed
+- name: payment.rescue.refund.dlq
+  bindings:
+  - exchange: hawkr.payment.dlx
+    key: payment.rescue.refund.dlq
+- name: payment.rescue.refund.queue
+  dlq:
+    via: hawkr.payment.dlx
+    queue: payment.rescue.refund.dlq
+    routing_key: payment.rescue.refund.dlq
+  bindings:
+  - exchange: payment.events
+    key: payment.rescue.refund_initiated
+- name: product.buyer.favorite.added
+  dlq:
+    via: hawkr.product.dlx
+    routing_key: product.buyer.favorite.added.dlq
+  bindings:
+  - exchange: hawkr.buyer
+    key: buyer.favorite.added
+- name: product.buyer.favorite.removed
+  dlq:
+    via: hawkr.product.dlx
+    routing_key: product.buyer.favorite.removed.dlq
+  bindings:
+  - exchange: hawkr.buyer
+    key: buyer.favorite.removed
+- name: product.certification.verify
+  dlq:
+    via: hawkr.product.dlx
+    routing_key: product.certification.verify.dlq
+  bindings:
+  - exchange: hawkr.product
+    key: product.certification.verify.requested
+- name: product.import.asset.download
+  dlq:
+    via: ''
+    queue: dlq.product.import.asset.download
+    routing_key: dlq.product.import.asset.download
+  bindings:
+  - exchange: hawkr.product.import
+    key: asset.download
+- name: product.import.asset.download.retry
+  dlq:
+    via: hawkr.product.import
+    queue: product.import.asset.download
+    routing_key: asset.download
+  args_json: true
+  arguments:
+    x-message-ttl: 120000
+- name: product.import.commit
+  dlq:
+    via: ''
+    queue: dlq.product.import.commit
+    routing_key: dlq.product.import.commit
+  bindings:
+  - exchange: hawkr.product.import
+    key: commit
+- name: product.import.commit.retry
+  dlq:
+    via: hawkr.product.import
+    queue: product.import.commit
+    routing_key: commit
+  args_json: true
+  arguments:
+    x-message-ttl: 10000
+- name: product.import.csv.parse
+  dlq:
+    via: ''
+    queue: dlq.product.import.csv.parse
+    routing_key: dlq.product.import.csv.parse
+  bindings:
+  - exchange: hawkr.product.import
+    key: csv.parse
+- name: product.import.csv.parse.retry
+  dlq:
+    via: hawkr.product.import
+    queue: product.import.csv.parse
+    routing_key: csv.parse
+  args_json: true
+  arguments:
+    x-message-ttl: 30000
+- name: product.import.html.fetch
+  dlq:
+    via: ''
+    queue: dlq.product.import.html.fetch
+    routing_key: dlq.product.import.html.fetch
+  bindings:
+  - exchange: hawkr.product.import
+    key: html.fetch
+- name: product.import.html.fetch.retry
+  dlq:
+    via: hawkr.product.import
+    queue: product.import.html.fetch
+    routing_key: html.fetch
+  args_json: true
+  arguments:
+    x-message-ttl: 120000
+- name: product.import.media.callback
+  dlq:
+    via: ''
+    queue: dlq.media.product.import.callback
+    routing_key: dlq.media.product.import.callback
+  bindings:
+  - exchange: hawkr.media
+    key: import.asset.downloaded
+- name: product.import.media.callback.retry
+  dlq:
+    via: hawkr.media
+    queue: product.import.media.callback
+    routing_key: import.asset.downloaded
+  args_json: true
+  arguments:
+    x-message-ttl: 300000
+- name: product.order.cancelled
+  dlq:
+    via: hawkr.product.dlx
+    routing_key: product.order.cancelled.dlq
+  bindings:
+  - exchange: hawkr.order
+    key: order.cancelled
+- name: product.order.sales.accumulated
+  dlq:
+    via: hawkr.product.dlx
+    routing_key: product.order.sales.accumulated.dlq
+  bindings:
+  - exchange: hawkr.order
+    key: order.sales.accumulated
+- name: product.review.stats
+  dlq:
+    via: hawkr.product.dlx
+    routing_key: product.review.stats.dlq
+  bindings:
+  - exchange: hawkr.review
+    key: review.created
+  - exchange: hawkr.review
+    key: review.hidden
+- name: product.seller.deleted
+  dlq:
+    via: hawkr.product.dlx
+    routing_key: product.seller.deleted.dlq
+  bindings:
+  - exchange: hawkr.seller
+    key: seller.deleted
+- name: product.seller.exposure.changed
+  dlq:
+    via: hawkr.product.dlx
+    routing_key: product.seller.exposure.changed.dlq
+  bindings:
+  - exchange: hawkr.seller
+    key: seller.exposure.changed
+- name: seller.account.deleted
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.account
+    key: account.deleted
+- name: seller.product.viewed
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.content
+    key: product.viewed
+- name: seller.review.created
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.review
+    key: review.created
+- name: seller.review.hidden
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.review
+    key: review.hidden
+- name: seller.review.result
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: seller.events
+    key: seller.review.result
+- name: shipping.order.paid
+  dlq:
+    via: shipping.webhook.dlx
+    routing_key: shipping.order.paid.dlq
+  bindings:
+  - exchange: hawkr.order
+    key: order.paid
+- name: shipping.order.receipt.confirmed
+  dlq:
+    via: shipping.webhook.dlx
+    routing_key: shipping.order.receipt.confirmed.dlq
+  bindings:
+  - exchange: hawkr.order
+    key: order.receipt.confirmed
+- name: shipping.payuni.webhook
+  dlq:
+    via: shipping.webhook.dlx
+    routing_key: shipping.payuni.webhook.dlq
+  bindings:
+  - exchange: payuni.events
+    key: payuni.shipping.status
+- name: shipping.shipment.create_requested
+  dlq:
+    via: shipping.webhook.dlx
+    routing_key: shipping.shipment.create_requested.dlq
+  bindings:
+  - exchange: hawkr.order
+    key: order.shipment.create_requested
+- name: shipping.uber.webhook
+  dlq:
+    via: shipping.webhook.dlx
+    routing_key: shipping.uber.webhook.dlq
+  bindings:
+  - exchange: payuni.events
+    key: uber.shipping.status
+- name: crm.buyer.deleted
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.buyer
+    key: buyer.deleted
+- name: social.buyer.deleted
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.buyer
+    key: buyer.deleted
+- name: social.seller.deleted
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.seller
+    key: seller.deleted
+- name: social.counter.delta
+  retry:
+    max_attempts: 3
+  bindings:
+  - exchange: hawkr.content
+    key: counter.delta

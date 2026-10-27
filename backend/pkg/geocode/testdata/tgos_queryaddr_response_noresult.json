@@ -1,0 +1,30 @@
+{
+  "Info": [
+    {
+      "IsSuccess": "True",
+      "InAddress": "火星市外星區銀河路一段1號",
+      "InSRS": "EPSG:4326",
+      "InFuzzyType": "最近門牌號機制",
+      "InFuzzyBuffer": "0",
+      "InIsOnlyFullMatch": "False",
+      "InIsSupportPast": "False",
+      "InIsShowCodeBase": "False",
+      "InIsLockCounty": "False",
+      "InIsLockTown": "False",
+      "InIsLockVillage": "False",
+      "InIsLockRoadSection": "False",
+      "InIsLockLane": "False",
+      "InIsLockAlley": "False",
+      "InIsLockArea": "False",
+      "InIsSameNumber_SubNumber": "False",
+      "InCanIgnoreVillage": "True",
+      "InCanIgnoreNeighborhood": "True",
+      "InReturnMaxCount": "5",
+      "OutTotal": "0",
+      "OutMatchType": "完全比對",
+      "OutMatchCode": "",
+      "OutTraceInfo": ""
+    }
+  ],
+  "AddressList": []
+}

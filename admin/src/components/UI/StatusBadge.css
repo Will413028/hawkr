@@ -1,0 +1,57 @@
+/* ========== Status Badge Component ========== */
+.hk-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 999px;
+	font-family: var(--admin-font-ui, "Noto Sans TC", system-ui, sans-serif);
+	white-space: nowrap;
+	border: 1px solid transparent;
+}
+
+/* Sizes */
+.hk-badge--sm {
+	padding: 4px 10px;
+	font-size: 12px;
+	font-weight: 700;
+	line-height: 18px;
+}
+
+.hk-badge--md {
+	padding: 5px 11px;
+	font-size: 13px;
+	font-weight: 700;
+	line-height: 20px;
+}
+
+/* Variants */
+.hk-badge--success {
+	color: var(--admin-success, var(--color-status-success));
+	border-color: var(--color-ink-100);
+	background: var(--admin-success-soft, var(--color-ink-50));
+}
+
+.hk-badge--danger {
+	color: var(--admin-danger, #b3261e);
+	border-color: #efc4bf;
+	background: var(--admin-danger-soft, #fce8e6);
+}
+
+.hk-badge--warning {
+	color: var(--admin-warning, #8a5a00);
+	border-color: #ead7a6;
+	background: var(--admin-warning-soft, #fff3d6);
+}
+
+/* 進行中 / 等待平台動作。邊框由 --admin-info 混白推導，不另立一個近似色 token。 */
+.hk-badge--info {
+	color: var(--admin-info, #3f6f9e);
+	border-color: color-mix(in srgb, var(--admin-info, #3f6f9e) 28%, #ffffff);
+	background: var(--admin-info-soft, #eaf2f9);
+}
+
+.hk-badge--gray {
+	color: var(--admin-muted-aa, #5f675b);
+	border-color: var(--admin-border, var(--color-ink-200));
+	background: var(--admin-control, #f0f1ea);
+}

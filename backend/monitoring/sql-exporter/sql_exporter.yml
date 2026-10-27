@@ -1,0 +1,1226 @@
+# SQL Exporter — 業務正確性 metrics（issue #1353 ATM 退款卡單 / #898 假日資料覆蓋）
+#
+# 依 §22：偵測歸 observability（本 exporter），非 application @Scheduled/reconciler。
+# 部署：co-located 於各 infra 主機（dev-infra / prod-infra），連「本地」的業務 DB
+#       （dev = 本地 Postgres、prod = Aliyun RDS）。env 標籤由 Prometheus scrape target 提供。
+# DSN：不寫死於此檔；由環境變數注入（含密碼，走各主機 infra/.env），本檔以 ${VAR} 引用：
+#   AFTERSALES_DSN 例：postgresql://dbadmin:<pwd>@postgres:5432/hawkr_aftersales?sslmode=disable（dev）
+#   SHIPPING_DSN   例：postgresql://dbadmin:<pwd>@postgres:5432/hawkr_shipping?sslmode=disable（dev）
+#   PAYMENT_DSN    例：postgresql://dbadmin:<pwd>@postgres:5432/hawkr_payment?sslmode=disable（dev）
+#   ACCOUNT_DSN    例：postgresql://dbadmin:<pwd>@postgres:5432/hawkr_account?sslmode=disable（dev）
+#   INVOICE_DSN    例：postgresql://dbadmin:<pwd>@postgres:5432/hawkr_invoice?sslmode=disable（dev）
+#                  prod 改 host=<rds> 且 sslmode=require。
+# ⚠️ 新增 DSN 的順序不可顛倒：**先**在該主機的 .env 補上實際值，**再**部署新 config。
+#    每個 DSN 都是 ${VAR:?…} 寫法 ⇒ 缺變數時整個容器起不來，順序做反會連帶打掉既有的 job。
+# ⚠️ 部署前置：確認 sql_exporter 版本支援 config 內 ${ENV} 展開（burningalchemist/sql_exporter 支援），
+#    否則改由各主機產生實體 config。首次套用前先 `--dry-run` / 手動驗證 query 可跑。
+global:
+  scrape_timeout: 10s
+  scrape_timeout_offset: 500ms
+  min_interval: 0s
+  max_connections: 3
+  max_idle_connections: 3
+
+jobs:
+  - job_name: aftersales
+    collectors:
+      - atm_refund
+    static_configs:
+      - targets:
+          aftersales: '${AFTERSALES_DSN}'
+
+  - job_name: shipping
+    collectors:
+      - holiday
+    static_configs:
+      - targets:
+          shipping: '${SHIPPING_DSN}'
+
+  - job_name: payment
+    collectors:
+      - rescue_manual_pending
+      # 36 §3.3.1 Outbox persisted exchange 的可觀測性（WP1）。⚠️ V11 migration 要先套用。
+      - payment_outbox
+      # 70 號線 B（賣家物流應收）。⚠️ 沿用既有的 PAYMENT_DSN，**不新增 DSN**：
+      # V9 把 9 張表建在 hawkr_payment 裡（架構裁決 DEC-20260912-184025），
+      # 所以這裡不會踩到本檔開頭那條「先補 .env 再部署」的順序陷阱。
+      - logistics_finance
+    static_configs:
+      - targets:
+          payment: '${PAYMENT_DSN}'
+
+  - job_name: account
+    collectors:
+      - delegation
+    static_configs:
+      - targets:
+          account: '${ACCOUNT_DSN}'
+
+  # 58 號電子發票 §8.2.5／§12.2.6 第 36 列。⚠️ 先在該主機的 .env 補 INVOICE_DSN 再部署本檔：
+  # 缺變數時整個容器起不來，順序做反會連帶打掉上面四個既有 job。
+  - job_name: invoice
+    collectors:
+      - invoice
+    static_configs:
+      - targets:
+          invoice: '${INVOICE_DSN}'
+
+  # Pricebook 行情資料新鮮度（ADR pricebook-ingest-window-resilience-scope D1）。
+  # ⚠️ 先在該主機的 .env 補 PRICEBOOK_DSN 再部署本檔：
+  # 缺變數時整個容器起不來，順序做反會連帶打掉上面五個既有 job。
+  - job_name: pricebook
+    collectors:
+      - pricebook_freshness
+    static_configs:
+      - targets:
+          pricebook: '${PRICEBOOK_DSN}'
+
+collectors:
+  # #1353：ATM 退款卡在 AWAITING_WEBHOOK(15) 超過 5 天的筆數（hawkr_aftersales.refund_tasks）
+  - collector_name: atm_refund
+    metrics:
+      - metric_name: hawkr_atm_refund_stuck_total
+        type: gauge
+        help: 'Count of ATM(2004) refunds stuck in refund_tasks.AWAITING_WEBHOOK(15) beyond 5 days (issue #1353)'
+        values:
+          - stuck
+        query: |
+          SELECT count(*)::float8 AS stuck
+          FROM refund_tasks
+          WHERE status = '15'
+            AND payment_method = '2004'
+            AND updated_at < now() - interval '5 days'
+
+  # #898：假日資料尚有幾天覆蓋 = MAX(holiday_date) - CURRENT_DATE（hawkr_shipping.holidays）
+  # 空表 / 資料耗盡 → 回 -1（觸發 critical），提醒下年度資料未匯入。
+  - collector_name: holiday
+    metrics:
+      - metric_name: hawkr_holiday_coverage_days
+        type: gauge
+        help: 'Days of holiday data coverage remaining = MAX(holiday_date) - today; -1 if empty (issue #898)'
+        values:
+          - coverage_days
+        query: |
+          SELECT COALESCE(MAX(holiday_date) - CURRENT_DATE, -1)::float8 AS coverage_days
+          FROM holidays
+
+  # #1369：ATM rescue 待人工退款積壓（取代原孤兒事件 payment.rescue.requires_manual）。
+  # rescue_action='8902'（REFUND_PENDING_MANUAL）表 ATM rescue 需人工頁面版完成退款；
+  # 排除已有成功退款（payment_refunds.status='2'=SUCCEEDED）者 → 只計真正待處理筆數。
+  - collector_name: rescue_manual_pending
+    metrics:
+      - metric_name: hawkr_payment_rescue_manual_pending
+        type: gauge
+        help: 'Count of ATM rescue refunds pending manual completion (payment_transactions.rescue_action=8902, no succeeded refund) (issue #1369)'
+        values:
+          - pending
+        query: |
+          SELECT count(*)::float8 AS pending
+          FROM payment_transactions pt
+          WHERE pt.rescue_action = '8902'
+            AND NOT EXISTS (
+              SELECT 1 FROM payment_refunds r
+              WHERE r.trade_no = pt.trade_no AND r.status = '2'
+            )
+
+  # ── outbox_events 積壓／DEAD 偵測（36 §3.3.1 Outbox persisted exchange 的可觀測性）──
+  #
+  # 🔴 為什麼必須有這一支：WP0 盤點坐實 outbox_events 的 DEAD（8224）是**無人推走的終態
+  #    且零偵測** —— markDeadGuarded 把 next_retry_at 設 NULL，而候選述詞 findPendingEvents
+  #    是 status IN ('8221','8223') 不含 8224 ⇒ 一列進 DEAD 就永久靜止，而在此之前沒有
+  #    任何指標、任何告警在看它。36 §3.3.1 自己寫著：rollout 順序錯的症狀是「一路重試到
+  #    DEAD，沒有任何一層會說出發錯 exchange」——那是它明文承認的失效模式。
+  #
+  # 🔴 為什麼 backlog 與 DEAD 要分成兩支（本檔下方 invoice M31 踩過同一個形狀）：
+  #    backlog 的述詞（'8221','8223'）與 DEAD **互斥** ⇒ 一列落到 DEAD 的同一刻就退出
+  #    backlog 指標 ⇒ 只看 backlog age 的話，告警會在事件真正卡死那一刻由 firing 轉
+  #    resolved。DEAD 必須自己一支，判準是「> 0」而不是「久久沒推進」：結構上沒有
+  #    任何查詢會再撈它。
+  #
+  # ── .claude/rules/06-no-small-tails.md §3.10 四問 ──
+  #
+  # ① **觀測窗**：hawkr_payment 的 outbox_events 全表，依 status 分兩類——
+  #    backlog ＝ 候選集合（'8221' PENDING ＋ '8223' FAILED）、dead ＝ '8224'。
+  #    '8222' SENT 不在窗內：已完成，且目前無任何清理路徑（application.yml 的
+  #    outbox-sent-retention-days 是孤兒設定，DataCleanupScheduler 沒碰這張表）⇒
+  #    它只會單調累積，數它是噪音不是訊號。
+  # ② **窗外發生的事輸出什麼**：🔴 **輸出 0，不輸出空集合**。三支都從 VALUES 清單長出
+  #    series 再 JOIN ⇒ 一列都沒有時仍有值為 0 的 series。少了這一步，「沒有積壓」與
+  #    「exporter 瞎了」在 `> 0` 的表達式上完全一樣。
+  # ③ **誰能把東西移到窗外**：(a) 新增 status 值——今天由 chk_payment_outbox_status 限定
+  #    四值，加值必須同時回來加這裡；(b) 新增 exchange 值——dead 那支用 FULL OUTER JOIN
+  #    而非 LEFT JOIN，**清單外的 exchange 仍會被數到**（只是零值時沒有 series），
+  #    漏登記不會造成靜默漏數；(c) 表改名。
+  #    述詞一律**正面列舉**狀態碼，不用 `status <> '8222'`：否定述詞會讓日後新增的終態
+  #    永遠留在桶子裡 ⇒ 永久紅 ⇒ 被靜音 ⇒ 等於沒有。
+  # ④ **對「目標不存在」FAIL 還是 SKIP**：表或欄位不存在 ⇒ SQL 出錯 ⇒ scrape 失敗 ⇒
+  #    infra-alerts.yml 的 SqlExporterScrapeErrors 轉紅。刻意不加存在性保護。
+  #    ⚠️ **部署順序**：payment-service 的 V11 migration 要**先**套用到該環境，再部署本設定
+  #    （exchange 欄在 V11 才存在）。做反的話 dead 那支查不到欄位 ⇒ 該 job 每次 scrape 出錯。
+  #
+  # ⚠️ exchange 當 label：值域由 36 §3.3.1 界定（payment.events／hawkr.shipping），
+  #    有界且正是本波要看的維度。routing_key 不當 label（十種以上且會再長）。
+  - collector_name: payment_outbox
+    metrics:
+      - metric_name: payment_outbox_backlog_rows
+        type: gauge
+        help: 'outbox_events rows still awaiting dispatch, by status (8221=PENDING, 8223=FAILED); 0-valued series always present (36 3.3.1)'
+        key_labels:
+          - status
+        values:
+          - cnt
+        query: |
+          SELECT v.status AS status,
+                 COALESCE(o.cnt, 0)::float8 AS cnt
+          FROM (VALUES ('8221'), ('8223')) AS v(status)
+          LEFT JOIN (
+            SELECT status, count(*) AS cnt
+            FROM outbox_events
+            WHERE status IN ('8221', '8223')
+            GROUP BY status
+          ) o ON o.status = v.status
+
+      - metric_name: payment_outbox_oldest_backlog_age_seconds
+        type: gauge
+        help: 'Age in seconds of the oldest outbox_events row still awaiting dispatch (0 when none) (36 3.3.1)'
+        values:
+          - age_seconds
+        query: |
+          SELECT COALESCE(
+                   EXTRACT(EPOCH FROM (now() - min(created_at))),
+                   0
+                 )::float8 AS age_seconds
+          FROM outbox_events
+          WHERE status IN ('8221', '8223')
+
+      - metric_name: payment_outbox_dead_rows
+        type: gauge
+        help: 'outbox_events rows in DEAD (8224) - a terminal state nothing will ever retry - by exchange (36 3.3.1)'
+        key_labels:
+          - exchange
+        values:
+          - cnt
+        query: |
+          SELECT COALESCE(o.exchange, v.exchange) AS exchange,
+                 COALESCE(o.cnt, 0)::float8 AS cnt
+          FROM (VALUES ('payment.events'), ('hawkr.shipping')) AS v(exchange)
+          FULL OUTER JOIN (
+            SELECT exchange, count(*) AS cnt
+            FROM outbox_events
+            WHERE status = '8224'
+            GROUP BY exchange
+          ) o ON o.exchange = v.exchange
+
+
+  # ── 70 號《物流財務結算》§8｜線 B 賣家物流應收的「卡住了誰會知道」───────────
+  #
+  # 🔴 這一格今天回 0 是因為**線 B 還沒有任何一行可執行的程式**（70 §1.1），
+  #    不是因為沒有問題。它必須在 worker 落地**之前**就存在——反過來做的現成案例
+  #    就在本檔下方：invoice_adjustments 是等到有列了才補指標，在那之前卡住的折讓
+  #    「錢退了、憑證沒開、沒有人會知道」。
+  #
+  # 🔴 **部署順序**：payment-service 的 V9 migration 要**先**套用到該環境，再部署本設定。
+  #    做反的話這幾句 SQL 查不到表 ⇒ 每次 scrape 出錯 ⇒ infra-alerts.yml 的
+  #    SqlExporterScrapeErrors 永久紅。那是刻意的 FAIL（見四問 ④），不是要修的誤報；
+  #    修法是把 V9 部署上去，不是在 SQL 裡加存在性保護。
+  #
+  # ── .claude/rules/06-no-small-tails.md §3.10 四問（70 §8 逐條要求）──
+  #
+  # ① **觀測窗是什麼**：hawkr_payment 的 logistics_receivables 全表，外加每列
+  #    **最新一筆** logistics_collection_attempts（LEFT JOIN LATERAL）。窗內只認
+  #    status 的四個**非終態**值；CLOSED／WRITTEN_OFF 是終態（70 §3.2），不在窗內。
+  #    UNCONFIRMED 也不在本指標內——它有自己一支（見下方），因為它是 70 §3.2.1 自稱
+  #    「本書最重要的一條」，混進 status label 裡會被其他狀態的噪音蓋掉。
+  #
+  # ② **窗外發生的事它輸出什麼**：🔴 **輸出 0，不輸出空集合**。四個 status 是從
+  #    VALUES 清單長出來再 LEFT JOIN 的 ⇒ 一列都沒有時仍有四條值為 0 的 series。
+  #    少了這一步，「沒有卡住」與「exporter 瞎了」在 `> 0` 的表達式上完全一樣
+  #    （70 §8 ②；本檔下方 invoice 區塊踩過同一個形狀）。
+  #
+  # ③ **誰能合法把東西移到窗外**（逐一列舉，不是「應該沒有」）：
+  #    (a) 有人改 LogisticsReceivableStatus 的碼值／新增狀態 ⇒ 下面的 VALUES 清單
+  #        要同步改，否則新狀態一列都不會被數到，**而指標照常是綠的**；
+  #    (b) 維運 SQL 把列推到未列舉的狀態（70 §3.2.2 那三問就是在擋這件事）；
+  #    (c) 🔴 有人把查詢 worker 的寬限期（停手點的 SETTLEMENT_FUND_DATE_GRACE_HOURS，
+  #        預設 24h）調大到超過下面 SUBMITTED 用的 48h ⇒ 本指標會在 worker 還沒到
+  #        判定時點就開始數它 ⇒ 誤報。**改那個設定之前要回來改這裡。**
+  #    (d) 有人把列直接 DELETE。本檔對刪除結構性全盲（66 §5.1.4 的對應做法是
+  #        「非終態的列永不刪除——它們不是垃圾，是缺陷的唯一證據」，線 B 同理）。
+  #
+  # ④ **對「目標不存在」是 FAIL 還是 SKIP**：**FAIL**。刻意不寫
+  #    `to_regclass('logistics_receivables') IS NULL` 這類存在性保護——表被搬走或改名時
+  #    query 直接出錯，由 SqlExporterScrapeErrors（infra-alerts.yml，帶 env 標籤）吼出來。
+  #    保護一加上去就變成「目標消失時靜默轉綠」，那正是 §3.10 第 4 問要擋的東西。
+  #
+  # 🔴 **本 collector 看不到什麼**（§3.10 誠實條款：標明邊界的 gate 是資產，被當成牆的是負債）：
+  #    - `FAILED` 只看得到「列還在 FAILED 且夠老」，**看不到退避重送耗盡了幾次**——
+  #      logistics_receivables 沒有 attempt 計數欄，70 §3.2.1 把那件事指給
+  #      `logistics_collection_failed_total{reason}`（application counter，本檔產不出來）。
+  #    - 賣家層級的帳齡階梯（70 §5 的 D+3／D+7／D+14）不在本檔：它的錨是
+  #      seller_logistics_accounts.last_activity_at ＋ 殘差容許上限，是另一個機制。
+  #    - provider 帳單側的缺口（`provider_settlement_lines` 有我方無紀錄的費用）不在本檔。
+  #    以上三項是**結論不是遺漏**；要補時各自獨立一支，不得靠放寬下面的述詞把它們吸進來。
+  - collector_name: logistics_finance
+    metrics:
+      - metric_name: logistics_receivable_stuck_rows
+        type: gauge
+        help: 'logistics_receivables rows parked in a non-terminal status past the executor own threshold (PENDING >1h; SUBMITTED past expected_fund_date+48h; FAILED >72h; SETTLED reconciled but not trued-up >24h) (70 section 8)'
+        key_labels:
+          - status
+        values:
+          - cnt
+        query: |
+          -- 🔴 每一條述詞的門檻都**比它的執行者自己的門檻寬**。這不是保守，是必要條件：
+          -- 門檻抓得一樣緊的話，每一列在正常流程中途都會被數成「卡住」，而一條經常
+          -- 誤報的告警第二次就會被當成狼來了忽略（§2.1.2：假的保證排擠掉真的警覺）。
+          WITH watched(status) AS (
+            -- 🔴 只列**非終態**。CLOSED／WRITTEN_OFF 列進來的話，每一筆正常結清的帳
+            -- 都會被數成卡住。值域出處：V9 的 chk_logrecv_status ＋ 70 §3.2 狀態機表。
+            VALUES ('PENDING'), ('SUBMITTED'), ('FAILED'), ('SETTLED')
+          ),
+          stuck AS (
+            SELECT r.status
+            FROM logistics_receivables r
+            -- 🔴 LEFT JOIN LATERAL 不是 INNER JOIN：一列是 SUBMITTED 卻**一筆 attempt
+            -- 都沒有**，代表 70 §4.3 第 2 層（送出前先落地 attempt）的不變式破了，
+            -- 那正是最該被數到的列。INNER JOIN 會把它直接丟出觀測窗。
+            LEFT JOIN LATERAL (
+              SELECT a.expected_fund_date, a.submitted_at
+              FROM logistics_collection_attempts a
+              WHERE a.receivable_id = r.id
+              ORDER BY a.created_at DESC
+              LIMIT 1
+            ) a ON true
+            WHERE
+              -- PENDING：門檻 1 小時，出處 70 §3.2.1 逐字「created_at 超過 1 小時仍未送出」。
+              -- ⚠️ 錨在 created_at 不是 updated_at：提交 worker 的租約（submit_lease_until）
+              -- 每 claim 一次就會動 updated_at ⇒ 用 updated_at 的話，一列**反覆被 claim
+              -- 卻永遠送不出去**就永遠離不開窗口（invoice_correction_stuck_rows 踩過這個坑）。
+              (r.status = 'PENDING' AND r.created_at < now() - interval '1 hour')
+
+              -- SUBMITTED：查詢 worker 在 expected_fund_date + 寬限（停手點預設 24h）之後
+              -- 應該把它推成 UNCONFIRMED。這裡給它**再多一整天**才算卡住 ⇒ 只有「連查詢
+              -- worker 也沒動」才會被數到（70 §3.2.1 逐字「若連它也沒動 ⇒ 同一支指標」）。
+              --
+              -- 🔴 COALESCE 的第二、三支不是防禦性冗餘，是一個**真的洞**：停手點的
+              -- pastGrace() 對 expected_fund_date IS NULL 回 false 並註明「判不了，保守地
+              -- 不推進（留給下一輪或人工）」——但沒有任何東西會把它交到人手上 ⇒ 那種列
+              -- 對查詢 worker 是**永久隱形**的。本指標必須看得到它。
+              --
+              -- 🔴 `AT TIME ZONE 'UTC'` 不能省：expected_fund_date 是 date，
+              -- `date + interval` 得到的是 timestamp **without** time zone，直接和 now()
+              -- 比會隱性套用連線的 TimeZone ⇒ exporter 換一台主機門檻就偏移
+              -- （CLAUDE.md §4／§21：不得以 server local timezone 製造隱性行為）。
+              OR (r.status = 'SUBMITTED' AND now() > COALESCE(
+                    (a.expected_fund_date + interval '48 hours') AT TIME ZONE 'UTC',
+                    a.submitted_at + interval '48 hours',
+                    r.created_at + interval '48 hours'))
+
+              -- FAILED：退避重送 1h／6h／24h 至多 3 次（70 §5 第一列）⇒ 最壞約 31 小時
+              -- 走完整條階梯。72 小時還在 FAILED ＝ 階梯耗盡或提交 worker 死了。
+              -- ⚠️ 同樣錨在 created_at：每一次「FAILED → SUBMITTED → FAILED」的重送都會
+              -- 動 updated_at，用它當錨會讓重送中的列一直往後推、永遠不進窗口。
+              OR (r.status = 'FAILED' AND r.created_at < now() - interval '72 hours')
+
+              -- SETTLED：🔴 **SETTLED 不是終態**（V9 的 chk_logrecv_status 旁註解與
+              -- 70 §3.2.1 都明寫）。已對帳（actual_cost 有值，由 chk_logrecv_recon_pair
+              -- 保證此時 statement_line_id 也有值）卻超過 24 小時沒 true-up 成 CLOSED
+              -- ⇒ actual > estimated 的差額永遠不會被收，**而帳面上看起來一切正常**。
+              --
+              -- ⚠️ 70 §3.2.1 把這一格指給「provider_statement_unmatched_rows 的另一面」，
+              -- 但那支指標數的是 recon_status='UNMATCHED' 的帳單列：對到帳的那一刻它變成
+              -- MATCHED、**離開那支指標的窗口**，而 receivable 這邊仍停在 SETTLED
+              -- ⇒ 那支結構上看不到這一格。所以放在這裡。
+              --
+              -- ⚠️ 這一支是**自我節流**的：線 C 對帳還沒落地時 actual_cost 恆為 NULL
+              -- ⇒ 零列 ⇒ 不會變成永久紅。它只在「對帳做了、true-up 沒做」時才響。
+              -- ⚠️ 此處只能錨 updated_at（沒有 reconciled_at 欄）。今天成立是因為
+              -- true-up 與對帳同屬一次 ADM 匯入、不是重試迴圈；**哪天有人加了會重試的
+              -- true-up worker，這個錨就會開始漏列，要回來改。**
+              OR (r.status = 'SETTLED'
+                  AND r.actual_cost IS NOT NULL
+                  AND r.updated_at < now() - interval '24 hours')
+          )
+          SELECT w.status,
+                 count(s.status)::float8 AS cnt
+          FROM watched w
+          LEFT JOIN stuck s ON s.status = w.status
+          GROUP BY 1
+
+      # 🔴 70 §8 逐字「**本書最重要的一條**——它代表『錢可能收了也可能沒收』」。
+      #
+      # 為什麼要獨立一支而不是塞進上面的 status label：UNCONFIRMED 是整個狀態機裡
+      # **唯一一個設計上就沒有自動執行者**的狀態（70 §3.2：不自動重送，理由是 PayUni 的
+      # TradeNo 官方標「可重複」且 agent_fee_query 回單筆結構非陣列 ⇒ 真的送重複了，
+      # 用官方 API 也對不出有幾筆 ⇒ 自動重送的期望值是「把一次不確定變成一次確定的
+      # 重複扣款」）。它的出邊三條全部是 ADM 人工。
+      #
+      # ⚠️ **刻意不設時間門檻**（沿用本檔 invoice_adjustment_stuck_rows 對 FAILED_* 的
+      # 處理：沒有自動執行者的狀態一律 any age）。70 §3.2.1 寫的「進入後超過 N 天無 ADM
+      # 處置」裡的 N，表達在告警的 `for:` 上而不是 SQL 裡——理由是 updated_at 在這裡
+      # 沒有鑑別力（ADM 一碰它就換狀態了），而 created_at 是送達日、與「何時進 UNCONFIRMED」
+      # 差了好幾天且不固定。
+      # 🔴 這個選擇的代價要講清楚：`> 0` ＋ `for: 6h` 數的是**持續有未處置的列**，
+      # 不是「某一列躺了 6 小時」。ADM 每小時清掉一筆但新的一直來時它也會響——
+      # 那是刻意的，70 §13 R1 正是「若發生率高，ADM 會被淹沒」。
+      - metric_name: logistics_receivable_unconfirmed_rows
+        type: gauge
+        help: 'logistics_receivables rows in UNCONFIRMED, i.e. agent_fee was submitted and PayUni FundDate is still 0000-00-00 so the money may or may not have been collected; ADM-only, no automatic executor (70 section 8)'
+        values:
+          - cnt
+        query: |
+          -- 無 GROUP BY ⇒ 空表也會回一列 0（70 §8 ②：期望恆 0 的指標空表回 0，
+          -- 不得回空集合，否則與 exporter 掛掉無法分辨）。
+          SELECT count(*)::float8 AS cnt
+          FROM logistics_receivables
+          WHERE status = 'UNCONFIRMED'
+
+      # ── 責任判定案件（65 §5.5.2 D 第 ④ 問／Batch A）────────────────────────
+      #
+      # 🔴 這三支的共同背景：責任判定沒有任何自動執行者——它決定買家拿不拿得到退款，
+      #    而唯一能推動它的是 ADM 的 maker-checker。一張卡住的責任案件，症狀是
+      #    **訂單無聲停在 SHIPPING_ABNORMAL(35)、買家的錢無限期卡住**，
+      #    而全鏈路每一層都是綠的（65 §5.5.2 E0.2 逐字：每一步都「照規則成功」）。
+      #    ⇒ 沒有這幾支指標，這條軸的失效是完全靜默的。
+      #
+      # ⚠️ 三支都掛在既有的 payment job 上，**不新增 DSN**：兩張案件表由
+      #    payment-service 擁有、住在 hawkr_payment（V9，架構裁決 DEC-20260912-184025）。
+      - metric_name: responsibility_case_open_rows
+        type: gauge
+        help: 'fulfillment_exception_cases with category RESPONSIBILITY_UNRESOLVED still awaiting an ADM decision, bucketed by status; each row means one order parked in SHIPPING_ABNORMAL(35) with the buyer money on hold (65 section 5.5.2)'
+        key_labels:
+          - status
+        values:
+          - cnt
+        query: |
+          -- 🔴 用 LEFT JOIN 到一張常數表而不是直接 GROUP BY：期望恆 0 的指標**空表必須回 0**
+          --    （70 §8 ②），否則「沒有卡住的案件」與「exporter 掛了」在 PromQL 上一模一樣。
+          --    直接 GROUP BY 在零列時回空集合 ⇒ series 消失 ⇒ `> 0` 的告警永遠不觸發。
+          WITH watched(status) AS (
+            -- 只列**尚未結案**的兩格。RESOLVED 是終局（已發 N16），列進來的話
+            -- 每一筆正常判完的案件都會被數成待處理。
+            -- ⚠️ DISMISSED 不列：責任判定案件不得進入該狀態（V12 chk_exc_responsibility_no_dismiss）
+            --    ⇒ 它恆為 0，列出來只會讓讀的人以為那是一個正常會有值的格子。
+            VALUES ('OPEN'), ('IN_PROGRESS')
+          )
+          SELECT w.status, count(c.id)::float8 AS cnt
+          FROM watched w
+          LEFT JOIN fulfillment_exception_cases c
+                 ON c.status = w.status
+                AND c.category = 'RESPONSIBILITY_UNRESOLVED'
+          GROUP BY w.status
+
+      - metric_name: responsibility_case_age_seconds
+        type: gauge
+        help: 'age of the oldest unresolved responsibility case in seconds, anchored on status_entered_at; -1 when there is none (65 section 5.5.2 D)'
+        values:
+          - age_seconds
+        query: |
+          -- 🔴 齡類指標空表回 **-1** 而不是 0（70 §8 ②逐字）：0 的意思是「有一張案件，
+          --    而且剛剛才進來」，與「一張都沒有」是完全不同的事實。回 0 會讓
+          --    `> threshold` 的告警在兩種情況下都沉默，而其中一種是真的有問題。
+          SELECT COALESCE(
+                   MAX(EXTRACT(EPOCH FROM (now() - status_entered_at)))::float8,
+                   -1::float8
+                 ) AS age_seconds
+          FROM fulfillment_exception_cases
+          WHERE category = 'RESPONSIBILITY_UNRESOLVED'
+            AND status IN ('OPEN', 'IN_PROGRESS')
+
+      - metric_name: responsibility_receivable_conflict_rows
+        type: gauge
+        help: 'logistics_receivables whose responsibility_cause snapshot says the settlement counterparty is not the seller (PROVIDER_CAUSED / PLATFORM_CAUSED) — the platform is charging a seller for a cost that is not theirs; expected to be 0 (70 section 3.6.1)'
+        values:
+          - cnt
+        query: |
+          -- 🔴 這一支是 ResponsibilitySettlementService 的 CONFLICT 分支在 DB 上的對應面。
+          --    consumer 端的衝突會進 DLQ（看得到），但**既有的存量列**不會有人重新檢查
+          --    ——它們是在 gate 存在之前、或由手寫 SQL 造出來的。
+          -- ⚠️ 值域出處：70 §3.6.1 的三軸分離表（Bearer = SELLER 的只有 BUYER_CAUSED
+          --    與 SELLER_CAUSED；PROVIDER_CAUSED 走爭議、PLATFORM_CAUSED 平台吸收）。
+          --    🔴 **BUYER_CAUSED 不在這裡**——fault = BUYER 但 counterparty = SELLER，
+          --    兩者同時成立且不矛盾，是全書最容易被「修正」成錯的一格。
+          SELECT count(*)::float8 AS cnt
+          FROM logistics_receivables
+          WHERE responsibility_cause IN ('PROVIDER_CAUSED', 'PLATFORM_CAUSED')
+
+  # 56 號 ADM 代行營運 §8.2.3：OBS2/3/4/9/12/13 ＋ OBS14（本案唯一資料源）。
+  # 這七支沒有其他來源——漏掉本 collector 的後果是六條告警 PromQL 回 no data、
+  # 永不觸發，而 no data 與「值為 0」在 `> 0` 的表達式上完全一樣。
+  # ⚠️ 判準是「series 存在」不是「值為 0」（§12.2 步驟 7c）。
+  - collector_name: delegation
+    metrics:
+      # OBS2：活躍 session 數。四個條件缺一不可——DB 只有 active/revoked 兩態，
+      # 「已結束」「已 hard 到期」「已閒置逾時」分別由 ended_at / expires_at /
+      # last_active_at(+idle 窗口) 表達。只寫 status='active' 會讓這支 gauge 單調非遞減。
+      # ⚠️ 900 是 DELEGATION_SESSION_IDLE_SECONDS 的第二個副本；改 env 必須同波改這裡。
+      - metric_name: delegation_sessions_active
+        type: gauge
+        help: 'Active delegated operation sessions (not ended, not hard-expired, not idle-expired) (56 OBS2)'
+        values:
+          - active
+        query: |
+          SELECT count(*)::float8 AS active
+          FROM delegated_operation_sessions
+          WHERE status = 'active'
+            AND ended_at IS NULL
+            AND expires_at > now()
+            AND last_active_at + interval '900 seconds' > now()
+
+      # OBS3：稽核 PENDING 殘留。兩個邊界都是必要的：
+      # 下界 10 分鐘對齊 §12.4 ② 的判讀門檻；上界 24 小時是因為 PENDING 是合法終態，
+      # 不設滾動窗會讓這支 gauge 單調非遞減且沒有任何合法動作清得掉它。
+      - metric_name: delegation_audit_pending_total
+        type: gauge
+        help: 'Audit rows stuck in PENDING for 10m..24h (intent written, confirm never returned) (56 OBS3)'
+        values:
+          - pending
+        query: |
+          SELECT count(*)::float8 AS pending
+          FROM admin_operation_audit_logs
+          WHERE result = 'PENDING'
+            AND created_at <  now() - interval '10 minutes'
+            AND created_at >= now() - interval '24 hours'
+
+      # OBS4：最舊未派送 outbox 列的年齡。述詞只能有 event_published_at IS NULL 這一個條件：
+      # ① 不得依賴 lease 欄位（失敗時會被清空，偵測只在租約被持有的那幾秒成立）
+      # ② 不得加 status='pending' 去縮窄（dead-letter 列在本書沒有其他告警覆蓋，
+      #    這支 gauge 是它今天唯一的可見形式）
+      - metric_name: delegation_outbox_lag_seconds
+        type: gauge
+        help: 'Age in seconds of the oldest undispatched admin_operation_outbox row (56 OBS4)'
+        values:
+          - lag_seconds
+        query: |
+          SELECT COALESCE(EXTRACT(epoch FROM now() - min(created_at)), 0)::float8 AS lag_seconds
+          FROM admin_operation_outbox
+          WHERE event_published_at IS NULL
+
+      # OBS9：寫入結果未確認。逾時被判成 FAILED 是 §7.3.2 的定版，代價就是這個窗口。
+      # 滾動 1 小時窗，避免歷史列讓 gauge 恆亮。
+      - metric_name: delegation_write_unconfirmed_total
+        type: gauge
+        help: 'Audit rows FAILED with biz_code 9280 in the last hour (domain write outcome unknown) (56 OBS9)'
+        values:
+          - unconfirmed
+        query: |
+          SELECT count(*)::float8 AS unconfirmed
+          FROM admin_operation_audit_logs
+          WHERE result = 'FAILED'
+            AND biz_code = 9280
+            AND confirmed_at >= now() - interval '1 hour'
+
+      # OBS12：稽核表實體大小。存在的唯一理由是讓 §9.2.3 的 > 5 GB 擴容條件真的有東西在評估它。
+      - metric_name: delegation_audit_table_bytes
+        type: gauge
+        help: 'pg_total_relation_size of admin_operation_audit_logs (56 OBS12)'
+        values:
+          - table_bytes
+        query: |
+          SELECT pg_total_relation_size('admin_operation_audit_logs')::float8 AS table_bytes
+
+      # OBS13：最舊稽核列的年齡。保留期清理是維運 SQL、沒有任何程式會自動執行它，
+      # 這支才是真正在守「有沒有人記得跑」——年齡超過保留期會遠早於 5 GB 發生。
+      - metric_name: delegation_audit_oldest_row_age_days
+        type: gauge
+        help: 'Age in days of the oldest admin_operation_audit_logs row (56 OBS13)'
+        values:
+          - oldest_age_days
+        query: |
+          SELECT COALESCE(EXTRACT(day FROM now() - min(created_at)), 0)::float8 AS oldest_age_days
+          FROM admin_operation_audit_logs
+
+      # OBS14：已撤回的代行授權列數。DelegationAuthorizationRevokedSpike 的資料源——
+      # 「9264 增加且該店家先前成功過」在 PromQL 內表達不出來（設計書自陳），改以本
+      # gauge 的 delta 表達；把 store_id 作 label 則直接違反基數紅線。
+      - metric_name: delegation_authorizations_revoked_total
+        type: gauge
+        help: 'Cumulative count of revoked seller_delegation_authorizations rows (56 OBS14)'
+        values:
+          - revoked
+        query: |
+          SELECT count(*)::float8 AS revoked
+          FROM seller_delegation_authorizations
+          WHERE revoked_at IS NOT NULL
+
+  # 58 號電子發票 §8.2.5：M6／M7／M8／M17 的唯一資料源（collector 恆為四支，不新增）。
+  # 這四支沒有其他來源——漏掉本 collector 的後果是四條告警 PromQL 回 no data、永不觸發，
+  # 而 no data 與「值為 0」在 `> 0` 的表達式上完全一樣。
+  # ⚠️ 判準是「series 存在」不是「值為 0」（§12.2.6 第 36 列）。
+  # ⚠️ 四支述詞一律「正面列舉」狀態值，禁用 NOT IN／<>：用 NOT IN 時，日後新增一個終態會讓那些列
+  #    永遠留在桶子裡 ⇒ 一條 critical 告警永久紅著 ⇒ 被靜音 ⇒ 等於沒有。
+  #    值域對帳：chk_invop_status 20 值 = M6 列舉 14 ∪ 排除 6；chk_invdoc_status 11 值 = M7 列舉 3 ∪ 排除 8；
+  #             chk_invinbox_status 5 值 = M8 列舉 4 ∪ 排除 1（SKIPPED）。
+  - collector_name: invoice
+    metrics:
+      # M6：待開票積壓，依年齡分桶（四個桶是封閉列舉）。
+      # 述詞只看「未進終態」，不看租約欄——next_attempt_at 是租約兼下次執行時間，
+      # 拿它當偵測依據會讓讀數只在租約被持有的那幾秒成立。
+      # 排除的 6 值＝SUCCEEDED / NOT_APPLICABLE / CANCELLED_BEFORE_ISSUE / RESOLVED_EXTERNALLY /
+      #   FAILED_PERMANENT（已結案，改由 M7 的文件軸看）/ CANCELLED_BY_ADMIN（ADM 已處置）。
+      # ⚠️ 排除依據是「還需不需要有人推進」，不是 §7.3.2 的 FSM 終態集合（那只有 4 個）——兩個集合
+      #    刻意不同，不要「順手統一」。⚠️ 寫 'CANCELLED' 不在值域內，等於沒有排除任何東西。
+      # ⚠️ FAILED_UNKNOWN／FAILED_RETRY_EXHAUSTED／MANUAL_PROCESS_ALLOWED／SELLER_ACTION_REQUIRED
+      #    四個「等人」值刻意留在桶內：它們是「等人」不是「結案」，正是最需要有人看見的一類。
+      - metric_name: invoice_pending_operations
+        type: gauge
+        # CANCELLED_BY_ADMIN **不是終態**（2026-09-04 補）：它的唯一出邊是 J29
+        # （雙人覆核解鎖 → MANUAL_PROCESS_ALLOWED），所以卡在那裡代表「等第二個人」，
+        # 正是這個桶要看到的東西。原本把它排除在外，於是 A4 卡在覆核那一步時
+        # 積壓量是 0——而 J28 那條入口在同一天之前根本不存在，兩個缺口互相掩護。
+        help: 'Invoice operations not yet in a terminal state, bucketed by age (58 M6)'
+        key_labels:
+          - age_bucket
+        values:
+          - cnt
+        query: |
+          SELECT CASE WHEN now() - created_at < interval '15 minutes' THEN 'lt15m'
+                      WHEN now() - created_at < interval '1 hour'     THEN '15m_1h'
+                      WHEN now() - created_at < interval '6 hours'    THEN '1h_6h'
+                      ELSE 'gt6h' END AS age_bucket,
+                 count(*)::float8 AS cnt
+          FROM invoice_operations
+          WHERE (
+                  status IN ('CREATED','AWAITING_TRIGGER','READY','HELD','SENDING',
+                             'RETRY_SCHEDULED','WAITING_CONFIRMATION','PROVIDER_STATUS_RECHECK',
+                             'FAILED_RETRY_EXHAUSTED','FAILED_UNKNOWN','SELLER_ACTION_REQUIRED',
+                             'CANCEL_REQUESTED','CANCEL_BLOCKED_UNKNOWN','MANUAL_PROCESS_ALLOWED')
+                  -- 🔴 CANCELLED_BY_ADMIN 只對**開立類**才是非終態（2026-09-08 #3257 實測修正）。
+                  --
+                  -- 它有兩條入邊：J28（雙人確認）與 J24（code=71 自動）。無論從哪條進來，
+                  -- 只有 ISSUE／REISSUE 需要繼續走 J29 → MANUAL_PROCESS_ALLOWED → J30
+                  -- 才算結案；而 VOID／ALLOWANCE／QUERY 走到這裡**就是結案**——端點 54
+                  -- 對它們逐字回 9349「這件工作不是開立類（作廢／折讓／查詢），不需要
+                  -- 人工出口解鎖；受控取消完成後即為結案」（dev 實測 2026-09-08）。
+                  --
+                  -- 原本一律計入 ⇒ 兩筆已結案的 ALLOWANCE 永遠留在 gt6h 桶裡讓
+                  -- InvoicePendingBacklog 永久紅，而它們**沒有任何動作可做**。
+                  -- 判準逐字鏡射 usecase 的 isIssuanceOperation（ISSUE／REISSUE 兩值）。
+                  OR (status = 'CANCELLED_BY_ADMIN' AND operation_type IN ('ISSUE','REISSUE'))
+                )
+          GROUP BY 1
+
+      # 🔴 I8：作廢後沒有重開後繼（58 §7 不變式表 I8，2026-08-31 補）。
+      #
+      # 設計書原文：「不存在『VOIDED 且 correction chain 無 ISSUED 後繼且
+      # voided_at < now()-15min』的 document」，機制欄寫「INV.dl 每 5 分鐘掃描告警
+      # （唯讀，不自動補償）」。
+      #
+      # ⚠️ 為什麼放在 sql_exporter 而不是 INV.dl：§22 的判準是「目的是**業務正確性**
+      # → 可考慮寫進 application code；**資料完整性監測** → 一律維運 SQL」。I8 是不變式
+      # 監測、設計書自己也標明「唯讀、不自動補償」⇒ 屬後者。放這裡另有兩個好處：
+      # 不動 worker 就沒有 promauto 重複註冊那類部署期風險，且與同批三支指標同一個
+      # 生命週期。**這是對設計書實作選擇的偏離，reviewer 可以推翻**——偏離的是「由誰掃」，
+      # 不是「掃什麼」與「唯讀」。
+      #
+      # 15 分鐘的寬限期不可省：REISSUE 是「先作廢、再開新件」兩步，中間那段時間
+      # 舊件確實是 VOIDED 且無後繼，而那是**正常過程**不是不變式破壞。
+      #
+      # correction chain 的接法：58 §5 的 DDL 註解逐字「重開文件指回鏈頭」
+      # ⇒ 後繼件的 original_document_id 指向原件 id（fk_invdoc_original 自我 FK）。
+      - metric_name: invoice_void_without_reissue
+        type: gauge
+        help: 'Voided documents with no ISSUED successor in the correction chain (58 I8)'
+        values:
+          - cnt
+        query: |
+          SELECT count(*)::float8 AS cnt
+          FROM invoice_documents d
+          WHERE d.status = 'VOIDED'
+            AND d.voided_at < now() - interval '15 minutes'
+            -- 🔴 **correction chain 是 I8 述詞的一部分**（58 §7 不變式表 I8 逐字：
+            -- 「VOIDED 且 **correction chain** 無 ISSUED 後繼且 voided_at < now()-15min」）。
+            -- 2026-09-08 之前這一句不存在 ⇒ 對**每一張** VOIDED 都查，於是「退款／取消
+            -- 造成的作廢」（本來就不該有後繼）永遠命中：dev 上 3 張純作廢票各自紅了
+            -- 4～8 天，佔當時 6 張告警量的一半。
+            -- I8 守的是「買家因為**更正**而失去憑證」；非更正的作廢由 InvoiceAdjustmentStuck
+            -- 與 InvoiceVoidingOrphaned 各守自己那一段，不歸本條。
+            AND EXISTS (
+                  SELECT 1 FROM invoice_correction_requests c
+                  WHERE c.document_id = d.id
+                )
+            AND NOT EXISTS (
+                  SELECT 1 FROM invoice_documents s
+                  WHERE s.original_document_id = d.id
+                    AND s.status = 'ISSUED'
+                )
+
+      # #2959 ⑧：document 停在 `VOIDING` 而**沒有任何東西會推它**。
+      #
+      # 為什麼需要它：`VOIDING` 不在 M7（法定上傳期限，§8.2.3 明列它為排除值）也不在
+      # M32 的涵蓋內，而 §7.3.1 的兩條出邊（→ VOIDED、→ ISSUED）**都由 VOID operation
+      # 驅動**。那個 operation 一旦落到終態而 document 沒跟著走，就沒有第二個執行者
+      # ——買家看到「處理中」，而那句話永遠不會再變。
+      #
+      # 🔴 判準是**不變式**不是時間門檻：時間門檻要猜「多久算久」，而 AMEGO 的 wait[]
+      #    佇列本來就會花不確定的時間。這裡問的是「還有沒有東西在推它」——
+      #    NOT EXISTS 一個處於兩支 worker 候選集合內的 VOID operation。
+      #    正常過程中一定有（所以平時恆為 0），真的孤兒時才 > 0。
+      #
+      # 候選集合逐字取自兩支 worker 的述詞，**改那邊就要改這裡**：
+      #   INV.op  FetchDueInvoiceOperations      READY / RETRY_SCHEDULED / SENDING
+      #   INV.rc  FetchPendingInvoiceRechecks    WAITING_CONFIRMATION / PROVIDER_STATUS_RECHECK /
+      #                                          FAILED_UNKNOWN / CANCEL_REQUESTED / CANCEL_BLOCKED_UNKNOWN
+      # ⚠️ FAILED_UNKNOWN 在候選集合**內**（不是終態）：作廢確認超過 24h 窗口之後
+      #    落在那裡，但 INV.rc 仍會繼續唯讀重查 ⇒ 它不算孤兒，不該被本指標數到。
+      #
+      # 告警方向（#2959 判準 B）：列進入孤兒狀態 ⇒ 計數上升；ADM 修好或 operation
+      # 回到候選集合 ⇒ 下降。兩個方向都會自動發生 ⇒ 不是永久紅。
+      - metric_name: invoice_documents_voiding_orphaned
+        type: gauge
+        help: 'Documents stuck in VOIDING with no VOID operation left in any scheduler candidate set (58 #2959 item 8)'
+        values:
+          - cnt
+        query: |
+          SELECT count(*)::float8 AS cnt
+          FROM invoice_documents d
+          WHERE d.status = 'VOIDING'
+            AND NOT EXISTS (
+                  SELECT 1 FROM invoice_operations o
+                  WHERE o.document_id = d.id
+                    AND o.operation_type = 'VOID'
+                    AND o.status IN ('READY','RETRY_SCHEDULED','SENDING',
+                                     'WAITING_CONFIRMATION','PROVIDER_STATUS_RECHECK',
+                                     'FAILED_UNKNOWN','CANCEL_REQUESTED','CANCEL_BLOCKED_UNKNOWN')
+                )
+
+      # ⚠️ `invoice_cross_period_pending` **不在本檔**，這是結論不是遺漏。
+      #
+      # 2026-08-31 我在這裡放過一支同名 gauge。讀 §8.2.3 才發現 **M20 早已指派給
+      # `INV.gov`**（「invoice-service 的每日治理掃描，§7.5.3 已登記此職責，
+      # **不新增第 N+1 支排程**」），而且 label 值域是 `open`／`closing`／`closed`
+      # **三個**，我做的只有兩個、判定規則也不同（我用時間差，規格是台北日期）。
+      # 已移除，改由 invoice-service 的 INV.gov 產生（#2969）。
+      #
+      # 🔴 **同一個錯我在同一天犯了兩次**（前一次是 `invoice_track_exhausted_sellers`／M21）。
+      # 第一次之後我把判準寫進了下面那段註解，然後照樣再犯 —— **寫下判準不等於執行判準**。
+      # 可機械執行的版本：**在本檔新增任何 `metric_name` 之前，先 grep
+      # `docs/詳細設計書/58-…md` 的 §8.2.3 M 表確認那個名字沒有主人**，
+      # 命中就不要寫在這裡。
+
+      # ⚠️ `invoice_track_exhausted_sellers` **不在本檔**，這是結論不是遺漏。
+      #
+      # 2026-08-31 我曾在這裡放過一支同名 gauge（數「因 3040111 卡在
+      # SELLER_ACTION_REQUIRED 的賣家」），當天稍後讀 §8.2.3 才發現 **M21 早已指派給
+      # `INV.trk`**，語意是「當期字軌已用盡（remaining==0 或 status ∈ {3 過期,9 用畢}）」
+      # ——兩者同名不同義，同時存在會讓 InvoiceTrackExhausted 讀到哪一個取決於抓取順序。
+      # 已移除，改由 invoice-service 的 INV.trk 產生（#2969）。
+      #
+      # 判準（可推廣）：**要新增指標前先在 §8.2.3 的 M 表查那個名字有沒有主人**。
+      # 名字是契約，先到先得會製造一個沒有任何東西會報錯的衝突。
+
+      # M7：逼近法定上傳期限（掛在**文件**上）。§9.1 指定的「三個 bucket 恆存在版」：
+      # 零逾期時 series 不存在 ⇒ no data 與 100% 在儀表板上一樣、在告警上不一樣。
+      # 四個不能改的地方：
+      #   ① 掛 invoice_documents 不是 invoice_operations（一文件多 operation ⇒ 同一張票被數很多次）
+      #   ② 欄位是 invoice_documents.statutory_deadline_at（operation 上的同名欄是反正規化副本）
+      #   ③ 狀態列舉不含 AWAITING_MANUAL——那是 overdue 桶唯一的排空路徑（逾期無法「補救成功」）；
+      #      含它 ⇒ 這條 critical 告警永久觸發
+      #   ④ (VALUES …) 必須在 LEFT JOIN 左邊（寫成 RIGHT JOIN 或子查詢在左，零筆時結果集是空的）
+      - metric_name: invoice_statutory_deadline_pending
+        type: gauge
+        help: 'Invoice documents approaching or past the statutory upload deadline (58 M7)'
+        key_labels:
+          - bucket
+        values:
+          - cnt
+        query: |
+          SELECT b.bucket, COALESCE(c.cnt, 0)::float8 AS cnt
+          FROM (VALUES ('lt6h'), ('lt2h'), ('overdue')) AS b(bucket)
+          LEFT JOIN (
+            SELECT CASE WHEN statutory_deadline_at <= now()                      THEN 'overdue'
+                        WHEN statutory_deadline_at <= now() + interval '2 hours' THEN 'lt2h'
+                        ELSE 'lt6h' END AS bucket,
+                   count(*)::float8 AS cnt
+            FROM invoice_documents
+            WHERE status IN ('PENDING','ISSUING','ISSUE_FAILED')
+              AND statutory_deadline_at IS NOT NULL
+              AND statutory_deadline_at <= now() + interval '6 hours'
+            GROUP BY 1
+          ) c ON c.bucket = b.bucket
+
+      # M8：收過 ORDER_PAID 卻沒有發票文件——「事件靜默失效」的唯一偵測手段
+      #（queue 沒建、binding key 打錯、consumer 被 skip 全部只在這裡現形）。
+      # 跨庫問題只能寫在 invoice 側（一個 job 只連一個 DSN）：以「invoice-service 收到過 order.paid」
+      # 為基準，因此偵測不到「事件根本沒送達」（那一段由 mq_consume_total 與 order 側 outbox 指標承擔）。
+      # ⚠️ NOT EXISTS 的對象是 invoice_documents 不是 invoice_operations：合法的「不開票」路徑
+      #    （零元訂單、免用發票賣家、切點前訂單）也會建文件（status=NOT_APPLICABLE）但不會建 operation
+      #    ⇒ 掛 operation 會讓那些訂單永遠留在桶裡 ⇒ 又一條永久紅。
+      # ⚠️ 排除 SKIPPED：那是「已決定不處理並留下 disposition」，本來就不該產生文件。
+      - metric_name: invoice_paid_orders_without_operation
+        type: gauge
+        help: 'Orders whose order.paid event was received but produced no invoice document (58 M8)'
+        key_labels:
+          - age_bucket
+        values:
+          - cnt
+        query: |
+          SELECT CASE WHEN now() - i.received_at < interval '15 minutes' THEN 'lt15m'
+                      WHEN now() - i.received_at < interval '1 hour'     THEN '15m_1h'
+                      ELSE 'gt1h' END AS age_bucket,
+                 count(*)::float8 AS cnt
+          FROM invoice_inbox_events i
+          -- 篩 event_type 不是 business_dedup_key 的前綴 LIKE（§12.5 R6 明文）：
+          -- uq_invinbox_business_key 是 (event_type, business_dedup_key) 複合唯一索引，
+          -- 前導欄是 event_type ⇒ 單獨對後者做前綴 LIKE 走不到索引，會隨表成長
+          -- 變成全表掃描並撞上本 job 的 scrape_timeout: 10s。
+          WHERE i.event_type = 'ORDER_PAID'
+            AND i.status IN ('RECEIVED','DEFERRED','FAILED','PROCESSED')
+            AND i.aggregate_ref IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM invoice_documents d
+                            WHERE d.source_type = 'ORDER' AND d.source_ref = i.aggregate_ref)
+          GROUP BY 1
+
+      # M30：inbox 裡「非終態且已經很久沒動」的列 —— 亦即**沒有任何執行者會來處理它**。
+      #
+      # 🔴 存在的理由：這張表的推進者不只一個（INV.dl 的兜底掃描、order.paid 成功後的
+      #    反向認領），而**每一個 event_type 的推進者是不是活的，是隨程式碼而變的**。
+      #    今天 INV.dl 只掃 ORDER_PAID（58 §7.2.2 的作廢／折讓 usecase 尚未落地，
+      #    掃 refund 只會空轉燒 attempt），所以 ORDER_REFUND_FINALIZED 的 DEFERRED／FAILED
+      #    列今天沒有任何自動執行者。在本指標出現之前，那些列是**完全看不見**的：
+      #    沒有 metric、沒有告警、DLQ 結構上恆為 0（pkg/mq 的 retry 會被 inbox 去重擋掉）。
+      #
+      # ⚠️ 述詞刻意**不列舉「誰有掃描器」**：那份名單會隨 code 改變而這裡不會有人記得改。
+      #    改用「非終態 ＋ 超過 7 天沒進終態」這個與執行者無關的判準 —— §7.2.2 落地之後
+      #    refund 列會開始推進，本指標自己就會降下來，不需要有人回來改它。
+      #    7 天取自 58 §7.2.5 與 §14 C-1 已載明（而從未被實作）的那條告警門檻。
+      #
+      # ⚠️ SKIPPED 與 PROCESSED 是終態，不列入：前者是「已決定不處理並留下 disposition」。
+      #    cutover 當下的歷史積壓要走 SKIPPED（見 docs/runbooks 的 inbox cutover 節），
+      #    不是靠放寬本述詞讓它消失。
+      # 折讓／作廢卡住（#3073，2026-09-03 補）。
+      #
+      # 🔴 這一格在 #3073 之前**不需要存在**：invoice_adjustments 全表零列，因為
+      #    AdjustmentApplier 是 Unimplemented。折讓執行軸落地之後它開始有列，而
+      #    ADM 對 invoice_adjustments **零可見性**（api/proto 與 internal/grpc 都零命中）
+      #    ⇒ 一筆折讓卡在 FAILED_PERMANENT／FAILED_UNKNOWN 是**完全無聲**的：
+      #    錢退了、憑證沒開、沒有人會知道。
+      #
+      # 三個狀態各有各的意思，所以 status 進 label 而不是合併成一個數字：
+      #   FAILED_PERMANENT   AMEGO 明確拒絕（金額超額、原票已折讓…）⇒ 要人判斷
+      #   FAILED_UNKNOWN     送出去了但結果查不到 ⇒ 不得重送，要人到 AMEGO 後台對帳
+      #   PENDING            §7.2.2 註 B 的機械保證：停在 PENDING 超過 24h 代表
+      #                      operation 沒被建出來，或 INV.op 沒在動
+      #
+      # ⚠️ 述詞刻意**不含 SENDING／WAITING_CONFIRMATION**：那兩個有自己的執行者
+      #    （INV.op 的第三軸與 INV.rc 的 ConfirmAllowance），停在那裡是正常過程。
+      #    🔴 SENDING 這一格成立的**前提**是 MarkInvoiceAdjustmentSending 的 allowed-from
+      #    含 SENDING 自己（租約回收）。dev 第 3 輪實測過它不含時的後果：持有者送出後
+      #    寫回前失敗 ⇒ claim 每次 rows=0 ⇒ 永久卡死，而本指標看不到它。
+      #    改那一句 allowed-from 之前，要先回來改這裡。
+      #    24h 的門檻沿用 G15 的放棄窗口 —— 過了它 WAITING_CONFIRMATION 會自己
+      #    轉成 FAILED_UNKNOWN，於是照樣落進本指標。
+      - metric_name: invoice_adjustment_stuck_rows
+        type: gauge
+        help: 'invoice_adjustments rows stuck with no automatic executor (FAILED_* any age; PENDING or WAITING_CONFIRMATION older than 24h) (58 §7.3.7)'
+        key_labels:
+          - adjustment_type
+          - status
+        values:
+          - cnt
+        query: |
+          SELECT adjustment_type,
+                 status,
+                 count(*)::float8 AS cnt
+          FROM invoice_adjustments
+          WHERE (status IN ('FAILED_PERMANENT','FAILED_UNKNOWN')
+                 OR (status = 'PENDING' AND created_at < now() - interval '24 hours')
+                 -- WAITING_CONFIRMATION 本身是合法的中間狀態，但 G15 明訂它必須在 24h
+                 -- 內離開（→ FAILED_UNKNOWN）。超過 24h 還在，依定義就是沒有執行者。
+                 -- 這一列原本整個不計 ⇒ 「作廢／折讓結果永遠不明」在指標上完全不存在。
+                 OR (status = 'WAITING_CONFIRMATION' AND updated_at < now() - interval '24 hours'))
+          GROUP BY 1, 2
+
+      # 🔴 行事曆鏡像的新鮮度（58 §5.1.14；2026-09-04 補）。
+      #
+      # 這一格是「機制自己有沒有在跑」的唯一訊號。鏡像過期的後果**完全靜默**：
+      # BusinessCalendar 對未涵蓋日一律當假日 ⇒ 申訴 SLA 悄悄退到 14 自然日的
+      # 硬上限，而 ComplaintSlaDueAt 恆有回傳值、沒有錯誤、沒有測試會紅。
+      #
+      # 🔴 空表回 -1 而不是「沒有序列」：後者在 PromQL 上與「exporter 掛了」
+      # 無法分辨，而空表恰恰是最該告警的狀態（同步器從未成功跑過一次）。
+      # 用 max(synced_at) 而不是 count(*)：假日筆數本來就會隨區間變動，
+      # 而「上一次成功同步是什麼時候」才是這個機制的健康度。
+      - metric_name: invoice_business_day_mirror_age_seconds
+        type: gauge
+        help: 'Seconds since the business-day mirror was last synced; -1 when the mirror is empty (58 M39/5.1.14)'
+        values:
+          - age
+        query: |
+          SELECT COALESCE(EXTRACT(EPOCH FROM (now() - MAX(synced_at))), -1)::float8 AS age
+          FROM invoice_business_day_mirror
+
+      - metric_name: invoice_correction_stuck_rows
+        type: gauge
+        help: 'invoice_correction_requests rows stuck at REISSUE_FAILED longer than the 15-minute SLA, i.e. the buyer holds a voided invoice and no replacement exists (58 §7.3.6)'
+        key_labels:
+          - status
+        values:
+          - cnt
+        query: |
+          -- 🔴 REISSUE_FAILED 是設計書自稱「最嚴重的單一狀態」：買家原本持有的合法發票
+          -- 已經作廢、新發票不存在，而那是平台的操作造成的。§7.3.6 要求 15 分鐘獨立 SLA。
+          --
+          -- 在 2026-09-04 之前 invoice_correction_requests 在 monitoring/ **全域零命中**
+          -- ——dev 上 3 列卡了 1–2 天沒有任何人知道（#3089 A 組第 1 項）。
+          --
+          -- ⚠️ 既有的 I8（invoice_void_without_reissue）守不到這一格：它的述詞是文件側
+          -- （原票 VOIDED 且無 ISSUED 後繼），一旦重試成功、新票轉 ISSUED，I8 立刻熄滅，
+          -- 而 correction 那一列仍停在 REISSUE_FAILED、reissued_document_id 仍是 NULL。
+          -- 那正是「列卡死時剛好離開告警述詞」的形狀，所以要獨立一條看 correction 自己。
+          -- 🔴 時間錨是 created_at **不是 updated_at**（2026-09-04 dev 實機驗證抓到）。
+          --
+          -- 用 updated_at 的話，一列**反覆被 ADM 重試**就永遠離不開 15 分鐘窗口：
+          -- 每按一次重試 updated_at 就前進，而重開票 8 秒後又失敗回 REISSUE_FAILED
+          -- ⇒ 指標從 3 掉到 2，**而那一列其實還卡著**。實測就是這樣發生的：
+          -- correction 7500463275147001856 在 04:44:07 被推回 VOID_REISSUE_IN_PROGRESS、
+          -- 04:44:15 又落回 REISSUE_FAILED，指標當場少算一筆。
+          --
+          -- 那正是 `.claude/rules/06-no-small-tails.md` §3.10 最後一列的形狀：
+          -- **列卡死時剛好離開告警述詞**，告警在最需要的時候熄滅。
+          --
+          -- created_at 不會被重試更新，而且語意更貼近 §7.3.6 的 15 分鐘 SLA ——
+          -- 那個 SLA 計時的起點是「買家的合法發票已作廢、新發票不存在」這個狀態，
+          -- 不是「上一次有人碰它」。
+          SELECT status,
+                 count(*)::float8 AS cnt
+          FROM invoice_correction_requests
+          WHERE status = 'REISSUE_FAILED'
+            AND created_at < now() - interval '15 minutes'
+          GROUP BY 1
+
+      - metric_name: invoice_inbox_stranded_rows
+        type: gauge
+        help: 'Non-terminal invoice_inbox_events rows older than 7 days, i.e. nothing is going to process them (58 M30)'
+        key_labels:
+          - event_type
+          - status
+        values:
+          - cnt
+        query: |
+          SELECT event_type,
+                 status,
+                 count(*)::float8 AS cnt
+          FROM invoice_inbox_events
+          WHERE status IN ('RECEIVED','DEFERRED','FAILED')
+            AND received_at < now() - interval '7 days'
+          GROUP BY 1, 2
+
+      # M31：invoice_outbox_events 裡「沒有任何執行者會完成它」的列 —— M30 的 outbox 對照。
+      #
+      # 🔴 為什麼要單獨一支：M30 的 FROM 只有 invoice_inbox_events，對 outbox 表**結構性全盲**。
+      #    兩張表的失效形狀不同，同一支查詢蓋不住：
+      #      inbox  沒有真正的終態（候選述詞含 'FAILED'）⇒ 危險的是「久久沒推進」
+      #      outbox 的 'failed' 是**永久旗標**（FetchPending／Claim／idx_invoutbox_pending
+      #             全是 status='pending'，沒有任何時間欄能讓它回來，DeleteDoneBefore 只刪
+      #             'done'）⇒ 危險的是「落到 failed」本身，而且**告警方向是反的**：
+      #             CountPending／OldestPending 的述詞同樣是 'pending'，所以一列落到
+      #             'failed' 的同時就退出 outbox_oldest_pending_age_seconds ⇒
+      #             InvoiceOutboxLag 會在事件真正卡死那一刻由 firing 轉 resolved。
+      #
+      # 程式面已改成**停泊不終結**（internal/worker/outbox_worker.go 的 outboxRepo.MarkFailed
+      # → domain.OutboxRepository.Park），所以 'failed' 不再由任何程式路徑寫入。它剩下的唯一
+      # 來源是維運 SQL 的隔離（把一列毒 payload 拿出候選集合），而那正是最需要被記得的一種列。
+      #
+      # 兩個並聯述詞，判準都與「今天哪支 worker 活著」無關（M30 的同一條原則）：
+      #   ① status='failed' —— 本表**沒有任何查詢**會再撈它 ⇒ 結構上就是死路，出現一列即計數，
+      #      不等 7 天（等於「有人隔離了一列然後忘記它」）
+      #   ② status='pending' 且建立超過 7 天 —— 停泊會自己重試，修不好的會停在這裡。
+      #      刻意不用「attempt_count >= MaxAttempts」：MaxAttempts 是 Go 常數，複製進 SQL 的
+      #      那一份不會有人跟著改（M30 的同一條理由）。
+      #
+      # ⚠️ 述詞**正面列舉**狀態值（'failed'／'pending'），不用 `status <> 'done'`
+      #    —— 與 §8.2.5 對其餘五支的要求同一條：用否定述詞的話，日後新增一個終態會讓那些列
+      #    永遠留在桶子裡 ⇒ 告警永久紅 ⇒ 被靜音 ⇒ 等於沒有。
+      #    代價是新增一個**非終態**而忘了登記這裡會漏數，而那個方向由 §8.2.5 的
+      #    「正面列舉」慣例統一承擔（漏數會被 InvoiceOutboxLag 的時效面接住，永久紅不會）。
+      #
+      # ⚠️ event_type 是有界基數（CodeMeta InvoiceEventType，個位數）⇒ 可以當 label；
+      #    routing_key 同樣有界但資訊量重疊，不加。
+      - metric_name: invoice_outbox_stranded_rows
+        type: gauge
+        help: 'invoice_outbox_events rows nothing will ever complete: quarantined (failed) or parked over 7 days (58 M31)'
+        key_labels:
+          - event_type
+          - status
+        values:
+          - cnt
+        query: |
+          SELECT event_type,
+                 status,
+                 count(*)::float8 AS cnt
+          FROM invoice_outbox_events
+          WHERE status = 'failed'
+             OR (status = 'pending' AND created_at < now() - interval '7 days')
+          GROUP BY 1, 2
+
+      # M32：停在 AWAITING_MANUAL 的文件 —— 「等人」這一類的唯一能見度。
+      #
+      # 🔴 為什麼要單獨一支（與 M30／M31 同一個 class 的第四個實例，而且更嚴重）：
+      #    AWAITING_MANUAL 的列在**六支既有指標裡一支都數不到**，而它的法定上傳期限照樣在倒數。
+      #      M6  invoice_pending_operations       —— AWAITING_MANUAL 的建立邊**不建 operation**
+      #          （usecase/issuance.go 的 plan.makeOp = false，§7.1.3 的 AM 節點明文）⇒ 結構性全盲
+      #      M7  invoice_statutory_deadline_pending —— 述詞 status IN ('PENDING','ISSUING','ISSUE_FAILED')
+      #      M8  invoice_paid_orders_without_operation —— NOT EXISTS 的對象是 invoice_documents，
+      #          只要「有一份文件」就出桶，不問那份文件是不是還需要人
+      #      M30／M31 —— inbox／outbox 兩張表
+      #      invoice_issue_total（M1，⑤與⑰的來源）—— 只由 internal/worker/issue_worker.go 遞增，
+      #          而那支走的是 **operation**；沒有 operation ⇒ 一次都不會加
+      #
+      # 🔴 **告警方向本來是反的**，這才是它必須存在的理由：ISSUE_FAILED → AWAITING_MANUAL 是
+      #    合法轉換（MarkInvoiceDocumentAwaitingManual 的 allowed-from 逐字含 ISSUE_FAILED）。
+      #    翻過去的那一刻，該列同時退出 M7 的 overdue 桶 ⇒ InvoiceStatutoryDeadlineOverdue
+      #    （critical、唯一與罰款直接相關）由 firing 轉 resolved，而那張票一張都還沒開出去。
+      #    坐實它的是 internal/repository/postgres/awaiting_manual_blindspot_integration_test.go
+      #    （跑本檔的查詢原文，前後對照同一列）。
+      #
+      # ⚠️ **不是把 AWAITING_MANUAL 併進 M7**：M7 的 ③ 已寫明併進去會讓那條 critical 永久觸發
+      #    （逾期無法「補救成功」）。正解是**交棒**不是合併 —— 列從 M7 掉出來的同時進入本指標，
+      #    訊號不中斷、而兩邊各自的排空條件都還成立。M7 是「還在自動線上」，本指標是「在等人」，
+      #    runbook 完全不同（前者查 AMEGO，後者去 ADM 工作台做判定）。
+      #    「M7 ∪ M32 覆蓋每一個未結案狀態」由 TestDocumentStatusCoverageHasNoSilentTerminal 守。
+      #
+      # ⚠️ 本指標的 overdue 桶**長期紅著是正確的**，不是誤報：它的排空路徑是三個真實的 ADM
+      #    動作（ResumeFromManual／MarkResolvedExternally／CancelBeforeIssue），有人做了就會降。
+      #    與 M7 的差別正在這裡 —— M7 的 overdue 桶沒有人工排空路徑，所以才不能含 AWAITING_MANUAL。
+      #
+      # 🔴 **那三個動作在 2026-09-05 之前對「零 operation 的 document」一個都到不了**，
+      #    所以上面那句話對其中一整類是假的。自動線判定要人工介入時（DecideFulfillment 的
+      #    四個葉子）document 落 AWAITING_MANUAL 而 **operation 根本不建**（§7.1.3 的 AM 節點
+      #    明文），而端點 52／53／56 的呼叫端全部以 operation id 為鍵 ⇒ 那些列沒有任何人推得動，
+      #    而且**不會出現在下面說的 ADM 工作台**（端點 50 是 invoice_operations INNER JOIN
+      #    invoice_documents，job-first）。dev 實證：同賣家同金額，有 operation 的走完全程
+      #    ISSUED，零 operation 的 version 恆 1。
+      #    ⇒ 已補**端點 73**（`POST /admin/invoices/documents/{id}/manual_resolutions`，
+      #    usecase `AdminJob.ResumeDocumentFromManual`）：它同時做 ResumeFromManual 與
+      #    「補建那件缺席的 ISSUE operation」，是這一類唯一的入口。名單見下一段的 SQL
+      #    （那支 SQL 本來就直接查 invoice_documents，不受工作台的 INNER JOIN 影響）。
+      #
+      # ⚠️ 四個 bucket 恆存在（同 M7 的 (VALUES …) LEFT JOIN，且 (VALUES …) 必須在左邊）：
+      #    零筆時 series 不存在 ⇒ no data 與 0 在告警上不一樣。
+      # ⚠️ 刻意**不把 manual_reason_code 當 label**：InvoiceManualReason 有 32 值，× 4 bucket
+      #    ＝ 128 條恆存在的序列，而它的用途是查名單不是告警分流。名單走 ADM 工作台
+      #    （端點 50 的 NEEDS_MANUAL 分頁），與 M7 把逐筆處置指向端點 52 是同一個慣例。
+      #    ⚠️ **工作台看不到零 operation 的那些**（端點 50 是 job-first 的 INNER JOIN）：
+      #    那一類要走 A12 文件查詢（端點 47）→ A13 詳情（端點 48）→「送回自動線」（端點 73）。
+      #    下面那支名單 SQL 兩類都查得到，因為它直接查 invoice_documents。
+      - metric_name: invoice_documents_awaiting_manual
+        type: gauge
+        help: 'Invoice documents parked in AWAITING_MANUAL, bucketed by statutory deadline (58 M32)'
+        key_labels:
+          - bucket
+        values:
+          - cnt
+        query: |
+          SELECT b.bucket, COALESCE(c.cnt, 0)::float8 AS cnt
+          FROM (VALUES ('overdue'), ('lt2h'), ('lt6h'), ('later')) AS b(bucket)
+          LEFT JOIN (
+            SELECT CASE WHEN statutory_deadline_at IS NULL                    THEN 'later'
+                        WHEN statutory_deadline_at <= now()                    THEN 'overdue'
+                        WHEN statutory_deadline_at <= now() + interval '2 hours' THEN 'lt2h'
+                        WHEN statutory_deadline_at <= now() + interval '6 hours' THEN 'lt6h'
+                        ELSE 'later' END AS bucket,
+                   count(*)::float8 AS cnt
+            FROM invoice_documents
+            WHERE status = 'AWAITING_MANUAL'
+            GROUP BY 1
+          ) c ON c.bucket = b.bucket
+      # M33：未結案的買家申訴 —— 與 M32 是同一個 root cause 的第二張表。
+      #
+      # 🔴 2026-08-31 盤點：`invoice_complaints` 整張表在 sql_exporter 與 business-alerts
+      #    **零指標零告警**（實測 grep 命中皆為 0），而它的四個非終態全都是「在等某個人」：
+      #      OPEN              等賣家回覆（sla_due_at，3 個工作天）
+      #      SELLER_RESPONDED  等買家異議期屆滿（buyer_review_due_at，72h）
+      #      OVERDUE           等 K05 升級（overdue_at）
+      #      ESCALATED_TO_ADM  **等 ADM 裁決 —— 連一個時間欄都沒有**
+      #    前三者至少有一個時間欄可以讓掃描器找到它們（雖然 K04／K05／K06 的掃描器
+      #    今天都還沒落地，見 internal/worker/deadline_worker.go 檔頭）；ESCALATED_TO_ADM
+      #    連時間欄都沒有 ⇒ 它是 M32 的 AWAITING_MANUAL 在申訴軸上的同構體。
+      #
+      # ⚠️ 述詞用**建案年齡**而不是那三個各不相同的到期欄：判準必須與「今天哪支掃描器活著」
+      #    無關（M30／M31／M32 的同一條原則）。三個到期欄分屬三個狀態，寫成 CASE 會讓
+      #    ESCALATED_TO_ADM 落進「沒有到期欄」的空隙 —— 那正是本指標要照亮的地方。
+      # ⚠️ 正面列舉四個非終態；RESOLVED／VIOLATION_CONFIRMED／WITHDRAWN 是終態
+      #    （chk_invcomp_resolved_pair 保證前兩者一定有 resolved_at）。
+      # ⚠️ status 是封閉七值、age_bucket 三值 ⇒ 最多 12 條序列，可以當 label。
+      - metric_name: invoice_complaints_unresolved
+        type: gauge
+        help: 'Invoice complaints not in a terminal state, bucketed by age since filing (58 M33)'
+        key_labels:
+          - status
+          - age_bucket
+        values:
+          - cnt
+        query: |
+          SELECT status,
+                 CASE WHEN now() - created_at < interval '3 days' THEN 'lt3d'
+                      WHEN now() - created_at < interval '7 days' THEN '3d_7d'
+                      ELSE 'gt7d' END AS age_bucket,
+                 count(*)::float8 AS cnt
+          FROM invoice_complaints
+          WHERE status IN ('OPEN','SELLER_RESPONDED','OVERDUE','ESCALATED_TO_ADM')
+          GROUP BY 1, 2
+      # M17：最舊稽核列年齡。守「保留期清理該跑而沒跑」——清理是維運 SQL，沒有程式會自動跑它。
+      # ⚠️ 時間欄是 occurred_at（本表沒有 created_at）。
+      # ⚠️ 這一支本來就該紅到有人去跑（InvoiceRetentionOverdue 的門檻 1826 必須與
+      #    INVOICE_AUDIT_RETENTION_DAYS 同值）。
+      - metric_name: invoice_audit_oldest_row_age_days
+        type: gauge
+        help: 'Age in days of the oldest invoice_provider_audit_logs row (58 M17)'
+        values:
+          - age_days
+        query: |
+          SELECT COALESCE(EXTRACT(day FROM now() - min(occurred_at)), 0)::float8 AS age_days
+          FROM invoice_provider_audit_logs
+
+  # ── Pricebook 行情資料完整性（ADR pricebook-ingest-window-resilience-scope D1）──
+  #
+  # 這一組量「資料本身」，不是「排程 job 有沒有回報失敗」。ingest_run 那張稽核表
+  # 已被實證會騙人：2026-08-14 那次 status=succeeded、零錯誤訊息，但上游 3 個大
+  # 市場整批空手（見 wiki stale-record-vs-live-state-verification）。這也是
+  # data-observability 的標準框法（dbt source freshness、Monte Carlo/Soda）。
+  #
+  # 🔴 **但「資料多舊」單獨拿來告警是錯的，這一點是 2026-09-02 實測出來的**：
+  # MOA 的上架延遲本來就是長尾分佈。近 40 天 646 個 (市場,交易日) 實測——
+  #   當天到 272（42%）／落後 1 天 178（28%）／2 天 108（17%）／3 天 68（11%）／
+  #   4 天 11／5 天 5／6 天 3／11 天 1
+  # ——所以任一時刻總有一批市場「還沒到齊」，那是**正常運作中的狀態**，不是故障。
+  # 分區模型的 pending 狀態正是為了吃這條長尾（見 usecase/price_partition.go）。拿
+  # 「最新資料距今幾天」當門檻，會在 11% 的常態延遲上誤報，然後被靜音——跟這個
+  # collector 一開始要取代的「對 NeedsAttention 告警」是同一個病。
+  #
+  # 真正該叫人的是**再也救不回來的缺口**：某一格重試用盡（MaxIngestAttempts=14）
+  # 被標成 abandoned，排程就再也不會撿它，只能人工跑 cmd/pricebook-backfill。
+  # ADR D1 擔心的正是這件事，而 ingest_run 的 NeedsAttention 完全報不出來——
+  # 它報的是長尾（天天有），漏的是永久缺口。
+  # 2026-09-02 實測 dev：27 個這樣的 (市場,交易日) 缺口，其中 2026-07-24 是 21 個
+  # 市場全中；隔日 backfill 證實上游那天 21 個市場全部有資料，缺口是我方造成的。
+  - collector_name: pricebook_freshness
+    metrics:
+      # 🔴 主訊號：系統自己判定「拿不到、已放棄」的格子數。
+      #
+      # 這一版直接讀 ingest_partition.status。分區模型上線後，「哪一格缺」是
+      # 系統內建的狀態，不必再從外面用 40 天 CROSS JOIN 重建；判定門檻
+      # （MaxIngestAttempts，依實測上架延遲分佈訂在 14）也搬進服務裡，跟這份
+      # 設定解耦——之後調整門檻不需要動 monitoring。
+      #
+      # status = 4（abandoned）的語意：那一格重試次數用盡仍拿不到，排程再也
+      # 不會撿它，只能人工跑 cmd/pricebook-backfill。健康時恆為 0，所以門檻
+      # 就是 > 0，不需要猜。
+      #
+      # ⚠️ 部署順序：本查詢依賴 ingest_partition 表，**必須在 pricebook-service
+      # 的 migration 套用之後**才更新這份設定。做反了每次 scrape 都會撞
+      # relation does not exist，SqlExporterScrapeErrors 直接永久紅——而永久紅
+      # 跟失明的後果相同。
+      - metric_name: hawkr_pricebook_market_unrecoverable_gap_days
+        type: gauge
+        help: 'Ingest partitions this market gave up on (attempts exhausted) — the daily job will never retry these; 0 = healthy'
+        key_labels:
+          - market_code
+          - market_name
+        values:
+          - gap_days
+        query: |
+          SELECT m.market_code AS market_code,
+                 m.name        AS market_name,
+                 count(p.*) FILTER (WHERE p.status = 4)::float8 AS gap_days
+          FROM market m
+          LEFT JOIN ingest_partition p ON p.market_id = m.id
+          WHERE m.active
+          GROUP BY m.market_code, m.name
+
+      # 輔助診斷（不 page）：排程 ingest 上一次**啟動**是幾小時前。
+      #
+      # 🔴 這一版刻意不看「有沒有寫進東西」。上一版的條件是
+      # `(inserted_count + revised_count) > 0`，把「有沒有寫入」當成「job 有沒有在
+      # 跑」的代理——digest-dedupe 之下那個代理是錯的：最近 10 次排程有 4 次
+      # （08-27／08-29／08-30／09-02）inserted=0 而 fetched 一萬多筆，因為上游那天
+      # 沒有出任何我們還缺的資料。08-29～08-31 連著兩次如此，兩次寫入間隔 72 小時，
+      # 30 小時的門檻會在其中約 42 小時內誤報，而那三天排程完全正常。
+      #
+      # 「有沒有寫入」是**資料完整度**的問題，已經由上面的 unrecoverable_gap 主訊號
+      # 負責；這一條只回答**活性**——排程有沒有跑——所以不加任何條件。從未跑過回 -1。
+      - metric_name: hawkr_pricebook_ingest_last_run_age_hours
+        type: gauge
+        help: 'Hours since the last scheduled ingest run started, regardless of outcome; -1 if never'
+        values:
+          - age_hours
+        query: |
+          SELECT COALESCE(
+                   EXTRACT(EPOCH FROM (now() - MAX(started_at))) / 3600,
+                   -1
+                 )::float8 AS age_hours
+          FROM ingest_run
+          WHERE kind = 1
+
+      # 輔助診斷：最近一次排程匯入是不是以 Failed(3) 收場。
+      # 活性訊號答「有沒有跑」，這條答「跑了但死了」——兩者拆開才不會互相遮蔽。
+      # NeedsAttention(4) 不算：那是「結果需要人看」，分區模型上線後由 pending／
+      # abandoned 的格子承接，不該再拿來 page。
+      - metric_name: hawkr_pricebook_ingest_last_run_failed
+        type: gauge
+        help: 'Whether the most recent scheduled ingest run ended in status=Failed(3)'
+        values:
+          - failed
+        query: |
+          SELECT (CASE WHEN status = 3 THEN 1 ELSE 0 END)::float8 AS failed
+          FROM ingest_run
+          WHERE kind = 1
+          ORDER BY started_at DESC
+          LIMIT 1
+
+      # 早期預警：pending 的格子已經落後超過實測長尾的市場數（attempt_count >= 4）。
+      #
+      # 補的是主訊號的時間盲區：abandoned 要 MaxIngestAttempts=14 次嘗試才會到，
+      # 也就是整條線斷掉之後要 14 天才叫得出人來。實測 40 天 646 格的上架延遲分佈裡
+      # 落後 4 天以上只有 20 格（3%）且分散在不同市場，所以「同時 >= 11 個市場落後
+      # 4 天以上」不可能是常態長尾，只可能是整條線出事。
+      - metric_name: hawkr_pricebook_partition_overdue_markets
+        type: gauge
+        help: 'Active markets with pending ingest partitions already past the observed long tail (attempt_count >= 4)'
+        values:
+          - markets
+        query: |
+          SELECT count(DISTINCT p.market_id)::float8 AS markets
+          FROM ingest_partition p
+          JOIN market m ON m.id = p.market_id AND m.active
+          WHERE p.status = 1 AND p.attempt_count >= 4
+
+      # 輔助診斷：卡在 Running 的匯入列。backfill CLI 中斷後那一列永遠停在
+      # status=1，沒有任何東西會收尾它（dev 上 2026-08 就留了 18 列）。
+      - metric_name: hawkr_pricebook_ingest_stuck_running_total
+        type: gauge
+        help: 'ingest_run rows still status=Running(1) more than 6h after they started'
+        values:
+          - stuck
+        query: |
+          SELECT count(*)::float8 AS stuck
+          FROM ingest_run
+          WHERE status = 1 AND started_at < now() - interval '6 hours'
+
+      # 已接受的缺口（status = 5，AcceptedGap）：人工向上游查證過「那一天確實
+      # 沒有資料」的格子。**刻意沒有對應的告警**——誰都補不到的東西叫人也沒用。
+      #
+      # 它仍然是一個 metric 而不是被刪掉，因為「接受」必須看得見：完整度報表
+      # 少掉的那幾格要有地方交代，否則接受就等於湮滅。數字持續變大代表上游的
+      # 資料品質在退步，那是要看的訊號，只是不該用 page 的方式看。
+      #
+      # 只有 cmd/pricebook-backfill --accept-gap 會產生這個狀態，排程與 backfill
+      # 都不會——系統不准自己把自己的告警關掉。理由見 ADR
+      # 2026-09-03-pricebook-accepted-gap-terminal-state。
+      - metric_name: hawkr_pricebook_market_accepted_gap_days
+        type: gauge
+        help: 'Ingest partitions a human accepted as confirmed-absent upstream; visibility only, never alerts'
+        key_labels:
+          - market_code
+          - market_name
+        values:
+          - accepted_days
+        query: |
+          SELECT m.market_code AS market_code,
+                 m.name        AS market_name,
+                 count(p.*) FILTER (WHERE p.status = 5)::float8 AS accepted_days
+          FROM market m
+          LEFT JOIN ingest_partition p ON p.market_id = m.id
+          WHERE m.active
+          GROUP BY m.market_code, m.name

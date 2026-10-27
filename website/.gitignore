@@ -1,0 +1,103 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# next.js
+.next/
+out/
+
+# production
+build/
+
+# misc
+.DS_Store
+*.pem
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# playwright
+test-results/
+playwright-report/
+.playwright-mcp/
+.playwright-cli/
+# Visual-regression baselines: large, dev-only (specs are test.skip in CI),
+# and regenerated per-file before each migration via --update-snapshots.
+tests/visual/**/*-snapshots/
+
+# tooling local state
+.claude/
+.firebase/
+
+# build artifacts
+output/
+
+# reference docs (keep out of repo)
+預設模組.openapi.json
+*.bak
+
+# Better Auth generated schema (dev reference; SoT 在 account-service atlas)
+better-auth.schema.sql
+
+# Apple Sign In .p8 key (uploaded to VM per deploy, never committed)
+AuthKey_*.p8
+env.local
+
+# git worktrees (superpowers)
+.worktrees/
+backend-issue-prompt.md
+
+# Lighthouse CI reports (.lighthouseci/ is lhci's own hardcoded internal
+# scratch dir; lighthouse-reports/ is the configured filesystem upload target
+# — kept non-dot-prefixed, see deploy.yml comment on the upload-artifact step)
+.lighthouseci/
+lighthouse-reports/
+docs/backend-issues/B-196-web-seller-onboarding-endpoints.md
+.gitignore
+docs/backend-issues/B-197-needs-onboarding-flag-inconsistency.md
+docs/backend-issues/B-195-oauth-endpoint-app-vs-web-divergence.md
+docs/E2E-B195-result.md
+seller-login-white.png
+.gitignore
+.gitignore
+.codex/config.toml
+.codex/config.toml
+
+certificates
+
+# OpenNext / Cloudflare Workers
+.open-next/
+.wrangler/
+.dev.vars
+cloudflare-env.d.ts
+docs/threads-promotion-plan.md
+.gitignore
+.gitignore
+scripts/hawkr-bd-outreach.config.ts
+scripts/hawkr-bd-outreach.ts
+scripts/hawkr-bd-sheet-dry-run.ts
+tests/hawkr-bd-outreach.test.ts
+tests/hawkr-bd-sheet-dry-run.test.ts
+.pnpm-store/
+
+# Generated from the installed MapLibre package during Next build/dev startup.
+/public/generated/maplibre/
+
+# 本機驗證用的截圖與腳本（含 dev 環境資料，不得提交）
+.claude-verify/
+.impeccable/critique/2026-08-04T22-55-22Z__features-seller-components-descriptioneditor-tsx.md

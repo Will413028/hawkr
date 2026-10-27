@@ -1,0 +1,6 @@
+[
+  {"targets": ["<MONITORING_HOST_IP>:9187"],  "labels": {"service": "postgres-infra", "env": "dev"}},
+  {"targets": ["<MONITORING_HOST_IP>:9121"],  "labels": {"service": "redis-infra", "env": "dev"}},
+  {"targets": ["<MONITORING_HOST_IP>:15692"], "labels": {"service": "rabbitmq-infra", "env": "dev"}},
+  {"targets": ["<MONITORING_HOST_IP>:9100"],  "labels": {"service": "node-exporter", "env": "dev"}}
+]

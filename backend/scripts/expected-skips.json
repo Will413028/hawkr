@@ -1,0 +1,8 @@
+{
+  "//": "被 skip 的測試白名單。key = <package>::<TestName>，value = 為什麼它可以不跑。",
+  "//規則": "規則不是『不准 skip』，是『不准未宣告的 skip』。加一行之前先問：它為什麼跳過？如果是環境不符（連不到某個服務、缺某個變數），那多半代表這支測試從來沒有真的跑過——本 repo 已經有五批這種測試，其中兩批一跑就 FAIL。正解是讓它能跑，不是登記進來。",
+  "//維護": "雙向檢查：未登記的 skip 會紅；登記了卻不再發生的也會紅（防止清單腐化成墳場）。",
+
+  "github.com/Will413028/hawkr/ai-service/internal/agent::TestAllAgentsCreation": "需要真實的 GEMINI_API_KEY 才能建構 agent。CI 從未提供該變數（grep .github/ 零命中），且 Gemini 專案月額度已用盡（#1979）。本機開發者設了 key 才會跑。要讓它在 CI 跑必須先把 agent 建構改成可注入假 client——那是 ai-service 的重構，不在此 gate 的範圍。",
+  "github.com/Will413028/hawkr/ai-service/internal/agent::TestNewAgents_MapsPopulated": "同上，同一個 GEMINI_API_KEY 前置條件。"
+}

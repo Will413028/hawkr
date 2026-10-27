@@ -1,0 +1,722 @@
+/* Extracted from styles/globals.css.
+ * Reset, typography, layout primitives, legacy nav/footer foundations.
+ * Keep import order in styles/globals.css unless intentionally changing cascade.
+ */
+
+/* ===========================================
+   2. CSS RESET / BASE STYLES
+   =========================================== */
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	height: 100%;
+	margin: 0;
+	padding: 0;
+}
+
+html {
+	/* 不設全域 scroll-behavior: smooth — 它會讓所有程式化捲動（導航捲頂、
+	 * 列表捲動還原、modal 關閉歸位）都變成滑行，與 Next 的捲動恢復互相
+	 * 拉扯造成抖動。需要平滑捲動的地方（頁內錨點、特定容器）各自以
+	 * scrollIntoView({ behavior: "smooth" }) 或容器級 CSS 明確宣告。 */
+	/* Reserve the scrollbar gutter so overlays that lock body scroll
+	 * (Dialog/Sheet, drawers, modals — they set `body { overflow: hidden }`)
+	 * don't make the page shift sideways when the scrollbar vanishes.
+	 * No-op on overlay-scrollbar systems (macOS trackpad). */
+	scrollbar-gutter: stable;
+}
+
+/* ===========================================
+   2b. 字體大小設定（小 / 中 / 大）
+   ===========================================
+ * 唯一真實來源是 <html> 的 `data-text-scale`，由 components/shared/RootDocument.tsx 的
+ * `hk-text-scale-boot` 於 hydration 前寫入（見 lib/theme/text-scale.ts）。
+ * 中 = 沒有屬性，所以絕大多數讀者不會多出任何一條規則。
+ *
+ * 只改根 font-size：全站排版走 rem，字級因此整體縮放，不必逐處覆寫。
+ * `--hk-text-scale` 是同一個倍率的數值版本，給 styles/globals.css 的
+ * `@theme { --spacing: … }` 反向補償 Tailwind 的間距（否則 p-4 / size-11
+ * 會跟著一起放大縮小，版面與 44px 觸控目標就守不住了）。 */
+:root {
+	--hk-text-scale: 1;
+}
+
+html[data-text-scale="sm"] {
+	font-size: 87.5%;
+	--hk-text-scale: 0.875;
+}
+
+html[data-text-scale="lg"] {
+	font-size: 112.5%;
+	--hk-text-scale: 1.125;
+}
+
+body {
+	font-family: var(--font-chinese);
+	font-size: var(--text-sm);
+	font-weight: var(--weight-regular);
+	line-height: var(--leading-normal);
+	color: var(--text-body);
+	background: var(--site-grainient-base);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	-webkit-overflow-scrolling: touch;
+}
+
+img {
+	display: block;
+	max-width: 100%;
+	height: auto;
+	/* Block the browser's native "drag image to desktop / address bar"
+	 * gesture site-wide. The HTML5 `draggable="false"` attribute alone
+	 * doesn't cover older WebKit; `-webkit-user-drag: none` does. We
+	 * already set both ad-hoc on PostDetailViewer / BrandLogo — making
+	 * it the default means new screens inherit the behaviour without
+	 * each author remembering. Drop-zones (UploadStep, ImageUploader,
+	 * ImageDropCell) listen on the wrapper div, not on <img>, so this
+	 * does not block dragging files INTO the page. */
+	-webkit-user-drag: none;
+	user-select: none;
+}
+
+/* Same rationale as the img rule above, but for the anchor itself: card
+ * grids are wall-to-wall <a> wrappers (product / post / seller cards), and
+ * mouse-dragging one pops the browser's native link-preview ghost (link
+ * title + URL chip) — which reads as a glitch, especially while panning a
+ * horizontal rail. The img rule only blocks the image ghost; the anchor
+ * stays draggable on its own, so suppress it here too. Unlayered (not in
+ * the @layer base block below) so it never competes with color utilities —
+ * it only touches the non-standard drag property. */
+a {
+	-webkit-user-drag: none;
+}
+
+/* Anchor base styles live in @layer base for the same reason h1-h6/p
+ * were moved there (commit 91dcb7d): unlayered type selectors beat
+ * Tailwind utilities (which live in @layer utilities), so footer/nav
+ * links wearing `text-hk-cream/N` would silently fall back to the
+ * default `--text-link` (olive green). Layering it lets utilities win
+ * while keeping the default for un-styled anchors. */
+@layer base {
+	a {
+		color: var(--text-link);
+		text-decoration: none;
+	}
+
+	a:hover {
+		text-decoration: none;
+	}
+
+	a:hover,
+	a:visited:hover {
+		text-decoration: none;
+	}
+}
+
+button {
+	font-family: inherit;
+}
+
+/* `cursor` is deliberately scoped to ENABLED buttons.
+ *
+ * This rule is UNLAYERED, and an unlayered declaration beats every @layer one
+ * regardless of specificity (same fact the comment further down states). A bare
+ * `button { cursor: pointer }` therefore silently overrode **every**
+ * `disabled:cursor-not-allowed` in the codebase — those compile into
+ * `@layer utilities`, so 40 disabled buttons across 18 files declared a cursor
+ * that could never win. Adding more utilities cannot fix that; this unlayered
+ * rule is the only layer where the fix can live.
+ *
+ * `:where()` contributes ZERO specificity, so this stays at (0,0,1) — exactly
+ * what the bare `button` selector was — and no bespoke rule that used to beat it
+ * starts losing. Disabled buttons now simply have no unlayered cursor, which
+ * hands the decision back to whatever `disabled:cursor-*` the component declares
+ * (not-allowed, default, wait…). See web#531.
+ */
+button:where(:not(:disabled)) {
+	cursor: pointer;
+}
+
+:focus-visible {
+	outline: 2px solid var(--color-primary);
+	outline-offset: 2px;
+	border-radius: var(--radius-sm);
+}
+
+/* ===========================================
+   FORM-CONTROL BRAND BASELINE
+   ===========================================
+ * Brands every *bare* text-like control (no competing border utility / no
+ * bespoke class) with the ink-tinted idle border + primary focus glow
+ * defined in components/ui-kit.css. This is what "extend the input look to
+ * everything" means in practice: the shared <Input>/<Textarea>/<Select>
+ * component already carries the treatment; this baseline catches the ~80
+ * raw native controls scattered across the app.
+ *
+ * Specificity is deliberately engineered:
+ *   - `input` / `textarea` / `select` are bare TYPE selectors = (0,0,1).
+ *     The `:where(:not(...))` filter excludes non-text controls (checkbox,
+ *     radio, file, range, color, buttons, hidden) at ZERO added specificity.
+ *   - (0,0,1) beats Tailwind preflight's `*{border:0 solid}` (0,0,0), so bare
+ *     fields actually get the border…
+ *   - …but loses to ANY single utility class (`border-2`, `.market-search…`)
+ *     and to every unlayered bespoke rule (unlayered always beats @layer).
+ * Net: intentional designs (borderless pill search, dashed dropzones, table
+ * cells) are untouched; only genuinely-unstyled fields inherit the brand.
+ */
+/* The `:not([data-slot])` inside every :where() is load-bearing: the shared
+ * <Input>/<Textarea>/<Select> stamps data-slot="control"/"textarea" on its
+ * INNER element, and that element already lives inside a styled wrapper. Without
+ * this exclusion the baseline would paint a border + focus box-shadow on the
+ * inner control too, drawing a second, smaller frame inset by the wrapper's
+ * padding. Bare native controls carry no data-slot, so they still match. */
+@layer base {
+	input:where(
+		:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not(
+			[type="range"]
+		):not([type="color"]):not([type="submit"]):not([type="button"]):not(
+			[type="reset"]
+		):not([type="image"]):not([type="hidden"]):not([data-slot])
+	),
+	textarea:where(:not([data-slot])),
+	select:where(:not([data-slot])) {
+		border: 1px solid
+			var(--hkui-input-border, rgb(var(--color-brand-ink-rgb) / 0.22));
+		border-radius: var(--hkui-radius-md, 12px);
+		background-color: var(--hkui-default-50, #fafaf7);
+		color: inherit;
+		font: inherit;
+		padding: 0.55rem 0.75rem;
+		transition:
+			border-color var(--hkui-dur-base, 200ms) var(--hkui-ease, ease),
+			box-shadow var(--hkui-dur-base, 200ms) var(--hkui-ease, ease);
+	}
+
+	input:where(
+		:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not(
+			[type="range"]
+		):not([type="color"]):not([type="submit"]):not([type="button"]):not(
+			[type="reset"]
+		):not([type="image"]):not([type="hidden"]):not([data-slot])
+	)::placeholder,
+	textarea:where(:not([data-slot]))::placeholder {
+		color: var(--hkui-foreground-soft);
+	}
+}
+
+/* Focus glow for bare text controls. UNLAYERED (not @layer base) on purpose:
+ * the global `:focus-visible { outline }` rule above is unlayered, so a
+ * layered rule could never replace its outline with the soft glow. This
+ * selector is (0,1,1) — it beats the generic `:focus-visible` (0,1,0) for
+ * text fields, yet still loses to any bespoke `.field:focus` (0,2,0).
+ * `:focus-visible` (not `:focus`) keeps it accessible; text inputs match it
+ * on pointer focus too, so the glow still shows on click. */
+input:where(
+	:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not(
+		[type="range"]
+	):not([type="color"]):not([type="submit"]):not([type="button"]):not(
+		[type="reset"]
+	):not([type="image"]):not([type="hidden"]):not([data-slot])
+):focus-visible,
+textarea:where(:not([data-slot])):focus-visible,
+select:where(:not([data-slot])):focus-visible {
+	outline: none;
+	border-color: var(--hkui-primary);
+	box-shadow: var(
+		--hkui-input-focus-ring,
+		0 0 0 3px rgb(var(--color-brand-ink-rgb) / 0.13)
+	);
+}
+
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* ===========================================
+   3. TYPOGRAPHY
+   =========================================== */
+
+/* Put heading and paragraph base styles in @layer base so that Tailwind
+ * utilities (which live in @layer utilities) can override them.
+ * Previously these were unlayered, which meant Tailwind's text-* / m-*
+ * utilities always lost — e.g. `text-lg` on an <h2> would silently use
+ * var(--text-4xl) instead. Moving to @layer base preserves defaults for
+ * headings that carry no utility class while letting utilities win when
+ * they are present. Any unlayered class-based selector (e.g. `.hero h2`)
+ * still wins because unlayered CSS beats every layer. */
+@layer base {
+	h1,
+	h2,
+	h3,
+	h4,
+	h5,
+	h6 {
+		color: var(--text-heading);
+		font-weight: var(--weight-bold);
+		line-height: var(--leading-tight);
+		margin: 0 0 var(--space-4) 0;
+	}
+
+	/* Page & section titles wear the rounded brand face; h3–h6 (dense
+	   sub-labels, table headers) stay on the body stack for legibility.
+	   Split here (rather than a separate override rule) so nothing in this
+	   layer competes for headings' font-family. Class-based rules — the home
+	   `.hkh-page` headings, seller-center `--hkui-font-display` titles — are
+	   more specific and still win. */
+	h1,
+	h2 {
+		font-family: var(--font-brand);
+	}
+	h3,
+	h4,
+	h5,
+	h6 {
+		font-family: var(--font-chinese);
+	}
+
+	h1 {
+		font-size: var(--text-5xl);
+	}
+	h2 {
+		font-size: var(--text-4xl);
+	}
+	h3 {
+		font-size: var(--text-3xl);
+	}
+	h4 {
+		font-size: var(--text-2xl);
+	}
+	h5 {
+		font-size: var(--text-xl);
+	}
+	h6 {
+		font-size: var(--text-lg);
+	}
+
+	p {
+		margin: 0 0 var(--space-4) 0;
+		line-height: var(--leading-relaxed);
+	}
+}
+
+.text-center {
+	text-align: center;
+}
+.mt-0 {
+	margin-top: 0;
+}
+.mb-0 {
+	margin-bottom: 0;
+}
+
+/* ===========================================
+   4. LAYOUT (containers, grids, sections)
+   =========================================== */
+.page-wrapper {
+	width: 100%;
+	margin: 0 auto;
+	/* `hidden` makes this auto-height wrapper a non-scrolling overflow
+	   container, so descendants using position: sticky bind to it instead of
+	   the viewport and silently fail to pin. `clip` keeps the same horizontal
+	   trimming without creating a scroll container. */
+	overflow-x: clip;
+}
+
+.content-container {
+	max-width: var(--content-width);
+	margin: 0 auto;
+	padding-left: var(--content-padding);
+	padding-right: var(--content-padding);
+}
+
+.section {
+	padding-top: var(--space-20);
+	padding-bottom: var(--space-20);
+	position: relative;
+	overflow: hidden;
+}
+
+.section--alt {
+	background: linear-gradient(
+		180deg,
+		rgb(var(--color-ink-50-rgb) / 0.7) 0%,
+		rgb(var(--color-ink-50-rgb) / 0.7) 100%
+	);
+}
+
+.page-header {
+	text-align: center;
+	padding-top: var(--space-16);
+	padding-bottom: var(--space-8);
+}
+
+.page-header__english {
+	font-family: var(--font-primary);
+	font-size: var(--text-sm);
+	font-weight: var(--weight-medium);
+	color: var(--color-gray-mid);
+	text-transform: uppercase;
+	letter-spacing: 2px;
+	margin-bottom: var(--space-2);
+}
+
+.page-header__title {
+	font-size: var(--text-4xl);
+	color: var(--text-heading);
+	margin-bottom: var(--space-4);
+}
+
+.page-header__desc {
+	font-size: var(--text-sm);
+	color: var(--text-body);
+	max-width: 600px;
+	margin: 0 auto;
+	line-height: var(--leading-relaxed);
+}
+
+/* Card Grid System */
+
+/* ===========================================
+   5. NAVIGATION
+   =========================================== */
+/* --- Outer frosted glass container --- */
+/* `.site-nav` / `.site-nav__inner` / `.site-nav__logo` removed in the 子刀 4
+ * PR-A detangle. These bare selectors (0,1,0) were shadowed by
+ * navigation-final.css `body .site-nav*` (0,1,1) on every painted property
+ * (the cream→primary pill lives in floating-navigation.css); only the flex
+ * layout (display/justify/align/width on the container, flex/text-decoration
+ * on the logo) and the nav-root background transition were live, and those are
+ * folded into navigation-final.css (see its "← detangle" markers). The
+ * `linear-gradient` pill + `var(--content-width)` / `var(--site-nav-inner-height)`
+ * sizing here never won and are gone with no visual change. */
+
+.brand-logo {
+	display: inline-flex;
+	align-items: center;
+	flex: 0 0 auto;
+	--brand-logo-render-height: 44px;
+	--brand-logo-ratio: 502 / 120;
+	--brand-logo-surface-bg: transparent;
+	--brand-logo-surface-border: transparent;
+	--brand-logo-surface-shadow: none;
+	--brand-logo-surface-padding: 0;
+	color: var(--ink-heading);
+	text-decoration: none;
+	line-height: 1;
+	padding: var(--brand-logo-surface-padding);
+	border: 1px solid var(--brand-logo-surface-border);
+	border-radius: var(--radius-pill);
+	background: var(--brand-logo-surface-bg);
+	box-shadow: var(--brand-logo-surface-shadow);
+}
+
+/* Image-based lockup straight from Figma (public/brand/logo-*.svg). The
+ * lockup variant determines aspect ratio; height drives the actual size.
+ * Each variant has a sensible default size that downstream overrides
+ * (e.g. .site-nav .brand-logo__lockup) can tighten. */
+.brand-logo__lockup {
+	flex: 0 0 auto;
+	display: block;
+	height: var(--brand-logo-render-height);
+	width: auto;
+	max-width: none;
+	aspect-ratio: var(--brand-logo-ratio);
+	object-fit: contain;
+	object-position: center;
+	filter: drop-shadow(0 3px 8px rgb(var(--color-ink-900-rgb) / 0.12));
+}
+.brand-logo--horizontal {
+	--brand-logo-render-height: 44px;
+	--brand-logo-ratio: 502 / 120;
+}
+.brand-logo--mark {
+	--brand-logo-render-height: 50px;
+	--brand-logo-ratio: 1;
+}
+.brand-logo--grass {
+	--brand-logo-render-height: 50px;
+	--brand-logo-ratio: 1;
+}
+.brand-logo--mark .brand-logo__lockup,
+.brand-logo--grass .brand-logo__lockup {
+	width: var(--brand-logo-render-height);
+}
+.brand-logo--size-xs {
+	--brand-logo-render-height: 28px;
+}
+.brand-logo--size-sm {
+	--brand-logo-render-height: 36px;
+}
+.brand-logo--size-md {
+	--brand-logo-render-height: 44px;
+}
+.brand-logo--size-lg {
+	--brand-logo-render-height: 56px;
+}
+.brand-logo--size-xl {
+	--brand-logo-render-height: 80px;
+}
+.brand-logo--size-fill {
+	--brand-logo-render-height: 100%;
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+.brand-logo--surface-soft {
+	--brand-logo-surface-padding: 8px 12px;
+	--brand-logo-surface-bg: rgb(var(--color-brand-primary-rgb) / 0.1);
+	--brand-logo-surface-border: rgb(var(--color-brand-ink-rgb) / 0.12);
+}
+.brand-logo--surface-pill {
+	--brand-logo-surface-padding: 8px 14px;
+	--brand-logo-surface-bg: rgb(var(--color-neutral-white-rgb) / 0.78);
+	--brand-logo-surface-border: rgb(var(--color-brand-ink-rgb) / 0.14);
+	--brand-logo-surface-shadow: var(--theme-shadow-nav);
+	-webkit-backdrop-filter: blur(18px);
+	backdrop-filter: blur(18px);
+}
+.brand-logo--surface-solid {
+	--brand-logo-surface-padding: 10px 14px;
+	--brand-logo-surface-bg: var(--theme-action-primary);
+	--brand-logo-surface-border: rgb(var(--color-brand-ink-rgb) / 0.2);
+	--brand-logo-surface-shadow: var(--theme-shadow-brand-soft);
+}
+.brand-logo--surface-solid .brand-logo__lockup {
+	filter: brightness(0) invert(1);
+}
+
+/* Light tone (dark backgrounds e.g. footer): convert the multi-color
+ * artwork to a flat white silhouette so it reads against the surface. */
+.brand-logo--light .brand-logo__lockup {
+	filter: brightness(0) invert(1);
+}
+
+/* Dark-mode swap. When a wheat-cream variant exists (Figma 17:245), we
+ * stack both lockups and CSS picks which one is visible based on
+ * `[data-theme="dark"]` on <html>. Avoids a hydration flash because
+ * THEME_BOOT_SCRIPT paints the attribute before the first render. */
+.brand-logo--has-dark {
+	position: relative;
+}
+.brand-logo--has-dark .brand-logo__lockup--dark {
+	position: absolute;
+	inset: 0;
+	margin: auto;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity var(--hkui-dur-base, 200ms) var(--hkui-ease, ease);
+}
+[data-theme="dark"] .brand-logo--has-dark .brand-logo__lockup--default {
+	opacity: 0;
+}
+[data-theme="dark"] .brand-logo--has-dark .brand-logo__lockup--dark {
+	opacity: 1;
+}
+/* `tone="light"` (footer) always shows the light variant regardless of
+ * theme, since the footer slab stays dark in both modes. */
+.brand-logo--light.brand-logo--has-dark .brand-logo__lockup--default {
+	opacity: 0;
+}
+.brand-logo--light.brand-logo--has-dark .brand-logo__lockup--dark {
+	opacity: 1;
+	position: absolute;
+}
+
+/* Unused alternative-navbar block removed in the 子刀 4 PR-A cleanup —
+ * an old search-mode navbar + mobile-menu design (.site-nav__actions /
+ * .nav-pill / .nav-pill--search / .nav-search-wrap* / .site-nav__search-btn /
+ * .site-nav__download-* / .site-nav__mobile-btn* / .mobile-nav / .mobile-nav-item
+ * / .mobile-nav-download*) with zero consumers anywhere in the app (verified by
+ * grep across all .tsx/.ts). Its `.nav-item` rule shared the live class but was
+ * fully shadowed by navigation-final.css; its live-only props were folded there. */
+
+/* Top spacing under the navbar.
+ *
+ * Originally this added `2 * v-padding + inner-height` (~140px) to
+ * clear a fixed-position navbar. The navbar is now `position: sticky`
+ * inside `.auto-nav` and takes its own layout space, so the clearance
+ * is double-counted — every page rendered ~140px of empty cream
+ * between the pill and its first heading. User asked for that band to
+ * be removed across the entire site.
+ *
+ * Down to 0 globally; pages that genuinely need more breathing room
+ * (e.g. mc-hero with its inverted scoop) already manage it themselves
+ * via negative-margin / their own padding. */
+.page-content {
+	padding-top: 0;
+	/* 切頁時 streaming 路由的 Suspense fallback 可能是 null，內容高度會
+	 * 瞬間歸零，footer 直接跳到 navbar 正下方、內容到位後又被推回——
+	 * 保底一個視窗高，footer 永遠至少在首屏之下，切頁版面不再跳。
+	 * （workspace shell 在 globals.css 另有同值 min-height；snap-page 的
+	 * height:100vh 與此取大者，互不衝突。） */
+	min-height: 100dvh;
+}
+
+/* mc-hero (homepage) pulls itself UP with a negative margin and adds
+ * its own padding-top. The old navbar clearance hid that; page-content
+ * must stay flush so the hero can render without a second offset. */
+
+/* Storefront banner — the .hkui-seller-profile component used to pull
+ * itself UP with a negative margin (-88..-120px) to tuck under the old
+ * 140px navbar clearance. That negative-margin trick is removed in
+ * styles/components/ui-kit.css; the global 0px page-content padding is the
+ * only top spacing the banner gets now. */
+
+/* When snap-container is inside, snap-container already has margin-top: nav-height */
+
+.page-content:has(.hkui-login) {
+	padding-top: 0;
+}
+
+/* When snap-page is inside, prevent double scroll */
+
+/* ===========================================
+   6. FOOTER
+   =========================================== */
+
+.hk-footer__heading {
+	font-size: var(--text-lg);
+	line-height: 1.55;
+}
+
+@media (max-width: 560px) {
+	.hk-footer__heading {
+		font-size: 0.8125rem;
+		line-height: 1.35;
+	}
+}
+
+.footer__grid {
+	display: grid;
+	grid-template-columns: 2fr 1fr 1fr 1.5fr;
+	gap: var(--space-8);
+}
+
+.footer__col-title {
+	font-family: var(--font-chinese);
+	font-size: var(--text-base);
+	font-weight: var(--weight-bold);
+	color: var(--color-white);
+	margin-bottom: var(--space-4);
+}
+
+.footer__desc {
+	font-size: var(--text-sm);
+	line-height: var(--leading-relaxed);
+	color: var(--text-footer);
+	margin-bottom: var(--space-4);
+}
+
+.footer__social {
+	display: flex;
+	gap: var(--space-3);
+}
+
+.footer__social-link {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	border-radius: var(--radius-circle);
+	background: rgba(255, 255, 255, 0.15);
+	color: var(--text-footer);
+	text-decoration: none;
+	font-size: var(--text-base);
+	transition: background var(--transition-fast);
+}
+
+.footer__social-link:hover {
+	background: rgba(255, 255, 255, 0.3);
+	text-decoration: none;
+}
+
+.footer__links {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.footer__links li {
+	margin-bottom: var(--space-2);
+}
+
+.footer__links a {
+	color: var(--text-footer);
+	font-size: var(--text-sm);
+	text-decoration: none;
+	transition: color var(--transition-fast);
+}
+
+.footer__links a:hover {
+	color: var(--color-white);
+	text-decoration: underline;
+}
+
+.footer__contact-item {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-2);
+	margin-bottom: var(--space-3);
+	font-size: var(--text-sm);
+	color: var(--text-footer);
+}
+
+.footer__contact-icon {
+	flex: 0 0 auto;
+	width: 18px;
+	height: 18px;
+	margin-top: 2px;
+}
+
+.footer__bottom {
+	border-top: 1px solid rgba(255, 255, 255, 0.15);
+	margin-top: var(--space-8);
+	padding: var(--space-4) 0;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.footer__copyright {
+	font-size: var(--text-xs);
+	color: rgba(255, 255, 255, 0.6);
+}
+
+.footer__bottom-links {
+	display: flex;
+	gap: var(--space-4);
+}
+
+.footer__bottom-links a {
+	color: var(--text-footer);
+	font-size: var(--text-xs);
+	text-decoration: none;
+}
+
+.footer__bottom-links a:hover {
+	text-decoration: underline;
+}
+
+.footer__logo-img {
+	height: 40px;
+	width: auto;
+	margin-bottom: var(--space-3);
+}
+
+/* ===========================================
+   7. SHARED COMPONENTS
+   =========================================== */

@@ -1,0 +1,139 @@
+name: backend sqlc generated diff
+
+# 守住 sqlc 生成檔與其源檔（services/*/db/{queries,schema}/*.sql）的同步。
+# 版本唯一宣告在 scripts/gen-sqlc.sh 的 IMAGE。對每個 service 複製到暫存路徑、
+# 從 sqlc.yaml 解析全部 out:（ai-service 有兩個）、生成前先清空 out:（才抓得到孤兒檔）、
+# 逐一與原始路徑對拍，全程零寫入 checkout。
+# 由 backend/.github/workflows/sqlc-generated-diff.yml 搬來。
+
+on:
+  pull_request:
+    paths: &sqlc_paths
+      - 'backend/services/*/db/queries/**'
+      - 'backend/services/*/db/schema/**'
+      - 'backend/services/*/db/sqlc.yaml'
+      - 'backend/services/*/internal/**/gen/**'
+      - 'backend/scripts/gen-sqlc.sh'
+      - '.github/workflows/backend-sqlc-generated-diff.yml'
+  push:
+    branches: [main]
+    paths: *sqlc_paths
+  workflow_dispatch:
+
+concurrency:
+  group: backend-sqlc-generated-diff-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  sqlc-generated-diff:
+    name: sqlc 生成檔 regenerate + diff
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: 讀取權威版本設定（SSOT = scripts/gen-sqlc.sh）
+        id: cfg
+        run: |
+          set -euo pipefail
+          IMAGE=$(sed -n 's/^IMAGE="\(.*\)"$/\1/p' scripts/gen-sqlc.sh | head -1)
+          if [ -z "$IMAGE" ]; then
+            echo "::error::無法從 scripts/gen-sqlc.sh 解析出 IMAGE"
+            echo "  該檔的變數寫法改了 → 同步改這支 workflow 的 sed（別在這裡另寫死一份版本）"
+            exit 1
+          fi
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          echo ">>> image=$IMAGE"
+
+      - name: 準備 sqlc image
+        env:
+          IMAGE: ${{ steps.cfg.outputs.image }}
+        run: |
+          set -euo pipefail
+          if docker image inspect "$IMAGE" >/dev/null 2>&1; then
+            echo ">>> $IMAGE 已存在，跳過 pull"
+          else
+            echo ">>> pull $IMAGE"
+            docker pull "$IMAGE"
+          fi
+
+      - name: 逐 service 重新生成並與 repo 對拍
+        env:
+          IMAGE: ${{ steps.cfg.outputs.image }}
+        run: |
+          set -uo pipefail
+          set +e  # GitHub Actions 的 run step 預設帶 -e；這個 step 靠自己的 if 判斷
+                  # 收集全部失敗，不能讓指令替換賦值失敗時被 -e 攔腰砍斷
+          FAILED=""
+
+          for dir in services/*/db; do
+            [ -f "$dir/sqlc.yaml" ] || continue
+            svc="$(basename "$(dirname "$dir")")"
+            TMP="$(mktemp -d "/tmp/sqlc-check-${svc}-XXXXXX")"
+
+            cp -r "services/$svc" "$TMP/svc"
+
+            OUT_RELS=$(sed -n 's/^[[:space:]]*out: "\(.*\)"[[:space:]]*$/\1/p' "$TMP/svc/db/sqlc.yaml")
+            if [ -z "$OUT_RELS" ]; then
+              echo "::error::$svc 的 db/sqlc.yaml 解析不出任何 out:（格式改了？這支 workflow 的 sed 要跟著改）"
+              FAILED="$FAILED $svc"
+              rm -rf "$TMP"
+              continue
+            fi
+
+            P_LIST=""
+            for rel in $OUT_RELS; do
+              P="$(cd "$TMP/svc/db" && realpath --relative-to="$TMP/svc" "$rel")"
+              P_LIST="$P_LIST $P"
+              rm -rf "$TMP/svc/$P"
+            done
+
+            GEN_OUT=$(docker run --rm --user "$(id -u):$(id -g)" -v "$TMP/svc:/work" -w /work/db "$IMAGE" generate 2>&1)
+            GEN_STATUS=$?
+
+            if [ "$GEN_STATUS" -ne 0 ]; then
+              echo "::error::$svc 的 sqlc generate 失敗"
+              echo "$GEN_OUT"
+              FAILED="$FAILED $svc"
+              rm -rf "$TMP"
+              continue
+            fi
+
+            SVC_FAILED=0
+            for P in $P_LIST; do
+              if ! DIFF_OUT=$(diff -ru "services/$svc/$P" "$TMP/svc/$P" 2>&1); then
+                echo "::error::$svc 的 $P 與 db/{queries,schema} 不同步（含新增／漂移／孤兒生成檔）"
+                echo "$DIFF_OUT"
+                SVC_FAILED=1
+              fi
+            done
+            rm -rf "$TMP"
+
+            if [ "$SVC_FAILED" -eq 1 ]; then
+              FAILED="$FAILED $svc"
+            else
+              echo "✓ $svc 生成檔與源檔一致"
+            fi
+          done
+
+          if [ -n "$FAILED" ]; then
+            echo ""
+            echo "::error::以下 service 的 sqlc 生成檔漂移：$FAILED"
+            echo ""
+            echo "修法（本機跑，只需要 docker；版本鎖在 scripts/gen-sqlc.sh，不依賴本機裝了什麼 sqlc）："
+            echo ""
+            for svc in $FAILED; do
+              echo "    ./scripts/gen-sqlc.sh $svc"
+            done
+            echo "    git add services/*/internal"
+            echo "    git commit"
+            echo ""
+            exit 1
+          fi

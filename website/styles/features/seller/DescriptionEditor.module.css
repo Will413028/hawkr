@@ -1,0 +1,901 @@
+.editorShell {
+	--desc-editor-border: color-mix(
+		in srgb,
+		var(--theme-border-soft) 78%,
+		transparent
+	);
+	--desc-editor-muted: color-mix(
+		in srgb,
+		var(--theme-text-muted) 72%,
+		transparent
+	);
+	--desc-editor-hover: color-mix(in srgb, var(--hkui-primary) 9%, transparent);
+	--desc-editor-shell-bg: color-mix(
+		in srgb,
+		var(--theme-surface-card) 94%,
+		white 6%
+	);
+	--desc-editor-toolbar-bg: color-mix(
+		in srgb,
+		var(--theme-surface-card) 88%,
+		transparent
+	);
+	--desc-editor-canvas-bg:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--theme-surface-card) 86%, transparent),
+			color-mix(in srgb, var(--theme-surface-page) 74%, transparent)
+		),
+		var(--theme-surface-card);
+	--desc-editor-button-color: var(--theme-text-heading);
+	--desc-editor-action-color: var(--hkui-primary);
+	--desc-editor-icon-primary: var(--color-brand-primary-strong);
+	--desc-editor-icon-secondary: var(--color-brand-secondary);
+	/* No `overflow: hidden` here — it would clip Editor.js's block-tunes
+	   popover (the ⋮⋮ "settings" menu) at the shell edge. The rounded corners
+	   are instead applied to the toolbar (top) and canvas (bottom) below. */
+	border: 1px solid var(--desc-editor-border);
+	border-radius: 10px;
+	background: var(--desc-editor-shell-bg);
+	box-shadow: 0 12px 32px -30px rgb(var(--color-ink-800-rgb) / 0.45);
+	transition:
+		border-color 160ms var(--hkui-ease, ease),
+		box-shadow 160ms var(--hkui-ease, ease),
+		background-color 160ms var(--hkui-ease, ease);
+}
+
+[data-theme="dark"] .editorShell {
+	--desc-editor-border: rgba(245, 222, 165, 0.16);
+	--desc-editor-muted: rgba(248, 241, 223, 0.62);
+	--desc-editor-hover: rgb(var(--color-ink-200-rgb) / 0.14);
+	--desc-editor-shell-bg: rgba(255, 255, 255, 0.05);
+	--desc-editor-toolbar-bg: rgb(var(--color-ink-950-rgb) / 0.92);
+	--desc-editor-canvas-bg:
+		linear-gradient(
+			180deg,
+			rgba(255, 255, 255, 0.06),
+			rgba(255, 255, 255, 0.035)
+		),
+		rgba(255, 255, 255, 0.04);
+	--desc-editor-button-color: #f8f1df;
+	--desc-editor-action-color: var(--color-ink-200);
+	--desc-editor-icon-primary: var(--color-ink-200);
+	--desc-editor-icon-secondary: #f3cc78;
+	box-shadow: 0 18px 42px -34px rgba(0, 0, 0, 0.72);
+}
+
+.editorShell:focus-within {
+	border-color: color-mix(in srgb, var(--hkui-primary) 42%, transparent);
+	box-shadow:
+		0 0 0 3px color-mix(in srgb, var(--hkui-primary) 12%, transparent),
+		0 16px 36px -32px rgb(var(--color-ink-800-rgb) / 0.58);
+}
+
+/* 外殼是 <dialog>：inline（non-modal open）時重設 UA 樣式讓它看起來就是
+   原本的區塊；放大時 showModal() 抬進 top layer（見 editorShell_expanded）。 */
+dialog.editorShell {
+	position: static;
+	width: 100%;
+	max-width: none;
+	max-height: none;
+	margin: 0;
+	padding: 0;
+	color: inherit;
+}
+
+.editorShell::backdrop {
+	background: rgb(var(--color-ink-950-rgb) / 0.46);
+	backdrop-filter: blur(4px);
+	animation: desc-editor-fade-in 160ms ease;
+}
+
+[data-theme="dark"] .editorShell::backdrop {
+	background: rgba(0, 0, 0, 0.58);
+}
+
+/* Scrollable toolbar + pinned expand button share one sticky row; the row now
+   owns the top radii / bottom border / blur that used to live on .toolbar. */
+.toolbarRow {
+	position: sticky;
+	top: 0;
+	z-index: 15;
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	border-top-left-radius: 9px;
+	border-top-right-radius: 9px;
+	border-bottom: 1px solid var(--desc-editor-border);
+	background: var(--desc-editor-toolbar-bg);
+	backdrop-filter: blur(14px);
+}
+
+.toolbarEnd {
+	flex: 0 0 auto;
+	display: flex;
+	align-items: center;
+	padding: 7px 9px 7px 8px;
+	border-left: 1px solid var(--desc-editor-border);
+	border-top-right-radius: 9px;
+}
+
+.toolbar {
+	flex: 1 1 auto;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+	min-height: 48px;
+	padding: 7px 9px;
+	overflow: visible;
+	border-top-left-radius: 9px;
+	cursor: default;
+	scrollbar-width: none;
+	touch-action: manipulation;
+	-webkit-overflow-scrolling: touch;
+	user-select: none;
+}
+
+.toolbar::-webkit-scrollbar {
+	display: none;
+}
+
+.toolbar_dragging {
+	cursor: grabbing;
+}
+
+.toolbar_dragging * {
+	cursor: grabbing;
+}
+
+.toolbarGroup {
+	flex: 0 0 auto;
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	min-width: 0;
+	min-inline-size: 0;
+	margin: 0;
+	border: 0;
+	padding: 0;
+}
+
+.toolbarGroupLabel {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
+
+.toolbarGroup_segmented {
+	gap: 2px;
+	padding: 3px;
+	border: 1px solid
+		color-mix(in srgb, var(--theme-border-soft) 82%, transparent);
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--theme-surface-muted) 54%, transparent);
+}
+
+.toolbarGroup_swatches {
+	gap: 2px;
+	padding: 2px;
+}
+
+.toolbarDivider {
+	flex: 0 0 auto;
+	width: 1px;
+	height: 24px;
+	background: var(--desc-editor-border);
+}
+
+.toolbarButton,
+.colorButton {
+	appearance: none;
+	border: 0;
+	background: transparent;
+	color: var(--desc-editor-button-color);
+	cursor: pointer;
+	transition:
+		background-color 140ms var(--hkui-ease, ease),
+		color 140ms var(--hkui-ease, ease),
+		box-shadow 140ms var(--hkui-ease, ease),
+		transform 140ms var(--hkui-ease, ease);
+}
+
+.toolbarButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 5px;
+	height: 36px;
+	min-width: 36px;
+	padding: 0 9px;
+	border-radius: 7px;
+	font-size: 0.875rem;
+	font-weight: 650;
+	line-height: 1;
+	white-space: nowrap;
+}
+
+.toolbarButton_icon {
+	width: 36px;
+	padding: 0;
+	font-size: 0.95rem;
+}
+
+.toolbarButton_segment {
+	min-width: 46px;
+	height: 36px;
+	padding: 0 11px;
+	font-size: 0.8125rem;
+}
+
+.toolbarButton_action {
+	width: 38px;
+	min-width: 38px;
+	padding: 0;
+	color: var(--desc-editor-action-color);
+	font-weight: 700;
+}
+
+.toolbarButton:hover,
+.colorButton:hover {
+	background: var(--desc-editor-hover);
+	color: var(--desc-editor-action-color);
+}
+
+.toolbarButton:focus-visible,
+.colorButton:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--hkui-primary) 18%, transparent);
+}
+
+.toolbarButton:active,
+.colorButton:active {
+	transform: translateY(1px);
+}
+
+.toolbarButton:disabled,
+.colorButton:disabled {
+	cursor: not-allowed;
+	opacity: 0.42;
+	transform: none;
+}
+
+.colorButton {
+	position: relative;
+	display: grid;
+	width: 36px;
+	height: 36px;
+	place-items: center;
+	border-radius: 7px;
+}
+
+.colorButton::before {
+	display: block;
+	width: 17px;
+	height: 17px;
+	border: 1px solid rgba(0, 0, 0, 0.12);
+	border-radius: 999px;
+	background: var(--desc-editor-swatch);
+	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+	content: "";
+}
+
+/* Excel/Notion 式表格尺寸挑選器 —— .tableTriggerAnchor 只用來量測觸發鈕的
+   實際 box（給 popover 定位），不影響版面；popover 本身 portal 進
+   <dialog>（而非 document.body），position:fixed 的座標才不會被
+   .toolbarRow 的 backdrop-filter 重設 containing block，展開全螢幕
+   （dialog showModal 的 top layer）時也才蓋得住畫布。 */
+.tableTriggerAnchor {
+	display: inline-flex;
+	/* 按住直接拖曳選尺寸 — 觸控時不能被瀏覽器攔去捲動 */
+	touch-action: none;
+}
+
+.tablePicker {
+	position: fixed;
+	top: var(--desc-editor-table-picker-top);
+	left: var(--desc-editor-table-picker-left);
+	z-index: 20;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 10px;
+	border: 1px solid var(--desc-editor-border);
+	border-radius: 10px;
+	background: var(--desc-editor-shell-bg);
+	box-shadow: 0 16px 36px -20px rgb(var(--color-ink-950-rgb) / 0.4);
+}
+
+.tablePickerLabel {
+	color: var(--desc-editor-muted);
+	font-size: 0.75rem;
+	font-weight: 650;
+	text-align: center;
+}
+
+.tablePickerGrid {
+	display: grid;
+	grid-template-columns: repeat(var(--desc-editor-table-picker-cols), 20px);
+	gap: 3px;
+	touch-action: none;
+}
+
+.tablePickerCell {
+	appearance: none;
+	width: 20px;
+	height: 20px;
+	border: 1px solid var(--desc-editor-border);
+	border-radius: 3px;
+	background: transparent;
+	cursor: pointer;
+	transition:
+		background-color 100ms var(--hkui-ease, ease),
+		border-color 100ms var(--hkui-ease, ease);
+}
+
+.tablePickerCell[data-active="true"] {
+	border-color: var(--hkui-primary);
+	background: color-mix(in srgb, var(--hkui-primary) 22%, transparent);
+}
+
+.tablePickerCell:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--hkui-primary) 30%, transparent);
+}
+
+.canvas {
+	position: relative;
+	/* Bottom corners rounded to match the shell. Overflow stays visible so the
+	   block-tunes popover can extend past the canvas edge when it opens near
+	   the bottom of a short document. */
+	border-bottom-left-radius: 9px;
+	border-bottom-right-radius: 9px;
+	background: var(--desc-editor-canvas-bg);
+}
+
+.holder {
+	min-height: 230px;
+	/* Asymmetric gutters: left holds the +/⋮⋮ controls, right holds the ↕ drag
+	   handle. Both controls live just outside the centred content box, so the
+	   padding must reserve room for them inside the frame (no overflow). */
+	padding: 20px 44px 28px 64px;
+}
+
+.editorShell[data-ready="false"] .holder {
+	opacity: 0.45;
+}
+
+/* ---- 放大編輯彈窗：同一個 shell 原地升級成置中 fixed 面板 ---- */
+
+/* dialog.editorShell（上方的 inline reset）同為 (0,1,1) 特異度 —
+   此區塊必須帶 dialog 前綴且位於其後，展開時才能贏過 reset。 */
+dialog.editorShell_expanded {
+	/* top-layer modal：inset:0 + margin:auto 置中，只需給尺寸 */
+	position: fixed;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	width: min(960px, calc(100vw - 48px));
+	height: min(88dvh, 920px);
+	max-width: none;
+	max-height: none;
+	margin: auto;
+	border-radius: 14px;
+	/* 外殼色是半透明（inline 時墊在表單卡上）；彈窗下方只有 backdrop，
+	   必須先鋪一層實色 page surface，深色模式才不會整片透出背景。 */
+	background:
+		linear-gradient(var(--desc-editor-shell-bg), var(--desc-editor-shell-bg)),
+		var(--theme-surface-page);
+	box-shadow:
+		0 32px 80px -32px rgb(var(--color-ink-950-rgb) / 0.5),
+		0 8px 24px -12px rgb(var(--color-ink-950-rgb) / 0.28);
+	animation: desc-editor-pop-in 180ms var(--hkui-ease, ease);
+}
+
+.editorShell_expanded .toolbarRow,
+.editorShell_expanded .toolbar,
+.editorShell_expanded .toolbarEnd {
+	border-top-left-radius: 13px;
+}
+
+.editorShell_expanded .toolbarRow,
+.editorShell_expanded .toolbarEnd {
+	border-top-right-radius: 13px;
+}
+
+.editorShell_expanded .canvas {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	border-bottom-left-radius: 13px;
+	border-bottom-right-radius: 13px;
+	overscroll-behavior: contain;
+}
+
+.editorShell_expanded .holder {
+	min-height: 100%;
+	padding: 28px 56px 48px 76px;
+}
+
+@keyframes desc-editor-fade-in {
+	from {
+		opacity: 0;
+	}
+}
+
+@keyframes desc-editor-pop-in {
+	from {
+		opacity: 0;
+		transform: scale(0.985);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.editorShell::backdrop,
+	.editorShell_expanded {
+		animation: none;
+	}
+}
+
+@media (max-width: 640px) {
+	.toolbar {
+		gap: 5px;
+		padding: 7px;
+	}
+
+	.toolbarDivider {
+		height: 22px;
+	}
+
+	.toolbarButton_segment {
+		min-width: 42px;
+		padding-inline: 9px;
+	}
+
+	.holder {
+		min-height: 210px;
+		padding: 14px 8px 18px 58px;
+	}
+
+	dialog.editorShell_expanded {
+		width: calc(100vw - 16px);
+		height: calc(100dvh - 24px);
+	}
+
+	.editorShell_expanded .holder {
+		padding: 16px 10px 28px 58px;
+	}
+}
+
+/* Product editing: restrained chrome, persistent action labels and clear selection. */
+.editorShell {
+	--desc-editor-shell-bg: var(--theme-surface-card);
+	--desc-editor-toolbar-bg: var(--theme-surface-card);
+	--desc-editor-canvas-bg: var(--theme-surface-card);
+	--desc-editor-muted: var(--theme-text-muted);
+}
+
+.editorShell .holder [class~="image-tool__caption"] {
+	color: var(--theme-text-body);
+}
+.editorHeader {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 12px 14px;
+	border-bottom: 1px solid var(--desc-editor-border);
+	color: var(--theme-text-heading);
+	font-size: 1rem;
+}
+.headerActions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+.headerActions .toolbarButton {
+	font-size: 0.8125rem;
+	font-weight: 500;
+}
+.headerActions .toolbarButton:last-child {
+	color: var(--desc-editor-action-color);
+	background: var(--desc-editor-hover);
+}
+.toolbarButton[aria-pressed="true"] {
+	color: var(--desc-editor-action-color);
+	background: var(--desc-editor-hover);
+	box-shadow: inset 0 0 0 1px
+		color-mix(in srgb, var(--hkui-primary) 28%, transparent);
+}
+.advancedToolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 14px;
+	border-top: 1px solid var(--desc-editor-border);
+}
+.advancedToolbar[hidden] {
+	display: none;
+}
+.advancedLabel {
+	font-size: 0.75rem;
+	color: var(--theme-text-body);
+}
+.advancedToolbar .toolbarDivider:last-child {
+	display: none;
+}
+.editorFooter {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 6px 16px;
+	padding: 10px 16px;
+	border-top: 1px solid var(--desc-editor-border);
+	color: var(--theme-text-body);
+	font-size: 0.75rem;
+	line-height: 1.5;
+}
+.editorFooter span:last-child {
+	white-space: nowrap;
+}
+.editorStatus {
+	padding: 12px 16px;
+	color: var(--theme-text-muted);
+}
+/* A caret in a long list should not paint the entire document as selected. */
+.editorShell [class~="ce-block--focused"]:not([class~="ce-block--selected"])
+	[class~="ce-block__content"],
+.editorShell
+	[class~="ce-block"]:hover:not([class~="ce-block--selected"])
+	[class~="ce-block__content"] {
+	background: transparent;
+	box-shadow: none;
+}
+.editorShell [class~="cdx-list"] {
+	padding: 6px 9px 6px 32px;
+	font-size: 1rem;
+	line-height: 1.7;
+}
+.editorShell [class~="cdx-list__item"] {
+	padding-block: 4px;
+}
+.editorShell [class~="ce-paragraph"] {
+	font-size: 1rem;
+}
+.editorShell[data-preview="true"] [class~="desc-editor-drag-handle"],
+.editorShell[data-preview="true"] [class~="ce-toolbar"],
+.editorShell[data-preview="true"] [class~="ce-inline-toolbar"] {
+	display: none;
+}
+.editorShell[data-preview="true"] .holder {
+	padding-inline: 24px;
+}
+.editorShell_expanded .editorHeader,
+.editorShell_expanded .editorFooter {
+	flex: 0 0 auto;
+}
+@media (pointer: coarse), (max-width: 640px) {
+	.toolbarButton,
+	.toolbarButton_icon,
+	.toolbarButton_segment,
+	.toolbarButton_action,
+	.colorButton {
+		min-width: 44px;
+		height: 44px;
+	}
+	.toolbar {
+		gap: 4px;
+		padding: 6px 8px;
+	}
+	.toolbarGroup {
+		gap: 0;
+	}
+	.toolbarGroup_segmented {
+		padding: 0;
+	}
+	.toolbarButton_segment {
+		padding-inline: 8px;
+	}
+	.toolbarDivider {
+		display: none;
+	}
+	.editorHeader {
+		padding: 10px;
+	}
+	.headerActions {
+		gap: 2px;
+	}
+	.editorFooter {
+		padding: 10px;
+	}
+	.editorShell_expanded .editorFooter span:first-child {
+		display: none;
+	}
+}
+
+.toolbarDock {
+	position: sticky;
+	top: 0;
+	z-index: 15;
+}
+.toolbarDock[hidden] {
+	display: none;
+}
+
+/* Image blocks share the seller canvas: one clear upload target, then image
+   and persistent actions. Caption data remains accessible alt, never a field. */
+.editorShell .holder :global(.hk-description-image) {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	margin: 12px 0 18px;
+	overflow: hidden;
+	border: 1px solid var(--theme-border-soft);
+	border-radius: var(--radius-md);
+	background: var(--hkui-input-surface);
+	color: var(--theme-text-body);
+	font-family: var(--font-primary);
+	font-size: 14px;
+	line-height: 1.5;
+}
+
+.editorShell .holder :global(.hk-description-image[hidden]),
+.editorShell .holder :global(.hk-description-image [hidden]) {
+	display: none;
+}
+
+.editorShell .holder :global(.hk-description-image[data-state="empty"]) {
+	border-style: dashed;
+	background: var(--theme-surface-muted);
+}
+
+.editorShell .holder :global(.hk-description-image[data-dragover="true"]) {
+	border-color: var(--theme-action-primary);
+	background: color-mix(
+		in srgb,
+		var(--theme-action-primary) 8%,
+		var(--hkui-input-surface)
+	);
+}
+
+.editorShell .holder :global(.hk-description-image__choose) {
+	appearance: none;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	width: 100%;
+	min-height: 204px;
+	padding: 24px 16px;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+	touch-action: manipulation;
+	transition: background-color 160ms ease;
+}
+
+.editorShell .holder :global(.hk-description-image__choose:hover) {
+	background: color-mix(in srgb, var(--theme-action-primary) 5%, transparent);
+}
+
+.editorShell .holder :global(.hk-description-image__icon) {
+	display: grid;
+	width: 48px;
+	height: 48px;
+	margin-bottom: 4px;
+	place-items: center;
+	border: 1px solid var(--theme-border-soft);
+	border-radius: var(--radius-md);
+	background: var(--hkui-input-surface);
+	color: var(--theme-action-primary);
+}
+
+.editorShell .holder :global(.hk-description-image__icon svg) {
+	width: 26px;
+	height: 26px;
+}
+
+.editorShell .holder :global(.hk-description-image__title) {
+	color: var(--theme-text-heading);
+	font-size: 16px;
+	font-weight: 600;
+}
+
+.editorShell .holder :global(.hk-description-image__hint) {
+	color: var(--theme-text-body);
+}
+
+.editorShell .holder :global(.hk-description-image__support) {
+	color: var(--theme-text-body);
+	font-size: 12px;
+}
+
+.editorShell .holder :global(.hk-description-image__media) {
+	order: 0;
+	overflow: hidden;
+	min-height: 80px;
+	border: 0;
+	border-radius: 0;
+	background: var(--theme-surface-muted);
+	box-shadow: none;
+}
+
+.editorShell .holder :global(.hk-description-image__picture) {
+	display: block;
+	width: 100%;
+	height: auto;
+	border-radius: 0;
+	object-fit: contain;
+	/* Editor.js dims selected images; retain product colors and mark the frame. */
+	opacity: 1;
+}
+
+.editorShell .holder :global(.ce-block--selected .hk-description-image) {
+	border-color: var(--theme-action-primary);
+}
+
+.editorShell
+	.holder
+	:global(
+		.hk-description-image[data-state="uploading"]
+		.hk-description-image__picture
+	) {
+	max-height: 280px;
+	opacity: 0.7;
+}
+
+.editorShell .holder :global(.hk-description-image__file-name) {
+	order: -1;
+	flex: 1 1 120px;
+	align-self: center;
+	margin: 0 auto 0 0;
+	overflow-wrap: anywhere;
+	color: var(--theme-text-body);
+	font-size: 12px;
+}
+
+.editorShell .holder :global(.hk-description-image__status) {
+	order: 2;
+	margin: 6px 14px;
+	color: var(--theme-text-body);
+	font-size: 13px;
+}
+
+.editorShell .holder :global(.hk-description-image__progress) {
+	order: 3;
+	appearance: none;
+	width: calc(100% - 28px);
+	height: 5px;
+	margin: 2px 14px 14px;
+	overflow: hidden;
+	border: 0;
+	border-radius: var(--radius-pill);
+	background: var(--theme-border-soft);
+	accent-color: var(--theme-action-primary);
+}
+
+.editorShell
+	.holder
+	:global(.hk-description-image__progress::-webkit-progress-bar) {
+	background: var(--theme-border-soft);
+}
+
+.editorShell
+	.holder
+	:global(.hk-description-image__progress::-webkit-progress-value),
+.editorShell
+	.holder
+	:global(.hk-description-image__progress::-moz-progress-bar) {
+	border-radius: var(--radius-pill);
+	background: var(--theme-action-primary);
+}
+
+.editorShell .holder :global(.hk-description-image__error) {
+	order: 4;
+	margin: 12px 14px 6px;
+	color: var(--hkui-danger-text);
+	font-size: 13px;
+}
+
+.editorShell .holder :global(.hk-description-image__actions) {
+	order: 6;
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 8px;
+	padding: 10px 12px;
+	border-top: 1px solid var(--theme-border-soft);
+	background: var(--hkui-input-surface);
+}
+
+.editorShell .holder :global(.hk-description-image__actions button),
+.editorShell .holder :global(.hk-description-image__retry),
+.editorShell .holder :global(.hk-description-image__reload) {
+	appearance: none;
+	min-height: 36px;
+	padding: 6px 12px;
+	border: 1px solid var(--theme-border-soft);
+	border-radius: var(--radius-sm);
+	background: transparent;
+	color: var(--theme-text-body);
+	font: inherit;
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+	touch-action: manipulation;
+}
+
+.editorShell
+	.holder
+	:global(.hk-description-image__actions button:hover:not(:disabled)) {
+	background: var(--theme-surface-muted);
+}
+
+.editorShell .holder :global(.hk-description-image__retry),
+.editorShell .holder :global(.hk-description-image__reload) {
+	order: 5;
+	align-self: flex-start;
+	margin: 4px 14px 12px;
+	border-color: transparent;
+	background: var(--theme-action-primary);
+	color: var(--theme-text-inverse);
+}
+
+.editorShell
+	.holder
+	:global(.hk-description-image__actions .hk-description-image__remove) {
+	border-color: transparent;
+	color: var(--theme-text-body);
+}
+
+.editorShell .holder :global(.hk-description-image button:focus-visible) {
+	outline: 2px solid var(--theme-action-primary);
+	outline-offset: -3px;
+}
+
+.editorShell .holder :global(.hk-description-image button:disabled) {
+	cursor: not-allowed;
+	opacity: 0.5;
+}
+
+.editorShell .holder :global(.hk-description-image[data-readonly="true"]) {
+	border-color: transparent;
+	background: transparent;
+}
+
+@media (pointer: coarse), (max-width: 649px) {
+	.editorShell .holder :global(.hk-description-image__actions button),
+	.editorShell .holder :global(.hk-description-image__retry),
+	.editorShell .holder :global(.hk-description-image__reload) {
+		min-height: 44px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.editorShell .holder :global(.hk-description-image__choose) {
+		transition: none;
+	}
+}
+
+.editorShell .holder :global(.hk-description-image__cta) {
+	display: inline-flex;
+	align-items: center;
+	min-height: 36px;
+	margin: 6px 0;
+	padding: 6px 16px;
+	border-radius: var(--radius-sm);
+	background: var(--theme-action-primary);
+	color: var(--theme-text-inverse);
+	font-size: 13px;
+	font-weight: 600;
+}

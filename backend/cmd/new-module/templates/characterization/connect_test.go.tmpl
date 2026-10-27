@@ -1,0 +1,22 @@
+package characterization
+
+import (
+	"net/http"
+
+	ch "{{.Module}}/internal/httpapi/characterize"
+)
+
+// connectDriver 以生成的 Connect client（internal/httpapi/gen）操作單體：JSON、讀取走 GET，與 web 相同。
+// 身分由 auth 帶入（ch.Bearer，token 來自 ch.DevAuth 或 ch.EnvTokens）。錯誤用 ch.ConnectKind 分類。
+type connectDriver struct {
+	http *http.Client
+	base string
+	auth func(ch.Caller, http.Header)
+}
+
+var _ Driver = (*connectDriver)(nil)
+
+// newConnectDriver 建立 driver；每個呼叫者一組以 interceptor 帶入身分的 client（照 content 的寫法）。
+func newConnectDriver(httpClient *http.Client, base string, auth func(ch.Caller, http.Header)) *connectDriver {
+	return &connectDriver{http: httpClient, base: base, auth: auth}
+}

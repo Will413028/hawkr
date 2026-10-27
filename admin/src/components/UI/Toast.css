@@ -1,0 +1,28 @@
+/* Toast：色調只走 AdminVisualRefresh.css 的 semantic token，不寫 hex。 */
+.adm-toast-host {
+	position: fixed;
+	top: 24px;
+	right: 24px;
+	z-index: 9999;
+	max-width: 320px;
+	pointer-events: none;
+}
+
+.adm-toast {
+	padding: 12px 20px;
+	border-radius: 8px;
+	background: var(--admin-success);
+	color: var(--admin-paper);
+	box-shadow: var(--admin-shadow-dialog);
+	font-size: 14px;
+	line-height: 1.5;
+	overflow-wrap: anywhere;
+}
+
+.adm-toast--warning {
+	background: var(--admin-warning);
+}
+
+.adm-toast--error {
+	background: var(--admin-danger);
+}
