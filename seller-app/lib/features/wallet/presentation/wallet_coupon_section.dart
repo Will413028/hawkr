@@ -32,32 +32,40 @@ class WalletCouponSection extends HookConsumerWidget {
     Widget buildStatusBar() {
       return Row(
         children: [
-          HkChoiceChip(
-            label: '進行中',
-            selected: couponFilter.value == 'active',
-            icon: AppIcons.chartOutlined,
-            selectedIcon: AppIcons.chart,
-            onTap: () {
-              couponFilter.value = 'active';
-              // 切換篩選時退出刪除模式
-              isDeleteMode.value = false;
-              selectedCoupons.value = {};
-            },
+          // 兩個篩選放不下時換行（窄螢幕加大字級），右側的按鈕維持靠右。
+          Expanded(
+            child: Wrap(
+              spacing: 12.w,
+              runSpacing: 8.h,
+              children: [
+                HkChoiceChip(
+                  label: '進行中',
+                  selected: couponFilter.value == 'active',
+                  icon: AppIcons.chartOutlined,
+                  selectedIcon: AppIcons.chart,
+                  onTap: () {
+                    couponFilter.value = 'active';
+                    // 切換篩選時退出刪除模式
+                    isDeleteMode.value = false;
+                    selectedCoupons.value = {};
+                  },
+                ),
+                HkChoiceChip(
+                  label: '已過期',
+                  selected: couponFilter.value == 'expired',
+                  icon: AppIcons.checkCircleOutline,
+                  selectedIcon: AppIcons.checkCircle,
+                  onTap: () {
+                    couponFilter.value = 'expired';
+                    // 切換篩選時退出刪除模式
+                    isDeleteMode.value = false;
+                    selectedCoupons.value = {};
+                  },
+                ),
+              ],
+            ),
           ),
-          SizedBox(width: 12.w),
-          HkChoiceChip(
-            label: '已過期',
-            selected: couponFilter.value == 'expired',
-            icon: AppIcons.checkCircleOutline,
-            selectedIcon: AppIcons.checkCircle,
-            onTap: () {
-              couponFilter.value = 'expired';
-              // 切換篩選時退出刪除模式
-              isDeleteMode.value = false;
-              selectedCoupons.value = {};
-            },
-          ),
-          const Spacer(),
+          SizedBox(width: 8.w),
           HkTapTarget(
             semanticLabel: '新增優惠券',
             onTap: () {
