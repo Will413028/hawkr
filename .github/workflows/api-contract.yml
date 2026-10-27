@@ -183,6 +183,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
+          package-manager-cache: false
       - name: 由 presets.ts 重新生成並比對
         run: |
           node backend/workers/image-gateway/scripts/gen-client-presets.mjs

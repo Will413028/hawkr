@@ -15,7 +15,10 @@ import 'package:test/test.dart';
 final _checkAppVersion = ContentPublicService.checkAppVersion;
 
 ContentPublicServiceClient _client(
-  FutureOr<CheckAppVersionResponse> Function(CheckAppVersionRequest, FakeHandlerContext)
+  FutureOr<CheckAppVersionResponse> Function(
+    CheckAppVersionRequest,
+    FakeHandlerContext,
+  )
   handler,
   List<Interceptor> interceptors,
 ) {
@@ -79,12 +82,16 @@ void main() {
         ],
       );
 
-      await client.checkAppVersion(CheckAppVersionRequest(clientVersion: '1.0.0'));
+      await client.checkAppVersion(
+        CheckAppVersionRequest(clientVersion: '1.0.0'),
+      );
       expect(seen!['x-app-type'], 'BUYER');
       expect(seen!.contains('x-app-version'), isFalse);
 
       version = '1.2.3';
-      await client.checkAppVersion(CheckAppVersionRequest(clientVersion: '1.0.0'));
+      await client.checkAppVersion(
+        CheckAppVersionRequest(clientVersion: '1.0.0'),
+      );
       expect(seen!['x-app-version'], '1.2.3');
     });
   });
@@ -128,8 +135,10 @@ void main() {
       await expectLater(
         withTimeout(
           const Duration(milliseconds: 50),
-          (signal) =>
-              client.checkAppVersion(CheckAppVersionRequest(clientVersion: '1.0.0'), signal: signal),
+          (signal) => client.checkAppVersion(
+            CheckAppVersionRequest(clientVersion: '1.0.0'),
+            signal: signal,
+          ),
         ),
         throwsA(
           isA<ConnectException>().having(
@@ -214,7 +223,9 @@ void main() {
           ),
         );
         await expectLater(
-          client.checkAppVersion(CheckAppVersionRequest(clientVersion: '1.0.0')),
+          client.checkAppVersion(
+            CheckAppVersionRequest(clientVersion: '1.0.0'),
+          ),
           throwsA(
             isA<ConnectException>().having(
               (e) => e.code,
@@ -256,10 +267,14 @@ void main() {
       var token = 'live';
       final h = harness(token: () async => token, onInvalid: () {});
 
-      await h.client.checkAppVersion(CheckAppVersionRequest(clientVersion: '1.0.0'));
+      await h.client.checkAppVersion(
+        CheckAppVersionRequest(clientVersion: '1.0.0'),
+      );
       token = 'other';
       await expectLater(
-        h.client.checkAppVersion(CheckAppVersionRequest(clientVersion: '1.0.0')),
+        h.client.checkAppVersion(
+          CheckAppVersionRequest(clientVersion: '1.0.0'),
+        ),
         throwsA(isA<ConnectException>()),
       );
 
@@ -270,7 +285,9 @@ void main() {
       final h = harness(token: () async => null, onInvalid: () {});
 
       await expectLater(
-        h.client.checkAppVersion(CheckAppVersionRequest(clientVersion: '1.0.0')),
+        h.client.checkAppVersion(
+          CheckAppVersionRequest(clientVersion: '1.0.0'),
+        ),
         throwsA(isA<ConnectException>()),
       );
 
@@ -285,7 +302,9 @@ void main() {
       );
 
       await expectLater(
-        h.client.checkAppVersion(CheckAppVersionRequest(clientVersion: '1.0.0')),
+        h.client.checkAppVersion(
+          CheckAppVersionRequest(clientVersion: '1.0.0'),
+        ),
         throwsA(
           isA<ConnectException>().having(
             (e) => e.code,
@@ -306,7 +325,9 @@ void main() {
       );
 
       await expectLater(
-        h.client.checkAppVersion(CheckAppVersionRequest(clientVersion: '1.0.0')),
+        h.client.checkAppVersion(
+          CheckAppVersionRequest(clientVersion: '1.0.0'),
+        ),
         throwsA(
           isA<ConnectException>()
               .having((e) => e.code, 'code', Code.unavailable)
@@ -330,7 +351,9 @@ void main() {
       );
 
       await expectLater(
-        h.client.checkAppVersion(CheckAppVersionRequest(clientVersion: '1.0.0')),
+        h.client.checkAppVersion(
+          CheckAppVersionRequest(clientVersion: '1.0.0'),
+        ),
         throwsA(
           isA<ConnectException>().having(
             (e) => e.code,
@@ -373,7 +396,9 @@ void main() {
         ),
       );
 
-      final res = await client.checkAppVersion(CheckAppVersionRequest(clientVersion: '1.0.0'));
+      final res = await client.checkAppVersion(
+        CheckAppVersionRequest(clientVersion: '1.0.0'),
+      );
 
       expect(res.storeUrl, 'Bearer b');
       expect(seenHeaders.map((h) => h['x-app-type']), ['SELLER', 'SELLER']);
@@ -397,7 +422,9 @@ void main() {
         ),
       );
 
-      await client.checkAppVersion(CheckAppVersionRequest(clientVersion: '1.0.0'));
+      await client.checkAppVersion(
+        CheckAppVersionRequest(clientVersion: '1.0.0'),
+      );
 
       expect(seen!.contains('x-active-role'), isFalse);
       expect(seen!.contains('authorization'), isFalse);
@@ -461,7 +488,9 @@ void main() {
           ),
         );
         await expectLater(
-          client.checkAppVersion(CheckAppVersionRequest(clientVersion: '1.0.0')),
+          client.checkAppVersion(
+            CheckAppVersionRequest(clientVersion: '1.0.0'),
+          ),
           throwsA(isA<ConnectException>()),
         );
         expect(suspended, 0);
@@ -526,7 +555,9 @@ void main() {
           reportInterceptor((e, c) => reported.add(c)),
         ]);
         await expectLater(
-          client.checkAppVersion(CheckAppVersionRequest(clientVersion: '1.0.0')),
+          client.checkAppVersion(
+            CheckAppVersionRequest(clientVersion: '1.0.0'),
+          ),
           throwsA(anything),
         );
       }
