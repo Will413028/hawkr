@@ -87,7 +87,7 @@ Adoption order and migration targets are tracked in
 ## Not In This Slice
 
 - No full auth/session migration to TanStack Query yet.
-- Locale routing (`app/[locale]`, next-intl `as-needed`) landed in I-web-0; see `AGENTS.md` "多語系路由".
+- Locale routing (`app/[locale]`, next-intl `as-needed`) landed in I-web-0; see `docs/i18n-routing.md`.
 - No replacement of the existing theme toggle context yet.
 - No global conversion of existing forms or list pages yet.
 - No Uppy/Tus, virtual list, WebSocket wrapper, or Comlink dependency until a

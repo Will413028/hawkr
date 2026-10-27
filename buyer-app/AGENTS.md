@@ -10,6 +10,8 @@
 
 ## 元件庫維護
 
+下面四條中，後三條也適用 seller-app（`../seller-app/AGENTS.md` 指向這裡）。
+
 - 共用 UI 工作先讀 [買家 App 元件庫](docs/component-library.md)，在同一次 PR 更新正式 widget、catalog 案例、Dart API 文件與相關測試；不要複製另一套預覽專用元件或主題。
 - 使用 `.fvmrc` 固定的 Flutter SDK；`bash scripts/component-catalog.sh run` 開啟目錄，`bash scripts/component-catalog.sh test` 檢查 catalog，另跑受影響的既有 widget tests 與 analyze。
 - 共用審查入口是管理後台的 `/admin/documentation`（部署環境尚未重建）。App 文件改動後，在 `website/` 執行 `pnpm storybook:sync-app-docs`；需要發布元件庫時先和使用者確認做法。

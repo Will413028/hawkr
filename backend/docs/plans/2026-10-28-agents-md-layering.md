@@ -61,7 +61,7 @@
   - 不能動：「沿用盤點」放 `CARRYOVER.md` 的規則與 `modules_test.go` 的檢查。
   - 驗收：`cd backend && GOWORK=off go test ./cmd/new-module/ ./cmd/hawkr/`；`main_test.go` 改成斷言 D2 的固定節；mutation：模板加回 D2 不允許的節（例如「## 已知限制」），`main_test.go` 要失敗；刪掉一個固定節，也要失敗。
 
-- [ ] **3. 根目錄與子專案**（被擋於：步驟 1）
+- [x] **3. 根目錄與子專案**（被擋於：步驟 1）
   - 範圍：根目錄表格去掉對齊空白並把契約表的長格收到 D1 的單行上限內（細節移到對應 ADR）；backend、website、admin 依 D2 的子專案內容界線收斂到上限內；buyer-app、seller-app 的「元件庫維護」重複段合併到一處並互相指向。
   - 消費端：`rg -n "AGENTS\.md" --glob '!backend/docs/plans/**' --glob '!**/node_modules/**' .` 逐筆分類（指向本步驟改的檔、指向模組、與本計畫無關）。已知要跟著改的：`admin/tests/admin-design-documentation.test.ts`（斷言 admin `AGENTS.md` 內文）、`website/tests/visual/_helpers.ts:6`（引用節名「CSS 現狀 & 遷移方向」）、`admin/` 下 `ConvertPanel.tsx:31`（引用「UI 契約」）。
   - 不能動：根目錄的跨專案契約表的語意、`nextjs-agent-rules` 區塊。
@@ -121,7 +121,7 @@
 |---|---|---|---|---|
 | 1 檢查腳本與 CI | 完成 | 本機：`python3 scripts/check-agents-md.py` exit 0；`python3 -m unittest scripts/test_check_agents_md.py` 8 項 OK；mutation：media 加長到 9,947 bytes 與 600 字元的一行 → exit 1；例外清單放不超限的 buyer-app → exit 1；`actionlint` 通過 ；CI repo-hygiene run 40552353091（commit 41ed095）兩步 success | 無 | e495fe3 |
 | 2 ADR 與模組模板 | 完成 | 本機：`GOWORK=off go test ./cmd/new-module/ ./cmd/hawkr/` ok；`go vet ./cmd/new-module/`、`gofmt -l` 無輸出；新測試 `TestGeneratedAgentsHasOnlyTheFixedSections` 在舊模板上失敗（節是職責…已知限制、讀取模型…）；mutation：模板加回「## 已知限制」→ 失敗，刪掉「## 不負責」→ 失敗；`python3 scripts/check-agents-md.py` exit 0。`backend/AGENTS.md` 單體規則 2 的節名「發布的讀取介面」與 D2 相同，未改；產生器不建 `docs/modules/<模組>.md`，main.go 的下一步提示指向它 | backend-monolith CI（push 後看） | 見 git log |
-| 3 根目錄與子專案 | 未開始 | | | |
+| 3 根目錄與子專案 | 完成 | 本機：`python3 scripts/check-agents-md.py` exit 0（EXCEPTIONS 拿掉根目錄、backend、website）；`python3 -m unittest scripts/test_check_agents_md.py` OK；mutation：backend 加長到 10,067 bytes → exit 1。大小（website 不含 nextjs 區塊）：根目錄 10,215、backend 9,945、website 8,254；admin 本來就在上限內，未改。backend 的結構與規則全文搬到 `docs/開發規範/單體開發規範.md`（編號不變），website 的多語系路由全文搬到 `website/docs/i18n-routing.md`，根目錄契約表的細節由既有 ADR／規範／設計文件承接；App 的元件庫維護共用三條留在 buyer-app | 引用節名的 `website/tests/visual/_helpers.ts`（節名未改）只在 CI 跑；`admin-design-documentation.test.ts` 未跑（admin 未改） | 見 git log |
 | 4 非 seller 的模組 | 未開始 | | | |
 | 5 seller 開工前的確認 | 未開始 | | | |
 | 6 seller 模組 | 未開始 | | | |
