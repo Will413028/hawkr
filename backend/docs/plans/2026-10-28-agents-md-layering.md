@@ -49,7 +49,7 @@
 
 ## 步驟
 
-- [x] **1. 檢查腳本與 CI**（被擋於：D1、D2）
+- [ ] **1. 檢查腳本與 CI**（被擋於：D1、D2）
   - 範圍：新增 `scripts/check-agents-md.py`（只用標準函式庫）：對 `git ls-files '*AGENTS.md'` 逐檔檢查層級（根目錄、子專案、`backend/internal/modules/*`、`packages/*`）的大小上限（bytes）與單行長度上限（字元），數值依 D1；`nextjs-agent-rules` 區塊不計入（由 `next dev` 維護）。例外清單寫在腳本裡，每項附「由第幾步清掉」；建立時列入所有超限的檔。附 `scripts/test_check_agents_md.py`（`unittest`，repo 目前沒有 Python 測試，不引入 pytest）。在 `.github/workflows/repo-hygiene.yml` 加兩步：`python3 scripts/check-agents-md.py` 與 `python3 -m unittest scripts/test_check_agents_md.py`。
   - 消費端：`.github/workflows/repo-hygiene.yml`；`rg -n "check-agents-md" .`
   - 不能動：其他 hygiene 檢查。
