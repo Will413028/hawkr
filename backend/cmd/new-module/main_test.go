@@ -250,6 +250,29 @@ func TestGeneratedAgentsLeavesTheAuditToFill(t *testing.T) {
 	}
 }
 
+// 模組 AGENTS.md 只有 ADR 2026-10-28-agents-md-layering 的固定七節，依序排列；
+// 行為規格與已知限制在 docs/modules/<模組>.md，不在每次都載入的指令檔。
+func TestGeneratedAgentsHasOnlyTheFixedSections(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join(scaffold(t, ""), "internal", "modules", "payment", "AGENTS.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	agents := string(b)
+	var got []string
+	for _, line := range strings.Split(agents, "\n") {
+		if strings.HasPrefix(line, "## ") {
+			got = append(got, strings.TrimPrefix(line, "## "))
+		}
+	}
+	want := []string{"職責", "擁有的資料", "發布的讀取介面", "模組內部結構", "不變量", "不負責", "決策紀錄"}
+	if strings.Join(got, "｜") != strings.Join(want, "｜") {
+		t.Errorf("AGENTS.md 的節是 %q，要是 %q", got, want)
+	}
+	if !strings.Contains(agents, "`docs/modules/payment.md`") {
+		t.Error("AGENTS.md 要指向模組規格 docs/modules/payment.md")
+	}
+}
+
 func TestRegisterAppendsTheModule(t *testing.T) {
 	root := scaffold(t, "")
 	src, err := os.ReadFile(filepath.Join(root, "cmd", "hawkr", "modules.go"))

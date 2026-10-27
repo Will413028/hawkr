@@ -57,7 +57,7 @@ make uitext                                         # 改文案目錄、模組�
 
 ## 契約規則（單體與舊服務都適用）
 
-- **SSOT 的優先序**：契約的唯一來源（`docs/開發規範/`、根目錄 `api/` 與 `api/proto/`、DB schema，以及舊契約的 CodeMeta）→ 對應的設計書（`docs/詳細設計書/`）→ 現有實作 → issue、畫面與口頭建議。唯一來源互相矛盾時，先指出矛盾，不要做會讓契約漂移的修改。
+- **SSOT 的優先序**：契約的唯一來源（`docs/開發規範/`、根目錄 `api/` 與 `api/proto/`、DB schema，以及舊契約的 CodeMeta）→ 對應的設計書（單體模組是 `docs/modules/<模組>.md`，其餘是 `docs/詳細設計書/`）→ 現有實作 → issue、畫面與口頭建議。唯一來源互相矛盾時，先指出矛盾，不要做會讓契約漂移的修改。
 - **對外 API**：根目錄 `api/` 的 proto 是唯一來源，慣例依 `docs/開發規範/API 設計規範（Connect）.md`；改 API 先改 proto，再跑 `make connect`，四個消費端各自重新生成（根目錄 `AGENTS.md` 的跨專案契約表）。上線前的 package 是 `v1alpha1`，契約可以直接改；上線時改成 `v1`，之後 `buf breaking`（`WIRE_JSON`）生效。
 - **舊 gateway 的 REST**（`/api/v1`，`docs/開發規範/API 設計規範.md`）：只維護到該模組搬進單體。namespace 只有 `public`、`app`、`admin`；URL path 與 query 用 `snake_case`，JSON 用 `camelCase`；統一 envelope；時間是 ISO 8601 UTC。
 - **現有 API 清單**：`api/openapi/openapi.yaml` 記錄舊 gateway 還在服務的 REST，模組搬遷、重新設計 API 時對照（ADR `docs/adr/2026-09-26-external-contract-protobuf-connect.md` D5）。gateway 的 swag 註解不再維護；改 gateway 的輸出或刪路由時一起改清單，`scripts/gateway-json-contract-check.py`（Check B：欄位）與 `gateway/internal/router/openapi_coverage_test.go`（路由，雙向）會檢查。

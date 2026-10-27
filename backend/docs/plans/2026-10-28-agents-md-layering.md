@@ -55,7 +55,7 @@
   - 不能動：其他 hygiene 檢查。
   - 驗收：`python3 scripts/check-agents-md.py` 在建立時的 HEAD 通過；`python3 -m unittest scripts/test_check_agents_md.py` 通過；mutation：把一個不在例外清單的檔加長到超過上限，腳本要失敗；在例外清單放一個已經不超限的檔，腳本要失敗（例外只能縮小）；push 後 repo-hygiene 的這兩步在 CI 的 job 紀錄裡有執行。
 
-- [ ] **2. 修訂單體 ADR 與模組模板**（被擋於：D2）
+- [x] **2. 修訂單體 ADR 與模組模板**（被擋於：D2）
   - 範圍：依 ADR 修訂流程修訂 `docs/adr/2026-09-24-go-modular-monolith.md` 第 41 行：模組 `AGENTS.md` 是「改這個模組前必須知道的規則」，固定節為 D2 的模組節；行為規格的唯一來源依 D3。D3 選 A 時，`backend/AGENTS.md`「契約規則」的 SSOT 優先序裡「設計書」一層加上 `docs/modules/`，並在步驟 4、6 碰到的每份舊設計書檔頭標明「單體模組的現行規格見 `docs/modules/<模組>.md`」。改 `cmd/new-module/templates/module/AGENTS.md.tmpl`、`main.go` 與 `main_test.go`。`docs/開發規範/設計文件治理規範.md` §1 的文件 taxonomy 加一列「模組規格」（`docs/modules/`，與詳細設計書同樣的 PURE SPEC 規則）。單體 ADR 的修訂已在 ADR 拍板時寫好（2026-10-28）。`backend/AGENTS.md` 單體規則 2 的最後一句改成新的節名（若 D2 改了節名）。
   - 消費端：`rg -n "AGENTS\.md" backend/cmd backend/internal/arch backend/docs/adr`；`main.go` 約第 66 行與模板第 3 行對 content 模組的引用。
   - 不能動：「沿用盤點」放 `CARRYOVER.md` 的規則與 `modules_test.go` 的檢查。
@@ -120,7 +120,7 @@
 | 步驟 | 狀態 | 已跑的驗收 | 未跑的驗收與原因 | commit |
 |---|---|---|---|---|
 | 1 檢查腳本與 CI | 完成 | 本機：`python3 scripts/check-agents-md.py` exit 0；`python3 -m unittest scripts/test_check_agents_md.py` 8 項 OK；mutation：media 加長到 9,947 bytes 與 600 字元的一行 → exit 1；例外清單放不超限的 buyer-app → exit 1；`actionlint` 通過 ；CI repo-hygiene run 40552353091（commit 41ed095）兩步 success | 無 | e495fe3 |
-| 2 ADR 與模組模板 | 未開始 | | | |
+| 2 ADR 與模組模板 | 完成 | 本機：`GOWORK=off go test ./cmd/new-module/ ./cmd/hawkr/` ok；`go vet ./cmd/new-module/`、`gofmt -l` 無輸出；新測試 `TestGeneratedAgentsHasOnlyTheFixedSections` 在舊模板上失敗（節是職責…已知限制、讀取模型…）；mutation：模板加回「## 已知限制」→ 失敗，刪掉「## 不負責」→ 失敗；`python3 scripts/check-agents-md.py` exit 0。`backend/AGENTS.md` 單體規則 2 的節名「發布的讀取介面」與 D2 相同，未改；產生器不建 `docs/modules/<模組>.md`，main.go 的下一步提示指向它 | backend-monolith CI（push 後看） | 見 git log |
 | 3 根目錄與子專案 | 未開始 | | | |
 | 4 非 seller 的模組 | 未開始 | | | |
 | 5 seller 開工前的確認 | 未開始 | | | |

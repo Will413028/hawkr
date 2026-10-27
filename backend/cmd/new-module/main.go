@@ -63,11 +63,11 @@ func run(args []string) error {
 			return err
 		}
 		fmt.Printf(`已產生 internal/modules/%s，並登記到 cmd/hawkr/modules.go 與 internal/arch/modules.go。接下來（遷移計畫「模組完成的定義」）：
-  1. 先做 CARRYOVER.md 的沿用盤點（TestEveryMovedModuleHasACarryOverAudit 在表還是空列時失敗），再填 AGENTS.md。
+  1. 先做 CARRYOVER.md 的沿用盤點（TestEveryMovedModuleHasACarryOverAudit 在表還是空列時失敗），再填 AGENTS.md；行為規格寫在 docs/modules/%s.md，AGENTS.md 只留規則與指向。
   2. 在 db/schema.sql 寫表，在 db/ 跑 atlas migrate diff <名稱> --env dev；寫第一支 query 後 make sqlc。
   3. 根套件只做公開 API；把 internal/feature 改成子領域名稱，在 cmd/hawkr 組裝，並更新 internal/arch 的依賴圖。
   4. 對外 API 先改根目錄 api/ 的 proto，再 make connect；特性測試用 make new-characterization 產生骨架。
-`, name)
+`, name, name)
 	case "characterization":
 		if err := newCharacterization(".", data{Name: name, Legacy: *legacy, Module: arch.ModulePath}); err != nil {
 			return err
