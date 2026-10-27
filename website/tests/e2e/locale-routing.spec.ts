@@ -279,7 +279,8 @@ test.describe("locale routing", { tag: ["@ui"] }, () => {
 		page,
 	}) => {
 		await page.goto("/en/faq");
-		const login = page.locator('a[href^="/en/login"]').first();
+		// 手機版導覽列的登入連結與桌機版是不同元素，只取看得到的那一個。
+		const login = page.locator('a[href^="/en/login"]:visible').first();
 		await expect(login).toHaveAttribute("data-hk-hard-navigation", "");
 		await login.click();
 		await expect(page).toHaveURL(/\/en\/login(?:\?|$)/);

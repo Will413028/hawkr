@@ -104,6 +104,9 @@ function installClerkStub(args: {
 		session,
 		user,
 		organization: null,
+		// @clerk/react 的 hooks 以 `clerk.telemetry?.record(...)` 記錄用量；沒有這個欄位時下面的 Proxy
+		// 會回一個函式，`.record` 就不是函式，useAuth 當場丟錯、整頁掉進根錯誤邊界。
+		telemetry: undefined,
 		__internal_lastEmittedResources: undefined,
 		async load() {
 			clerk.loaded = true;
@@ -159,5 +162,15 @@ export async function signInWithClerk(
 		// Clerk treats a token issued before the client_uat as stale and handshakes.
 		{ name: "__client_uat", value: String(iat - 60), url: origin },
 	]);
+	// 瀏覽器端的 ClerkProvider 仍會依假 key 的 Frontend API 網域嵌入 clerk-js 的 <script>；解不出網域會留下
+	// console.error（"Failed to load resource"），冒煙 spec 會把它當成執行期錯誤。window.Clerk 已由 stub 提供，
+	// 這個請求回空腳本即可。
+	await page.route("https://clerk.example.org/**", (route) =>
+		route.fulfill({
+			status: 200,
+			contentType: "application/javascript",
+			body: "",
+		}),
+	);
 	await page.addInitScript(installClerkStub, { token, userId, sessionId });
 }

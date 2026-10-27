@@ -33,11 +33,10 @@ test.describe("navbar reach on the narrowest phone", { tag: ["@ui"] }, () => {
 	});
 
 	test("a signed-in buyer can reach the account menu", async ({ page }) => {
-		await setupGatewayMocks(page, { identity: BUYER });
+		// 登入狀態是 Clerk 的（ADR 2026-09-27-identity-clerk）：session: "identity" 直接讓瀏覽器帶著 Clerk session 進站。
+		await setupGatewayMocks(page, { identity: BUYER, session: "identity" });
 
-		await page.goto("/login");
-		await page.getByTestId("mock-google").click();
-		await expect(page).toHaveURL(/\/$|\/market/, { timeout: 30_000 });
+		await page.goto("/");
 
 		const trigger = page.getByTestId("account-menu-trigger");
 		await expect(trigger).toBeVisible();

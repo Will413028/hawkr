@@ -94,8 +94,12 @@ function withLocaleIndexability(
  * from the handler; next-intl's "composing other middlewares" does the same
  * the other way round). Every redirect the site decides keeps the locale prefix.
  */
-export const middleware = clerkMiddleware((auth, request) =>
-	siteMiddleware(request, auth),
+export const middleware = clerkMiddleware(
+	(auth, request) => siteMiddleware(request, auth),
+	// Clerk 的「不連網驗證」：給了實例公鑰就在本機驗 session JWT。@clerk/nextjs 不會自己讀
+	// `CLERK_JWT_KEY`，要明確傳進來。部署沒設這個變數 → undefined → 照舊向 Clerk 取 JWKS；
+	// e2e 由 playwright.config.ts 設成一把本機產生的公鑰（tests/e2e/helpers/clerk-session.ts）。
+	{ jwtKey: process.env.CLERK_JWT_KEY || undefined },
 );
 
 /** Everything the site decides per request, given Clerk's verdict. */
