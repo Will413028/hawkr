@@ -2,8 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { create } from "@bufbuild/protobuf";
 import {
-	FDAChannel,
-	FDAReferralSchema,
 	ReporterContactSchema,
 	ReportMoveSchema,
 	ReportSupplementSchema,
@@ -19,7 +17,6 @@ import {
 	derivedMeasureText,
 	evidenceItems,
 	moveRecordText,
-	referralText,
 	reporterView,
 	reportSummary,
 	supplementSummary,
@@ -157,24 +154,6 @@ test("移動紀錄：站在案件看，移進來的與移出去的各是一句",
 	assert.equal(
 		moveRecordText(move("c-here", "c-new"), "c-here"),
 		"通報 r1 於 2026/10/18 10:00 移到案件 c-new（9001）",
-	);
-});
-
-test("轉報紀錄：已於 {時間} 記錄轉報（{管道}，案號 {no}）；沒有案號時沒有後半", () => {
-	const referral = (referenceNo: string) =>
-		create(FDAReferralSchema, {
-			channel: FDAChannel.FDA_CHANNEL_HOTLINE_1919,
-			referenceNo,
-			reportedByAdminId: "9001",
-			reportTime: ts(T0),
-		});
-	assert.equal(
-		referralText(referral("FDA-123")),
-		"已於 2026/10/18 10:00 記錄轉報（1919 食安專線，案號 FDA-123）",
-	);
-	assert.equal(
-		referralText(referral("")),
-		"已於 2026/10/18 10:00 記錄轉報（1919 食安專線）",
 	);
 });
 

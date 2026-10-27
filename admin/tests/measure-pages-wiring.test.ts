@@ -14,16 +14,14 @@ const exists = (path: string) =>
 		() => false,
 	);
 
-test("側欄：「措施與申覆」在「賣家 / 商品」分組、食品業者登錄審核之上；「商家通報」不在內容治理", async () => {
+test("側欄：「措施與申覆」在「賣家 / 商品」分組；「商家通報」不在內容治理", async () => {
 	const sidebar = await readFile("src/components/Layout/Sidebar.tsx", "utf8");
 	const measures = sidebar.indexOf('href: "/admin/measures"');
-	const food = sidebar.indexOf('href: "/admin/food-registrations"');
 	const sellerSection = sidebar.indexOf('section: "賣家 / 商品"');
 	assert.ok(
 		sellerSection >= 0 && measures > sellerSection,
 		"在賣家 / 商品分組內",
 	);
-	assert.ok(measures < food, "在食品業者登錄審核上面");
 	assert.match(sidebar, /label: "措施與申覆"/u);
 	assert.match(sidebar, /label: "商家通報"/u);
 	assert.doesNotMatch(sidebar, /商家違規 \/ 調查/u);

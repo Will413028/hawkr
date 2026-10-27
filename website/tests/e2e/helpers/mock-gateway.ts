@@ -187,23 +187,6 @@ export interface MockStore {
 	address?: { townCode: string; addressDetail: string };
 	prize?: string;
 	websiteUrl?: string;
-	/** 目前核准的食品業者登錄。 */
-	approvedFoodRegistration?: { id?: string; registrationNumber: string };
-	/** 待審的登錄。 */
-	pendingFoodRegistration?: {
-		id?: string;
-		state: "FOOD_REGISTRATION_STATE_PENDING";
-		registrationNumber: string;
-		submitTime?: string;
-	};
-	/** 被退回的登錄。 */
-	rejectedFoodRegistration?: {
-		id?: string;
-		state: "FOOD_REGISTRATION_STATE_REJECTED";
-		registrationNumber: string;
-		submitTime?: string;
-		rejectReason?: string;
-	};
 	/** 預設 true（已完成新手引導）。 */
 	onboardingCompleted?: boolean;
 	status?: "ACTIVE" | "PENDING_DELETION";
@@ -258,15 +241,6 @@ export function myStoreJson(store: MockStore) {
 			...(store.address ? { address: store.address } : {}),
 			prize: store.prize ?? "",
 			websiteUrl: store.websiteUrl ?? "",
-			...(store.approvedFoodRegistration
-				? { approvedFoodRegistration: store.approvedFoodRegistration }
-				: {}),
-			...(store.pendingFoodRegistration
-				? { pendingFoodRegistration: store.pendingFoodRegistration }
-				: {}),
-			...(store.rejectedFoodRegistration
-				? { rejectedFoodRegistration: store.rejectedFoodRegistration }
-				: {}),
 			onboardingCompleted: store.onboardingCompleted ?? true,
 			...(store.logoUriTemplate
 				? { logo: { uriTemplate: store.logoUriTemplate } }

@@ -14,11 +14,6 @@
 			"kind": "PAYUNI_TERMS",
 			"url": "https://www.payuni.com.tw/terms",
 			"version": "2026-10-07"
-		},
-		{
-			"kind": "FOOD_REGISTRATION_NOTICE",
-			"url": "/privacy#seller-food-registration-notice",
-			"doc": "seller-food-registration-notice.md"
 		}
 	]
 }

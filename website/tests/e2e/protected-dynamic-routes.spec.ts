@@ -84,7 +84,6 @@ interface DynamicRouteCase {
 const SELLER_STORE: MockStore = {
 	id: SELLER_ID,
 	storeName: "路由測試商店",
-	approvedFoodRegistration: { registrationNumber: "A-ROUTE-SMOKE" },
 };
 
 const PUBLIC_SELLER = {

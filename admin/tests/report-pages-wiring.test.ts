@@ -62,8 +62,8 @@ test("每個對話框都用共用的 Dialog（a11y 由 Dialog 一處保證）", 
 	);
 	assert.equal(
 		dialogs.length,
-		11,
-		"分案、設定結果、移到其他案件、結案、改嚴重度、記錄轉報；詢問賣家、記下賣家的回覆、撤回詢問、不轉報、記下主管機關的回覆（3c-b）",
+		8,
+		"分案、設定結果、移到其他案件、結案、改嚴重度；詢問賣家、記下賣家的回覆、撤回詢問（3c-b）",
 	);
 	for (const dialog of dialogs) {
 		assert.match(
@@ -122,8 +122,6 @@ test("按鈕只看伺服器的 can_*：案件與通報頁沒有自己推導可�
 		"canCreateMeasure",
 		"canLinkMeasure",
 		"canChangeSeverity",
-		"canExportFda",
-		"canRecordFdaReferral",
 	]) {
 		assert.ok(
 			caseSource.includes(`kase.${flag}`),

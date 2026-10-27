@@ -17,7 +17,6 @@ const sellerLegalPaths = [
 	"features/legal/pages/SellerTermsPage.tsx",
 	"docs/legal/seller-terms.md",
 	"docs/legal/seller-kyc-notice.md",
-	"docs/legal/seller-food-registration-notice.md",
 ];
 
 test("public legal policies keep private fee percentages out of public copy", () => {
@@ -78,10 +77,6 @@ test("seller legal pages render the generated documents", () => {
 		source("features/legal/pages/PrivacyPage.tsx"),
 		/本節版本：\$\{KYC_PRIVACY_NOTICE\.version\}/,
 	);
-	assert.match(
-		source("features/legal/pages/PrivacyPage.tsx"),
-		/本節版本：\$\{FOOD_REGISTRATION_NOTICE\.version\}/,
-	);
 });
 
 test("seller agreement URLs resolve to real routes and anchors", () => {
@@ -113,18 +108,4 @@ test("seller agreement URLs resolve to real routes and anchors", () => {
 		source("features/legal/pages/PrivacyPage.tsx"),
 		new RegExp(`id: "${noticeAnchor}"`),
 	);
-});
-
-test("the food registration notice has its own privacy section and the KYC notice and terms no longer list the number", () => {
-	const notice = manifestUrl("FOOD_REGISTRATION_NOTICE");
-	assert.equal(notice, "/privacy#seller-food-registration-notice");
-	assert.match(
-		source("features/legal/pages/PrivacyPage.tsx"),
-		/id: "seller-food-registration-notice"/,
-	);
-	assert.doesNotMatch(
-		source("docs/legal/seller-kyc-notice.md"),
-		/食品業者登錄字號/,
-	);
-	assert.doesNotMatch(source("docs/legal/seller-terms.md"), /食品業者登錄字號/);
 });

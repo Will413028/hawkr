@@ -35,7 +35,7 @@ const COLUMNS = ["種類", "店家", "開始時間", "期限"] as const;
 const ALL_KINDS = "";
 
 /**
- * 待辦：通報與案件、主管機關來函、措施、食品業者登錄與商家認證中等待處理的事項，依期限由急到緩（排序由伺服器決定，這裡不重排）；
+ * 待辦：通報與案件、主管機關來函、措施與商家認證中等待處理的事項，依期限由急到緩（排序由伺服器決定，這裡不重排）；
  * 每 30 秒自動更新。篩選是單選的種類，換篩選回第一頁。
  */
 export default function ReviewQueuePage() {
@@ -131,7 +131,7 @@ export default function ReviewQueuePage() {
 				<div>
 					<h1 className="page-title">待辦</h1>
 					<p className="page-subtitle">
-						通報與案件、主管機關來函、措施、食品業者登錄與商家認證中等待處理的事項，依期限由急到緩。每
+						通報與案件、主管機關來函、措施與商家認證中等待處理的事項，依期限由急到緩。每
 						30 秒自動更新。
 					</p>
 				</div>

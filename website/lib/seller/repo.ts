@@ -167,36 +167,6 @@ export const updateMyStore: SellerStorefrontRepo["updateMyStore"] = (
 	meta,
 ) => sellerStorefrontRepo.updateMyStore(update, meta);
 
-/** 送出食品業者登錄供平台核對；已有待審時由新的取代，目前核准的那一筆照常有效。 */
-export async function submitFoodRegistration(
-	registrationNumber: string,
-	acceptedAgreements: readonly AgreementAcceptanceInput[],
-): Promise<Store> {
-	const res = await sellerAppClient().submitFoodRegistration({
-		registrationNumber: registrationNumber.trim(),
-		acceptedAgreements: acceptedAgreements.map((a) => ({
-			kind: a.kind,
-			version: a.version,
-		})),
-	});
-	if (!res.store) throw new Error("SubmitFoodRegistration 的回應沒有店家");
-	return res.store;
-}
-
-/** 撤回待審的登錄，保留目前核准的那一筆。 */
-export async function withdrawFoodRegistration(): Promise<Store> {
-	const res = await sellerAppClient().withdrawFoodRegistration({});
-	if (!res.store) throw new Error("WithdrawFoodRegistration 的回應沒有店家");
-	return res.store;
-}
-
-/** 清除登錄：結束核准的那一筆並撤回待審的，立即生效。 */
-export async function clearFoodRegistration(): Promise<Store> {
-	const res = await sellerAppClient().clearFoodRegistration({});
-	if (!res.store) throw new Error("ClearFoodRegistration 的回應沒有店家");
-	return res.store;
-}
-
 export async function completeOnboarding(etag: string): Promise<Store> {
 	const res = await sellerAppClient().completeMyStoreOnboarding({ etag });
 	if (!res.store) throw new Error("CompleteMyStoreOnboarding 的回應沒有店家");

@@ -431,3 +431,42 @@ func TestApplyWithAnEmptyVersionIsInvalidInput(t *testing.T) {
 		t.Fatalf("err=%v", err)
 	}
 }
+
+// agreement_acceptances_source_check：每種 kind 只綁定剛好一種來源。開店的同意（SELLER_TERMS）不帶送出，KYC 的兩份同意
+// （KYC_PRIVACY_NOTICE、PAYUNI_TERMS）一定帶送出。被拒的語句以 wantViolates 斷言是這一條擋下，而且拿掉它就成功（沒有被別的約束遮住）。
+// 開店時已寫下的那列 SELLER_TERMS 先刪掉，否則每店一列的唯一索引會遮住「開店的同意帶了送出」。
+// mutation：在測試資料庫 ALTER TABLE seller.agreement_acceptances DROP CONSTRAINT agreement_acceptances_source_check，
+// 三個被拒的情況都改成寫入成功，本測試失敗。
+func TestAgreementAcceptancesBindExactlyOneSourceByKind(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	accountID, s, _ := f.submitted(t, idA, bankAcct)
+	ctx := context.Background()
+	review := f.submitReviewIDs(t, s.StoreID)[0]
+	_, err := f.db.Conn(ctx).Exec(ctx, "DELETE FROM seller.agreement_acceptances WHERE store_id = $1 AND kind = 'SELLER_TERMS'", s.StoreID)
+	must(t, err)
+	const insert = `INSERT INTO seller.agreement_acceptances (store_id, kind, version, account_id, accepted_at, submission_review_id)
+		VALUES ($1, $2, 'v', $3, now(), $4::uuid)`
+	for _, c := range []struct {
+		name, kind string
+		review     *string
+	}{
+		{"開店的同意帶了送出", "SELLER_TERMS", &review},
+		{"KYC 告知沒有送出", "KYC_PRIVACY_NOTICE", nil},
+		{"PayUni 條款沒有送出", "PAYUNI_TERMS", nil},
+	} {
+		f.wantViolates(t, c.name, "agreement_acceptances_source_check", insert, s.StoreID, c.kind, accountID, c.review)
+	}
+	for _, c := range []struct {
+		kind   string
+		review *string
+	}{
+		{"SELLER_TERMS", nil},
+		{"KYC_PRIVACY_NOTICE", &review},
+		{"PAYUNI_TERMS", &review},
+	} {
+		if _, err := f.db.Conn(ctx).Exec(ctx, insert, s.StoreID, c.kind, accountID, c.review); err != nil {
+			t.Errorf("%s 綁正確來源卻寫不進去：%v", c.kind, err)
+		}
+	}
+}

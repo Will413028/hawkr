@@ -14,13 +14,7 @@ import {
 	CaseInquiryState,
 	CaseInquiryWithdrawCause,
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/case_inquiry_pb";
-import {
-	FDAChannel,
-	FDAReferralReplySchema,
-	FDAReferralSchema,
-	FDAReferralWaiverSchema,
-	SellerGovernanceAdminService,
-} from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb";
+import { SellerGovernanceAdminService } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb";
 import { SellerAdminService } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb";
 import { DeadlineSchema } from "@hawkr/api/gen/hawkr/common/v1alpha1/deadline_pb";
 import {
@@ -47,8 +41,8 @@ import {
 } from "./fixtures/report-fixtures";
 
 /**
- * 案件詳情頁的詢問賣家與轉報 v2（3c-b-5）：詢問區塊的卡片與按鈕（只看伺服器的 can_*）、讀取失敗只影響詢問區塊、
- * 詢問／回覆（附件上傳）／撤回三個對話框的請求、轉報的追蹤日期與回覆與不轉報、頁首的等賣家與結案提示。
+ * 案件詳情頁的詢問賣家（3c-b-5）：詢問區塊的卡片與按鈕（只看伺服器的 can_*）、讀取失敗只影響詢問區塊、
+ * 詢問／回覆（附件上傳）／撤回三個對話框的請求、頁首的等賣家與結案提示。
  */
 
 const Page = requireFromTest(
@@ -255,7 +249,7 @@ test("詢問讀取失敗：只影響詢問區塊，顯示失敗句與重試；�
 	let calls = 0;
 	await openPage(
 		transportWith({
-			getCase: () => ({ case: kase({ canRecordFdaReferral: true }) }),
+			getCase: () => ({ case: kase({}) }),
 			listCaseInquiries: () => {
 				calls++;
 				if (calls === 1) throw new ConnectError("x", Code.Unavailable);
@@ -265,7 +259,6 @@ test("詢問讀取失敗：只影響詢問區塊，顯示失敗句與重試；�
 	);
 	await until(() => bodyText().includes("重試"), "失敗與重試");
 	assert.match(bodyText(), /案件詳情/u, "其他區塊照常");
-	assert.ok(maybeById("case-referral-title"));
 	await click("重試");
 	await until(() => bodyText().includes("請提供進貨紀錄"), "重試後列出");
 });
@@ -590,217 +583,4 @@ test("等賣家：頁首狀態旁有「等賣家」標記；結案對話框加�
 		dom.window.document.querySelector(".header-title-row")?.textContent ?? "",
 		/等賣家/u,
 	);
-});
-
-const REFERRAL_TIME = new Date("2026-10-01T02:00:00Z");
-
-test("轉報區塊：追蹤日期的 warning 只看伺服器的 follow_up_overdue（不比日期）；有回覆列出「{日期}：{內容}」；沒有回覆說還沒有回覆", async () => {
-	const reply = create(FDAReferralReplySchema, {
-		body: "已收到，辦理中",
-		receiveDate: { year: 2026, month: 10, day: 5 },
-		recordTime: ts(T0),
-	});
-	const referral = (followUpOverdue: boolean, replies: unknown[] = []) =>
-		create(FDAReferralSchema, {
-			channel: FDAChannel.FDA_CHANNEL_ONLINE_FORM,
-			referenceNo: "FDA-9",
-			reportTime: ts(REFERRAL_TIME),
-			// 日期早就過了：旗標是 false 時仍不可以有 warning，證明畫面不自己比日期。
-			followUpDate: { year: 2020, month: 10, day: 2 },
-			followUpOverdue,
-			replies: replies as never,
-		});
-	const warning = () => dom.window.document.querySelector(".adm-sla--warning");
-	const show = (followUpOverdue: boolean, replies: unknown[] = []) =>
-		openPage(
-			transportWith({
-				getCase: () => ({
-					case: kase({ fdaReferral: referral(followUpOverdue, replies) }),
-				}),
-			}),
-		);
-
-	await show(true);
-	assert.match(bodyText(), /追蹤日期 2020\/10\/02/u);
-	assert.match(bodyText(), /還沒有回覆/u);
-	assert.ok(warning(), "伺服器說逾期");
-
-	await show(false);
-	assert.match(bodyText(), /追蹤日期 2020\/10\/02/u);
-	assert.ok(warning() === null, "伺服器說沒逾期，日期再舊也不 warning");
-
-	// 有回覆而且新的追蹤日期又逾期：伺服器說逾期就 warning（跨輪）。
-	await show(true, [reply]);
-	assert.match(bodyText(), /2026\/10\/05：已收到，辦理中/u);
-	assert.doesNotMatch(bodyText(), /還沒有回覆/u);
-	assert.ok(warning(), "有回覆但新的追蹤日期逾期");
-
-	await show(false, [reply]);
-	assert.ok(warning() === null, "有回覆且伺服器說沒逾期");
-});
-
-test("轉報區塊：不轉報顯示「已於 {時間} 標記不轉報：{原因}」；按鈕只看 can_*", async () => {
-	await openPage(
-		transportWith({
-			getCase: () => ({
-				case: kase({
-					fdaReferralWaiver: create(FDAReferralWaiverSchema, {
-						reason: "主管機關已經介入",
-						waiveTime: ts(T0),
-					}),
-				}),
-			}),
-		}),
-	);
-	assert.match(
-		bodyText(),
-		/已於 2026\/10\/18 10:00 標記不轉報：主管機關已經介入/u,
-	);
-	assert.ok(buttonByText("不轉報") === undefined);
-	assert.ok(buttonByText("記下主管機關的回覆") === undefined);
-
-	await openPage(
-		transportWith({
-			getCase: () => ({
-				case: kase({
-					canRecordFdaReferral: true,
-					canWaiveFdaReferral: true,
-					canRecordFdaReferralReply: true,
-				}),
-			}),
-		}),
-	);
-	assert.ok(buttonByText("不轉報"));
-	assert.ok(buttonByText("記錄已轉報主管機關"));
-	assert.ok(buttonByText("記下主管機關的回覆"));
-});
-
-test("不轉報：原因去掉前後空白送出；已標記過時顯示橫幅", async () => {
-	const requests: Req[] = [];
-	await openPage(
-		transportWith({
-			getCase: () => ({ case: kase({ canWaiveFdaReferral: true }) }),
-			waiveFDAReferral: (req) => {
-				requests.push(req);
-				return { case: kase({}), alreadyWaived: true };
-			},
-		}),
-	);
-	await click("不轉報");
-	assert.match(bodyText(), /例如主管機關已經介入。標記之後不能再記錄轉報。/u);
-	await fill("waive-fda-referral-reason", "  主管機關已經介入 ");
-	await submit("標記不轉報");
-	await until(() => requests.length === 1, "送出");
-	assert.deepEqual(plain(requests[0]), {
-		caseId: CASE_ID,
-		reason: "主管機關已經介入",
-	});
-	await until(() => bodyText().includes("這個案件先前已標記不轉報。"), "橫幅");
-});
-
-test("記下主管機關的回覆：收到的日期預設今天，請求帶日期、內容、下一個追蹤日期；勾「不再追蹤」時追蹤日期欄停用並清空", async () => {
-	const requests: Req[] = [];
-	await openPage(
-		transportWith({
-			getCase: () => ({ case: kase({ canRecordFdaReferralReply: true }) }),
-			recordFDAReferralReply: (req) => {
-				requests.push(req);
-				return { case: kase({}) };
-			},
-		}),
-	);
-	await click("記下主管機關的回覆");
-	assert.match(
-		byId<HTMLInputElement>("fda-referral-reply-date").value,
-		/^\d{4}-\d{2}-\d{2}$/u,
-	);
-	await fill("fda-referral-reply-date", "2026-10-19");
-	await fill("fda-referral-reply-body", " 已受理 ");
-	await fill("fda-referral-reply-next", "2026-11-19");
-	await submit("記下回覆");
-	await until(() => requests.length === 1, "送出");
-	const { requestId, ...rest } = plain(requests[0]);
-	assert.match(requestId, UUID_V4);
-	assert.deepEqual(rest, {
-		caseId: CASE_ID,
-		body: "已受理",
-		receiveDate: { year: 2026, month: 10, day: 19 },
-		nextFollowUpDate: { year: 2026, month: 11, day: 19 },
-		clearFollowUp: false,
-	});
-
-	await click("記下主管機關的回覆");
-	await fill("fda-referral-reply-next", "2026-12-01");
-	await React.act(async () => {
-		byId<HTMLInputElement>("fda-referral-reply-clear").click();
-	});
-	assert.equal(byId<HTMLInputElement>("fda-referral-reply-next").value, "");
-	assert.equal(
-		byId<HTMLInputElement>("fda-referral-reply-next").disabled,
-		true,
-	);
-});
-
-test("記下主管機關的回覆：request_id 是 UUIDv4；同一份內容失敗後重送沿用同一個，內容改了換新的", async () => {
-	const requests: Req[] = [];
-	await openPage(
-		transportWith({
-			getCase: () => ({ case: kase({ canRecordFdaReferralReply: true }) }),
-			recordFDAReferralReply: (req) => {
-				requests.push(req);
-				if (requests.length < 3) {
-					throw new ConnectError("暫時失敗", Code.Unavailable);
-				}
-				return { case: kase({}) };
-			},
-		}),
-	);
-	await click("記下主管機關的回覆");
-	await fill("fda-referral-reply-body", "第一版");
-	await submit("記下回覆");
-	await until(() => requests.length === 1, "第一次送出");
-	await until(() => !footerButton("送出中…"), "可重送");
-	await submit("記下回覆");
-	await until(() => requests.length === 2, "原樣重送");
-	await until(() => !footerButton("送出中…"), "可再送");
-	await fill("fda-referral-reply-body", "第二版");
-	await submit("記下回覆");
-	await until(() => requests.length === 3, "改過內容");
-	const ids = requests.map((r) => r.requestId as string);
-	for (const id of ids) assert.match(id, UUID_V4);
-	assert.equal(ids[0], ids[1], "同一份內容重送沿用同一個");
-	assert.notEqual(ids[1], ids[2], "內容改了換新的");
-});
-
-test("記錄轉報：追蹤日期選填，有填就帶 follow_up_date；沒填不帶（伺服器取 30 天後）", async () => {
-	const requests: Req[] = [];
-	await openPage(
-		transportWith({
-			getCase: () => ({ case: kase({ canRecordFdaReferral: true }) }),
-			recordFDAReferral: (req) => {
-				requests.push(req);
-				return { case: kase({}), alreadyRecorded: false };
-			},
-		}),
-	);
-	for (const followUp of ["2026-11-30", ""]) {
-		await click("記錄已轉報主管機關");
-		assert.match(bodyText(), /追蹤日期（預設 30 天後）/u);
-		await fill(
-			"record-fda-referral-channel",
-			String(FDAChannel.FDA_CHANNEL_OTHER),
-		);
-		if (followUp) await fill("record-fda-referral-follow-up", followUp);
-		await submit("記錄轉報");
-		await until(
-			() => maybeById("record-fda-referral-channel") === null,
-			"對話框關閉",
-		);
-	}
-	assert.deepEqual(plain(requests[0].followUpDate), {
-		year: 2026,
-		month: 11,
-		day: 30,
-	});
-	assert.equal(requests[1].followUpDate, undefined);
 });

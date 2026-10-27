@@ -1,7 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import {
 	CapabilityStatusSchema,
-	FoodRegistrationState,
 	GetMyStoreResponseSchema,
 	KYCFlowStatus,
 	SellerCapability,
@@ -38,8 +37,6 @@ function build(
 		description?: string;
 		shippingRows?: ShippingOnboarding[];
 		productCount?: number | null;
-		foodRegistrationNumber?: string;
-		foodRequestState?: FoodRegistrationState;
 		/** SHIPPING_SETUP 的缺項；沒給時照伺服器：PUBLIC_LISTING 缺 KYC_APPROVED 才缺它。 */
 		shippingMissing?: SellerRequirement[];
 	} = {},
@@ -48,17 +45,6 @@ function build(
 		store: {
 			id: "1",
 			description: extra.description ?? "",
-			approvedFoodRegistration: extra.foodRegistrationNumber
-				? { registrationNumber: extra.foodRegistrationNumber }
-				: undefined,
-			pendingFoodRegistration:
-				extra.foodRequestState === FoodRegistrationState.PENDING
-					? { state: extra.foodRequestState, registrationNumber: "A-9" }
-					: undefined,
-			rejectedFoodRegistration:
-				extra.foodRequestState === FoodRegistrationState.REJECTED
-					? { state: extra.foodRequestState, registrationNumber: "A-9" }
-					: undefined,
 		},
 		capabilities:
 			missing === undefined
@@ -185,11 +171,10 @@ describe("公開前必須 follows the PUBLIC_LISTING missing requirements", () =
 });
 
 describe("建議完成", () => {
-	it("holds shipping, the first product, food registration and the store description", () => {
+	it("holds shipping, the first product and the store description", () => {
 		expect(recommended(build([])).map((t) => t.id)).toEqual([
 			"shipping",
 			"product",
-			"food",
 			"description",
 		]);
 	});
@@ -247,52 +232,10 @@ describe("建議完成", () => {
 		const tasks = build([], {
 			description: "產地直送",
 			productCount: 2,
-			foodRegistrationNumber: "A-123",
 		});
 		expect(task(tasks, "description").completed).toBe(true);
 		expect(task(tasks, "product").completed).toBe(true);
-		expect(task(tasks, "food").completed).toBe(true);
 		expect(task(build([]), "description").completed).toBe(false);
-		expect(task(build([]), "food").completed).toBe(false);
-	});
-
-	it("the food task always points to the wallet food row, whatever the KYC state", () => {
-		const expected =
-			"/seller-center/wallet?section=food-registration#food-registration";
-		for (const flowStatus of [
-			undefined,
-			F.KYC_FLOW_STATUS_NOT_STARTED,
-			F.KYC_FLOW_STATUS_UNDER_REVIEW,
-			F.KYC_FLOW_STATUS_APPROVED,
-		]) {
-			const food = task(build([R.KYC_APPROVED], { flowStatus }), "food");
-			expect(food.href).toBe(expected);
-			expect(food.panelDescription).toBe(
-				"若販售加工食品，請在錢包與認證送出食品業者登錄字號審核；一般生鮮商品可略過。",
-			);
-		}
-	});
-
-	it("the food task labels depend only on whether a registration is approved", () => {
-		const none = task(build([]), "food");
-		expect([none.cta, none.statusLabel]).toEqual(["填寫資料", "尚未登錄"]);
-		const pending = task(
-			build([], { foodRequestState: FoodRegistrationState.PENDING }),
-			"food",
-		);
-		expect(pending.completed).toBe(false);
-		expect([pending.cta, pending.statusLabel]).toEqual([
-			"填寫資料",
-			"尚未登錄",
-		]);
-		const approved = task(
-			build([], { foodRegistrationNumber: "A-123" }),
-			"food",
-		);
-		expect([approved.cta, approved.statusLabel]).toEqual([
-			"查看或更新資料",
-			"已登錄",
-		]);
 	});
 
 	it("no task asks the seller to publish a post first", () => {

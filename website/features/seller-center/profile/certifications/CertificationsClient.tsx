@@ -355,8 +355,8 @@ export default function CertificationsClient() {
 
 	const payuni = payuniHasState(flow.payuni) ? flow.payuni : null;
 
-	// 已通過認證的賣家不需要這頁 — 認證狀態與「販售加工食品」登錄都已移到
-	// 「錢包與認證」頁的展開式 row。任何已通過的賣家（剛通過或事後造訪）
+	// 已通過認證的賣家不需要這頁 — 認證狀態已移到「錢包與認證」頁的
+	// 展開式 row。任何已通過的賣家（剛通過或事後造訪）
 	// 一律導回錢包頁。此頁僅保留給尚未通過的賣家填 KYC 表單。
 	const router = useObservedRouter("seller_certifications");
 	React.useEffect(() => {

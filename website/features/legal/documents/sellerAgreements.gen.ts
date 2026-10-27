@@ -13,8 +13,4 @@ export const SELLER_AGREEMENTS = {
 		version: "2026-10-07",
 		url: "https://www.payuni.com.tw/terms",
 	},
-	FOOD_REGISTRATION_NOTICE: {
-		version: "2026-10-25",
-		url: "/privacy#seller-food-registration-notice",
-	},
 } as const;

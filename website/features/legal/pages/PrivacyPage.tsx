@@ -1,7 +1,6 @@
 import { LegalPage } from "@/features/legal";
 import DemoNotice from "@/features/legal/DemoNotice";
 import { LegalBlocks } from "@/features/legal/documents/LegalBlocks";
-import { FOOD_REGISTRATION_NOTICE } from "@/features/legal/documents/sellerFoodRegistrationNotice.gen";
 import { KYC_PRIVACY_NOTICE } from "@/features/legal/documents/sellerKycNotice.gen";
 import { pageMetadata } from "@/lib/seo/metadata";
 
@@ -36,16 +35,6 @@ export default function PrivacyPage() {
 						<>
 							<p>{`本節版本：${KYC_PRIVACY_NOTICE.version}`}</p>
 							<LegalBlocks blocks={KYC_PRIVACY_NOTICE.blocks} />
-						</>
-					),
-				},
-				{
-					id: "seller-food-registration-notice",
-					title: "三、食品業者登錄告知事項",
-					content: (
-						<>
-							<p>{`本節版本：${FOOD_REGISTRATION_NOTICE.version}`}</p>
-							<LegalBlocks blocks={FOOD_REGISTRATION_NOTICE.blocks} />
 						</>
 					),
 				},

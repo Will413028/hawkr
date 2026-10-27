@@ -42,7 +42,6 @@ const NO_ENTRY: Record<StoreActionUnavailableReason, boolean> = {
 	[StoreActionUnavailableReason.PAYUNI_MERCHANT_TERMINAL]: false,
 	[StoreActionUnavailableReason.PAYUNI_BIND_IN_PROGRESS]: true,
 	[StoreActionUnavailableReason.PAYUNI_BOUND]: true,
-	[StoreActionUnavailableReason.FOOD_REGISTRATION_NOT_PENDING]: true,
 	[StoreActionUnavailableReason.KYC_NOT_APPROVED]: false,
 	[StoreActionUnavailableReason.STORE_CLOSED]: false,
 	[StoreActionUnavailableReason.STORE_PENDING_DELETION]: false,

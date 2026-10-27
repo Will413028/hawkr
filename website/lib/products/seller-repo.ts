@@ -956,37 +956,6 @@ export function upsertCategoryNode(
 	return foundParent ? next : tree;
 }
 
-/** Does `node` (or any descendant) carry `target` as its id? */
-function categoryBranchHasId(node: CategoryNode, target: number): boolean {
-	if (Number(node.id) === target) return true;
-	for (const child of node.children ?? []) {
-		if (categoryBranchHasId(child, target)) return true;
-	}
-	return false;
-}
-
-/**
- * True when `categoryId` sits inside a 加工食品-style L1 branch — the gate for
- * 「販售加工食品需先補食品業者登錄字號才能上架」. Matches by Chinese keyword on the
- * L1 node so renames lower in the tree don't break the gate. Pure (takes the
- * already-fetched tree) so it works both in the form hook and per-row on the
- * products list. Returns `false` while the tree is empty / id is unset.
- */
-export function isProcessedFoodCategory(
-	tree: CategoryNode[],
-	categoryId: number | string | undefined,
-): boolean {
-	const target = Number(categoryId);
-	if (!Number.isFinite(target) || tree.length === 0) return false;
-	for (const l1 of tree) {
-		if (categoryBranchHasId(l1, target)) {
-			const name = (l1.name ?? "").toString();
-			return name.includes("加工") || name.includes("食品");
-		}
-	}
-	return false;
-}
-
 /**
  * Verify a seller-entered certification number against the 農業部 open-data
  * platform via `GET /app/products/certifications/verify`. Only the verifiable

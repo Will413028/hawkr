@@ -4,7 +4,6 @@ import {
 	CaseCloseReason,
 	CaseDecision,
 	CaseState,
-	FDAChannel,
 	ReportState,
 	SupplementMatch,
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb";
@@ -12,8 +11,6 @@ import { ReportOutcome } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
 import {
 	caseDecisionText,
 	caseStatusText,
-	FDA_CHANNEL_OPTIONS,
-	fdaChannelText,
 	reportOutcomeText,
 	reportStatusText,
 	supplementMatchNotice,
@@ -125,21 +122,6 @@ test("案件的狀態：進行中｜已結案：採取措施｜已結案：不�
 		caseStatusText({ state: CaseState.UNSPECIFIED, ...none }),
 		"未知",
 	);
-});
-
-test("轉報管道：1919 食安專線｜線上表單｜傳真衛生局｜親自送件｜其他，選項順序同契約", () => {
-	assert.deepEqual(
-		[...FDA_CHANNEL_OPTIONS],
-		valuesOf(FDAChannel, FDAChannel.FDA_CHANNEL_UNSPECIFIED),
-	);
-	assert.deepEqual(FDA_CHANNEL_OPTIONS.map(fdaChannelText), [
-		"1919 食安專線",
-		"線上表單",
-		"傳真衛生局",
-		"親自送件",
-		"其他",
-	]);
-	assert.equal(fdaChannelText(FDAChannel.FDA_CHANNEL_UNSPECIFIED), "未知");
 });
 
 test("匿名補充的比對提醒：電話或聯絡信箱其中一個相同才提醒；兩者都相同與登入者的補充不提醒", () => {

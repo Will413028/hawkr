@@ -12,13 +12,6 @@ import '../../../support/connect_errors.dart';
 import '../../../support/my_store_fixtures.dart';
 import '../../../support/default_error_text.dart';
 
-final _noticeAcceptances = [
-  AgreementAcceptance(
-    kind: AgreementKind.AGREEMENT_KIND_FOOD_REGISTRATION_NOTICE,
-    version: 'n1',
-  ),
-];
-
 void main() {
   late List<UpdateMyStoreRequest> requests;
   late int reloads;
@@ -103,101 +96,6 @@ void main() {
     final store = changes.toStore('v1');
     expect(store.logoStagedToken, 'logo');
     expect(store.address.townCode, '63000010');
-  });
-
-  group('食品業者登錄', () {
-    late List<Object> calls;
-    var omitStore = false;
-
-    StoreEditor foodEditor() {
-      omitStore = false;
-      calls = [];
-      adopted = [];
-      reloads = 0;
-      reloadOk = true;
-      return StoreEditor(
-        client: SellerAppServiceClient(
-          FakeTransportBuilder()
-              .unary(SellerAppService.submitFoodRegistration, (req, _) {
-                calls.add(req);
-                final error = failure;
-                if (error != null) throw error;
-                if (omitStore) return SubmitFoodRegistrationResponse();
-                return SubmitFoodRegistrationResponse(store: Store(etag: 'v3'));
-              })
-              .unary(SellerAppService.withdrawFoodRegistration, (req, _) {
-                calls.add(req);
-                return WithdrawFoodRegistrationResponse(
-                  store: Store(etag: 'v4'),
-                );
-              })
-              .unary(SellerAppService.clearFoodRegistration, (req, _) {
-                calls.add(req);
-                return ClearFoodRegistrationResponse(store: Store(etag: 'v5'));
-              })
-              .build(),
-        ),
-        current: () => myStore(etag: 'v1'),
-        reload: () async {
-          reloads++;
-          return reloadOk;
-        },
-        adopt: adopted.add,
-        defaults: zhDefaultErrorText,
-      );
-    }
-
-    test('送出、撤回、清除各打自己的方法，成功後採用回應的店家並重讀', () async {
-      final e = foodEditor();
-      expect(
-        await e.submitFoodRegistration('A-1', _noticeAcceptances),
-        isA<StoreSaved>(),
-      );
-      final submitted = calls.last as SubmitFoodRegistrationRequest;
-      expect(submitted.registrationNumber, 'A-1');
-      expect(submitted.acceptedAgreements.map((a) => (a.kind, a.version)), [
-        (AgreementKind.AGREEMENT_KIND_FOOD_REGISTRATION_NOTICE, 'n1'),
-      ]);
-      expect(await e.withdrawFoodRegistration(), isA<StoreSaved>());
-      expect(calls.last, isA<WithdrawFoodRegistrationRequest>());
-      expect(await e.clearFoodRegistration(), isA<StoreSaved>());
-      expect(calls.last, isA<ClearFoodRegistrationRequest>());
-      expect(adopted.map((s) => s.etag), ['v3', 'v4', 'v5']);
-      expect(reloads, 3);
-    });
-
-    test('回應沒有店家：不採用空的店家，仍重讀', () async {
-      final e = foodEditor();
-      omitStore = true;
-      expect(
-        await e.submitFoodRegistration('A-1', _noticeAcceptances),
-        isA<StoreSaved>(),
-      );
-      expect(adopted, isEmpty);
-      expect(reloads, 1);
-    });
-
-    test('失敗：欄位錯誤不採用店家也不重讀', () async {
-      final e = foodEditor();
-      failure = reasonError(Code.invalidArgument, 'INVALID_ARGUMENT');
-      expect(
-        await e.submitFoodRegistration('A-1', _noticeAcceptances),
-        isNot(isA<StoreSaved>()),
-      );
-      expect(adopted, isEmpty);
-      expect(reloads, 0);
-    });
-
-    test('AGREEMENT_OUTDATED：回報告知過期，不採用店家也不重讀', () async {
-      final e = foodEditor();
-      failure = reasonError(Code.failedPrecondition, 'AGREEMENT_OUTDATED');
-      final outcome = await e.submitFoodRegistration('A-1', _noticeAcceptances);
-      expect(outcome, isA<StoreSaveFailed>());
-      expect((outcome as StoreSaveFailed).agreementOutdated, isTrue);
-      expect(outcome.message, '條款已更新，請重新閱讀後再勾選。');
-      expect(adopted, isEmpty);
-      expect(reloads, 0);
-    });
   });
 
   test('沒有要寫的欄位就不送出', () async {

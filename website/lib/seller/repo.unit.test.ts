@@ -18,13 +18,7 @@ vi.mock("@/lib/connect/seller", () => ({
 	sellerAppClient: () => mocks.client,
 }));
 
-import {
-	buildUpdateMyStoreRequest,
-	clearFoodRegistration,
-	createSellerStorefrontRepo,
-	submitFoodRegistration,
-	withdrawFoodRegistration,
-} from "./repo";
+import { buildUpdateMyStoreRequest, createSellerStorefrontRepo } from "./repo";
 
 function recordingRepo() {
 	const requests: UpdateMyStoreRequest[] = [];
@@ -161,47 +155,5 @@ describe("storefront repo over SellerAppService", () => {
 		await expect(
 			repo.updateMyStore({ etag: "old", storeName: "x" }),
 		).rejects.toMatchObject({ code: Code.Aborted });
-	});
-});
-
-describe("食品業者登錄的三個指令", () => {
-	it("送出（字號去掉空白）、撤回、清除各打自己的 RPC，回傳回應裡的店家", async () => {
-		const calls: string[] = [];
-		const transport = createRouterTransport((router) =>
-			router.service(SellerAppService, {
-				submitFoodRegistration(req) {
-					calls.push(
-						`submit:${req.registrationNumber}:${req.acceptedAgreements.map((a) => `${a.kind}@${a.version}`).join(",")}`,
-					);
-					return { store: { id: "7", etag: "e2" } };
-				},
-				withdrawFoodRegistration() {
-					calls.push("cancel");
-					return { store: { id: "7", etag: "e3" } };
-				},
-				clearFoodRegistration() {
-					calls.push("clear");
-					return { store: { id: "7", etag: "e4" } };
-				},
-			}),
-		);
-		mocks.client = createClient(SellerAppService, transport);
-		expect(
-			(
-				await submitFoodRegistration(" A-1 ", [
-					{
-						kind: AgreementKind.FOOD_REGISTRATION_NOTICE,
-						version: "2026-10-16",
-					},
-				])
-			).etag,
-		).toBe("e2");
-		expect((await withdrawFoodRegistration()).etag).toBe("e3");
-		expect((await clearFoodRegistration()).etag).toBe("e4");
-		expect(calls).toEqual([
-			`submit:A-1:${AgreementKind.FOOD_REGISTRATION_NOTICE}@2026-10-16`,
-			"cancel",
-			"clear",
-		]);
 	});
 });

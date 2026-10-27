@@ -11,9 +11,6 @@ import {
 	CaseCloseReason,
 	CaseDecision,
 	CaseState,
-	FDAChannel,
-	FDAReferralSchema,
-	FDAReferralWaiverSchema,
 	GovernanceNoteSchema,
 	ReportMoveSchema,
 	ReportState,
@@ -37,7 +34,6 @@ import {
 	byId,
 	click,
 	dom,
-	downloads,
 	maybeById,
 	mount,
 	navigation,
@@ -61,7 +57,7 @@ import {
 
 /**
  * 案件詳情頁（/admin/violation-reports/cases/[id]）實際掛進 DOM 後的行為：讀取中與失敗、各區塊、按鈕只看伺服器的 can_*、
- * 從案件開三種建立措施（頂端說明、來源案件進請求、預先勾選最早的 20 筆來源通報）、結案、記錄轉報、下載轉報資料、
+ * 從案件開三種建立措施（頂端說明、來源案件進請求、預先勾選最早的 20 筆來源通報）、結案、
  * 案件裡通報的設定結果與版本衝突。
  */
 
@@ -134,8 +130,6 @@ const ACTION_LABELS = [
 	"建立風險措施",
 	"終止合作",
 	"改嚴重度",
-	"下載轉報資料（.md）",
-	"記錄已轉報主管機關",
 ];
 
 const actionButtons = () =>
@@ -148,8 +142,6 @@ const ALL_CAN = {
 	canChangeSeverity: true,
 	canLinkMeasure: true,
 	canCreateMeasure: true,
-	canRecordFdaReferral: true,
-	canExportFda: true,
 };
 
 const TERMINATION_STORE = {
@@ -592,103 +584,6 @@ test("移動紀錄：站在案件看，移進來的與移出去的；沒有移�
 		transportWith({ gov: { getCase: () => ({ case: kase({}) }) } }),
 	);
 	assert.ok(maybeById("case-moves-title") === null);
-});
-
-test("轉報主管機關：有紀錄或伺服器允許某個動作才顯示，不看案件類別；還沒記錄、已記錄（管道與案號）", async () => {
-	await openPage(
-		transportWith({
-			gov: { getCase: () => ({ case: kase({ canRecordFdaReferral: true }) }) },
-		}),
-	);
-	assert.match(bodyText(), /轉報主管機關/u);
-	assert.match(bodyText(), /還沒有記錄轉報/u);
-
-	// 食安案件，但伺服器什麼都不能做、也沒有紀錄：不顯示空的區塊。
-	await openPage(
-		transportWith({
-			gov: {
-				getCase: () => ({
-					case: kase({ category: PolicyCategory.FOOD_SAFETY }),
-				}),
-			},
-		}),
-	);
-	assert.ok(
-		maybeById("case-referral-title") === null,
-		"食安但沒有 can_* 與紀錄：不顯示區塊",
-	);
-
-	await openPage(
-		transportWith({
-			gov: {
-				getCase: () => ({
-					case: kase({
-						fdaReferral: create(FDAReferralSchema, {
-							channel: FDAChannel.FDA_CHANNEL_ONLINE_FORM,
-							referenceNo: "FDA-9",
-							reportTime: ts(T0),
-						}),
-					}),
-				}),
-			},
-		}),
-	);
-	assert.match(
-		bodyText(),
-		/已於 2026\/10\/18 10:00 記錄轉報（線上表單，案號 FDA-9）/u,
-	);
-
-	await openPage(
-		transportWith({
-			gov: {
-				getCase: () => ({ case: kase({ category: PolicyCategory.FRAUD }) }),
-			},
-		}),
-	);
-	assert.ok(
-		maybeById("case-referral-title") === null,
-		"沒有 can_* 與紀錄的案件沒有轉報區塊",
-	);
-});
-
-test("轉報區塊的顯示條件：以下任何一項單獨成立就顯示（不看案件類別），全部沒有才不顯示", async () => {
-	const base = { category: PolicyCategory.FRAUD };
-	for (const [name, patch] of [
-		[
-			"只有轉報紀錄",
-			{
-				fdaReferral: create(FDAReferralSchema, {
-					channel: FDAChannel.FDA_CHANNEL_ONLINE_FORM,
-					referenceNo: "FDA-1",
-					reportTime: ts(T0),
-				}),
-			},
-		],
-		[
-			"只有不轉報紀錄",
-			{
-				fdaReferralWaiver: create(FDAReferralWaiverSchema, {
-					reason: "已介入",
-					waiveTime: ts(T0),
-				}),
-			},
-		],
-		["只能記錄轉報", { canRecordFdaReferral: true }],
-		["只能標記不轉報", { canWaiveFdaReferral: true }],
-		["只能記下回覆", { canRecordFdaReferralReply: true }],
-		["只能匯出", { canExportFda: true }],
-	] as const) {
-		await openPage(
-			transportWith({
-				gov: { getCase: () => ({ case: kase({ ...base, ...patch }) }) },
-			}),
-		);
-		assert.ok(maybeById("case-referral-title"), `${name}：顯示轉報區塊`);
-	}
-	await openPage(
-		transportWith({ gov: { getCase: () => ({ case: kase(base) }) } }),
-	);
-	assert.ok(maybeById("case-referral-title") === null, "全部沒有：不顯示");
 });
 
 test("導出的措施：列出「{種類}・{狀態}・措施 {id}」連到措施詳情；沒有就說還沒有；讀取失敗可重試", async () => {
@@ -1224,84 +1119,6 @@ test("改嚴重度：開對話框送出，請求帶案件的 etag", async () => 
 	assert.equal(changed[0].etag, "c-7");
 	assert.equal(changed[0].severity, ViolationSeverity.CRITICAL);
 	assert.equal(changed[0].note, "又有人送醫");
-});
-
-test("記錄轉報：成功時沒有提示；伺服器說之前已經記過時顯示橫幅，說明這次輸入沒有寫入", async () => {
-	for (const alreadyRecorded of [false, true]) {
-		await openPage(
-			transportWith({
-				gov: {
-					getCase: () => ({ case: kase({ canRecordFdaReferral: true }) }),
-					recordFDAReferral: () => ({ case: kase({}), alreadyRecorded }),
-				},
-			}),
-		);
-		await click("記錄已轉報主管機關");
-		await pick(
-			"record-fda-referral-channel",
-			FDAChannel.FDA_CHANNEL_HOTLINE_1919,
-		);
-		const submit = [
-			...dom.window.document.querySelectorAll(".modal-footer button"),
-		].find((b) => b.textContent === "記錄轉報");
-		assert.ok(submit);
-		await React.act(async () => {
-			(submit as HTMLElement).click();
-		});
-		await until(
-			() => maybeById("record-fda-referral-channel") === null,
-			"對話框關閉",
-		);
-		const banner =
-			"這個案件先前已記錄轉報，以下是原本的紀錄，這次輸入的內容沒有寫入。";
-		assert.equal(bodyText().includes(banner), alreadyRecorded);
-	}
-});
-
-test("下載轉報資料：讀 GetFDAExport 在 client 組成 .md 下載；失敗顯示原因", async () => {
-	await openPage(
-		transportWith({
-			gov: {
-				getCase: () => ({ case: kase({ canExportFda: true }) }),
-				getFDAExport: (req) => {
-					assert.equal(req.caseId, CASE_ID);
-					return {
-						case: kase({ openTime: ts(T0) }),
-						reports: [report({ id: "r-1", description: "吃了便當之後腹瀉" })],
-						store: { id: STORE_ID, storeName: "阿里山農場" },
-					};
-				},
-			},
-		}),
-	);
-	await click("下載轉報資料（.md）");
-	await until(() => downloads.length === 1, "下載");
-	assert.equal(downloads[0].fileName, `fda-referral-case-${CASE_ID}.md`);
-	const md = await downloads[0].blob.text();
-	assert.match(md, new RegExp(`^# 食安通報轉報資料（案件 ${CASE_ID}）`, "u"));
-	assert.match(md, /吃了便當之後腹瀉/u);
-	assert.match(
-		md,
-		/本檔由後台於 \d{4}\/\d{2}\/\d{2} \d{2}:\d{2} 產生，供轉報主管機關使用。/u,
-	);
-
-	await openPage(
-		failingFirstOn(
-			transportWith({
-				gov: {
-					getCase: () => ({ case: kase({ canExportFda: true }) }),
-					getFDAExport: () => ({ case: kase({}), reports: [] }),
-				},
-			}),
-			"GetFDAExport",
-			1,
-		),
-	);
-	await click("下載轉報資料（.md）");
-	await until(
-		() => bodyText().includes("轉報資料讀取失敗，請再試一次。"),
-		"網路層失敗的句子",
-	);
 });
 
 // ---------------------------------------------------------------------------

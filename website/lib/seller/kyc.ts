@@ -167,7 +167,7 @@ export function kycDocsOf(app: KYCApplication | null): KycDocs {
 }
 
 /**
- * 建立草稿時別處已經建立了申請：原樣採用那一份。表單、證件與 baseline 都取自申請，店家的預設值（公司電話、食品業者登錄）
+ * 建立草稿時別處已經建立了申請：原樣採用那一份。表單、證件與 baseline 都取自申請，店家的預設值（公司電話）
  * 只屬於全新的申請，不能當成使用者的修改保留下來而被自動存檔寫進既有的申請。
  */
 export function adoptExistingApplication(app: KYCApplication): {

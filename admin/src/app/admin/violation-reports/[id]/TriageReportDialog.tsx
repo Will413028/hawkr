@@ -86,7 +86,7 @@ export default function TriageReportDialog({
 			}
 		>
 			<p className="adm-operation-field-note">
-				平台判定類別決定通報歸到這家店的哪個案件（同一家店、同一個類別一個案件），也決定是否走食安的轉報流程；不會改掉檢舉人選的類別。
+				平台判定類別決定通報歸到這家店的哪個案件（同一家店、同一個類別一個案件）；不會改掉檢舉人選的類別。
 			</p>
 			<label className="form-label" htmlFor="triage-report-category">
 				平台判定類別 <span className="required">*</span>

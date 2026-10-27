@@ -29,7 +29,7 @@ final class KycAgreements {
   ];
 }
 
-/// 賣家入駐文件（賣家契約、KYC 個資告知、PayUni 條款、食品業者登錄個資告知）的一次讀取：`SellerPublicService.GetSellerAgreements`。
+/// 賣家入駐文件（賣家契約、KYC 個資告知、PayUni 條款）的一次讀取：`SellerPublicService.GetSellerAgreements`。
 /// 取用某一種時缺少、版本或網址是空的，丟 [StateError]。
 final class SellerAgreementSet {
   const SellerAgreementSet(this.agreements);
@@ -49,10 +49,6 @@ final class SellerAgreementSet {
 
   SellerAgreement sellerTerms() =>
       _of(AgreementKind.AGREEMENT_KIND_SELLER_TERMS);
-
-  /// 食品業者登錄的個資蒐集告知（送出 `SubmitFoodRegistration` 時確認已閱讀）。
-  SellerAgreement foodRegistrationNotice() =>
-      _of(AgreementKind.AGREEMENT_KIND_FOOD_REGISTRATION_NOTICE);
 
   KycAgreements kycAgreements() => KycAgreements(
     privacyNotice: _of(AgreementKind.AGREEMENT_KIND_KYC_PRIVACY_NOTICE),
@@ -91,8 +87,3 @@ Future<SellerAgreement> sellerTerms(Ref ref) async =>
 @riverpod
 Future<KycAgreements> kycAgreements(Ref ref) async =>
     (await ref.watch(sellerAgreementsProvider.future)).kycAgreements();
-
-/// 送出食品業者登錄要確認的告知；取自 [sellerAgreementsProvider]。
-@riverpod
-Future<SellerAgreement> foodRegistrationNotice(Ref ref) async =>
-    (await ref.watch(sellerAgreementsProvider.future)).foodRegistrationNotice();

@@ -12,7 +12,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../config/flavor.dart';
 import '../../../core/l10n/ui_locale.dart';
 import '../../../core/router/app_router.dart';
-import '../../../core/router/pending_wallet_focus.dart';
 import '../../../core/session/my_store.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -44,8 +43,6 @@ import 'wallet_coupon_section.dart';
 /// 第一次開啟與從看不到變成看得到時重讀（30 秒內讀過就不讀），回前景只在看得到時重讀。重讀失敗時繼續顯示上一次成功的值
 /// （同 website 的 `useCertGate`），只有完全沒有值才顯示錯誤面板。
 /// 第一次顯示等 `GetMyKYC`（含 PayUni 狀態）與第一次 `GetMyStore`（店家決定帳戶與認證、前往提領與優惠券）。
-///
-/// 要展開加工食品列時，進度卡先設定 [pendingWalletFocusProvider] 再導覽到錢包；錢包套用後清掉，每次導覽只套用一次。
 class WalletScreen extends HookConsumerWidget {
   const WalletScreen({super.key});
 
@@ -54,7 +51,6 @@ class WalletScreen extends HookConsumerWidget {
     final kyc = ref.watch(currentKycProvider);
     final store = ref.watch(currentStoreProvider);
     final my = ref.watch(myStoreSnapshotProvider);
-    final pendingFocus = ref.watch(pendingWalletFocusProvider);
 
     final visible = useOnBecameVisible(
       () => _reload(ref, settledOnly: true, maxAge: statusStaleTime),
@@ -72,7 +68,7 @@ class WalletScreen extends HookConsumerWidget {
       backgroundColor: AppColors.bgPrimary,
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: statusBarStyle,
-        child: _body(context, ref, kyc, store, my, pendingFocus),
+        child: _body(context, ref, kyc, store, my),
       ),
     );
   }
@@ -83,7 +79,6 @@ class WalletScreen extends HookConsumerWidget {
     AsyncValue<MyKyc>? kyc,
     AsyncValue<Object?> store,
     MyStore? my,
-    String? pendingFocus,
   ) {
     if (kyc == null || _isLoading(kyc) || _isLoading(store)) {
       return const TruckLoadingOverlay();
@@ -91,7 +86,6 @@ class WalletScreen extends HookConsumerWidget {
     final marketing =
         my?.can(SellerCapability.SELLER_CAPABILITY_MARKETING) ?? false;
     if (_isFailed(kyc) || ref.watch(storeUnavailableProvider)) {
-      _dropPendingFocus(ref, pendingFocus);
       return _WalletPage(
         showCoupons: marketing,
         children: [
@@ -111,10 +105,7 @@ class WalletScreen extends HookConsumerWidget {
     if (payuni == null) {
       return _WalletPage(
         showCoupons: marketing,
-        children: [
-          _CertificationGate(status: current.status),
-          _foodSection(ref, pendingFocus, certified: false, kycApproved: false),
-        ],
+        children: [_CertificationGate(status: current.status)],
       );
     }
 
@@ -125,27 +116,10 @@ class WalletScreen extends HookConsumerWidget {
         if (payuniHasState(payuni))
           _PayuniStatusPanel(payuni: payuni, canResubmit: current.canResubmit),
         if (walletCanWithdraw(my, current)) const _WithdrawButton(),
-        _foodSection(
-          ref,
-          pendingFocus,
-          certified: certified,
-          kycApproved: kycInPayuniStage(current.status),
-        ),
+        if (certified) const WalletAccountSection(),
       ],
     );
   }
-
-  Widget _foodSection(
-    WidgetRef ref,
-    String? pendingFocus, {
-    required bool certified,
-    required bool kycApproved,
-  }) => WalletAccountSection(
-    showCertification: certified,
-    kycApproved: kycApproved,
-    focusFoodRegistration: pendingFocus == WalletSections.foodRegistration,
-    onFocusHandled: () => ref.read(pendingWalletFocusProvider.notifier).clear(),
-  );
 }
 
 Future<void> _openPayuniLogin(BuildContext context) async {
@@ -160,15 +134,6 @@ Future<void> _openPayuniLogin(BuildContext context) async {
   }
   if (!context.mounted || launched) return;
   FloatingToast.error(context, '無法開啟 PayUni，請稍後再試');
-}
-
-/// 帳戶與認證區塊沒有顯示（錯誤、閘門、尚未認證）時，等待中的展開意圖在第一次穩定的畫面就丟掉：它只屬於那一次導覽，
-/// 不會等到之後某次剛好顯示該區塊時才套用。
-void _dropPendingFocus(WidgetRef ref, String? pendingFocus) {
-  if (pendingFocus == null) return;
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    ref.read(pendingWalletFocusProvider.notifier).clear();
-  });
 }
 
 /// 進認證流程；回來後伺服器可能剛改變了狀態，fresh 重讀。

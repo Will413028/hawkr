@@ -131,11 +131,6 @@ export function hasCapability(
 	);
 }
 
-/** 平台核准的食品業者登錄字號（沒有核准的登錄或空白時回空字串）；待審與被退回的請求不算。 */
-export function foodRegistrationNumber(store: Store | undefined): string {
-	return (store?.approvedFoodRegistration?.registrationNumber ?? "").trim();
-}
-
 /** 賣家中心顯示用的 logo 與封面網址；沒設時是 undefined。 */
 export function storeImageUrls(store: Store | undefined): {
 	logoUrl: string | undefined;

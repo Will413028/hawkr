@@ -19,7 +19,6 @@ import type {
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { useMyKycFlow, useSellerSelf } from "@/lib/hooks/useSellerSelf";
 import {
-	foodRegistrationNumber,
 	isStoreCertified,
 	type MyStore,
 	type ShippingGate,
@@ -38,8 +37,6 @@ export interface CertGate {
 	flow: KYCFlow | null;
 	/** 賣家可以把申請改回草稿重新送出（`flow.can_resubmit`）。 */
 	canResubmit: boolean;
-	/** 店家是否有平台核准的食品業者登錄（加工食品類商品的上架條件）。 */
-	hasFoodBusinessReg: boolean;
 	/** 店家（GetMyStore 的回應），沒讀到時是 null。 */
 	seller: MyStore | null;
 	error: string | null;
@@ -61,7 +58,6 @@ export function useCertGate(): CertGate {
 			flowStatus: undefined,
 			flow: null,
 			canResubmit: false,
-			hasFoodBusinessReg: false,
 			seller: null,
 			error: null,
 			refresh: reload,
@@ -82,7 +78,6 @@ export function useCertGate(): CertGate {
 			flowStatus: undefined,
 			flow: null,
 			canResubmit: false,
-			hasFoodBusinessReg: false,
 			seller: null,
 			error: error ? error.message : null,
 			refresh: reload,
@@ -98,7 +93,6 @@ export function useCertGate(): CertGate {
 		flowStatus,
 		flow,
 		canResubmit: flow?.canResubmit ?? false,
-		hasFoodBusinessReg: foodRegistrationNumber(seller.store) !== "",
 		seller,
 		error: null,
 		refresh: reload,

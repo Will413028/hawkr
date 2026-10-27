@@ -18,14 +18,12 @@ import Button from "@/components/ui/Button";
 import AiAssistantPanel, {
 	AI_LISTING_ASSISTANT_ENABLED,
 } from "@/features/seller/components/AiAssistantPanel";
-import { useCertGate } from "@/lib/seller/cert-gate";
 import ShelfStatusControl from "../components/ShelfStatusControl";
 import { resolveStatusButtons } from "./adapters/productFormAdapter";
 import ProductCreationCertifications from "./components/ProductCreationCertifications";
 import ProductFormSections, {
 	LOCKED_SURFACE_CLASS,
 	LockedOverlay,
-	useIsProcessedFoodCategory,
 } from "./components/ProductFormSections";
 import { useProductForm } from "./hooks/useProductForm";
 
@@ -53,15 +51,11 @@ const LAST_STEP = WIZARD_STEPS.length;
 
 export default function ProductFormPage({ mode, productId }: Props) {
 	const form = useProductForm({ mode, productId });
-	const certGate = useCertGate();
 	const [aiOpen, setAiOpen] = React.useState(false);
 	const [step, setStep] = React.useState(1);
 	const [pendingSubmitAction, setPendingSubmitAction] = React.useState<
 		Parameters<typeof form.submit>[0] | null
 	>(null);
-	const isProcessedFoodCategory = useIsProcessedFoodCategory(
-		form.draft.category_id,
-	);
 
 	// Jump to a step and reset scroll so the new step starts at the top
 	// (mobile only — desktop never changes `step`).
@@ -72,7 +66,7 @@ export default function ProductFormPage({ mode, productId }: Props) {
 
 	if (form.createdProduct) return <ProductCreationCertifications form={form} />;
 
-	if (form.loading || certGate.loading) {
+	if (form.loading) {
 		// Skeleton silhouette mirroring the real form (header + stacked section
 		// cards) so the loading state fills the column instead of collapsing
 		// into a single line. Matches the coupon form's loading rhythm.
@@ -114,8 +108,6 @@ export default function ProductFormPage({ mode, productId }: Props) {
 		mode,
 		Number(form.draft.status ?? 0),
 	);
-	const publishBlocked =
-		isProcessedFoodCategory && !certGate.hasFoodBusinessReg;
 	// 上架中(=1)：內容不可改，但不再擋整頁；改以頂部可切換狀態 + 表單毛玻璃鎖住呈現。
 	const locked = mode === "edit" && Number(form.draft.status ?? 0) === 1;
 	// 編輯草稿／下架商品時，桌機可並排顯示「只儲存」與「儲存並上架」；手機底列
@@ -142,7 +134,7 @@ export default function ProductFormPage({ mode, productId }: Props) {
 	const handleShelfToggle = (target: "4003" | "4004") => {
 		if (target === "4003") {
 			void form.unshelf();
-		} else if (!publishBlocked) {
+		} else {
 			void form.submit("publish");
 		}
 	};
@@ -239,11 +231,10 @@ export default function ProductFormPage({ mode, productId }: Props) {
 					onSubmit={(e) => {
 						e.preventDefault();
 						if (locked) return;
-						if (primary.action === "publish" && publishBlocked) return;
 						void form.submit(primary.action);
 					}}
 				>
-					<ProductFormSections variant="page" form={form} certGate={certGate} />
+					<ProductFormSections variant="page" form={form} />
 				</form>
 				{locked && <LockedOverlay />}
 			</div>
@@ -279,15 +270,7 @@ export default function ProductFormPage({ mode, productId }: Props) {
 						<>
 							<Button
 								variant={primary.action === "publish" ? undefined : "bordered"}
-								disabled={
-									form.submitting ||
-									(primary.action === "publish" && publishBlocked)
-								}
-								title={
-									primary.action === "publish" && publishBlocked
-										? "加工食品需先通過食品業者登錄審核才能上架"
-										: undefined
-								}
+								disabled={form.submitting}
 								isLoading={
 									form.submitting && pendingSubmitAction === primary.action
 								}
@@ -298,15 +281,7 @@ export default function ProductFormPage({ mode, productId }: Props) {
 							</Button>
 							{secondary && (
 								<Button
-									disabled={
-										form.submitting ||
-										(secondary.action === "publish" && publishBlocked)
-									}
-									title={
-										secondary.action === "publish" && publishBlocked
-											? "加工食品需先通過食品業者登錄審核才能上架"
-											: undefined
-									}
+									disabled={form.submitting}
 									isLoading={
 										form.submitting && pendingSubmitAction === secondary.action
 									}
@@ -363,15 +338,7 @@ export default function ProductFormPage({ mode, productId }: Props) {
 									? undefined
 									: "bordered"
 							}
-							disabled={
-								form.submitting ||
-								(mobileProminentAction.action === "publish" && publishBlocked)
-							}
-							title={
-								mobileProminentAction.action === "publish" && publishBlocked
-									? "加工食品需先通過食品業者登錄審核才能上架"
-									: undefined
-							}
+							disabled={form.submitting}
 							isLoading={
 								form.submitting &&
 								pendingSubmitAction === mobileProminentAction.action
@@ -399,17 +366,7 @@ export default function ProductFormPage({ mode, productId }: Props) {
 												: "bordered"
 										}
 										fullWidth
-										disabled={
-											form.submitting ||
-											(mobileAlternateAction.action === "publish" &&
-												publishBlocked)
-										}
-										title={
-											mobileAlternateAction.action === "publish" &&
-											publishBlocked
-												? "加工食品需先通過食品業者登錄審核才能上架"
-												: undefined
-										}
+										disabled={form.submitting}
 										isLoading={
 											form.submitting &&
 											pendingSubmitAction === mobileAlternateAction.action

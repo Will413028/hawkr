@@ -172,11 +172,6 @@ export interface ShelfStatusControlProps {
 	 * 省略則為純顯示徽章。審核中一律不可點。
 	 */
 	onToggle?: (target: "4003" | "4004") => void;
-	/**
-	 * 設定後，當「點一下」會「上架」(4004) 時，開關停用並以此字串作為 tooltip /
-	 * aria-label（如加工食品沒有核准的食品業者登錄）。只擋上架，下架一律允許。
-	 */
-	upshelfDisabledReason?: string;
 	className?: string;
 }
 
@@ -187,7 +182,6 @@ export default function ShelfStatusControl({
 	size = "sm",
 	busy = false,
 	onToggle,
-	upshelfDisabledReason,
 	className,
 }: ShelfStatusControlProps) {
 	const state = resolveShelfState(status);
@@ -195,8 +189,6 @@ export default function ShelfStatusControl({
 	const tone = TONE[state];
 	const target = shelfToggleTarget(state);
 	const interactive = Boolean(onToggle) && target !== null;
-	// 只擋「上架」方向；下架/草稿→上架時若被閘記，停用開關並改用閘記原因當提示。
-	const upshelfBlocked = target === "4004" && Boolean(upshelfDisabledReason);
 
 	// cta 變體的上架/下架用實心顯眼色；其餘退回柔和底色。
 	const solid = variant === "cta" ? SOLID[state] : undefined;
@@ -227,13 +219,11 @@ export default function ShelfStatusControl({
 		fgClass,
 		bgClass,
 		interactive &&
-			!upshelfBlocked &&
 			cn(
 				hoverClass,
 				"cursor-pointer active:scale-[0.98]",
 				"focus-visible:!outline-none focus-visible:![box-shadow:var(--hkui-focus-ring)]",
 			),
-		upshelfBlocked && "cursor-not-allowed opacity-55",
 		className,
 	);
 
@@ -261,9 +251,7 @@ export default function ShelfStatusControl({
 	}
 
 	// 互動開關 ─────────────────────────────────────────────────
-	const hint = upshelfBlocked
-		? (upshelfDisabledReason as string)
-		: toggleHint(state, label);
+	const hint = toggleHint(state, label);
 	const pendingLabel = target === "4004" ? "上架商品中…" : "下架商品中…";
 	return (
 		<span className="shelf-status-control-tooltip" data-tooltip={hint}>
@@ -274,7 +262,7 @@ export default function ShelfStatusControl({
 				size="sm"
 				isIconOnly={variant === "icon"}
 				className={base}
-				disabled={busy || upshelfBlocked}
+				disabled={busy}
 				isLoading={busy}
 				loadingLabel={pendingLabel}
 				aria-pressed={state === "active"}

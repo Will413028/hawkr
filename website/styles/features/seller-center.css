@@ -1138,16 +1138,6 @@ body .page-content:has(.seller-shell) {
 	white-space: nowrap;
 }
 
-.seller-onboarding-step__optional {
-	flex: 0 0 auto;
-	padding: 3px 8px;
-	border-radius: var(--radius-pill);
-	background: var(--hkui-content3);
-	color: var(--hkui-foreground-muted);
-	font-size: var(--hkui-text-tiny);
-	font-weight: 700;
-}
-
 .seller-onboarding-step__state {
 	display: grid;
 	width: 22px;
@@ -1195,8 +1185,7 @@ body .page-content:has(.seller-shell) {
 	margin-bottom: var(--hkui-space-3);
 }
 
-.seller-onboarding-progress__status,
-.seller-onboarding-progress__optional {
+.seller-onboarding-progress__status {
 	display: inline-flex;
 	align-items: center;
 	min-height: 28px;
@@ -1214,8 +1203,7 @@ body .page-content:has(.seller-shell) {
 	color: var(--hkui-success);
 }
 
-.seller-onboarding-progress__status.is-muted,
-.seller-onboarding-progress__optional {
+.seller-onboarding-progress__status.is-muted {
 	background: var(--hkui-content3);
 	color: var(--hkui-foreground-muted);
 }
@@ -1312,17 +1300,8 @@ body .page-content:has(.seller-shell) {
 	}
 }
 
-/* On narrow phones, keep the task name intact and move the optional marker to
- * its own secondary row. The smallest supported width also tightens the icon
- * columns so the longest title remains fully visible without clipping. */
-@media (max-width: 429px) {
-	.seller-onboarding-step__main {
-		flex-direction: column;
-		align-items: flex-start;
-		gap: var(--hkui-space-1);
-	}
-}
-
+/* The smallest supported width tightens the icon columns so the longest task
+ * title remains fully visible without clipping. */
 @media (max-width: 359px) {
 	.seller-onboarding-step {
 		grid-template-columns: 34px minmax(0, 1fr) 22px;
@@ -1337,10 +1316,6 @@ body .page-content:has(.seller-shell) {
 
 	.seller-onboarding-step__title {
 		font-size: var(--hkui-text-small);
-	}
-
-	.seller-onboarding-step__optional {
-		padding: 2px 6px;
 	}
 }
 
@@ -14412,31 +14387,6 @@ button.seller-price-lookup__chart-legend-item:focus-visible {
 		inset 0 0 0 1px rgb(var(--color-brand-primary-rgb) / 0.22);
 }
 
-/* Product form full-page gate */
-
-/* Inline 加工食品 warning inside the product create form */
-.product-form__food-warn {
-	margin-top: 12px;
-	padding: 12px 16px;
-	background: var(--hkui-warning-50, #fff8e6);
-	border: 1px solid var(--hkui-warning-200, #ffe5a8);
-	border-radius: var(--radius-md);
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 8px 16px;
-}
-.product-form__food-warn strong {
-	font-size: 0.875rem;
-	color: var(--hkui-warning, #b87b00);
-}
-.product-form__food-warn span {
-	flex: 1;
-	font-size: 0.8125rem;
-	color: var(--hkui-foreground-soft);
-	line-height: 1.5;
-}
-
 /* ============================================================
  *           Night theme — scoped to .seller-shell only
  *
@@ -15924,21 +15874,6 @@ html[data-theme="dark"] body .seller-shell .seller-sidebar {
 	font-size: var(--text-xs);
 	color: var(--hkui-default-500);
 }
-.seller-wallet__acct-row-badge {
-	flex-shrink: 0;
-	font-size: var(--text-xs);
-	font-weight: 600;
-	padding: 3px 10px;
-	border-radius: var(--radius-pill);
-}
-.seller-wallet__acct-row-badge.is-ok {
-	color: var(--color-ink-500);
-	background: rgb(var(--color-ink-300-rgb) / 0.14);
-}
-.seller-wallet__acct-row-badge.is-muted {
-	color: var(--hkui-default-500);
-	background: rgb(86 86 86 / 0.08);
-}
 .seller-wallet__acct-row-icon {
 	flex-shrink: 0;
 	width: 22px;
@@ -16074,16 +16009,6 @@ html[data-theme="dark"] body .seller-shell .seller-sidebar {
 [data-theme="dark"] .seller-wallet__acct-row-main span,
 [data-theme="dark"] .seller-wallet__cert-passed-meta span {
 	color: rgb(var(--color-ink-100-rgb) / 0.58);
-}
-
-[data-theme="dark"] .seller-wallet__acct-row-badge.is-ok {
-	color: rgba(245, 233, 195, 0.84);
-	background: rgba(241, 205, 112, 0.12);
-}
-
-[data-theme="dark"] .seller-wallet__acct-row-badge.is-muted {
-	color: rgb(var(--color-ink-100-rgb) / 0.58);
-	background: rgba(255, 255, 255, 0.07);
 }
 
 [data-theme="dark"] .seller-wallet__acct-row-icon.is-ok {

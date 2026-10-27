@@ -1,6 +1,5 @@
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_seller/features/seller/data/current_kyc.dart';
-import 'package:hawkr_seller/features/seller/data/kyc_flow.dart';
 import 'package:hawkr_seller/features/seller/data/payuni.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -136,31 +135,6 @@ void main() {
           reason: '$state',
         );
       }
-    });
-  });
-
-  group('kycInPayuniStage', () {
-    test('只有進入 PayUni 階段的狀態為真，每個有效狀態都有明確答案', () {
-      const inStage = {
-        KYCFlowStatus.KYC_FLOW_STATUS_BINDING,
-        KYCFlowStatus.KYC_FLOW_STATUS_BIND_FAILED,
-        KYCFlowStatus.KYC_FLOW_STATUS_FORWARDED,
-        KYCFlowStatus.KYC_FLOW_STATUS_UNDER_REVIEW,
-        KYCFlowStatus.KYC_FLOW_STATUS_PENDING_INFO,
-        KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
-        KYCFlowStatus.KYC_FLOW_STATUS_PAYUNI_REJECTED,
-      };
-      for (final status in validKycFlowStatuses) {
-        expect(
-          kycInPayuniStage(status),
-          inStage.contains(status),
-          reason: '$status',
-        );
-      }
-      expect(
-        kycInPayuniStage(KYCFlowStatus.KYC_FLOW_STATUS_UNSPECIFIED),
-        isFalse,
-      );
     });
   });
 }

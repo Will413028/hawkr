@@ -31,13 +31,11 @@ import {
 import { useStoreDetail } from "@/app/admin/merchants/[id]/use-store-detail";
 import { Button, StatusBadge } from "@/components/UI";
 import { type ConflictText, runAction } from "@/lib/connect-action";
-import { downloadTextFile } from "@/lib/download";
 import { connectErrorText } from "@/lib/error-text";
 import { LIST_REFRESH_MS, useNow } from "@/lib/use-now";
 import { useScrollToHash } from "@/lib/use-scroll-to-hash";
 import MoveReportDialog from "../../[id]/MoveReportDialog";
 import ResolveReportDialog from "../../[id]/ResolveReportDialog";
-import { buildFdaExport, fdaExportFileName } from "../../fda-export";
 import { useInvalidateGovernance } from "../../governance-queries";
 import {
 	INQUIRY_ALREADY_REPLIED_TEXT,
@@ -47,12 +45,7 @@ import {
 import {
 	CASE_CONFLICT_TEXT,
 	DECIDE_FAILED_TEXT,
-	EXPORT_FAILED_TEXT,
 	MOVE_FAILED_TEXT,
-	REFERRAL_ALREADY_RECORDED_TEXT,
-	REFERRAL_ALREADY_WAIVED_TEXT,
-	REFERRAL_FAILED_TEXT,
-	REFERRAL_V2_FAILED_TEXT,
 	RESOLVE_FAILED_TEXT,
 	reportConflictText,
 	SEVERITY_FAILED_TEXT,
@@ -67,7 +60,6 @@ import { CaseInquiriesSection } from "./CaseInquiries";
 import {
 	CaseMovesSection,
 	CaseNotesSection,
-	CaseReferralSection,
 	CaseReportsSection,
 	CaseSummarySection,
 	DerivedMeasuresSection,
@@ -75,11 +67,8 @@ import {
 import ChangeCaseSeverityDialog from "./ChangeCaseSeverityDialog";
 import CreateCaseInquiryDialog from "./CreateCaseInquiryDialog";
 import DecideCaseDialog from "./DecideCaseDialog";
-import RecordFDAReferralDialog from "./RecordFDAReferralDialog";
-import RecordFDAReferralReplyDialog from "./RecordFDAReferralReplyDialog";
 import RecordInquiryReplyDialog from "./RecordInquiryReplyDialog";
 import { useCaseReports } from "./use-case-reports";
-import WaiveFDAReferralDialog from "./WaiveFDAReferralDialog";
 import WithdrawInquiryDialog from "./WithdrawInquiryDialog";
 import "@/styles/pages/MerchantCertificationDetail.css";
 import "@/styles/pages/DelegatedOperations.css";
@@ -88,9 +77,6 @@ import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 type DialogState =
 	| { name: "decide" }
 	| { name: "severity" }
-	| { name: "referral" }
-	| { name: "waive" }
-	| { name: "referralReply" }
 	| { name: "inquiry" }
 	| { name: "inquiryReply"; inquiry: CaseInquiry }
 	| { name: "inquiryWithdraw"; inquiry: CaseInquiry }
@@ -102,7 +88,7 @@ type DialogState =
 	| null;
 
 /**
- * 案件詳情：案件、案件裡的通報、移動紀錄、轉報主管機關（食安）、導出的措施與內部註記。按鈕只看伺服器的 can_*
+ * 案件詳情：案件、案件裡的通報、移動紀錄、導出的措施與內部註記。按鈕只看伺服器的 can_*
  * （不能操作時隱藏，不顯示原因）；從案件建立的措施都記為這個案件導出的措施（source_case_id）。
  */
 export default function CaseDetailPage() {
@@ -112,7 +98,6 @@ export default function CaseDetailPage() {
 	const now = useNow(LIST_REFRESH_MS);
 	const [dialog, setDialog] = useState<DialogState>(null);
 	const [notice, setNotice] = useState<GovernanceNotice | null>(null);
-	const [exporting, setExporting] = useState(false);
 	const [openingMove, setOpeningMove] = useState(false);
 	const invalidate = useInvalidateGovernance();
 
@@ -133,11 +118,6 @@ export default function CaseDetailPage() {
 	const G = SellerGovernanceAdminService.method;
 	const decide = useMutation(G.decideCase, { onSuccess: invalidate });
 	const changeSeverity = useMutation(G.changeCaseSeverity, {
-		onSuccess: invalidate,
-	});
-	const referral = useMutation(G.recordFDAReferral, { onSuccess: invalidate });
-	const waive = useMutation(G.waiveFDAReferral, { onSuccess: invalidate });
-	const referralReply = useMutation(G.recordFDAReferralReply, {
 		onSuccess: invalidate,
 	});
 	const createInquiry = useMutation(G.createCaseInquiry, {
@@ -221,33 +201,6 @@ export default function CaseDetailPage() {
 	const handleSeverity = (
 		request: Parameters<typeof changeSeverity.mutateAsync>[0],
 	) => run(() => changeSeverity.mutateAsync(request), SEVERITY_FAILED_TEXT);
-	const handleReferral = async (
-		request: Parameters<typeof referral.mutateAsync>[0],
-	) => {
-		let alreadyRecorded = false;
-		await run(async () => {
-			const res = await referral.mutateAsync(request);
-			alreadyRecorded = res.alreadyRecorded;
-		}, REFERRAL_FAILED_TEXT);
-		if (alreadyRecorded) {
-			setNotice({ tone: "success", text: REFERRAL_ALREADY_RECORDED_TEXT });
-		}
-	};
-	const handleWaive = async (
-		request: Parameters<typeof waive.mutateAsync>[0],
-	) => {
-		let alreadyWaived = false;
-		await run(async () => {
-			const res = await waive.mutateAsync(request);
-			alreadyWaived = res.alreadyWaived;
-		}, REFERRAL_V2_FAILED_TEXT);
-		if (alreadyWaived) {
-			setNotice({ tone: "success", text: REFERRAL_ALREADY_WAIVED_TEXT });
-		}
-	};
-	const handleReferralReply = (
-		request: Parameters<typeof referralReply.mutateAsync>[0],
-	) => run(() => referralReply.mutateAsync(request), REFERRAL_V2_FAILED_TEXT);
 	const handleCreateInquiry = (
 		request: Parameters<typeof createInquiry.mutateAsync>[0],
 	) => run(() => createInquiry.mutateAsync(request), INQUIRY_FAILED_TEXT);
@@ -301,29 +254,6 @@ export default function CaseDetailPage() {
 		const res = await createMeasure.mutateAsync(request);
 		setDialog(null);
 		setNotice({ tone: "success", text: text(res.measure) });
-	};
-
-	const download = async () => {
-		if (exporting) return;
-		setExporting(true);
-		try {
-			const res = await client.getFDAExport({ caseId: kase.id });
-			downloadTextFile(
-				fdaExportFileName(kase.id),
-				buildFdaExport(
-					{ case: res.case, reports: res.reports, store: res.store },
-					new Date(),
-				),
-			);
-			setNotice(null);
-		} catch (caught) {
-			setNotice({
-				tone: "error",
-				text: connectErrorText(caught, EXPORT_FAILED_TEXT),
-			});
-		} finally {
-			setExporting(false);
-		}
 	};
 
 	const storeFailed = store.isError && kase.canLinkMeasure;
@@ -449,27 +379,6 @@ export default function CaseDetailPage() {
 						改嚴重度
 					</Button>
 				)}
-				{kase.canExportFda && (
-					<Button variant="outline" loading={exporting} onClick={download}>
-						下載轉報資料（.md）
-					</Button>
-				)}
-				{kase.canRecordFdaReferral && (
-					<Button
-						variant="outline"
-						onClick={() => setDialog({ name: "referral" })}
-					>
-						記錄已轉報主管機關
-					</Button>
-				)}
-				{kase.canWaiveFdaReferral && (
-					<Button
-						variant="outline"
-						onClick={() => setDialog({ name: "waive" })}
-					>
-						不轉報
-					</Button>
-				)}
 			</div>
 
 			<CaseSummarySection kase={kase} now={now} />
@@ -489,10 +398,6 @@ export default function CaseDetailPage() {
 				}
 			/>
 			<CaseMovesSection kase={kase} />
-			<CaseReferralSection
-				kase={kase}
-				onReply={() => setDialog({ name: "referralReply" })}
-			/>
 			<DerivedMeasuresSection caseId={kase.id} />
 			<CaseNotesSection caseId={kase.id} />
 
@@ -508,27 +413,6 @@ export default function CaseDetailPage() {
 					kase={kase}
 					onClose={() => setDialog(null)}
 					onConfirm={handleSeverity}
-				/>
-			)}
-			{dialog?.name === "referral" && (
-				<RecordFDAReferralDialog
-					caseId={kase.id}
-					onClose={() => setDialog(null)}
-					onConfirm={handleReferral}
-				/>
-			)}
-			{dialog?.name === "waive" && (
-				<WaiveFDAReferralDialog
-					caseId={kase.id}
-					onClose={() => setDialog(null)}
-					onConfirm={handleWaive}
-				/>
-			)}
-			{dialog?.name === "referralReply" && (
-				<RecordFDAReferralReplyDialog
-					caseId={kase.id}
-					onClose={() => setDialog(null)}
-					onConfirm={handleReferralReply}
 				/>
 			)}
 			{dialog?.name === "inquiry" && (

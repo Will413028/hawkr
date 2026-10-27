@@ -56,7 +56,6 @@ import CreateMeasureDialog from "./CreateMeasureDialog";
 import CreateRiskMeasureDialog from "./CreateRiskMeasureDialog";
 import CreateTerminationDialog from "./CreateTerminationDialog";
 import EndMeasureDialog from "./EndMeasureDialog";
-import { FoodRegistrationCard } from "./FoodRegistrationCard";
 import {
 	type GovernanceNotice,
 	GovernanceNoticeBanner,
@@ -1204,11 +1203,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 			{/* PayUni 聯絡資訊 — 店家自己的聯絡欄位（K9）；全空或還沒有註冊時整張卡不渲染。 */}
 			{(!isApproved || activeTab === "basic") && (
 				<PayUniContactCard store={store} registration={payUniRegistration} />
-			)}
-
-			{/* 食品業者登錄：核准的字號與待審的登錄（連到審核頁）。 */}
-			{(!isApproved || activeTab === "basic") && (
-				<FoodRegistrationCard store={store} />
 			)}
 
 			{/* 商家認證：顯示全文列。沒有送出過的申請時不顯示。 */}

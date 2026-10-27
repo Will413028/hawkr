@@ -13,7 +13,6 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
 	cleanup,
-	fireEvent,
 	render as renderWithoutIntl,
 	screen,
 } from "@testing-library/react";
@@ -22,7 +21,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
 	cert: {} as Record<string, unknown>,
-	foodProps: null as { kycApproved?: boolean } | null,
 }));
 
 vi.mock("@/lib/seller/cert-gate", () => ({
@@ -38,12 +36,6 @@ vi.mock("@/lib/orders/repo", () => ({
 vi.mock("@/features/seller-center", () => ({
 	SellerCertGate: ({ status }: { status: string }) =>
 		React.createElement("div", { "data-testid": "cert-gate" }, status),
-}));
-vi.mock("@/features/seller-center/components/FoodRegSupplement", () => ({
-	FoodRegSupplement: (props: { kycApproved?: boolean }) => {
-		state.foodProps = props;
-		return null;
-	},
 }));
 vi.mock(
 	"@/features/seller-center/components/SellerMobileDisclosureList",
@@ -134,7 +126,6 @@ function setCert(
 
 afterEach(() => {
 	cleanup();
-	state.foodProps = null;
 });
 
 describe("WalletClient 的 PayUni 狀態", () => {
@@ -165,9 +156,8 @@ describe("WalletClient 的 PayUni 狀態", () => {
 		expect(screen.getByText("伺服器獨特說明-審核中")).toBeTruthy();
 		const text = document.body.textContent ?? "";
 		expect(text).not.toMatch(/上次同步|重新整理狀態/);
-		expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
-			expect.stringContaining("販售加工食品"),
-		]);
+		// 認證核准前不顯示「帳戶與認證」區塊，畫面上沒有任何按鈕。
+		expect(screen.queryAllByRole("button")).toHaveLength(0);
 	});
 
 	it("PayUni 拒絕時整個錢包不會被認證閘取代；審核意見在 zh-TW 的元素裡，原碼不顯示", () => {
@@ -265,49 +255,17 @@ describe("WalletClient 的 PayUni 狀態", () => {
 		expect(screen.getByTestId("cert-gate")).toBeTruthy();
 	});
 
-	it("商家認證核准前也顯示「販售加工食品」列，沒有「商家認證」列", () => {
+	it("商家認證核准前不顯示「帳戶與認證」", () => {
 		setCert("submitted", KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED);
 		mount();
-		expect(screen.getByText("販售加工食品")).toBeTruthy();
-		expect(screen.getByText("未登錄")).toBeTruthy();
+		expect(screen.queryByText("帳戶與認證")).toBeNull();
 		expect(screen.queryByText("商家認證")).toBeNull();
 	});
 
-	it("食品登錄審核中的「商家認證通過後審核」說明只看商家認證（KYC）是否核准，不看 PayUni", () => {
-		const kycApprovedFlows = [
-			KYCFlowStatus.KYC_FLOW_STATUS_BINDING,
-			KYCFlowStatus.KYC_FLOW_STATUS_UNDER_REVIEW,
-			KYCFlowStatus.KYC_FLOW_STATUS_PENDING_INFO,
-			KYCFlowStatus.KYC_FLOW_STATUS_PAYUNI_REJECTED,
-		];
-		for (const flow of kycApprovedFlows) {
-			setCert("under_review", flow);
-			state.cert = { ...state.cert, approved: false };
-			mount();
-			fireEvent.click(screen.getByText("販售加工食品"));
-			expect(state.foodProps?.kycApproved, `flow ${flow}`).toBe(true);
-			expect(screen.queryByText("商家認證")).toBeNull();
-			cleanup();
-			state.foodProps = null;
-		}
-		for (const flow of [
-			KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED,
-			KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED,
-		]) {
-			setCert("submitted", flow);
-			mount();
-			fireEvent.click(screen.getByText("販售加工食品"));
-			expect(state.foodProps?.kycApproved, `flow ${flow}`).toBe(false);
-			cleanup();
-			state.foodProps = null;
-		}
-	});
-
-	it("認證核准後兩列都顯示", () => {
+	it("認證核准後顯示「商家認證」列", () => {
 		setCert("approved", KYCFlowStatus.KYC_FLOW_STATUS_APPROVED);
 		state.cert = { ...state.cert, approved: true };
 		mount();
 		expect(screen.getByText("商家認證")).toBeTruthy();
-		expect(screen.getByText("販售加工食品")).toBeTruthy();
 	});
 });

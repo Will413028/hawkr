@@ -74,15 +74,3 @@ KycFlowCopy kycFlowCopy(KYCFlowStatus status, UiLocale l) {
     gateMessage: (subject) => shown.gateMessage(l, subject: subject),
   );
 }
-
-/// 申請已核准、進入 PayUni 階段（綁定、審核、補件、核准、被拒）：錢包顯示 PayUni 的狀態。
-bool kycInPayuniStage(KYCFlowStatus status) => switch (status) {
-  KYCFlowStatus.KYC_FLOW_STATUS_BINDING ||
-  KYCFlowStatus.KYC_FLOW_STATUS_BIND_FAILED ||
-  KYCFlowStatus.KYC_FLOW_STATUS_FORWARDED ||
-  KYCFlowStatus.KYC_FLOW_STATUS_UNDER_REVIEW ||
-  KYCFlowStatus.KYC_FLOW_STATUS_PENDING_INFO ||
-  KYCFlowStatus.KYC_FLOW_STATUS_APPROVED ||
-  KYCFlowStatus.KYC_FLOW_STATUS_PAYUNI_REJECTED => true,
-  _ => false,
-};

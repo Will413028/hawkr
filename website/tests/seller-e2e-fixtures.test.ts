@@ -55,11 +55,6 @@ test("myStoreJson parses as a GetMyStoreResponse with every field mapped", () =>
 			description: "原本的介紹",
 			contactPhone: "0912345678",
 			address: { townCode: "66000290", addressDetail: "東關路一段 100 號" },
-			approvedFoodRegistration: { registrationNumber: "A-1" },
-			pendingFoodRegistration: {
-				state: "FOOD_REGISTRATION_STATE_PENDING",
-				registrationNumber: "A-2",
-			},
 			logoUriTemplate: "https://img.test/{preset}/logo.png",
 			etag: "e7",
 			missingRequirements: ["KYC_APPROVED", "LOGO"],
@@ -69,14 +64,6 @@ test("myStoreJson parses as a GetMyStoreResponse with every field mapped", () =>
 	assert.equal(message.store?.id, "90030001");
 	assert.equal(message.store?.storeCode, "2600000003");
 	assert.equal(message.store?.address?.townCode, "66000290");
-	assert.equal(
-		message.store?.approvedFoodRegistration?.registrationNumber,
-		"A-1",
-	);
-	assert.equal(
-		message.store?.pendingFoodRegistration?.registrationNumber,
-		"A-2",
-	);
 	assert.equal(
 		message.store?.logo?.uriTemplate,
 		"https://img.test/{preset}/logo.png",

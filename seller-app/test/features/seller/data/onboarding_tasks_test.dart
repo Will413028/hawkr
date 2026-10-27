@@ -2,7 +2,6 @@ import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart';
 import 'package:hawkr_seller/features/seller/data/onboarding_tasks.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hawkr_seller/shared/widgets/hk_status_badge.dart';
-import 'package:hawkr_seller/core/router/pending_wallet_focus.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/my_store_fixtures.dart';
@@ -232,7 +231,6 @@ void main() {
       expect(_ids(tasks, OnboardingTaskGroup.recommended), [
         OnboardingTaskId.shipping,
         OnboardingTaskId.product,
-        OnboardingTaskId.food,
         OnboardingTaskId.description,
       ]);
     });
@@ -377,7 +375,7 @@ void main() {
       expect(other.processing, isFalse);
     });
 
-    test('商品、商店介紹、食品登錄字號', () {
+    test('商品與商店介紹', () {
       final empty = buildOnboardingTasks(
         l: UiLocale.zhTW,
         my: myStore(publicListing: publicListingMissing()),
@@ -386,15 +384,12 @@ void main() {
       expect(_task(empty, OnboardingTaskId.product).statusLabel, '待上架');
       expect(_task(empty, OnboardingTaskId.product).cta, '新增商品');
       expect(_task(empty, OnboardingTaskId.description).statusLabel, '待完成');
-      expect(_task(empty, OnboardingTaskId.food).statusLabel, '尚未登錄');
-      expect(_task(empty, OnboardingTaskId.food).optional, isTrue);
 
       final filled = buildOnboardingTasks(
         l: UiLocale.zhTW,
         my: myStore(
           publicListing: publicListingMissing(),
           description: '  產地直送  ',
-          foodRegistrationNumber: 'A-123',
         ),
         flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
         productCount: 3,
@@ -403,8 +398,6 @@ void main() {
       expect(_task(filled, OnboardingTaskId.product).statusLabel, '已上架');
       expect(_task(filled, OnboardingTaskId.description).completed, isTrue);
       expect(_task(filled, OnboardingTaskId.description).statusLabel, '已完成');
-      expect(_task(filled, OnboardingTaskId.food).completed, isTrue);
-      expect(_task(filled, OnboardingTaskId.food).statusLabel, '已登錄');
       expect(
         _task(
           buildOnboardingTasks(
@@ -412,7 +405,6 @@ void main() {
             my: myStore(
               publicListing: publicListingMissing(),
               description: '   ',
-              foodRegistrationNumber: '  ',
             ),
             flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
           ),
@@ -430,40 +422,6 @@ void main() {
         productCount: null,
       );
       expect(_task(tasks, OnboardingTaskId.product).completed, isFalse);
-    });
-
-    test('食品登錄字號：認證前後都導到錢包的食品列，依有沒有登錄給「填寫資料」或「查看或更新資料」', () {
-      final before = _task(
-        buildOnboardingTasks(
-          l: UiLocale.zhTW,
-          my: myStore(publicListing: publicListingMissing([_kyc])),
-          flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_DRAFT,
-        ),
-        OnboardingTaskId.food,
-      );
-      expect(before.cta, '填寫資料');
-      expect(before.walletSection, WalletSections.foodRegistration);
-      final unregistered = _task(
-        buildOnboardingTasks(
-          l: UiLocale.zhTW,
-          my: myStore(publicListing: publicListingMissing()),
-          flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
-        ),
-        OnboardingTaskId.food,
-      );
-      expect(unregistered.cta, '填寫資料');
-      final registered = _task(
-        buildOnboardingTasks(
-          l: UiLocale.zhTW,
-          my: myStore(
-            publicListing: publicListingMissing(),
-            foodRegistrationNumber: 'A-123',
-          ),
-          flowStatus: KYCFlowStatus.KYC_FLOW_STATUS_APPROVED,
-        ),
-        OnboardingTaskId.food,
-      );
-      expect(registered.cta, '查看或更新資料');
     });
   });
 }

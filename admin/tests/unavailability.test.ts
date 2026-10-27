@@ -39,7 +39,6 @@ test("結構性集合恰好是契約註解標明「表示沒有入口」的值�
 	assert.deepEqual(
 		fromContract.sort(),
 		[
-			"FOOD_REGISTRATION_NOT_PENDING",
 			"KYC_NOT_BUSINESS",
 			"KYC_NOT_SUBMITTED",
 			"PAYUNI_BIND_IN_PROGRESS",

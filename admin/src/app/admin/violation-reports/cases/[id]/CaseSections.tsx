@@ -34,13 +34,9 @@ import {
 import {
 	actorTimeText,
 	derivedMeasureText,
-	followUpText,
 	moveRecordText,
-	referralReplyText,
-	referralText,
 	reportSummary,
 	supplementSummary,
-	waiverText,
 } from "../../report-view";
 import { useAllMeasures } from "../../use-all-measures";
 
@@ -83,15 +79,6 @@ export function CaseSummarySection({ kase, now }: { kase: Case; now: Date }) {
 					<DeadlineLine
 						label="決定期限"
 						deadline={kase.decideDeadline}
-						now={now}
-					/>
-				</p>
-			)}
-			{kase.fdaReferralDeadline && (
-				<p>
-					<DeadlineLine
-						label="轉報期限"
-						deadline={kase.fdaReferralDeadline}
 						now={now}
 					/>
 				</p>
@@ -225,78 +212,6 @@ export function CaseMovesSection({ kase }: { kase: Case }) {
 					</li>
 				))}
 			</ul>
-		</Section>
-	);
-}
-
-/**
- * 轉報主管機關（食安案件）：還沒轉報、已記錄的轉報（加追蹤日期與主管機關的回覆），或已標記不轉報。按鈕只看伺服器的 can_*。
- * 追蹤日期的 warning 只看伺服器的 `follow_up_overdue`（有追蹤日期、台北今天已過、日期寫下之後沒有新回覆），畫面不比日期。
- */
-export function CaseReferralSection({
-	kase,
-	onReply,
-}: {
-	kase: Case;
-	onReply: () => void;
-}) {
-	const referral = kase.fdaReferral;
-	// 區塊只在有紀錄或伺服器允許某個動作時顯示（食安以外的案件兩者都沒有）。
-	if (
-		!referral &&
-		!kase.fdaReferralWaiver &&
-		!kase.canRecordFdaReferral &&
-		!kase.canWaiveFdaReferral &&
-		!kase.canRecordFdaReferralReply &&
-		!kase.canExportFda
-	) {
-		return null;
-	}
-	const followUp = referral ? followUpText(referral) : undefined;
-	return (
-		<Section
-			id="case-referral-title"
-			icon="account_balance"
-			title="轉報主管機關"
-		>
-			{referral ? (
-				<>
-					<p>{referralText(referral)}</p>
-					{followUp && (
-						<p>
-							{referral.followUpOverdue ? (
-								<span className="adm-sla adm-sla--warning">{followUp}</span>
-							) : (
-								followUp
-							)}
-						</p>
-					)}
-					<p>主管機關的回覆</p>
-					{referral.replies.length === 0 ? (
-						<p>還沒有回覆</p>
-					) : (
-						<ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-							{referral.replies.map((reply) => (
-								<li
-									key={`${reply.recordTime?.seconds}-${reply.body}`}
-									style={{ whiteSpace: "pre-wrap" }}
-								>
-									{referralReplyText(reply)}
-								</li>
-							))}
-						</ul>
-					)}
-				</>
-			) : kase.fdaReferralWaiver ? (
-				<p>{waiverText(kase.fdaReferralWaiver)}</p>
-			) : (
-				<p>還沒有記錄轉報</p>
-			)}
-			{kase.canRecordFdaReferralReply && (
-				<Button variant="outline" onClick={onReply}>
-					記下主管機關的回覆
-				</Button>
-			)}
 		</Section>
 	);
 }

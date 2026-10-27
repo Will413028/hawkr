@@ -119,12 +119,7 @@ describe("OnboardingProgressCard", () => {
 		const recommended = within(lists[1] as HTMLElement);
 		expect(required.getByRole("button", { name: /^商店資料，/ })).toBeTruthy();
 		expect(required.getByRole("button", { name: /^商家認證，/ })).toBeTruthy();
-		for (const title of [
-			"物流設定",
-			"上架商品",
-			"食品加工登錄字號",
-			"商店介紹",
-		]) {
+		for (const title of ["物流設定", "上架商品", "商店介紹"]) {
 			expect(
 				recommended.getByRole("button", { name: new RegExp(`^${title}，`) }),
 			).toBeTruthy();

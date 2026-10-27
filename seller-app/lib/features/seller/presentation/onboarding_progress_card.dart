@@ -7,7 +7,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../core/l10n/ui_locale.dart';
 import '../../../core/router/app_router.dart';
-import '../../../core/router/pending_wallet_focus.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/hk_tokens.dart';
 import '../../../shared/icons/app_icon_colors.dart';
@@ -69,8 +68,7 @@ class OnboardingProgressCard extends HookConsumerWidget {
         case OnboardingTaskId.description:
           _openProfile(context);
         case OnboardingTaskId.cert:
-        case OnboardingTaskId.food:
-          _openWallet(context, ref, task);
+          context.go(MainRoutes.wallet);
         case OnboardingTaskId.notSuspended:
           unawaited(context.push<void>(SellerRoutes.suspensionNotice));
         case OnboardingTaskId.storeActive:
@@ -116,14 +114,6 @@ class OnboardingProgressCard extends HookConsumerWidget {
         ],
       ),
     );
-  }
-
-  void _openWallet(BuildContext context, WidgetRef ref, OnboardingTask task) {
-    final section = task.walletSection;
-    if (section != null) {
-      ref.read(pendingWalletFocusProvider.notifier).request(section);
-    }
-    context.go(MainRoutes.wallet);
   }
 
   void _openProfile(BuildContext context) {
@@ -261,7 +251,7 @@ class _TaskRow extends StatelessWidget {
     final cta = task.cta;
     return Semantics(
       container: true,
-      label: '${task.title}，${task.statusLabel}${task.optional ? '，非必要' : ''}',
+      label: '${task.title}，${task.statusLabel}',
       child: Padding(
         padding: const EdgeInsets.only(top: HkSpace.md),
         child: Row(
@@ -276,27 +266,13 @@ class _TaskRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: HkSpace.sm,
-                    children: [
-                      Text(
-                        task.title,
-                        style: const TextStyle(
-                          color: AppColors.textEmphasis,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      if (task.optional)
-                        const Text(
-                          '非必要',
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                          ),
-                        ),
-                    ],
+                  Text(
+                    task.title,
+                    style: const TextStyle(
+                      color: AppColors.textEmphasis,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: HkSpace.xs),
                   Text(

@@ -14,13 +14,11 @@ export const QUEUE_KIND_TEXT: Record<
 	[ReviewQueueItemKind.REPORT_TRIAGE]: "分案通報",
 	[ReviewQueueItemKind.CASE_DECISION]: "決定案件",
 	[ReviewQueueItemKind.CASE_INQUIRY_OVERDUE]: "跟進逾期的詢問",
-	[ReviewQueueItemKind.CASE_FDA_REFERRAL]: "轉報主管機關",
 	[ReviewQueueItemKind.AUTHORITY_ORDER]: "處理主管機關來函",
 	[ReviewQueueItemKind.AUTHORITY_TARGET_NOTICE]: "確認是否告知被指名者",
 	[ReviewQueueItemKind.MEASURE_APPEAL]: "裁定申覆",
 	[ReviewQueueItemKind.MEASURE_LIFT_REQUEST]: "裁定解除請求",
 	[ReviewQueueItemKind.MEASURE_REVIEW]: "複審停權",
-	[ReviewQueueItemKind.FOOD_REGISTRATION]: "審核食品業者登錄",
 	[ReviewQueueItemKind.KYC_APPLICATION]: "審核商家認證",
 	[ReviewQueueItemKind.PAYUNI_BIND_RETRY]: "重新綁定 PayUni",
 };
@@ -64,8 +62,6 @@ export function itemHref(item: ReviewQueueItem): string | undefined {
 			return `/admin/measures/${subject.value.measureId}`;
 		case "measureId":
 			return `/admin/measures/${subject.value}`;
-		case "foodRegistrationId":
-			return `/admin/food-registrations/${subject.value}`;
 		case "kycApplication":
 			return `/admin/merchants/${subject.value.storeId}#kyc`;
 		default:

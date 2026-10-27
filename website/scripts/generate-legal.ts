@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * 賣家入駐文件的產生器。來源只有 docs/legal/ 的三份 Markdown 正本與 seller-agreements.json（manifest）；
+ * 賣家入駐文件的產生器。來源只有 docs/legal/ 的兩份 Markdown 正本與 seller-agreements.json（manifest）；
  * 版本是正本版本行的生效日，沒有正本的文件（PAYUNI_TERMS）的版本寫在 manifest。輸出：
  *   - features/legal/documents/<正本檔名>.gen.ts：正本的 TS 投影（頁面渲染用）
  *   - features/legal/documents/sellerAgreements.gen.ts：kind → { version, url }（web 送出同意用）
@@ -14,12 +14,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseLegalMarkdown } from "./legal-markdown";
 
-const KINDS = [
-	"SELLER_TERMS",
-	"KYC_PRIVACY_NOTICE",
-	"PAYUNI_TERMS",
-	"FOOD_REGISTRATION_NOTICE",
-] as const;
+const KINDS = ["SELLER_TERMS", "KYC_PRIVACY_NOTICE", "PAYUNI_TERMS"] as const;
 type Kind = (typeof KINDS)[number];
 
 interface ManifestEntry {

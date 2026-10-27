@@ -4,7 +4,6 @@ import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_api/transport.dart';
 import 'package:hawkr_seller/core/networking/connect_provider.dart';
-import 'package:hawkr_seller/core/router/pending_wallet_focus.dart';
 import 'package:hawkr_seller/core/refresh/refresh_clock.dart';
 import 'package:hawkr_seller/core/session/session_provider.dart';
 import 'package:hawkr_seller/features/seller/data/current_store.dart';
@@ -29,8 +28,6 @@ class _LoggedIn extends Session {
   SessionModel build() =>
       const SessionModel(accountId: 'acc-1', isLoggedIn: true);
 }
-
-ProviderContainer? _lastContainer;
 
 Future<GoRouter> _pump(
   WidgetTester tester, {
@@ -64,7 +61,6 @@ Future<GoRouter> _pump(
     ],
   );
   addTearDown(container.dispose);
-  _lastContainer = container;
   final sub = container.listen(currentStoreProvider, (_, _) {});
   addTearDown(sub.close);
   await container.read(currentStoreProvider.future);
@@ -129,8 +125,6 @@ void main() {
     expect(find.text('平台審核中'), findsOneWidget);
     expect(find.text('查看進度'), findsOneWidget);
     expect(find.text('需先通過認證'), findsOneWidget);
-    expect(find.text('食品加工登錄字號'), findsOneWidget);
-    expect(find.text('非必要'), findsOneWidget);
     expect(find.text('停權處分'), findsNothing);
     expect(find.text('收合'), findsOneWidget);
   });
@@ -264,39 +258,6 @@ void main() {
     expect(find.text('已上架'), findsOneWidget);
     expect(find.text('待完成'), findsNothing);
     expect(find.text('已完成'), findsNWidgets(2));
-  });
-
-  testWidgets('食品登錄字號：核准前後都導向錢包的加工食品列', (tester) async {
-    await _pump(
-      tester,
-      missing: const [],
-      kyc: _flow(KYCFlowStatus.KYC_FLOW_STATUS_APPROVED),
-    );
-    await tester.tap(find.text('展開任務'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('填寫資料'));
-    await tester.pumpAndSettle();
-    expect(find.text('認證頁'), findsOneWidget);
-    expect(find.text('uri:/main/wallet'), findsOneWidget);
-    expect(
-      _lastContainer!.read(pendingWalletFocusProvider),
-      WalletSections.foodRegistration,
-      reason: '錢包取走之前，意圖還在',
-    );
-
-    await tester.pumpWidget(const SizedBox.shrink());
-    await _pump(
-      tester,
-      missing: [_kyc],
-      kyc: _flow(KYCFlowStatus.KYC_FLOW_STATUS_DRAFT),
-    );
-    await tester.tap(find.text('填寫資料'));
-    await tester.pumpAndSettle();
-    expect(find.text('uri:/main/wallet'), findsOneWidget);
-    expect(
-      _lastContainer!.read(pendingWalletFocusProvider),
-      WalletSections.foodRegistration,
-    );
   });
 
   testWidgets('點任務去錢包：離開時不重讀，回到儀表板（成為可見）時重讀一次', (tester) async {

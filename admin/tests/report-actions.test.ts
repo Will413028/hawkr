@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-	CaseDecision,
-	FDAChannel,
-} from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb";
+import { CaseDecision } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb";
 import { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import { ReportOutcome } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
 import {
@@ -17,11 +14,8 @@ import {
 	buildCreateCaseNote,
 	buildDecide,
 	buildMove,
-	buildReferral,
-	buildReferralReply,
 	buildResolve,
 	buildTriage,
-	buildWaive,
 	livingSourceMeasures,
 	negatesAsSource,
 	SOURCE_OVERFLOW_TEXT,
@@ -29,7 +23,6 @@ import {
 	targetOf,
 	validateAssess,
 	validateDecide,
-	validateReferral,
 	validateResolve,
 	validateSeverity,
 } from "../src/app/admin/violation-reports/report-actions";
@@ -333,132 +326,6 @@ test("改嚴重度：要選嚴重度、不能和目前相同、原因必填且�
 			severity: ViolationSeverity.CRITICAL,
 			note: "又有人中毒",
 			etag: "c-2",
-		},
-	);
-});
-
-test("記錄轉報：管道必選、案號選填最多 100 字；請求不帶 etag，沒有案號送空字串", () => {
-	assert.equal(
-		validateReferral({ channel: undefined, referenceNo: "", followUp: "" }),
-		"請選擇管道。",
-	);
-	assert.equal(
-		validateReferral({
-			channel: FDAChannel.FDA_CHANNEL_UNSPECIFIED,
-			referenceNo: "",
-			followUp: "",
-		}),
-		"請選擇管道。",
-	);
-	assert.equal(
-		validateReferral({
-			channel: FDAChannel.FDA_CHANNEL_HOTLINE_1919,
-			referenceNo: "9".repeat(101),
-			followUp: "",
-		}),
-		"案號最多 100 字。",
-	);
-	assert.equal(
-		validateReferral({
-			channel: FDAChannel.FDA_CHANNEL_HOTLINE_1919,
-			referenceNo: "9".repeat(100),
-			followUp: "",
-		}),
-		undefined,
-	);
-	assert.deepEqual(
-		buildReferral("c1", {
-			channel: FDAChannel.FDA_CHANNEL_ONLINE_FORM,
-			referenceNo: " FDA-1 ",
-			followUp: "",
-		}),
-		{
-			caseId: "c1",
-			channel: FDAChannel.FDA_CHANNEL_ONLINE_FORM,
-			referenceNo: "FDA-1",
-		},
-	);
-	assert.deepEqual(
-		buildReferral("c1", {
-			channel: FDAChannel.FDA_CHANNEL_OTHER,
-			referenceNo: "",
-			followUp: "",
-		}),
-		{ caseId: "c1", channel: FDAChannel.FDA_CHANNEL_OTHER, referenceNo: "" },
-	);
-	assert.throws(
-		() =>
-			buildReferral("c1", {
-				channel: undefined,
-				referenceNo: "",
-				followUp: "",
-			}),
-		{ message: "請選擇管道。" },
-		"萬一沒驗證就送，使用者看到的是已核准的那一句",
-	);
-});
-
-test("記錄轉報的追蹤日期：選填，YYYY-MM-DD 轉成日期；沒填或不是日期就不帶這個欄位", () => {
-	const base = { channel: FDAChannel.FDA_CHANNEL_OTHER, referenceNo: "" };
-	assert.deepEqual(buildReferral("c1", { ...base, followUp: "2026-11-18" }), {
-		caseId: "c1",
-		channel: FDAChannel.FDA_CHANNEL_OTHER,
-		referenceNo: "",
-		followUpDate: { year: 2026, month: 11, day: 18 },
-	});
-	for (const bad of ["", "2026-02-30", "11/18"]) {
-		assert.ok(
-			!("followUpDate" in buildReferral("c1", { ...base, followUp: bad })),
-			bad,
-		);
-	}
-});
-
-test("不轉報：原因去掉前後空白；範圍與長度由伺服器判斷", () => {
-	assert.deepEqual(buildWaive("c1", "  主管機關已經介入 "), {
-		caseId: "c1",
-		reason: "主管機關已經介入",
-	});
-});
-
-test("主管機關的回覆：日期轉成日期、內容去掉前後空白；追蹤日期與不再追蹤原樣送出（衝突由伺服器擋）", () => {
-	assert.deepEqual(
-		buildReferralReply(
-			"c1",
-			{
-				receiveDate: "2026-10-19",
-				body: " 已收到 ",
-				nextFollowUp: "2026-11-01",
-				clearFollowUp: false,
-			},
-			"rid-1",
-		),
-		{
-			caseId: "c1",
-			requestId: "rid-1",
-			body: "已收到",
-			receiveDate: { year: 2026, month: 10, day: 19 },
-			nextFollowUpDate: { year: 2026, month: 11, day: 1 },
-			clearFollowUp: false,
-		},
-	);
-	assert.deepEqual(
-		buildReferralReply(
-			"c1",
-			{
-				receiveDate: "2026-10-19",
-				body: "結案",
-				nextFollowUp: "",
-				clearFollowUp: true,
-			},
-			"rid-2",
-		),
-		{
-			caseId: "c1",
-			requestId: "rid-2",
-			body: "結案",
-			receiveDate: { year: 2026, month: 10, day: 19 },
-			clearFollowUp: true,
 		},
 	);
 });

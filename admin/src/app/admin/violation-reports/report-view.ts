@@ -1,8 +1,5 @@
 import { type Timestamp, timestampDate } from "@bufbuild/protobuf/wkt";
 import type {
-	FDAReferral,
-	FDAReferralReply,
-	FDAReferralWaiver,
 	Report,
 	ReportMove,
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb";
@@ -15,7 +12,6 @@ import {
 } from "@/app/admin/merchants/[id]/measure";
 import { formatDateTimeShort } from "@/lib/format";
 import { policyCategoryText } from "@/lib/policy-category";
-import { fdaChannelText } from "./report-text";
 
 // 通報與案件詳情頁的顯示邏輯（純函式）：檢舉人、佐證的名稱、補充與移動紀錄的句子。資料與可做的動作都來自伺服器。
 
@@ -121,38 +117,12 @@ export function moveRecordText(move: ReportMove, caseId: string): string {
 		: `通報 ${move.reportId} 於 ${when} 移到案件 ${move.toCaseId}（${move.movedByAdminId}）`;
 }
 
-/** 轉報紀錄：「已於 {時間} 記錄轉報（{管道}，案號 {no}）」，沒有案號時沒有後半。 */
-export function referralText(referral: FDAReferral): string {
-	const when = timeText(referral.reportTime);
-	const channel = fdaChannelText(referral.channel);
-	return referral.referenceNo
-		? `已於 ${when} 記錄轉報（${channel}，案號 ${referral.referenceNo}）`
-		: `已於 ${when} 記錄轉報（${channel}）`;
-}
-
 /** 日期（google.type.Date）的顯示：「2026/10/19」；沒有日期是「-」。 */
 export function calendarDateText(
 	date: { year: number; month: number; day: number } | undefined,
 ): string {
 	const iso = formatCalendarDate(date);
 	return iso === "" ? "-" : iso.replaceAll("-", "/");
-}
-
-/** 追蹤日期的一句（K2）：「追蹤日期 {日期}」；沒有追蹤日期是 undefined。 */
-export function followUpText(referral: FDAReferral): string | undefined {
-	return referral.followUpDate
-		? `追蹤日期 ${calendarDateText(referral.followUpDate)}`
-		: undefined;
-}
-
-/** 主管機關的一則回覆（K3）：「{日期}：{內容}」。 */
-export function referralReplyText(reply: FDAReferralReply): string {
-	return `${calendarDateText(reply.receiveDate)}：${reply.body}`;
-}
-
-/** 不轉報（K4）：「已於 {時間} 標記不轉報：{原因}」。 */
-export function waiverText(waiver: FDAReferralWaiver): string {
-	return `已於 ${timeText(waiver.waiveTime)} 標記不轉報：${waiver.reason}`;
 }
 
 /** 導出的措施的一行：「{種類}・{狀態}・措施 {id}」。 */

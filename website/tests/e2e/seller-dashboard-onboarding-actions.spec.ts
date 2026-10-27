@@ -25,7 +25,7 @@ const BASE_STORE: MockStore = {
 	logoUriTemplate: "https://example.com/{preset}/logo.png",
 };
 
-/** 認證通過（含 PayUni）：公開條件齊全；沒有食品業者登錄，展開錢包的食品列時直接顯示輸入框。 */
+/** 認證通過（含 PayUni）：公開條件齊全。 */
 const APPROVED_STORE: MockStore = { ...BASE_STORE };
 
 /** 還沒認證：伺服器的公開條件缺 KYC_APPROVED。 */
@@ -307,29 +307,6 @@ const APPROVED_TASK_ACTIONS: TaskActionCase[] = [
 			await expect(page.locator("form.product-form-wizard")).toBeVisible();
 		},
 	},
-	{
-		name: "food-registration deep link expands its form",
-		taskTitle: "食品加工登錄字號",
-		panelTitle: "食品加工登錄字號",
-		cta: "送出審核",
-		location:
-			"/seller-center/wallet?section=food-registration#food-registration",
-		verify: async (page) => {
-			await expect(
-				page.getByRole("heading", { name: "錢包與認證", exact: true }),
-			).toBeVisible();
-
-			const row = page.locator("#food-registration");
-			await expect(row).toHaveAttribute("aria-expanded", "true");
-			await expect(row).toBeFocused();
-			await expect(page.locator("#food-registration-form")).toBeVisible();
-			await expect(
-				page.getByRole("textbox", {
-					name: /^食品業者登錄字號/,
-				}),
-			).toBeVisible();
-		},
-	},
 ];
 
 test.describe("seller dashboard onboarding task actions", {
@@ -398,13 +375,8 @@ test.describe("seller dashboard onboarding task actions", {
 		await expect(
 			groups.nth(0).getByRole("button", { name: /^商家認證，/ }),
 		).toBeVisible();
-		await expect(groups.nth(1).locator("li")).toHaveCount(4);
-		for (const title of [
-			"物流設定",
-			"上架商品",
-			"食品加工登錄字號",
-			"商店介紹",
-		]) {
+		await expect(groups.nth(1).locator("li")).toHaveCount(3);
+		for (const title of ["物流設定", "上架商品", "商店介紹"]) {
 			await expect(
 				groups.nth(1).getByRole("button", { name: new RegExp(`^${title}，`) }),
 			).toBeVisible();

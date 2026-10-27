@@ -907,13 +907,6 @@ describe("D4：開頁不寫入", () => {
 		expect(mocks.saveKycDraft).not.toHaveBeenCalled();
 		expect(screen.getByLabelText("公司電話")).toHaveProperty("value", "");
 	});
-
-	it("表單沒有食品業者登錄欄位", async () => {
-		kycStore.set(rejectedApp({ subject: { case: "business", value: {} } }));
-		await mount();
-		expect(screen.queryByLabelText(/有販售加工食品/)).toBeNull();
-		expect(screen.queryByLabelText(/食品業者登錄字號/)).toBeNull();
-	});
 });
 
 describe("D5、D7：PayUni 問題的顯示（flow.payuni）", () => {

@@ -7,14 +7,12 @@ import { DrawerSkeleton } from "@/components/ui/DrawerSkeleton";
 import { Input } from "@/components/ui/Input";
 import { ossImageUrl } from "@/lib/media/cdn";
 import type { SellerProductDetail } from "@/lib/products/seller-repo";
-import { useCertGate } from "@/lib/seller/cert-gate";
 import ShelfStatusControl from "../components/ShelfStatusControl";
 import { resolveStatusButtons } from "./adapters/productFormAdapter";
 import ProductFormSections, {
 	LOCKED_SURFACE_CLASS,
 	LockedOverlay,
 	ProductFormErrors,
-	useIsProcessedFoodCategory,
 } from "./components/ProductFormSections";
 import { useProductForm } from "./hooks/useProductForm";
 
@@ -66,8 +64,6 @@ export default function ProductEditDrawer({
 	onToggleExpanded,
 	onMutated,
 }: Props) {
-	const certGate = useCertGate();
-
 	const form = useProductForm({
 		mode: "edit",
 		productId: productId ?? undefined,
@@ -104,9 +100,6 @@ export default function ProductEditDrawer({
 		[form.submitting, submitAndClose],
 	);
 
-	const isProcessedFood = useIsProcessedFoodCategory(form.draft.category_id);
-	const publishBlocked = isProcessedFood && !certGate.hasFoodBusinessReg;
-
 	// The host keys this component by productId, so each open mounts a fresh
 	// form whose `loading` starts true — no need to diff ids to avoid flashing
 	// the previous product.
@@ -123,7 +116,7 @@ export default function ProductEditDrawer({
 	const handleShelfToggle = (target: "4003" | "4004") => {
 		if (target === "4003") {
 			void form.unshelf();
-		} else if (!publishBlocked) {
+		} else {
 			void submitAndClose("publish");
 		}
 	};
@@ -157,15 +150,7 @@ export default function ProductEditDrawer({
 					{secondary && (
 						<Button
 							size="sm"
-							disabled={
-								form.submitting ||
-								(secondary.action === "publish" && publishBlocked)
-							}
-							title={
-								secondary.action === "publish" && publishBlocked
-									? "加工食品需先通過食品業者登錄審核才能上架"
-									: undefined
-							}
+							disabled={form.submitting}
 							isLoading={
 								form.submitting && pendingSubmitAction === secondary.action
 							}
@@ -208,11 +193,7 @@ export default function ProductEditDrawer({
 					/>
 					<LockableContent locked={locked}>
 						{expanded ? (
-							<ProductFormSections
-								variant="drawer"
-								form={form}
-								certGate={certGate}
-							/>
+							<ProductFormSections variant="drawer" form={form} />
 						) : (
 							<QuickSkuFields form={form} />
 						)}

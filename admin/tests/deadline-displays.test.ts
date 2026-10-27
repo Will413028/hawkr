@@ -8,8 +8,6 @@ import {
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb";
 import { MeasureSchema } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/measure_pb";
 import {
-	FoodRegistrationSchema,
-	FoodRegistrationState,
 	KYCSummarySchema,
 	SellerAdminService,
 	StoreSchema,
@@ -81,12 +79,7 @@ const { PendingRequestSection } = requireFromTest(
 ) as { PendingRequestSection: unknown };
 const MeasureInbox = requireFromTest("../src/app/admin/measures/page")
 	.default as unknown;
-const FoodDetail = requireFromTest(
-	"../src/app/admin/food-registrations/[id]/page",
-).default as unknown;
 const MerchantDetail = requireFromTest("../src/app/admin/merchants/[id]/page")
-	.default as unknown;
-const FoodInbox = requireFromTest("../src/app/admin/food-registrations/page")
 	.default as unknown;
 
 test("DeadlineLine：「{欄名}：{日期時間}（剩／已逾期 …）」；逾期是 danger；沒有期限是「{欄名}：-」", async () => {
@@ -105,20 +98,16 @@ test("DeadlineLine：「{欄名}：{日期時間}（剩／已逾期 …）」；
 	});
 });
 
-test("#127 案件詳情：決定期限與轉報期限放在案件區；有值才顯示，已結案的不出現", async () => {
+test("#127 案件詳情：決定期限放在案件區；有值才顯示，已結案的不出現", async () => {
 	await withNow(async () => {
-		const withBoth = kase({
-			decideDeadline: upcoming(),
-			fdaReferralDeadline: overdue(),
-		});
+		const overdueCase = kase({ decideDeadline: overdue() });
 		const a = mount(
-			h(CaseSummarySection, { kase: withBoth, now: NOW }),
+			h(CaseSummarySection, { kase: overdueCase, now: NOW }),
 			idle(),
 		);
 		await a.render({ settle: false });
-		assert.match(bodyText(), new RegExp(`決定期限：${UPCOMING_TEXT}`, "u"));
-		assert.match(bodyText(), new RegExp(`轉報期限：${OVERDUE_TEXT}`, "u"));
-		assert.equal(dangerCount(), 1, "只有轉報期限逾期");
+		assert.match(bodyText(), new RegExp(`決定期限：${OVERDUE_TEXT}`, "u"));
+		assert.equal(dangerCount(), 1, "決定期限逾期");
 		await a.unmount();
 
 		const inProgress = mount(
@@ -130,7 +119,7 @@ test("#127 案件詳情：決定期限與轉報期限放在案件區；有值才
 		);
 		await inProgress.render({ settle: false });
 		assert.match(bodyText(), new RegExp(`決定期限：${UPCOMING_TEXT}`, "u"));
-		assert.doesNotMatch(bodyText(), /轉報期限/u, "沒有轉報期限就不顯示這一行");
+		assert.equal(dangerCount(), 0);
 		await inProgress.unmount();
 
 		const closed = mount(
@@ -142,7 +131,6 @@ test("#127 案件詳情：決定期限與轉報期限放在案件區；有值才
 		);
 		await closed.render({ settle: false });
 		assert.doesNotMatch(bodyText(), /決定期限/u, "已結案的案件沒有決定期限");
-		assert.doesNotMatch(bodyText(), /轉報期限/u, "已結案的案件沒有轉報期限");
 		assert.equal(dangerCount(), 0);
 		await closed.unmount();
 	});
@@ -225,101 +213,6 @@ test("#122／#128 措施清單：複審到期分頁每列「複審期限：…�
 			);
 		}
 		await m.unmount();
-	});
-});
-
-test("#124 食品業者登錄清單：新欄「期限」；待審核照伺服器的順序，等商家認證顯示「-」；換分頁回第一頁", async () => {
-	const registration = (
-		id: string,
-		patch: Parameters<typeof create<typeof FoodRegistrationSchema>>[1],
-	) =>
-		create(FoodRegistrationSchema, {
-			id,
-			state: FoodRegistrationState.PENDING,
-			registrationNumber: `字號-${id}`,
-			...patch,
-		});
-	const requests: { pageToken: string; inbox: number }[] = [];
-	await withNow(async () => {
-		const m = mount(
-			h(FoodInbox),
-			createRouterTransport(({ service }) => {
-				service(SellerAdminService, {
-					listFoodRegistrations: (req: {
-						pageToken: string;
-						inbox: number;
-					}) => {
-						requests.push({ pageToken: req.pageToken, inbox: req.inbox });
-						return req.inbox === 1
-							? {
-									registrations: [
-										registration("a", { decideDeadline: overdue() }),
-										registration("b", { decideDeadline: upcoming() }),
-									],
-									nextPageToken: "next",
-								}
-							: { registrations: [registration("c", {})] };
-					},
-				} as never);
-			}),
-		);
-		await m.render();
-		await until(
-			() => dom.window.document.querySelectorAll("tbody tr").length === 2,
-			"待審核的兩列",
-		);
-		const headers = [...dom.window.document.querySelectorAll("thead th")].map(
-			(th) => th.textContent,
-		);
-		assert.ok(headers.includes("期限"), `欄位 ${headers.join("｜")}`);
-		const column = headers.indexOf("期限");
-		const cells = () =>
-			[...dom.window.document.querySelectorAll("tbody tr")].map(
-				(tr) => tr.querySelectorAll("td")[column]?.textContent,
-			);
-		assert.deepEqual(cells(), ["已逾期 3 小時", "剩 2 天"], "照伺服器的順序");
-		await click("下一頁 ");
-		await until(
-			() => requests.at(-1)?.pageToken === "next",
-			"第二頁的請求帶上一頁給的 token",
-		);
-		await click("等商家認證");
-		await until(() => cells().join() === "-", "等商家認證的一列");
-		assert.deepEqual(cells(), ["-"]);
-		assert.equal(requests.at(-1)?.pageToken, "", "換分頁回第一頁");
-		await m.unmount();
-	});
-});
-
-test("#125 食品業者登錄詳情：裁定期限；沒有期限是「-」", async () => {
-	await withNow(async () => {
-		for (const [deadline, pattern, danger] of [
-			[upcoming(), `裁定期限：${UPCOMING_TEXT}`, 0],
-			[overdue(), `裁定期限：${OVERDUE_TEXT}`, 1],
-			[undefined, "裁定期限：-", 0],
-		] as const) {
-			navigation.params = { id: "f-1" };
-			const m = mount(
-				h(FoodDetail),
-				createRouterTransport(({ service }) => {
-					service(SellerAdminService, {
-						getFoodRegistration: () => ({
-							registration: create(FoodRegistrationSchema, {
-								id: "f-1",
-								state: FoodRegistrationState.PENDING,
-								registrationNumber: "字號-f-1",
-								decideDeadline: deadline,
-							}),
-						}),
-					} as never);
-				}),
-			);
-			await m.render();
-			await until(() => bodyText().includes("裁定期限："), "裁定期限那一行");
-			assert.match(bodyText(), new RegExp(pattern, "u"));
-			assert.equal(dangerCount(), danger, pattern);
-			await m.unmount();
-		}
 	});
 });
 

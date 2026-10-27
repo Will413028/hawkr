@@ -8,7 +8,6 @@ import {
 } from "@connectrpc/connect";
 import {
 	CaseDecision,
-	FDAChannel,
 	ReportState,
 	SellerGovernanceAdminService,
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb";
@@ -57,9 +56,6 @@ const Decide = requireFromTest(
 ).default as unknown;
 const Severity = requireFromTest(
 	"../src/app/admin/violation-reports/cases/[id]/ChangeCaseSeverityDialog",
-).default as unknown;
-const Referral = requireFromTest(
-	"../src/app/admin/violation-reports/cases/[id]/RecordFDAReferralDialog",
 ).default as unknown;
 
 type Handlers = Partial<
@@ -767,102 +763,7 @@ test("改嚴重度：送出失敗保留輸入並顯示原因", async () => {
 	);
 });
 
-// ---------------------------------------------------------------------------
-// 記錄已轉報主管機關
-
-test("記錄轉報：管道必選、案號選填最多 100 字；請求不帶 etag；標題是「記錄已轉報主管機關」、送出鍵是「記錄轉報」（Will 2026-10-18）", async () => {
-	const requests: unknown[] = [];
-	await open(
-		h(Referral, {
-			caseId: "c-food",
-			onClose: () => {},
-			onConfirm: async (request: unknown) => {
-				requests.push(request);
-			},
-		}),
-		transportWith({}),
-		{ settle: false },
-	);
-	assert.deepEqual(optionTexts("record-fda-referral-channel"), [
-		"請選擇",
-		"1919 食安專線",
-		"線上表單",
-		"傳真衛生局",
-		"親自送件",
-		"其他",
-	]);
-	assert.match(
-		bodyText(),
-		/轉報本身在系統外完成；這裡只記一次，記過之後不能修改。/u,
-	);
-	assert.match(bodyText(), /主管機關的案號（選填）/u);
-	assert.equal(
-		dom.window.document.querySelector(".modal-header h3")?.textContent,
-		"記錄已轉報主管機關",
-	);
-	assert.ok(buttonByText("記錄轉報"), "送出鍵");
-	await click("記錄轉報");
-	assert.match(bodyText(), /請選擇管道。/u);
-	await pick(
-		"record-fda-referral-channel",
-		FDAChannel.FDA_CHANNEL_FAX_HEALTH_DEPT,
-	);
-	await React.act(async () => {
-		setValue(byId("record-fda-referral-reference-no"), "9".repeat(101));
-	});
-	await click("記錄轉報");
-	assert.match(bodyText(), /案號最多 100 字。/u);
-	await React.act(async () => {
-		setValue(byId("record-fda-referral-reference-no"), " FAX-7 ");
-	});
-	await click("記錄轉報");
-	assert.deepEqual(requests, [
-		{
-			caseId: "c-food",
-			channel: FDAChannel.FDA_CHANNEL_FAX_HEALTH_DEPT,
-			referenceNo: "FAX-7",
-		},
-	]);
-});
-
-test("記錄轉報：沒有案號也能記（送空字串）；失敗保留輸入", async () => {
-	let fail = true;
-	const requests: unknown[] = [];
-	await open(
-		h(Referral, {
-			caseId: "c-food",
-			onClose: () => {},
-			onConfirm: async (request: unknown) => {
-				requests.push(request);
-				if (fail) throw new TypeError("Failed to fetch");
-			},
-		}),
-		transportWith({}),
-		{ settle: false },
-	);
-	await pick(
-		"record-fda-referral-channel",
-		FDAChannel.FDA_CHANNEL_HOTLINE_1919,
-	);
-	await click("記錄轉報");
-	assert.match(
-		bodyText(),
-		/記錄轉報失敗，案件沒有變動；請確認網路狀態後再試一次。/u,
-	);
-	assert.equal(
-		select("record-fda-referral-channel").value,
-		String(FDAChannel.FDA_CHANNEL_HOTLINE_1919),
-	);
-	fail = false;
-	await click("記錄轉報");
-	assert.deepEqual(requestOf(requests), {
-		caseId: "c-food",
-		channel: FDAChannel.FDA_CHANNEL_HOTLINE_1919,
-		referenceNo: "",
-	});
-});
-
-test("六個對話框都是 role=dialog、aria-modal，標題用 aria-labelledby 指到；Escape 關閉", async () => {
+test("五個對話框都是 role=dialog、aria-modal，標題用 aria-labelledby 指到；Escape 關閉", async () => {
 	const closed: string[] = [];
 	const onClose = () => closed.push("x");
 	const cases: [unknown, Record<string, unknown>, string, Handlers][] = [
@@ -889,12 +790,6 @@ test("六個對話框都是 role=dialog、aria-modal，標題用 aria-labelledby
 			{ getCase: (() => ({ case: decideCase() })) as never },
 		],
 		[Severity, { kase: kase({}), onConfirm: async () => {} }, "改嚴重度", {}],
-		[
-			Referral,
-			{ caseId: "c1", onConfirm: async () => {} },
-			"記錄已轉報主管機關",
-			{},
-		],
 	];
 	for (const [Dialog, props, title, handlers] of cases) {
 		const m = await open(

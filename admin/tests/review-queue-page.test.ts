@@ -128,13 +128,6 @@ test("itemHref：12 種逐種（含錨點）", () => {
 		],
 		[
 			{
-				kind: ReviewQueueItemKind.CASE_FDA_REFERRAL,
-				subject: { case: "caseId", value: "c2" },
-			},
-			"/admin/violation-reports/cases/c2",
-		],
-		[
-			{
 				kind: ReviewQueueItemKind.AUTHORITY_ORDER,
 				subject: { case: "authorityOrderId", value: "o1" },
 			},
@@ -179,13 +172,6 @@ test("itemHref：12 種逐種（含錨點）", () => {
 		],
 		[
 			{
-				kind: ReviewQueueItemKind.FOOD_REGISTRATION,
-				subject: { case: "foodRegistrationId", value: "f1" },
-			},
-			"/admin/food-registrations/f1",
-		],
-		[
-			{
 				kind: ReviewQueueItemKind.KYC_APPLICATION,
 				subject: {
 					case: "kycApplication",
@@ -224,13 +210,11 @@ test("種類標籤：涵蓋 enum 的每個非 UNSPECIFIED 值；UNSPECIFIED 不�
 		[ReviewQueueItemKind.REPORT_TRIAGE, "分案通報"],
 		[ReviewQueueItemKind.CASE_DECISION, "決定案件"],
 		[ReviewQueueItemKind.CASE_INQUIRY_OVERDUE, "跟進逾期的詢問"],
-		[ReviewQueueItemKind.CASE_FDA_REFERRAL, "轉報主管機關"],
 		[ReviewQueueItemKind.AUTHORITY_ORDER, "處理主管機關來函"],
 		[ReviewQueueItemKind.AUTHORITY_TARGET_NOTICE, "確認是否告知被指名者"],
 		[ReviewQueueItemKind.MEASURE_APPEAL, "裁定申覆"],
 		[ReviewQueueItemKind.MEASURE_LIFT_REQUEST, "裁定解除請求"],
 		[ReviewQueueItemKind.MEASURE_REVIEW, "複審停權"],
-		[ReviewQueueItemKind.FOOD_REGISTRATION, "審核食品業者登錄"],
 		[ReviewQueueItemKind.KYC_APPLICATION, "審核商家認證"],
 		[ReviewQueueItemKind.PAYUNI_BIND_RETRY, "重新綁定 PayUni"],
 	];
@@ -288,7 +272,7 @@ test("頁面：標題、說明、欄位、列內容、連結；期限未逾期�
 		assert.equal(doc().querySelector("h1")?.textContent, "待辦");
 		assert.match(
 			bodyText(),
-			/通報與案件、主管機關來函、措施、食品業者登錄與商家認證中等待處理的事項，依期限由急到緩。每\s*30 秒自動更新。/u,
+			/通報與案件、主管機關來函、措施與商家認證中等待處理的事項，依期限由急到緩。每\s*30 秒自動更新。/u,
 		);
 		assert.deepEqual(
 			[...doc().querySelectorAll("thead th")].map((th) => th.textContent),

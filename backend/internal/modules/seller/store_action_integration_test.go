@@ -112,7 +112,7 @@ func TestCreateMeasureOnAClosedStoreIsFailedPreconditionWithOneSentenceEverywher
 // 不在待辦、沒有審核期限；撤銷終止合作恢復營業之後回到待辦，開始時間是恢復營業的時刻（期限從那時起算）。
 // mutation：review_kyc_application 拿掉 s.status = 'ACTIVE' → 暫停期間仍在待辦（這個測試與下面兩個轉紅）。
 // 注意：這個測試抓不到「開始時間不取 reopened_at」：現行唯一的恢復營業路徑是撤銷終止合作，撤銷同時結束停權（revoked_at 與 reopened_at 是同一個時刻），
-// account_sanction_lifted_at 給出同一個值，所以 KYC 的 reopened_at 項在現行路徑下是冗餘的（保留作為防線），沒有測試單獨鎖住它。
+// account_sanction_lifted_at 給出同一個值；reopened_at 項由 TestKYCReviewStartsFromTheReopeningWhenItIsTheLatest 單獨鎖住。
 func TestKYCReviewPausesWhileTheStoreIsClosedAndResumesFromTheReopening(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -176,6 +176,40 @@ func TestKYCReviewPausesWhileTheStoreIsClosedAndResumesFromTheReopening(t *testi
 }
 
 // 等待刪除：與已關閉同一條（審核暫停），句子是 N6；不在待辦；等待刪除沒有反向，所以不會回來。
+// 審核待辦的開始時間取這個 stint 最近一次恢復營業的時間（store_closures.reopened_at），即使它晚於送出時間與停權結束的時間。
+// 現行唯一的恢復營業路徑（撤銷終止合作）讓 reopened_at 與停權結束是同一個時刻，所以這裡走完撤銷之後直接以 SQL 把 reopened_at 往後挪，
+// 造出 reopened_at 嚴格晚於另外兩個候選時刻的狀態。
+// mutation：review_kyc_application 的 greatest 拿掉 reopened_at 那一項 → 開始時間變成停權結束（撤銷）的時刻，這個測試轉紅。
+func TestKYCReviewStartsFromTheReopeningWhenItIsTheLatest(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	accountID, s, _ := f.submitted(t, idA, bankAcct)
+	submittedAt := f.now
+	m := f.terminate(t, s.StoreID, GroundFraud)
+	f.effect(t, m)
+	f.tick(48 * time.Hour)
+	f.revoke(t, m)
+	liftedAt := f.now
+	if l := f.liftedAt(t, accountID, liftedAt); l == nil || !l.Equal(liftedAt) {
+		t.Fatalf("撤銷的那一刻停權結束：%v", l)
+	}
+	reopened := f.tick(2 * time.Hour)
+	tag, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.store_closures SET reopened_at = $2 WHERE store_id = $1 AND reopened_at IS NOT NULL", s.StoreID, reopened)
+	must(t, err)
+	if tag.RowsAffected() != 1 {
+		t.Fatalf("應該只有一筆已恢復的關店紀錄：%d", tag.RowsAffected())
+	}
+	if !reopened.After(liftedAt) || !reopened.After(submittedAt) {
+		t.Fatal("前提：reopened_at 晚於送出與停權結束")
+	}
+	if got := f.kycReviewStarts(t, f.now); !got[s.StoreID].Equal(reopened) {
+		t.Fatalf("開始是恢復營業時間 %v（不是停權結束 %v）：%v", reopened, liftedAt, got)
+	}
+	if d := f.deadlineOf(t, s.StoreID); d == nil || !d.Due.Equal(reopened.Add(168*time.Hour)) {
+		t.Fatalf("期限從恢復營業起算：%+v", d)
+	}
+}
 func TestKYCReviewPausesWhileTheStoreIsPendingDeletion(t *testing.T) {
 	t.Parallel()
 	f := setup(t)

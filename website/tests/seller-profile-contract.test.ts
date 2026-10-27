@@ -121,23 +121,3 @@ test("the submitted application lands on the KYC query the gate reads", () => {
 	);
 	assert.match(client, /setMyKyc\(submitted\)/);
 });
-
-test("FoodRegSupplement writes only through the three food registration commands", () => {
-	const supplementSource = source(
-		"../features/seller-center/components/FoodRegSupplement.tsx",
-	);
-	for (const command of [
-		"submitFoodRegistration",
-		"withdrawFoodRegistration",
-		"clearFoodRegistration",
-	]) {
-		assert.ok(
-			supplementSource.includes(command),
-			`FoodRegSupplement must call ${command}`,
-		);
-	}
-	assert.ok(
-		!/updateMyStore|foodBusiness/.test(supplementSource),
-		"food registration is no longer a store profile field",
-	);
-});

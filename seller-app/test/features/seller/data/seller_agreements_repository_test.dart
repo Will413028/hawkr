@@ -59,19 +59,6 @@ void main() {
     );
   });
 
-  test('食品業者登錄的告知：版本與網址取自伺服器，缺少時丟 StateError', () {
-    final notice = _agreement(
-      AgreementKind.AGREEMENT_KIND_FOOD_REGISTRATION_NOTICE,
-      'n1',
-      'https://www.example.test/privacy#seller-food-registration-notice',
-    );
-    expect(_set([_seller, notice]).foodRegistrationNotice().version, 'n1');
-    expect(
-      () => _set([_seller, _privacy]).foodRegistrationNotice(),
-      throwsStateError,
-    );
-  });
-
   test('賣家契約仍照原樣取', () {
     expect(_set([_seller]).sellerTerms().version, 's1');
     expect(() => _set([_privacy]).sellerTerms(), throwsStateError);

@@ -210,13 +210,8 @@ test("dashboard quick actions keep each task label on one phone line", () => {
 test("narrow dashboard onboarding tasks keep the full title visible", () => {
 	assert.match(
 		css,
-		/@media \(max-width: 429px\)\s*\{[\s\S]*?\.seller-onboarding-step__main\s*\{[^}]*flex-direction:\s*column[^}]*align-items:\s*flex-start/s,
-		"the optional marker must move below the task name before it steals title width",
-	);
-	assert.match(
-		css,
 		/@media \(max-width: 359px\)\s*\{[\s\S]*?\.seller-onboarding-step\s*\{[^}]*grid-template-columns:\s*34px minmax\(0, 1fr\) 22px[^}]*padding-inline:\s*var\(--hkui-space-2\)[\s\S]*?\.seller-onboarding-step__title\s*\{[^}]*font-size:\s*var\(--hkui-text-small\)/s,
-		"the 320px layout must reserve enough width for 食品加工登錄字號",
+		"the 320px layout must reserve enough width for the longest task title",
 	);
 });
 

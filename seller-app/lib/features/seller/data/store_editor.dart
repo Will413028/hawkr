@@ -13,7 +13,6 @@ import '../../../core/networking/connect_provider.dart';
 import '../../../core/session/my_store.dart';
 import '../../../shared/utils/hk_log.dart';
 import 'current_store.dart';
-import 'seller_onboarding.dart' show agreementOutdatedMessage;
 import 'store_form.dart';
 import 'version_conflict.dart';
 
@@ -44,12 +43,9 @@ final class StoreSaveFieldErrors extends StoreSaveOutcome {
 }
 
 final class StoreSaveFailed extends StoreSaveOutcome {
-  const StoreSaveFailed(this.message, {this.agreementOutdated = false});
+  const StoreSaveFailed(this.message);
 
   final String message;
-
-  /// 伺服器回 `AGREEMENT_OUTDATED`：確認的文件版本已不是現行版本，呼叫端重讀文件、請賣家重新勾選。
-  final bool agreementOutdated;
 }
 
 /// 店家資料頁的寫入：帶讀到的 etag 呼叫 `UpdateMyStore`，成功或版本衝突後重讀店家。
@@ -93,58 +89,8 @@ class StoreEditor {
     return const StoreSaved();
   }
 
-  /// 送出食品業者登錄供平台核對（`SubmitFoodRegistration`）；已有待審時由伺服器取代。
-  Future<StoreSaveOutcome> submitFoodRegistration(
-    String registrationNumber,
-    List<AgreementAcceptance> acceptances,
-  ) => _writeStore(
-    () => _client.submitFoodRegistration(
-      SubmitFoodRegistrationRequest(
-        registrationNumber: registrationNumber,
-        acceptedAgreements: acceptances,
-      ),
-    ),
-  );
-
-  /// 撤回待審的登錄，核准的那一筆保留（`WithdrawFoodRegistration`）。
-  Future<StoreSaveOutcome> withdrawFoodRegistration() => _writeStore(
-    () => _client.withdrawFoodRegistration(WithdrawFoodRegistrationRequest()),
-  );
-
-  /// 清除核准的登錄並撤回待審的（`ClearFoodRegistration`），立即生效。
-  Future<StoreSaveOutcome> clearFoodRegistration() => _writeStore(
-    () => _client.clearFoodRegistration(ClearFoodRegistrationRequest()),
-  );
-
-  Future<StoreSaveOutcome> _writeStore(Future<Object> Function() call) async {
-    try {
-      final response = await call();
-      final written = switch (response) {
-        SubmitFoodRegistrationResponse(:final store) when response.hasStore() =>
-          store,
-        WithdrawFoodRegistrationResponse(:final store)
-            when response.hasStore() =>
-          store,
-        ClearFoodRegistrationResponse(:final store) when response.hasStore() =>
-          store,
-        _ => null,
-      };
-      if (written != null) _adopt(written);
-    } catch (error) {
-      return _failure(error);
-    }
-    await _reload();
-    return const StoreSaved();
-  }
-
   Future<StoreSaveOutcome> _failure(Object error) async {
     HKLog.logW('[StoreEditor] write failed: $error');
-    if (hasErrorReason(error, ErrorReason.AGREEMENT_OUTDATED)) {
-      return const StoreSaveFailed(
-        agreementOutdatedMessage,
-        agreementOutdated: true,
-      );
-    }
     final failure = submitError(error, defaults: _defaults);
     switch (failure) {
       case SubmitConflict():

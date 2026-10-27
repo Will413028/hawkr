@@ -3,7 +3,6 @@ import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/codemeta/code_meta.dart' show PayUniSubmitStatus;
-import '../../../core/router/pending_wallet_focus.dart';
 import '../../../core/session/my_store.dart';
 import '../../../shared/utils/hk_log.dart';
 import '../../../shared/widgets/hk_status_badge.dart';
@@ -31,7 +30,6 @@ enum OnboardingTaskId {
   otherRequirement,
   shipping,
   product,
-  food,
   description,
 }
 
@@ -45,8 +43,6 @@ final class OnboardingTask {
     required this.statusLabel,
     required this.completed,
     this.cta,
-    this.walletSection,
-    this.optional = false,
     this.locked = false,
   });
 
@@ -59,12 +55,6 @@ final class OnboardingTask {
 
   /// 按鈕文字；這項沒有要辦的事時是 null。
   final String? cta;
-
-  /// 這項導向錢包時要展開並捲到的區塊（見 [WalletSections]）；導向錢包頂端或不是錢包的任務是 null。
-  final String? walletSection;
-
-  /// 非必要。
-  final bool optional;
 
   /// 還不能做（物流設定在伺服器的 `SHIPPING_SETUP` 啟用之前）。
   final bool locked;
@@ -223,7 +213,6 @@ List<OnboardingTask> buildOnboardingTasks({
   final shippingOpen = shippingGate == ShippingGate.open;
   final productsDone = (productCount ?? 0) > 0;
   final hasDescription = my?.description != null;
-  final hasFoodReg = my?.foodRegistrationNumber != null;
 
   tasks.addAll([
     OnboardingTask(
@@ -254,17 +243,6 @@ List<OnboardingTask> buildOnboardingTasks({
       cta: '新增商品',
       completed: productsDone,
       statusLabel: productsDone ? '已上架' : '待上架',
-    ),
-    OnboardingTask(
-      id: OnboardingTaskId.food,
-      group: OnboardingTaskGroup.recommended,
-      title: '食品加工登錄字號',
-      description: '販售加工食品時再補上。',
-      cta: hasFoodReg ? '查看或更新資料' : '填寫資料',
-      walletSection: WalletSections.foodRegistration,
-      completed: hasFoodReg,
-      optional: true,
-      statusLabel: hasFoodReg ? '已登錄' : '尚未登錄',
     ),
     OnboardingTask(
       id: OnboardingTaskId.description,

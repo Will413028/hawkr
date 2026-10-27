@@ -36,7 +36,6 @@ const ORDER_PAGE_SIZE = 20;
 const SELLER_STORE: MockStore = {
 	id: SELLER_ID,
 	storeName: "數字對帳測試商店",
-	approvedFoodRegistration: { registrationNumber: "A-COUNT-CHECK" },
 };
 
 /** 27 筆已完成訂單 —— `status` 用語意名，repo 的 normalizeStatus 原樣放行。 */

@@ -15,22 +15,15 @@
  * shared {@link useProductForm} instance passed in.
  */
 
-import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import { ProductCertificationRow } from "@/components/shared/ProductCertificationRow";
 import { DatePicker } from "@/components/ui";
-import Button from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import CategorySelector from "@/features/seller/components/CategorySelector";
 import DescriptionEditor from "@/features/seller/components/DescriptionEditor";
 import ProductImageUploader from "@/features/seller/components/ProductImageUploader";
-import { useCategoryTree } from "@/lib/hooks/useCategoryTree";
 import { PRODUCT_CERT_CATALOG } from "@/lib/products/certifications";
-import {
-	isProcessedFoodCategory,
-	parseDescription,
-} from "@/lib/products/seller-repo";
-import type { useCertGate } from "@/lib/seller/cert-gate";
+import { parseDescription } from "@/lib/products/seller-repo";
 import type { useProductForm } from "../hooks/useProductForm";
 import ProductFormSkuEditor from "./ProductFormSkuEditor";
 import { SectionHeader } from "./SectionHeader";
@@ -77,7 +70,6 @@ type ProductFormVariant = "page" | "drawer";
 
 interface Props {
 	form: ReturnType<typeof useProductForm>;
-	certGate: ReturnType<typeof useCertGate>;
 	variant?: ProductFormVariant;
 }
 
@@ -94,15 +86,7 @@ function stepAttrs(
 	return variant === "page" ? { id, "data-step": step } : {};
 }
 
-export default function ProductFormSections({
-	form,
-	certGate,
-	variant = "page",
-}: Props) {
-	const isProcessedFoodCategory = useIsProcessedFoodCategory(
-		form.draft.category_id,
-	);
-
+export default function ProductFormSections({ form, variant = "page" }: Props) {
 	const basicSection = (
 		<section className={CARD} {...stepAttrs(variant, 1, "section-basic")}>
 			<SectionHeader
@@ -145,22 +129,6 @@ export default function ProductFormSections({
 				<small className="text-xs text-hk-muted" data-slot="hint">
 					商品需選到第三層細項。沒有合適選項時，可在選定的上層分類下直接新增。
 				</small>
-				{isProcessedFoodCategory && !certGate.hasFoodBusinessReg && (
-					<div className="product-form__food-warn" role="alert">
-						<strong>需要食品業者登錄字號</strong>
-						<span>
-							加工食品類商品需先通過食品業者登錄審核才能上架。請到『錢包與認證』送出食品業者登錄字號。
-						</span>
-						<Button
-							href="/seller-center/wallet"
-							variant="bordered"
-							color="warning"
-							size="sm"
-						>
-							前往錢包與認證
-						</Button>
-					</div>
-				)}
 			</div>
 
 			<Input
@@ -375,27 +343,6 @@ export default function ProductFormSections({
 				{advancedSection}
 			</aside>
 		</>
-	);
-}
-
-/* ============================================================
- *               Cert + food-cert helpers
- * ============================================================ */
-
-/**
- * React wrapper over {@link isProcessedFoodCategory}: fetches the category tree
- * once per mount and reports whether the picked leaf is inside a 加工食品-style
- * branch. Returns `false` while the tree is still loading — the inline warning
- * is advisory anyway and the food gate is enforced by the bottom bar's disabled
- * state. The products list shares the same pure detector for its row toggle.
- */
-export function useIsProcessedFoodCategory(
-	categoryId: number | undefined,
-): boolean {
-	const { tree } = useCategoryTree();
-	return React.useMemo(
-		() => isProcessedFoodCategory(tree, categoryId),
-		[categoryId, tree],
 	);
 }
 

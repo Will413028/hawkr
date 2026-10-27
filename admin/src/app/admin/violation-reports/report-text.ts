@@ -3,7 +3,6 @@ import {
 	CaseCloseReason,
 	CaseDecision,
 	CaseState,
-	FDAChannel,
 	type Report,
 	ReportState,
 	SupplementMatch,
@@ -101,34 +100,6 @@ export function caseStatusText(
 			? caseDecisionText(kase.decision)
 			: textOf<CaseCloseReason>(CASE_CLOSE_REASON_TEXT, kase.closeReason);
 	return `${closed}：${detail}`;
-}
-
-/** 轉報主管機關的管道。 */
-const FDA_CHANNEL_TEXT: Record<
-	Exclude<FDAChannel, FDAChannel.FDA_CHANNEL_UNSPECIFIED>,
-	string
-> = {
-	[FDAChannel.FDA_CHANNEL_HOTLINE_1919]: "1919 食安專線",
-	[FDAChannel.FDA_CHANNEL_ONLINE_FORM]: "線上表單",
-	[FDAChannel.FDA_CHANNEL_FAX_HEALTH_DEPT]: "傳真衛生局",
-	[FDAChannel.FDA_CHANNEL_IN_PERSON]: "親自送件",
-	[FDAChannel.FDA_CHANNEL_OTHER]: "其他",
-};
-
-/** 管道的選項，順序同契約。 */
-export const FDA_CHANNEL_OPTIONS: readonly Exclude<
-	FDAChannel,
-	FDAChannel.FDA_CHANNEL_UNSPECIFIED
->[] = [
-	FDAChannel.FDA_CHANNEL_HOTLINE_1919,
-	FDAChannel.FDA_CHANNEL_ONLINE_FORM,
-	FDAChannel.FDA_CHANNEL_FAX_HEALTH_DEPT,
-	FDAChannel.FDA_CHANNEL_IN_PERSON,
-	FDAChannel.FDA_CHANNEL_OTHER,
-];
-
-export function fdaChannelText(channel: FDAChannel): string {
-	return textOf<FDAChannel>(FDA_CHANNEL_TEXT, channel);
 }
 
 /** 匿名的補充以哪一種聯絡方式比對到原通報；兩者都相同時，以及登入者的補充，不需要提醒。 */

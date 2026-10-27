@@ -83,10 +83,6 @@ GetMyStoreResponse myStoreResponse({
   CapabilityStatus? shippingSetup,
   bool reportCapabilities = true,
   String description = '',
-  String? foodRegistrationNumber,
-  FoodRegistration? pendingFoodRegistration,
-  FoodRegistration? rejectedFoodRegistration,
-  FoodRegistration? revokedFoodRegistration,
 }) {
   final store = Store(
     description: description,
@@ -103,22 +99,6 @@ GetMyStoreResponse myStoreResponse({
   if (logoTemplate != null) store.logo = Image(uriTemplate: logoTemplate);
   if (coverTemplate != null) {
     store.coverImage = Image(uriTemplate: coverTemplate);
-  }
-  if (foodRegistrationNumber != null) {
-    store.approvedFoodRegistration = FoodRegistration(
-      id: 'fr-1',
-      state: FoodRegistrationState.FOOD_REGISTRATION_STATE_APPROVED,
-      registrationNumber: foodRegistrationNumber,
-    );
-  }
-  if (revokedFoodRegistration != null) {
-    store.revokedFoodRegistration = revokedFoodRegistration;
-  }
-  if (pendingFoodRegistration != null) {
-    store.pendingFoodRegistration = pendingFoodRegistration;
-  }
-  if (rejectedFoodRegistration != null) {
-    store.rejectedFoodRegistration = rejectedFoodRegistration;
   }
   if (townCode != null) {
     store.address = PostalAddress(
@@ -174,14 +154,12 @@ MyStore myStore({
   CapabilityStatus? shippingSetup,
   bool reportCapabilities = true,
   String description = '',
-  String? foodRegistrationNumber,
 }) => MyStore(
   myStoreResponse(
     publicListing: publicListing,
     shippingSetup: shippingSetup,
     reportCapabilities: reportCapabilities,
     description: description,
-    foodRegistrationNumber: foodRegistrationNumber,
     etag: etag,
     stats: stats,
     logoTemplate: logoTemplate,

@@ -8,7 +8,6 @@ export type SellerOnboardingTaskId =
 	| "other_requirement"
 	| "shipping"
 	| "product"
-	| "food"
 	| "description";
 
 type SellerDashboardUiPersistedState = {

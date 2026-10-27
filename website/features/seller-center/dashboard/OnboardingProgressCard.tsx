@@ -31,9 +31,7 @@ function OnboardingStep({
 					task.completed ? " is-complete" : ""
 				}${task.locked ? " is-locked" : ""}`}
 				aria-current={active ? "step" : undefined}
-				aria-label={`${task.title}，${task.statusLabel}${
-					task.optional ? "，非必要" : ""
-				}`}
+				aria-label={`${task.title}，${task.statusLabel}`}
 				onClick={onSelect}
 			>
 				<span className="seller-onboarding-step__icon">
@@ -41,9 +39,6 @@ function OnboardingStep({
 				</span>
 				<span className="seller-onboarding-step__main">
 					<span className="seller-onboarding-step__title">{task.title}</span>
-					{task.optional && (
-						<span className="seller-onboarding-step__optional">非必要</span>
-					)}
 				</span>
 				<span
 					className={`seller-onboarding-step__state ${
@@ -220,11 +215,6 @@ export default function OnboardingProgressCard({
 								>
 									{activeTask.statusLabel}
 								</span>
-								{activeTask.optional && (
-									<span className="seller-onboarding-progress__optional">
-										非必要
-									</span>
-								)}
 							</div>
 							<h2 className="seller-onboarding-progress__title">
 								{activeTask.panelTitle}

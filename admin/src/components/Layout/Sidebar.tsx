@@ -83,11 +83,6 @@ const navGroups: Array<{ section: string; items: NavItem[] }> = [
 				icon: "balance",
 			},
 			{
-				href: "/admin/food-registrations",
-				label: "食品業者登錄審核",
-				icon: "verified_user",
-			},
-			{
 				href: "/admin/delegated-operations",
 				label: "代行紀錄",
 				icon: "policy",

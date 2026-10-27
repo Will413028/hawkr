@@ -104,7 +104,6 @@ describe("generate-legal 的輸出", () => {
 		expect([...outputs.keys()].sort()).toEqual([
 			"backend/internal/modules/seller/internal/model/agreement_gen.go",
 			"website/features/legal/documents/sellerAgreements.gen.ts",
-			"website/features/legal/documents/sellerFoodRegistrationNotice.gen.ts",
 			"website/features/legal/documents/sellerKycNotice.gen.ts",
 			"website/features/legal/documents/sellerTerms.gen.ts",
 		]);
@@ -124,11 +123,7 @@ describe("generate-legal 的輸出", () => {
 		const go = outputs.get(
 			"backend/internal/modules/seller/internal/model/agreement_gen.go",
 		) as string;
-		for (const doc of [
-			"seller-terms.md",
-			"seller-kyc-notice.md",
-			"seller-food-registration-notice.md",
-		]) {
+		for (const doc of ["seller-terms.md", "seller-kyc-notice.md"]) {
 			const { version } = parseLegalMarkdown(
 				readFileSync(resolve(ROOT, "website/docs/legal", doc), "utf8"),
 			);
@@ -144,11 +139,7 @@ describe("generate-legal 的輸出", () => {
 		const go = outputs.get(
 			"backend/internal/modules/seller/internal/model/agreement_gen.go",
 		) as string;
-		for (const url of [
-			"/seller-terms",
-			"/privacy#seller-kyc-notice",
-			"/privacy#seller-food-registration-notice",
-		]) {
+		for (const url of ["/seller-terms", "/privacy#seller-kyc-notice"]) {
 			expect(ts).toContain(`"${url}"`);
 			expect(go).toContain(`"${url}"`);
 		}

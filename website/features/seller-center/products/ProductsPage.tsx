@@ -12,15 +12,12 @@ import { ApiClientError } from "@/lib/api/client";
 import type { DelegatedMutationMeta } from "@/lib/api/delegated";
 import { PRODUCT_STATUS_LABEL, ProductStatus } from "@/lib/codemeta/enums";
 import { formatTaipeiDate } from "@/lib/date/taipei";
-import { useCategoryTree } from "@/lib/hooks/useCategoryTree";
 import { useInvalidateSellerProducts } from "@/lib/hooks/useSellerProducts";
 import { ossImageUrl } from "@/lib/media/cdn";
 import {
 	fetchSellerSalesCounts,
-	isProcessedFoodCategory,
 	type SellerProductListItem,
 } from "@/lib/products/seller-repo";
-import { useCertGate } from "@/lib/seller/cert-gate";
 import { formatNullableCount } from "@/lib/seller/order-dashboard-counts";
 import { delegatedProductKpi } from "@/lib/seller-data/delegated-product-kpi";
 import { useSellerDataScope } from "@/lib/seller-data/scope";
@@ -49,9 +46,6 @@ import { useProductEditDrawer } from "./useProductEditDrawer";
 import { useProductReviewsDrawer } from "./useProductReviewsDrawer";
 
 const PAGE_SIZE = 20;
-
-/** 加工食品沒有核准的食品業者登錄時，禁止上架的提示（與商品表單共用同一句）。 */
-const FOOD_REG_REQUIRED_HINT = "加工食品需先通過食品業者登錄審核才能上架";
 
 export default function ProductsPage() {
 	// 賣家中心與代行工作區渲染的是同一支元件；傳輸層、快取鍵、寫入前的確認關卡
@@ -84,7 +78,6 @@ export default function ProductsPage() {
 	/** 建立商品的 capability（頂部導覽的 `＋ 上架新商品` 用同一個條件）。 */
 	const canWrite = !delegated || scope.hasCapability("products.write");
 	const productRepo = scope.repos.products;
-	const certGate = useCertGate();
 	// This page owns its own paginated/optimistic list; it only invalidates the
 	// shared seller-products family so the nav low-stock badge + dashboard count
 	// refetch after a create/update/status/delete.
@@ -119,16 +112,6 @@ export default function ProductsPage() {
 	// Backfill it in one extra request keyed by product id; merged at render.
 	const [salesMap, setSalesMap] = React.useState<Map<string, number>>(
 		new Map(),
-	);
-	// 分類樹（上架閘記用）：加工食品商品在店家有核准的食品業者登錄前不可上架。
-	// 表單已擋，這裡補上列表 row 的上架切換，避免從列表繞過。
-	const { tree: categoryTree } = useCategoryTree();
-	// 店家有核准的食品業者登錄就完全不需閘記；否則加工食品商品擋上架。
-	const upshelfBlockedFor = React.useCallback(
-		(product: SellerProductListItem): boolean =>
-			!certGate.hasFoodBusinessReg &&
-			isProcessedFoodCategory(categoryTree, product.category_id),
-		[certGate.hasFoodBusinessReg, categoryTree],
 	);
 
 	/**
@@ -744,22 +727,10 @@ export default function ProductsPage() {
 								status={p.status}
 								statusLabel={p.status_label}
 								busy={busyId === id && deletingId !== id}
-								upshelfDisabledReason={
-									!delegated && upshelfBlockedFor(p)
-										? FOOD_REG_REQUIRED_HINT
-										: undefined
-								}
 								onToggle={
 									deletingId === id || !canPublish
 										? undefined
 										: (target) => {
-												if (
-													!delegated &&
-													target === "4004" &&
-													upshelfBlockedFor(p)
-												) {
-													return;
-												}
 												handleSetStatus(p, target);
 											}
 								}
@@ -838,7 +809,6 @@ export default function ProductsPage() {
 			salesMap,
 			selectedIds,
 			toggleSelected,
-			upshelfBlockedFor,
 		],
 	);
 
@@ -1400,25 +1370,10 @@ export default function ProductsPage() {
 														busyId === String(p.id) &&
 														deletingId !== String(p.id)
 													}
-													upshelfDisabledReason={
-														// 加工食品閘記讀的是賣家自己的認證狀態，代行下沒有
-														// 那份資料；上架資格由後端授權鏈把關。
-														!delegated && upshelfBlockedFor(p)
-															? FOOD_REG_REQUIRED_HINT
-															: undefined
-													}
 													onToggle={
 														deletingId === String(p.id) || !canPublish
 															? undefined
 															: (target) => {
-																	// 停用按鈕已擋，這裡再保險一次：加工食品未補認證不可上架。
-																	if (
-																		!delegated &&
-																		target === "4004" &&
-																		upshelfBlockedFor(p)
-																	) {
-																		return;
-																	}
 																	handleSetStatus(p, target);
 																}
 													}

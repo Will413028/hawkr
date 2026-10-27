@@ -687,10 +687,7 @@ void main() {
     });
 
     test('建立時別處已經建立（already_exists）：原樣採用那一份，店家預設值不蓋掉它，回到續填位置', () async {
-      server.store = myStore(
-        contactPhone: '02-1234-5678',
-        foodRegistrationNumber: 'A-123',
-      ).store!;
+      server.store = myStore(contactPhone: '02-1234-5678').store!;
       await server.boot(
         kyc: const MyKyc.notStarted(),
         requested: KycSubject.business,

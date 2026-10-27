@@ -7,16 +7,12 @@ import {
 	type CreateCaseNoteRequestSchema,
 	type DecideCaseRequestSchema,
 	type DecisionOption,
-	type FDAChannel,
 	type MoveReportRequestSchema,
 	type OutcomeOption,
-	type RecordFDAReferralReplyRequestSchema,
-	type RecordFDAReferralRequestSchema,
 	type Report,
 	type ResolveReportRequestSchema,
 	type TriageReportRequestSchema,
 	type TriageTarget,
-	type WaiveFDAReferralRequestSchema,
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb";
 import type { Measure } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/measure_pb";
 import { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
@@ -25,7 +21,6 @@ import {
 	MeasureState,
 	ViolationSeverity,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
-import { parseDate } from "@hawkr/api/proto/date";
 import { goTrimmedRuneCount, trimGoSpace } from "@hawkr/api/text/server-text";
 import { violationSeverityText } from "@/app/admin/merchants/[id]/measure";
 import {
@@ -33,14 +28,13 @@ import {
 	VIOLATION_SEVERITY_OPTIONS,
 } from "@/app/admin/merchants/[id]/violation-measure";
 import { policyCategoryText } from "@/lib/policy-category";
-import { FDA_CHANNEL_OPTIONS, reportOutcomeText } from "./report-text";
+import { reportOutcomeText } from "./report-text";
 
 // 商家通報與案件的對話框：輸入的驗證、請求組裝、失敗句。能不能做、有哪些選項都來自伺服器（Report.can_*、available_outcomes、
 // Case.decision_options 與各個 can_*），這裡不推導；時間一律由呼叫端傳入（now）。
 
 export const RESULT_NOTE_MAX_LENGTH = 2000;
 export const SEVERITY_NOTE_MAX_LENGTH = 2000;
-export const REFERENCE_NO_MAX_LENGTH = 100;
 
 export const REPORT_CONFLICT_TEXT =
 	"這筆通報剛被更新，頁面已重新載入；請確認最新狀態後再操作。";
@@ -78,16 +72,10 @@ export const DECIDE_FAILED_TEXT =
 	"結案失敗，案件沒有變動；請確認網路狀態後再試一次。";
 export const SEVERITY_FAILED_TEXT =
 	"改嚴重度失敗，案件沒有變動；請確認網路狀態後再試一次。";
-export const REFERRAL_FAILED_TEXT =
-	"記錄轉報失敗，案件沒有變動；請確認網路狀態後再試一次。";
-export const EXPORT_FAILED_TEXT = "轉報資料讀取失敗，請再試一次。";
 
 /** 移動讓原案件因為通報都移走而關閉時，頁面顯示的橫幅。 */
 export const SOURCE_CASE_CLOSED_TEXT =
 	"原案件的通報都已移走，原案件已自動關閉。";
-/** 這個案件之前已經記過轉報時的橫幅：畫面上是原本的紀錄，這次輸入的內容沒有寫入。 */
-export const REFERRAL_ALREADY_RECORDED_TEXT =
-	"這個案件先前已記錄轉報，以下是原本的紀錄，這次輸入的內容沒有寫入。";
 /** 案件裡有成員通報的補充還沒被看過（頁首與結案對話框共用）；筆數取自伺服器的 `unseen_supplement_report_count`。 */
 export function unseenSupplementsText(count: number): string {
 	return `有 ${count} 筆通報有還沒看過的補充。`;
@@ -371,118 +359,6 @@ export function buildChangeSeverity(
 		severity: form.severity,
 		note: trimGoSpace(form.note),
 		etag: kase.etag,
-	};
-}
-
-// ---------------------------------------------------------------------------
-// 記錄已轉報主管機關
-
-export interface ReferralForm {
-	channel: FDAChannel | undefined;
-	/** 主管機關的案號（選填）。 */
-	referenceNo: string;
-	/** 追蹤日期（選填，`YYYY-MM-DD`，台北日期）；空字串＝不設，由伺服器取轉報日加 30 天（K6）。 */
-	followUp: string;
-}
-
-export const EMPTY_REFERRAL_FORM: ReferralForm = {
-	channel: undefined,
-	referenceNo: "",
-	followUp: "",
-};
-
-export function validateReferral(form: ReferralForm): string | undefined {
-	if (
-		form.channel === undefined ||
-		!FDA_CHANNEL_OPTIONS.some((option) => option === form.channel)
-	) {
-		return "請選擇管道。";
-	}
-	if (tooLong(form.referenceNo, REFERENCE_NO_MAX_LENGTH)) {
-		return `案號最多 ${REFERENCE_NO_MAX_LENGTH} 字。`;
-	}
-	return undefined;
-}
-
-/**
- * 呼叫前須先通過 validateReferral（管道沒選時丟例外，不送出缺值的請求）。記錄不帶 etag，記過之後不能修改。
- * 追蹤日期的範圍（不早於今天）由伺服器判斷（`referral.follow_up_past`），這裡只把 `YYYY-MM-DD` 轉成日期；沒填不帶這個欄位。
- */
-export function buildReferral(
-	caseId: string,
-	form: ReferralForm,
-): MessageInitShape<typeof RecordFDAReferralRequestSchema> {
-	// 送出前已驗證過；萬一漏了，使用者看到的是 validateReferral 同一句已核准的句子。
-	if (form.channel === undefined) throw new Error("請選擇管道。");
-	const followUpDate = parseDate(form.followUp);
-	return {
-		caseId,
-		channel: form.channel,
-		referenceNo: trimGoSpace(form.referenceNo),
-		...(followUpDate ? { followUpDate } : {}),
-	};
-}
-
-// ---------------------------------------------------------------------------
-// 不轉報、主管機關的回覆（3c-b-2；輸入的範圍與長度由伺服器判斷，句子已核准，這裡不重做）
-
-/** 不轉報、記下主管機關的回覆失敗（網路層）：沿用詢問那一句（J15），沒有寫入。 */
-export const REFERRAL_V2_FAILED_TEXT =
-	"記下失敗，沒有寫入；請確認網路狀態後再試一次。";
-/** 這個案件之前已經標記過不轉報時的橫幅（M1）：畫面上是原本的紀錄，這次輸入的原因沒有寫入。 */
-export const REFERRAL_ALREADY_WAIVED_TEXT = "這個案件先前已標記不轉報。";
-
-export function buildWaive(
-	caseId: string,
-	reason: string,
-): MessageInitShape<typeof WaiveFDAReferralRequestSchema> {
-	return { caseId, reason: trimGoSpace(reason) };
-}
-
-export interface ReferralReplyForm {
-	/** 收到的日期，`YYYY-MM-DD`（台北）。 */
-	receiveDate: string;
-	body: string;
-	/** 下一個追蹤日期（選填，`YYYY-MM-DD`）；與「不再追蹤」二選一。 */
-	nextFollowUp: string;
-	clearFollowUp: boolean;
-}
-
-export const EMPTY_REFERRAL_REPLY_FORM: ReferralReplyForm = {
-	receiveDate: "",
-	body: "",
-	nextFollowUp: "",
-	clearFollowUp: false,
-};
-
-/** 輸入內容的鍵：與送出的請求一一對應，request_id 依它換新（同 CreateMeasure）。 */
-export function referralReplyRequestKey(
-	caseId: string,
-	form: ReferralReplyForm,
-): string {
-	return JSON.stringify([
-		caseId,
-		form.receiveDate,
-		trimGoSpace(form.body),
-		form.nextFollowUp,
-		form.clearFollowUp,
-	]);
-}
-
-export function buildReferralReply(
-	caseId: string,
-	form: ReferralReplyForm,
-	requestId: string,
-): MessageInitShape<typeof RecordFDAReferralReplyRequestSchema> {
-	const receiveDate = parseDate(form.receiveDate);
-	const next = parseDate(form.nextFollowUp);
-	return {
-		caseId,
-		requestId,
-		body: trimGoSpace(form.body),
-		...(receiveDate ? { receiveDate } : {}),
-		...(next ? { nextFollowUpDate: next } : {}),
-		clearFollowUp: form.clearFollowUp,
 	};
 }
 

@@ -8,7 +8,6 @@ import Link from "@/components/shared/Link";
 import { SellerPageShell } from "@/components/shared/SellerPageShell";
 import Button from "@/components/ui/Button";
 import { SellerCertGate } from "@/features/seller-center";
-import { FoodRegSupplement } from "@/features/seller-center/components/FoodRegSupplement";
 import { PayuniStatusBody } from "@/features/seller-center/components/PayuniStatusBody";
 import {
 	SellerMobileDisclosureIcon,
@@ -21,14 +20,12 @@ import { fetchOrders } from "@/lib/orders/repo";
 import type { Order } from "@/lib/orders/types";
 import { queryKeys } from "@/lib/query/keys";
 import { CERT_PAGE_HREF, useCertGate } from "@/lib/seller/cert-gate";
-import { kycInPayuniStage } from "@/lib/seller/kyc-flow";
 import {
 	payuniFixPointsAtStore,
 	payuniHasState,
 	payuniStateAlert,
 	payuniStateTitle,
 } from "@/lib/seller/payuni";
-import { foodRegistrationNumber, type MyStore } from "@/lib/seller/store";
 import { walletShowsTransactions } from "@/lib/seller/wallet-transactions";
 
 /**
@@ -49,11 +46,7 @@ import { walletShowsTransactions } from "@/lib/seller/wallet-transactions";
  * this page surfaces the real status/reason so support can route it.
  */
 
-export default function WalletClient({
-	initialFoodOpen = false,
-}: {
-	initialFoodOpen?: boolean;
-}) {
+export default function WalletClient() {
 	const cert = useCertGate();
 	const identity = useQueryIdentity();
 
@@ -90,13 +83,7 @@ export default function WalletClient({
 					) : payuni ? null : (
 						<SellerCertGate flow={cert.flow} subject="啟用錢包與收款" />
 					)}
-					<AccountCertSection
-						seller={cert.seller}
-						certified={cert.approved}
-						kycApproved={kycInPayuniStage(cert.flowStatus)}
-						onSaved={cert.refresh}
-						initialFoodOpen={initialFoodOpen}
-					/>
+					{cert.approved && <AccountCertSection />}
 					{fullyApproved && (
 						<TransactionList
 							orders={transactionsQuery.data?.records ?? null}
@@ -299,121 +286,48 @@ function StatusClockIcon() {
 }
 
 /**
- * 帳戶與認證 — 把「商家認證」與「販售加工食品(加工食品登錄)」收成一個分組，
- * 每項一行 row；商家認證列只在認證通過後顯示，加工食品列在認證核准前也顯示，點開才展開登錄表單（FoodRegSupplement bare）。
- * 讓錢包頁的「錢」(餘額/交易) 與「認證設定」視覺上分開，避免大卡片平鋪打架。
+ * 帳戶與認證：商家認證與 PayUni 都已核准後才顯示，一行 row，點開看認證摘要。
+ * 讓錢包頁的「錢」(餘額/交易) 與「認證設定」視覺上分開。
  */
-function AccountCertSection({
-	seller,
-	certified,
-	kycApproved,
-	onSaved,
-	initialFoodOpen = false,
-}: {
-	seller: MyStore | null;
-	/** 商家認證與 PayUni 都已核准：商家認證列只在這時顯示。 */
-	certified: boolean;
-	/** 商家認證（KYC）已核准：食品登錄審核中的說明只在還沒核准時顯示。 */
-	kycApproved: boolean;
-	onSaved?: () => void;
-	initialFoodOpen?: boolean;
-}) {
+function AccountCertSection() {
 	const [certOpen, setCertOpen] = React.useState(false);
-	const [foodOpen, setFoodOpen] = React.useState(initialFoodOpen);
-	const foodRowRef = React.useRef<HTMLButtonElement>(null);
-	const hasReg = foodRegistrationNumber(seller?.store) !== "";
-
-	React.useEffect(() => {
-		if (!initialFoodOpen) return;
-		setFoodOpen(true);
-		const frame = window.requestAnimationFrame(() => {
-			const row = foodRowRef.current;
-			if (!row) return;
-			row.focus({ preventScroll: true });
-			const bounds = row.getBoundingClientRect();
-			if (bounds.top < 0 || bounds.bottom > window.innerHeight) {
-				row.scrollIntoView({ block: "center" });
-			}
-		});
-		return () => window.cancelAnimationFrame(frame);
-	}, [initialFoodOpen]);
 
 	return (
 		<section className="seller-wallet__section" aria-label="帳戶與認證">
 			<h2 className="seller-wallet__section-title">帳戶與認證</h2>
-			{certified && (
-				<>
-					<button
-						type="button"
-						className="seller-wallet__acct-row"
-						aria-expanded={certOpen}
-						onClick={() => setCertOpen((o) => !o)}
-					>
-						<span className="seller-wallet__acct-row-main">
-							<strong>商家認證</strong>
-							<span>身分、銀行帳戶、PayUni 資料</span>
-						</span>
-						<span
-							className="seller-wallet__acct-row-icon is-ok"
-							role="img"
-							aria-label="已通過"
-						>
-							<CertBadgeIcon />
-						</span>
-						<span
-							className={`seller-wallet__acct-row-chev ${certOpen ? "is-open" : ""}`}
-							aria-hidden="true"
-						>
-							<AppIcon name="chevron-right" size={18} />
-						</span>
-					</button>
-					{certOpen && (
-						<div className="seller-wallet__acct-expand">
-							<div className="seller-wallet__cert-passed-meta" role="status">
-								<strong>商家認證已通過</strong>
-								<span>
-									身分、銀行帳戶與 PayUni
-									收款皆已完成驗證，可正常收款與出貨。撥款週期為訂單完成 + 7
-									天。
-								</span>
-							</div>
-						</div>
-					)}
-				</>
-			)}
 			<button
-				ref={foodRowRef}
-				id="food-registration"
 				type="button"
 				className="seller-wallet__acct-row"
-				aria-expanded={foodOpen}
-				aria-controls="food-registration-form"
-				onClick={() => setFoodOpen((o) => !o)}
+				aria-expanded={certOpen}
+				onClick={() => setCertOpen((o) => !o)}
 			>
 				<span className="seller-wallet__acct-row-main">
-					<strong>販售加工食品</strong>
-					<span>加工食品類商品需食品業者登錄字號</span>
+					<strong>商家認證</strong>
+					<span>身分、銀行帳戶、PayUni 資料</span>
 				</span>
 				<span
-					className={`seller-wallet__acct-row-badge ${hasReg ? "is-ok" : "is-muted"}`}
+					className="seller-wallet__acct-row-icon is-ok"
+					role="img"
+					aria-label="已通過"
 				>
-					{hasReg ? "已登錄" : "未登錄"}
+					<CertBadgeIcon />
 				</span>
 				<span
-					className={`seller-wallet__acct-row-chev ${foodOpen ? "is-open" : ""}`}
+					className={`seller-wallet__acct-row-chev ${certOpen ? "is-open" : ""}`}
 					aria-hidden="true"
 				>
 					<AppIcon name="chevron-right" size={18} />
 				</span>
 			</button>
-			{foodOpen && (
-				<div id="food-registration-form" className="seller-wallet__acct-expand">
-					<FoodRegSupplement
-						seller={seller}
-						kycApproved={kycApproved}
-						onSaved={onSaved}
-						bare
-					/>
+			{certOpen && (
+				<div className="seller-wallet__acct-expand">
+					<div className="seller-wallet__cert-passed-meta" role="status">
+						<strong>商家認證已通過</strong>
+						<span>
+							身分、銀行帳戶與 PayUni
+							收款皆已完成驗證，可正常收款與出貨。撥款週期為訂單完成 + 7 天。
+						</span>
+					</div>
 				</div>
 			)}
 		</section>

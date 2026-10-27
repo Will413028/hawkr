@@ -23,21 +23,6 @@ g.document = dom.window.document;
 g.HTMLElement = dom.window.HTMLElement;
 g.Node = dom.window.Node;
 g.IS_REACT_ACT_ENVIRONMENT = true;
-// 頁面下載檔案用 URL.createObjectURL 與 <a download>.click()；JSDOM 兩者都不做，測試用替身記下檔名與內容。
-export const downloads: { fileName: string; blob: Blob }[] = [];
-let lastBlob: Blob | undefined;
-URL.createObjectURL = (blob: Blob) => {
-	lastBlob = blob;
-	return "blob:test";
-};
-URL.revokeObjectURL = () => {};
-dom.window.HTMLAnchorElement.prototype.click = function (
-	this: HTMLAnchorElement,
-) {
-	if (this.download && lastBlob) {
-		downloads.push({ fileName: this.download, blob: lastBlob });
-	}
-};
 
 /** 相對路徑從 tests/ 起算（跟其他測試檔一樣寫 "../src/..."）。 */
 export const requireFromTest = createRequire(
@@ -233,7 +218,6 @@ afterEach(async () => {
 	navigation.search = "";
 	navigation.pushed = [];
 	navigation.replaced = [];
-	downloads.length = 0;
 });
 
 /** 掛載一個元件（包在 transport 與 QueryClient 裡）；測試結束時自動卸載。 */

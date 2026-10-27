@@ -1,7 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import {
 	CapabilityStatusSchema,
-	FoodRegistrationState,
 	GetMyStoreResponseSchema,
 	SellerCapability,
 	SellerRequirement,
@@ -11,7 +10,6 @@ import { describe, expect, it } from "vitest";
 import { activeStatuses, publicListingStatus } from "./capability-fixtures";
 import {
 	activeCapabilities,
-	foodRegistrationNumber,
 	hasCapability,
 	isStoreCertified,
 	isStorePendingDeletion,
@@ -228,34 +226,5 @@ describe("unset fields are not values", () => {
 			}).store,
 		);
 		expect(images.logoUrl).toBe("https://img.test/i/avatar/logo.jpg");
-	});
-
-	it("food registration is the approved number, empty when unset or blank", () => {
-		expect(foodRegistrationNumber(undefined)).toBe("");
-		expect(foodRegistrationNumber(my({ store: {} }).store)).toBe("");
-		expect(
-			foodRegistrationNumber(
-				my({
-					store: {
-						approvedFoodRegistration: { registrationNumber: " A-1 " },
-					},
-				}).store,
-			),
-		).toBe("A-1");
-	});
-
-	it("a pending or rejected request is not a registration", () => {
-		expect(
-			foodRegistrationNumber(
-				my({
-					store: {
-						pendingFoodRegistration: {
-							state: FoodRegistrationState.PENDING,
-							registrationNumber: "A-2",
-						},
-					},
-				}).store,
-			),
-		).toBe("");
 	});
 });

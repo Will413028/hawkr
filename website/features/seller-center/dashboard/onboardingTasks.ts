@@ -13,7 +13,6 @@ import {
 	type ShippingOnboarding,
 } from "@/lib/seller/shipping";
 import {
-	foodRegistrationNumber,
 	isStoreCertified,
 	type MyStore,
 	missingRequirements,
@@ -37,7 +36,6 @@ export interface OnboardingTask {
 	icon: AppIconName;
 	completed: boolean;
 	statusLabel: string;
-	optional?: boolean;
 	locked?: boolean;
 }
 
@@ -165,7 +163,6 @@ function buildRecommendedTasks({
 	const shippingDone = shippingRows.some(isApproved);
 	const productsDone = (productCount ?? 0) > 0;
 	const hasDescription = (my?.store?.description ?? "").trim() !== "";
-	const hasFoodReg = foodRegistrationNumber(my?.store) !== "";
 
 	return [
 		{
@@ -208,21 +205,6 @@ function buildRecommendedTasks({
 			icon: "bag",
 			completed: productsDone,
 			statusLabel: productsDone ? "已上架" : "待上架",
-		},
-		{
-			id: "food",
-			group: "recommended",
-			title: "食品加工登錄字號",
-			description: "販售加工食品時再補上。",
-			panelTitle: "食品加工登錄字號",
-			panelDescription:
-				"若販售加工食品，請在錢包與認證送出食品業者登錄字號審核；一般生鮮商品可略過。",
-			href: "/seller-center/wallet?section=food-registration#food-registration",
-			cta: hasFoodReg ? "查看或更新資料" : "填寫資料",
-			icon: "document",
-			completed: hasFoodReg,
-			optional: true,
-			statusLabel: hasFoodReg ? "已登錄" : "尚未登錄",
 		},
 		{
 			id: "description",

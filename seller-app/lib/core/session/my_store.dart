@@ -226,34 +226,6 @@ final class MyStore {
   /// 商店介紹；沒有填時是 null。
   String? get description => _nonEmpty(store?.description);
 
-  /// 平台核准的食品業者登錄字號；沒有核准的登錄時是 null。
-  String? get foodRegistrationNumber {
-    final current = store;
-    if (current == null || !current.hasApprovedFoodRegistration()) return null;
-    return _nonEmpty(current.approvedFoodRegistration.registrationNumber);
-  }
-
-  /// 待審的登錄（有值時可以撤回）；沒有時是 null。
-  FoodRegistration? get pendingFoodRegistration {
-    final current = store;
-    if (current == null || !current.hasPendingFoodRegistration()) return null;
-    return current.pendingFoodRegistration;
-  }
-
-  /// 被退回、之後沒有再送出新的登錄；沒有時是 null。
-  FoodRegistration? get rejectedFoodRegistration {
-    final current = store;
-    if (current == null || !current.hasRejectedFoodRegistration()) return null;
-    return current.rejectedFoodRegistration;
-  }
-
-  /// 最近一次被平台撤銷的登錄（字號、撤銷時間與理由）；伺服器只在目前沒有核准、撤銷之後也沒有更新的待審或核准時才帶，沒有時是 null。
-  FoodRegistration? get revokedFoodRegistration {
-    final current = store;
-    if (current == null || !current.hasRevokedFoodRegistration()) return null;
-    return current.revokedFoodRegistration;
-  }
-
   /// 停權的通用說明：停權的內容（依據與期間）在措施列表。
   static const genericSuspensionLabel = '帳號已被平台停權';
 
