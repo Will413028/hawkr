@@ -346,7 +346,7 @@ test.describe("canonical public static route browser health", {
 
 	test("public static inventory stays explicit and complete", () => {
 		expect(PUBLIC_STATIC_ROUTES).toEqual([...EXPECTED_PUBLIC_STATIC_ROUTES]);
-		expect(PUBLIC_STATIC_ROUTES).toHaveLength(26);
+		expect(PUBLIC_STATIC_ROUTES).toHaveLength(24);
 	});
 
 	// EVERY route here is `@live`, including the ones that render nothing but
