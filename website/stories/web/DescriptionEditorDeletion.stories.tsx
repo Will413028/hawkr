@@ -571,6 +571,7 @@ export const ExitEmptyListItem: Story = {
 			await user.click(item);
 			setCaret(item, "end");
 			await user.keyboard("{Enter}離開清單後的文字");
+			// 編輯器的 onChange 是在輸入之後才非同步送出；受載的 CI runner 上預設的 1 秒會停在輸入到一半的快照。
 			await waitFor(() => {
 				const value = args.onChange.mock.lastCall?.[0] ?? args.value;
 				expect(
@@ -584,7 +585,7 @@ export const ExitEmptyListItem: Story = {
 				});
 				expect(documentText(value)).toEqual(["離開清單後的文字"]);
 				expect(editableText(dialog, "離開清單後的文字")).toBeVisible();
-			});
+			}, { timeout: 10_000 });
 		}),
 };
 

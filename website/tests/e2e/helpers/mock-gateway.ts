@@ -1,5 +1,6 @@
 import type { Page, Route } from "@playwright/test";
 import { ACTIVE_ROLE_STORAGE_KEY } from "../../../lib/auth/active-role";
+import { signInWithClerk } from "./clerk-session";
 
 /**
  * Server mocks for the e2e.
@@ -13,8 +14,9 @@ import { ACTIVE_ROLE_STORAGE_KEY } from "../../../lib/auth/active-role";
  *
  * The sign-in state itself is Clerk's: the browser only asks GetSession while
  * Clerk's SDK holds a session, and the middleware only lets a guarded path
- * through with a Clerk session. These mocks cannot create one — a spec that
- * needs a signed-in browser needs a real Clerk session (see the C5 report).
+ * through with a Clerk session. `session: "identity"` therefore also signs the
+ * browser in hermetically (helpers/clerk-session.ts: a locally signed session
+ * JWT for the middleware plus a stub `window.Clerk`).
  */
 const API = "**/api/v1";
 
@@ -881,7 +883,10 @@ export async function setupGatewayMocks(
 	// 2c. 開店可用性（GetMyStoreOpening）：預設可以開店。
 	await mockStoreOpening(page, opts.storeOpeningUnavailabilities ?? []);
 
-	// 3. The signed-in account (GetSession).
+	// 3. The signed-in account (GetSession), and the Clerk session behind it.
+	if (opts.session === "identity") {
+		await signInWithClerk(page, identity.accountId);
+	}
 	await page.route(GET_SESSION_URL, (route) => {
 		if (opts.session === "guest") {
 			void fulfillConnectError(route, "unauthenticated");

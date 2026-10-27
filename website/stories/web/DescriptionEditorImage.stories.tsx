@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { useState } from "react";
 import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 import { DescriptionEditorCanvas } from "@/features/seller/components/DescriptionEditor";
+import { getEnv } from "@/lib/config/env";
 import type { MediaUploadRepo, UploadedAsset } from "@/lib/media/upload";
 import type { ProductDescription } from "@/lib/products/seller-repo";
 import "@/styles/features/seller-center.css";
@@ -13,7 +14,9 @@ import {
 
 const newImageKey = "public/storybook/image-new.svg";
 const uploaded: UploadedAsset = {
-	previewUrl: `https://media.example.com/${newImageKey}`,
+	// 上傳結果的 previewUrl 要落在設定的媒體 origin 才會還原成 object key（lib/media/cdn.ts），
+	// 所以跟著 NEXT_PUBLIC_MEDIA_BASE_URL，不寫死主機。
+	previewUrl: `${getEnv().mediaBaseUrl}/${newImageKey}`,
 	stagedToken: "storybook-image-upload-token",
 };
 const textDocument: ProductDescription = {
