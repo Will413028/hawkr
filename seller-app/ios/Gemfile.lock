@@ -42,10 +42,6 @@ GEM
     aws-sigv4 (1.12.1)
       aws-eventstream (~> 1, >= 1.0.2)
     babosa (1.0.4)
-    badge (0.13.0)
-      fastimage (>= 1.6)
-      fastlane (>= 2.0)
-      mini_magick (>= 4.9.4, < 5.0.0)
     base64 (0.2.0)
     benchmark (0.4.1)
     bigdecimal (4.0.1)
@@ -182,12 +178,6 @@ GEM
       xcodeproj (>= 1.13.0, < 2.0.0)
       xcpretty (~> 0.4.1)
       xcpretty-travis-formatter (>= 0.0.3, < 2.0.0)
-    fastlane-plugin-badge (1.5.0)
-      badge (~> 0.13.0)
-    fastlane-plugin-flutter_version (1.1.15)
-    fastlane-plugin-sentry (1.36.0)
-      os (~> 1.1, >= 1.1.4)
-    fastlane-plugin-teams (0.2.0)
     fastlane-sirp (1.0.0)
       sysrandom (~> 1.0)
     ffi (1.17.2)
@@ -326,10 +316,6 @@ DEPENDENCIES
   cocoapods (= 1.16.2)
   dotenv
   fastlane (= 2.230.0)
-  fastlane-plugin-badge
-  fastlane-plugin-flutter_version
-  fastlane-plugin-sentry
-  fastlane-plugin-teams
   ostruct
   xcode-install
 
