@@ -1,4 +1,4 @@
-# Hawkr Website — Next.js 行銷官網
+# Hawkr Website — Next.js 買家與賣家網頁
 
 ## 開發指令
 - **啟動開發伺服器**: `pnpm dev`
