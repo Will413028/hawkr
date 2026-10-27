@@ -5,7 +5,7 @@
 任何 AI 或自動化代理在修改本專案前，必須依任務讀取下列文件：
 
 1. **所有 UI／UX 任務先讀 [`DESIGN.md`](./DESIGN.md)**：這是登入頁、Admin shell、管理模組與 ADM workspace 的通用視覺、元件、響應式及無障礙規範。
-2. **涉及產品、安全、授權或 ADM 代行時再讀 [`PRODUCT.md`](./PRODUCT.md)**，以及對應的 `.impeccable/surfaces/`、`../backend/docs/superpowers/specs/` 與 server contract。
+2. **涉及產品、安全、授權或 ADM 代行時再讀 [`PRODUCT.md`](./PRODUCT.md)**，以及對應的 `.impeccable/surfaces/` 與 server contract。
 3. 優先級為：產品與安全契約 → `DESIGN.md` 通用規範 → feature surface/spec → 現行共用元件 → legacy page CSS。舊 Figma 註解、legacy variables 與歷史計畫不能覆蓋現行規範。
 
 不要在本檔重抄色票；通用 tokens 只在 `DESIGN.md` 與 `src/styles/AdminVisualRefresh.css` 維護。若刻意改變設計系統，必須同步更新 `DESIGN.md` 和 `.impeccable/design.json`。
@@ -18,7 +18,7 @@
 - **格式化**: `pnpm format`（`biome format --write .`）
 - **測試**: `pnpm test`
 - **API 型別與 Connect 執行期**: 在共用套件 `@hawkr/api`（`packages/hawkr-api-ts`）：生成碼 import 自 `@hawkr/api/gen/…`，錯誤分類與重試是 `@hawkr/api/connect/errors`、`@hawkr/api/connect/retry`。改根目錄 `api/` 的 proto 後在根目錄跑 `pnpm --filter @hawkr/api gen:api`，不得手改生成檔
-- **共用文案目錄（proto enum 的使用者面文字）**: 在共用套件 `@hawkr/ui-text`（`packages/hawkr-ui-text-ts`），admin 不用 next-intl，直接用 `@hawkr/ui-text/keys` 的建構函式加 `@hawkr/ui-text/zh-TW` 的 `formatStaff`（後台員工受眾）；文字來源是 `backend/internal/platform/uitext/catalog`，不得手改生成檔。目錄裡的 enum 與伺服器擁有文字的 enum，其成員確定成立的分支或資料（`if (x === E.M)`、三元式、`&&`、`switch`／`case`、computed key、`value: E.M` 配對，含同檔或匯入的含漢字常數）裡不得在 admin 產生使用者面文字，補集與值號 0 不算（`pnpm lint` 的 `check-enum-text` 規則 E 會擋）；文字不是這個值的說法時，改依契約的欄位或伺服器給的可用性分流；目錄的名詞對 UNSPECIFIED 與不認得的值回 undefined，畫面要顯示「未知」時用 `src/lib/ui-text.ts` 的 `staffTextOrUnknown`（`common.unknown` 的「未知」）。錯誤顯示用 `src/lib/error-text.ts` 的 `errorMessage`（伺服器句子，否則該 code 的目錄預設文字），不寫 `userMessage(…) ?? "…"` 的後備句（`pnpm lint` 的 `check-enum-text` R3 會擋）。
+- **共用文案目錄（proto enum 的使用者面文字）**: 在共用套件 `@hawkr/ui-text`（`packages/hawkr-ui-text-ts`），admin 不用 next-intl，直接用 `@hawkr/ui-text/keys` 的建構函式加 `@hawkr/ui-text/zh-TW` 的 `formatStaff`。enum 文字規則見根目錄 `AGENTS.md`，由 `pnpm lint` 的 `check-enum-text` 擋。畫面要顯示「未知」時用 `src/lib/ui-text.ts` 的 `staffTextOrUnknown`；錯誤顯示用 `src/lib/error-text.ts` 的 `errorMessage`，不寫 `userMessage(…) ?? "…"` 的後備句。
 - **UI 圖示**: 共用套件 `@hawkr/icons`（`packages/hawkr-icons-ts`，Material Symbols），import 自 `@hawkr/icons/material-symbol` 的 `MaterialSymbol`，`name` 是 `MaterialSymbolName`，型別檢查守住圖示存在；新圖示在該套件的 `src/names.ts` 加名稱後跑 `pnpm --filter @hawkr/icons gen`，不得手改 `material-symbols.gen.ts`。不放 SVG 檔進 `public/`。
 - **鄉鎮市區代碼表與查詢**: 在共用套件 `@hawkr/twaddr`（`packages/hawkr-twaddr-ts`），import 自 `@hawkr/twaddr/lookup`；資料檔由 `backend/internal/platform/twaddr` 生成，不得手改。
 
@@ -50,7 +50,7 @@ src/
 - **編輯器與圖表**: Fabric.js (Canvas 編輯), Chart.js (數據分析)。
 - **開發慣例**:
   - 後台頁面預設使用 `'use client'`（互動性強且無需 SEO）。
-  - dev/prod 為固定 per-deployment；client 一律呼叫同源 `/api/bff` 或專用 same-origin Admin route，server 由 `BACKEND_BASE_URL` 決定後端（單體的入口）。禁止 runtime 切環境與硬編碼後端 URL。
+  - client 一律呼叫同源 `/api/bff` 或專用的 same-origin Admin route，見下方「環境」。
   - 跨來源的防護在後台自己這一層：`middleware.ts` 以 `src/lib/cross-origin.ts` 擋下 `/api/*` 的跨來源寫入（判準同後端的 `http.CrossOriginProtection`）。BFF 對後端是伺服器的請求，不轉送瀏覽器的 `Origin`，也不自己補一個。
 
 ## UI 實作契約

@@ -6,14 +6,14 @@
 - **代碼生成 (Build Runner)**: `fvm dart run build_runner build --delete-conflicting-outputs`
 - **代碼分析與格式化**: `make analyze` / `make format`
 - **單元測試**: `make test`
-- **目錄 enum 文字守門（規則 E）**: `make enum-text`（即 `(cd ../packages/hawkr_ui_text && dart pub get && dart run tool/check_enum_text.dart ../../seller-app/lib)`；契約值的名詞與句子取自 `hawkr_ui_text`。由目錄或伺服器擁有的 enum 成員確定成立的分支或資料（`if (state == E.M)`、三元式、`&&`、`switch`／`case`、map key、`value: E.M` 配對，含同檔或匯入的含漢字常數）裡不得產生使用者面文字；文字不是這個值的說法時，改依契約的欄位或伺服器給的可用性分流。CI 的 `_flutter-quality.yml` 同一條）
+- **enum 文字守門**: `make enum-text`（規則見根目錄 `AGENTS.md`，CI 的 `_flutter-quality.yml` 同一條）
 - **環境清理與重裝**: `make clean-reinstall` (清理快取並重裝 Pods)
 
 ## 元件庫維護
 
 - 共用 UI 工作先讀 [賣家 App 元件庫](docs/component-library.md)，在同一次 PR 更新正式 widget、catalog 案例、Dart API 文件與相關測試；不要複製另一套預覽專用元件或主題。
 - 使用 `.fvmrc` 固定的 Flutter SDK；`bash scripts/component-catalog.sh run` 開啟目錄，`bash scripts/component-catalog.sh test` 檢查 catalog，另跑受影響的既有 widget tests 與 analyze。
-- 共用審查入口是管理後台的 `/admin/documentation`（部署環境尚未重建）。App 文件改動後，在 `website/` 執行 `pnpm storybook:sync-app-docs`；公司時期的三端發布流程沒有搬進 monorepo（`ui-library-maintenance.md` 與 `ui:release:prepare` 都不存在），需要發布時先和使用者確認做法。
+- 共用審查入口是管理後台的 `/admin/documentation`（部署環境尚未重建）。App 文件改動後，在 `website/` 執行 `pnpm storybook:sync-app-docs`；需要發布元件庫時先和使用者確認做法。
 - UI 元件庫版本與手機 App 版本分開管理。已發布的來源 commit 與 artifact 保持不可變，更新以新 UI 版本發布；修改文件、建立 PR 或發布 catalog 都不代表已部署手機 App。
 
 ## 目錄結構
@@ -45,4 +45,4 @@ lib/
 - **Feature 內部結構**: `presentation/` 下扁平化放置，大型 Feature 用前綴命名 (例: `order_list_screen.dart`)。
 - **代碼生成**: 修改 `Freezed` 模型或 `Riverpod` 提供者後，必須執行 `build_runner`。
 - **Icons 規範**: feature code 透過 `AppIcons`（`lib/shared/icons/app_icons.dart`）或 `HkIcon`／`HkIconName` 取圖示，底層是 Flutter 內建的 Material Icons，不放圖示檔；品牌 Logo 才用圖片。
-- **共通規範**: 跨專案規則見根目錄 `AGENTS.md`。Core Principles、Data Flow、Error Handling 等通用 Flutter 慣例以本檔與 `buyer-app/AGENTS.md` 為準。
+- **共通規範**: 跨專案規則見根目錄 `AGENTS.md`。
