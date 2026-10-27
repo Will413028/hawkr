@@ -39,27 +39,19 @@
 ```bash
 cd backend
 GOWORK=off go test -race ./...                      # unit，含依賴方向檢查
-GOWORK=off go test -race -tags integration ./...    # integration，testcontainers，需要 Docker
-make lint-monolith                                  # 單體 golangci-lint：一般與 integration tag，僅掃 cmd、internal
-make infra-up                                       # 本機的 Postgres 18、Redis、RabbitMQ（docker-compose-infra.yml）
-make migrate                                        # 單體連本機的 hawkr database
-make serve                                          # :8080，/healthz、/readyz
-make worker                                         # River job；沒設定 WEB_REVALIDATE_* 時不送 website 的快取失效
-make dev-token args='-user dev_account_2001'        # 本機的登入：以本機的 dev 金鑰簽一個 token 印出（不連 Clerk；管理員：args='-admin -user dev_ops'）
-make dev-seed                                       # 本機測試資料的重置（infra/seed-test-data.sh；先 make migrate；前提與限制見 Makefile 的註解）
-make reannounce-exposures                           # seller 全量重新公告可曝光（不比對差異，版本照常加一）：種子重寫之後、Java 的 store_exposure 重建或死信處理之後；事件由 make worker 送出
-GOWORK=off go run ./cmd/hawkr delegation-eligibility disable -admin-id 123 -operator-admin-id 456  # 營運撤回代行資格；enable 開通；需 DATABASE_URL
-GOWORK=off go run ./cmd/hawkr admin-role grant -admin ops@example.com -role OWNER -reason '…'  # 授予管理員角色（-admin 是 ID 或 email，要先以 Access 登入過一次）；revoke 撤銷並撤銷進行中的代行；需 DATABASE_URL
-make sqlc                                           # 改完模組的 db/schema.sql、db/objects.sql 或 db/queries/ 後重新生成 internal/store（docker，版本同 scripts/gen-sqlc.sh）
-make jet                                            # 改完用 go-jet 的模組（social）的 migration 或擁有者的 pub.sql 後重新生成 internal/jet 與 internal/pubsql（docker；本機帶 DOCKER_CONTEXT 與 DOCKER_HOST，見 AGENTS.local.md）
-(cd internal/modules/<名稱>/db && atlas migrate diff <名稱> --env dev)   # 改完 schema.sql 後產生 migration（只在本機需要 Atlas CLI）；改 objects.sql 用 atlas migrate new <名稱> --env dev 手寫、再 atlas migrate hash --env dev
-make connect                                        # 改完根目錄 api/ 的 proto 後重新生成 internal/httpapi/gen，以及 internal/legacy/gen（buf 的版本見 ../api/.buf-version）
-make uitext                                         # 改完共用文案目錄（internal/platform/uitext/catalog）、模組的 internal/text/*.json 或 api/ 的 proto 註解後重新生成 Go、TS、Dart 與 golden，並把來源檔寫成正規形式（buf 的版本見 ../api/.buf-version）
-make new-module name=<模組> from=<舊服務>             # 模組骨架：AGENTS.md、CARRYOVER.md（沿用盤點）、db/、公開 API、integration 測試，並登記到 cmd/hawkr；需要 Atlas CLI
-make new-characterization name=<模組> legacy=<舊服務> # 特性測試骨架：driver、情境、REST 與 Connect driver、legacy.sh
-scripts/characterize.sh <模組>                      # 特性測試經本機的 gateway 打單體（與模組的舊服務，見 legacy.sh）；先 make infra-up
-python3 scripts/check-migration-inventory.py --assume-gone <服務>   # 刪除前列出要補的去向
+GOWORK=off go test -race -tags integration ./...    # integration，需要 Docker
+make lint-monolith
+make infra-up && make migrate && make serve         # 本機環境（:8080）；make worker 跑 River job
+make dev-token args='-user dev_account_2001'        # 本機登入；管理員用 args='-admin -user dev_ops'
+make dev-seed                                       # 重置測試資料（前提見 Makefile 註解）
+make sqlc                                           # 改 db/schema.sql、objects.sql、queries/ 後
+make jet                                            # 改 social 的 migration 或擁有者的 pub.sql 後
+make connect                                        # 改 api/ 的 proto 後
+make uitext                                         # 改文案目錄、模組的 text/*.json 或 proto 註解後
+(cd internal/modules/<名稱>/db && atlas migrate diff <名稱> --env dev)  # 改 schema.sql 後；objects.sql 用 atlas migrate new 手寫再 atlas migrate hash
 ```
+
+營運子命令（`go run ./cmd/hawkr <子命令>`，需要 `DATABASE_URL`）：`reannounce-exposures`、`delegation-eligibility`、`admin-role`、`social-recount`。搬模組時的工具（`make new-module`、`make new-characterization`、`scripts/characterize.sh`、`scripts/check-migration-inventory.py`）見遷移計畫。
 
 `GOWORK=off` 確保單體不依賴 `go.work` 裡的舊服務 module。單體的本機設定值集中在 `Makefile`，指向 `docker-compose-infra.yml`；連別的 database 用 `make migrate DATABASE_URL=…`。舊服務的整套本機環境是 `./dev.sh`（`docker-compose-local.yml`，需要 `.env`），還沒搬的路徑由單體轉給它的 gateway（`GATEWAY_URL`，:9900）。`backend/.env` 只放本機 Clerk development key，`make serve`／`make worker` 以 `scripts/clerk-env.sh` 帶上；dev key 與 `CF_ACCESS_*` 啟動時互斥。舊服務：Go 在各自的 module 目錄跑 `go test ./...`；Java 從 `services/java/` 用 Maven reactor。
 
