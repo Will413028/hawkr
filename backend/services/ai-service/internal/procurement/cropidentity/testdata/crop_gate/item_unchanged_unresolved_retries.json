@@ -2,11 +2,6 @@
   "resolverNil": false,
   "resolveResult": {
     "NeedsDisambiguation": false,
-    "CropCode": null,
-    "GroupCode": null,
-    "CommodityCode": null,
-    "FallbackGroupCode": null,
-    "Label": "",
     "Candidates": null,
     "Unavailable": false
   },
@@ -18,7 +13,6 @@
   },
   "result": {
     "item": "芭樂",
-    "resolution": null,
     "pending": false,
     "candidates": null,
     "pendingReason": "",

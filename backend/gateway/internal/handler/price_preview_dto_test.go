@@ -11,8 +11,7 @@ import (
 
 func TestRfqPricePreviewResponseFromProto_UnsetBuyerRangeSerializesAsNull(t *testing.T) {
 	dto := rfqPricePreviewResponseFromProto(&pb.RfqPricePreviewResponse{
-		PricePreviewId: "1", Version: "1", PricingMode: "PRICEBOOK_GUIDED",
-		ReferenceAvailability: "AVAILABLE",
+		PricePreviewId: "1", Version: "1",
 	})
 
 	raw, err := json.Marshal(dto)
@@ -21,7 +20,7 @@ func TestRfqPricePreviewResponseFromProto_UnsetBuyerRangeSerializesAsNull(t *tes
 	var out map[string]any
 	require.NoError(t, json.Unmarshal(raw, &out))
 	v, ok := out["buyerRequestedRange"]
-	require.True(t, ok, "鍵仍要在，與 referencePriceRange／marketPriceBasis／quoteTotalRange 同慣例")
+	require.True(t, ok, "鍵仍要在，與 quoteTotalRange 同慣例")
 	require.Nil(t, v,
 		"買家略過預算時要送 null，不是一個全空字串的物件——後者會讓前端 safeParse 失敗"+
 			"（currency 期望 \"TWD\"、priceComponent 期望 \"GOODS_ONLY\"、金額期望正數），"+
@@ -30,8 +29,7 @@ func TestRfqPricePreviewResponseFromProto_UnsetBuyerRangeSerializesAsNull(t *tes
 
 func TestRfqPricePreviewResponseFromProto_SetBuyerRangeStillSerializes(t *testing.T) {
 	dto := rfqPricePreviewResponseFromProto(&pb.RfqPricePreviewResponse{
-		PricePreviewId: "1", Version: "1", PricingMode: "PRICEBOOK_GUIDED",
-		ReferenceAvailability: "AVAILABLE",
+		PricePreviewId: "1", Version: "1",
 		BuyerRequestedRange: &pb.BuyerRequestedRange{
 			Currency: "TWD", PriceComponent: "GOODS_ONLY",
 			LowerBoundAmount: "90", UpperBoundAmount: "120",

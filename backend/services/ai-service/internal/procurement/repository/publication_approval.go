@@ -50,8 +50,6 @@ type PublicationApproval struct {
 	PricePreviewInputHash   string
 
 	QualityKnowledgeState   string
-	PricingMode             string
-	ReferenceAvailability   string
 	BuyerRequestedRangeHash string
 
 	AudienceMode          string
@@ -69,9 +67,8 @@ type PublicationApproval struct {
 	SellerFacingPayloadJSON json.RawMessage
 	SellerFacingPayloadHash string
 
-	DealTemperatureStatus string
-	State                 string
-	SchemaVersion         string
+	State         string
+	SchemaVersion string
 
 	PreviewClientRequestID string
 	GeneratedAt            time.Time
@@ -94,8 +91,6 @@ type InsertPublicationApprovalInput struct {
 	PricePreviewInputHash   string
 
 	QualityKnowledgeState   string
-	PricingMode             string
-	ReferenceAvailability   string
 	BuyerRequestedRangeHash string
 
 	AudienceMode              string
@@ -115,9 +110,8 @@ type InsertPublicationApprovalInput struct {
 	SellerFacingPayloadJSON json.RawMessage
 	SellerFacingPayloadHash string
 
-	DealTemperatureStatus string
-	State                 string
-	SchemaVersion         string
+	State         string
+	SchemaVersion string
 
 	PreviewClientRequestID string
 	GeneratedAt            time.Time
@@ -138,8 +132,6 @@ func toPublicationApprovalEntity(row gen.ProcurementRfqPublicationApproval) Publ
 		PricePreviewInputHash:   row.PricePreviewInputHash,
 
 		QualityKnowledgeState:   row.QualityKnowledgeState,
-		PricingMode:             row.PricingMode,
-		ReferenceAvailability:   row.ReferenceAvailability,
 		BuyerRequestedRangeHash: row.BuyerRequestedRangeHash,
 
 		AudienceMode:              row.AudienceMode,
@@ -153,9 +145,8 @@ func toPublicationApprovalEntity(row gen.ProcurementRfqPublicationApproval) Publ
 		SellerFacingPayloadJSON: row.SellerFacingPayloadJson,
 		SellerFacingPayloadHash: row.SellerFacingPayloadHash,
 
-		DealTemperatureStatus: row.DealTemperatureStatus,
-		State:                 row.State,
-		SchemaVersion:         row.SchemaVersion,
+		State:         row.State,
+		SchemaVersion: row.SchemaVersion,
 
 		PreviewClientRequestID: row.PreviewClientRequestID,
 		GeneratedAt:            row.GeneratedAt.Time,
@@ -208,8 +199,6 @@ func (r *Repo) InsertPublicationApproval(ctx context.Context, in InsertPublicati
 			PricePreviewInputHash:   in.PricePreviewInputHash,
 
 			QualityKnowledgeState:   in.QualityKnowledgeState,
-			PricingMode:             in.PricingMode,
-			ReferenceAvailability:   in.ReferenceAvailability,
 			BuyerRequestedRangeHash: in.BuyerRequestedRangeHash,
 			ResponseDeadline:        dateParam(in.ResponseDeadline),
 
@@ -223,9 +212,8 @@ func (r *Repo) InsertPublicationApproval(ctx context.Context, in InsertPublicati
 			SellerFacingPayloadJson: in.SellerFacingPayloadJSON,
 			SellerFacingPayloadHash: in.SellerFacingPayloadHash,
 
-			DealTemperatureStatus: in.DealTemperatureStatus,
-			State:                 in.State,
-			SchemaVersion:         in.SchemaVersion,
+			State:         in.State,
+			SchemaVersion: in.SchemaVersion,
 
 			PreviewClientRequestID: in.PreviewClientRequestID,
 			GeneratedAt:            timestamptzParam(in.GeneratedAt),

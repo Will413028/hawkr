@@ -274,11 +274,5 @@ func CropDisambiguationOptionID(c CropDisambiguationOption) string {
 	if c.CategoryID != "" {
 		return "category-" + c.CategoryID
 	}
-	if c.CropCode != nil {
-		return "crop-" + *c.CropCode
-	}
-	if c.GroupCode != nil {
-		return "group-" + *c.GroupCode
-	}
 	return CropOtherOptionID // 理論上不會發生（候選一定有 code），防禦性預設
 }

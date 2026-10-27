@@ -36,15 +36,11 @@ func TestVendorPortalRFQDTOFieldSet(t *testing.T) {
 		"buyerNote", "buyerRequestedRange", "deliveryCity", "deliveryDate",
 		"item", "itemLabel", "packaging", "publicationVersion",
 		"qualityKnowledgeState", "quantity",
-		"referencePriceRange", "responseDeadline", "unit",
+		"responseDeadline", "unit",
 	}, got)
 }
 
 func TestVendorPortalPriceRangeDTOFieldSets(t *testing.T) {
-	require.Equal(t, []string{
-		"basisQuantity", "basisUnit", "lowerBoundAmount", "upperBoundAmount",
-	}, jsonFieldNames(t, VendorPortalReferencePriceRangeDTO{}))
-
 	require.Equal(t, []string{
 		"basisQuantity", "basisUnit", "currency", "lowerBoundAmount",
 		"priceComponent", "upperBoundAmount",
@@ -69,7 +65,6 @@ func jsonFieldNames(t *testing.T, v any) []string {
 
 func TestVendorPortalRFQDTOHasNoPII(t *testing.T) {
 	raw, err := json.Marshal(VendorPortalRFQDTO{
-		ReferencePriceRange: &VendorPortalReferencePriceRangeDTO{},
 		BuyerRequestedRange: &VendorPortalRequestedPriceRangeDTO{},
 	})
 	require.NoError(t, err)

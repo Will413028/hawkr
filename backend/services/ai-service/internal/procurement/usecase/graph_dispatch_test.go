@@ -21,7 +21,6 @@ import (
 
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/domain"
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/repository"
-	"github.com/Will413028/hawkr/ai-service/internal/procurement/testkit"
 	"github.com/Will413028/hawkr/go-pkg/codemeta"
 	"github.com/Will413028/hawkr/go-pkg/identity"
 )
@@ -550,8 +549,8 @@ func TestClaimAndDispatchTurnViaGraph_Retry_SkipsGuardEvenWithOpenInterrupt(t *t
 // pendingCropGateCandidates is shared by the two runner-driven tests below.
 func pendingCropGateCandidates() []domain.CropDisambiguationOption {
 	return []domain.CropDisambiguationOption{
-		{Label: "紅蘿蔔", CropCode: item("CROP_CARROT")},
-		{Label: "白蘿蔔", CropCode: item("CROP_DAIKON")},
+		{Label: "紅蘿蔔", CategoryID: "21", CategoryLevel: 3},
+		{Label: "白蘿蔔", CategoryID: "22", CategoryLevel: 3},
 	}
 }
 
@@ -1607,11 +1606,8 @@ func TestClaimAndDispatchTurnViaGraph_CropDisambiguationPause_AppendRevisionFail
 func TestBuildResumedCropGateOutput(t *testing.T) {
 	current := domain.Slots{Item: item("高麗菜")}
 
-	t.Run("真候選：Item 沿用現況，解析結果轉交", func(t *testing.T) {
-		res := &domain.ItemResolution{
-			Kind: domain.ItemResolvedCrop, Code: testkit.Ptr("LA1"), Label: "甘藍-初秋",
-			Provenance: domain.ItemResolutionByBuyerChoice,
-		}
+	t.Run("Item 沿用現況，解析結果轉交", func(t *testing.T) {
+		res := domain.NewSelfPricedItemResolution(75, "甘藍-初秋", domain.CategoryAbsent("測試"))
 
 		got := buildResumedCropGateOutput(current, domain.SlotPatch{ItemResolution: res})
 

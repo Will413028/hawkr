@@ -130,9 +130,6 @@ type PreviewRfqPublicationResult struct {
 	SellerFacingPayloadJSON json.RawMessage
 	SellerFacingPayloadHash string
 
-	// DealTemperatureStatus 在 #2537 完成前恆為 UNKNOWN（doc 64 §2-5）。
-	DealTemperatureStatus string
-
 	ExpiresAt time.Time
 }
 
@@ -244,8 +241,6 @@ func (uc *PublicationPreviewUseCase) PreviewRfqPublication(ctx context.Context, 
 		PricePreviewInputHash:   preview.PreviewInputHash,
 
 		QualityKnowledgeState:   snap.QualityKnowledgeState,
-		PricingMode:             snap.PricingMode,
-		ReferenceAvailability:   preview.ReferenceAvailability,
 		BuyerRequestedRangeHash: pricing.HashJSON(json.RawMessage(preview.BuyerRequestedRangeJSON)),
 
 		AudienceMode:              audience.Mode,
@@ -262,9 +257,8 @@ func (uc *PublicationPreviewUseCase) PreviewRfqPublication(ctx context.Context, 
 		SellerFacingPayloadJSON: payloadJSON,
 		SellerFacingPayloadHash: payloadHash,
 
-		DealTemperatureStatus: dealTemperatureStatus(preview.DealTemperatureJSON),
-		State:                 codemeta.ProcurementRfqPublicationApprovalStatePending.Value,
-		SchemaVersion:         publicationApprovalSchemaVersion,
+		State:         codemeta.ProcurementRfqPublicationApprovalStatePending.Value,
+		SchemaVersion: publicationApprovalSchemaVersion,
 
 		PreviewClientRequestID: in.PreviewClientRequestID,
 		GeneratedAt:            now,
@@ -285,8 +279,7 @@ func (uc *PublicationPreviewUseCase) PreviewRfqPublication(ctx context.Context, 
 		SellerFacingPayloadJSON: row.SellerFacingPayloadJSON,
 		SellerFacingPayloadHash: row.SellerFacingPayloadHash,
 
-		DealTemperatureStatus: row.DealTemperatureStatus,
-		ExpiresAt:             row.ExpiresAt,
+		ExpiresAt: row.ExpiresAt,
 	}, nil
 }
 
@@ -387,22 +380,4 @@ func candidateSetPolicyVersionParam(a domain.PublicationAudience) *int {
 	}
 	v := a.CandidateSetPolicyVersion
 	return &v
-}
-
-// dealTemperatureStatus 從 price preview 持久化的 deal temperature 讀出 status。
-// #2537 完成前它恆為 UNKNOWN（doc 64 §2-5）；⛔ 解不開或缺值時回 UNKNOWN 而不是
-// 空字串——這一欄是 NOT NULL，而且「不知道」正是 UNKNOWN 的語意。不得由 client
-// 用 candidate score 補值。
-func dealTemperatureStatus(raw json.RawMessage) string {
-	const unknown = "UNKNOWN"
-	if len(raw) == 0 {
-		return unknown
-	}
-	var dt struct {
-		Status string `json:"status"`
-	}
-	if err := json.Unmarshal(raw, &dt); err != nil || dt.Status == "" {
-		return unknown
-	}
-	return dt.Status
 }

@@ -10,7 +10,7 @@ import (
 )
 
 // 2026-08-15 買家實測：說「高麗菜」，LLM（EXTRACTOR_MODEL=deepseek-flash）抽取結果
-// 變成簡體「高丽菜」，跟 pricebook／product 目錄的繁體字比對失敗，候選搜尋 0 家。
+// 變成簡體「高丽菜」，跟 product 目錄的繁體字比對失敗，候選搜尋 0 家。
 // retryingExtractor 是三個 provider 共用的既定插入點，在這裡正規化，provider
 // 換哪一個都受益，不用各自實作。
 func TestRetryingExtractor_NormalizesSimplifiedChineseInTextFields(t *testing.T) {

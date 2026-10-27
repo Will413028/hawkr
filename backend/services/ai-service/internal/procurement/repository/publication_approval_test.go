@@ -25,10 +25,8 @@ func seedApprovalInput(ctx context.Context, t *testing.T, repo *Repo) InsertPubl
 
 	preview, err := repo.InsertPricePreview(ctx, InsertPricePreviewInput{
 		BuyerID: testBuyerID, RequestID: req.ID, RequestRevisionID: rev.ID,
-		PricingMode: "PRICEBOOK_GUIDED", QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
-		ReferenceAvailability:   "AVAILABLE",
+		QualityKnowledgeState:   "BUYER_QUALITY_UNKNOWN",
 		BuyerRequestedRangeJSON: json.RawMessage(`{"min":"80","max":"120"}`),
-		DealTemperatureJSON:     json.RawMessage(`{"status":"UNKNOWN"}`),
 		ClientRequestID:         "seed-preview",
 		PreviewInputHash:        "seed-input-hash",
 		PayloadHash:             "seed-payload-hash",
@@ -36,12 +34,11 @@ func seedApprovalInput(ctx context.Context, t *testing.T, repo *Repo) InsertPubl
 	})
 	require.NoError(t, err)
 
-	canonical := json.RawMessage(`{"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","pricingMode":"PRICEBOOK_GUIDED","buyerRequestedRange":{"min":"80","max":"120"},"item":"高麗菜","quantity":100,"unit":"公斤","deliveryCity":"台中市"}`)
+	canonical := json.RawMessage(`{"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","buyerRequestedRange":{"min":"80","max":"120"},"item":"高麗菜","quantity":100,"unit":"公斤","deliveryCity":"台中市"}`)
 	snap, err := repo.InsertConfirmedRfqSnapshot(ctx, InsertConfirmedRfqSnapshotInput{
 		BuyerID: testBuyerID, RequestID: req.ID, RequestRevisionID: rev.ID,
 		PricePreviewID: preview.ID, PricePreviewVersion: preview.Version,
-		QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN", PricingMode: "PRICEBOOK_GUIDED",
-		CanonicalPayloadJSON: canonical, PayloadHash: "seed-snapshot-hash",
+		QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN", CanonicalPayloadJSON: canonical, PayloadHash: "seed-snapshot-hash",
 		ClientRequestID: "seed-snapshot", ExpiresAt: refTime().Add(time.Hour),
 	})
 	require.NoError(t, err)
@@ -51,13 +48,12 @@ func seedApprovalInput(ctx context.Context, t *testing.T, repo *Repo) InsertPubl
 		ConfirmedRfqSnapshotID: snap.ID, ConfirmedRfqPayloadHash: snap.PayloadHash,
 		PricePreviewID: preview.ID, PricePreviewVersion: preview.Version,
 		PricePreviewPayloadHash: preview.PayloadHash, PricePreviewInputHash: preview.PreviewInputHash,
-		QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN", PricingMode: "PRICEBOOK_GUIDED",
-		ReferenceAvailability: "AVAILABLE", BuyerRequestedRangeHash: "seed-range-hash",
+		QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN", BuyerRequestedRangeHash: "seed-range-hash",
 		AudienceMode: "DIRECT_RECIPIENTS", AudiencePolicyID: "", AudiencePolicyVersion: 0,
 		AudienceHash:   "seed-audience-hash",
 		CandidateSetID: int64p(900), CandidateSetPolicyVersion: ptr(1),
 		SellerFacingPayloadJSON: json.RawMessage(`{"item":"高麗菜"}`), SellerFacingPayloadHash: "seed-sfp-hash",
-		DealTemperatureStatus: "UNKNOWN", State: "PENDING",
+		State:                  "PENDING",
 		SchemaVersion:          "hawkr.agent.publication-approval.v1",
 		PreviewClientRequestID: "seed-approval",
 		GeneratedAt:            refTime(), ExpiresAt: refTime().Add(time.Hour),

@@ -129,7 +129,6 @@ type InviteSellerView struct {
 	DeliveryDate          string
 	ResponseDeadline      string
 	BuyerNote             string
-	ReferencePriceRange   *domain.SellerFacingReferenceRange
 	BuyerRequestedRange   *domain.SellerFacingRequestedRange
 
 	// PublicationVersion 是十進位字串（"" ＝ 未知）。站外業者正式送出報價時原樣帶
@@ -176,7 +175,6 @@ func toInviteSellerView(payloadJSON json.RawMessage, responseDeadline pgtype.Dat
 		DeliveryDate:          stringValue(payload.DeliveryDate),
 		ResponseDeadline:      stringValue(dateValue(responseDeadline)),
 		BuyerNote:             stringValue(payload.BuyerNote),
-		ReferencePriceRange:   payload.ReferencePriceRange,
 		BuyerRequestedRange:   payload.BuyerRequestedRange,
 		PublicationVersion:    strconv.FormatInt(int64(publicationVersion), 10),
 	}, nil

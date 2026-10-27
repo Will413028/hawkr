@@ -71,7 +71,6 @@ GO_REGISTRY_ENUMS=(
     ProcurementConfirmationStatus ProcurementRunFailureReason ProcurementErrorReason
     ProcurementLedgerEventType ProcurementArtifactType
     ProcurementRfqPublicationApprovalState ProcurementRfqInviteDeliveryState ProcurementPublicationAudienceMode ProcurementWishPoolPolicy ProcurementPublicationState
-    ProcurementDealTemperatureStatus ProcurementDealTemperatureReason ProcurementDealTemperatureBand
     ProcurementSellerResponseType ProcurementTaxInclusionBasis ProcurementSellerPartyType
     ProcurementSellerResponseStatus ProcurementQuoteAcceptability ProcurementOrderProvisioningState
     ReportStatus ReportTargetType ReportReasonCode ReportResolveAction ModerationActionType
@@ -112,8 +111,7 @@ ADMIN_ENUMS=(
     ProcurementArtifactStatus ProcurementConfirmationStatus
     ProcurementRfqPublicationApprovalState ProcurementRfqInviteDeliveryState
     ProcurementRunFailureReason ProcurementErrorReason ProcurementLedgerEventType
-    ProcurementArtifactType ProcurementDealTemperatureStatus
-    ProcurementDealTemperatureReason ProcurementDealTemperatureBand
+    ProcurementArtifactType
     ProcurementPublicationAudienceMode ProcurementPublicationState
     ProcurementSellerResponseType ProcurementTaxInclusionBasis
     ProcurementSellerPartyType ProcurementSellerResponseStatus

@@ -8,7 +8,7 @@ import (
 )
 
 func TestNewResolverForEvaluation_BuildsSameTypeAsProduction(t *testing.T) {
-	r := NewResolverForEvaluation(nil, nil, llmprovider.Procurement{})
+	r := NewResolverForEvaluation(nil, llmprovider.Procurement{})
 	require.NotNil(t, r)
 	require.IsType(t, &DisambiguationUseCase{}, r)
 }

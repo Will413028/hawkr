@@ -637,8 +637,8 @@ func buildResumedCropGateOutput(current domain.Slots, patch domain.SlotPatch) Cr
 // executeAnswerPipeline, called from ClaimAndDispatchResume (run_dispatch.go)
 // when the parent run's ControllerKind is GRAPH (Sub-project 3b, spec §4.3).
 //
-// Legacy pricebook choices and manual prices use buildCropDisambiguationPatch;
-// taxonomy answers use ResolveSelection and may pause for another question.
+// Manual prices use buildCropDisambiguationPatch; taxonomy answers use
+// ResolveSelection and may pause for another question.
 // Selected candidates preserve the original item text; crop-other accepts the
 // buyer's replacement description.
 //

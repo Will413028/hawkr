@@ -27,9 +27,8 @@ const (
 	ActSellerResponsesReady        ActCode = "SELLER_RESPONSES_READY"        // 同上（#2538/#2539 未開工）
 	ActExactAcceptanceConfirmed    ActCode = "EXACT_ACCEPTANCE_CONFIRMED"    // 同上
 	// ActItemNeedsDisambiguation 是 issue #2549 §B 原始 17 值清單之外的第 18 個
-	// 值——核准依據是 PM 2026-08-23 的產品需求（品項須落在 Pricebook 分類），
-	// 不是 #2549 原始範圍。見
-	// docs/superpowers/specs/2026-08-24-pricebook-crop-taxonomy-gate-design.md §5。
+	// 值——核准依據是 PM 2026-08-23 的產品需求（品項須落在平台分類樹），
+	// 不是 #2549 原始範圍。
 	ActItemNeedsDisambiguation ActCode = "ITEM_NEEDS_DISAMBIGUATION"
 )
 

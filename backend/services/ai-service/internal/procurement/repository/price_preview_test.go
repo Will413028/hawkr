@@ -21,11 +21,8 @@ func TestRepo_InsertPricePreview_CreatesRow(t *testing.T) {
 		BuyerID:                 testBuyerID,
 		RequestID:               1,
 		RequestRevisionID:       1,
-		PricingMode:             "PRICEBOOK_GUIDED",
 		QualityKnowledgeState:   "BUYER_QUALITY_UNKNOWN",
-		ReferenceAvailability:   "AVAILABLE",
 		BuyerRequestedRangeJSON: []byte(`{}`),
-		DealTemperatureJSON:     []byte(`{"status":"UNKNOWN"}`),
 		ClientRequestID:         "preview-key-1",
 		PreviewInputHash:        "hash-in",
 		PayloadHash:             "hash-out",
@@ -56,10 +53,10 @@ func TestRepo_InsertPricePreview_ConcurrentSameClientRequestID_IsIdempotent(t *t
 
 	input := InsertPricePreviewInput{
 		BuyerID: testBuyerID, RequestID: 1, RequestRevisionID: 1,
-		PricingMode: "PRICEBOOK_GUIDED", QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
-		ReferenceAvailability: "AVAILABLE", BuyerRequestedRangeJSON: []byte(`{}`),
-		DealTemperatureJSON: []byte(`{"status":"UNKNOWN"}`), ClientRequestID: "preview-key-race",
-		PreviewInputHash: "hash-in", PayloadHash: "hash-out", ExpiresAt: refTime().Add(15 * time.Minute),
+		QualityKnowledgeState:   "BUYER_QUALITY_UNKNOWN",
+		BuyerRequestedRangeJSON: []byte(`{}`),
+		ClientRequestID:         "preview-key-race",
+		PreviewInputHash:        "hash-in", PayloadHash: "hash-out", ExpiresAt: refTime().Add(15 * time.Minute),
 	}
 
 	var wg sync.WaitGroup
@@ -108,10 +105,10 @@ func TestRepo_InsertPricePreview_SameClientRequestIDDifferentPayload_ReturnsIdem
 
 	first := InsertPricePreviewInput{
 		BuyerID: testBuyerID, RequestID: 1, RequestRevisionID: 1,
-		PricingMode: "PRICEBOOK_GUIDED", QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
-		ReferenceAvailability: "AVAILABLE", BuyerRequestedRangeJSON: []byte(`{}`),
-		DealTemperatureJSON: []byte(`{"status":"UNKNOWN"}`), ClientRequestID: "preview-key-conflict",
-		PreviewInputHash: "hash-in-1", PayloadHash: "hash-out-1", ExpiresAt: refTime().Add(15 * time.Minute),
+		QualityKnowledgeState:   "BUYER_QUALITY_UNKNOWN",
+		BuyerRequestedRangeJSON: []byte(`{}`),
+		ClientRequestID:         "preview-key-conflict",
+		PreviewInputHash:        "hash-in-1", PayloadHash: "hash-out-1", ExpiresAt: refTime().Add(15 * time.Minute),
 	}
 	if _, err := r.InsertPricePreview(context.Background(), first); err != nil {
 		t.Fatalf("first InsertPricePreview() error = %v, want nil", err)
@@ -145,11 +142,8 @@ func TestRepo_FindPricePreviewByIDAndBuyer_WrongBuyerID_ReturnsNotFound(t *testi
 		BuyerID:                 testBuyerID,
 		RequestID:               1,
 		RequestRevisionID:       1,
-		PricingMode:             "PRICEBOOK_GUIDED",
 		QualityKnowledgeState:   "BUYER_QUALITY_UNKNOWN",
-		ReferenceAvailability:   "AVAILABLE",
 		BuyerRequestedRangeJSON: []byte(`{}`),
-		DealTemperatureJSON:     []byte(`{"status":"UNKNOWN"}`),
 		ClientRequestID:         "preview-key-owner-check",
 		PreviewInputHash:        "hash-in",
 		PayloadHash:             "hash-out",

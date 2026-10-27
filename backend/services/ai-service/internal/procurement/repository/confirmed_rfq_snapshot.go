@@ -39,7 +39,6 @@ type ConfirmedRfqSnapshot struct {
 	PricePreviewID        int64
 	PricePreviewVersion   int64
 	QualityKnowledgeState string
-	PricingMode           string
 	CanonicalPayloadJSON  json.RawMessage
 	PayloadHash           string
 	ClientRequestID       string
@@ -55,7 +54,6 @@ type InsertConfirmedRfqSnapshotInput struct {
 	PricePreviewID        int64
 	PricePreviewVersion   int64
 	QualityKnowledgeState string
-	PricingMode           string
 	CanonicalPayloadJSON  json.RawMessage
 	PayloadHash           string
 	ClientRequestID       string
@@ -69,7 +67,6 @@ func toConfirmedRfqSnapshotEntity(row gen.ProcurementConfirmedRfqSnapshot) Confi
 		PricePreviewID:        row.PricePreviewID,
 		PricePreviewVersion:   row.PricePreviewVersion,
 		QualityKnowledgeState: row.QualityKnowledgeState,
-		PricingMode:           row.PricingMode,
 		CanonicalPayloadJSON:  row.CanonicalPayloadJson,
 		PayloadHash:           row.PayloadHash,
 		ClientRequestID:       row.ClientRequestID,
@@ -95,7 +92,6 @@ func (r *Repo) InsertConfirmedRfqSnapshot(ctx context.Context, in InsertConfirme
 		PricePreviewID:        in.PricePreviewID,
 		PricePreviewVersion:   in.PricePreviewVersion,
 		QualityKnowledgeState: in.QualityKnowledgeState,
-		PricingMode:           in.PricingMode,
 		CanonicalPayloadJson:  in.CanonicalPayloadJSON,
 		PayloadHash:           in.PayloadHash,
 		ClientRequestID:       in.ClientRequestID,

@@ -141,14 +141,8 @@ func seedExecutablePublicationApproval(ctx context.Context, t *testing.T, pool *
 
 	preview, err := repo.InsertPricePreview(ctx, repository.InsertPricePreviewInput{
 		BuyerID: pubExecBuyerID, RequestID: req.ID, RequestRevisionID: rev.ID,
-		PricingMode: "PRICEBOOK_GUIDED", QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
-		// ⛔ "AVAILABLE" 是 price_preview.go 真的會寫出來的值之一。不要改成
-		// "UNAVAILABLE"：那個值只有搭配 BUYER_ENTERED_NO_REFERENCE 才放行
-		// （2026-09-08 controller 裁決），配 PRICEBOOK_GUIDED 會被 Scope 5 的
-		// hard block 擋下，而那是正確行為。
-		ReferenceAvailability:   "AVAILABLE",
+		QualityKnowledgeState:   "BUYER_QUALITY_UNKNOWN",
 		BuyerRequestedRangeJSON: json.RawMessage(`{"min":"80","max":"120"}`),
-		DealTemperatureJSON:     json.RawMessage(`{"status":"UNKNOWN"}`),
 		ClientRequestID:         "pubexec-preview",
 		PreviewInputHash:        "pubexec-input-hash",
 		PayloadHash:             "pubexec-preview-payload-hash",
@@ -156,12 +150,12 @@ func seedExecutablePublicationApproval(ctx context.Context, t *testing.T, pool *
 	})
 	require.NoError(t, err)
 
-	canonical := json.RawMessage(`{"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","pricingMode":"PRICEBOOK_GUIDED","buyerRequestedRange":{"min":"80","max":"120"},"item":"高麗菜","quantity":100,"unit":"公斤","deliveryCity":"台中市"}`)
+	canonical := json.RawMessage(`{"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","buyerRequestedRange":{"min":"80","max":"120"},"item":"高麗菜","quantity":100,"unit":"公斤","deliveryCity":"台中市"}`)
 	snap, err := repo.InsertConfirmedRfqSnapshot(ctx, repository.InsertConfirmedRfqSnapshotInput{
 		BuyerID: pubExecBuyerID, RequestID: req.ID, RequestRevisionID: rev.ID,
 		PricePreviewID: preview.ID, PricePreviewVersion: preview.Version,
-		QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN", PricingMode: "PRICEBOOK_GUIDED",
-		CanonicalPayloadJSON: canonical, PayloadHash: "pubexec-snapshot-hash",
+		QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
+		CanonicalPayloadJSON:  canonical, PayloadHash: "pubexec-snapshot-hash",
 		ClientRequestID: "pubexec-snapshot", ExpiresAt: pubExecNow.Add(time.Hour),
 	})
 	require.NoError(t, err)
@@ -176,8 +170,8 @@ func seedExecutablePublicationApproval(ctx context.Context, t *testing.T, pool *
 		ConfirmedRfqSnapshotID: snap.ID, ConfirmedRfqPayloadHash: snap.PayloadHash,
 		PricePreviewID: preview.ID, PricePreviewVersion: preview.Version,
 		PricePreviewPayloadHash: preview.PayloadHash, PricePreviewInputHash: preview.PreviewInputHash,
-		QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN", PricingMode: "PRICEBOOK_GUIDED",
-		ReferenceAvailability: "AVAILABLE", BuyerRequestedRangeHash: "pubexec-range-hash",
+		QualityKnowledgeState:   "BUYER_QUALITY_UNKNOWN",
+		BuyerRequestedRangeHash: "pubexec-range-hash",
 
 		AudienceMode: "DIRECT_RECIPIENTS", AudiencePolicyID: "", AudiencePolicyVersion: 0,
 		AudienceHash:   audienceHash,
@@ -187,7 +181,7 @@ func seedExecutablePublicationApproval(ctx context.Context, t *testing.T, pool *
 		SellerFacingPayloadJSON: json.RawMessage(`{"item":"高麗菜","quantity":"100","unit":"公斤"}`),
 		SellerFacingPayloadHash: "pubexec-seller-facing-hash",
 
-		DealTemperatureStatus: "UNKNOWN", State: "PENDING",
+		State:                  "PENDING",
 		SchemaVersion:          "hawkr.agent.publication-approval.v1",
 		PreviewClientRequestID: "pubexec-approval",
 		// ⛔ 未來式。到期 gate（uc.now().After(approval.ExpiresAt)）是 Scope 5 的

@@ -7,10 +7,7 @@ import "context"
 type Kind string
 
 const (
-	KindCropGroup Kind = "CROP_GROUP"
-	KindCrop      Kind = "CROP"
-	KindCommodity Kind = "COMMODITY"
-	// KindCategory 是 taxonomy 命中：Code 是分類 id，不是 pricebook 的 code。
+	// KindCategory 是 taxonomy 命中：Code 是分類 id。
 	KindCategory Kind = "CATEGORY"
 )
 
@@ -19,8 +16,7 @@ type Quality int
 
 const (
 	Weak   Quality = iota // 前綴／子串
-	Medium                // VARIANT 精確
-	Strong                // CANONICAL／SOURCE_TERM／ALIAS 精確，或分類名精確
+	Strong                // 分類名精確
 )
 
 // Query 是一次解析的輸入：原文與 query understanding 展開的變體（至少含原文）。
@@ -35,18 +31,13 @@ type Candidate struct {
 	Kind  Kind
 	Code  string
 	Label string
-	// CategoryIDs：實體映射到的 L3 分類；CATEGORY 候選是 {Code}。
+	// CategoryIDs：CATEGORY 候選是 {Code}。
 	CategoryIDs []string
-	// CategoryLevel／ParentID／ParentLabel 只有 CATEGORY 候選有：L3 的 L2 父節點決定 ITEM 卡的
-	// ParentCategoryID。
+	// CategoryLevel／ParentID／ParentLabel：L3 的 L2 父節點決定 ITEM 卡的 ParentCategoryID。
 	CategoryLevel int
 	ParentID      string
 	ParentLabel   string
-	// GroupCode：CROP 的所屬大類（FallbackGroupCode）；CROP_GROUP 是自己；其他空。
-	GroupCode string
-	// HasForecast：CROP／CROP_GROUP 算不算得出價；COMMODITY 與 CATEGORY 恆 true。
-	HasForecast bool
-	// MatchedBy 是命中的 surface form 或分類名，供消歧卡顯示理由。
+	// MatchedBy 是命中的分類名，供消歧卡顯示理由。
 	MatchedBy string
 	Quality   Quality
 	// Rank 是該 retriever 內的名次（1-based）。

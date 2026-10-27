@@ -12,7 +12,6 @@ import (
 type GateResult struct {
 	Item *string
 
-	Resolution *domain.ItemResolution
 	Pending    bool
 	Candidates []domain.CropDisambiguationOption
 	Selection  *domain.CropSelection
@@ -27,7 +26,7 @@ type GateResult struct {
 }
 
 func (g GateResult) Evaluated() bool {
-	return g.evaluated || g.Resolution != nil
+	return g.evaluated
 }
 
 type Resolver interface {
@@ -70,39 +69,22 @@ func ComputeGate(ctx context.Context, resolver Resolver, before, after domain.Sl
 	}
 
 	switch {
-	case res.Unavailable:
-
-		return GateResult{
-			Item: after.Item, Pending: true, Candidates: []domain.CropDisambiguationOption{}, Selection: res.Selection,
-			PendingReason: domain.CropPendingReasonUnavailable, evaluated: true, FactsAsOf: now,
-		}
 	case res.NeedsDisambiguation:
 		return GateResult{
 			Item: after.Item, Pending: true, Candidates: res.Candidates, Selection: res.Selection,
 			PendingReason: domain.CropPendingReasonAmbiguous, evaluated: true, FactsAsOf: now,
 		}
-	default:
+	case res.Unavailable:
 		return GateResult{
-			Item: after.Item,
-			Resolution: domain.NewSystemItemResolution(
-				res.CropCode, res.GroupCode, res.CommodityCode, res.FallbackGroupCode, res.Label,
-				res.CategoryOrigin),
-			evaluated: true, FactsAsOf: now,
+			Item: after.Item, Pending: true, Candidates: []domain.CropDisambiguationOption{}, Selection: res.Selection,
+			PendingReason: domain.CropPendingReasonUnavailable, evaluated: true, FactsAsOf: now,
 		}
+	default:
+		return GateResult{Item: after.Item, evaluated: true, FactsAsOf: now}
 	}
 }
 
-func (g GateResult) ApplyTo(slots *domain.Slots, patch *domain.SlotPatch) {
-	if g.Resolution == nil {
-		return
-	}
-	slots.ItemResolution = g.Resolution
-	if patch != nil {
-		patch.ItemResolution = g.Resolution
-	}
-}
-
-// needsResolution 判斷這一輪要不要真的去查 Pricebook。
+// needsResolution 判斷這一輪要不要真的去查分類樹。
 //
 // 「品項文字有沒有變」不足以當判準：resolver 失敗時會把既有解析一併清掉（見上面
 // 那行 log），於是同一個品項在下一輪仍然沒有解析結果，而文字沒變就永遠不會再查
@@ -111,7 +93,7 @@ func (g GateResult) ApplyTo(slots *domain.Slots, patch *domain.SlotPatch) {
 // 三條分支：
 //   - 品項變了 → 查（原本就有的行為）。
 //   - 品項沒變、但還沒有解析結果 → 上一輪不是失敗就是還沒查成功，重試。
-//   - 品項沒變、已經有解析結果 → 不查（避免每一輪重打 Pricebook）。
+//   - 品項沒變、已經有解析結果 → 不查（避免每一輪重查分類樹）。
 //
 // 例外是買家正在回答消歧提問：那一輪「沒有解析結果」是正常狀態，重查會換掉他
 // 眼前的候選（見 AwaitingBuyerAnswer）。

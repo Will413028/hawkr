@@ -26,10 +26,9 @@ var updateCropGateGolden = flag.Bool("update-crop-gate-golden", false, "重新�
 // 可以直接讀，但 encoding/json 不會匯出它，所以另外包一層。
 //
 // FactsAsOf 只凍「有沒有值」不凍值本身：它是 time.Now()，凍住真值會讓 fixture
-// 每次重跑都不同。有沒有值才是這裡真正要釘的判定（gate 有沒有真的查過 Pricebook）。
+// 每次重跑都不同。有沒有值才是這裡真正要釘的判定（gate 有沒有真的查過分類樹）。
 type cropGateGoldenResult struct {
 	Item          *string                           `json:"item"`
-	Resolution    *domain.ItemResolution            `json:"resolution"`
 	Pending       bool                              `json:"pending"`
 	Candidates    []domain.CropDisambiguationOption `json:"candidates"`
 	PendingReason domain.CropPendingReason          `json:"pendingReason"`
@@ -39,9 +38,9 @@ type cropGateGoldenResult struct {
 
 // TestComputeCropGate_GoldenFixtures 是 T4（見 domain 套件
 // dialogue_planner_golden_test.go 開頭 doc comment，理由同）的第三部分。
-// ComputeGate 不是純函式——依賴注入的 Resolver 會打 Pricebook——所以
+// ComputeGate 不是純函式——依賴注入的 Resolver 會查分類樹——所以
 // fixture 除了 (before, after) 兩個輸入，還要把 resolver 這次回傳的
-// canned 值也一併凍住，重播時才不需要真的接一個 Pricebook 替身。
+// canned 值也一併凍住，重播時才不需要真的接一個分類樹替身。
 //
 // 逐一對應 crop_gate_test.go 裡「測 ComputeGate 本身」的每一支測試。
 //
@@ -59,14 +58,12 @@ func TestComputeCropGate_GoldenFixtures(t *testing.T) {
 		after         domain.Slots
 	}{
 		{
-			// 已經有解析結果的品項＝真正的 no-op：不重打 Pricebook。
+			// 已經有解析結果的品項＝真正的 no-op：不重查分類樹。
 			name: "item_unchanged_already_resolved_no_op",
 			before: domain.Slots{Item: item("芭樂"),
-				ItemResolution: domain.NewSystemItemResolution(
-					item("CROP-GUAVA"), nil, nil, nil, "芭樂", domain.CategoryFromEntity("category-guava"))},
+				ItemResolution: domain.NewSelfPricedItemResolution(95, "芭樂", domain.CategoryAbsent("golden stub 不涵蓋分類來源"))},
 			after: domain.Slots{Item: item("芭樂"),
-				ItemResolution: domain.NewSystemItemResolution(
-					item("CROP-GUAVA"), nil, nil, nil, "芭樂", domain.CategoryFromEntity("category-guava"))},
+				ItemResolution: domain.NewSelfPricedItemResolution(95, "芭樂", domain.CategoryAbsent("golden stub 不涵蓋分類來源"))},
 		},
 		{
 			// 品項沒變、但還沒有解析結果——上一輪失敗過（失敗會清掉既有解析），
@@ -99,15 +96,8 @@ func TestComputeCropGate_GoldenFixtures(t *testing.T) {
 			after:  domain.Slots{Item: item("小白菜")},
 		},
 		{
-			name: "matched_keeps_item_no_pending",
-			resolveResult: DisambiguationResult{CropCode: ptrStr("CROP-X"),
-				CategoryOrigin: domain.CategoryAbsent("golden stub 不涵蓋分類來源，由 direct_resolution_category_test 專門驗")},
-			before: domain.Slots{},
-			after:  domain.Slots{Item: item("芭樂")},
-		},
-		{
 			name:       "resolver_error_degrades_without_blocking",
-			resolveErr: errors.New("pricebook unavailable"),
+			resolveErr: errors.New("category tree unavailable"),
 			before:     domain.Slots{},
 			after:      domain.Slots{Item: item("芭樂")},
 		},
@@ -129,7 +119,7 @@ func TestComputeCropGate_GoldenFixtures(t *testing.T) {
 			g := ComputeGate(context.Background(), resolver, tc.before, tc.after)
 
 			resultOut := cropGateGoldenResult{
-				Item: g.Item, Resolution: g.Resolution, Pending: g.Pending,
+				Item: g.Item, Pending: g.Pending,
 				Candidates: g.Candidates, PendingReason: g.PendingReason,
 				Evaluated: g.evaluated, FactsAsOfSet: !g.FactsAsOf.IsZero(),
 			}

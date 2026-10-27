@@ -1,67 +1,109 @@
-- query: 白肉雞
-  expect: { category: "肉類 > 雞肉 > 雞肉", label: "白肉雞（2.0 公斤以上）產地價", kind: COMMODITY }
-- query: 毛豬
-  expect: { category: "肉類 > 豬肉 > 豬肉", label: "毛豬（規格豬）", kind: COMMODITY }
-- query: 稉種
-  expect: { label: "白米零售價（稉種）", kind: COMMODITY }
+# 黃金查詢集。期望值是品項該落在分類樹的哪個節點（本機種子分類樹，
+# backend/infra/seed-data/04-product.sql）；category 可只寫到上層，觀察到的分類路徑以它為前綴就算命中。
+# 離線評測（offline_eval_test.go）逐筆跑 Resolve；線上評測 cmd/resolver-eval 打真實 gateway，吃同一份。
+# message 只有線上評測用（把品項放進完整句子），離線評測只看 query。
 
-- query: 豬肉
-  expect: { category: "肉類 > 豬肉 > 豬肉", label: "毛豬（規格豬）", kind: COMMODITY }
-- query: 雞肉
-  expect: { category: "肉類 > 雞肉 > 雞肉", label: "白肉雞（2.0 公斤以上）產地價", kind: COMMODITY }
-- query: 雞蛋
-  expect: { label: "雞蛋產地價", kind: COMMODITY }
-- query: 肉鵝
-  expect: { label: "肉鵝（白羅曼）產地價", kind: COMMODITY }
-- query: 白米
-  expect: { label: "白米零售價（稉種）", kind: COMMODITY }
-
+# 直接品名
 - query: 高麗菜
-  expect: { label: "甘藍-初秋", kind: CROP }
-- query: 臺灣豬五花
-  expect: { category: "肉類 > 豬肉", label: "毛豬（規格豬）" }
+  expect: { category: "蔬菜 > 葉菜類 > 高麗菜" }
+- query: 小白菜
+  expect: { category: "蔬菜 > 葉菜類 > 小白菜" }
+- query: 地瓜
+  expect: { category: "蔬菜 > 根莖類 > 地瓜" }
+- query: 紅蘿蔔
+  expect: { category: "蔬菜 > 根莖類 > 紅蘿蔔" }
+- query: 芒果
+  expect: { category: "水果 > 熱帶水果 > 芒果" }
+  note: 芒果乾也含「芒果」，但只是子字串命中；精確品名勝出，直接定案
+- query: 水蜜桃
+  expect: { category: "水果 > 溫帶水果 > 水蜜桃" }
+- query: 明蝦
+  expect: { category: "海鮮 > 蝦蟹 > 明蝦" }
+- query: 透抽
+  expect: { category: "海鮮 > 魚類 > 透抽" }
+- query: 鮮蚵
+  expect: { category: "海鮮 > 貝類 > 鮮蚵" }
+- query: 芒果乾
+  expect: { category: "加工食品 > 果乾蜜餞 > 芒果乾" }
 
-- query: 糯米
-  expect: { category: "穀物 > 米" }
-  note: 刻意問一題。2026-09-19 實測卡片是「米／荔枝」＋逃生艙，米排第一（人工同義詞 pinned）。
-    這是設計決定不是缺陷，理由見 spec〈人工覆寫用 pinned，不是短路〉：短路會讓真想買荔枝品種的人搜不到。
-    ⚠️ 不要把它「修」成直接定案——本輪已經為此繞了三圈（pricebook 別名、分類改名都不是成因）。
-
-- query: 水泥
-  expect: NIL
-- query: 筆記型電腦
-  expect: NIL
-- query: 二手汽車
-  expect: NIL
-
-- query: 甘藍-初秋
-  expect: { label: "甘藍-初秋", kind: CROP }
-  note: 精確品名直接定案（不出卡），與「高麗菜」經卡片抵達同一個實體
-- query: 洋蔥
-  expect: { label: "洋蔥-本產", kind: CROP }
-- query: 蕃茄
-  expect: { label: "番茄-牛番茄", kind: CROP }
-  note: 異體字，靠 understandQuery 展開成「番茄」
-
+# 別名、泛稱與寫法變體
+- query: 甘藍
+  expect: { category: "蔬菜 > 葉菜類 > 高麗菜" }
+  note: 甘藍是高麗菜的學名，要靠別名表對應；別名表（internal/cache 的 category_alias_gen.go）依完整分類樹生成，種子分類樹的名稱沒有進去，所以離線評測對不到
+  status: known_gap
+  tracked_by: 改成一般電商步驟 5（離線評測的種子樹沒有對應別名）
+- query: 蕃薯
+  expect: { category: "蔬菜 > 根莖類 > 地瓜" }
+  note: 異體字加別名；同甘藍，種子分類樹沒有對應別名，離線評測對不到
+  status: known_gap
+  tracked_by: 改成一般電商步驟 5（離線評測的種子樹沒有對應別名）
+- query: 高丽菜
+  expect: { category: "蔬菜 > 葉菜類 > 高麗菜" }
+  note: 簡體字，靠 understandQuery 轉成繁體
 - query: 豬五花
-  message: 我想要豬五花，50 kg, 送到桃園市
-  expect: { category: "肉類 > 豬肉 > 豬肉", label: "毛豬（規格豬）", kind: COMMODITY }
-  note: 拉丁單位小寫加空格、中英文逗號混用
+  expect: { category: "肉類 > 豬肉 > 黑毛豬五花" }
+  note: 子字串命中，樹裡只有一個候選
+- query: 臺灣土雞
+  expect: { category: "肉類 > 雞肉 > 土雞" }
+  note: 前綴加品名，臺／台寫法正規化後子字串命中
+- query: 豬肉
+  expect: { category: "肉類 > 豬肉" }
+  note: 泛稱，對到中層分類；觀察到的路徑只要在「肉類 > 豬肉」之下就算命中
+- query: 烏龍茶
+  expect: { category: "茶葉 > 烏龍茶" }
+
+# 上層分類名：要買家挑下一層
+- query: 蔬菜
+  expect: { category: "蔬菜" }
+- query: 海鮮
+  expect: { category: "海鮮" }
+- query: 水果
+  expect: { category: "水果" }
+
+# 一句話多個品項
+- query: 高麗菜和小白菜
+  expect: { category: "蔬菜 > 葉菜類" }
+  note: 兩個品項同屬一個中層分類，出細項卡
+- query: 地瓜、紅蘿蔔
+  expect: { category: "蔬菜 > 根莖類" }
+- query: 芒果跟水蜜桃
+  expect: { category: "水果" }
+  note: 兩個品項跨中層分類，先問大品項
+
+# 帶完整句子（線上評測用）
 - query: 高麗菜
   message: 我想要高麗菜，50kg，送到桃園市
-  expect: { label: "甘藍-初秋", kind: CROP }
+  expect: { category: "蔬菜 > 葉菜類 > 高麗菜" }
   note: 拉丁單位無空格
-- query: 洋蔥
-  message: 欸 我下個月要辦活動 大概需要五十公斤的洋蔥 送到高雄 有沒有便宜一點的
-  expect: { label: "洋蔥-本產", kind: CROP }
+- query: 地瓜
+  message: 欸 我下個月要辦活動 大概需要五十公斤的地瓜 送到高雄 有沒有便宜一點的
+  expect: { category: "蔬菜 > 根莖類 > 地瓜" }
   note: 口語長句、數量用國字、夾帶無關訴求
+- query: 透抽
+  message: 我想要透抽，50 kg, 送到桃園市
+  expect: { category: "海鮮 > 魚類 > 透抽" }
+  note: 拉丁單位小寫加空格、中英文逗號混用
+- query: 明蝦
+  message: 需要明蝦 30公斤，送新竹
+  expect: { category: "海鮮 > 蝦蟹 > 明蝦" }
+  note: 中文單位
 
-- query: 虱目魚
+# 樹裡沒有的品項：誠實走逃生艙（買家自填單價），不硬配鄰近字串
+- query: 水泥
   expect: NIL
-  note: pricebook 與分類樹都查無（兩種寫法都查過），正解是走自填價
+  note: 不是食品，分類樹查無
+- query: 筆記型電腦
+  expect: NIL
+  note: 不是食品，分類樹查無
+- query: 二手汽車
+  expect: NIL
+  note: 不是食品，分類樹查無
 - query: 松露
   expect: NIL
-  note: 修前會被綁成「松茸」——鄰近字串不是答案，寧可讓買家自填
+  note: 樹裡沒有；鄰近字串不是答案，寧可讓買家自填
+- query: 虱目魚
+  expect: NIL
+  note: 樹裡只有魚類下的透抽與黑鮪魚，沒有虱目魚；不能因為都是魚就硬配
 - query: 土豆
   expect: NIL
-  note: 台語指花生，而 落花生 FZ1／FZ2 在 pricebook 裡；修前被綁成馬鈴薯。現在誠實走 NIL，要正確解析需補別名，屆時把期望值改成 落花生
+  note: 台語指花生，樹裡沒有花生；要正確解析需補別名，屆時把期望值改成對應分類

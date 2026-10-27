@@ -22,7 +22,6 @@ var (
 	ArtifactClarification          = ArtifactType(codemeta.ProcurementArtifactTypeClarification.Value)
 	ArtifactCandidateResults       = ArtifactType(codemeta.ProcurementArtifactTypeCandidateResults.Value)
 	ArtifactPricingPreview         = ArtifactType(codemeta.ProcurementArtifactTypePricingPreview.Value)
-	ArtifactDealTemperature        = ArtifactType(codemeta.ProcurementArtifactTypeDealTemperature.Value)
 	ArtifactConfirmedRFQ           = ArtifactType(codemeta.ProcurementArtifactTypeConfirmedRfq.Value)
 	ArtifactRFQPublicationApproval = ArtifactType(codemeta.ProcurementArtifactTypeRfqPublicationApproval.Value)
 	ArtifactRFQPublicationResult   = ArtifactType(codemeta.ProcurementArtifactTypeRfqPublicationResult.Value)
@@ -41,7 +40,6 @@ var artifactTrackA = map[ArtifactType]bool{
 	ArtifactClarification:          true,
 	ArtifactCandidateResults:       true,
 	ArtifactPricingPreview:         true,
-	ArtifactDealTemperature:        true,
 	ArtifactConfirmedRFQ:           true,
 	ArtifactRFQPublicationApproval: true,
 	ArtifactRFQPublicationResult:   true,

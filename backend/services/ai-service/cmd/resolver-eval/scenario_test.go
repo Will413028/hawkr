@@ -139,7 +139,7 @@ func TestLiveRunner_RoutesFullConversation(t *testing.T) {
 			write(map[string]any{"result": map[string]any{
 				"requestId": "77",
 				"slots": map[string]any{"item": "芭樂",
-					"item_resolution": map[string]any{"kind": "CROP", "code": "CROP-TW"}},
+					"item_resolution": map[string]any{"kind": "SELF_PRICED", "label": "臺灣"}},
 				"missingRequired": []any{"unit"},
 			}})
 		case path == "/app/buyers/me/procurement/turns":

@@ -17,7 +17,7 @@ type SlotKey string
 
 const (
 	SlotItem SlotKey = "item"
-	// SlotItemResolution 是 SlotItem 的解析結果——品項落在 Pricebook 分類體系的
+	// SlotItemResolution 是 SlotItem 的解析結果——品項落在平台分類樹的
 	// 哪一格。刻意做成 item 的**兄弟 key** 而不是把 item 改成
 	// {raw, resolved, provenance} 的巢狀結構：巢狀會讓既有每一筆 revision 的
 	// slots_json（`"item": "高麗菜"`）反序列化直接失敗，rewind 與對話回放都得靠
@@ -54,11 +54,9 @@ const (
 	DateLayout = "2006-01-02"
 )
 
-// AllowedUnits 只允許重量單位：KG/CATTY/GRAM 都有天然公斤換算係數，可直接
-// 用來把 Pricebook 的 TWD/kg 市場參考價換算成對應金額。BOX/CASE/PIECE/SET
-// 等計數單位沒有天然公斤換算，Pricebook 對它們永遠算不出參考價，因此不在
-// 允許清單內（2026-08-17 commit b45ce3858 已做過一次這個決定；本清單曾短暫
-// 被再次擴張為包含計數單位，發現從未真正走通任何輸入路徑後撤回，理由同 b45ce3858）。
+// AllowedUnits 只允許重量單位：KG/CATTY/GRAM 都有天然公斤換算係數，詢價單價的
+// 計價基準（BuyerRequestedRange 的 basisQuantity／basisUnit）據此決定。BOX/CASE/
+// PIECE/SET 等計數單位沒有天然公斤換算，因此不在允許清單內。
 var AllowedUnits = []string{"KG", "CATTY", "GRAM"}
 
 // AllowedCities 是台灣 22 個縣市。配送城市必須是可比對的固定值。
@@ -77,8 +75,8 @@ var AllowedCities = []string{
 // 這是已與 Will 確認接受的 tradeoff，不在本次變更範圍內調整篩選邏輯本身。
 //
 // 2026-08-23 追加 unit，變回 3 個必填欄位——這是 issue #2403 買家報價試算
-// （price-preview）功能上線後與上面那個決策相衝的地方：Pricebook 的
-// domain.CompileReferencePrice 沒有 unit 就換算不出參考價（ErrPriceBasisUnavailable），
+// （price-preview）功能上線後與上面那個決策相衝的地方：計價基準沒有 unit 就算不出來
+// （詢價總額區間算不出，price-preview 的 basisUnit 也是空的），
 // 但買家原本可能在完全沒填 unit 的情況下就到達 REQUIREMENT_READY、看到
 // NextAction:"REVIEW_PRICE_PREVIEW" 提示，下一步呼叫報價試算端點必定失敗。
 // Will（product owner）明確決定把 unit 併回必填集合，用「多問一題」換「不會把
@@ -147,10 +145,10 @@ func (s Slots) Apply(p SlotPatch, now time.Time) (Slots, []RejectedField) {
 	//
 	// 舊形狀（解析結果住 procurement_requests 的七個欄位）沒有這個位置可守：欄位
 	// 跟 slots 不在同一次寫入裡，只能靠各個呼叫端記得清，於是 rewind 需要一支
-	// withClearedResolution 特判，而 Pricebook 查詢失敗那條降級路徑要另外寫一次
+	// withClearedResolution 特判，而分類樹查詢失敗那條降級路徑要另外寫一次
 	// 「全零 persist」。留著舊解析的代價不是資料難看——下游取價的
 	// 報價就緒門檻只看解析結果非空、看不出它對應的是哪個 item，於是買家會拿 A 品項
-	// 的行情對 B 報價、把邀請寄給真實賣家，寄出去就收不回來。
+	// 的單價對 B 報價、把邀請寄給真實賣家，寄出去就收不回來。
 	//
 	// 判準是「Apply 前後的 item 值不同」而不是 p.Item != nil：patch 帶了 item 但被
 	// 上面的驗證退回時，request 內容其實沒變，不該連帶清掉仍然正確的解析結果。

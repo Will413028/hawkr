@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/domain"
-	"github.com/Will413028/hawkr/ai-service/internal/procurement/pricing"
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/repository"
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/testkit"
 	"github.com/Will413028/hawkr/go-pkg/codemeta"
@@ -318,13 +317,10 @@ func wishPoolApproval() repository.PublicationApproval {
 		ID: execApprovalID, Version: execApprovalVersion, BuyerID: execBuyerID,
 		RequestID: execRequestID, RequestRevisionID: execRevisionID,
 		ConfirmedRfqSnapshotID: execSnapshotID,
-		// 預設是 guided 且參考價可得——rejection 測試只破壞自己要證明的那一項。
-		PricingMode:           "PRICEBOOK_GUIDED",
-		ReferenceAvailability: "AVAILABLE",
-		AudienceMode:          codemeta.ProcurementPublicationAudienceModeWishPool.Value,
-		AudiencePolicyID:      codemeta.ProcurementWishPoolPolicyAllActiveSellersV1.Value,
-		AudiencePolicyVersion: domain.WishPoolPolicyVersionV1,
-		AudienceHash:          audienceHash,
+		AudienceMode:           codemeta.ProcurementPublicationAudienceModeWishPool.Value,
+		AudiencePolicyID:       codemeta.ProcurementWishPoolPolicyAllActiveSellersV1.Value,
+		AudiencePolicyVersion:  domain.WishPoolPolicyVersionV1,
+		AudienceHash:           audienceHash,
 
 		SellerFacingPayloadHash: execPayloadHash,
 		State:                   codemeta.ProcurementRfqPublicationApprovalStatePending.Value,
@@ -498,56 +494,10 @@ func TestExecuteRfqPublication_RevisionMismatch_Rejects(t *testing.T) {
 	require.Zero(t, f.approvals.claimCalls, "revision 對不上時不該動 approval 的 CAS")
 }
 
-// reference_availability = PRICE_BASIS_UNAVAILABLE 是**無條件** hard block（Scope 5），
-// 與 pricing_mode 無關——這裡刻意用 BUYER_ENTERED_NO_REFERENCE 這個最寬鬆的 mode，
-// 證明放行的判準只給 "UNAVAILABLE"，不會外溢到這個值。
-//
-// 判準是 approval 上凍下來的值，不是重查 Pricebook——fixture 裡根本沒有 Pricebook。
-// （這個值今天不可達，見 referenceUnavailable 的註解；這道 block 是防禦性的。）
-func TestExecuteRfqPublication_PriceBasisUnavailable_Rejects(t *testing.T) {
-	approval := wishPoolApproval()
-	approval.PricingMode = "BUYER_ENTERED_NO_REFERENCE"
-	approval.ReferenceAvailability = "PRICE_BASIS_UNAVAILABLE"
-	f := newExecFixture(approval, nil)
-
-	_, err := f.uc.ExecuteRfqPublication(context.Background(), execInput())
-
-	require.ErrorIs(t, err, pricing.ErrPriceBasisUnavailable)
-	requireZeroWrites(t, f)
-}
-
-// reference_availability = "UNAVAILABLE" 搭上任何**不是** BUYER_ENTERED_NO_REFERENCE
-// 的 pricing mode → 擋下。這個組合今天的程式產不出來（guided 模式算得出參考價才會走到
-// 建立 preview，見 pricing/price_preview.go 兩條獨立路徑），所以它代表資料不自洽，不是正常輸入。
-//
-// 這一支與下一支的差別**只有 pricing_mode 一個欄位**——那正是裁決的判準所在。
-func TestExecuteRfqPublication_UnavailableOutsideBuyerEnteredMode_Rejects(t *testing.T) {
-	approval := wishPoolApproval()
-	approval.PricingMode = "PRICEBOOK_GUIDED"
-	approval.ReferenceAvailability = "UNAVAILABLE"
-	f := newExecFixture(approval, nil)
-
-	_, err := f.uc.ExecuteRfqPublication(context.Background(), execInput())
-
-	require.ErrorIs(t, err, pricing.ErrPriceBasisUnavailable)
-	requireZeroWrites(t, f)
-}
-
-// ⛔ **買家自訂價是合法模式，不是漏網之魚。**
-//
-// BUYER_ENTERED_NO_REFERENCE 這條 pricing mode 的正常產出就是
-// reference_availability = "UNAVAILABLE"（pricing/price_preview.go 該分支唯一會寫的值），而它正是
-// 系統在 guided 模式找不到可靠 mapping 時（ErrMappingUnavailableForGuidedMode）叫買家改用
-// 的模式。無條件擋下 "UNAVAILABLE" 會讓**每一張買家自訂價的 publication 都發不出去**——
-// 那不是 Scope 5 要的效果，Scope 5 禁止的是把 guided 請求**自動**降級成手動，而那件事在
-// preview 端就擋掉了。
-//
-// 這一支是那條線上路徑的迴歸守衛：任何回到「無條件擋 UNAVAILABLE」的實作都會讓它紅。
-func TestExecuteRfqPublication_BuyerEnteredNoReferenceMode_IsLegitimateAndPublishes(t *testing.T) {
-	approval := wishPoolApproval()
-	approval.PricingMode = "BUYER_ENTERED_NO_REFERENCE"
-	approval.ReferenceAvailability = "UNAVAILABLE"
-	f := newExecFixture(approval, nil)
+// 買家自訂價是唯一的定價方式：沒有任何價格依據的欄位會擋發布，發布只看 approval 的
+// 狀態、版本、payloadHash、request、revision 與受眾。
+func TestExecuteRfqPublication_BuyerEnteredPrice_Publishes(t *testing.T) {
+	f := newExecFixture(wishPoolApproval(), nil)
 
 	got, err := f.uc.ExecuteRfqPublication(context.Background(), execInput())
 
@@ -563,7 +513,7 @@ func TestExecuteRfqPublication_BuyerEnteredNoReferenceMode_IsLegitimateAndPublis
 // approval 已過期（expires_at 早於 now）→ ErrApprovalExpired。
 //
 // approval 的其餘每一項都是健康的（state PENDING、version 對得上、payloadHash 相符、
-// referenceAvailability 是 AVAILABLE、requestId 相符、WISH_POOL 的 audienceHash 相符），
+// requestId 相符、WISH_POOL 的 audienceHash 相符），
 // 唯一被破壞的是 expires_at——沒有 expiry gate 的實作會一路走到 InsertPublication。
 func TestExecuteRfqPublication_ExpiredApproval_Rejects(t *testing.T) {
 	approval := wishPoolApproval()
@@ -796,7 +746,7 @@ func TestExecuteRfqPublication_RejectedAttempt_DoesNotBurnIdempotencyKey(t *test
 }
 
 // RFQ_PUBLICATION_RESULT 的 publicDataJson 是 allowlist：恰好六欄，不多不少
-// （Scope 9、doc 64 §4.4）。⛔ 不得含 contact、token、買家預算、Pricebook internals、
+// （Scope 9、doc 64 §4.4）。⛔ 不得含 contact、token、買家預算、內部定價資料、
 // prompt／reasoning。
 //
 // 這支跑的是 wishPoolApproval（無收件人名單），刻意用它釘住 WISH_POOL 這條路徑的

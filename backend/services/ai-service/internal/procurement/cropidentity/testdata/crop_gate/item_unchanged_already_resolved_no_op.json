@@ -2,37 +2,29 @@
   "resolverNil": false,
   "resolveResult": {
     "NeedsDisambiguation": false,
-    "CropCode": null,
-    "GroupCode": null,
-    "CommodityCode": null,
-    "FallbackGroupCode": null,
-    "Label": "",
     "Candidates": null,
     "Unavailable": false
   },
   "before": {
     "item": "芭樂",
     "item_resolution": {
-      "kind": "CROP",
-      "code": "CROP-GUAVA",
+      "kind": "SELF_PRICED",
       "label": "芭樂",
-      "category_id": "category-guava",
-      "provenance": "SYSTEM"
+      "price_per_kg": 95,
+      "provenance": "BUYER_CHOICE"
     }
   },
   "after": {
     "item": "芭樂",
     "item_resolution": {
-      "kind": "CROP",
-      "code": "CROP-GUAVA",
+      "kind": "SELF_PRICED",
       "label": "芭樂",
-      "category_id": "category-guava",
-      "provenance": "SYSTEM"
+      "price_per_kg": 95,
+      "provenance": "BUYER_CHOICE"
     }
   },
   "result": {
     "item": "芭樂",
-    "resolution": null,
     "pending": false,
     "candidates": null,
     "pendingReason": "",

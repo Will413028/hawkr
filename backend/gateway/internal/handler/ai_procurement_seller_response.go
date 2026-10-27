@@ -179,13 +179,6 @@ type ProcurementSellerPublicationDetailDTO struct {
 	LatestResponse      *ProcurementSellerResponseVersionDTO       `json:"latestResponse,omitempty"`
 }
 
-type ProcurementSellerFacingPriceRangeDTO struct {
-	LowerBoundAmount string `json:"lowerBoundAmount"`
-	UpperBoundAmount string `json:"upperBoundAmount"`
-	BasisQuantity    string `json:"basisQuantity"`
-	BasisUnit        string `json:"basisUnit"`
-}
-
 type ProcurementSellerRequestedPriceRangeDTO struct {
 	Currency         string `json:"currency"`
 	PriceComponent   string `json:"priceComponent"`
@@ -210,7 +203,6 @@ type ProcurementSellerFacingPayloadDTO struct {
 	DeliveryDate          string                                   `json:"deliveryDate"`
 	ResponseDeadline      string                                   `json:"responseDeadline"`
 	BuyerNote             string                                   `json:"buyerNote"`
-	ReferencePriceRange   *ProcurementSellerFacingPriceRangeDTO    `json:"referencePriceRange"`
 	BuyerRequestedRange   *ProcurementSellerRequestedPriceRangeDTO `json:"buyerRequestedRange"`
 }
 
@@ -226,20 +218,7 @@ func sellerFacingPayloadFromProto(p *pb.RfqPublicationInviteSellerViewResponse) 
 		DeliveryDate:          p.GetDeliveryDate(),
 		ResponseDeadline:      p.GetResponseDeadline(),
 		BuyerNote:             p.GetBuyerNote(),
-		ReferencePriceRange:   sellerFacingReferenceRangeFromProto(p.GetReferencePriceRange()),
 		BuyerRequestedRange:   sellerRequestedRangeFromProto(p.GetBuyerRequestedRange()),
-	}
-}
-
-func sellerFacingReferenceRangeFromProto(r *pb.SellerFacingReferenceRange) *ProcurementSellerFacingPriceRangeDTO {
-	if r == nil {
-		return nil
-	}
-	return &ProcurementSellerFacingPriceRangeDTO{
-		LowerBoundAmount: r.GetLowerBoundAmount(),
-		UpperBoundAmount: r.GetUpperBoundAmount(),
-		BasisQuantity:    r.GetBasisQuantity(),
-		BasisUnit:        r.GetBasisUnit(),
 	}
 }
 

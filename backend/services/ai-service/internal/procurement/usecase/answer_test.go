@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/domain"
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/repository"
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/testkit"
-	pbusecase "github.com/Will413028/hawkr/ai-service/internal/usecase"
 	"github.com/Will413028/hawkr/go-pkg/codemeta"
 	"github.com/Will413028/hawkr/go-pkg/identity"
 	"github.com/stretchr/testify/require"
@@ -375,13 +374,11 @@ func TestAnswerUseCase_Skip_RequiredSlots_ReturnsErrCannotSkip(t *testing.T) {
 
 func TestAnswerUseCase_ItemAnswer_TriggersCropResolution(t *testing.T) {
 	repo := newFakeRepo()
-	client := &testkit.FakePricebookClient{PriceableMatches: []pbusecase.PriceableEntityMatch{
-		{Kind: "CROP_GROUP", Code: "N04-001", Name: "甘藍", MatchedForm: "甘藍", FormKind: "CANONICAL", Tier: 0, Rank: 1, GroupCode: "N04-001", HasForecast: true},
-	}}
+	tree := testkit.VegetableTree()
 	req, rev, err := repo.CreateRequest(context.Background(), identity.BuyerID(1234))
 	require.NoError(t, err)
 
-	uc := NewAnswerUseCase(repo, cropidentity.NewDisambiguationUseCase(client, nil, nil), nil, nil, nil, nil)
+	uc := NewAnswerUseCase(repo, cropidentity.NewDisambiguationUseCase(tree, nil), nil, nil, nil, nil)
 	got, err := uc.composeAnswerViaGraph(context.Background(), AnswerInput{
 		BuyerID: 1234, RequestID: req.ID, SlotKey: domain.SlotItem,
 		FreeText: "高麗菜", ExpectedRevisionID: rev.ID, ClientRequestID: "cr-answer-crop-1",
@@ -389,19 +386,15 @@ func TestAnswerUseCase_ItemAnswer_TriggersCropResolution(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, "高麗菜", *got.Slots.Item)
-	require.Equal(t, 1, client.PriceableCalls, "透過問題卡填入 item 一樣要解析一次")
-	require.Equal(t, []string{"高麗菜", "甘藍"}, client.GotVariants)
-	require.Equal(t, &domain.ItemResolution{
-		Kind: domain.ItemResolvedGroup, Code: ptr("N04-001"), Label: "甘藍",
-		FallbackGroupCode: ptr("N04-001"), Provenance: domain.ItemResolutionBySystem,
-	}, got.Slots.ItemResolution)
+	require.NotZero(t, tree.Calls, "透過問題卡填入 item 一樣要解析一次")
+	require.Nil(t, got.Slots.ItemResolution, "分類確認後下一步是買家填單價，解析結果要等買家填了單價才落進 slots")
+	require.NotNil(t, got.Question)
+	require.Equal(t, domain.SlotCropDisambiguation, got.Question.SlotKey)
 }
 
 func TestAnswerUseCase_NonItemAnswer_DoesNotResolve(t *testing.T) {
 	repo := newFakeRepo()
-	client := &testkit.FakePricebookClient{PriceableMatches: []pbusecase.PriceableEntityMatch{
-		{Kind: "CROP_GROUP", Code: "N04-001", Name: "甘藍", MatchedForm: "甘藍", FormKind: "CANONICAL", Tier: 0, Rank: 1, GroupCode: "N04-001", HasForecast: true},
-	}}
+	tree := testkit.VegetableTree()
 	req, _, err := repo.CreateRequest(context.Background(), identity.BuyerID(1234))
 	require.NoError(t, err)
 	item := "高麗菜"
@@ -410,21 +403,21 @@ func TestAnswerUseCase_NonItemAnswer_DoesNotResolve(t *testing.T) {
 	// 之後，而那個狀態現在要重試（見 cropidentity.needsResolution）。
 	rev, err := repo.AppendRevision(context.Background(), repository.AppendInput{
 		RequestID: req.ID, BuyerID: 1234, Slots: domain.Slots{Item: &item,
-			ItemResolution: domain.NewSystemItemResolution(
-				nil, ptr("N04-001"), nil, nil, "甘藍", domain.CategoryFromEntity("category-cabbage"))},
+			ItemResolution: domain.NewSelfPricedItemResolution(95, "高麗菜", domain.CategoryFromSelection(
+				&domain.CropSelection{Stage: domain.CropSelectionPrice, CategoryID: "17", Label: "高麗菜"}))},
 		Source: "LLM_EXTRACT", ClientRequestID: "seed-crop", PayloadJSON: []byte(`{}`),
 		RequestStatus: "CLARIFYING",
 	})
 	require.NoError(t, err)
 
-	uc := NewAnswerUseCase(repo, cropidentity.NewDisambiguationUseCase(client, nil, nil), nil, nil, nil, nil)
+	uc := NewAnswerUseCase(repo, cropidentity.NewDisambiguationUseCase(tree, nil), nil, nil, nil, nil)
 	_, err = uc.composeAnswerViaGraph(context.Background(), AnswerInput{
 		BuyerID: 1234, RequestID: req.ID, SlotKey: domain.SlotDeliveryCity,
 		OptionID: "city-taoyuan", ExpectedRevisionID: rev.ID, ClientRequestID: "cr-answer-crop-2",
 	})
 
 	require.NoError(t, err)
-	require.Zero(t, client.PriceableCalls, "item 沒變且已解析，就不該重新解析")
+	require.Zero(t, tree.Calls, "item 沒變且已解析，就不該重新解析")
 }
 
 func seedPendingDisambiguationRequest(t *testing.T, repo *fakeRepo, clientRequestID string) (int64, int64) {
@@ -442,21 +435,18 @@ func seedPendingDisambiguationRequest(t *testing.T, repo *fakeRepo, clientReques
 }
 
 func pendingCropFixture() *CropDisambiguationInterruptPayload {
-	cropCode := "CROP-X"
 	return &CropDisambiguationInterruptPayload{
 		Kind:          cropDisambiguationInterruptKind,
 		PendingReason: domain.CropPendingReasonAmbiguous,
-		Candidates:    []domain.CropDisambiguationOption{{Label: "有機小白菜", CropCode: &cropCode}},
+		Candidates:    []domain.CropDisambiguationOption{{Label: "有機小白菜", CategoryID: "18", CategoryLevel: 3}},
 	}
 }
 
 func TestCropDisambiguationAnswer_SelfPricedThenItemChanges_ClearsSelfPricedAndResolvesNormally(t *testing.T) {
 	repo := newFakeRepo()
 	reqID, revID := seedPendingDisambiguationRequest(t, repo, "seed-crop-selfpriced-then-change")
-	client := &testkit.FakePricebookClient{PriceableMatches: []pbusecase.PriceableEntityMatch{
-		{Kind: "CROP_GROUP", Code: "N04-001", Name: "甘藍", MatchedForm: "甘藍", FormKind: "CANONICAL", Tier: 0, Rank: 1, GroupCode: "N04-001", HasForecast: true},
-	}}
-	cropUC := cropidentity.NewDisambiguationUseCase(client, nil, nil)
+	tree := testkit.VegetableTree()
+	cropUC := cropidentity.NewDisambiguationUseCase(tree, nil)
 
 	patch, err := buildCropDisambiguationPatch(AnswerInput{
 		BuyerID: 1234, RequestID: reqID, SlotKey: domain.SlotCropDisambiguation,
@@ -467,7 +457,7 @@ func TestCropDisambiguationAnswer_SelfPricedThenItemChanges_ClearsSelfPricedAndR
 	require.NoError(t, err)
 	selfPriced, _ := domain.Slots{}.Apply(patch, time.Now().UTC())
 	require.Equal(t, "野生烏殼綠竹筍", *selfPriced.Item)
-	require.Zero(t, client.PriceableCalls, "選逃生艙這一輪不得呼叫 pricebook")
+	require.Zero(t, tree.Calls, "選逃生艙這一輪不得讀分類樹")
 	require.Equal(t, &domain.ItemResolution{
 		Kind: domain.ItemResolvedSelfPriced, PricePerKg: ptr(150),
 		Provenance: domain.ItemResolutionByBuyerChoice,
@@ -485,14 +475,11 @@ func TestCropDisambiguationAnswer_SelfPricedThenItemChanges_ClearsSelfPricedAndR
 	require.NoError(t, err)
 	require.NotNil(t, got.Item)
 	require.Equal(t, "高麗菜", *got.Item)
-	require.Equal(t, 1, client.PriceableCalls, "品項變了要重新解析一次")
-	require.Equal(t, &domain.ItemResolution{
-		Kind: domain.ItemResolvedGroup, Code: ptr("N04-001"), Label: "甘藍",
-		FallbackGroupCode: ptr("N04-001"), Provenance: domain.ItemResolutionBySystem,
-	}, got.Resolution)
-	require.Nil(t, got.Resolution.PricePerKg, "上一輪的自填價不得殘留")
-	require.False(t, got.Pending,
-		"成功解析（非消歧）不應該回到待消歧狀態——對應舊測試對 DialoguePlan.ActCode != ActItemNeedsDisambiguation 的斷言")
+	require.NotZero(t, tree.Calls, "品項變了要重新解析")
+	require.Nil(t, got.Resolution, "上一輪的自填價不得殘留")
+	require.True(t, got.Pending, "分類確認後待買家填單價")
+	require.Equal(t, domain.CropPendingReasonUnavailable, got.PendingReason)
+	require.Equal(t, "17", got.Selection.CategoryID)
 }
 
 func TestHandle_ItemAnswer_AmbiguousItem_OverridesQuestionWithDisambiguation(t *testing.T) {
@@ -502,8 +489,8 @@ func TestHandle_ItemAnswer_AmbiguousItem_OverridesQuestionWithDisambiguation(t *
 	resolver := &testkit.FakeResolver[cropidentity.DisambiguationResult]{ResolveResult: cropidentity.DisambiguationResult{
 		NeedsDisambiguation: true,
 		Candidates: []domain.CropDisambiguationOption{
-			{Label: "有機小白菜", CropCode: ptr("CROP-X")},
-			{Label: "小白菜（一般）", CropCode: ptr("CROP-Y")},
+			{Label: "有機小白菜", CategoryID: "18", CategoryLevel: 3},
+			{Label: "小白菜（一般）", CategoryID: "19", CategoryLevel: 3},
 		},
 	}}
 
@@ -819,8 +806,8 @@ func TestExecuteAnswerPipeline_CropDisambiguationPending_TransitionsToWaitingFor
 	resolver := &testkit.FakeResolver[cropidentity.DisambiguationResult]{ResolveResult: cropidentity.DisambiguationResult{
 		NeedsDisambiguation: true,
 		Candidates: []domain.CropDisambiguationOption{
-			{Label: "有機小白菜", CropCode: ptr("CROP-X")},
-			{Label: "小白菜（一般）", CropCode: ptr("CROP-Y")},
+			{Label: "有機小白菜", CategoryID: "18", CategoryLevel: 3},
+			{Label: "小白菜（一般）", CategoryID: "19", CategoryLevel: 3},
 		},
 	}}
 	uc := NewAnswerUseCase(repo, resolver, nil, nil, nil, nil)
@@ -1249,7 +1236,7 @@ func TestBuildCropDisambiguationPatch_PendingGate(t *testing.T) {
 
 	t.Run("UNAVAILABLE（0 候選）、送非 crop-other 的 optionId——乾淨 422", func(t *testing.T) {
 		_, err := buildCropDisambiguationPatch(AnswerInput{
-			SlotKey: domain.SlotCropDisambiguation, OptionID: "crop-SOME-CODE",
+			SlotKey: domain.SlotCropDisambiguation, OptionID: "category-18",
 			PendingCrop: &CropDisambiguationInterruptPayload{
 				Kind: cropDisambiguationInterruptKind, PendingReason: domain.CropPendingReasonUnavailable,
 			},
@@ -1258,77 +1245,19 @@ func TestBuildCropDisambiguationPatch_PendingGate(t *testing.T) {
 			"候選清單是空的，白名單比對必然落空——要回乾淨的 422，不是原始解析錯誤")
 	})
 
-	t.Run("白名單來自那個中斷本身——選中的候選帶回解析結果", func(t *testing.T) {
-		cropCode := "CROP-X"
-		patch, err := buildCropDisambiguationPatch(AnswerInput{
-			SlotKey: domain.SlotCropDisambiguation, OptionID: "crop-" + cropCode,
-			PendingCrop: &CropDisambiguationInterruptPayload{
-				Kind: cropDisambiguationInterruptKind, PendingReason: domain.CropPendingReasonAmbiguous,
-				Candidates: []domain.CropDisambiguationOption{{Label: "甘藍", CropCode: &cropCode}},
-			},
-		})
-		require.NoError(t, err)
-		require.NotNil(t, patch.ItemResolution)
-		require.Equal(t, "甘藍", patch.ItemResolution.Label)
-	})
-
-	t.Run("送一個不在那個中斷候選清單裡的 optionId——拒絕", func(t *testing.T) {
-		inList := "CROP-X"
+	t.Run("分類候選不走 patch：由 resolver 的 ResolveSelection 處理，這裡一律拒絕", func(t *testing.T) {
 		_, err := buildCropDisambiguationPatch(AnswerInput{
-			SlotKey: domain.SlotCropDisambiguation, OptionID: "crop-CROP-OTHER-REQUEST",
+			SlotKey: domain.SlotCropDisambiguation, OptionID: "category-18",
 			PendingCrop: &CropDisambiguationInterruptPayload{
 				Kind: cropDisambiguationInterruptKind, PendingReason: domain.CropPendingReasonAmbiguous,
-				Candidates: []domain.CropDisambiguationOption{{Label: "甘藍", CropCode: &inList}},
+				Candidates: []domain.CropDisambiguationOption{{Label: "小白菜", CategoryID: "18", CategoryLevel: 3}},
 			},
 		})
-		require.ErrorIs(t, err, ErrInvalidOptionID,
-			"白名單是這個中斷當初給的那一份，別的 request 的候選不算數")
+		require.ErrorIs(t, err, ErrInvalidOptionID)
 	})
 }
 
 func TestBuildCropDisambiguationPatch_CarriesResolutionInPatch(t *testing.T) {
-	t.Run("真候選：解析結果進 patch，item 原話不動", func(t *testing.T) {
-		cropCode, groupCode := "LA1", "LA"
-		asked := &CropDisambiguationInterruptPayload{
-			Kind: cropDisambiguationInterruptKind, PendingReason: domain.CropPendingReasonAmbiguous,
-			Candidates: []domain.CropDisambiguationOption{
-				{Label: "甘藍-初秋", CropCode: &cropCode, FallbackGroupCode: &groupCode},
-			},
-		}
-		patch, err := buildCropDisambiguationPatch(AnswerInput{
-			SlotKey: domain.SlotCropDisambiguation, OptionID: "crop-" + cropCode,
-			PendingCrop: asked,
-		})
-
-		require.NoError(t, err)
-		require.Nil(t, patch.Item, "挑候選不是改口說了別的品項，原話必須原樣留著")
-		require.Equal(t, &domain.ItemResolution{
-			Kind: domain.ItemResolvedCrop, Code: &cropCode, Label: "甘藍-初秋",
-			FallbackGroupCode: &groupCode, Provenance: domain.ItemResolutionByBuyerChoice,
-		}, patch.ItemResolution, "空 patch 正是「挑完候選畫面零回饋」的來源")
-	})
-
-	t.Run("挑「整個大類都可以」：落成 GROUP", func(t *testing.T) {
-		groupCode := "LA"
-		asked := &CropDisambiguationInterruptPayload{
-			Kind: cropDisambiguationInterruptKind, PendingReason: domain.CropPendingReasonAmbiguous,
-			Candidates: []domain.CropDisambiguationOption{
-				{Label: "整個甘藍都可以", GroupCode: &groupCode, FallbackGroupCode: &groupCode},
-			},
-		}
-
-		patch, err := buildCropDisambiguationPatch(AnswerInput{
-			SlotKey: domain.SlotCropDisambiguation, OptionID: "group-" + groupCode,
-			PendingCrop: asked,
-		})
-
-		require.NoError(t, err)
-		require.NotNil(t, patch.ItemResolution)
-		require.Equal(t, domain.ItemResolvedGroup, patch.ItemResolution.Kind)
-		require.Equal(t, groupCode, *patch.ItemResolution.Code)
-		require.Equal(t, domain.ItemResolutionByBuyerChoice, patch.ItemResolution.Provenance)
-	})
-
 	t.Run("逃生艙：落成 SELF_PRICED 並帶自填價，item 改寫成買家的描述", func(t *testing.T) {
 		patch, err := buildCropDisambiguationPatch(AnswerInput{
 			SlotKey: domain.SlotCropDisambiguation, OptionID: domain.CropOtherOptionID,
@@ -1357,7 +1286,7 @@ func TestBuildCropDisambiguationPatch_CarriesResolutionInPatch(t *testing.T) {
 		require.NoError(t, err)
 
 		before := domain.Slots{Item: item("星際迷航火星藜麥"), ItemResolution: &domain.ItemResolution{
-			Kind: domain.ItemResolvedCrop, Code: testkit.Ptr("OLD"), Provenance: domain.ItemResolutionBySystem,
+			Kind: domain.ItemResolvedSelfPriced, PricePerKg: testkit.Ptr(50), Provenance: domain.ItemResolutionByBuyerChoice,
 		}}
 		after, rejected := before.Apply(patch, time.Now())
 

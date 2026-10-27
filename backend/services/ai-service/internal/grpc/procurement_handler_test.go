@@ -547,19 +547,6 @@ func TestPreviewRfqPrice_EmptyClientRequestId_ReturnsInvalidArgument(t *testing.
 	}
 }
 
-func TestPreviewRfqPrice_InvalidPricingMode_ReturnsInvalidArgument(t *testing.T) {
-	s := NewAIProcurementGrpcServer(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, DurableRunDeps{}, nil, usecase.GraphControllerDeps{}, nil, SellerCommandDeps{})
-	_, err := s.PreviewRfqPrice(buyerActorContext("1"), &aipb.RfqPricePreviewRequest{
-		RequestId: "1", ExpectedRevisionId: "1", ClientRequestId: "cr-1", PricingMode: "BOGUS_MODE",
-	})
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	if got := status.Code(err); got != codes.InvalidArgument {
-		t.Fatalf("status code = %v, want InvalidArgument", got)
-	}
-}
-
 func TestPreviewRfqPriceErrorStatus_MapsTypedUsecaseErrors(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -568,7 +555,6 @@ func TestPreviewRfqPriceErrorStatus_MapsTypedUsecaseErrors(t *testing.T) {
 		wantReason string
 	}{
 		{"price basis unavailable", pricing.ErrPriceBasisUnavailable, codes.FailedPrecondition, "PRICE_BASIS_UNAVAILABLE"},
-		{"mapping unavailable for guided mode", pricing.ErrMappingUnavailableForGuidedMode, codes.FailedPrecondition, "MAPPING_MISSING"},
 		{"stale revision", pricing.ErrStalePricePreviewRevision, codes.Aborted, "STALE_REVISION"},
 		{"not found falls through to default mapping", repository.ErrNotFound, codes.NotFound, "REQUEST_NOT_FOUND"},
 	}
@@ -706,54 +692,15 @@ func TestConfirmRfqSnapshotErrorStatus_MapsTypedUsecaseErrors(t *testing.T) {
 	}
 }
 
-func TestToRfqPricePreviewResponseProto_UnavailableLeavesReferencePriceRangeNil(t *testing.T) {
-	result := pricing.PricePreviewResult{
-		PricePreviewID: 1, Version: 1, PricingMode: "BUYER_ENTERED_NO_REFERENCE",
-		ReferenceAvailability: "UNAVAILABLE",
-		BuyerRequestedRange:   pricing.BuyerRequestedRange{Currency: "TWD", PriceComponent: "GOODS_ONLY", LowerBoundAmount: "650", UpperBoundAmount: "850"},
-		DealTemperature:       pricing.DealTemperature{Status: "UNKNOWN", ReasonCode: "MAPPING_MISSING"},
-		PayloadHash:           "abc",
-	}
-	resp := toRfqPricePreviewResponseProto(result)
-	if resp.ReferencePriceRange != nil {
-		t.Fatalf("ReferencePriceRange = %+v, want nil", resp.ReferencePriceRange)
-	}
-	if resp.GetDealTemperature().GetReasonCode() != "MAPPING_MISSING" {
-		t.Fatalf("DealTemperature.ReasonCode = %q, want MAPPING_MISSING", resp.GetDealTemperature().GetReasonCode())
-	}
-}
-
-func TestToRfqPricePreviewResponseProto_AvailableFormatsReferencePriceRangeAmounts(t *testing.T) {
-	result := pricing.PricePreviewResult{
-		PricePreviewID: 2, Version: 1, PricingMode: "PRICEBOOK_GUIDED",
-		ReferenceAvailability: "AVAILABLE",
-		ReferencePriceRange:   &pricing.ReferencePriceRange{Lower: f64p(30.25), Midpoint: 36, Upper: f64p(41.75)},
-		BuyerRequestedRange:   pricing.BuyerRequestedRange{Currency: "TWD", PriceComponent: "GOODS_ONLY", LowerBoundAmount: "30.25", UpperBoundAmount: "41.75"},
-		DealTemperature:       pricing.DealTemperature{Status: "UNKNOWN"},
-		PayloadHash:           "def",
-	}
-	resp := toRfqPricePreviewResponseProto(result)
-	if resp.GetReferencePriceRange().GetLowerBoundAmount() != "30.25" ||
-		resp.GetReferencePriceRange().GetMidpointAmount() != "36" ||
-		resp.GetReferencePriceRange().GetUpperBoundAmount() != "41.75" {
-		t.Fatalf("ReferencePriceRange = %+v, want {30.25 36 41.75}", resp.GetReferencePriceRange())
-	}
-	if resp.GetPricePreviewId() != "2" || resp.GetVersion() != "1" {
-		t.Fatalf("PricePreviewId/Version = %q/%q, want 2/1", resp.GetPricePreviewId(), resp.GetVersion())
-	}
-}
-
 func TestToRfqPricePreviewResponseProto_CarriesBasisQuantityAndBasisUnit(t *testing.T) {
 	result := pricing.PricePreviewResult{
-		PricePreviewID: 3, Version: 1, PricingMode: "PRICEBOOK_GUIDED",
-		ReferenceAvailability: "AVAILABLE",
+		PricePreviewID: 3, Version: 1,
 		BuyerRequestedRange: pricing.BuyerRequestedRange{
 			Currency: "TWD", PriceComponent: "GOODS_ONLY",
-			LowerBoundAmount: "30.25", UpperBoundAmount: "41.75",
+			LowerBoundAmount: "30", UpperBoundAmount: "42",
 			BasisQuantity: "1000", BasisUnit: "GRAM",
 		},
-		DealTemperature: pricing.DealTemperature{Status: "UNKNOWN"},
-		PayloadHash:     "ghi",
+		PayloadHash: "ghi",
 	}
 	resp := toRfqPricePreviewResponseProto(result)
 	if got := resp.GetBuyerRequestedRange().GetBasisQuantity(); got != "1000" {
@@ -764,50 +711,22 @@ func TestToRfqPricePreviewResponseProto_CarriesBasisQuantityAndBasisUnit(t *test
 	}
 }
 
-func TestToRfqPricePreviewResponseProto_CarriesV6MarketBasisAndQuoteTotal(t *testing.T) {
-	asOf := "2026-08-14T15:59:59Z"
+func TestToRfqPricePreviewResponseProto_CarriesQuoteTotal(t *testing.T) {
 	result := pricing.PricePreviewResult{
-		PricePreviewID: 4, Version: 1, PricingMode: "PRICEBOOK_GUIDED",
-		ReferenceAvailability: "AVAILABLE",
-		ReferencePriceRange: &pricing.ReferencePriceRange{
-			Lower: f64p(605), Midpoint: 710, Upper: f64p(835),
-			BasisQuantity: "1", BasisUnit: "KG",
-		},
+		PricePreviewID: 4, Version: 1,
 		BuyerRequestedRange: pricing.BuyerRequestedRange{
 			Currency: "TWD", PriceComponent: "GOODS_ONLY",
 			LowerBoundAmount: "650", UpperBoundAmount: "850",
 			BasisQuantity: "1", BasisUnit: "KG",
 		},
-		MarketPriceBasis: &pricing.MarketPriceBasis{
-			RegionName: "桃園市", SupportingMarketCount: 3,
-			SourceDataAsOf: &asOf, FreshnessStatus: "fresh",
-		},
 		QuoteTotalRange: &pricing.QuoteTotalRange{
 			Currency: "TWD", LowerBoundAmount: "32500", UpperBoundAmount: "42500",
 			Quantity: "50", QuantityUnit: "KG",
 		},
-		DealTemperature: pricing.DealTemperature{Status: "UNKNOWN"},
-		PayloadHash:     "jkl",
+		QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
+		PayloadHash:           "jkl",
 	}
 	resp := toRfqPricePreviewResponseProto(result)
-
-	if got := resp.GetReferencePriceRange().GetBasisQuantity(); got != "1" {
-		t.Errorf("ReferencePriceRange.BasisQuantity = %q, want 1", got)
-	}
-	if got := resp.GetReferencePriceRange().GetBasisUnit(); got != "KG" {
-		t.Errorf("ReferencePriceRange.BasisUnit = %q, want KG", got)
-	}
-
-	basis := resp.GetMarketPriceBasis()
-	if basis == nil {
-		t.Fatal("MarketPriceBasis = nil, want non-nil")
-	}
-	if basis.GetRegionName() != "桃園市" || basis.GetSupportingMarketCount() != "3" || basis.GetFreshnessStatus() != "fresh" {
-		t.Errorf("MarketPriceBasis = %+v, want {桃園市 3 fresh}", basis)
-	}
-	if basis.SourceDataAsOf == nil || *basis.SourceDataAsOf != asOf {
-		t.Errorf("MarketPriceBasis.SourceDataAsOf = %v, want %q", basis.SourceDataAsOf, asOf)
-	}
 
 	total := resp.GetQuoteTotalRange()
 	if total == nil {
@@ -817,67 +736,18 @@ func TestToRfqPricePreviewResponseProto_CarriesV6MarketBasisAndQuoteTotal(t *tes
 		total.GetQuantity() != "50" || total.GetQuantityUnit() != "KG" || total.GetCurrency() != "TWD" {
 		t.Errorf("QuoteTotalRange = %+v, want {TWD 32500 42500 50 KG}", total)
 	}
-}
-
-func TestToRfqPricePreviewResponseProto_AvailableDealTemperature_CarriesAllNineFields(t *testing.T) {
-	result := pricing.PricePreviewResult{
-		PricePreviewID: 6, Version: 1, PricingMode: "PRICEBOOK_GUIDED",
-		ReferenceAvailability: "AVAILABLE",
-		BuyerRequestedRange:   pricing.BuyerRequestedRange{Currency: "TWD", PriceComponent: "GOODS_ONLY", LowerBoundAmount: "58", UpperBoundAmount: "70"},
-		DealTemperature: pricing.DealTemperature{
-			Status: "AVAILABLE", ReasonCode: "",
-			ProbabilityLowerBps: "4100", ProbabilityUpperBps: "7800",
-			Band:                     "WARM",
-			OutcomeDefinition:        "BUYER_RANGE_VS_PRICEBOOK_FORECAST_COVERAGE",
-			OutcomeDefinitionVersion: "1",
-			PolicyVersion:            "DEAL_TEMPERATURE_COVERAGE_V1",
-			BandVersion:              "BANDS_V1",
-		},
-		PayloadHash: "pqr",
-	}
-	resp := toRfqPricePreviewResponseProto(result)
-	dt := resp.GetDealTemperature()
-	if dt.GetStatus() != "AVAILABLE" {
-		t.Errorf("Status = %q, want AVAILABLE", dt.GetStatus())
-	}
-	if dt.GetReasonCode() != "" {
-		t.Errorf("ReasonCode = %q, want empty (AVAILABLE 不得帶 reason code)", dt.GetReasonCode())
-	}
-	if dt.GetProbabilityLowerBps() != "4100" {
-		t.Errorf("ProbabilityLowerBps = %q, want 4100", dt.GetProbabilityLowerBps())
-	}
-	if dt.GetProbabilityUpperBps() != "7800" {
-		t.Errorf("ProbabilityUpperBps = %q, want 7800", dt.GetProbabilityUpperBps())
-	}
-	if dt.GetBand() != "WARM" {
-		t.Errorf("Band = %q, want WARM", dt.GetBand())
-	}
-	if dt.GetOutcomeDefinition() != "BUYER_RANGE_VS_PRICEBOOK_FORECAST_COVERAGE" {
-		t.Errorf("OutcomeDefinition = %q, want BUYER_RANGE_VS_PRICEBOOK_FORECAST_COVERAGE", dt.GetOutcomeDefinition())
-	}
-	if dt.GetOutcomeDefinitionVersion() != "1" {
-		t.Errorf("OutcomeDefinitionVersion = %q, want 1", dt.GetOutcomeDefinitionVersion())
-	}
-	if dt.GetPolicyVersion() != "DEAL_TEMPERATURE_COVERAGE_V1" {
-		t.Errorf("PolicyVersion = %q, want DEAL_TEMPERATURE_COVERAGE_V1", dt.GetPolicyVersion())
-	}
-	if dt.GetBandVersion() != "BANDS_V1" {
-		t.Errorf("BandVersion = %q, want BANDS_V1", dt.GetBandVersion())
+	if resp.GetQualityKnowledgeState() != "BUYER_QUALITY_UNKNOWN" || resp.GetPayloadHash() != "jkl" {
+		t.Errorf("QualityKnowledgeState/PayloadHash = %q/%q", resp.GetQualityKnowledgeState(), resp.GetPayloadHash())
 	}
 }
 
-func TestToRfqPricePreviewResponseProto_NilV6BlocksStayNil(t *testing.T) {
+func TestToRfqPricePreviewResponseProto_NilQuoteTotalStaysNil(t *testing.T) {
 	result := pricing.PricePreviewResult{
-		PricePreviewID: 5, Version: 1, PricingMode: "BUYER_ENTERED_NO_REFERENCE",
-		ReferenceAvailability: "UNAVAILABLE",
-		BuyerRequestedRange:   pricing.BuyerRequestedRange{Currency: "TWD", LowerBoundAmount: "650", UpperBoundAmount: "850"},
-		DealTemperature:       pricing.DealTemperature{Status: "UNKNOWN", ReasonCode: "MAPPING_MISSING"},
-		PayloadHash:           "mno",
+		PricePreviewID: 5, Version: 1,
+		BuyerRequestedRange: pricing.BuyerRequestedRange{Currency: "TWD", LowerBoundAmount: "650", UpperBoundAmount: "850"},
+		PayloadHash:         "mno",
 	}
 	resp := toRfqPricePreviewResponseProto(result)
-	if resp.MarketPriceBasis != nil {
-		t.Errorf("MarketPriceBasis = %+v, want nil", resp.MarketPriceBasis)
-	}
 	if resp.QuoteTotalRange != nil {
 		t.Errorf("QuoteTotalRange = %+v, want nil", resp.QuoteTotalRange)
 	}

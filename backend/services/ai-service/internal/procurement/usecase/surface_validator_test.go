@@ -265,7 +265,7 @@ func TestValidateSurfaceBlocks_Passes_NoSupplierQuoteYetNegation(t *testing.T) {
 }
 
 // TestValidateSurfaceBlocks_Rejects_AbsoluteSupplierOrDealClaims 涵蓋 §2960：
-// 禁止「最佳供應商」「保證成交」這類排名／保證化宣稱——Pricebook／候選比較
+// 禁止「最佳供應商」「保證成交」這類排名／保證化宣稱——候選比較
 // 不做供應商排名，系統也不保證任何一筆 RFQ 會成交。
 func TestValidateSurfaceBlocks_Rejects_AbsoluteSupplierOrDealClaims(t *testing.T) {
 	plan := domain.DialoguePlanV1{

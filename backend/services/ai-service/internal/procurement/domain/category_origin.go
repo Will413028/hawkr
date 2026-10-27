@@ -6,10 +6,6 @@ type CategoryOrigin struct {
 	absentReason string
 }
 
-func CategoryFromEntity(categoryID string) CategoryOrigin {
-	return CategoryOrigin{declared: true, id: categoryID}
-}
-
 func CategoryFromSelection(sel *CropSelection) CategoryOrigin {
 	id, _ := sel.ConfirmedCategory()
 	return CategoryOrigin{declared: true, id: id}

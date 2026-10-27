@@ -35,14 +35,13 @@ type scenarioFixture struct {
 }
 
 var scenarioFixtures = map[string]func() scenarioFixture{
-	// guava-resolved：品項解析固定成芭樂，沒有既有試算、沒有任何發布。
+	// guava-resolved：品項解析固定成芭樂的分類（待買家填單價），沒有既有試算、沒有任何發布。
 	"guava-resolved": func() scenarioFixture {
 		return scenarioFixture{
 			resolver: &testkit.FakeResolver[cropidentity.DisambiguationResult]{
 				ResolveResult: cropidentity.DisambiguationResult{
-					CropCode:       strPtr("CROP-GUAVA"),
-					Label:          "芭樂",
-					CategoryOrigin: domain.CategoryFromEntity("category-guava"),
+					Unavailable: true,
+					Selection:   &domain.CropSelection{Stage: domain.CropSelectionPrice, CategoryID: "guava", Label: "芭樂"},
 				},
 			},
 		}
@@ -125,9 +124,6 @@ func slotsToMap(s domain.Slots) map[string]any {
 	}
 	if s.ItemResolution != nil {
 		out["item_resolution_kind"] = string(s.ItemResolution.Kind)
-		if s.ItemResolution.Code != nil {
-			out["item_resolution_code"] = *s.ItemResolution.Code
-		}
 	}
 	return out
 }

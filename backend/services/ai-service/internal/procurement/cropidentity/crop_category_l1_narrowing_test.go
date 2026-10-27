@@ -31,7 +31,7 @@ func TestSuggestCategories_NarrowsByL1BeforePickingGroups(t *testing.T) {
 		cropCategoryStageL1:       {"2"},
 		domain.CropSelectionGroup: {"2-0"},
 	}}
-	uc := NewDisambiguationUseCase(&categoryPricebookFake{}, nil, nil)
+	uc := NewDisambiguationUseCase(nil, nil)
 	uc.categoryModel = model
 
 	got := uc.suggestCategories(t.Context(), "某種肉", domain.CropSelectionGroup, "", groups)
@@ -52,7 +52,7 @@ func TestSuggestCategories_SecondL1RescuesAMisclassifiedFirst(t *testing.T) {
 		cropCategoryStageL1:       {"1", "2"}, // 第一個猜錯
 		domain.CropSelectionGroup: {"2-1"},    // 正確答案在第二個 L1 底下
 	}}
-	uc := NewDisambiguationUseCase(&categoryPricebookFake{}, nil, nil)
+	uc := NewDisambiguationUseCase(nil, nil)
 	uc.categoryModel = model
 
 	got := uc.suggestCategories(t.Context(), "某種肉", domain.CropSelectionGroup, "", groups)
@@ -69,7 +69,7 @@ func TestSuggestCategories_CapsL1PicksAtTwo(t *testing.T) {
 		cropCategoryStageL1:       {"1", "2", "3"},
 		domain.CropSelectionGroup: {"1-0"},
 	}}
-	uc := NewDisambiguationUseCase(&categoryPricebookFake{}, nil, nil)
+	uc := NewDisambiguationUseCase(nil, nil)
 	uc.categoryModel = model
 
 	uc.suggestCategories(t.Context(), "隨便", domain.CropSelectionGroup, "", groups)
@@ -85,7 +85,7 @@ func TestSuggestCategories_ChunksOversizedL1WithoutExceedingTheBound(t *testing.
 		cropCategoryStageL1:       {"9"},
 		domain.CropSelectionGroup: {"9-0"},
 	}}
-	uc := NewDisambiguationUseCase(&categoryPricebookFake{}, nil, nil)
+	uc := NewDisambiguationUseCase(nil, nil)
 	uc.categoryModel = model
 	var suppliedSizes []int
 	model.before = func() { suppliedSizes = append(suppliedSizes, len(model.allowed)) }
@@ -108,7 +108,7 @@ func TestSuggestCategories_RejectsIDsOutsideTheSelectedL1(t *testing.T) {
 		cropCategoryStageL1:       {"2"},
 		domain.CropSelectionGroup: {"1-0"}, // 不在選中的 L1 底下
 	}}
-	uc := NewDisambiguationUseCase(&categoryPricebookFake{}, nil, nil)
+	uc := NewDisambiguationUseCase(nil, nil)
 	uc.categoryModel = model
 
 	require.Empty(t, uc.suggestCategories(t.Context(), "某種肉", domain.CropSelectionGroup, "", groups))

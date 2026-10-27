@@ -48,7 +48,6 @@ type ProcurementBuyerRequestedRangeDTO struct {
 type ProcurementRfqPricePreviewRequest struct {
 	ExpectedRevisionID  string                             `json:"expectedRevisionId"`
 	ClientRequestID     string                             `json:"clientRequestId"`
-	PricingMode         string                             `json:"pricingMode"`
 	DeliveryCity        string                             `json:"deliveryCity"`
 	BuyerRequestedRange *ProcurementBuyerRequestedRangeDTO `json:"buyerRequestedRange,omitempty"`
 }
@@ -56,7 +55,7 @@ type ProcurementRfqPricePreviewRequest struct {
 func (r ProcurementRfqPricePreviewRequest) toProto(requestID string) *pb.RfqPricePreviewRequest {
 	req := &pb.RfqPricePreviewRequest{
 		RequestId: requestID, ExpectedRevisionId: r.ExpectedRevisionID,
-		ClientRequestId: r.ClientRequestID, PricingMode: r.PricingMode, DeliveryCity: r.DeliveryCity,
+		ClientRequestId: r.ClientRequestID, DeliveryCity: r.DeliveryCity,
 	}
 	if r.BuyerRequestedRange != nil {
 		req.BuyerRequestedRange = &pb.BuyerRequestedRange{
@@ -97,23 +96,19 @@ func turnResultFromProto(r *pb.TurnResult) procurementwire.TurnResultDTO {
 }
 
 type ProcurementCropDisambiguationOptionDTO struct {
-	Label     string  `json:"label"`
-	CropCode  *string `json:"cropCode,omitempty"`
-	GroupCode *string `json:"groupCode,omitempty"`
+	Label string `json:"label"`
 }
 
 func procurementCropDisambiguationOptionsFromProto(opts []*pb.CropDisambiguationOption) []ProcurementCropDisambiguationOptionDTO {
 	out := make([]ProcurementCropDisambiguationOptionDTO, 0, len(opts))
 	for _, o := range opts {
-		out = append(out, ProcurementCropDisambiguationOptionDTO{Label: o.GetLabel(), CropCode: o.CropCode, GroupCode: o.GroupCode})
+		out = append(out, ProcurementCropDisambiguationOptionDTO{Label: o.GetLabel()})
 	}
 	return out
 }
 
 type ProcurementCropResolutionDTO struct {
-	ResolvedCropCode  *string                                  `json:"resolvedCropCode"`
-	ResolvedGroupCode *string                                  `json:"resolvedGroupCode"`
-	Candidates        []ProcurementCropDisambiguationOptionDTO `json:"candidates"`
+	Candidates []ProcurementCropDisambiguationOptionDTO `json:"candidates"`
 }
 
 type ProcurementAgentRunSummaryDTO struct {
@@ -179,7 +174,6 @@ func snapshotResponseFromProto(r *pb.SnapshotResponse) ProcurementSnapshotRespon
 	}
 	if cr := r.GetCropResolution(); cr != nil {
 		dto.CropResolution = ProcurementCropResolutionDTO{
-			ResolvedCropCode: cr.ResolvedCropCode, ResolvedGroupCode: cr.ResolvedGroupCode,
 			Candidates: procurementCropDisambiguationOptionsFromProto(cr.GetCandidates()),
 		}
 	}
@@ -278,23 +272,6 @@ func candidateSetResponseFromProto(r *pb.CandidateSetResponse, mediaBaseURL stri
 	}
 }
 
-type ProcurementReferencePriceRangeDTO struct {
-	LowerBoundAmount string `json:"lowerBoundAmount"`
-	MidpointAmount   string `json:"midpointAmount"`
-	UpperBoundAmount string `json:"upperBoundAmount"`
-	BasisQuantity    string `json:"basisQuantity"`
-	BasisUnit        string `json:"basisUnit"`
-}
-
-type ProcurementMarketPriceBasisDTO struct {
-	Scope                 string  `json:"scope"`
-	PriceLayer            string  `json:"priceLayer"`
-	RegionName            string  `json:"regionName"`
-	SupportingMarketCount string  `json:"supportingMarketCount"`
-	SourceDataAsOf        *string `json:"sourceDataAsOf"`
-	FreshnessStatus       string  `json:"freshnessStatus"`
-}
-
 type ProcurementQuoteTotalRangeDTO struct {
 	Currency         string `json:"currency"`
 	LowerBoundAmount string `json:"lowerBoundAmount"`
@@ -303,68 +280,25 @@ type ProcurementQuoteTotalRangeDTO struct {
 	QuantityUnit     string `json:"quantityUnit"`
 }
 
-type ProcurementDealTemperatureDTO struct {
-	Status                   string `json:"status"`
-	ReasonCode               string `json:"reasonCode"`
-	ProbabilityLowerBps      string `json:"probabilityLowerBps,omitempty"`
-	ProbabilityUpperBps      string `json:"probabilityUpperBps,omitempty"`
-	Band                     string `json:"band,omitempty"`
-	OutcomeDefinition        string `json:"outcomeDefinition,omitempty"`
-	OutcomeDefinitionVersion string `json:"outcomeDefinitionVersion,omitempty"`
-	PolicyVersion            string `json:"policyVersion,omitempty"`
-	BandVersion              string `json:"bandVersion,omitempty"`
-}
-
 type ProcurementRfqPricePreviewResponseDTO struct {
 	PricePreviewID        string                             `json:"pricePreviewId"`
 	Version               string                             `json:"version"`
-	PricingMode           string                             `json:"pricingMode"`
 	QualityKnowledgeState string                             `json:"qualityKnowledgeState"`
-	ReferenceAvailability string                             `json:"referenceAvailability"`
-	ReferencePriceRange   *ProcurementReferencePriceRangeDTO `json:"referencePriceRange"`
 	BuyerRequestedRange   *ProcurementBuyerRequestedRangeDTO `json:"buyerRequestedRange"`
-	DealTemperature       ProcurementDealTemperatureDTO      `json:"dealTemperature"`
 	PayloadHash           string                             `json:"payloadHash"`
-	MarketPriceBasis      *ProcurementMarketPriceBasisDTO    `json:"marketPriceBasis"`
 	QuoteTotalRange       *ProcurementQuoteTotalRangeDTO     `json:"quoteTotalRange"`
 }
 
 func rfqPricePreviewResponseFromProto(r *pb.RfqPricePreviewResponse) ProcurementRfqPricePreviewResponseDTO {
 	dto := ProcurementRfqPricePreviewResponseDTO{
-		PricePreviewID: r.GetPricePreviewId(), Version: r.GetVersion(), PricingMode: r.GetPricingMode(),
-		QualityKnowledgeState: r.GetQualityKnowledgeState(),
-		ReferenceAvailability: r.GetReferenceAvailability(), PayloadHash: r.GetPayloadHash(),
+		PricePreviewID: r.GetPricePreviewId(), Version: r.GetVersion(),
+		QualityKnowledgeState: r.GetQualityKnowledgeState(), PayloadHash: r.GetPayloadHash(),
 	}
 	if br := r.GetBuyerRequestedRange(); br != nil {
 		dto.BuyerRequestedRange = &ProcurementBuyerRequestedRangeDTO{
 			Currency: br.GetCurrency(), PriceComponent: br.GetPriceComponent(),
 			LowerBoundAmount: br.GetLowerBoundAmount(), UpperBoundAmount: br.GetUpperBoundAmount(),
 			BasisQuantity: br.GetBasisQuantity(), BasisUnit: br.GetBasisUnit(),
-		}
-	}
-	if dt := r.GetDealTemperature(); dt != nil {
-		dto.DealTemperature = ProcurementDealTemperatureDTO{
-			Status: dt.GetStatus(), ReasonCode: dt.GetReasonCode(),
-			ProbabilityLowerBps:      dt.GetProbabilityLowerBps(),
-			ProbabilityUpperBps:      dt.GetProbabilityUpperBps(),
-			Band:                     dt.GetBand(),
-			OutcomeDefinition:        dt.GetOutcomeDefinition(),
-			OutcomeDefinitionVersion: dt.GetOutcomeDefinitionVersion(),
-			PolicyVersion:            dt.GetPolicyVersion(),
-			BandVersion:              dt.GetBandVersion(),
-		}
-	}
-	if rr := r.GetReferencePriceRange(); rr != nil {
-		dto.ReferencePriceRange = &ProcurementReferencePriceRangeDTO{
-			LowerBoundAmount: rr.GetLowerBoundAmount(), MidpointAmount: rr.GetMidpointAmount(), UpperBoundAmount: rr.GetUpperBoundAmount(),
-			BasisQuantity: rr.GetBasisQuantity(), BasisUnit: rr.GetBasisUnit(),
-		}
-	}
-	if b := r.GetMarketPriceBasis(); b != nil {
-		dto.MarketPriceBasis = &ProcurementMarketPriceBasisDTO{
-			Scope: b.GetScope(), PriceLayer: b.GetPriceLayer(),
-			RegionName: b.GetRegionName(), SupportingMarketCount: b.GetSupportingMarketCount(),
-			SourceDataAsOf: b.SourceDataAsOf, FreshnessStatus: b.GetFreshnessStatus(),
 		}
 	}
 	if q := r.GetQuoteTotalRange(); q != nil {
@@ -437,7 +371,6 @@ type ProcurementRfqPublicationPreviewResponseDTO struct {
 	SellerFacingPayloadHash string `json:"sellerFacingPayloadHash"`
 	SellerFacingPayloadJSON string `json:"sellerFacingPayloadJson"`
 	ExpiresAt               string `json:"expiresAt"`
-	DealTemperatureStatus   string `json:"dealTemperatureStatus"`
 	AudiencePolicyID        string `json:"audiencePolicyId"`
 	AudiencePolicyVersion   string `json:"audiencePolicyVersion"`
 	RecipientCount          string `json:"recipientCount"`
@@ -451,7 +384,6 @@ func rfqPublicationPreviewResponseFromProto(r *pb.RfqPublicationPreviewResponse)
 		SellerFacingPayloadHash: r.GetSellerFacingPayloadHash(),
 		SellerFacingPayloadJSON: r.GetSellerFacingPayloadJson(),
 		ExpiresAt:               r.GetExpiresAt(),
-		DealTemperatureStatus:   r.GetDealTemperatureStatus(),
 		AudiencePolicyID:        r.GetAudiencePolicyId(),
 		AudiencePolicyVersion:   r.GetAudiencePolicyVersion(),
 		RecipientCount:          r.GetRecipientCount(),

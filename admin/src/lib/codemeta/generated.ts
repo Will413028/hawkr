@@ -1162,7 +1162,6 @@ export const ProcurementArtifactType = {
 	CLARIFICATION: "CLARIFICATION",
 	CANDIDATE_RESULTS: "CANDIDATE_RESULTS",
 	PRICING_PREVIEW: "PRICING_PREVIEW",
-	DEAL_TEMPERATURE: "DEAL_TEMPERATURE",
 	CONFIRMED_RFQ: "CONFIRMED_RFQ",
 	RFQ_PUBLICATION_APPROVAL: "RFQ_PUBLICATION_APPROVAL",
 	RFQ_PUBLICATION_RESULT: "RFQ_PUBLICATION_RESULT",
@@ -1180,7 +1179,6 @@ export const PROCUREMENT_ARTIFACT_TYPE_LABEL: Record<string, string> = {
 	"CLARIFICATION": "澄清問題",
 	"CANDIDATE_RESULTS": "候選結果",
 	"PRICING_PREVIEW": "定價預覽",
-	"DEAL_TEMPERATURE": "成交溫度計",
 	"CONFIRMED_RFQ": "已確認詢價單",
 	"RFQ_PUBLICATION_APPROVAL": "發布核准",
 	"RFQ_PUBLICATION_RESULT": "發布結果",
@@ -1189,51 +1187,6 @@ export const PROCUREMENT_ARTIFACT_TYPE_LABEL: Record<string, string> = {
 	"PURCHASE_PLAN": "採買計畫",
 	"CART_APPROVAL": "購物車核准",
 	"CART_RESULT": "購物車結果",
-};
-
-/** 成交溫度計估計的可用性（見 `docs/詳細設計書/64` §2-5）。`AVAILABLE` 必須帶齊機率上下界、band 與四個版本欄位；`UNKNOWN` 不得帶任何機率或 band，只帶 `ProcurementDealTemperatureReason`。 */
-export const ProcurementDealTemperatureStatus = {
-	AVAILABLE: "AVAILABLE",
-	UNKNOWN: "UNKNOWN",
-} as const;
-export type ProcurementDealTemperatureStatusCode = keyof typeof ProcurementDealTemperatureStatus;
-export type ProcurementDealTemperatureStatusValue = (typeof ProcurementDealTemperatureStatus)[ProcurementDealTemperatureStatusCode];
-
-export const PROCUREMENT_DEAL_TEMPERATURE_STATUS_LABEL: Record<string, string> = {
-	"AVAILABLE": "可用",
-	"UNKNOWN": "未知",
-};
-
-/** 成交溫度計為何是 `UNKNOWN` 的原因碼。`MAPPING_MISSING` 與 `ProcurementErrorReason` 的同名值**刻意共用同一個字面值**（同一種「沒有可靠 mapping 可參考」語意，見該 enum 的既有說明），不另創同義詞。v6.0 V.7.3 的 `NO_RELIABLE_PRICEBOOK_MAPPING` 與 issue #2537 allowlist 的 `MAPPING_UNRELIABLE` 是同一概念的另外兩個名字，**不採用**——`MAPPING_MISSING` 已在 prod 的 wire 上。 */
-export const ProcurementDealTemperatureReason = {
-	MAPPING_MISSING: "MAPPING_MISSING",
-	BUYER_RANGE_NOT_SET: "BUYER_RANGE_NOT_SET",
-	RANGE_OUTSIDE_REFERENCE: "RANGE_OUTSIDE_REFERENCE",
-	QUANTILES_NOT_MONOTONIC: "QUANTILES_NOT_MONOTONIC",
-} as const;
-export type ProcurementDealTemperatureReasonCode = keyof typeof ProcurementDealTemperatureReason;
-export type ProcurementDealTemperatureReasonValue = (typeof ProcurementDealTemperatureReason)[ProcurementDealTemperatureReasonCode];
-
-export const PROCUREMENT_DEAL_TEMPERATURE_REASON_LABEL: Record<string, string> = {
-	"MAPPING_MISSING": "缺乏可靠映射",
-	"BUYER_RANGE_NOT_SET": "買家尚未設定區間",
-	"RANGE_OUTSIDE_REFERENCE": "區間落在參考之外",
-	"QUANTILES_NOT_MONOTONIC": "分位數非嚴格遞增",
-};
-
-/** 成交溫度計的色帶，由 server 依 `probabilityUpperBps`（買家上限落在行情分布的第幾百分位）決定，**client 不得自行由 bps 推導**（v6.0 §V.13 第 18 條）。`BANDS_V1` 曾依 `probabilityLowerBps`（嚴格界），但那個量對買家是**反指標**——出價遠高於行情時它反而下降——已於 `BANDS_V2` 改正。門檻屬 `bandVersion` 管轄，改門檻不動計算層。 */
-export const ProcurementDealTemperatureBand = {
-	COLD: "COLD",
-	WARM: "WARM",
-	HOT: "HOT",
-} as const;
-export type ProcurementDealTemperatureBandCode = keyof typeof ProcurementDealTemperatureBand;
-export type ProcurementDealTemperatureBandValue = (typeof ProcurementDealTemperatureBand)[ProcurementDealTemperatureBandCode];
-
-export const PROCUREMENT_DEAL_TEMPERATURE_BAND_LABEL: Record<string, string> = {
-	"COLD": "冷",
-	"WARM": "溫",
-	"HOT": "熱",
 };
 
 /** publication 的受眾種類（issue #2450 Scope 2）。兩支 pipeline **不共用完成定義**（doc 64 §4.2）：Wish Pool 的完成是「已建索引」，Direct 的完成是「已投遞給指定對象」。 */

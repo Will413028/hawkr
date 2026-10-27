@@ -2,11 +2,6 @@
   "resolverNil": false,
   "resolveResult": {
     "NeedsDisambiguation": true,
-    "CropCode": null,
-    "GroupCode": null,
-    "CommodityCode": null,
-    "FallbackGroupCode": null,
-    "Label": "",
     "Candidates": [
       {
         "label": "有機小白菜"
@@ -20,7 +15,6 @@
   },
   "result": {
     "item": "小白菜",
-    "resolution": null,
     "pending": true,
     "candidates": [
       {

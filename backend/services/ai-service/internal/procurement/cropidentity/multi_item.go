@@ -41,7 +41,7 @@ func (uc *DisambiguationUseCase) resolveMultiItem(ctx context.Context, itemText 
 		if len(q.Variants) == 0 {
 			continue
 		}
-		usable, err := uc.recallUsable(ctx, q)
+		usable, err := uc.recallPool(ctx, q)
 		if err != nil {
 			observability.RecordProcurementCropResolverV2(ctx, "error")
 			return DisambiguationResult{}, err
@@ -58,5 +58,5 @@ func (uc *DisambiguationUseCase) resolveMultiItem(ctx context.Context, itemText 
 		observability.RecordProcurementCropResolverV2(ctx, "escape")
 		return categoryPrice(nil), nil
 	}
-	return uc.ask(ctx, itemText, pool)
+	return uc.categoryCard(ctx, itemText, pool)
 }

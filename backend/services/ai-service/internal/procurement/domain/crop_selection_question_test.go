@@ -26,16 +26,13 @@ func TestCropSelectionQuestion_StagesAndOpaqueCategoryIDs(t *testing.T) {
 	require.NotContains(t, q.Prompt, "找不到吻合的品項分類")
 }
 
-func TestSelfPricedClassification_IsRetainedWithoutPricebookCode(t *testing.T) {
+func TestSelfPricedClassification_IsRetained(t *testing.T) {
 	r := newSelfPricedForTest(220)
 	r.CategoryID = "24"
 	r.Label = "豬肉／五花肉"
 	require.Empty(t, validateItemResolution(*r))
 	require.Contains(t, r.DisplayValue(), "豬肉／五花肉")
 	require.Contains(t, r.DisplayValue(), "220")
-	crop, group := r.PricebookQueryCodes()
-	require.Nil(t, crop)
-	require.Nil(t, group)
 	other := *r
 	other.CategoryID = "25"
 	require.False(t, r.Equal(&other))

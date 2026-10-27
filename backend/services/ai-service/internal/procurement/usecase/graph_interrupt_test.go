@@ -55,8 +55,8 @@ func TestCropDisambiguationInterruptNode_Pending_EmitsRequestInput(t *testing.T)
 	ctx := newTestAgentContext(t, nil)
 
 	candidates := []domain.CropDisambiguationOption{
-		{Label: "紅蘿蔔", CropCode: item("CROP_CARROT")},
-		{Label: "白蘿蔔", CropCode: item("CROP_DAIKON")},
+		{Label: "紅蘿蔔", CategoryID: "21", CategoryLevel: 3},
+		{Label: "白蘿蔔", CategoryID: "22", CategoryLevel: 3},
 	}
 
 	var sawRequestInput bool

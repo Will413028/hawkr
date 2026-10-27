@@ -79,7 +79,6 @@ func (uc *RewindUseCase) composeRewindViaGraph(ctx context.Context, in RewindInp
 	}
 
 	cropGate := cropidentity.ComputeGate(ctx, uc.cropResolver, currentSlots, targetSlots)
-	cropGate.ApplyTo(&targetSlots, nil)
 	rejected := []domain.RejectedField{}
 
 	missing := targetSlots.MissingRequired()

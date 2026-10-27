@@ -10,7 +10,6 @@ import (
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/domain"
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/repository"
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/testkit"
-	pbusecase "github.com/Will413028/hawkr/ai-service/internal/usecase"
 	"github.com/Will413028/hawkr/go-pkg/codemeta"
 	"github.com/Will413028/hawkr/go-pkg/identity"
 	"github.com/stretchr/testify/require"
@@ -374,9 +373,7 @@ func TestRewindUseCase_OtherBuyersRequest_ReturnsErrNotFound(t *testing.T) {
 
 func TestRewindUseCase_ItemChanged_TriggersCropResolution(t *testing.T) {
 	repo := newFakeRepo()
-	client := &testkit.FakePricebookClient{PriceableMatches: []pbusecase.PriceableEntityMatch{
-		{Kind: "CROP_GROUP", Code: "N04-001", Name: "甘藍", MatchedForm: "甘藍", FormKind: "CANONICAL", Tier: 0, Rank: 1, GroupCode: "N04-001", HasForecast: true},
-	}}
+	tree := testkit.VegetableTree()
 	req, _, err := repo.CreateRequest(context.Background(), identity.BuyerID(1234))
 	require.NoError(t, err)
 	cabbage := "高麗菜"
@@ -385,14 +382,14 @@ func TestRewindUseCase_ItemChanged_TriggersCropResolution(t *testing.T) {
 		Source: "LLM_EXTRACT", ClientRequestID: "seed-1", PayloadJSON: []byte(`{}`), RequestStatus: "CLARIFYING",
 	})
 	require.NoError(t, err)
-	carrot := "紅蘿蔔"
+	carrot := "地瓜"
 	_, err = repo.AppendRevision(context.Background(), repository.AppendInput{
 		RequestID: req.ID, BuyerID: 1234, Slots: domain.Slots{Item: &carrot},
 		Source: "ANSWER", ClientRequestID: "seed-2", PayloadJSON: []byte(`{}`), RequestStatus: "CLARIFYING",
 	})
 	require.NoError(t, err)
 
-	uc := NewRewindUseCase(repo, cropidentity.NewDisambiguationUseCase(client, nil, nil), nil, nil, nil, nil)
+	uc := NewRewindUseCase(repo, cropidentity.NewDisambiguationUseCase(tree, nil), nil, nil, nil, nil)
 	got, err := uc.composeRewindViaGraph(context.Background(), RewindInput{
 		BuyerID: 1234, RequestID: req.ID, SlotKey: domain.SlotItem, ClientRequestID: "cr-rewind-crop-1",
 	})
@@ -400,46 +397,40 @@ func TestRewindUseCase_ItemChanged_TriggersCropResolution(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, got.Slots.Item)
 	require.Equal(t, "高麗菜", *got.Slots.Item, "item 應該被回退成 rewind 前一次寫入的值")
-	require.Equal(t, 1, client.PriceableCalls, "rewind 把 item 改回不同值，也要重新解析一次")
-	require.Equal(t, []string{"高麗菜", "甘藍"}, client.GotVariants, "查詢變體要用 rewind 之後的 item 值，不是 rewind 前的")
-	require.Equal(t, &domain.ItemResolution{
-		Kind: domain.ItemResolvedGroup, Code: ptr("N04-001"), Label: "甘藍",
-		FallbackGroupCode: ptr("N04-001"), Provenance: domain.ItemResolutionBySystem,
-	}, got.Slots.ItemResolution)
+	require.NotZero(t, tree.Calls, "rewind 把 item 改回不同值，也要重新解析")
+	require.Nil(t, got.Slots.ItemResolution)
+	require.NotNil(t, got.Question)
+	require.Equal(t, domain.SlotCropDisambiguation, got.Question.SlotKey, "分類確認後待買家填單價")
 }
 
 func TestRewindUseCase_ItemUnchanged_DoesNotReResolve(t *testing.T) {
 	repo := newFakeRepo()
-	client := &testkit.FakePricebookClient{PriceableMatches: []pbusecase.PriceableEntityMatch{
-		{Kind: "CROP_GROUP", Code: "N04-001", Name: "甘藍", MatchedForm: "甘藍", FormKind: "CANONICAL", Tier: 0, Rank: 1, GroupCode: "N04-001", HasForecast: true},
-	}}
+	tree := testkit.VegetableTree()
 	req, _, err := repo.CreateRequest(context.Background(), identity.BuyerID(1234))
 	require.NoError(t, err)
 	item := "高麗菜"
 	_, err = repo.AppendRevision(context.Background(), repository.AppendInput{
 		RequestID: req.ID, BuyerID: 1234, Slots: domain.Slots{Item: &item,
-			ItemResolution: domain.NewSystemItemResolution(
-				nil, ptr("N04-001"), nil, nil, "甘藍", domain.CategoryFromEntity("category-cabbage"))},
+			ItemResolution: domain.NewSelfPricedItemResolution(95, "高麗菜", domain.CategoryAbsent("測試"))},
 		Source: "LLM_EXTRACT", ClientRequestID: "seed-1", PayloadJSON: []byte(`{}`), RequestStatus: "CLARIFYING",
 	})
 	require.NoError(t, err)
 	city := "桃園市"
 	_, err = repo.AppendRevision(context.Background(), repository.AppendInput{
 		RequestID: req.ID, BuyerID: 1234, Slots: domain.Slots{Item: &item, DeliveryCity: &city,
-			ItemResolution: domain.NewSystemItemResolution(
-				nil, ptr("N04-001"), nil, nil, "甘藍", domain.CategoryFromEntity("category-cabbage"))},
+			ItemResolution: domain.NewSelfPricedItemResolution(95, "高麗菜", domain.CategoryAbsent("測試"))},
 		Source: "ANSWER", ClientRequestID: "seed-2", PayloadJSON: []byte(`{}`), RequestStatus: "REQUIREMENT_READY",
 	})
 	require.NoError(t, err)
 
-	uc := NewRewindUseCase(repo, cropidentity.NewDisambiguationUseCase(client, nil, nil), nil, nil, nil, nil)
+	uc := NewRewindUseCase(repo, cropidentity.NewDisambiguationUseCase(tree, nil), nil, nil, nil, nil)
 	_, err = uc.composeRewindViaGraph(context.Background(), RewindInput{
 		BuyerID: 1234, RequestID: req.ID, SlotKey: domain.SlotDeliveryCity, ClientRequestID: "cr-rewind-crop-2",
 	})
 
 	require.NoError(t, err)
 	// ⛔ 前提是**已經解析過**：沒有 resolution 代表上一次失敗過，那要重試。
-	require.Zero(t, client.PriceableCalls, "item 沒變且已解析，就不該重新解析")
+	require.Zero(t, tree.Calls, "item 沒變且已解析，就不該重新解析")
 }
 
 func seedRewindableItemChain(t *testing.T, repo *fakeRepo, seedPrefix string) int64 {
@@ -467,7 +458,7 @@ func TestHandle_RewindToAmbiguousItem_OverridesQuestionWithDisambiguation(t *tes
 	resolver := &testkit.FakeResolver[cropidentity.DisambiguationResult]{ResolveResult: cropidentity.DisambiguationResult{
 		NeedsDisambiguation: true,
 		Candidates: []domain.CropDisambiguationOption{
-			{Label: "高麗菜（結球甘藍）", GroupCode: ptr("N04-001")},
+			{Label: "高麗菜", CategoryID: "17", CategoryLevel: 3},
 		},
 	}}
 
@@ -504,23 +495,6 @@ func TestHandle_RewindToUnavailableItem_AsksDisambiguationAndPersistsPendingReas
 	require.Equal(t, "高麗菜", *got.Slots.Item,
 		"rewind 的持久化是 RewindTo(targetRevisionID)，回應裡的 slots 必須跟它一致——"+
 			"crop_gate 不覆寫這個值，待處理狀態只反映在 Question／DialoguePlan")
-}
-
-func TestRewindUseCase_NoCropGateBlock_KeepsRejectedEmpty(t *testing.T) {
-	repo := newFakeRepo()
-	reqID := seedRewindableItemChain(t, repo, "seed-rewind-matched")
-	resolver := &testkit.FakeResolver[cropidentity.DisambiguationResult]{ResolveResult: cropidentity.DisambiguationResult{GroupCode: ptr("N04-001")}}
-
-	uc := NewRewindUseCase(repo, resolver, nil, nil, nil, nil)
-	got, err := uc.composeRewindViaGraph(context.Background(), RewindInput{
-		BuyerID: 1234, RequestID: reqID, SlotKey: domain.SlotItem, ClientRequestID: "cr-rewind-matched-1",
-	})
-
-	require.NoError(t, err)
-	require.Empty(t, got.Rejected)
-	require.Equal(t, "高麗菜", *got.Slots.Item)
-	require.NotNil(t, got.Question)
-	require.Equal(t, domain.SlotItem, got.Question.SlotKey, "沒有待消歧時仍是被 rewind 的那一格的問題卡")
 }
 
 func seedRewindableReadyRequest(t *testing.T, repo *fakeRepo) int64 {
@@ -781,7 +755,7 @@ func TestExecuteRewindPipeline_CropDisambiguationPending_TransitionsToWaitingFor
 	resolver := &testkit.FakeResolver[cropidentity.DisambiguationResult]{ResolveResult: cropidentity.DisambiguationResult{
 		NeedsDisambiguation: true,
 		Candidates: []domain.CropDisambiguationOption{
-			{Label: "高麗菜（結球甘藍）", GroupCode: ptr("N04-001")},
+			{Label: "高麗菜", CategoryID: "17", CategoryLevel: 3},
 		},
 	}}
 	uc := NewRewindUseCase(repo, resolver, nil, nil, nil, nil)

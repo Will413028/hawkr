@@ -15,13 +15,6 @@ import (
 // 對「什麼算合法」必須逐字一致——各自留一份字面值就是讓它們有機會分家。
 const ResponseDeadlineLayout = "2006-01-02"
 
-type SellerFacingReferenceRange struct {
-	LowerBoundAmount string `json:"lowerBoundAmount"`
-	UpperBoundAmount string `json:"upperBoundAmount"`
-	BasisQuantity    string `json:"basisQuantity"`
-	BasisUnit        string `json:"basisUnit"`
-}
-
 type SellerFacingRequestedRange struct {
 	Currency         string `json:"currency"`
 	PriceComponent   string `json:"priceComponent"`
@@ -38,7 +31,6 @@ type SellerFacingPayload struct {
 	// seller-facing 排除清單不含本欄）。
 	QualityKnowledgeState string  `json:"qualityKnowledgeState"`
 	Item                  string  `json:"item"`
-	ItemCode              *string `json:"itemCode,omitempty"`
 	ItemLabel             string  `json:"itemLabel,omitempty"`
 	Quantity              *int    `json:"quantity,omitempty"`
 	Unit                  *string `json:"unit,omitempty"`
@@ -53,21 +45,19 @@ type SellerFacingPayload struct {
 	// 解析、不比對、不由它推導等級。omitempty 是刻意的：沒填時這個鍵完全不出現，
 	// 序列化結果與本欄加入前逐位元相同 ⇒ 既有 payload_hash 全部不受影響。
 	BuyerNote           *string                     `json:"buyerNote,omitempty"`
-	ReferencePriceRange *SellerFacingReferenceRange `json:"referencePriceRange,omitempty"`
 	BuyerRequestedRange *SellerFacingRequestedRange `json:"buyerRequestedRange,omitempty"`
 }
 
 // canonicalRfqPayload 是 confirmed snapshot 的 canonical_payload_json 反序列化目標。
 // 欄位對齊 usecase.confirmedRfqPayload；這裡只挑賣家要看的那些——刻意不是完整鏡像，
-// 漏掉的欄位就是**不該**流進賣家視野的欄位（pricingMode 是買家端的分支旗標，
-// budgetPerUnit 一開始就不在 canonical payload 裡）。
+// 漏掉的欄位就是**不該**流進賣家視野的欄位（budgetPerUnit 一開始就不在 canonical
+// payload 裡）。
 type canonicalRfqPayload struct {
 	QualityKnowledgeState string  `json:"qualityKnowledgeState"`
 	Item                  *string `json:"item"`
 	ItemResolution        *struct {
-		Kind  string  `json:"kind"`
-		Code  *string `json:"code"`
-		Label string  `json:"label"`
+		Kind  string `json:"kind"`
+		Label string `json:"label"`
 	} `json:"itemResolution"`
 	Quantity            *int    `json:"quantity"`
 	Unit                *string `json:"unit"`
@@ -75,12 +65,6 @@ type canonicalRfqPayload struct {
 	DeliveryCity        *string `json:"deliveryCity"`
 	DeliveryDate        *string `json:"deliveryDate"`
 	BuyerNote           *string `json:"buyerNote"`
-	ReferencePriceRange *struct {
-		Lower         *float64 `json:"lower"`
-		Upper         *float64 `json:"upper"`
-		BasisQuantity string   `json:"basisQuantity"`
-		BasisUnit     string   `json:"basisUnit"`
-	} `json:"referencePriceRange"`
 	BuyerRequestedRange *struct {
 		Currency         string `json:"currency"`
 		PriceComponent   string `json:"priceComponent"`
@@ -110,16 +94,7 @@ func CompileSellerFacingPayload(canonicalPayloadJSON []byte, responseDeadline *s
 		out.Item = *src.Item
 	}
 	if src.ItemResolution != nil {
-		out.ItemCode = src.ItemResolution.Code
 		out.ItemLabel = src.ItemResolution.Label
-	}
-	if r := src.ReferencePriceRange; r != nil && (r.Lower != nil || r.Upper != nil) {
-		out.ReferencePriceRange = &SellerFacingReferenceRange{
-			LowerBoundAmount: optionalAmount(r.Lower),
-			UpperBoundAmount: optionalAmount(r.Upper),
-			BasisQuantity:    r.BasisQuantity,
-			BasisUnit:        r.BasisUnit,
-		}
 	}
 	if r := src.BuyerRequestedRange; r != nil && (r.LowerBoundAmount != "" || r.UpperBoundAmount != "") {
 		out.BuyerRequestedRange = &SellerFacingRequestedRange{

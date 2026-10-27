@@ -13,7 +13,6 @@ type Query struct {
 	Text           string
 	ExpectCategory string
 	ExpectLabel    string
-	ExpectKind     string
 	Note           string
 	Status         string
 	TrackedBy      string
@@ -29,17 +28,13 @@ func (q Query) ExpectDescription() string {
 		parts = append(parts, q.ExpectCategory)
 	}
 	if q.ExpectLabel != "" {
-		label := q.ExpectLabel
-		if q.ExpectKind != "" {
-			label += "（" + q.ExpectKind + "）"
-		}
-		parts = append(parts, label)
+		parts = append(parts, q.ExpectLabel)
 	}
 	return strings.Join(parts, " ／ ")
 }
 
 func (q Query) ExpectsNIL() bool {
-	return q.ExpectCategory == "" && q.ExpectLabel == "" && q.ExpectKind == ""
+	return q.ExpectCategory == "" && q.ExpectLabel == ""
 }
 
 type rawQuery struct {
@@ -68,9 +63,6 @@ func Load(raw []byte) ([]Query, error) {
 			}
 			if v, ok := m["label"].(string); ok {
 				q.ExpectLabel = v
-			}
-			if v, ok := m["kind"].(string); ok {
-				q.ExpectKind = v
 			}
 		}
 		if q.Status == StatusKnownGap && q.TrackedBy == "" {

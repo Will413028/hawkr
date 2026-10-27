@@ -64,8 +64,7 @@ type ConfirmedRfqSnapshotResult struct {
 }
 
 // confirmedRfqPayload 是白名單挑選的 seller-facing projection：只放已核准
-// 對外的欄位，明確不放 P10/P90/AggregationMethod/SupportingMarketCount（raw
-// quantiles/model lineage）與 lane markup、BudgetPerUnit（buyer-private）——
+// 對外的欄位，明確不放 lane markup、BudgetPerUnit（buyer-private）——
 // design spec D2 修正（V.7.4）明文排除這些欄位，見
 // docs/superpowers/specs/2026-08-22-procurement-rfq-price-preview-design.md。
 // PricePreviewResult 本身就不帶 Slots.BudgetPerUnit／MarkupRateByLane，白名單
@@ -75,10 +74,8 @@ type confirmedRfqPayload struct {
 	// BuyerNote 是這次擴大 preimage 唯一的例外，而它**不是**破壞性變更：
 	// omitempty ＋ 沒填時為 nil ⇒ 序列化結果與本欄加入前逐位元相同，既有的
 	// payload_hash 一個都不會改。這正是 §3.1 那次（一律出現的欄位）做不到的事。
-	BuyerNote           *string                      `json:"buyerNote,omitempty"`
-	PricingMode         string                       `json:"pricingMode"`
-	ReferencePriceRange *pricing.ReferencePriceRange `json:"referencePriceRange,omitempty"`
-	BuyerRequestedRange pricing.BuyerRequestedRange  `json:"buyerRequestedRange"`
+	BuyerNote           *string                     `json:"buyerNote,omitempty"`
+	BuyerRequestedRange pricing.BuyerRequestedRange `json:"buyerRequestedRange"`
 	// 以下六組是詢價單本身的識別性內容。它們原本不在 preimage 內，後果是兩張
 	// 品項、數量、配送城市全都不同的詢價單，只要 pricing mode 與價格區間相同，
 	// payload_hash 就一模一樣——買家接受時拿它當 CAS 依據，證明不了賣家報價當時
@@ -91,9 +88,8 @@ type confirmedRfqPayload struct {
 	// ⛔ 白名單紀律不變，擴大範圍不等於把整包 slots 倒進來。刻意不收：
 	//   - BudgetPerUnit：買家私有預算，既有紅線（design spec D2 §V.7.4）。
 	//   - ItemResolution.PricePerKg：買家自填的品項單價，跟 BudgetPerUnit 同一條線。
-	//   - ItemResolution.FallbackGroupCode／Provenance：前者是 Pricebook 查詢
-	//     退一級用的第二個查詢鍵，後者是「誰決定的」稽核欄位，兩者都不是賣家
-	//     報價要看的識別內容。
+	//   - ItemResolution.Provenance：「誰決定的」稽核欄位，不是賣家報價要看的
+	//     識別內容。
 	//   - ExactMatchRequired：買家給候選比對用的匹配偏好，不是賣家報價時要看的
 	//     需求內容。
 	//
@@ -120,9 +116,8 @@ type confirmedRfqPayload struct {
 // PricePerKg（買家自填單價）與 Provenance（稽核），序列化進來就是把買家私有
 // 資料寫進賣家看得到的 payload。
 type confirmedRfqItemIdentity struct {
-	Kind  string  `json:"kind"`
-	Code  *string `json:"code,omitempty"`
-	Label string  `json:"label,omitempty"`
+	Kind  string `json:"kind"`
+	Label string `json:"label,omitempty"`
 }
 
 // sellerFacingItemIdentity 把 slots 的解析結果收斂成上面那個白名單投影。
@@ -133,7 +128,7 @@ func sellerFacingItemIdentity(resolution *domain.ItemResolution) *confirmedRfqIt
 		return nil
 	}
 	return &confirmedRfqItemIdentity{
-		Kind: string(resolution.Kind), Code: resolution.Code, Label: resolution.Label,
+		Kind: string(resolution.Kind), Label: resolution.Label,
 	}
 }
 
@@ -328,8 +323,6 @@ func (uc *ConfirmRfqSnapshotUseCase) ConfirmRfqSnapshot(ctx context.Context, in 
 
 	payload := confirmedRfqPayload{
 		QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
-		PricingMode:           preview.PricingMode,
-		ReferencePriceRange:   preview.ReferencePriceRange,
 		BuyerRequestedRange:   preview.BuyerRequestedRange,
 		Item:                  slots.Item,
 		ItemResolution:        sellerFacingItemIdentity(slots.ItemResolution),
@@ -350,8 +343,8 @@ func (uc *ConfirmRfqSnapshotUseCase) ConfirmRfqSnapshot(ctx context.Context, in 
 	inserted, err := uc.repo.InsertConfirmedRfqSnapshot(ctx, repository.InsertConfirmedRfqSnapshotInput{
 		BuyerID: in.BuyerID, RequestID: in.RequestID, RequestRevisionID: activeRevisionID,
 		PricePreviewID: in.PricePreviewID, PricePreviewVersion: in.PricePreviewVersion,
-		QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN", PricingMode: preview.PricingMode,
-		CanonicalPayloadJSON: payloadBytes, PayloadHash: payloadHash,
+		QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
+		CanonicalPayloadJSON:  payloadBytes, PayloadHash: payloadHash,
 		ClientRequestID: in.ClientRequestID, ExpiresAt: time.Now().Add(confirmedRfqSnapshotTTL),
 	})
 	if err != nil {

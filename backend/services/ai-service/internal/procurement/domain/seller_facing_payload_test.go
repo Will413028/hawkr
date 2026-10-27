@@ -18,10 +18,9 @@ import (
 func TestCompileSellerFacingPayload_ReadsOnlyCanonicalPayload(t *testing.T) {
 	canonical := []byte(`{
 		"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN",
-		"pricingMode":"MARKET",
 		"buyerRequestedRange":{"min":"80","max":"120"},
 		"item":"高麗菜",
-		"itemResolution":{"kind":"CROP","code":"CABBAGE","label":"高麗菜"},
+		"itemResolution":{"kind":"SELF_PRICED","label":"高麗菜"},
 		"quantity":100,
 		"unit":"公斤",
 		"packaging":"紙箱",
@@ -33,7 +32,6 @@ func TestCompileSellerFacingPayload_ReadsOnlyCanonicalPayload(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "高麗菜", got.Item)
 	require.Equal(t, "2026-09-15", *got.ResponseDeadline)
-	require.Equal(t, "CABBAGE", *got.ItemCode)
 	require.Equal(t, "高麗菜", got.ItemLabel)
 	require.Equal(t, 100, *got.Quantity)
 	require.Equal(t, "公斤", *got.Unit)
@@ -44,7 +42,7 @@ func TestCompileSellerFacingPayload_ReadsOnlyCanonicalPayload(t *testing.T) {
 
 func TestCompileSellerFacingPayload_ExcludesBuyerBudget(t *testing.T) {
 	canonical := []byte(`{
-		"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","pricingMode":"MARKET",
+		"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN",
 		"item":"高麗菜",
 		"budgetPerUnit":"95",
 		"buyerRequestedRange":{
@@ -68,13 +66,10 @@ func TestCompileSellerFacingPayload_ExcludesBuyerBudget(t *testing.T) {
 // 不是 passthrough。這條擋住「把整包 canonical 直接 marshal 出去」這個改法。
 func TestCompileSellerFacingPayload_IsWhitelistNotPassthrough(t *testing.T) {
 	canonical := []byte(`{
-		"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","pricingMode":"MARKET",
+		"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN",
 		"item":"高麗菜",
 		"budgetPerUnit":"95",
-		"referencePriceRange":{
-			"lower":90,"midpoint":100,"upper":110,
-			"basisQuantity":"1","basisUnit":"KG"
-		},
+		"marketQuote":{"midpoint":100},
 		"someFutureBuyerPrivateField":"leak-me"
 	}`)
 
@@ -85,16 +80,14 @@ func TestCompileSellerFacingPayload_IsWhitelistNotPassthrough(t *testing.T) {
 	require.NoError(t, err)
 	require.NotContains(t, string(b), "budgetPerUnit")
 	require.NotContains(t, string(b), "leak-me")
-	require.NotContains(t, string(b), "pricingMode", "買家端的分支旗標不是賣家要看的內容")
-	require.Contains(t, string(b), "referencePriceRange")
+	require.NotContains(t, string(b), "marketQuote")
 	require.NotContains(t, string(b), "midpoint")
-	require.NotContains(t, string(b), "100")
 }
 
 // 內容不同就要 hash 不同——這是 #2538 買家接受時 CAS 的基礎。
 func TestSellerFacingPayloadHash_DiscriminatesContent(t *testing.T) {
-	base := []byte(`{"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","pricingMode":"MARKET","buyerRequestedRange":{"min":"80","max":"120"},"item":"高麗菜","quantity":100}`)
-	other := []byte(`{"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","pricingMode":"MARKET","buyerRequestedRange":{"min":"80","max":"120"},"item":"高麗菜","quantity":200}`)
+	base := []byte(`{"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","buyerRequestedRange":{"min":"80","max":"120"},"item":"高麗菜","quantity":100}`)
+	other := []byte(`{"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","buyerRequestedRange":{"min":"80","max":"120"},"item":"高麗菜","quantity":200}`)
 
 	p1, err := CompileSellerFacingPayload(base, nil)
 	require.NoError(t, err)
@@ -112,7 +105,7 @@ func TestSellerFacingPayloadHash_DiscriminatesContent(t *testing.T) {
 // 所以必須被 seller_facing_payload_hash 涵蓋——execute 時才 CAS 得到「賣家看到的
 // 截止日」有沒有被換掉。
 func TestSellerFacingPayloadHash_CoversResponseDeadline(t *testing.T) {
-	canonical := []byte(`{"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","pricingMode":"MARKET","item":"高麗菜"}`)
+	canonical := []byte(`{"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","item":"高麗菜"}`)
 
 	p1, err := CompileSellerFacingPayload(canonical, ptr("2026-09-15"))
 	require.NoError(t, err)
@@ -144,7 +137,6 @@ func TestCompileSellerFacingPayload_RejectsMalformedJSON(t *testing.T) {
 func TestCompileSellerFacingPayload_CarriesQualityKnowledgeState(t *testing.T) {
 	canonical := []byte(`{
 		"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN",
-		"pricingMode":"MARKET",
 		"buyerRequestedRange":{"min":"80","max":"120"},
 		"item":"高麗菜"
 	}`)
@@ -230,10 +222,6 @@ func TestSellerFacingPayloadHash_CoversBuyerNote(t *testing.T) {
 const canonicalWithRanges = `{
   "qualityKnowledgeState": "BUYER_QUALITY_UNKNOWN",
   "item": "甘藍-初秋",
-  "referencePriceRange": {
-    "lower": 32000, "midpoint": 36000, "upper": 40000,
-    "basisQuantity": "1", "basisUnit": "BOX"
-  },
   "buyerRequestedRange": {
     "currency": "TWD", "priceComponent": "GOODS_ONLY",
     "basisQuantity": "1", "basisUnit": "BOX",
@@ -245,12 +233,6 @@ func TestCompileSellerFacingPayload_CarriesPriceRanges(t *testing.T) {
 	payload, err := CompileSellerFacingPayload([]byte(canonicalWithRanges), nil)
 	require.NoError(t, err)
 
-	require.NotNil(t, payload.ReferencePriceRange, "Pricebook 參考區間必須帶到賣家視角")
-	require.Equal(t, SellerFacingReferenceRange{
-		LowerBoundAmount: "32000", UpperBoundAmount: "40000",
-		BasisQuantity: "1", BasisUnit: "BOX",
-	}, *payload.ReferencePriceRange)
-
 	require.NotNil(t, payload.BuyerRequestedRange, "買家希望詢價區間必須帶到賣家視角")
 	require.Equal(t, SellerFacingRequestedRange{
 		Currency: "TWD", PriceComponent: "GOODS_ONLY",
@@ -259,28 +241,14 @@ func TestCompileSellerFacingPayload_CarriesPriceRanges(t *testing.T) {
 	}, *payload.BuyerRequestedRange)
 }
 
-func TestCompileSellerFacingPayload_DropsReferenceMidpoint(t *testing.T) {
-	payload, err := CompileSellerFacingPayload([]byte(canonicalWithRanges), nil)
-	require.NoError(t, err)
-
-	raw, err := json.Marshal(payload)
-	require.NoError(t, err)
-	require.NotContains(t, string(raw), "midpoint",
-		"midpoint 是 Pricebook 的分位數本身，不得進入賣家視角")
-	require.NotContains(t, string(raw), "36000",
-		"midpoint 的值也不得以任何鍵名外流")
-}
-
 func TestCompileSellerFacingPayload_OmitsPriceRangeKeysWhenAbsent(t *testing.T) {
 	payload, err := CompileSellerFacingPayload(
 		[]byte(`{"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","item":"珍珠芭樂"}`), nil)
 	require.NoError(t, err)
-	require.Nil(t, payload.ReferencePriceRange)
 	require.Nil(t, payload.BuyerRequestedRange)
 
 	raw, err := json.Marshal(payload)
 	require.NoError(t, err)
-	require.NotContains(t, string(raw), "referencePriceRange")
 	require.NotContains(t, string(raw), "buyerRequestedRange")
 }
 

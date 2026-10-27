@@ -157,10 +157,10 @@ func TestStepsFromProto_PropagatesSafeArgs(t *testing.T) {
 //  3. display_value 一定要在：前端拿 kind＋label 自己拼會跟 recordedThisTurn 的
 //     chip 漂成兩套文案，而它們在畫面上相鄰。
 func TestSlotsFromProto_ItemResolution_ShapeAndTypes(t *testing.T) {
-	code, price := "LA1", "95"
+	price := "95"
 	dto := SlotsFromProto(&pb.Slots{
 		ItemResolution: &pb.ItemResolution{
-			Kind: "SELF_PRICED", Code: &code, Label: "甘藍-初秋",
+			Kind: "SELF_PRICED", Label: "甘藍-初秋",
 			Provenance: "BUYER_CHOICE", PricePerKg: &price,
 			DisplayValue: "自訂品項，單價 95 元／公斤",
 		},

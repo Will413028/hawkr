@@ -1,5 +1,4 @@
-// Package fuse 把多個 retriever 的名次序列融合成一份排序（Reciprocal Rank Fusion），
-// 再把 taxonomy 的分類候選併進「已映射到該分類」的實體候選。
+// Package fuse 把多個 retriever 的名次序列融合成一份排序（Reciprocal Rank Fusion）。
 package fuse
 
 import (
@@ -54,44 +53,6 @@ func RRF(results map[string][]recall.Candidate) []Fused {
 	return out
 }
 
-// AbsorbCategories 把 CATEGORY 候選併進 CategoryIDs 含該分類的實體候選：分數相加、
-// Sources 合併、Quality／Pinned 取強者。沒有實體承接的 CATEGORY 保留為獨立候選。
-// 一個分類被多個實體承接時每一個都得到加成（它們對這個分類是等價的答案）。
-func AbsorbCategories(in []Fused) []Fused {
-	var categories, entities []Fused
-	for _, f := range in {
-		if f.Kind == recall.KindCategory {
-			categories = append(categories, f)
-		} else {
-			entities = append(entities, f)
-		}
-	}
-	out := make([]Fused, 0, len(in))
-	claimed := map[string]bool{}
-	for _, e := range entities {
-		for _, cat := range categories {
-			if !containsID(e.CategoryIDs, cat.Code) {
-				continue
-			}
-			claimed[cat.Key] = true
-			e.Score += cat.Score
-			e.Sources = appendUnique(e.Sources, cat.Sources...)
-			if cat.Quality > e.Quality {
-				e.Quality = cat.Quality
-			}
-			e.Pinned = e.Pinned || cat.Pinned
-		}
-		out = append(out, e)
-	}
-	for _, cat := range categories {
-		if !claimed[cat.Key] {
-			out = append(out, cat)
-		}
-	}
-	sortFused(out)
-	return out
-}
-
 func merge(f *Fused, c recall.Candidate) {
 	if c.Quality > f.Quality {
 		f.Quality = c.Quality
@@ -104,9 +65,6 @@ func merge(f *Fused, c recall.Candidate) {
 	}
 	if f.MatchedBy == "" {
 		f.MatchedBy = c.MatchedBy
-	}
-	if !f.HasForecast && c.HasForecast {
-		f.HasForecast = c.HasForecast
 	}
 }
 
@@ -129,13 +87,4 @@ func containsID(ids []string, id string) bool {
 		}
 	}
 	return false
-}
-
-func appendUnique(dst []string, src ...string) []string {
-	for _, s := range src {
-		if !containsID(dst, s) {
-			dst = append(dst, s)
-		}
-	}
-	return dst
 }

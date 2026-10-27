@@ -222,8 +222,8 @@ func TestOptionalStreak_CropDisambiguationPending_DoesNotStarveQuoteRequiredOpti
 	store := newFakeRunStore()
 	seededSlots := domain.Slots{Item: &item, DeliveryCity: &city, Unit: &unit}
 	cropCandidates := []domain.CropDisambiguationOption{
-		{Label: "有機小白菜", CropCode: ptr("CROP-X")},
-		{Label: "小白菜（一般）", CropCode: ptr("CROP-Y")},
+		{Label: "有機小白菜", CategoryID: "18", CategoryLevel: 3},
+		{Label: "小白菜（一般）", CategoryID: "19", CategoryLevel: 3},
 	}
 	lastRevisionID := seedRev.ID
 	for i := 0; i < 3; i++ {

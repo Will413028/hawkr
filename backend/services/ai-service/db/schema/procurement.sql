@@ -222,8 +222,7 @@ CREATE INDEX idx_procurement_candidate_sets_lease
 --
 -- 刻意不存商品層的圖片與標價：候選的單位是**收件人**不是品項（#2377 是 #2450
 -- DIRECT_RECIPIENTS 的前置），而且 EXTERNAL lane 的候選來自站外名單、根本沒有平台商品。
--- 價格更不能放這裡——doc 57 §1.1-2 只認四種價格事實，商品標價不在其中；買家該看到的是
--- Pricebook 對該品項的參考價區間（referencePriceRange，屬 #2403）。
+-- 價格更不能放這裡——doc 57 §1.1-2 只認四種價格事實，商品標價不在其中。
 --
 -- ⛔ store_id **不是授權判準**。「這個商品現在屬於哪個賣家」必須在需要授權的當下重新
 --    問 product-service（見 usecase/quote_confirm.go 的 ConfirmByID 與
@@ -314,48 +313,23 @@ CREATE INDEX idx_procurement_candidate_selections_request
 -- procurement_conversation_commands 同一套冪等慣例：client_request_id 唯一鍵是
 -- 「有沒有處理過這個請求」唯一仲裁者，不用 application-level payload hash 比對。
 --
--- reference_facts_hash／reference_payload_json／unavailable_reason 彼此依
--- reference_availability 的值互斥：AVAILABLE 時前兩者有值、unavailable_reason 為
--- NULL；UNAVAILABLE 時相反——由寫入端（Task 6 usecase）保證，這裡不加 CHECK
--- constraint 表達（同一組互斥欄位在 procurement_requests 的品項解析三態也是
--- 應用層保證，見該表註解）。
---
--- market_price_basis_json／quote_total_range_json（v6 設計稿 03 市場價格參考
--- 區塊）是兩個純附加的 nullable 欄位。它們必須持久化、不能在讀取時重算：
--- FindPricePreviewByIdempotencyKey 的冪等回放路徑不會再打 Pricebook、也不會
--- 再讀 slots，重算不出來；沒有它們的話同一個 client_request_id 重送就會拿到
--- 一份少了「資料截至／計價基準／詢價總額區間」的殘缺結果。
---
--- 兩者各自為 NULL 的條件不同，刻意不合併成一欄：
---   market_price_basis_json 與 reference_payload_json 同生同滅（只有
---     PRICEBOOK_GUIDED 且 mapping 可靠時才有市場資料可揭露）；
---   quote_total_range_json 兩個 pricing_mode 都可能有值，但需求數量是選填
---     slot，沒填數量就算不出總額，這時為 NULL。
+-- quote_total_range_json 是伺服器依買家這次的單價範圍與需求數量算出的詢價總額區間，
+-- 必須持久化、不能在讀取時重算：冪等回放路徑不再讀 slots，重算不出來。需求數量是選填
+-- slot，沒填數量就算不出總額，這時為 NULL。
 CREATE TABLE procurement_price_previews (
     id                         BIGINT      PRIMARY KEY,
     buyer_id                   BIGINT      NOT NULL,
     request_id                 BIGINT      NOT NULL,
     request_revision_id        BIGINT      NOT NULL,
-    pricing_mode               TEXT        NOT NULL,
     quality_knowledge_state    TEXT        NOT NULL,
-    reference_availability     TEXT        NOT NULL,
-    reference_facts_hash       TEXT,
-    reference_payload_json     JSONB,
-    unavailable_reason         TEXT,
     buyer_requested_range_json JSONB       NOT NULL,
-    deal_temperature_json      JSONB       NOT NULL,
-    market_price_basis_json    JSONB,
     quote_total_range_json     JSONB,
     client_request_id          TEXT        NOT NULL,
     preview_input_hash         TEXT        NOT NULL,
     payload_hash               TEXT        NOT NULL,
     version                    BIGINT      NOT NULL DEFAULT 1,
     expires_at                 TIMESTAMPTZ NOT NULL,
-    created_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT chk_procurement_price_previews_pricing_mode
-        CHECK (pricing_mode IN ('PRICEBOOK_GUIDED','BUYER_ENTERED_NO_REFERENCE')),
-    CONSTRAINT chk_procurement_price_previews_reference_availability
-        CHECK (reference_availability IN ('AVAILABLE','UNAVAILABLE'))
+    created_at                 TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE UNIQUE INDEX uq_procurement_price_previews_idempotency
@@ -374,7 +348,7 @@ CREATE INDEX idx_procurement_price_previews_request
 -- 欄位，避免未來試算表真的開始覆寫版本時，既有快照的「當初確認的是哪一版」
 -- 這件事變成不可回溯。canonical_payload_json 是確認當下的完整定案內容快照
 -- （報價單建立與後續顯示的唯一依據），與 price_preview 的
--- reference_payload_json／buyer_requested_range_json 等試算期間的中間結果分開存。
+-- buyer_requested_range_json 等試算期間的中間結果分開存。
 --
 -- 冪等慣例與 procurement_price_previews 完全一致：client_request_id 唯一鍵是
 -- 「有沒有處理過這次確認」的唯一仲裁者。
@@ -386,7 +360,6 @@ CREATE TABLE procurement_confirmed_rfq_snapshots (
     price_preview_id        BIGINT      NOT NULL,
     price_preview_version   BIGINT      NOT NULL,
     quality_knowledge_state TEXT        NOT NULL,
-    pricing_mode            TEXT        NOT NULL,
     canonical_payload_json  JSONB       NOT NULL,
     payload_hash            TEXT        NOT NULL,
     client_request_id       TEXT        NOT NULL,
@@ -426,20 +399,10 @@ CREATE TABLE procurement_rfq_publication_approvals (
     confirmed_rfq_payload_hash   TEXT        NOT NULL,
     price_preview_id             BIGINT      NOT NULL,
     price_preview_version        BIGINT      NOT NULL,
-    -- 定價事實的兩個真實 hash。issue Scope 3 另外要求的 pricingFacts／policy／
-    -- unit-conversion 三個 hash 在生產路徑沒有來源，刻意不建欄位——綁一個恆為
-    -- NULL 的值等於假裝有防線。reference_facts_hash 在 procurement_price_previews
-    -- 是宣告了但生產路徑從未填過的欄位（usecase/price_preview.go 建
-    -- InsertPricePreviewInput 時沒帶它），因此不引用。
+    -- 定價事實的兩個真實 hash。
     price_preview_payload_hash   TEXT        NOT NULL,
     price_preview_input_hash     TEXT        NOT NULL,
     quality_knowledge_state      TEXT        NOT NULL,
-    pricing_mode                 TEXT        NOT NULL,
-    -- reference/no-reference truth（#2450 Scope 3、Scope 5 的 hard block 判準）。
-    -- 值域同 procurement_price_previews.reference_availability。
-    -- ⛔ PRICE_BASIS_UNAVAILABLE 在 execute 必須 hard block；legacy 的 UNAVAILABLE
-    -- 不得自動視為 BUYER_ENTERED_NO_REFERENCE 人工模式。
-    reference_availability       TEXT        NOT NULL,
     buyer_requested_range_hash   TEXT        NOT NULL,
     -- 報價截止：publication 自己的屬性，不在 confirmed snapshot 裡（doc 64 §3.1）。
     -- 它進 seller_facing_payload，所以已被 seller_facing_payload_hash 涵蓋。
@@ -454,8 +417,6 @@ CREATE TABLE procurement_rfq_publication_approvals (
     candidate_set_policy_version INT,
     seller_facing_payload_json   JSONB       NOT NULL,
     seller_facing_payload_hash   TEXT        NOT NULL,
-    -- #2537 完成前恆為 UNKNOWN（doc 64 §2-5）；不得由 client 用 candidate score 補值。
-    deal_temperature_status      TEXT        NOT NULL DEFAULT 'UNKNOWN',
     state                        TEXT        NOT NULL,
     schema_version               TEXT        NOT NULL,
     preview_client_request_id    TEXT        NOT NULL,
@@ -470,9 +431,7 @@ CREATE TABLE procurement_rfq_publication_approvals (
     CONSTRAINT chk_prpa_wish_pool_has_no_candidate_set CHECK (
         (audience_mode <> 'WISH_POOL')
         OR (candidate_set_id IS NULL AND candidate_set_policy_version IS NULL)
-    ),
-    CONSTRAINT chk_prpa_reference_availability
-        CHECK (reference_availability IN ('AVAILABLE','UNAVAILABLE'))
+    )
 );
 
 CREATE UNIQUE INDEX uq_procurement_rfq_publication_approvals_idempotency
@@ -1081,18 +1040,15 @@ CREATE UNIQUE INDEX uq_procurement_agent_run_commands ON procurement_agent_run_c
 --     interrupt 建成但候選沒落庫（有卡片、白名單卻是空的）。收進同一列之後這
 --     兩個狀態結構上不存在——候選就是 interrupt 的 INSERT 內容。
 --  2. 它**不能**放 slots_json：slots_hash 是買家輸入的內容指紋，候選清單是從
---     pricebook 現況推導出來的，同一份買家輸入會因為 pricebook 更新而算出不同
---     hash。
+--     分類樹現況推導出來的，同一份買家輸入會因為分類樹更新而算出不同 hash。
 --
 -- kind-specific 內容一律進 payload_json，不為 crop 開專屬欄位：下一個
 -- interrupt kind 不該需要動 schema。
 --
--- facts_as_of 是組出這份 payload 時查詢 pricebook 的時刻（比照
+-- facts_as_of 是組出這份 payload 時讀取分類樹的時刻（比照
 -- procurement_candidates.facts_as_of 的語意：**記錄**這份事實的時間，不是守門
--- 條件）。守門由既有的兩道負責——resume 路徑比對
--- ExpectedRevisionID（需求本身變了），以及下游 priceAvailability 三態（選中的
--- code 查無行情就回 UNAVAILABLE，不會算出錯價）。這裡不再加第三道 TTL：門檻值
--- 沒有非任意的定法，而它會在買家正常思考的時間內把人踢掉。
+-- 條件）。守門是 resume 路徑比對 ExpectedRevisionID（需求本身變了）。這裡不再加
+-- TTL：門檻值沒有非任意的定法，而它會在買家正常思考的時間內把人踢掉。
 CREATE TABLE procurement_agent_run_interrupts (
     id                       TEXT        PRIMARY KEY,
     run_id                   BIGINT      NOT NULL,

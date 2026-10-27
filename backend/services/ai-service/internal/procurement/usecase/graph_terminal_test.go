@@ -600,10 +600,9 @@ func TestComposeGraphTurnResult_NoSummaryNoJob(t *testing.T) {
 //
 // 缺口的形狀：required slots **不含** item_resolution（domain.Slots.MissingRequired
 // 只數六個 slot），所以「買家講了品項、其他條件也齊，但分類服務這一輪查詢失敗」
-// 會算成 Ready ⇒ nextAction 照樣設成 REVIEW_PRICE_PREVIEW。而那條路上
-// PRICEBOOK_GUIDED 需要 crop code，沒有 resolution 必定回 422 MAPPING_MISSING。
-// ⇒ 我們把買家推去一個**這一輪必然失敗**的動作，而正確的下一步是什麼都不催：
-// crop gate 下一輪自己會重查（既有的恢復通道），不需要買家做任何事。
+// 會算成 Ready ⇒ nextAction 照樣設成 REVIEW_PRICE_PREVIEW。
+// 這一輪還沒有品項分類，正確的下一步是什麼都不催：crop gate 下一輪自己會重查
+// （既有的恢復通道），不需要買家做任何事。
 //
 // 鑑別力：fixture 與上面那個 happy-path 測試**只差 CropResolveFailed 一個欄位**，
 // 兩個測試互為對照組——少了這個旗標的實作會讓兩者拿到同一個 nextAction。
@@ -615,7 +614,7 @@ func TestComposeGraphTurnResult_ResolveFailed_DoesNotNudgeToPricePreview(t *test
 	require.Empty(t, full.MissingRequired(),
 		"sanity check：這個 fixture 在 required-slot 的定義下是完整的——缺口正是「完整」不等於「查得到分類」")
 	require.Nil(t, full.ItemResolution,
-		"sanity check：沒有 resolution 就沒有 crop code，PRICEBOOK_GUIDED 必定 422")
+		"sanity check：這個 fixture 還沒有品項解析結果")
 
 	progress := graphTurnProgress{NextSlots: full, CropResolveFailed: true}
 

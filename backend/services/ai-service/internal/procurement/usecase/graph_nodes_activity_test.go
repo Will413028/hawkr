@@ -477,22 +477,19 @@ func TestCropGateNode_NoNewDecision_ClearsStaleSummary(t *testing.T) {
 		// 已解析＝這一輪 gate 真的沒有新判定；少了 resolution 代表上一次失敗過，
 		// 那一輪 gate 會重試，就不再是這條測試要驗的情境。
 		"current_slots": domain.Slots{Item: item("蘋果"),
-			ItemResolution: domain.NewSystemItemResolution(
-				nil, strPtr("N04-001"), nil, nil, "蘋果", domain.CategoryFromEntity("category-apple"))},
+			ItemResolution: domain.NewSelfPricedItemResolution(95, "蘋果", domain.CategoryAbsent("測試"))},
 		"now":        time.Now().UTC(),
 		"request_id": int64(1),
 		"graph_turn_progress": graphTurnProgress{
 			NextSlots: domain.Slots{Item: item("蘋果"),
-				ItemResolution: domain.NewSystemItemResolution(
-					nil, strPtr("N04-001"), nil, nil, "蘋果", domain.CategoryFromEntity("category-apple"))},
+				ItemResolution: domain.NewSelfPricedItemResolution(95, "蘋果", domain.CategoryAbsent("測試"))},
 			CropGateEvaluated:  true,
 			NarrationSummaries: map[domain.StepCode]string{domain.StepCropGate: "上一輪留下的摘要"},
 		},
 	})
 
 	for ev, err := range cropGateNode.Run(ctx, ValidateSlotsOutput{Slots: domain.Slots{Item: item("蘋果"),
-		ItemResolution: domain.NewSystemItemResolution(
-			nil, strPtr("N04-001"), nil, nil, "蘋果", domain.CategoryFromEntity("category-apple"))}}) {
+		ItemResolution: domain.NewSelfPricedItemResolution(95, "蘋果", domain.CategoryAbsent("測試"))}}) {
 		require.NoError(t, err)
 		if ev == nil {
 			continue

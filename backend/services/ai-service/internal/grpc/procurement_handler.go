@@ -164,9 +164,6 @@ func toItemResolutionProto(r *domain.ItemResolution) *aipb.ItemResolution {
 		Provenance:   string(r.Provenance),
 		DisplayValue: r.DisplayValue(),
 	}
-	if r.Code != nil {
-		out.Code = r.Code
-	}
 	if r.PricePerKg != nil {
 		v := itoa(*r.PricePerKg)
 		out.PricePerKg = &v
@@ -227,7 +224,7 @@ func toMissingRequiredProto(keys []domain.SlotKey) []string {
 func toCropDisambiguationOptionsProto(opts []domain.CropDisambiguationOption) []*aipb.CropDisambiguationOption {
 	out := make([]*aipb.CropDisambiguationOption, len(opts))
 	for i, o := range opts {
-		out[i] = &aipb.CropDisambiguationOption{Label: o.Label, CropCode: o.CropCode, GroupCode: o.GroupCode}
+		out[i] = &aipb.CropDisambiguationOption{Label: o.Label}
 	}
 	return out
 }
@@ -470,12 +467,10 @@ func (s *AIProcurementGrpcServer) GetSnapshot(ctx context.Context, req *aipb.Get
 		return nil, procurementUsecaseErrorStatus(ctx, pubErr)
 	}
 
-	resolvedCropCode, resolvedGroupCode := slots.ItemResolution.PricebookQueryCodes()
 	return &aipb.SnapshotResponse{
 		RequestId: itoa64(reqEntity.ID), RevisionId: itoa64(rev.ID), Status: reqEntity.Status,
 		Slots: toSlotsProto(slots), MissingRequired: toMissingRequiredProto(slots.MissingRequired()),
 		CropResolution: &aipb.CropResolution{
-			ResolvedCropCode: resolvedCropCode, ResolvedGroupCode: resolvedGroupCode,
 			Candidates: toCropDisambiguationOptionsProto(candidates),
 		},
 		Runs: runtimeView.Runs, ActiveRunId: runtimeView.ActiveRunID,
@@ -824,11 +819,6 @@ func rewindUsecaseErrorStatus(ctx context.Context, err error) error {
 	}
 }
 
-var allowedPricingModes = map[string]bool{
-	"PRICEBOOK_GUIDED":           true,
-	"BUYER_ENTERED_NO_REFERENCE": true,
-}
-
 func (s *AIProcurementGrpcServer) PreviewRfqPrice(ctx context.Context, req *aipb.RfqPricePreviewRequest) (*aipb.RfqPricePreviewResponse, error) {
 	buyerID, err := buyerIDFromContext(ctx)
 	if err != nil {
@@ -836,9 +826,6 @@ func (s *AIProcurementGrpcServer) PreviewRfqPrice(ctx context.Context, req *aipb
 	}
 	if req.GetClientRequestId() == "" {
 		return nil, procurementStatus(codes.InvalidArgument, "", "clientRequestId is required")
-	}
-	if !allowedPricingModes[req.GetPricingMode()] {
-		return nil, procurementStatus(codes.InvalidArgument, "", "invalid pricingMode")
 	}
 	requestID, err := parseInt64(req.GetRequestId())
 	if err != nil {
@@ -859,8 +846,8 @@ func (s *AIProcurementGrpcServer) PreviewRfqPrice(ctx context.Context, req *aipb
 
 	result, err := s.previewRfqPrice.PreviewRfqPrice(ctx, pricing.PreviewRfqPriceInput{
 		RequestID: requestID, BuyerID: buyerID, ClientRequestID: req.GetClientRequestId(),
-		ExpectedRevisionID: expectedRevisionID, PricingMode: req.GetPricingMode(),
-		DeliveryCity: req.GetDeliveryCity(), BuyerRequestedRange: buyerRange,
+		ExpectedRevisionID: expectedRevisionID,
+		DeliveryCity:       req.GetDeliveryCity(), BuyerRequestedRange: buyerRange,
 	})
 	if err != nil {
 		return nil, previewRfqPriceErrorStatus(ctx, err)
@@ -872,8 +859,6 @@ func previewRfqPriceErrorStatus(ctx context.Context, err error) error {
 	switch {
 	case errors.Is(err, pricing.ErrPriceBasisUnavailable):
 		return procurementStatus(codes.FailedPrecondition, "PRICE_BASIS_UNAVAILABLE", "currency/quantity/unit/conversion basis cannot be canonicalized")
-	case errors.Is(err, pricing.ErrMappingUnavailableForGuidedMode):
-		return procurementStatus(codes.FailedPrecondition, "MAPPING_MISSING", "Pricebook 映射或行情目前不可靠，請改用 BUYER_ENTERED_NO_REFERENCE 並提供 buyerRequestedRange 後重新送出")
 	case errors.Is(err, pricing.ErrStalePricePreviewRevision):
 		return procurementStatus(codes.Aborted, "STALE_REVISION", "需求已被其他裝置改動")
 	default:
@@ -888,41 +873,14 @@ func formatPriceAmount(f float64) string {
 func toRfqPricePreviewResponseProto(r pricing.PricePreviewResult) *aipb.RfqPricePreviewResponse {
 	resp := &aipb.RfqPricePreviewResponse{
 		PricePreviewId: itoa64(r.PricePreviewID), Version: itoa64(r.Version),
-		PricingMode: r.PricingMode, QualityKnowledgeState: r.QualityKnowledgeState,
-		ReferenceAvailability: r.ReferenceAvailability,
-		DealTemperature: &aipb.DealTemperature{
-			Status: r.DealTemperature.Status, ReasonCode: r.DealTemperature.ReasonCode,
-			ProbabilityLowerBps: r.DealTemperature.ProbabilityLowerBps, ProbabilityUpperBps: r.DealTemperature.ProbabilityUpperBps,
-			Band: r.DealTemperature.Band, OutcomeDefinition: r.DealTemperature.OutcomeDefinition,
-			OutcomeDefinitionVersion: r.DealTemperature.OutcomeDefinitionVersion,
-			PolicyVersion:            r.DealTemperature.PolicyVersion, BandVersion: r.DealTemperature.BandVersion,
-		},
-		PayloadHash: r.PayloadHash,
+		QualityKnowledgeState: r.QualityKnowledgeState,
+		PayloadHash:           r.PayloadHash,
 	}
 	if !r.BuyerRequestedRange.IsUnset() {
 		resp.BuyerRequestedRange = &aipb.BuyerRequestedRange{
 			Currency: r.BuyerRequestedRange.Currency, PriceComponent: r.BuyerRequestedRange.PriceComponent,
 			LowerBoundAmount: r.BuyerRequestedRange.LowerBoundAmount, UpperBoundAmount: r.BuyerRequestedRange.UpperBoundAmount,
 			BasisQuantity: r.BuyerRequestedRange.BasisQuantity, BasisUnit: r.BuyerRequestedRange.BasisUnit,
-		}
-	}
-	if r.ReferencePriceRange != nil {
-		resp.ReferencePriceRange = &aipb.ReferencePriceRange{
-			LowerBoundAmount: optionalPriceAmount(r.ReferencePriceRange.Lower),
-			MidpointAmount:   formatPriceAmount(r.ReferencePriceRange.Midpoint),
-			UpperBoundAmount: optionalPriceAmount(r.ReferencePriceRange.Upper),
-			BasisQuantity:    r.ReferencePriceRange.BasisQuantity,
-			BasisUnit:        r.ReferencePriceRange.BasisUnit,
-		}
-	}
-	if b := r.MarketPriceBasis; b != nil {
-		resp.MarketPriceBasis = &aipb.MarketPriceBasis{
-			Scope:                 b.Scope,
-			PriceLayer:            b.PriceLayer,
-			RegionName:            b.RegionName,
-			SupportingMarketCount: itoa64(int64(b.SupportingMarketCount)),
-			SourceDataAsOf:        b.SourceDataAsOf,
-			FreshnessStatus:       b.FreshnessStatus,
 		}
 	}
 	if q := r.QuoteTotalRange; q != nil {
@@ -1049,7 +1007,6 @@ func (s *AIProcurementGrpcServer) PreviewRfqPublication(ctx context.Context, req
 		SellerFacingPayloadHash: result.SellerFacingPayloadHash,
 		SellerFacingPayloadJson: string(result.SellerFacingPayloadJSON),
 		ExpiresAt:               result.ExpiresAt.UTC().Format(time.RFC3339),
-		DealTemperatureStatus:   result.DealTemperatureStatus,
 		AudiencePolicyId:        result.AudiencePolicyID,
 		AudiencePolicyVersion:   itoa(result.AudiencePolicyVersion),
 		RecipientCount:          itoa(result.RecipientCount),

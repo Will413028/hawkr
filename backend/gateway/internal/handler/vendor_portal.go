@@ -9,13 +9,6 @@ import (
 
 // ==================== DTO ====================
 
-type VendorPortalReferencePriceRangeDTO struct {
-	LowerBoundAmount string `json:"lowerBoundAmount"`
-	UpperBoundAmount string `json:"upperBoundAmount"`
-	BasisQuantity    string `json:"basisQuantity"`
-	BasisUnit        string `json:"basisUnit"`
-}
-
 type VendorPortalRequestedPriceRangeDTO struct {
 	Currency         string `json:"currency"`
 	PriceComponent   string `json:"priceComponent"`
@@ -46,7 +39,6 @@ type VendorPortalRFQDTO struct {
 	// 回來做 CAS：把報價綁在「他當時看到的那一版 RFQ」上。
 	// ⛔ seller_facing_payload_hash 不在這裡，理由見 ai.proto 同名欄位的註解。
 	PublicationVersion  string                              `json:"publicationVersion"`
-	ReferencePriceRange *VendorPortalReferencePriceRangeDTO `json:"referencePriceRange"`
 	BuyerRequestedRange *VendorPortalRequestedPriceRangeDTO `json:"buyerRequestedRange"`
 }
 
@@ -63,20 +55,7 @@ func vendorPortalRFQDTOFromProto(r *aipb.RfqPublicationInviteSellerViewResponse)
 		ResponseDeadline:      r.GetResponseDeadline(),
 		BuyerNote:             r.GetBuyerNote(),
 		PublicationVersion:    r.GetPublicationVersion(),
-		ReferencePriceRange:   vendorPortalReferenceRangeFromProto(r.GetReferencePriceRange()),
 		BuyerRequestedRange:   vendorPortalRequestedRangeFromProto(r.GetBuyerRequestedRange()),
-	}
-}
-
-func vendorPortalReferenceRangeFromProto(r *aipb.SellerFacingReferenceRange) *VendorPortalReferencePriceRangeDTO {
-	if r == nil {
-		return nil
-	}
-	return &VendorPortalReferencePriceRangeDTO{
-		LowerBoundAmount: r.GetLowerBoundAmount(),
-		UpperBoundAmount: r.GetUpperBoundAmount(),
-		BasisQuantity:    r.GetBasisQuantity(),
-		BasisUnit:        r.GetBasisUnit(),
 	}
 }
 

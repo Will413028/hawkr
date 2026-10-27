@@ -50,21 +50,8 @@ func (h *inviteSellerViewHandler) GetRfqPublicationInviteSellerView(ctx context.
 		ResponseDeadline:      view.ResponseDeadline,
 		BuyerNote:             view.BuyerNote,
 		PublicationVersion:    view.PublicationVersion,
-		ReferencePriceRange:   toSellerFacingReferenceRangeProto(view.ReferencePriceRange),
 		BuyerRequestedRange:   toSellerFacingRequestedRangeProto(view.BuyerRequestedRange),
 	}, nil
-}
-
-func toSellerFacingReferenceRangeProto(r *domain.SellerFacingReferenceRange) *aipb.SellerFacingReferenceRange {
-	if r == nil {
-		return nil
-	}
-	return &aipb.SellerFacingReferenceRange{
-		LowerBoundAmount: r.LowerBoundAmount,
-		UpperBoundAmount: r.UpperBoundAmount,
-		BasisQuantity:    r.BasisQuantity,
-		BasisUnit:        r.BasisUnit,
-	}
 }
 
 func toSellerFacingRequestedRangeProto(r *domain.SellerFacingRequestedRange) *aipb.SellerFacingRequestedRange {

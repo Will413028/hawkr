@@ -74,10 +74,9 @@ var Module = fx.Module("procurement",
 
 	fx.Provide(func(tm database.TxManager) commerce.TxRunner { return tm }),
 
-	// ⛔ 對外一律經過 WithTransientRetry：品項解析失敗會讓整張需求掉進「沒有行情、
-	// 自己填價格區間」，而 Resolve 的唯一錯誤來源是 Pricebook 查詢抖動（「查無此
-	// 品項」是成功回傳的結果）。當場重試一次讓大多數抖動對買家無感；連兩次失敗
-	// 才交給 crop_gate 的跨輪重試。
+	// ⛔ 對外一律經過 WithTransientRetry：Resolve 的唯一錯誤來源是分類樹查詢抖動
+	// （「查無此品項」是成功回傳的結果）。當場重試一次讓大多數抖動對買家無感；連兩次
+	// 失敗才交給 crop_gate 的跨輪重試。
 	fx.Provide(func(uc *cropidentity.DisambiguationUseCase) cropidentity.Resolver {
 		return cropidentity.WithTransientRetry(uc)
 	}),

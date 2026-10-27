@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/Will413028/hawkr/ai-service/internal/procurement/domain"
 )
 
 type scriptedResolver struct {
@@ -23,20 +25,19 @@ func (s *scriptedResolver) Resolve(context.Context, string) (DisambiguationResul
 	return s.got, nil
 }
 
-// TestWithTransientRetry_RecoversOnSecondAttempt：Pricebook 抖一下就好的情況，
-// 買家完全無感——這一輪照樣拿到行情，不會掉進「自己填價格區間」。
+// TestWithTransientRetry_RecoversOnSecondAttempt：分類樹抖一下就好的情況，
+// 買家完全無感——這一輪照樣解析到分類，不會掉進「自己填價格區間」。
 func TestWithTransientRetry_RecoversOnSecondAttempt(t *testing.T) {
-	code := "CROP-GUAVA"
 	inner := &scriptedResolver{
-		errs: []error{errors.New("pricebook unavailable")},
-		got:  DisambiguationResult{CropCode: &code, Label: "芭樂"},
+		errs: []error{errors.New("category tree unavailable")},
+		got:  DisambiguationResult{Unavailable: true, Selection: &domain.CropSelection{Stage: domain.CropSelectionPrice, CategoryID: "17", Label: "芭樂"}},
 	}
 
 	got, err := WithTransientRetry(inner).Resolve(context.Background(), "芭樂")
 
 	require.NoError(t, err)
 	require.Equal(t, 2, inner.calls, "第一次失敗要當場再試一次")
-	require.Equal(t, "CROP-GUAVA", *got.CropCode)
+	require.Equal(t, "17", got.Selection.CategoryID)
 }
 
 // TestWithTransientRetry_StopsAtOneRetry：連兩次都失敗就放手，交給跨輪重試。

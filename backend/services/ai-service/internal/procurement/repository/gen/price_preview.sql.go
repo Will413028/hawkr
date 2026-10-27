@@ -24,7 +24,7 @@ func (q *Queries) CountPricePreviewsByRequestID(ctx context.Context, requestID i
 }
 
 const findPricePreviewByIDAndBuyer = `-- name: FindPricePreviewByIDAndBuyer :one
-SELECT id, buyer_id, request_id, request_revision_id, pricing_mode, quality_knowledge_state, reference_availability, reference_facts_hash, reference_payload_json, unavailable_reason, buyer_requested_range_json, deal_temperature_json, market_price_basis_json, quote_total_range_json, client_request_id, preview_input_hash, payload_hash, version, expires_at, created_at FROM procurement_price_previews
+SELECT id, buyer_id, request_id, request_revision_id, quality_knowledge_state, buyer_requested_range_json, quote_total_range_json, client_request_id, preview_input_hash, payload_hash, version, expires_at, created_at FROM procurement_price_previews
 WHERE id = $1 AND buyer_id = $2
 `
 
@@ -41,15 +41,8 @@ func (q *Queries) FindPricePreviewByIDAndBuyer(ctx context.Context, arg FindPric
 		&i.BuyerID,
 		&i.RequestID,
 		&i.RequestRevisionID,
-		&i.PricingMode,
 		&i.QualityKnowledgeState,
-		&i.ReferenceAvailability,
-		&i.ReferenceFactsHash,
-		&i.ReferencePayloadJson,
-		&i.UnavailableReason,
 		&i.BuyerRequestedRangeJson,
-		&i.DealTemperatureJson,
-		&i.MarketPriceBasisJson,
 		&i.QuoteTotalRangeJson,
 		&i.ClientRequestID,
 		&i.PreviewInputHash,
@@ -62,7 +55,7 @@ func (q *Queries) FindPricePreviewByIDAndBuyer(ctx context.Context, arg FindPric
 }
 
 const findPricePreviewByIdempotencyKey = `-- name: FindPricePreviewByIdempotencyKey :one
-SELECT id, buyer_id, request_id, request_revision_id, pricing_mode, quality_knowledge_state, reference_availability, reference_facts_hash, reference_payload_json, unavailable_reason, buyer_requested_range_json, deal_temperature_json, market_price_basis_json, quote_total_range_json, client_request_id, preview_input_hash, payload_hash, version, expires_at, created_at FROM procurement_price_previews
+SELECT id, buyer_id, request_id, request_revision_id, quality_knowledge_state, buyer_requested_range_json, quote_total_range_json, client_request_id, preview_input_hash, payload_hash, version, expires_at, created_at FROM procurement_price_previews
 WHERE buyer_id = $1 AND client_request_id = $2
 `
 
@@ -79,15 +72,8 @@ func (q *Queries) FindPricePreviewByIdempotencyKey(ctx context.Context, arg Find
 		&i.BuyerID,
 		&i.RequestID,
 		&i.RequestRevisionID,
-		&i.PricingMode,
 		&i.QualityKnowledgeState,
-		&i.ReferenceAvailability,
-		&i.ReferenceFactsHash,
-		&i.ReferencePayloadJson,
-		&i.UnavailableReason,
 		&i.BuyerRequestedRangeJson,
-		&i.DealTemperatureJson,
-		&i.MarketPriceBasisJson,
 		&i.QuoteTotalRangeJson,
 		&i.ClientRequestID,
 		&i.PreviewInputHash,
@@ -101,18 +87,16 @@ func (q *Queries) FindPricePreviewByIdempotencyKey(ctx context.Context, arg Find
 
 const insertPricePreview = `-- name: InsertPricePreview :one
 INSERT INTO procurement_price_previews (
-    id, buyer_id, request_id, request_revision_id, pricing_mode,
-    quality_knowledge_state, reference_availability, reference_facts_hash,
-    reference_payload_json, unavailable_reason, buyer_requested_range_json,
-    deal_temperature_json, market_price_basis_json, quote_total_range_json,
+    id, buyer_id, request_id, request_revision_id,
+    quality_knowledge_state, buyer_requested_range_json, quote_total_range_json,
     client_request_id, preview_input_hash,
     payload_hash, version, expires_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
 )
 ON CONFLICT (buyer_id, client_request_id)
 DO UPDATE SET client_request_id = EXCLUDED.client_request_id
-RETURNING id, buyer_id, request_id, request_revision_id, pricing_mode, quality_knowledge_state, reference_availability, reference_facts_hash, reference_payload_json, unavailable_reason, buyer_requested_range_json, deal_temperature_json, market_price_basis_json, quote_total_range_json, client_request_id, preview_input_hash, payload_hash, version, expires_at, created_at
+RETURNING id, buyer_id, request_id, request_revision_id, quality_knowledge_state, buyer_requested_range_json, quote_total_range_json, client_request_id, preview_input_hash, payload_hash, version, expires_at, created_at
 `
 
 type InsertPricePreviewParams struct {
@@ -120,15 +104,8 @@ type InsertPricePreviewParams struct {
 	BuyerID                 int64              `db:"buyer_id" json:"buyer_id"`
 	RequestID               int64              `db:"request_id" json:"request_id"`
 	RequestRevisionID       int64              `db:"request_revision_id" json:"request_revision_id"`
-	PricingMode             string             `db:"pricing_mode" json:"pricing_mode"`
 	QualityKnowledgeState   string             `db:"quality_knowledge_state" json:"quality_knowledge_state"`
-	ReferenceAvailability   string             `db:"reference_availability" json:"reference_availability"`
-	ReferenceFactsHash      *string            `db:"reference_facts_hash" json:"reference_facts_hash"`
-	ReferencePayloadJson    json.RawMessage    `db:"reference_payload_json" json:"reference_payload_json"`
-	UnavailableReason       *string            `db:"unavailable_reason" json:"unavailable_reason"`
 	BuyerRequestedRangeJson json.RawMessage    `db:"buyer_requested_range_json" json:"buyer_requested_range_json"`
-	DealTemperatureJson     json.RawMessage    `db:"deal_temperature_json" json:"deal_temperature_json"`
-	MarketPriceBasisJson    json.RawMessage    `db:"market_price_basis_json" json:"market_price_basis_json"`
 	QuoteTotalRangeJson     json.RawMessage    `db:"quote_total_range_json" json:"quote_total_range_json"`
 	ClientRequestID         string             `db:"client_request_id" json:"client_request_id"`
 	PreviewInputHash        string             `db:"preview_input_hash" json:"preview_input_hash"`
@@ -146,15 +123,8 @@ func (q *Queries) InsertPricePreview(ctx context.Context, arg InsertPricePreview
 		arg.BuyerID,
 		arg.RequestID,
 		arg.RequestRevisionID,
-		arg.PricingMode,
 		arg.QualityKnowledgeState,
-		arg.ReferenceAvailability,
-		arg.ReferenceFactsHash,
-		arg.ReferencePayloadJson,
-		arg.UnavailableReason,
 		arg.BuyerRequestedRangeJson,
-		arg.DealTemperatureJson,
-		arg.MarketPriceBasisJson,
 		arg.QuoteTotalRangeJson,
 		arg.ClientRequestID,
 		arg.PreviewInputHash,
@@ -168,15 +138,8 @@ func (q *Queries) InsertPricePreview(ctx context.Context, arg InsertPricePreview
 		&i.BuyerID,
 		&i.RequestID,
 		&i.RequestRevisionID,
-		&i.PricingMode,
 		&i.QualityKnowledgeState,
-		&i.ReferenceAvailability,
-		&i.ReferenceFactsHash,
-		&i.ReferencePayloadJson,
-		&i.UnavailableReason,
 		&i.BuyerRequestedRangeJson,
-		&i.DealTemperatureJson,
-		&i.MarketPriceBasisJson,
 		&i.QuoteTotalRangeJson,
 		&i.ClientRequestID,
 		&i.PreviewInputHash,

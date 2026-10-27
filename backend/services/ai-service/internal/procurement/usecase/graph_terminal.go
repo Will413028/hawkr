@@ -59,8 +59,7 @@ type graphTurnProgress struct {
 	// needsResolution／WithTransientRetry），所以沒有需要跨輪記住的狀態。
 	//
 	// 唯一的消費者是下面 nextAction 的判斷：required slots 不含
-	// item_resolution，所以查詢失敗的那一輪照樣算 Ready，而催買家去做價格預覽
-	// 會把他推向必定 422 MAPPING_MISSING 的 PRICEBOOK_GUIDED。
+	// item_resolution，所以查詢失敗的那一輪照樣算 Ready。
 	CropResolveFailed bool
 	// Narration 是 extract_slots 已經算出來的 LLM 敘述，key 是 StepCode。這句話
 	// 本來只送進 Activity 事件、落地就丟掉（2026-09-03 前 graphTurnProgress 沒有
@@ -174,10 +173,8 @@ func composeGraphTurnResult(ctx context.Context, requestID int64, current domain
 		}
 	}
 	nextAction := ""
-	// ⚠️ 第三個條件不是防禦性檢查，是「這個建議現在做得成嗎」：分類查詢失敗的
-	// 那一輪沒有 crop code，PRICEBOOK_GUIDED 必定回 422 MAPPING_MISSING。
-	// 這一輪的正確下一步是**什麼都不催**——crop gate 下一輪自己會重查，買家不
-	// 需要做任何事。
+	// 分類查詢失敗的那一輪還沒有品項分類：這一輪什麼都不催，crop gate 下一輪自己
+	// 會重查，買家不需要做任何事。
 	if previewKnown && !hasPreview && !progress.CropResolveFailed {
 		nextAction = "REVIEW_PRICE_PREVIEW"
 	}

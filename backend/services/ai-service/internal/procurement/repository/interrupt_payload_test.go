@@ -57,7 +57,7 @@ func TestRepo_CreateInterrupt_RoundTripsPayloadAndFactsAsOf(t *testing.T) {
 		"kind":          "crop_disambiguation",
 		"pendingReason": string(domain.CropPendingReasonAmbiguous),
 		"candidates": []map[string]any{
-			{"label": "甘藍-初秋", "cropCode": "LA1", "fallbackGroupCode": "moa-group:abc"},
+			{"label": "高麗菜", "categoryId": "17", "categoryLevel": 3},
 		},
 		"factsAsOf": factsAsOf,
 	})
@@ -87,7 +87,7 @@ func TestRepo_CreateInterrupt_RoundTripsPayloadAndFactsAsOf(t *testing.T) {
 	require.Equal(t, domain.CropPendingReasonAmbiguous, decoded.PendingReason,
 		"待處理原因必須是顯式欄位——0 候選的 UNAVAILABLE 靠候選數量推不出來")
 	require.Len(t, decoded.Candidates, 1)
-	require.Equal(t, "LA1", *decoded.Candidates[0].CropCode)
+	require.Equal(t, "17", decoded.Candidates[0].CategoryID)
 }
 
 // TestRepo_CreateInterrupt_WithoutPayload_StoresEmptyObjectNotNull 釘住
@@ -137,82 +137,3 @@ func TestRepo_CreateInterrupt_WithoutPayload_StoresEmptyObjectNotNull(t *testing
 		created.ID).Scan(&isNull))
 	require.False(t, isNull, "payload_json 是 NOT NULL，未提供時存 '{}' 不是 NULL")
 }
-
-// TestMigrationBackfill_MovesPendingStateOntoOpenInterrupts 補
-// 20260905030000 的 backfill 在 testcontainers 上結構性測不到的那一半：空的 DB
-// 讓那支 UPDATE 匹配 0 列，SQL 語法被驗證了（語法錯的話 migration 當場失敗），
-// 但它**產出的 payload 形狀**沒有。
-//
-// 跟刀 1 的同型測試一樣，把 migration 裡逐字相同的 jsonb_build_object 拿出來餵
-// 真實的舊欄位組合，再反序列化回讀取端真正使用的形狀。形狀對不上時 Go 端不會
-// 報錯（未知 key 直接忽略），只會得到一個 Kind 為空的 payload——而那會讓 resume
-// 的白名單檢查把買家所有的答案都擋掉，沒有任何錯誤訊息指向 backfill。
-func TestMigrationBackfill_MovesPendingStateOntoOpenInterrupts(t *testing.T) {
-	ctx := context.Background()
-	pool, cleanup := setupProcurementTestDB(ctx, t)
-	defer cleanup()
-
-	// 逐字取自 20260905030000_move_crop_pending_state_into_interrupts.sql，
-	// 欄位改成參數。這份重複是刻意的：migration 已經套用完、來源欄位也 DROP 了，
-	// 沒有辦法再從 DB 那一側觸發它一次。
-	const backfillExpr = `
-		SELECT jsonb_build_object(
-			'kind', 'crop_disambiguation',
-			'pendingReason', coalesce($1::text, 'AMBIGUOUS'),
-			'candidates', coalesce($2::jsonb, '[]'::jsonb))::text`
-
-	cases := []struct {
-		name              string
-		pendingReason     *string
-		optionsJSON       *string
-		wantReason        domain.CropPendingReason
-		wantCandidateCode string
-		wantCandidates    int
-	}{
-		{
-			name:          "AMBIGUOUS＋候選清單",
-			pendingReason: ptrStr("AMBIGUOUS"),
-			optionsJSON: ptrStr(`[{"label":"甘藍-初秋","cropCode":"LA1",` +
-				`"fallbackGroupCode":"moa-group:abc"}]`),
-			wantReason: domain.CropPendingReasonAmbiguous, wantCandidates: 1, wantCandidateCode: "LA1",
-		},
-		{
-			name:          "UNAVAILABLE＋零候選（Cut 1 起刻意不落 options）",
-			pendingReason: ptrStr("UNAVAILABLE"),
-			wantReason:    domain.CropPendingReasonUnavailable, wantCandidates: 0,
-		},
-		{
-			// Cut 1 部署當下的在途 request：pending_reason 還沒回填，options 已經
-			// 是舊碼寫入的候選清單。migration 的 coalesce 預設值就是為了它。
-			name: "相容窗：只有 options、沒有 pending_reason",
-			optionsJSON: ptrStr(`[{"label":"整個甘藍都可以","groupCode":"moa-group:abc",` +
-				`"fallbackGroupCode":"moa-group:abc"}]`),
-			wantReason: domain.CropPendingReasonAmbiguous, wantCandidates: 1,
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			var raw string
-			require.NoError(t, pool.QueryRow(ctx, backfillExpr, tc.pendingReason, tc.optionsJSON).Scan(&raw))
-
-			var decoded struct {
-				Kind          string                            `json:"kind"`
-				PendingReason domain.CropPendingReason          `json:"pendingReason"`
-				Candidates    []domain.CropDisambiguationOption `json:"candidates"`
-			}
-			require.NoError(t, json.Unmarshal([]byte(raw), &decoded), "backfill 產出的 JSON 必須解得開")
-
-			require.Equal(t, "crop_disambiguation", decoded.Kind,
-				"kind 必須落成消歧 payload——resume 的白名單檢查認的就是這個值，錯了會把買家所有答案擋掉")
-			require.Equal(t, tc.wantReason, decoded.PendingReason)
-			require.Len(t, decoded.Candidates, tc.wantCandidates)
-			if tc.wantCandidateCode != "" {
-				require.NotNil(t, decoded.Candidates[0].CropCode)
-				require.Equal(t, tc.wantCandidateCode, *decoded.Candidates[0].CropCode)
-			}
-		})
-	}
-}
-
-func ptrStr(s string) *string { return &s }

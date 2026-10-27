@@ -33,22 +33,17 @@ func TestGoldenSet_KnownGapCountIsCapped(t *testing.T) {
 		"known_gap 目前 %v；只增不減就是訊號，要放寬上限先問為什麼缺口在長大", gaps)
 }
 
-// 查詢集要同時涵蓋兩條解析路徑與 NIL，否則它只能量到其中一邊。
-// 2026-09-17 的兩個缺陷剛好一條在 commodity、一條在 crop。
-func TestGoldenSet_CoversBothResolutionPathsAndNIL(t *testing.T) {
-	var commodity, crop, nilCase int
+// 查詢集要同時涵蓋會解析出分類的查詢與 NIL，否則它只能量到其中一邊。
+func TestGoldenSet_CoversResolvedAndNIL(t *testing.T) {
+	var resolved, nilCase int
 	for _, q := range loadGoldenSet(t) {
-		switch {
-		case q.ExpectsNIL():
+		if q.ExpectsNIL() {
 			nilCase++
-		case q.ExpectKind == "COMMODITY":
-			commodity++
-		case q.ExpectKind == "CROP":
-			crop++
+		} else {
+			resolved++
 		}
 	}
-	require.GreaterOrEqual(t, commodity, 3, "commodity 路徑至少三條")
-	require.GreaterOrEqual(t, crop, 1, "crop 路徑至少一條")
+	require.GreaterOrEqual(t, resolved, 10, "解析出分類的查詢至少十條")
 	require.GreaterOrEqual(t, nilCase, 2, "NIL 至少兩條——沒有它就量不到系統會不會硬給答案")
 }
 
@@ -88,7 +83,7 @@ func TestGoldenSet_CoversInputSpaceDimensions(t *testing.T) {
 			if q.Note != "" {
 				nilWithReason++
 			}
-		case q.ExpectLabel == q.Text:
+		case q.ExpectCategory != "" && strings.HasSuffix(q.ExpectCategory, " > "+q.Text):
 			exactName++
 		default:
 			aliasOrGeneric++

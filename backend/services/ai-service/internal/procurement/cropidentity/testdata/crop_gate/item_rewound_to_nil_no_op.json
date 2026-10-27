@@ -2,11 +2,6 @@
   "resolverNil": false,
   "resolveResult": {
     "NeedsDisambiguation": false,
-    "CropCode": null,
-    "GroupCode": null,
-    "CommodityCode": null,
-    "FallbackGroupCode": null,
-    "Label": "",
     "Candidates": null,
     "Unavailable": false
   },
@@ -16,7 +11,6 @@
   "after": {},
   "result": {
     "item": null,
-    "resolution": null,
     "pending": false,
     "candidates": null,
     "pendingReason": "",

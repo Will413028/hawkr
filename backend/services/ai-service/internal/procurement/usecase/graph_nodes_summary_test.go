@@ -132,7 +132,7 @@ func TestSummarizeCropGate_DoesNotNameTheEscapeHatchButton(t *testing.T) {
 }
 
 // 敘述的名詞要跟卡片上列的東西一致：taxonomy 兩階段列的是商品分類（豬肉／牛肉），
-// 沒有 Selection 的舊路徑列的才是 Pricebook 作物候選。
+// 沒有 Selection 的候選才是作物。
 func TestSummarizeCropGate_NounTracksSelectionStage(t *testing.T) {
 	candidates := []domain.CropDisambiguationOption{{Label: "豬肉"}, {Label: "牛肉"}}
 

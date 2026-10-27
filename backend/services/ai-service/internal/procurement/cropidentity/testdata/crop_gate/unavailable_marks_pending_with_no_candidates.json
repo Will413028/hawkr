@@ -2,11 +2,6 @@
   "resolverNil": false,
   "resolveResult": {
     "NeedsDisambiguation": false,
-    "CropCode": null,
-    "GroupCode": null,
-    "CommodityCode": null,
-    "FallbackGroupCode": null,
-    "Label": "",
     "Candidates": null,
     "Unavailable": true
   },
@@ -18,7 +13,6 @@
   },
   "result": {
     "item": "查無此物",
-    "resolution": null,
     "pending": true,
     "candidates": [],
     "pendingReason": "UNAVAILABLE",

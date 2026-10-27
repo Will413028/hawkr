@@ -111,14 +111,14 @@ func seed(ctx context.Context, t *testing.T, pool *pgxpool.Pool, lane string, st
 	_, err = pool.Exec(ctx, `
 		INSERT INTO procurement_confirmed_rfq_snapshots (
 			id, buyer_id, request_id, request_revision_id, price_preview_id, price_preview_version,
-			quality_knowledge_state, pricing_mode, canonical_payload_json, payload_hash,
+			quality_knowledge_state, canonical_payload_json, payload_hash,
 			client_request_id, expires_at
-		) VALUES ($1, $2, $3, 1, 1, 1, 'KNOWN', 'REFERENCE',
+		) VALUES ($1, $2, $3, 1, 1, 1, 'KNOWN',
 			$4, 'hash-snapshot', 'seed-snapshot', $5)`,
 		snapshotID, int64(buyerID), requestID,
 		// ⚠️ 傳 string 不是 []byte：DSN 帶 default_query_exec_mode=exec，參數以文字送出，
 		// []byte 會被編成 bytea 的 hex 字面值，jsonb 欄位收到就是 22P02。
-		`{"item":"文旦柚","itemResolution":{"kind":"CROP","label":"麻豆文旦"}}`,
+		`{"item":"文旦柚","itemResolution":{"kind":"SELF_PRICED","label":"麻豆文旦"}}`,
 		due.Add(72*time.Hour))
 	require.NoError(t, err)
 

@@ -16,7 +16,6 @@ public enum ProcurementArtifactType implements CodeMeta {
     CLARIFICATION("CLARIFICATION", "CLARIFICATION", "澄清問題", "Track A。承載 `domain.ClarifyQuestion` 的公開投影"),
     CANDIDATE_RESULTS("CANDIDATE_RESULTS", "CANDIDATE_RESULTS", "候選結果", "Track A。PLATFORM／EXTERNAL 兩條 lane 的候選清單，`data` 形狀已可從既有 `domain.CandidateLead` 欄位挑選層推導（不得含 email／phone／social／聯絡人，見 doc 57 §1.3）"),
     PRICING_PREVIEW("PRICING_PREVIEW", "PRICING_PREVIEW", "定價預覽", "Track A。上游流程屬 #2403（doc 57 §5.7），`data` 形狀**尚未展開**——本次只凍結型別名稱與共同 envelope"),
-    DEAL_TEMPERATURE("DEAL_TEMPERATURE", "DEAL_TEMPERATURE", "成交溫度計", "Track A。v1 不產本型 artifact——溫度住在 procurement_price_previews.deal_temperature_json，身分由 price_preview_id + version 承擔（見 docs/詳細設計書/64 §2-5）。`data` 形狀待 outcomeDefinitionVersion 2 展開"),
     CONFIRMED_RFQ("CONFIRMED_RFQ", "CONFIRMED_RFQ", "已確認詢價單", "Track A。#2403（doc 57 §5.7）的「不可變需求確認＝詢價單本體」，凍結 `snapshot`／`hash`／版本形狀時須讓商務線 CAS（`expectedRfqSnapshotHash`）用得上；`data` 形狀**尚未展開**"),
     RFQ_PUBLICATION_APPROVAL("RFQ_PUBLICATION_APPROVAL", "RFQ_PUBLICATION_APPROVAL", "發布核准", "Track A。屬商務線 #2450，`data` 形狀**尚未展開**；核准不得走 generic resume（doc 57 §4.6）"),
     RFQ_PUBLICATION_RESULT("RFQ_PUBLICATION_RESULT", "RFQ_PUBLICATION_RESULT", "發布結果", "Track A。屬商務線 #2450，`data` 形狀**尚未展開**；`PUBLISHED` 只表示 transaction 完成，Wish Pool indexed／Direct delivered／Seller viewed-quoted 需由 #2539 的 typed evidence 更新"),

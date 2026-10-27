@@ -124,7 +124,6 @@ func (uc *AnswerUseCase) composeAnswerViaGraph(ctx context.Context, in AnswerInp
 	}
 
 	cropGate := cropidentity.ComputeGate(ctx, uc.cropResolver, current, next)
-	cropGate.ApplyTo(&next, &patch)
 
 	missing := next.MissingRequired()
 	status := "CLARIFYING"
@@ -405,16 +404,7 @@ func buildCropDisambiguationPatch(in AnswerInput) (patch domain.SlotPatch, err e
 		return domain.SlotPatch{Item: &description, ItemResolution: resolution}, nil
 	}
 
-	chosen, ok := findCropDisambiguationOption(in.PendingCrop.Candidates, in.OptionID)
-	if !ok {
-		return domain.SlotPatch{}, ErrInvalidOptionID
-	}
-	if chosen.CategoryID != "" {
-		return domain.SlotPatch{}, ErrInvalidOptionID
-	}
-	return domain.SlotPatch{
-		ItemResolution: domain.NewBuyerChoiceItemResolution(chosen),
-	}, nil
+	return domain.SlotPatch{}, ErrInvalidOptionID
 }
 
 func findCropDisambiguationOption(candidates []domain.CropDisambiguationOption, optionID string) (domain.CropDisambiguationOption, bool) {

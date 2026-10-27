@@ -10,41 +10,40 @@
 
 `Module` 是 fx 接線，掛在 `internal/procurement/module.go`。
 
-## 解析路徑（retrieve-then-rank）
+## 解析路徑
 
 ```
 understandQuery（原文 → 變體）
-  → 並行召回：recall.EntityRetriever（SearchPriceableEntities，crop/group/commodity 同場）
-              taxonomyRetriever（分類樹；人工 synonym 命中＝pinned）
-  → fuse.RRF（k=60）→ fuse.AbsorbCategories（分類併入已映射到它的實體）→ usableOf（丟掉取不到價的）
-  → 過濾後全空才：llmRetriever（llm_recall.go；L1→GROUP 收斂包成 Retriever，輸出未展開的 L2）→ 再融合一次
+  → taxonomyRetriever（分類樹；人工 synonym 命中＝pinned）
+  → fuse.RRF（單一來源，名次即 retriever 的名次；pinned 排最前）
   → decide（匹配品質分層：恰好一個強訊號定案／唯一候選定案／其餘問）
   → 分類卡由 adaptive facet 決定問哪一層（facet.go）：L2 分組 ≥2 且最大組 <80% 問 L2，否則下鑽最大組問 L3；
     下鑽到模型建議的 L2 時才展開（expandGroup：一個子類直接問、多個走確定性比對→LLM ITEM）
 ```
 
-錯誤處理刻意不一致：entity 失敗往上拋，taxonomy／LLM 失敗降級。LLM 只在過濾後全空時呼叫（有 pricebook
-候選時卡片家族規則讓弱分類上不了卡；唯一弱候選會直接定案，模型補進第二個候選只會把定案退化成問一題）。
-模型建議的東西一律要買家確認：展開後即使只剩一個也出卡，不直接取價；逃生艙不帶模型猜的分類當「已確認」。
+沒有 pricebook：建構子只收分類樹與模型，`no_pricebook_test.go` 守解析路徑不得 import pricebook 的 client 或型別。
+`Resolve` 只有兩種結果：`NeedsDisambiguation`（要買家挑分類）與 `Unavailable`（沒有更多要問的：分類已確認，
+`Selection.CategoryID` 非空；或查無，`Selection` 沒有分類 → 買家自填品項描述與單價）。品項分類確認後一律進入填單價那一步。
+
+錯誤處理：分類樹是唯一的確定性來源，查詢失敗往上拋（`WithTransientRetry` 當場重試一次，再失敗交給 crop_gate 的跨輪重試）；
+LLM 失敗降級成沒有建議。LLM 只在 `expandGroup` 與買家自由輸入找不到確定性命中時才呼叫；
+模型建議的東西一律要買家確認：展開後即使只剩一個也出卡，逃生艙不帶模型猜的分類當「已確認」。
 每條規則各有一支 `resolver_v2_test.go`／`facet_test.go` 釘住。
 
 買家選完之後的 resume（`ResolveSelection`）走**同一條召回**，差別只在多一個約束：選了大品項就把候選收斂到
 那個 L2 底下（`narrowToGroup`）再交給 `categoryCard`；收斂後空手才展開那個 L2。自由輸入同樣走召回，但**一律
-出卡不定案**——打字是搜尋，只有明確按下選項才算確認。選到 L3 時直接取價，不再召回。
+出卡不定案**——打字是搜尋，只有明確按下選項才算確認。選到 L3 時直接進填單價，不再召回。
 
-2026-09-17：舊的 first-match-wins 階梯（`resolveV1`／`resolveCategoryFallback`）、兩個旗標、
-`retrieveCropCatalog`／`retrieveCategorySuggestions` 與 ai-service 端的 `SearchCropCatalog` 都已退場
-（該 RPC 本身留著，gateway 的賣家品項 picker 仍在用）。`Resolve` 與 `ResolveSelection` 只有這一條路徑。
+離線評測：`goldenset/offline_eval_test.go` 用種子分類樹（`backend/infra/seed-data/04-product.sql`）逐筆對
+`goldenset/testdata/golden_queries.yaml` 呼叫 `Resolve`，不打任何外部服務。
 
 ## 品項解析錯了，修哪裡
 
-**先判斷錯在哪一層**，三條修法不可互相替代：
+**先判斷錯在哪一層**，兩條修法不可互相替代：
 
 1. **某個別名對應到錯的分類** → 往 `internal/cache` 的 `synonyms` 加一行人工覆寫。那一層永遠壓過生成層，不需要重跑任何東西。`category_alias_gen.go` 是生成物，**不得手改**（該檔開頭自己寫著這件事）。
 
-2. **pricebook 那側的分類對應缺漏或錯誤** → 不在本 repo 修。`ResolveCategoryMapping` 讀的是 pricebook 的 mapping，要走該服務的 worklist。
-
-3. **整批別名品質下滑**（不是單一條） → 重跑生成器：
+2. **整批別名品質下滑**（不是單一條） → 重跑生成器：
 
    ```bash
    cd services/ai-service && go run ./cmd/category-alias-gen

@@ -409,11 +409,11 @@ func (uc *DisambiguationUseCase) ResolveSelection(ctx context.Context, itemText 
 	}
 	next := *selection
 	next.CategoryID, next.Label = chosen.ID, chosen.Label
-	return uc.priceSelectedCategory(ctx, &next)
+	return categoryPrice(&next), nil
 }
 
 func (uc *DisambiguationUseCase) resolveWithinGroup(ctx context.Context, query string, group cropCategory) (DisambiguationResult, error) {
-	pool, err := uc.recallUsable(ctx, understandQuery(query))
+	pool, err := uc.recallPool(ctx, understandQuery(query))
 	if err != nil {
 		return DisambiguationResult{}, err
 	}
@@ -425,7 +425,7 @@ func (uc *DisambiguationUseCase) resolveWithinGroup(ctx context.Context, query s
 }
 
 func (uc *DisambiguationUseCase) suggestWithinStage(ctx context.Context, text string, selection *domain.CropSelection, allowed []cropCategory) ([]cropCategory, error) {
-	pool, err := uc.recallUsable(ctx, understandQuery(text))
+	pool, err := uc.recallPool(ctx, understandQuery(text))
 	if err != nil {
 		return nil, err
 	}

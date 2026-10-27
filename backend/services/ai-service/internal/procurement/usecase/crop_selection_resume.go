@@ -46,8 +46,7 @@ func validateCropResumeAnswer(in AnswerInput) error {
 		}
 		return nil
 	}
-	_, err := buildCropDisambiguationPatch(in)
-	return err
+	return ErrInvalidOptionID
 }
 
 func resolveResumedCropGate(ctx context.Context, resolver cropidentity.Resolver, current domain.Slots, in AnswerInput) (CropGateOutput, error) {
@@ -85,24 +84,14 @@ func resolveResumedCropGate(ctx context.Context, resolver cropidentity.Resolver,
 		return CropGateOutput{}, err
 	}
 	out := CropGateOutput{Item: current.Item, Selection: result.Selection, FactsAsOf: time.Now().UTC()}
-	switch {
-	case result.NeedsDisambiguation:
+	if result.NeedsDisambiguation {
 		out.Pending = true
 		out.PendingReason = domain.CropPendingReasonAmbiguous
 		out.Candidates = result.Candidates
-	case result.Unavailable:
-		out.Pending = true
-		out.PendingReason = domain.CropPendingReasonUnavailable
-		out.Candidates = []domain.CropDisambiguationOption{}
-	default:
-		out.Resolution = domain.NewSystemItemResolution(result.CropCode, result.GroupCode, result.CommodityCode, result.FallbackGroupCode, result.Label, domain.CategoryFromSelection(result.Selection))
-		if out.Resolution == nil {
-			return CropGateOutput{}, ErrInvalidOptionID
-		}
-		out.Resolution.Provenance = domain.ItemResolutionByBuyerChoice
-		if result.Selection != nil {
-			out.Resolution.CategoryID = result.Selection.CategoryID
-		}
+		return out, nil
 	}
+	out.Pending = true
+	out.PendingReason = domain.CropPendingReasonUnavailable
+	out.Candidates = []domain.CropDisambiguationOption{}
 	return out, nil
 }

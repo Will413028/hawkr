@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/cropidentity/recall"
-	"github.com/Will413028/hawkr/ai-service/internal/procurement/testkit"
 	"github.com/Will413028/hawkr/go-pkg/codemeta"
 	categorypb "github.com/Will413028/hawkr/go-pkg/proto/category"
 )
@@ -35,7 +34,7 @@ func v2CategoryTree() *categoryTreeFake {
 }
 
 func newTaxonomyUC(tree cropCategoryReader) *DisambiguationUseCase {
-	return NewDisambiguationUseCase(&testkit.FakePricebookClient{}, tree, nil)
+	return NewDisambiguationUseCase(tree, nil)
 }
 
 func TestTaxonomyRetriever_ExactLeafIsStrongSiblingsWeak(t *testing.T) {

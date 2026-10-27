@@ -209,7 +209,6 @@ type ProcurementConfirmedRfqSnapshot struct {
 	PricePreviewID        int64              `db:"price_preview_id" json:"price_preview_id"`
 	PricePreviewVersion   int64              `db:"price_preview_version" json:"price_preview_version"`
 	QualityKnowledgeState string             `db:"quality_knowledge_state" json:"quality_knowledge_state"`
-	PricingMode           string             `db:"pricing_mode" json:"pricing_mode"`
 	CanonicalPayloadJson  json.RawMessage    `db:"canonical_payload_json" json:"canonical_payload_json"`
 	PayloadHash           string             `db:"payload_hash" json:"payload_hash"`
 	ClientRequestID       string             `db:"client_request_id" json:"client_request_id"`
@@ -257,15 +256,8 @@ type ProcurementPricePreview struct {
 	BuyerID                 int64              `db:"buyer_id" json:"buyer_id"`
 	RequestID               int64              `db:"request_id" json:"request_id"`
 	RequestRevisionID       int64              `db:"request_revision_id" json:"request_revision_id"`
-	PricingMode             string             `db:"pricing_mode" json:"pricing_mode"`
 	QualityKnowledgeState   string             `db:"quality_knowledge_state" json:"quality_knowledge_state"`
-	ReferenceAvailability   string             `db:"reference_availability" json:"reference_availability"`
-	ReferenceFactsHash      *string            `db:"reference_facts_hash" json:"reference_facts_hash"`
-	ReferencePayloadJson    json.RawMessage    `db:"reference_payload_json" json:"reference_payload_json"`
-	UnavailableReason       *string            `db:"unavailable_reason" json:"unavailable_reason"`
 	BuyerRequestedRangeJson json.RawMessage    `db:"buyer_requested_range_json" json:"buyer_requested_range_json"`
-	DealTemperatureJson     json.RawMessage    `db:"deal_temperature_json" json:"deal_temperature_json"`
-	MarketPriceBasisJson    json.RawMessage    `db:"market_price_basis_json" json:"market_price_basis_json"`
 	QuoteTotalRangeJson     json.RawMessage    `db:"quote_total_range_json" json:"quote_total_range_json"`
 	ClientRequestID         string             `db:"client_request_id" json:"client_request_id"`
 	PreviewInputHash        string             `db:"preview_input_hash" json:"preview_input_hash"`
@@ -330,8 +322,6 @@ type ProcurementRfqPublicationApproval struct {
 	PricePreviewPayloadHash   string             `db:"price_preview_payload_hash" json:"price_preview_payload_hash"`
 	PricePreviewInputHash     string             `db:"price_preview_input_hash" json:"price_preview_input_hash"`
 	QualityKnowledgeState     string             `db:"quality_knowledge_state" json:"quality_knowledge_state"`
-	PricingMode               string             `db:"pricing_mode" json:"pricing_mode"`
-	ReferenceAvailability     string             `db:"reference_availability" json:"reference_availability"`
 	BuyerRequestedRangeHash   string             `db:"buyer_requested_range_hash" json:"buyer_requested_range_hash"`
 	ResponseDeadline          pgtype.Date        `db:"response_deadline" json:"response_deadline"`
 	AudienceMode              string             `db:"audience_mode" json:"audience_mode"`
@@ -342,7 +332,6 @@ type ProcurementRfqPublicationApproval struct {
 	CandidateSetPolicyVersion *int32             `db:"candidate_set_policy_version" json:"candidate_set_policy_version"`
 	SellerFacingPayloadJson   json.RawMessage    `db:"seller_facing_payload_json" json:"seller_facing_payload_json"`
 	SellerFacingPayloadHash   string             `db:"seller_facing_payload_hash" json:"seller_facing_payload_hash"`
-	DealTemperatureStatus     string             `db:"deal_temperature_status" json:"deal_temperature_status"`
 	State                     string             `db:"state" json:"state"`
 	SchemaVersion             string             `db:"schema_version" json:"schema_version"`
 	PreviewClientRequestID    string             `db:"preview_client_request_id" json:"preview_client_request_id"`

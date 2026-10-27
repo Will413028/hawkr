@@ -10,15 +10,14 @@ import (
 func TestLoad_ParsesQueries(t *testing.T) {
 	raw := []byte(`
 - query: 白肉雞
-  expect: { category: "肉類 > 雞肉 > 雞肉", kind: COMMODITY }
-  note: SOURCE_TERM
+  expect: { category: "肉類 > 雞肉 > 雞肉" }
+  note: 別名
 `)
 	qs, err := Load(raw)
 	require.NoError(t, err)
 	require.Len(t, qs, 1)
 	require.Equal(t, "白肉雞", qs[0].Text)
 	require.Equal(t, "肉類 > 雞肉 > 雞肉", qs[0].ExpectCategory)
-	require.Equal(t, "COMMODITY", qs[0].ExpectKind)
 }
 
 func TestLoad_KnownGapRequiresTrackedBy(t *testing.T) {
@@ -62,7 +61,7 @@ func TestQueryExpectDescription(t *testing.T) {
 		want string
 	}{
 		{"分類", Query{ExpectCategory: "穀物 > 米"}, "穀物 > 米"},
-		{"label 與 kind", Query{ExpectLabel: "白米零售價（稉種）", ExpectKind: "COMMODITY"}, "白米零售價（稉種）（COMMODITY）"},
+		{"label", Query{ExpectLabel: "白米零售價（稉種）"}, "白米零售價（稉種）"},
 		{"兩者都有", Query{ExpectCategory: "肉類 > 豬肉", ExpectLabel: "毛豬（規格豬）"}, "肉類 > 豬肉 ／ 毛豬（規格豬）"},
 		{"逃生艙", Query{}, "NIL（逃生艙）"},
 	}

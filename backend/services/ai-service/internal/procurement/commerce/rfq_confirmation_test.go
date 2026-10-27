@@ -43,8 +43,8 @@ func (f *fakeConfirmedRfqSnapshotRepo) InsertConfirmedRfqSnapshot(ctx context.Co
 		ID: int64(f.insertCalls), BuyerID: in.BuyerID, RequestID: in.RequestID,
 		RequestRevisionID: in.RequestRevisionID, PricePreviewID: in.PricePreviewID,
 		PricePreviewVersion: in.PricePreviewVersion, QualityKnowledgeState: in.QualityKnowledgeState,
-		PricingMode: in.PricingMode, CanonicalPayloadJSON: in.CanonicalPayloadJSON,
-		PayloadHash: in.PayloadHash, ClientRequestID: in.ClientRequestID, ExpiresAt: in.ExpiresAt,
+		CanonicalPayloadJSON: in.CanonicalPayloadJSON,
+		PayloadHash:          in.PayloadHash, ClientRequestID: in.ClientRequestID, ExpiresAt: in.ExpiresAt,
 	}
 	if f.byIdempotencyKey == nil {
 		f.byIdempotencyKey = map[string]repository.ConfirmedRfqSnapshot{}
@@ -133,8 +133,7 @@ func TestConfirmRfqSnapshot_SellerFacingProjection_ExcludesRawQuantilesAndLaneMa
 	repo := &fakeConfirmedRfqSnapshotRepo{}
 	previewReader := fakePricePreviewReader{ownerID: identity.BuyerID(1), preview: pricing.PricePreviewResult{
 		PricePreviewID: 1, Version: 1, PayloadHash: "preview-hash",
-		ReferencePriceRange: &pricing.ReferencePriceRange{Lower: testkit.Ptr(30.25), Midpoint: 35.5, Upper: testkit.Ptr(41.75)},
-		RequestID:           validPreviewRequestID, RequestRevisionID: validPreviewRevisionID, ExpiresAt: validPreviewExpiresAt(),
+		RequestID: validPreviewRequestID, RequestRevisionID: validPreviewRevisionID, ExpiresAt: validPreviewExpiresAt(),
 	}}
 	uc := NewConfirmRfqSnapshotUseCase(repo, previewReader, testkit.FakeRevisionReader{RevisionID: 1})
 
@@ -402,9 +401,9 @@ func confirmSlotsFixture(item string, quantity int, city string) domain.Slots {
 	return domain.Slots{
 		Item: testkit.Ptr(item),
 		ItemResolution: &domain.ItemResolution{
-			Kind: domain.ItemResolvedCrop, Code: testkit.Ptr("CABBAGE_EARLY_AUTUMN"),
-			Label: "甘藍-初秋", FallbackGroupCode: testkit.Ptr("CABBAGE"),
-			PricePerKg: testkit.Ptr(42), Provenance: domain.ItemResolutionBySystem,
+			Kind:  domain.ItemResolvedSelfPriced,
+			Label: "甘藍-初秋", CategoryID: "17",
+			PricePerKg: testkit.Ptr(42), Provenance: domain.ItemResolutionByBuyerChoice,
 		},
 		Quantity:           testkit.Ptr(quantity),
 		Unit:               testkit.Ptr("KG"),
@@ -421,8 +420,6 @@ func confirmSlotsFixture(item string, quantity int, city string) domain.Slots {
 func confirmPreviewFixture() pricing.PricePreviewResult {
 	return pricing.PricePreviewResult{
 		PricePreviewID: 1, Version: 1, PayloadHash: "preview-hash",
-		PricingMode:         "PRICEBOOK_GUIDED",
-		ReferencePriceRange: &pricing.ReferencePriceRange{Lower: testkit.Ptr(30.25), Midpoint: 35.5, Upper: testkit.Ptr(41.75)},
 		BuyerRequestedRange: pricing.BuyerRequestedRange{
 			Currency: "TWD", PriceComponent: "GOODS_ONLY",
 			LowerBoundAmount: "30", UpperBoundAmount: "42",
@@ -450,7 +447,7 @@ func confirmWithSlots(t *testing.T, slots domain.Slots, clientRequestID string) 
 }
 
 // 這是 D1 決策 B 存在的理由：擴大 preimage 之前，兩張品項／數量／配送城市完全
-// 不同的詢價單，只要 pricing mode 與價格區間相同，payload_hash 就一模一樣——
+// 不同的詢價單，只要價格區間相同，payload_hash 就一模一樣——
 // 買家接受時拿它做 CAS，證明不了賣家報價當時看到的是哪一張詢價單。
 func TestConfirmRfqSnapshot_SamePricingDifferentRequirement_ProducesDifferentPayloadHash(t *testing.T) {
 	first, _ := confirmWithSlots(t, confirmSlotsFixture("高麗菜", 300, "臺中市"), "confirm-hash-a")
@@ -471,7 +468,6 @@ func TestConfirmRfqSnapshot_EachRequirementField_ChangesPayloadHash(t *testing.T
 		"item": func(s domain.Slots) domain.Slots { s.Item = testkit.Ptr("青江菜"); return s },
 		"itemResolution": func(s domain.Slots) domain.Slots {
 			r := *s.ItemResolution
-			r.Code = testkit.Ptr("BOK_CHOY")
 			r.Label = "青江菜"
 			s.ItemResolution = &r
 			return s
@@ -521,7 +517,7 @@ func TestConfirmRfqSnapshot_CanonicalPayload_CarriesSellerFacingRequirement(t *t
 	if !ok {
 		t.Fatalf("payload 缺 itemResolution，內容：%s", payload)
 	}
-	if resolution["kind"] != string(domain.ItemResolvedCrop) || resolution["code"] != "CABBAGE_EARLY_AUTUMN" || resolution["label"] != "甘藍-初秋" {
+	if resolution["kind"] != string(domain.ItemResolvedSelfPriced) || resolution["label"] != "甘藍-初秋" {
 		t.Errorf("itemResolution 身分欄位不符：%v", resolution)
 	}
 }
@@ -537,7 +533,6 @@ func TestConfirmRfqSnapshot_ExpandedPayload_StillExcludesBuyerPrivateSlots(t *te
 		"pricePerKg", "price_per_kg",
 		"exactMatchRequired", "exact_match_required",
 		"provenance", "Provenance",
-		"fallbackGroupCode", "fallback_group_code",
 	} {
 		if strings.Contains(string(payload), forbidden) {
 			t.Errorf("canonical_payload_json 含非 seller-facing 欄位 %q，內容：%s", forbidden, payload)
@@ -616,7 +611,6 @@ func TestConfirmRfqSnapshot_CanonicalPayloadKeysAreCamelCaseAllTheWayDown(t *tes
 
 	var got struct {
 		BuyerRequestedRange map[string]json.RawMessage `json:"buyerRequestedRange"`
-		ReferencePriceRange map[string]json.RawMessage `json:"referencePriceRange"`
 	}
 	if err := json.Unmarshal(payload, &got); err != nil {
 		t.Fatalf("反序列化 canonical payload 失敗：%v，內容：%s", err, payload)
@@ -625,11 +619,6 @@ func TestConfirmRfqSnapshot_CanonicalPayloadKeysAreCamelCaseAllTheWayDown(t *tes
 	for _, want := range []string{"currency", "priceComponent", "lowerBoundAmount", "upperBoundAmount", "basisQuantity", "basisUnit"} {
 		if _, ok := got.BuyerRequestedRange[want]; !ok {
 			t.Errorf("buyerRequestedRange 缺少鍵 %q，實際鍵：%v", want, keysOf(got.BuyerRequestedRange))
-		}
-	}
-	for _, want := range []string{"lower", "midpoint", "upper"} {
-		if _, ok := got.ReferencePriceRange[want]; !ok {
-			t.Errorf("referencePriceRange 缺少鍵 %q，實際鍵：%v", want, keysOf(got.ReferencePriceRange))
 		}
 	}
 }

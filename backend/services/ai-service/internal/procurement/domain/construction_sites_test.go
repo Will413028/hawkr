@@ -11,10 +11,8 @@ import (
 )
 
 var itemResolutionConstructionSites = map[string]string{
-	"procurement/domain/item_resolution.go":        "建構子本體",
-	"procurement/cropidentity/crop_gate.go":        "CategoryFromSelection：系統解析，分類來自買家已確認到的分類階段",
-	"procurement/usecase/crop_selection_resume.go": "CategoryFromSelection：resume 後重新解析，來源同上",
-	"procurement/usecase/answer.go":                "CategoryFromSelection：自填價逃生艙沿用已確認的分類",
+	"procurement/domain/item_resolution.go": "建構子本體",
+	"procurement/usecase/answer.go":         "CategoryFromSelection：自填價逃生艙沿用已確認的分類",
 }
 
 func TestItemResolutionConstructionSitesAreRegistered(t *testing.T) {
@@ -32,7 +30,7 @@ func TestItemResolutionConstructionSitesAreRegistered(t *testing.T) {
 			return rErr
 		}
 		src := string(b)
-		for _, ctor := range []string{"NewSystemItemResolution(", "NewBuyerChoiceItemResolution(", "NewSelfPricedItemResolution("} {
+		for _, ctor := range []string{"NewSelfPricedItemResolution("} {
 			if strings.Contains(src, ctor) {
 				rel := filepath.ToSlash(path)
 				if i := strings.Index(rel, "procurement/"); i >= 0 {
@@ -54,7 +52,7 @@ func TestItemResolutionConstructionSitesAreRegistered(t *testing.T) {
 	sort.Strings(unregistered)
 	require.Empty(t, unregistered,
 		"新的 ItemResolution 建構點必須登記在 itemResolutionConstructionSites 並寫明分類來源。"+
-			"2026-09-18 兩次漏接（pricebookCard 與 drillDownGroup）都是因為沒有任何清單枚舉建構點，"+
+			"2026-09-18 兩次漏接（兩條召回路徑）都是因為沒有任何清單枚舉建構點，"+
 			"改一個漏一個。登記時一併在 TestEveryConstructionSiteDeclaresCategoryOrigin 補案例。")
 
 	var missing []string
@@ -68,25 +66,12 @@ func TestItemResolutionConstructionSitesAreRegistered(t *testing.T) {
 }
 
 func TestEveryConstructionSiteDeclaresCategoryOrigin(t *testing.T) {
-	crop, group, commodity := "LA1", "moa-group:abc", "958000000000000001"
 	sel := &CropSelection{Stage: CropSelectionItem, ParentCategoryID: "1242", ParentLabel: "甘藍"}
 
 	cases := []struct {
 		site string
 		got  *ItemResolution
 	}{
-		{"NewSystemItemResolution／CROP（crop_gate、crop_selection_resume 走這條）",
-			NewSystemItemResolution(&crop, nil, nil, nil, "甘藍-初秋", CategoryFromSelection(sel))},
-		{"NewSystemItemResolution／GROUP",
-			NewSystemItemResolution(nil, &group, nil, nil, "甘藍", CategoryFromSelection(sel))},
-		{"NewSystemItemResolution／COMMODITY",
-			NewSystemItemResolution(nil, nil, &commodity, nil, "毛豬（規格豬）", CategoryFromSelection(sel))},
-		{"NewBuyerChoiceItemResolution／作物卡（pricebookCard 與 drillDownGroup 都灌進這條）",
-			NewBuyerChoiceItemResolution(CropDisambiguationOption{
-				Label: "甘藍-初秋", CropCode: &crop, EntityCategoryID: "1242"})},
-		{"NewBuyerChoiceItemResolution／整個大類",
-			NewBuyerChoiceItemResolution(CropDisambiguationOption{
-				Label: "整個甘藍都可以", ResolvedLabel: "甘藍", GroupCode: &group, EntityCategoryID: "1242"})},
 		{"NewSelfPricedItemResolution／自填價逃生艙",
 			NewSelfPricedItemResolution(450, "甘藍", CategoryFromSelection(sel))},
 	}

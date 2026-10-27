@@ -9,31 +9,13 @@ import (
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/cropidentity"
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/domain"
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/testkit"
-	pbusecase "github.com/Will413028/hawkr/ai-service/internal/usecase"
 	"github.com/stretchr/testify/require"
 )
 
-func cropOpt(code, name string, hasForecast bool) pbusecase.CropCatalogMatch {
-	c, n := code, name
-	return pbusecase.CropCatalogMatch{
-		MatchType: "crop", GroupCode: "N04-001", GroupName: "甘藍",
-		CropCode: &c, CropName: &n, HasForecast: hasForecast,
-	}
-}
+func TestDisambiguationUseCase_CategoryCandidates_ReachInterruptPayload(t *testing.T) {
+	uc := cropidentity.NewDisambiguationUseCase(testkit.VegetableTree(), nil)
 
-func TestDisambiguationUseCase_DrilledDown_CandidatesReachInterruptPayload(t *testing.T) {
-	client := &testkit.FakePricebookClient{
-		PriceableMatches: []pbusecase.PriceableEntityMatch{
-			{Kind: "CROP_GROUP", Code: "N04-001", Name: "甘藍", MatchedForm: "甘藍", FormKind: "CANONICAL", Tier: 0, Rank: 1, GroupCode: "N04-001", HasForecast: true},
-		},
-		GroupCrops: []pbusecase.CropCatalogMatch{
-			cropOpt("LA1", "甘藍-初秋", true),
-			cropOpt("LA2", "甘藍-改良種", true),
-		},
-	}
-	uc := cropidentity.NewDisambiguationUseCase(client, nil, nil)
-
-	res, err := uc.Resolve(context.Background(), "高麗菜")
+	res, err := uc.Resolve(context.Background(), "蔬菜")
 	require.NoError(t, err)
 	require.True(t, res.NeedsDisambiguation)
 
@@ -41,14 +23,17 @@ func TestDisambiguationUseCase_DrilledDown_CandidatesReachInterruptPayload(t *te
 		Kind:          cropDisambiguationInterruptKind,
 		PendingReason: domain.CropPendingReasonAmbiguous,
 		Candidates:    res.Candidates,
+		Selection:     res.Selection,
 	})
 	require.NoError(t, err)
 
 	var decoded CropDisambiguationInterruptPayload
 	require.NoError(t, json.Unmarshal(payloadJSON, &decoded))
 	require.Equal(t, domain.CropPendingReasonAmbiguous, decoded.PendingReason)
-	require.Len(t, decoded.Candidates, 3, "兩個子品項 + 一個「整個大類都可以」")
-	require.Equal(t, "LA1", *decoded.Candidates[0].CropCode)
+	require.Len(t, decoded.Candidates, 2, "葉菜類與根莖類兩個中層分類")
+	require.Equal(t, "4", decoded.Candidates[0].CategoryID)
+	require.Equal(t, 2, decoded.Candidates[0].CategoryLevel)
+	require.Equal(t, domain.CropSelectionGroup, decoded.Selection.Stage)
 }
 
 func categoryResumeQuestion(stage string) *CropDisambiguationInterruptPayload {
@@ -134,7 +119,6 @@ func TestCategoryManualPrice_PreservesConfirmedCategoryWithoutPricingCodes(t *te
 	require.False(t, out.Pending)
 	require.Equal(t, "24", out.Resolution.CategoryID)
 	require.Equal(t, domain.ItemResolvedSelfPriced, out.Resolution.Kind)
-	require.Nil(t, out.Resolution.Code)
 	require.Equal(t, 220, *out.Resolution.PricePerKg)
 }
 
@@ -150,7 +134,6 @@ func TestCategoryManualPrice_PreservesBroadCategoryWhenNoChildMatches(t *testing
 			require.NoError(t, err)
 			require.Equal(t, "8", out.Resolution.CategoryID)
 			require.Equal(t, "豬肉", out.Resolution.Label)
-			require.Nil(t, out.Resolution.Code)
 			require.Equal(t, domain.ItemResolvedSelfPriced, out.Resolution.Kind)
 		})
 	}
@@ -190,7 +173,6 @@ func TestCategoryManualPrice_DoesNotClassifyReplacementDescriptionAsOriginalItem
 					require.Equal(t, strings.TrimSpace(tc.description), *out.Item)
 					require.Equal(t, domain.ItemResolvedSelfPriced, out.Resolution.Kind)
 					require.Equal(t, 220, *out.Resolution.PricePerKg)
-					require.Nil(t, out.Resolution.Code)
 					require.Equal(t, domain.ItemResolutionByBuyerChoice, out.Resolution.Provenance)
 					if tc.keep {
 						require.Equal(t, categoryID, out.Resolution.CategoryID)

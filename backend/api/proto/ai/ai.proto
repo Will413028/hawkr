@@ -462,36 +462,29 @@ message Slots {
     optional ItemResolution item_resolution = 10;
 }
 
-// ItemResolution 是買家原話（Slots.item）被判定成 Pricebook 分類體系裡的哪一層，
-// 以及那個判定是誰做的。它決定報價的價格基準（同一大類內品種間實測差 2.96 倍），
-// 因此必須對買家可見且可更正——存在後端當內部狀態等於讓買家為看不見的東西付錢。
+// ItemResolution 是買家原話（Slots.item）被判定成平台分類樹的哪個節點與買家填的
+// 單價，以及那個判定是誰做的。必須對買家可見且可更正。
 message ItemResolution {
-    // CROP｜GROUP｜SELF_PRICED，三者互斥。字串而非 enum，同本檔
-    // price_availability／pricing_mode 的既有慣例。
+    reserved 2;
+    reserved "code";
+    // 目前只有 SELF_PRICED。字串而非 enum。
     string kind = 1;
-    // kind 對應的識別碼：CROP 是 crop_code、GROUP 是 group_code。
-    // SELF_PRICED 沒有 code（品項本來就不在分類體系內），恆為空。
-    optional string code = 2;
-    // 分類名稱（「甘藍-初秋」「甘藍」）。SELF_PRICED 時為空。
+    // 分類名稱。
     string label = 3;
-    // SYSTEM（檢索只命中一個候選，系統直接定案，買家沒有被問過）｜
     // BUYER_CHOICE（買家在消歧卡上親自挑的，含自填價逃生艙）。
-    // 前端據此分流呈現：SYSTEM 要提示可更正，BUYER_CHOICE 是已確認態。
     string provenance = 4;
-    // 只在 kind == SELF_PRICED 時有值；新台幣元／公斤，字串（CLAUDE.md §4：
-    // 對外金額一律字串）。
+    // 新台幣元／公斤，字串（CLAUDE.md §4：對外金額一律字串）。
     optional string price_per_kg = 5;
-    // 伺服器組好的顯示字串（「甘藍-初秋」／「甘藍（整個大類）」／「自訂品項，
-    // 單價 95 元／公斤」）。**前端不得自己用 kind＋label 重拼**：那會讓 slots 面板
-    // 與 recordedThisTurn 的 chip 出現兩套文案，而 chip 用的就是這個值。同
-    // SlotLabels／StepLabels 的既有結構性防呆。
+    // 伺服器組好的顯示字串（「自訂品項，單價 95 元／公斤」）。**前端不得自己用
+    // kind＋label 重拼**：那會讓 slots 面板與 recordedThisTurn 的 chip 出現兩套
+    // 文案，而 chip 用的就是這個值。
     string display_value = 6;
 }
 
 message CropDisambiguationOption {
+    reserved 2, 3;
+    reserved "crop_code", "group_code";
     string label = 1;
-    optional string crop_code = 2;
-    optional string group_code = 3;
 }
 
 // BusinessError 是 procurement RPC 透過 status.WithDetails() 附掛的機器可讀錯誤細節
@@ -605,8 +598,8 @@ message GetSnapshotRequest {
 }
 
 message CropResolution {
-    optional string resolved_crop_code = 1;
-    optional string resolved_group_code = 2;
+    reserved 1, 2;
+    reserved "resolved_crop_code", "resolved_group_code";
     repeated CropDisambiguationOption candidates = 3;
 }
 
@@ -694,7 +687,7 @@ message UnitBasis {
 
 message SellerQuotePayload {
     string response_type = 1;          // MANUAL_QUOTE | ACCEPT_NON_PRICE_TERMS_WITH_QUOTE
-    OfferedQuality offered_quality = 2; // 必填；⛔ 不得由平台、LLM 或 Pricebook 代填
+    OfferedQuality offered_quality = 2; // 必填；⛔ 不得由平台或 LLM 代填
     UnitBasis unit_basis = 3;
     string offered_quantity = 4;
     string offered_quantity_unit = 5;
@@ -1033,8 +1026,7 @@ message CandidateItem {
     //
     // 刻意不加商品層的圖片與標價：候選的單位是**收件人**不是品項（本票是 #2450
     // DIRECT_RECIPIENTS 的前置），EXTERNAL lane 也根本沒有平台商品。價格尤其不放這裡——
-    // 設計書 57 §1.1-2 只認四種價格事實，商品標價不在其中；買家該看到的是 Pricebook 對
-    // 該品項的參考價區間（referencePriceRange，屬 #2403）。
+    // 設計書 57 §1.1-2 只認四種價格事實，商品標價不在其中。
     //
     // ⛔ store_id **不是授權判準**：商品可以移店，快照會過期。要判斷「這個商品現在屬於
     //    誰」一律重新問 product-service（services/ai-service/internal/procurement/usecase/
@@ -1107,7 +1099,7 @@ message SubmitAnswerRequest {
     string expected_revision_id = 7;
     string client_request_id = 8;
     // self_entered_price_amount 只在 slot_key=="crop_disambiguation" 且
-    // option_id=="crop-other" 時使用（品項落在 Pricebook 分類設計書 §5）。
+    // option_id=="crop-other" 時使用（品項不在分類樹內）。
     // 字串（金額欄位一律字串慣例），空字串表示未提供。
     string self_entered_price_amount = 9;
 }
@@ -1171,17 +1163,16 @@ message DeleteConversationRequest {
     string client_request_id = 2;
 }
 
-// BuyerRequestedRange 同時是 RfqPricePreviewRequest 的輸入（買家自己給的範圍，
-// 第一次呼叫可省略）與 RfqPricePreviewResponse 的輸出（Server 回顯，PRICEBOOK_GUIDED
-// 且買家未給時以參考區間下上界預填——見 usecase.PreviewRfqPriceUseCase.PreviewRfqPrice）。
+// BuyerRequestedRange 同時是 RfqPricePreviewRequest 的輸入（買家自己給的範圍）與
+// RfqPricePreviewResponse 的輸出（Server 回顯並補上計價基準）。
 message BuyerRequestedRange {
     string currency = 1;
     string price_component = 2;
     string lower_bound_amount = 3;
     string upper_bound_amount = 4;
     // basis_quantity/basis_unit：這個價格是「每多少單位的什麼單位」——例如 GRAM
-    // 計價的品項固定 "1000"/"GRAM"（Pricebook 以每 1000 克計價避免四捨五入到
-    // 趨近零），其餘情況 "1"/<unit>（見 usecase.BuyerRequestedRange 與
+    // 計價的品項固定 "1000"/"GRAM"（每 1000 克計價避免四捨五入到趨近零），
+    // 其餘情況 "1"/<unit>（見 usecase.BuyerRequestedRange 與
     // usecase.PreviewRfqPriceUseCase.PreviewRfqPrice）。只在 RESPONSE 方向由
     // Server 計算並回填；買家送出 REQUEST 時不會（也不需要）帶這兩個欄位，
     // Server 也不讀取 request 方向的這兩個欄位。
@@ -1193,89 +1184,10 @@ message RfqPricePreviewRequest {
     string request_id = 1;
     string expected_revision_id = 2;
     string client_request_id = 3;
-    string pricing_mode = 4;
+    reserved 4;
+    reserved "pricing_mode";
     string delivery_city = 5;
     BuyerRequestedRange buyer_requested_range = 6;
-}
-
-// ReferencePriceRange 只在 PRICEBOOK_GUIDED 且 mapping 可靠時存在
-// （usecase.PricePreviewResult.ReferenceAvailability=="AVAILABLE"）；
-// BUYER_ENTERED_NO_REFERENCE 時 RfqPricePreviewResponse 不設這個欄位（null）。
-message ReferencePriceRange {
-    string lower_bound_amount = 1;
-    string midpoint_amount = 2;
-    string upper_bound_amount = 3;
-    // basis_quantity/basis_unit：這三個金額是「每多少單位的什麼單位」的價格，
-    // 語意與計算方式跟 BuyerRequestedRange 的同名欄位完全一致（同一支
-    // usecase.referenceBasis 產出，不是第二套規則）。Server 端一律回填，
-    // 讓 client 拿到金額的同時就拿到它的計價基準，不必自己從
-    // buyer_requested_range 推導、也不必自己乘任何換算係數
-    // （v6 設計稿 03「計價基準」那一行）。
-    string basis_quantity = 4;
-    string basis_unit = 5;
-}
-
-// DealTemperature 是成交溫度計 v1：買家希望詢價區間涵蓋 Pricebook 預測分布多少
-// 質量（docs/詳細設計書/64 §2-5）。兩個機率都是
-// 關於市場價格，不是關於賣家會不會回應——後者需要歷史 outcome，屬
-// outcomeDefinitionVersion 2。
-//
-// status == "UNKNOWN" 時 3–9 號欄位一律空字串；status == "AVAILABLE" 時 3–9 必須
-// 全部有值，缺任一欄即由讀取端 fail closed。
-message DealTemperature {
-    string status = 1;
-    string reason_code = 2;
-    string probability_lower_bps = 3;        // 嚴格界：落在買家區間內
-    string probability_upper_bps = 4;        // 寬鬆界：不超過買家上限
-    string band = 5;                         // COLD | WARM | HOT
-    string outcome_definition = 6;
-    string outcome_definition_version = 7;
-    string policy_version = 8;
-    string band_version = 9;
-}
-
-// MarketPriceBasis 揭露「這組參考價是從哪一份市場資料算出來的」（v6 設計稿 03
-// 市場價格參考區塊的「資料截至」與「計價基準」兩行）。與 reference_price_range
-// 同生同滅——只在 reference_availability=="AVAILABLE" 時存在，
-// BUYER_ENTERED_NO_REFERENCE 完全不查 Pricebook，這個欄位為 null。
-//
-// 值全部原樣來自 pricebook-service 的 GetRegionalComparisonResponse，不由
-// ai-service 重算或補值（見 usecase.PreviewRfqPriceUseCase.PreviewRfqPrice）。
-message MarketPriceBasis {
-    // region_name 是實際命中的 Pricebook 縣市名，不是買家送出的 delivery_city
-    // 原文——兩者要經 domain.NormalizeCityName 消除「臺／台」雙寫差異後才比對
-    // 得中，所以這裡回實際採用的那一個，讓買家看得到自己被對到哪個區域。
-    string region_name = 1;
-    // supporting_market_count 是這個縣市底下實際貢獻資料的批發市場家數，
-    // 對應 pricebook.proto RegionalComparisonRegion.supporting_market_count
-    // （那支是 service 之間的內部 RPC，用 int32；這裡是對外曝露面，依 Proto
-    // 管理規範 §6 計數一律 string，轉換發生在 gRPC 邊界）。
-    string supporting_market_count = 2;
-    // source_data_as_of 是這份行情資料涵蓋到的最後交易日（RFC3339 UTC），取自
-    // GetRegionalComparisonResponse.lineage.source_data_as_of。pricebook-service
-    // 在沒有底層資料時本來就會省略它，因此這裡是 optional，不得補成空字串或
-    // 當下時間假裝資料是新的。
-    optional string source_data_as_of = 3;
-    // freshness_status：fresh | stale | unavailable，pricebook-service 既有值域
-    // （這個縣市底下貢獻資料的市場中最差的新鮮度）。
-    //
-    // 純揭露，不參與 reference_availability 的判定——PreviewRfqPrice 的
-    // mapping 可靠性只看 status=="ready" 且 p50 非 nil，stale 資料照樣算出參考
-    // 價（與 /quote-batches 既有的 domain.MatchRegionPrice 一致，那裡也是照樣
-    // 取價、只把 availability 降級成 MARKET_STALE）。本欄位讓前端有辦法對買家
-    // 標示「行情資料較舊」，而不是把資料整批擋掉。
-    string freshness_status = 4;    // scope：REGION（這份行情對應到某一個縣市）或 NATIONAL（全國單一行情，
-    // 沒有區域維度）。多來源之後不是每條序列都有區域維度——白肉雞、雞蛋、
-    // 鴨鵝的來源一天只回一列。用明確的 scope 而不是「region_name 空的就當
-    // 全國」：後者讓「全國行情」與「區域比對失敗」在 wire 上長得一樣。
-    string scope = 5;
-    // price_layer：wholesale_auction｜farmgate｜live_animal｜retail｜
-    // wholesale_bulk。空字串代表既有的蔬果批發路徑。
-    //
-    // 🔴 這不是附加資訊。毛豬回的是活體拍賣均價，不是豬肉分切零售價，兩者
-    // 水平差數倍——把參考價給買家卻不說它是哪一個層級，買家會照著它出價。
-    // client 必須與金額一起顯示。
-    string price_layer = 6;
 }
 
 // QuoteTotalRange 是伺服器依「買家這次的單價範圍」與「需求數量」算出的詢價總額
@@ -1299,15 +1211,11 @@ message QuoteTotalRange {
 message RfqPricePreviewResponse {
     string price_preview_id = 1;
     string version = 2;
-    string pricing_mode = 3;
-    string reference_availability = 4;
-    ReferencePriceRange reference_price_range = 5;
+    reserved 3, 4, 5, 7, 9;
+    reserved "pricing_mode", "reference_availability", "reference_price_range", "deal_temperature", "market_price_basis";
     BuyerRequestedRange buyer_requested_range = 6;
-    DealTemperature deal_temperature = 7;
     string payload_hash = 8;
-    // market_price_basis／quote_total_range 是 v6 設計稿 03 市場價格參考區塊的
-    // 兩個純附加欄位，各自可為 null（條件見兩個 message 自己的註解）。
-    MarketPriceBasis market_price_basis = 9;
+    // 可為 null（條件見 QuoteTotalRange）。
     QuoteTotalRange quote_total_range = 10;
     // 空字串＝本欄加入前建立的 preview，呼叫端當「未知」處理，不得補值。
     string quality_knowledge_state = 11;
@@ -1367,7 +1275,8 @@ message RfqPublicationPreviewResponse {
     string seller_facing_payload_hash = 4;
     string seller_facing_payload_json = 5;
     string expires_at = 6;
-    string deal_temperature_status = 7; // #2537 完成前恆為 UNKNOWN
+    reserved 7;
+    reserved "deal_temperature_status";
 
     // audience policy 的身分要吐回去，買家介面才講得出「這會發給誰」。
     // v1 的 WISH_POOL 是 WISH_POOL_ALL_ACTIVE_SELLERS_V1 / 1 ＝ 全站未停權賣家，
@@ -1408,13 +1317,6 @@ message GetRfqPublicationInviteSellerViewRequest {
     string invite_id = 1;
 }
 
-message SellerFacingReferenceRange {
-    string lower_bound_amount = 1;
-    string upper_bound_amount = 2;
-    string basis_quantity = 3;
-    string basis_unit = 4;
-}
-
 message SellerFacingRequestedRange {
     string currency = 1;
     string price_component = 2;
@@ -1438,7 +1340,8 @@ message RfqPublicationInviteSellerViewResponse {
     // 空字串＝買家沒有補充說明（或這張 approval 建立於本欄加入前）。原文照登，
     // 伺服器不解析也不驗證內容。
     string buyer_note = 10;
-    SellerFacingReferenceRange reference_price_range = 11;
+    reserved 11;
+    reserved "reference_price_range";
     SellerFacingRequestedRange buyer_requested_range = 12;
     // 這張 publication 的版本（十進位字串）。站外業者正式送出報價時原樣帶回來做
     // CAS，把報價綁在「他當時看到的那一版 RFQ」上——業者從 email 連結進來，可能隔
@@ -1540,7 +1443,7 @@ service AIProcurementService {
     rpc SubmitAnswer(SubmitAnswerRequest) returns (TurnResult);
     rpc Rewind(RewindRequest) returns (TurnResult);
 
-    // 買家：RFQ 報價預覽（Pricebook 參考區間，issue #2403 Slice 2）
+    // 買家：RFQ 報價預覽（issue #2403 Slice 2）
     rpc PreviewRfqPrice(RfqPricePreviewRequest) returns (RfqPricePreviewResponse);
 
     // 買家：RFQ 報價確認（對某次 price preview 產生不可變確認快照，issue #2403 Slice 3）

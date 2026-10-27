@@ -27,33 +27,22 @@ var ErrPricePreviewNotFound = errors.New("procurement: price preview not found")
 // 路徑，不是預先查詢的路徑。
 var ErrPricePreviewIdempotencyConflict = errors.New("procurement: idempotency key already used for a different price preview payload")
 
-// PricePreview 是一次「報價前試算」的完整持久化結果。ReferenceFactsHash／
-// ReferencePayloadJSON／UnavailableReason 依 ReferenceAvailability 互斥
-// （見 schema procurement.sql 的表註解），寫入端負責保證組合一致，這裡只搬運。
+// PricePreview 是一次「報價前試算」的完整持久化結果。
 type PricePreview struct {
 	ID                      int64
 	BuyerID                 identity.BuyerID
 	RequestID               int64
 	RequestRevisionID       int64
-	PricingMode             string
 	QualityKnowledgeState   string
-	ReferenceAvailability   string
-	ReferenceFactsHash      *string
-	ReferencePayloadJSON    json.RawMessage
-	UnavailableReason       *string
 	BuyerRequestedRangeJSON json.RawMessage
-	// MarketPriceBasisJSON／QuoteTotalRangeJSON 是 v6 設計稿 03 市場價格參考
-	// 區塊的兩個附加欄位（見 schema procurement.sql 的表註解）。各自可為 nil：
-	// 前者與 ReferencePayloadJSON 同生同滅，後者在需求數量未填時沒有值。
-	MarketPriceBasisJSON json.RawMessage
-	QuoteTotalRangeJSON  json.RawMessage
-	DealTemperatureJSON  json.RawMessage
-	ClientRequestID      string
-	PreviewInputHash     string
-	PayloadHash          string
-	Version              int64
-	ExpiresAt            time.Time
-	CreatedAt            time.Time
+	// QuoteTotalRangeJSON 在需求數量未填時為 nil。
+	QuoteTotalRangeJSON json.RawMessage
+	ClientRequestID     string
+	PreviewInputHash    string
+	PayloadHash         string
+	Version             int64
+	ExpiresAt           time.Time
+	CreatedAt           time.Time
 }
 
 // InsertPricePreviewInput 是一次試算寫入的完整輸入。Version 不在這裡——固定從 1 開始，
@@ -63,16 +52,9 @@ type InsertPricePreviewInput struct {
 	BuyerID                 identity.BuyerID
 	RequestID               int64
 	RequestRevisionID       int64
-	PricingMode             string
 	QualityKnowledgeState   string
-	ReferenceAvailability   string
-	ReferenceFactsHash      *string
-	ReferencePayloadJSON    json.RawMessage
-	UnavailableReason       *string
 	BuyerRequestedRangeJSON json.RawMessage
-	MarketPriceBasisJSON    json.RawMessage
 	QuoteTotalRangeJSON     json.RawMessage
-	DealTemperatureJSON     json.RawMessage
 	ClientRequestID         string
 	PreviewInputHash        string
 	PayloadHash             string
@@ -83,16 +65,9 @@ func toPricePreviewEntity(row gen.ProcurementPricePreview) PricePreview {
 	return PricePreview{
 		ID: row.ID, BuyerID: identity.BuyerID(row.BuyerID), RequestID: row.RequestID,
 		RequestRevisionID:       row.RequestRevisionID,
-		PricingMode:             row.PricingMode,
 		QualityKnowledgeState:   row.QualityKnowledgeState,
-		ReferenceAvailability:   row.ReferenceAvailability,
-		ReferenceFactsHash:      row.ReferenceFactsHash,
-		ReferencePayloadJSON:    row.ReferencePayloadJson,
-		UnavailableReason:       row.UnavailableReason,
 		BuyerRequestedRangeJSON: row.BuyerRequestedRangeJson,
-		MarketPriceBasisJSON:    row.MarketPriceBasisJson,
 		QuoteTotalRangeJSON:     row.QuoteTotalRangeJson,
-		DealTemperatureJSON:     row.DealTemperatureJson,
 		ClientRequestID:         row.ClientRequestID,
 		PreviewInputHash:        row.PreviewInputHash,
 		PayloadHash:             row.PayloadHash,
@@ -116,16 +91,9 @@ func (r *Repo) InsertPricePreview(ctx context.Context, in InsertPricePreviewInpu
 	row, err := r.q(ctx).InsertPricePreview(ctx, gen.InsertPricePreviewParams{
 		ID: id, BuyerID: int64(in.BuyerID), RequestID: in.RequestID,
 		RequestRevisionID:       in.RequestRevisionID,
-		PricingMode:             in.PricingMode,
 		QualityKnowledgeState:   in.QualityKnowledgeState,
-		ReferenceAvailability:   in.ReferenceAvailability,
-		ReferenceFactsHash:      in.ReferenceFactsHash,
-		ReferencePayloadJson:    in.ReferencePayloadJSON,
-		UnavailableReason:       in.UnavailableReason,
 		BuyerRequestedRangeJson: in.BuyerRequestedRangeJSON,
-		MarketPriceBasisJson:    in.MarketPriceBasisJSON,
 		QuoteTotalRangeJson:     in.QuoteTotalRangeJSON,
-		DealTemperatureJson:     in.DealTemperatureJSON,
 		ClientRequestID:         in.ClientRequestID,
 		PreviewInputHash:        in.PreviewInputHash,
 		PayloadHash:             in.PayloadHash,

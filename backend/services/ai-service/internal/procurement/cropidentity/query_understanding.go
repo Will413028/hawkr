@@ -11,8 +11,7 @@ import (
 
 // understandQuery 把買家原文展開成查詢變體：原文、正規化（繁簡／全半形／標點／臺→台）、
 // 人工與生成別名改寫（高麗菜→甘藍）。去重、保序；空白輸入沒有變體。
-// ai-service 不做正規化的「索引綁定」那一半（那是 pricebook 的事），這裡只負責
-// 把一句話變成幾種問法，讓每個 retriever 各自去比對。
+// 這裡只負責把一句話變成幾種問法，讓每個 retriever 各自去比對。
 func understandQuery(text string) recall.Query {
 	q := recall.Query{Text: text}
 	if strings.TrimSpace(text) == "" {

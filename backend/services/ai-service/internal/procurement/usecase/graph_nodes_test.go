@@ -196,25 +196,18 @@ func TestCropGateNode_UnavailableItem_MarksProgressPendingWithNoCandidates(t *te
 	require.Empty(t, progress.CropCandidates)
 }
 
-// TestCropGateNode_Matched_WritesResolutionAndLeavesItemRejectedUntouched 釘住
-// crop_gate 對 progress 的**完整**寫入面：它只准新增 ItemResolution（連同
-// Patch.ItemResolution，讓 terminal 的 RecordedThisTurn 看得到）與
-// CropPending／CropCandidates，不准碰 NextSlots.Item 與 Rejected。
+// TestCropGateNode_Resolved_LeavesItemRejectedAndResolutionUntouched 釘住 crop_gate
+// 對 progress 的寫入面：它只准寫 CropPending／CropCandidates／CropSelection 這組待處理
+// 狀態，不准碰 NextSlots.Item、Rejected 與 ItemResolution。
 //
 // Item 那一半是既有不變量的延續——Cut 1 之前 crop_gate 硬擋時會把 Item 退回舊值，
 // 那個 override 隨 cropidentity.GateResult.Rejected 一起移除了；沒有這支測試，日後有人把
 // override 加回來會通過本檔其他每一支測試（golden fixture 根本不讀
 // graph_turn_progress），卻悄悄破壞下游組裝。
-//
-// ItemResolution 那一半是本次重構的載重點：解析結果必須在 AppendRevision 之前就
-// 進到這一輪的 slots 與 patch，否則買家挑完候選仍然拿不到任何回饋——那正是這條線
-// 一開始要修的問題。
-func TestCropGateNode_Matched_WritesResolutionAndLeavesItemRejectedUntouched(t *testing.T) {
-	cropCode := "CROP-X"
-	groupCode := "GRP-X"
+func TestCropGateNode_Resolved_LeavesItemRejectedAndResolutionUntouched(t *testing.T) {
 	resolver := &testkit.FakeResolver[cropidentity.DisambiguationResult]{ResolveResult: cropidentity.DisambiguationResult{
-		CropCode: &cropCode, FallbackGroupCode: &groupCode, Label: "芭樂-珍珠",
-		CategoryOrigin: domain.CategoryAbsent("本測試只驗 rejected 欄位不被動到，分類來源另有專門測試"),
+		Unavailable: true,
+		Selection:   &domain.CropSelection{Stage: domain.CropSelectionPrice, CategoryID: "17", Label: "高麗菜"},
 	}}
 	node := NewCropGateNode(resolver, seqIDs(5300))
 
@@ -228,7 +221,7 @@ func TestCropGateNode_Matched_WritesResolutionAndLeavesItemRejectedUntouched(t *
 		},
 	})
 
-	_, err := runFunctionNode[CropGateOutput](t, node, ctx, ValidateSlotsOutput{Slots: domain.Slots{Item: item("芭樂")}})
+	got, err := runFunctionNode[CropGateOutput](t, node, ctx, ValidateSlotsOutput{Slots: domain.Slots{Item: item("芭樂")}})
 	require.NoError(t, err)
 
 	progress, err := readGraphTurnProgress(ctx)
@@ -236,14 +229,12 @@ func TestCropGateNode_Matched_WritesResolutionAndLeavesItemRejectedUntouched(t *
 	require.Equal(t, item("蘋果"), progress.NextSlots.Item,
 		"crop_gate 不得覆寫 Item——validate_slots 算出來的值原樣通過")
 	require.Equal(t, seedRejected, progress.Rejected, "crop_gate 不得疊加 Rejected")
-	require.Equal(t, &domain.ItemResolution{
-		Kind: domain.ItemResolvedCrop, Code: &cropCode, Label: "芭樂-珍珠",
-		FallbackGroupCode: &groupCode, Provenance: domain.ItemResolutionBySystem,
-	}, progress.NextSlots.ItemResolution)
-	require.Equal(t, progress.NextSlots.ItemResolution, progress.Patch.ItemResolution,
-		"Patch 也要帶上，否則 terminal 的 RecordedThisTurn 看不到，買家挑完候選畫面零回饋")
-	require.False(t, progress.CropPending)
+	require.Nil(t, progress.NextSlots.ItemResolution, "分類確認後待買家填單價，解析結果由 resume 寫入")
+	require.Nil(t, progress.Patch.ItemResolution)
+	require.True(t, progress.CropPending)
 	require.Empty(t, progress.CropCandidates)
+	require.Equal(t, domain.CropPendingReasonUnavailable, got.PendingReason)
+	require.Equal(t, "17", got.Selection.CategoryID)
 }
 
 // TestCropGateNode_ItemUnchanged_DoesNotOverwriteCarriedResolution 是上面那條的
@@ -251,10 +242,7 @@ func TestCropGateNode_Matched_WritesResolutionAndLeavesItemRejectedUntouched(t *
 // Slots 自己帶著走，node 不得用 nil 把它洗掉。少了這條，把寫入改成無條件覆寫會
 // 讓買家在消歧之後隨便說一句話就把剛選好的品項分類弄丟。
 func TestCropGateNode_ItemUnchanged_DoesNotOverwriteCarriedResolution(t *testing.T) {
-	carried := &domain.ItemResolution{
-		Kind: domain.ItemResolvedCrop, Code: testkit.Ptr("LA1"), Label: "甘藍-初秋",
-		Provenance: domain.ItemResolutionByBuyerChoice,
-	}
+	carried := domain.NewSelfPricedItemResolution(75, "甘藍-初秋", domain.CategoryAbsent("測試"))
 	resolver := &testkit.FakeResolver[cropidentity.DisambiguationResult]{ResolveErr: errors.New("must not be called")}
 	node := NewCropGateNode(resolver, seqIDs(5400))
 
@@ -308,12 +296,10 @@ func TestCropGateNode_CarriesPendingReasonAndFactsAsOfAcrossTheNodeBoundary(t *t
 		"查詢時刻必須跨過 node 邊界，才寫得進 procurement_agent_run_interrupts.facts_as_of")
 }
 
-// TestPricePreviewNode_MatchesDirectCall_BuyerEnteredNoReference proves
+// TestPricePreviewNode_MatchesDirectCall proves
 // price_preview's FunctionNode wrapper doesn't corrupt input/output at the
 // node boundary, exercising the BUYER_ENTERED_NO_REFERENCE branch of
-// PreviewRfqPrice — the one code path that needs no Pricebook I/O (no
-// testkit.FakePricebookClient double required; nil pricebookClient is never
-// dereferenced on this branch, see price_preview.go's PricingMode switch).
+// PreviewRfqPrice.
 //
 // Both calls share the same uc (and its fakePricePreviewRepo). The first,
 // direct call runs the real BUYER_ENTERED_NO_REFERENCE logic and inserts a
@@ -325,14 +311,14 @@ func TestCropGateNode_CarriesPendingReasonAndFactsAsOfAcrossTheNodeBoundary(t *t
 // clock to dodge time.Now() nondeterminism. That replay is a genuine branch
 // of PreviewRfqPrice, so this remains a real node-vs-direct-call comparison,
 // not a tautology.
-func TestPricePreviewNode_MatchesDirectCall_BuyerEnteredNoReference(t *testing.T) {
+func TestPricePreviewNode_MatchesDirectCall(t *testing.T) {
 	repo := &testkit.FakePricePreviewRepo{}
 	revisions := testkit.FakeRevisionReader{RevisionID: 1}
-	uc := pricing.NewPreviewRfqPriceUseCase(nil, repo, revisions)
+	uc := pricing.NewPreviewRfqPriceUseCase(repo, revisions)
 
 	in := pricing.PreviewRfqPriceInput{
 		RequestID: 1, BuyerID: identity.BuyerID(1), ClientRequestID: "test-1",
-		ExpectedRevisionID: 1, PricingMode: "BUYER_ENTERED_NO_REFERENCE",
+		ExpectedRevisionID: 1,
 		BuyerRequestedRange: &pricing.BuyerRequestedRange{
 			Currency: "TWD", LowerBoundAmount: "100", UpperBoundAmount: "200",
 		},
@@ -340,7 +326,7 @@ func TestPricePreviewNode_MatchesDirectCall_BuyerEnteredNoReference(t *testing.T
 
 	want, err := uc.PreviewRfqPrice(t.Context(), in)
 	require.NoError(t, err)
-	require.Equal(t, "UNAVAILABLE", want.ReferenceAvailability, "sanity check: this fixture must exercise BUYER_ENTERED_NO_REFERENCE, not fall through to an error path")
+	require.Equal(t, "100", want.BuyerRequestedRange.LowerBoundAmount, "sanity check: the fixture must reach the persisted preview, not fall through to an error path")
 
 	node := NewPricePreviewNode(uc)
 
@@ -626,8 +612,7 @@ func TestCropGateNode_UnavailableItem_DoesNotInvalidateValidateSlotsNarration(t 
 // 沒有硬擋就沒有推翻，敘述必須原樣留著（否則等於每一輪都把 VALIDATE_SLOTS 打回
 // 固定文案，正是本分支要修掉的東西）。
 func TestCropGateNode_NoHardBlock_KeepsValidateSlotsNarration(t *testing.T) {
-	cropCode := "CROP-X"
-	resolver := &testkit.FakeResolver[cropidentity.DisambiguationResult]{ResolveResult: cropidentity.DisambiguationResult{CropCode: &cropCode}}
+	resolver := &testkit.FakeResolver[cropidentity.DisambiguationResult]{ResolveResult: cropidentity.DisambiguationResult{Unavailable: true}}
 	node := NewCropGateNode(resolver, seqIDs(5950))
 
 	ctx := newTestAgentContext(t, map[string]any{

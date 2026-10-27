@@ -196,7 +196,6 @@ func TestGraphStageDispatch_Integration_Postgres_ReparksAndPreservesSnapshot(t *
 	require.NotNil(t, final.Result.Slots.ItemResolution)
 	require.Equal(t, "24", final.Result.Slots.ItemResolution.CategoryID)
 	require.Equal(t, 220, *final.Result.Slots.ItemResolution.PricePerKg)
-	require.Nil(t, final.Result.Slots.ItemResolution.Code)
 	require.EqualValues(t, 1, atomic.LoadInt32(&extractor.calls))
 	require.EqualValues(t, 1, resolver.initialCalls.Load())
 	require.EqualValues(t, 2, resolver.selectionCalls.Load())
@@ -233,7 +232,7 @@ func TestGraphStageDispatch_Integration_Postgres_UpgradesLegacyHandoffPause(t *t
 	}}}
 	resolver := &countingCropResolver{inner: &testkit.FakeResolver[cropidentity.DisambiguationResult]{ResolveResult: cropidentity.DisambiguationResult{
 		NeedsDisambiguation: true,
-		Candidates:          []domain.CropDisambiguationOption{{CropCode: item("LA1"), Label: "甘藍-初秋"}},
+		Candidates:          []domain.CropDisambiguationOption{{CategoryID: "17", CategoryLevel: 3, Label: "高麗菜"}},
 	}}}
 	narrator := &fakeStepNarrator{text: "需要確認品項"}
 	ids := seqIDs(2000000)
@@ -285,7 +284,7 @@ func TestGraphStageDispatch_Integration_Postgres_UpgradesLegacyHandoffPause(t *t
 	// resume 走 ResumeRunner，升級後的 graph 也要換過去，否則驗到的是舊 graph。
 	deps.ResumeRunner = ResumeRunner{Runner: deps.Runner}
 	resumed, err := ClaimAndDispatchResume(ctx, ResumeInput{BuyerID: buyerID, InterruptID: open.ID,
-		ClientRequestID: "legacy-handoff-upgraded-answer", ResponsePayload: []byte(`{"optionId":"crop-LA1"}`)},
+		ClientRequestID: "legacy-handoff-upgraded-answer", ResponsePayload: []byte(`{"optionId":"crop-other","freeText":"高麗菜","selfEnteredPriceAmount":"80"}`)},
 		repo, deps.Dispatcher, deps)
 	require.NoError(t, err)
 	require.Equal(t, domain.RunStatusSucceeded(), resumed.RunStatus)
@@ -294,8 +293,8 @@ func TestGraphStageDispatch_Integration_Postgres_UpgradesLegacyHandoffPause(t *t
 	require.Equal(t, &quantity, resumed.Result.Slots.Quantity)
 	require.Equal(t, item("KG"), resumed.Result.Slots.Unit)
 	require.NotNil(t, resumed.Result.Slots.ItemResolution)
-	require.Equal(t, item("LA1"), resumed.Result.Slots.ItemResolution.Code)
-	require.Equal(t, "甘藍-初秋", resumed.Result.Slots.ItemResolution.Label)
+	require.Equal(t, domain.ItemResolvedSelfPriced, resumed.Result.Slots.ItemResolution.Kind)
+	require.Equal(t, 80, *resumed.Result.Slots.ItemResolution.PricePerKg)
 	require.Equal(t, strconv.FormatInt(requestID, 10)+"-rev"+strconv.FormatInt(first.Result.RevisionID, 10), resumed.Result.DialoguePlan.StateVersion)
 	_, err = repo.FindOpenInterruptForRequest(ctx, requestID, buyerID)
 	require.ErrorIs(t, err, repository.ErrNotFound)

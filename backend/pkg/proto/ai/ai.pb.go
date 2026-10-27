@@ -3405,30 +3405,21 @@ func (x *Slots) GetItemResolution() *ItemResolution {
 	return nil
 }
 
-// ItemResolution 是買家原話（Slots.item）被判定成 Pricebook 分類體系裡的哪一層，
-// 以及那個判定是誰做的。它決定報價的價格基準（同一大類內品種間實測差 2.96 倍），
-// 因此必須對買家可見且可更正——存在後端當內部狀態等於讓買家為看不見的東西付錢。
+// ItemResolution 是買家原話（Slots.item）被判定成平台分類樹的哪個節點與買家填的
+// 單價，以及那個判定是誰做的。必須對買家可見且可更正。
 type ItemResolution struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// CROP｜GROUP｜SELF_PRICED，三者互斥。字串而非 enum，同本檔
-	// price_availability／pricing_mode 的既有慣例。
+	// 目前只有 SELF_PRICED。字串而非 enum。
 	Kind string `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
-	// kind 對應的識別碼：CROP 是 crop_code、GROUP 是 group_code。
-	// SELF_PRICED 沒有 code（品項本來就不在分類體系內），恆為空。
-	Code *string `protobuf:"bytes,2,opt,name=code,proto3,oneof" json:"code,omitempty"`
-	// 分類名稱（「甘藍-初秋」「甘藍」）。SELF_PRICED 時為空。
+	// 分類名稱。
 	Label string `protobuf:"bytes,3,opt,name=label,proto3" json:"label,omitempty"`
-	// SYSTEM（檢索只命中一個候選，系統直接定案，買家沒有被問過）｜
 	// BUYER_CHOICE（買家在消歧卡上親自挑的，含自填價逃生艙）。
-	// 前端據此分流呈現：SYSTEM 要提示可更正，BUYER_CHOICE 是已確認態。
 	Provenance string `protobuf:"bytes,4,opt,name=provenance,proto3" json:"provenance,omitempty"`
-	// 只在 kind == SELF_PRICED 時有值；新台幣元／公斤，字串（CLAUDE.md §4：
-	// 對外金額一律字串）。
+	// 新台幣元／公斤，字串（CLAUDE.md §4：對外金額一律字串）。
 	PricePerKg *string `protobuf:"bytes,5,opt,name=price_per_kg,json=pricePerKg,proto3,oneof" json:"price_per_kg,omitempty"`
-	// 伺服器組好的顯示字串（「甘藍-初秋」／「甘藍（整個大類）」／「自訂品項，
-	// 單價 95 元／公斤」）。**前端不得自己用 kind＋label 重拼**：那會讓 slots 面板
-	// 與 recordedThisTurn 的 chip 出現兩套文案，而 chip 用的就是這個值。同
-	// SlotLabels／StepLabels 的既有結構性防呆。
+	// 伺服器組好的顯示字串（「自訂品項，單價 95 元／公斤」）。**前端不得自己用
+	// kind＋label 重拼**：那會讓 slots 面板與 recordedThisTurn 的 chip 出現兩套
+	// 文案，而 chip 用的就是這個值。
 	DisplayValue  string `protobuf:"bytes,6,opt,name=display_value,json=displayValue,proto3" json:"display_value,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -3471,13 +3462,6 @@ func (x *ItemResolution) GetKind() string {
 	return ""
 }
 
-func (x *ItemResolution) GetCode() string {
-	if x != nil && x.Code != nil {
-		return *x.Code
-	}
-	return ""
-}
-
 func (x *ItemResolution) GetLabel() string {
 	if x != nil {
 		return x.Label
@@ -3509,8 +3493,6 @@ func (x *ItemResolution) GetDisplayValue() string {
 type CropDisambiguationOption struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Label         string                 `protobuf:"bytes,1,opt,name=label,proto3" json:"label,omitempty"`
-	CropCode      *string                `protobuf:"bytes,2,opt,name=crop_code,json=cropCode,proto3,oneof" json:"crop_code,omitempty"`
-	GroupCode     *string                `protobuf:"bytes,3,opt,name=group_code,json=groupCode,proto3,oneof" json:"group_code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3548,20 +3530,6 @@ func (*CropDisambiguationOption) Descriptor() ([]byte, []int) {
 func (x *CropDisambiguationOption) GetLabel() string {
 	if x != nil {
 		return x.Label
-	}
-	return ""
-}
-
-func (x *CropDisambiguationOption) GetCropCode() string {
-	if x != nil && x.CropCode != nil {
-		return *x.CropCode
-	}
-	return ""
-}
-
-func (x *CropDisambiguationOption) GetGroupCode() string {
-	if x != nil && x.GroupCode != nil {
-		return *x.GroupCode
 	}
 	return ""
 }
@@ -4246,12 +4214,10 @@ func (x *GetSnapshotRequest) GetRequestId() string {
 }
 
 type CropResolution struct {
-	state             protoimpl.MessageState      `protogen:"open.v1"`
-	ResolvedCropCode  *string                     `protobuf:"bytes,1,opt,name=resolved_crop_code,json=resolvedCropCode,proto3,oneof" json:"resolved_crop_code,omitempty"`
-	ResolvedGroupCode *string                     `protobuf:"bytes,2,opt,name=resolved_group_code,json=resolvedGroupCode,proto3,oneof" json:"resolved_group_code,omitempty"`
-	Candidates        []*CropDisambiguationOption `protobuf:"bytes,3,rep,name=candidates,proto3" json:"candidates,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state         protoimpl.MessageState      `protogen:"open.v1"`
+	Candidates    []*CropDisambiguationOption `protobuf:"bytes,3,rep,name=candidates,proto3" json:"candidates,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CropResolution) Reset() {
@@ -4282,20 +4248,6 @@ func (x *CropResolution) ProtoReflect() protoreflect.Message {
 // Deprecated: Use CropResolution.ProtoReflect.Descriptor instead.
 func (*CropResolution) Descriptor() ([]byte, []int) {
 	return file_ai_ai_proto_rawDescGZIP(), []int{59}
-}
-
-func (x *CropResolution) GetResolvedCropCode() string {
-	if x != nil && x.ResolvedCropCode != nil {
-		return *x.ResolvedCropCode
-	}
-	return ""
-}
-
-func (x *CropResolution) GetResolvedGroupCode() string {
-	if x != nil && x.ResolvedGroupCode != nil {
-		return *x.ResolvedGroupCode
-	}
-	return ""
 }
 
 func (x *CropResolution) GetCandidates() []*CropDisambiguationOption {
@@ -4777,7 +4729,7 @@ func (x *UnitBasis) GetUnit() string {
 type SellerQuotePayload struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	ResponseType        string                 `protobuf:"bytes,1,opt,name=response_type,json=responseType,proto3" json:"response_type,omitempty"`       // MANUAL_QUOTE | ACCEPT_NON_PRICE_TERMS_WITH_QUOTE
-	OfferedQuality      *OfferedQuality        `protobuf:"bytes,2,opt,name=offered_quality,json=offeredQuality,proto3" json:"offered_quality,omitempty"` // 必填；⛔ 不得由平台、LLM 或 Pricebook 代填
+	OfferedQuality      *OfferedQuality        `protobuf:"bytes,2,opt,name=offered_quality,json=offeredQuality,proto3" json:"offered_quality,omitempty"` // 必填；⛔ 不得由平台或 LLM 代填
 	UnitBasis           *UnitBasis             `protobuf:"bytes,3,opt,name=unit_basis,json=unitBasis,proto3" json:"unit_basis,omitempty"`
 	OfferedQuantity     string                 `protobuf:"bytes,4,opt,name=offered_quantity,json=offeredQuantity,proto3" json:"offered_quantity,omitempty"`
 	OfferedQuantityUnit string                 `protobuf:"bytes,5,opt,name=offered_quantity_unit,json=offeredQuantityUnit,proto3" json:"offered_quantity_unit,omitempty"`
@@ -7384,8 +7336,7 @@ type CandidateItem struct {
 	//
 	// 刻意不加商品層的圖片與標價：候選的單位是**收件人**不是品項（本票是 #2450
 	// DIRECT_RECIPIENTS 的前置），EXTERNAL lane 也根本沒有平台商品。價格尤其不放這裡——
-	// 設計書 57 §1.1-2 只認四種價格事實，商品標價不在其中；買家該看到的是 Pricebook 對
-	// 該品項的參考價區間（referencePriceRange，屬 #2403）。
+	// 設計書 57 §1.1-2 只認四種價格事實，商品標價不在其中。
 	//
 	// ⛔ store_id **不是授權判準**：商品可以移店，快照會過期。要判斷「這個商品現在屬於
 	//
@@ -7868,7 +7819,7 @@ type SubmitAnswerRequest struct {
 	ExpectedRevisionId string                 `protobuf:"bytes,7,opt,name=expected_revision_id,json=expectedRevisionId,proto3" json:"expected_revision_id,omitempty"`
 	ClientRequestId    string                 `protobuf:"bytes,8,opt,name=client_request_id,json=clientRequestId,proto3" json:"client_request_id,omitempty"`
 	// self_entered_price_amount 只在 slot_key=="crop_disambiguation" 且
-	// option_id=="crop-other" 時使用（品項落在 Pricebook 分類設計書 §5）。
+	// option_id=="crop-other" 時使用（品項不在分類樹內）。
 	// 字串（金額欄位一律字串慣例），空字串表示未提供。
 	SelfEnteredPriceAmount string `protobuf:"bytes,9,opt,name=self_entered_price_amount,json=selfEnteredPriceAmount,proto3" json:"self_entered_price_amount,omitempty"`
 	unknownFields          protoimpl.UnknownFields
@@ -8524,9 +8475,8 @@ func (x *DeleteConversationRequest) GetClientRequestId() string {
 	return ""
 }
 
-// BuyerRequestedRange 同時是 RfqPricePreviewRequest 的輸入（買家自己給的範圍，
-// 第一次呼叫可省略）與 RfqPricePreviewResponse 的輸出（Server 回顯，PRICEBOOK_GUIDED
-// 且買家未給時以參考區間下上界預填——見 usecase.PreviewRfqPriceUseCase.PreviewRfqPrice）。
+// BuyerRequestedRange 同時是 RfqPricePreviewRequest 的輸入（買家自己給的範圍）與
+// RfqPricePreviewResponse 的輸出（Server 回顯並補上計價基準）。
 type BuyerRequestedRange struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Currency         string                 `protobuf:"bytes,1,opt,name=currency,proto3" json:"currency,omitempty"`
@@ -8534,8 +8484,8 @@ type BuyerRequestedRange struct {
 	LowerBoundAmount string                 `protobuf:"bytes,3,opt,name=lower_bound_amount,json=lowerBoundAmount,proto3" json:"lower_bound_amount,omitempty"`
 	UpperBoundAmount string                 `protobuf:"bytes,4,opt,name=upper_bound_amount,json=upperBoundAmount,proto3" json:"upper_bound_amount,omitempty"`
 	// basis_quantity/basis_unit：這個價格是「每多少單位的什麼單位」——例如 GRAM
-	// 計價的品項固定 "1000"/"GRAM"（Pricebook 以每 1000 克計價避免四捨五入到
-	// 趨近零），其餘情況 "1"/<unit>（見 usecase.BuyerRequestedRange 與
+	// 計價的品項固定 "1000"/"GRAM"（每 1000 克計價避免四捨五入到趨近零），
+	// 其餘情況 "1"/<unit>（見 usecase.BuyerRequestedRange 與
 	// usecase.PreviewRfqPriceUseCase.PreviewRfqPrice）。只在 RESPONSE 方向由
 	// Server 計算並回填；買家送出 REQUEST 時不會（也不需要）帶這兩個欄位，
 	// Server 也不讀取 request 方向的這兩個欄位。
@@ -8622,7 +8572,6 @@ type RfqPricePreviewRequest struct {
 	RequestId           string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	ExpectedRevisionId  string                 `protobuf:"bytes,2,opt,name=expected_revision_id,json=expectedRevisionId,proto3" json:"expected_revision_id,omitempty"`
 	ClientRequestId     string                 `protobuf:"bytes,3,opt,name=client_request_id,json=clientRequestId,proto3" json:"client_request_id,omitempty"`
-	PricingMode         string                 `protobuf:"bytes,4,opt,name=pricing_mode,json=pricingMode,proto3" json:"pricing_mode,omitempty"`
 	DeliveryCity        string                 `protobuf:"bytes,5,opt,name=delivery_city,json=deliveryCity,proto3" json:"delivery_city,omitempty"`
 	BuyerRequestedRange *BuyerRequestedRange   `protobuf:"bytes,6,opt,name=buyer_requested_range,json=buyerRequestedRange,proto3" json:"buyer_requested_range,omitempty"`
 	unknownFields       protoimpl.UnknownFields
@@ -8680,13 +8629,6 @@ func (x *RfqPricePreviewRequest) GetClientRequestId() string {
 	return ""
 }
 
-func (x *RfqPricePreviewRequest) GetPricingMode() string {
-	if x != nil {
-		return x.PricingMode
-	}
-	return ""
-}
-
 func (x *RfqPricePreviewRequest) GetDeliveryCity() string {
 	if x != nil {
 		return x.DeliveryCity
@@ -8699,325 +8641,6 @@ func (x *RfqPricePreviewRequest) GetBuyerRequestedRange() *BuyerRequestedRange {
 		return x.BuyerRequestedRange
 	}
 	return nil
-}
-
-// ReferencePriceRange 只在 PRICEBOOK_GUIDED 且 mapping 可靠時存在
-// （usecase.PricePreviewResult.ReferenceAvailability=="AVAILABLE"）；
-// BUYER_ENTERED_NO_REFERENCE 時 RfqPricePreviewResponse 不設這個欄位（null）。
-type ReferencePriceRange struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	LowerBoundAmount string                 `protobuf:"bytes,1,opt,name=lower_bound_amount,json=lowerBoundAmount,proto3" json:"lower_bound_amount,omitempty"`
-	MidpointAmount   string                 `protobuf:"bytes,2,opt,name=midpoint_amount,json=midpointAmount,proto3" json:"midpoint_amount,omitempty"`
-	UpperBoundAmount string                 `protobuf:"bytes,3,opt,name=upper_bound_amount,json=upperBoundAmount,proto3" json:"upper_bound_amount,omitempty"`
-	// basis_quantity/basis_unit：這三個金額是「每多少單位的什麼單位」的價格，
-	// 語意與計算方式跟 BuyerRequestedRange 的同名欄位完全一致（同一支
-	// usecase.referenceBasis 產出，不是第二套規則）。Server 端一律回填，
-	// 讓 client 拿到金額的同時就拿到它的計價基準，不必自己從
-	// buyer_requested_range 推導、也不必自己乘任何換算係數
-	// （v6 設計稿 03「計價基準」那一行）。
-	BasisQuantity string `protobuf:"bytes,4,opt,name=basis_quantity,json=basisQuantity,proto3" json:"basis_quantity,omitempty"`
-	BasisUnit     string `protobuf:"bytes,5,opt,name=basis_unit,json=basisUnit,proto3" json:"basis_unit,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ReferencePriceRange) Reset() {
-	*x = ReferencePriceRange{}
-	mi := &file_ai_ai_proto_msgTypes[117]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ReferencePriceRange) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ReferencePriceRange) ProtoMessage() {}
-
-func (x *ReferencePriceRange) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_ai_proto_msgTypes[117]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ReferencePriceRange.ProtoReflect.Descriptor instead.
-func (*ReferencePriceRange) Descriptor() ([]byte, []int) {
-	return file_ai_ai_proto_rawDescGZIP(), []int{117}
-}
-
-func (x *ReferencePriceRange) GetLowerBoundAmount() string {
-	if x != nil {
-		return x.LowerBoundAmount
-	}
-	return ""
-}
-
-func (x *ReferencePriceRange) GetMidpointAmount() string {
-	if x != nil {
-		return x.MidpointAmount
-	}
-	return ""
-}
-
-func (x *ReferencePriceRange) GetUpperBoundAmount() string {
-	if x != nil {
-		return x.UpperBoundAmount
-	}
-	return ""
-}
-
-func (x *ReferencePriceRange) GetBasisQuantity() string {
-	if x != nil {
-		return x.BasisQuantity
-	}
-	return ""
-}
-
-func (x *ReferencePriceRange) GetBasisUnit() string {
-	if x != nil {
-		return x.BasisUnit
-	}
-	return ""
-}
-
-// DealTemperature 是成交溫度計 v1：買家希望詢價區間涵蓋 Pricebook 預測分布多少
-// 質量（docs/詳細設計書/64 §2-5）。兩個機率都是
-// 關於市場價格，不是關於賣家會不會回應——後者需要歷史 outcome，屬
-// outcomeDefinitionVersion 2。
-//
-// status == "UNKNOWN" 時 3–9 號欄位一律空字串；status == "AVAILABLE" 時 3–9 必須
-// 全部有值，缺任一欄即由讀取端 fail closed。
-type DealTemperature struct {
-	state                    protoimpl.MessageState `protogen:"open.v1"`
-	Status                   string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
-	ReasonCode               string                 `protobuf:"bytes,2,opt,name=reason_code,json=reasonCode,proto3" json:"reason_code,omitempty"`
-	ProbabilityLowerBps      string                 `protobuf:"bytes,3,opt,name=probability_lower_bps,json=probabilityLowerBps,proto3" json:"probability_lower_bps,omitempty"` // 嚴格界：落在買家區間內
-	ProbabilityUpperBps      string                 `protobuf:"bytes,4,opt,name=probability_upper_bps,json=probabilityUpperBps,proto3" json:"probability_upper_bps,omitempty"` // 寬鬆界：不超過買家上限
-	Band                     string                 `protobuf:"bytes,5,opt,name=band,proto3" json:"band,omitempty"`                                                            // COLD | WARM | HOT
-	OutcomeDefinition        string                 `protobuf:"bytes,6,opt,name=outcome_definition,json=outcomeDefinition,proto3" json:"outcome_definition,omitempty"`
-	OutcomeDefinitionVersion string                 `protobuf:"bytes,7,opt,name=outcome_definition_version,json=outcomeDefinitionVersion,proto3" json:"outcome_definition_version,omitempty"`
-	PolicyVersion            string                 `protobuf:"bytes,8,opt,name=policy_version,json=policyVersion,proto3" json:"policy_version,omitempty"`
-	BandVersion              string                 `protobuf:"bytes,9,opt,name=band_version,json=bandVersion,proto3" json:"band_version,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
-}
-
-func (x *DealTemperature) Reset() {
-	*x = DealTemperature{}
-	mi := &file_ai_ai_proto_msgTypes[118]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DealTemperature) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DealTemperature) ProtoMessage() {}
-
-func (x *DealTemperature) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_ai_proto_msgTypes[118]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DealTemperature.ProtoReflect.Descriptor instead.
-func (*DealTemperature) Descriptor() ([]byte, []int) {
-	return file_ai_ai_proto_rawDescGZIP(), []int{118}
-}
-
-func (x *DealTemperature) GetStatus() string {
-	if x != nil {
-		return x.Status
-	}
-	return ""
-}
-
-func (x *DealTemperature) GetReasonCode() string {
-	if x != nil {
-		return x.ReasonCode
-	}
-	return ""
-}
-
-func (x *DealTemperature) GetProbabilityLowerBps() string {
-	if x != nil {
-		return x.ProbabilityLowerBps
-	}
-	return ""
-}
-
-func (x *DealTemperature) GetProbabilityUpperBps() string {
-	if x != nil {
-		return x.ProbabilityUpperBps
-	}
-	return ""
-}
-
-func (x *DealTemperature) GetBand() string {
-	if x != nil {
-		return x.Band
-	}
-	return ""
-}
-
-func (x *DealTemperature) GetOutcomeDefinition() string {
-	if x != nil {
-		return x.OutcomeDefinition
-	}
-	return ""
-}
-
-func (x *DealTemperature) GetOutcomeDefinitionVersion() string {
-	if x != nil {
-		return x.OutcomeDefinitionVersion
-	}
-	return ""
-}
-
-func (x *DealTemperature) GetPolicyVersion() string {
-	if x != nil {
-		return x.PolicyVersion
-	}
-	return ""
-}
-
-func (x *DealTemperature) GetBandVersion() string {
-	if x != nil {
-		return x.BandVersion
-	}
-	return ""
-}
-
-// MarketPriceBasis 揭露「這組參考價是從哪一份市場資料算出來的」（v6 設計稿 03
-// 市場價格參考區塊的「資料截至」與「計價基準」兩行）。與 reference_price_range
-// 同生同滅——只在 reference_availability=="AVAILABLE" 時存在，
-// BUYER_ENTERED_NO_REFERENCE 完全不查 Pricebook，這個欄位為 null。
-//
-// 值全部原樣來自 pricebook-service 的 GetRegionalComparisonResponse，不由
-// ai-service 重算或補值（見 usecase.PreviewRfqPriceUseCase.PreviewRfqPrice）。
-type MarketPriceBasis struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// region_name 是實際命中的 Pricebook 縣市名，不是買家送出的 delivery_city
-	// 原文——兩者要經 domain.NormalizeCityName 消除「臺／台」雙寫差異後才比對
-	// 得中，所以這裡回實際採用的那一個，讓買家看得到自己被對到哪個區域。
-	RegionName string `protobuf:"bytes,1,opt,name=region_name,json=regionName,proto3" json:"region_name,omitempty"`
-	// supporting_market_count 是這個縣市底下實際貢獻資料的批發市場家數，
-	// 對應 pricebook.proto RegionalComparisonRegion.supporting_market_count
-	// （那支是 service 之間的內部 RPC，用 int32；這裡是對外曝露面，依 Proto
-	// 管理規範 §6 計數一律 string，轉換發生在 gRPC 邊界）。
-	SupportingMarketCount string `protobuf:"bytes,2,opt,name=supporting_market_count,json=supportingMarketCount,proto3" json:"supporting_market_count,omitempty"`
-	// source_data_as_of 是這份行情資料涵蓋到的最後交易日（RFC3339 UTC），取自
-	// GetRegionalComparisonResponse.lineage.source_data_as_of。pricebook-service
-	// 在沒有底層資料時本來就會省略它，因此這裡是 optional，不得補成空字串或
-	// 當下時間假裝資料是新的。
-	SourceDataAsOf *string `protobuf:"bytes,3,opt,name=source_data_as_of,json=sourceDataAsOf,proto3,oneof" json:"source_data_as_of,omitempty"`
-	// freshness_status：fresh | stale | unavailable，pricebook-service 既有值域
-	// （這個縣市底下貢獻資料的市場中最差的新鮮度）。
-	//
-	// 純揭露，不參與 reference_availability 的判定——PreviewRfqPrice 的
-	// mapping 可靠性只看 status=="ready" 且 p50 非 nil，stale 資料照樣算出參考
-	// 價（與 /quote-batches 既有的 domain.MatchRegionPrice 一致，那裡也是照樣
-	// 取價、只把 availability 降級成 MARKET_STALE）。本欄位讓前端有辦法對買家
-	// 標示「行情資料較舊」，而不是把資料整批擋掉。
-	FreshnessStatus string `protobuf:"bytes,4,opt,name=freshness_status,json=freshnessStatus,proto3" json:"freshness_status,omitempty"` // scope：REGION（這份行情對應到某一個縣市）或 NATIONAL（全國單一行情，
-	// 沒有區域維度）。多來源之後不是每條序列都有區域維度——白肉雞、雞蛋、
-	// 鴨鵝的來源一天只回一列。用明確的 scope 而不是「region_name 空的就當
-	// 全國」：後者讓「全國行情」與「區域比對失敗」在 wire 上長得一樣。
-	Scope string `protobuf:"bytes,5,opt,name=scope,proto3" json:"scope,omitempty"`
-	// price_layer：wholesale_auction｜farmgate｜live_animal｜retail｜
-	// wholesale_bulk。空字串代表既有的蔬果批發路徑。
-	//
-	// 🔴 這不是附加資訊。毛豬回的是活體拍賣均價，不是豬肉分切零售價，兩者
-	// 水平差數倍——把參考價給買家卻不說它是哪一個層級，買家會照著它出價。
-	// client 必須與金額一起顯示。
-	PriceLayer    string `protobuf:"bytes,6,opt,name=price_layer,json=priceLayer,proto3" json:"price_layer,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *MarketPriceBasis) Reset() {
-	*x = MarketPriceBasis{}
-	mi := &file_ai_ai_proto_msgTypes[119]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *MarketPriceBasis) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*MarketPriceBasis) ProtoMessage() {}
-
-func (x *MarketPriceBasis) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_ai_proto_msgTypes[119]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use MarketPriceBasis.ProtoReflect.Descriptor instead.
-func (*MarketPriceBasis) Descriptor() ([]byte, []int) {
-	return file_ai_ai_proto_rawDescGZIP(), []int{119}
-}
-
-func (x *MarketPriceBasis) GetRegionName() string {
-	if x != nil {
-		return x.RegionName
-	}
-	return ""
-}
-
-func (x *MarketPriceBasis) GetSupportingMarketCount() string {
-	if x != nil {
-		return x.SupportingMarketCount
-	}
-	return ""
-}
-
-func (x *MarketPriceBasis) GetSourceDataAsOf() string {
-	if x != nil && x.SourceDataAsOf != nil {
-		return *x.SourceDataAsOf
-	}
-	return ""
-}
-
-func (x *MarketPriceBasis) GetFreshnessStatus() string {
-	if x != nil {
-		return x.FreshnessStatus
-	}
-	return ""
-}
-
-func (x *MarketPriceBasis) GetScope() string {
-	if x != nil {
-		return x.Scope
-	}
-	return ""
-}
-
-func (x *MarketPriceBasis) GetPriceLayer() string {
-	if x != nil {
-		return x.PriceLayer
-	}
-	return ""
 }
 
 // QuoteTotalRange 是伺服器依「買家這次的單價範圍」與「需求數量」算出的詢價總額
@@ -9043,7 +8666,7 @@ type QuoteTotalRange struct {
 
 func (x *QuoteTotalRange) Reset() {
 	*x = QuoteTotalRange{}
-	mi := &file_ai_ai_proto_msgTypes[120]
+	mi := &file_ai_ai_proto_msgTypes[117]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9055,7 +8678,7 @@ func (x *QuoteTotalRange) String() string {
 func (*QuoteTotalRange) ProtoMessage() {}
 
 func (x *QuoteTotalRange) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_ai_proto_msgTypes[120]
+	mi := &file_ai_ai_proto_msgTypes[117]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9068,7 +8691,7 @@ func (x *QuoteTotalRange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuoteTotalRange.ProtoReflect.Descriptor instead.
 func (*QuoteTotalRange) Descriptor() ([]byte, []int) {
-	return file_ai_ai_proto_rawDescGZIP(), []int{120}
+	return file_ai_ai_proto_rawDescGZIP(), []int{117}
 }
 
 func (x *QuoteTotalRange) GetCurrency() string {
@@ -9107,19 +8730,13 @@ func (x *QuoteTotalRange) GetQuantityUnit() string {
 }
 
 type RfqPricePreviewResponse struct {
-	state                 protoimpl.MessageState `protogen:"open.v1"`
-	PricePreviewId        string                 `protobuf:"bytes,1,opt,name=price_preview_id,json=pricePreviewId,proto3" json:"price_preview_id,omitempty"`
-	Version               string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
-	PricingMode           string                 `protobuf:"bytes,3,opt,name=pricing_mode,json=pricingMode,proto3" json:"pricing_mode,omitempty"`
-	ReferenceAvailability string                 `protobuf:"bytes,4,opt,name=reference_availability,json=referenceAvailability,proto3" json:"reference_availability,omitempty"`
-	ReferencePriceRange   *ReferencePriceRange   `protobuf:"bytes,5,opt,name=reference_price_range,json=referencePriceRange,proto3" json:"reference_price_range,omitempty"`
-	BuyerRequestedRange   *BuyerRequestedRange   `protobuf:"bytes,6,opt,name=buyer_requested_range,json=buyerRequestedRange,proto3" json:"buyer_requested_range,omitempty"`
-	DealTemperature       *DealTemperature       `protobuf:"bytes,7,opt,name=deal_temperature,json=dealTemperature,proto3" json:"deal_temperature,omitempty"`
-	PayloadHash           string                 `protobuf:"bytes,8,opt,name=payload_hash,json=payloadHash,proto3" json:"payload_hash,omitempty"`
-	// market_price_basis／quote_total_range 是 v6 設計稿 03 市場價格參考區塊的
-	// 兩個純附加欄位，各自可為 null（條件見兩個 message 自己的註解）。
-	MarketPriceBasis *MarketPriceBasis `protobuf:"bytes,9,opt,name=market_price_basis,json=marketPriceBasis,proto3" json:"market_price_basis,omitempty"`
-	QuoteTotalRange  *QuoteTotalRange  `protobuf:"bytes,10,opt,name=quote_total_range,json=quoteTotalRange,proto3" json:"quote_total_range,omitempty"`
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	PricePreviewId      string                 `protobuf:"bytes,1,opt,name=price_preview_id,json=pricePreviewId,proto3" json:"price_preview_id,omitempty"`
+	Version             string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
+	BuyerRequestedRange *BuyerRequestedRange   `protobuf:"bytes,6,opt,name=buyer_requested_range,json=buyerRequestedRange,proto3" json:"buyer_requested_range,omitempty"`
+	PayloadHash         string                 `protobuf:"bytes,8,opt,name=payload_hash,json=payloadHash,proto3" json:"payload_hash,omitempty"`
+	// 可為 null（條件見 QuoteTotalRange）。
+	QuoteTotalRange *QuoteTotalRange `protobuf:"bytes,10,opt,name=quote_total_range,json=quoteTotalRange,proto3" json:"quote_total_range,omitempty"`
 	// 空字串＝本欄加入前建立的 preview，呼叫端當「未知」處理，不得補值。
 	QualityKnowledgeState string `protobuf:"bytes,11,opt,name=quality_knowledge_state,json=qualityKnowledgeState,proto3" json:"quality_knowledge_state,omitempty"`
 	unknownFields         protoimpl.UnknownFields
@@ -9128,7 +8745,7 @@ type RfqPricePreviewResponse struct {
 
 func (x *RfqPricePreviewResponse) Reset() {
 	*x = RfqPricePreviewResponse{}
-	mi := &file_ai_ai_proto_msgTypes[121]
+	mi := &file_ai_ai_proto_msgTypes[118]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9140,7 +8757,7 @@ func (x *RfqPricePreviewResponse) String() string {
 func (*RfqPricePreviewResponse) ProtoMessage() {}
 
 func (x *RfqPricePreviewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_ai_proto_msgTypes[121]
+	mi := &file_ai_ai_proto_msgTypes[118]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9153,7 +8770,7 @@ func (x *RfqPricePreviewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RfqPricePreviewResponse.ProtoReflect.Descriptor instead.
 func (*RfqPricePreviewResponse) Descriptor() ([]byte, []int) {
-	return file_ai_ai_proto_rawDescGZIP(), []int{121}
+	return file_ai_ai_proto_rawDescGZIP(), []int{118}
 }
 
 func (x *RfqPricePreviewResponse) GetPricePreviewId() string {
@@ -9170,37 +8787,9 @@ func (x *RfqPricePreviewResponse) GetVersion() string {
 	return ""
 }
 
-func (x *RfqPricePreviewResponse) GetPricingMode() string {
-	if x != nil {
-		return x.PricingMode
-	}
-	return ""
-}
-
-func (x *RfqPricePreviewResponse) GetReferenceAvailability() string {
-	if x != nil {
-		return x.ReferenceAvailability
-	}
-	return ""
-}
-
-func (x *RfqPricePreviewResponse) GetReferencePriceRange() *ReferencePriceRange {
-	if x != nil {
-		return x.ReferencePriceRange
-	}
-	return nil
-}
-
 func (x *RfqPricePreviewResponse) GetBuyerRequestedRange() *BuyerRequestedRange {
 	if x != nil {
 		return x.BuyerRequestedRange
-	}
-	return nil
-}
-
-func (x *RfqPricePreviewResponse) GetDealTemperature() *DealTemperature {
-	if x != nil {
-		return x.DealTemperature
 	}
 	return nil
 }
@@ -9210,13 +8799,6 @@ func (x *RfqPricePreviewResponse) GetPayloadHash() string {
 		return x.PayloadHash
 	}
 	return ""
-}
-
-func (x *RfqPricePreviewResponse) GetMarketPriceBasis() *MarketPriceBasis {
-	if x != nil {
-		return x.MarketPriceBasis
-	}
-	return nil
 }
 
 func (x *RfqPricePreviewResponse) GetQuoteTotalRange() *QuoteTotalRange {
@@ -9259,7 +8841,7 @@ type RfqConfirmationRequest struct {
 
 func (x *RfqConfirmationRequest) Reset() {
 	*x = RfqConfirmationRequest{}
-	mi := &file_ai_ai_proto_msgTypes[122]
+	mi := &file_ai_ai_proto_msgTypes[119]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9271,7 +8853,7 @@ func (x *RfqConfirmationRequest) String() string {
 func (*RfqConfirmationRequest) ProtoMessage() {}
 
 func (x *RfqConfirmationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_ai_proto_msgTypes[122]
+	mi := &file_ai_ai_proto_msgTypes[119]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9284,7 +8866,7 @@ func (x *RfqConfirmationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RfqConfirmationRequest.ProtoReflect.Descriptor instead.
 func (*RfqConfirmationRequest) Descriptor() ([]byte, []int) {
-	return file_ai_ai_proto_rawDescGZIP(), []int{122}
+	return file_ai_ai_proto_rawDescGZIP(), []int{119}
 }
 
 func (x *RfqConfirmationRequest) GetRequestId() string {
@@ -9348,7 +8930,7 @@ type RfqConfirmationResponse struct {
 
 func (x *RfqConfirmationResponse) Reset() {
 	*x = RfqConfirmationResponse{}
-	mi := &file_ai_ai_proto_msgTypes[123]
+	mi := &file_ai_ai_proto_msgTypes[120]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9360,7 +8942,7 @@ func (x *RfqConfirmationResponse) String() string {
 func (*RfqConfirmationResponse) ProtoMessage() {}
 
 func (x *RfqConfirmationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_ai_proto_msgTypes[123]
+	mi := &file_ai_ai_proto_msgTypes[120]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9373,7 +8955,7 @@ func (x *RfqConfirmationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RfqConfirmationResponse.ProtoReflect.Descriptor instead.
 func (*RfqConfirmationResponse) Descriptor() ([]byte, []int) {
-	return file_ai_ai_proto_rawDescGZIP(), []int{123}
+	return file_ai_ai_proto_rawDescGZIP(), []int{120}
 }
 
 func (x *RfqConfirmationResponse) GetConfirmedRfqSnapshotId() string {
@@ -9417,7 +8999,7 @@ type RfqPublicationPreviewRequest struct {
 
 func (x *RfqPublicationPreviewRequest) Reset() {
 	*x = RfqPublicationPreviewRequest{}
-	mi := &file_ai_ai_proto_msgTypes[124]
+	mi := &file_ai_ai_proto_msgTypes[121]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9429,7 +9011,7 @@ func (x *RfqPublicationPreviewRequest) String() string {
 func (*RfqPublicationPreviewRequest) ProtoMessage() {}
 
 func (x *RfqPublicationPreviewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_ai_proto_msgTypes[124]
+	mi := &file_ai_ai_proto_msgTypes[121]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9442,7 +9024,7 @@ func (x *RfqPublicationPreviewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RfqPublicationPreviewRequest.ProtoReflect.Descriptor instead.
 func (*RfqPublicationPreviewRequest) Descriptor() ([]byte, []int) {
-	return file_ai_ai_proto_rawDescGZIP(), []int{124}
+	return file_ai_ai_proto_rawDescGZIP(), []int{121}
 }
 
 func (x *RfqPublicationPreviewRequest) GetRequestId() string {
@@ -9513,7 +9095,6 @@ type RfqPublicationPreviewResponse struct {
 	SellerFacingPayloadHash string                 `protobuf:"bytes,4,opt,name=seller_facing_payload_hash,json=sellerFacingPayloadHash,proto3" json:"seller_facing_payload_hash,omitempty"`
 	SellerFacingPayloadJson string                 `protobuf:"bytes,5,opt,name=seller_facing_payload_json,json=sellerFacingPayloadJson,proto3" json:"seller_facing_payload_json,omitempty"`
 	ExpiresAt               string                 `protobuf:"bytes,6,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
-	DealTemperatureStatus   string                 `protobuf:"bytes,7,opt,name=deal_temperature_status,json=dealTemperatureStatus,proto3" json:"deal_temperature_status,omitempty"` // #2537 完成前恆為 UNKNOWN
 	// audience policy 的身分要吐回去，買家介面才講得出「這會發給誰」。
 	// v1 的 WISH_POOL 是 WISH_POOL_ALL_ACTIVE_SELLERS_V1 / 1 ＝ 全站未停權賣家，
 	// 沒有分類、地區或分級維度——**typed 地說「無限制」，不是讓欄位消失**。
@@ -9527,7 +9108,7 @@ type RfqPublicationPreviewResponse struct {
 
 func (x *RfqPublicationPreviewResponse) Reset() {
 	*x = RfqPublicationPreviewResponse{}
-	mi := &file_ai_ai_proto_msgTypes[125]
+	mi := &file_ai_ai_proto_msgTypes[122]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9539,7 +9120,7 @@ func (x *RfqPublicationPreviewResponse) String() string {
 func (*RfqPublicationPreviewResponse) ProtoMessage() {}
 
 func (x *RfqPublicationPreviewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_ai_proto_msgTypes[125]
+	mi := &file_ai_ai_proto_msgTypes[122]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9552,7 +9133,7 @@ func (x *RfqPublicationPreviewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RfqPublicationPreviewResponse.ProtoReflect.Descriptor instead.
 func (*RfqPublicationPreviewResponse) Descriptor() ([]byte, []int) {
-	return file_ai_ai_proto_rawDescGZIP(), []int{125}
+	return file_ai_ai_proto_rawDescGZIP(), []int{122}
 }
 
 func (x *RfqPublicationPreviewResponse) GetApprovalId() string {
@@ -9597,13 +9178,6 @@ func (x *RfqPublicationPreviewResponse) GetExpiresAt() string {
 	return ""
 }
 
-func (x *RfqPublicationPreviewResponse) GetDealTemperatureStatus() string {
-	if x != nil {
-		return x.DealTemperatureStatus
-	}
-	return ""
-}
-
 func (x *RfqPublicationPreviewResponse) GetAudiencePolicyId() string {
 	if x != nil {
 		return x.AudiencePolicyId
@@ -9642,7 +9216,7 @@ type RfqPublicationExecuteRequest struct {
 
 func (x *RfqPublicationExecuteRequest) Reset() {
 	*x = RfqPublicationExecuteRequest{}
-	mi := &file_ai_ai_proto_msgTypes[126]
+	mi := &file_ai_ai_proto_msgTypes[123]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9654,7 +9228,7 @@ func (x *RfqPublicationExecuteRequest) String() string {
 func (*RfqPublicationExecuteRequest) ProtoMessage() {}
 
 func (x *RfqPublicationExecuteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_ai_proto_msgTypes[126]
+	mi := &file_ai_ai_proto_msgTypes[123]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9667,7 +9241,7 @@ func (x *RfqPublicationExecuteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RfqPublicationExecuteRequest.ProtoReflect.Descriptor instead.
 func (*RfqPublicationExecuteRequest) Descriptor() ([]byte, []int) {
-	return file_ai_ai_proto_rawDescGZIP(), []int{126}
+	return file_ai_ai_proto_rawDescGZIP(), []int{123}
 }
 
 func (x *RfqPublicationExecuteRequest) GetRequestId() string {
@@ -9730,7 +9304,7 @@ type RfqPublicationExecuteResponse struct {
 
 func (x *RfqPublicationExecuteResponse) Reset() {
 	*x = RfqPublicationExecuteResponse{}
-	mi := &file_ai_ai_proto_msgTypes[127]
+	mi := &file_ai_ai_proto_msgTypes[124]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9742,7 +9316,7 @@ func (x *RfqPublicationExecuteResponse) String() string {
 func (*RfqPublicationExecuteResponse) ProtoMessage() {}
 
 func (x *RfqPublicationExecuteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_ai_proto_msgTypes[127]
+	mi := &file_ai_ai_proto_msgTypes[124]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9755,7 +9329,7 @@ func (x *RfqPublicationExecuteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RfqPublicationExecuteResponse.ProtoReflect.Descriptor instead.
 func (*RfqPublicationExecuteResponse) Descriptor() ([]byte, []int) {
-	return file_ai_ai_proto_rawDescGZIP(), []int{127}
+	return file_ai_ai_proto_rawDescGZIP(), []int{124}
 }
 
 func (x *RfqPublicationExecuteResponse) GetPublicationId() string {
@@ -9824,7 +9398,7 @@ type GetRfqPublicationInviteSellerViewRequest struct {
 
 func (x *GetRfqPublicationInviteSellerViewRequest) Reset() {
 	*x = GetRfqPublicationInviteSellerViewRequest{}
-	mi := &file_ai_ai_proto_msgTypes[128]
+	mi := &file_ai_ai_proto_msgTypes[125]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9836,7 +9410,7 @@ func (x *GetRfqPublicationInviteSellerViewRequest) String() string {
 func (*GetRfqPublicationInviteSellerViewRequest) ProtoMessage() {}
 
 func (x *GetRfqPublicationInviteSellerViewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_ai_proto_msgTypes[128]
+	mi := &file_ai_ai_proto_msgTypes[125]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9849,80 +9423,12 @@ func (x *GetRfqPublicationInviteSellerViewRequest) ProtoReflect() protoreflect.M
 
 // Deprecated: Use GetRfqPublicationInviteSellerViewRequest.ProtoReflect.Descriptor instead.
 func (*GetRfqPublicationInviteSellerViewRequest) Descriptor() ([]byte, []int) {
-	return file_ai_ai_proto_rawDescGZIP(), []int{128}
+	return file_ai_ai_proto_rawDescGZIP(), []int{125}
 }
 
 func (x *GetRfqPublicationInviteSellerViewRequest) GetInviteId() string {
 	if x != nil {
 		return x.InviteId
-	}
-	return ""
-}
-
-type SellerFacingReferenceRange struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	LowerBoundAmount string                 `protobuf:"bytes,1,opt,name=lower_bound_amount,json=lowerBoundAmount,proto3" json:"lower_bound_amount,omitempty"`
-	UpperBoundAmount string                 `protobuf:"bytes,2,opt,name=upper_bound_amount,json=upperBoundAmount,proto3" json:"upper_bound_amount,omitempty"`
-	BasisQuantity    string                 `protobuf:"bytes,3,opt,name=basis_quantity,json=basisQuantity,proto3" json:"basis_quantity,omitempty"`
-	BasisUnit        string                 `protobuf:"bytes,4,opt,name=basis_unit,json=basisUnit,proto3" json:"basis_unit,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
-}
-
-func (x *SellerFacingReferenceRange) Reset() {
-	*x = SellerFacingReferenceRange{}
-	mi := &file_ai_ai_proto_msgTypes[129]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SellerFacingReferenceRange) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SellerFacingReferenceRange) ProtoMessage() {}
-
-func (x *SellerFacingReferenceRange) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_ai_proto_msgTypes[129]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SellerFacingReferenceRange.ProtoReflect.Descriptor instead.
-func (*SellerFacingReferenceRange) Descriptor() ([]byte, []int) {
-	return file_ai_ai_proto_rawDescGZIP(), []int{129}
-}
-
-func (x *SellerFacingReferenceRange) GetLowerBoundAmount() string {
-	if x != nil {
-		return x.LowerBoundAmount
-	}
-	return ""
-}
-
-func (x *SellerFacingReferenceRange) GetUpperBoundAmount() string {
-	if x != nil {
-		return x.UpperBoundAmount
-	}
-	return ""
-}
-
-func (x *SellerFacingReferenceRange) GetBasisQuantity() string {
-	if x != nil {
-		return x.BasisQuantity
-	}
-	return ""
-}
-
-func (x *SellerFacingReferenceRange) GetBasisUnit() string {
-	if x != nil {
-		return x.BasisUnit
 	}
 	return ""
 }
@@ -9941,7 +9447,7 @@ type SellerFacingRequestedRange struct {
 
 func (x *SellerFacingRequestedRange) Reset() {
 	*x = SellerFacingRequestedRange{}
-	mi := &file_ai_ai_proto_msgTypes[130]
+	mi := &file_ai_ai_proto_msgTypes[126]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9953,7 +9459,7 @@ func (x *SellerFacingRequestedRange) String() string {
 func (*SellerFacingRequestedRange) ProtoMessage() {}
 
 func (x *SellerFacingRequestedRange) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_ai_proto_msgTypes[130]
+	mi := &file_ai_ai_proto_msgTypes[126]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9966,7 +9472,7 @@ func (x *SellerFacingRequestedRange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SellerFacingRequestedRange.ProtoReflect.Descriptor instead.
 func (*SellerFacingRequestedRange) Descriptor() ([]byte, []int) {
-	return file_ai_ai_proto_rawDescGZIP(), []int{130}
+	return file_ai_ai_proto_rawDescGZIP(), []int{126}
 }
 
 func (x *SellerFacingRequestedRange) GetCurrency() string {
@@ -10026,7 +9532,6 @@ type RfqPublicationInviteSellerViewResponse struct {
 	// 空字串＝買家沒有補充說明（或這張 approval 建立於本欄加入前）。原文照登，
 	// 伺服器不解析也不驗證內容。
 	BuyerNote           string                      `protobuf:"bytes,10,opt,name=buyer_note,json=buyerNote,proto3" json:"buyer_note,omitempty"`
-	ReferencePriceRange *SellerFacingReferenceRange `protobuf:"bytes,11,opt,name=reference_price_range,json=referencePriceRange,proto3" json:"reference_price_range,omitempty"`
 	BuyerRequestedRange *SellerFacingRequestedRange `protobuf:"bytes,12,opt,name=buyer_requested_range,json=buyerRequestedRange,proto3" json:"buyer_requested_range,omitempty"`
 	// 這張 publication 的版本（十進位字串）。站外業者正式送出報價時原樣帶回來做
 	// CAS，把報價綁在「他當時看到的那一版 RFQ」上——業者從 email 連結進來，可能隔
@@ -10044,7 +9549,7 @@ type RfqPublicationInviteSellerViewResponse struct {
 
 func (x *RfqPublicationInviteSellerViewResponse) Reset() {
 	*x = RfqPublicationInviteSellerViewResponse{}
-	mi := &file_ai_ai_proto_msgTypes[131]
+	mi := &file_ai_ai_proto_msgTypes[127]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10056,7 +9561,7 @@ func (x *RfqPublicationInviteSellerViewResponse) String() string {
 func (*RfqPublicationInviteSellerViewResponse) ProtoMessage() {}
 
 func (x *RfqPublicationInviteSellerViewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_ai_proto_msgTypes[131]
+	mi := &file_ai_ai_proto_msgTypes[127]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10069,7 +9574,7 @@ func (x *RfqPublicationInviteSellerViewResponse) ProtoReflect() protoreflect.Mes
 
 // Deprecated: Use RfqPublicationInviteSellerViewResponse.ProtoReflect.Descriptor instead.
 func (*RfqPublicationInviteSellerViewResponse) Descriptor() ([]byte, []int) {
-	return file_ai_ai_proto_rawDescGZIP(), []int{131}
+	return file_ai_ai_proto_rawDescGZIP(), []int{127}
 }
 
 func (x *RfqPublicationInviteSellerViewResponse) GetQualityKnowledgeState() string {
@@ -10142,13 +9647,6 @@ func (x *RfqPublicationInviteSellerViewResponse) GetBuyerNote() string {
 	return ""
 }
 
-func (x *RfqPublicationInviteSellerViewResponse) GetReferencePriceRange() *SellerFacingReferenceRange {
-	if x != nil {
-		return x.ReferencePriceRange
-	}
-	return nil
-}
-
 func (x *RfqPublicationInviteSellerViewResponse) GetBuyerRequestedRange() *SellerFacingRequestedRange {
 	if x != nil {
 		return x.BuyerRequestedRange
@@ -10177,7 +9675,7 @@ type WatchRunEventsRequest struct {
 
 func (x *WatchRunEventsRequest) Reset() {
 	*x = WatchRunEventsRequest{}
-	mi := &file_ai_ai_proto_msgTypes[132]
+	mi := &file_ai_ai_proto_msgTypes[128]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10189,7 +9687,7 @@ func (x *WatchRunEventsRequest) String() string {
 func (*WatchRunEventsRequest) ProtoMessage() {}
 
 func (x *WatchRunEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_ai_proto_msgTypes[132]
+	mi := &file_ai_ai_proto_msgTypes[128]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10202,7 +9700,7 @@ func (x *WatchRunEventsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchRunEventsRequest.ProtoReflect.Descriptor instead.
 func (*WatchRunEventsRequest) Descriptor() ([]byte, []int) {
-	return file_ai_ai_proto_rawDescGZIP(), []int{132}
+	return file_ai_ai_proto_rawDescGZIP(), []int{128}
 }
 
 func (x *WatchRunEventsRequest) GetRunId() string {
@@ -10254,7 +9752,7 @@ type RunEvent struct {
 
 func (x *RunEvent) Reset() {
 	*x = RunEvent{}
-	mi := &file_ai_ai_proto_msgTypes[133]
+	mi := &file_ai_ai_proto_msgTypes[129]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10266,7 +9764,7 @@ func (x *RunEvent) String() string {
 func (*RunEvent) ProtoMessage() {}
 
 func (x *RunEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_ai_proto_msgTypes[133]
+	mi := &file_ai_ai_proto_msgTypes[129]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10279,7 +9777,7 @@ func (x *RunEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunEvent.ProtoReflect.Descriptor instead.
 func (*RunEvent) Descriptor() ([]byte, []int) {
-	return file_ai_ai_proto_rawDescGZIP(), []int{133}
+	return file_ai_ai_proto_rawDescGZIP(), []int{129}
 }
 
 func (x *RunEvent) GetEventId() string {
@@ -10349,7 +9847,7 @@ type CancelRunRequest struct {
 
 func (x *CancelRunRequest) Reset() {
 	*x = CancelRunRequest{}
-	mi := &file_ai_ai_proto_msgTypes[134]
+	mi := &file_ai_ai_proto_msgTypes[130]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10361,7 +9859,7 @@ func (x *CancelRunRequest) String() string {
 func (*CancelRunRequest) ProtoMessage() {}
 
 func (x *CancelRunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_ai_proto_msgTypes[134]
+	mi := &file_ai_ai_proto_msgTypes[130]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10374,7 +9872,7 @@ func (x *CancelRunRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelRunRequest.ProtoReflect.Descriptor instead.
 func (*CancelRunRequest) Descriptor() ([]byte, []int) {
-	return file_ai_ai_proto_rawDescGZIP(), []int{134}
+	return file_ai_ai_proto_rawDescGZIP(), []int{130}
 }
 
 func (x *CancelRunRequest) GetRunId() string {
@@ -10419,7 +9917,7 @@ type CancelRunResponse struct {
 
 func (x *CancelRunResponse) Reset() {
 	*x = CancelRunResponse{}
-	mi := &file_ai_ai_proto_msgTypes[135]
+	mi := &file_ai_ai_proto_msgTypes[131]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10431,7 +9929,7 @@ func (x *CancelRunResponse) String() string {
 func (*CancelRunResponse) ProtoMessage() {}
 
 func (x *CancelRunResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_ai_proto_msgTypes[135]
+	mi := &file_ai_ai_proto_msgTypes[131]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10444,7 +9942,7 @@ func (x *CancelRunResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelRunResponse.ProtoReflect.Descriptor instead.
 func (*CancelRunResponse) Descriptor() ([]byte, []int) {
-	return file_ai_ai_proto_rawDescGZIP(), []int{135}
+	return file_ai_ai_proto_rawDescGZIP(), []int{131}
 }
 
 func (x *CancelRunResponse) GetRunId() string {
@@ -10489,7 +9987,7 @@ type ResumeRunRequest struct {
 
 func (x *ResumeRunRequest) Reset() {
 	*x = ResumeRunRequest{}
-	mi := &file_ai_ai_proto_msgTypes[136]
+	mi := &file_ai_ai_proto_msgTypes[132]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10501,7 +9999,7 @@ func (x *ResumeRunRequest) String() string {
 func (*ResumeRunRequest) ProtoMessage() {}
 
 func (x *ResumeRunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_ai_proto_msgTypes[136]
+	mi := &file_ai_ai_proto_msgTypes[132]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10514,7 +10012,7 @@ func (x *ResumeRunRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeRunRequest.ProtoReflect.Descriptor instead.
 func (*ResumeRunRequest) Descriptor() ([]byte, []int) {
-	return file_ai_ai_proto_rawDescGZIP(), []int{136}
+	return file_ai_ai_proto_rawDescGZIP(), []int{132}
 }
 
 func (x *ResumeRunRequest) GetInterruptId() string {
@@ -10553,7 +10051,7 @@ type ResumeRunResponse struct {
 
 func (x *ResumeRunResponse) Reset() {
 	*x = ResumeRunResponse{}
-	mi := &file_ai_ai_proto_msgTypes[137]
+	mi := &file_ai_ai_proto_msgTypes[133]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10565,7 +10063,7 @@ func (x *ResumeRunResponse) String() string {
 func (*ResumeRunResponse) ProtoMessage() {}
 
 func (x *ResumeRunResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_ai_proto_msgTypes[137]
+	mi := &file_ai_ai_proto_msgTypes[133]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10578,7 +10076,7 @@ func (x *ResumeRunResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeRunResponse.ProtoReflect.Descriptor instead.
 func (*ResumeRunResponse) Descriptor() ([]byte, []int) {
-	return file_ai_ai_proto_rawDescGZIP(), []int{137}
+	return file_ai_ai_proto_rawDescGZIP(), []int{133}
 }
 
 func (x *ResumeRunResponse) GetRunId() string {
@@ -10892,27 +10390,20 @@ const file_ai_ai_proto_rawDesc = "" +
 	"\x0e_delivery_cityB\x10\n" +
 	"\x0e_delivery_dateB\x17\n" +
 	"\x15_exact_match_requiredB\x12\n" +
-	"\x10_item_resolutionJ\x04\b\x02\x10\x03R\x04spec\"\xd9\x01\n" +
+	"\x10_item_resolutionJ\x04\b\x02\x10\x03R\x04spec\"\xc3\x01\n" +
 	"\x0eItemResolution\x12\x12\n" +
-	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x17\n" +
-	"\x04code\x18\x02 \x01(\tH\x00R\x04code\x88\x01\x01\x12\x14\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x14\n" +
 	"\x05label\x18\x03 \x01(\tR\x05label\x12\x1e\n" +
 	"\n" +
 	"provenance\x18\x04 \x01(\tR\n" +
 	"provenance\x12%\n" +
-	"\fprice_per_kg\x18\x05 \x01(\tH\x01R\n" +
+	"\fprice_per_kg\x18\x05 \x01(\tH\x00R\n" +
 	"pricePerKg\x88\x01\x01\x12#\n" +
-	"\rdisplay_value\x18\x06 \x01(\tR\fdisplayValueB\a\n" +
-	"\x05_codeB\x0f\n" +
-	"\r_price_per_kg\"\x93\x01\n" +
+	"\rdisplay_value\x18\x06 \x01(\tR\fdisplayValueB\x0f\n" +
+	"\r_price_per_kgJ\x04\b\x02\x10\x03R\x04code\"S\n" +
 	"\x18CropDisambiguationOption\x12\x14\n" +
-	"\x05label\x18\x01 \x01(\tR\x05label\x12 \n" +
-	"\tcrop_code\x18\x02 \x01(\tH\x00R\bcropCode\x88\x01\x01\x12\"\n" +
-	"\n" +
-	"group_code\x18\x03 \x01(\tH\x01R\tgroupCode\x88\x01\x01B\f\n" +
-	"\n" +
-	"_crop_codeB\r\n" +
-	"\v_group_code\"z\n" +
+	"\x05label\x18\x01 \x01(\tR\x05labelJ\x04\b\x02\x10\x03J\x04\b\x03\x10\x04R\tcrop_codeR\n" +
+	"group_code\"z\n" +
 	"\rBusinessError\x12\x16\n" +
 	"\x06reason\x18\x01 \x01(\tR\x06reason\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1c\n" +
@@ -10974,15 +10465,11 @@ const file_ai_ai_proto_rawDesc = "" +
 	"\breset_at\x18\x04 \x01(\tR\aresetAt\"3\n" +
 	"\x12GetSnapshotRequest\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x01 \x01(\tR\trequestId\"\xeb\x01\n" +
-	"\x0eCropResolution\x121\n" +
-	"\x12resolved_crop_code\x18\x01 \x01(\tH\x00R\x10resolvedCropCode\x88\x01\x01\x123\n" +
-	"\x13resolved_group_code\x18\x02 \x01(\tH\x01R\x11resolvedGroupCode\x88\x01\x01\x12B\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\"\x89\x01\n" +
+	"\x0eCropResolution\x12B\n" +
 	"\n" +
 	"candidates\x18\x03 \x03(\v2\".hawkr.ai.CropDisambiguationOptionR\n" +
-	"candidatesB\x15\n" +
-	"\x13_resolved_crop_codeB\x16\n" +
-	"\x14_resolved_group_code\"\xe2\x01\n" +
+	"candidatesJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03R\x12resolved_crop_codeR\x13resolved_group_code\"\xe2\x01\n" +
 	"\x0fAgentRunSummary\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x19\n" +
 	"\brun_type\x18\x02 \x01(\tR\arunType\x12\x16\n" +
@@ -11356,62 +10843,29 @@ const file_ai_ai_proto_rawDesc = "" +
 	"\x12upper_bound_amount\x18\x04 \x01(\tR\x10upperBoundAmount\x12%\n" +
 	"\x0ebasis_quantity\x18\x05 \x01(\tR\rbasisQuantity\x12\x1d\n" +
 	"\n" +
-	"basis_unit\x18\x06 \x01(\tR\tbasisUnit\"\xb0\x02\n" +
+	"basis_unit\x18\x06 \x01(\tR\tbasisUnit\"\xa1\x02\n" +
 	"\x16RfqPricePreviewRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x120\n" +
 	"\x14expected_revision_id\x18\x02 \x01(\tR\x12expectedRevisionId\x12*\n" +
-	"\x11client_request_id\x18\x03 \x01(\tR\x0fclientRequestId\x12!\n" +
-	"\fpricing_mode\x18\x04 \x01(\tR\vpricingMode\x12#\n" +
+	"\x11client_request_id\x18\x03 \x01(\tR\x0fclientRequestId\x12#\n" +
 	"\rdelivery_city\x18\x05 \x01(\tR\fdeliveryCity\x12Q\n" +
-	"\x15buyer_requested_range\x18\x06 \x01(\v2\x1d.hawkr.ai.BuyerRequestedRangeR\x13buyerRequestedRange\"\xe0\x01\n" +
-	"\x13ReferencePriceRange\x12,\n" +
-	"\x12lower_bound_amount\x18\x01 \x01(\tR\x10lowerBoundAmount\x12'\n" +
-	"\x0fmidpoint_amount\x18\x02 \x01(\tR\x0emidpointAmount\x12,\n" +
-	"\x12upper_bound_amount\x18\x03 \x01(\tR\x10upperBoundAmount\x12%\n" +
-	"\x0ebasis_quantity\x18\x04 \x01(\tR\rbasisQuantity\x12\x1d\n" +
-	"\n" +
-	"basis_unit\x18\x05 \x01(\tR\tbasisUnit\"\xfd\x02\n" +
-	"\x0fDealTemperature\x12\x16\n" +
-	"\x06status\x18\x01 \x01(\tR\x06status\x12\x1f\n" +
-	"\vreason_code\x18\x02 \x01(\tR\n" +
-	"reasonCode\x122\n" +
-	"\x15probability_lower_bps\x18\x03 \x01(\tR\x13probabilityLowerBps\x122\n" +
-	"\x15probability_upper_bps\x18\x04 \x01(\tR\x13probabilityUpperBps\x12\x12\n" +
-	"\x04band\x18\x05 \x01(\tR\x04band\x12-\n" +
-	"\x12outcome_definition\x18\x06 \x01(\tR\x11outcomeDefinition\x12<\n" +
-	"\x1aoutcome_definition_version\x18\a \x01(\tR\x18outcomeDefinitionVersion\x12%\n" +
-	"\x0epolicy_version\x18\b \x01(\tR\rpolicyVersion\x12!\n" +
-	"\fband_version\x18\t \x01(\tR\vbandVersion\"\x93\x02\n" +
-	"\x10MarketPriceBasis\x12\x1f\n" +
-	"\vregion_name\x18\x01 \x01(\tR\n" +
-	"regionName\x126\n" +
-	"\x17supporting_market_count\x18\x02 \x01(\tR\x15supportingMarketCount\x12.\n" +
-	"\x11source_data_as_of\x18\x03 \x01(\tH\x00R\x0esourceDataAsOf\x88\x01\x01\x12)\n" +
-	"\x10freshness_status\x18\x04 \x01(\tR\x0ffreshnessStatus\x12\x14\n" +
-	"\x05scope\x18\x05 \x01(\tR\x05scope\x12\x1f\n" +
-	"\vprice_layer\x18\x06 \x01(\tR\n" +
-	"priceLayerB\x14\n" +
-	"\x12_source_data_as_of\"\xca\x01\n" +
+	"\x15buyer_requested_range\x18\x06 \x01(\v2\x1d.hawkr.ai.BuyerRequestedRangeR\x13buyerRequestedRangeJ\x04\b\x04\x10\x05R\fpricing_mode\"\xca\x01\n" +
 	"\x0fQuoteTotalRange\x12\x1a\n" +
 	"\bcurrency\x18\x01 \x01(\tR\bcurrency\x12,\n" +
 	"\x12lower_bound_amount\x18\x02 \x01(\tR\x10lowerBoundAmount\x12,\n" +
 	"\x12upper_bound_amount\x18\x03 \x01(\tR\x10upperBoundAmount\x12\x1a\n" +
 	"\bquantity\x18\x04 \x01(\tR\bquantity\x12#\n" +
-	"\rquantity_unit\x18\x05 \x01(\tR\fquantityUnit\"\x8f\x05\n" +
+	"\rquantity_unit\x18\x05 \x01(\tR\fquantityUnit\"\xd3\x03\n" +
 	"\x17RfqPricePreviewResponse\x12(\n" +
 	"\x10price_preview_id\x18\x01 \x01(\tR\x0epricePreviewId\x12\x18\n" +
-	"\aversion\x18\x02 \x01(\tR\aversion\x12!\n" +
-	"\fpricing_mode\x18\x03 \x01(\tR\vpricingMode\x125\n" +
-	"\x16reference_availability\x18\x04 \x01(\tR\x15referenceAvailability\x12Q\n" +
-	"\x15reference_price_range\x18\x05 \x01(\v2\x1d.hawkr.ai.ReferencePriceRangeR\x13referencePriceRange\x12Q\n" +
-	"\x15buyer_requested_range\x18\x06 \x01(\v2\x1d.hawkr.ai.BuyerRequestedRangeR\x13buyerRequestedRange\x12D\n" +
-	"\x10deal_temperature\x18\a \x01(\v2\x19.hawkr.ai.DealTemperatureR\x0fdealTemperature\x12!\n" +
-	"\fpayload_hash\x18\b \x01(\tR\vpayloadHash\x12H\n" +
-	"\x12market_price_basis\x18\t \x01(\v2\x1a.hawkr.ai.MarketPriceBasisR\x10marketPriceBasis\x12E\n" +
+	"\aversion\x18\x02 \x01(\tR\aversion\x12Q\n" +
+	"\x15buyer_requested_range\x18\x06 \x01(\v2\x1d.hawkr.ai.BuyerRequestedRangeR\x13buyerRequestedRange\x12!\n" +
+	"\fpayload_hash\x18\b \x01(\tR\vpayloadHash\x12E\n" +
 	"\x11quote_total_range\x18\n" +
 	" \x01(\v2\x19.hawkr.ai.QuoteTotalRangeR\x0fquoteTotalRange\x126\n" +
-	"\x17quality_knowledge_state\x18\v \x01(\tR\x15qualityKnowledgeState\"\xb5\x02\n" +
+	"\x17quality_knowledge_state\x18\v \x01(\tR\x15qualityKnowledgeStateJ\x04\b\x03\x10\x04J\x04\b\x04\x10\x05J\x04\b\x05\x10\x06J\x04\b\a\x10\bJ\x04\b\t\x10\n" +
+	"R\fpricing_modeR\x16reference_availabilityR\x15reference_price_rangeR\x10deal_temperatureR\x12market_price_basis\"\xb5\x02\n" +
 	"\x16RfqConfirmationRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12*\n" +
@@ -11437,7 +10891,7 @@ const file_ai_ai_proto_rawDesc = "" +
 	"\x10candidate_set_id\x18\x06 \x01(\tR\x0ecandidateSetId\x124\n" +
 	"\x16selected_candidate_ids\x18\a \x03(\tR\x14selectedCandidateIds\x120\n" +
 	"\x11response_deadline\x18\b \x01(\tH\x00R\x10responseDeadline\x88\x01\x01B\x14\n" +
-	"\x12_response_deadline\"\xf0\x03\n" +
+	"\x12_response_deadline\"\xd7\x03\n" +
 	"\x1dRfqPublicationPreviewResponse\x12\x1f\n" +
 	"\vapproval_id\x18\x01 \x01(\tR\n" +
 	"approvalId\x12)\n" +
@@ -11446,12 +10900,11 @@ const file_ai_ai_proto_rawDesc = "" +
 	"\x1aseller_facing_payload_hash\x18\x04 \x01(\tR\x17sellerFacingPayloadHash\x12;\n" +
 	"\x1aseller_facing_payload_json\x18\x05 \x01(\tR\x17sellerFacingPayloadJson\x12\x1d\n" +
 	"\n" +
-	"expires_at\x18\x06 \x01(\tR\texpiresAt\x126\n" +
-	"\x17deal_temperature_status\x18\a \x01(\tR\x15dealTemperatureStatus\x12,\n" +
+	"expires_at\x18\x06 \x01(\tR\texpiresAt\x12,\n" +
 	"\x12audience_policy_id\x18\b \x01(\tR\x10audiencePolicyId\x126\n" +
 	"\x17audience_policy_version\x18\t \x01(\tR\x15audiencePolicyVersion\x12'\n" +
 	"\x0frecipient_count\x18\n" +
-	" \x01(\tR\x0erecipientCount\"\x8a\x02\n" +
+	" \x01(\tR\x0erecipientCountJ\x04\b\a\x10\bR\x17deal_temperature_status\"\x8a\x02\n" +
 	"\x1cRfqPublicationExecuteRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12*\n" +
@@ -11471,13 +10924,7 @@ const file_ai_ai_proto_rawDesc = "" +
 	"\fpublished_at\x18\a \x01(\tR\vpublishedAt\x12\x1a\n" +
 	"\breplayed\x18\b \x01(\bR\breplayed\"G\n" +
 	"(GetRfqPublicationInviteSellerViewRequest\x12\x1b\n" +
-	"\tinvite_id\x18\x01 \x01(\tR\binviteId\"\xbe\x01\n" +
-	"\x1aSellerFacingReferenceRange\x12,\n" +
-	"\x12lower_bound_amount\x18\x01 \x01(\tR\x10lowerBoundAmount\x12,\n" +
-	"\x12upper_bound_amount\x18\x02 \x01(\tR\x10upperBoundAmount\x12%\n" +
-	"\x0ebasis_quantity\x18\x03 \x01(\tR\rbasisQuantity\x12\x1d\n" +
-	"\n" +
-	"basis_unit\x18\x04 \x01(\tR\tbasisUnit\"\x83\x02\n" +
+	"\tinvite_id\x18\x01 \x01(\tR\binviteId\"\x83\x02\n" +
 	"\x1aSellerFacingRequestedRange\x12\x1a\n" +
 	"\bcurrency\x18\x01 \x01(\tR\bcurrency\x12'\n" +
 	"\x0fprice_component\x18\x02 \x01(\tR\x0epriceComponent\x12%\n" +
@@ -11485,7 +10932,7 @@ const file_ai_ai_proto_rawDesc = "" +
 	"\n" +
 	"basis_unit\x18\x04 \x01(\tR\tbasisUnit\x12,\n" +
 	"\x12lower_bound_amount\x18\x05 \x01(\tR\x10lowerBoundAmount\x12,\n" +
-	"\x12upper_bound_amount\x18\x06 \x01(\tR\x10upperBoundAmount\"\xdc\x04\n" +
+	"\x12upper_bound_amount\x18\x06 \x01(\tR\x10upperBoundAmount\"\x9f\x04\n" +
 	"&RfqPublicationInviteSellerViewResponse\x126\n" +
 	"\x17quality_knowledge_state\x18\t \x01(\tR\x15qualityKnowledgeState\x12\x12\n" +
 	"\x04item\x18\x01 \x01(\tR\x04item\x12\x1d\n" +
@@ -11500,9 +10947,8 @@ const file_ai_ai_proto_rawDesc = "" +
 	"\n" +
 	"buyer_note\x18\n" +
 	" \x01(\tR\tbuyerNote\x12X\n" +
-	"\x15reference_price_range\x18\v \x01(\v2$.hawkr.ai.SellerFacingReferenceRangeR\x13referencePriceRange\x12X\n" +
 	"\x15buyer_requested_range\x18\f \x01(\v2$.hawkr.ai.SellerFacingRequestedRangeR\x13buyerRequestedRange\x12/\n" +
-	"\x13publication_version\x18\r \x01(\tR\x12publicationVersion\"j\n" +
+	"\x13publication_version\x18\r \x01(\tR\x12publicationVersionJ\x04\b\v\x10\fR\x15reference_price_range\"j\n" +
 	"\x15WatchRunEventsRequest\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x1d\n" +
 	"\n" +
@@ -11620,7 +11066,7 @@ func file_ai_ai_proto_rawDescGZIP() []byte {
 	return file_ai_ai_proto_rawDescData
 }
 
-var file_ai_ai_proto_msgTypes = make([]protoimpl.MessageInfo, 140)
+var file_ai_ai_proto_msgTypes = make([]protoimpl.MessageInfo, 136)
 var file_ai_ai_proto_goTypes = []any{
 	(*AssistantRequest)(nil),                         // 0: hawkr.ai.AssistantRequest
 	(*TextEvent)(nil),                                // 1: hawkr.ai.TextEvent
@@ -11739,34 +11185,30 @@ var file_ai_ai_proto_goTypes = []any{
 	(*DeleteConversationRequest)(nil),                // 114: hawkr.ai.DeleteConversationRequest
 	(*BuyerRequestedRange)(nil),                      // 115: hawkr.ai.BuyerRequestedRange
 	(*RfqPricePreviewRequest)(nil),                   // 116: hawkr.ai.RfqPricePreviewRequest
-	(*ReferencePriceRange)(nil),                      // 117: hawkr.ai.ReferencePriceRange
-	(*DealTemperature)(nil),                          // 118: hawkr.ai.DealTemperature
-	(*MarketPriceBasis)(nil),                         // 119: hawkr.ai.MarketPriceBasis
-	(*QuoteTotalRange)(nil),                          // 120: hawkr.ai.QuoteTotalRange
-	(*RfqPricePreviewResponse)(nil),                  // 121: hawkr.ai.RfqPricePreviewResponse
-	(*RfqConfirmationRequest)(nil),                   // 122: hawkr.ai.RfqConfirmationRequest
-	(*RfqConfirmationResponse)(nil),                  // 123: hawkr.ai.RfqConfirmationResponse
-	(*RfqPublicationPreviewRequest)(nil),             // 124: hawkr.ai.RfqPublicationPreviewRequest
-	(*RfqPublicationPreviewResponse)(nil),            // 125: hawkr.ai.RfqPublicationPreviewResponse
-	(*RfqPublicationExecuteRequest)(nil),             // 126: hawkr.ai.RfqPublicationExecuteRequest
-	(*RfqPublicationExecuteResponse)(nil),            // 127: hawkr.ai.RfqPublicationExecuteResponse
-	(*GetRfqPublicationInviteSellerViewRequest)(nil), // 128: hawkr.ai.GetRfqPublicationInviteSellerViewRequest
-	(*SellerFacingReferenceRange)(nil),               // 129: hawkr.ai.SellerFacingReferenceRange
-	(*SellerFacingRequestedRange)(nil),               // 130: hawkr.ai.SellerFacingRequestedRange
-	(*RfqPublicationInviteSellerViewResponse)(nil),   // 131: hawkr.ai.RfqPublicationInviteSellerViewResponse
-	(*WatchRunEventsRequest)(nil),                    // 132: hawkr.ai.WatchRunEventsRequest
-	(*RunEvent)(nil),                                 // 133: hawkr.ai.RunEvent
-	(*CancelRunRequest)(nil),                         // 134: hawkr.ai.CancelRunRequest
-	(*CancelRunResponse)(nil),                        // 135: hawkr.ai.CancelRunResponse
-	(*ResumeRunRequest)(nil),                         // 136: hawkr.ai.ResumeRunRequest
-	(*ResumeRunResponse)(nil),                        // 137: hawkr.ai.ResumeRunResponse
-	nil,                                              // 138: hawkr.ai.StepEvent.SafeArgsEntry
-	nil,                                              // 139: hawkr.ai.Step.SafeArgsEntry
-	(*timestamppb.Timestamp)(nil),                    // 140: google.protobuf.Timestamp
-	(*emptypb.Empty)(nil),                            // 141: google.protobuf.Empty
+	(*QuoteTotalRange)(nil),                          // 117: hawkr.ai.QuoteTotalRange
+	(*RfqPricePreviewResponse)(nil),                  // 118: hawkr.ai.RfqPricePreviewResponse
+	(*RfqConfirmationRequest)(nil),                   // 119: hawkr.ai.RfqConfirmationRequest
+	(*RfqConfirmationResponse)(nil),                  // 120: hawkr.ai.RfqConfirmationResponse
+	(*RfqPublicationPreviewRequest)(nil),             // 121: hawkr.ai.RfqPublicationPreviewRequest
+	(*RfqPublicationPreviewResponse)(nil),            // 122: hawkr.ai.RfqPublicationPreviewResponse
+	(*RfqPublicationExecuteRequest)(nil),             // 123: hawkr.ai.RfqPublicationExecuteRequest
+	(*RfqPublicationExecuteResponse)(nil),            // 124: hawkr.ai.RfqPublicationExecuteResponse
+	(*GetRfqPublicationInviteSellerViewRequest)(nil), // 125: hawkr.ai.GetRfqPublicationInviteSellerViewRequest
+	(*SellerFacingRequestedRange)(nil),               // 126: hawkr.ai.SellerFacingRequestedRange
+	(*RfqPublicationInviteSellerViewResponse)(nil),   // 127: hawkr.ai.RfqPublicationInviteSellerViewResponse
+	(*WatchRunEventsRequest)(nil),                    // 128: hawkr.ai.WatchRunEventsRequest
+	(*RunEvent)(nil),                                 // 129: hawkr.ai.RunEvent
+	(*CancelRunRequest)(nil),                         // 130: hawkr.ai.CancelRunRequest
+	(*CancelRunResponse)(nil),                        // 131: hawkr.ai.CancelRunResponse
+	(*ResumeRunRequest)(nil),                         // 132: hawkr.ai.ResumeRunRequest
+	(*ResumeRunResponse)(nil),                        // 133: hawkr.ai.ResumeRunResponse
+	nil,                                              // 134: hawkr.ai.StepEvent.SafeArgsEntry
+	nil,                                              // 135: hawkr.ai.Step.SafeArgsEntry
+	(*timestamppb.Timestamp)(nil),                    // 136: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),                            // 137: google.protobuf.Empty
 }
 var file_ai_ai_proto_depIdxs = []int32{
-	138, // 0: hawkr.ai.StepEvent.safe_args:type_name -> hawkr.ai.StepEvent.SafeArgsEntry
+	134, // 0: hawkr.ai.StepEvent.safe_args:type_name -> hawkr.ai.StepEvent.SafeArgsEntry
 	1,   // 1: hawkr.ai.StreamEvent.text:type_name -> hawkr.ai.TextEvent
 	2,   // 2: hawkr.ai.StreamEvent.done:type_name -> hawkr.ai.DoneEvent
 	3,   // 3: hawkr.ai.StreamEvent.error:type_name -> hawkr.ai.ErrorEvent
@@ -11791,7 +11233,7 @@ var file_ai_ai_proto_depIdxs = []int32{
 	42,  // 22: hawkr.ai.TransformImageResponse.data:type_name -> hawkr.ai.TransformImageData
 	43,  // 23: hawkr.ai.ClarifyQuestion.options:type_name -> hawkr.ai.QuestionOption
 	43,  // 24: hawkr.ai.ClarifyQuestion.unit_options:type_name -> hawkr.ai.QuestionOption
-	139, // 25: hawkr.ai.Step.safe_args:type_name -> hawkr.ai.Step.SafeArgsEntry
+	135, // 25: hawkr.ai.Step.safe_args:type_name -> hawkr.ai.Step.SafeArgsEntry
 	49,  // 26: hawkr.ai.Slots.item_resolution:type_name -> hawkr.ai.ItemResolution
 	48,  // 27: hawkr.ai.TurnResult.slots:type_name -> hawkr.ai.Slots
 	47,  // 28: hawkr.ai.TurnResult.rejected:type_name -> hawkr.ai.RejectedField
@@ -11816,18 +11258,18 @@ var file_ai_ai_proto_depIdxs = []int32{
 	66,  // 47: hawkr.ai.UpsertSellerResponseDraftRequest.draft:type_name -> hawkr.ai.SellerQuotePayload
 	66,  // 48: hawkr.ai.SellerResponseDraftResponse.draft:type_name -> hawkr.ai.SellerQuotePayload
 	66,  // 49: hawkr.ai.UpsertVendorPortalResponseDraftRequest.draft:type_name -> hawkr.ai.SellerQuotePayload
-	140, // 50: hawkr.ai.VendorPortalVerification.verified_at:type_name -> google.protobuf.Timestamp
+	136, // 50: hawkr.ai.VendorPortalVerification.verified_at:type_name -> google.protobuf.Timestamp
 	66,  // 51: hawkr.ai.SubmitVendorPortalResponseRequest.quote:type_name -> hawkr.ai.SellerQuotePayload
 	76,  // 52: hawkr.ai.SubmitVendorPortalResponseRequest.verification:type_name -> hawkr.ai.VendorPortalVerification
 	76,  // 53: hawkr.ai.WithdrawVendorPortalResponseRequest.verification:type_name -> hawkr.ai.VendorPortalVerification
 	76,  // 54: hawkr.ai.DeclineVendorPortalRfqPublicationRequest.verification:type_name -> hawkr.ai.VendorPortalVerification
 	81,  // 55: hawkr.ai.SellerPublicationListItem.publication:type_name -> hawkr.ai.SellerPublicationSummary
-	131, // 56: hawkr.ai.SellerPublicationListItem.seller_facing_payload:type_name -> hawkr.ai.RfqPublicationInviteSellerViewResponse
+	127, // 56: hawkr.ai.SellerPublicationListItem.seller_facing_payload:type_name -> hawkr.ai.RfqPublicationInviteSellerViewResponse
 	82,  // 57: hawkr.ai.ListSellerPublicationsResponse.publications:type_name -> hawkr.ai.SellerPublicationListItem
 	81,  // 58: hawkr.ai.SellerPublicationDetailResponse.publication:type_name -> hawkr.ai.SellerPublicationSummary
 	73,  // 59: hawkr.ai.SellerPublicationDetailResponse.draft:type_name -> hawkr.ai.SellerResponseDraftResponse
 	68,  // 60: hawkr.ai.SellerPublicationDetailResponse.latest_response:type_name -> hawkr.ai.SellerResponseVersionResponse
-	131, // 61: hawkr.ai.SellerPublicationDetailResponse.seller_facing_payload:type_name -> hawkr.ai.RfqPublicationInviteSellerViewResponse
+	127, // 61: hawkr.ai.SellerPublicationDetailResponse.seller_facing_payload:type_name -> hawkr.ai.RfqPublicationInviteSellerViewResponse
 	89,  // 62: hawkr.ai.ListSellerResponsesResponse.responses:type_name -> hawkr.ai.BuyerFacingSellerResponse
 	88,  // 63: hawkr.ai.BuyerFacingSellerResponse.seller:type_name -> hawkr.ai.SellerIdentityView
 	66,  // 64: hawkr.ai.BuyerFacingSellerResponse.quote:type_name -> hawkr.ai.SellerQuotePayload
@@ -11843,141 +11285,137 @@ var file_ai_ai_proto_depIdxs = []int32{
 	46,  // 74: hawkr.ai.ConversationMessage.recorded_this_turn:type_name -> hawkr.ai.RecordedField
 	111, // 75: hawkr.ai.ConversationMessagesResponse.records:type_name -> hawkr.ai.ConversationMessage
 	115, // 76: hawkr.ai.RfqPricePreviewRequest.buyer_requested_range:type_name -> hawkr.ai.BuyerRequestedRange
-	117, // 77: hawkr.ai.RfqPricePreviewResponse.reference_price_range:type_name -> hawkr.ai.ReferencePriceRange
-	115, // 78: hawkr.ai.RfqPricePreviewResponse.buyer_requested_range:type_name -> hawkr.ai.BuyerRequestedRange
-	118, // 79: hawkr.ai.RfqPricePreviewResponse.deal_temperature:type_name -> hawkr.ai.DealTemperature
-	119, // 80: hawkr.ai.RfqPricePreviewResponse.market_price_basis:type_name -> hawkr.ai.MarketPriceBasis
-	120, // 81: hawkr.ai.RfqPricePreviewResponse.quote_total_range:type_name -> hawkr.ai.QuoteTotalRange
-	129, // 82: hawkr.ai.RfqPublicationInviteSellerViewResponse.reference_price_range:type_name -> hawkr.ai.SellerFacingReferenceRange
-	130, // 83: hawkr.ai.RfqPublicationInviteSellerViewResponse.buyer_requested_range:type_name -> hawkr.ai.SellerFacingRequestedRange
-	56,  // 84: hawkr.ai.ResumeRunResponse.result:type_name -> hawkr.ai.TurnResult
-	40,  // 85: hawkr.ai.AIImageService.TransformImage:input_type -> hawkr.ai.TransformImageRequest
-	26,  // 86: hawkr.ai.AIImageService.ListAiStyles:input_type -> hawkr.ai.ListAiStylesRequest
-	29,  // 87: hawkr.ai.AIAdminService.ListAiStylesForAdmin:input_type -> hawkr.ai.ListAiStylesForAdminRequest
-	31,  // 88: hawkr.ai.AIAdminService.CreateAiStyle:input_type -> hawkr.ai.CreateAiStyleRequest
-	32,  // 89: hawkr.ai.AIAdminService.UpdateAiStyle:input_type -> hawkr.ai.UpdateAiStyleRequest
-	33,  // 90: hawkr.ai.AIAdminService.DeleteAiStyle:input_type -> hawkr.ai.DeleteAiStyleRequest
-	35,  // 91: hawkr.ai.AIAdminService.GetAiQuota:input_type -> hawkr.ai.GetAiQuotaRequest
-	36,  // 92: hawkr.ai.AIAdminService.UpdateAiQuota:input_type -> hawkr.ai.UpdateAiQuotaRequest
-	37,  // 93: hawkr.ai.AIAdminService.DeleteAiQuota:input_type -> hawkr.ai.DeleteAiQuotaRequest
-	19,  // 94: hawkr.ai.RecommendationService.PersonalizedRecommend:input_type -> hawkr.ai.PersonalizedRequest
-	0,   // 95: hawkr.ai.AIAssistantService.SellerChat:input_type -> hawkr.ai.AssistantRequest
-	0,   // 96: hawkr.ai.AIAssistantService.SellerOrders:input_type -> hawkr.ai.AssistantRequest
-	0,   // 97: hawkr.ai.AIAssistantService.SellerInventory:input_type -> hawkr.ai.AssistantRequest
-	0,   // 98: hawkr.ai.AIAssistantService.SellerPayment:input_type -> hawkr.ai.AssistantRequest
-	0,   // 99: hawkr.ai.AIAssistantService.SellerPrice:input_type -> hawkr.ai.AssistantRequest
-	0,   // 100: hawkr.ai.AIAssistantService.SellerProductListingChat:input_type -> hawkr.ai.AssistantRequest
-	17,  // 101: hawkr.ai.AIAssistantService.SellerProductAutofill:input_type -> hawkr.ai.SellerProductAutofillRequest
-	11,  // 102: hawkr.ai.AIAssistantService.SellerLatestSession:input_type -> hawkr.ai.LatestSessionRequest
-	0,   // 103: hawkr.ai.AIAssistantService.BuyerOrders:input_type -> hawkr.ai.AssistantRequest
-	0,   // 104: hawkr.ai.AIAssistantService.BuyerTracking:input_type -> hawkr.ai.AssistantRequest
-	0,   // 105: hawkr.ai.AIAssistantService.BuyerReturnPolicy:input_type -> hawkr.ai.AssistantRequest
-	0,   // 106: hawkr.ai.AIAssistantService.BuyerSeasonal:input_type -> hawkr.ai.AssistantRequest
-	0,   // 107: hawkr.ai.AIAssistantService.BuyerSellerMatch:input_type -> hawkr.ai.AssistantRequest
-	0,   // 108: hawkr.ai.AIAssistantService.BuyerChat:input_type -> hawkr.ai.AssistantRequest
-	11,  // 109: hawkr.ai.AIAssistantService.BuyerLatestSession:input_type -> hawkr.ai.LatestSessionRequest
-	52,  // 110: hawkr.ai.AIProcurementService.SubmitTurn:input_type -> hawkr.ai.TurnRequest
-	52,  // 111: hawkr.ai.AIProcurementService.SubmitTurnStream:input_type -> hawkr.ai.TurnRequest
-	58,  // 112: hawkr.ai.AIProcurementService.GetSnapshot:input_type -> hawkr.ai.GetSnapshotRequest
-	97,  // 113: hawkr.ai.AIProcurementService.StartCandidateSearch:input_type -> hawkr.ai.StartCandidateSearchRequest
-	99,  // 114: hawkr.ai.AIProcurementService.GetCandidateSearch:input_type -> hawkr.ai.GetCandidateSearchRequest
-	103, // 115: hawkr.ai.AIProcurementService.ToggleSelection:input_type -> hawkr.ai.ToggleSelectionRequest
-	105, // 116: hawkr.ai.AIProcurementService.SubmitAnswer:input_type -> hawkr.ai.SubmitAnswerRequest
-	106, // 117: hawkr.ai.AIProcurementService.Rewind:input_type -> hawkr.ai.RewindRequest
-	116, // 118: hawkr.ai.AIProcurementService.PreviewRfqPrice:input_type -> hawkr.ai.RfqPricePreviewRequest
-	122, // 119: hawkr.ai.AIProcurementService.ConfirmRfqSnapshot:input_type -> hawkr.ai.RfqConfirmationRequest
-	124, // 120: hawkr.ai.AIProcurementService.PreviewRfqPublication:input_type -> hawkr.ai.RfqPublicationPreviewRequest
-	126, // 121: hawkr.ai.AIProcurementService.ExecuteRfqPublication:input_type -> hawkr.ai.RfqPublicationExecuteRequest
-	128, // 122: hawkr.ai.AIProcurementService.GetRfqPublicationInviteSellerView:input_type -> hawkr.ai.GetRfqPublicationInviteSellerViewRequest
-	107, // 123: hawkr.ai.AIProcurementService.ListConversations:input_type -> hawkr.ai.ListConversationsRequest
-	110, // 124: hawkr.ai.AIProcurementService.GetConversationMessages:input_type -> hawkr.ai.GetConversationMessagesRequest
-	94,  // 125: hawkr.ai.AIProcurementService.GetRuntimeSnapshot:input_type -> hawkr.ai.GetRuntimeSnapshotRequest
-	80,  // 126: hawkr.ai.AIProcurementService.ListSellerPublications:input_type -> hawkr.ai.ListSellerPublicationsRequest
-	84,  // 127: hawkr.ai.AIProcurementService.GetSellerPublication:input_type -> hawkr.ai.GetSellerPublicationRequest
-	72,  // 128: hawkr.ai.AIProcurementService.UpsertSellerResponseDraft:input_type -> hawkr.ai.UpsertSellerResponseDraftRequest
-	74,  // 129: hawkr.ai.AIProcurementService.GetVendorPortalResponseDraft:input_type -> hawkr.ai.GetVendorPortalResponseDraftRequest
-	75,  // 130: hawkr.ai.AIProcurementService.UpsertVendorPortalResponseDraft:input_type -> hawkr.ai.UpsertVendorPortalResponseDraftRequest
-	77,  // 131: hawkr.ai.AIProcurementService.SubmitVendorPortalResponse:input_type -> hawkr.ai.SubmitVendorPortalResponseRequest
-	78,  // 132: hawkr.ai.AIProcurementService.WithdrawVendorPortalResponse:input_type -> hawkr.ai.WithdrawVendorPortalResponseRequest
-	79,  // 133: hawkr.ai.AIProcurementService.DeclineVendorPortalRfqPublication:input_type -> hawkr.ai.DeclineVendorPortalRfqPublicationRequest
-	67,  // 134: hawkr.ai.AIProcurementService.SubmitSellerResponse:input_type -> hawkr.ai.SubmitSellerResponseRequest
-	69,  // 135: hawkr.ai.AIProcurementService.WithdrawSellerResponse:input_type -> hawkr.ai.WithdrawSellerResponseRequest
-	70,  // 136: hawkr.ai.AIProcurementService.DeclineRfqPublication:input_type -> hawkr.ai.DeclineRfqPublicationRequest
-	86,  // 137: hawkr.ai.AIProcurementService.ListSellerResponses:input_type -> hawkr.ai.ListSellerResponsesRequest
-	90,  // 138: hawkr.ai.AIProcurementService.PutShortlistEntry:input_type -> hawkr.ai.ShortlistEntryRequest
-	90,  // 139: hawkr.ai.AIProcurementService.DeleteShortlistEntry:input_type -> hawkr.ai.ShortlistEntryRequest
-	92,  // 140: hawkr.ai.AIProcurementService.AcceptSellerQuote:input_type -> hawkr.ai.BuyerQuoteAcceptanceRequest
-	113, // 141: hawkr.ai.AIProcurementService.RenameConversation:input_type -> hawkr.ai.RenameConversationRequest
-	114, // 142: hawkr.ai.AIProcurementService.DeleteConversation:input_type -> hawkr.ai.DeleteConversationRequest
-	132, // 143: hawkr.ai.AIProcurementService.WatchRunEvents:input_type -> hawkr.ai.WatchRunEventsRequest
-	134, // 144: hawkr.ai.AIProcurementService.CancelRun:input_type -> hawkr.ai.CancelRunRequest
-	136, // 145: hawkr.ai.AIProcurementService.ResumeRun:input_type -> hawkr.ai.ResumeRunRequest
-	41,  // 146: hawkr.ai.AIImageService.TransformImage:output_type -> hawkr.ai.TransformImageResponse
-	27,  // 147: hawkr.ai.AIImageService.ListAiStyles:output_type -> hawkr.ai.ListAiStylesResponse
-	30,  // 148: hawkr.ai.AIAdminService.ListAiStylesForAdmin:output_type -> hawkr.ai.ListAiStylesForAdminResponse
-	34,  // 149: hawkr.ai.AIAdminService.CreateAiStyle:output_type -> hawkr.ai.AiStyleResponse
-	34,  // 150: hawkr.ai.AIAdminService.UpdateAiStyle:output_type -> hawkr.ai.AiStyleResponse
-	34,  // 151: hawkr.ai.AIAdminService.DeleteAiStyle:output_type -> hawkr.ai.AiStyleResponse
-	38,  // 152: hawkr.ai.AIAdminService.GetAiQuota:output_type -> hawkr.ai.AiQuotaResponse
-	38,  // 153: hawkr.ai.AIAdminService.UpdateAiQuota:output_type -> hawkr.ai.AiQuotaResponse
-	38,  // 154: hawkr.ai.AIAdminService.DeleteAiQuota:output_type -> hawkr.ai.AiQuotaResponse
-	23,  // 155: hawkr.ai.RecommendationService.PersonalizedRecommend:output_type -> hawkr.ai.PersonalizedRecommendResponse
-	10,  // 156: hawkr.ai.AIAssistantService.SellerChat:output_type -> hawkr.ai.StreamEvent
-	10,  // 157: hawkr.ai.AIAssistantService.SellerOrders:output_type -> hawkr.ai.StreamEvent
-	10,  // 158: hawkr.ai.AIAssistantService.SellerInventory:output_type -> hawkr.ai.StreamEvent
-	10,  // 159: hawkr.ai.AIAssistantService.SellerPayment:output_type -> hawkr.ai.StreamEvent
-	10,  // 160: hawkr.ai.AIAssistantService.SellerPrice:output_type -> hawkr.ai.StreamEvent
-	10,  // 161: hawkr.ai.AIAssistantService.SellerProductListingChat:output_type -> hawkr.ai.StreamEvent
-	18,  // 162: hawkr.ai.AIAssistantService.SellerProductAutofill:output_type -> hawkr.ai.SellerProductAutofillResponse
-	13,  // 163: hawkr.ai.AIAssistantService.SellerLatestSession:output_type -> hawkr.ai.LatestSessionResponse
-	10,  // 164: hawkr.ai.AIAssistantService.BuyerOrders:output_type -> hawkr.ai.StreamEvent
-	10,  // 165: hawkr.ai.AIAssistantService.BuyerTracking:output_type -> hawkr.ai.StreamEvent
-	10,  // 166: hawkr.ai.AIAssistantService.BuyerReturnPolicy:output_type -> hawkr.ai.StreamEvent
-	10,  // 167: hawkr.ai.AIAssistantService.BuyerSeasonal:output_type -> hawkr.ai.StreamEvent
-	10,  // 168: hawkr.ai.AIAssistantService.BuyerSellerMatch:output_type -> hawkr.ai.StreamEvent
-	10,  // 169: hawkr.ai.AIAssistantService.BuyerChat:output_type -> hawkr.ai.StreamEvent
-	13,  // 170: hawkr.ai.AIAssistantService.BuyerLatestSession:output_type -> hawkr.ai.LatestSessionResponse
-	56,  // 171: hawkr.ai.AIProcurementService.SubmitTurn:output_type -> hawkr.ai.TurnResult
-	10,  // 172: hawkr.ai.AIProcurementService.SubmitTurnStream:output_type -> hawkr.ai.StreamEvent
-	63,  // 173: hawkr.ai.AIProcurementService.GetSnapshot:output_type -> hawkr.ai.SnapshotResponse
-	98,  // 174: hawkr.ai.AIProcurementService.StartCandidateSearch:output_type -> hawkr.ai.StartCandidateSearchResponse
-	102, // 175: hawkr.ai.AIProcurementService.GetCandidateSearch:output_type -> hawkr.ai.CandidateSetResponse
-	104, // 176: hawkr.ai.AIProcurementService.ToggleSelection:output_type -> hawkr.ai.ToggleSelectionResponse
-	56,  // 177: hawkr.ai.AIProcurementService.SubmitAnswer:output_type -> hawkr.ai.TurnResult
-	56,  // 178: hawkr.ai.AIProcurementService.Rewind:output_type -> hawkr.ai.TurnResult
-	121, // 179: hawkr.ai.AIProcurementService.PreviewRfqPrice:output_type -> hawkr.ai.RfqPricePreviewResponse
-	123, // 180: hawkr.ai.AIProcurementService.ConfirmRfqSnapshot:output_type -> hawkr.ai.RfqConfirmationResponse
-	125, // 181: hawkr.ai.AIProcurementService.PreviewRfqPublication:output_type -> hawkr.ai.RfqPublicationPreviewResponse
-	127, // 182: hawkr.ai.AIProcurementService.ExecuteRfqPublication:output_type -> hawkr.ai.RfqPublicationExecuteResponse
-	131, // 183: hawkr.ai.AIProcurementService.GetRfqPublicationInviteSellerView:output_type -> hawkr.ai.RfqPublicationInviteSellerViewResponse
-	109, // 184: hawkr.ai.AIProcurementService.ListConversations:output_type -> hawkr.ai.ListConversationsResponse
-	112, // 185: hawkr.ai.AIProcurementService.GetConversationMessages:output_type -> hawkr.ai.ConversationMessagesResponse
-	96,  // 186: hawkr.ai.AIProcurementService.GetRuntimeSnapshot:output_type -> hawkr.ai.RuntimeSnapshotResponse
-	83,  // 187: hawkr.ai.AIProcurementService.ListSellerPublications:output_type -> hawkr.ai.ListSellerPublicationsResponse
-	85,  // 188: hawkr.ai.AIProcurementService.GetSellerPublication:output_type -> hawkr.ai.SellerPublicationDetailResponse
-	73,  // 189: hawkr.ai.AIProcurementService.UpsertSellerResponseDraft:output_type -> hawkr.ai.SellerResponseDraftResponse
-	73,  // 190: hawkr.ai.AIProcurementService.GetVendorPortalResponseDraft:output_type -> hawkr.ai.SellerResponseDraftResponse
-	73,  // 191: hawkr.ai.AIProcurementService.UpsertVendorPortalResponseDraft:output_type -> hawkr.ai.SellerResponseDraftResponse
-	68,  // 192: hawkr.ai.AIProcurementService.SubmitVendorPortalResponse:output_type -> hawkr.ai.SellerResponseVersionResponse
-	71,  // 193: hawkr.ai.AIProcurementService.WithdrawVendorPortalResponse:output_type -> hawkr.ai.SellerResponseClosureResponse
-	71,  // 194: hawkr.ai.AIProcurementService.DeclineVendorPortalRfqPublication:output_type -> hawkr.ai.SellerResponseClosureResponse
-	68,  // 195: hawkr.ai.AIProcurementService.SubmitSellerResponse:output_type -> hawkr.ai.SellerResponseVersionResponse
-	71,  // 196: hawkr.ai.AIProcurementService.WithdrawSellerResponse:output_type -> hawkr.ai.SellerResponseClosureResponse
-	71,  // 197: hawkr.ai.AIProcurementService.DeclineRfqPublication:output_type -> hawkr.ai.SellerResponseClosureResponse
-	87,  // 198: hawkr.ai.AIProcurementService.ListSellerResponses:output_type -> hawkr.ai.ListSellerResponsesResponse
-	91,  // 199: hawkr.ai.AIProcurementService.PutShortlistEntry:output_type -> hawkr.ai.ShortlistEntryResponse
-	91,  // 200: hawkr.ai.AIProcurementService.DeleteShortlistEntry:output_type -> hawkr.ai.ShortlistEntryResponse
-	93,  // 201: hawkr.ai.AIProcurementService.AcceptSellerQuote:output_type -> hawkr.ai.BuyerQuoteAcceptanceResponse
-	141, // 202: hawkr.ai.AIProcurementService.RenameConversation:output_type -> google.protobuf.Empty
-	141, // 203: hawkr.ai.AIProcurementService.DeleteConversation:output_type -> google.protobuf.Empty
-	133, // 204: hawkr.ai.AIProcurementService.WatchRunEvents:output_type -> hawkr.ai.RunEvent
-	135, // 205: hawkr.ai.AIProcurementService.CancelRun:output_type -> hawkr.ai.CancelRunResponse
-	137, // 206: hawkr.ai.AIProcurementService.ResumeRun:output_type -> hawkr.ai.ResumeRunResponse
-	146, // [146:207] is the sub-list for method output_type
-	85,  // [85:146] is the sub-list for method input_type
-	85,  // [85:85] is the sub-list for extension type_name
-	85,  // [85:85] is the sub-list for extension extendee
-	0,   // [0:85] is the sub-list for field type_name
+	115, // 77: hawkr.ai.RfqPricePreviewResponse.buyer_requested_range:type_name -> hawkr.ai.BuyerRequestedRange
+	117, // 78: hawkr.ai.RfqPricePreviewResponse.quote_total_range:type_name -> hawkr.ai.QuoteTotalRange
+	126, // 79: hawkr.ai.RfqPublicationInviteSellerViewResponse.buyer_requested_range:type_name -> hawkr.ai.SellerFacingRequestedRange
+	56,  // 80: hawkr.ai.ResumeRunResponse.result:type_name -> hawkr.ai.TurnResult
+	40,  // 81: hawkr.ai.AIImageService.TransformImage:input_type -> hawkr.ai.TransformImageRequest
+	26,  // 82: hawkr.ai.AIImageService.ListAiStyles:input_type -> hawkr.ai.ListAiStylesRequest
+	29,  // 83: hawkr.ai.AIAdminService.ListAiStylesForAdmin:input_type -> hawkr.ai.ListAiStylesForAdminRequest
+	31,  // 84: hawkr.ai.AIAdminService.CreateAiStyle:input_type -> hawkr.ai.CreateAiStyleRequest
+	32,  // 85: hawkr.ai.AIAdminService.UpdateAiStyle:input_type -> hawkr.ai.UpdateAiStyleRequest
+	33,  // 86: hawkr.ai.AIAdminService.DeleteAiStyle:input_type -> hawkr.ai.DeleteAiStyleRequest
+	35,  // 87: hawkr.ai.AIAdminService.GetAiQuota:input_type -> hawkr.ai.GetAiQuotaRequest
+	36,  // 88: hawkr.ai.AIAdminService.UpdateAiQuota:input_type -> hawkr.ai.UpdateAiQuotaRequest
+	37,  // 89: hawkr.ai.AIAdminService.DeleteAiQuota:input_type -> hawkr.ai.DeleteAiQuotaRequest
+	19,  // 90: hawkr.ai.RecommendationService.PersonalizedRecommend:input_type -> hawkr.ai.PersonalizedRequest
+	0,   // 91: hawkr.ai.AIAssistantService.SellerChat:input_type -> hawkr.ai.AssistantRequest
+	0,   // 92: hawkr.ai.AIAssistantService.SellerOrders:input_type -> hawkr.ai.AssistantRequest
+	0,   // 93: hawkr.ai.AIAssistantService.SellerInventory:input_type -> hawkr.ai.AssistantRequest
+	0,   // 94: hawkr.ai.AIAssistantService.SellerPayment:input_type -> hawkr.ai.AssistantRequest
+	0,   // 95: hawkr.ai.AIAssistantService.SellerPrice:input_type -> hawkr.ai.AssistantRequest
+	0,   // 96: hawkr.ai.AIAssistantService.SellerProductListingChat:input_type -> hawkr.ai.AssistantRequest
+	17,  // 97: hawkr.ai.AIAssistantService.SellerProductAutofill:input_type -> hawkr.ai.SellerProductAutofillRequest
+	11,  // 98: hawkr.ai.AIAssistantService.SellerLatestSession:input_type -> hawkr.ai.LatestSessionRequest
+	0,   // 99: hawkr.ai.AIAssistantService.BuyerOrders:input_type -> hawkr.ai.AssistantRequest
+	0,   // 100: hawkr.ai.AIAssistantService.BuyerTracking:input_type -> hawkr.ai.AssistantRequest
+	0,   // 101: hawkr.ai.AIAssistantService.BuyerReturnPolicy:input_type -> hawkr.ai.AssistantRequest
+	0,   // 102: hawkr.ai.AIAssistantService.BuyerSeasonal:input_type -> hawkr.ai.AssistantRequest
+	0,   // 103: hawkr.ai.AIAssistantService.BuyerSellerMatch:input_type -> hawkr.ai.AssistantRequest
+	0,   // 104: hawkr.ai.AIAssistantService.BuyerChat:input_type -> hawkr.ai.AssistantRequest
+	11,  // 105: hawkr.ai.AIAssistantService.BuyerLatestSession:input_type -> hawkr.ai.LatestSessionRequest
+	52,  // 106: hawkr.ai.AIProcurementService.SubmitTurn:input_type -> hawkr.ai.TurnRequest
+	52,  // 107: hawkr.ai.AIProcurementService.SubmitTurnStream:input_type -> hawkr.ai.TurnRequest
+	58,  // 108: hawkr.ai.AIProcurementService.GetSnapshot:input_type -> hawkr.ai.GetSnapshotRequest
+	97,  // 109: hawkr.ai.AIProcurementService.StartCandidateSearch:input_type -> hawkr.ai.StartCandidateSearchRequest
+	99,  // 110: hawkr.ai.AIProcurementService.GetCandidateSearch:input_type -> hawkr.ai.GetCandidateSearchRequest
+	103, // 111: hawkr.ai.AIProcurementService.ToggleSelection:input_type -> hawkr.ai.ToggleSelectionRequest
+	105, // 112: hawkr.ai.AIProcurementService.SubmitAnswer:input_type -> hawkr.ai.SubmitAnswerRequest
+	106, // 113: hawkr.ai.AIProcurementService.Rewind:input_type -> hawkr.ai.RewindRequest
+	116, // 114: hawkr.ai.AIProcurementService.PreviewRfqPrice:input_type -> hawkr.ai.RfqPricePreviewRequest
+	119, // 115: hawkr.ai.AIProcurementService.ConfirmRfqSnapshot:input_type -> hawkr.ai.RfqConfirmationRequest
+	121, // 116: hawkr.ai.AIProcurementService.PreviewRfqPublication:input_type -> hawkr.ai.RfqPublicationPreviewRequest
+	123, // 117: hawkr.ai.AIProcurementService.ExecuteRfqPublication:input_type -> hawkr.ai.RfqPublicationExecuteRequest
+	125, // 118: hawkr.ai.AIProcurementService.GetRfqPublicationInviteSellerView:input_type -> hawkr.ai.GetRfqPublicationInviteSellerViewRequest
+	107, // 119: hawkr.ai.AIProcurementService.ListConversations:input_type -> hawkr.ai.ListConversationsRequest
+	110, // 120: hawkr.ai.AIProcurementService.GetConversationMessages:input_type -> hawkr.ai.GetConversationMessagesRequest
+	94,  // 121: hawkr.ai.AIProcurementService.GetRuntimeSnapshot:input_type -> hawkr.ai.GetRuntimeSnapshotRequest
+	80,  // 122: hawkr.ai.AIProcurementService.ListSellerPublications:input_type -> hawkr.ai.ListSellerPublicationsRequest
+	84,  // 123: hawkr.ai.AIProcurementService.GetSellerPublication:input_type -> hawkr.ai.GetSellerPublicationRequest
+	72,  // 124: hawkr.ai.AIProcurementService.UpsertSellerResponseDraft:input_type -> hawkr.ai.UpsertSellerResponseDraftRequest
+	74,  // 125: hawkr.ai.AIProcurementService.GetVendorPortalResponseDraft:input_type -> hawkr.ai.GetVendorPortalResponseDraftRequest
+	75,  // 126: hawkr.ai.AIProcurementService.UpsertVendorPortalResponseDraft:input_type -> hawkr.ai.UpsertVendorPortalResponseDraftRequest
+	77,  // 127: hawkr.ai.AIProcurementService.SubmitVendorPortalResponse:input_type -> hawkr.ai.SubmitVendorPortalResponseRequest
+	78,  // 128: hawkr.ai.AIProcurementService.WithdrawVendorPortalResponse:input_type -> hawkr.ai.WithdrawVendorPortalResponseRequest
+	79,  // 129: hawkr.ai.AIProcurementService.DeclineVendorPortalRfqPublication:input_type -> hawkr.ai.DeclineVendorPortalRfqPublicationRequest
+	67,  // 130: hawkr.ai.AIProcurementService.SubmitSellerResponse:input_type -> hawkr.ai.SubmitSellerResponseRequest
+	69,  // 131: hawkr.ai.AIProcurementService.WithdrawSellerResponse:input_type -> hawkr.ai.WithdrawSellerResponseRequest
+	70,  // 132: hawkr.ai.AIProcurementService.DeclineRfqPublication:input_type -> hawkr.ai.DeclineRfqPublicationRequest
+	86,  // 133: hawkr.ai.AIProcurementService.ListSellerResponses:input_type -> hawkr.ai.ListSellerResponsesRequest
+	90,  // 134: hawkr.ai.AIProcurementService.PutShortlistEntry:input_type -> hawkr.ai.ShortlistEntryRequest
+	90,  // 135: hawkr.ai.AIProcurementService.DeleteShortlistEntry:input_type -> hawkr.ai.ShortlistEntryRequest
+	92,  // 136: hawkr.ai.AIProcurementService.AcceptSellerQuote:input_type -> hawkr.ai.BuyerQuoteAcceptanceRequest
+	113, // 137: hawkr.ai.AIProcurementService.RenameConversation:input_type -> hawkr.ai.RenameConversationRequest
+	114, // 138: hawkr.ai.AIProcurementService.DeleteConversation:input_type -> hawkr.ai.DeleteConversationRequest
+	128, // 139: hawkr.ai.AIProcurementService.WatchRunEvents:input_type -> hawkr.ai.WatchRunEventsRequest
+	130, // 140: hawkr.ai.AIProcurementService.CancelRun:input_type -> hawkr.ai.CancelRunRequest
+	132, // 141: hawkr.ai.AIProcurementService.ResumeRun:input_type -> hawkr.ai.ResumeRunRequest
+	41,  // 142: hawkr.ai.AIImageService.TransformImage:output_type -> hawkr.ai.TransformImageResponse
+	27,  // 143: hawkr.ai.AIImageService.ListAiStyles:output_type -> hawkr.ai.ListAiStylesResponse
+	30,  // 144: hawkr.ai.AIAdminService.ListAiStylesForAdmin:output_type -> hawkr.ai.ListAiStylesForAdminResponse
+	34,  // 145: hawkr.ai.AIAdminService.CreateAiStyle:output_type -> hawkr.ai.AiStyleResponse
+	34,  // 146: hawkr.ai.AIAdminService.UpdateAiStyle:output_type -> hawkr.ai.AiStyleResponse
+	34,  // 147: hawkr.ai.AIAdminService.DeleteAiStyle:output_type -> hawkr.ai.AiStyleResponse
+	38,  // 148: hawkr.ai.AIAdminService.GetAiQuota:output_type -> hawkr.ai.AiQuotaResponse
+	38,  // 149: hawkr.ai.AIAdminService.UpdateAiQuota:output_type -> hawkr.ai.AiQuotaResponse
+	38,  // 150: hawkr.ai.AIAdminService.DeleteAiQuota:output_type -> hawkr.ai.AiQuotaResponse
+	23,  // 151: hawkr.ai.RecommendationService.PersonalizedRecommend:output_type -> hawkr.ai.PersonalizedRecommendResponse
+	10,  // 152: hawkr.ai.AIAssistantService.SellerChat:output_type -> hawkr.ai.StreamEvent
+	10,  // 153: hawkr.ai.AIAssistantService.SellerOrders:output_type -> hawkr.ai.StreamEvent
+	10,  // 154: hawkr.ai.AIAssistantService.SellerInventory:output_type -> hawkr.ai.StreamEvent
+	10,  // 155: hawkr.ai.AIAssistantService.SellerPayment:output_type -> hawkr.ai.StreamEvent
+	10,  // 156: hawkr.ai.AIAssistantService.SellerPrice:output_type -> hawkr.ai.StreamEvent
+	10,  // 157: hawkr.ai.AIAssistantService.SellerProductListingChat:output_type -> hawkr.ai.StreamEvent
+	18,  // 158: hawkr.ai.AIAssistantService.SellerProductAutofill:output_type -> hawkr.ai.SellerProductAutofillResponse
+	13,  // 159: hawkr.ai.AIAssistantService.SellerLatestSession:output_type -> hawkr.ai.LatestSessionResponse
+	10,  // 160: hawkr.ai.AIAssistantService.BuyerOrders:output_type -> hawkr.ai.StreamEvent
+	10,  // 161: hawkr.ai.AIAssistantService.BuyerTracking:output_type -> hawkr.ai.StreamEvent
+	10,  // 162: hawkr.ai.AIAssistantService.BuyerReturnPolicy:output_type -> hawkr.ai.StreamEvent
+	10,  // 163: hawkr.ai.AIAssistantService.BuyerSeasonal:output_type -> hawkr.ai.StreamEvent
+	10,  // 164: hawkr.ai.AIAssistantService.BuyerSellerMatch:output_type -> hawkr.ai.StreamEvent
+	10,  // 165: hawkr.ai.AIAssistantService.BuyerChat:output_type -> hawkr.ai.StreamEvent
+	13,  // 166: hawkr.ai.AIAssistantService.BuyerLatestSession:output_type -> hawkr.ai.LatestSessionResponse
+	56,  // 167: hawkr.ai.AIProcurementService.SubmitTurn:output_type -> hawkr.ai.TurnResult
+	10,  // 168: hawkr.ai.AIProcurementService.SubmitTurnStream:output_type -> hawkr.ai.StreamEvent
+	63,  // 169: hawkr.ai.AIProcurementService.GetSnapshot:output_type -> hawkr.ai.SnapshotResponse
+	98,  // 170: hawkr.ai.AIProcurementService.StartCandidateSearch:output_type -> hawkr.ai.StartCandidateSearchResponse
+	102, // 171: hawkr.ai.AIProcurementService.GetCandidateSearch:output_type -> hawkr.ai.CandidateSetResponse
+	104, // 172: hawkr.ai.AIProcurementService.ToggleSelection:output_type -> hawkr.ai.ToggleSelectionResponse
+	56,  // 173: hawkr.ai.AIProcurementService.SubmitAnswer:output_type -> hawkr.ai.TurnResult
+	56,  // 174: hawkr.ai.AIProcurementService.Rewind:output_type -> hawkr.ai.TurnResult
+	118, // 175: hawkr.ai.AIProcurementService.PreviewRfqPrice:output_type -> hawkr.ai.RfqPricePreviewResponse
+	120, // 176: hawkr.ai.AIProcurementService.ConfirmRfqSnapshot:output_type -> hawkr.ai.RfqConfirmationResponse
+	122, // 177: hawkr.ai.AIProcurementService.PreviewRfqPublication:output_type -> hawkr.ai.RfqPublicationPreviewResponse
+	124, // 178: hawkr.ai.AIProcurementService.ExecuteRfqPublication:output_type -> hawkr.ai.RfqPublicationExecuteResponse
+	127, // 179: hawkr.ai.AIProcurementService.GetRfqPublicationInviteSellerView:output_type -> hawkr.ai.RfqPublicationInviteSellerViewResponse
+	109, // 180: hawkr.ai.AIProcurementService.ListConversations:output_type -> hawkr.ai.ListConversationsResponse
+	112, // 181: hawkr.ai.AIProcurementService.GetConversationMessages:output_type -> hawkr.ai.ConversationMessagesResponse
+	96,  // 182: hawkr.ai.AIProcurementService.GetRuntimeSnapshot:output_type -> hawkr.ai.RuntimeSnapshotResponse
+	83,  // 183: hawkr.ai.AIProcurementService.ListSellerPublications:output_type -> hawkr.ai.ListSellerPublicationsResponse
+	85,  // 184: hawkr.ai.AIProcurementService.GetSellerPublication:output_type -> hawkr.ai.SellerPublicationDetailResponse
+	73,  // 185: hawkr.ai.AIProcurementService.UpsertSellerResponseDraft:output_type -> hawkr.ai.SellerResponseDraftResponse
+	73,  // 186: hawkr.ai.AIProcurementService.GetVendorPortalResponseDraft:output_type -> hawkr.ai.SellerResponseDraftResponse
+	73,  // 187: hawkr.ai.AIProcurementService.UpsertVendorPortalResponseDraft:output_type -> hawkr.ai.SellerResponseDraftResponse
+	68,  // 188: hawkr.ai.AIProcurementService.SubmitVendorPortalResponse:output_type -> hawkr.ai.SellerResponseVersionResponse
+	71,  // 189: hawkr.ai.AIProcurementService.WithdrawVendorPortalResponse:output_type -> hawkr.ai.SellerResponseClosureResponse
+	71,  // 190: hawkr.ai.AIProcurementService.DeclineVendorPortalRfqPublication:output_type -> hawkr.ai.SellerResponseClosureResponse
+	68,  // 191: hawkr.ai.AIProcurementService.SubmitSellerResponse:output_type -> hawkr.ai.SellerResponseVersionResponse
+	71,  // 192: hawkr.ai.AIProcurementService.WithdrawSellerResponse:output_type -> hawkr.ai.SellerResponseClosureResponse
+	71,  // 193: hawkr.ai.AIProcurementService.DeclineRfqPublication:output_type -> hawkr.ai.SellerResponseClosureResponse
+	87,  // 194: hawkr.ai.AIProcurementService.ListSellerResponses:output_type -> hawkr.ai.ListSellerResponsesResponse
+	91,  // 195: hawkr.ai.AIProcurementService.PutShortlistEntry:output_type -> hawkr.ai.ShortlistEntryResponse
+	91,  // 196: hawkr.ai.AIProcurementService.DeleteShortlistEntry:output_type -> hawkr.ai.ShortlistEntryResponse
+	93,  // 197: hawkr.ai.AIProcurementService.AcceptSellerQuote:output_type -> hawkr.ai.BuyerQuoteAcceptanceResponse
+	137, // 198: hawkr.ai.AIProcurementService.RenameConversation:output_type -> google.protobuf.Empty
+	137, // 199: hawkr.ai.AIProcurementService.DeleteConversation:output_type -> google.protobuf.Empty
+	129, // 200: hawkr.ai.AIProcurementService.WatchRunEvents:output_type -> hawkr.ai.RunEvent
+	131, // 201: hawkr.ai.AIProcurementService.CancelRun:output_type -> hawkr.ai.CancelRunResponse
+	133, // 202: hawkr.ai.AIProcurementService.ResumeRun:output_type -> hawkr.ai.ResumeRunResponse
+	142, // [142:203] is the sub-list for method output_type
+	81,  // [81:142] is the sub-list for method input_type
+	81,  // [81:81] is the sub-list for extension type_name
+	81,  // [81:81] is the sub-list for extension extendee
+	0,   // [0:81] is the sub-list for field type_name
 }
 
 func init() { file_ai_ai_proto_init() }
@@ -12001,17 +11439,14 @@ func file_ai_ai_proto_init() {
 	file_ai_ai_proto_msgTypes[32].OneofWrappers = []any{}
 	file_ai_ai_proto_msgTypes[48].OneofWrappers = []any{}
 	file_ai_ai_proto_msgTypes[49].OneofWrappers = []any{}
-	file_ai_ai_proto_msgTypes[50].OneofWrappers = []any{}
-	file_ai_ai_proto_msgTypes[59].OneofWrappers = []any{}
-	file_ai_ai_proto_msgTypes[119].OneofWrappers = []any{}
-	file_ai_ai_proto_msgTypes[124].OneofWrappers = []any{}
+	file_ai_ai_proto_msgTypes[121].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ai_ai_proto_rawDesc), len(file_ai_ai_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   140,
+			NumMessages:   136,
 			NumExtensions: 0,
 			NumServices:   5,
 		},

@@ -25,41 +25,6 @@ const publicationSchemaVersion = "hawkr.agent.publication.v1"
 // candidate search 的 "candidateSetId"）。
 const publicationRunDomainRefType = "publicationId"
 
-// ---------------------------------------------------------------------------
-// 價格依據 hard block 的值域（#2450 Scope 5，2026-09-08 controller 裁決）
-//
-// 這三個都是字面值常數而不是 CodeMeta：
-// procurement_price_previews.reference_availability 與 pricing_mode 兩欄的值域**從來
-// 沒有登記過**（price_preview.go 只寫這幾個字面值），為了單一個 gate 去登記一組新值域
-// 是獨立決定，不在本 slice 範圍。
-// ---------------------------------------------------------------------------
-
-// referenceUnavailable 是「伺服器算不出價格依據」這件事寫在 approval 上的樣子。
-//
-// ⚠️ **今天沒有任何路徑會寫出這個值，這道 block 是防禦性的。** codemeta 裡叫
-// PRICE_BASIS_UNAVAILABLE 的那一個是 ProcurementErrorReason（422 錯誤碼，**不同軸**），
-// 而它自己的登記描述明寫「零 side effect、不建立 preview 列」——沒有 preview 列就沒有
-// approval，也就永遠到不了 execute。留著它是為了在這個值哪天真的被持久化時，Scope 5
-// 的字面要求已經成立，成本為零。
-const referenceUnavailable = "PRICE_BASIS_UNAVAILABLE"
-
-// legacyReferenceUnavailable 是 reference_availability 目前**唯一**的非 AVAILABLE 值。
-//
-// ⛔ 它本身不是錯誤訊號：`BUYER_ENTERED_NO_REFERENCE` 這條 pricing mode 的正常產出就是
-// 它（price_preview.go 的該分支——買家自己出價，本來就不參考 Pricebook）。無條件擋下它
-// 會讓**每一張買家自訂價的 publication 都發不出去**，而那正是系統在 guided 模式找不到
-// 可靠 mapping 時（ErrMappingUnavailableForGuidedMode）叫買家改用的模式。
-//
-// Scope 5 真正禁止的是「把 UNAVAILABLE **自動**當成人工模式」，也就是 guided 請求被靜默
-// 降級成手動——那件事在 preview 端就已經擋掉了（見 price_preview.go 兩條 mode 各自獨立
-// 的路徑），execute 沒有立場重新審一次已經凍在 approval 上的決定。所以判準不是這個值本身，
-// 而是它有沒有一個明確宣告的 pricing_mode 支撐它。
-const legacyReferenceUnavailable = "UNAVAILABLE"
-
-// buyerEnteredNoReferencePricingMode 是「買家自己出價、不參考 Pricebook」的 pricing mode，
-// 也是 legacyReferenceUnavailable 唯一合法的搭配。
-const buyerEnteredNoReferencePricingMode = "BUYER_ENTERED_NO_REFERENCE"
-
 var (
 	// ErrApprovalStale：買家手上的 approval 已經不是可執行的那一個。四種成因對呼叫端
 	// 是同一個結論——「重讀 approval（必要時重新 preview）再試」——所以共用一個 sentinel：
@@ -385,23 +350,6 @@ func (uc *PublicationExecuteUseCase) gate(txCtx context.Context, in ExecuteRfqPu
 		return repository.PublicationApproval{}, nil, ErrPayloadHashMismatch
 	}
 
-	// Scope 5 的 hard block。讀 approval 上凍下來的值，**不重查 Pricebook**：核准當下
-	// 算不出參考價這件事已經發生過了，事後 Pricebook 恰好查得到不會讓那次核准變得有依據。
-	//
-	// 兩個值的判準不同，理由見上面兩個常數各自的註解：
-	//   - PRICE_BASIS_UNAVAILABLE：無條件擋。今天不可達，純防禦。
-	//   - UNAVAILABLE：只有在 pricing_mode **沒有**明確宣告買家自訂價時才擋。
-	//     它與 BUYER_ENTERED_NO_REFERENCE 的組合是那條模式的正常產出，擋下它等於讓
-	//     買家自訂價永遠發不出去；它與其他 mode 的組合則是不自洽的資料（今天的程式
-	//     產不出來），擋下才對。
-	if approval.ReferenceAvailability == referenceUnavailable {
-		return repository.PublicationApproval{}, nil, pricing.ErrPriceBasisUnavailable
-	}
-	if approval.ReferenceAvailability == legacyReferenceUnavailable &&
-		approval.PricingMode != buyerEnteredNoReferencePricingMode {
-		return repository.PublicationApproval{}, nil, pricing.ErrPriceBasisUnavailable
-	}
-
 	// 這份核准是不是這個 request 的（別把 A 案的核准發成 B 案的詢價）。
 	if approval.RequestID != in.RequestID {
 		return repository.PublicationApproval{}, nil, ErrApprovalStale
@@ -481,7 +429,7 @@ func (uc *PublicationExecuteUseCase) verifyAudience(txCtx context.Context, appro
 
 // inviteCreatedPayload 是 outbox 列的 JSONB 內容。
 //
-// ⛔ 只帶 id：不帶 contact、token、私有預算或任何 Pricebook internals（Scope 9）。
+// ⛔ 只帶 id：不帶 contact、token、私有預算或任何內部定價資料（Scope 9）。
 // ID 一律字串（API/Proto 規範：避免 JavaScript 精度問題）。
 type inviteCreatedPayload struct {
 	InviteID      string `json:"inviteId"`
@@ -512,7 +460,7 @@ func inviteExpiry(approval repository.PublicationApproval, now time.Time) time.T
 // publicationResultData 是 RFQ_PUBLICATION_RESULT 的 publicDataJson。
 //
 // ⛔ **allowlist，恰好六欄，不多不少**（#2450 Scope 9、doc 64 §4.4 的時序圖）：
-// 不得含聯絡方式、token、買家預算、Pricebook internals、prompt 或 reasoning。
+// 不得含聯絡方式、token、買家預算、內部定價資料、prompt 或 reasoning。
 // 加欄位之前先問「賣家／任何能讀到這個 artifact 的人看到它可以嗎」。
 //
 // publicationId／version／sellerFacingPayloadHash 這三個是 ID／雜湊，數字以字串過線，

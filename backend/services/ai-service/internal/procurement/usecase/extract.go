@@ -137,7 +137,7 @@ func parseExtractResult(raw []byte) (ExtractResult, error) {
 	if err := json.Unmarshal(raw, &wire); err != nil {
 		return ExtractResult{}, fmt.Errorf("slot patch JSON 解析失敗: %w", err)
 	}
-	// item_resolution 不是模型能填的欄位：它是 crop_gate 查 Pricebook 之後的判定
+	// item_resolution 不是模型能填的欄位：它是 crop_gate 查分類樹之後的判定
 	// 結果，不是自然語言裡抽得出來的東西。buildSlotSchema 的 Properties 是白名單、
 	// 本來就沒有它，但 wire 是嵌入整個 domain.SlotPatch 反序列化的——白名單只約束
 	// 模型「應該」輸出什麼，擋不住它多吐一個 key（tool-call 模式的 Args 更是如此）。

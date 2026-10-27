@@ -10,8 +10,7 @@ import (
 
 func TestToRfqPricePreviewResponseProto_UnsetBuyerRangeIsAbsentOnTheWire(t *testing.T) {
 	got := toRfqPricePreviewResponseProto(pricing.PricePreviewResult{
-		PricePreviewID: 1, Version: 1, PricingMode: "PRICEBOOK_GUIDED",
-		ReferenceAvailability: "AVAILABLE",
+		PricePreviewID: 1, Version: 1,
 	})
 
 	require.Nil(t, got.GetBuyerRequestedRange(),
@@ -22,8 +21,7 @@ func TestToRfqPricePreviewResponseProto_UnsetBuyerRangeIsAbsentOnTheWire(t *test
 
 func TestToRfqPricePreviewResponseProto_SetBuyerRangeStillTravels(t *testing.T) {
 	got := toRfqPricePreviewResponseProto(pricing.PricePreviewResult{
-		PricePreviewID: 1, Version: 1, PricingMode: "PRICEBOOK_GUIDED",
-		ReferenceAvailability: "AVAILABLE",
+		PricePreviewID: 1, Version: 1,
 		BuyerRequestedRange: pricing.BuyerRequestedRange{
 			Currency: "TWD", PriceComponent: "GOODS_ONLY",
 			LowerBoundAmount: "90", UpperBoundAmount: "120",

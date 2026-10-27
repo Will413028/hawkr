@@ -1342,7 +1342,7 @@ type AIProcurementServiceClient interface {
 	// 買家：引導式問答
 	SubmitAnswer(ctx context.Context, in *SubmitAnswerRequest, opts ...grpc.CallOption) (*TurnResult, error)
 	Rewind(ctx context.Context, in *RewindRequest, opts ...grpc.CallOption) (*TurnResult, error)
-	// 買家：RFQ 報價預覽（Pricebook 參考區間，issue #2403 Slice 2）
+	// 買家：RFQ 報價預覽（issue #2403 Slice 2）
 	PreviewRfqPrice(ctx context.Context, in *RfqPricePreviewRequest, opts ...grpc.CallOption) (*RfqPricePreviewResponse, error)
 	// 買家：RFQ 報價確認（對某次 price preview 產生不可變確認快照，issue #2403 Slice 3）
 	ConfirmRfqSnapshot(ctx context.Context, in *RfqConfirmationRequest, opts ...grpc.CallOption) (*RfqConfirmationResponse, error)
@@ -1788,7 +1788,7 @@ type AIProcurementServiceServer interface {
 	// 買家：引導式問答
 	SubmitAnswer(context.Context, *SubmitAnswerRequest) (*TurnResult, error)
 	Rewind(context.Context, *RewindRequest) (*TurnResult, error)
-	// 買家：RFQ 報價預覽（Pricebook 參考區間，issue #2403 Slice 2）
+	// 買家：RFQ 報價預覽（issue #2403 Slice 2）
 	PreviewRfqPrice(context.Context, *RfqPricePreviewRequest) (*RfqPricePreviewResponse, error)
 	// 買家：RFQ 報價確認（對某次 price preview 產生不可變確認快照，issue #2403 Slice 3）
 	ConfirmRfqSnapshot(context.Context, *RfqConfirmationRequest) (*RfqConfirmationResponse, error)

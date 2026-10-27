@@ -52,7 +52,7 @@ func (t taxonomyRetriever) Recall(ctx context.Context, q recall.Query) ([]recall
 		add(recall.Candidate{
 			Key: recall.CandidateKey(recall.KindCategory, g.ID), Kind: recall.KindCategory, Code: g.ID,
 			Label: g.Label, CategoryLevel: 2, ParentID: g.ParentID, ParentLabel: g.L1Label,
-			HasForecast: true, MatchedBy: g.L1Label, Quality: recall.Strong,
+			MatchedBy: g.L1Label, Quality: recall.Strong,
 		})
 	}
 
@@ -65,7 +65,7 @@ func (t taxonomyRetriever) Recall(ctx context.Context, q recall.Query) ([]recall
 				cand := recall.Candidate{
 					Key: recall.CandidateKey(recall.KindCategory, child.ID), Kind: recall.KindCategory, Code: child.ID,
 					Label: child.Label, CategoryIDs: []string{child.ID}, CategoryLevel: 3,
-					ParentID: g.ID, ParentLabel: g.Label, HasForecast: true, MatchedBy: child.Label,
+					ParentID: g.ID, ParentLabel: g.Label, MatchedBy: child.Label,
 				}
 				switch {
 				case exact && anyCategoryNameMatches(queries, cNorm, true):

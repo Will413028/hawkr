@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/domain"
-	"github.com/Will413028/hawkr/ai-service/internal/procurement/testkit"
-	pbusecase "github.com/Will413028/hawkr/ai-service/internal/usecase"
 	"github.com/Will413028/hawkr/go-pkg/codemeta"
 	categorypb "github.com/Will413028/hawkr/go-pkg/proto/category"
 	"github.com/stretchr/testify/require"
@@ -51,23 +49,6 @@ func (f *categorySuggestFake) Suggest(_ context.Context, query string, stage, _ 
 	return f.ids, f.err
 }
 
-type categoryPricebookFake struct {
-	testkit.FakePricebookClient
-	queries []string
-	limits  []int32
-	byQuery map[string][]pbusecase.CropCatalogMatch
-}
-
-func (f *categoryPricebookFake) SearchCropCatalog(_ context.Context, query string, limit int32) ([]pbusecase.CropCatalogMatch, error) {
-	f.queries = append(f.queries, query)
-	f.limits = append(f.limits, limit)
-	matches := f.byQuery[query]
-	if len(matches) > int(limit) {
-		matches = matches[:limit]
-	}
-	return matches, f.Err
-}
-
 func porkCategoryTree() *categoryTreeFake {
 	return &categoryTreeFake{response: &categorypb.GetCategoryTreeResponse{Categories: []*categorypb.CategoryNode{
 		{Id: "100", Name: "肉類", Status: codemeta.CommonStatusActive.Value, Children: []*categorypb.CategoryNode{
@@ -83,9 +64,8 @@ func porkCategoryTree() *categoryTreeFake {
 	}}}
 }
 
-func newCategoryResolver(pb *categoryPricebookFake, model *categorySuggestFake) *DisambiguationUseCase {
-	uc := NewDisambiguationUseCase(pb, nil, nil)
-	uc.categories = porkCategoryTree()
+func newCategoryResolver(model *categorySuggestFake) *DisambiguationUseCase {
+	uc := NewDisambiguationUseCase(porkCategoryTree(), nil)
 	if model != nil {
 		uc.categoryModel = model
 	}
@@ -93,9 +73,8 @@ func newCategoryResolver(pb *categoryPricebookFake, model *categorySuggestFake) 
 }
 
 func TestCropCategoryFallback_GroupToItemThenManualPricePreservesCategory(t *testing.T) {
-	pb := &categoryPricebookFake{}
 	model := &categorySuggestFake{ids: []string{"301"}}
-	uc := newCategoryResolver(pb, model)
+	uc := newCategoryResolver(model)
 	group := &domain.CropSelection{Stage: domain.CropSelectionGroup}
 	options := []domain.CropDisambiguationOption{{Label: "豬肉", CategoryID: "200", CategoryLevel: 2}}
 	item, err := uc.ResolveSelection(context.Background(), "不知名部位", group, options, "category-200", "")
@@ -117,15 +96,11 @@ func TestCropCategoryFallback_GroupToItemThenManualPricePreservesCategory(t *tes
 	require.Equal(t, "200", price.Selection.ParentCategoryID)
 	require.Equal(t, "301", price.Selection.CategoryID)
 	require.Equal(t, "五花肉", price.Selection.Label)
-	require.Empty(t, pb.queries, "resume 改走 v2 召回之後不再打 SearchCropCatalog")
-	require.Equal(t, 1, pb.PriceableCalls, "選了大品項那一次召回一次；選到葉不再召回")
-	require.Nil(t, price.CropCode)
-	require.Nil(t, price.GroupCode)
 	require.Equal(t, 1, model.calls)
 }
 
 func TestCropCategoryFallback_TypedGroupAndItemRespectStage(t *testing.T) {
-	uc := newCategoryResolver(&categoryPricebookFake{}, &categorySuggestFake{})
+	uc := newCategoryResolver(&categorySuggestFake{})
 	group, err := uc.ResolveSelection(context.Background(), "五花肉", &domain.CropSelection{Stage: domain.CropSelectionGroup}, nil, "", "豬肉")
 	require.NoError(t, err)
 	require.Equal(t, domain.CropSelectionGroup, group.Selection.Stage)
@@ -147,7 +122,7 @@ func TestCropCategoryFallback_TypedGroupAndItemRespectStage(t *testing.T) {
 }
 
 func TestCropCategoryFallback_StaleFabricatedAndCrossParentChoicesNeverAdopted(t *testing.T) {
-	uc := newCategoryResolver(&categoryPricebookFake{}, nil)
+	uc := newCategoryResolver(nil)
 	stage := &domain.CropSelection{Stage: domain.CropSelectionItem, ParentCategoryID: "200", ParentLabel: "豬肉"}
 	for _, id := range []string{"401", "303", "999"} {
 		result, err := uc.ResolveSelection(context.Background(), "五花肉", stage, []domain.CropDisambiguationOption{{CategoryID: id, CategoryLevel: 3}}, "category-"+id, "")
@@ -171,8 +146,7 @@ func TestCropCategoryFallback_ProductServiceNumericStatusWire(t *testing.T) {
 			}},
 		}},
 	}}}
-	uc := NewDisambiguationUseCase(&categoryPricebookFake{}, nil, nil)
-	uc.categories = tree
+	uc := NewDisambiguationUseCase(tree, nil)
 	result, err := uc.Resolve(context.Background(), "豬五花")
 	require.NoError(t, err)
 	require.Equal(t, "active", tree.status)
@@ -213,15 +187,4 @@ func TestMatchCropCategories_ExactAliasBeatsContainsOnRawText(t *testing.T) {
 
 	require.Len(t, matches, 1)
 	require.Equal(t, "210", matches[0].ID, "別名的精確命中應勝過原話的包含命中")
-}
-
-type categoryMappingFake struct {
-	categoryIDs []string
-	mapping     pbusecase.PricebookCategoryMapping
-	err         error
-}
-
-func (f *categoryMappingFake) ResolveCategoryMapping(_ context.Context, categoryID string) (pbusecase.PricebookCategoryMapping, error) {
-	f.categoryIDs = append(f.categoryIDs, categoryID)
-	return f.mapping, f.err
 }

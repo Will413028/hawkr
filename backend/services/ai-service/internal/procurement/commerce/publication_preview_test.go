@@ -20,7 +20,7 @@ const (
 	pubSnapshotID  = int64(5100)
 	pubPreviewID   = int64(6100)
 	pubCandSetID   = int64(900)
-	pubCanonical   = `{"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","pricingMode":"PRICEBOOK_GUIDED","buyerRequestedRange":{"min":"80","max":"120"},"item":"高麗菜","quantity":100,"unit":"公斤","deliveryCity":"台中市"}`
+	pubCanonical   = `{"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","buyerRequestedRange":{"min":"80","max":"120"},"item":"高麗菜","quantity":100,"unit":"公斤","deliveryCity":"台中市"}`
 	pubSnapshotSum = "snapshot-hash"
 )
 
@@ -49,7 +49,6 @@ func (f *fakePublicationApprovalRepo) InsertPublicationApproval(ctx context.Cont
 		AudienceHash:            in.AudienceHash,
 		SellerFacingPayloadJSON: in.SellerFacingPayloadJSON,
 		SellerFacingPayloadHash: in.SellerFacingPayloadHash,
-		DealTemperatureStatus:   in.DealTemperatureStatus,
 		State:                   in.State, SchemaVersion: in.SchemaVersion,
 		PreviewClientRequestID: in.PreviewClientRequestID,
 		GeneratedAt:            in.GeneratedAt, ExpiresAt: in.ExpiresAt,
@@ -119,15 +118,14 @@ func newPublicationPreviewFixture() (*PublicationPreviewUseCase, *fakePublicatio
 		fakeConfirmedRfqSnapshotByIDReader{snap: repository.ConfirmedRfqSnapshot{
 			ID: pubSnapshotID, BuyerID: pubBuyerID, RequestID: pubRequestID,
 			RequestRevisionID: pubRevisionID, PricePreviewID: pubPreviewID, PricePreviewVersion: 1,
-			QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN", PricingMode: "PRICEBOOK_GUIDED",
-			CanonicalPayloadJSON: json.RawMessage(pubCanonical), PayloadHash: pubSnapshotSum,
+			QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
+			CanonicalPayloadJSON:  json.RawMessage(pubCanonical), PayloadHash: pubSnapshotSum,
 		}},
 		fakePricePreviewByIDReader{preview: repository.PricePreview{
 			ID: pubPreviewID, BuyerID: pubBuyerID, RequestID: pubRequestID,
-			RequestRevisionID: pubRevisionID, PricingMode: "PRICEBOOK_GUIDED",
-			QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN", ReferenceAvailability: "AVAILABLE",
+			RequestRevisionID:       pubRevisionID,
+			QualityKnowledgeState:   "BUYER_QUALITY_UNKNOWN",
 			BuyerRequestedRangeJSON: json.RawMessage(`{"min":"80","max":"120"}`),
-			DealTemperatureJSON:     json.RawMessage(`{"status":"UNKNOWN"}`),
 			PreviewInputHash:        "preview-input-hash", PayloadHash: "preview-payload-hash",
 			Version: 1,
 		}},
@@ -185,7 +183,6 @@ func TestPreviewRfqPublication_WishPool_ReturnsServerOwnedAudienceHashAndCASToke
 	require.Equal(t, "WISH_POOL_ALL_ACTIVE_SELLERS_V1", got.AudiencePolicyID)
 	require.Equal(t, 1, got.AudiencePolicyVersion)
 	require.Equal(t, 0, got.RecipientCount, "WISH_POOL 沒有名單是本模式的定義")
-	require.Equal(t, "UNKNOWN", got.DealTemperatureStatus)
 	require.False(t, got.ExpiresAt.IsZero())
 
 	require.Equal(t, 1, approvals.insertCalls)
@@ -196,7 +193,6 @@ func TestPreviewRfqPublication_WishPool_ReturnsServerOwnedAudienceHashAndCASToke
 	require.Equal(t, pubSnapshotSum, approvals.lastInput.ConfirmedRfqPayloadHash)
 	require.Equal(t, "preview-payload-hash", approvals.lastInput.PricePreviewPayloadHash)
 	require.Equal(t, "preview-input-hash", approvals.lastInput.PricePreviewInputHash)
-	require.Equal(t, "AVAILABLE", approvals.lastInput.ReferenceAvailability)
 	require.NotEmpty(t, approvals.lastInput.BuyerRequestedRangeHash)
 }
 
@@ -347,15 +343,14 @@ func TestPreviewRfqPublication_CandidateIdentityUnresolved_WritesNothing(t *test
 		fakeConfirmedRfqSnapshotByIDReader{snap: repository.ConfirmedRfqSnapshot{
 			ID: pubSnapshotID, BuyerID: pubBuyerID, RequestID: pubRequestID,
 			RequestRevisionID: pubRevisionID, PricePreviewID: pubPreviewID, PricePreviewVersion: 1,
-			QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN", PricingMode: "PRICEBOOK_GUIDED",
-			CanonicalPayloadJSON: json.RawMessage(pubCanonical), PayloadHash: pubSnapshotSum,
+			QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
+			CanonicalPayloadJSON:  json.RawMessage(pubCanonical), PayloadHash: pubSnapshotSum,
 		}},
 		fakePricePreviewByIDReader{preview: repository.PricePreview{
 			ID: pubPreviewID, BuyerID: pubBuyerID, RequestID: pubRequestID,
-			RequestRevisionID: pubRevisionID, PricingMode: "PRICEBOOK_GUIDED",
-			QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN", ReferenceAvailability: "AVAILABLE",
+			RequestRevisionID:       pubRevisionID,
+			QualityKnowledgeState:   "BUYER_QUALITY_UNKNOWN",
 			BuyerRequestedRangeJSON: json.RawMessage(`{"min":"80","max":"120"}`),
-			DealTemperatureJSON:     json.RawMessage(`{"status":"UNKNOWN"}`),
 			PreviewInputHash:        "preview-input-hash", PayloadHash: "preview-payload-hash",
 			Version: 1,
 		}},
@@ -450,16 +445,3 @@ func TestPreviewRfqPublication_ValidResponseDeadline_IsPersistedAndHashed(t *tes
 }
 
 func pubInt64Ptr(v int64) *int64 { return &v }
-
-// TestDealTemperatureStatus_ReadsBothKeyCasings 釘住 publication preview 那支
-// 讀取器對新舊兩種鍵都成立。它本來就宣告 `json:"status"`，而寫入端當時產出的是
-// "Status"——同一條 case-insensitive fallback 讓它一直是對的。改 tag 之後兩種
-// 大小寫的列會並存於同一張表，兩邊都要讀得到。
-func TestDealTemperatureStatus_ReadsBothKeyCasings(t *testing.T) {
-	if got := dealTemperatureStatus(json.RawMessage(`{"Status":"WARM","ReasonCode":"X"}`)); got != "WARM" {
-		t.Errorf("舊列（PascalCase）status = %q，want WARM", got)
-	}
-	if got := dealTemperatureStatus(json.RawMessage(`{"status":"COLD","reasonCode":"X"}`)); got != "COLD" {
-		t.Errorf("新列（camelCase）status = %q，want COLD", got)
-	}
-}

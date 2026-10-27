@@ -4068,8 +4068,6 @@ enum ProcurementArtifactType {
   candidateResults(code: 'CANDIDATE_RESULTS', value: 'CANDIDATE_RESULTS', label: '候選結果'),
   /// 定價預覽 — Track A。上游流程屬 #2403（doc 57 §5.7），`data` 形狀**尚未展開**——本次只凍結型別名稱與共同 envelope
   pricingPreview(code: 'PRICING_PREVIEW', value: 'PRICING_PREVIEW', label: '定價預覽'),
-  /// 成交溫度計 — Track A。v1 不產本型 artifact——溫度住在 procurement_price_previews.deal_temperature_json，身分由 price_preview_id + version 承擔（見 docs/詳細設計書/64 §2-5）。`data` 形狀待 outcomeDefinitionVersion 2 展開
-  dealTemperature(code: 'DEAL_TEMPERATURE', value: 'DEAL_TEMPERATURE', label: '成交溫度計'),
   /// 已確認詢價單 — Track A。#2403（doc 57 §5.7）的「不可變需求確認＝詢價單本體」，凍結 `snapshot`／`hash`／版本形狀時須讓商務線 CAS（`expectedRfqSnapshotHash`）用得上；`data` 形狀**尚未展開**
   confirmedRfq(code: 'CONFIRMED_RFQ', value: 'CONFIRMED_RFQ', label: '已確認詢價單'),
   /// 發布核准 — Track A。屬商務線 #2450，`data` 形狀**尚未展開**；核准不得走 generic resume（doc 57 §4.6）
@@ -4107,114 +4105,6 @@ enum ProcurementArtifactType {
 
   /// 依 value 查找，找不到回傳 null
   static ProcurementArtifactType? fromValue(String value) {
-    for (final v in values) {
-      if (v.value == value) return v;
-    }
-    return null;
-  }
-}
-
-/// 成交溫度計估計的可用性（見 `docs/詳細設計書/64` §2-5）。`AVAILABLE` 必須帶齊機率上下界、band 與四個版本欄位；`UNKNOWN` 不得帶任何機率或 band，只帶 `ProcurementDealTemperatureReason`。
-enum ProcurementDealTemperatureStatus {
-  /// 可用 — 估計成立，機率上下界、band 與版本欄位齊全
-  available(code: 'AVAILABLE', value: 'AVAILABLE', label: '可用'),
-  /// 未知 — 估計不成立，原因見 reasonCode；不得顯示 0%、百分比或色帶
-  unknown(code: 'UNKNOWN', value: 'UNKNOWN', label: '未知');
-
-  const ProcurementDealTemperatureStatus({
-    required this.code,
-    required this.value,
-    required this.label,
-  });
-
-  final String code;
-  final String value;
-  final String label;
-
-  /// 依 code 查找，找不到回傳 null
-  static ProcurementDealTemperatureStatus? fromCode(String code) {
-    for (final v in values) {
-      if (v.code == code) return v;
-    }
-    return null;
-  }
-
-  /// 依 value 查找，找不到回傳 null
-  static ProcurementDealTemperatureStatus? fromValue(String value) {
-    for (final v in values) {
-      if (v.value == value) return v;
-    }
-    return null;
-  }
-}
-
-/// 成交溫度計為何是 `UNKNOWN` 的原因碼。`MAPPING_MISSING` 與 `ProcurementErrorReason` 的同名值**刻意共用同一個字面值**（同一種「沒有可靠 mapping 可參考」語意，見該 enum 的既有說明），不另創同義詞。v6.0 V.7.3 的 `NO_RELIABLE_PRICEBOOK_MAPPING` 與 issue #2537 allowlist 的 `MAPPING_UNRELIABLE` 是同一概念的另外兩個名字，**不採用**——`MAPPING_MISSING` 已在 prod 的 wire 上。
-enum ProcurementDealTemperatureReason {
-  /// 缺乏可靠映射 — 沒有可靠的 Pricebook 映射可參考，因此沒有預測分布可算涵蓋率；`BUYER_ENTERED_NO_REFERENCE` 恆為此值
-  mappingMissing(code: 'MAPPING_MISSING', value: 'MAPPING_MISSING', label: '缺乏可靠映射'),
-  /// 買家尚未設定區間 — 四種情形共用此碼：①買家未動過希望區間、server 以參考上下限預填（涵蓋率恆為 80%，與品項、城市、價格無關，零資訊量，故不顯示）②下限金額解析失敗 ③上限金額解析失敗 ④上下限顛倒。②③④ 出現在 PRICEBOOK_GUIDED 路徑——它不走 `validateBuyerRequestedRange`，故金額仍可能解不出來；對溫度計而言「讀不到買家區間」與「買家沒設區間」是同一件事
-  buyerRangeNotSet(code: 'BUYER_RANGE_NOT_SET', value: 'BUYER_RANGE_NOT_SET', label: '買家尚未設定區間'),
-  /// 區間落在參考之外 — 買家希望區間完全高於或低於參考區間；結果將全由未知的尾部形狀決定，不給假精確的數字
-  rangeOutsideReference(code: 'RANGE_OUTSIDE_REFERENCE', value: 'RANGE_OUTSIDE_REFERENCE', label: '區間落在參考之外'),
-  /// 分位數非嚴格遞增 — 編譯取整後三個參考分位數未維持嚴格遞增，CDF 無定義。名稱沿用 pricebook-service `internal/domain/forecast/gate.go` 的同義原因碼
-  quantilesNotMonotonic(code: 'QUANTILES_NOT_MONOTONIC', value: 'QUANTILES_NOT_MONOTONIC', label: '分位數非嚴格遞增');
-
-  const ProcurementDealTemperatureReason({
-    required this.code,
-    required this.value,
-    required this.label,
-  });
-
-  final String code;
-  final String value;
-  final String label;
-
-  /// 依 code 查找，找不到回傳 null
-  static ProcurementDealTemperatureReason? fromCode(String code) {
-    for (final v in values) {
-      if (v.code == code) return v;
-    }
-    return null;
-  }
-
-  /// 依 value 查找，找不到回傳 null
-  static ProcurementDealTemperatureReason? fromValue(String value) {
-    for (final v in values) {
-      if (v.value == value) return v;
-    }
-    return null;
-  }
-}
-
-/// 成交溫度計的色帶，由 server 依 `probabilityUpperBps`（買家上限落在行情分布的第幾百分位）決定，**client 不得自行由 bps 推導**（v6.0 §V.13 第 18 條）。`BANDS_V1` 曾依 `probabilityLowerBps`（嚴格界），但那個量對買家是**反指標**——出價遠高於行情時它反而下降——已於 `BANDS_V2` 改正。門檻屬 `bandVersion` 管轄，改門檻不動計算層。
-enum ProcurementDealTemperatureBand {
-  /// 冷 — 買家上限落在行情第 25 百分位以下（`BANDS_V2`）
-  cold(code: 'COLD', value: 'COLD', label: '冷'),
-  /// 溫 — 買家上限落在行情第 25–75 百分位（`BANDS_V2`）
-  warm(code: 'WARM', value: 'WARM', label: '溫'),
-  /// 熱 — 買家上限落在行情第 75 百分位以上（`BANDS_V2`）
-  hot(code: 'HOT', value: 'HOT', label: '熱');
-
-  const ProcurementDealTemperatureBand({
-    required this.code,
-    required this.value,
-    required this.label,
-  });
-
-  final String code;
-  final String value;
-  final String label;
-
-  /// 依 code 查找，找不到回傳 null
-  static ProcurementDealTemperatureBand? fromCode(String code) {
-    for (final v in values) {
-      if (v.code == code) return v;
-    }
-    return null;
-  }
-
-  /// 依 value 查找，找不到回傳 null
-  static ProcurementDealTemperatureBand? fromValue(String value) {
     for (final v in values) {
       if (v.value == value) return v;
     }

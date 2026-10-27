@@ -476,7 +476,7 @@ var ErrInterruptPending = errors.New("procurement: request is parked on an open 
 //
 // 裁決：不把這個 guard 改成持鎖讀。理由三點：(1) 要真正關掉它，guard 必須與
 // AppendRevision 落在同一個交易並對 interrupt 下 FOR UPDATE——那等於把
-// Handle() 整條 answer pipeline 包進一個橫跨 Pricebook 呼叫的長交易，或重構
+// Handle() 整條 answer pipeline 包進一個橫跨外部呼叫的長交易，或重構
 // Handle()，兩者都是為了一個毫秒級窗口付出線上回歸風險；(2) 這條 race 的壞
 // 結果集合是空的——不會產生錯誤的 revision、不會讓兩份寫入互相覆蓋、不會讓
 // ledger 說謊，只會把一次 resume 導向 ErrStaleRevision，那是已裁決的正確

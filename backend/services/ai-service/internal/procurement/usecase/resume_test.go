@@ -106,7 +106,7 @@ func resumeCropInterruptCtx(reqID, revID int64) repository.ResumeResolveContext 
 func TestClaimAndDispatchResume_HappyPath_ChildSucceedsAndRunsTheGraph(t *testing.T) {
 	store, _, deps := newGraphResumeFixture(t, "seed-resume-happy")
 
-	payload := []byte(`{"optionId":"crop-CROP-X"}`)
+	payload := []byte(`{"optionId":"crop-other","freeText":"小白菜","selfEnteredPriceAmount":"60"}`)
 	out, err := ClaimAndDispatchResume(context.Background(), ResumeInput{
 		BuyerID: 1234, InterruptID: "int-happy-1", ClientRequestID: "cr-resume-happy-1", ResponsePayload: payload,
 	}, store, NewRunDispatcher(), deps)
@@ -129,7 +129,7 @@ func TestClaimAndDispatchResume_HappyPath_ChildSucceedsAndRunsTheGraph(t *testin
 	// expectedRevisionId／slotKey（伺服器推導）與 optionId（買家送的）。
 	require.Equal(t, "v1", store.lastResolved.InputSchemaVersion)
 	require.Equal(t, "BUYER_INPUT", store.lastResolved.RetentionClass)
-	require.Contains(t, string(store.lastResolved.InputRefJSON), `"optionId":"crop-CROP-X"`)
+	require.Contains(t, string(store.lastResolved.InputRefJSON), `"optionId":"crop-other"`)
 	require.Contains(t, string(store.lastResolved.InputRefJSON), `"slotKey":"crop_disambiguation"`)
 }
 
@@ -227,7 +227,7 @@ func TestClaimAndDispatchResume_AppendRunEventFails_StillTerminalizesCorrectly(t
 
 	out, err := ClaimAndDispatchResume(context.Background(), ResumeInput{
 		BuyerID: 1234, InterruptID: "int-appendfail-1", ClientRequestID: "cr-resume-appendfail-1",
-		ResponsePayload: []byte(`{"optionId":"crop-CROP-X"}`),
+		ResponsePayload: []byte(`{"optionId":"crop-other","freeText":"小白菜","selfEnteredPriceAmount":"60"}`),
 	}, store, NewRunDispatcher(), deps)
 
 	require.NoError(t, err)
@@ -256,7 +256,7 @@ func TestClaimAndDispatchResume_BackgroundPanic_DoesNotHangCaller(t *testing.T) 
 	go func() {
 		res, err := ClaimAndDispatchResume(context.Background(), ResumeInput{
 			BuyerID: 1234, InterruptID: "int-panic-1", ClientRequestID: "cr-resume-panic-1",
-			ResponsePayload: []byte(`{"optionId":"crop-CROP-X"}`),
+			ResponsePayload: []byte(`{"optionId":"crop-other","freeText":"小白菜","selfEnteredPriceAmount":"60"}`),
 		}, store, NewRunDispatcher(), deps)
 		ch <- outcome{res, err}
 	}()
@@ -402,7 +402,7 @@ func TestClaimAndDispatchResume_StaleRevision_TerminalizesFailed_NoRollback(t *t
 
 	out, err := ClaimAndDispatchResume(context.Background(), ResumeInput{
 		BuyerID: 1234, InterruptID: "int-graph-stale-1", ClientRequestID: "cr-resume-graph-stale-1",
-		ResponsePayload: []byte(`{"optionId":"crop-CROP-X"}`),
+		ResponsePayload: []byte(`{"optionId":"crop-other","freeText":"小白菜","selfEnteredPriceAmount":"60"}`),
 	}, store, NewRunDispatcher(), deps)
 
 	require.ErrorIs(t, err, ErrStaleRevision)
@@ -427,7 +427,7 @@ func TestClaimAndDispatchResume_OptionIDNotInCandidates_ZeroMutation(t *testing.
 
 	_, err := ClaimAndDispatchResume(context.Background(), ResumeInput{
 		BuyerID: 1234, InterruptID: "int-not-a-candidate-1", ClientRequestID: "cr-resume-not-a-candidate-1",
-		// pendingCropFixture 唯一的候選是 CROP-X（optionId "crop-CROP-X"）。
+		// pendingCropFixture 唯一的候選是分類 18（optionId "category-18"）。
 		ResponsePayload: []byte(`{"optionId":"crop-CROP-NOT-OFFERED"}`),
 	}, store, NewRunDispatcher(), GraphControllerDeps{})
 
@@ -440,7 +440,7 @@ func TestClaimAndDispatchResume_OptionIDNotInCandidates_ZeroMutation(t *testing.
 
 // TestClaimAndDispatchResume_CropOtherOptionID_NotWhitelistChecked 是上一個測試
 // 的邊界另一半：crop-other 逃生艙**不在**候選清單裡（它是伺服器固定提供的選項，
-// 不是 pricebook 候選），新增的白名單比對不得把它一起擋掉——否則
+// 不是分類候選），新增的白名單比對不得把它一起擋掉——否則
 // PendingReason=UNAVAILABLE、0 候選那個情境下買家就完全無路可走。
 // 這裡斷言它通過了 T0（拿到 child run），而不是被 ErrInvalidOptionID 擋下。
 func TestClaimAndDispatchResume_CropOtherOptionID_NotWhitelistChecked(t *testing.T) {
@@ -489,7 +489,7 @@ func TestClaimAndDispatchResume_PipelineFails_RestoresInterruptSoBuyerCanAnswerA
 
 	out, err := ClaimAndDispatchResume(context.Background(), ResumeInput{
 		BuyerID: 1234, InterruptID: "int-restore-1", ClientRequestID: "cr-restore-1",
-		ResponsePayload: []byte(`{"optionId":"crop-CROP-X"}`),
+		ResponsePayload: []byte(`{"optionId":"crop-other","freeText":"小白菜","selfEnteredPriceAmount":"60"}`),
 	}, store, NewRunDispatcher(), deps)
 
 	require.Error(t, err)
@@ -508,7 +508,7 @@ func TestClaimAndDispatchResume_StaleRevision_DoesNotRestoreInterrupt(t *testing
 
 	_, err := ClaimAndDispatchResume(context.Background(), ResumeInput{
 		BuyerID: 1234, InterruptID: "int-restore-stale-1", ClientRequestID: "cr-restore-stale-1",
-		ResponsePayload: []byte(`{"optionId":"crop-CROP-X"}`),
+		ResponsePayload: []byte(`{"optionId":"crop-other","freeText":"小白菜","selfEnteredPriceAmount":"60"}`),
 	}, store, NewRunDispatcher(), deps)
 
 	require.ErrorIs(t, err, ErrStaleRevision)
@@ -520,7 +520,7 @@ func TestClaimAndDispatchResume_Succeeds_DoesNotRestoreInterrupt(t *testing.T) {
 
 	_, err := ClaimAndDispatchResume(context.Background(), ResumeInput{
 		BuyerID: 1234, InterruptID: "int-restore-happy-1", ClientRequestID: "cr-restore-happy-1",
-		ResponsePayload: []byte(`{"optionId":"crop-CROP-X"}`),
+		ResponsePayload: []byte(`{"optionId":"crop-other","freeText":"小白菜","selfEnteredPriceAmount":"60"}`),
 	}, store, NewRunDispatcher(), deps)
 
 	require.NoError(t, err)

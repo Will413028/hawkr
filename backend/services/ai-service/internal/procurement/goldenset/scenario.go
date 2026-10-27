@@ -265,7 +265,7 @@ func CompareScenario(spec Scenario, got []TurnObservation) []ScenarioFailure {
 // slotCategory 把欄位對應到失敗分類，讓報告能回答「壞的是哪一層」。
 func slotCategory(key string) string {
 	switch key {
-	case "item_resolution", "item_resolution_kind", "item_resolution_code":
+	case "item_resolution", "item_resolution_kind":
 		return CategoryIdentityMapping
 	case "unit":
 		return CategoryUnitBasis

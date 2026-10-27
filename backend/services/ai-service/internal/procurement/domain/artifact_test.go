@@ -13,7 +13,7 @@ import (
 func allArtifactTypes() []ArtifactType {
 	return []ArtifactType{
 		ArtifactRequestSnapshot, ArtifactClarification, ArtifactCandidateResults,
-		ArtifactPricingPreview, ArtifactDealTemperature, ArtifactConfirmedRFQ,
+		ArtifactPricingPreview, ArtifactConfirmedRFQ,
 		ArtifactRFQPublicationApproval, ArtifactRFQPublicationResult, ArtifactSellerQuoteResult,
 		ArtifactErrorRecovery, ArtifactPurchasePlan, ArtifactCartApproval, ArtifactCartResult,
 	}
@@ -21,10 +21,10 @@ func allArtifactTypes() []ArtifactType {
 
 func TestArtifactType_MatchesCodeMetaRegistry(t *testing.T) {
 	// 逐一比對 CodeMeta 生成的 AllProcurementArtifactTypes，確保 domain 常數與
-	// 業務類型碼.md 的 13 個值一一對應——新增/刪除 CodeMeta 值卻忘記更新這裡
+	// 業務類型碼.md 的 12 個值一一對應——新增/刪除 CodeMeta 值卻忘記更新這裡
 	// 會在這裡先炸，而不是等到 golden fixture 才發現。
-	require.Len(t, codemeta.AllProcurementArtifactTypes, 13, "doc 57 §4.5：Track A 10 型＋Track B 3 型＝13")
-	require.Len(t, allArtifactTypes(), 13)
+	require.Len(t, codemeta.AllProcurementArtifactTypes, 12, "doc 57 §4.5：Track A 9 型＋Track B 3 型＝12（DEAL_TEMPERATURE 隨成交溫度計刪除）")
+	require.Len(t, allArtifactTypes(), 12)
 
 	registryValues := make([]string, 0, len(codemeta.AllProcurementArtifactTypes))
 	for _, e := range codemeta.AllProcurementArtifactTypes {
@@ -40,14 +40,14 @@ func TestArtifactType_MatchesCodeMetaRegistry(t *testing.T) {
 
 func TestArtifactType_TrackAAndTrackBAreDisjointAndComplete(t *testing.T) {
 	// doc 57 §4.5：「兩個 Track 不得共用一個 generic schema」——先確保集合本身互斥
-	// 且聯集覆蓋全部 13 型，回歸測試才能真正保護這條不變式。
+	// 且聯集覆蓋全部 12 型，回歸測試才能真正保護這條不變式。
 	for _, at := range allArtifactTypes() {
 		require.NotEqual(t, at.IsTrackA(), at.IsTrackB(), "ArtifactType %q 必須恰好屬於一個 Track", at)
 	}
 
 	wantTrackA := []ArtifactType{
 		ArtifactRequestSnapshot, ArtifactClarification, ArtifactCandidateResults,
-		ArtifactPricingPreview, ArtifactDealTemperature, ArtifactConfirmedRFQ,
+		ArtifactPricingPreview, ArtifactConfirmedRFQ,
 		ArtifactRFQPublicationApproval, ArtifactRFQPublicationResult, ArtifactSellerQuoteResult,
 		ArtifactErrorRecovery,
 	}

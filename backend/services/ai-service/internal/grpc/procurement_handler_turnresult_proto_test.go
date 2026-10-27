@@ -87,25 +87,24 @@ func TestToTurnResultProto_RenderMode_ReflectsSourceOfBlocks(t *testing.T) {
 // recordedThisTurn 的 chip，但 slots 面板本身看不到——前端因此無法對「系統猜的」
 // 與「你選的」分流呈現。少了這個 mapping，proto 欄位加了也永遠是 nil。
 func TestToSlotsProto_ItemResolution_ReachesTheWire(t *testing.T) {
-	code, fallback := "LA1", "moa-group:abc"
 	item := "高麗菜"
+	price := 95
 
 	got := toSlotsProto(domain.Slots{
 		Item: &item,
 		ItemResolution: &domain.ItemResolution{
-			Kind: domain.ItemResolvedCrop, Code: &code, Label: "甘藍-初秋",
-			FallbackGroupCode: &fallback, Provenance: domain.ItemResolutionByBuyerChoice,
+			Kind: domain.ItemResolvedSelfPriced, Label: "高麗菜", CategoryID: "17",
+			PricePerKg: &price, Provenance: domain.ItemResolutionByBuyerChoice,
 		},
 	})
 
 	require.NotNil(t, got.ItemResolution)
-	require.Equal(t, "CROP", got.ItemResolution.GetKind())
-	require.Equal(t, "LA1", got.ItemResolution.GetCode())
-	require.Equal(t, "甘藍-初秋", got.ItemResolution.GetLabel())
+	require.Equal(t, "SELF_PRICED", got.ItemResolution.GetKind())
+	require.Equal(t, "高麗菜", got.ItemResolution.GetLabel())
 	require.Equal(t, "BUYER_CHOICE", got.ItemResolution.GetProvenance())
-	require.Equal(t, "甘藍-初秋", got.ItemResolution.GetDisplayValue(),
+	require.Equal(t, "高麗菜，單價 95 元／公斤", got.ItemResolution.GetDisplayValue(),
 		"顯示字串由伺服器組——前端拿 kind＋label 自己拼會跟 chip 漂成兩套文案")
-	require.Empty(t, got.ItemResolution.GetPricePerKg(), "CROP 不帶自填價")
+	require.Equal(t, "95", got.ItemResolution.GetPricePerKg())
 }
 
 // TestToSlotsProto_SelfPriced_PricePerKgIsAString 釘住金額對外一律字串
@@ -122,7 +121,6 @@ func TestToSlotsProto_SelfPriced_PricePerKgIsAString(t *testing.T) {
 	require.NotNil(t, got.ItemResolution)
 	require.Equal(t, "SELF_PRICED", got.ItemResolution.GetKind())
 	require.Equal(t, "95", got.ItemResolution.GetPricePerKg())
-	require.Empty(t, got.ItemResolution.GetCode(), "自填價品項不屬於任何分類代碼")
 	require.Equal(t, "自訂品項，單價 95 元／公斤", got.ItemResolution.GetDisplayValue())
 }
 

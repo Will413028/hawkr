@@ -138,8 +138,6 @@ type SlotsDTO struct {
 type ItemResolutionDTO struct {
 	// CROP｜GROUP｜SELF_PRICED，三者互斥。
 	Kind string `json:"kind"`
-	// CROP 是 crop_code、GROUP 是 group_code；SELF_PRICED 沒有 code。
-	Code *string `json:"code,omitempty"`
 	// 分類名稱（「甘藍-初秋」「甘藍」）。SELF_PRICED 時為空。
 	Label string `json:"label,omitempty"`
 	// SYSTEM（系統依檢索結果直接定案，買家沒被問過）｜BUYER_CHOICE（買家在消歧卡
@@ -160,9 +158,6 @@ func itemResolutionFromProto(r *pb.ItemResolution) *ItemResolutionDTO {
 	out := &ItemResolutionDTO{
 		Kind: r.GetKind(), Label: r.GetLabel(),
 		Provenance: r.GetProvenance(), DisplayValue: r.GetDisplayValue(),
-	}
-	if r.Code != nil {
-		out.Code = r.Code
 	}
 	// price_per_kg 走 wire 時是十進位字串（同 Quantity／BudgetPerUnit 的既有慣例），
 	// 轉回 *int 讓對外 JSON 是不帶引號的數字，與 SlotsDTO 其餘數值欄位一致。

@@ -6,8 +6,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/Will413028/hawkr/ai-service/internal/procurement/domain"
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/testkit"
-	pbusecase "github.com/Will413028/hawkr/ai-service/internal/usecase"
+	"github.com/Will413028/hawkr/go-pkg/codemeta"
+	categorypb "github.com/Will413028/hawkr/go-pkg/proto/category"
 )
 
 func TestSplitItems_SplitsOnConjunctionsWhenBothSidesAreSubstantial(t *testing.T) {
@@ -24,59 +26,43 @@ func TestSplitItems_KeepsSingleItemNamesThatContainAConjunction(t *testing.T) {
 }
 
 func TestResolveV2_MultiItemAsksInsteadOfSilentlyKeepingOne(t *testing.T) {
-	pb := &perVariantPricebookFake{byVariant: map[string][]pbusecase.PriceableEntityMatch{
-		"高麗菜": {pm("CROP", "LA1", "甘藍-初秋", "高麗菜", "ALIAS", 0, 1, []string{"533"}, "G-CAB", true)},
-		"紅蘿蔔": {pm("CROP", "SD5", "蘿蔔-紅蘿蔔", "紅蘿蔔", "ALIAS", 0, 1, []string{"601"}, "G-RAD", true)},
-	}}
-	uc := v2UC(&categoryPricebookFake{}, v2CategoryTree(), nil, nil)
-	uc.pricebook = pb
+	uc := v2UC(testkit.VegetableTree(), nil)
 
-	got, err := uc.Resolve(context.Background(), "高麗菜和紅蘿蔔")
+	got, err := uc.Resolve(context.Background(), "高麗菜和地瓜")
 
 	require.NoError(t, err)
 	require.True(t, got.NeedsDisambiguation, "%+v", got)
-	require.ElementsMatch(t, []string{"crop-LA1", "crop-SD5"}, optionIDs(got.Candidates),
-		"整串查不到任何實體，切開後兩段各自查得到 ⇒ 兩個都要上卡讓買家挑")
+	require.ElementsMatch(t, []string{"category-4", "category-5"}, optionIDs(got.Candidates),
+		"整串查不到任何分類，切開後兩段各自查得到 ⇒ 兩個都要上卡讓買家挑")
+	require.Equal(t, domain.CropSelectionGroup, got.Selection.Stage)
 }
 
 func TestResolveV2_MultiItemWithoutSplitWouldFindNothing(t *testing.T) {
-	pb := &perVariantPricebookFake{byVariant: map[string][]pbusecase.PriceableEntityMatch{
-		"高麗菜": {pm("CROP", "LA1", "甘藍-初秋", "高麗菜", "ALIAS", 0, 1, []string{"533"}, "G-CAB", true)},
-	}}
-	uc := v2UC(&categoryPricebookFake{}, v2CategoryTree(), nil, nil)
-	uc.pricebook = pb
+	uc := v2UC(testkit.VegetableTree(), nil)
 
 	got, err := uc.Resolve(context.Background(), "高麗菜和紅蘿蔔")
 
 	require.NoError(t, err)
-	require.False(t, got.Unavailable, "%+v", got)
-	require.Equal(t, []string{"crop-LA1"}, optionIDs(got.Candidates),
+	require.Equal(t, domain.CropSelectionPrice, got.Selection.Stage)
+	require.Equal(t, "17", got.Selection.CategoryID,
 		"只有一段查得到時仍要走切開後的召回——沒切就是零命中，這條證明切法真的有作用")
 }
 
-func TestResolveV2_WholeTextIsARealProductSoItIsNotSplit(t *testing.T) {
-	pb := &categoryPricebookFake{FakePricebookClient: testkit.FakePricebookClient{PriceableMatches: []pbusecase.PriceableEntityMatch{
-		pm("CROP", "OR9", "虎頭蘭-中、小輪", "虎頭蘭-中、小輪", "CANONICAL", 0, 1, []string{"901"}, "G-ORC", true),
+func TestResolveV2_WholeTextIsARealCategoryNameSoItIsNotSplit(t *testing.T) {
+	active := codemeta.CommonStatusActive.Value
+	tree := &categoryTreeFake{response: &categorypb.GetCategoryTreeResponse{Categories: []*categorypb.CategoryNode{
+		{Id: "1", Name: "花卉", Status: active, Children: []*categorypb.CategoryNode{
+			{Id: "9", Name: "蘭花", ParentId: "1", Status: active, Children: []*categorypb.CategoryNode{
+				{Id: "901", Name: "虎頭蘭-中、小輪", ParentId: "9", Status: active},
+			}},
+		}},
 	}}}
-	uc := v2UC(pb, v2CategoryTree(), nil, nil)
+	uc := v2UC(tree, nil)
 
 	got, err := uc.Resolve(context.Background(), "虎頭蘭-中、小輪")
 
 	require.NoError(t, err)
 	require.False(t, got.NeedsDisambiguation, "%+v", got)
-	require.Equal(t, "OR9", *got.CropCode,
-		"整串就是目錄裡的真實品名，不能因為中間有頓號就被當成兩個品項")
-}
-
-type perVariantPricebookFake struct {
-	categoryPricebookFake
-	byVariant map[string][]pbusecase.PriceableEntityMatch
-}
-
-func (f *perVariantPricebookFake) SearchPriceableEntities(_ context.Context, variants []string, _ int32) ([]pbusecase.PriceableEntityMatch, error) {
-	out := []pbusecase.PriceableEntityMatch{}
-	for _, v := range variants {
-		out = append(out, f.byVariant[v]...)
-	}
-	return out, nil
+	require.Equal(t, "901", got.Selection.CategoryID,
+		"整串就是分類樹裡的真實名稱，不能因為中間有頓號就被當成兩個品項")
 }

@@ -34,7 +34,7 @@ func TestComputeCropGate_Unavailable_MarksPendingWithNoCandidates(t *testing.T) 
 	// PendingReason 隨這一輪的判定往下游走，最後跟中斷本體同一次 INSERT——
 	// 「是不是待處理、為什麼」完全由它承載，不靠候選清單長度推斷。
 	require.Equal(t, domain.CropPendingReasonUnavailable, g.PendingReason)
-	require.False(t, g.FactsAsOf.IsZero(), "真的查過 Pricebook，要記下查詢時刻")
+	require.False(t, g.FactsAsOf.IsZero(), "真的查過分類樹，要記下查詢時刻")
 }
 
 func TestComputeCropGate_Ambiguous_KeepsItemAndMarksPending(t *testing.T) {
@@ -53,19 +53,8 @@ func TestComputeCropGate_Ambiguous_KeepsItemAndMarksPending(t *testing.T) {
 	require.False(t, g.FactsAsOf.IsZero())
 }
 
-func TestComputeCropGate_Matched_KeepsItemNoPending(t *testing.T) {
-	cropCode := "CROP-X"
-	resolver := &testkit.FakeResolver[DisambiguationResult]{ResolveResult: DisambiguationResult{CropCode: &cropCode}}
-
-	g := ComputeGate(context.Background(), resolver,
-		domain.Slots{}, domain.Slots{Item: item("芭樂")})
-
-	require.Equal(t, "芭樂", *g.Item)
-	require.False(t, g.Pending)
-}
-
 func TestComputeCropGate_ResolverError_DegradesWithoutBlocking(t *testing.T) {
-	resolver := &testkit.FakeResolver[DisambiguationResult]{ResolveErr: errors.New("pricebook unavailable")}
+	resolver := &testkit.FakeResolver[DisambiguationResult]{ResolveErr: errors.New("category tree unavailable")}
 
 	g := ComputeGate(context.Background(), resolver,
 		domain.Slots{}, domain.Slots{Item: item("芭樂")})
@@ -76,7 +65,7 @@ func TestComputeCropGate_ResolverError_DegradesWithoutBlocking(t *testing.T) {
 
 // TestComputeCropGate_NilResolver_DoesNotResolve 釘住 nil-safe 慣例：
 // turn／answer／rewind 的絕大多數既有單元測試都傳 nil cropResolver（沒有
-// pricebook 替身，也不驗證品項解析），ComputeGate 不得因此 panic。
+// 分類樹替身，也不驗證品項解析），ComputeGate 不得因此 panic。
 func TestComputeCropGate_NilResolver_DoesNotResolve(t *testing.T) {
 	g := ComputeGate(context.Background(), nil,
 		domain.Slots{}, domain.Slots{Item: item("芭樂")})
@@ -92,9 +81,10 @@ func TestComputeCropGate_NilResolver_DoesNotResolve(t *testing.T) {
 func TestGateResult_Evaluated(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("品項變動並解析成功＝有判定", func(t *testing.T) {
-		code := "moa-group:abc"
-		resolver := &testkit.FakeResolver[DisambiguationResult]{ResolveResult: DisambiguationResult{GroupCode: &code}}
+	t.Run("品項變動並確認分類＝有判定", func(t *testing.T) {
+		resolver := &testkit.FakeResolver[DisambiguationResult]{ResolveResult: DisambiguationResult{
+			Unavailable: true, Selection: &domain.CropSelection{Stage: domain.CropSelectionPrice, CategoryID: "17", Label: "高麗菜"},
+		}}
 		g := ComputeGate(ctx, resolver,
 			domain.Slots{}, domain.Slots{Item: item("高麗菜")})
 		require.True(t, g.Evaluated())
@@ -107,8 +97,8 @@ func TestGateResult_Evaluated(t *testing.T) {
 		require.True(t, g.Evaluated(), "Unavailable 會產生 Rejected，買家看得到結果，就該佔一格")
 	})
 
-	t.Run("Pricebook 查詢失敗＝有判定，且標記 ResolveFailed", func(t *testing.T) {
-		resolver := &testkit.FakeResolver[DisambiguationResult]{ResolveErr: errors.New("pricebook unavailable")}
+	t.Run("分類樹查詢失敗＝有判定，且標記 ResolveFailed", func(t *testing.T) {
+		resolver := &testkit.FakeResolver[DisambiguationResult]{ResolveErr: errors.New("category tree unavailable")}
 		g := ComputeGate(ctx, resolver,
 			domain.Slots{Item: item("高麗菜")}, domain.Slots{Item: item("番茄")})
 		require.True(t, g.Evaluated())
@@ -118,8 +108,7 @@ func TestGateResult_Evaluated(t *testing.T) {
 
 	t.Run("🔴 品項沒變動且已解析＝沒有判定", func(t *testing.T) {
 		resolved := domain.Slots{Item: item("甘藍"),
-			ItemResolution: domain.NewSystemItemResolution(
-				item("LA1"), nil, nil, nil, "甘藍-初秋", domain.CategoryFromEntity("category-cabbage"))}
+			ItemResolution: domain.NewSelfPricedItemResolution(75, "甘藍", domain.CategoryAbsent("測試"))}
 		g := ComputeGate(ctx, &testkit.FakeResolver[DisambiguationResult]{}, resolved, resolved)
 
 		require.False(t, g.Pending, "沒有開著的中斷（三個進入點都有 guard），這一輪不待消歧")
@@ -128,18 +117,17 @@ func TestGateResult_Evaluated(t *testing.T) {
 	})
 
 	// 上一條的前提是「已經有解析結果」。品項沒變動但**還沒有**解析結果時 gate 這
-	// 一輪真的去查了 Pricebook，那就是一次新判定，該有它自己的那一格；重複步驟的
-	// 疑慮不成立——解析成功之後就回到上一條的 no-op。
+	// 一輪真的去查了分類樹，那就是一次新判定，該有它自己的那一格；重複步驟的
+	// 疑慮不成立——解析之後就回到上一條的 no-op。
 	t.Run("品項沒變動但尚未解析＝有判定", func(t *testing.T) {
 		resolver := &testkit.FakeResolver[DisambiguationResult]{ResolveResult: DisambiguationResult{
-			CropCode: item("LA1"), Label: "甘藍-初秋",
-			CategoryOrigin: domain.CategoryFromEntity("category-cabbage"),
+			Unavailable: true, Selection: &domain.CropSelection{Stage: domain.CropSelectionPrice, CategoryID: "17", Label: "高麗菜"},
 		}}
 		g := ComputeGate(ctx, resolver,
 			domain.Slots{Item: item("甘藍")}, domain.Slots{Item: item("甘藍")})
 
 		require.True(t, g.Evaluated(), "重試成功是一次新判定")
-		require.NotNil(t, g.Resolution)
+		require.True(t, g.Pending)
 	})
 }
 
@@ -155,7 +143,7 @@ func (c *countingResolver) Resolve(ctx context.Context, itemText string) (Disamb
 	return c.inner.Resolve(ctx, itemText)
 }
 
-// TestComputeCropGate_RetriesAfterResolverFailure：Pricebook 這一輪掛了，下一輪買家
+// TestComputeCropGate_RetriesAfterResolverFailure：分類樹這一輪掛了，下一輪買家
 // 只補了城市、品項一個字都沒改——解析必須重試。
 //
 // 現行 itemChanged 只比品項文字，所以失敗之後同一個品項永遠不會再查一次；而失敗
@@ -168,43 +156,37 @@ func TestComputeCropGate_RetriesAfterResolverFailure(t *testing.T) {
 	slots := domain.Slots{Item: item("芭樂"), Unit: item("KG")}
 	first := ComputeGate(context.Background(), resolver, domain.Slots{}, slots)
 	require.True(t, first.ResolveFailed)
-	require.Nil(t, first.Resolution)
 	require.Equal(t, 1, resolver.calls)
 
 	// 第二輪：resolver 恢復，買家只補了配送城市。
 	inner.ResolveErr = nil
 	inner.ResolveResult = DisambiguationResult{
-		CropCode: item("CROP-GUAVA"), Label: "芭樂",
-		CategoryOrigin: domain.CategoryFromEntity("category-guava"),
+		Unavailable: true, Selection: &domain.CropSelection{Stage: domain.CropSelectionPrice, CategoryID: "17", Label: "芭樂"},
 	}
 	after := slots
 	after.DeliveryCity = item("桃園市")
 
 	second := ComputeGate(context.Background(), resolver, slots, after)
 	require.Equal(t, 2, resolver.calls, "依賴恢復後必須重試，不能等買家去改品項")
-	require.NotNil(t, second.Resolution, "重試成功必須產生解析結果")
+	require.True(t, second.Pending, "重試成功必須產生新的判定")
 	require.False(t, second.ResolveFailed)
 }
 
 // TestComputeCropGate_ResolvedItemIsNotReResolved 是上一條的負控制：已經有解析結果
-// 的品項不得每一輪重查一次 Pricebook。
+// 的品項不得每一輪重查一次分類樹。
 func TestComputeCropGate_ResolvedItemIsNotReResolved(t *testing.T) {
-	inner := &testkit.FakeResolver[DisambiguationResult]{ResolveResult: DisambiguationResult{
-		CropCode: item("CROP-GUAVA"), Label: "芭樂",
-	}}
+	inner := &testkit.FakeResolver[DisambiguationResult]{ResolveResult: DisambiguationResult{Unavailable: true}}
 	resolver := &countingResolver{inner: inner}
 
 	resolved := domain.Slots{
-		Item: item("芭樂"),
-		ItemResolution: domain.NewSystemItemResolution(
-			item("CROP-GUAVA"), nil, nil, nil, "芭樂", domain.CategoryFromEntity("category-guava")),
+		Item:           item("芭樂"),
+		ItemResolution: domain.NewSelfPricedItemResolution(75, "芭樂", domain.CategoryAbsent("測試")),
 	}
 	after := resolved
 	after.DeliveryCity = item("桃園市")
 
 	g := ComputeGate(context.Background(), resolver, resolved, after)
 	require.Zero(t, resolver.calls, "已解析的品項不得重查")
-	require.Nil(t, g.Resolution)
 	require.False(t, g.Evaluated())
 }
 

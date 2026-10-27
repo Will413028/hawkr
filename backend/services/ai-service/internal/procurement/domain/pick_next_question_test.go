@@ -309,9 +309,8 @@ func TestPickNextQuestion_QuantityAndDeliveryDateAskedBeforeOtherOptionals(t *te
 }
 
 func TestBuildCropDisambiguationQuestion_IncludesRealCandidatesAndOtherOption(t *testing.T) {
-	cropCode := "CROP-ORGANIC-BOKCHOY"
 	q := BuildCropDisambiguationQuestion([]CropDisambiguationOption{
-		{Label: "有機小白菜", CropCode: &cropCode},
+		{Label: "有機小白菜", CategoryID: "18", CategoryLevel: 3},
 	})
 	if q.SlotKey != SlotCropDisambiguation {
 		t.Errorf("SlotKey = %q, want %q", q.SlotKey, SlotCropDisambiguation)
@@ -325,8 +324,8 @@ func TestBuildCropDisambiguationQuestion_IncludesRealCandidatesAndOtherOption(t 
 	if len(q.Options) != 2 { // 1 real + D other
 		t.Errorf("Options len = %d, want 2", len(q.Options))
 	}
-	if q.Options[0].OptionID != "crop-"+cropCode {
-		t.Errorf("Options[0].OptionID = %q, want %q", q.Options[0].OptionID, "crop-"+cropCode)
+	if q.Options[0].OptionID != "category-18" {
+		t.Errorf("Options[0].OptionID = %q, want %q", q.Options[0].OptionID, "category-18")
 	}
 	if q.Options[0].Label != "有機小白菜" {
 		t.Errorf("Options[0].Label = %q, want %q", q.Options[0].Label, "有機小白菜")
@@ -360,15 +359,5 @@ func TestBuildCropDisambiguationQuestion_NoCandidates_OnlyOtherOptionWithDedicat
 	}
 	if q.CanSkip {
 		t.Error("CanSkip must be false even with zero candidates")
-	}
-}
-
-func TestBuildCropDisambiguationQuestion_GroupCandidateUsesGroupPrefix(t *testing.T) {
-	groupCode := "GROUP-BOKCHOY"
-	q := BuildCropDisambiguationQuestion([]CropDisambiguationOption{
-		{Label: "小白菜（未分品種）", GroupCode: &groupCode},
-	})
-	if q.Options[0].OptionID != "group-"+groupCode {
-		t.Errorf("Options[0].OptionID = %q, want %q", q.Options[0].OptionID, "group-"+groupCode)
 	}
 }

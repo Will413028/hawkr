@@ -19,12 +19,9 @@ func (f *FakePricePreviewRepo) InsertPricePreview(ctx context.Context, in reposi
 	f.InsertCalls++
 	row := repository.PricePreview{
 		ID: int64(f.InsertCalls), BuyerID: in.BuyerID, RequestID: in.RequestID,
-		RequestRevisionID: in.RequestRevisionID, PricingMode: in.PricingMode,
-		QualityKnowledgeState: in.QualityKnowledgeState, ReferenceAvailability: in.ReferenceAvailability,
-		ReferenceFactsHash: in.ReferenceFactsHash, ReferencePayloadJSON: in.ReferencePayloadJSON,
-		UnavailableReason: in.UnavailableReason, BuyerRequestedRangeJSON: in.BuyerRequestedRangeJSON,
-		MarketPriceBasisJSON: in.MarketPriceBasisJSON, QuoteTotalRangeJSON: in.QuoteTotalRangeJSON,
-		DealTemperatureJSON: in.DealTemperatureJSON, ClientRequestID: in.ClientRequestID,
+		RequestRevisionID: in.RequestRevisionID, QualityKnowledgeState: in.QualityKnowledgeState,
+		BuyerRequestedRangeJSON: in.BuyerRequestedRangeJSON, QuoteTotalRangeJSON: in.QuoteTotalRangeJSON,
+		ClientRequestID:  in.ClientRequestID,
 		PreviewInputHash: in.PreviewInputHash, PayloadHash: in.PayloadHash,
 		Version: 1, ExpiresAt: in.ExpiresAt,
 	}

@@ -111,14 +111,10 @@ func TestGetRfqPublicationInviteSellerView_ReachableOnRegisteredServer(t *testin
 	require.Equal(t, "桃園市", resp.GetDeliveryCity())
 }
 
-func TestGetRfqPublicationInviteSellerView_CarriesPriceRanges(t *testing.T) {
+func TestGetRfqPublicationInviteSellerView_CarriesBuyerRequestedRange(t *testing.T) {
 	h := newInviteSellerViewHandler(&stubInviteViewRepo{
 		view: repository.InviteSellerView{
 			Item: "甘藍-初秋",
-			ReferencePriceRange: &domain.SellerFacingReferenceRange{
-				LowerBoundAmount: "32000", UpperBoundAmount: "40000",
-				BasisQuantity: "1", BasisUnit: "BOX",
-			},
 			BuyerRequestedRange: &domain.SellerFacingRequestedRange{
 				Currency: "TWD", PriceComponent: "GOODS_ONLY",
 				BasisQuantity: "1", BasisUnit: "BOX",
@@ -130,16 +126,12 @@ func TestGetRfqPublicationInviteSellerView_CarriesPriceRanges(t *testing.T) {
 	got, err := h.GetRfqPublicationInviteSellerView(context.Background(),
 		&pb.GetRfqPublicationInviteSellerViewRequest{InviteId: "123"})
 	require.NoError(t, err)
-	require.Equal(t, "32000", got.GetReferencePriceRange().GetLowerBoundAmount())
-	require.Equal(t, "40000", got.GetReferencePriceRange().GetUpperBoundAmount())
-	require.Equal(t, "1", got.GetReferencePriceRange().GetBasisQuantity())
-	require.Equal(t, "BOX", got.GetReferencePriceRange().GetBasisUnit())
 	require.Equal(t, "TWD", got.GetBuyerRequestedRange().GetCurrency())
 	require.Equal(t, "38000", got.GetBuyerRequestedRange().GetLowerBoundAmount())
 	require.Equal(t, "43000", got.GetBuyerRequestedRange().GetUpperBoundAmount())
 }
 
-func TestGetRfqPublicationInviteSellerView_KeepsAbsentPriceRangesNil(t *testing.T) {
+func TestGetRfqPublicationInviteSellerView_KeepsAbsentBuyerRequestedRangeNil(t *testing.T) {
 	h := newInviteSellerViewHandler(&stubInviteViewRepo{
 		view: repository.InviteSellerView{Item: "台灣蘋果", DeliveryCity: "桃園市"},
 	})
@@ -147,6 +139,5 @@ func TestGetRfqPublicationInviteSellerView_KeepsAbsentPriceRangesNil(t *testing.
 	got, err := h.GetRfqPublicationInviteSellerView(context.Background(),
 		&pb.GetRfqPublicationInviteSellerViewRequest{InviteId: "123"})
 	require.NoError(t, err)
-	require.Nil(t, got.GetReferencePriceRange())
 	require.Nil(t, got.GetBuyerRequestedRange())
 }

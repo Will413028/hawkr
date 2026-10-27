@@ -402,9 +402,6 @@ func TestProxyProcurementSnapshot_Success_ReturnsSnapshotJSON(t *testing.T) {
 	if !ok {
 		t.Fatalf("cropResolution is not an object: %v", data["cropResolution"])
 	}
-	if v, present := cr["resolvedCropCode"]; !present || v != nil {
-		t.Fatalf("resolvedCropCode should be present and explicitly null: %v", cr)
-	}
 	candidates, ok := cr["candidates"].([]interface{})
 	if !ok || len(candidates) != 0 {
 		t.Fatalf("candidates should be an empty array, not null: %v", cr["candidates"])
@@ -955,19 +952,18 @@ func TestProxyProcurementRewind_ApprovalPending_ReturnsMappedJSON(t *testing.T) 
 	}
 }
 
-func TestProxyProcurementRfqPricePreview_Available_ReturnsPreviewJSONWithReferenceRange(t *testing.T) {
+func TestProxyProcurementRfqPricePreview_ReturnsPreviewJSON(t *testing.T) {
 	mock := &mockAIProcurementServiceClient{
 		previewRfqPriceResp: &aipb.RfqPricePreviewResponse{
-			PricePreviewId: "501", Version: "1", PricingMode: "PRICEBOOK_GUIDED", ReferenceAvailability: "AVAILABLE",
-			ReferencePriceRange: &aipb.ReferencePriceRange{LowerBoundAmount: "30.25", MidpointAmount: "36", UpperBoundAmount: "41.75"},
-			BuyerRequestedRange: &aipb.BuyerRequestedRange{Currency: "TWD", PriceComponent: "GOODS_ONLY", LowerBoundAmount: "30.25", UpperBoundAmount: "41.75", BasisQuantity: "1000", BasisUnit: "GRAM"},
-			DealTemperature:     &aipb.DealTemperature{Status: "UNKNOWN"},
+			PricePreviewId: "501", Version: "1",
+			BuyerRequestedRange: &aipb.BuyerRequestedRange{Currency: "TWD", PriceComponent: "GOODS_ONLY", LowerBoundAmount: "30", UpperBoundAmount: "42", BasisQuantity: "1000", BasisUnit: "GRAM"},
+			QuoteTotalRange:     &aipb.QuoteTotalRange{Currency: "TWD", LowerBoundAmount: "1500", UpperBoundAmount: "2100", Quantity: "50", QuantityUnit: "KG"},
 			PayloadHash:         "hash-abc",
 		},
 	}
 	h := newProcurementTestHolder(mock)
 
-	body := `{"expectedRevisionId":"3","clientRequestId":"c-1","pricingMode":"PRICEBOOK_GUIDED","deliveryCity":"台北市"}`
+	body := `{"expectedRevisionId":"3","clientRequestId":"c-1","deliveryCity":"台北市","buyerRequestedRange":{"currency":"TWD","lowerBoundAmount":"30","upperBoundAmount":"42"}}`
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/app/buyers/me/procurement/requests/77/rfq-price-previews", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Account-Id", "99")
@@ -976,282 +972,47 @@ func TestProxyProcurementRfqPricePreview_Available_ReturnsPreviewJSONWithReferen
 
 	assertHTTPStatus(t, w, http.StatusOK)
 	if mock.gotPreviewRfqPriceReq.GetRequestId() != "77" || mock.gotPreviewRfqPriceReq.GetExpectedRevisionId() != "3" ||
-		mock.gotPreviewRfqPriceReq.GetClientRequestId() != "c-1" || mock.gotPreviewRfqPriceReq.GetPricingMode() != "PRICEBOOK_GUIDED" ||
-		mock.gotPreviewRfqPriceReq.GetDeliveryCity() != "台北市" {
+		mock.gotPreviewRfqPriceReq.GetClientRequestId() != "c-1" ||
+		mock.gotPreviewRfqPriceReq.GetDeliveryCity() != "台北市" ||
+		mock.gotPreviewRfqPriceReq.GetBuyerRequestedRange().GetLowerBoundAmount() != "30" {
 		t.Fatalf("request not mapped correctly: %+v", mock.gotPreviewRfqPriceReq)
 	}
 	respBody := parseJSON(t, w.Body)
 	assertCode(t, respBody, 0)
 	data := respBody["data"].(map[string]interface{})
-	if data["pricePreviewId"] != "501" || data["version"] != "1" || data["pricingMode"] != "PRICEBOOK_GUIDED" ||
-		data["referenceAvailability"] != "AVAILABLE" || data["payloadHash"] != "hash-abc" {
+	if data["pricePreviewId"] != "501" || data["version"] != "1" || data["payloadHash"] != "hash-abc" {
 		t.Fatalf("data = %v", data)
 	}
-	refRange, ok := data["referencePriceRange"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("referencePriceRange is not an object: %v", data["referencePriceRange"])
-	}
-	if refRange["lowerBoundAmount"] != "30.25" || refRange["midpointAmount"] != "36" || refRange["upperBoundAmount"] != "41.75" {
-		t.Fatalf("referencePriceRange = %v", refRange)
+	for _, gone := range []string{"pricingMode", "referenceAvailability", "referencePriceRange", "dealTemperature", "marketPriceBasis"} {
+		if _, present := data[gone]; present {
+			t.Errorf("%s 已不在回應契約內：%v", gone, data)
+		}
 	}
 	buyerRange, ok := data["buyerRequestedRange"].(map[string]interface{})
 	if !ok {
 		t.Fatalf("buyerRequestedRange is not an object: %v", data["buyerRequestedRange"])
 	}
-	if buyerRange["currency"] != "TWD" || buyerRange["lowerBoundAmount"] != "30.25" || buyerRange["upperBoundAmount"] != "41.75" {
+	if buyerRange["currency"] != "TWD" || buyerRange["lowerBoundAmount"] != "30" || buyerRange["upperBoundAmount"] != "42" ||
+		buyerRange["basisQuantity"] != "1000" || buyerRange["basisUnit"] != "GRAM" {
 		t.Fatalf("buyerRequestedRange = %v", buyerRange)
 	}
-	if buyerRange["basisQuantity"] != "1000" || buyerRange["basisUnit"] != "GRAM" {
-		t.Fatalf("buyerRequestedRange basisQuantity/basisUnit = %v", buyerRange)
-	}
-	dealTemp, ok := data["dealTemperature"].(map[string]interface{})
-	if !ok || dealTemp["status"] != "UNKNOWN" {
-		t.Fatalf("dealTemperature = %v", data["dealTemperature"])
-	}
-}
-
-func TestProxyProcurementRfqPricePreview_AvailableDealTemperature_ProjectsAllFields(t *testing.T) {
-	mock := &mockAIProcurementServiceClient{
-		previewRfqPriceResp: &aipb.RfqPricePreviewResponse{
-			PricePreviewId: "501", Version: "1", PricingMode: "PRICEBOOK_GUIDED", ReferenceAvailability: "AVAILABLE",
-			BuyerRequestedRange: &aipb.BuyerRequestedRange{Currency: "TWD", PriceComponent: "GOODS_ONLY", LowerBoundAmount: "30.25", UpperBoundAmount: "41.75", BasisQuantity: "1000", BasisUnit: "GRAM"},
-			DealTemperature: &aipb.DealTemperature{
-				Status:                   "AVAILABLE",
-				ProbabilityLowerBps:      "4100",
-				ProbabilityUpperBps:      "7800",
-				Band:                     "WARM",
-				OutcomeDefinition:        "BUYER_RANGE_VS_PRICEBOOK_FORECAST_COVERAGE",
-				OutcomeDefinitionVersion: "1",
-				PolicyVersion:            "DEAL_TEMPERATURE_COVERAGE_V1",
-				BandVersion:              "BANDS_V1",
-			},
-			PayloadHash: "hash-abc",
-		},
-	}
-	h := newProcurementTestHolder(mock)
-
-	body := `{"expectedRevisionId":"3","clientRequestId":"c-1","pricingMode":"PRICEBOOK_GUIDED","deliveryCity":"台北市"}`
-	req, _ := http.NewRequest(http.MethodPost, "/api/v1/app/buyers/me/procurement/requests/77/rfq-price-previews", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Account-Id", "99")
-	w := httptest.NewRecorder()
-	setupProcurementUnaryRouter(h).ServeHTTP(w, req)
-
-	assertHTTPStatus(t, w, http.StatusOK)
-	respBody := parseJSON(t, w.Body)
-	assertCode(t, respBody, 0)
-	data := respBody["data"].(map[string]interface{})
-	dealTemp, ok := data["dealTemperature"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("dealTemperature = %v", data["dealTemperature"])
-	}
-	for k, want := range map[string]string{
-		"status": "AVAILABLE", "probabilityLowerBps": "4100",
-		"probabilityUpperBps": "7800", "band": "WARM",
-		"outcomeDefinition":        "BUYER_RANGE_VS_PRICEBOOK_FORECAST_COVERAGE",
-		"outcomeDefinitionVersion": "1",
-		"policyVersion":            "DEAL_TEMPERATURE_COVERAGE_V1",
-		"bandVersion":              "BANDS_V1",
-	} {
-		if got := dealTemp[k]; got != want {
-			t.Errorf("dealTemperature[%q] = %v，預期 %q", k, got, want)
-		}
-	}
-}
-
-func TestProxyProcurementRfqPricePreview_UnknownDealTemperature_OmitsSevenFields(t *testing.T) {
-	mock := &mockAIProcurementServiceClient{
-		previewRfqPriceResp: &aipb.RfqPricePreviewResponse{
-			PricePreviewId: "501", Version: "1", PricingMode: "PRICEBOOK_GUIDED", ReferenceAvailability: "AVAILABLE",
-			BuyerRequestedRange: &aipb.BuyerRequestedRange{Currency: "TWD", PriceComponent: "GOODS_ONLY", LowerBoundAmount: "30.25", UpperBoundAmount: "41.75", BasisQuantity: "1000", BasisUnit: "GRAM"},
-			DealTemperature: &aipb.DealTemperature{
-				Status:     "UNKNOWN",
-				ReasonCode: "BUYER_RANGE_NOT_SET",
-			},
-			PayloadHash: "hash-abc",
-		},
-	}
-	h := newProcurementTestHolder(mock)
-
-	body := `{"expectedRevisionId":"3","clientRequestId":"c-1","pricingMode":"PRICEBOOK_GUIDED","deliveryCity":"台北市"}`
-	req, _ := http.NewRequest(http.MethodPost, "/api/v1/app/buyers/me/procurement/requests/77/rfq-price-previews", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Account-Id", "99")
-	w := httptest.NewRecorder()
-	setupProcurementUnaryRouter(h).ServeHTTP(w, req)
-
-	assertHTTPStatus(t, w, http.StatusOK)
-	respBody := parseJSON(t, w.Body)
-	assertCode(t, respBody, 0)
-	data := respBody["data"].(map[string]interface{})
-	dealTemp, ok := data["dealTemperature"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("dealTemperature = %v", data["dealTemperature"])
-	}
-	if dealTemp["status"] != "UNKNOWN" {
-		t.Errorf("dealTemperature[\"status\"] = %v，預期 \"UNKNOWN\"", dealTemp["status"])
-	}
-	if dealTemp["reasonCode"] != "BUYER_RANGE_NOT_SET" {
-		t.Errorf("dealTemperature[\"reasonCode\"] = %v，預期 \"BUYER_RANGE_NOT_SET\"", dealTemp["reasonCode"])
-	}
-	for _, k := range []string{
-		"probabilityLowerBps", "probabilityUpperBps", "band",
-		"outcomeDefinition", "outcomeDefinitionVersion", "policyVersion", "bandVersion",
-	} {
-		if _, present := dealTemp[k]; present {
-			t.Errorf("dealTemperature[%q] should be absent on UNKNOWN, got %v", k, dealTemp[k])
-		}
-	}
-	if len(dealTemp) != 2 {
-		t.Errorf("dealTemperature should have exactly 2 keys on UNKNOWN, got %d: %v", len(dealTemp), dealTemp)
-	}
-}
-
-func TestProxyProcurementRfqPricePreview_Unavailable_ReturnsNullReferencePriceRange(t *testing.T) {
-	mock := &mockAIProcurementServiceClient{
-		previewRfqPriceResp: &aipb.RfqPricePreviewResponse{
-			PricePreviewId: "502", Version: "1", PricingMode: "BUYER_ENTERED_NO_REFERENCE", ReferenceAvailability: "UNAVAILABLE",
-			BuyerRequestedRange: &aipb.BuyerRequestedRange{Currency: "TWD", PriceComponent: "GOODS_ONLY", LowerBoundAmount: "650", UpperBoundAmount: "850"},
-			DealTemperature:     &aipb.DealTemperature{Status: "UNKNOWN", ReasonCode: "MAPPING_MISSING"},
-			PayloadHash:         "hash-def",
-		},
-	}
-	h := newProcurementTestHolder(mock)
-
-	body := `{"expectedRevisionId":"3","clientRequestId":"c-2","pricingMode":"BUYER_ENTERED_NO_REFERENCE","deliveryCity":"台北市","buyerRequestedRange":{"currency":"TWD","priceComponent":"GOODS_ONLY","lowerBoundAmount":"650","upperBoundAmount":"850"}}`
-	req, _ := http.NewRequest(http.MethodPost, "/api/v1/app/buyers/me/procurement/requests/77/rfq-price-previews", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Account-Id", "99")
-	w := httptest.NewRecorder()
-	setupProcurementUnaryRouter(h).ServeHTTP(w, req)
-
-	assertHTTPStatus(t, w, http.StatusOK)
-	if got := mock.gotPreviewRfqPriceReq.GetBuyerRequestedRange(); got == nil || got.GetLowerBoundAmount() != "650" || got.GetUpperBoundAmount() != "850" {
-		t.Fatalf("buyerRequestedRange not mapped into request: %+v", mock.gotPreviewRfqPriceReq)
-	}
-	respBody := parseJSON(t, w.Body)
-	assertCode(t, respBody, 0)
-	data := respBody["data"].(map[string]interface{})
-	if v, present := data["referencePriceRange"]; !present || v != nil {
-		t.Fatalf("referencePriceRange should be present and explicitly null: %v", data)
-	}
-	dealTemp, ok := data["dealTemperature"].(map[string]interface{})
-	if !ok || dealTemp["reasonCode"] != "MAPPING_MISSING" {
-		t.Fatalf("dealTemperature = %v", data["dealTemperature"])
-	}
-}
-
-func TestProxyProcurementRfqPricePreview_CarriesV6MarketBasisAndQuoteTotal(t *testing.T) {
-	asOf := "2026-08-14T15:59:59Z"
-	mock := &mockAIProcurementServiceClient{
-		previewRfqPriceResp: &aipb.RfqPricePreviewResponse{
-			PricePreviewId: "503", Version: "1", PricingMode: "PRICEBOOK_GUIDED", ReferenceAvailability: "AVAILABLE",
-			ReferencePriceRange: &aipb.ReferencePriceRange{
-				LowerBoundAmount: "605", MidpointAmount: "710", UpperBoundAmount: "835",
-				BasisQuantity: "1", BasisUnit: "KG",
-			},
-			BuyerRequestedRange: &aipb.BuyerRequestedRange{
-				Currency: "TWD", PriceComponent: "GOODS_ONLY",
-				LowerBoundAmount: "650", UpperBoundAmount: "850", BasisQuantity: "1", BasisUnit: "KG",
-			},
-			MarketPriceBasis: &aipb.MarketPriceBasis{
-				RegionName: "桃園市", SupportingMarketCount: "3",
-				SourceDataAsOf: &asOf, FreshnessStatus: "fresh",
-			},
-			QuoteTotalRange: &aipb.QuoteTotalRange{
-				Currency: "TWD", LowerBoundAmount: "32500", UpperBoundAmount: "42500",
-				Quantity: "50", QuantityUnit: "KG",
-			},
-			DealTemperature: &aipb.DealTemperature{Status: "UNKNOWN"},
-			PayloadHash:     "hash-v6",
-		},
-	}
-	h := newProcurementTestHolder(mock)
-
-	body := `{"expectedRevisionId":"3","clientRequestId":"c-v6","pricingMode":"PRICEBOOK_GUIDED","deliveryCity":"桃園市"}`
-	req, _ := http.NewRequest(http.MethodPost, "/api/v1/app/buyers/me/procurement/requests/77/rfq-price-previews", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Account-Id", "99")
-	w := httptest.NewRecorder()
-	setupProcurementUnaryRouter(h).ServeHTTP(w, req)
-
-	assertHTTPStatus(t, w, http.StatusOK)
-	data := parseJSON(t, w.Body)["data"].(map[string]interface{})
-
-	refRange := data["referencePriceRange"].(map[string]interface{})
-	if refRange["basisQuantity"] != "1" || refRange["basisUnit"] != "KG" {
-		t.Fatalf("referencePriceRange basis = %v", refRange)
-	}
-	basis, ok := data["marketPriceBasis"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("marketPriceBasis is not an object: %v", data["marketPriceBasis"])
-	}
-	if basis["regionName"] != "桃園市" || basis["supportingMarketCount"] != "3" ||
-		basis["sourceDataAsOf"] != asOf || basis["freshnessStatus"] != "fresh" {
-		t.Fatalf("marketPriceBasis = %v", basis)
-	}
 	total, ok := data["quoteTotalRange"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("quoteTotalRange is not an object: %v", data["quoteTotalRange"])
-	}
-	if total["currency"] != "TWD" || total["lowerBoundAmount"] != "32500" || total["upperBoundAmount"] != "42500" ||
-		total["quantity"] != "50" || total["quantityUnit"] != "KG" {
-		t.Fatalf("quoteTotalRange = %v", total)
+	if !ok || total["lowerBoundAmount"] != "1500" || total["quantityUnit"] != "KG" {
+		t.Fatalf("quoteTotalRange = %v", data["quoteTotalRange"])
 	}
 }
 
-func TestProxyProcurementRfqPricePreview_CarriesPriceLayerAndScope(t *testing.T) {
-	asOf := "2026-09-15"
+func TestProxyProcurementRfqPricePreview_NilQuoteTotalRange_IsExplicitNull(t *testing.T) {
 	mock := &mockAIProcurementServiceClient{
 		previewRfqPriceResp: &aipb.RfqPricePreviewResponse{
-			PricePreviewId: "505", Version: "1", PricingMode: "PRICEBOOK_GUIDED", ReferenceAvailability: "AVAILABLE",
-			ReferencePriceRange: &aipb.ReferencePriceRange{
-				MidpointAmount: "103", BasisQuantity: "1", BasisUnit: "KG",
-			},
-			MarketPriceBasis: &aipb.MarketPriceBasis{
-				Scope: "NATIONAL", PriceLayer: "live_animal", SupportingMarketCount: "19",
-				SourceDataAsOf: &asOf, FreshnessStatus: "ready",
-			},
-			DealTemperature: &aipb.DealTemperature{Status: "UNKNOWN"},
-			PayloadHash:     "hash-commodity",
-		},
-	}
-	h := newProcurementTestHolder(mock)
-
-	body := `{"expectedRevisionId":"3","clientRequestId":"c-layer","pricingMode":"PRICEBOOK_GUIDED","deliveryCity":"桃園市"}`
-	req, _ := http.NewRequest(http.MethodPost, "/api/v1/app/buyers/me/procurement/requests/77/rfq-price-previews", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Account-Id", "99")
-	w := httptest.NewRecorder()
-	setupProcurementUnaryRouter(h).ServeHTTP(w, req)
-
-	assertHTTPStatus(t, w, http.StatusOK)
-	data := parseJSON(t, w.Body)["data"].(map[string]interface{})
-
-	basis, ok := data["marketPriceBasis"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("marketPriceBasis is not an object: %v", data["marketPriceBasis"])
-	}
-	if basis["priceLayer"] != "live_animal" {
-		t.Fatalf("priceLayer = %v, want live_animal（買家看不到層級就會照著活體價出價）", basis["priceLayer"])
-	}
-	if basis["scope"] != "NATIONAL" {
-		t.Fatalf("scope = %v, want NATIONAL（空的 regionName 不該被讀成區域比對失敗）", basis["scope"])
-	}
-}
-
-func TestProxyProcurementRfqPricePreview_NilV6Blocks_AreExplicitNull(t *testing.T) {
-	mock := &mockAIProcurementServiceClient{
-		previewRfqPriceResp: &aipb.RfqPricePreviewResponse{
-			PricePreviewId: "504", Version: "1", PricingMode: "BUYER_ENTERED_NO_REFERENCE", ReferenceAvailability: "UNAVAILABLE",
+			PricePreviewId: "504", Version: "1",
 			BuyerRequestedRange: &aipb.BuyerRequestedRange{Currency: "TWD", LowerBoundAmount: "650", UpperBoundAmount: "850"},
-			DealTemperature:     &aipb.DealTemperature{Status: "UNKNOWN", ReasonCode: "MAPPING_MISSING"},
-			PayloadHash:         "hash-v6-null",
+			PayloadHash:         "hash-null",
 		},
 	}
 	h := newProcurementTestHolder(mock)
 
-	body := `{"expectedRevisionId":"3","clientRequestId":"c-v6-null","pricingMode":"BUYER_ENTERED_NO_REFERENCE","deliveryCity":"桃園市","buyerRequestedRange":{"currency":"TWD","lowerBoundAmount":"650","upperBoundAmount":"850"}}`
+	body := `{"expectedRevisionId":"3","clientRequestId":"c-null","deliveryCity":"桃園市","buyerRequestedRange":{"currency":"TWD","lowerBoundAmount":"650","upperBoundAmount":"850"}}`
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/app/buyers/me/procurement/requests/77/rfq-price-previews", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Account-Id", "99")
@@ -1260,10 +1021,8 @@ func TestProxyProcurementRfqPricePreview_NilV6Blocks_AreExplicitNull(t *testing.
 
 	assertHTTPStatus(t, w, http.StatusOK)
 	data := parseJSON(t, w.Body)["data"].(map[string]interface{})
-	for _, key := range []string{"marketPriceBasis", "quoteTotalRange"} {
-		if v, present := data[key]; !present || v != nil {
-			t.Fatalf("%s should be present and explicitly null: %v", key, data[key])
-		}
+	if v, present := data["quoteTotalRange"]; !present || v != nil {
+		t.Fatalf("quoteTotalRange should be present and explicitly null: %v", data["quoteTotalRange"])
 	}
 }
 
@@ -1274,7 +1033,7 @@ func TestProxyProcurementRfqPricePreview_PriceBasisUnavailable_ReturnsUnprocessa
 	}
 	h := newProcurementTestHolder(mock)
 
-	body := `{"expectedRevisionId":"3","clientRequestId":"c-3","pricingMode":"PRICEBOOK_GUIDED","deliveryCity":"台北市"}`
+	body := `{"expectedRevisionId":"3","clientRequestId":"c-3","deliveryCity":"台北市"}`
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/app/buyers/me/procurement/requests/77/rfq-price-previews", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Account-Id", "99")
@@ -1296,7 +1055,7 @@ func TestProxyProcurementRfqPricePreview_StaleRevision_ReturnsConflict(t *testin
 	}
 	h := newProcurementTestHolder(mock)
 
-	body := `{"expectedRevisionId":"2","clientRequestId":"c-4","pricingMode":"PRICEBOOK_GUIDED","deliveryCity":"台北市"}`
+	body := `{"expectedRevisionId":"2","clientRequestId":"c-4","deliveryCity":"台北市"}`
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/app/buyers/me/procurement/requests/77/rfq-price-previews", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Account-Id", "99")
@@ -1862,7 +1621,6 @@ func TestProxyProcurementRfqPublicationPreview_Success_ReturnsExactJSONContract(
 			SellerFacingPayloadHash: "sfp-hash-1",
 			SellerFacingPayloadJson: "{}",
 			ExpiresAt:               "2026-09-08T00:00:00Z",
-			DealTemperatureStatus:   "UNKNOWN",
 			AudiencePolicyId:        "WISH_POOL_ALL_ACTIVE_SELLERS_V1",
 			AudiencePolicyVersion:   "1",
 			RecipientCount:          "0",
@@ -1892,8 +1650,7 @@ func TestProxyProcurementRfqPublicationPreview_Success_ReturnsExactJSONContract(
 		"approvalId": "7001", "approvalVersion": "1",
 		"audienceHash": "audience-hash-1", "sellerFacingPayloadHash": "sfp-hash-1",
 		"sellerFacingPayloadJson": "{}", "expiresAt": "2026-09-08T00:00:00Z",
-		"dealTemperatureStatus": "UNKNOWN",
-		"audiencePolicyId":      "WISH_POOL_ALL_ACTIVE_SELLERS_V1", "audiencePolicyVersion": "1",
+		"audiencePolicyId": "WISH_POOL_ALL_ACTIVE_SELLERS_V1", "audiencePolicyVersion": "1",
 		"recipientCount": "0",
 	}
 	if data := respBody["data"]; !reflect.DeepEqual(data, want) {

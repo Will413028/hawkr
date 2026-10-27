@@ -3,7 +3,7 @@ package zhtw
 import "testing"
 
 // LLM 抽取的中文語域是機率性的——不能靠 prompt 保證輸出繁體，這支測試釘住的是
-// 讓「高丽菜」（簡體，2026-08-15 買家實測回報的真實案例，導致跟 pricebook／
+// 讓「高丽菜」（簡體，2026-08-15 買家實測回報的真實案例，導致跟
 // product 目錄的繁體字比對失敗、候選搜尋 0 家）轉成「高麗菜」。
 func TestToTraditional_ConvertsSimplifiedToTraditional(t *testing.T) {
 	got := ToTraditional("高丽菜")

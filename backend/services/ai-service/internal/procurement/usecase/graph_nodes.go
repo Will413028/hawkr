@@ -476,8 +476,7 @@ type CropGateOutput struct {
 	// ResolveFailed 走這條路的理由跟 Candidates 相同：它是下游唯一能知道
 	// 「這一輪分類查詢是失敗，不是查到了沒有」的地方。少了它，
 	// composeGraphTurnResult 會把 required slots 齊全當成 Ready，然後催買家去
-	// 做價格預覽——而沒有 crop code 的 PRICEBOOK_GUIDED 必定回 422
-	// MAPPING_MISSING（required slots 不含 item_resolution，見
+	// 做價格預覽（required slots 不含 item_resolution，見
 	// domain.Slots.MissingRequired）。
 	ResolveFailed bool
 }
@@ -507,8 +506,8 @@ func summarizeSlotsRejected(rejected []domain.RejectedField) string {
 	return b.String()
 }
 
-// cropGateChoiceNoun 讓敘述的名詞跟卡片上實際列的東西一致：Pricebook 候選確實
-// 是作物，taxonomy 兩階段列的是商品分類（豬肉／牛肉）。判準用 Selection，與
+// cropGateChoiceNoun 讓敘述的名詞跟卡片上實際列的東西一致：分類樹兩階段列的是商品
+// 分類（豬肉／牛肉）。判準用 Selection，與
 // BuildCropDisambiguationQuestion 挑問句同源。
 func cropGateChoiceNoun(selection *domain.CropSelection) string {
 	if selection == nil {
@@ -531,7 +530,7 @@ func summarizeCropGate(result cropidentity.GateResult) string {
 	case result.ResolveFailed:
 		// 必須排在 Pending／Rejected 之前判斷嗎？不必——降級路徑回傳的 result 兩者
 		// 皆為零值。排在最前面是為了讓「這條路徑有被獨立處理」在讀碼時一眼看得到：
-		// 少了這一支，Pricebook 查詢失敗會落進 default 分支，對買家說「分類判斷已
+		// 少了這一支，分類樹查詢失敗會落進 default 分支，對買家說「分類判斷已
 		// 完成」——而實際上這一輪什麼都沒判定成功。
 		//
 		// 措辭刻意不宣稱「已清除」：清空是 persistCropGate 的事，而那支失敗時只
@@ -629,18 +628,6 @@ func NewCropGateNode(resolver cropidentity.Resolver, newID func() int64) *workfl
 
 			result := cropidentity.ComputeGate(ctx, resolver, before, validated.Slots, gateOpts...)
 
-			// 解析結果併進這一輪的 slots 與 patch——**在 AppendRevision 之前**，
-			// 所以它跟 item 原話落在同一個 revision、同一次寫入（ADR
-			// 2026-09-04-crop-resolution-into-slots）。寫進 Patch 是為了讓
-			// terminal 的 domain.RecordedThisTurn 看得到它：買家挑完候選要在
-			// ①確認段看到「品項分類＝甘藍-初秋」，而那個函式的判準是「patch 有
-			// 帶到且 Apply 後真的改變」。
-			//
-			// 只在非 nil 時寫、不做「用 nil 覆寫」：舊解析的清除是 validate_slots
-			// 那一步 Slots.Apply 在 item 變動時做掉的（見該函式內的說明），這裡
-			// 無條件覆寫會把「item 未變動、解析原樣帶著走」那條路徑的既有解析
-			// 洗掉。
-			result.ApplyTo(&progress.NextSlots, &progress.Patch)
 			progress.CropPending = result.Pending
 			progress.CropCandidates = result.Candidates
 			progress.CropSelection = result.Selection
@@ -666,7 +653,7 @@ func NewCropGateNode(resolver cropidentity.Resolver, newID func() int64) *workfl
 			}
 
 			return CropGateOutput{
-				Item: result.Item, Resolution: result.Resolution,
+				Item:    result.Item,
 				Pending: result.Pending, Candidates: result.Candidates, Selection: result.Selection,
 				PendingReason: result.PendingReason, FactsAsOf: result.FactsAsOf,
 				ResolveFailed: result.ResolveFailed,
@@ -678,9 +665,7 @@ func NewCropGateNode(resolver cropidentity.Resolver, newID func() int64) *workfl
 
 // NewPricePreviewNode 包裝既有 PreviewRfqPriceUseCase.PreviewRfqPrice
 // （price_preview.go:135），函式本身一行不改——它已經是一個高度收斂的原子
-// 單元（idempotency 短路、CAS 版本檢查、依 PricingMode 分兩條互斥分支、
-// Pricebook I/O、持久化都耦合在一起），沒有可以乾淨拆出的「pricing mode
-// 判定」子函式，見設計書 §3。
+// 單元（idempotency 短路、CAS 版本檢查、持久化都耦合在一起），見設計書 §3。
 //
 // 跟 validate_slots／crop_gate 不同，這個 node 直接沿用既有的
 // PreviewRfqPriceInput／PricePreviewResult 當泛型參數（用 NewFunctionNode，
@@ -693,12 +678,10 @@ func NewCropGateNode(resolver cropidentity.Resolver, newID func() int64) *workfl
 // node 從一開始就用 NewFunctionNode（nil schema），不受上面三個 node 修復的
 // scheduler 執行 bug 影響。
 //
-// 這個 node 本次不會被任何邊引用（見任務 8 T8 plan）——PricingMode／
-// BuyerRequestedRange 目前是買家明確選擇的結構化輸入，對話中怎麼收集這兩個
-// 欄位需要獨立設計，超出這次骨架範圍。本任務只交付「node 存在、獨立測試
-// 通過」，不交付「controller 能路由到它」。RetryConfig 用 ADK 預設，跟
-// crop_gate 同理：這個 guard 有真實 I/O（Pricebook gRPC client、DB
-// 持久化），有暫時性失敗的可能，不同於 validate_slots 的純函式。
+// 這個 node 本次不會被任何邊引用（見任務 8 T8 plan）——BuyerRequestedRange
+// 目前是買家明確選擇的結構化輸入，對話中怎麼收集它需要獨立設計，超出這次骨架範圍。
+// 本任務只交付「node 存在、獨立測試通過」，不交付「controller 能路由到它」。
+// RetryConfig 用 ADK 預設：持久化有暫時性失敗的可能，不同於 validate_slots 的純函式。
 func NewPricePreviewNode(uc *pricing.PreviewRfqPriceUseCase) *workflow.FunctionNode {
 	return workflow.NewFunctionNode(
 		"price_preview",

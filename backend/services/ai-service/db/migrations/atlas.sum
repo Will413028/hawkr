@@ -1,4 +1,4 @@
-h1:kY+BFJbeVjYHMh0mScC48yhgplnFEL4zBeG0hbOxvTI=
+h1:75YKikwDDltsB1vBKq3B4P+5VsUFMq/vqYfSnjV+zOU=
 20260406093514_init_session_tables.sql h1:bK89HLaGKQDy5RUXy/m79anLdPtXC9Ybw6otgDFTKwQ=
 20260406200000_add_ai_styles_and_usage.sql h1:tSA8eIqLTaY+U/3IwOGrhqjc/8lhnuInTUk71UvHf5A=
 20260408000001_ai_styles_id_bigint.sql h1:hFvjGwySxr2Q/tsD3XT9jkwBwEDFXkOpo6u0qOe5y1U=
@@ -60,3 +60,4 @@ h1:kY+BFJbeVjYHMh0mScC48yhgplnFEL4zBeG0hbOxvTI=
 20260921050452_fix_provisioning_outbox_completed_at.sql h1:D4wiW4jEDtggcd/yvB5Kzg6vv1UsR4Mmqm7Zx40INX8=
 20260922011352_drop_outbox_product_sku_id.sql h1:gSyA73yzmMvauU3z2/2tjusEcrmaptJTOgLCf4Gslr4=
 20261004124052_add_seller_response_command_evidence.sql h1:25PdVSkHQNRK0CG46vSe6lsjKr9TVzbdbnDF+qUmuDc=
+20261027181357_drop_procurement_market_reference.sql h1:pLgbx1Na28k7B2vHEYgGwwgqQN+72RQou0SefSGsjVI=

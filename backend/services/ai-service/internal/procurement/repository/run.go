@@ -709,7 +709,7 @@ type Interrupt struct {
 	// 這一層不知道 crop 消歧是什麼，跟 procurement_agent_run_events.payload_json
 	// 的既有處理方式相同。
 	PayloadJSON json.RawMessage
-	// FactsAsOf 是組出 PayloadJSON 時查詢外部事實（Pricebook）的時刻，零值表示
+	// FactsAsOf 是組出 PayloadJSON 時讀取分類樹的時刻，零值表示
 	// 這個 kind 沒有外部事實，或是搬遷前建立的舊列。
 	FactsAsOf time.Time
 }
@@ -819,7 +819,7 @@ type ResumeRunInput struct {
 	// usecase 層的業務知識，repository import usecase 會成環。
 	//
 	// 契約：這個 callback 只能做 DB 以外零 I/O 的事（純 JSON 解碼＋常數
-	// 比對）——不得呼叫 Pricebook／LLM，那會把外部延遲綁進一個持有兩把
+	// 比對）——不得呼叫分類樹／LLM，那會把外部延遲綁進一個持有兩把
 	// row lock 的交易。
 	//
 	// !IsNew（冪等命中）路徑**不呼叫**這個 callback：那次命令的 resolved

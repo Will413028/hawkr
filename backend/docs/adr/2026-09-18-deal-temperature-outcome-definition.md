@@ -2,7 +2,7 @@
 
 | 項目 | 值 |
 |---|---|
-| 狀態 | accepted |
+| 狀態 | superseded by `2026-10-27-general-ecommerce-scope-cut.md`（D2：報價只看供應商報的價，成交溫度計與 pricebook 行情一併刪除） |
 | 日期 | 2026-09-18（決策作成於 2026-09-09） |
 | 影響範圍 | ai-service 的 `procurement_price_previews`、買家端溫度顯示、CodeMeta reason code |
 

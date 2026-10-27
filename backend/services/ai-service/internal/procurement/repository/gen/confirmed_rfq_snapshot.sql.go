@@ -13,7 +13,7 @@ import (
 )
 
 const findConfirmedRfqSnapshotByIDAndBuyer = `-- name: FindConfirmedRfqSnapshotByIDAndBuyer :one
-SELECT id, buyer_id, request_id, request_revision_id, price_preview_id, price_preview_version, quality_knowledge_state, pricing_mode, canonical_payload_json, payload_hash, client_request_id, expires_at, created_at FROM procurement_confirmed_rfq_snapshots
+SELECT id, buyer_id, request_id, request_revision_id, price_preview_id, price_preview_version, quality_knowledge_state, canonical_payload_json, payload_hash, client_request_id, expires_at, created_at FROM procurement_confirmed_rfq_snapshots
 WHERE id = $1 AND buyer_id = $2
 `
 
@@ -33,7 +33,6 @@ func (q *Queries) FindConfirmedRfqSnapshotByIDAndBuyer(ctx context.Context, arg 
 		&i.PricePreviewID,
 		&i.PricePreviewVersion,
 		&i.QualityKnowledgeState,
-		&i.PricingMode,
 		&i.CanonicalPayloadJson,
 		&i.PayloadHash,
 		&i.ClientRequestID,
@@ -44,7 +43,7 @@ func (q *Queries) FindConfirmedRfqSnapshotByIDAndBuyer(ctx context.Context, arg 
 }
 
 const findConfirmedRfqSnapshotByIdempotencyKey = `-- name: FindConfirmedRfqSnapshotByIdempotencyKey :one
-SELECT id, buyer_id, request_id, request_revision_id, price_preview_id, price_preview_version, quality_knowledge_state, pricing_mode, canonical_payload_json, payload_hash, client_request_id, expires_at, created_at FROM procurement_confirmed_rfq_snapshots
+SELECT id, buyer_id, request_id, request_revision_id, price_preview_id, price_preview_version, quality_knowledge_state, canonical_payload_json, payload_hash, client_request_id, expires_at, created_at FROM procurement_confirmed_rfq_snapshots
 WHERE buyer_id = $1 AND client_request_id = $2
 `
 
@@ -64,7 +63,6 @@ func (q *Queries) FindConfirmedRfqSnapshotByIdempotencyKey(ctx context.Context, 
 		&i.PricePreviewID,
 		&i.PricePreviewVersion,
 		&i.QualityKnowledgeState,
-		&i.PricingMode,
 		&i.CanonicalPayloadJson,
 		&i.PayloadHash,
 		&i.ClientRequestID,
@@ -75,7 +73,7 @@ func (q *Queries) FindConfirmedRfqSnapshotByIdempotencyKey(ctx context.Context, 
 }
 
 const findLatestConfirmedRfqSnapshotByRequestID = `-- name: FindLatestConfirmedRfqSnapshotByRequestID :one
-SELECT id, buyer_id, request_id, request_revision_id, price_preview_id, price_preview_version, quality_knowledge_state, pricing_mode, canonical_payload_json, payload_hash, client_request_id, expires_at, created_at FROM procurement_confirmed_rfq_snapshots
+SELECT id, buyer_id, request_id, request_revision_id, price_preview_id, price_preview_version, quality_knowledge_state, canonical_payload_json, payload_hash, client_request_id, expires_at, created_at FROM procurement_confirmed_rfq_snapshots
 WHERE request_id = $1 AND buyer_id = $2
 ORDER BY created_at DESC
 LIMIT 1
@@ -97,7 +95,6 @@ func (q *Queries) FindLatestConfirmedRfqSnapshotByRequestID(ctx context.Context,
 		&i.PricePreviewID,
 		&i.PricePreviewVersion,
 		&i.QualityKnowledgeState,
-		&i.PricingMode,
 		&i.CanonicalPayloadJson,
 		&i.PayloadHash,
 		&i.ClientRequestID,
@@ -110,14 +107,14 @@ func (q *Queries) FindLatestConfirmedRfqSnapshotByRequestID(ctx context.Context,
 const insertConfirmedRfqSnapshot = `-- name: InsertConfirmedRfqSnapshot :one
 INSERT INTO procurement_confirmed_rfq_snapshots (
     id, buyer_id, request_id, request_revision_id, price_preview_id,
-    price_preview_version, quality_knowledge_state, pricing_mode,
+    price_preview_version, quality_knowledge_state,
     canonical_payload_json, payload_hash, client_request_id, expires_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
 )
 ON CONFLICT (buyer_id, client_request_id)
 DO UPDATE SET client_request_id = EXCLUDED.client_request_id
-RETURNING id, buyer_id, request_id, request_revision_id, price_preview_id, price_preview_version, quality_knowledge_state, pricing_mode, canonical_payload_json, payload_hash, client_request_id, expires_at, created_at
+RETURNING id, buyer_id, request_id, request_revision_id, price_preview_id, price_preview_version, quality_knowledge_state, canonical_payload_json, payload_hash, client_request_id, expires_at, created_at
 `
 
 type InsertConfirmedRfqSnapshotParams struct {
@@ -128,7 +125,6 @@ type InsertConfirmedRfqSnapshotParams struct {
 	PricePreviewID        int64              `db:"price_preview_id" json:"price_preview_id"`
 	PricePreviewVersion   int64              `db:"price_preview_version" json:"price_preview_version"`
 	QualityKnowledgeState string             `db:"quality_knowledge_state" json:"quality_knowledge_state"`
-	PricingMode           string             `db:"pricing_mode" json:"pricing_mode"`
 	CanonicalPayloadJson  json.RawMessage    `db:"canonical_payload_json" json:"canonical_payload_json"`
 	PayloadHash           string             `db:"payload_hash" json:"payload_hash"`
 	ClientRequestID       string             `db:"client_request_id" json:"client_request_id"`
@@ -146,7 +142,6 @@ func (q *Queries) InsertConfirmedRfqSnapshot(ctx context.Context, arg InsertConf
 		arg.PricePreviewID,
 		arg.PricePreviewVersion,
 		arg.QualityKnowledgeState,
-		arg.PricingMode,
 		arg.CanonicalPayloadJson,
 		arg.PayloadHash,
 		arg.ClientRequestID,
@@ -161,7 +156,6 @@ func (q *Queries) InsertConfirmedRfqSnapshot(ctx context.Context, arg InsertConf
 		&i.PricePreviewID,
 		&i.PricePreviewVersion,
 		&i.QualityKnowledgeState,
-		&i.PricingMode,
 		&i.CanonicalPayloadJson,
 		&i.PayloadHash,
 		&i.ClientRequestID,
