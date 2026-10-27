@@ -26,7 +26,7 @@ type SellerResponse struct {
 // PublicSellerInfo 是 GET /api/v1/public/sellers/{id} 的 response DTO —— 匿名可讀。
 //
 // 公開面只放店家的營業資訊，不含店主的 email／手機／生日／性別／寄退件街道地址：
-// 官網賣家頁的資料來源正是這支，任何人帶一個 store_id 就拿得到。
+// 網頁賣家頁的資料來源正是這支，任何人帶一個 store_id 就拿得到。
 //
 // 白名單設計（deny-by-default）：新欄位不會因為上游 proto 長胖而自動出現在公開
 // 面，要公開得在這裡明確加一行。加之前先回答一句話——「這是店家的營業資訊，還是
@@ -64,10 +64,8 @@ type PublicSellerInfo struct {
 	District                   string  `json:"district"`
 	SellerType                 string  `json:"sellerType"`
 	OverallCertificationStatus string  `json:"overallCertificationStatus"`
-	FoodBusinessRegNo          string  `json:"foodBusinessRegNo"` // 食品業者登錄字號：法定應公開揭露
 	WebsiteUrl                 string  `json:"websiteUrl"`
 	Rating                     float64 `json:"rating"`
-	IsProcessedFood            bool    `json:"isProcessedFood"`
 }
 
 // toPublicSellerInfoDTO 是 gRPC SellerInfo proto → 公開 DTO 的**唯一**映射點。
@@ -95,10 +93,8 @@ func toPublicSellerInfoDTO(m *pb.SellerInfo, mediaBase string) PublicSellerInfo 
 		District:                   m.District,
 		SellerType:                 m.SellerType,
 		OverallCertificationStatus: m.OverallCertificationStatus,
-		FoodBusinessRegNo:          m.FoodBusinessRegNo,
 		WebsiteUrl:                 m.WebsiteUrl,
 		Rating:                     m.Rating,
-		IsProcessedFood:            m.IsProcessedFood,
 	}
 }
 

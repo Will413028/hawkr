@@ -15,7 +15,7 @@ import (
 )
 
 // GET /api/v1/public/sellers/{id} 掛在 OptionalJWTAuth 底下 —— **匿名可打**，而它
-// 正是官網賣家頁與買家 App 商家頁的資料來源。公開面一旦帶上店主的 email、已驗證
+// 正是網頁賣家頁與買家 App 商家頁的資料來源。公開面一旦帶上店主的 email、已驗證
 // 手機、生日、性別或寄退件街道地址，任何人帶一個 store_id 就拿得到。
 //
 // 本檔是防復發的機械保證：任何人日後把這些欄位加回公開 DTO，都會在這裡轉紅。
@@ -128,7 +128,7 @@ func TestPublicSellerInfo_NoPIIOnWire(t *testing.T) {
 }
 
 // TestPublicSellerInfo_KeepsStorefrontFields 是上面那條的對稱面：擋掉 PII 不能
-// 順手把店面該顯示的東西也擋掉（官網賣家頁與買家 App 商家頁靠這些欄位渲染）。
+// 順手把店面該顯示的東西也擋掉（網頁賣家頁與買家 App 商家頁靠這些欄位渲染）。
 func TestPublicSellerInfo_KeepsStorefrontFields(t *testing.T) {
 	data := servePublicSeller(t)
 
@@ -145,10 +145,8 @@ func TestPublicSellerInfo_KeepsStorefrontFields(t *testing.T) {
 		"district":                   "壽豐鄉",
 		"sellerType":                 "personal",
 		"overallCertificationStatus": "approved",
-		"foodBusinessRegNo":          "F-123456789-00000-1",
 		"websiteUrl":                 "https://example.com",
 		"rating":                     4.8,
-		"isProcessedFood":            true,
 	}
 	for k, expected := range want {
 		got, ok := data[k]
@@ -176,7 +174,7 @@ func TestPublicSellerInfo_FieldSetIsExhaustive(t *testing.T) {
 
 	want := []string{
 		"city", "coverKey", "coverUrl", "description", "district",
-		"foodBusinessRegNo", "isProcessedFood", "logoKey", "logoUrl",
+		"logoKey", "logoUrl",
 		"overallCertificationStatus", "prize", "rating", "sellerName",
 		"sellerType", "storeCode", "storeId",
 		"storeName", "websiteUrl",
