@@ -86,21 +86,16 @@ env:
 jobs:
   e2e:
     name: Playwright e2e
-    # Playwright 還不支援 ubuntu-latest（26.04）的 chromium-headless-shell。
     runs-on: ubuntu-24.04
+    # 官方映像已含瀏覽器與系統相依套件，省掉每次 apt 安裝（實測在 runner 上會卡十幾分鐘）。
+    container: mcr.microsoft.com/playwright:v1.59.1-noble
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/pnpm-install
-      - name: 快取 Playwright 瀏覽器
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: playwright-${{ runner.os }}-
-      # 只裝 chromium 的 headless shell（playwright.config.ts 的 chromium 與 mobile 兩個 project 都用它）與系統相依套件。
-      - name: 安裝瀏覽器
-        run: pnpm exec playwright install --with-deps --only-shell chromium
+      # 映像的版本要和 lockfile 的 @playwright/test 相同，否則找不到瀏覽器；升級時兩邊一起改。
+      - name: 確認 Playwright 版本與映像一致
+        run: test "$(pnpm exec playwright --version)" = "Version 1.59.1"
       # CI 的 webServer 是 `pnpm start`，吃這一步 build 出的產物。
       - run: pnpm run build
       - name: 偵測視覺基準
@@ -141,16 +136,12 @@ jobs:
   storybook:
     name: Storybook 互動測試
     runs-on: ubuntu-24.04
+    container: mcr.microsoft.com/playwright:v1.59.1-noble
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/pnpm-install
-      - name: 快取 Playwright 瀏覽器
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: playwright-${{ runner.os }}-
-      - name: 安裝瀏覽器
-        run: pnpm exec playwright install --with-deps --only-shell chromium
+      # 映像的版本要和 lockfile 的 @playwright/test 相同，否則找不到瀏覽器；升級時兩邊一起改。
+      - name: 確認 Playwright 版本與映像一致
+        run: test "$(pnpm exec playwright --version)" = "Version 1.59.1"
       - run: pnpm run storybook:test
