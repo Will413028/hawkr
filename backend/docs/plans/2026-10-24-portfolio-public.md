@@ -363,6 +363,7 @@ NOT RUN 與負載造成的假失敗見 `ci-local-map.md` 最後一節。
     - 新 repo 的 `git rev-list --count HEAD` 在初始 push 時是 1。
     - 用 GitHub API 查到 repo 是 public、fork 核准與 push protection 已開啟、ruleset 存在。
     - 第一輪 CI 的每個 job 綠燈。修正以後續 commit 推上，不重寫初始 commit。
+    - 例外（Will 2026-10-27）：計畫基線的三項既有失敗（單體 golangci-lint 的 `exhaustive`、`pnpm audit`、pricebook integration）等一般電商裁減計畫刪掉 pricebook 之後再處理，不擋本步驟；列在「延後」。
   - 停止條件：轉 public 前，scan 或 gitleaks 任何一類大於 0。
   - 需要人做的事：授權轉 public 與封存舊 repo；在 GitHub 上檢視一次新 repo。
 - [ ] **9. 收尾**：
