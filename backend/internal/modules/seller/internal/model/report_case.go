@@ -6,7 +6,6 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
-	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
@@ -34,7 +33,7 @@ func OutcomeValues() []Outcome {
 	return []Outcome{OutcomeActionTaken, OutcomeNoViolation, OutcomeInsufficient, OutcomeDuplicate, OutcomeAbusive}
 }
 
-// Negates 回報這個結果是否否定了通報（未違規、內容不足或濫報）：被否定的通報不能當認定的來源、不列進轉報資料。
+// Negates 回報這個結果是否否定了通報（未違規、內容不足或濫報）：被否定的通報不能當認定的來源。
 func (o Outcome) Negates() bool {
 	return o == OutcomeNoViolation || o == OutcomeInsufficient || o == OutcomeAbusive
 }
@@ -198,88 +197,15 @@ func (r Report) EffectiveCategory() policy.Category {
 // HasUnseenSupplements 回報有沒有管理員還沒看過的補充：還沒有結果，而且存在編號大於 SupplementsSeenSeq（分案、移動與明確已讀時記下）的補充。
 // 比的是最新一則的編號（LatestSupplementSeq，max(seq)）而不是則數：與 SQL（db/queries/cases.sql 的 EXISTS seq > supplements_seen_seq、
 // MarkReportSupplementsSeen 記下 max(seq)）同一個定義，不依賴編號連號（DB 只保證 1..10 與每筆通報內唯一）。比編號不比時間，不依賴任何時鐘。
-// 讀取、案件結案帶入的預設結果、改案件嚴重度與記錄轉報都不記（它們不是帶著這筆通報的 etag 做的）。有了結果的通報不再提醒（補充只併入還沒有結果的通報；
+// 讀取、案件結案帶入的預設結果、改案件嚴重度都不記（它們不是帶著這筆通報的 etag 做的）。有了結果的通報不再提醒（補充只併入還沒有結果的通報；
 // 結果是管理員設的，或案件結案時由決定帶入），所以設定結果不需要記。
 func (r Report) HasUnseenSupplements() bool {
 	return r.Outcome == nil && r.LatestSupplementSeq > r.SupplementsSeenSeq
 }
 
-// Supporting 回報結果有沒有否定這筆通報（沒有結果、已採取措施或重複，不是未違規、內容不足或濫報）：可以當認定的來源、列進轉報資料、預填進建立措施
+// Supporting 回報結果有沒有否定這筆通報（沒有結果、已採取措施或重複，不是未違規、內容不足或濫報）：可以當認定的來源、預填進建立措施
 // （rb R2 的 3b 規則）。
 func (r Report) Supporting() bool { return r.Outcome == nil || !r.Outcome.Negates() }
-
-// ReferralFollowUpDays 是記錄轉報時沒有指定追蹤日期的預設：轉報日（台北）加這麼多天。
-const ReferralFollowUpDays = 30
-
-// ReferralOutcome 是案件的轉報紀錄是哪一種：已轉報，或標記不轉報（兩者互斥，同一列）。
-type ReferralOutcome string
-
-const (
-	// ReferralReferred 已轉報主管機關。
-	ReferralReferred ReferralOutcome = "REFERRED"
-	// ReferralWaived 標記不轉報（例如主管機關已經介入）。
-	ReferralWaived ReferralOutcome = "WAIVED"
-)
-
-// FDAReferral 是食安案件轉報主管機關的紀錄；ReferenceNo 空字串是沒有案號。FollowUpOn 是追蹤日期（台北日期，以 UTC 午夜的 time.Time 表示，同 DATE 欄位的
-// 讀法）：到了這天還沒收到主管機關的回覆就聯絡主管機關；nil 是沒有（回覆時清掉，或轉換前就有的紀錄）。Replies 是主管機關的回覆，舊到新。
-type FDAReferral struct {
-	ReportedAt        time.Time
-	Channel           FDAChannel
-	ReferenceNo       string
-	ReportedByAdminID int64
-	FollowUpOn        *time.Time
-	// FollowUpSetAt 是設定目前這個追蹤日期的時間（記錄轉報，或記下回覆時換成下一個）；FollowUpOn 是 nil 時也是 nil。
-	FollowUpSetAt *time.Time
-	Replies       []FDAReferralReply
-}
-
-// FollowUpOverdue 是「追蹤逾期」：有追蹤日期、now 的台北日期晚於它，而且設定這個追蹤日期之後還沒有記下主管機關的回覆（記下回覆時換成下一個追蹤日期，
-// 那一則回覆就是設定的時間點，不算「之後」）。只在讀取時推導，API 的 FDAReferral.follow_up_overdue 是它；client 不自己比較日期。
-func (r FDAReferral) FollowUpOverdue(now time.Time) bool {
-	if r.FollowUpOn == nil || r.FollowUpSetAt == nil || !twtime.Day(now).After(*r.FollowUpOn) {
-		return false
-	}
-	for _, reply := range r.Replies {
-		if reply.RecordedAt.After(*r.FollowUpSetAt) {
-			return false
-		}
-	}
-	return true
-}
-
-// FDAReferralReply 是主管機關對轉報的一則回覆（只新增）。ReceivedOn 是收到的台北日期（UTC 午夜的 time.Time）。
-type FDAReferralReply struct {
-	Body              string
-	ReceivedOn        time.Time
-	RecordedByAdminID int64
-	RecordedAt        time.Time
-}
-
-// ReferralWaiver 是標記不轉報的紀錄。
-type ReferralWaiver struct {
-	Reason          string
-	WaivedByAdminID int64
-	WaivedAt        time.Time
-}
-
-// CaseReferral 是案件唯一的轉報紀錄：Outcome 是 ReferralReferred 時 FDA 有值，是 ReferralWaived 時 Waiver 有值，兩者至多一個（DB 的 CHECK 保證）。
-type CaseReferral struct {
-	Outcome ReferralOutcome
-	FDA     *FDAReferral
-	Waiver  *ReferralWaiver
-}
-
-// Referred 回報案件已經記錄轉報（不是不轉報）。
-func (r *CaseReferral) Referred() bool { return r != nil && r.Outcome == ReferralReferred }
-
-// Waived 回報案件已經標記不轉報。
-func (r *CaseReferral) Waived() bool { return r != nil && r.Outcome == ReferralWaived }
-
-// DefaultReferralFollowUp 是沒有指定追蹤日期時的預設：轉報日（台北）加 ReferralFollowUpDays 天。
-func DefaultReferralFollowUp(now time.Time) time.Time {
-	return twtime.Day(now).AddDate(0, 0, ReferralFollowUpDays)
-}
 
 // ReportMove 是一次把通報移到其他案件的紀錄（append-only）。
 type ReportMove struct {
@@ -289,8 +215,8 @@ type ReportMove struct {
 }
 
 // Case 是案件：同一家店、同一個平台判定類別，同時最多一個進行中的案件。Category 是案件的類別（平台判定類別，Assessable 的子集）。Severity 在開案時決定，之後只經
-// ChangeCaseSeverity 修改。ReportCount、UnresolvedReportCount、UnseenSupplementReports 與 StoreName 在清單與單筆都帶；Referral 與 Moves 在單筆讀取時載入
-// （Referral 在清單也帶）。UpdatedAt 是上一次「處理」的時間：成員進出、成員有了結果、改嚴重度、記錄轉報、結案；補充、註記與措施不改它。
+// ChangeCaseSeverity 修改。ReportCount、UnresolvedReportCount、UnseenSupplementReports 與 StoreName 在清單與單筆都帶；Moves 在單筆讀取時載入。
+// UpdatedAt 是上一次「處理」的時間：成員進出、成員有了結果、改嚴重度、結案；補充、註記與措施不改它。
 // UnseenSupplementReports 是有補充還沒被管理員看過的成員數（Report.HasUnseenSupplements 的計數），不看 UpdatedAt。
 type Case struct {
 	ID                      uuid.UUID
@@ -309,15 +235,13 @@ type Case struct {
 	ReportCount             int
 	UnresolvedReportCount   int
 	UnseenSupplementReports int
-	Referral                *CaseReferral
 	Moves                   []ReportMove
 	UpdatedAt               time.Time
 	// OpenInquiryID 是還沒結束的詢問（每個案件最多一筆）；沒有時 nil。在清單與單筆都帶（每頁一支固定查詢：OpenCaseInquiries）。
 	// 「待決定」的開始時間只在 DecideDeadline.Start（seller.review_case_decision）。
 	OpenInquiryID *uuid.UUID
-	// DecideDeadline 是待決定的期限（seller.review_case_decision）、FDAReferralDeadline 是待轉報的期限（seller.review_case_fda_referral）；
-	// 義務不在時 nil。由 caseFacts 填入。
-	DecideDeadline, FDAReferralDeadline *Deadline
+	// DecideDeadline 是待決定的期限（seller.review_case_decision）；義務不在時 nil。由 caseFacts 填入。
+	DecideDeadline *Deadline
 }
 
 // Open 回報案件是否進行中。
@@ -352,9 +276,6 @@ const (
 	ReportBlockFindingSource ReportBlock = "FINDING_SOURCE"
 	// ReportBlockLastReportWithMeasure 是案件唯一的成員，而案件有導出的措施（有導出措施的案件不會因移動而變空）。
 	ReportBlockLastReportWithMeasure ReportBlock = "LAST_REPORT_WITH_MEASURE"
-	// ReportBlockLastReportWithReferral 是案件唯一的成員，而案件已記錄轉報（有轉報紀錄的案件不會因移動而變空：空案件以 NO_REPORTS 關閉，
-	// 而轉報資料要有通報才能匯出）。
-	ReportBlockLastReportWithReferral ReportBlock = "LAST_REPORT_WITH_REFERRAL"
 	// ReportBlockNegated 結果是未違規、內容不足或濫報。
 	ReportBlockNegated ReportBlock = "NEGATED"
 	// ReportBlockStoreClosed 店家已關閉。
@@ -365,7 +286,7 @@ const (
 func ReportBlockValues() []ReportBlock {
 	return []ReportBlock{
 		ReportBlockResolved, ReportBlockAlreadyTriaged, ReportBlockNeedsCase, ReportBlockNoActionBasis, ReportBlockNotInOpenCase,
-		ReportBlockFindingSource, ReportBlockLastReportWithMeasure, ReportBlockLastReportWithReferral, ReportBlockNegated, ReportBlockStoreClosed,
+		ReportBlockFindingSource, ReportBlockLastReportWithMeasure, ReportBlockNegated, ReportBlockStoreClosed,
 	}
 }
 
@@ -386,8 +307,6 @@ func (b ReportBlock) Text() uitext.Message {
 		return text.ReportUnavailableFindingSource()
 	case ReportBlockLastReportWithMeasure:
 		return text.ReportUnavailableLastReportWithMeasure()
-	case ReportBlockLastReportWithReferral:
-		return text.ReportUnavailableLastReportWithReferral()
 	case ReportBlockNegated:
 		return text.SourceReportNegated()
 	case ReportBlockStoreClosed:
@@ -410,16 +329,6 @@ const (
 	CaseBlockReportActionTaken CaseBlock = "REPORT_ACTION_TAKEN"
 	// CaseBlockStoreClosed 店家已關閉。
 	CaseBlockStoreClosed CaseBlock = "STORE_CLOSED"
-	// CaseBlockNotFoodSafety 平台判定類別不是食安。
-	CaseBlockNotFoodSafety CaseBlock = "NOT_FOOD_SAFETY"
-	// CaseBlockNoReports 以 NO_REPORTS 關閉的案件（沒有通報）。
-	CaseBlockNoReports CaseBlock = "NO_REPORTS"
-	// CaseBlockReferralRecorded 已經記錄過轉報（記過時指令回原紀錄，不是錯誤）。
-	CaseBlockReferralRecorded CaseBlock = "REFERRAL_RECORDED"
-	// CaseBlockReferralWaived 已經標記不轉報（標記過時，不轉報的指令回原紀錄，其餘指令是錯誤）。
-	CaseBlockReferralWaived CaseBlock = "REFERRAL_WAIVED"
-	// CaseBlockNoReferral 還沒有轉報紀錄，沒有東西可以回覆。
-	CaseBlockNoReferral CaseBlock = "NO_REFERRAL"
 	// CaseBlockInquiryOpen 已經有一筆還沒結束的詢問。
 	CaseBlockInquiryOpen CaseBlock = "INQUIRY_OPEN"
 	// CaseBlockStorePurged 店家的個資已依保留期限清除，沒有聯絡資料可以詢問賣家（只是關店不擋）。
@@ -430,11 +339,11 @@ const (
 func CaseBlockValues() []CaseBlock {
 	return []CaseBlock{
 		CaseBlockClosed, CaseBlockNoActionBasis, CaseBlockUnrevokedMeasureExists, CaseBlockReportActionTaken, CaseBlockStoreClosed,
-		CaseBlockNotFoodSafety, CaseBlockNoReports, CaseBlockReferralRecorded, CaseBlockReferralWaived, CaseBlockNoReferral, CaseBlockInquiryOpen, CaseBlockStorePurged,
+		CaseBlockInquiryOpen, CaseBlockStorePurged,
 	}
 }
 
-// CaseAction 是案件上有前置條件的動作；CaseBlock.Text 依它選句（轉報與匯出的句子不同；已結案時，連結措施的句子說明是不能再從案件建立措施）。
+// CaseAction 是案件上有前置條件的動作；CaseBlock.Text 依它選句（已結案時，連結措施的句子說明是不能再從案件建立措施）。
 type CaseAction string
 
 const (
@@ -446,16 +355,8 @@ const (
 	CaseActionLinkMeasure CaseAction = "LINK_MEASURE"
 	// CaseActionCreateMeasure 從案件建立警告、停權或風險措施。
 	CaseActionCreateMeasure CaseAction = "CREATE_MEASURE"
-	// CaseActionRecordReferral 記錄轉報主管機關。
-	CaseActionRecordReferral CaseAction = "RECORD_REFERRAL"
-	// CaseActionWaiveReferral 標記不轉報。
-	CaseActionWaiveReferral CaseAction = "WAIVE_REFERRAL"
-	// CaseActionRecordReferralReply 記下主管機關對轉報的回覆。
-	CaseActionRecordReferralReply CaseAction = "RECORD_REFERRAL_REPLY"
 	// CaseActionCreateInquiry 對案件的賣家發詢問。
 	CaseActionCreateInquiry CaseAction = "CREATE_INQUIRY"
-	// CaseActionExport 匯出轉報資料。
-	CaseActionExport CaseAction = "EXPORT"
 )
 
 // Text 是原因給後台看的一句話（只有 zh-TW）；指令被擋下時錯誤的訊息取第一個原因的句子。不認得的原因回零值（Text 是空字串）。
@@ -474,22 +375,6 @@ func (b CaseBlock) Text(action CaseAction) uitext.Message {
 		return text.CaseUnavailableReportActionTaken()
 	case CaseBlockStoreClosed:
 		return StoreActionUnavailableText(StoreReasonStoreClosed, StoreActionCreateMeasure)
-	case CaseBlockNotFoodSafety:
-		if action == CaseActionExport {
-			return text.ExportNotFoodSafety()
-		}
-		return text.ReferralNotFoodSafety()
-	case CaseBlockNoReports:
-		if action == CaseActionExport {
-			return text.ExportNoReports()
-		}
-		return text.ReferralNoReports()
-	case CaseBlockReferralRecorded:
-		return text.CaseUnavailableReferralRecorded()
-	case CaseBlockReferralWaived:
-		return text.CaseUnavailableReferralWaived()
-	case CaseBlockNoReferral:
-		return text.CaseUnavailableNoReferral()
 	case CaseBlockInquiryOpen:
 		return text.CaseUnavailableInquiryOpen()
 	case CaseBlockStorePurged:
@@ -517,12 +402,8 @@ func (f CaseFacts) ActionTakenSupported() bool {
 
 // CaseAvailability 是案件每個動作不能做的原因，空的就是可以做。
 type CaseAvailability struct {
-	Decide                                                             map[Decision][]CaseBlock
-	ChangeSeverity, LinkMeasure, CreateMeasure, RecordReferral, Export []CaseBlock
-	// WaiveReferral 是標記不轉報：與記錄轉報的前置條件相同，加上已經有轉報紀錄（已轉報或已標記不轉報）。
-	WaiveReferral []CaseBlock
-	// RecordReferralReply 是記下主管機關的回覆：食安案件、已記錄轉報（沒有轉報紀錄或已標記不轉報都不行）。
-	RecordReferralReply []CaseBlock
+	Decide                                     map[Decision][]CaseBlock
+	ChangeSeverity, LinkMeasure, CreateMeasure []CaseBlock
 	// CreateInquiry 是對賣家發詢問：案件進行中、店家的個資還沒清除（只是關店不擋）、沒有還沒結束的詢問。
 	CreateInquiry []CaseBlock
 }
@@ -570,33 +451,6 @@ func (f CaseFacts) Availability() CaseAvailability {
 	if !(TerminationTarget{Closed: f.StoreClosed}).AllowsMeasure() {
 		a.CreateMeasure = append(a.CreateMeasure, CaseBlockStoreClosed)
 	}
-	var referral []CaseBlock
-	if c.Category != policy.FoodSafety {
-		referral = append(referral, CaseBlockNotFoodSafety)
-	}
-	if c.CloseReason != nil && *c.CloseReason == CaseClosedNoReports {
-		referral = append(referral, CaseBlockNoReports)
-	}
-	a.Export = referral
-	a.RecordReferral = append([]CaseBlock(nil), referral...)
-	a.WaiveReferral = append([]CaseBlock(nil), referral...)
-	switch {
-	case c.Referral.Referred():
-		a.RecordReferral = append(a.RecordReferral, CaseBlockReferralRecorded)
-		a.WaiveReferral = append(a.WaiveReferral, CaseBlockReferralRecorded)
-	case c.Referral.Waived():
-		a.RecordReferral = append(a.RecordReferral, CaseBlockReferralWaived)
-		a.WaiveReferral = append(a.WaiveReferral, CaseBlockReferralWaived)
-	}
-	if c.Category != policy.FoodSafety {
-		a.RecordReferralReply = append(a.RecordReferralReply, CaseBlockNotFoodSafety)
-	}
-	switch {
-	case c.Referral == nil:
-		a.RecordReferralReply = append(a.RecordReferralReply, CaseBlockNoReferral)
-	case c.Referral.Waived():
-		a.RecordReferralReply = append(a.RecordReferralReply, CaseBlockReferralWaived)
-	}
 	a.CreateInquiry = append([]CaseBlock(nil), closed...)
 	if f.StorePurged {
 		a.CreateInquiry = append(a.CreateInquiry, CaseBlockStorePurged)
@@ -607,7 +461,7 @@ func (f CaseFacts) Availability() CaseAvailability {
 	return a
 }
 
-// ReportFacts 是判斷通報能做什麼需要的事實；Case 是它所在的案件（沒有時 nil）：帶成員統計、導出的措施數與轉報紀錄，移動要看案件上有沒有措施或轉報。
+// ReportFacts 是判斷通報能做什麼需要的事實；Case 是它所在的案件（沒有時 nil）：帶成員統計與導出的措施數，移動要看案件上有沒有措施。
 type ReportFacts struct {
 	Report        Report
 	StoreClosed   bool
@@ -668,13 +522,9 @@ func (f ReportFacts) Availability() ReportAvailability {
 		a.Move = append(a.Move, ReportBlockFindingSource)
 	}
 	if f.Case != nil && f.Case.Case.ReportCount == 1 {
-		// 案件唯一的成員移走，案件就空了（以 NO_REPORTS 關閉）：案件上已經有措施或轉報紀錄時不行（兩個原因依序列出，錯誤取第一個）。
+		// 案件唯一的成員移走，案件就空了（以 NO_REPORTS 關閉）：案件上已經有措施時不行。
 		if f.Case.ResultingMeasures > 0 {
 			a.Move = append(a.Move, ReportBlockLastReportWithMeasure)
-		}
-		// 只擋已轉報：標記不轉報的案件空了照樣以 NO_REPORTS 關閉（不轉報的原因留在案件上），句子也只說「已記錄轉報」。
-		if f.Case.Case.Referral.Referred() {
-			a.Move = append(a.Move, ReportBlockLastReportWithReferral)
 		}
 	}
 	if !r.Supporting() {
@@ -710,8 +560,6 @@ type AdminReport struct {
 type AdminCase struct {
 	Case
 	Availability CaseAvailability
-	// ReadAt 是讀取的時間：讀取時推導、會隨時間改變的欄位（轉報的 FollowUpOverdue）以它判斷。
-	ReadAt time.Time
 }
 
 // SubmitReportInput 是提出通報（檢舉）的輸入；空字串表示沒有提供。ReporterBuyerID 大於零是登入的檢舉人（呼叫方解析的業務鍵），佐證由 AccountID（同一個登入者的帳號）上傳；
@@ -811,48 +659,6 @@ type ChangeCaseSeverityInput struct {
 	ExpectedVersion int64
 }
 
-// RecordFDAReferralInput 是記下轉報的輸入；ReferenceNo 選填（主管機關的案號，最多 100 字）。FollowUpOn 選填：追蹤日期（台北日期，UTC 午夜），不早於今天；
-// nil 時是轉報日（台北）加 ReferralFollowUpDays 天。
-type RecordFDAReferralInput struct {
-	CaseID      uuid.UUID
-	AdminID     int64
-	Channel     FDAChannel
-	ReferenceNo string
-	FollowUpOn  *time.Time
-}
-
-// WaiveFDAReferralInput 是標記不轉報的輸入；Reason 必填（1 到 2000 字）。
-type WaiveFDAReferralInput struct {
-	CaseID  uuid.UUID
-	AdminID int64
-	Reason  string
-}
-
-// WaiveFDAReferralResult 是標記不轉報的結果；AlreadyWaived 表示之前已經標記過，回傳的案件帶的是原本的紀錄。
-type WaiveFDAReferralResult struct {
-	Case          AdminCase
-	AlreadyWaived bool
-}
-
-// RecordFDAReferralReplyInput 是記下主管機關回覆的輸入。ReceivedOn 是收到的台北日期（UTC 午夜），不早於轉報日、不晚於今天；Body 1 到 2000 字。
-// NextFollowUpOn 設定時取代原本的追蹤日期（不早於今天）；ClearFollowUp 為 true 時清掉；兩者都沒有時不變，兩者同時有是無效的輸入。
-type RecordFDAReferralReplyInput struct {
-	CaseID         uuid.UUID
-	AdminID        int64
-	Body           string
-	ReceivedOn     time.Time
-	NextFollowUpOn *time.Time
-	ClearFollowUp  bool
-	// RequestID 選填（AIP-155），範圍是（記下的管理員, request_id）：同一個值、同樣的內容重送不會多記一則（回應遺失之後再送一次）。
-	RequestID *uuid.UUID
-}
-
-// RecordFDAReferralResult 是記下轉報的結果；AlreadyRecorded 表示之前已經記過，回傳的案件帶的是原本的紀錄。
-type RecordFDAReferralResult struct {
-	Case            AdminCase
-	AlreadyRecorded bool
-}
-
 // ReportCursor 是通報列表的 keyset 位置（依建立時間；方向由篩選決定：待分案與案件的成員舊到新，其他新到舊）。
 type ReportCursor struct {
 	CreatedAt time.Time
@@ -922,13 +728,6 @@ type CaseListInput struct {
 type AdminCasePage struct {
 	Items []AdminCase
 	Next  *CaseCursor
-}
-
-// FDAExport 是轉報主管機關需要的資料：案件、案件裡結果沒有被否定的通報（含補充與佐證的位置，不含檢舉人的聯絡方式）與以案件的 store_id 讀到的店家。呈現（文件格式）在 client。
-type FDAExport struct {
-	Case    AdminCase
-	Reports []AdminReport
-	Store   Store
 }
 
 // ReportReceived 在每次送出的 transaction 內發出：新的檢舉、補充（SupplementID）、補充已達上限而沒有存下的匿名送出（Discarded）。ConfirmationEmail 是這次送出留的

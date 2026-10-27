@@ -19,7 +19,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/closing"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/devseed"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/exposure"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/foodreg"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/governance"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/kyc"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/measure"
@@ -91,7 +90,6 @@ type Module struct {
 	governance *governance.Service
 	measure    *measure.Service
 	kyc        *kyc.Service
-	foodreg    *foodreg.Service
 	payuni     *payuni.Service
 	purge      *purge.Service
 	prospect   *prospect.Service
@@ -139,8 +137,7 @@ func New(d Deps) *Module {
 		measure: measure.New(measure.Deps{
 			DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Identity: d.Identity, Linked: kycService, Closing: closings, Exposure: exposures, Now: d.Now,
 		}),
-		kyc:     kycService,
-		foodreg: foodreg.New(foodreg.Deps{DB: d.DB, Events: d.Events, Jobs: d.Jobs, Exposure: exposures, Now: d.Now}),
+		kyc: kycService,
 		payuni: payuni.New(payuni.Deps{
 			DB: d.DB, Events: d.Events, Jobs: d.Jobs, Client: d.PayUni, KYC: kycService, Exposure: exposures,
 			StorefrontBaseURL: d.StorefrontBaseURL, Now: d.Now, Logger: d.Logger,
@@ -273,8 +270,6 @@ const (
 	AgreementSellerTerms      = model.AgreementSellerTerms
 	AgreementKYCPrivacyNotice = model.AgreementKYCPrivacyNotice
 	AgreementPayUniTerms      = model.AgreementPayUniTerms
-
-	AgreementFoodRegistrationNotice = model.AgreementFoodRegistrationNotice
 )
 
 // CurrentAgreement 回傳一種文件的現行版本與網址；不認得的種類回 false。
@@ -290,11 +285,6 @@ func AgreementKinds() []AgreementKind { return model.AgreementKinds() }
 // （KYC_PRIVACY_NOTICE 與 PAYUNI_TERMS 的現行版本）：給測試組出合法的輸入，不是 client 版本的來源（client 讀 GetSellerAgreements）。
 func CurrentApplyAcceptances() []AgreementAcceptance {
 	return currentAcceptances(model.ApplyAgreements)
-}
-
-// CurrentFoodRegistrationAcceptances 見 CurrentApplyAcceptances（SubmitFoodRegistration 要求的 FOOD_REGISTRATION_NOTICE）。
-func CurrentFoodRegistrationAcceptances() []AgreementAcceptance {
-	return currentAcceptances(model.SubmitFoodRegistrationAgreements)
 }
 
 // CurrentKYCAcceptances 見 CurrentApplyAcceptances。
@@ -663,7 +653,7 @@ func (m *Module) ReannounceExposures(ctx context.Context) (int, error) {
 
 // PurgePII 跑關店之後的兩段清理（ADR 2026-10-19-seller-kyc-payuni-consolidated「關店與個資保留」與 2026-10-20 修訂）：第一段（退場）在一般關店 30 天
 // （StoreRetireAfter；終止合作關店不早於申覆期限）後清公開內容、釋放 logo 與封面並發 StoreRetired；第二段在關店 184 天（StoreRetention）後清註冊、身分與連線資料
-// （店家聯絡、KYC、PayUni 的自由文字、食品登錄字號、同意紀錄的來源）。申覆的 legal hold 與主管機關來函的保存擋兩段。分批處理到沒有候選為止，回傳第二段清理了個資的店家數（退場看 retired_at）；
+// （店家聯絡、KYC、PayUni 的自由文字、同意紀錄的來源）。申覆的 legal hold 與主管機關來函的保存擋兩段。分批處理到沒有候選為止，回傳第二段清理了個資的店家數（退場看 retired_at）；
 // 重跑是 no-op。它是 seller.purge_pii job 的內容，給 worker 與測試呼叫。
 func (m *Module) PurgePII(ctx context.Context) (int, error) {
 	return m.purge.Run(ctx)

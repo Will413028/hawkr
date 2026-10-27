@@ -10,12 +10,7 @@ import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart' as hawkr
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
 const _enumNumber = <String, int>{
-  'FOOD_REGISTRATION_STATE_APPROVED': 2,
-	'FOOD_REGISTRATION_STATE_ENDED': 4,
-	'FOOD_REGISTRATION_STATE_PENDING': 1,
-	'FOOD_REGISTRATION_STATE_REJECTED': 3,
-	'FOOD_REGISTRATION_STATE_UNSPECIFIED': 0,
-	'GENDER_FEMALE': 2,
+  'GENDER_FEMALE': 2,
 	'GENDER_MALE': 1,
 	'GENDER_OTHER': 3,
 	'GENDER_UNSPECIFIED': 0,
@@ -184,18 +179,6 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return commonErrorText(_codes[value]!, l);
     case 'common.unknown':
       return commonUnknown(l);
-    case 'seller.FoodRegistration.kyc_pending_note':
-      return sellerFoodRegistrationKycPendingNote(l);
-    case 'seller.FoodRegistration.status_approved':
-      return sellerFoodRegistrationStatusApproved(l, number: params['number']! as String);
-    case 'seller.FoodRegistration.status_pending':
-      return sellerFoodRegistrationStatusPending(l, number: params['number']! as String, date: params['date']! as String);
-    case 'seller.FoodRegistration.status_rejected':
-      return sellerFoodRegistrationStatusRejected(l, reason: params['reason']! as String);
-    case 'seller.FoodRegistration.status_revoked':
-      return sellerFoodRegistrationStatusRevoked(l, number: params['number']! as String, reason: params['reason']! as String);
-    case 'seller.FoodRegistrationState':
-      return hawkr_seller_v1alpha1_seller.FoodRegistrationState.valueOf(_n(value))!.uiText(l);
     case 'seller.KYCField':
       return hawkr_seller_v1alpha1_seller.KYCField.valueOf(_n(value))!.uiText(l);
     case 'seller.KYCFlowStatus':

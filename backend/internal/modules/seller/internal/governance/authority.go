@@ -27,7 +27,7 @@ import (
 // 主管機關來函（step10e-reports-brief R5、設計 step10e-3cb-design §3.2）：登記、完成、延長保存與記下告知。
 //
 // 鎖順序：被指名帳號的店家列（stint.LockAccounts，account_id 升序、帳號內依 store_id）→ 來函列。登記、完成與延長都先鎖被指名帳號的店家列，讓寫入保存條件的一方
-// 和個資清理（RetireDueStores／ExpiredFoodRegistrations 鎖同一組店家列）在同一組列上競爭——這是 §2.4「鎖住之後再判斷一次」的證明所需要的前提。
+// 和個資清理（RetireDueStores 鎖同一組店家列）在同一組列上競爭——這是 §2.4「鎖住之後再判斷一次」的證明所需要的前提。
 // 來函列只由完成、延長與記下告知鎖（FOR UPDATE）；建立措施只讀來函與對象（來函建立後對象不變），不鎖。
 // 登記與完成不檢查店家狀態：已關閉、已清理的店家也可以被指名，逐家的涵蓋狀態照實顯示。
 
@@ -800,4 +800,20 @@ func (s *Service) AuthorityOrders(ctx context.Context, in model.AuthorityOrderLi
 		return nil
 	})
 	return page, err
+}
+
+// civilDay 把 t 的年月日（t 所在時區的日曆日）取成 UTC 午夜的 time.Time；零值仍是零值。client 傳來的日期已經是這個形狀，這裡只是不信任呼叫端。
+func civilDay(t time.Time) time.Time {
+	if t.IsZero() {
+		return t
+	}
+	y, m, d := t.Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

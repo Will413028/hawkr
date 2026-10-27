@@ -98,13 +98,6 @@ func TestStoreActionTextIsTheApprovedCopy(t *testing.T) {
 		{StoreReasonStorePendingDeletion, StoreActionRebindPayUni, "店家等待刪除，不能重新綁定 PayUni。"},
 		{StoreReasonKYCNotApproved, StoreActionRebindPayUni, "賣家正在修改商家認證，重新核准後會自動重新綁定。"},
 		{StoreReasonPayUniBound, StoreActionRebindPayUni, "只有綁定失敗的註冊能重新綁定。"},
-		{StoreReasonFoodRegistrationNotPending, StoreActionApproveFoodRegistration, "這筆食品業者登錄已不在待審。"},
-		{StoreReasonFoodRegistrationNotPending, StoreActionRejectFoodRegistration, "這筆食品業者登錄已不在待審。"},
-		{StoreReasonStoreClosed, StoreActionApproveFoodRegistration, "店家已關閉，不能裁定食品業者登錄。"},
-		{StoreReasonStoreClosed, StoreActionRejectFoodRegistration, "店家已關閉，不能裁定食品業者登錄。"},
-		{StoreReasonStorePendingDeletion, StoreActionApproveFoodRegistration, "店家等待刪除，不能裁定食品業者登錄。"},
-		{StoreReasonStorePendingDeletion, StoreActionRejectFoodRegistration, "店家等待刪除，不能裁定食品業者登錄。"},
-		{StoreReasonKYCNotApproved, StoreActionApproveFoodRegistration, "店家的商家認證還沒核准，不能核准食品業者登錄。"},
 	} {
 		if got := StoreActionUnavailableText(tc.reason, tc.action).Text; got != tc.want {
 			t.Errorf("%s/%s = %q，期望 %q", tc.reason, tc.action, got, tc.want)
@@ -235,33 +228,6 @@ func TestRebindReasonsFirstReasonPerState(t *testing.T) {
 		if got := RebindUnavailableReasons(storeIn(Active, false), reg(BindFailed, false), app); !reasonsEqual(got, StoreReasonKYCNotApproved) {
 			t.Errorf("申請 %s：%v", app, got)
 		}
-	}
-}
-
-// 食品業者登錄：原因的先後與店家、KYC 的條件。
-func TestFoodRegistrationReasons(t *testing.T) {
-	kyc := func(s KYCStatus) *KYCStatus { return &s }
-	for _, tc := range []struct {
-		name    string
-		review  FoodRegistrationReview
-		approve []StoreActionUnavailableReason
-		reject  []StoreActionUnavailableReason
-	}{
-		{"待審、營運中、商家認證已核准", FoodRegistrationReview{State: FoodRegPending, StoreStatus: Active, KYCStatus: kyc(KYCStatusApproved)}, nil, nil},
-		{"商家認證還沒核准：只擋核准", FoodRegistrationReview{State: FoodRegPending, StoreStatus: Active, KYCStatus: kyc(KYCStatusSubmitted)}, []StoreActionUnavailableReason{StoreReasonKYCNotApproved}, nil},
-		{"沒有申請", FoodRegistrationReview{State: FoodRegPending, StoreStatus: Active}, []StoreActionUnavailableReason{StoreReasonKYCNotApproved}, nil},
-		{"已關閉", FoodRegistrationReview{State: FoodRegPending, StoreStatus: Closed, KYCStatus: kyc(KYCStatusApproved)}, []StoreActionUnavailableReason{StoreReasonStoreClosed}, []StoreActionUnavailableReason{StoreReasonStoreClosed}},
-		{"等待刪除", FoodRegistrationReview{State: FoodRegPending, StoreStatus: PendingDeletion, KYCStatus: kyc(KYCStatusApproved)}, []StoreActionUnavailableReason{StoreReasonStorePendingDeletion}, []StoreActionUnavailableReason{StoreReasonStorePendingDeletion}},
-		{"不在待審而且已關閉：結構性在前", FoodRegistrationReview{State: FoodRegApproved, StoreStatus: Closed}, []StoreActionUnavailableReason{StoreReasonFoodRegistrationNotPending, StoreReasonStoreClosed, StoreReasonKYCNotApproved}, []StoreActionUnavailableReason{StoreReasonFoodRegistrationNotPending, StoreReasonStoreClosed}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := tc.review.ApproveUnavailable(); !slices.Equal(got, tc.approve) || tc.review.CanApprove() != (len(tc.approve) == 0) {
-				t.Errorf("approve=%v 期望 %v", got, tc.approve)
-			}
-			if got := tc.review.RejectUnavailable(); !slices.Equal(got, tc.reject) || tc.review.CanReject() != (len(tc.reject) == 0) {
-				t.Errorf("reject=%v 期望 %v", got, tc.reject)
-			}
-		})
 	}
 }
 

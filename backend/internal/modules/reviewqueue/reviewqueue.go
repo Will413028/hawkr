@@ -37,18 +37,16 @@ type (
 	Cursor = model.Cursor
 )
 
-// 待辦的種類：seller 發布的 12 種。
+// 待辦的種類：seller 發布的 10 種。
 const (
 	ReportTriage          = model.ReportTriage
 	CaseDecision          = model.CaseDecision
 	CaseInquiryOverdue    = model.CaseInquiryOverdue
-	CaseFDAReferral       = model.CaseFDAReferral
 	AuthorityOrder        = model.AuthorityOrder
 	AuthorityTargetNotice = model.AuthorityTargetNotice
 	MeasureAppeal         = model.MeasureAppeal
 	MeasureLiftRequest    = model.MeasureLiftRequest
 	MeasureReview         = model.MeasureReview
-	FoodRegistration      = model.FoodRegistration
 	KYCApplication        = model.KYCApplication
 	PayUniBindRetry       = model.PayUniBindRetry
 )

@@ -21,7 +21,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/Will413028/hawkr/backend/internal/platform/seal"
-	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
 
 // terminated 開店、建立 21.3 終止並關店（沒有未結訂單）；回傳帳號、店家與措施。
@@ -1021,86 +1020,5 @@ func TestMeasureEndsAfterItIsCreated(t *testing.T) {
 	_, err := f.db.Conn(context.Background()).Exec(context.Background(), "UPDATE seller.measures SET ends_at = created_at WHERE id = $1", m.ID)
 	if err == nil || !strings.Contains(err.Error(), "measures_ends_check") {
 		t.Fatalf("ends_at = created_at 要被 CHECK 擋下：%v", err)
-	}
-}
-
-// 食品業者登錄隨 stint 退場（StoreRetired 的同一個 transaction），不隨關店：因終止合作而關閉、之後恢復營業的店家，核准的字號與待審的件
-// 在保留期內、清理 job 多次執行後都原封不動，審核紀錄也不會因為「關店 2 年」被刪（那一筆關店紀錄已結束，不是目前的）；
-// 終止撤銷之後店家公開的字號仍在。
-// mutation：RetireDueStores 的保留期拿掉（30 天的舊值）→ 40 天時就被清理，字號消失；DeleteExpiredFoodRegistrations 不看目前關店紀錄
-// 而看店家狀態以外的條件並放寬清理條件 → 見 TestTerminatedStoreFoodReviewsExpireTwoYearsAfterTheClosure。
-func TestTerminatedThenReopenedStoreKeepsItsFoodRegistrations(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	account, s := f.kycApprovedStoreWithAccount(t, idA, bankAcct)
-	_ = account
-	f.approveFood(t, s, "KEEP-1")
-	f.submitFood(t, s, "KEEP-2")
-	want := f.foodStates(t, s)
-	m := f.terminate(t, s.StoreID, GroundCeasedBusiness)
-	f.effect(t, m)
-	if f.storeRow(t, s.StoreID).Status != Closed {
-		t.Fatal("終止之後要關店")
-	}
-	// 關閉 40 天、保留期與申覆期限之前：清理 job 不動店家，也不動它的食品業者登錄。
-	f.now = f.now.Add(40 * 24 * time.Hour)
-	for range 2 {
-		if n, err := f.module.PurgePII(ctx); err != nil || n != 0 {
-			t.Fatalf("n=%d err=%v", n, err)
-		}
-	}
-	if f.purged(t, s.StoreID) || !slices.Equal(f.foodStates(t, s), want) {
-		t.Fatalf("保留期內不清理登錄：%v want %v", f.foodStates(t, s), want)
-	}
-	f.revoke(t, m)
-	if f.storeRow(t, s.StoreID).Status != Active {
-		t.Fatal("撤銷終止之後要恢復營業")
-	}
-	// 恢復營業之後再過 3 年：登錄不退場、不清、審核紀錄不刪。
-	f.now = f.now.Add(3 * 365 * 24 * time.Hour)
-	if n, err := f.module.PurgePII(ctx); err != nil || n != 0 {
-		t.Fatalf("n=%d err=%v", n, err)
-	}
-	cur, err := f.module.Store(ctx, s.StoreID)
-	must(t, err)
-	if cur.ApprovedFoodRegistration == nil || cur.ApprovedFoodRegistration.RegistrationNumber != "KEEP-1" || cur.OpenFoodRegistration == nil || cur.OpenFoodRegistration.RegistrationNumber != "KEEP-2" {
-		t.Fatalf("恢復營業的店家保留核准的字號與待審的件：%+v", cur)
-	}
-	if !slices.Equal(f.foodStates(t, s), want) || f.count(t, "SELECT count(*) FROM seller.food_registrations WHERE store_id=$1 AND pii_purged_at IS NOT NULL", s.StoreID) != 0 {
-		t.Fatalf("登錄原封不動：%v want %v", f.foodStates(t, s), want)
-	}
-}
-
-// 審核紀錄的 2 年從關店紀錄（store_closures）的關店時間起算，不是清理時間：終止關閉的店家在申覆期限之後才被清理，字號當時清掉；
-// 審核紀錄在關店後 2 年（日曆年，台北時區）整列刪除，差一秒不刪。
-// mutation：cutoff 的比較改成清理時間（pii_purged_at）→ 關店後 2 年那一刻刪不掉；改成 >= 的反向 → 差一秒就刪。
-func TestTerminatedStoreFoodReviewsExpireTwoYearsAfterTheClosure(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	_, s := f.kycApprovedStoreWithAccount(t, idA, bankAcct)
-	f.approveFood(t, s, "GONE-1")
-	m := f.terminate(t, s.StoreID, GroundCeasedBusiness)
-	f.effect(t, m)
-	closedAt := f.now
-	f.now = m.StartsAt.Add(4416*time.Hour + time.Microsecond)
-	if n, err := f.module.PurgePII(ctx); err != nil || n != 1 || !f.purged(t, s.StoreID) {
-		t.Fatalf("n=%d err=%v", n, err)
-	}
-	rows := func() int64 {
-		return f.count(t, "SELECT count(*) FROM seller.food_registrations WHERE store_id=$1", s.StoreID)
-	}
-	if rows() != 1 || f.count(t, "SELECT count(*) FROM seller.food_registrations WHERE store_id=$1 AND registration_number IS NULL AND state='ENDED' AND end_cause='STORE_RETIRED'", s.StoreID) != 1 {
-		t.Fatal("清理時核准中的登錄結束成 STORE_RETIRED、字號清掉，審核紀錄還在")
-	}
-	expiry := closedAt.In(twtime.Taipei).AddDate(2, 0, 0)
-	f.now = expiry.Add(-time.Second)
-	if _, err := f.module.PurgePII(ctx); err != nil || rows() != 1 {
-		t.Fatalf("關店後 2 年還沒到不刪：%d err=%v", rows(), err)
-	}
-	f.now = expiry.Add(time.Second)
-	if _, err := f.module.PurgePII(ctx); err != nil || rows() != 0 {
-		t.Fatalf("關店後 2 年要刪：%d err=%v", rows(), err)
 	}
 }

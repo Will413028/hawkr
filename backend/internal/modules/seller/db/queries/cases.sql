@@ -50,7 +50,7 @@ WHERE case_id = $1
 ORDER BY created_at, id;
 
 -- name: BumpCase :exec
--- 案件層級的處理（成員進出、成員有了結果、記錄轉報）：版本加一，updated_at 是上一次處理的時間。
+-- 案件層級的處理（成員進出、成員有了結果）：版本加一，updated_at 是上一次處理的時間。
 UPDATE seller.cases
 SET version = version + 1,
     updated_at = sqlc.arg(now)::timestamptz
@@ -174,64 +174,10 @@ FROM seller.report_case_moves
 WHERE from_case_id = $1 OR to_case_id = $1
 ORDER BY moved_at, id;
 
--- name: InsertCaseReferral :one
--- 記錄轉報（outcome 為 REFERRED）：每個案件一列；已經有時（已轉報或不轉報）不寫入、回 0 列（不讓 transaction 失效）。
-INSERT INTO seller.case_referrals (case_id, category, outcome, channel, reference_no, follow_up_on, follow_up_set_at, recorded_at, recorded_by_admin_id)
-VALUES (sqlc.arg(case_id), sqlc.arg(category), 'REFERRED', sqlc.arg(channel), sqlc.narg(reference_no), sqlc.narg(follow_up_on),
-        CASE WHEN sqlc.narg(follow_up_on)::date IS NULL THEN NULL ELSE sqlc.arg(now)::timestamptz END, sqlc.arg(now), sqlc.arg(admin_id))
-ON CONFLICT DO NOTHING
-RETURNING *;
-
--- name: InsertCaseReferralWaiver :one
--- 標記不轉報（outcome 為 WAIVED）：和轉報同一列，所以互斥；已經有時不寫入、回 0 列。
-INSERT INTO seller.case_referrals (case_id, category, outcome, waiver_reason, recorded_at, recorded_by_admin_id)
-VALUES (sqlc.arg(case_id), sqlc.arg(category), 'WAIVED', sqlc.arg(reason), sqlc.arg(now), sqlc.arg(admin_id))
-ON CONFLICT DO NOTHING
-RETURNING *;
-
--- name: CaseReferrals :many
-SELECT *
-FROM seller.case_referrals
-WHERE case_id = ANY(sqlc.arg(case_ids)::uuid[]);
-
--- name: InsertCaseReferralReply :execrows
--- 記下主管機關的回覆；outcome 取預設值 REFERRED，複合外鍵讓它只能掛在已轉報的列。同一位管理員的同一個 request_id 已經有時不寫入、回 0 列
--- （不讓 transaction 失效，呼叫方接著讀原本那一則比對內容）。
-INSERT INTO seller.case_referral_replies (id, case_id, body, received_on, recorded_by_admin_id, recorded_at, request_id, request_hash)
-VALUES (sqlc.arg(id), sqlc.arg(case_id), sqlc.arg(body), sqlc.arg(received_on), sqlc.arg(admin_id), sqlc.arg(now), sqlc.narg(request_id), sqlc.narg(request_hash))
-ON CONFLICT (recorded_by_admin_id, request_id) DO NOTHING;
-
--- name: CaseReferralReplyByRequest :one
--- 冪等重送的查詢：範圍是 (管理員, request_id)。
-SELECT *
-FROM seller.case_referral_replies
-WHERE recorded_by_admin_id = sqlc.arg(admin_id) AND request_id = sqlc.arg(request_id);
-
--- name: CaseReferralReplies :many
--- 一批案件的主管機關回覆，舊到新（依記下的時間）。
-SELECT *
-FROM seller.case_referral_replies
-WHERE case_id = ANY(sqlc.arg(case_ids)::uuid[])
-ORDER BY recorded_at, id;
-
--- name: SetReferralFollowUp :exec
--- 更新或清掉追蹤日期（只對已轉報的列；不轉報的列 CHECK 要求它是 NULL），同時記下設定的時間（清掉時一起清）：追蹤逾期只看這個時間之後的回覆。
-UPDATE seller.case_referrals
-SET follow_up_on = sqlc.narg(follow_up_on),
-    follow_up_set_at = CASE WHEN sqlc.narg(follow_up_on)::date IS NULL THEN NULL ELSE sqlc.arg(now)::timestamptz END
-WHERE case_id = sqlc.arg(case_id) AND outcome = 'REFERRED';
-
 -- name: ReviewCaseDecisionByIDs :many
 -- 這些案件的「待決定」開始時間與期限（資源的 decide_deadline）。規則只有 seller.review_case_decision(at)（objects.sql）；不是待決定的案件
 -- （已結案、等賣家回覆）沒有列。
 -- 輸出欄位的轉型是給 sqlc 的（它不型別化複合型別函式的輸出欄位，沒有轉型會在生成時報 column does not exist）。
 SELECT r.case_id::uuid AS case_id, r.start_at::timestamptz AS start_at, r.due_at::timestamptz AS due_at
 FROM seller.review_case_decision(sqlc.arg(at)::timestamptz) r
-WHERE r.case_id = ANY(sqlc.arg(ids)::uuid[]);
-
--- name: ReviewCaseFDAReferralByIDs :many
--- 這些案件的「待轉報」開始時間與期限（資源的 fda_referral_deadline）。規則只有 seller.review_case_fda_referral(at)（objects.sql）；不是待轉報的案件沒有列。
--- 輸出欄位的轉型是給 sqlc 的（它不型別化複合型別函式的輸出欄位，沒有轉型會在生成時報 column does not exist）。
-SELECT r.case_id::uuid AS case_id, r.start_at::timestamptz AS start_at, r.due_at::timestamptz AS due_at
-FROM seller.review_case_fda_referral(sqlc.arg(at)::timestamptz) r
 WHERE r.case_id = ANY(sqlc.arg(ids)::uuid[]);

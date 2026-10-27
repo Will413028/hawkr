@@ -15,20 +15,19 @@ type SellerPubExposableStore struct {
 }
 
 type SellerPubReviewItem struct {
-	Kind               string
-	ItemID             string
-	ReportID           *uuid.UUID
-	CaseID             *uuid.UUID
-	InquiryID          *uuid.UUID
-	AuthorityOrderID   *uuid.UUID
-	TargetPosition     *int16
-	AccountID          *int64
-	MeasureID          *uuid.UUID
-	RequestID          *uuid.UUID
-	FoodRegistrationID *uuid.UUID
-	KycApplicationID   *uuid.UUID
-	StoreID            *int64
-	StoreName          *string
-	StartAt            time.Time
-	DueAt              time.Time
+	Kind             string
+	ItemID           string
+	ReportID         *uuid.UUID
+	CaseID           *uuid.UUID
+	InquiryID        *uuid.UUID
+	AuthorityOrderID *uuid.UUID
+	TargetPosition   *int16
+	AccountID        *int64
+	MeasureID        *uuid.UUID
+	RequestID        *uuid.UUID
+	KycApplicationID *uuid.UUID
+	StoreID          *int64
+	StoreName        *string
+	StartAt          time.Time
+	DueAt            time.Time
 }

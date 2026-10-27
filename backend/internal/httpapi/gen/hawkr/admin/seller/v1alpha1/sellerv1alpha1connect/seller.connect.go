@@ -2,7 +2,7 @@
 //
 // Source: hawkr/admin/seller/v1alpha1/seller.proto
 
-// seller 模組給後台的 API：店家的清單與統計、身分認證（KYC）的審核、食品業者登錄的審核與 PayUni 子商店。停權是措施
+// seller 模組給後台的 API：店家的清單與統計、身分認證（KYC）的審核與 PayUni 子商店。停權是措施
 // （警告與停權），建立、結束與撤銷在 hawkr.admin.seller.v1alpha1 的 SellerGovernanceAdminService。
 // 前台的 API 在 hawkr.seller.v1alpha1。
 // 後台刪整個帳號在 hawkr.admin.identity.v1alpha1 的 DeleteAccount。
@@ -87,18 +87,6 @@ const (
 	// SellerAdminServiceRequeryKYCRegistrationProcedure is the fully-qualified name of the
 	// SellerAdminService's RequeryKYCRegistration RPC.
 	SellerAdminServiceRequeryKYCRegistrationProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/RequeryKYCRegistration"
-	// SellerAdminServiceListFoodRegistrationsProcedure is the fully-qualified name of the
-	// SellerAdminService's ListFoodRegistrations RPC.
-	SellerAdminServiceListFoodRegistrationsProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/ListFoodRegistrations"
-	// SellerAdminServiceGetFoodRegistrationProcedure is the fully-qualified name of the
-	// SellerAdminService's GetFoodRegistration RPC.
-	SellerAdminServiceGetFoodRegistrationProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/GetFoodRegistration"
-	// SellerAdminServiceDecideFoodRegistrationProcedure is the fully-qualified name of the
-	// SellerAdminService's DecideFoodRegistration RPC.
-	SellerAdminServiceDecideFoodRegistrationProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/DecideFoodRegistration"
-	// SellerAdminServiceRevokeFoodRegistrationProcedure is the fully-qualified name of the
-	// SellerAdminService's RevokeFoodRegistration RPC.
-	SellerAdminServiceRevokeFoodRegistrationProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/RevokeFoodRegistration"
 )
 
 // SellerAdminServiceClient is a client for the hawkr.admin.seller.v1alpha1.SellerAdminService
@@ -157,27 +145,6 @@ type SellerAdminServiceClient interface {
 	// 先收掉再新增一筆，所以重送沒有「已有查詢中就什麼都不做」的情形。申請不能重新查詢（不在審核中、不是公司型、店家已關閉或等待刪除）
 	// 時回 failed_precondition，訊息是 KYCApplication.requery_registration_unavailabilities 的第一句；申請不存在或是賣家的草稿回 not_found。
 	RequeryKYCRegistration(context.Context, *connect.Request[v1alpha1.RequeryKYCRegistrationRequest]) (*connect.Response[v1alpha1.RequeryKYCRegistrationResponse], error)
-	// ListFoodRegistrations 是食品業者登錄的審核收件匣。沒有指定 state（UNSPECIFIED）或 PENDING：營運中的店家的待審件；已關閉或等待刪除的店家的待審件不列。
-	// 收件匣再依 inbox 分兩個隊列：預設（UNSPECIFIED 或 DECIDABLE）只列現在可以裁定的件，也就是店家的 KYC 已核准的，依裁定期限
-	// （decide_deadline.due_time）由近到遠，期限相同時依 id；AWAITING_KYC 列還在等 KYC 核准的，依送出時間舊到新（還不能裁定，沒有期限）。
-	// 指定其他 state 是歷史：新到舊，店家的狀態不限，不可以同時指定 inbox（回 invalid_argument）。page_token 帶最後一筆的排序值與 id
-	// （DECIDABLE 是期限，其他是送出時間）；inbox 是篩選，不是排序鍵：翻頁途中店家的 KYC 核准了，件離開 AWAITING_KYC、進入 DECIDABLE，
-	// 位置依 DECIDABLE 的排序鍵，在已翻過的游標之前的，這一輪不會再翻到，重新載入即可。商家認證被退回又核准時，期限的開始時間會換，
-	// 該筆的位置在翻頁途中可能移動（重複或漏看一筆），重新載入即可。換 state、inbox 或 query 要重新從第一頁開始。
-	// 哪些件現在可以核准看每筆的 can_approve。query 是字號或店名的子字串。
-	ListFoodRegistrations(context.Context, *connect.Request[v1alpha1.ListFoodRegistrationsRequest]) (*connect.Response[v1alpha1.ListFoodRegistrationsResponse], error)
-	// GetFoodRegistration 讀一筆登錄：送出的字號、店家目前核准的字號、店家 KYC 的狀態，以及已核准的 KYC 主體（核對食藥署資料時
-	// 要比對的對象；賣家還沒送出或還在審的 KYC 內容不會出現在這裡）。
-	GetFoodRegistration(context.Context, *connect.Request[v1alpha1.GetFoodRegistrationRequest]) (*connect.Response[v1alpha1.GetFoodRegistrationResponse], error)
-	// DecideFoodRegistration 核准或退回待審的登錄。核准：店家的 KYC 要是 APPROVED（核對的是已驗證過的主體），否則回 failed_precondition；
-	// 新的字號成為店家公開的字號，目前核准的那一筆同時結束。退回：reason 必填，賣家看得到；店家公開的字號不變。internal_note 選填，
-	// 只給後台看（例如個人賣家「僅核對有效」）。不能裁定（已不是待審：被撤回、被取代、已裁定；店家已關閉或等待刪除；核准時店家的 KYC 還沒核准）
-	// 時回 failed_precondition，訊息是 FoodRegistration.approve_unavailabilities 或 reject_unavailabilities 的第一句。
-	DecideFoodRegistration(context.Context, *connect.Request[v1alpha1.DecideFoodRegistrationRequest]) (*connect.Response[v1alpha1.DecideFoodRegistrationResponse], error)
-	// RevokeFoodRegistration 撤銷已核准的登錄（資源層級：更正單一資訊，不是對賣家的措施）：reason 必填，賣家看得到；撤銷不帶內部註記，核准時寫的註記留著
-	// （冒用或不實登錄的細節記在違規認定與措施上）。撤銷後店面與商品頁立即不再顯示這個字號，賣家重新送審即可，不另設申覆；店家若有同一字號
-	// 的待審件不會自動退回，由管理員另外裁定。登錄不是核准中的（待審、已退回、已結束）回 failed_precondition。
-	RevokeFoodRegistration(context.Context, *connect.Request[v1alpha1.RevokeFoodRegistrationRequest]) (*connect.Response[v1alpha1.RevokeFoodRegistrationResponse], error)
 }
 
 // NewSellerAdminServiceClient constructs a client for the
@@ -291,32 +258,6 @@ func NewSellerAdminServiceClient(httpClient connect.HTTPClient, baseURL string, 
 			connect.WithSchema(sellerAdminServiceMethods.ByName("RequeryKYCRegistration")),
 			connect.WithClientOptions(opts...),
 		),
-		listFoodRegistrations: connect.NewClient[v1alpha1.ListFoodRegistrationsRequest, v1alpha1.ListFoodRegistrationsResponse](
-			httpClient,
-			baseURL+SellerAdminServiceListFoodRegistrationsProcedure,
-			connect.WithSchema(sellerAdminServiceMethods.ByName("ListFoodRegistrations")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		getFoodRegistration: connect.NewClient[v1alpha1.GetFoodRegistrationRequest, v1alpha1.GetFoodRegistrationResponse](
-			httpClient,
-			baseURL+SellerAdminServiceGetFoodRegistrationProcedure,
-			connect.WithSchema(sellerAdminServiceMethods.ByName("GetFoodRegistration")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		decideFoodRegistration: connect.NewClient[v1alpha1.DecideFoodRegistrationRequest, v1alpha1.DecideFoodRegistrationResponse](
-			httpClient,
-			baseURL+SellerAdminServiceDecideFoodRegistrationProcedure,
-			connect.WithSchema(sellerAdminServiceMethods.ByName("DecideFoodRegistration")),
-			connect.WithClientOptions(opts...),
-		),
-		revokeFoodRegistration: connect.NewClient[v1alpha1.RevokeFoodRegistrationRequest, v1alpha1.RevokeFoodRegistrationResponse](
-			httpClient,
-			baseURL+SellerAdminServiceRevokeFoodRegistrationProcedure,
-			connect.WithSchema(sellerAdminServiceMethods.ByName("RevokeFoodRegistration")),
-			connect.WithClientOptions(opts...),
-		),
 	}
 }
 
@@ -337,10 +278,6 @@ type sellerAdminServiceClient struct {
 	listPayUniObservations  *connect.Client[v1alpha1.ListPayUniObservationsRequest, v1alpha1.ListPayUniObservationsResponse]
 	refreshPayUniStatus     *connect.Client[v1alpha1.RefreshPayUniStatusRequest, v1alpha1.RefreshPayUniStatusResponse]
 	requeryKYCRegistration  *connect.Client[v1alpha1.RequeryKYCRegistrationRequest, v1alpha1.RequeryKYCRegistrationResponse]
-	listFoodRegistrations   *connect.Client[v1alpha1.ListFoodRegistrationsRequest, v1alpha1.ListFoodRegistrationsResponse]
-	getFoodRegistration     *connect.Client[v1alpha1.GetFoodRegistrationRequest, v1alpha1.GetFoodRegistrationResponse]
-	decideFoodRegistration  *connect.Client[v1alpha1.DecideFoodRegistrationRequest, v1alpha1.DecideFoodRegistrationResponse]
-	revokeFoodRegistration  *connect.Client[v1alpha1.RevokeFoodRegistrationRequest, v1alpha1.RevokeFoodRegistrationResponse]
 }
 
 // ListStores calls hawkr.admin.seller.v1alpha1.SellerAdminService.ListStores.
@@ -421,28 +358,6 @@ func (c *sellerAdminServiceClient) RequeryKYCRegistration(ctx context.Context, r
 	return c.requeryKYCRegistration.CallUnary(ctx, req)
 }
 
-// ListFoodRegistrations calls hawkr.admin.seller.v1alpha1.SellerAdminService.ListFoodRegistrations.
-func (c *sellerAdminServiceClient) ListFoodRegistrations(ctx context.Context, req *connect.Request[v1alpha1.ListFoodRegistrationsRequest]) (*connect.Response[v1alpha1.ListFoodRegistrationsResponse], error) {
-	return c.listFoodRegistrations.CallUnary(ctx, req)
-}
-
-// GetFoodRegistration calls hawkr.admin.seller.v1alpha1.SellerAdminService.GetFoodRegistration.
-func (c *sellerAdminServiceClient) GetFoodRegistration(ctx context.Context, req *connect.Request[v1alpha1.GetFoodRegistrationRequest]) (*connect.Response[v1alpha1.GetFoodRegistrationResponse], error) {
-	return c.getFoodRegistration.CallUnary(ctx, req)
-}
-
-// DecideFoodRegistration calls
-// hawkr.admin.seller.v1alpha1.SellerAdminService.DecideFoodRegistration.
-func (c *sellerAdminServiceClient) DecideFoodRegistration(ctx context.Context, req *connect.Request[v1alpha1.DecideFoodRegistrationRequest]) (*connect.Response[v1alpha1.DecideFoodRegistrationResponse], error) {
-	return c.decideFoodRegistration.CallUnary(ctx, req)
-}
-
-// RevokeFoodRegistration calls
-// hawkr.admin.seller.v1alpha1.SellerAdminService.RevokeFoodRegistration.
-func (c *sellerAdminServiceClient) RevokeFoodRegistration(ctx context.Context, req *connect.Request[v1alpha1.RevokeFoodRegistrationRequest]) (*connect.Response[v1alpha1.RevokeFoodRegistrationResponse], error) {
-	return c.revokeFoodRegistration.CallUnary(ctx, req)
-}
-
 // SellerAdminServiceHandler is an implementation of the
 // hawkr.admin.seller.v1alpha1.SellerAdminService service.
 type SellerAdminServiceHandler interface {
@@ -499,27 +414,6 @@ type SellerAdminServiceHandler interface {
 	// 先收掉再新增一筆，所以重送沒有「已有查詢中就什麼都不做」的情形。申請不能重新查詢（不在審核中、不是公司型、店家已關閉或等待刪除）
 	// 時回 failed_precondition，訊息是 KYCApplication.requery_registration_unavailabilities 的第一句；申請不存在或是賣家的草稿回 not_found。
 	RequeryKYCRegistration(context.Context, *connect.Request[v1alpha1.RequeryKYCRegistrationRequest]) (*connect.Response[v1alpha1.RequeryKYCRegistrationResponse], error)
-	// ListFoodRegistrations 是食品業者登錄的審核收件匣。沒有指定 state（UNSPECIFIED）或 PENDING：營運中的店家的待審件；已關閉或等待刪除的店家的待審件不列。
-	// 收件匣再依 inbox 分兩個隊列：預設（UNSPECIFIED 或 DECIDABLE）只列現在可以裁定的件，也就是店家的 KYC 已核准的，依裁定期限
-	// （decide_deadline.due_time）由近到遠，期限相同時依 id；AWAITING_KYC 列還在等 KYC 核准的，依送出時間舊到新（還不能裁定，沒有期限）。
-	// 指定其他 state 是歷史：新到舊，店家的狀態不限，不可以同時指定 inbox（回 invalid_argument）。page_token 帶最後一筆的排序值與 id
-	// （DECIDABLE 是期限，其他是送出時間）；inbox 是篩選，不是排序鍵：翻頁途中店家的 KYC 核准了，件離開 AWAITING_KYC、進入 DECIDABLE，
-	// 位置依 DECIDABLE 的排序鍵，在已翻過的游標之前的，這一輪不會再翻到，重新載入即可。商家認證被退回又核准時，期限的開始時間會換，
-	// 該筆的位置在翻頁途中可能移動（重複或漏看一筆），重新載入即可。換 state、inbox 或 query 要重新從第一頁開始。
-	// 哪些件現在可以核准看每筆的 can_approve。query 是字號或店名的子字串。
-	ListFoodRegistrations(context.Context, *connect.Request[v1alpha1.ListFoodRegistrationsRequest]) (*connect.Response[v1alpha1.ListFoodRegistrationsResponse], error)
-	// GetFoodRegistration 讀一筆登錄：送出的字號、店家目前核准的字號、店家 KYC 的狀態，以及已核准的 KYC 主體（核對食藥署資料時
-	// 要比對的對象；賣家還沒送出或還在審的 KYC 內容不會出現在這裡）。
-	GetFoodRegistration(context.Context, *connect.Request[v1alpha1.GetFoodRegistrationRequest]) (*connect.Response[v1alpha1.GetFoodRegistrationResponse], error)
-	// DecideFoodRegistration 核准或退回待審的登錄。核准：店家的 KYC 要是 APPROVED（核對的是已驗證過的主體），否則回 failed_precondition；
-	// 新的字號成為店家公開的字號，目前核准的那一筆同時結束。退回：reason 必填，賣家看得到；店家公開的字號不變。internal_note 選填，
-	// 只給後台看（例如個人賣家「僅核對有效」）。不能裁定（已不是待審：被撤回、被取代、已裁定；店家已關閉或等待刪除；核准時店家的 KYC 還沒核准）
-	// 時回 failed_precondition，訊息是 FoodRegistration.approve_unavailabilities 或 reject_unavailabilities 的第一句。
-	DecideFoodRegistration(context.Context, *connect.Request[v1alpha1.DecideFoodRegistrationRequest]) (*connect.Response[v1alpha1.DecideFoodRegistrationResponse], error)
-	// RevokeFoodRegistration 撤銷已核准的登錄（資源層級：更正單一資訊，不是對賣家的措施）：reason 必填，賣家看得到；撤銷不帶內部註記，核准時寫的註記留著
-	// （冒用或不實登錄的細節記在違規認定與措施上）。撤銷後店面與商品頁立即不再顯示這個字號，賣家重新送審即可，不另設申覆；店家若有同一字號
-	// 的待審件不會自動退回，由管理員另外裁定。登錄不是核准中的（待審、已退回、已結束）回 failed_precondition。
-	RevokeFoodRegistration(context.Context, *connect.Request[v1alpha1.RevokeFoodRegistrationRequest]) (*connect.Response[v1alpha1.RevokeFoodRegistrationResponse], error)
 }
 
 // NewSellerAdminServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -628,32 +522,6 @@ func NewSellerAdminServiceHandler(svc SellerAdminServiceHandler, opts ...connect
 		connect.WithSchema(sellerAdminServiceMethods.ByName("RequeryKYCRegistration")),
 		connect.WithHandlerOptions(opts...),
 	)
-	sellerAdminServiceListFoodRegistrationsHandler := connect.NewUnaryHandler(
-		SellerAdminServiceListFoodRegistrationsProcedure,
-		svc.ListFoodRegistrations,
-		connect.WithSchema(sellerAdminServiceMethods.ByName("ListFoodRegistrations")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	sellerAdminServiceGetFoodRegistrationHandler := connect.NewUnaryHandler(
-		SellerAdminServiceGetFoodRegistrationProcedure,
-		svc.GetFoodRegistration,
-		connect.WithSchema(sellerAdminServiceMethods.ByName("GetFoodRegistration")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	sellerAdminServiceDecideFoodRegistrationHandler := connect.NewUnaryHandler(
-		SellerAdminServiceDecideFoodRegistrationProcedure,
-		svc.DecideFoodRegistration,
-		connect.WithSchema(sellerAdminServiceMethods.ByName("DecideFoodRegistration")),
-		connect.WithHandlerOptions(opts...),
-	)
-	sellerAdminServiceRevokeFoodRegistrationHandler := connect.NewUnaryHandler(
-		SellerAdminServiceRevokeFoodRegistrationProcedure,
-		svc.RevokeFoodRegistration,
-		connect.WithSchema(sellerAdminServiceMethods.ByName("RevokeFoodRegistration")),
-		connect.WithHandlerOptions(opts...),
-	)
 	return "/hawkr.admin.seller.v1alpha1.SellerAdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SellerAdminServiceListStoresProcedure:
@@ -686,14 +554,6 @@ func NewSellerAdminServiceHandler(svc SellerAdminServiceHandler, opts ...connect
 			sellerAdminServiceRefreshPayUniStatusHandler.ServeHTTP(w, r)
 		case SellerAdminServiceRequeryKYCRegistrationProcedure:
 			sellerAdminServiceRequeryKYCRegistrationHandler.ServeHTTP(w, r)
-		case SellerAdminServiceListFoodRegistrationsProcedure:
-			sellerAdminServiceListFoodRegistrationsHandler.ServeHTTP(w, r)
-		case SellerAdminServiceGetFoodRegistrationProcedure:
-			sellerAdminServiceGetFoodRegistrationHandler.ServeHTTP(w, r)
-		case SellerAdminServiceDecideFoodRegistrationProcedure:
-			sellerAdminServiceDecideFoodRegistrationHandler.ServeHTTP(w, r)
-		case SellerAdminServiceRevokeFoodRegistrationProcedure:
-			sellerAdminServiceRevokeFoodRegistrationHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -761,20 +621,4 @@ func (UnimplementedSellerAdminServiceHandler) RefreshPayUniStatus(context.Contex
 
 func (UnimplementedSellerAdminServiceHandler) RequeryKYCRegistration(context.Context, *connect.Request[v1alpha1.RequeryKYCRegistrationRequest]) (*connect.Response[v1alpha1.RequeryKYCRegistrationResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.RequeryKYCRegistration is not implemented"))
-}
-
-func (UnimplementedSellerAdminServiceHandler) ListFoodRegistrations(context.Context, *connect.Request[v1alpha1.ListFoodRegistrationsRequest]) (*connect.Response[v1alpha1.ListFoodRegistrationsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.ListFoodRegistrations is not implemented"))
-}
-
-func (UnimplementedSellerAdminServiceHandler) GetFoodRegistration(context.Context, *connect.Request[v1alpha1.GetFoodRegistrationRequest]) (*connect.Response[v1alpha1.GetFoodRegistrationResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.GetFoodRegistration is not implemented"))
-}
-
-func (UnimplementedSellerAdminServiceHandler) DecideFoodRegistration(context.Context, *connect.Request[v1alpha1.DecideFoodRegistrationRequest]) (*connect.Response[v1alpha1.DecideFoodRegistrationResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.DecideFoodRegistration is not implemented"))
-}
-
-func (UnimplementedSellerAdminServiceHandler) RevokeFoodRegistration(context.Context, *connect.Request[v1alpha1.RevokeFoodRegistrationRequest]) (*connect.Response[v1alpha1.RevokeFoodRegistrationResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.RevokeFoodRegistration is not implemented"))
 }

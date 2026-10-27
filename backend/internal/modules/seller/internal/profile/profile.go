@@ -133,11 +133,7 @@ func (s *Service) PublicStoreByCode(ctx context.Context, storeCode int64) (model
 	if len(announced) == 1 {
 		announcedAt = announced[0].ExposableChangedAt
 	}
-	foodChanged, err := foodChangedAt(ctx, q, []int64{row.StoreID})
-	if err != nil {
-		return model.PublicStore{}, err
-	}
-	return publicStore(exposed[0], row.UpdatedAt, row.FirstExposedAt, announcedAt, foodChanged[row.StoreID]), nil
+	return publicStore(exposed[0], row.UpdatedAt, row.FirstExposedAt, announcedAt), nil
 }
 
 // ListPublicStores 依 store_id 由小到大列出最後公告為可曝光的店家（store_exposures，keyset），取 PageSize+1 家候選判斷有沒有下一頁，
@@ -175,42 +171,17 @@ func (s *Service) ListPublicStores(ctx context.Context, in model.ListPublicStore
 	if err != nil {
 		return model.PublicStorePage{}, err
 	}
-	foodChanged, err := foodChangedAt(ctx, q, storeIDsOf(rows))
-	if err != nil {
-		return model.PublicStorePage{}, err
-	}
 	for i, v := range verdicts {
 		if v.exposable {
 			c := candidates[i]
-			page.Items = append(page.Items, publicStore(v.exposedStore, c.SellerStore.UpdatedAt, c.SellerStore.FirstExposedAt, c.ExposureChangedAt, foodChanged[c.SellerStore.StoreID]))
+			page.Items = append(page.Items, publicStore(v.exposedStore, c.SellerStore.UpdatedAt, c.SellerStore.FirstExposedAt, c.ExposureChangedAt))
 		}
-	}
-	food := make([]*model.Store, len(page.Items))
-	for i := range page.Items {
-		food[i] = &page.Items[i].Store
-	}
-	if err := stint.AttachFood(ctx, q, food...); err != nil {
-		return model.PublicStorePage{}, err
 	}
 	return page, nil
 }
 
-func publicStore(e exposedStore, updatedAt time.Time, firstExposedAt, announcedAt, foodChangedAt *time.Time) model.PublicStore {
-	return model.PublicStore{Store: e.store, UpdateTime: model.PublicStoreUpdateTime(updatedAt, firstExposedAt, announcedAt, foodChangedAt)}
-}
-
-// foodChangedAt 是這些店家的公開字號最後一次改變（核准、清除或撤銷）的時間；沒有改變過的店家不在結果裡。
-func foodChangedAt(ctx context.Context, q *store.Queries, storeIDs []int64) (map[int64]*time.Time, error) {
-	rows, err := q.StoreFoodChangedAt(ctx, storeIDs)
-	if err != nil {
-		return nil, err
-	}
-	out := make(map[int64]*time.Time, len(rows))
-	for _, r := range rows {
-		changed := r.FoodChangedAt
-		out[r.StoreID] = &changed
-	}
-	return out, nil
+func publicStore(e exposedStore, updatedAt time.Time, firstExposedAt, announcedAt *time.Time) model.PublicStore {
+	return model.PublicStore{Store: e.store, UpdateTime: model.PublicStoreUpdateTime(updatedAt, firstExposedAt, announcedAt)}
 }
 
 func storeIDsOf(rows []store.SellerStore) []int64 {
@@ -299,13 +270,6 @@ func (s *Service) exposedRows(ctx context.Context, q *store.Queries, rows []stor
 		if c.exposable {
 			out = append(out, c.exposedStore)
 		}
-	}
-	food := make([]*model.Store, len(out))
-	for i := range out {
-		food[i] = &out[i].store
-	}
-	if err := stint.AttachFood(ctx, q, food...); err != nil {
-		return nil, err
 	}
 	return out, nil
 }
@@ -692,11 +656,7 @@ func (s *Service) BatchStores(ctx context.Context, storeIDs []int64) ([]model.St
 	if err != nil {
 		return nil, err
 	}
-	food := make([]*model.Store, len(stores))
-	for i := range stores {
-		food[i] = &stores[i]
-	}
-	return stores, stint.AttachFood(ctx, q, food...)
+	return stores, nil
 }
 
 // loadMany 把列轉成公開型別並帶上推導的停權狀態（一次 stint.EffectiveMany）、能力與曝光的條件（一次 stint.WithConditions）與關店紀錄。

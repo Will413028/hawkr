@@ -63,8 +63,8 @@ func (s *Service) List(ctx context.Context, now time.Time, kinds []model.Kind, a
 			Kind: kind, ItemID: r.ItemID,
 			ReportID: r.ReportID, CaseID: r.CaseID, InquiryID: r.InquiryID, AuthorityOrderID: r.AuthorityOrderID,
 			TargetPosition: r.TargetPosition, AccountID: r.AccountID, MeasureID: r.MeasureID, RequestID: r.RequestID,
-			FoodRegistrationID: r.FoodRegistrationID, KYCApplicationID: r.KycApplicationID,
-			StoreID: r.StoreID, Start: r.StartAt, Due: r.DueAt,
+			KYCApplicationID: r.KycApplicationID,
+			StoreID:          r.StoreID, Start: r.StartAt, Due: r.DueAt,
 		}
 		if r.StoreName != nil {
 			item.StoreName = *r.StoreName

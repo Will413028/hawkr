@@ -92,7 +92,6 @@ func publicStore() model.PublicStore {
 			AddressDetail: text("測試路一號"), Prize: text("優良農民"), WebsiteURL: text("https://farm.example.invalid"),
 		},
 		StoreID: 11, StoreCode: 2600000001, AccountID: 7, Version: 3, Status: model.Active, LogoKey: &logo,
-		ApprovedFoodRegistration: &model.FoodRegistration{RegistrationNumber: "A-123"},
 	}, UpdateTime: publicUpdateTime}
 }
 
@@ -129,11 +128,11 @@ func TestGetStoreReadsByStoreCodeAndExposesOnlyThePublicFields(t *testing.T) {
 		s.GetLogo().GetUriTemplate() != "https://media.example.test/i/{preset}/stores/logo" || s.GetCoverImage() != nil {
 		t.Fatalf("store=%v", s)
 	}
-	if s.GetFoodBusinessRegistrationNumber() != "A-123" || !s.GetUpdateTime().AsTime().Equal(publicUpdateTime) {
-		t.Fatalf("registration=%q update_time=%v", s.GetFoodBusinessRegistrationNumber(), s.GetUpdateTime())
+	if !s.GetUpdateTime().AsTime().Equal(publicUpdateTime) {
+		t.Fatalf("update_time=%v", s.GetUpdateTime())
 	}
 	fields := s.ProtoReflect().Descriptor().Fields()
-	for _, private := range []string{"contact_phone", "address_detail", "food_business_reg_no", "is_processed_food", "processed", "etag", "account_id"} {
+	for _, private := range []string{"contact_phone", "address_detail", "food_business_reg_no", "food_business_registration_number", "is_processed_food", "processed", "etag", "account_id"} {
 		if fields.ByName(protoName(private)) != nil {
 			t.Errorf("PublicStore 不該有 %s", private)
 		}
@@ -364,7 +363,6 @@ func TestGetSellerAgreementsReturnsTheCurrentVersionsInProtoOrder(t *testing.T) 
 		pb.AgreementKind_AGREEMENT_KIND_SELLER_TERMS,
 		pb.AgreementKind_AGREEMENT_KIND_KYC_PRIVACY_NOTICE,
 		pb.AgreementKind_AGREEMENT_KIND_PAYUNI_TERMS,
-		pb.AgreementKind_AGREEMENT_KIND_FOOD_REGISTRATION_NOTICE,
 	}
 	if len(got) != len(wantKinds) {
 		t.Fatalf("agreements=%v", got)
@@ -395,7 +393,6 @@ func TestGetSellerAgreementsReturnsTheCurrentVersionsInProtoOrder(t *testing.T) 
 func TestListStoresMapsThePublicFieldsAndPassesPagingToTheModule(t *testing.T) {
 	second := publicStore()
 	second.StoreID, second.StoreCode = 12, 2600000002
-	second.ApprovedFoodRegistration = nil
 	m := &fakePublic{list: model.PublicStorePage{Items: []model.PublicStore{publicStore(), second}, Next: &model.PublicStoreCursor{StoreID: 12}}}
 	h := newPublic(t, m, fakeFollowerCounts{}, fakeRatings{})
 	resp, err := h.ListStores(context.Background(), connect.NewRequest(&pb.ListStoresRequest{PageSize: 2}))
@@ -406,8 +403,8 @@ func TestListStoresMapsThePublicFieldsAndPassesPagingToTheModule(t *testing.T) {
 		t.Fatalf("模組收到 %+v", m.listIn)
 	}
 	got := resp.Msg.GetStores()
-	if len(got) != 2 || got[0].GetId() != "11" || got[1].GetId() != "12" || got[0].GetFoodBusinessRegistrationNumber() != "A-123" ||
-		got[1].GetFoodBusinessRegistrationNumber() != "" || !got[0].GetUpdateTime().AsTime().Equal(publicUpdateTime) {
+	if len(got) != 2 || got[0].GetId() != "11" || got[1].GetId() != "12" ||
+		!got[0].GetUpdateTime().AsTime().Equal(publicUpdateTime) {
 		t.Fatalf("stores=%v", got)
 	}
 	if resp.Msg.GetNextPageToken() == "" {

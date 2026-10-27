@@ -16,8 +16,4 @@ var CurrentAgreements = map[AgreementKind]Agreement{
 		Version: "2026-10-07",
 		URL:     "https://www.payuni.com.tw/terms",
 	},
-	"FOOD_REGISTRATION_NOTICE": {
-		Version: "2026-10-25",
-		URL:     "/privacy#seller-food-registration-notice",
-	},
 }

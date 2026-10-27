@@ -48,18 +48,6 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return m.Text, ok
 	case "common.unknown":
 		return t.CommonUnknown(), true
-	case "seller.FoodRegistration.kyc_pending_note":
-		return t.SellerFoodRegistrationKycPendingNote(), true
-	case "seller.FoodRegistration.status_approved":
-		return t.SellerFoodRegistrationStatusApproved(goldenString(c, "number")), true
-	case "seller.FoodRegistration.status_pending":
-		return t.SellerFoodRegistrationStatusPending(goldenString(c, "number"), goldenString(c, "date")), true
-	case "seller.FoodRegistration.status_rejected":
-		return t.SellerFoodRegistrationStatusRejected(goldenString(c, "reason")), true
-	case "seller.FoodRegistration.status_revoked":
-		return t.SellerFoodRegistrationStatusRevoked(goldenString(c, "number"), goldenString(c, "reason")), true
-	case "seller.FoodRegistrationState":
-		return t.SellerFoodRegistrationState(goldenEnum(c.Value, "FOOD_REGISTRATION_STATE_"))
 	case "seller.KYCField":
 		return t.SellerKYCField(goldenEnum(c.Value, "KYC_FIELD_"))
 	case "seller.KYCFlowStatus":

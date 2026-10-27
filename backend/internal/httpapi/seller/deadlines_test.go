@@ -42,18 +42,12 @@ func TestEveryDeadlineFieldIsEmittedOnlyWhileTheObligationExists(t *testing.T) {
 	report.TriageDeadline = nil
 	wantWire(t, "Report.triage_deadline（分案後）", toReport(report).GetTriageDeadline(), nil)
 
-	// 案件：決定期限與轉報期限是兩個欄位。
+	// 案件：決定期限。
 	c := caseFixture(model.CaseFacts{})
-	c.DecideDeadline, c.FDAReferralDeadline = dl(2*time.Minute, 72*time.Hour), dl(3*time.Minute, 24*time.Hour)
-	got := toCase(c)
-	wantWire(t, "Case.decide_deadline", got.GetDecideDeadline(), c.DecideDeadline)
-	wantWire(t, "Case.fda_referral_deadline", got.GetFdaReferralDeadline(), c.FDAReferralDeadline)
+	c.DecideDeadline = dl(2*time.Minute, 72*time.Hour)
+	wantWire(t, "Case.decide_deadline", toCase(c).GetDecideDeadline(), c.DecideDeadline)
 	c.DecideDeadline = nil
-	got = toCase(c)
-	wantWire(t, "Case.decide_deadline（結案後）", got.GetDecideDeadline(), nil)
-	wantWire(t, "Case.fda_referral_deadline（還在）", got.GetFdaReferralDeadline(), c.FDAReferralDeadline)
-	c.FDAReferralDeadline = nil
-	wantWire(t, "Case.fda_referral_deadline（記錄轉報後）", toCase(c).GetFdaReferralDeadline(), nil)
+	wantWire(t, "Case.decide_deadline（結案後）", toCase(c).GetDecideDeadline(), nil)
 
 	// 措施的複審期限與請求的裁定期限。
 	m := riskMeasureFixture()
@@ -65,10 +59,4 @@ func TestEveryDeadlineFieldIsEmittedOnlyWhileTheObligationExists(t *testing.T) {
 	wantWire(t, "MeasureRequest.decide_deadline", toAdminRequest(request).GetDecideDeadline(), request.DecideDeadline)
 	request.DecideDeadline = nil
 	wantWire(t, "MeasureRequest.decide_deadline（裁定後）", toAdminRequest(request).GetDecideDeadline(), nil)
-
-	// 食品業者登錄與商家認證。
-	food := model.FoodRegistrationReview{ID: uuid.NewV7(), StoreID: 12, State: model.FoodRegPending, SubmittedAt: start, DecideDeadline: dl(5*time.Minute, 7*24*time.Hour)}
-	wantWire(t, "FoodRegistration.decide_deadline", toAdminFoodRegistration(food).GetDecideDeadline(), food.DecideDeadline)
-	food.DecideDeadline = nil
-	wantWire(t, "FoodRegistration.decide_deadline（等商家認證或已裁定）", toAdminFoodRegistration(food).GetDecideDeadline(), nil)
 }

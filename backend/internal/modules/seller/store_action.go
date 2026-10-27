@@ -5,19 +5,17 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// StoreAction 是 admin 對店家（或它的帳號、商家認證申請、PayUni 註冊、食品業者登錄）做的、有前置條件的動作。
+// StoreAction 是 admin 對店家（或它的帳號、商家認證申請、PayUni 註冊）做的、有前置條件的動作。
 type StoreAction = model.StoreAction
 
 // 店家動作。
 const (
-	StoreActionCreateMeasure           = model.StoreActionCreateMeasure
-	StoreActionDelegate                = model.StoreActionDelegate
-	StoreActionApproveKYC              = model.StoreActionApproveKYC
-	StoreActionRejectKYC               = model.StoreActionRejectKYC
-	StoreActionRequeryKYC              = model.StoreActionRequeryKYC
-	StoreActionRebindPayUni            = model.StoreActionRebindPayUni
-	StoreActionApproveFoodRegistration = model.StoreActionApproveFoodRegistration
-	StoreActionRejectFoodRegistration  = model.StoreActionRejectFoodRegistration
+	StoreActionCreateMeasure = model.StoreActionCreateMeasure
+	StoreActionDelegate      = model.StoreActionDelegate
+	StoreActionApproveKYC    = model.StoreActionApproveKYC
+	StoreActionRejectKYC     = model.StoreActionRejectKYC
+	StoreActionRequeryKYC    = model.StoreActionRequeryKYC
+	StoreActionRebindPayUni  = model.StoreActionRebindPayUni
 )
 
 // StoreActionUnavailableReason 是 admin 此刻不能做某個店家動作的原因（與 API 的 StoreActionUnavailableReason 一致）。
@@ -38,14 +36,13 @@ func StoreActionUnavailableText(r StoreActionUnavailableReason, a StoreAction) u
 
 // 店家動作不能做的原因。
 const (
-	StoreReasonKYCNotSubmitted            = model.StoreReasonKYCNotSubmitted
-	StoreReasonKYCNotBusiness             = model.StoreReasonKYCNotBusiness
-	StoreReasonPayUniMerchantTerminal     = model.StoreReasonPayUniMerchantTerminal
-	StoreReasonPayUniBindInProgress       = model.StoreReasonPayUniBindInProgress
-	StoreReasonPayUniBound                = model.StoreReasonPayUniBound
-	StoreReasonFoodRegistrationNotPending = model.StoreReasonFoodRegistrationNotPending
-	StoreReasonKYCNotApproved             = model.StoreReasonKYCNotApproved
-	StoreReasonStoreClosed                = model.StoreReasonStoreClosed
-	StoreReasonStorePendingDeletion       = model.StoreReasonStorePendingDeletion
-	StoreReasonAccountSuspended           = model.StoreReasonAccountSuspended
+	StoreReasonKYCNotSubmitted        = model.StoreReasonKYCNotSubmitted
+	StoreReasonKYCNotBusiness         = model.StoreReasonKYCNotBusiness
+	StoreReasonPayUniMerchantTerminal = model.StoreReasonPayUniMerchantTerminal
+	StoreReasonPayUniBindInProgress   = model.StoreReasonPayUniBindInProgress
+	StoreReasonPayUniBound            = model.StoreReasonPayUniBound
+	StoreReasonKYCNotApproved         = model.StoreReasonKYCNotApproved
+	StoreReasonStoreClosed            = model.StoreReasonStoreClosed
+	StoreReasonStorePendingDeletion   = model.StoreReasonStorePendingDeletion
+	StoreReasonAccountSuspended       = model.StoreReasonAccountSuspended
 )

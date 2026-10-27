@@ -328,18 +328,6 @@
       "message": "還沒有從這個案件建立的措施，也沒有通報的結果是已採取措施，不能決定採取措施。",
       "description": "案件不能決定採取措施：沒有導出的措施（已撤銷的也算），也沒有成員的結果是已採取措施（CaseBlock.NO_ACTION_BASIS）。"
     },
-    "case.unavailable.no_referral": {
-      "message": "這個案件還沒有記錄轉報。",
-      "description": "案件不能記下主管機關的回覆：沒有轉報紀錄（CaseBlock.NO_REFERRAL）。"
-    },
-    "case.unavailable.referral_recorded": {
-      "message": "這個案件先前已記錄轉報。",
-      "description": "案件不能再記錄轉報：已經記過（CaseBlock.REFERRAL_RECORDED）；記過時指令回原本的紀錄，不是錯誤。"
-    },
-    "case.unavailable.referral_waived": {
-      "message": "這個案件已標記不轉報。",
-      "description": "案件不能記錄轉報或記下主管機關的回覆：已經標記不轉報（CaseBlock.REFERRAL_WAIVED）；再標記不轉報時 WaiveFDAReferral 回原本的紀錄（already_waived），不是錯誤。"
-    },
     "case.unavailable.report_action_taken": {
       "message": "案件裡有通報的結果是已採取措施，不能決定不採取措施。",
       "description": "案件不能決定不採取措施：有成員的結果是已採取措施（CaseBlock.REPORT_ACTION_TAKEN）。"
@@ -354,19 +342,11 @@
     },
     "case.version_conflict": {
       "message": "這個案件剛被更新，請重新讀取後再送出。",
-      "description": "案件的 etag 與目前的版本不符（成員進出、成員有了結果、改嚴重度、決定、自動關閉或記錄轉報讓版本前進）；案件指令（結案、改嚴重度）自己帶的 etag 過時。分案與移動的去處不成立另用 case.target_version_conflict。"
+      "description": "案件的 etag 與目前的版本不符（成員進出、成員有了結果、改嚴重度、決定或自動關閉讓版本前進）；案件指令（結案、改嚴重度）自己帶的 etag 過時。分案與移動的去處不成立另用 case.target_version_conflict。"
     },
     "decide.decision_required": {
       "message": "請選擇結案結果。",
       "description": "結案：沒有選決定（或值不認得）。"
-    },
-    "export.no_reports": {
-      "message": "這個案件沒有通報，不能匯出轉報資料。",
-      "description": "匯出轉報資料：案件以沒有通報關閉（CaseBlock.NO_REPORTS）。"
-    },
-    "export.not_food_safety": {
-      "message": "平台判定類別是食安的案件才能匯出轉報資料。",
-      "description": "匯出轉報資料：案件的平台判定類別不是食安（CaseBlock.NOT_FOOD_SAFETY）。"
     },
     "inquiry.body_length": {
       "message": "回覆內容必須是 1 到 4000 字。",
@@ -374,7 +354,7 @@
     },
     "inquiry.channel_required": {
       "message": "請選擇管道。",
-      "description": "記下詢問的回覆：沒有選管道（句子同 referral.channel_required）。"
+      "description": "記下詢問的回覆：沒有選管道。"
     },
     "inquiry.due_range": {
       "message": "期限要在建立後 1 天到 14 天之間。",
@@ -444,42 +424,6 @@
       "message": "內部註記必須是 1 到 2000 字。",
       "description": "新增內部註記（措施或案件）：內容是空的或超過 2000 字。"
     },
-    "referral.channel_required": {
-      "message": "請選擇管道。",
-      "description": "記錄轉報：沒有選轉報管道（或值不認得）。"
-    },
-    "referral.follow_up_conflict": {
-      "message": "不能同時設定下一個追蹤日期和不再追蹤。",
-      "description": "記下主管機關的回覆：next_follow_up_date 與 clear_follow_up 同時設定。"
-    },
-    "referral.follow_up_past": {
-      "message": "追蹤日期不能早於今天。",
-      "description": "記錄轉報的追蹤日期，或記下回覆時的下一個追蹤日期，早於今天（台北）或不是有效的日期。"
-    },
-    "referral.no_reports": {
-      "message": "這個案件沒有通報，不能轉報。",
-      "description": "記錄轉報：案件以沒有通報關閉（CaseBlock.NO_REPORTS）。"
-    },
-    "referral.not_food_safety": {
-      "message": "平台判定類別是食安的案件才能轉報主管機關。",
-      "description": "記錄轉報：案件的平台判定類別不是食安（CaseBlock.NOT_FOOD_SAFETY）。"
-    },
-    "referral.receive_date_range": {
-      "message": "收到的日期不能早於轉報日，也不能晚於今天。",
-      "description": "記下主管機關的回覆：收到的日期（台北）早於轉報日、晚於今天，或沒有設定／不是有效的日期。"
-    },
-    "referral.reference_no_length": {
-      "message": "案號最多 100 字。",
-      "description": "記錄轉報：主管機關的案號超過 100 字。"
-    },
-    "referral.reply_body_length": {
-      "message": "回覆內容必須是 1 到 2000 字。",
-      "description": "記下主管機關的回覆：內容是空的或超過 2000 字。"
-    },
-    "referral.waiver_reason_length": {
-      "message": "不轉報的原因必須是 1 到 2000 字。",
-      "description": "標記不轉報：原因是空的或超過 2000 字。"
-    },
     "report.not_found": {
       "message": "找不到這筆通報。",
       "description": "通報不存在（後台讀取或指令、建立措施引用的來源通報）。"
@@ -495,10 +439,6 @@
     "report.unavailable.last_report_with_measure": {
       "message": "這個案件已有導出的措施，不能把最後一筆通報移走。",
       "description": "通報不能移動：它是案件唯一的成員，而案件有導出的措施（ReportBlock.LAST_REPORT_WITH_MEASURE）。"
-    },
-    "report.unavailable.last_report_with_referral": {
-      "message": "這個案件已記錄轉報，不能把最後一筆通報移走。",
-      "description": "通報不能移動：它是案件唯一的成員，而案件已記錄轉報（ReportBlock.LAST_REPORT_WITH_REFERRAL）。"
     },
     "report.unavailable.needs_case": {
       "message": "還沒分案的通報不能設為已採取措施；請先分案。",
@@ -552,14 +492,6 @@
       "message": "帳號停權中，無法代行。",
       "description": "admin 不能代行營運：帳號有生效中的停權措施（ACCOUNT_SUSPENDED，動作是代行）。"
     },
-    "store_action.unavailable.food_registration_not_pending.decide_food_registration": {
-      "message": "這筆食品業者登錄已不在待審。",
-      "description": "admin 不能裁定食品業者登錄：登錄已不在待審（FOOD_REGISTRATION_NOT_PENDING，動作是核准、退回，同一句）。"
-    },
-    "store_action.unavailable.kyc_not_approved.approve_food_registration": {
-      "message": "店家的商家認證還沒核准，不能核准食品業者登錄。",
-      "description": "admin 不能核准食品業者登錄：店家目前的商家認證申請不是已核准（KYC_NOT_APPROVED，動作是核准食品業者登錄）。"
-    },
     "store_action.unavailable.kyc_not_approved.rebind_payuni": {
       "message": "賣家正在修改商家認證，重新核准後會自動重新綁定。",
       "description": "admin 不能重新綁定 PayUni：註冊所根據的申請已被賣家改回草稿，不是已核准（KYC_NOT_APPROVED，動作是重新綁定）。PayUniRegistration.rebind_unavailabilities 與 RebindPayUni 被擋下時錯誤的訊息是同一句。"
@@ -588,10 +520,6 @@
       "message": "店家已關閉，不能建立警告、停權或風險措施。",
       "description": "admin 不能建立警告、停權或風險措施：店家已關閉（STORE_CLOSED，動作是建立措施）。GetStoreResponse.create_measure_unavailabilities、CreateMeasure 被擋下時錯誤的訊息、案件與通報的原因（CaseBlockStoreClosed、ReportBlockStoreClosed）是同一句（StoreActionUnavailableText）。"
     },
-    "store_action.unavailable.store_closed.decide_food_registration": {
-      "message": "店家已關閉，不能裁定食品業者登錄。",
-      "description": "admin 不能裁定食品業者登錄：店家已關閉（STORE_CLOSED，動作是核准、退回，同一句）。"
-    },
     "store_action.unavailable.store_closed.delegate": {
       "message": "店家已關閉，無法代行。",
       "description": "admin 不能代行營運：店家已關閉（STORE_CLOSED，動作是代行）。清單的 delegation_unavailabilities 與代行 preflight 被拒絕時的訊息是同一句。"
@@ -603,10 +531,6 @@
     "store_action.unavailable.store_closed.review_kyc": {
       "message": "店家已關閉，這份商家認證申請暫停審核，店家恢復營業後才能審核或重新查詢。",
       "description": "admin 不能核准、退回或重新查詢商家認證：店家已關閉（STORE_CLOSED，動作是核准、退回、重新查詢，同一句）；申請維持審核中，不在後台待辦，店家恢復營業後回到待辦。"
-    },
-    "store_action.unavailable.store_pending_deletion.decide_food_registration": {
-      "message": "店家等待刪除，不能裁定食品業者登錄。",
-      "description": "admin 不能裁定食品業者登錄：店家等待刪除（STORE_PENDING_DELETION，動作是核准、退回，同一句）。"
     },
     "store_action.unavailable.store_pending_deletion.delegate": {
       "message": "店家等待刪除，無法代行。",

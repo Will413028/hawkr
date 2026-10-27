@@ -18,13 +18,11 @@ const (
 	AgreementKYCPrivacyNotice AgreementKind = "KYC_PRIVACY_NOTICE"
 	// AgreementPayUniTerms 是 PayUni 的服務條款，送出 KYC 時同意。
 	AgreementPayUniTerms AgreementKind = "PAYUNI_TERMS"
-	// AgreementFoodRegistrationNotice 是食品業者登錄的個資蒐集告知，送出食品業者登錄時確認已閱讀。
-	AgreementFoodRegistrationNotice AgreementKind = "FOOD_REGISTRATION_NOTICE"
 )
 
 // AgreementKinds 回傳全部文件種類，依契約 AgreementKind 的數字順序。
 func AgreementKinds() []AgreementKind {
-	return []AgreementKind{AgreementSellerTerms, AgreementKYCPrivacyNotice, AgreementPayUniTerms, AgreementFoodRegistrationNotice}
+	return []AgreementKind{AgreementSellerTerms, AgreementKYCPrivacyNotice, AgreementPayUniTerms}
 }
 
 // Agreement 是一份文件的現行版本。Version 是生效日（YYYY-MM-DD），各版本的全文以 repo 裡的正本保存；URL 是站內路徑
@@ -40,8 +38,6 @@ var (
 	ApplyAgreements = []AgreementKind{AgreementSellerTerms}
 	// SubmitKYCAgreements 是 SubmitKYC 要求的文件。
 	SubmitKYCAgreements = []AgreementKind{AgreementKYCPrivacyNotice, AgreementPayUniTerms}
-	// SubmitFoodRegistrationAgreements 是 SubmitFoodRegistration 要求的文件。
-	SubmitFoodRegistrationAgreements = []AgreementKind{AgreementFoodRegistrationNotice}
 )
 
 // AgreementAcceptance 是賣家對一份文件的同意：Version 是 client 顯示給賣家的版本。

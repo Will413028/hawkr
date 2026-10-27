@@ -160,52 +160,40 @@ func blocksOf(bs ...CaseBlock) []CaseBlock { return bs }
 // 案件每個動作不能做的原因，逐格斷言內容與順序（API 的 can_*／decision_options 與指令的前置檢查都只看這個函式）。
 func TestCaseAvailabilityListsEveryReasonInOrder(t *testing.T) {
 	type want struct {
-		takeAction, noAction                     []CaseBlock
-		severity, link, create, referral, export []CaseBlock
-		waive, reply                             []CaseBlock
-		options                                  []Decision
+		takeAction, noAction   []CaseBlock
+		severity, link, create []CaseBlock
+		options                []Decision
 	}
 	food, fraud := policy.FoodSafety, policy.Fraud
-	referral := &CaseReferral{Outcome: ReferralReferred, FDA: &FDAReferral{ReportedAt: reportCaseEpoch, Channel: FDAHotline1919, ReferenceNo: "F-1", ReportedByAdminID: 7}}
-	waived := &CaseReferral{Outcome: ReferralWaived, Waiver: &ReferralWaiver{Reason: "主管機關已經介入", WaivedByAdminID: 7, WaivedAt: reportCaseEpoch}}
-	withReferral := func(c Case) Case {
-		c.Referral = referral
-		return c
-	}
-	withWaiver := func(c Case) Case {
-		c.Referral = waived
-		return c
-	}
 	for name, tt := range map[string]struct {
 		facts CaseFacts
 		want  want
 	}{
-		"進行中的食安案件，什麼作為都沒有": {
+		"進行中的案件，什麼作為都沒有": {
 			CaseFacts{Case: openCase(food)},
-			want{takeAction: blocksOf(CaseBlockNoActionBasis), reply: blocksOf(CaseBlockNoReferral), options: []Decision{DecisionNoAction}},
+			want{takeAction: blocksOf(CaseBlockNoActionBasis), options: []Decision{DecisionNoAction}},
 		},
 		"進行中、有一個未撤銷的導出措施": {
 			CaseFacts{Case: openCase(fraud), ResultingMeasures: 1, UnrevokedMeasures: 1},
-			want{noAction: blocksOf(CaseBlockUnrevokedMeasureExists), referral: blocksOf(CaseBlockNotFoodSafety), export: blocksOf(CaseBlockNotFoodSafety), waive: blocksOf(CaseBlockNotFoodSafety), reply: blocksOf(CaseBlockNotFoodSafety, CaseBlockNoReferral), options: []Decision{DecisionActionTaken}},
+			want{noAction: blocksOf(CaseBlockUnrevokedMeasureExists), options: []Decision{DecisionActionTaken}},
 		},
 		"進行中、導出的措施都撤銷了（做過就是採取過措施）": {
 			CaseFacts{Case: openCase(fraud), ResultingMeasures: 1},
-			want{referral: blocksOf(CaseBlockNotFoodSafety), export: blocksOf(CaseBlockNotFoodSafety), waive: blocksOf(CaseBlockNotFoodSafety), reply: blocksOf(CaseBlockNotFoodSafety, CaseBlockNoReferral), options: []Decision{DecisionActionTaken, DecisionNoAction}},
+			want{options: []Decision{DecisionActionTaken, DecisionNoAction}},
 		},
 		"進行中、有成員的結果是已採取措施": {
 			CaseFacts{Case: openCase(fraud), ActionTakenReports: 1},
-			want{noAction: blocksOf(CaseBlockReportActionTaken), referral: blocksOf(CaseBlockNotFoodSafety), export: blocksOf(CaseBlockNotFoodSafety), waive: blocksOf(CaseBlockNotFoodSafety), reply: blocksOf(CaseBlockNotFoodSafety, CaseBlockNoReferral), options: []Decision{DecisionActionTaken}},
+			want{noAction: blocksOf(CaseBlockReportActionTaken), options: []Decision{DecisionActionTaken}},
 		},
 		"進行中、未撤銷的措施與已採取措施的成員都有（兩個原因依序列出）": {
 			CaseFacts{Case: openCase(fraud), ResultingMeasures: 2, UnrevokedMeasures: 1, ActionTakenReports: 3},
-			want{noAction: blocksOf(CaseBlockUnrevokedMeasureExists, CaseBlockReportActionTaken), referral: blocksOf(CaseBlockNotFoodSafety), export: blocksOf(CaseBlockNotFoodSafety), waive: blocksOf(CaseBlockNotFoodSafety), reply: blocksOf(CaseBlockNotFoodSafety, CaseBlockNoReferral), options: []Decision{DecisionActionTaken}},
+			want{noAction: blocksOf(CaseBlockUnrevokedMeasureExists, CaseBlockReportActionTaken), options: []Decision{DecisionActionTaken}},
 		},
 		"已結案、什麼作為都沒有": {
 			CaseFacts{Case: closedCase(fraud, CaseClosedDecided)},
 			want{
 				takeAction: blocksOf(CaseBlockClosed, CaseBlockNoActionBasis), noAction: blocksOf(CaseBlockClosed),
 				severity: blocksOf(CaseBlockClosed), link: blocksOf(CaseBlockClosed), create: blocksOf(CaseBlockClosed),
-				referral: blocksOf(CaseBlockNotFoodSafety), export: blocksOf(CaseBlockNotFoodSafety), waive: blocksOf(CaseBlockNotFoodSafety), reply: blocksOf(CaseBlockNotFoodSafety, CaseBlockNoReferral),
 			},
 		},
 		"已結案、有未撤銷的措施與已採取措施的成員（已結案永遠在最前面）": {
@@ -213,64 +201,25 @@ func TestCaseAvailabilityListsEveryReasonInOrder(t *testing.T) {
 			want{
 				takeAction: blocksOf(CaseBlockClosed), noAction: blocksOf(CaseBlockClosed, CaseBlockUnrevokedMeasureExists, CaseBlockReportActionTaken),
 				severity: blocksOf(CaseBlockClosed), link: blocksOf(CaseBlockClosed), create: blocksOf(CaseBlockClosed),
-				referral: blocksOf(CaseBlockNotFoodSafety), export: blocksOf(CaseBlockNotFoodSafety), waive: blocksOf(CaseBlockNotFoodSafety), reply: blocksOf(CaseBlockNotFoodSafety, CaseBlockNoReferral),
 			},
 		},
 		"進行中、店家已關閉：只有從案件建立措施被擋": {
 			CaseFacts{Case: openCase(food), StoreClosed: true},
-			want{takeAction: blocksOf(CaseBlockNoActionBasis), create: blocksOf(CaseBlockStoreClosed), reply: blocksOf(CaseBlockNoReferral), options: []Decision{DecisionNoAction}},
+			want{takeAction: blocksOf(CaseBlockNoActionBasis), create: blocksOf(CaseBlockStoreClosed), options: []Decision{DecisionNoAction}},
 		},
 		"已結案、店家已關閉：建立措施依序是已結案、店家已關閉": {
 			CaseFacts{Case: closedCase(food, CaseClosedDecided), StoreClosed: true},
 			want{
 				takeAction: blocksOf(CaseBlockClosed, CaseBlockNoActionBasis), noAction: blocksOf(CaseBlockClosed),
-				severity: blocksOf(CaseBlockClosed), link: blocksOf(CaseBlockClosed), create: blocksOf(CaseBlockClosed, CaseBlockStoreClosed), reply: blocksOf(CaseBlockNoReferral),
+				severity: blocksOf(CaseBlockClosed), link: blocksOf(CaseBlockClosed), create: blocksOf(CaseBlockClosed, CaseBlockStoreClosed),
 			},
 		},
-		"食安案件以沒有通報關閉：不能轉報也不能匯出": {
+		"以沒有通報關閉": {
 			CaseFacts{Case: closedCase(food, CaseClosedNoReports)},
 			want{
 				takeAction: blocksOf(CaseBlockClosed, CaseBlockNoActionBasis), noAction: blocksOf(CaseBlockClosed),
 				severity: blocksOf(CaseBlockClosed), link: blocksOf(CaseBlockClosed), create: blocksOf(CaseBlockClosed),
-				referral: blocksOf(CaseBlockNoReports), export: blocksOf(CaseBlockNoReports),
-				waive: blocksOf(CaseBlockNoReports), reply: blocksOf(CaseBlockNoReferral),
 			},
-		},
-		"非食安案件以沒有通報關閉：先是不是食安、再是沒有通報": {
-			CaseFacts{Case: closedCase(fraud, CaseClosedNoReports)},
-			want{
-				takeAction: blocksOf(CaseBlockClosed, CaseBlockNoActionBasis), noAction: blocksOf(CaseBlockClosed),
-				severity: blocksOf(CaseBlockClosed), link: blocksOf(CaseBlockClosed), create: blocksOf(CaseBlockClosed),
-				referral: blocksOf(CaseBlockNotFoodSafety, CaseBlockNoReports), export: blocksOf(CaseBlockNotFoodSafety, CaseBlockNoReports),
-				waive: blocksOf(CaseBlockNotFoodSafety, CaseBlockNoReports), reply: blocksOf(CaseBlockNotFoodSafety, CaseBlockNoReferral),
-			},
-		},
-		"食安案件已記錄轉報：只有記錄被擋，匯出照樣可以": {
-			CaseFacts{Case: withReferral(closedCase(food, CaseClosedDecided)), ResultingMeasures: 1},
-			want{
-				takeAction: blocksOf(CaseBlockClosed), noAction: blocksOf(CaseBlockClosed),
-				severity: blocksOf(CaseBlockClosed), link: blocksOf(CaseBlockClosed), create: blocksOf(CaseBlockClosed),
-				referral: blocksOf(CaseBlockReferralRecorded), waive: blocksOf(CaseBlockReferralRecorded), reply: nil,
-			},
-		},
-		"食安案件已標記不轉報：記錄轉報與回覆都擋下，再標記是 already，匯出照樣可以": {
-			CaseFacts{Case: withWaiver(closedCase(food, CaseClosedDecided)), ResultingMeasures: 1},
-			want{
-				takeAction: blocksOf(CaseBlockClosed), noAction: blocksOf(CaseBlockClosed),
-				severity: blocksOf(CaseBlockClosed), link: blocksOf(CaseBlockClosed), create: blocksOf(CaseBlockClosed),
-				referral: blocksOf(CaseBlockReferralWaived), waive: blocksOf(CaseBlockReferralWaived), reply: blocksOf(CaseBlockReferralWaived),
-			},
-		},
-		"食安案件還沒有轉報紀錄：可以記錄、可以不轉報，沒有東西可以回覆": {
-			CaseFacts{Case: openCase(food), ActionTakenReports: 1},
-			want{
-				noAction: blocksOf(CaseBlockReportActionTaken), reply: blocksOf(CaseBlockNoReferral), options: []Decision{DecisionActionTaken},
-			},
-		},
-		"不是食安卻有轉報（資料庫不允許，但順序要固定）": {
-			CaseFacts{Case: withReferral(openCase(fraud)), ActionTakenReports: 1},
-			want{noAction: blocksOf(CaseBlockReportActionTaken), referral: blocksOf(CaseBlockNotFoodSafety, CaseBlockReferralRecorded), export: blocksOf(CaseBlockNotFoodSafety),
-				waive: blocksOf(CaseBlockNotFoodSafety, CaseBlockReferralRecorded), reply: blocksOf(CaseBlockNotFoodSafety), options: []Decision{DecisionActionTaken}},
 		},
 	} {
 		a := tt.facts.Availability()
@@ -285,10 +234,6 @@ func TestCaseAvailabilityListsEveryReasonInOrder(t *testing.T) {
 		check("改嚴重度", a.ChangeSeverity, tt.want.severity)
 		check("連結措施", a.LinkMeasure, tt.want.link)
 		check("建立措施", a.CreateMeasure, tt.want.create)
-		check("記錄轉報", a.RecordReferral, tt.want.referral)
-		check("匯出轉報資料", a.Export, tt.want.export)
-		check("不轉報", a.WaiveReferral, tt.want.waive)
-		check("記下主管機關的回覆", a.RecordReferralReply, tt.want.reply)
 		if got := a.DecisionOptions(); !slices.Equal(got, tt.want.options) {
 			t.Errorf("%s／decision_options：%v，預期 %v", name, got, tt.want.options)
 		}
@@ -358,11 +303,6 @@ func TestReportAvailabilityListsEveryReasonInOrder(t *testing.T) {
 		v.Case.ReportCount = 2
 		return &v
 	}
-	referred := func(c *CaseFacts) *CaseFacts {
-		v := *c
-		v.Case.Referral = &CaseReferral{Outcome: ReferralReferred, FDA: &FDAReferral{ReportedAt: reportCaseEpoch, Channel: FDAHotline1919, ReferenceNo: "F-1", ReportedByAdminID: 7}}
-		return &v
-	}
 	for name, tt := range map[string]struct {
 		facts ReportFacts
 		want  want
@@ -398,22 +338,6 @@ func TestReportAvailabilityListsEveryReasonInOrder(t *testing.T) {
 		"既是認定的來源、又是有導出措施的案件唯一的成員（兩個原因依序列出）": {
 			ReportFacts{Report: inCase, Case: lastWithMeasure(withBasis), FindingSource: true},
 			want{triage: reportBlocksOf(ReportBlockAlreadyTriaged), move: reportBlocksOf(ReportBlockFindingSource, ReportBlockLastReportWithMeasure), outcomes: allOutcomes},
-		},
-		"是案件唯一的成員而案件已記錄轉報（沒有導出的措施）": {
-			ReportFacts{Report: inCase, Case: referred(lastWithMeasure(noActionBasis))},
-			want{triage: reportBlocksOf(ReportBlockAlreadyTriaged), move: reportBlocksOf(ReportBlockLastReportWithReferral), takeAction: reportBlocksOf(ReportBlockNoActionBasis), outcomes: withoutActionTaken},
-		},
-		"是案件唯一的成員，案件既有導出的措施又已記錄轉報（兩個原因依序列出：措施、轉報）": {
-			ReportFacts{Report: inCase, Case: referred(lastWithMeasure(withBasis))},
-			want{triage: reportBlocksOf(ReportBlockAlreadyTriaged), move: reportBlocksOf(ReportBlockLastReportWithMeasure, ReportBlockLastReportWithReferral), outcomes: allOutcomes},
-		},
-		"既是認定的來源、又是已記錄轉報的案件唯一的成員（兩個原因依序列出）": {
-			ReportFacts{Report: inCase, Case: referred(lastWithMeasure(withBasis)), FindingSource: true},
-			want{triage: reportBlocksOf(ReportBlockAlreadyTriaged), move: reportBlocksOf(ReportBlockFindingSource, ReportBlockLastReportWithMeasure, ReportBlockLastReportWithReferral), outcomes: allOutcomes},
-		},
-		"案件已記錄轉報，但還有別的成員時可以移動": {
-			ReportFacts{Report: inCase, Case: referred(moreMembers(noActionBasis))},
-			want{triage: reportBlocksOf(ReportBlockAlreadyTriaged), takeAction: reportBlocksOf(ReportBlockNoActionBasis), outcomes: withoutActionTaken},
 		},
 		"已有結果、在已結案的案件裡": {
 			ReportFacts{Report: resolvedInCase, Case: closedWithOutcome},
@@ -498,17 +422,10 @@ func TestEveryBlockHasADistinctSentence(t *testing.T) {
 		seen[msg] = "ReportBlock " + string(b)
 	}
 	for _, b := range CaseBlockValues() {
-		for _, action := range []CaseAction{CaseActionDecide, CaseActionChangeSeverity, CaseActionLinkMeasure, CaseActionCreateMeasure, CaseActionRecordReferral, CaseActionWaiveReferral, CaseActionRecordReferralReply, CaseActionExport, CaseActionCreateInquiry} {
+		for _, action := range []CaseAction{CaseActionDecide, CaseActionChangeSeverity, CaseActionLinkMeasure, CaseActionCreateMeasure, CaseActionCreateInquiry} {
 			if b.Text(action).Text == "" {
 				t.Errorf("CaseBlock %s（%s）沒有句子", b, action)
 			}
-		}
-		// 轉報與匯出的句子不同：這兩個原因依動作選句。
-		if b == CaseBlockNotFoodSafety || b == CaseBlockNoReports {
-			if b.Text(CaseActionExport).Text == b.Text(CaseActionRecordReferral).Text {
-				t.Errorf("CaseBlock %s：匯出與記錄轉報要是不同的句子", b)
-			}
-			continue
 		}
 		msg := b.Text(CaseActionDecide).Text
 		if b == CaseBlockStoreClosed {
@@ -528,47 +445,7 @@ func TestEveryBlockHasADistinctSentence(t *testing.T) {
 	if link, other := CaseBlockClosed.Text(CaseActionLinkMeasure).Text, CaseBlockClosed.Text(CaseActionDecide).Text; link != "案件已結案，不能再從它建立措施。" || link == other {
 		t.Errorf("CaseBlock CLOSED：連結措施 %q，其他動作 %q", link, other)
 	}
-	if ReportBlock("").Text().Text != "" || ReportBlock("UNKNOWN").Text().Text != "" || CaseBlock("").Text(CaseActionDecide).Text != "" || CaseBlock("UNKNOWN").Text(CaseActionExport).Text != "" {
+	if ReportBlock("").Text().Text != "" || ReportBlock("UNKNOWN").Text().Text != "" || CaseBlock("").Text(CaseActionDecide).Text != "" || CaseBlock("UNKNOWN").Text(CaseActionCreateInquiry).Text != "" {
 		t.Error("不認得的原因不得有句子")
-	}
-}
-
-// 追蹤日期的預設是轉報日（台北）加 30 天：台北的日界不是 UTC 的日界（UTC 16:00 就是台北的隔天 00:00）。
-func TestDefaultReferralFollowUpUsesTheTaipeiDay(t *testing.T) {
-	for name, tt := range map[string]struct {
-		now  time.Time
-		want string
-	}{
-		"台北 23:59（UTC 15:59）還是同一天":     {time.Date(2026, 10, 19, 15, 59, 59, 0, time.UTC), "2026-11-18"},
-		"台北 00:00（UTC 前一天 16:00）是新的一天": {time.Date(2026, 10, 19, 16, 0, 0, 0, time.UTC), "2026-11-19"},
-		"跨月": {time.Date(2026, 12, 15, 4, 0, 0, 0, time.UTC), "2027-01-14"},
-	} {
-		got := DefaultReferralFollowUp(tt.now)
-		if got.Format(time.DateOnly) != tt.want || got.Location() != time.UTC || got.Hour() != 0 {
-			t.Errorf("%s：%v，預期 %s（UTC 午夜）", name, got, tt.want)
-		}
-	}
-	if ReferralFollowUpDays != 30 {
-		t.Errorf("ReferralFollowUpDays=%d，預期 30", ReferralFollowUpDays)
-	}
-}
-
-// 標記不轉報的案件空了照樣能關閉（只有已轉報擋下最後一筆通報的移動）；沒有轉報紀錄的當然也不擋。
-func TestOnlyARecordedReferralBlocksMovingTheLastReport(t *testing.T) {
-	last := &CaseFacts{Case: Case{ReportCount: 1}}
-	for name, tt := range map[string]struct {
-		referral *CaseReferral
-		want     bool
-	}{
-		"沒有轉報紀錄": {nil, false},
-		"已轉報":    {&CaseReferral{Outcome: ReferralReferred, FDA: &FDAReferral{}}, true},
-		"不轉報":    {&CaseReferral{Outcome: ReferralWaived, Waiver: &ReferralWaiver{}}, false},
-	} {
-		facts := *last
-		facts.Case.Referral = tt.referral
-		a := ReportFacts{Report: Report{}, Case: &facts}.Availability()
-		if got := slices.Contains(a.Move, ReportBlockLastReportWithReferral); got != tt.want {
-			t.Errorf("%s：LastReportWithReferral=%v，預期 %v（%v）", name, got, tt.want, a.Move)
-		}
 	}
 }

@@ -1,5 +1,5 @@
 // Package governance 是商家治理（ADR 2026-10-18-seller-governance-consolidated、step10e-reports-brief R2、R3、R7）的通報與案件：通報（檢舉與食安通報同一張表，一位檢舉人
-// 的一次送出，含之後的補充）與它的佐證、分案、設定結果、移動，案件（同一家店、同一個平台判定類別，同時最多一個進行中的案件）的決定、改嚴重度、轉報主管機關與內部註記，
+// 的一次送出，含之後的補充）與它的佐證、分案、設定結果、移動，案件（同一家店、同一個平台判定類別，同時最多一個進行中的案件）的決定、改嚴重度與內部註記，
 // 匿名聯絡欄位的保留期限清理，以及通報與措施上請求的佐證讀取。措施（警告、停權與終止合作）、認定與申覆在 measure 套件；治理的狀態改變在寫入的 transaction 內發模組事件，
 // 送達由 A8 的 notification 負責。
 //
@@ -178,23 +178,6 @@ func toCase(row store.SellerCase, storeName *string) model.Case {
 	return c
 }
 
-// toReferral 把轉報列轉成模型：已轉報帶管道、案號與追蹤日期（回覆由 caseFacts 另載入），不轉報帶原因。CHECK 保證 REFERRED 有管道、WAIVED 有原因。
-func toReferral(row store.SellerCaseReferral) *model.CaseReferral {
-	out := &model.CaseReferral{Outcome: model.ReferralOutcome(row.Outcome)}
-	if out.Waived() {
-		out.Waiver = &model.ReferralWaiver{Reason: deref(row.WaiverReason), WaivedByAdminID: row.RecordedByAdminID, WaivedAt: row.RecordedAt}
-		return out
-	}
-	out.FDA = &model.FDAReferral{
-		ReportedAt: row.RecordedAt, Channel: model.FDAChannel(deref(row.Channel)), ReportedByAdminID: row.RecordedByAdminID, FollowUpOn: row.FollowUpOn,
-		FollowUpSetAt: row.FollowUpSetAt,
-	}
-	if row.ReferenceNo != nil {
-		out.FDA.ReferenceNo = *row.ReferenceNo
-	}
-	return out
-}
-
 // caseRow 是一個案件加上店名、店家是否已關閉與個資是否已清理（CasesByIDs、AdminCases 兩支查詢的共同形狀）。
 type caseRow struct {
 	row         store.SellerCase
@@ -203,8 +186,8 @@ type caseRow struct {
 	storePurged bool
 }
 
-// caseFacts 讀一批案件的事實：成員統計（成員數、沒有結果的、已採取措施的、有補充還沒看過的）、導出的措施數（案件導出的措施的定義在 CaseMeasureCounts）、轉報紀錄
-// （Case.Referral：案件的可用性看它，通報的移動也看它——有轉報紀錄的案件，最後一筆通報不能移走）與詢問（還沒結束的那一筆、「待決定」重新起算的時間）。
+// caseFacts 讀一批案件的事實：成員統計（成員數、沒有結果的、已採取措施的、有補充還沒看過的）、導出的措施數（案件導出的措施的定義在 CaseMeasureCounts）
+// 與詢問（還沒結束的那一筆、「待決定」重新起算的時間）。
 // 每批固定七次查詢以內；同一個讀取快照或指令裡鎖住案件之後呼叫。
 func caseFacts(ctx context.Context, q *store.Queries, rows []caseRow) (map[uuid.UUID]model.CaseFacts, error) {
 	out := make(map[uuid.UUID]model.CaseFacts, len(rows))
@@ -237,31 +220,6 @@ func caseFacts(ctx context.Context, q *store.Queries, rows []caseRow) (map[uuid.
 		f := out[*m.CaseID]
 		f.ResultingMeasures, f.UnrevokedMeasures = int(m.ResultingMeasures), int(m.UnrevokedMeasures)
 		out[*m.CaseID] = f
-	}
-	referrals, err := q.CaseReferrals(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
-	var referred []uuid.UUID
-	for _, r := range referrals {
-		f := out[r.CaseID]
-		f.Case.Referral = toReferral(r)
-		out[r.CaseID] = f
-		if f.Case.Referral.Referred() {
-			referred = append(referred, r.CaseID)
-		}
-	}
-	if len(referred) > 0 {
-		replies, err := q.CaseReferralReplies(ctx, referred)
-		if err != nil {
-			return nil, err
-		}
-		for _, r := range replies {
-			fda := out[r.CaseID].Case.Referral.FDA
-			fda.Replies = append(fda.Replies, model.FDAReferralReply{
-				Body: r.Body, ReceivedOn: r.ReceivedOn, RecordedByAdminID: r.RecordedByAdminID, RecordedAt: r.RecordedAt,
-			})
-		}
 	}
 	open, err := q.OpenCaseInquiries(ctx, ids)
 	if err != nil {
@@ -297,7 +255,7 @@ func adminCases(rows []caseRow, facts map[uuid.UUID]model.CaseFacts, now time.Ti
 	out := make([]model.AdminCase, len(rows))
 	for i, r := range rows {
 		f := facts[r.row.ID]
-		out[i] = model.AdminCase{Case: f.Case, Availability: f.Availability(), ReadAt: now}
+		out[i] = model.AdminCase{Case: f.Case, Availability: f.Availability()}
 	}
 	return out
 }
@@ -370,8 +328,8 @@ func loadTriageDeadlines(ctx context.Context, q *store.Queries, now time.Time, i
 	return nil
 }
 
-// loadCaseDeadlines 一次讀出這批案件的決定期限與轉報期限（DecideDeadline、FDAReferralDeadline），填進 facts。成員、開始與期限只在
-// seller.review_case_decision(at)、seller.review_case_fda_referral(at)（db/objects.sql）；義務不在時維持 nil。
+// loadCaseDeadlines 一次讀出這批案件的決定期限（DecideDeadline），填進 facts。成員、開始與期限只在
+// seller.review_case_decision(at)（db/objects.sql）；義務不在時維持 nil。
 func loadCaseDeadlines(ctx context.Context, q *store.Queries, now time.Time, facts map[uuid.UUID]model.CaseFacts) error {
 	if len(facts) == 0 {
 		return nil
@@ -387,15 +345,6 @@ func loadCaseDeadlines(ctx context.Context, q *store.Queries, now time.Time, fac
 	for _, r := range decide {
 		f := facts[r.CaseID]
 		f.Case.DecideDeadline = &model.Deadline{Start: r.StartAt, Due: r.DueAt}
-		facts[r.CaseID] = f
-	}
-	referral, err := q.ReviewCaseFDAReferralByIDs(ctx, store.ReviewCaseFDAReferralByIDsParams{At: now, Ids: ids})
-	if err != nil {
-		return err
-	}
-	for _, r := range referral {
-		f := facts[r.CaseID]
-		f.Case.FDAReferralDeadline = &model.Deadline{Start: r.StartAt, Due: r.DueAt}
 		facts[r.CaseID] = f
 	}
 	return nil
@@ -527,8 +476,7 @@ func triageTargets(ctx context.Context, q *store.Queries, r model.Report, triage
 	return out, nil
 }
 
-// readCase 讀一個案件的後台檢視（含移動紀錄、轉報紀錄與此刻可以做的動作）；在 q 的連線上執行，同 readReport。
-// now 是讀取的時間：讀取時推導的欄位（轉報的追蹤逾期）以它判斷。
+// readCase 讀一個案件的後台檢視（含移動紀錄、期限與此刻可以做的動作）；在 q 的連線上執行，同 readReport。now 是讀取的時間（期限以它判斷）。
 func readCase(ctx context.Context, q *store.Queries, caseID uuid.UUID, now time.Time) (model.AdminCase, error) {
 	facts, err := caseFactsByIDs(ctx, q, []uuid.UUID{caseID})
 	if err != nil {
@@ -550,7 +498,7 @@ func readCase(ctx context.Context, q *store.Queries, caseID uuid.UUID, now time.
 	for i, m := range moves {
 		f.Case.Moves[i] = model.ReportMove{ReportID: m.ReportID, FromCaseID: m.FromCaseID, ToCaseID: m.ToCaseID, AdminID: m.AdminID, MovedAt: m.MovedAt}
 	}
-	return model.AdminCase{Case: f.Case, Availability: f.Availability(), ReadAt: now}, nil
+	return model.AdminCase{Case: f.Case, Availability: f.Availability()}, nil
 }
 
 // facts 組出一筆已鎖住的通報的事實：店家是否已關閉、是不是認定的來源、所在案件的事實（案件已鎖住）。

@@ -4,7 +4,7 @@
 -- keyset 用同樣的 row-value 比較；第一頁沒有游標（四個 after_* 都是 NULL），照 repo 的慣例寫 IS NULL OR。
 -- 整句是一個語句快照（READ COMMITTED 下每個語句一個快照），不需要 transaction。
 SELECT q.kind, q.item_id, q.report_id, q.case_id, q.inquiry_id, q.authority_order_id, q.target_position, q.account_id,
-       q.measure_id, q.request_id, q.food_registration_id, q.kyc_application_id, q.store_id, q.store_name, q.start_at, q.due_at
+       q.measure_id, q.request_id, q.kyc_application_id, q.store_id, q.store_name, q.start_at, q.due_at
 FROM seller.pub_review_items(sqlc.arg(now)::timestamptz) q
 WHERE q.kind = ANY(sqlc.arg(kinds)::text[])
   AND (sqlc.narg(after_id)::text IS NULL

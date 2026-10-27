@@ -36,10 +36,6 @@ type AdminModule interface {
 	PayUniObservations(context.Context, model.PayUniObservationListInput) (model.PayUniObservationPage, error)
 	RefreshPayUniStatus(ctx context.Context, storeID int64) error
 	RequeryKYCRegistration(context.Context, model.RequeryKYCRegistrationInput) (model.RegistrationCheck, error)
-	FoodRegistrations(context.Context, model.FoodRegistrationListInput) (model.FoodRegistrationPage, error)
-	FoodRegistrationReview(ctx context.Context, id uuid.UUID) (model.FoodRegistrationReview, error)
-	DecideFoodRegistration(context.Context, model.DecideFoodRegistrationInput) (model.FoodRegistrationReview, error)
-	RevokeFoodRegistration(context.Context, model.RevokeFoodRegistrationInput) (model.FoodRegistrationReview, error)
 }
 
 // Admin 是 SellerAdminService 的 handler。授權（只有管理員）由 rpc 的 interceptor 依 service 名稱檢查。
@@ -82,8 +78,6 @@ func toAdminStore(images rpc.Images, s model.Store) (*adminpb.Store, error) {
 		Status:              rpc.EnumToProto[pb.StoreStatus](s.Status),
 		CreateTime:          timestamppb.New(s.CreatedAt), UpdateTime: timestamppb.New(s.UpdatedAt),
 	}
-	out.ApprovedFoodRegistration = toAdminStoreFoodRegistration(s.StoreID, s.ApprovedFoodRegistration)
-	out.OpenFoodRegistration = toAdminStoreFoodRegistration(s.StoreID, s.OpenFoodRegistration)
 	if s.TownCode != nil {
 		out.Address = &commonpb.PostalAddress{
 			TownCode:      *s.TownCode,

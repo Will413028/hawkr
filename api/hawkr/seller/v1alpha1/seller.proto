@@ -30,7 +30,7 @@ service SellerAppService {
   // ApplyStore 申請開店：建立店家並授予賣家角色。前置條件依優先序檢查，第一個不符的決定回應：有生效中的終止合作回
   // failed_precondition 與 STORE_OPENING_TERMINATED（解除停權也開不了店）；其次帳號停權中回 failed_precondition 與
   // STORE_OPENING_SUSPENDED；其次帳號正在刪除回 failed_precondition（沒有 reason）；最後帳號已經有店家才回 already_exists。
-  // 所以被終止、停權或正在刪除的帳號即使還有店家，回的也不是 already_exists；任何一個欄位不合法都不會建立店家。官網、logo 與封面開店後以 UpdateMyStore 設定，食品業者登錄以 SubmitFoodRegistration 送審。
+  // 所以被終止、停權或正在刪除的帳號即使還有店家，回的也不是 already_exists；任何一個欄位不合法都不會建立店家。官網、logo 與封面開店後以 UpdateMyStore 設定。
   rpc ApplyStore(ApplyStoreRequest) returns (ApplyStoreResponse);
 
   // GetMyStoreOpening 回答呼叫者的帳號此刻能不能申請開店，以及不能的原因（依優先序）。開店入口在送出表單之前讀它，不必等 ApplyStore 失敗才知道。
@@ -46,7 +46,7 @@ service SellerAppService {
   }
 
   // UpdateMyStore 修改店家資料的欄位（update_mask），含 logo 與封面（logo_staged_token、
-  // cover_staged_token）。食品業者登錄不在這裡（SubmitFoodRegistration）。換圖與文字欄位在同一個版本條件下一起寫入，任何一項失敗都不會寫入；沒有任何欄位改變時
+  // cover_staged_token）。換圖與文字欄位在同一個版本條件下一起寫入，任何一項失敗都不會寫入；沒有任何欄位改變時
   // 不寫入，etag 不變。
   rpc UpdateMyStore(UpdateMyStoreRequest) returns (UpdateMyStoreResponse);
 
@@ -68,19 +68,6 @@ service SellerAppService {
   rpc GetMyDashboard(GetMyDashboardRequest) returns (GetMyDashboardResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
-
-  // SubmitFoodRegistration 送出食品業者登錄供平台核對（食藥署的登錄資料，人工核對）；通過後才會成為店面與商品頁公開的字號，並開放上架
-  // 加工食品。店家要在營業中，開店前後的 KYC 狀態不影響送出，平台在實名認證（KYC）核准後才能核准。已有待審的登錄時：字號相同就沿用
-  // （不改變排隊的時間），不同就撤回舊的、換成新的，所以同時最多一筆待審。審核期間目前核准的登錄照常有效。字號去掉前後空白後 1 到 50 字，
-  // 不檢查格式（沒有官方規格，交給人工核對），不合法回 invalid_argument。回傳送出之後的店家（pending_food_registration 是這筆待審）。
-  rpc SubmitFoodRegistration(SubmitFoodRegistrationRequest) returns (SubmitFoodRegistrationResponse);
-
-  // WithdrawFoodRegistration 撤回待審的登錄（狀態成為已撤回，賣家不再看到），目前核准的那一筆保留。沒有待審的登錄回 failed_precondition。
-  rpc WithdrawFoodRegistration(WithdrawFoodRegistrationRequest) returns (WithdrawFoodRegistrationResponse);
-
-  // ClearFoodRegistration 清除食品業者登錄（不再賣加工食品）：結束目前核准的那一筆、同時撤回待審的，立即生效，店面與商品頁不再顯示
-  // 字號。核准的與待審的都沒有時回 failed_precondition。
-  rpc ClearFoodRegistration(ClearFoodRegistrationRequest) returns (ClearFoodRegistrationResponse);
 
   // CloseMyStore 關閉店家（帳號與買家身分留著，賣家角色移除）。店家有未結訂單時回 failed_precondition；
   // 停權中也可以關店；正在隨帳號刪除的店家由刪除流程關閉，回 failed_precondition。
@@ -173,7 +160,7 @@ service SellerPublicService {
   }
 
   // GetSellerAgreements 讀取賣家入駐時要同意的文件的現行版本與網址，全部種類都回，依 AgreementKind 的數字順序。內容是公開的，
-  // 開店前就要能讀，所以不需要登入。client 把這裡的版本顯示給賣家勾選，再原樣帶回 ApplyStore、SubmitKYC 與 SubmitFoodRegistration 的
+  // 開店前就要能讀，所以不需要登入。client 把這裡的版本顯示給賣家勾選，再原樣帶回 ApplyStore 與 SubmitKYC 的
   // accepted_agreements。
   rpc GetSellerAgreements(GetSellerAgreementsRequest) returns (GetSellerAgreementsResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -186,7 +173,7 @@ service SellerPublicService {
 }
 
 // AgreementKind 是賣家入駐時要同意或確認已閱讀的文件種類。每個操作要求的種類固定：ApplyStore 要 SELLER_TERMS；SubmitKYC 要
-// KYC_PRIVACY_NOTICE 與 PAYUNI_TERMS；SubmitFoodRegistration 要 FOOD_REGISTRATION_NOTICE。
+// KYC_PRIVACY_NOTICE 與 PAYUNI_TERMS。
 enum AgreementKind {
   AGREEMENT_KIND_UNSPECIFIED = 0;
   // 賣家契約，開店（ApplyStore）時同意。
@@ -195,8 +182,9 @@ enum AgreementKind {
   AGREEMENT_KIND_KYC_PRIVACY_NOTICE = 2;
   // PayUni 的服務條款，送出 KYC（SubmitKYC）時同意。
   AGREEMENT_KIND_PAYUNI_TERMS = 3;
-  // 食品業者登錄的個資蒐集告知，送出食品業者登錄（SubmitFoodRegistration）時確認已閱讀（告知不是同意）。
-  AGREEMENT_KIND_FOOD_REGISTRATION_NOTICE = 4;
+
+  reserved 4;
+  reserved "AGREEMENT_KIND_FOOD_REGISTRATION_NOTICE";
 }
 
 // AgreementAcceptance 是賣家對一份文件的同意：client 送回它顯示給賣家的版本，伺服器核對後記錄。
@@ -304,9 +292,9 @@ enum StoreField {
 
 // Store 是賣家的店家資料。
 message Store {
-  reserved 6, 7, 10, 11, 22, 27;
-  // 27 原本是待審或被退回的合併欄位 open_food_registration，已拆成 pending_food_registration 與 rejected_food_registration。
+  reserved 6, 7, 10, 11, 22, 26 to 30;
   reserved "town_code", "address_detail", "processed_food", "food_business_reg_no", "food_business", "open_food_registration";
+  reserved "approved_food_registration", "revoked_food_registration", "pending_food_registration", "rejected_food_registration";
 
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
   // 店家網址的路徑段。
@@ -339,81 +327,13 @@ message Store {
   hawkr.common.v1alpha1.Image cover_image = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
   StoreStatus status = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
   google.protobuf.Timestamp create_time = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 店家資料最後一次被編輯的時間；食品業者登錄的送出、核准、清除與撤銷不是店家資料的編輯，不會讓它前進（etag 也不變）。
+  // 店家資料最後一次被編輯的時間。
   google.protobuf.Timestamp update_time = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
   string etag = 18;
   // 上傳完成後拿到的 staged token；換 logo 時列進 update_mask。
   string logo_staged_token = 19 [(google.api.field_behavior) = INPUT_ONLY];
   // 上傳完成後拿到的 staged token；換封面時列進 update_mask。
   string cover_staged_token = 20 [(google.api.field_behavior) = INPUT_ONLY];
-  // 目前核准的食品業者登錄（state 是 APPROVED）；沒有核准的登錄時不設。店面與商品頁公開的字號就是它。
-  FoodRegistration approved_food_registration = 26 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 待審（PENDING）的登錄；沒有時不設。有值時可以撤回。與 approved_food_registration 各自獨立（審核期間目前核准的照常有效）。
-  FoodRegistration pending_food_registration = 29 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 被退回（REJECTED）、之後沒有再送出新的登錄；沒有時不設。與 approved_food_registration 各自獨立。
-  FoodRegistration rejected_food_registration = 30 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 最近一次被平台撤銷的登錄（state 是 ENDED，end_time 與 end_reason 有值）；目前沒有核准的登錄、撤銷之後也沒有更新的待審或核准（更新的核准即使之後又結束也算）時才設，
-  // 賣家看到它就知道字號被撤銷、要重新送審。沒有時不設。
-  FoodRegistration revoked_food_registration = 28 [(google.api.field_behavior) = OUTPUT_ONLY];
-}
-
-// FoodRegistrationState 是賣家看得到的登錄狀態：撤回與被新的取代的登錄賣家看不到，核准後因賣家清除或被新核准的取代而結束的也不顯示，
-// 所以只有被平台撤銷的才會以 ENDED 出現（Store.revoked_food_registration）。
-enum FoodRegistrationState {
-  FOOD_REGISTRATION_STATE_UNSPECIFIED = 0;
-  // 等平台核對。
-  FOOD_REGISTRATION_STATE_PENDING = 1;
-  // 核准中：店面與商品頁公開的字號只讀這一筆。
-  FOOD_REGISTRATION_STATE_APPROVED = 2;
-  // 平台退回；賣家確認字號與食藥署的登錄資料一致後可以重新送出。
-  FOOD_REGISTRATION_STATE_REJECTED = 3;
-  // 核准後結束；賣家看得到的只有被平台撤銷的（end_time 與 end_reason 有值）。
-  FOOD_REGISTRATION_STATE_ENDED = 4;
-}
-
-// FoodRegistration 是店家的一筆食品業者登錄（食安法第 8 條第 3 項），一個資源、一個狀態：Store.approved_food_registration 是核准中的那一筆，
-// Store.pending_food_registration 是待審的那一筆，Store.rejected_food_registration 是被退回的那一筆，Store.revoked_food_registration 是最近被平台撤銷的那一筆。
-message FoodRegistration {
-  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
-  FoodRegistrationState state = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 食品業者登錄字號，最多 50 字。
-  string registration_number = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 賣家送出的時間。
-  google.protobuf.Timestamp submit_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 平台核准或退回的時間；待審時不設。
-  google.protobuf.Timestamp decide_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 退回的理由；只在 REJECTED 設定。
-  string reject_reason = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 被平台撤銷的時間；只在 Store.revoked_food_registration 設定。
-  google.protobuf.Timestamp end_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 平台撤銷的理由，賣家看得到；只在 Store.revoked_food_registration 設定。
-  string end_reason = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
-}
-
-message SubmitFoodRegistrationRequest {
-  // 食品業者登錄字號，去掉前後空白後 1 到 50 字。
-  string registration_number = 1 [(google.api.field_behavior) = REQUIRED];
-  // 賣家確認已閱讀的 FOOD_REGISTRATION_NOTICE，剛好這一份。缺種類、多出不屬於這個操作的種類、同一種重複或 UNSPECIFIED 回
-  // invalid_argument（field violation 指向 accepted_agreements）；版本不是現行版本回 failed_precondition，ErrorInfo.reason 是
-  // AGREEMENT_OUTDATED，client 重讀 GetSellerAgreements，請賣家重新勾選。這項檢查先於字號的檢查；建立新的登錄時，確認紀錄與登錄同一個
-  // transaction、綁定那一筆登錄（字號與待審或核准中的相同、沒有建立新登錄時不另記）。
-  repeated AgreementAcceptance accepted_agreements = 2 [(google.api.field_behavior) = REQUIRED];
-}
-
-message SubmitFoodRegistrationResponse {
-  Store store = 1;
-}
-
-message WithdrawFoodRegistrationRequest {}
-
-message WithdrawFoodRegistrationResponse {
-  Store store = 1;
-}
-
-message ClearFoodRegistrationRequest {}
-
-message ClearFoodRegistrationResponse {
-  Store store = 1;
 }
 
 // CapabilityStatus 是一個能力此刻的狀態：啟用，或沒有啟用與還缺的條件。
@@ -1344,11 +1264,10 @@ message RequestRemediationResponse {
   Measure measure = 1;
 }
 
-// PublicStore 是店面頁上的店家資料。逐欄列出前台需要的欄位：沒有聯絡電話、詳細地址與任何版本欄位；
-// 食品業者登錄只有字號（food_business_registration_number）。
+// PublicStore 是店面頁上的店家資料。逐欄列出前台需要的欄位：沒有聯絡電話、詳細地址與任何版本欄位。
 message PublicStore {
-  reserved 10, 11;
-  reserved "seo_title", "seo_description";
+  reserved 10, 11, 12;
+  reserved "seo_title", "seo_description", "food_business_registration_number";
 
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
   // 店家網址的路徑段。
@@ -1366,10 +1285,8 @@ message PublicStore {
   hawkr.common.v1alpha1.Image logo = 8;
   // 沒有設定時不設。
   hawkr.common.v1alpha1.Image cover_image = 9;
-  // 食品業者登錄字號，平台核對過的那一筆（Store.approved_food_registration）；空字串表示沒有核准的登錄。
-  string food_business_registration_number = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 這家店的公開資料最後更新的時間，給 sitemap 的 lastmod：取店家資料的最後修改時間、第一次可公開曝光的時間、最後一次可曝光狀態翻轉
-  // 的時間與食品業者登錄字號最後一次核准、清除或撤銷的時間中最晚的一個，所以不會早於上架日，停權結束後重新曝光、字號核准、清除或撤銷也會前進，
+  // 這家店的公開資料最後更新的時間，給 sitemap 的 lastmod：取店家資料的最後修改時間、第一次可公開曝光的時間與最後一次可曝光狀態翻轉
+  // 的時間中最晚的一個，所以不會早於上架日，停權結束後重新曝光也會前進，
   // 全量重新公告重發同一個狀態則不會。店家的非公開欄位（例如聯絡資料）改變也會讓它前進，因此偶爾比公開內容的實際變更晚。
   google.protobuf.Timestamp update_time = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

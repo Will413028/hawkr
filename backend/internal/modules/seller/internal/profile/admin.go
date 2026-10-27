@@ -117,13 +117,6 @@ func (s *Service) AdminList(ctx context.Context, in model.StoreListInput) (model
 	for i := range page.Items {
 		page.Items[i].Store = listed[i]
 	}
-	food := make([]*model.Store, len(page.Items))
-	for i := range page.Items {
-		food[i] = &page.Items[i].Store
-	}
-	if err := stint.AttachFood(ctx, q, food...); err != nil {
-		return model.StorePage{}, err
-	}
 	if hasMore {
 		last := page.Items[len(page.Items)-1].Store
 		page.Next = &model.StoreCursor{CreatedAt: last.CreatedAt, StoreID: last.StoreID}

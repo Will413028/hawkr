@@ -6,7 +6,7 @@
 
 // reviewqueue 模組給後台的待辦 API（step10e-3d-design.md §1.3）：所有模組中等待營運處理的事項，依期限由急到緩。
 // 待辦不是儲存的資源：每一項由擁有它的模組的領域狀態推導（成員、開始與期限的規則只在擁有者），所以沒有 Get；
-// 處理一項待辦在它所屬的頁面（通報、案件、來函、措施、食品業者登錄、商家認證），項目帶對象的 ID 讓 client 連過去。
+// 處理一項待辦在它所屬的頁面（通報、案件、來函、措施、商家認證），項目帶對象的 ID 讓 client 連過去。
 // 每一項都有期限（Deadline.start_time、due_time 都由伺服器給）；client 只拿現在和它們比較，不重建起算規則。
 
 package reviewqueuev1alpha1
@@ -39,8 +39,6 @@ const (
 	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_CASE_DECISION ReviewQueueItemKind = 2
 	// 案件裡逾期未回覆的詢問，營運要跟進（subject 是 case_inquiry）。
 	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_CASE_INQUIRY_OVERDUE ReviewQueueItemKind = 3
-	// 待轉報主管機關的案件（subject 是 case_id）。
-	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_CASE_FDA_REFERRAL ReviewQueueItemKind = 4
 	// 處理中的主管機關來函（subject 是 authority_order_id）。
 	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_AUTHORITY_ORDER ReviewQueueItemKind = 5
 	// 來函中暫不告知的對象，確認日期已到，要確認是否可以告知（subject 是 authority_target）。
@@ -51,8 +49,6 @@ const (
 	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_MEASURE_LIFT_REQUEST ReviewQueueItemKind = 8
 	// 複審期限將到的風險停權（subject 是 measure_id）。
 	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_MEASURE_REVIEW ReviewQueueItemKind = 9
-	// 待審核的食品業者登錄（subject 是 food_registration_id）。
-	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_FOOD_REGISTRATION ReviewQueueItemKind = 10
 	// 待審核的商家認證（subject 是 kyc_application）。
 	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION ReviewQueueItemKind = 11
 	// 重試用完的 PayUni 綁定失敗，等管理員重新綁定（subject 是 kyc_application）。
@@ -66,13 +62,11 @@ var (
 		1:  "REVIEW_QUEUE_ITEM_KIND_REPORT_TRIAGE",
 		2:  "REVIEW_QUEUE_ITEM_KIND_CASE_DECISION",
 		3:  "REVIEW_QUEUE_ITEM_KIND_CASE_INQUIRY_OVERDUE",
-		4:  "REVIEW_QUEUE_ITEM_KIND_CASE_FDA_REFERRAL",
 		5:  "REVIEW_QUEUE_ITEM_KIND_AUTHORITY_ORDER",
 		6:  "REVIEW_QUEUE_ITEM_KIND_AUTHORITY_TARGET_NOTICE",
 		7:  "REVIEW_QUEUE_ITEM_KIND_MEASURE_APPEAL",
 		8:  "REVIEW_QUEUE_ITEM_KIND_MEASURE_LIFT_REQUEST",
 		9:  "REVIEW_QUEUE_ITEM_KIND_MEASURE_REVIEW",
-		10: "REVIEW_QUEUE_ITEM_KIND_FOOD_REGISTRATION",
 		11: "REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION",
 		12: "REVIEW_QUEUE_ITEM_KIND_PAYUNI_BIND_RETRY",
 	}
@@ -81,13 +75,11 @@ var (
 		"REVIEW_QUEUE_ITEM_KIND_REPORT_TRIAGE":           1,
 		"REVIEW_QUEUE_ITEM_KIND_CASE_DECISION":           2,
 		"REVIEW_QUEUE_ITEM_KIND_CASE_INQUIRY_OVERDUE":    3,
-		"REVIEW_QUEUE_ITEM_KIND_CASE_FDA_REFERRAL":       4,
 		"REVIEW_QUEUE_ITEM_KIND_AUTHORITY_ORDER":         5,
 		"REVIEW_QUEUE_ITEM_KIND_AUTHORITY_TARGET_NOTICE": 6,
 		"REVIEW_QUEUE_ITEM_KIND_MEASURE_APPEAL":          7,
 		"REVIEW_QUEUE_ITEM_KIND_MEASURE_LIFT_REQUEST":    8,
 		"REVIEW_QUEUE_ITEM_KIND_MEASURE_REVIEW":          9,
-		"REVIEW_QUEUE_ITEM_KIND_FOOD_REGISTRATION":       10,
 		"REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION":         11,
 		"REVIEW_QUEUE_ITEM_KIND_PAYUNI_BIND_RETRY":       12,
 	}
@@ -251,7 +243,6 @@ type ReviewQueueItem struct {
 	//	*ReviewQueueItem_AuthorityTarget
 	//	*ReviewQueueItem_MeasureRequest
 	//	*ReviewQueueItem_MeasureId
-	//	*ReviewQueueItem_FoodRegistrationId
 	//	*ReviewQueueItem_KycApplication
 	Subject isReviewQueueItem_Subject `protobuf_oneof:"subject"`
 	// 對象所屬的店家；空字串表示這個項目沒有單一店家（例如來函）。
@@ -371,15 +362,6 @@ func (x *ReviewQueueItem) GetMeasureId() string {
 	return ""
 }
 
-func (x *ReviewQueueItem) GetFoodRegistrationId() string {
-	if x != nil {
-		if x, ok := x.Subject.(*ReviewQueueItem_FoodRegistrationId); ok {
-			return x.FoodRegistrationId
-		}
-	}
-	return ""
-}
-
 func (x *ReviewQueueItem) GetKycApplication() *KYCApplicationRef {
 	if x != nil {
 		if x, ok := x.Subject.(*ReviewQueueItem_KycApplication); ok {
@@ -442,10 +424,6 @@ type ReviewQueueItem_MeasureId struct {
 	MeasureId string `protobuf:"bytes,8,opt,name=measure_id,json=measureId,proto3,oneof"`
 }
 
-type ReviewQueueItem_FoodRegistrationId struct {
-	FoodRegistrationId string `protobuf:"bytes,9,opt,name=food_registration_id,json=foodRegistrationId,proto3,oneof"`
-}
-
 type ReviewQueueItem_KycApplication struct {
 	KycApplication *KYCApplicationRef `protobuf:"bytes,10,opt,name=kyc_application,json=kycApplication,proto3,oneof"`
 }
@@ -463,8 +441,6 @@ func (*ReviewQueueItem_AuthorityTarget) isReviewQueueItem_Subject() {}
 func (*ReviewQueueItem_MeasureRequest) isReviewQueueItem_Subject() {}
 
 func (*ReviewQueueItem_MeasureId) isReviewQueueItem_Subject() {}
-
-func (*ReviewQueueItem_FoodRegistrationId) isReviewQueueItem_Subject() {}
 
 func (*ReviewQueueItem_KycApplication) isReviewQueueItem_Subject() {}
 
@@ -702,7 +678,7 @@ const file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDesc = "" +
 	"\x05kinds\x18\x03 \x03(\x0e25.hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItemKindR\x05kinds\"\x8a\x01\n" +
 	"\x17ListReviewQueueResponse\x12G\n" +
 	"\x05items\x18\x01 \x03(\v21.hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItemR\x05items\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xa1\x06\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\x89\x06\n" +
 	"\x0fReviewQueueItem\x12N\n" +
 	"\x04kind\x18\x01 \x01(\x0e25.hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItemKindB\x03\xe0A\x02R\x04kind\x12\x1d\n" +
 	"\treport_id\x18\x02 \x01(\tH\x00R\breportId\x12\x19\n" +
@@ -712,15 +688,15 @@ const file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDesc = "" +
 	"\x10authority_target\x18\x06 \x01(\v24.hawkr.admin.reviewqueue.v1alpha1.AuthorityTargetRefH\x00R\x0fauthorityTarget\x12^\n" +
 	"\x0fmeasure_request\x18\a \x01(\v23.hawkr.admin.reviewqueue.v1alpha1.MeasureRequestRefH\x00R\x0emeasureRequest\x12\x1f\n" +
 	"\n" +
-	"measure_id\x18\b \x01(\tH\x00R\tmeasureId\x122\n" +
-	"\x14food_registration_id\x18\t \x01(\tH\x00R\x12foodRegistrationId\x12^\n" +
+	"measure_id\x18\b \x01(\tH\x00R\tmeasureId\x12^\n" +
 	"\x0fkyc_application\x18\n" +
 	" \x01(\v23.hawkr.admin.reviewqueue.v1alpha1.KYCApplicationRefH\x00R\x0ekycApplication\x12\x19\n" +
 	"\bstore_id\x18\x14 \x01(\tR\astoreId\x12\x1d\n" +
 	"\n" +
 	"store_name\x18\x15 \x01(\tR\tstoreName\x12@\n" +
 	"\bdeadline\x18\x16 \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x02R\bdeadlineB\t\n" +
-	"\asubject\"H\n" +
+	"\asubjectJ\x04\b\t\x10\n" +
+	"R\x14food_registration_id\"H\n" +
 	"\x0eCaseInquiryRef\x12\x17\n" +
 	"\acase_id\x18\x01 \x01(\tR\x06caseId\x12\x1d\n" +
 	"\n" +
@@ -737,22 +713,21 @@ const file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDesc = "" +
 	"request_id\x18\x02 \x01(\tR\trequestId\"U\n" +
 	"\x11KYCApplicationRef\x12\x19\n" +
 	"\bstore_id\x18\x01 \x01(\tR\astoreId\x12%\n" +
-	"\x0eapplication_id\x18\x02 \x01(\tR\rapplicationId*\xdf\x04\n" +
+	"\x0eapplication_id\x18\x02 \x01(\tR\rapplicationId*\xe3\x04\n" +
 	"\x13ReviewQueueItemKind\x12&\n" +
 	"\"REVIEW_QUEUE_ITEM_KIND_UNSPECIFIED\x10\x00\x12(\n" +
 	"$REVIEW_QUEUE_ITEM_KIND_REPORT_TRIAGE\x10\x01\x12(\n" +
 	"$REVIEW_QUEUE_ITEM_KIND_CASE_DECISION\x10\x02\x12/\n" +
-	"+REVIEW_QUEUE_ITEM_KIND_CASE_INQUIRY_OVERDUE\x10\x03\x12,\n" +
-	"(REVIEW_QUEUE_ITEM_KIND_CASE_FDA_REFERRAL\x10\x04\x12*\n" +
+	"+REVIEW_QUEUE_ITEM_KIND_CASE_INQUIRY_OVERDUE\x10\x03\x12*\n" +
 	"&REVIEW_QUEUE_ITEM_KIND_AUTHORITY_ORDER\x10\x05\x122\n" +
 	".REVIEW_QUEUE_ITEM_KIND_AUTHORITY_TARGET_NOTICE\x10\x06\x12)\n" +
 	"%REVIEW_QUEUE_ITEM_KIND_MEASURE_APPEAL\x10\a\x12/\n" +
 	"+REVIEW_QUEUE_ITEM_KIND_MEASURE_LIFT_REQUEST\x10\b\x12)\n" +
-	"%REVIEW_QUEUE_ITEM_KIND_MEASURE_REVIEW\x10\t\x12,\n" +
-	"(REVIEW_QUEUE_ITEM_KIND_FOOD_REGISTRATION\x10\n" +
-	"\x12*\n" +
+	"%REVIEW_QUEUE_ITEM_KIND_MEASURE_REVIEW\x10\t\x12*\n" +
 	"&REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION\x10\v\x12,\n" +
-	"(REVIEW_QUEUE_ITEM_KIND_PAYUNI_BIND_RETRY\x10\f2\xa7\x01\n" +
+	"(REVIEW_QUEUE_ITEM_KIND_PAYUNI_BIND_RETRY\x10\f\"\x04\b\x04\x10\x04\"\x04\b\n" +
+	"\x10\n" +
+	"*(REVIEW_QUEUE_ITEM_KIND_CASE_FDA_REFERRAL*(REVIEW_QUEUE_ITEM_KIND_FOOD_REGISTRATION2\xa7\x01\n" +
 	"\x17ReviewQueueAdminService\x12\x8b\x01\n" +
 	"\x0fListReviewQueue\x128.hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueRequest\x1a9.hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueResponse\"\x03\x90\x02\x01B\xca\x02\n" +
 	"$com.hawkr.admin.reviewqueue.v1alpha1B\x10ReviewQueueProtoP\x01Zmgithub.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/reviewqueue/v1alpha1;reviewqueuev1alpha1\xa2\x02\x03HAR\xaa\x02 Hawkr.Admin.Reviewqueue.V1alpha1\xca\x02 Hawkr\\Admin\\Reviewqueue\\V1alpha1\xe2\x02,Hawkr\\Admin\\Reviewqueue\\V1alpha1\\GPBMetadata\xea\x02#Hawkr::Admin::Reviewqueue::V1alpha1b\x06proto3"
@@ -813,7 +788,6 @@ func file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_init() {
 		(*ReviewQueueItem_AuthorityTarget)(nil),
 		(*ReviewQueueItem_MeasureRequest)(nil),
 		(*ReviewQueueItem_MeasureId)(nil),
-		(*ReviewQueueItem_FoodRegistrationId)(nil),
 		(*ReviewQueueItem_KycApplication)(nil),
 	}
 	type x struct{}

@@ -42,9 +42,6 @@ type CaseBlock = model.CaseBlock
 // CaseAction 是案件上有前置條件的動作（CaseBlock.Text 依它選句）。
 type CaseAction = model.CaseAction
 
-// FDAChannel 是食安事件轉報主管機關的管道。
-type FDAChannel = model.FDAChannel
-
 // InquiryKind 是詢問要賣家做的事（提供紀錄、請說明）。
 type InquiryKind = model.InquiryKind
 
@@ -159,11 +156,6 @@ const (
 	CaseBlockUnrevokedMeasureExists  = model.CaseBlockUnrevokedMeasureExists
 	CaseBlockReportActionTaken       = model.CaseBlockReportActionTaken
 	CaseBlockStoreClosed             = model.CaseBlockStoreClosed
-	CaseBlockNotFoodSafety           = model.CaseBlockNotFoodSafety
-	CaseBlockNoReports               = model.CaseBlockNoReports
-	CaseBlockReferralRecorded        = model.CaseBlockReferralRecorded
-	CaseBlockReferralWaived          = model.CaseBlockReferralWaived
-	CaseBlockNoReferral              = model.CaseBlockNoReferral
 	CaseBlockInquiryOpen             = model.CaseBlockInquiryOpen
 	CaseBlockStorePurged             = model.CaseBlockStorePurged
 	InquiryKindRecords               = model.InquiryKindRecords
@@ -183,18 +175,7 @@ const (
 	CaseActionChangeSeverity         = model.CaseActionChangeSeverity
 	CaseActionLinkMeasure            = model.CaseActionLinkMeasure
 	CaseActionCreateMeasure          = model.CaseActionCreateMeasure
-	CaseActionRecordReferral         = model.CaseActionRecordReferral
-	CaseActionWaiveReferral          = model.CaseActionWaiveReferral
-	CaseActionRecordReferralReply    = model.CaseActionRecordReferralReply
-	CaseActionExport                 = model.CaseActionExport
-	ReferralReferred                 = model.ReferralReferred
-	ReferralWaived                   = model.ReferralWaived
 	CaseActionCreateInquiry          = model.CaseActionCreateInquiry
-	FDAHotline1919                   = model.FDAHotline1919
-	FDAOnlineForm                    = model.FDAOnlineForm
-	FDAFaxHealthDept                 = model.FDAFaxHealthDept
-	FDAInPerson                      = model.FDAInPerson
-	FDAOther                         = model.FDAOther
 	ViolationStatusEnforced          = model.ViolationStatusEnforced
 	ViolationStatusRevoked           = model.ViolationStatusRevoked
 	RevokeAppealAccepted             = model.RevokeAppealAccepted
@@ -264,8 +245,6 @@ const (
 	MeasureActionShorten             = model.MeasureActionShorten
 	MeasureActionRevoke              = model.MeasureActionRevoke
 	MeasureActionEnd                 = model.MeasureActionEnd
-	// ReportBlockLastReportWithReferral 是案件唯一的成員而案件已記錄轉報：最後一筆通報不能移走。
-	ReportBlockLastReportWithReferral = model.ReportBlockLastReportWithReferral
 	// ContactRetention 是匿名檢舉人聯絡欄位的保留期限（從建立起算）；結果設定之後還要再留 ContactRetentionAfterOutcome。
 	ContactRetention = model.ContactRetention
 	// ContactRetentionAfterOutcome 是匿名檢舉人聯絡欄位在結果設定之後的保留期限。
@@ -336,9 +315,6 @@ func InquiryStateValues() []InquiryState { return model.InquiryStateValues() }
 
 // InquiryBlockValues 回傳全部詢問不能做動作的原因。
 func InquiryBlockValues() []InquiryBlock { return model.InquiryBlockValues() }
-
-// FDAChannelValues 回傳全部轉報管道。
-func FDAChannelValues() []FDAChannel { return model.FDAChannelValues() }
 
 // ViolationStatusValues 回傳全部違規狀態。
 func ViolationStatusValues() []ViolationStatus { return model.ViolationStatusValues() }
@@ -416,16 +392,6 @@ type (
 	FileContent = model.FileContent
 	// ReporterContact 是匿名檢舉人的聯絡方式。
 	ReporterContact = model.ReporterContact
-	// FDAReferral 是案件轉報主管機關的紀錄。
-	FDAReferral = model.FDAReferral
-	// FDAReferralReply 是主管機關對轉報的一則回覆。
-	FDAReferralReply = model.FDAReferralReply
-	// ReferralWaiver 是標記不轉報的紀錄。
-	ReferralWaiver = model.ReferralWaiver
-	// CaseReferral 是案件唯一的轉報紀錄（已轉報或不轉報）。
-	CaseReferral = model.CaseReferral
-	// ReferralOutcome 是轉報紀錄的種類。
-	ReferralOutcome = model.ReferralOutcome
 	// CaseInquiry 是案件上對賣家的一筆詢問。
 	CaseInquiry = model.CaseInquiry
 	// InquiryReply 是管理員記下的賣家回覆（系統外收到）。
@@ -502,16 +468,6 @@ type (
 	DecideCaseInput = model.DecideCaseInput
 	// ChangeCaseSeverityInput 是改嚴重度的輸入。
 	ChangeCaseSeverityInput = model.ChangeCaseSeverityInput
-	// RecordFDAReferralInput 是記下轉報的輸入。
-	RecordFDAReferralInput = model.RecordFDAReferralInput
-	// RecordFDAReferralResult 是記下轉報的結果。
-	RecordFDAReferralResult = model.RecordFDAReferralResult
-	// WaiveFDAReferralInput 是標記不轉報的輸入。
-	WaiveFDAReferralInput = model.WaiveFDAReferralInput
-	// WaiveFDAReferralResult 是標記不轉報的結果。
-	WaiveFDAReferralResult = model.WaiveFDAReferralResult
-	// RecordFDAReferralReplyInput 是記下主管機關回覆的輸入。
-	RecordFDAReferralReplyInput = model.RecordFDAReferralReplyInput
 	// ReportCursor 是通報列表的 keyset 位置。
 	ReportCursor = model.ReportCursor
 	// ReportListInput 是 admin 通報清單的輸入。
@@ -528,8 +484,6 @@ type (
 	CaseListInput = model.CaseListInput
 	// AdminCasePage 是一頁案件。
 	AdminCasePage = model.AdminCasePage
-	// FDAExport 是轉報主管機關需要的資料。
-	FDAExport = model.FDAExport
 	// MeasureRequest 是措施上賣家的請求（申覆）。
 	MeasureRequest = model.MeasureRequest
 	// Violation 是一筆認定（違規）。
@@ -654,21 +608,6 @@ func (m *Module) ChangeCaseSeverity(ctx context.Context, in ChangeCaseSeverityIn
 	return m.governance.ChangeSeverity(ctx, in)
 }
 
-// RecordFDAReferral 記下食安案件轉報主管機關；已記過時回傳原本的紀錄。
-func (m *Module) RecordFDAReferral(ctx context.Context, in RecordFDAReferralInput) (RecordFDAReferralResult, error) {
-	return m.governance.RecordFDAReferral(ctx, in)
-}
-
-// WaiveFDAReferral 標記食安案件不轉報（附原因）；已標記過時回傳原本的紀錄，已記錄轉報是錯誤。
-func (m *Module) WaiveFDAReferral(ctx context.Context, in WaiveFDAReferralInput) (WaiveFDAReferralResult, error) {
-	return m.governance.WaiveReferral(ctx, in)
-}
-
-// RecordFDAReferralReply 記下主管機關對轉報的回覆（只新增），並依輸入更新或清掉追蹤日期。只限已記錄轉報的案件。
-func (m *Module) RecordFDAReferralReply(ctx context.Context, in RecordFDAReferralReplyInput) (AdminCase, error) {
-	return m.governance.RecordReferralReply(ctx, in)
-}
-
 // CreateCaseInquiry 對案件的賣家發一筆詢問（提供紀錄或請說明，有期限）；不發事件（沒有消費者）。同一位管理員同一個 request_id 的重送回傳原本那一筆。
 func (m *Module) CreateCaseInquiry(ctx context.Context, in CreateCaseInquiryInput) (CreateCaseInquiryResult, error) {
 	return m.governance.CreateInquiry(ctx, in)
@@ -694,14 +633,9 @@ func (m *Module) Report(ctx context.Context, reportID uuid.UUID) (AdminReport, e
 	return m.governance.Report(ctx, reportID)
 }
 
-// Case 讀取一個案件的後台檢視：移動紀錄、轉報紀錄與此刻可以做的動作。只由 admin 的 handler 呼叫，自己開讀取快照。
+// Case 讀取一個案件的後台檢視：移動紀錄與此刻可以做的動作。只由 admin 的 handler 呼叫，自己開讀取快照。
 func (m *Module) Case(ctx context.Context, caseID uuid.UUID) (AdminCase, error) {
 	return m.governance.Case(ctx, caseID)
-}
-
-// FDAExport 回傳食安案件轉報主管機關需要的資料（案件、結果沒有被否定的通報與以 store_id 讀到的店家）。
-func (m *Module) FDAExport(ctx context.Context, caseID uuid.UUID) (FDAExport, error) {
-	return m.governance.FDAExport(ctx, caseID)
 }
 
 // AdminReports 是 admin 的通報清單。

@@ -137,17 +137,17 @@ func HasPublicCard(firstExposedAt *time.Time, exposable bool) bool {
 }
 
 // PublicStore 是可以公開曝光的店家連同公開資料最後更新的時間（UpdateTime，給 sitemap 的 lastmod）：stores.updated_at、
-// first_exposed_at、公告值最後一次翻轉的時間（store_exposures.exposable_changed_at）與食品業者登錄最後一次改變公開字號的時間
-// （核准、清除或撤銷，StoreFoodChangedAt）中最晚的一個，所以店家第一次公開、停權結束後重新曝光、字號核准、清除或撤銷時 lastmod 都會前進；重發同一個公告值不會。
+// first_exposed_at 與公告值最後一次翻轉的時間（store_exposures.exposable_changed_at）中最晚的一個，所以店家第一次公開、停權結束後重新曝光時
+// lastmod 都會前進；重發同一個公告值不會。
 type PublicStore struct {
 	Store
 	UpdateTime time.Time
 }
 
-// PublicStoreUpdateTime 是 PublicStore.UpdateTime 的唯一算法；沒有值的時間（還沒公開、還沒公告、沒有核准、清除或撤銷過字號）略過。
-func PublicStoreUpdateTime(updatedAt time.Time, firstExposedAt, announcedAt, foodChangedAt *time.Time) time.Time {
+// PublicStoreUpdateTime 是 PublicStore.UpdateTime 的唯一算法；沒有值的時間（還沒公開、還沒公告）略過。
+func PublicStoreUpdateTime(updatedAt time.Time, firstExposedAt, announcedAt *time.Time) time.Time {
 	latest := updatedAt
-	for _, t := range []*time.Time{firstExposedAt, announcedAt, foodChangedAt} {
+	for _, t := range []*time.Time{firstExposedAt, announcedAt} {
 		if t != nil && t.After(latest) {
 			latest = *t
 		}

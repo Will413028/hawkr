@@ -9,7 +9,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// StoreAction 是 admin 對店家（或它的帳號、商家認證申請、PayUni 註冊、食品業者登錄）做的、有前置條件的動作；原因清單與句子都依動作決定。
+// StoreAction 是 admin 對店家（或它的帳號、商家認證申請、PayUni 註冊）做的、有前置條件的動作；原因清單與句子都依動作決定。
 type StoreAction string
 
 const (
@@ -25,17 +25,13 @@ const (
 	StoreActionRequeryKYC StoreAction = "REQUERY_KYC"
 	// StoreActionRebindPayUni 對綁定失敗的 PayUni 註冊重新綁定。
 	StoreActionRebindPayUni StoreAction = "REBIND_PAYUNI"
-	// StoreActionApproveFoodRegistration 核准食品業者登錄。
-	StoreActionApproveFoodRegistration StoreAction = "APPROVE_FOOD_REGISTRATION"
-	// StoreActionRejectFoodRegistration 退回食品業者登錄。
-	StoreActionRejectFoodRegistration StoreAction = "REJECT_FOOD_REGISTRATION"
 )
 
 // StoreActionValues 回傳全部有前置條件的店家動作。
 func StoreActionValues() []StoreAction {
 	return []StoreAction{
 		StoreActionCreateMeasure, StoreActionDelegate, StoreActionApproveKYC, StoreActionRejectKYC, StoreActionRequeryKYC,
-		StoreActionRebindPayUni, StoreActionApproveFoodRegistration, StoreActionRejectFoodRegistration,
+		StoreActionRebindPayUni,
 	}
 }
 
@@ -53,8 +49,6 @@ const (
 	StoreReasonPayUniBindInProgress StoreActionUnavailableReason = "PAYUNI_BIND_IN_PROGRESS"
 	// StoreReasonPayUniBound PayUni 註冊已綁定。表示沒有入口。
 	StoreReasonPayUniBound StoreActionUnavailableReason = "PAYUNI_BOUND"
-	// StoreReasonFoodRegistrationNotPending 食品業者登錄不在待審。表示沒有入口。
-	StoreReasonFoodRegistrationNotPending StoreActionUnavailableReason = "FOOD_REGISTRATION_NOT_PENDING"
 	// StoreReasonKYCNotApproved 店家目前的商家認證還沒核准（重新綁定時是註冊所根據的申請不是已核准）。
 	StoreReasonKYCNotApproved StoreActionUnavailableReason = "KYC_NOT_APPROVED"
 	// StoreReasonStoreClosed 店家已關閉。
@@ -69,7 +63,7 @@ const (
 func StoreActionUnavailableReasonValues() []StoreActionUnavailableReason {
 	return []StoreActionUnavailableReason{
 		StoreReasonKYCNotSubmitted, StoreReasonKYCNotBusiness, StoreReasonPayUniMerchantTerminal, StoreReasonPayUniBindInProgress,
-		StoreReasonPayUniBound, StoreReasonFoodRegistrationNotPending, StoreReasonKYCNotApproved, StoreReasonStoreClosed,
+		StoreReasonPayUniBound, StoreReasonKYCNotApproved, StoreReasonStoreClosed,
 		StoreReasonStorePendingDeletion, StoreReasonAccountSuspended,
 	}
 }
@@ -86,7 +80,6 @@ type storeActionFacts struct {
 	KYC       KYCApplicationState
 	PayUni    PayUniRegistration
 	PayUniApp KYCStatus
-	FoodReg   FoodRegistrationReview
 }
 
 // storeActionRule 是有效組合表的一列：原因、成立的條件、給員工的句子。Text 是 nil 表示 idempotent：方法不回錯誤、回目前的狀態，沒有句子
@@ -97,13 +90,12 @@ type storeActionRule struct {
 	Text    func() uitext.Message
 }
 
-// 各動作共用的條件。FoodRegistrationUnavailableReasons 沒有載入停權（只有 StoreStatus），所以食品業者登錄的動作不能用 whenSuspended。
+// 各動作共用的條件。
 var (
 	whenStoreClosed = func(f storeActionFacts) bool { return f.Store.Status == Closed }
 	whenPending     = func(f storeActionFacts) bool { return f.Store.Status == PendingDeletion }
 	whenSuspended   = func(f storeActionFacts) bool { return f.Store.Suspended() }
 	whenKYCNotSub   = func(f storeActionFacts) bool { return f.KYC.Status != KYCStatusSubmitted }
-	whenFoodNotPend = func(f storeActionFacts) bool { return f.FoodReg.State != FoodRegPending }
 )
 
 // missesDelegating 回報店家缺 CapStorefrontWrite 的哪個條件（代行營運看的就是店家能不能寫店面）。
@@ -151,19 +143,6 @@ var storeActionRules = map[StoreAction][]storeActionRule{
 		{StoreReasonPayUniBound, func(f storeActionFacts) bool { return f.PayUni.BindStatus == BindBound }, text.StoreActionUnavailablePayuniBoundRebindPayuni},
 		{StoreReasonKYCNotApproved, func(f storeActionFacts) bool { return f.PayUniApp != KYCStatusApproved }, text.StoreActionUnavailableKycNotApprovedRebindPayuni},
 	},
-	StoreActionApproveFoodRegistration: {
-		{StoreReasonFoodRegistrationNotPending, whenFoodNotPend, text.StoreActionUnavailableFoodRegistrationNotPendingDecideFoodRegistration},
-		{StoreReasonStoreClosed, whenStoreClosed, text.StoreActionUnavailableStoreClosedDecideFoodRegistration},
-		{StoreReasonStorePendingDeletion, whenPending, text.StoreActionUnavailableStorePendingDeletionDecideFoodRegistration},
-		{StoreReasonKYCNotApproved, func(f storeActionFacts) bool {
-			return f.FoodReg.KYCStatus == nil || *f.FoodReg.KYCStatus != KYCStatusApproved
-		}, text.StoreActionUnavailableKycNotApprovedApproveFoodRegistration},
-	},
-	StoreActionRejectFoodRegistration: {
-		{StoreReasonFoodRegistrationNotPending, whenFoodNotPend, text.StoreActionUnavailableFoodRegistrationNotPendingDecideFoodRegistration},
-		{StoreReasonStoreClosed, whenStoreClosed, text.StoreActionUnavailableStoreClosedDecideFoodRegistration},
-		{StoreReasonStorePendingDeletion, whenPending, text.StoreActionUnavailableStorePendingDeletionDecideFoodRegistration},
-	},
 }
 
 // unavailableReasons 依表的順序跑 a 的條件，回傳成立的原因（空表示可以做）；未知的動作回 nil。
@@ -178,7 +157,7 @@ func unavailableReasons(a StoreAction, f storeActionFacts) []StoreActionUnavaila
 }
 
 // ActionUnavailableReasons 回傳此刻不能對店家做 a 的原因（依優先序，空表示可以）：CREATE_MEASURE 與 DELEGATE 只看店家。DELEGATE 對應 CapStorefrontWrite
-// 缺的條件（已關閉、等待刪除、停權）；其他動作回 nil（它們還要申請、註冊或登錄的事實，用下面的函式）。
+// 缺的條件（已關閉、等待刪除、停權）；其他動作回 nil（它們還要申請或註冊的事實，用下面的函式）。
 func (s Store) ActionUnavailableReasons(a StoreAction) []StoreActionUnavailableReason {
 	if a != StoreActionCreateMeasure && a != StoreActionDelegate {
 		return nil
@@ -199,15 +178,6 @@ func KYCActionUnavailableReasons(s Store, app KYCApplicationState, a StoreAction
 // RebindPayUni 回目前的註冊；其他原因回 failed_precondition；空表示會開始一次新的綁定。
 func RebindUnavailableReasons(s Store, reg PayUniRegistration, app KYCStatus) []StoreActionUnavailableReason {
 	return unavailableReasons(StoreActionRebindPayUni, storeActionFacts{Store: s, PayUni: reg, PayUniApp: app})
-}
-
-// FoodRegistrationUnavailableReasons 回傳此刻不能裁定食品業者登錄 r 的原因（a 是核准或退回）；店家的條件只看 r.StoreStatus。
-func FoodRegistrationUnavailableReasons(r FoodRegistrationReview, a StoreAction) []StoreActionUnavailableReason {
-	switch a {
-	case StoreActionApproveFoodRegistration, StoreActionRejectFoodRegistration:
-		return unavailableReasons(a, storeActionFacts{Store: Store{Status: r.StoreStatus}, FoodReg: r})
-	}
-	return nil
 }
 
 // StoreActionIdempotent 回報 (a, reason) 在表上是不是 idempotent（沒有句子）：方法不回錯誤、回目前的狀態。表外的組合不是。

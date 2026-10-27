@@ -62,8 +62,8 @@ func TestDeclarationsMatchTheServiceDescriptors(t *testing.T) {
 	if err := Check(svcs); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(declarations), methodCount(t); got != want || got != 88 {
-		t.Fatalf("declarations=%d methods=%d，預期 88", got, want)
+	if got, want := len(declarations), methodCount(t); got != want || got != 80 {
+		t.Fatalf("declarations=%d methods=%d，預期 80", got, want)
 	}
 
 	for procedure := range declarations {
@@ -264,25 +264,6 @@ func TestEveryProspectMethodDeclaresItsOwnPermission(t *testing.T) {
 		seen[permission] = true
 		if !adminperm.Allows([]adminperm.Role{adminperm.RoleOwner}, permission) || adminperm.Allows(nil, permission) {
 			t.Errorf("%s：OWNER 要允許、零角色要拒絕", permission)
-		}
-	}
-}
-
-// 食品業者登錄審核的四支方法各自一個權限（list、get、decide、revoke），授予 OWNER；零角色的管理員沒有任何一個。
-func TestEveryFoodRegistrationMethodDeclaresItsOwnPermission(t *testing.T) {
-	want := map[string]adminperm.Permission{
-		sellerv1alpha1connect.SellerAdminServiceListFoodRegistrationsProcedure:  adminperm.SellerFoodRegistrationsList,
-		sellerv1alpha1connect.SellerAdminServiceGetFoodRegistrationProcedure:    adminperm.SellerFoodRegistrationsGet,
-		sellerv1alpha1connect.SellerAdminServiceDecideFoodRegistrationProcedure: adminperm.SellerFoodRegistrationsDecide,
-		sellerv1alpha1connect.SellerAdminServiceRevokeFoodRegistrationProcedure: adminperm.SellerFoodRegistrationsRevoke,
-	}
-	for procedure, permission := range want {
-		got, ok := declarations[procedure]
-		if !ok || got.permission != permission || got.exemptReason != "" {
-			t.Errorf("%s 的宣告 = %+v，預期 %s", procedure, got, permission)
-		}
-		if !adminperm.InCatalog(permission) || !adminperm.Allows([]adminperm.Role{adminperm.RoleOwner}, permission) || adminperm.Allows(nil, permission) {
-			t.Errorf("%s：要在目錄、OWNER 允許、零角色拒絕", permission)
 		}
 	}
 }

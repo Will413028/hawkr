@@ -117,10 +117,10 @@ func TestKYCDraftSubmitApproveFlow(t *testing.T) {
 	if len(approved.all()) != 1 || approved.all()[0].EventID != approveReview.ID || approved.all()[0].AccountID != accountID || approved.all()[0].StoreID != s.StoreID {
 		t.Fatalf("approved=%+v", approved.all())
 	}
-	// 核准 KYC 不碰店家的 profile 與食品業者登錄（登錄是獨立的審核資源）：店家的版本不動、沒有 profile 事件、沒有核准的登錄。
+	// 核准 KYC 不碰店家的 profile：店家的版本不動、沒有 profile 事件。
 	after, err := f.module.Store(ctx, s.StoreID)
 	must(t, err)
-	if after.ApprovedFoodRegistration != nil || after.Version != storeBefore.Version || len(profile.all()) != 0 {
+	if after.Version != storeBefore.Version || len(profile.all()) != 0 {
 		t.Fatalf("store=%+v profile events=%d", after, len(profile.all()))
 	}
 	// 已核准的不能再核准、退回、取消或修改。

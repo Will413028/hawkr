@@ -49,3 +49,7 @@
 做的時候要先解決 queue brief §2 列的五點：先鎖再算靠領域鎖、重算的單位、週期的身分、核對的漂移定義、存結束原因；以及佇列的列在全域鎖順序的位置。
 
 第一個沒有期限的種類出現時（例如 A7 的某一種），`pub_review_item` 加「有無期限」一欄，排序與游標各改一處、`deadline` 改選填。
+
+## 修訂：刪除兩種待辦（2026-10-28，ADR `2026-10-27-general-ecommerce-scope-cut` D3；計畫 `plans/2026-10-27-ecommerce-scope-cut.md` 步驟 4）
+
+FDA 轉報與食品業者登錄刪除，待辦少了 `CASE_FDA_REFERRAL`（待轉報）與 `FOOD_REGISTRATION`（審核食品業者登錄），seller 發布的種類剩 10 種；`seller.review_item` 與 `seller.pub_review_item` 少了 `food_registration_id`，`ReviewQueueItem.subject` 少了 `food_registration_id`（欄號 reserved）。排序、游標與「每一項都有期限」的決策不變。

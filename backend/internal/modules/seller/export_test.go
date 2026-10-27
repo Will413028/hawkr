@@ -12,6 +12,3 @@ func (m *Module) SetPurgeAfterPurgeCandidates(fn func()) { m.purge.SetAfterPurge
 func (m *Module) SetRequestHooks(afterPreRead, afterLock func()) {
 	m.measure.SetRequestHooks(afterPreRead, afterLock)
 }
-
-// SetPurgeAfterFoodCandidates 讓測試固定食品登錄審核紀錄的刪除與寫入來函保存的一方的交錯（purge.Service.SetAfterFoodCandidates）。
-func (m *Module) SetPurgeAfterFoodCandidates(fn func()) { m.purge.SetAfterFoodCandidates(fn) }

@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-// seller 模組給後台的 API：店家的清單與統計、身分認證（KYC）的審核、食品業者登錄的審核與 PayUni 子商店。停權是措施
+// seller 模組給後台的 API：店家的清單與統計、身分認證（KYC）的審核與 PayUni 子商店。停權是措施
 // （警告與停權），建立、結束與撤銷在 hawkr.admin.seller.v1alpha1 的 SellerGovernanceAdminService。
 // 前台的 API 在 hawkr.seller.v1alpha1。
 // 後台刪整個帳號在 hawkr.admin.identity.v1alpha1 的 DeleteAccount。
@@ -108,41 +108,12 @@ service SellerAdminService {
   // 先收掉再新增一筆，所以重送沒有「已有查詢中就什麼都不做」的情形。申請不能重新查詢（不在審核中、不是公司型、店家已關閉或等待刪除）
   // 時回 failed_precondition，訊息是 KYCApplication.requery_registration_unavailabilities 的第一句；申請不存在或是賣家的草稿回 not_found。
   rpc RequeryKYCRegistration(RequeryKYCRegistrationRequest) returns (RequeryKYCRegistrationResponse);
-
-  // ListFoodRegistrations 是食品業者登錄的審核收件匣。沒有指定 state（UNSPECIFIED）或 PENDING：營運中的店家的待審件；已關閉或等待刪除的店家的待審件不列。
-  // 收件匣再依 inbox 分兩個隊列：預設（UNSPECIFIED 或 DECIDABLE）只列現在可以裁定的件，也就是店家的 KYC 已核准的，依裁定期限
-  // （decide_deadline.due_time）由近到遠，期限相同時依 id；AWAITING_KYC 列還在等 KYC 核准的，依送出時間舊到新（還不能裁定，沒有期限）。
-  // 指定其他 state 是歷史：新到舊，店家的狀態不限，不可以同時指定 inbox（回 invalid_argument）。page_token 帶最後一筆的排序值與 id
-  // （DECIDABLE 是期限，其他是送出時間）；inbox 是篩選，不是排序鍵：翻頁途中店家的 KYC 核准了，件離開 AWAITING_KYC、進入 DECIDABLE，
-  // 位置依 DECIDABLE 的排序鍵，在已翻過的游標之前的，這一輪不會再翻到，重新載入即可。商家認證被退回又核准時，期限的開始時間會換，
-  // 該筆的位置在翻頁途中可能移動（重複或漏看一筆），重新載入即可。換 state、inbox 或 query 要重新從第一頁開始。
-  // 哪些件現在可以核准看每筆的 can_approve。query 是字號或店名的子字串。
-  rpc ListFoodRegistrations(ListFoodRegistrationsRequest) returns (ListFoodRegistrationsResponse) {
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-
-  // GetFoodRegistration 讀一筆登錄：送出的字號、店家目前核准的字號、店家 KYC 的狀態，以及已核准的 KYC 主體（核對食藥署資料時
-  // 要比對的對象；賣家還沒送出或還在審的 KYC 內容不會出現在這裡）。
-  rpc GetFoodRegistration(GetFoodRegistrationRequest) returns (GetFoodRegistrationResponse) {
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-
-  // DecideFoodRegistration 核准或退回待審的登錄。核准：店家的 KYC 要是 APPROVED（核對的是已驗證過的主體），否則回 failed_precondition；
-  // 新的字號成為店家公開的字號，目前核准的那一筆同時結束。退回：reason 必填，賣家看得到；店家公開的字號不變。internal_note 選填，
-  // 只給後台看（例如個人賣家「僅核對有效」）。不能裁定（已不是待審：被撤回、被取代、已裁定；店家已關閉或等待刪除；核准時店家的 KYC 還沒核准）
-  // 時回 failed_precondition，訊息是 FoodRegistration.approve_unavailabilities 或 reject_unavailabilities 的第一句。
-  rpc DecideFoodRegistration(DecideFoodRegistrationRequest) returns (DecideFoodRegistrationResponse);
-
-  // RevokeFoodRegistration 撤銷已核准的登錄（資源層級：更正單一資訊，不是對賣家的措施）：reason 必填，賣家看得到；撤銷不帶內部註記，核准時寫的註記留著
-  // （冒用或不實登錄的細節記在違規認定與措施上）。撤銷後店面與商品頁立即不再顯示這個字號，賣家重新送審即可，不另設申覆；店家若有同一字號
-  // 的待審件不會自動退回，由管理員另外裁定。登錄不是核准中的（待審、已退回、已結束）回 failed_precondition。
-  rpc RevokeFoodRegistration(RevokeFoodRegistrationRequest) returns (RevokeFoodRegistrationResponse);
 }
 
-// StoreActionUnavailableReason 是 admin 此刻不能對店家（或它的帳號、商家認證申請、PayUni 註冊、食品業者登錄）做某個動作的原因
+// StoreActionUnavailableReason 是 admin 此刻不能對店家（或它的帳號、商家認證申請、PayUni 註冊）做某個動作的原因
 // （StoreActionUnavailability.reason）。每個動作只會出現它相關的原因，依該動作的先後排列，與對應方法的前置檢查是同一個規則
 // （model/store_action.go 的有效組合表）。client 用它分支，不用它組顯示文字。分支規則：依先後，第一個是下面標明「表示沒有入口」的值
-// （KYC_NOT_SUBMITTED、KYC_NOT_BUSINESS、PAYUNI_BIND_IN_PROGRESS、PAYUNI_BOUND、FOOD_REGISTRATION_NOT_PENDING）時，畫面不顯示這個動作的
+// （KYC_NOT_SUBMITTED、KYC_NOT_BUSINESS、PAYUNI_BIND_IN_PROGRESS、PAYUNI_BOUND）時，畫面不顯示這個動作的
 // 入口，也不顯示句子；其餘的值顯示 message。新增值時要在它的註解寫明是否表示沒有入口。
 enum StoreActionUnavailableReason {
   STORE_ACTION_UNAVAILABLE_REASON_UNSPECIFIED = 0;
@@ -156,9 +127,7 @@ enum StoreActionUnavailableReason {
   STORE_ACTION_UNAVAILABLE_REASON_PAYUNI_BIND_IN_PROGRESS = 4;
   // PayUni 註冊已綁定（BOUND）。表示沒有入口。
   STORE_ACTION_UNAVAILABLE_REASON_PAYUNI_BOUND = 5;
-  // 食品業者登錄不在待審。表示沒有入口。
-  STORE_ACTION_UNAVAILABLE_REASON_FOOD_REGISTRATION_NOT_PENDING = 6;
-  // 店家目前的商家認證還沒核准（核准食品業者登錄；重新綁定 PayUni 時是註冊所根據的申請不是已核准，例如賣家正在修改）。
+  // 重新綁定 PayUni 時，註冊所根據的申請不是已核准（例如賣家正在修改）。
   STORE_ACTION_UNAVAILABLE_REASON_KYC_NOT_APPROVED = 7;
   // 店家已關閉。
   STORE_ACTION_UNAVAILABLE_REASON_STORE_CLOSED = 8;
@@ -166,6 +135,9 @@ enum StoreActionUnavailableReason {
   STORE_ACTION_UNAVAILABLE_REASON_STORE_PENDING_DELETION = 9;
   // 帳號有生效中的停權措施。
   STORE_ACTION_UNAVAILABLE_REASON_ACCOUNT_SUSPENDED = 10;
+
+  reserved 6;
+  reserved "STORE_ACTION_UNAVAILABLE_REASON_FOOD_REGISTRATION_NOT_PENDING";
 }
 
 // StoreActionUnavailability 是此刻不能做某個動作的一個原因；message 與該方法被拒絕時錯誤的 LocalizedMessage 是同一句（同一個 Go 函式）。
@@ -204,6 +176,8 @@ message Closure {
 message Store {
   reserved 7, 8, 11, 12, 17, 18, 23, 25;
   reserved "town_code", "address_detail", "processed_food", "food_business_reg_no", "seo_title", "seo_description", "etag", "food_business";
+  reserved 29, 30;
+  reserved "approved_food_registration", "open_food_registration";
 
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
   // 店家網址的路徑段。
@@ -223,7 +197,7 @@ message Store {
   hawkr.common.v1alpha1.Image cover_image = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
   hawkr.seller.v1alpha1.StoreStatus status = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
   google.protobuf.Timestamp create_time = 19 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 店家資料最後一次被編輯的時間；食品業者登錄的送出、核准、清除與撤銷不會讓它前進。
+  // 店家資料最後一次被編輯的時間。
   google.protobuf.Timestamp update_time = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 關店的時間；沒有關閉時不設。
   google.protobuf.Timestamp close_time = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -231,11 +205,6 @@ message Store {
   Closure closure = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 店家地址（可以只有鄉鎮市區）；沒有填或個資清除之後不設。
   hawkr.common.v1alpha1.PostalAddress address = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 目前核准的食品業者登錄（state 是 APPROVED）；沒有時不設。只帶登錄本身的欄位（id、store_id、registration_number、state、時間與理由），
-  // 審核用的欄位（KYC 狀態、主體、內部註記、裁定者、can_*）用 GetFoodRegistration 讀。
-  FoodRegistration approved_food_registration = 29 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 最近一筆未結束的登錄（待審，或被退回而且之後沒有再送出新的）；沒有時不設。欄位範圍同 approved_food_registration。
-  FoodRegistration open_food_registration = 30 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 聯絡人姓名；沒有填或個資清除之後是空字串。
   string contact_name = 26 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 聯絡人手機；沒有填或個資清除之後是空字串。
@@ -833,155 +802,4 @@ message RequeryKYCRegistrationRequest {
 message RequeryKYCRegistrationResponse {
   // 這筆進行中的查詢（同 KYCApplication.pending_registration_check：seq、request_time、deadline_time）。
   KYCRegistrationCheck registration_check = 1;
-}
-
-// FoodRegistrationState 是食品業者登錄的狀態。
-enum FoodRegistrationState {
-  FOOD_REGISTRATION_STATE_UNSPECIFIED = 0;
-  // 賣家送出，等平台核對。
-  FOOD_REGISTRATION_STATE_PENDING = 1;
-  // 核准中的登錄：店家公開的字號只讀這一筆。
-  FOOD_REGISTRATION_STATE_APPROVED = 2;
-  // 被退回。
-  FOOD_REGISTRATION_STATE_REJECTED = 3;
-  // 賣家撤回，或被新送出的取代、隨清除撤回；沒有裁定。
-  FOOD_REGISTRATION_STATE_WITHDRAWN = 4;
-  // 曾經核准而後結束，原因是 end_cause。
-  FOOD_REGISTRATION_STATE_ENDED = 5;
-}
-
-// FoodRegistrationInbox 是審核收件匣的隊列（待審、店家營運中的件依店家的 KYC 是否已核准分開）。
-enum FoodRegistrationInbox {
-  // 沒有指定：等同 DECIDABLE。
-  FOOD_REGISTRATION_INBOX_UNSPECIFIED = 0;
-  // 現在可以裁定：店家的 KYC 已核准（核對的是已驗證過的主體）。
-  FOOD_REGISTRATION_INBOX_DECIDABLE = 1;
-  // 還在等 KYC 核准：店家還沒有核准的 KYC 申請（沒申請、填寫中、審核中、已退回都算）；KYC 核准後這些件進入 DECIDABLE。
-  FOOD_REGISTRATION_INBOX_AWAITING_KYC = 2;
-}
-
-// FoodRegistrationEndCause 是核准的登錄結束的原因。
-enum FoodRegistrationEndCause {
-  FOOD_REGISTRATION_END_CAUSE_UNSPECIFIED = 0;
-  // 被新核准的字號取代。
-  FOOD_REGISTRATION_END_CAUSE_SUPERSEDED = 1;
-  // 賣家清除。
-  FOOD_REGISTRATION_END_CAUSE_CLEARED = 2;
-  // 平台撤銷。
-  FOOD_REGISTRATION_END_CAUSE_REVOKED = 3;
-  // 店家個資清理（關店滿保留期，6 個月）時，仍核准中的登錄隨之結束。
-  FOOD_REGISTRATION_END_CAUSE_STORE_RETIRED = 4;
-}
-
-// FoodRegistrationDecision 是管理員對待審登錄的裁定。
-enum FoodRegistrationDecision {
-  FOOD_REGISTRATION_DECISION_UNSPECIFIED = 0;
-  FOOD_REGISTRATION_DECISION_APPROVE = 1;
-  FOOD_REGISTRATION_DECISION_REJECT = 2;
-}
-
-// FoodRegistrationSubject 是核對食藥署的登錄資料時要比對的 KYC 主體：企業是公司名稱與統編，個人是真實姓名。
-message FoodRegistrationSubject {
-  KYCSellerType seller_type = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 個人賣家的真實姓名；企業賣家是負責人。
-  string real_name = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 企業賣家才有。
-  string company_name = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
-  string tax_id = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
-}
-
-// FoodRegistration 是後台看到的一筆食品業者登錄。
-message FoodRegistration {
-  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
-  string store_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 空字串表示沒有（關店滿保留期清除個資之後）。
-  string store_name = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
-  hawkr.seller.v1alpha1.StoreStatus store_status = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 送出的字號。
-  string registration_number = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
-  FoodRegistrationState state = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
-  google.protobuf.Timestamp submit_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 裁定的管理員；沒有裁定（待審、撤回）時是空字串。
-  string decider_admin_id = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 裁定的時間；沒有裁定時不設。
-  google.protobuf.Timestamp decide_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 退回的理由，賣家看得到；只在 REJECTED。
-  string reject_reason = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 內部備註，只給後台看；核准時寫的註記撤銷後留著。
-  string internal_note = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 撤回或結束的時間；其他狀態不設。
-  google.protobuf.Timestamp end_time = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 只在 ENDED。
-  FoodRegistrationEndCause end_cause = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 店家目前還沒取消的 KYC 申請的狀態；不設表示店家還沒有申請。
-  optional hawkr.seller.v1alpha1.KYCStatus kyc_status = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 店家已核准的 KYC 申請的主體；KYC 還沒核准（含只有草稿）時不設。
-  FoodRegistrationSubject subject = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 店家目前核准的食品業者登錄（可能就是這一筆）；沒有時不設。
-  FoodRegistration approved = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 現在可以核准：待審、店家營運中、店家的 KYC 已核准。等於 approve_unavailabilities 是空的。
-  bool can_approve = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 現在可以退回：待審、店家營運中。等於 reject_unavailabilities 是空的。
-  bool can_reject = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 平台撤銷的理由，賣家看得到；只在 end_cause 是 REVOKED。
-  string end_reason = 19 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 現在可以撤銷：核准中。
-  bool can_revoke = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 撤銷的管理員；只在 end_cause 是 REVOKED。
-  string revoker_admin_id = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 裁定的期限，只在現在可以裁定時設（待審、店家營運中、店家的 KYC 已核准；等 KYC 核准的不設）：開始時間是送出時間與 KYC 核准時間中較晚的，期限 7 天。
-  hawkr.common.v1alpha1.Deadline decide_deadline = 22 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 不能核准的原因，依先後；DecideFoodRegistration 核准被拒絕時訊息是第一句。
-  repeated StoreActionUnavailability approve_unavailabilities = 23 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 不能退回的原因，依先後；DecideFoodRegistration 退回被拒絕時訊息是第一句。
-  repeated StoreActionUnavailability reject_unavailabilities = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
-}
-
-message ListFoodRegistrationsRequest {
-  // 每頁筆數：0 用預設值 20，上限 100。
-  int32 page_size = 1;
-  string page_token = 2;
-  // UNSPECIFIED 與 PENDING 是收件匣，其他狀態是歷史。
-  FoodRegistrationState state = 3;
-  // 字號或店名包含這段文字（不分大小寫）；空字串不篩選。
-  string query = 4;
-  // 收件匣的隊列；只有 state 是 UNSPECIFIED 或 PENDING 時可以指定，指定歷史狀態時回 invalid_argument。UNSPECIFIED 等同 DECIDABLE。
-  FoodRegistrationInbox inbox = 5;
-}
-
-message ListFoodRegistrationsResponse {
-  repeated FoodRegistration registrations = 1;
-  string next_page_token = 2;
-}
-
-message GetFoodRegistrationRequest {
-  string id = 1 [(google.api.field_behavior) = REQUIRED];
-}
-
-message GetFoodRegistrationResponse {
-  FoodRegistration registration = 1;
-}
-
-message DecideFoodRegistrationRequest {
-  string id = 1 [(google.api.field_behavior) = REQUIRED];
-  FoodRegistrationDecision decision = 2 [(google.api.field_behavior) = REQUIRED];
-  // 退回的理由，最多 1000 字；賣家看得到。退回時必填，核准時不可以帶。
-  string reason = 3;
-  // 內部備註，選填，最多 1000 字；只給後台看，賣家看不到。
-  string internal_note = 4;
-}
-
-message DecideFoodRegistrationResponse {
-  FoodRegistration registration = 1;
-}
-
-message RevokeFoodRegistrationRequest {
-  // 核准中的登錄的 id（FoodRegistration.id，state 是 APPROVED）。
-  string id = 1 [(google.api.field_behavior) = REQUIRED];
-  // 撤銷的理由，1 到 1000 字；賣家看得到。
-  string reason = 2 [(google.api.field_behavior) = REQUIRED];
-}
-
-message RevokeFoodRegistrationResponse {
-  FoodRegistration registration = 1;
 }

@@ -104,8 +104,7 @@ func (h *Public) toPublicStore(s model.PublicStore) (*pb.PublicStore, error) {
 	out := &pb.PublicStore{
 		Id: rpc.FormatID(s.StoreID), StoreCode: rpc.FormatID(s.StoreCode), StoreName: s.StoreName,
 		Description: deref(s.Description), TownCode: deref(s.TownCode), Prize: deref(s.Prize), WebsiteUrl: deref(s.WebsiteURL),
-		FoodBusinessRegistrationNumber: foodRegistrationNumber(s.Store),
-		UpdateTime:                     timestamppb.New(s.UpdateTime),
+		UpdateTime: timestamppb.New(s.UpdateTime),
 	}
 	if s.LogoKey != nil {
 		if err := rpc.ObjectKey(*s.LogoKey); err != nil {

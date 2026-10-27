@@ -19,7 +19,6 @@ type SellerAgreementAcceptance struct {
 	AccountID          int64
 	AcceptedAt         time.Time
 	SubmissionReviewID *uuid.UUID
-	FoodRegistrationID *uuid.UUID
 	ClientIp           *netip.Addr
 	UserAgent          *string
 	PiiPurgedAt        *time.Time
@@ -135,31 +134,6 @@ type SellerCaseInquiryReplyEvidence struct {
 	ObjectKey string
 }
 
-type SellerCaseReferral struct {
-	CaseID            uuid.UUID
-	Category          string
-	Outcome           string
-	Channel           *string
-	ReferenceNo       *string
-	FollowUpOn        *time.Time
-	FollowUpSetAt     *time.Time
-	WaiverReason      *string
-	RecordedAt        time.Time
-	RecordedByAdminID int64
-}
-
-type SellerCaseReferralReply struct {
-	ID                uuid.UUID
-	CaseID            uuid.UUID
-	Outcome           string
-	Body              string
-	ReceivedOn        time.Time
-	RecordedByAdminID int64
-	RecordedAt        time.Time
-	RequestID         *uuid.UUID
-	RequestHash       []byte
-}
-
 type SellerEvidenceAccess struct {
 	AccessID      uuid.UUID
 	ReportID      *uuid.UUID
@@ -179,24 +153,6 @@ type SellerFindingAuthorityOrder struct {
 type SellerFindingReport struct {
 	ViolationID uuid.UUID
 	ReportID    uuid.UUID
-}
-
-type SellerFoodRegistration struct {
-	ID                 uuid.UUID
-	StoreID            int64
-	AccountID          int64
-	RegistrationNumber *string
-	State              string
-	SubmittedAt        time.Time
-	DecidedByAdminID   *int64
-	DecidedAt          *time.Time
-	RejectReason       *string
-	InternalNote       *string
-	EndedAt            *time.Time
-	EndCause           *string
-	EndReason          *string
-	EndedByAdminID     *int64
-	PiiPurgedAt        *time.Time
 }
 
 type SellerGovernanceNote struct {

@@ -1,4 +1,4 @@
-h1:C3LK4PHaY9FXm7rjPDDgopa+bcs+QEW/bGzQDr38JAU=
+h1:fWf9bUF/e2DJgzeVs5OitZEa2liMVP1KjTmKd8Q93yE=
 20261001160141_seller_core.sql h1:hVkQ8Wo6S5BLgzr4nFSGS/1EZpRX9mHqRwpxmIP3Yeg=
 20261002120004_seller_governance.sql h1:Dj/zGg4clK5U8YBsKn+TWnE5ZizigjU9/s7EXXHuc+g=
 20261002133159_seller_kyc.sql h1:QiN6KkqvCU/lwdw0B66YQniBEGnAhojvTYHQJ8lOqlc=
@@ -57,3 +57,4 @@ h1:C3LK4PHaY9FXm7rjPDDgopa+bcs+QEW/bGzQDr38JAU=
 20261021105752_seller_payuni_bind_retry_review.sql h1:y1mFB95za/BeWZryeR9pONzb20qXq+VRL7ljQyngs9U=
 20261021144547_seller_kyc_review_pause.sql h1:uOVy8hXifIEUKwfTEaCFJvSvjJ8DC5WQtZOb+U1OakQ=
 20261023130906_seller_store_blocks.sql h1:uv1H3Xv2XL5hdvWJLga2Y2Mz6tOVR3aSTW/6YGaIbRs=
+20261027164917_seller_drop_food_registrations_and_referrals.sql h1:kUoyqNUQdYz5pYg8qufErT6FnxZPfSksuq8pfKu/BRQ=

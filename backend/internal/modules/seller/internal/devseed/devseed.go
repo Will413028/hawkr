@@ -31,8 +31,6 @@ import (
 
 // Store 是一家種子店家（明文）。StoreID 與 StoreCode 固定（Java 資料庫的 psql 種子寫死 store_id，MerID 是 HAWK 加 StoreCode）；
 // KYC 是核准的申請內容（含明文的識別欄位）；PayUniMerStatus、PayUniMemberStatus 是 PayUni 回報的原碼，推導出的結果必須是核准。
-// FoodRegistration 是核准的食品業者登錄字號、PendingFoodRegistration 是待審的字號（都可以不填），給 UI 開發用：這是 fixture 直接寫表的例外
-// （seedFoodRegistrations 繞過送出與裁定的狀態轉移，不發 FoodRegistrationDecided；裁定的管理員是固定的假 ID）。
 type Store struct {
 	StoreID, StoreCode, AccountID                            int64
 	Name, Description, ContactPhone, TownCode, AddressDetail string
@@ -40,7 +38,6 @@ type Store struct {
 	LogoKey, LogoAssetID                                     string
 	KYC                                                      model.KYCDraftInput
 	PayUniMerStatus, PayUniMemberStatus                      string
-	FoodRegistration, PendingFoodRegistration                string
 }
 
 // Deps 外部依賴。
@@ -80,7 +77,6 @@ func New(d Deps) *Service {
 // 的未關閉店家，重建帳號會讓店家失去 SELLER 角色（有店沒角色是壞掉的不變量），Check 在 01 執行之前就擋下，不自動刪店。已關閉的店家（角色已移除）
 // 不受影響。
 var clearChildrenSQL = []string{
-	`DELETE FROM seller.food_registrations WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.evidence_accesses WHERE report_id IN (SELECT id FROM seller.reports WHERE store_id = ANY($1)) OR request_id IN (SELECT id FROM seller.measure_requests WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1))) OR inquiry_id IN (SELECT id FROM seller.case_inquiries WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.measure_request_evidence WHERE request_id IN (SELECT id FROM seller.measure_requests WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1)))`,
 	`DELETE FROM seller.measure_requests WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1))`,
@@ -108,8 +104,6 @@ var clearChildrenSQL = []string{
 	`DELETE FROM seller.reports WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.case_inquiry_reply_evidence WHERE inquiry_id IN (SELECT id FROM seller.case_inquiries WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.case_inquiries WHERE store_id = ANY($1)`,
-	`DELETE FROM seller.case_referral_replies WHERE case_id IN (SELECT id FROM seller.cases WHERE store_id = ANY($1))`,
-	`DELETE FROM seller.case_referrals WHERE case_id IN (SELECT id FROM seller.cases WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.cases WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.payuni_observations WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.payuni_registrations WHERE store_id = ANY($1)`,
@@ -131,8 +125,7 @@ const insertExposureSQL = `INSERT INTO seller.store_exposures (store_id) VALUES 
 
 // profile 的快照：upsert 還原的欄位（不含 status，那是生命週期；不含版本）。前後兩次快照不同才發 StoreProfileChanged。
 const profileExpr = `jsonb_build_array(s.store_name, s.description, s.contact_phone, s.contact_name, s.contact_mobile, s.support_email, s.town_code, s.address_detail, s.logo_key, s.logo_asset_id,
-    s.prize, s.website_url, s.onboarding_completed,
-    (SELECT f.registration_number FROM seller.food_registrations f WHERE f.store_id = s.store_id AND f.state = 'APPROVED'))::text`
+    s.prize, s.website_url, s.onboarding_completed)::text`
 
 // 鎖店家列（依 store_id，與 stint.LockAccountOf 同一個順序）並取得還原前的 profile 快照。
 const lockStoresSQL = `SELECT s.store_id, ` + profileExpr + ` FROM seller.stores s WHERE s.store_id = ANY($1) ORDER BY s.store_id FOR UPDATE`
@@ -607,9 +600,6 @@ func (s *Service) seedOne(ctx context.Context, q *store.Queries, st Store, now t
 	if _, err := conn.Exec(ctx, insertExposureSQL, st.StoreID); err != nil {
 		return err
 	}
-	if err := seedFoodRegistrations(ctx, conn, st, now); err != nil {
-		return err
-	}
 	app, submitID, err := s.d.KYC.SeedApproved(ctx, q, st.StoreID, st.KYC, now)
 	if err != nil {
 		return err
@@ -643,38 +633,6 @@ func (s *Service) seedOne(ctx context.Context, q *store.Queries, st Store, now t
 		Outcome: string(model.PayUniOutcomeOf(st.PayUniMerStatus, st.PayUniMemberStatus)), ExecutedAt: &now, Now: now,
 	})
 	return err
-}
-
-// devSeedAdminID 是種子的食品業者登錄裁定者：固定的假管理員 ID（只需要是正數，沒有對應的管理員帳號）。
-const devSeedAdminID int64 = 1
-
-const insertFoodRegistrationSQL = `
-INSERT INTO seller.food_registrations (id, store_id, account_id, registration_number, state, submitted_at, decided_by_admin_id, decided_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
-
-// seedFoodRegistrations 寫入 fixture 的核准字號與待審字號（clearChildrenSQL 已清掉舊的）。核准的那一筆直接寫成 APPROVED、待審的寫成 PENDING；
-// 每一筆各有送出時確認的食品業者登錄告知（與 foodreg.Submit 同樣綁定那一筆登錄）。
-func seedFoodRegistrations(ctx context.Context, conn db.DBTX, st Store, now time.Time) error {
-	q := store.New(conn)
-	seed := func(number string, state model.FoodRegState, adminID *int64, decidedAt *time.Time) error {
-		id := uuid.NewV7()
-		if _, err := conn.Exec(ctx, insertFoodRegistrationSQL, id, st.StoreID, st.AccountID, number, string(state), now, adminID, decidedAt); err != nil {
-			return err
-		}
-		return agreement.Record(ctx, q, st.StoreID, st.AccountID, current(model.SubmitFoodRegistrationAgreements), now, agreement.Subject{FoodRegistrationID: &id}, agreement.Source{})
-	}
-	if st.FoodRegistration != "" {
-		admin := devSeedAdminID
-		if err := seed(st.FoodRegistration, model.FoodRegApproved, &admin, &now); err != nil {
-			return err
-		}
-	}
-	if st.PendingFoodRegistration != "" {
-		if err := seed(st.PendingFoodRegistration, model.FoodRegPending, nil, nil); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func current(kinds []model.AgreementKind) []model.AgreementAcceptance {

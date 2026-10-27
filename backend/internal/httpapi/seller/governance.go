@@ -32,9 +32,6 @@ type GovernanceModule interface {
 	Case(ctx context.Context, caseID uuid.UUID) (model.AdminCase, error)
 	DecideCase(context.Context, model.DecideCaseInput) (model.AdminCase, error)
 	ChangeCaseSeverity(context.Context, model.ChangeCaseSeverityInput) (model.AdminCase, error)
-	RecordFDAReferral(context.Context, model.RecordFDAReferralInput) (model.RecordFDAReferralResult, error)
-	WaiveFDAReferral(context.Context, model.WaiveFDAReferralInput) (model.WaiveFDAReferralResult, error)
-	RecordFDAReferralReply(context.Context, model.RecordFDAReferralReplyInput) (model.AdminCase, error)
 	CreateCaseInquiry(context.Context, model.CreateCaseInquiryInput) (model.CreateCaseInquiryResult, error)
 	CaseInquiries(context.Context, model.CaseInquiryListInput) (model.AdminInquiryPage, error)
 	RecordCaseInquiryReply(context.Context, model.RecordCaseInquiryReplyInput) (model.RecordCaseInquiryReplyResult, error)
@@ -46,7 +43,6 @@ type GovernanceModule interface {
 	ExtendAuthorityOrderHold(context.Context, model.ExtendAuthorityOrderHoldInput) (model.AdminAuthorityOrder, error)
 	RecordAuthorityTargetNotice(context.Context, model.RecordAuthorityTargetNoticeInput) (model.AdminAuthorityOrder, error)
 	RevokeAuthorityOrder(context.Context, model.RevokeAuthorityOrderInput) (model.RevokeAuthorityOrderResult, error)
-	FDAExport(ctx context.Context, caseID uuid.UUID) (model.FDAExport, error)
 	CreateCaseNote(context.Context, model.CreateCaseNoteInput) (model.GovernanceNote, error)
 	CaseNotes(context.Context, model.CaseNoteListInput) (model.NotePage, error)
 	CreateMeasure(context.Context, model.CreateMeasureInput) (model.CreateMeasureResult, error)
@@ -87,9 +83,6 @@ var (
 	listCasesPaths         = rpc.FieldPaths{"State": "state", "Category": "category", "StoreID": "store_id", "AwaitingSeller": "awaiting_seller"}
 	decideCasePaths        = rpc.FieldPaths{"Decision": "decision", "Note": "note", "ExpectedVersion": "etag"}
 	changeSeverityPaths    = rpc.FieldPaths{"Severity": "severity", "Note": "note", "ExpectedVersion": "etag"}
-	fdaReferralPaths       = rpc.FieldPaths{"Channel": "channel", "ReferenceNo": "reference_no", "FollowUpOn": "follow_up_date"}
-	waiveReferralPaths     = rpc.FieldPaths{"Reason": "reason"}
-	referralReplyPaths     = rpc.FieldPaths{"Body": "body", "ReceivedOn": "receive_date", "NextFollowUpOn": "next_follow_up_date", "ClearFollowUp": "clear_follow_up", "RequestID": "request_id"}
 	createNotePaths        = rpc.FieldPaths{"Body": "note.body"}
 	createMeasureNotePaths = createNotePaths
 	createWarningPaths     = createMeasurePaths(violationPaths("Violation", "warning.violation"))
@@ -235,35 +228,6 @@ func caseTargetFrom(t *adminpb.CaseTarget) (model.CaseTarget, error) {
 	return model.CaseTarget{}, nil
 }
 
-// toFDAReferral 轉換轉報紀錄；追蹤逾期以讀取的時間（AdminCase.ReadAt）推導。
-func toFDAReferral(r *model.CaseReferral, readAt time.Time) *adminpb.FDAReferral {
-	if !r.Referred() {
-		return nil
-	}
-	f := r.FDA
-	out := &adminpb.FDAReferral{
-		Channel: rpc.EnumToProto[adminpb.FDAChannel](f.Channel), ReferenceNo: f.ReferenceNo,
-		ReportedByAdminId: rpc.FormatID(f.ReportedByAdminID), ReportTime: timestamppb.New(f.ReportedAt),
-		FollowUpOverdue: f.FollowUpOverdue(readAt),
-	}
-	if f.FollowUpOn != nil {
-		out.FollowUpDate = protoDate(*f.FollowUpOn)
-	}
-	for _, r := range f.Replies {
-		out.Replies = append(out.Replies, &adminpb.FDAReferralReply{
-			Body: r.Body, ReceiveDate: protoDate(r.ReceivedOn), RecordedByAdminId: rpc.FormatID(r.RecordedByAdminID), RecordTime: timestamppb.New(r.RecordedAt),
-		})
-	}
-	return out
-}
-
-func toFDAReferralWaiver(r *model.CaseReferral) *adminpb.FDAReferralWaiver {
-	if !r.Waived() {
-		return nil
-	}
-	return &adminpb.FDAReferralWaiver{Reason: r.Waiver.Reason, WaivedByAdminId: rpc.FormatID(r.Waiver.WaivedByAdminID), WaiveTime: timestamppb.New(r.Waiver.WaivedAt)}
-}
-
 // civilDate 把 google.type.Date 轉成 UTC 午夜的 time.Time（模組的日期形狀）；沒設是 nil。不是有效日期（年月日超出範圍或不存在的日子）回零值，
 // 模組把零值當成「早於任何日期」，回該欄位原本的範圍句子，所以不另加一種錯誤。
 func civilDate(d *date.Date) *time.Time {
@@ -286,13 +250,11 @@ func toCase(c model.AdminCase) *adminpb.Case {
 		DecisionNote: deref(c.DecisionNote), OpenedByAdminId: rpc.FormatID(c.OpenedByAdminID), OpenTime: timestamppb.New(c.OpenedAt),
 		ClosedByAdminId: formatAdminID(c.ClosedByAdminID), CloseTime: optionalTimestamp(c.ClosedAt),
 		ReportCount: int32(c.ReportCount), UnresolvedReportCount: int32(c.UnresolvedReportCount), UnseenSupplementReportCount: int32(c.UnseenSupplementReports), //nolint:gosec // 計數不會超過 int32
-		FdaReferral: toFDAReferral(c.Referral, c.ReadAt), FdaReferralWaiver: toFDAReferralWaiver(c.Referral), UpdateTime: timestamppb.New(c.UpdatedAt),
-		Etag: rpc.Etag(c.Version), CanDecide: len(options) > 0, CanChangeSeverity: len(c.Availability.ChangeSeverity) == 0,
+		UpdateTime: timestamppb.New(c.UpdatedAt),
+		Etag:       rpc.Etag(c.Version), CanDecide: len(options) > 0, CanChangeSeverity: len(c.Availability.ChangeSeverity) == 0,
 		CanLinkMeasure: len(c.Availability.LinkMeasure) == 0, CanCreateMeasure: len(c.Availability.CreateMeasure) == 0,
-		CanRecordFdaReferral: len(c.Availability.RecordReferral) == 0, CanExportFda: len(c.Availability.Export) == 0,
 		AwaitingSeller: c.AwaitingSeller(), CanCreateInquiry: len(c.Availability.CreateInquiry) == 0,
-		CanWaiveFdaReferral: len(c.Availability.WaiveReferral) == 0, CanRecordFdaReferralReply: len(c.Availability.RecordReferralReply) == 0,
-		DecideDeadline: toDeadline(c.DecideDeadline), FdaReferralDeadline: toDeadline(c.FDAReferralDeadline),
+		DecideDeadline: toDeadline(c.DecideDeadline),
 	}
 	if c.AwaitingSeller() {
 		out.OpenInquiryId = c.OpenInquiryID.String()
@@ -570,91 +532,6 @@ func (h *Governance) ChangeCaseSeverity(ctx context.Context, req *connect.Reques
 		return nil, rpc.WithFieldPaths(err, changeSeverityPaths)
 	}
 	return connect.NewResponse(&adminpb.ChangeCaseSeverityResponse{Case: toCase(c)}), nil
-}
-
-func (h *Governance) RecordFDAReferral(ctx context.Context, req *connect.Request[adminpb.RecordFDAReferralRequest]) (*connect.Response[adminpb.RecordFDAReferralResponse], error) {
-	adminID, err := adminFrom(ctx)
-	if err != nil {
-		return nil, err
-	}
-	id, err := rpc.ParseUUID("case_id", req.Msg.GetCaseId())
-	if err != nil {
-		return nil, err
-	}
-	result, err := h.m.RecordFDAReferral(ctx, model.RecordFDAReferralInput{
-		CaseID: id, AdminID: adminID, Channel: rpc.EnumFromProto[model.FDAChannel](req.Msg.GetChannel()), ReferenceNo: req.Msg.GetReferenceNo(),
-		FollowUpOn: civilDate(req.Msg.GetFollowUpDate()),
-	})
-	if err != nil {
-		return nil, rpc.WithFieldPaths(err, fdaReferralPaths)
-	}
-	return connect.NewResponse(&adminpb.RecordFDAReferralResponse{Case: toCase(result.Case), AlreadyRecorded: result.AlreadyRecorded}), nil
-}
-
-func (h *Governance) WaiveFDAReferral(ctx context.Context, req *connect.Request[adminpb.WaiveFDAReferralRequest]) (*connect.Response[adminpb.WaiveFDAReferralResponse], error) {
-	adminID, err := adminFrom(ctx)
-	if err != nil {
-		return nil, err
-	}
-	id, err := rpc.ParseUUID("case_id", req.Msg.GetCaseId())
-	if err != nil {
-		return nil, err
-	}
-	result, err := h.m.WaiveFDAReferral(ctx, model.WaiveFDAReferralInput{CaseID: id, AdminID: adminID, Reason: req.Msg.GetReason()})
-	if err != nil {
-		return nil, rpc.WithFieldPaths(err, waiveReferralPaths)
-	}
-	return connect.NewResponse(&adminpb.WaiveFDAReferralResponse{Case: toCase(result.Case), AlreadyWaived: result.AlreadyWaived}), nil
-}
-
-func (h *Governance) RecordFDAReferralReply(ctx context.Context, req *connect.Request[adminpb.RecordFDAReferralReplyRequest]) (*connect.Response[adminpb.RecordFDAReferralReplyResponse], error) {
-	adminID, err := adminFrom(ctx)
-	if err != nil {
-		return nil, err
-	}
-	msg := req.Msg
-	id, err := rpc.ParseUUID("case_id", msg.GetCaseId())
-	if err != nil {
-		return nil, err
-	}
-	reqID, err := requestID(msg.GetRequestId())
-	if err != nil {
-		return nil, err
-	}
-	var received time.Time
-	if d := civilDate(msg.GetReceiveDate()); d != nil {
-		received = *d
-	}
-	c, err := h.m.RecordFDAReferralReply(ctx, model.RecordFDAReferralReplyInput{
-		CaseID: id, AdminID: adminID, Body: msg.GetBody(), ReceivedOn: received,
-		NextFollowUpOn: civilDate(msg.GetNextFollowUpDate()), ClearFollowUp: msg.GetClearFollowUp(), RequestID: reqID,
-	})
-	if err != nil {
-		return nil, rpc.WithFieldPaths(err, referralReplyPaths)
-	}
-	return connect.NewResponse(&adminpb.RecordFDAReferralReplyResponse{Case: toCase(c)}), nil
-}
-
-func (h *Governance) GetFDAExport(ctx context.Context, req *connect.Request[adminpb.GetFDAExportRequest]) (*connect.Response[adminpb.GetFDAExportResponse], error) {
-	id, err := rpc.ParseUUID("case_id", req.Msg.GetCaseId())
-	if err != nil {
-		return nil, err
-	}
-	export, err := h.m.FDAExport(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	store, err := toAdminStore(h.images, export.Store)
-	if err != nil {
-		return nil, err
-	}
-	out := &adminpb.GetFDAExportResponse{Case: toCase(export.Case), Store: store, Reports: make([]*adminpb.Report, len(export.Reports))}
-	for i, r := range export.Reports {
-		// 轉報資料不放檢舉人的聯絡方式（同意之後再放，跟著檢舉表單那一刀）。
-		out.Reports[i] = toReport(r)
-		out.Reports[i].Contact = nil
-	}
-	return connect.NewResponse(out), nil
 }
 
 // CreateCaseNote 新增案件的內部註記：不帶 etag，也不改案件的任何 etag；severity_change 只由 ChangeCaseSeverity 寫，這裡不採用。

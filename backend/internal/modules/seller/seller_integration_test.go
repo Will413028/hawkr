@@ -910,15 +910,12 @@ func TestChecksMatchGo(t *testing.T) {
 		{"measure_requests", "measure_requests_kind_check", stringsOf(model.RequestKindValues()), true},
 		{"measure_requests", "measure_requests_state_check", stringsOf(RequestStateValues()), true},
 		{"measure_requests", "measure_requests_close_cause_check", stringsOf(RequestCloseCauseValues()), true},
-		{"food_registrations", "food_registrations_state_check", stringsOf(FoodRegStateValues()), true},
-		{"food_registrations", "food_registrations_end_cause_check", stringsOf(FoodRegEndCauseValues()), true},
 		{"reports", "reports_category_check", stringsOf(policy.ReporterSelectable()), true},
 		{"reports", "reports_outcome_check", stringsOf(OutcomeValues()), true},
 		{"report_supplements", "report_supplements_matched_by_check", stringsOf(SupplementMatchValues()), true},
 		{"cases", "cases_category_check", stringsOf(policy.Assessable()), true},
 		{"cases", "cases_severity_check", stringsOf(SeverityValues()), true},
 		{"cases", "cases_close_check", append(stringsOf(CaseCloseReasonValues()), stringsOf(DecisionValues())...), true},
-		{"case_referrals", "case_referrals_channel_check", stringsOf(FDAChannelValues()), true},
 		{"case_inquiries", "case_inquiries_kind_check", stringsOf(InquiryKindValues()), true},
 		{"case_inquiries", "case_inquiries_reply_check", stringsOf(InquiryReplyChannelValues()), true},
 		{"case_inquiries", "case_inquiries_withdraw_check", stringsOf(InquiryWithdrawCauseValues()), true},
@@ -1141,4 +1138,18 @@ func TestImageFailureAfterFinalizeLeavesNoReference(t *testing.T) {
 	if current.LogoKey != nil {
 		t.Fatalf("logo written: %+v", current)
 	}
+}
+
+func day(y int, m time.Month, d int) time.Time { return time.Date(y, m, d, 0, 0, 0, 0, time.UTC) }
+
+// kycApprovedStore 開店並讓 KYC 核准。
+func (f *fixture) kycApprovedStore(t *testing.T, idCard, bank string) Store {
+	t.Helper()
+	_, s := f.approvedWith(t, idCard, bank)
+	return s
+}
+
+func (f *fixture) kycApprovedStoreWithAccount(t *testing.T, idCard, bank string) (int64, Store) {
+	t.Helper()
+	return f.approvedWith(t, idCard, bank)
 }

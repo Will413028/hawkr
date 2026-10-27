@@ -201,7 +201,7 @@ func PruneIdentities(ctx context.Context, q *store.Queries, accountID int64, now
 }
 
 // Load 把儲存的列轉成公開型別，帶上 now 時推導的停權狀態與生效中的措施（同一次讀取；讀取失敗時回錯誤，呼叫方一律拒絕，
-// fail-closed）、能力與曝光的條件（WithConditions），以及核准的食品業者登錄與最近一筆未結束的登錄（AttachFood）。
+// fail-closed）、能力與曝光的條件（WithConditions）與關店紀錄（WithClosures）。
 func Load(ctx context.Context, q *store.Queries, row store.SellerStore, now time.Time) (model.Store, error) {
 	sanctions, err := Effective(ctx, q, row.AccountID, now)
 	if err != nil {
@@ -214,9 +214,6 @@ func Load(ctx context.Context, q *store.Queries, row store.SellerStore, now time
 		return model.Store{}, err
 	}
 	if err := WithClosures(ctx, q, one); err != nil {
-		return model.Store{}, err
-	}
-	if err := AttachFood(ctx, q, &one[0]); err != nil {
 		return model.Store{}, err
 	}
 	return one[0], nil

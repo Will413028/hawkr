@@ -208,12 +208,6 @@ type Store struct {
 	CreatedAt, UpdatedAt          time.Time
 	// Closure 是 stint 目前這一次的關店紀錄（何時、為什麼）；已關閉的 stint 讀取時一定帶上（store_closures 目前的那一列），沒有關閉時是 nil。
 	Closure *Closure
-	// ApprovedFoodRegistration 是目前核准的食品業者登錄（公開字號的唯一來源），沒有時是 nil；OpenFoodRegistration 是賣家看得到的最近
-	// 一筆未結束的登錄（待審或被退回）；RevokedFoodRegistration 是最近一次被平台撤銷的登錄，只在目前沒有核准、撤銷之後也沒有更新的待審或核准
-	// （更新的核准即使之後又結束也算）時有值（賣家看到它就知道要重新送審）。三者只在讀取的路徑上載入（stint.Load、stint.AttachFood），ToStore 不帶。
-	ApprovedFoodRegistration *FoodRegistration
-	OpenFoodRegistration     *FoodRegistration
-	RevokedFoodRegistration  *FoodRegistration
 }
 
 // Suspended 回報帳號是否停權：沒有推導過（Sanctions 是 nil）也算停權。

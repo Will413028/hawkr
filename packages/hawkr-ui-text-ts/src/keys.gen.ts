@@ -2,7 +2,7 @@
 import { Code } from "@connectrpc/connect";
 import type { Gender } from "@hawkr/api/gen/hawkr/buyer/v1alpha1/buyer_pb";
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
-import type { FoodRegistrationState, KYCField, KYCFlowStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, PayUniState, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import type { KYCField, KYCFlowStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, PayUniState, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import type { UiMessage } from "./message";
 
 export type { DefaultErrorText, UiMessage } from "./message";
@@ -44,15 +44,6 @@ export type UiTextKey =
 	| "common.error.UNIMPLEMENTED"
 	| "common.error.UNKNOWN"
 	| "common.unknown"
-	| "seller.FoodRegistration.kyc_pending_note"
-	| "seller.FoodRegistration.status_approved"
-	| "seller.FoodRegistration.status_pending"
-	| "seller.FoodRegistration.status_rejected"
-	| "seller.FoodRegistration.status_revoked"
-	| "seller.FoodRegistrationState.FOOD_REGISTRATION_STATE_APPROVED"
-	| "seller.FoodRegistrationState.FOOD_REGISTRATION_STATE_ENDED"
-	| "seller.FoodRegistrationState.FOOD_REGISTRATION_STATE_PENDING"
-	| "seller.FoodRegistrationState.FOOD_REGISTRATION_STATE_REJECTED"
 	| "seller.KYCField.KYC_FIELD_BANK_ACCOUNT"
 	| "seller.KYCField.KYC_FIELD_BANK_BOOK"
 	| "seller.KYCField.KYC_FIELD_BANK_CODE"
@@ -291,45 +282,6 @@ export function commonError(code: Code): UiMessage | undefined {
 /** 不認得的值與 UNSPECIFIED 一律顯示的文字。 */
 export function commonUnknown(): UiMessage {
 	return { key: "common.unknown" };
-}
-
-/** seller.FoodRegistration.kyc_pending_note */
-export function sellerFoodRegistrationKycPendingNote(): UiMessage {
-	return { key: "seller.FoodRegistration.kyc_pending_note" };
-}
-
-/** seller.FoodRegistration.status_approved */
-export function sellerFoodRegistrationStatusApproved(a: { number: string }): UiMessage {
-	return { key: "seller.FoodRegistration.status_approved", values: { number: a.number } };
-}
-
-/** seller.FoodRegistration.status_pending */
-export function sellerFoodRegistrationStatusPending(a: { number: string; date: string }): UiMessage {
-	return { key: "seller.FoodRegistration.status_pending", values: { number: a.number, date: a.date } };
-}
-
-/** seller.FoodRegistration.status_rejected */
-export function sellerFoodRegistrationStatusRejected(a: { reason: string }): UiMessage {
-	return { key: "seller.FoodRegistration.status_rejected", values: { reason: a.reason } };
-}
-
-/** seller.FoodRegistration.status_revoked */
-export function sellerFoodRegistrationStatusRevoked(a: { number: string; reason: string }): UiMessage {
-	return { key: "seller.FoodRegistration.status_revoked", values: { number: a.number, reason: a.reason } };
-}
-
-const SELLER_FOOD_REGISTRATION_STATE: Readonly<Partial<Record<number, UiTextKey>>> = {
-	1: "seller.FoodRegistrationState.FOOD_REGISTRATION_STATE_PENDING",
-	2: "seller.FoodRegistrationState.FOOD_REGISTRATION_STATE_APPROVED",
-	3: "seller.FoodRegistrationState.FOOD_REGISTRATION_STATE_REJECTED",
-	4: "seller.FoodRegistrationState.FOOD_REGISTRATION_STATE_ENDED",
-};
-
-/** seller.FoodRegistrationState 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
-export function sellerFoodRegistrationState(v: FoodRegistrationState): UiMessage | undefined {
-	const key = SELLER_FOOD_REGISTRATION_STATE[v];
-	if (key === undefined) return undefined;
-	return { key };
 }
 
 const SELLER_KYCFIELD: Readonly<Partial<Record<number, UiTextKey>>> = {

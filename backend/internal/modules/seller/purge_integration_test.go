@@ -9,18 +9,14 @@ import (
 	"slices"
 	"testing"
 	"time"
-	"uuid"
 
 	pu "github.com/Will413028/hawkr/backend/internal/platform/payuni"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
-	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
-	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
 
-// 清理之後可以留下值的欄位（其餘一律必須是 NULL）。新增欄位時這份清單逼人決定：留下的要有理由（事實、狀態碼、時間、
-// 食品業者登錄的字號也不留，審核的事實另由食品登錄的清理測試檢查），不是個資。
+// 清理之後可以留下值的欄位（其餘一律必須是 NULL）。新增欄位時這份清單逼人決定：留下的要有理由（事實、狀態碼、時間），不是個資。
 var (
 	storeKept = []string{
 		"store_id", "store_code", "account_id", "status", "version", "logo_key", "logo_asset_id", "cover_key", "cover_asset_id",
@@ -291,141 +287,6 @@ func TestPurgeOnlyTouchesStintsClosedForMoreThanTheStoreRetention(t *testing.T) 
 	}
 	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.payuni_registrations SET pii_purged_at=$1 WHERE store_id=$2", f.now, openStore.StoreID); err == nil {
 		t.Error("PayUni 標記清理卻沒有清欄位")
-	}
-}
-
-// 退場（關店 30 天）時待審的食品業者登錄撤回、核准中的結束（不會再重開）；個資清理（關店 184 天）時全部登錄的字號、退回與撤銷的理由、內部註記清成 NULL
-// 並記下 pii_purged_at，審核的事實（狀態、時間、審核人員、結束原因）保留；店家公開的字號跟著消失；還沒滿 184 天的店家字號不動。
-// 審核紀錄保留到關閉後 2 年：未滿不刪，期滿整列刪除，綁在這一列的告知同意紀錄隨之刪除，其他入駐文件的同意紀錄不受影響。
-func TestPurgeErasesFoodRegistrationNumbersAndKeepsTheReviewRecordForTwoYears(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	type row struct {
-		Number, Reason, EndReason, Note *string
-		State                           string
-		PurgedAt                        *time.Time
-		AdminID                         *int64
-		Cause                           *string
-	}
-	rowsOf := func(storeID int64) []row {
-		rows, err := f.db.Conn(ctx).Query(ctx, `SELECT registration_number, reject_reason, end_reason, internal_note, state, pii_purged_at, decided_by_admin_id, end_cause
-			FROM seller.food_registrations WHERE store_id=$1 ORDER BY submitted_at, id`, storeID)
-		must(t, err)
-		defer rows.Close()
-		var out []row
-		for rows.Next() {
-			var r row
-			must(t, rows.Scan(&r.Number, &r.Reason, &r.EndReason, &r.Note, &r.State, &r.PurgedAt, &r.AdminID, &r.Cause))
-			out = append(out, r)
-		}
-		must(t, rows.Err())
-		return out
-	}
-	noticeRows := func(storeID int64) int64 {
-		return f.count(t, "SELECT count(*) FROM seller.agreement_acceptances WHERE store_id=$1 AND kind='FOOD_REGISTRATION_NOTICE'", storeID)
-	}
-	oldAccount, oldStore := f.kycApprovedStoreWithAccount(t, idA, bankAcct)
-	rejected := f.submitFood(t, oldStore, "OLD-0")
-	_, err := f.decideFood(rejected.OpenFoodRegistration.ID, FoodRegRejected, "字號查無資料", "內部：查無")
-	must(t, err)
-	f.approveFood(t, oldStore, "OLD-1")
-	_, err = f.revokeFood(f.approvedID(t, oldStore), "字號與資料不符")
-	must(t, err)
-	f.approveFood(t, oldStore, "OLD-2")
-	f.submitFood(t, oldStore, "OLD-3")
-	_, err = f.module.CloseCurrent(ctx, oldAccount)
-	must(t, err)
-	closedAt := f.now
-	f.now = f.now.Add(11 * 24 * time.Hour)
-	recentAccount, recentStore := f.kycApprovedStoreWithAccount(t, idB, "111222333444")
-	f.submitFood(t, recentStore, "NEW-1")
-	f.now = f.now.Add(20 * 24 * time.Hour)
-	_, err = f.module.CloseCurrent(ctx, recentAccount)
-	must(t, err)
-
-	// 第一段（退場，關店 30 天後）：店家不會再重開，待審的撤回、核准中的結束（STORE_RETIRED），字號與理由留到第二段。
-	f.now = closedAt.Add(StoreRetireAfter + time.Second)
-	if n, err := f.module.PurgePII(ctx); err != nil || n != 0 || !f.retired(t, oldStore.StoreID) || f.purged(t, oldStore.StoreID) {
-		t.Fatalf("關店 30 天後退場、不清個資：n=%d err=%v", n, err)
-	}
-	afterRetire := rowsOf(oldStore.StoreID)
-	if len(afterRetire) != 4 || afterRetire[2].State != "ENDED" || afterRetire[2].Cause == nil || *afterRetire[2].Cause != "STORE_RETIRED" ||
-		afterRetire[3].State != "WITHDRAWN" || afterRetire[2].Number == nil || afterRetire[3].Number == nil || afterRetire[2].PurgedAt != nil {
-		t.Fatalf("退場時結束核准中的、撤回待審的，字號留著：%+v", afterRetire)
-	}
-
-	f.now = closedAt.Add(StoreRetention + time.Second)
-	n, err := f.module.PurgePII(ctx)
-	must(t, err)
-	if n != 1 || !f.purged(t, oldStore.StoreID) || f.purged(t, recentStore.StoreID) {
-		t.Fatalf("n=%d", n)
-	}
-	got := rowsOf(oldStore.StoreID)
-	wantStates := []string{"REJECTED", "ENDED", "ENDED", "WITHDRAWN"}
-	if len(got) != len(wantStates) {
-		t.Fatalf("rows=%+v", got)
-	}
-	for i, r := range got {
-		if r.State != wantStates[i] || r.Number != nil || r.Reason != nil || r.EndReason != nil || r.Note != nil || r.PurgedAt == nil || !r.PurgedAt.Equal(f.now.UTC().Truncate(time.Microsecond)) {
-			t.Fatalf("[%d] 字號與理由要清掉、審核的事實保留：%+v", i, r)
-		}
-	}
-	if got[1].Cause == nil || *got[1].Cause != "REVOKED" || got[0].AdminID == nil || got[2].AdminID == nil {
-		t.Fatalf("審核的事實保留：%+v", got)
-	}
-	if got[2].Cause == nil || *got[2].Cause != "STORE_RETIRED" {
-		t.Fatalf("仍核准中的登錄隨清理結束，原因是 STORE_RETIRED：%+v", got[2])
-	}
-	// 已清理的登錄不能再被撤銷：是領域錯誤（FailedPrecondition），不是 500。
-	var retiredID uuid.UUID
-	must(t, f.db.Conn(ctx).QueryRow(ctx, `SELECT id FROM seller.food_registrations WHERE store_id=$1 AND end_cause='STORE_RETIRED'`, oldStore.StoreID).Scan(&retiredID))
-	if _, err := f.revokeFood(retiredID, "清理後撤銷"); apperr.KindOf(err) != apperr.KindFailedPrecondition {
-		t.Fatalf("清理後撤銷要回 FailedPrecondition：%v", err)
-	}
-	if cur, err := f.module.Store(ctx, oldStore.StoreID); err != nil || cur.ApprovedFoodRegistration != nil || cur.OpenFoodRegistration != nil || cur.RevokedFoodRegistration != nil {
-		t.Fatalf("清理之後店家沒有字號：%+v err=%v", cur, err)
-	}
-	// 關店 153 天的店家已退場（待審的撤回），但還沒滿第二段的 184 天：字號與理由不動。
-	if r := rowsOf(recentStore.StoreID); len(r) != 1 || r[0].State != "WITHDRAWN" || r[0].Number == nil || *r[0].Number != "NEW-1" || r[0].PurgedAt != nil {
-		t.Fatalf("還沒滿保留期的店家字號不動：%+v", r)
-	}
-	if noticeRows(oldStore.StoreID) != 4 || noticeRows(recentStore.StoreID) != 1 {
-		t.Fatalf("保留期滿的清理不刪告知同意紀錄：%d %d", noticeRows(oldStore.StoreID), noticeRows(recentStore.StoreID))
-	}
-	otherKinds := f.count(t, "SELECT count(*) FROM seller.agreement_acceptances WHERE store_id=$1 AND kind <> 'FOOD_REGISTRATION_NOTICE'", oldStore.StoreID)
-
-	// 關閉後 2 年（日曆年，台北時區；中間有閏日，所以不是 730 天）：未滿一秒不刪，期滿整列刪除，告知同意紀錄 CASCADE；清理 job 重跑沒有副作用。
-	expiry := closedAt.In(twtime.Taipei).AddDate(2, 0, 0)
-	f.now = closedAt.Add(2*365*24*time.Hour + time.Second)
-	if _, err := f.module.PurgePII(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if len(rowsOf(oldStore.StoreID)) != 4 {
-		t.Fatalf("730 天不是 2 年（中間有閏日），不能刪：%d rows", len(rowsOf(oldStore.StoreID)))
-	}
-	f.now = expiry.Add(-time.Second)
-	if _, err := f.module.PurgePII(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if len(rowsOf(oldStore.StoreID)) != 4 || noticeRows(oldStore.StoreID) != 4 {
-		t.Fatalf("2 年還沒到不刪：%d rows %d notices", len(rowsOf(oldStore.StoreID)), noticeRows(oldStore.StoreID))
-	}
-	f.now = expiry.Add(time.Second)
-	if _, err := f.module.PurgePII(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if len(rowsOf(oldStore.StoreID)) != 0 || noticeRows(oldStore.StoreID) != 0 {
-		t.Fatalf("期滿刪除登錄與它的告知同意紀錄：%d rows %d notices", len(rowsOf(oldStore.StoreID)), noticeRows(oldStore.StoreID))
-	}
-	if got := f.count(t, "SELECT count(*) FROM seller.agreement_acceptances WHERE store_id=$1 AND kind <> 'FOOD_REGISTRATION_NOTICE'", oldStore.StoreID); got != otherKinds {
-		t.Fatalf("其他文件的同意紀錄不受影響：%d → %d", otherKinds, got)
-	}
-	if len(rowsOf(recentStore.StoreID)) != 1 {
-		t.Fatal("還沒關閉滿 2 年的店家不動")
-	}
-	if _, err := f.module.PurgePII(ctx); err != nil {
-		t.Fatalf("重跑：%v", err)
 	}
 }
 

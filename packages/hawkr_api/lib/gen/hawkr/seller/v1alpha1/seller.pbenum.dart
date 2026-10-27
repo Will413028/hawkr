@@ -15,7 +15,7 @@ import 'dart:core' as $core;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 /// AgreementKind 是賣家入駐時要同意或確認已閱讀的文件種類。每個操作要求的種類固定：ApplyStore 要 SELLER_TERMS；SubmitKYC 要
-/// KYC_PRIVACY_NOTICE 與 PAYUNI_TERMS；SubmitFoodRegistration 要 FOOD_REGISTRATION_NOTICE。
+/// KYC_PRIVACY_NOTICE 與 PAYUNI_TERMS。
 class AgreementKind extends $pb.ProtobufEnum {
   static const AgreementKind AGREEMENT_KIND_UNSPECIFIED =
       AgreementKind._(0, _omitEnumNames ? '' : 'AGREEMENT_KIND_UNSPECIFIED');
@@ -33,21 +33,15 @@ class AgreementKind extends $pb.ProtobufEnum {
   static const AgreementKind AGREEMENT_KIND_PAYUNI_TERMS =
       AgreementKind._(3, _omitEnumNames ? '' : 'AGREEMENT_KIND_PAYUNI_TERMS');
 
-  /// 食品業者登錄的個資蒐集告知，送出食品業者登錄（SubmitFoodRegistration）時確認已閱讀（告知不是同意）。
-  static const AgreementKind AGREEMENT_KIND_FOOD_REGISTRATION_NOTICE =
-      AgreementKind._(
-          4, _omitEnumNames ? '' : 'AGREEMENT_KIND_FOOD_REGISTRATION_NOTICE');
-
   static const $core.List<AgreementKind> values = <AgreementKind>[
     AGREEMENT_KIND_UNSPECIFIED,
     AGREEMENT_KIND_SELLER_TERMS,
     AGREEMENT_KIND_KYC_PRIVACY_NOTICE,
     AGREEMENT_KIND_PAYUNI_TERMS,
-    AGREEMENT_KIND_FOOD_REGISTRATION_NOTICE,
   ];
 
   static final $core.List<AgreementKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 4);
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
   static AgreementKind? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
@@ -292,50 +286,6 @@ class StoreField extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const StoreField._(super.value, super.name);
-}
-
-/// FoodRegistrationState 是賣家看得到的登錄狀態：撤回與被新的取代的登錄賣家看不到，核准後因賣家清除或被新核准的取代而結束的也不顯示，
-/// 所以只有被平台撤銷的才會以 ENDED 出現（Store.revoked_food_registration）。
-class FoodRegistrationState extends $pb.ProtobufEnum {
-  static const FoodRegistrationState FOOD_REGISTRATION_STATE_UNSPECIFIED =
-      FoodRegistrationState._(
-          0, _omitEnumNames ? '' : 'FOOD_REGISTRATION_STATE_UNSPECIFIED');
-
-  /// 等平台核對。
-  static const FoodRegistrationState FOOD_REGISTRATION_STATE_PENDING =
-      FoodRegistrationState._(
-          1, _omitEnumNames ? '' : 'FOOD_REGISTRATION_STATE_PENDING');
-
-  /// 核准中：店面與商品頁公開的字號只讀這一筆。
-  static const FoodRegistrationState FOOD_REGISTRATION_STATE_APPROVED =
-      FoodRegistrationState._(
-          2, _omitEnumNames ? '' : 'FOOD_REGISTRATION_STATE_APPROVED');
-
-  /// 平台退回；賣家確認字號與食藥署的登錄資料一致後可以重新送出。
-  static const FoodRegistrationState FOOD_REGISTRATION_STATE_REJECTED =
-      FoodRegistrationState._(
-          3, _omitEnumNames ? '' : 'FOOD_REGISTRATION_STATE_REJECTED');
-
-  /// 核准後結束；賣家看得到的只有被平台撤銷的（end_time 與 end_reason 有值）。
-  static const FoodRegistrationState FOOD_REGISTRATION_STATE_ENDED =
-      FoodRegistrationState._(
-          4, _omitEnumNames ? '' : 'FOOD_REGISTRATION_STATE_ENDED');
-
-  static const $core.List<FoodRegistrationState> values =
-      <FoodRegistrationState>[
-    FOOD_REGISTRATION_STATE_UNSPECIFIED,
-    FOOD_REGISTRATION_STATE_PENDING,
-    FOOD_REGISTRATION_STATE_APPROVED,
-    FOOD_REGISTRATION_STATE_REJECTED,
-    FOOD_REGISTRATION_STATE_ENDED,
-  ];
-
-  static final $core.List<FoodRegistrationState?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 4);
-  static FoodRegistrationState? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const FoodRegistrationState._(super.value, super.name);
 }
 
 /// StoreOpeningUnavailableReason 是帳號此刻不能申請開店的原因（StoreOpeningUnavailability.reason）。client 用它分支，不用它組顯示文字。

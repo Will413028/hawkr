@@ -17,7 +17,7 @@ extension type SellerAppServiceClient (connect.Transport _transport) {
   /// ApplyStore 申請開店：建立店家並授予賣家角色。前置條件依優先序檢查，第一個不符的決定回應：有生效中的終止合作回
   /// failed_precondition 與 STORE_OPENING_TERMINATED（解除停權也開不了店）；其次帳號停權中回 failed_precondition 與
   /// STORE_OPENING_SUSPENDED；其次帳號正在刪除回 failed_precondition（沒有 reason）；最後帳號已經有店家才回 already_exists。
-  /// 所以被終止、停權或正在刪除的帳號即使還有店家，回的也不是 already_exists；任何一個欄位不合法都不會建立店家。官網、logo 與封面開店後以 UpdateMyStore 設定，食品業者登錄以 SubmitFoodRegistration 送審。
+  /// 所以被終止、停權或正在刪除的帳號即使還有店家，回的也不是 already_exists；任何一個欄位不合法都不會建立店家。官網、logo 與封面開店後以 UpdateMyStore 設定。
   Future<hawkrsellerv1alpha1seller.ApplyStoreResponse> applyStore(
     hawkrsellerv1alpha1seller.ApplyStoreRequest input, {
     connect.Headers? headers,
@@ -74,7 +74,7 @@ extension type SellerAppServiceClient (connect.Transport _transport) {
   }
 
   /// UpdateMyStore 修改店家資料的欄位（update_mask），含 logo 與封面（logo_staged_token、
-  /// cover_staged_token）。食品業者登錄不在這裡（SubmitFoodRegistration）。換圖與文字欄位在同一個版本條件下一起寫入，任何一項失敗都不會寫入；沒有任何欄位改變時
+  /// cover_staged_token）。換圖與文字欄位在同一個版本條件下一起寫入，任何一項失敗都不會寫入；沒有任何欄位改變時
   /// 不寫入，etag 不變。
   Future<hawkrsellerv1alpha1seller.UpdateMyStoreResponse> updateMyStore(
     hawkrsellerv1alpha1seller.UpdateMyStoreRequest input, {
@@ -143,64 +143,6 @@ extension type SellerAppServiceClient (connect.Transport _transport) {
   }) {
     return connect.Client(_transport).unary(
       specs.SellerAppService.getMyDashboard,
-      input,
-      signal: signal,
-      headers: headers,
-      onHeader: onHeader,
-      onTrailer: onTrailer,
-    );
-  }
-
-  /// SubmitFoodRegistration 送出食品業者登錄供平台核對（食藥署的登錄資料，人工核對）；通過後才會成為店面與商品頁公開的字號，並開放上架
-  /// 加工食品。店家要在營業中，開店前後的 KYC 狀態不影響送出，平台在實名認證（KYC）核准後才能核准。已有待審的登錄時：字號相同就沿用
-  /// （不改變排隊的時間），不同就撤回舊的、換成新的，所以同時最多一筆待審。審核期間目前核准的登錄照常有效。字號去掉前後空白後 1 到 50 字，
-  /// 不檢查格式（沒有官方規格，交給人工核對），不合法回 invalid_argument。回傳送出之後的店家（pending_food_registration 是這筆待審）。
-  Future<hawkrsellerv1alpha1seller.SubmitFoodRegistrationResponse> submitFoodRegistration(
-    hawkrsellerv1alpha1seller.SubmitFoodRegistrationRequest input, {
-    connect.Headers? headers,
-    connect.AbortSignal? signal,
-    Function(connect.Headers)? onHeader,
-    Function(connect.Headers)? onTrailer,
-  }) {
-    return connect.Client(_transport).unary(
-      specs.SellerAppService.submitFoodRegistration,
-      input,
-      signal: signal,
-      headers: headers,
-      onHeader: onHeader,
-      onTrailer: onTrailer,
-    );
-  }
-
-  /// WithdrawFoodRegistration 撤回待審的登錄（狀態成為已撤回，賣家不再看到），目前核准的那一筆保留。沒有待審的登錄回 failed_precondition。
-  Future<hawkrsellerv1alpha1seller.WithdrawFoodRegistrationResponse> withdrawFoodRegistration(
-    hawkrsellerv1alpha1seller.WithdrawFoodRegistrationRequest input, {
-    connect.Headers? headers,
-    connect.AbortSignal? signal,
-    Function(connect.Headers)? onHeader,
-    Function(connect.Headers)? onTrailer,
-  }) {
-    return connect.Client(_transport).unary(
-      specs.SellerAppService.withdrawFoodRegistration,
-      input,
-      signal: signal,
-      headers: headers,
-      onHeader: onHeader,
-      onTrailer: onTrailer,
-    );
-  }
-
-  /// ClearFoodRegistration 清除食品業者登錄（不再賣加工食品）：結束目前核准的那一筆、同時撤回待審的，立即生效，店面與商品頁不再顯示
-  /// 字號。核准的與待審的都沒有時回 failed_precondition。
-  Future<hawkrsellerv1alpha1seller.ClearFoodRegistrationResponse> clearFoodRegistration(
-    hawkrsellerv1alpha1seller.ClearFoodRegistrationRequest input, {
-    connect.Headers? headers,
-    connect.AbortSignal? signal,
-    Function(connect.Headers)? onHeader,
-    Function(connect.Headers)? onTrailer,
-  }) {
-    return connect.Client(_transport).unary(
-      specs.SellerAppService.clearFoodRegistration,
       input,
       signal: signal,
       headers: headers,
@@ -482,7 +424,7 @@ extension type SellerPublicServiceClient (connect.Transport _transport) {
   }
 
   /// GetSellerAgreements 讀取賣家入駐時要同意的文件的現行版本與網址，全部種類都回，依 AgreementKind 的數字順序。內容是公開的，
-  /// 開店前就要能讀，所以不需要登入。client 把這裡的版本顯示給賣家勾選，再原樣帶回 ApplyStore、SubmitKYC 與 SubmitFoodRegistration 的
+  /// 開店前就要能讀，所以不需要登入。client 把這裡的版本顯示給賣家勾選，再原樣帶回 ApplyStore 與 SubmitKYC 的
   /// accepted_agreements。
   Future<hawkrsellerv1alpha1seller.GetSellerAgreementsResponse> getSellerAgreements(
     hawkrsellerv1alpha1seller.GetSellerAgreementsRequest input, {

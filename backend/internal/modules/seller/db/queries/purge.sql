@@ -32,7 +32,7 @@ FOR UPDATE OF s SKIP LOCKED;
 --   appeal_hold（legal hold）：帳號上未撤銷的終止合作措施有待處理的申覆，或帳號上未撤銷的關聯終止（LINKED_ACCOUNT）的來源措施有待處理的申覆（來源撤銷時
 --   關聯終止同一個 transaction 連帶撤銷，所以未撤銷的關聯終止的來源也一定未撤銷）：帳號全部已關閉的 stint 都擋。擋兩段清理，也讓恢復營業視為
 --   「保留期還沒過」（爭議還沒結束，店家應該還能恢復）。
---   preservation_hold：帳號上有沒撤銷登記、hold_until 晚於 now 的主管機關來函指名（不指定店家，或就是這家店）。擋兩段清理與食品登錄審核紀錄的刪除，
+--   preservation_hold：帳號上有沒撤銷登記、hold_until 晚於 now 的主管機關來函指名（不指定店家，或就是這家店）。擋兩段清理，
 --   不影響恢復營業（第三方的保存義務只凍結刪除）。
 -- 清理在鎖住候選之後才問它（新的語句、新的快照）：寫入保存條件的一方都先鎖同一組店家列，所以候選鎖住之後不會再出現新的保存（step10e-3cb §2.4）。
 SELECT s.store_id,
@@ -75,8 +75,7 @@ RETURNING store_id;
 
 -- name: PurgeStores :many
 -- 第二段清理：清掉店家列的註冊資料（店名、聯絡、地址）並記下 pii_purged_at。只作用於已退場的店家；時間與保存的判斷在 RetireDueStores（第二段）與 StoreHolds
--- （候選已被鎖住）；stores_pii_purged_check 是保底。food_business_reg_no 是公開的登記號，不是個資。
--- 食品業者登錄（food_registrations）的字號與理由由 PurgeFoodRegistrations 清（待審的件在退場時已撤回、核准中的已結束）。
+-- （候選已被鎖住）；stores_pii_purged_check 是保底。
 UPDATE seller.stores
 SET store_name = NULL,
     contact_phone = NULL,
@@ -92,7 +91,7 @@ RETURNING store_id, store_code;
 
 -- name: PurgeKYCApplications :many
 -- 清掉這些店家的 KYC 申請的個人欄位（全部狀態）。只作用於店家列已清理的申請：保留期限的判斷只有 PurgeStores 一處。
--- 審核的事實（status、時間、kyc_reviews）、seller_type、product_type 與食品登錄保留。回傳被清理的申請，
+-- 審核的事實（status、時間、kyc_reviews）、seller_type、product_type 保留。回傳被清理的申請，
 -- 呼叫方刪證件並把證件記成退場。
 UPDATE seller.kyc_applications a
 SET real_name = NULL,
@@ -150,44 +149,3 @@ UPDATE seller.payuni_observations o
 SET reason = NULL
 FROM seller.stores s
 WHERE o.store_id = ANY(sqlc.arg(store_ids)::bigint[]) AND s.store_id = o.store_id AND s.pii_purged_at IS NOT NULL AND o.reason IS NOT NULL;
-
--- name: RetireApprovedFoodRegistrations :execrows
--- 店家退場（第一段清理，之後不能恢復營業）時結束仍核准中的食品業者登錄（end_cause STORE_RETIRED）；字號留到第二段（PurgeFoodRegistrations）才清。
--- 只作用於店家列已退場的店家。
-UPDATE seller.food_registrations f
-SET state = 'ENDED', ended_at = sqlc.arg(now)::timestamptz, end_cause = 'STORE_RETIRED'
-FROM seller.stores s
-WHERE f.store_id = ANY(sqlc.arg(store_ids)::bigint[]) AND s.store_id = f.store_id AND s.retired_at IS NOT NULL AND f.state = 'APPROVED';
-
--- name: PurgeFoodRegistrations :execrows
--- 清掉這些店家全部食品業者登錄的字號、退回與撤銷的理由與內部註記，並記下 pii_purged_at；審核的事實（狀態、時間、審核人員）保留，
--- 保存到關店後 2 年（DeleteExpiredFoodRegistrations）。只作用於店家列已清理的店家：保留期限的判斷只有 PurgeStores 一處；待審的件要先撤回、
--- 核准中的要先結束（RetireApprovedFoodRegistrations）。
-UPDATE seller.food_registrations f
-SET registration_number = NULL,
-    reject_reason = NULL,
-    end_reason = NULL,
-    internal_note = NULL,
-    pii_purged_at = sqlc.arg(now)
-FROM seller.stores s
-WHERE f.store_id = ANY(sqlc.arg(store_ids)::bigint[]) AND s.store_id = f.store_id AND s.pii_purged_at IS NOT NULL AND f.pii_purged_at IS NULL;
-
--- name: ExpiredFoodRegistrations :many
--- 刪除食品業者登錄審核紀錄的時間條件，只有這一處：關店（store_closures 目前這一筆的 closed_at）嚴格超過 cutoff（現在減 2 個日曆年）、已清過個資。
--- 找候選並鎖住登錄列與店家列（SKIP LOCKED：正被別的流程鎖住的列這一輪略過），一次最多 batch_limit 列，after_id 是 keyset（被保存而略過的列不會讓
--- 下一批一直選到同一批）。來函的保存只在 StoreHolds：呼叫方鎖住之後以候選的店家問它，只刪沒有被保存的（時間條件單調、已清理的店家不會恢復，所以
--- 不用再判斷一次時間）。
-SELECT f.id, f.store_id
-FROM seller.food_registrations f
-JOIN seller.stores s ON s.store_id = f.store_id
-JOIN seller.store_closures c ON c.store_id = s.store_id AND c.reopened_at IS NULL
-WHERE s.status = 'CLOSED' AND c.closed_at < sqlc.arg(cutoff) AND f.pii_purged_at IS NOT NULL
-  AND (sqlc.narg(after_id)::uuid IS NULL OR f.id > sqlc.narg(after_id)::uuid)
-ORDER BY f.id
-LIMIT sqlc.arg(batch_limit)
-FOR UPDATE OF f, s SKIP LOCKED;
-
--- name: DeleteFoodRegistrations :execrows
--- 刪除這些食品業者登錄審核紀錄（ExpiredFoodRegistrations 鎖住、StoreHolds 沒有保存的 id，這裡不再判斷條件）；綁在這些列的告知同意紀錄由外鍵 ON DELETE CASCADE 一起刪。
-DELETE FROM seller.food_registrations
-WHERE id = ANY(sqlc.arg(ids)::uuid[]);

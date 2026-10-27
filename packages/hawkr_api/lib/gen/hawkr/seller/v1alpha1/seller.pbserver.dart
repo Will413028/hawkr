@@ -35,12 +35,6 @@ abstract class SellerAppServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $9.ListMyFollowersRequest request);
   $async.Future<$9.GetMyDashboardResponse> getMyDashboard(
       $pb.ServerContext ctx, $9.GetMyDashboardRequest request);
-  $async.Future<$9.SubmitFoodRegistrationResponse> submitFoodRegistration(
-      $pb.ServerContext ctx, $9.SubmitFoodRegistrationRequest request);
-  $async.Future<$9.WithdrawFoodRegistrationResponse> withdrawFoodRegistration(
-      $pb.ServerContext ctx, $9.WithdrawFoodRegistrationRequest request);
-  $async.Future<$9.ClearFoodRegistrationResponse> clearFoodRegistration(
-      $pb.ServerContext ctx, $9.ClearFoodRegistrationRequest request);
   $async.Future<$9.CloseMyStoreResponse> closeMyStore(
       $pb.ServerContext ctx, $9.CloseMyStoreRequest request);
   $async.Future<$9.SaveKYCDraftResponse> saveKYCDraft(
@@ -79,12 +73,6 @@ abstract class SellerAppServiceBase extends $pb.GeneratedService {
         return $9.ListMyFollowersRequest();
       case 'GetMyDashboard':
         return $9.GetMyDashboardRequest();
-      case 'SubmitFoodRegistration':
-        return $9.SubmitFoodRegistrationRequest();
-      case 'WithdrawFoodRegistration':
-        return $9.WithdrawFoodRegistrationRequest();
-      case 'ClearFoodRegistration':
-        return $9.ClearFoodRegistrationRequest();
       case 'CloseMyStore':
         return $9.CloseMyStoreRequest();
       case 'SaveKYCDraft':
@@ -128,15 +116,6 @@ abstract class SellerAppServiceBase extends $pb.GeneratedService {
         return listMyFollowers(ctx, request as $9.ListMyFollowersRequest);
       case 'GetMyDashboard':
         return getMyDashboard(ctx, request as $9.GetMyDashboardRequest);
-      case 'SubmitFoodRegistration':
-        return submitFoodRegistration(
-            ctx, request as $9.SubmitFoodRegistrationRequest);
-      case 'WithdrawFoodRegistration':
-        return withdrawFoodRegistration(
-            ctx, request as $9.WithdrawFoodRegistrationRequest);
-      case 'ClearFoodRegistration':
-        return clearFoodRegistration(
-            ctx, request as $9.ClearFoodRegistrationRequest);
       case 'CloseMyStore':
         return closeMyStore(ctx, request as $9.CloseMyStoreRequest);
       case 'SaveKYCDraft':

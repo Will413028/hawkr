@@ -98,14 +98,6 @@ func deref(p *string) string {
 	return *p
 }
 
-// foodRegistrationNumber 是店家目前核准的食品業者登錄字號；沒有核准的是空字串（legacy 的 is_processed_food 由它推導）。
-func foodRegistrationNumber(s seller.Store) string {
-	if s.ApprovedFoodRegistration == nil {
-		return ""
-	}
-	return s.ApprovedFoodRegistration.RegistrationNumber
-}
-
 // roundRating 與舊 seller-service 相同：四捨五入到小數 2 位。
 func roundRating(r float64) float64 { return math.Round(r*100) / 100 }
 
@@ -147,8 +139,9 @@ func location(town *string) (cityName, district, postal string) {
 
 // sellerInfo 逐欄位建立 SellerInfo。填的欄位：account_id、name、logo_key、description、contact_phone、rating、cover_key、prize、
 // city、district、address_detail、postal_code、onboarding_completed、nickname（= 店名）、phone（= 聯絡電話）、
-// is_processed_food（有沒有核准的食品業者登錄）、food_business_reg_no（核准的字號）、store_id、store_code、lifecycle_status、website_url、version。
-// 不填的欄位：seo_title、seo_description（欄位已從模組刪除，ADR 2026-10-09-store-seo-platform-generated；舊契約的欄位只能留著不填）；status、created_at（舊 server 也沒填）；email、avatar_key、account_type、birthday、gender（模組沒有）；seller_type、
+// store_id、store_code、lifecycle_status、website_url、version。
+// 不填的欄位：seo_title、seo_description（欄位已從模組刪除，ADR 2026-10-09-store-seo-platform-generated；舊契約的欄位只能留著不填）；
+// is_processed_food、food_business_reg_no（模組沒有食品業者登錄，ADR 2026-10-27-general-ecommerce-scope-cut D3）；status、created_at（舊 server 也沒填）；email、avatar_key、account_type、birthday、gender（模組沒有）；seller_type、
 // overall_certification_status、current_certification_id（KYC 的流程狀態，沒有 legacy 讀者）；suspension_reason_code 只在 GetSeller 填。
 func sellerInfo(s seller.Store, rating float64) (*pb.SellerInfo, error) {
 	lifecycle, err := lifecycleStatus(s)
@@ -172,8 +165,6 @@ func sellerInfo(s seller.Store, rating float64) (*pb.SellerInfo, error) {
 		OnboardingCompleted: s.OnboardingCompleted,
 		Nickname:            s.StoreName,
 		Phone:               deref(s.ContactPhone),
-		IsProcessedFood:     s.ApprovedFoodRegistration != nil,
-		FoodBusinessRegNo:   foodRegistrationNumber(s),
 		StoreId:             format(s.StoreID),
 		StoreCode:           format(s.StoreCode),
 		LifecycleStatus:     lifecycle,

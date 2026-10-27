@@ -1,6 +1,6 @@
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 import { Code } from "@connectrpc/connect";
-import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonUnknown, sellerFoodRegistrationKycPendingNote, sellerFoodRegistrationState, sellerFoodRegistrationStatusApproved, sellerFoodRegistrationStatusPending, sellerFoodRegistrationStatusRejected, sellerFoodRegistrationStatusRevoked, sellerKYCField, sellerKYCFlowStatus, sellerKYCFlowStatusAction, sellerKYCFlowStatusBannerDescription, sellerKYCFlowStatusBannerTitle, sellerKYCFlowStatusGateHeading, sellerKYCFlowStatusGateMessage, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerPayUniState, sellerRevokeReason, sellerRiskGround, sellerSellerPayUniFixFieldsHeading, sellerSellerPayUniReasonHeading, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity } from "../src/keys.gen";
+import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonUnknown, sellerKYCField, sellerKYCFlowStatus, sellerKYCFlowStatusAction, sellerKYCFlowStatusBannerDescription, sellerKYCFlowStatusBannerTitle, sellerKYCFlowStatusGateHeading, sellerKYCFlowStatusGateMessage, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerPayUniState, sellerRevokeReason, sellerRiskGround, sellerSellerPayUniFixFieldsHeading, sellerSellerPayUniReasonHeading, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity } from "../src/keys.gen";
 import { sellerMeasureRequestStateWithKindStaff } from "../src/zh-tw.gen";
 import type { UiMessage } from "../src/message";
 
@@ -15,11 +15,6 @@ export interface GoldenCase {
 }
 
 const ENUM_NUMBER: Readonly<Record<string, number>> = {
-	"FOOD_REGISTRATION_STATE_APPROVED": 2,
-	"FOOD_REGISTRATION_STATE_ENDED": 4,
-	"FOOD_REGISTRATION_STATE_PENDING": 1,
-	"FOOD_REGISTRATION_STATE_REJECTED": 3,
-	"FOOD_REGISTRATION_STATE_UNSPECIFIED": 0,
 	"GENDER_FEMALE": 2,
 	"GENDER_MALE": 1,
 	"GENDER_OTHER": 3,
@@ -198,24 +193,6 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	}
 	case "common.unknown": {
 		return commonUnknown();
-	}
-	case "seller.FoodRegistration.kyc_pending_note": {
-		return sellerFoodRegistrationKycPendingNote();
-	}
-	case "seller.FoodRegistration.status_approved": {
-		return sellerFoodRegistrationStatusApproved({ number: p.number as string });
-	}
-	case "seller.FoodRegistration.status_pending": {
-		return sellerFoodRegistrationStatusPending({ number: p.number as string, date: p.date as string });
-	}
-	case "seller.FoodRegistration.status_rejected": {
-		return sellerFoodRegistrationStatusRejected({ reason: p.reason as string });
-	}
-	case "seller.FoodRegistration.status_revoked": {
-		return sellerFoodRegistrationStatusRevoked({ number: p.number as string, reason: p.reason as string });
-	}
-	case "seller.FoodRegistrationState": {
-		return sellerFoodRegistrationState(num(c.value));
 	}
 	case "seller.KYCField": {
 		return sellerKYCField(num(c.value));

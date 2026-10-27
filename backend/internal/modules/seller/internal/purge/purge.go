@@ -2,14 +2,13 @@
 //
 //   - 第一段（退場，retire）：stint 關閉之後過了 model.StoreRetireAfter（一般關店 30 天；因終止合作而關閉的到終止的申覆期限，且不早於這 30 天），
 //     店家的公開內容（說明、獎項、網站）清掉，logo 與封面在這時才釋放，並發出 StoreRetired（relay 轉成 seller.deleted，商品、貼文、聊天的個資等下游
-//     在這時刪除）：關店可逆，不可逆的下游動作都在這裡，之後不能恢復營業。食品業者登錄待審的撤回、核准中的結束（STORE_RETIRED，字號留到第二段）。
+//     在這時刪除）：關店可逆，不可逆的下游動作都在這裡，之後不能恢復營業。
 //   - 第二段（個資清理，purge）：已退場而且關店之後過了 model.StoreRetention（184 天，詐欺犯罪危害防制條例第 37 條第 1 項的六個月），註冊、身分與連線資料
-//     在同一個 transaction 內一併清掉：店名、聯絡與地址、KYC 申請的個人欄位與證件、登記資料查詢、PayUni 註冊與觀測的自由文字、食品業者登錄的字號與理由、
+//     在同一個 transaction 內一併清掉：店名、聯絡與地址、KYC 申請的個人欄位與證件、登記資料查詢、PayUni 註冊與觀測的自由文字、
 //     同意紀錄的 IP 與 User-Agent。審核的事實、PayUni 的狀態碼與措施的身分快照（措施擁有，隨措施撤銷才刪）保留。
-//   - 食品業者登錄的審核紀錄保留到關店（store_closures 目前這一筆的 closed_at）後 2 個日曆年再整列刪除。
 //
-// 時間條件各只有一支查詢（兩段清理是 RetireDueStores 的兩個 stage，審核紀錄是 ExpiredFoodRegistrations），保存條件只有 StoreHolds 一支：申覆的 legal hold 擋兩段清理（也讓
-// 恢復營業視為保留期還沒過），主管機關來函的保存擋兩段清理與審核紀錄的刪除（不影響恢復營業）。每一批都是：時間條件選候選並鎖住（FOR UPDATE SKIP LOCKED）
+// 時間條件只有一支查詢（兩段清理是 RetireDueStores 的兩個 stage），保存條件只有 StoreHolds 一支：申覆的 legal hold 擋兩段清理（也讓
+// 恢復營業視為保留期還沒過），主管機關來函的保存擋兩段清理（不影響恢復營業）。每一批都是：時間條件選候選並鎖住（FOR UPDATE SKIP LOCKED）
 // → 鎖住之後以新的語句再判斷（時間條件以同一支查詢限定在候選上；保存問 StoreHolds）→ 只處理仍然成立而且沒有被保存的。寫入保存條件的一方都先鎖被保護帳號的
 // 店家列，所以候選鎖住之後不會再出現新的保存（step10e-3cb §2.4 的證明）。恢復營業（closing.ReopenPlan）問同一支 RetireDueStores 與 StoreHolds 的申覆 hold，
 // 所以「恢復或只撤銷紀錄」只由資料決定，不受清理 job 的延遲影響。
@@ -32,17 +31,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
-	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
-
-// FoodReviewRetentionYears 是 stint 關閉之後保留食品業者登錄審核紀錄（不含字號與理由，清理時已清）的年數，期滿整列刪除，
-// 綁在這一列的告知同意紀錄隨之刪除（〈食品業者登錄個人資料蒐集告知事項〉第 4 項）。年數照日曆算（台北時區），不是固定的小時數。
-const FoodReviewRetentionYears = 2
-
-// FoodReviewCutoff 是刪除審核紀錄的界線：關店時間（store_closures.closed_at）嚴格早於它的店家，審核紀錄期滿。
-func FoodReviewCutoff(now time.Time) time.Time {
-	return now.In(twtime.Taipei).AddDate(-FoodReviewRetentionYears, 0, 0).UTC()
-}
 
 // batchSize 是一個 transaction 清理的店家數上限（批次大小，不是總量上限）。
 const batchSize int32 = 100
@@ -65,7 +54,7 @@ type Service struct {
 // New 建立服務。
 func New(d Deps) *Service { return &Service{d: d} }
 
-// Run 依序跑第一段（退場）、第二段（個資清理）與食品登錄審核紀錄的刪除，各自分批到沒有候選為止；回傳第二段清理了個資的店家數
+// Run 依序跑第一段（退場）與第二段（個資清理），各自分批到沒有候選為止；回傳第二段清理了個資的店家數
 // （退場由 retired_at 看得到，不計入）。
 func (s *Service) Run(ctx context.Context) (int, error) {
 	purged := 0
@@ -85,66 +74,20 @@ func (s *Service) Run(ctx context.Context) (int, error) {
 			after = last
 		}
 	}
-	return purged, s.deleteExpiredFoodReviews(ctx)
+	return purged, nil
 }
 
-// holds 回傳候選之中沒有被保存擋下的（StoreHolds 是保存條件的唯一定義）；appeal 為 false 時只看來函的保存（審核紀錄的刪除）。
-func holds(ctx context.Context, q *store.Queries, ids []int64, now time.Time, appeal bool) (map[int64]bool, error) {
+// holds 回傳候選之中被保存擋下的（StoreHolds 是保存條件的唯一定義）：申覆的 legal hold 或主管機關來函的保存。
+func holds(ctx context.Context, q *store.Queries, ids []int64, now time.Time) (map[int64]bool, error) {
 	rows, err := q.StoreHolds(ctx, store.StoreHoldsParams{StoreIds: ids, Now: now})
 	if err != nil {
 		return nil, err
 	}
 	held := make(map[int64]bool, len(rows))
 	for _, r := range rows {
-		held[r.StoreID] = r.PreservationHold || (appeal && r.AppealHold)
+		held[r.StoreID] = r.PreservationHold || r.AppealHold
 	}
 	return held, nil
-}
-
-// deleteExpiredFoodReviews 每批一個 transaction，以 keyset 迴圈到取不滿為止。每批：ExpiredFoodRegistrations 找候選並鎖住登錄列與店家列，鎖住之後以候選的店家問
-// StoreHolds（新的語句），DeleteFoodRegistrations 只刪沒有被來函保存的。時間條件單調（已清理的店家不會恢復），所以不用再判斷一次時間。
-func (s *Service) deleteExpiredFoodReviews(ctx context.Context) error {
-	var after *uuid.UUID
-	for {
-		var candidates int
-		err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
-			q := store.New(s.d.DB.Conn(ctx))
-			now := s.d.Now().UTC()
-			rows, err := q.ExpiredFoodRegistrations(ctx, store.ExpiredFoodRegistrationsParams{Cutoff: FoodReviewCutoff(now), BatchLimit: batchSize, AfterID: after})
-			if err != nil {
-				return err
-			}
-			candidates = len(rows)
-			if len(rows) == 0 {
-				return nil
-			}
-			last := rows[len(rows)-1].ID
-			after = &last
-			s.hooks.afterFoodCandidates()
-			storeIDs := make([]int64, 0, len(rows))
-			for _, r := range rows {
-				storeIDs = append(storeIDs, r.StoreID)
-			}
-			held, err := holds(ctx, q, storeIDs, now, false)
-			if err != nil {
-				return err
-			}
-			var ids []uuid.UUID
-			for _, r := range rows {
-				if !held[r.StoreID] {
-					ids = append(ids, r.ID)
-				}
-			}
-			if len(ids) == 0 {
-				return nil
-			}
-			_, err = q.DeleteFoodRegistrations(ctx, ids)
-			return err
-		})
-		if err != nil || candidates < int(batchSize) {
-			return err
-		}
-	}
 }
 
 // retireBatch 在一個 transaction 內讓一批店家退場（第一段）；回傳這批實際退場的店家數、第一次選到的候選數（滿批次大小才需要再跑一批）與最後一個候選的
@@ -180,7 +123,7 @@ func (s *Service) retireBatch(ctx context.Context, after *int64) (int, int, *int
 		if due, err = q.RetireDueStores(ctx, params); err != nil {
 			return err
 		}
-		held, err := holds(ctx, q, candidates, now, true)
+		held, err := holds(ctx, q, candidates, now)
 		if err != nil {
 			return err
 		}
@@ -226,12 +169,7 @@ func (s *Service) retireBatch(ctx context.Context, after *int64) (int, int, *int
 				return err
 			}
 		}
-		// 退場的店家不會再重開：待審的食品業者登錄撤回，仍核准中的結束（STORE_RETIRED）；字號、理由與內部註記留到第二段清。
-		if _, err := q.WithdrawPendingFoodRegistrations(ctx, store.WithdrawPendingFoodRegistrationsParams{StoreIds: retired, Now: now}); err != nil {
-			return err
-		}
-		_, err = q.RetireApprovedFoodRegistrations(ctx, store.RetireApprovedFoodRegistrationsParams{StoreIds: retired, Now: now})
-		return err
+		return nil
 	})
 	return retiredCount, candidateCount, last, err
 }
@@ -270,7 +208,7 @@ func (s *Service) purgeBatch(ctx context.Context, after *int64) (int, int, *int6
 		for i, r := range rechecked {
 			recheck[i] = r.StoreID
 		}
-		held, err := holds(ctx, q, due, now, true)
+		held, err := holds(ctx, q, due, now)
 		if err != nil {
 			return err
 		}
@@ -295,9 +233,6 @@ func (s *Service) purgeBatch(ctx context.Context, after *int64) (int, int, *int6
 			if err := s.d.Jobs.Enqueue(ctx, revalidate.Args{Tags: revalidate.StoreTags(r.StoreID, r.StoreCode)}, nil); err != nil {
 				return err
 			}
-		}
-		if _, err := q.PurgeFoodRegistrations(ctx, store.PurgeFoodRegistrationsParams{StoreIds: purged, Now: &now}); err != nil {
-			return err
 		}
 		applications, err := q.PurgeKYCApplications(ctx, store.PurgeKYCApplicationsParams{StoreIds: purged, Now: &now})
 		if err != nil {

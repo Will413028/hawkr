@@ -61,12 +61,6 @@ type MeasureRequestDecided = model.MeasureRequestDecided
 // MeasureRequestClosed 在待處理的請求以 CLOSED 結案的 transaction 內發出，Cause 是措施撤銷或措施已結束。
 type MeasureRequestClosed = model.MeasureRequestClosed
 
-// FoodRegistrationDecided 在管理員裁定食品業者登錄（核准或退回，看 Outcome）的 transaction 內發出。
-type FoodRegistrationDecided = model.FoodRegistrationDecided
-
-// FoodRegistrationRevoked 在管理員撤銷核准中的食品業者登錄的 transaction 內發出。
-type FoodRegistrationRevoked = model.FoodRegistrationRevoked
-
 // KYCSubmitted 在賣家送出 KYC 申請的 transaction 內發出。
 type KYCSubmitted = model.KYCSubmitted
 

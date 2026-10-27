@@ -249,21 +249,6 @@ func CaseUnavailableNoActionBasis() uitext.Message {
 	return uitext.Message{Text: "還沒有從這個案件建立的措施，也沒有通報的結果是已採取措施，不能決定採取措施。", Locale: uitext.ZhTW}
 }
 
-// CaseUnavailableNoReferral 是後台員工受眾的模組句子 case.unavailable.no_referral（只有 zh-TW）。
-func CaseUnavailableNoReferral() uitext.Message {
-	return uitext.Message{Text: "這個案件還沒有記錄轉報。", Locale: uitext.ZhTW}
-}
-
-// CaseUnavailableReferralRecorded 是後台員工受眾的模組句子 case.unavailable.referral_recorded（只有 zh-TW）。
-func CaseUnavailableReferralRecorded() uitext.Message {
-	return uitext.Message{Text: "這個案件先前已記錄轉報。", Locale: uitext.ZhTW}
-}
-
-// CaseUnavailableReferralWaived 是後台員工受眾的模組句子 case.unavailable.referral_waived（只有 zh-TW）。
-func CaseUnavailableReferralWaived() uitext.Message {
-	return uitext.Message{Text: "這個案件已標記不轉報。", Locale: uitext.ZhTW}
-}
-
 // CaseUnavailableReportActionTaken 是後台員工受眾的模組句子 case.unavailable.report_action_taken（只有 zh-TW）。
 func CaseUnavailableReportActionTaken() uitext.Message {
 	return uitext.Message{Text: "案件裡有通報的結果是已採取措施，不能決定不採取措施。", Locale: uitext.ZhTW}
@@ -287,16 +272,6 @@ func CaseVersionConflict() uitext.Message {
 // DecideDecisionRequired 是後台員工受眾的模組句子 decide.decision_required（只有 zh-TW）。
 func DecideDecisionRequired() uitext.Message {
 	return uitext.Message{Text: "請選擇結案結果。", Locale: uitext.ZhTW}
-}
-
-// ExportNoReports 是後台員工受眾的模組句子 export.no_reports（只有 zh-TW）。
-func ExportNoReports() uitext.Message {
-	return uitext.Message{Text: "這個案件沒有通報，不能匯出轉報資料。", Locale: uitext.ZhTW}
-}
-
-// ExportNotFoodSafety 是後台員工受眾的模組句子 export.not_food_safety（只有 zh-TW）。
-func ExportNotFoodSafety() uitext.Message {
-	return uitext.Message{Text: "平台判定類別是食安的案件才能匯出轉報資料。", Locale: uitext.ZhTW}
 }
 
 // InquiryBodyLength 是後台員工受眾的模組句子 inquiry.body_length（只有 zh-TW）。
@@ -499,51 +474,6 @@ func PayuniStateTerminated(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "請聯繫客服了解原因。", Locale: uitext.ZhTW}
 }
 
-// ReferralChannelRequired 是後台員工受眾的模組句子 referral.channel_required（只有 zh-TW）。
-func ReferralChannelRequired() uitext.Message {
-	return uitext.Message{Text: "請選擇管道。", Locale: uitext.ZhTW}
-}
-
-// ReferralFollowUpConflict 是後台員工受眾的模組句子 referral.follow_up_conflict（只有 zh-TW）。
-func ReferralFollowUpConflict() uitext.Message {
-	return uitext.Message{Text: "不能同時設定下一個追蹤日期和不再追蹤。", Locale: uitext.ZhTW}
-}
-
-// ReferralFollowUpPast 是後台員工受眾的模組句子 referral.follow_up_past（只有 zh-TW）。
-func ReferralFollowUpPast() uitext.Message {
-	return uitext.Message{Text: "追蹤日期不能早於今天。", Locale: uitext.ZhTW}
-}
-
-// ReferralNoReports 是後台員工受眾的模組句子 referral.no_reports（只有 zh-TW）。
-func ReferralNoReports() uitext.Message {
-	return uitext.Message{Text: "這個案件沒有通報，不能轉報。", Locale: uitext.ZhTW}
-}
-
-// ReferralNotFoodSafety 是後台員工受眾的模組句子 referral.not_food_safety（只有 zh-TW）。
-func ReferralNotFoodSafety() uitext.Message {
-	return uitext.Message{Text: "平台判定類別是食安的案件才能轉報主管機關。", Locale: uitext.ZhTW}
-}
-
-// ReferralReceiveDateRange 是後台員工受眾的模組句子 referral.receive_date_range（只有 zh-TW）。
-func ReferralReceiveDateRange() uitext.Message {
-	return uitext.Message{Text: "收到的日期不能早於轉報日，也不能晚於今天。", Locale: uitext.ZhTW}
-}
-
-// ReferralReferenceNoLength 是後台員工受眾的模組句子 referral.reference_no_length（只有 zh-TW）。
-func ReferralReferenceNoLength() uitext.Message {
-	return uitext.Message{Text: "案號最多 100 字。", Locale: uitext.ZhTW}
-}
-
-// ReferralReplyBodyLength 是後台員工受眾的模組句子 referral.reply_body_length（只有 zh-TW）。
-func ReferralReplyBodyLength() uitext.Message {
-	return uitext.Message{Text: "回覆內容必須是 1 到 2000 字。", Locale: uitext.ZhTW}
-}
-
-// ReferralWaiverReasonLength 是後台員工受眾的模組句子 referral.waiver_reason_length（只有 zh-TW）。
-func ReferralWaiverReasonLength() uitext.Message {
-	return uitext.Message{Text: "不轉報的原因必須是 1 到 2000 字。", Locale: uitext.ZhTW}
-}
-
 // RemediationUnavailableAppealPending 是模組句子 remediation.unavailable.appeal_pending；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func RemediationUnavailableAppealPending(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "這筆措施的申覆審核中，審核完成前不能請求解除", Locale: uitext.ZhTW}
@@ -624,11 +554,6 @@ func ReportUnavailableLastReportWithMeasure() uitext.Message {
 	return uitext.Message{Text: "這個案件已有導出的措施，不能把最後一筆通報移走。", Locale: uitext.ZhTW}
 }
 
-// ReportUnavailableLastReportWithReferral 是後台員工受眾的模組句子 report.unavailable.last_report_with_referral（只有 zh-TW）。
-func ReportUnavailableLastReportWithReferral() uitext.Message {
-	return uitext.Message{Text: "這個案件已記錄轉報，不能把最後一筆通報移走。", Locale: uitext.ZhTW}
-}
-
 // ReportUnavailableNeedsCase 是後台員工受眾的模組句子 report.unavailable.needs_case（只有 zh-TW）。
 func ReportUnavailableNeedsCase() uitext.Message {
 	return uitext.Message{Text: "還沒分案的通報不能設為已採取措施；請先分案。", Locale: uitext.ZhTW}
@@ -694,16 +619,6 @@ func StoreActionUnavailableAccountSuspendedDelegate() uitext.Message {
 	return uitext.Message{Text: "帳號停權中，無法代行。", Locale: uitext.ZhTW}
 }
 
-// StoreActionUnavailableFoodRegistrationNotPendingDecideFoodRegistration 是後台員工受眾的模組句子 store_action.unavailable.food_registration_not_pending.decide_food_registration（只有 zh-TW）。
-func StoreActionUnavailableFoodRegistrationNotPendingDecideFoodRegistration() uitext.Message {
-	return uitext.Message{Text: "這筆食品業者登錄已不在待審。", Locale: uitext.ZhTW}
-}
-
-// StoreActionUnavailableKycNotApprovedApproveFoodRegistration 是後台員工受眾的模組句子 store_action.unavailable.kyc_not_approved.approve_food_registration（只有 zh-TW）。
-func StoreActionUnavailableKycNotApprovedApproveFoodRegistration() uitext.Message {
-	return uitext.Message{Text: "店家的商家認證還沒核准，不能核准食品業者登錄。", Locale: uitext.ZhTW}
-}
-
 // StoreActionUnavailableKycNotApprovedRebindPayuni 是後台員工受眾的模組句子 store_action.unavailable.kyc_not_approved.rebind_payuni（只有 zh-TW）。
 func StoreActionUnavailableKycNotApprovedRebindPayuni() uitext.Message {
 	return uitext.Message{Text: "賣家正在修改商家認證，重新核准後會自動重新綁定。", Locale: uitext.ZhTW}
@@ -739,11 +654,6 @@ func StoreActionUnavailableStoreClosedCreateMeasure() uitext.Message {
 	return uitext.Message{Text: "店家已關閉，不能建立警告、停權或風險措施。", Locale: uitext.ZhTW}
 }
 
-// StoreActionUnavailableStoreClosedDecideFoodRegistration 是後台員工受眾的模組句子 store_action.unavailable.store_closed.decide_food_registration（只有 zh-TW）。
-func StoreActionUnavailableStoreClosedDecideFoodRegistration() uitext.Message {
-	return uitext.Message{Text: "店家已關閉，不能裁定食品業者登錄。", Locale: uitext.ZhTW}
-}
-
 // StoreActionUnavailableStoreClosedDelegate 是後台員工受眾的模組句子 store_action.unavailable.store_closed.delegate（只有 zh-TW）。
 func StoreActionUnavailableStoreClosedDelegate() uitext.Message {
 	return uitext.Message{Text: "店家已關閉，無法代行。", Locale: uitext.ZhTW}
@@ -757,11 +667,6 @@ func StoreActionUnavailableStoreClosedRebindPayuni() uitext.Message {
 // StoreActionUnavailableStoreClosedReviewKyc 是後台員工受眾的模組句子 store_action.unavailable.store_closed.review_kyc（只有 zh-TW）。
 func StoreActionUnavailableStoreClosedReviewKyc() uitext.Message {
 	return uitext.Message{Text: "店家已關閉，這份商家認證申請暫停審核，店家恢復營業後才能審核或重新查詢。", Locale: uitext.ZhTW}
-}
-
-// StoreActionUnavailableStorePendingDeletionDecideFoodRegistration 是後台員工受眾的模組句子 store_action.unavailable.store_pending_deletion.decide_food_registration（只有 zh-TW）。
-func StoreActionUnavailableStorePendingDeletionDecideFoodRegistration() uitext.Message {
-	return uitext.Message{Text: "店家等待刪除，不能裁定食品業者登錄。", Locale: uitext.ZhTW}
 }
 
 // StoreActionUnavailableStorePendingDeletionDelegate 是後台員工受眾的模組句子 store_action.unavailable.store_pending_deletion.delegate（只有 zh-TW）。

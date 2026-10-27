@@ -63,15 +63,6 @@ const (
 	// SellerAppServiceGetMyDashboardProcedure is the fully-qualified name of the SellerAppService's
 	// GetMyDashboard RPC.
 	SellerAppServiceGetMyDashboardProcedure = "/hawkr.seller.v1alpha1.SellerAppService/GetMyDashboard"
-	// SellerAppServiceSubmitFoodRegistrationProcedure is the fully-qualified name of the
-	// SellerAppService's SubmitFoodRegistration RPC.
-	SellerAppServiceSubmitFoodRegistrationProcedure = "/hawkr.seller.v1alpha1.SellerAppService/SubmitFoodRegistration"
-	// SellerAppServiceWithdrawFoodRegistrationProcedure is the fully-qualified name of the
-	// SellerAppService's WithdrawFoodRegistration RPC.
-	SellerAppServiceWithdrawFoodRegistrationProcedure = "/hawkr.seller.v1alpha1.SellerAppService/WithdrawFoodRegistration"
-	// SellerAppServiceClearFoodRegistrationProcedure is the fully-qualified name of the
-	// SellerAppService's ClearFoodRegistration RPC.
-	SellerAppServiceClearFoodRegistrationProcedure = "/hawkr.seller.v1alpha1.SellerAppService/ClearFoodRegistration"
 	// SellerAppServiceCloseMyStoreProcedure is the fully-qualified name of the SellerAppService's
 	// CloseMyStore RPC.
 	SellerAppServiceCloseMyStoreProcedure = "/hawkr.seller.v1alpha1.SellerAppService/CloseMyStore"
@@ -124,7 +115,7 @@ type SellerAppServiceClient interface {
 	// ApplyStore 申請開店：建立店家並授予賣家角色。前置條件依優先序檢查，第一個不符的決定回應：有生效中的終止合作回
 	// failed_precondition 與 STORE_OPENING_TERMINATED（解除停權也開不了店）；其次帳號停權中回 failed_precondition 與
 	// STORE_OPENING_SUSPENDED；其次帳號正在刪除回 failed_precondition（沒有 reason）；最後帳號已經有店家才回 already_exists。
-	// 所以被終止、停權或正在刪除的帳號即使還有店家，回的也不是 already_exists；任何一個欄位不合法都不會建立店家。官網、logo 與封面開店後以 UpdateMyStore 設定，食品業者登錄以 SubmitFoodRegistration 送審。
+	// 所以被終止、停權或正在刪除的帳號即使還有店家，回的也不是 already_exists；任何一個欄位不合法都不會建立店家。官網、logo 與封面開店後以 UpdateMyStore 設定。
 	ApplyStore(context.Context, *connect.Request[v1alpha1.ApplyStoreRequest]) (*connect.Response[v1alpha1.ApplyStoreResponse], error)
 	// GetMyStoreOpening 回答呼叫者的帳號此刻能不能申請開店，以及不能的原因（依優先序）。開店入口在送出表單之前讀它，不必等 ApplyStore 失敗才知道。
 	// 與 ApplyStore 的前置條件是同一份規則（伺服器推導）：can_apply_store 為 true 時 ApplyStore 不會被前置條件擋下；ApplyStore 的 ErrorReason
@@ -133,7 +124,7 @@ type SellerAppServiceClient interface {
 	// GetMyStore 回傳呼叫者的店家，連同停權與每個能力的狀態（含缺的條件）。停權與等待刪除的店家照樣回傳。
 	GetMyStore(context.Context, *connect.Request[v1alpha1.GetMyStoreRequest]) (*connect.Response[v1alpha1.GetMyStoreResponse], error)
 	// UpdateMyStore 修改店家資料的欄位（update_mask），含 logo 與封面（logo_staged_token、
-	// cover_staged_token）。食品業者登錄不在這裡（SubmitFoodRegistration）。換圖與文字欄位在同一個版本條件下一起寫入，任何一項失敗都不會寫入；沒有任何欄位改變時
+	// cover_staged_token）。換圖與文字欄位在同一個版本條件下一起寫入，任何一項失敗都不會寫入；沒有任何欄位改變時
 	// 不寫入，etag 不變。
 	UpdateMyStore(context.Context, *connect.Request[v1alpha1.UpdateMyStoreRequest]) (*connect.Response[v1alpha1.UpdateMyStoreResponse], error)
 	// CompleteMyStoreOnboarding 標記新手引導完成；已經完成時不改變任何東西（etag 仍要相符）。
@@ -146,16 +137,6 @@ type SellerAppServiceClient interface {
 	// 需要行銷經營的能力（CAP_MARKETING），所以停權或等待刪除的店家回 permission_denied（SELLER_SUSPENDED）或
 	// failed_precondition。
 	GetMyDashboard(context.Context, *connect.Request[v1alpha1.GetMyDashboardRequest]) (*connect.Response[v1alpha1.GetMyDashboardResponse], error)
-	// SubmitFoodRegistration 送出食品業者登錄供平台核對（食藥署的登錄資料，人工核對）；通過後才會成為店面與商品頁公開的字號，並開放上架
-	// 加工食品。店家要在營業中，開店前後的 KYC 狀態不影響送出，平台在實名認證（KYC）核准後才能核准。已有待審的登錄時：字號相同就沿用
-	// （不改變排隊的時間），不同就撤回舊的、換成新的，所以同時最多一筆待審。審核期間目前核准的登錄照常有效。字號去掉前後空白後 1 到 50 字，
-	// 不檢查格式（沒有官方規格，交給人工核對），不合法回 invalid_argument。回傳送出之後的店家（pending_food_registration 是這筆待審）。
-	SubmitFoodRegistration(context.Context, *connect.Request[v1alpha1.SubmitFoodRegistrationRequest]) (*connect.Response[v1alpha1.SubmitFoodRegistrationResponse], error)
-	// WithdrawFoodRegistration 撤回待審的登錄（狀態成為已撤回，賣家不再看到），目前核准的那一筆保留。沒有待審的登錄回 failed_precondition。
-	WithdrawFoodRegistration(context.Context, *connect.Request[v1alpha1.WithdrawFoodRegistrationRequest]) (*connect.Response[v1alpha1.WithdrawFoodRegistrationResponse], error)
-	// ClearFoodRegistration 清除食品業者登錄（不再賣加工食品）：結束目前核准的那一筆、同時撤回待審的，立即生效，店面與商品頁不再顯示
-	// 字號。核准的與待審的都沒有時回 failed_precondition。
-	ClearFoodRegistration(context.Context, *connect.Request[v1alpha1.ClearFoodRegistrationRequest]) (*connect.Response[v1alpha1.ClearFoodRegistrationResponse], error)
 	// CloseMyStore 關閉店家（帳號與買家身分留著，賣家角色移除）。店家有未結訂單時回 failed_precondition；
 	// 停權中也可以關店；正在隨帳號刪除的店家由刪除流程關閉，回 failed_precondition。
 	CloseMyStore(context.Context, *connect.Request[v1alpha1.CloseMyStoreRequest]) (*connect.Response[v1alpha1.CloseMyStoreResponse], error)
@@ -261,24 +242,6 @@ func NewSellerAppServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
-		submitFoodRegistration: connect.NewClient[v1alpha1.SubmitFoodRegistrationRequest, v1alpha1.SubmitFoodRegistrationResponse](
-			httpClient,
-			baseURL+SellerAppServiceSubmitFoodRegistrationProcedure,
-			connect.WithSchema(sellerAppServiceMethods.ByName("SubmitFoodRegistration")),
-			connect.WithClientOptions(opts...),
-		),
-		withdrawFoodRegistration: connect.NewClient[v1alpha1.WithdrawFoodRegistrationRequest, v1alpha1.WithdrawFoodRegistrationResponse](
-			httpClient,
-			baseURL+SellerAppServiceWithdrawFoodRegistrationProcedure,
-			connect.WithSchema(sellerAppServiceMethods.ByName("WithdrawFoodRegistration")),
-			connect.WithClientOptions(opts...),
-		),
-		clearFoodRegistration: connect.NewClient[v1alpha1.ClearFoodRegistrationRequest, v1alpha1.ClearFoodRegistrationResponse](
-			httpClient,
-			baseURL+SellerAppServiceClearFoodRegistrationProcedure,
-			connect.WithSchema(sellerAppServiceMethods.ByName("ClearFoodRegistration")),
-			connect.WithClientOptions(opts...),
-		),
 		closeMyStore: connect.NewClient[v1alpha1.CloseMyStoreRequest, v1alpha1.CloseMyStoreResponse](
 			httpClient,
 			baseURL+SellerAppServiceCloseMyStoreProcedure,
@@ -354,9 +317,6 @@ type sellerAppServiceClient struct {
 	completeMyStoreOnboarding  *connect.Client[v1alpha1.CompleteMyStoreOnboardingRequest, v1alpha1.CompleteMyStoreOnboardingResponse]
 	listMyFollowers            *connect.Client[v1alpha1.ListMyFollowersRequest, v1alpha1.ListMyFollowersResponse]
 	getMyDashboard             *connect.Client[v1alpha1.GetMyDashboardRequest, v1alpha1.GetMyDashboardResponse]
-	submitFoodRegistration     *connect.Client[v1alpha1.SubmitFoodRegistrationRequest, v1alpha1.SubmitFoodRegistrationResponse]
-	withdrawFoodRegistration   *connect.Client[v1alpha1.WithdrawFoodRegistrationRequest, v1alpha1.WithdrawFoodRegistrationResponse]
-	clearFoodRegistration      *connect.Client[v1alpha1.ClearFoodRegistrationRequest, v1alpha1.ClearFoodRegistrationResponse]
 	closeMyStore               *connect.Client[v1alpha1.CloseMyStoreRequest, v1alpha1.CloseMyStoreResponse]
 	saveKYCDraft               *connect.Client[v1alpha1.SaveKYCDraftRequest, v1alpha1.SaveKYCDraftResponse]
 	getMyKYC                   *connect.Client[v1alpha1.GetMyKYCRequest, v1alpha1.GetMyKYCResponse]
@@ -402,21 +362,6 @@ func (c *sellerAppServiceClient) ListMyFollowers(ctx context.Context, req *conne
 // GetMyDashboard calls hawkr.seller.v1alpha1.SellerAppService.GetMyDashboard.
 func (c *sellerAppServiceClient) GetMyDashboard(ctx context.Context, req *connect.Request[v1alpha1.GetMyDashboardRequest]) (*connect.Response[v1alpha1.GetMyDashboardResponse], error) {
 	return c.getMyDashboard.CallUnary(ctx, req)
-}
-
-// SubmitFoodRegistration calls hawkr.seller.v1alpha1.SellerAppService.SubmitFoodRegistration.
-func (c *sellerAppServiceClient) SubmitFoodRegistration(ctx context.Context, req *connect.Request[v1alpha1.SubmitFoodRegistrationRequest]) (*connect.Response[v1alpha1.SubmitFoodRegistrationResponse], error) {
-	return c.submitFoodRegistration.CallUnary(ctx, req)
-}
-
-// WithdrawFoodRegistration calls hawkr.seller.v1alpha1.SellerAppService.WithdrawFoodRegistration.
-func (c *sellerAppServiceClient) WithdrawFoodRegistration(ctx context.Context, req *connect.Request[v1alpha1.WithdrawFoodRegistrationRequest]) (*connect.Response[v1alpha1.WithdrawFoodRegistrationResponse], error) {
-	return c.withdrawFoodRegistration.CallUnary(ctx, req)
-}
-
-// ClearFoodRegistration calls hawkr.seller.v1alpha1.SellerAppService.ClearFoodRegistration.
-func (c *sellerAppServiceClient) ClearFoodRegistration(ctx context.Context, req *connect.Request[v1alpha1.ClearFoodRegistrationRequest]) (*connect.Response[v1alpha1.ClearFoodRegistrationResponse], error) {
-	return c.clearFoodRegistration.CallUnary(ctx, req)
 }
 
 // CloseMyStore calls hawkr.seller.v1alpha1.SellerAppService.CloseMyStore.
@@ -476,7 +421,7 @@ type SellerAppServiceHandler interface {
 	// ApplyStore 申請開店：建立店家並授予賣家角色。前置條件依優先序檢查，第一個不符的決定回應：有生效中的終止合作回
 	// failed_precondition 與 STORE_OPENING_TERMINATED（解除停權也開不了店）；其次帳號停權中回 failed_precondition 與
 	// STORE_OPENING_SUSPENDED；其次帳號正在刪除回 failed_precondition（沒有 reason）；最後帳號已經有店家才回 already_exists。
-	// 所以被終止、停權或正在刪除的帳號即使還有店家，回的也不是 already_exists；任何一個欄位不合法都不會建立店家。官網、logo 與封面開店後以 UpdateMyStore 設定，食品業者登錄以 SubmitFoodRegistration 送審。
+	// 所以被終止、停權或正在刪除的帳號即使還有店家，回的也不是 already_exists；任何一個欄位不合法都不會建立店家。官網、logo 與封面開店後以 UpdateMyStore 設定。
 	ApplyStore(context.Context, *connect.Request[v1alpha1.ApplyStoreRequest]) (*connect.Response[v1alpha1.ApplyStoreResponse], error)
 	// GetMyStoreOpening 回答呼叫者的帳號此刻能不能申請開店，以及不能的原因（依優先序）。開店入口在送出表單之前讀它，不必等 ApplyStore 失敗才知道。
 	// 與 ApplyStore 的前置條件是同一份規則（伺服器推導）：can_apply_store 為 true 時 ApplyStore 不會被前置條件擋下；ApplyStore 的 ErrorReason
@@ -485,7 +430,7 @@ type SellerAppServiceHandler interface {
 	// GetMyStore 回傳呼叫者的店家，連同停權與每個能力的狀態（含缺的條件）。停權與等待刪除的店家照樣回傳。
 	GetMyStore(context.Context, *connect.Request[v1alpha1.GetMyStoreRequest]) (*connect.Response[v1alpha1.GetMyStoreResponse], error)
 	// UpdateMyStore 修改店家資料的欄位（update_mask），含 logo 與封面（logo_staged_token、
-	// cover_staged_token）。食品業者登錄不在這裡（SubmitFoodRegistration）。換圖與文字欄位在同一個版本條件下一起寫入，任何一項失敗都不會寫入；沒有任何欄位改變時
+	// cover_staged_token）。換圖與文字欄位在同一個版本條件下一起寫入，任何一項失敗都不會寫入；沒有任何欄位改變時
 	// 不寫入，etag 不變。
 	UpdateMyStore(context.Context, *connect.Request[v1alpha1.UpdateMyStoreRequest]) (*connect.Response[v1alpha1.UpdateMyStoreResponse], error)
 	// CompleteMyStoreOnboarding 標記新手引導完成；已經完成時不改變任何東西（etag 仍要相符）。
@@ -498,16 +443,6 @@ type SellerAppServiceHandler interface {
 	// 需要行銷經營的能力（CAP_MARKETING），所以停權或等待刪除的店家回 permission_denied（SELLER_SUSPENDED）或
 	// failed_precondition。
 	GetMyDashboard(context.Context, *connect.Request[v1alpha1.GetMyDashboardRequest]) (*connect.Response[v1alpha1.GetMyDashboardResponse], error)
-	// SubmitFoodRegistration 送出食品業者登錄供平台核對（食藥署的登錄資料，人工核對）；通過後才會成為店面與商品頁公開的字號，並開放上架
-	// 加工食品。店家要在營業中，開店前後的 KYC 狀態不影響送出，平台在實名認證（KYC）核准後才能核准。已有待審的登錄時：字號相同就沿用
-	// （不改變排隊的時間），不同就撤回舊的、換成新的，所以同時最多一筆待審。審核期間目前核准的登錄照常有效。字號去掉前後空白後 1 到 50 字，
-	// 不檢查格式（沒有官方規格，交給人工核對），不合法回 invalid_argument。回傳送出之後的店家（pending_food_registration 是這筆待審）。
-	SubmitFoodRegistration(context.Context, *connect.Request[v1alpha1.SubmitFoodRegistrationRequest]) (*connect.Response[v1alpha1.SubmitFoodRegistrationResponse], error)
-	// WithdrawFoodRegistration 撤回待審的登錄（狀態成為已撤回，賣家不再看到），目前核准的那一筆保留。沒有待審的登錄回 failed_precondition。
-	WithdrawFoodRegistration(context.Context, *connect.Request[v1alpha1.WithdrawFoodRegistrationRequest]) (*connect.Response[v1alpha1.WithdrawFoodRegistrationResponse], error)
-	// ClearFoodRegistration 清除食品業者登錄（不再賣加工食品）：結束目前核准的那一筆、同時撤回待審的，立即生效，店面與商品頁不再顯示
-	// 字號。核准的與待審的都沒有時回 failed_precondition。
-	ClearFoodRegistration(context.Context, *connect.Request[v1alpha1.ClearFoodRegistrationRequest]) (*connect.Response[v1alpha1.ClearFoodRegistrationResponse], error)
 	// CloseMyStore 關閉店家（帳號與買家身分留著，賣家角色移除）。店家有未結訂單時回 failed_precondition；
 	// 停權中也可以關店；正在隨帳號刪除的店家由刪除流程關閉，回 failed_precondition。
 	CloseMyStore(context.Context, *connect.Request[v1alpha1.CloseMyStoreRequest]) (*connect.Response[v1alpha1.CloseMyStoreResponse], error)
@@ -609,24 +544,6 @@ func NewSellerAppServiceHandler(svc SellerAppServiceHandler, opts ...connect.Han
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
-	sellerAppServiceSubmitFoodRegistrationHandler := connect.NewUnaryHandler(
-		SellerAppServiceSubmitFoodRegistrationProcedure,
-		svc.SubmitFoodRegistration,
-		connect.WithSchema(sellerAppServiceMethods.ByName("SubmitFoodRegistration")),
-		connect.WithHandlerOptions(opts...),
-	)
-	sellerAppServiceWithdrawFoodRegistrationHandler := connect.NewUnaryHandler(
-		SellerAppServiceWithdrawFoodRegistrationProcedure,
-		svc.WithdrawFoodRegistration,
-		connect.WithSchema(sellerAppServiceMethods.ByName("WithdrawFoodRegistration")),
-		connect.WithHandlerOptions(opts...),
-	)
-	sellerAppServiceClearFoodRegistrationHandler := connect.NewUnaryHandler(
-		SellerAppServiceClearFoodRegistrationProcedure,
-		svc.ClearFoodRegistration,
-		connect.WithSchema(sellerAppServiceMethods.ByName("ClearFoodRegistration")),
-		connect.WithHandlerOptions(opts...),
-	)
 	sellerAppServiceCloseMyStoreHandler := connect.NewUnaryHandler(
 		SellerAppServiceCloseMyStoreProcedure,
 		svc.CloseMyStore,
@@ -706,12 +623,6 @@ func NewSellerAppServiceHandler(svc SellerAppServiceHandler, opts ...connect.Han
 			sellerAppServiceListMyFollowersHandler.ServeHTTP(w, r)
 		case SellerAppServiceGetMyDashboardProcedure:
 			sellerAppServiceGetMyDashboardHandler.ServeHTTP(w, r)
-		case SellerAppServiceSubmitFoodRegistrationProcedure:
-			sellerAppServiceSubmitFoodRegistrationHandler.ServeHTTP(w, r)
-		case SellerAppServiceWithdrawFoodRegistrationProcedure:
-			sellerAppServiceWithdrawFoodRegistrationHandler.ServeHTTP(w, r)
-		case SellerAppServiceClearFoodRegistrationProcedure:
-			sellerAppServiceClearFoodRegistrationHandler.ServeHTTP(w, r)
 		case SellerAppServiceCloseMyStoreProcedure:
 			sellerAppServiceCloseMyStoreHandler.ServeHTTP(w, r)
 		case SellerAppServiceSaveKYCDraftProcedure:
@@ -767,18 +678,6 @@ func (UnimplementedSellerAppServiceHandler) ListMyFollowers(context.Context, *co
 
 func (UnimplementedSellerAppServiceHandler) GetMyDashboard(context.Context, *connect.Request[v1alpha1.GetMyDashboardRequest]) (*connect.Response[v1alpha1.GetMyDashboardResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.GetMyDashboard is not implemented"))
-}
-
-func (UnimplementedSellerAppServiceHandler) SubmitFoodRegistration(context.Context, *connect.Request[v1alpha1.SubmitFoodRegistrationRequest]) (*connect.Response[v1alpha1.SubmitFoodRegistrationResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.SubmitFoodRegistration is not implemented"))
-}
-
-func (UnimplementedSellerAppServiceHandler) WithdrawFoodRegistration(context.Context, *connect.Request[v1alpha1.WithdrawFoodRegistrationRequest]) (*connect.Response[v1alpha1.WithdrawFoodRegistrationResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.WithdrawFoodRegistration is not implemented"))
-}
-
-func (UnimplementedSellerAppServiceHandler) ClearFoodRegistration(context.Context, *connect.Request[v1alpha1.ClearFoodRegistrationRequest]) (*connect.Response[v1alpha1.ClearFoodRegistrationResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.ClearFoodRegistration is not implemented"))
 }
 
 func (UnimplementedSellerAppServiceHandler) CloseMyStore(context.Context, *connect.Request[v1alpha1.CloseMyStoreRequest]) (*connect.Response[v1alpha1.CloseMyStoreResponse], error) {
@@ -839,7 +738,7 @@ type SellerPublicServiceClient interface {
 	// 從沒公開過的 id 直接略過，不回錯誤，client 以回應裡有沒有該 id 判斷（ADR 2026-10-03-public-store-identity-and-visibility）。
 	BatchGetStores(context.Context, *connect.Request[v1alpha1.BatchGetStoresRequest]) (*connect.Response[v1alpha1.BatchGetStoresResponse], error)
 	// GetSellerAgreements 讀取賣家入駐時要同意的文件的現行版本與網址，全部種類都回，依 AgreementKind 的數字順序。內容是公開的，
-	// 開店前就要能讀，所以不需要登入。client 把這裡的版本顯示給賣家勾選，再原樣帶回 ApplyStore、SubmitKYC 與 SubmitFoodRegistration 的
+	// 開店前就要能讀，所以不需要登入。client 把這裡的版本顯示給賣家勾選，再原樣帶回 ApplyStore 與 SubmitKYC 的
 	// accepted_agreements。
 	GetSellerAgreements(context.Context, *connect.Request[v1alpha1.GetSellerAgreementsRequest]) (*connect.Response[v1alpha1.GetSellerAgreementsResponse], error)
 	// RecordProductView 記錄一次商品頁的瀏覽，只計訪客：登入的買家由買家的瀏覽紀錄計入，登入的呼叫者收到成功的回應但
@@ -949,7 +848,7 @@ type SellerPublicServiceHandler interface {
 	// 從沒公開過的 id 直接略過，不回錯誤，client 以回應裡有沒有該 id 判斷（ADR 2026-10-03-public-store-identity-and-visibility）。
 	BatchGetStores(context.Context, *connect.Request[v1alpha1.BatchGetStoresRequest]) (*connect.Response[v1alpha1.BatchGetStoresResponse], error)
 	// GetSellerAgreements 讀取賣家入駐時要同意的文件的現行版本與網址，全部種類都回，依 AgreementKind 的數字順序。內容是公開的，
-	// 開店前就要能讀，所以不需要登入。client 把這裡的版本顯示給賣家勾選，再原樣帶回 ApplyStore、SubmitKYC 與 SubmitFoodRegistration 的
+	// 開店前就要能讀，所以不需要登入。client 把這裡的版本顯示給賣家勾選，再原樣帶回 ApplyStore 與 SubmitKYC 的
 	// accepted_agreements。
 	GetSellerAgreements(context.Context, *connect.Request[v1alpha1.GetSellerAgreementsRequest]) (*connect.Response[v1alpha1.GetSellerAgreementsResponse], error)
 	// RecordProductView 記錄一次商品頁的瀏覽，只計訪客：登入的買家由買家的瀏覽紀錄計入，登入的呼叫者收到成功的回應但

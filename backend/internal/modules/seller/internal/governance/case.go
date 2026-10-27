@@ -32,7 +32,7 @@ func lockCase(ctx context.Context, q *store.Queries, caseID uuid.UUID, expected 
 	return row, nil
 }
 
-// caseFactsOf 組出一個已鎖住的案件的事實（成員統計、導出的措施、轉報紀錄、店家是否已關閉）。
+// caseFactsOf 組出一個已鎖住的案件的事實（成員統計、導出的措施、店家是否已關閉）。
 func caseFactsOf(ctx context.Context, q *store.Queries, caseID uuid.UUID) (model.CaseFacts, error) {
 	facts, err := caseFactsByIDs(ctx, q, []uuid.UUID{caseID})
 	if err != nil {
@@ -186,7 +186,7 @@ func (s *Service) ChangeSeverity(ctx context.Context, in model.ChangeCaseSeverit
 	return result, err
 }
 
-// Case 讀取一個案件的後台檢視：移動紀錄、轉報紀錄、此刻可以做的動作與 etag（Version）。
+// Case 讀取一個案件的後台檢視：移動紀錄、此刻可以做的動作與 etag（Version）。
 func (s *Service) Case(ctx context.Context, caseID uuid.UUID) (model.AdminCase, error) {
 	var out model.AdminCase
 	err := s.d.DB.InReadSnapshot(ctx, func(ctx context.Context) error {
@@ -263,59 +263,6 @@ func (s *Service) AdminCases(ctx context.Context, in model.CaseListInput) (model
 		return nil
 	})
 	return page, err
-}
-
-// FDAExport 回傳轉報主管機關需要的資料：案件、案件裡結果沒有被否定的通報（Supporting，含補充與佐證的位置，舊到新，不帶檢舉人的聯絡方式）與以案件的 store_id 讀到的店家
-// （已關閉的也回傳）。只限食安案件、有通報的案件（Availability().Export），否則 failed_precondition。
-func (s *Service) FDAExport(ctx context.Context, caseID uuid.UUID) (model.FDAExport, error) {
-	var out model.FDAExport
-	err := s.d.DB.InReadSnapshot(ctx, func(ctx context.Context) error {
-		q := store.New(s.d.DB.Conn(ctx))
-		view, err := readCase(ctx, q, caseID, s.now())
-		if err != nil {
-			return err
-		}
-		if err := caseBlocked(view.Availability.Export, model.CaseActionExport); err != nil {
-			return err
-		}
-		members, err := q.CaseReportIDs(ctx, &caseID)
-		if err != nil {
-			return err
-		}
-		var reports []model.AdminReport
-		if len(members) > 0 {
-			details, err := q.ReportDetails(ctx, members)
-			if err != nil {
-				return err
-			}
-			rows := make([]reportRow, len(details))
-			for i, d := range details {
-				rows[i] = reportRow{report: d.SellerReport, storeName: d.StoreName, storeClosed: d.StoreClosed, supplementCount: d.SupplementCount, latestSupplementSeq: d.LatestSupplementSeq, latestSupplementAt: timeOf(d.LatestSupplementAt)}
-			}
-			if reports, err = adminReports(ctx, q, rows, true, s.now()); err != nil {
-				return err
-			}
-		}
-		supporting := make([]model.AdminReport, 0, len(reports))
-		for _, r := range reports {
-			if r.Supporting() {
-				// 轉報資料不放檢舉人的聯絡方式（同意之後再放，跟著檢舉表單那一刀）。
-				r.Contact = nil
-				supporting = append(supporting, r)
-			}
-		}
-		storeRow, err := q.StoreByID(ctx, view.StoreID)
-		if err != nil {
-			return model.Error(err)
-		}
-		loaded, err := stint.Load(ctx, q, storeRow, s.now())
-		if err != nil {
-			return err
-		}
-		out = model.FDAExport{Case: view, Reports: supporting, Store: loaded}
-		return nil
-	})
-	return out, err
 }
 
 // CreateCaseNote 新增案件的一則內部註記：只新增、不帶 etag，也不動 cases（版本與 updated_at 都不變，所以後台依舊 etag 的寫入不受影響）；已結案的案件也可以寫。

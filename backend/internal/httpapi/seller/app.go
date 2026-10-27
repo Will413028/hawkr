@@ -27,9 +27,6 @@ type Module interface {
 	Apply(context.Context, model.ApplyInput) (model.Store, error)
 	StoreOpening(ctx context.Context, accountID int64) (model.StoreOpening, error)
 	UpdateProfile(context.Context, model.UpdateProfileInput) (model.Store, error)
-	SubmitFoodRegistration(context.Context, model.SubmitFoodRegistrationInput) (model.Store, error)
-	WithdrawFoodRegistration(ctx context.Context, storeID int64) (model.Store, error)
-	ClearFoodRegistration(ctx context.Context, storeID int64) (model.Store, error)
 	CompleteOnboarding(ctx context.Context, storeID, expectedVersion int64) (model.Store, error)
 	CloseCurrent(context.Context, int64) (model.Store, error)
 	SaveKYCDraft(context.Context, model.KYCDraftInput) (model.KYCApplication, error)
@@ -115,19 +112,6 @@ func (h *App) toStore(s model.Store) *pb.Store {
 		Status:              rpc.EnumToProto[pb.StoreStatus](s.Status),
 		CreateTime:          timestamppb.New(s.CreatedAt), UpdateTime: timestamppb.New(s.UpdatedAt), Etag: rpc.Etag(s.Version),
 	}
-	out.ApprovedFoodRegistration = toFoodRegistration(s.ApprovedFoodRegistration)
-	// 模組的 OpenFoodRegistration 是待審或被退回的那一筆；契約以欄位表達狀態，client 不比較 state。
-	if open := s.OpenFoodRegistration; open != nil {
-		switch open.State {
-		case model.FoodRegPending:
-			out.PendingFoodRegistration = toFoodRegistration(open)
-		case model.FoodRegRejected:
-			out.RejectedFoodRegistration = toFoodRegistration(open)
-		case model.FoodRegApproved, model.FoodRegWithdrawn, model.FoodRegEnded:
-			// 模組的 OpenFoodRegistration 只會是待審或被退回；其他狀態沒有對應的欄位，不輸出。
-		}
-	}
-	out.RevokedFoodRegistration = toFoodRegistration(s.RevokedFoodRegistration)
 	if s.TownCode != nil {
 		out.Address = &commonpb.PostalAddress{
 			TownCode:      *s.TownCode,

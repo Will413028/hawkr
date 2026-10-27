@@ -157,7 +157,7 @@ func TestListMembershipEqualsTheStatePredicates(t *testing.T) {
 			t.Errorf("案件成員（舊到新）：%+v", r.Report)
 		}
 	}
-	// 案件：狀態篩選與判定式一致；待決定的判定式 = 進行中；待轉報的判定式 = 食安、決定採取措施、還沒有轉報。
+	// 案件：狀態篩選與判定式一致；待決定的判定式 = 進行中。
 	cases := f.allCases(t, CaseListInput{})
 	if len(cases) != 5 {
 		t.Fatalf("cases=%d", len(cases))
@@ -188,22 +188,6 @@ func TestListMembershipEqualsTheStatePredicates(t *testing.T) {
 	counterfeit := policy.Counterfeit
 	if got := f.allCases(t, CaseListInput{Category: &counterfeit, StoreID: b.StoreID}); len(got) != 1 || got[0].Category != policy.Counterfeit {
 		t.Fatalf("案件的類別與店家篩選：%+v", got)
-	}
-	// 待轉報：食安案件決定採取措施之後，還沒有轉報紀錄。
-	food, _ := f.newCase(t, a.StoreID, policy.FoodSafety, SeverityCritical, 1)
-	f.riskFromCase(t, a.StoreID, food.ID)
-	d, err := f.decide(t, food.ID, DecisionActionTaken, "")
-	must(t, err)
-	if !referralPending(d.Case) {
-		t.Fatalf("決定採取措施的食安案件、還沒有轉報：待轉報 %+v", d.Case)
-	}
-	_, err = f.module.RecordFDAReferral(context.Background(), RecordFDAReferralInput{CaseID: food.ID, AdminID: 14, Channel: FDAOnlineForm})
-	must(t, err)
-	if referralPending(f.caseOf(t, food.ID).Case) {
-		t.Fatal("記錄轉報之後不再是待轉報")
-	}
-	if referralPending(f.caseOf(t, decided.ID).Case) || referralPending(openCase.Case) {
-		t.Fatal("非食安或還沒決定的案件不是待轉報")
 	}
 }
 
@@ -463,7 +447,7 @@ func TestCreateMeasureCanLinkAnyKindToAnOpenCaseOfTheSameStore(t *testing.T) {
 }
 
 // can_cite_as_source 與 can_* 的表格：每個情境各嘗試一次每個動作，動作成功 ⇔ 可用性說可以。每個情境、每個動作都在新建立的店家與案件上做（動作會改狀態）。
-// 涵蓋通報的每個原因（已有結果、已分案、還沒分案、不在進行中的案件、認定的來源、案件有導出措施或已記錄轉報而它是最後一筆、結果被否定、店家已關閉）與案件的每個原因。
+// 涵蓋通報的每個原因（已有結果、已分案、還沒分案、不在進行中的案件、認定的來源、案件有導出措施而它是最後一筆、結果被否定、店家已關閉）與案件的每個原因。
 func TestReportAvailabilityIsExactlyWhatTheCommandsAccept(t *testing.T) {
 	t.Parallel()
 	type scenario struct {
@@ -512,28 +496,6 @@ func TestReportAvailabilityIsExactlyWhatTheCommandsAccept(t *testing.T) {
 			_, s := f.open(t)
 			c, m := f.newCase(t, s.StoreID, policy.Fraud, SeverityLow, 1)
 			f.revoke(t, f.riskFromCase(t, s.StoreID, c.ID))
-			return m[0].ID
-		}},
-		{"案件裡、單獨一筆、已記錄轉報（食安）", func(t *testing.T, f *fixture) uuid.UUID {
-			_, s := f.open(t)
-			c, m := f.newCase(t, s.StoreID, policy.FoodSafety, SeverityLow, 1)
-			_, err := f.module.RecordFDAReferral(context.Background(), RecordFDAReferralInput{CaseID: c.ID, AdminID: 14, Channel: FDAHotline1919})
-			must(t, err)
-			return m[0].ID
-		}},
-		{"案件裡、兩筆、已記錄轉報（食安）", func(t *testing.T, f *fixture) uuid.UUID {
-			_, s := f.open(t)
-			c, m := f.newCase(t, s.StoreID, policy.FoodSafety, SeverityLow, 2)
-			_, err := f.module.RecordFDAReferral(context.Background(), RecordFDAReferralInput{CaseID: c.ID, AdminID: 14, Channel: FDAHotline1919})
-			must(t, err)
-			return m[0].ID
-		}},
-		{"案件裡、單獨一筆、有未撤銷的措施又已記錄轉報（食安）", func(t *testing.T, f *fixture) uuid.UUID {
-			_, s := f.open(t)
-			c, m := f.newCase(t, s.StoreID, policy.FoodSafety, SeverityLow, 1)
-			f.riskFromCase(t, s.StoreID, c.ID)
-			_, err := f.module.RecordFDAReferral(context.Background(), RecordFDAReferralInput{CaseID: c.ID, AdminID: 14, Channel: FDAHotline1919})
-			must(t, err)
 			return m[0].ID
 		}},
 		{"案件裡、另一筆是已採取措施（措施已撤銷）", func(t *testing.T, f *fixture) uuid.UUID {
@@ -696,20 +658,6 @@ func TestCaseAvailabilityIsExactlyWhatTheCommandsAccept(t *testing.T) {
 			f.revoke(t, risk)
 			return built{c.ID, s.StoreID, a}
 		}},
-		{"進行中、食安、已記錄轉報", func(t *testing.T, f *fixture) built {
-			a, s := f.open(t)
-			c, _ := f.newCase(t, s.StoreID, policy.FoodSafety, SeverityHigh, 1)
-			_, err := f.module.RecordFDAReferral(context.Background(), RecordFDAReferralInput{CaseID: c.ID, AdminID: 14, Channel: FDAHotline1919})
-			must(t, err)
-			return built{c.ID, s.StoreID, a}
-		}},
-		{"進行中、食安、已標記不轉報", func(t *testing.T, f *fixture) built {
-			a, s := f.open(t)
-			c, _ := f.newCase(t, s.StoreID, policy.FoodSafety, SeverityHigh, 1)
-			_, err := f.module.WaiveFDAReferral(context.Background(), WaiveFDAReferralInput{CaseID: c.ID, AdminID: 14, Reason: "主管機關已經介入"})
-			must(t, err)
-			return built{c.ID, s.StoreID, a}
-		}},
 		{"進行中、店家已關閉", func(t *testing.T, f *fixture) built {
 			a, s := f.open(t)
 			c, _ := f.newCase(t, s.StoreID, policy.FoodSafety, SeverityLow, 1)
@@ -717,13 +665,11 @@ func TestCaseAvailabilityIsExactlyWhatTheCommandsAccept(t *testing.T) {
 			must(t, err)
 			return built{c.ID, s.StoreID, a}
 		}},
-		{"已結案：決定採取措施（食安、已記錄轉報）", func(t *testing.T, f *fixture) built {
+		{"已結案：決定採取措施（食安）", func(t *testing.T, f *fixture) built {
 			a, s := f.open(t)
 			c, _ := f.newCase(t, s.StoreID, policy.FoodSafety, SeverityLow, 1)
 			f.riskFromCase(t, s.StoreID, c.ID)
 			_, err := f.decide(t, c.ID, DecisionActionTaken, "")
-			must(t, err)
-			_, err = f.module.RecordFDAReferral(context.Background(), RecordFDAReferralInput{CaseID: c.ID, AdminID: 14, Channel: FDAOther})
 			must(t, err)
 			return built{c.ID, s.StoreID, a}
 		}},
@@ -766,7 +712,7 @@ func TestCaseAvailabilityIsExactlyWhatTheCommandsAccept(t *testing.T) {
 			b := sc.build(t, f)
 			c := f.caseOf(t, b.caseID)
 			av := c.Availability
-			for _, blocks := range [][]CaseBlock{av.ChangeSeverity, av.LinkMeasure, av.CreateMeasure, av.RecordReferral, av.WaiveReferral, av.RecordReferralReply, av.Export, av.CreateInquiry, av.Decide[DecisionActionTaken], av.Decide[DecisionNoAction]} {
+			for _, blocks := range [][]CaseBlock{av.ChangeSeverity, av.LinkMeasure, av.CreateMeasure, av.CreateInquiry, av.Decide[DecisionActionTaken], av.Decide[DecisionNoAction]} {
 				for _, blk := range blocks {
 					reasons[blk] = true
 				}
@@ -803,32 +749,8 @@ func TestCaseAvailabilityIsExactlyWhatTheCommandsAccept(t *testing.T) {
 			})
 			return err
 		})
-		probe("記錄轉報", func(c AdminCase) bool { return len(c.Availability.RecordReferral) == 0 }, func(b built) error {
-			result, err := f.module.RecordFDAReferral(ctx, RecordFDAReferralInput{CaseID: b.caseID, AdminID: 14, Channel: FDAOnlineForm})
-			if err == nil && result.AlreadyRecorded {
-				// 記過時回原本的紀錄，不是錯誤：可用性說不能（REFERRAL_RECORDED）。
-				return apperr.FailedPrecondition("已記錄過")
-			}
-			return err
-		})
-		probe("不轉報", func(c AdminCase) bool { return len(c.Availability.WaiveReferral) == 0 }, func(b built) error {
-			result, err := f.module.WaiveFDAReferral(ctx, WaiveFDAReferralInput{CaseID: b.caseID, AdminID: 14, Reason: "主管機關已經介入"})
-			if err == nil && result.AlreadyWaived {
-				// 標記過時回原本的紀錄，不是錯誤：可用性說不能（REFERRAL_WAIVED）。
-				return apperr.FailedPrecondition("已標記過")
-			}
-			return err
-		})
-		probe("記下主管機關的回覆", func(c AdminCase) bool { return len(c.Availability.RecordReferralReply) == 0 }, func(b built) error {
-			_, err := f.module.RecordFDAReferralReply(ctx, RecordFDAReferralReplyInput{CaseID: b.caseID, AdminID: 14, Body: "已收件", ReceivedOn: taipeiDay(f.now)})
-			return err
-		})
 		probe("發詢問", func(c AdminCase) bool { return len(c.Availability.CreateInquiry) == 0 }, func(b built) error {
 			_, err := f.inquire(t, b.caseID, InquiryKindRecords, "請提供紀錄")
-			return err
-		})
-		probe("匯出轉報資料", func(c AdminCase) bool { return len(c.Availability.Export) == 0 }, func(b built) error {
-			_, err := f.module.FDAExport(ctx, b.caseID)
 			return err
 		})
 	}

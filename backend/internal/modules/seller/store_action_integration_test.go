@@ -112,8 +112,7 @@ func TestCreateMeasureOnAClosedStoreIsFailedPreconditionWithOneSentenceEverywher
 // 不在待辦、沒有審核期限；撤銷終止合作恢復營業之後回到待辦，開始時間是恢復營業的時刻（期限從那時起算）。
 // mutation：review_kyc_application 拿掉 s.status = 'ACTIVE' → 暫停期間仍在待辦（這個測試與下面兩個轉紅）。
 // 注意：這個測試抓不到「開始時間不取 reopened_at」：現行唯一的恢復營業路徑是撤銷終止合作，撤銷同時結束停權（revoked_at 與 reopened_at 是同一個時刻），
-// account_sanction_lifted_at 給出同一個值，所以 KYC 的 reopened_at 項在現行路徑下是冗餘的（保留作為防線）。reopened_at 項由食品業者登錄的測試鎖住
-// （TestFoodRegistrationReviewRestartsFromTheReopening：食品業者登錄的期限函式不看停權，reopened_at 是它唯一的恢復項）。
+// account_sanction_lifted_at 給出同一個值，所以 KYC 的 reopened_at 項在現行路徑下是冗餘的（保留作為防線），沒有測試單獨鎖住它。
 func TestKYCReviewPausesWhileTheStoreIsClosedAndResumesFromTheReopening(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -483,102 +482,4 @@ func TestRebindReasonsAndErrorsAreTheSameFunction(t *testing.T) {
 			t.Fatalf("again=%+v err=%v", again, err)
 		}
 	})
-}
-
-// 食品業者登錄：核准與退回的原因與 DecideFoodRegistration 的錯誤是同一句。
-func TestFoodRegistrationReasonsMatchTheDecisionErrors(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	// 商家認證已核准才能送審，所以「商家認證還沒核准」的組合在單元測試（TestFoodRegistrationReasons）覆蓋；這裡用營運中、等待刪除。
-	approved := f.kycApprovedStore(t, idB, "012345678902")
-	pending := f.submitFood(t, approved, "A-1")
-	id := pending.OpenFoodRegistration.ID
-	review, err := f.module.FoodRegistrationReview(ctx, id)
-	must(t, err)
-	if len(review.ApproveUnavailable()) != 0 || len(review.RejectUnavailable()) != 0 || !review.CanApprove() || !review.CanReject() {
-		t.Fatalf("營運中：%v %v", review.ApproveUnavailable(), review.RejectUnavailable())
-	}
-	// 等待刪除。
-	f.beginDeletion(t, approved.AccountID, approved.StoreID)
-	review, err = f.module.FoodRegistrationReview(ctx, id)
-	must(t, err)
-	want := []StoreActionUnavailableReason{StoreReasonStorePendingDeletion}
-	if !slices.Equal(review.ApproveUnavailable(), want) || !slices.Equal(review.RejectUnavailable(), want) {
-		t.Fatalf("approve=%v reject=%v", review.ApproveUnavailable(), review.RejectUnavailable())
-	}
-	for _, outcome := range []FoodRegState{FoodRegApproved, FoodRegRejected} {
-		_, err := f.decideFood(id, outcome, map[FoodRegState]string{FoodRegRejected: "x"}[outcome], "")
-		if apperr.KindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), "店家等待刪除，不能裁定食品業者登錄。") {
-			t.Fatalf("%s：%v", outcome, err)
-		}
-	}
-}
-
-func TestFoodRegistrationReasonsWhenClosedAndWhenNotPending(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	approved := f.kycApprovedStore(t, idA, bankAcct)
-	pending := f.submitFood(t, approved, "A-1")
-	id := pending.OpenFoodRegistration.ID
-	_, err := f.module.CloseCurrent(ctx, approved.AccountID)
-	must(t, err)
-	review, err := f.module.FoodRegistrationReview(ctx, id)
-	must(t, err)
-	closed := []StoreActionUnavailableReason{StoreReasonStoreClosed}
-	if !slices.Equal(review.ApproveUnavailable(), closed) || !slices.Equal(review.RejectUnavailable(), closed) {
-		t.Fatalf("approve=%v reject=%v", review.ApproveUnavailable(), review.RejectUnavailable())
-	}
-	for _, outcome := range []FoodRegState{FoodRegApproved, FoodRegRejected} {
-		_, err := f.decideFood(id, outcome, map[FoodRegState]string{FoodRegRejected: "x"}[outcome], "")
-		if apperr.KindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), "店家已關閉，不能裁定食品業者登錄。") {
-			t.Fatalf("%s：%v", outcome, err)
-		}
-	}
-	// 不在待審：結構性原因在前，錯誤是同一句。
-	f2 := setup(t)
-	s2 := f2.kycApprovedStore(t, idB, "012345678902")
-	p2 := f2.submitFood(t, s2, "B-1")
-	_, err = f2.decideFood(p2.OpenFoodRegistration.ID, FoodRegRejected, "x", "")
-	must(t, err)
-	r2, err := f2.module.FoodRegistrationReview(ctx, p2.OpenFoodRegistration.ID)
-	must(t, err)
-	if len(r2.ApproveUnavailable()) == 0 || r2.ApproveUnavailable()[0] != StoreReasonFoodRegistrationNotPending || r2.RejectUnavailable()[0] != StoreReasonFoodRegistrationNotPending {
-		t.Fatalf("approve=%v reject=%v", r2.ApproveUnavailable(), r2.RejectUnavailable())
-	}
-	if _, err := f2.decideFood(p2.OpenFoodRegistration.ID, FoodRegApproved, "", ""); apperr.KindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), "這筆食品業者登錄已不在待審。") {
-		t.Fatalf("不在待審：%v", err)
-	}
-}
-
-// 食品業者登錄的待辦在關店期間不在、恢復營業後回來，開始時間是恢復營業的時刻，期限從那時起算（不是送出時間：否則恢復的件一回來就逾期）。
-// 食品業者登錄的裁定與待辦不看停權，所以 reopened_at 是它唯一的恢復項。
-// mutation：review_food_registration 的 greatest 拿掉 reopened_at → 恢復後的開始仍是送出（或 KYC 核准）時間，這裡失敗。
-func TestFoodRegistrationReviewRestartsFromTheReopening(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	s := f.kycApprovedStore(t, idA, bankAcct)
-	pending := f.submitFood(t, s, "A-1")
-	id := pending.OpenFoodRegistration.ID.String()
-	submitStart := f.now
-	f.tick(time.Hour)
-	if got := f.reviewSet(t, "review_food_registration", f.now); got[id].Start == nil || got[id].Start.After(submitStart) {
-		t.Fatalf("營運中：開始不晚於送出時間 %v：%+v", submitStart, got[id])
-	}
-	m := f.terminate(t, s.StoreID, GroundFraud)
-	f.effect(t, m)
-	if f.storeRow(t, s.StoreID).Status != Closed {
-		t.Fatal("終止生效要關店")
-	}
-	if _, ok := f.reviewSet(t, "review_food_registration", f.now)[id]; ok {
-		t.Fatal("關店期間不在待辦")
-	}
-	f.tick(48 * time.Hour)
-	f.revoke(t, m)
-	reopened := f.now
-	got, ok := f.reviewSet(t, "review_food_registration", f.now)[id]
-	if !ok || !got.Start.Equal(reopened) || !got.Due.Equal(reopened.Add(168*time.Hour)) {
-		t.Fatalf("恢復營業之後開始是 %v、期限是開始加 168 小時：%+v", reopened, got)
-	}
 }

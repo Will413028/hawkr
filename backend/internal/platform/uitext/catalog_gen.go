@@ -130,47 +130,6 @@ func (t Text) CommonUnknown() string {
 	return "未知"
 }
 
-// SellerFoodRegistrationKycPendingNote 是 seller.FoodRegistration.kyc_pending_note 的文案。
-func (t Text) SellerFoodRegistrationKycPendingNote() string {
-	return "平台會在商家認證通過後進行審核。"
-}
-
-// SellerFoodRegistrationStatusApproved 是 seller.FoodRegistration.status_approved 的文案。
-func (t Text) SellerFoodRegistrationStatusApproved(number string) string {
-	return "已登錄：" + number
-}
-
-// SellerFoodRegistrationStatusPending 是 seller.FoodRegistration.status_pending 的文案。
-func (t Text) SellerFoodRegistrationStatusPending(number string, date string) string {
-	return "審核中：" + number + "（" + date + " 送出）"
-}
-
-// SellerFoodRegistrationStatusRejected 是 seller.FoodRegistration.status_rejected 的文案。
-func (t Text) SellerFoodRegistrationStatusRejected(reason string) string {
-	return "未通過：" + reason + "。請確認字號與食藥署登錄資料一致後重新送出。"
-}
-
-// SellerFoodRegistrationStatusRevoked 是 seller.FoodRegistration.status_revoked 的文案。
-func (t Text) SellerFoodRegistrationStatusRevoked(number string, reason string) string {
-	return "已被平台撤銷：" + number + "。理由：" + reason + "。請確認字號與食藥署登錄資料一致後重新送出審核。"
-}
-
-// SellerFoodRegistrationState 是 seller.FoodRegistrationState 的文案。
-// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
-func (t Text) SellerFoodRegistrationState(v string) (string, bool) {
-	switch v {
-	case "PENDING":
-		return "審核中", true
-	case "APPROVED":
-		return "已通過", true
-	case "REJECTED":
-		return "未通過", true
-	case "ENDED":
-		return "已結束", true
-	}
-	return "", false
-}
-
 // SellerKYCField 是 seller.KYCField 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) SellerKYCField(v string) (string, bool) {

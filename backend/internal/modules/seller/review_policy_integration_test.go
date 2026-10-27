@@ -22,32 +22,30 @@ import (
 // 審閱政策（step10e-3d-design.md E10、§3.1）：每種待辦一支 seller.review_<種類>(at)，成員、開始與期限只寫在 SQL。
 // 這個檔的測試：逐種的表格（成員集合、開始、期限、邊界 ±1µs）、成員 ⇔ Go 判定式的資料集、依 ID 批次讀的計畫。
 
-// reviewKinds 是函式的種類與 SQL 函式名（設計 §1.3 的 11 種加 step10e-5a 的 PAYUNI_BIND_RETRY）。
+// reviewKinds 是函式的種類與 SQL 函式名（設計 §1.3 的種類加 step10e-5a 的 PAYUNI_BIND_RETRY）。
 var reviewKinds = []struct{ kind, fn string }{
 	{"REPORT_TRIAGE", "review_report_triage"},
 	{"CASE_DECISION", "review_case_decision"},
 	{"CASE_INQUIRY_OVERDUE", "review_case_inquiry_overdue"},
-	{"CASE_FDA_REFERRAL", "review_case_fda_referral"},
 	{"AUTHORITY_ORDER", "review_authority_order"},
 	{"AUTHORITY_TARGET_NOTICE", "review_authority_target_notice"},
 	{"MEASURE_APPEAL", "review_measure_appeal"},
 	{"MEASURE_LIFT_REQUEST", "review_measure_lift_request"},
 	{"MEASURE_REVIEW", "review_measure_review"},
-	{"FOOD_REGISTRATION", "review_food_registration"},
 	{"KYC_APPLICATION", "review_kyc_application"},
 	{"PAYUNI_BIND_RETRY", "review_payuni_bind_retry"},
 }
 
 // reviewRow 是函式的一列（seller.review_item 的欄位）。
 type reviewRow struct {
-	Kind, ItemID                           string
-	ReportID, CaseID, InquiryID, OrderID   *uuid.UUID
-	Position                               *int16
-	AccountID                              *int64
-	MeasureID, RequestID, FoodRegID, KYCID *uuid.UUID
-	StoreID                                *int64
-	StoreName                              *string
-	Start, Due                             *time.Time
+	Kind, ItemID                         string
+	ReportID, CaseID, InquiryID, OrderID *uuid.UUID
+	Position                             *int16
+	AccountID                            *int64
+	MeasureID, RequestID, KYCID          *uuid.UUID
+	StoreID                              *int64
+	StoreName                            *string
+	Start, Due                           *time.Time
 }
 
 // reviewOf 以 at 呼叫一支審閱政策函式，依 item_id 排序。
@@ -55,7 +53,7 @@ func (f *fixture) reviewOf(t *testing.T, fn string, at time.Time) []reviewRow {
 	t.Helper()
 	ctx := context.Background()
 	rows, err := f.db.Conn(ctx).Query(ctx, `SELECT kind, item_id, report_id, case_id, inquiry_id, authority_order_id, target_position, account_id,
-		measure_id, request_id, food_registration_id, kyc_application_id, store_id, store_name, start_at, due_at
+		measure_id, request_id, kyc_application_id, store_id, store_name, start_at, due_at
 		FROM seller.`+fn+`($1::timestamptz) ORDER BY item_id COLLATE "C"`, at)
 	must(t, err)
 	defer rows.Close()
@@ -63,7 +61,7 @@ func (f *fixture) reviewOf(t *testing.T, fn string, at time.Time) []reviewRow {
 	for rows.Next() {
 		var r reviewRow
 		must(t, rows.Scan(&r.Kind, &r.ItemID, &r.ReportID, &r.CaseID, &r.InquiryID, &r.OrderID, &r.Position, &r.AccountID,
-			&r.MeasureID, &r.RequestID, &r.FoodRegID, &r.KYCID, &r.StoreID, &r.StoreName, &r.Start, &r.Due))
+			&r.MeasureID, &r.RequestID, &r.KYCID, &r.StoreID, &r.StoreName, &r.Start, &r.Due))
 		out = append(out, r)
 	}
 	must(t, rows.Err())
@@ -184,15 +182,13 @@ type reviewWorld struct {
 		recheck  time.Time
 		store    int64
 	}
-	risks              []riskMember // 全部的 RISK 措施（複審用）
-	reviewSoon         riskMember   // 複審已進入的 RISK 措施（review_by 在建立後 20 小時，at 時還沒到）
-	reviewLater        riskMember   // 複審還沒進入的 RISK 措施（review_by 在建立後 60 小時，at 時進入時間還沒到）
-	appealID, liftID   uuid.UUID
-	appealMeasure      uuid.UUID
-	liftMeasure        uuid.UUID
-	mootMeasure        uuid.UUID // 解除請求還是 PENDING、措施已結束
-	foodStartsAtKYC    uuid.UUID // 食品業者登錄先送出、KYC 後核准：開始是 KYC 核准時間
-	foodStartsAtSubmit uuid.UUID // KYC 先核准、登錄後送出：開始是送出時間
+	risks            []riskMember // 全部的 RISK 措施（複審用）
+	reviewSoon       riskMember   // 複審已進入的 RISK 措施（review_by 在建立後 20 小時，at 時還沒到）
+	reviewLater      riskMember   // 複審還沒進入的 RISK 措施（review_by 在建立後 60 小時，at 時進入時間還沒到）
+	appealID, liftID uuid.UUID
+	appealMeasure    uuid.UUID
+	liftMeasure      uuid.UUID
+	mootMeasure      uuid.UUID // 解除請求還是 PENDING、措施已結束
 
 	bindRetry           uuid.UUID // 綁定重試用完的待辦對象（申請 ID）
 	bindRetryStore      int64
@@ -277,29 +273,6 @@ func newReviewWorld(t *testing.T, f *fixture) *reviewWorld {
 	must(t, err)
 	add("CASE_DECISION", withdrawn.ID.String(), sQ.StoreID, f.now, f.now.Add(7*day))
 
-	// 待轉報：食安、決定採取措施、還沒有轉報紀錄；已轉報、已標記不轉報、不採取措施、非食安的都不是。
-	foodCase := func(category policy.Category, decision Decision) (AdminCase, int64) {
-		_, s := f.open(t)
-		c, _ := f.newCase(t, s.StoreID, category, SeverityLow, 1)
-		if decision == DecisionActionTaken {
-			w.risks = append(w.risks, riskOf(f.riskFromCase(t, s.StoreID, c.ID)))
-		}
-		f.tick(hour)
-		_, err := f.decide(t, c.ID, decision, "")
-		must(t, err)
-		return c, s.StoreID
-	}
-	pending, sPending := foodCase(policy.FoodSafety, DecisionActionTaken)
-	add("CASE_FDA_REFERRAL", pending.ID.String(), sPending, f.now, f.now.Add(24*hour))
-	waived, _ := foodCase(policy.FoodSafety, DecisionActionTaken)
-	_, err = f.module.WaiveFDAReferral(ctx, WaiveFDAReferralInput{CaseID: waived.ID, AdminID: 9, Reason: "不轉報"})
-	must(t, err)
-	referred, _ := foodCase(policy.FoodSafety, DecisionActionTaken)
-	_, err = f.module.RecordFDAReferral(ctx, RecordFDAReferralInput{CaseID: referred.ID, AdminID: 9, Channel: FDAOnlineForm})
-	must(t, err)
-	foodCase(policy.FoodSafety, DecisionNoAction)
-	foodCase(policy.Fraud, DecisionActionTaken)
-
 	// 主管機關來函：沒完成也沒撤銷的；暫不告知的對象在確認日期（台北）到了之後進入，已告知與由措施告知的不是。
 	accountA, sA := f.open(t)
 	accountB, _ := f.open(t)
@@ -360,46 +333,6 @@ func newReviewWorld(t *testing.T, f *fixture) *reviewWorld {
 	f.tick(hour)
 	w.reviewSoon, w.reviewLater = reviewRisk(20*hour), reviewRisk(60*hour)
 	add("MEASURE_REVIEW", w.reviewSoon.id.String(), w.reviewSoon.store, w.reviewSoon.reviewBy.Add(-24*hour), w.reviewSoon.reviewBy)
-
-	// 食品業者登錄：開始是 max(送出, 目前核准的商家認證的核准時間)；等商家認證、店家已關閉、已核准的不是。
-	f.tick(hour)
-	accountF1, sF1 := f.open(t)
-	f.submitFood(t, sF1, "F1-1")
-	f.tick(2 * hour)
-	f1 := f.submitKYCFor(t, accountF1, 101)
-	must(t, approve(f, f1))
-	w.foodStartsAtKYC = f.pendingID(t, sF1)
-	add("FOOD_REGISTRATION", w.foodStartsAtKYC.String(), sF1.StoreID, f.now, f.now.Add(7*day))
-
-	f.tick(hour)
-	accountF2, sF2 := f.open(t)
-	f2 := f.submitKYCFor(t, accountF2, 102)
-	must(t, approve(f, f2))
-	f.tick(3 * hour)
-	f.submitFood(t, sF2, "F2-1")
-	w.foodStartsAtSubmit = f.pendingID(t, sF2)
-	add("FOOD_REGISTRATION", w.foodStartsAtSubmit.String(), sF2.StoreID, f.now, f.now.Add(7*day))
-
-	f.tick(hour)
-	accountF3, sF3 := f.open(t)
-	f.submitFood(t, sF3, "F3-1")
-	f3 := f.submitKYCFor(t, accountF3, 103) // 審核中：登錄還在等商家認證，但商家認證本身是待辦
-	add("KYC_APPLICATION", f3.ID.String(), sF3.StoreID, f.now, f.now.Add(7*day))
-
-	f.tick(hour)
-	accountF4, sF4 := f.open(t)
-	f4 := f.submitKYCFor(t, accountF4, 104)
-	must(t, approve(f, f4))
-	f.submitFood(t, sF4, "F4-1")
-	_, err = f.module.CloseCurrent(ctx, accountF4)
-	must(t, err)
-
-	f.tick(hour)
-	accountF5, sF5 := f.open(t)
-	f5 := f.submitKYCFor(t, accountF5, 105)
-	must(t, approve(f, f5))
-	f.submitFood(t, sF5, "F5-1")
-	f.mustDecide(t, f.pendingID(t, sF5), FoodRegApproved)
 
 	// 商家認證：審核中的；草稿、被退回、已核准的不是。
 	f.tick(hour)
@@ -464,7 +397,7 @@ func riskOf(m Measure) riskMember {
 func day2026(m time.Month, d int) time.Time { return time.Date(2026, m, d, 0, 0, 0, 0, time.UTC) }
 
 // 每一種函式一張表：成員集合、開始、期限與店家，反例（差一點不是）不在結果裡。時長的字面值寫在 newReviewWorld，不從 SQL 或 Go 常數讀：
-// mutation——任一分支的時長（食安 4 小時、其他 72 小時、四個嚴重度、詢問逾期 24 小時、轉報 24 小時、7 天）改掉，這裡就失敗。
+// mutation——任一分支的時長（食安 4 小時、其他 72 小時、四個嚴重度、詢問逾期 24 小時、7 天）改掉，這裡就失敗。
 func TestReviewFunctionsReturnTheDesignedMembersStartsAndDeadlines(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -584,8 +517,8 @@ func TestReviewBoundariesAreExactToTheMicrosecond(t *testing.T) {
 }
 
 // goReviewSets 是逐種套用指令真正用的 Go 定義得到的成員（item_id 的集合）：Report.State()、Case.Open() 加 AwaitingSeller()、
-// CaseFacts.Availability().RecordReferral（加決定採取措施）、CaseInquiry.Open() 加 DueAt、AuthorityOrder.Open、AuthorityOrderTarget 的告知欄位、
-// Measure.Pending／PendingRemediation、FoodRegistrationReview.CanApprove、KYC 的 SUBMITTED，以及複審到期分頁（收件匣的成員）。
+// CaseInquiry.Open() 加 DueAt、AuthorityOrder.Open、AuthorityOrderTarget 的告知欄位、
+// Measure.Pending／PendingRemediation、KYC 的 SUBMITTED，以及複審到期分頁（收件匣的成員）。
 // 正式程式沒有第二份成員規則，這些只在測試裡當比對的對象。時間用 f.now（模組的時鐘）。
 // 同時回傳待決定的案件（比對開始時間用）。
 func (f *fixture) goReviewSets(t *testing.T) (sets map[string]map[string]bool, decisionStarts map[string]time.Time) {
@@ -613,9 +546,6 @@ func (f *fixture) goReviewSets(t *testing.T) (sets map[string]map[string]bool, d
 				}
 			}
 			decisionStarts[c.ID.String()] = start
-		}
-		if referralPending(c.Case) {
-			sets["CASE_FDA_REFERRAL"][c.ID.String()] = true
 		}
 		var after *InquiryCursor
 		for {
@@ -680,23 +610,6 @@ func (f *fixture) goReviewSets(t *testing.T) (sets map[string]map[string]bool, d
 			break
 		}
 		afterMeasure = page.Next
-	}
-	for _, inbox := range []FoodRegInbox{FoodRegInboxDecidable, FoodRegInboxAwaitingKYC} {
-		inbox := inbox
-		var after *FoodRegistrationCursor
-		for {
-			page, err := f.module.FoodRegistrations(ctx, FoodRegistrationListInput{Inbox: &inbox, PageSize: 2, After: after})
-			must(t, err)
-			for _, r := range page.Items {
-				if r.CanApprove() {
-					sets["FOOD_REGISTRATION"][r.ID.String()] = true
-				}
-			}
-			if page.Next == nil {
-				break
-			}
-			after = page.Next
-		}
 	}
 	var afterKYC *KYCCursor
 	for {
@@ -819,7 +732,7 @@ func TestBindRetryQueueIsASubsetOfRebindableStores(t *testing.T) {
 
 // 成員 ⇔ Go 判定式：同一份資料集，逐種比較函式與判定式的成員集合；世界建完的那一刻（at）與一週後（詢問逾期、告知、複審都進入）各比一次。
 // 待決定的開始時間再與由開案與詢問的事實算出的值比（含管理員撤回、不含系統撤回）。
-// mutation：任一支函式的條件（例如詢問逾期的 <=、食品業者登錄的店家狀態、解除請求的生效中）改掉，那一種的集合就不等於判定式的集合。
+// mutation：任一支函式的條件（例如詢問逾期的 <=、商家認證的店家狀態、解除請求的生效中）改掉，那一種的集合就不等於判定式的集合。
 func TestReviewMembersAgreeWithTheGoPredicates(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -869,12 +782,10 @@ func TestReviewDeadlinePushdown(t *testing.T) {
 	for _, tt := range []struct{ fn, key, table, column string }{
 		{"review_report_triage", "report_id", "reports", "id"},
 		{"review_case_decision", "case_id", "cases", "id"},
-		{"review_case_fda_referral", "case_id", "cases", "id"},
 		{"review_authority_order", "authority_order_id", "authority_orders", "id"},
 		{"review_measure_appeal", "request_id", "measure_requests", "id"},
 		{"review_measure_lift_request", "request_id", "measure_requests", "id"},
 		{"review_measure_review", "measure_id", "measures", "id"},
-		{"review_food_registration", "food_registration_id", "food_registrations", "id"},
 		{"review_kyc_application", "kyc_application_id", "kyc_applications", "application_id"},
 		{"review_payuni_bind_retry", "kyc_application_id", "kyc_applications", "application_id"},
 	} {
@@ -983,7 +894,6 @@ func TestResourceDeadlinesExistWhileTheObligationDoes(t *testing.T) {
 	// 案件：待決定有決定期限（嚴重度 HIGH 72 小時），詢問期間沒有，回覆後從收到的時間重新起算；結案後沒有。
 	c := f.caseOf(t, *triaged.CaseID)
 	wantDeadline(t, "待決定", c.DecideDeadline, opened, opened.Add(72*hour))
-	wantNoDeadline(t, "還沒有決定的案件沒有轉報期限", c.FDAReferralDeadline)
 	f.tick(hour)
 	inquiry := f.mustInquire(t, c.ID)
 	wantNoDeadline(t, "等賣家的案件（詢問的回應）", inquiry.Case.DecideDeadline)
@@ -999,15 +909,6 @@ func TestResourceDeadlinesExistWhileTheObligationDoes(t *testing.T) {
 	decided, err := f.decide(t, c.ID, DecisionActionTaken, "")
 	must(t, err)
 	wantNoDeadline(t, "結案後的決定期限", decided.DecideDeadline)
-	wantDeadline(t, "食安案件結案後的轉報期限", f.caseOf(t, c.ID).FDAReferralDeadline, f.now, f.now.Add(24*hour))
-	for _, listed := range f.allCases(t, CaseListInput{}) {
-		if listed.ID == c.ID {
-			wantDeadline(t, "清單的轉報期限", listed.FDAReferralDeadline, f.now, f.now.Add(24*hour))
-		}
-	}
-	_, err = f.module.RecordFDAReferral(ctx, RecordFDAReferralInput{CaseID: c.ID, AdminID: 9, Channel: FDAOnlineForm})
-	must(t, err)
-	wantNoDeadline(t, "記錄轉報後", f.caseOf(t, c.ID).FDAReferralDeadline)
 
 	// 主管機關來函：處理中有期限（收文到登記時存下的 due_at），完成後沒有。
 	accountA, _ := f.open(t)
@@ -1053,30 +954,15 @@ func TestResourceDeadlinesExistWhileTheObligationDoes(t *testing.T) {
 	wantNoDeadline(t, "結束的措施沒有複審期限", ended.ReviewDeadline)
 	wantNoDeadline(t, "結束的措施沒有複審期限（重讀）", f.measureOf(t, risk.Measure.ID).ReviewDeadline)
 
-	// 食品業者登錄：等商家認證沒有期限；商家認證核准後從核准時間起算 7 天；裁定後沒有。商家認證：審核中有期限（送出起算 7 天），核准後沒有。
+	// 商家認證：審核中有期限（送出起算 7 天），核准後沒有。
 	f.tick(hour)
-	accountF, sF := f.open(t)
-	f.submitFood(t, sF, "D-1")
-	reviewOf := func() FoodRegistrationReview {
-		got, err := f.module.FoodRegistrationReview(ctx, f.pendingID(t, sF))
-		must(t, err)
-		return got
-	}
-	wantNoDeadline(t, "等商家認證的登錄", reviewOf().DecideDeadline)
-	f.tick(hour)
-	kyc := f.submitKYCFor(t, accountF, 301)
+	accountK, sK := f.open(t)
+	kyc := f.submitKYCFor(t, accountK, 301)
 	submittedKYC := f.now
-	wantDeadline(t, "審核中的商家認證（送出的回應不帶，重讀）", mustStoreKYC(t, f, sF.StoreID).DecideDeadline, submittedKYC, submittedKYC.Add(7*24*hour))
-	wantNoDeadline(t, "商家認證審核中，登錄還不能裁定", reviewOf().DecideDeadline)
+	wantDeadline(t, "審核中的商家認證（送出的回應不帶，重讀）", mustStoreKYC(t, f, sK.StoreID).DecideDeadline, submittedKYC, submittedKYC.Add(7*24*hour))
 	f.tick(hour)
 	must(t, approve(f, kyc))
-	approvedAt := f.now
-	wantNoDeadline(t, "核准後的商家認證", mustStoreKYC(t, f, sF.StoreID).DecideDeadline)
-	wantDeadline(t, "商家認證核准後的登錄", reviewOf().DecideDeadline, approvedAt, approvedAt.Add(7*24*hour))
-	f.mustDecide(t, f.pendingID(t, sF), FoodRegApproved)
-	approvedReview, err := f.module.FoodRegistrationReview(ctx, f.foodIDs(t, sF)[0])
-	must(t, err)
-	wantNoDeadline(t, "裁定後的登錄", approvedReview.DecideDeadline)
+	wantNoDeadline(t, "核准後的商家認證", mustStoreKYC(t, f, sK.StoreID).DecideDeadline)
 }
 
 func mustStoreKYC(t *testing.T, f *fixture, storeID int64) KYCApplication {
@@ -1087,134 +973,6 @@ func mustStoreKYC(t *testing.T, f *fixture, storeID int64) KYCApplication {
 		t.Fatalf("店家 %d 沒有商家認證", storeID)
 	}
 	return a
-}
-
-// foodIDs 是店家全部的登錄 ID（新到舊）。
-func (f *fixture) foodIDs(t *testing.T, s Store) []uuid.UUID {
-	t.Helper()
-	ctx := context.Background()
-	rows, err := f.db.Conn(ctx).Query(ctx, "SELECT id FROM seller.food_registrations WHERE store_id = $1 ORDER BY submitted_at DESC, id DESC", s.StoreID)
-	must(t, err)
-	defer rows.Close()
-	var ids []uuid.UUID
-	for rows.Next() {
-		var id uuid.UUID
-		must(t, rows.Scan(&id))
-		ids = append(ids, id)
-	}
-	must(t, rows.Err())
-	return ids
-}
-
-// 食品業者登錄的「待審核」收件匣依裁定期限由近到遠（期限相同時依 id），不是依送出時間；翻頁（每頁 1、2、3、10 筆）不漏不重。
-// 資料集：先送出的登錄最晚核准商家認證（開始最晚）、商家認證先核准的登錄開始是送出時間、兩筆開始時間相同（只能靠 id 定序）。
-// mutation：排序改回送出時間、或 keyset 少了 id，順序或翻頁失敗。
-func TestFoodRegistrationInboxIsOrderedByDeadlineAndPagesWithoutGapsOrDuplicates(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	const hour = time.Hour
-	type seed struct {
-		number string
-		store  Store
-		start  time.Time
-	}
-	var seeds []*seed
-	newStore := func(number string) (*seed, int64) {
-		accountID, s := f.open(t)
-		sd := &seed{number: number, store: s}
-		seeds = append(seeds, sd)
-		return sd, accountID
-	}
-	approveKYC := func(accountID int64, serial int) {
-		must(t, approve(f, f.submitKYCFor(t, accountID, serial)))
-	}
-	a, accountA := newStore("A") // 最早送出、商家認證最晚核准 → 開始最晚
-	f.submitFood(t, a.store, a.number)
-	f.tick(hour)
-	e, accountE := newStore("E") // 商家認證核准後送出，開始最早
-	approveKYC(accountE, 202)
-	f.submitFood(t, e.store, e.number)
-	e.start = f.now
-	f.tick(hour)
-	b, accountB := newStore("B")
-	approveKYC(accountB, 203)
-	f.submitFood(t, b.store, b.number)
-	b.start = f.now
-	f.tick(hour)
-	c, accountC := newStore("C") // C 與 D：開始時間相同
-	approveKYC(accountC, 204)
-	f.submitFood(t, c.store, c.number)
-	c.start = f.now
-	d, accountD := newStore("D")
-	approveKYC(accountD, 205)
-	f.submitFood(t, d.store, d.number)
-	d.start = f.now
-	f.tick(hour)
-	approveKYC(accountA, 201)
-	a.start = f.now
-
-	ids := map[string]uuid.UUID{}
-	for _, sd := range seeds {
-		ids[sd.number] = f.pendingID(t, sd.store)
-	}
-	// 預期順序：開始（= 期限 − 7 天）由早到晚，相同時依 id。
-	order := []string{"E", "B", "C", "D", "A"}
-	if ids["C"].String() > ids["D"].String() {
-		order = []string{"E", "B", "D", "C", "A"}
-	}
-	byNumber := map[string]*seed{"A": a, "E": e, "B": b, "C": c, "D": d}
-	// 函式本身依 (期限, id) 排序後的順序必須就是預期（函式與收件匣讀同一份）。
-	rows := f.reviewOf(t, "review_food_registration", f.now)
-	slices.SortFunc(rows, func(x, y reviewRow) int {
-		if c := x.Due.Compare(*y.Due); c != 0 {
-			return c
-		}
-		return strings.Compare(x.ItemID, y.ItemID)
-	})
-	var fromFunction []string
-	for _, r := range rows {
-		for number, id := range ids {
-			if r.ItemID == id.String() {
-				fromFunction = append(fromFunction, number)
-			}
-		}
-	}
-	if !slices.Equal(fromFunction, order) {
-		t.Fatalf("函式的 (期限, id) 順序 %v，預期 %v", fromFunction, order)
-	}
-	for _, size := range []int32{1, 2, 3, 10} {
-		var got []string
-		var after *FoodRegistrationCursor
-		for pages := 0; ; pages++ {
-			if pages > 10 {
-				t.Fatalf("每頁 %d 筆：翻不完", size)
-			}
-			page, err := f.module.FoodRegistrations(ctx, FoodRegistrationListInput{PageSize: size, After: after})
-			must(t, err)
-			for _, item := range page.Items {
-				got = append(got, item.RegistrationNumber)
-				sd := byNumber[item.RegistrationNumber]
-				wantDeadline(t, "登錄 "+item.RegistrationNumber, item.DecideDeadline, sd.start, sd.start.Add(7*24*hour))
-			}
-			if page.Next == nil {
-				break
-			}
-			after = page.Next
-		}
-		if !slices.Equal(got, order) {
-			t.Errorf("每頁 %d 筆：順序 %v，預期依期限 %v", size, got, order)
-		}
-	}
-	// 等商家認證的隊列照舊依送出時間，沒有期限。
-	_, waiting := f.open(t)
-	f.submitFood(t, waiting, "W")
-	awaiting := FoodRegInboxAwaitingKYC
-	page, err := f.module.FoodRegistrations(ctx, FoodRegistrationListInput{Inbox: &awaiting, PageSize: 10})
-	must(t, err)
-	if len(page.Items) != 1 || page.Items[0].RegistrationNumber != "W" || page.Items[0].DecideDeadline != nil {
-		t.Fatalf("等商家認證的隊列：%+v", page.Items)
-	}
 }
 
 // inquiryClockRestart 是測試的 oracle：這筆詢問讓案件「待決定」重新起算的時間（回覆收到的時間，或管理員撤回的時間；系統撤回與還沒結束的是 nil）。
@@ -1229,81 +987,4 @@ func inquiryClockRestart(i AdminInquiry) *time.Time {
 		return &t
 	}
 	return nil
-}
-
-// referralPending 是測試的 oracle：食安案件決定採取措施、還沒有轉報紀錄（標記不轉報也是一筆紀錄）。前置條件取指令用的 Availability.RecordReferral。
-func referralPending(c Case) bool {
-	return c.Decision != nil && *c.Decision == DecisionActionTaken && len((CaseFacts{Case: c}).Availability().RecordReferral) == 0
-}
-
-// 食品業者登錄收件匣的兩個分頁互補：「可以裁定」（讀 review_food_registration）與「等商家認證」（AdminFoodRegistrationAwaitingKYC 自己的條件）沒有交集，
-// 聯集正好是全部「待審而且店家營業中」的登錄；店家已關閉與已裁定的兩邊都沒有。
-// mutation：任一邊的條件改動（例如等商家認證漏掉店家營運中、審閱函式改了商家認證的定義），聯集就缺或交集就非空。
-func TestFoodRegistrationInboxTabsPartitionPendingOfActiveStores(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	w := newReviewWorld(t, f)
-	f.now = w.at
-	ctx := context.Background()
-	tab := func(inbox FoodRegInbox) map[string]bool {
-		out := map[string]bool{}
-		var after *FoodRegistrationCursor
-		for {
-			page, err := f.module.FoodRegistrations(ctx, FoodRegistrationListInput{Inbox: &inbox, PageSize: 2, After: after})
-			must(t, err)
-			for _, r := range page.Items {
-				if out[r.ID.String()] {
-					t.Fatalf("%s：%s 重複", inbox, r.ID)
-				}
-				out[r.ID.String()] = true
-			}
-			if page.Next == nil {
-				return out
-			}
-			after = page.Next
-		}
-	}
-	decidable, awaiting := tab(FoodRegInboxDecidable), tab(FoodRegInboxAwaitingKYC)
-	all := map[string]bool{}
-	rows, err := f.db.Conn(ctx).Query(ctx, `SELECT f.id::text FROM seller.food_registrations f JOIN seller.stores s ON s.store_id = f.store_id
-		WHERE f.state = 'PENDING' AND s.status = 'ACTIVE'`)
-	must(t, err)
-	for rows.Next() {
-		var id string
-		must(t, rows.Scan(&id))
-		all[id] = true
-	}
-	must(t, rows.Err())
-	rows.Close()
-	if len(decidable) == 0 || len(awaiting) == 0 || len(all) != len(decidable)+len(awaiting) {
-		t.Fatalf("資料集要兩個分頁都有成員：可以裁定 %d、等商家認證 %d、待審且營業中 %d", len(decidable), len(awaiting), len(all))
-	}
-	for id := range decidable {
-		if awaiting[id] {
-			t.Errorf("%s 同時在兩個分頁", id)
-		}
-		if !all[id] {
-			t.Errorf("%s 在「可以裁定」，卻不是待審而且店家營業中", id)
-		}
-	}
-	for id := range awaiting {
-		if !all[id] {
-			t.Errorf("%s 在「等商家認證」，卻不是待審而且店家營業中", id)
-		}
-	}
-	for id := range all {
-		if !decidable[id] && !awaiting[id] {
-			t.Errorf("%s 待審而且店家營業中，兩個分頁都沒有", id)
-		}
-	}
-	// 「可以裁定」就是審閱函式的成員。
-	fn := f.reviewSet(t, "review_food_registration", f.now)
-	if len(fn) != len(decidable) {
-		t.Errorf("審閱函式 %d 個，可以裁定的分頁 %d 個", len(fn), len(decidable))
-	}
-	for id := range decidable {
-		if _, ok := fn[id]; !ok {
-			t.Errorf("%s 在分頁，審閱函式裡沒有", id)
-		}
-	}
 }

@@ -30,27 +30,6 @@ func SeverityValues() []Severity {
 // Rank 是嚴重度由低到高的名次（LOW 0、MEDIUM 1、HIGH 2、CRITICAL 3）；不認得的值是 -1。
 func (s Severity) Rank() int { return slices.Index(SeverityValues(), s) }
 
-// FDAChannel 是食安事件轉報主管機關的管道（手動轉報，沒有 API）。
-type FDAChannel string
-
-const (
-	// FDAHotline1919 1919 食安專線。
-	FDAHotline1919 FDAChannel = "HOTLINE_1919"
-	// FDAOnlineForm 線上表單。
-	FDAOnlineForm FDAChannel = "ONLINE_FORM"
-	// FDAFaxHealthDept 傳真衛生局。
-	FDAFaxHealthDept FDAChannel = "FAX_HEALTH_DEPT"
-	// FDAInPerson 親自送件。
-	FDAInPerson FDAChannel = "IN_PERSON"
-	// FDAOther 其他管道。
-	FDAOther FDAChannel = "OTHER"
-)
-
-// FDAChannelValues 回傳全部轉報管道，與 DB 的 case_referrals_channel_check 一致。
-func FDAChannelValues() []FDAChannel {
-	return []FDAChannel{FDAHotline1919, FDAOnlineForm, FDAFaxHealthDept, FDAInPerson, FDAOther}
-}
-
 // ViolationStatus 是認定（違規）的狀態；措施是否仍生效看措施，不在認定上。
 type ViolationStatus string
 

@@ -36,16 +36,19 @@ const AgreementKind$json = {
     {'1': 'AGREEMENT_KIND_SELLER_TERMS', '2': 1},
     {'1': 'AGREEMENT_KIND_KYC_PRIVACY_NOTICE', '2': 2},
     {'1': 'AGREEMENT_KIND_PAYUNI_TERMS', '2': 3},
-    {'1': 'AGREEMENT_KIND_FOOD_REGISTRATION_NOTICE', '2': 4},
   ],
+  '4': [
+    {'1': 4, '2': 4},
+  ],
+  '5': ['AGREEMENT_KIND_FOOD_REGISTRATION_NOTICE'],
 };
 
 /// Descriptor for `AgreementKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List agreementKindDescriptor = $convert.base64Decode(
     'Cg1BZ3JlZW1lbnRLaW5kEh4KGkFHUkVFTUVOVF9LSU5EX1VOU1BFQ0lGSUVEEAASHwobQUdSRU'
     'VNRU5UX0tJTkRfU0VMTEVSX1RFUk1TEAESJQohQUdSRUVNRU5UX0tJTkRfS1lDX1BSSVZBQ1lf'
-    'Tk9USUNFEAISHwobQUdSRUVNRU5UX0tJTkRfUEFZVU5JX1RFUk1TEAMSKwonQUdSRUVNRU5UX0'
-    'tJTkRfRk9PRF9SRUdJU1RSQVRJT05fTk9USUNFEAQ=');
+    'Tk9USUNFEAISHwobQUdSRUVNRU5UX0tJTkRfUEFZVU5JX1RFUk1TEAMiBAgEEAQqJ0FHUkVFTU'
+    'VOVF9LSU5EX0ZPT0RfUkVHSVNUUkFUSU9OX05PVElDRQ==');
 
 @$core.Deprecated('Use storeStatusDescriptor instead')
 const StoreStatus$json = {
@@ -149,25 +152,6 @@ final $typed_data.Uint8List storeFieldDescriptor = $convert.base64Decode(
     'RfQUREUkVTUxABEhwKGFNUT1JFX0ZJRUxEX0NPTlRBQ1RfTkFNRRACEh4KGlNUT1JFX0ZJRUxE'
     'X0NPTlRBQ1RfTU9CSUxFEAMSHQoZU1RPUkVfRklFTERfU1VQUE9SVF9FTUFJTBAEEh0KGVNUT1'
     'JFX0ZJRUxEX0NPTlRBQ1RfUEhPTkUQBQ==');
-
-@$core.Deprecated('Use foodRegistrationStateDescriptor instead')
-const FoodRegistrationState$json = {
-  '1': 'FoodRegistrationState',
-  '2': [
-    {'1': 'FOOD_REGISTRATION_STATE_UNSPECIFIED', '2': 0},
-    {'1': 'FOOD_REGISTRATION_STATE_PENDING', '2': 1},
-    {'1': 'FOOD_REGISTRATION_STATE_APPROVED', '2': 2},
-    {'1': 'FOOD_REGISTRATION_STATE_REJECTED', '2': 3},
-    {'1': 'FOOD_REGISTRATION_STATE_ENDED', '2': 4},
-  ],
-};
-
-/// Descriptor for `FoodRegistrationState`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List foodRegistrationStateDescriptor = $convert.base64Decode(
-    'ChVGb29kUmVnaXN0cmF0aW9uU3RhdGUSJwojRk9PRF9SRUdJU1RSQVRJT05fU1RBVEVfVU5TUE'
-    'VDSUZJRUQQABIjCh9GT09EX1JFR0lTVFJBVElPTl9TVEFURV9QRU5ESU5HEAESJAogRk9PRF9S'
-    'RUdJU1RSQVRJT05fU1RBVEVfQVBQUk9WRUQQAhIkCiBGT09EX1JFR0lTVFJBVElPTl9TVEFURV'
-    '9SRUpFQ1RFRBADEiEKHUZPT0RfUkVHSVNUUkFUSU9OX1NUQVRFX0VOREVEEAQ=');
 
 @$core.Deprecated('Use storeOpeningUnavailableReasonDescriptor instead')
 const StoreOpeningUnavailableReason$json = {
@@ -797,42 +781,6 @@ const Store$json = {
       '8': {},
       '10': 'coverStagedToken'
     },
-    {
-      '1': 'approved_food_registration',
-      '3': 26,
-      '4': 1,
-      '5': 11,
-      '6': '.hawkr.seller.v1alpha1.FoodRegistration',
-      '8': {},
-      '10': 'approvedFoodRegistration'
-    },
-    {
-      '1': 'pending_food_registration',
-      '3': 29,
-      '4': 1,
-      '5': 11,
-      '6': '.hawkr.seller.v1alpha1.FoodRegistration',
-      '8': {},
-      '10': 'pendingFoodRegistration'
-    },
-    {
-      '1': 'rejected_food_registration',
-      '3': 30,
-      '4': 1,
-      '5': 11,
-      '6': '.hawkr.seller.v1alpha1.FoodRegistration',
-      '8': {},
-      '10': 'rejectedFoodRegistration'
-    },
-    {
-      '1': 'revoked_food_registration',
-      '3': 28,
-      '4': 1,
-      '5': 11,
-      '6': '.hawkr.seller.v1alpha1.FoodRegistration',
-      '8': {},
-      '10': 'revokedFoodRegistration'
-    },
   ],
   '9': [
     {'1': 6, '2': 7},
@@ -840,7 +788,7 @@ const Store$json = {
     {'1': 10, '2': 11},
     {'1': 11, '2': 12},
     {'1': 22, '2': 23},
-    {'1': 27, '2': 28},
+    {'1': 26, '2': 31},
   ],
   '10': [
     'town_code',
@@ -848,7 +796,11 @@ const Store$json = {
     'processed_food',
     'food_business_reg_no',
     'food_business',
-    'open_food_registration'
+    'open_food_registration',
+    'approved_food_registration',
+    'revoked_food_registration',
+    'pending_food_registration',
+    'rejected_food_registration'
   ],
 };
 
@@ -870,201 +822,11 @@ final $typed_data.Uint8List storeDescriptor = $convert.base64Decode(
     '90aW1lGBEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgp1cGRhdGVUaW1l'
     'EhIKBGV0YWcYEiABKAlSBGV0YWcSLwoRbG9nb19zdGFnZWRfdG9rZW4YEyABKAlCA+BBBFIPbG'
     '9nb1N0YWdlZFRva2VuEjEKEmNvdmVyX3N0YWdlZF90b2tlbhgUIAEoCUID4EEEUhBjb3ZlclN0'
-    'YWdlZFRva2VuEmoKGmFwcHJvdmVkX2Zvb2RfcmVnaXN0cmF0aW9uGBogASgLMicuaGF3a3Iuc2'
-    'VsbGVyLnYxYWxwaGExLkZvb2RSZWdpc3RyYXRpb25CA+BBA1IYYXBwcm92ZWRGb29kUmVnaXN0'
-    'cmF0aW9uEmgKGXBlbmRpbmdfZm9vZF9yZWdpc3RyYXRpb24YHSABKAsyJy5oYXdrci5zZWxsZX'
-    'IudjFhbHBoYTEuRm9vZFJlZ2lzdHJhdGlvbkID4EEDUhdwZW5kaW5nRm9vZFJlZ2lzdHJhdGlv'
-    'bhJqChpyZWplY3RlZF9mb29kX3JlZ2lzdHJhdGlvbhgeIAEoCzInLmhhd2tyLnNlbGxlci52MW'
-    'FscGhhMS5Gb29kUmVnaXN0cmF0aW9uQgPgQQNSGHJlamVjdGVkRm9vZFJlZ2lzdHJhdGlvbhJo'
-    'ChlyZXZva2VkX2Zvb2RfcmVnaXN0cmF0aW9uGBwgASgLMicuaGF3a3Iuc2VsbGVyLnYxYWxwaG'
-    'ExLkZvb2RSZWdpc3RyYXRpb25CA+BBA1IXcmV2b2tlZEZvb2RSZWdpc3RyYXRpb25KBAgGEAdK'
-    'BAgHEAhKBAgKEAtKBAgLEAxKBAgWEBdKBAgbEBxSCXRvd25fY29kZVIOYWRkcmVzc19kZXRhaW'
-    'xSDnByb2Nlc3NlZF9mb29kUhRmb29kX2J1c2luZXNzX3JlZ19ub1INZm9vZF9idXNpbmVzc1IW'
-    'b3Blbl9mb29kX3JlZ2lzdHJhdGlvbg==');
-
-@$core.Deprecated('Use foodRegistrationDescriptor instead')
-const FoodRegistration$json = {
-  '1': 'FoodRegistration',
-  '2': [
-    {'1': 'id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'id'},
-    {
-      '1': 'state',
-      '3': 2,
-      '4': 1,
-      '5': 14,
-      '6': '.hawkr.seller.v1alpha1.FoodRegistrationState',
-      '8': {},
-      '10': 'state'
-    },
-    {
-      '1': 'registration_number',
-      '3': 3,
-      '4': 1,
-      '5': 9,
-      '8': {},
-      '10': 'registrationNumber'
-    },
-    {
-      '1': 'submit_time',
-      '3': 4,
-      '4': 1,
-      '5': 11,
-      '6': '.google.protobuf.Timestamp',
-      '8': {},
-      '10': 'submitTime'
-    },
-    {
-      '1': 'decide_time',
-      '3': 5,
-      '4': 1,
-      '5': 11,
-      '6': '.google.protobuf.Timestamp',
-      '8': {},
-      '10': 'decideTime'
-    },
-    {
-      '1': 'reject_reason',
-      '3': 6,
-      '4': 1,
-      '5': 9,
-      '8': {},
-      '10': 'rejectReason'
-    },
-    {
-      '1': 'end_time',
-      '3': 7,
-      '4': 1,
-      '5': 11,
-      '6': '.google.protobuf.Timestamp',
-      '8': {},
-      '10': 'endTime'
-    },
-    {'1': 'end_reason', '3': 8, '4': 1, '5': 9, '8': {}, '10': 'endReason'},
-  ],
-};
-
-/// Descriptor for `FoodRegistration`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List foodRegistrationDescriptor = $convert.base64Decode(
-    'ChBGb29kUmVnaXN0cmF0aW9uEhMKAmlkGAEgASgJQgPgQQhSAmlkEkcKBXN0YXRlGAIgASgOMi'
-    'wuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkZvb2RSZWdpc3RyYXRpb25TdGF0ZUID4EEDUgVzdGF0'
-    'ZRI0ChNyZWdpc3RyYXRpb25fbnVtYmVyGAMgASgJQgPgQQNSEnJlZ2lzdHJhdGlvbk51bWJlch'
-    'JACgtzdWJtaXRfdGltZRgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBA1IK'
-    'c3VibWl0VGltZRJACgtkZWNpZGVfdGltZRgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3'
-    'RhbXBCA+BBA1IKZGVjaWRlVGltZRIoCg1yZWplY3RfcmVhc29uGAYgASgJQgPgQQNSDHJlamVj'
-    'dFJlYXNvbhI6CghlbmRfdGltZRgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+'
-    'BBA1IHZW5kVGltZRIiCgplbmRfcmVhc29uGAggASgJQgPgQQNSCWVuZFJlYXNvbg==');
-
-@$core.Deprecated('Use submitFoodRegistrationRequestDescriptor instead')
-const SubmitFoodRegistrationRequest$json = {
-  '1': 'SubmitFoodRegistrationRequest',
-  '2': [
-    {
-      '1': 'registration_number',
-      '3': 1,
-      '4': 1,
-      '5': 9,
-      '8': {},
-      '10': 'registrationNumber'
-    },
-    {
-      '1': 'accepted_agreements',
-      '3': 2,
-      '4': 3,
-      '5': 11,
-      '6': '.hawkr.seller.v1alpha1.AgreementAcceptance',
-      '8': {},
-      '10': 'acceptedAgreements'
-    },
-  ],
-};
-
-/// Descriptor for `SubmitFoodRegistrationRequest`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List submitFoodRegistrationRequestDescriptor = $convert.base64Decode(
-    'Ch1TdWJtaXRGb29kUmVnaXN0cmF0aW9uUmVxdWVzdBI0ChNyZWdpc3RyYXRpb25fbnVtYmVyGA'
-    'EgASgJQgPgQQJSEnJlZ2lzdHJhdGlvbk51bWJlchJgChNhY2NlcHRlZF9hZ3JlZW1lbnRzGAIg'
-    'AygLMiouaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkFncmVlbWVudEFjY2VwdGFuY2VCA+BBAlISYW'
-    'NjZXB0ZWRBZ3JlZW1lbnRz');
-
-@$core.Deprecated('Use submitFoodRegistrationResponseDescriptor instead')
-const SubmitFoodRegistrationResponse$json = {
-  '1': 'SubmitFoodRegistrationResponse',
-  '2': [
-    {
-      '1': 'store',
-      '3': 1,
-      '4': 1,
-      '5': 11,
-      '6': '.hawkr.seller.v1alpha1.Store',
-      '10': 'store'
-    },
-  ],
-};
-
-/// Descriptor for `SubmitFoodRegistrationResponse`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List submitFoodRegistrationResponseDescriptor =
-    $convert.base64Decode(
-        'Ch5TdWJtaXRGb29kUmVnaXN0cmF0aW9uUmVzcG9uc2USMgoFc3RvcmUYASABKAsyHC5oYXdrci'
-        '5zZWxsZXIudjFhbHBoYTEuU3RvcmVSBXN0b3Jl');
-
-@$core.Deprecated('Use withdrawFoodRegistrationRequestDescriptor instead')
-const WithdrawFoodRegistrationRequest$json = {
-  '1': 'WithdrawFoodRegistrationRequest',
-};
-
-/// Descriptor for `WithdrawFoodRegistrationRequest`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List withdrawFoodRegistrationRequestDescriptor =
-    $convert.base64Decode('Ch9XaXRoZHJhd0Zvb2RSZWdpc3RyYXRpb25SZXF1ZXN0');
-
-@$core.Deprecated('Use withdrawFoodRegistrationResponseDescriptor instead')
-const WithdrawFoodRegistrationResponse$json = {
-  '1': 'WithdrawFoodRegistrationResponse',
-  '2': [
-    {
-      '1': 'store',
-      '3': 1,
-      '4': 1,
-      '5': 11,
-      '6': '.hawkr.seller.v1alpha1.Store',
-      '10': 'store'
-    },
-  ],
-};
-
-/// Descriptor for `WithdrawFoodRegistrationResponse`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List withdrawFoodRegistrationResponseDescriptor =
-    $convert.base64Decode(
-        'CiBXaXRoZHJhd0Zvb2RSZWdpc3RyYXRpb25SZXNwb25zZRIyCgVzdG9yZRgBIAEoCzIcLmhhd2'
-        'tyLnNlbGxlci52MWFscGhhMS5TdG9yZVIFc3RvcmU=');
-
-@$core.Deprecated('Use clearFoodRegistrationRequestDescriptor instead')
-const ClearFoodRegistrationRequest$json = {
-  '1': 'ClearFoodRegistrationRequest',
-};
-
-/// Descriptor for `ClearFoodRegistrationRequest`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List clearFoodRegistrationRequestDescriptor =
-    $convert.base64Decode('ChxDbGVhckZvb2RSZWdpc3RyYXRpb25SZXF1ZXN0');
-
-@$core.Deprecated('Use clearFoodRegistrationResponseDescriptor instead')
-const ClearFoodRegistrationResponse$json = {
-  '1': 'ClearFoodRegistrationResponse',
-  '2': [
-    {
-      '1': 'store',
-      '3': 1,
-      '4': 1,
-      '5': 11,
-      '6': '.hawkr.seller.v1alpha1.Store',
-      '10': 'store'
-    },
-  ],
-};
-
-/// Descriptor for `ClearFoodRegistrationResponse`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List clearFoodRegistrationResponseDescriptor =
-    $convert.base64Decode(
-        'Ch1DbGVhckZvb2RSZWdpc3RyYXRpb25SZXNwb25zZRIyCgVzdG9yZRgBIAEoCzIcLmhhd2tyLn'
-        'NlbGxlci52MWFscGhhMS5TdG9yZVIFc3RvcmU=');
+    'YWdlZFRva2VuSgQIBhAHSgQIBxAISgQIChALSgQICxAMSgQIFhAXSgQIGhAfUgl0b3duX2NvZG'
+    'VSDmFkZHJlc3NfZGV0YWlsUg5wcm9jZXNzZWRfZm9vZFIUZm9vZF9idXNpbmVzc19yZWdfbm9S'
+    'DWZvb2RfYnVzaW5lc3NSFm9wZW5fZm9vZF9yZWdpc3RyYXRpb25SGmFwcHJvdmVkX2Zvb2Rfcm'
+    'VnaXN0cmF0aW9uUhlyZXZva2VkX2Zvb2RfcmVnaXN0cmF0aW9uUhlwZW5kaW5nX2Zvb2RfcmVn'
+    'aXN0cmF0aW9uUhpyZWplY3RlZF9mb29kX3JlZ2lzdHJhdGlvbg==');
 
 @$core.Deprecated('Use capabilityStatusDescriptor instead')
 const CapabilityStatus$json = {
@@ -3143,14 +2905,6 @@ const PublicStore$json = {
       '10': 'coverImage'
     },
     {
-      '1': 'food_business_registration_number',
-      '3': 12,
-      '4': 1,
-      '5': 9,
-      '8': {},
-      '10': 'foodBusinessRegistrationNumber'
-    },
-    {
       '1': 'update_time',
       '3': 13,
       '4': 1,
@@ -3163,8 +2917,9 @@ const PublicStore$json = {
   '9': [
     {'1': 10, '2': 11},
     {'1': 11, '2': 12},
+    {'1': 12, '2': 13},
   ],
-  '10': ['seo_title', 'seo_description'],
+  '10': ['seo_title', 'seo_description', 'food_business_registration_number'],
 };
 
 /// Descriptor for `PublicStore`. Decode as a `google.protobuf.DescriptorProto`.
@@ -3175,10 +2930,9 @@ final $typed_data.Uint8List publicStoreDescriptor = $convert.base64Decode(
     'oFcHJpemUYBiABKAlSBXByaXplEh8KC3dlYnNpdGVfdXJsGAcgASgJUgp3ZWJzaXRlVXJsEjAK'
     'BGxvZ28YCCABKAsyHC5oYXdrci5jb21tb24udjFhbHBoYTEuSW1hZ2VSBGxvZ28SPQoLY292ZX'
     'JfaW1hZ2UYCSABKAsyHC5oYXdrci5jb21tb24udjFhbHBoYTEuSW1hZ2VSCmNvdmVySW1hZ2US'
-    'TgohZm9vZF9idXNpbmVzc19yZWdpc3RyYXRpb25fbnVtYmVyGAwgASgJQgPgQQNSHmZvb2RCdX'
-    'NpbmVzc1JlZ2lzdHJhdGlvbk51bWJlchJACgt1cGRhdGVfdGltZRgNIAEoCzIaLmdvb2dsZS5w'
-    'cm90b2J1Zi5UaW1lc3RhbXBCA+BBA1IKdXBkYXRlVGltZUoECAoQC0oECAsQDFIJc2VvX3RpdG'
-    'xlUg9zZW9fZGVzY3JpcHRpb24=');
+    'QAoLdXBkYXRlX3RpbWUYDSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNSCn'
+    'VwZGF0ZVRpbWVKBAgKEAtKBAgLEAxKBAgMEA1SCXNlb190aXRsZVIPc2VvX2Rlc2NyaXB0aW9u'
+    'UiFmb29kX2J1c2luZXNzX3JlZ2lzdHJhdGlvbl9udW1iZXI=');
 
 @$core.Deprecated('Use storeStatsDescriptor instead')
 const StoreStats$json = {
@@ -3434,21 +3188,6 @@ const $core.Map<$core.String, $core.dynamic> SellerAppServiceBase$json = {
       '4': {'34': 1},
     },
     {
-      '1': 'SubmitFoodRegistration',
-      '2': '.hawkr.seller.v1alpha1.SubmitFoodRegistrationRequest',
-      '3': '.hawkr.seller.v1alpha1.SubmitFoodRegistrationResponse'
-    },
-    {
-      '1': 'WithdrawFoodRegistration',
-      '2': '.hawkr.seller.v1alpha1.WithdrawFoodRegistrationRequest',
-      '3': '.hawkr.seller.v1alpha1.WithdrawFoodRegistrationResponse'
-    },
-    {
-      '1': 'ClearFoodRegistration',
-      '2': '.hawkr.seller.v1alpha1.ClearFoodRegistrationRequest',
-      '3': '.hawkr.seller.v1alpha1.ClearFoodRegistrationResponse'
-    },
-    {
       '1': 'CloseMyStore',
       '2': '.hawkr.seller.v1alpha1.CloseMyStoreRequest',
       '3': '.hawkr.seller.v1alpha1.CloseMyStoreResponse'
@@ -3514,7 +3253,6 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.seller.v1alpha1.Store': Store$json,
   '.hawkr.common.v1alpha1.Image': $0.Image$json,
   '.google.protobuf.Timestamp': $1.Timestamp$json,
-  '.hawkr.seller.v1alpha1.FoodRegistration': FoodRegistration$json,
   '.hawkr.seller.v1alpha1.GetMyStoreOpeningRequest':
       GetMyStoreOpeningRequest$json,
   '.hawkr.seller.v1alpha1.GetMyStoreOpeningResponse':
@@ -3548,18 +3286,6 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.seller.v1alpha1.PeriodCount': PeriodCount$json,
   '.hawkr.seller.v1alpha1.DashboardFollowers': DashboardFollowers$json,
   '.hawkr.seller.v1alpha1.OrderStatusCounts': OrderStatusCounts$json,
-  '.hawkr.seller.v1alpha1.SubmitFoodRegistrationRequest':
-      SubmitFoodRegistrationRequest$json,
-  '.hawkr.seller.v1alpha1.SubmitFoodRegistrationResponse':
-      SubmitFoodRegistrationResponse$json,
-  '.hawkr.seller.v1alpha1.WithdrawFoodRegistrationRequest':
-      WithdrawFoodRegistrationRequest$json,
-  '.hawkr.seller.v1alpha1.WithdrawFoodRegistrationResponse':
-      WithdrawFoodRegistrationResponse$json,
-  '.hawkr.seller.v1alpha1.ClearFoodRegistrationRequest':
-      ClearFoodRegistrationRequest$json,
-  '.hawkr.seller.v1alpha1.ClearFoodRegistrationResponse':
-      ClearFoodRegistrationResponse$json,
   '.hawkr.seller.v1alpha1.CloseMyStoreRequest': CloseMyStoreRequest$json,
   '.hawkr.seller.v1alpha1.CloseMyStoreResponse': CloseMyStoreResponse$json,
   '.hawkr.seller.v1alpha1.SaveKYCDraftRequest': SaveKYCDraftRequest$json,
@@ -3622,34 +3348,26 @@ final $typed_data.Uint8List sellerAppServiceDescriptor = $convert.base64Decode(
     'dWVzdBouLmhhd2tyLnNlbGxlci52MWFscGhhMS5MaXN0TXlGb2xsb3dlcnNSZXNwb25zZSIDkA'
     'IBEnIKDkdldE15RGFzaGJvYXJkEiwuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkdldE15RGFzaGJv'
     'YXJkUmVxdWVzdBotLmhhd2tyLnNlbGxlci52MWFscGhhMS5HZXRNeURhc2hib2FyZFJlc3Bvbn'
-    'NlIgOQAgEShQEKFlN1Ym1pdEZvb2RSZWdpc3RyYXRpb24SNC5oYXdrci5zZWxsZXIudjFhbHBo'
-    'YTEuU3VibWl0Rm9vZFJlZ2lzdHJhdGlvblJlcXVlc3QaNS5oYXdrci5zZWxsZXIudjFhbHBoYT'
-    'EuU3VibWl0Rm9vZFJlZ2lzdHJhdGlvblJlc3BvbnNlEosBChhXaXRoZHJhd0Zvb2RSZWdpc3Ry'
-    'YXRpb24SNi5oYXdrci5zZWxsZXIudjFhbHBoYTEuV2l0aGRyYXdGb29kUmVnaXN0cmF0aW9uUm'
-    'VxdWVzdBo3Lmhhd2tyLnNlbGxlci52MWFscGhhMS5XaXRoZHJhd0Zvb2RSZWdpc3RyYXRpb25S'
-    'ZXNwb25zZRKCAQoVQ2xlYXJGb29kUmVnaXN0cmF0aW9uEjMuaGF3a3Iuc2VsbGVyLnYxYWxwaG'
-    'ExLkNsZWFyRm9vZFJlZ2lzdHJhdGlvblJlcXVlc3QaNC5oYXdrci5zZWxsZXIudjFhbHBoYTEu'
-    'Q2xlYXJGb29kUmVnaXN0cmF0aW9uUmVzcG9uc2USZwoMQ2xvc2VNeVN0b3JlEiouaGF3a3Iuc2'
-    'VsbGVyLnYxYWxwaGExLkNsb3NlTXlTdG9yZVJlcXVlc3QaKy5oYXdrci5zZWxsZXIudjFhbHBo'
-    'YTEuQ2xvc2VNeVN0b3JlUmVzcG9uc2USZwoMU2F2ZUtZQ0RyYWZ0EiouaGF3a3Iuc2VsbGVyLn'
-    'YxYWxwaGExLlNhdmVLWUNEcmFmdFJlcXVlc3QaKy5oYXdrci5zZWxsZXIudjFhbHBoYTEuU2F2'
-    'ZUtZQ0RyYWZ0UmVzcG9uc2USYAoIR2V0TXlLWUMSJi5oYXdrci5zZWxsZXIudjFhbHBoYTEuR2'
-    'V0TXlLWUNSZXF1ZXN0GicuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkdldE15S1lDUmVzcG9uc2Ui'
-    'A5ACARJeCglTdWJtaXRLWUMSJy5oYXdrci5zZWxsZXIudjFhbHBoYTEuU3VibWl0S1lDUmVxdW'
-    'VzdBooLmhhd2tyLnNlbGxlci52MWFscGhhMS5TdWJtaXRLWUNSZXNwb25zZRJeCglDYW5jZWxL'
-    'WUMSJy5oYXdrci5zZWxsZXIudjFhbHBoYTEuQ2FuY2VsS1lDUmVxdWVzdBooLmhhd2tyLnNlbG'
-    'xlci52MWFscGhhMS5DYW5jZWxLWUNSZXNwb25zZRKRAQoaTG9va3VwQnVzaW5lc3NSZWdpc3Ry'
-    'YXRpb24SOC5oYXdrci5zZWxsZXIudjFhbHBoYTEuTG9va3VwQnVzaW5lc3NSZWdpc3RyYXRpb2'
-    '5SZXF1ZXN0GjkuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkxvb2t1cEJ1c2luZXNzUmVnaXN0cmF0'
-    'aW9uUmVzcG9uc2UScgoOTGlzdE15TWVhc3VyZXMSLC5oYXdrci5zZWxsZXIudjFhbHBoYTEuTG'
-    'lzdE15TWVhc3VyZXNSZXF1ZXN0Gi0uaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkxpc3RNeU1lYXN1'
-    'cmVzUmVzcG9uc2UiA5ACARJsCgxHZXRNeU1lYXN1cmUSKi5oYXdrci5zZWxsZXIudjFhbHBoYT'
-    'EuR2V0TXlNZWFzdXJlUmVxdWVzdBorLmhhd2tyLnNlbGxlci52MWFscGhhMS5HZXRNeU1lYXN1'
-    'cmVSZXNwb25zZSIDkAIBEmcKDFN1Ym1pdEFwcGVhbBIqLmhhd2tyLnNlbGxlci52MWFscGhhMS'
-    '5TdWJtaXRBcHBlYWxSZXF1ZXN0GisuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlN1Ym1pdEFwcGVh'
-    'bFJlc3BvbnNlEnkKElJlcXVlc3RSZW1lZGlhdGlvbhIwLmhhd2tyLnNlbGxlci52MWFscGhhMS'
-    '5SZXF1ZXN0UmVtZWRpYXRpb25SZXF1ZXN0GjEuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlJlcXVl'
-    'c3RSZW1lZGlhdGlvblJlc3BvbnNl');
+    'NlIgOQAgESZwoMQ2xvc2VNeVN0b3JlEiouaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkNsb3NlTXlT'
+    'dG9yZVJlcXVlc3QaKy5oYXdrci5zZWxsZXIudjFhbHBoYTEuQ2xvc2VNeVN0b3JlUmVzcG9uc2'
+    'USZwoMU2F2ZUtZQ0RyYWZ0EiouaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlNhdmVLWUNEcmFmdFJl'
+    'cXVlc3QaKy5oYXdrci5zZWxsZXIudjFhbHBoYTEuU2F2ZUtZQ0RyYWZ0UmVzcG9uc2USYAoIR2'
+    'V0TXlLWUMSJi5oYXdrci5zZWxsZXIudjFhbHBoYTEuR2V0TXlLWUNSZXF1ZXN0GicuaGF3a3Iu'
+    'c2VsbGVyLnYxYWxwaGExLkdldE15S1lDUmVzcG9uc2UiA5ACARJeCglTdWJtaXRLWUMSJy5oYX'
+    'drci5zZWxsZXIudjFhbHBoYTEuU3VibWl0S1lDUmVxdWVzdBooLmhhd2tyLnNlbGxlci52MWFs'
+    'cGhhMS5TdWJtaXRLWUNSZXNwb25zZRJeCglDYW5jZWxLWUMSJy5oYXdrci5zZWxsZXIudjFhbH'
+    'BoYTEuQ2FuY2VsS1lDUmVxdWVzdBooLmhhd2tyLnNlbGxlci52MWFscGhhMS5DYW5jZWxLWUNS'
+    'ZXNwb25zZRKRAQoaTG9va3VwQnVzaW5lc3NSZWdpc3RyYXRpb24SOC5oYXdrci5zZWxsZXIudj'
+    'FhbHBoYTEuTG9va3VwQnVzaW5lc3NSZWdpc3RyYXRpb25SZXF1ZXN0GjkuaGF3a3Iuc2VsbGVy'
+    'LnYxYWxwaGExLkxvb2t1cEJ1c2luZXNzUmVnaXN0cmF0aW9uUmVzcG9uc2UScgoOTGlzdE15TW'
+    'Vhc3VyZXMSLC5oYXdrci5zZWxsZXIudjFhbHBoYTEuTGlzdE15TWVhc3VyZXNSZXF1ZXN0Gi0u'
+    'aGF3a3Iuc2VsbGVyLnYxYWxwaGExLkxpc3RNeU1lYXN1cmVzUmVzcG9uc2UiA5ACARJsCgxHZX'
+    'RNeU1lYXN1cmUSKi5oYXdrci5zZWxsZXIudjFhbHBoYTEuR2V0TXlNZWFzdXJlUmVxdWVzdBor'
+    'Lmhhd2tyLnNlbGxlci52MWFscGhhMS5HZXRNeU1lYXN1cmVSZXNwb25zZSIDkAIBEmcKDFN1Ym'
+    '1pdEFwcGVhbBIqLmhhd2tyLnNlbGxlci52MWFscGhhMS5TdWJtaXRBcHBlYWxSZXF1ZXN0Gisu'
+    'aGF3a3Iuc2VsbGVyLnYxYWxwaGExLlN1Ym1pdEFwcGVhbFJlc3BvbnNlEnkKElJlcXVlc3RSZW'
+    '1lZGlhdGlvbhIwLmhhd2tyLnNlbGxlci52MWFscGhhMS5SZXF1ZXN0UmVtZWRpYXRpb25SZXF1'
+    'ZXN0GjEuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlJlcXVlc3RSZW1lZGlhdGlvblJlc3BvbnNl');
 
 const $core.Map<$core.String, $core.dynamic> SellerPublicServiceBase$json = {
   '1': 'SellerPublicService',

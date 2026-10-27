@@ -17,7 +17,7 @@ func (f *fixture) pubReviewItems(t *testing.T, at time.Time) []reviewRow {
 	t.Helper()
 	ctx := context.Background()
 	rows, err := f.db.Conn(ctx).Query(ctx, `SELECT kind, item_id, report_id, case_id, inquiry_id, authority_order_id, target_position, account_id,
-		measure_id, request_id, food_registration_id, kyc_application_id, store_id, store_name, start_at, due_at
+		measure_id, request_id, kyc_application_id, store_id, store_name, start_at, due_at
 		FROM seller.pub_review_items($1::timestamptz)`, at)
 	must(t, err)
 	defer rows.Close()
@@ -25,7 +25,7 @@ func (f *fixture) pubReviewItems(t *testing.T, at time.Time) []reviewRow {
 	for rows.Next() {
 		var r reviewRow
 		must(t, rows.Scan(&r.Kind, &r.ItemID, &r.ReportID, &r.CaseID, &r.InquiryID, &r.OrderID, &r.Position, &r.AccountID,
-			&r.MeasureID, &r.RequestID, &r.FoodRegID, &r.KYCID, &r.StoreID, &r.StoreName, &r.Start, &r.Due))
+			&r.MeasureID, &r.RequestID, &r.KYCID, &r.StoreID, &r.StoreName, &r.Start, &r.Due))
 		out = append(out, r)
 	}
 	must(t, rows.Err())
@@ -39,7 +39,7 @@ func ptrStr[T any](p *T) string {
 	return fmt.Sprint(*p)
 }
 
-// rowKey 把一列的 16 個欄位全部寫成字串（時間以 UTC、ns 精度），用來整列比較。
+// rowKey 把一列的 15 個欄位全部寫成字串（時間以 UTC、ns 精度），用來整列比較。
 func rowKey(r reviewRow) string {
 	ts := func(t *time.Time) string {
 		if t == nil {
@@ -47,8 +47,8 @@ func rowKey(r reviewRow) string {
 		}
 		return t.UTC().Format(time.RFC3339Nano)
 	}
-	return fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s", r.Kind, r.ItemID, ptrStr(r.ReportID), ptrStr(r.CaseID), ptrStr(r.InquiryID),
-		ptrStr(r.OrderID), ptrStr(r.Position), ptrStr(r.AccountID), ptrStr(r.MeasureID), ptrStr(r.RequestID), ptrStr(r.FoodRegID), ptrStr(r.KYCID),
+	return fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s", r.Kind, r.ItemID, ptrStr(r.ReportID), ptrStr(r.CaseID), ptrStr(r.InquiryID),
+		ptrStr(r.OrderID), ptrStr(r.Position), ptrStr(r.AccountID), ptrStr(r.MeasureID), ptrStr(r.RequestID), ptrStr(r.KYCID),
 		ptrStr(r.StoreID), ptrStr(r.StoreName), ts(r.Start), ts(r.Due))
 }
 

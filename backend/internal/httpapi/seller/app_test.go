@@ -62,15 +62,13 @@ func ctxWithStore(s model.Store) context.Context {
 
 func currentStore() model.Store {
 	text := func(s string) *string { return &s }
-	approvedAt := time.Date(2026, 10, 1, 8, 0, 0, 0, time.UTC)
 	return model.Store{
 		Profile: model.Profile{
 			StoreName: "範例小農", Description: text("介紹"), TownCode: text("63000050"),
 		},
 		StoreID: 11, StoreCode: 2600000001, AccountID: 7, Version: 3, Status: model.Active, Sanctions: model.NoSanctions(),
 		// seller 讀出的條件：營運中、有店名與鄉鎮市區，KYC 還沒核准、沒有 logo。
-		Conditions:               model.Conditions{Derived: true, Active: true, NotPendingDeletion: true, StoreName: true, TownCode: true},
-		ApprovedFoodRegistration: &model.FoodRegistration{ID: uuid.MustParse("0198a0a0-0000-7000-8000-000000000001"), RegistrationNumber: "A-123", State: model.FoodRegApproved, SubmittedAt: time.Date(2026, 9, 30, 8, 0, 0, 0, time.UTC), DecidedAt: &approvedAt},
+		Conditions: model.Conditions{Derived: true, Active: true, NotPendingDeletion: true, StoreName: true, TownCode: true},
 	}
 }
 
@@ -395,7 +393,7 @@ func TestListMyFollowersRejectsAMalformedCursor(t *testing.T) {
 	}
 }
 
-// UpdateMyStore 不再接受 food_business：食品業者登錄只有 SubmitFoodRegistration 這一條寫入路徑，未知的路徑是 invalid_argument。
+// UpdateMyStore 不接受已移除的 food_business 路徑：未知的路徑是 invalid_argument。
 func TestUpdateMyStoreRejectsTheRemovedFoodBusinessPath(t *testing.T) {
 	m := &fakeModule{updated: currentStore()}
 	h := mustApp(t, m, nil, rpc.Images{}, Dashboard{}, testStats(fakeFollowerCounts{}, fakeRatings{}))
@@ -405,81 +403,6 @@ func TestUpdateMyStoreRejectsTheRemovedFoodBusinessPath(t *testing.T) {
 	}))
 	if err == nil || !strings.HasPrefix(err.Error(), "invalid_argument") || m.update.StoreID != 0 {
 		t.Fatalf("err=%v update=%+v", err, m.update)
-	}
-}
-
-// Store 輸出核准的登錄與未結束的那一筆（待審放 pending_food_registration、被退回放 rejected_food_registration，各自只在該狀態設值）；沒有時都不設（不是空訊息）。
-// mutation：被退回放進 pending_food_registration → 斷言 rejected 有值與 pending 為 nil 失敗。
-func TestStoreOutputsTheApprovedRegistrationAndTheRequest(t *testing.T) {
-	st := currentStore()
-	decided := time.Date(2026, 10, 2, 8, 0, 0, 0, time.UTC)
-	st.OpenFoodRegistration = &model.FoodRegistration{
-		ID: uuid.MustParse("0198a0a0-0000-7000-8000-000000000002"), RegistrationNumber: "A-456", State: model.FoodRegRejected,
-		SubmittedAt: time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC), DecidedAt: &decided, RejectReason: "字號與登錄資料不符",
-	}
-	h := mustApp(t, &fakeModule{updated: st}, nil, rpc.Images{}, Dashboard{}, testStats(fakeFollowerCounts{}, fakeRatings{}))
-	got, err := h.GetMyStore(ctxWithStore(st), connect.NewRequest(&pb.GetMyStoreRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	reg, req := got.Msg.GetStore().GetApprovedFoodRegistration(), got.Msg.GetStore().GetRejectedFoodRegistration()
-	if reg.GetRegistrationNumber() != "A-123" || reg.GetId() == "" || !reg.GetDecideTime().AsTime().Equal(*st.ApprovedFoodRegistration.DecidedAt) || reg.GetState() != pb.FoodRegistrationState_FOOD_REGISTRATION_STATE_APPROVED {
-		t.Fatalf("registration=%v", reg)
-	}
-	if req.GetState() != pb.FoodRegistrationState_FOOD_REGISTRATION_STATE_REJECTED || req.GetRegistrationNumber() != "A-456" ||
-		req.GetRejectReason() != "字號與登錄資料不符" || !req.GetDecideTime().AsTime().Equal(decided) || req.GetId() == "" {
-		t.Fatalf("request=%v", req)
-	}
-	if got.Msg.GetStore().PendingFoodRegistration != nil {
-		t.Fatalf("被退回的登錄不能放進 pending_food_registration：%v", got.Msg.GetStore())
-	}
-
-	none := currentStore()
-	none.ApprovedFoodRegistration = nil
-	got, err = h.GetMyStore(ctxWithStore(none), connect.NewRequest(&pb.GetMyStoreRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Msg.GetStore().ApprovedFoodRegistration != nil || got.Msg.GetStore().PendingFoodRegistration != nil || got.Msg.GetStore().RejectedFoodRegistration != nil {
-		t.Fatalf("store=%v", got.Msg.GetStore())
-	}
-}
-
-// GetMyStore 把伺服器算好的 revoked_food_registration 原樣帶出（字號、撤銷時間、理由），與同時存在的待審請求並存；核准中時不設。
-func TestGetMyStoreCarriesTheRevokedRegistrationAndTheNewerRequest(t *testing.T) {
-	st := currentStore()
-	st.ApprovedFoodRegistration = nil
-	ended := time.Date(2026, 10, 3, 8, 0, 0, 0, time.UTC)
-	decidedAt := time.Date(2026, 10, 1, 8, 0, 0, 0, time.UTC)
-	st.RevokedFoodRegistration = &model.FoodRegistration{
-		ID: uuid.MustParse("0198a0a0-0000-7000-8000-000000000003"), RegistrationNumber: "A-789", State: model.FoodRegEnded,
-		SubmittedAt: time.Date(2026, 9, 30, 8, 0, 0, 0, time.UTC), DecidedAt: &decidedAt, EndedAt: &ended, EndReason: "字號與食藥署資料不符",
-	}
-	st.OpenFoodRegistration = &model.FoodRegistration{
-		ID: uuid.MustParse("0198a0a0-0000-7000-8000-000000000004"), RegistrationNumber: "A-789", State: model.FoodRegPending,
-		SubmittedAt: time.Date(2026, 10, 2, 9, 0, 0, 0, time.UTC),
-	}
-	h := mustApp(t, &fakeModule{updated: st}, nil, rpc.Images{}, Dashboard{}, testStats(fakeFollowerCounts{}, fakeRatings{}))
-	got, err := h.GetMyStore(ctxWithStore(st), connect.NewRequest(&pb.GetMyStoreRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	revoked := got.Msg.GetStore().GetRevokedFoodRegistration()
-	if revoked.GetRegistrationNumber() != "A-789" || revoked.GetEndReason() != "字號與食藥署資料不符" || !revoked.GetEndTime().AsTime().Equal(ended) || revoked.GetId() == "" ||
-		revoked.GetState() != pb.FoodRegistrationState_FOOD_REGISTRATION_STATE_ENDED {
-		t.Fatalf("revoked=%v", revoked)
-	}
-	if got.Msg.GetStore().GetApprovedFoodRegistration() != nil || got.Msg.GetStore().GetPendingFoodRegistration().GetRegistrationNumber() != "A-789" ||
-		got.Msg.GetStore().RejectedFoodRegistration != nil {
-		t.Fatalf("store=%v", got.Msg.GetStore())
-	}
-	approved := currentStore()
-	got, err = h.GetMyStore(ctxWithStore(approved), connect.NewRequest(&pb.GetMyStoreRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Msg.GetStore().GetRevokedFoodRegistration() != nil {
-		t.Fatalf("沒有撤銷時不設：%v", got.Msg.GetStore().GetRevokedFoodRegistration())
 	}
 }
 

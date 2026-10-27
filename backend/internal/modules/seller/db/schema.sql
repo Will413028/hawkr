@@ -149,78 +149,14 @@ CREATE TABLE seller.store_exposures (
 -- 縣市篩選與對帳只看最後公告為可曝光的店。
 CREATE INDEX store_exposures_exposable ON seller.store_exposures (store_id) WHERE exposable;
 
--- 食品業者登錄（食安法第 8 條第 3 項）：賣家送審、平台人工對照食藥署的登錄資料後裁定，核准的那一筆是店家公開字號的唯一來源
--- （店家表沒有食品欄位）。state：PENDING 待審、APPROVED 目前有效的登錄、REJECTED 被退回（reject_reason 必填）、WITHDRAWN
--- 賣家撤回或被新送出的取代（沒有裁定）、ENDED 曾經核准而後結束（end_cause：SUPERSEDED 被新核准的取代、CLEARED 賣家清除、
--- REVOKED 平台撤銷、STORE_RETIRED 店家個資清理時結束）。撤銷必有給賣家看的理由（end_reason）與撤銷的管理員（ended_by_admin_id）；
--- 核准時的 internal_note 撤銷後留著（稽核紀錄只增不改）。APPROVED 一定有字號（approved_number_check）：清掉字號的列先結束。
--- 每家店最多一筆 PENDING、最多一筆 APPROVED（兩個 partial UNIQUE）；新值核准之前舊的核准照常有效。internal_note 只給後台看，
--- 可以留在 APPROVED、REJECTED 與 ENDED 的裁定上。store_id 與 account_id 以複合外鍵跟著店家；關店不改這張表（待審的件留著，
--- 收件匣只列營運中的店）。字號只限制長度，沒有官方格式規格，核對交給人工。
--- 保存期間（〈食品業者登錄個人資料蒐集告知事項〉第 4 項）：店家個資清理（關店滿保留期）時，字號與退回、撤銷的理由、內部註記
--- 一起清成 NULL 並記下 pii_purged_at（purged_check；仍核准中的先結束為 STORE_RETIRED），審核的事實（時間、結果、審核人員）保留；關店滿 2 年後整列刪除，
--- 綁在這一列的告知同意紀錄（agreement_acceptances.food_registration_id）隨之 CASCADE 刪除。
-CREATE TABLE seller.food_registrations (
-    id                  UUID PRIMARY KEY,
-    store_id            BIGINT NOT NULL,
-    account_id          BIGINT NOT NULL,
-    registration_number TEXT,
-    state               TEXT NOT NULL,
-    submitted_at        TIMESTAMPTZ NOT NULL,
-    decided_by_admin_id BIGINT,
-    decided_at          TIMESTAMPTZ,
-    reject_reason       TEXT,
-    internal_note       TEXT,
-    ended_at            TIMESTAMPTZ,
-    end_cause           TEXT,
-    end_reason          TEXT,
-    ended_by_admin_id   BIGINT,
-    pii_purged_at       TIMESTAMPTZ,
-    CONSTRAINT food_registrations_store_fkey FOREIGN KEY (store_id, account_id) REFERENCES seller.stores (store_id, account_id),
-    CONSTRAINT food_registrations_state_check CHECK (state IN ('PENDING', 'APPROVED', 'REJECTED', 'WITHDRAWN', 'ENDED')),
-    CONSTRAINT food_registrations_end_cause_check CHECK (end_cause IN ('SUPERSEDED', 'CLEARED', 'REVOKED', 'STORE_RETIRED')),
-    CONSTRAINT food_registrations_number_check CHECK (char_length(registration_number) >= 1 AND char_length(registration_number) <= 50 AND registration_number !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
-    CONSTRAINT food_registrations_reject_reason_check CHECK (char_length(reject_reason) BETWEEN 1 AND 1000),
-    CONSTRAINT food_registrations_end_reason_check CHECK (char_length(end_reason) BETWEEN 1 AND 1000),
-    CONSTRAINT food_registrations_internal_note_check CHECK (char_length(internal_note) BETWEEN 1 AND 1000),
-    CONSTRAINT food_registrations_decision_check CHECK (
-        (state IN ('PENDING', 'WITHDRAWN') AND decided_by_admin_id IS NULL AND decided_at IS NULL AND reject_reason IS NULL AND internal_note IS NULL) OR
-        (state IN ('APPROVED', 'ENDED') AND decided_by_admin_id IS NOT NULL AND decided_by_admin_id > 0 AND decided_at IS NOT NULL AND decided_at >= submitted_at AND
-         reject_reason IS NULL) OR
-        (state = 'REJECTED' AND decided_by_admin_id IS NOT NULL AND decided_by_admin_id > 0 AND decided_at IS NOT NULL AND decided_at >= submitted_at AND
-         (reject_reason IS NOT NULL OR pii_purged_at IS NOT NULL))
-    ),
-    CONSTRAINT food_registrations_end_check CHECK (
-        (state IN ('PENDING', 'APPROVED', 'REJECTED') AND ended_at IS NULL AND end_cause IS NULL) OR
-        (state = 'WITHDRAWN' AND ended_at IS NOT NULL AND ended_at >= submitted_at AND end_cause IS NULL) OR
-        (state = 'ENDED' AND ended_at IS NOT NULL AND ended_at >= decided_at AND end_cause IS NOT NULL)
-    ),
-    CONSTRAINT food_registrations_revoke_check CHECK (
-        (end_cause = 'REVOKED' AND ended_by_admin_id IS NOT NULL AND ended_by_admin_id > 0 AND
-         (end_reason IS NOT NULL OR pii_purged_at IS NOT NULL)) OR
-        (end_cause IS DISTINCT FROM 'REVOKED' AND end_reason IS NULL AND ended_by_admin_id IS NULL)
-    ),
-    CONSTRAINT food_registrations_approved_number_check CHECK (state <> 'APPROVED' OR registration_number IS NOT NULL),
-    CONSTRAINT food_registrations_purged_check CHECK (
-        (pii_purged_at IS NULL AND registration_number IS NOT NULL) OR
-        (pii_purged_at IS NOT NULL AND registration_number IS NULL AND reject_reason IS NULL AND end_reason IS NULL AND internal_note IS NULL)
-    )
-);
-CREATE UNIQUE INDEX food_registrations_one_pending ON seller.food_registrations (store_id) WHERE state = 'PENDING';
-CREATE UNIQUE INDEX food_registrations_one_approved ON seller.food_registrations (store_id) WHERE state = 'APPROVED';
--- 後台的收件匣：待審的件，舊到新。
-CREATE INDEX food_registrations_inbox ON seller.food_registrations (submitted_at, id) WHERE state = 'PENDING';
--- 一家店的最近一筆（賣家看到的請求）。
-CREATE INDEX food_registrations_store ON seller.food_registrations (store_id, submitted_at DESC, id DESC);
-
 -- 案件（step10e-reports-brief R2、R3，Will 2026-10-18）：同一家店、同一個平台判定類別，同時最多一個進行中的案件（cases_one_open）。嚴重度在開案時設定，之後只經
 -- ChangeCaseSeverity 修改（改前改後記在內部註記上：governance_notes.severity_from、severity_to）。決定就是結案（終態）：close_reason 是 DECIDED 時帶 decision
 -- （ACTION_TAKEN 或 NO_ACTION）；通報都移到其他案件時以 NO_REPORTS 關閉，不算決定。version 是後台的 etag，updated_at 是上一次「處理」的時間（成員進出、成員有了結果、
--- 改嚴重度、記錄轉報、結案；補充、註記與措施不改它）。處理狀態（進行中、已結案）由 closed_at 在讀取時推導，不存。
--- 三個複合唯一鍵給別的表的複合外鍵：reports 以 (case_id, store_id, assessed_category) 指向 (id, store_id, category)，所以通報的店家與平台判定類別一定等於案件的；
--- measures.source_case_id 與 report_case_moves 以 (id, store_id)、case_referrals 以 (id, category) 指向它。
+-- 改嚴重度、結案；補充、註記與措施不改它）。處理狀態（進行中、已結案）由 closed_at 在讀取時推導，不存。
+-- 兩個複合唯一鍵給別的表的複合外鍵：reports 以 (case_id, store_id, assessed_category) 指向 (id, store_id, category)，所以通報的店家與平台判定類別一定等於案件的；
+-- measures.source_case_id 與 report_case_moves 以 (id, store_id) 指向它。
 -- DB 保證不了、由模組保證並以資料集測試守的跨列不變量：I1 進行中的案件至少有一筆通報；I2 已結案的案件每筆通報都有結果；I3 決定是 NO_ACTION 的案件沒有結果是 ACTION_TAKEN 的通報；
--- I4 決定是 ACTION_TAKEN 的案件，決定當下有導出的措施（不論狀態）或結果是 ACTION_TAKEN 的成員；I5 每個進行中的案件至少有一個可以選的決定；I6 有導出措施或轉報紀錄的案件不會因移動而變空。
+-- I4 決定是 ACTION_TAKEN 的案件，決定當下有導出的措施（不論狀態）或結果是 ACTION_TAKEN 的成員；I5 每個進行中的案件至少有一個可以選的決定；I6 有導出措施的案件不會因移動而變空。
 CREATE TABLE seller.cases (
     id                 UUID PRIMARY KEY,
     store_id           BIGINT NOT NULL REFERENCES seller.stores (store_id),
@@ -237,7 +173,6 @@ CREATE TABLE seller.cases (
     updated_at         TIMESTAMPTZ NOT NULL,
     CONSTRAINT cases_report_key UNIQUE (id, store_id, category),
     CONSTRAINT cases_store_key UNIQUE (id, store_id),
-    CONSTRAINT cases_category_key UNIQUE (id, category),
     -- 政策分類（platform/policy）中平台判定與認定可用的值：全部除了 OTHER。
     CONSTRAINT cases_category_check CHECK (category IN (
         'FOOD_SAFETY', 'PROHIBITED_GOODS', 'UNLICENSED_SALE', 'MISLEADING_INFO', 'FAKE_CERTIFICATION', 'COUNTERFEIT',
@@ -262,8 +197,6 @@ CREATE INDEX cases_opened ON seller.cases (opened_at DESC, id DESC);
 CREATE INDEX cases_open ON seller.cases (opened_at DESC, id DESC) WHERE closed_at IS NULL;
 CREATE INDEX cases_closed ON seller.cases (opened_at DESC, id DESC) WHERE closed_at IS NOT NULL;
 CREATE INDEX cases_store ON seller.cases (store_id, opened_at DESC, id DESC);
--- 「待轉報」的存取路徑（3d 的來源）：決定採取措施的食安案件，依結案時間；是否已轉報由 NOT EXISTS case_referrals 判斷。
-CREATE INDEX cases_decided_food_safety ON seller.cases (closed_at, id) WHERE category = 'FOOD_SAFETY' AND decision = 'ACTION_TAKEN';
 
 -- 通報（ADR 2026-10-18-seller-governance-consolidated、step10e-reports-brief R2）：檢舉與食安通報同一張表，一列是一位檢舉人的一次送出（之後的補充在 report_supplements）。
 -- 檢舉人剛好一種（reports_reporter_check）：登入的買家（reporter_buyer_id，呼叫方給的業務鍵），或留下電話、email 的匿名者；匿名的聯絡欄位在保留期限後清成 NULL，
@@ -296,7 +229,7 @@ CREATE TABLE seller.reports (
     discarded_submissions INTEGER NOT NULL DEFAULT 0,
     -- 管理員看過的最新補充的編號（report_supplements.seq；0 = 還沒看過任何補充）。分案、移動與明確已讀（MarkReportSupplementsSeen）把它設成當時最新一則的編號
     -- （三個動作都帶讀到的 etag，etag 含當時全部補充，所以做了就等於看過）。「有新的補充」= 還沒有結果，而且存在編號大於它的補充；不比時間，所以不依賴任何時鐘。
-    -- 讀取、設定結果（有了結果就不再提醒）、結案帶入的預設結果、改案件嚴重度與記錄轉報都不記。
+    -- 讀取、設定結果（有了結果就不再提醒）、結案帶入的預設結果、改案件嚴重度都不記。
     supplements_seen_seq  SMALLINT NOT NULL DEFAULT 0,
     version               BIGINT NOT NULL DEFAULT 1,
     created_at            TIMESTAMPTZ NOT NULL,
@@ -413,59 +346,6 @@ CREATE TABLE seller.report_case_moves (
 );
 CREATE INDEX report_case_moves_from ON seller.report_case_moves (from_case_id, moved_at, id);
 CREATE INDEX report_case_moves_to ON seller.report_case_moves (to_case_id, moved_at, id);
-
--- 食安案件的轉報紀錄（轉報本身在系統外以人工完成，這裡只記一次）：每個案件最多一列，複合外鍵＋CHECK 讓它只能掛在食安案件。
--- outcome 是 REFERRED（已轉報：管道必填，案號與追蹤日期選填）或 WAIVED（不轉報：只有原因，沒有管道、案號與追蹤日期）；兩者互斥由 CHECK 保證，
--- 「不轉報也是一列」讓待轉報的判定式（NOT EXISTS case_referrals）自然排除它。recorded_at、recorded_by_admin_id 兩種都是「記下的時間與管理員」。
--- follow_up_on 是追蹤日期（台北日期）：到了這天還沒收到主管機關的回覆就聯絡主管機關；回覆時可以改或清掉。
-CREATE TABLE seller.case_referrals (
-    case_id              UUID PRIMARY KEY,
-    category             TEXT NOT NULL,
-    outcome              TEXT NOT NULL,
-    channel              TEXT,
-    reference_no         TEXT,
-    follow_up_on         DATE,
-    -- 設定目前這個追蹤日期的時間（記錄轉報，或記下回覆時換成下一個）；追蹤逾期＝今天晚於 follow_up_on，而且這個時間之後沒有記下回覆。
-    follow_up_set_at     TIMESTAMPTZ,
-    waiver_reason        TEXT,
-    recorded_at          TIMESTAMPTZ NOT NULL,
-    recorded_by_admin_id BIGINT NOT NULL,
-    CONSTRAINT case_referrals_case_fkey FOREIGN KEY (case_id, category) REFERENCES seller.cases (id, category),
-    CONSTRAINT case_referrals_category_check CHECK (category = 'FOOD_SAFETY'),
-    CONSTRAINT case_referrals_channel_check CHECK (channel IN ('HOTLINE_1919', 'ONLINE_FORM', 'FAX_HEALTH_DEPT', 'IN_PERSON', 'OTHER')),
-    CONSTRAINT case_referrals_reference_no_check CHECK (char_length(reference_no) BETWEEN 1 AND 100),
-    CONSTRAINT case_referrals_admin_check CHECK (recorded_by_admin_id > 0),
-    CONSTRAINT case_referrals_follow_up_check CHECK ((follow_up_on IS NULL) = (follow_up_set_at IS NULL)),
-    CONSTRAINT case_referrals_outcome_check CHECK ((
-      (outcome = 'REFERRED' AND channel IS NOT NULL AND waiver_reason IS NULL) OR
-      (outcome = 'WAIVED' AND channel IS NULL AND reference_no IS NULL AND follow_up_on IS NULL
-       AND char_length(waiver_reason) BETWEEN 1 AND 2000)) IS TRUE),
-    -- 回覆的複合外鍵指向它（case_id 已是主鍵，這個 UNIQUE 不改變任何唯一性）。
-    CONSTRAINT case_referrals_outcome_key UNIQUE (case_id, outcome)
-);
-
--- 主管機關對轉報的回覆（只新增；移送通知與結果通知可以是兩則）。outcome 固定是 REFERRED 的複本：複合外鍵帶它，DB 保證回覆只掛在已轉報的列，
--- 不能掛在「不轉報」的列（外鍵不能帶常數，所以存一欄 CHECK 成常數；先例：case_referrals 以 (case_id, category) 加 CHECK 只掛食安案件）。
--- 模組的 Availability 照樣先擋（給句子），DB 是保底。received_on 不早於轉報日（台北）、不晚於記下當天由模組檢查。
-CREATE TABLE seller.case_referral_replies (
-    id                   UUID PRIMARY KEY,
-    case_id              UUID NOT NULL,
-    outcome              TEXT NOT NULL DEFAULT 'REFERRED',
-    body                 TEXT NOT NULL,
-    received_on          DATE NOT NULL,
-    recorded_by_admin_id BIGINT NOT NULL,
-    recorded_at          TIMESTAMPTZ NOT NULL,
-    request_id           UUID,
-    request_hash         BYTEA,
-    CONSTRAINT case_referral_replies_request_check CHECK ((request_id IS NULL) = (request_hash IS NULL)),
-    -- 冪等鍵（AIP-155）的範圍同 measures_request：（記下的管理員, request_id）。
-    CONSTRAINT case_referral_replies_request_key UNIQUE (recorded_by_admin_id, request_id),
-    CONSTRAINT case_referral_replies_body_check CHECK (char_length(body) BETWEEN 1 AND 2000),
-    CONSTRAINT case_referral_replies_admin_check CHECK (recorded_by_admin_id > 0),
-    CONSTRAINT case_referral_replies_outcome_check CHECK (outcome = 'REFERRED'),
-    CONSTRAINT case_referral_replies_referral_fkey FOREIGN KEY (case_id, outcome) REFERENCES seller.case_referrals (case_id, outcome)
-);
-CREATE INDEX case_referral_replies_case ON seller.case_referral_replies (case_id, recorded_at, id);
 
 -- 詢問（rb R4）：平台對案件的賣家的一次要求，有期限、一則回覆、可撤回；每個案件同時最多一筆還沒結束的。
 -- 回覆在 3c-b 只由管理員記下（系統外收到）；10f 加賣家在賣家中心的回覆（channel = SELLER_CENTER、replied_by_account_id）。
@@ -624,7 +504,7 @@ CREATE INDEX authority_orders_received ON seller.authority_orders (received_at D
 
 -- 來函指名的對象：任何帳號（帳號是否存在由模組問 identity，不建跨 schema 外鍵），選填店家（NULL＝帳號全部的 stint；有值時複合外鍵保證它屬於帳號，
 -- 而且只算那一家，同帳號的新 stint 不在指名內）。(來函, 帳號, 店家) 不可重複（NULLS NOT DISTINCT：不指定店家的帳號也只能列一次）；整個帳號加上它的店家是重疊，
--- 由模組拒絕（DB 保證不了）。保存的判斷（RetireDueStores、ExpiredFoodRegistrations）依帳號找有效的指名。
+-- 由模組拒絕（DB 保證不了）。保存的判斷（RetireDueStores）依帳號找有效的指名。
 -- 告知（Q1 (a)，DSA 9(5)、10(5) 的基準）：完成來函時每個對象記一筆（notice：NOTIFIED 已告知、WITHHELD 機關要求暫不告知並必填確認日期 recheck_on、
 -- MEASURE_IS_NOTICE 由措施告知），之後只有 WITHHELD 能改（RecordAuthorityTargetNotice，被取代的值留在 authority_target_notice_history）。
 -- 「來函完成 ⇔ 每個對象都有 notice」跨兩張表，由模組在完成的 transaction 內保證並以資料集測試守。
@@ -1648,17 +1528,16 @@ CREATE TABLE seller.retired_assets (
 );
 CREATE INDEX retired_assets_retired_at ON seller.retired_assets (retired_at);
 
--- 入駐同意紀錄：賣家在開店（SELLER_TERMS）、送出 KYC（KYC_PRIVACY_NOTICE、PAYUNI_TERMS）與送出食品業者登錄（FOOD_REGISTRATION_NOTICE）時同意或確認已閱讀的文件版本，記事實（哪家
+-- 入駐同意紀錄：賣家在開店（SELLER_TERMS）、送出 KYC（KYC_PRIVACY_NOTICE、PAYUNI_TERMS）時同意或確認已閱讀的文件版本，記事實（哪家
 -- 店、哪份文件的哪個版本、誰、何時、來源 IP 與 User-Agent）。每次同意事件一列：沒有 ON CONFLICT，紀錄是一連串事件；開店的 SELLER_TERMS
 -- 每家店一列（部分唯一索引），KYC 的兩份每次送出各一列、以 submission_review_id 綁定那次送出的 SUBMIT 審核紀錄（kyc_reviews；
--- 被退回後換了申請主體再送出，也各自留下一組）；食品業者登錄的告知每次送出新的登錄各一列、以 food_registration_id 綁定那一筆登錄。
+-- 被退回後換了申請主體再送出，也各自留下一組）。
 -- 依種類恰好綁一個來源（source_check）。version 是文件的生效日（Go 常數表 model.CurrentAgreements），全文以 repo 裡的正本保存。
 -- 只有 INSERT 的查詢，agreement_queries_test.go 檢查；唯一的例外是個資清理把來源欄位清成 NULL（PurgeAgreementSources），以及 dev
 -- seed 的重設（internal/devseed 的 clearChildrenSQL 刪掉種子店家的紀錄再依 fixture 重寫）。
 -- client_ip 是 inet（取不到是 NULL），user_agent 取不到是 NULL（空字串存成 NULL），上限 512 字是儲存成本。IP 與 User-Agent 是欄位值，
 -- 依 ADR 2026-10-19-seller-kyc-payuni-consolidated「關店與個資保留」只保留審核的事實：店家關閉滿保留期由 purge 套件清成 NULL 並記下
--- pii_purged_at（agreement_acceptances_purged_check），種類、版本、時間、帳號與送出的紀錄保留。food_registration_id 是 ON DELETE CASCADE：登錄的審核紀錄保存期滿（關店後 2 年）刪除時，這份告知同意一起刪；其他外鍵不設 ON DELETE（店家列與審核
--- 紀錄都不刪）。
+-- pii_purged_at（agreement_acceptances_purged_check），種類、版本、時間、帳號與送出的紀錄保留。外鍵不設 ON DELETE（店家列與審核紀錄都不刪）。
 CREATE TABLE seller.agreement_acceptances (
     acceptance_id        BIGINT      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     store_id             BIGINT      NOT NULL REFERENCES seller.stores (store_id),
@@ -1667,24 +1546,21 @@ CREATE TABLE seller.agreement_acceptances (
     account_id           BIGINT      NOT NULL,
     accepted_at          TIMESTAMPTZ NOT NULL,
     submission_review_id UUID        REFERENCES seller.kyc_reviews (review_id),
-    food_registration_id UUID        REFERENCES seller.food_registrations (id) ON DELETE CASCADE,
     client_ip            INET,
     user_agent           TEXT,
     pii_purged_at        TIMESTAMPTZ,
-    CONSTRAINT agreement_acceptances_kind_check CHECK (kind IN ('SELLER_TERMS', 'KYC_PRIVACY_NOTICE', 'PAYUNI_TERMS', 'FOOD_REGISTRATION_NOTICE')),
+    CONSTRAINT agreement_acceptances_kind_check CHECK (kind IN ('SELLER_TERMS', 'KYC_PRIVACY_NOTICE', 'PAYUNI_TERMS')),
     CONSTRAINT agreement_acceptances_version_check CHECK (char_length(version) >= 1),
     CONSTRAINT agreement_acceptances_account_check CHECK (account_id > 0),
     CONSTRAINT agreement_acceptances_user_agent_check CHECK (user_agent IS NULL OR char_length(user_agent) BETWEEN 1 AND 512),
     CONSTRAINT agreement_acceptances_source_check CHECK (
-        (kind = 'SELLER_TERMS' AND submission_review_id IS NULL AND food_registration_id IS NULL) OR
-        (kind IN ('KYC_PRIVACY_NOTICE', 'PAYUNI_TERMS') AND submission_review_id IS NOT NULL AND food_registration_id IS NULL) OR
-        (kind = 'FOOD_REGISTRATION_NOTICE' AND submission_review_id IS NULL AND food_registration_id IS NOT NULL)
+        (kind = 'SELLER_TERMS' AND submission_review_id IS NULL) OR
+        (kind IN ('KYC_PRIVACY_NOTICE', 'PAYUNI_TERMS') AND submission_review_id IS NOT NULL)
     ),
     CONSTRAINT agreement_acceptances_purged_check CHECK (pii_purged_at IS NULL OR (client_ip IS NULL AND user_agent IS NULL))
 );
 CREATE UNIQUE INDEX agreement_acceptances_seller_terms ON seller.agreement_acceptances (store_id) WHERE kind = 'SELLER_TERMS';
 CREATE INDEX agreement_acceptances_submission ON seller.agreement_acceptances (submission_review_id) WHERE submission_review_id IS NOT NULL;
-CREATE INDEX agreement_acceptances_food_registration ON seller.agreement_acceptances (food_registration_id) WHERE food_registration_id IS NOT NULL;
 CREATE INDEX agreement_acceptances_store ON seller.agreement_acceptances (store_id, accepted_at, acceptance_id);
 
 -- 店家封鎖：店家封鎖一位買家（單向：店家看得到買家，買家仍看得到店家的公開內容；封鎖只擋買家在這家店的新互動，不擋下單）。

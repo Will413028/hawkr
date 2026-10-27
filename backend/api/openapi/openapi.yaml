@@ -37756,11 +37756,6 @@ components:
           type: string
         district:
           type: string
-        foodBusinessRegNo:
-          type: string
-          description: 食品業者登錄字號：法定應公開揭露
-        isProcessedFood:
-          type: boolean
         logoKey:
           type: string
           description: 商家 logo objectKey（SSOT；49 §6.1）

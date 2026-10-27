@@ -2,7 +2,6 @@ package seller
 
 import (
 	"context"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -142,19 +141,5 @@ func TestListStoresMapsFiltersAndLeavesUnspecifiedUnfiltered(t *testing.T) {
 func TestAdminEnumsMatchTheModule(t *testing.T) {
 	if got := rpc.EnumMismatches[adminpb.StoreCloser](model.ClosedByValues()); len(got) != 0 {
 		t.Fatalf("StoreCloser：%v", got)
-	}
-	if got := rpc.EnumMismatches[adminpb.FoodRegistrationInbox](model.FoodRegInboxValues()); len(got) != 0 {
-		t.Fatalf("FoodRegistrationInbox：%v", got)
-	}
-	if got := rpc.EnumMismatches[adminpb.FoodRegistrationState](model.FoodRegStateValues()); len(got) != 0 {
-		t.Fatalf("FoodRegistrationState：%v", got)
-	}
-	// 賣家的 FoodRegistrationState 只有賣家看得到的狀態：撤回的（WITHDRAWN）賣家看不到，所以沒有這個值。
-	sellerVisible := slices.DeleteFunc(model.FoodRegStateValues(), func(v model.FoodRegState) bool { return v == model.FoodRegWithdrawn })
-	if got := rpc.EnumMismatches[pb.FoodRegistrationState](sellerVisible); len(got) != 0 {
-		t.Fatalf("賣家的 FoodRegistrationState：%v", got)
-	}
-	if got := rpc.EnumMismatches[adminpb.FoodRegistrationEndCause](model.FoodRegEndCauseValues()); len(got) != 0 {
-		t.Fatalf("FoodRegistrationEndCause：%v", got)
 	}
 }

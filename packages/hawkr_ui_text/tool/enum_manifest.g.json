@@ -78,13 +78,6 @@
       "serverOwned": true
     },
     {
-      "name": "hawkr.seller.v1alpha1.FoodRegistrationState",
-      "dartClass": "FoodRegistrationState",
-      "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
-      "inCatalog": true,
-      "serverOwned": false
-    },
-    {
       "name": "hawkr.seller.v1alpha1.KYCField",
       "dartClass": "KYCField",
       "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",

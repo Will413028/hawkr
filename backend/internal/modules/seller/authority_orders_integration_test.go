@@ -16,7 +16,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/Will413028/hawkr/backend/internal/platform/seal/sealtest"
-	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -492,90 +491,6 @@ func TestReopenIgnoresTheAuthorityHold(t *testing.T) {
 	}
 }
 
-// 食品登錄審核紀錄（關店 2 年期滿）的刪除也遵守保存：期限內不刪，到期那一刻刪。
-func TestFoodReviewDeletionRespectsTheHold(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	accountID, s := f.kycApprovedStoreWithAccount(t, idA, bankAcct)
-	f.approveFood(t, s, "HELD-1")
-	_, err := f.module.CloseCurrent(ctx, accountID)
-	must(t, err)
-	closedAt := f.now
-	f.now = f.now.Add(StoreRetention + time.Hour)
-	if n, err := f.module.PurgePII(ctx); err != nil || n != 1 {
-		t.Fatalf("n=%d err=%v", n, err)
-	}
-	expiry := closedAt.In(twtime.Taipei).AddDate(2, 0, 0)
-	f.now = expiry.Add(-10 * 24 * time.Hour)
-	o := f.holdOrder(t, accountID) // 保存到 f.now + 184 天，超過 2 年期滿
-	rows := func() int64 {
-		return f.count(t, "SELECT count(*) FROM seller.food_registrations WHERE store_id=$1", s.StoreID)
-	}
-	f.now = expiry.Add(time.Second)
-	if _, err := f.module.PurgePII(ctx); err != nil || rows() != 1 {
-		t.Fatalf("2 年期滿但還在保存：%d err=%v", rows(), err)
-	}
-	f.now = o.HoldUntil.Add(-time.Microsecond)
-	if _, err := f.module.PurgePII(ctx); err != nil || rows() != 1 {
-		t.Fatalf("保存期限之前不刪：%d err=%v", rows(), err)
-	}
-	f.now = o.HoldUntil
-	if _, err := f.module.PurgePII(ctx); err != nil || rows() != 0 {
-		t.Fatalf("保存期限到了就刪：%d err=%v", rows(), err)
-	}
-}
-
-// 審核紀錄的刪除鎖住之後再判斷一次：登記來函的一方不鎖店家列、在第一個語句之後 commit，審核紀錄不刪。
-// mutation：purge.deleteExpiredFoodReviews 拿掉鎖住之後的 StoreHolds → 審核紀錄被刪，斷言失敗。
-func TestFoodReviewDeletionRechecksTheHoldAfterLocking(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	accountID, s := f.kycApprovedStoreWithAccount(t, idA, bankAcct)
-	f.approveFood(t, s, "RACE-1")
-	_, err := f.module.CloseCurrent(ctx, accountID)
-	must(t, err)
-	closedAt := f.now
-	f.now = f.now.Add(StoreRetention + time.Hour)
-	if n, err := f.module.PurgePII(ctx); err != nil || n != 1 {
-		t.Fatalf("n=%d err=%v", n, err)
-	}
-	f.now = closedAt.In(twtime.Taipei).AddDate(2, 0, 0).Add(time.Second)
-
-	writer, err := f.db.Pool().Begin(ctx)
-	must(t, err)
-	defer func() { _ = writer.Rollback(ctx) }()
-	f.insertRawOrder(t, writer, accountID, f.now.Add(24*time.Hour))
-
-	locked, proceed, done := make(chan struct{}), make(chan struct{}), make(chan struct{})
-	var once sync.Once
-	f.module.SetPurgeAfterFoodCandidates(func() {
-		once.Do(func() { close(locked) })
-		<-proceed
-	})
-	t.Cleanup(func() { f.module.SetPurgeAfterFoodCandidates(nil) })
-	var purgeErr error
-	go func() {
-		defer close(done)
-		_, purgeErr = f.module.PurgePII(ctx)
-	}()
-	select {
-	case <-locked:
-	case <-done:
-		t.Fatalf("清理沒有審核紀錄的候選：%v", purgeErr)
-	case <-time.After(20 * time.Second):
-		t.Fatal("清理沒有到達 hook")
-	}
-	must(t, writer.Commit(ctx))
-	close(proceed)
-	<-done
-	must(t, purgeErr)
-	if n := f.count(t, "SELECT count(*) FROM seller.food_registrations WHERE store_id=$1", s.StoreID); n != 1 {
-		t.Fatalf("再判斷看到保存，審核紀錄不能刪：%d", n)
-	}
-}
-
 // 調取資料完成時，保存期限取收文與提供兩者較晚的（設計 Q5 (b)）：提供時間晚於收文時延到提供時間＋184 天並記一列 DATA_PROVIDED；
 // 提供時間等於收文時沒有變（不記）；已經被延得更遠的不縮短。提供時間必須在 [收文, 現在]，而且只有調取資料的來函可以帶。
 // mutation：HoldAfterProvision 改成取較早的或把延長條件反過來 → 這裡失敗。
@@ -1005,23 +920,20 @@ func TestMeasureSourceAuthorityOrderNamingAndListFilter(t *testing.T) {
 	f.assertHoldInvariant(t)
 }
 
-// 來函保存的述詞只有一份（StoreHolds），店家個資的清理與審核紀錄的刪除（對象不同）都在鎖住候選之後問它；這個資料集鎖住兩條刪除路徑對「哪些來函算有效」一致：
-// 每個情境各有兩個帳號，同樣的來函各指名一份——一個帳號的店家早就清理過、審核紀錄剛好 2 年期滿（驗審核紀錄的刪除），另一個帳號的店家剛好保留期滿（驗店家的清理）；
-// 同一個時間點跑一次清理。被保存的（指名帳號、指名店家、有效期限內）兩邊都留下，沒有來函與保存已到期的兩邊都清掉。
-// mutation：deleteExpiredFoodReviews 不問 StoreHolds（或只用帳號判斷）→ 指名店家的情境審核紀錄被刪而失敗。
-func TestBothPreservationPredicatesAgreeOnWhichOrdersCount(t *testing.T) {
+// 來函保存的述詞只有一份（StoreHolds），店家個資的清理在鎖住候選之後問它；這個資料集鎖住「哪些來函算有效」：每個情境一個帳號的店家剛好保留期滿，
+// 同一個時間點跑一次清理。被保存的（指名帳號、指名店家、有效期限內）留下，沒有來函與保存已到期的清掉。
+func TestPreservationPredicateDecidesWhichOrdersCount(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	type scenario struct {
-		name             string
-		keep             bool
-		receivedOffset   time.Duration
-		byStore          bool
-		noOrder          bool
-		foodAccount      int64
-		foodStore, plain Store
-		plainAccount     int64
+		name           string
+		keep           bool
+		receivedOffset time.Duration
+		byStore        bool
+		noOrder        bool
+		account        int64
+		store          Store
 	}
 	scenarios := []*scenario{
 		{name: "沒有來函", noOrder: true},
@@ -1029,52 +941,30 @@ func TestBothPreservationPredicatesAgreeOnWhichOrdersCount(t *testing.T) {
 		{name: "指名店家、保存中", keep: true, byStore: true},
 		{name: "指名帳號、保存已到期", receivedOffset: -300 * 24 * time.Hour},
 	}
-	ids := []struct{ id, bank string }{{idA, bankAcct}, {idB, "012345678902"}, {idC, "012345678903"}, {idD, "012345678904"}}
-	start := f.now
-	for i, sc := range scenarios {
-		sc.foodAccount, sc.foodStore = f.kycApprovedStoreWithAccount(t, ids[i].id, ids[i].bank)
-		f.approveFood(t, sc.foodStore, "AGREE-"+string(rune('A'+i)))
-		_, err := f.module.CloseCurrent(ctx, sc.foodAccount)
-		must(t, err)
-		sc.plainAccount, sc.plain = f.open(t)
-	}
-	f.now = start.Add(StoreRetention + time.Hour)
-	if n, err := f.module.PurgePII(ctx); err != nil || n != len(scenarios) { // 審核紀錄那一邊的店家先清掉（另一邊的店還開著）
-		t.Fatalf("n=%d err=%v", n, err)
-	}
-	f.now = start.In(twtime.Taipei).AddDate(2, 0, 0)
 	for _, sc := range scenarios {
-		_, err := f.module.CloseCurrent(ctx, sc.plainAccount)
+		sc.account, sc.store = f.open(t)
+		_, err := f.module.CloseCurrent(ctx, sc.account)
 		must(t, err)
 	}
 	// 來函在關店十天之後收文：保存期限（收文後 184 天）才晚於保留期（關店後 184 天，同值）。
-	plainClosedAt := f.now
-	f.now = plainClosedAt.Add(10 * 24 * time.Hour)
+	closedAt := f.now
+	f.now = closedAt.Add(10 * 24 * time.Hour)
 	for _, sc := range scenarios {
 		if sc.noOrder {
 			continue
 		}
-		for _, side := range []struct {
-			account int64
-			store   Store
-		}{{sc.foodAccount, sc.foodStore}, {sc.plainAccount, sc.plain}} {
-			var storeID *int64
-			if sc.byStore {
-				storeID = &side.store.StoreID
-			}
-			f.holdOrderAt(t, side.account, storeID, sc.receivedOffset)
+		var storeID *int64
+		if sc.byStore {
+			storeID = &sc.store.StoreID
 		}
+		f.holdOrderAt(t, sc.account, storeID, sc.receivedOffset)
 	}
-	f.now = plainClosedAt.Add(StoreRetention + time.Hour)
+	f.now = closedAt.Add(StoreRetention + time.Hour)
 	if _, err := f.module.PurgePII(ctx); err != nil {
 		t.Fatal(err)
 	}
 	for _, sc := range scenarios {
-		foodRows := f.count(t, "SELECT count(*) FROM seller.food_registrations WHERE store_id=$1", sc.foodStore.StoreID)
-		if (foodRows == 1) != sc.keep {
-			t.Errorf("%s：保存=%v，審核紀錄 %d 列", sc.name, sc.keep, foodRows)
-		}
-		if purged := f.purged(t, sc.plain.StoreID); purged == sc.keep {
+		if purged := f.purged(t, sc.store.StoreID); purged == sc.keep {
 			t.Errorf("%s：保存=%v，店家已清=%v", sc.name, sc.keep, purged)
 		}
 	}

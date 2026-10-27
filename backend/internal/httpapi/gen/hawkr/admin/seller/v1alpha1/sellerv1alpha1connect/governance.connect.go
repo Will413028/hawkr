@@ -4,11 +4,11 @@
 
 // seller 模組給後台的商家治理 API（ADR 2026-10-18-seller-governance-consolidated、設計書 32、step10e-reports-brief R2、R3）：
 // 通報與案件分開。一筆通報是一位檢舉人的一次送出（含之後的補充）；同一家店、同一個平台判定類別，同時最多一個進行中的案件。
-// 通報先分案（判定類別並掛到案件，或不開案件直接設定結果），案件再由一次決定結案；食安案件轉報主管機關、記內部註記、
+// 通報先分案（判定類別並掛到案件，或不開案件直接設定結果），案件再由一次決定結案；記內部註記、
 // 導出措施（警告、停權與終止合作，依據是認定、風險類型或契約條款）。措施與它依據的認定、申覆的訊息在 measure.proto。
 // 檢舉人送出檢舉在 hawkr.seller.v1alpha1 的 SellerReportAppService、SellerReportPublicService；賣家看措施與申覆在 SellerAppService。
 //
-// 狀態的推進是指令（TriageReport、ResolveReport、MoveReport、DecideCase、ChangeCaseSeverity、RecordFDAReferral、WaiveFDAReferral、RecordFDAReferralReply、CreateCaseInquiry、RecordCaseInquiryReply、WithdrawCaseInquiry、CompleteAuthorityOrder、ExtendAuthorityOrderHold、RecordAuthorityTargetNotice），不是改欄位：每個指令只在前置條件成立時
+// 狀態的推進是指令（TriageReport、ResolveReport、MoveReport、DecideCase、ChangeCaseSeverity、CreateCaseInquiry、RecordCaseInquiryReply、WithdrawCaseInquiry、CompleteAuthorityOrder、ExtendAuthorityOrderHold、RecordAuthorityTargetNotice），不是改欄位：每個指令只在前置條件成立時
 // 可以做，其餘回 failed_precondition（訊息是第一個原因的句子）；能不能做看回應裡的 can_*、available_outcomes 與 decision_options（同一個函式，
 // 不輸出原因）。處理狀態（ReportState、CaseState）由伺服器推導、不儲存。管理員只以 ID 記錄，顯示名稱由 client 經 IdentityAdminService 查。
 //
@@ -77,18 +77,6 @@ const (
 	// SellerGovernanceAdminServiceChangeCaseSeverityProcedure is the fully-qualified name of the
 	// SellerGovernanceAdminService's ChangeCaseSeverity RPC.
 	SellerGovernanceAdminServiceChangeCaseSeverityProcedure = "/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/ChangeCaseSeverity"
-	// SellerGovernanceAdminServiceRecordFDAReferralProcedure is the fully-qualified name of the
-	// SellerGovernanceAdminService's RecordFDAReferral RPC.
-	SellerGovernanceAdminServiceRecordFDAReferralProcedure = "/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/RecordFDAReferral"
-	// SellerGovernanceAdminServiceWaiveFDAReferralProcedure is the fully-qualified name of the
-	// SellerGovernanceAdminService's WaiveFDAReferral RPC.
-	SellerGovernanceAdminServiceWaiveFDAReferralProcedure = "/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/WaiveFDAReferral"
-	// SellerGovernanceAdminServiceRecordFDAReferralReplyProcedure is the fully-qualified name of the
-	// SellerGovernanceAdminService's RecordFDAReferralReply RPC.
-	SellerGovernanceAdminServiceRecordFDAReferralReplyProcedure = "/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/RecordFDAReferralReply"
-	// SellerGovernanceAdminServiceGetFDAExportProcedure is the fully-qualified name of the
-	// SellerGovernanceAdminService's GetFDAExport RPC.
-	SellerGovernanceAdminServiceGetFDAExportProcedure = "/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/GetFDAExport"
 	// SellerGovernanceAdminServiceCreateCaseInquiryProcedure is the fully-qualified name of the
 	// SellerGovernanceAdminService's CreateCaseInquiry RPC.
 	SellerGovernanceAdminServiceCreateCaseInquiryProcedure = "/hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService/CreateCaseInquiry"
@@ -189,11 +177,11 @@ type SellerGovernanceAdminServiceClient interface {
 	// 導出的措施或已有成員的結果是已採取措施；還沒分案的通報可以直接設定其他四個結果。etag 必填。
 	ResolveReport(context.Context, *connect.Request[v1alpha1.ResolveReportRequest]) (*connect.Response[v1alpha1.ResolveReportResponse], error)
 	// MoveReport 改通報的平台判定類別，通報移到這家店那個類別的案件（沒有進行中的就開一個）。只有進行中案件裡、還沒有結果、不是認定來源的通報
-	// 可以；案件有導出的措施或已記錄轉報時最後一筆不能移走。移走最後一筆時原案件以 NO_REPORTS 自動關閉，不算一次決定。etag 必填。
+	// 可以；案件有導出的措施時最後一筆不能移走。移走最後一筆時原案件以 NO_REPORTS 自動關閉，不算一次決定。etag 必填。
 	MoveReport(context.Context, *connect.Request[v1alpha1.MoveReportRequest]) (*connect.Response[v1alpha1.MoveReportResponse], error)
 	// ListCases 列出案件，開案時間新到舊。
 	ListCases(context.Context, *connect.Request[v1alpha1.ListCasesRequest]) (*connect.Response[v1alpha1.ListCasesResponse], error)
-	// GetCase 讀一個案件，含移動紀錄、轉報紀錄與 etag；can_* 與 decision_options 是此刻能做的動作。
+	// GetCase 讀一個案件，含移動紀錄與 etag；can_* 與 decision_options 是此刻能做的動作。
 	GetCase(context.Context, *connect.Request[v1alpha1.GetCaseRequest]) (*connect.Response[v1alpha1.GetCaseResponse], error)
 	// DecideCase 決定案件（採取措施或不採取措施），決定即結案，結案是終態。結案時還沒有結果的通報帶入決定的預設結果與給檢舉人的說明。
 	// 還沒結束的詢問在同一個 transaction 由系統撤回（withdraw_cause 是 CASE_CLOSED）。
@@ -201,22 +189,6 @@ type SellerGovernanceAdminServiceClient interface {
 	DecideCase(context.Context, *connect.Request[v1alpha1.DecideCaseRequest]) (*connect.Response[v1alpha1.DecideCaseResponse], error)
 	// ChangeCaseSeverity 修改案件的嚴重度，必須附原因：原因寫成案件的一則內部註記，改前改後記在那則註記上。只限進行中的案件。etag 必填。
 	ChangeCaseSeverity(context.Context, *connect.Request[v1alpha1.ChangeCaseSeverityRequest]) (*connect.Response[v1alpha1.ChangeCaseSeverityResponse], error)
-	// RecordFDAReferral 記下食安案件已轉報主管機關（轉報本身在系統外以人工完成）。只限平台判定類別是食安、有通報的案件，只記一次：已經記過時回傳
-	// 原本的紀錄（already_recorded），不覆寫；已標記不轉報回 failed_precondition。不要求先決定。follow_up_date 選填：到這天還沒收到主管機關的回覆就聯絡主管機關，
-	// 不設時是轉報日（台北）加 30 天。不帶 etag。
-	RecordFDAReferral(context.Context, *connect.Request[v1alpha1.RecordFDAReferralRequest]) (*connect.Response[v1alpha1.RecordFDAReferralResponse], error)
-	// WaiveFDAReferral 標記這個食安案件不轉報（例如主管機關已經介入），必須附原因。它也是一筆轉報紀錄（outcome 為不轉報）：標記之後不能再記錄轉報，
-	// 記錄轉報之後也不能標記不轉報。只限平台判定類別是食安、有通報的案件；已經標記過時回傳原本的紀錄（already_waived），不覆寫。不要求先決定。
-	// 讓案件的 etag 前進。
-	WaiveFDAReferral(context.Context, *connect.Request[v1alpha1.WaiveFDAReferralRequest]) (*connect.Response[v1alpha1.WaiveFDAReferralResponse], error)
-	// RecordFDAReferralReply 記下主管機關對轉報的回覆（只新增；移送通知與結果通知可以是兩則）。只限已記錄轉報的案件（沒有轉報紀錄或已標記不轉報回
-	// failed_precondition）。收到的日期不早於轉報日（台北）、不晚於今天。追蹤日期依 next_follow_up_date 與 clear_follow_up 更新，兩者都不設時不變。
-	// 讓案件的 etag 前進。不帶 etag（只新增）；request_id 選填（AIP-155）：同一位管理員以同一個 request_id 重送（例如回應遺失後再送一次）不會多記一則，
-	// 回傳案件目前的狀態；內容不同回 invalid_argument。範圍是（記下的管理員, request_id），同 CreateCaseInquiry。
-	RecordFDAReferralReply(context.Context, *connect.Request[v1alpha1.RecordFDAReferralReplyRequest]) (*connect.Response[v1alpha1.RecordFDAReferralReplyResponse], error)
-	// GetFDAExport 回傳轉報主管機關需要的資料：案件、案件裡結果不是未違規、內容不足或濫報的通報（含補充與佐證的位置，不帶檢舉人的聯絡方式）與被通報的店家
-	// （已關閉的也回傳）。轉報文件的格式由 client 呈現。只限食安案件，其他回 failed_precondition。
-	GetFDAExport(context.Context, *connect.Request[v1alpha1.GetFDAExportRequest]) (*connect.Response[v1alpha1.GetFDAExportResponse], error)
 	// CreateCaseInquiry 對案件的賣家發一筆詢問（提供紀錄或請說明，有期限；詢問只帶管理員轉述的說明，不附通報原文、佐證與檢舉人）。每個案件同時最多
 	// 一筆還沒結束的詢問；案件結案後、店家的個資已依保留期限清除後不能發（關店不擋）。建立讓案件的 etag 前進，案件進入「等賣家」（awaiting_seller），
 	// 不在「待決定」。不帶 etag；request_id 選填（AIP-155）：同一位管理員以同一個 request_id 重送，回傳原本那一筆，內容不同回 invalid_argument。
@@ -393,31 +365,6 @@ func NewSellerGovernanceAdminServiceClient(httpClient connect.HTTPClient, baseUR
 			httpClient,
 			baseURL+SellerGovernanceAdminServiceChangeCaseSeverityProcedure,
 			connect.WithSchema(sellerGovernanceAdminServiceMethods.ByName("ChangeCaseSeverity")),
-			connect.WithClientOptions(opts...),
-		),
-		recordFDAReferral: connect.NewClient[v1alpha1.RecordFDAReferralRequest, v1alpha1.RecordFDAReferralResponse](
-			httpClient,
-			baseURL+SellerGovernanceAdminServiceRecordFDAReferralProcedure,
-			connect.WithSchema(sellerGovernanceAdminServiceMethods.ByName("RecordFDAReferral")),
-			connect.WithClientOptions(opts...),
-		),
-		waiveFDAReferral: connect.NewClient[v1alpha1.WaiveFDAReferralRequest, v1alpha1.WaiveFDAReferralResponse](
-			httpClient,
-			baseURL+SellerGovernanceAdminServiceWaiveFDAReferralProcedure,
-			connect.WithSchema(sellerGovernanceAdminServiceMethods.ByName("WaiveFDAReferral")),
-			connect.WithClientOptions(opts...),
-		),
-		recordFDAReferralReply: connect.NewClient[v1alpha1.RecordFDAReferralReplyRequest, v1alpha1.RecordFDAReferralReplyResponse](
-			httpClient,
-			baseURL+SellerGovernanceAdminServiceRecordFDAReferralReplyProcedure,
-			connect.WithSchema(sellerGovernanceAdminServiceMethods.ByName("RecordFDAReferralReply")),
-			connect.WithClientOptions(opts...),
-		),
-		getFDAExport: connect.NewClient[v1alpha1.GetFDAExportRequest, v1alpha1.GetFDAExportResponse](
-			httpClient,
-			baseURL+SellerGovernanceAdminServiceGetFDAExportProcedure,
-			connect.WithSchema(sellerGovernanceAdminServiceMethods.ByName("GetFDAExport")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
 		createCaseInquiry: connect.NewClient[v1alpha1.CreateCaseInquiryRequest, v1alpha1.CreateCaseInquiryResponse](
@@ -600,10 +547,6 @@ type sellerGovernanceAdminServiceClient struct {
 	getCase                     *connect.Client[v1alpha1.GetCaseRequest, v1alpha1.GetCaseResponse]
 	decideCase                  *connect.Client[v1alpha1.DecideCaseRequest, v1alpha1.DecideCaseResponse]
 	changeCaseSeverity          *connect.Client[v1alpha1.ChangeCaseSeverityRequest, v1alpha1.ChangeCaseSeverityResponse]
-	recordFDAReferral           *connect.Client[v1alpha1.RecordFDAReferralRequest, v1alpha1.RecordFDAReferralResponse]
-	waiveFDAReferral            *connect.Client[v1alpha1.WaiveFDAReferralRequest, v1alpha1.WaiveFDAReferralResponse]
-	recordFDAReferralReply      *connect.Client[v1alpha1.RecordFDAReferralReplyRequest, v1alpha1.RecordFDAReferralReplyResponse]
-	getFDAExport                *connect.Client[v1alpha1.GetFDAExportRequest, v1alpha1.GetFDAExportResponse]
 	createCaseInquiry           *connect.Client[v1alpha1.CreateCaseInquiryRequest, v1alpha1.CreateCaseInquiryResponse]
 	listCaseInquiries           *connect.Client[v1alpha1.ListCaseInquiriesRequest, v1alpha1.ListCaseInquiriesResponse]
 	recordCaseInquiryReply      *connect.Client[v1alpha1.RecordCaseInquiryReplyRequest, v1alpha1.RecordCaseInquiryReplyResponse]
@@ -682,28 +625,6 @@ func (c *sellerGovernanceAdminServiceClient) DecideCase(ctx context.Context, req
 // hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ChangeCaseSeverity.
 func (c *sellerGovernanceAdminServiceClient) ChangeCaseSeverity(ctx context.Context, req *connect.Request[v1alpha1.ChangeCaseSeverityRequest]) (*connect.Response[v1alpha1.ChangeCaseSeverityResponse], error) {
 	return c.changeCaseSeverity.CallUnary(ctx, req)
-}
-
-// RecordFDAReferral calls
-// hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.RecordFDAReferral.
-func (c *sellerGovernanceAdminServiceClient) RecordFDAReferral(ctx context.Context, req *connect.Request[v1alpha1.RecordFDAReferralRequest]) (*connect.Response[v1alpha1.RecordFDAReferralResponse], error) {
-	return c.recordFDAReferral.CallUnary(ctx, req)
-}
-
-// WaiveFDAReferral calls hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.WaiveFDAReferral.
-func (c *sellerGovernanceAdminServiceClient) WaiveFDAReferral(ctx context.Context, req *connect.Request[v1alpha1.WaiveFDAReferralRequest]) (*connect.Response[v1alpha1.WaiveFDAReferralResponse], error) {
-	return c.waiveFDAReferral.CallUnary(ctx, req)
-}
-
-// RecordFDAReferralReply calls
-// hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.RecordFDAReferralReply.
-func (c *sellerGovernanceAdminServiceClient) RecordFDAReferralReply(ctx context.Context, req *connect.Request[v1alpha1.RecordFDAReferralReplyRequest]) (*connect.Response[v1alpha1.RecordFDAReferralReplyResponse], error) {
-	return c.recordFDAReferralReply.CallUnary(ctx, req)
-}
-
-// GetFDAExport calls hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.GetFDAExport.
-func (c *sellerGovernanceAdminServiceClient) GetFDAExport(ctx context.Context, req *connect.Request[v1alpha1.GetFDAExportRequest]) (*connect.Response[v1alpha1.GetFDAExportResponse], error) {
-	return c.getFDAExport.CallUnary(ctx, req)
 }
 
 // CreateCaseInquiry calls
@@ -870,11 +791,11 @@ type SellerGovernanceAdminServiceHandler interface {
 	// 導出的措施或已有成員的結果是已採取措施；還沒分案的通報可以直接設定其他四個結果。etag 必填。
 	ResolveReport(context.Context, *connect.Request[v1alpha1.ResolveReportRequest]) (*connect.Response[v1alpha1.ResolveReportResponse], error)
 	// MoveReport 改通報的平台判定類別，通報移到這家店那個類別的案件（沒有進行中的就開一個）。只有進行中案件裡、還沒有結果、不是認定來源的通報
-	// 可以；案件有導出的措施或已記錄轉報時最後一筆不能移走。移走最後一筆時原案件以 NO_REPORTS 自動關閉，不算一次決定。etag 必填。
+	// 可以；案件有導出的措施時最後一筆不能移走。移走最後一筆時原案件以 NO_REPORTS 自動關閉，不算一次決定。etag 必填。
 	MoveReport(context.Context, *connect.Request[v1alpha1.MoveReportRequest]) (*connect.Response[v1alpha1.MoveReportResponse], error)
 	// ListCases 列出案件，開案時間新到舊。
 	ListCases(context.Context, *connect.Request[v1alpha1.ListCasesRequest]) (*connect.Response[v1alpha1.ListCasesResponse], error)
-	// GetCase 讀一個案件，含移動紀錄、轉報紀錄與 etag；can_* 與 decision_options 是此刻能做的動作。
+	// GetCase 讀一個案件，含移動紀錄與 etag；can_* 與 decision_options 是此刻能做的動作。
 	GetCase(context.Context, *connect.Request[v1alpha1.GetCaseRequest]) (*connect.Response[v1alpha1.GetCaseResponse], error)
 	// DecideCase 決定案件（採取措施或不採取措施），決定即結案，結案是終態。結案時還沒有結果的通報帶入決定的預設結果與給檢舉人的說明。
 	// 還沒結束的詢問在同一個 transaction 由系統撤回（withdraw_cause 是 CASE_CLOSED）。
@@ -882,22 +803,6 @@ type SellerGovernanceAdminServiceHandler interface {
 	DecideCase(context.Context, *connect.Request[v1alpha1.DecideCaseRequest]) (*connect.Response[v1alpha1.DecideCaseResponse], error)
 	// ChangeCaseSeverity 修改案件的嚴重度，必須附原因：原因寫成案件的一則內部註記，改前改後記在那則註記上。只限進行中的案件。etag 必填。
 	ChangeCaseSeverity(context.Context, *connect.Request[v1alpha1.ChangeCaseSeverityRequest]) (*connect.Response[v1alpha1.ChangeCaseSeverityResponse], error)
-	// RecordFDAReferral 記下食安案件已轉報主管機關（轉報本身在系統外以人工完成）。只限平台判定類別是食安、有通報的案件，只記一次：已經記過時回傳
-	// 原本的紀錄（already_recorded），不覆寫；已標記不轉報回 failed_precondition。不要求先決定。follow_up_date 選填：到這天還沒收到主管機關的回覆就聯絡主管機關，
-	// 不設時是轉報日（台北）加 30 天。不帶 etag。
-	RecordFDAReferral(context.Context, *connect.Request[v1alpha1.RecordFDAReferralRequest]) (*connect.Response[v1alpha1.RecordFDAReferralResponse], error)
-	// WaiveFDAReferral 標記這個食安案件不轉報（例如主管機關已經介入），必須附原因。它也是一筆轉報紀錄（outcome 為不轉報）：標記之後不能再記錄轉報，
-	// 記錄轉報之後也不能標記不轉報。只限平台判定類別是食安、有通報的案件；已經標記過時回傳原本的紀錄（already_waived），不覆寫。不要求先決定。
-	// 讓案件的 etag 前進。
-	WaiveFDAReferral(context.Context, *connect.Request[v1alpha1.WaiveFDAReferralRequest]) (*connect.Response[v1alpha1.WaiveFDAReferralResponse], error)
-	// RecordFDAReferralReply 記下主管機關對轉報的回覆（只新增；移送通知與結果通知可以是兩則）。只限已記錄轉報的案件（沒有轉報紀錄或已標記不轉報回
-	// failed_precondition）。收到的日期不早於轉報日（台北）、不晚於今天。追蹤日期依 next_follow_up_date 與 clear_follow_up 更新，兩者都不設時不變。
-	// 讓案件的 etag 前進。不帶 etag（只新增）；request_id 選填（AIP-155）：同一位管理員以同一個 request_id 重送（例如回應遺失後再送一次）不會多記一則，
-	// 回傳案件目前的狀態；內容不同回 invalid_argument。範圍是（記下的管理員, request_id），同 CreateCaseInquiry。
-	RecordFDAReferralReply(context.Context, *connect.Request[v1alpha1.RecordFDAReferralReplyRequest]) (*connect.Response[v1alpha1.RecordFDAReferralReplyResponse], error)
-	// GetFDAExport 回傳轉報主管機關需要的資料：案件、案件裡結果不是未違規、內容不足或濫報的通報（含補充與佐證的位置，不帶檢舉人的聯絡方式）與被通報的店家
-	// （已關閉的也回傳）。轉報文件的格式由 client 呈現。只限食安案件，其他回 failed_precondition。
-	GetFDAExport(context.Context, *connect.Request[v1alpha1.GetFDAExportRequest]) (*connect.Response[v1alpha1.GetFDAExportResponse], error)
 	// CreateCaseInquiry 對案件的賣家發一筆詢問（提供紀錄或請說明，有期限；詢問只帶管理員轉述的說明，不附通報原文、佐證與檢舉人）。每個案件同時最多
 	// 一筆還沒結束的詢問；案件結案後、店家的個資已依保留期限清除後不能發（關店不擋）。建立讓案件的 etag 前進，案件進入「等賣家」（awaiting_seller），
 	// 不在「待決定」。不帶 etag；request_id 選填（AIP-155）：同一位管理員以同一個 request_id 重送，回傳原本那一筆，內容不同回 invalid_argument。
@@ -1069,31 +974,6 @@ func NewSellerGovernanceAdminServiceHandler(svc SellerGovernanceAdminServiceHand
 		SellerGovernanceAdminServiceChangeCaseSeverityProcedure,
 		svc.ChangeCaseSeverity,
 		connect.WithSchema(sellerGovernanceAdminServiceMethods.ByName("ChangeCaseSeverity")),
-		connect.WithHandlerOptions(opts...),
-	)
-	sellerGovernanceAdminServiceRecordFDAReferralHandler := connect.NewUnaryHandler(
-		SellerGovernanceAdminServiceRecordFDAReferralProcedure,
-		svc.RecordFDAReferral,
-		connect.WithSchema(sellerGovernanceAdminServiceMethods.ByName("RecordFDAReferral")),
-		connect.WithHandlerOptions(opts...),
-	)
-	sellerGovernanceAdminServiceWaiveFDAReferralHandler := connect.NewUnaryHandler(
-		SellerGovernanceAdminServiceWaiveFDAReferralProcedure,
-		svc.WaiveFDAReferral,
-		connect.WithSchema(sellerGovernanceAdminServiceMethods.ByName("WaiveFDAReferral")),
-		connect.WithHandlerOptions(opts...),
-	)
-	sellerGovernanceAdminServiceRecordFDAReferralReplyHandler := connect.NewUnaryHandler(
-		SellerGovernanceAdminServiceRecordFDAReferralReplyProcedure,
-		svc.RecordFDAReferralReply,
-		connect.WithSchema(sellerGovernanceAdminServiceMethods.ByName("RecordFDAReferralReply")),
-		connect.WithHandlerOptions(opts...),
-	)
-	sellerGovernanceAdminServiceGetFDAExportHandler := connect.NewUnaryHandler(
-		SellerGovernanceAdminServiceGetFDAExportProcedure,
-		svc.GetFDAExport,
-		connect.WithSchema(sellerGovernanceAdminServiceMethods.ByName("GetFDAExport")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
 	sellerGovernanceAdminServiceCreateCaseInquiryHandler := connect.NewUnaryHandler(
@@ -1283,14 +1163,6 @@ func NewSellerGovernanceAdminServiceHandler(svc SellerGovernanceAdminServiceHand
 			sellerGovernanceAdminServiceDecideCaseHandler.ServeHTTP(w, r)
 		case SellerGovernanceAdminServiceChangeCaseSeverityProcedure:
 			sellerGovernanceAdminServiceChangeCaseSeverityHandler.ServeHTTP(w, r)
-		case SellerGovernanceAdminServiceRecordFDAReferralProcedure:
-			sellerGovernanceAdminServiceRecordFDAReferralHandler.ServeHTTP(w, r)
-		case SellerGovernanceAdminServiceWaiveFDAReferralProcedure:
-			sellerGovernanceAdminServiceWaiveFDAReferralHandler.ServeHTTP(w, r)
-		case SellerGovernanceAdminServiceRecordFDAReferralReplyProcedure:
-			sellerGovernanceAdminServiceRecordFDAReferralReplyHandler.ServeHTTP(w, r)
-		case SellerGovernanceAdminServiceGetFDAExportProcedure:
-			sellerGovernanceAdminServiceGetFDAExportHandler.ServeHTTP(w, r)
 		case SellerGovernanceAdminServiceCreateCaseInquiryProcedure:
 			sellerGovernanceAdminServiceCreateCaseInquiryHandler.ServeHTTP(w, r)
 		case SellerGovernanceAdminServiceListCaseInquiriesProcedure:
@@ -1390,22 +1262,6 @@ func (UnimplementedSellerGovernanceAdminServiceHandler) DecideCase(context.Conte
 
 func (UnimplementedSellerGovernanceAdminServiceHandler) ChangeCaseSeverity(context.Context, *connect.Request[v1alpha1.ChangeCaseSeverityRequest]) (*connect.Response[v1alpha1.ChangeCaseSeverityResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.ChangeCaseSeverity is not implemented"))
-}
-
-func (UnimplementedSellerGovernanceAdminServiceHandler) RecordFDAReferral(context.Context, *connect.Request[v1alpha1.RecordFDAReferralRequest]) (*connect.Response[v1alpha1.RecordFDAReferralResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.RecordFDAReferral is not implemented"))
-}
-
-func (UnimplementedSellerGovernanceAdminServiceHandler) WaiveFDAReferral(context.Context, *connect.Request[v1alpha1.WaiveFDAReferralRequest]) (*connect.Response[v1alpha1.WaiveFDAReferralResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.WaiveFDAReferral is not implemented"))
-}
-
-func (UnimplementedSellerGovernanceAdminServiceHandler) RecordFDAReferralReply(context.Context, *connect.Request[v1alpha1.RecordFDAReferralReplyRequest]) (*connect.Response[v1alpha1.RecordFDAReferralReplyResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.RecordFDAReferralReply is not implemented"))
-}
-
-func (UnimplementedSellerGovernanceAdminServiceHandler) GetFDAExport(context.Context, *connect.Request[v1alpha1.GetFDAExportRequest]) (*connect.Response[v1alpha1.GetFDAExportResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerGovernanceAdminService.GetFDAExport is not implemented"))
 }
 
 func (UnimplementedSellerGovernanceAdminServiceHandler) CreateCaseInquiry(context.Context, *connect.Request[v1alpha1.CreateCaseInquiryRequest]) (*connect.Response[v1alpha1.CreateCaseInquiryResponse], error) {

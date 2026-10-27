@@ -65,9 +65,9 @@ BEGIN ATOMIC
 END;
 
 -- 審閱政策唯一的家（step10e-3d-design.md E10、§3.1）：營運要處理的事項，每種一支 seller.review_<種類>(at)。每一列是一件待辦：種類、對象的鍵、店家、
--- 開始時間與期限；成員的條件、開始時間與期限的時長只寫在這裡。後台待辦（pub_review_items 是它們的 UNION ALL）、資源輸出的 *_deadline 與兩個收件匣
--- （複審到期、食品業者登錄待審核）都讀這些函式，Go 不寫時長。Go 沒有第二份成員規則；成員與指令真正用的 Go 定義
--- （Report.State()、Case.Open()、CaseInquiry.Open() 加 due_at 等）一致由資料集測試鎖住。時長是上線前的起始值（rb R3、3b D8），一律日曆時間（開始時間由各種類定義：KYC 與食品業者登錄從可以裁定時起算，店家不是營運中或帳號停權時暫停，恢復後重新起算），上線後依 rb R3 的觸發校準；
+-- 開始時間與期限；成員的條件、開始時間與期限的時長只寫在這裡。後台待辦（pub_review_items 是它們的 UNION ALL）、資源輸出的 *_deadline 與複審到期的收件匣
+-- 都讀這些函式，Go 不寫時長。Go 沒有第二份成員規則；成員與指令真正用的 Go 定義
+-- （Report.State()、Case.Open()、CaseInquiry.Open() 加 due_at 等）一致由資料集測試鎖住。時長是上線前的起始值（rb R3、3b D8），一律日曆時間（開始時間由各種類定義：KYC 從可以裁定時起算，店家不是營運中或帳號停權時暫停，恢復後重新起算），上線後依 rb R3 的觸發校準；
 -- 以小時寫（不寫 days）：interval 的 days 在有夏令時間的 session 時區會依日曆加，起始值要的是固定長度。
 -- 欄位（所有種類同一個形狀，沒有的欄位 NULL）：kind 是 UPPER_SNAKE 的種類；item_id 是同一種類內唯一、位元組順序穩定的鍵（UUID 的 ::text；
 -- 來函的對象是 order_id::text || '/' || lpad(position::text, 5, '0')）；store_id 與 store_name 在沒有單一店家時 NULL，店名已清理時 store_name 是空字串。
@@ -84,7 +84,6 @@ CREATE TYPE seller.review_item AS (
     account_id BIGINT,
     measure_id UUID,
     request_id UUID,
-    food_registration_id UUID,
     kyc_application_id UUID,
     store_id BIGINT,
     store_name TEXT,
@@ -97,7 +96,7 @@ CREATE FUNCTION seller.review_report_triage(at TIMESTAMPTZ) RETURNS SETOF seller
 LANGUAGE sql STABLE
 BEGIN ATOMIC
     SELECT 'REPORT_TRIAGE'::text, r.id::text, r.id, NULL::uuid, NULL::uuid, NULL::uuid, NULL::smallint, NULL::bigint,
-           NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, r.store_id, COALESCE(s.store_name, ''),
+           NULL::uuid, NULL::uuid, NULL::uuid, r.store_id, COALESCE(s.store_name, ''),
            r.created_at,
            r.created_at + CASE WHEN r.category = 'FOOD_SAFETY' THEN INTERVAL '4 hours' ELSE INTERVAL '72 hours' END
     FROM seller.reports r
@@ -112,7 +111,7 @@ CREATE FUNCTION seller.review_case_decision(at TIMESTAMPTZ) RETURNS SETOF seller
 LANGUAGE sql STABLE
 BEGIN ATOMIC
     SELECT 'CASE_DECISION'::text, c.id::text, NULL::uuid, c.id, NULL::uuid, NULL::uuid, NULL::smallint, NULL::bigint,
-           NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, c.store_id, COALESCE(s.store_name, ''),
+           NULL::uuid, NULL::uuid, NULL::uuid, c.store_id, COALESCE(s.store_name, ''),
            k.start_at,
            k.start_at + CASE c.severity
                WHEN 'CRITICAL' THEN INTERVAL '24 hours'
@@ -137,25 +136,11 @@ CREATE FUNCTION seller.review_case_inquiry_overdue(at TIMESTAMPTZ) RETURNS SETOF
 LANGUAGE sql STABLE
 BEGIN ATOMIC
     SELECT 'CASE_INQUIRY_OVERDUE'::text, i.id::text, NULL::uuid, i.case_id, i.id, NULL::uuid, NULL::smallint, NULL::bigint,
-           NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, i.store_id, COALESCE(s.store_name, ''),
+           NULL::uuid, NULL::uuid, NULL::uuid, i.store_id, COALESCE(s.store_name, ''),
            i.due_at, i.due_at + INTERVAL '24 hours'
     FROM seller.case_inquiries i
     JOIN seller.stores s ON s.store_id = i.store_id
     WHERE i.reply_received_at IS NULL AND i.withdrawn_at IS NULL AND i.due_at <= at;
-END;
-
--- CASE_FDA_REFERRAL 待轉報：食安案件、決定是採取措施、還沒有轉報紀錄（CaseFacts.Availability().RecordReferral 為空；標記不轉報也是一筆紀錄）。
--- 開始是結案（決定）時間，期限 24 小時。
-CREATE FUNCTION seller.review_case_fda_referral(at TIMESTAMPTZ) RETURNS SETOF seller.review_item
-LANGUAGE sql STABLE
-BEGIN ATOMIC
-    SELECT 'CASE_FDA_REFERRAL'::text, c.id::text, NULL::uuid, c.id, NULL::uuid, NULL::uuid, NULL::smallint, NULL::bigint,
-           NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, c.store_id, COALESCE(s.store_name, ''),
-           c.closed_at, c.closed_at + INTERVAL '24 hours'
-    FROM seller.cases c
-    JOIN seller.stores s ON s.store_id = c.store_id
-    WHERE c.category = 'FOOD_SAFETY' AND c.decision = 'ACTION_TAKEN'
-      AND NOT EXISTS (SELECT 1 FROM seller.case_referrals f WHERE f.case_id = c.id);
 END;
 
 -- AUTHORITY_ORDER 主管機關來函：還沒完成也沒撤銷（AuthorityOrder.Open）。開始是收文時間，期限是登記時存下的 due_at。來函沒有單一店家。
@@ -163,7 +148,7 @@ CREATE FUNCTION seller.review_authority_order(at TIMESTAMPTZ) RETURNS SETOF sell
 LANGUAGE sql STABLE
 BEGIN ATOMIC
     SELECT 'AUTHORITY_ORDER'::text, o.id::text, NULL::uuid, NULL::uuid, NULL::uuid, o.id, NULL::smallint, NULL::bigint,
-           NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::bigint, NULL::text,
+           NULL::uuid, NULL::uuid, NULL::uuid, NULL::bigint, NULL::text,
            o.received_at, o.due_at
     FROM seller.authority_orders o
     WHERE o.completed_at IS NULL AND o.revoked_at IS NULL;
@@ -176,7 +161,7 @@ LANGUAGE sql STABLE
 BEGIN ATOMIC
     SELECT 'AUTHORITY_TARGET_NOTICE'::text, t.order_id::text || '/' || lpad(t.position::text, 5, '0'),
            NULL::uuid, NULL::uuid, NULL::uuid, t.order_id, t.position, t.account_id,
-           NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, t.store_id, CASE WHEN s.store_id IS NULL THEN NULL ELSE COALESCE(s.store_name, '') END,
+           NULL::uuid, NULL::uuid, NULL::uuid, t.store_id, CASE WHEN s.store_id IS NULL THEN NULL ELSE COALESCE(s.store_name, '') END,
            t.recheck_on::timestamp AT TIME ZONE 'Asia/Taipei',
            (t.recheck_on::timestamp AT TIME ZONE 'Asia/Taipei') + INTERVAL '72 hours'
     FROM seller.authority_order_targets t
@@ -189,7 +174,7 @@ CREATE FUNCTION seller.review_measure_appeal(at TIMESTAMPTZ) RETURNS SETOF selle
 LANGUAGE sql STABLE
 BEGIN ATOMIC
     SELECT 'MEASURE_APPEAL'::text, q.id::text, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::smallint, NULL::bigint,
-           q.measure_id, q.id, NULL::uuid, NULL::uuid, m.store_id, COALESCE(s.store_name, ''),
+           q.measure_id, q.id, NULL::uuid, m.store_id, COALESCE(s.store_name, ''),
            q.submitted_at, q.submitted_at + INTERVAL '168 hours'
     FROM seller.measure_requests q
     JOIN seller.measures m ON m.id = q.measure_id
@@ -203,7 +188,7 @@ CREATE FUNCTION seller.review_measure_lift_request(at TIMESTAMPTZ) RETURNS SETOF
 LANGUAGE sql STABLE
 BEGIN ATOMIC
     SELECT 'MEASURE_LIFT_REQUEST'::text, q.id::text, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::smallint, NULL::bigint,
-           q.measure_id, q.id, NULL::uuid, NULL::uuid, m.store_id, COALESCE(s.store_name, ''),
+           q.measure_id, q.id, NULL::uuid, m.store_id, COALESCE(s.store_name, ''),
            q.submitted_at, q.submitted_at + INTERVAL '168 hours'
     FROM seller.measure_requests q
     JOIN seller.measures m ON m.id = q.measure_id
@@ -218,7 +203,7 @@ CREATE FUNCTION seller.review_measure_review(at TIMESTAMPTZ) RETURNS SETOF selle
 LANGUAGE sql STABLE
 BEGIN ATOMIC
     SELECT 'MEASURE_REVIEW'::text, m.id::text, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::smallint, NULL::bigint,
-           m.id, NULL::uuid, NULL::uuid, NULL::uuid, m.store_id, COALESCE(s.store_name, ''),
+           m.id, NULL::uuid, NULL::uuid, m.store_id, COALESCE(s.store_name, ''),
            m.review_by - INTERVAL '24 hours', m.review_by
     FROM seller.measures m
     JOIN seller.stores s ON s.store_id = m.store_id
@@ -240,21 +225,6 @@ BEGIN ATOMIC
       AND least(m.ends_at, CASE WHEN m.status = 'REVOKED' THEN m.revoked_at END) > m.starts_at;
 END;
 
--- FOOD_REGISTRATION 審核食品業者登錄：現在可以裁定的（FoodRegistrationReview.CanApprove）：待審、店家營運中、店家目前的商家認證已核准；
--- 等商家認證的不在這裡。開始是 max(送出時間, 目前核准的商家認證的核准時間, 這個 stint 最近一次恢復營業的時間)（3b D8「從可以裁定時起算」；關店期間不裁定，恢復營業時重新起算），期限 168 小時。裁定本來就不看停權，所以停權不影響成員與開始時間。
-CREATE FUNCTION seller.review_food_registration(at TIMESTAMPTZ) RETURNS SETOF seller.review_item
-LANGUAGE sql STABLE
-BEGIN ATOMIC
-    SELECT 'FOOD_REGISTRATION'::text, f.id::text, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::smallint, NULL::bigint,
-           NULL::uuid, NULL::uuid, f.id, NULL::uuid, f.store_id, COALESCE(s.store_name, ''),
-           greatest(f.submitted_at, k.decided_at, (SELECT max(c.reopened_at) FROM seller.store_closures c WHERE c.store_id = f.store_id)),
-           greatest(f.submitted_at, k.decided_at, (SELECT max(c.reopened_at) FROM seller.store_closures c WHERE c.store_id = f.store_id)) + INTERVAL '168 hours'
-    FROM seller.food_registrations f
-    JOIN seller.stores s ON s.store_id = f.store_id
-    JOIN seller.kyc_applications k ON k.store_id = f.store_id AND k.status = 'APPROVED'
-    WHERE f.state = 'PENDING' AND s.status = 'ACTIVE';
-END;
-
 -- KYC_APPLICATION 審核商家認證：審核中（SUBMITTED）、店家營運中（已關閉與等待刪除時審核暫停）、帳號沒有生效中的停權（停權時不能核准，審核暫停；退回雖然可用，件不在待辦）。
 -- 成員對應的 Go 定義是 APPROVE_KYC 的原因清單為空（model.KYCActionUnavailableReasons）：身分命中別的帳號生效中的處分不在原因裡，照舊留在待辦讓員工退回；
 -- 商家清單的「待審核」分頁與統計讀這個函式，所以待審核只有這一個定義。開始是 max(送出時間, 這個 stint 最近一次恢復營業的時間, 帳號最近一次停權結束的時間)，
@@ -263,7 +233,7 @@ CREATE FUNCTION seller.review_kyc_application(at TIMESTAMPTZ) RETURNS SETOF sell
 LANGUAGE sql STABLE
 BEGIN ATOMIC
     SELECT 'KYC_APPLICATION'::text, k.application_id::text, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::smallint, NULL::bigint,
-           NULL::uuid, NULL::uuid, NULL::uuid, k.application_id, k.store_id, COALESCE(s.store_name, ''),
+           NULL::uuid, NULL::uuid, k.application_id, k.store_id, COALESCE(s.store_name, ''),
            greatest(k.submitted_at, (SELECT max(c.reopened_at) FROM seller.store_closures c WHERE c.store_id = k.store_id), seller.account_sanction_lifted_at(s.account_id, at)),
            greatest(k.submitted_at, (SELECT max(c.reopened_at) FROM seller.store_closures c WHERE c.store_id = k.store_id), seller.account_sanction_lifted_at(s.account_id, at)) + INTERVAL '168 hours'
     FROM seller.kyc_applications k
@@ -279,7 +249,7 @@ CREATE FUNCTION seller.review_payuni_bind_retry(at TIMESTAMPTZ) RETURNS SETOF se
 LANGUAGE sql STABLE
 BEGIN ATOMIC
     SELECT 'PAYUNI_BIND_RETRY'::text, k.application_id::text, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::smallint, NULL::bigint,
-           NULL::uuid, NULL::uuid, NULL::uuid, k.application_id, r.store_id, COALESCE(s.store_name, ''),
+           NULL::uuid, NULL::uuid, k.application_id, r.store_id, COALESCE(s.store_name, ''),
            r.bind_failed_at, r.bind_failed_at + INTERVAL '24 hours'
     FROM seller.payuni_registrations r
     JOIN seller.stores s ON s.store_id = r.store_id
@@ -288,7 +258,7 @@ BEGIN ATOMIC
 END;
 
 -- 發布的讀取介面（step10e-3d-design.md §2.1）：at 這一刻營運要處理的事項，後台待辦（reviewqueue 模組）的 seller 部分。每一列是一件待辦：種類、對象的鍵、
--- 店家、開始時間與期限，欄位的意義同 review_item。12 種都有期限，due_at 一律有值（E3）。是 12 支 review_<種類>(at) 的 UNION ALL：成員的條件與時長只寫在那些
+-- 店家、開始時間與期限，欄位的意義同 review_item。10 種都有期限，due_at 一律有值（E3）。是 10 支 review_<種類>(at) 的 UNION ALL：成員的條件與時長只寫在那些
 -- 函式（規則只有一個家，E10），這裡不重寫；成員與指令用的 Go 定義一致由資料集測試鎖住。時間由呼叫方以請求的 clock 傳入，不用 now()。
 -- 消費端排序與分頁（reviewqueue 的 keyset：due_at、start_at、kind COLLATE "C"、item_id COLLATE "C"）；kind 是 UPPER_SNAKE，item_id 的位元組順序穩定。
 CREATE TYPE seller.pub_review_item AS (
@@ -302,7 +272,6 @@ CREATE TYPE seller.pub_review_item AS (
     account_id BIGINT,
     measure_id UUID,
     request_id UUID,
-    food_registration_id UUID,
     kyc_application_id UUID,
     store_id BIGINT,
     store_name TEXT,
@@ -319,8 +288,6 @@ BEGIN ATOMIC
     UNION ALL
     SELECT * FROM seller.review_case_inquiry_overdue(at)
     UNION ALL
-    SELECT * FROM seller.review_case_fda_referral(at)
-    UNION ALL
     SELECT * FROM seller.review_authority_order(at)
     UNION ALL
     SELECT * FROM seller.review_authority_target_notice(at)
@@ -330,8 +297,6 @@ BEGIN ATOMIC
     SELECT * FROM seller.review_measure_lift_request(at)
     UNION ALL
     SELECT * FROM seller.review_measure_review(at)
-    UNION ALL
-    SELECT * FROM seller.review_food_registration(at)
     UNION ALL
     SELECT * FROM seller.review_kyc_application(at)
     UNION ALL

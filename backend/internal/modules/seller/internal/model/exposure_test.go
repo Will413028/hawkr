@@ -12,19 +12,18 @@ func TestPublicStoreUpdateTimeIsTheLatestOfEverySource(t *testing.T) {
 		return &v
 	}
 	cases := []struct {
-		name                         string
-		updated                      time.Time
-		first, announced, foodChange *time.Time
-		want                         time.Time
+		name             string
+		updated          time.Time
+		first, announced *time.Time
+		want             time.Time
 	}{
-		{"only updated_at", *at(1), nil, nil, nil, *at(1)},
-		{"first exposure later", *at(1), at(2), nil, nil, *at(2)},
-		{"announcement latest", *at(1), at(2), at(5), at(3), *at(5)},
-		{"food registration latest", *at(1), at(2), at(3), at(9), *at(9)},
-		{"older sources are ignored", *at(6), at(2), at(3), at(4), *at(6)},
+		{"only updated_at", *at(1), nil, nil, *at(1)},
+		{"first exposure later", *at(1), at(2), nil, *at(2)},
+		{"announcement latest", *at(1), at(2), at(5), *at(5)},
+		{"older sources are ignored", *at(6), at(2), at(3), *at(6)},
 	}
 	for _, c := range cases {
-		if got := PublicStoreUpdateTime(c.updated, c.first, c.announced, c.foodChange); !got.Equal(c.want) {
+		if got := PublicStoreUpdateTime(c.updated, c.first, c.announced); !got.Equal(c.want) {
 			t.Errorf("%s：%v，want %v", c.name, got, c.want)
 		}
 	}

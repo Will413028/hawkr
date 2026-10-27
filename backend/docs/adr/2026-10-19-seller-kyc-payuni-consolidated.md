@@ -142,3 +142,7 @@ KYC 認證與 PayUni 子商店從 seller-service 搬進 seller 模組。舊實�
 - **綁定失敗的重新綁定與申請狀態**：管理員 `RebindPayUni` 在註冊的申請不是已核准（賣家把它改回草稿）時回 `failed_precondition`，避免綁定 job 把還沒審核的草稿送給 PayUni。
 - **不能重送時帶原因**：`KYCFlow.resubmit_unavailabilities`（原因 enum 加伺服器句子，與兩個 RPC 的 `failed_precondition` 同一個 Go 函式 `model.ResubmitUnavailableReasons`），client 只顯示。
 - **綁定重試用完進後台待辦**（`PAYUNI_BIND_RETRY`，期限 24 小時，上線前的起始值）：「平台會協助重新送出」由待辦成立，管理員重新綁定後待辦消失。
+
+## 修訂：食品業者登錄刪除（2026-10-28，ADR `2026-10-27-general-ecommerce-scope-cut` D3；計畫 `plans/2026-10-27-ecommerce-scope-cut.md` 步驟 4）
+
+示範品類改成一般電商。食品業者登錄（`food_registrations` 與它的審核、公開字號、2 年保存）整個刪除：入駐同意紀錄少了 `FOOD_REGISTRATION_NOTICE` 與 `food_registration_id`（每次同意事件仍一列，依種類綁定來源），關店後的兩段清理少了退場時撤回待審、結束核准中的登錄與個資清理時清字號，也不再有關店後 2 年刪除審核紀錄；admin 對店家的動作少了核准與退回登錄。KYC、PayUni、兩段清理的時間條件與保存條件（`StoreHolds`）不變。

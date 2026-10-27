@@ -113,41 +113,6 @@
       "serverOwned": false
     },
     {
-      "name": "hawkr.admin.seller.v1alpha1.FDAChannel",
-      "tsName": "FDAChannel",
-      "tsModule": "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb",
-      "inCatalog": false,
-      "serverOwned": false
-    },
-    {
-      "name": "hawkr.admin.seller.v1alpha1.FoodRegistrationDecision",
-      "tsName": "FoodRegistrationDecision",
-      "tsModule": "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb",
-      "inCatalog": false,
-      "serverOwned": false
-    },
-    {
-      "name": "hawkr.admin.seller.v1alpha1.FoodRegistrationEndCause",
-      "tsName": "FoodRegistrationEndCause",
-      "tsModule": "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb",
-      "inCatalog": false,
-      "serverOwned": false
-    },
-    {
-      "name": "hawkr.admin.seller.v1alpha1.FoodRegistrationInbox",
-      "tsName": "FoodRegistrationInbox",
-      "tsModule": "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb",
-      "inCatalog": false,
-      "serverOwned": false
-    },
-    {
-      "name": "hawkr.admin.seller.v1alpha1.FoodRegistrationState",
-      "tsName": "FoodRegistrationState",
-      "tsModule": "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb",
-      "inCatalog": false,
-      "serverOwned": false
-    },
-    {
       "name": "hawkr.admin.seller.v1alpha1.KYCRegistrationOutcome",
       "tsName": "KYCRegistrationOutcome",
       "tsModule": "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb",
@@ -349,13 +314,6 @@
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
       "inCatalog": false,
       "serverOwned": true
-    },
-    {
-      "name": "hawkr.seller.v1alpha1.FoodRegistrationState",
-      "tsName": "FoodRegistrationState",
-      "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
-      "inCatalog": true,
-      "serverOwned": false
     },
     {
       "name": "hawkr.seller.v1alpha1.KYCField",

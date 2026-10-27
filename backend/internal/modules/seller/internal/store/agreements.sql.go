@@ -14,9 +14,9 @@ import (
 )
 
 const insertAgreementAcceptance = `-- name: InsertAgreementAcceptance :exec
-INSERT INTO seller.agreement_acceptances (store_id, kind, version, account_id, accepted_at, submission_review_id, food_registration_id, client_ip, user_agent)
-VALUES ($1, $2, $3, $4, $5, $6, $7,
-        $8, $9)
+INSERT INTO seller.agreement_acceptances (store_id, kind, version, account_id, accepted_at, submission_review_id, client_ip, user_agent)
+VALUES ($1, $2, $3, $4, $5, $6,
+        $7, $8)
 `
 
 type InsertAgreementAcceptanceParams struct {
@@ -26,13 +26,12 @@ type InsertAgreementAcceptanceParams struct {
 	AccountID          int64
 	AcceptedAt         time.Time
 	SubmissionReviewID *uuid.UUID
-	FoodRegistrationID *uuid.UUID
 	ClientIp           *netip.Addr
 	UserAgent          *string
 }
 
 // 每次同意事件寫一列（沒有 ON CONFLICT）：開店的 SELLER_TERMS 每家店一列（agreement_acceptances_seller_terms），KYC 的兩份帶
-// 那次送出的 SUBMIT 審核紀錄，食品業者登錄的告知帶那次送出的登錄（agreement_acceptances_source_check：依種類恰好綁一個來源）。
+// 那次送出的 SUBMIT 審核紀錄（agreement_acceptances_source_check：依種類綁定來源）。
 func (q *Queries) InsertAgreementAcceptance(ctx context.Context, arg InsertAgreementAcceptanceParams) error {
 	_, err := q.db.Exec(ctx, insertAgreementAcceptance,
 		arg.StoreID,
@@ -41,7 +40,6 @@ func (q *Queries) InsertAgreementAcceptance(ctx context.Context, arg InsertAgree
 		arg.AccountID,
 		arg.AcceptedAt,
 		arg.SubmissionReviewID,
-		arg.FoodRegistrationID,
 		arg.ClientIp,
 		arg.UserAgent,
 	)

@@ -51,10 +51,6 @@ const (
 	SellerKYCRevealsCreate            Permission = "seller.kyc_reveals.create"
 	SellerKYCDocumentAccessesList     Permission = "seller.kyc_document_accesses.list"
 	SellerKYCDocumentsGet             Permission = "seller.kyc_documents.get"
-	SellerFoodRegistrationsList       Permission = "seller.food_registrations.list"
-	SellerFoodRegistrationsGet        Permission = "seller.food_registrations.get"
-	SellerFoodRegistrationsDecide     Permission = "seller.food_registrations.decide"
-	SellerFoodRegistrationsRevoke     Permission = "seller.food_registrations.revoke"
 	SellerPayUniRegistrationsGet      Permission = "seller.payuni_registrations.get"
 	SellerPayUniRegistrationsRebind   Permission = "seller.payuni_registrations.rebind"
 	SellerPayUniRegistrationsRefresh  Permission = "seller.payuni_registrations.refresh"
@@ -69,9 +65,6 @@ const (
 	SellerCasesGet                    Permission = "seller.cases.get"
 	SellerCasesDecide                 Permission = "seller.cases.decide"
 	SellerCasesChangeSeverity         Permission = "seller.cases.change_severity"
-	SellerCasesRecordFDAReferral      Permission = "seller.cases.record_fda_referral"
-	SellerCasesWaiveFDAReferral       Permission = "seller.cases.waive_fda_referral"
-	SellerCasesRecordFDAReferralReply Permission = "seller.cases.record_fda_referral_reply"
 	SellerCaseNotesCreate             Permission = "seller.case_notes.create"
 	SellerCaseNotesList               Permission = "seller.case_notes.list"
 	SellerCaseInquiriesCreate         Permission = "seller.case_inquiries.create"
@@ -86,7 +79,6 @@ const (
 	SellerAuthorityOrdersExtendHold   Permission = "seller.authority_orders.extend_hold"
 	SellerAuthorityOrdersRecordNotice Permission = "seller.authority_orders.record_target_notice"
 	SellerAuthorityOrdersRevoke       Permission = "seller.authority_orders.revoke"
-	SellerFDAExportsGet               Permission = "seller.fda_exports.get"
 	SellerReportEvidenceGet           Permission = "seller.report_evidence.get"
 	SellerViolationsList              Permission = "seller.violations.list"
 	SellerViolationsGet               Permission = "seller.violations.get"
@@ -131,12 +123,10 @@ func Catalog() []Permission {
 		SellerKYCApplicationsList, SellerKYCApplicationsGet, SellerKYCApplicationsApprove, SellerKYCApplicationsReject,
 		SellerKYCApplicationsRequery,
 		SellerKYCRevealsList, SellerKYCRevealsCreate, SellerKYCDocumentAccessesList, SellerKYCDocumentsGet,
-		SellerFoodRegistrationsList, SellerFoodRegistrationsGet, SellerFoodRegistrationsDecide, SellerFoodRegistrationsRevoke,
 		SellerPayUniRegistrationsGet, SellerPayUniRegistrationsRebind, SellerPayUniRegistrationsRefresh, SellerPayUniObservationsList,
 		SellerReportsList, SellerReportsGet, SellerReportsMarkSupplementsSeen, SellerReportsTriage, SellerReportsResolve, SellerReportsMove,
-		SellerCasesList, SellerCasesGet, SellerCasesDecide, SellerCasesChangeSeverity, SellerCasesRecordFDAReferral,
-		SellerCasesWaiveFDAReferral, SellerCasesRecordFDAReferralReply,
-		SellerCaseNotesCreate, SellerCaseNotesList, SellerFDAExportsGet, SellerReportEvidenceGet,
+		SellerCasesList, SellerCasesGet, SellerCasesDecide, SellerCasesChangeSeverity,
+		SellerCaseNotesCreate, SellerCaseNotesList, SellerReportEvidenceGet,
 		SellerCaseInquiriesCreate, SellerCaseInquiriesList, SellerCaseInquiriesRecordReply, SellerCaseInquiriesWithdraw, SellerCaseInquiryEvidenceGet,
 		SellerAuthorityOrdersCreate, SellerAuthorityOrdersList, SellerAuthorityOrdersGet, SellerAuthorityOrdersComplete, SellerAuthorityOrdersExtendHold,
 		SellerAuthorityOrdersRecordNotice, SellerAuthorityOrdersRevoke,

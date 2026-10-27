@@ -8,8 +8,7 @@ import (
 )
 
 // agreement_acceptances 只追加：queries 裡沒有 DELETE、TRUNCATE；UPDATE 只允許一條，名稱是 PurgeAgreementSources，而且它只把
-// client_ip、user_agent 清成 NULL 並記下 pii_purged_at。寫入的 INSERT 沒有 ON CONFLICT（每次同意事件一列）。食品業者登錄的告知同意紀錄隨登錄的
-// 審核紀錄期滿刪除（food_registration_id 的 ON DELETE CASCADE），不是 queries 對這張表的 DELETE。
+// client_ip、user_agent 清成 NULL 並記下 pii_purged_at。寫入的 INSERT 沒有 ON CONFLICT（每次同意事件一列）。
 func TestAgreementAcceptancesAreAppendOnly(t *testing.T) {
 	files, err := filepath.Glob(filepath.Join("db", "queries", "*.sql"))
 	if err != nil || len(files) == 0 {

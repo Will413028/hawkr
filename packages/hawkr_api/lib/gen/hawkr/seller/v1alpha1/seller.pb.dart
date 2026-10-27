@@ -219,10 +219,6 @@ class Store extends $pb.GeneratedMessage {
     $core.String? contactName,
     $core.String? contactMobile,
     $core.String? supportEmail,
-    FoodRegistration? approvedFoodRegistration,
-    FoodRegistration? revokedFoodRegistration,
-    FoodRegistration? pendingFoodRegistration,
-    FoodRegistration? rejectedFoodRegistration,
   }) {
     final result = Store._();
     if (id != null) result.id = id;
@@ -246,14 +242,6 @@ class Store extends $pb.GeneratedMessage {
     if (contactName != null) result.contactName = contactName;
     if (contactMobile != null) result.contactMobile = contactMobile;
     if (supportEmail != null) result.supportEmail = supportEmail;
-    if (approvedFoodRegistration != null)
-      result.approvedFoodRegistration = approvedFoodRegistration;
-    if (revokedFoodRegistration != null)
-      result.revokedFoodRegistration = revokedFoodRegistration;
-    if (pendingFoodRegistration != null)
-      result.pendingFoodRegistration = pendingFoodRegistration;
-    if (rejectedFoodRegistration != null)
-      result.rejectedFoodRegistration = rejectedFoodRegistration;
     return result;
   }
 
@@ -297,18 +285,6 @@ class Store extends $pb.GeneratedMessage {
     ..aOS(23, _omitFieldNames ? '' : 'contactName')
     ..aOS(24, _omitFieldNames ? '' : 'contactMobile')
     ..aOS(25, _omitFieldNames ? '' : 'supportEmail')
-    ..aOM<FoodRegistration>(
-        26, _omitFieldNames ? '' : 'approvedFoodRegistration',
-        subBuilder: FoodRegistration.$_createMessage)
-    ..aOM<FoodRegistration>(
-        28, _omitFieldNames ? '' : 'revokedFoodRegistration',
-        subBuilder: FoodRegistration.$_createMessage)
-    ..aOM<FoodRegistration>(
-        29, _omitFieldNames ? '' : 'pendingFoodRegistration',
-        subBuilder: FoodRegistration.$_createMessage)
-    ..aOM<FoodRegistration>(
-        30, _omitFieldNames ? '' : 'rejectedFoodRegistration',
-        subBuilder: FoodRegistration.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -454,7 +430,7 @@ class Store extends $pb.GeneratedMessage {
   @$pb.TagNumber(16)
   $1.Timestamp ensureCreateTime() => $_ensure(11);
 
-  /// 店家資料最後一次被編輯的時間；食品業者登錄的送出、核准、清除與撤銷不是店家資料的編輯，不會讓它前進（etag 也不變）。
+  /// 店家資料最後一次被編輯的時間。
   @$pb.TagNumber(17)
   $1.Timestamp get updateTime => $_getN(12);
   @$pb.TagNumber(17)
@@ -538,593 +514,6 @@ class Store extends $pb.GeneratedMessage {
   $core.bool hasSupportEmail() => $_has(19);
   @$pb.TagNumber(25)
   void clearSupportEmail() => $_clearField(25);
-
-  /// 目前核准的食品業者登錄（state 是 APPROVED）；沒有核准的登錄時不設。店面與商品頁公開的字號就是它。
-  @$pb.TagNumber(26)
-  FoodRegistration get approvedFoodRegistration => $_getN(20);
-  @$pb.TagNumber(26)
-  set approvedFoodRegistration(FoodRegistration value) => $_setField(26, value);
-  @$pb.TagNumber(26)
-  $core.bool hasApprovedFoodRegistration() => $_has(20);
-  @$pb.TagNumber(26)
-  void clearApprovedFoodRegistration() => $_clearField(26);
-  @$pb.TagNumber(26)
-  FoodRegistration ensureApprovedFoodRegistration() => $_ensure(20);
-
-  /// 最近一次被平台撤銷的登錄（state 是 ENDED，end_time 與 end_reason 有值）；目前沒有核准的登錄、撤銷之後也沒有更新的待審或核准（更新的核准即使之後又結束也算）時才設，
-  /// 賣家看到它就知道字號被撤銷、要重新送審。沒有時不設。
-  @$pb.TagNumber(28)
-  FoodRegistration get revokedFoodRegistration => $_getN(21);
-  @$pb.TagNumber(28)
-  set revokedFoodRegistration(FoodRegistration value) => $_setField(28, value);
-  @$pb.TagNumber(28)
-  $core.bool hasRevokedFoodRegistration() => $_has(21);
-  @$pb.TagNumber(28)
-  void clearRevokedFoodRegistration() => $_clearField(28);
-  @$pb.TagNumber(28)
-  FoodRegistration ensureRevokedFoodRegistration() => $_ensure(21);
-
-  /// 待審（PENDING）的登錄；沒有時不設。有值時可以撤回。與 approved_food_registration 各自獨立（審核期間目前核准的照常有效）。
-  @$pb.TagNumber(29)
-  FoodRegistration get pendingFoodRegistration => $_getN(22);
-  @$pb.TagNumber(29)
-  set pendingFoodRegistration(FoodRegistration value) => $_setField(29, value);
-  @$pb.TagNumber(29)
-  $core.bool hasPendingFoodRegistration() => $_has(22);
-  @$pb.TagNumber(29)
-  void clearPendingFoodRegistration() => $_clearField(29);
-  @$pb.TagNumber(29)
-  FoodRegistration ensurePendingFoodRegistration() => $_ensure(22);
-
-  /// 被退回（REJECTED）、之後沒有再送出新的登錄；沒有時不設。與 approved_food_registration 各自獨立。
-  @$pb.TagNumber(30)
-  FoodRegistration get rejectedFoodRegistration => $_getN(23);
-  @$pb.TagNumber(30)
-  set rejectedFoodRegistration(FoodRegistration value) => $_setField(30, value);
-  @$pb.TagNumber(30)
-  $core.bool hasRejectedFoodRegistration() => $_has(23);
-  @$pb.TagNumber(30)
-  void clearRejectedFoodRegistration() => $_clearField(30);
-  @$pb.TagNumber(30)
-  FoodRegistration ensureRejectedFoodRegistration() => $_ensure(23);
-}
-
-/// FoodRegistration 是店家的一筆食品業者登錄（食安法第 8 條第 3 項），一個資源、一個狀態：Store.approved_food_registration 是核准中的那一筆，
-/// Store.pending_food_registration 是待審的那一筆，Store.rejected_food_registration 是被退回的那一筆，Store.revoked_food_registration 是最近被平台撤銷的那一筆。
-class FoodRegistration extends $pb.GeneratedMessage {
-  factory FoodRegistration({
-    $core.String? id,
-    FoodRegistrationState? state,
-    $core.String? registrationNumber,
-    $1.Timestamp? submitTime,
-    $1.Timestamp? decideTime,
-    $core.String? rejectReason,
-    $1.Timestamp? endTime,
-    $core.String? endReason,
-  }) {
-    final result = FoodRegistration._();
-    if (id != null) result.id = id;
-    if (state != null) result.state = state;
-    if (registrationNumber != null)
-      result.registrationNumber = registrationNumber;
-    if (submitTime != null) result.submitTime = submitTime;
-    if (decideTime != null) result.decideTime = decideTime;
-    if (rejectReason != null) result.rejectReason = rejectReason;
-    if (endTime != null) result.endTime = endTime;
-    if (endReason != null) result.endReason = endReason;
-    return result;
-  }
-
-  FoodRegistration._();
-
-  factory FoodRegistration.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      FoodRegistration()..mergeFromBuffer(data, registry);
-  factory FoodRegistration.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      FoodRegistration()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'FoodRegistration',
-      package: const $pb.PackageName(
-          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
-      createEmptyInstance: FoodRegistration.$_createMessage)
-    ..aOS(1, _omitFieldNames ? '' : 'id')
-    ..aE<FoodRegistrationState>(2, _omitFieldNames ? '' : 'state',
-        enumValues: FoodRegistrationState.values)
-    ..aOS(3, _omitFieldNames ? '' : 'registrationNumber')
-    ..aOM<$1.Timestamp>(4, _omitFieldNames ? '' : 'submitTime',
-        subBuilder: $1.Timestamp.$_createMessage)
-    ..aOM<$1.Timestamp>(5, _omitFieldNames ? '' : 'decideTime',
-        subBuilder: $1.Timestamp.$_createMessage)
-    ..aOS(6, _omitFieldNames ? '' : 'rejectReason')
-    ..aOM<$1.Timestamp>(7, _omitFieldNames ? '' : 'endTime',
-        subBuilder: $1.Timestamp.$_createMessage)
-    ..aOS(8, _omitFieldNames ? '' : 'endReason')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  FoodRegistration clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  FoodRegistration copyWith(void Function(FoodRegistration) updates) =>
-      super.copyWith((message) => updates(message as FoodRegistration))
-          as FoodRegistration;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  @$core.Deprecated('Use FoodRegistration() / FoodRegistration.new instead')
-  static FoodRegistration create() => FoodRegistration._();
-  static $pb.GeneratedMessage $_createMessage() => FoodRegistration._();
-  @$core.override
-  FoodRegistration createEmptyInstance() => FoodRegistration._();
-  @$core.pragma('dart2js:noInline')
-  static FoodRegistration getDefault() =>
-      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<FoodRegistration>(
-          FoodRegistration.$_createMessage);
-  static FoodRegistration? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.String get id => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set id($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasId() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearId() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  FoodRegistrationState get state => $_getN(1);
-  @$pb.TagNumber(2)
-  set state(FoodRegistrationState value) => $_setField(2, value);
-  @$pb.TagNumber(2)
-  $core.bool hasState() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearState() => $_clearField(2);
-
-  /// 食品業者登錄字號，最多 50 字。
-  @$pb.TagNumber(3)
-  $core.String get registrationNumber => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set registrationNumber($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasRegistrationNumber() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearRegistrationNumber() => $_clearField(3);
-
-  /// 賣家送出的時間。
-  @$pb.TagNumber(4)
-  $1.Timestamp get submitTime => $_getN(3);
-  @$pb.TagNumber(4)
-  set submitTime($1.Timestamp value) => $_setField(4, value);
-  @$pb.TagNumber(4)
-  $core.bool hasSubmitTime() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearSubmitTime() => $_clearField(4);
-  @$pb.TagNumber(4)
-  $1.Timestamp ensureSubmitTime() => $_ensure(3);
-
-  /// 平台核准或退回的時間；待審時不設。
-  @$pb.TagNumber(5)
-  $1.Timestamp get decideTime => $_getN(4);
-  @$pb.TagNumber(5)
-  set decideTime($1.Timestamp value) => $_setField(5, value);
-  @$pb.TagNumber(5)
-  $core.bool hasDecideTime() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearDecideTime() => $_clearField(5);
-  @$pb.TagNumber(5)
-  $1.Timestamp ensureDecideTime() => $_ensure(4);
-
-  /// 退回的理由；只在 REJECTED 設定。
-  @$pb.TagNumber(6)
-  $core.String get rejectReason => $_getSZ(5);
-  @$pb.TagNumber(6)
-  set rejectReason($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasRejectReason() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearRejectReason() => $_clearField(6);
-
-  /// 被平台撤銷的時間；只在 Store.revoked_food_registration 設定。
-  @$pb.TagNumber(7)
-  $1.Timestamp get endTime => $_getN(6);
-  @$pb.TagNumber(7)
-  set endTime($1.Timestamp value) => $_setField(7, value);
-  @$pb.TagNumber(7)
-  $core.bool hasEndTime() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearEndTime() => $_clearField(7);
-  @$pb.TagNumber(7)
-  $1.Timestamp ensureEndTime() => $_ensure(6);
-
-  /// 平台撤銷的理由，賣家看得到；只在 Store.revoked_food_registration 設定。
-  @$pb.TagNumber(8)
-  $core.String get endReason => $_getSZ(7);
-  @$pb.TagNumber(8)
-  set endReason($core.String value) => $_setString(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasEndReason() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearEndReason() => $_clearField(8);
-}
-
-class SubmitFoodRegistrationRequest extends $pb.GeneratedMessage {
-  factory SubmitFoodRegistrationRequest({
-    $core.String? registrationNumber,
-    $core.Iterable<AgreementAcceptance>? acceptedAgreements,
-  }) {
-    final result = SubmitFoodRegistrationRequest._();
-    if (registrationNumber != null)
-      result.registrationNumber = registrationNumber;
-    if (acceptedAgreements != null)
-      result.acceptedAgreements.addAll(acceptedAgreements);
-    return result;
-  }
-
-  SubmitFoodRegistrationRequest._();
-
-  factory SubmitFoodRegistrationRequest.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      SubmitFoodRegistrationRequest()..mergeFromBuffer(data, registry);
-  factory SubmitFoodRegistrationRequest.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      SubmitFoodRegistrationRequest()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'SubmitFoodRegistrationRequest',
-      package: const $pb.PackageName(
-          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
-      createEmptyInstance: SubmitFoodRegistrationRequest.$_createMessage)
-    ..aOS(1, _omitFieldNames ? '' : 'registrationNumber')
-    ..pPM<AgreementAcceptance>(2, _omitFieldNames ? '' : 'acceptedAgreements',
-        subBuilder: AgreementAcceptance.$_createMessage)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  SubmitFoodRegistrationRequest clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  SubmitFoodRegistrationRequest copyWith(
-          void Function(SubmitFoodRegistrationRequest) updates) =>
-      super.copyWith(
-              (message) => updates(message as SubmitFoodRegistrationRequest))
-          as SubmitFoodRegistrationRequest;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  @$core.Deprecated(
-      'Use SubmitFoodRegistrationRequest() / SubmitFoodRegistrationRequest.new instead')
-  static SubmitFoodRegistrationRequest create() =>
-      SubmitFoodRegistrationRequest._();
-  static $pb.GeneratedMessage $_createMessage() =>
-      SubmitFoodRegistrationRequest._();
-  @$core.override
-  SubmitFoodRegistrationRequest createEmptyInstance() =>
-      SubmitFoodRegistrationRequest._();
-  @$core.pragma('dart2js:noInline')
-  static SubmitFoodRegistrationRequest getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<SubmitFoodRegistrationRequest>(
-          SubmitFoodRegistrationRequest.$_createMessage);
-  static SubmitFoodRegistrationRequest? _defaultInstance;
-
-  /// 食品業者登錄字號，去掉前後空白後 1 到 50 字。
-  @$pb.TagNumber(1)
-  $core.String get registrationNumber => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set registrationNumber($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasRegistrationNumber() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearRegistrationNumber() => $_clearField(1);
-
-  /// 賣家確認已閱讀的 FOOD_REGISTRATION_NOTICE，剛好這一份。缺種類、多出不屬於這個操作的種類、同一種重複或 UNSPECIFIED 回
-  /// invalid_argument（field violation 指向 accepted_agreements）；版本不是現行版本回 failed_precondition，ErrorInfo.reason 是
-  /// AGREEMENT_OUTDATED，client 重讀 GetSellerAgreements，請賣家重新勾選。這項檢查先於字號的檢查；建立新的登錄時，確認紀錄與登錄同一個
-  /// transaction、綁定那一筆登錄（字號與待審或核准中的相同、沒有建立新登錄時不另記）。
-  @$pb.TagNumber(2)
-  $pb.PbList<AgreementAcceptance> get acceptedAgreements => $_getList(1);
-}
-
-class SubmitFoodRegistrationResponse extends $pb.GeneratedMessage {
-  factory SubmitFoodRegistrationResponse({
-    Store? store,
-  }) {
-    final result = SubmitFoodRegistrationResponse._();
-    if (store != null) result.store = store;
-    return result;
-  }
-
-  SubmitFoodRegistrationResponse._();
-
-  factory SubmitFoodRegistrationResponse.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      SubmitFoodRegistrationResponse()..mergeFromBuffer(data, registry);
-  factory SubmitFoodRegistrationResponse.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      SubmitFoodRegistrationResponse()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'SubmitFoodRegistrationResponse',
-      package: const $pb.PackageName(
-          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
-      createEmptyInstance: SubmitFoodRegistrationResponse.$_createMessage)
-    ..aOM<Store>(1, _omitFieldNames ? '' : 'store',
-        subBuilder: Store.$_createMessage)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  SubmitFoodRegistrationResponse clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  SubmitFoodRegistrationResponse copyWith(
-          void Function(SubmitFoodRegistrationResponse) updates) =>
-      super.copyWith(
-              (message) => updates(message as SubmitFoodRegistrationResponse))
-          as SubmitFoodRegistrationResponse;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  @$core.Deprecated(
-      'Use SubmitFoodRegistrationResponse() / SubmitFoodRegistrationResponse.new instead')
-  static SubmitFoodRegistrationResponse create() =>
-      SubmitFoodRegistrationResponse._();
-  static $pb.GeneratedMessage $_createMessage() =>
-      SubmitFoodRegistrationResponse._();
-  @$core.override
-  SubmitFoodRegistrationResponse createEmptyInstance() =>
-      SubmitFoodRegistrationResponse._();
-  @$core.pragma('dart2js:noInline')
-  static SubmitFoodRegistrationResponse getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<SubmitFoodRegistrationResponse>(
-          SubmitFoodRegistrationResponse.$_createMessage);
-  static SubmitFoodRegistrationResponse? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  Store get store => $_getN(0);
-  @$pb.TagNumber(1)
-  set store(Store value) => $_setField(1, value);
-  @$pb.TagNumber(1)
-  $core.bool hasStore() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearStore() => $_clearField(1);
-  @$pb.TagNumber(1)
-  Store ensureStore() => $_ensure(0);
-}
-
-class WithdrawFoodRegistrationRequest extends $pb.GeneratedMessage {
-  factory WithdrawFoodRegistrationRequest() =>
-      WithdrawFoodRegistrationRequest._();
-
-  WithdrawFoodRegistrationRequest._();
-
-  factory WithdrawFoodRegistrationRequest.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      WithdrawFoodRegistrationRequest()..mergeFromBuffer(data, registry);
-  factory WithdrawFoodRegistrationRequest.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      WithdrawFoodRegistrationRequest()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'WithdrawFoodRegistrationRequest',
-      package: const $pb.PackageName(
-          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
-      createEmptyInstance: WithdrawFoodRegistrationRequest.$_createMessage)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  WithdrawFoodRegistrationRequest clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  WithdrawFoodRegistrationRequest copyWith(
-          void Function(WithdrawFoodRegistrationRequest) updates) =>
-      super.copyWith(
-              (message) => updates(message as WithdrawFoodRegistrationRequest))
-          as WithdrawFoodRegistrationRequest;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  @$core.Deprecated(
-      'Use WithdrawFoodRegistrationRequest() / WithdrawFoodRegistrationRequest.new instead')
-  static WithdrawFoodRegistrationRequest create() =>
-      WithdrawFoodRegistrationRequest._();
-  static $pb.GeneratedMessage $_createMessage() =>
-      WithdrawFoodRegistrationRequest._();
-  @$core.override
-  WithdrawFoodRegistrationRequest createEmptyInstance() =>
-      WithdrawFoodRegistrationRequest._();
-  @$core.pragma('dart2js:noInline')
-  static WithdrawFoodRegistrationRequest getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<WithdrawFoodRegistrationRequest>(
-          WithdrawFoodRegistrationRequest.$_createMessage);
-  static WithdrawFoodRegistrationRequest? _defaultInstance;
-}
-
-class WithdrawFoodRegistrationResponse extends $pb.GeneratedMessage {
-  factory WithdrawFoodRegistrationResponse({
-    Store? store,
-  }) {
-    final result = WithdrawFoodRegistrationResponse._();
-    if (store != null) result.store = store;
-    return result;
-  }
-
-  WithdrawFoodRegistrationResponse._();
-
-  factory WithdrawFoodRegistrationResponse.fromBuffer(
-          $core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      WithdrawFoodRegistrationResponse()..mergeFromBuffer(data, registry);
-  factory WithdrawFoodRegistrationResponse.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      WithdrawFoodRegistrationResponse()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'WithdrawFoodRegistrationResponse',
-      package: const $pb.PackageName(
-          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
-      createEmptyInstance: WithdrawFoodRegistrationResponse.$_createMessage)
-    ..aOM<Store>(1, _omitFieldNames ? '' : 'store',
-        subBuilder: Store.$_createMessage)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  WithdrawFoodRegistrationResponse clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  WithdrawFoodRegistrationResponse copyWith(
-          void Function(WithdrawFoodRegistrationResponse) updates) =>
-      super.copyWith(
-              (message) => updates(message as WithdrawFoodRegistrationResponse))
-          as WithdrawFoodRegistrationResponse;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  @$core.Deprecated(
-      'Use WithdrawFoodRegistrationResponse() / WithdrawFoodRegistrationResponse.new instead')
-  static WithdrawFoodRegistrationResponse create() =>
-      WithdrawFoodRegistrationResponse._();
-  static $pb.GeneratedMessage $_createMessage() =>
-      WithdrawFoodRegistrationResponse._();
-  @$core.override
-  WithdrawFoodRegistrationResponse createEmptyInstance() =>
-      WithdrawFoodRegistrationResponse._();
-  @$core.pragma('dart2js:noInline')
-  static WithdrawFoodRegistrationResponse getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<WithdrawFoodRegistrationResponse>(
-          WithdrawFoodRegistrationResponse.$_createMessage);
-  static WithdrawFoodRegistrationResponse? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  Store get store => $_getN(0);
-  @$pb.TagNumber(1)
-  set store(Store value) => $_setField(1, value);
-  @$pb.TagNumber(1)
-  $core.bool hasStore() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearStore() => $_clearField(1);
-  @$pb.TagNumber(1)
-  Store ensureStore() => $_ensure(0);
-}
-
-class ClearFoodRegistrationRequest extends $pb.GeneratedMessage {
-  factory ClearFoodRegistrationRequest() => ClearFoodRegistrationRequest._();
-
-  ClearFoodRegistrationRequest._();
-
-  factory ClearFoodRegistrationRequest.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      ClearFoodRegistrationRequest()..mergeFromBuffer(data, registry);
-  factory ClearFoodRegistrationRequest.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      ClearFoodRegistrationRequest()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'ClearFoodRegistrationRequest',
-      package: const $pb.PackageName(
-          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
-      createEmptyInstance: ClearFoodRegistrationRequest.$_createMessage)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ClearFoodRegistrationRequest clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ClearFoodRegistrationRequest copyWith(
-          void Function(ClearFoodRegistrationRequest) updates) =>
-      super.copyWith(
-              (message) => updates(message as ClearFoodRegistrationRequest))
-          as ClearFoodRegistrationRequest;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  @$core.Deprecated(
-      'Use ClearFoodRegistrationRequest() / ClearFoodRegistrationRequest.new instead')
-  static ClearFoodRegistrationRequest create() =>
-      ClearFoodRegistrationRequest._();
-  static $pb.GeneratedMessage $_createMessage() =>
-      ClearFoodRegistrationRequest._();
-  @$core.override
-  ClearFoodRegistrationRequest createEmptyInstance() =>
-      ClearFoodRegistrationRequest._();
-  @$core.pragma('dart2js:noInline')
-  static ClearFoodRegistrationRequest getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<ClearFoodRegistrationRequest>(
-          ClearFoodRegistrationRequest.$_createMessage);
-  static ClearFoodRegistrationRequest? _defaultInstance;
-}
-
-class ClearFoodRegistrationResponse extends $pb.GeneratedMessage {
-  factory ClearFoodRegistrationResponse({
-    Store? store,
-  }) {
-    final result = ClearFoodRegistrationResponse._();
-    if (store != null) result.store = store;
-    return result;
-  }
-
-  ClearFoodRegistrationResponse._();
-
-  factory ClearFoodRegistrationResponse.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      ClearFoodRegistrationResponse()..mergeFromBuffer(data, registry);
-  factory ClearFoodRegistrationResponse.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      ClearFoodRegistrationResponse()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'ClearFoodRegistrationResponse',
-      package: const $pb.PackageName(
-          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
-      createEmptyInstance: ClearFoodRegistrationResponse.$_createMessage)
-    ..aOM<Store>(1, _omitFieldNames ? '' : 'store',
-        subBuilder: Store.$_createMessage)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ClearFoodRegistrationResponse clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ClearFoodRegistrationResponse copyWith(
-          void Function(ClearFoodRegistrationResponse) updates) =>
-      super.copyWith(
-              (message) => updates(message as ClearFoodRegistrationResponse))
-          as ClearFoodRegistrationResponse;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  @$core.Deprecated(
-      'Use ClearFoodRegistrationResponse() / ClearFoodRegistrationResponse.new instead')
-  static ClearFoodRegistrationResponse create() =>
-      ClearFoodRegistrationResponse._();
-  static $pb.GeneratedMessage $_createMessage() =>
-      ClearFoodRegistrationResponse._();
-  @$core.override
-  ClearFoodRegistrationResponse createEmptyInstance() =>
-      ClearFoodRegistrationResponse._();
-  @$core.pragma('dart2js:noInline')
-  static ClearFoodRegistrationResponse getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<ClearFoodRegistrationResponse>(
-          ClearFoodRegistrationResponse.$_createMessage);
-  static ClearFoodRegistrationResponse? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  Store get store => $_getN(0);
-  @$pb.TagNumber(1)
-  set store(Store value) => $_setField(1, value);
-  @$pb.TagNumber(1)
-  $core.bool hasStore() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearStore() => $_clearField(1);
-  @$pb.TagNumber(1)
-  Store ensureStore() => $_ensure(0);
 }
 
 /// CapabilityStatus 是一個能力此刻的狀態：啟用，或沒有啟用與還缺的條件。
@@ -6718,8 +6107,7 @@ class RequestRemediationResponse extends $pb.GeneratedMessage {
   Measure ensureMeasure() => $_ensure(0);
 }
 
-/// PublicStore 是店面頁上的店家資料。逐欄列出前台需要的欄位：沒有聯絡電話、詳細地址與任何版本欄位；
-/// 食品業者登錄只有字號（food_business_registration_number）。
+/// PublicStore 是店面頁上的店家資料。逐欄列出前台需要的欄位：沒有聯絡電話、詳細地址與任何版本欄位。
 class PublicStore extends $pb.GeneratedMessage {
   factory PublicStore({
     $core.String? id,
@@ -6731,7 +6119,6 @@ class PublicStore extends $pb.GeneratedMessage {
     $core.String? websiteUrl,
     $0.Image? logo,
     $0.Image? coverImage,
-    $core.String? foodBusinessRegistrationNumber,
     $1.Timestamp? updateTime,
   }) {
     final result = PublicStore._();
@@ -6744,8 +6131,6 @@ class PublicStore extends $pb.GeneratedMessage {
     if (websiteUrl != null) result.websiteUrl = websiteUrl;
     if (logo != null) result.logo = logo;
     if (coverImage != null) result.coverImage = coverImage;
-    if (foodBusinessRegistrationNumber != null)
-      result.foodBusinessRegistrationNumber = foodBusinessRegistrationNumber;
     if (updateTime != null) result.updateTime = updateTime;
     return result;
   }
@@ -6775,7 +6160,6 @@ class PublicStore extends $pb.GeneratedMessage {
         subBuilder: $0.Image.$_createMessage)
     ..aOM<$0.Image>(9, _omitFieldNames ? '' : 'coverImage',
         subBuilder: $0.Image.$_createMessage)
-    ..aOS(12, _omitFieldNames ? '' : 'foodBusinessRegistrationNumber')
     ..aOM<$1.Timestamp>(13, _omitFieldNames ? '' : 'updateTime',
         subBuilder: $1.Timestamp.$_createMessage)
     ..hasRequiredFields = false;
@@ -6894,30 +6278,19 @@ class PublicStore extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   $0.Image ensureCoverImage() => $_ensure(8);
 
-  /// 食品業者登錄字號，平台核對過的那一筆（Store.approved_food_registration）；空字串表示沒有核准的登錄。
-  @$pb.TagNumber(12)
-  $core.String get foodBusinessRegistrationNumber => $_getSZ(9);
-  @$pb.TagNumber(12)
-  set foodBusinessRegistrationNumber($core.String value) =>
-      $_setString(9, value);
-  @$pb.TagNumber(12)
-  $core.bool hasFoodBusinessRegistrationNumber() => $_has(9);
-  @$pb.TagNumber(12)
-  void clearFoodBusinessRegistrationNumber() => $_clearField(12);
-
-  /// 這家店的公開資料最後更新的時間，給 sitemap 的 lastmod：取店家資料的最後修改時間、第一次可公開曝光的時間、最後一次可曝光狀態翻轉
-  /// 的時間與食品業者登錄字號最後一次核准、清除或撤銷的時間中最晚的一個，所以不會早於上架日，停權結束後重新曝光、字號核准、清除或撤銷也會前進，
+  /// 這家店的公開資料最後更新的時間，給 sitemap 的 lastmod：取店家資料的最後修改時間、第一次可公開曝光的時間與最後一次可曝光狀態翻轉
+  /// 的時間中最晚的一個，所以不會早於上架日，停權結束後重新曝光也會前進，
   /// 全量重新公告重發同一個狀態則不會。店家的非公開欄位（例如聯絡資料）改變也會讓它前進，因此偶爾比公開內容的實際變更晚。
   @$pb.TagNumber(13)
-  $1.Timestamp get updateTime => $_getN(10);
+  $1.Timestamp get updateTime => $_getN(9);
   @$pb.TagNumber(13)
   set updateTime($1.Timestamp value) => $_setField(13, value);
   @$pb.TagNumber(13)
-  $core.bool hasUpdateTime() => $_has(10);
+  $core.bool hasUpdateTime() => $_has(9);
   @$pb.TagNumber(13)
   void clearUpdateTime() => $_clearField(13);
   @$pb.TagNumber(13)
-  $1.Timestamp ensureUpdateTime() => $_ensure(10);
+  $1.Timestamp ensureUpdateTime() => $_ensure(9);
 }
 
 /// StoreStats 是店面頁的統計。每個欄位都只在讀得到時才設：粉絲與評價各自來自別的模組，讀取失敗不是零。
@@ -7616,7 +6989,7 @@ class SellerAppServiceApi {
   /// ApplyStore 申請開店：建立店家並授予賣家角色。前置條件依優先序檢查，第一個不符的決定回應：有生效中的終止合作回
   /// failed_precondition 與 STORE_OPENING_TERMINATED（解除停權也開不了店）；其次帳號停權中回 failed_precondition 與
   /// STORE_OPENING_SUSPENDED；其次帳號正在刪除回 failed_precondition（沒有 reason）；最後帳號已經有店家才回 already_exists。
-  /// 所以被終止、停權或正在刪除的帳號即使還有店家，回的也不是 already_exists；任何一個欄位不合法都不會建立店家。官網、logo 與封面開店後以 UpdateMyStore 設定，食品業者登錄以 SubmitFoodRegistration 送審。
+  /// 所以被終止、停權或正在刪除的帳號即使還有店家，回的也不是 already_exists；任何一個欄位不合法都不會建立店家。官網、logo 與封面開店後以 UpdateMyStore 設定。
   $async.Future<ApplyStoreResponse> applyStore(
           $pb.ClientContext? ctx, ApplyStoreRequest request) =>
       _client.invoke<ApplyStoreResponse>(
@@ -7637,7 +7010,7 @@ class SellerAppServiceApi {
           ctx, 'SellerAppService', 'GetMyStore', request, GetMyStoreResponse());
 
   /// UpdateMyStore 修改店家資料的欄位（update_mask），含 logo 與封面（logo_staged_token、
-  /// cover_staged_token）。食品業者登錄不在這裡（SubmitFoodRegistration）。換圖與文字欄位在同一個版本條件下一起寫入，任何一項失敗都不會寫入；沒有任何欄位改變時
+  /// cover_staged_token）。換圖與文字欄位在同一個版本條件下一起寫入，任何一項失敗都不會寫入；沒有任何欄位改變時
   /// 不寫入，etag 不變。
   $async.Future<UpdateMyStoreResponse> updateMyStore(
           $pb.ClientContext? ctx, UpdateMyStoreRequest request) =>
@@ -7669,32 +7042,6 @@ class SellerAppServiceApi {
           $pb.ClientContext? ctx, GetMyDashboardRequest request) =>
       _client.invoke<GetMyDashboardResponse>(ctx, 'SellerAppService',
           'GetMyDashboard', request, GetMyDashboardResponse());
-
-  /// SubmitFoodRegistration 送出食品業者登錄供平台核對（食藥署的登錄資料，人工核對）；通過後才會成為店面與商品頁公開的字號，並開放上架
-  /// 加工食品。店家要在營業中，開店前後的 KYC 狀態不影響送出，平台在實名認證（KYC）核准後才能核准。已有待審的登錄時：字號相同就沿用
-  /// （不改變排隊的時間），不同就撤回舊的、換成新的，所以同時最多一筆待審。審核期間目前核准的登錄照常有效。字號去掉前後空白後 1 到 50 字，
-  /// 不檢查格式（沒有官方規格，交給人工核對），不合法回 invalid_argument。回傳送出之後的店家（pending_food_registration 是這筆待審）。
-  $async.Future<SubmitFoodRegistrationResponse> submitFoodRegistration(
-          $pb.ClientContext? ctx, SubmitFoodRegistrationRequest request) =>
-      _client.invoke<SubmitFoodRegistrationResponse>(ctx, 'SellerAppService',
-          'SubmitFoodRegistration', request, SubmitFoodRegistrationResponse());
-
-  /// WithdrawFoodRegistration 撤回待審的登錄（狀態成為已撤回，賣家不再看到），目前核准的那一筆保留。沒有待審的登錄回 failed_precondition。
-  $async.Future<WithdrawFoodRegistrationResponse> withdrawFoodRegistration(
-          $pb.ClientContext? ctx, WithdrawFoodRegistrationRequest request) =>
-      _client.invoke<WithdrawFoodRegistrationResponse>(
-          ctx,
-          'SellerAppService',
-          'WithdrawFoodRegistration',
-          request,
-          WithdrawFoodRegistrationResponse());
-
-  /// ClearFoodRegistration 清除食品業者登錄（不再賣加工食品）：結束目前核准的那一筆、同時撤回待審的，立即生效，店面與商品頁不再顯示
-  /// 字號。核准的與待審的都沒有時回 failed_precondition。
-  $async.Future<ClearFoodRegistrationResponse> clearFoodRegistration(
-          $pb.ClientContext? ctx, ClearFoodRegistrationRequest request) =>
-      _client.invoke<ClearFoodRegistrationResponse>(ctx, 'SellerAppService',
-          'ClearFoodRegistration', request, ClearFoodRegistrationResponse());
 
   /// CloseMyStore 關閉店家（帳號與買家身分留著，賣家角色移除）。店家有未結訂單時回 failed_precondition；
   /// 停權中也可以關店；正在隨帳號刪除的店家由刪除流程關閉，回 failed_precondition。
@@ -7822,7 +7169,7 @@ class SellerPublicServiceApi {
           'BatchGetStores', request, BatchGetStoresResponse());
 
   /// GetSellerAgreements 讀取賣家入駐時要同意的文件的現行版本與網址，全部種類都回，依 AgreementKind 的數字順序。內容是公開的，
-  /// 開店前就要能讀，所以不需要登入。client 把這裡的版本顯示給賣家勾選，再原樣帶回 ApplyStore、SubmitKYC 與 SubmitFoodRegistration 的
+  /// 開店前就要能讀，所以不需要登入。client 把這裡的版本顯示給賣家勾選，再原樣帶回 ApplyStore 與 SubmitKYC 的
   /// accepted_agreements。
   $async.Future<GetSellerAgreementsResponse> getSellerAgreements(
           $pb.ClientContext? ctx, GetSellerAgreementsRequest request) =>

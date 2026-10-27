@@ -144,68 +144,6 @@
       "message": "未知",
       "description": "不認得的值與 UNSPECIFIED 一律顯示這個字。"
     },
-    "seller.FoodRegistration.kyc_pending_note": {
-      "message": "平台會在商家認證通過後進行審核。",
-      "description": "食品業者登錄送出後、商家認證還沒通過時的說明。"
-    },
-    "seller.FoodRegistration.status_approved": {
-      "message": "已登錄：{number}",
-      "params": {
-        "number": {
-          "type": "string"
-        }
-      },
-      "description": "食品業者登錄已通過。number 是登錄字號。"
-    },
-    "seller.FoodRegistration.status_pending": {
-      "message": "審核中：{number}（{date} 送出）",
-      "params": {
-        "date": {
-          "type": "string"
-        },
-        "number": {
-          "type": "string"
-        }
-      },
-      "description": "食品業者登錄審核中。number 是登錄字號，date 是送出日期（台北，YYYY/MM/DD）。"
-    },
-    "seller.FoodRegistration.status_rejected": {
-      "message": "未通過：{reason}。請確認字號與食藥署登錄資料一致後重新送出。",
-      "params": {
-        "reason": {
-          "type": "string"
-        }
-      },
-      "description": "食品業者登錄未通過。reason 是駁回理由（平台人員輸入的文字）。"
-    },
-    "seller.FoodRegistration.status_revoked": {
-      "message": "已被平台撤銷：{number}。理由：{reason}。請確認字號與食藥署登錄資料一致後重新送出審核。",
-      "params": {
-        "number": {
-          "type": "string"
-        },
-        "reason": {
-          "type": "string"
-        }
-      },
-      "description": "食品業者登錄被平台撤銷。number 是登錄字號，reason 是撤銷理由（平台人員輸入的文字）。"
-    },
-    "seller.FoodRegistrationState.FOOD_REGISTRATION_STATE_APPROVED": {
-      "message": "已通過",
-      "description": "核准中：店面與商品頁公開的字號只讀這一筆。"
-    },
-    "seller.FoodRegistrationState.FOOD_REGISTRATION_STATE_ENDED": {
-      "message": "已結束",
-      "description": "核准後結束；賣家看得到的只有被平台撤銷的（end_time 與 end_reason 有值）。"
-    },
-    "seller.FoodRegistrationState.FOOD_REGISTRATION_STATE_PENDING": {
-      "message": "審核中",
-      "description": "等平台核對。"
-    },
-    "seller.FoodRegistrationState.FOOD_REGISTRATION_STATE_REJECTED": {
-      "message": "未通過",
-      "description": "平台退回；賣家確認字號與食藥署的登錄資料一致後可以重新送出。"
-    },
     "seller.KYCField.KYC_FIELD_BANK_ACCOUNT": {
       "message": "銀行帳號",
       "description": "KYCField 是申請上一個欄位，值與 KYCApplication 的欄位路徑一對一（名稱同樣是 snake_case，巢狀路徑的 . 換成 _：\nKYC_FIELD_BUSINESS_TAX_ID 是 business.tax_id）。退回時指出有問題的欄位（KYCIssue.field）、PayUni 問題要補的\n欄位（PayUniProblem.fields）、還缺的欄位（KYCApplication.missing_fields）與送出時 BadRequest 的 field 都用這一套。（值 KYC_FIELD_BANK_ACCOUNT）"

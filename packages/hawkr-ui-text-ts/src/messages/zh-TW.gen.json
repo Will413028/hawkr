@@ -48,19 +48,6 @@
     "unknown": "未知"
   },
   "seller": {
-    "FoodRegistration": {
-      "kyc_pending_note": "平台會在商家認證通過後進行審核。",
-      "status_approved": "已登錄：{number}",
-      "status_pending": "審核中：{number}（{date} 送出）",
-      "status_rejected": "未通過：{reason}。請確認字號與食藥署登錄資料一致後重新送出。",
-      "status_revoked": "已被平台撤銷：{number}。理由：{reason}。請確認字號與食藥署登錄資料一致後重新送出審核。"
-    },
-    "FoodRegistrationState": {
-      "FOOD_REGISTRATION_STATE_APPROVED": "已通過",
-      "FOOD_REGISTRATION_STATE_ENDED": "已結束",
-      "FOOD_REGISTRATION_STATE_PENDING": "審核中",
-      "FOOD_REGISTRATION_STATE_REJECTED": "未通過"
-    },
     "KYCField": {
       "KYC_FIELD_BANK_ACCOUNT": "銀行帳號",
       "KYC_FIELD_BANK_BOOK": "存摺封面",

@@ -142,3 +142,7 @@
 - **可用性由伺服器給**（2026-10-20 修正輪）：每個對象的 `can_record_notice`（來函已完成、沒有撤銷，而且目前是暫不告知）與原因；對象範圍內每家店的 `can_create_measure`（店家沒有關閉）與 `can_create_termination`（同 `GetStore.can_create_termination` 的規則），與 `CreateMeasure` 是同一份規則（`TerminationTarget.AllowsMeasure`／`BlockFor`），撤銷登記的來函都不行。
 - 來函與其子表的資料沿用「治理資料目前沒有保存政策」，列進 I-legal 的檢查清單（設計 B31）；來函暫時留在 seller（設計 B32，觸發同 Q3）。
 
+
+## 修訂：FDA 轉報刪除（2026-10-28，ADR `2026-10-27-general-ecommerce-scope-cut` D3；計畫 `plans/2026-10-27-ecommerce-scope-cut.md` 步驟 4）
+
+示範品類改成一般電商，食安法的轉報義務不成立。本 ADR 的轉報（「通報與案件」的轉報、2026-10-19「轉報紀錄加追蹤日期、主管機關的回覆與不轉報」修訂整段）不再適用：`case_referrals`、`case_referral_replies`、`RecordFDAReferral`、`WaiveFDAReferral`、`RecordFDAReferralReply`、`GetFDAExport`、待辦種類 `CASE_FDA_REFERRAL` 與案件的 `fda_referral_deadline` 一併刪除；案件的可用性少了記錄轉報、不轉報、記回覆與匯出，「已記錄轉報的案件最後一筆通報不能移走」也跟著拿掉。通報（含檢舉人選的食安類別與它的 4 小時分案期限）、案件、處分、申訴與主管機關來函不變；清理與來函保存的鎖順序不變（清理的參與者剩兩段清理）。

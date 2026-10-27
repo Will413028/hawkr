@@ -2,11 +2,11 @@ syntax = "proto3";
 
 // seller 模組給後台的商家治理 API（ADR 2026-10-18-seller-governance-consolidated、設計書 32、step10e-reports-brief R2、R3）：
 // 通報與案件分開。一筆通報是一位檢舉人的一次送出（含之後的補充）；同一家店、同一個平台判定類別，同時最多一個進行中的案件。
-// 通報先分案（判定類別並掛到案件，或不開案件直接設定結果），案件再由一次決定結案；食安案件轉報主管機關、記內部註記、
+// 通報先分案（判定類別並掛到案件，或不開案件直接設定結果），案件再由一次決定結案；記內部註記、
 // 導出措施（警告、停權與終止合作，依據是認定、風險類型或契約條款）。措施與它依據的認定、申覆的訊息在 measure.proto。
 // 檢舉人送出檢舉在 hawkr.seller.v1alpha1 的 SellerReportAppService、SellerReportPublicService；賣家看措施與申覆在 SellerAppService。
 //
-// 狀態的推進是指令（TriageReport、ResolveReport、MoveReport、DecideCase、ChangeCaseSeverity、RecordFDAReferral、WaiveFDAReferral、RecordFDAReferralReply、CreateCaseInquiry、RecordCaseInquiryReply、WithdrawCaseInquiry、CompleteAuthorityOrder、ExtendAuthorityOrderHold、RecordAuthorityTargetNotice），不是改欄位：每個指令只在前置條件成立時
+// 狀態的推進是指令（TriageReport、ResolveReport、MoveReport、DecideCase、ChangeCaseSeverity、CreateCaseInquiry、RecordCaseInquiryReply、WithdrawCaseInquiry、CompleteAuthorityOrder、ExtendAuthorityOrderHold、RecordAuthorityTargetNotice），不是改欄位：每個指令只在前置條件成立時
 // 可以做，其餘回 failed_precondition（訊息是第一個原因的句子）；能不能做看回應裡的 can_*、available_outcomes 與 decision_options（同一個函式，
 // 不輸出原因）。處理狀態（ReportState、CaseState）由伺服器推導、不儲存。管理員只以 ID 記錄，顯示名稱由 client 經 IdentityAdminService 查。
 //
@@ -18,7 +18,6 @@ package hawkr.admin.seller.v1alpha1;
 import "hawkr/admin/seller/v1alpha1/authority_order.proto";
 import "hawkr/admin/seller/v1alpha1/case_inquiry.proto";
 import "hawkr/admin/seller/v1alpha1/measure.proto";
-import "hawkr/admin/seller/v1alpha1/seller.proto";
 import "hawkr/common/v1alpha1/deadline.proto";
 import "hawkr/common/v1alpha1/policy_category.proto";
 import "hawkr/seller/v1alpha1/report.proto";
@@ -27,7 +26,6 @@ import "google/api/field_behavior.proto";
 import "google/api/field_info.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
-import "google/type/date.proto";
 
 // SellerGovernanceAdminService 只有管理員能呼叫。
 service SellerGovernanceAdminService {
@@ -59,7 +57,7 @@ service SellerGovernanceAdminService {
   rpc ResolveReport(ResolveReportRequest) returns (ResolveReportResponse);
 
   // MoveReport 改通報的平台判定類別，通報移到這家店那個類別的案件（沒有進行中的就開一個）。只有進行中案件裡、還沒有結果、不是認定來源的通報
-  // 可以；案件有導出的措施或已記錄轉報時最後一筆不能移走。移走最後一筆時原案件以 NO_REPORTS 自動關閉，不算一次決定。etag 必填。
+  // 可以；案件有導出的措施時最後一筆不能移走。移走最後一筆時原案件以 NO_REPORTS 自動關閉，不算一次決定。etag 必填。
   rpc MoveReport(MoveReportRequest) returns (MoveReportResponse);
 
   // ListCases 列出案件，開案時間新到舊。
@@ -67,7 +65,7 @@ service SellerGovernanceAdminService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  // GetCase 讀一個案件，含移動紀錄、轉報紀錄與 etag；can_* 與 decision_options 是此刻能做的動作。
+  // GetCase 讀一個案件，含移動紀錄與 etag；can_* 與 decision_options 是此刻能做的動作。
   rpc GetCase(GetCaseRequest) returns (GetCaseResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
@@ -79,28 +77,6 @@ service SellerGovernanceAdminService {
 
   // ChangeCaseSeverity 修改案件的嚴重度，必須附原因：原因寫成案件的一則內部註記，改前改後記在那則註記上。只限進行中的案件。etag 必填。
   rpc ChangeCaseSeverity(ChangeCaseSeverityRequest) returns (ChangeCaseSeverityResponse);
-
-  // RecordFDAReferral 記下食安案件已轉報主管機關（轉報本身在系統外以人工完成）。只限平台判定類別是食安、有通報的案件，只記一次：已經記過時回傳
-  // 原本的紀錄（already_recorded），不覆寫；已標記不轉報回 failed_precondition。不要求先決定。follow_up_date 選填：到這天還沒收到主管機關的回覆就聯絡主管機關，
-  // 不設時是轉報日（台北）加 30 天。不帶 etag。
-  rpc RecordFDAReferral(RecordFDAReferralRequest) returns (RecordFDAReferralResponse);
-
-  // WaiveFDAReferral 標記這個食安案件不轉報（例如主管機關已經介入），必須附原因。它也是一筆轉報紀錄（outcome 為不轉報）：標記之後不能再記錄轉報，
-  // 記錄轉報之後也不能標記不轉報。只限平台判定類別是食安、有通報的案件；已經標記過時回傳原本的紀錄（already_waived），不覆寫。不要求先決定。
-  // 讓案件的 etag 前進。
-  rpc WaiveFDAReferral(WaiveFDAReferralRequest) returns (WaiveFDAReferralResponse);
-
-  // RecordFDAReferralReply 記下主管機關對轉報的回覆（只新增；移送通知與結果通知可以是兩則）。只限已記錄轉報的案件（沒有轉報紀錄或已標記不轉報回
-  // failed_precondition）。收到的日期不早於轉報日（台北）、不晚於今天。追蹤日期依 next_follow_up_date 與 clear_follow_up 更新，兩者都不設時不變。
-  // 讓案件的 etag 前進。不帶 etag（只新增）；request_id 選填（AIP-155）：同一位管理員以同一個 request_id 重送（例如回應遺失後再送一次）不會多記一則，
-  // 回傳案件目前的狀態；內容不同回 invalid_argument。範圍是（記下的管理員, request_id），同 CreateCaseInquiry。
-  rpc RecordFDAReferralReply(RecordFDAReferralReplyRequest) returns (RecordFDAReferralReplyResponse);
-
-  // GetFDAExport 回傳轉報主管機關需要的資料：案件、案件裡結果不是未違規、內容不足或濫報的通報（含補充與佐證的位置，不帶檢舉人的聯絡方式）與被通報的店家
-  // （已關閉的也回傳）。轉報文件的格式由 client 呈現。只限食安案件，其他回 failed_precondition。
-  rpc GetFDAExport(GetFDAExportRequest) returns (GetFDAExportResponse) {
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
 
   // CreateCaseInquiry 對案件的賣家發一筆詢問（提供紀錄或請說明，有期限；詢問只帶管理員轉述的說明，不附通報原文、佐證與檢舉人）。每個案件同時最多
   // 一筆還沒結束的詢問；案件結案後、店家的個資已依保留期限清除後不能發（關店不擋）。建立讓案件的 etag 前進，案件進入「等賣家」（awaiting_seller），
@@ -246,20 +222,6 @@ service SellerGovernanceAdminService {
   }
 }
 
-// FDAChannel 是轉報主管機關的管道。
-enum FDAChannel {
-  FDA_CHANNEL_UNSPECIFIED = 0;
-  // 1919 食安專線。
-  FDA_CHANNEL_HOTLINE_1919 = 1;
-  // 線上表單。
-  FDA_CHANNEL_ONLINE_FORM = 2;
-  // 傳真衛生局。
-  FDA_CHANNEL_FAX_HEALTH_DEPT = 3;
-  // 親自送件。
-  FDA_CHANNEL_IN_PERSON = 4;
-  FDA_CHANNEL_OTHER = 5;
-}
-
 // ReportState 是通報此刻在後台的處理狀態，由伺服器推導（不儲存）。
 enum ReportState {
   REPORT_STATE_UNSPECIFIED = 0;
@@ -323,40 +285,6 @@ message ReporterContact {
   string name = 3;
 }
 
-// FDAReferral 是案件轉報主管機關的紀錄。
-message FDAReferral {
-  FDAChannel channel = 1;
-  // 主管機關的案號；空字串表示沒有案號。
-  string reference_no = 2;
-  string reported_by_admin_id = 3;
-  google.protobuf.Timestamp report_time = 4;
-  // 追蹤日期（台北日期）；沒有時不設（不再追蹤，或轉換前就有的紀錄）。到了這天還沒收到主管機關的回覆，就聯絡主管機關。
-  google.type.Date follow_up_date = 5;
-  // 主管機關的回覆，舊到新（依記下的時間）。
-  repeated FDAReferralReply replies = 6;
-  // 追蹤逾期（伺服器在讀取時推導）：有追蹤日期、今天（台北）晚於它，而且設定這個追蹤日期之後還沒有記下主管機關的回覆。記下回覆時換成下一個追蹤日期，
-  // 逾期就以新的日期重新判斷；client 不自己比較日期。
-  bool follow_up_overdue = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
-}
-
-// FDAReferralReply 是主管機關對轉報的一則回覆（只新增）。
-message FDAReferralReply {
-  // 回覆內容，1 到 2000 字。
-  string body = 1;
-  // 收到的日期（台北），不早於轉報日、不晚於記下的當天。
-  google.type.Date receive_date = 2;
-  string recorded_by_admin_id = 3;
-  google.protobuf.Timestamp record_time = 4;
-}
-
-// FDAReferralWaiver 是標記不轉報的紀錄。
-message FDAReferralWaiver {
-  // 不轉報的原因，1 到 2000 字。
-  string reason = 1;
-  string waived_by_admin_id = 2;
-  google.protobuf.Timestamp waive_time = 3;
-}
-
 // Report 是後台看到的通報：一位檢舉人的一次送出（含之後併入的補充），有自己的結果；可以掛在案件裡，也可以不開案件直接設定結果。
 message Report {
   reserved 10 to 15, 19, 21;
@@ -377,7 +305,7 @@ message Report {
   string description = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 登入的檢舉人（買家 id）；匿名檢舉是空字串。
   string reporter_buyer_id = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 匿名檢舉人的聯絡方式；登入的檢舉人、聯絡方式已清除時不設。只有 GetReport 帶（ListReports 與 GetFDAExport 不帶個資）。
+  // 匿名檢舉人的聯絡方式；登入的檢舉人、聯絡方式已清除時不設。只有 GetReport 帶（ListReports 不帶個資）。
   ReporterContact contact = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 匿名檢舉人的聯絡方式被清除的時間；沒有清除時不設。
   google.protobuf.Timestamp contact_erase_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -397,9 +325,9 @@ message Report {
   string resolved_by_admin_id = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 給檢舉人的結果說明；沒有時是空字串。
   string resolution_note = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 佐證，原通報與補充的都在這裡（依位置）；只有 GetReport 與 GetFDAExport 帶。
+  // 佐證，原通報與補充的都在這裡（依位置）；只有 GetReport 帶。
   repeated Evidence evidence = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 補充，舊到新；只有 GetReport 與 GetFDAExport 帶。
+  // 補充，舊到新；只有 GetReport 帶。
   repeated ReportSupplement supplements = 32 [(google.api.field_behavior) = OUTPUT_ONLY];
   int32 supplement_count = 33 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 最新一則補充的時間；沒有補充時不設。
@@ -422,7 +350,7 @@ message Report {
   hawkr.common.v1alpha1.PolicyCategory effective_category = 42 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 有補充是管理員還沒看過的：這筆通報還沒有結果，而且存在編號比「管理員看過的最新補充」更大的補充（分案、移動與 MarkReportSupplementsSeen 會記下看過的編號；
   // 比編號不比時間，不依賴時鐘）。有了結果的通報不再提醒。補充不改案件的 etag，所以案件頁與通報頁都看這個標示提醒。
-  // 讀取（GetReport）、設定結果、結案時帶入的預設結果、改案件嚴重度與記錄轉報都不記。
+  // 讀取（GetReport）、設定結果、結案時帶入的預設結果、改案件嚴重度都不記。
   bool has_unseen_supplements = 43 [(google.api.field_behavior) = OUTPUT_ONLY];
   reserved 44;
   reserved "supplements_seen_time";
@@ -451,6 +379,8 @@ message ReportSupplement {
 message Case {
   reserved 19;
   reserved "has_new_supplements";
+  reserved 16, 26, 27, 32 to 34, 36;
+  reserved "fda_referral", "can_record_fda_referral", "can_export_fda", "fda_referral_waiver", "can_waive_fda_referral", "can_record_fda_referral_reply", "fda_referral_deadline";
 
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
   string store_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -473,13 +403,11 @@ message Case {
   int32 report_count = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 還沒有結果的通報數：結案時會帶入預設結果的筆數。
   int32 unresolved_report_count = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 轉報主管機關的紀錄；沒有轉報、或標記不轉報（見 fda_referral_waiver）時不設。
-  FDAReferral fda_referral = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 移入與移出這個案件的移動，舊到新；只有 GetCase 帶。
   repeated ReportMove moves = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 上一次處理的時間：成員進出、成員有了結果、改嚴重度、記錄轉報、標記不轉報、記下主管機關的回覆、詢問的建立與回覆與撤回、結案。補充、註記與措施的建立或撤銷不改它（它不再用來判斷補充有沒有看過）。
+  // 上一次處理的時間：成員進出、成員有了結果、改嚴重度、詢問的建立與回覆與撤回、結案。補充、註記與措施的建立或撤銷不改它（它不再用來判斷補充有沒有看過）。
   google.protobuf.Timestamp update_time = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 案件的版本；成員進出、成員有了結果、改嚴重度、決定、自動關閉、記錄轉報、標記不轉報、記下主管機關的回覆與詢問的建立、記下回覆、撤回都讓它前進，補充、註記與措施不會。
+  // 案件的版本；成員進出、成員有了結果、改嚴重度、決定、自動關閉與詢問的建立、記下回覆、撤回都讓它前進，補充、註記與措施不會。
   string etag = 20;
   // 此刻可以決定；等於 decision_options 不為空。進行中的案件一定是 true（每個進行中的案件至少有一個可以選的決定）。
   bool can_decide = 21 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -490,8 +418,6 @@ message Case {
   bool can_link_measure = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
   // can_link_measure 而且店家沒有關閉（警告、停權與風險措施要開著的店）。
   bool can_create_measure = 25 [(google.api.field_behavior) = OUTPUT_ONLY];
-  bool can_record_fda_referral = 26 [(google.api.field_behavior) = OUTPUT_ONLY];
-  bool can_export_fda = 27 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 成員裡有補充還沒被管理員看過的通報數（該成員的 Report.has_unseen_supplements 為 true 的筆數）。補充不改案件的 etag，改由這個數字提醒結案前先看過；
   // 要知道是哪幾筆看成員通報的 has_unseen_supplements。
   int32 unseen_supplement_report_count = 28 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -501,23 +427,15 @@ message Case {
   string open_inquiry_id = 30 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 此刻可以對賣家發詢問：案件進行中、店家的個資還沒清除、沒有還沒結束的詢問。
   bool can_create_inquiry = 31 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 標記不轉報的紀錄；沒有時不設。與 fda_referral 至多一個（不轉報也是這個案件唯一的轉報紀錄）。
-  FDAReferralWaiver fda_referral_waiver = 32 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 此刻可以標記不轉報：與 can_record_fda_referral 的條件相同（尚未有轉報紀錄）。
-  bool can_waive_fda_referral = 33 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 此刻可以記下主管機關的回覆：已記錄轉報（不是不轉報）的食安案件。
-  bool can_record_fda_referral_reply = 34 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 決定的期限，只在待決定時設（進行中而且沒有還沒結束的詢問）：開始時間是開案，或最後一筆詢問被回覆或被管理員撤回的時間，期限依嚴重度
   // （嚴重 24 小時、高 72 小時、中 7 天、低 14 天）。
   hawkr.common.v1alpha1.Deadline decide_deadline = 35 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 轉報主管機關的期限，只在待轉報時設（食安案件、決定採取措施、還沒有轉報紀錄或標記不轉報）：開始時間是結案，期限 24 小時。
-  hawkr.common.v1alpha1.Deadline fda_referral_deadline = 36 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // OutcomeOption 是一個可以設定的結果；形狀同 DecisionOption：伺服器帶出結果對這筆通報的影響，client 不自己對應。
 message OutcomeOption {
   hawkr.seller.v1alpha1.ReportOutcome outcome = 1;
-  // 設定這個結果會否定這筆通報（未違規、內容不足或濫報）：之後它不能當認定的來源、不列進轉報資料。
+  // 設定這個結果會否定這筆通報（未違規、內容不足或濫報）：之後它不能當認定的來源。
   bool negates_source = 2;
 }
 
@@ -719,62 +637,6 @@ message ChangeCaseSeverityRequest {
 
 message ChangeCaseSeverityResponse {
   Case case = 1;
-}
-
-message RecordFDAReferralRequest {
-  string case_id = 1 [(google.api.field_behavior) = REQUIRED];
-  FDAChannel channel = 2 [(google.api.field_behavior) = REQUIRED];
-  // 主管機關的案號，最多 100 字；可以不填。
-  string reference_no = 3;
-  // 選填：追蹤日期（台北日期），不早於今天；不設時是轉報日（台北）加 30 天。
-  google.type.Date follow_up_date = 4;
-}
-
-message RecordFDAReferralResponse {
-  Case case = 1;
-  // 這個案件之前已經記過轉報：case.fda_referral 是原本的紀錄，這次的輸入沒有寫入。
-  bool already_recorded = 2;
-}
-
-message WaiveFDAReferralRequest {
-  string case_id = 1 [(google.api.field_behavior) = REQUIRED];
-  // 不轉報的原因，1 到 2000 字。
-  string reason = 2 [(google.api.field_behavior) = REQUIRED];
-}
-
-message WaiveFDAReferralResponse {
-  Case case = 1;
-  // 這個案件之前已經標記過不轉報：case.fda_referral_waiver 是原本的紀錄，這次的輸入沒有寫入。
-  bool already_waived = 2;
-}
-
-message RecordFDAReferralReplyRequest {
-  string case_id = 1 [(google.api.field_behavior) = REQUIRED];
-  // 回覆內容，1 到 2000 字。
-  string body = 2 [(google.api.field_behavior) = REQUIRED];
-  // 收到的日期（台北），不早於轉報日、不晚於今天。
-  google.type.Date receive_date = 3 [(google.api.field_behavior) = REQUIRED];
-  // 下一個追蹤日期（台北日期，不早於今天）：設定時取代原本的；clear_follow_up 為 true 時清掉；兩者都不設時不變。兩者同時設回 invalid_argument。
-  google.type.Date next_follow_up_date = 4;
-  bool clear_follow_up = 5;
-  // 選填，UUIDv4（AIP-155）：範圍是（記下的管理員, request_id）；同一個值、同樣的內容重送不會多記一則，內容不同回 invalid_argument。
-  string request_id = 6 [(google.api.field_info).format = UUID4];
-}
-
-message RecordFDAReferralReplyResponse {
-  Case case = 1;
-}
-
-message GetFDAExportRequest {
-  string case_id = 1 [(google.api.field_behavior) = REQUIRED];
-}
-
-message GetFDAExportResponse {
-  Case case = 1;
-  // 案件裡結果不是未違規、內容不足或濫報的通報（含補充與佐證的位置），舊到新；不帶檢舉人的聯絡方式。
-  repeated Report reports = 2;
-  // 被檢舉的店家（含聯絡電話、地址與食品業者登錄字號；已關閉的也回傳）。
-  Store store = 3;
 }
 
 message CreateCaseInquiryRequest {

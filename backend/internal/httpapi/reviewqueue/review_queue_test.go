@@ -134,21 +134,19 @@ func TestKindsAreOneToOneWithTheContract(t *testing.T) {
 	if !slices.Equal(fromProto, all) {
 		t.Errorf("proto %v，模組 %v", fromProto, all)
 	}
-	if len(all) != 12 {
-		t.Errorf("種類 %d 個，設計 §1.3 的 11 個加 step10e-5a 的 PAYUNI_BIND_RETRY 是 12 個", len(all))
+	if len(all) != 10 {
+		t.Errorf("種類 %d 個，預期 10 個", len(all))
 	}
 	// 權限表：逐種類寫死期望的來源讀取權限（E13），每個權限都在目錄裡。
 	wantPerm := map[rq.Kind]adminperm.Permission{
 		rq.ReportTriage:          adminperm.SellerReportsList,
 		rq.CaseDecision:          adminperm.SellerCasesList,
 		rq.CaseInquiryOverdue:    adminperm.SellerCaseInquiriesList,
-		rq.CaseFDAReferral:       adminperm.SellerCasesList,
 		rq.AuthorityOrder:        adminperm.SellerAuthorityOrdersList,
 		rq.AuthorityTargetNotice: adminperm.SellerAuthorityOrdersList,
 		rq.MeasureAppeal:         adminperm.SellerMeasuresList,
 		rq.MeasureLiftRequest:    adminperm.SellerMeasuresList,
 		rq.MeasureReview:         adminperm.SellerMeasuresList,
-		rq.FoodRegistration:      adminperm.SellerFoodRegistrationsList,
 		rq.KYCApplication:        adminperm.SellerKYCApplicationsList,
 		// PayUni 註冊只有 get 讀取權（沒有 list RPC）。
 		rq.PayUniBindRetry: adminperm.SellerPayUniRegistrationsGet,
@@ -376,7 +374,7 @@ func TestKindsAreIntersectedWithThePermissionsOfTheCaller(t *testing.T) {
 	}
 	// OWNER 是全部。
 	f.calls = nil
-	if _, err := list(t, newAdmin(f), asOwner, kinds()); err != nil || len(f.calls[0].kinds) != 12 {
+	if _, err := list(t, newAdmin(f), asOwner, kinds()); err != nil || len(f.calls[0].kinds) != 10 {
 		t.Errorf("OWNER：%v %v", err, f.calls)
 	}
 	// 呼叫者不是管理員、或沒有認證：interceptor 在 handler 之前擋下，不呼叫模組。
@@ -413,7 +411,6 @@ func TestToProtoBuildsTheSubjectOfEachKind(t *testing.T) {
 	}{
 		{rq.Item{Kind: rq.ReportTriage, ReportID: id()}, func(p *adminpb.ReviewQueueItem) string { return p.GetReportId() }, "report"},
 		{rq.Item{Kind: rq.CaseDecision, CaseID: id()}, func(p *adminpb.ReviewQueueItem) string { return p.GetCaseId() }, "case"},
-		{rq.Item{Kind: rq.CaseFDAReferral, CaseID: id()}, func(p *adminpb.ReviewQueueItem) string { return p.GetCaseId() }, "case"},
 		{rq.Item{Kind: rq.CaseInquiryOverdue, CaseID: id(), InquiryID: id()}, func(p *adminpb.ReviewQueueItem) string {
 			return p.GetCaseInquiry().GetCaseId() + "/" + p.GetCaseInquiry().GetInquiryId()
 		}, "case_inquiry"},
@@ -429,7 +426,6 @@ func TestToProtoBuildsTheSubjectOfEachKind(t *testing.T) {
 			return p.GetMeasureRequest().GetMeasureId() + "/" + p.GetMeasureRequest().GetRequestId()
 		}, "measure_request"},
 		{rq.Item{Kind: rq.MeasureReview, MeasureID: id()}, func(p *adminpb.ReviewQueueItem) string { return p.GetMeasureId() }, "measure"},
-		{rq.Item{Kind: rq.FoodRegistration, FoodRegistrationID: id()}, func(p *adminpb.ReviewQueueItem) string { return p.GetFoodRegistrationId() }, "food"},
 		{rq.Item{Kind: rq.KYCApplication, KYCApplicationID: id(), StoreID: &store}, func(p *adminpb.ReviewQueueItem) string {
 			return p.GetKycApplication().GetStoreId() + "/" + p.GetKycApplication().GetApplicationId()
 		}, "kyc"},
@@ -449,7 +445,7 @@ func TestToProtoBuildsTheSubjectOfEachKind(t *testing.T) {
 			continue
 		}
 		var ids []string
-		for _, u := range []*uuid.UUID{it.ReportID, it.CaseID, it.InquiryID, it.AuthorityOrderID, it.MeasureID, it.RequestID, it.FoodRegistrationID, it.KYCApplicationID} {
+		for _, u := range []*uuid.UUID{it.ReportID, it.CaseID, it.InquiryID, it.AuthorityOrderID, it.MeasureID, it.RequestID, it.KYCApplicationID} {
 			if u != nil {
 				ids = append(ids, u.String())
 			}
@@ -474,7 +470,7 @@ func TestToProtoBuildsTheSubjectOfEachKind(t *testing.T) {
 		}
 		// 只設一支 subject：其他 oneof 的 getter 都是零值。
 		set := 0
-		for _, s := range []string{p.GetReportId(), p.GetCaseId(), p.GetAuthorityOrderId(), p.GetMeasureId(), p.GetFoodRegistrationId()} {
+		for _, s := range []string{p.GetReportId(), p.GetCaseId(), p.GetAuthorityOrderId(), p.GetMeasureId()} {
 			if s != "" {
 				set++
 			}
@@ -492,13 +488,13 @@ func TestToProtoBuildsTheSubjectOfEachKind(t *testing.T) {
 			"report_id": func(i *rq.Item) { i.ReportID = nil }, "case_id": func(i *rq.Item) { i.CaseID = nil }, "inquiry_id": func(i *rq.Item) { i.InquiryID = nil },
 			"authority_order_id": func(i *rq.Item) { i.AuthorityOrderID = nil }, "position": func(i *rq.Item) { i.TargetPosition = nil },
 			"account_id": func(i *rq.Item) { i.AccountID = nil }, "measure_id": func(i *rq.Item) { i.MeasureID = nil }, "request_id": func(i *rq.Item) { i.RequestID = nil },
-			"food_registration_id": func(i *rq.Item) { i.FoodRegistrationID = nil }, "kyc_application_id": func(i *rq.Item) { i.KYCApplicationID = nil },
+			"kyc_application_id": func(i *rq.Item) { i.KYCApplicationID = nil },
 		} {
 			c := it
 			drop(&c)
 			needed := (name == "report_id" && c.ReportID == nil && it.ReportID != nil) || (name == "case_id" && it.CaseID != nil) || (name == "inquiry_id" && it.InquiryID != nil) ||
 				(name == "authority_order_id" && it.AuthorityOrderID != nil) || (name == "position" && it.TargetPosition != nil) || (name == "account_id" && it.AccountID != nil) ||
-				(name == "measure_id" && it.MeasureID != nil) || (name == "request_id" && it.RequestID != nil) || (name == "food_registration_id" && it.FoodRegistrationID != nil) ||
+				(name == "measure_id" && it.MeasureID != nil) || (name == "request_id" && it.RequestID != nil) ||
 				(name == "kyc_application_id" && it.KYCApplicationID != nil)
 			if _, err := toProto(c); needed && err == nil {
 				t.Errorf("%s：缺 %s 卻沒有回錯", it.Kind, name)

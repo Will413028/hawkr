@@ -2128,7 +2128,7 @@ func TestAccountMeasuresCarryThePeriodAndState(t *testing.T) {
 }
 
 // 通報與案件的資料庫保證：檢舉人剛好一種、已採取措施一定在案件裡、結果與時間成對、通報的店家與平台判定類別一定等於案件的（複合外鍵）、
-// 移動紀錄的通報與兩個案件是同一家店、措施的來源案件是同一家店的、註記剛好掛在案件或措施的其中一個、改嚴重度的改前改後只在案件的註記、轉報只能掛在食安案件、
+// 移動紀錄的通報與兩個案件是同一家店、措施的來源案件是同一家店的、註記剛好掛在案件或措施的其中一個、改嚴重度的改前改後只在案件的註記、
 // 同一家店同一個類別同時最多一個進行中的案件、佐證的位置在一筆通報全部佐證的張數之內。
 // 每個案例只違反一條約束，而且指名是哪一條（wantViolates）：只看「有錯誤」會把參數數量不符之類不是資料庫擋下的錯誤也當成通過，
 // 也會讓同時違反兩條約束的案例遮住其中一條（拿掉它測試仍然通過）。SQL 裡的 $1 是 s 的 store_id，直接代入文字（不用參數）。
@@ -2142,7 +2142,6 @@ func TestReportSchemaConstraints(t *testing.T) {
 	c, members := f.newCase(t, s.StoreID, policy.Fraud, SeverityLow, 2)
 	foreign, _ := f.newCase(t, other.StoreID, policy.Fraud, SeverityLow, 1)
 	foreignSecond, _ := f.newCase(t, other.StoreID, policy.Counterfeit, SeverityLow, 1) // 別家店的第二個案件：移動紀錄的來源與目標要不同
-	food, _ := f.newCase(t, s.StoreID, policy.FoodSafety, SeverityLow, 1)
 	m := f.violate(t, s.StoreID, SeverityLow, MeasureWarning, nil)
 	// 同一位買家再送一次：members[0] 有一則補充（下面的佐證用它）。
 	if r, err := f.module.SubmitReport(ctx, SubmitReportInput{StoreID: s.StoreID, ReporterBuyerID: *members[0].ReporterBuyerID, Category: policy.Fraud, Description: "補充"}); err != nil || !r.Supplemented {
@@ -2151,7 +2150,7 @@ func TestReportSchemaConstraints(t *testing.T) {
 	insertReport := "INSERT INTO seller.reports (id, store_id, category, description, created_at, updated_at, "
 	insertMove := "INSERT INTO seller.report_case_moves (id, report_id, store_id, from_case_id, to_case_id, admin_id, moved_at) VALUES (uuidv7(), '"
 	storeID, otherStoreID := fmt.Sprint(s.StoreID), fmt.Sprint(other.StoreID)
-	report0, report1, caseID, foreignID, foreignSecondID, foodID, measureID := members[0].ID.String(), members[1].ID.String(), c.ID.String(), foreign.ID.String(), foreignSecond.ID.String(), food.ID.String(), m.ID.String()
+	report0, report1, caseID, foreignID, foreignSecondID, measureID := members[0].ID.String(), members[1].ID.String(), c.ID.String(), foreign.ID.String(), foreignSecond.ID.String(), m.ID.String()
 	for _, v := range []struct{ name, constraint, sql string }{
 		{"買家又留電話", "reports_reporter_check", insertReport + "reporter_buyer_id, reporter_phone) VALUES (uuidv7(), $1, 'FRAUD', 'x', now(), now(), 5, '0912345678')"},
 		{"只有姓名", "reports_reporter_check", insertReport + "reporter_name) VALUES (uuidv7(), $1, 'FRAUD', 'x', now(), now(), '王')"},
@@ -2187,9 +2186,6 @@ func TestReportSchemaConstraints(t *testing.T) {
 		{"措施的註記帶嚴重度", "governance_notes_severity_check", "INSERT INTO seller.governance_notes (note_id, measure_id, admin_id, body, severity_from, severity_to, created_at) VALUES (uuidv7(), '" + measureID + "', 1, 'x', 'LOW', 'HIGH', now())"},
 		{"案件的註記改前改後相同", "governance_notes_severity_check", "INSERT INTO seller.governance_notes (note_id, case_id, admin_id, body, severity_from, severity_to, created_at) VALUES (uuidv7(), '" + caseID + "', 1, 'x', 'LOW', 'LOW', now())"},
 		{"案件的註記只有改前", "governance_notes_severity_check", "INSERT INTO seller.governance_notes (note_id, case_id, admin_id, body, severity_from, created_at) VALUES (uuidv7(), '" + caseID + "', 1, 'x', 'LOW', now())"},
-		{"轉報掛在非食安案件", "case_referrals_category_check", "INSERT INTO seller.case_referrals (case_id, category, outcome, channel, recorded_at, recorded_by_admin_id) VALUES ('" + caseID + "', 'FRAUD', 'REFERRED', 'OTHER', now(), 1)"},
-		{"轉報的類別和案件的不同", "case_referrals_case_fkey", "INSERT INTO seller.case_referrals (case_id, category, outcome, channel, recorded_at, recorded_by_admin_id) VALUES ('" + caseID + "', 'FOOD_SAFETY', 'REFERRED', 'OTHER', now(), 1)"},
-		{"轉報的案號是空字串", "case_referrals_reference_no_check", "INSERT INTO seller.case_referrals (case_id, category, outcome, channel, reference_no, recorded_at, recorded_by_admin_id) VALUES ('" + foodID + "', 'FOOD_SAFETY', 'REFERRED', 'OTHER', '', now(), 1)"},
 		{"同一家店同一個類別第二個進行中的案件", "cases_one_open", "INSERT INTO seller.cases (id, store_id, category, severity, opened_at, opened_by_admin_id, updated_at) VALUES (uuidv7(), $1, 'FRAUD', 'LOW', now(), 1, now())"},
 		{"案件的類別是 OTHER", "cases_category_check", "INSERT INTO seller.cases (id, store_id, category, severity, opened_at, opened_by_admin_id, updated_at) VALUES (uuidv7(), $1, 'OTHER', 'LOW', now(), 1, now())"},
 		{"案件結案沒有原因", "cases_close_check", "UPDATE seller.cases SET closed_at = now(), closed_by_admin_id = 1 WHERE id = '" + caseID + "'"},

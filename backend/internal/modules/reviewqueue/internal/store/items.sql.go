@@ -12,7 +12,7 @@ import (
 
 const listItems = `-- name: ListItems :many
 SELECT q.kind, q.item_id, q.report_id, q.case_id, q.inquiry_id, q.authority_order_id, q.target_position, q.account_id,
-       q.measure_id, q.request_id, q.food_registration_id, q.kyc_application_id, q.store_id, q.store_name, q.start_at, q.due_at
+       q.measure_id, q.request_id, q.kyc_application_id, q.store_id, q.store_name, q.start_at, q.due_at
 FROM seller.pub_review_items($1::timestamptz) q
 WHERE q.kind = ANY($2::text[])
   AND ($3::text IS NULL
@@ -65,7 +65,6 @@ func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]SellerP
 			&i.AccountID,
 			&i.MeasureID,
 			&i.RequestID,
-			&i.FoodRegistrationID,
 			&i.KycApplicationID,
 			&i.StoreID,
 			&i.StoreName,

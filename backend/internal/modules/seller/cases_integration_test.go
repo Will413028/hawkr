@@ -176,7 +176,7 @@ func wantBlocked(t *testing.T, err error, sentence string) {
 
 // assertCaseInvariants 在每個指令之後對全部案件檢查跨列不變量（DB 保證不了，由模組保證）：
 // I1 進行中的案件至少有一筆通報；I2 已結案（DECIDED）的案件每筆通報都有結果；I3 決定是不採取措施的案件沒有結果是已採取措施的通報；
-// I4 決定是採取措施的案件有導出的措施（不論狀態）或結果是已採取措施的成員；I5 每個進行中的案件至少有一個可以選的決定；I6 有導出措施或已轉報的案件不會因移動而變空（標記不轉報的案件空了照樣以 NO_REPORTS 關閉）。
+// I4 決定是採取措施的案件有導出的措施（不論狀態）或結果是已採取措施的成員；I5 每個進行中的案件至少有一個可以選的決定；I6 有導出措施的案件不會因移動而變空。
 func (f *fixture) assertCaseInvariants(t *testing.T) {
 	t.Helper()
 	ctx := context.Background()
@@ -189,7 +189,6 @@ func (f *fixture) assertCaseInvariants(t *testing.T) {
 			AND NOT EXISTS (SELECT 1 FROM seller.measures m WHERE m.source_case_id = c.id)
 			AND NOT EXISTS (SELECT 1 FROM seller.reports r JOIN seller.finding_reports fr ON fr.report_id = r.id JOIN seller.measure_findings mf ON mf.violation_id = fr.violation_id WHERE r.case_id = c.id)`,
 		"I6 有連結措施的案件被清空":               `SELECT count(*) FROM seller.cases c JOIN seller.measures m ON m.source_case_id = c.id WHERE c.close_reason = 'NO_REPORTS'`,
-		"I6 有轉報紀錄的案件被清空":               `SELECT count(*) FROM seller.cases c JOIN seller.case_referrals r ON r.case_id = c.id WHERE c.close_reason = 'NO_REPORTS' AND r.outcome = 'REFERRED'`,
 		"J1 已結案的案件還有沒結束的詢問":            `SELECT count(*) FROM seller.case_inquiries i JOIN seller.cases c ON c.id = i.case_id WHERE c.closed_at IS NOT NULL AND i.reply_received_at IS NULL AND i.withdrawn_at IS NULL`,
 		"closed_at 與 close_reason 不一致": `SELECT count(*) FROM seller.cases WHERE (closed_at IS NULL) <> (close_reason IS NULL)`,
 		"一家店一個類別有兩個進行中的案件":             `SELECT count(*) FROM (SELECT store_id, category FROM seller.cases WHERE closed_at IS NULL GROUP BY 1, 2 HAVING count(*) > 1) x`,
@@ -514,11 +513,10 @@ func TestMoveReportsBetweenCasesKeepsARecordAndClosesAnEmptiedCase(t *testing.T)
 	_ = ctx
 }
 
-// 移動的前置條件：已有結果、不在進行中的案件、是認定的來源、案件有導出的措施或已記錄轉報而它是最後一筆，都是 failed_precondition，而且什麼都不寫。
-func TestMoveIsBlockedByTheReportsStateItsFindingsAndTheCasesMeasuresAndReferral(t *testing.T) {
+// 移動的前置條件：已有結果、不在進行中的案件、是認定的來源、案件有導出的措施而它是最後一筆，都是 failed_precondition，而且什麼都不寫。
+func TestMoveIsBlockedByTheReportsStateItsFindingsAndTheCasesMeasures(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	ctx := context.Background()
 	_, s := f.open(t)
 	assertUnchanged := func(name string, before AdminReport, err error, sentence string) {
 		t.Helper()
@@ -556,36 +554,6 @@ func TestMoveIsBlockedByTheReportsStateItsFindingsAndTheCasesMeasuresAndReferral
 	_, err = f.move(t, solo[0].ID, policy.Fraud, nil)
 	assertUnchanged("措施已撤銷也算", f.reportOf(t, solo[0].ID), err, "這個案件已有導出的措施，不能把最後一筆通報移走。")
 
-	// 案件已記錄轉報，而它是最後一筆：轉報掛在案件上，移走最後一筆會留下一個空案件（以 NO_REPORTS 關閉、不能匯出轉報資料）。
-	food, foodSolo := f.newCase(t, s.StoreID, policy.FoodSafety, SeverityHigh, 1)
-	_, err = f.module.RecordFDAReferral(ctx, RecordFDAReferralInput{CaseID: food.ID, AdminID: 14, Channel: FDAHotline1919})
-	must(t, err)
-	before := f.caseOf(t, food.ID)
-	_, err = f.move(t, foodSolo[0].ID, policy.Fraud, severityPtr(SeverityLow))
-	assertUnchanged("最後一筆而案件已記錄轉報", f.reportOf(t, foodSolo[0].ID), err, "這個案件已記錄轉報，不能把最後一筆通報移走。")
-	if after := f.caseOf(t, food.ID); after.Version != before.Version || !after.Open() || after.ReportCount != 1 || after.Referral == nil {
-		t.Fatalf("被擋下的移動不得動到案件：%+v → %+v", before.Case, after.Case)
-	}
-	// 案件既有導出的措施又已記錄轉報：錯誤取第一個原因（措施）。
-	f.riskFromCase(t, s.StoreID, food.ID)
-	_, err = f.move(t, foodSolo[0].ID, policy.Fraud, severityPtr(SeverityLow))
-	assertUnchanged("最後一筆而案件既有措施又已記錄轉報", f.reportOf(t, foodSolo[0].ID), err, "這個案件已有導出的措施，不能把最後一筆通報移走。")
-
-	// 還有別的成員時可以移走（轉報留在案件上）；移走之後剩下的那一筆就是最後一筆，不能再移。轉報只能掛在食安案件，同一家店同時只有一個進行中的食安案件，所以另開一家店。
-	_, other := f.open(t)
-	pair, members := f.newCase(t, other.StoreID, policy.FoodSafety, SeverityHigh, 2)
-	_, err = f.module.RecordFDAReferral(ctx, RecordFDAReferralInput{CaseID: pair.ID, AdminID: 14, Channel: FDAOnlineForm, ReferenceNo: "F-1"})
-	must(t, err)
-	moved, err := f.move(t, members[0].ID, policy.MisleadingInfo, severityPtr(SeverityLow))
-	must(t, err)
-	if moved.SourceCaseClosed {
-		t.Fatal("案件還有別的成員，不該被關閉")
-	}
-	if after := f.caseOf(t, pair.ID); !after.Open() || after.ReportCount != 1 || after.Referral == nil || after.Referral.FDA.ReferenceNo != "F-1" {
-		t.Fatalf("轉報留在案件上：%+v", after.Case)
-	}
-	_, err = f.move(t, members[1].ID, policy.Fraud, severityPtr(SeverityLow))
-	assertUnchanged("剩下的那一筆是最後一筆", f.reportOf(t, members[1].ID), err, "這個案件已記錄轉報，不能把最後一筆通報移走。")
 	f.assertCaseInvariants(t)
 }
 
@@ -846,121 +814,11 @@ func TestCaseNotesAreAppendOnlyAndDoNotBumpTheCase(t *testing.T) {
 	}
 }
 
-// 轉報掛在案件上：只限食安案件、只記一次（記過回原本的紀錄、不動案件的版本）、案號選填；不要求先決定；以沒有通報關閉的案件不能轉報。
-func TestFDAReferralBelongsToTheCaseAndIsRecordedOnce(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	_, s := f.open(t)
-	food, _ := f.newCase(t, s.StoreID, policy.FoodSafety, SeverityCritical, 2)
-	fraud, _ := f.newCase(t, s.StoreID, policy.Fraud, SeverityLow, 1)
-	record := func(caseID uuid.UUID, channel FDAChannel, ref string) (RecordFDAReferralResult, error) {
-		return f.module.RecordFDAReferral(ctx, RecordFDAReferralInput{CaseID: caseID, AdminID: 14, Channel: channel, ReferenceNo: ref})
-	}
-	_, err := record(fraud.ID, FDAHotline1919, "A1")
-	wantBlocked(t, err, "平台判定類別是食安的案件才能轉報主管機關。")
-	_, err = record(uuid.NewV7(), FDAHotline1919, "A1")
-	wantKind(t, err, apperr.KindNotFound)
-	for name, in := range map[string]struct {
-		channel FDAChannel
-		ref     string
-	}{"管道不認得": {"EMAIL", "A1"}, "沒選管道": {"", "A1"}, "案號太長": {FDAOnlineForm, strings.Repeat("9", 101)}} {
-		if _, err := record(food.ID, in.channel, in.ref); len(invalidFields(t, err)) != 1 {
-			t.Errorf("%s：%v", name, err)
-		}
-	}
-	if f.count(t, "SELECT count(*) FROM seller.case_referrals") != 0 {
-		t.Fatal("被拒絕的轉報寫入了")
-	}
-	f.now = f.now.Add(time.Hour)
-	first, err := record(food.ID, FDAHotline1919, " A1 ")
-	must(t, err)
-	r := first.Case.Referral.FDA
-	if first.AlreadyRecorded || r == nil || r.ReferenceNo != "A1" || r.Channel != FDAHotline1919 || r.ReportedByAdminID != 14 || !r.ReportedAt.Equal(f.now) ||
-		first.Case.Version != food.Version+1 || !first.Case.UpdatedAt.Equal(f.now) || len(first.Case.Availability.RecordReferral) == 0 {
-		t.Fatalf("first=%+v", first.Case.Case)
-	}
-	f.now = f.now.Add(time.Hour)
-	again, err := record(food.ID, FDAOnlineForm, "B2")
-	must(t, err)
-	if !again.AlreadyRecorded || again.Case.Referral.FDA.ReferenceNo != "A1" || again.Case.Referral.FDA.Channel != FDAHotline1919 || again.Case.Version != first.Case.Version ||
-		!again.Case.UpdatedAt.Equal(first.Case.UpdatedAt) {
-		t.Fatalf("記過時回原本的紀錄、不動版本：%+v", again.Case.Case)
-	}
-	// 案號選填。
-	solo, _ := f.newCase(t, f.anotherStore(t).StoreID, policy.FoodSafety, SeverityHigh, 1)
-	noRef, err := record(solo.ID, FDAInPerson, "")
-	must(t, err)
-	if noRef.Case.Referral == nil || noRef.Case.Referral.FDA.ReferenceNo != "" {
-		t.Fatalf("noRef=%+v", noRef.Case.Referral)
-	}
-	if f.count(t, "SELECT count(*) FROM seller.case_referrals WHERE reference_no = ''") != 0 {
-		t.Fatal("沒有案號是 NULL，不存空字串")
-	}
-	// DB：轉報只能掛在食安案件。
-	if _, err := f.db.Conn(ctx).Exec(ctx, "INSERT INTO seller.case_referrals (case_id, category, outcome, channel, recorded_at, recorded_by_admin_id) VALUES ($1, 'FRAUD', 'REFERRED', 'OTHER', now(), 1)", fraud.ID); err == nil {
-		t.Fatal("DB 接受了非食安案件的轉報")
-	}
-	f.assertCaseInvariants(t)
-}
-
 // anotherStore 開另一個帳號的店。
 func (f *fixture) anotherStore(t *testing.T) Store {
 	t.Helper()
 	_, s := f.open(t)
 	return s
-}
-
-// 轉報資料以案件為單位：只列結果沒有被否定的通報（含補充與佐證的位置），不放檢舉人的聯絡方式；店家以案件的 store_id 讀（已關閉的也讀得到）；非食安的案件不能匯出。
-func TestFDAExportListsTheSupportingReportsWithoutContactDetails(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	accountID, s := f.open(t)
-	c, members := f.newCase(t, s.StoreID, policy.FoodSafety, SeverityHigh, 3)
-	f.mustResolve(t, members[0].ID, OutcomeAbusive)   // 被否定的不列
-	f.mustResolve(t, members[1].ID, OutcomeDuplicate) // 重複仍列
-	// 第三筆有補充與佐證（登入的檢舉人補充）。
-	r3 := f.reportOf(t, members[2].ID)
-	f.media.rejected = nil
-	if _, err := f.module.SubmitReport(ctx, SubmitReportInput{
-		StoreID: s.StoreID, ReporterBuyerID: *r3.ReporterBuyerID, AccountID: accountID + 1000, Category: policy.Fraud, Description: "補充說明", EvidenceTokens: []string{"x1"},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	anonymous := f.anonymousReport(t, s.StoreID, "0912345678").Report
-	f.mustTriage(t, anonymous.ID, policy.FoodSafety, nil)
-
-	export, err := f.module.FDAExport(ctx, c.ID)
-	must(t, err)
-	ids := make([]uuid.UUID, len(export.Reports))
-	for i, r := range export.Reports {
-		ids[i] = r.ID
-		if r.Contact != nil {
-			t.Errorf("轉報資料不放聯絡方式：%+v", r.Contact)
-		}
-	}
-	if want := []uuid.UUID{members[1].ID, members[2].ID, anonymous.ID}; !slices.Equal(ids, want) {
-		t.Fatalf("export reports=%v，預期 %v（舊到新，不含被否定的）", ids, want)
-	}
-	third := export.Reports[1]
-	if len(third.Supplements) != 1 || third.Supplements[0].Description != "補充說明" || len(third.Evidence) != 1 || len(third.Supplements[0].EvidencePositions) != 1 || third.Supplements[0].EvidencePositions[0] != 0 {
-		t.Fatalf("補充與佐證的位置：%+v", third)
-	}
-	if export.Case.ID != c.ID || export.Store.StoreID != s.StoreID || export.Store.AccountID != accountID {
-		t.Fatalf("export=%+v", export)
-	}
-	// 店家已關閉照樣匯出。
-	_, err = f.module.CloseCurrent(ctx, accountID)
-	must(t, err)
-	if closed, err := f.module.FDAExport(ctx, c.ID); err != nil || closed.Store.StoreID != s.StoreID || closed.Store.Status != Closed {
-		t.Fatalf("closed=%+v err=%v", closed.Store, err)
-	}
-	fraud, _ := f.newCase(t, f.anotherStore(t).StoreID, policy.Fraud, SeverityLow, 1)
-	_, err = f.module.FDAExport(ctx, fraud.ID)
-	wantBlocked(t, err, "平台判定類別是食安的案件才能匯出轉報資料。")
-	_, err = f.module.FDAExport(ctx, uuid.NewV7())
-	wantKind(t, err, apperr.KindNotFound)
 }
 
 // 分案與移動的去處由伺服器輸出（設計審查 #1）：只有此刻能分案或能移動的通報帶 triage_targets；每個可判定的類別一筆（順序同政策分類），
@@ -1049,7 +907,7 @@ func TestSupplementsAreSeenOnlyWhenTheAdminActsOnThatReport(t *testing.T) {
 	if after := f.caseOf(t, c.ID); after.UnseenSupplementReports != 2 {
 		t.Fatalf("案件還有 2 個成員的補充沒看過：%+v", after.Case)
 	}
-	// 改案件嚴重度、記錄轉報之類的案件層級處理不記任何成員的補充：B、C 仍然沒看過。
+	// 改案件嚴重度之類的案件層級處理不記任何成員的補充：B、C 仍然沒看過。
 	f.now = f.now.Add(time.Minute)
 	_, err := f.module.ChangeCaseSeverity(ctx, ChangeCaseSeverityInput{CaseID: c.ID, AdminID: 10, Severity: SeverityMedium, Note: "改", ExpectedVersion: f.caseOf(t, c.ID).Version})
 	must(t, err)

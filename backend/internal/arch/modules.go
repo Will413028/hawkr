@@ -109,7 +109,6 @@ var InternalDependencies = map[string]InternalGraph{
 		"governance": {"mediaref", "model", "store", "stint", "text"}, // text：指令被擋下時的伺服器句子（ADR 2026-10-17 多語系）
 		"measure":    {"closing", "exposure", "mediaref", "model", "store", "stint", "suspension", "text"},
 		"closing":    {"exposure", "model", "payuni", "store", "stint", "suspension"},
-		"foodreg":    {"agreement", "exposure", "model", "store", "stint"},
 		"mediaref":   {"model", "store"},
 		"kyc":        {"agreement", "exposure", "mediaref", "model", "payuni", "store", "stint"},
 		"payuni":     {"exposure", "model", "store", "stint"},

@@ -10,7 +10,6 @@ import (
 	"uuid"
 
 	"connectrpc.com/connect"
-	"google.golang.org/genproto/googleapis/type/date"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -92,35 +91,28 @@ func TestCaseCarriesTheModulesAvailabilityAndDecisionOptions(t *testing.T) {
 			t.Errorf("%s：options=%v defaults=%v can_decide=%v", name, options, defaults, got.GetCanDecide())
 		}
 		if got.GetState() != adminpb.CaseState_CASE_STATE_OPEN || !got.GetCanChangeSeverity() || !got.GetCanLinkMeasure() || !got.GetCanCreateMeasure() ||
-			!got.GetCanRecordFdaReferral() || !got.GetCanExportFda() || got.GetEtag() != "6" {
-			t.Errorf("%s：進行中的食安案件 %v", name, got)
+			got.GetEtag() != "6" {
+			t.Errorf("%s：進行中的案件 %v", name, got)
 		}
 	}
-	// 已結案：什麼決定都不能做、不能改嚴重度與連結措施；已記過轉報時不能再記，仍可匯出。
+	// 已結案：什麼決定都不能做、不能改嚴重度與連結措施。
 	closedAt, reason, decision := governanceNow, model.CaseClosedDecided, model.DecisionNoAction
-	closed := caseFixture(model.CaseFacts{Case: model.Case{ClosedAt: &closedAt, CloseReason: &reason, Decision: &decision, Referral: &model.CaseReferral{Outcome: model.ReferralReferred, FDA: &model.FDAReferral{Channel: model.FDAHotline1919}}}, StoreClosed: true})
+	closed := caseFixture(model.CaseFacts{Case: model.Case{ClosedAt: &closedAt, CloseReason: &reason, Decision: &decision}, StoreClosed: true})
 	got := toCase(closed)
 	if got.GetCanDecide() || len(got.GetDecisionOptions()) != 0 || got.GetCanChangeSeverity() || got.GetCanLinkMeasure() || got.GetCanCreateMeasure() ||
-		got.GetCanRecordFdaReferral() || !got.GetCanExportFda() || got.GetState() != adminpb.CaseState_CASE_STATE_CLOSED ||
-		got.GetCloseReason() != adminpb.CaseCloseReason_CASE_CLOSE_REASON_DECIDED || got.GetDecision() != adminpb.CaseDecision_CASE_DECISION_NO_ACTION || got.GetFdaReferral() == nil {
+		got.GetState() != adminpb.CaseState_CASE_STATE_CLOSED ||
+		got.GetCloseReason() != adminpb.CaseCloseReason_CASE_CLOSE_REASON_DECIDED || got.GetDecision() != adminpb.CaseDecision_CASE_DECISION_NO_ACTION {
 		t.Fatalf("已結案：%v", got)
 	}
-	// 以沒有通報關閉的案件不能轉報也不能匯出；店家已關閉時進行中的案件不能建立警告、停權與風險措施，仍可連結終止合作。
+	// 以沒有通報關閉的案件沒有決定；店家已關閉時進行中的案件不能建立警告、停權與風險措施，仍可連結終止合作。
 	noReports := model.CaseClosedNoReports
 	got = toCase(caseFixture(model.CaseFacts{Case: model.Case{ClosedAt: &closedAt, CloseReason: &noReports}}))
-	if got.GetCanRecordFdaReferral() || got.GetCanExportFda() || got.GetDecision() != adminpb.CaseDecision_CASE_DECISION_UNSPECIFIED {
+	if got.GetDecision() != adminpb.CaseDecision_CASE_DECISION_UNSPECIFIED {
 		t.Fatalf("以沒有通報關閉：%v", got)
 	}
 	got = toCase(caseFixture(model.CaseFacts{StoreClosed: true}))
 	if got.GetCanCreateMeasure() || !got.GetCanLinkMeasure() {
 		t.Fatalf("店家已關閉：%v", got)
-	}
-	// 非食安的案件不能轉報、不能匯出。
-	other := caseFixture(model.CaseFacts{})
-	other.Category = policy.Fraud
-	other.Availability = model.CaseFacts{Case: other.Case}.Availability()
-	if got := toCase(other); got.GetCanRecordFdaReferral() || got.GetCanExportFda() {
-		t.Fatalf("非食安：%v", got)
 	}
 }
 
@@ -174,10 +166,7 @@ func TestStateChangingReportAndCaseCommandsRequireAnEtag(t *testing.T) {
 			t.Fatalf("%s：沒有 etag 的指令不能呼叫模組", name)
 		}
 	}
-	// 不帶 etag 的是記錄轉報與寫註記（只依據狀態、只新增）。
-	if _, err := h.RecordFDAReferral(ctx, connect.NewRequest(&adminpb.RecordFDAReferralRequest{CaseId: caseID, Channel: adminpb.FDAChannel_FDA_CHANNEL_ONLINE_FORM})); err != nil {
-		t.Fatal(err)
-	}
+	// 不帶 etag 的是寫註記（只新增）。
 	if _, err := h.CreateCaseNote(ctx, connect.NewRequest(&adminpb.CreateCaseNoteRequest{CaseId: caseID, Note: &adminpb.GovernanceNote{Body: "x"}})); err != nil {
 		t.Fatal(err)
 	}
@@ -200,17 +189,12 @@ func TestMoveReportReportsTheClosedSourceCase(t *testing.T) {
 	}
 }
 
-// 案件清單與詳情：篩選照轉給模組，page token 綁在篩選上；案件的移動、轉報與「有新的補充」依模組的值轉出。
-func TestListCasesBindsThePageTokenAndGetCaseCarriesMovesAndReferral(t *testing.T) {
+// 案件清單與詳情：篩選照轉給模組，page token 綁在篩選上；案件的移動與「有新的補充」依模組的值轉出。
+func TestListCasesBindsThePageTokenAndGetCaseCarriesMoves(t *testing.T) {
 	cursor := &model.CaseCursor{OpenedAt: governanceNow, ID: uuid.NewV7()}
 	c := caseFixture(model.CaseFacts{})
 	c.UnseenSupplementReports = 1
 	c.Moves = []model.ReportMove{{ReportID: uuid.NewV7(), FromCaseID: uuid.NewV7(), ToCaseID: c.ID, AdminID: 5, MovedAt: governanceNow}}
-	followUp := time.Date(2026, 11, 18, 0, 0, 0, 0, time.UTC)
-	c.Referral = &model.CaseReferral{Outcome: model.ReferralReferred, FDA: &model.FDAReferral{
-		ReportedAt: governanceNow, Channel: model.FDAOnlineForm, ReferenceNo: "A-1", ReportedByAdminID: 6, FollowUpOn: &followUp,
-		Replies: []model.FDAReferralReply{{Body: "已收件", ReceivedOn: time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC), RecordedByAdminID: 8, RecordedAt: governanceNow}},
-	}}
 	c.Availability = model.CaseFacts{Case: c.Case}.Availability()
 	m := &governanceModule{cases: c, casePage: model.AdminCasePage{Items: []model.AdminCase{c}, Next: cursor}}
 	h := NewGovernance(m, rpc.Images{})
@@ -241,49 +225,8 @@ func TestListCasesBindsThePageTokenAndGetCaseCarriesMovesAndReferral(t *testing.
 		t.Fatal(err)
 	}
 	pc := one.Msg.GetCase()
-	if len(pc.GetMoves()) != 1 || pc.GetMoves()[0].GetMovedByAdminId() != "5" || pc.GetFdaReferral().GetReferenceNo() != "A-1" ||
-		pc.GetFdaReferral().GetReportedByAdminId() != "6" || pc.GetUnseenSupplementReportCount() != 1 {
+	if len(pc.GetMoves()) != 1 || pc.GetMoves()[0].GetMovedByAdminId() != "5" || pc.GetUnseenSupplementReportCount() != 1 {
 		t.Fatalf("case=%v", pc)
-	}
-	// 追蹤日期與回覆依模組的值轉出（日期是 google.type.Date）；已轉報的案件可以記回覆、不能標記不轉報，也沒有不轉報的紀錄。
-	fda := pc.GetFdaReferral()
-	if d := fda.GetFollowUpDate(); d.GetYear() != 2026 || d.GetMonth() != 11 || d.GetDay() != 18 || len(fda.GetReplies()) != 1 ||
-		fda.GetReplies()[0].GetBody() != "已收件" || fda.GetReplies()[0].GetReceiveDate().GetDay() != 20 || fda.GetReplies()[0].GetRecordedByAdminId() != "8" ||
-		pc.GetFdaReferralWaiver() != nil || pc.GetCanWaiveFdaReferral() || !pc.GetCanRecordFdaReferralReply() || pc.GetCanRecordFdaReferral() {
-		t.Fatalf("轉報：%v", pc)
-	}
-}
-
-// 不轉報的案件：fda_referral 不設、fda_referral_waiver 帶原因；不能再記錄轉報、不能再標記（仍可匯出），也不能記回覆。
-func TestCaseCarriesTheReferralWaiverAndItsPermissions(t *testing.T) {
-	c := caseFixture(model.CaseFacts{})
-	c.Referral = &model.CaseReferral{Outcome: model.ReferralWaived, Waiver: &model.ReferralWaiver{Reason: "主管機關已經介入", WaivedByAdminID: 9, WaivedAt: governanceNow}}
-	c.Availability = model.CaseFacts{Case: c.Case}.Availability()
-	got := toCase(c)
-	if got.GetFdaReferral() != nil || got.GetFdaReferralWaiver().GetReason() != "主管機關已經介入" || got.GetFdaReferralWaiver().GetWaivedByAdminId() != "9" ||
-		got.GetFdaReferralWaiver().GetWaiveTime() == nil || got.GetCanRecordFdaReferral() || got.GetCanWaiveFdaReferral() || got.GetCanRecordFdaReferralReply() || !got.GetCanExportFda() {
-		t.Fatalf("不轉報：%v", got)
-	}
-	fresh := toCase(caseFixture(model.CaseFacts{}))
-	if !fresh.GetCanRecordFdaReferral() || !fresh.GetCanWaiveFdaReferral() || fresh.GetCanRecordFdaReferralReply() || fresh.GetFdaReferralWaiver() != nil {
-		t.Fatalf("還沒有轉報紀錄：%v", fresh)
-	}
-}
-
-// 轉報資料不放檢舉人的聯絡方式（同意之後再放）：即使模組的通報帶了 Contact，匯出的回應也不帶；案件、店家與通報一起回。
-func TestFDAExportCarriesNoReporterContact(t *testing.T) {
-	report := anonymousFoodSafetyReport()
-	m := &governanceModule{export: model.FDAExport{Case: caseFixture(model.CaseFacts{}), Reports: []model.AdminReport{report}}}
-	h := NewGovernance(m, rpc.Images{})
-	got, err := h.GetFDAExport(adminCtx(1), connect.NewRequest(&adminpb.GetFDAExportRequest{CaseId: uuid.NewV7().String()}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got.Msg.GetReports()) != 1 || got.Msg.GetReports()[0].GetContact() != nil || got.Msg.GetCase().GetId() == "" || got.Msg.GetStore() == nil {
-		t.Fatalf("export=%v", got.Msg)
-	}
-	if raw := protojson.Format(got.Msg); strings.Contains(raw, "0912345678") {
-		t.Fatalf("匯出不帶電話：%s", raw)
 	}
 }
 
@@ -491,68 +434,4 @@ func TestTriageAndMoveForwardTheExplicitTarget(t *testing.T) {
 		Id: report.ID.String(), AssessedCategory: commonpb.PolicyCategory_POLICY_CATEGORY_FRAUD, Etag: "4", Target: join("x", "1"),
 	}))
 	wantInvalidArgument(t, err)
-}
-
-// 轉報的三個指令：日期是 google.type.Date 轉成台北日期（UTC 午夜）；不是有效日期的轉成零值（模組回該欄位的範圍句子）；沒設的追蹤日期是 nil（用預設）。
-func TestReferralCommandsPassDatesAndFieldsToTheModule(t *testing.T) {
-	m := &governanceModule{cases: caseFixture(model.CaseFacts{})}
-	h := NewGovernance(m, rpc.Images{})
-	ctx := adminCtx(42)
-	caseID := m.cases.ID.String()
-	if _, err := h.RecordFDAReferral(ctx, connect.NewRequest(&adminpb.RecordFDAReferralRequest{CaseId: caseID, Channel: adminpb.FDAChannel_FDA_CHANNEL_ONLINE_FORM})); err != nil || m.fda.FollowUpOn != nil {
-		t.Fatalf("沒設追蹤日期是 nil：%+v %v", m.fda, err)
-	}
-	if _, err := h.RecordFDAReferral(ctx, connect.NewRequest(&adminpb.RecordFDAReferralRequest{
-		CaseId: caseID, Channel: adminpb.FDAChannel_FDA_CHANNEL_ONLINE_FORM, FollowUpDate: &date.Date{Year: 2026, Month: 11, Day: 18},
-	})); err != nil || m.fda.FollowUpOn == nil || !m.fda.FollowUpOn.Equal(time.Date(2026, 11, 18, 0, 0, 0, 0, time.UTC)) {
-		t.Fatalf("追蹤日期：%+v %v", m.fda, err)
-	}
-	if _, err := h.RecordFDAReferral(ctx, connect.NewRequest(&adminpb.RecordFDAReferralRequest{
-		CaseId: caseID, Channel: adminpb.FDAChannel_FDA_CHANNEL_ONLINE_FORM, FollowUpDate: &date.Date{Year: 2026, Month: 2, Day: 30},
-	})); err != nil || m.fda.FollowUpOn == nil || !m.fda.FollowUpOn.IsZero() {
-		t.Fatalf("2 月 30 日不是有效日期，轉成零值：%+v %v", m.fda, err)
-	}
-	waived, err := h.WaiveFDAReferral(ctx, connect.NewRequest(&adminpb.WaiveFDAReferralRequest{CaseId: caseID, Reason: "主管機關已經介入"}))
-	if err != nil || m.waive.AdminID != 42 || m.waive.CaseID != m.cases.ID || m.waive.Reason != "主管機關已經介入" || !waived.Msg.GetAlreadyWaived() {
-		t.Fatalf("waive=%+v %v", m.waive, err)
-	}
-	if _, err := h.RecordFDAReferralReply(ctx, connect.NewRequest(&adminpb.RecordFDAReferralReplyRequest{
-		CaseId: caseID, Body: "已收件", ReceiveDate: &date.Date{Year: 2026, Month: 10, Day: 20}, NextFollowUpDate: &date.Date{Year: 2026, Month: 12, Day: 1},
-	})); err != nil || m.fdaReply.AdminID != 42 || m.fdaReply.Body != "已收件" || !m.fdaReply.ReceivedOn.Equal(time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC)) ||
-		m.fdaReply.NextFollowUpOn == nil || !m.fdaReply.NextFollowUpOn.Equal(time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)) || m.fdaReply.ClearFollowUp {
-		t.Fatalf("reply=%+v %v", m.fdaReply, err)
-	}
-	if _, err := h.RecordFDAReferralReply(ctx, connect.NewRequest(&adminpb.RecordFDAReferralReplyRequest{CaseId: caseID, Body: "x", ClearFollowUp: true})); err != nil ||
-		!m.fdaReply.ReceivedOn.IsZero() || m.fdaReply.NextFollowUpOn != nil || !m.fdaReply.ClearFollowUp {
-		t.Fatalf("沒設收到的日期是零值（模組回範圍句子）、不再追蹤：%+v %v", m.fdaReply, err)
-	}
-	reqID := uuid.NewV4()
-	if _, err := h.RecordFDAReferralReply(ctx, connect.NewRequest(&adminpb.RecordFDAReferralReplyRequest{CaseId: caseID, Body: "x", RequestId: reqID.String()})); err != nil ||
-		m.fdaReply.RequestID == nil || *m.fdaReply.RequestID != reqID {
-		t.Fatalf("request_id 交給模組：%+v %v", m.fdaReply, err)
-	}
-	_, err = h.RecordFDAReferralReply(ctx, connect.NewRequest(&adminpb.RecordFDAReferralReplyRequest{CaseId: caseID, Body: "x", RequestId: uuid.NewV7().String()}))
-	wantInvalidArgument(t, err) // request_id 必須是 UUIDv4
-	_, err = h.WaiveFDAReferral(ctx, connect.NewRequest(&adminpb.WaiveFDAReferralRequest{CaseId: "not-a-uuid", Reason: "x"}))
-	wantInvalidArgument(t, err)
-}
-
-// 追蹤逾期以讀取的時間（AdminCase.ReadAt）推導，handler 照轉：追蹤日期過了而設定之後沒有回覆是 true；設定之後有回覆是 false。
-func TestFDAReferralFollowUpOverdueIsReadTimeDerived(t *testing.T) {
-	followUp := time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC)
-	setAt := time.Date(2026, 9, 20, 3, 0, 0, 0, time.UTC)
-	referral := &model.CaseReferral{Outcome: model.ReferralReferred, FDA: &model.FDAReferral{
-		ReportedAt: setAt, Channel: model.FDAOnlineForm, FollowUpOn: &followUp, FollowUpSetAt: &setAt,
-	}}
-	readAt := time.Date(2026, 10, 20, 16, 0, 0, 0, time.UTC) // 台北 10/21 00:00
-	if !toFDAReferral(referral, readAt).GetFollowUpOverdue() {
-		t.Fatal("追蹤日期隔天（台北）、沒有回覆：逾期")
-	}
-	if toFDAReferral(referral, readAt.Add(-time.Second)).GetFollowUpOverdue() {
-		t.Fatal("追蹤日期當天（台北）：不逾期")
-	}
-	referral.FDA.Replies = []model.FDAReferralReply{{Body: "已移送", ReceivedOn: followUp, RecordedByAdminID: 1, RecordedAt: setAt.Add(time.Hour)}}
-	if toFDAReferral(referral, readAt).GetFollowUpOverdue() {
-		t.Fatal("設定之後有回覆：不逾期")
-	}
 }

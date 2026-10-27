@@ -57,21 +57,6 @@ extension CommonPolicyCategoryUiText on hawkr_common_v1alpha1_policy_category.Po
   String? uiText(UiLocale l) => _commonPolicyCategory(l, value);
 }
 
-String? _sellerFoodRegistrationState(UiLocale l, int value) {
-return switch ((l, value)) {
-(UiLocale.zhTW || UiLocale.en, 1) => '審核中',
-(UiLocale.zhTW || UiLocale.en, 2) => '已通過',
-(UiLocale.zhTW || UiLocale.en, 3) => '未通過',
-(UiLocale.zhTW || UiLocale.en, 4) => '已結束',
-_ => null,
-};
-}
-
-extension SellerFoodRegistrationStateUiText on hawkr_seller_v1alpha1_seller.FoodRegistrationState {
-  /// seller.FoodRegistrationState 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
-  String? uiText(UiLocale l) => _sellerFoodRegistrationState(l, value);
-}
-
 String? _sellerKYCField(UiLocale l, int value) {
 return switch ((l, value)) {
 (UiLocale.zhTW || UiLocale.en, 1) => '真實姓名',
@@ -455,41 +440,6 @@ _ => null,
 String commonUnknown(UiLocale l) => switch (l) {
 UiLocale.zhTW || UiLocale.en => '未知',
 };
-
-/// seller.FoodRegistration.kyc_pending_note
-String sellerFoodRegistrationKycPendingNote(UiLocale l) {
-return switch (l) {
-UiLocale.zhTW || UiLocale.en => '平台會在商家認證通過後進行審核。',
-};
-}
-
-/// seller.FoodRegistration.status_approved
-String sellerFoodRegistrationStatusApproved(UiLocale l, {required String number}) {
-return switch (l) {
-UiLocale.zhTW || UiLocale.en => '已登錄：' + number,
-};
-}
-
-/// seller.FoodRegistration.status_pending
-String sellerFoodRegistrationStatusPending(UiLocale l, {required String number, required String date}) {
-return switch (l) {
-UiLocale.zhTW || UiLocale.en => '審核中：' + number + '（' + date + ' 送出）',
-};
-}
-
-/// seller.FoodRegistration.status_rejected
-String sellerFoodRegistrationStatusRejected(UiLocale l, {required String reason}) {
-return switch (l) {
-UiLocale.zhTW || UiLocale.en => '未通過：' + reason + '。請確認字號與食藥署登錄資料一致後重新送出。',
-};
-}
-
-/// seller.FoodRegistration.status_revoked
-String sellerFoodRegistrationStatusRevoked(UiLocale l, {required String number, required String reason}) {
-return switch (l) {
-UiLocale.zhTW || UiLocale.en => '已被平台撤銷：' + number + '。理由：' + reason + '。請確認字號與食藥署登錄資料一致後重新送出審核。',
-};
-}
 
 /// seller.Measure.appeal_deadline
 String sellerMeasureAppealDeadline(UiLocale l, {required String deadline}) {

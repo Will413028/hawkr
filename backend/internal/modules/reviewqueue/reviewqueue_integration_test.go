@@ -298,16 +298,16 @@ func TestListRejectsInvalidInput(t *testing.T) {
 	}
 }
 
-// 模組認得的種類與來源一致：seller 的 12 支函式各自的 kind 字面值，集合等於模組的 Kinds（加來源的種類時沒有同步 model.Kinds，這裡失敗）。
+// 模組認得的種類與來源一致：seller 的 10 支函式各自的 kind 字面值，集合等於模組的 Kinds（加來源的種類時沒有同步 model.Kinds，這裡失敗）。
 // 查詢以 kinds 篩選，所以來源多出模組不認得的種類時，那些列在執行期不會出現在結果裡、也不報錯，只有這個測試（測試期）看得到。
 func TestKindsMatchTheSource(t *testing.T) {
 	t.Parallel()
 	d, _ := setup(t)
 	ctx := context.Background()
 	fns := []string{
-		"review_report_triage", "review_case_decision", "review_case_inquiry_overdue", "review_case_fda_referral", "review_authority_order",
+		"review_report_triage", "review_case_decision", "review_case_inquiry_overdue", "review_authority_order",
 		"review_authority_target_notice", "review_measure_appeal", "review_measure_lift_request", "review_measure_review",
-		"review_food_registration", "review_kyc_application", "review_payuni_bind_retry",
+		"review_kyc_application", "review_payuni_bind_retry",
 	}
 	var sourceKinds []string
 	// 每支函式的 kind 字面值：從函式定義裡讀（pg_get_functiondef 的第一個 SELECT 字面值）。
@@ -328,7 +328,7 @@ func TestKindsMatchTheSource(t *testing.T) {
 	}
 	slices.Sort(known)
 	if !slices.Equal(sourceKinds, known) {
-		t.Errorf("seller 的 12 支函式發布的 kind %v，模組認得的 %v", sourceKinds, known)
+		t.Errorf("seller 的 10 支函式發布的 kind %v，模組認得的 %v", sourceKinds, known)
 	}
 }
 
@@ -360,7 +360,7 @@ func setupICU(t *testing.T) (*db.DB, *reviewqueue.Module) {
 
 // 全序是位元組順序，不是資料庫的 collation：在預設 collation 是 ICU 語言排序的 database 裡（a < A < b < B），query 的 ORDER BY 與 keyset 的
 // row-value 比較沒有 COLLATE "C" 時依語言排序，逐頁讀完的序列不等於位元組順序（A < B < a < b），翻頁在頁界漏掉或重複。
-// mutation：拿掉 ORDER BY 或 keyset 任一處的 item_id 的 COLLATE "C"，這裡失敗。kind 的 COLLATE "C" 不在內：現在的 11 個 kind 值在預設與 C collation
+// mutation：拿掉 ORDER BY 或 keyset 任一處的 item_id 的 COLLATE "C"，這裡失敗。kind 的 COLLATE "C" 不在內：現在的 kind 值在預設與 C collation
 // 下順序相同，拿掉它這裡抓不到（實測）；保留它是為了與 item_id 一致、不依賴資料庫的 collation。觸發：新增的 kind 值若與既有值在
 // collation 下順序不同（例如 '_' 對字母的位置），這支 ICU 測試要加入跨種類的列。
 func TestOrderingIsBytewiseNotLocale(t *testing.T) {
@@ -372,7 +372,7 @@ func TestOrderingIsBytewiseNotLocale(t *testing.T) {
 		LANGUAGE sql STABLE
 		BEGIN ATOMIC
 		    SELECT 'REPORT_TRIAGE'::text, v.id::text, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::smallint, NULL::bigint,
-		           NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::bigint, NULL::text, at, at
+		           NULL::uuid, NULL::uuid, NULL::uuid, NULL::bigint, NULL::text, at, at
 		    FROM (VALUES ('B'), ('a'), ('A'), ('b'), ('a-1'), ('a/1'), ('ab'), ('Ab'), ('_x'), ('1')) AS v(id);
 		END`)
 	must(t, err)

@@ -40,7 +40,6 @@ var trimmedColumns = []trimmedColumn{
 	{table: "agent.vendor_portal_invites", column: "invited_email", constraint: "vendor_portal_invites_email_check"},
 	{table: "seller.stores", column: "store_name", constraint: "stores_store_name_check"},
 	{table: "seller.stores", column: "contact_name", constraint: "stores_contact_name_check", extra: map[string]any{"store_name": "店"}},
-	{table: "seller.food_registrations", column: "registration_number", constraint: "food_registrations_number_check"},
 	{table: "seller.kyc_applications", column: "real_name", constraint: "kyc_applications_real_name_check"},
 	{table: "seller.prospects", column: "display_name", constraint: "prospects_display_name_check"},
 	{table: "seller.prospect_contacts", column: "value", constraint: "prospect_contacts_value_check"},

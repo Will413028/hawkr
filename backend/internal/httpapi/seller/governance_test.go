@@ -43,7 +43,6 @@ type governanceModule struct {
 	reportPage  model.AdminReportPage
 	caseList    model.CaseListInput
 	casePage    model.AdminCasePage
-	export      model.FDAExport
 	measureList model.AdminMeasureListInput
 	violList    model.ViolationListInput
 	noteList    model.MeasureNoteListInput
@@ -56,9 +55,6 @@ type governanceModule struct {
 	moveResult  model.MoveReportResult
 	decideCase  model.DecideCaseInput
 	severity    model.ChangeCaseSeverityInput
-	fda         model.RecordFDAReferralInput
-	waive       model.WaiveFDAReferralInput
-	fdaReply    model.RecordFDAReferralReplyInput
 	caseNote    model.CreateCaseNoteInput
 	create      model.CreateMeasureInput
 	update      model.UpdateMeasureInput
@@ -118,25 +114,6 @@ func (m *governanceModule) DecideCase(_ context.Context, in model.DecideCaseInpu
 func (m *governanceModule) ChangeCaseSeverity(_ context.Context, in model.ChangeCaseSeverityInput) (model.AdminCase, error) {
 	m.severity, m.calls = in, m.calls+1
 	return m.cases, nil
-}
-
-func (m *governanceModule) RecordFDAReferral(_ context.Context, in model.RecordFDAReferralInput) (model.RecordFDAReferralResult, error) {
-	m.fda, m.calls = in, m.calls+1
-	return model.RecordFDAReferralResult{Case: m.cases, AlreadyRecorded: true}, nil
-}
-
-func (m *governanceModule) WaiveFDAReferral(_ context.Context, in model.WaiveFDAReferralInput) (model.WaiveFDAReferralResult, error) {
-	m.waive, m.calls = in, m.calls+1
-	return model.WaiveFDAReferralResult{Case: m.cases, AlreadyWaived: true}, nil
-}
-
-func (m *governanceModule) RecordFDAReferralReply(_ context.Context, in model.RecordFDAReferralReplyInput) (model.AdminCase, error) {
-	m.fdaReply, m.calls = in, m.calls+1
-	return m.cases, nil
-}
-
-func (m *governanceModule) FDAExport(context.Context, uuid.UUID) (model.FDAExport, error) {
-	return m.export, nil
 }
 
 func (m *governanceModule) CreateCaseNote(_ context.Context, in model.CreateCaseNoteInput) (model.GovernanceNote, error) {
@@ -273,7 +250,6 @@ func TestGovernanceEnumsMatchTheModule(t *testing.T) {
 		"CaseCloseReason":                rpc.EnumMismatches[adminpb.CaseCloseReason](model.CaseCloseReasonValues()),
 		"CaseDecision":                   rpc.EnumMismatches[adminpb.CaseDecision](model.DecisionValues()),
 		"SupplementMatch":                rpc.EnumMismatches[adminpb.SupplementMatch](model.SupplementMatchValues()),
-		"FDAChannel":                     rpc.EnumMismatches[adminpb.FDAChannel](model.FDAChannelValues()),
 		"ViolationSeverity":              rpc.EnumMismatches[pb.ViolationSeverity](model.SeverityValues()),
 		"MeasureRequestKind":             rpc.EnumMismatches[pb.MeasureRequestKind](model.RequestKindValues()),
 		"RemediationUnavailableReason":   rpc.EnumMismatches[pb.RemediationUnavailableReason](model.RemediationUnavailableReasonValues()),
@@ -493,15 +469,12 @@ func TestGovernanceCommandsUseTheCallingAdmin(t *testing.T) {
 		Id: caseID.String(), Severity: pb.ViolationSeverity_VIOLATION_SEVERITY_LOW, Note: "事實更清楚", Etag: "8",
 	}))
 	must(err)
-	fda, err := h.RecordFDAReferral(ctx, connect.NewRequest(&adminpb.RecordFDAReferralRequest{CaseId: caseID.String(), Channel: adminpb.FDAChannel_FDA_CHANNEL_HOTLINE_1919}))
-	must(err)
 	if m.triage.AdminID != 42 || m.triage.ReportID != report.ID || m.triage.AssessedCategory != policy.FoodSafety || m.triage.Target.OpenNew == nil || *m.triage.Target.OpenNew != model.SeverityCritical || m.triage.Target.Join != nil || m.triage.ExpectedVersion != 4 ||
 		m.resolve.AdminID != 42 || m.resolve.Outcome != model.OutcomeNoViolation || m.resolve.Note != "查無" || m.resolve.ExpectedVersion != 5 ||
 		m.move.AdminID != 42 || m.move.AssessedCategory != policy.Fraud || m.move.Target.Join == nil || m.move.Target.Join.CaseID != caseID || m.move.Target.Join.ExpectedVersion != 3 || m.move.Target.OpenNew != nil || m.move.ExpectedVersion != 6 || moved.Msg.GetSourceCaseClosed() ||
 		m.decideCase.AdminID != 42 || m.decideCase.CaseID != caseID || m.decideCase.Decision != model.DecisionNoAction || m.decideCase.Note != "已確認" || m.decideCase.ExpectedVersion != 7 ||
-		m.severity.AdminID != 42 || m.severity.Severity != model.SeverityLow || m.severity.Note != "事實更清楚" || m.severity.ExpectedVersion != 8 ||
-		m.fda.AdminID != 42 || m.fda.CaseID != caseID || m.fda.Channel != model.FDAHotline1919 || m.fda.ReferenceNo != "" || !fda.Msg.GetAlreadyRecorded() {
-		t.Fatalf("triage=%+v resolve=%+v move=%+v decide=%+v severity=%+v fda=%+v", m.triage, m.resolve, m.move, m.decideCase, m.severity, m.fda)
+		m.severity.AdminID != 42 || m.severity.Severity != model.SeverityLow || m.severity.Note != "事實更清楚" || m.severity.ExpectedVersion != 8 {
+		t.Fatalf("triage=%+v resolve=%+v move=%+v decide=%+v severity=%+v", m.triage, m.resolve, m.move, m.decideCase, m.severity)
 	}
 	ends := governanceNow.Add(48 * time.Hour)
 	reqID := uuid.New()
@@ -877,9 +850,6 @@ func TestMeasureFieldPathsExistInTheRequests(t *testing.T) {
 		"listCases":         {listCasesPaths, &adminpb.ListCasesRequest{}},
 		"decideCase":        {decideCasePaths, &adminpb.DecideCaseRequest{}},
 		"severity":          {changeSeverityPaths, &adminpb.ChangeCaseSeverityRequest{}},
-		"referral":          {fdaReferralPaths, &adminpb.RecordFDAReferralRequest{}},
-		"waiveReferral":     {waiveReferralPaths, &adminpb.WaiveFDAReferralRequest{}},
-		"referralReply":     {referralReplyPaths, &adminpb.RecordFDAReferralReplyRequest{}},
 		"update":            {updateMeasurePaths, &adminpb.UpdateMeasureRequest{}},
 		"end":               {endMeasurePaths, &adminpb.EndMeasureRequest{}},
 		"revoke":            {revokeMeasurePaths, &adminpb.RevokeMeasureRequest{}},
