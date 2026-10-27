@@ -23,7 +23,7 @@ notification-service（設計書 12、13）的現況：
 - 偏好 10 類（`internal/domain/notification_preference.go:6-15`），`shipment_anomaly` 對賣家強制開啟。
 
 約束：
-- 外部：推播只有 FCM（APNs 經 FCM）。不得使用舊公司的 Firebase 專案、Resend 帳號與 `example.com` 寄件網域（repo `AGENTS.md`「不連到舊公司」；Will 2026-10-05 確認 Resend 與網域屬於舊公司），新的推播專案、寄信服務帳號與寄件網域是本步驟的前置。
+- 外部：推播只有 FCM（APNs 經 FCM）。不得使用舊公司的 Firebase 專案、Resend 帳號與 `example.com` 寄件網域（單體 ADR `2026-09-24-go-modular-monolith.md` D9；Will 2026-10-05 確認 Resend 與網域屬於舊公司），新的推播專案、寄信服務帳號與寄件網域是本步驟的前置。
 - 外部：登入只有 Google、Apple、LINE（ADR `2026-09-27-identity-clerk.md` D2）；LINE 不保證回傳 email，部分帳號沒有 email。Apple 私密轉寄地址只收已在 Apple Developer 登記的寄件網域。
 - 外部：個資法第 20 條（為行銷利用個資時，當事人表示拒絕就停止）；Gmail、Yahoo 2024 年起的大量寄件者規範（SPF、DKIM、DMARC，行銷信符合 RFC 8058 一鍵退訂）。
 - 繼承：還沒搬進單體的服務（Java 等）到各自的步驟前仍經 RabbitMQ 發事件，wire 格式與「發布失敗只記 log」都在邊界外。仍成立，舊事件能達到的可靠度受它限制。
