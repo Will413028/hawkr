@@ -28,11 +28,13 @@ const EXPECTED_PUBLIC_STATIC_ROUTES = [
 	"/adm/unavailable",
 	"/cart",
 	"/contact",
-	"/hawkr-agent-rfq-demo",
-	"/hawkr-agent-rfq-preview",
 	"/faq",
 	"/feed",
+	"/hawkr-agent-rfq-demo",
+	"/hawkr-agent-rfq-preview",
 	"/login",
+	// Clerk 社群登入的回呼頁：登入流程中的訪客落在這裡，必須匿名可達。
+	"/login/sso-callback",
 	"/market/products",
 	"/payment/return",
 	"/privacy",
@@ -344,7 +346,7 @@ test.describe("canonical public static route browser health", {
 
 	test("public static inventory stays explicit and complete", () => {
 		expect(PUBLIC_STATIC_ROUTES).toEqual([...EXPECTED_PUBLIC_STATIC_ROUTES]);
-		expect(PUBLIC_STATIC_ROUTES).toHaveLength(25);
+		expect(PUBLIC_STATIC_ROUTES).toHaveLength(26);
 	});
 
 	// EVERY route here is `@live`, including the ones that render nothing but

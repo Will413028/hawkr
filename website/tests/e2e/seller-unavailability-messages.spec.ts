@@ -80,6 +80,24 @@ async function prepareSeller(page: Page, baseURL: string | undefined) {
 	}, LOADER_KEY);
 }
 
+/**
+ * 措施列表在手機寬度只顯示收合的紀錄列（桌面版卡片被隱藏），入口與句子在展開後的細節裡。
+ * 桌面寬度沒有展開鈕，什麼都不做；回傳只找看得到的那份。
+ */
+async function serverSentence(page: Page, sentence: string) {
+	// 與 styles/components/seller-mobile-disclosure.css 的斷點（max-width: 767px）相同。
+	if ((page.viewportSize()?.width ?? 1280) <= 767) {
+		const toggle = page
+			.locator(".seller-mobile-disclosure-list button[aria-expanded]")
+			.first();
+		await toggle.waitFor();
+		if ((await toggle.getAttribute("aria-expanded")) === "false") {
+			await toggle.click();
+		}
+	}
+	return page.getByText(sentence).locator("visible=true").first();
+}
+
 test.describe("伺服器給的不能做的原因句", { tag: ["@ui"] }, () => {
 	test("措施列表：申覆與解除請求入口附伺服器的句子，冷卻時間不是 client 用 nextRemediationTime 組的", async ({
 		page,
@@ -90,10 +108,12 @@ test.describe("伺服器給的不能做的原因句", { tag: ["@ui"] }, () => {
 
 		await page.goto("/seller/measures");
 
-		await expect(page.getByText(APPEAL_PENDING_SENTENCE).first()).toBeVisible();
+		await expect(
+			await serverSentence(page, APPEAL_PENDING_SENTENCE),
+		).toBeVisible();
 		// 句子裡的時間（10:06）與 nextRemediationTime（10:05:01）進位後相同只是巧合；
 		// 換掉句子就換掉畫面，證明畫面讀的是句子而不是欄位。
-		await expect(page.getByText(COOLDOWN_SENTENCE).first()).toBeVisible();
+		await expect(await serverSentence(page, COOLDOWN_SENTENCE)).toBeVisible();
 		await expect(
 			page.getByRole("button", { name: "提出申覆" }).first(),
 		).toBeDisabled();
@@ -121,9 +141,11 @@ test.describe("伺服器給的不能做的原因句", { tag: ["@ui"] }, () => {
 
 		await page.goto("/seller/measures");
 
-		await expect(page.getByText("伺服器改過的申覆說明").first()).toBeVisible();
 		await expect(
-			page.getByText("伺服器改過的解除請求說明").first(),
+			await serverSentence(page, "伺服器改過的申覆說明"),
+		).toBeVisible();
+		await expect(
+			await serverSentence(page, "伺服器改過的解除請求說明"),
 		).toBeVisible();
 		await expect(page.getByText(APPEAL_PENDING_SENTENCE)).toHaveCount(0);
 		await expect(page.getByText(COOLDOWN_SENTENCE)).toHaveCount(0);

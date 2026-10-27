@@ -750,6 +750,76 @@ export function localizedMessageDetail(message: string) {
 	);
 }
 
+/**
+ * BuyerAppService 的 Connect 方法：與 identity 同樣打 `/api/connect/{package.Service}/{Method}`，
+ * NO_SIDE_EFFECTS 的方法（Get*、List*）以 GET 呼叫、帶 query。
+ */
+function buyerMethod(method: string): RegExp {
+	return new RegExp(
+		`/api/connect/hawkr\\.buyer\\.v1alpha1\\.BuyerAppService/${method}(?:\\?|$)`,
+	);
+}
+export const GET_PROFILE_URL = buyerMethod("GetProfile");
+export const LIST_ADDRESSES_URL = buyerMethod("ListAddresses");
+
+/** proto3 JSON 的買家 `Address`（buyer.proto）；`townCode` 是內政部 8 碼鄉鎮市區代碼。 */
+export interface MockBuyerAddress {
+	id: string;
+	receiverName: string;
+	receiverPhone: string;
+	townCode: string;
+	addressDetail: string;
+	defaultAddress?: boolean;
+}
+
+/** 以固定的收貨地址清單回應 ListAddresses（單頁，不帶 next_page_token）。 */
+export async function mockBuyerAddresses(
+	page: Page,
+	addresses: readonly MockBuyerAddress[],
+): Promise<void> {
+	await page.route(LIST_ADDRESSES_URL, (route) => {
+		void fulfillConnect(route, {
+			addresses: addresses.map((a) => ({
+				id: a.id,
+				receiverName: a.receiverName,
+				receiverPhone: a.receiverPhone,
+				postalAddress: {
+					townCode: a.townCode,
+					addressDetail: a.addressDetail,
+				},
+				defaultAddress: a.defaultAddress ?? false,
+				etag: `etag-${a.id}`,
+			})),
+			nextPageToken: "",
+		});
+	});
+}
+
+/**
+ * 登入頁面共用的買家資料讀取（個人資料與帳號選單、收藏、追蹤、造訪、會員卡、地址）：
+ * 預設都回空清單，沒有被個別 mock 蓋過時不會打到沒有後端的同源代理而 502。
+ * 較晚註冊的 route 會蓋過這裡。
+ */
+async function mockBuyerDefaults(page: Page, accountId: string) {
+	await page.route(GET_PROFILE_URL, (route) => {
+		void fulfillConnect(route, {
+			profile: { id: accountId, displayName: "測試買家", etag: "etag-profile" },
+		});
+	});
+	const empty: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
+		["ListAddresses", { addresses: [], nextPageToken: "" }],
+		["ListMemberCards", { memberCards: [], nextPageToken: "" }],
+		["ListFavorites", { favorites: [], nextPageToken: "", totalSize: 0 }],
+		["ListFollows", { follows: [], nextPageToken: "", totalSize: 0 }],
+		["ListVisits", { visits: [], nextPageToken: "" }],
+	];
+	for (const [method, body] of empty) {
+		await page.route(buyerMethod(method), (route) => {
+			void fulfillConnect(route, body);
+		});
+	}
+}
+
 /** 以 Connect 的錯誤（JSON）回應：HTTP 狀態碼依 code，body 是 `{code, message}`（加上 details）。 */
 export function fulfillConnectError(
 	route: Route,
@@ -850,6 +920,10 @@ export async function setupGatewayMocks(
 			);
 		});
 	}
+
+	// 2a. 買家資料與賣家儀表板的讀取：預設回空，個別 mock 較晚註冊會蓋過。
+	await mockBuyerDefaults(page, identity.accountId);
+	await mockMyDashboard(page, {});
 
 	// 2b. 措施與申覆（ListMyMeasures）：預設空。
 	await mockMyMeasures(page, opts.measures ?? []);

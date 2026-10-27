@@ -10,7 +10,9 @@ import {
 	type DynamicRouteAccess,
 } from "./helpers/dynamic-route-catalog";
 import {
+	fulfillConnect,
 	type MockStore,
+	mockBuyerAddresses,
 	mockMyKyc,
 	mockMyStore,
 	setupGatewayMocks,
@@ -537,25 +539,20 @@ const ROUTE_CASES: readonly DynamicRouteCase[] = [
 		role: "buyer",
 		url: "/account/addresses/101/edit",
 		pathname: "/account/addresses/101/edit",
-		mocks: [
-			{
-				path: "/app/buyers/me/addresses",
-				data: {
-					records: [
-						{
-							id: "101",
-							receiverName: "路由測試收件人",
-							receiverPhone: "0912345678",
-							city: "臺北市",
-							district: "中正區",
-							detailAddress: "測試路1號",
-							isDefault: true,
-						},
-					],
+		mocks: [],
+		async setup(page) {
+			await mockBuyerAddresses(page, [
+				{
+					id: "101",
+					receiverName: "路由測試收件人",
+					receiverPhone: "0912345678",
+					townCode: "63000050",
+					addressDetail: "測試路1號",
+					defaultAddress: true,
 				},
-			},
-		],
-		requiredRequests: [{ method: "GET", path: "/app/buyers/me/addresses" }],
+			]);
+		},
+		requiredRequests: [],
 		async assertVisible(page) {
 			await assertHeading(page, "編輯地址");
 			await expect(page.getByLabel("收件人姓名")).toHaveValue("路由測試收件人");
@@ -777,31 +774,28 @@ const ROUTE_CASES: readonly DynamicRouteCase[] = [
 		role: "buyer",
 		url: `/account/wallet/${SELLER_ID}?name=${encodeURIComponent("路由測試商店")}`,
 		pathname: `/account/wallet/${SELLER_ID}`,
-		mocks: [
-			{
-				path: `/app/buyers/me/member-cards/${SELLER_ID}/records`,
-				data: {
-					records: [
-						{
-							orderDate: "2026-01-01",
-							orderSn: ORDER_NO,
-							amount: "120",
-							refund: "0",
-							hasCoupon: false,
-						},
-					],
-					total: 1,
-					totalSpending: "120",
-					totalRefund: "0",
-				},
-			},
-		],
-		requiredRequests: [
-			{
-				method: "GET",
-				path: `/app/buyers/me/member-cards/${SELLER_ID}/records`,
-			},
-		],
+		mocks: [],
+		async setup(page) {
+			await page.route(
+				/\/api\/connect\/hawkr\.buyer\.v1alpha1\.BuyerAppService\/ListSpendingRecords(?:\?|$)/,
+				(route) =>
+					fulfillConnect(route, {
+						records: [
+							{
+								orderNumber: ORDER_NO,
+								amount: "120",
+								refundedAmount: "0",
+								couponApplied: false,
+								orderTime: "2026-01-01T00:00:00Z",
+							},
+						],
+						nextPageToken: "",
+						totalSpent: "120",
+						totalRefunded: "0",
+					}),
+			);
+		},
+		requiredRequests: [],
 		async assertVisible(page) {
 			await assertHeading(page, "路由測試商店 · 會員卡");
 			await assertText(page, `訂單 ${ORDER_NO}`);
@@ -1059,7 +1053,8 @@ const ROUTE_CASES: readonly DynamicRouteCase[] = [
 		pathname: `/seller-center/posts/${POST_ID}/edit`,
 		mocks: [
 			{
-				path: `/public/posts/${POST_ID}`,
+				// 編輯頁讀賣家自己的單篇（任何發布狀態），不是公開的 /public/posts。
+				path: `/app/sellers/posts/${POST_ID}`,
 				data: {
 					id: POST_ID,
 					content: "路由測試貼文內容",
@@ -1074,7 +1069,7 @@ const ROUTE_CASES: readonly DynamicRouteCase[] = [
 			},
 		],
 		requiredRequests: [
-			{ method: "GET", path: `/public/posts/${POST_ID}` },
+			{ method: "GET", path: `/app/sellers/posts/${POST_ID}` },
 			{
 				method: "GET",
 				path: `/public/sellers/${SELLER_ID}/products`,

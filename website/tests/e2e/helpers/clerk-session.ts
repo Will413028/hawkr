@@ -74,7 +74,11 @@ function installClerkStub(args: {
 	sessionId: string;
 }) {
 	const { token, userId, sessionId } = args;
-	const user = { id: userId, organizationMemberships: [] };
+	const user = {
+		id: userId,
+		organizationMemberships: [],
+		externalAccounts: [],
+	};
 	const session: Record<string, unknown> = {
 		id: sessionId,
 		status: "active",

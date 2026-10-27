@@ -578,6 +578,15 @@ test.describe("賣家中心手機摘要卡滑軌", { tag: ["@ui"] }, () => {
 				expect(action.controlHeight, action.label).toBeGreaterThanOrEqual(44);
 			}
 
+			// 公開前必須的條件都滿足（店家資料齊全、KYC 已通過）時任務卡預設收合；
+			// 這裡要量的是任務名稱，先展開。
+			await expect(page.locator(".seller-onboarding-progress")).toBeVisible();
+			const expandTasks = page.getByRole("button", { name: "展開任務" });
+			if ((await expandTasks.count()) > 0) await expandTasks.click();
+			await expect(
+				page.locator(".seller-onboarding-step__title"),
+			).not.toHaveCount(0);
+
 			const onboardingTitleWidths = await page
 				.locator(".seller-onboarding-step__title")
 				.evaluateAll((titles) =>

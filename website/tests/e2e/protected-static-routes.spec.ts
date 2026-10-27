@@ -178,6 +178,27 @@ function attachRuntimeMonitors(page: Page, baseURL: string): string[] {
 	return issues;
 }
 
+/**
+ * 還沒申請 KYC 的店家，GetMyKYC 依契約回 not_found（HTTP 404），瀏覽器為每一筆再記一則
+ * 「Failed to load resource ... 404」的 console.error。這是契約規定的回應，不是故障；
+ * 只扣掉 GetMyKYC 的 404 與同數量的那則 console 訊息，其他 404 與任何失敗照樣算。
+ */
+function withoutContractKycNotFound(issues: readonly string[]): string[] {
+	const kycNotFound =
+		/^HTTP 404 GET \S+\/hawkr\.seller\.v1alpha1\.SellerAppService\/GetMyKYC\?/;
+	const consoleNotFound =
+		/^console\.error: Failed to load resource: the server responded with a status of 404/;
+	let consoleBudget = issues.filter((issue) => kycNotFound.test(issue)).length;
+	return issues.filter((issue) => {
+		if (kycNotFound.test(issue)) return false;
+		if (consoleBudget > 0 && consoleNotFound.test(issue)) {
+			consoleBudget--;
+			return false;
+		}
+		return true;
+	});
+}
+
 async function assertRenderedLinksSafe(page: Page, route: string) {
 	const hrefs = await page.locator("a[href]").evaluateAll((anchors) =>
 		anchors.flatMap((anchor) => {
@@ -281,9 +302,10 @@ async function assertProtectedRoute(
 	// errors that occur after the first hydrated commit.
 	await page.waitForTimeout(500);
 	const text = await pageContent.innerText();
-	expect(runtimeIssues, `${route} emitted runtime/network failures`).toEqual(
-		[],
-	);
+	expect(
+		withoutContractKycNotFound(runtimeIssues),
+		`${route} emitted runtime/network failures`,
+	).toEqual([]);
 	expect(text, `${route} rendered an error/not-found shell`).not.toMatch(
 		ERROR_SHELL,
 	);

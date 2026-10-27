@@ -4,6 +4,7 @@ import { CART_UPDATED_EVENT } from "../../lib/cart";
 import type { CartGroupWire, CartItemWire } from "../../lib/cart/types";
 import { ShippingMethod, ShippingTemperature } from "../../lib/codemeta/enums";
 import {
+	mockBuyerAddresses,
 	seedStoredActiveRole,
 	setupGatewayMocks,
 } from "./helpers/mock-gateway";
@@ -166,24 +167,16 @@ async function setupCart(page: Page, baseURL: string | undefined) {
 			},
 		});
 	});
-	await page.route("**/api/v1/app/buyers/me/addresses**", (route) =>
-		route.fulfill({
-			json: {
-				code: 0,
-				data: [
-					{
-						id: "selection-address",
-						receiverName: "測試收件人",
-						receiverPhone: "0912345678",
-						city: "臺北市",
-						district: "中正區",
-						detailAddress: "測試路 1 號",
-						isDefault: true,
-					},
-				],
-			},
-		}),
-	);
+	await mockBuyerAddresses(page, [
+		{
+			id: "selection-address",
+			receiverName: "測試收件人",
+			receiverPhone: "0912345678",
+			townCode: "63000050",
+			addressDetail: "測試路 1 號",
+			defaultAddress: true,
+		},
+	]);
 	await page.route("**/api/v1/app/checkout/validate", async (route) => {
 		const { items } = route.request().postDataJSON() as {
 			items: { skuId: string }[];
