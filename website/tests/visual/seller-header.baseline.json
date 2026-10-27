@@ -170,7 +170,7 @@
 				"display": "flex",
 				"align-items": "center",
 				"column-gap": "0px",
-				"color": "rgb(232, 239, 226)",
+				"color": "rgb(228, 231, 235)",
 				"text-decoration-line": "none"
 			},
 			"nav": {
@@ -186,7 +186,7 @@
 				"min-height": "44px",
 				"padding": "0px 14px",
 				"border-radius": "999px",
-				"color": "rgb(232, 239, 226)",
+				"color": "rgb(228, 231, 235)",
 				"font-size": "14px",
 				"font-weight": "700",
 				"text-decoration-line": "none",
@@ -201,7 +201,7 @@
 				"min-height": "44px",
 				"padding": "0px 14px",
 				"border-radius": "999px",
-				"color": "rgb(232, 239, 226)",
+				"color": "rgb(228, 231, 235)",
 				"font-size": "14px",
 				"font-weight": "700",
 				"text-decoration-line": "none",
@@ -223,7 +223,7 @@
 				"padding": "0px 18px",
 				"border-radius": "999px",
 				"background-color": "rgb(184, 68, 31)",
-				"color": "rgb(232, 239, 226)",
+				"color": "rgb(228, 231, 235)",
 				"font-size": "14px",
 				"font-weight": "700",
 				"text-decoration-line": "none",
@@ -239,7 +239,7 @@
 				"border-top-width": "0px",
 				"border-radius": "999px",
 				"background-color": "rgba(0, 0, 0, 0)",
-				"color": "rgb(232, 239, 226)"
+				"color": "rgb(228, 231, 235)"
 			},
 			"themeBtn": {
 				"width": "44px",
@@ -254,7 +254,7 @@
 				"border-top-width": "2px",
 				"border-top-color": "rgba(154, 165, 177, 0.36)",
 				"border-radius": "999px",
-				"background-color": "rgb(33, 58, 46)",
+				"background-color": "rgb(43, 54, 66)",
 				"color": "rgb(184, 68, 31)",
 				"box-shadow": "rgba(255, 255, 255, 0.72) 0px 1px 0px 0px inset"
 			}
@@ -262,17 +262,17 @@
 		"hover": {
 			"navItem": {
 				"backgroundColor": "rgba(184, 68, 31, 0.1)",
-				"color": "rgb(232, 239, 226)",
+				"color": "rgb(228, 231, 235)",
 				"transform": "matrix(1, 0, 0, 1, 0, -1)"
 			},
 			"cta": {
 				"backgroundColor": "rgb(143, 51, 21)",
-				"color": "rgb(232, 239, 226)",
+				"color": "rgb(228, 231, 235)",
 				"transform": "matrix(1, 0, 0, 1, 0, -1)"
 			},
 			"iconBtn": {
 				"backgroundColor": "rgba(245, 222, 165, 0.12)",
-				"color": "rgb(232, 239, 226)",
+				"color": "rgb(228, 231, 235)",
 				"transform": "matrix(1, 0, 0, 1, 0, -1)"
 			}
 		}
@@ -448,7 +448,7 @@
 				"display": "flex",
 				"align-items": "center",
 				"column-gap": "0px",
-				"color": "rgb(232, 239, 226)",
+				"color": "rgb(228, 231, 235)",
 				"text-decoration-line": "none"
 			},
 			"nav": {
@@ -464,7 +464,7 @@
 				"min-height": "44px",
 				"padding": "0px 14px",
 				"border-radius": "999px",
-				"color": "rgb(232, 239, 226)",
+				"color": "rgb(228, 231, 235)",
 				"font-size": "14px",
 				"font-weight": "700",
 				"text-decoration-line": "none",
@@ -479,7 +479,7 @@
 				"min-height": "44px",
 				"padding": "0px 14px",
 				"border-radius": "999px",
-				"color": "rgb(232, 239, 226)",
+				"color": "rgb(228, 231, 235)",
 				"font-size": "14px",
 				"font-weight": "700",
 				"text-decoration-line": "none",
@@ -501,7 +501,7 @@
 				"padding": "0px 18px",
 				"border-radius": "999px",
 				"background-color": "rgb(184, 68, 31)",
-				"color": "rgb(232, 239, 226)",
+				"color": "rgb(228, 231, 235)",
 				"font-size": "14px",
 				"font-weight": "700",
 				"text-decoration-line": "none",
@@ -517,7 +517,7 @@
 				"border-top-width": "0px",
 				"border-radius": "999px",
 				"background-color": "rgba(0, 0, 0, 0)",
-				"color": "rgb(232, 239, 226)"
+				"color": "rgb(228, 231, 235)"
 			},
 			"themeBtn": {
 				"width": "44px",
@@ -532,7 +532,7 @@
 				"border-top-width": "2px",
 				"border-top-color": "rgba(154, 165, 177, 0.36)",
 				"border-radius": "999px",
-				"background-color": "rgb(33, 58, 46)",
+				"background-color": "rgb(43, 54, 66)",
 				"color": "rgb(184, 68, 31)",
 				"box-shadow": "rgba(255, 255, 255, 0.72) 0px 1px 0px 0px inset"
 			}
@@ -540,17 +540,17 @@
 		"hover": {
 			"navItem": {
 				"backgroundColor": "rgba(0, 0, 0, 0)",
-				"color": "rgb(232, 239, 226)",
+				"color": "rgb(228, 231, 235)",
 				"transform": "none"
 			},
 			"cta": {
 				"backgroundColor": "rgb(184, 68, 31)",
-				"color": "rgb(232, 239, 226)",
+				"color": "rgb(228, 231, 235)",
 				"transform": "none"
 			},
 			"iconBtn": {
 				"backgroundColor": "rgba(0, 0, 0, 0)",
-				"color": "rgb(232, 239, 226)",
+				"color": "rgb(228, 231, 235)",
 				"transform": "none"
 			}
 		}

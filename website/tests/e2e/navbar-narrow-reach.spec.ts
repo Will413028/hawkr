@@ -64,7 +64,25 @@ test.describe("navbar reach on the narrowest phone", { tag: ["@ui"] }, () => {
 				?.closest("header, nav");
 			return nav ? nav.scrollWidth - nav.clientWidth : -1;
 		});
-		expect(navOverflow, "navbar overflows horizontally").toBe(0);
+		// 溢出時列出超出右緣的元素，失敗訊息直接指出是誰撐寬的。
+		const overflowing = await page.evaluate(() => {
+			const nav = document
+				.querySelector('[data-testid="account-menu-trigger"]')
+				?.closest("header, nav");
+			if (!nav) return [];
+			const edge = nav.getBoundingClientRect().right;
+			return Array.from(nav.querySelectorAll("*"))
+				.filter((el) => el.getBoundingClientRect().right > edge + 0.5)
+				.slice(0, 8)
+				.map((el) => {
+					const r = el.getBoundingClientRect();
+					return `${el.tagName.toLowerCase()}.${String(el.className).slice(0, 80)} right=${r.right.toFixed(1)} width=${r.width.toFixed(1)}`;
+				});
+		});
+		expect(
+			navOverflow,
+			`navbar overflows horizontally: ${overflowing.join(" | ")}`,
+		).toBe(0);
 
 		await trigger.click();
 		await expect(page.getByTestId("logout-button")).toBeVisible();
