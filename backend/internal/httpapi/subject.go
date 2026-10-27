@@ -15,7 +15,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 )
 
-// 限流的身分（subject）回答「這個請求算在誰頭上」，與額度是兩個問題。官網的 SSR 與 CI 各以一個位址
+// 限流的身分（subject）回答「這個請求算在誰頭上」，與額度是兩個問題。網頁的 SSR 與 CI 各以一個位址
 // 代表很多人，所以它們以 origin-auth 自己簽出身分（#2264）：
 //
 //	X-HK-Origin-Auth: base64url(payload) "." base64url(HMAC-SHA256(key, "hkorigin1:" || base64url(payload)))
@@ -30,7 +30,7 @@ const (
 	originAuthSkew    = 60 * time.Second
 )
 
-// OriginAuth 是驗證 origin-auth 的金鑰。Main（換金鑰時加上 Prev）給官網的 worker，CI 另一把：持有 CI 金鑰的
+// OriginAuth 是驗證 origin-auth 的金鑰。Main（換金鑰時加上 Prev）給網頁的 worker，CI 另一把：持有 CI 金鑰的
 // 人不能簽 visitor，否則能以任何人的 IP 把對方擋在登入之外。空的金鑰表示停用那一類的驗證（以空的 key 驗 HMAC
 // 等於任何人都能簽）。
 type OriginAuth struct {

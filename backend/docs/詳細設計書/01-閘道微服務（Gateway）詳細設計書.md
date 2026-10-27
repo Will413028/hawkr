@@ -82,7 +82,7 @@ Client Request
 🔴 **配額鍵一律是限流身分，不是來源 IP。** 任何 per-IP 配額、封鎖或連線數上限都**必須**
 經由 `RateLimitSubject()`——`c.ClientIP()` 不得直接當配額鍵：
 
-- **不唯一**：官網 SSR、admin BFF、CI runner 都是「一個位址代表無限多個真人」
+- **不唯一**：網頁 SSR、admin BFF、CI runner 都是「一個位址代表無限多個真人」
 - **不可信**：能直連 origin 的人可自填 `CF-Connecting-IP`
 
 `429` 的 envelope `code` 恆為 `429`；AI 配額用 `4291`。兩者共用 HTTP 429，
@@ -113,7 +113,7 @@ autofill、session 查詢、snapshot、候選搜尋建立與輪詢、selection�
 
 **豁免的條件是「會自動重連」，這三棵不符合**：`exemptExact` 存在是為了斷線後客戶端立刻
 重撥的連線（通知 SSE、IM WebSocket），per-request 計數器會把一個邏輯 session 看成一場
-風暴。AI 這三棵沒有任何消費端是這個形狀——官網是一次性 `fetch`
+風暴。AI 這三棵沒有任何消費端是這個形狀——網頁是一次性 `fetch`
 （`lib/ai-chat/stream-client.ts`，無 `EventSource`、無 `Last-Event-ID`），buyer／seller
 兩支 App 是單次 `dio.post(responseType: ResponseType.stream)`，非 200 直接 `addError` 後
 關閉 controller，兩個 repo 都沒有註冊任何 retry interceptor（各自的
@@ -139,11 +139,11 @@ deadline 傳到 ai-service）。
 `proxy.ServeAIAssistantStream`，直接寫 `c.Writer`，不進 Hub、不佔位子。
 ⇒ 一個身分可以只花 3 個請求就同時掛著 3 條 120 秒串流。
 
-⚠️ **表裡頻率最高的一條**：`GET .../requests/:id/candidate-searches/:runId` 被官網以
+⚠️ **表裡頻率最高的一條**：`GET .../requests/:id/candidate-searches/:runId` 被網頁以
 **1.5 秒**輪詢整段候選搜尋（`features/procurement-assistant/useProcurementSession.ts`），
 即每位搜尋中的買家約 40 req/min，對 300/60s 的桶。單一買家寬裕，**同一個對外位址有數位
-買家同時搜尋則不寬裕**，而官網的輪詢器把 429 當網路失敗處理（三次 backoff 後停下、改為
-手動重試）。真的發生時可動的旋鈕是官網的 `POLL_INTERVAL_MS` 與本側的 tier 配額——
+買家同時搜尋則不寬裕**，而網頁的輪詢器把 429 當網路失敗處理（三次 backoff 後停下、改為
+手動重試）。真的發生時可動的旋鈕是網頁的 `POLL_INTERVAL_MS` 與本側的 tier 配額——
 **不是重開一個豁免**。
 
 
@@ -155,7 +155,7 @@ type SubjectKind int
 
 const (
     SubjectVisitor SubjectKind = iota // 一個真人
-    SubjectSSR                        // 官網 server 端渲染（含 ISR 背景 regenerate、build、暖機）
+    SubjectSSR                        // 網頁 server 端渲染（含 ISR 背景 regenerate、build、暖機）
     SubjectCI                         // CI runner / E2E / smoke
 )
 
@@ -175,7 +175,7 @@ func RateLimitSubject(c *gin.Context) (subject string, kind SubjectKind)
 | 3 | 有效簽章（CI 密鑰），`p=ci` | `s:ci` | `SubjectCI` |
 | 4 | 其餘（無簽章／簽章無效／機制停用）；`c.ClientIP()` 亦須通過 `net.ParseIP`，失敗則為 `v:invalid` | `v:<ClientIP>` | `SubjectVisitor` |
 
-**#1 與 #4 刻意同前綴 ⇒ 同一把 key**：一個真人做的事算在一個人頭上，不論他是瀏覽器直接打的、還是官網／admin 代他打的。因此**這兩列必須共用同一個配額值**——`pkg/ratelimit/ratelimit.go` 的 limit 是 per-call 參數而 counter 是 per-key，同一把 key 餵兩個上限，低的那半會先擋人。
+**#1 與 #4 刻意同前綴 ⇒ 同一把 key**：一個真人做的事算在一個人頭上，不論他是瀏覽器直接打的、還是網頁／admin 代他打的。因此**這兩列必須共用同一個配額值**——`pkg/ratelimit/ratelimit.go` 的 limit 是 per-call 參數而 counter 是 per-key，同一把 key 餵兩個上限，低的那半會先擋人。
 
 **為何前綴與 IP 格式驗證兩者缺一不可**：gin 對 `CF-Connecting-IP` 不做格式驗證。若 subject 無前綴，任何能直連 origin 的人送 `CF-Connecting-IP: s:ssr` 就把自己算進了 SSR 軸（該軸配額是訪客軸的 20 倍）。前綴加上格式驗證，讓「無簽章的請求」**永遠只能落在 `v:` 命名空間內**。
 
@@ -214,7 +214,7 @@ flowchart TD
 
 #### 3.2.5 來源簽章 `X-HK-Origin-Auth`
 
-自家的 server 端呼叫者（官網 Worker、admin Worker、CI）用簽章宣告「我代表誰」。設計參照 `internal/middleware/chat_ws_ticket_hmac.go`，以及 [52 微服務間內部授權](52-微服務間內部授權（Internal%20Service%20Authorization）詳細設計書.md) 的 HMAC 慣例（canonical string 前綴、`_PREV` 輪替、時間窗）。
+自家的 server 端呼叫者（網頁 Worker、admin Worker、CI）用簽章宣告「我代表誰」。設計參照 `internal/middleware/chat_ws_ticket_hmac.go`，以及 [52 微服務間內部授權](52-微服務間內部授權（Internal%20Service%20Authorization）詳細設計書.md) 的 HMAC 慣例（canonical string 前綴、`_PREV` 輪替、時間窗）。
 
 > **與內部授權（52 號）的分工**：`x-internal-service` 系列簽章回答「這是不是我方微服務發的呼叫」，用於**授權**；`X-HK-Origin-Auth` 回答「這個請求代表哪一個限流身分」，**不授予任何權限**。兩者密鑰不同、驗證點不同、失敗處置也相反——內部授權在 enforcing 模式 fail-closed，本簽章一律 fail-open。
 
@@ -228,12 +228,12 @@ mac     = HMAC-SHA256(secret, "hkorigin1:" || base64url(payload))
 
 | 決策 | 選擇 | 理由 |
 |---|---|---|
-| 密鑰 | 獨立 `ORIGIN_AUTH_SECRET`，**不**共用 `JWT_SECRET` | 不同用途要能獨立輪替；官網 Worker 不該持有能簽 JWT 的密鑰 |
+| 密鑰 | 獨立 `ORIGIN_AUTH_SECRET`，**不**共用 `JWT_SECRET` | 不同用途要能獨立輪替；網頁 Worker 不該持有能簽 JWT 的密鑰 |
 | 綁定 | `m`（method）+ `u`（path） | 防止簽章被挪去打別的 endpoint |
 | 時效 | `ts` ±60 秒 | 與限流窗同量級 |
 | nonce | **不做** | SSR 高頻，per-request nonce 存 Redis 不划算；重放的獲益僅止於「換一條配額軸」，已由綁 method+path 與 60 秒窗界定 |
 | 輪替 | `ORIGIN_AUTH_SECRET_PREV` 同時接受 | 無縫輪替 |
-| 驗證失敗 | **fail-open**：降級為 `SubjectVisitor` + metric + 告警 | 密鑰輪替窗口不該打掛官網；降級後的行為＝沒有本設計時的行為 |
+| 驗證失敗 | **fail-open**：降級為 `SubjectVisitor` + metric + 告警 | 密鑰輪替窗口不該打掛網頁；降級後的行為＝沒有本設計時的行為 |
 | 密鑰為空 | **完全停用簽章驗證** + gauge + critical 告警 | 見下 |
 
 ##### 空密鑰：停用驗證，不是「用空密鑰驗」，也不是「啟動失敗」
@@ -261,23 +261,23 @@ CI 密鑰為空  ⇒ 只停用 p=ci 的驗證
 
 | secret | 持有者 | 只接受的 `p` |
 |---|---|---|
-| `ORIGIN_AUTH_SECRET`（+ `_PREV`） | 官網 Worker、admin Worker | `visitor`、`ssr` |
+| `ORIGIN_AUTH_SECRET`（+ `_PREV`） | 網頁 Worker、admin Worker | `visitor`、`ssr` |
 | `ORIGIN_AUTH_CI_SECRET` | GitHub Actions | **僅** `ci` |
 
 理由與「不共用 `JWT_SECRET`」同一條：**暴露面不同的持有者不該共用密鑰**。GitHub Actions secret 的暴露面（fork PR、workflow 注入、第三方 action）與 CF Worker secret 完全不同。
 
-**兩把密鑰的停用開關也是獨立的**：只設主密鑰 ⇒ 官網／admin 的簽章生效、CI 簽章一律被忽略（CI 流量落 `v:<runner IP>`）；只設 CI 密鑰 ⇒ 反之。這正是人工建立 secret 最可能出現的中間狀態，設計上必須有定義且分別可觀測，見 §3.2.11 的 `key` label。
+**兩把密鑰的停用開關也是獨立的**：只設主密鑰 ⇒ 網頁／admin 的簽章生效、CI 簽章一律被忽略（CI 流量落 `v:<runner IP>`）；只設 CI 密鑰 ⇒ 反之。這正是人工建立 secret 最可能出現的中間狀態，設計上必須有定義且分別可觀測，見 §3.2.11 的 `key` label。
 
-##### 官網 SSR 一次請求的完整路徑
+##### 網頁 SSR 一次請求的完整路徑
 
-下圖的重點是**訪客身分在哪一段還在、哪一段沒了**：訪客 IP 只存在於「CF edge → Worker」那一跳的 header 上；一旦進入 RSC render（`unstable_cache` 內），`headers()` 會直接 throw（Next.js `E838`），訪客身分在應用層就不存在了。因此官網不做環境偵測，改為**顯式傳遞 `visitorIp`**：拿得到就簽 `p=visitor`，拿不到就簽 `p=ssr`。
+下圖的重點是**訪客身分在哪一段還在、哪一段沒了**：訪客 IP 只存在於「CF edge → Worker」那一跳的 header 上；一旦進入 RSC render（`unstable_cache` 內），`headers()` 會直接 throw（Next.js `E838`），訪客身分在應用層就不存在了。因此網頁不做環境偵測，改為**顯式傳遞 `visitorIp`**：拿得到就簽 `p=visitor`，拿不到就簽 `p=ssr`。
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant U as 訪客瀏覽器
     participant CF as Cloudflare Edge
-    participant W as 官網 Worker SSR
+    participant W as 網頁 Worker SSR
     participant GW as Gateway
     participant MS as 微服務
 
@@ -311,7 +311,7 @@ sequenceDiagram
     CF-->>U: 回應
 ```
 
-> ⚠️ 官網端的簽章分支必須是 `typeof window === "undefined"`。否則官網**瀏覽器端**的請求也會帶簽章，全部擠進同一個 subject，比沒有本設計更糟（含 OTP）。
+> ⚠️ 網頁端的簽章分支必須是 `typeof window === "undefined"`。否則網頁**瀏覽器端**的請求也會帶簽章，全部擠進同一個 subject，比沒有本設計更糟（含 OTP）。
 > ⚠️ `visitorIp` **絕不可進 `unstable_cache` 的 keyParts**：那會讓 cache entry 依訪客分裂，等於廢掉快取。傳遞鏈只走「不經 cached wrapper」的呼叫點。
 
 #### 3.2.6 分軸配額
@@ -389,7 +389,7 @@ subject 抽象在**所有 tier** 生效（key 一律 `ratelimit:{tier}:{subject}
 
 ##### `SubjectVisitor` = 600 的依據
 
-`v:` 軸實際承載的是：① 瀏覽器直連的 API 呼叫 ② App 直連 ③ 官網 middleware 代打（`/sellers/*` canonical lookup）④ 官網 7 支 `/api/public/*` route handler 代打 ⑤ admin BFF 代打。**不含 page SSR**（它走 `s:ssr`）。
+`v:` 軸實際承載的是：① 瀏覽器直連的 API 呼叫 ② App 直連 ③ 網頁 middleware 代打（`/sellers/*` canonical lookup）④ 網頁 7 支 `/api/public/*` route handler 代打 ⑤ admin BFF 代打。**不含 page SSR**（它走 `s:ssr`）。
 
 實測單訪客瀏覽器直連尖峰 25/分鐘，加上第 3–5 項的代打量，保守估上界約 **200/分鐘**。600 ＝ 3× 上界，符合《[硬上限依賴接入治理規範（配額與容量）](../開發規範/硬上限依賴接入治理規範（配額與容量）.md)》§6 step 1 的「供需差 < 3 倍即不合格」門檻；且對 NAT / CGNAT 後多真人共用一個 IP 留有餘裕（本值只放寬不收緊）。
 
@@ -413,7 +413,7 @@ subject 抽象在**所有 tier** 生效（key 一律 `ratelimit:{tier}:{subject}
 | 現況用量 prod 24h max | 31/分 ＝ 0.26%。⚠️ **此數字結構性無效、不得作為安全證據**：prod 當前「推薦賣家 1 個、商品 0 筆」，預抓根本沒東西可扇出 |
 | 告警門檻 | 40%（4,800/分）⇒ 約 20–24 個並發訪客時通知 |
 | 何時逼近 | 依上一列，並發重度訪客達 20 即觸發通知；達 50 觸頂 |
-| 定位 | **失控保險絲，不是日常節流閥**。官網是自家系統，日常量應遠低於此；觸及 200 req/s 代表官網有失控迴圈 |
+| 定位 | **失控保險絲，不是日常節流閥**。網頁是自家系統，日常量應遠低於此；觸及 200 req/s 代表網頁有失控迴圈 |
 
 ##### 配額值的落點（缺一即靜默失效）
 
@@ -433,7 +433,7 @@ subject 抽象在**所有 tier** 生效（key 一律 `ratelimit:{tier}:{subject}
 
 | kind | 在軸內？ | 理由 |
 |---|---|---|
-| `SubjectVisitor` | **是** | 涵蓋全部真人流量（瀏覽器直連 + App + 官網代打）。把它排除，等於讓 `RATE_LIMIT_AUTH_FAILURE_PER_WINDOW=100` 這條防線整條失效 |
+| `SubjectVisitor` | **是** | 涵蓋全部真人流量（瀏覽器直連 + App + 網頁代打）。把它排除，等於讓 `RATE_LIMIT_AUTH_FAILURE_PER_WINDOW=100` 這條防線整條失效 |
 | `SubjectSSR` | 否 | 匿名讀取，不會產生「使用者驗證失敗」；計數只會讓一個共用軸替所有人背黑鍋 |
 | `SubjectCI` | 否 | 自動化測試依設計會刻意打出 401 斷言 |
 
@@ -626,7 +626,7 @@ origin」。後者是網路層問題，需要三層各自獨立的收口——**
 - **Redis 不可用時 degrade-open**：`pkg/ratelimit` 落回有界的記憶體 limiter。這是刻意選擇——限流是保護機制而非業務正確性機制，錯放比錯擋便宜。此性質不因 subject 抽象而改變。
 - **簽章驗證 fail-open**，密鑰為空則整條停用。兩者的共同性質是：**任何失效都退回「沒有本設計時的行為」，並由告警大聲叫**，不會啟動失敗、不會靜默開後門。
 - **key 前綴變更（`otp:ip:` → `otp:subj:`）不做資料搬遷**。舊 key 隨自身 TTL 過期即消失，一次性放行的成本（§3.2.8）遠低於寫一支搬遷腳本。
-- **部署順序無耦合**：Gateway 端（本設計書）與呼叫端（官網／admin／CI）可各自獨立上線。呼叫端先上 ⇒ Gateway 忽略未知 header；Gateway 先上 ⇒ 無簽章流量全走 `v:<ClientIP>`。任何中間狀態都不會壞。
+- **部署順序無耦合**：Gateway 端（本設計書）與呼叫端（網頁／admin／CI）可各自獨立上線。呼叫端先上 ⇒ Gateway 忽略未知 header；Gateway 先上 ⇒ 無簽章流量全走 `v:<ClientIP>`。任何中間狀態都不會壞。
 
 #### 3.2.15 使用的 Enum 與代碼值
 
@@ -686,7 +686,7 @@ Worker 出口位址送出**。
 **為什麼走 payload 而不是 `CF-Connecting-IP`**：Worker 對 CF-proxied host 發 subrequest
 時，自己設的 `CF-Connecting-IP` 會不會被 CF edge 覆寫或剝除是**未經驗證的假設**。
 §3.2.5 的簽章 payload 本來就有 `ip` 欄、§3.2.4 歸屬規則 #1 也是**從 payload 讀** ⇒
-走 payload 不依賴那個假設，也讓 admin 與官網用同一種載體。
+走 payload 不依賴那個假設，也讓 admin 與網頁用同一種載體。
 
 > ⚠️ **這裡沒有「防偽造」的收益，不要那樣寫**：不帶簽章時**本來就不可偽造**，有兩道
 > 獨立的鎖（任一道單獨就擋死）——① Cloudflare edge 直接 **403** 掉任何帶

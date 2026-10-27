@@ -20,7 +20,7 @@ import (
 
 const rateWindow = time.Minute
 
-// rateTier 是一個級別在一個時間窗的額度（window 是 0 時為 rateWindow）。ssr、ci 是官網 SSR 與 CI 的身分（它們代表很多人），
+// rateTier 是一個級別在一個時間窗的額度（window 是 0 時為 rateWindow）。ssr、ci 是網頁 SSR 與 CI 的身分（它們代表很多人），
 // 0 表示同 visitor。
 type rateTier struct {
 	name             string

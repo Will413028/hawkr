@@ -434,7 +434,7 @@ func (p *postSchedulePublisher) cancelByRevocation(ctx context.Context, row *gen
 	}
 }
 
-// bust 讓官網把這則貼文與計數變動過的標籤重新取一次。
+// bust 讓網頁把這則貼文與計數變動過的標籤重新取一次。
 // 只送 entity tag；domain-collection tag 是 web 邊界的職責。best-effort，未設定即 no-op。
 func (p *postSchedulePublisher) bust(ctx context.Context, postID int64, hashtagIDs []int64) {
 	if p.reval == nil || !p.reval.Enabled() {

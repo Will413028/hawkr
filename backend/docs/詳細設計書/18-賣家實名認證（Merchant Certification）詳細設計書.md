@@ -436,11 +436,11 @@ sequenceDiagram
 |---|---|---|
 | `idNumber` | `id_card_no` | 賣家 App 精靈**自動存檔**（camelCase） |
 | `id_card_no` | `id_card_no` | 同一個 App 的**送出前存檔**（snake_case） |
-| `idCardNo` | `id_card_no` | **官網表單**直接展開 form state |
-| `bankAccount` | `bank_account` | App 自動存檔 ／ 官網表單 |
+| `idCardNo` | `id_card_no` | **網頁表單**直接展開 form state |
+| `bankAccount` | `bank_account` | App 自動存檔 ／ 網頁表單 |
 | `bank_account` | `bank_account` | App 送出前存檔 |
 
-這些拼法**不是可互換的別名**，而是三個生產者各自真實寫出來的欄位名，五個都真的會落到同一個欄位；每次存檔覆蓋整包 blob，故一列只會帶其中一種形狀——清單因此是**聯集**，不是「正規名＋別名」。🔴 **新增生產者、或任一端改欄位名，都必須同步加進這份清單。** ⚠️ 生產者分散在 App 與官網兩個 repo，官網的相關程式在 `features/` 與 `lib/`（不在 `src/` 或 `app/`）——盤點生產者時不得只掃單一目錄。
+這些拼法**不是可互換的別名**，而是三個生產者各自真實寫出來的欄位名，五個都真的會落到同一個欄位；每次存檔覆蓋整包 blob，故一列只會帶其中一種形狀——清單因此是**聯集**，不是「正規名＋別名」。🔴 **新增生產者、或任一端改欄位名，都必須同步加進這份清單。** ⚠️ 生產者分散在 App 與網頁兩個 repo，網頁的相關程式在 `features/` 與 `lib/`（不在 `src/` 或 `app/`）——盤點生產者時不得只掃單一目錄。
 
 **為什麼 `name` / `birthDate` / `companyPhone` / `sellerAddress` 等不加密**
 

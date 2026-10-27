@@ -40,7 +40,7 @@ import (
 //
 // 判準是「今天有沒有使用者看得見的缺陷」，不是「一致比較整齊」。2026-07-31 實測
 // 四個前端 repo（website / admin / buyer app / seller app）：
-//   - /related 零客戶端呼叫（官網的「相關商品」是自己用 /public/search/products
+//   - /related 零客戶端呼叫（網頁的「相關商品」是自己用 /public/search/products
 //     併同分類補齊做的，不走這支）
 //   - /brief 唯一呼叫者是 buyer app product_repository.dart:206 getSkuImageUrl()，
 //     只讀 url / imageUrl / data，不讀任何 seller 欄位，且該方法無人呼叫（dead code）

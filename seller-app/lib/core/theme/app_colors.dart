@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 /// Hawkr 品牌色彩系統。
 ///
-/// 單一來源：官網 `styles/foundation/00-color-config.css`，品牌色票見 `brand/hawkr/README.md`。
+/// 單一來源：網頁 `styles/foundation/00-color-config.css`，品牌色票見 `brand/hawkr/README.md`。
 class AppColors {
   AppColors._();
 
@@ -30,7 +30,7 @@ class AppColors {
   static const Color ink900 = brandInk;
   static const Color ink950 = Color(0xFF161C23);
 
-  // ── 官網 neutral palette ──────────────────────────────────
+  // ── 網頁 neutral palette ──────────────────────────────────
   static const Color neutralWhite = Color(0xFFFFFFFF);
   static const Color neutralCream = Color(0xFFFFFDF7);
   static const Color neutralPage = Color(0xFFF8F6EF);
@@ -65,11 +65,11 @@ class AppColors {
   static const Color surfacePanel = neutralPanel;
   static const Color surfaceGlass = Color(0xF5FFFDF7);
 
-  /// 官網 `<body>` 的單一連續頁面底色。
+  /// 網頁 `<body>` 的單一連續頁面底色。
   static const Color bgApp = surfacePage;
   static const Color bgPrimary = bgApp;
 
-  /// 官網 card surface。
+  /// 網頁 card surface。
   static const Color surfaceCard = surfaceCream;
   static const Color bgCard = surfaceCard;
   static const Color bgElevated = neutralWhite;
@@ -175,7 +175,7 @@ class AppColors {
   static const Color textPrimary = neutralBody;
   static const Color textEmphasis = neutralInk;
 
-  /// 一般次要文字仍需通過 App 的 WCAG AA；使用官網 body 色。
+  /// 一般次要文字仍需通過 App 的 WCAG AA；使用網頁 body 色。
   static const Color textSecondary = neutralBody;
   static const Color textMuted = neutralMutedText;
   static const Color textHint = neutralMutedText;

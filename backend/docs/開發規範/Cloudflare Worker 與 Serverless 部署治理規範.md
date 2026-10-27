@@ -2,7 +2,7 @@
 
 > 現況（作品集轉 public 步驟 2，D7）：公司時期的部署環境設定已刪除——`infra/mq/envs/{dev,prod}`、`mq-topology.yml` 等部署 workflow、`monitoring/` 的 prod exporter 與 `prod-infra.json`、image-gateway 的 dev／production 環境與 custom domain、website／admin 的 `wrangler.jsonc` env 區塊。下文提到這些的部署、plan／apply 與環境操作段落是公司時期的歷史紀錄，不是現行流程；部署設定等選定 demo 部署目標時重寫。
 
-> 制定：2026-07-28（源起：backend#1907 盤點——prod 官網 API 反代中樞 `api-first-party-proxy` 僅存在於 CF dashboard，無版控、無 review、不可重建）。
+> 制定：2026-07-28（源起：backend#1907 盤點——prod 網頁 API 反代中樞 `api-first-party-proxy` 僅存在於 CF dashboard，無版控、無 review、不可重建）。
 > 本檔為最終權威。
 
 ## 1. 原則（不可違反）
@@ -25,7 +25,7 @@
 | hawkr-admin-dev / -prod | hawkr-admin repo | 同 repo `deploy.yml` |
 | image-gateway-dev / -production | backend `workers/image-gateway/` | backend `deploy-worker.yml` |
 | api-first-party-proxy | backend `workers/api-first-party-proxy/` | backend `deploy-worker.yml`（#1907 納管；單一 script，僅 main 部署） |
-| ~~hawkr-router~~ | 已退役（2026-07-28）——/sitemap* 為官網遷 Workers 前殘留（官網 Worker 原生服務 sitemap，此 route 反攔截）、/s/* 為死功能零引用；源碼存證於 git 歷史 `workers/hawkr-router/` | — |
+| ~~hawkr-router~~ | 已退役（2026-07-28）——/sitemap* 為網頁遷 Workers 前殘留（網頁 Worker 原生服務 sitemap，此 route 反攔截）、/s/* 為死功能零引用；源碼存證於 git 歷史 `workers/hawkr-router/` | — |
 | hawkr-apple-pay-domain | backend `workers/hawkr-apple-pay-domain/` | backend `deploy-worker.yml`（#1907 納管；單一 script，僅 main 部署。實測為 .well-known 的實際服務者且涵蓋 api./test-api. host，判定保留） |
 
 - 新增 / 退役 Worker 時**必須同步更新本表**與 `docs/基礎建設/系統架構與資料流向.md` 的 Worker 表。

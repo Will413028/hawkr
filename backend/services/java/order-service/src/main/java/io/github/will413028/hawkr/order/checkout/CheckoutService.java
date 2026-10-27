@@ -1035,7 +1035,7 @@ public class CheckoutService {
         //      在此之前接線＝五格檢查全部不會拒絕任何東西，裝一個永遠不作用的檢查。
         //
         // ⚠️ 今天真正會拒絕的只有 **9326（待審接單雙上限）**：其餘四格都要買家送出
-        //    `invoice` 區塊才觸發，而已上架 App 不帶、官網 B02 尚未實作。B02 上線後
+        //    `invoice` 區塊才觸發，而已上架 App 不帶、網頁 B02 尚未實作。B02 上線後
         //    9302／9305／9306 才會開始發揮作用。
         validateInvoiceInputOrThrow(request, buyerId, storeId,
                 orderSubtotal, finalShippingFee, discountAmount, totalActualAmount);

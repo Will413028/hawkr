@@ -5,7 +5,7 @@
 > ⚠️ **現況校正（2026-06-28）**：本指南描述較早期架構，部分已與現況不符——
 > ① origin 埠實為 **gateway `:9900`**（非 `:8080`，前方 Traefik 終結 TLS）；
 > ② prod WebSocket 走 **`wss://api.example.com`**（與 REST 同網域；`ws.example.com` 已不存在，`test-ws` 僅為 dev 殘留 DNS）；
-> ③ prod 官網 `/api/v1/*` 經 Cloudflare Worker 同源反代。
+> ③ prod 網頁 `/api/v1/*` 經 Cloudflare Worker 同源反代。
 > 完整且當前的拓撲 / 子網域 / 資料流以 [`系統架構與資料流向`](系統架構與資料流向.md) 為準。
 
 ---

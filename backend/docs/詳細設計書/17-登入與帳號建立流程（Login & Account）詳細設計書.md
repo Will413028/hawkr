@@ -40,7 +40,7 @@ flowchart TD
 | Client | Credential | 角色資訊住哪 | 切換工作區 |
 |---|---|---|---|
 | **Mobile**（買家 / 賣家 App） | 無狀態 **JWT**（Bearer） | `loginRole` 烘進 JWT claim，固定到 refresh/重登 | re-OAuth（各 App 送固定 `userType`） |
-| **Web**（官網） | Gateway 持有的 **opaque cookie session**（`web_sessions` row 為真實來源，Redis 為加速層；§3） | session 存 **role SET**（`accountType`）＋**持久化的 active role**（`loginRole`）；每請求解析時 `X-Active-Role` hint 優先，無 hint 則單角色帳號回該角色、Both 帳號回持久值 | 改 `X-Active-Role` hint（單次）或 `POST /app/auth/active-role`（持久化），皆不重登（§3） |
+| **Web**（網頁） | Gateway 持有的 **opaque cookie session**（`web_sessions` row 為真實來源，Redis 為加速層；§3） | session 存 **role SET**（`accountType`）＋**持久化的 active role**（`loginRole`）；每請求解析時 `X-Active-Role` hint 優先，無 hint 則單角色帳號回該角色、Both 帳號回持久值 | 改 `X-Active-Role` hint（單次）或 `POST /app/auth/active-role`（持久化），皆不重登（§3） |
 
 ### 角色與視角
 

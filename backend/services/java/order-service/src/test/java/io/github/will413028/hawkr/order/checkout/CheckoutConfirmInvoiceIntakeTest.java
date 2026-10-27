@@ -262,7 +262,7 @@ class CheckoutConfirmInvoiceIntakeTest {
      * §6.2.4 order ③：invoice-service 回非 0 業務碼時**必須擋下建單**。
      *
      * <p>今天真正會走到這裡的只有 9326（待審接單雙上限）——其餘四格都要買家送出
-     * {@code invoice} 區塊才觸發，而已上架 App 不帶、官網 B02 尚未實作。
+     * {@code invoice} 區塊才觸發，而已上架 App 不帶、網頁 B02 尚未實作。
      *
      * <p>🔴 這一支守的是「有沒有真的接上」，不是「helper 寫得對不對」：接線漏掉時
      * 訂單會照常建出去，而沒有任何東西會報錯。

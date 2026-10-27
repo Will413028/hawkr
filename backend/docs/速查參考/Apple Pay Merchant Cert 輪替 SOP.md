@@ -98,7 +98,7 @@ ssh root@203.0.113.20 \
 1. Apple Developer 後台 → Merchant IDs → 該 merchant → **Merchant Domains**
 2. 找對應 domain → **Download Domain Association File**
 3. 把檔案內容（一段 5KB base64 純文字）給前端團隊，請他們更新 `hawkr-website` 的 `APPLE_PAY_DOMAIN_ASSOCIATION` 並**重跑一次部署**
-4. ⚠️ **web 部署位置＝Cloudflare Workers，不是 VM**（2026-08-04 覆核；官網已於 2026-07-01/02 cutover，Infra VM `203.0.113.10` 上**已無 website 容器、無 `/root/hawkr-website*` 目錄**）。~~舊 SOP 寫「SSH 上 Infra VM `docker compose --env-file .env.dev` 重啟」~~ **已不可行**——生效路徑是改該值後由 `hawkr-website/.github/workflows/deploy.yml` 的 `deploy-cloudflare` job 重新部署（值本身走 wrangler secret / GitHub secret）。
+4. ⚠️ **web 部署位置＝Cloudflare Workers，不是 VM**（2026-08-04 覆核；網頁已於 2026-07-01/02 cutover，Infra VM `203.0.113.10` 上**已無 website 容器、無 `/root/hawkr-website*` 目錄**）。~~舊 SOP 寫「SSH 上 Infra VM `docker compose --env-file .env.dev` 重啟」~~ **已不可行**——生效路徑是改該值後由 `hawkr-website/.github/workflows/deploy.yml` 的 `deploy-cloudflare` job 重新部署（值本身走 wrangler secret / GitHub secret）。
 5. 確認：
    ```bash
    curl https://web-dev.example.com/.well-known/apple-developer-merchantid-domain-association

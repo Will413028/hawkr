@@ -189,7 +189,7 @@ WHERE r.id = sqlc.arg(id)
 -- 🔴 為什麼不能沿用 GetOpenCorrectionRequestByDocument：那一支只認 REQUESTED／
 --    VOID_REISSUE_IN_PROGRESS ⇒ **被婉拒（REJECTED）的那一筆查不到**，而那正是
 --    買家最需要看到的一筆（`reject_reason_code` 決定他該改走折讓還是申訴）。
---    2026-09-05 第 6 輪稽核實測：官網有 `fetchInvoiceCorrection`（端點 12 的 client）
+--    2026-09-05 第 6 輪稽核實測：網頁有 `fetchInvoiceCorrection`（端點 12 的 client）
 --    卻**零呼叫端**，因為端點 8 的回應裡沒有任何管道拿得到 correction_id
 --    ⇒ 買家送出修改申請、關掉頁面再回來，申請進度與婉拒理由三處都看不到。
 --

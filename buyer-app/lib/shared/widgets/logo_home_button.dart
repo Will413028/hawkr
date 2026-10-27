@@ -22,7 +22,7 @@ class LogoHomeButton extends ConsumerStatefulWidget {
   ConsumerState<LogoHomeButton> createState() => _LogoHomeButtonState();
 }
 
-/// 官網 mobile header 使用的橫式 Hawkr 品牌標誌。
+/// 網頁 mobile header 使用的橫式 Hawkr 品牌標誌。
 ///
 /// 維持 48dp 點擊熱區、保留原始 SVG 色票；窄螢幕只壓縮可用寬度，不縮小
 /// Header 與 action 的標準高度。

@@ -22,10 +22,10 @@ abstract final class AppIconColors {
   /// Secondary brand icon (`--color-brand-primary-strong`).
   static const secondary = AppColors.brandPrimaryStrong;
 
-  /// 官網 `--icon-secondary`: primary 55%。
+  /// 網頁 `--icon-secondary`: primary 55%。
   static const secondarySoft = Color(0x8CE4572E);
 
-  /// 官網 `--icon-secondary-active`: Gold 70%。
+  /// 網頁 `--icon-secondary-active`: Gold 70%。
   static const secondaryActive = Color(0xB3F2A541);
 
   /// Icon placed on primary-strong or dark media.

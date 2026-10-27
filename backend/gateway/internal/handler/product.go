@@ -953,7 +953,7 @@ func (h *Holder) GetRelatedProducts(c *gin.Context) {
 	products := make([]ProductItem, 0, len(resp.Products))
 	// 刻意不組 Seller（也不設 StoreID）：2026-07-31 實測四個前端 repo
 	// （website / admin / buyer app / seller app）**無任何客戶端呼叫本端點**——
-	// 官網的「相關商品」是自己用 /public/search/products 併「同分類補齊」實作的
+	// 網頁的「相關商品」是自己用 /public/search/products 併「同分類補齊」實作的
 	// （app/api/public/search/products/route.ts），不走這裡。
 	// 上游帶得出來：product-service getRelatedProducts 用 publicApi(true) 查詢，
 	// ProductService.java:1085 的公開分支會 batch 填 seller meta，

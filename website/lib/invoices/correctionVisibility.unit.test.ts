@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
  * B04 送出修改申請之後，**重新載入頁面仍然看得到進度與婉拒理由**。
  *
  * 🔴 2026-09-05 第 6 輪稽核抓到的缺口：`fetchInvoiceCorrection`（端點 12 的
- * client）在官網**零呼叫端**，因為端點 8 的回應沒有任何管道拿得到 correction_id。
+ * client）在網頁**零呼叫端**，因為端點 8 的回應沒有任何管道拿得到 correction_id。
  * 症狀是買家送出申請、關掉頁面再回來，畫面上一個字都沒有——而 `rejectReasonCode`
  * 決定他該改走折讓還是申訴。
  *

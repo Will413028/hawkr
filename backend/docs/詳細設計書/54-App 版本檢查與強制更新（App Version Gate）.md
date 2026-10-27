@@ -20,7 +20,7 @@
 
 本文件描述「買家／賣家 App 發布新版本後，強制舊版用戶端更新到新版本才可繼續使用」的機制設計。目標讀者：後端、兩支 Flutter App、admin 後台。涵蓋跨四個 repo（`backend-payuni`／`hawkr_buyer`／`hawkr_seller`／`hawkr-admin`）的完整契約。
 
-不涵蓋：web 官網（`hawkr-website` 無安裝版本概念，部署即生效，快取與版本一致性見 53 號）、App 的發版流程本身（Xcode Cloud／商店送審）。
+不涵蓋：網頁（`hawkr-website` 無安裝版本概念，部署即生效，快取與版本一致性見 53 號）、App 的發版流程本身（Xcode Cloud／商店送審）。
 
 ### 1.2 服務一句話定位
 
@@ -37,7 +37,7 @@ content-service 持有「哪個 App × 哪個平台的最低可用版本」設�
 | **Goal** | 版本比較邏輯只有一份，位於 content-service（後端獨佔比較，App 只讀布林） |
 | **Non-Goal** | **不**做 Gateway 逐請求版本攔截（D5：App 非敵對環境；冷啟動＋前景恢復兩檢查點已覆蓋含「放量當下正在使用」的場景；且伺服端硬擋卡在判別不出舊 App，見 §3.1）。🔴 **重啟它的前置是組合判準（Origin allowlist ＋ path namespace ＋ header 缺席）的可行性實測——沒有這一步不要重開 D5。** |
 | **Non-Goal** | **不**做「建議更新（可跳過）」兩級機制，**不**預留 `latestVersion` 欄位（D4：需求只要求強制；預留無消費者的欄位＝零消費抽象，本 repo 已有 `can_accept_orders` 做了卻全 repo 零消費的教訓） |
-| **Non-Goal** | **不**做伺服端硬擋舊 App——判別不出（「無版本 header」的集合同時包含官網 SSR 與所有 server-to-server 呼叫，§3.1），需組合判準且每條都得實測 |
+| **Non-Goal** | **不**做伺服端硬擋舊 App——判別不出（「無版本 header」的集合同時包含網頁 SSR 與所有 server-to-server 呼叫，§3.1），需組合判準且每條都得實測 |
 | **Non-Goal** | **不**做兩 App 共用 package／monorepo 化／跨 repo CI checksum 對拍（D10：兩 repo 無 shared package、無 workspace；跨 repo CI 需另一 repo 的 checkout 憑證與同步時序，且 Flutter CI gate 只掛 `pull_request` 而兩 App 走直接 push dev，擋不到。改以本設計書為 SSOT ＋ §4.6 兩 repo 實作對照表對齊） |
 | **Non-Goal** | **不**新增 MQ event、**不**新增環境變數、**不**引入任何補償／backfill／drift 偵測任務（本需求不需要；責任邊界規範 §22） |
 | **Non-Goal** | **不**新增業務錯誤碼（D9：檢查結果以 `data.updateRequired` 表達，非錯誤路徑） |
@@ -105,7 +105,7 @@ flowchart LR
 2. 🔴 **「無 `X-App-Version` header ＝ 舊 App」不成立，不得據此設計伺服端硬擋**：
    - `hawkr-website` 的統一 fetch client（`lib/api/client.ts`）只送 `Accept`／`Content-Type`／`X-Requested-With`（unsafe method）／`X-Active-Role`，**不送任何版本類 header**。
    - website 是 Next.js on Cloudflare Workers，SSR/ISR 取數是 **Worker 伺服端 fetch，連 `Origin` 都沒有**（見 Gateway `internal/middleware/cors.go` 對 native client 無 Origin 的說明）。
-   - ⇒ 「無 `X-App-Version`」的集合 ＝ {舊 App} ∪ {官網 SSR} ∪ {任何 server-to-server 呼叫}——**照這個判準硬擋會打死官網公開頁**。
+   - ⇒ 「無 `X-App-Version`」的集合 ＝ {舊 App} ∪ {網頁 SSR} ∪ {任何 server-to-server 呼叫}——**照這個判準硬擋會打死網頁公開頁**。
    - 要做伺服端硬擋，需要**組合判準**（Origin allowlist ＋ path namespace ＋ header 缺席），且每一條都必須實測可行才能上線。
 
 3. **對 issue 目標第 1 條的達成度只能宣稱「可觀測 ＋ 絕大多數情況可強制」，不得宣稱「保證」**。只要 gate 在客戶端且 fail-open（§7.6 ②），就存在「後端不可用期間舊版 App 仍可運作」的窗口。本機制真正的、可驗證的增量是：版本佔比從不可知變成可觀測（§8.2）。
@@ -616,7 +616,7 @@ DB CHECK 已擋寫入端；此處防禦讀取端（例如既有壞資料、或�
 
 **統計分母的定義（不定義就會算錯）**
 
-**分母只取 `app_version != ""` 的請求**——也就是「本來就會帶版本 header 的那個母體」。不要用「全部請求扣掉某幾類」的思路去湊分母：dev 實測不帶版本的請求有 2,698 筆，其中**絕大多數是官網 SSR、server-to-server 呼叫與 health probe**，不是下表三類；把它們放進分母只會讓每個版本的佔比一起被稀釋成無意義的數字。
+**分母只取 `app_version != ""` 的請求**——也就是「本來就會帶版本 header 的那個母體」。不要用「全部請求扣掉某幾類」的思路去湊分母：dev 實測不帶版本的請求有 2,698 筆，其中**絕大多數是網頁 SSR、server-to-server 呼叫與 health probe**，不是下表三類；把它們放進分母只會讓每個版本的佔比一起被稀釋成無意義的數字。
 
 以 `app_version != ""` 為分母後，下表三類**自動既不進分子也不進分母**，不需要任何排除邏輯：
 
@@ -634,7 +634,7 @@ DB CHECK 已擋寫入端；此處防禦讀取端（例如既有壞資料、或�
 
 ⚠️ **LogQL 反引號是 raw string**：正則的跳脫點必須寫成單一 `\.`。寫成 `\\.` 會被解讀成「反斜線 ＋ 任意字元」而**全不匹配**——查詢回空、面板一片空白，但不會報錯。
 
-**再次強調**：無版本 header 的請求集合還包含官網 SSR 與所有 server-to-server 呼叫（§3.1 第 2 點）——**不可反推「這是舊 App」**。
+**再次強調**：無版本 header 的請求集合還包含網頁 SSR 與所有 server-to-server 呼叫（§3.1 第 2 點）——**不可反推「這是舊 App」**。
 
 **⚠️ 查詢窗口上限＝ 7 天（不是 30 天）**
 

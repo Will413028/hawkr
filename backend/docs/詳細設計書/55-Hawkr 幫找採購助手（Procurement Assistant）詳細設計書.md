@@ -39,7 +39,7 @@
 | **Non-Goal** | **不**做外部業者 Email 邀價、secure link、入駐與 KYC；EXTERNAL／EMAIL 在本次不建立 seller notification |
 | **Non-Goal** | **不**做付款、訂單、售後與撥款 |
 | **Non-Goal** | **不**做逐事件重播（event ledger + cursor replay）——理由見 [ADR D3](../adr/2026-09-18-procurement-assistant-mvp-a-decisions.md) |
-| **Non-Goal** | **不**做行動 App 端；本次僅官網 Web |
+| **Non-Goal** | **不**做行動 App 端；本次僅網頁 |
 | **Non-Goal** | Agent **不**代買家勾選候選、**不**自動送出、**不**代為承諾任何交易條件 |
 
 ### 1.4 與其他設計書／服務的關係

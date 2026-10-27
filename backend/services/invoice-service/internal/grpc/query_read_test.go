@@ -523,7 +523,7 @@ func TestGetOrderInvoice_ReturnsEveryDocumentInTheReissueChain(t *testing.T) {
 // 訂單的最新 document 是**重開的新那張**（rDocNewID）、身上沒有任何 correction 列。
 // 以「最新 document」為範圍去查 ⇒ 每一次**成功**的作廢重開都會讓這一欄立刻變回
 // 空字串，買家一重新載入就看不到「你的更正已完成」——而端點 12 是**只能**靠這一欄
-// 才到得了的（官網的 fetchInvoiceCorrection 沒有第二個 id 來源）。
+// 才到得了的（網頁的 fetchInvoiceCorrection 沒有第二個 id 來源）。
 //
 // dev 實測 O323007025（2026-09-05）：correction 7501682805546418176 是 COMPLETED、
 // reissued_document_id 指向現行文件，端點 8 仍回空字串。

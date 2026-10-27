@@ -477,8 +477,8 @@ func (h *Hub) runGC() {
 
 // capKeyOf 回傳這條連線該記在哪個 cap map 的哪個 key、上限多少、超限回什麼錯。
 // 登入者用 accountId、匿名用 `Connection.Subject`（handler 填入
-// middleware.RateLimitSubject 的結果，不是裸 client IP —— 官網 SSR／CI 一個位址
-// 背後是無限多個人，用位址當 key 會讓 5 條連線的額度被整個官網共用）；兩者都沒有
+// middleware.RateLimitSubject 的結果，不是裸 client IP —— 網頁 SSR／CI 一個位址
+// 背後是無限多個人，用位址當 key 會讓 5 條連線的額度被整個網頁共用）；兩者都沒有
 // 就不受 per-key cap 管（僅受 pod cap）。
 func (h *Hub) capKeyOf(conn *Connection) (m *sync.Map, key any, limit int, capErr error) {
 	switch {

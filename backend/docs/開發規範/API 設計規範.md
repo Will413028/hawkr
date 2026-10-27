@@ -156,7 +156,7 @@ Gateway 定位為**薄代理層（Thin Proxy）**，僅負責協議轉換與基�
 * 地址類的公開精度**止於行政區**（city + district）。街道級地址的用途是寄退件與物流開通，不是店面展示；個人賣家填的常常就是住家。
 * public DTO 必須有契約測試斷言「PII 欄名不在回應中」＋「欄位集合與白名單一致」（範例：`gateway/internal/handler/seller_public_pii_test.go`）。**只擋已知欄名不夠**——欄位集合斷言才擋得住日後上游長胖時靜默流出的新欄位。
 
-教訓：`GET /api/v1/public/sellers/{id}` 曾與 `GET /api/v1/app/sellers/me` 共用同一個 `SellerInfo` DTO，於是官網每一個店面頁背後都掛著店主的 email、已驗證手機、生日、性別與寄退件街道地址，匿名帶一個 store\_id 即可取得。規則（本節「不得回傳敏感資訊」＋第十節「每個 endpoint 必須對應唯一 DTO」）當時都已存在，缺的是可執行的判準與機械保證。
+教訓：`GET /api/v1/public/sellers/{id}` 曾與 `GET /api/v1/app/sellers/me` 共用同一個 `SellerInfo` DTO，於是網頁每一個店面頁背後都掛著店主的 email、已驗證手機、生日、性別與寄退件街道地址，匿名帶一個 store\_id 即可取得。規則（本節「不得回傳敏感資訊」＋第十節「每個 endpoint 必須對應唯一 DTO」）當時都已存在，缺的是可執行的判準與機械保證。
 
 ### **3.2 app**
 

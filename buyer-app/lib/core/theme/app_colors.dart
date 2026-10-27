@@ -2,7 +2,7 @@ import 'package:flutter/services.dart';
 
 /// Hawkr App 統一顏色 token。
 ///
-/// 單一來源：官網 `styles/foundation/00-color-config.css`，品牌色票見 `brand/hawkr/README.md`。
+/// 單一來源：網頁 `styles/foundation/00-color-config.css`，品牌色票見 `brand/hawkr/README.md`。
 /// Widget 不得自行硬編碼品牌色，請依 Surface / Text / Semantic 角色取用。
 class AppColors {
   AppColors._();
@@ -31,7 +31,7 @@ class AppColors {
   static const Color ink900 = brandInk;
   static const Color ink950 = Color(0xFF161C23);
 
-  // ── 官網 neutral palette ──────────────────────────────────
+  // ── 網頁 neutral palette ──────────────────────────────────
   static const Color neutralWhite = Color(0xFFFFFFFF);
   static const Color neutralCream = Color(0xFFFFFDF7);
   static const Color neutralPage = Color(0xFFF8F6EF);
@@ -113,24 +113,24 @@ class AppColors {
   static const Color surfacePanel = neutralPanel;
   static const Color surfaceGlass = Color(0xF5FFFDF7);
 
-  /// 官網 `<body>` 的單一連續頁面底色。
+  /// 網頁 `<body>` 的單一連續頁面底色。
   static const Color bgPrimary = surfacePage;
 
-  /// 官網 card surface。
+  /// 網頁 card surface。
   static const Color bgCard = surfaceCream;
   static const Color bgElevated = neutralWhite;
 
-  /// 官網頂部 chrome 使用 page surface，而非會員卡灰或品牌深綠。
+  /// 網頁頂部 chrome 使用 page surface，而非會員卡灰或品牌深綠。
   static const Color topBarBackground = surfacePage;
 
-  /// 官網 header `rgba(248, 246, 239, .96)` 的不透明 fallback／玻璃底色。
+  /// 網頁 header `rgba(248, 246, 239, .96)` 的不透明 fallback／玻璃底色。
   static const Color topBarGlass = Color(0xF5F8F6EF);
 
-  /// 官網浮動 NAV 的 cream glass 不透明 fallback。
+  /// 網頁浮動 NAV 的 cream glass 不透明 fallback。
   /// 與 page surface 保持一階明度差，避免底部導覽融入內容畫布。
   static const Color navBarBackground = surfaceCream;
 
-  /// 官網浮動 NAV 的 cream glass surface。
+  /// 網頁浮動 NAV 的 cream glass surface。
   static const Color navBarGlass = Color(0xF0FFFDF7);
 
   /// @deprecated 請依元件角色改用 [topBarBackground] 或 [navBarBackground]。
@@ -143,7 +143,7 @@ class AppColors {
   // ── 文字色 Text ───────────────────────────────────────────
   static const Color textPrimary = neutralBody;
 
-  /// 官網次要資訊色。只用於 14px 以上 metadata，不用於主要正文。
+  /// 網頁次要資訊色。只用於 14px 以上 metadata，不用於主要正文。
   static const Color textSecondary = neutralMutedText;
   static const Color textMuted = neutralMutedText;
   static const Color textHint = neutralMutedText;
@@ -189,7 +189,7 @@ class AppColors {
   static const Color borderStrong = Color(0x3D1F2933);
   static const Color borderPrimary = Color(0x66B8441F);
 
-  /// 官網 form input 的中性邊框，避免米色卡片與米色頁面黏在一起。
+  /// 網頁 form input 的中性邊框，避免米色卡片與米色頁面黏在一起。
   static const Color borderInput = Color(0xFFDED8CB);
   static const Color dragHandle = neutralPanel;
   static const Color dividerLight = neutralPanel;

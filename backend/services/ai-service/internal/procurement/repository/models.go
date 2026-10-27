@@ -145,7 +145,7 @@ func toCandidateSetEntity(row gen.ProcurementCandidateSet) CandidateSet {
 
 // Candidate 是 candidate_set 底下的一個候選（PLATFORM 或 EXTERNAL lane）。
 //
-// StoreID 以下四欄是 #2377 的賣家身分快照（facts_as_of 當下的事實），讓官網把候選呈現成
+// StoreID 以下四欄是 #2377 的賣家身分快照（facts_as_of 當下的事實），讓網頁把候選呈現成
 // 「找到哪幾家商家」。⛔ StoreID **不是授權判準**——擁有權必須在需要的當下重新問
 // product-service，見 usecase/quote_confirm.go 的 ConfirmByID。EXTERNAL lane 四欄一律零值。
 type Candidate struct {

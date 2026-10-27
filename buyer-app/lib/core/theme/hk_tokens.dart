@@ -72,7 +72,7 @@ class HkControl {
   static const double compactChoiceFontSize = 12;
   static const double compactChoiceHorizontalPadding = 12;
 
-  /// 官網 mobile header 的固定內容高度（不包含 system status inset）。
+  /// 網頁 mobile header 的固定內容高度（不包含 system status inset）。
   static const double topBarHeight = 56;
 
   /// 一般 TopBar／篩選區的搜尋與輸入控制，符合最小觸控高度。
@@ -81,7 +81,7 @@ class HkControl {
   /// 首頁獨立的全寬搜尋欄。
   static const double prominentSearchHeight = 56;
 
-  /// 官網 mobile floating navigation 的實測高度約 67.5px。
+  /// 網頁 mobile floating navigation 的實測高度約 67.5px。
   static const double navHeight = 68;
   static const double navItemHeight = 50;
   static const double navIcon = 30;
@@ -112,7 +112,7 @@ class HkBreakpoints {
   }
 }
 
-/// 官網式霧面玻璃效果。
+/// 網頁式霧面玻璃效果。
 ///
 /// 數值刻意保持克制：只模糊小面積 chrome，不套在長列表或商品圖片上。
 class HkGlass {

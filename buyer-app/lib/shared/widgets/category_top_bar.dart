@@ -32,7 +32,7 @@ class CategoryTopBar extends StatelessWidget {
   final Widget middle;
   final List<Widget> actions;
 
-  /// 外層左右 padding。預設 12 logical px（官網 mobile gutter）。
+  /// 外層左右 padding。預設 12 logical px（網頁 mobile gutter）。
   final EdgeInsetsGeometry? horizontalPadding;
 
   /// 內層 Row 的 padding。預設 zero（外層已處理）。

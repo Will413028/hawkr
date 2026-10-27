@@ -298,7 +298,7 @@ groups:
       # ── 來源簽章 X-HK-Origin-Auth（#2264，01 設計書 §3.2.11）──────────────────
       #
       # 選簽章而不是明文共享 secret 的理由是「失效可量測」，那就必須真的量測。
-      # 失效的形狀是：secret 任一端沒更新 / 輪替沒對齊 / 沒注入 ⇒ 官網 SSR 的簽章
+      # 失效的形狀是：secret 任一端沒更新 / 輪替沒對齊 / 沒注入 ⇒ 網頁 SSR 的簽章
       # 全部驗不過 ⇒ fail-open 降級回對端 IP ⇒ **全站 SSR 又共用一把 key，即
       # #2264 本身 100% 重現**——而服務正常回應、CI 全綠、頁面 200，沒有任何人會知道。
       #
@@ -339,9 +339,9 @@ groups:
           description: "近 5 分鐘 {{ $value | humanizePercentage }} 的 X-HK-Origin-Auth 驗不過（fail-open 降級成 per-ClientIP）。查密鑰是否兩端不一致、輪替是否只做了一半，或簽章端時鐘偏移超過 60 秒。"
 
       # C：SSR 軸逼近配額上限（硬上限依賴接入治理規範 §6 要求的「逼近上限」告警）。
-      # 這條軸的定位是**失控保險絲不是日常節流閥**：官網是自家系統，日常量應該遠低
+      # 這條軸的定位是**失控保險絲不是日常節流閥**：網頁是自家系統，日常量應該遠低
       # 於 200 req/s。40% 門檻對應約 20–24 個並發重度瀏覽訪客——真的長到那個量體是
-      # 好事，但要在觸頂**之前**知道，因為觸頂的症狀是官網整片 429。
+      # 好事，但要在觸頂**之前**知道，因為觸頂的症狀是網頁整片 429。
       - alert: GatewaySSRQuotaUtilizationHigh
         expr: |
           (
@@ -353,8 +353,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "官網 SSR 限流軸用量達 {{ $value | humanizePercentage }} (env={{ $labels.env }})"
-          description: "SSR 軸（RATE_LIMIT_MODERATE_SSR_PER_WINDOW）用量超過 40%。要嘛並發訪客真的長上來了（該調高上限並重算預算），要嘛官網有失控的扇出迴圈。"
+          summary: "網頁 SSR 限流軸用量達 {{ $value | humanizePercentage }} (env={{ $labels.env }})"
+          description: "SSR 軸（RATE_LIMIT_MODERATE_SSR_PER_WINDOW）用量超過 40%。要嘛並發訪客真的長上來了（該調高上限並重算預算），要嘛網頁有失控的扇出迴圈。"
 
   # ===========================================================================
   # 選填功能的開通狀態（backend#3329）

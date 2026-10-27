@@ -39,7 +39,7 @@ func WithSubject(ctx context.Context, subject string) context.Context {
 	return context.WithValue(ctx, subjectKey{}, subject)
 }
 
-// SubjectFrom 回傳入口判定的限流身分：帳號是 a:<ID>、管理員是 m:<ID>、訪客是 v:<IP>，官網的 SSR 與 CI 各是一個身分（見 httpapi 的 origin-auth）。
+// SubjectFrom 回傳入口判定的限流身分：帳號是 a:<ID>、管理員是 m:<ID>、訪客是 v:<IP>，網頁的 SSR 與 CI 各是一個身分（見 httpapi 的 origin-auth）。
 func SubjectFrom(ctx context.Context) string {
 	s, _ := ctx.Value(subjectKey{}).(string)
 	return s

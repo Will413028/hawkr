@@ -218,7 +218,7 @@ CREATE INDEX idx_procurement_candidate_sets_lease
 -- 刻意不存 public_email/public_phone：候選聯絡方式不得進入本模組任何一層（doc 55 §8.1）。
 --
 -- store_id 以下四欄是 issue #2377 新增的**賣家身分快照**（facts_as_of 當下的事實），
--- 讓官網把候選呈現成「找到哪幾家商家」，不必逐候選反查 product-service。
+-- 讓網頁把候選呈現成「找到哪幾家商家」，不必逐候選反查 product-service。
 --
 -- 刻意不存商品層的圖片與標價：候選的單位是**收件人**不是品項（#2377 是 #2450
 -- DIRECT_RECIPIENTS 的前置），而且 EXTERNAL lane 的候選來自站外名單、根本沒有平台商品。

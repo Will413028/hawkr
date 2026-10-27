@@ -293,7 +293,7 @@ const ProductList: React.FC = () => {
 									</td>
 									<td>
 										{/* 按鈕上的「上架 / 下架」是**動作用語**，不是狀態標籤——不走 CodeMeta
-										    Label（那邊是「已上架 / 未上架」）。這條界線與官網賣家中心一致。 */}
+										    Label（那邊是「已上架 / 未上架」）。這條界線與網頁賣家中心一致。 */}
 										{p.status !== ProductStatus.DRAFT && (
 											<button
 												type="button"

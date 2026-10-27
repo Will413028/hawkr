@@ -259,7 +259,7 @@ postgres repository、usecase、gRPC handler、Fx wiring、Gateway route／handl
 成功、跨帳號隔離、DELETE 重複與他人 ID、失效 target、latest revision、零／缺量、
 previous=0、latest two outside chart window、空頁 total、讀取中外部更新的 snapshot
 一致性、1／20／100 張卡片查詢數固定。Gateway 測 query validation、trusted
-metadata、401／403 no-store、decimal string／空集合契約；官網測 all／watchlist、
+metadata、401／403 no-store、decimal string／空集合契約；網頁測 all／watchlist、
 市場與名稱篩選、追蹤增刪，維持版面互動。完成 SQLC／Atlas／Proto／Java／Swagger
 生成檢查與 DEV 真實 seller session 驗收。
 

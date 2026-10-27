@@ -13,7 +13,7 @@ import 'logo_home_button.dart';
 import 'text_size_top_bar_action.dart';
 import 'top_navigation.dart';
 
-/// 五個主要分頁共用的官網式 mobile header。
+/// 五個主要分頁共用的網頁式 mobile header。
 ///
 /// Header 本身只保留品牌與全域操作；首頁搜尋獨立成下一列。首頁可加入字級
 /// action，窄螢幕則改用草標，所有 action 仍維持 48dp。

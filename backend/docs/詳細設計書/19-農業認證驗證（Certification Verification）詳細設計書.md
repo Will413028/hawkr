@@ -1213,7 +1213,7 @@ RPC 契約見 §10（`MatchCertificateHolder`）；稽核只記命中欄位名�
 ⚠️ **advisory 端點的對外語意要一起處理**：`GET /app/products/certifications/verify` 的回應只有 `{exists}`，
 本節之後「已失效」會塌成 `exists=false`，前端沿用「查無此編號，請確認後再試」
 ⇒ **對已失效證書是錯的訊息**。⇒ 該端點回應擴充為結構化（§9.4），
-三個前端消費點（官網商品表單、官網匯入編輯、代行工作區）的文案同步。
+三個前端消費點（網頁商品表單、網頁匯入編輯、代行工作區）的文案同步。
 
 ### 8.7 現行 API Key 輪替與超時（沿用，僅調整背景 timeout）
 
@@ -1562,7 +1562,7 @@ GET /api/v1/app/products/certifications/verify?cert_no={certNo}&type={value}
 `validity` ∈ `VALID` / `EXPIRED` / `TERMINATED` / `SUSPENDED` / `NOT_FOUND` / `UNKNOWN`。
 
 > 🔴 **為什麼必須擴充**：§8.6 之後「已失效」會塌成 `exists=false`，而三個前端消費點
-> （官網商品表單、官網匯入編輯、代行工作區）的文案是「查無此編號，請確認後再試」
+> （網頁商品表單、網頁匯入編輯、代行工作區）的文案是「查無此編號，請確認後再試」
 > ⇒ **對已失效證書是錯的訊息**。三處文案必須同步改成能區分 `EXPIRED` 與 `NOT_FOUND`。
 >
 > ⚠️ **相容性**：`exists` 欄位**保留一版且必須出現在回應中**（`exists = found && validity == VALID`），

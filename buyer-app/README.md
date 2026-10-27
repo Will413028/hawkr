@@ -233,7 +233,7 @@ flutter run --flavor prod --dart-define-from-file=config/dart-defines.json
 - `SENTRY_DSN`：空值時 Sentry 不送任何事件。
 - `GATEWAY_HOST`、`MEDIA_BASE_HOST`：API 與媒體主機；`dev` 沒有提供時連本機單體 `http://localhost:8080`，
   `stage` 與 `prod` 必須提供 `GATEWAY_HOST`，沒有預設值，缺少時 App 啟動前直接報錯。
-- `PUBLIC_SITE_ORIGIN`：官網公開網址，伺服器沒給分享連結時用來組分享連結；沒有提供時不開分享面板。
+- `PUBLIC_SITE_ORIGIN`：網頁公開網址，伺服器沒給分享連結時用來組分享連結；沒有提供時不開分享面板。
 - `HELP_CENTER_LINE_ID`、`HELP_CENTER_LINE_URL`：幫助中心的客服 LINE 官方帳號；沒有提供時不顯示 LINE 入口。
 
 ## 建置發布

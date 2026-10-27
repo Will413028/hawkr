@@ -6,7 +6,7 @@
 |---|---|
 | 維護者 | 維護團隊 |
 | 對應程式碼 | `hawkr-website/lib/api/cached.ts`、`hawkr-website/next.config.ts`、`hawkr-website/open-next.config.ts`、`hawkr-website/wrangler.jsonc`、`hawkr-website/app/api/revalidate/route.ts`、`hawkr-website/lib/api/revalidate-request.ts`、`hawkr-website/lib/seo/tags.ts`、`hawkr-website/public/_headers`、`hawkr-website/scripts/cloudflare-version-release.mjs`、`hawkr-website/scripts/cloudflare-wait-for-rollout.mjs`、`patches/@opennextjs__cloudflare.patch`、`hawkr-website/cloudflare/canary/src/index.js`、`hawkr-website/cloudflare/canary/wrangler.jsonc`；backend 觸發端見「後端服務責任邊界規範」§9 |
-| 相關 doc | §48 SEO 優化與現況（`generateMetadata` 讀取 cached fetcher）、§49 多媒體儲存與圖片服務（`media.example.com` 圖片 immutable 快取）、`基礎建設/系統架構與資料流向.md`（官網 hosting 與邊緣拓撲全貌）、「後端服務責任邊界規範」§9（backend 觸發 revalidate 的 SSOT） |
+| 相關 doc | §48 SEO 優化與現況（`generateMetadata` 讀取 cached fetcher）、§49 多媒體儲存與圖片服務（`media.example.com` 圖片 immutable 快取）、`基礎建設/系統架構與資料流向.md`（網頁 hosting 與邊緣拓撲全貌）、「後端服務責任邊界規範」§9（backend 觸發 revalidate 的 SSOT） |
 
 ---
 
@@ -17,12 +17,12 @@
 本文件描述 `hawkr-website`（買家與賣家網頁，Next.js on Cloudflare Workers）的**前端快取
 分層架構**與**部署版本一致性**現行契約。標【推斷】者為缺可觀測手段的估計。
 
-**架構定位**：官網為**純 ISR**（Incremental Static Regeneration），
+**架構定位**：網頁為**純 ISR**（Incremental Static Regeneration），
 **Cache Components / PPR 明確關閉**。
 
 ### 1.2 服務一句話定位
 
-本文件不對應單一可部署後端服務，而是描述官網前端（`hawkr-website`，跑於 Cloudflare Workers / OpenNext）的快取與版本一致性主題（比照 §47/§48 的跨 repo 編寫方式）。backend 側僅透過 `POST /api/revalidate` 觸發失效，該責任歸屬與觸發點矩陣見「後端服務責任邊界規範」§9。
+本文件不對應單一可部署後端服務，而是描述網頁前端（`hawkr-website`，跑於 Cloudflare Workers / OpenNext）的快取與版本一致性主題（比照 §47/§48 的跨 repo 編寫方式）。backend 側僅透過 `POST /api/revalidate` 觸發失效，該責任歸屬與觸發點矩陣見「後端服務責任邊界規範」§9。
 
 ### 1.3 設計目標 (Goals) 與 非目標 (Non-Goals)
 
@@ -44,7 +44,7 @@
 - 「後端服務責任邊界規範」§9：backend 何時、對哪些 tag 呼叫 `/api/revalidate` 的**唯一真實來源**（觸發點矩陣、HTTP contract、env 契約、共用 helper）。本文件描述「revalidate 進入前端後各層如何被 bust」，兩者在 `/api/revalidate` 端點交接。
 - §48 SEO：各頁 `generateMetadata` 讀取本文件描述的 `unstable_cache` fetcher（`getCachedSeller`/`getCachedProduct`）；賣家 SEO override 更新透過同一條 revalidate 鏈生效。
 - §49 多媒體儲存：圖片走 `media.example.com`（Image Gateway Worker + R2），與本文件的 ISR/R2 incremental cache 為**不同 R2 bucket、不同快取路徑**（圖片 immutable 1 年，見 §6）。
-- `基礎建設/系統架構與資料流向.md`：官網 hosting（CF Workers）、邊緣拓撲、Workers 清單的全貌在該文件；本文件深入快取分層細節。
+- `基礎建設/系統架構與資料流向.md`：網頁 hosting（CF Workers）、邊緣拓撲、Workers 清單的全貌在該文件；本文件深入快取分層細節。
 
 ---
 
@@ -63,7 +63,7 @@ Cloudflare Edge
   │               ⇒ 每次導覽回源 Worker
   │  /_next/static/*：immutable 1 年（平台資產層，cf-cache-status: HIT，per-colo）
   ▼
-官網 Worker（OpenNext on Cloudflare Workers，純 ISR）
+網頁 Worker（OpenNext on Cloudflare Workers，純 ISR）
   │  Worker ISR incremental cache（x-nextjs-cache: HIT/STALE）
   ├─ Regional cache（邊緣再快取一層，short-lived ~1min）
   ▼
@@ -72,7 +72,7 @@ R2 incremental cache（源，key 以 deploymentId 命名空間）
   ├─ Refresh queue（DO）           ← 去重並發 regenerate
   └─ CDN purge buffer（DO）        ← 緩衝呼 CF CDN purge API
 
-後端 mutation ──POST /api/revalidate──▶ 官網 Worker（bust tag → 上述各層失效）
+後端 mutation ──POST /api/revalidate──▶ 網頁 Worker（bust tag → 上述各層失效）
                     └──ctx.waitUntil──▶ canary WarmQueue DO（合成讀者，§4.5）
                                           └── GET / ?_warm ──▶ 觸發 stale 條目背景重生
 ```
@@ -81,7 +81,7 @@ R2 incremental cache（源，key 以 deploymentId 命名空間）
 
 | | 涵蓋 (In-scope) | 不涵蓋 (Out-of-scope，由誰負責) |
 |---|---|---|
-| 責任 | 官網公開頁面各快取層的存量/TTL/失效方式；revalidate 進入前端後的 bust 鏈；部署版本一致性 | backend 何時觸發 revalidate（責任邊界規範 §9）；圖片快取（§49）；admin 快取；登入態互動資料快取（TanStack Query，見 §3 末列） |
+| 責任 | 網頁公開頁面各快取層的存量/TTL/失效方式；revalidate 進入前端後的 bust 鏈；部署版本一致性 | backend 何時觸發 revalidate（責任邊界規範 §9）；圖片快取（§49）；admin 快取；登入態互動資料快取（TanStack Query，見 §3 末列） |
 
 ### 2.3 角色與身份模型
 
@@ -882,7 +882,7 @@ ISR incremental cache 落於 R2（與 §49 的 `hawkr-media` 圖片 bucket 為**
 
 ### 8.1 環境與設定
 
-- 官網跑於 Cloudflare Workers（OpenNext / wrangler）：prod `example.com`、dev `web-dev.example.com`（見 `基礎建設/系統架構與資料流向.md`）。
+- 網頁跑於 Cloudflare Workers（OpenNext / wrangler）：prod `example.com`、dev `web-dev.example.com`（見 `基礎建設/系統架構與資料流向.md`）。
 - 部署 pipeline：candidate 版本上傳 → 0% staging → version-override smoke → promote 100% → canonical smoke（失敗即 rollback），每次部署換 `deploymentId` → 新靜態資產 URL + 新 R2 incremental cache namespace（§5）。
 - R2 / DO bindings 由 `wrangler.jsonc` per-env 宣告（incremental cache R2、tag cache / queue / purge DO），DO migrations `v1/v2/v3` 宣告 `DOShardedTagCache`/`DOQueueHandler`/`BucketCachePurge`。
 
@@ -908,18 +908,18 @@ backend 呼叫 `/api/revalidate` 所需的 `WEB_REVALIDATE_BASE_URL` / `WEB_REVA
 
 | 術語 | 定義 |
 |---|---|
-| ISR | Incremental Static Regeneration，Next.js 的預渲染 + 背景重生機制；官網目前為純 ISR |
+| ISR | Incremental Static Regeneration，Next.js 的預渲染 + 背景重生機制；網頁目前為純 ISR |
 | OpenNext | `@opennextjs/cloudflare`，把 Next.js 應用適配到 Cloudflare Workers 執行的 adapter |
-| PPR / Cache Components | Next.js 的 Partial Prerendering / Cache Components；官網**已關閉**（#338 root cause） |
-| incremental cache | ISR 全量渲染結果的持久層，官網落於 R2（`NEXT_INC_CACHE_R2_BUCKET`） |
-| tag cache | tag→entry 對應，`revalidateTag` 的失效索引，官網以 sharded Durable Object 實作 |
+| PPR / Cache Components | Next.js 的 Partial Prerendering / Cache Components；網頁**已關閉**（#338 root cause） |
+| incremental cache | ISR 全量渲染結果的持久層，網頁落於 R2（`NEXT_INC_CACHE_R2_BUCKET`） |
+| tag cache | tag→entry 對應，`revalidateTag` 的失效索引，網頁以 sharded Durable Object 實作 |
 | regional cache | R2 讀結果在邊緣 PoP 的短暫再快取層（short-lived ~1min） |
 | Workers Cache | CF 在 Worker invoke **之前**的共享回應快取（`wrangler.jsonc` 的 `cache` 鍵）。**本站任何環境皆不啟用**，`wrangler.jsonc` 的 top-level 與每個 env 都不得出現該鍵；交付正確性不依賴它（§3.3 有機械 gate） |
 | default-deny（無 opt-out） | `headers()` 的四條規則讓**每一種**請求形狀的 document / RSC 都拿到不可共享的 `Cache-Control`（公開頁 `no-cache`、私有路由 `no-store`），沒有任何路由 opt-out（§3.3） |
 | `deploymentId` | 每 deploy 唯一 build id，用於靜態資產 `?dpl=`、`<html data-dpl-id>` 與 R2 incremental cache key namespace（新版本讀不到舊 namespace） |
 | rollout 傳播 gate | 輪詢 `SMOKE_ROUTES` 的 `data-dpl-id`、連續 3 輪全部命中當次 deployment 才放行的 CI 關卡（`scripts/cloudflare-wait-for-rollout.mjs`），promote 前後各跑一次，用於擋住傳播窗口造成的 version-skew 白屏（§5.2） |
 | candidate 版本 | `wrangler versions upload` 上傳但停在 0% 流量的 Worker 版本；以 `Cloudflare-Workers-Version-Overrides` header 定向驗證，通過才 promote 到 100%，未通過則 rollback 回前一個 stable 版本（§5） |
-| DO (Durable Object) | Cloudflare 的強一致單例狀態單元，官網用於 tag cache / refresh queue / CDN purge buffer |
+| DO (Durable Object) | Cloudflare 的強一致單例狀態單元，網頁用於 tag cache / refresh queue / CDN purge buffer |
 | revalidation profile | `/api/revalidate` 依 tag 形狀決定的失效強度：entity tag → `{expire:0}`（立即過期，下一次讀取即為新內容）；domain-collection tag → `"max"`（serve-stale-while-revalidate，保留重生去重與 stale-if-error）。producer 不得指定 |
 | 合成讀者（synthetic reader / warm） | 失效發生後由 canary worker 主動發出的公開 GET，用來替代「等真人來讀」以觸發 `"max"` profile 條目的背景重生（§4.5）。它是觀測設施，不讀 DB、不改任何持久狀態，失敗只降級回今日行為。與站內 `tab-bootstrap/v1/warm`（瀏覽器端 idle 預熱）同名不同物 |
 | arm / converge（兩階段） | 合成讀者的控制流（§4.5.3(e)）。**arm** ＝ 輪詢到 `x-nextjs-cache ∈ {STALE, MISS}`，證明 tag 寫入已生效；**converge** ＝ 自首次 STALE 起輪詢到 `HIT`，證明重生完成。分兩段是為了擋掉「tag 還沒生效就拿到 HIT ＋ 舊內容」被誤判成收斂的靜默 no-op |

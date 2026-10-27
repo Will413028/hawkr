@@ -1,6 +1,6 @@
 ---
 name: "Hawkr Admin"
-description: "與 Hawkr 官網一致、成熟且重視營運安全的操作後台"
+description: "與 Hawkr 網頁一致、成熟且重視營運安全的操作後台"
 colors:
   primary-strong: "#b8441f"
   primary-strong-hover: "#8f3315"
@@ -165,19 +165,19 @@ components:
 
 **Creative North Star: "沉穩的生鮮營運台"**
 
-Hawkr Admin 是高頻操作的營運工具，不是行銷落地頁。整體以官網的磚橘、暖米白與正式品牌資產建立可信度，再用清楚層級、緊湊但可掃描的資訊密度，讓管理員快速判斷狀態並安全完成工作。表現應成熟、安靜、明確；品牌存在於色彩、字型、Logo 與細節，而不是裝飾性特效。
+Hawkr Admin 是高頻操作的營運工具，不是行銷落地頁。整體以網頁的磚橘、暖米白與正式品牌資產建立可信度，再用清楚層級、緊湊但可掃描的資訊密度，讓管理員快速判斷狀態並安全完成工作。表現應成熟、安靜、明確；品牌存在於色彩、字型、Logo 與細節，而不是裝飾性特效。
 
 本文件是登入頁、Admin shell、所有管理模組與 ADM 代行工作區的通用視覺真相。`PRODUCT.md` 與功能契約負責產品、安全及授權邊界；`.impeccable/surfaces/` 與 `docs/superpowers/specs/` 只能補充單一功能，不得覆蓋本文件的通用視覺規則。既有 CSS 中的舊 Figma 註解、legacy aliases 或一次性色碼也不是新畫面的依據。
 
 **Key Characteristics:**
 
-- 官網一致的磚橘結構、暖色工作面與正式 SVG 品牌資產。
+- 網頁一致的磚橘結構、暖色工作面與正式 SVG 品牌資產。
 - 清楚、低噪音、適合長時間工作的營運密度。
 - 邊框與色階優先，陰影只表示真正離開平面的介面。
 - 狀態色承載語意；暖橘黃只標示 ADM 代行安全情境。
 - 繁體中文優先、完整鍵盤操作、可縮放且誠實呈現資料狀態。
 
-**The Website Authority Rule.** Hawkr 官網是品牌資產與核心識別的來源；Admin 可參考外部產品的資訊層級，但不能複製其視覺身分。
+**The Website Authority Rule.** Hawkr 網頁是品牌資產與核心識別的來源；Admin 可參考外部產品的資訊層級，但不能複製其視覺身分。
 
 ## Colors
 

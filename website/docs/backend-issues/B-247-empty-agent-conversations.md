@@ -44,7 +44,7 @@
 
 ## 備註
 
-- **影響頁面**：官網 Web `/account/messages`（買家訊息中心側欄）
+- **影響頁面**：網頁 `/account/messages`（買家訊息中心側欄）
 - **前端檔案**：`features/messages/components/ConversationSidebar.tsx`（暫時過濾）、`features/procurement-assistant/conversations.ts`（列表契約）
 - **關聯**：#2343（B-244 Hawkr Agent 多對話側欄）、B-245（自動標題門檻過嚴／backfill）
 - **與 B-245 的差別**：B-245 是「有內容但標題沒產生」，這張是「連內容都沒有」。兩者症狀在 UI 上都顯示為「未命名對話」，但成因與處理方式不同

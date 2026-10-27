@@ -1906,7 +1906,7 @@ type CorrectionRequestRepository interface {
 	// 🔴 B04（端點 8）用它產出 latest_correction_id，讓買家在**重新載入之後**
 	// 仍看得到申請進度與婉拒理由。GetOpenByDocument 做不到這件事：它的述詞不含
 	// REJECTED，而那正是買家最需要看到的一筆。
-	// 2026-09-05 第 6 輪稽核：官網的 `fetchInvoiceCorrection`（端點 12 的 client）
+	// 2026-09-05 第 6 輪稽核：網頁的 `fetchInvoiceCorrection`（端點 12 的 client）
 	// 零呼叫端，因為端點 8 從來沒有給出任何 correction_id。
 	//
 	// 🔴 **範圍是訂單不是單一 document**（2026-09-05 修）：更正請求掛在被作廢的那張

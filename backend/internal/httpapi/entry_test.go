@@ -273,7 +273,7 @@ func TestRateLimitSubject(t *testing.T) {
 		want   string
 	}{
 		{"沒有簽章：連線的 IP", "", "subject=v:192.0.2.1"},
-		{"官網的 SSR", originAuth("main-secret", "ssr", "", "GET", path, entryNow), "subject=s:ssr"},
+		{"網頁的 SSR", originAuth("main-secret", "ssr", "", "GET", path, entryNow), "subject=s:ssr"},
 		{"SSR 代訪客呼叫", originAuth("main-secret", "visitor", "203.0.113.9", "GET", path, entryNow), "subject=v:203.0.113.9"},
 		{"CI", originAuth("ci-secret", "ci", "", "GET", path, entryNow), "subject=s:ci"},
 		{"CI 的金鑰不能簽訪客", originAuth("ci-secret", "visitor", "203.0.113.9", "GET", path, entryNow), "subject=v:192.0.2.1"},

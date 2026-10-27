@@ -15,7 +15,7 @@
 
 ### 1.1 色階來源
 
-官網賣家中心價格地圖的色階 breaks **依「這個 selection ＋ 這個 target date」的統計快照動態產生**（policy `selection-p50-v1`），不是依 MOA 類別共用固定值。
+網頁賣家中心價格地圖的色階 breaks **依「這個 selection ＋ 這個 target date」的統計快照動態產生**（policy `selection-p50-v1`），不是依 MOA 類別共用固定值。
 
 `reference/price_scale.v1.csv` **不提供 breaks**，只作為 **eligibility gate**：沒有對應審核列的 selection 整個回 `unavailable`（fail-closed，不建立任何 surface）。
 

@@ -14,13 +14,13 @@ abstract final class AppConstants {
   // 分享連結
   // ============================================================
 
-  /// 官網公開網址：`--dart-define=PUBLIC_SITE_ORIGIN=https://...`。
+  /// 網頁公開網址：`--dart-define=PUBLIC_SITE_ORIGIN=https://...`。
   /// 沒有提供時，伺服器沒給分享連結的情況下不開分享面板。
   static const String publicSiteOrigin = String.fromEnvironment(
     'PUBLIC_SITE_ORIGIN',
   );
 
-  /// 以 [origin] 組出官網上 [path] 的分享連結；[origin] 為空時回 `null`（分享停用）。
+  /// 以 [origin] 組出網頁上 [path] 的分享連結；[origin] 為空時回 `null`（分享停用）。
   static String? shareFallbackUrl(
     String path, {
     String origin = publicSiteOrigin,

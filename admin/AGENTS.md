@@ -56,7 +56,7 @@ src/
 ## UI 實作契約
 
 - 新介面先重用 `AdminBrand`、Layout、`components/UI`、`src/lib/a11y.ts` 與 `DESIGN.md` 的 semantic tokens；不得從 legacy `--color*`／`--brand-*` 建立新 palette。
-- 官網是 Logo 與品牌識別來源。只使用 `/public/brand/` 中的正式 SVG，並經 `AdminBrand` 選擇 light／dark／mark。
+- 網頁是 Logo 與品牌識別來源。只使用 `/public/brand/` 中的正式 SVG，並經 `AdminBrand` 選擇 light／dark／mark。
 - 互動目標原則上至少 44px，focus 必須可見；dialog／mobile drawer 要 trap focus、背景 inert、支援 Escape 並 restore trigger focus。
 - 對話框一律用共用的 `components/UI/Dialog`（`standard`、`operation`、`side` 三種外觀；focus trap、Escape、背景 inert、還焦、aria 與內容區捲動都在它裡面），不自己畫 overlay 或 `role="dialog"`（`tests/dialog-skeleton-guard.test.ts` 會擋）。短暫訊息一律用 `useToast()`（`components/UI/Toast`，`ToastProvider` 在 admin layout），色調 `success`／`warning`／`error` 走 token，頁面不自己放 toast 狀態、計時器或顏色；對話框開著時訊息會進最上層對話框內的 live region。
 - Compound input 只有一層可見邊界。表格在窄螢幕於自身容器捲動，不能造成 document overflow。

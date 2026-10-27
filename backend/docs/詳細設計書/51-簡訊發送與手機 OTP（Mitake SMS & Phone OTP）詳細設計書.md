@@ -173,7 +173,7 @@ flowchart TB
 | `otp:daily:{phone}:{yyyymmdd}` | Counter（INCR）| 次數 | 至當日 24:00（或 86400s）| 同號每日發送上限 |
 | `otp:subj:{subject}:{yyyymmddHH}` | Counter（INCR）| 次數 | 3600s（1 小時）| per-subject（限流身分）每小時發送上限 |
 
-- `{subject}` 是 Gateway `middleware.RateLimitSubject` 的回傳值（`v:<訪客 IP>` / `s:ssr` / `s:ci`，歸屬規則見 [01 號 §3.2.4](01-閘道微服務（Gateway）詳細設計書.md)），**不是裸 client IP**——官網 SSR／CI 一個位址代表的不是一個真人。
+- `{subject}` 是 Gateway `middleware.RateLimitSubject` 的回傳值（`v:<訪客 IP>` / `s:ssr` / `s:ci`，歸屬規則見 [01 號 §3.2.4](01-閘道微服務（Gateway）詳細設計書.md)），**不是裸 client IP**——網頁 SSR／CI 一個位址代表的不是一個真人。
 - `{phone}` 一律先 `NormalizeToLocal`（09xx）再組 key，避免 `+886` 與 `09` 造成兩把 key。
 - 驗碼成功或 `attempts` 達上限 → `DEL otp:{phone}`（碼作廢，須重發）。
 
@@ -205,7 +205,7 @@ flowchart TB
 { "phone": "0912345678" }
 ```
 
-- 限流身分（`rateLimitSubject`）**不由前端帶**，Gateway 以 `middleware.RateLimitSubject(c)` 解析後注入下游 gRPC（§4.1 exception #1，前端不可控）。它**不等於連線來源 IP**：請求帶有效簽章時取的是簽章 payload 內的訪客 IP（`v:<ip>`），官網 SSR／CI 則各自落在 `s:ssr` / `s:ci`（[01 號 §3.2.4](01-閘道微服務（Gateway）詳細設計書.md)）。
+- 限流身分（`rateLimitSubject`）**不由前端帶**，Gateway 以 `middleware.RateLimitSubject(c)` 解析後注入下游 gRPC（§4.1 exception #1，前端不可控）。它**不等於連線來源 IP**：請求帶有效簽章時取的是簽章 payload 內的訪客 IP（`v:<ip>`），網頁 SSR／CI 則各自落在 `s:ssr` / `s:ci`（[01 號 §3.2.4](01-閘道微服務（Gateway）詳細設計書.md)）。
 
 **Response（成功）**：
 

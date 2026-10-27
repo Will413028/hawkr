@@ -84,7 +84,7 @@ type Deps struct {
 	// Origins 是自己的 web 與後台的 origin：CORS 允許它們帶 cookie 呼叫，CSRF 信任它們。web 在各環境都經第一方同源
 	// 反代打單體，只有選擇跨來源的開發模式用得到。
 	Origins []string
-	// OriginAuth 驗證官網 SSR 與 CI 自己簽出的限流身分；ClientIP 決定訪客的 IP。
+	// OriginAuth 驗證網頁 SSR 與 CI 自己簽出的限流身分；ClientIP 決定訪客的 IP。
 	OriginAuth OriginAuth
 	ClientIP   ClientIP
 	// Legacy 是轉給舊 gateway 的 handler，掛在 LegacyPrefixes 底下（internal/legacy/gatewayproxy）；nil 時不掛。

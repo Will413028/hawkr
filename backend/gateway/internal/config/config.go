@@ -39,11 +39,11 @@ type Config struct {
 	// 跨 pod 共享（避免 per-pod N×放大），Redis 不可用時降級為 bounded 記憶體限流。
 	// 各層上限為「每 RateLimitWindowSeconds 秒的請求數」，皆可 env 覆寫。
 	RateLimitWindowSeconds     int
-	RateLimitModeratePerWindow int // 匿名公開讀取：一個真人（含官網／admin 代打）
-	// 匿名公開讀取的另外兩軸。只有這一層分 kind：官網 SSR 一個訪客就會扇出上百次
+	RateLimitModeratePerWindow int // 匿名公開讀取：一個真人（含網頁／admin 代打）
+	// 匿名公開讀取的另外兩軸。只有這一層分 kind：網頁 SSR 一個訪客就會扇出上百次
 	// 上游讀取，CI 的 E2E 亦然，而它們共用一個出口位址——與真人共用同一個配額值，
 	// 不是「誰超量誰被擋」，是「誰先到誰用完」。
-	RateLimitModerateSSRPerWindow int // 官網 server 端渲染（含 ISR / build 預抓）
+	RateLimitModerateSSRPerWindow int // 網頁 server 端渲染（含 ISR / build 預抓）
 	RateLimitModerateCIPerWindow  int // CI runner / E2E
 	RateLimitDefaultPerWindow     int // 已認證 app + admin
 	RateLimitFallbackCapacity     int // 記憶體 fallback 保留的 key 數上限（LRU 淘汰）
@@ -53,12 +53,12 @@ type Config struct {
 	RateLimitAuthFailurePerWindow int
 
 	// ---- 來源簽章 X-HK-Origin-Auth（#2264，01 設計書 §3.2.5）----
-	// 自家 server 端呼叫者（官網 Worker / CI）用它宣告「我代表哪個限流
+	// 自家 server 端呼叫者（網頁 Worker / CI）用它宣告「我代表哪個限流
 	// 身分」。刻意不進 Validate()：空值 = 停用該類簽章驗證（請求落回 v:<ClientIP>，
 	// 即本設計之前的行為），不是啟動失敗——secret 是人工建立的，把它變成啟動必要
 	// 條件等於保證每個環境第一次部署就 CrashLoop。停用狀態由
 	// gateway_origin_auth_enabled gauge 的 critical 告警現形。
-	OriginAuthSecret     string // 官網 Worker：只接受 p=visitor / p=ssr
+	OriginAuthSecret     string // 網頁 Worker：只接受 p=visitor / p=ssr
 	OriginAuthSecretPrev string // 輪替重疊窗口（同 §5.2 慣例）
 	OriginAuthCISecret   string // GitHub Actions：只接受 p=ci。暴露面不同的持有者不共用密鑰
 
@@ -152,7 +152,7 @@ func Load() (*Config, error) {
 		WebBaseURL:   pkgconfig.GetEnvOrDefault("WEB_BASE_URL", "http://localhost:3000"),
 
 		RateLimitWindowSeconds: pkgconfig.GetEnvAsIntOrDefault("RATE_LIMIT_WINDOW_SECONDS", 60),
-		// 600 = 實測上界（瀏覽器直連尖峰 25/分 + 官網 middleware／route handler
+		// 600 = 實測上界（瀏覽器直連尖峰 25/分 + 網頁 middleware／route handler
 		// 與 admin BFF 代打，保守估上界約 200/分）的 3 倍，並對 NAT／CGNAT 後多
 		// 真人共用一個位址留餘裕。舊值 120 只放寬不收緊。
 		RateLimitModeratePerWindow: pkgconfig.GetEnvAsIntOrDefault("RATE_LIMIT_MODERATE_PER_WINDOW", 600),

@@ -6,7 +6,7 @@
  * 不能印成 `NT$ 0` —— 那是在告訴管理員「這件商品標價零元」。
  *
  * ⚠️ falsy 判斷（`if (!min && !max)`）擋不住這件事：`"0"` 是非空字串，truthy。
- * 判準只能是「parse 完之後是不是正數」。同一份語意在官網是
+ * 判準只能是「parse 完之後是不是正數」。同一份語意在網頁是
  * `hawkr-website/lib/products/pricing.ts` 的 `num()`。
  */
 

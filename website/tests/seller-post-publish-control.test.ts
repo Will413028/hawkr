@@ -14,7 +14,7 @@ import { PostPublishStatus } from "../lib/codemeta/enums";
  * 賣家貼文的發布／下架入口。
  *
  * 這一顆補的是「後端做了、使用者摸不到」：`POST /app/sellers/posts/{id}/publish`
- * 與 `.../unpublish` 兩支端點在 gateway 註冊了（`routes_post.go:76-77`），而整個官網
+ * 與 `.../unpublish` 兩支端點在 gateway 註冊了（`routes_post.go:76-77`），而整個網頁
  * 一個呼叫端都沒有 —— 賣家看得到「未發布」pill，卻沒有任何一顆按鈕能發布。
  *
  * 所以斷言的重點不是「元件會不會渲染」，是**每一個賣家真的會遇到的狀態下，那顆

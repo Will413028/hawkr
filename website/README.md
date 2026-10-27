@@ -1,6 +1,6 @@
-# Hawkr Website — Next.js 行銷／電商官網
+# Hawkr Website — Next.js 買家與賣家網頁
 
-使用 Next.js 16（App Router）、TypeScript、Tailwind CSS v4 構建的 Hawkr 對 C 端官網。
+使用 Next.js 16（App Router）、TypeScript、Tailwind CSS v4 構建的 Hawkr 買家與賣家網頁。
 
 ## 快速開始
 

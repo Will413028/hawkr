@@ -28,7 +28,7 @@
         "type": "loki",
         "uid": "loki"
       },
-      "description": "回答的問題：「$environment 的 $app_type App，各版本的請求量隨時間怎麼變」——新版放量後，舊版那條線是否往下走到接近 0。\n\n分母定義：**只計本來就帶 X-App-Version header 的請求**，也就是兩支 Flutter App 經 dio 發出的一般 HTTP 請求。不帶版本的請求（官網 SSR、server-to-server、health probe、以及設計書 54 §8.2 列的 SSE/WS 握手後訊息、WebView 導航、圖片直取）既不進分子也不進分母，因此本圖是「App HTTP 請求的版本組成」，不是「使用者人數的版本組成」。\n\n⚠️ 已知偏差：重度使用長連線（聊天 WS / SSE）的使用者，其活躍度不會反映在請求數上，會被系統性低估。判斷「舊版是否歸零」時這偏差是安全方向（低估舊版），但判斷「新版是否被採用」時要留意。\n\n⚠️ app_version 已用 semver 白名單 `^[0-9]+\\.[0-9]+\\.[0-9]+$` 過濾：header 是 client 可控輸入，任何人 curl 一個亂數就會多一條 series。被白名單擋掉的值請看下方「資料品質」區。",
+      "description": "回答的問題：「$environment 的 $app_type App，各版本的請求量隨時間怎麼變」——新版放量後，舊版那條線是否往下走到接近 0。\n\n分母定義：**只計本來就帶 X-App-Version header 的請求**，也就是兩支 Flutter App 經 dio 發出的一般 HTTP 請求。不帶版本的請求（網頁 SSR、server-to-server、health probe、以及設計書 54 §8.2 列的 SSE/WS 握手後訊息、WebView 導航、圖片直取）既不進分子也不進分母，因此本圖是「App HTTP 請求的版本組成」，不是「使用者人數的版本組成」。\n\n⚠️ 已知偏差：重度使用長連線（聊天 WS / SSE）的使用者，其活躍度不會反映在請求數上，會被系統性低估。判斷「舊版是否歸零」時這偏差是安全方向（低估舊版），但判斷「新版是否被採用」時要留意。\n\n⚠️ app_version 已用 semver 白名單 `^[0-9]+\\.[0-9]+\\.[0-9]+$` 過濾：header 是 client 可控輸入，任何人 curl 一個亂數就會多一條 series。被白名單擋掉的值請看下方「資料品質」區。",
       "fieldConfig": {
         "defaults": {
           "color": {

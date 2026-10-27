@@ -24,7 +24,7 @@ import (
 // Decisions #3，以及 doc 55 §6.2 對單價預算的 2026-09-19 修訂）。
 //
 // #2377：每個候選另外帶「這個商品屬於哪個商家」的賣家身分快照（store_id ＋ 店名／logo／
-// store_code），讓官網把候選呈現成「找到哪幾家商家」，不必逐候選反查 product-service。
+// store_code），讓網頁把候選呈現成「找到哪幾家商家」，不必逐候選反查 product-service。
 // 店家資料一律走一次 BatchGetSellerMeta（呼叫次數是 O(1)，不隨候選數或商家數成長）。
 //
 // 子系統 1（2026-08-29）：新增 rankingFacts 讀取本地 seller_ranking_facts（同樣 O(1)

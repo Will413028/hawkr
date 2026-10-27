@@ -32,7 +32,7 @@ const STATUS_META: Record<string, StatusMeta> = {
 	// 審核中必須與草稿一眼分得出來：兩者都「還不能賣」，但只有這一個在等平台動作。
 	// 既有值域（pending / approved / rejected / disabled / gray）給不出第四個色調——
 	// 灰會跟 4003 撞、紅是「被退回」的意思——所以走 info tone，色票用既有的
-	// `--admin-info`，不另造近似色。官網賣家中心的 review 態也是 info ＋ 時鐘，兩邊一致。
+	// `--admin-info`，不另造近似色。網頁賣家中心的 review 態也是 info ＋ 時鐘，兩邊一致。
 	[ProductStatus.PENDING_REVIEW]: {
 		className: "info",
 		badgeVariant: "info",
