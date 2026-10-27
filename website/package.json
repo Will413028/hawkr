@@ -20,7 +20,7 @@
 		"analyze": "ANALYZE=true next build --webpack",
 		"knip": "knip",
 		"format": "biome format --write .",
-		"test:unit": "node --experimental-test-module-mocks --import tsx --import ./tests/setup/hermetic.mjs --test tests/*.test.ts",
+		"test:unit": "node --experimental-test-module-mocks --import tsx --import ./tests/setup/hermetic.mjs --test tests/*.test.ts tests/*.test.mjs",
 		"test:build-output": "node --import tsx --import ./tests/setup/hermetic.mjs --test tests/build-output/*.test.ts",
 		"test:e2e": "playwright test",
 		"test:e2e:hermetic": "playwright test --grep-invert @live --retries=0",
@@ -42,7 +42,6 @@
 		"storybook:apps": "node scripts/build-app-catalogs.mjs",
 		"storybook:build:all": "pnpm storybook:apps && pnpm storybook:build",
 		"storybook:mcp": "node scripts/storybook-mcp.mjs",
-		"storybook:sync-app-docs": "node scripts/sync-app-catalog-docs.mjs",
 		"design:test": "node --test tests/check-cross-platform-tokens.test.mjs"
 	},
 	"keywords": [],

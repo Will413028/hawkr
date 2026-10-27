@@ -17,10 +17,8 @@
 - **Lint 檢查**: `pnpm lint`（`tsc --noEmit && biome check .` 加共用文案目錄的守門 `check-enum-text`，使用 Biome 取代 ESLint）
 - **格式化**: `pnpm format`（`biome format --write .`）
 - **測試**: `pnpm test`
-- **API 型別與 Connect 執行期**: 在共用套件 `@hawkr/api`（`packages/hawkr-api-ts`）：生成碼 import 自 `@hawkr/api/gen/…`，錯誤分類與重試是 `@hawkr/api/connect/errors`、`@hawkr/api/connect/retry`。改根目錄 `api/` 的 proto 後在根目錄跑 `pnpm --filter @hawkr/api gen:api`，不得手改生成檔
 - **共用文案目錄（proto enum 的使用者面文字）**: 在共用套件 `@hawkr/ui-text`（`packages/hawkr-ui-text-ts`），admin 不用 next-intl，直接用 `@hawkr/ui-text/keys` 的建構函式加 `@hawkr/ui-text/zh-TW` 的 `formatStaff`。enum 文字規則見根目錄 `AGENTS.md`，由 `pnpm lint` 的 `check-enum-text` 擋。畫面要顯示「未知」時用 `src/lib/ui-text.ts` 的 `staffTextOrUnknown`；錯誤顯示用 `src/lib/error-text.ts` 的 `errorMessage`，不寫 `userMessage(…) ?? "…"` 的後備句。
 - **UI 圖示**: 共用套件 `@hawkr/icons`（`packages/hawkr-icons-ts`，Material Symbols），import 自 `@hawkr/icons/material-symbol` 的 `MaterialSymbol`，`name` 是 `MaterialSymbolName`，型別檢查守住圖示存在；新圖示在該套件的 `src/names.ts` 加名稱後跑 `pnpm --filter @hawkr/icons gen`，不得手改 `material-symbols.gen.ts`。不放 SVG 檔進 `public/`。
-- **鄉鎮市區代碼表與查詢**: 在共用套件 `@hawkr/twaddr`（`packages/hawkr-twaddr-ts`），import 自 `@hawkr/twaddr/lookup`；資料檔由 `backend/internal/platform/twaddr` 生成，不得手改。
 
 ## 目錄結構
 ```

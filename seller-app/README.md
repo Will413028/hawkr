@@ -4,9 +4,9 @@ Hawkr Seller 是 Hawkr 平台的商家端 Flutter App，提供商品管理、訂
 
 ## 共用元件庫
 
-[賣家 App 元件庫文件](docs/component-library.md) 提供真實 widget 的 catalog、Dart API、啟動與測試方式；[管理後台 UI 元件庫](https://admin.example.com/admin/documentation) 可對照買家、賣家與 Web。
+[賣家 App 元件庫文件](docs/component-library.md) 提供真實 widget 的 catalog、Dart API、啟動與測試方式；website 的 Storybook（`pnpm storybook`）可對照買家、賣家與 Web。
 
-共用元件改動應在同一次 PR 更新正式 widget、catalog、API 文件與測試，再由 Web 的文件同步及版本發布流程整合。UI 元件庫版本與手機 App 發行版本獨立；既有 artifact 不覆寫，文件更新不會自動發布手機 App。
+共用元件改動應在同一次 PR 更新正式 widget、catalog、API 文件與測試，Web 的 Storybook 在 build 時直接讀入 API 文件。文件與 catalog 的更新不代表已發布手機 App。
 
 **版本**: 1.0.1 (build_number 於打包時透過 git commit 數動態推導)
 **Flutter SDK**: 3.41.2（使用 FVM 管理；Dart 設定區間為 >=3.8.0 <4.0.0）

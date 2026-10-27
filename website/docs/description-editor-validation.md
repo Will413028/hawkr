@@ -46,4 +46,3 @@ Storybook 測試比對實際編輯區、`onChange` 文件及瀏覽器錯誤。�
 
 這份表格記錄本次來源提交前的本機驗證；同批 Web 回歸包含 Input 與 PostContent stories，但不代表重新執行兩 App 的原生測試。人工元件庫契約仍為 draft，沒有填入本次遠端 CI 或已發布結果。
 
-本次變更進入 dev 後，依 [元件庫維護規範](./ui-library-maintenance.md#dev-自動快照流程) 經中央 Admin CI 的三端完整檢查與 private R2 不可變快照發布，成功更新版本指標後才會反映在管理後台文件入口。Web CI、中央快照 CI、來源 SHA／artifact digest、後台啟用與產品部署分別核對；目前尚待本次推送後的 run 和入口證據，不能由上表推定成功。

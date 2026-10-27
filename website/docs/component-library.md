@@ -1,7 +1,5 @@
 # 三端元件庫交付與驗證
 
-管理後台文件與版本入口：<https://admin.example.com/admin/documentation>。維護與發布依 [元件庫維護規範](./ui-library-maintenance.md)。
-
 本機入口：<http://127.0.0.1:6006/?path=/story/cross-platform-comparison--overview>
 
 範圍為買家 App、賣家 App、主網站含賣家中心。Storybook 10.6.0 直接渲染正式 Web components；兩 App 以各自 `lib/main_catalog.dart` 編譯真實 Flutter widget，再嵌入同一目錄。MCP `docs-list`／`docs-show` 同時提供 Web props 和同步的 Flutter API 文件。
@@ -25,21 +23,6 @@ MCP `test-run` 的 7 個新增案例（含 a11y）、既有問答卡 34 項 Node
 `openConfirmation.question` 是重新整理與 snapshot 校正時的權威問句；前端保留後端的 opaque optionId、allowFreeText 與選項，不從分類階段或 categoryId 自行推導。有效問句存在時抑制 legacy 分類卡。相容舊版 snapshot：同一個仍開啟的中斷沒有 question 欄位時，校正保留現有題目；不同中斷不沿用上一題。
 
 本機 MCP `test-run` 的 12 個採購問答 stories（含互動與 a11y）、4 個 session hook 測試檔共 41 項、問答與 session wiring 等 70 項 Node 檢查，以及 `pnpm storybook:typecheck` 通過。完整 MCP 測試首次遇到開發伺服器中斷，重啟後透過 `pnpm storybook:mcp test-run '{}'` 完整執行，151 個 stories 全部通過。CSS 檢查無錯誤，仍有 31 項既有警告。實際檢視桌面與 320px／深色／1.4 倍字級渲染；窄卡片的分類選項改為單欄，避免長選項逐字直排。這些都是固定 fixture 與本機驗證，沒有連線至真實交易或部署。
-
-## 管理後台如何取得更新
-
-依 [dev 自動快照流程](./ui-library-maintenance.md#dev-自動快照流程)，變更進入 dev 後，中央 Admin CI 會以排程檢查三個 dev 分支，固定來源並執行九道 gate。全部通過、不可變快照上傳 private R2 並再次核對來源後，才更新目前版本指標；管理後台文件入口讀取該指標與 artifact manifest，已開啟頁面每 60 秒檢查版本更新。五分鐘是輪詢設定，不是完成時限，任一步失敗都保留前一版。
-
-快照版本使用 `0.<run-id>.<attempt>`，manifest 的 `release.contractVersion` 保留人工版本。元件 API、stories 與變更資訊會隨通過的快照進入管理後台元件庫；這不等於產品網站或 App 已部署，也不會只因改 JSON 就立即啟用。是否成功須核對本次 CI run、三個來源 SHA、artifact digest、版本指標及受保護入口。
-
-本次提交前的證據狀態：
-
-| 層級 | 已取得的紀錄 |
-| --- | --- |
-| 本機 Web／基礎 MCP | 116 個案例全部通過，含 input、PostContent、42 個 editor／色盤／圖片案例及 a11y |
-| 本機相關 Node unit、Storybook TypeScript、範圍格式檢查 | 81 個 unit 通過；TypeScript 與範圍 Biome 通過，細節見編輯器驗證文件 |
-| 本次推送後的 Web／中央 Admin CI | 尚待取得 run 與 exact commit 對應結果；不沿用首次建庫或前次快照的成功紀錄 |
-| 本次管理後台啟用 | 尚待核對新 artifact、版本指標及入口；不預填已發布 |
 
 ## 初次建立元件庫的交付範圍
 
@@ -66,7 +49,7 @@ MCP `test-run` 的 7 個新增案例（含 a11y）、既有問答卡 34 項 Node
 
 App／三端 iframe stories 標記 `!test`，共20個，不計入65個 React story tests。它們以 Flutter tests 與實際瀏覽器驗證，不把 iframe 容器測試當成原生 widget 驗證。
 
-上表是首次本機驗證紀錄；當時尚未執行遠端 CI 或部署。最新來源與啟用版本以管理後台 registry、artifact manifest 和發布紀錄為準。完整網站 `tsc --noEmit` 原設定會掃到本機 `output/playwright` 歷史診斷檔，含已不存在的臨時路徑；本次使用獨立 `tsconfig.storybook.json` 檢查元件庫及其 imports，未改寫或刪除歷史檔案。
+上表是首次本機驗證紀錄；當時尚未執行遠端 CI 或部署。完整網站 `tsc --noEmit` 原設定會掃到本機 `output/playwright` 歷史診斷檔，含已不存在的臨時路徑；本次使用獨立 `tsconfig.storybook.json` 檢查元件庫及其 imports，未改寫或刪除歷史檔案。
 
 ## 重現與維護
 
@@ -77,7 +60,6 @@ pnpm install --frozen-lockfile
 pnpm exec playwright install chromium
 # 預設讀 monorepo 的 buyer-app、seller-app；其他位置設定 HAWKR_APPS_ROOT
 pnpm storybook:apps
-pnpm storybook:sync-app-docs
 pnpm storybook
 ```
 
@@ -93,7 +75,7 @@ pnpm design:check --apps-root ..
 
 靜態輸出在 `output/storybook`，含已建置的 App。MCP 由 Storybook 開發伺服器提供；靜態網站本身沒有 MCP endpoint。`pnpm storybook:test` 是 CI 的同組瀏覽器測試入口。原有 `pnpm test` 維持單元測試，不載入 Storybook 的 Next 環境設定。
 
-畫面紀錄在 `output/playwright/component-library-comparison-final.png` 和 `output/playwright/catalog-*.png`。App API 文件修改後需跑 `pnpm storybook:sync-app-docs`；`node scripts/sync-app-catalog-docs.mjs --check` 會擋住過期鏡像。
+畫面紀錄在 `output/playwright/component-library-comparison-final.png` 和 `output/playwright/catalog-*.png`。App API 文件就是兩支 App 的 `docs/component-library.md`，`stories/apps/*Api.mdx` 在 build 時直接讀入，不需同步。
 
 ## 2026-09-13 骨架對齊
 

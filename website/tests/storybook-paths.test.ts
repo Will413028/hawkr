@@ -16,7 +16,7 @@ import {
 	rebaseCatalogCssUrl,
 } from "../scripts/storybook-paths.mjs";
 
-const base = "/admin/documentation/library/1.0.0/";
+const base = "/storybook/1.0.0/";
 
 test("catalog base is a canonical path, never an origin or traversal", () => {
 	assert.equal(normalizeStorybookBasePath(), "/");

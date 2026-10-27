@@ -68,14 +68,14 @@ test("Flutter selection prefers explicit CI executable, then local SDK, FVM and 
 	);
 });
 
-test("CI Flutter override checks the pinned SDK and builds the snapshot base path without FVM", (t) => {
+test("CI Flutter override checks the pinned SDK and builds under a base path without FVM", (t) => {
 	const cwd = fixture(t);
 	const log = join(cwd, "calls.jsonl");
 	const output = join(cwd, "output");
 	buildAppCatalog({
 		cwd,
 		output,
-		basePath: "/admin/documentation/library/0.123.2/",
+		basePath: "/storybook/0.123.2/",
 		app: "buyer",
 		env: {
 			...process.env,
@@ -94,7 +94,7 @@ test("CI Flutter override checks the pinned SDK and builds the snapshot base pat
 		"--output",
 		output,
 		"--base-href",
-		"/admin/documentation/library/0.123.2/flutter/buyer/",
+		"/storybook/0.123.2/flutter/buyer/",
 		"--no-web-resources-cdn",
 	]);
 });

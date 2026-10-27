@@ -4,9 +4,9 @@
 
 ## 共用元件庫
 
-[買家 App 元件庫文件](docs/component-library.md) 提供真實 widget 的 catalog、Dart API、啟動與測試方式；[管理後台 UI 元件庫](https://admin.example.com/admin/documentation) 可對照買家、賣家與 Web。
+[買家 App 元件庫文件](docs/component-library.md) 提供真實 widget 的 catalog、Dart API、啟動與測試方式；website 的 Storybook（`pnpm storybook`）可對照買家、賣家與 Web。
 
-共用元件改動應在同一次 PR 更新正式 widget、catalog、API 文件與測試，再由 Web 的文件同步及版本發布流程整合。UI 元件庫版本與手機 App 發行版本獨立；既有 artifact 不覆寫，文件更新不會自動發布手機 App。
+共用元件改動應在同一次 PR 更新正式 widget、catalog、API 文件與測試，Web 的 Storybook 在 build 時直接讀入 API 文件。文件與 catalog 的更新不代表已發布手機 App。
 
 ## 功能特色
 

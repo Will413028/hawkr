@@ -5,8 +5,6 @@
 - **正式環境編譯**: `pnpm build`
 - **Lint 與類型檢查**: `pnpm lint`（tsc、biome check 與架構／transport／dark mode 等檢查腳本）
 - **測試**: `pnpm test`（Vitest）、`pnpm test:unit`（`tests/*.test.ts`，node:test）；E2E 用 `pnpm test:e2e`。單元測試不得連到真的主機（`tests/setup/hermetic.mjs` 擋非 loopback 連線；沒有 handler 的 msw 請求會失敗）；啟動子程序時用 `hermeticEnv()`（`tests/helpers/hermetic-env.ts`，`tests/hermetic-guard.test.ts` 檢查）。`pnpm run test:build-output` 檢查 `pnpm build` 預先渲染的 HTML。本機跑 `pnpm build` 要把兩個 API base 設成 loopback。
-- **API 型別與 Connect 執行期**: 在共用套件 `@hawkr/api`（`packages/hawkr-api-ts`）：生成碼 import 自 `@hawkr/api/gen/…`，錯誤分類與重試是 `@hawkr/api/connect/errors`、`@hawkr/api/connect/retry`。改根目錄 `api/` 的 proto 後在根目錄跑 `pnpm --filter @hawkr/api gen:api`，不得手改生成檔
-- **鄉鎮市區代碼表與查詢**: 在共用套件 `@hawkr/twaddr`（`packages/hawkr-twaddr-ts`），import 自 `@hawkr/twaddr/lookup`；資料檔由 `backend/internal/platform/twaddr` 生成，不得手改。
 - **共用文案目錄**: 在共用套件 `@hawkr/ui-text`（`packages/hawkr-ui-text-ts`），import 自 `@hawkr/ui-text/keys` 與 `@hawkr/ui-text/format`。元件用 `useUiText()`、RSC 與測試用 `uiTextFor(locale)`（`lib/i18n/ui-text.ts`，不用 `getTranslations()`，否則 ISR 的頁會變動態）；回傳字串的純函式第一個參數收 `ut: UiText`。目錄的名詞對 UNSPECIFIED 與不認得的值回 undefined，要文字用 `optionalText(ut, m)`，要「未知」用 `commonUnknown()`；錯誤文字用 `@hawkr/api/connect/errors` 的 `errorText`。enum 文字規則見根目錄 `AGENTS.md`，由 `pnpm lint` 的 `check-enum-text` 擋。
 - **佔位圖**: `pnpm gen:placeholders` 依 `scripts/gen-placeholders.ts` 的表與 `design-system/cross-platform-tokens.json` 的 `brand.*` 重新產生 `public/placeholders/*.svg`；`tests/placeholders.test.ts` 比對檔案、並檢查原始碼引用的本機素材路徑都存在
 - **自動格式化**: `pnpm format`
@@ -58,7 +56,7 @@ docs/                       # 技術文件（directory-architecture.md、design-
 - UI 工作前先讀 `DESIGN.md`、`components/README.md` 與相關的正式元件，重用既有的品牌與語意 token。
 - 起 `pnpm storybook`，用 `hawkr-storybook` MCP（`http://127.0.0.1:6006/mcp`：`docs-list`、`docs-show`、`get-storybook-story-instructions`）；工具不能熱載入時用 `pnpm storybook:mcp <tool> '<json>'`。不自創元件 props，import 用實際的 `@/components/...`。
 - 共用 UI 的改動在同一次變更內更新 stories 與 API 文件；用 MCP `test-run` 看實際渲染，並跑 `pnpm storybook:typecheck`（`storybook:test` 交給 CI）。
-- 跨平台的改動看 `design-system/cross-platform.md`，跑 `pnpm design:check --apps-root ..`，App 文件用 `pnpm storybook:sync-app-docs` 同步；Flutter iframe 的 props 不是 Dart widget API，以 App 的 API 文件與原始碼為準，widget 測試在各 App 目錄跑。
+- 跨平台的改動看 `design-system/cross-platform.md`，跑 `pnpm design:check --apps-root ..`；App 的 API 文件頁在 build 時直接讀入各 App 的 `docs/component-library.md`；Flutter iframe 的 props 不是 Dart widget API，以 App 的 API 文件與原始碼為準，widget 測試在各 App 目錄跑。
 - 預覽要 deterministic、不連真實交易。
 
 <!-- BEGIN:nextjs-agent-rules -->

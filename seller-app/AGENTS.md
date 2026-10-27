@@ -12,7 +12,6 @@
 ## 元件庫維護
 
 - 共用 UI 工作先讀 [賣家 App 元件庫](docs/component-library.md)，在同一次 PR 更新正式 widget、catalog 案例、Dart API 文件與相關測試；不要複製另一套預覽專用元件或主題。
-- 其餘規則（catalog 指令、審查入口與文件同步、版本與發布）兩支 App 共用一份，在 `../buyer-app/AGENTS.md`「元件庫維護」。
 
 ## 目錄結構
 ```

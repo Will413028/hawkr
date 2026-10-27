@@ -6,15 +6,15 @@ import { Meta } from "@storybook/addon-docs/blocks";
 
 這裡是買家 App、賣家 App 與主網站含賣家中心的共用審查入口。**產品外觀與行為以正式 runtime tokens 和元件來源為準；Storybook 展示現況、使用方式與待收斂差異。** 元件庫更新不會自動發布網站或手機 App。
 
-[查看目前版本與發布狀態](?path=/docs/documentation-releases--docs) · [三端對照](?path=/story/cross-platform-comparison--overview) · [買家 Dart API](?path=/docs/apps-buyer-api--docs) · [賣家 Dart API](?path=/docs/apps-seller-api--docs)
+[三端對照](?path=/story/cross-platform-comparison--overview) · [買家 Dart API](?path=/docs/apps-buyer-api--docs) · [賣家 Dart API](?path=/docs/apps-seller-api--docs)
 
 ## 選元件與修改方式
 
 1. 先在目錄找現有元件，用 MCP `docs-list`／`docs-show` 看實際 props。Web 從正式 `@/components/...` 匯入；Flutter 使用各自 Dart API 文件。
 2. 改正式元件時一起更新 stories，至少補齊適用的載入、停用、錯誤、空狀態、選取、focus 與長中文案例。
-3. 修改 App API 時，先更新該 App 的元件庫文件，再執行 `pnpm storybook:sync-app-docs`；不要手改生成的 Buyer API／Seller API 文件。
+3. 修改 App API 時，更新該 App 的 `docs/component-library.md`；Buyer API／Seller API 頁面在 build 時直接讀入它。
 4. 改共同 token 時同步三端來源與 `cross-platform-tokens.json`。六項既有差異仍在 exceptions 中，不能因相近就當成一致。
-5. 把改動範圍、版本影響、已知限制與驗證結果放進同一個 PR／release 工作。
+5. 把改動範圍、版本影響、已知限制與驗證結果放進同一個 PR。
 
 ## 誰負責
 
@@ -24,7 +24,6 @@ import { Meta } from "@storybook/addon-docs/blocks";
     <tr><td>設計系統負責角色</td><td>品牌語意、平台例外與視覺基線核可</td></tr>
     <tr><td>Web 元件維護角色</td><td>React／CSS、stories、互動及無障礙</td></tr>
     <tr><td>買家、賣家 App 維護角色</td><td>各自 Flutter widget、主題、API 文件與原生平台驗證</td></tr>
-    <tr><td>發布維護角色</td><td>固定三 repo 來源、完整 bundle、管理員權限、版本與回退</td></tr>
   </tbody>
 </table>
 
@@ -38,7 +37,7 @@ import { Meta } from "@storybook/addon-docs/blocks";
     <tr><td>MCP <code>test-run</code></td><td>Web story 的互動、語意與 a11y 檢查結果</td><td>真實資料、完整 feature 流程與發布環境</td></tr>
     <tr><td>三端 token gate</td><td>明列 runtime token 來源符合契約</td><td>每頁是否採用 token、渲染是否相同</td></tr>
     <tr><td>Flutter widget tests</td><td>Flutter widget 邏輯與指定尺寸／字級下的版面</td><td>受影響的 iOS 實機或模擬器行為</td></tr>
-    <tr><td>Static build</td><td>該建置設定能產生 artifact</td><td>管理員入口、資產路由與線上權限</td></tr>
+    <tr><td>Static build</td><td>該建置設定能產生 artifact</td><td>Flutter iframe 的資產路由與實際載入</td></tr>
   </tbody>
 </table>
 
@@ -50,11 +49,11 @@ App iframe 已獨立標記，不把 React 容器測試當作 Flutter widget 測�
 
 有意改版先說明差異，由設計系統負責角色審查後再更新基線。**核可基線是在確認設計意圖；測試通過是在確認實作符合該基線。** 不可批次接受所有差異來消除測試失敗。
 
-目前互動／a11y／widget tests 和人工截圖，不等於完整自動像素回歸系統。自動 snapshot pipeline 建好前，每次發布需保存人工比較與審查紀錄。
+目前互動／a11y／widget tests 和人工截圖，不等於完整自動像素回歸系統。自動 snapshot pipeline 建好前，每次有意改版需保存人工比較與審查紀錄。
 
 ## 工具與平台
 
-兩 App 的 `.fvmrc` 固定 Flutter 3.41.2，catalog 使用 Web JavaScript build；升級 Flutter、renderer 或改用 Wasm 應另開可審查的工具鏈變更。保留三 repo 的 lockfile，artifact 記錄實際工具版本。
+兩 App 的 `.fvmrc` 固定 Flutter 3.41.2，catalog 使用 Web JavaScript build；升級 Flutter、renderer 或改用 Wasm 應另開可審查的工具鏈變更。保留各自的 lockfile。
 
 小螢幕至少覆蓋 320／390／768px 與 1.4 倍字級；不得為了畫面一致而關閉使用者文字縮放。原生 safe area、鍵盤、輸入法與字型 fallback 要在受影響平台驗證。
 
@@ -64,7 +63,6 @@ App iframe 已獨立標記，不把 React 容器測試當作 Flutter widget 測�
 pnpm storybook:mcp test-run
 pnpm storybook:typecheck
 pnpm design:check --apps-root ..
-node scripts/sync-app-catalog-docs.mjs --check
 ```
 
-在各 App repository 執行 `bash scripts/component-catalog.sh test`，再跑受影響的既有 widget tests 與 analyze。完整元件庫建置使用 `pnpm storybook:build:all`；Web-only CI artifact 不等於包含兩 App 的完整發布。
+在各 App 目錄執行 `bash scripts/component-catalog.sh test`，再跑受影響的既有 widget tests 與 analyze。完整元件庫建置使用 `pnpm storybook:build:all`。

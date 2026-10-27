@@ -57,3 +57,13 @@
 
 - 執行計畫的步驟 1–7。
 - seller 拆模組的階段計畫（觸發：本計畫步驟 6 完成後 seller 仍超過 6,000 bytes）。
+
+## 修訂：兄弟子專案共用的規則（2026-10-28，Will）
+
+原決策沒有處理兩個以上兄弟子專案（或模組）共用的規則；步驟 3 把 buyer-app、seller-app 相同的三條只留在一處、另一處指向它，但 Claude Code 不會載入兄弟目錄的 `AGENTS.md`，Codex 只串接根目錄到工作目錄的那幾份（[Claude Code memory](https://code.claude.com/docs/en/memory)、[Codex AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md)、[agents.md](https://agents.md/)，2026-10-28 查證）。
+
+- 決策：共用的規則依序處理。能機械檢查的交給 CI 或測試，指令檔不寫；描述不存在的流程的刪除；內容已在各自文件裡的，指令檔只留一行「做 X 前先讀 Y」。指令檔不指向兄弟目錄的指令檔。
+- 剩下真正共用、無法機械檢查、又不屬於根目錄的規則，放一份中立的共用檔，各子專案的 `AGENTS.md` 以 `@路徑` 引用（Claude Code 會展開，Codex 看到一行指標）。第一次這樣做時，`scripts/check-agents-md.py` 要把引入的 bytes 算進上限。2026-10-28 時這類規則是 0 條，所以不建這個機制。
+- 否決：兄弟互指（不會被載入）；各寫一份再加比對檢查（防漂移的檢查本身就是第二份真相）；建 `apps/` 當共同上層（Codex 從根目錄工作時不載入它，而且需要放的規則是 0 條）；工具專屬、依 glob 套用的規則檔（Cursor、Copilot、`.claude/rules/` 各一種格式，Codex 不支援）。
+- 第一次套用：兩支 App 的「元件庫維護」三條刪除，內容已在各自的 `docs/component-library.md`、CI 與根目錄；Storybook 的 App API 頁改成 build 時讀入 App 的文件，刪掉同步腳本（2026-10-28 時鏡像已經漂移，`--check` 沒有 CI 呼叫）；不存在的元件庫版本化發布流程（`/admin/documentation`）的描述與孤兒元件刪除。
+- 撤銷條件：AGENTS.md 規範、Claude Code 或 Codex 改變載入或匯入行為時，重新評估。

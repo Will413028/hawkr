@@ -226,7 +226,7 @@ HkSkeletonShimmer(child: _ProductCardSkeleton());
 
 ## 版本與文件維護
 
-共用 UI 修改需一起更新 catalog、Dart API 文件及測試；由 Web 的 `pnpm storybook:sync-app-docs` 同步。
+共用 UI 修改需一起更新 catalog、Dart API 文件及測試；Web 的 Storybook 在 build 時直接讀入本檔。
 
 受保護的 Web catalog 使用自訂 `web/flutter_bootstrap.js`，不安裝離線 service worker。舊 UI 版本以獨立 bundle 保留；回復文件庫版本不等於回復已發布的 App。
 
