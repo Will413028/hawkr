@@ -79,9 +79,9 @@ describe("isConfiguredMediaUrl compares the full origin", () => {
 		expect(isConfiguredMediaUrl(new URL("https://cdn.example/a.png"))).toBe(
 			true,
 		);
-		expect(
-			isConfiguredMediaUrl(new URL("https://cdn.example:443/a.png")),
-		).toBe(true);
+		expect(isConfiguredMediaUrl(new URL("https://cdn.example:443/a.png"))).toBe(
+			true,
+		);
 		expect(
 			isConfiguredMediaUrl(new URL("https://cdn.example:8443/a.png")),
 		).toBe(false);
