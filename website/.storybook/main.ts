@@ -40,6 +40,23 @@ const config: StorybookConfig = {
 			...(config.plugins || []),
 			catalogAssetPlugin(webRoot, basePath),
 		];
+		// Clerk 需要 provider、網路與 application key；預覽一律用未登入的替身（clerk-mock.tsx）。
+		config.resolve = {
+			...config.resolve,
+			alias: [
+				...(Array.isArray(config.resolve?.alias)
+					? config.resolve.alias
+					: Object.entries(config.resolve?.alias ?? {}).map(
+							([find, replacement]) => ({ find, replacement }),
+						)),
+				{
+					find: /^@clerk\/nextjs$/,
+					replacement: fileURLToPath(
+						new URL("./clerk-mock.tsx", import.meta.url),
+					),
+				},
+			],
+		};
 		config.css = {
 			...config.css,
 			postcss: { plugins: [tailwindcss(), catalogCssAssetPlugin(basePath)] },

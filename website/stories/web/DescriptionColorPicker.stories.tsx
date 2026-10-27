@@ -58,8 +58,13 @@ export const AreaAndHue: Story = {
 		const before = Number(area.getAttribute("aria-valuenow"));
 		await userEvent.keyboard("{ArrowRight}");
 		await expect(Number(area.getAttribute("aria-valuenow"))).toBe(before + 1);
+		const brightness = Number(
+			/亮度 (\d+)%/.exec(area.getAttribute("aria-valuetext") ?? "")?.[1],
+		);
 		await userEvent.keyboard("{Shift>}{ArrowUp}{/Shift}");
-		await expect(area.getAttribute("aria-valuetext")).toContain("亮度 40%");
+		await expect(area.getAttribute("aria-valuetext")).toContain(
+			`亮度 ${brightness + 10}%`,
+		);
 		const hue = panel.getByRole("slider", { name: "色相" });
 		// Range keys require native browser defaults; Testing Library tries to
 		// setSelectionRange on input[type=range], which the browser disallows.
@@ -141,7 +146,7 @@ export const CancelAndEscape: Story = {
 		await userEvent.tab();
 		await expect(panel.getByRole("button", { name: "關閉色盤" })).toHaveFocus();
 		await userEvent.click(
-			panel.getByRole("button", { name: "冬夜藍 #1e5fab" }),
+			panel.getByRole("button", { name: "深藍 #1e5fab" }),
 		);
 		await userEvent.keyboard("{Escape}");
 		await expect(
@@ -192,10 +197,10 @@ export const NarrowDarkAndDisabled: Story = {
 		const element = await waitForPalette(canvasElement);
 		const panel = within(element);
 		await userEvent.click(
-			panel.getByRole("button", { name: "冬夜藍 #1e5fab" }),
+			panel.getByRole("button", { name: "深藍 #1e5fab" }),
 		);
 		await expect(
-			panel.getByRole("button", { name: "冬夜藍 #1e5fab" }),
+			panel.getByRole("button", { name: "深藍 #1e5fab" }),
 		).toHaveAttribute("aria-pressed", "true");
 		await expect(args.onApply).not.toHaveBeenCalled();
 		const bounds = element.getBoundingClientRect();

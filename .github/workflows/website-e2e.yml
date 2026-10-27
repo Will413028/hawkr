@@ -82,6 +82,15 @@ env:
   NEXT_PUBLIC_GOOGLE_CLIENT_ID: e2e-dummy-client-id.apps.googleusercontent.com
   WEB_PROCUREMENT_RFQ_PRICE_RANGE_V1: 'true'
   WEB_PROCUREMENT_RFQ_APPROVAL_V1: 'true'
+  # 媒體 origin（測試用假網域，不指向任何真的主機）：沒設時 buildImageUrl 不組網址，e2e 的圖片全部缺席，
+  # Storybook 的描述編輯器圖片區塊也會判定資料無效而跳過（fixture 的 msw 攔的就是這個網域）。
+  NEXT_PUBLIC_MEDIA_BASE_URL: https://test-media.example.com
+  # 假的 Clerk key，只為了讓 clerkMiddleware 與 ClerkProvider 能啟動；沒有對應的 Clerk application。
+  # 用 pk_live_ 而不是 pk_test_：development instance 的請求若沒有 dev browser cookie，middleware 會 handshake 導向 FAPI（網路）；
+  # production 形式的 key 在沒有 session cookie 時直接視為未登入，不連網。
+  # 內容是 base64('clerk.example.org$')，CSP 的 Clerk Frontend API 也由它推得（example.org 為保留網域）。
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_live_Y2xlcmsuZXhhbXBsZS5vcmck
+  CLERK_SECRET_KEY: sk_live_e2e_dummy_not_a_real_key
 
 jobs:
   e2e:
