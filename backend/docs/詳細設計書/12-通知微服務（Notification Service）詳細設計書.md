@@ -456,7 +456,7 @@ var eventTypeToCategory = map[string]string{
 
 > 由 product-service 偵測庫存 0→可見 transition（02 §5.13b）→ 發 `product.restock` event → buyer-service `restock_consumer` fan-out 為每個 ACTIVE 訂閱者發 `product.restock.target` event → notification-service template-driven consumer 自動寫 inbox + FCM。
 >
-> **冪等鍵**：notification `reference_id_template = restock_#{subscriptionId}`，搭配 schema 既有 UNIQUE `(user_id, user_type, event_type, reference_id)` 保 inbox 端 fan-out retry 時不重複插入（39 §5.5a.3 / §7.4）。
+> **冪等鍵**：notification `reference_id_template = restock_#{subscriptionId}`，搭配 schema 既有 UNIQUE `(user_id, user_type, event_type, reference_id)` 保 inbox 端 fan-out retry 時不重複插入。
 
 ```json
 // 範例：系統公告（gRPC BroadcastAnnouncement 產出，見 §7.5）

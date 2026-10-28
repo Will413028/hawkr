@@ -1616,7 +1616,7 @@ SELECT store_id FROM seller_subscriptions WHERE buyer_id = :buyerId;
 buyer-service 全部 8 支 favorite/follow 讀寫 RPC（`GetFavoriteList` / `CheckFavorite` /
 `BatchCheckFavorites` / `AddFavorite` / `RemoveFavorite` / `GetFavoriteCount` /
 `ListFavoritedProductIds` / `ListSubscribedSellerIds`）的 request 欄位皆為 `buyer_id`，
-由 **gateway** 的 `resolveBuyerID`（Redis 快取）解析後傳入（39 §2.2）。
+由 **gateway** 的 `resolveBuyerID`（Redis 快取）解析後傳入。
 
 `ListFavoritedProductIds` / `ListSubscribedSellerIds` 的呼叫方是 product-service，
 不是 gateway 本身：product-service 手上的 `GetProductListRequest.viewer_buyer_id`
@@ -2145,7 +2145,7 @@ sequenceDiagram
     alt followed_product_only 與 followed_seller_only 皆為 false
         GW->>PS: GetProductList(viewerBuyerId=0, followedProductOnly=false, followedSellerOnly=false, ...)
     else 任一 filter 為 true
-        GW->>GW: resolveBuyerID(accountId)（Redis 快取，39 §2.2）
+        GW->>GW: resolveBuyerID(accountId)（Redis 快取）
         alt 未登入（無 accountId）
             GW->>FE: 401 unauthorized
         else 已登入但無現任 buyer stint
@@ -2940,7 +2940,7 @@ public final class ProductAggregateRules {
 
 ### 5.13b 補貨 transition 偵測與 product.restock event 發布
 
-承接 §5.13a，本節定義 `product.stock_qty` 由 0 增加為 >0（補貨 transition）或商品從不可見變為可見（4003→4004 + stock>0）時，product-service 對外發布 `product.restock` event 的設計。Fan-out 由 buyer-service `restock_consumer` 處理（見 [39-買家服務（Buyer Service）詳細設計書](39-買家服務（Buyer%20Service）詳細設計書.md) §5.X 補貨訂閱），product-service 不持訂閱表也不知道訂閱者。
+承接 §5.13a，本節定義 `product.stock_qty` 由 0 增加為 >0（補貨 transition）或商品從不可見變為可見（4003→4004 + stock>0）時，product-service 對外發布 `product.restock` event 的設計。Fan-out 由 buyer-service `restock_consumer` 處理（見 `docs/modules/buyer.md`），product-service 不持訂閱表也不知道訂閱者。
 
 #### 5.13b.1 觸發條件
 
@@ -3065,7 +3065,7 @@ GROUP BY store_id;
 | `buyer.favorite.added` | buyer-service `FavoriteUseCase.Add` | 新增收藏成功後 publish |
 | `buyer.favorite.removed` | buyer-service `FavoriteUseCase.Remove` | 取消收藏成功後 publish |
 
-詳細 publisher 設計見 [39-買家服務（Buyer Service）詳細設計書](39-買家服務（Buyer%20Service）詳細設計書.md) §收藏（Favorite）。
+詳細 publisher 設計見 `docs/modules/buyer.md`。
 
 #### 5.14.2 業務流程
 

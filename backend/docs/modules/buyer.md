@@ -4,7 +4,7 @@
 
 ## 1. 範圍與公開面
 
-- 買家 stint、profile、頭像、收貨地址、收藏、追蹤（賣家訂閱）、個人封鎖、瀏覽、補貨訂閱與刪除（設計書 39 已退場，只留指引）。
+- 買家 stint、profile、頭像、收貨地址、收藏、追蹤（賣家訂閱）、個人封鎖、瀏覽、補貨訂閱與刪除。
 - 會員方案、指派與額度週期（設計書 59、ADR `2026-09-18-buyer-membership-entitlement-model`）。
 - 業務事件在同一個 transaction 內發布（含進入刪除中時的 `BuyerDeletionRequested`、關閉時的 `BuyerDeleted`）；River 釋放頭像與清理 PII。
 - 買家不是 identity 的角色：建立與關閉買家都不授予、移除角色，也不自己鎖帳號。

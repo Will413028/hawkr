@@ -61,7 +61,7 @@
 | 粉絲週統計 | 台灣賣家按日曆週比較新增數 | 原始計數成立；週日起的週與「本週到目前比上週整週」不成立（比較期不等長，週初必然大跌） | 等長、緊鄰的比較期，以店家時區切日（ShopifyQL `COMPARE TO`、vocus 的創作者統計），回原始值 | `SubscriberStats(storeID, windows)`：總數與各時間窗的新增數，界線由呼叫者給；賣家儀表板（8d）用最近 7 個完整台北日對前 7 日（Will 2026-10-03）。只為 gateway 舊儀表板存在的週日週由 legacy buyerserver 自己算（`TestSubscriberWeeksFollowTheTaipeiSunday`），gateway 的 `/app/sellers/me/dashboard` 路由已在 A3b 第 4B 刀刪除，但成長計算屬 `GetSubscriberDashboardStats` 的回應，該 server 因 seller-service 還讀 Total 而保留（K23），週日週與測試隨它在步驟 11 一起刪；`TestSubscriberStatsCountsEachWindowHalfOpenForTheStore` |
 | 補貨終態歷史 | 有已通知或取消歷史讀者 | 不成立；舊 ListActiveRestockSubscriptionsByBuyerID 與 ListRestock／BatchCheck 只讀待通知 | 純關聯複合主鍵，取消與通知後刪列 | PK (buyer_id, product_id)，無 UUID／status／notified_at；有界 FanOut 事件與刪除同 tx |
 | 刪除稽核來源與原因 | 需辨識來源並保留操作者文字 | 成立；account_id 可由 buyer_id 推得 | trigger 封閉列舉、reason 自由文字、同模組 FK | 申請與稽核改由 accountdeletion.deletion_requests 擁有；buyer 只維護 stint |
-| 每次瀏覽發 ProductViewed | 商品瀏覽原始計數與通知來源 | 成立；設計書 39 的 visit 事件、13 的「瀏覽您的商品」、45 的 engagement，以及 seller A3b 計數均需要 | buyer 發原始事件，下游各自聚合 | 每次 RecordVisit 都發，事件不帶店家（商品所屬的店家不在請求路徑上解析：RecordVisit 因此不依賴商品服務；seller 7c 的重做，取代階段 4 把 `StoreID` 經入口帶進事件的做法）；seller 以事件追加原始瀏覽事件，店家由它的背景 job 解析（見 seller 的 CARRYOVER）；seller 通知節流／聚合屬 notification A8，依下列設計書 |
+| 每次瀏覽發 ProductViewed | 商品瀏覽原始計數與通知來源 | 成立；visit 事件、13 的「瀏覽您的商品」，以及 seller A3b 計數均需要 | buyer 發原始事件，下游各自聚合 | 每次 RecordVisit 都發，事件不帶店家（商品所屬的店家不在請求路徑上解析：RecordVisit 因此不依賴商品服務；seller 7c 的重做，取代階段 4 把 `StoreID` 經入口帶進事件的做法）；seller 以事件追加原始瀏覽事件，店家由它的背景 job 解析（見 seller 的 CARRYOVER）；seller 通知節流／聚合屬 notification A8，依下列設計書 |
 | visit_history 不設筆數或期限 | 每個 buyer×product 僅需最後瀏覽時間 | 成立；upsert 使每 stint 筆數受 catalog 大小限制 | 複合鍵保留最後時間；以量測決定 cap／TTL | 維持無 cap／retention。觸發條件：單一買家超過 1,000 列，或 `ListVisits` 的 p95 超過 200 ms；量測要等部署後的監控（見第 19 列），第一次部署時一併加上這兩個指標 |
 | 地址標籤（label：HOME／COMPANY／OTHER，REQUIRED＋CHECK） | 有人設定（使用者選）或有人讀（畫面或下游） | 不成立：沒有畫面設定也沒有讀者，buyer-app 的選擇器 2026-07-16 品牌改版刪除（`d09f9fa61`），值全由 client 編造；legacy gRPC 轉送但沒有讀者 | ［外部，未查證］零售平台的地址標籤是使用者選的選填欄位；沒有功能就不存欄位 | 刪除（5c F1 α）；產品要讓買家替地址分類時以選填加回，同時做選擇器與顯示 |
 | buyer-app 地址 ID 以 `int` 保存（`address_repository.dart` 的 `int.parse`） | 契約的地址 `id` 是整數 | 不成立：契約 `id` 是不透明字串（AIP-122），`int` 是舊 REST 時期的形狀 | ［外部，AIP-122，本次未重新查證］業界把資源 ID 當不透明字串，client 不解析 | 保留；buyer-app 結帳改走 Connect（ordering 搬進單體）時改成 `String` |
@@ -73,7 +73,7 @@
 | 買家刪帳後封鎖列的去向 | 對象退場後名單與過濾是否保留他 | 不成立：墓碑對象的列沒有讀者（名單顯示不出內容，過濾對一個已不公開的對象沒有效果） | 帳號刪除時一併清除與該帳號有關的關聯（雙向） | 買家刪帳時 buyer 在自己的刪帳 transaction 刪他發起的兩種封鎖與以他為對象的 `blocked_buyers` 列；各店對他的封鎖由 accountdeletion 在同一個 transaction 刪（seller 擁有）。店退場後以店為對象的列保留 |
 | 封鎖與並發寫入的鎖 | 封鎖生效後不應再有新內容寫入 | 不成立為強保證：封鎖與他人的寫入各自提交，READ COMMITTED 下封鎖提交前開始的寫入可以成功 | Mastodon 的封鎖與寫入不互鎖，寫入前檢查 | 封鎖與他人的寫入不互鎖：寫入端在 transaction 內檢查封鎖（social），封鎖提交之後開始的寫入被擋。封鎖買家則在同一個 transaction 依 buyer_id 升冪鎖發起者（排他）與對象（共享），鎖到後才檢查對象狀態，所以不會留下指向已關閉買家的列，兩人同時互相封鎖也不互等（`TestMutualBlocksDoNotDeadlock`、`TestBlockingAClosedBuyerFails`）。重新評估條件：營運出現「封鎖之後仍寫入成功」的檢舉 |
 
-瀏覽事件依據：[設計書 39](../../../docs/詳細設計書/39-買家服務（Buyer%20Service）詳細設計書.md) 的 visit／product.viewed、[設計書 13](../../../docs/詳細設計書/13-通知模板引擎與收件箱（Notification%20Template）詳細設計書.md) 的賣家通知模板，以及 [設計書 45](../../../docs/詳細設計書/45-首頁區塊動態排序與營運干預（Homepage%20Dynamic%20Layout%20&%20Merchandising）詳細設計書.md) 的商品 engagement 聚合。
+瀏覽事件依據：[設計書 13](../../../docs/詳細設計書/13-通知模板引擎與收件箱（Notification%20Template）詳細設計書.md) 的賣家通知模板。
 
 ## 傳輸層的沿用盤點
 

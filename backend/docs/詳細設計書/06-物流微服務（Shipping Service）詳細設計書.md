@@ -581,7 +581,7 @@ PayUni 物流建單 API 對部分欄位有長度約束，違反會回業務錯�
 
 **判斷準則**：欄位**前端可控**（使用者輸入，可回頭要求修正）→ 源頭驗證拒絕，讓使用者結帳時即修正；欄位**系統背景填寫**（撈取既有資料、使用者無法干預）→ 送 PayUni 前自動截斷，不阻斷建單。
 
-**收件人姓名的輸入入口不只結帳**：`recipientName` 有兩個源頭輸入入口——(1) 結帳當下填寫（order-service `CheckoutService`，**權威防線**，依配送方式精確驗證）；(2) 買家地址本（buyer-service `AddAddress`/`UpdateAddress`，**源頭提早提示**，採聯集約束 [4,30]，見 [39 §2.8](../詳細設計書/39-買家服務（Buyer%20Service）詳細設計書.md)）。兩入口都驗證，避免「地址本存壞、結帳才被擋」的 UX 斷裂。
+**收件人姓名的輸入入口不只結帳**：`recipientName` 有兩個源頭輸入入口——(1) 結帳當下填寫（order-service `CheckoutService`，**權威防線**，依配送方式精確驗證）；(2) 買家地址本（buyer-service `AddAddress`/`UpdateAddress`，**源頭提早提示**，採聯集約束 [4,30]，見 `docs/modules/buyer.md`）。兩入口都驗證，避免「地址本存壞、結帳才被擋」的 UX 斷裂。
 
 驗證 / 截斷統一走 common-core `InputValidator`（`requireDisplayLengthBetween` / `truncateByDisplayLength`，計長規則「英文 1、中文/全形 2」對齊 PayUni），約束值集中於 `PayUniShippingConstraints` 常數。詳見 [26-輸入驗證模組 §2.3 R10/R11](../詳細設計書/26-輸入驗證模組（Java%20InputValidator）詳細設計書.md)。
 

@@ -230,7 +230,7 @@ func buyerDisplayName(name string) string {
 //
 // 🔴 判斷「是不是墓碑」一律讀 deleted 旗標（proto `ReviewInfo.user_deleted`），
 // 不要拿 name 去跟墓碑字串做比對 —— 那會在 gateway 再硬編碼一份文案，正是
-// BatchGetBuyerDisplayByBuyerIDs 這支 RPC 要消滅的東西（39 號設計書）。
+// BatchGetBuyerDisplayByBuyerIDs 這支 RPC 要消滅的東西。
 func maskBuyerDisplayName(name string, deleted bool) string {
 	if deleted && name != "" {
 		return name // 墓碑常數，原樣顯示

@@ -48,7 +48,6 @@
   - [35 商品列表排序與銷量反正規化（Product Sort & Sales Count）](詳細設計書/35-商品列表排序與銷量反正規化%EF%BC%88Product%20Sort%20&%20Sales%20Count%EF%BC%89詳細設計書.md)
   - [36 MQ 與事件總覽（MQ & Event Catalog）](詳細設計書/36-MQ%20與事件總覽（MQ%20%26%20Event%20Catalog）.md)
   - [38 Flyway 自動同步與 DB 自動初始化](詳細設計書/38-Flyway%20自動同步與%20DB%20自動初始化%EF%BC%88Flyway%20Auto%20Sync%20&%20DB%20Auto%20Init%EF%BC%89詳細設計書.md)
-  - [39 買家服務（Buyer Service）](詳細設計書/39-買家服務%EF%BC%88Buyer%20Service%EF%BC%89詳細設計書.md)
   - [40 商品匯入精靈服務（Product Import Service）](詳細設計書/40-商品匯入精靈服務%EF%BC%88Product%20Import%20Service%EF%BC%89詳細設計書.md)
   - [41 Realtime SSE 推播平台（Realtime SSE Push Platform）](詳細設計書/41-Realtime%20SSE%20推播平台%EF%BC%88Realtime%20SSE%20Push%20Platform%EF%BC%89詳細設計書.md)
   - [43 評論微服務（Review Service）](詳細設計書/43-評論微服務%EF%BC%88Review%20Service%EF%BC%89詳細設計書.md)

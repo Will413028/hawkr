@@ -1278,7 +1278,7 @@ rpc GetOrderByShipTradeNo(GetOrderByShipTradeNoRequest) returns (GetOrderByShipT
 rpc GetOrderForReview(GetOrderForReviewRequest) returns (GetOrderForReviewResponse);
 rpc GetOrderForAfterSales(GetOrderForAfterSalesRequest) returns (GetOrderForAfterSalesResponse);
 rpc CancelOrderInternal(CancelOrderInternalRequest) returns (CancelOrderInternalResponse);
-rpc GetBuyerMerchantSummary(GetBuyerMerchantSummaryRequest) returns (GetBuyerMerchantSummaryResponse);  // 會員卡累計消費 + 累計退款；納入狀態 SSOT = OrderRepository.spendingRecordStatuses() = {50, 54, 60}（排除 70），見 39 號 §5.7.0。🔴 54（DELIVERY_FAILED_NO_REFUND）必須納入——它是 refund_to_buyer = 0 的成交，漏了會靜默短計累計消費，見 §2.1 下游讀者 #10
+rpc GetBuyerMerchantSummary(GetBuyerMerchantSummaryRequest) returns (GetBuyerMerchantSummaryResponse);  // 會員卡累計消費 + 累計退款；納入狀態 SSOT = OrderRepository.spendingRecordStatuses() = {50, 54, 60}（排除 70）。🔴 54（DELIVERY_FAILED_NO_REFUND）必須納入——它是 refund_to_buyer = 0 的成交，漏了會靜默短計累計消費，見 §2.1 下游讀者 #10
 rpc GetBuyerOrdersForSeller(GetBuyerOrdersForSellerRequest) returns (GetBuyerOrdersForSellerResponse);  // 消費紀錄明細（買家會員卡 + 賣家 CRM 顧客消費紀錄共用）；納入狀態同上（含 54），逐筆帶 refund_amount
 rpc GetSellerOrderStatusCounts(GetSellerOrderStatusCountsRequest) returns (GetSellerOrderStatusCountsResponse);  // 賣家工作台四桶 count，計算規則見 §2.1「賣家工作台 Dashboard 狀態卡 Count 規則（SSOT）」；含售後覆蓋，aftersales_count 由本 RPC 一併回傳
 rpc GetTopSellersByRevenue(GetTopSellersByRevenueRequest) returns (GetTopSellersByRevenueResponse);
@@ -1395,7 +1395,7 @@ rpc BatchGetBuyerDisplayByBuyerIDs(BatchGetBuyerDisplayByBuyerIDsRequest) return
 🔴 **不得改用 `BatchGetBuyerMetaByBuyerIDs`**：那支底層帶
 `deleted_at IS NULL`，是刻意的 PII 邊界，買家註銷後解不出來 ⇒ 賣家訂單列表的
 買家名整片空白。Display 版讓已註銷的 stint 也解得出來，但只回墓碑字串
-「已刪除帳號」、頭像清空，真名不離開 buyer-service。詳見 39 號設計書。
+「已刪除帳號」、頭像清空，真名不離開 buyer-service。詳見 `docs/modules/buyer.md`。
 
 #### Payment Service — 撥款指示
 
