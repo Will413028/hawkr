@@ -44,3 +44,7 @@ expires_at ≥ charge_cutoff_at + 24h
 - 接受一個冗餘欄。**它沒有漂移面**：`cycle.charge_cutoff_at` 與 hold 列都在 lock 那一刻定案
   且此後不可變（cycle 進 `LOCKED` 後不再改時間軸，hold 只會被釋放不會被改期）⇒ 沒有第二個寫入者。
 - INV-10 因此是**真的 DB 強制**，而不是宣告式的口頭約定。
+
+## 修訂：設計書 67 已刪除（2026-10-29）
+
+定期配送訂閱不做，設計書 67 已刪除，本文討論的 `recurring_inventory_hold`／`recurring_capacity_hold`／`recurring_cycle` 不會建立。決策對這三張表不再適用；若日後重做定期配送，要從零重新設計 hold 壽命，不能把本文當作既定結論。

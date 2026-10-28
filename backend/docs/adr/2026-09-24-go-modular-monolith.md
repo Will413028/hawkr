@@ -373,3 +373,7 @@
 ## 修訂：pricebook 刪除（2026-10-28，ADR `2026-10-27-general-ecommerce-scope-cut` D1；計畫 `plans/2026-10-27-ecommerce-scope-cut.md` 步驟 6）
 
 模組表的 `pricebook` 列取消，`agent` 的依賴拿掉 `pricebook`；主計畫的 A4 取消，不搬進單體。
+
+## 修訂：設計書 67 已刪除（2026-10-29）
+
+「不搬」清單裡的 `recurring-service` 對應的設計書 67（定期配送訂閱）已刪除，不做。

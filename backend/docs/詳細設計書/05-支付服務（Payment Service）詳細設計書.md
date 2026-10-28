@@ -3295,10 +3295,6 @@ sequenceDiagram
 >
 > 兩條硬規則：① **費率不得寫成商業常數**（含把「1%」寫進 code 或設定檔）——精確費率、扣費時點、gross／net 方向、是否另行扣收，一律以**該筆交易的實際查詢值**記帳；② 該手續費**必須與物流商實際成本分帳**，不得併成單一數字（否則對帳時無法還原任一方）。手續費由誰吸收是業務決策，本服務不自行推定（見 §1.3）。
 
-> 🔴 **定期扣款不得沿用 `MembershipBillingService`**：它走 PayUni **Period（固定金額）**路徑，逐字綁定「固定週期＋固定金額」；定期配送每期金額會變，沿用它會把可變金額硬塞進固定金額協議。定期配送的 mandate 與扣款**擴用既有的 `billing_provider_accounts` / `billing_commands` 表，不另建表**，PayUni mandate 與 `CreditHash` 走既有 `billing_*` 底座。
->
-> **mandate 查詢類回應必須帶 `expires_at`**（`CreateRecurringMandate` / `GetRecurringMandate`）：下游排程器以它組候選述詞，漏了這個欄位候選集恆為 0 列，而**排程器不會報錯**——症狀是「什麼都沒發生」。
-
 代理商模式下，所有交易建立時帶入 `GrantExport=1`，PayUni 不會自動將款項撥給商店。由代理商（本系統）在業務流程完成後（買家確認收貨），主動呼叫 PayUni Grant API 發動撥款指示。
 
 **觸發來源**：Order Service 在買家確認收貨、訂單狀態更新為 COMPLETED 後，呼叫 `GrantPayment(order_no)` RPC。

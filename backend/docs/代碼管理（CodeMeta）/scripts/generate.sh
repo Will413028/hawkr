@@ -89,7 +89,7 @@ GO_REGISTRY_ENUMS=(
     #    刪掉會讓 ADMIN_ENUMS 那半也要重判，而 ADM 的帳本畫面確實會用到值域。
     CommerceModel CollectionModel FulfillmentMode InvoiceModel
     LedgerOwnerType LedgerAccountCode LedgerTxnType ProviderFeeType
-    FulfillmentAction RecurringAction UberDeliveryOutcome
+    FulfillmentAction UberDeliveryOutcome
     # 70 物流財務結算（線 B）：應收狀態機與責任成因判定（runtime owner 已改為 payment-service）
     # 都在 Go 側，需要 typed 常數與 FromValue（狀態值用字串比對會讓 typo 在 runtime 才現形）。
     LogisticsReceivableStatus ResponsibilityCause
@@ -122,7 +122,7 @@ ADMIN_ENUMS=(
     # 帳本四個 enum 標「前端可見: No」（買賣家端不消費），**只能靠本 allowlist 進 ADM**——
     # 少任何一個，ADM 的帳本／撥款畫面就會拿不到值域而只能硬編碼字串。
     CommerceModel CollectionModel FulfillmentMode InvoiceModel
-    FulfillmentAction RecurringAction UberDeliveryOutcome ShippingType ReceiptStatus
+    FulfillmentAction UberDeliveryOutcome ShippingType ReceiptStatus
     LedgerOwnerType LedgerAccountCode LedgerTxnType ProviderFeeType
     # 70 物流財務結算：ADM 的收款異常佇列依 LogisticsReceivableStatus 篩 UNCONFIRMED／FAILED，
     # 對帳與爭議畫面依 ResponsibilityCause 分流歸屬。

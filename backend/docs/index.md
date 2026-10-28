@@ -16,12 +16,11 @@
 | 06 | [物流微服務（Shipping Service）](基本設計書/06-物流微服務%EF%BC%88Shipping%20Service%EF%BC%89基本設計書.md) | [06](詳細設計書/06-物流微服務%EF%BC%88Shipping%20Service%EF%BC%89詳細設計書.md) |
 | 65 | [物流履約平台（Fulfillment Platform）](基本設計書/65-物流履約平台%EF%BC%88Fulfillment%20Platform%EF%BC%89基本設計書.md)（共用骨架） | [65](詳細設計書/65-物流履約平台%EF%BC%88Fulfillment%20Platform%EF%BC%89詳細設計書.md)、[65A](詳細設計書/65A-物流履約前端實作規格.md) |
 | 66 | [Uber Direct 即時配送整合](基本設計書/66-Uber%20Direct%20即時配送整合基本設計書.md) | [66](詳細設計書/66-Uber%20Direct%20即時配送整合詳細設計書.md) |
-| 67 | [定期配送訂閱（Subscription Delivery）](基本設計書/67-定期配送訂閱%EF%BC%88Subscription%20Delivery%EF%BC%89基本設計書.md) | [67](詳細設計書/67-定期配送訂閱%EF%BC%88Subscription%20Delivery%EF%BC%89詳細設計書.md) |
 | 68 | [7-ELEVEN 大宗寄倉](基本設計書/68-7-ELEVEN%20大宗寄倉（B2C）基本設計書.md) | [68](詳細設計書/68-7-ELEVEN%20大宗寄倉%EF%BC%88B2C%EF%BC%89詳細設計書.md) |
 | 69 | [商家自有出貨（Merchant Self-Delivery）](基本設計書/69-商家自有出貨%EF%BC%88Merchant%20Self-Delivery%EF%BC%89基本設計書.md) | [69](詳細設計書/69-商家自有出貨%EF%BC%88Merchant%20Self-Delivery%EF%BC%89詳細設計書.md) |
 | 70 | [物流財務結算（Logistics Settlement & Receivable）](基本設計書/70-物流財務結算%EF%BC%88Logistics%20Settlement%20%26%20Receivable%EF%BC%89基本設計書.md) | [70](詳細設計書/70-物流財務結算%EF%BC%88Logistics%20Settlement%20%26%20Receivable%EF%BC%89詳細設計書.md) |
 
-🔴 **物流領域（06／65／66／67／68／69／70）已建立編號一一對應的基本設計書**（2026-09-11）。
+🔴 **物流領域（06／65／66／68／69／70）已建立編號一一對應的基本設計書**（2026-09-11）。
 65A 是前端實作規格，不建立對應的基本設計書。
 
 ---
@@ -95,10 +94,9 @@
 | 55 | [Hawkr 幫找採購助手（Procurement Assistant）](詳細設計書/55-Hawkr%20幫找採購助手%EF%BC%88Procurement%20Assistant%EF%BC%89詳細設計書.md) | `services/ai-service/internal/procurement/`、`gateway/internal/handler/ai.go`、`hawkr-website/features/procurement-assistant/` |
 | 56 | [ADM 代行營運（Delegated Operations）](詳細設計書/56-ADM%20代行營運%EF%BC%88Delegated%20Operations%EF%BC%89詳細設計書.md) | `internal/modules/delegation/`（規格見 `modules/delegation.md`）、`internal/legacy/delegationservice/`、`gateway/internal/authz/`、`gateway/internal/router/`、`api/proto/common/delegation.proto`、`hawkr-admin/src/features/delegated-operations/` |
 | 64 | [Hawkr Agent 商務線（RFQ Publication、Seller Quote、Buyer Acceptance）](詳細設計書/64-Hawkr%20Agent%20%E5%95%86%E5%8B%99%E7%B7%9A%EF%BC%88RFQ%20Publication%E3%80%81Seller%20Quote%E3%80%81Buyer%20Acceptance%EF%BC%89%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88%E6%9B%B8.md) | 由另一條 lane 維護；本列僅補登記（`00-總覽.md` 已有，`_sidebar`／`index` 先前漏登） |
-| 65 | [物流履約平台（Fulfillment Platform）](詳細設計書/65-物流履約平台%EF%BC%88Fulfillment%20Platform%EF%BC%89詳細設計書.md) | `services/java/shipping-service/`（擴充）、`services/java/payment-service/`（線 B ⇒ Logistics Finance module）、本波新增 Recurring（Go）、`api/proto/shipping/`（draft，僅稽核附錄與骨架已定版） |
-| 65A | [物流履約前端實作規格](詳細設計書/65A-物流履約前端實作規格.md) | 四個前端 repo（website／admin／buyer／seller），43 個畫面（draft，骨架已定版） |
+| 65 | [物流履約平台（Fulfillment Platform）](詳細設計書/65-物流履約平台%EF%BC%88Fulfillment%20Platform%EF%BC%89詳細設計書.md) | `services/java/shipping-service/`（擴充）、`services/java/payment-service/`（線 B ⇒ Logistics Finance module）、`api/proto/shipping/`（draft，僅稽核附錄與骨架已定版） |
+| 65A | [物流履約前端實作規格](詳細設計書/65A-物流履約前端實作規格.md) | 四個前端 repo（website／admin／buyer／seller），41 個畫面（draft，骨架已定版） |
 | 66 | [Uber Direct 即時配送整合](詳細設計書/66-Uber%20Direct%20即時配送整合詳細設計書.md) | `services/java/shipping-service/`（provider adapter）、`services/java/payment-service/`（Logistics Finance module）（draft） |
-| 67 | [定期配送訂閱（Subscription Delivery）](詳細設計書/67-定期配送訂閱%EF%BC%88Subscription%20Delivery%EF%BC%89詳細設計書.md) | 本波新增 `services/recurring-service/`、`services/java/payment-service/`（mandate 擴充）（draft） |
 | 68 | [7-ELEVEN 大宗寄倉（B2C）](詳細設計書/68-7-ELEVEN%20大宗寄倉%EF%BC%88B2C%EF%BC%89詳細設計書.md) | `services/java/shipping-service/`、`services/java/payuni-webhook-service/`（draft） |
 | 69 | [商家自有出貨（Merchant Self-Delivery）](詳細設計書/69-商家自有出貨%EF%BC%88Merchant%20Self-Delivery%EF%BC%89詳細設計書.md) | `services/java/shipping-service/`、賣家 App（draft） |
 | 70 | [物流財務結算（Logistics Settlement & Receivable）](詳細設計書/70-物流財務結算%EF%BC%88Logistics%20Settlement%20%26%20Receivable%EF%BC%89詳細設計書.md) | 🔴 **Runtime Owner ＝ `services/java/payment-service/`（Logistics Finance module）**、`services/java/shipping-service/`、`services/invoice-service/`（draft） |

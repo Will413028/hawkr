@@ -268,7 +268,6 @@ docker exec hawkr-rabbitmq rabbitmqctl list_queues name messages \
 | `hawkr.seller_workspace` | Topic | order-service（Java）+ aftersales-service（Java）| 賣家工作區 realtime invalidation 事件（gateway SSE 唯一 consumer，§3.6i / 41 §四之二） | `EXCHANGE_SELLER_WORKSPACE` | `ExchangeSellerWorkspace` |
 | `hawkr.invoice` | Topic | invoice-service（Go） | 電子發票生命週期事件（開立 / 作廢 / 折讓 / 申訴 / 稅務身分，§3.6k / 58 號設計書） | — | `ExchangeInvoice` |
 | `procurement.events` | Topic | ai-service（Go） | 採購報價邀請通知事件（§3.6l / 55 號設計書）＋ RFQ 發布直投線的收件人 invite 事件（§3.6l.1 / 64 號設計書） | — | `ExchangeProcurement` |
-| 🔶 `hawkr.recurring` | Topic | recurring-service（Go） | 定期配送訂閱契約／週期／授權生命週期（§3.6n / 67 號設計書）；**consumer 只有 notification-service**。67 落地時與服務同 PR 佈建 | — | `ExchangeRecurring` |
 
 > **一個 exchange 有多個 publisher 不是違規**：§1.4 的硬規則是「同 **routing key** 對應多個 publisher」才禁止。本表已有三個多 publisher exchange——`hawkr.product`（product-service ＋ 單體 buyer 模組）、`hawkr.seller_workspace`（order-service ＋ aftersales-service）、`hawkr.shipping`（shipping-service ＋ payment-service）——三者的每條 routing key 發送方都唯一。判別步驟：拿該 exchange 的 routing key 清單去 §三，看有沒有**同一條 key 出現兩個 Producer**；沒有就合規，不要以「這個 exchange 有兩個服務在發」為由退件。
 
@@ -323,16 +322,15 @@ docker exec hawkr-rabbitmq rabbitmqctl list_queues name messages \
 | `order.paid` | order-service `OrderEventPublisher.publishOrderPaid` | shipping-service `OrderPaidConsumer.onOrderPaid`（🔴 **語意定版 2026-09-13：本 consumer 的處理止於 `FL-1`，不得由此觸發任何 provider 的 `FL-2`（派車／預約取件／實體交寄）**——`FL-2` 由賣家透過 `S-10` 發動，見 [65 §4.4.1a](65-物流履約平台（Fulfillment%20Platform）詳細設計書.md)。⚠️ **「止於 `FL-1`」不等於「只能寫本地資料」**：3001／3002 在此呼叫 PayUni `createHomeShipment`／`createCvsShipment` 取得物流單號，那是**既有且正確**的 `FL-1`；3003 因為 Uber 沒有「只建資料不派車」的 API，才只能建本地列。⚠️ 這條約束適用**所有** provider，但各 provider 的 `FL-1` 做多少事**本來就不一樣**） | `OrderPaidPayload`（outbox 派送時 enrich 的 seller/buyer meta 圖片欄位依 49 號設計書 §6.3 帶 objectKey＋`*Key` 欄位名，顯示 URL 由消費端組出） | ✅ shipping.order.paid.dlq | shipments.shipment_no IS NULL 樂觀鎖 |
 | `order.paid` | 同上 | notification-service（Go，動態 binding 至 `notification.order.paid` queue，**僅買家**「訂單付款成功」推播） | 同上 | — | DB seed 配置 |
 | `order.cancelled` | order-service **`order_outbox`（取消事務內 `OrderService.insertCancelledOutbox`，`OrderOutboxPublisherScheduler` 投遞）** ⚠️ **不是每一次取消都會發**：`insertCancelledOutbox` 在「查不到 `status=SUCCESS` 的扣庫存紀錄」時直接 return、不落 outbox ⇒ 本事件的實際語意是「**有庫存要歸還的**訂單取消了」 | product-service `OrderCancelledConsumer.onOrderCancelled` | `OrderCancelledPayload`（`sellerAvatar` 等圖片欄位依 49 號設計書 §6.3 帶 objectKey＋`*Key` 欄位名，顯示 URL 由消費端組出） | ✅ product.order.cancelled.dlq | `(stockTxId, RESTORE)` 複合鍵 |
-| `order.completed` | order-service **`order_outbox`（同 tx 寫入，`OrderOutboxPublisherScheduler` 投遞）** | notification-service（Go，binding 至 `notification.order.events`）；**crm-service（Go，`crm.order.completed` queue，CRM 客戶消費統計 `total_spent` 累加）**；**單體 buyer 模組（`internal/legacy/buyerconsumer`，queue `hawkr.monolith.buyer.order.completed`，訂單結案後加速完成買家與店家兩側等待中的刪帳）**；🆕 **recurring-service（Go，`recurring.order.completed` queue，67 §6.5.2 — commerce `COMPLETED` → Cycle `COMPLETED`，缺它 Cycle 永停 `MATERIALIZED`）** | `OrderCompletedPayload` ⚠️ 缺 event_id（F2） | notification：—；crm / buyer：✅ `topology.yaml` `retry: {max_attempts: 3}` 展開出 queue-scoped `{queue}.dlx`（fanout）與 `{queue}.dlq`；`pkg/mq` 負責重試／直投語意（§1.5） | notification：Best-effort（推播容忍重複）；**crm：exactly-once effect——`crm_processed_orders` 表 tx 內 claim（`MarkOrderProcessed` rows==0 即不累加，策略 1 dedup 表），金額累加不容忍重複**；buyer：`IsPendingDeletion` guard 天然冪等（刪號完成後 status≠`pending_deletion`，重投遞為 no-op） |
+| `order.completed` | order-service **`order_outbox`（同 tx 寫入，`OrderOutboxPublisherScheduler` 投遞）** | notification-service（Go，binding 至 `notification.order.events`）；**crm-service（Go，`crm.order.completed` queue，CRM 客戶消費統計 `total_spent` 累加）**；**單體 buyer 模組（`internal/legacy/buyerconsumer`，queue `hawkr.monolith.buyer.order.completed`，訂單結案後加速完成買家與店家兩側等待中的刪帳）** | `OrderCompletedPayload` ⚠️ 缺 event_id（F2） | notification：—；crm / buyer：✅ `topology.yaml` `retry: {max_attempts: 3}` 展開出 queue-scoped `{queue}.dlx`（fanout）與 `{queue}.dlq`；`pkg/mq` 負責重試／直投語意（§1.5） | notification：Best-effort（推播容忍重複）；**crm：exactly-once effect——`crm_processed_orders` 表 tx 內 claim（`MarkOrderProcessed` rows==0 即不累加，策略 1 dedup 表），金額累加不容忍重複**；buyer：`IsPendingDeletion` guard 天然冪等（刪號完成後 status≠`pending_deletion`，重投遞為 no-op） |
 | `payout.completed` | order-service `OrderEventPublisher.publishPayoutCompleted`（`GrantPaymentWorker` 撥款成功 emit；exchange `hawkr.order`） | notification-service（Go，動態 binding）+ gateway SSE（inbox.new） | `PayoutCompletedPayload`（snake_case wire，含 event_id UUID） | ❌ 無 DLQ | notification reference_id `payout_{order_no}`（UNIQUE，策略 3）|
 | `order.delivered` | order-service **`order_outbox`**（`ShippingEventConsumer.deliveredInTx` 與送達 CAS 同事務寫入，`OrderOutboxPublisherScheduler` 投遞） | 🔴 **無有效消費端**（issue #3486）：訊息會進 notification-service 的 `notification.order` wildcard queue，但 `notification_templates` 無 `order.delivered` 列，**查表落空即丟棄**；其餘 `hawkr.order` 的 binding 皆為字面 routing key、不含本事件 | `OrderDeliveredPayload` | — | N/A（無有效消費端）|
 | `order.receipt.confirmed` | order-service **`order_outbox`（同 tx 寫入，`OrderOutboxPublisherScheduler` 投遞）** | shipping-service `OrderReceiptConfirmedConsumer.onOrderReceiptConfirmed`（MANUAL ACK） | `OrderReceiptConfirmedPayload` | ✅ shipping.order.receipt.confirmed.dlq | mapper 冪等更新 |
 | `order.sales.accumulated` | order-service **`order_outbox`**（`PaymentEventHandler.handlePendingPaymentOrder` 與 `order.paid` 同一事務寫入） | product-service `SalesAccumulatedConsumer.onSalesAccumulated` | `OrderSalesAccumulatedPayload` | ✅ product.order.sales.accumulated.dlq | publisher 端 group by productId |
 | `order.shipment.create_requested` | order-service `OrderEventPublisher.publishShipmentCreateRequested`（Backstop 重試建單，見 03 §8.11） | shipping-service `ShipmentCreateRequestedConsumer` → `createShipmentFromOrder` | `{orderNo}` JSON | ✅ shipping.shipment.create_requested.dlq | createShipmentFromOrder 以 order_no 查重 |
 | `order.shipment.creation_failed` | order-service `OrderEventPublisher.publishShipmentCreationFailed`（重試上限，見 03 §8.11） | aftersales-service `ShipmentCreationFailedConsumer` → `cancelShipmentBySystem(SHIPMENT_CREATE_TIMEOUT)` | `{orderNo,sellerAccountId,buyerAccountId}` JSON | ✅ aftersales.shipment.creation_failed.dlq | SellerCancelRequest 查重 |
-| `order.refund.finalized` | order-service **`order_outbox`**（三個發布點皆在既有交易內：`AfterSalesRefundEventHandler.handleRefundCompleted`（僅 `duplicate == false` 分支）／`AutoRefundTxHandler.completeAutoRefund`／`AfterSalesEventConsumer.onCancelCompleted` 新抽的 tx handler） | invoice-service `invoice.order.refund.finalized`；🆕 **recurring-service（`recurring.order.refund.finalized` queue，67 §6.5.2 — 退款終態回收，寫 `refund_status`）** | `OrderRefundFinalizedPayload` | ✅ `invoice.order.refund.finalized.dlq`（由 `topology.yaml` `retry:` 展開） | **策略 2（invoice_inbox_events，鍵 `REFUND:{refund_ref}`，`refund_ref` = `financial_logs.external_txn_id`）**。⚠️ **禁止以 `event_id` 去重**——aftersales 的 `RefundSyncWorker` 每小時重發且每次換新 UUID |
+| `order.refund.finalized` | order-service **`order_outbox`**（三個發布點皆在既有交易內：`AfterSalesRefundEventHandler.handleRefundCompleted`（僅 `duplicate == false` 分支）／`AutoRefundTxHandler.completeAutoRefund`／`AfterSalesEventConsumer.onCancelCompleted` 新抽的 tx handler） | invoice-service `invoice.order.refund.finalized` | `OrderRefundFinalizedPayload` | ✅ `invoice.order.refund.finalized.dlq`（由 `topology.yaml` `retry:` 展開） | **策略 2（invoice_inbox_events，鍵 `REFUND:{refund_ref}`，`refund_ref` = `financial_logs.external_txn_id`）**。⚠️ **禁止以 `event_id` 去重**——aftersales 的 `RefundSyncWorker` 每小時重發且每次換新 UUID |
 | `order.cancelled` | order-service（重複展示，見上） | + notification-service（Go，binding 至 `notification.order.events`） | 同上 | — | Best-effort（無冪等保護，notification 推播容忍重複） |
-| `order.cancelled` | order-service（重複展示，見上） | + 🆕 **recurring-service（`recurring.order.cancelled` queue，67 §6.5.2 — 訂單取消 ⇒ Cycle 連動 `CANCELLED` ＋ 退款判定）** | 同上 | ✅ `recurring.order.cancelled.dlq`（`retry:` 展開） | 67 §6.5.2：失敗處置一律 **retry 3 → DLQ，不得 ACK 丟棄** |
 | `order.cancelled` | order-service（重複展示，見上） | + **invoice-service `invoice.order.cancelled` queue（`OrderCancelledConsumer`）** | `OrderCancelledPayload` ⚠️ **`buyer_id`／`store_id`／`notify_*_account_id` 是 `Long` ⇒ wire 上是 JSON 數字**，與同表 `order.refund.finalized`（16 個 component 全 `String`）相反；照另一支抄會讓 consumer 對每一則訊息 `json.Unmarshal` 失敗 | ✅ `invoice.order.cancelled.dlq`（由 `topology.yaml` `retry:` 展開） | **策略 2（`invoice_inbox_events`，鍵 `ORDER_CANCELLED:{order_no}`）**。用途是讓端點 8 對已取消的訂單不再回「付款完成後會立即開立發票」，**不碰 `invoice_documents`／`invoice_adjustments`**。🔴 handler 全程單交易（去重列＋業務寫入＋終態標記）⇒ 失敗時整批 rollback、重投真的會重跑、打滿 3 次**真的進 DLQ**——與同服務的 `invoice.order.paid`／`invoice.order.refund.finalized` 相反（那兩條的 DLQ 結構上恆為 0，失敗歸宿是 inbox 兜底掃描） |
 | `review.created` | review-service（Go）`PublishReviewCreated` | order-service `ReviewEventConsumer.onReviewCreated`；**product-service `ReviewStatsConsumer`（商品 rating / review_count 聚合）** | `ReviewCreatedEvent`（擴充：`orderItemId` / `content` / `imageKeys`（objectKey 陣列，原 `imageUrls`，依 49 號設計書 §5.3） / `createdAt` 供 order 快照；seller 統計 `avgRating` / `totalCount`（單體 seller 不消費）；**商品層級 `productId` / `productAvgRating` / `productReviewCount`**） | order：❌ 無 DLQ；product：✅ `product.review.stats.dlq` | order：markReviewed 冪等 + `orders.review` most-recent-wins；product：**full-recompute 覆寫**（策略 4 變形：直接以 event 攜帶的權威重算值 UPDATE，無 CAS 終態檢查，天然冪等，無需 dedup 表） |
 | `review.hidden` | review-service（Go）`PublishReviewHidden`（admin `HideReview` 隱藏評論後） | product-service `ReviewStatsConsumer`（重算商品 rating / review_count） | `ReviewHiddenEvent`（`reviewId` / `sellerAccountId` / `productId` / `avgRating` / `totalCount`（seller 級）/ `productAvgRating` / `productReviewCount`） | product：✅ `product.review.stats.dlq` | full-recompute 覆寫天然冪等（隱藏後排除 hidden 列重算聚合，反映於賣家 / 商品評分） |
@@ -1268,46 +1266,6 @@ fan-out、查無訂閱者不產生任何錯誤或 log（2026-09-03 修復前即�
 
 ---
 
-### 3.6n 定期配送領域（Recurring Delivery Domain，67 號設計書）
-
-**Exchange**：`hawkr.recurring`（🔶 67 落地時與 recurring-service 同 PR 佈建）
-
-🔴 **本領域的商流是 `SELLER_DIRECT`**（賣家自收、賣家開票、**明文禁止撥款**）
-⇒ **不得**出現任何 settlement／payout／1% 相關事件。
-
-> **共同 payload 欄（每列不重複寫）**：`event_id`／`occurred_at`(ISO8601 UTC)／`buyer_id`／`store_id`
-> （`mandate.*` 三條無 `store_id`）。下表 Payload 欄只列該事件的**額外欄**（snake_case），全文見 67 §6.5.1。
-
-| # | Routing Key | Producer | Consumer | Payload（額外欄） | DLQ | Idempotency |
-|---|-------------|----------|----------|------------------|-----|-------------|
-| 1 | `recurring.contract.activated` | recurring-service | notification-service（queue 🆕 `notification.recurring`，`'#'`） | `contract_id, plan_id, plan_version_no, first_cycle_id, first_scheduled_for` | ✅ notification.recurring.dlq | `contract_id` |
-| 2 | `recurring.contract.paused` | 同上 | 同上 | `contract_id, resume_at(nullable), reason` | ✅ | `contract_id` ＋ `occurred_at`（可重複發生） |
-| 3 | 🆕 `recurring.contract.resumed` | 同上 | 同上 | `contract_id, next_cycle_id` | ✅ | 同上 |
-| 4 | `recurring.contract.cancelled` | 同上 | 同上 | `contract_id, effective, cancelled_by, refund_required` | ✅ | `contract_id` |
-| 5 | 🆕 `recurring.contract.completed` | 同上（R-S5） | 同上 | `contract_id, total_cycles` | ✅ | `contract_id` |
-| 6 | `recurring.contract.action_required` | 同上 | 同上 | `contract_id, cycle_id, reason_code, deadline_at` | ✅ | `contract_id` ＋ `occurred_at`（可重複發生） |
-| 7 | `recurring.cycle.locked` | 同上（R-S2） | 同上 | `cycle_id, contract_id, scheduled_for, snapshot_hash, charge_cutoff_at` | ✅ | `cycle_id` |
-| 8 | `recurring.cycle.charge_failed` | 同上（R-S3） | 同上 | `cycle_id, contract_id, attempt_no, failure_code, next_retry_at(nullable)` | ✅ | `cycle_id` ＋ **`attempt_no`** |
-| 9 | `recurring.cycle.paid` | 同上 | 同上 | `cycle_id, contract_id, charged_amount(string), trade_no` | ✅ | `cycle_id` |
-| 10 | `recurring.cycle.materialized` | 同上（R-S4） | 同上 | `cycle_id, contract_id, order_no` | ✅ | `cycle_id` |
-| 11 | `recurring.cycle.skipped` | 同上 | 同上 | `cycle_id, contract_id, skipped_by` | ✅ | `cycle_id` |
-| 12 | 🆕 `recurring.cycle.cancelled` | 同上 | 同上 | `cycle_id, contract_id, was_charged, refund_required, reason_code` | ✅ | `cycle_id` |
-| 13 | 🆕 `recurring.cycle.rescheduled` | 同上 | 同上 | `cycle_id, contract_id, old_scheduled_for, new_scheduled_for` | ✅ | `cycle_id` ＋ **`new_scheduled_for`** |
-| 14 | 🆕 `recurring.mandate.revoked` | 同上 | 同上 | `mandate_id, revoked_by, affected_contract_ids[]` | ✅ | `mandate_id` ＋ 該事件的時間欄 |
-| 15 | 🆕 `recurring.mandate.expiring` | 同上（R-S7） | 同上 | `mandate_id, expires_at, affected_contract_ids[]` | ✅ | `mandate_id` ＋ `expires_at` |
-
-**入向 3 條不新增 routing key**（綁既有 `hawkr.order`），但**新增 3 條 queue**：
-`recurring.order.completed`（key `order.completed`）／`recurring.order.cancelled`（`order.cancelled`）／
-`recurring.order.refund.finalized`（`order.refund.finalized`）
-⇒ **§3.1 訂單領域那三列的 Consumer 欄已補 recurring-service**（`order.cancelled` 因該 key 在 §3.1 是分列展示，
-另起一列登記，與既有 notification／invoice 兩列並排）；§5.2／§6.2 同步。
-🔴 **失敗處置一律 retry 3 → DLQ，不得 ACK 丟棄**；三條入向的 payload 都不是 recurring-service 自己寫的
-⇒ 契約測試 fixture 必須從 **producer 原始碼**（order outbox payload struct）解析，**禁止手寫**（走 `mq-wire-contract` 三方對拍）。
-
-**對應 Enum**：`RecurringEventType`（Go 慣例：Code ＝ Value ＝ `UPPER_SNAKE`）。
-
----
-
 ### 3.7 跨團隊外發事件（Outbound to 其他團隊）
 
 > 以下為我們服務 publish 出去、由 Go 服務 consume 的事件契約。這些是「跨服務 / 跨團隊契約」，修改需協調對方團隊。
@@ -1460,7 +1418,6 @@ fan-out、查無訂閱者不產生任何錯誤或 log（2026-09-03 修復前即�
 | 單體 `identity` 模組 | `internal/legacy/accountservice` | `hawkr.account` | `account.deleted` |
 | 單體 `delegation` 模組 | confirm 同 tx 發出（§3.6j）| `hawkr.delegation` | `delegation.operation.completed` |
 | ai-service | `internal/procurement/publicationoutbox`（`procurement_rfq_publication_outbox` + `pkg/outbox.Worker`；payload **原樣**送出，不解碼再重編碼） | `procurement.events` | `procurement.rfq_publication_invite.created` / `procurement.rfq_publication_invite.external_created`（RFQ 發布直投線，PLATFORM／EXTERNAL 兩個 lane 皆排投遞，Vendor Portal E1 起，§3.6l.1） |
-| 🔶 recurring-service | 契約／週期／授權事件 publisher（67 §6.5.1） | `hawkr.recurring` | 15 條 `recurring.contract.*` / `recurring.cycle.*` / `recurring.mandate.*`（逐條見 §3.6n） |
 
 ### 4.3 Gateway
 
@@ -1546,14 +1503,13 @@ fan-out、查無訂閱者不產生任何錯誤或 log（2026-09-03 修復前即�
 
 | 服務 | Consumer | 監聽 Queue / Exchange | 用途 |
 |------|----------|---------------------|------|
-| notification-service | `internal/worker/consumer.go` | **每來源 exchange 一條 queue**。🔴 **清單的權威是 code 內的 `notificationQueueByExchange` map，本書不寫死條數**（`#` 萬用綁定）。67 落地時 `hawkr.recurring` → `notification.recurring` 與服務同 PR 加一條。🔴 **新增 exchange 必須在同一個 PR 補這個 map 一條**——該 map 的註解逐字如此要求；漏了只記一行 warn，**服務照常起來而那條訂閱不存在**；dispatch 依 `(exchange, routing_key)` 查 `notification_templates` | 多事件推播 |
+| notification-service | `internal/worker/consumer.go` | **每來源 exchange 一條 queue**。🔴 **清單的權威是 code 內的 `notificationQueueByExchange` map，本書不寫死條數**（`#` 萬用綁定）。🔴 **新增 exchange 必須在同一個 PR 補這個 map 一條**——該 map 的註解逐字如此要求；漏了只記一行 warn，**服務照常起來而那條訂閱不存在**；dispatch 依 `(exchange, routing_key)` 查 `notification_templates` | 多事件推播 |
 | 單體 `seller` 模組 | `internal/legacy/sellerconsumer` | `seller.events` / `seller.review.result`（queue `hawkr.monolith.seller.review.result`，consumer 自己宣告、不在 topology） | 處理 PayUni 代收代付商家通知（AGENT_NOTIFY 單通道）|
 | product-service（Java） | `ReviewStatsConsumer.java` | `hawkr.review` / queue `product.review.stats`（bind `review.created` + `review.hidden`） | 覆寫商品 `rating` + `review_count` 反正規化欄位 |
 | social-service | `internal/worker/di.go` `subscriptions()` | `hawkr.buyer` → `social.buyer.deleted`（`buyer.deleted`）／`hawkr.seller` → `social.seller.deleted`（`seller.deleted`）／`hawkr.content` → `social.counter.delta`（`counter.delta`） | 帳號／賣家刪除的貼文與留言軟刪；計數 delta 收斂 |
 | **social-service** | `internal/worker/counter_delta.go`（自身消費） | exchange `hawkr.content` / routing key `counter.delta` / queue `social.counter.delta`（durable, DLX `hawkr.content.dlx` / DLQ `social.counter.delta.dlq`） | 非同步套用 post/comment 的 comment_count / like_count / reply_count +1/-1；非冪等，10 分鐘 reconciler 兜底（見 §3.6d） |
 | **gateway** | `internal/mq/consumer.go` | 動態 broadcast queue `gateway.sse.<pod-hostname>`（auto-delete, durable=false）<br/>bind 多個 routing key：`hawkr.content:comment.#` + `hawkr.notification:notification.inbox.new` + `hawkr.notification:notification.unread_changed` + `hawkr.seller_workspace:seller.order.updated` + `hawkr.seller_workspace:seller.after_sale.updated`| SSE Hub fan-out — 訊息抵達 → registry dispatch → topic-based push 給該 pod 持有的 SSE connection（見 [41 §五](41-Realtime%20SSE%20推播平台（Realtime%20SSE%20Push%20Platform）詳細設計書.md)） |
 | **單體 `buyer` 模組** | `internal/legacy/buyerconsumer` | `hawkr.product` / `product.restock` → queue `hawkr.monolith.buyer.product.restock`；`hawkr.order` / `order.completed` → queue `hawkr.monolith.buyer.order.completed`（兩條皆由 consumer 自己宣告、不在 topology；永久錯誤進 `{queue}.dead`） | 補貨事件 fan-out（以 `event_id` 去重的 River job，`FanOut` 分批發布 `product.restock.target`）；訂單結案後加速完成買家與店家兩側等待中的刪帳 |
-| 🆕 **recurring-service** | 跨軸觀察者（67 §6.5.2） | exchange `hawkr.order` ×3：queue `recurring.order.completed`（key `order.completed`）／`recurring.order.cancelled`（`order.cancelled`）／`recurring.order.refund.finalized`（`order.refund.finalized`）；皆 `retry: {max_attempts: 3}`、DLX `hawkr.order.dlx` | commerce 軸 → Cycle 軸連動。🔴 **失敗處置一律 retry 3 → DLQ，不得 ACK 丟棄**；payload 同樣非自己所寫 ⇒ fixture 從 producer 原始碼解析 |
 
 **procurement consumer**：notification-service `internal/worker/consumer.go` 以 `procurement.events` 的 `#` binding 消費 `notification.procurement`，再由 `(exchange, routing_key)` 查 `notification_templates`。§3.6l 的兩個 quote-invite seller template 與 §3.6l.1 的 `procurement.rfq_publication_invite.created.seller` 均以 `store_id` 建立 inbox row。⚠️ **`#` 綁定代表新 routing key 不需要改 topology，但也代表沒有模板的 key 走 `logger.Debug` ＋ ACK 靜默丟棄**（不進 DLQ、不重試、沒有 metric）——新增 producer 事件時，模板列必須與 producer 同一波落地。
 
@@ -1622,10 +1578,6 @@ grep -cE '^\s+(retry|dlq):' infra/mq/topology/topology.yaml
 | `notification.delegation` | `hawkr.delegation.dlx` | `notification.delegation.dlq`（56 §6.3 / §3.6j；由 `topology.yaml` `retry:` policy 展開，勿手寫）|
 | `notification.procurement` | `procurement.events.dlx` | `notification.procurement.dlq`（由 `topology.yaml` `retry:` policy 展開，勿手寫；§3.6l ＋ §3.6l.1 共用同一組 queue／DLQ）|
 | `aftersales.order.fulfillment.failed` | `aftersales.events.dlx` | 併入既有共用 `aftersales.events.dlq`（routing key=`dlq`）。🔴 Java 家族用 `dlq: {via, queue, routing_key}` 形狀，不是 `retry:` |
-| 🆕 `notification.recurring` | `hawkr.recurring.dlx` | `notification.recurring.dlq`（`retry:` 展開，勿手寫；67 §6.5.3 / §3.6n）|
-| 🆕 `recurring.order.completed` | `hawkr.order.dlx` | `recurring.order.completed.dlq`（同上）|
-| 🆕 `recurring.order.cancelled` | `hawkr.order.dlx` | `recurring.order.cancelled.dlq`（同上）|
-| 🆕 `recurring.order.refund.finalized` | `hawkr.order.dlx` | `recurring.order.refund.finalized.dlq`（同上）|
 
 ---
 
@@ -1836,16 +1788,7 @@ flowchart TD
 | `InvoiceEventType` | 同上目錄（[內部技術碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/內部技術碼.md#InvoiceEventType)）| 12 個 `invoice.*`（routing key 點分式、event_type UPPER_SNAKE），exchange `hawkr.invoice`（58 號設計書，§3.6k）|
 | `ShippingEventType` | 同上目錄（[內部技術碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/內部技術碼.md#shippingeventtype)）| **9 個 `shipment.*`**，exchange `hawkr.shipping`（65 附錄 C.4，§3.3）。`Value` ＝點分式 routing key（對應 `MqConstants.ROUTING_KEY_SHIPMENT_*`）、`Code` ＝ `UPPER_SNAKE`（對應 `EVENT_TYPE_SHIPMENT_*`），兩軸同時承載。⚠️ 值域邊界錨在**契約**（routing key ＋ exchange）不錨在 topology binding ⇒ 只靠 `#` 收的 `shipment.anomaly.detected` **仍屬本領域**；而 `order.shipment.create_requested` / `order.shipment.creation_failed`（`hawkr.order`，見 `OrderEventType`）與 `payuni.shipping.status`（`payuni.events`）**不在**值域內 |
 
-### 8.2 尚未建立的 Event Type Enum
-
-| Enum | 應涵蓋 Routing Keys | 慣例 |
-|------|--------------------|------|
-| `RecurringEventType` | 15 個 `recurring.contract.*` / `recurring.cycle.*` / `recurring.mandate.*`（§3.6n） | Go 領域慣例：`Code` ＝ `Value` ＝ `UPPER_SNAKE`，routing key 另寫在 `pkg/mq/exchanges.go`，與 `InvoiceEventType`／`BuyerEventType`／`SocialEventType` 一致（67 §6.5.5） |
-
-🔴 **落碼與 producer／consumer 服務同一波**（`recurring-service` 目前不存在），
-且一律 `./generate.sh --all`（§8.3）——自己判斷「這個 enum 前端看不看得到」會與 CI 的逐位元對拍不一致。
-
-### 8.3 CodeMeta SSOT 流程
+### 8.2 CodeMeta SSOT 流程
 
 依《[Java 微服務開發規範](../開發規範/Java%20微服務開發規範.md)》§6 與 [CodeMeta README](../代碼管理（CodeMeta）/README.md)：
 1. 修改 `docs/代碼管理（CodeMeta）/內部技術碼.md`

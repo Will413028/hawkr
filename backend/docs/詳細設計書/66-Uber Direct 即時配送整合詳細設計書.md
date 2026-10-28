@@ -710,7 +710,7 @@ Uber 的 courier 指派由 Uber 依 `pickup_ready_dt` 自行排程，我方沒�
 | E3 | List Deliveries | `track()` | ✅ | `track().search(ctx)` | — | 不出現 | 無（P1 排程） | 🔴 **本格是 E3 用途的唯一定義**：List **沒有** `external_id`／`manifest_reference` 的 **exact query**（🔴 **不存在**）**但可以有界過濾**——`external_store_id`／`start_dt`／`end_dt`（changelog 2025-04-17，SDK spec 未收錄，§6.3.2a-2）。<br/>⇒ **`991` 主要收斂＝`idempotency_key` replay E2**（≤60 分）；**E3 的角色＝ >60 分時的 bounded candidate search**（有界過濾 ＋ 嚴格本地比對 ＋ 唯一完整匹配才自動收斂），**不是 unbounded 全掃**（§7.7） |
 | E4 | Get Delivery | `track()` | ✅ | `track().fetch(ctx)` | `track` | `track`（`930`／`31` 兩格 enabled） | `S-1 GET /app/shipments/:order_no/tracking`〔既有〕／ADM `POST /admin/shipments/:id/uber_resync` | 重試 2 次（1s／3s）⇒「留原狀態，下個 tick 再來」；亂序收斂第三道**有 deadline 且不重試**（§6.3.5）；🔴 **`991` 誤用 E4 ⇒ 每次 404、永不收斂**（陷阱 B2） |
 | E5 | Update Delivery | `reportReady()`（🔴 **專用語意 capability**；不借 `dispatch()`、不開 generic `update()`，理由見上方） | ✅ | `reportReady().apply(ctx)`（🔴 **provider 呼叫是可選的**，見下方 `requiresProviderCall`） | **`REPORT_READY`** | `report_ready`（🔴 **`91 UNPROCESSED` 一格 enabled**；`933` 之後 provider 已在取件途中，不再開放前移） | **65 §6.1.1 的賣家履約動作端點**（🔴 URL 一律由 `allowedActions[].href` 給，前端不自行組） | 🔴 **正式納入 capability：`E5` 是 Seller-early-ready 的首選且唯一自動路徑**，完整契約見 §4.5.0a。失敗 ⇒ **保留原 Delivery ＋ 保留原取件窗 ＋ bounded retry ＋ operational alert**；🔴 **一律不得升級為 Cancel／Recreate** |
-| E6 | Cancel Delivery | `cancel()` | ✅ **（四本唯一）** | `cancel().execute(ctx)` | `cancel` | `cancel`（`91`／`933`／`930` 三格 enabled；`31 dropoff` 之後不可用。🔴 **`91` 不再分兩種情形**：三段模型下停在 `91` 的訂單**必然已有 delivery** ⇒ **一律打 E6**，走 §4.5.5 的三步 Cancel Saga（`E4` → `E6` → 再確認 terminal）。🔴 **不得有「Uber 側沒有東西要取消、只走訂單軸」這條分支**——它會留下一筆**沒有人取消的 Uber 單**：外送員照樣到店、照樣計費。見 65 §6.3.4 E） | **`S-11 POST /app/shipments/:order_no/cancel`**（65 §6.1.1；本書其他章節亦以 `S-U4` 稱之） | 寫 `992` → 打 E6 → 成功 `41`；`noncancelable_delivery` 400 ⇒ **取消失敗、留原狀態、不寫 `992→41`、回 `9522`**；🔴 **不得直接寫 `41`**；取消費用不在 API 契約內 ⇒ 🔴 **退款方向由責任成因決定（二元政策，§4.5.5），不是「一律全額退」**；🔴 **「退給買家」與「成本誰負擔」仍然是兩件事**——取消費依 [`ADR-004`](../adr/2026-09-11-responsibility-based-cost-attribution.md) 的**責任成因**歸屬，**不是一律平台吸收**（§4.5.4／§4.5.5／§7.6） |
+| E6 | Cancel Delivery | `cancel()` | ✅ **（三本唯一）** | `cancel().execute(ctx)` | `cancel` | `cancel`（`91`／`933`／`930` 三格 enabled；`31 dropoff` 之後不可用。🔴 **`91` 不再分兩種情形**：三段模型下停在 `91` 的訂單**必然已有 delivery** ⇒ **一律打 E6**，走 §4.5.5 的三步 Cancel Saga（`E4` → `E6` → 再確認 terminal）。🔴 **不得有「Uber 側沒有東西要取消、只走訂單軸」這條分支**——它會留下一筆**沒有人取消的 Uber 單**：外送員照樣到店、照樣計費。見 65 §6.3.4 E） | **`S-11 POST /app/shipments/:order_no/cancel`**（65 §6.1.1；本書其他章節亦以 `S-U4` 稱之） | 寫 `992` → 打 E6 → 成功 `41`；`noncancelable_delivery` 400 ⇒ **取消失敗、留原狀態、不寫 `992→41`、回 `9522`**；🔴 **不得直接寫 `41`**；取消費用不在 API 契約內 ⇒ 🔴 **退款方向由責任成因決定（二元政策，§4.5.5），不是「一律全額退」**；🔴 **「退給買家」與「成本誰負擔」仍然是兩件事**——取消費依 [`ADR-004`](../adr/2026-09-11-responsibility-based-cost-attribution.md) 的**責任成因**歸屬，**不是一律平台吸收**（§4.5.4／§4.5.5／§7.6） |
 | E7 | Get POD | `pod()` | ✅ | `pod().fetch(ctx)` | `view_pod` | `view_pod`（`11 delivered` 一格 enabled） | **`S-12 GET /app/shipments/:order_no/pod`**（65 §6.1.1；本書其他章節亦以 `S-U5` 稱之） | 重試 2 次（1s／3s）留原狀態；窗口 **7 天**（T-12）；逾期 ⇒ 建 case `UBER_POD_MISSING` ＋ timeline 留一行「POD 不可得，原因 X」（§7.8）。🔴 **查無一律 200 ＋ `data.available=false` ＋ `unavailableReason`，不得回 404**（65 §6.1.1 S-12） |
 | — | POD 自存到 media | `pod()` 的後段 | ✅ | `pod().persist(ctx)` | — | 不出現 | 無 | 🔴 **必須走 secure 上傳**：現況 `MediaGrpcClient` 只有 `serverUploadAndFinalize`（走 `public/`）⇒ 要新增 secure 包裝。用 public 上傳**沒有任何訊號**（陷阱 B3） |
 | — | store mapping 建立／查詢 | `onboard()` | ✅ | `onboard().apply(ctx)`／`onboard().status(ctx)` | — | 不出現 | `POST /app/shipping_onboardings/uber`（S-U1）／狀態查詢走 **`GET /app/shipping_methods`**（`ListSellerShippingMethods` response 擴充，S-U6） | 🔴 **S-U1 端點刻意保留 provider 名**（65 §6.2.1 硬約束 1 的例外：各 provider 建店欄位本質不同）。🔴 **`onboard().status(ctx)` 的對外載體不是 S-U2**——S-U2 回的是 PayUni 形狀的 `ShippingOnboardingView`，其 `:onboarding_id` ＝ `seller_shipment_settings.id`，而 Uber 沒有那一列；`UBER_STORE_NOT_MAPPED` 409 |
@@ -2088,7 +2088,7 @@ confirm（capture 後）：quote 標 `CHECKOUT_ACCEPTED`；🔴 **建單走 §4.
 | S-U2 | GET | `/app/shipping_onboardings/:onboarding_id` | `CapProductManage` | 🔴 **既有端點，本書不改，且 Uber 不使用它**。它是 PayUni 建店明細端點，`:onboarding_id` 的語意 ＝ `seller_shipment_settings.id`（06 §5.6），Uber 沒有那一列 ⇒ 🔴 **不得為了讓 UI 拿得到 `onboarding_id` 而替 Uber 造一列假的**。賣家的 Uber setup／health 走 **S-U6** | ❌ 鎖 |
 | **S-U6**　🔴 **既有端點，非新增** | GET | `/app/shipping_methods`（`ListSellerShippingMethods`） | `CapProductManage` | 🔴 **賣家 Uber setup／health／availability 的唯一對外載體。**<br/>選它的理由：它本來就是 **provider-neutral 的「這個賣家有哪些配送方式」read model**（06 §5.13），request 只需要 **store identity**（`store_id` ＋ `account_type`，無商品、無地址），而 3003 本來就在它的固定槽位清單裡 ⇒ **不新增 RPC、不新增 endpoint、不恢復任何 `/uber_enablement` 路徑**。<br/>3003 那一槽至少要能表達：`shippingMethod = 3003`／`available`／**`onboardingRequired = true`**（U8）／setup・onboarding 狀態／`enabled`（provider availability）／**`unavailableReason`**／**`unavailableMessage`**。<br/>🔴 **`unavailableReason` 的值域權威在 §6.1.2a，任何一端不得自行新增、改名或省略。**<br/>🔴 **欄位集合仍受 §8.1 白名單拘束**：`client_id`／`client_secret`／`organization_id`／`customer_id`／`external_store_id`／`pickup_snapshot`／任何 webhook signing key 一律不得外露 | ❌ 鎖 |
 | S-U3 ＝ **65 `S-10`** | POST | `/app/shipments/:order_no/dispatch`（🔴 **路徑字面值的權威在 65 §6.1.1**；3003 的 action 代號是 **`REPORT_READY`**，而 URL 一律由 `allowedActions[].href` 給、**前端不自行組** ⇒ 路徑用哪個字對前端不可見） | `CapOrderFulfill` | 🔴 **賣家宣告「貨已備妥」**——它**不建單、不叫車**（建單由 `order.paid` 觸發，§4.1 ③）：本地記 `seller_ready_at` ＋ 停掉賣家備貨時鐘，並在明顯提早時**可選地**打 `E5`（§4.5.0a）。⚠️ **`990 CREATE_FAILED` 沒有賣家側入口**，見下方。契約定版見 65 §6.3.4 | ✅ 白名單 |
-| S-U4 ＝ **65 `S-11`** | POST | `/app/shipments/:order_no/cancel` | `CapOrderFulfill` | 取消 ⇒ 打 E6；🔴 **本書是四本唯一真的呼叫 provider 的取消**（`cancel()` present，§4.5.0），先寫 `CANCEL_PENDING(992)` 再打 | ✅ 白名單（收縮型） |
+| S-U4 ＝ **65 `S-11`** | POST | `/app/shipments/:order_no/cancel` | `CapOrderFulfill` | 取消 ⇒ 打 E6；🔴 **本書是三本唯一真的呼叫 provider 的取消**（`cancel()` present，§4.5.0），先寫 `CANCEL_PENDING(992)` 再打 | ✅ 白名單（收縮型） |
 | S-U5 ＝ **65 `S-12`** | GET | `/app/shipments/:order_no/pod` | `CapOrderFulfill` | 查看 POD（回授權下載連結，**不回 objectKey**） | ✅ 白名單 |
 
 🔴 **S-U3／S-U4／S-U5 一律 provider-neutral，不帶 `uber_` 前綴**（65 §6.2.1）：
@@ -2128,7 +2128,7 @@ CVS／宅配寫 `seller_shipment_settings`；**同形不等於同一張表**）�
 
 #### 6.1.7 錯誤碼
 
-→ 附錄 C.3。🔴 **本書不取號**（65 §6.7.0 逐字：號碼由 65 §6.7 一次配完，66／67／68／69 只引用）。
+→ 附錄 C.3。🔴 **本書不取號**（65 §6.7.0 逐字：號碼由 65 §6.7 一次配完，66／68／69 只引用）。
 
 ### 6.2 gRPC 介面
 
@@ -2552,7 +2552,7 @@ X4 的 `provider` 是 **MQ payload 的配送服務提供者維度**（65 §4.2�
 🔴 **本書新增：exchange +0／queue +1（`shipping.uber.webhook`，`dlq:` 形狀）。**
 
 🔴 **`test_expand.py` 的資源數量 pin 會變，施工時一律以實跑對帳，不得抄任何寫在文件裡的絕對值。**
-絕對值受**落地順序**影響（66／67／68／69 哪一本先進）⇒ 抄舊數字必然撞。
+絕對值受**落地順序**影響（66／68／69 哪一本先進）⇒ 抄舊數字必然撞。
 
 ```bash
 cd infra/mq && python3 -m unittest discover -s tools -p 'test_*.py'
@@ -4184,7 +4184,7 @@ SQL 片段同步改為**逐值列舉 11 值 ＋ fail-closed `ELSE 'HIGH'`**，�
 
 ### C.3 錯誤碼佔用清單與號段選擇
 
-🔴 **本書不取號**（65 §6.7.0 逐字：「號碼由本節一次配完，66／67／68／69 只引用不自行取號」）。下表只列語意。
+🔴 **本書不取號**（65 §6.7.0 逐字：「號碼由本節一次配完，66／68／69 只引用不自行取號」）。下表只列語意。
 
 **可沿用既有碼（先確認語意真的相同）**：`5004 SHIPMENT_SELLER_NOT_ONBOARDED`（reason `SELLER_NOT_ONBOARDED`）／
 `5014 SHIPMENT_UNSUPPORTED_METHOD`／`5018 SHIPMENT_PROVIDER_CREATE_FAILED`（§7.6 的 400 分支）／
@@ -4218,12 +4218,12 @@ SQL 片段同步改為**逐值列舉 11 值 ＋ fail-closed `ELSE 'HIGH'`**，�
 🔴 `bizHTTPStatus` 一律 4xx（65 §6.7.2：Cloudflare 會把 origin 的 5xx body 整個換掉 ⇒ 前端永遠拿不到業務碼）。
 
 ⚠️ **號段對帳（65 §6.7.4）**：C.5.1 估 66 ＝29 條，本書實際新配 **18** 條（另沿用 10 條）⇒ **少 11 條**。
-🔴 **該觸發已經成立且已執行**：65 §6.7.0 定版 **`9500~9699`（200 個）**，65 佔 `9501~9575`，66／67／68／69 自 `9576` 起連號追加。本書只引用不自行取號。
+🔴 **該觸發已經成立且已執行**：65 §6.7.0 定版 **`9500~9699`（200 個）**，65 佔 `9501~9575`，66／68／69 自 `9576` 起連號追加。本書只引用不自行取號。
 
 🔴 **本書實配聲明（配號的權威輸入）**：**新配語意 18 條**（上表 1～18）＋ **沿用既有碼 10 條**（上一段「可沿用既有碼」列的 10 個）
 ⇒ 本書向 `9576` 起的連號區間**只索取 18 個號**。
 ⚠️ **65 附錄 C.5.1 的「66 ＝29 條」是分本估數、已過時**：配號時**以各本自己的附錄為準逐條扣除**，
-不得拿 C.5.1 的估數預留號段——預留 29 個而實配 18 個 ⇒ 中間空出 11 個號，**67／68／69 的起號會全部錯位**。
+不得拿 C.5.1 的估數預留號段——預留 29 個而實配 18 個 ⇒ 中間空出 11 個號，**68／69 的起號會全部錯位**。
 （本書不改 65；此處只聲明本書這一側的權威數字。）
 
 ### C.4 刻意不納管的值域

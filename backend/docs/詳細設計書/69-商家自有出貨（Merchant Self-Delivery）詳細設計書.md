@@ -94,8 +94,8 @@
 ④在證據不足時**不讓錢出去**。
 
 🔴 **本書與帳務軸正交**：它不決定誰開發票、錢收給誰、要不要撥款。
-同一套商家自送能力會被兩本書引用——66（Uber 不可用時的替代方案）與 67（定期配送**唯一**的配送方式）——
-而那兩本的 `commerce_model` 不同。**本書任何一節都不得寫入「因為是商家自送所以…撥款／發票…」**。
+同一套商家自送能力會被 66（Uber 不可用時的替代方案）引用，
+而 `commerce_model` 取自訂單快照、不由配送方式決定。**本書任何一節都不得寫入「因為是商家自送所以…撥款／發票…」**。
 
 ### 1.1a 先讀基本設計書
 
@@ -134,7 +134,6 @@
 |---|---|
 | **65 骨幹** | 值域、identity、金額、時間、API envelope、錯誤碼、MQ、排程器、媒體規約的唯一來源。本書只引用 |
 | **66 Uber** | 平行的 provider 實作；**互為替代方案**，不互相依賴 |
-| **67 定期配送** | 🔴 **單向依賴本書**：67 的物流只有商家自送。67 讀本書的 `merchant_service_zone`／`_window`／`_capacity_bucket` 做方案發布前置驗證（§5.1.7） |
 | **68 7-11 B2C** | 無關係。兩者唯一交集是都新增了 `ShippingMethod` 值 |
 | **06 Shipping** | 本書是它的擴充：新增一個 **`FulfillmentProviderAdapter`** 實作（65 §4.4.1；能力集合逐成熟度不同，見 §4.2a）與一組 3005 專屬的服務層 |
 | **09 售後** | 商家拒單／無法配送 → C 軸 `33` → 既有履約失敗鏈（65 §6A.1.2 N1）→ aftersales 退款 |
@@ -230,7 +229,7 @@ DNS rebinding 讓「登記時是公網 IP、呼叫時是內網 IP」完全可行
 理由：默認常溫會讓冷凍商品被排進一台沒有冷凍設備的車，而那個錯誤在資料層完全看不出來。
 
 **服務區資料要標來源**：`merchant_service_zone.source` ∈ `MERCHANT_DECLARED`／`ADM_VERIFIED`／`IMPORTED`。
-67 的方案發布前置驗證會讀它，而「商家自己說的」與「營運核實過的」在爭議時的責任歸屬不同。
+「商家自己說的」與「營運核實過的」在爭議時的責任歸屬不同。
 
 ### 3.4 工程約束
 
@@ -243,7 +242,7 @@ DNS rebinding 讓「登記時是公網 IP、呼叫時是內網 IP」完全可行
 |---|---|---|
 | A1 | 商家的配送範圍在台灣本島／離島，不跨境 | 服務區模型要加國別維度 |
 | A2 | 一張訂單一個 job（不拆單） | `merchant_delivery_job` 與 `shipments` 的 1:1 要改成 1:N |
-| A3 | 商家的 endpoint 數量級是「每個賣家一個」，不是「每個門市一個」 | profile 要加門市維度（67 的 capacity bucket 已預留 `site_ref`） |
+| A3 | 商家的 endpoint 數量級是「每個賣家一個」，不是「每個門市一個」 | profile 要加門市維度（capacity bucket 已預留 `site_ref`） |
 
 ### 3.6 三條本設計特有的判定
 
@@ -256,7 +255,7 @@ L2 的 carrier event **仍然是商家轉述的**（我方沒有與 carrier 的�
 **② onboarding profile 八項的 owner 服務 → `shipping-service`。**
 
 判準是「誰讀它」：profile 的消費者是①建單（`createShipmentFromOrder`）②費率計算
-③結帳可用性驗證（`hasAnyEnabledConfig` 的 3005 等價物）④服務區／時段（67 讀）——
+③結帳可用性驗證（`hasAnyEnabledConfig` 的 3005 等價物）④服務區／時段——
 **全部在 shipping-service 內或以 shipping-service 為 gRPC 對端**。
 單體 seller 模組持有的是店面身分，不持有配送能力。
 ⚠️ 🔴 **畫面歸屬 ≠ 資料歸屬**：profile 的**編輯畫面**在賣家後台、與 seller 的其他設定並列（65A），
@@ -384,7 +383,7 @@ L0 沒有商家原生事件 ⇒ **L0 的 `allowedActions[]` 由賣家在我方 A
 ### 4.3 部署拓撲與 Port（🔴 本書不新增服務）
 
 落在既有 `shipping-service`（**k8s 覆寫值** HTTP `9930` / gRPC `9931`；application 預設為 `9928`／`9929`，見 06 §9.1 —— 🔴 **兩個層級都要對得上**）。
-完整推導見 **65 附錄 G.8**。三條旁證與那條反面論據（對外第三方 API 讓爆炸半徑變大）
+完整推導見 **65 附錄 G.8**。兩條旁證與那條反面論據（對外第三方 API 讓爆炸半徑變大）
 的處置：**照 68 的 adapter 形狀做 package 邊界 ＋ 對外面走 Gateway namespace**。
 
 **入站跨服務邊：無新增。** Gateway → shipping-service 的 gRPC 邊已存在
@@ -653,8 +652,6 @@ CREATE INDEX idx_mpa_job ON merchant_pod_artifact(job_id, kind);
 
 #### 5.1.7 `merchant_service_zone` ／ `merchant_service_window` ／ `merchant_capacity_bucket`
 
-🔴 **67 直接引用這三張表**（方案發布前置驗證），所以它們的形狀是**跨本契約**，改動要通知 67。
-
 ```sql
 CREATE TABLE merchant_service_zone (
   id BIGINT PRIMARY KEY, profile_version_id BIGINT NOT NULL,
@@ -885,7 +882,7 @@ profile 的**電話**與 POD 的**簽收人姓名**走專屬的 `MERCHANT_ENCRYP
 ## 6. API 與介面契約
 
 > 🔴 **本章的號碼一律不自行取**：業務碼由 **65 §6.7 一次配完**，本書只列語意並引用既有碼。
-> 65 §6.7.4 已訂下「66／67／68／69 定版時回到本表連號追加」的程序。
+> 65 §6.7.4 已訂下「66／68／69 定版時回到本表連號追加」的程序。
 
 ### 6.1 對外 REST（我方 Gateway，給賣家在我方 App／Web 用）
 
@@ -927,8 +924,6 @@ profile 的**電話**與 POD 的**簽收人姓名**走專屬的 `MERCHANT_ENCRYP
 | M-10 | GET／PUT | `/app/merchant_delivery/capacity` | `CapOrderFulfill`（日常營運調整，不是開通） |
 | M-11 | GET | `/app/merchant_delivery/pricing` ／ PUT 同路徑 | `CapProductManage` |
 
-🔴 **67 的 publish 前置驗證讀 M-8／M-9／M-10 的同一份資料**（走 gRPC 不走 HTTP，§6.3）。
-⇒ 這四支的欄位語意改動是**跨本破壞性變更**。
 
 #### 6.1.3 onboarding 與健康狀態端點
 
@@ -1208,9 +1203,8 @@ GET {merchant.base_url}/v1/shipments/{shipmentNo}
 | `GetMerchantDeliveryCapability(store_id, temp, zipcode)` | order-service（checkout） | 結帳可用性；🔴 **fail-closed**：查不到／逾時 ⇒ 類 C（整筆請求失敗），不得靜默排除 |
 | `QuoteMerchantDelivery(...)` | order-service | `DYNAMIC_QUOTE` 開啟時才呼叫；**3s deadline** |
 | `IngestMerchantDeliveryEvent(bytes raw_body, map<string,string> headers)` | gateway | §6.2.3 |
-| `GetMerchantDeliveryWindows(store_id, date_from, date_to)` | **recurring-service（67）** | 方案發布前置驗證 |
-| `ReserveMerchantCapacity(store_id, bucket_key, qty)` | order-service／recurring-service | 承載預約，單列 CAS |
-| `ReleaseMerchantCapacity(store_id, bucket_key, qty, reason)` | order-service／recurring-service | **承載釋放，單列 CAS**。🔴 **缺這一支，67 §5.1.7 要求的「雙向釋放」做不到**——本地把 hold 標成 `RELEASED` 而**對方仍鎖著**，且**沒有任何錯誤訊息**（67 §5.5 的靜默陷阱 B3）。`reason` 值域 `EXPIRED`／`CANCELLED`／`RESCHEDULED`／`COMMIT_FAILED` |
+| `ReserveMerchantCapacity(store_id, bucket_key, qty)` | order-service | 承載預約，單列 CAS |
+| `ReleaseMerchantCapacity(store_id, bucket_key, qty, reason)` | order-service | **承載釋放，單列 CAS**。`reason` 值域 `EXPIRED`／`CANCELLED`／`RESCHEDULED`／`COMMIT_FAILED` |
 
 🔴 **proto 型別**：response 側**沒有**「內部 RPC 可用原生數值」的豁免（65 §6.5.2）——
 `capacity`／`reserved`／金額一律 `string`。`make proto-lint-numeric` 的走訪起點是 OUTPUT type，
@@ -1228,10 +1222,10 @@ GET {merchant.base_url}/v1/shipments/{shipmentNo}
 ⇒ 本書要辦的只有三件：
 1. `ShippingEventPayload` 的 `provider` 欄在 3005 上填 `MERCHANT`（🔴 值域的 SSOT 是 **65 附錄 C.2** 的 `provider` 那一列＝`MERCHANT`／`TAQBIN`／`CVS_711`／`UBER_DIRECT`，**字串**）
 1b. 🔴 **`commerce_model` 欄：本書不決定它的值，一律照抄 `orders` 的快照欄**（65 §5.1 的訂單快照六欄之一）。
-   65 §4.6 把 `commerce_model` 列為 **66／67／68／69 共用 envelope 的必帶欄**
+   65 §4.6 把 `commerce_model` 列為 **66／68／69 共用 envelope 的必帶欄**
    （逐字理由：「消費端要據此決定『這筆要不要進撥款鏈』。**沒有它，consumer 只能猜**」），
-   而本書被 **66** 與 **67** 共同引用。
-   ⚠️ 66／67 兩本現行都是 `SELLER_DIRECT`（65 §0.6.1／§3.8b C-1）⇒ 這個欄位**實際只會出現一種值**。
+   而本書被 **66** 引用。
+   ⚠️ 66 與本書現行都是 `SELLER_DIRECT`（65 §0.6.1／§3.8b C-1）⇒ 這個欄位**實際只會出現一種值**。
    🔴 **不得因此改成硬填**——判準是「這個欄位的值由誰決定」，不是「現在有幾種值」：
    `commerce_model` 是 `orders` 的快照欄，**政策可以再變**（保留值仍在值域內），
    而硬填的那一版不會跟著變，且**填錯時完全靜默**（consumer 只會拿到一個看起來正常的錯值）。

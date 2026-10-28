@@ -2347,7 +2347,7 @@ func InvoiceTaxRiskFlagFromValue(value string) (InvoiceTaxRiskFlag, bool) {
 }
 
 // ===== CommerceModel =====
-// 商流模式——**這筆錢誰收、誰開票**，決定整條帳務軸。訂單快照六欄之一：付款後鎖定，改政策不得回溯既有訂單。取**短名**（不把 provider 綁進商流維度），與 `provider` 維度正交。🔴 **本值域是三條商流帳務軸互斥的分界線**，65 定版、66／67／68／69 只引用。
+// 商流模式——**這筆錢誰收、誰開票**，決定整條帳務軸。訂單快照六欄之一：付款後鎖定，改政策不得回溯既有訂單。取**短名**（不把 provider 綁進商流維度），與 `provider` 維度正交。🔴 **本值域是三條商流帳務軸互斥的分界線**，65 定版、66／68／69 只引用。
 
 type CommerceModel struct {
 	Code        string
@@ -2515,7 +2515,7 @@ type FulfillmentAction struct {
 var (
 	FulfillmentActionDispatch        = FulfillmentAction{Code: "DISPATCH", Value: "dispatch", Label: "派車／叫件", Description: "配送推進群。3001 黑貓叫件、3003 Uber 建單即派車"}
 	FulfillmentActionHandover        = FulfillmentAction{Code: "HANDOVER", Value: "handover", Label: "回報交運", Description: "配送推進群。B2C 交倉／自送出發，`requiresProviderCall=false`"}
-	FulfillmentActionCancel          = FulfillmentAction{Code: "CANCEL", Value: "cancel", Label: "取消配送單", Description: "配送推進群。🔴 四個 provider 中只有 3003 的 `requiresProviderCall=true`；其餘寫 992 或本地終態。**與 RecurringAction.CANCEL 是不同資源軸的同名動作，文案不得共用**"}
+	FulfillmentActionCancel          = FulfillmentAction{Code: "CANCEL", Value: "cancel", Label: "取消配送單", Description: "配送推進群。🔴 四個 provider 中只有 3003 的 `requiresProviderCall=true`；其餘寫 992 或本地終態。"}
 	FulfillmentActionResubmit        = FulfillmentAction{Code: "RESUBMIT", Value: "resubmit", Label: "重新建單", Description: "配送推進群。只有 990 建單失敗的配送單可重建"}
 	FulfillmentActionUpdate          = FulfillmentAction{Code: "UPDATE", Value: "update", Label: "修改配送資料", Description: "配送推進群。⚠️ 在 provider 的 update 契約到位前**恆 disabled**"}
 	FulfillmentActionPrintLabel      = FulfillmentAction{Code: "PRINT_LABEL", Value: "print_label", Label: "列印標籤", Description: "標籤群。3004 為批次型（單批上限與分組鍵由 capability 攜帶，呼叫端不得寫死數字）"}
@@ -2588,52 +2588,6 @@ func FulfillmentActionFromValue(value string) (FulfillmentAction, bool) {
 		}
 	}
 	return FulfillmentAction{}, false
-}
-
-// ===== RecurringAction =====
-// **定期配送軸**（`recurring_contract`／`recurring_cycle`）的領域動作值域，6 值。🔴 **與 `FulfillmentAction` 是兩個 enum、兩個資源軸**——兩者都有 `cancel` 但對象不同（配送單 vs 訂閱契約），前端的通用 CTA 元件**必須以資源軸為第一層分派**，否則兩軸的同名動作會互相覆蓋。⚠️ `approve_amount` 統一為 snake_case（原設計文字為 kebab-case）。
-
-type RecurringAction struct {
-	Code        string
-	Value       string
-	Label       string
-	Description string
-}
-
-var (
-	RecurringActionPause         = RecurringAction{Code: "PAUSE", Value: "pause", Label: "暫停訂閱", Description: "暫停後續週期"}
-	RecurringActionResume        = RecurringAction{Code: "RESUME", Value: "resume", Label: "恢復訂閱", Description: "恢復已暫停的訂閱"}
-	RecurringActionCancel        = RecurringAction{Code: "CANCEL", Value: "cancel", Label: "取消訂閱", Description: "🔴 對象是**契約**不是配送單，文案不得與 FulfillmentAction.CANCEL 共用"}
-	RecurringActionSkip          = RecurringAction{Code: "SKIP", Value: "skip", Label: "跳過本期", Description: "跳過單一週期"}
-	RecurringActionReschedule    = RecurringAction{Code: "RESCHEDULE", Value: "reschedule", Label: "改期", Description: "調整本期配送日"}
-	RecurringActionApproveAmount = RecurringAction{Code: "APPROVE_AMOUNT", Value: "approve_amount", Label: "同意超額", Description: "本期金額超出授權額度時的買家同意"}
-)
-
-var AllRecurringActions = []RecurringAction{
-	RecurringActionPause,
-	RecurringActionResume,
-	RecurringActionCancel,
-	RecurringActionSkip,
-	RecurringActionReschedule,
-	RecurringActionApproveAmount,
-}
-
-func RecurringActionFromCode(code string) (RecurringAction, bool) {
-	for _, v := range AllRecurringActions {
-		if v.Code == code {
-			return v, true
-		}
-	}
-	return RecurringAction{}, false
-}
-
-func RecurringActionFromValue(value string) (RecurringAction, bool) {
-	for _, v := range AllRecurringActions {
-		if v.Value == value {
-			return v, true
-		}
-	}
-	return RecurringAction{}, false
 }
 
 // ===== LedgerOwnerType =====

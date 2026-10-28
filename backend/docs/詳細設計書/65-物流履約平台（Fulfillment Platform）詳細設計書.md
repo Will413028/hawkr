@@ -18,7 +18,7 @@
 
 > **服務定位**：本書是物流履約領域的**骨幹**——正規化配送域模型、四個正交維度、統一狀態機、事件 envelope、
 > provider adapter 邊界、責任與退款矩陣、帳本／撥款／結算，以及與 58 號電子發票鏈的接縫，**只在本書定義一次**。
-> 66（Uber Direct）／69（商家自有出貨）／67（定期配送訂閱）／68（7-ELEVEN 大宗寄倉）**只准引用，不得各寫一份**。
+> 66（Uber Direct）／69（商家自有出貨）／68（7-ELEVEN 大宗寄倉）**只准引用，不得各寫一份**。
 
 > 🔴 **商流（讀本書任一帳務章節之前必讀）**：
 > **五種履約方式一律 `commerce_model = SELLER_DIRECT`**；平台對 `3003`（Uber Direct）另向賣家收
@@ -45,7 +45,7 @@
 ---
 
 **覆蓋需求書**：§0／§1／§2／§3／§6／§7／§8／§9／需求書 §10／§11／§16／需求書 §19（前段）
-**本書定義、66／67／68／69 只准引用的共用規約**：見 **§3.9**（十一節）
+**本書定義、66／68／69 只准引用的共用規約**：見 **§3.9**（十一節）
 
 ---
 
@@ -62,7 +62,7 @@
 | **需求來源** | Hawkr 物流加強詳細規劃書 v1.4（客戶交付的外部文件，不在版控內）。與它的偏離一律登記在 §3.7／§3.8／§3.8a／**§3.8b** 四節衝突表 |
 | **本書涵蓋** | 需求書 §0／§1／§2／§3／§6／§7／§8／§9／需求書 §10／§11／§16／需求書 §19（前段） |
 | **本書是誰的擴充** | **06 號物流微服務**的重大擴充（**只 expand，不改既有語意**） |
-| **分冊** | 66 Uber Direct／69 商家自送／67 定期配送／68 7-11 大宗寄倉／**65A 前端實作規格**；切割理由見 [`2026-09-06-fulfillment-docs-split-into-six`](../adr/2026-09-06-fulfillment-docs-split-into-six.md) |
+| **分冊** | 66 Uber Direct／69 商家自送／68 7-11 大宗寄倉／**65A 前端實作規格**；切割理由見 [`2026-09-06-fulfillment-docs-split-into-six`](../adr/2026-09-06-fulfillment-docs-split-into-six.md) |
 | **外部設計** | [65 基本設計書](../基本設計書/65-物流履約平台（Fulfillment%20Platform）基本設計書.md)（先讀它，見 §1.1a） |
 | **架構決策** | rationale 與被否決方案落在 `docs/adr/`；本書只寫結論並以檔名引用 |
 | **未決前提** | **6 項（`U-1`～`U-3`／`U-5`～`U-7`）**，見 §3.5，每項附 fail-closed 的具體形式 |
@@ -77,7 +77,7 @@
 |---|---|---|
 | **R1** | **本節不是任何一個數字的 SSOT，它是索引 ＋ 大小關係。** 改值一律改「出處」欄指的那一處，改完回來對一次本節的不等式 | 同一個數字寫兩份必漂移。本節唯一獨佔的內容是 **§0.1.6 的不等式**——那些關係**沒有任何一節在寫**，這正是它們一直沒人守的原因 |
 | **R2** | **本節與 §0.4 分工**：§0.1 給「值 ＋ 不等式」；**§0.4 給逐支排程器的單筆最壞耗時證據與租約算式**（哪一個外部呼叫的 deadline 決定下界）。§0.4 不重複本節的不等式，本節不重複 §0.4 的推導 | 規則只准存在一處 |
-| **R3** | **provider 專屬的營運數字（Uber quote TTL／回查間隔／POD 窗口、7-11 批次截止、自送 SLA）值的 SSOT 在 66／69／67／68**，本節只在 §0.1.5 引用「會與骨幹參數比大小的那幾個」，**不得在本書定值** | §2.3 的引用方向：65 定骨幹、66／67／68／69 只做映射與填值 |
+| **R3** | **provider 專屬的營運數字（Uber quote TTL／回查間隔／POD 窗口、7-11 批次截止、自送 SLA）值的 SSOT 在 66／69／68**，本節只在 §0.1.5 引用「會與骨幹參數比大小的那幾個」，**不得在本書定值** | §2.3 的引用方向：65 定骨幹、66／68／69 只做映射與填值 |
 | **R4** | 🔴 **值未定的一律寫「待定」並列進 §0.1.7，附「定它之前不得上線的理由」。禁止先編一個數字讓表看起來完整** | 這一欄的數字全部會動到錢或動到「錢什麼時候出去」；一個編出來的預設值上線後就再也沒人回來問它從哪來 |
 
 **符號**：〔既有〕＝ repo 現有且已在跑的值（附 `檔案:符號名`）；🆕 ＝ 新增；**待定** ＝ 尚無值。
@@ -114,7 +114,7 @@
 | **建單兜底：重試上限** 〔既有〕 | `5` | 次 | `ORDER_SHIPMENT_BACKSTOP_MAX_ATTEMPTS` | 同上 | 重試預算 |
 | **建單兜底：退避＝give-up 租約** 〔既有〕 | `30` | 分 | `ORDER_SHIPMENT_BACKSTOP_BACKOFF_MINUTES`；租約欄 `orders.shipment_create_next_retry_at`（`OrderRepository.bumpShipmentCreateAttempt` / `claimShipmentBackstopGiveUp`） | 🔴 **`giveUpLease ≤ backoffMinutes` 用「共用同一個值」結構性保證**（該 scheduler 的 javadoc 逐字記載：曾獨立設 `1440` ⇒ 買家已付款、無單、無退款、無告警 24 小時，救援延遲放大 288 倍）。⚠️ **不要把它拆回兩個旋鈕** | give-up 事件靜默失敗後的救援窗口 |
 | **建單「放棄門檻」（推導值）** | ≈ `30 + 5×30 = 180`（3h） | 分 | 上四列的加總（本節推導，非獨立設定） | 🔴 **與 CREATE_UNKNOWN 回查窗直接衝突**，見不等式 ⑥ | 付款後最快在此時點系統取消 ＋ 全額退款 |
-| **CREATE_UNKNOWN 回查窗** 🆕 | **`180`**（✅ 定版，取不等式 ⑥ 的上界） | 分 | 🔴 **本列是這個值的 SSOT，66／67／68／69 只引用不自行取值**；§7.3 K-08（`ShipmentCreateUnknownRecheckScheduler`，新增）；狀態語意見 §7.1.2 `991` | ✅ **> provider 最大重試窗**（不等式 ⑤：180 分 ＞ 約 100 秒）；✅ **≤ 建單放棄門檻 ≈180 分**（不等式 ⑥ 取等號）。🔴 **取等號只讓兩條鏈的終點對齊，不消除不等式 ⑥ 症狀欄描述的「3 小時內重試建單 5 次」** ⇒ ⑥ 的 (b) 不是 (a) 的替代方案而是**同時必做** | 建單結果未知時，多久之後放棄回查、寫 `41` ＋ 建人工案件。**寫太短＝把 unknown 當失敗（重建第二張單、重複計費，正是需求書明禁的）；寫太長＝與建單兜底打架** |
+| **CREATE_UNKNOWN 回查窗** 🆕 | **`180`**（✅ 定版，取不等式 ⑥ 的上界） | 分 | 🔴 **本列是這個值的 SSOT，66／68／69 只引用不自行取值**；§7.3 K-08（`ShipmentCreateUnknownRecheckScheduler`，新增）；狀態語意見 §7.1.2 `991` | ✅ **> provider 最大重試窗**（不等式 ⑤：180 分 ＞ 約 100 秒）；✅ **≤ 建單放棄門檻 ≈180 分**（不等式 ⑥ 取等號）。🔴 **取等號只讓兩條鏈的終點對齊，不消除不等式 ⑥ 症狀欄描述的「3 小時內重試建單 5 次」** ⇒ ⑥ 的 (b) 不是 (a) 的替代方案而是**同時必做** | 建單結果未知時，多久之後放棄回查、寫 `41` ＋ 建人工案件。**寫太短＝把 unknown 當失敗（重建第二張單、重複計費，正是需求書明禁的）；寫太長＝與建單兜底打架** |
 | **取消待確認（992）逾時** 🆕 | **待定** | 小時 | §7.3 K-09（`CancelPendingTimeoutScheduler`，新增） | 應 ≤ provider 對取消請求的最長回覆時間 ×2（值在 66／68） | 🔴 `992` **不推進 A／E 軸**（§7.1.2.3）⇒ 沒有逾時出口，訂單就地凍結在「取消處理中」（§0.1.7） |
 | **`provider_poll_interval`（3003 取件回查節奏）** 🆕 | `5` | 分 | 本列是 SSOT；消費者 ＝ `ProviderPickupDeadlineScheduler`（§7.5.1 第 18 支） | 必須 ≪ `provider_pickup_hard_deadline`（30 分 ⇒ 窗口內約 6 次機會）；🔴 **也是 rematch 的唯一偵測手段**（webhook 對 rematch 完全靜默，§7.1.2.1 `933` 列） | 調稀 ⇒ rematch 與逾時偵測整段延後；調密 ⇒ Uber API 配額。⚠️ **唯一有官方背書的一個值**（Uber 台灣指南「建議每隔 5 或 10 分鐘」），但那是**建議不是 SLA** |
 | **`provider_pickup_warn_after`（取件延遲預警）** 🆕 | `10` | 分 | 同上；產生 Seller／ADM 預警，**不改變任何狀態** | 🔴 **必須 `< provider_pickup_hard_deadline`**，否則預警與強制取消同時發生、等於沒有預警 | 賣家與 ADM 提前介入的時間；**configurable，非 Uber SLA** |
@@ -191,7 +191,7 @@
 
 ---
 
-#### 0.1.5 表 E：外部 provider 硬約束（**本節只引用，值的 SSOT 在 66／67／68／69**）
+#### 0.1.5 表 E：外部 provider 硬約束（**本節只引用，值的 SSOT 在 66／68／69**）
 
 | 參數 | 值 | 單位 | 出處（SSOT） | 與其他參數的約束關係 | 改動它會影響什麼 |
 |---|---|---|---|---|---|
@@ -362,7 +362,6 @@ gate 對「目標不存在」必須 **FAIL 不是 SKIP**（§3.10 ④）——�
 | **Uber Direct `3003`** | **66** | 🔴 `SELLER_DIRECT` | 🔴 `SELLER_MERCHANT` | 🔴 **賣家** | 🔴 **無** | 🔴 **有**（唯一一條） | 🚫 不適用 |
 | 7-11 大宗寄倉 `3004` | **68** | `SELLER_DIRECT` | `PROVIDER_COLLECTED` 或 `EXTERNAL_PREPAID` | **賣家** | 無 | 無 | 🚫 不適用 |
 | 商家自送 `3005` | **69** | `SELLER_DIRECT` | `SELLER_MERCHANT` | **賣家** | 無 | 無 | 🚫 不適用 |
-| 定期配送（疊在 `3005` 上） | **67** | `SELLER_DIRECT` | `SELLER_MERCHANT` | **賣家**（每期一張） | 無 | 無 | 🔴 **明文禁止** |
 
 🔴 **`PLATFORM_CONSIGNMENT`／`PLATFORM_AGENT_MERCHANT`／`PLATFORM_TO_BUYER` 沒有任何履約方式採用**
 ⇒ 三者是**值域內的保留值**。
@@ -395,9 +394,7 @@ gate 對「目標不存在」必須 **FAIL 不是 SKIP**（§3.10 ④）——�
    **整條鏈不會誤撥任何一筆**。
    🔴 **G0 是安全屬性，不是缺陷**；該軸的去留屬產品決定（§11.1 第 6 項），
    **不得因為「看起來沒用」就刪**。
-2. **66 也不再是 65 帳務章的消費者。** 66／67／68／69 **四本都不接** §5.3／§5.4／§5A.2。
-   67 的實作者仍受需求書 §20.15 逐字禁令約束（不得出現
-   「平台買家發票、seller-to-platform invoice obligation、1%、seller net、negative balance 或 payout batch」）。
+2. **66 也不再是 65 帳務章的消費者。** 66／68／69 **三本都不接** §5.3／§5.4／§5A.2。
 3. **新增的線 B 在本書只定義業務用途，不定義呼叫契約。**
    `agent_fee` 的 payload／`BalType`／加密／重試／次日入帳／對帳狀態機，
    以及**收費時點（Uber Logistics Fee Charge Trigger）**，一律屬 66 ＋ Uber Scoped Review（66 §11.2 UP-11～UP-13）。
@@ -414,19 +411,18 @@ gate 對「目標不存在」必須 **FAIL 不是 SKIP**（§3.10 ④）——�
 平台原本只有**一條**物流路徑（PayUni 代叫的黑貓宅配與 7-11 C2C），而且它的假設寫死在程式裡：
 一張訂單 ↔ 一個 shipment ↔ 一組 PayUni 端點 ↔ 平台代收代開票。
 
-本書涵蓋的四種新履約方式，**每一種都打破其中一個假設**：
+本書涵蓋的三種新履約方式，**每一種都打破其中一個假設**：
 
 | 新方式 | 打破的假設 | 後果 |
 |---|---|---|
 | Uber Direct（66） | 「配送狀態只有 PayUni 會送」 | 出現第二個 webhook 來源與第二套狀態碼 |
 | 商家自送（69） | 「配送由第三方執行」 | 出現「沒有 provider」的配送，服務範圍與承載要自建 |
-| 定期配送（67） | 「一次購買一次出貨」＋「平台代收」 | 出現契約／週期兩層，且**帳務軸完全不同**（賣家自收自開票） |
 | 7-11 大宗寄倉（68） | 「一個包裹一次交運」 | 出現包裹 × 批次的二維模型 |
 
-**如果讓四種各自實作**，會得到四套狀態碼、四種 webhook 落點、四份運費邏輯、四個撥款判斷
+**如果讓三種各自實作**，會得到三套狀態碼、三種 webhook 落點、三份運費邏輯、三個撥款判斷
 ——而它們共用同一張訂單。本書的存在理由就是**先把共用的那一層定死**：
 正規化配送域、四個正交維度、統一狀態機、事件 envelope、provider adapter 邊界、
-責任與退款矩陣、帳本與撥款、與 58 號發票鏈的接縫。**66／67／68／69 只准引用，不得各寫一份。**
+責任與退款矩陣、帳本與撥款、與 58 號發票鏈的接縫。**66／68／69 只准引用，不得各寫一份。**
 
 ### 1.1a 先讀基本設計書
 
@@ -439,10 +435,9 @@ maker-checker／多軸並存），**大約 15 分鐘**，之後本書的每一�
 🔴 **各配送方式各有自己的基本設計書，編號一一對應**：
 [06 物流微服務](../基本設計書/06-物流微服務（Shipping%20Service）基本設計書.md)（既有黑貓與 7-11 店到店）／
 [66 Uber Direct](../基本設計書/66-Uber%20Direct%20即時配送整合基本設計書.md)／
-[67 定期配送訂閱](../基本設計書/67-定期配送訂閱（Subscription%20Delivery）基本設計書.md)／
 [68 7-ELEVEN 大宗寄倉](../基本設計書/68-7-ELEVEN%20大宗寄倉（B2C）基本設計書.md)／
 [69 商家自有出貨](../基本設計書/69-商家自有出貨（Merchant%20Self-Delivery）基本設計書.md)。
-**65 的基本設計書只裝共用骨架**，不再重複四本的逐一流程。
+**65 的基本設計書只裝共用骨架**，不再重複三本的逐一流程。
 
 ⚠️ 反過來也成立：**基本設計書不是本書的摘要**，它不含任何可施工的細節（無 DDL、無端點、無述詞）。
 兩本的分工是「為什麼這樣設計」vs「照著做」，**不要拿基本設計書當契約來源**。
@@ -452,14 +447,14 @@ maker-checker／多軸並存），**大約 15 分鐘**，之後本書的每一�
 1. **一套狀態機服務四條通路**：新增第五條通路時，改的是 adapter 與碼表，不是狀態機。
 2. **錢與憑證的正確性由述詞守住**，不由流程紀律守住——每一條不變式都要答得出「守在哪一層、破掉時誰會知道」（§7.7）。
 3. **每個新狀態都有推走它的人**（§3.11 四問），沒有例外、沒有留白。
-4. **66／67／68／69 可以獨立施工**：本書定完之後，四本之間不需要互相等待（依賴順序見附錄 F.1）。
+4. **66／68／69 可以獨立施工**：本書定完之後，三本之間不需要互相等待（依賴順序見附錄 F.1）。
 5. **既有的 06 號路徑零回歸**：只 expand，不改既有語意（§1.4）。
 
 ### 1.3 Non-Goals
 
 **本書不做的事**：
 
-- 不定義任一通路的**業務細節**（Uber 的報價欄位、7-11 的批次上限、定期配送的排程規則）——那些在 66／67／68／69
+- 不定義任一通路的**業務細節**（Uber 的報價欄位、7-11 的批次上限）——那些在 66／68／69
 - 不定義**前端**（畫面、文案、a11y）——在 65A
 - 不寫**時程與人力**（需求書 §21.19 的 WBS）——依任務書不收進設計書
 
@@ -524,22 +519,22 @@ maker-checker／多軸並存），**大約 15 分鐘**，之後本書的每一�
    ┌────────────┬───────┼────────────┬─────────────┬──────────────┬──────────┘
    │            │       │            │             │              │
 ┌──┴───┐   ┌────┴───┐ ┌─┴─────┐ ┌────┴─────┐  ┌────┴──────┐  ┌────┴──────────┐
-│order │   │shipping│ │product│ │ payment  │  │settlement │  │  recurring    │
-│(既有)│   │ (擴充) │ │(既有) │ │ (擴充)   │  │ 新 Go     │  │  新 Go        │
-└──┬───┘   └────┬───┘ └───────┘ └────┬─────┘  └────┬──────┘  └────┬──────────┘
-   │            │                    │             │              │
-   │       ┌────┴──────────────────┐ │        ┌────┴────┐         │
-   │       │  provider adapter     │ │        │ 帳本    │         │
-   │       │ MERCHANT / TAQBIN /   │ │        │ 撥款    │         │
-   │       │ CVS_711 / UBER_DIRECT │ │        └─────────┘         │
-   │       └────┬──────────────┬───┘ │                            │
-   │            │              │     │                            │
-   │       ┌────┴─────┐   ┌────┴──┐  │                            │
-   │       │  PayUni  │   │ Uber  │  │                            │
-   │       │(3001/2/4)│   │(3003) │  │                            │
-   │       └──────────┘   └───────┘  │                            │
-   │                                 │                            │
-   └──────── invoice (58 號) ────────┴────────────────────────────┘
+│order │   │shipping│ │product│ │ payment  │  │settlement │
+│(既有)│   │ (擴充) │ │(既有) │ │ (擴充)   │  │ 新 Go     │
+└──┬───┘   └────┬───┘ └───────┘ └────┬─────┘  └────┬──────┘
+   │            │                    │             │
+   │       ┌────┴──────────────────┐ │        ┌────┴────┐
+   │       │  provider adapter     │ │        │ 帳本    │
+   │       │ MERCHANT / TAQBIN /   │ │        │ 撥款    │
+   │       │ CVS_711 / UBER_DIRECT │ │        └─────────┘
+   │       └────┬──────────────┬───┘ │
+   │            │              │     │
+   │       ┌────┴─────┐   ┌────┴──┐  │
+   │       │  PayUni  │   │ Uber  │  │
+   │       │(3001/2/4)│   │(3003) │  │
+   │       └──────────┘   └───────┘  │
+   │                                 │
+   └──────── invoice (58 號) ────────┴────────
 ```
 
 🔴 **四個 provider 只對應兩個外部 API 供應商**：`MERCHANT`（無外部 API）、
@@ -552,13 +547,13 @@ maker-checker／多軸並存），**大約 15 分鐘**，之後本書的每一�
 
 > 🔴 **五種履約方式全部走 `commerce_model = SELLER_DIRECT`**（買家的錢一律進賣家、發票一律賣家開）。
 > 本書的「帳本（§5.3）／撥款（§5.4）／撥款指示費（§5A.2）」整章
-> **只適用於 `PLATFORM_CONSIGNMENT`，而五種履約方式都不使用該值** ⇒ **四本都不要接**。
+> **只適用於 `PLATFORM_CONSIGNMENT`，而五種履約方式都不使用該值** ⇒ **三本都不要接**。
 
 判斷自己該不該接的方法：問「**這筆錢是誰收的**」。
 
 | 這筆錢誰收 | `commerce_model` | 要不要接 65 的帳務章 |
 |---|---|---|
-| **賣家自己收**（`3001`／`3002`／`3003`／`3005`／定期配送） | `SELLER_DIRECT` | 🔴 **不要**。定期配送另受需求書 §20.15 逐字禁令（不得出現 payout batch） |
+| **賣家自己收**（`3001`／`3002`／`3003`／`3005`） | `SELLER_DIRECT` | 🔴 **不要** |
 | **provider 代收或外部預付**（`3004`） | `SELLER_DIRECT` | 🔴 **不要**；帳戶屬賣家 ⇒ 款項不得再進平台 payout queue |
 
 🔴 **第二個要問的問題（修正後新增）**：「**平台有沒有向賣家收這條路的物流服務費**？」
@@ -566,9 +561,9 @@ maker-checker／多軸並存），**大約 15 分鐘**，之後本書的每一�
 | 答案 | 哪些方式 | 要接什麼 |
 |---|---|---|
 | **有** | 🔴 只有 `3003`（Uber） | 線 B：平台→賣家的物流費應收 ＋ 平台對賣家開票（58 方向二）＋ PayUni `agent_fee`。**契約與時點屬 66 ＋ Uber Scoped Review** |
-| **沒有** | `3001`／`3002`／`3004`／`3005`／定期配送 | 什麼都不接。物流費由 PayUni 直接從賣家帳戶扣，平台不經手 |
+| **沒有** | `3001`／`3002`／`3004`／`3005` | 什麼都不接。物流費由 PayUni 直接從賣家帳戶扣，平台不經手 |
 
-### 2.3 本書與 66／69／67／68／65A 的分工與引用方向
+### 2.3 本書與 66／69／68／65A 的分工與引用方向
 
 **引用方向是單向的，不得循環**：
 
@@ -578,24 +573,21 @@ maker-checker／多軸並存），**大約 15 分鐘**，之後本書的每一�
    66 ──┐
    69 ──┤──→  65（骨幹：共用的那一層）
    68 ──┘        ↑
-   67 ───────────┘   67 在帳務軸上與 66 平行且互斥，但仍引用 65 的狀態機與事件 envelope
 ```
 
 | 誰 | 定義什麼 | 不得定義什麼 |
 |---|---|---|
 | **65** | 正規化配送域、統一狀態機、事件 envelope、adapter 邊界、責任／退款矩陣、帳本／撥款、58 接縫、四問（§3.10／§3.11） | 任一通路的業務細節 |
-| **66／69／67／68** | 各自通路的端點、表、狀態映射、provider 契約、排程器 | 🔴 **不得重新定義 65 已定的東西**（狀態值域、envelope、錯誤碼段、四問） |
+| **66／69／68** | 各自通路的端點、表、狀態映射、provider 契約、排程器 | 🔴 **不得重新定義 65 已定的東西**（狀態值域、envelope、錯誤碼段、四問） |
 | **65A** | 畫面、文案、狀態呈現、a11y、前端檔案落點 | 🔴 **不得自行改契約**——契約一律沿用 65 §3.9 與 §6 |
 
-⚠️ **66／67／68／69 之間互不引用**。需要共用的東西一律**上移到 65**，不得橫向引用
+⚠️ **66／68／69 之間互不引用**。需要共用的東西一律**上移到 65**，不得橫向引用
 （橫向引用會讓「改一本要動另一本」，而那正是分冊要避免的）。
-唯一例外是 67 引用 69 的承載（`merchant_capacity_bucket`），因為定期配送的承載來源就是商家自送的服務範圍。
 
 ### 2.4 不在本書範圍的東西
 
 | 不做 | 理由 | 何時會回來 |
 |---|---|---|
-| 庫存**硬保留** | product-service 沒有 reserve／hold RPC（只有 `GetStock`／`DeductStock`／`RestoreStock`） | product 提供預留 RPC 後（67 §3.7） |
 | admin **step-up 驗證**（2FA） | repo 零基礎，且 maker-checker 已覆蓋主要風險 | 另一波 |
 | 稽核 log 的**共用抽象** | 既有已有兩套（invoice／56 號），物流新增是第三套 | 登記為已知技術債（§11.1），不假裝沒看到 |
 | 撥款後退款的**追回機制** | 🔴 **場景確實存在**：申訴是第二個退款入口且**零 `orders.status` 守衛**。現況缺陷 #3262 | U-7 業務／財務裁決後 |
@@ -792,7 +784,7 @@ maker-checker／多軸並存），**大約 15 分鐘**，之後本書的每一�
 **偷偷改掉歷史決策卻仍稱作 v1.4 會讓所有引用它的段落失去可追溯性**。
 本 repo 既有的處置機制就是這四節衝突登記表，本次沿用，不自行發明版本政策。
 
-### 3.9 跨文件共用規約（十一節，**66／67／68／69 只准引用，不得各寫一份**）
+### 3.9 跨文件共用規約（十一節，**66／68／69 只准引用，不得各寫一份**）
 
 > 每一格都標了**依據**——凡標「repo 硬規則」者無裁量空間；標「本次決議」者附 D 編號可回查推導。
 
@@ -865,10 +857,10 @@ seller_net               = fee_base − payout_instruction_fee − 合約平台�
 
 #### 六、錯誤碼號段
 
-**現行號段：`9500~9699`（物流履約業務碼）**，65 骨幹佔 `9501~9575`，66／67／68／69 自 `9576` 起連號追加。
+**現行號段：`9500~9699`（物流履約業務碼）**，65 骨幹佔 `9501~9575`，66／68／69 自 `9576` 起連號追加。
 逐碼 SSOT ＝ `docs/代碼管理（CodeMeta）/錯誤碼.md` 的「物流履約業務碼」節；**本書不複述實配個數**。
 
-🔴 **新增碼一律由 65 §6.7 統一指派，66／67／68／69 只引用、不得自行挑號。**
+🔴 **新增碼一律由 65 §6.7 統一指派，66／68／69 只引用、不得自行挑號。**
 
 **選段規則**（未來新開域時沿用）：**先估需要的碼數，再選段**
 - 估出來 **≤ 既有段剩餘空位** ⇒ 續用；否則新開整段，且**同 PR 更新 `錯誤碼.md` 的「錯誤碼範圍分配」表**（該表是號段 SSOT）
@@ -910,7 +902,7 @@ seller_net               = fee_base − payout_instruction_fee − 合約平台�
 | commit 後保證事件必發 | 例外 A（同 tx outbox）或出路 4 | 先例：58 號 `INV.ob` |
 | **向外投遞**（通知／扣款／打第三方） | 🔴 **一律不得 level-triggered** | 重放＝重複扣款 |
 
-#### 十、新服務（**已定案 2 個**：Settlement、Recurring；推導見附錄 G.8）
+#### 十、新服務（**本領域不新增可部署單元**；開新服務時適用；推導見附錄 G.8）
 
 | 項目 | 決定 | 依據 |
 |---|---|---|
@@ -931,7 +923,7 @@ seller_net               = fee_base − payout_instruction_fee − 合約平台�
 
 ### 3.10 寫任何 gate／告警／型別保證之前的四問
 
-> 🔴 **本節與 §3.11 是全書（含 66／67／68／69）唯一的四問定義處。**
+> 🔴 **本節與 §3.11 是全書（含 66／68／69）唯一的四問定義處。**
 > 先前版本引用的是 repository 個人規則檔的章節編號，而那個目錄在 `.gitignore` 內
 > ——換一台機器就不存在，讀的人會拿到一個開不了的指標。所以定義搬到這裡，**版控內、自足**。
 
@@ -969,7 +961,7 @@ seller_net               = fee_base − payout_instruction_fee − 合約平台�
 
 ### 3.11 每個新狀態的四問
 
-> 適用對象：本書與 66／67／68／69 新增的**每一個**狀態值（`shipment_status`／`commerce_status`／
+> 適用對象：本書與 66／68／69 新增的**每一個**狀態值（`shipment_status`／`commerce_status`／
 > cycle／contract／batch／adjustment 各軸皆同），以及**任何會改狀態的維運 SQL**。
 
 | # | 問題 | 答不出來的後果 |
@@ -991,7 +983,7 @@ seller_net               = fee_base − payout_instruction_fee − 合約平台�
 
 ## 4. 架構 (Architecture)
 
-### 4.1 服務責任與邊界（含新增的 2 個 Go 服務）
+### 4.1 服務責任與邊界
 
 > **「服務數」講的是 image ／ 原始碼目錄，不是 release 數。**
 
@@ -1000,17 +992,14 @@ seller_net               = fee_base − payout_instruction_fee − 合約平台�
 | `gateway` | 對外唯一入口 | 擴充 | 路由、身分注入、capability 判定。🔴 **不做業務判斷** |
 | `shipping-service`（Java） | 正規化配送域的權威 | **擴充**（最大宗） | 狀態機、provider adapter、標籤／取號、服務範圍與承載。66／68／69 全部落在這裡 |
 | `order-service`（Java） | 訂單軸與收貨確認軸 | 擴充 | A 軸／E 軸；`order_outbox`；`ReceiptReviewDeadlineScheduler` |
-| `payment-service`（Java） | 金流與 mandate | 擴充 | `payment_transactions`、退款、67 的 `recurring_payment_mandate` |
+| `payment-service`（Java） | 金流 | 擴充 | `payment_transactions`、退款 |
 | `payuni-webhook-service`（Java） | webhook 入口 | 擴充（＋uber slice） | inbox/outbox；**不做業務判斷**，只落庫與轉發 |
 | `invoice-service`（Go，58 號） | 發票 | **零變更** | 見 §4.7 |
 | `payment-service` / **Logistics Finance module**（Java，`io.github.will413028.hawkr.payment.logistics.**`） | **帳本／異常案件／provider 帳單** | **擴充** | `ledger_transactions`／`ledger_entries`／`fulfillment_exception_cases`／`fulfillment_case_resolutions`／`provider_settlement_lines`，DDL 在 `V9__add_logistics_finance_tables.sql`；契約見 [70 號](70-物流財務結算%EF%BC%88Logistics%20Settlement%20%26%20Receivable%EF%BC%89詳細設計書.md)。🔴 **撥款／結算／撥款指示費／F 軸的九張表不在此列**（只服務 `PLATFORM_CONSIGNMENT`，隨該值啟用才建，見 §5.0） |
-| 🆕 `recurring-service`（Go） | 定期配送契約與週期 | **新建** | 67 號全部。🔴 **明文禁止出現任何 settlement／payout／1% 相關的表與事件** |
 
-**`recurring-service` 選 Go**，理由：① 可參照最新的 Go 服務（invoice-service）的 client／breaker／audit 分層
-② **Go 不需挑 TSID Node ID**（少一個全域協調點）③ Go 服務數已多於 Java。
 
 🔴 **邊界的判準是「誰是那份資料的權威」，不是「誰比較方便」**：
-- 承載 bucket 的權威在 shipping-service ⇒ recurring 只能以 gRPC 在對方交易內操作
+- 承載 bucket 的權威在 shipping-service ⇒ 其他服務只能以 gRPC 在對方交易內操作
 - 帳本的權威在 **payment-service 的 Logistics Finance module**（`io.github.will413028.hawkr.payment.logistics.**`）⇒ order **不得**自己記分錄；payment-service 自己也**不得跨 package 直接寫**——判準是 package 粒度不是服務粒度（70 §3.8 的 gate 逐字說明為何服務粒度會恆真而永不轉紅）
 - 配送狀態的權威在 shipping-service ⇒ order-service 只消費事件，不反寫
 
@@ -1041,8 +1030,8 @@ seller_net               = fee_base − payout_instruction_fee − 合約平台�
 
 | 項目 | 值 | 依據 |
 |---|---|---|
-| **新增可部署單元** | **1**（僅 `recurring-service`） | §4.1；物流財務網域併入既有 `payment-service`，不新建服務 |
-| **Port** | 🔴 **落地前以 `k8s/values/*.yaml` 的現況重跑一次盤點**，取下一個可用值 | Logistics Finance module 併在 payment-service 內，**不需要新 port**（走既有 9924／9925）。⚠️ **不得沿用本書或 67 號寫死的號碼**——port 佔用會隨任何人新增服務而變，寫死必撞 |
+| **新增可部署單元** | **0** | §4.1；物流財務網域併入既有 `payment-service`，不新建服務 |
+| **Port** | 🔴 **落地前以 `k8s/values/*.yaml` 的現況重跑一次盤點**，取下一個可用值 | Logistics Finance module 併在 payment-service 內，**不需要新 port**（走既有 9924／9925）。⚠️ **不得沿用本書或任何分冊寫死的號碼**——port 佔用會隨任何人新增服務而變，寫死必撞 |
 | **TSID Node ID** | 🔴 **不需要** | Go 服務用 `pkg/tsid.NewGenerator`（time-based ＋ 22-bit random），無 Node ID 概念 |
 | **replicas** | 依 chart 預設 `1` | ⚠️ **但 chart 預設 `maxUnavailable: 0` / `maxSurge: 1` ⇒ 每次部署都有兩個 pod 並存** ⇒ 排程器一樣要有搶佔（§7.5） |
 | **登記** | 《新增微服務指南》§0 六類 | §12.1；⚠️ **build 集鍵＝`services/<name>/Dockerfile`、deploy 集鍵＝`k8s/values/<release>.yaml`，是兩個不同的集合** |
@@ -1278,7 +1267,7 @@ public interface FulfillmentProviderAdapter {
 ＋ 在 5 處 `if` 各加一個分支」，而那 5 處**沒有任何 gate 保證你都加到了**
 （漏一處的症狀是靜默走進 PayUni 分支，見 §7.1.2.6 的波及面清單）。
 
-##### 4.4.1b 🔴 capability × provider 總表（本表是 66／68／69 的唯一輸入，四本不得各寫一份）
+##### 4.4.1b 🔴 capability × provider 總表（本表是 66／68／69 的唯一輸入，三本不得各寫一份）
 
 > 三本的 provider 操作章節原本各自以
 > 「在 `ShippingService` 上新增具名方法」的形式描述——那是 `ShipmentStrategy`「只抽象建單」的舊前提。
@@ -1335,30 +1324,6 @@ public interface FulfillmentProviderAdapter {
 | 68 | 🔴 **18 個**（🔴 **`3004` 不含 `report_ready`**：它是 3003 專屬，見 §6.3.4 A2）（**`dispatch`** 🆕／`cancel`／`resubmit`／`print_label`／`scan_bind`／`assign_batch`／`remove_from_batch`／`view_only`／`requery`／`admin_resolve`／`open_case`／`arrange_return`／`claim`／`reselect_store`／`accept_return`／`seller_pickup`／`admin_close_case`／`update`） | ① **加**：隨 68 §7.2 **M1** 改為 `dispatch`／`cancel` 並補端點 `C4`（＝ 本書 §6.3.4 A 的 `S-10`），`dispatch` 進入 68 的集合；② **減**：`cancel_request` **移除**——68 §4.5.0 逐字「`FulfillmentAction` 值域**沒有 `cancel_request` 這個值**…§7.2 映射表的 `cancel_request` 已於同一次改為 `cancel`（M2／M3 兩列），**本書全書不再出現該值**」，且 CodeMeta `業務類型碼.md` 的 `FulfillmentAction` **值域內沒有它**（對照組：`CANCEL`／`DISPATCH` 皆命中 ⇒ 查詢有效）。一加一減 ⇒ **仍是 18**。<br/>⚠️ **本欄原本的問題敘述「`cancel` 與 `cancel_request` 並列成兩個 action」對 68 已不成立**，該併入已完成（§4.4.1c）。🔴 **fail-closed 的後果**：照舊清單施工會送出一個不在值域內的 action，被 validator 擋掉 |
 | 69 | `handover`／`cancel`／`report_progress`／`report_delivered`／`report_exception`／`upload_pod`／`admin_resolve` | 與 68 重疊的是 **`admin_resolve` ＋ `cancel` 兩個**。其餘 5 個（`handover`／`report_progress`／`report_delivered`／`report_exception`／`upload_pod`）確實只有 69 有 |
 
-🔴 **先定適用軸——這一格漏了會讓 67 的五顆按鈕靜默消失**：
-
-`allowedActions[]` **不是只有配送軸在用**。見 67 §8.1：`RB-6`／`RB-11`／`RS-8` **一律回傳 `allowedActions[]`**，
-而 67 §6.1.4 定義的六個動作是 **contract／cycle 軸**的：
-`pause`／`resume`／`cancel`／`skip`／`reschedule`／`approve-amount`
-——**其中五個不在下面那 28 值裡**，且 `approve-amount` 是 kebab-case。
-
-⇒ 若把 `FulfillmentAction` 寫成「`allowedActions[].action` 的值域」而不限定軸，
-再配上「fail-closed，表上沒列的一律不可用、前端只准 fallback 到 `view_only`」，
-**67 的「跳過本期／改期／暫停／恢復／同意超額」五顆按鈕會全部靜默消失**
-——正是 §6A 的 `I-9` 自己描述的症狀（前端拿到不認得的 action ⇒ 按鈕消失、零錯誤）。
-
-**⇒ 值域按資源軸分兩個，指派權都在 65：**
-
-| 軸 | enum | 涵蓋的資源 | 誰引用 |
-|---|---|---|---|
-| **配送／履約軸** | **`FulfillmentAction`**（下表 28 值） | `shipment`、`order` 的履約面（B-1／S-\*／A-\*） | 65／66／68／69 |
-| **定期配送軸** | **`RecurringAction`** 🆕（6 值，見附錄 C.2） | `recurring_contract`、`recurring_cycle`（RB-6／RB-11／RS-8） | 67 |
-
-⚠️ **兩個 enum 都有 `cancel`，而它們的對象不同**（配送單 vs 契約）——這**不是撞號**（不同 enum），
-但**前端不得用單一 mapping 把 `cancel` 綁死到一個文案或一個端點**：
-文案（「取消配送單」vs「取消訂閱」）由所在資源決定，URL 一律走 `allowedActions[].href`。
-🔴 **65A §1.9 的通用 CTA 元件必須以「資源軸」為第一層分派**，否則兩軸的同名 action 會互相覆蓋。
-
 **裁決（與 C-6／C-7 同一個判準：值域指派權在骨幹，分冊只准引用）**：
 
 1. **新增 CodeMeta enum `FulfillmentAction`**，登記於附錄 C.2（`§4.2` 指名的 SSOT）。
@@ -1402,9 +1367,9 @@ public interface FulfillmentProviderAdapter {
 ⚠️ **envelope 的 `provider` 欄不再恆為 `"PAYUNI"`** ⇒ 下游「用 `webhookType` 路由」的地方
 **要加 provider 維度**，否則兩個 provider 的同名 `webhookType` 會撞在一起（10 號 §5.3）。
 
-### 4.6 事件 envelope（標準格式，66／67／68／69 共用）
+### 4.6 事件 envelope（標準格式，66／68／69 共用）
 
-> 🔴 **本節是 66／67／68／69 的共用契約，四本只准引用不得各寫一份。**
+> 🔴 **本節是 66／68／69 的共用契約，三本只准引用不得各寫一份。**
 
 每一條新增或擴充的事件，payload 必須帶下列**共用欄位**（各領域自己的業務欄位另加）：
 
@@ -1932,10 +1897,10 @@ dev 實證該軸 0 列，而契約測試因為只斷言「有呼叫寫入」而�
 
 ### 5.3 帳本（雙分錄）—— 唯一從零建的領域
 
-> 🔴 **本節的分錄設計（`ORDER_ACCRUAL`／`PAYOUT_*`／`HOLD_*`）只適用於 `commerce_model = PLATFORM_CONSIGNMENT`**（其餘履約方式在帳務軸上是平行且互斥的分支，需求書 §20.15 明文禁止定期配送出現 `seller net`／`negative balance`／`payout batch`）。
+> 🔴 **本節的分錄設計（`ORDER_ACCRUAL`／`PAYOUT_*`／`HOLD_*`）只適用於 `commerce_model = PLATFORM_CONSIGNMENT`**（其餘履約方式在帳務軸上是平行且互斥的分支）。
 > 🔴 **五種履約方式都不使用該值**（§0.6）——撥款資格的 G0 軸守門就是這個值，整條鏈不會誤撥。
 > **本節是 `PLATFORM_CONSIGNMENT` 啟用時的規格：不得刪除，也不得改接到 `SELLER_DIRECT`。**
-> 67／68 的實作者讀到這裡可以停。
+> 68 的實作者讀到這裡可以停。
 >
 > 🔴 **「不得改接」在 DB 層有機械形式，而且是兩道 CHECK 不是一道**
 > （`services/java/payment-service/src/main/resources/db/migration/V9__add_logistics_finance_tables.sql`）：
@@ -3592,7 +3557,7 @@ C8 ⇔ SellerNegativeBalance(store_id) = 0
 |---|---|
 | 〔既有〕 | 端點已存在，**只擴充回應欄位或 allowed-from**，不改路由、不改既有欄位語意 |
 | 🆕 | 新增的路由 |
-| →66／69／67／68 | 骨幹只定形狀，provider 專屬語意由該本填 |
+| →66／69／68 | 骨幹只定形狀，provider 專屬語意由該本填 |
 | 🔴 | 照做會出錯，而且錯誤是靜默的 |
 
 ---
@@ -3668,7 +3633,7 @@ F="docs/詳細設計書/65-物流履約平台（Fulfillment Platform）詳細設
 否則 65A 會少填一列而沒有任何東西會發現（`A-19` 就是這樣漏掉的）。
 
 🔴 **任何一節指名某支端點是「唯一寫入者」時，那支端點必須同時進 §6.1.1**——散落在資料設計章的端點宣告，對施工者等於不存在。
-其他四本的引用方向是「端點總表見 65 §6.1」，漏登記的症狀是：該表變成只有讀者沒有寫者的空表、aging 指標永遠沒有資料。
+其他三本的引用方向是「端點總表見 65 §6.1」，漏登記的症狀是：該表變成只有讀者沒有寫者的空表、aging 指標永遠沒有資料。
 ⚠️ 本行曾寫「20＋6＝26」——與本表實際列數不符，而 65A §7.1 的對照表列數基準就是抄這個數字
 ⇒ **照 26 填表會漏 6 支**（65A 已改成「以本節現讀為準、每次重數」）。
 
@@ -4535,9 +4500,9 @@ ReleaseSettlementHoldRequest { reason: string }
 #### 6.7.0 號段與配號規則
 
 **號段 `9500~9699`（200 個）**（分配規則見附錄 C.5）。
-**65 佔 `9501~9575`；66／67／68／69 自 `9576` 起連號追加。**
+**65 佔 `9501~9575`；66／68／69 自 `9576` 起連號追加。**
 
-🔴 **號碼由本節一次配完，66／67／68／69 只引用不自行取號**——各本自己在段內挑會撞號，而撞號只在生成階段才發現。
+🔴 **號碼由本節一次配完，66／68／69 只引用不自行取號**——各本自己在段內挑會撞號，而撞號只在生成階段才發現。
 
 **配號慣例**：**按語意分群並留空位**，不按設計書分子段。
 本 repo 既有慣例即此形狀——Invoice 段的 `9301~9314`（買家發票）／`9320~9327`（賣家稅務）／`9330~9332`（服務商）就是三個留空的語意群。
@@ -4643,19 +4608,19 @@ ReleaseSettlementHoldRequest { reason: string }
 
 #### 6.7.4 🔴 號段容量與擴段門檻
 
-🔴 **號段容量的判準只有一條：擴段門檻量在「五本合計實配」，不准量在任何一本身上。**
+🔴 **號段容量的判準只有一條：擴段門檻量在「四本合計實配」，不准量在任何一本身上。**
 真正會用完號段的是合計；量在單一本必然低估，而低估的代價是把號段 SSOT 再改一次。
 
-⚠️ **「需求數」必須含 65 骨幹自己的實配**，不是只算四個分冊的淨需求——
+⚠️ **「需求數」必須含 65 骨幹自己的實配**，不是只算三個分冊的淨需求——
 漏算骨幹會讓同一本書對「配哪一段」給出兩個答案。
 
 | 觸發 | 動作 |
 |---|---|
-| **五本合計實配 > 170 個** | 改配 `9500~9799`，同 PR 更新 `錯誤碼.md` 的分配表 |
-| 66／67／68／69 定版時 | **回到 §6.7.1 自 `9576` 起連號追加**，不得在段內自己挑 |
+| **四本合計實配 > 170 個** | 改配 `9500~9799`，同 PR 更新 `錯誤碼.md` 的分配表 |
+| 66／68／69 定版時 | **回到 §6.7.1 自 `9576` 起連號追加**，不得在段內自己挑 |
 
 🔴 **實配個數只准有一份，而它在 `docs/代碼管理（CodeMeta）/錯誤碼.md`。**
-本書與四個分冊都**不得各自重算**並寫死一個數字——寫在兩處必漂移，而漂移的那一份不會告訴讀者它漂了。
+本書與三個分冊都**不得各自重算**並寫死一個數字——寫在兩處必漂移，而漂移的那一份不會告訴讀者它漂了。
 
 ### 6.8 🔴 即時通道（SSE）契約：`B-6`／`S-14`
 
@@ -5417,7 +5382,6 @@ python3 scripts/mq-consumer-registration-check.py                            # r
 |---|---|
 | normalized 配送域的**逐值定義**（**31 值 ＝ 既有 24 ＋ 新增 7**；建議值的逐條判定見 §7.1.2.8） | **§7.1.2** |
 | provider 原生值 → normalized 值的**映射表** | **66 §7.3**（Uber）／**68 §7.3**（7-11 B2C）／**69**（商家自送） |
-| 定期配送的 **contract／cycle 兩層軸** | **67 §7.3**（本節只定它與骨幹軸的接縫） |
 | 每個狀態的四問逐格填表（誰推進／誰推走／allowed-from／卡住誰知道） | **§7.2**（本節給軸級規則，§7.2 給值級稽核表） |
 | 撥款資格的 **1 條軸守門 ＋ 10 條資格條件**全文 | **§7.7.1**（唯一權威；§0.2 只是速查，沒有值域校正） |
 
@@ -5458,27 +5422,26 @@ python3 scripts/mq-consumer-registration-check.py                            # r
 
 **商流 × 軸適用矩陣**（`commerce_model` 是唯一輸入；擴充自基本設計書 §7 那張表）
 
-| 軸 | Uber 即時配送<br/>`SELLER_DIRECT` | 定期配送訂閱<br/>`SELLER_DIRECT` | 7-11 大宗寄倉<br/>`SELLER_DIRECT`（預設） |
-|---|:---:|:---:|:---:|
-| A 商務 | ✅ | ✅ | ✅ |
-| B 付款 | ✅（平台代理商戶收款） | ✅（賣家自己的 merchant trade） | ✅（provider 代收／外部預付） |
-| C 配送 | ✅ | ✅（商家自送） | ✅ |
-| D 退款 | ✅ | ✅ | ✅ |
-| E 收貨確認 | ✅ | ✅ | ✅（到店取貨） |
-| F 賣家發票（對平台） | ✅ | 🚫 **無此關係** | 🚫 **無此關係** |
-| G **結算／撥款** | ✅ | 🚫 **明文禁止** | 🚫 帳戶屬賣家時不進佇列 |
-| H 買家發票 | ✅ **平台開**（受託代銷） | ✅ **賣家開** | ✅ **賣家開** |
-| I 批次 | — | — | ✅ **不掛訂單，獨立一軸** |
-| （67 專屬）contract／cycle 兩層 | — | ✅ 見 67 §7.3 | — |
+| 軸 | Uber 即時配送<br/>`SELLER_DIRECT` | 7-11 大宗寄倉<br/>`SELLER_DIRECT`（預設） |
+|---|:---:|:---:|
+| A 商務 | ✅ | ✅ |
+| B 付款 | ✅（平台代理商戶收款） | ✅（provider 代收／外部預付） |
+| C 配送 | ✅ | ✅ |
+| D 退款 | ✅ | ✅ |
+| E 收貨確認 | ✅ | ✅（到店取貨） |
+| F 賣家發票（對平台） | ✅ | 🚫 **無此關係** |
+| G **結算／撥款** | ✅ | 🚫 帳戶屬賣家時不進佇列 |
+| H 買家發票 | ✅ **平台開**（受託代銷） | ✅ **賣家開** |
+| I 批次 | — | ✅ **不掛訂單，獨立一軸** |
 
 🔴 **「🚫」不是「這條軸永遠停在初始值」，而是「這張訂單根本不會有那條軸的列」**。
 兩者在程式裡差很多：前者要處理一個永遠不動的狀態並為它配 aging 告警，
 後者是**表級不變式**——`SELLER_DIRECT` 的訂單出現 `settlement_*` 或 `seller_invoice_*` 的列，
-本身就是缺陷（逐字：「定期配送資料庫不得出現 …… `payout batch`」）。
+本身就是缺陷。
 ⇒ 見 §7.1.1.4 的 X-1／X-2。
 
 ⚠️ **「有幾條軸」看的是商流不是訂單**。實作 read model 時，
-**不得**以「欄位為 null 就顯示待處理」處理不適用的軸——那會讓賣家在定期配送的訂單上
+**不得**以「欄位為 null 就顯示待處理」處理不適用的軸——那會讓賣家在 `SELLER_DIRECT` 的訂單上
 看到一個永遠不會前進的「撥款：未開始」。不適用的軸在 API 回應中**整個欄位不存在**，
 前端據此不渲染該區塊（`/public/*` 另受白名單約束，見 §3.9 五）。
 
@@ -5670,7 +5633,7 @@ E／G／H 三軸在 `COMPLETED` 之後才開始動。**把 `COMPLETED` 當成全
 | 商流 | issuer | 本軸的典型終局 |
 |---|---|---|
 | 🔴 **Uber（修正後 `SELLER_DIRECT`）** | **賣家**（與其餘四種一致） | `ISSUED` |
-| 定期配送／大宗寄倉（`SELLER_DIRECT`） | **賣家** | `NOT_APPLICABLE`（理由碼＝賣家自行開票）或 `RESOLVED_EXTERNALLY`（賣家回報自開號碼） |
+| 大宗寄倉（`SELLER_DIRECT`） | **賣家** | `NOT_APPLICABLE`（理由碼＝賣家自行開票）或 `RESOLVED_EXTERNALLY`（賣家回報自開號碼） |
 
 ⚠️ **本軸不新增 `MANUAL_REVIEW`**（雖然「四軸各自新增」的通則說四軸都要）——58 已有 `AWAITING_MANUAL`
 且帶 `manual_reason_code` 的 CHECK 強制。同一領域兩個名字是技術債。
@@ -5939,14 +5902,14 @@ fulfillment_state_count{axis, state, commerce_model}         # gauge，該格的
 ##### 7.1.2.0b 🔴 定案的三處內部矛盾（**下表的對應格以本節為準**）
 
 > 這三格的共同形狀是：**65 內部兩節互相矛盾，於是分冊各自裁決了一種處置**
-> ——68 明寫「在 65 改之前，本書照上表施工，**不照 65 的 `53` 列施工**」，69 與 67 對 `992` 各定一種過渡。
+> ——68 明寫「在 65 改之前，本書照上表施工，**不照 65 的 `53` 列施工**」，69 對 `992` 定了一種過渡。
 > 🔴 **分冊各自裁決同一格，等於這一格有三個真相。** 值域與狀態邊是骨幹的 SSOT，收回定案。
 
 | # | 矛盾 | 65 原本的兩種說法 | **定案** | 理由 |
 |---|---|---|---|---|
 | **M-1** ✅ **已回灌** | `98 PROCESSING_ACCEPTED` 的**寫者與集合歸屬** | §7.1.2.1 說寫者是 **PayUni 貨態 webhook**、仍留在既有 `PRE_SHIPMENT` 集合；68 §7.5 說在 B2C 寫者是**我方端點（B1）**，且必須移進 `LOCAL_PROCESSING_DONE` | **採 68**：`98` 從 `PRE_SHIPMENT` **移到** `LOCAL_PROCESSING_DONE`，並顯式加三條邊 `920 → 98`、`98 → 930`、`98 → 920`（僅批次 `OPEN` 時） | `98` 在 B2C 語意是「我方已受理進倉」＝本地處理完成，不是「等 provider 出貨」。留在 `PRE_SHIPMENT` 會讓 `isValidTransition` 拒絕 `920 → 98` ⇒ **B2C 批次流程在第一步就卡住**。⚠️ 這是**共用 mapper 集合**的改動，C2C 路徑要一併回歸驗證 |
 | **M-2** ✅ **已回灌** | `53 RETURN_TO_WAREHOUSE` 在 **3004** 上的出邊 | §7.1.2.1 的 `53` 列寫「適用 3001／3002／3004，出邊 → `55`／`82`／`11`」；而同表 `55`／`82` 兩列的**適用欄各自只有 3002** | **採 68**：**`3004` 上不得推 `55`／`82`**；`53` 列的出邊欄依 provider 分列（3002 才有 `55`／`82`） | 65 自己的兩列互相矛盾，而 `55`（逾期未領）／`82`（待宅配退回）是**超商 C2C 的門市語意**，B2C 走物流中心退回、不經門市。⚠️ 68 §7.3.2 另指出 `RETURN_COLLECTED`（賣家領回）在 31 值裡**沒有對應者** ⇒ 落 `shipment_returns.outcome = COLLECTED`，**不新增第 32 個值** |
-| **M-3** | `CANCEL_PENDING(992)` 的**適用通路** | 〔**矛盾當下的狀態**〕§7.1.2.1 的 `992` 列適用 `3002／3003／3004`（不含 3005）；§7.1.2.4 ⑤ 的「3005 不經過清單」未列 `992`。🔴 §7.1.2.1 該列與 §6 的取消分支必須含 `3005（限 L1／L2）` | **擴到 3005**（採 69 的請求），但**限 L1／L2**；**L0（純人工）不適用** | 3005 的 L1／L2 有商家 API／webhook ⇒ 取消需等對方確認，正是 `992` 的語意。L0 沒有對象可等 ⇒ 同步走 `41`。<br>⚠️ **67 的處置不變且不受本格影響**：定期配送的「取消等待」一律落 **Cycle 軸**（`ACTION_REQUIRED`／`CANCELLED`），**不得去 delivery 軸借 `992`**——那是兩條不同的軸，67 §7.4 的裁決正確 |
+| **M-3** | `CANCEL_PENDING(992)` 的**適用通路** | 〔**矛盾當下的狀態**〕§7.1.2.1 的 `992` 列適用 `3002／3003／3004`（不含 3005）；§7.1.2.4 ⑤ 的「3005 不經過清單」未列 `992`。🔴 §7.1.2.1 該列與 §6 的取消分支必須含 `3005（限 L1／L2）` | **擴到 3005**（採 69 的請求），但**限 L1／L2**；**L0（純人工）不適用** | 3005 的 L1／L2 有商家 API／webhook ⇒ 取消需等對方確認，正是 `992` 的語意。L0 沒有對象可等 ⇒ 同步走 `41`。 |
 
 ⚠️ **M-1／M-2 都會改動既有 C2C 路徑的共用結構**（mapper 集合、出邊表）⇒
 依 §17.6 的 bounded regression，施工時 **3002 的正逆向各至少一條 E2E 必須重跑**，不能只驗 3004。
@@ -7036,7 +6999,7 @@ Go 的 worker 沒被 fx 註冊）時，`age > 3T` 這條**永遠不會響**，�
 | 12 | 🆕 `SettlementEligibilityScheduler` | `status = 'PENDING' AND eligible_at IS NOT NULL AND eligible_at <= now() AND (claim_expires_at IS NULL OR claim_expires_at <= now())` | `settlement_candidates.claim_expires_at` | 求值**只讀本地欄**（7.3.4）⇒ 單筆 ≈ 一次本地查詢＋一個短 tx，< 1s | 候選窗口 ∞；業務上界＝「資格成立到錢出去」的可接受延遲，遠小於 G 軸 `PENDING` 的 14d aging | 租約 **60s**（≈ 6 tick）✅ |
 | 13 | 🆕 `SettlementGrantOutboxWorker` | `status = 'pending' AND next_attempt_at <= :now` | `settlement_outbox_events.next_attempt_at` | 🔴 一次 PayUni `grant`（沿用 `PAYUNI_BACKED_DEADLINE_SEC = 100s`）＋ 本地 tx（寫 `payout_instructions` ＋ 六個快照欄 ＋ 狀態歷程） | 候選窗口 ∞；業務上界＝「錢卡在外面沒人知道」＝ `INSTRUCTED` aging T+3 | 租約 **= grantDeadline × 1.5**，由**同一個設定值算出**（不給第二個可以被單獨改大的旋鈕，做法比照第 8 支）⇒ 今日值 150s ✅ |
 | 14 | 🆕 `SellerInvoiceObligationScheduler` | ①`status='PENDING' AND due_at <= now()` ②`status='OVERDUE' AND (nudge_next_at IS NULL OR nudge_next_at <= now())` | ①無（例外 A）②`seller_invoice_obligations.nudge_next_at` 🆕 | ②單筆＝1 次通知事件 publish | ②候選窗口 ∞（賣家不交票就一直是候選） | ①例外 A ②租約 **24h**（＝催補節奏）。🔴 ②**必須是 lease 不是例外 B**：判準「狀態沒解除時再發一次對收件人是否仍有新資訊」答案是**是**（賣家沒交票就該一直吵）✅ |
-| 15 | 🆕 `ShipmentCreateUnknownRecheckScheduler` | `status = '991' AND created_at >= :now - :recheckWindow AND (create_query_next_at IS NULL OR create_query_next_at <= :now)` | `shipments.create_query_next_at` 🆕 | 1 次 provider 查詢（**必須先給該呼叫一個 deadline**，無 deadline ⇒ 最壞耗時無上界 ⇒ 下界無從建立） | 窗口＝`recheckWindow`（**180 分**，值的 SSOT 在 §0.1.2；66／67／68／69 只引用）⇒ 租約 ≤ 18 分 | 租約 **10 分**（＝1 tick，窗口內約 18 次）✅ |
+| 15 | 🆕 `ShipmentCreateUnknownRecheckScheduler` | `status = '991' AND created_at >= :now - :recheckWindow AND (create_query_next_at IS NULL OR create_query_next_at <= :now)` | `shipments.create_query_next_at` 🆕 | 1 次 provider 查詢（**必須先給該呼叫一個 deadline**，無 deadline ⇒ 最壞耗時無上界 ⇒ 下界無從建立） | 窗口＝`recheckWindow`（**180 分**，值的 SSOT 在 §0.1.2；66／68／69 只引用）⇒ 租約 ≤ 18 分 | 租約 **10 分**（＝1 tick，窗口內約 18 次）✅ |
 | 16 | 🆕 `CancelPendingTimeoutScheduler` | `status = '992' AND cancel_requested_at <= :now - :providerGrace AND (cancel_confirm_next_at IS NULL OR cancel_confirm_next_at <= :now)` | `shipments.cancel_confirm_next_at` 🆕 | 1 次 provider 查詢（同上，需 deadline） | 窗口 ∞（provider 可能永不回覆）；🔴 業務上界＝「買家已被告知取消受理，最多能懸多久」⇒ 逾 **P-4（待定）** 強制建 ADM 案件 | 租約 **10 分**；**P-4 是升級門檻不是租約**（`:providerGrace` 讀的就是 P-4）。🔴 **P-4 定案前 `992` 不對買家開放**（§7.4.3／§0.1.7 的 fail-closed），本支只處理既有存量 ✅ |
 | 17 | 🆕 `PayoutInstructionQueryScheduler` | `status = 'PENDING_CONFIRM' AND (query_next_at IS NULL OR query_next_at <= now())` 🔴 **`AMBIGUOUS` 是結果語意不是欄值**，它在 `payout_instructions` 的形式就是 `status='PENDING_CONFIRM'`（§5.4.2 的 `chk_payoutinstr_status` 值域內沒有 `INSTRUCTED`，那是 `settlement_candidates` 的 G 軸值） | `payout_instructions.query_next_at` 🆕 | 1 次 PayUni `grant_query`（唯讀） | 窗口 ∞；業務上界＝ `INSTRUCTED` aging T+3 | 租約 **5 分** ✅ |
 | **18** 🆕 | **`ProviderPickupDeadlineScheduler`** | `shipping_method = '3003' AND status IN ('91','933') AND (provider_pickup_next_at IS NULL OR provider_pickup_next_at <= :now)` 🔴 **正面枚舉狀態 ＋ 正面限定 provider**（不寫 `NOT IN`）。⚠️ **`91` 必須在集合內**：rematch 可以發生在賣家 Ready 之前，而那時配送軸還停在 `91` | `shipments.provider_pickup_next_at` 🆕（§5.2.1 ⑤） | 🔴 **1 次 Uber `E4 Get Delivery`，必須先給該呼叫一個 deadline**（無 deadline ⇒ 最壞耗時無上界 ⇒ **下界根本建立不起來**）。取內部唯讀 gRPC／HTTP 的既有 deadline 量級（**10s**，§0.1.2）⇒ **下界 ＝ 10s** | 🔴 **上界 ＝ 候選窗口的剩餘壽命，逐筆不同**：本支的業務窗口是 `provider_pickup_hard_deadline`（30m）**減去該筆已經過的時間** ⇒ 最壞情況（剛好在硬期限前一刻被搶到）剩餘壽命極短 ⇒ **上界取一個 tick（5m）**，保證「延後一輪還來得及再試」 | 租約 **5 分**（＝ 1 tick）✅ **10s < 5m < 30m**（不等式 ②③ 同時成立）。<br/>🔴 **租約基準必須在 claim 當下逐筆取** `now()`，**不得**在批次迴圈外算一次——那會讓不變式從「單筆最壞耗時 < 租約」退化成「批次總耗時 < 租約」，並隨 `batch-size` 一起破 |
@@ -7055,7 +7018,7 @@ Go 的 worker 沒被 fx 註冊）時，`age > 3T` 這條**永遠不會響**，�
 | 5 | 表名少了尾巴 | outbox／inbox 三表沿用 58 號的命名是 `*_events`（§5.4.5），不是 `settlement_outbox` |
 | 6 | 述詞沒錨在 §5 指名的承載欄 | §5 的欄位註解會寫「本欄是 X 排程的候選述詞」（如 `orders.receipt_review_due_at`）；用別的時戳算差值 ⇒ 那個時戳會被無關的狀態轉換重置 |
 
-🔴 **本節是三個跨本值的 SSOT，66／67／68／69 只引用不自訂**：
+🔴 **本節是三個跨本值的 SSOT，66／68／69 只引用不自訂**：
 ① `CREATE_UNKNOWN(991)` 回查窗 ＝ **180 分**（值在 §0.1.2）；
 ② 排程器的兩支必備指標名與 `absent() ∨ age > 3×cadence` 的告警形式（§7.5.1）；
 ③ 狀態卡住一律用 `fulfillment_state_age_seconds{axis,state,commerce_model}`（§7.1.1.6），
@@ -7288,13 +7251,12 @@ claim（逐筆取 now() 算租約，5 分）
 
 | # | 未解格 | 影響 | 誰能解 |
 |---|---|---|---|
-| **SO-1** | `recurring-service` 的 **prod `replicas` 與 `strategy`** 尚未有 values 檔。<br/>⚠️ 物流財務排程的搶佔論證**現在就可以做**、不必等新服務——它的輸入是既有的 `k8s/values/payment-service.yaml` | 缺 values ＝ 從未部署（G.8 列的靜默陷阱） | §12.1 的六類登記，與服務一起落地 |
 | **SO-2** | 第 15／16 支要打的 **provider 查詢目前沒有 deadline**（Uber 側 API 契約未確認，U-5）。**沒有 deadline ⇒ 單筆最壞耗時無上界 ⇒ 租約下界無從建立** | 表 B 的「10 分鐘」是暫定值 | 先補 deadline 再定租約；U-5 解除後回本節改數字 |
 | **SO-3** | 第 13 支的租約寫成 `grantDeadline × 1.5`。**1.5 這個係數沒有量測依據**（本地 tx 的耗時未量測） | 太小 ⇒ 持有者還在打 PayUni 就被搶走 ＝ 重複撥款 | dev 上量一週 p99 後校準；校準**只准調係數，不准改述詞** |
 | **SO-4** | 7.5.5 ② 的正面枚舉清單，必須與 §7.1.2.1 的 31 值逐一對照。目前**兩處人工維護** | 兩份必然漂移，症狀是「斷言通過但擋不住真的錯誤」 | 比照 A-4 的做法：由 §7.1.2.1 的表生成，斷言只從生成物取 |
 | **SO-5** | `dev`／`prod` 目前有多少列卡在 `CREATE_FAILED(990)`（見 §7.1.1.7 的已知缺口表）。第 15 支上線時這批列會不會被誤撈，取決於它們有沒有 `ship_trade_no` | 決定要不要附一次性維運 SQL | 一句 `SELECT status, ship_trade_no IS NULL, count(*) FROM shipments GROUP BY 1,2` 即可坐實 |
 | **SO-6** | 66／68 的「門市 / 賣場對映同步」是唯一在形狀上像 level-triggered 的東西，本書**不預先放行** | 誤用會造成不可逆的互相覆寫 | 66／68 各自跑 7.5.4.2 的三條硬要求 ＋ 規範 §七的三題 |
-| **SO-7** | 本節**未涵蓋** 67（定期配送）的 contract／cycle 兩層軸排程，與 68 的 batch `OPEN → CLOSED` 截止排程 | 那兩本若各自訂租約，可能與本節的骨幹軸接縫衝突 | 67 §7.3／68 §7 各自撰寫；本節只保證骨幹軸不與其衝突 |
+| **SO-7** | 本節**未涵蓋** 68 的 batch `OPEN → CLOSED` 截止排程 | 那本若自訂租約，可能與本節的骨幹軸接縫衝突 | 68 §7 自行撰寫；本節只保證骨幹軸不與其衝突 |
 
 ### 7.6 併發與順序（多副本下的重複風險）
 
@@ -7367,7 +7329,7 @@ claim（逐筆取 now() 算租約，5 分）
 | 來源 | 對十條做了什麼 |
 |---|---|
 | **需求書 §3.6** | 給出十條 AND 的基準版本，並修掉第 10 條的自我依賴（`seller_net` 讀 instruction，而 instruction 是資格通過才建） |
-| — | 追加**第 11 條軸守門**：`commerce_model = PLATFORM_CONSIGNMENT`。`SELLER_DIRECT` 的訂單**根本不進這個判斷**（需求書 §20.15 逐字禁止定期配送出現 payout batch） |
+| — | 追加**第 11 條軸守門**：`commerce_model = PLATFORM_CONSIGNMENT`。`SELLER_DIRECT` 的訂單**根本不進這個判斷** |
 | **本書** | 改寫**第 5 條**：`refund_status ∉ (PROCESSING, MANUAL_REVIEW, FAILED, REQUESTED, APPROVED)`，語意是「**凡退款未終結，一律不撥款**」 |
 
 ⇒ **合成後是 1 條軸守門 ＋ 10 條資格條件**，寫成單一具名述詞 `PayoutEligibility`。
@@ -7488,7 +7450,7 @@ DisputeHold ⇔ 下列任一成立：
 
 | 洞 | 不補的後果 | 補在哪 |
 |---|---|---|
-| 漏第 11 條軸守門 | `SELLER_DIRECT`（定期配送／7-11 寄倉）的訂單被拉進撥款判斷 ⇒ 需求書 §20.15 逐字禁止的 `payout_instruction` 憑空出現 ⇒ 賣家自己已收的款被平台再撥一次 | G0 ＋ **INV-P8** |
+| 漏第 11 條軸守門 | `SELLER_DIRECT`（7-11 寄倉）的訂單被拉進撥款判斷 ⇒ `payout_instruction` 憑空出現 ⇒ 賣家自己已收的款被平台再撥一次 | G0 ＋ **INV-P8** |
 | 第 5 條沿用兩值清單 | `refund_status = FAILED` 不在排除清單 ⇒ **買家沒拿到退款，錢照樣撥給賣家** | C5 的 `RefundSettled` |
 | 第 10 條讀 instruction | 資格條件依賴自己的結果 ⇒ 要嘛永遠不通過、要嘛實作者為了讓它跑起來把這條拿掉 | 7.7.1.5 |
 | （本節新增）識別字對不上 | `CAPTURED`／`VERIFIED`／`MANUAL_REVIEW`／`APPROVED` 四個識別字在 repo 值域內**全部不存在** ⇒ 若用它們寫 SQL，`WHERE status='CAPTURED'` 恆 0 列，**而 rows=0 會被呼叫端讀成「沒有候選」而不是「述詞寫錯」** | 7.7.1.2 對拍表，並落成 **INV-P9** 的 CI gate |
@@ -7683,7 +7645,7 @@ fail-open 的是**訊號**（沒有人知道發生過）。🔴 **兩件事必�
 | `settlement_seller_direct_rows` | INV-P8 | payout 相關表中 `commerce_model <> 'PLATFORM_CONSIGNMENT'` 的列數，期望恆 0 |
 | `ledger_unbalanced_transactions` | INV-L1 | `HAVING SUM(debit) <> SUM(credit)` 的交易數，期望恆 0 |
 | `fulfillment_receipt_axis_divergence_rows` | INV-S7 | receipt 軸與 `orders.status=50` 不一致的訂單數，期望恆 0 |
-| `fulfillment_state_age_seconds{axis,state,commerce_model}` | INV-S1 | **每個非終態一條 aging**（110 個非終態中 82% 缺 aging）。🔴 錨在 `now - <axis>_status_entered_at`，**不錨在狀態集合**。🔴 **label 集合的 SSOT 是 §7.1.1.6**，本書其他章節與 66／67／68／69 一律引用此三個 label，不得各寫一組（label 對不上 ⇒ PromQL 匹配不到 series ⇒ 告警永不觸發，而儀表板看起來與「一切正常」相同） |
+| `fulfillment_state_age_seconds{axis,state,commerce_model}` | INV-S1 | **每個非終態一條 aging**（110 個非終態中 82% 缺 aging）。🔴 錨在 `now - <axis>_status_entered_at`，**不錨在狀態集合**。🔴 **label 集合的 SSOT 是 §7.1.1.6**，本書其他章節與 66／68／69 一律引用此三個 label，不得各寫一組（label 對不上 ⇒ PromQL 匹配不到 series ⇒ 告警永不觸發，而儀表板看起來與「一切正常」相同） |
 | `fulfillment_shipping_config_missing_total{method,temp}` | G4／INV-E5 | 類 B 排除次數 |
 | `fulfillment_provider_unknown_status_total{provider,raw}` | G8／INV-E5 | 未知 provider 碼次數 |
 | `fulfillment_create_failed_rows` | G5 存量 | `shipments.status = 990` 的列數與最舊齡 |
@@ -7749,7 +7711,7 @@ fail-open 的是**訊號**（沒有人知道發生過）。🔴 **兩件事必�
 | 手段 | 用在哪 | 硬條件 |
 |---|---|---|
 | **同 tx outbox** | order-service 的狀態轉換 ＋ 事件 | 事件與狀態必須同一個 tx；`order_outbox` 已有，不另建 |
-| **出路 4（CAS ＋ publish 同一短 tx）** | settlement／recurring 的排程器 | tx 內**只准一列 CAS 與一次 publish**，多放任何網路呼叫豁免即失效 |
+| **出路 4（CAS ＋ publish 同一短 tx）** | settlement 的排程器 | tx 內**只准一列 CAS 與一次 publish**，多放任何網路呼叫豁免即失效 |
 | **consumer 冪等** | 全部 | 每個 consumer 自己的去重鍵，見 §6A.3 |
 
 🔴 **冪等鍵必須含「這一次嘗試」的維度**，不能只有業務 ID：
@@ -7783,7 +7745,7 @@ fail-open 的是**訊號**（沒有人知道發生過）。🔴 **兩件事必�
 | **PayUni（物流建單）** | fail-closed ＋ `991` 回查 | 建單不可逆；`991` 讓「不知道成功沒有」變成一個**有出口的狀態**而不是猜 |
 | **Uber（報價）** | fail-closed | 報價失敗就不提供該選項，比報一個錯的價好 |
 | **Uber（POD 抓取）** | fail-open ＋ 重試 | 抓不到照片不影響配送；但**必須有 aging**（7 天窗口過了就永遠沒有） |
-| **shipping（服務範圍／承載）** | 🔴 **fail-closed** | 放行 ⇒ 超賣承載；67 §7 逐字要求 |
+| **shipping（服務範圍／承載）** | 🔴 **fail-closed** | 放行 ⇒ 超賣承載 |
 | **invoice（58）** | fail-open | 開票失敗不阻擋出貨（58 自己有重試與人工出口） |
 | **settlement（撥款資格查詢）** | fail-closed | 資格查不到就不撥款 |
 | **notification** | fail-open | 通知失敗不阻擋業務；靠 DLQ 與重試 |
@@ -8114,7 +8076,7 @@ gate 是 `k8s/scripts/check-secret-declarations.sh`。
 
 ## 14. 術語表 (Glossary)
 
-> 🔴 **`provider` 維度 ≠ API 通道**（本組六本一律照此措辭）
+> 🔴 **`provider` 維度 ≠ API 通道**（本組五本一律照此措辭）
 >
 > 需求書的 `provider = MERCHANT | TAQBIN | CVS_711 | UBER_DIRECT` 是**配送服務提供者**的業務維度，
 > 它**不等於**「我方要對接幾套外部 API」。兩者的實際對應是：
@@ -8269,9 +8231,7 @@ CONSTRAINT chk_shipping_type CHECK (shipping_type IN ('3651', '3652')),  -- Ship
 
 🔴 **狀態碼號段一併由 65 指派**（69 附錄 C-3 自標的 open item）：
 `MerchantDeliveryJobStatus` = **`4501~4519`**（69）／batch 狀態沿用 §5.2.2 `chk_batch_status`（68，不新增 enum）／
-67 的 recurring 四個 enum **維持 UPPER_SNAKE 字串**（沿用 58 號 `InvoiceDocumentStatus` 慣例，不配數字碼段）。
-⚠️ **兩種編碼慣例並存是刻意的**：數字碼段用於「與既有 4xxx 家族同層的技術狀態」，
-UPPER_SNAKE 用於「本身就是業務語彙的契約狀態」。**但值域指派權一律在 65**，四本各自撿號就會撞號（與錯誤碼同一個形狀）。
+**但值域指派權一律在 65**，各本自己撿號就會撞號（與錯誤碼同一個形狀）。
 
 **帳本三個 enum**（§5.3 全程引用 —— 「設計書宣告 → CodeMeta `.md`」這個方向沒有 gate，最容易整組漏登記）：
 
@@ -8285,7 +8245,6 @@ UPPER_SNAKE 用於「本身就是業務語彙的契約狀態」。**但值域指
 | **`FulfillmentExceptionCategory`** | **`RESPONSIBILITY_UNRESOLVED`**（🔴 **案件分類**，**不是** `ResponsibilityCause` 的值） | — | §5.5.2 D。⚠️ `前端可見: No`（ADM 內部佇列分類）⇒ **刻意不進四份前端拷貝**，那不是漂移。<br/>🔴 **契約不變式（不是施工待辦）**：若未來 CodeMeta 漂移或該 category 被移除，`CodeMetaValidator` 必須 **fail-closed** 擋下建案——症狀會是「配送失敗了但沒有案件」 |
 | **`UberDeliveryOutcome`** 值域擴充 | 🔴 **值域必須能表達「買家原因」**，五值表達不了 ⇒ `refund_to_buyer = 0` 的 evidence ① 不成立 | 缺口見 #3387 | §4.6／§6A.1.1；🔴 **它是 provider 終局原因不是責任分類**，兩者的關係是證據權重不是映射規則 |
 | **`OrderStatus`** 終態 | **`DELIVERY_FAILED_NO_REFUND`**（Value `54`；value／label／十二條硬語意的 SSOT 在 [03](03-訂單微服務（Order%20Service）詳細設計書.md)） | — | §7.1.1.2 A 軸／§7.3.2 K-06。<br/>🔴 **但 CodeMeta 到位 ≠ UI 完成**：買家訂單分頁對該值的**分類述詞**仍為 **frontend pending**（65A §2.3）——碼值同步了不代表畫面把它歸到對的分頁 |
-| **`RecurringAction`** 🆕 | `pause`／`resume`／`cancel`／`skip`／`reschedule`／`approve_amount` ＝ **6 值** |  ✅ 已定案。**定期配送軸**（`recurring_contract`／`recurring_cycle`）的 `allowedActions[].action` 值域，由 67 §6.1.4 的六個動作提煉；🔴 **與 `FulfillmentAction` 是兩個 enum、兩個資源軸**（§4.4.1c）。⚠️ **`approve-amount` 改為 `approve_amount`**——67 原文是 kebab-case，全值域統一 `snake_case`。🔴 前端可見 ⇒ 四份前端拷貝適用 | — |
 | `ProviderFeeType` 🆕 | `DELIVERY`／`CANCELLATION`／`WAITING`／`RETURN`／`ADJUSTMENT` ＝ **5 值** | ✅ 已定案。`provider_settlement_lines.fee_type` 的值域（§5.3.1a ③ 的 T16）；**未登記則 `CodeMetaValidator` 會擋下寫入** | — |
 
 ⚠️ **`REFUND_REVERSAL` 拆成兩個值**（§5.3.1a ②）：該 enum 為新建、無存量資料 ⇒ 直接以拆分後的形式落地，不需要遷移。
@@ -8295,11 +8254,11 @@ UPPER_SNAKE 用於「本身就是業務語彙的契約狀態」。**但值域指
 
 🔴 **本表是 §4.2 指名的 SSOT，每一格都必須有實值。**
 ⚠️ 其中兩格的值域權威在 §5.1.2＋§5.1.3 的 DDL CHECK
-——**被指名的 SSOT 是空的，真正的值域在一個沒有被指名的章節**。這正是 66／67／68／69「只准引用」規約失效的機制：
+——**被指名的 SSOT 是空的，真正的值域在一個沒有被指名的章節**。這正是 66／68／69「只准引用」規約失效的機制：
 引用者引到空表就只能自己造名字。⇒ **本表與 §5.1.3 的 DDL 必須一起改，任一單獨改動即為不完整修復。**
 
-⚠️ **`CommerceModel` 是本組六本的分界線**（三條商流帳務軸互斥），
-它的值域錯了會讓 67／68 誤用 65 的帳本與撥款章 ⇒ **它必須在 65 定版，其他三本只引用**。
+⚠️ **`CommerceModel` 是本組五本的分界線**（三條商流帳務軸互斥），
+它的值域錯了會讓 68 誤用 65 的帳本與撥款章 ⇒ **它必須在 65 定版，其他三本只引用**。
 
 ### C.3 既有 enum 擴充（**擴充不是新建**）
 
@@ -8383,7 +8342,7 @@ UPPER_SNAKE 用於「本身就是業務語彙的契約狀態」。**但值域指
 
 **段內分配**：
 - **65 骨幹佔 `9501~9575`**，按語意分群留空位（§6.7.0）
-- **66／67／68／69 自 `9576` 起由 §6.7.1 連號追加**，🔴 **不得在段內自己挑號**
+- **66／68／69 自 `9576` 起由 §6.7.1 連號追加**，🔴 **不得在段內自己挑號**
 - 實配個數以 `錯誤碼.md` 該節現讀為準——**本書與各分冊都不得另寫一份計數**（兩處寫死必漂移）
 
 **新增碼的程序**：
@@ -8412,12 +8371,12 @@ UPPER_SNAKE 用於「本身就是業務語彙的契約狀態」。**但值域指
 
 🔴 **擴段必須在任何一本落碼之前完成**——第二本開始落碼就會撞號，而撞號只在生成階段才發現。
 
-**擴段門檻**（🔴 量在五本合計，不量在 65 一本身上；與 §6.7.4 同一個答案，兩處不得各寫一個數字）：
+**擴段門檻**（🔴 量在四本合計，不量在 65 一本身上；與 §6.7.4 同一個答案，兩處不得各寫一個數字）：
 
 | 觸發 | 動作 |
 |---|---|
-| **五本合計實配 > 170 個**（＝ 200 − 30，即剩餘不足該段容量的 15%） | 改配 `9500~9799`（三個百位段），同 PR 更新 `錯誤碼.md` 的分配表 |
-| 任一分冊改變自己的碼數 | 重算五本合計；仍 ≤ 170 則號段不變，只重算 headroom |
+| **四本合計實配 > 170 個**（＝ 200 − 30，即剩餘不足該段容量的 15%） | 改配 `9500~9799`（三個百位段），同 PR 更新 `錯誤碼.md` 的分配表 |
+| 任一分冊改變自己的碼數 | 重算四本合計；仍 ≤ 170 則號段不變，只重算 headroom |
 
 ⚠️ **跨本共用的語意只配一個碼**：「履約模式鎖定」與「收貨 Gate 證據不足」歸 **65**，
 66／69 不得各配一個 ⇒ 合計時必須先去重，否則會高估用量而提前擴段。
@@ -8442,7 +8401,7 @@ CI 跑的就是 `--all`，自己猜會紅在一個與邏輯無關的地方。
 
 > 這一節回答的是「**要新增一則通知／一個事件／一支 public 端點／一個 secret，
 > 到底要動哪些地方**」。每格的共同特徵是：**漏了不會編譯錯、不會測試紅、不會告警**。
-> 66／67／68／69 只引用本附錄，不各寫一套。
+> 66／68／69 只引用本附錄，不各寫一套。
 
 ### G.1 MQ 事件（新增或修改一條）
 
@@ -8633,7 +8592,7 @@ smoke 全綠，唯一痕跡是 pod log 一行 `UNAVAILABLE: io exception`。
 ⑥ 硬上限依賴登記表
 
 **Port 下一個可用 `10043`**；**Go 服務不需要 TSID Node ID**（那是 Java 的概念）。
-✅ **服務數已定案：2 個**（`Settlement`、`Recurring`）。
+✅ **新增可部署服務數：0 個**（`Settlement` 併入既有 `payment-service` 的 Logistics Finance module）。
 
 🔴 **`Seller Delivery`（商家自送）是既有 `shipping-service` 的模組，不是獨立服務**：
 
@@ -8642,12 +8601,10 @@ smoke 全綠，唯一痕跡是 pod log 一行 `UNAVAILABLE: io exception`。
 `chk_shipping_method` CHECK、`OnboardingService.SLOT_DEFINITIONS`——**都是 shipping-service 擁有的表與程式碼**。
 獨立服務等於跨服務寫別人的表、改別人的 `OnboardingService`。
 
-**旁證三條**：
+**旁證兩條**：
 - 66（Uber）與 68（B2C）**都明寫「本書不新增服務」**，且 66 已被程式碼坐實
   （`UberShipmentStrategy` 就在 shipping-service 裡）；68 的 `cvs-711-adapter` 逐字是
   「本服務**內部**的唯一 provider 呼叫點」＝ package 邊界，不是可部署單元
-- 67 是唯一新服務，理由是**帳務軸互斥**（需求書 §20.15 明文禁止定期配送 DB 出現平台發票／1%／payout）；
-  而 69 自述「本書是**履約層、與帳務軸正交**」⇒ **讓 67 獨立的那條理由在 69 身上明確不成立**
 - 65 已裁決過同型問題：`/seller/*` ＋ `/webhooks/*` 共 12 支端點全部改掛 `/app/*`／`/admin/*`
   ⇒ **對外面是 Gateway namespace 的問題，不是服務切分問題**
 
@@ -8658,7 +8615,7 @@ smoke 全綠，唯一痕跡是 pod log 一行 `UNAVAILABLE: io exception`。
 `merchant-delivery` **模組 ＋ 明確的 adapter 邊界**，對外認證面走 Gateway。
 
 ⚠️ **證據不足的部分要誠實記著**：repo 的《新增微服務指南》**只講 how、不講 when**——
-全檔沒有任何一段給「什麼情況該開新服務」的判準。上面的結論是從 66／67／68 三本的實際裁決
+全檔沒有任何一段給「什麼情況該開新服務」的判準。上面的結論是從 66／68 兩本的實際裁決
 ＋ `aftersales-service`（跨服務編排軸）／`payuni-webhook-service`（純 ingress、零業務邏輯）
 兩個既有服務的職責宣告**推導**的，**不是引述某條規則**。
 

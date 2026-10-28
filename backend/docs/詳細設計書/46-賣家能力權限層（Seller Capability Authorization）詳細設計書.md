@@ -120,8 +120,8 @@ flowchart LR
 |---|---|:---:|:---:|
 | `CAP_ACCOUNT_SELF_READ` | 看自己 profile / 停權狀態 | ✓ | ✓ |
 | `CAP_STOREFRONT_WRITE` | 店面設定寫入（profile/logo/封面/onboarding/KYC 草稿、送出與取消） | ✓ | ✗ |
-| `CAP_PRODUCT_MANAGE` | **供給定義**：商品建立/編輯/上下架/匯入/分類/運費試算/認證/hashtag；物流方案供給（68 大宗寄倉開通、69 商家自送 profile、67 定期配送方案／版本／發布） | ✓ | ✗ |
-| `CAP_ORDER_FULFILL` | **既有契約的履約**：出貨/物流/售後/訂單查詢/PayUni 狀態；結算與撥款檢視（65）、批次出貨（68）、定期配送履約與日曆／例外（67）、商家自送日常營運（69） | ✓ | ✓ |
+| `CAP_PRODUCT_MANAGE` | **供給定義**：商品建立/編輯/上下架/匯入/分類/運費試算/認證/hashtag；物流方案供給（68 大宗寄倉開通、69 商家自送 profile） | ✓ | ✗ |
+| `CAP_ORDER_FULFILL` | **既有契約的履約**：出貨/物流/售後/訂單查詢/PayUni 狀態；結算與撥款檢視（65）、批次出貨（68）、商家自送日常營運（69） | ✓ | ✓ |
 | `CAP_ORDER_CONTRACT` | 收縮型：cancelShipment（取消出貨+退款受理） | ✓ | ✓ |
 | `CAP_MARKETING` | 行銷經營：優惠券建立/CRM 寫入+查詢/貼文發佈/AI 助理/dashboard/報表/賣家市場行情查詢、雷達與追蹤增刪（Pricebook） | ✓ | ✗ |
 | `CAP_CONTENT_CONTRACT` | 收縮型：刪自己貼文、自行下架貼文、撤自己券 | ✓ | ✓ |

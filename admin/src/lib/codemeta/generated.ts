@@ -1678,7 +1678,7 @@ export const PRODUCT_CERTIFICATION_REJECT_REASON_LABEL: Record<string, string> =
 	"OTHER": "其他原因",
 };
 
-/** 商流模式——**這筆錢誰收、誰開票**，決定整條帳務軸。訂單快照六欄之一：付款後鎖定，改政策不得回溯既有訂單。取**短名**（不把 provider 綁進商流維度），與 `provider` 維度正交。🔴 **本值域是三條商流帳務軸互斥的分界線**，65 定版、66／67／68／69 只引用。 */
+/** 商流模式——**這筆錢誰收、誰開票**，決定整條帳務軸。訂單快照六欄之一：付款後鎖定，改政策不得回溯既有訂單。取**短名**（不把 provider 綁進商流維度），與 `provider` 維度正交。🔴 **本值域是三條商流帳務軸互斥的分界線**，65 定版、66／68／69 只引用。 */
 export const CommerceModel = {
 	SELLER_DIRECT: "SELLER_DIRECT",
 	PLATFORM_CONSIGNMENT: "PLATFORM_CONSIGNMENT",
@@ -1795,27 +1795,6 @@ export const FULFILLMENT_ACTION_LABEL: Record<string, string> = {
 	"admin_resolve": "處置提案",
 	"admin_close_case": "關閉案件",
 	"view_only": "僅檢視",
-};
-
-/** **定期配送軸**（`recurring_contract`／`recurring_cycle`）的領域動作值域，6 值。🔴 **與 `FulfillmentAction` 是兩個 enum、兩個資源軸**——兩者都有 `cancel` 但對象不同（配送單 vs 訂閱契約），前端的通用 CTA 元件**必須以資源軸為第一層分派**，否則兩軸的同名動作會互相覆蓋。⚠️ `approve_amount` 統一為 snake_case（原設計文字為 kebab-case）。 */
-export const RecurringAction = {
-	PAUSE: "pause",
-	RESUME: "resume",
-	CANCEL: "cancel",
-	SKIP: "skip",
-	RESCHEDULE: "reschedule",
-	APPROVE_AMOUNT: "approve_amount",
-} as const;
-export type RecurringActionCode = keyof typeof RecurringAction;
-export type RecurringActionValue = (typeof RecurringAction)[RecurringActionCode];
-
-export const RECURRING_ACTION_LABEL: Record<string, string> = {
-	"pause": "暫停訂閱",
-	"resume": "恢復訂閱",
-	"cancel": "取消訂閱",
-	"skip": "跳過本期",
-	"reschedule": "改期",
-	"approve_amount": "同意超額",
 };
 
 /** 雙分錄帳本的科目歸屬主體。🔴 **落地順序**：CodeMeta → `generate.sh --all` → DDL 的 CHECK → 程式碼；反過來做的話 `ledger_entries` 的 INSERT 會在 CHECK 上失敗，而症狀是「撥款流程 500」，不會有人聯想到是碼表沒生成。 */

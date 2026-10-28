@@ -112,7 +112,7 @@
 | `ShippingType` | **`3653 CVS_B2C`** | 🔴 **值域定案在 65 附錄 C.1.1／C.2，本書只引用不得自行裁決**。它是 §5.1.14 撞號問題的唯一正解。🔴 **65 這次擴充新增的是兩個值不是一個**：`3653 CVS_B2C`（本書）與 `3654 MERCHANT_DELIVERY`（69）——**不是「兩本共用同一次擴充的同一個值」**，兩者的 `buildSlotKey` 第一段必須不同 |
 | `ShippingStatus` | 用 65 §7.1.2 的 31 值，**本書不新增任何值** | `930`／`931`／`932`／`991`／`992`／**`993`** 用得到（`993 CLAIM_PENDING` 見 §7.2 X11、§6.4.1 第 16 列）；`933` 是 Uber 專用 |
 | batch 狀態 | `OPEN／CLOSED／DISPATCHED／DC_RECEIVED／RECONCILING／RECONCILED` | 🔴 值域由 65 §5.2.2 `chk_batch_status` 定死，**不得另立第二套** |
-| 錯誤碼 | 本書需 **≈35 個**業務碼 | 🔴 **號碼由 65 §6.7 統一指派，本書不得自己撿號**（65 附錄 C.5.1 明訂）。號段 `9500~9699`（200 個）：65 佔 `9501~9575`（實配 **50** 個），**66／67／68／69 自 `9576` 起連號追加** |
+| 錯誤碼 | 本書需 **≈35 個**業務碼 | 🔴 **號碼由 65 §6.7 統一指派，本書不得自己撿號**（65 附錄 C.5.1 明訂）。號段 `9500~9699`（200 個）：65 佔 `9501~9575`（實配 **50** 個），**66／68／69 自 `9576` 起連號追加** |
 
 ---
 
@@ -1357,7 +1357,7 @@ Notify 網域是**每個賣家送件當下凍結的值**，不是一個全域設
 推導在 §6A.2（貨態沿用既有 queue）與 §6A.4（batch 事件由 `notification.shipping` 的 `'#'` binding 涵蓋），本節只做對帳。
 
 🔴 **pin 的現值於施工時現讀 `infra/mq/tools/test_expand.py`（`grep -n 'len(out\['`），本書不凍結數字**：
-那份 pin 是**單一份**共用檔，65／66／67／69 的增減量都先落在它身上 ⇒ 抄任何一個快照值都會漂。
+那份 pin 是**單一份**共用檔，65／66／69 的增減量都先落在它身上 ⇒ 抄任何一個快照值都會漂。
 
 **對帳算式（逐項驗算，不得只抄結論）**：
 1. 🔴 **總和是四項相加不是三項**——`sum(len(v) for v in out.values())` 把 `queues_json_args` 也算進去。
@@ -2388,7 +2388,7 @@ checkout preview ──▶ C-GATE 三態（§0.2）
 
 🔴 **L4 對 B2C 是 `SELLER_DIRECT`**（§3.5.5：無平台撥款）
 ⇒ 右值是**賣家自己的**銀行入帳，我方拿不到 ⇒ **L4 在 v1.4 只跑到「我方帳本自洽」為止**，
-`provider_settlement_lines` 與銀行的比對標為 **N/A 不是 0**（同 §8.2.1 G5 的寫法）。
+`provider_settlement_lines` 與銀行的比對標為 **N/A 不是 0**（同 §8.2.1 G4 的寫法）。
 把拿不到的那一半量成 0，會讓 Dashboard 顯示「零差異」而其實是零觀測。
 
 ⚠️ **每一層都要能回答「這一層今天跑過了嗎」**：靠 §7.0 的
@@ -2495,7 +2495,7 @@ provider 的 `ShipStatusTime` 是**它的**時鐘，我方無法校時；
 
 - 下載 URL **短效、一次性、需授權檢查**；manifest 含收件人 PII，同等處理。
 
-#### 8.2.1 需求書 13 指標 ＋ 7 條零容忍 guard ＋ 6 區 Dashboard
+#### 8.2.1 需求書 13 指標 ＋ 6 條零容忍 guard ＋ 6 區 Dashboard
 
 **命名沿 repo 既有 sql-exporter 慣例**（實測 `monitoring/sql-exporter/sql_exporter.yml`：
 `hawkr_atm_refund_stuck_total`／`hawkr_holiday_coverage_days`／
@@ -2510,7 +2510,7 @@ provider 的 `ShipStatusTime` 是**它的**時鐘，我方無法校時；
 | 1 | capability 可用率 | `hawkr_b2c_capability_available_ratio{store_id}` | gauge | C-GATE 求值結果 |
 | 2 | 寄件編號成功率 | `hawkr_b2c_trade_total{result}` | counter | K68-1 |
 | 3 | 寄件編號延遲 | `hawkr_b2c_trade_duration_seconds` | histogram | C-ADPT |
-| 4 | 重複寄件編號 | `hawkr_b2c_duplicate_ship_trade_no_total` | counter | 🔴 **零容忍 G4**，穩態必須恆 0 |
+| 4 | 重複寄件編號 | `hawkr_b2c_duplicate_ship_trade_no_total` | counter | 🔴 **零容忍 G3**，穩態必須恆 0 |
 | 5 | 標籤失敗 | `hawkr_b2c_label_total{result}` | counter | K68-2 |
 | 6 | batch 未關閉 aging | `hawkr_b2c_batch_open_aging_seconds` | gauge | sql-exporter |
 | 7 | planned-vs-accepted mismatch | `hawkr_b2c_batch_count_mismatch` | gauge | sql-exporter（§7.8 L2） |
@@ -2521,7 +2521,7 @@ provider 的 `ShipStatusTime` 是**它的**時鐘，我方無法校時；
 | 12 | event lag／replay | `hawkr_b2c_inbox_lag_seconds`、`hawkr_b2c_notify_replayed_total` | gauge／counter | §6.3.2、§6.3.3 |
 | 13 | fee／settlement mismatch ＋ claim rate | `hawkr_b2c_fee_mismatch`、`hawkr_b2c_claim_open_total` | gauge／gauge | §7.8 L3 |
 
-##### 7 條零容忍 guard（需求書 §21.18 逐條）
+##### 6 條零容忍 guard（需求書 §21.18）
 
 🔴 **零容忍的意思是「穩態值必須是 0，出現任何非 0 就是事故」**，
 不是「數字大的時候才看」。⇒ 告警一律 `> 0 for 5m`，severity `critical`。
@@ -2530,11 +2530,10 @@ provider 的 `ShipStatusTime` 是**它的**時鐘，我方無法校時；
 |---|---|---|---|
 | G1 | 跨 tenant 存取 | 端點層：`store_id` 歸屬檢查失敗次數 `hawkr_b2c_cross_tenant_denied_total` | 那不是「沒有發生」，是**沒有在看**（65 §3.10 ②） |
 | G2 | 未知 code fallback | `hawkr_b2c_unknown_code_total{field}`；🔴 `ShippingType.fromValue` 遇 `5`／`6` 必須**拋錯不得靜默**（§0.3） | 靜默 fallback 是本書最大的單點：它讓 B2C 走到 C2C 的設定上 |
-| G3 | recurring 使用 `3002`／`3004` | 67 號（定期配送）的守衛；本書只斷言**不得有** `3004` 的 recurring 列 | 需求書 §21.1 逐字「永久 guard」 |
-| G4 | 重複 provider shipment | 指標 #4 ＋ `provider_shipments` 的唯一鍵 | 唯一鍵是結構保證，指標是它的逃逸偵測 |
-| G5 | 重複費用／退款／撥款 | `shipping_fee_ledger` 對 `(shipment_id, component, rate_snapshot)` 唯一 | B2C 無平台撥款（§3.5.5）⇒ 撥款那一半 **N/A 不是 0** |
-| G6 | 未授權狀態跳轉 | `hawkr_b2c_transition_rejected_total{from,to}`（§6.3.3） | ⚠️ 它與 G2 是不同的東西：這裡是**合法值走了非法邊**，那裡是**值本身不認得** |
-| G7 | PII 洩漏 | 見 §8.6：barcode 與 `userMessage` 兩條路徑各有斷言 | 🔴 **沒有一支指標量得到 PII 洩漏**——它由契約測試擋，不由 runtime 指標擋。誠實寫出來 |
+| G3 | 重複 provider shipment | 指標 #4 ＋ `provider_shipments` 的唯一鍵 | 唯一鍵是結構保證，指標是它的逃逸偵測 |
+| G4 | 重複費用／退款／撥款 | `shipping_fee_ledger` 對 `(shipment_id, component, rate_snapshot)` 唯一 | B2C 無平台撥款（§3.5.5）⇒ 撥款那一半 **N/A 不是 0** |
+| G5 | 未授權狀態跳轉 | `hawkr_b2c_transition_rejected_total{from,to}`（§6.3.3） | ⚠️ 它與 G2 是不同的東西：這裡是**合法值走了非法邊**，那裡是**值本身不認得** |
+| G6 | PII 洩漏 | 見 §8.6：barcode 與 `userMessage` 兩條路徑各有斷言 | 🔴 **沒有一支指標量得到 PII 洩漏**——它由契約測試擋，不由 runtime 指標擋。誠實寫出來 |
 
 ##### 6 區 Dashboard
 
@@ -2545,7 +2544,7 @@ provider 的 `ShipStatusTime` 是**它的**時鐘，我方無法校時；
 | seller exceptions | 9 個工作台清單的列數（§6.1.4 D1）＋ `991`／`992`／`993` aging | `store_id` |
 | buyer delivery | #9 #10 ＋ 買家 6 階段分布（§7.7） | `order_no` |
 | finance reconciliation | #13 ＋ 五層對帳各層差異列數（§7.8） | `case_id` |
-| security audit | G1～G7 ＋ ADM 高風險 action 次數（§8.4 的 8 個觸發時機） | audit 六欄 |
+| security audit | G1～G6 ＋ ADM 高風險 action 次數（§8.4 的 8 個觸發時機） | audit 六欄 |
 
 🔴 **每一張圖預設遮罩 PII**（需求書 §21.18 逐字）：drill down 欄位一律是**業務單號**
 （`batch_no`／`order_no`／`case_id`／`correlationId`），不是姓名、電話或 barcode。
@@ -3299,7 +3298,7 @@ provider 健康屬**指標與 breaker**（§8.2.1 provider health 區），不�
 | 觸發 | 訊號 |
 |---|---|
 | provider 大範圍失敗 | `hawkr_b2c_trade_total{result!="ok"}` 佔比 > 20% for 10m ／ breaker 開啟 |
-| 重複寄件編號 | `hawkr_b2c_duplicate_ship_trade_no_total > 0`（零容忍 G4） |
+| 重複寄件編號 | `hawkr_b2c_duplicate_ship_trade_no_total > 0`（零容忍 G3） |
 | PII 疑似外洩 | 任一 §8.6 的契約測試在 prod 對應行為上被推翻 |
 | 對帳連續兩日差異未收斂 | `hawkr_b2c_fee_mismatch` 連兩日非 0 |
 

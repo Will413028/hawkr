@@ -4688,7 +4688,7 @@ enum ProductCertificationRejectReason {
   }
 }
 
-/// 商流模式——**這筆錢誰收、誰開票**，決定整條帳務軸。訂單快照六欄之一：付款後鎖定，改政策不得回溯既有訂單。取**短名**（不把 provider 綁進商流維度），與 `provider` 維度正交。🔴 **本值域是三條商流帳務軸互斥的分界線**，65 定版、66／67／68／69 只引用。
+/// 商流模式——**這筆錢誰收、誰開票**，決定整條帳務軸。訂單快照六欄之一：付款後鎖定，改政策不得回溯既有訂單。取**短名**（不把 provider 綁進商流維度），與 `provider` 維度正交。🔴 **本值域是三條商流帳務軸互斥的分界線**，65 定版、66／68／69 只引用。
 enum CommerceModel {
   /// 賣家直營 — 賣家為收款主體與開票人。**既有全部訂單皆為本值**（merId = 'HAWK' ‖ store_id）。撥款資格述詞對本值回 NOT_APPLICABLE——不是「不合格」，是不在撥款軸上
   sellerDirect(code: 'SELLER_DIRECT', value: 'SELLER_DIRECT', label: '賣家直營'),
@@ -4834,7 +4834,7 @@ enum FulfillmentAction {
   dispatch(code: 'DISPATCH', value: 'dispatch', label: '派車／叫件'),
   /// 回報交運 — 配送推進群。B2C 交倉／自送出發，`requiresProviderCall=false`
   handover(code: 'HANDOVER', value: 'handover', label: '回報交運'),
-  /// 取消配送單 — 配送推進群。🔴 四個 provider 中只有 3003 的 `requiresProviderCall=true`；其餘寫 992 或本地終態。**與 RecurringAction.CANCEL 是不同資源軸的同名動作，文案不得共用**
+  /// 取消配送單 — 配送推進群。🔴 四個 provider 中只有 3003 的 `requiresProviderCall=true`；其餘寫 992 或本地終態。
   cancel(code: 'CANCEL', value: 'cancel', label: '取消配送單'),
   /// 重新建單 — 配送推進群。只有 990 建單失敗的配送單可重建
   resubmit(code: 'RESUBMIT', value: 'resubmit', label: '重新建單'),
@@ -4905,48 +4905,6 @@ enum FulfillmentAction {
 
   /// 依 value 查找，找不到回傳 null
   static FulfillmentAction? fromValue(String value) {
-    for (final v in values) {
-      if (v.value == value) return v;
-    }
-    return null;
-  }
-}
-
-/// **定期配送軸**（`recurring_contract`／`recurring_cycle`）的領域動作值域，6 值。🔴 **與 `FulfillmentAction` 是兩個 enum、兩個資源軸**——兩者都有 `cancel` 但對象不同（配送單 vs 訂閱契約），前端的通用 CTA 元件**必須以資源軸為第一層分派**，否則兩軸的同名動作會互相覆蓋。⚠️ `approve_amount` 統一為 snake_case（原設計文字為 kebab-case）。
-enum RecurringAction {
-  /// 暫停訂閱 — 暫停後續週期
-  pause(code: 'PAUSE', value: 'pause', label: '暫停訂閱'),
-  /// 恢復訂閱 — 恢復已暫停的訂閱
-  resume(code: 'RESUME', value: 'resume', label: '恢復訂閱'),
-  /// 取消訂閱 — 🔴 對象是**契約**不是配送單，文案不得與 FulfillmentAction.CANCEL 共用
-  cancel(code: 'CANCEL', value: 'cancel', label: '取消訂閱'),
-  /// 跳過本期 — 跳過單一週期
-  skip(code: 'SKIP', value: 'skip', label: '跳過本期'),
-  /// 改期 — 調整本期配送日
-  reschedule(code: 'RESCHEDULE', value: 'reschedule', label: '改期'),
-  /// 同意超額 — 本期金額超出授權額度時的買家同意
-  approveAmount(code: 'APPROVE_AMOUNT', value: 'approve_amount', label: '同意超額');
-
-  const RecurringAction({
-    required this.code,
-    required this.value,
-    required this.label,
-  });
-
-  final String code;
-  final String value;
-  final String label;
-
-  /// 依 code 查找，找不到回傳 null
-  static RecurringAction? fromCode(String code) {
-    for (final v in values) {
-      if (v.code == code) return v;
-    }
-    return null;
-  }
-
-  /// 依 value 查找，找不到回傳 null
-  static RecurringAction? fromValue(String value) {
     for (final v in values) {
       if (v.value == value) return v;
     }
