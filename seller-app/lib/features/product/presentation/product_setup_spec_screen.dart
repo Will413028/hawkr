@@ -262,7 +262,7 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
         if (resp['code'] == 4301) {
           shippingError.value = '所有配送方式都超過尺寸或重量限制';
           shippingOptions.value = [];
-          } else if (resp['code'] == 0) {
+        } else if (resp['code'] == 0) {
           final data = resp['data'] as Map<String, dynamic>? ?? {};
           final options =
               (data['shippingOptions'] as List?)
@@ -273,7 +273,7 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
         } else {
           shippingError.value = resp['message']?.toString() ?? '查詢失敗';
           shippingOptions.value = [];
-          }
+        }
       } on TimeoutException {
         if (!context.mounted) return;
         shippingError.value = '載入逾時，請重試';
