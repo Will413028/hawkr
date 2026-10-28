@@ -65,6 +65,8 @@
 - 暫時性失敗（驗證 ID token 連不到公鑰、保存失敗）不撤銷，改排 `identity.save_apple_token` job 帶加密的 token 回應重試；最後一次仍失敗就記 error 並放棄，下一次原生登入再交。
 - 每種失敗都以 error 等級記 log（原因與帳號 ID，不含 code 與 token）。不呼叫 Clerk Backend API 核對 `sub`。
 - 所有刪除路徑都經 `DeleteAccount`；它在同一個 transaction 內取走 token、刪列並排入 `identity.revoke_apple_token`。沒有保存的 token 就沒有東西可撤銷，刪帳不受影響。
+- 撤銷 job 最多嘗試 10 次，第 10 次大約在四小時後；仍失敗的 job 留在 `discarded`，由人工處理。撤銷失敗不回滾刪帳：帳號在我方已刪除，對 Apple 的撤銷盡力而為。
+- 向 Apple 認證用的 client secret 是 ES256 簽的 JWT，用 `.p8` 私鑰動態簽出（有效 5 分鐘），不保存。
 - 部署的環境 Apple 設定必填（缺任何一個啟動失敗）；本機開發可不設，此時 `LinkAppleCredential` 回 unavailable。啟動時 `CheckAppleKeys` 檢查保存的密文與排隊中 job 參數的密文用到的金鑰都在 `IDENTITY_TOKEN_KEYS`。
 - web 登入的 Apple 使用者沒有保存的 token（授權碼在 Clerk），website 維持人工提示。
 

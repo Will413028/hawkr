@@ -75,7 +75,6 @@
 | 26 | [輸入驗證模組（Java InputValidator）](詳細設計書/26-輸入驗證模組%EF%BC%88Java%20InputValidator%EF%BC%89詳細設計書.md) | `services/java/shared/common-core/` |
 | 28 | [商品瀏覽統計（Product View Stats）](詳細設計書/28-商品瀏覽統計%EF%BC%88Product%20View%20Stats%EF%BC%89詳細設計書.md) | `services/seller-service/`、`gateway/` |
 | 29 | [Admin 異常訂單管理 API](詳細設計書/29-Admin%20異常訂單管理%20API%20詳細設計書.md) | 跨 Payment / Shipping / AfterSales / Order |
-| 30 | [Sign in with Apple 認證（Apple OAuth）](詳細設計書/30-Sign%20in%20with%20Apple%20認證%EF%BC%88Apple%20OAuth%EF%BC%89詳細設計書.md) | `internal/modules/identity/`、`internal/httpapi/identity/` |
 | 31 | [內容檢舉與封鎖（Content Reporting & Block）](詳細設計書/31-內容檢舉與封鎖%EF%BC%88Content%20Reporting%20&%20Block%EF%BC%89詳細設計書.md) | `gateway/`、`services/{social,im,review}-service/`、`pkg/{blocklist,moderation}` |
 | 32 | [商家治理與食安通報（Seller Governance & Food Safety）](詳細設計書/32-商家治理與食安通報%EF%BC%88Seller%20Governance%20&%20Food%20Safety%EF%BC%89詳細設計書.md) | `gateway/`、`services/seller-service/`、`pkg/mq` |
 | 33 | [商品 Hashtag 模組（Product Hashtag）](詳細設計書/33-商品%20Hashtag%20模組%EF%BC%88Product%20Hashtag%EF%BC%89詳細設計書.md) | `services/java/product-service/` |

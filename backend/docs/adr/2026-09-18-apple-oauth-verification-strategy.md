@@ -49,3 +49,7 @@ Apple 對後端提供兩種可用的機制，各自能取得的東西不同：
 ## 尚未採用
 
 `Sign in with Apple for Web` 不在範圍內——目前只有兩個原生 App 需要 Apple 登入。
+
+## 修訂（2026-10-28）
+
+設計書 30（Sign in with Apple 認證）已刪除，Apple 登入與撤銷的現行行為見 `docs/modules/identity.md` §7。表頭「規格」的連結與本文中的章節編號指向已刪除的文件，內容見 git 歷史。
