@@ -60,13 +60,15 @@ flowchart LR
     end
 
     subgraph "Go 微服務（跨團隊）"
-        Seller[seller-service]
         Review[review-service]
         Social[social-service]
         Notification[notification-service]
-        Account[account-service]
-        Buyer[buyer-service]
-        Content[content-service]
+    end
+
+    subgraph "單體（Go modular monolith，經 internal/legacy 的 relay 與 consumer 上 RabbitMQ）"
+        Seller[seller 模組]
+        Account[identity 模組]
+        Buyer[buyer 模組]
     end
 
     subgraph "外部"
@@ -77,7 +79,7 @@ flowchart LR
     Webhook -- payuni.events --> Payment
     Webhook -- payuni.events --> Shipping
     Webhook -- payuni.events --> AfterSales
-    Webhook -- payuni.events --> Seller
+    Webhook -- seller.events --> Seller
 
     Order -- hawkr.order --> Product
     Order -- hawkr.order --> Shipping
@@ -95,16 +97,17 @@ flowchart LR
     Coupon -- hawkr.marketing --> Notification
 
     Review -- hawkr.review --> Order
-    Review -- hawkr.review --> Seller
     Review -- hawkr.review --> Product
 
-    Seller -- hawkr.governance --> Notification
     Seller -- hawkr.merchant --> Notification
 
     Social -- hawkr.content --> Notification
-    Social -- hawkr.content --> Seller
 
     Product -- hawkr.product --> Buyer
+    Buyer -- hawkr.product（restock.target） --> Notification
+    Buyer -- hawkr.buyer --> Product
+    Account -- hawkr.account --> Notification
+    Seller -- hawkr.seller --> Product
     Product -- hawkr.product --> Notification
     Product -- hawkr.product（認證查驗，自發自收） --> Product
 
@@ -146,7 +149,7 @@ flowchart LR
 **禁止**：
 - ❌ 在程式碼中以字面值直接寫 routing key / exchange / queue 名稱（必須走 `MqConstants` / `pkg/mq` 常數）
 - ❌ Java / Go 對同一邏輯領域使用不同 exchange 名稱（見 §九 已知不一致）
-- ❌ 同 routing key 對應多個 publisher（每個 routing key 只能有一個發送方）。⚠️ **本條的粒度是 routing key，不是 exchange**：同一個 exchange 上可以有多個 publisher，只要每條 routing key 的發送方唯一即可——既有先例見 §2.1 的 `hawkr.product`（product-service ＋ buyer-service）、`hawkr.seller_workspace`（order-service ＋ aftersales-service）、`hawkr.shipping`（shipping-service ＋ payment-service）
+- ❌ 同 routing key 對應多個 publisher（每個 routing key 只能有一個發送方）。⚠️ **本條的粒度是 routing key，不是 exchange**：同一個 exchange 上可以有多個 publisher，只要每條 routing key 的發送方唯一即可——既有先例見 §2.1 的 `hawkr.product`（product-service ＋ 單體 buyer 模組）、`hawkr.seller_workspace`（order-service ＋ aftersales-service）、`hawkr.shipping`（shipping-service ＋ payment-service）
 
 #### 1.4.1 圖片 / 頭像類 payload 欄位語意（49 號設計書 §6.3＋《多媒體與圖片 URL 規範》）
 
@@ -250,25 +253,24 @@ docker exec hawkr-rabbitmq rabbitmqctl list_queues name messages \
 | `hawkr.marketing` | Topic | coupon-service | 行銷/優惠券事件 | `EXCHANGE_MARKETING` | `ExchangeMarketing` |
 | `hawkr.review` | Topic | review-service（Go） | 評論事件 | `EXCHANGE_REVIEW` | `ExchangeReview` |
 | `seller.events` | Topic | payuni-webhook-service | PayUni 代收代付商家事件分發 | `EXCHANGE_SELLER` | — |
-| 🔶 `hawkr.governance` | Topic | seller-service（Go） | 商家治理 / 食安通報 / 申訴事件。**未佈建於 `topology.yaml`**（issue #3488） | — | `ExchangeGovernance` |
-| `hawkr.merchant` | Topic | seller-service（Go） | 商家認證事件 | — | `exchangeMerchant`（局部常數） |
+| `hawkr.merchant` | Topic | 單體 seller 模組（`internal/legacy/sellerrelay`） | 商家認證事件 | — | `exchangeMerchant`（局部常數） |
 | `hawkr.content` | Topic | social-service（Go） | 貼文 / 評論 / 按讚事件 | `EXCHANGE_CONTENT` | `ExchangeContent` |
-| `hawkr.buyer` | Topic | buyer-service（Go） | 買家動作事件（收藏 / 取消收藏） | `EXCHANGE_BUYER` | `ExchangeBuyer` |
-| `hawkr.account` | Topic | account-service（Go） | 帳號事件 | — | `ExchangeAccount` |
-| `hawkr.delegation` | Topic | account-service（Go） | 代行營運事件（§3.6j / 56 號設計書） | — | `ExchangeDelegation` |
-| `hawkr.seller` | Topic | seller-service（Go） | 賣家生命週期事件（刪除 / 資料變更） | `EXCHANGE_SELLER_BIZ` | `ExchangeSeller` |
+| `hawkr.buyer` | Topic | 單體 buyer 模組（`internal/legacy/buyerrelay`） | 買家動作事件（收藏 / 取消收藏 / 追蹤 / 買家刪除） | `EXCHANGE_BUYER` | `ExchangeBuyer` |
+| `hawkr.account` | Topic | 單體 identity 模組（`internal/legacy/accountservice`） | 帳號事件 | — | `ExchangeAccount` |
+| `hawkr.delegation` | Topic | 單體 delegation 模組（`internal/legacy/delegationservice`） | 代行營運事件（§3.6j / 56 號設計書） | — | `ExchangeDelegation` |
+| `hawkr.seller` | Topic | 單體 seller 模組（`internal/legacy/sellerrelay`） | 賣家生命週期事件（退場 / 停權 / 解除停權 / 資料變更 / 可曝光變化） | `EXCHANGE_SELLER_BIZ` | `ExchangeSeller` |
 | `hawkr.notification` | Topic | notification-service（Go） | 通知派發內部 | `EXCHANGE_NOTIFICATION` | `ExchangeNotification` |
 | 🔶 `hawkr.delayed` | Topic | （無 publisher） | 延遲訊息。**未佈建於 `topology.yaml`**，兩端皆只有常數宣告 | `EXCHANGE_DELAYED` | `ExchangeDelayed` |
 | `hawkr.media` | Topic | media-service | 媒體事件（宣告但未實際使用） | `EXCHANGE_MEDIA` | `ExchangeMedia` |
 | `hawkr.im` | Topic | im-service（Go） | IM 事件（宣告但未驗證使用） | `EXCHANGE_IM` | — |
 | `hawkr.product.import` | Topic | product-import-service | 商品匯入精靈內部解耦 + 跨 Media GC 通知（見 [40 號設計書](40-商品匯入精靈服務（Product%20Import%20Service）詳細設計書.md)） | `EXCHANGE_PRODUCT_IMPORT` | — |
-| `hawkr.product` | Topic | product-service（Java，補貨事件 ＋ 商品認證事件 producer）+ buyer-service（Go，per-subscriber fan-out re-publish）| 商品領域事件：補貨 transition + 個別買家補貨通知 fan-out target（§3.6h）+ **商品認證審核**（§3.6h.1，19 號設計書；product-service 在此 exchange 上同時是 producer 與 consumer） | `EXCHANGE_PRODUCT` | `ExchangeProduct` |
+| `hawkr.product` | Topic | product-service（Java，補貨事件 ＋ 商品認證事件 producer）+ 單體 buyer 模組（per-subscriber fan-out re-publish）| 商品領域事件：補貨 transition + 個別買家補貨通知 fan-out target（§3.6h）+ **商品認證審核**（§3.6h.1，19 號設計書；product-service 在此 exchange 上同時是 producer 與 consumer） | `EXCHANGE_PRODUCT` | `ExchangeProduct` |
 | `hawkr.seller_workspace` | Topic | order-service（Java）+ aftersales-service（Java）| 賣家工作區 realtime invalidation 事件（gateway SSE 唯一 consumer，§3.6i / 41 §四之二） | `EXCHANGE_SELLER_WORKSPACE` | `ExchangeSellerWorkspace` |
 | `hawkr.invoice` | Topic | invoice-service（Go） | 電子發票生命週期事件（開立 / 作廢 / 折讓 / 申訴 / 稅務身分，§3.6k / 58 號設計書） | — | `ExchangeInvoice` |
 | `procurement.events` | Topic | ai-service（Go） | 採購報價邀請通知事件（§3.6l / 55 號設計書）＋ RFQ 發布直投線的收件人 invite 事件（§3.6l.1 / 64 號設計書） | — | `ExchangeProcurement` |
 | 🔶 `hawkr.recurring` | Topic | recurring-service（Go） | 定期配送訂閱契約／週期／授權生命週期（§3.6n / 67 號設計書）；**consumer 只有 notification-service**。67 落地時與服務同 PR 佈建 | — | `ExchangeRecurring` |
 
-> **一個 exchange 有多個 publisher 不是違規**：§1.4 的硬規則是「同 **routing key** 對應多個 publisher」才禁止。本表已有三個多 publisher exchange——`hawkr.product`（product-service ＋ buyer-service）、`hawkr.seller_workspace`（order-service ＋ aftersales-service）、`hawkr.shipping`（shipping-service ＋ payment-service）——三者的每條 routing key 發送方都唯一。判別步驟：拿該 exchange 的 routing key 清單去 §三，看有沒有**同一條 key 出現兩個 Producer**；沒有就合規，不要以「這個 exchange 有兩個服務在發」為由退件。
+> **一個 exchange 有多個 publisher 不是違規**：§1.4 的硬規則是「同 **routing key** 對應多個 publisher」才禁止。本表已有三個多 publisher exchange——`hawkr.product`（product-service ＋ 單體 buyer 模組）、`hawkr.seller_workspace`（order-service ＋ aftersales-service）、`hawkr.shipping`（shipping-service ＋ payment-service）——三者的每條 routing key 發送方都唯一。判別步驟：拿該 exchange 的 routing key 清單去 §三，看有沒有**同一條 key 出現兩個 Producer**；沒有就合規，不要以「這個 exchange 有兩個服務在發」為由退件。
 
 ### 2.2 具名共用 DLX（Dead Letter Exchange）
 
@@ -321,7 +323,7 @@ docker exec hawkr-rabbitmq rabbitmqctl list_queues name messages \
 | `order.paid` | order-service `OrderEventPublisher.publishOrderPaid` | shipping-service `OrderPaidConsumer.onOrderPaid`（🔴 **語意定版 2026-09-13：本 consumer 的處理止於 `FL-1`，不得由此觸發任何 provider 的 `FL-2`（派車／預約取件／實體交寄）**——`FL-2` 由賣家透過 `S-10` 發動，見 [65 §4.4.1a](65-物流履約平台（Fulfillment%20Platform）詳細設計書.md)。⚠️ **「止於 `FL-1`」不等於「只能寫本地資料」**：3001／3002 在此呼叫 PayUni `createHomeShipment`／`createCvsShipment` 取得物流單號，那是**既有且正確**的 `FL-1`；3003 因為 Uber 沒有「只建資料不派車」的 API，才只能建本地列。⚠️ 這條約束適用**所有** provider，但各 provider 的 `FL-1` 做多少事**本來就不一樣**） | `OrderPaidPayload`（outbox 派送時 enrich 的 seller/buyer meta 圖片欄位依 49 號設計書 §6.3 帶 objectKey＋`*Key` 欄位名，顯示 URL 由消費端組出） | ✅ shipping.order.paid.dlq | shipments.shipment_no IS NULL 樂觀鎖 |
 | `order.paid` | 同上 | notification-service（Go，動態 binding 至 `notification.order.paid` queue，**僅買家**「訂單付款成功」推播） | 同上 | — | DB seed 配置 |
 | `order.cancelled` | order-service **`order_outbox`（取消事務內 `OrderService.insertCancelledOutbox`，`OrderOutboxPublisherScheduler` 投遞）** ⚠️ **不是每一次取消都會發**：`insertCancelledOutbox` 在「查不到 `status=SUCCESS` 的扣庫存紀錄」時直接 return、不落 outbox ⇒ 本事件的實際語意是「**有庫存要歸還的**訂單取消了」 | product-service `OrderCancelledConsumer.onOrderCancelled` | `OrderCancelledPayload`（`sellerAvatar` 等圖片欄位依 49 號設計書 §6.3 帶 objectKey＋`*Key` 欄位名，顯示 URL 由消費端組出） | ✅ product.order.cancelled.dlq | `(stockTxId, RESTORE)` 複合鍵 |
-| `order.completed` | order-service **`order_outbox`（同 tx 寫入，`OrderOutboxPublisherScheduler` 投遞）** | notification-service（Go，binding 至 `notification.order.events`）；**crm-service（Go，`crm.order.completed` queue，CRM 客戶消費統計 `total_spent` 累加）**；**buyer-service（Go，`buyer.order.completed` queue，觸發買家刪號 pending-deletion 完成流程 `CompletePendingDeletion`）**；**ai-service（Go，`ai_service.order.completed` queue，子系統 1 — 依 storeId 累加 seller_ranking_facts.monthly_completed_orders，冪等鍵 event_id，見 Task 13）**；🆕 **recurring-service（Go，`recurring.order.completed` queue，67 §6.5.2 — commerce `COMPLETED` → Cycle `COMPLETED`，缺它 Cycle 永停 `MATERIALIZED`）** | `OrderCompletedPayload` ⚠️ 缺 event_id（F2） | notification：—；crm / buyer：✅ `topology.yaml` `retry: {max_attempts: 3}` 展開出 queue-scoped `{queue}.dlx`（fanout）與 `{queue}.dlq`；`pkg/mq` 負責重試／直投語意（§1.5） | notification：Best-effort（推播容忍重複）；**crm：exactly-once effect——`crm_processed_orders` 表 tx 內 claim（`MarkOrderProcessed` rows==0 即不累加，策略 1 dedup 表），金額累加不容忍重複**；buyer：`IsPendingDeletion` guard 天然冪等（刪號完成後 status≠`pending_deletion`，重投遞為 no-op） |
+| `order.completed` | order-service **`order_outbox`（同 tx 寫入，`OrderOutboxPublisherScheduler` 投遞）** | notification-service（Go，binding 至 `notification.order.events`）；**crm-service（Go，`crm.order.completed` queue，CRM 客戶消費統計 `total_spent` 累加）**；**單體 buyer 模組（`internal/legacy/buyerconsumer`，queue `hawkr.monolith.buyer.order.completed`，訂單結案後加速完成買家與店家兩側等待中的刪帳）**；**ai-service（Go，`ai_service.order.completed` queue，子系統 1 — 依 storeId 累加 seller_ranking_facts.monthly_completed_orders，冪等鍵 event_id，見 Task 13）**；🆕 **recurring-service（Go，`recurring.order.completed` queue，67 §6.5.2 — commerce `COMPLETED` → Cycle `COMPLETED`，缺它 Cycle 永停 `MATERIALIZED`）** | `OrderCompletedPayload` ⚠️ 缺 event_id（F2） | notification：—；crm / buyer：✅ `topology.yaml` `retry: {max_attempts: 3}` 展開出 queue-scoped `{queue}.dlx`（fanout）與 `{queue}.dlq`；`pkg/mq` 負責重試／直投語意（§1.5） | notification：Best-effort（推播容忍重複）；**crm：exactly-once effect——`crm_processed_orders` 表 tx 內 claim（`MarkOrderProcessed` rows==0 即不累加，策略 1 dedup 表），金額累加不容忍重複**；buyer：`IsPendingDeletion` guard 天然冪等（刪號完成後 status≠`pending_deletion`，重投遞為 no-op） |
 | `payout.completed` | order-service `OrderEventPublisher.publishPayoutCompleted`（`GrantPaymentWorker` 撥款成功 emit；exchange `hawkr.order`） | notification-service（Go，動態 binding）+ gateway SSE（inbox.new） | `PayoutCompletedPayload`（snake_case wire，含 event_id UUID） | ❌ 無 DLQ | notification reference_id `payout_{order_no}`（UNIQUE，策略 3）|
 | `order.delivered` | order-service **`order_outbox`**（`ShippingEventConsumer.deliveredInTx` 與送達 CAS 同事務寫入，`OrderOutboxPublisherScheduler` 投遞） | 🔴 **無有效消費端**（issue #3486）：訊息會進 notification-service 的 `notification.order` wildcard queue，但 `notification_templates` 無 `order.delivered` 列，**查表落空即丟棄**；其餘 `hawkr.order` 的 binding 皆為字面 routing key、不含本事件 | `OrderDeliveredPayload` | — | N/A（無有效消費端）|
 | `order.receipt.confirmed` | order-service **`order_outbox`（同 tx 寫入，`OrderOutboxPublisherScheduler` 投遞）** | shipping-service `OrderReceiptConfirmedConsumer.onOrderReceiptConfirmed`（MANUAL ACK） | `OrderReceiptConfirmedPayload` | ✅ shipping.order.receipt.confirmed.dlq | mapper 冪等更新 |
@@ -332,8 +334,8 @@ docker exec hawkr-rabbitmq rabbitmqctl list_queues name messages \
 | `order.cancelled` | order-service（重複展示，見上） | + notification-service（Go，binding 至 `notification.order.events`） | 同上 | — | Best-effort（無冪等保護，notification 推播容忍重複） |
 | `order.cancelled` | order-service（重複展示，見上） | + 🆕 **recurring-service（`recurring.order.cancelled` queue，67 §6.5.2 — 訂單取消 ⇒ Cycle 連動 `CANCELLED` ＋ 退款判定）** | 同上 | ✅ `recurring.order.cancelled.dlq`（`retry:` 展開） | 67 §6.5.2：失敗處置一律 **retry 3 → DLQ，不得 ACK 丟棄** |
 | `order.cancelled` | order-service（重複展示，見上） | + **invoice-service `invoice.order.cancelled` queue（`OrderCancelledConsumer`）** | `OrderCancelledPayload` ⚠️ **`buyer_id`／`store_id`／`notify_*_account_id` 是 `Long` ⇒ wire 上是 JSON 數字**，與同表 `order.refund.finalized`（16 個 component 全 `String`）相反；照另一支抄會讓 consumer 對每一則訊息 `json.Unmarshal` 失敗 | ✅ `invoice.order.cancelled.dlq`（由 `topology.yaml` `retry:` 展開） | **策略 2（`invoice_inbox_events`，鍵 `ORDER_CANCELLED:{order_no}`）**。用途是讓端點 8 對已取消的訂單不再回「付款完成後會立即開立發票」，**不碰 `invoice_documents`／`invoice_adjustments`**。🔴 handler 全程單交易（去重列＋業務寫入＋終態標記）⇒ 失敗時整批 rollback、重投真的會重跑、打滿 3 次**真的進 DLQ**——與同服務的 `invoice.order.paid`／`invoice.order.refund.finalized` 相反（那兩條的 DLQ 結構上恆為 0，失敗歸宿是 inbox 兜底掃描） |
-| `review.created` | review-service（Go）`PublishReviewCreated` | order-service `ReviewEventConsumer.onReviewCreated`；seller-service `review_rating_consumer`（賣家 rating）；**product-service `ReviewStatsConsumer`（商品 rating / review_count 聚合）** | `ReviewCreatedEvent`（擴充：`orderItemId` / `content` / `imageKeys`（objectKey 陣列，原 `imageUrls`，依 49 號設計書 §5.3） / `createdAt` 供 order 快照；既有 seller 統計 `avgRating` / `totalCount`；**商品層級 `productId` / `productAvgRating` / `productReviewCount`**） | order：❌ 無 DLQ；product：✅ `product.review.stats.dlq` | order：markReviewed 冪等 + `orders.review` most-recent-wins；seller / product：**full-recompute 覆寫**（策略 4 變形：直接以 event 攜帶的權威重算值 UPDATE，無 CAS 終態檢查，天然冪等，無需 dedup 表） |
-| `review.hidden` | review-service（Go）`PublishReviewHidden`（admin `HideReview` 隱藏評論後） | seller-service `review_rating_consumer`（重算賣家 rating）；product-service `ReviewStatsConsumer`（重算商品 rating / review_count） | `ReviewHiddenEvent`（`reviewId` / `sellerAccountId` / `productId` / `avgRating` / `totalCount`（seller 級）/ `productAvgRating` / `productReviewCount`） | seller：✅ `topology.yaml` `retry:` 展開的 `{queue}.dlq`（§2.2 註）；product：✅ `product.review.stats.dlq` | full-recompute 覆寫天然冪等（隱藏後排除 hidden 列重算聚合，反映於賣家 / 商品評分） |
+| `review.created` | review-service（Go）`PublishReviewCreated` | order-service `ReviewEventConsumer.onReviewCreated`；**product-service `ReviewStatsConsumer`（商品 rating / review_count 聚合）** | `ReviewCreatedEvent`（擴充：`orderItemId` / `content` / `imageKeys`（objectKey 陣列，原 `imageUrls`，依 49 號設計書 §5.3） / `createdAt` 供 order 快照；seller 統計 `avgRating` / `totalCount`（單體 seller 不消費）；**商品層級 `productId` / `productAvgRating` / `productReviewCount`**） | order：❌ 無 DLQ；product：✅ `product.review.stats.dlq` | order：markReviewed 冪等 + `orders.review` most-recent-wins；product：**full-recompute 覆寫**（策略 4 變形：直接以 event 攜帶的權威重算值 UPDATE，無 CAS 終態檢查，天然冪等，無需 dedup 表） |
+| `review.hidden` | review-service（Go）`PublishReviewHidden`（admin `HideReview` 隱藏評論後） | product-service `ReviewStatsConsumer`（重算商品 rating / review_count） | `ReviewHiddenEvent`（`reviewId` / `sellerAccountId` / `productId` / `avgRating` / `totalCount`（seller 級）/ `productAvgRating` / `productReviewCount`） | product：✅ `product.review.stats.dlq` | full-recompute 覆寫天然冪等（隱藏後排除 hidden 列重算聚合，反映於賣家 / 商品評分） |
 | 🆕 `order.fulfillment.failed` | order-service（`order_outbox`；65 §6A.1.2 群 A） | aftersales-service（新 queue `aftersales.order.fulfillment.failed`，handler ＝ `SellerCancelService.cancelShipmentBySystem(orderNo, FULFILLMENT_FAILED)`）＋ notification-service（既有 `notification.order`，`'#'` 綁定 ⇒ **binding +0**） | `OrderFulfillmentFailedPayload` | ✅ aftersales.events.dlq | `order_no` ＋ 失敗原因 |
 | 🆕 `order.receipt.disputed` | order-service（**B-5** 買家申訴，65 §6.1.2） | notification-service（既有 `notification.order`） | `OrderReceiptDisputedPayload` | ✅ | `order_no` ＋ `dispute_source` |
 
@@ -813,26 +815,26 @@ generic path 不得含任何 payment 業務 metric。
 
 | Routing Key | Producer | Consumer | Payload Class | DLQ | Idempotency |
 |-------------|----------|----------|---------------|-----|-------------|
-| `buyer.favorite.added` | buyer-service `FavoriteUseCase.Add`（best-effort goroutine）| product-service `FavoriteCountConsumer`（02 §5.14） | `FavoriteAddedEvent` (`eventId`, `eventType`, `productId`, `accountId`, `occurredAt`) | ✅ product.buyer.favorite.added.dlq | `favorite_count_event_dedup(event_id) PK` |
-| `buyer.favorite.removed` | buyer-service `FavoriteUseCase.Remove`（best-effort goroutine，2026-06 補上）| 同上 | `FavoriteRemovedEvent`（同上載荷） | ✅ product.buyer.favorite.removed.dlq | 同上 |
-| `buyer.deleted` | buyer-service `buyer_deleted_outbox_worker`（outbox 保發；buyer store-stint rekey W2/W3 §3.2 D5——買家 stint 關閉即發，帳號可能仍存活於其他角色）| ① coupon-service `BuyerDeletedConsumer`（Java，queue `coupon.buyer.deleted`，批量作廢 owner 全部 UNUSED instance——自 `account.deleted` 遷入，2026-07-16）<br/>② im-service（queue `im.buyer.deleted`）<br/>③ social-service（queue `social.buyer.deleted`，soft-delete cms_comment / cms_seller_forum）<br/>④ notification-service（queue `notification.buyer.deleted`）<br/>⑤ **crm-service（queue `crm.buyer.deleted`，抹除 `crm_customers` 的 `nickname`／`phone` 個資快取）**| `BuyerDeletedEvent`（`pkg/mq/events.go`）| ✅ 各 queue 對應 `.dlq`（coupon 端 `coupon.buyer.deleted.dlq`；Go 端由 `topology.yaml` `retry:` 展開，§2.2 註） | coupon：`WHERE owner AND status='0'` 重跑 affected=0 天然冪等；im/social/notification：刪除 / soft-delete 類天然冪等；**crm：`UPDATE ... WHERE nickname <> '已刪除帳號' OR phone <> ''` 重跑 affected=0，天然冪等** |
+| `buyer.favorite.added` | 單體 buyer 模組（`FavoriteAdded` 事件，同 transaction 發出，`internal/legacy/buyerrelay` 轉送）| product-service `FavoriteCountConsumer`（02 §5.14） | `FavoriteAddedEvent` (`eventId`, `eventType`, `productId`, `accountId`, `occurredAt`) | ✅ product.buyer.favorite.added.dlq | `favorite_count_event_dedup(event_id) PK` |
+| `buyer.favorite.removed` | 單體 buyer 模組（`FavoriteRemoved` 事件；買家關閉時逐筆發出）| 同上 | `FavoriteRemovedEvent`（同上載荷） | ✅ product.buyer.favorite.removed.dlq | 同上 |
+| `buyer.deleted` | 單體 buyer 模組（`BuyerDeleted` 事件，`CloseForDeletion` 關閉買家的同一個 transaction 發出，`internal/legacy/buyerrelay` 轉送；帳號可能仍存活於其他角色）| ① coupon-service `BuyerDeletedConsumer`（Java，queue `coupon.buyer.deleted`，批量作廢 owner 全部 UNUSED instance——自 `account.deleted` 遷入，2026-07-16）<br/>② im-service（queue `im.buyer.deleted`）<br/>③ social-service（queue `social.buyer.deleted`，soft-delete cms_comment / cms_seller_forum）<br/>④ notification-service（queue `notification.buyer.deleted`）<br/>⑤ **crm-service（queue `crm.buyer.deleted`，抹除 `crm_customers` 的 `nickname`／`phone` 個資快取）**| `BuyerDeletedEvent`（`pkg/mq/events.go`）| ✅ 各 queue 對應 `.dlq`（coupon 端 `coupon.buyer.deleted.dlq`；Go 端由 `topology.yaml` `retry:` 展開，§2.2 註） | coupon：`WHERE owner AND status='0'` 重跑 affected=0 天然冪等；im/social/notification：刪除 / soft-delete 類天然冪等；**crm：`UPDATE ... WHERE nickname <> '已刪除帳號' OR phone <> ''` 重跑 affected=0，天然冪等** |
 
 **⑤ crm-service consumer 的設計要點**：
 
-- **值**：`nickname` → `'已刪除帳號'`（與 buyer-service `SetBuyerPIICleared` 同一字串，該處註解稱其為 *readable tombstone marker*）、`phone` → `''`（欄位 `NOT NULL DEFAULT ''`）。墓碑字串是常數不是個資，寫它不違反刪除義務，同時讓賣家仍看得出「這筆訂單來自已註銷帳號」而不是一片空白。
-- **時點**：本事件在買家註銷的**同一個 transaction** 入 outbox，比 buyer-service 自己的 30 天 PII cleanup cron 早。這是刻意的——註銷時若買家還有進行中訂單，buyer-service 會導向 `PENDING_DELETION` 且**不發**本事件，所以收到事件時賣家對該買家已無操作需求。
+- **值**：`nickname` → `'已刪除帳號'`（與 `internal/legacy/buyerserver` 對舊系統呈現的已刪除買家名稱同一字串）、`phone` → `''`（欄位 `NOT NULL DEFAULT ''`）。墓碑字串是常數不是個資，寫它不違反刪除義務，同時讓賣家仍看得出「這筆訂單來自已註銷帳號」而不是一片空白。
+- **時點**：本事件在買家關閉（`CloseForDeletion`）的**同一個 transaction** 發布，早於 buyer 模組 River 清理 PII 的時點。這是刻意的——買家還有進行中訂單時，buyer 模組停在 `PENDING_DELETION` 且**不發**本事件，所以收到事件時賣家對該買家已無操作需求。
 - ⚠️ **不要與 `UpdateCustomerCache` 的空值語意混談**：那支在上游暫時給不出值時**刻意保留舊值**（避免賣家 keyword 搜尋失效，見該 query 的註解與它列的四個連動點）；本 consumer 處理的是「當事人已行使刪除權」，保留舊值即違規，因此無條件覆寫。
 - **已知取捨**：抹除後賣家無法再用姓名關鍵字搜到該顧客。這是預期行為（個資合規優先於搜尋便利）。
 
-**Go 對應常數**：`pkg/mq/exchanges.go` 新增 `ExchangeBuyer = "hawkr.buyer"` + `RoutingKeyBuyerFavoriteAdded` / `RoutingKeyBuyerFavoriteRemoved`；payload struct 寫於 `pkg/mq/events.go` 與既有 EventType 風格一致。
+**Go 對應常數**：`pkg/mq/exchanges.go` 的 `ExchangeBuyer = "hawkr.buyer"` + `RoutingKeyBuyerFavoriteAdded` / `RoutingKeyBuyerFavoriteRemoved`；payload struct 寫於 `pkg/mq/events.go`；單體的 `internal/legacy/buyerrelay` 以字面值組出相同形狀。
 
 **Java consumer 對應 EventType**（內部技術碼）：`BUYER_FAVORITE_ADDED` / `BUYER_FAVORITE_REMOVED`（見 §8.1 與 [CodeMeta 內部技術碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/內部技術碼.md)）。
 
 **設計參考**：
 - favorite 事件：`docs/modules/buyer.md` + [02-產品微服務（Product Service）詳細設計書](02-產品微服務（Product%20Service）詳細設計書.md) §5.14。
-- `buyer.deleted` 買家側觸發鏈（含 outbox 保發）：`docs/modules/buyer.md`、`docs/modules/accountdeletion.md`。
+- `buyer.deleted` 的觸發：`docs/modules/buyer.md` 與 `docs/modules/accountdeletion.md`。
 - coupon-service 消費邏輯：[07 號設計書 §5.19](07-優惠券微服務（Coupon%20Service）詳細設計書.md#519-買家刪除自動作廢-unused-couponbuyerdeletedconsumer)。
-- **為何用 `buyer.deleted` 而非 `account.deleted`**（2026-07-16 coupon 換綁）：`account.deleted` 只在帳號「**最後一個** active role」被移除時才發，買家角色單獨被移除（例如同帳號仍是賣家）不會觸發 → 該買家的舊券不會作廢，在買家重新註冊後原樣冒回來。`buyer.deleted` 由買家 stint 關閉**無條件**發出，與帳號是否存活無關，才是「買家身分結束」的正確訊號。同 pattern 見 §3.6f `seller.deleted`。
+- coupon 作廢綁 `buyer.deleted`，不綁 `account.deleted`：`buyer.deleted` 在買家關閉時發（見 `docs/modules/buyer.md`）。同 pattern 見 §3.6f `seller.deleted`。
 
 ---
 
@@ -842,11 +844,11 @@ generic path 不得含任何 payment 業務 metric。
 
 | Routing Key | Producer | Consumer | Payload Class | DLQ | Idempotency |
 |-------------|----------|----------|---------------|-----|-------------|
-| `account.deleted` | account-service `RemoveRole`（最後一個 active role 被移除時）/ `DeleteAccount`（best-effort）| ① buyer-service（queue `buyer.account.deleted`，頭像 media 引用釋放）<br/>② im-service（queue `im.account.deleted`）<br/>③ seller-service（queue `seller.account.deleted`）<br/>④ notification-service（queue `notification.account.deleted`）<br/>（coupon `AccountDeletedConsumer` 已於 2026-07-16 遷至 `buyer.deleted`） | `AccountDeletedEvent { eventId(BaseEvent), eventType=ACCOUNT_DELETED, accountId }`（`pkg/mq/events.go`）| ✅ 各 queue 對應 `.dlq`（Go 端由 `topology.yaml` `retry:` 展開，§2.2 註） | 各端刪除 / soft-delete / 引用釋放類操作天然冪等；無 dedup 表 |
+| `account.deleted` | 單體 identity 模組（刪帳號時發 `AccountDeleted`，同一個 transaction 排入，`internal/legacy/accountservice` 送出）| ① im-service（queue `im.account.deleted`）<br/>② notification-service（queue `notification.account.deleted`）| `AccountDeletedEvent { eventId(BaseEvent), eventType=ACCOUNT_DELETED, accountId }`（`pkg/mq/events.go`）| ✅ 各 queue 對應 `.dlq`（Go 端由 `topology.yaml` `retry:` 展開，§2.2 註） | 各端刪除 / soft-delete / 引用釋放類操作天然冪等；無 dedup 表 |
 
 **設計參考**：
-- buyer 自助刪除觸發鏈：`docs/modules/accountdeletion.md` → account-service `RemoveRole` → `account.deleted` MQ（**僅當這是最後一個 active role**）
-- coupon 作廢**不在本事件**：已於 2026-07-16 換綁到 `buyer.deleted`（換綁理由見 §3.6a）
+- 刪帳觸發鏈：`docs/modules/accountdeletion.md`（買家與店家都結清後由 identity 刪帳號，發 `account.deleted`）
+- coupon 作廢**不在本事件**：綁 `buyer.deleted`（§3.6a）
 
 ---
 
@@ -856,20 +858,20 @@ generic path 不得含任何 payment 業務 metric。
 
 | Routing Key | Producer | Consumer | Payload Class | DLQ | Idempotency |
 |-------------|----------|----------|---------------|-----|-------------|
-| `seller.deleted` | seller-service `SelfDeleteSeller`（賣家自助刪除時無條件發；best-effort async）| product-service `SellerDeletedConsumer`（queue `product.seller.deleted` → 批次把該賣家名下 ACTIVE 商品下架為 INACTIVE，連帶 hashtag 計數 / cache 失效，詳 02 §4.3）| `SellerDeletedEvent { eventId(BaseEvent), eventType=SELLER_DELETED, accountId }`（`pkg/mq/events.go`）| ✅ `product.seller.deleted.dlq`（product 端，經 `hawkr.product.dlx`）| product 端：只挑 `status=ACTIVE` 商品處理，重送選到 0 筆 → 0 副作用，自然冪等；無 dedup 表 |
-| `seller.membership_changed` | seller-service `AssignMembership`（admin 指派方案時經 seller-lifecycle outbox 發，同 tx） | ai-service `ai_service.seller.membership_changed` queue（子系統 1 — upsert seller_ranking_facts.tier_rank/monthly_order_cap，天然冪等：SET 最新值，重送無副作用） | `SellerMembershipChangedEvent { eventId(BaseEvent), eventType=SELLER_MEMBERSHIP_CHANGED, storeId, planCode, tierRank, monthlyOrderCap, effectiveAt }`（`pkg/mq/events.go`） | ✅ `ai_service.seller.membership_changed.dlq`（經 `hawkr.seller.dlx`） | Upsert 天然冪等（見 Consumer 欄），無 dedup 表 |
-| `seller.profile.changed` | seller-service `UpdateProfile` / `UpdateLogo` / `UpdateCover`（改店名 / logo / 封面成功後 best-effort async emit）| cart-service `SellerProfileChangedConsumer`（queue `cart.seller.profile.changed` → evict `seller:meta:{storeId}`，下次 GetCart miss 經 gRPC lazy 回填；詳 04 §3.2）| `SellerProfileChangedEvent { event_id, event_type=SELLER_PROFILE_CHANGED, store_id(string), occurred_at }`（`pkg/mq/events.go`，snake_case wire）| ✅ `cart.seller.profile.changed.dlq`（cart 端，經 cart 自有 `hawkr.cart.dlx`）| cart 端：evict（delete key）天然冪等，重放同 key 0 副作用；無 dedup 表 |
-| `seller.suspended` | seller-service `SuspendSellerForAdmin`（admin 手動停權；**走 outbox 保 MQ 必達**，§22 明列合法例外，非 best-effort）| **多 consumer**：product `SellerSuspendedConsumer`（queue `product.seller.suspended` → ACTIVE 商品下架 INACTIVE + 可逆快照，02 §5.10a）、order `SellerSuspendedConsumer`（`order.seller.suspended` → 批次取消未付款單，03 §5.1a.2）、coupon `SellerSuspendedConsumer`（`coupon.seller.suspended` → 停用 ACTIVE 模板，07 §5.20）、notification（`notification.seller.suspension` → 通知賣家，12 §7.10）、im `SellerSuspendedConsumer`（強制斷 WS `DisconnectUser`，14 §6.5.4）| `SellerSuspendedEvent { eventId(BaseEvent), eventType=SELLER_SUSPENDED, suspensionId, accountId, reasonCode, reasonLabel }`（`pkg/mq/events.go`；`reasonCode` 為 CodeMeta SellerSuspensionReason **Value 數字碼**（`9601`/`9602`/`9603`），與 DB/domain/gRPC 全鏈路同形態——一次切換依據＝盤點坐實 consumer 對此值零依賴（im 僅 log、notification 模板只渲染 reasonLabel、product/order/coupon 不讀值判斷）；`reasonLabel` optional/omitempty，人類可讀 CodeMeta label，供 notification 字面代入模板渲染）| ✅ 各 consumer 端：`product.seller.suspended.dlq` / `order.seller.suspended.dlq` / `dlq.coupon.seller.suspended`（各經該服務自有 DLX）| 各 consumer 自然冪等：product/coupon 只挑 ACTIVE、order 逐筆 CAS（已付款/已取消跳過）；重送 0 副作用，無 dedup 表 |
-| `seller.unsuspended` | seller-service `LiftSellerSuspensionForAdmin`（admin 手動解除；走 outbox 保必達）| product `SellerUnsuspendedConsumer`（`product.seller.unsuspended` → 依快照精準還原 ACTIVE，02 §5.10a）、coupon `SellerUnsuspendedConsumer`（`coupon.seller.unsuspended` → 還原 `disabled_by_suspension=TRUE` 模板，07 §5.20）、notification（解除通知，12 §7.10）| `SellerUnsuspendedEvent { eventId(BaseEvent), eventType=SELLER_UNSUSPENDED, suspensionId, accountId }`（`pkg/mq/events.go`）| ✅ `product.seller.unsuspended.dlq` / `dlq.coupon.seller.unsuspended` | product：只還原快照內仍 INACTIVE 且未變動者、標記 consumed；coupon：`WHERE disabled_by_suspension=TRUE`；重放 0 副作用 |
+| `seller.deleted` | 單體 seller 模組（`StoreRetired` 事件，店家退場（第一段清理）時發；關店可逆，`StoreClosed` 不轉送；`internal/legacy/sellerrelay` 轉送）| product-service `SellerDeletedConsumer`（queue `product.seller.deleted` → 批次把該賣家名下 ACTIVE 商品下架為 INACTIVE，連帶 hashtag 計數 / cache 失效，詳 02 §4.3）| `SellerDeletedEvent { eventId(BaseEvent), eventType=SELLER_DELETED, accountId }`（`pkg/mq/events.go`）| ✅ `product.seller.deleted.dlq`（product 端，經 `hawkr.product.dlx`）| product 端：只挑 `status=ACTIVE` 商品處理，重送選到 0 筆 → 0 副作用，自然冪等；無 dedup 表 |
+| `seller.profile.changed` | 單體 seller 模組（`StoreProfileChanged` 事件：店名 / logo / 封面變更，`internal/legacy/sellerrelay` 轉送）| cart-service `SellerProfileChangedConsumer`（queue `cart.seller.profile.changed` → evict `seller:meta:{storeId}`，下次 GetCart miss 經 gRPC lazy 回填；詳 04 §3.2）| `SellerProfileChangedEvent { event_id, event_type=SELLER_PROFILE_CHANGED, store_id(string), occurred_at }`（`pkg/mq/events.go`，snake_case wire）| ✅ `cart.seller.profile.changed.dlq`（cart 端，經 cart 自有 `hawkr.cart.dlx`）| cart 端：evict（delete key）天然冪等，重放同 key 0 副作用；無 dedup 表 |
+| `seller.suspended` | 單體 seller 模組（`StoreSuspended` 事件，停權措施生效時在同一個 transaction 內發出，`internal/legacy/sellerrelay` 轉送；`reasonCode` 與 `reasonLabel` 在轉送當下讀店家生效中的措施）| **多 consumer**：order `SellerSuspendedConsumer`（`order.seller.suspended` → 批次取消未付款單，03 §5.1a.2）、coupon `SellerSuspendedConsumer`（`coupon.seller.suspended` → 停用 ACTIVE 模板，07 §5.20）、notification（`notification.seller.suspension` → 通知賣家，12 §7.10）、im `SellerSuspendedConsumer`（強制斷 WS `DisconnectUser`，14 §6.5.4）| `SellerSuspendedEvent { eventId(BaseEvent), eventType=SELLER_SUSPENDED, suspensionId, accountId, reasonCode, reasonLabel }`（`pkg/mq/events.go`；`reasonCode` 為 CodeMeta SellerSuspensionReason **Value 數字碼**（`9601`/`9602`/`9603`），與 DB/domain/gRPC 全鏈路同形態——一次切換依據＝盤點坐實 consumer 對此值零依賴（im 僅 log、notification 模板只渲染 reasonLabel、product/order/coupon 不讀值判斷）；`reasonLabel` optional/omitempty，人類可讀 CodeMeta label，供 notification 字面代入模板渲染）| ✅ 各 consumer 端：`order.seller.suspended.dlq` / `dlq.coupon.seller.suspended`（各經該服務自有 DLX）| 各 consumer 自然冪等：coupon 只挑 ACTIVE、order 逐筆 CAS（已付款/已取消跳過）；重送 0 副作用，無 dedup 表 |
+| `seller.unsuspended` | 單體 seller 模組（`StoreUnsuspended` 事件，`internal/legacy/sellerrelay` 轉送）| coupon `SellerUnsuspendedConsumer`（`coupon.seller.unsuspended` → 還原 `disabled_by_suspension=TRUE` 模板，07 §5.20）、notification（解除通知，12 §7.10）| `SellerUnsuspendedEvent { eventId(BaseEvent), eventType=SELLER_UNSUSPENDED, suspensionId, accountId }`（`pkg/mq/events.go`）| ✅ `dlq.coupon.seller.unsuspended` | coupon：`WHERE disabled_by_suspension=TRUE`；重放 0 副作用 |
+| `seller.exposure.changed` | 單體 seller 模組（`StoreExposureChanged` 事件：店家可曝光翻轉時在寫入的 transaction 內發出，時間造成的變化（停權到期）由定期 job 比對後補發；`internal/legacy/sellerrelay` 轉送）| product-service `SellerExposureChangedConsumer`（queue `product.seller.exposure.changed`，記下每家店可不可曝光，`ProductPublicationPolicy` 讀取時把不可曝光的店的商品當成不公開）| `{ event_id, event_type=SELLER_EXPOSURE_CHANGED, version, timestamp, source, store_id, exposable, exposure_version }`（snake_case wire）| ✅ `product.seller.exposure.changed.dlq`（經 `hawkr.product.dlx`）| 事件依 `exposure_version` 排序，讀取端丟棄舊版本；重放同版本 0 副作用 |
 
 **設計參考**：
 - **Pricebook 追蹤清理**：同一 `SellerDeletedEvent.accountId` 由 `pricebook-service` 消費，queue `pricebook.seller.deleted` 綁定 `hawkr.seller` / `seller.deleted`。以 `account_id` 冪等刪除全部 `market_watch_target`；不得使用 `store_id` 或以 `account.deleted` 替代。無效 payload／DB 錯誤回傳 error，沿用 typed consumer `MaxRetries=3`，DLX `hawkr.seller.dlx`、DLQ `pricebook.seller.deleted.dlq`；queue 的 `retry: {max_attempts: 3}` 由 topology 展開，應用程式不另建 broker 資源。
 - **NetworkPolicy／監控**：Pricebook 目前僅 ingress policy；既有 egress default-deny 只選 media／product-import，不涵蓋 Pricebook，因此 AMQP 出向無需新增 allow。沿用共用 `mq_consume_total`，低頻失敗以 `increase(...{queue="pricebook.seller.deleted",result=~"retry|dlq|requeue"}[10m]) > 0` 告警；DLQ 使用帶 queue label 的 `rabbitmq_detailed_queue_messages_ready`，不得改用無 queue label 的 aggregated metric。
 - **部署順序**：Deploy (K8s) 呼叫共用 MQ Topology workflow，完成 schema／plan／destructive gate／apply 後才允許 consumer rollout。每次部署增加一次本環境 topology reconcile（與 image build 平行，僅 rollout 等待）；不再另由 push 重複 apply。PR 先審 dev + prod plan，**逐項確認沒有 replace／destroy**（改 queue arguments ＝ 先刪後建，未消費訊息一起消失）。
 
-- 為何用 `seller.deleted` 而非 `account.deleted`：賣家刪除無條件發此事件；`account.deleted` 只在帳號最後一個 active role 被移除時才發，買家+賣家者刪賣家身分時帳號未軟刪、不發 → 會漏下架。
-- `seller.profile.changed`：cart 快取 `seller:meta` 24h TTL 僅作 safety net，賣家改店名 / logo 後靠本 event 主動 evict 消除最長 24h stale；選 event-driven 而非縮短 TTL / 每次即時 gRPC，換取「不對 cart 熱路徑 GetCart 加 seller-service 同步依賴」。cart-service 首個 MQ consumer，故新增 amqp 依賴 + cart 自有 DLX。`store_id` wire 為 string（TSID 精度，見 §7.4）。
-- `seller.suspended` / `seller.unsuspended`（賣家停權 saga）：**必達語意**（下架/取消/停券為停權正確性連動，非 fail-and-forget）→ 走 seller-service outbox（複用 `seller_deleted_outbox_worker` 前例，§22 允許「Outbox 保 MQ 必發」例外）；`suspensionId`（= `seller_suspensions.id`）綁定本次停權 episode，供 product 商品快照 scope 精準還原。整體方案見 46 號、32 號 §13。
+- `seller.deleted` 在店家退場時發，與帳號是否刪除無關；下游（product、social、im、notification、pricebook）此時才刪店家資料，不得以 `account.deleted` 替代。
+- `seller.profile.changed`：cart 快取 `seller:meta` 24h TTL 僅作 safety net，賣家改店名 / logo 後靠本 event 主動 evict 消除最長 24h stale；選 event-driven 而非縮短 TTL / 每次即時 gRPC，換取「不對 cart 熱路徑 GetCart 加同步依賴」。cart-service 有自己的 DLX。`store_id` wire 為 string（TSID 精度，見 §7.4）。
+- `seller.suspended` / `seller.unsuspended`（賣家停權 saga）：**必達語意**（下架/取消/停券為停權正確性連動，非 fail-and-forget）→ 單體 seller 模組在停權的 transaction 內發事件，relay 以 River job 送出（`event_id` 為唯一鍵，失敗重試不重複）；`suspensionId`（= `seller.suspension_periods` 的 `period_id`）綁定本次停權期間，coupon 據此還原本次停用的模板。整體方案見 46 號、32 號 §13。
 - **Java consumer 對應 EventType**（內部技術碼）：`SELLER_DELETED` / `SELLER_PROFILE_CHANGED` / `SELLER_SUSPENDED` / `SELLER_UNSUSPENDED`（[CodeMeta SellerEventType](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/內部技術碼.md#SellerEventType)）。
 
 ---
@@ -1012,8 +1014,8 @@ generic path 不得含任何 payment 業務 metric。
 
 | Routing Key | Producer | Consumer | Payload Class / Schema | DLQ | Idempotency |
 |-------------|----------|----------|------------------------|-----|-------------|
-| `product.restock` | product-service `ProductEventPublisher.publishRestock`（02 §5.13b：StockService.cascadeProductStock + UpdateSellerProductStatus 偵測 0→可見 transition 後 spring afterCommit publish） | buyer-service `internal/worker/restock_consumer.go`（queue: `buyer.product.restock`，fan-out 給該 product 全部 ACTIVE 訂閱者） | `ProductRestockPayload { eventId UUIDv4, eventType=PRODUCT_RESTOCK, productId, productName, imageKey, sellerAccountId, occurredAt }`（02 §5.13b.3；`imageKey`＝商品縮圖 objectKey，原 `imageUrl`，依 49 號設計書 §6.3/§8.6）| ✅ `buyer.product.restock.dlq` | buyer-side `restock_event_dedup(event_id) PK + ON CONFLICT DO NOTHING` |
-| `product.restock.target` | buyer-service `internal/worker/restock_consumer.go` fan-out（每 ACTIVE 訂閱者一條）| notification-service template-driven consumer（DB seed template，event_type=`product.restock.target`，target_user_field=`buyer_id`，category=`restock`，reference_id_template=`restock_#{subscriptionId}`） | `ProductRestockTargetPayload { eventId UUIDv4, eventType=PRODUCT_RESTOCK_TARGET, subscriptionId, buyer_id, productId, productName, imageKey, deepLink, occurredAt }`（`imageKey`＝商品縮圖 objectKey，原 `imageUrl`，依 49 號設計書 §6.3/§8.6）| ✅ `notification.product.restock.target.dlq` | notification-service `notifications` 表 UNIQUE `(user_id, user_type, event_type, reference_id)` 保 inbox 冪等（schema 既有）+ `push_notifications` dedup |
+| `product.restock` | product-service `ProductEventPublisher.publishRestock`（02 §5.13b：StockService.cascadeProductStock + UpdateSellerProductStatus 偵測 0→可見 transition 後 spring afterCommit publish） | 單體 buyer 模組（`internal/legacy/buyerconsumer`，queue `hawkr.monolith.buyer.product.restock`，由 consumer 自己宣告、不在 topology；River job 分批 fan-out 給該 product 全部待通知訂閱者） | `ProductRestockPayload { eventId UUIDv4, eventType=PRODUCT_RESTOCK, productId, productName, imageKey, sellerAccountId, occurredAt }`（02 §5.13b.3；`imageKey`＝商品縮圖 objectKey，原 `imageUrl`，依 49 號設計書 §6.3/§8.6）| ✅ `hawkr.monolith.buyer.product.restock.dead`（永久錯誤，經 `hawkr.monolith.dead`） | River job 以上游 `event_id` 為唯一鍵，重送不重複排工作 |
+| `product.restock.target` | 單體 buyer 模組（`FanOut` 每批最多 100 筆，刪除待通知關聯與發布事件同一個 transaction，`internal/legacy/buyerrelay` 轉送；每個訂閱者一條）| notification-service template-driven consumer（DB seed template，event_type=`product.restock.target`，target_user_field=`buyer_id`，category=`restock`，reference_id_template=`restock_#{subscriptionId}`） | `ProductRestockTargetPayload { eventId UUIDv4, eventType=PRODUCT_RESTOCK_TARGET, subscriptionId, buyer_id, productId, productName, imageKey, deepLink, occurredAt }`（39 §5.5a.3；`imageKey`＝商品縮圖 objectKey，原 `imageUrl`，依 49 號設計書 §6.3/§8.6）| ✅ `notification.product.restock.target.dlq` | notification-service `notifications` 表 UNIQUE `(user_id, user_type, event_type, reference_id)` 保 inbox 冪等（schema 既有）+ `push_notifications` dedup |
 
 🔴 **買家收件人的 wire key 只有 `buyer_id`**（`payment.rescue.refund_completed` 與
 `product.restock.target` 兩條）。**不接受任何 alias**（`buyerAccountId`／`buyer_account_id`）——
@@ -1031,7 +1033,7 @@ notification-service 在 `buyer_id` 缺漏或格式錯誤時 **fail-closed 不�
 
 **Producer 設計重點**（一致性）：
 - `product.restock` 發布走 spring `TransactionSynchronizationManager.registerSynchronization` afterCommit；無 tx context fallback eager publish + WARN log（02 §7.5b）
-- `product.restock.target` 在 buyer-service fan-out 同事務 chunked iteration（每批 200 筆 UPDATE NOTIFIED + per-subscriber publish）；publish 失敗 → tx rollback → ResilientConsumer retry
+- `product.restock.target` 由 buyer 模組 `FanOut` 分批發布（每批 ≤ 100 筆，刪除待通知關聯與發布事件原子提交）；失敗由 River job 重試（`docs/modules/buyer.md` §補貨）
 - 不引入 application-level outbox（§22 服務責任邊界）
 
 ---
@@ -1227,7 +1229,7 @@ fan-out、查無訂閱者不產生任何錯誤或 log（2026-09-03 修復前即�
 | Routing Key | Producer | Consumer | Payload / Schema | DLQ | Idempotency |
 |-------------|----------|----------|------------------|-----|-------------|
 | `procurement.rfq_publication_invite.created` | ai-service `procurement_rfq_publication_outbox`（`event_type = RFQ_PUBLICATION_INVITE_CREATED`，execute 交易內逐位 PLATFORM 收件人各排一列；worker `internal/procurement/publicationoutbox`） | notification-service（queue `notification.procurement`，`#` 綁定 → template `procurement.rfq_publication_invite.created.seller`） | `{ inviteId, publicationId, storeId }`——**恰好三欄、全為 camelCase 字串化 TSID**（producer 端 `internal/procurement/commerce/publication_execute.go` 的 `inviteCreatedPayload`）。⚠️ 與 §3.6l 的 snake_case `store_id` **不同形狀，不可互抄** | ✅ `notification.procurement.dlq`（由 `topology.yaml` `retry:` 展開，勿手寫） | notification `UNIQUE (user_id, user_type, event_type, reference_id)`；**`reference_id = inviteId`** |
-| `procurement.rfq_publication_invite.external_created` | ai-service `procurement_rfq_publication_outbox`（`event_type = RFQ_PUBLICATION_INVITE_EXTERNAL_CREATED`，execute 交易內逐位 EXTERNAL 收件人各排一列；worker `internal/procurement/publicationoutbox`） | notification-service（queue `notification.procurement`，`#` 綁定 → `withVendorInvite` 依 routing key 分流進 `newVendorInviteHandler`，見 `internal/worker/vendor_invite.go`／`di.go`）。⚠️ **本事件刻意不走 template engine**：consumer 直接呼叫 seller-service `EnsureInvite` 取回明文 email 與一次性 secret、組信、呼叫 `Mail.Send`，成功後呼叫 `MarkInviteSecretDelivered`（seller-service `MarkSecretDelivered` RPC）。**不寫 `notifications` / `notifications_inbox`**——收件人是站外業者，沒有站內 inbox 可寫 | `{ inviteId, publicationId, prospectId, expiresAt }`——**恰好四欄、全為 camelCase**；`inviteId`／`publicationId`／`prospectId` 字串化 TSID，`expiresAt` 為 ISO 8601 UTC（producer 端 `internal/procurement/commerce/publication_execute.go` 的 `inviteExternalCreatedPayload`）。⚠️ 與 PLATFORM 那支的 `storeId` **不同形狀，不可互抄**——收件人是站外業者（prospect），沒有 store_id | ✅ `notification.procurement.dlq`（由 `topology.yaml` `retry:` 展開，勿手寫） | 非 notification `UNIQUE (user_id, user_type, event_type, reference_id)`——本事件不寫 `notifications` 列，該約束不適用。一次性由 seller-service 承擔：`uq_vpinv_rfq_recipient`（`vendor_portal_invites.rfq_recipient_id` 唯一）＋ `secret_delivered_at`——`EnsureInvite` 對已交付的邀請回 `AlreadyExists`，consumer 收到後 no-op ack（`codes.AlreadyExists` 分支） |
+| `procurement.rfq_publication_invite.external_created` | ai-service `procurement_rfq_publication_outbox`（`event_type = RFQ_PUBLICATION_INVITE_EXTERNAL_CREATED`，execute 交易內逐位 EXTERNAL 收件人各排一列；worker `internal/procurement/publicationoutbox`） | notification-service（queue `notification.procurement`，`#` 綁定 → `withVendorInvite` 依 routing key 分流進 `newVendorInviteHandler`，見 `internal/worker/vendor_invite.go`／`di.go`）。⚠️ **本事件刻意不走 template engine**：consumer 直接呼叫單體 agent 模組的 `EnsureInvite`（legacy gRPC `EnsureVendorPortalInvite`）取回明文 email 與一次性 secret、組信、呼叫 `Mail.Send`，成功後呼叫 `MarkInviteSecretDelivered`（legacy gRPC `MarkVendorPortalInviteSecretDelivered`）。**不寫 `notifications` / `notifications_inbox`**——收件人是站外業者，沒有站內 inbox 可寫 | `{ inviteId, publicationId, prospectId, expiresAt }`——**恰好四欄、全為 camelCase**；`inviteId`／`publicationId`／`prospectId` 字串化 TSID，`expiresAt` 為 ISO 8601 UTC（producer 端 `internal/procurement/commerce/publication_execute.go` 的 `inviteExternalCreatedPayload`）。⚠️ 與 PLATFORM 那支的 `storeId` **不同形狀，不可互抄**——收件人是站外業者（prospect），沒有 store_id | ✅ `notification.procurement.dlq`（由 `topology.yaml` `retry:` 展開，勿手寫） | 非 notification `UNIQUE (user_id, user_type, event_type, reference_id)`——本事件不寫 `notifications` 列，該約束不適用。一次性由 agent 模組承擔：`uq_vpinv_rfq_recipient`（`vendor_portal_invites.rfq_recipient_id` 唯一）＋ `secret_delivered_at`——`EnsureInvite` 對已交付的邀請回 `AlreadyExists`，consumer 收到後 no-op ack（`codes.AlreadyExists` 分支） |
 
 **為什麼 `reference_id` 必須綁 `inviteId`**：worker 的順序是「先發 MQ、後把 invite 轉 `SENT`」
 （不可對調，理由見 `publicationoutbox/worker.go`）。`MarkDone` 失敗時那一列會重發，而**吸收重發的
@@ -1320,7 +1322,7 @@ fan-out、查無訂閱者不產生任何錯誤或 log（2026-09-03 修復前即�
 | `coupon.issued` | coupon-service | notification-service | 推播「優惠券發放」 |
 | `product.import.job.parsed` | product-import-service | notification-service | 推播給賣家「商品匯入已解析完成 N 筆請預覽」（CSV 解析 + 圖片下載皆完成時觸發，每個 job 只發一次） |
 | `product.import.job.commit_finished` | product-import-service | notification-service | 推播給賣家「批次匯入完成 N 成功 M 失敗」（每輪 commit 完成都發） |
-| `seller.review.result` | payuni-webhook-service | seller-service | PayUni 代收代付商家狀態變更（AGENT_NOTIFY 單通道）|
+| `seller.review.result` | payuni-webhook-service | 單體 seller 模組（`internal/legacy/sellerconsumer`） | PayUni 代收代付商家狀態變更（AGENT_NOTIFY 單通道）|
 | `payuni.refund.accepted` | payuni-webhook-service | payment-service `PayUniRefundAcceptedConsumer`（另見 §3.5） | — |
 
 ### 3.8 跨團隊內收事件（Inbound from 其他團隊）
@@ -1330,21 +1332,19 @@ fan-out、查無訂閱者不產生任何錯誤或 log（2026-09-03 修復前即�
 | Exchange / Routing Key | Producer（跨團隊） | Consumer（我們） | 用途 |
 |-----------------------|--------------------|------------------|------|
 | `hawkr.review` / `review.created` | review-service（Go） | order-service `ReviewEventConsumer` | 標記訂單已評論 + 反正規化**訂單層級**評論快照（取最近一筆商品評論，rating/content/imageKeys/createdAt）至 `orders.review`，供訂單詳情顯示（見 03 §評論快照） |
-| `hawkr.review` / `review.created` | review-service（Go） | seller-service（Go，自費 consume） | 更新賣家 rating |
 | `hawkr.review` / `review.created` | review-service（Go） | **product-service `ReviewStatsConsumer`** | 更新商品 `rating`（平均星等）+ `review_count`（評論數）反正規化欄位 |
-| `hawkr.review` / `review.hidden` | review-service（Go） | seller-service `review_rating_consumer` + product-service `ReviewStatsConsumer` | admin 隱藏評論後重算並覆寫賣家 / 商品聚合（排除 hidden 列） |
-| `seller.review.result` | payuni-webhook-service（AGENT_NOTIFY 單通道） | seller-service（Go，queue `seller.review.result`，`internal/mq/di.go` 的 `agentNotifyHandler`） | 賣家審核結果 |
-| `hawkr.governance` / `seller.governance.violation_created` 等 | seller-service（Go） | notification-service（Go） | 商家違規通知 |
-| `hawkr.merchant` / `merchant.verification.*` | seller-service（Go） | notification-service（queue `notification.merchant`，`'#'` 綁定，模板驅動） | 商家認證結果 |
+| `hawkr.review` / `review.hidden` | review-service（Go） | product-service `ReviewStatsConsumer` | admin 隱藏評論後重算並覆寫商品聚合（排除 hidden 列） |
+| `seller.review.result` | payuni-webhook-service（AGENT_NOTIFY 單通道） | 單體 seller 模組（`internal/legacy/sellerconsumer`，queue `hawkr.monolith.seller.review.result`，由 consumer 自己宣告、不在 topology；形狀不合的訊息進 `.dead`） | 賣家審核結果 |
+| `hawkr.merchant` / `merchant.verification.*` | 單體 seller 模組（`internal/legacy/sellerrelay`） | notification-service（queue `notification.merchant`，`'#'` 綁定，模板驅動） | 商家認證結果 |
 | `hawkr.media` / `import.asset.downloaded` | media-service | product-import-service `MediaCallbackListener` | Media 完成 import_asset 下載（async 結果回推）；Payload `MediaImportAssetDownloadedEvent` 由 `common-core` `io.github.will413028.hawkr.common.mq.events` 集中定義，兩端共用 SSOT；`resultStatus` 對齊 `ImportAssetMediaStatus.value()`（9402=UPLOADED / 9404=FAILED）；Import 端 inbox dedup（`product_import_media_callback_inbox.event_id`）；詳見 [08 號 §7.2a](08-多媒體微服務（Media%20Service）詳細設計書.md#72a-media-內部下載-worker-pool--callback-publisher) |
 
-> **`review.created` payload 與快照語意**：payload 帶評論完整欄位（`review_id`、`order_no`、`order_item_id`、`buyer_id`、`store_id`（**2026-08-02 正名**：wire key 原為 `seller_account_id`，值從來就是 store surrogate 非登入 account_id；publisher `pkg/mq/events.go` + consumer `seller-service review_rating_consumer.go` + notification `reference_id_template` 同一 PR 原子改名。Java 側零消費此 key，不需 `@JsonAlias`）、`notify_seller_account_id`（**登入 account_id**，供 notification 推播定位收件人，與 `store_id` 為不同 id space）、`rating`、`content`、`image_keys`（objectKey 陣列，原 `imageUrls`，依 49 號設計書 §5.3）、`created_at`，以及既有的 seller 統計 `avg_rating`/`total_count` 與買家 `buyer_nickname`/`buyer_avatar_key`（原 `buyerAvatar`，49 §6.3/S3 批 4 收斂為 `*Key` 名帶 objectKey/外部 URL passthrough））。`orders.review` JSONB 快照欄位同步改為 `imageKeys`。評論記錄為 **order_item（商品）層級**（review-service `order_item_reviews`，一品項一筆，為 SSOT）；但前端訂單詳情「我的評價 / 商品評價」card 為**訂單層級單一**顯示，故 order-service 消費後取該訂單**最近一筆**商品評論，反正規化存於 `orders.review`（訂單層級，most-recent-wins：僅較新 `createdAt` 覆寫），訂單詳情 API 於**頂層 `review`** 直接回傳本地快照，讀取零跨服務耦合。因本平台評論**不可修改、不可刪除**（review.proto 無 `UpdateReview` / `DeleteReview` RPC），訂單層級快照欄位寫入後永不變更 → 為**凍結快照**，**不需** `review.updated` / `review.deleted` 事件維護（符合《後端服務責任邊界規範》單一寫入路徑、不引入補償基礎設施）。
+> **`review.created` payload 與快照語意**：payload 帶評論完整欄位（`review_id`、`order_no`、`order_item_id`、`buyer_id`、`store_id`（**2026-08-02 正名**：wire key 原為 `seller_account_id`，值從來就是 store surrogate 非登入 account_id；publisher `pkg/mq/events.go` + notification `reference_id_template` 同一 PR 原子改名。Java 側零消費此 key，不需 `@JsonAlias`）、`notify_seller_account_id`（**登入 account_id**，供 notification 推播定位收件人，與 `store_id` 為不同 id space）、`rating`、`content`、`image_keys`（objectKey 陣列，原 `imageUrls`，依 49 號設計書 §5.3）、`created_at`，以及既有的 seller 統計 `avg_rating`/`total_count` 與買家 `buyer_nickname`/`buyer_avatar_key`（原 `buyerAvatar`，49 §6.3/S3 批 4 收斂為 `*Key` 名帶 objectKey/外部 URL passthrough））。`orders.review` JSONB 快照欄位同步改為 `imageKeys`。評論記錄為 **order_item（商品）層級**（review-service `order_item_reviews`，一品項一筆，為 SSOT）；但前端訂單詳情「我的評價 / 商品評價」card 為**訂單層級單一**顯示，故 order-service 消費後取該訂單**最近一筆**商品評論，反正規化存於 `orders.review`（訂單層級，most-recent-wins：僅較新 `createdAt` 覆寫），訂單詳情 API 於**頂層 `review`** 直接回傳本地快照，讀取零跨服務耦合。因本平台評論**不可修改、不可刪除**（review.proto 無 `UpdateReview` / `DeleteReview` RPC），訂單層級快照欄位寫入後永不變更 → 為**凍結快照**，**不需** `review.updated` / `review.deleted` 事件維護（符合《後端服務責任邊界規範》單一寫入路徑、不引入補償基礎設施）。
 
 > **兩個讀模型、兩種一致性語意**：`review.created` / `review.hidden` 服務於語意不同的兩類下游讀模型，務必區分：
 > 1. **訂單層級評論快照**（`orders.review`，order-service）—— 屬「交易雙方對該筆訂單的評價紀錄」，most-recent-wins **凍結快照**，admin `HideReview`（內容審核）**不連動**訂單詳情視圖（隱藏只作用於公開商品評論頁與聚合，不抹除買賣雙方對自身交易的紀錄）。
-> 2. **聚合反正規化欄位**（seller `rating`、product `rating` / `review_count`）—— 屬「對外公開展示的統計聚合」，必須反映**當前可見評論集合**。因此 `HideReview` 隱藏評論後，可見集合改變 → 必須重算聚合，由 review-service 發 `review.hidden`（攜帶排除 hidden 列後重算的 seller / product 統計），seller-service 與 product-service 各自 full-recompute 覆寫。`review.created` / `review.hidden` 帶的統計均為 review-service 於同流程內查 `order_item_reviews`（`deleted_at IS NULL AND hidden_at IS NULL`）權威重算之值，consumer 直接覆寫，天然冪等。
+> 2. **聚合反正規化欄位**（product `rating` / `review_count`）—— 屬「對外公開展示的統計聚合」，必須反映**當前可見評論集合**。因此 `HideReview` 隱藏評論後，可見集合改變 → 必須重算聚合，由 review-service 發 `review.hidden`（攜帶排除 hidden 列後重算的 seller / product 統計），product-service full-recompute 覆寫。`review.created` / `review.hidden` 帶的統計均為 review-service 於同流程內查 `order_item_reviews`（`deleted_at IS NULL AND hidden_at IS NULL`）權威重算之值，consumer 直接覆寫，天然冪等。
 
-`review.created` 新增的 seller / product 統計與快照欄位皆為向後相容（JSON additive），既有 order / seller / notification consumer 不受影響（order 只讀 `rating` / `content` 快照欄位、notification 只讀 `avgRating` / `totalCount` placeholder）。詳見 `03-訂單微服務（Order Service）詳細設計書` §6.1 / §8.9 與 `02-產品微服務（Product Service）詳細設計書` §5.14a。
+`review.created` 新增的 seller / product 統計與快照欄位皆為向後相容（JSON additive），既有 order / notification consumer 不受影響（order 只讀 `rating` / `content` 快照欄位、notification 只讀 `avgRating` / `totalCount` placeholder）。詳見 `03-訂單微服務（Order Service）詳細設計書` §6.1 / §8.9 與 `02-產品微服務（Product Service）詳細設計書` §5.14a。
 
 ---
 
@@ -1449,14 +1449,15 @@ fan-out、查無訂閱者不產生任何錯誤或 log（2026-09-03 修復前即�
 
 | 服務 | Publisher | Exchange | Routing Keys |
 |------|-----------|----------|--------------|
-| seller-service | `merchant_event_publisher.go`（經 `merchant_verification_outbox` 交易型 outbox 可靠發布） | `hawkr.merchant` | `merchant.verification.approved` / `merchant.verification.rejected` / `merchant.verification.pending_info` / `merchant.verification.forwarded`（2026-07 新增，通知模板「平台審核通過」，18 §5.7.1）/ **`merchant.verification.under_review`（通知模板「補件已收到」，18 §5.7.1）** |
-| seller-service | `violation.go` + `food_safety_report.go` | `hawkr.governance` | `seller.governance.violation_created` / `seller.governance.violation_revoked` / `seller.governance.appeal_decided`（及其他 governance 事件） |
+| 單體 `seller` 模組 | `internal/legacy/sellerrelay`（事件在 transaction 內排 River job，worker 轉成 RabbitMQ 訊息）| `hawkr.merchant` | `merchant.verification.approved` / `merchant.verification.rejected` / `merchant.verification.pending_info` / `merchant.verification.forwarded`（2026-07 新增，通知模板「平台審核通過」，18 §5.7.1）/ **`merchant.verification.under_review`（通知模板「補件已收到」，18 §5.7.1）** |
+| 單體 `seller` 模組 | 同上 | `hawkr.seller` | `seller.deleted` / `seller.suspended` / `seller.unsuspended` / `seller.profile.changed` / `seller.exposure.changed` |
 | review-service | `publisher.go` | `hawkr.review` | `review.created` / **`review.hidden`** |
 | social-service | `publisher.go` | `hawkr.content` | 9 個事件：PostCreated / PostLiked / PostHiddenByPlatform / CommentCreated（補欄位 + fat 化）/ CommentReplied（補欄位 + fat 化）/ **CommentUpdated**（新）/ **CommentDeleted**（新）/ **CommentLikeChanged**（新，取代 CommentLiked，無過渡期）/ **CounterDelta**（新，2026-07-31，非同步 comment_count/like_count/reply_count 維護，見 §3.6d） |
 | notification-service | `internal/mq/publisher.go`（**2026-06 新增 publisher**，首次成為 producer） | `hawkr.notification` | `notification.inbox.new` / `notification.unread_changed`（供 gateway SSE 推 web，見 §3.6e） |
-| buyer-service | `internal/mq/publisher.go` | `hawkr.content` | `follow.added` / `product.viewed` |
-| buyer-service | 同上 | `hawkr.buyer` | `buyer.favorite.added` / `buyer.favorite.removed` |
-| buyer-service | `internal/worker/restock_consumer.go` fan-out 內呼 `internal/mq/publisher.go::publishRestockTarget`（補貨通知）| `hawkr.product` | `product.restock.target`（per-subscriber，chunked 同事務 publish；payload 含 subscriptionId 供 inbox 端冪等）|
+| 單體 `buyer` 模組 | `internal/legacy/buyerrelay` | `hawkr.content` | `product.viewed` |
+| 單體 `buyer` 模組 | 同上 | `hawkr.buyer` | `buyer.favorite.added` / `buyer.favorite.removed` / `follow.added` / `buyer.deleted` |
+| 單體 `buyer` 模組 | 同上（`FanOut` 每批的事件）| `hawkr.product` | `product.restock.target`（per-subscriber，payload 含 subscriptionId 供 inbox 端冪等）|
+| 單體 `identity` 模組 | `internal/legacy/accountservice` | `hawkr.account` | `account.deleted` |
 | 單體 `delegation` 模組 | confirm 同 tx 發出（§3.6j）| `hawkr.delegation` | `delegation.operation.completed` |
 | ai-service | `internal/procurement/publicationoutbox`（`procurement_rfq_publication_outbox` + `pkg/outbox.Worker`；payload **原樣**送出，不解碼再重編碼） | `procurement.events` | `procurement.rfq_publication_invite.created` / `procurement.rfq_publication_invite.external_created`（RFQ 發布直投線，PLATFORM／EXTERNAL 兩個 lane 皆排投遞，Vendor Portal E1 起，§3.6l.1） |
 | 🔶 recurring-service | 契約／週期／授權事件 publisher（67 §6.5.1） | `hawkr.recurring` | 15 條 `recurring.contract.*` / `recurring.cycle.*` / `recurring.mandate.*`（逐條見 §3.6n） |
@@ -1546,14 +1547,12 @@ fan-out、查無訂閱者不產生任何錯誤或 log（2026-09-03 修復前即�
 | 服務 | Consumer | 監聽 Queue / Exchange | 用途 |
 |------|----------|---------------------|------|
 | notification-service | `internal/worker/consumer.go` | **每來源 exchange 一條 queue**。🔴 **清單的權威是 code 內的 `notificationQueueByExchange` map，本書不寫死條數**（`#` 萬用綁定）。67 落地時 `hawkr.recurring` → `notification.recurring` 與服務同 PR 加一條。🔴 **新增 exchange 必須在同一個 PR 補這個 map 一條**——該 map 的註解逐字如此要求；漏了只記一行 warn，**服務照常起來而那條訂閱不存在**；dispatch 依 `(exchange, routing_key)` 查 `notification_templates` | 多事件推播 |
-| seller-service | `agent_notify_consumer.go` | `seller.events` / `seller.review.result` | 處理 PayUni 代收代付商家通知（AGENT_NOTIFY 單通道）|
-| seller-service | `product_view_consumer.go` | （`hawkr.content` → queue `seller.product.viewed`，routing key `product.viewed`） | 累計 product view |
-| seller-service | `review_rating_consumer.go` | `hawkr.review` / queue `seller.review.created`（bind `review.created`）+ `seller.review.hidden`（bind `review.hidden`） | 覆寫賣家 rating（create + admin 隱藏後重算） |
+| 單體 `seller` 模組 | `internal/legacy/sellerconsumer` | `seller.events` / `seller.review.result`（queue `hawkr.monolith.seller.review.result`，consumer 自己宣告、不在 topology） | 處理 PayUni 代收代付商家通知（AGENT_NOTIFY 單通道）|
 | product-service（Java） | `ReviewStatsConsumer.java` | `hawkr.review` / queue `product.review.stats`（bind `review.created` + `review.hidden`） | 覆寫商品 `rating` + `review_count` 反正規化欄位 |
 | social-service | `internal/worker/di.go` `subscriptions()` | `hawkr.buyer` → `social.buyer.deleted`（`buyer.deleted`）／`hawkr.seller` → `social.seller.deleted`（`seller.deleted`）／`hawkr.content` → `social.counter.delta`（`counter.delta`） | 帳號／賣家刪除的貼文與留言軟刪；計數 delta 收斂 |
 | **social-service** | `internal/worker/counter_delta.go`（自身消費） | exchange `hawkr.content` / routing key `counter.delta` / queue `social.counter.delta`（durable, DLX `hawkr.content.dlx` / DLQ `social.counter.delta.dlq`） | 非同步套用 post/comment 的 comment_count / like_count / reply_count +1/-1；非冪等，10 分鐘 reconciler 兜底（見 §3.6d） |
 | **gateway** | `internal/mq/consumer.go` | 動態 broadcast queue `gateway.sse.<pod-hostname>`（auto-delete, durable=false）<br/>bind 多個 routing key：`hawkr.content:comment.#` + `hawkr.notification:notification.inbox.new` + `hawkr.notification:notification.unread_changed` + `hawkr.seller_workspace:seller.order.updated` + `hawkr.seller_workspace:seller.after_sale.updated`| SSE Hub fan-out — 訊息抵達 → registry dispatch → topic-based push 給該 pod 持有的 SSE connection（見 [41 §五](41-Realtime%20SSE%20推播平台（Realtime%20SSE%20Push%20Platform）詳細設計書.md)） |
-| **buyer-service** | `internal/worker/restock_consumer.go`（**2026-06 新增 #942**） | exchange `hawkr.product` / routing key `product.restock` / queue `buyer.product.restock`（durable, DLX `hawkr.product.dlx` / DLQ `buyer.product.restock.dlq`） | 補貨事件 fan-out：dedup → query ACTIVE 訂閱者 → chunked publish per-subscriber `product.restock.target` event + UPDATE NOTIFIED |
+| **單體 `buyer` 模組** | `internal/legacy/buyerconsumer` | `hawkr.product` / `product.restock` → queue `hawkr.monolith.buyer.product.restock`；`hawkr.order` / `order.completed` → queue `hawkr.monolith.buyer.order.completed`（兩條皆由 consumer 自己宣告、不在 topology；永久錯誤進 `{queue}.dead`） | 補貨事件 fan-out（以 `event_id` 去重的 River job，`FanOut` 分批發布 `product.restock.target`）；訂單結案後加速完成買家與店家兩側等待中的刪帳 |
 | 🆕 **recurring-service** | 跨軸觀察者（67 §6.5.2） | exchange `hawkr.order` ×3：queue `recurring.order.completed`（key `order.completed`）／`recurring.order.cancelled`（`order.cancelled`）／`recurring.order.refund.finalized`（`order.refund.finalized`）；皆 `retry: {max_attempts: 3}`、DLX `hawkr.order.dlx` | commerce 軸 → Cycle 軸連動。🔴 **失敗處置一律 retry 3 → DLQ，不得 ACK 丟棄**；payload 同樣非自己所寫 ⇒ fixture 從 producer 原始碼解析 |
 
 **procurement consumer**：notification-service `internal/worker/consumer.go` 以 `procurement.events` 的 `#` binding 消費 `notification.procurement`，再由 `(exchange, routing_key)` 查 `notification_templates`。§3.6l 的兩個 quote-invite seller template 與 §3.6l.1 的 `procurement.rfq_publication_invite.created.seller` 均以 `store_id` 建立 inbox row。⚠️ **`#` 綁定代表新 routing key 不需要改 topology，但也代表沒有模板的 key 走 `logger.Debug` ＋ ACK 靜默丟棄**（不進 DLQ、不重試、沒有 metric）——新增 producer 事件時，模板列必須與 producer 同一波落地。
@@ -1564,9 +1563,6 @@ fan-out、查無訂閱者不產生任何錯誤或 log（2026-09-03 修復前即�
 |----------|-------------|------------|
 | `hawkr.order` | `order.paid` | `notification.order.paid`（buyer）|
 | `hawkr.shipping` | `shipment.created` | `notification.order.placed`（seller）|
-| `hawkr.governance` | `seller.governance.violation_created` | `notification.governance.seller` |
-| `hawkr.governance` | `seller.governance.violation_revoked` | `notification.governance.seller` |
-| `hawkr.governance` | `seller.governance.appeal_decided` | `notification.governance.seller` |
 | `payment.events` | `payment.rescue.refund_completed` | `notification.payment.rescue.refund.completed`（buyer + seller silent） |
 | `hawkr.product` | `product.restock.target` | `notification.product`（buyer 補貨通知；reference_id_template=`restock_#{subscriptionId}` 保 inbox 端冪等）|
 | `hawkr.product` | `product.certification.approved` / `.rejected` / `.revoked` | `notification.product`（賣家商品認證審核結果；三支 seller 模板見 [13 §4.1「商品認證」](13-通知模板引擎與收件箱（Notification%20Template）詳細設計書.md)；reference_id_template=`product_cert_#{applicationId}`）|
@@ -1644,7 +1640,6 @@ grep -cE '^\s+(retry|dlq):' infra/mq/topology/topology.yaml
 | `shipping_webhook_dedup` | shipping-service | PayUni 物流 webhook 去重 | `event_key = MerID:ShipTradeNo:ApiType/ShipStatus` |
 | `payment_event_dedup` | order-service | 支付事件 dedup | `transaction_id`（payment 的 trade_no） |
 | `favorite_count_event_dedup` | product-service | buyer.favorite.added/removed 計數冪等（02 §3.5.1 / §5.14）| `event_id`（buyer publisher 生成 UUID v4） |
-| `restock_event_dedup` | buyer-service | `product.restock` event 冪等（**2026-06 新增 #942**）| `event_id`（product-service publisher 生成 UUID v4） |
 
 ### 7.2 Outbox 表
 
@@ -1736,7 +1731,7 @@ grep -cE '^\s+(retry|dlq):' infra/mq/topology/topology.yaml
 
 | # | 策略 | 一句話 | 適用場景 | DB schema 範本 | 範例 |
 |---|------|--------|---------|---------------|------|
-| **1** | **集中 dedup 表（EventID UUID）** | 寫入專用 dedup 表 PK=event_id，INSERT 衝突 = 已處理 | 跨服務 event + consumer 端不關心 payload 業務鍵組合 + publisher 端能生成 UUID | `CREATE TABLE xxx_event_dedup (event_id UUID PRIMARY KEY, processed_at TIMESTAMPTZ DEFAULT NOW())` | buyer-service `restock_event_dedup`、product-service `favorite_count_event_dedup` |
+| **1** | **集中 dedup 表（EventID UUID）** | 寫入專用 dedup 表 PK=event_id，INSERT 衝突 = 已處理 | 跨服務 event + consumer 端不關心 payload 業務鍵組合 + publisher 端能生成 UUID | `CREATE TABLE xxx_event_dedup (event_id UUID PRIMARY KEY, processed_at TIMESTAMPTZ DEFAULT NOW())` | product-service `favorite_count_event_dedup` |
 | **2** | **集中 inbox 表（業務鍵 idempotency_key）** | 寫入專用 inbox 表 UNIQUE=業務鍵 | 來自外部系統（如 PayUni）的 webhook，event_id 不存在，需從 payload 組業務鍵作 idempotency_key | `UNIQUE (provider, webhook_type, event_key)` 或 `UNIQUE (idempotency_key)` | payment-service `payment_webhooks`、shipping-service `shipping_webhook_dedup`、payuni-webhook `webhook_inbox` |
 | **3** | **業務表 UNIQUE 約束（含 reference_id template）** | 業務表自身有自然鍵組成 UNIQUE，INSERT 衝突 = 已處理 | 業務表本身有自然唯一性可表達 event 一次性 | `UNIQUE (user_id, user_type, event_type, reference_id)` | notification-service `notifications` UNIQUE、payuni-webhook 的 inbox UNIQUE |
 | **4** | **SQL CAS / 終態自然冪等（WHERE 終態 affected=0）** | 業務 UPDATE 帶條件，重跑 affected=0 自動跳過 | 業務操作本身對終態冪等（重跑 0 副作用） | `UPDATE x SET status=? WHERE id=? AND status=?` | coupon-service `BuyerDeletedConsumer`、product-service `SellerDeletedConsumer`、aftersales mapper SQL CAS。⚠️ **order-service 對 `shipment.status.changed` 不屬本 pattern**（它是無守衛直接覆蓋，見 §3.3 該事件的冪等欄） |
@@ -1783,17 +1778,17 @@ flowchart TD
 | Producer | Producer Language | Routing Key | Consumer | Consumer Language |
 |----------|-----------|-----------|----------|-----------|
 | review-service | Go | `review.created` | order-service `ReviewEventConsumer` | Java |
-| buyer-service | Go | `buyer.deleted` | coupon-service `BuyerDeletedConsumer` | Java |
-| seller-service | Go | `seller.deleted` | product-service `SellerDeletedConsumer` | Java |
-| seller-service | Go | `seller.profile.changed` | cart-service `SellerProfileChangedConsumer` | Java |
-| buyer-service | Go | `buyer.favorite.added` / `buyer.favorite.removed` | product-service `FavoriteCountConsumer` | Java |
+| 單體 buyer 模組 | Go | `buyer.deleted` | coupon-service `BuyerDeletedConsumer` | Java |
+| 單體 seller 模組 | Go | `seller.deleted` | product-service `SellerDeletedConsumer` | Java |
+| 單體 seller 模組 | Go | `seller.profile.changed` | cart-service `SellerProfileChangedConsumer` | Java |
+| 單體 buyer 模組 | Go | `buyer.favorite.added` / `buyer.favorite.removed` | product-service `FavoriteCountConsumer` | Java |
 | order-service | Java | `order.paid` / `order.completed` / `order.delivered` 等 | notification-service | Go |
 | shipping-service | Java | `shipment.created` 等 | notification-service | Go |
 | payment-service | Java | `payment.rescue.refund_completed` 等 | notification-service | Go |
 | aftersales-service | Java | `aftersales.case.*` 等 | notification-service | Go |
 | coupon-service | Java | `coupon.issued` | notification-service | Go |
-| product-service | Java | `product.restock` | buyer-service `restock_consumer` | Go |
-| buyer-service | Go | `product.restock.target` | notification-service | Go |
+| product-service | Java | `product.restock` | 單體 buyer 模組 `buyerconsumer` | Go |
+| 單體 buyer 模組 | Go | `product.restock.target` | notification-service | Go |
 
 #### 7.6.4 事件命名遷移守則與契約 Guardrail
 
@@ -1873,9 +1868,8 @@ flowchart TD
 | Shipping | `hawkr.shipping` | `hawkr.shipping` | 一致 |
 | Marketing | `hawkr.marketing` | `hawkr.marketing` | 一致 |
 | Review | `hawkr.review` | `hawkr.review` | 一致 |
-| Content | （未定義） | `hawkr.content` | Go 端獨用：buyer-service publish `product.viewed`，seller-service ＋ notification-service consume |
-| Merchant | （未定義） | `hawkr.merchant`（局部常數） | Go 端獨用：seller-service publish `merchant.verification.*` |
-| Governance | （未定義） | `hawkr.governance` | Go 端獨用：seller-service publish `seller.governance.*`。🔴 **未佈建於 `topology.yaml`**（issue #3488） |
+| Content | （未定義） | `hawkr.content` | Go 端獨用：單體 buyer 模組 publish `product.viewed`，notification-service consume |
+| Merchant | （未定義） | `hawkr.merchant`（局部常數） | Go 端獨用：單體 seller 模組 publish `merchant.verification.*` |
 
 🔴 **新增 exchange 時兩端命名必須一致**——同一個邏輯領域出現兩個字面值，
 就會像 Payment 這一列一樣產生一個沒有人使用、卻看起來很正常的常數。
