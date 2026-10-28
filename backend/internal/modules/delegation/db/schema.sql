@@ -15,7 +15,7 @@ CREATE TABLE delegation.admin_eligibilities (
 );
 
 -- ============================================================================
--- 代行營運（設計書 56 §5.1；計畫步驟 5）。代行的編排目前在 gateway（A10 搬進本模組）；本 schema 擁有
+-- 代行營運（docs/modules/delegation.md §2）。代行的編排目前在 gateway（A10 搬進本模組）；本 schema 擁有
 -- session、授權與稽核資料。管理員的 ID 是 BIGINT（過渡規則同 admins），店家與賣家的 ID 是 seller 的
 -- BIGINT（seller 還是舊服務），跨模組不下 FK。模組內的 FK 不寫 ON DELETE：稽核列不得被連坐刪除。
 --

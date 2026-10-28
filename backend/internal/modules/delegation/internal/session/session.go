@@ -17,12 +17,12 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
 )
 
-// idleExpired 回傳閒置逾時是否已到（設計書 56 §7.5.1 第 3 順位）。與 SQL 的 last_active_at > idle_since 互補。
+// idleExpired 回傳閒置逾時是否已到（docs/modules/delegation.md §3：閒置逾時）。與 SQL 的 last_active_at > idle_since 互補。
 func idleExpired(s store.DelegationDelegatedOperationSession, now time.Time) bool {
 	return model.IdleExpired(s.LastActiveAt, now)
 }
 
-// delegationStatus 依設計書 56 §7.5.1 的順位推導：撤銷、hard 到期、閒置逾時，否則進行中。兩種到期共用 expired：
+// delegationStatus 依 docs/modules/delegation.md §3 的順位推導：撤銷、hard 到期、閒置逾時，否則進行中。兩種到期共用 expired：
 // 前端的狀態是三個值的封閉列舉，區分成因是稽核的事。
 func delegationStatus(s store.DelegationDelegatedOperationSession, now time.Time) model.DelegationStatus {
 	return model.SessionStatus(s.Status, s.ExpiresAt, s.LastActiveAt, now)
@@ -148,7 +148,7 @@ func (m *Module) preflight(ctx context.Context, q *store.Queries, in model.Deleg
 // displayCodeAttempts 是 display_code 撞號時重試的次數上限（67 bit 的亂數，撞一次都可以忽略）。
 const displayCodeAttempts = 3
 
-// StartDelegation 建立代行的 session，或重放同一把冪等鍵的 session（設計書 56 §7.4.1）：
+// StartDelegation 建立代行的 session，或重放同一把冪等鍵的 session（docs/modules/delegation.md §3）：
 //   - 同一把 key：回既有的 session；尚未兌換時改簽 handoff code，已兌換時不回 code；內容不同是 9267。
 //   - 不同的 key、管理員已經在代行：9268；店家已經被代行：9269。
 //

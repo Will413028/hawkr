@@ -23,7 +23,7 @@ type Config struct {
 	RabbitMQ      RabbitMQConfig
 	Redis         RedisConfig
 	WebRevalidate WebRevalidateConfig
-	// ScheduledPostPublish 為排程貼文發布 worker 的參數（56 號設計書 §8.5.1 (C)）。
+	// ScheduledPostPublish 為排程貼文發布 worker 的參數（56 號設計書 §8.5.1 (B)）。
 	ScheduledPostPublish ScheduledPostPublishConfig
 }
 
@@ -36,8 +36,8 @@ type ServerConfig struct {
 }
 
 // ScheduledPostPublishConfig holds the scheduled-post publish worker's tunables
-// (56 號設計書 §8.5.1 (C)). 這組必須是本服務自己的參數而不是沿用 Gateway 的 (B) 組：
-// (B) 落在 gateway 的 config，social-service 讀不到它；而 deadline 是呼叫端的決定，
+// (56 號設計書 §8.5.1 (B)). 這組必須是本服務自己的參數而不是沿用 Gateway 的 (A) 組：
+// (A) 落在 gateway 的 config，social-service 讀不到它；而 deadline 是呼叫端的決定，
 // worker 是 RecordAuditIntent 的第三個呼叫端。
 //
 // ⚠️ 這組的三條 Validate() 斷言比的是**這組參數彼此之間**的不等式，全部吃程式碼預設值
@@ -200,7 +200,7 @@ func (c *Config) Validate() error {
 }
 
 // validateScheduledPostPublish enforces the three lease/backoff assertions of
-// §8.5.1 (C). 值域逐項成立不保證不等式成立（例：lease 取 30 而 TX_BUDGET_MS 一起調到
+// §8.5.1 (B). 值域逐項成立不保證不等式成立（例：lease 取 30 而 TX_BUDGET_MS 一起調到
 // 上界 15000），所以真正的守門人是這三條。
 func (c *Config) validateScheduledPostPublish() error {
 	s := &c.ScheduledPostPublish

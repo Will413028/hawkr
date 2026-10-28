@@ -4,10 +4,10 @@
 
 ## 1. 範圍與公開介面
 
-- 判定店家授權與管理員資格、建立與撤銷工作階段、核發 credential、兌換一次性 handoff code（設計書 56 §5.1、§7）。
-- 管理店家的代行授權及只追加的治理歷史（§5.1.2）。
-- 記錄兩階段操作稽核與唯讀回看；確認成功時在同一個 transaction 發出 `DelegationOperationCompleted`（§5.1.3、§8.4）。
-- 舊 gateway 仍編排跨服務寫入，經 `internal/legacy/delegationservice` 呼叫模組的公開 API；舊契約的業務碼與文字映射在該轉接層。
+- 判定店家授權與管理員資格、建立與撤銷工作階段、核發 credential、兌換一次性 handoff code。
+- 管理店家的代行授權及只追加的治理歷史（§4）。
+- 記錄兩階段操作稽核與唯讀回看；確認成功時在同一個 transaction 發出 `DelegationOperationCompleted`（§6）。
+- gateway 編排跨服務寫入，經 `internal/legacy/delegationservice` 呼叫模組的公開 API；舊契約的業務碼與文字映射在該轉接層。gateway、領域服務與兩個前端的代行行為見 [詳細設計書 56](../詳細設計書/56-ADM%20代行營運（Delegated%20Operations）詳細設計書.md)。
 - 根套件只組裝 `Module`、轉呼叫、公開 `internal/model` 的型別別名與事件。
 - 模組沒有 `db/pub.sql`，不發布 `pub_*`。
 
@@ -28,18 +28,23 @@ TTL、閒置、handoff、分頁與保留天數是 `internal/model` 的常數，�
 ## 3. 工作階段
 
 - 狀態只儲存 `active`、`revoked`。hard 到期（1800 秒）與閒置到期（900 秒）在讀取時推導，所有「進行中」查詢都含兩個到期述詞。
+- 結束代行把 `ended_at` 設為現在、`expires_at` 取 `LEAST(expires_at, 現在)`（不早於 `issued_at` 加一秒），`revision` 加一；對已終止的 session 重放是冪等。
+- `revision` 只在結束與撤銷時增加；輪詢、活動延長與代行讀寫不改它。session 列永不硬刪，只有 `admin_eligibilities` 會 `DELETE`。
 - 輪詢（`ResolveDelegation` 的 activity 為假）不延長閒置期限；代行資源的反查（activity 為真）才會延長。
 - 管理員同時只代行一家、店家同時只被一位管理員代行，由 partial unique index 與寫入檢查守住。
 - 建立只交付一次性 handoff code；handoff code 與 credential 都只存 SHA-256。兌換以一條 CAS 同時清掉 code 雜湊並寫入 credential 雜湊，credential 是兌換時以 CSPRNG 核發的 256 bit 隨機值。同一個 code 再兌換回 9282；已兌換 session 的同鍵重放只回摘要，不再發 code 或改寫雜湊。
 - handoff code 與 credential 不進 log。
-- 同一個冪等鍵併發建立共用一個 session。
+- 同一個冪等鍵併發建立共用一個 session；尚未兌換時的重放重簽 handoff code（新的雜湊與期限，不改 `revision`），已核發 credential 的列不重簽。
+- 建立時，同一個 transaction 先結束同一管理員與同一店家已到期（hard 或閒置）卻仍佔著 partial unique index 的列，再檢查衝突。
+- handoff code 有效 60 秒，前綴 `dhof_`；credential 前綴 `dops_`。
 - 能力是封閉的九項；Go 規則與 DB CHECK 都拒絕履約、退款與金流能力。
 - `display_code` 格式為 `OPS-` 加 13 碼 0-9A-Z，以 CSPRNG 產生，撞號重試。
 - 開始代行要有管理員角色的權限 `delegation.sessions.create`（`platform/adminperm`）：`StartDelegation` 在自己的 transaction 內以 identity 的 `AdminAllows`（`FOR SHARE`）檢查，沒有時回 `DenialAdminNotAllowlisted`（permission denied）。代行資格（`admin_eligibilities`）獨立於角色。
 
 ### 撤銷
 
-- `revoke_reason` 是系統寫入的固定值（`internal/model` 的 `RevokeReason*`），DB 只有長度的 CHECK：登出 `admin_logout`、撤回資格 `delegation_disabled`、撤回店家授權 `authorization_revoked`、撤銷管理員角色 `admin_role_revoked`。
+- 模組自己寫入的 `revoke_reason` 是固定值（`internal/model` 的 `RevokeReason*`），DB 只有長度的 CHECK：登出 `admin_logout`、撤回資格 `delegation_disabled`、撤回店家授權 `authorization_revoked`、撤銷管理員角色 `admin_role_revoked`。
+- `RevokeDelegationSession` 的理由由呼叫端帶入（1–200 字）：gateway 在授權鏈第 8 項命中時帶 `store_not_operable`（`pkg/delegation`），人工撤銷帶操作者填的文字。
 - 角色撤銷的 `revoked_by_admin_id` 是 NULL：系統因角色變動而撤銷，沒有操作者；誰撤的在 identity 的 `admin_role_events`。
 - 後台登出時由 `internal/httpapi/identity` 直接呼叫 `RevokeDelegationsOfAdmin`。
 - 撤回代行資格時，刪除資格與撤銷進行中的 session 在同一個 transaction，任一處失敗整個回滾。
@@ -48,7 +53,7 @@ TTL、閒置、handoff、分頁與保留天數是 `internal/model` 的常數，�
 
 ## 4. 店家授權
 
-- 授權寫入與治理歷史同 transaction；撤回同時撤銷該店進行中的工作階段（§5.1.2）。
+- 授權寫入與治理歷史同 transaction；撤回同時撤銷該店進行中的工作階段。
 - 店家層級授權列一旦存在，即遮蔽全域列，無論它是否有效。
 - 治理需要已開通資格的管理員；授權的店家必須存在。
 - 授權的三處冪等鍵以唯一鍵與 `ON CONFLICT DO NOTHING` 守住；重放比對 action、resource 與 payload hash，不同 payload 回衝突。
@@ -66,7 +71,10 @@ TTL、閒置、handoff、分頁與保留天數是 `internal/model` 的常數，�
 ## 6. 操作稽核
 
 - 兩階段：寫入前先寫 PENDING intent；confirm 只從 PENDING 轉移一次，成功且需通知時在同一個 transaction 發出事件。事件發不出去則 confirm 回滾。
-- 讀取、揭露與更正類動作不能通知店家；confirm 只在成功時檢查能力。
+- 讀取、揭露與更正類動作不能通知店家；confirm 只在成功時檢查能力，`SUCCEEDED` 列的能力必須在該 session 的授權快照內。
+- confirm 只更新 `result`、`resource_id`、`after_snapshot`、`changed_fields`、`resource_version_after`、`biz_code`、`confirmed_at` 與 `notified_at`，其餘欄位寫入後不變；稽核列永不硬刪。
+- `origin=scheduled` 是排程執行的 intent：session 已到期仍可寫入，已撤銷仍拒絕；只支援貼文、必須帶 `resourceId`；操作理由繼承同一 session、同一資源最近一筆 `POST_SCHEDULE` 的理由，找不到回 9279。
+- 事件只有 `DelegationOperationCompleted`；結束與撤銷不發事件。
 - intent 需要可用的工作階段與有效輸入；冪等鍵綁定指令、資源與 payload。
 - 批次上限 50。
 - 動作（19 個）、原因碼與能力都有 DB CHECK。
@@ -74,7 +82,7 @@ TTL、閒置、handoff、分頁與保留天數是 `internal/model` 的常數，�
 
 ## 7. 管理員代行資格
 
-- 代行資格沒有後台畫面；營運以 `hawkr delegation-eligibility enable|disable` 呼叫 `SetAdminEligibility`，撤回時同步撤銷進行中的工作階段（設計書 56 §8.5.3）。
+- 代行資格沒有後台畫面；營運以 `hawkr delegation-eligibility enable|disable` 呼叫 `SetAdminEligibility`，撤回時同步撤銷進行中的工作階段。
 - 建立 session 時鎖住資格列，避免與撤回交錯後留下 active session。
 
 ## 8. 分頁

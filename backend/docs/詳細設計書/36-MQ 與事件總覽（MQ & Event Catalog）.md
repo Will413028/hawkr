@@ -1139,11 +1139,11 @@ fan-out、查無訂閱者不產生任何錯誤或 log（2026-09-03 修復前即�
 
 **Exchange**：`hawkr.delegation`
 
-承載「平台管理員代賣家完成一次寫入」的完成事件。**本領域目前只有這一個事件**：工作階段的建立 / 結束 / 撤銷**不發事件**（結束摘要是查詢，沒有 consumer；且 `admin_operation_outbox.audit_log_id` 為 `NOT NULL` FK，session 起訖不寫稽核表，這種列在 schema 上就插不進去）。
+承載「平台管理員代賣家完成一次寫入」的完成事件。**本領域目前只有這一個事件**：工作階段的建立 / 結束 / 撤銷**不發事件**（結束摘要是查詢，沒有 consumer；session 起訖不寫稽核表，沒有可依附的稽核列）。
 
 | Routing Key | Producer | Consumer | Payload Class / Schema | DLQ | Idempotency |
 |-------------|----------|----------|------------------------|-----|-------------|
-| `delegation.operation.completed` | account-service `admin_operation_outbox` dispatcher（稽核列轉 `SUCCEEDED` 時**同一 tx** 建立 outbox 列，僅 `result='SUCCEEDED'` 且 `notify_seller = true`；`ORDER_PII_REVEAL` 恆 `false` 故永不建列）| notification-service（queue `notification.delegation`，`#` 綁定 → 模板 `delegation.operation.completed.seller` → **站內訊息**：inbox ＋ App 推播，`push_mode='visible'`；**無 Email**，平台無寄信通道）| `DelegationOperationCompletedEvent { BaseEvent, audit_log_id, session_id, session_display_code, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, capability, action, action_label, risk_level, resource_type, resource_id, resource_name?, operation_reason?, case_reference?, occurred_at }`（`pkg/mq/events.go`，snake_case wire，**所有 id 皆為 string**——TSID 精度，int64 給 generic-map consumer 會 float64 截斷）| ✅ `notification.delegation.dlq`（經 `hawkr.delegation.dlx`，由 `topology.yaml` `retry:` 展開）| **`audit_log_id`**（consumer 建 `notifications` 列時填 `reference_id`，由既有 `UNIQUE (user_id, user_type, event_type, reference_id)` 承擔；⚠️ **不得以 `event_id` 去重**——dispatcher 重送同一列時 `event_id` 是新的 UUID，等於完全沒有去重）|
+| `delegation.operation.completed` | 單體 `delegation` 模組（稽核列轉 `SUCCEEDED` 時**同一 tx** 發出，僅 `result='SUCCEEDED'` 且 `notify_seller = true`；`ORDER_PII_REVEAL` 恆 `false` 故永不發出）| notification-service（queue `notification.delegation`，`#` 綁定 → 模板 `delegation.operation.completed.seller` → **站內訊息**：inbox ＋ App 推播，`push_mode='visible'`；**無 Email**，平台無寄信通道）| `DelegationOperationCompletedEvent { BaseEvent, audit_log_id, session_id, session_display_code, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, capability, action, action_label, risk_level, resource_type, resource_id, resource_name?, operation_reason?, case_reference?, occurred_at }`（`pkg/mq/events.go`，snake_case wire，**所有 id 皆為 string**——TSID 精度，int64 給 generic-map consumer 會 float64 截斷）| ✅ `notification.delegation.dlq`（經 `hawkr.delegation.dlx`，由 `topology.yaml` `retry:` 展開）| **`audit_log_id`**（consumer 建 `notifications` 列時填 `reference_id`，由既有 `UNIQUE (user_id, user_type, event_type, reference_id)` 承擔；⚠️ **不得以 `event_id` 去重**——dispatcher 重送同一列時 `event_id` 是新的 UUID，等於完全沒有去重）|
 
 **Go 對應常數**：`pkg/mq/exchanges.go` 新增 `ExchangeDelegation` / `ExchangeDelegationDLX` / `RoutingKeyDelegationOperationCompleted`；`pkg/mq/events.go` 新增 `EventTypeDelegationOperationCompleted` 與 `DelegationOperationCompletedEvent` struct。CodeMeta 對照見 §8.1 `DelegationEventType`。
 
@@ -1151,8 +1151,7 @@ fan-out、查無訂閱者不產生任何錯誤或 log（2026-09-03 修復前即�
 
 **設計參考**：
 - **為何開自己的 exchange**：見 [ADR 2026-09-18-mq-dedicated-exchange-per-domain](../adr/2026-09-18-mq-dedicated-exchange-per-domain.md)。
-- **為何走 outbox 而不是寫完直接 publish**：代行寫入成功後的賣家通知屬「**一定要發出去**」的語意（賣家有權知道平台動過他的商店），best-effort publish 在 broker 短暫不可用時會靜默丟失。走《[後端服務責任邊界規範](../開發規範/後端服務責任邊界規範.md)》**例外 2（Outbox：DB commit 後保證 MQ event 一定發出）**，與稽核列轉 `SUCCEEDED` 同一個 tx 寫入（同服務同庫，真正的同交易）。**範圍嚴格限制**：dispatcher 只搬運**已 commit 的稽核事實**，不修正任何業務資料、不回填、不比對——它不是 reconciliation / backfill，那一類仍然不得寫進 application code。
-- dispatcher 的 claim 走**單列 CAS ＋ 冷卻租約**（`lease_expires_at` 是租約不是已處理旗標，claim 當下逐筆取基準），見《[多副本排程搶佔規範](../開發規範/多副本排程搶佔規範.md)》與 56 號 §5.1.4。
+- **為何與稽核列轉 `SUCCEEDED` 在同一個 tx 發出**：代行寫入成功後的賣家通知屬「**一定要發出去**」的語意（賣家有權知道平台動過他的商店），事件發不出去時 confirm 整個回滾，稽核列停在 `PENDING`（`docs/modules/delegation.md` §6）。模組只搬運已確認的稽核事實，不修正任何業務資料、不回填、不比對。
 - ⚠️ **模板列缺席是本鏈路最靜默的失敗**：`template_handler.go` 找不到模板時走 `logger.Debug` ＋ `return nil`（ack）⇒ 訊息**不進 DLQ、不重試、直接消失**，「查 DLQ 再 re-drive」對此情境完全無效（DLQ 是空的，稽核列卻顯示 `notified_at` 有值）。驗收不得只看 `consumers ≥ 1`，必須端到端斷言 `notifications` 出現對應列。
 - ⚠️ **模板的 `target_user_field` 是 `target_seller_account_id` 不是 `target_store_id`**：payload 兩欄都在，而賣家收件匣讀取端對 `user_type != 'buyer'` 直接拿 `X-Account-Id` 當 `user_id`（不解析 store surrogate）⇒ **填錯不報錯**，首任店家（`store_id == account_id`）測起來全綠、re-key 過的店家永遠收不到且無告警。契約 gate 也擋不住（`target_store_id` 同樣在 `emitted_keys` 內）。日後 44 號 re-key ② 若把賣家收件匣改成以 `store_id` 讀取，本欄與該 resolver 必須同波修改。
 - 全文與逐欄定版：[56 §6.3 非同步事件](56-ADM%20代行營運（Delegated%20Operations）詳細設計書.md) / [13 通知模板引擎與收件箱](13-通知模板引擎與收件箱（Notification%20Template）詳細設計書.md)。
@@ -1190,7 +1189,7 @@ fan-out、查無訂閱者不產生任何錯誤或 log（2026-09-03 修復前即�
   唯一訊號是 notification-service 啟動時一行 ERROR log。
   ⚠️ 出向才適用：兩條入向 queue（`invoice.order.paid` / `invoice.order.refund.finalized`）綁的是
   `hawkr.order`，其 `.dlq` **必然**掛在 `hawkr.order.dlx` 上，無法也不該迴避。
-- **為何走 outbox 而不是寫完直接 publish**：發票開立結果屬「一定要發出去」的語意，best-effort publish 在 broker
+- **為何與稽核列轉 `SUCCEEDED` 在同一個 tx 發出**：代行寫入成功後的賣家通知屬「**一定要發出去**」的語意（賣家有權知道平台動過他的商店），事件發不出去時 confirm 整個回滾，稽核列停在 `PENDING`（`docs/modules/delegation.md` §6）。模組只搬運已確認的稽核事實，不修正任何業務資料、不回填、不比對。
   短暫不可用時會靜默丟失。走《後端服務責任邊界規範》**例外 2**，與 `invoice_documents` 寫入同一個交易落
   `invoice_outbox_events`。
 - **為何 consumer 不打 AMEGO**：`pkg/mq` 的重試是無退避的立即重投，把外部 HTTP 放進 handler 等於在 broker 上做
@@ -1458,7 +1457,7 @@ fan-out、查無訂閱者不產生任何錯誤或 log（2026-09-03 修復前即�
 | buyer-service | `internal/mq/publisher.go` | `hawkr.content` | `follow.added` / `product.viewed` |
 | buyer-service | 同上 | `hawkr.buyer` | `buyer.favorite.added` / `buyer.favorite.removed` |
 | buyer-service | `internal/worker/restock_consumer.go` fan-out 內呼 `internal/mq/publisher.go::publishRestockTarget`（補貨通知）| `hawkr.product` | `product.restock.target`（per-subscriber，chunked 同事務 publish；payload 含 subscriptionId 供 inbox 端冪等，39 §5.5a.3）|
-| account-service | `admin_operation_outbox` dispatcher（Outbox 保 MQ 必發，§7.2 / §3.6j）| `hawkr.delegation` | `delegation.operation.completed` |
+| 單體 `delegation` 模組 | confirm 同 tx 發出（§3.6j）| `hawkr.delegation` | `delegation.operation.completed` |
 | ai-service | `internal/procurement/publicationoutbox`（`procurement_rfq_publication_outbox` + `pkg/outbox.Worker`；payload **原樣**送出，不解碼再重編碼） | `procurement.events` | `procurement.rfq_publication_invite.created` / `procurement.rfq_publication_invite.external_created`（RFQ 發布直投線，PLATFORM／EXTERNAL 兩個 lane 皆排投遞，Vendor Portal E1 起，§3.6l.1） |
 | 🔶 recurring-service | 契約／週期／授權事件 publisher（67 §6.5.1） | `hawkr.recurring` | 15 條 `recurring.contract.*` / `recurring.cycle.*` / `recurring.mandate.*`（逐條見 §3.6n） |
 
@@ -1653,9 +1652,8 @@ grep -cE '^\s+(retry|dlq):' infra/mq/topology/topology.yaml
 |------|------|------|--------|
 | `outbox_events` | payuni-webhook-service | webhook 事件可靠投遞（PayUni 解密後 ＋ 🆕 Uber 原始位元組信封）；`aggregate_type` 存 provider 碼值 | `OutboxPublisherScheduler` 每 5s |
 | `outbox_events` | payment-service | 付款結果事件（`payment.success`/`failed`/`conflict`，六發布點經兩收斂點統一走 `PaymentOutboxWriter.enqueueAndDispatch`）+ rescue（`payment.rescue.refund_initiated`/`refund_completed`）可靠投遞；付款結果與 reconcile 單筆 rescue（`PaymentOutboxWriter`）走 afterCommit 即時 + publisher-confirm，重複付款偵測 rescue 與 `refund_completed`（純 outbox INSERT）走排程器 + publisher-confirm | afterCommit 即時（付款結果 / reconcile 單筆 rescue）+ `OutboxEventPublisherScheduler` 每 5s 兜底 |
-| `admin_operation_outbox` | account-service | 代行操作事件可靠投遞（`delegation.operation.completed`；與稽核列轉 `SUCCEEDED` 同一 tx 建列，見 §3.6j 與 56 §5.1.4）| outbox dispatcher（`DELEGATION_OUTBOX_POLL_INTERVAL_SECONDS`，預設 10s；單列 CAS ＋ 冷卻租約 claim）|
 
-**重試策略**（兩張 `outbox_events`）：指數退避 5s → 15s → 45s → 135s → 405s（共 5 次），超過則標記 `DEAD`（需人工介入）。`admin_operation_outbox` 不走這套：失敗即清空租約（釋放語句帶 `AND lease_owner = $1` 守衛），下一輪 poll 重新 claim，見 56 §5.1.4。
+**重試策略**（兩張 `outbox_events`）：指數退避 5s → 15s → 45s → 135s → 405s（共 5 次），超過則標記 `DEAD`（需人工介入）。
 
 ### 7.3 Idempotency 覆蓋率
 

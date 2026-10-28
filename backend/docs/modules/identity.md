@@ -93,4 +93,4 @@ schema `identity`（`db/schema.sql`）：
 - 帳號的 email 是建帳時的快照，在 Clerk 改了 email 不會同步；後台的清單以它顯示與搜尋。
 - 賣家 CRM 以手機找顧客（legacy 的 `GetAccountByPhone`）一律回「找不到」：帳號沒有手機。
 - 外部 Access 登出不會自動撤銷代行。
-- 代行資格與撤回時的工作階段撤銷由 delegation 管理（設計書 56 §8.5.3）。
+- 代行資格與撤回時的工作階段撤銷由 delegation 管理（`docs/modules/delegation.md` §7）。

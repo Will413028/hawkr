@@ -126,7 +126,7 @@ type DelegatedSessionSummary struct {
 	// 當成值。
 	//
 	// 取「四者最小」而不是「挑第一個命中」：後者在「閒置逾時之後才被撤銷」的列上會
-	// 答撤銷時刻而不是最後活動時刻。SSOT 是 56 §7.5.2 的 SQL，實作在
+	// 答撤銷時刻而不是最後活動時刻。SSOT 是 docs/modules/delegation.md §3 的規則，實作在
 	// 單體的 internal/modules/identity/delegation_query.go（DelegationSessionSummary）。
 	DurationSeconds string `json:"durationSeconds"`
 	Status          string `json:"status"`

@@ -41,7 +41,7 @@ type Holder struct {
 	MediaBaseURL  string
 	WebBaseURL    string
 	Docs          *Docs
-	// Delegation carries the per-hop gRPC deadlines for ADM 代行營運 (56 §8.5.1 (B)).
+	// Delegation carries the per-hop gRPC deadlines for ADM 代行營運 (56 §8.5.1 (A)).
 	// Deadlines belong to the caller, and the caller of every delegated hop is the
 	// Gateway — so the numbers travel with the holder rather than being re-read from
 	// the environment at each call site, where they would drift into a second copy.

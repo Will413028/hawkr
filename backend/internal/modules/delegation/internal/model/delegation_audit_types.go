@@ -51,7 +51,7 @@ type auditActionRule struct {
 	risk  RiskLevel
 }
 
-// auditActions 是 19 個登錄的動作：中文標籤（原本在 CodeMeta）與風險等級（設計書 56 §6.5.3 (3)）。
+// auditActions 是 19 個登錄的動作：中文標籤（原本在 CodeMeta）與風險等級（CodeMeta 的 DelegationAuditAction）。
 var auditActions = map[AuditAction]auditActionRule{
 	AuditStorefrontUpdate:      {"更新店面資料", RiskMedium},
 	AuditStorefrontLogoUpdate:  {"更新商店 Logo", RiskMedium},

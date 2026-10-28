@@ -150,8 +150,8 @@ services:
       RATE_LIMIT_FALLBACK_CAPACITY: 10000
       RATE_LIMIT_AUTH_FAILURE_PER_WINDOW: 100
 
-      # ── ADM 代行營運：per-hop gRPC deadline（56 號設計書 §8.5.1 (B)）──
-      # 分組以 §8.5.1 的 (A)(B)(C) 為準、不以名稱前綴為準：
+      # ── ADM 代行營運：per-hop gRPC deadline（56 號設計書 §8.5.1 (A)）──
+      # 分組以 §8.5.1 的 (A)(B) 為準、不以名稱前綴為準：
       # 這裡的 _STORE_STATE_MS 是 Gateway 讀店家狀態的逾時；單體的 DelegationService 讀店家狀態是同行程呼叫 seller 模組，
       # 沒有逾時設定。
       # 三環境同值是刻意的——這組是逾時預算，不是環境資源差異的函式。
@@ -936,7 +936,7 @@ services:
       MEDIA_SERVICE_HOST: media-service
       MEDIA_SERVICE_GRPC_PORT: 9937
 
-      # ── ADM 代行營運：排程貼文發布 worker（56 號設計書 §8.5.1 (C)）──
+      # ── ADM 代行營運：排程貼文發布 worker（56 號設計書 §8.5.1 (B)）──
       # 全部字面值：這組沒有任何一支是「本機測試會調」的（要調就直接改這裡）。
       # Config.Validate() 的三條斷言比的是這組彼此之間的不等式，全部吃程式碼預設值時
       # 三條照樣成立、boot 照樣綠 —— 斷言擋得住「調錯」，擋不住「沒設」，所以要列全。

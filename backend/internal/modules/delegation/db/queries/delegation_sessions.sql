@@ -1,4 +1,4 @@
--- 代行的 session（設計書 56 §5.2 的 canonical 查詢）。時間一律由模組傳入（now、idle_since = now − 閒置逾時），
+-- 代行的 session 的 canonical 查詢。時間一律由模組傳入（now、idle_since = now − 閒置逾時），
 -- 不用 DB 的 now()：測試注入時鐘，也讓同一個請求的判定都用同一個時刻。
 --
 -- 「進行中」的述詞有四項：status = 'active'、ended_at IS NULL、now < expires_at、last_active_at > idle_since。

@@ -68,7 +68,7 @@ type Config struct {
 	// TrustedPlatform 處理，兩者並存）。#1416。
 	TrustedProxyCIDRs []string
 
-	// Delegation 是 ADM 代行營運的 per-hop gRPC deadline（56 號設計書 §8.5.1 (B)）。
+	// Delegation 是 ADM 代行營運的 per-hop gRPC deadline（56 號設計書 §8.5.1 (A)）。
 	Delegation DelegationConfig
 
 	// ProcurementReplaySseEnabled 是 doc 57 §13 的 capability flag
@@ -87,7 +87,7 @@ type Config struct {
 }
 
 // DelegationConfig holds the Gateway's per-hop gRPC deadlines for delegated
-// operations (56 號設計書 §8.5.1 (B)). Deadlines belong to the caller, so this
+// operations (56 號設計書 §8.5.1 (A)). Deadlines belong to the caller, so this
 // group lives here and not in account-service: account-service has neither the
 // standing nor the information to decide how long the Gateway waits before
 // giving up. The mirror-imaged DELEGATION_GRPC_DEADLINE_SELLER_STATE_MS is
@@ -254,7 +254,7 @@ const (
 	delegationBatchWriteBudgetMs  = 50000
 )
 
-// validateDelegation asserts the two budget inequalities of §8.5.1 (B).
+// validateDelegation asserts the two budget inequalities of §8.5.1 (A).
 // Per-variable ranges hold individually but do not add up: every single-item
 // deadline at its own upper bound sums to 27s, far past this path's outer
 // timeout. Both assertions fail-fast, never log a warning.

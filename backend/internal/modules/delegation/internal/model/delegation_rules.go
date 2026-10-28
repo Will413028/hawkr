@@ -14,8 +14,7 @@ import (
 
 // 以下是代行營運（設計書 56）的共用定義：參數、封閉的值域與業務拒絕。
 
-// 代行的參數。原本是 account-service 的 DELEGATION_* 環境變數（設計書 56 §8.5.1 (A)），沒有任何部署需要不同的值，
-// 改成常數，值是原本的預設值。改值時先讀設計書該節列的關聯：TTL 的上限同時是 DB 的 CHECK
+// 代行的參數：常數，不是環境變數，沒有任何部署需要不同的值。TTL 的上限同時是 DB 的 CHECK
 // （delegated_operation_sessions_lifetime_check），閒置逾時必須小於 TTL 的上限。
 const (
 	// DelegationTTL 是 preflight 下發的 TTL，也是 TTL 的上限（DELEGATION_SESSION_TTL_DEFAULT_SECONDS、
@@ -79,7 +78,7 @@ type DelegationReasonOption struct {
 	CaseReferenceRequired bool
 }
 
-// delegationReasons 是設計書 56 §6.5.3 (2) 的表，順序即顯示順序。三個都要案件編號（#2749：平台維護原本豁免，
+// delegationReasons 是CodeMeta 的 DelegationReasonCode 登錄的表，順序即顯示順序。三個都要案件編號（#2749：平台維護原本豁免，
 // 找不到任何理由；要推翻只改那一格）。標籤原本在 CodeMeta 的 DelegationReasonCode，隨代行的資料搬進 delegation。
 var delegationReasons = []DelegationReasonOption{
 	{Code: ReasonSellerRequest, Label: "賣家請求（管理員記錄）", CaseReferenceRequired: true},
@@ -124,7 +123,7 @@ const (
 	DelegationRevoked DelegationStatus = "revoked"
 )
 
-// 撤銷的理由裡由系統寫入的固定值（設計書 56 §12.4 ①）：稽核以這一欄機械地區分撤銷的來源，不是自由文字。
+// 撤銷的理由裡由系統寫入的固定值（設計書 56 §12.4 ①、docs/modules/delegation.md §3）：稽核以這一欄機械地區分撤銷的來源，不是自由文字。
 const (
 	// RevokeReasonAdminLogout：管理員登出時撤銷他進行中的代行，revoked_by_admin_id 是他自己。
 	RevokeReasonAdminLogout        = "admin_logout"
@@ -359,7 +358,7 @@ func SameCapabilitySet(a, b []Capability) bool {
 	return slices.Equal(x, y)
 }
 
-// ---- credential 與 handoff code（設計書 56 §8.1.6） ----
+// ---- credential 與 handoff code（docs/modules/delegation.md §3） ----
 
 const (
 	HandoffPrefix    = "dhof_"

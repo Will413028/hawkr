@@ -71,7 +71,7 @@ func IsValidWeightUnit(value string) bool {
 }
 
 // DelegationAuditActions is the closed nineteen-value set of
-// DelegationAuditAction (56 §6.5.3 (3)). Gateway needs the SET (to reject an
+// DelegationAuditAction (56 §6.5.3). Gateway needs the SET (to reject an
 // unknown audit-logs filter with 9260 instead of silently returning the full
 // result) — the Chinese labels stay in the generated pkg/codemeta.
 //

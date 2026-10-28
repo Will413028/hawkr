@@ -33,7 +33,7 @@ export type DelegatedAuditRiskLevel =
 	(typeof DELEGATED_AUDIT_RISK_LEVELS)[number];
 
 /**
- * `DelegationAuditAction` 的封閉十九值（56 §6.5.3 (3)）。
+ * `DelegationAuditAction` 的封閉十九值（56 §6.5.3）。
  *
  * 這裡只存**值域**，稽核列的中文由後端逐列下發的 `actionLabel` 決定（同
  * `changedFields[].label` 的理由）。值域留在前端是為了讓篩選送出前就擋掉不合法
