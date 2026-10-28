@@ -26,7 +26,7 @@
 | **Goal** | Apple Guideline 1.2 四要求全覆蓋：內容過濾、檢舉、封鎖使用者、24h 內處理 |
 | **Goal** | 單一 `reports` 表支援 6 種 targetType（REVIEW/POST/POST_COMMENT/SELLER_FORUM/CHAT_MESSAGE/USER），統一裁決流程 |
 | **Goal** | 一切下架（含 admin 直接下架）都留 `moderation_actions` 稽核軌跡，不得有繞過稽核的下架路徑 |
-| **Goal** | BAN_USER 為真停權（account-service durable，OAuth 重登路徑亦擋），非僅快取 |
+| **Goal** | BAN_USER 為真停權（identity 模組 durable，下一個請求起回 PermissionDenied），非僅快取 |
 | **Non-Goal** | **不**做 DB-driven 字典 + admin CRUD；字典詞庫是共用 `go-pkg/moderation` 的硬編碼詞表 |
 | **Non-Goal** | **不**接 ML moderation（如 OpenAI Moderation API） |
 | **Non-Goal** | **不**做 SLA dashboard / breach 告警；24h SLA 由 admin 前端計算顯示 |
@@ -36,7 +36,7 @@
 ### 1.4 與其他設計書／服務的關係
 - **32 號（商家治理與食安通報）**：獨立 `violation_reports` schema。分工——本模組治理「**誰貼了違規內容**」（隱藏內容 / 停權作者，Apple 1.2 合規驅動）；32 號治理「**商家資格**」（法遵 / 食安 / 證照，影響上架資格，法規驅動）。兩者刻意**不合併**（對象、驅動法規、生命週期、reason 詞彙皆異）；理由見[相關 ADR](../adr/2026-09-18-content-moderation-consolidation.md) D2。
 - **跨服務隱藏**：HIDE_TARGET 對 REVIEW / CHAT_MESSAGE 需呼叫 review-service（43 號）/ im-service（14 號）的 Hide RPC；POST / POST_COMMENT / SELLER_FORUM 為 social-service 本地。
-- **停權**：BAN_USER 呼叫 account-service `SuspendAccount`（durable 停權，OAuth 重登路徑亦擋）。
+- **停權**：BAN_USER 呼叫單體 identity 模組的 `SuspendAccount`（經 legacy gRPC 入口；durable 停權，下一個請求起回 PermissionDenied，見 `docs/modules/identity.md` §4）。
 
 ---
 
@@ -51,7 +51,7 @@ flowchart LR
   GW -->|gRPC| SOC["social-service<br/>（內容審核內嵌）"]
   SOC -->|gRPC HideReview| REV[review-service]
   SOC -->|gRPC HideMessage| IM[im-service]
-  SOC -->|gRPC SuspendAccount| ACC[account-service]
+  SOC -->|gRPC SuspendAccount| ACC[單體 identity 模組]
   SOC -->|MQ PostHiddenByPlatform| MQ[(RabbitMQ)]
   SOC --> DB[(PostgreSQL<br/>reports · user_blocks · moderation_actions)]
   SOC --> RDS[(Redis<br/>blocklist · account-blocked)]
@@ -61,7 +61,7 @@ flowchart LR
 
 | | 涵蓋 (In-scope) | 不涵蓋 (Out-of-scope，由誰負責) |
 |---|---|---|
-| 責任 | 檢舉受理、24h 去重、rate limit、admin 裁決狀態機、雙向封鎖、平台下架、稽核軌跡 | 商家資格治理 → 32 號；停權帳號 durable 寫入 → account-service；REVIEW/CHAT 內容實體隱藏 → review/im-service；字典詞庫 → `go-pkg/moderation`（共用 module） |
+| 責任 | 檢舉受理、24h 去重、rate limit、admin 裁決狀態機、雙向封鎖、平台下架、稽核軌跡 | 商家資格治理 → 32 號；停權帳號 durable 寫入 → identity 模組；REVIEW/CHAT 內容實體隱藏 → review/im-service；字典詞庫 → `go-pkg/moderation`（共用 module） |
 
 ### 2.3 角色與身份模型
 - **buyer / seller**：檢舉、封鎖。身份來自 gateway JWT（`JWTAuth`），`reporter_id` / `blocker_id` 由 server 從已驗 token 取得，**不信任 client 欄位**。
@@ -76,7 +76,7 @@ flowchart LR
 |---|---|
 | 技術約束 | PK 一律 TSID（`uc.tsid()`，禁 UUID / serial）；Go 服務 schema 走 **Atlas declarative**（`schema.sql` 為 SSOT，禁手寫 SQL / psql 手動套）；REST 回應走統一 Envelope `{code,message,data}`；前端可控 ID（report_id / post_id）一律 string 防 TSID 精度遺失 |
 | 組織約束 | 單人 / 小團隊維運；上線前不留技術債；審核邏輯內嵌 social-service，不獨立成服務 |
-| 既有系統約束 | Redis 無 HA（blocklist / account-blocked 快取 fail-open）；k3s + Traefik；審核依賴 review/im/account 三個上游 gRPC |
+| 既有系統約束 | Redis 無 HA（blocklist / account-blocked 快取 fail-open）；k3s + Traefik；審核依賴 review/im 兩個上游 gRPC 與單體 identity 模組的 `SuspendAccount` |
 | **假設 (Assumptions)** | 檢舉量級低（rate limit 20/日/人，硬編碼即可）；字典詞庫變動不頻繁（硬編碼即可，失真時才評估 DB-driven 字典）；admin 人力足以 24h 內清 PENDING 佇列（故不設自動 SLA 告警） |
 
 ---
@@ -111,7 +111,7 @@ flowchart TB
   DISP --> HIDER
   RUC --> REPO
   BUC --> REPO
-  DISP -->|HideReview/HideMessage/Suspend| EXT["review / im / account svc"]
+  DISP -->|HideReview/HideMessage/Suspend| EXT["review / im svc · 單體 identity"]
   FILT --> RDS[(Redis blocklist)]
 ```
 
@@ -119,7 +119,7 @@ flowchart TB
 |---|---|---|
 | `usecase/report.go` | 檢舉受理、裁決狀態機、稽核 | dispatcher, repository |
 | `usecase/block.go` | 雙向封鎖 | repository, Redis blocklist |
-| `usecase/dispatcher.go` | HIDE/BAN 副作用分派、`TargetOwnerResolver` snapshot owner | review/im/account client, hider |
+| `usecase/dispatcher.go` | HIDE/BAN 副作用分派、`TargetOwnerResolver` snapshot owner | review/im/account(identity) client, hider |
 | `usecase/post_hider.go` | 本地貼文隱藏 + MQ 通知賣家 | repository, MQ publisher |
 | `grpc/blocklist_filter.go` | 讀路徑（post/comment/forum）雙向過濾 | Redis blocklist |
 
@@ -286,7 +286,7 @@ sequenceDiagram
 | 24h 去重查詢 | — | 命中回舊 report（天然冪等） | — |
 | rate limit 查詢 | — | — | `CountByReporterSince ≥ 20/日` → `ResourceExhausted` |
 | HIDE_TARGET 副作用 | 副作用**先於**狀態轉換 | `ErrNotFound`（內容已消失）視為達標仍轉 RESOLVED_HIDDEN；其他 error **不轉狀態**讓 admin 重試 | fail-safe（狀態與副作用不脫節） |
-| BAN_USER → account Suspend | 任何 error 即中止 | account durable 為 SoT | 停權失敗則不落 RESOLVED_BANNED |
+| BAN_USER → identity Suspend | 任何 error 即中止 | identity 的 durable 停權為 SoT | 停權失敗則不落 RESOLVED_BANNED |
 | moderation_actions 寫入 | **best-effort，無 logger** | — | 靜默丟棄、不 rollback（見 §11 風險） |
 | TargetOwnerResolver | fail-open | — | resolve 失敗不阻擋裁決（owner_id=0） |
 | MQ PostHiddenByPlatform | fail-open | — | 通知失敗不影響下架 |
@@ -333,7 +333,7 @@ stateDiagram-v2
 | 依賴掛掉 | 行為 |
 |---|---|
 | Redis（blocklist / account-blocked） | fail-open：封鎖過濾略過（寧可漏過濾也不阻斷讀取） |
-| account-service（Suspend） | fail-closed：停權失敗則不落 RESOLVED_BANNED |
+| identity 模組（Suspend） | fail-closed：停權失敗則不落 RESOLVED_BANNED |
 | review / im-service（跨服務 Hide） | 副作用失敗不轉狀態，admin 可重試 |
 | MQ | fail-open：通知失敗不影響下架 |
 | PostgreSQL | 核心流程 fail：檢舉 / 裁決不可用 |
@@ -356,7 +356,7 @@ stateDiagram-v2
 | 指標 (SLI) | 目標 (SLO) | 量測點 |
 |---|---|---|
 | 檢舉處理時效 | PENDING → 裁決 < 24h（Apple 1.2） | `create_time` → `resolved_at` |
-| 停權生效延遲 | JWT 立即失效 | account Suspend ＋ Redis TTL 365d |
+| 停權生效延遲 | JWT 立即失效 | identity Suspend ＋ Redis TTL 365d |
 
 ### 9.2 容量與規模
 UGC 檢舉量級低，單 replica social-service 足夠；rate limit 20/日/人抑制濫用。scaling 觸發：若檢舉量大到 PENDING 佇列無法 24h 內清，先補 SLA 告警再談審核人力／自動化。
