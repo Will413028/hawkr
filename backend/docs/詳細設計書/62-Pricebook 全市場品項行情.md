@@ -268,12 +268,12 @@ metadata、401／403 no-store、decimal string／空集合契約；網頁測 all
 沿用事件總覽的 `SellerDeletedEvent`，訂閱 `hawkr.seller` exchange 的
 `seller.deleted`，獨立 queue `pricebook.seller.deleted`。僅使用 `accountId` 清除
 `market_watch_target.account_id`；`store_id` 是不同身分，不能代替 account ID。
-賣家角色刪除即清理，不等待最後角色刪除時才發出的 `account.deleted`。
+店家退場（關店後第一段清理）時 seller 模組發出 `seller.deleted`，即清理，不等待帳號刪除時才發出的 `account.deleted`。
 不新增 HTTP／gRPC 契約、不變更 schema，也不建立跨服務 FK。
 
 ```mermaid
 sequenceDiagram
-    participant Seller as seller-service
+    participant Seller as seller 模組（單體）
     participant MQ as hawkr.seller
     participant Worker as Pricebook typed consumer
     participant DB as Pricebook PostgreSQL
