@@ -22,7 +22,7 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'content.pbenum.dart';
 
-/// Banner 是首頁的一則 banner（設計書 25）。
+/// Banner 是首頁的一則 banner。
 class Banner extends $pb.GeneratedMessage {
   factory Banner({
     $core.String? id,

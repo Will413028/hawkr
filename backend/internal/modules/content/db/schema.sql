@@ -7,7 +7,7 @@ CREATE SCHEMA IF NOT EXISTS public;
 
 CREATE SCHEMA content;
 
--- 首頁 banner（設計書 25）。id 是 UUIDv7，由應用層產生、不設 DEFAULT：轉正圖片時就要用 id
+-- 首頁 banner。id 是 UUIDv7，由應用層產生、不設 DEFAULT：轉正圖片時就要用 id
 -- 登記引用，所以在寫入前產生（ADR 2026-09-25-row-identity-by-data-kind）。
 CREATE TABLE content.banners (
     id                UUID         PRIMARY KEY,

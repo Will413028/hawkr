@@ -39,7 +39,6 @@
   - [22 商品配送驗證（Product Shipping Validation）](詳細設計書/22-商品配送驗證%EF%BC%88Product%20Shipping%20Validation%EF%BC%89詳細設計書.md)
   - [23 門市管理模組（Store Pickup Management）](詳細設計書/23-門市管理模組%EF%BC%88Store%20Pickup%20Management%EF%BC%89詳細設計書.md)
   - [24 節假日管理（Holiday Management）](詳細設計書/24-節假日管理%EF%BC%88Holiday%20Management%EF%BC%89詳細設計書.md)
-  - [25 Banner 動作跳轉（Banner Action）](詳細設計書/25-Banner%20動作跳轉%EF%BC%88Banner%20Action%EF%BC%89詳細設計書.md)
   - [26 輸入驗證模組（Java InputValidator）](詳細設計書/26-輸入驗證模組%EF%BC%88Java%20InputValidator%EF%BC%89詳細設計書.md)
   - [27 地址搜尋與驗證（Address Proxy）](詳細設計書/27-地址搜尋與驗證%EF%BC%88Address%20Proxy%EF%BC%89詳細設計書.md)
   - [28 商品瀏覽統計（Product View Stats）](詳細設計書/28-商品瀏覽統計%EF%BC%88Product%20View%20Stats%EF%BC%89詳細設計書.md)

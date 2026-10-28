@@ -5,7 +5,7 @@ import (
 	"uuid"
 )
 
-// BannerActionType 是 banner 被點擊後的行為（設計書 25）。
+// BannerActionType 是 banner 被點擊後的行為。
 type BannerActionType string
 
 const (

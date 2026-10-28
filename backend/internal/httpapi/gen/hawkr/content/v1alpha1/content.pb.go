@@ -80,7 +80,7 @@ func (AppType) EnumDescriptor() ([]byte, []int) {
 	return file_hawkr_content_v1alpha1_content_proto_rawDescGZIP(), []int{0}
 }
 
-// Banner 是首頁的一則 banner（設計書 25）。
+// Banner 是首頁的一則 banner。
 type Banner struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`

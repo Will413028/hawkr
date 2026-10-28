@@ -39,7 +39,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Banner 是首頁的一則 banner（設計書 25），含後台才需要的排程與編輯狀態。
+// Banner 是首頁的一則 banner，含後台才需要的排程與編輯狀態。
 type Banner struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`

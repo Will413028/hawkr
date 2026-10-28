@@ -6,7 +6,7 @@
 
 - **服務**：content-service（Go）
 - **相關程式碼**：`services/content-service/`、`gateway/`（content handler）、`api/proto/content/content.proto`、`hawkr-admin/`
-- **相關設計書**：25（Banner 動作跳轉，同服務 admin CRUD 樣板）、49（多媒體儲存與圖片服務，圖片治理）、44（身份模型，admin 授權）、46（能力權限層，僅賣家面適用—食譜為 admin-only 不適用）
+- **相關設計書**：49（多媒體儲存與圖片服務，圖片治理）、44（身份模型，admin 授權）、46（能力權限層，僅賣家面適用—食譜為 admin-only 不適用）
 - **CodeMeta**：`docs/代碼管理（CodeMeta）/業務類型碼.md` → `AssetReferenceType.RECIPE`
 - **一句話定位**：content-service 食譜模組的資料模型與 API 契約，含 Admin 端 CRUD；食譜圖片納入既有 staged-upload 媒體治理鏈。
 

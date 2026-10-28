@@ -21,7 +21,7 @@ func TestBannerActionMustBeComplete(t *testing.T) {
 		{model.BannerAction{}, false},                            // 被洗成 {} 的那種
 		{model.BannerAction{Type: model.BannerActionURL}, false}, // 選了 url 沒填網址
 		{model.BannerAction{Type: model.BannerActionURL, Target: " "}, false},
-		// 設計書 25：只有 http、https 可以開啟，後台不能對 App 觸發任意 scheme。
+		// 只有 http、https 可以開啟，後台不能對 App 觸發任意 scheme。
 		{model.BannerAction{Type: model.BannerActionURL, Target: "javascript:alert(1)"}, false},
 		{model.BannerAction{Type: model.BannerActionURL, Target: "hawkr://order/1"}, false},
 		{model.BannerAction{Type: model.BannerActionURL, Target: "https://"}, false},

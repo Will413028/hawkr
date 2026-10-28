@@ -6,7 +6,7 @@
 |---|---|
 | 維護者 | Antigravity / Will |
 | 對應程式碼 | `backend-payuni/services/content/...`（Go）<br/>`hawkr-website/features/home/...`（Next.js）<br/>`hawkr-admin/src/pages/homepage/...`（React Admin） |
-| 相關 doc | [15-AI 微服務（AI Service）](15-AI%20微服務（AI%20Service）詳細設計書.md)<br/>[25-Banner 動作跳轉（Banner Action）](25-Banner%20動作跳轉（Banner%20Action）詳細設計書.md)<br/>[39-買家服務（Buyer Service）](39-買家服務（Buyer%20Service）詳細設計書.md)<br/>[ADR：首頁動態版面——結構／數據分離與排序融合](../adr/2026-09-18-homepage-dynamic-layout-ranking.md) |
+| 相關 doc | [15-AI 微服務（AI Service）](15-AI%20微服務（AI%20Service）詳細設計書.md)<br/>[39-買家服務（Buyer Service）](39-買家服務（Buyer%20Service）詳細設計書.md)<br/>[ADR：首頁動態版面——結構／數據分離與排序融合](../adr/2026-09-18-homepage-dynamic-layout-ranking.md) |
 
 ---
 
@@ -32,7 +32,7 @@
 
 ### 1.4 與其他設計書／服務的關係
 *   **AI 微服務 (§15)**：AI 個人化分數模式下的分數來源。提供個人化的區塊點擊率 (CTR) 預估分數，於該模式啟用時取代自建熱度分數作為 Layout Engine 的動態基礎分數。
-*   **Banner 動作跳轉 (§25)**：為首頁 Banner 區塊的項目配置跳轉與跳出控制。
+*   **Banner 點擊行為**：為首頁 Banner 區塊的項目配置跳轉與跳出控制，規格見 `docs/modules/content.md`。
 *   **買家服務 (§39)**：買家 App/Web 呼叫 Gateway，轉發至本模組的 Layout API。
 
 ---
