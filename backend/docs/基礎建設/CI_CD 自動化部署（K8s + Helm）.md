@@ -113,8 +113,8 @@ git diff <github.event.before> <本次 SHA>
 Go 服務的 proto 依賴用 `grep` 動態掃描 import（不需要手動維護對照表）：
 
 ```bash
-grep -rh 'github.com/Will413028/hawkr/go-pkg/proto/' services/account-service --include='*.go'
-# → proto/product, proto/payment → 這兩個 proto 有改，account-service 就要 rebuild
+grep -rh 'github.com/Will413028/hawkr/go-pkg/proto/' services/review-service --include='*.go'
+# → proto/buyer, proto/media, proto/order, proto/review, proto/seller → 這幾個 proto 有改，review-service 就要 rebuild
 ```
 
 ### values-only 變更
@@ -375,7 +375,7 @@ gh workflow run deploy-k8s.yml --ref dev
 gh workflow run deploy-k8s.yml --ref dev -f force_all=true
 
 # 只重 build + 部署指定服務（deploy drift 補救；--ref 必須與目標環境對齊）
-gh workflow run deploy-k8s.yml --ref dev -f services=buyer-service,account-service
+gh workflow run deploy-k8s.yml --ref dev -f services=review-service,social-service
 
 # 查看部署狀態
 gh run list --workflow=deploy-k8s.yml --limit=5
