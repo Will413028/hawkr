@@ -22,7 +22,6 @@
 | 代碼位置 | `serverless/egress-proxy/`（Dockerfile／nginx.conf／deploy.sh／README） |
 | 已收編路徑 | `/api/mtk/SmSend`、`/api/mtk/SmQuery`（三竹簡訊）；`/addrws/v40/QueryAddr.asmx/QueryAddr`（TGOS 地址驗證） |
 
-> **TGOS 收編已完成（2026-07-28）**：`tgos-proxy`（地址驗證）原為獨立服務，已收編進 egress-proxy 並退役——`serverless/tgos-proxy/` 已從版控移除（源碼存證於 git 歷史，退役 commit `3f47cf908`），buyer-service／seller-service 的 `TGOS_BASE_URL` 皆已指向 egress-proxy。呼叫端 SA 仍沿用 `tgos-proxy-caller`（由 egress-proxy 追授 invoker，故 code 與 secret 皆零改動），secret `tgos-proxy-caller-credentials` 續用。egress-proxy 是 TGOS 的唯一入口。
 
 ## 3. 新第三方接入流程（強制）
 
