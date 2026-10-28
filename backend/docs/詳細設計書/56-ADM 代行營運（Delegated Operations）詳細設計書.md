@@ -5538,7 +5538,7 @@ C12 是硬約束：admin 前端把 preflight 的 **404 與 503 都**顯示成「
 | **notification-service** | — | — | — | 通知延後／失敗，`OBS5` 上升；**不影響代行寫入的成立**（通知是事後告知，不是前置條件） |
 | **Redis** | 不受影響 | 不受影響 | 不受影響 | 不受影響——**本功能不使用 Redis**（§9.4） |
 
-**整條鏈路的降級方向：一律 fail-closed。** 這與 54 號 App 版本閘門刻意全 fail-open 的選擇相反，理由是
+**整條鏈路的降級方向：一律 fail-closed。** 這與 App 版本閘門刻意全 fail-open 的選擇（`docs/modules/content.md` §5）相反，理由是
 兩者的失敗代價不對稱：版本閘門失敗只是「該更新的人沒被擋」，代行授權失敗是「不該寫的人寫進去了」。
 
 **單體 delegation 不可用時的完整語意**：
@@ -5841,7 +5841,7 @@ fail-fast：`Config.Validate()` 必須斷言下面三條，任一不成立即啟
 ① 先確認不是單一 client 迴圈 ② 確認對應管理員 principal 的請求量 ③ 才調高
 `RATE_LIMIT_DEFAULT_PER_WINDOW` 或為 `/api/v1/admin/*` 另立 tier。
 ⚠️ **不得**把代行端點加進 `exemptExact` 豁免——那會開一個 admin session 被竊後可無限打 DB 的洞
-（同 54 號 §8.3 對版本檢查端點的既有裁決）。
+（版本檢查端點同樣不豁免）。
 
 ### 9.3 效能預算
 
