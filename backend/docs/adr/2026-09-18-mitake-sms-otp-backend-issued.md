@@ -61,7 +61,7 @@ OTP 輸碼成功本身就是「送達且使用者讀到了」的最強證明，�
 **不採用**：兩條路徑並存一段 grace period。
 
 雙軌等於同時維護兩套驗證契約，而前端要判斷「這個版本走哪一條」。
-改成硬切 ＋ App 強制更新放量（強更機制見 54 號設計書）。
+改成硬切 ＋ App 強制更新放量（強更機制見 `docs/modules/content.md` 與 `packages/hawkr_app_update/docs/spec.md`）。
 
 ### D6 發送失敗不自動重試
 

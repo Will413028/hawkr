@@ -142,8 +142,8 @@ var exemptExact = map[string]struct{}{
 // anywhere (ai_assistant_repository.dart in each app). One turn is one request,
 // so a request counter models these correctly.
 //
-// The precedent is already written down: 54 號 §11.2 refused to exempt
-// /public/app-version-gate on the grounds that 「豁免等於開一個匿名可無限打 DB
+// The precedent is already written down: the app-version check endpoint is
+// not exempt either (/public/app-version-gate) on the grounds that 「豁免等於開一個匿名可無限打 DB
 // 的端點——用一個更大的洞換一個較小的洞」. Same trade, larger stakes here, since
 // the endpoint behind it bills a paid model rather than a DB read.
 //

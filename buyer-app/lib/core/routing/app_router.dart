@@ -567,7 +567,7 @@ class _RouterNotifier extends ChangeNotifier {
       sessionProvider,
       (_, __) => notifyListeners(),
     );
-    // 前景恢復重檢後結果變動，要立刻觸發 redirect 重判（54 號設計書 §7.2）。
+    // 前景恢復重檢後結果變動，要立刻觸發 redirect 重判（`packages/hawkr_app_update/docs/spec.md`）。
     ref.listen<CheckAppVersionResponse>(
       forceUpdateProvider,
       (_, __) => notifyListeners(),

@@ -13,7 +13,7 @@ import '../session/session_provider.dart';
 /// 而 `sessionProvider` / `forceUpdateGateProvider` 是 Riverpod Notifier。
 /// 此類別監聽兩者變化，觸發 `notifyListeners()` 讓 GoRouter 重新執行
 /// `redirect`——redirect 讀哪個 provider，這裡就要聽哪個，否則 state 變了
-/// 也不會重判（54 號設計書 §7.2：前景恢復重檢靠這條路徑生效）。
+/// 也不會重判（`packages/hawkr_app_update/docs/spec.md`：前景恢復重檢靠這條路徑生效）。
 class SessionChangeNotifier extends ChangeNotifier {
   SessionChangeNotifier(this._ref) {
     _sub = _ref.listen<SessionModel>(sessionProvider, (previous, next) {

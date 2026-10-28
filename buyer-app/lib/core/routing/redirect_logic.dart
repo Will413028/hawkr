@@ -1,6 +1,6 @@
 import 'route_access_policy.dart';
 
-/// 強制更新攔截頁路徑（54 號設計書 §4.5）。
+/// 強制更新攔截頁路徑（`packages/hawkr_app_update/docs/spec.md`）。
 const String forceUpdateRoute = '/force-update';
 
 /// 登入頁路徑。
@@ -9,7 +9,7 @@ const String loginRoute = '/login';
 /// GoRouter redirect 的純函式決策核心。
 ///
 /// 抽成 top-level 純函式而非留在 closure 內，是為了讓兩個不變式可被單元測試
-/// 直接驗證（54 號設計書 §11.1 指名的風險緩解手段）：
+/// 直接驗證（`packages/hawkr_app_update/docs/spec.md` 指名的風險緩解手段）：
 ///
 /// 1. **強更判斷早於登入判斷** —— 否則未登入者會先被導去 [loginRoute]，
 ///    在一個後端已宣告不再支援的版本上繼續操作，永遠看不到更新畫面。
@@ -32,7 +32,7 @@ String? resolveBuyerRedirect({
   String? loginContinueParam,
   String? currentUri,
 }) {
-  // App 強制更新（54 號設計書 §4.5）：必須早於登入判斷。截圖模式豁免。
+  // App 強制更新（`packages/hawkr_app_update/docs/spec.md`）：必須早於登入判斷。截圖模式豁免。
   // [forceUpdateRoute] 自身放行，否則 redirect 自我循環。
   if (!isScreenshotMode && needsForceUpdate) {
     return location == forceUpdateRoute ? null : forceUpdateRoute;

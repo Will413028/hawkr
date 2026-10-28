@@ -31,7 +31,7 @@ String? resolveAuthRedirect({
   bool needsForceUpdate = false,
   bool storeUnavailable = false,
 }) {
-  // App 版本低於後端設定的最低可用版本（54 號設計書 §4.1）：**先於所有其他
+  // App 版本低於後端設定的最低可用版本（`packages/hawkr_app_update/docs/spec.md`）：**先於所有其他
   // 判斷**。未登入者也要被攔——否則會先被導去 /login，在一個後端已宣告不再
   // 支援的版本上繼續操作。/force-update 自身放行，否則 redirect 自我循環。
   //

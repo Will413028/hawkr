@@ -51,7 +51,7 @@ type ContentPublicServiceClient interface {
 	// ListLiveBanners 列出此刻要在首頁顯示的 banner：啟用中、而且在顯示期間 [開始, 結束) 內，依顯示順序排列。
 	// 啟用中的 banner 最多 20 則（寫入時限制），第一頁（預設 50 則）就是全部，client 不必翻頁。
 	ListLiveBanners(context.Context, *connect.Request[v1alpha1.ListLiveBannersRequest]) (*connect.Response[v1alpha1.ListLiveBannersResponse], error)
-	// CheckAppVersion 判斷 App 是否低於最低版本、必須強制更新（設計書 54）。版本比較只在後端做，
+	// CheckAppVersion 判斷 App 是否低於最低版本、必須強制更新。版本比較只在後端做，
 	// App 只看 update_required。App 收到任何錯誤都要放行（fail-open）。
 	CheckAppVersion(context.Context, *connect.Request[v1alpha1.CheckAppVersionRequest]) (*connect.Response[v1alpha1.CheckAppVersionResponse], error)
 }
@@ -107,7 +107,7 @@ type ContentPublicServiceHandler interface {
 	// ListLiveBanners 列出此刻要在首頁顯示的 banner：啟用中、而且在顯示期間 [開始, 結束) 內，依顯示順序排列。
 	// 啟用中的 banner 最多 20 則（寫入時限制），第一頁（預設 50 則）就是全部，client 不必翻頁。
 	ListLiveBanners(context.Context, *connect.Request[v1alpha1.ListLiveBannersRequest]) (*connect.Response[v1alpha1.ListLiveBannersResponse], error)
-	// CheckAppVersion 判斷 App 是否低於最低版本、必須強制更新（設計書 54）。版本比較只在後端做，
+	// CheckAppVersion 判斷 App 是否低於最低版本、必須強制更新。版本比較只在後端做，
 	// App 只看 update_required。App 收到任何錯誤都要放行（fail-open）。
 	CheckAppVersion(context.Context, *connect.Request[v1alpha1.CheckAppVersionRequest]) (*connect.Response[v1alpha1.CheckAppVersionResponse], error)
 }

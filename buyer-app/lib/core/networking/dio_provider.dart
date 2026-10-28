@@ -70,7 +70,7 @@ Dio dio(Ref ref) {
       baseUrl: F.appFlavor.apiBaseUrl,
       connectTimeout: const Duration(seconds: 30),
       receiveTimeout: const Duration(seconds: 30),
-      // X-App-* 三欄供 Gateway access log 統計版本佔比（54 號設計書 §6.5）。
+      // X-App-* 三欄供 Gateway access log 統計版本佔比（`packages/hawkr_app_update/docs/spec.md`）。
       headers: {'Accept': 'application/json', ...AppVersionHeaders.headers},
     ),
   );

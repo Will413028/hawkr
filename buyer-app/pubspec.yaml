@@ -57,7 +57,7 @@ dependencies:
     path: ../packages/hawkr_api
   hawkr_auth:
     path: ../packages/hawkr_auth
-  # App 版本門檻的檢查邏輯（設計書 54），與另一支 App 共用。
+  # App 版本門檻的檢查邏輯，與另一支 App 共用。
   hawkr_app_update:
     path: ../packages/hawkr_app_update
   # 內政部鄉鎮市區代碼表與查詢（由 backend/internal/platform/twaddr 生成），與另一支 App 共用。

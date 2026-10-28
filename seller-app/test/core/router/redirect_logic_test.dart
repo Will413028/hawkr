@@ -359,7 +359,7 @@ void main() {
     },
   );
 
-  group('resolveAuthRedirect — needsForceUpdate（54 號設計書 §4.5：置於所有判斷最前）', () {
+  group('resolveAuthRedirect — needsForceUpdate（置於所有判斷最前）', () {
     test('未登入 + 需強更 → 導強更頁，不是 /auth', () {
       expect(
         resolveAuthRedirect(

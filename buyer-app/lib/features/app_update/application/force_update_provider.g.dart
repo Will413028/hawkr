@@ -8,7 +8,7 @@ part of 'force_update_provider.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// 版本門檻的結果，供 GoRouter redirect 讀取（設計書 54 §4.1）；攔截一律由 router redirect 執行。
+/// 版本門檻的結果，供 GoRouter redirect 讀取（`packages/hawkr_app_update/docs/spec.md`）；攔截一律由 router redirect 執行。
 ///
 /// 檢查的規則（只在 iOS、3 秒逾時、失敗一律放行、回到前景的節流）在兩支 App 共用的
 /// `hawkr_app_update`，這裡只把結果放進 state。CheckAppVersion 是公開的 service，不帶身分：token 過期時
@@ -17,14 +17,14 @@ part of 'force_update_provider.dart';
 @ProviderFor(ForceUpdate)
 final forceUpdateProvider = ForceUpdateProvider._();
 
-/// 版本門檻的結果，供 GoRouter redirect 讀取（設計書 54 §4.1）；攔截一律由 router redirect 執行。
+/// 版本門檻的結果，供 GoRouter redirect 讀取（`packages/hawkr_app_update/docs/spec.md`）；攔截一律由 router redirect 執行。
 ///
 /// 檢查的規則（只在 iOS、3 秒逾時、失敗一律放行、回到前景的節流）在兩支 App 共用的
 /// `hawkr_app_update`，這裡只把結果放進 state。CheckAppVersion 是公開的 service，不帶身分：token 過期時
 /// 不會觸發 refresh。
 final class ForceUpdateProvider
     extends $NotifierProvider<ForceUpdate, CheckAppVersionResponse> {
-  /// 版本門檻的結果，供 GoRouter redirect 讀取（設計書 54 §4.1）；攔截一律由 router redirect 執行。
+  /// 版本門檻的結果，供 GoRouter redirect 讀取（`packages/hawkr_app_update/docs/spec.md`）；攔截一律由 router redirect 執行。
   ///
   /// 檢查的規則（只在 iOS、3 秒逾時、失敗一律放行、回到前景的節流）在兩支 App 共用的
   /// `hawkr_app_update`，這裡只把結果放進 state。CheckAppVersion 是公開的 service，不帶身分：token 過期時
@@ -58,7 +58,7 @@ final class ForceUpdateProvider
 
 String _$forceUpdateHash() => r'a0d4cc1736bcd1f796a98ccf7087dd43f60bc0b2';
 
-/// 版本門檻的結果，供 GoRouter redirect 讀取（設計書 54 §4.1）；攔截一律由 router redirect 執行。
+/// 版本門檻的結果，供 GoRouter redirect 讀取（`packages/hawkr_app_update/docs/spec.md`）；攔截一律由 router redirect 執行。
 ///
 /// 檢查的規則（只在 iOS、3 秒逾時、失敗一律放行、回到前景的節流）在兩支 App 共用的
 /// `hawkr_app_update`，這裡只把結果放進 state。CheckAppVersion 是公開的 service，不帶身分：token 過期時

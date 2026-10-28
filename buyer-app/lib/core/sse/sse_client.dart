@@ -64,7 +64,7 @@ class SseClient {
   void _subscribe() {
     if (_disposed) return;
     // X-App-* 三欄供 Gateway access log 統計版本佔比；SSE 只在握手記一筆
-    // access log，之後的訊息不進 log（54 號設計書 §6.5 / §8.2）。
+    // access log，之後的訊息不進 log（`packages/hawkr_app_update/docs/spec.md`）。
     final headers = <String, String>{
       'Accept': 'text/event-stream',
       ...AppVersionHeaders.headers,

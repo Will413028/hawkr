@@ -65,7 +65,6 @@
   - [51 簡訊發送與手機 OTP（Mitake SMS & Phone OTP）](詳細設計書/51-簡訊發送與手機%20OTP%EF%BC%88Mitake%20SMS%20&%20Phone%20OTP%EF%BC%89詳細設計書.md)
   - [52 微服務間內部授權（Internal Service Authorization）](詳細設計書/52-微服務間內部授權%EF%BC%88Internal%20Service%20Authorization%EF%BC%89詳細設計書.md)
   - [53 Web 前端快取架構與版本一致性（Web Frontend Cache & Deployment Consistency）](詳細設計書/53-Web%20前端快取架構與版本一致性%EF%BC%88Web%20Frontend%20Cache%20%26%20Deployment%20Consistency%EF%BC%89詳細設計書.md)
-  - [54 App 版本檢查與強制更新（App Version Gate）](詳細設計書/54-App%20版本檢查與強制更新%EF%BC%88App%20Version%20Gate%EF%BC%89.md)
   - [55 Hawkr 幫找採購助手（Procurement Assistant）](詳細設計書/55-Hawkr%20幫找採購助手%EF%BC%88Procurement%20Assistant%EF%BC%89詳細設計書.md)
   - [56 ADM 代行營運（Delegated Operations）](詳細設計書/56-ADM%20代行營運%EF%BC%88Delegated%20Operations%EF%BC%89詳細設計書.md)
   - [58 電子發票服務（Invoice Service）](詳細設計書/58-電子發票服務%EF%BC%88Invoice%20Service%EF%BC%89詳細設計書.md)
@@ -151,6 +150,7 @@
   - [食安事件處理 Runbook](runbooks/food-safety-incident-runbook.md)
   - [賣家違規管理 Runbook](runbooks/seller-violation-management-runbook.md)
   - [賣家治理共用判斷標準](runbooks/seller-governance-shared.md)
+  - [App 版本門檻 Runbook](runbooks/app-version-gate.md)
   - [商品 re-key backfill gate](runbooks/product-rekey-backfill-gate.md)
   - [賣家通知身分 store_id backfill（device_tokens + notification_preferences）](runbooks/seller-notification-identity-store-id-backfill.md)
 

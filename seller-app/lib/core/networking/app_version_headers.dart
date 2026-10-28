@@ -3,7 +3,7 @@ import '../codemeta/code_meta.dart';
 
 /// 每個請求都帶的 header（含 WebSocket 握手）。
 ///
-/// - 版本（54 號設計書 §6.5）：`X-App-Version`／`X-App-Type`（App 只發 iOS，不帶平台），供 access log
+/// - 版本（`packages/hawkr_app_update/docs/spec.md`）：`X-App-Version`／`X-App-Type`（App 只發 iOS，不帶平台），供 access log
 ///   統計版本分佈。**純可觀測性用途**：伺服器不因缺這些 header 拒絕任何請求，也不拿它們當授權依據。
 /// - 視角：舊 REST、SSE、WebSocket 握手與 chat ws-ticket 另外帶 [kActiveRoleHeader]（固定是 [kAppActiveRole]），舊
 ///   gateway 依它選擇以買家或賣家身分動作；只是視角、不是授權。Connect 不送它（ADR

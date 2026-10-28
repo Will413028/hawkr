@@ -16,7 +16,7 @@
 #### force_update_screen (強制更新頁面)
 | API | Method | 說明 |
 |-----|--------|------|
-| `/api/v1/public/app-version-gate` | GET | 檢查 App 版本是否需要強制更新 (設計書 54) |
+| `/api/v1/public/app-version-gate` | GET | 檢查 App 版本是否需要強制更新 (`docs/modules/content.md` §5) |
 
 #### auth_screen (登入註冊頁面)
 | API | Method | 說明 |
@@ -371,7 +371,7 @@
 #### force_update_screen (強制更新頁面)
 | API | Method | 說明 |
 |-----|--------|------|
-| `/api/v1/public/app-version-gate` | GET | 檢查 App 版本是否需要強制更新 (設計書 54) |
+| `/api/v1/public/app-version-gate` | GET | 檢查 App 版本是否需要強制更新 (`docs/modules/content.md` §5) |
 
 #### auth_screen (登入註冊頁面)
 | API | Method | 說明 |

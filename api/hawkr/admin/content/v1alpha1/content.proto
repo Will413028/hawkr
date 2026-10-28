@@ -85,7 +85,7 @@ message Banner {
   string etag = 16;
 }
 
-// AppVersionGate 是一支 App 的最低可用版本（設計書 54），以 app_type 識別。App 只發 iOS。
+// AppVersionGate 是一支 App 的最低可用版本，以 app_type 識別。App 只發 iOS。
 message AppVersionGate {
   // 識別一組門檻。
   hawkr.content.v1alpha1.AppType app_type = 1 [

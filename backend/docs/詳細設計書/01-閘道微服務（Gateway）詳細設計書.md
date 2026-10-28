@@ -119,7 +119,7 @@ autofill、session 查詢、snapshot、候選搜尋建立與輪詢、selection�
 關閉 controller，兩個 repo 都沒有註冊任何 retry interceptor（各自的
 `ai_assistant_repository.dart`）。**一輪對話 ＝ 一個請求**，request counter 對它是正確的模型。
 
-同一判準見 54 號 §11：`/public/app-version-gate` 同樣不列入豁免——**豁免等於開一個匿名
+同一判準：App 版本檢查的公開端點同樣不列入豁免——**豁免等於開一個匿名
 可無限打 DB 的端點**。這裡賭注更大，因為端點後面是**計費模型**不是一次 DB 讀取。
 
 分類表在 `middleware/ratelimit_ai_routes_test.go` 的 `aiRouteTiers`，對**實際路由表**

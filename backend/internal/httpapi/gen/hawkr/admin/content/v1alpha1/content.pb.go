@@ -217,7 +217,7 @@ func (x *Banner) GetEtag() string {
 	return ""
 }
 
-// AppVersionGate 是一支 App 的最低可用版本（設計書 54），以 app_type 識別。App 只發 iOS。
+// AppVersionGate 是一支 App 的最低可用版本，以 app_type 識別。App 只發 iOS。
 type AppVersionGate struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 識別一組門檻。

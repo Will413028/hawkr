@@ -95,12 +95,12 @@ const (
 // AppTypes 是所有的 App 類型。資料庫的 CHECK 必須與它一致（integration 測試比對）。
 func AppTypes() []AppType { return []AppType{AppTypeBuyer, AppTypeSeller} }
 
-// AppVersionGate 是一支 App 的最低可用版本（設計書 54 §5.1），以 AppType 識別。App 只發 iOS，
+// AppVersionGate 是一支 App 的最低可用版本，以 AppType 識別。App 只發 iOS，
 // 所以沒有平台這個維度。
 type AppVersionGate struct {
 	AppType        AppType
 	MinimumVersion string
-	// StoreURL 為空表示還沒設定，App 會隱藏「前往更新」按鈕（§7.6 ④）。
+	// StoreURL 為空表示還沒設定，App 會隱藏「前往更新」按鈕。
 	StoreURL    string
 	NoticeTitle string
 	NoticeBody  string
@@ -109,7 +109,7 @@ type AppVersionGate struct {
 	UpdatedAt time.Time
 }
 
-// VersionCheck 是版本檢查的結果。版本比較只在這裡做，App 只看 UpdateRequired（§4.1、§4.2）。
+// VersionCheck 是版本檢查的結果。版本比較只在這裡做，App 只看 UpdateRequired。
 type VersionCheck struct {
 	UpdateRequired bool
 	MinimumVersion string

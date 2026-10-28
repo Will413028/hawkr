@@ -12,14 +12,14 @@ import '../../../shared/widgets/common_top_bar.dart';
 import '../../../shared/widgets/hk_button_label.dart';
 import '../application/force_update_provider.dart';
 
-/// App 強制更新畫面（54 號設計書 §4.5 / §7.6 ④）。
+/// App 強制更新畫面（`packages/hawkr_app_update/docs/spec.md`）。
 ///
 /// 版本低於後端設定的 `minimum_version` 時，router redirect 一律導來此頁。
 /// 這是**不可跳過**的攔截頁：沒有返回鍵、`PopScope(canPop: false)` 擋掉
 /// 系統返回手勢，唯一出路是更新 App 後重啟。
 ///
 /// `storeUrl` 為空時**隱藏「前往更新」按鈕**改顯示文字指引——不導向任何猜測
-/// URL，使用者撞 404 比沒有按鈕更糟（D7）。
+/// URL，使用者撞 404 比沒有按鈕更糟。
 class ForceUpdateScreen extends ConsumerWidget {
   const ForceUpdateScreen({super.key});
 

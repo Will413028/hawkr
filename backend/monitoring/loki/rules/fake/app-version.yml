@@ -1,4 +1,4 @@
-# Loki ruler 告警：App 版本 header 出現非法值（設計書 54 §8.2）
+# Loki ruler 告警：App 版本 header 出現非法值（見 docs/runbooks/app-version-gate.md）
 #
 # X-App-Version 是**匿名可控輸入**（Gateway 只截斷不驗證，logger.go truncateHeaderValue
 # 限 32 字元），任何人 curl 一個亂數就會在 Loki 多出一條 app_version series，
@@ -34,4 +34,4 @@ groups:
           severity: warning
         annotations:
           summary: "App 版本 header 出現非法值 ({{ $labels.environment }})"
-          description: "近 5m 內持續有 app_version 不符 semver 的請求（已持續 15m 以上）。依序排查：① Grafana dashboard `hawkr-app-versions` 的「非法 app_version 明細」表看實際值 ② 值是剛好 32 字元 → Gateway 截斷邏輯 ③ 值看得出是版本號但帶 build number／前綴 → App 端送錯格式（設計書 54 §6.5），此時版本佔比統計已失真，放行判準不可用 ④ 值是亂數且來自單一 IP → 有人在灌 header，確認來源後可忽略。"
+          description: "近 5m 內持續有 app_version 不符 semver 的請求（已持續 15m 以上）。依序排查：① Grafana dashboard `hawkr-app-versions` 的「非法 app_version 明細」表看實際值 ② 值是剛好 32 字元 → Gateway 截斷邏輯 ③ 值看得出是版本號但帶 build number／前綴 → App 端送錯格式（見 packages/hawkr_app_update/docs/spec.md §5），此時版本佔比統計已失真，放行判準不可用 ④ 值是亂數且來自單一 IP → 有人在灌 header，確認來源後可忽略。"

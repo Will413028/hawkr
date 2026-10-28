@@ -20,7 +20,7 @@ Future<String> fetchAppVersion() async {
 
 /// 取得 bare semver 版本字串（`"1.0.3"`，**不含** build number）
 ///
-/// 專供 App 版本 gate 與 `X-App-Version` header 使用（54 號設計書 §6.5）：
+/// 專供 App 版本 gate 與 `X-App-Version` header 使用（`packages/hawkr_app_update/docs/spec.md`）：
 /// 後端以三段數字比對版本，**不可**餵 [fetchAppVersion] 的顯示字串
 /// `"1.0.3(7)"`——那會讓比對全部失敗 → fail-open → 強更靜默永不觸發。
 ///

@@ -93,7 +93,7 @@ Future<Widget> _bootstrapApplication() async {
   }
 
   // bare semver 快取一次供同步讀取（Dio BaseOptions 的 header 與版本 gate
-  // 都要用，54 號設計書 §6.5）。必須早於任何 Dio instance 建立。
+  // 都要用，`packages/hawkr_app_update/docs/spec.md`）。必須早於任何 Dio instance 建立。
   await initAppVersionInfo();
 
   // 從 --dart-define=FLUTTER_FLAVOR=xxx 讀取環境配置
@@ -143,9 +143,9 @@ Future<Widget> _bootstrapApplication() async {
   await container.read(appTextSizeProvider.notifier).restore();
   PushNotificationManager.instance.injectContainer(container);
 
-  // App 版本 gate（54 號設計書 §7.1）：**await** 完成才進路由，否則會先進
+  // App 版本 gate（`packages/hawkr_app_update/docs/spec.md`）：**await** 完成才進路由，否則會先進
   // 首頁再彈更新畫面，出現可操作空窗。位置刻意早於下面的推播初始化——
-  // 通知導頁在 gate 攔截時還沒 arm，不需另建抑制機制（§7.1 D5b）。
+  // 通知導頁在 gate 攔截時還沒 arm，不需另建抑制機制。
   //
   // ⚠️ 例外必須在這裡自己吃掉：`BrandStartupGate._runBootstrap` 的 catch 只
   // reportError、不 setState 也不解除 splash（`brand_startup_splash.dart:75-84`），

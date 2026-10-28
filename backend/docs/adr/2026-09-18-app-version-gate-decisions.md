@@ -6,7 +6,7 @@
 | 日期 | 2026-09-18 |
 | 影響範圍 | `content-service`（2026-09-26 起是單體的 content 模組）／Gateway／`hawkr_buyer`／`hawkr_seller`／`hawkr-admin` |
 
-逐欄規格見 `docs/詳細設計書/54-App 版本檢查與強制更新（App Version Gate）.md`。
+逐欄規格見 `docs/modules/content.md`（後端）與 `packages/hawkr_app_update/docs/spec.md`（App 端）。
 本檔只保存「為什麼選這個、否決了什麼」。
 
 ## D1 設定存哪：新建專用表 `app_version_gates`
@@ -111,3 +111,7 @@ content-service 是既有「站台營運可維護資料」的承載者（`site_c
 佔比」「新版放量後舊版是否歸零」。
 
 🔴 **價值不包含「單憑 header 缺席就能硬擋舊 App」**——見 D5 與詳細設計書 §3.1 第 2 點。
+
+## 修訂（2026-10-28）
+
+設計書 54（App 版本檢查與強制更新）已刪除，內容由 `docs/modules/content.md`（後端）、`packages/hawkr_app_update/docs/spec.md`（App 端）與 `docs/runbooks/app-version-gate.md`（排查與放行判準）承接。本文中「設計書 54」與它的章節編號（§3.1、§4.6、§9.2 等）指向已刪除的文件，內容見 git 歷史。

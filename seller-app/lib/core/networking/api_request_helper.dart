@@ -114,7 +114,7 @@ mixin ApiRequestHelper {
 
   /// Typed GET contract. Unlike [apiGet], transport, HTTP and business
   /// failures remain distinct and can never be mistaken for success — a caller
-  /// that must fail open (App 版本 gate，54 號設計書 §7.6 ②) has to tell a
+  /// that must fail open (App 版本 gate，`packages/hawkr_app_update/docs/spec.md`) has to tell a
   /// transport error apart from a legitimate `updateRequired: false`.
   Future<ApiResult<Map<String, dynamic>>> apiGetResult(
     String path, {

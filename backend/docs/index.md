@@ -99,7 +99,6 @@
 | 51 | [簡訊發送與手機 OTP（Mitake SMS & Phone OTP）](詳細設計書/51-簡訊發送與手機%20OTP%EF%BC%88Mitake%20SMS%20&%20Phone%20OTP%EF%BC%89詳細設計書.md) | `serverless/egress-proxy/`、`internal/modules/identity/`、`internal/httpapi/identity/` |
 | 52 | [微服務間內部授權（Internal Service Authorization）](詳細設計書/52-微服務間內部授權%EF%BC%88Internal%20Service%20Authorization%EF%BC%89詳細設計書.md) | `services/java/shared/common-core/`、`pkg/middleware/grpc/interceptor/`、`k8s/external-services/networkpolicy.yaml` |
 | 53 | [Web 前端快取架構與版本一致性（Web Frontend Cache & Deployment Consistency）](詳細設計書/53-Web%20前端快取架構與版本一致性%EF%BC%88Web%20Frontend%20Cache%20%26%20Deployment%20Consistency%EF%BC%89詳細設計書.md) | `hawkr-website/lib/api/cached.ts`、`hawkr-website/open-next.config.ts`、`hawkr-website/app/api/revalidate/route.ts` |
-| 54 | [App 版本檢查與強制更新（App Version Gate）](詳細設計書/54-App%20版本檢查與強制更新%EF%BC%88App%20Version%20Gate%EF%BC%89.md) | `internal/modules/content/`、`internal/httpapi/content/`、`hawkr_buyer/`、`hawkr_seller/`、`hawkr-admin/` |
 | 55 | [Hawkr 幫找採購助手（Procurement Assistant）](詳細設計書/55-Hawkr%20幫找採購助手%EF%BC%88Procurement%20Assistant%EF%BC%89詳細設計書.md) | `services/ai-service/internal/procurement/`、`gateway/internal/handler/ai.go`、`hawkr-website/features/procurement-assistant/` |
 | 56 | [ADM 代行營運（Delegated Operations）](詳細設計書/56-ADM%20代行營運%EF%BC%88Delegated%20Operations%EF%BC%89詳細設計書.md) | `internal/modules/identity/`（代行資料）、`internal/legacy/delegationservice/`、`gateway/internal/authz/`、`gateway/internal/router/`、`api/proto/common/delegation.proto`、`hawkr-admin/src/features/delegated-operations/` |
 | 64 | [Hawkr Agent 商務線（RFQ Publication、Seller Quote、Buyer Acceptance）](詳細設計書/64-Hawkr%20Agent%20%E5%95%86%E5%8B%99%E7%B7%9A%EF%BC%88RFQ%20Publication%E3%80%81Seller%20Quote%E3%80%81Buyer%20Acceptance%EF%BC%89%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88%E6%9B%B8.md) | 由另一條 lane 維護；本列僅補登記（`00-總覽.md` 已有，`_sidebar`／`index` 先前漏登） |
@@ -206,6 +205,7 @@
 | [食安事件處理 Runbook](runbooks/food-safety-incident-runbook.md) | `food_safety_reports`（critical，4 小時 SLA）從受理到處置的操作步驟與 SQL |
 | [賣家違規管理 Runbook](runbooks/seller-violation-management-runbook.md) | `seller_violation_reports` high/medium/low 檢舉與 admin 主動建立 violation |
 | [賣家治理共用判斷標準](runbooks/seller-governance-shared.md) | 上兩份 runbook 共用的 penalty 選用、public_summary 撰寫、申訴決議標準（SSOT） |
+| [App 版本門檻 Runbook](runbooks/app-version-gate.md) | 強更沒生效或全體被鎖的排查、各版本請求佔比的讀法、舊版 App 的放行判準 |
 | [商品 re-key backfill gate](runbooks/product-rekey-backfill-gate.md) | seller/store aggregate re-key 的人工 gate（跨 `hawkr_seller`／`hawkr_product` 兩 DB） |
 
 ---

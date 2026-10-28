@@ -38,8 +38,8 @@ func (m *Service) q(ctx context.Context) *store.Queries {
 
 // CheckAppVersion 判斷 clientVersion 是否低於門檻、必須強制更新。
 //
-// 一律 fail-open（§7.6 ①③、§8.3）：沒有設定、門檻或 App 送來的版本格式不對，都回傳不需要
-// 更新，不讓設定錯誤把使用者擋在門外。這兩種情況各記一筆 log，是發現設定漏填的唯一線索（§8.2）。
+// 一律 fail-open：沒有設定、門檻或 App 送來的版本格式不對，都回傳不需要更新，不讓設定錯誤把
+// 使用者擋在門外。這兩種情況各記一筆 log，是發現設定漏填的唯一線索。
 func (m *Service) CheckAppVersion(ctx context.Context, appType model.AppType, clientVersion string) (model.VersionCheck, error) {
 	if err := validateAppType(appType); err != nil {
 		return model.VersionCheck{}, err
@@ -196,7 +196,7 @@ func validStoreURL(v string) bool {
 }
 
 // parseSemver 把 "major.minor.patch" 拆成三個整數，逐段比較，所以 1.0.10 大於 1.0.9。
-// 只接受三段純數字（與 DB 的 CHECK 相同）；build number 不參與（各平台不一致，設計書 54 D3）。
+// 只接受三段純數字（與 DB 的 CHECK 相同）；build number 不參與（各平台不一致）。
 func parseSemver(v string) ([3]int, bool) {
 	var out [3]int
 	parts := strings.Split(v, ".")

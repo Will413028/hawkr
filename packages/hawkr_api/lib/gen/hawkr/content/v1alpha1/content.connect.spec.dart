@@ -21,7 +21,7 @@ abstract final class ContentPublicService {
     idempotency: connect.Idempotency.noSideEffects,
   );
 
-  /// CheckAppVersion 判斷 App 是否低於最低版本、必須強制更新（設計書 54）。版本比較只在後端做，
+  /// CheckAppVersion 判斷 App 是否低於最低版本、必須強制更新。版本比較只在後端做，
   /// App 只看 update_required。App 收到任何錯誤都要放行（fail-open）。
   static const checkAppVersion = connect.Spec(
     '/$name/CheckAppVersion',

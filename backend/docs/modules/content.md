@@ -50,9 +50,14 @@
 - 商店網址以空字串表示沒有設定（`NOT NULL DEFAULT ''`），有值時只接受 `https://`、`itms-apps://` 開頭。
 - 建立只建立（`CreateAppVersionGate`，`ON CONFLICT DO NOTHING`）：已經存在回 `AlreadyExists`，業務原因與版本衝突相同。修改（`UpdateAppVersionGate`）要帶版本。同時建立同一組 key，只有一個成功。
 - 沒有刪除，所以版本不必區分同一組 key 的不同建立。
-- 檢查一律 fail-open：沒有設定、門檻或 App 送來的版本格式不對，都不要求更新。
+- 檢查一律 fail-open：沒有設定、門檻或 App 送來的版本格式不對，都不要求更新。沒有設定與格式不對各記一筆 log（分別是 Info、Warn），是發現設定漏填或壞掉的唯一線索；格式不對時回應仍帶門檻的內容，只有 `update_required` 是 false。
+- `CheckAppVersion` 是公開的 RPC，不讀身分、不回個資：未登入、guest、停權的賣家都可以呼叫。請求帶 `app_type`（不認得回 `InvalidInput`）與 `client_version`（必填，三段數字、不含 build number）；回應是 `update_required`、`minimum_version`、`store_url`、`notice_title`、`notice_body`，沒有設定時除 `update_required=false` 外全空。
+- `minimum_version` 是最低可用版本，不是最新版本。後端沒有「已發布版本」的來源，無法拒絕填成尚未發布的版本；防護是後台送出前的二次確認（§6）。
+- 後台清單回傳所有已建立的門檻，不分頁。
 
-## 6. banner 點擊行為在 client 的呈現
+## 6. client 的呈現
+
+### banner 點擊行為
 
 - 點擊行為是語意化的結構，不是路由字串：型別加上對應的值（網址或資源 ID），各端自己對應到平台路由。後台不可填 App 內部 route 或 deep link，否則路由結構變成對外契約，每次改路由都會讓既有 banner 失效。
 - 後台編輯器的動作類型有四個選項：「顯示彈窗大圖」（預設）、「開啟外部連結」、「跳轉至商品」、「跳轉至貼文」；選外部連結時顯示網址欄，選商品或貼文時顯示 ID 欄。送出的 action 一定帶型別（`popup` 也帶），選了 `url`、`product`、`post` 卻留空時照送空字串，由伺服器以欄位錯誤擋下；規則只在伺服器一處。
@@ -66,6 +71,12 @@
   | `popup`、點擊行為沒有設定 | 無 | 只顯示彈窗，不出現 CTA |
 
 - CTA 的文字：banner 的 `button_text`（去除前後空白）非空時用它，否則依型別取預設：`url`「查看詳情」、`product`「立即購買」、`post`「查看貼文」。
+
+### 版本門檻（後台）
+
+- 後台頁固定列出每種 App 的一組，逐列編輯，沒有刪除；還沒有設定的一組用建立，已有的帶讀到的 etag 修改。版本衝突時保留輸入，讀最新的值給使用者對照。
+- 送出前一定先開二次確認：顯示「此值會立即擋住所有低於它的 App」，並列出所有組的現值，提醒先確認商店上已經可以下載到該版本。`minimum_version` 填成尚未發布的版本會把所有使用者擋在更新畫面外，而且無法自救。
+- App 端的檢查、攔截與更新畫面見 `packages/hawkr_app_update/docs/spec.md`。
 
 ## 7. 已知限制
 

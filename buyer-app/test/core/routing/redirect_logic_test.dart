@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// `resolveBuyerRedirect` 是 GoRouter redirect 的純函式決策核心。
 ///
-/// 本檔是 54 號設計書 §11.1 指名的風險緩解手段：兩個不變式（強更早於登入、
+/// 本檔是 `packages/hawkr_app_update/docs/spec.md` 指名的風險緩解手段：兩個不變式（強更早於登入、
 /// 截圖模式豁免強更）過去只活在 closure 裡不可測，改壞了只有 Apple 送審當下
 /// 才會發現。
 void main() {

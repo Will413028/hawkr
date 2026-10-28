@@ -45,7 +45,7 @@ COMMENT ON COLUMN content.banners.action_target IS '點擊行為的值：url 的
 
 -- banner 由後台維護、筆數少，全表掃描加排序就夠快，所以除了主鍵不建索引：索引要等 EXPLAIN 證明需要才加。
 
--- App 版本門檻（設計書 54 §5.1）：每種 App 一組（App 只發 iOS，沒有平台維度），以 app_type 為主鍵，不對外暴露 id。
+-- App 版本門檻：每種 App 一組（App 只發 iOS，沒有平台維度），以 app_type 為主鍵，不對外暴露 id。
 CREATE TABLE content.app_version_gates (
     app_type        TEXT         NOT NULL,
     minimum_version TEXT         NOT NULL,

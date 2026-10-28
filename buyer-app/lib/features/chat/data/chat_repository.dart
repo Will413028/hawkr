@@ -52,7 +52,7 @@ class ChatRepository with WidgetsBindingObserver {
   final Future<String?> Function() _sessionToken;
   final String? Function() _accountId;
 
-  // X-App-* 三欄供 Gateway access log 統計版本佔比（54 號設計書 §6.5）。
+  // X-App-* 三欄供 Gateway access log 統計版本佔比（`packages/hawkr_app_update/docs/spec.md`）。
   final Dio _dio = Dio(
     BaseOptions(
       validateStatus: (_) => true,
@@ -249,7 +249,7 @@ class ChatRepository with WidgetsBindingObserver {
           '$_wsBase?ticket=${Uri.encodeQueryComponent(ticket.ticket)}';
       HKLog.logD('[ChatRepository] Connecting to WebSocket (ws-ticket)');
 
-      // 長連線握手同樣帶 X-App-*（只算 Dio 會漏；54 號設計書 §6.5 / D11）。
+      // 長連線握手同樣帶 X-App-*（只算 Dio 會漏；`packages/hawkr_app_update/docs/spec.md`）。
       final socket = await WebSocket.connect(
         wsUrl,
         headers: {...AppVersionHeaders.headers},

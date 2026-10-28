@@ -67,3 +67,7 @@
 
 - **決定**：帶 etag 的指令不推斷重送：版本不符一律 `ABORTED`（`VERSION_CONFLICT`），不寫入；client 重讀後依目前的狀態呈現。
 - **重新評估的條件**：有 client 需要自動重試這類指令（例如離線佇列、網路逾時後自動重送）時，該方法加 AIP-155 的 `request_id`，不恢復版本推斷。
+
+## 修訂（2026-10-28）
+
+設計書 54（App 版本檢查與強制更新）已刪除，內容由 `docs/modules/content.md`（後端）、`packages/hawkr_app_update/docs/spec.md`（App 端）與 `docs/runbooks/app-version-gate.md`（排查與放行判準）承接。本文中「設計書 54」與它的章節編號（§3.1、§4.6、§9.2 等）指向已刪除的文件，內容見 git 歷史。

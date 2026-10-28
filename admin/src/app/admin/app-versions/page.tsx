@@ -111,7 +111,7 @@ const AppVersionGateManagement: React.FC = () => {
 	} = useQuery(ContentAdminService.method.listAppVersionGates, {});
 	const gates = data?.appVersionGates ?? [];
 
-	// 後端初始為空表（§7.6 ①：查無設定＝不強更），買家、賣家兩列一律顯示、缺的以空值補位。
+	// 後端初始為空表（查無設定＝不強更，content.md §5），買家、賣家兩列一律顯示、缺的以空值補位。
 	const rows: AppVersionGate[] = FIXED_APP_TYPES.map(
 		(appType) => gates.find((g) => g.appType === appType) ?? emptyGate(appType),
 	);
@@ -137,7 +137,7 @@ const AppVersionGateManagement: React.FC = () => {
 		setEditing((prev) => (prev ? { ...prev, [field]: value } : prev));
 	};
 
-	// 送出前二次確認（設計書 §7.6 ⑥）：填錯會鎖死全體，所以驗證過了也不直接送出，先開確認視窗。
+	// 送出前二次確認（`backend/docs/modules/content.md` §6）：填錯會鎖死全體，所以驗證過了也不直接送出，先開確認視窗。
 	const handleRequestSave = () => {
 		if (!editing) return;
 		const err = validate(editing);
@@ -499,7 +499,7 @@ const AppVersionGateManagement: React.FC = () => {
 				</Dialog>
 			)}
 
-			{/* ─── 二次確認 Modal（設計書 §7.6 ⑥ 唯一防護）─────────────────── */}
+			{/* ─── 二次確認 Modal（唯一防護，見 content.md §6）─────────────────── */}
 			{editing && confirming && (
 				<Dialog
 					maxWidth={600}

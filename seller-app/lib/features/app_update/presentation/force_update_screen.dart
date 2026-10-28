@@ -11,15 +11,15 @@ import '../../../shared/utils/hk_log.dart';
 import '../../../shared/widgets/hk_glass_app_bar.dart';
 import '../application/force_update_provider.dart';
 
-/// App 強制更新攔截頁（54 號設計書 §4.5 / §7.6 ④）。
+/// App 強制更新攔截頁（`packages/hawkr_app_update/docs/spec.md`）。
 ///
 /// 後端判定本機版本低於最低可用版本時，router gating（見
 /// `core/router/redirect_logic.dart`）一律導來此頁。骨架比照
 /// `suspension_notice_screen.dart`，差別在多一層 `PopScope(canPop: false)`：
-/// 停權頁還留著白名單頁可去，強更沒有任何可去之處，語意更強（§6.2）。
+/// 停權頁還留著白名單頁可去，強更沒有任何可去之處，語意更強。
 ///
 /// `storeUrl` 為空時**隱藏**「前往更新」按鈕改顯示文字指引——不導向任何猜測
-/// 的商店 URL，使用者撞 404 比沒有按鈕更糟（§7.6 ④）。
+/// 的商店 URL，使用者撞 404 比沒有按鈕更糟。
 class ForceUpdateScreen extends ConsumerWidget {
   const ForceUpdateScreen({super.key});
 
@@ -166,7 +166,7 @@ class _VersionInfoCard extends StatelessWidget {
   }
 }
 
-/// `storeUrl` 未設定時的文字指引（§7.6 ④）。
+/// `storeUrl` 未設定時的文字指引。
 class _ManualUpdateGuidance extends StatelessWidget {
   const _ManualUpdateGuidance();
 

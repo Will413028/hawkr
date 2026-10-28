@@ -293,7 +293,7 @@ class ChatRepository with WidgetsBindingObserver {
           '$_wsBase?ticket=${Uri.encodeQueryComponent(ticket.ticket)}';
       HKLog.logD('[ChatRepository] Connecting to WebSocket (ws-ticket)');
 
-      // WS 握手也是打 Gateway 的請求，版本 header 同樣要帶（54 號設計書 §6.5）。
+      // WS 握手也是打 Gateway 的請求，版本 header 同樣要帶（`packages/hawkr_app_update/docs/spec.md`）。
       final socket = await WebSocket.connect(
         wsUrl,
         headers: appVersionHeaders(),

@@ -462,7 +462,7 @@ sequenceDiagram
 1. 部署 `egress-proxy`（`deploy.sh`），向三竹申報固定出口 IP `203.0.113.30`，取得成功回應（非 `k`）。
 2. account-service 上 `SendOtp` + OTP 驗證 + 移除 Firebase 驗證分支；Proto 同步（§6.2）。
 3. Gateway 上 `/public/auth/otp/send` + `/app/auth/phone/verify`（改路徑）。
-4. App 強制更新放量（新流程無雙軌，舊 App 需強更）；強更機制見 [54 號 App 版本檢查與強制更新](54-App%20版本檢查與強制更新%EF%BC%88App%20Version%20Gate%EF%BC%89.md)。
+4. App 強制更新放量（新流程無雙軌，舊 App 需強更）；強更機制見 `docs/modules/content.md` 與 `packages/hawkr_app_update/docs/spec.md`。
 5. App 強更覆蓋足夠後停用 Firebase console Phone Auth（§12.5）。
 
 ### 12.3 健康檢查與優雅關閉

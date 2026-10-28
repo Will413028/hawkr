@@ -10,7 +10,7 @@
 #   本檔（未生效）        retention_period: 720h  = 30 天
 #   local-config.yaml     retention_period: 168h  = 7 天  ← 真正生效的值
 #   runtime 實查 `/config` 回 `retention_period: 1w`，以它為準。
-# 任何「Loki 可回溯幾天」的判斷（例如設計書 54 §8.2 的 App 版本佔比查詢窗口）
+# 任何「Loki 可回溯幾天」的判斷（例如 `docs/runbooks/app-version-gate.md` 的 App 版本佔比查詢窗口）
 # 一律以 7 天為上限，不要引用本檔的 30 天。
 #
 # 保留本檔不刪：它是完整版參考配置（含 query_range cache / storage_config /

@@ -20,15 +20,15 @@ content-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 | 點擊行為的商品、貼文 ID 只檢查非空，不確認存在 | 擁有者模組能被查詢 | 不成立：catalog、social 還是舊服務，ID 格式也會隨它們搬進單體從 TSID 改成 UUID | 經擁有者模組的公開 API 確認存在（ADR D2） | 現在只檢查非空；catalog、social 搬進單體時，依賴表加上它們並以公開 API 確認存在 |
 | 商店網址 `store_url` 可為 NULL，NULL 表示沒有設定 | 需要區分 NULL 與空字串 | 不成立：沒有地方區分，proto 也以空字串表示沒有設定 | 「沒有設定」只有一種表示法 | 改 `NOT NULL DEFAULT ''`（同一個 migration） |
 | 站點文案 `site_contents` 的後台 CRUD | 前台有地方讀 | 不成立：website 的 `lib/site-content` 已退役並被 `check-architecture.ts` 禁止 import，App 沒讀，gateway 也沒有公開的 endpoint。唯一的讀取方是 gateway 的退貨文案 SSE（key `return-policy`，沒有值時退回 ai-service 的固定文案 `ReturnPolicyFacts`），盤點時漏列；後台頁刪除後已經寫不進值 | 同上 | 拿掉（Will 2026-09-25，同一個 migration）；admin 的文案頁在試點步驟 6 刪除，退貨文案 SSE 在刪除 content-service 時改成一律由 ai-service 回固定文案。真的需要以 key 管理文案時，連讀取端一起設計 |
-| 並發修改：最後寫入者獲勝（設計書 50 §7.4、54 §5.3，不加樂觀鎖） | 修改頻率低，而且衝突無害 | 不成立：頻率低只讓衝突少見；整筆覆寫會靜默蓋掉別人的修改，換圖時還會讓 GC 刪掉正在顯示的圖 | 資源帶 etag，修改時比對（Google AIP-154、RFC 9110 的 `If-Match`） | 改成 etag（ADR `2026-09-25-optimistic-concurrency-etag.md`，Will 2026-09-25 決定）：`version` 欄與條件式 UPDATE（migration `etag_versions`），見 `docs/modules/content.md` §4 |
+| 並發修改：最後寫入者獲勝（舊設計書 50 §7.4 與 content-service 時期的 App 版本門檻設計，不加樂觀鎖） | 修改頻率低，而且衝突無害 | 不成立：頻率低只讓衝突少見；整筆覆寫會靜默蓋掉別人的修改，換圖時還會讓 GC 刪掉正在顯示的圖 | 資源帶 etag，修改時比對（Google AIP-154、RFC 9110 的 `If-Match`） | 改成 etag（ADR `2026-09-25-optimistic-concurrency-etag.md`，Will 2026-09-25 決定）：`version` 欄與條件式 UPDATE（migration `etag_versions`），見 `docs/modules/content.md` §4 |
 | 版本門檻的 upsert（`ON CONFLICT DO UPDATE`） | 設定只有一份，覆寫無害 | 不成立：兩個人同時設定時，後寫入的一方靜默蓋掉前一方 | 以 key 建立只建立、修改帶版本（ADR 的 D3；RFC 9110 的 `If-None-Match: *` 與 `If-Match`） | 拆成 `CreateAppVersionGate` 與 `UpdateAppVersionGate` |
 | 次要索引：`banners` 的 `(is_active, display_order)` | 表大到全表掃描太慢 | 不成立：由後台維護、筆數少 | 小表不建次要索引，等 EXPLAIN 證明需要 | 拿掉（migration `drop_unmeasured_indexes`）；EXPLAIN 顯示需要時再加 |
 | 分頁用頁碼加 `OFFSET`（`go-pkg/pagination`） | 前端以頁碼跳頁、需要總數 | 不成立：沒有畫面跳頁或讀總數，後台清單寫死第一頁 | 對外用不透明的 page token（Google AIP-158）；內部用 keyset，翻頁途中有新增或刪除也不重複、不漏 | 模組收上一頁最後一筆的排序鍵（`BannerCursor`），多取一筆判斷有沒有下一頁；token 的編碼在 http 層。每頁筆數照 AIP-158（0 用預設值、超過上限以上限計、負數是錯誤）。不回總數 |
 | `updated_at` 在 UPDATE 語句明寫 `NOW()`，不用 trigger | 設計書 50 規定明寫；PostgreSQL 設計規範 §四 原本規定 trigger | 兩份唯一來源矛盾，2026-09-25 由 Will 決定採明寫 | 兩種都常見：trigger 保證任何 UPDATE 都刷新；明寫才能讓計數這類更新不刷新 | 沿用明寫；規範 §四 改寫成單體的規則。`version` 同樣在每支 UPDATE 明寫加一 |
-| 文字欄位 `VARCHAR(n)` 的上限（255、100、50） | 產品上需要長度上限 | 沒有證據：255 是 MySQL 時期的慣用值（content-service 的 migration 註解寫「migrated from MySQL」），設計書 54 的 `VARCHAR(255)` 是欄位型別，不是產品上限；找得到的產品上限只有後台 banner 按鈕文字的 12 字，與 DB 的 100 不一致 | 上限從產品規格來，沒有就用 `text`（PostgreSQL 設計規範 §一、PG wiki「Don't use varchar(n) by default」） | 改 `text`（Will 2026-09-25 決定，migration `text_columns`）；只留產品規格有的上限：banner 按鈕文字 12 字，與後台編輯器一致。其他欄位的大小由傳輸層的 request 上限擋 |
+| 文字欄位 `VARCHAR(n)` 的上限（255、100、50） | 產品上需要長度上限 | 沒有證據：255 是 MySQL 時期的慣用值（content-service 的 migration 註解寫「migrated from MySQL」），content-service 時期設計書的 `VARCHAR(255)` 是欄位型別，不是產品上限；找得到的產品上限只有後台 banner 按鈕文字的 12 字，與 DB 的 100 不一致 | 上限從產品規格來，沒有就用 `text`（PostgreSQL 設計規範 §一、PG wiki「Don't use varchar(n) by default」） | 改 `text`（Will 2026-09-25 決定，migration `text_columns`）；只留產品規格有的上限：banner 按鈕文字 12 字，與後台編輯器一致。其他欄位的大小由傳輸層的 request 上限擋 |
 | 錯誤用 `go-pkg/errors`（對應 gRPC status） | 錯誤經 gRPC 回給 gateway | 不成立：單體內直接呼叫 | 模組只回報錯誤的種類，狀態碼由傳輸層決定 | 改成 `platform/apperr` |
 | log 用 zap（`go-pkg/logger`）；時間字串用 `go-pkg/timeutil` 解析 | 共用套件 | 不成立 | 標準庫 `log/slog`；時間在傳輸層解析，模組收 `time.Time` | 改 slog；timeutil 不搬 |
-| App 版本比較：x.y.z 三段數字、格式不對一律 fail-open | App 版本號格式固定，檢查失敗不能擋住使用者 | 成立（設計書 54） | 同 | 沿用 |
+| App 版本比較：x.y.z 三段數字、格式不對一律 fail-open | App 版本號格式固定，檢查失敗不能擋住使用者 | 成立 | 同 | 沿用 |
 | 管理員上傳圖片的身分用 CodeMeta 的 `AccountType`（`codemeta.AccountTypeAdmin`） | Java media-service 的舊契約用數字帳號類型判斷上傳者 | content 已不用 CodeMeta；傳 `media.Uploader{Admin: true}`，僅 `internal/legacy/mediaservice` 轉成舊數字碼 | 上傳者的輸入型別由 media 定義，舊 wire 值留在轉接層 | 改用 `media.Uploader`；B1 改寫 Java media-service 時移除轉接層的數字碼 |
 | 圖片引用的類型用 CodeMeta 的 `AssetReferenceType` 數字碼（banner 7109，`media.RefType*`） | 引用類型由 Java 的 media-service 解讀，值域要跨語言一致 | 成立到 B1：media 仍是 Java 服務 | 引用類型屬於 media，由 media 模組定義 | 沿用；`media.RefType*` 是 `generate.sh --go-media` 的生成物（遷移計畫 0.2），B1 改寫 media 時值域移進 media 模組，並決定是否保留數字碼 |
 
@@ -64,7 +64,7 @@ content-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 - 文字欄位從 `VARCHAR(n)` 改成 `text`，長度上限只留 banner 按鈕文字的 12 字（原本 DB 與寫入端都是 100，後台編輯器限 12）。
 - 刪除不存在的 banner 回 NotFound（原本回成功）。
 - 修改時不能指定要沿用的 key，只能換新或沿用這筆資料現有的圖（原本送 key、只檢查格式，可以指向別筆資料的圖；對方換圖或刪除後，GC 會刪掉這邊還在顯示的圖）。
-- 版本檢查收到不認得的 app_type 回 InvalidInput（原本當成沒有設定而放行）。設計書 54 §4.4 規定值域由 content 守；App 收到錯誤時本來就 fail-open。
+- 版本檢查收到不認得的 app_type 回 InvalidInput（原本當成沒有設定而放行）。值域由 content 守；App 收到錯誤時本來就 fail-open。
 - 拿掉站點文案（`site_contents`）：沒有讀取端（見沿用盤點）。後台清單以 keyset 翻頁，不回總數。
 - 商店網址沒有設定時存空字串，不再是 NULL。
 - banner 的排程改成 [開始, 結束)，開始等於結束不再合法；DB 加上 `banners_schedule_check`（原本只有寫入端檢查，而且允許開始等於結束）。

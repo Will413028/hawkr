@@ -188,7 +188,7 @@ class SellerRoutes {
   /// 讀不到店家狀態的重試頁（GetMyStore 失敗而且沒有上一次的快照）
   static const storeUnavailable = '/seller/store-unavailable';
 
-  /// App 強制更新攔截頁（54 號設計書「App 版本檢查與強制更新」§4.5）
+  /// App 強制更新攔截頁（`packages/hawkr_app_update/docs/spec.md`）
   static const forceUpdate = '/force-update';
 }
 
@@ -1050,7 +1050,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const StoreUnavailableScreen(),
       ),
       // parentNavigatorKey 是全螢幕攔截的關鍵：少了它會被 ShellRoute 的
-      // bottom nav 包住，強更畫面下方還留著可點的分頁（54 號設計書 §4.6）。
+      // bottom nav 包住，強更畫面下方還留著可點的分頁（`packages/hawkr_app_update/docs/spec.md`）。
       GoRoute(
         path: SellerRoutes.forceUpdate,
         parentNavigatorKey: rootNavigatorKey,

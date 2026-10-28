@@ -1,4 +1,4 @@
-/// App 版本門檻（設計書 54）的檢查邏輯，buyer-app 與 seller-app 共用（ADR
+/// App 版本門檻的檢查邏輯（規格見 `docs/spec.md`），buyer-app 與 seller-app 共用（ADR
 /// `backend/docs/adr/2026-09-27-app-version-gate-shared-package.md`）。強制更新的畫面、路由的攔截與
 /// provider 留在各自的 App。
 ///
@@ -19,10 +19,10 @@ import 'package:hawkr_api/transport.dart';
 export 'package:hawkr_api/gen/hawkr/content/v1alpha1/content.pb.dart'
     show AppType, CheckAppVersionResponse;
 
-/// 一次檢查（含重試）的上限（設計書 54 §7.3）。
+/// 一次檢查（含重試）的上限。
 const Duration versionGateTimeout = Duration(seconds: 3);
 
-/// 回到前景時重新檢查的節流間隔（設計書 54 §7.6 ⑤）：`resumed` 每次切回前景都會觸發，不節流會打出請求風暴，
+/// 回到前景時重新檢查的節流間隔：`resumed` 每次切回前景都會觸發，不節流會打出請求風暴，
 /// 也會排擠同一個 IP 的其他匿名公開讀取。
 const Duration versionGateRecheckInterval = Duration(minutes: 10);
 

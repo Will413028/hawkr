@@ -1,7 +1,7 @@
 import '../../shared/utils/app_version_utils.dart';
 import '../codemeta/code_meta.dart';
 
-/// 每個請求都帶的 header：客戶端版本（54 號設計書 §6.5 / D11）。
+/// 每個請求都帶的 header：客戶端版本（`packages/hawkr_app_update/docs/spec.md`）。
 ///
 /// 兩支 App 對**所有打 Gateway 的請求**（含 SSE / WebSocket 握手、Connect）帶
 /// `X-App-Version` / `X-App-Type`，Gateway access log

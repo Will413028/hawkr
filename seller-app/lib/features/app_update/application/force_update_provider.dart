@@ -9,7 +9,7 @@ import '../../../shared/utils/platform_io.dart' show Platform;
 
 part 'force_update_provider.g.dart';
 
-/// App 強制更新 gate 的單一狀態來源（設計書 54 §4.1）；攔截一律由 GoRouter 頂層 redirect 執行（見
+/// App 強制更新 gate 的單一狀態來源（`packages/hawkr_app_update/docs/spec.md`）；攔截一律由 GoRouter 頂層 redirect 執行（見
 /// `core/router/redirect_logic.dart`）。
 ///
 /// 檢查的規則（只在 iOS、3 秒逾時、失敗一律放行、回到前景的節流）在兩支 App 共用的

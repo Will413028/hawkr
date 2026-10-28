@@ -161,9 +161,9 @@ Future<Widget> _bootstrapApplication() async {
     () => !container.read(sessionProvider).isLoading,
   );
 
-  // ============ App 版本 gate（54 號設計書 §7.1）============
+  // ============ App 版本 gate（`packages/hawkr_app_update/docs/spec.md`）============
   // 位置刻意排在 bootstrap 最前段：此處早於推播初始化，`getInitialMessage()`
-  // 的導航還沒 arm，不需要另建抑制機制（D5b）。
+  // 的導航還沒 arm，不需要另建抑制機制。
   //
   // ⚠️ 例外必須在此自行吃掉：`BrandStartupGate._runBootstrap` 的 catch 只
   // reportError、不 setState、不解除 splash（brand_startup_splash.dart:75-84），
@@ -265,7 +265,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       NotificationRouter.flushPending();
       PushNotificationManager.instance.onAppResumed();
-      // 版本 gate 前景恢復重檢（54 號設計書 §7.6 ⑤）；節流錨點是「上次成功
+      // 版本 gate 前景恢復重檢（`packages/hawkr_app_update/docs/spec.md`）；節流錨點是「上次成功
       // 檢查」，門檻 10 分鐘，判斷在 provider 內，失敗 fail-open。
       unawaited(ref.read(forceUpdateProvider.notifier).checkThrottled());
     }

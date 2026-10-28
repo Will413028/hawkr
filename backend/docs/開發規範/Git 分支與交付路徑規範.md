@@ -83,7 +83,7 @@ iOS 走 Xcode Cloud run 序號，皆非 semver；repo 內也無商店查詢管�
 因此做不出伺服端拒絕條件，**這一步只能靠人記得**。
 
 漏做不會報錯、不會有 log，只會**靜默**：gate 永遠停在上線那天的版本，等於不存在。
-機制全文見 [54-App 版本檢查與強制更新](../詳細設計書/54-App%20版本檢查與強制更新%EF%BC%88App%20Version%20Gate%EF%BC%89.md) §7.6 ⑥／§12.2。
+機制見 [content 模組規格](../modules/content.md) §5 與 [App 版本門檻 Runbook](../runbooks/app-version-gate.md)。
 
 ### 2.2 為什麼 Flutter 與 web 的把關方式不同（理解這個才不會又推定錯）
 

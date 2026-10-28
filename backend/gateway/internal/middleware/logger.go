@@ -660,7 +660,7 @@ func diagnosticExtraAllowed(c *gin.Context) map[string]struct{} {
 	return nil
 }
 
-// headerValueLogLimit 是 client 可控 header 寫進 access log 的長度上限（設計書 54 §8.2）。
+// headerValueLogLimit 是 client 可控 header 寫進 access log 的長度上限（見 `docs/runbooks/app-version-gate.md`）。
 const headerValueLogLimit = 32
 
 // truncateHeaderValue 把 client 可控的 header 值截到 headerValueLogLimit 字元，

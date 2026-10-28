@@ -74,7 +74,7 @@ void main() {
     expect(logs, hasLength(1));
   });
 
-  // 設計書 54 §7.6 ②：任何失敗都放行。後端故障時若判成「需要更新」，所有使用者會被鎖在沒辦法自救的畫面。
+  // `docs/spec.md`：任何失敗都放行。後端故障時若判成「需要更新」，所有使用者會被鎖在沒辦法自救的畫面。
   for (final (name, error) in <(String, Object)>[
     ('伺服器錯誤', ConnectException(Code.internal, 'boom')),
     ('參數錯誤', ConnectException(Code.invalidArgument, 'bad version')),

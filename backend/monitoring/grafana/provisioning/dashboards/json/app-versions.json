@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "App 版本分佈（設計書 54 §8.2）。資料源＝Gateway access log 的 app_version / app_type 兩欄（Loki）。App 只發 iOS，不分平台（2026-09-26）。用途：破壞性契約變更前，判斷舊版 App 是否已退場到可放行的水位（放行判準見設計書 54 §8.2）。⚠️ Loki 保留期 7 天（monitoring/loki/local-config.yaml retention_period: 168h），時間範圍不可拉超過 7 天，拉超過只會得到被截斷的假象。",
+  "description": "App 版本分佈（見 docs/runbooks/app-version-gate.md）。資料源＝Gateway access log 的 app_version / app_type 兩欄（Loki）。App 只發 iOS，不分平台（2026-09-26）。用途：破壞性契約變更前，判斷舊版 App 是否已退場到可放行的水位（放行判準見 docs/runbooks/app-version-gate.md §3）。⚠️ Loki 保留期 7 天（monitoring/loki/local-config.yaml retention_period: 168h），時間範圍不可拉超過 7 天，拉超過只會得到被截斷的假象。",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -28,7 +28,7 @@
         "type": "loki",
         "uid": "loki"
       },
-      "description": "回答的問題：「$environment 的 $app_type App，各版本的請求量隨時間怎麼變」——新版放量後，舊版那條線是否往下走到接近 0。\n\n分母定義：**只計本來就帶 X-App-Version header 的請求**，也就是兩支 Flutter App 經 dio 發出的一般 HTTP 請求。不帶版本的請求（網頁 SSR、server-to-server、health probe、以及設計書 54 §8.2 列的 SSE/WS 握手後訊息、WebView 導航、圖片直取）既不進分子也不進分母，因此本圖是「App HTTP 請求的版本組成」，不是「使用者人數的版本組成」。\n\n⚠️ 已知偏差：重度使用長連線（聊天 WS / SSE）的使用者，其活躍度不會反映在請求數上，會被系統性低估。判斷「舊版是否歸零」時這偏差是安全方向（低估舊版），但判斷「新版是否被採用」時要留意。\n\n⚠️ app_version 已用 semver 白名單 `^[0-9]+\\.[0-9]+\\.[0-9]+$` 過濾：header 是 client 可控輸入，任何人 curl 一個亂數就會多一條 series。被白名單擋掉的值請看下方「資料品質」區。",
+      "description": "回答的問題：「$environment 的 $app_type App，各版本的請求量隨時間怎麼變」——新版放量後，舊版那條線是否往下走到接近 0。\n\n分母定義：**只計本來就帶 X-App-Version header 的請求**，也就是兩支 Flutter App 經 dio 發出的一般 HTTP 請求。不帶版本的請求（網頁 SSR、server-to-server、health probe、以及docs/runbooks/app-version-gate.md §2 列的 SSE/WS 握手後訊息、WebView 導航、圖片直取）既不進分子也不進分母，因此本圖是「App HTTP 請求的版本組成」，不是「使用者人數的版本組成」。\n\n⚠️ 已知偏差：重度使用長連線（聊天 WS / SSE）的使用者，其活躍度不會反映在請求數上，會被系統性低估。判斷「舊版是否歸零」時這偏差是安全方向（低估舊版），但判斷「新版是否被採用」時要留意。\n\n⚠️ app_version 已用 semver 白名單 `^[0-9]+\\.[0-9]+\\.[0-9]+$` 過濾：header 是 client 可控輸入，任何人 curl 一個亂數就會多一條 series。被白名單擋掉的值請看下方「資料品質」區。",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -238,7 +238,7 @@
         "type": "loki",
         "uid": "loki"
       },
-      "description": "回答的問題：「有沒有不符合 semver 的 app_version 混進來」。\n\n**這格恆應為 0。非 0 代表下列其中之一：**\n① 有人在灌 header（X-App-Version 是匿名可控輸入，curl 一個亂數就會出現一筆）——若量小且值明顯是亂數，屬噪音，確認來源 IP 後可忽略；\n② Gateway 的截斷邏輯出問題（`logger.go` 的 truncateHeaderValue 限 32 字元）——症狀是出現剛好 32 字元的值；\n③ App 端送錯格式——最典型是把顯示字串 `1.0.3(7)` 當版本送出（設計書 54 §6.5 陷阱），這一種要立刻修，因為它會讓上方所有佔比少算掉一整個版本。\n\n注意本查詢**刻意不依 $app_type 過濾**：灌進來的垃圾請求連 app_type 都可能是亂的，依 app_type 過濾會把它們藏起來。所以本區的數字與上方三張圖的分母沒有從屬關係。\n\n對應告警：`monitoring/loki/rules/fake/app-version.yml` 的 AppVersionGarbageValues（> 0 持續 15m）。",
+      "description": "回答的問題：「有沒有不符合 semver 的 app_version 混進來」。\n\n**這格恆應為 0。非 0 代表下列其中之一：**\n① 有人在灌 header（X-App-Version 是匿名可控輸入，curl 一個亂數就會出現一筆）——若量小且值明顯是亂數，屬噪音，確認來源 IP 後可忽略；\n② Gateway 的截斷邏輯出問題（`logger.go` 的 truncateHeaderValue 限 32 字元）——症狀是出現剛好 32 字元的值；\n③ App 端送錯格式——最典型是把顯示字串 `1.0.3(7)` 當版本送出（packages/hawkr_app_update/docs/spec.md §1 的版本字串陷阱），這一種要立刻修，因為它會讓上方所有佔比少算掉一整個版本。\n\n注意本查詢**刻意不依 $app_type 過濾**：灌進來的垃圾請求連 app_type 都可能是亂的，依 app_type 過濾會把它們藏起來。所以本區的數字與上方三張圖的分母沒有從屬關係。\n\n對應告警：`monitoring/loki/rules/fake/app-version.yml` 的 AppVersionGarbageValues（> 0 持續 15m）。",
       "fieldConfig": {
         "defaults": {
           "color": {

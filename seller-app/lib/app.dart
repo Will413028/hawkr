@@ -89,7 +89,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     if (!widget.runtimeSideEffectsEnabled) return;
     if (state == AppLifecycleState.resumed) {
       PushNotificationManager.instance.onAppResumed();
-      // App 版本 gate 前景重檢（54 號設計書 §7.6 ⑤）：節流 10 分鐘、以上次
+      // App 版本 gate 前景重檢（`packages/hawkr_app_update/docs/spec.md`）：節流 10 分鐘、以上次
       // 成功檢查為錨；結果變動經 SessionChangeNotifier 觸發 redirect 重判。
       unawaited(ref.read(forceUpdateGateProvider.notifier).checkOnResume());
     }

@@ -33,3 +33,7 @@
 
 - 設計書 54 §4.6 的對照表不再需要對照 repository 與 provider：規則只有一份。
 - §4.6.1 另外兩個「必須逐位元組相同」的檔不在這次的範圍：`app_version_utils.dart` 依賴 `package_info_plus`（Flutter plugin），也被 `X-App-Version` header 使用；`brand_startup_splash.dart` 是畫面。要共用的話是另一個依賴 Flutter 的套件，另外決定。
+
+## 修訂（2026-10-28）
+
+設計書 54（App 版本檢查與強制更新）已刪除，內容由 `docs/modules/content.md`（後端）、`packages/hawkr_app_update/docs/spec.md`（App 端）與 `docs/runbooks/app-version-gate.md`（排查與放行判準）承接。本文中「設計書 54」與它的章節編號（§3.1、§4.6、§9.2 等）指向已刪除的文件，內容見 git 歷史。

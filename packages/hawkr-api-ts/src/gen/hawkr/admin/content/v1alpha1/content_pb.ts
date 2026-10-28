@@ -152,7 +152,7 @@ export const BannerSchema: GenMessage<Banner> = /*@__PURE__*/
   messageDesc(file_hawkr_admin_content_v1alpha1_content, 0);
 
 /**
- * AppVersionGate 是一支 App 的最低可用版本（設計書 54），以 app_type 識別。App 只發 iOS。
+ * AppVersionGate 是一支 App 的最低可用版本，以 app_type 識別。App 只發 iOS。
  *
  * @generated from message hawkr.admin.content.v1alpha1.AppVersionGate
  */
