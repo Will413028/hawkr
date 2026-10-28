@@ -139,7 +139,7 @@ flowchart LR
 1. **瀏覽器永遠打不到 Gateway，而且兩個 host 各只持有一半憑證。** ADM host 持 ADM session cookie（preflight／create／revoke／稽核查詢），www host 持 operation credential（資源端點／`current`／媒體）；兩者都是 host-only、互相讀不到（§4.5）。credential 只存在於 HttpOnly cookie 與 BFF→Gateway 的 server-to-server header，不出現在任何 JSON 回應、URL、page props 或瀏覽器儲存中（§3.1 F7）——**唯一進得了 URL 的是一次性 handoff code**（單次、60 秒），它不是 credential。⇒ **代行執行期的請求裡沒有 ADM session，操作者身分由 credential 承擔**（§8.1.3「第 1 項的兩種身分來源」）。
 2. **Gateway 是唯一對外入口，且是唯一驗證點的位置。** 代行的真實性由 Gateway 建立，微服務信任之（§8.1 信任邊界）。
 3. **賣家本人的路徑（虛線）完全不變。** 代行寫入與賣家寫入落在同一批資料上，因此需要資源樂觀鎖來處理「賣家與管理員同時編輯」（見 §5.4 與 §6.1）。
-4. **`social-service → 單體 delegation` 是全圖唯一一條反向邊，而且它是必要的。** 排程發布在「到點」那一刻才發生，當下沒有任何 HTTP 請求、Gateway 不在場，但那一次發布仍然是代行寫入、仍然必須落稽核 ⇒ 排程 worker 必須自己呼叫 `RecordAuditIntent`／`ConfirmAuditResult`（`origin=scheduled`，流程見 §7.6）。這條邊也是 `origin` 欄位存在的原因：**「這是不是排程來的」只有呼叫端知道**，單體 delegation 推定不出來，因此由呼叫端帶入、並在服務端以 HMAC 驗簽後的 `serviceName` 機械檢查（§4.5 social-service 條目、§7.6）。
+4. **`social-service → 單體 delegation` 是全圖唯一一條反向邊，而且它是必要的。** 排程發布在「到點」那一刻才發生，當下沒有任何 HTTP 請求、Gateway 不在場，但那一次發布仍然是代行寫入、仍然必須落稽核 ⇒ 排程 worker 必須自己呼叫 `RecordAuditIntent`／`ConfirmAuditResult`（`origin=scheduled`，流程見 §7.6）。這條邊也是 `origin` 欄位存在的原因：**「這是不是排程來的」只有呼叫端知道**，單體 delegation 推定不出來，因此由呼叫端帶入（§7.6）。
 
 ### 2.2 邊界與責任 (In / Out of Scope)
 
@@ -186,7 +186,7 @@ flowchart LR
 | 概念 | 定義 | 值來源 | ID space | 前端可否指定 |
 |---|---|---|---|---|
 | **Actor**（操作者） | 目前登入的 ADM 管理員 | Gateway 由 admin session cookie 解析出的 `account_id` | **`admin_accounts.id`** —— 與 `accounts` 表**分離**（`internal/modules/delegation/db/schema.sql`） | ❌ 只能由伺服器 session 取得（F1） |
-| **Subject**（被代行者） | 被代行的賣家 account | Operation Session 建立當下的 snapshot ＋ 每次請求重新評估授權 | `accounts.id`（登入 principal，44 號） | ❌ |
+| **Subject**（被代行者） | 被代行的賣家 account | Operation Session 建立當下的 snapshot；請求時以 session 狀態判斷（撤回授權同 transaction 撤銷其下 session） | `accounts.id`（登入 principal，44 號） | ❌ |
 | **Target Store**（目標店家） | 該 Subject 的現任 store surrogate | 同上 snapshot，並與 URL path 的 `{storeId}` 交叉比對 | `sellers.store_id`（surrogate，44 號） | URL path 帶 `{storeId}`，但**只用於交叉比對，不作為授權依據**（§8.1） |
 | **Operation Session**（代行工作階段） | 一次有理由、scope、期限、可撤銷的授權載體 | 伺服器簽發，credential 走 `X-HK-Operation-Session` header | TSID（`delegated_operation_sessions.id`） | ❌ credential 由 BFF 從 HttpOnly cookie 取出後轉送 |
 
@@ -212,7 +212,7 @@ flowchart TD
   H --> I["www 兌換 code，核發隨機 credential"]
   I --> D["credential（opaque）<br/>→ HttpOnly cookie"]
   D --> E{"每一次代行請求"}
-  E --> F["① credential → session<br/>② session 未終態且未過期<br/>③ session.target_store_id == URL storeId<br/>④ capability 命中<br/>⑤ 授權未被撤回（重新評估）<br/>⑥ 資源 owner == target store"]
+  E --> F["① credential → session<br/>② session 未終態且未過期<br/>③ session.target_store_id == URL storeId<br/>④ capability 命中<br/>⑤ 授權撤回已反映在 session（撤回授權同 transaction 撤銷 session，② 涵蓋）<br/>⑥ 資源 owner == target store"]
   F -->|任一不成立| Y["fail-closed<br/>唯一業務碼 → 對應 HTTP status"]
   F -->|全部成立| G["稽核 intent → domain write → confirm"]
 ```
@@ -639,7 +639,7 @@ hawkr.common.DelegationContext delegation = 100;
 
 | 位置 |
 |---|
-| `pkg/delegation/{context.go,validate.go,store_state.go}`（與 common-core 的 Java helper 對稱。兩個服務**共用這一份**，禁止各自實作。`store_state.go` ＝ `StoreOperable(lifecycleStatus string, deleted bool) (ok bool, deniedCode int32)`，是「這家店現在能不能被代行」的唯一判定（§8.1.3 第 8 項）。**三個消費者**：單體 delegation preflight／Gateway 授權鏈第 8 項／單體 delegation `RecordAuditIntent(origin=scheduled)`。**純函式、不做 I/O**——查 seller-service 是呼叫端的事，判定是這支的事；混在一起會讓它變成第四個「需要 mock 才測得動」的東西，而它正是最該被 table-driven 窮舉的一支（§13 unit 層）。**deny-by-default 白名單**：只有 `active` 且未刪除放行，未知狀態值一律拒絕） |
+| `pkg/delegation/{context.go,validate.go,store_state.go}`（與 common-core 的 Java helper 對稱。兩個服務**共用這一份**，禁止各自實作。`store_state.go` ＝ `StoreOperable(lifecycleStatus string, deleted bool) (ok bool, deniedCode int32)`，是「這家店現在能不能被代行」的唯一判定（§8.1.3 第 8 項）。**消費者**：Gateway 授權鏈第 8 項。**純函式、不做 I/O**——查 seller-service 是呼叫端的事，判定是這支的事；混在一起會讓它變成第四個「需要 mock 才測得動」的東西，而它正是最該被 table-driven 窮舉的一支（§13 unit 層）。**deny-by-default 白名單**：只有 `active` 且未刪除放行，未知狀態值一律拒絕） |
 | `services/seller-service/db/schema/schema.sql`（`sellers` 加 `"version" bigint NOT NULL DEFAULT 0`，接在 `food_business_reg_no` 之後、`CONSTRAINT "chk_sellers_status"`之前） |
 | `services/seller-service/db/migrations/{timestamp}_add_sellers_version.sql`（現行最新 ＝ `20260807065415_fix_food_safety_week_unique_null_bypass.sql`；`atlas migrate diff` 產生 ＋ `atlas migrate hash`） |
 | `services/seller-service/internal/grpc/`（`UpdateSeller` / `UpdateLogo` / `UpdateCover` 三支寫入 handler 前置 `pkgdelegation.Validate(...)` ＋ `expectedVersion` CAS；`handler.go GetSeller` 這支**讀取**同樣前置 `pkgdelegation.Validate(...)`，capability ＝ `storefront.read`） |
@@ -648,7 +648,7 @@ hawkr.common.DelegationContext delegation = 100;
 | `services/social-service/internal/grpc/`（`CreatePost` / `UpdatePost` 寫入 handler 前置 `pkgdelegation.Validate(...)` ＋ `expectedVersion` CAS；`handler.go GetPostDetail` / `ListMyPosts` 兩支**讀取**同樣前置 `pkgdelegation.Validate(...)`，capability ＝ `posts.read`；排程發布欄位處理見 §7.6）。<br/>⚠️ **`GetPostDetail` 在 `delegation` 非空時必須額外斷言 Q4 歸屬**：該貼文的 `cms_post.seller_id` **等於 delegation 的 target store**，不符一律回 **9275**——包含**已發布**的貼文（`publish_status = 4402`）。`GetPost`（`posts.sql`）刻意不在 SQL 層過濾（§5.1.5），所以這一層不做，代行讀者就讀得到任意賣家的貼文詳情，且成功讀取不落稽核（§7.1.2）⇒ 零痕跡。**草稿可見性規則同址定版**：代行讀者看得到 `seller_id == target` 的**全部** `publish_status`（含草稿 `4401`／已下架 `4403`），其餘一律 9275；買家／匿名路徑維持現狀不動 |
 | `services/social-service/internal/worker/post_schedule_worker.go`（排程發布 worker：到點把 `schedule_state='pending'` 的貼文轉為已發布。claim 一律走 lease（[多副本排程搶佔規範](../開發規範/多副本排程搶佔規範.md)），禁用永久旗標；租約長度上下界與 tick 見 §7.6 ＋ §8.5.1；session 撤銷會把待發排程改為 `cancelled_by_revocation`，授權模型見 §7.6；**每個 tick 的順序固定為「三條收斂（刪除 → 下架 → 窗口）→ 候選 SELECT → 逐列 claim」，且候選 SELECT 與 claim 述詞各帶 `AND deleted_at IS NULL AND hidden_at IS NULL`**（SQL 全文見 §5.1.5）；本檔同時是 `delegation_scheduled_post_expired_total`（OBS8）的**唯一生產者**——**兩處**都要累加：① 窗口收斂語句依 `RowsAffected` 累加 `reason="window_exceeded"`；② 重試達 `SCHEDULED_POST_PUBLISH_MAX_RETRY` 而轉 `expired` 的那一次累加 `reason="retry_exhausted"`。漏掉任一處，§8.2.4 的 `DelegationScheduledPostExpired` 告警在該條路徑上永遠不觸發，貼文靜默過期無人知道；本檔**同時**是 `delegation_scheduled_post_cancelled_total`（OBS10）的唯一生產者——**三處**都要累加：刪除收斂與下架收斂各依自己那一句的 `RowsAffected` 累加 `reason="deletion"`／`"governance"`，撤銷轉態那一次累加 `reason="revocation"`） |
 | `services/social-service/db/queries/posts.sql` ＋ `hashtag.sql` —— **`publish_status = 4402` 過濾**（§5.1.5）。引入 `publish_status` 之前，全部公開／買家側查詢只過濾 `deleted_at`／`hidden_at`，⇒ **不加這一列，代行建立的草稿當天就會出現在買家 feed 與熱門標籤裡**。逐檔逐 query（`FROM/JOIN cms_post` 全庫 8 處，下表即全集）：<br/>**要加**：`posts.sql ListPosts`、`posts.sql CountPosts`（買家／店面 feed，`$1=0` 時是全站）；`posts.sql ListPostsByHashtagName`、`posts.sql CountPostsByHashtagName`（標籤頁）；`hashtag.sql SelectPopularHashtagsInRange`（熱門標籤——草稿的 hashtag 會把未發布內容的熱度灌進公開榜）<br/>**不加**：`posts.sql ListMyPosts`、`posts.sql CountMyPosts`（賣家與代行者本來就必須看得見自己的草稿）——⚠️ **「不加」指的是不加無條件過濾，不是這兩支不用改**：它們的 `status=published` 篩選同時問 `hidden_at IS NULL` 與 `publish_status`，否則賣家挑「已發布」會撈到自己從未發布的貼文（判準與定版述詞見 §5.1.5 的「賣家自己的貼文管理」列）；`posts.sql AdminListPosts`、`posts.sql AdminCountPosts`（治理視角要看得見全部）；`posts.sql` 的兩支計數對帳 UPDATE（不是讀取路徑）<br/>**`posts.sql GetPost` 不在 SQL 層加過濾**：它同時是留言（`usecase/comment.go`）、檢舉派工（`usecase/dispatcher.go`）、隱藏（`usecase/post_hider.go`）與詳情（`usecase/post.go`）四類路徑的存在性查詢，一律過濾會讓草稿無法被治理與隱藏。草稿的可見性判定改在 `internal/grpc/handler.go GetPostDetail` 依讀者身分裁決，規則以 §5.1.5 為準 |
-| `services/social-service/internal/client/account/client.go`（`NewClient` 的 `grpc.NewClient` 加 `grpc.WithUnaryInterceptor(interceptor.InternalAuthClientInterceptor("social-service", true))`，並擴充本 client 暴露 `RecordAuditIntent`／`ConfirmAuditResult` 兩支 stub 供排程 worker 使用。**樣板就在同服務隔壁**：`internal/client/media/client.go` 已是這個形狀；本 client 現況**只掛了 `OTelClientStatsHandler`、沒有掛 HMAC**，不補上就無法通過 單體 delegation 的內部驗簽（52 號），且 §7.6 的 `origin=scheduled` 機械判準（驗簽通過且 `serviceName == "social-service"` 才接受）**沒有簽章就永遠不成立** ⇒ 排程發布的稽核會被降級成 `interactive` 或直接被拒；補上之後，本 client 既有的 `GetAccountInfo`／`GetAccountInfoBatch` 也會開始帶簽章，這是預期且正確的方向（其餘 client 早已如此） |
+| `services/social-service/internal/client/account/client.go`（`NewClient` 的 `grpc.NewClient` 加 `grpc.WithUnaryInterceptor(interceptor.InternalAuthClientInterceptor("social-service", true))`，並擴充本 client 暴露 `RecordAuditIntent`／`ConfirmAuditResult` 兩支 stub 供排程 worker 使用。**樣板就在同服務隔壁**：`internal/client/media/client.go` 已是這個形狀；本 client 現況**只掛了 `OTelClientStatsHandler`、沒有掛 HMAC**，不補上就無法通過 單體 delegation 的內部驗簽（52 號）；補上之後，本 client 既有的 `GetAccountInfo`／`GetAccountInfoBatch` 也會開始帶簽章，這是預期且正確的方向（其餘 client 早已如此） |
 | `services/social-service/internal/client/di.go`（`account.NewClient` 的 provide 已存在，無需新增；若排程 worker 走**獨立介面**（`usecase.DelegationAuditClient`）取用同一個 `*account.Client`，在此追加一行 `fx.Annotate(...)` 綁定。**不要為稽核另建第二條 account 連線**——同一個下游服務兩份 `grpc.ClientConn` 會讓斷路器與連線池各算各的） |
 
 **api/proto**
@@ -3946,9 +3946,9 @@ flowchart TD
     end
 
     subgraph P4 ["P4 稽核 → domain write → confirm → 事件"]
-        P4A["RecordAuditIntent<br/>寫 PENDING：actor／target／capability／origin<br/>reason／before 快照／payloadHash<br/>notifySeller／idempotency／correlation"] --> P4B{"授權是否已撤回？<br/>（同 tx 重新評估）"}
-        P4B -- 已撤回 --> P4C["同 tx 將 session 轉 revoked<br/>→ DELEGATION_AUTHORIZATION_REVOKED"]
-        P4B -- 有效 --> P4D["呼叫領域服務<br/>帶 DelegationContext 與 idempotency_key"]
+        P4A["RecordAuditIntent<br/>寫 PENDING：actor／target／capability／origin<br/>reason／before 快照／payloadHash<br/>notifySeller／idempotency／correlation"] --> P4B{"session 仍可用？<br/>（RecordAuditIntent 內檢查 session 狀態）"}
+        P4B -- 已撤銷或已到期 --> P4C["拒絕：DELEGATION_SESSION_REVOKED／EXPIRED<br/>不寫 intent"]
+        P4B -- 可用 --> P4D["呼叫領域服務<br/>帶 DelegationContext 與 idempotency_key"]
         P4D --> P4E{"Q4 資源屬於 target store？"}
         P4E -- 否 --> P4F["FAILED：DELEGATION_RESOURCE_NOT_OWNED"]
         P4E -- 是 --> P4G{"Q5 expectedVersion 相符？"}
@@ -3974,8 +3974,8 @@ flowchart TD
 #### 7.1.5 流程圖的三個關鍵讀法
 
 1. **P1 的六道檢查是「授權」，P3 的四道 Gateway 檢查（Q1／Q2／Q3／Q3b）是「認證、綁定與對象狀態」**。P1 只在建立前跑一次；P3 每一次請求都跑。
-   **P3 的唯讀分支之後還有一道 Q4（歸屬），判定者是領域服務不是 Gateway** —— 圖上把它畫在 domain call 之後正是因為這個順序：Gateway 發出讀取請求時還不知道那個資源屬於誰。**Q4 在讀取路徑上與寫入路徑（P4E）同樣必須成立**，它不是寫入專屬的檢查：`ProductService.java` 現況對 **ACTIVE 商品放行任何 storeId**、`GetPost` 依 §5.1.5 刻意不在 SQL 層過濾，兩者接上代行之後就是跨店讀取面（§13 security「跨店讀取」阻斷項）。P4B 之所以要在寫入路徑上再評估一次 `seller_delegation_authorizations`，是因為 P1 的結果只是建立當下的 snapshot（`docs/modules/delegation.md` §2），授權在工作階段存活期間可能被撤回。
-   **Q3b 與 P1 第 4 步問的是同一件事，但不是重複**：P1 那次答的是「現在能不能**開始**代行」，Q3b 答的是「現在能不能**繼續**代行」。同一個 snapshot 問題——P1 的結論一旦被建立成 session，就再也不會自己更新；停權發生在建立之後時，只有 Q3b 看得見。**這與 P4B 對授權表的重新評估是同一個模式的兩個實例**：凡是「建立當下取快照」的判定，都必須在請求路徑上有一個對應的重驗點，否則 snapshot 就變成了一張永不過期的通行證。
+   **P3 的唯讀分支之後還有一道 Q4（歸屬），判定者是領域服務不是 Gateway** —— 圖上把它畫在 domain call 之後正是因為這個順序：Gateway 發出讀取請求時還不知道那個資源屬於誰。**Q4 在讀取路徑上與寫入路徑（P4E）同樣必須成立**，它不是寫入專屬的檢查：`ProductService.java` 現況對 **ACTIVE 商品放行任何 storeId**、`GetPost` 依 §5.1.5 刻意不在 SQL 層過濾，兩者接上代行之後就是跨店讀取面（§13 security「跨店讀取」阻斷項）。P1 對授權表的結論只是建立當下的 snapshot（`docs/modules/delegation.md` §2），寫入路徑不再讀授權表：撤回授權在同一 transaction 把其下 session 轉為 revoked，P4A 的 session 狀態檢查因此等於檢查授權。撤銷前已通過該檢查的那一筆寫入可能落地，由該筆的稽核列記下。
+   **Q3b 與 P1 第 4 步問的是同一件事，但不是重複**：P1 那次答的是「現在能不能**開始**代行」，Q3b 答的是「現在能不能**繼續**代行」。同一個 snapshot 問題——P1 的結論一旦被建立成 session，就再也不會自己更新；停權發生在建立之後時，只有 Q3b 看得見。**授權的對應機制是撤回授權時在同一 transaction 把其下 session 轉為 revoked（§6.1.15 端點 6），店家狀態的對應機制是 Q3b**：「建立當下取快照」的判定，在請求路徑上各有一個使它失效的機制。
 2. **P1 的所有拒絕都是 `200 {code:0,data:{allowed:false}}`，不是 HTTP 錯誤**（唯一例外是 `DELEGATION_UPSTREAM_UNAVAILABLE`，那是 preflight 自己壞了，走 424）。**`allowed:false` 時 `reasonOptions` 與 `capabilities` 仍必須非空**——回「該店家在無阻擋時會核發的集合」，另以 `deniedCode` 表達拒絕原因。**不得回空陣列**：前端 parser 在 `allowed` 分支**之前**就對這兩欄做非空校驗，空陣列會直接讓 BFF 判成契約錯誤回 502，連 `deniedCode` 一起被丟掉。`deniedCode` 本身目前不被前端顯示（已列入 §4.5 的跨 repo 待辦），但它是稽核與 trace 的依據，仍必須回。
 3. **P4 的 intent 一定早於 domain write，confirm 一定晚於 domain write**。這個順序不是效能取捨，是稽核的不變式：稽核可以「多記一筆結果未確認」，但**不可以少記一筆已發生的變更**。
 
@@ -4125,7 +4125,7 @@ sequenceDiagram
         GW->>PRD: GetProduct（取 before 快照與當前 version）
         PRD-->>GW: before 快照 ＋ version
         GW->>ACC: RecordAuditIntent<br/>PENDING：actor／target／capability／origin=interactive<br/>operationReason／before_snapshot／resource_version_before<br/>payload_hash／notify_seller／idempotency／correlation／UA
-        ACC->>ACC: 同 tx 重新評估 seller_delegation_authorizations
+        ACC->>ACC: 檢查 session 狀態（SessionForAudit）
         ACC-->>GW: auditLogId
 
         GW->>PRD: UpdateProduct<br/>store_id＝session.target_store_id<br/>delegation＝DelegationContext（含 auditLogId）<br/>idempotency_key／expected_version
@@ -4431,7 +4431,7 @@ sequenceDiagram
 
 1. **`revision + 1` 不是為了通知任何人**，它是 session 列自己的樂觀鎖版本（`docs/modules/delegation.md` §3）。前端察覺撤銷靠的是下一次 `GET current` 讀到 `status='revoked'`，不是靠 `revision` 變了。
 2. **ADM 登出連動走 `RevokeSessionsByActor`**，`revoke_reason = 'admin_logout'`、`revoked_by_admin_id` 填**該 admin 自己**（實作落點見 §4.5 的 admin logout handler）。**它與 `RevokeSession` 是同一個轉態、同一組 SET 子句**，差別只在定位方式：登出 handler 手上只有 `admin_accounts.id`，而 `RevokeSession` 以 `session_id` 定位 ⇒ 需要一支以 actor 為條件的批次版。它不是第二條機制，因此也自動獲得上面兩個連帶。
-   **第三個呼叫者是店家狀態重驗**（§8.1.3 第 8 項）：`revoke_reason = 'store_not_operable'`、`revoked_by_admin_id` 同樣填當前這位 ADM 自己。**本節的三個連帶對它一體適用**——這正是第 8 項不必自己實作「取消排程」與「卸載工作區」的原因。排程路徑上還有一個對稱的觸發點在 單體 delegation（`RecordAuditIntent(origin=scheduled)`，§7.6.3 例外段），它不經 Gateway，因此 `revoked_by_admin_id` 填該 session 自己的 `actor_admin_id`。**三個呼叫者共用同一支 RPC、同一組連帶，只有 `revoke_reason` 不同。**
+   **第三個呼叫者是店家狀態重驗**（§8.1.3 第 8 項）：`revoke_reason = 'store_not_operable'`、`revoked_by_admin_id` 同樣填當前這位 ADM 自己。**本節的三個連帶對它一體適用**——這正是第 8 項不必自己實作「取消排程」與「卸載工作區」的原因。**三個呼叫者共用同一支 RPC、同一組連帶，只有 `revoke_reason` 不同。**
 
 #### 7.2.8 批次下架的逐項語意與部分成功（S-6 批次）
 
@@ -4826,31 +4826,14 @@ UPDATE cms_post
 | `origin` | session 必須 | 目標店家必須 | 用途 |
 |---|---|---|---|
 | `interactive` | `status='active'` **且** `now() < expires_at` | 仍可代行（由 Gateway 第 8 項在請求路徑上判，§8.1.3） | 所有由 ADM 當下觸發的讀寫 |
-| `scheduled` | `status <> 'revoked'`（**允許已到期**） | 仍可代行（**由 單體 delegation 在本次呼叫內判**，見下方例外） | 排程 worker 執行已授權的延後動作 |
+| `scheduled` | `status <> 'revoked'`（**允許已到期**） | 不檢查（見下方） | 排程 worker 執行已授權的延後動作 |
 
-`origin` 是稽核表的**持久欄位**（`TEXT NOT NULL`，見 `docs/modules/delegation.md` §6），且**必須由 `RecordAuditIntentRequest` 帶入**——它不能由 單體 delegation 自行推定，因為「這是不是排程來的」只有呼叫端知道。這個欄位是**提權欄位**（它決定用哪一組授權條件），因此判準是**執行期機械強制**而非測試：單體 delegation 只在「內部授權簽章驗證通過且 `serviceName == "social-service"`」時才接受 `scheduled`，其餘一切情形一律以 `interactive` 落庫。判定表與理由見 §8.1.4(b-1)。
+`origin` 是稽核表的**持久欄位**（`TEXT NOT NULL`，見 `docs/modules/delegation.md` §6），且**必須由 `RecordAuditIntentRequest` 帶入**——它不能由 單體 delegation 自行推定，因為「這是不是排程來的」只有呼叫端知道。單體 delegation 依請求所帶的值選用條件，不另驗呼叫端身分（§8.1.4(b-1)）。
 
-##### 例外：目標店家被停權／關店／刪帳號時，排程一律不執行
+##### 目標店家被停權／關店時的排程
 
-**「到期不影響已授權動作的效力」這條裡的「到期」，指的是操作者的操作權消失，不是被代行的那家店消失。** 店家被停權／關店／刪帳號時，這次代行的**正當性基礎本身**已經不在了——不是操作者離開，是被代行的對象已經不該再被平台以它的名義寫入任何東西。因此店家不可代行時的定版在排程上與「到期不影響已建立的排程」方向相反：**已排程但未發布的貼文不發。**
+停權與關店不會撤銷代行 session：`RevokeActiveOfStore` 只由撤回授權呼叫。`RecordAuditIntent(origin=scheduled)` 只檢查 session 狀態，不檢查目標店家狀態。因此店家停權或關店之後，只要建立排程的 session 未被撤銷，排程到點仍通過這一步。session 被撤銷的情形有：互動式請求撞上 §8.1.3 第 8 項（`revoke_reason='store_not_operable'`）、撤回授權、ADM 登出、人工撤銷；撤銷後排程到點被拒，走 §7.6.4。
 
-這與「貼文被刪除／被強制下架時不發」（§7.6.1 第 3 點）是**同一組讀時防禦**，只是防的層級不同：前者防的是**這則貼文**不該發，本項防的是**這家店**不該被寫。兩者都在 worker 執行時 fail-closed，都不由治理端推送、不追殺任何東西。
-
-**機制（刻意不新增任何狀態值與指標 label）**：`RecordAuditIntent(origin=scheduled)` 的前置條件由「`status <> 'revoked'`」擴充為「`status <> 'revoked'` **且** 目標店家仍可代行」。後者不成立時，單體 delegation 在**同一次呼叫**內：
-
-1. 以 `pkg/delegation.StoreOperable` 判定（與 preflight、Gateway 第 8 項共用同一份規則，§8.1.3）——資料來源是 seller 的公開 API（`Deps.Seller`，`docs/modules/delegation.md` §5），與 preflight 同一條；
-2. 把該 session 轉為 `revoked`（`revoke_reason='store_not_operable'`，與 Gateway 第 8 項同一個字面值）；
-3. 回 **9271 `DELEGATION_SESSION_REVOKED`**。
-
-於是 worker 走的是**既有的那個分支**：`schedule_state='cancelled_by_revocation'`、清 lease、OBS10 累加 `reason="revocation"`（§7.6.4、§8.2.3）。
-
-**回 9271 不是把原因說謊**：判定成立的那一刻 session **真的**已經被撤銷，9271 描述的是當下的事實；真正的起因由 session 列的 `revoke_reason='store_not_operable'` 完整保留，事後以 `SELECT revoke_reason FROM delegation.delegated_operation_sessions WHERE id = <scheduled_by_session_id>` 一句就查得出來。**這是刻意的設計選擇**：另立一個 `schedule_state='cancelled_by_store_not_operable'` 需要同時改 §5.1.5 的 CHECK、OBS10 的封閉 label 集合與 worker 的分支邏輯，換到的資訊在 session 列上本來就有。
-
-⚠️ **這一道與 Gateway 第 8 項是兩道獨立的判定，不是同一道的兩個呼叫點，兩道缺一不可**：
-- 只有 Gateway 那道 → 代行者在停權後沒有再送任何請求時，session 不會被轉態，排程照發。
-- 只有這一道 → 代行者可以繼續互動式寫入**最長 30 分鐘**（hard 上限；他還在動作，閒置逾時不會先到），「進行中的工作階段立即失效」這條保證不成立。
-
-**「問不到答案」的處置與 §8.1.3 一致，但落點不同**：seller-service 逾時／不可用時，單體 delegation **不轉終態、不拒絕成 `revoked`**，而是回 9280（`DELEGATION_UPSTREAM_UNAVAILABLE`）；worker 收到 9280 **不取消排程**，走既有的失敗釋放語意（清 lease ＋ `schedule_next_attempt_at = now() + 退避`，§7.6.2），下一個 tick 重試。理由同 §8.1.3：轉終態不可逆、上游抖動是暫時的，而排程路徑另有 24 小時候選窗口兜底（逾窗轉 `expired` 並告警，§7.6.2）。**「不知道」絕不可以走上「取消」這條不可逆的路。**
 
 #### 7.6.4 撤銷會取消未執行的排程
 
@@ -4860,7 +4843,7 @@ UPDATE cms_post
 
 同理，ADM session 登出時其下所有 active 工作階段一併撤銷（見 `docs/modules/delegation.md` §3），因此登出也會連帶讓未執行的排程在到點時被拒絕——這是同一條機制的自然結果，不是額外邏輯。
 
-**`cancelled_by_revocation` 這個終態值有四個來源，不是一個**（`docs/modules/delegation.md` §3 的 `active → revoked` 觸發者表即其全集）：人工撤銷、ADM 登出連動、**治理端撤回該店的代行授權**（§6.1.15 端點 6 的連帶轉態）、以及**目標店家轉為不可代行**（§7.6.3 例外段與 §8.1.3 第 8 項）。四者都寫同一個終態轉換（`RevokeSession`，登出連動走它的批次版 `RevokeSessionsByActor`）／同一個前置條件被拒，因此 worker 端只有一條分支；要分辨是哪一種，讀 session 列的 `revoke_reason`（固定字面值 `admin_logout`／`store_not_operable`／`delegation_disabled`／`authorization_revoked`／人工填入的工單號；完整對照表見 §12.4 ①）。
+**`cancelled_by_revocation` 這個終態值有四個來源，不是一個**（`docs/modules/delegation.md` §3 的 `active → revoked` 觸發者表即其全集）：人工撤銷、ADM 登出連動、**治理端撤回該店的代行授權**（§6.1.15 端點 6 的連帶轉態）、以及**目標店家轉為不可代行**（§8.1.3 第 8 項）。四者都寫同一個終態轉換（`RevokeSession`，登出連動走它的批次版 `RevokeSessionsByActor`）／同一個前置條件被拒，因此 worker 端只有一條分支；要分辨是哪一種，讀 session 列的 `revoke_reason`（固定字面值 `admin_logout`／`store_not_operable`／`delegation_disabled`／`authorization_revoked`／人工填入的工單號；完整對照表見 §12.4 ①）。
 
 ### 7.7 媒體引用的釋放路徑
 
@@ -5138,7 +5121,7 @@ flowchart TD
 
 ##### 第 8 項：目標店家狀態仍可代行（命中即立即失效）
 
-**定版**：賣家在代行期間被**停權／關店／刪帳號**時，進行中的工作階段**立即失效**——下一次代行請求即 fail-closed，並且該工作階段當場轉入終態（連帶讓已排程未發布的貼文不再發出，見 §7.6.3）。
+**定版**：賣家在代行期間被**停權／關店／刪帳號**時，進行中的工作階段**立即失效**——下一次代行請求即 fail-closed，並且該工作階段當場轉入終態（該工作階段轉入終態後，其下已排程未發布的貼文在到點時被拒，見 §7.6.4）。
 
 **為什麼是「立即」而不是「有效至自然到期」**：停權是**即時的風險控制**，而它被觸發的原因往往正是這家店出了問題；讓一個已經建立的代行工作階段繼續寫入，等於讓風險控制對「正在進行中的操作」失效——治理端按下停權之後，平台自己的帳號仍在替該店改商品、改店面、發貼文，事後沒有任何說法能解釋為什麼那些寫入被允許。而代行的最長曝險窗口是 30 分鐘（`docs/modules/delegation.md` §2、§3 硬上限 1800 秒；**無人操作時 15 分鐘即由閒置逾時結束**），**選擇立即失效的代價（一次操作被中斷）遠小於選擇延續的代價（停權後仍有寫入發生）**。⚠️ **這個窗口是 30 分鐘，長度本身使本項更必要**：窗口愈長，「等它自然到期」這個替代方案就愈弱，逐次重驗（本項）承擔的兜底比重就愈大。代價是實的、不是零。
 
@@ -5146,7 +5129,7 @@ flowchart TD
 |---|---|
 | **查什麼** | 目標店家的 `sellers.status`（生命週期值 `active`／`suspended`／`suspended_governance`／`closed`）與 `deleted_at` |
 | **判定規則** | **deny-by-default：只有 `status='active'` 且未刪除才放行。** 其餘一律拒絕——包含日後新增的任何 `status` 值。⚠️ 反過來寫成「命中 `suspended`／`closed` 才拒」的黑名單形式是錯的：新增一個生命週期值時，黑名單會**靜默放行**它，而白名單只會誤擋（誤擋看得見、靜默放行看不見） |
-| **判定的唯一實作** | `pkg/delegation.StoreOperable(lifecycleStatus string, deleted bool) (ok bool, deniedCode int32)`（新增，與 `Validate` 同 package）。**三個消費者共用這一份**：preflight 的第 3／4 步（§6.1.2）、本項、`RecordAuditIntent(origin=scheduled)`（§7.6.3）。三處各寫一份判定 ＝ 三份會各自演化，於是「入口說不可以、寫入說可以」這種矛盾遲早出現；規則只有一份，才談得上「這家店能不能被代行」有唯一答案 |
+| **判定的唯一實作** | `pkg/delegation.StoreOperable(lifecycleStatus string, deleted bool) (ok bool, deniedCode int32)`（與 `Validate` 同 package）。**本項呼叫這一份**（`gateway/internal/router/delegated_capability.go` 的 `enforceStoreOperable`）。判定只放在 `pkg/delegation`，不在呼叫點各寫一份，否則各份會各自演化，於是「入口說不可以、寫入說可以」這種矛盾遲早出現；規則只有一份，才談得上「這家店能不能被代行」有唯一答案 |
 | **資料來源** | seller-service，**沿用 preflight 用的同一支 RPC** `GetSeller`（§7.2.1 ①、§7.2.5）。Gateway 本來就持有 seller-service client（§6.1.1 的 `/storefront` 路由即走 `SellerService.GetSeller`），**這句只涵蓋 Gateway 這一跳**——preflight 的同一份判定由單體 delegation 在行程內讀 seller 取得（`docs/modules/delegation.md` §5）。**刻意不為此另立一支輕量 RPC**：第二支 RPC ＝ 第二個「店家可否代行」的答案來源，preflight 與逐次重驗一旦查不同支，兩邊的欄位取用與判定就會各自漂移 |
 | **拒絕碼** | 停權（`suspended`／`suspended_governance`）與關店（`closed`）→ **9272 `DELEGATION_STORE_NOT_OPERABLE`**（422）；已刪除或查無該店 → **9265 `DELEGATION_STORE_NOT_DELEGABLE`**（403）。兩者都是既有碼、語意原封相符（§6.5.1），**不新增業務碼**——這兩個碼在 preflight 表達的就是同樣兩件事，逐次重驗只是把同一個判定搬到請求路徑上。⚠️ **`closed` 實際落 9265 而非本列的 9272**（seller-service 對公開 lookup 把關店視同不存在，preflight 亦然），偏差與理由見下方 ⛔ 段落，寫測試時以實際行為為準 |
 | **本跳帶不帶 `delegation`** | **不帶。** 這一跳是 **Gateway 自己的授權判定**，不是代行操作 —— 它問的是「這家店現在能不能被代行」，發生在放行之前，此刻還沒有任何 `DelegationContext` 可以送（`audit_log_id` 也還不存在，因為讀取路徑本來就不寫 intent，§7.1.2）。⇒ **`GetSellerRequest.delegation` 留空**，seller-service 端走 `pkg/delegation` 的 **S0**（`d == nil` ⇒ 賣家本人／既有路徑，直接回 nil），視同既有 admin 讀取。<br/>**這一列必須明寫，否則會與 §6.2.1／§6.2.3「代行讀取一律帶 `delegation`」對撞**：那兩節講的是**代行端點**（`GET .../storefront` 等，帶 `storefront.read`），本跳不是端點、不在 `delegatedRoutes` registry 內、沒有 capability。照字面把 `delegation` 帶上去，反而會因為 `audit_log_id` 為空而在寫入類語境下被 S1b 打回 9260 |
@@ -5183,7 +5166,7 @@ flowchart TD
 
 **第二與第三個連帶都只在「代行者又送了至少一次代行資源請求」時才觸發**——轉態發生在第 8 項命中的那一刻，而第 8 項只掛在資源路由上（作用域見下方）。因此：
 
-- **第三個連帶**：操作者若在停權發生後就沒有再動作，工作階段不會被轉態，排程照樣會發 ⇒ §7.6.3 在排程路徑上另有一道**獨立**的同名判定，兩道缺一不可。
+- **第三個連帶**：操作者若在停權發生後就沒有再動作，工作階段不會被轉態，排程到點時照樣通過 `RecordAuditIntent(origin=scheduled)`（該呼叫只檢查 session 狀態，§7.6.3）。
 - **第二個連帶**：同理，`GET current` 會持續讀到 `active`，**工作區不會自動切成阻擋畫面**；上表那個「≤30 秒」的計時起點是**第 8 項命中的那一次請求**，不是店家被停權的那一刻。這一項**沒有**對應的獨立防線，而且是**刻意接受的**：未轉態期間寫入面已由第 8 項 fail-closed 完全擋住（代行者一動作就撞上），缺的只是「操作者停手不動時 UI 早一點知道」。要補齊的正解是事件驅動撤銷（消費既有 `seller.suspended`／`seller.deleted`），本期不做，選項與否決理由見 [ADR：停權即時失效、通知通道與 PII 揭露](../adr/2026-09-18-adm-delegation-suspension-and-notification.md)。
 
 **`RevokeSession` 呼叫本身失敗不改變本次請求的結果**：拒絕在第 8 項判定成立的那一刻就已成立，撤銷只是為了讓 UI 與排程跟上。失敗時記 warn 並照常回 9272／9265，下一次請求會再撞一次同一個判定、再試一次撤銷。**不得**因為撤銷失敗而把請求改判成 5xx——那會把一個已經正確拒絕的請求，變成一個看起來像後端壞掉的請求。
@@ -5284,36 +5267,11 @@ canonical。**代行的讀取與寫入一律走賣家既有 RPC 並一律帶本�
 |---|---|---|
 | `INTERNAL_AUTH_MODE=enforcing` | 內部呼叫以 HMAC 簽驗；permissive 下缺 secret 時 fallback 為不簽不驗（`internal_auth.go` 的未簽名內部呼叫直接放行），本機即是此行為 | 代行功能上線前必須逐次查核五個服務（gateway／單體／product／seller／social）的**生效值**為 `enforcing` 且 `internal.auth.unsigned` 歸零。理由：這個前提由**別的變更**維護，隨時可能被改回去 |
 
-**(b-1) `origin=scheduled` 是提權欄位，判準必須是執行期機械強制，不是測試**
+**(b-1) `origin` 由呼叫端帶入，單體 delegation 不驗呼叫端身分**
 
-`RecordAuditIntentRequest.origin` 決定 單體 delegation 用**哪一組條件**判定授權是否仍然成立
-（§7.6.3：`interactive` 要求 session 仍 `active` 且未到期，`scheduled` 只要求 `status <> 'revoked'`）。
-⇒ 一個能任意宣告 `origin=scheduled` 的呼叫端，就能對**已到期的 session** 繼續寫入。這是提權欄位，
-和 `capability` 同級，**不能靠「約定只有 worker 會傳」＋一條測試守住**——測試只在 CI 跑，執行期沒有
-任何東西在檢查。
+`RecordAuditIntentRequest.origin` 決定 單體 delegation 用哪一組條件判定 session（§7.6.3：`interactive` 要求 session 仍 `active` 且未到期，`scheduled` 只要求 `status <> 'revoked'`）。
 
-**定版（單體 delegation 側，`RecordAuditIntent` 的入口判定）**：
-
-| 條件 | 判定 |
-|---|---|
-| 52 號的內部授權簽章驗證通過（server 側 interceptor 判出 `isInternalCall() == true`）**且** `x-internal-service` 解析出的 `serviceName == "social-service"` | 接受請求所帶的 `origin`（可為 `scheduled`） |
-| 其餘一切情形（未驗簽、驗簽失敗、`serviceName` 為其他值） | **一律以 `interactive` 落庫**，忽略請求所帶的值，不報錯 |
-
-**為什麼這個判準是機械的而不是約定**：Gateway 依 [Java 微服務開發規範](../開發規範/Java%20微服務開發規範.md) §4.2 **不得帶 `x-internal-service`**
-（使用者面走 `requireAccountType`／capability 判定），因此 Gateway 這條路徑在結構上永遠拿不到
-`serviceName == "social-service"`，也就永遠只能落 `interactive`。而排程 worker 走的是
-social-service → 單體 delegation 的內部 client，該 client **必須掛 `InternalAuthClientInterceptor`**
-（落點見 §4.5；同服務的 media client 已有先例）⇒ 它的簽章由 52 號的 HMAC 保證，`serviceName` 偽造
-不了。判準的兩個輸入（驗簽結果、`serviceName`）都不是呼叫端可自我宣告的值。
-
-**靜默降級而非報錯是刻意的**：`origin` 是稽核欄位不是業務參數，把不合格的宣告降級成
-`interactive` 會讓該次請求繼續走**較嚴格**的那組授權條件（session 必須仍有效），fail-closed 方向正確；
-回錯誤反而給了攻擊者一個「我猜對了服務名嗎」的探測訊號。降級發生時記一條 `warn` 級 application log
-（不是稽核列），供排查用。
-
-**這條取代原本「以 §13 security 層測試守住」的說法**。§13 的對應測試仍然保留，但它的角色從
-「唯一防線」降為「迴歸守門」：斷言「非 social-service 身分傳 `origin=scheduled` → 落庫值為
-`interactive`」。
+`internal/legacy/delegationservice/audit.go` 的 `toIntentInput` 直接採用請求所帶的 `Origin`，不檢查內部授權簽章與服務名。Gateway 的寫入路徑帶 `interactive`，排程 worker 帶 `scheduled`。legacy listener 不驗服務間 HMAC，且只存在於本機與 CI（Gateway 與舊服務不會部署）。
 
 **(c) storeid resolver 的負快取陷阱：代行路徑完全不走 resolver**
 
@@ -5713,7 +5671,7 @@ k8s 落點 `k8s/values/social-service.yaml`）。**本表是這組參數的唯�
 | `SCHEDULED_POST_PUBLISH_BATCH_SIZE` | `50` | 1–500 | 每輪 claim 筆數。**租約基準逐筆取**，此值不影響租約不變式（§29） |
 | `SCHEDULED_POST_PUBLISH_LEASE_SECONDS` | `120` | **30–600** | 貼文列的租約長度（`cms_post.schedule_lease_expires_at`，欄位見 §5.1.5）。值域是逐項上下界，**真正的守門人是下方三條 `Validate()` 斷言**（值域內仍可能違反不等式，例如 lease 取 30 而 `_PUBLISH_TX_BUDGET_MS` 一起調到上界 15000） |
 | `SCHEDULED_POST_PUBLISH_MAX_RETRY` | `5` | 1–20 | 重試上限；達上限即 `schedule_state='expired'`，由 §12.4 Runbook 人工判讀 |
-| `SCHEDULED_POST_PUBLISH_BACKOFF_BASE_SECONDS` | `60` | 30–600 | 退避基數。§7.6.2／§7.6.3 寫的「`schedule_next_attempt_at = now() + 退避`」指的是這條算式：`LEAST(BASE × 2^(retry_count - 1), SCHEDULED_POST_PUBLISH_BACKOFF_MAX_SECONDS)`，`retry_count` 取本次失敗後的值（1 起算）。**下界應 ≥ 一個 tick**——小於 tick 的退避不會讓重試更早發生，只會製造「看起來很密其實沒差」的假象 |
+| `SCHEDULED_POST_PUBLISH_BACKOFF_BASE_SECONDS` | `60` | 30–600 | 退避基數。§7.6.2 寫的「`schedule_next_attempt_at = now() + 退避`」指的是這條算式：`LEAST(BASE × 2^(retry_count - 1), SCHEDULED_POST_PUBLISH_BACKOFF_MAX_SECONDS)`，`retry_count` 取本次失敗後的值（1 起算）。**下界應 ≥ 一個 tick**——小於 tick 的退避不會讓重試更早發生，只會製造「看起來很密其實沒差」的假象 |
 | `SCHEDULED_POST_PUBLISH_BACKOFF_MAX_SECONDS` | `1800` | 300–7200 | 單次退避的封頂值（達此值後不再倍增）。**必須讓整條退避序列在候選窗口內走完**，否則重試還沒用完該列就已逾窗轉 `expired`，`DelegationScheduledPostExpired` 的 `reason` 會全部記成 `window_exceeded`、把真正的 `retry_exhausted` 蓋掉（斷言見下方） |
 | `SCHEDULED_POST_PUBLISH_AUDIT_INTENT_DEADLINE_MS` | `800` | 200–3000 | worker → 單體 delegation `RecordAuditIntent(origin=scheduled)` 的單次 deadline。**必須是本組參數而不是沿用 (B) 組**：(B) 落在 Gateway 的 config，social-service 讀不到它；而 deadline 是**呼叫端**的決定，worker 是這支 RPC 的第三個呼叫端（§7.3.2 末列） |
 | `SCHEDULED_POST_PUBLISH_AUDIT_CONFIRM_DEADLINE_MS` | `400` | 100–3000 | worker → 單體 delegation `ConfirmAuditResult` 的**單次** deadline |
@@ -6257,11 +6215,11 @@ UPDATE delegation.seller_delegation_authorizations
 | **unit** | 樂觀鎖參數 | 以 session 的 `revision` 值當作 `expectedVersion` 送出 → 必須被拒（型別／來源不符），不得成為「永遠成功的樂觀鎖」 | `revision` 與 `version` 是本設計最容易混淆的一組（§14） |
 | **unit** | **樂觀鎖 `rows = 0` 的轉譯**（Java／Go 兩側，每個帶樂觀鎖的寫入方法各一條） | ① `mapper.updateById(entity)` 回傳 **0** → 必須拋 `BusinessException(DELEGATION_RESOURCE_VERSION_CONFLICT)`（9266）。**不得**當成成功回傳、**不得**退化成「再查一次然後用新版本覆蓋」；② 回傳 **1** → 正常路徑，且該筆 `version` 恰 +1；③ Go 側 `UPDATE ... WHERE id=$1 AND version=$2` 的 `RowsAffected() == 0` 走**同一條**轉譯（同一個業務碼）。⚠️ **不接受「其中一個寫入方法測過就代表全部」**——每個方法都是獨立的一行 `if`，漏一個就是漏一個 | **MyBatis-Plus 版本不符時回傳 0 且不拋例外**（§6.6.3）。漏寫這行 `if` 的路徑會把賣家的併發修改**靜默覆蓋**，而編譯、既有測試、smoke 全綠——沒有任何訊號 |
 | **unit** | **`DelegationContext` 驗證器的 Java／Go 等價性** | 以 §6.2.4 的判定步驟為準，做**一份共用的 table-driven 案例集**（每列 ＝ 一組 `DelegationContext` ＋ 呼叫端宣告 ＋ **期望業務碼**），**Java 與 Go 各跑同一組，逐列期望值必須完全相同**。案例至少涵蓋 §6.2.4 每一個判定步驟的通過與失敗各一列（欄位空／capability 不在封閉列舉／capability 與本 RPC 宣告不符／`idempotency_key` 與 request 既有欄位不一致），外加一列全通過的 happy case。**案例集以資料檔形式共用**（同一份 JSON 檔，兩側各自讀），不是兩邊各抄一份 | 同一份語意有兩份實作，等價性不會自己成立。⚠️ 兩邊各寫各的測試只證明「各自沒壞」，證明不了「兩邊判一樣」——**共用案例集是唯一能證明後者的做法**。判不一樣的後果是同一個請求在 Java 服務被拒、在 Go 服務放行 |
-| **unit** | **店家狀態判定 `pkg/delegation.StoreOperable`**（§8.1.3 第 8 項） | ① `('active', deleted=false)` → 放行；② `('suspended', false)`／`('suspended_governance', false)`／`('closed', false)` → 拒絕且回 **9272**；③ `(任意 status, deleted=true)` → 拒絕且回 **9265**（刪除優先於狀態，與 social 側 `deleted_at ≻ hidden_at` 的既有排序同向）；④ **鑑別力：傳一個虛構的第五個狀態值（例 `'dormant'`）必須回拒絕**——這一條才是驗「白名單而非黑名單」的斷言，沒有它，一份寫成 `if status == "suspended" \|\| status == "closed"` 的黑名單實作會讓①②③全綠 | 判定只有一份，卻被 preflight／Gateway 第 8 項／`RecordAuditIntent(origin=scheduled)` 三處消費。④ 對應的失敗模式是**靜默放行**：新增生命週期值時黑名單不報錯、不編譯失敗、既有測試全綠 |
+| **unit** | **店家狀態判定 `pkg/delegation.StoreOperable`**（§8.1.3 第 8 項） | ① `('active', deleted=false)` → 放行；② `('suspended', false)`／`('suspended_governance', false)`／`('closed', false)` → 拒絕且回 **9272**；③ `(任意 status, deleted=true)` → 拒絕且回 **9265**（刪除優先於狀態，與 social 側 `deleted_at ≻ hidden_at` 的既有排序同向）；④ **鑑別力：傳一個虛構的第五個狀態值（例 `'dormant'`）必須回拒絕**——這一條才是驗「白名單而非黑名單」的斷言，沒有它，一份寫成 `if status == "suspended" \|\| status == "closed"` 的黑名單實作會讓①②③全綠 | 判定只有一份，由 Gateway 第 8 項呼叫。④ 對應的失敗模式是**靜默放行**：新增生命週期值時黑名單不報錯、不編譯失敗、既有測試全綠 |
 | **unit** | 批次冪等鍵導出 | 一次批次下架 3 項、單一 header key `K` → 導出 `K:<resourceId>` 三把互異的鍵；重送同一把 header key → 已成功的兩項跳過、只重跑失敗的第 1 項 | 三項共用一把 key 會當場違反 `uq_aoal_session_idempotency`，且部分成功的批次無法重試 |
 | **unit** | **`changed_fields` 的比較範圍**（§6.1.12「比較範圍」） | ① 逐 action 跑一次完整 orchestrate，斷言 `changed_fields` 的**欄位集合**恰等於該 action 動得到的欄位（`STOREFRONT_LOGO_UPDATE` ⇒ 只有 `logoKey`；`PRODUCT_PUBLISH` ⇒ 只有 `status`）；② 反向：`PRODUCT_UPDATE` 改一欄仍記那一欄（收窄不得吃掉正常路徑）；③ `before_snapshot` 在收窄的 action 上仍是**完整**投影；④ AST 掃每一個 `Orchestrate`／`OrchestrateBatch` 呼叫點都宣告了 `SnapshotFields`；⑤ 每個 `Scope*` 的欄名都在規則表內。⚠️ **stub 必須刻意回殘缺的寫入回應**（狀態端點不回 `hashtags`），否則 ①②③ 在拿掉修復後照樣全綠 | 多記一列從未發生的變更，比少記一列更糟——`changed_fields` 是爭議時的舉證，賣家看到的是「你把我的店名清空了」。**這一類失效不會有任何錯誤訊號**：端點回 200、稽核列寫入成功、形狀完全正確。漏掉時，換一次 logo 會記 10 列而只有 1 列是真的；上下架每次虛報「主題標籤被清空」。④ 是給第 14 支端點的閘門：漏填 `SnapshotFields` 等於選了全表比較，而它不編譯失敗也不轉紅 |
 | **integration** | **通知消費端冪等**（notification-service ＋ 真 DB） | ① **重送同一則完成事件**（同一個 `audit_log_id`）→ 賣家站內訊息**恰一則**；第二次由既有 `UNIQUE (user_id, user_type, event_type, reference_id)` 擋下，consumer **視為成功 ack**（不進 DLQ、不無限重試）；② 兩則不同 `audit_log_id` 的事件 → **兩則**訊息 | 去重由 `reference_id = audit_log_id` 承擔（§4.5、`pkg/mq/events.go`），**不是**由 `event_id` 承擔。①防的是重複通知；②防的是把去重鍵寫成 session 級——那會讓同一個 session 的第二次操作**靜默不通知**，而且沒有任何錯誤 |
-| **integration** | 排程發布（social-service） | ① 排程時間到 → 發布成功且寫稽核；② **建立排程的 session 已到期 → 排程仍執行**；③ **該 session 被撤銷 → 未執行的排程被取消**；④ 兩個 worker 副本不重複發布；⑤ **排程 `pending` → 賣家刪除貼文 → 到點斷言未發布且 `schedule_state='cancelled_by_deletion'`**；⑥ 同上但走平台強制下架 → `cancelled_by_governance`；⑦ **反向對照：未刪除也未下架者到點必須發布**；⑧ **排程 `pending` → 目標店家轉 `suspended`（貼文本身未刪未下架）→ 到點斷言未發布、`schedule_state='cancelled_by_revocation'`、且該 session 的 `revoke_reason='store_not_operable'`**（§7.6.3 例外段）；⑨ **⑧ 的失效對照：seller-service 不可用（回 `UNAVAILABLE`）時，排程既不發布也不取消**——該列回到候選集合、下一個 tick 重試，`schedule_state` 仍為 `pending` | ②③是同一個機制的兩面，只測一面會讓另一面靜默錯誤。⑦ 是 ⑤⑥ 的鑑別力：沒有它，一個「永遠不發布」的壞 worker 也會讓 ⑤⑥ 全綠。⚠️ **⑧ 不可用「刪帳號」情境代替**：刪帳號會經 `seller.deleted` 把貼文寫上 `deleted_at`，於是 ⑤ 那條路徑先命中 ⇒ 拿刪帳號測 ⑧ 會**測到 ⑤ 而以為測到 ⑧**。**停權與關店才是只有 ⑧ 擋得住的情境**。**⑨ 是 ⑧ 的反向鑑別力**：沒有它，一個「把所有查不到狀態的都當成不可代行」的實作會讓 ⑧ 全綠，而那正是 §8.1.3 明令禁止的（上游抖動不得轉終態） |
+| **integration** | 排程發布（social-service） | ① 排程時間到 → 發布成功且寫稽核；② **建立排程的 session 已到期 → 排程仍執行**；③ **該 session 被撤銷 → 未執行的排程被取消**；④ 兩個 worker 副本不重複發布；⑤ **排程 `pending` → 賣家刪除貼文 → 到點斷言未發布且 `schedule_state='cancelled_by_deletion'`**；⑥ 同上但走平台強制下架 → `cancelled_by_governance`；⑦ **反向對照：未刪除也未下架者到點必須發布** | ②③是同一個機制的兩面，只測一面會讓另一面靜默錯誤。⑦ 是 ⑤⑥ 的鑑別力：沒有它，一個「永遠不發布」的壞 worker 也會讓 ⑤⑥ 全綠。 |
 | **integration** | **店家狀態逐次重驗（第 8 項，互動路徑）** | ① 建立 session → 店家轉 `suspended` → **下一次代行寫入**回 9272，且**該筆 domain write 未發生**（回領域 DB 斷言資源未變）；② 同上，**下一次代行讀取**（`GET .../products`）同樣回 9272——**唯讀路徑不得放行**；③ ①之後再打**任一**代行請求 → 改回 **9271**（session 已轉終態），且 `GET /admin/delegated-operations/current` 回 `status='revoked'`、`revision` 已 +1、`revoke_reason='store_not_operable'`；④ 店家轉 `closed` → 拒絕並轉終態，但**碼是 9265 不是 9272**（seller-service 把關店視同不存在，見 §8.1.3 第 8 項 ⛔ 段落）；店家 `deleted_at` 非空 → 同樣回 **9265**；⑤ **`GET current` 本身不跑第 8 項**：店家已停權時該端點仍必須回 200 ＋ session summary（而非 422）——否則前端永遠讀不到終態、工作區切不成阻擋畫面；⑥ **反向對照：`status='active'` 且未刪除者，同樣的請求必須成功**；⑦ **上游不可用**（seller-service 回 `UNAVAILABLE`）→ 回 **9280**，domain write 未發生，且 **session 仍為 `active`**（`GET current` 斷言）——不得因為一次上游抖動就轉終態 | ⑤⑥⑦ 三條各自是前四條的鑑別力來源：⑥ 防「永遠拒絕」的壞實作、⑤ 防「把第 8 項掛到 session 端點」這個很自然但會讓 UI 卡死的錯掛、⑦ 防「確知」與「不知道」被混成同一條路徑（§8.1.3 明列的最易錯點）。**①與②必須各測一條**：一份「只在 mutation 路徑掛第 8 項」的實作會讓①綠②紅，而②正是「工作階段立即失效」與「只擋寫入」那個被否決選項的分界 |
 | **contract** | 與 hawkr-admin 的九支既有測試對齊（見下方「跨 repo 對齊」） | 逐條鏡像斷言：envelope `code` 為**數字 0** 且 `data` key 存在／`caseReference` 為 string 或**顯式 `null`**（Go `*string` 且**無 `omitempty`**）／`status` 恰為三個**小寫**值／`revision` 為非負安全整數／`capabilities` 非空去重且全落在九值內／**`ttlSeconds ∈ [1,1800]` 且 `expiresAt − issuedAt ∈ (0,1800s]`**（**同波前 admin repo 的值是 900，兩邊對不上時以本書為準並立即改前端**）／`operationCredential` 長度 16–8192 且不含空白／`;`／`,`／`reasonCode` 與 `caseReference` **原字串回音**／`DELETE` 回 `200 {code:0,data:{ended:true}}` 且對已終止 session 仍回同樣的 200<br/>**＋案件編號最低門檻的兩條負向斷言**：`caseReference` 長度 <4 或不含數字 ⇒ **9260**（`"1"`／`"----"` 皆須被拒）；某店家**從未開通** ⇒ preflight 回 `allowed:false` ＋ **9286**（逐店開通之下這是常態路徑，不是例外路徑，必須有正向測試），而**已撤回**的店家回 **9264**——**兩條都要，且必須是兩個不同的 case**：只寫一條的話，一份把兩種情形合成同一個碼的實作照樣全綠 | 這些斷言全部是「後端看起來 200 成功、UI 靜默失效」的形狀（§3.1.2／§3.1.3），**沒有任何錯誤 log 會告訴你踩到了** |
 | **contract** | 前端 fail-closed 五類各至少一條（A–E） | **A**（入口消失）：preflight 對「賣家不存在」**不得回 404**、對「服務暫時不可用」**不得回 503**，一律 `200 {allowed:false}`；**B**（契約作廢）：`capabilities` **空陣列 → 前端整份契約作廢**，因此後端**任何**路徑都不得回空陣列（含 `allowed:false` 的 preflight）——這是唯一仍會讓契約作廢的形狀，必須有專門的負向測試；至於 `capabilities` 出現**第 10 個值**，前端會忽略該值、保留已知，**不再是契約作廢**，它的同波保證不在契約測試層重複；**C**（進不了工作區）：create 回應缺 `operationCredential`／時間戳 4 位小數／`status` 大寫 → 各一條負向測試；**D**（結束卡死）：`DELETE` 回 `202`／`{ended:false}`／裸 `404` → 各一條負向測試斷言後端**不會**產生這些回應；**E**（輪詢誤判）：`GET current` 只能由 credential 解析 session，**不接受 storeId query** | 五類的共同特徵是後端無感。契約測試是唯一能在後端這側抓到它們的地方 |

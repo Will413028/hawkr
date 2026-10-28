@@ -223,6 +223,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
 - [ ] **A9 agent**
   - AI 助理與 procurement 的串流（AG-UI，12 支 SSE）：依 ADR `2026-09-26-external-contract-protobuf-connect.md` D7 在這一步決定改成 proto 的 server streaming，或保留 AG-UI 的 SSE 並明列為第二套契約（AG-UI 是外部的開放格式）。
 - [ ] **A10 delegation**：從 gateway 搬出代行編排；session 與稽核資料留在 identity。
+  - 代行寫入搬進單體時，在領域寫入的同一個 transaction 以 `FOR SHARE` 讀 session 列檢查狀態，再寫入與寫稽核（撤銷與寫入序列化）。理由：撤銷以 session 為準，gateway 與領域服務不同 DB 時無法保證撤銷前後的順序，同 DB 後成本只是一次加鎖讀取。
   - 代行貼文的 6 條路由排在 A7-2d 改走單體 Connect（A7 計畫 S1），A10 只剩商品與訂單的路由；A7-2d 完成後，代行 Connect 的第一版形狀（credential、能力、`request_id`、限流）記在 ADR `2026-09-27-delegation-module.md` 的修訂段，A10 沿用或修訂。
   - 代行營運有 24 條路由不在現有 API 清單裡（gateway 的 `routesNotInSpec`，另有 binary 代理 9 條等），搬遷時以路由表為準，不能只看 `openapi.yaml`。
   - website 的代行 client（`lib/api/delegated.ts`、`app/(delegated)/adm/api/_upstream.ts`）還送 `X-Requested-With`，理由是 gateway 的 CSRF guard；A2 之後 gateway 沒有這道檢查，入口的 CSRF 看 `Sec-Fetch-Site`／Origin。它在 56 號設計書的 header 允許清單裡，改 client 時一起改清單。

@@ -11,9 +11,8 @@ const (
 )
 
 // StoreOperable answers "can this store be operated on behalf of right now"
-// (§8.1.3 第 8 項). Pure function, no I/O — its three consumers are
-// account-service preflight, the Gateway authorization chain, and
-// RecordAuditIntent(origin=scheduled), and they must all get the same answer.
+// (§8.1.3 第 8 項). Pure function, no I/O — its only consumer is the Gateway
+// authorization chain (gateway/internal/router/delegated_capability.go).
 //
 // deny-by-default whitelist: only an active, undeleted store is allowed. Any
 // lifecycle value added in the future is refused until someone comes here and
