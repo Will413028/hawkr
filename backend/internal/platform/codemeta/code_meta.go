@@ -543,7 +543,7 @@ func RefundStatusFromValue(value string) (RefundStatus, bool) {
 }
 
 // ===== PayuniMerchantVerificationStatus =====
-// PayUni 商店（merchant）審核狀態。沿用既有 Go `domain.PayuniMerStatus`
+// PayUni 商店（merchant）審核狀態。終止狀態（`2`、`8`、`92`、`99`）由 seller 模組的 `TerminalMerStatus`（`internal/modules/seller/internal/model/payuni.go`）判定。未命中 `codeLabel()` 的 fail-safe：一律回傳
 
 type PayuniMerchantVerificationStatus struct {
 	Code        string
@@ -2160,7 +2160,7 @@ var (
 	InvoiceComplaintStatusOverdue            = InvoiceComplaintStatus{Code: "OVERDUE", Value: "OVERDUE", Label: "已逾期", Description: "超過 3 個工作天未回覆；24 小時後自動升級 ADM"}
 	InvoiceComplaintStatusEscalatedToAdm     = InvoiceComplaintStatus{Code: "ESCALATED_TO_ADM", Value: "ESCALATED_TO_ADM", Label: "待平台判定", Description: "賣家請求協助／買家不接受／逾期自動升級"}
 	InvoiceComplaintStatusResolved           = InvoiceComplaintStatus{Code: "RESOLVED", Value: "RESOLVED", Label: "已解決", Description: "ADM 判定已解決、買家確認、或系統偵測發票已送達。**非終態**（可於 24 小時後重開，最多 2 次）"}
-	InvoiceComplaintStatusViolationConfirmed = InvoiceComplaintStatus{Code: "VIOLATION_CONFIRMED", Value: "VIOLATION_CONFIRMED", Label: "判定賣家違規", Description: "計入 90 天違規窗口；發票模組只發建議，停權處分由 seller-service 執行（終態）"}
+	InvoiceComplaintStatusViolationConfirmed = InvoiceComplaintStatus{Code: "VIOLATION_CONFIRMED", Value: "VIOLATION_CONFIRMED", Label: "判定賣家違規", Description: "計入 90 天違規窗口；發票模組只發建議，停權處分由 seller 模組的措施執行（終態）"}
 	InvoiceComplaintStatusWithdrawn          = InvoiceComplaintStatus{Code: "WITHDRAWN", Value: "WITHDRAWN", Label: "買家已撤回", Description: "不計入違規計數（終態）"}
 )
 

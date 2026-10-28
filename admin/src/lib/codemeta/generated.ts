@@ -114,7 +114,7 @@ export const REFUND_STATUS_LABEL: Record<string, string> = {
 	"5": "人工審核中",
 };
 
-/** PayUni 商店（merchant）審核狀態。沿用既有 Go `domain.PayuniMerStatus` */
+/** PayUni 商店（merchant）審核狀態。終止狀態（`2`、`8`、`92`、`99`）由 seller 模組的 `TerminalMerStatus`（`internal/modules/seller/internal/model/payuni.go`）判定。未命中 `codeLabel()` 的 fail-safe：一律回傳 */
 export const PayuniMerchantVerificationStatus = {
 	ACTIVE: "1",
 	CLOSED: "2",
@@ -1976,7 +1976,7 @@ export const UBER_DELIVERY_OUTCOME_LABEL: Record<string, string> = {
 	"CREATE_FAILED": "建單失敗",
 };
 
-/** ADM 代行營運的稽核動作類型。Code 與 Value 一致（UPPER_SNAKE_CASE，直接存讀可辨識文字），對齊 EventType 系列字串式 value 設計。`riskLevel` 不是本 enum 的欄位，由 account-service `DelegationActionRules.RiskLevel(action)` 純函式決定（未登錄的 action 一律回 high，忘記登記的後果必須是多記一次高風險而非靜默降級）；CodeMeta enum 內禁止放業務輔助邏輯。四個 READ 動作只在讀取被拒絕時寫入，result 恆為 FAILED、biz_code 僅 9262 / 9263 / 9275 三者，讀取成功一律不落稽核（可觀測性由 access log 承擔）。 */
+/** ADM 代行營運的稽核動作類型。Code 與 Value 一致（UPPER_SNAKE_CASE，直接存讀可辨識文字），對齊 EventType 系列字串式 value 設計。`riskLevel` 不是本 enum 的欄位，由 delegation 模組的 `RiskLevel()`（`internal/modules/delegation/internal/model`）純函式決定（未登錄的 action 一律回 high，忘記登記的後果必須是多記一次高風險而非靜默降級）；CodeMeta enum 內禁止放業務輔助邏輯。四個 READ 動作只在讀取被拒絕時寫入，result 恆為 FAILED、biz_code 僅 9262 / 9263 / 9275 三者，讀取成功一律不落稽核（可觀測性由 access log 承擔）。 */
 export const DelegationAuditAction = {
 	STOREFRONT_UPDATE: "STOREFRONT_UPDATE",
 	STOREFRONT_LOGO_UPDATE: "STOREFRONT_LOGO_UPDATE",

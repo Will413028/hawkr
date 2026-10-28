@@ -239,7 +239,7 @@ export const REFUND_STATUS_LABEL: Record<string, string> = {
 	"5": "人工審核中",
 };
 
-/** PayUni 商店（merchant）審核狀態。沿用既有 Go `domain.PayuniMerStatus` */
+/** PayUni 商店（merchant）審核狀態。終止狀態（`2`、`8`、`92`、`99`）由 seller 模組的 `TerminalMerStatus`（`internal/modules/seller/internal/model/payuni.go`）判定。未命中 `codeLabel()` 的 fail-safe：一律回傳 */
 export const PayuniMerchantVerificationStatus = {
 	ACTIVE: "1",
 	CLOSED: "2",

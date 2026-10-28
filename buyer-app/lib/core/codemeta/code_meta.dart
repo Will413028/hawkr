@@ -494,7 +494,7 @@ enum RefundStatus {
   }
 }
 
-/// PayUni 商店（merchant）審核狀態。沿用既有 Go `domain.PayuniMerStatus`
+/// PayUni 商店（merchant）審核狀態。終止狀態（`2`、`8`、`92`、`99`）由 seller 模組的 `TerminalMerStatus`（`internal/modules/seller/internal/model/payuni.go`）判定。未命中 `codeLabel()` 的 fail-safe：一律回傳
 enum PayuniMerchantVerificationStatus {
   /// 啟用 — PayUni 商店已啟用，可收款
   active(code: 'ACTIVE', value: '1', label: '啟用'),
@@ -1984,7 +1984,7 @@ enum InvoiceComplaintStatus {
   escalatedToAdm(code: 'ESCALATED_TO_ADM', value: 'ESCALATED_TO_ADM', label: '待平台判定'),
   /// 已解決 — ADM 判定已解決、買家確認、或系統偵測發票已送達。**非終態**（可於 24 小時後重開，最多 2 次）
   resolved(code: 'RESOLVED', value: 'RESOLVED', label: '已解決'),
-  /// 判定賣家違規 — 計入 90 天違規窗口；發票模組只發建議，停權處分由 seller-service 執行（終態）
+  /// 判定賣家違規 — 計入 90 天違規窗口；發票模組只發建議，停權處分由 seller 模組的措施執行（終態）
   violationConfirmed(code: 'VIOLATION_CONFIRMED', value: 'VIOLATION_CONFIRMED', label: '判定賣家違規'),
   /// 買家已撤回 — 不計入違規計數（終態）
   withdrawn(code: 'WITHDRAWN', value: 'WITHDRAWN', label: '買家已撤回');
