@@ -19,6 +19,7 @@ buyer-service 已刪除（遷移計畫 A3a）。買家的建立、存活與關�
 
 | 內容 | 位置 |
 |---|---|
+| 行為規格 | `backend/docs/modules/buyer.md` |
 | 職責、擁有的資料、不變量 | `backend/internal/modules/buyer/AGENTS.md` |
 | 與舊服務的差異、沿用盤點 | `backend/internal/modules/buyer/CARRYOVER.md` |
 | 對外 API | `api/hawkr/buyer/v1alpha1/buyer.proto`（前台）、`api/hawkr/admin/buyer/v1alpha1/buyer.proto`（後台） |

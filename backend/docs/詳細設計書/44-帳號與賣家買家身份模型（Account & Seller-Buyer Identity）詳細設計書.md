@@ -73,7 +73,7 @@ flowchart LR
 | | 涵蓋 (In-scope) | 不涵蓋 (Out-of-scope，由誰負責) |
 |---|---|---|
 | account-service | `account_id` 生成、`account_type` bitmask、角色升級（AddRole）/移除（RemoveRole）、帳號軟刪、`auth_providers` 清理、`account.deleted` | 憑證驗證 / session（gateway + 17）、Apple revoke outbox 細節（見 17 §14） |
-| buyer 模組（單體） | `buyer_id`（surrogate）、建帳時建立買家（訂閱 `AccountCreated`）、關閉時清除關聯資料、PII 清理 | 收藏 / 補貨 / 會員卡等買家領域（模組 `AGENTS.md`）；刪帳的編排（accountdeletion） |
+| buyer 模組（單體） | `buyer_id`（surrogate）、建帳時建立買家（訂閱 `AccountCreated`）、關閉時清除關聯資料、PII 清理 | 收藏 / 補貨 / 會員卡等買家領域（`docs/modules/buyer.md`）；刪帳的編排（accountdeletion） |
 | accountdeletion 模組（單體） | 刪帳申請、有未結訂單時等待、在同一個 transaction 關閉買家並刪除帳號 | 未結訂單的判斷（ordering，過渡期經 legacy 讀 Java） |
 | seller-service | `store_id`、`store_code`、incarnation remint、PayUni MerID 推導、`ResolvePrincipals`、賣家軟刪 + outbox | 認證流程（見 18）、治理停權（見 32） |
 | 守衛 5 服務 | 呼叫 `ResolvePrincipals` 做 resolve-to-principal 後比對 | 各自的下單 / 發券 / 私訊業務邏輯 |
