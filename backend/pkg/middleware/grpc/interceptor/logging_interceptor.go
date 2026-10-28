@@ -59,7 +59,7 @@ type loggingConfig struct {
 //
 // Scoping is deliberately per-method and opt-in. Some RPCs answer NotFound as
 // their normal negative answer (a web session lookup for an expired or revoked
-// cookie — a permanent share of real traffic, see 17 號設計書 §「負向快取的必要性」),
+// cookie — a permanent share of real traffic),
 // while for others the very same code means something genuinely went wrong.
 // A blanket "NotFound is never an error" rule would silence the second group
 // too, so there is intentionally no way to express one here: an unlisted method

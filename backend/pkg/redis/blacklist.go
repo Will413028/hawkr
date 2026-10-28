@@ -140,8 +140,7 @@ func AccountBlockedTTL() time.Duration {
 // AccountBlockedTTL is derived from SESSION_TTL_SECONDS because soft-delete's
 // job is to outlive the web sessions that existed at deletion time. Suspension's
 // job is to outlive the STATELESS BEARER JWT — the only credential that has no
-// server-side record to delete, and hence the only one this key still exists for
-// (see 17 號設計書). Those lifetimes are configured independently, so tying
+// server-side record to delete, and hence the only one this key still exists for. Those lifetimes are configured independently, so tying
 // suspension to the session knob means lowering SESSION_TTL_SECONDS silently
 // shortens suspensions below the tokens they must cover.
 //

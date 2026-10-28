@@ -48,3 +48,7 @@ commit——SSOT 說 suspended、快取說乾淨。而穩態下快取贏（`Acco
 - dispatcher 只保留 principal 解析與 `SuspendAccount` 呼叫。
 - 重新評估條件：若未來出現「不經 account-service 就要封鎖帳號」的需求，這個收斂會擋路，
   屆時要先問那個需求是不是應該改走 account-service。
+
+## 修訂（2026-10-28）
+
+設計書 17（登入與帳號建立流程）已刪除，登入、帳號與 session 見 `docs/modules/identity.md`，買家建立見 `docs/modules/buyer.md`。本文中「設計書 17」與它的章節編號指向已刪除的文件，內容見 git 歷史。

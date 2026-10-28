@@ -124,3 +124,7 @@ A2 把 account-service 搬進單體時，登入、session、手機驗證都是�
 - 只用 web 登入 Apple 的使用者，授權碼在 Clerk（web 的 Clerk 流程不經過 App）：伺服器沒有 token 可撤銷，website 維持人工提示。觸發條件：Clerk 支援 web 以原生 id_token 登入時，同樣改成交出憑證。
 
 沿用的 `AppleTokens` client、加密與 `identity.revoke_apple_token` job 不變。原決策段保留歷史。
+
+## 修訂（2026-10-28）
+
+設計書 17（登入與帳號建立流程）已刪除，登入、帳號與 session 見 `docs/modules/identity.md`，買家建立見 `docs/modules/buyer.md`。本文中「設計書 17」與它的章節編號指向已刪除的文件，內容見 git 歷史。

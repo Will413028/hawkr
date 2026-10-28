@@ -60,7 +60,6 @@
 
 | 編號 | 設計書 | 對應程式碼 |
 |------|--------|-----------|
-| 17 | [登入與帳號建立流程（Login & Account）](詳細設計書/17-登入與帳號建立流程%EF%BC%88Login%20&%20Account%EF%BC%89詳細設計書.md) | `gateway/` |
 | 18 | [賣家實名認證（Merchant Certification）](詳細設計書/18-賣家實名認證%EF%BC%88Merchant%20Certification%EF%BC%89詳細設計書.md) | `services/java/product-service/` |
 | 19 | [農業認證申請與審核（Product Certification Application & Review）](詳細設計書/19-農業認證驗證%EF%BC%88Certification%20Verification%EF%BC%89詳細設計書.md) | `services/java/product-service/` |
 

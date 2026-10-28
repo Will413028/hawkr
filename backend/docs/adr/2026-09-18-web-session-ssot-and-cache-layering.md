@@ -69,3 +69,7 @@ outage 下走不到——它需要 account-service 已回答 OAuth RPC（服務�
 - 兩層都答不出來時回 503 而非猜測；503 不是登出，cookie 不清。
 - 重新評估條件：若 gateway 改為單 replica，或 session 權威再次搬家，決策一與決策二的前提
   都要重新檢查。
+
+## 修訂（2026-10-28）
+
+設計書 17（登入與帳號建立流程）已刪除，登入、帳號與 session 見 `docs/modules/identity.md`，買家建立見 `docs/modules/buyer.md`。本文中「設計書 17」與它的章節編號指向已刪除的文件，內容見 git 歷史。

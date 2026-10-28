@@ -58,3 +58,7 @@
 - D2 的 web 7 天同時是 website 提示 cookie 的上限：WebKit 把 JS 寫的 cookie 限在 7 天，web 的閒置逾時調長之前，要先改提示 cookie 的做法（2026-09-27 design-review 補記）。
 - D4 與實作不一致：實作以明文保存驗證碼（6 位數的雜湊能窮舉，發簡訊的 job 也要讀出碼），目前也只有 1303 一個用途。明文或加密保存待 Will 決定（2026-09-27 design-review）。
 - 應該重新評估的條件：量測顯示 session 的讀取是熱路徑的瓶頸（先考慮 process 內的短 TTL 快取，並重新接受它的撤銷延遲）；或驗證憑證的地方又和 identity 的資料分到不同的 process。
+
+## 修訂（2026-10-28）
+
+設計書 17（登入與帳號建立流程）已刪除，登入、帳號與 session 見 `docs/modules/identity.md`，買家建立見 `docs/modules/buyer.md`。本文中「設計書 17」與它的章節編號指向已刪除的文件，內容見 git 歷史。

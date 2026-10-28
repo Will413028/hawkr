@@ -14,6 +14,7 @@
 ## 2. 買家的建立與生命週期
 
 - 帳號活著 ⇔ 買家活著（ADR `2026-09-30-account-created-provisions-buyer`）。買家只在 identity 建帳的 transaction 內由 `OnAccountCreated` 建立；一個帳號一生只有一個買家（DB `UNIQUE (account_id)`）。重送，或買家關閉後再建，都回錯誤讓建帳回滾，不重讀、不補建。
+- 買家的顯示名稱取 identity 帶來的 Clerk 姓名（去頭尾空白）；為空則用 `Hawkr 用戶` 加四位隨機數字，超過 100 字元截斷，所以不會是空的。
 - 買家只由 `accountdeletion` 隨帳號刪除關閉；本模組不訂閱 `AccountDeleted`，沒有第二條關閉路徑。存活帳號查不到現任買家是不變量被破壞，呼叫方回 internal。
 - 狀態有 ACTIVE、PENDING_DELETION、CLOSED。CLOSED 必有 `deleted_at`；PII 只能清 CLOSED。
 - `BeginDeletion` 把買家從 ACTIVE 轉成 PENDING_DELETION，並在同一個 transaction 發布 `BuyerDeletionRequested` 一次；重送不重複寫入，之後的關閉不再發。訂閱者只該排入自己的清除 job。刪帳申請不能撤回，只有完成。

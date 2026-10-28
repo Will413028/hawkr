@@ -31,7 +31,6 @@
   - [14 即時通訊微服務（IM Service）](詳細設計書/14-即時通訊微服務%EF%BC%88IM%20Service%EF%BC%89詳細設計書.md)
   - [15 AI 微服務（AI Service）](詳細設計書/15-AI%20微服務%EF%BC%88AI%20Service%EF%BC%89詳細設計書.md)
   - [16 顧客管理微服務（CRM Service）](詳細設計書/16-顧客管理微服務%EF%BC%88CRM%20Service%EF%BC%89詳細設計書.md)
-  - [17 登入與帳號建立流程（Login & Account）](詳細設計書/17-登入與帳號建立流程%EF%BC%88Login%20&%20Account%EF%BC%89詳細設計書.md)
   - [18 賣家實名認證（Merchant Certification）](詳細設計書/18-賣家實名認證%EF%BC%88Merchant%20Certification%EF%BC%89詳細設計書.md)
   - [19 農業認證申請與審核（Product Certification Application & Review）](詳細設計書/19-農業認證驗證%EF%BC%88Certification%20Verification%EF%BC%89詳細設計書.md)
   - [20 結帳模組（Checkout Module）](詳細設計書/20-結帳模組%EF%BC%88Checkout%20Module%EF%BC%89詳細設計書.md)

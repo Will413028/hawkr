@@ -6,7 +6,7 @@
 >
 > 刪除時機：賣家身份的部分在 seller 規格檔建立後搬進去；gateway 的身份解析與守衛服務搬進單體時，其餘刪除。
 >
-> 登入憑證機制（OAuth token 驗證、web cookie session、JWT、VerifyPhone、LinkConfirm、token refresh）不在本文，見 [17 號](17-登入與帳號建立流程（Login%20&%20Account）詳細設計書.md)。
+> 登入與 session 不在本文，見 `docs/modules/identity.md`。
 
 ---
 
@@ -17,7 +17,7 @@
 | 狀態 | `active` |
 | 維護者 | Will |
 | 對應程式碼 | `internal/modules/seller`（stint、`store_id`／`store_code`）、`internal/legacy/sellerserver`（`ResolvePrincipals` 等 legacy 讀取）、`gateway/internal/{middleware,buyerid,storeid}`（還沒搬的路徑的身份解析）、跨角色守衛 `services/im-service`、`services/social-service`、`services/java/{cart,coupon,order}-service` |
-| 相關 doc | [17 登入與帳號建立流程](17-登入與帳號建立流程（Login%20&%20Account）詳細設計書.md)（登入憑證機制）、[18 賣家實名認證](18-賣家實名認證（Merchant%20Certification）詳細設計書.md)（PayUni MerID 綁定源頭）、[32 商家治理](32-商家治理與食安通報（Seller%20Governance%20&%20Food%20Safety）詳細設計書.md)（違規停權）、[36 MQ 與事件總覽](36-MQ%20與事件總覽（MQ%20&%20Event%20Catalog）.md)；單體模組規格 `docs/modules/{identity,buyer,accountdeletion}.md`、`internal/modules/seller/AGENTS.md` |
+| 相關 doc | [18 賣家實名認證](18-賣家實名認證（Merchant%20Certification）詳細設計書.md)（PayUni MerID 綁定源頭）、[32 商家治理](32-商家治理與食安通報（Seller%20Governance%20&%20Food%20Safety）詳細設計書.md)（違規停權）、[36 MQ 與事件總覽](36-MQ%20與事件總覽（MQ%20&%20Event%20Catalog）.md)；單體模組規格 `docs/modules/{identity,buyer,accountdeletion}.md`、`internal/modules/seller/AGENTS.md` |
 
 ---
 
@@ -41,7 +41,7 @@
 
 ### 1.4 與其他設計書／服務的關係
 
-- **上游**：[17 登入流程](17-登入與帳號建立流程（Login%20&%20Account）詳細設計書.md) 負責憑證驗證與 session；本文承接其產出的 `account_id` 與角色（SELLER）。
+- **上游**：`docs/modules/identity.md` 負責憑證驗證與 session；本文承接其產出的 `account_id` 與角色（SELLER）。
 - **下游**：[18 賣家實名認證](18-賣家實名認證（Merchant%20Certification）詳細設計書.md) 消費 `store_code` 推導 MerID；[36 MQ Catalog](36-MQ%20與事件總覽（MQ%20&%20Event%20Catalog）.md) 定義 `account.deleted` / `seller.deleted` 契約。
 - **姊妹**：違規停權走 [32 商家治理](32-商家治理與食安通報（Seller%20Governance%20&%20Food%20Safety）詳細設計書.md)；停權由措施在讀取時推導，不是 stint 的狀態（見 `internal/modules/seller/AGENTS.md`）。
 
@@ -184,9 +184,9 @@ flowchart LR
 
 ### 6.1 對外 API
 
-登入 / 建帳 endpoint 見 [17](17-登入與帳號建立流程（Login%20&%20Account）詳細設計書.md)。賣家**關店**的對外方法是 Connect `SellerAppService.CloseMyStore`（契約以 `api/hawkr/seller/v1alpha1/seller.proto` 為準：店家有未結訂單回 `failed_precondition`；停權中也可以關店）。
+登入與建帳見 `docs/modules/identity.md`。賣家**關店**的對外方法是 Connect `SellerAppService.CloseMyStore`（契約以 `api/hawkr/seller/v1alpha1/seller.proto` 為準：店家有未結訂單回 `failed_precondition`；停權中也可以關店）。
 
-> 帳號刪除（Connect `IdentityAppService.DeleteAccount`）見 `docs/modules/accountdeletion.md`。Admin 面的帳號生命週期端點（`GET /admin/accounts`、`GET /admin/accounts/:id`、`POST /admin/accounts/:id/suspend`、`POST /admin/accounts/:id/unsuspend`、`DELETE /admin/accounts/:id`）SSOT 在 [17](17-登入與帳號建立流程（Login%20&%20Account）詳細設計書.md)「帳號停權與解除停權」。
+> 帳號刪除（Connect `IdentityAppService.DeleteAccount`）見 `docs/modules/accountdeletion.md`。Admin 面的帳號生命週期端點（`GET /admin/accounts`、`GET /admin/accounts/:id`、`POST /admin/accounts/:id/suspend`、`POST /admin/accounts/:id/unsuspend`、`DELETE /admin/accounts/:id`）SSOT 在 `api/hawkr/admin/identity/v1alpha1/identity.proto`。
 
 ### 6.2 gRPC（服務間）
 
