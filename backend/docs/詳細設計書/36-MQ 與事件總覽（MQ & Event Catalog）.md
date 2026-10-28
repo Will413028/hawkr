@@ -1454,8 +1454,8 @@ fan-out、查無訂閱者不產生任何錯誤或 log（2026-09-03 修復前即�
 | review-service | `publisher.go` | `hawkr.review` | `review.created` / **`review.hidden`** |
 | social-service | `publisher.go` | `hawkr.content` | 9 個事件：PostCreated / PostLiked / PostHiddenByPlatform / CommentCreated（補欄位 + fat 化）/ CommentReplied（補欄位 + fat 化）/ **CommentUpdated**（新）/ **CommentDeleted**（新）/ **CommentLikeChanged**（新，取代 CommentLiked，無過渡期）/ **CounterDelta**（新，2026-07-31，非同步 comment_count/like_count/reply_count 維護，見 §3.6d） |
 | notification-service | `internal/mq/publisher.go`（**2026-06 新增 publisher**，首次成為 producer） | `hawkr.notification` | `notification.inbox.new` / `notification.unread_changed`（供 gateway SSE 推 web，見 §3.6e） |
-| 單體 `buyer` 模組 | `internal/legacy/buyerrelay` | `hawkr.content` | `product.viewed` |
-| 單體 `buyer` 模組 | 同上 | `hawkr.buyer` | `buyer.favorite.added` / `buyer.favorite.removed` / `follow.added` / `buyer.deleted` |
+| 單體 `buyer` 模組 | `internal/legacy/buyerrelay` | `hawkr.content` | `product.viewed` / `follow.added` |
+| 單體 `buyer` 模組 | 同上 | `hawkr.buyer` | `buyer.favorite.added` / `buyer.favorite.removed` / `buyer.deleted` |
 | 單體 `buyer` 模組 | 同上（`FanOut` 每批的事件）| `hawkr.product` | `product.restock.target`（per-subscriber，payload 含 subscriptionId 供 inbox 端冪等）|
 | 單體 `identity` 模組 | `internal/legacy/accountservice` | `hawkr.account` | `account.deleted` |
 | 單體 `delegation` 模組 | confirm 同 tx 發出（§3.6j）| `hawkr.delegation` | `delegation.operation.completed` |

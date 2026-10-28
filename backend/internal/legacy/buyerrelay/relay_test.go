@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/riverqueue/river"
+	"go.yaml.in/yaml/v3"
 
 	"github.com/Will413028/hawkr/backend/internal/legacy/rabbitmq"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
@@ -143,7 +144,9 @@ func TestLegacyEventsEnrichProductAndSellerFields(t *testing.T) {
 		{"view", "hawkr.content", "product.viewed", "product.viewed", func(w *Worker) error {
 			return w.productViewed(t.Context(), ProductViewedArgs{eventFields: fields("event-1"), ProductID: 11})
 		}, map[string]any{"product_name": "蘋果", "seller_id": float64(88), "store_id": float64(91)}},
-		{"follow", "hawkr.buyer", "follow.added", "follow.added", func(w *Worker) error {
+		// follow.added 的通知 template 登記在 hawkr.content（notification-service 依 exchange 與 routing key 找 template，
+		// 見 12 號設計書 §4 與 13 號設計書）；送到別的 exchange 會被 notification.buyer 的 handler 找不到 template 而丟棄。
+		{"follow", "hawkr.content", "follow.added", "follow.added", func(w *Worker) error {
 			return w.sellerFollowed(t.Context(), SellerFollowedArgs{eventFields: fields("event-1"), StoreID: 91})
 		}, map[string]any{"merchant_id": float64(88), "store_id": float64(91), "follower_id": float64(99), "follower_name": "買家甲"}},
 		{"restock", "hawkr.product", "product.restock.target", "product.restock.target", func(w *Worker) error {
@@ -161,6 +164,9 @@ func TestLegacyEventsEnrichProductAndSellerFields(t *testing.T) {
 			a, payload := q.published(t)
 			if a.Exchange != tc.exchange || a.RoutingKey != tc.key {
 				t.Fatalf("routing=%s/%s", a.Exchange, a.RoutingKey)
+			}
+			if !topologyDeclaresExchange(t, a.Exchange) {
+				t.Errorf("exchange %s 不在 infra/mq/topology/topology.yaml 的 exchanges", a.Exchange)
 			}
 			for key, want := range tc.fields {
 				if payload[key] != want {
@@ -260,4 +266,27 @@ func TestRelayTreatsMissingStoreAsPermanent(t *testing.T) {
 			}
 		})
 	}
+}
+
+// topologyDeclaresExchange 讀 topology.yaml（exchange 的唯一登記處），回答 exchange 有沒有宣告。
+func topologyDeclaresExchange(t *testing.T, exchange string) bool {
+	t.Helper()
+	body, err := os.ReadFile(filepath.Join("..", "..", "..", "infra", "mq", "topology", "topology.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var topology struct {
+		Exchanges []struct {
+			Name string `yaml:"name"`
+		} `yaml:"exchanges"`
+	}
+	if err := yaml.Unmarshal(body, &topology); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range topology.Exchanges {
+		if e.Name == exchange {
+			return true
+		}
+	}
+	return false
 }

@@ -269,7 +269,7 @@ func (w *Worker) sellerFollowed(ctx context.Context, a SellerFollowedArgs) error
 	payload["follower_id"], payload["follower_name"] = accountID, name
 	payload["merchant_id"], payload["store_id"] = store.AccountID, a.StoreID
 	payload["occurred_at"] = a.Occurred.UTC().Format(time.RFC3339Nano)
-	return w.enqueuePublish(ctx, a.eventFields, "hawkr.buyer", "follow.added", payload)
+	return w.enqueuePublish(ctx, a.eventFields, "hawkr.content", "follow.added", payload)
 }
 
 func (w *Worker) productViewed(ctx context.Context, a ProductViewedArgs) error {
