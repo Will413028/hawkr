@@ -73,18 +73,18 @@
   - 不能動：`pub_*` 的形狀與說明（只能改寫法，不能刪掉）；任何程式。
   - 驗收：腳本通過、例外清單少掉該模組；`cd backend && GOWORK=off go test ./cmd/hawkr/ ./internal/arch/`；搬走的每條規格在 commit 訊息附「原段落 → 新位置」；抽查：從新 `AGENTS.md` 的每個「規格位置」連結都能打開到含那條規則的段落（`python3` 小腳本或人工逐條，結果貼進進度表）。
 
-- [ ] **5. seller 開工前的確認**（被擋於：範圍裁減計畫的食品業者登錄步驟已 commit）
+- [x] **5. seller 開工前的確認**（被擋於：範圍裁減計畫的食品業者登錄步驟已 commit）
   - 範圍：確認 `backend/internal/modules/seller/AGENTS.md` 沒有其他 session 的未提交改動；量測當時的大小與節。
   - 驗收：`git status --short backend/internal/modules/seller/` 沒有 `AGENTS.md`；大小記進進度表。
   - 停止條件：仍有未提交改動就停下，不和對方的改動混在一起。
 
-- [ ] **6. seller 模組**（被擋於：步驟 2、5，D3、D4）
+- [x] **6. seller 模組**（被擋於：步驟 2、5，D3、D4）
   - 範圍：同步驟 4，依節拆成子步驟：6a 不變量、6b 已知限制、6c 其餘節。規格的位置依 D3。
   - 消費端：同步驟 4；另有 ADR `2026-10-19-seller-kyc-payuni-consolidated.md:44`、`backend/docs/runbooks/seller-food-registration-runbook.md:3`（範圍裁減若已刪這份 runbook 就略過）。
   - 不能動：同步驟 4。
   - 驗收：同步驟 4；依 D4，例外清單少掉 seller，或 seller 的例外項改成指向拆模組計畫。
 
-- [ ] **7. 收尾**：完成定義逐項核對；獨立設計審查（design-review skill）；`scripts/check-agents-md.py` 的例外清單為空（D4 選 B 時只剩 seller 一項，且指向拆模組計畫）；延後項附觸發條件搬回主清單。驗收：`python3 scripts/check-agents-md.py` 通過；`rg -n "EXCEPTIONS" -A20 scripts/check-agents-md.py` 的清單符合上述；repo-hygiene CI 綠燈。
+- [x] **7. 收尾**：完成定義逐項核對；獨立設計審查（design-review skill）；`scripts/check-agents-md.py` 的例外清單為空（D4 選 B 時只剩 seller 一項，且指向拆模組計畫）；延後項附觸發條件搬回主清單。驗收：`python3 scripts/check-agents-md.py` 通過；`rg -n "EXCEPTIONS" -A20 scripts/check-agents-md.py` 的清單符合上述；repo-hygiene CI 綠燈。
 
 ## 決定
 
@@ -126,6 +126,6 @@
 | 2 ADR 與模組模板 | 完成 | 本機：`GOWORK=off go test ./cmd/new-module/ ./cmd/hawkr/` ok；`go vet ./cmd/new-module/`、`gofmt -l` 無輸出；新測試 `TestGeneratedAgentsHasOnlyTheFixedSections` 在舊模板上失敗（節是職責…已知限制、讀取模型…）；mutation：模板加回「## 已知限制」→ 失敗，刪掉「## 不負責」→ 失敗；`python3 scripts/check-agents-md.py` exit 0。`backend/AGENTS.md` 單體規則 2 的節名「發布的讀取介面」與 D2 相同，未改；產生器不建 `docs/modules/<模組>.md`，main.go 的下一步提示指向它 | backend-monolith CI（push 後看） | 見 git log |
 | 3 根目錄與子專案 | 完成 | 本機：`python3 scripts/check-agents-md.py` exit 0（EXCEPTIONS 拿掉根目錄、backend、website）；`python3 -m unittest scripts/test_check_agents_md.py` OK；mutation：backend 加長到 10,067 bytes → exit 1。大小（website 不含 nextjs 區塊）：根目錄 10,215、backend 9,945、website 8,254；admin 本來就在上限內，未改。backend 的結構與規則全文搬到 `docs/開發規範/單體開發規範.md`（編號不變），website 的多語系路由全文搬到 `website/docs/i18n-routing.md`，根目錄契約表的細節由既有 ADR／規範／設計文件承接；App 的元件庫維護共用三條留在 buyer-app | 引用節名的 `website/tests/visual/_helpers.ts`（節名未改）只在 CI 跑；`admin-design-documentation.test.ts` 未跑（admin 未改） | 見 git log |
 | 4 非 seller 的模組 | 完成 | 本機：`python3 scripts/check-agents-md.py` exit 0（EXCEPTIONS 只剩 seller）；unittest OK；`GOWORK=off go test ./cmd/hawkr/ ./internal/arch/ ./cmd/new-module/` ok；10 個 AGENTS.md 2,973–5,557 bytes，七節與模板同序；規格位置抽查（python，比對 AGENTS 裡每個 §N 與 `docs/modules/<模組>.md` 的編號標題）10 個模組 0 缺；AGENTS 引用的守門測試名稱逐一 `rg "func <名稱>("` 0 缺；各模組「原段落 → 新位置」在各自 commit 訊息 | 整合測試（`-tags integration`）只確認名稱存在、未跑（只改文件）；backend-monolith CI 待 push | 見 git log |
-| 5 seller 開工前的確認 | 未開始 | | | |
-| 6 seller 模組 | 未開始 | | | |
-| 7 收尾 | 未開始 | | | |
+| 5 seller 開工前的確認 | 完成 | `git status --short backend/internal/modules/seller/` 無輸出（2026-10-29）；`seller/AGENTS.md` 168,619 bytes，各節：職責 27,235、擁有的資料 5,677、發布的讀取介面 2,169、模組內部結構 2,998、不變量 112,395（80 條）、已知限制 11,433、讀取模型 326、不負責 4,578、決策紀錄 194、特性測試 611 | 無 | 無（只量測） |
+| 6 seller 模組 | 完成 | 6a 不變量、6b 已知限制、6c 其餘節、6d 設計書收編（18、28 刪除；19、32、44、46 只留仍運作服務的部分並標檔頭；48 改指向）。本機：`python3 scripts/check-agents-md.py` exit 0，EXCEPTIONS 為空（D4 的後備沒用上，ADR 文末修訂）；unittest 8 項 OK；`GOWORK=off go test ./cmd/hawkr/ ./internal/arch/ ./cmd/new-module/` ok；seller AGENTS.md 5,925 bytes、七節同模板；引用的 §N 與守門測試／函式逐一 `rg` 0 缺；程式檔 diff 只有註解（過濾非註解行 0 行） | proto 註解改動的生成比對要 docker，待 CI；整合測試未跑（只改文件）；seller-service 與 Java 舊 migration 註解仍指向已刪的 32 §13，隨 seller-service 刪除處理 | 見 git log |
+| 7 收尾 | 程式完成待驗收 | 完成定義逐項核對；獨立審查（新 subagent，比對 base `9b40593`）：內容遺失 0、理由遺失 0、5 項 MED/LOW（待辦數 12→10、重複句、32 舊節引用 8 處、§23 缺觸發、漏一條 `RecordProductView` 規則）已修 | repo-hygiene、backend CI 待 push | 見 git log |
