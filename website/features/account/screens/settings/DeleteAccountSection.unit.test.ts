@@ -18,13 +18,14 @@ const mocks = vi.hoisted(() => ({
 	deleteAccount: vi.fn(),
 	signOut: vi.fn(async () => {}),
 	externalAccounts: [] as { provider: string }[],
+	hasSeller: false,
 }));
 vi.mock("@clerk/nextjs", () => ({
 	useUser: () => ({ user: { externalAccounts: mocks.externalAccounts } }),
 }));
 vi.mock("@/lib/api/auth", () => ({ deleteAccount: mocks.deleteAccount }));
 vi.mock("@/lib/auth/context", () => ({
-	useAuth: () => ({ signOut: mocks.signOut }),
+	useAuth: () => ({ signOut: mocks.signOut, hasSeller: mocks.hasSeller }),
 }));
 vi.mock("@/components/ui/Button", () => ({
 	default: ({
@@ -82,6 +83,7 @@ beforeEach(() => {
 	mocks.deleteAccount.mockReset();
 	mocks.signOut.mockClear();
 	mocks.externalAccounts = [];
+	mocks.hasSeller = false;
 	assign.mockReset();
 	vi.stubGlobal("location", { ...window.location, assign });
 });
@@ -178,6 +180,14 @@ describe("DeleteAccountSection", () => {
 		await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
 		expect(mocks.signOut).not.toHaveBeenCalled();
 		expect(assign).not.toHaveBeenCalled();
+	});
+
+	it("an account with a store is told the store closes with the account", () => {
+		mocks.hasSeller = true;
+		expect(openDialog().textContent).toContain("你的商店也會一起關閉");
+		cleanup();
+		mocks.hasSeller = false;
+		expect(openDialog().textContent).not.toContain("商店也會一起關閉");
 	});
 
 	it("an account with an Apple external account is told to revoke the authorization", () => {

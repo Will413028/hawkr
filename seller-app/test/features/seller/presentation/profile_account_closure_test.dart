@@ -18,6 +18,7 @@ void main() {
       DeleteAccountResponse_DeletionState state =
           DeleteAccountResponse_DeletionState.DELETION_STATE_DELETED,
       Object? deleteError,
+      void Function()? onDialog,
       void Function()? afterFlow,
     }) async {
       final events = <String>[];
@@ -55,6 +56,7 @@ void main() {
 
       await tester.tap(find.text('刪除帳號').last);
       await tester.pumpAndSettle();
+      onDialog?.call();
       await tester.tap(find.text('確認刪除'));
       await tester.pumpAndSettle();
       afterFlow?.call();
@@ -67,6 +69,16 @@ void main() {
       final events = await deleteWith(tester);
 
       expect(events, ['delete', 'logout']);
+    });
+
+    testWidgets('確認框告知商店會一起關閉', (tester) async {
+      await deleteWith(
+        tester,
+        onDialog: () => expect(
+          find.textContaining('你的商店也會一起關閉，商店與商品不再公開，賣家身分會移除。'),
+          findsOneWidget,
+        ),
+      );
     });
 
     testWidgets('還有未完成的訂單：不登出', (tester) async {

@@ -593,7 +593,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     final confirmed = await showCommonDialog(
       context: context,
       title: '刪除帳號',
-      content: '刪除後帳號資料會被移除，無法復原。還有未完成的訂單時，帳號會在最後一筆訂單完成後刪除，期間無法新增收藏與追蹤。',
+      content:
+          '刪除後帳號資料會被移除，無法復原。還有未完成的訂單時，帳號會在最後一筆訂單完成後刪除，期間無法新增收藏與追蹤。\n\n若你有開設商店，商店也會一起關閉，商店與商品不再公開，賣家身分會移除。有未結訂單時，帳號與商店會在訂單結清後才刪除，期間商店不能自行關閉或換店。',
       confirmText: '確認刪除',
       cancelText: '取消',
       confirmColor: AppColors.danger,

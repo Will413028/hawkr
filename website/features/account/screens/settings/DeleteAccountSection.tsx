@@ -16,6 +16,9 @@ type Outcome =
 	| { kind: "pending_orders" }
 	| { kind: "error"; message: string };
 
+const STORE_CLOSURE_NOTICE =
+	"你的商店也會一起關閉，商店與商品不再公開，賣家身分會移除。有未結訂單時，帳號與商店會在訂單結清後才刪除，期間商店不能自行關閉或換店。";
+
 const APPLE_REVOKE_GUIDANCE =
 	"刪除後請到 Apple ID 設定的「使用 Apple 登入」移除 Hawkr 的授權。";
 
@@ -24,7 +27,7 @@ const APPLE_REVOKE_GUIDANCE =
  * 自動刪除。
  */
 export default function DeleteAccountSection() {
-	const { signOut } = useAuth();
+	const { signOut, hasSeller } = useAuth();
 	const { user } = useUser();
 	const defaults = useDefaultErrorText();
 	const hasAppleAccount =
@@ -121,6 +124,11 @@ export default function DeleteAccountSection() {
 				<p className="text-sm text-[var(--hkui-default-700)]">
 					刪除後帳號資料會被移除，無法復原。還有未完成的訂單時，帳號會在最後一筆訂單完成後刪除，期間無法新增收藏與追蹤。
 				</p>
+				{hasSeller ? (
+					<p className="mt-2 text-sm text-[var(--hkui-default-700)]">
+						{STORE_CLOSURE_NOTICE}
+					</p>
+				) : null}
 				{hasAppleAccount ? (
 					<p className="mt-2 text-sm text-[var(--hkui-default-700)]">
 						{APPLE_REVOKE_GUIDANCE}
