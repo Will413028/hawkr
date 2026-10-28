@@ -64,7 +64,6 @@ class ProfileScreen extends HookConsumerWidget {
         mine?.can(SellerCapability.SELLER_CAPABILITY_STOREFRONT_WRITE) ?? false;
     final canClose =
         mine?.can(SellerCapability.SELLER_CAPABILITY_ACCOUNT_CLOSE) ?? false;
-    final closeStoreKey = useMemoized(GlobalKey.new);
     final kyc = ref.watch(currentKycProvider)?.value;
     final payuniLocked = kyc?.identityLocked ?? false;
     final shippingGate = mine?.shippingGate ?? ShippingGate.unknown;
@@ -99,17 +98,6 @@ class ProfileScreen extends HookConsumerWidget {
         refreshProgress();
       }
     });
-
-    void goToCloseStore() {
-      final target = closeStoreKey.currentContext;
-      if (target == null) return;
-      unawaited(
-        Scrollable.ensureVisible(
-          target,
-          duration: const Duration(milliseconds: 300),
-        ),
-      );
-    }
 
     void goToProfileInfo() {
       final target = profileInfoKey.currentContext;
@@ -581,15 +569,10 @@ class ProfileScreen extends HookConsumerWidget {
                               ),
                               if (canClose) ...[
                                 const SizedBox(height: HkSpace.section),
-                                KeyedSubtree(
-                                  key: closeStoreKey,
-                                  child: const ProfileCloseStoreSection(),
-                                ),
+                                const ProfileCloseStoreSection(),
                               ],
                               const SizedBox(height: HkSpace.section),
-                              ProfileDeleteAccountSection(
-                                onGoToCloseStore: goToCloseStore,
-                              ),
+                              const ProfileDeleteAccountSection(),
                               const SizedBox(height: HkSpace.xxl),
                               Center(
                                 child: FutureBuilder<String>(

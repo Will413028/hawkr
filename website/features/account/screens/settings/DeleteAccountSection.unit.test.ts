@@ -26,10 +26,6 @@ vi.mock("@/lib/api/auth", () => ({ deleteAccount: mocks.deleteAccount }));
 vi.mock("@/lib/auth/context", () => ({
 	useAuth: () => ({ signOut: mocks.signOut }),
 }));
-vi.mock("@/components/shared/Link", () => ({
-	default: ({ href, children }: { href: string; children: React.ReactNode }) =>
-		React.createElement("a", { href }, children),
-}));
 vi.mock("@/components/ui/Button", () => ({
 	default: ({
 		children,
@@ -131,30 +127,6 @@ describe("DeleteAccountSection", () => {
 		expect(assign).not.toHaveBeenCalled();
 	});
 
-	it("an account that still has a store is guided to close the store first", async () => {
-		mocks.deleteAccount.mockRejectedValue(
-			new ConnectError("has store", Code.FailedPrecondition, undefined, [
-				{
-					desc: ErrorInfoSchema,
-					value: {
-						reason: ErrorReason[ErrorReason.ACCOUNT_HAS_OPEN_STORE],
-						domain: "hawkr",
-					},
-				},
-			]),
-		);
-		const dialog = openDialog();
-		fireEvent.click(screen.getByRole("button", { name: "確認刪除" }));
-
-		await waitFor(() =>
-			expect(screen.getByRole("alert").textContent).toContain("先到"),
-		);
-		const link = screen.getByRole("link", { name: "商店設定" });
-		expect(link.getAttribute("href")).toBe("/seller-center/me");
-		expect(dialog.isConnected).toBe(true);
-		expect(mocks.signOut).not.toHaveBeenCalled();
-	});
-
 	it("a failed precondition carrying a different reason is a generic failure", async () => {
 		mocks.deleteAccount.mockRejectedValue(
 			new ConnectError("other", Code.FailedPrecondition, undefined, [
@@ -171,8 +143,6 @@ describe("DeleteAccountSection", () => {
 		fireEvent.click(screen.getByRole("button", { name: "確認刪除" }));
 
 		await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
-		expect(screen.queryByRole("link", { name: "商店設定" })).toBeNull();
-		expect(screen.getByRole("alert").textContent).not.toContain("先到");
 		expect(mocks.signOut).not.toHaveBeenCalled();
 	});
 
@@ -184,8 +154,6 @@ describe("DeleteAccountSection", () => {
 		fireEvent.click(screen.getByRole("button", { name: "確認刪除" }));
 
 		await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
-		expect(screen.queryByRole("link", { name: "商店設定" })).toBeNull();
-		expect(screen.getByRole("alert").textContent).not.toContain("先到");
 		expect(mocks.signOut).not.toHaveBeenCalled();
 	});
 
@@ -197,7 +165,6 @@ describe("DeleteAccountSection", () => {
 		fireEvent.click(screen.getByRole("button", { name: "確認刪除" }));
 
 		await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
-		expect(screen.queryByRole("link", { name: "商店設定" })).toBeNull();
 		expect(mocks.signOut).not.toHaveBeenCalled();
 	});
 

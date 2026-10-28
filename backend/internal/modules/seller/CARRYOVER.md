@@ -56,7 +56,7 @@
 | 刪店要求 `IsActive`（停權回 9204） | 刪除流程中不重入 | 不成立：停權的賣家應能關店、管理員應能刪除（能力檢查 ADR 的 CAP_ACCOUNT_CLOSE，盤點 §6-4） | 關閉的權限由能力推導 | `CloseCurrent` 要 `CAP_ACCOUNT_CLOSE`：停權時有；等待刪除時沒有（由刪帳流程關閉，審查 CR-F1）。`CloseForDeletion` 不看能力；已關閉時重送安全 |
 | 刪店的未結訂單檢查（stub 回 0）、管理員 `OverrideActiveOrders`、`seller_deletion_audit` | 店家有未完成的訂單時不能關 | 成立，但 port 不存在（盤點 §6-5）；稽核屬於帳號流程 | 擁有訂單者提供查詢；流程管理者保存申請紀錄 | **7c 階段 3 完成**：店家未結訂單 port `HasOpenStoreOrders(ctx, storeID)`，`seller.closing`（自助關店、管理員刪賣家角色）與 `accountdeletion`（管理員與等待中的刪帳）各自宣告 consumer-side 介面、由 `legacy/orderservice` 同一個 client 實作；`OverrideActiveOrders` 不搬（不保留任何覆寫旗標，要立即處理惡意店家走停權）；稽核由 `accountdeletion` 保存。見下面「7c 階段 3」各列 |
 | 刪店後非同步 `RemoveRole`（`rolestate`、`HasActiveBuyer`、`source_id` 柵欄） | 角色在另一個服務 | 不成立 | 同一個 transaction | 關閉時在同一個 transaction 內 `identity.RemoveRole`（帳號列已鎖）；買家不是角色，不查 buyer。`source_id` 照樣帶 store_id，柵欄在步驟 11 拿掉 |
-| 刪帳號：管理員依序刪 seller、buyer、帳號（三次遠端呼叫） | 跨服務 cascade 的順序 | 不成立 | 流程管理者在一個 transaction 協調參與者（accountdeletion ADR） | seller 只提供 `BeginDeletion`／`CloseForDeletion`，由 `accountdeletion` 在已鎖帳號列的 transaction 內呼叫；管理員的申請連同店家一起關閉，帳號本人的申請仍要先關店（Will 決定，7c 之後再評估）；申請進入等待時帳號變成 PENDING_DELETION，identity 拒絕授予 SELLER（Will W-C） |
+| 刪帳號：管理員依序刪 seller、buyer、帳號（三次遠端呼叫） | 跨服務 cascade 的順序 | 不成立 | 流程管理者在一個 transaction 協調參與者（accountdeletion ADR） | seller 只提供 `BeginDeletion`／`CloseForDeletion`，由 `accountdeletion` 在已鎖帳號列的 transaction 內呼叫；本人與管理員的申請都連同店家一起關閉（accountdeletion ADR 2026-10-28 的修訂）；申請進入等待時帳號變成 PENDING_DELETION，identity 拒絕授予 SELLER（Will W-C） |
 | 刪店的 PII 清理（每日 19:05 UTC，只清名稱、電話、email、logo） | 關閉後的保留期限 | 成立，範圍不足（盤點 §6-7） | 排程以業務鍵分批清理 | **7c 階段 3 完成**：`internal/purge`，見下面「7c 階段 3」各列 |
 | `sellers.rating` 與 `review.created`／`review.hidden` 的 consumer（以 `avg_rating` 覆寫，沒有順序保護） | 店家頁、推薦與列表顯示評分 | 不成立：只為顯示的副本；亂序送達會倒退；依賴表是 review → seller，seller 不得依賴 review | 評價的擁有者維護彙總，只顯示的消費端在呈現層組裝，需要排序的消費端自己建讀取模型 | **刪除**（ADR 2026-10-02 的評分決策）：seller 不存評分、不處理兩個 review 事件；店家頁的評分在 `internal/httpapi/seller` 組裝（步驟 8），推薦排行由 `discovery` 決定 |
 | 店家列上的 `birthday`、`gender`、`seller_type`、`current_certification_id`、`certified_at`、`payuni_account_unlinked_at` | KYC 與 PayUni 的結果 | 屬於 KYC 申請人與 PayUni 綁定，不是店家 profile | 資料放在擁有它的子領域 | **7c 階段 1**：7a 的 `stores` 不建這些欄；生日（`birth_date`，明文）與 `seller_type` 在 `kyc_applications`；`gender` 沒有搬（KYC 申請沒有這個欄位，沒有逐一確認過它的消費者）；`current_certification_id` 不存（見上面申請歸屬那一列），`certified_at` 以核准的審核紀錄與申請列的 `decided_at` 表示；`payuni_account_unlinked_at` 沒有搬（它只在關店時被設成關店時間，沒有真的呼叫 PayUni 解除綁定；關店時間就是 `stores.deleted_at`，PayUni 端的商店不需要解綁，MerID 是一次性的） |
@@ -440,7 +440,7 @@ ADR `2026-10-27-general-ecommerce-scope-cut` D3：食品業者登錄（`internal
 
 ## Will 的決定（2026-10-01）與能力表的對照
 
-- W-A：停權紀錄以 store_id 記來源，效果以帳號為單位；W-B：能力由生命週期與停權推導；W-C：等待刪除是 identity 的帳號狀態（accountdeletion ADR 的修訂）；W-D：地址存內政部鄉鎮市區代碼。帳號本人刪帳號時仍要先關店，7c 接上店家未結訂單的檢查後再評估。
+- W-A：停權紀錄以 store_id 記來源，效果以帳號為單位；W-B：能力由生命週期與停權推導；W-C：等待刪除是 identity 的帳號狀態（accountdeletion ADR 的修訂）；W-D：地址存內政部鄉鎮市區代碼。帳號本人刪帳號時店家也是參與者，不必先關店。
 - 經營類／履約類的分法與能力檢查 ADR 的對照，衝突時照 ADR：
   - `CAP_MARKETING` 含 dashboard 與報表（查看，按分法是履約類），ADR 停權時封鎖，歸經營類：等待刪除時也不能看 dashboard。
   - `CAP_INVOICE_MANAGE`（發票的查詢與設定）ADR 停權時封鎖，歸經營類；稅務救濟 `CAP_INVOICE_TAX_REMEDY` 是白名單，歸履約類。

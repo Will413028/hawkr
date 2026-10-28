@@ -6,6 +6,7 @@
 | 日期 | 2026-09-30 |
 | 影響範圍 | 單體新增 `accountdeletion` 模組、`internal/arch` 的依賴表、buyer 模組的刪除 API 與 `deletion_audits`、`internal/httpapi/identity` 的 `DeleteAccount`、遷移計畫 A3 步驟 4 的 `order.completed` consumer 與步驟 8 的後台刪帳號 |
 | 取代 | 遷移計畫 `2026-09-29-a3-buyer-seller.md` 決定 4a「刪帳號是 `internal/httpapi` 的一個 use case」的放置；`2026-09-24-go-modular-monolith.md` D2「反方向的需要」第 3 點中「buyer／seller 刪除帳號需要確認沒有未結訂單，由 ordering 實作」的 port 擁有者 |
+| 修訂 | 2026-10-28：本人的申請也把店家當參與者，移除 `ACCOUNT_HAS_OPEN_STORE`（Will 決定）；2026-10-01：等待刪除是 identity 保存的帳號狀態（Will 決定）、關閉買家只由本模組編排（W8） |
 
 ## 脈絡
 
@@ -63,3 +64,16 @@
 **決策**：identity 的帳號有 `deletion_pending_at`，生命週期是 ACTIVE → PENDING_DELETION → DELETED（`identity.Account.Lifecycle`）。accountdeletion 在受理會等待未結訂單的申請的 transaction 內呼叫 `identity.BeginDeletion`；identity 的 `GrantRole` 在 PENDING_DELETION 時回 FailedPrecondition，`DeleteAccount` 清掉這個狀態。流程（等待、完成、對帳）仍由本模組編排，identity 只保存狀態、不知道訂單。目前沒有撤回申請的路徑，所以沒有「回到 ACTIVE」的轉移；之後加上撤回時，由本模組在同一個 transaction 清掉它。
 
 **後果**：開店（seller 的 Apply）已經在同一個 transaction 內鎖帳號再授予 SELLER，所以等待刪除的帳號開店會整筆回滾；等待期間才開的店不會出現。`TestStoreCannotOpenWhileAccountPendingDeletion`（accountdeletion）、`TestDeletionPendingRefusesGrantRole`（identity）驗證。
+
+## 修訂：本人的申請也把店家當參與者（2026-10-28，Will 決定）
+
+**脈絡**：原實作只有管理員的申請把店家當參與者（同一個 transaction 關買家、關店家、刪帳號；兩側未結訂單都阻擋並進入等待）；帳號本人有 SELLER 時以 `ACCOUNT_HAS_OPEN_STORE` 拒絕，要求先關店。這個拒絕是原決策時店家流程尚未進單體的暫時行為，沒有獨立的保護理由：seller 本人關店（`CloseCurrent`）檢查的只有 `CAP_ACCOUNT_CLOSE` 與店家的未結訂單，刪帳路徑與它共用同一個 `close` 和同一個訂單查詢，所以刪帳不會漏掉關店的檢查。
+
+| 方案 | 代價 | 判定 |
+|---|---|---|
+| 基準：買家與賣家側有未完成的訂單就拒絕刪帳，結清後帳號連同賣場一起刪除（Shopee：https://help.shopee.sg/portal/4/article/76524 ） | 本人與管理員同一條路徑，沒有新機制；App 申請前要說明店家會一起關閉 | 採用 |
+| 維持現狀：本人要先關店，再刪帳號 | 兩條路徑、一個只為這個分支存在的錯誤原因與四個 client 的處理分支；使用者要走兩段流程 | 否決（約束是我們自己的流程分段，不是外部約束） |
+
+**決策**：帳號本人的申請與管理員的申請一樣把店家當參與者，移除 `ACCOUNT_HAS_OPEN_STORE`（proto 的 `ErrorReason` 值 5 與名稱保留為 reserved）。本人與管理員的差異只剩稽核欄位（申請者、操作者、理由）。
+
+**後果**：兩支 App 與 website 刪掉處理這個 reason 的分支與寫死文案。App 申請前「店家會一起關閉」的說明另行同意後再加；那之前，有店家的帳號按下刪除不會先看到店家受影響的說明。守門：`TestOwnerRequestClosesStoreBuyerAndAccountTogether`、`TestOwnerRequestIsPendingWhileTheStoreHasOpenOrders`。

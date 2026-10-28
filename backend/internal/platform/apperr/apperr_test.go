@@ -67,8 +67,8 @@ func TestInvalidInputFieldsKeepsPerFieldMessages(t *testing.T) {
 }
 
 func TestReasonsListsEveryDeclaredReason(t *testing.T) {
-	want := []Reason{ReasonVersionConflict, ReasonSellerSuspended, ReasonProspectMatchFound, ReasonProspectTaxIDHeld, ReasonAccountHasOpenStore, ReasonAgreementOutdated, ReasonSellerRequirementMissing, ReasonStoreOpeningSuspended, ReasonStoreOpeningTerminated}
-	if got := Reasons(); !slices.Equal(got, want) || len(got) != 9 || got[0].String() != "VERSION_CONFLICT" || got[1].String() != "SELLER_SUSPENDED" || got[2].String() != "PROSPECT_MATCH_FOUND" || got[3].String() != "PROSPECT_TAX_ID_HELD" || got[4].String() != "ACCOUNT_HAS_OPEN_STORE" || got[5].String() != "AGREEMENT_OUTDATED" || got[6].String() != "SELLER_REQUIREMENT_MISSING" || got[7].String() != "STORE_OPENING_SUSPENDED" || got[8].String() != "STORE_OPENING_TERMINATED" {
+	want := []Reason{ReasonVersionConflict, ReasonSellerSuspended, ReasonProspectMatchFound, ReasonProspectTaxIDHeld, ReasonAgreementOutdated, ReasonSellerRequirementMissing, ReasonStoreOpeningSuspended, ReasonStoreOpeningTerminated}
+	if got := Reasons(); !slices.Equal(got, want) || len(got) != 8 || got[0].String() != "VERSION_CONFLICT" || got[1].String() != "SELLER_SUSPENDED" || got[2].String() != "PROSPECT_MATCH_FOUND" || got[3].String() != "PROSPECT_TAX_ID_HELD" || got[4].String() != "AGREEMENT_OUTDATED" || got[5].String() != "SELLER_REQUIREMENT_MISSING" || got[6].String() != "STORE_OPENING_SUSPENDED" || got[7].String() != "STORE_OPENING_TERMINATED" {
 		t.Fatalf("Reasons() = %v", got)
 	}
 	if (VersionConflict("x").Reason) != ReasonVersionConflict || (NotFound("x").Reason != Reason{}) || (InvalidInput("x").Reason != Reason{}) || len(InvalidInput("x").Metadata) != 0 {

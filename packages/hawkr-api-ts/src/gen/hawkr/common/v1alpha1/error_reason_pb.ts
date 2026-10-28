@@ -9,7 +9,7 @@ import { enumDesc, fileDesc } from "@bufbuild/protobuf/codegenv2";
  * Describes the file hawkr/common/v1alpha1/error_reason.proto.
  */
 export const file_hawkr_common_v1alpha1_error_reason: GenFile = /*@__PURE__*/
-  fileDesc("CihoYXdrci9jb21tb24vdjFhbHBoYTEvZXJyb3JfcmVhc29uLnByb3RvEhVoYXdrci5jb21tb24udjFhbHBoYTEqtAIKC0Vycm9yUmVhc29uEhwKGEVSUk9SX1JFQVNPTl9VTlNQRUNJRklFRBAAEhQKEFZFUlNJT05fQ09ORkxJQ1QQARIUChBTRUxMRVJfU1VTUEVOREVEEAMSGAoUUFJPU1BFQ1RfTUFUQ0hfRk9VTkQQBBIYChRQUk9TUEVDVF9UQVhfSURfSEVMRBAKEhoKFkFDQ09VTlRfSEFTX09QRU5fU1RPUkUQBRIWChJBR1JFRU1FTlRfT1VUREFURUQQBhIeChpTRUxMRVJfUkVRVUlSRU1FTlRfTUlTU0lORxAHEhsKF1NUT1JFX09QRU5JTkdfU1VTUEVOREVEEAgSHAoYU1RPUkVfT1BFTklOR19URVJNSU5BVEVEEAkiBAgCEAIqElBIT05FX0NPREVfRVhQSVJFRGIGcHJvdG8z");
+  fileDesc("CihoYXdrci9jb21tb24vdjFhbHBoYTEvZXJyb3JfcmVhc29uLnByb3RvEhVoYXdrci5jb21tb24udjFhbHBoYTEqtgIKC0Vycm9yUmVhc29uEhwKGEVSUk9SX1JFQVNPTl9VTlNQRUNJRklFRBAAEhQKEFZFUlNJT05fQ09ORkxJQ1QQARIUChBTRUxMRVJfU1VTUEVOREVEEAMSGAoUUFJPU1BFQ1RfTUFUQ0hfRk9VTkQQBBIYChRQUk9TUEVDVF9UQVhfSURfSEVMRBAKEhYKEkFHUkVFTUVOVF9PVVREQVRFRBAGEh4KGlNFTExFUl9SRVFVSVJFTUVOVF9NSVNTSU5HEAcSGwoXU1RPUkVfT1BFTklOR19TVVNQRU5ERUQQCBIcChhTVE9SRV9PUEVOSU5HX1RFUk1JTkFURUQQCSIECAIQAiIECAUQBSoSUEhPTkVfQ09ERV9FWFBJUkVEKhZBQ0NPVU5UX0hBU19PUEVOX1NUT1JFYgZwcm90bzM");
 
 /**
  * ErrorReason 是錯誤 details 裡 google.rpc.ErrorInfo.reason 可以用的值，domain 是 hawkr
@@ -64,14 +64,6 @@ export enum ErrorReason {
    * @generated from enum value: PROSPECT_TAX_ID_HELD = 10;
    */
   PROSPECT_TAX_ID_HELD = 10,
-
-  /**
-   * 帳號本人刪除帳號，但帳號還有沒關閉的店家（搭配 failed_precondition）。client 引導使用者先關閉店家再回來刪除
-   * （identity.v1alpha1.IdentityService.DeleteAccount）。
-   *
-   * @generated from enum value: ACCOUNT_HAS_OPEN_STORE = 5;
-   */
-  ACCOUNT_HAS_OPEN_STORE = 5,
 
   /**
    * 賣家同意的入駐文件版本不是現行版本（搭配 failed_precondition）。client 重讀

@@ -13,8 +13,8 @@
 | pending 重送回 9204 | 舊 REST 相容 | 不成立，未上線且新 Connect 契約回狀態 | 冪等請求回當前狀態 | 重送沿用同一 pending 狀態列，另追加不可變的 request_attempts；管理員後續申請亦留痕 |
 | pending 時移除角色及撤銷 token | 舊跨服務角色處理 | 不成立；等待期間仍是買家 | 待辦流程保留參與者直到可關閉 | pending 期間仍是買家；完成時 buyer.CloseForDeletion 關閉買家，identity 再刪帳（買家不是角色，W5，不移除角色） |
 | buyer_deletion_audit | 管理員申請須留操作者與原因 | 成立，但稽核屬帳號流程 | 流程管理者的持久狀態紀錄 | accountdeletion.deletion_requests 保存狀態與時間；request_attempts 每次保存本人或管理員、operator_admin_id、reason；buyer 刪舊表 |
-| 管理員先 seller 後 buyer | 兩個遠端服務藉順序避免提早 cascade | 不成立：seller 在單體，三者同一個 transaction | 單一 transaction 由流程管理者協調參與者 | 管理員的申請在已鎖帳號列的 transaction 內呼叫 seller 的 `BeginDeletion`／`CloseForDeletion`（與 buyer 同一個 transaction，順序不再有語意）；帳號本人的申請仍要先關店。店家的未結訂單由 Orders port 的店家側簽名查（7c 階段 3，見下一列） |
-| 管理員刪帳號略過店家訂單、`OverrideActiveOrders`（7a 暫時行為與 gateway 的強制覆寫） | 店家有未結訂單時不能刪 | 成立；覆寫不成立（強制刪除讓進行中的訂單失去賣家，要立即處理惡意店家走停權） | 流程管理者等待參與者可以關閉；擁有訂單者提供查詢 | **7c 階段 3**：Orders 加 `HasOpenStoreOrders(storeID)`（與 `seller.closing` 的自助關店同一個 legacy 實作，`GetSellerOrders` 含未付款加 `aftersales_count`，fail-closed）；管理員的申請與 `CompletePending` 都查，買家側先查、已有未結訂單就不問店家；任一失敗不寫入；不搬覆寫旗標；交易內確認仍是同一個 stint |
+| 管理員先 seller 後 buyer | 兩個遠端服務藉順序避免提早 cascade | 不成立：seller 在單體，三者同一個 transaction | 單一 transaction 由流程管理者協調參與者 | 申請（本人與管理員一樣）在已鎖帳號列的 transaction 內呼叫 seller 的 `BeginDeletion`／`CloseForDeletion`（與 buyer 同一個 transaction，順序不再有語意）；本人有店家時不必先關店（ADR `2026-09-30-account-deletion-module.md` 修訂）。店家的未結訂單由 Orders port 的店家側簽名查（7c 階段 3，見下一列） |
+| 管理員刪帳號略過店家訂單、`OverrideActiveOrders`（7a 暫時行為與 gateway 的強制覆寫） | 店家有未結訂單時不能刪 | 成立；覆寫不成立（強制刪除讓進行中的訂單失去賣家，要立即處理惡意店家走停權） | 流程管理者等待參與者可以關閉；擁有訂單者提供查詢 | **7c 階段 3**：Orders 加 `HasOpenStoreOrders(storeID)`（與 `seller.closing` 的自助關店同一個 legacy 實作，`GetSellerOrders` 含未付款加 `aftersales_count`，fail-closed）；申請（本人與管理員）與 `CompletePending` 都查，買家側先查、已有未結訂單就不問店家；任一失敗不寫入；不搬覆寫旗標；交易內確認仍是同一個 stint |
 | order.completed 加速只認買家 | 訂單結案時等待中的刪帳要盡快完成 | 店家是商家的訂單也阻擋刪帳，事件有 `store_id` | 事件只加速收斂，對帳是保底 | `buyerconsumer` 的 job 帶 `store_id`，經 `seller.Store` 解析帳號後各自呼叫 `CompletePending`，一側失敗不擋另一側；沒有設定解析器卻有 `store_id` 是錯誤、不默默略過 |
 | 無角色 fallback 刪帳 | 帳號可沒有 buyer/seller | 不成立；帳號活著 ⇔ 買家活著（ADR `2026-09-30-account-created-provisions-buyer`） | 不變量被破壞時失敗並告警，不以替代路徑掩蓋 | 不搬；未刪除的帳號沒有現任買家回 internal 並記 error log，不寫入、不刪帳 |
 | order 查詢在 buyer transaction 內 | 舊遠端呼叫併發競態 | 不成立；跨服務交易應避免遠端呼叫 | 外部前置查詢先於本地交易，未來同 DB 可納入交易 | Orders port 先查，查詢失敗 unavailable 且無寫入 |
@@ -22,7 +22,7 @@
 | PII、地址、收藏清理 | 關閉買家身分需要 | 成立 | 由擁有資料的 participant 做 | buyer.CloseForDeletion 保留既有清理與事件；鎖順序改由本模組保證（交易內先 `identity.LockAccount` 再呼叫它），buyer 不再自己鎖帳號，也不訂閱 `AccountDeleted`：關閉買家只有本模組一條路徑（ADR `2026-09-30-account-deletion-module.md` 修訂） |
 | CodeMeta／bizcode | 舊 wire 契約 | 只有過渡訂單狀態成立 | 模組使用具名字串型別與 CHECK，邊界轉 Connect code | Requester／State 用 UPPER_SNAKE＋DB CHECK；錯誤用 apperr |
 | 定期收斂 pending | order.completed 事件可能早於申請 commit 或遺失 | 成立 | 定期掃描持久流程狀態並重試 | 每小時 River job 啟動即補跑、有界 keyset 掃描、逐筆錯誤不中斷；步驟 4 event consumer 只加速，先經 buyer.ProfileByBuyerID 由 buyer_id 解析 account_id 再呼叫 CompletePending；一小時符合訂單結案非即時刪帳的需求，並限制過渡期 Java 訂單服務的負載 |
-| 同帳號申請與角色寫入的序列化 | 交易外查遠端訂單後，SELLER 可能在交易開始前授予、帳號可能被刪除；買家不會換成另一個（一個帳號一生一個買家） | 成立 | 所有參與者共用同一個帳號列鎖（PostgreSQL row lock，`SELECT … FOR UPDATE`）；不另建只保護單一模組的 advisory lock | 交易內先呼叫 `identity.LockAccount`（與 GrantRole、RemoveRole、DeleteAccount 同一把鎖），再重讀帳號與買家；帳號本人的申請在 SELLER 出現時拒絕、管理員的申請改為連同店家一起處理，已刪除就記完成。buyer_id 比對與重試迴圈已刪除（走不到）；交易內不再重讀「還有其他角色」（SELLER 剛在同一把鎖下檢查過）；partial UNIQUE 保底 |
+| 同帳號申請與角色寫入的序列化 | 交易外查遠端訂單後，SELLER 可能在交易開始前授予、帳號可能被刪除；買家不會換成另一個（一個帳號一生一個買家） | 成立 | 所有參與者共用同一個帳號列鎖（PostgreSQL row lock，`SELECT … FOR UPDATE`）；不另建只保護單一模組的 advisory lock | 交易內先呼叫 `identity.LockAccount`（與 GrantRole、RemoveRole、DeleteAccount 同一把鎖），再重讀帳號與買家；SELLER 與店家出現時連同店家處理（交易內的店家與交易前不同就要求重試），已刪除就記完成。buyer_id 比對與重試迴圈已刪除（走不到）；交易內不再重讀「還有其他角色」（SELLER 剛在同一把鎖下檢查過）；partial UNIQUE 保底 |
 | schema FK 跨模組 | 跨 schema 資料擁有權 | 不成立 | 模組資料庫邊界以 ID 關聯 | account_id bigint，不設跨 schema FK；partial UNIQUE 保護 pending |
 
 ## 傳輸層的沿用盤點
@@ -40,7 +40,7 @@
 
 - 稽核從 buyer stint 移到帳號申請；本人申請也留一筆，pending 與 completed 有明確欄位及約束；每次申請有獨立 append-only attempt。
 - pending 期間仍是買家；完成刪除在單一資料庫 transaction 內進行。
-- 帳號本人的申請在有 SELLER 時拒絕；管理員的申請把店家當參與者，在同一個 transaction 關閉。管理員的申請把店家的未結訂單與買家的一樣當成等待條件（7c 階段 3），本人的關店在 seller 的 `CloseCurrent` 檢查同一個 port，不保留 gateway 那種永久的強制覆寫。
+- 本人與管理員的申請都把店家當參與者，在同一個 transaction 關閉；店家的未結訂單與買家的一樣當成等待條件（7c 階段 3），本人的關店在 seller 的 `CloseCurrent` 檢查同一個 port，不保留 gateway 那種永久的強制覆寫。
 - 申請進入等待時帳號變成 PENDING_DELETION（identity 保存的狀態），等待期間不能授予角色。
 - 不依賴 Redis、outbox、舊公司服務或既有正式資料 migration。
 - 管理員的理由是管理員的稽核文字，由本模組驗證與正規化（`platform/auditreason`，與 seller 的後台關店理由同一條規則），個資清理不動它；重新評估的時機：隱私政策定稿時，或 A8。

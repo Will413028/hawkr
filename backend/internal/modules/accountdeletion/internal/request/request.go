@@ -102,7 +102,7 @@ func (s *Service) lockAccount(ctx context.Context, accountID int64) error {
 type snapshot struct {
 	deleted, seller bool
 	buyerID         int64
-	// store 是帳號目前的店家，只在需要店家參與時（管理員申請、完成等待中的申請）由 withStore 讀取。
+	// store 是帳號目前的店家，由 withStore 讀取（申請與完成等待中的申請都一樣）。
 	store *seller.Store
 }
 
@@ -181,17 +181,9 @@ func sameStore(before, current *seller.Store) bool {
 
 func errStoreChanged() error { return apperr.Unavailable("店家剛剛有變動，請重試") }
 
-// sellerAllowed 回報這次申請能不能連同店家一起關閉：管理員刪帳號時店家是參與者；帳號本人要先關店（關店的檢查
-// 在 seller 的關店流程）。
-func sellerAllowed(in model.RequestInput) bool { return in.Requester == model.Admin }
-
 // pendingStore 回報店家是不是已隨這個帳號的刪除申請進入等待（完成等待中的申請時一起關閉）。
 func pendingStore(snap snapshot) bool {
 	return snap.store != nil && snap.store.Status == seller.PendingDeletion
-}
-
-func errCloseStoreFirst() error {
-	return apperr.FailedPrecondition("請先關閉店家，再刪除帳號").WithReason(apperr.ReasonAccountHasOpenStore)
 }
 
 func (s *Service) brokenInvariant(ctx context.Context, accountID int64, what string, cause error) error {
@@ -210,16 +202,11 @@ func (s *Service) Request(ctx context.Context, in model.RequestInput) (model.Sta
 	if err != nil {
 		return "", err
 	}
-	if before.seller && !sellerAllowed(in) {
-		return "", errCloseStoreFirst()
-	}
 	open := false
 	if !before.deleted {
-		// 管理員的申請把店家當參與者：店家的訂單也要查（帳號本人有店家時已在上面拒絕）。
-		if sellerAllowed(in) {
-			if err := s.withStore(ctx, in.AccountID, &before); err != nil {
-				return "", err
-			}
+		// 不論申請者，店家都是參與者：店家的訂單也要查。
+		if err := s.withStore(ctx, in.AccountID, &before); err != nil {
+			return "", err
 		}
 		if open, err = s.openOrders(ctx, before); err != nil {
 			return "", err
@@ -246,9 +233,6 @@ func (s *Service) Request(ctx context.Context, in model.RequestInput) (model.Sta
 			}
 			state = model.Completed
 			return nil
-		}
-		if current.seller && !sellerAllowed(in) {
-			return errCloseStoreFirst()
 		}
 		if err := s.withStore(ctx, in.AccountID, &current); err != nil {
 			return err
@@ -340,7 +324,7 @@ func (s *Service) CompletePending(ctx context.Context, accountID int64) (model.S
 			return errStoreChanged()
 		}
 		if current.seller && !current.deleted && !pendingStore(current) {
-			return errCloseStoreFirst()
+			return s.brokenInvariant(ctx, accountID, "等待中的申請，店家卻不在等待刪除", nil)
 		}
 		q := store.New(s.d.DB.Conn(ctx))
 		pending, err := q.PendingRequest(ctx, accountID)

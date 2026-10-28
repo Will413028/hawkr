@@ -1,5 +1,3 @@
-import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart'
-    show SellerCapability;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -16,7 +14,6 @@ import '../../auth/presentation/auth_controller.dart';
 import '../data/account_deletion.dart';
 import '../data/current_store.dart';
 import '../data/store_closing.dart';
-import '../data/version_conflict.dart';
 
 /// 設定頁的「關閉商店」。呼叫端只在 `ACCOUNT_CLOSE` 能力存在時顯示（停權中也可以關店，等待刪除時沒有）。
 /// 成功後店家狀態重讀，路由把賣家導去開店頁。
@@ -79,10 +76,7 @@ class _ProfileCloseStoreSectionState
 
 /// 設定頁的「刪除帳號」（Apple Guideline 5.1.1(v) 要求 App 內提供帳號刪除）。順序見 [AccountDeletion]。
 class ProfileDeleteAccountSection extends ConsumerStatefulWidget {
-  const ProfileDeleteAccountSection({super.key, this.onGoToCloseStore});
-
-  /// 帳號還有商店時，「前往關閉商店」要做的事。
-  final VoidCallback? onGoToCloseStore;
+  const ProfileDeleteAccountSection({super.key});
 
   @override
   ConsumerState<ProfileDeleteAccountSection> createState() =>
@@ -120,31 +114,6 @@ class _ProfileDeleteAccountSectionState
       case AccountDeletionPending():
         FloatingToast.success(context, accountPendingOrdersMessage);
         await ref.read(currentStoreProvider.notifier).refresh();
-      case AccountHasOpenStore():
-        final refreshed = await ref
-            .read(currentStoreProvider.notifier)
-            .refresh();
-        if (!mounted) return;
-        if (!refreshed) {
-          FloatingToast.error(context, storeStateUnavailableNotice);
-          return;
-        }
-        final canClose =
-            ref
-                .read(myStoreSnapshotProvider)
-                ?.can(SellerCapability.SELLER_CAPABILITY_ACCOUNT_CLOSE) ??
-            false;
-        if (!canClose) {
-          FloatingToast.error(context, accountHasOpenStoreMessage);
-          return;
-        }
-        final goToClose = await showAppConfirmDialog(
-          context,
-          title: '刪除帳號',
-          message: accountHasOpenStoreMessage,
-          confirmText: '前往關閉商店',
-        );
-        if (goToClose && mounted) widget.onGoToCloseStore?.call();
       case AccountDeletionFailed(:final message):
         FloatingToast.error(context, message);
     }

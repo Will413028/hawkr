@@ -50,11 +50,6 @@ class ErrorReason extends $pb.ProtobufEnum {
   static const ErrorReason PROSPECT_TAX_ID_HELD =
       ErrorReason._(10, _omitEnumNames ? '' : 'PROSPECT_TAX_ID_HELD');
 
-  /// 帳號本人刪除帳號，但帳號還有沒關閉的店家（搭配 failed_precondition）。client 引導使用者先關閉店家再回來刪除
-  /// （identity.v1alpha1.IdentityService.DeleteAccount）。
-  static const ErrorReason ACCOUNT_HAS_OPEN_STORE =
-      ErrorReason._(5, _omitEnumNames ? '' : 'ACCOUNT_HAS_OPEN_STORE');
-
   /// 賣家同意的入駐文件版本不是現行版本（搭配 failed_precondition）。client 重讀
   /// seller.v1alpha1.SellerPublicService.GetSellerAgreements，顯示新版本，請賣家重新勾選後再送出。
   static const ErrorReason AGREEMENT_OUTDATED =
@@ -83,7 +78,6 @@ class ErrorReason extends $pb.ProtobufEnum {
     SELLER_SUSPENDED,
     PROSPECT_MATCH_FOUND,
     PROSPECT_TAX_ID_HELD,
-    ACCOUNT_HAS_OPEN_STORE,
     AGREEMENT_OUTDATED,
     SELLER_REQUIREMENT_MISSING,
     STORE_OPENING_SUSPENDED,

@@ -86,27 +86,6 @@ void main() {
     );
   });
 
-  test('ACCOUNT_HAS_OPEN_STORE：要先關閉商店', () async {
-    final t = build(
-      deleteAccount: () => throw ConnectException(
-        Code.failedPrecondition,
-        'open store',
-        details: [
-          ErrorDetail(
-            'google.rpc.ErrorInfo',
-            (ErrorInfo()
-                  ..reason = 'ACCOUNT_HAS_OPEN_STORE'
-                  ..domain = 'hawkr')
-                .writeToBuffer(),
-          ),
-        ],
-      ),
-    );
-
-    expect(await t.deletion.run(), isA<AccountHasOpenStore>());
-    expect(t.calls, ['delete']);
-  });
-
   test('其他錯誤：顯示伺服器給的文字', () async {
     final t = build(
       deleteAccount: () => throw ConnectException(

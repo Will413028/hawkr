@@ -28,9 +28,6 @@ enum ErrorReason {
   // PROSPECT_MATCH_FOUND）。修改時持有者是進行中的，client 可以讓管理員與它合併；還原時是同一家就不需要還原
   // （ADR 2026-10-04-prospect-contact-points-and-matching）。
   PROSPECT_TAX_ID_HELD = 10;
-  // 帳號本人刪除帳號，但帳號還有沒關閉的店家（搭配 failed_precondition）。client 引導使用者先關閉店家再回來刪除
-  // （identity.v1alpha1.IdentityService.DeleteAccount）。
-  ACCOUNT_HAS_OPEN_STORE = 5;
   // 賣家同意的入駐文件版本不是現行版本（搭配 failed_precondition）。client 重讀
   // seller.v1alpha1.SellerPublicService.GetSellerAgreements，顯示新版本，請賣家重新勾選後再送出。
   AGREEMENT_OUTDATED = 6;
@@ -48,4 +45,7 @@ enum ErrorReason {
   // 2 是刪掉的 PHONE_CODE_EXPIRED（新帳號不驗證手機，ADR 2026-09-27-identity-clerk）。
   reserved 2;
   reserved "PHONE_CODE_EXPIRED";
+  // 5 是刪掉的 ACCOUNT_HAS_OPEN_STORE（本人刪帳號時店家是參與者，不再要求先關店，ADR 2026-09-30-account-deletion-module 的修訂）。
+  reserved 5;
+  reserved "ACCOUNT_HAS_OPEN_STORE";
 }

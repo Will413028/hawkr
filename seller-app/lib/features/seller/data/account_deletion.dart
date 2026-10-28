@@ -8,7 +8,6 @@ import '../../auth/data/auth_repository.dart';
 
 part 'account_deletion.g.dart';
 
-const accountHasOpenStoreMessage = '你的帳號還有商店，請先關閉商店，再刪除帳號。';
 const accountPendingOrdersMessage = '帳號刪除處理中，最後一筆未完成的訂單完成後會自動刪除；期間無法新增收藏與追蹤。';
 const accountNotDeletedMessage = '帳號尚未刪除，請再試一次。';
 const accountDeletionUnconfirmedMessage = '無法確認帳號是否已刪除，請檢查網路後再試一次。';
@@ -28,11 +27,6 @@ final class AccountDeletionPending extends AccountDeletionOutcome {
   const AccountDeletionPending();
 }
 
-/// 帳號還有沒關閉的店家：要先關店。
-final class AccountHasOpenStore extends AccountDeletionOutcome {
-  const AccountHasOpenStore();
-}
-
 final class AccountDeletionFailed extends AccountDeletionOutcome {
   const AccountDeletionFailed(this.message);
 
@@ -40,7 +34,7 @@ final class AccountDeletionFailed extends AccountDeletionOutcome {
 }
 
 /// 刪除帳號：呼叫 `DeleteAccount`，結果由共用的 [classifyAccountDeletion] 分類（沒收到回應時以 `GetSession` 確認帳號有沒有
-/// 被刪掉），這裡只對應成這個 App 的結果與文案。店家是否還開著由伺服器擋（`ACCOUNT_HAS_OPEN_STORE`）。
+/// 被刪掉），這裡只對應成這個 App 的結果與文案。帳號有店家時店家是刪除的參與者，由伺服器一起關閉。
 class AccountDeletion {
   AccountDeletion({
     required AuthRepository auth,
@@ -62,7 +56,6 @@ class AccountDeletion {
     return switch (result) {
       AccountDeletionDeleted() => const AccountDeleted(),
       AccountDeletionPendingOrders() => const AccountDeletionPending(),
-      AccountDeletionHasOpenStore() => const AccountHasOpenStore(),
       AccountDeletionNotDeleted() => const AccountDeletionFailed(
         accountNotDeletedMessage,
       ),

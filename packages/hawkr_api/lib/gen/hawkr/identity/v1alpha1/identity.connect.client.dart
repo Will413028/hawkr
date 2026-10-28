@@ -50,8 +50,8 @@ extension type IdentityAppServiceClient (connect.Transport _transport) {
   }
 
   /// DeleteAccount 刪除呼叫者的帳號（App Store 審核準則 5.1.1(v)）。沒有未完成的訂單時立即刪除；有的話進入刪除流程，
-  /// 最後一筆訂單完成後自動刪除，期間不能新增收藏與追蹤；流程中再呼叫回目前的狀態。帳號還有沒關閉的店家時回
-  /// failed_precondition，reason 是 ACCOUNT_HAS_OPEN_STORE：要先關閉店家；其他 failed_precondition 不帶這個 reason。保存的 Apple 授權由伺服器在最後刪除時撤銷，client 不需要任何前置步驟。
+  /// 最後一筆訂單完成後自動刪除，期間不能新增收藏與追蹤；流程中再呼叫回目前的狀態。帳號有店家時店家是
+  /// 參與者：同一個 transaction 關閉買家、店家並刪除帳號，店家有未結訂單時與買家一起等待到兩側都結清。保存的 Apple 授權由伺服器在最後刪除時撤銷，client 不需要任何前置步驟。
   /// 刪除之後 token 不再有效，所以 client 不自動重送：沒收到回應時以 GetSession 確認，unauthenticated 表示已刪除。
   Future<hawkridentityv1alpha1identity.DeleteAccountResponse> deleteAccount(
     hawkridentityv1alpha1identity.DeleteAccountRequest input, {

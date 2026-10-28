@@ -619,8 +619,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         context.go('/');
       case AccountDeletionPending():
         setState(() => _deleteMessage = accountPendingOrdersMessage);
-      case AccountHasOpenStore():
-        setState(() => _deleteMessage = accountHasOpenStoreMessage);
       case AccountDeletionFailed(:final message):
         setState(() => _deleteMessage = message);
     }

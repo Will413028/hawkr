@@ -105,9 +105,6 @@ var ReasonProspectMatchFound = newReason("PROSPECT_MATCH_FOUND")
 // FailedPrecondition。持有者以 metadata 的 `prospectIds` 傳給 client（十進位 ID，只有一筆）。
 var ReasonProspectTaxIDHeld = newReason("PROSPECT_TAX_ID_HELD")
 
-// ReasonAccountHasOpenStore 表示帳號本人要刪除帳號，但帳號還有沒關閉的店家；搭配 FailedPrecondition。
-var ReasonAccountHasOpenStore = newReason("ACCOUNT_HAS_OPEN_STORE")
-
 // ReasonAgreementOutdated 表示賣家同意的入駐文件版本不是現行版本；搭配 FailedPrecondition。client 重讀 GetSellerAgreements，
 // 請賣家重新勾選。
 var ReasonAgreementOutdated = newReason("AGREEMENT_OUTDATED")

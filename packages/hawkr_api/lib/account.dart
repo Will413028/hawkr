@@ -4,7 +4,6 @@ library;
 import 'package:connectrpc/connect.dart';
 
 import 'errors.dart';
-import 'gen/hawkr/common/v1alpha1/error_reason.pbenum.dart';
 import 'gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
 import 'gen/hawkr/identity/v1alpha1/identity.pb.dart';
 import 'submit.dart';
@@ -62,11 +61,6 @@ final class AccountDeletionPendingOrders extends AccountDeletionResult {
   const AccountDeletionPendingOrders();
 }
 
-/// 帳號還有沒關閉的店家（`ACCOUNT_HAS_OPEN_STORE`）。
-final class AccountDeletionHasOpenStore extends AccountDeletionResult {
-  const AccountDeletionHasOpenStore();
-}
-
 /// 沒收到回應，確認之後帳號還在：請使用者再試一次。
 final class AccountDeletionNotDeleted extends AccountDeletionResult {
   const AccountDeletionNotDeleted();
@@ -106,11 +100,6 @@ Future<AccountDeletionResult> classifyAccountDeletion({
     final facts = ErrorFacts.fromException(ConnectException.from(error));
     if (_outcomeUnknown(facts)) {
       return _confirmDeleted(accountExists, defaults, onError);
-    }
-    final decision = classifyError(facts);
-    if (decision.action == ErrorAction.reason &&
-        decision.reason == ErrorReason.ACCOUNT_HAS_OPEN_STORE) {
-      return const AccountDeletionHasOpenStore();
     }
     return AccountDeletionFailure(_message(error, defaults));
   }

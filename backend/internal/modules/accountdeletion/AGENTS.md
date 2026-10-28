@@ -20,14 +20,14 @@ schema `accountdeletion`（`db/schema.sql`）：`deletion_requests`（流程狀�
 
 ## 不變量
 
-- 帳號本人的申請在 SELLER 存在時拒絕且不寫入；訂單 port 失敗回 unavailable 且不寫入。守門：`TestSellerPreconditionWritesNothing`、`TestOrdersErrorWritesNothing`。規格：§4、§3。
-- 管理員的申請把店家當參與者，同一個 transaction 關閉買家、店家與帳號（停權店家也一樣）。守門：`TestAdminRequestClosesStoreBuyerAndAccountTogether`、`TestAdminRequestDeletesSuspendedSeller`。規格：§5。
-- 店家的未結訂單與買家的一樣阻擋刪帳，查詢失敗 fail-closed，交易內店家換過就不寫入，沒有覆寫旗標。守門：`TestAdminRequestIsPendingWhileTheStoreHasOpenOrders`、`TestStoreOrdersErrorFailsClosed`、`TestStoreReplacedAfterTheOrdersCheckWritesNothing`、`TestOwnerRequestWithAStoreDoesNotAskStoreOrders`。規格：§5。
+- 訂單 port 失敗回 unavailable 且不寫入。守門：`TestOrdersErrorWritesNothing`。規格：§3。
+- 不論申請者，店家都是參與者，同一個 transaction 關閉買家、店家與帳號（停權店家也一樣）。守門：`TestAdminRequestClosesStoreBuyerAndAccountTogether`、`TestOwnerRequestClosesStoreBuyerAndAccountTogether`、`TestAdminRequestDeletesSuspendedSeller`。規格：§4、§5。
+- 店家的未結訂單與買家的一樣阻擋刪帳，查詢失敗 fail-closed，交易內店家換過就不寫入，沒有覆寫旗標。守門：`TestAdminRequestIsPendingWhileTheStoreHasOpenOrders`、`TestStoreOrdersErrorFailsClosed`、`TestStoreReplacedAfterTheOrdersCheckWritesNothing`、`TestStoreOpenedBetweenOrdersReadAndTransactionWritesNothing`、`TestOwnerRequestIsPendingWhileTheStoreHasOpenOrders`。規格：§5。
 - `CompletePending` 沒有待辦申請時不發任何訂單 RPC；買家側結清後才查店家側。守門：`TestCompletePendingWithoutARequestDoesNotQueryOrders`、`TestCompletePendingChecksTheStoreAfterTheBuyerSideClears`。規格：§6。
 - 有店家沒有 SELLER、有 SELLER 沒有店家、帳號沒有現任買家，都回 internal 且不寫入。守門：`TestStoreWithoutSellerRoleIsInternalError`、`TestSellerRoleWithoutStoreIsInternalError`、`TestAccountWithoutBuyerIsInternalError`。規格：§3、§5。
 - 申請進入等待時帳號同交易進入 PENDING_DELETION，等待期間不能開店，等待中的店家不能自己關店。守門：`TestStoreCannotOpenWhileAccountPendingDeletion`、`TestPendingStoreCannotBeClosedOrReplacedByOwner`、`TestAdminPendingIncludesStoreAndCompletesIt`。規格：§3、§5。
 - 同帳號只有一筆 PENDING_ORDERS（DB partial UNIQUE，交易內先 `identity.LockAccount` 序列化），每次受理追加 attempt。守門：`TestPendingRequestUniqueAndRepeatedRequest`、`TestConcurrentRequestsReuseOneProcessRow`、`TestAdminAttemptAfterOwnerPendingIsRecorded`、`TestRequestConstraints`（DB CHECK）。規格：§2、§3、§7。
-- 遠端訂單只在 transaction 外查；SELLER 在遠端查詢後才加入也不寫入。守門：`TestSellerGrantedBetweenOrdersReadAndTransactionWritesNothing`、`TestSellerGrantedBeforeTransactionLockIsNotDeleted`。規格：§7。
+- 遠端訂單只在 transaction 外查；店家或 SELLER 在遠端查詢後才出現也不寫入。守門：`TestStoreOpenedBetweenOrdersReadAndTransactionWritesNothing`、`TestSellerGrantedBeforeTransactionLockIsNotDeleted`。規格：§7。
 - 關閉買家只有本模組一條路徑，鎖順序帳號列、買家列、店家列、上層模組；刪帳同時檢查帳號已刪與買家已關。守門：`TestDeletionLocksBuyerAndSellerBeforeSocialRows`、`TestRequestClosedDeletesAccountAndCompletes`、`TestCompletePendingChecksOrdersAgain`。規格：§7。
 - 買家刪帳時兩個方向的封鎖都刪。守門：`TestRequestClosedDeletesBlocksInBothDirections`。規格：§7。
 - 帳號只由本模組刪除；每小時 River 對帳有界掃描、逐筆失敗仍繼續。守門：`TestReconcileBatchesAndContinuesAfterError`。規格：§6。

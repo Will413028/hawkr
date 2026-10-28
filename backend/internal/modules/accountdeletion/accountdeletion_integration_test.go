@@ -340,21 +340,6 @@ func TestCompletePendingWithoutARequestDoesNotQueryOrders(t *testing.T) {
 	}
 }
 
-// 若跳過 SELLER 前置檢查，此測試會觀察到寫入或錯誤類型改變。
-func TestSellerPreconditionWritesNothing(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	id, _ := f.account(t)
-	if err := f.identity.GrantRole(context.Background(), identity.GrantRoleInput{AccountID: id, Role: identity.RoleSeller}); err != nil {
-		t.Fatal(err)
-	}
-	_, err := f.module.Request(context.Background(), RequestInput{AccountID: id, Requester: AccountOwner})
-	var ae *apperr.Error
-	if !errors.As(err, &ae) || ae.Kind() != apperr.KindFailedPrecondition || ae.Reason != apperr.ReasonAccountHasOpenStore || f.count(t, id) != 0 {
-		t.Fatalf("seller request: %v count=%d", err, f.count(t, id))
-	}
-}
-
 func TestOrdersErrorWritesNothing(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -366,21 +351,19 @@ func TestOrdersErrorWritesNothing(t *testing.T) {
 	}
 }
 
-// 若移除 transaction 內的 SELLER 重查，這次 interleave 會刪帳並寫入申請。
-func TestSellerGrantedBetweenOrdersReadAndTransactionWritesNothing(t *testing.T) {
+// 查完買家訂單之後、進交易之前帳號才開店：交易前沒有把店家納入查詢，交易內讀到店家就不寫入、要求重試。拿掉交易內的
+// 店家比對，這次交錯會在沒查過店家訂單的情況下刪帳並關店。
+func TestStoreOpenedBetweenOrdersReadAndTransactionWritesNothing(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	id, _ := f.account(t)
-	f.orders.open = true
 	f.orders.onCall = func() {
 		f.orders.onCall = nil
-		if err := f.identity.GrantRole(context.Background(), identity.GrantRoleInput{AccountID: id, Role: identity.RoleSeller}); err != nil {
-			t.Fatal(err)
-		}
+		f.store(t, id)
 	}
 	_, err := f.module.Request(context.Background(), RequestInput{AccountID: id, Requester: AccountOwner})
-	if apperr.KindOf(err) != apperr.KindFailedPrecondition || f.count(t, id) != 0 {
-		t.Fatalf("state=%v rows=%d", err, f.count(t, id))
+	if apperr.KindOf(err) != apperr.KindUnavailable || f.count(t, id) != 0 {
+		t.Fatalf("err=%v rows=%d", err, f.count(t, id))
 	}
 	a, err := f.identity.Account(context.Background(), id)
 	if err != nil || a.Deleted {
@@ -410,14 +393,15 @@ func (g *grantSellerBeforeLock) DeleteAccount(ctx context.Context, id int64) err
 	return g.inner.DeleteAccount(ctx, id)
 }
 
+// 交易外讀帳號時還沒有 SELLER，取得帳號鎖之前才授予（沒有店家）：交易內的成對檢查回 internal，不刪帳、不寫入。
 func TestSellerGrantedBeforeTransactionLockIsNotDeleted(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	id, _ := f.account(t)
 	identityWithHook := &grantSellerBeforeLock{inner: f.identity, accountID: id}
-	s := processrequest.New(processrequest.Deps{DB: f.db, Identity: identityWithHook, Buyer: f.buyer, HasOpenOrders: f.orders.HasOpenOrders, Now: time.Now, NewID: uuid.NewV7})
+	s := processrequest.New(processrequest.Deps{DB: f.db, Identity: identityWithHook, Buyer: f.buyer, Seller: f.seller, HasOpenOrders: f.orders.HasOpenOrders, HasOpenStoreOrders: f.orders.HasOpenStoreOrders, Now: time.Now, NewID: uuid.NewV7})
 	_, err := s.Request(context.Background(), RequestInput{AccountID: id, Requester: AccountOwner})
-	if apperr.KindOf(err) != apperr.KindFailedPrecondition || f.count(t, id) != 0 {
+	if apperr.KindOf(err) != apperr.KindInternal || f.count(t, id) != 0 {
 		t.Fatalf("err=%v rows=%d", err, f.count(t, id))
 	}
 	a, err := f.identity.Account(context.Background(), id)
@@ -718,8 +702,7 @@ func TestAdminPendingIncludesStoreAndCompletesIt(t *testing.T) {
 	}
 }
 
-// 帳號等待刪除時不能開店（identity 的 GrantRole 拒絕，開店整筆回滾），所以「等待期間才開的店」不會出現；帳號本人的
-// 申請仍要先關店。
+// 帳號等待刪除時不能開店（identity 的 GrantRole 拒絕，開店整筆回滾），所以「等待期間才開的店」不會出現。
 func TestStoreCannotOpenWhileAccountPendingDeletion(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -781,9 +764,11 @@ func TestSellerRoleWithoutStoreIsInternalError(t *testing.T) {
 	if err := f.identity.GrantRole(ctx, identity.GrantRoleInput{AccountID: id, Role: identity.RoleSeller}); err != nil {
 		t.Fatal(err)
 	}
-	_, err := f.module.Request(ctx, adminRequest(id))
-	if err == nil || apperr.KindOf(err) != apperr.KindInternal || f.count(t, id) != 0 {
-		t.Fatalf("err=%v kind=%v rows=%d", err, apperr.KindOf(err), f.count(t, id))
+	for _, in := range []RequestInput{{AccountID: id, Requester: AccountOwner}, adminRequest(id)} {
+		_, err := f.module.Request(ctx, in)
+		if err == nil || apperr.KindOf(err) != apperr.KindInternal || f.count(t, id) != 0 {
+			t.Fatalf("%s: err=%v kind=%v rows=%d", in.Requester, err, apperr.KindOf(err), f.count(t, id))
+		}
 	}
 	if _, err := f.module.CompletePending(ctx, id); err == nil {
 		t.Fatal("沒有待辦的帳號不應完成")
@@ -908,17 +893,62 @@ func TestStoreOrdersErrorFailsClosed(t *testing.T) {
 	}
 }
 
-// 帳號本人有店家時仍要先關店，也不會去問店家的訂單（關店的檢查在 seller）。
-func TestOwnerRequestWithAStoreDoesNotAskStoreOrders(t *testing.T) {
+// 帳號本人的申請與管理員的申請一樣把店家當參與者：沒有未結訂單時，關閉買家、關閉店家、刪帳號在同一個 transaction，並且
+// 用 store_id 問店家的訂單。拿掉本人路徑的店家參與，店家會留在 ACTIVE 或申請被拒絕。
+func TestOwnerRequestClosesStoreBuyerAndAccountTogether(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	id, _ := f.account(t)
-	f.store(t, id)
-	if _, err := f.module.Request(context.Background(), RequestInput{AccountID: id, Requester: AccountOwner}); apperr.KindOf(err) != apperr.KindFailedPrecondition {
-		t.Fatalf("err=%v", err)
+	ctx := context.Background()
+	id, buyerID := f.account(t)
+	s := f.store(t, id)
+	state, err := f.module.Request(ctx, RequestInput{AccountID: id, Requester: AccountOwner})
+	if err != nil || state != Completed {
+		t.Fatalf("state=%s err=%v", state, err)
 	}
-	if len(f.orders.storeCalls) != 0 {
-		t.Fatalf("store orders asked: %v", f.orders.storeCalls)
+	if len(f.orders.storeCalls) != 1 || f.orders.storeCalls[0] != s.StoreID {
+		t.Fatalf("store orders must be asked with the store_id: %v", f.orders.storeCalls)
+	}
+	if a, err := f.identity.Account(ctx, id); err != nil || !a.Deleted {
+		t.Fatalf("account=%+v err=%v", a, err)
+	}
+	if f.storeStatus(t, s.StoreID) != seller.Closed || f.buyerStatus(t, buyerID) != "CLOSED" {
+		t.Fatalf("store=%s buyer=%s", f.storeStatus(t, s.StoreID), f.buyerStatus(t, buyerID))
+	}
+}
+
+// 店家側有未結訂單時，本人的申請讓帳號、買家與店家一起進入等待（買家側沒有訂單）；店家結清之後 CompletePending 完成。
+func TestOwnerRequestIsPendingWhileTheStoreHasOpenOrders(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	id, buyerID := f.account(t)
+	s := f.store(t, id)
+	f.orders.storeOpen = true
+	state, err := f.module.Request(ctx, RequestInput{AccountID: id, Requester: AccountOwner})
+	if err != nil || state != PendingOrders {
+		t.Fatalf("state=%s err=%v", state, err)
+	}
+	if a, err := f.identity.Account(ctx, id); err != nil || a.Deleted || a.Lifecycle != identity.LifecyclePendingDeletion {
+		t.Fatalf("account=%+v err=%v", a, err)
+	}
+	if f.storeStatus(t, s.StoreID) != seller.PendingDeletion || f.buyerStatus(t, buyerID) != "PENDING_DELETION" {
+		t.Fatalf("store=%s buyer=%s", f.storeStatus(t, s.StoreID), f.buyerStatus(t, buyerID))
+	}
+	if _, err := f.seller.CloseCurrent(ctx, id); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("owner closes a pending store: %v", err)
+	}
+	if state, err = f.module.CompletePending(ctx, id); err != nil || state != PendingOrders {
+		t.Fatalf("still open: %s %v", state, err)
+	}
+	f.orders.storeOpen = false
+	if state, err = f.module.CompletePending(ctx, id); err != nil || state != Completed {
+		t.Fatalf("cleared: %s %v", state, err)
+	}
+	if a, err := f.identity.Account(ctx, id); err != nil || !a.Deleted {
+		t.Fatalf("account=%+v err=%v", a, err)
+	}
+	if f.storeStatus(t, s.StoreID) != seller.Closed || f.buyerStatus(t, buyerID) != "CLOSED" {
+		t.Fatalf("store=%s buyer=%s", f.storeStatus(t, s.StoreID), f.buyerStatus(t, buyerID))
 	}
 }
 
@@ -1026,16 +1056,14 @@ func TestEveryFinalDeletionPathRevokesAppleToken(t *testing.T) {
 			t.Fatalf("撤銷 job %d 個，token 還在 %v", f.queue.count(revokeAppleJob), f.hasAppleToken(t, id))
 		}
 	})
-	t.Run("被拒絕的刪除（還有商店）不撤銷", func(t *testing.T) {
+	t.Run("被拒絕的刪除（有 SELLER 沒有店家）不撤銷", func(t *testing.T) {
 		f := setup(t)
 		id, _ := f.account(t)
 		f.giveAppleToken(t, id)
 		if err := f.identity.GrantRole(ctx, identity.GrantRoleInput{AccountID: id, Role: identity.RoleSeller}); err != nil {
 			t.Fatal(err)
 		}
-		_, err := f.module.Request(ctx, RequestInput{AccountID: id, Requester: AccountOwner})
-		var ae *apperr.Error
-		if !errors.As(err, &ae) || ae.Reason != apperr.ReasonAccountHasOpenStore {
+		if _, err := f.module.Request(ctx, RequestInput{AccountID: id, Requester: AccountOwner}); apperr.KindOf(err) != apperr.KindInternal {
 			t.Fatalf("err=%v", err)
 		}
 		if f.queue.count(revokeAppleJob) != 0 || !f.hasAppleToken(t, id) {

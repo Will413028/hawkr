@@ -86,16 +86,6 @@ void main() {
       );
     });
 
-    test('ACCOUNT_HAS_OPEN_STORE（讀店之後才開的店）：引導關店', () async {
-      deleteResult = () =>
-          reasonError(Code.failedPrecondition, 'ACCOUNT_HAS_OPEN_STORE');
-
-      final outcome = await build().run();
-
-      expect(outcome, isA<AccountHasOpenStore>());
-      expect(calls, ['delete']);
-    });
-
     test('其他錯誤：沒有訊息時用預設文字', () async {
       deleteResult = () => ConnectException(Code.failedPrecondition, 'x');
 

@@ -6,26 +6,11 @@ import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.da
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.spec.dart';
 import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.pb.dart';
-import 'package:hawkr_api/gen/google/rpc/error_details.pb.dart';
 import 'package:test/test.dart';
 
 const _deleted = DeleteAccountResponse_DeletionState.DELETION_STATE_DELETED;
 const _pending =
     DeleteAccountResponse_DeletionState.DELETION_STATE_PENDING_ORDERS;
-
-ConnectException _openStore() => ConnectException(
-  Code.failedPrecondition,
-  'open store',
-  details: [
-    ErrorDetail(
-      'google.rpc.ErrorInfo',
-      (ErrorInfo()
-            ..reason = 'ACCOUNT_HAS_OPEN_STORE'
-            ..domain = 'hawkr')
-          .writeToBuffer(),
-    ),
-  ],
-);
 
 Object _noResponse() => ConnectException.from(const SocketException('down'));
 
@@ -65,13 +50,6 @@ void main() {
       );
       expect(r, isA<AccountDeletionFailure>());
       expect((r as AccountDeletionFailure).message, isNull);
-    });
-
-    test('ACCOUNT_HAS_OPEN_STORE', () async {
-      expect(
-        await _run(() async => throw _openStore()),
-        isA<AccountDeletionHasOpenStore>(),
-      );
     });
 
     test('沒收到回應：GetSession unauthenticated 是已刪除', () async {

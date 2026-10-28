@@ -49,9 +49,6 @@ const (
 	// PROSPECT_MATCH_FOUND）。修改時持有者是進行中的，client 可以讓管理員與它合併；還原時是同一家就不需要還原
 	// （ADR 2026-10-04-prospect-contact-points-and-matching）。
 	ErrorReason_PROSPECT_TAX_ID_HELD ErrorReason = 10
-	// 帳號本人刪除帳號，但帳號還有沒關閉的店家（搭配 failed_precondition）。client 引導使用者先關閉店家再回來刪除
-	// （identity.v1alpha1.IdentityService.DeleteAccount）。
-	ErrorReason_ACCOUNT_HAS_OPEN_STORE ErrorReason = 5
 	// 賣家同意的入駐文件版本不是現行版本（搭配 failed_precondition）。client 重讀
 	// seller.v1alpha1.SellerPublicService.GetSellerAgreements，顯示新版本，請賣家重新勾選後再送出。
 	ErrorReason_AGREEMENT_OUTDATED ErrorReason = 6
@@ -76,7 +73,6 @@ var (
 		3:  "SELLER_SUSPENDED",
 		4:  "PROSPECT_MATCH_FOUND",
 		10: "PROSPECT_TAX_ID_HELD",
-		5:  "ACCOUNT_HAS_OPEN_STORE",
 		6:  "AGREEMENT_OUTDATED",
 		7:  "SELLER_REQUIREMENT_MISSING",
 		8:  "STORE_OPENING_SUSPENDED",
@@ -88,7 +84,6 @@ var (
 		"SELLER_SUSPENDED":           3,
 		"PROSPECT_MATCH_FOUND":       4,
 		"PROSPECT_TAX_ID_HELD":       10,
-		"ACCOUNT_HAS_OPEN_STORE":     5,
 		"AGREEMENT_OUTDATED":         6,
 		"SELLER_REQUIREMENT_MISSING": 7,
 		"STORE_OPENING_SUSPENDED":    8,
@@ -127,19 +122,18 @@ var File_hawkr_common_v1alpha1_error_reason_proto protoreflect.FileDescriptor
 
 const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\n" +
-	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xb4\x02\n" +
+	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xb6\x02\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10VERSION_CONFLICT\x10\x01\x12\x14\n" +
 	"\x10SELLER_SUSPENDED\x10\x03\x12\x18\n" +
 	"\x14PROSPECT_MATCH_FOUND\x10\x04\x12\x18\n" +
 	"\x14PROSPECT_TAX_ID_HELD\x10\n" +
-	"\x12\x1a\n" +
-	"\x16ACCOUNT_HAS_OPEN_STORE\x10\x05\x12\x16\n" +
+	"\x12\x16\n" +
 	"\x12AGREEMENT_OUTDATED\x10\x06\x12\x1e\n" +
 	"\x1aSELLER_REQUIREMENT_MISSING\x10\a\x12\x1b\n" +
 	"\x17STORE_OPENING_SUSPENDED\x10\b\x12\x1c\n" +
-	"\x18STORE_OPENING_TERMINATED\x10\t\"\x04\b\x02\x10\x02*\x12PHONE_CODE_EXPIREDB\x82\x02\n" +
+	"\x18STORE_OPENING_TERMINATED\x10\t\"\x04\b\x02\x10\x02\"\x04\b\x05\x10\x05*\x12PHONE_CODE_EXPIRED*\x16ACCOUNT_HAS_OPEN_STOREB\x82\x02\n" +
 	"\x19com.hawkr.common.v1alpha1B\x10ErrorReasonProtoP\x01Z]github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1;commonv1alpha1\xa2\x02\x03HCX\xaa\x02\x15Hawkr.Common.V1alpha1\xca\x02\x15Hawkr\\Common\\V1alpha1\xe2\x02!Hawkr\\Common\\V1alpha1\\GPBMetadata\xea\x02\x17Hawkr::Common::V1alpha1b\x06proto3"
 
 var (

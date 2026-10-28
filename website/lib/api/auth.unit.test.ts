@@ -112,7 +112,7 @@ describe("deleteAccount", () => {
 		);
 	});
 
-	it("帳號還有店家時錯誤原樣丟出（failed_precondition），由畫面引導先關店", async () => {
+	it("failed_precondition 的錯誤原樣丟出，由畫面顯示", async () => {
 		rpc.deleteAccount.mockRejectedValue(
 			new ConnectError("has store", Code.FailedPrecondition),
 		);

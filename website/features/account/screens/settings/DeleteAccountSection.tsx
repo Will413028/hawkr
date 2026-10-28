@@ -1,16 +1,9 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { ConnectError } from "@connectrpc/connect";
-import {
-	classifyError,
-	errorText,
-	factsFromError,
-} from "@hawkr/api/connect/errors";
-import { ErrorReason } from "@hawkr/api/gen/hawkr/common/v1alpha1/error_reason_pb";
+import { errorText } from "@hawkr/api/connect/errors";
 import { DeleteAccountResponse_DeletionState } from "@hawkr/api/gen/hawkr/identity/v1alpha1/identity_pb";
 import * as React from "react";
-import Link from "@/components/shared/Link";
 import Button from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { deleteAccount } from "@/lib/api/auth";
@@ -20,7 +13,6 @@ import { commitDocumentNavigation } from "@/lib/navigation/document-location";
 
 type Outcome =
 	| { kind: "idle" }
-	| { kind: "has_store" }
 	| { kind: "pending_orders" }
 	| { kind: "error"; message: string };
 
@@ -29,7 +21,7 @@ const APPLE_REVOKE_GUIDANCE =
 
 /**
  * 設定頁的「刪除帳號」。沒有未完成的訂單時立即刪除並登出；有的話進入刪除流程，最後一筆訂單完成後
- * 自動刪除。帳號還有沒關閉的店家時伺服器回 failed_precondition 與 ACCOUNT_HAS_OPEN_STORE，這裡引導先到商店設定關閉商店。
+ * 自動刪除。
  */
 export default function DeleteAccountSection() {
 	const { signOut } = useAuth();
@@ -69,15 +61,7 @@ export default function DeleteAccountSection() {
 				commitDocumentNavigation("/");
 			}
 		} catch (e) {
-			const decision = classifyError(factsFromError(ConnectError.from(e)));
-			if (
-				decision.action === "reason" &&
-				decision.reason === ErrorReason.ACCOUNT_HAS_OPEN_STORE
-			) {
-				setOutcome({ kind: "has_store" });
-			} else {
-				setOutcome({ kind: "error", message: errorText(e, defaults) });
-			}
+			setOutcome({ kind: "error", message: errorText(e, defaults) });
 		} finally {
 			setBusy(false);
 		}
@@ -140,18 +124,6 @@ export default function DeleteAccountSection() {
 				{hasAppleAccount ? (
 					<p className="mt-2 text-sm text-[var(--hkui-default-700)]">
 						{APPLE_REVOKE_GUIDANCE}
-					</p>
-				) : null}
-				{outcome.kind === "has_store" ? (
-					<p
-						className="mt-2 text-sm text-[var(--hkui-danger,#d4380d)]"
-						role="alert"
-					>
-						你的帳號還有商店，請先到
-						<Link href="/seller-center/me" className="underline">
-							商店設定
-						</Link>
-						關閉商店，再刪除帳號。
 					</p>
 				) : null}
 				{outcome.kind === "error" ? (
