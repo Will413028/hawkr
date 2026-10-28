@@ -257,7 +257,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
 - [ ] **B2 payment**：物流財務與責任判定先留在 Java，B10 再處理。
   - `createRefund` 依 D5 修正。
 - [ ] **B3 fulfillment**
-  - Uber 建單依 D5 補上 pre-commit。
+  - 刪除 Uber 即時配送（ADR `2026-10-27-general-ecommerce-scope-cut.md` D4）：Java shipping 的 Uber 程式、payuni-webhook-service 的 Uber webhook、只服務它們的 proto RPC 與生成物、CodeMeta 的 Uber 值域、`.env.template` 與 `docker-compose-local.yml` 的 Uber 設定、`docs/runbooks/uber-quote-retention/`，4 份 Uber ADR 標 superseded；清單見 `docs/plans/2026-10-27-ecommerce-scope-cut.md`「延後」（Will 2026-10-29）。
 - [ ] **B4 catalog**
   - 不建 `store_state` 讀取模型：catalog 的列表在 SQL 內 join `seller.pub_exposable_stores(at)`（時間用請求的 clock），取代停權快照（ADR 2026-09-24 修訂段，2026-10-18；簡報 `docs/plans/2026-10-18-a7-social/d3-read-model-brief.md` §4.2）。
     - 2026-10-19：`seller.pub_exposable_stores(at)` 已建（A′(i)）。B4 把 product 搬進單體、`rg -n "OnStoreExposureChanged" cmd` 歸零時一起刪除 `seller.store_exposures`、`StoreExposureChanged`、`seller.reconcile_exposure` 與 `make reannounce-exposures`，`ListPublicStores` 改以 `pub_exposable_stores($now)` 做 keyset，`first_exposed_at` 改由週期 job 讀 `pub_exposable_stores(now)` 寫入（seller `CARRYOVER.md`「A′(i)」）。
