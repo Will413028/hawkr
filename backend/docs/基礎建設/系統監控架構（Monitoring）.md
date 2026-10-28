@@ -722,7 +722,7 @@ rate(http_server_requests_seconds_count[5m])
 {job="kubernetes-pods"} | trace_id = "4408d9f7f14b5275d12ca52751375282"
 ```
 
-這會列出該 request 經過的所有微服務（如 gateway → order-service → product-service → seller-service）的完整 log。
+這會列出該 request 經過的所有微服務（如 gateway → order-service → product-service → 單體）的完整 log。
 
 #### Step 4: 跳轉 Tempo 看 Trace 樹
 
