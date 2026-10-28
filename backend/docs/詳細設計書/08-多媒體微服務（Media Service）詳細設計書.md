@@ -1,6 +1,6 @@
 # 多媒體微服務 (Media Service) 詳細設計書
 
-> 單體模組的現行規格見 `docs/modules/media.md`；本文只當歷史參考。
+> 本文是 Java `media-service` 的現行規格；單體 `media` 模組（Go API 外殼與引用同步）的規格見 `docs/modules/media.md`。服務搬進單體時刪除本文。
 
 > **儲存層以 [49 號設計書（多媒體儲存與圖片服務／Cloudflare R2 & Image Gateway）](49-多媒體儲存與圖片服務（Cloudflare%20R2%20%26%20Image%20Gateway）詳細設計書.md) 為準**：物件儲存已由阿里雲 OSS 遷移至 Cloudflare R2，公開圖片讀取出口為 `media.example.com` 上的 Image Gateway Worker。本文件僅描述資產生命週期（upload session／finalize／引用計數／GC），storage API 與 URL 組裝細節不在本文件展開。
 

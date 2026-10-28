@@ -2,7 +2,7 @@
 
 ## 職責
 
-圖片等靜態資產的轉正、引用登記與解除、機敏資產的讀取，以及擁有媒體的模組（buyer、seller、content）共用的引用同步演算法。實作還是 Java 的 media-service（舊設計書 08 只當歷史參考）。行為規格的唯一來源是 `docs/modules/media.md`。
+圖片等靜態資產的轉正、引用登記與解除、機敏資產的讀取，以及擁有媒體的模組（buyer、seller、content）共用的引用同步演算法。實作還是 Java 的 media-service（Java media-service 的規格見設計書 08）。行為規格的唯一來源是 `docs/modules/media.md`。
 
 ## 擁有的資料
 

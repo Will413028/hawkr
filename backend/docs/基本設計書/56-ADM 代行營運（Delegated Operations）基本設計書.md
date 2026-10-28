@@ -1,7 +1,5 @@
 # 56 · ADM 代行營運（基本設計）
 
-> 單體模組的現行規格見 `docs/modules/delegation.md`；本文只當歷史參考。
-
 > **這是外部設計。** 實作契約（DDL／proto／端點簽章／capability 列舉／狀態機轉移邊／boot 斷言／實作陷阱）在
 > [詳細設計書 56](../詳細設計書/56-ADM%20代行營運（Delegated%20Operations）詳細設計書.md)。
 > 本書不重複那些內容，每一節指向對應章節。
