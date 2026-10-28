@@ -59,26 +59,14 @@ route:
           repeat_interval: 24h
     # infra 系統告警（無 channel label）→ 既有 monitor-alert 頻道
     #
-    # 這兩條同樣各帶一個 cadence 子 route，理由與上面的 business 兩條相同：
-    # infra 側也有「狀態型」告警——`RabbitMQQueuePendingConsumerImplementation`
-    # 說的是「這個 queue 的 consumer 還沒有人實作」（backend#3365），那在功能做完
-    # 之前恆為 firing，拿 30m 去催沒有意義。
     - match:
         env: dev
       receiver: "discord"
       repeat_interval: 2h
-      routes:
-        - match:
-            cadence: daily
-          repeat_interval: 24h
     - match:
         env: prod
       receiver: "discord"
       repeat_interval: 30m
-      routes:
-        - match:
-            cadence: daily
-          repeat_interval: 24h
 
 receivers:
   # 刻意沒有任何 webhook_configs：Alertmanager 對沒有 receiver 設定的 route

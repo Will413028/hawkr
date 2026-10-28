@@ -72,15 +72,6 @@ exchanges:
 - name: shipping.webhook.dlx
   type: topic
 queues:
-- name: buyer.membership.payment.result
-  dlq:
-    via: payment.events.dlx
-    routing_key: buyer.membership.payment.result.dlq
-  bindings:
-  - exchange: payment.events
-    key: payment.membership.buyer.success
-  - exchange: payment.events
-    key: payment.membership.buyer.failed
 - name: aftersales.events.dlq
   bindings:
   - exchange: aftersales.events.dlx
@@ -574,22 +565,6 @@ queues:
   bindings:
   - exchange: payuni.events
     key: payuni.payment.uop
-- name: payment.payuni.membership.recurring
-  dlq:
-    via: payment.webhook.dlx
-    routing_key: payment.payuni.membership.recurring.dlq
-  bindings:
-  - exchange: payuni.events
-    key: payuni.payment.recurring
-- name: seller.membership.payment.result
-  dlq:
-    via: payment.events.dlx
-    routing_key: seller.membership.payment.result.dlq
-  bindings:
-  - exchange: payment.events
-    key: payment.membership.seller.success
-  - exchange: payment.events
-    key: payment.membership.seller.failed
 - name: payment.rescue.refund.dlq
   bindings:
   - exchange: hawkr.payment.dlx

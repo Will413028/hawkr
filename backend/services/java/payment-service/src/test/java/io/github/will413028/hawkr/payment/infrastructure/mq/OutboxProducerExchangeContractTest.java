@@ -1,7 +1,6 @@
 package io.github.will413028.hawkr.payment.infrastructure.mq;
 
 import io.github.will413028.hawkr.common.utils.code.RescueReason;
-import io.github.will413028.hawkr.membership.grpc.MembershipEventEnvelope;
 import io.github.will413028.hawkr.payment.application.service.DuplicatePaymentService;
 import io.github.will413028.hawkr.payment.domain.event.PaymentDomainEvent;
 import io.github.will413028.hawkr.payment.domain.model.PaymentTransaction;
@@ -30,14 +29,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 四條既有 outbox 寫入路徑的契約：<b>exchange 一律 explicit 且為 {@code payment.events}</b>，
+ * 三條既有 outbox 寫入路徑的契約：<b>exchange 一律 explicit 且為 {@code payment.events}</b>，
  * 而且 <b>delivery timing 語意未被 genericize 改變</b>（36 §3.3.1 BL6）。
  *
  * <p><b>為什麼 timing 也要測</b>：本輪把 exchange 做成 factory 的必填參數、並把
  * {@code PaymentOutboxWriter} 的底層抽成 generic enqueue。這類重構最容易順手「統一」
- * 四條路徑的投遞時機——而它們現在是<b>刻意分裂</b>的：
+ * 各路徑的投遞時機——而它們現在是<b>刻意分裂</b>的：
  * <ul>
- *   <li>A1 {@code PaymentOutboxWriter} / A2 {@code MembershipBillingOutboxWriter}
+ *   <li>A1 {@code PaymentOutboxWriter}
  *       ＝ INSERT ＋ afterCommit 即時投遞 ＋ scheduler 兜底</li>
  *   <li>A3 {@code DuplicatePaymentService} / A4 {@code RescueRefundConsumer}
  *       ＝ 純 INSERT，只靠 scheduler 每 5s 派送（<b>刻意沒有</b> afterCommit）</li>
@@ -158,27 +157,6 @@ class OutboxProducerExchangeContractTest {
 
         assertEquals(1.0, registry.counter("hawkr_payment").count(),
                 "payment wrapper 的業務 metric 必須留著——它不是 generic path 的東西，但也不能被一併刪掉");
-    }
-
-    // ───────────────── A2 MembershipBillingOutboxWriter（afterCommit 路徑）─────────────────
-
-    @Test
-    @DisplayName("A2 MembershipBillingOutboxWriter：exchange=payment.events，afterCommit 仍在")
-    void a2_membershipBillingOutboxWriter() {
-        OutboxEventMapper mapper = mock(OutboxEventMapper.class);
-        MembershipBillingOutboxWriter writer =
-                new MembershipBillingOutboxWriter(mapper, mock(PaymentOutboxPublisher.class));
-
-        TransactionSynchronizationManager.initSynchronization();
-        writer.enqueueAndDispatch(
-                MembershipEventEnvelope.newBuilder().setEventType("payment.membership.buyer.success").build(),
-                "payment.membership.buyer.success");
-
-        OutboxEventEntity row = captureInsert(mapper);
-        assertEquals(PAYMENT_EXCHANGE, row.getExchange());
-        assertEquals("payment.membership.buyer.success", row.getRoutingKey());
-        assertFalse(TransactionSynchronizationManager.getSynchronizations().isEmpty(),
-                "A2 的 afterCommit 即時投遞不得消失");
     }
 
     // ───────────────── A3／A4（純 INSERT，刻意無 afterCommit）─────────────────

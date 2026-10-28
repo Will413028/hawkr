@@ -174,30 +174,6 @@ groups:
           summary: "RabbitMQ queue depth is high"
           description: 'Queue {{ $labels.queue }} has {{ printf "%.0f" $value }} messages'
 
-      # ── 「consumer 還沒有人實作」的 queue 清單（唯一定義處）─────────────
-      #
-      # 🔴 這條 recording rule 是清單的**唯一**寫處，下面三條告警都引用它。
-      # 刻意不在每條告警的 regex 裡各寫一份：那是三份平行清單，而平行清單的典型
-      # 死法就是只更新其中一份（10-engineering-contracts.md §14.5.2 第三種形狀）
-      # —— 漏掉排除的那一條會照樣以 critical 30m 洗版，漏掉納入的那一條則完全沒訊號。
-      #
-      # 判準（貼一個 queue 進來之前逐條確認，由 scripts/check-pending-consumer-queues.py 守）：
-      #   ① 它在 infra/mq/topology/topology.yaml 有登記
-      #   ② repo 裡**確實沒有**任何 consumer 實作（Go 字面值／Java @RabbitListener 皆無）
-      #   ③ 有一張 open issue 追蹤那個實作缺口
-      # ②「一旦有人把 consumer 實作出來，gate 就會要求把它從這裡移除」——
-      # 保護因此自動恢復，不需要有人記得回來改。
-      #
-      # 目前的成員（backend#3365）：payment-service 真的在發 payment.membership.*，
-      # binding 也綁好了，但兩端都沒有 consumer ⇒ 事件進去就永遠躺著。
-      # dev 實測各堆 6 則；prod 是 0，而那只是因為 prod 零交易。
-      #
-      # ⚠️ 不要為了讓告警閉嘴就把這兩個 queue 從 topology 刪掉：刪了 binding 就沒了，
-      # 事件會變成 unroutable 被直接丟棄。留著至少訊息還在，將來可以重放。
-      - record: queue:consumer_impl_pending:info
-        expr: |
-          rabbitmq_detailed_queue_consumers{queue=~"^buyer\\.membership\\.payment\\.result$|^seller\\.membership\\.payment\\.result$"} * 0 + 1
-
       # RabbitMQ DLQ Messages — 死信出現就該關注（>0），閾值不再用 >100：
       # DLQ 語意下訊息=已重試耗盡的失敗事件，堆到 100 才報過鈍。
       # 涵蓋 repo 兩種 DLQ 命名：後綴 *.dlq 與前綴 dlq.*。
@@ -218,7 +194,6 @@ groups:
         expr: |
           rabbitmq_detailed_queue_consumers{queue!~".*\\.dlq$|^dlq\\..*"} == 0
             and on(env, queue, vhost) rabbitmq_detailed_queue_messages_ready > 0
-            unless on(env, queue, vhost) queue:consumer_impl_pending:info
         for: 5m
         labels:
           severity: critical
@@ -238,42 +213,12 @@ groups:
       - alert: RabbitMQQueueNoConsumersStalled
         expr: |
           rabbitmq_detailed_queue_consumers{queue!~".*\\.dlq$|^dlq\\..*|.*\\.retry$|^gateway\\.sse\\..*"} == 0
-            unless on(env, queue, vhost) queue:consumer_impl_pending:info
         for: 15m
         labels:
           severity: critical
         annotations:
           summary: "RabbitMQ queue 無任何 consumer (queue={{ $labels.queue }} env={{ $labels.env }})"
-          description: "Queue {{ $labels.queue }} 存在但無任何 consumer 逾 15 分鐘：可能是 406 args drift（queue 宣告參數不一致致 consumer 被拒）或服務斷線。這是 #1625 prod 斷線 5 天無告警的直接防再犯，查該 queue 對應服務的啟動 log 與 QueueDeclare 參數。⚠️ 本條刻意 `unless` 掉 `queue:consumer_impl_pending:info`（consumer 從未實作的 queue）——它們由下面那條專職告警接走，理由見該處。"
-
-      # ── consumer 從未實作（不是斷線）────────────────────────────────────
-      #
-      # 為什麼要跟上面那條分開，而不是調整上面那條：兩者是**不同的事件**，
-      # 只是症狀相同（consumer 數 = 0）。
-      #
-      #   上面那條：原本有 consumer，現在沒了 ⇒ **隨時可能是正在發生的事故**
-      #             （406 args drift／服務斷線／#1625 那種）⇒ critical、30m 一直催，正確。
-      #   本條　　：從來沒有過 consumer ⇒ **是一個還沒做的功能**，不是壞掉的東西。
-      #             拿 critical 30m 去催一個要排期的實作，產出是 72 則/天的洗版
-      #             （prod 48 ＋ dev 24 實測），而同一個頻道還要承載真的斷線告警。
-      #
-      # 🔴 這不是靜音：告警照樣 firing、照樣看得到、consumer 實作上線那一刻照樣
-      # 即時 resolved。改的是 severity（warning，因為它不是事故）與投遞節奏
-      # （`cadence: daily`，一天一則，見 alertmanager config 的 cadence 子 route）。
-      #
-      # ⚠️ 清單的守門在 scripts/check-pending-consumer-queues.py：貼進 recording rule
-      # 的 queue 必須在 topology 有登記、repo 裡確實沒有 consumer 實作、且有 open issue。
-      # **一旦有人把 consumer 實作出來，那道 gate 會要求把它從清單移除** ⇒ 它自動回到
-      # 上面那條 critical 的守備範圍，不需要有人記得回來改。
-      - alert: RabbitMQQueuePendingConsumerImplementation
-        expr: queue:consumer_impl_pending:info == 1
-        for: 15m
-        labels:
-          severity: warning
-          cadence: daily
-        annotations:
-          summary: "queue={{ $labels.queue }}（env={{ $labels.env }}）的 consumer 尚未實作"
-          description: "Queue {{ $labels.queue }} 在 topology 有登記、binding 也綁好了，生產端真的在發事件，但 repo 裡沒有任何 consumer 實作 ⇒ 進去的事件會一直躺著，沒有任何東西會處理它們。追蹤：backend#3365（payment.membership.* 的買賣家會員扣款結果）。⚠️ **不要為了讓本條閉嘴而把 queue 從 topology 刪掉**：刪了 binding 就消失，事件會變成 unroutable 被直接丟棄——現在至少訊息還留在 queue 裡，consumer 實作之後可以重放（dev 實測已各堆 6 則）。⚠️ 本條為 warning 而非 critical：它不是事故而是待實作的功能；真正的「原本有 consumer 卻不見了」由 `RabbitMQQueueNoConsumersStalled` 以 critical 接手，而那條刻意把本清單 `unless` 掉，兩者互斥不疊報。⚠️ prod 上的訊息數是 0 **不代表沒問題**——那只是因為 prod 目前零交易；一旦開始有會員交易，真實付款的結果事件就會這樣滯留。"
+          description: "Queue {{ $labels.queue }} 存在但無任何 consumer 逾 15 分鐘：可能是 406 args drift（queue 宣告參數不一致致 consumer 被拒）或服務斷線。這是 #1625 prod 斷線 5 天無告警的直接防再犯，查該 queue 對應服務的啟動 log 與 QueueDeclare 參數。"
 
   - name: node-alerts
     interval: 60s

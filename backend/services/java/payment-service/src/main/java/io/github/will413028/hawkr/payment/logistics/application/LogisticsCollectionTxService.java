@@ -43,7 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <h2>⚠️ 命名</h2>
  * payment-service <b>沒有</b> {@code *TxHandler} 這個命名，它用
  * {@code *Service} / {@code *CloseService} ＋ 跨 bean 呼叫（{@code ExpiredTransactionCloseService}），
- * 或就地 {@code TransactionTemplate.execute}（{@code MembershipBillingApplicationService}）。
+ * 或就地 {@code TransactionTemplate.execute}。
  * 本類別沿用前者——因為這裡要的正是它那條「例外穿過 proxy ⇒ 該筆 rollback」的保證，
  * 不是第三種寫法。
  */

@@ -4,7 +4,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Buyer／seller Membership 與 shared billing provider-result 的 canonical event type。Value 使用 UPPER_SNAKE_CASE；domain routing key 由 `pkg/mq`／服務 topology 管理，不放進 enum。
+ * Buyer／seller Membership 的 canonical event type。Value 使用 UPPER_SNAKE_CASE；domain routing key 由 `pkg/mq`／服務 topology 管理，不放進 enum。
  *
  * ⚠ 此檔案由 generate.sh 自動生成，請勿手動修改。
  * 業務輔助邏輯請在使用該 enum 的服務或模組內建立 helper class
@@ -16,11 +16,7 @@ public enum MembershipEventType implements CodeMeta {
     MEMBERSHIP_ENTITLEMENT_REVISION_PUBLISHED("MEMBERSHIP_ENTITLEMENT_REVISION_PUBLISHED", "MEMBERSHIP_ENTITLEMENT_REVISION_PUBLISHED", "權益版本發布", "plan 的 immutable entitlement revision 發布"),
     MEMBERSHIP_PERIOD_STARTED("MEMBERSHIP_PERIOD_STARTED", "MEMBERSHIP_PERIOD_STARTED", "會員週期開始", "新的 canonical membership period 建立"),
     MEMBERSHIP_CHANGE_REQUESTED("MEMBERSHIP_CHANGE_REQUESTED", "MEMBERSHIP_CHANGE_REQUESTED", "會員變更申請", "NEXT_PERIOD 或待付款 membership change 建立"),
-    MEMBERSHIP_CANCELED("MEMBERSHIP_CANCELED", "MEMBERSHIP_CANCELED", "會員取消", "membership 或 provider 取消完成"),
-    PAYMENT_MEMBERSHIP_BUYER_SUCCESS("PAYMENT_MEMBERSHIP_BUYER_SUCCESS", "PAYMENT_MEMBERSHIP_BUYER_SUCCESS", "買家會員扣款成功", "payment-service provider authoritative success 發給 buyer-service"),
-    PAYMENT_MEMBERSHIP_BUYER_FAILED("PAYMENT_MEMBERSHIP_BUYER_FAILED", "PAYMENT_MEMBERSHIP_BUYER_FAILED", "買家會員扣款失敗", "payment-service provider authoritative failure 發給 buyer-service"),
-    PAYMENT_MEMBERSHIP_SELLER_SUCCESS("PAYMENT_MEMBERSHIP_SELLER_SUCCESS", "PAYMENT_MEMBERSHIP_SELLER_SUCCESS", "賣家會員扣款成功", "payment-service provider authoritative success 發給 seller-service"),
-    PAYMENT_MEMBERSHIP_SELLER_FAILED("PAYMENT_MEMBERSHIP_SELLER_FAILED", "PAYMENT_MEMBERSHIP_SELLER_FAILED", "賣家會員扣款失敗", "payment-service provider authoritative failure 發給 seller-service");
+    MEMBERSHIP_CANCELED("MEMBERSHIP_CANCELED", "MEMBERSHIP_CANCELED", "會員取消", "membership 或 provider 取消完成");
 
     private final String code;
     private final String value;

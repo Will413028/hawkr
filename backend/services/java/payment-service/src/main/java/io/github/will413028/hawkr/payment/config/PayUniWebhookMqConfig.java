@@ -43,39 +43,6 @@ public class PayUniWebhookMqConfig {
                 .with(MqConstants.ROUTING_KEY_PAYUNI_PAYMENT_UOP);
     }
 
-    /**
-     * Shared membership billing ingress.  This is intentionally a separate queue from the
-     * legacy one-time payment queue: recurring payloads have a different identity and must never
-     * be handed to the UOP state machine.
-     */
-    @Bean
-    public Queue paymentPayuniRecurringQueue() {
-        return QueueBuilder.durable(MqConstants.QUEUE_PAYMENT_PAYUNI_RECURRING)
-                .withArgument("x-dead-letter-exchange", MqConstants.EXCHANGE_PAYMENT_WEBHOOK_DLX)
-                .withArgument("x-dead-letter-routing-key", MqConstants.QUEUE_PAYMENT_PAYUNI_RECURRING_DLQ)
-                .build();
-    }
-
-    @Bean
-    public Binding bindPayuniPaymentRecurring(Queue paymentPayuniRecurringQueue,
-                                               TopicExchange payuniWebhookExchange) {
-        return BindingBuilder.bind(paymentPayuniRecurringQueue)
-                .to(payuniWebhookExchange)
-                .with(MqConstants.ROUTING_KEY_PAYUNI_PAYMENT_RECURRING);
-    }
-
-    @Bean
-    public Queue paymentPayuniRecurringDlq() {
-        return QueueBuilder.durable(MqConstants.QUEUE_PAYMENT_PAYUNI_RECURRING_DLQ).build();
-    }
-
-    @Bean
-    public Binding paymentPayuniRecurringDlqBinding() {
-        return BindingBuilder.bind(paymentPayuniRecurringDlq())
-                .to(paymentWebhookDlxExchange())
-                .with(MqConstants.QUEUE_PAYMENT_PAYUNI_RECURRING_DLQ);
-    }
-
     // ==================== DLX Exchange ====================
 
     @Bean

@@ -28,8 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <ul>
  *   <li>不驗 migration 真的套得起來、也不驗既有列回填——那要真 DB。
  *       本輪以 {@code postgres:17-alpine} 依序套 V1..V11 實測（回填、滾動更新相容、
- *       7 個約束變異全部正確），證據留在 WP1 報告；
- *       CI 側由 {@code MembershipBillingMigrationTest}（Testcontainers 真 Flyway）承接。</li>
+ *       7 個約束變異全部正確），證據留在 WP1 報告。</li>
  *   <li>{@link #stripLineComments} 只處理 {@code --} 行註解，不認得字串字面值裡的 {@code --}。
  *       本檔的斷言都跑在剝乾淨的視圖上；V11 沒有含 {@code --} 的字串字面值。</li>
  * </ul>

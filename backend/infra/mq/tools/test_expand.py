@@ -226,14 +226,26 @@ class TestExpandedCountsAgainstRealTopology(unittest.TestCase):
         # queues          185 → 169 (-16)  每條的 queue ＋ .dlq
         # queues_json_args  6 →   6 (+0)
         # bindings        235 → 211 (-24)  每條的來源 binding ＋ .retry→queue ＋ .dlx→.dlq
+        #
+        # 刪除沒有消費者的會員付款流程的三條 queue（buyer.membership.payment.result、
+        # seller.membership.payment.result、payment.payuni.membership.recurring），三條都走 dlq: 分支：
+        # exchanges        98 →  98 (+0)  沿用既有 payment.events.dlx 與 payment.webhook.dlx，
+        #                                 dlq: 不產生 exchange
+        # queues          169 → 163 (-6)  每條的 queue ＋ 展開出的 .dlq
+        # queues_json_args  6 →   6 (+0)  三個條目都沒有 args_json
+        # bindings        211 → 203 (-8)  buyer 與 seller 各 2 條來源 binding
+        #                                 （payment.membership.{buyer,seller}.{success,failed}）＋ 各 1 條
+        #                                 payment.events.dlx→.dlq；recurring 1 條來源 binding
+        #                                 （payuni.events→payuni.payment.recurring）＋ 1 條
+        #                                 payment.webhook.dlx→.dlq
         self.assertEqual(len(out["exchanges"]), 98, "exchanges 數量與 pin 不符")
-        self.assertEqual(len(out["queues"]), 169, "queues 數量與 pin 不符")
+        self.assertEqual(len(out["queues"]), 163, "queues 數量與 pin 不符")
         self.assertEqual(
             len(out["queues_json_args"]), 6, "queues_json_args 數量與 pin 不符"
         )
-        self.assertEqual(len(out["bindings"]), 211, "bindings 數量與 pin 不符")
-        # 98 + 169 + 6 + 211 = 484
-        self.assertEqual(sum(len(v) for v in out.values()), 484)
+        self.assertEqual(len(out["bindings"]), 203, "bindings 數量與 pin 不符")
+        # 98 + 163 + 6 + 203 = 470
+        self.assertEqual(sum(len(v) for v in out.values()), 470)
 
 
 @unittest.skipUnless(

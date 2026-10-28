@@ -620,9 +620,6 @@ services:
       PAYUNI_AGENT_KEY: ${PAYUNI_AGENT_KEY}
       PAYUNI_AGENT_IV: ${PAYUNI_AGENT_IV}
       PAYUNI_SANDBOX: ${PAYUNI_SANDBOX}
-      # 平台自有 PayUni 商家 MerID，供買家訂閱計費（60 號設計書）；值待平台商家帳號核准後填入，
-      # 訂閱計費引擎本身尚未實作，此值目前未被任何程式碼讀取
-      PAYUNI_SUBSCRIPTION_MER_ID: ${PAYUNI_SUBSCRIPTION_MER_ID:-}
 
       # §2A.2 / §2A.5 金額與 ATM 期限
       PAYMENT_MIN_AMOUNT: ${PAYMENT_MIN_AMOUNT:-15}

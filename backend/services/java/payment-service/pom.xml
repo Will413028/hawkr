@@ -192,12 +192,6 @@
             <artifactId>protobuf-java</artifactId>
             <version>${protobuf.version}</version>
         </dependency>
-        <!-- Protobuf JSON printer for the canonical MembershipEventEnvelope outbox payload -->
-        <dependency>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java-util</artifactId>
-            <version>${protobuf.version}</version>
-        </dependency>
         <!-- gRPC 生成碼所需的 @Generated 註解 -->
         <dependency>
             <groupId>javax.annotation</groupId>

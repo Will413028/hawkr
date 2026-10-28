@@ -162,10 +162,6 @@ public final class MqConstants {
     public static final String ROUTING_KEY_PAYMENT_EXPIRED = "payment.expired";
     public static final String ROUTING_KEY_PAYMENT_CLOSED = "payment.closed";
     public static final String ROUTING_KEY_PAYMENT_CONFLICT = "payment.conflict";
-    public static final String ROUTING_KEY_PAYMENT_MEMBERSHIP_BUYER_SUCCESS = "payment.membership.buyer.success";
-    public static final String ROUTING_KEY_PAYMENT_MEMBERSHIP_BUYER_FAILED = "payment.membership.buyer.failed";
-    public static final String ROUTING_KEY_PAYMENT_MEMBERSHIP_SELLER_SUCCESS = "payment.membership.seller.success";
-    public static final String ROUTING_KEY_PAYMENT_MEMBERSHIP_SELLER_FAILED = "payment.membership.seller.failed";
     public static final String ROUTING_KEY_PAYMENT_RESCUE_REFUND_INITIATED = "payment.rescue.refund_initiated";
     public static final String ROUTING_KEY_PAYMENT_RESCUE_REFUND_COMPLETED = "payment.rescue.refund_completed";
 
@@ -382,8 +378,6 @@ public final class MqConstants {
 
     // PayUni Webhook 下游消費 Queue
     public static final String QUEUE_PAYMENT_PAYUNI_WEBHOOK = "payment.payuni.webhook";
-    public static final String QUEUE_PAYMENT_PAYUNI_RECURRING = "payment.payuni.membership.recurring";
-    public static final String QUEUE_PAYMENT_PAYUNI_RECURRING_DLQ = "payment.payuni.membership.recurring.dlq";
     public static final String QUEUE_PAYMENT_PAYUNI_REFUND_NOTIFY = "payment.payuni.refund.notify";
     public static final String QUEUE_PAYMENT_PAYUNI_REFUND_NOTIFY_DLQ = "payment.payuni.refund.notify.dlq";
     public static final String QUEUE_PAYMENT_PAYUNI_REFUND_ACCEPTED = "payment.payuni.refund.accepted";

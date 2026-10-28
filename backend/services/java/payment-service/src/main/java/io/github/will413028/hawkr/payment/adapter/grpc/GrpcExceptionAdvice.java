@@ -1,7 +1,6 @@
 package io.github.will413028.hawkr.payment.adapter.grpc;
 
 import io.github.will413028.hawkr.common.obs.log.ObsLogger;
-import io.github.will413028.hawkr.payment.domain.subscriptionbilling.BillingValidationException;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import net.devh.boot.grpc.server.advice.GrpcAdvice;
@@ -16,13 +15,6 @@ import net.devh.boot.grpc.server.advice.GrpcExceptionHandler;
 public class GrpcExceptionAdvice {
 
     private static final ObsLogger log = ObsLogger.forClass(GrpcExceptionAdvice.class);
-
-    /** Preserve the shared machine-readable billing symbol in google.rpc.ErrorInfo details. */
-    @GrpcExceptionHandler(BillingValidationException.class)
-    public StatusRuntimeException handleBillingValidationException(BillingValidationException e) {
-        log.warn("GrpcExceptionAdvice.billingValidation", e.getMessage());
-        return MembershipBillingGrpcError.toStatusRuntimeException(e);
-    }
 
     /**
      * 處理 IllegalArgumentException

@@ -1383,7 +1383,7 @@ const (
 //	只能有一個實作 bean。掛進 PaymentService 就必須把十支 RPC 塞進已經 1900 行的
 //	PaymentGrpcService，而那支的每個方法都帶著自己的授權與遮蔽規則——混進去之後
 //	「這支 RPC 的授權軸是什麼」要逐行讀才知道。獨立 service ＝ 獨立 bean ＝
-//	授權規則看一眼就成立（對照：MembershipBillingService 同一個理由）。
+//	授權規則看一眼就成立。
 //	⚠️ 它與 PaymentService 共用同一個 gRPC channel／port，不新增任何服務或部署單元。
 type LogisticsFinanceServiceClient interface {
 	// 賣家面：一間店（可選期間）的物流財務總覽，十一個維度逐一具名。
@@ -1549,7 +1549,7 @@ func (c *logisticsFinanceServiceClient) GetFulfillmentExceptionCaseForAdmin(ctx 
 //	只能有一個實作 bean。掛進 PaymentService 就必須把十支 RPC 塞進已經 1900 行的
 //	PaymentGrpcService，而那支的每個方法都帶著自己的授權與遮蔽規則——混進去之後
 //	「這支 RPC 的授權軸是什麼」要逐行讀才知道。獨立 service ＝ 獨立 bean ＝
-//	授權規則看一眼就成立（對照：MembershipBillingService 同一個理由）。
+//	授權規則看一眼就成立。
 //	⚠️ 它與 PaymentService 共用同一個 gRPC channel／port，不新增任何服務或部署單元。
 type LogisticsFinanceServiceServer interface {
 	// 賣家面：一間店（可選期間）的物流財務總覽，十一個維度逐一具名。
@@ -1922,7 +1922,7 @@ const (
 //	把責任判定的寫入塞進去，會讓那句「全部唯讀」變成假的，而**一句被推翻的不變式
 //	比沒有不變式更危險**：下一個人讀到它會以為那支 service 不會寫任何東西。
 //	⇒ 獨立 service ＝ 獨立 bean ＝ 授權與寫入邊界看一眼就成立
-//	  （與 LogisticsFinanceService／MembershipBillingService 同一個判準）。
+//	  （與 LogisticsFinanceService 同一個判準）。
 //	⚠️ 共用同一個 gRPC channel／port（payment-service 9925），不新增服務或部署單元。
 //
 // 🔴 **本 service 只做「責任判定」這一種 resolution_type**（`RESPONSIBILITY_ATTRIBUTE`）。
@@ -1998,7 +1998,7 @@ func (c *fulfillmentResponsibilityServiceClient) ReviewResponsibilityResolutionF
 //	把責任判定的寫入塞進去，會讓那句「全部唯讀」變成假的，而**一句被推翻的不變式
 //	比沒有不變式更危險**：下一個人讀到它會以為那支 service 不會寫任何東西。
 //	⇒ 獨立 service ＝ 獨立 bean ＝ 授權與寫入邊界看一眼就成立
-//	  （與 LogisticsFinanceService／MembershipBillingService 同一個判準）。
+//	  （與 LogisticsFinanceService 同一個判準）。
 //	⚠️ 共用同一個 gRPC channel／port（payment-service 9925），不新增服務或部署單元。
 //
 // 🔴 **本 service 只做「責任判定」這一種 resolution_type**（`RESPONSIBILITY_ATTRIBUTE`）。

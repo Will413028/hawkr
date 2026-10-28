@@ -4,9 +4,6 @@ import io.github.will413028.hawkr.payment.infrastructure.audit.PayUniAuditLogger
 import io.github.will413028.hawkr.payuni.crypto.PayUniCryptoService;
 import io.github.will413028.hawkr.payuni.http.PayUniHttpClient;
 import io.github.will413028.hawkr.payuni.payment.PaymentClient;
-import io.github.will413028.hawkr.payment.domain.subscriptionbilling.MembershipBillingRepository;
-import io.github.will413028.hawkr.payment.domain.subscriptionbilling.ProviderAccountProfile;
-import io.github.will413028.hawkr.payment.provider.payuni.PayUniRecurringWebhookNormalizer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -60,23 +57,6 @@ public class PayUniConfig {
     @Bean
     public PaymentClient paymentClient(PayUniHttpClient httpClient) {
         return new PaymentClient(httpClient, baseUrl, notifyUrl, returnUrl);
-    }
-
-    /**
-     * Recurring webhook normalization is provider-specific. MerID is resolved through the
-     * payment-owned provider-account allowlist; a payload value is never accepted as an account
-     * alias merely because it is non-blank. Unknown, disabled, or non-PayUni profiles fail closed.
-     */
-    @Bean
-    public PayUniRecurringWebhookNormalizer payUniRecurringWebhookNormalizer(
-            MembershipBillingRepository billingRepository
-    ) {
-        return new PayUniRecurringWebhookNormalizer(merId -> billingRepository.findProviderAccount(merId)
-                .filter(ProviderAccountProfile::isActive)
-                .filter(profile -> "PAYUNI".equals(profile.provider()))
-                .map(ProviderAccountProfile::accountRef)
-                .orElse(""),
-                PayUniRecurringWebhookNormalizer.DEFAULT_CURRENCY);
     }
 
     public String getAgentId() {
