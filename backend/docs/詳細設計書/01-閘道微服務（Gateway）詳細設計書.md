@@ -90,12 +90,11 @@ Client Request
 
 #### 3.2.3 分層（tier）
 
-路由依敏感度分五層，分類集中在 `classifyTier()` 一處（`ratelimit.go`）：
+路由依敏感度分四層，分類集中在 `classifyTier()` 一處（`ratelimit.go`）：
 
 | tier | 涵蓋 | 預設配額 |
 |---|---|---|
 | `tierExempt` | **會自動重連的**長連線（notification SSE、post comments SSE、IM WebSocket）、健康檢查、PayUni callback、view beacon | 不限流（middleware early-return） |
-| `tierOTP` | `POST /api/v1/public/auth/otp/send` | 10 / 窗 |
 | `tierStrict` | 登入 / refresh / OAuth / phone verify | 30 / 窗 |
 | `tierModerate` | `/api/v1/public/*` 匿名讀取 | 見 §3.2.6 |
 | `tierDefault` | 已認證 `/app` + `/admin`，以及未匹配路由（含 404） | 300 / 窗 |
@@ -164,7 +163,7 @@ const (
 func RateLimitSubject(c *gin.Context) (subject string, kind SubjectKind)
 ```
 
-`RateLimitSubject` 與 `SubjectKind` **必須 exported**：`package handler` 的兩個呼叫點（OTP 注入、SSE 連線數）在 middleware 之外。它也必須是**可獨立呼叫的純函式**——SSE 屬 `tierExempt`，限流 middleware 對它 early-return，SSE 的連線數上限不可能從 middleware 拿到結果。
+`RateLimitSubject` 與 `SubjectKind` **必須 exported**：`package handler` 的呼叫點（SSE 連線數）在 middleware 之外。它也必須是**可獨立呼叫的純函式**——SSE 屬 `tierExempt`，限流 middleware 對它 early-return，SSE 的連線數上限不可能從 middleware 拿到結果。
 
 **歸屬規則**：
 
@@ -240,7 +239,7 @@ mac     = HMAC-SHA256(secret, "hkorigin1:" || base64url(payload))
 
 `chat_ws_ticket_hmac.go` 對空密鑰不特判，理由是 `JWT_SECRET` 在任何會做驗證的環境一定有設（`internal/config/config.go` 的 `Validate()` 確實只強制 `JWT_SECRET`）。**這個理由不能移植到新密鑰**：
 
-- **若沿用「不特判」**：空密鑰下 `HMAC("", ·)` 人人算得出來 ⇒ 任何人可簽任意 `p`、把請求算到任意 `v:<受害者 IP>` ⇒ **定向鎖死他人登入**（auth-failure 軸刻意保留 `SubjectVisitor`）、**耗盡他人 OTP 配額**；而且這些簽章的 metric 是 `result="ok"`，**告警不會響**。
+- **若沿用「不特判」**：空密鑰下 `HMAC("", ·)` 人人算得出來 ⇒ 任何人可簽任意 `p`、把請求算到任意 `v:<受害者 IP>` ⇒ **定向鎖死他人登入**（auth-failure 軸刻意保留 `SubjectVisitor`）；而且這些簽章的 metric 是 `result="ok"`，**告警不會響**。
 - **若改用 boot-time fail**：`k8s/scripts/create-secrets.sh` 在 CI 中**只被 `static-gates.yml` 的「SCRIPT_REVISION 必須遞增」step 做 gate 檢查**，**沒有任何 workflow 執行它**；secret 的實際建立是人工步驟（`k8s/SETUP.md` 的 scp ＋ ssh），dev 與 prod 各做一次。把 secret 變成啟動必要條件 ⇒ 沒先手動建好就部署＝**gateway CrashLoop**，而且會發生兩次：dev 一次，prod 一次由執行 `dev → main` 的同事觸發。
 
 **定版作法**（**每把密鑰各自獨立判定**）：
@@ -311,7 +310,7 @@ sequenceDiagram
     CF-->>U: 回應
 ```
 
-> ⚠️ 網頁端的簽章分支必須是 `typeof window === "undefined"`。否則網頁**瀏覽器端**的請求也會帶簽章，全部擠進同一個 subject，比沒有本設計更糟（含 OTP）。
+> ⚠️ 網頁端的簽章分支必須是 `typeof window === "undefined"`。否則網頁**瀏覽器端**的請求也會帶簽章，全部擠進同一個 subject，比沒有本設計更糟。
 > ⚠️ `visitorIp` **絕不可進 `unstable_cache` 的 keyParts**：那會讓 cache entry 依訪客分裂，等於廢掉快取。傳遞鏈只走「不經 cached wrapper」的呼叫點。
 
 #### 3.2.6 分軸配額
@@ -323,11 +322,11 @@ subject 抽象在**所有 tier** 生效（key 一律 `ratelimit:{tier}:{subject}
 | `tierModerate` × `SubjectVisitor`（直連與代打共用同一把 key） | **600/60s** | `RATE_LIMIT_MODERATE_PER_WINDOW` |
 | `tierModerate` × `SubjectSSR` | **12000/60s**（200 req/s） | `RATE_LIMIT_MODERATE_SSR_PER_WINDOW` |
 | `tierModerate` × `SubjectCI` | **300/60s** | `RATE_LIMIT_MODERATE_CI_PER_WINDOW` |
-| 其餘組合（含 `tierStrict` / `tierDefault` / `tierOTP` × `SubjectCI`） | **該 tier 預設值** | — |
+| 其餘組合（含 `tierStrict` / `tierDefault` × `SubjectCI`） | **該 tier 預設值** | — |
 
 `limitFor(tier, kind)`：**只有 `tierModerate` 對三個 kind 各有值**，其餘 tier 不分 kind、一律落該 tier 預設。
 
-🔴 **`tierStrict` / `tierDefault` / `tierOTP` 不設 CI 覆寫 env**：那幾個 tier 沒有 CI 生產者，
+🔴 **`tierStrict` / `tierDefault` 不設 CI 覆寫 env**：那幾個 tier 沒有 CI 生產者，
 填任何數字都違反本節的「不得先猜一個數字上線」。不設 ＝ 落該 tier 預設。
 
 ##### `tierModerate × SubjectCI` = 300 的預算
@@ -439,18 +438,15 @@ subject 抽象在**所有 tier** 生效（key 一律 `ratelimit:{tier}:{subject}
 
 #### 3.2.8 subject 的全部套用點
 
-🔴 **配額鍵有四個套用點，全部走 `RateLimitSubject()`，一個都不得回退成 `c.ClientIP()`**
+🔴 **配額鍵有三個套用點，全部走 `RateLimitSubject()`，一個都不得回退成 `c.ClientIP()`**
 （由 ruleguard `banClientIPForQuota` 守，見 §3.2.13）：
 
 | # | 位置 | 現行鍵 |
 |---|---|---|
 | 1 | `gateway/internal/middleware/ratelimit.go` 分層配額 | `ratelimit:{tier}:{subject}` |
 | 2 | 同檔 `authFailureKey()` 與其 gate / 計數 | `ratelimit:authfail:{subject}` |
-| 3 | OTP 次數：`gateway/internal/handler/auth.go` 注入 → `gateway/internal/grpc/account_client.go` → `services/account-service/internal/grpc/handler.go` → `internal/usecase/otp.go` → `internal/infrastructure/otp_store.go` | `otp:subj:{subject}:{hour}` |
-| 4 | SSE 連線數上限：`gateway/internal/handler/sse_stream.go` 填入 `conn.IP` → `gateway/internal/sse/hub.go` 的 `capKeyOf()` | per-subject 連線數 |
+| 3 | SSE 連線數上限：`gateway/internal/handler/sse_stream.go` 填入 `conn.IP` → `gateway/internal/sse/hub.go` 的 `capKeyOf()` | per-subject 連線數 |
 | 附 | 同檔 block log sampler `logBlocked()` | 取樣鍵 per-`(reason, subject)` |
-
-第 3 項跨到 account-service 的 proto 欄位語意，見 §3.2.10。
 
 **`logBlocked()` 必須同時輸出 `ip` 與 `subject` 兩欄**（取樣鍵用 subject 還不夠——那只影響印幾行，不影響印什麼）：
 
@@ -460,7 +456,7 @@ subject 抽象在**所有 tier** 生效（key 一律 `ratelimit:{tier}:{subject}
 | `subject` | **新增**，`RateLimitSubject()` 的結果 | 歸因用：這些量算在誰的配額上 |
 | `reason` / `xff` / `method` / `path` | 不變 | |
 
-> ⚠️ **不可以把 subject 塞進既有的 `ip` 欄**。`v:...` / `s:ssr` / `s:ci` 不是 IP，欄名說謊會讓所有既有的 log 查詢在無聲中變成錯的——這正是本設計替 proto `client_ip` 改名（§3.2.10）所主張的同一條理由，不能在 log 這一側自打嘴巴。兩欄並存才同時答得出「誰在打」與「算誰頭上」，而這兩個答案在 SSR／CI／admin 代打的情境下本來就不同。
+> ⚠️ **不可以把 subject 塞進既有的 `ip` 欄**。`v:...` / `s:ssr` / `s:ci` 不是 IP，欄名說謊會讓所有既有的 log 查詢在無聲中變成錯的。兩欄並存才同時答得出「誰在打」與「算誰頭上」，而這兩個答案在 SSR／CI／admin 代打的情境下本來就不同。
 
 > ⚠️ `/api/v1/health` 因 `exemptExact` 而不計配額（canary cron 每 5 分鐘 ×3 打它），subject 改動後不得影響此行為。
 
@@ -501,27 +497,6 @@ Gateway 共有**四處**會產生 429。前三處要補同一組 header（少補
 > ⚠️ **唯一已知的前端消費者讀的是 SSE 那一個 429**，不是限流器產生的那個。只補 middleware 的話，本項對現有消費者零效果。
 
 **`X-HK-Origin-Auth` 不進 Swagger `@Param`**：它是全域 middleware 讀取的 header、掛不到任何一支 handler 上，對 API 消費者也是誤導（他們簽不出來）。內部授權 header 亦無先例。它的歸宿是本設計書。
-
-#### 3.2.10 account-service 的 OTP 欄位契約
-
-OTP 次數的鍵是**限流身分**不是 client IP，`api/proto/account/account.proto` 的
-`SendOtpRequest` 逐字為：
-
-```protobuf
-string rate_limit_subject = 2;  // 限流身分（v:<ip> / s:ssr / s:ci），非 IP
-```
-
-🔴 **欄名必須維持 `rate_limit_subject`。** 它承載的值可能是 `s:ssr` / `s:ci` 這類
-非 IP 字串，改回 `client_ip` 之類的名字會讓下游依欄名推斷語意的人做錯事——
-與 §3.2.8 要求 log 保留 `ip` / `subject` 兩欄是同一條理由。
-
-本欄是 [§4.1 例外 #1](../開發規範/Java%20微服務開發規範.md)（Gateway 注入、前端不可控）
-⇒ 可用原生型別，不受「數字一律 string」拘束。
-
-直接讀寫這個 generated field 的呼叫點只有兩處：`gateway/internal/grpc/account_client.go`
-與 `services/account-service/internal/grpc/handler.go`（Java 側零消費者）。
-
-> `gateway/internal/handler/auth.go` 走的是自家 wrapper 的**位置參數**、不碰 proto 欄位名。
 
 #### 3.2.11 可觀測性與告警
 
@@ -625,7 +600,6 @@ origin」。後者是網路層問題，需要三層各自獨立的收口——**
 - **限流狀態不是持久資料**。全部是 Redis 上帶 TTL 的計數器，窗一過即自然消失。沒有需要對帳的兩份真相，因此**不引入任何補償任務基礎設施**——不寫 reconciliation job、不寫 backfill CLI、不寫 drift detection、不建 `*_task` 表、不加 `@Scheduled` 巡檢（[後端服務責任邊界規範](../開發規範/後端服務責任邊界規範.md) §六）。
 - **Redis 不可用時 degrade-open**：`pkg/ratelimit` 落回有界的記憶體 limiter。這是刻意選擇——限流是保護機制而非業務正確性機制，錯放比錯擋便宜。此性質不因 subject 抽象而改變。
 - **簽章驗證 fail-open**，密鑰為空則整條停用。兩者的共同性質是：**任何失效都退回「沒有本設計時的行為」，並由告警大聲叫**，不會啟動失敗、不會靜默開後門。
-- **key 前綴變更（`otp:ip:` → `otp:subj:`）不做資料搬遷**。舊 key 隨自身 TTL 過期即消失，一次性放行的成本（§3.2.8）遠低於寫一支搬遷腳本。
 - **部署順序無耦合**：Gateway 端（本設計書）與呼叫端（網頁／admin／CI）可各自獨立上線。呼叫端先上 ⇒ Gateway 忽略未知 header；Gateway 先上 ⇒ 無簽章流量全走 `v:<ClientIP>`。任何中間狀態都不會壞。
 
 #### 3.2.15 使用的 Enum 與代碼值
