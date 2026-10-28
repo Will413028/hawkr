@@ -105,3 +105,7 @@ PATCH 語意，且能避免「前端漏帶某欄位、後端把它覆寫成零�
 - D1：歸屬改成單體的 buyer 模組（`internal/modules/buyer`），`buyer-service` 已刪除；ai-service 經 legacy `BuyerService.GetBuyerEntitlement` 讀取。D4 的「buyer-service 不可用」變成單體不可用。
 - D6：一個帳號一生一個買家（ADR `2026-09-30-account-created-provisions-buyer.md`），不再有「刪除後重建買家」，`buyer_id` 與帳號同壽，「換 stint 歸零」的情境不會發生；計量軸仍是 `buyer_id`。
 - D5 的 admin 指派：後台入口沒有搬，`AssignMembership` 沒有呼叫方。Will 決定刪除指派的寫入路徑，entitlement 固定回預設方案；觸發條件記在計畫 `docs/plans/2026-09-29-a3-buyer-seller.md` 步驟 6。計費或指派入口要做時重新設計。
+
+## 修訂：設計書 60 已刪除（2026-10-29）
+
+會員計費不做，設計書 60（買家訂閱計費引擎）已刪除，上文指向它的連結不再有目標。D3 的決定（週期公式對齊 PayUni 定期定額）只剩週期公式這一半成立：沒有扣款流程，也就沒有由 PayUni 排程驅動的續約。

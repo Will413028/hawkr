@@ -9,7 +9,7 @@
 | 維護者 | Will |
 | 對應程式碼 | `backend/internal/modules/buyer/internal/membership/membership.go`（單體 buyer 模組）、`backend/internal/httpapi/buyer/admin.go`（後台 Connect）、`backend/internal/legacy/buyerserver/server.go`（給 ai-service 的 `GetBuyerEntitlement`）、`services/ai-service/internal/client/buyer/adapter.go`、`services/ai-service/internal/procurement/usecase/turn.go` |
 | 相關 ADR | [2026-09-18-buyer-membership-entitlement-model](../adr/2026-09-18-buyer-membership-entitlement-model.md) |
-| 相關 doc | [57-Hawkr 幫找 Agent Runtime（Agent Runtime）詳細設計書](./57-Hawkr%20幫找%20Agent%20Runtime（Agent%20Runtime）詳細設計書.md) §7（本設計的消費端）；[60-買家訂閱計費引擎](./60-買家訂閱計費引擎（Buyer%20Subscription%20Billing%20Engine）詳細設計書.md)（訂閱計費，本書不涵蓋） |
+| 相關 doc | [57-Hawkr 幫找 Agent Runtime（Agent Runtime）詳細設計書](./57-Hawkr%20幫找%20Agent%20Runtime（Agent%20Runtime）詳細設計書.md) §7（本設計的消費端） |
 
 ---
 
@@ -30,7 +30,7 @@
 | Goal | 三級方案（`free`／`basic`／`premium`）的額度與價格可透過資料變更，不需重新部署服務。 |
 | Goal | 營運可在後台調整方案目錄的額度、月費與是否開放購買，即時生效。（手動指派方案給單一買家沒有後台 API，指派路徑預定刪除，見 §5.1。） |
 | Goal | `ai-service` 的 57 號 §7 reserve-commit-release 機制不受影響，只有額度上限與週期起訖改由本模組提供。 |
-| Non-Goal | **不**做真的收費／扣款（PayUni 定期定額串接由 60 號負責）。 |
+| Non-Goal | **不**做真的收費／扣款。 |
 | Non-Goal | **不**做網站上的方案選購頁面。 |
 | Non-Goal | **不**提供買家查詢自己額度的對外端點。 |
 | Non-Goal | **不**做額度以外的功能差異化——三個等級的 Agent 能力完全相同，不做 per-tier 模型路由或功能旗標。 |
@@ -39,7 +39,6 @@
 ### 1.4 與其他設計書／服務的關係
 
 - **57 號《Hawkr 幫找 Agent Runtime》§7** 是本設計的消費端與機制來源（reserve/commit/release、`ai_usage_reservations` 表）。額度上限與週期起訖由本書 §5.1 的錨點滾動規則決定，計量軸是 `buyer_id`。
-- **60 號《買家訂閱計費引擎》** 在 `buyer.memberships` 之上承擔由扣款事件驅動的續約／降級邏輯，本書不涵蓋。
 - **網站訂閱購買流程**、**Admin 操作介面** 是本書 API 的前端消費者，各自另開設計。
 - 產品規劃脈絡（分級定義、業務規則白話版、時程總覽）見對應的產品規格書；本文件只涵蓋工程架構。
 
@@ -65,7 +64,7 @@ flowchart LR
 
 | | 涵蓋 (In-scope) | 不涵蓋 (Out-of-scope，由誰負責) |
 |---|---|---|
-| buyer 模組 | 方案目錄、買家目前生效方案的判定 | 真實扣款 → payment-service（60 號）；購買 UI → 網站訂閱購買流程 |
+| buyer 模組 | 方案目錄、買家目前生效方案的判定 | 真實扣款、購買 UI（不做） |
 | ai-service | 額度用量計量（reserve/commit/release，57 號所有）、經 legacy `GetBuyerEntitlement` 取得動態上限 | 方案定義與異動 → buyer 模組 |
 
 ### 2.3 角色與身份模型
@@ -223,7 +222,7 @@ ai-service 搬進單體前，以 legacy `BuyerService.GetBuyerEntitlement`（`ba
 
 ### 6.3 非同步事件 (MQ)
 
-N/A——方案指派是同步操作，本模組不發 MQ 事件。訂閱續約相關事件由 60 號《買家訂閱計費引擎》負責。
+N/A——方案指派是同步操作，本模組不發 MQ 事件。
 
 ### 6.4 即時通道 (WS/SSE)
 
