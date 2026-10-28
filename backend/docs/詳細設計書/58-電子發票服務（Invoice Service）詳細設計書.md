@@ -161,12 +161,12 @@
 | **18 賣家實名認證** | `seller.kyc_applications` 的 `tax_id`／`company_name`／`seller_type` 是目前唯一存賣方稅籍的地方（`internal/modules/seller/db/schema.sql`）；被退回的申請重送沿用原列，狀態回到 `DRAFT` | **新增獨立稅務身分軸 `seller_tax_profiles`，不沿用認證申請單當開票依據**（U4）。開票當下取快照，有自己的審核 FSM、有效期與複審觸發 |
 | **36 MQ 與事件總覽** | 事件契約 SSOT；exchange／routing key／payload 登記格式與 Idempotency 策略代號 | 同一 PR 回寫三段（缺任一段不會編譯錯、不會測試紅）：① 36 號 §2.1／§2.2 各加一列（`hawkr.invoice` ＋ 手寫的 `hawkr.invoice.dlx`）並新增 §3.6k 發票領域，登記出向 11 條 routing key；② 36 號 §3.1「訂單領域」加一列 `order.refund.finalized`（屬 `hawkr.order`，不屬發票領域）；③ `topology.yaml` 新增三條入向 queue（`invoice.order.paid`／`invoice.order.refund.finalized`／`invoice.order.cancelled`，皆帶 `retry:`）與 invoice 出向資源。⚠️ `order.paid` 的 routing key **就是 `order.paid`，沒有 `.v1`**（`infra/mq/topology/topology.yaml:773`）——綁 `.v1` 收不到任何訊息且不報錯，整條自動開票鏈靜默不啟動 |
 | **44 身分模型** | `account_id` ＝登入 principal；`buyer_id`／`store_id` ＝業務鍵，皆 surrogate、首任 grandfather 相等但禁止假設恆等；store-stint 語意（買家一個帳號一生只有一個）；T+30 PII 清理 | ① 新增第三、四個身分概念：發票的 **issuer** 與 **recipient**（§2.3），兩者都可指向不在 `accounts` 表內的對象；② 發票文件、折讓證明、買家同意訊息屬法定 5 年保存，為 PII 清理例外，帳號刪除不連帶刪除、僅關閉對外查詢 |
-| **46 賣家能力層** | deny-by-default、「宣告＝掛載合一」registry、boot 斷言、`GrantedCapabilities` 單一問答點；停權白名單四類；純唯讀查看也鎖 | 新增賣家面發票 capability 並回答 46 號必答題（逐條裁決見 §8.1）。**「自動開票」是系統行為**（排程／MQ，不經 Gateway guard），能力層管不到；能力層只管「賣家在前端查發票／設定稅籍」 |
+| **46 賣家能力層** | deny-by-default、「宣告＝掛載合一」registry、boot 斷言、`GrantedCapabilities` 單一問答點；停權白名單四類；純唯讀查看也鎖 | 新增賣家面發票 capability 並回答 46 號必答題（逐條裁決見 §8.1）。**「自動開票」是系統行為**（排程／MQ，不經賣家能力檢查），能力層管不到；能力層只管「賣家在前端查發票／設定稅籍」 |
 | **49／08 多媒體** | DB/MQ/快取只存 objectKey、欄位名必須誠實（`*_key`）、URL 組裝唯一入口 `pkg/mediaurl.BuildURL`；PDF 落 media 的先例（`ShipmentLabelService`） | 新增機敏版後端直傳 RPC **`ServerUploadSecureAndFinalize`**（`ref_type`／`ref_id` 必填、加密落 R2、`is_secure=true`、objectKey 落 `secure/` 前綴）。既有 `ServerUploadAndFinalize` 不可用（硬寫 `public/` 前綴、`is_secure=false`、`uploaderAccountId=NULL` 導致授權述詞兩分支都不通）。**media GC 規則不改**：解法是把「建資產」與「建 `asset_reference`」壓成同一次呼叫。另需 CodeMeta 新增 `AssetReferenceType.INVOICE_DOCUMENT = 7120`（哨兵 `7199 OTHER` 之前），`ref_id` 用 `invoice_documents.id` 不用 `order_no`。⚠️ **加密落 R2 是強制的**：上傳必須 AES-GCM 加密並落 wrapped key，主密鑰不可用時 **fail loud**——退回明文是靜默失效，一旦發生就無從察覺。🔴 **讀取端的明文分支是永久的、不得刪除**：早期寫入的資產 `encryption_key` 為 NULL 而 `is_secure` 仍為 true，刪掉那條分支等於把歷史發票鎖死；**判斷以 `encryption_key` 欄位值為準，不以 `is_secure` 為準**。 |
 | **52 內部授權** | HMAC 四件套；`INTERNAL_AUTH_MODE=enforcing` ＋ per-service NetworkPolicy | 無新增。invoice-service 的 gRPC client **必須自己掛** `interceptor.InternalAuthClientInterceptor("invoice-service", ...)`——server 端由 `pkg/server/grpc.go` 自動裝、client 端不會。repo 內已有漏掛實例（`services/review-service/internal/client/order/client.go:22`，不要照抄） |
 | **56 ADM 代行營運** | `invoice` 是它的 boot-time 禁字（`seller_route_assert.go:76-79`）；代行 storefront allow-list 明文排除發票（`gateway/internal/handler/admin_delegated_storefront.go:22-24`）；ADM actor 來自 `admin_accounts`（不在 `accounts` 表）、`admin_capability` 是封閉九值 | ① 「發票與稅籍」必須登記進 `hawkr-website/features/delegated-operations/nav-policy.ts:21-25` 的 `DELEGATED_HIDDEN_HREFS`（現有 3 條：`/seller-center/wallet`、`/seller-center/me/shipping`、`/seller-center/preview`）。那是**排除清單、其餘一律渲染**（判定式 `:75`），漏登記不會編譯錯、不會測試紅，後果是代行人員可進 AppKey 設定頁；② 禁止把 `ADMIN_INVOICE_*` 塞進封閉九值（會撞兩個 DB CHECK ＋ boot 斷言），禁止另蓋第二套授權層 |
 | **29 Admin 異常訂單** | ADM 唯讀查詢的欄位取捨、分頁與錯誤慣例；「不提供改寫業務狀態的動作端點」「手動重試／取消／強制成功 API 不實作」（`29:53`） | 本書的 ADM 發票工作台是**發票域的處置入口**（重試、取消、解鎖人工處理），與 29 號的訂單域唯讀聚合是不同的東西，路由、DTO 與稽核落點皆不同，不可互相取代 |
-| **32 商家治理** | `sellers.status` 是停權權威來源；違規 → `suspended_governance` 的既有路徑 | **發票模組不自建停權**。重複違規暫停接單一律走既有 violation → `suspended_governance`，發票模組只提建議與計數（90 天 3 次，D15）。疊加語意採多來源獨立 flag、AND 才放行 |
+| **32 商家治理** | 停權由 seller 模組的措施表示，管理員經 `CreateMeasure` 建立 | **發票模組不自建停權**。重複違規的停權一律由管理員經 seller 的 `CreateMeasure` 建立處分，發票模組只提建議與計數（90 天 3 次，D15）。疊加語意採多來源獨立 flag、AND 才放行 |
 | **24 節假日** | 既有 `HolidayService`（在 shipping-service）與 ADM 的 holiday-calendar 資料源 | 申訴 3 **工作天** SLA：**後端算 `due_at`、前端禁自算**。shipping-service 新增唯讀 internal RPC **`GetHolidaysInternal(from_date, to_date) → repeated date`**（52 號 HMAC，deadline 3s；既有 `ListBusinessDays` 是 App 面、request 無日期區間，不得直用）；invoice-service 建唯讀鏡像 `invoice_business_day_mirror`（每日整段覆蓋，DDL 見 §5.1.14），算式走 `pkg/bizcalendar.AddBusinessDays`。**禁止複製第二份假日邏輯**。行事曆耗盡時 fallback 方向必須偏晚：未涵蓋日期視為假日、以「起算日 + 14 自然日」為硬上限並告警 |
 | **20 結帳模組** | `CheckoutPreviewRequest.consolidated`（`api/proto/order/order.proto:716`）；`resolvePaymentMerId` 分流（`.../order/checkout/CheckoutService.java:454-463`） | 新增 fail-closed：賣家已進 `AMEGO_AUTO` 模式時**拒絕 `consolidated=true`**（M4） |
 
@@ -1897,7 +1897,7 @@ CREATE TABLE "seller_tax_profiles" (
   "receipt_approval_basis_asset_id" bigint,                         -- 給 Gateway 組 approvalBasisDownloadPath（key 才是 SSOT）
   "violation_window_days"     smallint NOT NULL DEFAULT 90,          -- 90 天內 3 次判定違規 ⇒ 建議停權 14 天
   "violation_threshold"       smallint NOT NULL DEFAULT 3,
-  "suspension_days"           smallint NOT NULL DEFAULT 14,          -- 建議值，本服務不倒數（停權權威＝sellers.status）
+  "suspension_days"           smallint NOT NULL DEFAULT 14,          -- 建議值，本服務不倒數（停權權威＝seller 模組的停權措施）
   "version"                   bigint NOT NULL DEFAULT 0,
   "created_at"                timestamptz NOT NULL DEFAULT NOW(),
   "updated_at"                timestamptz NOT NULL DEFAULT NOW(),
@@ -5413,7 +5413,7 @@ func InjectStoreIDHeader(r *storeid.Resolver) gin.HandlerFunc // 失敗 → resp
 
 #### 6.1.11 賣家：買家申訴列表／詳情／回覆（S09/S10，端點 34–36）
 
-三支全放行且沿用既有 `CapOrderFulfill`（已在白名單），不新增 token。**不放行會製造死結**：申訴有 3 工作天 SLA，逾期即計違規、90 天內 3 次即停權 ⇒ 鎖住等於「因為停權所以無法回覆，因為無法回覆所以繼續累積違規」。**兩支 `GET` 必須一起放行**——看不到案件內容就寫不出回覆，只放行 `POST` 等於沒放行。
+三支全放行且沿用既有 `CapOrderFulfill`（已在白名單），不新增 token。**不放行會製造死結**：申訴有 3 工作天 SLA，逾期即計違規、90 天內達 3 次時建議停權（由管理員建立處分） ⇒ 鎖住等於「因為停權所以無法回覆，因為無法回覆所以繼續累積違規」。**兩支 `GET` 必須一起放行**——看不到案件內容就寫不出回覆，只放行 `POST` 等於沒放行。
 
 **端點 34 query**：`status`（S09 三分頁，**視圖名不是 DB 狀態值**）、`sort`（`due_at_asc` **預設**，最接近逾期者優先／`created_at_desc`）、`PG`。
 
@@ -6256,7 +6256,7 @@ Go 端 embed `pkg/mq.BaseEvent`（已提供 `event_id`／`event_type`／`version
 
 照 P2–P10 的規則給 P11 填 `refId.field = "order_no"` 會撞契約 gate 第 3 條（`data_fields[*].field ∈ emitted_keys`）⇒ CI 紅；硬塞空值則 `BuildDataMap` 產出空 refId、gateway 整組降級成 `null`，賣家點通知導向不存在的訂單。P11 的正確配置見 §6.3.9。
 
-P11 的 `to_status ∈ SellerTaxReviewStatus`（值域 SSOT ＝ `chk_stp_review_status` 的 10 值；**沒有 `APPROVED` 這個值**——核准分成應開與免用兩種，寫 `APPROVED` 的 payload 在下游對不到任何一格）。**P11 不會自動停權任何賣家**：能力層的 `SellerContext` 只有 `Status` 與 `Tier` 兩欄、讀不到也不該讀發票狀態；稅務逾期的執行機構是「invoice-service 發 P11 ＋ 進 ADM 佇列 → ADM 走既有 violation 流程 → `sellers.status` 停權」，待審接單上限則是結帳鏈的 9326。**這是設計不是缺口。**
+P11 的 `to_status ∈ SellerTaxReviewStatus`（值域 SSOT ＝ `chk_stp_review_status` 的 10 值；**沒有 `APPROVED` 這個值**——核准分成應開與免用兩種，寫 `APPROVED` 的 payload 在下游對不到任何一格）。**P11 不會自動停權任何賣家**：能力層的 `SellerContext` 只有 `Status` 與 `Tier` 兩欄、讀不到也不該讀發票狀態；稅務逾期的執行機構是「invoice-service 發 P11 ＋ 進 ADM 佇列 → ADM 經 seller 的 `CreateMeasure` 建立停權處分」，待審接單上限則是結帳鏈的 9326。**這是設計不是缺口。**
 
 #### 6.3.3.4 通知冪等：`notification_ref_id` 的組成
 
@@ -7547,7 +7547,7 @@ stateDiagram-v2
 
 **違規計數與停權（決策 C1／C2 的落點分在兩個服務）**
 
-**發票模組不寫入任何停權狀態。** 《賣家能力權限層規範》要求「這個賣家能不能做這件事」只有一個問答點，而停權狀態的權威是 `sellers.status`；發票模組另開一套倒數 ⇒ 兩份狀態、兩個時鐘，ADM 在一邊解除另一邊還鎖著。invoice-service 只負責判定與建議：
+**發票模組不寫入任何停權狀態。** 《賣家能力權限層規範》要求「這個賣家能不能做這件事」只有一個問答點，而停權狀態的權威是 seller 模組的措施；發票模組另開一套倒數 ⇒ 兩份狀態、兩個時鐘，ADM 在一邊解除另一邊還鎖著。invoice-service 只負責判定與建議：
 
 | 項目 | 規則 |
 |---|---|
@@ -7566,7 +7566,7 @@ K09 命中門檻時**只做兩件事**（同一事務、全部只寫本地）：
 
 兩件事都不在 invoice-service：① 認定的類別是平台共用的政策分類 `PolicyCategory`（十三個值，認定可用 12 個、沒有「其他」），**沒有發票相關的值** ⇒ A08 的建立措施對話框不預填類別，由管理員選最接近、有賣家條款依據的類別，ADM 清單分不出發票類違規；要加值是賣家治理模組的決策（見 58A 的 X-a）；② 停權通知由賣家治理模組的措施事件（`MeasureCreated` 等）觸發，送達是 notification 的工作 ⇒ `seller.invoice_capability.suspended`／`.restored` 兩個事件**不建立**。
 
-**停權不影響既有訂單的履約與開票。** `INV.op` 的候選述詞完全不看賣家有沒有被停權（它根本不讀 `sellers.status`）——停權只擋「接新單」。讓被停權的賣家開不出票，等於把對賣家的懲罰轉嫁給無辜的買家。同理，違規判定與停權都**不是 M3 的狀態轉移**：`review_status` 全程不變（被停權的賣家仍然是 `APPROVED_INVOICE_REQUIRED`），否則 7.1.3 決策樹只認 `APPROVED_*` 走 `AMEGO_AUTO`，停權賣家的既有訂單會在停權當下全部變成開不出票。§5.5 **I-57** 把「本服務不持有賣家停權狀態、也不對停權倒數」寫成有測試守護的不變式。
+**停權不影響既有訂單的履約與開票。** `INV.op` 的候選述詞完全不看賣家有沒有被停權（它根本不讀賣家的停權措施）——停權只擋「接新單」。讓被停權的賣家開不出票，等於把對賣家的懲罰轉嫁給無辜的買家。同理，違規判定與停權都**不是 M3 的狀態轉移**：`review_status` 全程不變（被停權的賣家仍然是 `APPROVED_INVOICE_REQUIRED`），否則 7.1.3 決策樹只認 `APPROVED_*` 走 `AMEGO_AUTO`，停權賣家的既有訂單會在停權當下全部變成開不出票。§5.5 **I-57** 把「本服務不持有賣家停權狀態、也不對停權倒數」寫成有測試守護的不變式。
 
 **「3 個工作天」的定義（本節唯一的計算點）**
 
@@ -8784,7 +8784,7 @@ media-service 的 GC 第 2 階段會刪除「無 `asset_reference` 且建立超�
 | 33 | 發票異常詳情（S08） | `GET .../invoices/jobs/{job_id}` | `CapInvoiceManage` | ❌ BLOCK | 純唯讀。S08 的「通知平台處理」CTA 走既有客服入口、不是新端點（§6.1.10 定版，T-H06 推翻 的「重新嘗試」）⇒ 能力層對它沒有裁決對象。**不要為它發明 `POST .../assistance_requests` 之類的新端點**：路由表裡沒有這一支，憑空加會同時撞 `expectedSellerRoutes` 的雙向斷言與 §6 的端點總數 |
 | `62R` | 本訂單可回報／已回報的自行開立案件（S07；端點 62 的前置讀取子路由） | `GET .../invoices/orders/{order_no}/external_issuances` | `CapInvoiceTaxRemedy` | ✅ 放行 | **這一列是 #62 能不能用的前提，不是便利性**：#62 的 `job_id`（path）與 `expectedVersion`（body 必填）原本只有 #33 給得出來，而 #33 是 BLOCK ⇒ 放行 #62 等於沒放行（兩個各自正確的裁決互相抵銷）。停權賣家手上唯一的鍵是 `order_no`（§6.3.9 定版第 1–11 列與第 13 列的 `data_fields` 一律 `{refType: ORDER, refId: order_no}`，A4 解鎖通知 P7 也在其中 ⇒ 深連結帶不出 `job_id`）。**它不是 D16 的例外**：述詞被寫死成「只回這張訂單底下 `MANUAL_PROCESS_ALLOWED`／`RESOLVED_EXTERNALLY` 的 operation」，看不到任何其他 job，屬「救濟流程自身的狀態」——與 #17 已定版的判準逐字同源。**述詞放寬就等於把 S08 放行了**，§6.1.10 已把「不得放寬」寫成定版 3 並要求測試斷言 |
 | 62 | 回報自行開立的發票號碼（S07；§7.4 A4 受控人工出口的最後一步） | `POST .../invoices/jobs/{job_id}/external_issuances` | `CapInvoiceTaxRemedy` | ✅ 放行 | 救濟管道，且是 `RESOLVED_EXTERNALLY` 的唯一入口（§7 J30）。不放行會製造與 #34–36 同形的死結：落到 A4 的賣家正是「發票一直開不出來」那一群，因違規停權的機率遠高於平均 ⇒ 回報不了 ⇒ job 永遠停在 `MANUAL_PROCESS_ALLOWED` ⇒ 買家繼續申訴 ⇒ 繼續累積違規。而放行它不擴大賣家能做的事：不打 AMEGO、不建憑證、不改金額，只是把一個**已經發生在平台之外**的事實記錄下來（收縮型操作）。同路徑的 `GET /jobs/{job_id}`（#33）仍 BLOCK 是刻意的，缺口由 `62R` 補 |
-| 34–36 | 買家「未收到發票」申訴：列表／詳情／回覆（S09／S10） | `GET .../invoices/complaints`、`GET .../complaints/{complaint_id}`、`POST .../complaints/{complaint_id}/responses` | `CapOrderFulfill`（既有，白名單） | ✅ 放行（3 支） | 屬「處理既有已付款訂單」類（規範 §五 第 2 點第 1 款）。**不放行會製造死結**：申訴有 3 個工作天 SLA（決策 B2），逾期即計違規、90 天內 3 次即停權（C1）——鎖住等於「因為停權所以無法回覆，因為無法回覆所以繼續累積違規」。兩支 `GET` 一起放行：看不到案件內容就寫不出回覆。沿用 `CapOrderFulfill` 而不新增，是因為語意完全吻合且它已在白名單、無需改 `policy.go` |
+| 34–36 | 買家「未收到發票」申訴：列表／詳情／回覆（S09／S10） | `GET .../invoices/complaints`、`GET .../complaints/{complaint_id}`、`POST .../complaints/{complaint_id}/responses` | `CapOrderFulfill`（既有，白名單） | ✅ 放行（3 支） | 屬「處理既有已付款訂單」類（規範 §五 第 2 點第 1 款）。**不放行會製造死結**：申訴有 3 個工作天 SLA（決策 B2），逾期即計違規、90 天內達 3 次時建議停權（由管理員建立處分）（C1）——鎖住等於「因為停權所以無法回覆，因為無法回覆所以繼續累積違規」。兩支 `GET` 一起放行：看不到案件內容就寫不出回覆。沿用 `CapOrderFulfill` 而不新增，是因為語意完全吻合且它已在白名單、無需改 `policy.go` |
 
 **歸屬驗算**：`CapInvoiceTaxRemedy` 收 #17–#22、#62、`62R`；`CapInvoiceManage` 收 #16、#23–#31、#33、#72 與 PDF 子路由；`CapOrderFulfill` 收 #32、#34–#36。**每一支 `sellerHandle` 路由都必須落在這三組之一**，驗算方式是跑 `seller_capability_test.go`——它會同時指出多判與漏判的那一條。
 
@@ -10946,7 +10946,7 @@ INVOICE_ISSUE_LEASE_SECONDS = 120 是唯一同時滿足兩章算式的值：
 | `INVOICE_TAX_REVIEW_PENDING_MAX_ORDERS` / `_MAX_AMOUNT` | `50` / `100000` | 待審期間的接單筆數與金額上限（元） |
 | `INVOICE_REAPPLY_COOLDOWN_DAYS` | `7` | 重申冷卻 |
 | `INVOICE_COMPLAINT_SLA_WORKING_DAYS` | `3` | 申訴回覆 SLA（工作天） |
-| `INVOICE_VIOLATION_WINDOW_DAYS` / `_SUSPEND_THRESHOLD` | `90` / `3` | 違規計數窗口／窗口內第 N 次即停權 |
+| `INVOICE_VIOLATION_WINDOW_DAYS` / `_SUSPEND_THRESHOLD` | `90` / `3` | 違規計數窗口／窗口內達第 N 次時建議停權 |
 | `INVOICE_SUSPENSION_DAYS` | `14` | 停權天數（到期自動恢復） |
 | `INVOICE_DOCUMENT_RETENTION_DAYS` / `INVOICE_AUDIT_RETENTION_DAYS` | `1826` / `1826` | 文件／稽核保留期。**與告警 ⑨ 的閾值是同一組數字的兩端**，改 env 沒改告警規則等於把保留期改成兩個互不知情的數字，而錯的那一邊不會有任何訊號 ⇒ 兩處要寫在同一個 PR |
 | `INVOICE_MANUAL_CAPACITY_PER_DAY` | `20` | 人力參數；同時是告警 ⑰ 的門檻 |
@@ -12300,7 +12300,7 @@ export const SUSPENSION_WHITELIST_PREFIXES = [
 
 | 決定 | 理由 |
 |---|---|
-| **必須有第三條 `/seller-center/invoices/appeals`** | 端點 34–36 是 `CapOrderFulfill`＝**白名單放行**，理由是「不放行會製造死結——申訴有 3 個工作天 SLA，逾期即計違規，90 天內 3 次即停權 ⇒ 鎖住等於『因為停權所以無法回覆，因為無法回覆所以繼續累積違規』」。⇒ **只加兩條 ＝ 後端放行、前端把停權賣家導去 `/seller-center/suspended`**，賣家看得到通知卻回不了申訴，SLA 必逾期 |
+| **必須有第三條 `/seller-center/invoices/appeals`** | 端點 34–36 是 `CapOrderFulfill`＝**白名單放行**，理由是「不放行會製造死結——申訴有 3 個工作天 SLA，逾期即計違規，90 天內達 3 次時建議停權（由管理員建立處分） ⇒ 鎖住等於『因為停權所以無法回覆，因為無法回覆所以繼續累積違規』」。⇒ **只加兩條 ＝ 後端放行、前端把停權賣家導去 `/seller-center/suspended`**，賣家看得到通知卻回不了申訴，SLA 必逾期 |
 | **不能加父路徑 `/seller-center/invoices`** | `isSuspensionWhitelisted` 是 **prefix 比對** ⇒ 加父路徑等於把 S01／S03／S05／S06／S08 全部一起放行，而那五個在 Gateway 是 `CapInvoiceManage`＝**BLOCK**（依「純唯讀查看也鎖」的裁決）。前端放行、後端擋 ⇒ 停權賣家點進去看到一頁錯誤，比擋在門口更糟 |
 | **端點 62／62R／32 不需要第四條前綴** | 三者的畫面都是 S07，而 S07 是 `/seller-center/orders/[orderNo]` 的頁內 section ⇒ 落在既有前綴內。但 S07 頁上**同時**有 BLOCK 端點（30／31）⇒ **頁面查詢層必須自己 gate**：既有行為是「白名單頁收到 BLOCK 只 invalidate、不導頁」，不先 gate 就會在每次載入訂單詳情時觸發一次無意義的全域 invalidate 風暴 |
 | **`/seller-center/suspended` 公告頁必須新增 CTA** | 側欄只有 `/seller-center/invoices`（已被鎖）⇒ 停權賣家**沒有任何導覽路徑**可以走到被放行的那三頁（違規頁曾經也踩過同一個坑）。公告頁加**兩個** CTA：→`tax-status`（**只在該賣家有未完成的稅務審核時渲染**）與 →`appeals`（**只在 `openComplaintCount > 0` 時渲染**） |

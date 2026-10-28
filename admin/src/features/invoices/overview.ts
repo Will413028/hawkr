@@ -113,7 +113,7 @@ export function kpiMetaOf(key: string): KpiMeta {
  * KPI 值的顯示。
  *
  * 🔴 空字串 ＝ **這個數字取不到**，不是 0。`suspended_sellers` 的權威是
- * `sellers.status`（seller 模組），發票服務不持有 ⇒ 後端刻意回空字串而不是 "0"。
+ * seller 模組的停權措施，發票服務不持有 ⇒ 後端刻意回空字串而不是 "0"。
  * 印成 0 看起來就像「今天沒有人被停權」，而那是一句後端拒絕說的謊。
  */
 export function kpiDisplayValue(value: string, loading: boolean): string {

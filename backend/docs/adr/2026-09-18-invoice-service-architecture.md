@@ -189,3 +189,17 @@ Java 側 AES-GCM 共用元件（抽進 `common-core`）、TSID `node-id-base` �
 - 持有 N 份賣家 AppKey 使 invoice-service 成為平台機敏等級最高的服務，部署權限即解密權限。
 - 「發票人是賣家」這條約束否決了所有由平台代開的捷徑（PayUni 代開、平台載具、平台統編），
   任何未來想走回捷徑的提案，要先推翻的是這一條而不是個別 ADR。
+
+## 修訂：發票申訴的違規累計交給 seller（2026-10-28，Will 選方案 B）
+
+原決策段保留歷史。D15（治理參數）原先讓發票模組自己計數已確認違規並產生停權建議（`seller_tax_profiles` 的 `violation_window_days`、`violation_threshold`、`suspension_days`）。這一段改變終態，現行 invoice-service 在 A5 之前仍照原樣運作。
+
+- **決策**：參數只有 seller 一份。發票模組只提供「已確認、去重後的申訴」，作為管理員建立違規認定的依據；累計與升級由 seller 既有的升級規則負責（近 90 天第 3 筆未撤銷的 MEDIUM 升 HIGH，只升嚴重度）；停權天數由管理員依 runbook `seller-governance-shared.md` 的指引裁量；不做自動停權。
+- **理由**：
+  - 避免兩套計數與兩套參數：發票模組一套、seller 一套，同一個賣家會得到兩個互相不一致的「幾次了」。
+  - 歐盟 DSA Art. 23（https://www.springlex.eu/en/packages/dsa/dsa-regulation/article-23/）只要求先警告、給合理期間，並依嚴重度判斷是否停權，沒有要求機械式的次數門檻。
+  - 業界（例如 Amazon Account Health Rating）多為分級之後由人工裁決。
+- **被否決的方案**：維持發票模組自己的門檻與停權建議（兩套計數）；發票模組直接停權（違反本檔「發票模組不自建停權」）。
+- **自動停權的重新評估條件**：停權量超出人工處理，且判定可以機械化。
+- **發票認定類別**：是否在 `PolicyCategory` 新增發票類別，照 58A X-a 在 A5 決定。
+- **生效時點**：A5（invoice 搬進單體）。工作項在 `plans/2026-09-24-go-modular-monolith.md` 的 A5 段。現有 invoice-service、`api/proto/invoice`、gateway、admin 不為此改動。

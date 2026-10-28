@@ -508,7 +508,7 @@ export interface ComplaintResponseItem {
  *
  * ⚠️ `remainingBusinessDays` / `overdueBusinessDays` 是**後端算好的工作天字串、可為負**。
  * 前端零計算（§0.6 C10）：只扣週末不扣國定假日會與後端得到不同答案，而逾期會計違規、
- * 90 天 3 次即停權。
+ * 90 天達 3 次時建議停權（由管理員建立處分）。
  */
 export interface InvoiceComplaintInfo {
 	complaintId: string;
