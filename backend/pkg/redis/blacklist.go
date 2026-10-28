@@ -110,7 +110,7 @@ func CheckAccountBlocked(ctx context.Context, rdb *redis.Client, accountID int64
 
 // SessionTTL returns the configured web session idle TTL (SESSION_TTL_SECONDS
 // env, default 7 days). Single source of truth: gateway (different Go module)
-// and account-service's AccountBlockedTTL both derive from this instead of
+// and the identity module's AccountBlockedTTL both derive from this instead of
 // each hardcoding their own literal, which is exactly how the #1406 TTL gap
 // happened (a 25h blacklist literal never updated when the session's own TTL
 // grew to 7 days elsewhere).

@@ -1,18 +1,18 @@
 // Package rolestate is the single source of truth for OtherRoleState: the
-// three-way judgment a role-owning service (seller-service, buyer-service)
-// sends to account-service so it knows whether an account's *other* role is
+// three-way judgment a role-owning service (the seller module, the buyer module)
+// sends to the identity module so it knows whether an account's *other* role is
 // genuinely gone before performing an irreversible cascade delete (wiping
 // auth_providers). Before this package existed, the type, its constants, and
 // the three-way mapping were hand-duplicated across three independent go
 // modules — the exact kind of drift that caused issue #1544 (accounts.
 // account_type bitmask drifting from the real role tables) in the first
-// place. Inverting Active/Absent in any one copy would make account-service
+// place. Inverting Active/Absent in any one copy would make the identity module
 // cascade-delete accounts whose other role is still alive; this package
 // makes that impossible to do inconsistently.
 //
 // This package deliberately does NOT import the generated proto package —
-// usecase-layer callers (e.g. account-service's RemoveRoleUseCase,
-// seller-service's DeleteSellerAccountUseCase) depend on rolestate for the
+// usecase-layer callers (e.g. the identity module's RemoveRoleUseCase,
+// the seller module's DeleteSellerAccountUseCase) depend on rolestate for the
 // type and Resolve, and must stay free of a pb dependency (see each
 // service's usecase layer convention). The pb <-> Go conversions live in the
 // rolestatepb sub-package, imported only by the grpc/client layers that
@@ -27,7 +27,7 @@ const (
 	// OtherRoleUnknown means the lookup wasn't done or failed. This MUST stay
 	// the zero value: a caller who forgets to set it (an unset proto field, a
 	// zero-valued struct in a test, ...) fails closed instead of silently
-	// triggering a cascade delete. account-service never cascades on
+	// triggering a cascade delete. The identity module never cascades on
 	// OtherRoleUnknown — an under-delete is recoverable, an over-delete
 	// (wiping auth_providers) is not.
 	OtherRoleUnknown OtherRoleState = iota
@@ -42,8 +42,8 @@ const (
 // always resolves to OtherRoleUnknown (fail-closed) — callers that want
 // visibility into the failure should log err themselves alongside this
 // call; this function only owns the three-way mapping, shared by every call
-// site that determines "should account-service cascade" across
-// seller-service and buyer-service (the primary synchronous delete path and
+// site that determines "should the identity module cascade" across
+// the seller module and the buyer module (the primary synchronous delete path and
 // the compensating retry path in each).
 func Resolve(hasActive bool, err error) OtherRoleState {
 	if err != nil {

@@ -20,11 +20,10 @@ import (
 // operational endpoints only.
 //
 // Gateway is the single external HTTP entrypoint; inter-service traffic is gRPC.
-// content-service previously served a full banner/site-content CRUD surface
-// on its internal HTTP port behind nothing but gin.Recovery() — no authentication,
-// no authorization — duplicating RPCs the gateway already fronts (backend#2219).
-// That surface is gone; every service built on this shared router inherits the same
-// guarantee, and this test fails if any business route is wired back in.
+// Every service built on this shared router exposes only operational routes: a
+// business route on the internal HTTP port would sit behind nothing but gin.Recovery()
+// — no authentication, no authorization — and duplicate RPCs the gateway already
+// fronts. This test fails if any business route is wired back in.
 func TestNewRouter_ExposesOnlyOperationalRoutes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

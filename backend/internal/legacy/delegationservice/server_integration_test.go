@@ -346,7 +346,7 @@ func TestErrorsKeepTheLegacyWireBehavior(t *testing.T) {
 	if list.Msg.GetCode() != 9288 {
 		t.Fatalf("沒有開通 = %v", list)
 	}
-	// 沒有開通的管理員：seller-service 讀不到也照樣回 9288（不需要店家的判斷先做）。
+	// 沒有開通的管理員：seller 模組讀不到也照樣回 9288（不需要店家的判斷先做）。
 	f.stores.setDown(true)
 	pre, err = f.client.Preflight(ctx, connect.NewRequest(&pb.PreflightRequest{ActorAdminId: outsider, TargetStoreId: store}))
 	if err != nil || pre.Msg.GetData().GetDeniedCode() != 9288 || pre.Msg.GetData().GetTarget().GetStoreName() != "（查無此店家）" ||
@@ -356,7 +356,7 @@ func TestErrorsKeepTheLegacyWireBehavior(t *testing.T) {
 	// 讀不到店家不是拒絕：gRPC 的 internal（不是 unavailable，#3330），gateway 回 9280。
 	_, err = f.client.Preflight(ctx, connect.NewRequest(&pb.PreflightRequest{ActorAdminId: admin, TargetStoreId: store}))
 	if connect.CodeOf(err) != connect.CodeInternal {
-		t.Fatalf("seller-service 掛了 = %v", err)
+		t.Fatalf("seller 模組掛了 = %v", err)
 	}
 	f.stores.setDown(false)
 	// 不存在的店家。

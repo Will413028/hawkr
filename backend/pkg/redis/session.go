@@ -37,7 +37,7 @@ return {1, redis.call("TTL", KEYS[1]), v}
 //
 // It is the single derivation shared by everything that has to NAME a session
 // without holding the credential: the Redis key (SessionKey), the gateway's L1
-// cache key, and web_sessions.token_hash — the only form account-service has
+// cache key, and web_sessions.token_hash — the only form the identity module has
 // been given since #1592. Because all three agree, a party holding just the
 // hash can address the session in any of them, which is what makes account-level
 // revocation able to evict the cache (see SessionKeyForHash).
@@ -51,7 +51,7 @@ func HashToken(token string) string {
 // Keyed by the token's HASH, not the token itself (#2049). Two reasons:
 //
 //   - Account-level revocation has to be able to COMPUTE this key from what the
-//     source of truth stores. account-service holds token_hash and deliberately
+//     source of truth stores. The identity module holds token_hash and deliberately
 //     nothing else, so under the old "session:"+rawToken format it could not name
 //     the cache entry it needed to evict; revocation had to fall back on the
 //     blacklist key, whose only precision is "this whole account", and whose only
@@ -66,7 +66,7 @@ func HashToken(token string) string {
 func SessionKey(token string) string { return SessionKeyForHash(HashToken(token)) }
 
 // SessionKeyForHash builds the same key from an ALREADY-hashed token, for the
-// holders of web_sessions.token_hash (account-service's account-level
+// holders of web_sessions.token_hash (the identity module's account-level
 // revocation). Keeping it next to SessionKey is the point: the two must not be
 // able to drift, or a revocation would delete a key nobody reads.
 func SessionKeyForHash(tokenHash string) string { return sessionPrefix + tokenHash }

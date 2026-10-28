@@ -17,8 +17,8 @@ func TestZeroValueIsUnknown(t *testing.T) {
 }
 
 // TestResolve pins the three-way mapping used by every call site that
-// decides whether account-service should cascade-delete an account. Getting
-// this backwards (ACTIVE <-> ABSENT) would make account-service wipe
+// decides whether the identity module should cascade-delete an account. Getting
+// this backwards (ACTIVE <-> ABSENT) would make the identity module wipe
 // auth_providers for an account whose other role is still alive.
 func TestResolve(t *testing.T) {
 	sentinelErr := errTest("boom")

@@ -131,12 +131,12 @@ type BuyerServiceClient interface {
 	// 永遠不等於 account_id（連第一個 stint 也一樣），把它塞進上面那支
 	// account_id/current-stint 版本一律查無此人靜默回空。任何消費「持久化
 	// buyer_id」的呼叫端都該走這支，即使該帳號已重新註冊產生新 stint 也能
-	// 解析回當時那個 buyer_id 的資料（比照 seller-service GetSellerBatch 的
+	// 解析回當時那個 buyer_id 的資料（比照 seller 模組 GetSellerBatch 的
 	// PK lookup 設計）。回應 map key 與 BuyerMeta.buyer_id 都承載 buyer_id。
 	BatchGetBuyerMetaByBuyerIDs(ctx context.Context, in *BatchGetBuyerMetaByBuyerIDsRequest, opts ...grpc.CallOption) (*BatchGetBuyerMetaByBuyerIDsResponse, error)
 	// ========== Cross-Role Guards: Principal Resolution ==========
 	// 解析 buyer_id → 登入 principal account_id（② 買家 store-stint re-key
-	// W2/W3，mirrors seller-service ResolvePrincipals；供 im-service
+	// W2/W3，mirrors the seller module ResolvePrincipals；供 im-service
 	// SendMessage 自我對話防護用）。只解析存活的買家；其餘的 id 不在 principals 裡，只出現在 unresolved_ids。
 	ResolvePrincipals(ctx context.Context, in *ResolvePrincipalsRequest, opts ...grpc.CallOption) (*ResolvePrincipalsResponse, error)
 	// ========== Restock Subscription (補貨通知訂閱，2026-06 新增 #942) ==========
@@ -729,12 +729,12 @@ type BuyerServiceServer interface {
 	// 永遠不等於 account_id（連第一個 stint 也一樣），把它塞進上面那支
 	// account_id/current-stint 版本一律查無此人靜默回空。任何消費「持久化
 	// buyer_id」的呼叫端都該走這支，即使該帳號已重新註冊產生新 stint 也能
-	// 解析回當時那個 buyer_id 的資料（比照 seller-service GetSellerBatch 的
+	// 解析回當時那個 buyer_id 的資料（比照 seller 模組 GetSellerBatch 的
 	// PK lookup 設計）。回應 map key 與 BuyerMeta.buyer_id 都承載 buyer_id。
 	BatchGetBuyerMetaByBuyerIDs(context.Context, *BatchGetBuyerMetaByBuyerIDsRequest) (*BatchGetBuyerMetaByBuyerIDsResponse, error)
 	// ========== Cross-Role Guards: Principal Resolution ==========
 	// 解析 buyer_id → 登入 principal account_id（② 買家 store-stint re-key
-	// W2/W3，mirrors seller-service ResolvePrincipals；供 im-service
+	// W2/W3，mirrors the seller module ResolvePrincipals；供 im-service
 	// SendMessage 自我對話防護用）。只解析存活的買家；其餘的 id 不在 principals 裡，只出現在 unresolved_ids。
 	ResolvePrincipals(context.Context, *ResolvePrincipalsRequest) (*ResolvePrincipalsResponse, error)
 	// ========== Restock Subscription (補貨通知訂閱，2026-06 新增 #942) ==========

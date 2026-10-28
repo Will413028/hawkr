@@ -13,7 +13,7 @@ import (
 // 無聲：成功的讀取本來就不落稽核，這一列若寫錯面、寫錯 capability、或三個 transport 欄位
 // 空著，稽核表看起來仍然完全正常——每一列都合法，只是再也分不出哪一列是攻擊嘗試。
 //
-// 直接驅動 Orchestrator 而不是打 HTTP：要斷言的是「Gateway 送了什麼給 account-service」。
+// 直接驅動 Orchestrator 而不是打 HTTP：要斷言的是「Gateway 送了什麼給 delegation 模組」。
 
 func denialSession() *accountpb.OperationSessionSummary {
 	return &accountpb.OperationSessionSummary{SessionId: "2701445588392017"}
@@ -109,7 +109,7 @@ func TestRecordReadDenialShape(t *testing.T) {
 	}
 }
 
-// 寫不出合法 action 的輸入一律不送。送出去的下場是 account-service 回 9260（action 不在
+// 寫不出合法 action 的輸入一律不送。送出去的下場是 delegation 模組回 9260（action 不在
 // 已登錄的稽核動作內），而呼叫端只會 log 一行 Warn —— 白白付一次 gRPC 往返換一個沒人看
 // 的錯誤。
 func TestRecordReadDenialSkipsUnwritableRows(t *testing.T) {

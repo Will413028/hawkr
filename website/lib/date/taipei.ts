@@ -82,7 +82,7 @@ const WALL_CLOCK_RE =
  * 瀏覽器時區會變成不同的 instant，`partsFromMs` 再乾淨也已經來不及 ——
  * UTC+8 以東的使用者會少一天（實測：`orderDate="2026/07/19"` 在
  * `Asia/Tokyo` 顯示 `2026/07/18`；本站主要使用者確實有人常駐日本）。
- * 本站的牆上時間一律是台北業務時間（例：buyer-service 消費明細的
+ * 本站的牆上時間一律是台北業務時間（例：buyer 模組消費明細的
  * `orderDate` 契約就是 `YYYY/MM/DD（Asia/Taipei）`），所以這裡固定以
  * `Date.UTC(...) - 08:00` 還原成 instant，輸出因此與 runtime 時區脫鉤。
  * 純日期（`YYYY-MM-DD`，如生日 / 交易日）視為台北當日 00:00，日期欄位的

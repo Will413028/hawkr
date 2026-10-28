@@ -84,7 +84,7 @@ type CrmServiceClient interface {
 	GetCustomerTags(context.Context, *connect.Request[crm.GetCustomerTagsRequest]) (*connect.Response[crm.TagListResponse], error)
 	// 依多標籤搜尋目標客戶（AND 邏輯，需同時擁有所有標籤）
 	SearchCustomersByTags(context.Context, *connect.Request[crm.SearchCustomersByTagsRequest]) (*connect.Response[crm.SearchCustomersByTagsResponse], error)
-	// 批次查詢買家在多個賣家的 VIP 狀態（buyer-service 用）
+	// 批次查詢買家在多個賣家的 VIP 狀態（buyer 模組用）
 	GetBuyerVipStatuses(context.Context, *connect.Request[crm.GetBuyerVipStatusesRequest]) (*connect.Response[crm.GetBuyerVipStatusesResponse], error)
 }
 
@@ -267,7 +267,7 @@ type CrmServiceHandler interface {
 	GetCustomerTags(context.Context, *connect.Request[crm.GetCustomerTagsRequest]) (*connect.Response[crm.TagListResponse], error)
 	// 依多標籤搜尋目標客戶（AND 邏輯，需同時擁有所有標籤）
 	SearchCustomersByTags(context.Context, *connect.Request[crm.SearchCustomersByTagsRequest]) (*connect.Response[crm.SearchCustomersByTagsResponse], error)
-	// 批次查詢買家在多個賣家的 VIP 狀態（buyer-service 用）
+	// 批次查詢買家在多個賣家的 VIP 狀態（buyer 模組用）
 	GetBuyerVipStatuses(context.Context, *connect.Request[crm.GetBuyerVipStatusesRequest]) (*connect.Response[crm.GetBuyerVipStatusesResponse], error)
 }
 

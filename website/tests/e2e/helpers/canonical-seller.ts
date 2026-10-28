@@ -39,7 +39,7 @@ import type { APIRequestContext } from "@playwright/test";
  * fault, never on the happy path, and the E2E proxy caches public GETs
  * (`app/api/v1/[...path]/route.ts`) so repeat lookups do not reach the shared
  * test gateway at all. `/public/sellers/{id}` accepts either key
- * (`seller-service` matches `store_id = $1 OR store_code = $1`), as do the
+ * (the seller module matches `store_id = $1 OR store_code = $1`), as do the
  * storefront collection endpoints, so every downstream fixture request can use
  * the canonical code.
  */

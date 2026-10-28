@@ -367,7 +367,7 @@ func (m *mockProductServiceClient) GetPublicSellerCitiesSummary(ctx context.Cont
 	return nil, nil
 }
 
-// ListStoreIDsWithPublicProductsInternal is seller-service's caller-side RPC
+// ListStoreIDsWithPublicProductsInternal is the seller module's caller-side RPC
 // (02 §5.13c) — the gateway never issues it; the method exists here only to keep
 // this mock satisfying productpb.ProductServiceClient.
 func (m *mockProductServiceClient) ListStoreIDsWithPublicProductsInternal(ctx context.Context, in *productpb.ListStoreIDsWithPublicProductsInternalRequest, opts ...grpc.CallOption) (*productpb.ListStoreIDsWithPublicProductsInternalResponse, error) {
@@ -959,7 +959,7 @@ func TestGetMarketplace_HotProducts_NoSalePrice(t *testing.T) {
 }
 
 // TestGetMarketplace_EnrichPairsLogoKeyAndURL 驗證 §231 收尾：
-// enrichPostsWithSellerInfo 以 seller-service 資料覆蓋貼文賣家 logo 時，
+// enrichPostsWithSellerInfo 以 seller 模組資料覆蓋貼文賣家 logo 時，
 // seller_logo_key（objectKey）與 seller_logo（URL）必須成對回填，
 // 不可只蓋 URL 讓 key 留空造成不對稱。
 func TestGetMarketplace_EnrichPairsLogoKeyAndURL(t *testing.T) {

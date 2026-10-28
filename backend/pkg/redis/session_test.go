@@ -200,7 +200,7 @@ func TestSessionKey_DoesNotExposeTheRawToken(t *testing.T) {
 	}
 }
 
-// #2049, half two — and the reason the ticket exists. account-service holds
+// #2049, half two — and the reason the ticket exists. The identity module holds
 // web_sessions.token_hash and deliberately never the token (#1592), so the key
 // has to be COMPUTABLE from the hash alone. Without this equality, account-level
 // revocation cannot name the cache entries it needs to evict and is back to
@@ -215,7 +215,7 @@ func TestSessionKeyForHash_MatchesTheKeyWrittenByPutSession(t *testing.T) {
 		t.Fatalf("PutSession: %v", err)
 	}
 
-	// Everything account-service has is the hash — this is that path exactly.
+	// Everything the identity module has is the hash — this is that path exactly.
 	tokenHash := pkgredis.HashToken(token)
 	if got := rdb.Exists(ctx, pkgredis.SessionKeyForHash(tokenHash)).Val(); got != 1 {
 		t.Fatalf("the key derived from token_hash alone does not exist (Exists=%d); "+
@@ -227,7 +227,7 @@ func TestSessionKeyForHash_MatchesTheKeyWrittenByPutSession(t *testing.T) {
 	}
 }
 
-// The revocation act itself, in the form account-service performs it: it has a
+// The revocation act itself, in the form the identity module performs it: it has a
 // set of token hashes (the rows it just deleted) and nothing else. Exactly those
 // sessions must go, and no other account's may be touched.
 func TestDeleteSessionsByTokenHash_EvictsExactlyTheNamedSessions(t *testing.T) {

@@ -25,7 +25,7 @@ export interface HistoryItem {
 	 * 賣家店面 canonical 路徑短碼（`sellers.store_code`）。
 	 *
 	 * `sellerId` 是 store_id（內部代理鍵），賣家頁 canonical 網址走 storeCode。
-	 * buyer-service 為了 sellerName/logo 本來就會呼叫 GetSellerBatch，值同源；
+	 * buyer 模組為了 sellerName/logo 本來就會呼叫 GetSellerBatch，值同源；
 	 * 取不到時後端送空字串（→ 不連結，不回退 sellerId）。
 	 */
 	storeCode?: string;

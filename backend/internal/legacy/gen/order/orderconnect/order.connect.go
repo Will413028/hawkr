@@ -176,9 +176,9 @@ type OrderServiceClient interface {
 	GetOrderForReview(context.Context, *connect.Request[order.GetOrderForReviewRequest]) (*connect.Response[order.GetOrderForReviewResponse], error)
 	// 取得物流建單所需訂單資訊（shipping-service 用）
 	GetOrderForShipping(context.Context, *connect.Request[order.GetOrderForShippingRequest]) (*connect.Response[order.GetOrderForShippingResponse], error)
-	// 查詢買家在各賣家的累計消費總額（buyer-service 用，會員卡清單）
+	// 查詢買家在各賣家的累計消費總額（buyer 模組用，會員卡清單）
 	GetBuyerMerchantSummary(context.Context, *connect.Request[order.GetBuyerMerchantSummaryRequest]) (*connect.Response[order.GetBuyerMerchantSummaryResponse], error)
-	// 查詢買家在特定賣家的消費紀錄（buyer-service 用，消費紀錄明細）
+	// 查詢買家在特定賣家的消費紀錄（buyer 模組用，消費紀錄明細）
 	GetBuyerOrdersForSeller(context.Context, *connect.Request[order.GetBuyerOrdersForSellerRequest]) (*connect.Response[order.GetBuyerOrdersForSellerResponse], error)
 	// 售後用：查詢訂單詳情（含買家地址、金額、送達時間，aftersales-service 用）
 	GetOrderForAfterSales(context.Context, *connect.Request[order.GetOrderForAfterSalesRequest]) (*connect.Response[order.GetOrderForAfterSalesResponse], error)
@@ -721,9 +721,9 @@ type OrderServiceHandler interface {
 	GetOrderForReview(context.Context, *connect.Request[order.GetOrderForReviewRequest]) (*connect.Response[order.GetOrderForReviewResponse], error)
 	// 取得物流建單所需訂單資訊（shipping-service 用）
 	GetOrderForShipping(context.Context, *connect.Request[order.GetOrderForShippingRequest]) (*connect.Response[order.GetOrderForShippingResponse], error)
-	// 查詢買家在各賣家的累計消費總額（buyer-service 用，會員卡清單）
+	// 查詢買家在各賣家的累計消費總額（buyer 模組用，會員卡清單）
 	GetBuyerMerchantSummary(context.Context, *connect.Request[order.GetBuyerMerchantSummaryRequest]) (*connect.Response[order.GetBuyerMerchantSummaryResponse], error)
-	// 查詢買家在特定賣家的消費紀錄（buyer-service 用，消費紀錄明細）
+	// 查詢買家在特定賣家的消費紀錄（buyer 模組用，消費紀錄明細）
 	GetBuyerOrdersForSeller(context.Context, *connect.Request[order.GetBuyerOrdersForSellerRequest]) (*connect.Response[order.GetBuyerOrdersForSellerResponse], error)
 	// 售後用：查詢訂單詳情（含買家地址、金額、送達時間，aftersales-service 用）
 	GetOrderForAfterSales(context.Context, *connect.Request[order.GetOrderForAfterSalesRequest]) (*connect.Response[order.GetOrderForAfterSalesResponse], error)

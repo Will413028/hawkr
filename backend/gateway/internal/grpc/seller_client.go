@@ -128,14 +128,14 @@ func (c *SellerClient) GetRecommendedSellers(ctx context.Context, limit int32) (
 	})
 }
 
-// SuggestAddress 地址模糊搜尋（proxy 至 seller-service 的 geocode ACL）。
+// SuggestAddress 地址模糊搜尋（proxy 至 seller 模組的 geocode ACL）。
 func (c *SellerClient) SuggestAddress(ctx context.Context, county, district, query string) (*pb.SuggestAddressResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	return c.client.SuggestAddress(ctx, &pb.SuggestAddressRequest{County: county, District: district, Query: query})
 }
 
-// ValidateAddress 地址嚴格驗證（proxy 至 seller-service 的 geocode ACL）。
+// ValidateAddress 地址嚴格驗證（proxy 至 seller 模組的 geocode ACL）。
 func (c *SellerClient) ValidateAddress(ctx context.Context, address string) (*pb.ValidateAddressResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()

@@ -161,7 +161,7 @@ func TestLookupBuyer_InvalidBuyerID(t *testing.T) {
 // TestGetBuyerMeta_ClosedStint_Returns404_IsPIIBoundary 釘住一個**預期行為**，
 // 不是待修的 bug：對已關閉 stint 的 buyer_id 打 /meta 一律 404。
 //
-// 推導（2026-07-27 對 buyer-service schema/SQL 逐條核對）：
+// 推導（2026-07-27 對 buyer 模組 schema/SQL 逐條核對）：
 //   - GetBuyersByBuyerIDs（buyers.sql:14-15）不濾 is_current，但濾
 //     `deleted_at IS NULL`
 //   - RetireCurrentStint（:58-59）是全 repo 唯一把 is_current 設 false 的地方，
@@ -179,11 +179,11 @@ func TestLookupBuyer_InvalidBuyerID(t *testing.T) {
 // （stats / orders / coupons / tags）則仍看得到——那四張表直接吃
 // (store_id, buyer_id)，不經過 buyers 表。
 //
-// ⚠️ 不要為了讓這支「過」而去放寬 buyer-service 的 deleted_at 過濾。
+// ⚠️ 不要為了讓這支「過」而去放寬 buyer 模組的 deleted_at 過濾。
 //
 // ⚠️ 2026-08-29（#2830）之後有第二條路，本邊界**未被破壞**：
 // `BatchGetBuyerDisplayByBuyerIDs` 對已關閉 stint 查得出來，但只回**常數**
-// 墓碑字串「已刪除帳號」＋空頭像，真名與其他 PII 一律不出 buyer-service。
+// 墓碑字串「已刪除帳號」＋空頭像，真名與其他 PII 一律不出 buyer 模組。
 // 「查得到」與「供應個資」是兩件事 —— 本測試守的是後者。
 func TestGetBuyerMeta_ClosedStint_Returns404_IsPIIBoundary(t *testing.T) {
 	h := &Holder{

@@ -9,7 +9,7 @@ import (
 )
 
 // The golden file is one of the four places the closed enumeration lives (Go
-// constants / golden / two account-service CHECK constraints). CI compares all four
+// constants / golden / two delegation-module CHECK constraints). CI compares all four
 // with scripts/check-delegation-capability-closure.py; this test keeps the two
 // in-repo Go-side copies honest without needing the workflow to run.
 func TestAdminCapabilitiesMatchGolden(t *testing.T) {

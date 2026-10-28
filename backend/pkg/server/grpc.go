@@ -45,7 +45,7 @@ type ServerConfig struct {
 	// false (the zero value) for gRPC services with no streaming RPCs.
 	EnableStreamInterceptors bool
 	// LoggingOptions customizes interceptor.LoggingInterceptor per service —
-	// e.g. account-service's WithExpectedCodes(accountgrpc.ExpectedStatusCodes)
+	// e.g. the identity module's WithExpectedCodes(accountgrpc.ExpectedStatusCodes)
 	// keeps routine per-method negative outcomes (GetWebSession → NotFound for
 	// a dead cookie) out of error-level logs (issue #2072). Empty by default:
 	// zero behavior change for services that don't need this.

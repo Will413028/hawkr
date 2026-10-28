@@ -93,7 +93,7 @@ type ProductServiceClient interface {
 	// 批次取 before 快照與當前 version（代行批次寫入的第一跳，56 設計書 §7.2.8 步驟 ②）。
 	// 存在的理由是「跳數不得與 items 筆數成正比」：逐項打 GetProduct 會讓
 	//
-	//	一次 50 筆的批次多出 50 跳，而 prod 的 account-service 連線池只有 2。
+	//	一次 50 筆的批次多出 50 跳，而 gateway 到 delegation 模組的連線池只有 2。
 	//
 	// 唯讀；查不到的 product_id 在 results 內以 found=false 回報，不整批失敗
 	//
@@ -159,7 +159,7 @@ type ProductServiceClient interface {
 	// 商家註冊所在地完整聚合；固定回 22 縣市，count 與列表 filter 共用 seller SSOT。
 	GetPublicSellerCitiesSummary(ctx context.Context, in *GetPublicSellerCitiesSummaryRequest, opts ...grpc.CallOption) (*GetPublicSellerCitiesSummaryResponse, error)
 	// 回傳「至少有一件公開上架商品」的 store_id 全集。
-	// 內部 RPC（seller-service 推薦賣家 / marketplace rail 用來濾掉空店），不對前端暴露。
+	// 內部 RPC（seller 模組推薦賣家 / marketplace rail 用來濾掉空店），不對前端暴露。
 	// 詳見 02 §5.13c
 	ListStoreIDsWithPublicProductsInternal(ctx context.Context, in *ListStoreIDsWithPublicProductsInternalRequest, opts ...grpc.CallOption) (*ListStoreIDsWithPublicProductsInternalResponse, error)
 	// 驗證 category_id 為合法葉節點，回傳 cat_l1/l2 反正規化欄位
@@ -660,7 +660,7 @@ type ProductServiceServer interface {
 	// 批次取 before 快照與當前 version（代行批次寫入的第一跳，56 設計書 §7.2.8 步驟 ②）。
 	// 存在的理由是「跳數不得與 items 筆數成正比」：逐項打 GetProduct 會讓
 	//
-	//	一次 50 筆的批次多出 50 跳，而 prod 的 account-service 連線池只有 2。
+	//	一次 50 筆的批次多出 50 跳，而 gateway 到 delegation 模組的連線池只有 2。
 	//
 	// 唯讀；查不到的 product_id 在 results 內以 found=false 回報，不整批失敗
 	//
@@ -726,7 +726,7 @@ type ProductServiceServer interface {
 	// 商家註冊所在地完整聚合；固定回 22 縣市，count 與列表 filter 共用 seller SSOT。
 	GetPublicSellerCitiesSummary(context.Context, *GetPublicSellerCitiesSummaryRequest) (*GetPublicSellerCitiesSummaryResponse, error)
 	// 回傳「至少有一件公開上架商品」的 store_id 全集。
-	// 內部 RPC（seller-service 推薦賣家 / marketplace rail 用來濾掉空店），不對前端暴露。
+	// 內部 RPC（seller 模組推薦賣家 / marketplace rail 用來濾掉空店），不對前端暴露。
 	// 詳見 02 §5.13c
 	ListStoreIDsWithPublicProductsInternal(context.Context, *ListStoreIDsWithPublicProductsInternalRequest) (*ListStoreIDsWithPublicProductsInternalResponse, error)
 	// 驗證 category_id 為合法葉節點，回傳 cat_l1/l2 反正規化欄位

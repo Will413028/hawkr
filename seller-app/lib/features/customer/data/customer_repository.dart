@@ -82,7 +82,7 @@ class CustomerRepository with ApiRequestHelper {
   // ─── 買家基本資訊（不限 CRM 客戶）─────────────────────────────────────────
 
   /// GET /app/sellers/me/customers/{buyerId}/meta
-  /// 透過 buyer-service 查詢，不需要買家在 CRM 中
+  /// 透過 buyer 模組查詢，不需要買家在 CRM 中
   Future<({String nickname, String avatarUrl})?> getBuyerMeta(
     String accountId,
   ) async {

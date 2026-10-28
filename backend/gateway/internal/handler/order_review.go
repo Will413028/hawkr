@@ -201,7 +201,7 @@ type OrderReviewRecord struct {
 // 轉為含雙欄位的 Gateway DTO，顯示 URL 以 mediaBaseURL 組（49 §6.1）。
 // buyerDisplayName 是買家名稱的**最後防線**（#2830）。
 //
-// 主要答案來自 buyer-service 的 BatchGetBuyerDisplayByBuyerIDs：買家註銷後它回
+// 主要答案來自 buyer 模組的 BatchGetBuyerDisplayByBuyerIDs：買家註銷後它回
 // 墓碑字串「已刪除帳號」，所以正常路徑上這裡拿到的永遠是可顯示的值。
 //
 // 🔴 這兩個字串代表**不同狀態**，不是同一件事的兩種講法：

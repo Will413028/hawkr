@@ -130,7 +130,7 @@ function formatDuration(seconds: number): string {
  * 「工作時長」那一列的文案。與 `sessionEndText` 同一個前提，因此必須同一時間修。
  *
  * 後端的 `durationSeconds` 是 `LEAST(ended_at, 閒置逾時點, expires_at, now) − issued_at`
- * （account-service `usecase/summary.go`），只有右端落到 `now` 時它才是會長大的值。哪
+ * （delegation 模組 `usecase/summary.go`），只有右端落到 `now` 時它才是會長大的值。哪
  * 一種狀態會落到 `now`，從 `status` 就推得出來：
  *   active  —— 本來就該取 now，這一列問的正是「目前已經進行多久」。
  *   expired —— 代表兩支到期述詞至少一支已成立，右端必在過去，值固定。

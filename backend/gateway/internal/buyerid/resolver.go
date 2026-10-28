@@ -59,7 +59,7 @@ func (r *Resolver) CurrentBuyerID(ctx context.Context, accountID identity.Accoun
 	}
 
 	// err == nil 保證 resp.GetCode() == 0（成功）；resp 為 nil/empty 是防禦性
-	// 分支（buyer-service handler 現行邏輯不會走到，但保留給未來 nil-Data 成功
+	// 分支（buyer 模組的 handler 現行邏輯不會走到，但保留給未來 nil-Data 成功
 	// response 的可能）。
 	if resp == nil || resp.GetId() == "" {
 		return 0, ErrNoCurrentBuyer

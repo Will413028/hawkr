@@ -1,9 +1,9 @@
 // Package crypto provides AES-256-GCM authenticated encryption shared across
-// services that must encrypt sensitive data at rest (e.g. account-service's
-// apple_revoke_outbox refresh_token, seller-service's certification id_card_no).
+// services that must encrypt sensitive data at rest (e.g. the identity module's
+// apple_revoke_outbox refresh_token, the seller module's certification id_card_no).
 //
-// The key is derived from a config secret via SHA-256. Unlike the earlier
-// account-service-local implementation, this package is fail-closed: an empty
+// The key is derived from a config secret via SHA-256. Unlike a
+// module-local implementation, this package is fail-closed: an empty
 // secret is rejected at construction time so a mis-configured deployment can
 // never silently downgrade to storing plaintext (issue #608 / #1396).
 package crypto
@@ -24,7 +24,7 @@ import (
 var ErrEmptySecret = errors.New("crypto: master key secret is empty (fail-closed; refusing to run without a key)")
 
 // Encrypter is the byte-oriented interface satisfied by *Cipher. Kept so that
-// existing consumers (account-service) that adapt to their own usecase-defined
+// existing consumers (the identity module) that adapt to their own usecase-defined
 // interfaces can depend on an interface rather than the concrete type.
 type Encrypter interface {
 	Encrypt(plaintext []byte) ([]byte, error)

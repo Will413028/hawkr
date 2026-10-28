@@ -32584,7 +32584,7 @@ components:
         status:
           type: string
           description: |-
-            Status 恰三值：active / expired / revoked。由 account-service 以單一 now() 對
+            Status 恰三值：active / expired / revoked。由 delegation 模組以單一 now() 對
             整頁逐列推導——同一頁的兩列若各自取時間，邊界上會出現兩個不同的答案。
         target:
           $ref: '#/components/schemas/DelegatedAuditTarget'
@@ -35234,7 +35234,7 @@ components:
             連結一律用它組 /sellers/{store_code}。值由 enrichPostsWithSellerInfo 從
             既有的 GetSellerBatch 回應回填——social-service 只存 seller_id，沒有
             store_code，但那支 batch RPC 為了店名/logo 本來就會呼叫，順手帶回來零成本。
-            空字串代表該賣家在 seller-service 查不到（已關店/批次逾時），此時前端
+            空字串代表該賣家在 seller 模組查不到（已關店/批次逾時），此時前端
             必須不渲染賣家連結，而不是退回 seller_id——store_id 定址已不再受支援。
         tags:
           type: array
@@ -36851,7 +36851,7 @@ components:
           type: number
         sellerName:
           type: string
-          description: '== storeName（seller-service toResponse: Nickname = StoreName）'
+          description: '== storeName（seller 模組 toResponse: Nickname = StoreName）'
         sellerType:
           type: string
         storeCode:

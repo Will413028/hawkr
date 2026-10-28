@@ -28,7 +28,7 @@ service CrmService {
     // 依多標籤搜尋目標客戶（AND 邏輯，需同時擁有所有標籤）
     rpc SearchCustomersByTags(SearchCustomersByTagsRequest) returns (SearchCustomersByTagsResponse);
 
-    // 批次查詢買家在多個賣家的 VIP 狀態（buyer-service 用）
+    // 批次查詢買家在多個賣家的 VIP 狀態（buyer 模組用）
     rpc GetBuyerVipStatuses(GetBuyerVipStatusesRequest) returns (GetBuyerVipStatusesResponse);
 }
 
@@ -71,12 +71,12 @@ message CrmCustomer {
     string total_spent = 6;
     string order_count = 7;
     reserved 8, 9, 10;                         // removed: first_order_at, last_order_at, remark
-    string nickname = 11;               // cache in DB + enriched from account-service
+    string nickname = 11;               // cache in DB + enriched from the identity module
     string avatar_key = 12;             // 買家頭像 objectKey（49 §6.6 S9：enrich 自 buyer 透傳 key；Gateway 組 avatarUrl；http 值 passthrough）
     repeated Tag tags = 13;             // Enriched from crm tags
-    string phone = 14;                  // cache in DB + enriched from account-service
-    string address = 15;                // Enriched from account-service
-    string email = 16;                  // Enriched from account-service
+    string phone = 14;                  // cache in DB + enriched from the identity module
+    string address = 15;                // enriched from the identity module
+    string email = 16;                  // enriched from the identity module
     string coupon_count = 17;           // Enriched from marketing-service
     repeated string frequent_categories = 18; // Enriched from order-service
 }
@@ -180,7 +180,7 @@ message MatchedCustomer {
     string avatar_key = 4;  // 買家頭像 objectKey（49 §6.6 S9：enrich 自 buyer 透傳 key；Gateway 組 avatarUrl；http 值 passthrough）
 }
 
-// ========== GetBuyerVipStatuses（buyer-service 內部呼叫）====================
+// ========== GetBuyerVipStatuses（buyer 模組內部呼叫）====================
 
 message GetBuyerVipStatusesRequest {
     string buyer_id = 1;

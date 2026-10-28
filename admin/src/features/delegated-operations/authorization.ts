@@ -651,7 +651,7 @@ export const DELEGATION_AUTHORIZATION_ERROR_MESSAGES: Record<number, string> = {
 	9260: "送出的內容不符合授權設定的格式要求，請檢查後重試。",
 	9261: "管理員登入狀態已失效，請重新登入後再試。",
 	// 「或已到期」不是贅字：治理端只在 revoked_at 有值時送 9264，但 preflight／
-	// 建立工作階段那條路徑對「有效期間已過」也送同一個碼（account-service 的
+	// 建立工作階段那條路徑對「有效期間已過」也送同一個碼（delegation 模組的
 	// `authorizationVerdict`），而兩者的下一步一樣是重新開通。少了它，一個因到期
 	// 而失效的授權會被說成「被撤回」，管理員會去查一件從未發生的治理動作。
 	9264: "這家店的代行授權已撤回或已到期，請改用「重新開通」。",

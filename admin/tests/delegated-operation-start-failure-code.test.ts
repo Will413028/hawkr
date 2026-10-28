@@ -20,7 +20,7 @@ afterEach(() => {
  *   ① 路由不存在 → 這個環境沒有代行營運服務，操作者該找維運
  *   ② 9286「這家店從來沒有授權列」→ 該去商家詳情頁按開通
  *
- * 後端把 preflight 的拒絕碼原樣透傳（account-service `session.go`），而 9286 在
+ * 後端把 preflight 的拒絕碼原樣透傳（delegation 模組 `session.go`），而 9286 在
  * gateway 的狀態表上就是 404（`bizhttp.go`）。BFF 若以 status 分派，②會被講成①，
  * 管理員去找維運等一個沒有壞掉的服務。
  *

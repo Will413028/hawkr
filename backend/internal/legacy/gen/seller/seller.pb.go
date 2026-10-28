@@ -1622,7 +1622,7 @@ type UpdateSellerRequest struct {
 	// current stint」語意（/app/sellers/me），store_id 則指名一個 stint。
 	//
 	// 代行路徑必須填這一欄：account_id 是登入 principal、store_id 是營運鍵，兩者在
-	// re-onboard 過的賣家上不相等（44 號 §3.1），把 store_id 填進 account_id 會讓
+	// re-onboard 過的賣家上不相等（44 號 §3），把 store_id 填進 account_id 會讓
 	// 寫入落到「account_id 恰好等於該 store_id」的另一家店，且回 code: 0。
 	StoreId       int64                     `protobuf:"varint,16,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
 	Delegation    *common.DelegationContext `protobuf:"bytes,100,opt,name=delegation,proto3" json:"delegation,omitempty"`

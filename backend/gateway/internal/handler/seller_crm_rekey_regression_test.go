@@ -63,7 +63,7 @@ func TestCustomerHandlers_ForwardPathBuyerIDVerbatim(t *testing.T) {
 	const (
 		// 已關閉 stint 的 buyer_id：crm 列上掛的就是它，端點必須原值使用
 		staleStintBuyerID = "2619321233"
-		// 仍活著的 stint（buyer-service 供得出 profile），用來驗 /meta 的軸一致
+		// 仍活著的 stint（buyer 模組供得出 profile），用來驗 /meta 的軸一致
 		liveStintBuyerID    = "2619399999"
 		liveStintBuyerIDInt = int64(2619399999)
 		// resolver 會把任何輸入翻成這個值——新語意下沒有任何 handler 該碰它
@@ -114,7 +114,7 @@ func TestCustomerHandlers_ForwardPathBuyerIDVerbatim(t *testing.T) {
 			requested := in.BuyerIds[0]
 			captured = strconv.FormatInt(requested, 10)
 			if requested != liveStintBuyerIDInt {
-				// 已關閉 stint：buyer-service 回空 map（deleted_at 已設）
+				// 已關閉 stint：buyer 模組回空 map（deleted_at 已設）
 				return &buyerpb.BatchGetBuyerMetaByBuyerIDsResponse{Code: 0, Buyers: map[int64]*buyerpb.BuyerMeta{}}, nil
 			}
 			return &buyerpb.BatchGetBuyerMetaByBuyerIDsResponse{
@@ -180,7 +180,7 @@ func TestCustomerHandlers_ForwardPathBuyerIDVerbatim(t *testing.T) {
 			assertHTTPStatus(t, w, tc.wantStatus)
 
 			// 不論結果是 200 還是 404，gateway 送給下游的都必須是 path 原值。
-			// /meta 的 404 來自 buyer-service 查無此 stint，不是 gateway 把 id
+			// /meta 的 404 來自 buyer 模組查無此 stint，不是 gateway 把 id
 			// 換掉了——這個區別就是本斷言要守住的。
 			wantID := staleStintBuyerID
 			if tc.name == "GetBuyerMeta_LiveStint" {

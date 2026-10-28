@@ -16,7 +16,7 @@ import (
 // issue #2707 C2 修復（本 task）起改用 h.resolveStoreID 解析**當前** store_id，
 // 不再直接送 account_id —— notification_preferences 表的既有列同批原子遷移到
 // store_id 鍵。**沒有對應的 db migration 檔**：notification-service 與
-// seller-service 是各自獨立的 database、無法跨 DB JOIN，既有資料的搬遷走
+// seller 模組是各自獨立的 database、無法跨 DB JOIN，既有資料的搬遷走
 // 人工審核 runbook，不是 migration 檔（見
 // docs/runbooks/seller-notification-identity-store-id-backfill.md 與 13 號
 // 設計書 §12.1.4）。買家路徑（GetBuyerNotificationPreferences／

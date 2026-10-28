@@ -196,7 +196,7 @@ type SubmitFoodSafetyReportRequest struct {
 	ReporterName    string `json:"reporterName"`
 	Description     string `json:"description"        binding:"required"`
 	// issue #1527：匿名食安通報不接受佐證附件（deny-by-default）。刻意不宣告 evidence_asset_ids —
-	// 前端帶入會被忽略（第一層）；繞 Gateway 直打 gRPC 則由 seller-service domain Validate 拒（第二層）。
+	// 前端帶入會被忽略（第一層）；繞 Gateway 直打 gRPC 則由 seller 模組 domain Validate 拒（第二層）。
 }
 
 // SubmitFoodSafetyReport — 公開無登入食安通報入口

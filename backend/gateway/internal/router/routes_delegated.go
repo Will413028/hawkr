@@ -126,7 +126,7 @@ func registerDelegatedOperationRoutes(admin, adminNoAuth *gin.RouterGroup, h *ha
 // 掛任何一個都會讓交接永遠失敗：delegatedHandle／credentialHandle 都會要求一個它正要
 // 去換的東西，adminHandle 則要求一個 www 上的瀏覽器沒有的東西。它的授權完全由
 // handoff code 自己那四道防護承擔（單句 CAS、六個述詞、一次性、四種成因共用 9282），
-// 全部落在 account-service 的 RedeemHandoff 內，一道都不得推給呼叫端。
+// 全部落在 delegation 模組的 RedeemHandoff 內，一道都不得推給呼叫端。
 func handoffHandle(g *gin.RouterGroup, method, relPath string, h gin.HandlerFunc) {
 	full := ginJoinPath(g.BasePath(), relPath)
 	registerAdminNoAuth(method, full)

@@ -100,9 +100,9 @@ type OrderServiceClient interface {
 	GetOrderForReview(ctx context.Context, in *GetOrderForReviewRequest, opts ...grpc.CallOption) (*GetOrderForReviewResponse, error)
 	// 取得物流建單所需訂單資訊（shipping-service 用）
 	GetOrderForShipping(ctx context.Context, in *GetOrderForShippingRequest, opts ...grpc.CallOption) (*GetOrderForShippingResponse, error)
-	// 查詢買家在各賣家的累計消費總額（buyer-service 用，會員卡清單）
+	// 查詢買家在各賣家的累計消費總額（buyer 模組用，會員卡清單）
 	GetBuyerMerchantSummary(ctx context.Context, in *GetBuyerMerchantSummaryRequest, opts ...grpc.CallOption) (*GetBuyerMerchantSummaryResponse, error)
-	// 查詢買家在特定賣家的消費紀錄（buyer-service 用，消費紀錄明細）
+	// 查詢買家在特定賣家的消費紀錄（buyer 模組用，消費紀錄明細）
 	GetBuyerOrdersForSeller(ctx context.Context, in *GetBuyerOrdersForSellerRequest, opts ...grpc.CallOption) (*GetBuyerOrdersForSellerResponse, error)
 	// 售後用：查詢訂單詳情（含買家地址、金額、送達時間，aftersales-service 用）
 	GetOrderForAfterSales(ctx context.Context, in *GetOrderForAfterSalesRequest, opts ...grpc.CallOption) (*GetOrderForAfterSalesResponse, error)
@@ -572,9 +572,9 @@ type OrderServiceServer interface {
 	GetOrderForReview(context.Context, *GetOrderForReviewRequest) (*GetOrderForReviewResponse, error)
 	// 取得物流建單所需訂單資訊（shipping-service 用）
 	GetOrderForShipping(context.Context, *GetOrderForShippingRequest) (*GetOrderForShippingResponse, error)
-	// 查詢買家在各賣家的累計消費總額（buyer-service 用，會員卡清單）
+	// 查詢買家在各賣家的累計消費總額（buyer 模組用，會員卡清單）
 	GetBuyerMerchantSummary(context.Context, *GetBuyerMerchantSummaryRequest) (*GetBuyerMerchantSummaryResponse, error)
-	// 查詢買家在特定賣家的消費紀錄（buyer-service 用，消費紀錄明細）
+	// 查詢買家在特定賣家的消費紀錄（buyer 模組用，消費紀錄明細）
 	GetBuyerOrdersForSeller(context.Context, *GetBuyerOrdersForSellerRequest) (*GetBuyerOrdersForSellerResponse, error)
 	// 售後用：查詢訂單詳情（含買家地址、金額、送達時間，aftersales-service 用）
 	GetOrderForAfterSales(context.Context, *GetOrderForAfterSalesRequest) (*GetOrderForAfterSalesResponse, error)

@@ -9,11 +9,10 @@ import (
 
 // TestToProto pins the rolestate.OtherRoleState → pb.OtherRoleState mapping.
 //
-// If this mapping is ever inverted (ACTIVE <-> ABSENT), account-service will
+// If this mapping is ever inverted (ACTIVE <-> ABSENT), the identity module will
 // cascade-delete accounts whose other role is still alive — an irreversible
 // wipe of auth_providers. This is the single copy of that mapping shared by
-// seller-service and buyer-service (previously two hand-duplicated copies
-// that could silently diverge).
+// the seller and buyer modules.
 func TestToProto(t *testing.T) {
 	tests := []struct {
 		name string
@@ -41,7 +40,7 @@ func TestToProto(t *testing.T) {
 }
 
 // TestFromProto pins the reverse direction (pb.OtherRoleState →
-// rolestate.OtherRoleState) used by account-service's grpc handler to decode
+// rolestate.OtherRoleState) used by the identity module's grpc handler to decode
 // the incoming RemoveRoleRequest. Same inversion risk as TestToProto, just
 // the other way across the wire.
 func TestFromProto(t *testing.T) {

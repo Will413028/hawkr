@@ -4910,7 +4910,7 @@ type CheckoutPreviewRequest struct {
 	//
 	// ⚠️ 為什麼不攤平字串讓 shipping 反解：shipping.proto 的 UberQuoteDropoff 逐字禁止，
 	// 每一筆解不出來的就是一個看不到選項的買家。address_id 讓 order-service 走
-	// buyer-service 取回 city／district／detail_address 三欄——與 /app/checkout/uber_quote
+	// buyer 模組取回 city／district／detail_address 三欄——與 /app/checkout/uber_quote
 	// 同一個來源，兩邊不會給出不同的答案。
 	AddressId     string `protobuf:"bytes,9,opt,name=address_id,json=addressId,proto3" json:"address_id,omitempty"`          // 買家地址簿的 shipping_addresses.id（TSID 數字字串）
 	UberQuoteId   string `protobuf:"bytes,10,opt,name=uber_quote_id,json=uberQuoteId,proto3" json:"uber_quote_id,omitempty"` // 買家手上那筆報價（uber_quotes.quote_id，dqt_ 前綴）；空 ⇒ 重新取價
@@ -10048,7 +10048,7 @@ func (x *OrderInvoiceSnapshotItem) GetUnitPrice() string {
 type OrderUberQuoteRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	BuyerId       int64                  `protobuf:"varint,1,opt,name=buyer_id,json=buyerId,proto3" json:"buyer_id,omitempty"`      // Gateway 注入（E.5.5 int64 例外，與 CheckoutValidateRequest 同）
-	AddressId     string                 `protobuf:"bytes,2,opt,name=address_id,json=addressId,proto3" json:"address_id,omitempty"` // 買家收件地址 id（buyer-service 的 shipping_addresses.id）
+	AddressId     string                 `protobuf:"bytes,2,opt,name=address_id,json=addressId,proto3" json:"address_id,omitempty"` // 買家收件地址 id（buyer 模組的 shipping_addresses.id）
 	Items         []*CheckoutItem        `protobuf:"bytes,3,rep,name=items,proto3" json:"items,omitempty"`                          // 當前已勾選的商品，與 CheckoutValidate 同一個型別
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

@@ -38,7 +38,7 @@ func TestProxyRoutesDeclareFailureStatusByConsumer(t *testing.T) {
 			// 常數，消費者全是我們自己的前端 ⇒ 只需要這一列。
 			"routes_invoice.go:CreateProxy:ServiceInvoice": "proxy.FailClientFacing",
 			// routes_seller.go:CreateProxy:ServiceSeller 已於 #2813 移除——那是條死路由
-			// （seller-service 未實作 /app/sellers/{id}、四個前端 repo 零呼叫端），
+			// （seller 模組未實作 /app/sellers/{id}、四個前端 repo 零呼叫端），
 			// 且它每個請求都 panic 回 500 空 body。不要因為看到這裡少一條就補回去。
 			// 開發用 webhook 模擬器：我們自己用瀏覽器開的工具，不是第三方送信端。
 			"routes_webhook_simulator.go:proxyToPath:ServicePayuniWebhook": "proxy.FailClientFacing",

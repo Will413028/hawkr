@@ -4,7 +4,7 @@ package authz
 // thing an administrator may do to a store while operating on its behalf inside a
 // delegated operation session. The value is the lowercase dotted machine name the
 // whole stack shares — this file, testdata/admin_capabilities.golden, the two
-// account-service CHECK constraints (chk_aoal_capability_closed on the audit table,
+// delegation-module CHECK constraints (chk_aoal_capability_closed on the audit table,
 // chk_sda_capabilities_closed on the authorization table) and the admin repo's
 // policy.ts allow-list.
 //

@@ -115,7 +115,7 @@ func TestMintChatWSTicket_BuyerView(t *testing.T) {
 
 // Buyer resolver erroring must NOT fail the mint: MintChatWSTicket's buyer
 // branch is deliberately fail-open (mirrors the pre-existing seller branch) —
-// a buyer-service hiccup must not block issuing a chat ticket. This pins that
+// a buyer module hiccup must not block issuing a chat ticket. This pins that
 // when h.BuyerID.CurrentBuyerID errors, wireID falls back to the raw
 // accountID (not a 403, not a 5xx) — guards against someone later "fixing"
 // this into a fail-closed check.

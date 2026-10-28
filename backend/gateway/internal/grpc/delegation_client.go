@@ -64,7 +64,7 @@ func requireCapability(d *commonpb.DelegationContext, rpc string, want pkgdelega
 		bizcode.DelegationInternalContractMismatch, rpc, want, got))
 }
 
-// ==================== account-service：兩階段稽核與查詢 ====================
+// ==================== delegation 模組：兩階段稽核與查詢 ====================
 
 // RecordAuditIntent writes the PENDING audit row that every delegated mutation must
 // have before it touches any domain state. Failure is fail-closed (9279): the caller
@@ -133,11 +133,11 @@ func (c *AccountClient) ListAllDelegationAuditLogs(ctx context.Context, req *acc
 	return c.delegation.ListAllAuditLogs(ctx, req)
 }
 
-// ==================== account-service：代行授權列治理（#2444） ====================
+// ==================== delegation 模組：代行授權列治理（#2444） ====================
 //
 // 這六支與上面的稽核／工作階段呼叫不同層：它們是**治理設定**動作，發生在任何工作階段
 // 之前，因此不帶 DelegationContext、不驗 capability——requireCapability 那道鏡像對它們
-// 沒有意義（沒有一跳是「代行操作」）。授權者資格由 account-service 以
+// 沒有意義（沒有一跳是「代行操作」）。授權者資格由 delegation 模組以
 // admin_accounts.delegation_enabled 判定並回 9288。
 //
 // deadline 沿用既有兩個參數：唯讀走 CurrentMs、寫入走 CreateMs。刻意不新增 config 欄位
@@ -174,7 +174,7 @@ func (c *AccountClient) UpdateDelegationAuthorization(ctx context.Context, req *
 }
 
 // RevokeDelegationAuthorization backs POST .../authorizations/{store_id}/revoke。
-// 它會在 account-service 的同一個交易內連帶中止該店進行中的工作階段，因此比其他寫入
+// 它會在 delegation 模組的同一個交易內連帶中止該店進行中的工作階段，因此比其他寫入
 // 多做一件事——deadline 仍沿用 CreateMs：連帶撤銷是同一個交易內的一句 UPDATE，不是
 // 額外的網路往返。
 func (c *AccountClient) RevokeDelegationAuthorization(ctx context.Context, req *accountpb.RevokeDelegationAuthorizationRequest, deadlineMs int) (*accountpb.RevokeDelegationAuthorizationResponse, error) {
@@ -190,22 +190,22 @@ func (c *AccountClient) ListDelegationAuthorizationHistory(ctx context.Context, 
 	return c.delegation.ListDelegationAuthorizationHistory(ctx, req)
 }
 
-// ==================== seller-service ====================
+// ==================== seller 模組 ====================
 
 // GetStoreStateForGuard reads the target store's lifecycle state for 授權鏈第 8 項
 // (§8.1.3 第 8 項) — "can this store still be operated on behalf of right now".
 //
 // It deliberately sends NO DelegationContext. This hop is the Gateway's own
 // authorization judgment, taken BEFORE anything is allowed through, so there is no
-// audit_log_id to carry and nothing to authorize yet; seller-service therefore takes
+// audit_log_id to carry and nothing to authorize yet; the seller module therefore takes
 // the S0 branch (d == nil ⇒ existing path). Filling delegation here would get the
 // call rejected as a write-context read with an empty audit_log_id.
 //
-// The verdict the caller reads is not only lifecycle_status. seller-service answers
+// The verdict the caller reads is not only lifecycle_status. The seller module answers
 // this lookup with a non-zero envelope code in two cases that both mean "not
 // delegable": a soft-deleted store (the lookup filters deleted_at IS NULL ⇒ NotFound)
 // and a closed one (handler.go:114 answers 4040 for public callers). Both land as
-// 9265 at the call site, exactly as account-service's preflight already treats them
+// 9265 at the call site, exactly as the delegation module's preflight already treats them
 // (internal/client/seller/client.go:95).
 func (c *SellerClient) GetStoreStateForGuard(ctx context.Context, storeID int64, deadlineMs int) (*sellerpb.SellerResponse, error) {
 	ctx, cancel := withDeadline(ctx, deadlineMs)

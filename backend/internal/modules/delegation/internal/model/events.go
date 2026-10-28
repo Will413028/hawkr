@@ -5,8 +5,7 @@ import (
 	"uuid"
 )
 
-// DelegationOperationCompleted 在代行的寫入確認成功、而且 intent 要求通知賣家時，於確認的 transaction 內發出（原本是
-// account-service 的 admin_operation_outbox）。過渡期由 internal/legacy 排入 job，送到 notification-service 訂閱的
+// DelegationOperationCompleted 在代行的寫入確認成功、而且 intent 要求通知賣家時，於確認的 transaction 內發出。過渡期由 internal/legacy 排入 job，送到 notification-service 訂閱的
 // RabbitMQ（delegation.operation.completed）。欄位是寫入當下的快照；消費者以 AuditLogID 去重。
 type DelegationOperationCompleted struct {
 	AuditLogID            uuid.UUID

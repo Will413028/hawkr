@@ -181,7 +181,7 @@ type DelegatedOperationSessionRecord struct {
 	IssuedAt      string   `json:"issuedAt"`
 	ExpiresAt     string   `json:"expiresAt"`
 	EndedAt       *string  `json:"endedAt"`
-	// Status 恰三值：active / expired / revoked。由 account-service 以單一 now() 對
+	// Status 恰三值：active / expired / revoked。由 delegation 模組以單一 now() 對
 	// 整頁逐列推導——同一頁的兩列若各自取時間，邊界上會出現兩個不同的答案。
 	Status                    string  `json:"status"`
 	RevokedAt                 *string `json:"revokedAt"`

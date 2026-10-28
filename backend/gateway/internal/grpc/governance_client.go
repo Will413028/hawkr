@@ -8,7 +8,7 @@ import (
 )
 
 // SellerClient method wrappers for governance / food-safety / appeals (B-169) —
-// gateway → seller-service gRPC.
+// gateway → seller 模組 gRPC.
 // 配合 internal/handler/governance.go HTTP handler 使用。
 
 const governanceRPCTimeout = 30 * time.Second

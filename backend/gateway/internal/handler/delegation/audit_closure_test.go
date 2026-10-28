@@ -18,7 +18,7 @@ import (
 // 回應是成功的、log 只有一行 Warn、指標照常。
 //
 // ⚠️ 這裡刻意直接驅動 Orchestrator 而不是打 HTTP：要斷言的是「Gateway 送了什麼給
-// account-service」，而三條路徑在 HTTP 層的回應全部正常，從外面看不出差別。
+// delegation 模組」，而三條路徑在 HTTP 層的回應全部正常，從外面看不出差別。
 
 // closureAuditStub 記下送出的 intent／confirm，並可指定 intent 回 replayed 與既有 result。
 type closureAuditStub struct {
@@ -135,7 +135,7 @@ func TestOrchestrate_ReplayedPendingRowGetsClosed(t *testing.T) {
 // confirm。
 //
 // 這是上一條的反向護欄。confirm 的述詞是 `WHERE result='PENDING'` 先到先贏，對已經
-// SUCCEEDED 的列再送一次會被靜默丟棄（account-service 把 ErrNotFound 吞掉回 nil），
+// SUCCEEDED 的列再送一次會被靜默丟棄（delegation 模組把 ErrNotFound 吞掉回 nil），
 // 所以「多送一次沒差」——差在多副本：若另一個 pod 正要寫 FAILED，多送的這次會贏，
 // 把稽核記成成功。不送才是對的。
 func TestOrchestrate_ReplayedTerminalRowStaysUntouched(t *testing.T) {

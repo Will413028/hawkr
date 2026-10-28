@@ -65,10 +65,10 @@ service OrderService {
     // 取得物流建單所需訂單資訊（shipping-service 用）
     rpc GetOrderForShipping(GetOrderForShippingRequest) returns (GetOrderForShippingResponse);
 
-    // 查詢買家在各賣家的累計消費總額（buyer-service 用，會員卡清單）
+    // 查詢買家在各賣家的累計消費總額（buyer 模組用，會員卡清單）
     rpc GetBuyerMerchantSummary(GetBuyerMerchantSummaryRequest) returns (GetBuyerMerchantSummaryResponse);
 
-    // 查詢買家在特定賣家的消費紀錄（buyer-service 用，消費紀錄明細）
+    // 查詢買家在特定賣家的消費紀錄（buyer 模組用，消費紀錄明細）
     rpc GetBuyerOrdersForSeller(GetBuyerOrdersForSellerRequest) returns (GetBuyerOrdersForSellerResponse);
 
     // 售後用：查詢訂單詳情（含買家地址、金額、送達時間，aftersales-service 用）
@@ -820,7 +820,7 @@ message CheckoutPreviewRequest {
     //
     // ⚠️ 為什麼不攤平字串讓 shipping 反解：shipping.proto 的 UberQuoteDropoff 逐字禁止，
     // 每一筆解不出來的就是一個看不到選項的買家。address_id 讓 order-service 走
-    // buyer-service 取回 city／district／detail_address 三欄——與 /app/checkout/uber_quote
+    // buyer 模組取回 city／district／detail_address 三欄——與 /app/checkout/uber_quote
     // 同一個來源，兩邊不會給出不同的答案。
     string address_id = 9;                     // 買家地址簿的 shipping_addresses.id（TSID 數字字串）
     string uber_quote_id = 10;                 // 買家手上那筆報價（uber_quotes.quote_id，dqt_ 前綴）；空 ⇒ 重新取價
@@ -1533,7 +1533,7 @@ message OrderInvoiceSnapshotItem {
 
 message OrderUberQuoteRequest {
     int64 buyer_id = 1;                    // Gateway 注入（E.5.5 int64 例外，與 CheckoutValidateRequest 同）
-    string address_id = 2;                 // 買家收件地址 id（buyer-service 的 shipping_addresses.id）
+    string address_id = 2;                 // 買家收件地址 id（buyer 模組的 shipping_addresses.id）
     repeated CheckoutItem items = 3;       // 當前已勾選的商品，與 CheckoutValidate 同一個型別
 }
 

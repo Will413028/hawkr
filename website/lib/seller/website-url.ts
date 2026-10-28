@@ -28,7 +28,7 @@ export function isValidHostname(hostname: string): boolean {
 }
 
 /**
- * Mirrors the backend's validateWebsiteURL (seller-service): empty string is
+ * Mirrors the backend's validateWebsiteURL (seller module): empty string is
  * valid (clears the field), non-empty must be an absolute http(s) URL with a
  * host. Client-side pre-check only — the backend PUT is still the final gate.
  */

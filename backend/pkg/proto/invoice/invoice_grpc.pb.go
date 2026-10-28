@@ -236,7 +236,7 @@ type InvoiceServiceClient interface {
 	// order-service 在 checkout confirm 呼叫：驗證買家發票輸入（載具/統編/捐贈碼格式與
 	// 三者互斥）＋ 檢查待審接單上限，回傳可持久化的發票快照。
 	ValidateOrderInvoiceInputInternal(ctx context.Context, in *ValidateOrderInvoiceInputInternalRequest, opts ...grpc.CallOption) (*ValidateOrderInvoiceInputInternalResponse, error)
-	// seller-service / ADM 查賣家是否已具備開票能力（薄查詢，供其他服務判斷）。
+	// seller 模組與 ADM 查賣家是否已具備開票能力（薄查詢，供其他服務判斷）。
 	GetSellerInvoiceCapabilitySimple(ctx context.Context, in *GetSellerInvoiceCapabilitySimpleRequest, opts ...grpc.CallOption) (*GetSellerInvoiceCapabilitySimpleResponse, error)
 }
 
@@ -1129,7 +1129,7 @@ type InvoiceServiceServer interface {
 	// order-service 在 checkout confirm 呼叫：驗證買家發票輸入（載具/統編/捐贈碼格式與
 	// 三者互斥）＋ 檢查待審接單上限，回傳可持久化的發票快照。
 	ValidateOrderInvoiceInputInternal(context.Context, *ValidateOrderInvoiceInputInternalRequest) (*ValidateOrderInvoiceInputInternalResponse, error)
-	// seller-service / ADM 查賣家是否已具備開票能力（薄查詢，供其他服務判斷）。
+	// seller 模組與 ADM 查賣家是否已具備開票能力（薄查詢，供其他服務判斷）。
 	GetSellerInvoiceCapabilitySimple(context.Context, *GetSellerInvoiceCapabilitySimpleRequest) (*GetSellerInvoiceCapabilitySimpleResponse, error)
 	mustEmbedUnimplementedInvoiceServiceServer()
 }

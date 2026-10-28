@@ -17,7 +17,7 @@ import (
 )
 
 // fakeInvoker returns a grpc.UnaryInvoker that fills `reply` with the canned values.
-// `replyCode` / `replyMsg` simulate what account-service returned in the response envelope.
+// `replyCode` / `replyMsg` simulate what the delegation module returned in the response envelope.
 func fakeInvoker(replyCode int32, replyMsg string, retErr error) grpc.UnaryInvoker {
 	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, opts ...grpc.CallOption) error {
 		if retErr != nil {

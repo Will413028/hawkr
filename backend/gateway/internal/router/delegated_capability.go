@@ -63,17 +63,17 @@ func registeredAdminNoAuth() []string {
 }
 
 // delegationSessionResolver is the slice of the account gRPC client the guards need
-// (an interface so tests can stub it without a live account-service).
+// (an interface so tests can stub it without a live delegation module).
 type delegationSessionResolver interface {
 	GetCurrentDelegationSession(ctx context.Context, credential string, countsAsActivity bool, deadlineMs int) (*accountpb.GetCurrentSessionResponse, error)
 }
 
-// delegationStoreStateResolver is the seller-service slice §8.1.3 第 8 項 needs.
+// delegationStoreStateResolver is the seller module slice §8.1.3 第 8 項 needs.
 type delegationStoreStateResolver interface {
 	GetStoreStateForGuard(ctx context.Context, storeID int64, deadlineMs int) (*sellerpb.SellerResponse, error)
 }
 
-// delegationSessionRevoker is the account-service slice used to put the session into
+// delegationSessionRevoker is the delegation module slice used to put the session into
 // its terminal state once the target store stops being operable. It is the SAME RPC
 // the ADM governance action uses — a system-triggered revocation is told apart from a
 // human one by revoke_reason, not by a second endpoint (§7.2.7 ①).
@@ -174,7 +174,7 @@ func resolveDelegationSession(c *gin.Context, deps delegationDeps, countsAsActiv
 	if err != nil {
 		// 先問一句：這個 err 是「上游真的不可用」，還是「上游明確拒絕了這把憑證」？
 		//
-		// account-service 對無效憑證回的是 gRPC OK ＋ 非零 envelope code（9274 等），
+		// delegation 模組對無效憑證回的是 gRPC OK ＋ 非零 envelope code（9274 等），
 		// 而 EnvelopeGuardInterceptor 會把非零碼轉成 gRPC error 並在 message 前面加上
 		// "[9274] " 前綴（gateway/internal/grpc/envelope_guard_interceptor.go:104）。
 		// 少了這一步還原，下面那個 resp.GetCode() != 0 分支永遠進不去（碼在到達前就
@@ -220,7 +220,7 @@ func resolveDelegationSession(c *gin.Context, deps delegationDeps, countsAsActiv
 // number — are told apart by exactly this column, so the value is not free text.
 //
 // 值取自 pkgdelegation 的封閉字面值集合，不在這裡手抄第二份：這一欄的判讀是跨服務的
-// （Gateway 寫 store_not_operable、account-service 寫 authorization_revoked），
+// （Gateway 寫 store_not_operable、delegation 模組寫 authorization_revoked），
 // 各寫各的字面值就會出現只差一個字的兩種值而稽核查詢完全看不出來。
 const revokeReasonStoreNotOperable = pkgdelegation.RevokeReasonStoreNotOperable
 
@@ -233,10 +233,10 @@ const revokeReasonStoreNotOperable = pkgdelegation.RevokeReasonStoreNotOperable
 // the nine capabilities).
 //
 // 「確知不可代行」與「問不到答案」走兩條不同的路，這是本項最容易寫錯的地方：
-//   - 確知（seller-service 明確回覆非 active，或該店查無／已關閉）→ 拒絕 ＋ 轉終態
+//   - 確知（seller 模組明確回覆非 active，或該店查無／已關閉）→ 拒絕 ＋ 轉終態
 //   - 不知道（逾時／UNAVAILABLE）→ 拒絕，但工作階段**維持原狀**
 //
-// 轉終態是不可逆的，而 seller-service 的一次抖動是暫時的；把「問不到」也拿去轉終態，
+// 轉終態是不可逆的，而 seller 模組的一次抖動是暫時的；把「問不到」也拿去轉終態，
 // 一次 30 秒的不可用就會把當下所有進行中的工作階段永久打死。fail-closed 要求的是
 // 「這次請求不准通過」，不是「把授權銷毀」。
 //
@@ -282,8 +282,8 @@ func enforceStoreOperable(c *gin.Context, deps delegationDeps, session *accountp
 	return false
 }
 
-// storeStateIsBusinessVerdict tells "seller-service answered" apart from
-// "seller-service could not be reached", which on this hop is NOT the same as
+// storeStateIsBusinessVerdict tells "the seller module answered" apart from
+// "the seller module could not be reached", which on this hop is NOT the same as
 // err == nil: EnvelopeGuardInterceptor turns every non-zero envelope code into a
 // gRPC error, so a business rejection and a transport failure both arrive as err.
 // Reading err alone as "unknown" would make a deleted store answer 9280 forever and
@@ -366,7 +366,7 @@ func recordGuardDenial(c *gin.Context, deps delegationDeps, session *accountpb.O
 	if face == "" {
 		return
 	}
-	// ⚠️ 這一列落在 session 自己的 target store 名下（account-service 以
+	// ⚠️ 這一列落在 session 自己的 target store 名下（delegation 模組以
 	// session.TargetStoreID 填列），不是 URL 上那家被試探的店。記的是「這個工作階段想
 	// 去別家」，看報表時別把它讀成「那家店被動了手腳」。
 	deps.audit.RecordReadDenial(c.Request.Context(), delegation.ReadDenial{
@@ -407,7 +407,7 @@ func delegatedFace(cap authz.AdminCapability) string {
 // (list / create / batch) where the request names no single resource.
 //
 // 店面沒有自己的 id：它就是那家店，而 store_id 已在 session 快照上。訂單編號不是數字，
-// account-service 的 resourceNameForRow 會把它轉存進 resource_name——那一列因此仍指
+// delegation 模組的 resourceNameForRow 會把它轉存進 resource_name——那一列因此仍指
 // 得回那筆訂單。
 func guardResourceID(c *gin.Context, face string) string {
 	switch face {

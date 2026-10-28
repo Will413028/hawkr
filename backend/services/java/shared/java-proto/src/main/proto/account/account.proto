@@ -21,7 +21,7 @@ service AccountService {
     // 手機驗證
     rpc VerifyPhone(VerifyPhoneRequest) returns (VerifyPhoneResponse);
 
-    // 發送手機 OTP 簡訊（後端經三竹發送，51 號設計書）
+    // 發送手機 OTP 簡訊（後端經三竹發送）
     rpc SendOtp(SendOtpRequest) returns (SendOtpResponse);
 
     // Token 刷新
@@ -42,7 +42,7 @@ service AccountService {
     // 綁定賣家
     rpc BindSeller(BindSellerRequest) returns (BindSellerResponse);
 
-    // 綁定買家角色（buyer-service 建立 buyer row 後補 account_type 的 buyer bit）
+    // 綁定買家角色（buyer 模組建立 buyer row 後補 account_type 的 buyer bit）
     rpc BindBuyer(BindBuyerRequest) returns (BindBuyerResponse);
 
     // 管理員帳號密碼登入
@@ -58,8 +58,7 @@ service AccountService {
 
     // 解除停權（#2053）：DEL account:blocked:<id> 後把 status 寫回 active。
     // 順序不可顛倒——先寫 status 會產生「SSOT 說 active、衍生快取說 blocked」的
-    // 中間態，帳號各處看起來正常卻每個請求都 401。詳見 17 號設計書
-    //「帳號停權與解除停權」。軟刪帳號不可解除（GetByID 的 deleted_at IS NULL
+    // 中間態，帳號各處看起來正常卻每個請求都 401。軟刪帳號不可解除（GetByID 的 deleted_at IS NULL
     // 即為該防線：軟刪路徑寫的是同一把 key，放行等於清掉「已刪除」的證據）。
     rpc UnsuspendAccount(UnsuspendAccountRequest) returns (UnsuspendAccountResponse);
 
@@ -126,10 +125,10 @@ message GoogleOAuthRequest {
     string id_token = 1;     // Google ID Token
     string phone = 2;        // 手機號 (新用戶第二輪帶 OTP 驗證過的門號)
     int32 user_type = 3;     // 用戶類型 (新用戶): 1=買家, 2=賣家
-    reserved 4;              // was: firebase_phone_id_token（Firebase Phone Auth 退役，51 號）
+    reserved 4;              // was: firebase_phone_id_token（Firebase Phone Auth 退役）
     string fcm_token = 5;    // FCM Token
     string platform = 6;     // Device Platform
-    string otp_code = 7;     // 手機 OTP 6 位碼（新用戶第二輪；後端經三竹發送，51 號）
+    string otp_code = 7;     // 手機 OTP 6 位碼（新用戶第二輪；後端經三竹發送）
 
     // 本次登入是否需要 bearer 憑證對（access token ＋ refresh token）。
     //
@@ -144,7 +143,7 @@ message AppleOAuthRequest {
     string identity_token          = 1;  // Apple JWT（必填）
     string apple_uid               = 2;  // userIdentifier，帳號主鍵（必填）
     int32  user_type               = 3;  // 1=buyer, 2=seller（必填）
-    reserved 4;                          // was: firebase_phone_id_token（Firebase Phone Auth 退役，51 號）
+    reserved 4;                          // was: firebase_phone_id_token（Firebase Phone Auth 退役）
     string fcm_token               = 5;  // FCM token
     string platform                = 6;  // ios（App）/ web
     string email                   = 7;  // 可為 relay 或空
@@ -152,7 +151,7 @@ message AppleOAuthRequest {
     string family_name             = 9;  // fullName.familyName
     string authorization_code      = 10; // Apple OAuth authorization_code (used to exchange refresh_token for revoke flow); optional
     string phone                   = 11; // 手機號 (新用戶第二輪帶 OTP 驗證過的門號)
-    string otp_code                = 12; // 手機 OTP 6 位碼（新用戶第二輪；後端經三竹發送，51 號）
+    string otp_code                = 12; // 手機 OTP 6 位碼（新用戶第二輪；後端經三竹發送）
 
     // 本次登入是否需要 bearer 憑證對（access token ＋ refresh token）。見
     // GoogleOAuthRequest.issue_refresh_token。
@@ -196,9 +195,9 @@ message ValidateUserResponse {
 
 message VerifyPhoneRequest {
     int64 account_id = 1;
-    reserved 2;             // was: firebase_token（Firebase Phone Auth 退役，51 號）
+    reserved 2;             // was: firebase_token（Firebase Phone Auth 退役）
     string phone = 3;
-    string otp_code = 4;    // 手機 OTP 6 位碼（後端經三竹發送，51 號）
+    string otp_code = 4;    // 手機 OTP 6 位碼（後端經三竹發送）
 }
 
 message VerifyPhoneResponse {
@@ -208,7 +207,7 @@ message VerifyPhoneResponse {
     AccountInfo account = 4;
 }
 
-// ==================== OTP Messages（51 號設計書）====================
+// ==================== OTP Messages ====================
 
 message SendOtpRequest {
     string phone = 1;                 // 手機號（前端可控，§4 規範一律 string）
@@ -292,9 +291,9 @@ message BindSellerRequest {
     int64 account_id = 1;
     reserved 2, 3;  // was: seller_id (int64), merchant_id (string)
     // source_id 是「造成這次授予的那個實體」——seller 角色填 sellers.store_id
-    // （該次入駐的 stint surrogate）。account-service 把它記在 account_roles 上，
+    // （該次入駐的 stint surrogate）。identity 模組把它記在 account_roles 上，
     // 之後的撤銷必須指名同一個 source_id 才會生效（見 RemoveRoleRequest.source_id）。
-    // 0 = 未歸因（account-service 內部授予）：這種授予任何撤銷都撤得掉。
+    // 0 = 未歸因（identity 模組內部授予）：這種授予任何撤銷都撤得掉。
     int64 source_id = 4;
 }
 
@@ -326,7 +325,7 @@ message AdminLoginRequest {
     // GoogleOAuthRequest.issue_refresh_token 的欄位語意——但與該欄位不同，
     // admin 密碼登入唯一的 gateway 呼叫端（account_client.go 的 AdminLogin）
     // 固定帶 false：admin 前端已改走 AdminGoogleLogin/AdminGoogleOAuth（SSO、
-    // cookie session），密碼登入路徑不需要再開一條輪替鏈；account-service
+    // cookie session），密碼登入路徑不需要再開一條輪替鏈；identity 模組
     // 的 AdminLogin handler 也不消費這個欄位（issue #1544 L2 Task 3 fix
     // round 1）。欄位留在 proto 上是為了未來若真的需要 bearer-only admin
     // client 時不必再加欄位。
@@ -436,7 +435,7 @@ enum Role {
 }
 
 // 呼叫方對「帳號另一個角色是否還活著」的判定結果。
-// 未帶 / 查詢失敗一律是 UNKNOWN，account-service 據此 fail-closed 不 cascade。
+// 未帶 / 查詢失敗一律是 UNKNOWN，identity 模組據此 fail-closed 不 cascade。
 enum OtherRoleState {
     OTHER_ROLE_STATE_UNKNOWN = 0;
     OTHER_ROLE_STATE_ACTIVE  = 1;
@@ -453,7 +452,7 @@ message RemoveRoleRequest {
     //   UPDATE account_roles ... WHERE revoked_at IS NULL
     //     AND (source_id IS NULL OR source_id = @source_id)
     //
-    // 這道柵欄存在的理由是撤銷會延遲執行（seller-service 的 outbox worker 重試
+    // 這道柵欄存在的理由是撤銷會延遲執行（非同步的 job 重試
     // 退避最長數小時），期間帳號可能已經重新入駐並取得一筆**較新**的授予。沒有
     // 柵欄時，過期的撤銷會蓋掉那筆合法授予，受害者變成「有店、無角色」且無自癒
     // 路徑。柵欄比對就在那一句 UPDATE 裡，不存在 check-then-act 的競態窗口。

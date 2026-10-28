@@ -82,12 +82,11 @@ func TestReverifyRouteIsPostOnly(t *testing.T) {
 	}
 }
 
-// /admin/certifications* 與 GET /admin/sellers/:store_id 原本是商家實名認證（KYC，18 號設計書）的後台入口，
-// 商品認證刻意不佔用同一段（路由前綴共用會讓 gin 的 param 衝突在啟動時才爆，或安靜地讓其中一組蓋住另一組）。
-// A3b 步驟 10e 第 2b 刀把 KYC 審核搬進單體（SellerAdminService.GetKYCApplication、ApproveKYC、RejectKYC…），
-// 這幾條路由已刪除，前綴現在是空的。這條測試因此改守「不會復活」：gateway 不得再註冊 KYC 的後台路由
-// （一旦有人在 /admin/certifications 底下加路由，不論是不是商品認證，都會讓舊的 KYC 入口與新的單體入口並存，
-// 同一份申請有兩個審核入口），商品認證仍然只在自己的 product_certification_applications 底下。
+// /admin/certifications* 與 GET /admin/sellers/:store_id 是商家實名認證（KYC，18 號設計書）的前綴，KYC 審核在單體
+// （SellerAdminService.GetKYCApplication、ApproveKYC、RejectKYC…），商品認證刻意不佔用同一段（路由前綴共用會讓 gin 的
+// param 衝突在啟動時才爆，或安靜地讓其中一組蓋住另一組）。這條測試守「不會復活」：gateway 不得註冊 KYC 的後台路由
+// （一旦有人在 /admin/certifications 底下加路由，不論是不是商品認證，同一份申請就有兩個審核入口），
+// 商品認證只在自己的 product_certification_applications 底下。
 func TestLegacyKYCAdminRoutesStayDeleted(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()

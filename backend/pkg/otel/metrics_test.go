@@ -283,7 +283,7 @@ func containsMetric(resources []*metricdatapb.ResourceMetrics, want string) bool
 // 這條的存在理由是一次真實的失聯：gRPC-only 遷移把 9940 的 HTTP bootstrap 連同
 // /metrics 一起移除之後，promauto 註冊的指標就再也沒有出口——OTel 的
 // MeterProvider 只讀自己的 instrument，不會去看 prometheus 的 registry。
-// 2026-09-07 在 dev 上實測：account-service 的 auth_refresh_total 在剛被大量
+// 2026-09-07 在 dev 上實測：identity 模組的 auth_refresh_total 在剛被大量
 // 增量之後，Prometheus 裡 30 天內 0 個 series，而同一個 process 的
 // server_start_total（OTel instrument）一直都在。
 //

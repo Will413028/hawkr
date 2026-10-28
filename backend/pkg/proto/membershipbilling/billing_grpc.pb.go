@@ -29,8 +29,8 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// MembershipBillingService is an internal service. Only buyer-service and
-// seller-service control planes may call it; Gateway/App clients never supply
+// MembershipBillingService is an internal service. Only the buyer and
+// seller modules may call it; Gateway/App clients never supply
 // commercial terms directly.
 type MembershipBillingServiceClient interface {
 	// Errors are returned as a non-OK gRPC status. The status details contain
@@ -95,8 +95,8 @@ func (c *membershipBillingServiceClient) EndMembershipSubscription(ctx context.C
 // All implementations must embed UnimplementedMembershipBillingServiceServer
 // for forward compatibility.
 //
-// MembershipBillingService is an internal service. Only buyer-service and
-// seller-service control planes may call it; Gateway/App clients never supply
+// MembershipBillingService is an internal service. Only the buyer and
+// seller modules may call it; Gateway/App clients never supply
 // commercial terms directly.
 type MembershipBillingServiceServer interface {
 	// Errors are returned as a non-OK gRPC status. The status details contain

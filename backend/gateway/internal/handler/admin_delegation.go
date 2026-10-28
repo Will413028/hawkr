@@ -390,7 +390,7 @@ func parseDelegationCaseReference(raw json.RawMessage) (*string, bool) {
 // 列舉內。
 //
 // 「已知但這個工作階段沒被核發」不在這裡判——那是伺服端當下重新評估的結果，由
-// account-service 回 9262（fail-closed，禁止靜默剔除）。Gateway 只擋根本不存在的
+// delegation 模組回 9262（fail-closed，禁止靜默剔除）。Gateway 只擋根本不存在的
 // token，那是格式錯（9260）。
 func validateDelegationCapabilities(caps []string) bool {
 	if len(caps) == 0 {
@@ -617,7 +617,7 @@ func (h *Holder) CreateDelegatedOperation(c *gin.Context) {
 		}
 	}
 	// clamp 是伺服端的義務，前端夾一次不會錯，但一旦被當成唯一防線，curl 直打就繞
-	// 過去了。這裡擋值域，真正的封頂（min(requested, MAX)）在 account-service。
+	// 過去了。這裡擋值域，真正的封頂（min(requested, MAX)）在 delegation 模組。
 	if req.TTLSeconds == nil || *req.TTLSeconds < 1 || *req.TTLSeconds > 1800 {
 		delegationDeny(c, bizcode.DelegationInvalidCommand, "ttlSeconds 必須為 1–1800 的整數")
 		return
@@ -628,7 +628,7 @@ func (h *Holder) CreateDelegatedOperation(c *gin.Context) {
 		TargetStoreId: req.StoreID,
 		ReasonCode:    req.ReasonCode,
 		// ActorDisplayName 刻意留空：Gateway 手上只有 ADM session 的 account id，
-		// 管理員的顯示名由 account-service 從自己的權威資料補（preflight 同一支
+		// 管理員的顯示名由 delegation 模組從自己的權威資料補（preflight 同一支
 		// 判定的 actor）。在這裡塞一個猜來的值只會讓稽核列記錯人。
 		RequestedCapabilities: req.Capabilities,
 		RequestedTtlSeconds:   *req.TTLSeconds,

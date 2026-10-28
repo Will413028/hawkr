@@ -101,7 +101,7 @@ func newMeterProvider(
 			// 遷移把 9940 的 HTTP bootstrap 連同 /metrics 一起移除之後，就再也沒有
 			// 東西會去讀那個 registry。
 			//
-			// 2026-09-07 實測：account-service 的 auth_refresh_total 在剛剛被
+			// 2026-09-07 實測：identity 模組的 auth_refresh_total 在剛剛被
 			// 大量增量之後，Prometheus 裡 30 天內 0 個 series；而同一個 process 的
 			// server_start_total（OTel instrument，走 MeterProvider）一直都在。
 			// auth_dual_write_total 的歷史 series 帶 instance=<pod-ip>:9940，

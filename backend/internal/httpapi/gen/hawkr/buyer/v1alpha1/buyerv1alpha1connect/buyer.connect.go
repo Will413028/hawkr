@@ -2,7 +2,7 @@
 //
 // Source: hawkr/buyer/v1alpha1/buyer.proto
 
-// buyer 模組給前台的 API：買家的 profile、收貨地址、收藏、追蹤、瀏覽紀錄、補貨通知、會員卡與刪除帳號（設計書 39）。
+// buyer 模組給前台的 API：買家的 profile、收貨地址、收藏、追蹤、瀏覽紀錄、補貨通知、會員卡與刪除帳號（行為規格在 backend/docs/modules/buyer.md）。
 // 後台的 API 在 hawkr.admin.buyer.v1alpha1。
 //
 // ID 是不透明的字串；過渡期買家、地址、商品、店家的 ID 是十進位整數字串，client 不解析、不轉數字

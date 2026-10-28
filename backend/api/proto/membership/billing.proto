@@ -8,8 +8,8 @@ option java_multiple_files = true;
 
 import "membership/entitlement.proto";
 
-// MembershipBillingService is an internal service. Only buyer-service and
-// seller-service control planes may call it; Gateway/App clients never supply
+// MembershipBillingService is an internal service. Only the buyer and
+// seller modules may call it; Gateway/App clients never supply
 // commercial terms directly.
 service MembershipBillingService {
   // Errors are returned as a non-OK gRPC status. The status details contain

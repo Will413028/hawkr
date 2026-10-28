@@ -23,7 +23,7 @@ import (
 // 行為：
 //   - buyerID <= 0（未解析出 current buyer_id，含呼叫端解析失敗直接傳 0 的情況）
 //     或 productIDs 為空 → no-op，所有 item 保持 false
-//   - BatchCheckRestockSubscriptions RPC 失敗（含 buyer-service 端 GetCurrentByBuyerID
+//   - BatchCheckRestockSubscriptions RPC 失敗（含 buyer 模組端 GetCurrentByBuyerID
 //     驗證 stint 失敗）→ fail-open（pkglogger.Debug 紀錄；不阻斷 list 主流程，所有
 //     item 保持 false）
 //   - 部分商品有 ACTIVE 訂閱 → setter 對該 productID 寫 true，其餘 false

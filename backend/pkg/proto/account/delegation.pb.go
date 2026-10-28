@@ -1214,7 +1214,7 @@ type GetCurrentSessionRequest struct {
 	// 本次呼叫是否算作「操作者的活動」（閒置逾時用，設計書 §6.2.4a／A23）。
 	//
 	//	true  ＝ 呼叫方是**代行資源路由**（經 delegatedHandle 註冊，讀寫皆然）
-	//	         → account-service 以同一句 UPDATE … RETURNING 順延 last_active_at
+	//	         → delegation 模組以同一句 UPDATE … RETURNING 順延 last_active_at
 	//	false ＝ 呼叫方是**六支 session 端點**（preflight／create／current／end／current-summary／revoke）
 	//	         → 純唯讀，一個位元都不寫
 	//
@@ -2040,7 +2040,7 @@ type RecordAuditIntentRequest struct {
 	//	讀取被拒絕而落的稽核列（STOREFRONT_READ／PRODUCT_READ／POST_READ／ORDER_READ）
 	//	→ 唯一可空的情境，傳空字串，稽核表存 NULL。
 	//
-	// 除上述第三態外，account-service 收到空字串一律回 INVALID_ARGUMENT，
+	// 除上述第三態外，delegation 模組收到空字串一律回 INVALID_ARGUMENT，
 	//
 	//	不得靜默存成 NULL —— 稽核列少一個理由，事後就再也補不回來。
 	OperationReason       string `protobuf:"bytes,7,opt,name=operation_reason,json=operationReason,proto3" json:"operation_reason,omitempty"`
@@ -3895,7 +3895,7 @@ type DelegationAuthorization struct {
 	EffectiveFrom       string   `protobuf:"bytes,6,opt,name=effective_from,json=effectiveFrom,proto3" json:"effective_from,omitempty"`          // ISO 8601 UTC 秒精度，恆非空
 	EffectiveUntil      *string  `protobuf:"bytes,7,opt,name=effective_until,json=effectiveUntil,proto3,oneof" json:"effective_until,omitempty"` // null ＝ 無期限
 	ApprovedByAdminId   string   `protobuf:"bytes,8,opt,name=approved_by_admin_id,json=approvedByAdminId,proto3" json:"approved_by_admin_id,omitempty"`
-	// 由 account-service 讀取時 join admin_accounts 解析（現況投影，不落庫）。
+	// 由 delegation 模組讀取時 join admin_accounts 解析（現況投影，不落庫）。
 	// ⚠️ admin_accounts **沒有顯示名欄位**，這裡填的是 email——與 Preflight 的
 	//
 	//	DisplayName 同一個來源，不要另外發明一個「名字」欄位或拿 id 冒充。

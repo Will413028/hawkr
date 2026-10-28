@@ -252,7 +252,7 @@ func TestRequireDelegatedFailsClosedOnUpstream(t *testing.T) {
 // TestRequireDelegatedRestoresBizCodeFromUpstreamError 鎖住「憑證無效」與「上游不可用」
 // 的分辨。
 //
-// account-service 對無效憑證回的是 gRPC OK ＋ 非零 envelope code，而
+// delegation 模組對無效憑證回的是 gRPC OK ＋ 非零 envelope code，而
 // EnvelopeGuardInterceptor 會把它轉成帶 "[9274] " 前綴的 gRPC error
 // （gateway/internal/grpc/envelope_guard_interceptor.go:104）。少了還原這一步，
 // 憑證無效會一律落進 9280/424 分支 —— 前端顯示「代行服務暫時不可用，請稍後再試」，
@@ -319,7 +319,7 @@ func TestRequireDelegatedRechecksStoreState(t *testing.T) {
 			wantRevoke: true,
 		},
 		{
-			// 軟刪的店在 seller-service 的 lookup 上是 NotFound（濾 deleted_at）。
+			// 軟刪的店在 seller 模組的 lookup 上是 NotFound（濾 deleted_at）。
 			name:     "已刪除／查無 → 9265",
 			stores:   &stubStoreState{err: grpcstatus.Error(codes.NotFound, "seller not found")},
 			wantHTTP: http.StatusForbidden, wantCode: bizcode.DelegationStoreNotDelegable,
@@ -341,7 +341,7 @@ func TestRequireDelegatedRechecksStoreState(t *testing.T) {
 		},
 		{
 			// 問不到答案 ≠ 確知不可代行：拒絕本次請求，但工作階段必須維持原狀，否則
-			// seller-service 抖動 30 秒就會把當下所有工作階段永久打死。
+			// seller 模組抖動 30 秒就會把當下所有工作階段永久打死。
 			name:     "逾時 → 9280 且不轉終態",
 			stores:   &stubStoreState{err: grpcstatus.Error(codes.DeadlineExceeded, "context deadline exceeded")},
 			wantHTTP: http.StatusFailedDependency, wantCode: bizcode.DelegationUpstreamUnavailable,
@@ -608,7 +608,7 @@ func TestGuardDenialFaceMatchesRoute(t *testing.T) {
 			"/g/sellers/2685914682/products/77/publish", "PRODUCT_READ", "product", "77"},
 		{"貼文", authz.AdminCapPostsWrite, "/sellers/:store_id/posts/:post_id",
 			"/g/sellers/2685914682/posts/88", "POST_READ", "post", "88"},
-		// 訂單編號不是數字，account-service 的 resourceNameForRow 會把它轉存進
+		// 訂單編號不是數字，delegation 模組的 resourceNameForRow 會把它轉存進
 		// resource_name，那一列因此仍指得回那筆訂單。
 		{"訂單", authz.AdminCapOrdersRead, "/sellers/:store_id/orders/:order_no",
 			"/g/sellers/2685914682/orders/O005001417", "ORDER_READ", "order", "O005001417"},

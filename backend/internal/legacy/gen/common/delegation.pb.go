@@ -53,7 +53,7 @@ type DelegationContext struct {
 	Capability string `protobuf:"bytes,3,opt,name=capability,proto3" json:"capability,omitempty"`
 	// 單筆操作理由（≤ 100 字，已 trim）。與工作階段層的 reason 是兩層，不可混用。
 	OperationReason string `protobuf:"bytes,4,opt,name=operation_reason,json=operationReason,proto3" json:"operation_reason,omitempty"`
-	// 稽核列 ID（account-service 於 RecordAuditIntent 先行產生，數字字串）。
+	// 稽核列 ID（delegation 模組於 RecordAuditIntent 先行產生，數字字串）。
 	// 領域服務**不需要**把它回寫進自己的表。domain write 與稽核列的對帳，
 	//    由稽核列自己的 resource_id ＋ resource_version_after 達成
 	//    （版本每次成功寫入 +1，比對得上就是同一次寫入）。

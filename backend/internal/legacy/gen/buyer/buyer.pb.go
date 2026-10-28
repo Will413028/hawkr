@@ -115,7 +115,7 @@ type EnsureBuyerProfileRequest struct {
 	// Display name suggested by the OAuth provider (Google account name /
 	// Apple fullName) at this login. Used only to seed a brand-new profile's
 	// nickname or backfill an existing empty one; ignored once a nickname is
-	// already set. Empty when the provider gave no name — buyer-service then
+	// already set. Empty when the provider gave no name — the buyer module then
 	// generates its own default (see EnsureProfile).
 	SuggestedNickname string `protobuf:"bytes,2,opt,name=suggested_nickname,json=suggestedNickname,proto3" json:"suggested_nickname,omitempty"`
 	unknownFields     protoimpl.UnknownFields
@@ -1778,7 +1778,7 @@ type FavoriteInfo struct {
 	SalePriceMax int64 `protobuf:"varint,18,opt,name=sale_price_max,json=salePriceMax,proto3" json:"sale_price_max,omitempty"`
 	// 賣家 canonical 短碼（sellers.store_code，bigint NOT NULL + unique）。
 	// seller_id 是 store_id，賣家頁 canonical 網址走 store_code；只帶 store_id
-	// 的消費端只能連非 canonical 路徑。seller-service 取不到時為空字串（此列的
+	// 的消費端只能連非 canonical 路徑。seller 模組取不到時為空字串（此列的
 	// 賣家區塊本來就一併留空，見 favorite.go enrichWithProductInfo 的降級註解）。
 	StoreCode string `protobuf:"bytes,19,opt,name=store_code,json=storeCode,proto3" json:"store_code,omitempty"`
 	// product-service 取不到這一批商品時為 true：本列的 product_name / 價格 /
@@ -3918,9 +3918,9 @@ type GetMemberCardsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 已由 gateway 解析完成的 buyer_id，不是 JWT 的 account_id。
 	// 這與本檔其餘 RPC（address / favorite / follow / visit…）相反：那些收的是
-	// 原始 account_id，由 buyer-service 內部 buyerLookup.GetByAccountID 自行解析；
+	// 原始 account_id，由 buyer 模組內部 buyerLookup.GetByAccountID 自行解析；
 	// 只有會員卡這兩支（GetMemberCards / GetSpendingRecords）是 gateway 先解析
-	// （gateway/internal/handler/member_card.go）再送進來。buyer-service 端一律
+	// （gateway/internal/handler/member_card.go）再送進來。buyer 模組端一律
 	// 直接透傳、禁止再解析一次——re-resolve 會讓所有 buyer_id != account_id 的
 	// 分岔買家 404「buyer not found」（2026-07-28 live bug 的成因；本欄位原名
 	// account_id 就是那次事故的地雷本體，2026-08-05 正名）。
@@ -4075,7 +4075,7 @@ type MemberCardItem struct {
 	CoverKey      string                 `protobuf:"bytes,5,opt,name=cover_key,json=coverKey,proto3" json:"cover_key,omitempty"`                  // 賣家封面 objectKey（49 §6.6 S9+GW組：Gateway 組 coverUrl）
 	IsVip         bool                   `protobuf:"varint,6,opt,name=is_vip,json=isVip,proto3" json:"is_vip,omitempty"`                          // 買家是否為此賣家的 VIP
 	// 賣家 canonical 短碼（sellers.store_code）；seller_id 是 store_id，
-	// 賣家頁 canonical 網址走 store_code。seller-service 取不到時為空字串
+	// 賣家頁 canonical 網址走 store_code。seller 模組取不到時為空字串
 	// （同一列的 seller_name / logo 也一併留空，見 member_card.go 降級註解）。
 	StoreCode     string `protobuf:"bytes,7,opt,name=store_code,json=storeCode,proto3" json:"store_code,omitempty"`
 	unknownFields protoimpl.UnknownFields

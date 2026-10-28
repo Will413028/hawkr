@@ -19,7 +19,7 @@ import (
 // 七支全部掛在 ADM host 組（JWTAuth + requireAdmin），沒有 operation credential、
 // 不宣告 capability、也不寫 admin_operation_audit_logs（那張表的 session_id 是
 // NOT NULL REFERENCES delegated_operation_sessions，結構上就填不進去）。留痕走
-// account-service 的 delegation_authorization_audit_logs，與授權列同一個交易。
+// delegation 模組的 delegation_authorization_audit_logs，與授權列同一個交易。
 //
 // ⚠️ 路徑一律含 `delegated-operations` 這個 segment。hawkr-admin 的 catch-all BFF
 // （features/delegated-operations/server/bff-boundary.ts）只認 `delegated-operation`／
@@ -50,7 +50,7 @@ var delegationAuthorizationStatuses = map[string]struct{}{
 // delegationEffectiveUntilRE 是對外時間格式（ISO 8601 UTC 秒精度）。
 //
 // 只驗形狀，不驗「是不是已經過去了」：那個判斷要用 now()，而 now() 的權威在
-// account-service（回應的 effective 欄就是它算的）。在 Gateway 用自己的時鐘再判一次，
+// delegation 模組（回應的 effective 欄就是它算的）。在 Gateway 用自己的時鐘再判一次，
 // 兩邊時鐘差幾秒就會出現「Gateway 說不行、服務說可以」的分歧，而分歧的那一側永遠是
 // 使用者看到的那一側。
 var delegationEffectiveUntilRE = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$`)

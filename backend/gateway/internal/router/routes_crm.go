@@ -18,7 +18,7 @@ func registerCRMRoutes(app *gin.RouterGroup, h *handler.Holder) {
 		// 買家精準查詢（依手機號）
 		sellerHandle(crm, "GET", CrmCustomerLookup, cap, h.LookupBuyer)
 
-		// 買家基本資訊（不限 CRM 客戶，透過 buyer-service 查詢）
+		// 買家基本資訊（不限 CRM 客戶，透過 buyer 模組查詢）
 		sellerHandle(crm, "GET", CrmCustomerMeta, cap, h.GetBuyerMeta)
 
 		// 客戶管理

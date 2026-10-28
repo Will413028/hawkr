@@ -336,7 +336,7 @@ func TestSendChatMessage_ResolvesStoreCodeToStoreID(t *testing.T) {
 	assertCode(t, body, 0)
 }
 
-// 賣家不存在（seller-service 回 NotFound）時必須直接回錯，不能讓 room_id 存進
+// 賣家不存在（seller 模組回 NotFound）時必須直接回錯，不能讓 room_id 存進
 // 一個查無資料的代理鍵——那樣訊息「送出成功」但對話列表永遠空白，使用者拿不到
 // 任何錯誤訊號。狀態碼比照 resolveStorefrontSellerID 既有慣例（見
 // TestResolveStorefrontSellerID_NotFound）。

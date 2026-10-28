@@ -171,7 +171,7 @@ service InvoiceService {
     // 三者互斥）＋ 檢查待審接單上限，回傳可持久化的發票快照。
     rpc ValidateOrderInvoiceInputInternal(ValidateOrderInvoiceInputInternalRequest) returns (ValidateOrderInvoiceInputInternalResponse);
 
-    // seller-service / ADM 查賣家是否已具備開票能力（薄查詢，供其他服務判斷）。
+    // seller 模組與 ADM 查賣家是否已具備開票能力（薄查詢，供其他服務判斷）。
     rpc GetSellerInvoiceCapabilitySimple(GetSellerInvoiceCapabilitySimpleRequest) returns (GetSellerInvoiceCapabilitySimpleResponse);
 }
 

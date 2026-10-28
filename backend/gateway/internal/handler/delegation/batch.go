@@ -18,7 +18,7 @@ type BatchItem struct {
 
 // BatchWriteItem is what the domain write hop receives per element: the audit row id
 // is filled in by the Gateway after RecordAuditIntentBatch, because the domain service
-// cannot know it (the audit rows live in account-service) and yet has to echo it back
+// cannot know it (the audit rows live in the delegation module) and yet has to echo it back
 // so the front end can reconcile each element with its own audit entry.
 type BatchWriteItem struct {
 	ResourceID      string
@@ -51,7 +51,7 @@ type BatchResultItem struct {
 // The shape is N independent delegated writes carried by O(1) batch RPCs — six hops
 // regardless of N. The per-element shape (1+4N, i.e. 201 hops at N=50) is functionally
 // identical and only shows up as RPC count, which is exactly why the stress test has
-// to assert the count rather than the outcome. prod account-service runs a connection
+// to assert the count rather than the outcome. prod, the delegation module runs a connection
 // pool of 2; 100 short transactions against it spill latency onto unrelated requests.
 type BatchSpec struct {
 	Session      *accountpb.OperationSessionSummary

@@ -39,7 +39,7 @@ import (
 
 type delegationAuditFakeServer struct {
 	accountpb.UnimplementedDelegationServiceServer
-	// envelopeCode 非零時回 gRPC OK ＋ 該 envelope code，鏡射 account-service 的
+	// envelopeCode 非零時回 gRPC OK ＋ 該 envelope code，鏡射 delegation 模組的
 	// bizOf(err) 分支（internal/grpc/delegation.go）：業務拒絕從來不是 gRPC error。
 	envelopeCode int32
 	envelopeMsg  string
@@ -155,7 +155,7 @@ var delegationAuditEndpoints = []struct {
 	},
 }
 
-// 查無工作階段（account-service 回 9277）必須還原成 410／9277，不得塌成 424／9280。
+// 查無工作階段（delegation 模組回 9277）必須還原成 410／9277，不得塌成 424／9280。
 func TestDelegatedAuditEndpoints_RestoreSessionNotFound(t *testing.T) {
 	for _, ep := range delegationAuditEndpoints {
 		t.Run(ep.name, func(t *testing.T) {

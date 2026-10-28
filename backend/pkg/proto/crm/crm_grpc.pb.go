@@ -54,7 +54,7 @@ type CrmServiceClient interface {
 	GetCustomerTags(ctx context.Context, in *GetCustomerTagsRequest, opts ...grpc.CallOption) (*TagListResponse, error)
 	// 依多標籤搜尋目標客戶（AND 邏輯，需同時擁有所有標籤）
 	SearchCustomersByTags(ctx context.Context, in *SearchCustomersByTagsRequest, opts ...grpc.CallOption) (*SearchCustomersByTagsResponse, error)
-	// 批次查詢買家在多個賣家的 VIP 狀態（buyer-service 用）
+	// 批次查詢買家在多個賣家的 VIP 狀態（buyer 模組用）
 	GetBuyerVipStatuses(ctx context.Context, in *GetBuyerVipStatusesRequest, opts ...grpc.CallOption) (*GetBuyerVipStatusesResponse, error)
 }
 
@@ -207,7 +207,7 @@ type CrmServiceServer interface {
 	GetCustomerTags(context.Context, *GetCustomerTagsRequest) (*TagListResponse, error)
 	// 依多標籤搜尋目標客戶（AND 邏輯，需同時擁有所有標籤）
 	SearchCustomersByTags(context.Context, *SearchCustomersByTagsRequest) (*SearchCustomersByTagsResponse, error)
-	// 批次查詢買家在多個賣家的 VIP 狀態（buyer-service 用）
+	// 批次查詢買家在多個賣家的 VIP 狀態（buyer 模組用）
 	GetBuyerVipStatuses(context.Context, *GetBuyerVipStatusesRequest) (*GetBuyerVipStatusesResponse, error)
 	mustEmbedUnimplementedCrmServiceServer()
 }

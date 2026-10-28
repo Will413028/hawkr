@@ -4,7 +4,7 @@
 // Split out from pkg/rolestate itself so that usecase-layer callers can
 // import rolestate for the type and Resolve without dragging the generated
 // proto package into their import graph. Only the grpc/client layers (which
-// already depend on pb to speak the account-service RPC) import this
+// already depend on pb to speak the identity module RPC) import this
 // sub-package.
 package rolestatepb
 
@@ -13,7 +13,7 @@ import (
 	"github.com/Will413028/hawkr/go-pkg/rolestate"
 )
 
-// ToProto converts rolestate.OtherRoleState to the pb enum account-service's
+// ToProto converts rolestate.OtherRoleState to the pb enum the identity module's
 // RemoveRole expects. Defaults to UNKNOWN (fail-closed) for any value that
 // isn't explicitly Active or Absent.
 func ToProto(s rolestate.OtherRoleState) pb.OtherRoleState {

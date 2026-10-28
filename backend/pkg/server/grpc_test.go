@@ -78,7 +78,7 @@ func TestBuildServerOptions_ExtraInterceptorsRunAfterStandardChain(t *testing.T)
 
 // TestBuildServerOptions_LoggingOptionsThreadThrough verifies LoggingOptions
 // (e.g. WithExpectedCodes) reach interceptor.LoggingInterceptor — this is what
-// lets account-service migrate to pkg/server.NewGRPCServer without losing its
+// lets the identity module migrate to pkg/server.NewGRPCServer without losing its
 // issue #2072 expected-code handling.
 func TestBuildServerOptions_LoggingOptionsThreadThrough(t *testing.T) {
 	logger := zap.NewNop()

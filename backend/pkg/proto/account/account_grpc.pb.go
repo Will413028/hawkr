@@ -65,7 +65,7 @@ type AccountServiceClient interface {
 	ValidateUser(ctx context.Context, in *ValidateUserRequest, opts ...grpc.CallOption) (*ValidateUserResponse, error)
 	// 手機驗證
 	VerifyPhone(ctx context.Context, in *VerifyPhoneRequest, opts ...grpc.CallOption) (*VerifyPhoneResponse, error)
-	// 發送手機 OTP 簡訊（後端經三竹發送，51 號設計書）
+	// 發送手機 OTP 簡訊（後端經三竹發送）
 	SendOtp(ctx context.Context, in *SendOtpRequest, opts ...grpc.CallOption) (*SendOtpResponse, error)
 	// Token 刷新
 	RefreshToken(ctx context.Context, in *RefreshTokenRequest, opts ...grpc.CallOption) (*RefreshTokenResponse, error)
@@ -79,7 +79,7 @@ type AccountServiceClient interface {
 	GetAccountByPhone(ctx context.Context, in *GetAccountByPhoneRequest, opts ...grpc.CallOption) (*AccountInfoResponse, error)
 	// 綁定賣家
 	BindSeller(ctx context.Context, in *BindSellerRequest, opts ...grpc.CallOption) (*BindSellerResponse, error)
-	// 綁定買家角色（buyer-service 建立 buyer row 後補 account_type 的 buyer bit）
+	// 綁定買家角色（buyer 模組建立 buyer row 後補 account_type 的 buyer bit）
 	BindBuyer(ctx context.Context, in *BindBuyerRequest, opts ...grpc.CallOption) (*BindBuyerResponse, error)
 	// 管理員帳號密碼登入
 	AdminLogin(ctx context.Context, in *AdminLoginRequest, opts ...grpc.CallOption) (*AdminLoginResponse, error)
@@ -91,8 +91,7 @@ type AccountServiceClient interface {
 	SuspendAccount(ctx context.Context, in *SuspendAccountRequest, opts ...grpc.CallOption) (*SuspendAccountResponse, error)
 	// 解除停權（#2053）：DEL account:blocked:<id> 後把 status 寫回 active。
 	// 順序不可顛倒——先寫 status 會產生「SSOT 說 active、衍生快取說 blocked」的
-	// 中間態，帳號各處看起來正常卻每個請求都 401。詳見 17 號設計書
-	// 「帳號停權與解除停權」。軟刪帳號不可解除（GetByID 的 deleted_at IS NULL
+	// 中間態，帳號各處看起來正常卻每個請求都 401。軟刪帳號不可解除（GetByID 的 deleted_at IS NULL
 	// 即為該防線：軟刪路徑寫的是同一把 key，放行等於清掉「已刪除」的證據）。
 	UnsuspendAccount(ctx context.Context, in *UnsuspendAccountRequest, opts ...grpc.CallOption) (*UnsuspendAccountResponse, error)
 	// Admin 會員管理唯讀面（#2053）。以 accounts 為主軸而非 buyers：可施加的
@@ -473,7 +472,7 @@ type AccountServiceServer interface {
 	ValidateUser(context.Context, *ValidateUserRequest) (*ValidateUserResponse, error)
 	// 手機驗證
 	VerifyPhone(context.Context, *VerifyPhoneRequest) (*VerifyPhoneResponse, error)
-	// 發送手機 OTP 簡訊（後端經三竹發送，51 號設計書）
+	// 發送手機 OTP 簡訊（後端經三竹發送）
 	SendOtp(context.Context, *SendOtpRequest) (*SendOtpResponse, error)
 	// Token 刷新
 	RefreshToken(context.Context, *RefreshTokenRequest) (*RefreshTokenResponse, error)
@@ -487,7 +486,7 @@ type AccountServiceServer interface {
 	GetAccountByPhone(context.Context, *GetAccountByPhoneRequest) (*AccountInfoResponse, error)
 	// 綁定賣家
 	BindSeller(context.Context, *BindSellerRequest) (*BindSellerResponse, error)
-	// 綁定買家角色（buyer-service 建立 buyer row 後補 account_type 的 buyer bit）
+	// 綁定買家角色（buyer 模組建立 buyer row 後補 account_type 的 buyer bit）
 	BindBuyer(context.Context, *BindBuyerRequest) (*BindBuyerResponse, error)
 	// 管理員帳號密碼登入
 	AdminLogin(context.Context, *AdminLoginRequest) (*AdminLoginResponse, error)
@@ -499,8 +498,7 @@ type AccountServiceServer interface {
 	SuspendAccount(context.Context, *SuspendAccountRequest) (*SuspendAccountResponse, error)
 	// 解除停權（#2053）：DEL account:blocked:<id> 後把 status 寫回 active。
 	// 順序不可顛倒——先寫 status 會產生「SSOT 說 active、衍生快取說 blocked」的
-	// 中間態，帳號各處看起來正常卻每個請求都 401。詳見 17 號設計書
-	// 「帳號停權與解除停權」。軟刪帳號不可解除（GetByID 的 deleted_at IS NULL
+	// 中間態，帳號各處看起來正常卻每個請求都 401。軟刪帳號不可解除（GetByID 的 deleted_at IS NULL
 	// 即為該防線：軟刪路徑寫的是同一把 key，放行等於清掉「已刪除」的證據）。
 	UnsuspendAccount(context.Context, *UnsuspendAccountRequest) (*UnsuspendAccountResponse, error)
 	// Admin 會員管理唯讀面（#2053）。以 accounts 為主軸而非 buyers：可施加的

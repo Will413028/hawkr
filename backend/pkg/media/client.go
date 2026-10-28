@@ -35,7 +35,7 @@ const (
 // 實作放在 pkg 層，各服務的 media client 直接委派到此函式。
 //
 // link 失敗會回報給 caller，不吞掉。理由：所有呼叫端（ai-service 風格縮圖、
-// content-service banner、review-service 評論圖、im-service 聊天圖）都在寫入自己的
+// content 模組 banner、review-service 評論圖、im-service 聊天圖）都在寫入自己的
 // 表之前呼叫本函式，且收到 error 就中止，因此回 error 的結果是「沒有任何人引用這個
 // objectKey」——正好落在 media GC 對孤兒資產的處理範圍（09 §8.4）。反之若在此吞掉錯誤，caller 會把 objectKey 寫進 DB，形成
 // 「有人在用但沒有 asset_reference」，7 天後 GC 刪掉的就是正在顯示的圖，且事後無跡可循。
@@ -85,7 +85,7 @@ func FinalizeAndLink(ctx context.Context, client pb.MediaServiceClient, stagedTo
 // 絕不會出現「業務列指著、卻沒有引用」的資產——那種資產會被 GC 連同 R2 物件實體刪除，
 // 事後無跡可循（2026-08 dev 上 16 個賣家 logo 即因此消失）。
 //
-// 這個 ①②③ 順序契約對**六個媒體擁有者一體適用**（貼文、ai-service 縮圖、content-service
+// 這個 ①②③ 順序契約對**六個媒體擁有者一體適用**（貼文、ai-service 縮圖、content 模組
 // banner、review-service 評論圖、im-service 聊天圖，見 56 號設計書 §7.7.3）。
 //
 // 貼文曾經是唯一的例外——③ 一度整個從寫入路徑拿掉，改由一支 level-triggered reconciler

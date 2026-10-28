@@ -29,8 +29,8 @@ type Config struct {
 	// 讓它啟動失敗。注入來源：dev = k8s/values/*.yaml、prod = overlays/prod/common.yaml、
 	// 本機 = docker-compose-local.yml。
 	MediaBaseURL string
-	// WebBaseURL 是賣家公開頁（買家與賣家網頁）的域名，跟 seller-service 的 WEB_BASE_URL
-	// 語意相同、各自獨立設定（非跨服務共享）。目前唯一用途：admin 審核頁算平台
+	// WebBaseURL 是賣家公開頁（買家與賣家網頁）的域名，由 gateway 自己設定。
+	// 目前唯一用途：admin 審核頁算平台
 	// 生成頁 fallback URL 顯示用，見 handler.Holder.WebBaseURL 的說明。
 	WebBaseURL string
 
@@ -88,11 +88,9 @@ type Config struct {
 
 // DelegationConfig holds the Gateway's per-hop gRPC deadlines for delegated
 // operations (56 號設計書 §8.5.1 (A)). Deadlines belong to the caller, so this
-// group lives here and not in account-service: account-service has neither the
+// group lives in the Gateway: the monolith that serves these RPCs has neither the
 // standing nor the information to decide how long the Gateway waits before
-// giving up. The mirror-imaged DELEGATION_GRPC_DEADLINE_SELLER_STATE_MS is
-// account-service's own hop and is deliberately not in this struct — setting
-// either one on the wrong service produces no error signal at all.
+// giving up.
 //
 // 預設值取自 §7.3.1 的逾時預算表；值域上界另有各自的線（本 struct 不斷言逐支值域，
 // 因為值域逐項成立不保證加總成立——真正的守門人是 Validate() 的兩條總預算斷言）。
@@ -115,10 +113,7 @@ type DelegationConfig struct {
 	GrpcDeadlineBatchAuditConfirmMs int
 
 	// AuditConfirmTotalBudgetMs 是單筆 confirm 重試迴圈的總預算（含重試之間的
-	// 退避）。account-service 也有一支同名 env（server 端自己的處理上界），兩者
-	// 必須同值——confirm 的重試迴圈實際跑在 Gateway 的 orchestrator，總預算的
-	// 執行者是這裡；而 Gateway 讀不到別的服務的 env，所以各自宣告一份。
-	// **同值沒有任何機械保證**，靠 §12.1 位置 5 的部署後對帳。
+	// 退避）。confirm 的重試迴圈跑在 Gateway 的 orchestrator，總預算的執行者是這裡。
 	AuditConfirmTotalBudgetMs int
 	// AuditConfirmBatchTotalBudgetMs 是批次版，只落在 Gateway。
 	AuditConfirmBatchTotalBudgetMs int

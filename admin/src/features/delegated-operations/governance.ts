@@ -255,7 +255,7 @@ export function isDelegatedSessionId(value: unknown): value is string {
 /**
  * 工作階段代號（`OPS-` ＋ 13 碼 Crockford base32）。
  *
- * 三處同一份形狀：DB 的 `chk_dos_display_code_format`、account-service 的
+ * 三處同一份形狀：DB 的 `chk_dos_display_code_format`、delegation 模組的
  * `domain.IsValidDisplayCode`、gateway 列表端點的 `delegatedDisplayCodeRE`。gateway
  * 對格式錯的代號回 9260 而不是放行 —— 未驗證的錯字會換來一個空白頁，讀起來像「沒有
  * 這個工作階段」而不是「你打錯了」，而前端這一份存在的理由完全相同。
@@ -689,7 +689,7 @@ export interface DelegatedOperationSessionRecord {
 	expiresAt: string;
 	endedAt: string | null;
 	/**
-	 * ⚠️ `expired` 是 account-service 讀取當下以**單一** now() 對整頁逐列推導的，DB 只
+	 * ⚠️ `expired` 是 delegation 模組讀取當下以**單一** now() 對整頁逐列推導的，DB 只
 	 * 存 active／revoked。前端不得自己拿 `expiresAt` 與瀏覽器時間再推一次：那會讓同一
 	 * 列在列表與詳情頁上各有一個狀態，而讀的人正在比對時序。
 	 */

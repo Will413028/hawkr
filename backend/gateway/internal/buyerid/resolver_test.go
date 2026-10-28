@@ -53,7 +53,7 @@ func TestCurrentBuyerID_NoRowIsNoCurrentBuyer(t *testing.T) {
 	}
 }
 
-// 防禦性分支：err == nil 但 resp 為 nil（buyer-service handler 現行邏輯不會
+// 防禦性分支：err == nil 但 resp 為 nil（buyer 模組的 handler 現行邏輯不會
 // 產出這個組合，見 resolver.go 註解，但保留給未來 nil-Data 成功 response）。
 func TestCurrentBuyerID_NilResponseIsNoCurrentBuyer(t *testing.T) {
 	r := New(GetterFunc(func(context.Context, int64) (*pb.BuyerInfo, error) {

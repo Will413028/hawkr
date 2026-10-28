@@ -119,7 +119,7 @@ test("A01：未知 KPI key 落 default 分支（不是白畫面、不是靜默�
 });
 
 test("A01：KPI 空字串是『取不到』不是 0", () => {
-	// suspended_sellers 的權威在 seller-service，取不到時後端回空字串。
+	// suspended_sellers 的權威在 seller 模組，取不到時後端回空字串。
 	// 印成 0 會看起來像「今天沒有人被停權」。
 	assert.equal(kpiDisplayValue("", false), "取不到");
 	assert.equal(kpiDisplayValue("0", false), "0");

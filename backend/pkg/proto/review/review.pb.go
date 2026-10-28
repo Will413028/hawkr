@@ -812,7 +812,7 @@ type OrderReviewInfo struct {
 	ItemImageKey   string                 `protobuf:"bytes,10,opt,name=item_image_key,json=itemImageKey,proto3" json:"item_image_key,omitempty"`       // 商品圖 objectKey（快照；49 §6.6；Gateway 組顯示 URL）
 	Price          string                 `protobuf:"bytes,11,opt,name=price,proto3" json:"price,omitempty"`                                           // 商品單價（數字字串，元）
 	CreatedAt      string                 `protobuf:"bytes,12,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`                  // RFC3339 UTC
-	BuyerName      string                 `protobuf:"bytes,13,opt,name=buyer_name,json=buyerName,proto3" json:"buyer_name,omitempty"`                  // 買家暱稱（由 buyer-service 填充）
+	BuyerName      string                 `protobuf:"bytes,13,opt,name=buyer_name,json=buyerName,proto3" json:"buyer_name,omitempty"`                  // 買家暱稱（由 buyer 模組填充）
 	BuyerAvatarKey string                 `protobuf:"bytes,14,opt,name=buyer_avatar_key,json=buyerAvatarKey,proto3" json:"buyer_avatar_key,omitempty"` // 買家頭像 objectKey/外部 URL（49 §6.6 S2；Gateway 組顯示 URL）
 	ProductId      string                 `protobuf:"bytes,15,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`                  // 商品 ID（數字字串）— 前端連結商品頁用（#1155）
 	Reply          *ReplyInfo             `protobuf:"bytes,16,opt,name=reply,proto3" json:"reply,omitempty"`                                           // 賣家回覆（#1174；null = 未回覆）

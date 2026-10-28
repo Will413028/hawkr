@@ -765,7 +765,7 @@ func (h *Holder) BatchUnpublishDelegatedProducts(c *gin.Context) {
 					ProductId:       wi.ResourceID,
 					ExpectedVersion: wi.ExpectedVersion,
 					// audit_log_id 由 Gateway 填、領域服務原樣回音：稽核列在
-					// account-service，領域服務拿不到這個值。
+					// delegation 模組，領域服務拿不到這個值。
 					AuditLogId: wi.AuditLogID,
 				})
 			}

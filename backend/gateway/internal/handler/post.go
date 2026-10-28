@@ -1117,7 +1117,7 @@ type PostListItemData struct {
 	// 連結一律用它組 /sellers/{store_code}。值由 enrichPostsWithSellerInfo 從
 	// 既有的 GetSellerBatch 回應回填——social-service 只存 seller_id，沒有
 	// store_code，但那支 batch RPC 為了店名/logo 本來就會呼叫，順手帶回來零成本。
-	// 空字串代表該賣家在 seller-service 查不到（已關店/批次逾時），此時前端
+	// 空字串代表該賣家在 seller 模組查不到（已關店/批次逾時），此時前端
 	// 必須不渲染賣家連結，而不是退回 seller_id——store_id 定址已不再受支援。
 	StoreCode    string `json:"storeCode"`
 	CreatedAt    int64  `json:"createdAt"`

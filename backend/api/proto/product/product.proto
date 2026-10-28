@@ -42,7 +42,7 @@ service ProductService {
 
     // 批次取 before 快照與當前 version（代行批次寫入的第一跳，56 設計書 §7.2.8 步驟 ②）。
     // 存在的理由是「跳數不得與 items 筆數成正比」：逐項打 GetProduct 會讓
-    //    一次 50 筆的批次多出 50 跳，而 prod 的 account-service 連線池只有 2。
+    //    一次 50 筆的批次多出 50 跳，而 gateway 到 delegation 模組的連線池只有 2。
     // 唯讀；查不到的 product_id 在 results 內以 found=false 回報，不整批失敗
     //    —— 那一項的失敗要走稽核（intent → FAILED），不能在讀取階段就消失。
     rpc BatchGetSellerProductsForDelegation (BatchGetSellerProductsForDelegationRequest)
@@ -161,7 +161,7 @@ service ProductService {
     // ==================== 有公開上架商品的店家（Seller Service 呼叫） ====================
 
     // 回傳「至少有一件公開上架商品」的 store_id 全集。
-    // 內部 RPC（seller-service 推薦賣家 / marketplace rail 用來濾掉空店），不對前端暴露。
+    // 內部 RPC（seller 模組推薦賣家 / marketplace rail 用來濾掉空店），不對前端暴露。
     // 詳見 02 §5.13c
     rpc ListStoreIDsWithPublicProductsInternal (ListStoreIDsWithPublicProductsInternalRequest) returns (ListStoreIDsWithPublicProductsInternalResponse);
 
@@ -388,7 +388,7 @@ message BatchProductStatusItem {
     string expected_version = 2;
     // 該項的稽核列 ID。**由 Gateway 在 RecordAuditIntentBatch 回來之後填入**，
     //    領域服務只原樣回音到 BatchProductStatusResult.audit_log_id —— 它拿不到這個值，
-    //    稽核列在 account-service。少了本欄，Result 那一欄就是一個永遠填不出來的宣稱（§7.2.8 讀法 5）。
+    //    稽核列在 delegation 模組。少了本欄，Result 那一欄就是一個永遠填不出來的宣稱（§7.2.8 讀法 5）。
     // 空字串 = 有人繞過兩階段稽核，領域服務必須拒絕（同 §6.2.1 S1）。
     string audit_log_id = 3;
 }
@@ -414,7 +414,7 @@ message BatchProductSnapshot {
     // 同步的症狀是「批次的稽核少記一欄」——不會編譯錯、不會有測試轉紅。
     //
     // ⚠️ seller／reviews 不填：投影用不到，而 buildSellerInfo 是跨服務呼叫，逐項付一次
-    //    會讓這一跳退化成 N 次 seller-service RPC，正是 §7.2.8「跳數與 items 筆數脫鉤」
+    //    會讓這一跳退化成 N 次 seller 模組 RPC，正是 §7.2.8「跳數與 items 筆數脫鉤」
     //    要消掉的形狀。found=false 時本欄為空。
     ProductDetail detail = 6;
 }

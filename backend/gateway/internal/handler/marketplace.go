@@ -157,7 +157,7 @@ func (h *Holder) GetMarketplace(c *gin.Context) {
 
 	_ = g.Wait()
 
-	// 用 seller-service 補上貼文缺少的賣家名稱/頭貼
+	// 用 seller 模組補上貼文缺少的賣家名稱/頭貼
 	h.enrichPostsWithSellerInfo(c.Request.Context(), posts)
 
 	// 確保空陣列而非 null
@@ -220,8 +220,8 @@ func (h *Holder) GetMarketplace(c *gin.Context) {
 	})
 }
 
-// enrichPostsWithSellerInfo 用 seller-service 的店名/logo 覆蓋貼文的賣家資訊。
-// social-service 從 account-service 取 nickname，但賣家的顯示名稱應該用 seller-service 的 store_name。
+// enrichPostsWithSellerInfo 用 seller 模組的店名/logo 覆蓋貼文的賣家資訊。
+// social-service 從 identity 模組取 nickname，但賣家的顯示名稱應該用 seller 模組的 store_name。
 func (h *Holder) enrichPostsWithSellerInfo(ctx context.Context, posts []PostListItemData) {
 	seen := make(map[int64]struct{})
 	var ids []int64

@@ -293,12 +293,12 @@ type CrmCustomer struct {
 	CustomerType       string                 `protobuf:"bytes,4,opt,name=customer_type,json=customerType,proto3" json:"customer_type,omitempty"` // "normal" / "vip" / "blocklist"
 	TotalSpent         string                 `protobuf:"bytes,6,opt,name=total_spent,json=totalSpent,proto3" json:"total_spent,omitempty"`
 	OrderCount         string                 `protobuf:"bytes,7,opt,name=order_count,json=orderCount,proto3" json:"order_count,omitempty"`
-	Nickname           string                 `protobuf:"bytes,11,opt,name=nickname,proto3" json:"nickname,omitempty"`                                               // cache in DB + enriched from account-service
+	Nickname           string                 `protobuf:"bytes,11,opt,name=nickname,proto3" json:"nickname,omitempty"`                                               // cache in DB + enriched from the identity module
 	AvatarKey          string                 `protobuf:"bytes,12,opt,name=avatar_key,json=avatarKey,proto3" json:"avatar_key,omitempty"`                            // 買家頭像 objectKey（49 §6.6 S9：enrich 自 buyer 透傳 key；Gateway 組 avatarUrl；http 值 passthrough）
 	Tags               []*Tag                 `protobuf:"bytes,13,rep,name=tags,proto3" json:"tags,omitempty"`                                                       // Enriched from crm tags
-	Phone              string                 `protobuf:"bytes,14,opt,name=phone,proto3" json:"phone,omitempty"`                                                     // cache in DB + enriched from account-service
-	Address            string                 `protobuf:"bytes,15,opt,name=address,proto3" json:"address,omitempty"`                                                 // Enriched from account-service
-	Email              string                 `protobuf:"bytes,16,opt,name=email,proto3" json:"email,omitempty"`                                                     // Enriched from account-service
+	Phone              string                 `protobuf:"bytes,14,opt,name=phone,proto3" json:"phone,omitempty"`                                                     // cache in DB + enriched from the identity module
+	Address            string                 `protobuf:"bytes,15,opt,name=address,proto3" json:"address,omitempty"`                                                 // enriched from the identity module
+	Email              string                 `protobuf:"bytes,16,opt,name=email,proto3" json:"email,omitempty"`                                                     // enriched from the identity module
 	CouponCount        string                 `protobuf:"bytes,17,opt,name=coupon_count,json=couponCount,proto3" json:"coupon_count,omitempty"`                      // Enriched from marketing-service
 	FrequentCategories []string               `protobuf:"bytes,18,rep,name=frequent_categories,json=frequentCategories,proto3" json:"frequent_categories,omitempty"` // Enriched from order-service
 	unknownFields      protoimpl.UnknownFields

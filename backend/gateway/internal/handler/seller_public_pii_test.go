@@ -26,7 +26,7 @@ import (
 // publicSellerPIIDenylist 是絕對不得出現在公開賣家端點的 JSON 欄名。
 //
 // 分類與理由（詳見 PublicSellerInfo 型別註解）：
-//   - email/phone/contactPhone：帳號註冊時已驗證的個人信箱與手機（seller-service
+//   - email/phone/contactPhone：帳號註冊時已驗證的個人信箱與手機（seller 模組
 //     toResponse 讓 phone == contactPhone，且 GetShippingProfile 拿它們當寄件人身分）
 //   - birthday/gender：店主個人資料
 //   - address/addressDetail/postalCode：街道級寄退件地址（公開面只到 city+district）

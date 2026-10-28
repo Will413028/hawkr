@@ -166,7 +166,7 @@ func TestGetSellerInfo_SkipsVisitForNonBuyerAccount(t *testing.T) {
 		},
 	}
 	// 一個沒有現任買家 stint 的登入身分（例如純賣家帳號逛別家商店）——
-	// noBuyerResolverForTest 模擬 buyer-service 404 → ErrNoCurrentBuyer。
+	// noBuyerResolverForTest 模擬 buyer 模組 404 → ErrNoCurrentBuyer。
 	h := &Holder{Seller: grpcclient.NewSellerClientForTest(sellerMock), BuyerID: noBuyerResolverForTest()}
 	r := gin.New()
 	r.GET("/api/v1/public/sellers/:id", fakeOptionalAuth(), h.GetSellerInfo)

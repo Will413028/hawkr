@@ -27,7 +27,7 @@
  *
  * Orders, coupons, browsing history and im conversations joined in #2137. Each
  * was assumed to need a new seller lookup; each turned out to already make one
- * (order-service and coupon-service via batchGetSellerMeta, buyer-service and
+ * (order-service and coupon-service via batchGetSellerMeta, the buyer module and
  * im-service via GetSellerBatch) and to be dropping store_code while copying
  * the store name and logo out of the very same response. Zero extra RPC, so
  * they cleared the "already fetched, merely dropped" bar.
@@ -361,7 +361,7 @@ test("favorite rows carry the seller store_code the wire now sends", async () =>
 	assert.equal(row.product?.store?.id, STORE_ID);
 	assert.equal(row.product?.store?.storeCode, STORE_CODE);
 
-	// seller-service unreachable → the backend blanks the whole seller block,
+	// seller 模組 unreachable → the backend blanks the whole seller block,
 	// so the absent segment is indistinguishable from "no seller info at all".
 	const degraded = create(FavoriteSchema, { product: { id: "p2" } });
 	assert.equal(degraded.product?.store, undefined);

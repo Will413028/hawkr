@@ -579,7 +579,7 @@ const TZ_MATRIX = [
 
 /** 每一種 wire 上會出現的時間表示法，都必須是時區不變量。 */
 const TZ_INVARIANT_INPUTS: readonly DateLike[] = [
-	"2026/07/19", // buyer-service 消費明細 orderDate（台北牆上時間）
+	"2026/07/19", // buyer 模組消費明細 orderDate（台北牆上時間）
 	"2026/01/01", // 年界：東移時區在修復前會退回前一年
 	"2026-07-19", // 純日期（生日 / 交易日）
 	"2026-07-19 08:30", // 空白分隔的牆上時間

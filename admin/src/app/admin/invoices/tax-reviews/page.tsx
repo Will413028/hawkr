@@ -124,7 +124,7 @@ export default function TaxReviewQueuePage() {
 					{/* 文案逐字對齊後端述詞（backend #3089 第 16 項）：
 					    ListTaxReviewsForAdmin 比對 legal_name／tax_id／issuer_ref_id(store_id)。
 					    原文案寫「店名」而後端比的是**法定名稱** —— 店名（store_name）
-					    在 seller-service，本服務搜不到，照螢幕上的字去搜必然 0 筆。
+					    在 seller 模組，本服務搜不到，照螢幕上的字去搜必然 0 筆。
 					    store_id 那一格是同一批補上的（在那之前述詞裡根本沒有它）。 */}
 					<input
 						type="text"

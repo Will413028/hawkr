@@ -1491,7 +1491,7 @@ type BatchProductStatusItem struct {
 	ExpectedVersion string                 `protobuf:"bytes,2,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
 	// 該項的稽核列 ID。**由 Gateway 在 RecordAuditIntentBatch 回來之後填入**，
 	//    領域服務只原樣回音到 BatchProductStatusResult.audit_log_id —— 它拿不到這個值，
-	//    稽核列在 account-service。少了本欄，Result 那一欄就是一個永遠填不出來的宣稱（§7.2.8 讀法 5）。
+	//    稽核列在 delegation 模組。少了本欄，Result 那一欄就是一個永遠填不出來的宣稱（§7.2.8 讀法 5）。
 	// 空字串 = 有人繞過兩階段稽核，領域服務必須拒絕（同 §6.2.1 S1）。
 	AuditLogId    string `protobuf:"bytes,3,opt,name=audit_log_id,json=auditLogId,proto3" json:"audit_log_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1624,7 +1624,7 @@ type BatchProductSnapshot struct {
 	// 同步的症狀是「批次的稽核少記一欄」——不會編譯錯、不會有測試轉紅。
 	//
 	// ⚠️ seller／reviews 不填：投影用不到，而 buildSellerInfo 是跨服務呼叫，逐項付一次
-	//    會讓這一跳退化成 N 次 seller-service RPC，正是 §7.2.8「跳數與 items 筆數脫鉤」
+	//    會讓這一跳退化成 N 次 seller 模組 RPC，正是 §7.2.8「跳數與 items 筆數脫鉤」
 	//    要消掉的形狀。found=false 時本欄為空。
 	Detail        *ProductDetail `protobuf:"bytes,6,opt,name=detail,proto3" json:"detail,omitempty"`
 	unknownFields protoimpl.UnknownFields

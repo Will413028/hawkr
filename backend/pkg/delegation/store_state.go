@@ -2,7 +2,7 @@ package delegation
 
 import "github.com/Will413028/hawkr/go-pkg/errors/bizcode"
 
-// sellers.status lifecycle values (seller-service schema chk_sellers_status).
+// sellers.status lifecycle values (seller module schema chk_sellers_status).
 const (
 	storeStatusActive              = "active"
 	storeStatusSuspended           = "suspended"

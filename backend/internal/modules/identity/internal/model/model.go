@@ -172,8 +172,8 @@ const (
 type RemoveRoleInput struct {
 	AccountID int64
 	Role      Role
-	// SourceID 是要撤銷的那次授予的來源；目前的授予屬於另一個（較新的）來源時不移除（#3189，只剩 seller-service
-	// 非同步移除 SELLER 需要，A3b 步驟 11 拿掉）。
+	// SourceID 是要撤銷的那次授予的來源；目前的授予屬於另一個（較新的）來源時不移除（遲到的撤銷
+	// 不能蓋掉重新入駐後的授予，#3189）。
 	SourceID *int64
 }
 

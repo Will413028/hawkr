@@ -145,7 +145,7 @@ message OrderReviewInfo {
     string item_image_key = 10; // 商品圖 objectKey（快照；49 §6.6；Gateway 組顯示 URL）
     string price = 11;          // 商品單價（數字字串，元）
     string created_at = 12;     // RFC3339 UTC
-    string buyer_name = 13;     // 買家暱稱（由 buyer-service 填充）
+    string buyer_name = 13;     // 買家暱稱（由 buyer 模組填充）
     string buyer_avatar_key = 14;   // 買家頭像 objectKey/外部 URL（49 §6.6 S2；Gateway 組顯示 URL）
     string product_id = 15;     // 商品 ID（數字字串）— 前端連結商品頁用（#1155）
     ReplyInfo reply = 16;       // 賣家回覆（#1174；null = 未回覆）

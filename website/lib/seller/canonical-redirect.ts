@@ -38,7 +38,7 @@
  * of #365 was that "no store_code" and "no such seller" are different facts and
  * only the second may 404 — a backend blip must never take every storefront
  * down with it. They are different facts, and they are also separable ones:
- * `seller-service` answers a settled `404 {"code":404,"message":"seller not
+ * the seller module answers a settled `404 {"code":404,"message":"seller not
  * found"}` for an id nobody holds, while an outage is a 5xx, a timeout or a
  * socket error. `fetchSeller` splits exactly there, so this file fails CLOSED
  * on the authoritative answer and OPEN on every no-answer — rather than picking
@@ -165,11 +165,11 @@ async function fetchSeller(
 		// Reachable only from that 404 soften: a 2xx whose envelope carries a
 		// non-zero code has already thrown by the time we get here.
 		//
-		// The `message` guard separates seller-service's answer from the gateway's
+		// The `message` guard separates the seller module's answer from the gateway's
 		// router. Only the former is authoritative. A 404 that never reached the
 		// handler — route dropped or renamed by a deploy — comes back as Gin's
 		// plain-text `404 page not found`, which fails to parse as an envelope and
-		// so arrives here with no message; seller-service's own answer always
+		// so arrives here with no message; the seller module's own answer always
 		// carries one (`{"code":404,"message":"seller not found"}`, verified
 		// against both the dev and prod gateways). Without this, a single
 		// mis-routed deploy would 404 every storefront on the site at once. Note

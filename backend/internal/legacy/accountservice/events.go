@@ -11,8 +11,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 )
 
-// accountDeleted 是舊的 account.deleted 事件（go-pkg/mq 的 AccountDeletedEvent）：buyer、im、notification、seller、
-// social 還在 RabbitMQ 上訂閱它（遷移計畫的 events.csv）。
+// accountDeleted 是舊的 account.deleted 事件（go-pkg/mq 的 AccountDeletedEvent）：im 與 notification 還在 RabbitMQ 上訂閱它
+// （遷移計畫的 events.csv）；buyer 與 seller 不訂閱，由 accountdeletion 在刪帳的 transaction 內直接關閉。
 type accountDeleted struct {
 	EventID   string            `json:"event_id"`
 	EventType string            `json:"event_type"`

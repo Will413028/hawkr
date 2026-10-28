@@ -96,7 +96,7 @@ func (SweepArgs) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{UniqueOpts: river.UniqueOpts{ByPeriod: 10 * time.Minute}}
 }
 
-// resyncDelay 是 sync 結果寫入後發現又有新資料、或別的 job 持有租約時，等多久再跑一輪。
+// resyncDelay 是 sync 結果寫入後發現 intent_seq 又前進（期間有人改了資料）時，等多久再跑一輪。
 const resyncDelay = 2 * time.Second
 
 // jobError 把永久的失敗轉成 River 的取消（記錄在 job 上、不再重試），其他原樣回傳由 River 重試。
@@ -124,7 +124,7 @@ func (w *syncWorker) Work(ctx context.Context, job *river.Job[SyncArgs]) error {
 	return nil
 }
 
-// Timeout 是一次 sync 的時間上限（租約比它長）。
+// Timeout 是一次 sync 的時間上限。
 func (w *syncWorker) Timeout(*river.Job[SyncArgs]) time.Duration { return jobTimeout }
 
 type pollWorker struct {

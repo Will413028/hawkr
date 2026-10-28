@@ -16,7 +16,7 @@ export default async function SellerStorefrontLayout({
 }) {
 	const { id } = await params;
 	// Seller keys are positive signed-64-bit decimals. Reject anything else at
-	// the route boundary instead of sending it to seller-service as a 400
+	// the route boundary instead of sending it to the seller module as a 400
 	// "invalid seller id" that Next/Sentry records as an application failure —
 	// the old check only excluded non-digits, so `/sellers/0` and any id past
 	// int64 still reached the backend and surfaced as a crawler-visible 500.

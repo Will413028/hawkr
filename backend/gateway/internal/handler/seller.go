@@ -34,9 +34,9 @@ type SellerResponse struct {
 //
 // 明確排除且不得加回（見 seller_public_pii_test.go 的契約測試）：
 //   - email / phone / contactPhone：三者都是帳號註冊時已驗證的**個人**信箱與手機。
-//     seller-service `toResponse` 是 `Email: m.Email, ContactPhone: m.ContactPhone,
+//     seller 模組 `toResponse` 是 `Email: m.Email, ContactPhone: m.ContactPhone,
 //     Phone: m.ContactPhone` —— phone 與 contactPhone 是同一個值；賣家自我讀取路徑
-//     還會拿 account-service 的已驗證手機回填 contact_phone，而 GetShippingProfile
+//     還會拿 identity 模組的已驗證手機回填 contact_phone，而 GetShippingProfile
 //     把它們當寄件人 SenderPhone／ContactEmail 用。那是物流寄件人身分，不是客服專線。
 //   - birthday / gender：店主個人資料，與「商家資訊」無關。
 //   - address / addressDetail / postalCode：賣家端填寫時的語意是「營運地址 — 用於
@@ -44,7 +44,7 @@ type SellerResponse struct {
 //     district 已足夠；街道級地址是寄退件用，個人賣家填的多半就是住家。
 //   - certificationDraftId / currentCertificationId：認證流程的內部記錄 id。
 //   - accountType / needsOnboarding / lifecycleStatus / suspensionReasonCode：
-//     帳號與治理內部狀態（46 §7.2 明載後兩者是給賣家自己的停權公告頁用）。公開查詢已在 seller-service 過濾 closed 店，公開面不需要它們。
+//     帳號與治理內部狀態（46 §7.2 明載後兩者是給賣家自己的停權公告頁用）。公開查詢已在 seller 模組過濾 closed 店，公開面不需要它們。
 //
 // 保留 overallCertificationStatus：它是買家端的信任標章（買家 App 商家頁讀它顯示
 // 認證徽章），屬於營業資訊。
@@ -52,7 +52,7 @@ type PublicSellerInfo struct {
 	StoreID     string `json:"storeId"`
 	StoreCode   string `json:"storeCode"`
 	StoreName   string `json:"storeName"`
-	SellerName  string `json:"sellerName"` // == storeName（seller-service toResponse: Nickname = StoreName）
+	SellerName  string `json:"sellerName"` // == storeName（seller 模組 toResponse: Nickname = StoreName）
 	Description string `json:"description"`
 	LogoKey     string `json:"logoKey"`  // 商家 logo objectKey（SSOT；49 §6.1）
 	LogoUrl     string `json:"logoUrl"`  // 商家 logo 顯示 URL（Gateway 組）

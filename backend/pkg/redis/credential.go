@@ -25,7 +25,7 @@ import (
 //     revocation that can be aimed at a credential nobody holds a copy of any
 //     more: role removal, a suspected leak, an incident.
 //
-// Both are CACHES over rows in account-service (revoked_tokens.token_hash and
+// Both are CACHES over rows in the identity module (revoked_tokens.token_hash and
 // accounts.auth_epoch / admin_accounts.auth_epoch), for the same reason #2050
 // gave the blacklist a rebuild path: a revocation that lives only in Redis
 // disappears when Redis does, and a bearer JWT has nothing else to fall back
@@ -66,7 +66,7 @@ type CredentialState int
 
 const (
 	// CredentialUnknown means the cache could not answer. It is NOT "valid" —
-	// rebuild the answer from account-service, and only fail open if that
+	// rebuild the answer from the identity module, and only fail open if that
 	// cannot answer either.
 	CredentialUnknown CredentialState = iota
 	// CredentialValid means Redis answered and holds no revocation for this
@@ -78,7 +78,7 @@ const (
 
 // SetTokenRevoked marks one credential revoked for ttl. ttl must outlive the
 // credential itself (including its refresh grace window) or the entry lapses
-// while the token can still be used; account-service computes it from the row
+// while the token can still be used; the identity module computes it from the row
 // it just wrote.
 func SetTokenRevoked(ctx context.Context, rdb *redis.Client, tokenHash string, ttl time.Duration) error {
 	if rdb == nil {
@@ -104,7 +104,7 @@ func SetAuthEpoch(ctx context.Context, rdb *redis.Client, accountID int64, epoch
 // This is NOT a revocation and must never be conflated with one. A role grant
 // only ever ADDS capability, so an older token is under-privileged rather than
 // over-privileged — safe to hold, wrong to trust. Moving the auth epoch instead
-// would void the token for the refresh path too (see account-service's
+// would void the token for the refresh path too (see the identity module's
 // RefreshTokenUseCase, which refuses any credential predating auth_epoch), and
 // the holder would be logged out at the exact moment they gained a role.
 //
@@ -251,7 +251,7 @@ func credentialStateFrom(revoked *redis.IntCmd, epoch, rolesEpoch *redis.StringC
 
 	// Both epochs convict, because both mean "do not trust this token as it
 	// stands". They differ in what the holder can do next, and that difference
-	// lives entirely in account-service: a credential predating auth_epoch
+	// lives entirely in the identity module: a credential predating auth_epoch
 	// cannot even be refreshed (RefreshTokenUseCase), while one predating only
 	// roles_epoch refreshes normally and comes back carrying the new role set.
 	// Collapsing them here would be harmless; collapsing them THERE is what

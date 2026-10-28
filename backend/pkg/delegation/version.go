@@ -16,7 +16,7 @@ import (
 // delegated write into last-writer-wins with no error anywhere, which is exactly
 // the outcome the version column exists to prevent.
 //
-// Shared by seller-service and social-service; both feed it into `WHERE ... AND
+// Shared by the seller module and social-service; both feed it into `WHERE ... AND
 // (expected < 0 OR version = expected)` queries whose sentinel for "no CAS" is a
 // negative number, so a negative input must never reach the query.
 func ParseExpectedVersion(raw string) (*int64, error) {

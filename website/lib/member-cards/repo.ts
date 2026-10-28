@@ -13,7 +13,7 @@ export interface MemberCard {
 	/** Seller's canonical path segment (gateway `memberCardItem.storeCode`).
 	 * `sellerId` routes the in-site card (`/account/wallet/{sellerId}`) and keys
 	 * the spending-records API; only this reaches the seller's storefront
-	 * without a 308. Empty when seller-service was unreachable — the same
+	 * without a 308. Empty when seller 模組 was unreachable — the same
 	 * degrade that blanks `sellerName`/`sellerLogo`. */
 	storeCode: string;
 	/** Cumulative spend at this seller, kept as a string (backend ships it as one). */

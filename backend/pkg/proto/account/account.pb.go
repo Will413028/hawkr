@@ -72,7 +72,7 @@ func (Role) EnumDescriptor() ([]byte, []int) {
 }
 
 // 呼叫方對「帳號另一個角色是否還活著」的判定結果。
-// 未帶 / 查詢失敗一律是 UNKNOWN，account-service 據此 fail-closed 不 cascade。
+// 未帶 / 查詢失敗一律是 UNKNOWN，identity 模組據此 fail-closed 不 cascade。
 type OtherRoleState int32
 
 const (
@@ -129,7 +129,7 @@ type GoogleOAuthRequest struct {
 	UserType int32                  `protobuf:"varint,3,opt,name=user_type,json=userType,proto3" json:"user_type,omitempty"` // 用戶類型 (新用戶): 1=買家, 2=賣家
 	FcmToken string                 `protobuf:"bytes,5,opt,name=fcm_token,json=fcmToken,proto3" json:"fcm_token,omitempty"`  // FCM Token
 	Platform string                 `protobuf:"bytes,6,opt,name=platform,proto3" json:"platform,omitempty"`                  // Device Platform
-	OtpCode  string                 `protobuf:"bytes,7,opt,name=otp_code,json=otpCode,proto3" json:"otp_code,omitempty"`     // 手機 OTP 6 位碼（新用戶第二輪；後端經三竹發送，51 號）
+	OtpCode  string                 `protobuf:"bytes,7,opt,name=otp_code,json=otpCode,proto3" json:"otp_code,omitempty"`     // 手機 OTP 6 位碼（新用戶第二輪；後端經三竹發送）
 	// 本次登入是否需要 bearer 憑證對（access token ＋ refresh token）。
 	//
 	// web 登入路徑（WebGoogleOAuth / WebAppleOAuth / AdminGoogleOAuth）拿到 JWT
@@ -232,7 +232,7 @@ type AppleOAuthRequest struct {
 	FamilyName        string                 `protobuf:"bytes,9,opt,name=family_name,json=familyName,proto3" json:"family_name,omitempty"`                       // fullName.familyName
 	AuthorizationCode string                 `protobuf:"bytes,10,opt,name=authorization_code,json=authorizationCode,proto3" json:"authorization_code,omitempty"` // Apple OAuth authorization_code (used to exchange refresh_token for revoke flow); optional
 	Phone             string                 `protobuf:"bytes,11,opt,name=phone,proto3" json:"phone,omitempty"`                                                  // 手機號 (新用戶第二輪帶 OTP 驗證過的門號)
-	OtpCode           string                 `protobuf:"bytes,12,opt,name=otp_code,json=otpCode,proto3" json:"otp_code,omitempty"`                               // 手機 OTP 6 位碼（新用戶第二輪；後端經三竹發送，51 號）
+	OtpCode           string                 `protobuf:"bytes,12,opt,name=otp_code,json=otpCode,proto3" json:"otp_code,omitempty"`                               // 手機 OTP 6 位碼（新用戶第二輪；後端經三竹發送）
 	// 本次登入是否需要 bearer 憑證對（access token ＋ refresh token）。見
 	// GoogleOAuthRequest.issue_refresh_token。
 	IssueRefreshToken bool `protobuf:"varint,13,opt,name=issue_refresh_token,json=issueRefreshToken,proto3" json:"issue_refresh_token,omitempty"`
@@ -646,7 +646,7 @@ type VerifyPhoneRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AccountId     int64                  `protobuf:"varint,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	Phone         string                 `protobuf:"bytes,3,opt,name=phone,proto3" json:"phone,omitempty"`
-	OtpCode       string                 `protobuf:"bytes,4,opt,name=otp_code,json=otpCode,proto3" json:"otp_code,omitempty"` // 手機 OTP 6 位碼（後端經三竹發送，51 號）
+	OtpCode       string                 `protobuf:"bytes,4,opt,name=otp_code,json=otpCode,proto3" json:"otp_code,omitempty"` // 手機 OTP 6 位碼（後端經三竹發送）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1478,9 +1478,9 @@ type BindSellerRequest struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	AccountId int64                  `protobuf:"varint,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	// source_id 是「造成這次授予的那個實體」——seller 角色填 sellers.store_id
-	// （該次入駐的 stint surrogate）。account-service 把它記在 account_roles 上，
+	// （該次入駐的 stint surrogate）。identity 模組把它記在 account_roles 上，
 	// 之後的撤銷必須指名同一個 source_id 才會生效（見 RemoveRoleRequest.source_id）。
-	// 0 = 未歸因（account-service 內部授予）：這種授予任何撤銷都撤得掉。
+	// 0 = 未歸因（identity 模組內部授予）：這種授予任何撤銷都撤得掉。
 	SourceId      int64 `protobuf:"varint,4,opt,name=source_id,json=sourceId,proto3" json:"source_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1711,7 +1711,7 @@ type AdminLoginRequest struct {
 	// GoogleOAuthRequest.issue_refresh_token 的欄位語意——但與該欄位不同，
 	// admin 密碼登入唯一的 gateway 呼叫端（account_client.go 的 AdminLogin）
 	// 固定帶 false：admin 前端已改走 AdminGoogleLogin/AdminGoogleOAuth（SSO、
-	// cookie session），密碼登入路徑不需要再開一條輪替鏈；account-service
+	// cookie session），密碼登入路徑不需要再開一條輪替鏈；identity 模組
 	// 的 AdminLogin handler 也不消費這個欄位（issue #1544 L2 Task 3 fix
 	// round 1）。欄位留在 proto 上是為了未來若真的需要 bearer-only admin
 	// client 時不必再加欄位。
@@ -2570,7 +2570,7 @@ type RemoveRoleRequest struct {
 	//	UPDATE account_roles ... WHERE revoked_at IS NULL
 	//	  AND (source_id IS NULL OR source_id = @source_id)
 	//
-	// 這道柵欄存在的理由是撤銷會延遲執行（seller-service 的 outbox worker 重試
+	// 這道柵欄存在的理由是撤銷會延遲執行（非同步的 job 重試
 	// 退避最長數小時），期間帳號可能已經重新入駐並取得一筆**較新**的授予。沒有
 	// 柵欄時，過期的撤銷會蓋掉那筆合法授予，受害者變成「有店、無角色」且無自癒
 	// 路徑。柵欄比對就在那一句 UPDATE 裡，不存在 check-then-act 的競態窗口。

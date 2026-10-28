@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// auditResultPending is the audit row's open state. It is the value account-service
+// auditResultPending is the audit row's open state. It is the value the delegation module
 // echoes back on a replayed intent (`api/proto/account/delegation.proto:422`) and the
 // one the pending-rows gauge counts, so gateway must compare against the same literal
 // rather than "no result".
@@ -19,7 +19,7 @@ const auditResultPending = "PENDING"
 
 // AuditClient is the slice of the account gRPC client the orchestrator needs. An
 // interface so handler tests can drive the whole three-step sequence without a live
-// account-service — and so the tests can assert what was SENT, which is the half that
+// the delegation module — and so the tests can assert what was SENT, which is the half that
 // actually breaks (notify_seller travelling as false is invisible everywhere else).
 type AuditClient interface {
 	RecordAuditIntent(ctx context.Context, req *accountpb.RecordAuditIntentRequest, deadlineMs int) (*accountpb.RecordAuditIntentResponse, error)
@@ -100,7 +100,7 @@ type Spec struct {
 	// one is the resource's own name at the moment of the operation.
 	//
 	// 訂單面必須填它：`admin_operation_audit_logs.resource_id` 是 bigint 而訂單編號
-	// 是 `O` ＋ 9 位序號，account-service 對它 ParseInt 失敗後存 NULL（§11 ADR）。
+	// 是 `O` ＋ 9 位序號，delegation 模組對它 ParseInt 失敗後存 NULL（§11 ADR）。
 	// 兩欄都空的稽核列指不回任何一筆訂單，而 PII 揭露正是 risk_level='high' 的那一群。
 	ResourceName string
 

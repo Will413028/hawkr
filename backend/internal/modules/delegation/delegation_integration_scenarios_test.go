@@ -49,8 +49,7 @@ func fromCapabilities(caps []Capability) []string {
 	return out
 }
 
-// 代行（設計書 56）的 integration 測試：由原 account-service 的 delegation_integration_test、
-// authorization_integration_test 與 outbox dispatcher 的測試搬來。時間由 fixture 的 f.now 控制，不用 sleep。
+// 代行（設計書 56）的 integration 測試。時間由 fixture 的 f.now 控制，不用 sleep。
 
 const testStore = int64(2685914682)
 

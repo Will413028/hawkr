@@ -136,7 +136,7 @@ type AccountServiceClient interface {
 	ValidateUser(context.Context, *connect.Request[account.ValidateUserRequest]) (*connect.Response[account.ValidateUserResponse], error)
 	// 手機驗證
 	VerifyPhone(context.Context, *connect.Request[account.VerifyPhoneRequest]) (*connect.Response[account.VerifyPhoneResponse], error)
-	// 發送手機 OTP 簡訊（後端經三竹發送，51 號設計書）
+	// 發送手機 OTP 簡訊（後端經三竹發送）
 	SendOtp(context.Context, *connect.Request[account.SendOtpRequest]) (*connect.Response[account.SendOtpResponse], error)
 	// Token 刷新
 	RefreshToken(context.Context, *connect.Request[account.RefreshTokenRequest]) (*connect.Response[account.RefreshTokenResponse], error)
@@ -150,7 +150,7 @@ type AccountServiceClient interface {
 	GetAccountByPhone(context.Context, *connect.Request[account.GetAccountByPhoneRequest]) (*connect.Response[account.AccountInfoResponse], error)
 	// 綁定賣家
 	BindSeller(context.Context, *connect.Request[account.BindSellerRequest]) (*connect.Response[account.BindSellerResponse], error)
-	// 綁定買家角色（buyer-service 建立 buyer row 後補 account_type 的 buyer bit）
+	// 綁定買家角色（buyer 模組建立 buyer row 後補 account_type 的 buyer bit）
 	BindBuyer(context.Context, *connect.Request[account.BindBuyerRequest]) (*connect.Response[account.BindBuyerResponse], error)
 	// 管理員帳號密碼登入
 	AdminLogin(context.Context, *connect.Request[account.AdminLoginRequest]) (*connect.Response[account.AdminLoginResponse], error)
@@ -162,8 +162,7 @@ type AccountServiceClient interface {
 	SuspendAccount(context.Context, *connect.Request[account.SuspendAccountRequest]) (*connect.Response[account.SuspendAccountResponse], error)
 	// 解除停權（#2053）：DEL account:blocked:<id> 後把 status 寫回 active。
 	// 順序不可顛倒——先寫 status 會產生「SSOT 說 active、衍生快取說 blocked」的
-	// 中間態，帳號各處看起來正常卻每個請求都 401。詳見 17 號設計書
-	//「帳號停權與解除停權」。軟刪帳號不可解除（GetByID 的 deleted_at IS NULL
+	// 中間態，帳號各處看起來正常卻每個請求都 401。軟刪帳號不可解除（GetByID 的 deleted_at IS NULL
 	// 即為該防線：軟刪路徑寫的是同一把 key，放行等於清掉「已刪除」的證據）。
 	UnsuspendAccount(context.Context, *connect.Request[account.UnsuspendAccountRequest]) (*connect.Response[account.UnsuspendAccountResponse], error)
 	// Admin 會員管理唯讀面（#2053）。以 accounts 為主軸而非 buyers：可施加的
@@ -612,7 +611,7 @@ type AccountServiceHandler interface {
 	ValidateUser(context.Context, *connect.Request[account.ValidateUserRequest]) (*connect.Response[account.ValidateUserResponse], error)
 	// 手機驗證
 	VerifyPhone(context.Context, *connect.Request[account.VerifyPhoneRequest]) (*connect.Response[account.VerifyPhoneResponse], error)
-	// 發送手機 OTP 簡訊（後端經三竹發送，51 號設計書）
+	// 發送手機 OTP 簡訊（後端經三竹發送）
 	SendOtp(context.Context, *connect.Request[account.SendOtpRequest]) (*connect.Response[account.SendOtpResponse], error)
 	// Token 刷新
 	RefreshToken(context.Context, *connect.Request[account.RefreshTokenRequest]) (*connect.Response[account.RefreshTokenResponse], error)
@@ -626,7 +625,7 @@ type AccountServiceHandler interface {
 	GetAccountByPhone(context.Context, *connect.Request[account.GetAccountByPhoneRequest]) (*connect.Response[account.AccountInfoResponse], error)
 	// 綁定賣家
 	BindSeller(context.Context, *connect.Request[account.BindSellerRequest]) (*connect.Response[account.BindSellerResponse], error)
-	// 綁定買家角色（buyer-service 建立 buyer row 後補 account_type 的 buyer bit）
+	// 綁定買家角色（buyer 模組建立 buyer row 後補 account_type 的 buyer bit）
 	BindBuyer(context.Context, *connect.Request[account.BindBuyerRequest]) (*connect.Response[account.BindBuyerResponse], error)
 	// 管理員帳號密碼登入
 	AdminLogin(context.Context, *connect.Request[account.AdminLoginRequest]) (*connect.Response[account.AdminLoginResponse], error)
@@ -638,8 +637,7 @@ type AccountServiceHandler interface {
 	SuspendAccount(context.Context, *connect.Request[account.SuspendAccountRequest]) (*connect.Response[account.SuspendAccountResponse], error)
 	// 解除停權（#2053）：DEL account:blocked:<id> 後把 status 寫回 active。
 	// 順序不可顛倒——先寫 status 會產生「SSOT 說 active、衍生快取說 blocked」的
-	// 中間態，帳號各處看起來正常卻每個請求都 401。詳見 17 號設計書
-	//「帳號停權與解除停權」。軟刪帳號不可解除（GetByID 的 deleted_at IS NULL
+	// 中間態，帳號各處看起來正常卻每個請求都 401。軟刪帳號不可解除（GetByID 的 deleted_at IS NULL
 	// 即為該防線：軟刪路徑寫的是同一把 key，放行等於清掉「已刪除」的證據）。
 	UnsuspendAccount(context.Context, *connect.Request[account.UnsuspendAccountRequest]) (*connect.Response[account.UnsuspendAccountResponse], error)
 	// Admin 會員管理唯讀面（#2053）。以 accounts 為主軸而非 buyers：可施加的

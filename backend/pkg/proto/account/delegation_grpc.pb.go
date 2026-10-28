@@ -46,7 +46,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// DelegationService - ADM 代行營運工作階段與稽核服務（account-service）
+// DelegationService - ADM 代行營運工作階段與稽核服務（delegation 模組）
 //
 // 全部 RPC 皆為 **internal-only**：唯一合法呼叫方是 Gateway，
 // 不對前端暴露、不經任何 public/app namespace。
@@ -193,7 +193,7 @@ type DelegationServiceClient interface {
 	// ⚠️ **只查 store 級那一列，不得回落全域列**：全域列存在時會遮蔽所有店，治理畫面
 	//
 	//	若把它當成「這家店的設定」顯示，管理員會對著一列不屬於該店的授權按下撤回。
-	//	account-service 側要用 store 級專用查詢，**不要沿用工作階段建立路徑那一支**
+	//	delegation 模組側要用 store 級專用查詢，**不要沿用工作階段建立路徑那一支**
 	//	（那支「不過濾有效性、含全域回落」是刻意的，改它會動到 Preflight 的判定）。
 	GetDelegationAuthorization(ctx context.Context, in *GetDelegationAuthorizationRequest, opts ...grpc.CallOption) (*GetDelegationAuthorizationResponse, error)
 	// 開通或重新開通一家店的代行授權。
@@ -501,7 +501,7 @@ func (c *delegationServiceClient) ListDelegationAuthorizationHistory(ctx context
 // All implementations must embed UnimplementedDelegationServiceServer
 // for forward compatibility.
 //
-// DelegationService - ADM 代行營運工作階段與稽核服務（account-service）
+// DelegationService - ADM 代行營運工作階段與稽核服務（delegation 模組）
 //
 // 全部 RPC 皆為 **internal-only**：唯一合法呼叫方是 Gateway，
 // 不對前端暴露、不經任何 public/app namespace。
@@ -648,7 +648,7 @@ type DelegationServiceServer interface {
 	// ⚠️ **只查 store 級那一列，不得回落全域列**：全域列存在時會遮蔽所有店，治理畫面
 	//
 	//	若把它當成「這家店的設定」顯示，管理員會對著一列不屬於該店的授權按下撤回。
-	//	account-service 側要用 store 級專用查詢，**不要沿用工作階段建立路徑那一支**
+	//	delegation 模組側要用 store 級專用查詢，**不要沿用工作階段建立路徑那一支**
 	//	（那支「不過濾有效性、含全域回落」是刻意的，改它會動到 Preflight 的判定）。
 	GetDelegationAuthorization(context.Context, *GetDelegationAuthorizationRequest) (*GetDelegationAuthorizationResponse, error)
 	// 開通或重新開通一家店的代行授權。

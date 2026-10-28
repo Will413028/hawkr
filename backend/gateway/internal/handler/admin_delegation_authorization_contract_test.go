@@ -431,7 +431,7 @@ func TestGrantDelegationAuthorization_BodyValidation(t *testing.T) {
 			}
 			// 被擋下的請求一律不得抵達領域服務：驗證的意義正是「在稽核與寫入之前失敗」。
 			if len(stub.grants) != 0 {
-				t.Fatalf("驗證失敗的請求仍被送往 account-service：%v", stub.grants[0])
+				t.Fatalf("驗證失敗的請求仍被送往 delegation 模組：%v", stub.grants[0])
 			}
 		})
 	}
@@ -594,7 +594,7 @@ func TestListDelegationAuthorizations_QueryValidation(t *testing.T) {
 				t.Fatalf("業務碼應為 9260，實際 %d", code)
 			}
 			if len(stub.lists) != 0 {
-				t.Fatal("驗證失敗的查詢仍被送往 account-service")
+				t.Fatal("驗證失敗的查詢仍被送往 delegation 模組")
 			}
 		})
 	}
@@ -663,7 +663,7 @@ func TestUpdateAndRevokeDelegationAuthorization_Validation(t *testing.T) {
 			t.Fatalf("HTTP 應為 400，實際 %d", w.Code)
 		}
 		if len(stub.updates) != 0 {
-			t.Fatal("驗證失敗的請求仍被送往 account-service")
+			t.Fatal("驗證失敗的請求仍被送往 delegation 模組")
 		}
 	})
 
@@ -702,7 +702,7 @@ func TestUpdateAndRevokeDelegationAuthorization_Validation(t *testing.T) {
 			t.Fatalf("業務碼應為 9260，實際 %d", code)
 		}
 		if len(stub.revokes) != 0 {
-			t.Fatal("驗證失敗的撤回仍被送往 account-service")
+			t.Fatal("驗證失敗的撤回仍被送往 delegation 模組")
 		}
 	})
 
@@ -752,7 +752,7 @@ func TestUpdateAndRevokeDelegationAuthorization_Validation(t *testing.T) {
 // 那不是 bug，補上閘門才是錯的修法，三個理由缺一不可：
 //
 //  1. 這支端點**不打領域服務**（整個 handler 只讀 authz package 的常數），而 allowlist
-//     只存在於 account-service 的 DB ⇒ 要驗就得為一支回傳九個常數字串的端點多付一次
+//     只存在於 delegation 模組的 DB ⇒ 要驗就得為一支回傳九個常數字串的端點多付一次
 //     gRPC 往返。
 //  2. 它回的內容**零租戶資料**，而且 ADM 前端 bundle 本來就把同一份能力名稱送到每個
 //     管理員的瀏覽器（hawkr-admin 的 labels.ts）⇒ 加閘門買不到任何機密性。

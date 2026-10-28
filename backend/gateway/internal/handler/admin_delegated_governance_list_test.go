@@ -108,7 +108,7 @@ func TestListDelegatedOperations_QueryValidation(t *testing.T) {
 				t.Fatalf("業務碼應為 9260，實際 %d", code)
 			}
 			if len(stub.sessionQueries) != 0 {
-				t.Fatal("驗證失敗的查詢仍被送往 account-service")
+				t.Fatal("驗證失敗的查詢仍被送往 delegation 模組")
 			}
 		})
 	}
@@ -142,7 +142,7 @@ func TestListAllDelegatedAuditLogs_QueryValidation(t *testing.T) {
 				t.Fatalf("業務碼應為 9260，實際 %d", code)
 			}
 			if len(stub.auditQueries) != 0 {
-				t.Fatal("驗證失敗的查詢仍被送往 account-service")
+				t.Fatal("驗證失敗的查詢仍被送往 delegation 模組")
 			}
 		})
 	}

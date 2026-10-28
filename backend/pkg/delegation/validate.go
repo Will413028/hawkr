@@ -2,10 +2,10 @@
 // contract (56 號設計書 §6.2.4) plus the store-operability predicate (§8.1.3
 // 第 8 項). The Java half lives in common-core's DelegationContextValidator; the
 // two implement the same numbered steps (S1a–S5) so that one request cannot be
-// accepted by seller-service and rejected by product-service. Both sides run the
+// accepted by the seller module and rejected by product-service. Both sides run the
 // same fixture set (§13).
 //
-// seller-service, social-service and account-service share this one package —
+// The seller module, social-service and the delegation module share this one package —
 // none of them may grow its own copy.
 package delegation
 
@@ -62,7 +62,7 @@ var knownCapabilities = func() map[Capability]struct{} {
 	return m
 }()
 
-// IsKnown reports whether cap is one of the nine tokens. account-service uses it
+// IsKnown reports whether cap is one of the nine tokens. The delegation module uses it
 // to reject a CreateSession request before the DB CHECK has to.
 func IsKnown(cap Capability) bool {
 	_, ok := knownCapabilities[cap]

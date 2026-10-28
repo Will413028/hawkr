@@ -15,7 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// noBuyerResolverForTest：模擬帳號目前無現任買家 stint（buyer-service 404，
+// noBuyerResolverForTest：模擬帳號目前無現任買家 stint（buyer 模組 404，
 // resolver 轉譯成 ErrNoCurrentBuyer）。mirrors noStoreResolverForTest in
 // resolve_seller_test.go.
 func noBuyerResolverForTest() *buyerid.Resolver {

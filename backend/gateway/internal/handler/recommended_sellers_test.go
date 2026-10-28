@@ -165,7 +165,7 @@ func TestGetRecommendedSellers_LogoFields(t *testing.T) {
 // TestGetRecommendedSellers_CarriesStoreCode pins store_code onto the standalone
 // recommendation endpoint (web#365). The storefront links each rail card to a
 // seller by display code; with the field absent the frontend helper falls back to
-// the numeric store id and the link resolves through a 308 redirect. seller-service
+// the numeric store id and the link resolves through a 308 redirect. The seller module
 // carries the code on RecommendedSeller, so any regression would be a silent drop
 // in this handler's gin.H assembly.
 func TestGetRecommendedSellers_CarriesStoreCode(t *testing.T) {

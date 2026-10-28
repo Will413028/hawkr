@@ -206,7 +206,7 @@ type DelegationServiceClient interface {
 	//    會讓「這家店還沒開通」與「上游掛了」在前端長得一模一樣。
 	// ⚠️ **只查 store 級那一列，不得回落全域列**：全域列存在時會遮蔽所有店，治理畫面
 	//    若把它當成「這家店的設定」顯示，管理員會對著一列不屬於該店的授權按下撤回。
-	//    account-service 側要用 store 級專用查詢，**不要沿用工作階段建立路徑那一支**
+	//    delegation 模組側要用 store 級專用查詢，**不要沿用工作階段建立路徑那一支**
 	//    （那支「不過濾有效性、含全域回落」是刻意的，改它會動到 Preflight 的判定）。
 	GetDelegationAuthorization(context.Context, *connect.Request[account.GetDelegationAuthorizationRequest]) (*connect.Response[account.GetDelegationAuthorizationResponse], error)
 	// 開通或重新開通一家店的代行授權。
@@ -647,7 +647,7 @@ type DelegationServiceHandler interface {
 	//    會讓「這家店還沒開通」與「上游掛了」在前端長得一模一樣。
 	// ⚠️ **只查 store 級那一列，不得回落全域列**：全域列存在時會遮蔽所有店，治理畫面
 	//    若把它當成「這家店的設定」顯示，管理員會對著一列不屬於該店的授權按下撤回。
-	//    account-service 側要用 store 級專用查詢，**不要沿用工作階段建立路徑那一支**
+	//    delegation 模組側要用 store 級專用查詢，**不要沿用工作階段建立路徑那一支**
 	//    （那支「不過濾有效性、含全域回落」是刻意的，改它會動到 Preflight 的判定）。
 	GetDelegationAuthorization(context.Context, *connect.Request[account.GetDelegationAuthorizationRequest]) (*connect.Response[account.GetDelegationAuthorizationResponse], error)
 	// 開通或重新開通一家店的代行授權。

@@ -2,7 +2,7 @@
 // @generated from file hawkr/identity/v1alpha1/identity.proto (package hawkr.identity.v1alpha1, syntax proto3)
 /* eslint-disable */
 
-// identity 模組給前台的 API：登入的帳號與它的角色（設計書 17）。後台的 API 在 hawkr.admin.identity.v1alpha1。
+// identity 模組給前台的 API：登入的帳號與它的角色（行為規格在 backend/docs/modules/identity.md）。後台的 API 在 hawkr.admin.identity.v1alpha1。
 //
 // 登入、登出與 session 由 Clerk 處理（ADR 2026-09-27-identity-clerk）：每個請求以 Authorization: Bearer 帶 Clerk SDK
 // 取得的 session token（web 在每次請求前取，App 同樣）；沒有 Bearer 時讀 web 同源的 Clerk `__session` cookie，給瀏覽器

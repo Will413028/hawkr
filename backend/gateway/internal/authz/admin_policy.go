@@ -80,7 +80,7 @@ func AdminSessionDenial(status string) int32 {
 // without the two disagreeing.
 //
 // Items 7 (授權來源仍有效) and 8 (目標店家狀態仍可代行) of §8.1.3 are NOT decided
-// here: both need I/O (account-service 的授權表、seller-service 的 sellers.status)
+// here: both need I/O (delegation 模組的授權表、seller 模組的 sellers.status)
 // and this function is pure, exactly like StoreOperable in pkg/delegation.
 func GrantedAdminCapabilities(ctx AdminDelegationContext) (granted []AdminCapability, deniedCode int32) {
 	// 1. session status.

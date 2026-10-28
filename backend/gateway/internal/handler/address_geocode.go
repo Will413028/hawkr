@@ -45,7 +45,7 @@ type AddressValidationResult struct {
 // @Security     BearerAuth
 // @Router       /app/address/suggestions [get]
 //
-// 地址查詢由 seller-service 處理；這裡只做 REST→gRPC 轉發。
+// 地址查詢由 seller 模組處理；這裡只做 REST→gRPC 轉發。
 func (h *Holder) AddressSuggestions(c *gin.Context) {
 	county := strings.TrimSpace(c.Query("county"))
 	district := strings.TrimSpace(c.Query("district"))

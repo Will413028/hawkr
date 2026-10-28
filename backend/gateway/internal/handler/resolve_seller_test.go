@@ -67,7 +67,7 @@ func buyerGrandfatherResolverForTest() *buyerid.Resolver {
 	}))
 }
 
-// buyerServiceDownResolverForTest：模擬 buyer-service 基礎設施錯誤（非
+// buyerServiceDownResolverForTest：模擬 buyer 模組基礎設施錯誤（非
 // ErrNoCurrentBuyer），驗證呼叫端走 GrpcErr（503）而非 Forbidden（403）分支。
 // noBuyerResolverForTest（ErrNoCurrentBuyer 版）定義在 resolve_buyer_test.go，共用。
 func buyerServiceDownResolverForTest() *buyerid.Resolver {
@@ -76,7 +76,7 @@ func buyerServiceDownResolverForTest() *buyerid.Resolver {
 	}))
 }
 
-// storeServiceDownResolverForTest：模擬 seller-service 基礎設施錯誤（非
+// storeServiceDownResolverForTest：模擬 seller 模組基礎設施錯誤（非
 // ErrNoCurrentStore），驗證呼叫端走 GrpcErr（503）而非 Forbidden（403）分支。
 // noStoreResolverForTest（ErrNoCurrentStore 版）定義在上方，共用。
 func storeServiceDownResolverForTest() *storeid.Resolver {
