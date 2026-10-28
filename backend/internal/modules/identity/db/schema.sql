@@ -9,7 +9,7 @@ CREATE SCHEMA IF NOT EXISTS public;
 
 CREATE SCHEMA identity;
 
--- 帳號：登入的 principal（設計書 44）。買家、賣家是同一個帳號的角色（account_roles）；業務身分
+-- 帳號：登入的 principal（`docs/modules/identity.md`）。買家、賣家是同一個帳號的角色（account_roles）；業務身分
 -- （buyer_id、store_id）屬於 buyer、seller 模組。
 --
 -- 登入由 Clerk 處理（ADR 2026-09-27-identity-clerk）：clerk_user_id 是顧客的 Clerk application 的使用者 ID，

@@ -17,7 +17,7 @@
 - 買家只由 `accountdeletion` 隨帳號刪除關閉；本模組不訂閱 `AccountDeleted`，沒有第二條關閉路徑。存活帳號查不到現任買家是不變量被破壞，呼叫方回 internal。
 - 狀態有 ACTIVE、PENDING_DELETION、CLOSED。CLOSED 必有 `deleted_at`；PII 只能清 CLOSED。
 - `BeginDeletion` 把買家從 ACTIVE 轉成 PENDING_DELETION，並在同一個 transaction 發布 `BuyerDeletionRequested` 一次；重送不重複寫入，之後的關閉不再發。訂閱者只該排入自己的清除 job。刪帳申請不能撤回，只有完成。
-- `CloseForDeletion` 可關閉 ACTIVE 或 PENDING_DELETION，重送安全。關閉時刪除收貨地址並逐筆發 `FavoriteRemoved`，刪除買家發起的兩種封鎖與以他為對象的 `blocked_buyers` 列，把目前的頭像記成退場，發布 `BuyerDeleted`。
+- `CloseForDeletion` 可關閉 ACTIVE 或 PENDING_DELETION，重送安全。關閉時在同一個 transaction 刪除收貨地址、收藏（逐筆發 `FavoriteRemoved`）、追蹤、瀏覽與補貨訂閱，刪除買家發起的兩種封鎖與以他為對象的 `blocked_buyers` 列，把目前的頭像記成退場，發布 `BuyerDeleted`；會員紀錄保留。PENDING_DELETION 期間不清這些資料（未結訂單需要地址）。
 - 前置條件：`BeginDeletion` 與 `CloseForDeletion` 只由 `accountdeletion` 在已以 `identity.LockAccount` 鎖住帳號列的 transaction 內呼叫。鎖順序是帳號列先於買家列；本模組只鎖買家列。刪帳時買家一定關閉。
 - 刪帳由 `accountdeletion` 編排（seller 也是參與者）；buyer 只提供 `BeginDeletion` 與 `CloseForDeletion`，不刪帳號。
 - `LockActive(ctx, buyerID)` 給其他模組的寫入路徑，在自己的 transaction 內以共享鎖確認買家是 ACTIVE，鎖持有到 transaction 結束。`BeginDeletion` 的排他鎖要等它：申請刪除之前成立的寫入一定先於清除 job 提交；之後才開始的回 FailedPrecondition；已關閉回 NotFound；沒有 transaction 時回錯誤。鎖順序是帳號列、買家列、呼叫方自己的表。

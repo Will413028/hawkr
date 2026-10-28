@@ -1070,11 +1070,11 @@ invoice-service 的 seller template 一律 `store_id`／`identity_migrated=true`
 
 ### 12.2 退休 buyer stint 的收件匣歸宿
 
-本節是 **44 號設計書 §10 D6** 在通知領域的落地方式。D6：「買家軟刪除後重新註冊 ＝ 完全全新開始（含過去訂單／售後依據／評論在新身份下不可見）」；44 號 §7.6 第 6 步把 notification 列為承接這條規則的下游服務之一。
+本節是 **44 號設計書 §10 D6** 在通知領域的落地方式。D6：「買家軟刪除後重新註冊 ＝ 完全全新開始（含過去訂單／售後依據／評論在新身份下不可見）」；買家關閉的規則（帳號刪除時同一個 transaction 關閉買家並清除關聯資料）見 `docs/modules/buyer.md` §2。
 
 | 問題 | 本設計的答案 | 依據 |
 |---|---|---|
-| 新 stint 讀不到舊 stint 的通知，算 bug 嗎？ | **不算，是規格。** `resolveInboxUserID` 以現任 `buyer_id` 查收件匣（§12.1），re-key 之後舊列自然不在結果內 | 44 §10 D6 / §7.6 第 6 步 |
+| 新 stint 讀不到舊 stint 的通知，算 bug 嗎？ | **不算，是規格。** `resolveInboxUserID` 以現任 `buyer_id` 查收件匣（§12.1），re-key 之後舊列自然不在結果內 | 44 §10 D6；`docs/modules/buyer.md` §2 |
 | 那要不要把舊列遷移到新 `buyer_id`？ | **禁止。** `UPDATE notifications SET user_id = <新 buyer_id>` 會讓通知成為唯一跨 stint 可見的資料，與其餘 7 個下游（order／review／social／im／coupon／cart／aftersales）相反 | 同上 |
 | 那些讀不到的列怎麼辦？ | **soft delete，交給既有的清理 job。** 讀不到 ＋ 永久保留 ＝ 零價值 ＋ 純個資責任（那些列的標題常含訂單號），而使用者當初按的是刪除帳號 | §8.3 |
 

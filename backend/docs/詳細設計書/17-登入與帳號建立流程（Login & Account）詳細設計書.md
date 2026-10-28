@@ -6,7 +6,7 @@
 
 > 涵蓋買家 / 賣家 App（mobile，JWT）與 `hawkr-website`（web，cookie session）的完整登入、建帳、角色切換流程。
 >
-> **身份模型以 [44 號](44-帳號與賣家買家身份模型（Account%20&%20Seller-Buyer%20Identity）詳細設計書.md) 為準**：account/buyer/seller 三種身份建模、登入 `account_id` vs 營運身分鍵（賣家 `store_id`／買家 `buyer_id`）分離、角色與視角、軟刪除／復活生命週期、跨角色守衛，皆在 44。本文件聚焦**登入憑證機制**（OAuth token 驗證、web cookie session、VerifyPhone、LinkConfirm、token refresh）。
+> **身份模型的規格分散在三處**：帳號、角色與生命週期見單體 identity 模組規格 `docs/modules/identity.md`，買家見 `docs/modules/buyer.md`，刪帳流程見 `docs/modules/accountdeletion.md`；賣家身份（`store_id` 與登入 `account_id`、`buyer_id` 的分離、重新入駐 incarnation）與跨角色守衛見 [44 號](44-帳號與賣家買家身份模型（Account%20&%20Seller-Buyer%20Identity）詳細設計書.md)。本文件聚焦**登入憑證機制**（OAuth token 驗證、web cookie session、VerifyPhone、LinkConfirm、token refresh）。
 
 ---
 
@@ -44,7 +44,7 @@ flowchart TD
 
 ### 角色與視角
 
-模型以 [44 號 §2.3](44-帳號與賣家買家身份模型（Account%20&%20Seller-Buyer%20Identity）詳細設計書.md) 為準，登入相關的結論：
+模型以 `docs/modules/identity.md` §3、§6 與 [44 號 §2.3](44-帳號與賣家買家身份模型（Account%20&%20Seller-Buyer%20Identity）詳細設計書.md)（賣家身份）為準，登入相關的結論：
 
 - 每個帳號都是買家：建帳時建立買家（§8），買家不是角色。
 - 角色只有要另外申請的 SELLER，由開店授予；登入不授予、不升級角色。
@@ -699,11 +699,11 @@ sequenceDiagram
 
 ## 6. 資料庫 Schema
 
-> 身份資料模型（`accounts`、`auth_providers`、`buyers`、`sellers`、`payuni_registrations` 的欄位與索引）以 **[44 號 §5.1/§5.2](44-帳號與賣家買家身份模型（Account%20&%20Seller-Buyer%20Identity）詳細設計書.md)** 為單一真實來源；買家關聯表細節見 [39 §3](39-買家服務（Buyer%20Service）詳細設計書.md)。
+> 身份資料模型的單一真實來源：`sellers`、`payuni_registrations` 的欄位與索引是 **[44 號 §5.1/§5.2](44-帳號與賣家買家身份模型（Account%20&%20Seller-Buyer%20Identity）詳細設計書.md)**，帳號表是 `docs/modules/identity.md` §9，`buyers` 是 `internal/modules/buyer/db/schema.sql`；買家關聯表細節見 [39 §3](39-買家服務（Buyer%20Service）詳細設計書.md)。
 >
 > 登入相關要點：帳號身份鍵 = `email`（partial unique `WHERE deleted_at IS NULL`）+ `auth_providers(provider, provider_sub_id)` UNIQUE；`phone` **非** unique（#944）。登入一律查 `auth_providers`；`accounts` 不持有 `firebase_uid` / `nickname` / `avatar`。
 
-登入專屬、不在 44 號範圍內的三處（#2035，語意見 §3「Bearer 憑證撤銷」）：
+登入專屬、不在身份模型規格範圍內的三處（#2035，語意見 §3「Bearer 憑證撤銷」）：
 
 | 位置 | 欄位／表 | 用途 |
 |---|---|---|
@@ -875,7 +875,7 @@ sequenceDiagram
 
 ## 14. 帳號軟刪與 provider 清理
 
-帳號軟刪除、角色移除、`auth_providers` 清理與 `account.deleted` 事件的完整生命週期見 **[44 號 §7.5/§8.1](44-帳號與賣家買家身份模型（Account%20&%20Seller-Buyer%20Identity）詳細設計書.md)**。
+帳號刪除、角色移除與 `AccountDeleted` 事件的生命週期見 `docs/modules/identity.md` §3、§4 與 `docs/modules/accountdeletion.md`；賣家的自助刪除與重新入駐見 **[44 號 §7.1/§7.5](44-帳號與賣家買家身份模型（Account%20&%20Seller-Buyer%20Identity）詳細設計書.md)**。
 
 登入相關要點：帳號只經 `accountdeletion` 刪除（ADR `docs/adr/2026-09-30-account-deletion-module.md`），同一個 transaction 關閉買家；移除 SELLER 不刪帳號。刪除的帳號留墓碑，同一個 Clerk 使用者不會再建帳號。以下描述舊服務：**web session 的撤銷走 `DeleteByAccountID`**（刪光該帳號全部 `web_sessions` row，失敗即回錯誤）——那才是撤銷本身；緊接著以該呼叫回傳的 `token_hash` 逐出各自的 Redis 快取副本，即時性由這一步提供（逐出失敗只記 warn，不影響撤銷成立）。同時寫的 Redis 撤銷黑名單覆蓋的是**無狀態 mobile JWT**與逐出打不到 Redis 時的兜底（見 §3「Redis blacklist 的角色」）。（注意：admin/force 的 `SoftDeleteAccount` 路徑**不**清 auth_providers，留孤兒 link，靠登入端 `isLiveAccount` 防呆擋下——見 44 §11.1。）
 

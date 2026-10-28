@@ -217,7 +217,7 @@ func (m *Service) SuspendAccount(ctx context.Context, accountID int64, reason st
 	return nil
 }
 
-// DeleteAccount 刪除帳號（設計書 44 §7.5）。已經刪除時成功（冪等）；從來不存在時回 NotFound。
+// DeleteAccount 刪除帳號（`docs/modules/identity.md` §4）。已經刪除時成功（冪等）；從來不存在時回 NotFound。
 func (m *Service) DeleteAccount(ctx context.Context, accountID int64) error {
 	return m.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := m.q(ctx)

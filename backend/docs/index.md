@@ -90,7 +90,7 @@
 | 40 | [商品匯入精靈服務（Product Import Service）](詳細設計書/40-商品匯入精靈服務%EF%BC%88Product%20Import%20Service%EF%BC%89詳細設計書.md) | `services/product-import-service/` |
 | 41 | [Realtime SSE 推播平台（Realtime SSE Push Platform）](詳細設計書/41-Realtime%20SSE%20推播平台%EF%BC%88Realtime%20SSE%20Push%20Platform%EF%BC%89詳細設計書.md) | `gateway/`、`services/social-service/`、`services/notification-service/` |
 | 43 | [評論微服務（Review Service）](詳細設計書/43-評論微服務%EF%BC%88Review%20Service%EF%BC%89詳細設計書.md) | `services/review-service/`、`gateway/` |
-| 44 | [帳號與賣家買家身份模型（Account & Seller-Buyer Identity）](詳細設計書/44-帳號與賣家買家身份模型%EF%BC%88Account%20&%20Seller-Buyer%20Identity%EF%BC%89詳細設計書.md) | `internal/modules/{identity,buyer,accountdeletion}/`、`services/seller-service/`、`gateway/` |
+| 44 | [帳號與賣家買家身份模型（Account & Seller-Buyer Identity）](詳細設計書/44-帳號與賣家買家身份模型%EF%BC%88Account%20&%20Seller-Buyer%20Identity%EF%BC%89詳細設計書.md) | `services/seller-service/`、`gateway/`、跨角色守衛（單體 identity、buyer、accountdeletion 的規格在 `docs/modules/`） |
 | 45 | [首頁區塊動態排序與營運干預（Homepage Dynamic Layout & Merchandising）](詳細設計書/45-首頁區塊動態排序與營運干預%EF%BC%88Homepage%20Dynamic%20Layout%20&%20Merchandising%EF%BC%89詳細設計書.md) | draft，尚未實作（無對應程式碼） |
 | 46 | [賣家能力權限層（Seller Capability Authorization）](詳細設計書/46-賣家能力權限層%EF%BC%88Seller%20Capability%20Authorization%EF%BC%89詳細設計書.md) | `gateway/internal/authz/`、`services/seller-service/` |
 | 47 | [GA4 分析追蹤（GA4 Cross-Platform Analytics）](詳細設計書/47-GA4%20分析追蹤%EF%BC%88GA4%20Cross-Platform%20Analytics%EF%BC%89詳細設計書.md) | `hawkr-website/`、`hawkr_buyer/`、`hawkr_seller/` |
