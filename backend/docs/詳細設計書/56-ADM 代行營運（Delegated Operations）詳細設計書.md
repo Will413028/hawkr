@@ -1,13 +1,13 @@
 # ADM 代行營運（Delegated Operations）詳細設計書
 
-> 本文是仍在運作的代行服務的現行規格：gateway 的授權與路由、product-service／order-service／seller-service／social-service 的代行讀寫、`pkg/delegation`，以及 admin 與 website 的代行畫面。單體 `delegation` 模組（工作階段、授權、操作稽核、管理員代行資格）的行為見 [`docs/modules/delegation.md`](../modules/delegation.md)，本文與它重疊處以它為準；gateway 經 `account.DelegationService`（`api/proto/account/delegation.proto`）呼叫單體在 legacy gRPC listener 提供的實作（`internal/legacy/delegationservice`）。本文在 gateway 的代行編排與各領域服務的代行讀寫併入單體或各自的模組規格時刪除。
+> 本文是仍在運作的代行服務的現行規格：gateway 的授權與路由、product-service／order-service／social-service 的代行讀寫、`pkg/delegation`，以及 admin 與 website 的代行畫面。單體 `delegation` 模組（工作階段、授權、操作稽核、管理員代行資格）的行為見 [`docs/modules/delegation.md`](../modules/delegation.md)，本文與它重疊處以它為準；gateway 經 `account.DelegationService`（`api/proto/account/delegation.proto`）呼叫單體在 legacy gRPC listener 提供的實作（`internal/legacy/delegationservice`）。gateway 的店家狀態重驗經單體的 legacy `SellerService.GetSeller`（`internal/legacy/sellerserver`）；店面的四條代行路由（`/admin/sellers/:store_id/storefront*`）固定回 503，不讀不寫（`DelegatedStorefrontUnavailable`）。本文在 gateway 的代行編排與各領域服務的代行讀寫併入單體或各自的模組規格時刪除。
 
 ## 0. 文件元資訊 (Metadata)
 
 | 項目 | 值 |
 |---|---|
 | 維護者 | 維護團隊 |
-| 對應程式碼 | **`backend/`**：`gateway/internal/authz/*`（capability／policy／registry，賣家與 admin 雙軌）、`gateway/internal/router/*`（`delegatedHandle` 掛載與 boot 斷言）、`gateway/internal/response/*`（業務碼到 HTTP status 的映射表 `bizhttp.go`）、`gateway/internal/handler/*`（代行 handler：`admin_delegation.go`、`admin_delegation_authorization.go`、`admin_delegated_{storefront,product,post,order,audit,media}.go`、`handler/delegation/*`）、`gateway/internal/middleware/*`（`X-Delegation-*` 剝除）、`gateway/internal/grpc/delegation_client.go`、`internal/modules/delegation`（單體 `delegation` 模組，經 `internal/legacy/delegationservice` 提供 `DelegationService`）、`services/java/product-service/*`、`services/seller-service/*`、`services/social-service/*`、`services/java/order-service/*`、`services/notification-service/*`、`api/proto/common/delegation.proto`、`api/proto/{account,product,seller,social,order}/*`、`services/java/shared/common-core/*`（`DelegationContextValidator`、`GrpcAuthContext`）、`pkg/delegation/*`、`pkg/mq/{exchanges,events}.go`、`infra/mq/topology/topology.yaml`。**`admin/`**：`src/features/delegated-operations/*`、`src/app/api/admin/delegated-operations/*`。**`website/`**：`app/(delegated)/adm/**`（工作區路由與 BFF）、`features/delegated-operations/*`、`features/seller-center/**`（與賣家本人共用的同一份）、`lib/api/{client,delegated}.ts`。三者的職責劃分見 §4.5 |
+| 對應程式碼 | **`backend/`**：`gateway/internal/authz/*`（capability／policy／registry，賣家與 admin 雙軌）、`gateway/internal/router/*`（`delegatedHandle` 掛載與 boot 斷言）、`gateway/internal/response/*`（業務碼到 HTTP status 的映射表 `bizhttp.go`）、`gateway/internal/handler/*`（代行 handler：`admin_delegation.go`、`admin_delegation_authorization.go`、`admin_delegated_{product,post,order,audit,media}.go`、`storefront_unavailable.go`、`handler/delegation/*`）、`gateway/internal/middleware/*`（`X-Delegation-*` 剝除）、`gateway/internal/grpc/delegation_client.go`、`internal/modules/delegation`（單體 `delegation` 模組，經 `internal/legacy/delegationservice` 提供 `DelegationService`）、`internal/legacy/sellerserver`（`SellerService.GetSeller`）、`services/java/product-service/*`、`services/social-service/*`、`services/java/order-service/*`、`services/notification-service/*`、`api/proto/common/delegation.proto`、`api/proto/{account,product,seller,social,order}/*`、`services/java/shared/common-core/*`（`DelegationContextValidator`、`GrpcAuthContext`）、`pkg/delegation/*`、`pkg/mq/{exchanges,events}.go`、`infra/mq/topology/topology.yaml`。**`admin/`**：`src/features/delegated-operations/*`、`src/app/api/admin/delegated-operations/*`。**`website/`**：`app/(delegated)/adm/**`（工作區路由與 BFF）、`features/delegated-operations/*`、`features/seller-center/**`（與賣家本人共用的同一份）、`lib/api/{client,delegated}.ts`。三者的職責劃分見 §4.5 |
 | 相關 doc | [44 帳號與賣家買家身份模型](44-帳號與賣家買家身份模型%EF%BC%88Account%20&%20Seller-Buyer%20Identity%EF%BC%89詳細設計書.md)（actor／subject 的 ID space 來源）、[46 賣家能力權限層](46-賣家能力權限層%EF%BC%88Seller%20Capability%20Authorization%EF%BC%89詳細設計書.md)（本書擴充其 authz package 為雙軌）、[52 微服務間內部授權](52-微服務間內部授權%EF%BC%88Internal%20Service%20Authorization%EF%BC%89詳細設計書.md)（`DelegationContext` 可信的前提）、[29 Admin 異常訂單管理 API](29-Admin%20異常訂單管理%20API%20詳細設計書.md)（治理視角的訂單唯讀）、[32 商家治理與食安通報](32-商家治理與食安通報%EF%BC%88Seller%20Governance%20&%20Food%20Safety%EF%BC%89詳細設計書.md)（治理入口與 admin actor 慣例）、[36 MQ 與事件總覽](36-MQ%20與事件總覽%EF%BC%88MQ%20&%20Event%20Catalog%EF%BC%89.md)（事件契約 SSOT）、[12 通知微服務](12-通知微服務%EF%BC%88Notification%20Service%EF%BC%89詳細設計書.md)／[13 通知模板引擎與收件箱](13-通知模板引擎與收件箱%EF%BC%88Notification%20Template%EF%BC%89詳細設計書.md)（賣家通知投遞） |
 
 ### 0.1 全書閱讀約定：⚠️ 的語意
@@ -108,7 +108,7 @@ flowchart LR
   GW["Gateway :9900<br/>/api/v1/admin/… 代行路由<br/>ADM 組：requireAdmin<br/>www 組：credential ＋ delegatedHandle(cap)"]
   ACC["單體 delegation 模組<br/>經 legacy gRPC listener 提供 DelegationService<br/>Session／授權／稽核"]
   PROD["product-service（Java）<br/>商品讀寫・上下架"]
-  SEL["seller-service（Go）<br/>店面公開欄位"]
+  SEL["單體 seller 模組<br/>legacy gRPC SellerService.GetSeller<br/>店家狀態重驗"]
   SOC["social-service（Go）<br/>貼文・排程發布"]
   ORD["order-service（Java）<br/>訂單唯讀"]
   NOTI["notification-service（Go）<br/>站內訊息（inbox ＋ App 推播）"]
@@ -123,7 +123,7 @@ flowchart LR
   WBFF -->|"HTTPS<br/>X-HK-Operation-Session<br/>Idempotency-Key<br/>（資源端點／current／媒體；不帶 ADM session）"| GW
   GW -->|"gRPC：preflight／建立／查詢／結束／撤銷／稽核"| ACC
   GW -->|"gRPC ＋ DelegationContext"| PROD
-  GW -->|"gRPC ＋ DelegationContext"| SEL
+  GW -->|"gRPC：GetSeller（授權鏈第 8 項）"| SEL
   GW -->|"gRPC ＋ DelegationContext"| SOC
   GW -->|"gRPC ＋ DelegationContext（賣家唯讀 RPC）"| ORD
   SOC -->|"gRPC：RecordAuditIntent／ConfirmAuditResult<br/>（排程發布 worker，origin=scheduled）<br/>★ 唯一不經 Gateway 的代行寫入"| ACC
@@ -148,7 +148,7 @@ flowchart LR
 | # | 面向 | 代行能力 | 後端範圍 | 硬性限制 |
 |---|---|---|---|---|
 | 1 | Operation Session 生命週期 | preflight／建立／查詢當前／結束／撤銷 | 單體 delegation `DelegationService` ＋ Gateway 5 支端點 | hard expiry ≤ 1800 秒 ＋ idle expiry 900 秒；一次只綁一個 target；軟終止不硬刪 |
-| 2 | 店面 | 查看、編輯公開店面欄位 | seller-service 既有**讀寫** RPC 加 `DelegationContext`；欄位 allow-list | 法定名稱、統編、負責人、銀行、PayUni、認證、KYC 欄位**排除**；SEO 欄位（`seoTitle`／`seoDescription`）亦不在代行 allow-list（§6.1.7） |
+| 2 | 店面 | 查看、編輯公開店面欄位 | 目前四條店面路由固定回 503（`DelegatedStorefrontUnavailable`），不讀不寫；欄位 allow-list 見 §6.1.7 | 法定名稱、統編、負責人、銀行、PayUni、認證、KYC 欄位**排除**；SEO 欄位（`seoTitle`／`seoDescription`）亦不在代行 allow-list（§6.1.7） |
 | 3 | 商品 | 列表、詳情、建立／編輯草稿、單品上下架、受控批次下架 | product-service 既有**讀寫** RPC 加 `DelegationContext`；新增批次下架 RPC 與批次 before 快照讀 RPC（§7.2.8）與 `@Version` | 上下架與批次屬**獨立 capability**＋二次確認＋單筆 reason 必填＋通知賣家 |
 | 4 | 動態／貼文 | 列表、草稿、媒體、標籤、關聯商品、發布／下架、排程發布 | social-service 既有**讀寫** RPC 加 `DelegationContext`；排程器（滿足多副本搶佔規範） | 草稿與發布**分權**（建立草稿與發布是兩支端點）；不代回覆私人訊息 |
 | 5 | 訂單 | 列表、篩選、詳情、狀態時間線、完整地址揭露 | order-service 既有**賣家唯讀** RPC 加 `DelegationContext`（代行讀取一律走賣家 RPC，見 §6.2.1）；完整地址走獨立端點 | **唯讀**；不得出現任何 shipment／payment mutation；PII 預設遮罩 |
@@ -352,7 +352,7 @@ flowchart TD
 | # | 假設 | 依據 | 失真後果 | 偵測方式 |
 |---|---|---|---|---|
 | A1 | **`hawkr-admin` 由本團隊維護，且 capability 白名單與後端九值保持逐字相同** | 該 repo 屬本團隊守備範圍，由本團隊維護 | 白名單與後端九值不一致時，多出來的值是前端永遠收不到的死碼、少掉的值則讓該能力在 UI 上不出現。**兩 repo 之間沒有硬性先後**：`parseDelegatedOperationCapabilities` 是忽略式降級（逐項過濾未知值，只有 `parsed.length === 0` 才判契約失敗），因此新增第 10 個 capability 時同波發布即可 | §13.1 的 capability golden 與 admin 的契約測試；另確認 `parseDelegatedOperationCapabilities` 仍是忽略式降級 |
-| A2 | ⚠️ **這一列不是假設，是一個「部署當下必須查核」的前提，不要讀成永久成立的既成事實。** 五支服務（gateway／單體 delegation／product-service／seller-service／social-service）的 `INTERNAL_AUTH_MODE` 必須為 `enforcing`。本設計把 proto `DelegationContext` 當可信輸入**完全依賴**這個前提，而它不會「失真」、**會被別人改回去**，故需要在部署時查核生效值 | §8.1.4 前提表 | **前提未達成即不得啟用代行。** 若未達成會打開兩條都繞過全部稽核的旁路：**(a) 領域服務側**——任一內部呼叫方 可自造 `DelegationContext` 直寫 product／seller／social 的代行寫入 RPC；**(b) 單體 delegation 側**——可直呼 `DelegationService` 憑空寫改稽核列。⇒ 稽核表既攔不住偽造的寫入，自己也可被竄改 | 不設獨立偵測 |
+| A2 | ⚠️ **這一列不是假設，是一個「部署當下必須查核」的前提，不要讀成永久成立的既成事實。** 四支服務（gateway／單體／product-service／social-service）的 `INTERNAL_AUTH_MODE` 必須為 `enforcing`。本設計把 proto `DelegationContext` 當可信輸入**完全依賴**這個前提，而它不會「失真」、**會被別人改回去**，故需要在部署時查核生效值 | §8.1.4 前提表 | **前提未達成即不得啟用代行。** 若未達成會打開兩條都繞過全部稽核的旁路：**(a) 領域服務側**——任一內部呼叫方 可自造 `DelegationContext` 直寫 product／seller／social 的代行寫入 RPC；**(b) 單體 delegation 側**——可直呼 `DelegationService` 憑空寫改稽核列。⇒ 稽核表既攔不住偽造的寫入，自己也可被竄改 | 不設獨立偵測 |
 | A3 | **Gateway 是唯一對外入口，且代行端點不可能被瀏覽器直接觸及** | E1 ＋ 前端 F16（泛用 BFF 硬性拒絕代行路徑） | credential 若可由瀏覽器直送 Gateway，HttpOnly cookie 的保護即失效 | 代行路由的負向測試（帶 credential 直打 Gateway 應被 CORS／Origin 檢查擋下） |
 | A6 | **代行併發規模低**：同一時間全平台的 active session 數量在**個位數到數十**量級（一個 admin 一次只能代行一家、一家一次只被一個 admin 代行，見 `docs/modules/delegation.md` §2） | 內部員工人數 ＋ §6.1 的兩條 partial unique 約束 | 若規模上升一個數量級，`GET current` 的 30 秒輪詢（C16）會成為 單體 delegation 的常態負載，需重估 §9 容量與是否加快取（受 E21 約束） | `GET current` QPS 與 active session 計數的 metrics |
 | A8 | **NTP 同步正常**，後端與瀏覽器時鐘偏差在 60 秒內 | C13 是前端硬性檢查 | 時鐘漂移 > 60 秒 ⇒ 全部 session 被判 invalid，且**後端看起來完全正常**（靜默）——請求根本不會送出來，沒有任何後端指標會動 ⇒ **監控對它完全失明** | 量測 `abs(now_client − issuedAt) < 5 秒`。**不用「節點時鐘偏差告警」代替**：要量的是**後端輸出的 `issuedAt`**，中間隔著時區換算與截秒兩層轉換 |
@@ -465,7 +465,7 @@ flowchart TB
 
   subgraph dom["領域服務（既有 RPC + DelegationContext）"]
     PROD["product-service<br/>requireSellerOrDelegated"]
-    SEL["seller-service<br/>pkg/delegation.Validate"]
+    SEL["單體 seller<br/>legacy SellerService.GetSeller"]
     SOC["social-service<br/>pkg/delegation.Validate"]
     SOCW["social-service<br/>internal/worker<br/>post_schedule_worker（lease claim）"]
     ORD["order-service（唯讀）<br/>requireSellerOrDelegated"]
@@ -478,7 +478,7 @@ flowchart TB
   WBFF -->|"X-HK-Operation-Session（代行資源端點與 GET current）"| RT
   HD -->|gRPC| DGRPC
   HD -->|"gRPC + DelegationContext"| PROD
-  HD -->|"gRPC + DelegationContext"| SEL
+  HD -->|"gRPC：GetSeller（第 8 項）"| SEL
   HD -->|"gRPC + DelegationContext"| SOC
   HD -->|"gRPC + DelegationContext"| ORD
   SOCW -->|"gRPC：RecordAuditIntent／ConfirmAuditResult<br/>origin=scheduled（掛 InternalAuthClientInterceptor）"| DGRPC
@@ -505,7 +505,7 @@ flowchart TB
 | `gateway/internal/router/seller_route_assert.go`（泛化） | boot fail-fast：保留既有 3 條賣家檢查，新增 **4 條** admin 檢查（`delegatedHandle` 註冊路由 capability 非空、禁字清單掃描、`/api/v1/admin` 禁 wildcard、**`/api/v1/admin` 下不經 `requireAdmin()` 者必須命中 26 支具名白名單**；見 §4.1.2 支柱一） | authz registry |
 | `gateway/internal/response/bizhttp.go` | **業務碼 → HTTP status 的統一映射表**。現況未登錄業務碼一律塌縮 409（`pkg/envelope.GrpcErr` 的 `AlreadyExists`／`FailedPrecondition`／`Aborted` 分支；該邏輯已自 `gateway/internal/response` 搬走，不要再照舊行號找），而本功能需要 401/403/409/410/422/429 分流 | 無 |
 | `common-core DelegationContextValidator` | Java 側驗 `DelegationContext` 完整性與 capability 匹配；`GrpcAuthContext.requireSellerOrDelegated` 呼叫它 | GrpcAuthContext |
-| `pkg/delegation` | Go 側與上者對稱的 `Validate(ctx, d, storeID, cap) error` ＋ `NewContext` / `FromContext(ctx)`（**舊名 `FromRequest` 作廢**，不做泛型 request 解析）；seller-service 與 social-service 共用，禁止各自實作。簽章與判定步驟見 §6.2.4 | `pkg/proto/common` |
+| `pkg/delegation` | Go 側與上者對稱的 `Validate(ctx, d, storeID, cap) error` ＋ `NewContext` / `FromContext(ctx)`（**舊名 `FromRequest` 作廢**，不做泛型 request 解析）；social-service 使用 `Validate`、gateway 使用 `StoreOperable`，禁止各自實作。簽章與判定步驟見 §6.2.4 | `pkg/proto/common` |
 
 ---
 
@@ -635,14 +635,11 @@ hawkr.common.DelegationContext delegation = 100;
 | `services/java/shared/common-core/src/main/java/io/github/will413028/hawkr/common/grpc/GrpcAuthContext.java`（新增 `requireSellerOrDelegated(DelegationContext delegation, long storeId, String capability)`，接在 `requireAccountType`之後。**簽章必須帶 `delegation` 參數**：gRPC interceptor 看不到 request body，而本案定版**不新增任何 gRPC metadata**（§4.4.2）⇒ delegation 只能由各 RPC 方法從 request 取出傳入，無法像 `requireAccountType` 那樣零參數從 `Context.Key` 拿；若需要覆寫下游身分，一律 `Context.current().withValue(...)`，**禁止額外 put header**，理由全文在該檔註解） |
 | `services/java/shared/common-core/src/main/java/io/github/will413028/hawkr/common/grpc/DelegationContextValidator.java`（驗 `DelegationContext` 完整性 ＋ capability 匹配 ＋ target storeId 一致） |
 
-**seller-service / social-service（Go）**
+**social-service（Go）／gateway**
 
 | 位置 |
 |---|
-| `pkg/delegation/{context.go,validate.go,store_state.go}`（與 common-core 的 Java helper 對稱。兩個服務**共用這一份**，禁止各自實作。`store_state.go` ＝ `StoreOperable(lifecycleStatus string, deleted bool) (ok bool, deniedCode int32)`，是「這家店現在能不能被代行」的唯一判定（§8.1.3 第 8 項）。**消費者**：Gateway 授權鏈第 8 項。**純函式、不做 I/O**——查 seller-service 是呼叫端的事，判定是這支的事；混在一起會讓它變成第四個「需要 mock 才測得動」的東西，而它正是最該被 table-driven 窮舉的一支（§13 unit 層）。**deny-by-default 白名單**：只有 `active` 且未刪除放行，未知狀態值一律拒絕） |
-| `services/seller-service/db/schema/schema.sql`（`sellers` 加 `"version" bigint NOT NULL DEFAULT 0`，接在 `food_business_reg_no` 之後、`CONSTRAINT "chk_sellers_status"`之前） |
-| `services/seller-service/db/migrations/{timestamp}_add_sellers_version.sql`（現行最新 ＝ `20260807065415_fix_food_safety_week_unique_null_bypass.sql`；`atlas migrate diff` 產生 ＋ `atlas migrate hash`） |
-| `services/seller-service/internal/grpc/`（`UpdateSeller` / `UpdateLogo` / `UpdateCover` 三支寫入 handler 前置 `pkgdelegation.Validate(...)` ＋ `expectedVersion` CAS；`handler.go GetSeller` 這支**讀取**同樣前置 `pkgdelegation.Validate(...)`，capability ＝ `storefront.read`） |
+| `pkg/delegation/{context.go,validate.go,store_state.go}`（與 common-core 的 Java helper 對稱。兩個服務**共用這一份**，禁止各自實作。`store_state.go` ＝ `StoreOperable(lifecycleStatus string, deleted bool) (ok bool, deniedCode int32)`，是「這家店現在能不能被代行」的唯一判定（§8.1.3 第 8 項）。**消費者**：Gateway 授權鏈第 8 項。**純函式、不做 I/O**——查店家狀態是呼叫端的事，判定是這支的事；混在一起會讓它變成第四個「需要 mock 才測得動」的東西，而它正是最該被 table-driven 窮舉的一支（§13 unit 層）。**deny-by-default 白名單**：只有 `active` 且未刪除放行，未知狀態值一律拒絕） |
 | `services/social-service/db/schema/schema.sql`（`cms_post` 加 `version BIGINT NOT NULL DEFAULT 0`，接在 `update_time` 之後、`);`之前；同時加排程發布欄位群（`publish_status` / `scheduled_publish_at` / `published_at` / `schedule_state` / `scheduled_by_session_id` / `schedule_lease_owner` / `schedule_lease_expires_at` / `schedule_next_attempt_at` / `schedule_retry_count`）＋ partial index ＋ CHECK。**欄位定義、型別與約束全文以 §5.1.5 為準，本檔不重列**） |
 | `services/social-service/db/migrations/{timestamp}_add_cms_post_version_and_schedule.sql`（現行最新 ＝ `20260807233630_add_cms_seller_forum_role.sql`；`atlas migrate diff` 產生 ＋ `atlas migrate hash`） |
 | `services/social-service/internal/grpc/`（`CreatePost` / `UpdatePost` 寫入 handler 前置 `pkgdelegation.Validate(...)` ＋ `expectedVersion` CAS；`handler.go GetPostDetail` / `ListMyPosts` 兩支**讀取**同樣前置 `pkgdelegation.Validate(...)`，capability ＝ `posts.read`；排程發布欄位處理見 §7.6）。<br/>⚠️ **`GetPostDetail` 在 `delegation` 非空時必須額外斷言 Q4 歸屬**：該貼文的 `cms_post.seller_id` **等於 delegation 的 target store**，不符一律回 **9275**——包含**已發布**的貼文（`publish_status = 4402`）。`GetPost`（`posts.sql`）刻意不在 SQL 層過濾（§5.1.5），所以這一層不做，代行讀者就讀得到任意賣家的貼文詳情，且成功讀取不落稽核（§7.1.2）⇒ 零痕跡。**草稿可見性規則同址定版**：代行讀者看得到 `seller_id == target` 的**全部** `publish_status`（含草稿 `4401`／已下架 `4403`），其餘一律 9275；買家／匿名路徑維持現狀不動 |
@@ -820,7 +817,7 @@ sequenceDiagram
 同一個抽屜上的**第四件事不是後端要求，但漏讀規格一樣會做錯**：「變更摘要」三欄表出現在**送出之前**，而 `changedFields` 只存在於寫入之後的稽核回應 —— 該表的資料來源、與稽核那一張的界線、以及必須排除哪些欄位，**定版在 §6.1.12 末節**（結論：不新增預覽端點、前端本地自算、送出後一律改用 `changedFields[].label`）。
 
 ## 5. 資料設計 (Data Design)
-本章只收仍在運作的服務自己的資料欄位：social-service 的排程發布與媒體引用，以及 product-service、seller-service、social-service 的樂觀鎖。delegation 模組的五張表見 `docs/modules/delegation.md` §2 與模組的 `db/schema.sql`。
+本章只收仍在運作的服務自己的資料欄位：social-service 的排程發布與媒體引用，以及 product-service、social-service 的樂觀鎖；店家的 `version` 欄位由 seller 模組擁有（`seller.stores.version`，`internal/modules/seller/db/schema.sql`）。delegation 模組的五張表見 `docs/modules/delegation.md` §2 與模組的 `db/schema.sql`。
 
 ---
 
@@ -1118,17 +1115,15 @@ ALTER TABLE product_sku ADD CONSTRAINT chk_product_sku_version_nonneg CHECK (ver
 | 5 | `ProductSkuRepository.deleteByIdIn`／`deleteByProductId` | 實體刪除 | — | 列已不存在，代行的下一次操作得到 `PRODUCT_SKU_NOT_FOUND` 而非靜默覆蓋 |
 
 
-#### seller-service／social-service（Atlas）— 樂觀鎖欄位（social 另含排程欄位）
+#### social-service（Atlas）— 樂觀鎖欄位與排程欄位
 
-兩者流程與 單體 delegation 相同（`make migrate-diff` → `atlas migrate hash`），只是改的是各自的 `db/schema/schema.sql`：
+流程與 單體 delegation 相同（`make migrate-diff` → `atlas migrate hash`），只是改的是 social-service 的 `db/schema/schema.sql`：
 
 | 服務 | 表 | 新增欄位 | migration 名稱 |
 |---|---|---|---|
-| seller-service | `sellers`（`db/schema/schema.sql`） | `"version" bigint NOT NULL DEFAULT 0` ＋ `chk_sellers_version_nonneg` | `add_sellers_version` |
 | social-service | `cms_post`（`db/schema/schema.sql`） | `version` ＋ 9 個排程發布欄位 ＋ 1 索引 ＋ 3 約束，**欄位定義見 §5.1.5** | `add_cms_post_version_and_schedule` |
 
-`sellers.version` 的回填判定同 product-service：不由既有欄位推導，`DEFAULT 0` 即正確初值，不需追加 `UPDATE`。
-⚠️ `cms_post` **不是**同一個結論——`publish_status` 與 `published_at` 兩欄可由既有狀態推導，**必須在同一個 migration 檔內回填**，逐欄判定見 §5.1.5。⚠️ **回填之外還有一件事**：`CreatePost` 的 INSERT 必須同步寫入 `published_at`，否則 migration 之後新建的每一篇貼文都是「已發布但無發布時點」（定版與理由見 §5.1.5 回填判定表下方）。
+`cms_post` 的回填判定：`publish_status` 與 `published_at` 兩欄可由既有狀態推導，**必須在同一個 migration 檔內回填**，逐欄判定見 §5.1.5。⚠️ **回填之外還有一件事**：`CreatePost` 的 INSERT 必須同步寫入 `published_at`，否則 migration 之後新建的每一篇貼文都是「已發布但無發布時點」（定版與理由見 §5.1.5 回填判定表下方）。
 
 Go 側 CAS 寫法固定為 `UPDATE ... SET <欄位...>, version = version + 1 WHERE <pk> = $1 AND version = $2`，**`rows = 0` 即版本衝突**，轉版本衝突業務碼（碼名與 HTTP 見 §6.5.1）。
 
@@ -1142,7 +1137,7 @@ Go 側 CAS 寫法固定為 `UPDATE ... SET <欄位...>, version = version + 1 WH
 
 見 `services/java/product-service/src/main/java/io/github/will413028/hawkr/product/repository/ProductRepository.java` 的全部寫入方法，以及 `grep -oE 'productRepository\.[a-zA-Z]+'` 的全部呼叫點。
 
-⚠️ **只掃 `ProductRepository` 與 `productRepository.` 兩個錨會漏掉第 12 列**：`ProductSuspensionSnapshotRepository.restoreFromSnapshot` 用 **`@Select` 包一句 `UPDATE product`**（為了 `RETURNING`），bean 名不是 `productRepository`、註解不是 `@Update` ⇒ **兩層掃描盲區都避開了**。窮舉 `product` 表的寫入路徑時，錨必須下在**表名 ＋ UPDATE 動詞**（`grep -rn 'UPDATE product' services/java/product-service/src/main/java`），不是 repository 的 bean 名，也不是 `@Update` 這個註解名。
+⚠️ **只掃 `ProductRepository` 與 `productRepository.` 兩個錨會漏掉以 `@Select` 包一句 `UPDATE product … RETURNING` 的寫法**（bean 名不是 `productRepository`、註解不是 `@Update` ⇒ **兩層掃描盲區都避開了**）。窮舉 `product` 表的寫入路徑時，錨必須下在**表名 ＋ UPDATE 動詞**（`grep -rn 'UPDATE product' services/java/product-service/src/main/java`），不是 repository 的 bean 名，也不是 `@Update` 這個註解名。
 
 | # | 寫入路徑 | 機制 | 是否 bump `version` | 處置 |
 |---|---|---|---|---|
@@ -1157,22 +1152,10 @@ Go 側 CAS 寫法固定為 `UPDATE ... SET <欄位...>, version = version + 1 WH
 | 9 | `batchUpdateStatusByIds` | `@Update` 自訂 SQL | ❌ **不 bump** | **必須改**：同上。這條尤其重要——它是賣家停權／刪除的連動下架，與代行的上下架寫同一個欄位 |
 | 10 | `stampSellerDeletedByMerchant` | `@Update` 自訂 SQL | ❌ 不 bump | **可接受並標明**：只蓋 `seller_deleted_at`，且蓋完該賣家已進入刪除流程、不會再有代行 session |
 | 11 | `incrementSalesCount`／`reaggregateStockFromSku`／`incrementFavoriteCount`／`updateReviewStats` | `@Update` 自訂 SQL | ❌ 不 bump | **刻意不 bump，必須在文件標明後果**：這四條是 MQ consumer 驅動的**反正規化計數欄**（`sales_count`／`stock_qty`／`favorite_count`／`rating`＋`review_count`），與代行者編輯的欄位不相交，且它們的更新頻率遠高於代行操作——讓它們 bump 會使代行編輯在高流量商品上幾乎必然 409，把樂觀鎖變成阻斷器。**代價**：代行者若在同一秒讀到舊的計數欄再寫回，會用舊值覆蓋——**因此 §6.1.12 的「可編輯？」欄必須把這些欄位標為「❌ 唯讀觀察」**（`stockQty`／`priceMin`／`priceMax` 由 SKU 聚合，`salesCount`／`favoriteCount`／`rating`／`reviewCount` 由 MQ consumer 維護），代行的 `UpdateProduct` 一律不送這些欄位，覆蓋就不會發生。**它們仍然進稽核快照與 diff**（唯讀觀察值），這與「不可編輯」不衝突——稽核要記的是「這次操作前後商品長什麼樣」，不是「這次改了什麼」。代行者要調整庫存或售價，正解是走 **SKU 層**的編輯（`skus` 欄位可編輯），聚合欄由領域服務重算。⚠️ **SKU 層有它自己的樂觀鎖**（`product_sku.version`，本節「SKU 層樂觀鎖欄位」）：本列的「不 bump」只涵蓋 `product`，不代表 SKU 的寫回不受保護——那條路徑的 lost update（賣家把賣掉的庫存原樣寫回復活）正是靠 SKU 自己的 version 擋住的 |
-| 12 | **`ProductSuspensionSnapshotRepository.restoreFromSnapshot`** | **`@Select` 包 `UPDATE product … RETURNING`**（為了拿回還原的 id） | ❌ **不 bump** | **必須改**：SQL 加 `version = p.version + 1`。它是停權解除的**批次還原**（`INACTIVE → ACTIVE`），改的正是代行者會改的 `status` 欄，且由治理／MQ 路徑觸發、可能落在代行者讀出 `version` 之後。⚠️ 它同時是**第 9 列的反向操作**，只改第 9 列而漏這一列，等於樂觀鎖只擋得住「下架」擋不住「上架回來」 |
 
-**`sellers`（seller-service，Go／sqlc）**
+**`seller.stores`（seller 模組）**
 
-見 `services/seller-service/db/queries/sellers.sql` 全部 `UPDATE sellers`／`INSERT INTO sellers`，另全 repo `grep -rn 'UPDATE sellers'` 確認寫入只在 seller-service（其餘命中皆為測試 fixture）：
-
-| # | 查詢 | 用途 | 處置 |
-|---|---|---|---|
-| 1 | `CreateSeller`（`sellers.sql`） | 建立 store stint | 無需改（新列 `version = 0`） |
-| 2 | `UpdateSeller` | **代行店面編輯的主路徑** | **必須加** `version = version + 1` ＋ `AND version = $N` 的 CAS 述詞 |
-| 3 | `UpdateSellerLogo`／`UpdateSellerCover`／`UpdateSellerSEO` | 賣家自行更換素材與 SEO | **必須加** `version = version + 1`（不需 CAS 述詞：它們不是代行路徑，只需讓代行者的 `expectedVersion` 察覺變化）。SEO 欄位不在代行 allow-list（§6.1.7），但**仍要 bump**——代行者讀到的整列快照包含它 |
-| 4 | `UpdateCurrentCertificationID`／`CompleteOnboarding`／`UpdateSellerFoodBusinessRegistration` | 認證與 onboarding 狀態機 | **必須加** `version = version + 1` |
-| 5 | `UpdateSellerRatingByStoreID` | 評分反正規化（事件驅動） | **刻意不 bump**，理由同 product 的計數欄；`rating` 不在代行 allow-list |
-| 6 | `UpdateSellerStatusByStoreID`／`UpdateSellerStatusCurrentByAccountID` | 治理停權／解除、刪除 | **必須加** `version = version + 1`。停權會改變代行是否還能寫（§8.1.3），版本必須反映 |
-| 7 | `RetireCurrentSellerStint`／`SetSellerPIICleared` | stint 退場、PII 清理 | **不 bump，須標明**：兩者都發生在該 stint 已無代行可能之後（`is_current = false` 或帳號已刪） |
-| 8 | `storecode_backfill.go`（一次性回填） | store_code 補值 | **不 bump，須標明**：一次性維運腳本（§22），執行時無代行 session |
+`version` 欄位由 seller 模組擁有（`internal/modules/seller/db/schema.sql` 的 `seller.stores.version`），模組自己的寫入路徑維護它。代行店面寫入目前沒有接上（§2.2 第 2 列），本節不列店面的代行寫入點。
 
 **`cms_post`（social-service，Go／sqlc）**
 
@@ -2034,6 +2017,8 @@ Content-Type: application/json
 ---
 
 #### 6.1.7 資源 API｜店面（storefront）
+
+四條店面路由（`GET`／`PATCH` storefront、`POST` storefront/logo、`POST` storefront/cover）的掛載與授權鏈照舊，handler 固定回 503（`DelegatedStorefrontUnavailable`），不讀不寫；以下是店面代行的欄位 allow-list 與值域。
 
 **`GET /api/v1/admin/sellers/{storeId}/storefront`** — `storefront.read`
 
@@ -3386,7 +3371,7 @@ func ScopePostPublishState() []string // {publishStatus, scheduledPublishAt, pub
 **共用簽章**
 
 ```go
-// pkg/delegation（Go 側；seller-service 與 social-service 共用這一份，禁止各自實作）
+// pkg/delegation（Go 側；social-service 使用 `Validate`、gateway 使用 `StoreOperable`，同一份，禁止各自實作，禁止各自實作）
 package delegation
 
 // Capability 是 9 個 admin capability token 的封閉列舉。
@@ -3464,7 +3449,7 @@ public static void validate(DelegationContext d, long storeId, String capability
 | E10 | request 的 `idempotency_key = "ik_a"`，`d.idempotency_key = "ik_a"` | 通過 |
 | E11 | request 有 `idempotency_key = ""`，`d.idempotency_key = "ik_a"` | 通過（request 沒送就不比對，見 S5 通過條件） |
 | **E12** | `capability = "products.read"`、`audit_log_id = ""`，宣告 `products.read`，其餘齊全 | **通過**（S1b 不適用於 `.read`）。⚠️ **這一列是本組唯一守得住「代行讀取能不能用」的 fixture**：少了它，兩側實作把 `audit_log_id` 寫成無條件必填時，Java 與 Go 會「等價地一起錯」，等價性測試照樣全綠 |
-| **E13** | `capability = "storefront.read"`、`audit_log_id = ""`，宣告 `storefront.read`，其餘齊全 | **通過**。這是 `GET .../storefront` 代行讀取端點打到 `SellerService.GetSeller` 的形狀（§4.5 seller-service 條目）。**不要與 §8.1.3 第 8 項的店家狀態重驗混為一談**：那一跳**根本不帶 `delegation`**（走 S0 直接回 nil），見該節 |
+| **E13** | `capability = "storefront.read"`、`audit_log_id = ""`，宣告 `storefront.read`，其餘齊全 | **通過**。這是 `storefront.read` 的 `Validate` 判定形狀（storefront 代行讀取端點目前固定回 503，§2.2 第 2 列）。**不要與 §8.1.3 第 8 項的店家狀態重驗混為一談**：那一跳**根本不帶 `delegation`**，見該節 |
 
 ⚠️ E6 存在的理由：`capability` 是前端 allowlist 的成員，**大小寫也是契約的一部分**。若驗證器先 `toLowerCase` 再比，Gateway 就可以核發一個前端不認得的大寫值而不被伺服端擋下 —— 那個值會在前端造成「未知 capability ＝ 整份契約作廢」的 502（§6.1.1）。
 
@@ -3546,7 +3531,7 @@ notification-service 建立 `notifications` 列時填：
 | 9276 | `DELEGATION_BATCH_PARTIAL_FAILED` | **200** | **整批被拒**：在逐項執行**之前**就終止的批次（此時沒有 `results` 可回）。**部分失敗不用這個碼** —— 受理的批次一律 `code: 0` ＋ `data.failed > 0` ＋ 逐項 `code`（§6.1.8） | 顯示整批未執行的原因；重新提交 |
 | 9277 | `DELEGATION_SESSION_NOT_FOUND` | **410** | 指定的 `sessionId` 不存在（revoke／audit-logs／summary 路徑） | 重載列表 |
 | 9279 | `DELEGATION_AUDIT_INTENT_FAILED` | **409** | 稽核 intent 寫入失敗 → fail-closed，未進行 domain write | 以**同一把 Idempotency-Key** 重試 |
-| 9280 | `DELEGATION_UPSTREAM_UNAVAILABLE` | **424** | 代行所依賴的下游（單體 delegation／seller-service）逾時或不可用 | 顯示「代行營運服務暫時無法使用」＋`traceId`；可重試。⚠️ **不得用 500／502／503，也不得用任何 5xx**：Cloudflare 站在 Gateway 前面，origin 回 5xx 時它會把整個 body 換成自己的錯誤頁（見 §6.5.2 的實測），前端的 `response.json()` 直接拋錯、**永遠拿不到 9280**；而 503 與 404 另有被前端解讀為「功能尚未啟用」並**永久隱藏入口**的問題（C12）。選 **424 Failed Dependency** 的理由是它的語意就是「所依賴的上游失敗」，且身為 4xx 不觸發 CF 的 body 替換——C12 的顧慮對 4xx 不成立：4xx 說的是「這一次請求出了事」，不是「這個服務不存在」 |
+| 9280 | `DELEGATION_UPSTREAM_UNAVAILABLE` | **424** | 代行所依賴的下游（單體 delegation、單體 seller 的 legacy `GetSeller`）逾時或不可用 | 顯示「代行營運服務暫時無法使用」＋`traceId`；可重試。⚠️ **不得用 500／502／503，也不得用任何 5xx**：Cloudflare 站在 Gateway 前面，origin 回 5xx 時它會把整個 body 換成自己的錯誤頁（見 §6.5.2 的實測），前端的 `response.json()` 直接拋錯、**永遠拿不到 9280**；而 503 與 404 另有被前端解讀為「功能尚未啟用」並**永久隱藏入口**的問題（C12）。選 **424 Failed Dependency** 的理由是它的語意就是「所依賴的上游失敗」，且身為 4xx 不觸發 CF 的 body 替換——C12 的顧慮對 4xx 不成立：4xx 說的是「這一次請求出了事」，不是「這個服務不存在」 |
 | **9281** | **`DELEGATION_ACTOR_MISMATCH`** | **403** | **保留碼位，本期無任何端點回傳**。原語意＝「credential 解析得到的工作階段，其 `actor_admin_id` 與當前 ADM session 的 admin **不是同一人**」；代行執行期整組在 www host，請求裡沒有第二個身分可以拿來比對，這個判定在本期**做不出來** | 前端不需要、也不得為它寫處置分支。⚠️ **碼位保留是為了防重用**：日後若恢復「www 側也持有獨立的 ADM 身分」（例如「由 ADM BFF 代轉每一支代行請求」那個選項被重開），語意必須原樣回到這一格；中途被拿去表達別的東西就再也回不來 |
 | **9282** | **`DELEGATION_HANDOFF_INVALID`** | **410** | S6 兌換失敗。**四種成因共用同一個碼**：code 不存在／已被兌換過／code 逾時（> handoff 期限 60 秒（`internal/model.DelegationHandoffTTL`））／對應工作階段已不可用（`ended`／`revoked`／**hard 或 idle 到期**——後者的 `status` 仍是 `active`，由 CAS 的 `expires_at`／`last_active_at` 兩個述詞攔下，`docs/modules/delegation.md` §3） | 顯示「此代行連結已失效，請回 ADM 重新開始」＋ 返回 ADM 連結；**不得自動重試**（code 是單次的，重試必然再失敗）。<br/>⚠️ **四種成因刻意不分開**：分開等於送給攻擊者一支「這把 code 存在嗎」的探測器。這與 9281／9274 刻意分開**不矛盾**——那兩者分開是因為操作者的**正解不同**（換帳號 vs 重建），而這四種的正解完全相同（回 ADM 重新開始） |
 
@@ -3708,7 +3693,7 @@ func BizStatusData(c *gin.Context, code int32, message string, data interface{})
 |---|---|---|
 | 出現位置 | `SessionSummary.revision` | 資源 DTO 的 `version`、mutation 的 `expectedVersion` |
 | JSON 型別 | **number**（§4 例外） | **string**（§4 常規） |
-| 載體 | `delegated_operation_sessions.revision` | `products.version`／`sellers.version`／`cms_post.version` |
+| 載體 | `delegated_operation_sessions.revision` | `products.version`／`seller.stores.version`／`cms_post.version` |
 | 何時 +1 | **只有真正的狀態轉換**，恰有兩種：主動結束、撤銷（本設計沒有「capability 縮減」，見 `docs/modules/delegation.md` §2、§3） | **每次成功寫入** |
 | 讀取／輪詢時 | **一律不 bump**（C8；bump 了操作者永遠進不了工作區） | 不變 |
 | 衝突表現 | 無（前端只比對相等） | `expectedVersion` 不符 → 9266 / 409 |
@@ -3717,11 +3702,11 @@ func BizStatusData(c *gin.Context, code int32, message string, data interface{})
 
 **可直接抄的三段落地形式**（缺這三段，實作者會寫出「回傳 0 筆卻回 200 成功」的路徑）：
 
-**(a) Go（seller-service／social-service）** —— 版本比對寫進 `WHERE`，用影響筆數判定：
+**(a) Go（social-service）** —— 版本比對寫進 `WHERE`，用影響筆數判定：
 
 ```sql
-UPDATE sellers
-   SET store_name = $1, updated_at = $2, version = version + 1
+UPDATE cms_post
+   SET <欄位...>, updated_at = $2, version = version + 1
  WHERE id = $3
    AND version = $4;      -- $4 = expectedVersion
 ```
@@ -3755,7 +3740,6 @@ return buildSuccessResponse(entity);   // 版本不符時，這裡會回 200 成
 | 服務 | 現況 | 本期動作 |
 |---|---|---|
 | product-service（Java） | `ProductEntity` **沒有** `@Version`（全 repo 只有 6 個 entity 有） | 加 `@Version` 欄位 ＋ Flyway `V{N+1}__add_product_version.sql` |
-| seller-service（Go） | `sellers` 無版本欄 | 加欄 ＋ Atlas migration |
 | social-service（Go） | `cms_post` 無版本欄 | 加欄 ＋ Atlas migration |
 
 統一語意：`BIGINT NOT NULL DEFAULT 0`，每次成功寫入 `+1`。
@@ -3804,7 +3788,7 @@ return buildSuccessResponse(entity);   // 版本不符時，這裡會回 200 成
 | S-1 | 判定某店家可否代行（入口按鈕的可用性） | ADM 管理員開啟賣家列表／詳情 | `GET /api/v1/admin/sellers/{storeId}/delegated-operation/preflight` | §7.1.4 P1 段 | **§7.2.5** |
 | S-2 | 建立代行工作階段 | ADM 於 modal 按「建立代行工作階段」 | `POST /api/v1/admin/delegated-operations` | §7.2.1 | §7.2.1 |
 | S-3 | 工作階段狀態輪詢（每 30 秒＋focus／reconnect） | ADM 工作區前端 | `GET /api/v1/admin/delegated-operations/current` | §7.2.1 尾段 | **—**：單跳唯讀（Gateway → 單體 delegation），無分支、無副作用、不跨第三個服務；它唯一的非顯然行為是「完全唯讀、不 bump `revision`、**不順延 `last_active_at`**」，而那已由 §7.2.1 的兩次對帳與 B1／B5、§6.2.4a 的 Gateway 填法表完整表達，畫成獨立時序圖不增加資訊 |
-| S-4 | 代行讀取（店面／商品／貼文／訂單） | ADM 於工作區瀏覽 | `GET /api/v1/admin/sellers/{storeId}/{storefront,products,posts,orders}` | §7.1.4 P3 段 | **—**：成功路徑不落稽核，**唯一的寫入是那句順延 `last_active_at` 的 `UPDATE … RETURNING`**（§6.2.4a，與第一跳的反查合為同一句、不新增往返），形狀恆為「`GetCurrentSession` → **seller-service `GetSeller`（Q3b 店家狀態重驗）** → 領域讀取 RPC」**三跳**；Gateway 側的 Q1–Q3b 已由 §7.1.4 P3 段的流程圖窮舉；**Q4（資源歸屬）不在 P3 段的圖上**——它由領域服務判定，節點見 P4E，**讀取與寫入共用同一個判定**，讀取側的具體述詞見 §4.5 的 product／social 兩列與 §5.1.5「`GetPostDetail` 的四種讀者」。拒絕路徑的稽核形狀與 §7.2.6 的 alt 分支相同。**唯一例外是 PII 揭露，它另有圖（S-7）** |
+| S-4 | 代行讀取（店面／商品／貼文／訂單） | ADM 於工作區瀏覽 | `GET /api/v1/admin/sellers/{storeId}/{storefront,products,posts,orders}` | §7.1.4 P3 段 | **—**：成功路徑不落稽核，**唯一的寫入是那句順延 `last_active_at` 的 `UPDATE … RETURNING`**（§6.2.4a，與第一跳的反查合為同一句、不新增往返），形狀恆為「`GetCurrentSession` → **單體 seller `GetSeller`（Q3b 店家狀態重驗）** → 領域讀取 RPC」**三跳**；Gateway 側的 Q1–Q3b 已由 §7.1.4 P3 段的流程圖窮舉；**Q4（資源歸屬）不在 P3 段的圖上**——它由領域服務判定，節點見 P4E，**讀取與寫入共用同一個判定**，讀取側的具體述詞見 §4.5 的 product／social 兩列與 §5.1.5「`GetPostDetail` 的四種讀者」。拒絕路徑的稽核形狀與 §7.2.6 的 alt 分支相同。**唯一例外是 PII 揭露，它另有圖（S-7）** |
 | S-5 | 代行寫入（非發布層：店面欄位、商品編輯、貼文草稿） | ADM 在編輯表單按儲存（**只有貼文與商品才是「儲存草稿」；店面沒有草稿態**，§6.1.7） | `PATCH .../storefront`、`PATCH .../products/{id}`、`POST .../posts`（草稿）等 | §7.2.2 | §7.2.2 |
 | S-6 | 代行發布命令（商品上下架、貼文發布下架、批次下架） | ADM 於二次確認 drawer 按「確認上架」 | `POST .../products/{id}/publish`、`POST .../posts/{id}/publish`、`POST .../products/batch-unpublish` | §7.2.3 | 單筆 §7.2.3；批次 **§7.2.8** |
 | S-7 | 訂單完整收件資訊揭露（PII） | ADM 按「查看完整地址」 | `GET .../orders/{orderNo}/recipient-contact` | §7.1.4 P3 段 | **§7.2.6** |
@@ -3826,7 +3810,7 @@ return buildSuccessResponse(entity);   // 版本不符時，這裡會回 200 成
 | Q1 | 工作階段有效嗎（**hard 未到期、未閒置逾時**、未撤銷）？ | 單體 delegation（權威） | `delegated_operation_sessions.status` ＋ `expires_at` ＋ **`last_active_at`**（`docs/modules/delegation.md` §3 推導規則的三個順位）。**Q1 同時是 `last_active_at` 的順延點**：代行資源路由上它是一句 `UPDATE … RETURNING`，判定與順延同一次往返（§6.2.4a） |
 | Q2 | 工作階段的 target 與 URL 的 `{storeId}` 相符嗎？ | Gateway | session snapshot 的 `target_store_id`。**不呼叫 `storeid.CurrentStoreID`**（見 §4：該 resolver 對 admin account 會寫入 60 秒負快取，不可用於 target 判定） |
 | Q3 | 本路由宣告的 capability 落在工作階段的 capability snapshot 內嗎？ | Gateway `authz.GrantedAdminCapabilities` | 宣告＝掛載合一（§4.2） |
-| **Q3b** | **目標店家現在還能被代行嗎（未停權／未關店／未刪除）？** | Gateway（判定）＋ seller-service（事實權威） | `sellers.status` ＋ `deleted_at`，經 `pkg/delegation.StoreOperable`。全文見 §8.1.3 第 8 項。**執行位置在 Q3 之後**：前三問只讀 session 與記憶體 registry，Q3b 是這條鏈上第一次跨服務往返，排在最後才問最省 |
+| **Q3b** | **目標店家現在還能被代行嗎（未停權／未關店／未刪除）？** | Gateway（判定）＋ 單體 seller（事實權威，legacy `GetSeller`） | seller 模組的店家狀態（`lifecycle_status`），經 `pkg/delegation.StoreOperable`。全文見 §8.1.3 第 8 項。**執行位置在 Q3 之後**：前三問只讀 session 與記憶體 registry，Q3b 是這條鏈上第一次跨服務往返，排在最後才問最省 |
 | Q4 | 被寫的資源真的屬於 target store 嗎？ | 領域服務 | `product.store_id`／`cms_post.seller_id`／`sellers.store_id` 與 `DelegationContext` 的 target 比對 |
 | Q5 | `expectedVersion` 與資源當前版本相符嗎？ | 領域服務（權威）＋ Gateway（快速失敗） | 資源樂觀鎖欄位（§5.4） |
 
@@ -3862,7 +3846,7 @@ return buildSuccessResponse(entity);   // 版本不符時，這裡會回 200 成
 | 無有效代行授權／授權已撤回 | `DELEGATION_AUTHORIZATION_REVOKED` | `data.allowed=false` | 同上 |
 | 該 admin 已有 active session（**同店家或不同店家皆然**） | `DELEGATION_CONFLICT_ACTOR_OTHER_STORE` | `data.allowed=false` | 「請先結束目前的代行工作階段」 |
 | 該店家已被別的 admin 代行 | `DELEGATION_CONFLICT_STORE_OTHER_ACTOR` | `data.allowed=false` | 同上 |
-| preflight 內部依賴失效（account／seller RPC 逾時或錯誤） | `DELEGATION_UPSTREAM_UNAVAILABLE` | — | 入口暫時不可用並可重試。**必須是 424，不得用 500／502／503**（C12 ＋ CF 會換掉 5xx 的 body，見 §6.5.2） |
+| preflight 內部依賴失效（gateway 呼叫單體 delegation 逾時或錯誤） | `DELEGATION_UPSTREAM_UNAVAILABLE` | — | 入口暫時不可用並可重試。**必須是 424，不得用 500／502／503**（C12 ＋ CF 會換掉 5xx 的 body，見 §6.5.2） |
 | 同 `Idempotency-Key` 但 payload 不同 | `DELEGATION_IDEMPOTENCY_KEY_REUSED` | — | 停止重送並顯示 `traceId` |
 | 參數／命令不合法（含寫入路徑 `operationReason` 缺漏） | `DELEGATION_INVALID_COMMAND` | — | 定位到欄位 |
 | admin session 失效 | `DELEGATION_ADMIN_SESSION_REQUIRED` | — | 返回 ADM 登入 |
@@ -3870,7 +3854,7 @@ return buildSuccessResponse(entity);   // 版本不符時，這裡會回 200 成
 | capability 不足 | `DELEGATION_CAPABILITY_DENIED` | — | 該模組本來就不 mount；若靠直呼 API 觸發則只回 `code`＋`traceId` |
 | **代行期間目標店家轉為停權／關店（Q3b）** | `DELEGATION_STORE_NOT_OPERABLE` | —（preflight 階段同碼，但那是「擋新建」） | 本次請求失敗；**工作階段同時轉終態**，≤30 秒後輪詢讀到 `revoked`、工作區切成阻擋畫面並清 cookie。**不落稽核**（理由見 §7.1.2 末段）；前端**不得**當成可重試錯誤 |
 | **代行期間目標店家被刪除（Q3b）** | `DELEGATION_STORE_NOT_DELEGABLE` | — | 同上 |
-| **Q3b 問不到答案**（seller-service 逾時／不可用） | `DELEGATION_UPSTREAM_UNAVAILABLE` | — | 本次請求失敗且**可重試**；**工作階段維持 `active`、不轉終態**——上游抖動是暫時的，而終態不可逆（§8.1.3） |
+| **Q3b 問不到答案**（單體 seller（legacy gRPC）逾時／不可用） | `DELEGATION_UPSTREAM_UNAVAILABLE` | — | 本次請求失敗且**可重試**；**工作階段維持 `active`、不轉終態**——上游抖動是暫時的，而終態不可逆（§8.1.3） |
 | URL `{storeId}` 與工作階段 target 不符（Q2） | `DELEGATION_TARGET_MISMATCH` | — | 阻擋跨店存取，**且必落稽核**（§7.2.2 alt 分支） |
 | 資源不屬於 target store（Q4） | `DELEGATION_RESOURCE_NOT_OWNED` | — | 同上，**必記安全稽核** |
 | 資源版本衝突（Q5） | `DELEGATION_RESOURCE_VERSION_CONFLICT` | — | 開啟 diff／重新載入流程，不覆寫賣家較新的修改 |
@@ -4020,14 +4004,14 @@ sequenceDiagram
     participant WEB as Website BFF（hawkr-website）
     participant GW as Gateway
     participant ACC as 單體 delegation
-    participant SEL as seller-service
+    participant SEL as 單體 seller
 
     BR->>BFF: POST /api/admin/delegated-operations<br/>storeId／reasonCode／caseReference
     BFF->>BFF: 驗 admin session cookie；產生 Idempotency-Key
 
     BFF->>GW: ① GET /admin/sellers/{storeId}/delegated-operation/preflight
     GW->>ACC: Preflight
-    ACC->>SEL: GetSeller／ResolveSellerAccountID
+    ACC->>SEL: 店家狀態（行程內呼叫 seller 公開 API）
     SEL-->>ACC: store 狀態、storeName、sellerAccountId
     ACC-->>GW: allowed／target／actor／reasonOptions／capabilities／ttlSeconds／idleSeconds
     GW-->>BFF: 200 code=0
@@ -4095,7 +4079,7 @@ sequenceDiagram
     participant BFF as 代行 BFF（hawkr-website）
     participant GW as Gateway
     participant ACC as 單體 delegation
-    participant SEL as seller-service
+    participant SEL as 單體 seller
     participant PRD as product-service
     participant DB as product DB
 
@@ -4112,15 +4096,15 @@ sequenceDiagram
         GW-->>BFF: DELEGATION_TARGET_MISMATCH／DELEGATION_CAPABILITY_DENIED
     else Q3b 目標店家已停權／關店／刪除
         GW->>SEL: GetSeller（店家狀態重驗，deadline 800ms）
-        SEL-->>GW: status=suspended／closed 或 deleted_at 非空
+        SEL-->>GW: lifecycle_status 為 suspended／suspended_governance／pending_deletion，或 NotFound（不存在／已關閉）
         GW->>ACC: RevokeSession（revoke_reason='store_not_operable'）
         GW-->>BFF: DELEGATION_STORE_NOT_OPERABLE／DELEGATION_STORE_NOT_DELEGABLE<br/>不落稽核；工作階段已轉終態
-    else Q3b 問不到答案（seller-service 逾時／不可用）
+    else Q3b 問不到答案（單體 seller 逾時／不可用）
         GW->>SEL: GetSeller
         SEL-->>GW: DEADLINE_EXCEEDED／UNAVAILABLE
         GW-->>BFF: DELEGATION_UPSTREAM_UNAVAILABLE<br/>可重試，工作階段維持 active
     else 授權通過（Q1–Q3b 全過）
-        GW->>SEL: GetSeller（Q3b 通過：status=active 且未刪除）
+        GW->>SEL: GetSeller（Q3b 通過：lifecycle_status=active）
         SEL-->>GW: 可代行
         GW->>PRD: GetProduct（取 before 快照與當前 version）
         PRD-->>GW: before 快照 ＋ version
@@ -4153,7 +4137,7 @@ sequenceDiagram
 1. **before 快照必須在 intent 時就寫入**。稽核列是 append-oriented：只有 `result`／`after_snapshot`／`confirmed_at`／`resource_id` 允許被 confirm 更新一次（`resource_id` 在此白名單內，是因為建立類操作在 intent 當下還沒有 id），`before_snapshot` 寫下去就不可變。因此 Gateway 必須在 intent 之前先讀一次資源。這一次讀與後續寫之間的競態，由 `expectedVersion` 樂觀鎖關掉——中途被別人改掉就是版本衝突，稽核列以 `FAILED` 收尾，不會留下說謊的 before。
 2. **`ConfirmAuditResult` 與完成事件同一個 tx**，兩者都在單體 delegation 內；跨到領域服務的那一段用 intent → confirm 兩階段補上（§8.4）。
 3. **`Idempotency-Key` 一路透傳到領域服務的 `idempotency_key` 欄位**。product-service 既有的冪等作用域是 `(key, store_id)`；代行寫入的 `store_id` 就是 target store，與賣家本人共用同一個作用域，靠 BFF 產生的 UUID 保證不撞。各層冪等鍵的完整定義見 §6.6.1。
-4. **Q3b（店家狀態重驗）必須排在 before 快照與 `RecordAuditIntent` 之前**（§8.1.3 第 8 項）。把它挪到 intent 之後會同時弄壞兩件事：**(a)** 會為一個注定被拒絕的請求寫下一列 `PENDING` 稽核，而 §7.1.2 定版「Q3b 拒絕不落稽核」；**(b)** 撤銷動作與 intent 的順序會倒過來——`origin=interactive` 的 intent 前置條件是 session 有效，若先撤銷再寫 intent，intent 會被自己剛造成的終態擋下，變成一個 9279（稽核前置失敗）而不是 9272。反過來也不要把它提到 `GetCurrentSession` **之前**：那樣做會在 session 根本無效（過期／別人的 credential）時，白白對 seller-service 多打一次無謂的查詢，而那條路徑本來是最便宜的拒絕。
+4. **Q3b（店家狀態重驗）必須排在 before 快照與 `RecordAuditIntent` 之前**（§8.1.3 第 8 項）。把它挪到 intent 之後會同時弄壞兩件事：**(a)** 會為一個注定被拒絕的請求寫下一列 `PENDING` 稽核，而 §7.1.2 定版「Q3b 拒絕不落稽核」；**(b)** 撤銷動作與 intent 的順序會倒過來——`origin=interactive` 的 intent 前置條件是 session 有效，若先撤銷再寫 intent，intent 會被自己剛造成的終態擋下，變成一個 9279（稽核前置失敗）而不是 9272。反過來也不要把它提到 `GetCurrentSession` **之前**：那樣做會在 session 根本無效（過期／別人的 credential）時，白白對單體 seller 多打一次無謂的查詢，而那條路徑本來是最便宜的拒絕。
 
 #### 7.2.3 發布命令與通知賣家
 
@@ -4265,7 +4249,7 @@ sequenceDiagram
     participant BFF as Admin BFF
     participant GW as Gateway
     participant ACC as 單體 delegation
-    participant SEL as seller-service
+    participant SEL as 單體 seller
 
     loop 入口存活期間：初次掛載 ＋ 每 30 秒 stale ＋ 視窗 focus ＋ 每次 create 前再抓一次
         BR->>BFF: GET /api/admin/merchants/{storeId}/…/preflight
@@ -4275,15 +4259,8 @@ sequenceDiagram
         GW->>ACC: Preflight（deadline DELEGATION_GRPC_DEADLINE_PREFLIGHT，§8.5.1）
 
         ACC->>ACC: ① delegation.admin_eligibilities<br/>② store 存在且未刪除
-        ACC->>SEL: GetSeller／ResolveSellerAccountID（deadline 1.2s）
+        ACC->>SEL: 店家狀態（行程內呼叫 seller 公開 API）
 
-        alt seller-service 逾時或錯誤
-            SEL-->>ACC: DEADLINE_EXCEEDED／UNAVAILABLE
-            ACC-->>GW: 下游不可用
-            GW-->>BFF: 424 code=9280 DELEGATION_UPSTREAM_UNAVAILABLE
-            BFF-->>BR: 424（入口暫時不可用、可重試，下一輪 stale 會自動重抓）
-            Note over GW,BR: 禁止 503／404／500：前端把 503 與 404 讀成<br/>「此環境尚未部署代行營運」並永久隱藏入口（C12）
-        else 取得店家狀態
             SEL-->>ACC: status／storeName／sellerAccountId
             ACC->>ACC: ④ 店家未停權？ ⑤ seller_delegation_authorizations 有有效授權？<br/>⑥ 衝突的 active session（actor／target 拆兩支查詢，`docs/modules/delegation.md` §3）
             alt ④⑤⑥ 任一不通過
@@ -4296,7 +4273,6 @@ sequenceDiagram
                 GW-->>BFF: 200 code=0
                 BFF-->>BR: 200 allowed=true（入口按鈕可用）
             end
-        end
     end
 ```
 
@@ -4317,7 +4293,7 @@ sequenceDiagram
     participant BFF as 代行 BFF（hawkr-website）
     participant GW as Gateway
     participant ACC as 單體 delegation
-    participant SEL as seller-service
+    participant SEL as 單體 seller
     participant ORD as order-service
 
     BFF->>GW: GET /admin/sellers/{storeId}/orders/{orderNo}/recipient-contact<br/>?operation_reason=…（trim 後 1–100 字，必填）<br/>X-HK-Operation-Session
@@ -4337,7 +4313,7 @@ sequenceDiagram
             GW-->>BFF: DELEGATION_TARGET_MISMATCH／DELEGATION_CAPABILITY_DENIED
         else Q1–Q3 通過
             GW->>SEL: GetSeller（targetStoreId）※Q3b，第 8 項店家狀態重驗
-            SEL-->>GW: 店家狀態（status／deleted_at）
+            SEL-->>GW: 店家狀態（lifecycle_status）
             alt 店家已停權／關店／刪帳號
                 GW-->>BFF: 9272 DELEGATION_STORE_NOT_OPERABLE / 422<br/>**唯讀也擋**——理由正是「這家店出了問題時，連看都不該再看」<br/>（尤其 orders.read 帶 PII）
             else Q3b 通過（店家狀態正常）
@@ -4447,7 +4423,7 @@ sequenceDiagram
     participant BFF as 代行 BFF（hawkr-website）
     participant GW as Gateway
     participant ACC as 單體 delegation
-    participant SEL as seller-service
+    participant SEL as 單體 seller
     participant PRD as product-service
     participant MQ as RabbitMQ
 
@@ -4456,7 +4432,7 @@ sequenceDiagram
     GW->>ACC: ① GetCurrentSession → Q1／Q2／Q3（**整批只付一次**）
     ACC-->>GW: status／target／capabilities
     GW->>SEL: ①b GetSeller（targetStoreId）→ Q3b 店家狀態（**整批只付一次**）
-    SEL-->>GW: 店家狀態（status／deleted_at）
+    SEL-->>GW: 店家狀態（lifecycle_status）
     Note over GW: 店家已停權／關店／刪帳號 ⇒ 9272 · 422，整批不執行（§8.1.3 第 8 項）
 
     alt 整批被拒（capability 不足／items 超量／productId 重複／operationReason 缺）
@@ -4492,7 +4468,7 @@ sequenceDiagram
 5. **`auditLogId` 由 Gateway 填進 ④ 的 `items`，領域服務原樣回音。** 不是領域服務產生、也不是它回寫——它拿不到那個值，因為稽核列在 單體 delegation、而 intent 由 Gateway 打。`BatchProductStatusItem` 因此**必須有 `audit_log_id` 欄位**（§6.2.3）：`BatchProductStatusResult.audit_log_id` 要回得出來，前提是它先被傳得進去。
 6. **③ 逐項 intent 失敗的處置：該項標 9279／`FAILED`，且不進入 ④ 的 `items`，其餘照跑。** 單筆路徑的規則是「intent 失敗 ⇒ 整個代行寫入中止」（§7.3.2），**批次版必須逐項化**——否則一列稽核寫不進去就炸掉整批 50 件，而那 49 件的 intent 明明是成功的。實作面：③ 在單一交易內逐項 INSERT 時**必須逐項 `SAVEPOINT`**——PostgreSQL 交易內任一句 SQL 失敗會讓整個交易 aborted（`25P02`），之後所有指令一律被拒，「某項失敗其餘照跑」在沒有 SAVEPOINT 的情況下**做不到**（[Java 微服務開發規範](../開發規範/Java%20微服務開發規範.md) §9）。
 7. **⑤ 是 all-or-nothing，因此 confirm 失敗的影響面是 N 列而不是 1 列。** 這是本形狀唯一的退步，**必須明講、不得靜默**——完整的寬度分析與「為什麼仍是淨改善」見 §7.3.3 視窗 A。
-8. **② 回的必須是完整 before 快照，不是只夠做狀態轉換判斷的那幾欄。** `before_snapshot` 是爭議時的舉證素材（§6.1.12），而批次正是「一次動很多件」的高風險操作——它的舉證素材**不得比單筆少**。⇒ `BatchProductSnapshot` 帶 `ProductDetail detail`，Gateway 對批次與單筆跑同一支投影函式。⚠️ **這與讀法 3「逐項獨立」及本節的跳數承諾都不衝突**：服務端逐項組 detail 是三次**本地**查詢（SKU／hashtag／分類階層），Gateway 這一跳仍然只有一次。反過來讓 Gateway 逐項打 `GetProduct` 才會破壞跳數承諾，而且那條路還會連帶付 N 次 seller-service 呼叫（`GetProduct` 內含 `buildSellerInfo`）。⚠️ 補齊 before **不放寬比較範圍**：`SnapshotFields` 仍是 `{status}`。
+8. **② 回的必須是完整 before 快照，不是只夠做狀態轉換判斷的那幾欄。** `before_snapshot` 是爭議時的舉證素材（§6.1.12），而批次正是「一次動很多件」的高風險操作——它的舉證素材**不得比單筆少**。⇒ `BatchProductSnapshot` 帶 `ProductDetail detail`，Gateway 對批次與單筆跑同一支投影函式。⚠️ **這與讀法 3「逐項獨立」及本節的跳數承諾都不衝突**：服務端逐項組 detail 是三次**本地**查詢（SKU／hashtag／分類階層），Gateway 這一跳仍然只有一次。反過來讓 Gateway 逐項打 `GetProduct` 才會破壞跳數承諾，而且那條路還會連帶付 N 次單體 seller 呼叫（`GetProduct` 內含 `buildSellerInfo`）。⚠️ 補齊 before **不放寬比較範圍**：`SnapshotFields` 仍是 `{status}`。
 
 > **批次的總時間預算見 §7.3.1「② 批次資源端點的預算表」。** 批次語意下跳數與 N 脫鉤（6 跳，含店家狀態查詢），`items` 上限 50 不構成時間問題。
 > **仍留給業務裁決的只剩一個不阻擋實作的產品題**：一次批次下架最多幾件是想要的操作體驗。
@@ -4521,11 +4497,11 @@ sequenceDiagram
 | 前端 → BFF → Gateway（**媒體 upload session 兩支**） | **15s**（同上檔，見上方 ③） | 位元組走步 ② 直送 R2、不經本路徑；這兩支只送 JSON metadata |
 | Gateway handler 總預算（session 端點） | 8s | 外層 10s 留 2s 給網路與 BFF 開銷 |
 | Gateway handler 總預算（單筆資源 mutation） | **12s** | 外層 15s 留 3s 給網路、BFF 與 CF 開銷 |
-| Gateway → `Preflight` | 3s（內含 seller-service 1.2s） | preflight 只在建立前與入口輪詢時呼叫 |
+| Gateway → `Preflight` | 3s | preflight 只在建立前與入口輪詢時呼叫 |
 | Gateway → `CreateSession` | 2s | |
 | Gateway → `GetCurrentSession` | 800ms | 每次代行請求都會呼叫，必須廉價 |
 | `DELETE current` 的**單跳**：`EndSession`（2s，沿用 `_CREATE_MS`） | **2s** < 8s | **一跳，不是兩跳**：不打 `GetCurrentSession`（取 `actor` 做比對的往返不參與任何判定）（§6.1.5、§7.2.4）。⚠️ **BFF 側前置的那次 `GET current`（驗 target 綁定）不在本列作用域內**——它是另一支端點、另一條 10s 預算，不要因為都叫 `GET current` 就以為連它一起省掉了。不重試，`EndSession` 冪等，由前端重送 `DELETE` 恢復（§7.3.2） |
-| Gateway → seller-service `GetSeller`（授權鏈第 8 項：店家狀態重驗） | 800ms | **店家狀態重驗新增**（§8.1.3 第 8 項）。**每一次代行請求都會呼叫，讀與寫皆然**——唯讀路徑的額外成本就只有這一跳（它沒有 intent／confirm）。命中時多一次 `RevokeSession`（2s，沿用 `DELEGATION_GRPC_DEADLINE_CREATE_MS`），**不列入本表的最壞總和**：那條路徑不會再往下走 domain write，且撤銷失敗不改變本次請求的結果（§8.1.3） |
+| Gateway → 單體 seller `GetSeller`（legacy gRPC）（授權鏈第 8 項：店家狀態重驗） | 800ms | **店家狀態重驗新增**（§8.1.3 第 8 項）。**每一次代行請求都會呼叫，讀與寫皆然**——唯讀路徑的額外成本就只有這一跳（它沒有 intent／confirm）。命中時多一次 `RevokeSession`（2s，沿用 `DELEGATION_GRPC_DEADLINE_CREATE_MS`），**不列入本表的最壞總和**：那條路徑不會再往下走 domain write，且撤銷失敗不改變本次請求的結果（§8.1.3） |
 | Gateway → 領域服務 read RPC（before 快照） | 800ms | 每次代行寫入的第一跳（`before_snapshot` 必須在 intent 之前取得，見 §7.2.2 讀法 1） |
 | Gateway → `RecordAuditIntent` | 800ms | |
 | Gateway → 領域服務 write RPC | 4s | |
@@ -4539,7 +4515,7 @@ sequenceDiagram
 | 前端 → BFF → Gateway（批次） | **60s**（本書定版） | 接線資源端點時採此值；刻意留在 CF 對 origin 的等待上界（推測 ~100s）之下 |
 | Gateway handler 總預算（批次） | **50s** | 外層 60s 留 10s 給網路、BFF 與 CF 開銷 |
 | Gateway → `GetCurrentSession` | 800ms | **整批只付一次**（在逐項語意之外，見 §7.2.8） |
-| Gateway → seller-service `GetSeller`（第 8 項） | 800ms | **整批只付一次**——批次的 target store 恰好一個（第 5 項已保證 `session.target_store_id == URL 的 storeId`），因此這一跳與 `items` 筆數無關 |
+| Gateway → 單體 seller `GetSeller`（legacy gRPC）（第 8 項） | 800ms | **整批只付一次**——批次的 target store 恰好一個（第 5 項已保證 `session.target_store_id == URL 的 storeId`），因此這一跳與 `items` 筆數無關 |
 | Gateway → 領域服務批次 read RPC（before 快照） | 3s | 一次取回 N 筆的 before 快照與 `version` |
 | Gateway → `RecordAuditIntentBatch` | 4s | 一次交易寫 **N 列**稽核（逐項語意不變，只是收進一個交易） |
 | Gateway → 領域服務批次 write RPC | 20s | `BatchUpdateSellerProductStatus`（§6.2），服務端逐項 try-catch＋逐項 version CAS |
@@ -4567,7 +4543,6 @@ sequenceDiagram
 | Gateway → 領域服務 write RPC | 4s | 不重試 | 領域服務既有 `idempotency_key` 機制 | `ConfirmAuditResult(FAILED)`；逾時視為結果未知，一律走 FAILED＋業務碼，由使用者以同一把 key 重送 |
 | Gateway → 單體 delegation `ConfirmAuditResult` | 400ms／次 | **3 次、指數退避（100ms／200ms）、總計 < 2s** | `auditLogId` 為鍵，重複 confirm 為 no-op | 仍失敗則稽核列停在 `PENDING`（合法終態，語意見 `docs/modules/delegation.md` §6），查詢時如實顯示、不計入成功數，**不做對帳 job、不做 backfill**（§8.4） |
 | Gateway → 單體 delegation `EndSession`／`RevokeSession` | 2s | 不重試 | 冪等（終態再結束仍回成功） | 回原狀態碼；cookie 由前端保留，不宣稱已結束 |
-| 單體 delegation → seller-service `GetSeller` | 1.2s（`DELEGATION_GRPC_DEADLINE_SELLER_STATE_MS`） | 不重試 | 天然（唯讀） | 回 **424 ＋ `DELEGATION_UPSTREAM_UNAVAILABLE`（9280）**，與 §6.1.2 失敗情境表一致。**不得回 `allowed:false`＋`DELEGATION_STORE_NOT_OPERABLE`（9272）**——9272 的語意是「**確知**此店家不可代行」，逾時／`UNAVAILABLE` 是「**問不到答案**」，兩者依 §8.1.3 第 8 項必須分開；混用會讓操作者看到「此店家停權中」這個與事實無關的原因（正是 §6.1.2 引入 `deniedCode`／`deniedLabel` 要解決的問題），也會讓 seller-service 的一次抖動被誤讀成治理事件。fail-closed 仍然成立：**兩者都不放行**，差別只在錯誤碼與可重試性（9280 可重試、9272 不可） |
 | notification-service → 站內訊息寫入 | 2s | consumer framework 的 retry／DLX | 以 `reference_id = audit_log_id` 去重（§6.3.2） | 進 DLQ，人工處理（§12.4） |
 | notification-service → FCM 推播 | 由 FCM client 自帶 | **不重試、不 nack** | `push_notifications` 的 `(user_id, user_type, event_type, reference_id)` 唯一索引 | 失敗只寫一列 `status='failed'`＋`error_log` 後 **`return nil`**（`internal/usecase/send_push.go`）⇒ **不影響 inbox 已寫入的事實**、也不會讓訊息重回 queue。這是既有行為，本案沿用不改：inbox 才是通知賣家的權威載體，推播只是提醒 |
 | 排程 worker → 單體 delegation intent／confirm | 同上兩列 | 同上 | 同上 | intent 失敗 ⇒ 該次排程不執行，租約到期後重試（§7.6） |
@@ -4620,7 +4595,7 @@ UPDATE product
 
 **影響筆數 = 0 的處置**：一律視為版本衝突，回 `DELEGATION_RESOURCE_VERSION_CONFLICT`，**不得**退化成「再查一次然後覆蓋」。前端據此開啟 diff／重新載入流程，並在合併後取得新的 `expectedVersion`；**原 `Idempotency-Key` 不可用於不同 payload**，否則會撞上 `DELEGATION_IDEMPOTENCY_KEY_REUSED`。
 
-註：三個資源的樂觀鎖欄位都是各自的資料列欄位（`ProductEntity` 的 `@Version`、seller-service 與 social-service 的 `version` 欄位），欄位定義與遷移見 §5.4。
+註：三個資源的樂觀鎖欄位都是各自的資料列欄位（`ProductEntity` 的 `@Version`、social-service 的 `version` 欄位與 seller 模組的 `seller.stores.version`），欄位定義與遷移見 §5.4。
 
 #### 7.4.3 批次操作的逐項語意
 
@@ -5130,25 +5105,25 @@ flowchart TD
 | **查什麼** | 目標店家的 `sellers.status`（生命週期值 `active`／`suspended`／`suspended_governance`／`closed`）與 `deleted_at` |
 | **判定規則** | **deny-by-default：只有 `status='active'` 且未刪除才放行。** 其餘一律拒絕——包含日後新增的任何 `status` 值。⚠️ 反過來寫成「命中 `suspended`／`closed` 才拒」的黑名單形式是錯的：新增一個生命週期值時，黑名單會**靜默放行**它，而白名單只會誤擋（誤擋看得見、靜默放行看不見） |
 | **判定的唯一實作** | `pkg/delegation.StoreOperable(lifecycleStatus string, deleted bool) (ok bool, deniedCode int32)`（與 `Validate` 同 package）。**本項呼叫這一份**（`gateway/internal/router/delegated_capability.go` 的 `enforceStoreOperable`）。判定只放在 `pkg/delegation`，不在呼叫點各寫一份，否則各份會各自演化，於是「入口說不可以、寫入說可以」這種矛盾遲早出現；規則只有一份，才談得上「這家店能不能被代行」有唯一答案 |
-| **資料來源** | seller-service，**沿用 preflight 用的同一支 RPC** `GetSeller`（§7.2.1 ①、§7.2.5）。Gateway 本來就持有 seller-service client（§6.1.1 的 `/storefront` 路由即走 `SellerService.GetSeller`），**這句只涵蓋 Gateway 這一跳**——preflight 的同一份判定由單體 delegation 在行程內讀 seller 取得（`docs/modules/delegation.md` §5）。**刻意不為此另立一支輕量 RPC**：第二支 RPC ＝ 第二個「店家可否代行」的答案來源，preflight 與逐次重驗一旦查不同支，兩邊的欄位取用與判定就會各自漂移 |
-| **拒絕碼** | 停權（`suspended`／`suspended_governance`）與關店（`closed`）→ **9272 `DELEGATION_STORE_NOT_OPERABLE`**（422）；已刪除或查無該店 → **9265 `DELEGATION_STORE_NOT_DELEGABLE`**（403）。兩者都是既有碼、語意原封相符（§6.5.1），**不新增業務碼**——這兩個碼在 preflight 表達的就是同樣兩件事，逐次重驗只是把同一個判定搬到請求路徑上。⚠️ **`closed` 實際落 9265 而非本列的 9272**（seller-service 對公開 lookup 把關店視同不存在，preflight 亦然），偏差與理由見下方 ⛔ 段落，寫測試時以實際行為為準 |
-| **本跳帶不帶 `delegation`** | **不帶。** 這一跳是 **Gateway 自己的授權判定**，不是代行操作 —— 它問的是「這家店現在能不能被代行」，發生在放行之前，此刻還沒有任何 `DelegationContext` 可以送（`audit_log_id` 也還不存在，因為讀取路徑本來就不寫 intent，§7.1.2）。⇒ **`GetSellerRequest.delegation` 留空**，seller-service 端走 `pkg/delegation` 的 **S0**（`d == nil` ⇒ 賣家本人／既有路徑，直接回 nil），視同既有 admin 讀取。<br/>**這一列必須明寫，否則會與 §6.2.1／§6.2.3「代行讀取一律帶 `delegation`」對撞**：那兩節講的是**代行端點**（`GET .../storefront` 等，帶 `storefront.read`），本跳不是端點、不在 `delegatedRoutes` registry 內、沒有 capability。照字面把 `delegation` 帶上去，反而會因為 `audit_log_id` 為空而在寫入類語境下被 S1b 打回 9260 |
-| **問不到答案時** | seller-service 逾時／`UNAVAILABLE` → **9280 `DELEGATION_UPSTREAM_UNAVAILABLE`**（424，可重試）。**本次請求一律拒絕（fail-closed），但不得轉終態** |
+| **資料來源** | 單體 seller 的 legacy `SellerService.GetSeller`（`internal/legacy/sellerserver`）。**這句只涵蓋 Gateway 這一跳**——preflight 的同一份判定由單體 delegation 在行程內讀 seller 取得（`docs/modules/delegation.md` §5）。**刻意不為此另立一支輕量 RPC**：第二支 RPC ＝ 第二個「店家可否代行」的答案來源，兩邊的欄位取用與判定就會各自漂移 |
+| **拒絕碼** | 停權（`suspended`／`suspended_governance`）與關店（`closed`）→ **9272 `DELEGATION_STORE_NOT_OPERABLE`**（422）；已刪除或查無該店 → **9265 `DELEGATION_STORE_NOT_DELEGABLE`**（403）。兩者都是既有碼、語意原封相符（§6.5.1），**不新增業務碼**——這兩個碼在 preflight 表達的就是同樣兩件事，逐次重驗只是把同一個判定搬到請求路徑上。⚠️ **`closed` 實際落 9265 而非本列的 9272**（`GetSeller` 把關店視同不存在，preflight 亦然），偏差與理由見下方 ⛔ 段落，寫測試時以實際行為為準 |
+| **本跳帶不帶 `delegation`** | **不帶。** 這一跳是 **Gateway 自己的授權判定**，不是代行操作 —— 它問的是「這家店現在能不能被代行」，發生在放行之前，此刻還沒有任何 `DelegationContext` 可以送（`audit_log_id` 也還不存在，因為讀取路徑本來就不寫 intent，§7.1.2）。⇒ **`GetSellerRequest.delegation` 留空**，單體 `GetSeller` 不檢查 `delegation`，視同既有 admin 讀取。<br/>**這一列必須明寫，否則會與 §6.2.1／§6.2.3「代行讀取一律帶 `delegation`」對撞**：那兩節講的是**代行端點**（`GET .../storefront` 等，帶 `storefront.read`），本跳不是端點、不在 `delegatedRoutes` registry 內、沒有 capability。照字面把 `delegation` 帶上去，反而會因為 `audit_log_id` 為空而在寫入類語境下被 S1b 打回 9260 |
+| **問不到答案時** | 單體 seller 逾時／`UNAVAILABLE` → **9280 `DELEGATION_UPSTREAM_UNAVAILABLE`**（424，可重試）。**本次請求一律拒絕（fail-closed），但不得轉終態** |
 
 > **接線落點**（`requireDelegated`，`gateway/internal/router/delegated_capability.go`）：`enforceStoreOperable` 排在第 5／6 項之後、`c.Next()` 之前，打 `SellerClient.GetStoreStateForGuard`（`internal/grpc/delegation_client.go`，**不帶 `delegation`**）取 `lifecycle_status` 餵 `pkg/delegation.StoreOperable`，命中即 `RevokeDelegationSession(revoke_reason='store_not_operable')` 後回拒絕碼。deadline 取 `DELEGATION_GRPC_DEADLINE_STORE_STATE_MS`（800），撤銷沿用 `..._CREATE_MS`。
 >
-> ⚠️ **「seller-service 明確回答了」在這一跳不等於 `err == nil`**：Gateway 的 `EnvelopeGuardInterceptor` 會把非零 envelope code 一律轉成 gRPC error，所以業務拒絕與傳輸失敗**都以 `err` 現身**，必須在呼叫端分開，否則已刪除的店會永遠回 9280 且工作階段永不轉終態。判準：`NotFound`（軟刪的店——lookup 濾 `deleted_at IS NULL`）與 `FailedPrecondition`（envelope 業務碼的預設映射，已關店的 `4040` 走這裡）＝**確知**，其餘（`Unavailable`／`DeadlineExceeded`／`Canceled`／`Internal`）＝**問不到**。
+> ⚠️ **「單體 seller 明確回答了」在這一跳不等於 `err == nil`**：Gateway 的 `EnvelopeGuardInterceptor` 會把非零 envelope code 一律轉成 gRPC error，所以業務拒絕與傳輸失敗**都以 `err` 現身**，必須在呼叫端分開，否則已刪除的店會永遠回 9280 且工作階段永不轉終態。判準：`NotFound`（店家不存在或已關閉：`GetSeller` 回 envelope 業務碼 404）與 `FailedPrecondition`（envelope 業務碼的預設映射）＝**確知**，其餘（`Unavailable`／`DeadlineExceeded`／`Canceled`／`Internal`）＝**問不到**。
 >
-> **`SellerInfo` 沒有 deleted 欄位，但 9265／9272 分得出來，因此不動 proto**：`SellerService.GetSeller(store_id)` 走 `GetPublicSellerProfileByStoreIDOrCode`，SQL 述詞為 `(store_id = $1 OR store_code = $1) AND deleted_at IS NULL`，且**不濾 status** ⇒ 停權店查得到、`lifecycle_status='suspended'` 原樣回來（→ 9272）；已刪除的店根本不在結果集（→ `NotFound` → 9265）；已關店由 `handler.go` 回 `4040`（→ 9265）。⇒ `StoreOperable` 的 `deleted` 參數在這一跳**恆傳 `false` 且正確**——查得到的列必然未軟刪。**與 單體 delegation preflight 對同一支 RPC 的處置逐字相同**（`internal/client/seller/client.go` 把 `NotFound` 與非零 code 一律譯成 `ErrStoreNotFound` → 9265），於是入口與逐次重驗對同一家店永遠給同一個答案。
-> **殘留的契約偏差只有一項**：`closed` 依 §6.5.1 字面應為 **9272（422）**，實際落 **9265（403）**，因為 seller-service 對公開 lookup 把關店視同不存在。這個偏差**在 preflight 已經存在**（同一支 RPC、同一個形狀），不是逐次重驗引入的；要修就得改 seller-service 對 `closed` 的回法，那會動到所有公開店面頁的既有行為，超出本案範圍。兩者都 fail-closed 拒絕並轉終態，差別只在 HTTP 狀態與前端文案。
+> **`SellerInfo` 沒有 deleted 欄位，但 9265／9272 分得出來，因此不動 proto**：`SellerService.GetSeller(store_id)` 讀 seller 模組的店家（`Store`），已關閉的店與不存在的店都回 envelope 業務碼 404（→ `NotFound` → 9265）；其餘店家回 `lifecycle_status`：停權（`suspended`／`suspended_governance`）與 `pending_deletion` 原樣回來（→ `StoreOperable` 拒絕 → 9272）。⇒ `StoreOperable` 的 `deleted` 參數在這一跳**恆傳 `false` 且正確**——查得到的店必然沒有關閉。**單體 delegation 的 preflight 用同一份店家狀態**（`docs/modules/delegation.md` §5），於是入口與逐次重驗對同一家店永遠給同一個答案。
+> **殘留的契約偏差只有一項**：`closed` 依 §6.5.1 字面應為 **9272（422）**，實際落 **9265（403）**，因為 `GetSeller` 把已關閉的店視同不存在。這個偏差**在 preflight 已經存在**（`docs/modules/delegation.md` §5：9265 只在 legacy `bizCodes`），不是逐次重驗引入的；兩者都 fail-closed 拒絕並轉終態，差別只在 HTTP 狀態與前端文案。
 > ⚠️ **不要為此在 `SellerInfo` 加 `deleted` 欄位**：查得到的列必然未軟刪，該欄位在每一個成功回應上恆為 `false` ⇒ 它是一個沒有判別力卻看起來像防線的欄位，正是否決「留著但不判定」的同一個理由。
 
 **「確知不可代行」與「問不到答案」必須分開處置，這是本項最容易寫錯的地方。**
 
-- **確知**（seller-service 明確回覆了一個非 `active` 的狀態，或該店已刪除）→ 拒絕 ＋ **轉終態**。
+- **確知**（單體 seller 明確回覆了一個非 `active` 的狀態，或該店不存在／已關閉）→ 拒絕 ＋ **轉終態**。
 - **不知道**（逾時／連線失敗）→ 拒絕，**但工作階段維持原狀**。
 
-理由：轉終態是**不可逆**的（`revoked` 為終態，`docs/modules/delegation.md` §3），而 seller-service 的一次抖動是**暫時**的。若把「問不到」也拿去轉終態，一次 30 秒的 seller-service 不可用就會把當下所有進行中的代行工作階段永久打死，且全部需要重建——用一個暫時故障換一批不可逆的損失。fail-closed 的要求是「這次請求不准通過」，它不要求「把授權銷毀」，兩者不是同一件事。
+理由：轉終態是**不可逆**的（`revoked` 為終態，`docs/modules/delegation.md` §3），而單體 seller 的一次抖動是**暫時**的。若把「問不到」也拿去轉終態，一次 30 秒的單體 seller 不可用就會把當下所有進行中的代行工作階段永久打死，且全部需要重建——用一個暫時故障換一批不可逆的損失。fail-closed 的要求是「這次請求不准通過」，它不要求「把授權銷毀」，兩者不是同一件事。
 
 **命中之後：把工作階段轉為 `revoked`，而不是只回一個錯誤**
 
@@ -5175,7 +5150,7 @@ flowchart TD
 
 ⚠️ **兩支媒體 upload session 端點（§6.1.13）同樣不跑第 8 項**——它們不碰 target store，沒有「這家店還能不能被代行」可問。**但它們要填 `counts_as_activity = true`**（§6.2.4a）：**店家狀態重驗**與**活動順延**是兩條各自獨立的作用域，不要因為前者不適用就把後者也一起關掉（關掉的症狀是靜默的，見 §6.2.4a 該列）。
 
-這不是效能取捨，是正確性要求：`GET /admin/delegated-operations/current` 走 `credentialHandle`（§6.1.1、§8.1.2 斷言作用域），**它若也跑第 8 項就會回 422 而不是回 `status='revoked'`**，前端於是永遠讀不到終態，工作區會卡在「暫時不可用」而不是切成阻擋畫面——上一段的第二個連帶當場失效。同一個理由使第 8 項與 §9.1.1「`GET current` 不查 seller-service、單次查詢」的三條硬性要求**完全不衝突**：那三條約束的是 session 端點，第 8 項一步都沒踏進去。
+這不是效能取捨，是正確性要求：`GET /admin/delegated-operations/current` 走 `credentialHandle`（§6.1.1、§8.1.2 斷言作用域），**它若也跑第 8 項就會回 422 而不是回 `status='revoked'`**，前端於是永遠讀不到終態，工作區會卡在「暫時不可用」而不是切成阻擋畫面——上一段的第二個連帶當場失效。同一個理由使第 8 項與 §9.1.1「`GET current` 不查單體 seller、單次查詢」的三條硬性要求**完全不衝突**：那三條約束的是 session 端點，第 8 項一步都沒踏進去。
 
 **為什麼唯讀路徑也要擋**（不是只擋寫入）：
 
@@ -5187,7 +5162,7 @@ flowchart TD
 ⚠️ **不沿用既有的 `seller:suspended:<accountId>` Redis 快取**（46 號 §4.2）。`pkg/redis/seller_suspension.go` 不適用的理由有**三條，各自獨立成立**，任一條都足以否決：
 
 1. **它是 fail-open 的**。`GetSellerSuspension`在 **cache miss 與 Redis 錯誤兩種情況都回 `("", false)`＝未停權**，函式註解自己寫明「callers on the BLOCK-if-suspended path must fail-open per 46 §4.3」。拿一個設計上就會在故障時回「沒事」的來源，去餵一個必須 fail-closed 的判定，等於 Redis 一有狀況第 8 項就**靜默失效**——而這正是 §28 教訓的形狀（不能失敗的判定放在一個會失敗且量不到的地方）。
-2. **它的值域涵蓋不了本項要判的三件事**。該 key 只在**管理員手動停權**時由 seller-service 寫入（檔頭註解：`admin manual suspension state propagation`），**關店（`status='closed'`）與刪帳號（`deleted_at`）根本不會寫這個 key**。要擋的三個情境（停權／關店／刪帳號）它只涵蓋一個。
+2. **它的值域涵蓋不了本項要判的三件事**。該 key 只在**管理員手動停權**時寫入（檔頭註解：`admin manual suspension state propagation`），**關店（`status='closed'`）與刪帳號（`deleted_at`）根本不會寫這個 key**。要擋的三個情境（停權／關店／刪帳號）它只涵蓋一個。
 3. **它以 `accountId` 為鍵**，而代行路徑的鍵是 `store_id`（surrogate），且代行路徑**刻意不走 storeid resolver**（§8.1.4(c)）。沿用它就要在代行路徑上把 §8.1.4(c) 剛避開的那次身分解析裝回去。
 
 ⇒ 因此 §9.4 的判定**維持不變**：本功能仍然完全不使用 Redis、不新增任何硬上限依賴。第 8 項多出來的成本是一次同叢集 gRPC，落在既有的 PostgreSQL 與 gRPC 預算內。
@@ -5256,10 +5231,7 @@ canonical。**代行的讀取與寫入一律走賣家既有 RPC 並一律帶本�
 2. **delegation 的真實性由 Gateway 保證**：Gateway 是唯一驗證 credential、比對 target、判定 capability
    並產生 `DelegationContext` 的地方；微服務不重新驗證 credential（它也拿不到 credential —— 見 §8.1.6）。
 
-**這與既有 `SuspendSellerForAdminRequest.AdminId` 是同一個信任模型**
-（`gateway/internal/handler/admin_seller_suspension.go` → `seller-service` usecase 簽章
-`seller_suspension.go` 的 `adminID int64`）：admin 身分走 proto 明示欄位、由 Gateway 填、微服務信任。
-本設計不發明新的信任模型，只是把同一個模型的載體從單一 `int64` 換成一個結構化 message。
+**本設計不發明新的信任模型**：admin 身分走 proto 明示欄位、由 Gateway 填、微服務信任；載體是結構化 message `DelegationContext`。
 
 **這個模型的兩個前提，缺一即失效**（兩者都不是本設計新增的機制，但本設計**依賴**它們，因此登記於此）：
 
@@ -5490,8 +5462,8 @@ C12 是硬約束：admin 前端把 preflight 的 **404 與 503 都**顯示成「
 | 依賴掛掉 | preflight | create | current | 代行 mutation |
 |---|---|---|---|---|
 | **單體 delegation** | **424 ＋ `DELEGATION_UPSTREAM_UNAVAILABLE`**（**fail-closed**：無法判定授權即不得放行） | 424，session 不建立 | 424，**前端保留 cookie、不宣稱已結束**（`current/route.ts` 的 `!ok` 分支），工作區顯示暫時不可用 | **一律拒絕**（424）。稽核 intent 寫不進去 ⇒ 不得執行任何 domain write |
-| **seller-service**（店家狀態／授權查核） | `allowed:false` ＋ `deniedCode`（不是 424——判定得出「現在不可代行」）。此時 `reasonOptions` 與 `capabilities` **仍必須非空**，見 §6.1 | 424 | 不受影響（current 不查 seller，§9.1.1） | **店家狀態重驗上線後變成一律 424 ＋ `DELEGATION_UPSTREAM_UNAVAILABLE`**：第 8 項（Q3b）問不到店家狀態即 fail-closed，讀與寫皆然（§8.1.3）。**但工作階段維持 `active` 不轉終態**——服務恢復後下一次請求自動放行，不需要重建。**這是店家狀態重驗帶進來的新失效面**：舊版代行 mutation 不查 seller-service，因此不受它影響；現在它是每一次代行請求的必經跳，seller-service 的可用性直接成為代行的可用性上界 |
-| **領域服務**（product／seller／social） | 不受影響 | 不受影響 | 不受影響 | 502 ＋ 稽核列停在 `PENDING`（見 §8.4） |
+| **單體 seller**（legacy `GetSeller`，只有 Gateway 授權鏈第 8 項經網路呼叫；preflight 與 create 由單體 delegation 在行程內讀 seller） | 不受影響（行程內） | 不受影響 | 不受影響（current 不查 seller，§9.1.1） | **一律 424 ＋ `DELEGATION_UPSTREAM_UNAVAILABLE`**：第 8 項（Q3b）問不到店家狀態即 fail-closed，讀與寫皆然（§8.1.3）。**但工作階段維持 `active` 不轉終態**——服務恢復後下一次請求自動放行，不需要重建。它是每一次代行請求的必經跳，單體 seller 的可用性直接成為代行的可用性上界 |
+| **領域服務**（product／social） | 不受影響 | 不受影響 | 不受影響 | 502 ＋ 稽核列停在 `PENDING`（見 §8.4） |
 | **MQ** | — | — | — | domain write 已成立；完成事件發不出去時 confirm 回滾，稽核列停在 `PENDING`（`docs/modules/delegation.md` §6） |
 | **notification-service** | — | — | — | 通知延後／失敗，`OBS5` 上升；**不影響代行寫入的成立**（通知是事後告知，不是前置條件） |
 | **Redis** | 不受影響 | 不受影響 | 不受影響 | 不受影響——**本功能不使用 Redis**（§9.4） |
@@ -5517,7 +5489,7 @@ C12 是硬約束：admin 前端把 preflight 的 **404 與 503 都**顯示成「
 | # | 寫入點 | 服務 | 同事務內維護的東西 |
 |---|---|---|---|
 | W6 | 商品 mutation | product-service | 商品欄位 ＋ `version + 1`（樂觀鎖 CAS，`WHERE version = expectedVersion`）＋ 既有冪等表 |
-| W7 | 店面 mutation | seller-service | 店面欄位 ＋ `version + 1`（同上） |
+| W7 | 店面 mutation | seller 模組 | 店面欄位 ＋ `version + 1`（代行店面寫入目前沒有接上，§2.2 第 2 列） |
 | W8 | 貼文 mutation | social-service | 貼文欄位 ＋ `version + 1`（同上）＋ 排程發布欄位 |
 | W10 | 排程發布 worker | social-service | 單列 CAS claim（同上形狀，欄位見 §5.1.5）→ 貼文轉發布 ＋ `version + 1` → 稽核 confirm |
 
@@ -5605,10 +5577,10 @@ delegation 模組的參數（TTL、閒置逾時、handoff 期限、保留天數�
 
 | 環境變數 | 預設 | 值域 | 對應 §7.3.1 的哪一列 |
 |---|---|---|---|
-| `DELEGATION_GRPC_DEADLINE_PREFLIGHT_MS` | `3000` | 500–**5000** | Gateway → `Preflight`（內含 seller-service 1.2s）。**上界刻意高於預設，本列不是「只能調快」的例外**：preflight 走 session 端點那一組（外層 10s／handler 8s，§7.3.1 ①），5000 ms 仍遠低於該預算。但**調鬆會直接吃掉 S1**（preflight P95 < 300 ms）與 S9（建立流程端到端 < 3s）的餘裕，而 preflight 是本功能呼叫頻率最高的端點（C15／C16 的 30 秒 stale ＋ focus 重抓）⇒ 調它之前先確認 S1 的實測分佈，不要拿它當「上游變慢」的止痛藥 |
+| `DELEGATION_GRPC_DEADLINE_PREFLIGHT_MS` | `3000` | 500–**5000** | Gateway → `Preflight`。**上界刻意高於預設，本列不是「只能調快」的例外**：preflight 走 session 端點那一組（外層 10s／handler 8s，§7.3.1 ①），5000 ms 仍遠低於該預算。但**調鬆會直接吃掉 S1**（preflight P95 < 300 ms）與 S9（建立流程端到端 < 3s）的餘裕，而 preflight 是本功能呼叫頻率最高的端點（C15／C16 的 30 秒 stale ＋ focus 重抓）⇒ 調它之前先確認 S1 的實測分佈，不要拿它當「上游變慢」的止痛藥 |
 | `DELEGATION_GRPC_DEADLINE_CREATE_MS` | `2000` | 500–**5000** | Gateway → `CreateSession`。`EndSession`／`RevokeSession`／`RevokeSessionsByActor` **沿用本值**（§7.3.1 同為 2s），不另立參數 |
 | `DELEGATION_GRPC_DEADLINE_CURRENT_MS` | `800` | 200–**2000** | Gateway → `GetCurrentSession`（每次代行請求都會呼叫，必須廉價） |
-| `DELEGATION_GRPC_DEADLINE_STORE_STATE_MS` | `800` | 200–**2000** | Gateway → seller-service `GetSeller`（授權鏈第 8 項的店家狀態重驗，§8.1.3）。**與 `_CURRENT_MS` 同量級是刻意的**：兩者都是「每次代行請求都跑、且只做單筆索引查詢」的判定跳，任一被調鬆都會讓每一次代行請求（含唯讀）跟著變慢。**第 8 項命中後的 `RevokeSession` 沿用 `DELEGATION_GRPC_DEADLINE_CREATE_MS`**（§8.5.1 該列已載明 `EndSession`／`RevokeSession` 共用），不另立參數。 |
+| `DELEGATION_GRPC_DEADLINE_STORE_STATE_MS` | `800` | 200–**2000** | Gateway → 單體 seller `GetSeller`（legacy gRPC）（授權鏈第 8 項的店家狀態重驗，§8.1.3）。**與 `_CURRENT_MS` 同量級是刻意的**：兩者都是「每次代行請求都跑、且只做單筆索引查詢」的判定跳，任一被調鬆都會讓每一次代行請求（含唯讀）跟著變慢。**第 8 項命中後的 `RevokeSession` 沿用 `DELEGATION_GRPC_DEADLINE_CREATE_MS`**（§8.5.1 該列已載明 `EndSession`／`RevokeSession` 共用），不另立參數。 |
 | `DELEGATION_GRPC_DEADLINE_DOMAIN_READ_MS` | `800` | 200–**3000** | Gateway → 領域服務 read RPC（before 快照，每次代行寫入的第一跳） |
 | `DELEGATION_GRPC_DEADLINE_AUDIT_INTENT_MS` | `800` | 200–**3000** | Gateway → `RecordAuditIntent` |
 | `DELEGATION_GRPC_DEADLINE_AUDIT_CONFIRM_MS` | `400` | 100–**3000** | Gateway → `ConfirmAuditResult`（**每次**；總預算由 `DELEGATION_AUDIT_CONFIRM_TOTAL_BUDGET_MS` 管，本值只管單次） |
@@ -5764,10 +5736,10 @@ fail-fast：`Config.Validate()` 必須斷言下面三條，任一不成立即啟
 | 要求 | 原因 | 機械保證 |
 |---|---|---|
 | **完全唯讀** | C8：連續兩次呼叫必須回位元等價的 summary。任一寫入（bump `revision`、sliding expiration、更新 `issuedAt`）都會讓操作者**永遠進不了工作區**。其中「不得 sliding expiration」另有**獨立成立的後端理由**（風險曝險窗口上界，見 §4.1.2），C8 對該項是佐證而非唯一依據。**`last_active_at` 的順延同樣不得發生在本端點**——理由不是 C8（該欄不進 DTO，順延它不會讓 summary 不等價），而是**閒置逾時會因此永不觸發**（本端點每 30 秒被輪詢，§6.2.4a） | 本端點恆以 `counts_as_activity = false` 呼叫 `GetCurrentSession`（§6.2.4a），該分支在 usecase 內走純 `SELECT`；§13 契約測試連打兩次斷言逐欄相等，**外加直查 DB 斷言 `last_active_at` 未變**（後者才是 idle 這一側的鑑別力——前者對它完全失明） |
-| **單次查詢** | 每分鐘 2 次 × 併發 session 數；不得為了組 summary 打多支 RPC | 由 `credential_hash` 的 UNIQUE 索引單筆命中；target／actor／reason 全部是 session 列上的 snapshot 欄位，**不需要 join，也不需要回查 seller-service** |
-| **不查 seller-service** | snapshot 已含 `target_store_name`／`actor_display_name`／`reason_label`；前端的九欄比對**不包含**這三欄（`model.ts`），它們允許漂移 | 依 `docs/modules/delegation.md` §2、§3 的 snapshot 欄位設計，不是靠實作紀律 |
+| **單次查詢** | 每分鐘 2 次 × 併發 session 數；不得為了組 summary 打多支 RPC | 由 `credential_hash` 的 UNIQUE 索引單筆命中；target／actor／reason 全部是 session 列上的 snapshot 欄位，**不需要 join，也不需要回查 seller** |
+| **不查單體 seller** | snapshot 已含 `target_store_name`／`actor_display_name`／`reason_label`；前端的九欄比對**不包含**這三欄（`model.ts`），它們允許漂移 | 依 `docs/modules/delegation.md` §2、§3 的 snapshot 欄位設計，不是靠實作紀律 |
 
-**「不查 seller-service」的作用域只到本端點為止，不要推廣成「代行路徑不查 seller-service」**：**代行資源路由**每一次請求都會查一次店家狀態（§8.1.3 第 8 項）。兩者不衝突，因為它掛在 `delegatedHandle` 上而本端點走 `credentialHandle`——**而且必須不掛**：`GET current` 若也跑第 8 項，店家停權時它會回 422 而不是回 `status='revoked'`，前端就永遠讀不到終態、工作區切不成阻擋畫面（§8.1.3「作用域」段）。
+**「不查單體 seller」的作用域只到本端點為止，不要推廣成「代行路徑不查單體 seller」**：**代行資源路由**每一次請求都會查一次店家狀態（§8.1.3 第 8 項）。兩者不衝突，因為它掛在 `delegatedHandle` 上而本端點走 `credentialHandle`——**而且必須不掛**：`GET current` 若也跑第 8 項，店家停權時它會回 422 而不是回 `status='revoked'`，前端就永遠讀不到終態、工作區切不成阻擋畫面（§8.1.3「作用域」段）。
 
 **`status` 是推導值不是查詢值**：`revoked` 看 `status` 欄位、`expired` 由 `now() >= expires_at`
 
@@ -5804,7 +5776,7 @@ fail-fast：`Config.Validate()` 必須斷言下面三條，任一不成立即啟
 ### 9.3 效能預算
 
 代行 mutation 相對於「賣家自己操作同一件事」多出的成本，全部來自**五次額外的 gRPC 往返**：
-`GetCurrentSession`（驗 session）、seller-service `GetSeller`（授權鏈第 8 項的店家狀態重驗）、
+`GetCurrentSession`（驗 session）、單體 seller `GetSeller`（授權鏈第 8 項的店家狀態重驗）、
 領域服務 read RPC（取 `before_snapshot`）、`RecordAuditIntent`（落 intent）、`ConfirmAuditResult`（回填結果）。
 **這五跳與 §7.3.1 的逾時預算表、§8.5.1 (A) 的五個 deadline 參數、§7.2.2 的時序圖逐跳一一對應**——三處任一多一跳或少一跳，就是本節與它們之中有一處寫錯了。
 **唯讀路徑只付前兩跳**（沒有 before 快照讀、沒有 intent／confirm），因此第 8 項對讀取的額外成本是 **P95 < 50 ms**，不是 261 ms。
@@ -5822,7 +5794,7 @@ fail-fast：`Config.Validate()` 必須斷言下面三條，任一不成立即啟
 |---|---|---|
 | Gateway 授權判定（credential 解析前的 capability 查表 ＋ target 比對） | **< 1 ms** | 純記憶體，registry 是啟動時建好的 map |
 | `GetCurrentSession`（credential_hash 單筆 UNIQUE 命中 ＋ 授權表重新評估） | **P95 < 40 ms** | 同叢集 gRPC ＋ 單筆索引查詢，無 join、無跨服務呼叫（§9.1.1）。**代行資源路由上它是一句 `UPDATE … RETURNING`**（順延 `last_active_at`，§6.2.4a）**而非 `SELECT`，預算不變**：同一個唯一索引單筆命中，改動的欄位未建索引 ⇒ 落在 PostgreSQL 的 HOT update 路徑（同頁更新、零索引維護），成本與同一筆的讀取同量級。⚠️ **若有人為 `last_active_at` 加索引，HOT 當場失效、本列預算不再成立**，且沒有任何錯誤訊號（`docs/modules/delegation.md` §2、§3 同名警告）。`GET current` 端點本身仍走純 `SELECT`（`counts_as_activity=false`） |
-| seller-service `GetSeller`（第 8 項店家狀態重驗） | **P95 < 50 ms** | 同叢集 gRPC ＋ 單筆 PK 查詢。**刻意沿用 preflight 那支 fat `GetSeller` 而不另立輕量 RPC**——理由是「店家可否代行」只能有一個答案來源（§8.1.3），而回應體積對 P95 的影響遠小於一次跨服務往返本身。**不快取**：`seller:suspended:<accountId>` 是 fail-open 且值域涵蓋不到關店／刪帳號，理由三條見 §8.1.3 |
+| 單體 seller `GetSeller`（legacy gRPC）（第 8 項店家狀態重驗） | **P95 < 50 ms** | 同叢集 gRPC ＋ 單筆 PK 查詢。**刻意沿用 preflight 那支 fat `GetSeller` 而不另立輕量 RPC**——理由是「店家可否代行」只能有一個答案來源（§8.1.3），而回應體積對 P95 的影響遠小於一次跨服務往返本身。**不快取**：`seller:suspended:<accountId>` 是 fail-open 且值域涵蓋不到關店／刪帳號，理由三條見 §8.1.3 |
 | 領域服務 read RPC（取 `before_snapshot` 與當前 `version`） | **P95 < 50 ms** | 同叢集 gRPC ＋ 單筆 PK 查詢。**每次代行寫入的第一跳**（`before_snapshot` 必須在 intent 之前取得，§7.2.2 讀法 1），deadline 800 ms（`DELEGATION_GRPC_DEADLINE_DOMAIN_READ_MS`，§8.5.1 (A)）。回應只含白名單投影的欄位（§6.1.12），不是整個 entity dump，所以與 `GetSeller` 同量級 |
 | `RecordAuditIntent`（PENDING 列 INSERT ＋ `before_snapshot` 組裝） | **P95 < 60 ms** | 同叢集 gRPC ＋ 單一短 tx |
 | domain write | **與賣家自助路徑相同** | 額外只多了 `DelegationContext` 的欄位驗證（純記憶體）與 `version` CAS |
@@ -5841,7 +5813,7 @@ fail-fast：`Config.Validate()` 必須斷言下面三條，任一不成立即啟
 ⚠️ **不要因此推論「多一個 Worker 沒有代價」**：代價不在延遲而在**回歸面**——website 是 prod 上唯一有真實買家流量的服務，本案在它裡面動到了賣家資料層（§4.5 Delegated Adapter 三列）。
 
 **批次端點的效能預算**（§7.2.8）：額外成本**不隨 `items` 筆數成長**——Gateway 端的五次往返
-（`GetCurrentSession` ＋ **seller-service `GetSeller`** ＋ 批次 before 讀 ＋ `RecordAuditIntentBatch` ＋
+（`GetCurrentSession` ＋ **單體 seller `GetSeller`** ＋ 批次 before 讀 ＋ `RecordAuditIntentBatch` ＋
 `ConfirmAuditResultBatch`）與 `items` 筆數無關（第 8 項那一跳同樣整批只付一次，因為 target store 恰好一個），成長的只有各服務**單一交易內**的 N 筆列工作（每筆 5–15 ms，同交易內無 per-row 網路往返）。
 N=50 的端到端耗時**推測 1.5–2 s**（**未實測**——這條路徑在 dev 上尚不存在，無從量測；§13 stress ④ 上線前
 必須把實測值補回本節）。**這個「不隨 N 成長」正是逐項迴圈做不到的事**：逐項是 `1 + 4N` 跳，額外成本與 N 成正比，
@@ -6220,7 +6192,7 @@ UPDATE delegation.seller_delegation_authorizations
 | **unit** | **`changed_fields` 的比較範圍**（§6.1.12「比較範圍」） | ① 逐 action 跑一次完整 orchestrate，斷言 `changed_fields` 的**欄位集合**恰等於該 action 動得到的欄位（`STOREFRONT_LOGO_UPDATE` ⇒ 只有 `logoKey`；`PRODUCT_PUBLISH` ⇒ 只有 `status`）；② 反向：`PRODUCT_UPDATE` 改一欄仍記那一欄（收窄不得吃掉正常路徑）；③ `before_snapshot` 在收窄的 action 上仍是**完整**投影；④ AST 掃每一個 `Orchestrate`／`OrchestrateBatch` 呼叫點都宣告了 `SnapshotFields`；⑤ 每個 `Scope*` 的欄名都在規則表內。⚠️ **stub 必須刻意回殘缺的寫入回應**（狀態端點不回 `hashtags`），否則 ①②③ 在拿掉修復後照樣全綠 | 多記一列從未發生的變更，比少記一列更糟——`changed_fields` 是爭議時的舉證，賣家看到的是「你把我的店名清空了」。**這一類失效不會有任何錯誤訊號**：端點回 200、稽核列寫入成功、形狀完全正確。漏掉時，換一次 logo 會記 10 列而只有 1 列是真的；上下架每次虛報「主題標籤被清空」。④ 是給第 14 支端點的閘門：漏填 `SnapshotFields` 等於選了全表比較，而它不編譯失敗也不轉紅 |
 | **integration** | **通知消費端冪等**（notification-service ＋ 真 DB） | ① **重送同一則完成事件**（同一個 `audit_log_id`）→ 賣家站內訊息**恰一則**；第二次由既有 `UNIQUE (user_id, user_type, event_type, reference_id)` 擋下，consumer **視為成功 ack**（不進 DLQ、不無限重試）；② 兩則不同 `audit_log_id` 的事件 → **兩則**訊息 | 去重由 `reference_id = audit_log_id` 承擔（§4.5、`pkg/mq/events.go`），**不是**由 `event_id` 承擔。①防的是重複通知；②防的是把去重鍵寫成 session 級——那會讓同一個 session 的第二次操作**靜默不通知**，而且沒有任何錯誤 |
 | **integration** | 排程發布（social-service） | ① 排程時間到 → 發布成功且寫稽核；② **建立排程的 session 已到期 → 排程仍執行**；③ **該 session 被撤銷 → 未執行的排程被取消**；④ 兩個 worker 副本不重複發布；⑤ **排程 `pending` → 賣家刪除貼文 → 到點斷言未發布且 `schedule_state='cancelled_by_deletion'`**；⑥ 同上但走平台強制下架 → `cancelled_by_governance`；⑦ **反向對照：未刪除也未下架者到點必須發布** | ②③是同一個機制的兩面，只測一面會讓另一面靜默錯誤。⑦ 是 ⑤⑥ 的鑑別力：沒有它，一個「永遠不發布」的壞 worker 也會讓 ⑤⑥ 全綠。 |
-| **integration** | **店家狀態逐次重驗（第 8 項，互動路徑）** | ① 建立 session → 店家轉 `suspended` → **下一次代行寫入**回 9272，且**該筆 domain write 未發生**（回領域 DB 斷言資源未變）；② 同上，**下一次代行讀取**（`GET .../products`）同樣回 9272——**唯讀路徑不得放行**；③ ①之後再打**任一**代行請求 → 改回 **9271**（session 已轉終態），且 `GET /admin/delegated-operations/current` 回 `status='revoked'`、`revision` 已 +1、`revoke_reason='store_not_operable'`；④ 店家轉 `closed` → 拒絕並轉終態，但**碼是 9265 不是 9272**（seller-service 把關店視同不存在，見 §8.1.3 第 8 項 ⛔ 段落）；店家 `deleted_at` 非空 → 同樣回 **9265**；⑤ **`GET current` 本身不跑第 8 項**：店家已停權時該端點仍必須回 200 ＋ session summary（而非 422）——否則前端永遠讀不到終態、工作區切不成阻擋畫面；⑥ **反向對照：`status='active'` 且未刪除者，同樣的請求必須成功**；⑦ **上游不可用**（seller-service 回 `UNAVAILABLE`）→ 回 **9280**，domain write 未發生，且 **session 仍為 `active`**（`GET current` 斷言）——不得因為一次上游抖動就轉終態 | ⑤⑥⑦ 三條各自是前四條的鑑別力來源：⑥ 防「永遠拒絕」的壞實作、⑤ 防「把第 8 項掛到 session 端點」這個很自然但會讓 UI 卡死的錯掛、⑦ 防「確知」與「不知道」被混成同一條路徑（§8.1.3 明列的最易錯點）。**①與②必須各測一條**：一份「只在 mutation 路徑掛第 8 項」的實作會讓①綠②紅，而②正是「工作階段立即失效」與「只擋寫入」那個被否決選項的分界 |
+| **integration** | **店家狀態逐次重驗（第 8 項，互動路徑）** | ① 建立 session → 店家轉 `suspended` → **下一次代行寫入**回 9272，且**該筆 domain write 未發生**（回領域 DB 斷言資源未變）；② 同上，**下一次代行讀取**（`GET .../products`）同樣回 9272——**唯讀路徑不得放行**；③ ①之後再打**任一**代行請求 → 改回 **9271**（session 已轉終態），且 `GET /admin/delegated-operations/current` 回 `status='revoked'`、`revision` 已 +1、`revoke_reason='store_not_operable'`；④ 店家轉 `closed` → 拒絕並轉終態，但**碼是 9265 不是 9272**（`GetSeller` 把關店視同不存在，見 §8.1.3 第 8 項 ⛔ 段落）；店家不存在 → 同樣回 **9265**；⑤ **`GET current` 本身不跑第 8 項**：店家已停權時該端點仍必須回 200 ＋ session summary（而非 422）——否則前端永遠讀不到終態、工作區切不成阻擋畫面；⑥ **反向對照：`status='active'` 且未刪除者，同樣的請求必須成功**；⑦ **上游不可用**（單體 seller 回 `UNAVAILABLE`）→ 回 **9280**，domain write 未發生，且 **session 仍為 `active`**（`GET current` 斷言）——不得因為一次上游抖動就轉終態 | ⑤⑥⑦ 三條各自是前四條的鑑別力來源：⑥ 防「永遠拒絕」的壞實作、⑤ 防「把第 8 項掛到 session 端點」這個很自然但會讓 UI 卡死的錯掛、⑦ 防「確知」與「不知道」被混成同一條路徑（§8.1.3 明列的最易錯點）。**①與②必須各測一條**：一份「只在 mutation 路徑掛第 8 項」的實作會讓①綠②紅，而②正是「工作階段立即失效」與「只擋寫入」那個被否決選項的分界 |
 | **contract** | 與 hawkr-admin 的九支既有測試對齊（見下方「跨 repo 對齊」） | 逐條鏡像斷言：envelope `code` 為**數字 0** 且 `data` key 存在／`caseReference` 為 string 或**顯式 `null`**（Go `*string` 且**無 `omitempty`**）／`status` 恰為三個**小寫**值／`revision` 為非負安全整數／`capabilities` 非空去重且全落在九值內／**`ttlSeconds ∈ [1,1800]` 且 `expiresAt − issuedAt ∈ (0,1800s]`**（**同波前 admin repo 的值是 900，兩邊對不上時以本書為準並立即改前端**）／`operationCredential` 長度 16–8192 且不含空白／`;`／`,`／`reasonCode` 與 `caseReference` **原字串回音**／`DELETE` 回 `200 {code:0,data:{ended:true}}` 且對已終止 session 仍回同樣的 200<br/>**＋案件編號最低門檻的兩條負向斷言**：`caseReference` 長度 <4 或不含數字 ⇒ **9260**（`"1"`／`"----"` 皆須被拒）；某店家**從未開通** ⇒ preflight 回 `allowed:false` ＋ **9286**（逐店開通之下這是常態路徑，不是例外路徑，必須有正向測試），而**已撤回**的店家回 **9264**——**兩條都要，且必須是兩個不同的 case**：只寫一條的話，一份把兩種情形合成同一個碼的實作照樣全綠 | 這些斷言全部是「後端看起來 200 成功、UI 靜默失效」的形狀（§3.1.2／§3.1.3），**沒有任何錯誤 log 會告訴你踩到了** |
 | **contract** | 前端 fail-closed 五類各至少一條（A–E） | **A**（入口消失）：preflight 對「賣家不存在」**不得回 404**、對「服務暫時不可用」**不得回 503**，一律 `200 {allowed:false}`；**B**（契約作廢）：`capabilities` **空陣列 → 前端整份契約作廢**，因此後端**任何**路徑都不得回空陣列（含 `allowed:false` 的 preflight）——這是唯一仍會讓契約作廢的形狀，必須有專門的負向測試；至於 `capabilities` 出現**第 10 個值**，前端會忽略該值、保留已知，**不再是契約作廢**，它的同波保證不在契約測試層重複；**C**（進不了工作區）：create 回應缺 `operationCredential`／時間戳 4 位小數／`status` 大寫 → 各一條負向測試；**D**（結束卡死）：`DELETE` 回 `202`／`{ended:false}`／裸 `404` → 各一條負向測試斷言後端**不會**產生這些回應；**E**（輪詢誤判）：`GET current` 只能由 credential 解析 session，**不接受 storeId query** | 五類的共同特徵是後端無感。契約測試是唯一能在後端這側抓到它們的地方 |
 | **contract** | **稽核 API 的回應形狀**（§6.1.11 兩支） | ① `audit-logs` 每一列**必有** `actor`（`adminId`／`displayName`）與 `target`（`storeId`／`sellerAccountId`／`storeName`），且兩個物件的**欄位集合與 `GET summary` 的同名物件相等**（前端一份 parser 的前提）；② 回應**任一層都不得出現** `beforeSnapshot`／`afterSnapshot`／`before_snapshot`／`after_snapshot` 四個鍵中的任何一個（**負向斷言**）；③ `result='PENDING'` 的列必須**出現在 `records` 內**（不得被過濾掉），且 `confirmedAt` 為 `null`、`changedFields` 為 `[]`；④ `GET summary` 必回 `auditRetentionDays`，且其值**等於**當前 稽核保留天數 730（`internal/model.DelegationAuditRetentionDays`）（測試需以非預設值跑一次） | 四條都是「畫面看起來對、契約已經偏離」的形狀。**鑑別力逐條**：①漏了之後前端只能拿 session 級的 actor／target 冒充逐列快照，改名情境永遠對不上，而畫面上看不出來；②**把快照掛上 DTO 不會讓任何既有測試轉紅**，只會在某天回一包 6.4 MB，這條負向斷言是該定版的唯一機械保證；③被過濾掉之後 `pendingAuditCount` 與列表互相矛盾（摘要說有 N 筆、列表一列都看不到），而操作者手上沒有第二個查法（§12.4 ② 的 SQL 是維運路徑）；④**用預設值 730 測不出鑑別力**——寫死 `"730"` 的實作與正確實作在預設環境下完全一致 |
