@@ -68,7 +68,7 @@
 | `collection_model` | 恆為 `SELLER_MERCHANT` |
 | `invoice_model` | 恆為 `SELLER_TO_BUYER` |
 | `policy_version` | `v1-foundation` |
-| `fulfillment_mode` | 配送方式為 `3005` → `SELLER_MANAGED`；配送方式在平台履約白名單（`3001`、`3002`）→ `PLATFORM_LOGISTICS`；其餘（含 null、未知字串）→ 拋 `FULFILLMENT_COMMERCE_MODEL_UNKNOWN`（9504） |
+| `fulfillment_mode` | 配送方式為 `3005` → `SELLER_MANAGED`；配送方式在平台履約白名單（`3001`、`3002`、`3003`）→ `PLATFORM_LOGISTICS`；其餘（含 null、未知字串）→ 拋 `FULFILLMENT_COMMERCE_MODEL_UNKNOWN`（9504） |
 
 - `PLATFORM_CONSIGNMENT`、`PLATFORM_AGENT_MERCHANT`、`PLATFORM_TO_BUYER`、`PROVIDER_COLLECTED`、`EXTERNAL_PREPAID` 是值域內的值，結帳與 RFQ 建單都不會寫入。啟用任一值的改動點是 `OrderPolicyResolver`，不是呼叫端。
 - 平台履約白名單是具名集合（deny-by-default）：新增配送方式必須回到 `OrderPolicyResolver` 歸類，不得以「非 3005 即平台」推導。
