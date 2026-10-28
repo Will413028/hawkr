@@ -3701,7 +3701,7 @@ gate ＝ `k8s/scripts/check-secret-declarations.sh`（實讀存在），靜態�
 
 **egress**：shipping-service → `api.uber.com`／`auth.uber.com` 是新的對外呼叫。
 Uber 是否要求來源 IP 白名單：**官方認證指南全篇未提及 IP 白名單**，認證是純 OAuth 2.0 `client_credentials` bearer token（https://developer.uber.com/docs/deliveries/guides/authentication ）⇒ **不走 `egress-proxy`**。⚠️ 「文件未提及」不等於「一定不需要」——sandbox 實測若出現 403／IP 相關錯誤，回頭**一律收斂到既有 `egress-proxy`**（不得為 Uber 另開新 proxy／新固定 IP）
-（`serverless/egress-proxy/nginx.conf` 加路徑前綴白名單 ＋ 重跑 `deploy.sh`），不為單一第三方另開 proxy／VPC／固定 IP（《51 號設計書》proxy 章節）。
+（`serverless/egress-proxy/nginx.conf` 加路徑前綴白名單 ＋ 重跑 `deploy.sh`），不為單一第三方另開 proxy／VPC／固定 IP（《固定 IP 出口與第三方轉發規範（Egress Proxy）》）。
 不要求則直連，但仍需 k8s egress NetworkPolicy 放行。
 
 ### 8.6 PII 與 log 遮罩

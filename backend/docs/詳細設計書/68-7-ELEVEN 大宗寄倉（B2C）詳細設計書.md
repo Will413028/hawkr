@@ -2693,7 +2693,7 @@ absent(fulfillment_scheduler_last_success_timestamp_seconds{scheduler="X"})
 
 | 方向 | 誰的 allowlist | 現況 | 落點 |
 |---|---|---|---|
-| **出站**（我方 → PAYUNi） | PAYUNi 側白名單我方來源 IP | 🔴 **屬 RFI-9**（§11.2.1）；值未取得 | 若需要固定出口 IP ⇒ 走既有 `egress-proxy`（《51 號設計書》proxy 章節），🔴 **不得為此另開新 proxy／新 VPC／新固定 IP** |
+| **出站**（我方 → PAYUNi） | PAYUNi 側白名單我方來源 IP | 🔴 **屬 RFI-9**（§11.2.1）；值未取得 | 若需要固定出口 IP ⇒ 走既有 `egress-proxy`（《固定 IP 出口與第三方轉發規範（Egress Proxy）》），🔴 **不得為此另開新 proxy／新 VPC／新固定 IP** |
 | **入站**（PAYUNi → 我方 Notify） | 我方側白名單 provider 來源 IP | 🔴 **provider 來源 IP 清單未取得**（需求書 §21.3.8 第 7 題） | ⚠️ **未取得前不得只靠 IP 白名單**——驗簽（§6.3.1）才是唯一到位的防線；IP 是加分不是替代 |
 
 🔴 **兩個方向常被講成同一件事，它們不是**：出站白名單沒設好 ⇒ 我方呼叫被拒（**吵、看得見**）；
@@ -2702,7 +2702,7 @@ absent(fulfillment_scheduler_last_success_timestamp_seconds{scheduler="X"})
 
 ⚠️ **`egress-proxy` 這條路要先問「現在需不需要」**：現況 C2C 已在 production 呼叫同一組端點且沒有固定 IP 需求
 ⇒ 若 PAYUNi 回覆說 B2C 需要 IP allowlist，那是一個**新的**基礎設施依賴，
-要走 《51 號設計書》proxy 章節 的接入流程（路徑前綴白名單 ＋ 斷路器 ＋ 呼叫端韌性），不是改一行 config。
+要走 《固定 IP 出口與第三方轉發規範（Egress Proxy）》 的接入流程（路徑前綴白名單 ＋ 斷路器 ＋ 呼叫端韌性），不是改一行 config。
 
 ### 8.6 PII 與 log 遮罩
 #### 8.6.1 🔴 **業務鍵同時是敏感值**：`條碼`（provider barcode）被明列不得進 log，而它正是掃描綁定的業務鍵 ⇒ 遮罩策略必答
