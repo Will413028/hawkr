@@ -611,7 +611,6 @@ var (
 	ProcurementErrorReasonLaneMismatch                = ProcurementErrorReason{Code: "LANE_MISMATCH", Value: "LANE_MISMATCH", Label: "通道不符", Description: "400。指定的 lane 與候選實際所屬通道不一致"}
 	ProcurementErrorReasonInviteAlreadyResolved       = ProcurementErrorReason{Code: "INVITE_ALREADY_RESOLVED", Value: "INVITE_ALREADY_RESOLVED", Label: "邀請已被處理", Description: "409。該報價邀請已被確認或已失效（先到先得）"}
 	ProcurementErrorReasonPriceBasisUnavailable       = ProcurementErrorReason{Code: "PRICE_BASIS_UNAVAILABLE", Value: "PRICE_BASIS_UNAVAILABLE", Label: "報價基準無法解析", Description: "422。currency/quantity/unit/conversion basis 無法 canonicalize，RFQ 報價預覽的 typed hard block，零 side effect、不建立 preview 列（issue #2403 Slice 2）"}
-	ProcurementErrorReasonMappingMissing              = ProcurementErrorReason{Code: "MAPPING_MISSING", Value: "MAPPING_MISSING", Label: "缺乏可靠映射", Description: "422。RFQ 報價預覽 PricingMode 為 PRICEBOOK_GUIDED 但 Pricebook crop/group mapping 或市場行情不可靠（未解析、非 ready、或缺 P50），須買家改用 BUYER_ENTERED_NO_REFERENCE 明確重新送出，零 side effect、不建立 preview 列；不得靜默成功或誤用 PRICE_BASIS_UNAVAILABLE。與同一支 RPC 200 回應裡 dealTemperature.reasonCode 用的是同一個字面值（同一種「沒有可靠 mapping 可參考」語意），刻意不另創同義詞（issue #2403 Slice 2，2026-08-22 whole-branch review Fix 3）"}
 	ProcurementErrorReasonRunNotActive                = ProcurementErrorReason{Code: "RUN_NOT_ACTIVE", Value: "RUN_NOT_ACTIVE", Label: "Run 非執行中", Description: "409。對非 QUEUED/RUNNING/WAITING_FOR_INPUT 狀態的 run 送出需要 active run 的命令"}
 	ProcurementErrorReasonInterruptExpired            = ProcurementErrorReason{Code: "INTERRUPT_EXPIRED", Value: "INTERRUPT_EXPIRED", Label: "中斷已逾期", Description: "409。resume 命令對應的 interrupt 已超過 expiresAt"}
 	ProcurementErrorReasonApprovalStale               = ProcurementErrorReason{Code: "APPROVAL_STALE", Value: "APPROVAL_STALE", Label: "核准依據已過期", Description: "409。resume/確認命令帶的 expectedVersion 與現行版本不符"}
@@ -655,7 +654,6 @@ var AllProcurementErrorReasons = []ProcurementErrorReason{
 	ProcurementErrorReasonLaneMismatch,
 	ProcurementErrorReasonInviteAlreadyResolved,
 	ProcurementErrorReasonPriceBasisUnavailable,
-	ProcurementErrorReasonMappingMissing,
 	ProcurementErrorReasonRunNotActive,
 	ProcurementErrorReasonInterruptExpired,
 	ProcurementErrorReasonApprovalStale,

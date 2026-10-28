@@ -1231,7 +1231,7 @@ func (h *Holder) ProxyProcurementAnswer(c *gin.Context) {
 	result, err := h.AIProcurement.SubmitAnswer(ctx, &pb.SubmitAnswerRequest{
 		RequestId: c.Param("id"), SlotKey: req.SlotKey, OptionId: req.OptionID, FreeText: req.FreeText,
 		UnitOptionId: req.UnitOptionID, Skip: req.Skip, ExpectedRevisionId: req.ExpectedRevisionID,
-		ClientRequestId: req.ClientRequestID, SelfEnteredPriceAmount: req.SelfEnteredPriceAmount,
+		ClientRequestId: req.ClientRequestID,
 	})
 	if err != nil {
 		writeProcurementError(c, err)
@@ -1288,25 +1288,13 @@ func (h *Holder) ProxyProcurementRewind(c *gin.Context) {
 // ProxyProcurementRfqPricePreview proxies a "preview RFQ price" request to
 // ai-service (issue #2403 Slice 2).
 //
-// @Summary      Hawkr 幫找 — RFQ 報價預覽（Pricebook 參考區間）
-// @Description  算出這次 RFQ 詢價可用的 Pricebook 參考價區間（`referencePriceRange`，pricingMode=`PRICEBOOK_GUIDED`），
-// @Description  或在可靠映射缺失時改走買家自行出價（pricingMode=`BUYER_ENTERED_NO_REFERENCE`，`referencePriceRange` 為 `null`）。
+// @Summary      Hawkr 幫找 — RFQ 報價預覽
+// @Description  依買家給的 `buyerRequestedRange` 算出這次 RFQ 詢價的價格預覽（含 `quoteTotalRange`）。
 // @Description  不建立 immutable RFQ confirmation、不通知任何供應商、除了寫入這筆 preview 本身沒有其他 side effect。
 // @Description
-// @Description  第一次呼叫可省略 `buyerRequestedRange`，Server 以參考區間下上界預填；帶了就原樣回顯，
-// @Description  Server 不會把買家給的範圍 clamp 到參考區間內。
+// @Description  `buyerRequestedRange` 必填；缺少時回 422 `PRICE_BASIS_UNAVAILABLE`。Server 原樣回顯，不 clamp。
 // @Description
-// @Description  Idempotency：同一買家同一 `clientRequestId` 重送回同一筆既有結果（不重算、不重打 Pricebook）。
-// @Description
-// @Description  `referencePriceRange.basisQuantity`／`basisUnit` 說明三個金額是「每多少單位」的價格
-// @Description  （GRAM 品項是每 1000 公克），值與 `buyerRequestedRange` 的同名欄位一致；client 不得自行換算。
-// @Description
-// @Description  `marketPriceBasis`（計價層級、涵蓋範圍、區域名、貢獻市場家數、資料截至、新鮮度）與
-// @Description  `referencePriceRange` 同生同滅，`BUYER_ENTERED_NO_REFERENCE` 時為 `null`。
-// @Description  `freshnessStatus` 只是揭露，不影響 `referenceAvailability`。
-// @Description  `priceLayer`（`wholesale_auction`｜`farmgate`｜`live_animal`｜`retail`｜`wholesale_bulk`，
-// @Description  空字串＝既有蔬果批發路徑）必須與金額一起顯示：毛豬回的是活體拍賣均價、不是豬肉分切零售價，
-// @Description  兩者水平差數倍。`scope` 是 `REGION`／`NATIONAL`，用來區分「全國單一行情」與「區域比對失敗」。
+// @Description  Idempotency：同一買家同一 `clientRequestId` 重送回同一筆既有結果（不重算）。
 // @Description
 // @Description  `quoteTotalRange` 是伺服器依本次單價範圍與需求數量算出的詢價總額區間；需求數量是選填 slot，
 // @Description  未填時為 `null`，client 應隱藏總額區塊而不是顯示 0。

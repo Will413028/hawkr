@@ -526,7 +526,6 @@ export default function AssistantWorkspace({
 	if (showEntry) {
 		return (
 			<AgentEntryPanel
-				capabilities={capabilities}
 				draft={draft}
 				onPrefill={(text) => {
 					handleDraftChange(text);
@@ -616,21 +615,20 @@ export default function AssistantWorkspace({
 						}
 						question={canClarify ? session.question : null}
 						cropDisambiguation={session.cropDisambiguation}
-						onChooseCropDisambiguation={(option) =>
+						onChooseCropDisambiguation={
 							session.pendingInterrupt
-								? void session.resume({ optionId: option.optionId })
-								: void session.chooseCropDisambiguation(option)
+								? (option) => void session.resume({ optionId: option.optionId })
+								: undefined
 						}
 						onPickOption={(option) => void session.submitAnswer(option)}
 						onSubmitFreeText={({ slotKey, freeText }) =>
 							void session.submitAnswer({ slotKey, freeText })
 						}
-						onSubmitCropOther={({ slotKey, description, priceAmount }) =>
+						onSubmitCropOther={({ slotKey, description }) =>
 							void session.submitAnswer({
 								slotKey,
 								optionId: "crop-other",
 								freeText: description,
-								selfEnteredPriceAmount: priceAmount,
 							})
 						}
 						onSkipOption={

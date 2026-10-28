@@ -1,10 +1,8 @@
 /**
  * 買家出價 → 賣家接受 → 買家確認 的可操作 demo。
  *
- * 與 `features/procurement-rfq-prototype` 的關係：那份是 11 個畫面的靜態設計
- * 預覽（零 API 呼叫，畫面上自陳「前端預覽不會送出任何回覆」）。本 demo 只取
- * 其中三個真正構成商務閉環的步驟，並且**買家那半吃真資料**——真 request
- * slots、真候選名單、真 Pricebook 參考價，出價也真的落成 confirmed snapshot；
+ * 買家那半吃真資料——真 request slots、真候選名單，出價也真的落成
+ * confirmed snapshot；
  * 賣家那半仍是 local state，但它顯示的是買家這次真的定稿的那張詢價單，
  * 所以整條流程是連貫的。
  *
@@ -51,22 +49,6 @@ export interface DemoCandidate {
 	sellerName: string | null;
 	matchedFactCount: number;
 	unverifiableFactCount: number;
-}
-
-/**
- * Pricebook 行情，來自 `POST /rfq-price-previews` 的 referencePriceRange
- * ＋ marketPriceBasis。只有 `PRICEBOOK_GUIDED` 且 mapping 可靠時才有值。
- */
-export interface DemoMarketReference {
-	lower: number;
-	midpoint: number;
-	upper: number;
-	/** 金額是「每多少單位」的價格。GRAM 是每 1000 公克，不講會差 1000 倍。 */
-	basisQuantity: string;
-	basisUnit: string;
-	regionName: string;
-	sourceDataAsOf: string | null;
-	freshnessStatus: string;
 }
 
 /**
@@ -122,9 +104,6 @@ export interface DemoContext {
 	candidates: DemoCandidate[];
 	/** 找不到 CANDIDATE_SEARCH run 時的原因，用來誠實說明為何名單是空的。 */
 	candidatesUnavailableReason: string | null;
-	market: DemoMarketReference | null;
 	quoteTotalRange: DemoQuoteTotalRange | null;
 	preview: DemoPreviewIdentity | null;
-	/** 行情不可用時的 typed 原因，原樣搬運不改寫。 */
-	marketUnavailableReason: string | null;
 }

@@ -1,11 +1,9 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
-import { discoverRedirectOnlyPages } from "./e2e/helpers/app-route-inventory";
-
-const root = fileURLToPath(new URL("..", import.meta.url));
+import {
+	discoverRedirectOnlyPages,
+	isRedirectOnlyPageSource,
+} from "./e2e/helpers/app-route-inventory";
 
 /**
  * `discoverRedirectOnlyPages` 決定一個靜態頁屬於哪個 HTTP 回應類別
@@ -13,28 +11,40 @@ const root = fileURLToPath(new URL("..", import.meta.url));
  * 會掉回「公開靜態頁」類、被斷言成 200，而它其實回 307。
  *
  * 2026-08-27 就是這樣擋掉一次 main 部署（run 33093420954）：偵測器原本要求
- * 函式主體「只有一行」，`/hawkr-agent-rfq-preview` 在 redirect 前面加了一行
+ * 函式主體「只有一行」，某個頁面在 redirect 前面加了一行
  * `if (!HAWKR_AGENT_ENABLED) notFound();` —— 行為一個字都沒變，類別卻換了。
  */
 test("守衛行不會讓一個 redirect-only 頁換類別", () => {
+	const guarded = `
+import { notFound } from "next/navigation";
+
+export default async function Page() {
+	if (!ENABLED) notFound();
+	redirect({
+		href: "/target",
+		locale: "zh-TW",
+	});
+}
+`;
+	assert.equal(isRedirectOnlyPageSource(guarded), true);
+
+	const unguarded = `
+export default function Page() {
+	redirect("/target");
+}
+`;
+	assert.equal(isRedirectOnlyPageSource(unguarded), true);
+
+	const renders = `
+export default function Page() {
+	if (!ENABLED) notFound();
+	redirect("/target");
+	return <div />;
+}
+`;
+	assert.equal(isRedirectOnlyPageSource(renders), false);
+
 	const routes = discoverRedirectOnlyPages();
-
-	// 真實案例：redirect 前面有一行 notFound 守衛。
-	const source = readFileSync(
-		path.join(root, "app/[locale]/hawkr-agent-rfq-preview/page.tsx"),
-		"utf8",
-	);
-	assert.match(
-		source,
-		/notFound\(\);?\s*\n\s*redirect\(/,
-		"前提變了：這個頁面不再是「守衛 + redirect」的形狀，本測試要跟著改",
-	);
-	assert.ok(
-		routes.includes("/hawkr-agent-rfq-preview"),
-		`守衛 + redirect 必須仍被認定為 redirect-only，實際得到：${JSON.stringify(routes)}`,
-	);
-
-	// 反向：沒有守衛的單行 redirect 一直都算，不能因為這次放寬而漏掉。
 	assert.ok(routes.includes("/seller-center"));
 });
 

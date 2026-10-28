@@ -96,7 +96,7 @@ func NewCropDisambiguationInterruptNode(idGenerators ...func() int64) *workflow.
 			}
 			ev := workflow.NewRequestInputEvent(ctx, session.RequestInput{
 				InterruptID: interruptID,
-				Message:     "需要買家確認品項分類或填入單價",
+				Message:     "需要買家確認品項分類或描述品項",
 				Payload: CropDisambiguationInterruptPayload{
 					Kind:                cropDisambiguationInterruptKind,
 					PendingReason:       in.PendingReason,

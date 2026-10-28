@@ -35,7 +35,6 @@ test("selected candidates open the typed RFQ price confirmation inside the works
 		candidateCanvas,
 		/onConfirmRfqSnapshot=\{onConfirmRfqSnapshot\}/,
 	);
-	assert.doesNotMatch(candidateBrowser, /hawkr-agent-rfq-preview/);
 });
 
 test("the live RFQ flow uses the new preview and confirmation endpoints, never legacy publication", () => {
@@ -52,19 +51,14 @@ test("the live RFQ flow uses the new preview and confirmation endpoints, never l
 	assert.doesNotMatch(rfqDraft, /發布詢價（尚未開放）/);
 });
 
-test("guided preview omits buyerRequestedRange until the buyer edits it, and seeds the inputs from the server's prefill", () => {
+test("the preview always carries the buyer's range; there is no pricing-mode switch and no prefill from the server", () => {
+	assert.doesNotMatch(rfqDraft, /pricingMode|RfqPricingMode|PRICEBOOK_GUIDED/);
+	assert.doesNotMatch(rfqDraft, /type="radio"/);
 	assert.match(
 		rfqDraft,
-		/React\.useState<RfqPricingMode>\("PRICEBOOK_GUIDED"\)/,
+		/buyerRequestedRange: \{[\s\S]*?lowerBoundAmount: desiredPriceLower\.trim\(\)/,
 	);
-	assert.match(
-		rfqDraft,
-		/pricingMode === "BUYER_ENTERED_NO_REFERENCE" \|\|[\s\S]*?pricingMode === "PRICEBOOK_GUIDED" && hasDesiredRangeInput/,
-	);
-	assert.match(
-		rfqDraft,
-		/result\.data\.pricingMode === "PRICEBOOK_GUIDED"[\s\S]*?setDesiredPriceLower\([\s\S]*?result\.data\.buyerRequestedRange\.lowerBoundAmount/,
-	);
+	assert.doesNotMatch(rfqDraft, /setDesiredPriceLower\(\s*result/);
 	assert.doesNotMatch(rfqDraft, /basisQuantity:\s*(?:quantity|"1")/);
 	assert.doesNotMatch(rfqDraft, /basisUnit:\s*(?:unit|"KG")/);
 });
@@ -81,10 +75,7 @@ test("quantity, unit, city and delivery date are persisted-slot read-only fields
 	assert.match(rfqDraft, /回到對話產生新的需求版本/);
 });
 
-test("no-reference mode is explicit and remains fail closed without a canonical server basis", () => {
-	assert.match(rfqDraft, /type="radio"/);
-	assert.match(rfqDraft, /改用自行設定價格/);
-	assert.match(rfqDraft, /MAPPING_MISSING/);
+test("confirmation stays fail closed without a canonical server basis", () => {
 	assert.match(rfqDraft, /hasConfirmablePriceBasis\(preview,\s*unit\)/);
 	assert.match(rfqDraft, /價格資料尚未完整，或與目前需求單位不一致/);
 	assert.match(priceContract, /basisUnit === "KG"/);
@@ -209,9 +200,8 @@ test("RFQ capability flags separately gate entry and confirmation", () => {
 	assert.match(rfqDraft, /approvalEnabled &&/);
 });
 
-test("new loading, error, mode, confirmed and mobile states are styled", () => {
+test("new loading, error, confirmed and mobile states are styled", () => {
 	for (const selector of [
-		"assistant-rfq-guidance__modes",
 		"assistant-rfq-guidance__loading",
 		"assistant-rfq-guidance__error",
 		"assistant-rfq-guidance__server-range",
@@ -222,11 +212,7 @@ test("new loading, error, mode, confirmed and mobile states are styled", () => {
 	assert.match(procurementCss, /@media \(max-width: 640px\)/);
 });
 
-test("v6 稿 03 的市場價格參考與總額區間都由伺服器供給，前端不自算也不補值", () => {
-	assert.match(
-		rfqDraft,
-		/const basis = preview\.marketPriceBasis;\s*if \(!basis\) return null;/,
-	);
+test("總額區間由伺服器供給，前端不自算也不補值", () => {
 	assert.match(
 		rfqDraft,
 		/const total = preview\.quoteTotalRange;\s*if \(!total\) return null;/,
@@ -235,32 +221,14 @@ test("v6 稿 03 的市場價格參考與總額區間都由伺服器供給，前�
 	assert.match(rfqDraft, /formatTwd\(total\.lowerBoundAmount\)/);
 	assert.match(rfqDraft, /formatTwd\(total\.upperBoundAmount\)/);
 	assert.doesNotMatch(rfqDraft, /total\.quantity\s*\*|Number\(total\./);
-
-	assert.match(rfqDraft, /每 \$\{basisQuantity\} \$\{basisUnit\}/);
 	assert.doesNotMatch(rfqDraft, /quantityUnit:\s*"|basisUnit\s*=\s*"/);
 
-	assert.match(rfqDraft, /formatTaipeiDate\(basis\.sourceDataAsOf\)/);
-	assert.match(rfqDraft, /行情來源未提供/);
-
-	assert.match(
-		priceContract,
-		/marketPriceBasis: rfqMarketPriceBasisSchema\.nullable\(\)\.default\(null\)/,
-	);
 	assert.match(
 		priceContract,
 		/quoteTotalRange: rfqQuoteTotalRangeSchema\.nullable\(\)\.default\(null\)/,
 	);
-	assert.match(
-		priceContract,
-		/\(preview\.marketPriceBasis !== null\) !== hasReference/,
-	);
 
-	for (const selector of [
-		"assistant-rfq-guidance__market-basis",
-		"assistant-rfq-guidance__quote-total",
-	]) {
-		assert.match(procurementCss, new RegExp(`\\.${selector}`), selector);
-	}
+	assert.match(procurementCss, /\.assistant-rfq-guidance__quote-total/);
 });
 
 test("A13：execute CTA 從 workspace 一路接到 RfqDraftFlow", () => {

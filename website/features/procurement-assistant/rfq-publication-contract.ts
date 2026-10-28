@@ -79,8 +79,6 @@ export const rfqPublicationApprovalSchema = z.object({
 	sellerFacingPayloadHash: payloadHashSchema,
 	sellerFacingPayloadJson: z.string(),
 	expiresAt: z.string().min(1),
-	// #2537 完成前恆為 UNKNOWN。
-	dealTemperatureStatus: z.string(),
 	// WISH_POOL v1 是 WISH_POOL_ALL_ACTIVE_SELLERS_V1／1；DIRECT_RECIPIENTS 兩欄
 	// 為空字串／"0"，受眾大小改由 recipientCount 表達，所以這兩欄必須容許空值。
 	audiencePolicyId: z.string(),

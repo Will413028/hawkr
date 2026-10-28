@@ -14,7 +14,6 @@ import {
 } from "../features/procurement-assistant/capabilities";
 import {
 	ENTRY_HEADING,
-	flaggedCapabilityChips,
 	SLICE_A_CAPABILITY_CHIPS,
 } from "../features/procurement-assistant/entry-content";
 import {
@@ -142,8 +141,6 @@ test("§V.11.0：Slice A 只顯示三個 capability chip，未啟用的能力完
 		SLICE_A_CAPABILITY_CHIPS.map((chip) => chip.label),
 		["找供應商", "整理採購需求", "比較候選"],
 	);
-	// 旗標全關時不得多出任何 chip——「未啟用時完全不出現」，不是 disabled。
-	assert.deepEqual(flaggedCapabilityChips(AGENT_CAPABILITIES_OFF), []);
 	assert.deepEqual(
 		SLICE_A_CAPABILITY_CHIPS.map((chip) => chip.icon),
 		["find-suppliers", "organise-requirements", "compare-candidates"],

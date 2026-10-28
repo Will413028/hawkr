@@ -1960,22 +1960,6 @@
 	white-space: nowrap;
 }
 
-.assistant-rfq-guidance__state[data-mode="LEGACY_P50_ONLY"] {
-	border-color: var(--theme-primary-border);
-	background: var(--theme-primary-subtle);
-	color: var(--theme-text-accent-on-tint);
-}
-
-.assistant-rfq-guidance__state[data-mode="NO_REFERENCE"] {
-	border-color: color-mix(
-		in srgb,
-		var(--hkui-warning) 36%,
-		var(--hkui-divider)
-	);
-	background: color-mix(in srgb, var(--hkui-warning) 8%, var(--hkui-content1));
-	color: var(--hkui-foreground);
-}
-
 .assistant-rfq-guidance__state[data-mode="success"],
 .assistant-rfq-snapshot__state {
 	border-color: var(--theme-primary-border);
@@ -1983,78 +1967,11 @@
 	color: var(--theme-text-accent-on-tint);
 }
 
-.assistant-rfq-guidance__modes {
-	display: grid;
-	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: 10px;
-	min-width: 0;
-	margin: 0;
-	padding: 16px;
-	border: 0;
-	border-bottom: 1px solid var(--hkui-divider);
-}
-
-.assistant-rfq-guidance__modes legend {
-	width: 100%;
-	margin-bottom: 9px;
-	color: var(--hkui-foreground-soft);
-	font-size: var(--hkui-text-tiny, 0.75rem);
-	font-weight: 700;
-}
-
-.assistant-rfq-guidance__modes label {
-	display: grid;
-	grid-template-columns: auto minmax(0, 1fr);
-	align-items: start;
-	gap: 10px;
-	min-height: 64px;
-	padding: 11px 12px;
-	border: 1px solid var(--hkui-divider);
-	border-radius: var(--radius-md);
-	background: var(--hkui-content2);
-	cursor: pointer;
-}
-
-.assistant-rfq-guidance__modes label:has(input:checked) {
-	border-color: var(--theme-primary-border);
-	background: var(--theme-primary-subtle);
-}
-
-.assistant-rfq-guidance__modes input {
-	width: 18px;
-	height: 18px;
-	margin: 2px 0 0;
-	accent-color: var(--hkui-primary);
-}
-
-.assistant-rfq-guidance__modes label > span {
-	display: grid;
-	gap: 3px;
-}
-
-.assistant-rfq-guidance__modes label small {
-	line-height: 1.45;
-}
-
-.assistant-rfq-guidance__modes label:has(input:focus-visible) {
-	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
-}
-
-.assistant-rfq-guidance__modes label:has(input:disabled) {
-	opacity: 0.68;
-	cursor: not-allowed;
-}
-
 .assistant-rfq-guidance__row,
 .assistant-rfq-guidance__price,
-.assistant-rfq-guidance__desired,
-.assistant-rfq-guidance__temperature {
+.assistant-rfq-guidance__desired {
 	padding: 16px;
 	border-bottom: 1px solid var(--hkui-divider);
-}
-
-.assistant-rfq-guidance__temperature {
-	border-bottom: 0;
 }
 
 .assistant-rfq-guidance__loading,
@@ -2103,35 +2020,6 @@
 	gap: 4px;
 }
 
-/* 稿 03 市場價格參考的出處揭露：資料截至 ／ 計價基準 兩欄 ＋ 一行免責。 */
-.assistant-rfq-guidance__market-basis {
-	display: grid;
-	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: 8px 12px;
-	padding: 14px 16px;
-	border-bottom: 1px solid var(--hkui-divider);
-	background: color-mix(in srgb, var(--hkui-warning) 7%, var(--hkui-content1));
-}
-
-.assistant-rfq-guidance__market-basis > div {
-	display: grid;
-	gap: 4px;
-	min-width: 0;
-}
-
-.assistant-rfq-guidance__market-basis p {
-	grid-column: 1 / -1;
-	margin: 0;
-	color: var(--hkui-foreground-soft);
-	font-size: var(--hkui-text-tiny, 0.75rem);
-}
-
-.assistant-rfq-guidance__market-basis[data-freshness="stale"] p,
-.assistant-rfq-guidance__market-basis[data-freshness="unavailable"] p {
-	color: var(--hkui-warning);
-	font-weight: 600;
-}
-
 /* 稿 03 詢價總額區間。quoteTotalRange 為 null 時整張卡不渲染（元件層早退）。 */
 .assistant-rfq-guidance__quote-total {
 	padding: 14px 16px;
@@ -2156,8 +2044,7 @@
 	gap: 12px;
 }
 
-.assistant-rfq-guidance__row-icon,
-.assistant-rfq-guidance__temperature-label > span {
+.assistant-rfq-guidance__row-icon {
 	display: grid;
 	place-items: center;
 	width: 36px;
@@ -2170,8 +2057,7 @@
 
 .assistant-rfq-guidance__row > div:last-child,
 .assistant-rfq-guidance__price-copy,
-.assistant-rfq-guidance__desired > div:first-child,
-.assistant-rfq-guidance__temperature-label > div {
+.assistant-rfq-guidance__desired > div:first-child {
 	display: grid;
 	gap: 4px;
 	min-width: 0;
@@ -2197,118 +2083,6 @@
 .assistant-rfq-guidance__price {
 	display: grid;
 	gap: 14px;
-}
-
-/* 稿 P-01 的參考區間數線：下限靠左、中位置中放大、上限靠右，下方一條軌道把
-   中位畫在它於區間裡的相對位置上。金額在上、標籤在下（dd/dt 用 order 對調）。 */
-.assistant-rfq-guidance__reference {
-	display: grid;
-	gap: 10px;
-	padding: 14px 14px 12px;
-	border: 1px solid var(--hkui-divider);
-	border-radius: var(--radius-md);
-	background: var(--hkui-content2);
-}
-
-.assistant-rfq-guidance__reference-values {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr);
-	align-items: end;
-	gap: 8px;
-	margin: 0;
-}
-
-.assistant-rfq-guidance__reference-values > div {
-	display: grid;
-	gap: 3px;
-	min-width: 0;
-}
-
-.assistant-rfq-guidance__reference-values > div[data-edge="mid"] {
-	justify-items: center;
-	text-align: center;
-}
-
-.assistant-rfq-guidance__reference-values > div[data-edge="upper"] {
-	justify-items: end;
-	text-align: end;
-}
-
-.assistant-rfq-guidance__reference-values dt {
-	order: 2;
-	color: var(--theme-text-body);
-	font-size: var(--hkui-text-tiny, 0.75rem);
-}
-
-.assistant-rfq-guidance__reference-values dd {
-	order: 1;
-	display: flex;
-	flex-wrap: wrap;
-	align-items: baseline;
-	gap: 0 3px;
-	margin: 0;
-	overflow-wrap: anywhere;
-	color: var(--hkui-foreground);
-	font-size: var(--hkui-text-small, 0.875rem);
-	font-weight: 750;
-}
-
-.assistant-rfq-guidance__reference-values dd small {
-	font-size: var(--hkui-text-tiny, 0.75rem);
-	font-weight: 600;
-}
-
-.assistant-rfq-guidance__reference-values > div[data-primary] dd {
-	color: var(--hkui-primary);
-	font-size: var(--hkui-text-medium, 1rem);
-}
-
-.assistant-rfq-guidance__reference-axis {
-	position: relative;
-	height: 12px;
-	margin: 0 3px;
-}
-
-.assistant-rfq-guidance__reference-axis::before,
-.assistant-rfq-guidance__reference-axis::after {
-	position: absolute;
-	top: 50%;
-	width: 2px;
-	height: 10px;
-	border-radius: var(--radius-pill);
-	background: var(--hkui-divider);
-	content: "";
-	transform: translateY(-50%);
-}
-
-.assistant-rfq-guidance__reference-axis::before {
-	left: 0;
-}
-
-.assistant-rfq-guidance__reference-axis::after {
-	right: 0;
-}
-
-.assistant-rfq-guidance__reference-track {
-	position: absolute;
-	top: 50%;
-	right: 0;
-	left: 0;
-	height: 2px;
-	border-radius: var(--radius-pill);
-	background: var(--hkui-divider);
-	transform: translateY(-50%);
-}
-
-.assistant-rfq-guidance__reference-mark {
-	position: absolute;
-	top: 50%;
-	width: 11px;
-	height: 11px;
-	border: 2px solid var(--hkui-content2);
-	border-radius: var(--radius-circle);
-	background: var(--hkui-primary);
-	transform: translate(-50%, -50%);
 }
 
 .assistant-rfq-guidance__desired {
@@ -2392,105 +2166,6 @@
 
 [data-theme="dark"] .assistant-rfq-guidance__range-help[data-error] {
 	color: var(--hkui-danger-200);
-}
-
-.assistant-rfq-guidance__temperature {
-	display: grid;
-	gap: 12px;
-}
-
-.assistant-rfq-guidance__temperature-label {
-	display: flex;
-	align-items: center;
-	gap: 11px;
-}
-
-/* 色帶只有這一處來源：容器上的 data-band，由 server 回的 band 決定。
-   ⛔ 不得把軌道畫成 0/20/50/100 的漸層——那等於把 BANDS_V1 的門檻抄進前端，
-   server 改 bandVersion 之後畫面會與它回的 band 靜默牴觸。 */
-.assistant-rfq-guidance__temperature[data-band="COLD"] {
-	--rfq-band-color: var(--hkui-foreground-soft);
-}
-
-.assistant-rfq-guidance__temperature[data-band="WARM"] {
-	--rfq-band-color: var(--hkui-warning);
-}
-
-.assistant-rfq-guidance__temperature[data-band="HOT"] {
-	--rfq-band-color: var(--hkui-primary);
-}
-
-.assistant-rfq-guidance__temperature-head {
-	display: grid;
-	grid-template-columns: minmax(0, auto) minmax(0, 1fr);
-	align-items: center;
-	gap: 14px;
-}
-
-.assistant-rfq-guidance__temperature[data-status="available"]
-	.assistant-rfq-guidance__temperature-label
-	strong {
-	color: var(--rfq-band-color, var(--hkui-foreground));
-	font-size: var(--hkui-text-large, 1.25rem);
-	font-weight: 800;
-	letter-spacing: -0.01em;
-}
-
-.assistant-rfq-guidance__temperature-label em {
-	color: var(--theme-text-body);
-	font-size: var(--hkui-text-tiny, 0.75rem);
-	font-style: normal;
-}
-
-.assistant-rfq-guidance__temperature-gauge {
-	display: grid;
-	grid-template-columns: auto minmax(0, 1fr) auto;
-	align-items: center;
-	gap: 9px;
-}
-
-.assistant-rfq-guidance__temperature-axis {
-	color: var(--theme-text-body);
-	font-size: var(--hkui-text-tiny, 0.75rem);
-}
-
-.assistant-rfq-guidance__temperature-track {
-	position: relative;
-	height: 7px;
-	border-radius: var(--radius-pill);
-	background: var(--hkui-divider);
-}
-
-.assistant-rfq-guidance__temperature-fill {
-	position: absolute;
-	top: 0;
-	bottom: 0;
-	border-radius: var(--radius-pill);
-	background: color-mix(
-		in srgb,
-		var(--rfq-band-color, var(--hkui-foreground-soft)) 45%,
-		transparent
-	);
-}
-
-.assistant-rfq-guidance__temperature-point {
-	position: absolute;
-	top: 50%;
-	width: 12px;
-	height: 12px;
-	border: 2px solid var(--hkui-content1);
-	border-radius: var(--radius-circle);
-	background: var(--rfq-band-color, var(--hkui-foreground-soft));
-	transform: translate(-50%, -50%);
-}
-
-.assistant-rfq-guidance__temperature ul {
-	display: grid;
-	gap: 3px;
-	margin: 0;
-	padding-left: 18px;
-	color: var(--theme-text-body);
-	font-size: var(--hkui-text-tiny, 0.75rem);
 }
 
 .assistant-rfq-snapshot__facts {
@@ -2780,27 +2455,11 @@
 	flex-wrap: wrap;
 }
 
-/* 成果側欄實測寬 430px（稿 P-01 假設的右欄約 600px），所以數線、量表與輸入列
-   的斷點不跟上面那組共用的 640px 走——那會讓它們在正常桌面寬度就整組退化成
-   舊的堆疊卡。這裡只在真的塞不下時才收。 */
+/* 成果側欄實測寬 430px，所以輸入列的斷點不跟下面那組共用的 640px 走。
+   這裡只在真的塞不下時才收。 */
 @container (max-width: 390px) {
-	.assistant-rfq-guidance__reference-values,
-	.assistant-rfq-guidance__temperature-head,
-	.assistant-rfq-guidance__market-basis,
 	.assistant-rfq-guidance__desired-fields {
 		grid-template-columns: minmax(0, 1fr);
-	}
-
-	/* 三個數字疊成一欄之後就不是一條線了，數線一併收起來，不留一條對不上任何
-	   刻度的軌道。 */
-	.assistant-rfq-guidance__reference-axis {
-		display: none;
-	}
-
-	.assistant-rfq-guidance__reference-values > div[data-edge="mid"],
-	.assistant-rfq-guidance__reference-values > div[data-edge="upper"] {
-		justify-items: start;
-		text-align: start;
 	}
 }
 
@@ -2808,7 +2467,6 @@
 	.assistant-rfq-draft__field-row,
 	.assistant-rfq-draft__review-card dl,
 	.assistant-rfq-snapshot__facts,
-	.assistant-rfq-guidance__modes,
 	.assistant-rfq-guidance__server-range {
 		grid-template-columns: minmax(0, 1fr);
 	}
@@ -3827,21 +3485,8 @@
 
 .hawkr-agent-question-card__crop-actions {
 	display: flex;
-	align-items: flex-end;
-	gap: var(--hkui-space-4);
 	padding-top: var(--hkui-space-4);
 	border-top: 1px solid var(--theme-border-subtle);
-}
-
-.hawkr-agent-question-card__crop-price {
-	flex: 1;
-	min-width: 0;
-}
-
-.hawkr-agent-question-card__crop-unit {
-	color: var(--theme-text-body);
-	font-size: var(--hkui-text-small);
-	white-space: nowrap;
 }
 
 .hawkr-agent-question-card__crop-submit {
@@ -3864,7 +3509,6 @@
 
 	.hawkr-agent-question-card__crop-actions {
 		flex-direction: column;
-		align-items: stretch;
 	}
 }
 

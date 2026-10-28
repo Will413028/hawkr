@@ -9,9 +9,7 @@ const PROCUREMENT_PATH = "/account/messages/assistant/procurement";
 
 /**
  * doc57 run ledger 的 interrupt／resume 覆蓋（backend-payuni#2861 開放
- * interrupt guard；hawkr-website#548 接上 UI）。跟
- * procurement-crop-disambiguation.spec.ts（沒有 pendingInterrupt 的 legacy
- * 消歧流程）分開放：這裡每個情境都要組 SSE frame／sync-fallback／reload
+ * interrupt guard；hawkr-website#548 接上 UI）。這裡每個情境都要組 SSE frame／sync-fallback／reload
  * 深連結三種不同 transport 的 mock，setup 發散到值得獨立成檔——precedent 是
  * procurement-quote-batch-preview.spec.ts 之於 procurement-quote-batch-send.spec.ts。
  *
@@ -139,14 +137,10 @@ test.describe("procurement assistant — interrupt／resume（doc57 run ledger�
 									{
 										optionId: "opt-1",
 										label: "甘藍",
-										cropCode: null,
-										groupCode: "N04-001",
 									},
 									{
 										optionId: "opt-2",
 										label: "高麗菜芽（高麗菜）",
-										cropCode: null,
-										groupCode: "N04-002",
 									},
 								],
 							},
@@ -221,8 +215,7 @@ test.describe("procurement assistant — interrupt／resume（doc57 run ledger�
 
 		await page.getByRole("button", { name: "高麗菜芽（高麗菜）" }).click();
 
-		// resume 成功 → pendingInterrupt 清空，composer 解鎖（不是走
-		// chooseCropDisambiguation／crop-disambiguation 端點；上面的 resume
+		// resume 成功 → pendingInterrupt 清空，composer 解鎖（上面的 resume
 		// route handler 已經斷言過實際送出的 body）。
 		await expect(textarea).not.toBeDisabled();
 		await textarea.fill("之後想再訂別的");
@@ -323,8 +316,6 @@ test.describe("procurement assistant — interrupt／resume（doc57 run ledger�
 									{
 										optionId: "opt-a",
 										label: "綜合水果禮盒",
-										cropCode: null,
-										groupCode: "F01-001",
 									},
 								],
 							},
@@ -553,8 +544,6 @@ test.describe("procurement assistant — interrupt／resume（doc57 run ledger�
 								{
 									optionId: "opt-1",
 									label: "甘藍",
-									cropCode: null,
-									groupCode: "N04-001",
 								},
 							],
 						},
@@ -632,8 +621,6 @@ test.describe("procurement assistant — interrupt／resume（doc57 run ledger�
 									{
 										optionId: "opt-sp",
 										label: "地瓜（甘藷）",
-										cropCode: null,
-										groupCode: "R01-001",
 									},
 								],
 							},

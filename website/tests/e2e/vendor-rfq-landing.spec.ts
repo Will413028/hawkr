@@ -154,12 +154,6 @@ const RFQ_BODY = {
 		deliveryDate: "2026-09-20",
 		responseDeadline: "2026-09-18",
 		buyerNote: "",
-		referencePriceRange: {
-			lowerBoundAmount: "32000",
-			upperBoundAmount: "40000",
-			basisQuantity: "1",
-			basisUnit: "BOX",
-		},
 		buyerRequestedRange: {
 			currency: "TWD",
 			priceComponent: "GOODS_ONLY",
@@ -806,9 +800,7 @@ test.describe("站外業者 RFQ 落地頁", { tag: ["@ui"] }, () => {
 		await expect(page.getByText("實際品相")).toBeVisible();
 	});
 
-	test("Pricebook 行情與買家希望區間都顯示，並各自標明計價基準", async ({
-		page,
-	}) => {
+	test("買家希望區間顯示並標明計價基準", async ({ page }) => {
 		await routeInviteeSession(page);
 		await page.route("**/api/v1/public/vendor_portal/rfqs/*", (route) =>
 			route.fulfill({
@@ -821,40 +813,12 @@ test.describe("站外業者 RFQ 落地頁", { tag: ["@ui"] }, () => {
 
 		await page.goto(ENTRY_URL);
 
-		await expect(page.getByText("Pricebook 市場行情")).toBeVisible();
-		await expect(page.getByText("32000 ～ 40000")).toBeVisible();
 		await expect(page.getByText("買家希望區間")).toBeVisible();
 		await expect(page.getByText("TWD 38000 ～ 43000")).toBeVisible();
-		await expect(page.getByText("每 1 BOX")).toHaveCount(2);
-		await expect(
-			page.getByText("這兩個區間只是報價脈絡，不是成交價格"),
-		).toBeVisible();
+		await expect(page.getByText("每 1 BOX")).toHaveCount(1);
 	});
 
-	test("買家自行出價、沒有 Pricebook 參考時，不畫一個空的行情區塊", async ({
-		page,
-	}) => {
-		await routeInviteeSession(page);
-		await page.route("**/api/v1/public/vendor_portal/rfqs/*", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					...RFQ_BODY,
-					data: { ...RFQ_BODY.data, referencePriceRange: null },
-				}),
-			}),
-		);
-		await routeDraftAbsent(page);
-
-		await page.goto(ENTRY_URL);
-
-		await expect(page.getByText("Pricebook 市場行情")).toHaveCount(0);
-		await expect(page.getByText("買家希望區間")).toBeVisible();
-		await expect(page.getByText("TWD 38000 ～ 43000")).toBeVisible();
-	});
-
-	test("兩個區間都沒有時，連那句脈絡說明都不出現", async ({ page }) => {
+	test("買家希望區間沒有時，連那句脈絡說明都不出現", async ({ page }) => {
 		await routeInviteeSession(page);
 		await page.route("**/api/v1/public/vendor_portal/rfqs/*", (route) =>
 			route.fulfill({
@@ -864,7 +828,6 @@ test.describe("站外業者 RFQ 落地頁", { tag: ["@ui"] }, () => {
 					...RFQ_BODY,
 					data: {
 						...RFQ_BODY.data,
-						referencePriceRange: null,
 						buyerRequestedRange: null,
 					},
 				}),
@@ -875,10 +838,9 @@ test.describe("站外業者 RFQ 落地頁", { tag: ["@ui"] }, () => {
 		await page.goto(ENTRY_URL);
 
 		await expect(page.getByText("結球萵苣")).toBeVisible();
-		await expect(page.getByText("Pricebook 市場行情")).toHaveCount(0);
 		await expect(page.getByText("買家希望區間")).toHaveCount(0);
 		await expect(
-			page.getByText("這兩個區間只是報價脈絡，不是成交價格"),
+			page.getByText("這個區間只是報價脈絡，不是成交價格"),
 		).toHaveCount(0);
 	});
 

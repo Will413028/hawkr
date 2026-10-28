@@ -1,6 +1,4 @@
-/* 商務線 demo：買家出價 → 賣家決定 → 買家確認。
- * 沿用 hkui token，與 procurement-rfq-prototype 的視覺語彙一致但獨立，
- * 動這裡不會影響那份設計預覽。 */
+/* 商務線 demo：買家出價 → 賣家決定 → 買家確認。沿用 hkui token。 */
 
 .shell {
 	max-width: 880px;
@@ -156,12 +154,6 @@
 	flex-wrap: wrap;
 	align-items: baseline;
 	gap: 12px;
-}
-
-.marketMid {
-	font-size: 0.875rem;
-	font-weight: 500;
-	opacity: 0.7;
 }
 
 .priceGrid {

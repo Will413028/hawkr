@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
-	guidedPreviewData,
+	pricePreviewData,
 	RFQ_APPROVAL_ID,
 	RFQ_CONFIRMED_HASH,
 	RFQ_CONFIRMED_ID,
@@ -85,7 +85,7 @@ test.describe("procurement assistant — 受眾變更使核准失效", {
 				route.fulfill({
 					status: 200,
 					contentType: "application/json",
-					body: JSON.stringify({ code: 0, data: guidedPreviewData() }),
+					body: JSON.stringify({ code: 0, data: pricePreviewData() }),
 				}),
 			confirmationHandler: (route) =>
 				route.fulfill({
@@ -120,7 +120,6 @@ test.describe("procurement assistant — 受眾變更使核准失效", {
 							sellerFacingPayloadHash: RFQ_SELLER_PAYLOAD_HASH,
 							sellerFacingPayloadJson: '{"item":"珍珠芭樂"}',
 							expiresAt: "2026-08-22T12:36:00Z",
-							dealTemperatureStatus: "UNKNOWN",
 							audiencePolicyId: "",
 							audiencePolicyVersion: "0",
 							recipientCount: approvalCalls === 1 ? "1" : "2",

@@ -18,10 +18,9 @@ func TestGateCarriesConfirmedCategoryForExactName(t *testing.T) {
 	got := ComputeGate(context.Background(), uc, domain.Slots{}, domain.Slots{Item: &item})
 
 	require.True(t, got.Evaluated(), "%+v", got)
-	require.True(t, got.Pending, "分類確認後待買家填單價")
-	require.Equal(t, domain.CropPendingReasonUnavailable, got.PendingReason)
-	id, label := got.Selection.ConfirmedCategory()
-	require.Equal(t, "2008", id,
+	require.False(t, got.Pending, "分類確認後直接通過，不出卡片")
+	require.NotNil(t, got.Resolution)
+	require.Equal(t, "2008", got.Resolution.CategoryID,
 		"精確品名直接定案時，分類 id 必須跟著判定走。愈精確的買家拿到愈差的結果，就是這條路掉了分類")
-	require.Equal(t, "豬肉", label)
+	require.Equal(t, "豬肉", got.Resolution.Label)
 }

@@ -23,9 +23,6 @@ func validateCropResumeAnswer(in AnswerInput) error {
 		_, err := buildCropDisambiguationPatch(in)
 		return err
 	}
-	if in.SelfEnteredPriceAmount != "" {
-		return ErrInvalidOptionID
-	}
 	if in.OptionID == "" {
 		text := strings.TrimSpace(in.FreeText)
 		if selection == nil || (selection.Stage != domain.CropSelectionGroup && selection.Stage != domain.CropSelectionItem) || text == "" || utf8.RuneCountInString(text) > 200 {
@@ -58,17 +55,6 @@ func resolveResumedCropGate(ctx context.Context, resolver cropidentity.Resolver,
 		if err != nil {
 			return CropGateOutput{}, err
 		}
-		if in.OptionID == domain.CropOtherOptionID {
-
-			sourceItem := ""
-			if current.Item != nil {
-				sourceItem = cropidentity.NormalizeCategoryText(*current.Item)
-			}
-			if sourceItem == "" || sourceItem != cropidentity.NormalizeCategoryText(*patch.Item) {
-				patch.ItemResolution.CategoryID = ""
-				patch.ItemResolution.Label = ""
-			}
-		}
 		return buildResumedCropGateOutput(current, patch), nil
 	}
 	selector, ok := resolver.(cropSelectionResolver)
@@ -88,6 +74,11 @@ func resolveResumedCropGate(ctx context.Context, resolver cropidentity.Resolver,
 		out.Pending = true
 		out.PendingReason = domain.CropPendingReasonAmbiguous
 		out.Candidates = result.Candidates
+		return out, nil
+	}
+	if resolution := domain.NewCategoryConfirmedItemResolution(result.Selection); resolution != nil {
+		out.Resolution = resolution
+		out.Selection = nil
 		return out, nil
 	}
 	out.Pending = true

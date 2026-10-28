@@ -1,22 +1,18 @@
 package domain
 
-import (
-	"fmt"
-	"strconv"
-	"strings"
-)
+import "strings"
 
 type ItemResolutionKind string
 
-const ItemResolvedSelfPriced ItemResolutionKind = "SELF_PRICED"
+const (
+	ItemResolvedCategoryConfirmed ItemResolutionKind = "CATEGORY_CONFIRMED"
+
+	ItemResolvedBuyerDescribed ItemResolutionKind = "BUYER_DESCRIBED"
+)
 
 type ItemResolutionProvenance string
 
-const (
-	ItemResolutionBySystem ItemResolutionProvenance = "SYSTEM"
-
-	ItemResolutionByBuyerChoice ItemResolutionProvenance = "BUYER_CHOICE"
-)
+const ItemResolutionByBuyerChoice ItemResolutionProvenance = "BUYER_CHOICE"
 
 type ItemResolution struct {
 	Kind ItemResolutionKind `json:"kind"`
@@ -25,22 +21,10 @@ type ItemResolution struct {
 
 	CategoryID string `json:"category_id,omitempty"`
 
-	PricePerKg *int `json:"price_per_kg,omitempty"`
-
 	Provenance ItemResolutionProvenance `json:"provenance"`
 }
 
 func (r ItemResolution) DisplayValue() string {
-	if r.Kind == ItemResolvedSelfPriced {
-		label := "自訂品項"
-		if r.CategoryID != "" && strings.TrimSpace(r.Label) != "" {
-			label = strings.TrimSpace(r.Label)
-		}
-		if r.PricePerKg != nil {
-			return label + "，單價 " + strconv.Itoa(*r.PricePerKg) + " 元／公斤"
-		}
-		return label
-	}
 	return strings.TrimSpace(r.Label)
 }
 
@@ -48,41 +32,55 @@ func (r *ItemResolution) Equal(o *ItemResolution) bool {
 	if r == nil || o == nil {
 		return r == o
 	}
-	return r.Kind == o.Kind &&
-		r.Label == o.Label &&
-		r.CategoryID == o.CategoryID &&
-		intPtrEqual(r.PricePerKg, o.PricePerKg) &&
-		r.Provenance == o.Provenance
+	return *r == *o
 }
 
 func validateItemResolution(r ItemResolution) string {
 	switch r.Kind {
-	case ItemResolvedSelfPriced:
-		if r.PricePerKg == nil {
-			return "自填價品項必須帶單價"
+	case ItemResolvedCategoryConfirmed:
+		if strings.TrimSpace(r.CategoryID) == "" {
+			return "已確認分類的品項必須帶分類 ID"
 		}
-		if *r.PricePerKg < 1 || *r.PricePerKg > MaxPricePerKg {
-			return fmt.Sprintf("單價需介於 1 與 %d 元之間", MaxPricePerKg)
+	case ItemResolvedBuyerDescribed:
+		if strings.TrimSpace(r.Label) == "" {
+			return "買家自行描述的品項必須帶描述"
+		}
+		if r.CategoryID != "" {
+			return "買家自行描述的品項不可帶分類 ID"
 		}
 	default:
 		return "未知的品項解析類型"
 	}
-	if r.Provenance != ItemResolutionBySystem && r.Provenance != ItemResolutionByBuyerChoice {
+	if r.Provenance != ItemResolutionByBuyerChoice {
 		return "未知的品項解析來源"
 	}
 	return ""
 }
 
-func NewSelfPricedItemResolution(pricePerKg int, label string, origin CategoryOrigin) *ItemResolution {
-	if !origin.Declared() {
+func NewCategoryConfirmedItemResolution(sel *CropSelection) *ItemResolution {
+	if sel == nil || sel.CategoryID == "" {
 		return nil
 	}
 	return &ItemResolution{
-		Kind: ItemResolvedSelfPriced, PricePerKg: &pricePerKg, Label: label,
-		CategoryID: origin.ID(), Provenance: ItemResolutionByBuyerChoice,
+		Kind: ItemResolvedCategoryConfirmed, Label: sel.Label,
+		CategoryID: sel.CategoryID, Provenance: ItemResolutionByBuyerChoice,
 	}
 }
 
-func (r *ItemResolution) IsSelfPriced() bool {
-	return r != nil && r.Kind == ItemResolvedSelfPriced
+// NewBuyerDescribedItemResolution 記下買家在「找不到符合的品項」卡上的自行描述。
+// 買家已確認過上層分類時，改記成掛在該分類下的 CATEGORY_CONFIRMED。
+func NewBuyerDescribedItemResolution(sel *CropSelection, description string) *ItemResolution {
+	description = strings.TrimSpace(description)
+	if description == "" {
+		return nil
+	}
+	if id, _ := sel.ConfirmedCategory(); id != "" {
+		return &ItemResolution{
+			Kind: ItemResolvedCategoryConfirmed, Label: description,
+			CategoryID: id, Provenance: ItemResolutionByBuyerChoice,
+		}
+	}
+	return &ItemResolution{
+		Kind: ItemResolvedBuyerDescribed, Label: description, Provenance: ItemResolutionByBuyerChoice,
+	}
 }

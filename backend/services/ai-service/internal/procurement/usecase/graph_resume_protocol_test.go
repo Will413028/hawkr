@@ -257,7 +257,7 @@ func TestGraphResumeProtocol_ResumeClearsCropPendingProgress(t *testing.T) {
 	require.True(t, before.CropPending, "fixture must actually park on crop disambiguation")
 	require.NotEmpty(t, before.CropCandidates)
 
-	chosen := domain.NewSelfPricedItemResolution(60, "有機小白菜", domain.CategoryAbsent("測試"))
+	chosen := testkit.ConfirmedResolution("有機小白菜")
 	resumed := drainEvents(t, r.Run(ctx, userID, sessionID,
 		&genai.Content{Role: genai.RoleUser, Parts: []*genai.Part{{
 			FunctionResponse: &genai.FunctionResponse{
@@ -300,8 +300,8 @@ func TestGraphResumeProtocol_ResumeClearsCropPendingProgress(t *testing.T) {
 // 出來的形狀）餵給節點，斷言 ItemResolution 仍然完整——包含它自己的 json tag
 // （kind/label/provenance）有沒有對上。
 func TestCropResumeReconcile_ResolutionSurvivesJSONRoundTrip(t *testing.T) {
-	chosen := domain.NewSelfPricedItemResolution(75, "甘藍-初秋", domain.CategoryFromSelection(
-		&domain.CropSelection{Stage: domain.CropSelectionPrice, CategoryID: "17", Label: "甘藍-初秋"}))
+	chosen := domain.NewCategoryConfirmedItemResolution(
+		&domain.CropSelection{Stage: domain.CropSelectionDescribe, CategoryID: "17", Label: "甘藍-初秋"})
 	raw, err := json.Marshal(CropGateOutput{Item: item("高麗菜"), Resolution: chosen, Pending: false})
 	require.NoError(t, err)
 	var roundTripped map[string]any

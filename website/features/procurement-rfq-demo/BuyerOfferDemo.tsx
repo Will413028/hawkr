@@ -26,11 +26,6 @@ function money(value: number): string {
 	return `NT$ ${value.toLocaleString("zh-TW")}`;
 }
 
-/** 基準是「每 basisQuantity basisUnit」；GRAM 是每 1000 公克，不能省略。 */
-function basisLabel(quantity: string, unit: string): string {
-	return quantity === "1" ? `每 1 ${unit}` : `每 ${quantity} ${unit}`;
-}
-
 const CANDIDATE_REASON_COPY: Record<string, string> = {
 	NO_CANDIDATE_SEARCH_RUN: "這份需求還沒跑過候選搜尋，所以沒有收件名單。",
 	NO_SELECTED_CANDIDATE: "候選搜尋跑過了，但買家一家都還沒勾選。",
@@ -73,12 +68,6 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 				setContext(loaded);
 				if (loaded.requirement.budgetPerUnit !== null) {
 					setIdealPrice(String(loaded.requirement.budgetPerUnit));
-				} else if (loaded.market) {
-					setIdealPrice(String(loaded.market.midpoint));
-				}
-				if (loaded.market) {
-					setMinPrice(String(loaded.market.lower));
-					setMaxPrice(String(loaded.market.upper));
 				}
 			} catch (err) {
 				if (cancelled) return;
@@ -117,7 +106,7 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 	if (!context) {
 		return (
 			<main className={styles.shell}>
-				<p className={styles.loading}>載入需求、收件名單與市場行情…</p>
+				<p className={styles.loading}>載入需求與收件名單…</p>
 			</main>
 		);
 	}
@@ -126,9 +115,7 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 		requirement,
 		candidates,
 		candidatesUnavailableReason,
-		market,
 		quoteTotalRange,
-		marketUnavailableReason,
 	} = context;
 	const quantityLabel =
 		requirement.quantity !== null && requirement.unit
@@ -160,10 +147,8 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 				prev
 					? {
 							...prev,
-							market: outcome.market,
 							quoteTotalRange: outcome.quoteTotalRange,
 							preview: outcome.preview,
-							marketUnavailableReason: outcome.reason,
 						}
 					: prev,
 			);
@@ -207,8 +192,8 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 					<h1>買家出價 → 賣家決定 → 買家確認</h1>
 				</div>
 				<p className={styles.flag}>
-					買家那半全部是真的：需求、收件名單、Pricebook 行情，出價也真的凍結成
-					confirmed snapshot。賣家那半是本機狀態，不會送出、不會通知任何人。
+					買家那半全部是真的：需求、收件名單，出價也真的凍結成 confirmed
+					snapshot。賣家那半是本機狀態，不會送出、不會通知任何人。
 				</p>
 			</header>
 
@@ -284,35 +269,6 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 					<p className={styles.panelNote}>
 						{CANDIDATE_REASON_COPY[candidatesUnavailableReason ?? ""] ??
 							"目前沒有收件名單。"}
-					</p>
-				)}
-			</section>
-
-			<section className={styles.panel}>
-				<h2>市場行情</h2>
-				{market ? (
-					<>
-						<p className={styles.marketRange}>
-							{money(market.lower)} – {money(market.upper)}
-							<span className={styles.marketMid}>
-								中位 {money(market.midpoint)}
-							</span>
-						</p>
-						<p className={styles.panelNote}>
-							{market.regionName} ·{" "}
-							{basisLabel(market.basisQuantity, market.basisUnit)} · 資料截至{" "}
-							{market.sourceDataAsOf ?? "未提供"} · 新鮮度{" "}
-							{market.freshnessStatus}
-						</p>
-						<p className={styles.panelNote}>
-							這是區域行情，不屬於任何一家賣家，也不是報價。
-						</p>
-					</>
-				) : (
-					<p className={styles.panelNote}>
-						這個品項與城市目前沒有可用行情（
-						{marketUnavailableReason ?? "UNAVAILABLE"}）。買家仍可自行出價，demo
-						不代為推估數字。
 					</p>
 				)}
 			</section>

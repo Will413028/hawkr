@@ -24,7 +24,7 @@ interface ClarifyQuestionCardProps {
 		optionLabel: string;
 	}) => void;
 	/** 卡片內的自由文字答案。crop_disambiguation 的 allowFreeText=true 時
-	 * 用來重新查找品項；不帶 crop-other 或自填單價。 */
+	 * 用來重新查找品項；不帶 crop-other。 */
 	onSubmitFreeText?: (freeText: string) => void;
 	/** 跳過這題（僅選填欄位；必填欄位由呼叫端不傳這個 prop 來隱藏按鈕）。
 	 * 未傳＝不渲染跳過按鈕。 */
@@ -38,13 +38,10 @@ interface ClarifyQuestionCardProps {
 		unitLabel: string;
 		freeText?: string;
 	}) => void;
-	/** crop_disambiguation 問句選「D 其他」後的自填描述＋自填價格提交
-	 * （Pricebook 品項分類消歧 gate）。未傳＝不渲染 D 子表單提交能力
+	/** crop_disambiguation 問句選「D 其他」後的自填描述提交
+	 * （品項分類消歧 gate）。未傳＝不渲染 D 子表單提交能力
 	 * （但 D chip 本身仍會展開表單，只是送不出去——理論上呼叫端一律會傳）。 */
-	onSubmitCropOther?: (payload: {
-		description: string;
-		priceAmount: string;
-	}) => void;
+	onSubmitCropOther?: (payload: { description: string }) => void;
 	/** 上一題以 chip 作答時，新卡掛載後把焦點還給第一顆選項——
 	 * 鍵盤流程不落回 <body>。 */
 	autoFocusFirstOption?: boolean;
@@ -98,9 +95,9 @@ const DATE_MIN_OFFSET_DAYS = 0;
 /** 365 天：不處理閏年差一天，這是日曆上限不是結算日。 */
 const DATE_MAX_OFFSET_DAYS = 365;
 
-/** Pricebook 品項分類消歧問句（backend-payuni Pricebook crop taxonomy gate）：
+/** 品項分類消歧問句（crop taxonomy gate）：
  * 動態 A/B/C 候選＋固定 D「其他」。D 選項不直接送 optionId，而是在本卡展開
- * 描述＋價格子表單（見下方 showCropOtherForm）。wire 值已與後端多輪對齊確認，
+ * 描述子表單（見下方 showCropOtherForm）。wire 值已與後端多輪對齊確認，
  * 不得改動。 */
 const CROP_DISAMBIGUATION_SLOT_KEY = "crop_disambiguation";
 const CROP_OTHER_OPTION_ID = "crop-other";
@@ -111,8 +108,8 @@ const CROP_OTHER_OPTION_ID = "crop-other";
  * 不是需求快照卡的復活——e2e 釘住需求快照的舊 class 不得存在，這裡全部用新 class。
  */
 export default function ClarifyQuestionCard(props: ClarifyQuestionCardProps) {
-	// 大類、小類與自填價可能沿用同一個 slotKey；題目內容改變時，上一題的
-	// 描述、價格與展開狀態不能留在新題目。pending 或 callback 更新不清掉草稿。
+	// 大類、小類與自行描述品項可能沿用同一個 slotKey；題目內容改變時，上一題的
+	// 描述與展開狀態不能留在新題目。pending 或 callback 更新不清掉草稿。
 	const questionKey = JSON.stringify(props.question);
 	return <ClarifyQuestionForm key={questionKey} {...props} />;
 }
@@ -147,10 +144,9 @@ function ClarifyQuestionForm({
 	const canSubmitFreeText =
 		question.allowFreeText && Boolean(freeText.trim()) && !pending;
 
-	// Pricebook 品項分類消歧問句的 D「其他」子表單：本地展開，不經 onPick。
+	// 品項分類消歧問句的 D「其他」子表單：本地展開，不經 onPick。
 	const [showCropOtherForm, setShowCropOtherForm] = React.useState(false);
 	const [cropOtherDescription, setCropOtherDescription] = React.useState("");
-	const [cropOtherPrice, setCropOtherPrice] = React.useState("");
 	const isCropDisambiguation =
 		question.slotKey === CROP_DISAMBIGUATION_SLOT_KEY;
 	const canRetryCropDescription =
@@ -163,10 +159,7 @@ function ClarifyQuestionForm({
 		question.options[0]?.optionId === CROP_OTHER_OPTION_ID;
 	const cropOtherDescriptionId = `clarify-crop-other-description-${question.slotKey}`;
 	const canSubmitCropOther =
-		isCropDisambiguation &&
-		Boolean(cropOtherDescription.trim()) &&
-		Boolean(cropOtherPrice.trim()) &&
-		!pending;
+		isCropDisambiguation && Boolean(cropOtherDescription.trim()) && !pending;
 
 	// quantity 複合問題卡／單位追問卡（backend-payuni#2442 §4）：quantity 本身
 	// 沒有 canonical options，unitOptions 是它獨立的單位子值，只有 Unit 尚未填
@@ -243,11 +236,9 @@ function ClarifyQuestionForm({
 		if (!canSubmitCropOther || !onSubmitCropOther) return;
 		onSubmitCropOther({
 			description: cropOtherDescription.trim(),
-			priceAmount: cropOtherPrice.trim(),
 		});
 		setShowCropOtherForm(false);
 		setCropOtherDescription("");
-		setCropOtherPrice("");
 	};
 
 	return (
@@ -526,44 +517,12 @@ function ClarifyQuestionForm({
 									maxLength={200}
 								/>
 								<div className="hawkr-agent-question-card__crop-actions">
-									<Input
-										label="預期單價"
-										aria-label="預期單價（新台幣／公斤）"
-										placeholder="例如 120"
-										startContent={
-											<span
-												className="hawkr-agent-question-card__crop-unit"
-												aria-hidden="true"
-											>
-												NT$
-											</span>
-										}
-										endContent={
-											<span
-												className="hawkr-agent-question-card__crop-unit"
-												aria-hidden="true"
-											>
-												/ 公斤
-											</span>
-										}
-										variant="bordered"
-										size="md"
-										type="text"
-										inputMode="numeric"
-										value={cropOtherPrice}
-										onChange={(event) =>
-											setCropOtherPrice(event.currentTarget.value)
-										}
-										disabled={pending || !onSubmitCropOther}
-										className="hawkr-agent-question-card__crop-price"
-									/>
 									<Button
 										type="submit"
 										size="lg"
 										disabled={!canSubmitCropOther || !onSubmitCropOther}
 										isLoading={pending}
 										loadingLabel="送出中…"
-										aria-label="送出自填品項與價格"
 										endContent={
 											<AppIcon
 												name="arrow-right"

@@ -23,7 +23,7 @@ understandQuery（原文 → 變體）
 
 沒有 pricebook：建構子只收分類樹與模型，`no_pricebook_test.go` 守解析路徑不得 import pricebook 的 client 或型別。
 `Resolve` 只有兩種結果：`NeedsDisambiguation`（要買家挑分類）與 `Unavailable`（沒有更多要問的：分類已確認，
-`Selection.CategoryID` 非空；或查無，`Selection` 沒有分類 → 買家自填品項描述與單價）。品項分類確認後一律進入填單價那一步。
+`Selection.CategoryID` 非空；或查無，`Selection` 沒有分類 → 買家自行描述品項）。分類已確認時 gate 直接通過並產生 `CATEGORY_CONFIRMED` 解析結果，不出卡片。
 
 錯誤處理：分類樹是唯一的確定性來源，查詢失敗往上拋（`WithTransientRetry` 當場重試一次，再失敗交給 crop_gate 的跨輪重試）；
 LLM 失敗降級成沒有建議。LLM 只在 `expandGroup` 與買家自由輸入找不到確定性命中時才呼叫；
@@ -32,7 +32,7 @@ LLM 失敗降級成沒有建議。LLM 只在 `expandGroup` 與買家自由輸入
 
 買家選完之後的 resume（`ResolveSelection`）走**同一條召回**，差別只在多一個約束：選了大品項就把候選收斂到
 那個 L2 底下（`narrowToGroup`）再交給 `categoryCard`；收斂後空手才展開那個 L2。自由輸入同樣走召回，但**一律
-出卡不定案**——打字是搜尋，只有明確按下選項才算確認。選到 L3 時直接進填單價，不再召回。
+出卡不定案**——打字是搜尋，只有明確按下選項才算確認。選到 L3 時直接定案，不再召回。
 
 離線評測：`goldenset/offline_eval_test.go` 用種子分類樹（`backend/infra/seed-data/04-product.sql`）逐筆對
 `goldenset/testdata/golden_queries.yaml` 呼叫 `Resolve`，不打任何外部服務。

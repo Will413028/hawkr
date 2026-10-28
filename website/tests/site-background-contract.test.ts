@@ -107,65 +107,6 @@ test("standalone and delegated flows keep a pause control without role-specific 
 	);
 });
 
-test("RFQ preview exposes the site canvas without clearing its content sections", async () => {
-	const path =
-		"styles/features/procurement-rfq-prototype/rfq-prototype.module.css";
-	assert.deepEqual(await values(path, ".prototype", "background"), [
-		"transparent",
-	]);
-	assert.deepEqual(await values(path, ".section", "background"), [
-		"var(--hkui-content1)",
-	]);
-});
-
-test("external vendor canvas stays transparent at every breakpoint while cards retain their surfaces", async () => {
-	const path =
-		"styles/features/procurement-rfq-prototype/external-vendor-portal.module.css";
-	// walkRules visits nested media queries too: a mobile override must not
-	// silently bring back a second page illustration or opaque canvas.
-	assert.deepEqual(await values(path, ".portal", "background"), [
-		"transparent",
-	]);
-	assert.ok(
-		(await values(path, ".portal", "background-color")).every(
-			(value) => value === "transparent",
-		),
-	);
-	assert.ok(
-		(await values(path, ".portal", "background-image")).every(
-			(value) => value === "none",
-		),
-	);
-	assert.doesNotMatch(await source(path), /page-bg-tall(?:-mobile)?\.webp/);
-	assert.deepEqual(await values(path, ".card", "background"), [
-		"var(--hkui-content1)",
-		"var(--portal-glass-strong)",
-	]);
-	const topbarBackgrounds = await values(path, ".topbar", "background");
-	assert.ok(topbarBackgrounds.length > 0);
-	assert.ok(topbarBackgrounds.every((value) => value !== "transparent"));
-});
-
-test("external vendor pale panels retain readable foreground roles over the dark site canvas", async () => {
-	const path =
-		"styles/features/procurement-rfq-prototype/external-vendor-portal.module.css";
-	for (const [property, expected] of [
-		["--hk-text-body", "var(--color-neutral-body)"],
-		["--hk-text-strong", "var(--color-neutral-ink)"],
-		["--hk-text-soft", "var(--color-neutral-muted-text)"],
-	]) {
-		assert.deepEqual(await values(path, ".portal", property), [expected]);
-	}
-	assert.deepEqual(
-		await values(
-			path,
-			'[data-theme="dark"] .portal a:not([data-hkui-button])',
-			"color",
-		),
-		["var(--hkui-primary)"],
-	);
-});
-
 test("Agent route state shares the canvas but preserves its status mark", async () => {
 	const path = "styles/features/procurement-assistant.css";
 	assert.deepEqual(

@@ -99,15 +99,16 @@ export interface RawProcurementSlots {
 /** 後端 domain.ItemResolution 的 wire 格式（同樣 snake_case，見上方註解）。 */
 export interface RawProcurementItemResolution {
 	kind?: string;
-	code?: string;
 	label?: string;
 	provenance?: string;
-	price_per_kg?: number;
 	display_value?: string;
 }
 
-const ITEM_RESOLUTION_KINDS = ["CROP", "GROUP", "SELF_PRICED"] as const;
-const ITEM_RESOLUTION_PROVENANCES = ["SYSTEM", "BUYER_CHOICE"] as const;
+const ITEM_RESOLUTION_KINDS = [
+	"CATEGORY_CONFIRMED",
+	"BUYER_DESCRIBED",
+] as const;
+const ITEM_RESOLUTION_PROVENANCES = ["BUYER_CHOICE"] as const;
 
 /** 解析 item_resolution。回傳 undefined 有兩種情況，呼叫端不需要分辨：欄位不在，
  *  或內容不符合契約。
@@ -135,17 +136,11 @@ function normalizeItemResolution(
 	}
 	const optionalString = (v: unknown): string | undefined =>
 		typeof v === "string" && v !== "" ? v : undefined;
-	const pricePerKg =
-		typeof raw.price_per_kg === "number" && Number.isFinite(raw.price_per_kg)
-			? raw.price_per_kg
-			: undefined;
 	return {
 		kind,
 		provenance,
 		displayValue: raw.display_value,
-		code: optionalString(raw.code),
 		label: optionalString(raw.label),
-		pricePerKg,
 	};
 }
 

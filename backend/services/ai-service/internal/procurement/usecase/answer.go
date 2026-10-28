@@ -33,17 +33,16 @@ type AnswerStore interface {
 }
 
 type AnswerInput struct {
-	BuyerID                identity.BuyerID
-	RequestID              int64
-	SlotKey                domain.SlotKey
-	OptionID               string
-	FreeText               string
-	UnitOptionID           string
-	SelfEnteredPriceAmount string
-	Skip                   bool
-	ExpectedRevisionID     int64
-	ClientRequestID        string
-	PendingCrop            *CropDisambiguationInterruptPayload
+	BuyerID            identity.BuyerID
+	RequestID          int64
+	SlotKey            domain.SlotKey
+	OptionID           string
+	FreeText           string
+	UnitOptionID       string
+	Skip               bool
+	ExpectedRevisionID int64
+	ClientRequestID    string
+	PendingCrop        *CropDisambiguationInterruptPayload
 }
 
 type AnswerUseCase struct {
@@ -124,6 +123,10 @@ func (uc *AnswerUseCase) composeAnswerViaGraph(ctx context.Context, in AnswerInp
 	}
 
 	cropGate := cropidentity.ComputeGate(ctx, uc.cropResolver, current, next)
+	if cropGate.Resolution != nil {
+		next.ItemResolution = cropGate.Resolution
+		patch.ItemResolution = cropGate.Resolution
+	}
 
 	missing := next.MissingRequired()
 	status := "CLARIFYING"
@@ -390,18 +393,13 @@ func buildCropDisambiguationPatch(in AnswerInput) (patch domain.SlotPatch, err e
 
 	if in.OptionID == domain.CropOtherOptionID {
 		description := strings.TrimSpace(in.FreeText)
-		price := strings.TrimSpace(in.SelfEnteredPriceAmount)
 		if description == "" {
 			return domain.SlotPatch{}, ErrInvalidOptionID
 		}
-		amount, atoiErr := strconv.Atoi(price)
-		if atoiErr != nil || amount <= 0 || amount > domain.MaxPricePerKg {
-			return domain.SlotPatch{}, ErrInvalidOptionID
-		}
-		_, selLabel := in.PendingCrop.Selection.ConfirmedCategory()
-		resolution := domain.NewSelfPricedItemResolution(amount, selLabel,
-			domain.CategoryFromSelection(in.PendingCrop.Selection))
-		return domain.SlotPatch{Item: &description, ItemResolution: resolution}, nil
+		return domain.SlotPatch{
+			Item:           &description,
+			ItemResolution: domain.NewBuyerDescribedItemResolution(in.PendingCrop.Selection, description),
+		}, nil
 	}
 
 	return domain.SlotPatch{}, ErrInvalidOptionID
@@ -420,18 +418,17 @@ var errAnswerPipelinePanicked = errors.New("procurement: answer pipeline panicke
 
 func canonicalAnswerHash(in AnswerInput) string {
 	return canonicalHash(struct {
-		BuyerID                identity.BuyerID
-		RequestID              int64
-		SlotKey                domain.SlotKey
-		OptionID               string
-		FreeText               string
-		UnitOptionID           string
-		SelfEnteredPriceAmount string
-		Skip                   bool
-		ExpectedRevisionID     int64
+		BuyerID            identity.BuyerID
+		RequestID          int64
+		SlotKey            domain.SlotKey
+		OptionID           string
+		FreeText           string
+		UnitOptionID       string
+		Skip               bool
+		ExpectedRevisionID int64
 	}{
 		in.BuyerID, in.RequestID, in.SlotKey, in.OptionID, in.FreeText,
-		in.UnitOptionID, in.SelfEnteredPriceAmount, in.Skip, in.ExpectedRevisionID,
+		in.UnitOptionID, in.Skip, in.ExpectedRevisionID,
 	})
 }
 

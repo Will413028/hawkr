@@ -16,12 +16,12 @@ func pathStub(id string) string {
 	}[id]
 }
 
-// 品項定到分類樹節點後 Resolve 回 Unavailable（下一步是填單價），分類來自
+// 品項定到分類樹節點後 Resolve 回 Unavailable（分類已確認），分類來自
 // Selection.ConfirmedCategory()。
 func TestObserveFrom_ConfirmedCategoryIsRankedFirst(t *testing.T) {
 	res := cropidentity.DisambiguationResult{
 		Unavailable: true,
-		Selection:   &domain.CropSelection{Stage: domain.CropSelectionPrice, CategoryID: "2011", Label: "雞肉"},
+		Selection:   &domain.CropSelection{Stage: domain.CropSelectionDescribe, CategoryID: "2011", Label: "雞肉"},
 	}
 	o := ObserveFrom(Query{Text: "白肉雞"}, res, pathStub)
 	require.Equal(t, []string{"肉類 > 雞肉 > 雞肉"}, o.RankedCategories)
@@ -32,7 +32,7 @@ func TestObserveFrom_ConfirmedCategoryIsRankedFirst(t *testing.T) {
 func TestObserveFrom_ConfirmedCategoryOutsidePathMapIsUnmappable(t *testing.T) {
 	res := cropidentity.DisambiguationResult{
 		Unavailable: true,
-		Selection:   &domain.CropSelection{Stage: domain.CropSelectionPrice, CategoryID: "9999", Label: "未知"},
+		Selection:   &domain.CropSelection{Stage: domain.CropSelectionDescribe, CategoryID: "9999", Label: "未知"},
 	}
 	o := ObserveFrom(Query{Text: "未知"}, res, pathStub)
 	require.True(t, o.Unmappable)

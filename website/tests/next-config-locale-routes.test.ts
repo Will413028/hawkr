@@ -85,17 +85,9 @@ test("the staff workspace redirect has no locale twin: /adm is not localized", a
 	);
 });
 
-test("the Agent gate rules (production default) are localized too, and a bare '/' destination becomes '/en'", async () => {
+test("the Agent gate rules (production default) are localized too", async () => {
 	const { redirects } = await loadConfig("dev", "dev-agent-off", {
 		hawkrAgentEnabled: false,
-	});
-	const preview = redirects.find(
-		(r) => r.source === "/en/hawkr-agent-rfq-preview",
-	);
-	assert.deepEqual(preview, {
-		source: "/en/hawkr-agent-rfq-preview",
-		destination: "/en",
-		permanent: false,
 	});
 	const assistant = redirects.find(
 		(r) => r.source === "/en/account/messages/assistant/:path*" && r.has,

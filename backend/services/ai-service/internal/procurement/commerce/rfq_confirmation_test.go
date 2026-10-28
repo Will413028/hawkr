@@ -396,14 +396,14 @@ func TestConfirmRfqSnapshot_ExpiredPreview_ReturnsStalePricePreview(t *testing.T
 // confirmSlotsFixture 是一張「報價就緒」的詢價單 slots：六個賣家報價一定要看到的
 // 欄位（品項、數量、單位、包裝、配送城市、交期）都有值，另外帶買家私有／非
 // seller-facing 的欄位（budget_per_unit、exact_match_required、
-// item_resolution.price_per_kg），用來讓白名單測試有東西可擋。
+// item_resolution.category_id），用來讓白名單測試有東西可擋。
 func confirmSlotsFixture(item string, quantity int, city string) domain.Slots {
 	return domain.Slots{
 		Item: testkit.Ptr(item),
 		ItemResolution: &domain.ItemResolution{
-			Kind:  domain.ItemResolvedSelfPriced,
+			Kind:  domain.ItemResolvedCategoryConfirmed,
 			Label: "甘藍-初秋", CategoryID: "17",
-			PricePerKg: testkit.Ptr(42), Provenance: domain.ItemResolutionByBuyerChoice,
+			Provenance: domain.ItemResolutionByBuyerChoice,
 		},
 		Quantity:           testkit.Ptr(quantity),
 		Unit:               testkit.Ptr("KG"),
@@ -517,20 +517,18 @@ func TestConfirmRfqSnapshot_CanonicalPayload_CarriesSellerFacingRequirement(t *t
 	if !ok {
 		t.Fatalf("payload 缺 itemResolution，內容：%s", payload)
 	}
-	if resolution["kind"] != string(domain.ItemResolvedSelfPriced) || resolution["label"] != "甘藍-初秋" {
+	if resolution["kind"] != string(domain.ItemResolvedCategoryConfirmed) || resolution["label"] != "甘藍-初秋" {
 		t.Errorf("itemResolution 身分欄位不符：%v", resolution)
 	}
 }
 
 // 擴大 preimage 不等於把整包 slots 倒進去：買家私有與非 seller-facing 的欄位
-// 一個都不准進來。budget_per_unit 是既有紅線（design spec D2 §V.7.4），
-// item_resolution.price_per_kg 是買家自填的品項單價，同一條線上的東西。
+// 一個都不准進來。budget_per_unit 是既有紅線（design spec D2 §V.7.4）。
 func TestConfirmRfqSnapshot_ExpandedPayload_StillExcludesBuyerPrivateSlots(t *testing.T) {
 	_, payload := confirmWithSlots(t, confirmSlotsFixture("高麗菜", 300, "臺中市"), "confirm-payload-whitelist")
 
 	for _, forbidden := range []string{
 		"budgetPerUnit", "budget_per_unit", "BudgetPerUnit",
-		"pricePerKg", "price_per_kg",
 		"exactMatchRequired", "exact_match_required",
 		"provenance", "Provenance",
 	} {

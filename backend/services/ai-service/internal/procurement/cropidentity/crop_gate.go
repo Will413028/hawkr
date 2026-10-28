@@ -16,6 +16,8 @@ type GateResult struct {
 	Candidates []domain.CropDisambiguationOption
 	Selection  *domain.CropSelection
 
+	Resolution *domain.ItemResolution
+
 	PendingReason domain.CropPendingReason
 
 	FactsAsOf time.Time
@@ -75,6 +77,9 @@ func ComputeGate(ctx context.Context, resolver Resolver, before, after domain.Sl
 			PendingReason: domain.CropPendingReasonAmbiguous, evaluated: true, FactsAsOf: now,
 		}
 	case res.Unavailable:
+		if resolution := domain.NewCategoryConfirmedItemResolution(res.Selection); resolution != nil {
+			return GateResult{Item: after.Item, Resolution: resolution, evaluated: true, FactsAsOf: now}
+		}
 		return GateResult{
 			Item: after.Item, Pending: true, Candidates: []domain.CropDisambiguationOption{}, Selection: res.Selection,
 			PendingReason: domain.CropPendingReasonUnavailable, evaluated: true, FactsAsOf: now,

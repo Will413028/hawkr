@@ -118,7 +118,7 @@ func seed(ctx context.Context, t *testing.T, pool *pgxpool.Pool, lane string, st
 		snapshotID, int64(buyerID), requestID,
 		// ⚠️ 傳 string 不是 []byte：DSN 帶 default_query_exec_mode=exec，參數以文字送出，
 		// []byte 會被編成 bytea 的 hex 字面值，jsonb 欄位收到就是 22P02。
-		`{"item":"文旦柚","itemResolution":{"kind":"SELF_PRICED","label":"麻豆文旦"}}`,
+		`{"item":"文旦柚","itemResolution":{"kind":"CATEGORY_CONFIRMED","label":"麻豆文旦"}}`,
 		due.Add(72*time.Hour))
 	require.NoError(t, err)
 

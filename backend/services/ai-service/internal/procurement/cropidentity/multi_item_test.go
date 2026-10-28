@@ -43,7 +43,7 @@ func TestResolveV2_MultiItemWithoutSplitWouldFindNothing(t *testing.T) {
 	got, err := uc.Resolve(context.Background(), "高麗菜和紅蘿蔔")
 
 	require.NoError(t, err)
-	require.Equal(t, domain.CropSelectionPrice, got.Selection.Stage)
+	require.Equal(t, domain.CropSelectionDescribe, got.Selection.Stage)
 	require.Equal(t, "17", got.Selection.CategoryID,
 		"只有一段查得到時仍要走切開後的召回——沒切就是零命中，這條證明切法真的有作用")
 }

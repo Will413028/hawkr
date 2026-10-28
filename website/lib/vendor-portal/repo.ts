@@ -33,13 +33,6 @@ export interface VendorInvitePreview {
 	expiresAt: string;
 }
 
-export interface VendorRfqReferencePriceRange {
-	lowerBoundAmount: string;
-	upperBoundAmount: string;
-	basisQuantity: string;
-	basisUnit: string;
-}
-
 export interface VendorRfqRequestedPriceRange {
 	currency: string;
 	priceComponent: string;
@@ -49,7 +42,7 @@ export interface VendorRfqRequestedPriceRange {
 	upperBoundAmount: string;
 }
 
-/** gateway `VendorPortalRFQDTO` 的 deny-by-default 白名單，就這十三欄。 */
+/** gateway `VendorPortalRFQDTO` 的 deny-by-default 白名單，就這十二欄。 */
 export interface VendorRfqSummary {
 	/** 空字串＝這筆 approval 建立於後端加這個欄位之前，當「未知」處理、不得補值。 */
 	qualityKnowledgeState: string;
@@ -63,7 +56,6 @@ export interface VendorRfqSummary {
 	responseDeadline: string;
 	/** 買家自己打字的補充說明，原文照登。空字串＝沒有。⛔ 不是品相宣告。 */
 	buyerNote: string;
-	referencePriceRange: VendorRfqReferencePriceRange | null;
 	buyerRequestedRange: VendorRfqRequestedPriceRange | null;
 	/**
 	 * 這張 RFQ 的版本（十進位字串）。正式送出報價時原樣帶回去做 CAS：把報價綁在

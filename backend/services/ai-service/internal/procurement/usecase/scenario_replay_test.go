@@ -35,13 +35,13 @@ type scenarioFixture struct {
 }
 
 var scenarioFixtures = map[string]func() scenarioFixture{
-	// guava-resolved：品項解析固定成芭樂的分類（待買家填單價），沒有既有試算、沒有任何發布。
+	// guava-resolved：品項解析固定成芭樂的分類（分類已確認），沒有既有試算、沒有任何發布。
 	"guava-resolved": func() scenarioFixture {
 		return scenarioFixture{
 			resolver: &testkit.FakeResolver[cropidentity.DisambiguationResult]{
 				ResolveResult: cropidentity.DisambiguationResult{
 					Unavailable: true,
-					Selection:   &domain.CropSelection{Stage: domain.CropSelectionPrice, CategoryID: "guava", Label: "芭樂"},
+					Selection:   &domain.CropSelection{Stage: domain.CropSelectionDescribe, CategoryID: "guava", Label: "芭樂"},
 				},
 			},
 		}

@@ -398,9 +398,11 @@ func TestRewindUseCase_ItemChanged_TriggersCropResolution(t *testing.T) {
 	require.NotNil(t, got.Slots.Item)
 	require.Equal(t, "高麗菜", *got.Slots.Item, "item 應該被回退成 rewind 前一次寫入的值")
 	require.NotZero(t, tree.Calls, "rewind 把 item 改回不同值，也要重新解析")
-	require.Nil(t, got.Slots.ItemResolution)
-	require.NotNil(t, got.Question)
-	require.Equal(t, domain.SlotCropDisambiguation, got.Question.SlotKey, "分類確認後待買家填單價")
+	require.NotNil(t, got.Slots.ItemResolution)
+	require.Equal(t, "17", got.Slots.ItemResolution.CategoryID)
+	if got.Question != nil {
+		require.NotEqual(t, domain.SlotCropDisambiguation, got.Question.SlotKey, "分類確認後不出消歧卡片")
+	}
 }
 
 func TestRewindUseCase_ItemUnchanged_DoesNotReResolve(t *testing.T) {
@@ -411,14 +413,14 @@ func TestRewindUseCase_ItemUnchanged_DoesNotReResolve(t *testing.T) {
 	item := "高麗菜"
 	_, err = repo.AppendRevision(context.Background(), repository.AppendInput{
 		RequestID: req.ID, BuyerID: 1234, Slots: domain.Slots{Item: &item,
-			ItemResolution: domain.NewSelfPricedItemResolution(95, "高麗菜", domain.CategoryAbsent("測試"))},
+			ItemResolution: testkit.ConfirmedResolution("高麗菜")},
 		Source: "LLM_EXTRACT", ClientRequestID: "seed-1", PayloadJSON: []byte(`{}`), RequestStatus: "CLARIFYING",
 	})
 	require.NoError(t, err)
 	city := "桃園市"
 	_, err = repo.AppendRevision(context.Background(), repository.AppendInput{
 		RequestID: req.ID, BuyerID: 1234, Slots: domain.Slots{Item: &item, DeliveryCity: &city,
-			ItemResolution: domain.NewSelfPricedItemResolution(95, "高麗菜", domain.CategoryAbsent("測試"))},
+			ItemResolution: testkit.ConfirmedResolution("高麗菜")},
 		Source: "ANSWER", ClientRequestID: "seed-2", PayloadJSON: []byte(`{}`), RequestStatus: "REQUIREMENT_READY",
 	})
 	require.NoError(t, err)

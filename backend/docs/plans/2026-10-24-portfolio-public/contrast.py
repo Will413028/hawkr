@@ -878,7 +878,6 @@ KNOWN_DARK_GAPS: dict[str, int] = {
     "website/styles/features/delegated-operations.css": 2,
     "website/styles/features/market.css": 2,
     "website/styles/features/messages.css": 1,
-    "website/styles/features/procurement-rfq-prototype/external-vendor-portal.module.css": 4,
     "website/styles/features/seller-center.css": 2,
     "website/styles/legacy/prd-v2-commerce.css": 1,
 }

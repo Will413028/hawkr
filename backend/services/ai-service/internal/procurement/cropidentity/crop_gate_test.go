@@ -37,6 +37,41 @@ func TestComputeCropGate_Unavailable_MarksPendingWithNoCandidates(t *testing.T) 
 	require.False(t, g.FactsAsOf.IsZero(), "真的查過分類樹，要記下查詢時刻")
 }
 
+func TestComputeCropGate_TreeConfirmedCategory_PassesWithoutCard(t *testing.T) {
+	resolver := &testkit.FakeResolver[DisambiguationResult]{ResolveResult: DisambiguationResult{
+		Unavailable: true,
+		Selection: &domain.CropSelection{
+			Stage: domain.CropSelectionDescribe, CategoryID: "24", Label: "五花肉", ParentCategoryID: "8", ParentLabel: "豬肉",
+		},
+	}}
+
+	g := ComputeGate(context.Background(), resolver,
+		domain.Slots{}, domain.Slots{Item: item("五花肉")})
+
+	require.False(t, g.Pending, "分類樹已確認的品項不得再出卡片")
+	require.Nil(t, g.Selection)
+	require.True(t, g.Evaluated())
+	require.Equal(t, &domain.ItemResolution{
+		Kind: domain.ItemResolvedCategoryConfirmed, Label: "五花肉", CategoryID: "24",
+		Provenance: domain.ItemResolutionByBuyerChoice,
+	}, g.Resolution)
+}
+
+func TestComputeCropGate_NoCategory_AsksBuyerToDescribe(t *testing.T) {
+	resolver := &testkit.FakeResolver[DisambiguationResult]{ResolveResult: DisambiguationResult{
+		Unavailable: true, Selection: &domain.CropSelection{Stage: domain.CropSelectionDescribe},
+	}}
+
+	g := ComputeGate(context.Background(), resolver,
+		domain.Slots{}, domain.Slots{Item: item("查無此物")})
+
+	require.True(t, g.Pending)
+	require.Nil(t, g.Resolution)
+	q := domain.BuildCropDisambiguationQuestion(g.Candidates, g.Selection)
+	require.Equal(t, "找不到符合的品項，請描述你要的品項：", q.Prompt)
+	require.Equal(t, "自行描述品項", q.Options[len(q.Options)-1].Label)
+}
+
 func TestComputeCropGate_Ambiguous_KeepsItemAndMarksPending(t *testing.T) {
 	resolver := &testkit.FakeResolver[DisambiguationResult]{ResolveResult: DisambiguationResult{
 		NeedsDisambiguation: true,
@@ -83,7 +118,7 @@ func TestGateResult_Evaluated(t *testing.T) {
 
 	t.Run("品項變動並確認分類＝有判定", func(t *testing.T) {
 		resolver := &testkit.FakeResolver[DisambiguationResult]{ResolveResult: DisambiguationResult{
-			Unavailable: true, Selection: &domain.CropSelection{Stage: domain.CropSelectionPrice, CategoryID: "17", Label: "高麗菜"},
+			Unavailable: true, Selection: &domain.CropSelection{Stage: domain.CropSelectionDescribe, CategoryID: "17", Label: "高麗菜"},
 		}}
 		g := ComputeGate(ctx, resolver,
 			domain.Slots{}, domain.Slots{Item: item("高麗菜")})
@@ -108,7 +143,7 @@ func TestGateResult_Evaluated(t *testing.T) {
 
 	t.Run("🔴 品項沒變動且已解析＝沒有判定", func(t *testing.T) {
 		resolved := domain.Slots{Item: item("甘藍"),
-			ItemResolution: domain.NewSelfPricedItemResolution(75, "甘藍", domain.CategoryAbsent("測試"))}
+			ItemResolution: testkit.ConfirmedResolution("甘藍")}
 		g := ComputeGate(ctx, &testkit.FakeResolver[DisambiguationResult]{}, resolved, resolved)
 
 		require.False(t, g.Pending, "沒有開著的中斷（三個進入點都有 guard），這一輪不待消歧")
@@ -121,13 +156,14 @@ func TestGateResult_Evaluated(t *testing.T) {
 	// 疑慮不成立——解析之後就回到上一條的 no-op。
 	t.Run("品項沒變動但尚未解析＝有判定", func(t *testing.T) {
 		resolver := &testkit.FakeResolver[DisambiguationResult]{ResolveResult: DisambiguationResult{
-			Unavailable: true, Selection: &domain.CropSelection{Stage: domain.CropSelectionPrice, CategoryID: "17", Label: "高麗菜"},
+			Unavailable: true, Selection: &domain.CropSelection{Stage: domain.CropSelectionDescribe, CategoryID: "17", Label: "高麗菜"},
 		}}
 		g := ComputeGate(ctx, resolver,
 			domain.Slots{Item: item("甘藍")}, domain.Slots{Item: item("甘藍")})
 
 		require.True(t, g.Evaluated(), "重試成功是一次新判定")
-		require.True(t, g.Pending)
+		require.False(t, g.Pending)
+		require.NotNil(t, g.Resolution)
 	})
 }
 
@@ -161,14 +197,15 @@ func TestComputeCropGate_RetriesAfterResolverFailure(t *testing.T) {
 	// 第二輪：resolver 恢復，買家只補了配送城市。
 	inner.ResolveErr = nil
 	inner.ResolveResult = DisambiguationResult{
-		Unavailable: true, Selection: &domain.CropSelection{Stage: domain.CropSelectionPrice, CategoryID: "17", Label: "芭樂"},
+		Unavailable: true, Selection: &domain.CropSelection{Stage: domain.CropSelectionDescribe, CategoryID: "17", Label: "芭樂"},
 	}
 	after := slots
 	after.DeliveryCity = item("桃園市")
 
 	second := ComputeGate(context.Background(), resolver, slots, after)
 	require.Equal(t, 2, resolver.calls, "依賴恢復後必須重試，不能等買家去改品項")
-	require.True(t, second.Pending, "重試成功必須產生新的判定")
+	require.True(t, second.Evaluated(), "重試成功必須產生新的判定")
+	require.NotNil(t, second.Resolution)
 	require.False(t, second.ResolveFailed)
 }
 
@@ -180,7 +217,7 @@ func TestComputeCropGate_ResolvedItemIsNotReResolved(t *testing.T) {
 
 	resolved := domain.Slots{
 		Item:           item("芭樂"),
-		ItemResolution: domain.NewSelfPricedItemResolution(75, "芭樂", domain.CategoryAbsent("測試")),
+		ItemResolution: testkit.ConfirmedResolution("芭樂"),
 	}
 	after := resolved
 	after.DeliveryCity = item("桃園市")

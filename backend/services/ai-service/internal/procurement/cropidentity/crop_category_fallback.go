@@ -337,11 +337,11 @@ func categoryPending(selection domain.CropSelection, categories []cropCategory) 
 	return DisambiguationResult{NeedsDisambiguation: true, Candidates: options, Selection: &selection}
 }
 
-func categoryPrice(selection *domain.CropSelection) DisambiguationResult {
-	out := domain.CropSelection{Stage: domain.CropSelectionPrice}
+func categoryDescribeStage(selection *domain.CropSelection) DisambiguationResult {
+	out := domain.CropSelection{Stage: domain.CropSelectionDescribe}
 	if selection != nil {
 		out = *selection
-		out.Stage = domain.CropSelectionPrice
+		out.Stage = domain.CropSelectionDescribe
 	}
 	return DisambiguationResult{Unavailable: true, Selection: &out}
 }
@@ -350,15 +350,15 @@ func (uc *DisambiguationUseCase) ResolveSelection(ctx context.Context, itemText 
 	ctx, cancel := context.WithTimeout(ctx, cropCategorySelectionTimeout)
 	defer cancel()
 	if selection == nil || (selection.Stage != domain.CropSelectionGroup && selection.Stage != domain.CropSelectionItem) {
-		return categoryPrice(selection), nil
+		return categoryDescribeStage(selection), nil
 	}
 	if optionID == domain.CropOtherOptionID && strings.TrimSpace(freeText) == "" {
-		return categoryPrice(selection), nil
+		return categoryDescribeStage(selection), nil
 	}
 	groups, err := uc.categoryGroups(ctx)
 	if err != nil {
 		pkglogger.Warn(ctx, "procurement active taxonomy unavailable on resume", zap.Error(err))
-		return categoryPrice(selection), nil
+		return categoryDescribeStage(selection), nil
 	}
 	allowed := groups
 	if selection.Stage == domain.CropSelectionItem {
@@ -398,7 +398,7 @@ func (uc *DisambiguationUseCase) ResolveSelection(ctx context.Context, itemText 
 		}
 	}
 	if chosen == nil {
-		return categoryPrice(selection), nil
+		return categoryDescribeStage(selection), nil
 	}
 	if selection.Stage == domain.CropSelectionGroup {
 		query := itemText
@@ -409,7 +409,7 @@ func (uc *DisambiguationUseCase) ResolveSelection(ctx context.Context, itemText 
 	}
 	next := *selection
 	next.CategoryID, next.Label = chosen.ID, chosen.Label
-	return categoryPrice(&next), nil
+	return categoryDescribeStage(&next), nil
 }
 
 func (uc *DisambiguationUseCase) resolveWithinGroup(ctx context.Context, query string, group cropCategory) (DisambiguationResult, error) {

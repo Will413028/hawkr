@@ -50,7 +50,7 @@ func TestCropCategoryResume_GroupChoiceWithEmptyRecallExpandsThatGroup(t *testin
 	require.Equal(t, []string{"ITEM"}, model.stages)
 }
 
-func TestCropCategoryResume_ItemChoiceStillPricesDirectly(t *testing.T) {
+func TestCropCategoryResume_ItemChoiceConfirmsDirectly(t *testing.T) {
 	uc := v2UC(facetTree(), nil)
 
 	got, err := uc.ResolveSelection(context.Background(), "豬肉", &domain.CropSelection{Stage: domain.CropSelectionItem, ParentCategoryID: "200", ParentLabel: "豬肉"},

@@ -124,7 +124,7 @@ func newFixture(t *testing.T, lane string) (*processor, *fakeStore, *fakeCreator
 		},
 		snapshot: repository.ConfirmedRfqSnapshot{
 			CanonicalPayloadJSON: json.RawMessage(
-				`{"item":"文旦柚","itemResolution":{"kind":"SELF_PRICED","label":"文旦柚"}}`),
+				`{"item":"文旦柚","itemResolution":{"kind":"CATEGORY_CONFIRMED","label":"文旦柚"}}`),
 		},
 	}
 	if lane == repository.SellerResponseLanePlatform {

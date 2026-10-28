@@ -204,10 +204,10 @@ func TestCropGateNode_UnavailableItem_MarksProgressPendingWithNoCandidates(t *te
 // 那個 override 隨 cropidentity.GateResult.Rejected 一起移除了；沒有這支測試，日後有人把
 // override 加回來會通過本檔其他每一支測試（golden fixture 根本不讀
 // graph_turn_progress），卻悄悄破壞下游組裝。
-func TestCropGateNode_Resolved_LeavesItemRejectedAndResolutionUntouched(t *testing.T) {
+func TestCropGateNode_Resolved_RecordsResolutionAndLeavesItemRejectedUntouched(t *testing.T) {
 	resolver := &testkit.FakeResolver[cropidentity.DisambiguationResult]{ResolveResult: cropidentity.DisambiguationResult{
 		Unavailable: true,
-		Selection:   &domain.CropSelection{Stage: domain.CropSelectionPrice, CategoryID: "17", Label: "高麗菜"},
+		Selection:   &domain.CropSelection{Stage: domain.CropSelectionDescribe, CategoryID: "17", Label: "高麗菜"},
 	}}
 	node := NewCropGateNode(resolver, seqIDs(5300))
 
@@ -229,12 +229,16 @@ func TestCropGateNode_Resolved_LeavesItemRejectedAndResolutionUntouched(t *testi
 	require.Equal(t, item("蘋果"), progress.NextSlots.Item,
 		"crop_gate 不得覆寫 Item——validate_slots 算出來的值原樣通過")
 	require.Equal(t, seedRejected, progress.Rejected, "crop_gate 不得疊加 Rejected")
-	require.Nil(t, progress.NextSlots.ItemResolution, "分類確認後待買家填單價，解析結果由 resume 寫入")
-	require.Nil(t, progress.Patch.ItemResolution)
-	require.True(t, progress.CropPending)
-	require.Empty(t, progress.CropCandidates)
-	require.Equal(t, domain.CropPendingReasonUnavailable, got.PendingReason)
-	require.Equal(t, "17", got.Selection.CategoryID)
+	want := &domain.ItemResolution{
+		Kind: domain.ItemResolvedCategoryConfirmed, Label: "高麗菜", CategoryID: "17",
+		Provenance: domain.ItemResolutionByBuyerChoice,
+	}
+	require.Equal(t, want, progress.NextSlots.ItemResolution, "分類樹已確認的品項由 crop_gate 直接寫入解析結果")
+	require.Equal(t, want, progress.Patch.ItemResolution)
+	require.False(t, progress.CropPending)
+	require.Nil(t, progress.CropSelection)
+	require.False(t, got.Pending)
+	require.Equal(t, want, got.Resolution)
 }
 
 // TestCropGateNode_ItemUnchanged_DoesNotOverwriteCarriedResolution 是上面那條的
@@ -242,7 +246,7 @@ func TestCropGateNode_Resolved_LeavesItemRejectedAndResolutionUntouched(t *testi
 // Slots 自己帶著走，node 不得用 nil 把它洗掉。少了這條，把寫入改成無條件覆寫會
 // 讓買家在消歧之後隨便說一句話就把剛選好的品項分類弄丟。
 func TestCropGateNode_ItemUnchanged_DoesNotOverwriteCarriedResolution(t *testing.T) {
-	carried := domain.NewSelfPricedItemResolution(75, "甘藍-初秋", domain.CategoryAbsent("測試"))
+	carried := testkit.ConfirmedResolution("甘藍-初秋")
 	resolver := &testkit.FakeResolver[cropidentity.DisambiguationResult]{ResolveErr: errors.New("must not be called")}
 	node := NewCropGateNode(resolver, seqIDs(5400))
 

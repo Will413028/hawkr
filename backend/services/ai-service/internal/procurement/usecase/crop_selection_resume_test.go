@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/cropidentity"
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/domain"
@@ -45,8 +46,8 @@ func categoryResumeQuestion(stage string) *CropDisambiguationInterruptPayload {
 
 func TestCategoryResumeInput_ValidatesBeforeConsumingInterrupt(t *testing.T) {
 	for _, tc := range []struct {
-		name, stage, optionID, text, price string
-		valid                              bool
+		name, stage, optionID, text string
+		valid                       bool
 	}{
 		{name: "broad choice", stage: "GROUP", optionID: "category-8", valid: true},
 		{name: "broad typed", stage: "GROUP", text: "豬肉", valid: true},
@@ -54,13 +55,12 @@ func TestCategoryResumeInput_ValidatesBeforeConsumingInterrupt(t *testing.T) {
 		{name: "unknown option", stage: "GROUP", optionID: "category-forged"},
 		{name: "blank retry", stage: "GROUP", text: "  "},
 		{name: "two answers", stage: "GROUP", optionID: "category-8", text: "牛肉"},
-		{name: "price on retry", stage: "ITEM", text: "五花肉", price: "220"},
-		{name: "retry after exhausted", stage: "PRICE", text: "五花肉"},
-		{name: "manual missing price", stage: "PRICE", optionID: domain.CropOtherOptionID, text: "臺灣豬五花"},
-		{name: "manual price", stage: "PRICE", optionID: domain.CropOtherOptionID, text: "臺灣豬五花", price: "220", valid: true},
+		{name: "retry after exhausted", stage: "DESCRIBE", text: "五花肉"},
+		{name: "manual missing description", stage: "DESCRIBE", optionID: domain.CropOtherOptionID, text: "  "},
+		{name: "manual description", stage: "DESCRIBE", optionID: domain.CropOtherOptionID, text: "臺灣豬五花", valid: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			in := AnswerInput{PendingCrop: categoryResumeQuestion(tc.stage), OptionID: tc.optionID, FreeText: tc.text, SelfEnteredPriceAmount: tc.price}
+			in := AnswerInput{PendingCrop: categoryResumeQuestion(tc.stage), OptionID: tc.optionID, FreeText: tc.text}
 			err := validateCropResumeAnswer(in)
 			if tc.valid {
 				require.NoError(t, err)
@@ -71,7 +71,7 @@ func TestCategoryResumeInput_ValidatesBeforeConsumingInterrupt(t *testing.T) {
 			store.resolveCtx = resumeCropInterruptCtx(4242, 77)
 			store.resolveCtx.InterruptPayload, err = json.Marshal(in.PendingCrop)
 			require.NoError(t, err)
-			body, err := json.Marshal(cropDisambiguationResponseV1{OptionID: tc.optionID, FreeText: tc.text, SelfEnteredPriceAmount: tc.price})
+			body, err := json.Marshal(cropDisambiguationResponseV1{OptionID: tc.optionID, FreeText: tc.text})
 			require.NoError(t, err)
 			_, err = ClaimAndDispatchResume(t.Context(), ResumeInput{BuyerID: 1234, InterruptID: "category-int", ClientRequestID: tc.name, ResponsePayload: body}, store, NewRunDispatcher(), GraphControllerDeps{})
 			require.ErrorIs(t, err, ErrInvalidOptionID)
@@ -108,82 +108,113 @@ func TestCategoryResumeOutput_KeepsOriginalItemAndReparksNextStage(t *testing.T)
 	require.Equal(t, "category-24", domain.CropDisambiguationOptionID(out.Candidates[0]))
 }
 
-func TestCategoryManualPrice_PreservesConfirmedCategoryWithoutPricingCodes(t *testing.T) {
-	question := categoryResumeQuestion("PRICE")
-	question.Selection.CategoryID = "24"
-	question.Selection.Label = "豬肉／五花肉"
-	out, err := resolveResumedCropGate(t.Context(), nil, domain.Slots{Item: item("臺灣豬五花")}, AnswerInput{
-		PendingCrop: question, OptionID: domain.CropOtherOptionID, FreeText: "臺灣豬五花", SelfEnteredPriceAmount: "220",
-	})
-	require.NoError(t, err)
-	require.False(t, out.Pending)
-	require.Equal(t, "24", out.Resolution.CategoryID)
-	require.Equal(t, domain.ItemResolvedSelfPriced, out.Resolution.Kind)
-	require.Equal(t, 220, *out.Resolution.PricePerKg)
-}
-
-func TestCategoryManualPrice_PreservesBroadCategoryWhenNoChildMatches(t *testing.T) {
-	for _, stage := range []string{domain.CropSelectionItem, domain.CropSelectionPrice} {
-		t.Run(stage, func(t *testing.T) {
-			question := categoryResumeQuestion(stage)
-			question.Selection.ParentCategoryID = "8"
-			question.Selection.ParentLabel = "豬肉"
-			out, err := resolveResumedCropGate(t.Context(), nil, domain.Slots{Item: item("臺灣豬五花")}, AnswerInput{
-				PendingCrop: question, OptionID: domain.CropOtherOptionID, FreeText: "臺灣豬五花", SelfEnteredPriceAmount: "220",
-			})
-			require.NoError(t, err)
-			require.Equal(t, "8", out.Resolution.CategoryID)
-			require.Equal(t, "豬肉", out.Resolution.Label)
-			require.Equal(t, domain.ItemResolvedSelfPriced, out.Resolution.Kind)
-		})
-	}
-}
-
-func TestCategoryManualPrice_DoesNotClassifyReplacementDescriptionAsOriginalItem(t *testing.T) {
+func TestCategoryManualDescription_NoConfirmedCategory_RecordsBuyerDescribed(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
 		source      *string
 		description string
-		keep        bool
 	}{
-		{name: "unchanged", source: item("臺灣豬五花"), description: "臺灣豬五花", keep: true},
-		{name: "normalized spelling and punctuation", source: item("臺灣豬五花"), description: " 台灣 豬五花。 ", keep: true},
-		{name: "different product", source: item("臺灣豬五花"), description: "有機蘋果"},
-		{name: "substantive refinement needs confirmation", source: item("臺灣豬五花"), description: "臺灣豬五花（去皮）"},
-		{name: "canonical label is still an edited description", source: item("臺灣豬五花"), description: "五花肉"},
+		{name: "unchanged", source: item("臺灣豬五花"), description: "臺灣豬五花"},
+		{name: "replacement", source: item("臺灣豬五花"), description: "有機蘋果"},
+		{name: "trimmed", source: item("臺灣豬五花"), description: "  臺灣豬五花（去皮） "},
 		{name: "missing source", description: "臺灣豬五花"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			for _, stage := range []string{domain.CropSelectionItem, domain.CropSelectionPrice} {
-				t.Run(stage, func(t *testing.T) {
-					question := categoryResumeQuestion(stage)
-					question.Selection.ParentCategoryID, question.Selection.ParentLabel = "8", "豬肉"
-					categoryID, label := "8", "豬肉"
-					if stage == domain.CropSelectionPrice {
-						question.Selection.CategoryID, question.Selection.Label = "24", "五花肉"
-						categoryID, label = "24", "五花肉"
-					}
-					originalSelection := *question.Selection
-					out, err := resolveResumedCropGate(t.Context(), nil, domain.Slots{Item: tc.source}, AnswerInput{
-						PendingCrop: question, OptionID: domain.CropOtherOptionID,
-						FreeText: tc.description, SelfEnteredPriceAmount: "220",
-					})
-					require.NoError(t, err, "manual description edits remain supported")
-					require.False(t, out.Pending)
-					require.Equal(t, strings.TrimSpace(tc.description), *out.Item)
-					require.Equal(t, domain.ItemResolvedSelfPriced, out.Resolution.Kind)
-					require.Equal(t, 220, *out.Resolution.PricePerKg)
-					require.Equal(t, domain.ItemResolutionByBuyerChoice, out.Resolution.Provenance)
-					if tc.keep {
-						require.Equal(t, categoryID, out.Resolution.CategoryID)
-						require.Equal(t, label, out.Resolution.Label)
-					} else {
-						require.Empty(t, out.Resolution.CategoryID, "a prior confirmation does not classify edited item text")
-						require.Empty(t, out.Resolution.Label, "the old category label must not appear for the replacement")
-					}
-					require.Equal(t, originalSelection, *question.Selection, "the stored question remains immutable")
-				})
-			}
+			question := categoryResumeQuestion(domain.CropSelectionGroup)
+			originalSelection := *question.Selection
+			out, err := resolveResumedCropGate(t.Context(), nil, domain.Slots{Item: tc.source}, AnswerInput{
+				PendingCrop: question, OptionID: domain.CropOtherOptionID, FreeText: tc.description,
+			})
+			require.NoError(t, err)
+			require.False(t, out.Pending)
+			require.Equal(t, strings.TrimSpace(tc.description), *out.Item)
+			require.Equal(t, &domain.ItemResolution{
+				Kind: domain.ItemResolvedBuyerDescribed, Label: strings.TrimSpace(tc.description),
+				Provenance: domain.ItemResolutionByBuyerChoice,
+			}, out.Resolution)
+			require.Equal(t, originalSelection, *question.Selection, "the stored question remains immutable")
 		})
 	}
+}
+
+func TestCategoryManualDescription_ConfirmedParent_FallsBackToParentCategory(t *testing.T) {
+	for _, stage := range []string{domain.CropSelectionItem, domain.CropSelectionDescribe} {
+		t.Run(stage, func(t *testing.T) {
+			question := categoryResumeQuestion(stage)
+			question.Selection.ParentCategoryID, question.Selection.ParentLabel = "8", "豬肉"
+			originalSelection := *question.Selection
+			out, err := resolveResumedCropGate(t.Context(), nil, domain.Slots{Item: item("臺灣豬五花")}, AnswerInput{
+				PendingCrop: question, OptionID: domain.CropOtherOptionID, FreeText: " 臺灣豬五花（去皮） ",
+			})
+			require.NoError(t, err)
+			require.False(t, out.Pending)
+			require.Equal(t, &domain.ItemResolution{
+				Kind: domain.ItemResolvedCategoryConfirmed, Label: "臺灣豬五花（去皮）", CategoryID: "8",
+				Provenance: domain.ItemResolutionByBuyerChoice,
+			}, out.Resolution)
+			require.Equal(t, originalSelection, *question.Selection, "the stored question remains immutable")
+		})
+	}
+}
+
+type describeLoopResolver struct{ calls int }
+
+func (r *describeLoopResolver) Resolve(context.Context, string) (cropidentity.DisambiguationResult, error) {
+	r.calls++
+	return cropidentity.DisambiguationResult{
+		Unavailable: true, Selection: &domain.CropSelection{Stage: domain.CropSelectionDescribe},
+	}, nil
+}
+
+func TestBuyerDescribedItem_NextTurnDoesNotAskToDescribeAgain(t *testing.T) {
+	resolver := &describeLoopResolver{}
+	now := time.Now()
+
+	turn1 := cropidentity.ComputeGate(t.Context(), resolver, domain.Slots{}, domain.Slots{Item: item("查無此物")})
+	require.True(t, turn1.Pending)
+	require.Equal(t, domain.CropPendingReasonUnavailable, turn1.PendingReason)
+
+	pending := &CropDisambiguationInterruptPayload{
+		Kind: cropDisambiguationInterruptKind, PendingReason: turn1.PendingReason,
+		Candidates: turn1.Candidates, Selection: turn1.Selection,
+	}
+	resumed, err := resolveResumedCropGate(t.Context(), resolver, domain.Slots{Item: item("查無此物")}, AnswerInput{
+		PendingCrop: pending, OptionID: domain.CropOtherOptionID, FreeText: "野生黑木耳",
+	})
+	require.NoError(t, err)
+	patch := domain.SlotPatch{Item: resumed.Item, ItemResolution: resumed.Resolution}
+	recorded, rejected := domain.Slots{Item: item("查無此物")}.Apply(patch, now)
+	require.Empty(t, rejected)
+	require.NotNil(t, recorded.ItemResolution)
+
+	callsBefore := resolver.calls
+	turn2 := cropidentity.ComputeGate(t.Context(), resolver, recorded, recorded)
+	require.False(t, turn2.Pending, "買家已描述過品項，下一輪不得再出『找不到符合的品項』卡")
+	require.Equal(t, callsBefore, resolver.calls, "已有解析結果就不再查分類樹")
+}
+
+func TestCategoryResumeOutput_LeafSelectionPassesWithResolution(t *testing.T) {
+	r := &stageResumeResolver{result: cropidentity.DisambiguationResult{
+		Unavailable: true,
+		Selection:   &domain.CropSelection{Stage: domain.CropSelectionDescribe, ParentCategoryID: "8", ParentLabel: "豬肉", CategoryID: "24", Label: "五花肉"},
+	}}
+	out, err := resolveResumedCropGate(t.Context(), r, domain.Slots{Item: item("臺灣豬五花")}, AnswerInput{PendingCrop: categoryResumeQuestion("ITEM"), OptionID: "category-8"})
+	require.NoError(t, err)
+	require.False(t, out.Pending)
+	require.Nil(t, out.Selection)
+	require.Equal(t, domain.ItemResolvedCategoryConfirmed, out.Resolution.Kind)
+	require.Equal(t, "24", out.Resolution.CategoryID)
+	require.Equal(t, "五花肉", out.Resolution.Label)
+}
+
+func TestCategoryResumeOutput_NoLeafSelectionAsksBuyerToDescribe(t *testing.T) {
+	r := &stageResumeResolver{result: cropidentity.DisambiguationResult{
+		Unavailable: true,
+		Selection:   &domain.CropSelection{Stage: domain.CropSelectionDescribe, ParentCategoryID: "8", ParentLabel: "豬肉"},
+	}}
+	out, err := resolveResumedCropGate(t.Context(), r, domain.Slots{Item: item("臺灣豬五花")}, AnswerInput{PendingCrop: categoryResumeQuestion("ITEM"), OptionID: "category-8"})
+	require.NoError(t, err)
+	require.True(t, out.Pending)
+	require.Equal(t, domain.CropPendingReasonUnavailable, out.PendingReason)
+	require.Nil(t, out.Resolution)
 }

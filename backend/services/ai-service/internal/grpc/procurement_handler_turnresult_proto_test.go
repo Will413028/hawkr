@@ -88,40 +88,21 @@ func TestToTurnResultProto_RenderMode_ReflectsSourceOfBlocks(t *testing.T) {
 // 與「你選的」分流呈現。少了這個 mapping，proto 欄位加了也永遠是 nil。
 func TestToSlotsProto_ItemResolution_ReachesTheWire(t *testing.T) {
 	item := "高麗菜"
-	price := 95
 
 	got := toSlotsProto(domain.Slots{
 		Item: &item,
 		ItemResolution: &domain.ItemResolution{
-			Kind: domain.ItemResolvedSelfPriced, Label: "高麗菜", CategoryID: "17",
-			PricePerKg: &price, Provenance: domain.ItemResolutionByBuyerChoice,
+			Kind: domain.ItemResolvedCategoryConfirmed, Label: "高麗菜", CategoryID: "17",
+			Provenance: domain.ItemResolutionByBuyerChoice,
 		},
 	})
 
 	require.NotNil(t, got.ItemResolution)
-	require.Equal(t, "SELF_PRICED", got.ItemResolution.GetKind())
+	require.Equal(t, "CATEGORY_CONFIRMED", got.ItemResolution.GetKind())
 	require.Equal(t, "高麗菜", got.ItemResolution.GetLabel())
 	require.Equal(t, "BUYER_CHOICE", got.ItemResolution.GetProvenance())
-	require.Equal(t, "高麗菜，單價 95 元／公斤", got.ItemResolution.GetDisplayValue(),
+	require.Equal(t, "高麗菜", got.ItemResolution.GetDisplayValue(),
 		"顯示字串由伺服器組——前端拿 kind＋label 自己拼會跟 chip 漂成兩套文案")
-	require.Equal(t, "95", got.ItemResolution.GetPricePerKg())
-}
-
-// TestToSlotsProto_SelfPriced_PricePerKgIsAString 釘住金額對外一律字串
-// （CLAUDE.md §4，避免 JavaScript 精度問題）——這條在 proto 邊界很容易寫成
-// int64 而測不出來，因為兩者在 Go 端都能編譯。
-func TestToSlotsProto_SelfPriced_PricePerKgIsAString(t *testing.T) {
-	item := "阿嬤自種特殊品種高麗菜"
-
-	got := toSlotsProto(domain.Slots{
-		Item:           &item,
-		ItemResolution: domain.NewSelfPricedItemResolution(95, "", domain.CategoryAbsent("測試")),
-	})
-
-	require.NotNil(t, got.ItemResolution)
-	require.Equal(t, "SELF_PRICED", got.ItemResolution.GetKind())
-	require.Equal(t, "95", got.ItemResolution.GetPricePerKg())
-	require.Equal(t, "自訂品項，單價 95 元／公斤", got.ItemResolution.GetDisplayValue())
 }
 
 // TestToSlotsProto_NoResolution_OmitsTheField：尚未解析時不帶這個欄位，前端據此

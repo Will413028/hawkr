@@ -148,41 +148,43 @@ func TestStepsFromProto_PropagatesSafeArgs(t *testing.T) {
 }
 
 // TestSlotsFromProto_ItemResolution_ShapeAndTypes 釘住品項解析結果在對外 JSON 上的
-// 形狀。三件事各自都能靜默壞掉，而且壞了以後前端只會看到欄位消失、不會有錯誤：
+// 形狀。兩種 kind 都要過，而且壞了以後前端只會看到欄位消失、不會有錯誤：
 //
-//  1. price_per_kg 是**不帶引號的數字**——SlotsDTO 整組刻意鏡射 domain.Slots 的
-//     JSON 形狀（quantity／budget_per_unit 也是這樣從 wire 的字串轉回 int）。
-//  2. fallback_group_code **不得**出現：它是 crop 查無行情時退一級重查的內部查詢
-//     鍵，買家無從使用，不該進對外契約。
-//  3. display_value 一定要在：前端拿 kind＋label 自己拼會跟 recordedThisTurn 的
+//  1. fallback_group_code 與 price_per_kg 不得出現：前者是內部查詢鍵，後者已經
+//     從契約移除。
+//  2. display_value 一定要在：前端拿 kind＋label 自己拼會跟 recordedThisTurn 的
 //     chip 漂成兩套文案，而它們在畫面上相鄰。
 func TestSlotsFromProto_ItemResolution_ShapeAndTypes(t *testing.T) {
-	price := "95"
-	dto := SlotsFromProto(&pb.Slots{
-		ItemResolution: &pb.ItemResolution{
-			Kind: "SELF_PRICED", Label: "甘藍-初秋",
-			Provenance: "BUYER_CHOICE", PricePerKg: &price,
-			DisplayValue: "自訂品項，單價 95 元／公斤",
-		},
-	})
+	for _, kind := range []string{"CATEGORY_CONFIRMED", "BUYER_DESCRIBED"} {
+		t.Run(kind, func(t *testing.T) {
+			dto := SlotsFromProto(&pb.Slots{
+				ItemResolution: &pb.ItemResolution{
+					Kind: kind, Label: "甘藍-初秋",
+					Provenance: "BUYER_CHOICE", DisplayValue: "甘藍-初秋",
+				},
+			})
 
-	b, err := json.Marshal(dto)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	got := string(b)
+			b, err := json.Marshal(dto)
+			if err != nil {
+				t.Fatalf("marshal: %v", err)
+			}
+			got := string(b)
 
-	if !strings.Contains(got, `"price_per_kg":95`) {
-		t.Errorf("price_per_kg 必須是不帶引號的數字，got %s", got)
-	}
-	if strings.Contains(got, "fallback_group_code") {
-		t.Errorf("內部查詢鍵不得進對外契約，got %s", got)
-	}
-	if !strings.Contains(got, `"display_value":"自訂品項，單價 95 元／公斤"`) {
-		t.Errorf("display_value 必須由伺服器組好送出，got %s", got)
-	}
-	if !strings.Contains(got, `"provenance":"BUYER_CHOICE"`) {
-		t.Errorf("provenance 是前端分流呈現的依據，got %s", got)
+			if !strings.Contains(got, `"kind":"`+kind+`"`) {
+				t.Errorf("kind 必須原樣送出，got %s", got)
+			}
+			for _, banned := range []string{"fallback_group_code", "price_per_kg"} {
+				if strings.Contains(got, banned) {
+					t.Errorf("%s 不得進對外契約，got %s", banned, got)
+				}
+			}
+			if !strings.Contains(got, `"display_value":"甘藍-初秋"`) {
+				t.Errorf("display_value 必須由伺服器組好送出，got %s", got)
+			}
+			if !strings.Contains(got, `"provenance":"BUYER_CHOICE"`) {
+				t.Errorf("provenance 是前端分流呈現的依據，got %s", got)
+			}
+		})
 	}
 }
 

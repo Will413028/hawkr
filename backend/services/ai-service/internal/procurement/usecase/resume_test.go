@@ -106,7 +106,7 @@ func resumeCropInterruptCtx(reqID, revID int64) repository.ResumeResolveContext 
 func TestClaimAndDispatchResume_HappyPath_ChildSucceedsAndRunsTheGraph(t *testing.T) {
 	store, _, deps := newGraphResumeFixture(t, "seed-resume-happy")
 
-	payload := []byte(`{"optionId":"crop-other","freeText":"小白菜","selfEnteredPriceAmount":"60"}`)
+	payload := []byte(`{"optionId":"crop-other","freeText":"小白菜"}`)
 	out, err := ClaimAndDispatchResume(context.Background(), ResumeInput{
 		BuyerID: 1234, InterruptID: "int-happy-1", ClientRequestID: "cr-resume-happy-1", ResponsePayload: payload,
 	}, store, NewRunDispatcher(), deps)
@@ -227,7 +227,7 @@ func TestClaimAndDispatchResume_AppendRunEventFails_StillTerminalizesCorrectly(t
 
 	out, err := ClaimAndDispatchResume(context.Background(), ResumeInput{
 		BuyerID: 1234, InterruptID: "int-appendfail-1", ClientRequestID: "cr-resume-appendfail-1",
-		ResponsePayload: []byte(`{"optionId":"crop-other","freeText":"小白菜","selfEnteredPriceAmount":"60"}`),
+		ResponsePayload: []byte(`{"optionId":"crop-other","freeText":"小白菜"}`),
 	}, store, NewRunDispatcher(), deps)
 
 	require.NoError(t, err)
@@ -256,7 +256,7 @@ func TestClaimAndDispatchResume_BackgroundPanic_DoesNotHangCaller(t *testing.T) 
 	go func() {
 		res, err := ClaimAndDispatchResume(context.Background(), ResumeInput{
 			BuyerID: 1234, InterruptID: "int-panic-1", ClientRequestID: "cr-resume-panic-1",
-			ResponsePayload: []byte(`{"optionId":"crop-other","freeText":"小白菜","selfEnteredPriceAmount":"60"}`),
+			ResponsePayload: []byte(`{"optionId":"crop-other","freeText":"小白菜"}`),
 		}, store, NewRunDispatcher(), deps)
 		ch <- outcome{res, err}
 	}()
@@ -402,7 +402,7 @@ func TestClaimAndDispatchResume_StaleRevision_TerminalizesFailed_NoRollback(t *t
 
 	out, err := ClaimAndDispatchResume(context.Background(), ResumeInput{
 		BuyerID: 1234, InterruptID: "int-graph-stale-1", ClientRequestID: "cr-resume-graph-stale-1",
-		ResponsePayload: []byte(`{"optionId":"crop-other","freeText":"小白菜","selfEnteredPriceAmount":"60"}`),
+		ResponsePayload: []byte(`{"optionId":"crop-other","freeText":"小白菜"}`),
 	}, store, NewRunDispatcher(), deps)
 
 	require.ErrorIs(t, err, ErrStaleRevision)
@@ -448,7 +448,7 @@ func TestClaimAndDispatchResume_CropOtherOptionID_NotWhitelistChecked(t *testing
 
 	_, err := ClaimAndDispatchResume(context.Background(), ResumeInput{
 		BuyerID: 1234, InterruptID: "int-crop-other-1", ClientRequestID: "cr-resume-crop-other-1",
-		ResponsePayload: []byte(`{"optionId":"crop-other","freeText":"野生黑木耳","selfEnteredPriceAmount":"150"}`),
+		ResponsePayload: []byte(`{"optionId":"crop-other","freeText":"野生黑木耳"}`),
 	}, store, NewRunDispatcher(), deps)
 
 	require.NoError(t, err)
@@ -489,7 +489,7 @@ func TestClaimAndDispatchResume_PipelineFails_RestoresInterruptSoBuyerCanAnswerA
 
 	out, err := ClaimAndDispatchResume(context.Background(), ResumeInput{
 		BuyerID: 1234, InterruptID: "int-restore-1", ClientRequestID: "cr-restore-1",
-		ResponsePayload: []byte(`{"optionId":"crop-other","freeText":"小白菜","selfEnteredPriceAmount":"60"}`),
+		ResponsePayload: []byte(`{"optionId":"crop-other","freeText":"小白菜"}`),
 	}, store, NewRunDispatcher(), deps)
 
 	require.Error(t, err)
@@ -508,7 +508,7 @@ func TestClaimAndDispatchResume_StaleRevision_DoesNotRestoreInterrupt(t *testing
 
 	_, err := ClaimAndDispatchResume(context.Background(), ResumeInput{
 		BuyerID: 1234, InterruptID: "int-restore-stale-1", ClientRequestID: "cr-restore-stale-1",
-		ResponsePayload: []byte(`{"optionId":"crop-other","freeText":"小白菜","selfEnteredPriceAmount":"60"}`),
+		ResponsePayload: []byte(`{"optionId":"crop-other","freeText":"小白菜"}`),
 	}, store, NewRunDispatcher(), deps)
 
 	require.ErrorIs(t, err, ErrStaleRevision)
@@ -520,7 +520,7 @@ func TestClaimAndDispatchResume_Succeeds_DoesNotRestoreInterrupt(t *testing.T) {
 
 	_, err := ClaimAndDispatchResume(context.Background(), ResumeInput{
 		BuyerID: 1234, InterruptID: "int-restore-happy-1", ClientRequestID: "cr-restore-happy-1",
-		ResponsePayload: []byte(`{"optionId":"crop-other","freeText":"小白菜","selfEnteredPriceAmount":"60"}`),
+		ResponsePayload: []byte(`{"optionId":"crop-other","freeText":"小白菜"}`),
 	}, store, NewRunDispatcher(), deps)
 
 	require.NoError(t, err)

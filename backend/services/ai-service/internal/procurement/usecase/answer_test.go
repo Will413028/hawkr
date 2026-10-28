@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	"encoding/json"
-	"strconv"
 	"testing"
 	"time"
 
@@ -387,9 +386,12 @@ func TestAnswerUseCase_ItemAnswer_TriggersCropResolution(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "高麗菜", *got.Slots.Item)
 	require.NotZero(t, tree.Calls, "透過問題卡填入 item 一樣要解析一次")
-	require.Nil(t, got.Slots.ItemResolution, "分類確認後下一步是買家填單價，解析結果要等買家填了單價才落進 slots")
-	require.NotNil(t, got.Question)
-	require.Equal(t, domain.SlotCropDisambiguation, got.Question.SlotKey)
+	require.NotNil(t, got.Slots.ItemResolution, "分類樹已確認的品項直接落解析結果")
+	require.Equal(t, domain.ItemResolvedCategoryConfirmed, got.Slots.ItemResolution.Kind)
+	require.NotEmpty(t, got.Slots.ItemResolution.CategoryID)
+	if got.Question != nil {
+		require.NotEqual(t, domain.SlotCropDisambiguation, got.Question.SlotKey, "已確認分類不得再出消歧卡片")
+	}
 }
 
 func TestAnswerUseCase_NonItemAnswer_DoesNotResolve(t *testing.T) {
@@ -403,8 +405,8 @@ func TestAnswerUseCase_NonItemAnswer_DoesNotResolve(t *testing.T) {
 	// 之後，而那個狀態現在要重試（見 cropidentity.needsResolution）。
 	rev, err := repo.AppendRevision(context.Background(), repository.AppendInput{
 		RequestID: req.ID, BuyerID: 1234, Slots: domain.Slots{Item: &item,
-			ItemResolution: domain.NewSelfPricedItemResolution(95, "高麗菜", domain.CategoryFromSelection(
-				&domain.CropSelection{Stage: domain.CropSelectionPrice, CategoryID: "17", Label: "高麗菜"}))},
+			ItemResolution: domain.NewCategoryConfirmedItemResolution(
+				&domain.CropSelection{Stage: domain.CropSelectionDescribe, CategoryID: "17", Label: "高麗菜"})},
 		Source: "LLM_EXTRACT", ClientRequestID: "seed-crop", PayloadJSON: []byte(`{}`),
 		RequestStatus: "CLARIFYING",
 	})
@@ -442,28 +444,25 @@ func pendingCropFixture() *CropDisambiguationInterruptPayload {
 	}
 }
 
-func TestCropDisambiguationAnswer_SelfPricedThenItemChanges_ClearsSelfPricedAndResolvesNormally(t *testing.T) {
+func TestCropDisambiguationAnswer_DescribedThenItemChanges_ResolvesNormally(t *testing.T) {
 	repo := newFakeRepo()
-	reqID, revID := seedPendingDisambiguationRequest(t, repo, "seed-crop-selfpriced-then-change")
+	reqID, revID := seedPendingDisambiguationRequest(t, repo, "seed-crop-described-then-change")
 	tree := testkit.VegetableTree()
 	cropUC := cropidentity.NewDisambiguationUseCase(tree, nil)
 
 	patch, err := buildCropDisambiguationPatch(AnswerInput{
 		BuyerID: 1234, RequestID: reqID, SlotKey: domain.SlotCropDisambiguation,
 		PendingCrop: pendingCropFixture(),
-		OptionID:    domain.CropOtherOptionID, FreeText: "野生烏殼綠竹筍", SelfEnteredPriceAmount: "150",
-		ExpectedRevisionID: revID, ClientRequestID: "cr-crop-selfpriced-then-change-1",
+		OptionID:    domain.CropOtherOptionID, FreeText: "野生烏殼綠竹筍",
+		ExpectedRevisionID: revID, ClientRequestID: "cr-crop-described-then-change-1",
 	})
 	require.NoError(t, err)
-	selfPriced, _ := domain.Slots{}.Apply(patch, time.Now().UTC())
-	require.Equal(t, "野生烏殼綠竹筍", *selfPriced.Item)
+	described, _ := domain.Slots{}.Apply(patch, time.Now().UTC())
+	require.Equal(t, "野生烏殼綠竹筍", *described.Item)
 	require.Zero(t, tree.Calls, "選逃生艙這一輪不得讀分類樹")
-	require.Equal(t, &domain.ItemResolution{
-		Kind: domain.ItemResolvedSelfPriced, PricePerKg: ptr(150),
-		Provenance: domain.ItemResolutionByBuyerChoice,
-	}, selfPriced.ItemResolution, "前置條件：逃生艙要把自填價落進 slots")
+	require.Equal(t, domain.ItemResolvedBuyerDescribed, described.ItemResolution.Kind, "前置條件：逃生艙把買家的描述記成解析結果")
 
-	before := domain.Slots{Item: selfPriced.Item, ItemResolution: selfPriced.ItemResolution}
+	before := domain.Slots{Item: described.Item}
 	after := domain.Slots{Item: ptr("高麗菜")}
 	node := NewCropGateNode(cropUC, seqIDs(9700))
 	ctx := newTestAgentContext(t, map[string]any{
@@ -476,10 +475,9 @@ func TestCropDisambiguationAnswer_SelfPricedThenItemChanges_ClearsSelfPricedAndR
 	require.NotNil(t, got.Item)
 	require.Equal(t, "高麗菜", *got.Item)
 	require.NotZero(t, tree.Calls, "品項變了要重新解析")
-	require.Nil(t, got.Resolution, "上一輪的自填價不得殘留")
-	require.True(t, got.Pending, "分類確認後待買家填單價")
-	require.Equal(t, domain.CropPendingReasonUnavailable, got.PendingReason)
-	require.Equal(t, "17", got.Selection.CategoryID)
+	require.False(t, got.Pending, "分類確認後不再出卡片")
+	require.NotNil(t, got.Resolution)
+	require.Equal(t, "17", got.Resolution.CategoryID)
 }
 
 func TestHandle_ItemAnswer_AmbiguousItem_OverridesQuestionWithDisambiguation(t *testing.T) {
@@ -1173,50 +1171,28 @@ func TestNewRewindUseCase_KeepsNarrator(t *testing.T) {
 	}
 }
 
-func TestBuildCropDisambiguationPatch_SelfPricedBounds(t *testing.T) {
-	base := func(price string) AnswerInput {
-		return AnswerInput{
-			BuyerID: 1234, SlotKey: domain.SlotCropDisambiguation,
-			PendingCrop: pendingCropFixture(),
-			OptionID:    domain.CropOtherOptionID, FreeText: "野生烏殼綠竹筍",
-			SelfEnteredPriceAmount: price,
-		}
+func TestBuildCropDisambiguationPatch_DescriptionRequired(t *testing.T) {
+	in := AnswerInput{
+		BuyerID: 1234, SlotKey: domain.SlotCropDisambiguation,
+		PendingCrop: pendingCropFixture(),
+		OptionID:    domain.CropOtherOptionID, FreeText: "   ",
 	}
+	_, err := buildCropDisambiguationPatch(in)
+	require.ErrorIs(t, err, ErrInvalidOptionID)
 
-	t.Run("非正數——拒絕", func(t *testing.T) {
-		_, err := buildCropDisambiguationPatch(base("0"))
-		require.ErrorIs(t, err, ErrInvalidOptionID)
-		_, err = buildCropDisambiguationPatch(base("-1"))
-		require.ErrorIs(t, err, ErrInvalidOptionID)
-	})
-
-	t.Run("超過上界——拒絕", func(t *testing.T) {
-		_, err := buildCropDisambiguationPatch(base(strconv.Itoa(domain.MaxPricePerKg + 1)))
-		require.ErrorIs(t, err, ErrInvalidOptionID)
-	})
-
-	t.Run("剛好等於上界——接受，且原樣落進 ItemResolution", func(t *testing.T) {
-		patch, err := buildCropDisambiguationPatch(base(strconv.Itoa(domain.MaxPricePerKg)))
-		require.NoError(t, err)
-		require.NotNil(t, patch.ItemResolution)
-		require.Equal(t, domain.ItemResolvedSelfPriced, patch.ItemResolution.Kind)
-		require.NotNil(t, patch.ItemResolution.PricePerKg)
-		require.Equal(t, domain.MaxPricePerKg, *patch.ItemResolution.PricePerKg)
-	})
-
-	t.Run("描述必填——缺了就拒絕", func(t *testing.T) {
-		in := base("150")
-		in.FreeText = "   "
-		_, err := buildCropDisambiguationPatch(in)
-		require.ErrorIs(t, err, ErrInvalidOptionID)
-	})
+	in.FreeText = " 野生烏殼綠竹筍 "
+	patch, err := buildCropDisambiguationPatch(in)
+	require.NoError(t, err)
+	require.Equal(t, "野生烏殼綠竹筍", *patch.Item)
+	require.Equal(t, domain.ItemResolvedBuyerDescribed, patch.ItemResolution.Kind)
+	require.Equal(t, "野生烏殼綠竹筍", patch.ItemResolution.Label)
 }
 
 func TestBuildCropDisambiguationPatch_PendingGate(t *testing.T) {
 	t.Run("沒有正在回答的中斷——拒絕", func(t *testing.T) {
 		_, err := buildCropDisambiguationPatch(AnswerInput{
 			SlotKey: domain.SlotCropDisambiguation, OptionID: domain.CropOtherOptionID,
-			FreeText: "隨便", SelfEnteredPriceAmount: "100",
+			FreeText: "隨便",
 		})
 		require.ErrorIs(t, err, ErrInvalidOptionID)
 	})
@@ -1224,14 +1200,14 @@ func TestBuildCropDisambiguationPatch_PendingGate(t *testing.T) {
 	t.Run("UNAVAILABLE（0 候選）——crop-other 逃生艙可用", func(t *testing.T) {
 		patch, err := buildCropDisambiguationPatch(AnswerInput{
 			SlotKey: domain.SlotCropDisambiguation, OptionID: domain.CropOtherOptionID,
-			FreeText: "紫蘇", SelfEnteredPriceAmount: "100",
+			FreeText: "紫蘇",
 			PendingCrop: &CropDisambiguationInterruptPayload{
 				Kind: cropDisambiguationInterruptKind, PendingReason: domain.CropPendingReasonUnavailable,
 			},
 		})
 		require.NoError(t, err)
 		require.Equal(t, "紫蘇", *patch.Item)
-		require.Equal(t, domain.ItemResolvedSelfPriced, patch.ItemResolution.Kind)
+		require.Equal(t, domain.ItemResolvedBuyerDescribed, patch.ItemResolution.Kind)
 	})
 
 	t.Run("UNAVAILABLE（0 候選）、送非 crop-other 的 optionId——乾淨 422", func(t *testing.T) {
@@ -1257,43 +1233,22 @@ func TestBuildCropDisambiguationPatch_PendingGate(t *testing.T) {
 	})
 }
 
-func TestBuildCropDisambiguationPatch_CarriesResolutionInPatch(t *testing.T) {
-	t.Run("逃生艙：落成 SELF_PRICED 並帶自填價，item 改寫成買家的描述", func(t *testing.T) {
-		patch, err := buildCropDisambiguationPatch(AnswerInput{
-			SlotKey: domain.SlotCropDisambiguation, OptionID: domain.CropOtherOptionID,
-			FreeText: "紫蘇", SelfEnteredPriceAmount: "100",
-			PendingCrop: &CropDisambiguationInterruptPayload{
-				Kind: cropDisambiguationInterruptKind, PendingReason: domain.CropPendingReasonUnavailable,
-			},
-		})
-
-		require.NoError(t, err)
-		require.Equal(t, "紫蘇", *patch.Item)
-		require.Equal(t, &domain.ItemResolution{
-			Kind: domain.ItemResolvedSelfPriced, PricePerKg: ptr(100),
-			Provenance: domain.ItemResolutionByBuyerChoice,
-		}, patch.ItemResolution)
+func TestBuildCropDisambiguationPatch_EscapeReplacesItemAndDropsStaleResolution(t *testing.T) {
+	patch, err := buildCropDisambiguationPatch(AnswerInput{
+		SlotKey: domain.SlotCropDisambiguation, OptionID: domain.CropOtherOptionID,
+		FreeText: "紫蘇",
+		PendingCrop: &CropDisambiguationInterruptPayload{
+			Kind: cropDisambiguationInterruptKind, PendingReason: domain.CropPendingReasonUnavailable,
+		},
 	})
+	require.NoError(t, err)
 
-	t.Run("逃生艙的 patch 套進 Slots 之後，解析結果沒有被自己觸發的清除吃掉", func(t *testing.T) {
-		patch, err := buildCropDisambiguationPatch(AnswerInput{
-			SlotKey: domain.SlotCropDisambiguation, OptionID: domain.CropOtherOptionID,
-			FreeText: "紫蘇", SelfEnteredPriceAmount: "100",
-			PendingCrop: &CropDisambiguationInterruptPayload{
-				Kind: cropDisambiguationInterruptKind, PendingReason: domain.CropPendingReasonUnavailable,
-			},
-		})
-		require.NoError(t, err)
+	before := domain.Slots{Item: item("星際迷航火星藜麥"), ItemResolution: testkit.ConfirmedResolution("火星藜麥")}
+	after, rejected := before.Apply(patch, time.Now())
 
-		before := domain.Slots{Item: item("星際迷航火星藜麥"), ItemResolution: &domain.ItemResolution{
-			Kind: domain.ItemResolvedSelfPriced, PricePerKg: testkit.Ptr(50), Provenance: domain.ItemResolutionByBuyerChoice,
-		}}
-		after, rejected := before.Apply(patch, time.Now())
-
-		require.Empty(t, rejected)
-		require.Equal(t, "紫蘇", *after.Item)
-		require.NotNil(t, after.ItemResolution)
-		require.Equal(t, domain.ItemResolvedSelfPriced, after.ItemResolution.Kind)
-		require.Equal(t, 100, *after.ItemResolution.PricePerKg)
-	})
+	require.Empty(t, rejected)
+	require.Equal(t, "紫蘇", *after.Item)
+	require.Equal(t, &domain.ItemResolution{
+		Kind: domain.ItemResolvedBuyerDescribed, Label: "紫蘇", Provenance: domain.ItemResolutionByBuyerChoice,
+	}, after.ItemResolution, "舊品項的分類不得沿用到買家改寫的描述")
 }

@@ -542,10 +542,9 @@ func summarizeCropGate(result cropidentity.GateResult) string {
 		// 讀成「品項尚待買家從 0 個候選中選擇」——候選是空的，不是還沒展示
 		// 完，兩者要對買家講的話不同。
 		//
-		// 不點名逃生艙按鈕：BuildCropDisambiguationQuestion 帶 Selection 時會把它
-		// 改寫成「沒有符合的品項，自行填寫單價」，而這段摘要是 StepNarrator 的
-		// 輸入，寫死的按鈕名會被忠實複誦給買家。
-		return "查無吻合的品項分類，買家可以自行描述品項並填入單價。"
+		// 不點名逃生艙按鈕：這段摘要是 StepNarrator 的輸入，寫死的按鈕名會被
+		// 忠實複誦給買家。
+		return "查無吻合的品項分類，買家可以自行描述品項。"
 	case result.Pending:
 		return fmt.Sprintf("品項尚待買家從 %d 個%s中選擇。", len(result.Candidates), cropGateChoiceNoun(result.Selection))
 	default:
@@ -632,7 +631,10 @@ func NewCropGateNode(resolver cropidentity.Resolver, newID func() int64) *workfl
 			progress.CropCandidates = result.Candidates
 			progress.CropSelection = result.Selection
 			progress.CropGateEvaluated = result.Evaluated()
-			progress.CropResolveFailed = result.ResolveFailed
+			if result.Resolution != nil {
+				progress.NextSlots.ItemResolution = result.Resolution
+				progress.Patch.ItemResolution = result.Resolution
+			}
 
 			// 摘要的生命週期與上一行的 CropGateEvaluated 綁死，判準是同一個
 			// Evaluated()——也就是 ComputeTurnSteps 產不產生 CROP_GATE 那一格的
@@ -653,8 +655,9 @@ func NewCropGateNode(resolver cropidentity.Resolver, newID func() int64) *workfl
 			}
 
 			return CropGateOutput{
-				Item:    result.Item,
-				Pending: result.Pending, Candidates: result.Candidates, Selection: result.Selection,
+				Item:       result.Item,
+				Resolution: result.Resolution,
+				Pending:    result.Pending, Candidates: result.Candidates, Selection: result.Selection,
 				PendingReason: result.PendingReason, FactsAsOf: result.FactsAsOf,
 				ResolveFailed: result.ResolveFailed,
 			}, nil

@@ -93,7 +93,7 @@ func (c *AIProcurementClient) Rewind(ctx context.Context, req *aipb.RewindReques
 	return c.client.Rewind(ctx, req)
 }
 
-// PreviewRfqPrice：委派給既有 PreviewRfqPriceUseCase，讀 Pricebook 快照＋DB
+// PreviewRfqPrice：委派給既有 PreviewRfqPriceUseCase，讀 DB
 // 冪等鍵查詢，無同步 LLM 呼叫，因此歸進 readTimeout。
 func (c *AIProcurementClient) PreviewRfqPrice(ctx context.Context, req *aipb.RfqPricePreviewRequest) (*aipb.RfqPricePreviewResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, readTimeout)

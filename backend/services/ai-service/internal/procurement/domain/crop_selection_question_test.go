@@ -19,27 +19,22 @@ func TestCropSelectionQuestion_StagesAndOpaqueCategoryIDs(t *testing.T) {
 			require.False(t, q.CanSkip)
 		})
 	}
-	q := BuildCropDisambiguationQuestion(nil, &CropSelection{Stage: "PRICE", CategoryID: "24", Label: "五花肉"})
+	q := BuildCropDisambiguationQuestion(nil, &CropSelection{Stage: "DESCRIBE"})
 	require.False(t, q.AllowFreeText)
 	require.Len(t, q.Options, 1)
-	require.Contains(t, q.Prompt, "五花肉")
-	require.NotContains(t, q.Prompt, "找不到吻合的品項分類")
+	require.Equal(t, "找不到符合的品項，請描述你要的品項：", q.Prompt)
+	require.Equal(t, "自行描述品項", q.Options[0].Label)
 }
 
-func TestSelfPricedClassification_IsRetained(t *testing.T) {
-	r := newSelfPricedForTest(220)
-	r.CategoryID = "24"
-	r.Label = "豬肉／五花肉"
-	require.Empty(t, validateItemResolution(*r))
-	require.Contains(t, r.DisplayValue(), "豬肉／五花肉")
-	require.Contains(t, r.DisplayValue(), "220")
-	other := *r
-	other.CategoryID = "25"
-	require.False(t, r.Equal(&other))
+func TestCropSelectionQuestion_NoSelectionNoCandidatesAsksForDescription(t *testing.T) {
+	q := BuildCropDisambiguationQuestion(nil)
+	require.Equal(t, "找不到符合的品項，請描述你要的品項：", q.Prompt)
+	require.Equal(t, CropOtherOptionID, q.Options[0].OptionID)
+	require.Equal(t, "自行描述品項", q.Options[0].Label)
 }
 
-func TestCropSelectionQuestion_PriceRetainsConfirmedParent(t *testing.T) {
-	q := BuildCropDisambiguationQuestion(nil, &CropSelection{Stage: CropSelectionPrice, ParentCategoryID: "8", ParentLabel: "豬肉"})
-	require.Contains(t, q.Prompt, "已確認品項「豬肉」")
+func TestCropSelectionQuestion_DescribeStageRetainsConfirmedParentWithoutPriceWording(t *testing.T) {
+	q := BuildCropDisambiguationQuestion(nil, &CropSelection{Stage: CropSelectionDescribe, ParentCategoryID: "8", ParentLabel: "豬肉"})
+	require.NotContains(t, q.Prompt, "單價")
 	require.False(t, q.AllowFreeText)
 }

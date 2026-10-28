@@ -87,7 +87,6 @@ type confirmedRfqPayload struct {
 	//
 	// ⛔ 白名單紀律不變，擴大範圍不等於把整包 slots 倒進來。刻意不收：
 	//   - BudgetPerUnit：買家私有預算，既有紅線（design spec D2 §V.7.4）。
-	//   - ItemResolution.PricePerKg：買家自填的品項單價，跟 BudgetPerUnit 同一條線。
 	//   - ItemResolution.Provenance：「誰決定的」稽核欄位，不是賣家報價要看的
 	//     識別內容。
 	//   - ExactMatchRequired：買家給候選比對用的匹配偏好，不是賣家報價時要看的
@@ -111,17 +110,17 @@ type confirmedRfqPayload struct {
 }
 
 // confirmedRfqItemIdentity 是 domain.ItemResolution 的 seller-facing 白名單投影：
-// 只留「這是哪一個品項」需要的三欄。不直接內嵌 domain.ItemResolution，理由跟
+// 只留「這是哪一個品項」需要的欄位。不直接內嵌 domain.ItemResolution，理由跟
 // confirmedRfqPayload 不直接內嵌 PricePreviewResult 一樣——那個型別帶著
-// PricePerKg（買家自填單價）與 Provenance（稽核），序列化進來就是把買家私有
-// 資料寫進賣家看得到的 payload。
+// Provenance（稽核）與內部分類 ID，序列化進來就是把非 seller-facing 的資料
+// 寫進賣家看得到的 payload。
 type confirmedRfqItemIdentity struct {
 	Kind  string `json:"kind"`
 	Label string `json:"label,omitempty"`
 }
 
 // sellerFacingItemIdentity 把 slots 的解析結果收斂成上面那個白名單投影。
-// resolution 為 nil（品項還沒解析完成，或走自填價逃生艙）時回 nil——此時品項
+// resolution 為 nil（品項還沒解析完成）時回 nil——此時品項
 // 身分由 Item 原話承載，不補一個空殼進 preimage。
 func sellerFacingItemIdentity(resolution *domain.ItemResolution) *confirmedRfqItemIdentity {
 	if resolution == nil {

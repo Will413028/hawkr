@@ -40,14 +40,7 @@ function preview(): RfqPricePreview {
 	return {
 		pricePreviewId: "1234567890123456799",
 		version: "1",
-		pricingMode: "PRICEBOOK_GUIDED",
 		qualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
-		referenceAvailability: "AVAILABLE",
-		referencePriceRange: {
-			lowerBoundAmount: "52",
-			midpointAmount: "61",
-			upperBoundAmount: "74",
-		},
 		buyerRequestedRange: {
 			currency: "TWD",
 			priceComponent: "GOODS_ONLY",
@@ -56,14 +49,7 @@ function preview(): RfqPricePreview {
 			basisQuantity: "1",
 			basisUnit: "KG",
 		},
-		dealTemperature: { status: "UNKNOWN", reasonCode: "BUYER_RANGE_NOT_SET" },
 		payloadHash: "a".repeat(64),
-		marketPriceBasis: {
-			regionName: "臺北市",
-			supportingMarketCount: "3",
-			sourceDataAsOf: "2026-08-20T12:36:00Z",
-			freshnessStatus: "fresh",
-		},
 		quoteTotalRange: null,
 	} as RfqPricePreview;
 }
@@ -86,7 +72,6 @@ function approval(
 		sellerFacingPayloadHash: "e".repeat(64),
 		sellerFacingPayloadJson: '{"item":"蘋果"}',
 		expiresAt: "2026-08-22T12:36:00Z",
-		dealTemperatureStatus: "UNKNOWN",
 		audiencePolicyId: "WISH_POOL_ALL_ACTIVE_SELLERS_V1",
 		audiencePolicyVersion: "1",
 		recipientCount: "0",
@@ -188,8 +173,15 @@ async function renderAtReconfirm(
 	);
 	fireEvent.click(screen.getByRole("button", { name: "查看預計名單" }));
 	fireEvent.click(screen.getByRole("button", { name: "取得價格範圍" }));
+	fireEvent.change(screen.getByLabelText("希望下限", { exact: false }), {
+		target: { value: "58" },
+	});
+	fireEvent.change(screen.getByLabelText("希望上限", { exact: false }), {
+		target: { value: "70" },
+	});
+	fireEvent.click(screen.getByRole("button", { name: "取得無參考價試算" }));
 	await waitFor(() => {
-		expect(screen.getByText("參考行情與希望詢價")).toBeTruthy();
+		expect(screen.getByText("希望詢價區間")).toBeTruthy();
 	});
 	fireEvent.click(
 		screen.getByRole("checkbox", { name: /我已核對這份需求版本與價格範圍/ }),
@@ -381,8 +373,15 @@ describe("RfqDraftFlow — A13 發布受眾預設", () => {
 		);
 		fireEvent.click(screen.getByRole("button", { name: "查看預計名單" }));
 		fireEvent.click(screen.getByRole("button", { name: "取得價格範圍" }));
+		fireEvent.change(screen.getByLabelText("希望下限", { exact: false }), {
+			target: { value: "58" },
+		});
+		fireEvent.change(screen.getByLabelText("希望上限", { exact: false }), {
+			target: { value: "70" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "取得無參考價試算" }));
 		await waitFor(() => {
-			expect(screen.getByText("參考行情與希望詢價")).toBeTruthy();
+			expect(screen.getByText("希望詢價區間")).toBeTruthy();
 		});
 		fireEvent.click(
 			screen.getByRole("checkbox", { name: /我已核對這份需求版本與價格範圍/ }),

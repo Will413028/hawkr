@@ -41,7 +41,7 @@ test("price slice names confirmation separately from publication", () => {
 
 test("confirmation success only claims the server-owned price projection", () => {
 	assert.match(draft, /需求版本與價格範圍已固定，等待發布。/);
-	assert.match(draft, /確認後會固定這一版需求、價格方式與參考／希望區間/);
+	assert.match(draft, /確認後會固定這一版需求與希望區間/);
 	assert.match(draft, /這次確認不包含候選名單、截止時間與通知設定/);
 	assert.doesNotMatch(draft, /候選名單已固定|邀請已建立|通知已排入處理/);
 });

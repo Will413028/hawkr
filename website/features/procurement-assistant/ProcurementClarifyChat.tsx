@@ -109,13 +109,12 @@ interface ProcurementClarifyChatProps {
 		unitLabel: string;
 		freeText?: string;
 	}) => void;
-	/** crop_disambiguation 問句選「D 其他」子表單提交（Pricebook 品項分類消歧
+	/** crop_disambiguation 問句選「D 其他」子表單提交（品項分類消歧
 	 * gate）；帶上 question.slotKey 走 answers 端點，同 onSubmitFreeText 的
 	 * 傳遞慣例。 */
 	onSubmitCropOther?: (payload: {
 		slotKey: string;
 		description: string;
-		priceAmount: string;
 	}) => void;
 	/** 最新一輪的品項消歧問題卡（B-244 Ask 3.5）；null＝這輪沒有待處理的消歧。 */
 	cropDisambiguation?: CropDisambiguation | null;
@@ -362,7 +361,6 @@ export default function ProcurementClarifyChat({
 									onSubmitCropOther({
 										slotKey: question.slotKey,
 										description: payload.description,
-										priceAmount: payload.priceAmount,
 									})
 							: undefined
 					}

@@ -11,8 +11,9 @@ import (
 )
 
 var itemResolutionConstructionSites = map[string]string{
-	"procurement/domain/item_resolution.go": "建構子本體",
-	"procurement/usecase/answer.go":         "CategoryFromSelection：自填價逃生艙沿用已確認的分類",
+	"procurement/domain/item_resolution.go":        "建構子本體",
+	"procurement/usecase/crop_selection_resume.go": "買家逐層挑選後，分類取自 CropSelection.CategoryID",
+	"procurement/cropidentity/crop_gate.go":        "分類樹判定後，分類取自 CropSelection.CategoryID",
 }
 
 func TestItemResolutionConstructionSitesAreRegistered(t *testing.T) {
@@ -30,7 +31,7 @@ func TestItemResolutionConstructionSitesAreRegistered(t *testing.T) {
 			return rErr
 		}
 		src := string(b)
-		for _, ctor := range []string{"NewSelfPricedItemResolution("} {
+		for _, ctor := range []string{"NewCategoryConfirmedItemResolution("} {
 			if strings.Contains(src, ctor) {
 				rel := filepath.ToSlash(path)
 				if i := strings.Index(rel, "procurement/"); i >= 0 {
@@ -53,7 +54,7 @@ func TestItemResolutionConstructionSitesAreRegistered(t *testing.T) {
 	require.Empty(t, unregistered,
 		"新的 ItemResolution 建構點必須登記在 itemResolutionConstructionSites 並寫明分類來源。"+
 			"2026-09-18 兩次漏接（兩條召回路徑）都是因為沒有任何清單枚舉建構點，"+
-			"改一個漏一個。登記時一併在 TestEveryConstructionSiteDeclaresCategoryOrigin 補案例。")
+			"改一個漏一個。登記時一併在 TestEveryConstructionSiteCarriesCategoryID 補案例。")
 
 	var missing []string
 	for site := range itemResolutionConstructionSites {
@@ -65,15 +66,14 @@ func TestItemResolutionConstructionSitesAreRegistered(t *testing.T) {
 	require.Empty(t, missing, "登記表有已經不存在的建構點，清單會腐化，請刪除：%v", missing)
 }
 
-func TestEveryConstructionSiteDeclaresCategoryOrigin(t *testing.T) {
-	sel := &CropSelection{Stage: CropSelectionItem, ParentCategoryID: "1242", ParentLabel: "甘藍"}
+func TestEveryConstructionSiteCarriesCategoryID(t *testing.T) {
+	sel := &CropSelection{Stage: CropSelectionDescribe, CategoryID: "1242", Label: "甘藍"}
 
 	cases := []struct {
 		site string
 		got  *ItemResolution
 	}{
-		{"NewSelfPricedItemResolution／自填價逃生艙",
-			NewSelfPricedItemResolution(450, "甘藍", CategoryFromSelection(sel))},
+		{"NewCategoryConfirmedItemResolution／分類樹確認", NewCategoryConfirmedItemResolution(sel)},
 	}
 
 	for _, c := range cases {

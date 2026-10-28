@@ -29,14 +29,7 @@ function preview(overrides: Partial<RfqPricePreview> = {}): RfqPricePreview {
 	return {
 		pricePreviewId: "1",
 		version: "1",
-		pricingMode: "PRICEBOOK_GUIDED",
 		qualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
-		referenceAvailability: "AVAILABLE",
-		referencePriceRange: {
-			lowerBoundAmount: "52",
-			midpointAmount: "61",
-			upperBoundAmount: "74",
-		},
 		buyerRequestedRange: {
 			currency: "TWD",
 			priceComponent: "GOODS_ONLY",
@@ -45,9 +38,7 @@ function preview(overrides: Partial<RfqPricePreview> = {}): RfqPricePreview {
 			basisQuantity: "1",
 			basisUnit: "KG",
 		},
-		dealTemperature: { status: "UNKNOWN", reasonCode: "BUYER_RANGE_NOT_SET" },
 		payloadHash: "a".repeat(64),
-		marketPriceBasis: null,
 		quoteTotalRange: null,
 		...overrides,
 	} as RfqPricePreview;
@@ -89,6 +80,13 @@ async function renderAtStep2(data: RfqPricePreview) {
 	);
 	fireEvent.click(screen.getByRole("button", { name: "查看預計名單" }));
 	fireEvent.click(screen.getByRole("button", { name: "取得價格範圍" }));
+	fireEvent.change(screen.getByLabelText("希望下限", { exact: false }), {
+		target: { value: "58" },
+	});
+	fireEvent.change(screen.getByLabelText("希望上限", { exact: false }), {
+		target: { value: "70" },
+	});
+	fireEvent.click(screen.getByRole("button", { name: "取得無參考價試算" }));
 }
 
 // 稿 P-01 的頂部四格：品項／數量／配送城市／品相。前三格買家自己填過，第四格
@@ -112,7 +110,7 @@ describe("RfqDraftFlow — P-01 頂部需求摘要", () => {
 
 		// 先確定真的走到了價格確認這一步，否則「找不到品相」會是假綠。
 		await waitFor(() => {
-			expect(screen.getByText("參考行情與希望詢價")).toBeTruthy();
+			expect(screen.getByText("希望詢價區間")).toBeTruthy();
 		});
 		expect(screen.queryByText("買家尚未指定")).toBeNull();
 		expect(screen.queryByText("品相")).toBeNull();

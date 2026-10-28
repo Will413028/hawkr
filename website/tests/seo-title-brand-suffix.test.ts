@@ -389,7 +389,6 @@ test("Hawkr-derived feature names keep their brand prefix in the page title, opt
 		"app/[locale]/(account)/account/messages/assistant/procurement/page.tsx":
 			"Hawkr Agent",
 		"app/[locale]/hawkr-agent-rfq-demo/page.tsx": "Hawkr Agent",
-		"app/[locale]/hawkr-agent-rfq-preview/[screen]/page.tsx": "Hawkr Agent",
 	};
 	for (const [file, prefix] of Object.entries(expected)) {
 		const own = titles.filter((t) => t.file === file);

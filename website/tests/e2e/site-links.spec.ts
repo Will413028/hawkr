@@ -80,12 +80,8 @@ const PUBLIC_DYNAMIC_ROUTES = DYNAMIC_ROUTE_CATALOG.filter(
 const PUBLIC_CALLBACK_DYNAMIC_ROUTES = PUBLIC_DYNAMIC_ROUTES.filter(
 	(route) => route.fixture === "order-callback",
 );
-const PUBLIC_PREVIEW_DYNAMIC_ROUTES = PUBLIC_DYNAMIC_ROUTES.filter(
-	(route) => route.fixture === "rfq-prototype",
-);
 const PUBLIC_DATA_DYNAMIC_ROUTES = PUBLIC_DYNAMIC_ROUTES.filter(
-	(route) =>
-		route.fixture !== "order-callback" && route.fixture !== "rfq-prototype",
+	(route) => route.fixture !== "order-callback",
 );
 const CRAWL_SEEDS = [
 	"/",
@@ -641,38 +637,11 @@ test.describe("whole-site route and link contract", () => {
 			}
 		}
 
-		expect(PUBLIC_DYNAMIC_ROUTES).toHaveLength(11);
+		expect(PUBLIC_DYNAMIC_ROUTES).toHaveLength(9);
 		expect(PUBLIC_CALLBACK_DYNAMIC_ROUTES).toHaveLength(2);
 		expect(
 			failures,
 			`${PUBLIC_CALLBACK_DYNAMIC_ROUTES.length} callback public dynamic routes checked:\n${failures.join("\n")}`,
-		).toEqual([]);
-	});
-
-	test("every deterministic public preview dynamic page serves a real guest document", {
-		tag: ["@ui", "@live"],
-	}, async ({ request }) => {
-		const failures: string[] = [];
-
-		for (const entry of PUBLIC_PREVIEW_DYNAMIC_ROUTES) {
-			const route = materializeDynamicRoute(entry);
-			try {
-				const response = await getDocumentWithRetry(request, route);
-				const failure = publicDocumentFailure(entry, route, response);
-				if (failure) failures.push(failure);
-			} catch (error) {
-				failures.push(
-					`REQUEST_FAILED ${route}: ${
-						error instanceof Error ? error.message : String(error)
-					}`,
-				);
-			}
-		}
-
-		expect(PUBLIC_PREVIEW_DYNAMIC_ROUTES).toHaveLength(2);
-		expect(
-			failures,
-			`${PUBLIC_PREVIEW_DYNAMIC_ROUTES.length} deterministic preview routes checked:\n${failures.join("\n")}`,
 		).toEqual([]);
 	});
 

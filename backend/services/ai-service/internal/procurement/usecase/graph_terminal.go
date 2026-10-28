@@ -54,13 +54,6 @@ type graphTurnProgress struct {
 	// true，反推會讓消歧期間每一輪都多出一格內容相同的步驟。
 	CropGateEvaluated bool
 
-	// CropResolveFailed＝這一輪的分類查詢**失敗了**（不是查到了沒有）。它只
-	// 活一輪，刻意不持久化：下一輪 crop gate 會自己重查（cropidentity 的
-	// needsResolution／WithTransientRetry），所以沒有需要跨輪記住的狀態。
-	//
-	// 唯一的消費者是下面 nextAction 的判斷：required slots 不含
-	// item_resolution，所以查詢失敗的那一輪照樣算 Ready。
-	CropResolveFailed bool
 	// Narration 是 extract_slots 已經算出來的 LLM 敘述，key 是 StepCode。這句話
 	// 本來只送進 Activity 事件、落地就丟掉（2026-09-03 前 graphTurnProgress 沒有
 	// 任何欄位留它）；留在這裡是為了讓 composeGraphTurnResult 把它填進持久化的
@@ -173,9 +166,9 @@ func composeGraphTurnResult(ctx context.Context, requestID int64, current domain
 		}
 	}
 	nextAction := ""
-	// 分類查詢失敗的那一輪還沒有品項分類：這一輪什麼都不催，crop gate 下一輪自己
-	// 會重查，買家不需要做任何事。
-	if previewKnown && !hasPreview && !progress.CropResolveFailed {
+	// 報價預覽只看供應商報價，不需要品項分類，所以分類查詢失敗
+	// 也照樣催。
+	if previewKnown && !hasPreview {
 		nextAction = "REVIEW_PRICE_PREVIEW"
 	}
 

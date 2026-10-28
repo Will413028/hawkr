@@ -30,7 +30,7 @@ func (s *scriptedResolver) Resolve(context.Context, string) (DisambiguationResul
 func TestWithTransientRetry_RecoversOnSecondAttempt(t *testing.T) {
 	inner := &scriptedResolver{
 		errs: []error{errors.New("category tree unavailable")},
-		got:  DisambiguationResult{Unavailable: true, Selection: &domain.CropSelection{Stage: domain.CropSelectionPrice, CategoryID: "17", Label: "芭樂"}},
+		got:  DisambiguationResult{Unavailable: true, Selection: &domain.CropSelection{Stage: domain.CropSelectionDescribe, CategoryID: "17", Label: "芭樂"}},
 	}
 
 	got, err := WithTransientRetry(inner).Resolve(context.Background(), "芭樂")

@@ -75,8 +75,6 @@ test("production HTTP redirects and page-level guards block every Agent route", 
 	for (const source of [
 		"/account/messages/assistant/:path*",
 		"/account/find-sellers",
-		"/hawkr-agent-rfq-preview",
-		"/hawkr-agent-rfq-preview/:path*",
 	]) {
 		assert.match(
 			config,
@@ -92,14 +90,6 @@ test("production HTTP redirects and page-level guards block every Agent route", 
 			read(route),
 			/if \(!HAWKR_AGENT_ENABLED\) \{\s*redirect\(\{\s*href: "\/account\/messages",\s*locale: localeFromParam\(/,
 		);
-	}
-
-	for (const route of [
-		"app/[locale]/hawkr-agent-rfq-preview/page.tsx",
-		"app/[locale]/hawkr-agent-rfq-preview/[screen]/page.tsx",
-		"app/[locale]/hawkr-agent-rfq-preview/external-vendor/[step]/page.tsx",
-	]) {
-		assert.match(read(route), /if \(!HAWKR_AGENT_ENABLED\) notFound\(\)/);
 	}
 
 	const analyticsPrivacy = read("lib/analytics/page-view-privacy.ts");

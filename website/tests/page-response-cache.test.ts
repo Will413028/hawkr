@@ -128,9 +128,6 @@ const PRIVATE_PATHS = [
 	"/quote-confirm",
 	// 開店流程：承接已驗證手機與表單狀態。
 	"/seller/onboarding",
-	// 交易預覽 fixture，已 noindex。
-	"/hawkr-agent-rfq-preview",
-	"/hawkr-agent-rfq-preview/entry",
 	// route handler 自己宣告 no-store 是契約，全域規則不得把它降級。
 	"/api/health",
 	"/api/public/tab-bootstrap/v1/home",
@@ -268,7 +265,6 @@ const LOCALIZED_PRIVATE_PATHS = [
 	"/search",
 	"/orders/HK123/refund",
 	"/seller/onboarding",
-	"/hawkr-agent-rfq-preview/entry",
 ];
 
 test("a routed non-default locale keeps every page's cache policy: public stays no-cache, private stays no-store", async () => {

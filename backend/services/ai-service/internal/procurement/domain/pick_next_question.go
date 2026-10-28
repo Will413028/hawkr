@@ -33,7 +33,7 @@ const ClarifyQuestionSourceFixed = "FIXED"
 const SlotCropDisambiguation SlotKey = "crop_disambiguation"
 
 // CropOtherOptionID 是消歧問句固定附加的「D 其他」選項 ID——買家選這個時
-// 自填描述＋自填價格（spec §5），usecase.AnswerUseCase.Handle 用這個常數
+// 自行描述品項（spec §5），usecase.AnswerUseCase.Handle 用這個常數
 // 比對，不是逐字面字串。
 const CropOtherOptionID = "crop-other"
 
@@ -232,12 +232,16 @@ func BuildCropDisambiguationQuestion(candidates []CropDisambiguationOption, sele
 			Value:    c.Label,
 		})
 	}
+	otherLabel := "其他（自己輸入）"
+	if len(candidates) == 0 {
+		otherLabel = "自行描述品項"
+	}
 	opts = append(opts, QuestionOption{
-		OptionID: CropOtherOptionID, Label: "其他（自己輸入）", Value: "OTHER",
+		OptionID: CropOtherOptionID, Label: otherLabel, Value: "OTHER",
 	})
 	prompt := "找到幾個相符的品項，麻煩選一下你要的是哪一個："
 	if len(candidates) == 0 {
-		prompt = "找不到吻合的品項分類，可以自己輸入品項描述並填單價："
+		prompt = "找不到符合的品項，請描述你要的品項："
 	}
 	allowFreeText := false
 	if len(selections) > 0 && selections[0] != nil {
@@ -249,13 +253,10 @@ func BuildCropDisambiguationQuestion(candidates []CropDisambiguationOption, sele
 		case CropSelectionItem:
 			prompt = "接著確認「" + selection.ParentLabel + "」的細項，請選擇一項，或輸入更具體的名稱："
 			allowFreeText = true
-		case CropSelectionPrice:
-			prompt = "目前沒有可用的對應行情，請確認品項描述並填入單價："
-			if categoryID, label := selection.ConfirmedCategory(); categoryID != "" && label != "" {
-				prompt = "已確認品項「" + label + "」，目前沒有可用的對應行情，請填入單價："
-			}
+		case CropSelectionDescribe:
+			prompt = "找不到符合的品項，請描述你要的品項："
 		}
-		opts[len(opts)-1].Label = "沒有符合的品項，自行填寫單價"
+		opts[len(opts)-1].Label = "自行描述品項"
 	}
 	return &ClarifyQuestion{
 		SlotKey: SlotCropDisambiguation,

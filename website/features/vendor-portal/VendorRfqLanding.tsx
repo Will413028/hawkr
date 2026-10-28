@@ -318,11 +318,7 @@ function rangeLabel(lower: string, upper: string): string {
 
 function BuyerRequirementCard({ rfq }: { rfq: VendorRfqSummary }) {
 	const quantity = [rfq.quantity, rfq.unit].filter(Boolean).join(" ");
-	const reference = rfq.referencePriceRange;
 	const requested = rfq.buyerRequestedRange;
-	const referenceRange = reference
-		? rangeLabel(reference.lowerBoundAmount, reference.upperBoundAmount)
-		: "";
 	const requestedRange = requested
 		? rangeLabel(requested.lowerBoundAmount, requested.upperBoundAmount)
 		: "";
@@ -347,13 +343,6 @@ function BuyerRequirementCard({ rfq }: { rfq: VendorRfqSummary }) {
 					</p>
 				</div>
 			) : null}
-			{reference && referenceRange ? (
-				<PriceRangeBlock
-					label="Pricebook 市場行情"
-					amounts={referenceRange}
-					basis={basisLabel(reference.basisQuantity, reference.basisUnit)}
-				/>
-			) : null}
 			{requested && requestedRange ? (
 				<PriceRangeBlock
 					label="買家希望區間"
@@ -363,9 +352,9 @@ function BuyerRequirementCard({ rfq }: { rfq: VendorRfqSummary }) {
 					basis={basisLabel(requested.basisQuantity, requested.basisUnit)}
 				/>
 			) : null}
-			{reference || requested ? (
+			{requested ? (
 				<p className="mt-4 mb-0 text-foreground-soft text-xs">
-					這兩個區間只是報價脈絡，不是成交價格，也不是可接受的上下限。報價高於或低於區間都可以送出，由買家決定。
+					這個區間只是報價脈絡，不是成交價格，也不是可接受的上下限。報價高於或低於區間都可以送出，由買家決定。
 				</p>
 			) : null}
 		</section>

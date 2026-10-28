@@ -164,10 +164,6 @@ func toItemResolutionProto(r *domain.ItemResolution) *aipb.ItemResolution {
 		Provenance:   string(r.Provenance),
 		DisplayValue: r.DisplayValue(),
 	}
-	if r.PricePerKg != nil {
-		v := itoa(*r.PricePerKg)
-		out.PricePerKg = &v
-	}
 	return out
 }
 
@@ -754,8 +750,7 @@ func (s *AIProcurementGrpcServer) SubmitAnswer(ctx context.Context, req *aipb.Su
 	in := usecase.AnswerInput{
 		RequestID: requestID, BuyerID: buyerID, SlotKey: domain.SlotKey(req.GetSlotKey()),
 		OptionID: req.GetOptionId(), FreeText: req.GetFreeText(), UnitOptionID: req.GetUnitOptionId(),
-		SelfEnteredPriceAmount: req.GetSelfEnteredPriceAmount(),
-		Skip:                   req.GetSkip(), ExpectedRevisionID: expectedRevisionID, ClientRequestID: req.GetClientRequestId(),
+		Skip: req.GetSkip(), ExpectedRevisionID: expectedRevisionID, ClientRequestID: req.GetClientRequestId(),
 	}
 
 	out, err := s.answer.ClaimAndDispatchAnswer(ctx, in, s.durableRun.RunStore, s.durableRun.Dispatcher)

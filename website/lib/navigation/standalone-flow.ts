@@ -1,9 +1,6 @@
 import { stripLocale } from "@/lib/intl/paths";
 
-const STANDALONE_FLOW_ROOTS = [
-	"/seller/onboarding",
-	"/hawkr-agent-rfq-preview/external-vendor",
-] as const;
+const STANDALONE_FLOW_ROOTS = ["/seller/onboarding"] as const;
 
 /**
  * Focused account-transition flows suppress surrounding page chrome such as

@@ -1,6 +1,5 @@
 import type { Page, Route } from "@playwright/test";
 import { expect } from "@playwright/test";
-import type { RfqDealTemperature } from "@/features/procurement-assistant/rfq-price-contract";
 import { seedStoredActiveRole, setupGatewayMocks } from "./mock-gateway";
 
 export const RFQ_PATH = "/account/messages/assistant/demo";
@@ -19,12 +18,11 @@ export const RFQ_PUBLICATION_ID = "1234567890123456804";
 export const RFQ_AUDIENCE_HASH = "c".repeat(64);
 export const RFQ_SELLER_PAYLOAD_HASH = "d".repeat(64);
 
-export function guidedPreviewData(
+export function pricePreviewData(
 	overrides: {
-		dealTemperature?: RfqDealTemperature;
-		// guided 模式重新試算時 command 帶的是買家剛編輯的區間，不再是預設的
-		// 30／42——呼叫端要驗證「編輯後的區間原樣回送」就傳這個覆寫，同樣不要
-		// 在呼叫端另起一份 preview 物件（見下面 dealTemperature 的說明）。
+		// 重新試算時 command 帶的是買家剛編輯的區間，不再是預設的 30／42——
+		// 呼叫端要驗證「編輯後的區間原樣回送」就傳這個覆寫，不要在呼叫端另起一份
+		// preview 物件。
 		buyerRequestedRange?: {
 			lowerBoundAmount: string;
 			upperBoundAmount: string;
@@ -34,13 +32,6 @@ export function guidedPreviewData(
 	return {
 		pricePreviewId: RFQ_PREVIEW_ID,
 		version: "1",
-		pricingMode: "PRICEBOOK_GUIDED",
-		referenceAvailability: "AVAILABLE",
-		referencePriceRange: {
-			lowerBoundAmount: "30.25",
-			midpointAmount: "35.5",
-			upperBoundAmount: "41.75",
-		},
 		buyerRequestedRange: {
 			currency: "TWD",
 			priceComponent: "GOODS_ONLY",
@@ -49,22 +40,7 @@ export function guidedPreviewData(
 			basisQuantity: "1",
 			basisUnit: "KG",
 		},
-		// 首次 preview 的真實形狀：買家還沒設定希望區間，後端回 UNKNOWN／
-		// BUYER_RANGE_NOT_SET。呼叫端要別的情境（AVAILABLE 或其他 reasonCode）
-		// 就傳 overrides.dealTemperature 覆寫，不要在呼叫端另起一份 preview 物件。
-		dealTemperature: overrides.dealTemperature ?? {
-			status: "UNKNOWN",
-			reasonCode: "BUYER_RANGE_NOT_SET",
-		},
 		payloadHash: RFQ_PREVIEW_HASH,
-		// v6 稿 03 的兩個附加欄位（backend PR #3156 已 merge）。marketPriceBasis 與
-		// referencePriceRange 同生同滅，所以 guided 這份一定帶著它。
-		marketPriceBasis: {
-			regionName: "桃園市",
-			supportingMarketCount: "3",
-			sourceDataAsOf: "2026-08-14T00:00:00Z",
-			freshnessStatus: "fresh",
-		},
 		quoteTotalRange: {
 			currency: "TWD",
 			lowerBoundAmount: "15000",
@@ -354,7 +330,7 @@ export async function setupRfqPriceReview(
 			return route.fulfill({
 				status: 200,
 				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: guidedPreviewData() }),
+				body: JSON.stringify({ code: 0, data: pricePreviewData() }),
 			});
 		},
 	);
@@ -420,7 +396,6 @@ export async function setupRfqPriceReview(
 						sellerFacingPayloadHash: RFQ_SELLER_PAYLOAD_HASH,
 						sellerFacingPayloadJson: '{"item":"蘋果"}',
 						expiresAt: "2026-08-22T12:36:00Z",
-						dealTemperatureStatus: "UNKNOWN",
 						audiencePolicyId: "WISH_POOL_ALL_ACTIVE_SELLERS_V1",
 						audiencePolicyVersion: "1",
 						recipientCount: "0",
@@ -510,6 +485,10 @@ export async function setupRfqPriceReview(
 		page.getByRole("heading", { name: "預計邀請 1 筆候選" }),
 	).toBeVisible();
 	await page.getByRole("button", { name: "取得價格範圍" }).click();
+	// 買家自己設定希望詢價區間後才取得試算（伺服器不再預填）。
+	await page.getByLabel("希望下限").fill("30");
+	await page.getByLabel("希望上限").fill("42");
+	await page.getByRole("button", { name: "取得無參考價試算" }).click();
 
 	return { legacy };
 }

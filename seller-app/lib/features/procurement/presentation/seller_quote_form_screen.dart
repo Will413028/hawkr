@@ -469,7 +469,7 @@ class _QualityCard extends StatelessWidget {
         children: [
           Text('實際品相與驗收（必填）', style: AppTypography.sectionTitle),
           const SizedBox(height: HkSpace.xs),
-          // ⛔ 不得由平台、LLM 或 Pricebook 代填，也沒有「帶入上次報價」。
+          // ⛔ 不得由平台或 LLM 代填，也沒有「帶入上次報價」。
           Text('這兩欄只能由你自己填寫，平台不會替你帶入上一次報價的品相。', style: AppTypography.metaMuted),
           const SizedBox(height: HkSpace.md),
           _QuoteTextField(

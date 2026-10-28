@@ -74,58 +74,54 @@ export function discoverPermanentRedirects(): PermanentRedirect[] {
  * 而紅的原因與它要守的東西（頁面壞掉）無關。
  *
  * 為什麼不改成 `next.config.ts` 的 `permanent: true` redirect：那會把語意從
- * **暫時**改成**永久**（308），瀏覽器與搜尋引擎會快取它。對一個 prototype 預覽
+ * **暫時**改成**永久**（308），瀏覽器與搜尋引擎會快取它。對一個暫時的
  * 入口而言那是更強的承諾，不該為了讓測試變綠而做出去。
  *
  * 判準刻意保守：整支檔案除了 import 與 `export default function Page()` 之外
  * 只有一個 `redirect(...)` 呼叫。有任何其他渲染邏輯的頁面**不算**，因為那種頁面
  * 真的可能回 200。
  */
+export function isRedirectOnlyPageSource(src: string): boolean {
+	if (!/\bredirect\s*\(/.test(src)) return false;
+	// 函式主體必須「永遠不渲染」：最後一句是 redirect(...)，它前面只允許
+	// 單行守衛（notFound / forbidden / unauthorized / redirect）。有 return
+	// JSX 或多行分支的一律排除。
+	//
+	// 判準看行為而非行數：redirect 前面多一行 `if (...) notFound();` 守衛，
+	// 頁面照樣不渲染、照樣回 307，不該因此換類別（曾因此掉回「公開靜態頁」
+	// 類、被斷言成 200 而擋掉一次 main 部署）。
+	const body = src.match(
+		/export\s+default\s+(?:async\s+)?function\s+\w*\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/,
+	)?.[1];
+	if (!body) return false;
+	const meaningful = body
+		.split("\n")
+		.map((line) => line.trim())
+		.filter((line) => line && !line.startsWith("//") && !line.startsWith("*"));
+	if (meaningful.length === 0) return false;
+	// 最後一句是 redirect(...)：可以跨多行（`redirect({ href, locale })`），
+	// 從它開頭的那一行起，括號配平的那一行必須是函式主體的最後一行。
+	const start = meaningful.findIndex((line) => /^redirect\s*\(/.test(line));
+	if (start === -1) return false;
+	let depth = 0;
+	let end = -1;
+	for (let i = start; i < meaningful.length && end === -1; i++) {
+		for (const ch of meaningful[i]) {
+			if (ch === "(") depth++;
+			else if (ch === ")") depth--;
+		}
+		if (depth === 0) end = i;
+	}
+	if (end !== meaningful.length - 1) return false;
+	const GUARD_ONLY =
+		/^if\s*\(.*\)\s*(?:return\s+)?(?:notFound|forbidden|unauthorized|redirect)\s*\(/;
+	return meaningful.slice(0, start).every((line) => GUARD_ONLY.test(line));
+}
+
 export function discoverRedirectOnlyPages(): string[] {
 	const routes = walk(APP_ROOT)
 		.filter((file) => /(?:^|\/)page\.(?:ts|tsx)$/.test(file))
-		.filter((file) => {
-			const src = readFileSync(file, "utf8");
-			if (!/\bredirect\s*\(/.test(src)) return false;
-			// 函式主體必須「永遠不渲染」：最後一句是 redirect(...)，它前面只允許
-			// 單行守衛（notFound / forbidden / unauthorized / redirect）。有 return
-			// JSX 或多行分支的一律排除。
-			//
-			// ⚠️ 這裡原本要求 `meaningful.length === 1`，而那個門檻把「行為」與
-			// 「行數」綁在一起。2026-08-27 `/hawkr-agent-rfq-preview` 在 redirect
-			// 前面加了一行 `if (!HAWKR_AGENT_ENABLED) notFound();` —— 頁面照樣不
-			// 渲染、照樣回 307，行為一個字都沒變，但偵測器認不得了 ⇒ 它掉回
-			// 「公開靜態頁」類、被斷言成 200 ⇒ main 的 E2E 紅、部署被 skip
-			// （run 33093420954）。一行守衛不該讓一個頁面換類別。
-			const body = src.match(
-				/export\s+default\s+(?:async\s+)?function\s+\w*\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/,
-			)?.[1];
-			if (!body) return false;
-			const meaningful = body
-				.split("\n")
-				.map((line) => line.trim())
-				.filter(
-					(line) => line && !line.startsWith("//") && !line.startsWith("*"),
-				);
-			if (meaningful.length === 0) return false;
-			// 最後一句是 redirect(...)：可以跨多行（`redirect({ href, locale })`），
-			// 從它開頭的那一行起，括號配平的那一行必須是函式主體的最後一行。
-			const start = meaningful.findIndex((line) => /^redirect\s*\(/.test(line));
-			if (start === -1) return false;
-			let depth = 0;
-			let end = -1;
-			for (let i = start; i < meaningful.length && end === -1; i++) {
-				for (const ch of meaningful[i]) {
-					if (ch === "(") depth++;
-					else if (ch === ")") depth--;
-				}
-				if (depth === 0) end = i;
-			}
-			if (end !== meaningful.length - 1) return false;
-			const GUARD_ONLY =
-				/^if\s*\(.*\)\s*(?:return\s+)?(?:notFound|forbidden|unauthorized|redirect)\s*\(/;
-			return meaningful.slice(0, start).every((line) => GUARD_ONLY.test(line));
-		})
+		.filter((file) => isRedirectOnlyPageSource(readFileSync(file, "utf8")))
 		.map(routeForPage)
 		.filter((route): route is string => Boolean(route));
 	return [...new Set(routes)].sort();

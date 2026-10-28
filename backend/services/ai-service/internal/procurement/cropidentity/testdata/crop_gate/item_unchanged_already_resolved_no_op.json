@@ -8,18 +8,18 @@
   "before": {
     "item": "芭樂",
     "item_resolution": {
-      "kind": "SELF_PRICED",
+      "kind": "CATEGORY_CONFIRMED",
       "label": "芭樂",
-      "price_per_kg": 95,
+      "category_id": "7",
       "provenance": "BUYER_CHOICE"
     }
   },
   "after": {
     "item": "芭樂",
     "item_resolution": {
-      "kind": "SELF_PRICED",
+      "kind": "CATEGORY_CONFIRMED",
       "label": "芭樂",
-      "price_per_kg": 95,
+      "category_id": "7",
       "provenance": "BUYER_CHOICE"
     }
   },

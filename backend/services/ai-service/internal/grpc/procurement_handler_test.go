@@ -385,11 +385,11 @@ func TestSubmitAnswer_CropDisambiguationSlot_OtherWithFreeTextButNoPriceAmount_R
 	}
 }
 
-func TestSubmitAnswer_CropDisambiguationSlot_OtherWithPriceAmount_StillReachesUsecase(t *testing.T) {
+func TestSubmitAnswer_CropDisambiguationSlot_Other_StillReachesUsecase(t *testing.T) {
 	s := newCropAnswerServerForTest(10)
 	_, err := s.SubmitAnswer(buyerActorContext("1"), &aipb.SubmitAnswerRequest{
 		RequestId: "1", ClientRequestId: "cr-1", SlotKey: "crop_disambiguation",
-		OptionId: "crop-other", FreeText: "野生黑木耳", SelfEnteredPriceAmount: "150", ExpectedRevisionId: "10",
+		OptionId: "crop-other", FreeText: "野生黑木耳", ExpectedRevisionId: "10",
 	})
 	if err == nil {
 		t.Fatal("直接打 /answers 回答消歧必須被擋下——唯一合法入口是 resume")

@@ -17,8 +17,6 @@ export const ASSISTANT_LEGACY_LIVE_PATH =
 	`/account/messages/assistant/${ASSISTANT_LEGACY_LIVE_CONVERSATION_ID}` as const;
 export const ASSISTANT_PROCUREMENT_PATH =
 	"/account/messages/assistant/procurement" as const;
-export const ASSISTANT_RFQ_PREVIEW_PATH =
-	"/hawkr-agent-rfq-preview/candidate-handoff" as const;
 
 /** 每個對話的路由位址（B-244：conversationId 是 TSID decimal string）。
  * 取代散落的硬編字面值；[conversationId] 路由對非保留字 segment 一律

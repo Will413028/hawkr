@@ -128,11 +128,6 @@ function rfqCommandFailure(
 	}
 
 	const byReason: Partial<Record<string, RfqCommandFailure>> = {
-		MAPPING_MISSING: {
-			code: "MAPPING_MISSING",
-			detail: "Pricebook 找不到可用的品項與區域參考。",
-			retryable: false,
-		},
 		PRICE_BASIS_UNAVAILABLE: {
 			code: "PRICE_BASIS_UNAVAILABLE",
 			detail: "目前數量或單位無法形成可確認的價格基準。",
@@ -142,7 +137,7 @@ function rfqCommandFailure(
 			operation === "confirmation"
 				? {
 						code: "PRICE_PREVIEW_STALE",
-						detail: "這份價格試算已過期或不屬於目前版本，請重新取得行情。",
+						detail: "這份價格試算已過期或不屬於目前版本，請重新試算。",
 						retryable: false,
 					}
 				: {
@@ -162,7 +157,7 @@ function rfqCommandFailure(
 		},
 		RESOURCE_NOT_FOUND: {
 			code: "RESOURCE_NOT_FOUND",
-			detail: "找不到這份價格試算，請重新取得行情後再確認。",
+			detail: "找不到這份價格試算，請重新試算後再確認。",
 			retryable: false,
 		},
 	};
@@ -280,8 +275,6 @@ function normalizeCropDisambiguation(raw: unknown): CropDisambiguation | null {
 					{
 						optionId: opt.optionId,
 						label: opt.label,
-						cropCode: typeof opt.cropCode === "string" ? opt.cropCode : null,
-						groupCode: typeof opt.groupCode === "string" ? opt.groupCode : null,
 					},
 				];
 			})
@@ -1323,7 +1316,6 @@ export function useProcurementSession(
 			unitOptionId?: string;
 			unitLabel?: string;
 			skip?: boolean;
-			selfEnteredPriceAmount?: string;
 		}) => {
 			const current = stateRef.current;
 			if (!current.requestId || !current.revisionId || current.pendingTurn)
@@ -1383,7 +1375,6 @@ export function useProcurementSession(
 				const outcome = await resume({
 					optionId: answer.optionId,
 					freeText: answer.freeText,
-					selfEnteredPriceAmount: answer.selfEnteredPriceAmount,
 				});
 				if (!operationGuard.isCurrent(operation)) return;
 				if (outcome.resolved && outcome.turnResult !== undefined) {
@@ -1426,7 +1417,6 @@ export function useProcurementSession(
 							freeText: answer.freeText,
 							unitOptionId: answer.unitOptionId,
 							skip: answer.skip,
-							selfEnteredPriceAmount: answer.selfEnteredPriceAmount,
 							expectedRevisionId: current.revisionId,
 							clientRequestId,
 						},
@@ -1887,94 +1877,6 @@ export function useProcurementSession(
 			}
 		},
 		[selectionGuard, sessionGenerationGuard],
-	);
-
-	const chooseCropDisambiguation = React.useCallback(
-		async (option: CropDisambiguationOption) => {
-			const current = stateRef.current;
-			if (!current.requestId || current.pendingTurn) return;
-			const clientRequestId = crypto.randomUUID();
-			sessionGenerationGuard.invalidate();
-			setRestoring(false);
-			const operation = operationGuard.begin({
-				clientRequestId,
-				requestId: current.requestId,
-			});
-			stateRef.current = { ...current, pendingTurn: true };
-			setState((s) =>
-				operationGuard.isCurrent(operation)
-					? {
-							...s,
-							justCompletedTurnId: null,
-							pendingTurn: true,
-							error: null,
-							terminalTelemetry: null,
-						}
-					: s,
-			);
-			try {
-				const env = await apiClient.authed.post<unknown>(
-					`/buyers/me/procurement/requests/${operation.requestId}/crop-disambiguation`,
-					{
-						signal: operation.signal,
-						json: {
-							cropCode: option.cropCode ?? undefined,
-							groupCode: option.groupCode ?? undefined,
-							clientRequestId,
-						},
-					},
-				);
-				if (!operationGuard.isCurrent(operation)) return;
-				const terminalTelemetry = terminalTelemetryObservation(
-					monotonicNow(),
-					operation.generation,
-				);
-				await applyTurnResult(
-					env.data,
-					`${clientRequestId}-assistant`,
-					operation,
-					terminalTelemetry,
-				);
-			} catch (err) {
-				if (!operationGuard.isCurrent(operation)) return;
-				const terminalTelemetry = terminalTelemetryObservation(
-					monotonicNow(),
-					operation.generation,
-				);
-				setState((s) =>
-					operationGuard.isCurrent(operation)
-						? {
-								...s,
-								pendingTurn: false,
-								error:
-									err instanceof ApiClientError
-										? procurementErrorFromStatus(
-												err.status,
-												err.reason,
-												err.message,
-											)
-										: {
-												code: "NETWORK_ERROR",
-												detail: "選擇品項失敗，請重試",
-											},
-								terminalTelemetry,
-							}
-						: s,
-				);
-				if (
-					err instanceof ApiClientError &&
-					err.reason === "APPROVAL_PENDING"
-				) {
-					await refreshCurrentSnapshot();
-				}
-			}
-		},
-		[
-			applyTurnResult,
-			operationGuard,
-			refreshCurrentSnapshot,
-			sessionGenerationGuard,
-		],
 	);
 
 	const previewRfqPrice = React.useCallback(
@@ -2451,7 +2353,6 @@ export function useProcurementSession(
 		startSearch,
 		retryPolling,
 		toggleSelection,
-		chooseCropDisambiguation,
 		previewRfqPrice,
 		confirmRfqSnapshot,
 		previewRfqPublication,

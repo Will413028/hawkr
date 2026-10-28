@@ -767,26 +767,6 @@ func TestProxyProcurementAnswer_Success_ReturnsTurnResultJSON(t *testing.T) {
 	}
 }
 
-func TestSubmitAnswer_ForwardsSelfEnteredPriceAmount(t *testing.T) {
-	mock := &mockAIProcurementServiceClient{
-		submitAnswerResp: &aipb.TurnResult{RequestId: "77", ConversationId: "5", RevisionId: "4", Reply: "已記錄"},
-	}
-	h := newProcurementTestHolder(mock)
-
-	body := `{"slotKey":"crop_disambiguation","optionId":"crop-other","freeText":"野生黑木耳","selfEnteredPriceAmount":"150","expectedRevisionId":"3","clientRequestId":"c-1"}`
-	req, _ := http.NewRequest(http.MethodPost, "/api/v1/app/buyers/me/procurement/requests/77/answers", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Account-Id", "99")
-	w := httptest.NewRecorder()
-	setupProcurementUnaryRouter(h).ServeHTTP(w, req)
-
-	assertHTTPStatus(t, w, http.StatusOK)
-	if mock.gotSubmitAnswerReq.GetSelfEnteredPriceAmount() != "150" {
-		t.Fatalf("SelfEnteredPriceAmount not forwarded: got %q, want %q (full request: %+v)",
-			mock.gotSubmitAnswerReq.GetSelfEnteredPriceAmount(), "150", mock.gotSubmitAnswerReq)
-	}
-}
-
 func TestProxyProcurementAnswer_CropDisambiguation_OtherWithFreeText_Accepted(t *testing.T) {
 	mock := &mockAIProcurementServiceClient{
 		submitAnswerResp: &aipb.TurnResult{RequestId: "77", ConversationId: "5", RevisionId: "4", Reply: "已記錄"},

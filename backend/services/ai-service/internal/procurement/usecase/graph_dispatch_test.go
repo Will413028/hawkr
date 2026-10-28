@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/Will413028/hawkr/ai-service/internal/procurement/testkit"
 	"strconv"
 	"sync"
 	"testing"
@@ -1607,7 +1608,7 @@ func TestBuildResumedCropGateOutput(t *testing.T) {
 	current := domain.Slots{Item: item("高麗菜")}
 
 	t.Run("Item 沿用現況，解析結果轉交", func(t *testing.T) {
-		res := domain.NewSelfPricedItemResolution(75, "甘藍-初秋", domain.CategoryAbsent("測試"))
+		res := testkit.ConfirmedResolution("甘藍-初秋")
 
 		got := buildResumedCropGateOutput(current, domain.SlotPatch{ItemResolution: res})
 
@@ -1617,8 +1618,8 @@ func TestBuildResumedCropGateOutput(t *testing.T) {
 		require.False(t, got.Pending)
 	})
 
-	t.Run("逃生艙：Item 改寫成買家描述，自填價一併轉交", func(t *testing.T) {
-		res := domain.NewSelfPricedItemResolution(75, "", domain.CategoryAbsent("測試"))
+	t.Run("逃生艙：Item 改寫成買家描述，解析結果一併轉交", func(t *testing.T) {
+		res := testkit.ConfirmedResolution("")
 
 		got := buildResumedCropGateOutput(current, domain.SlotPatch{Item: item("紫蘇"), ItemResolution: res})
 

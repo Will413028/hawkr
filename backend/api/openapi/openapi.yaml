@@ -10995,26 +10995,14 @@ paths:
   /api/v1/app/buyers/me/procurement/requests/{id}/rfq-price-previews:
     post:
       operationId: proxyProcurementRfqPricePreview
-      summary: Hawkr 幫找 — RFQ 報價預覽（Pricebook 參考區間）
+      summary: Hawkr 幫找 — RFQ 報價預覽
       description: |-
-        算出這次 RFQ 詢價可用的 Pricebook 參考價區間（`referencePriceRange`，pricingMode=`PRICEBOOK_GUIDED`），
-        或在可靠映射缺失時改走買家自行出價（pricingMode=`BUYER_ENTERED_NO_REFERENCE`，`referencePriceRange` 為 `null`）。
+        依買家給的 `buyerRequestedRange` 算出這次 RFQ 詢價的價格預覽（含 `quoteTotalRange`）。
         不建立 immutable RFQ confirmation、不通知任何供應商、除了寫入這筆 preview 本身沒有其他 side effect。
 
-        第一次呼叫可省略 `buyerRequestedRange`，Server 以參考區間下上界預填；帶了就原樣回顯，
-        Server 不會把買家給的範圍 clamp 到參考區間內。
+        `buyerRequestedRange` 必填；缺少時回 422 `PRICE_BASIS_UNAVAILABLE`。Server 原樣回顯，不 clamp。
 
-        Idempotency：同一買家同一 `clientRequestId` 重送回同一筆既有結果（不重算、不重打 Pricebook）。
-
-        `referencePriceRange.basisQuantity`／`basisUnit` 說明三個金額是「每多少單位」的價格
-        （GRAM 品項是每 1000 公克），值與 `buyerRequestedRange` 的同名欄位一致；client 不得自行換算。
-
-        `marketPriceBasis`（計價層級、涵蓋範圍、區域名、貢獻市場家數、資料截至、新鮮度）與
-        `referencePriceRange` 同生同滅，`BUYER_ENTERED_NO_REFERENCE` 時為 `null`。
-        `freshnessStatus` 只是揭露，不影響 `referenceAvailability`。
-        `priceLayer`（`wholesale_auction`｜`farmgate`｜`live_animal`｜`retail`｜`wholesale_bulk`，
-        空字串＝既有蔬果批發路徑）必須與金額一起顯示：毛豬回的是活體拍賣均價、不是豬肉分切零售價，
-        兩者水平差數倍。`scope` 是 `REGION`／`NATIONAL`，用來區分「全國單一行情」與「區域比對失敗」。
+        Idempotency：同一買家同一 `clientRequestId` 重送回同一筆既有結果（不重算）。
 
         `quoteTotalRange` 是伺服器依本次單價範圍與需求數量算出的詢價總額區間；需求數量是選填 slot，
         未填時為 `null`，client 應隱藏總額區塊而不是顯示 0。
@@ -34892,9 +34880,6 @@ components:
     ItemResolutionDTO:
       type: object
       properties:
-        code:
-          type: string
-          description: CROP 是 crop_code、GROUP 是 group_code；SELF_PRICED 沒有 code。
         display_value:
           type: string
           description: |-
@@ -34903,18 +34888,14 @@ components:
             而它們在畫面上相鄰。
         kind:
           type: string
-          description: CROP｜GROUP｜SELF_PRICED，三者互斥。
+          description: CATEGORY_CONFIRMED 或 BUYER_DESCRIBED。
         label:
           type: string
-          description: 分類名稱（「甘藍-初秋」「甘藍」）。SELF_PRICED 時為空。
-        price_per_kg:
-          type: integer
-          description: 只在 Kind == SELF_PRICED 時有值，新台幣元／公斤。
+          description: 分類名稱（「甘藍-初秋」「甘藍」），BUYER_DESCRIBED 時為買家的描述。
         provenance:
           type: string
           description: |-
-            SYSTEM（系統依檢索結果直接定案，買家沒被問過）｜BUYER_CHOICE（買家在消歧卡
-            上親自挑的）。前端據此分流：SYSTEM 要提示可更正，BUYER_CHOICE 是已確認態。
+            目前只有 BUYER_CHOICE（買家在消歧卡上親自挑的）。
     LatestSessionResponse:
       type: object
       properties:
@@ -36175,8 +36156,6 @@ components:
           type: string
         optionId:
           type: string
-        selfEnteredPriceAmount:
-          type: string
         skip:
           type: boolean
         slotKey:
@@ -36383,10 +36362,6 @@ components:
     ProcurementCropDisambiguationOptionDTO:
       type: object
       properties:
-        cropCode:
-          type: string
-        groupCode:
-          type: string
         label:
           type: string
     ProcurementCropResolutionDTO:
@@ -36396,31 +36371,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ProcurementCropDisambiguationOptionDTO'
-        resolvedCropCode:
-          type: string
-        resolvedGroupCode:
-          type: string
-    ProcurementDealTemperatureDTO:
-      type: object
-      properties:
-        band:
-          type: string
-        bandVersion:
-          type: string
-        outcomeDefinition:
-          type: string
-        outcomeDefinitionVersion:
-          type: string
-        policyVersion:
-          type: string
-        probabilityLowerBps:
-          type: string
-        probabilityUpperBps:
-          type: string
-        reasonCode:
-          type: string
-        status:
-          type: string
     ProcurementDeclineRfqPublicationRequest:
       type: object
       properties:
@@ -36442,21 +36392,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ProcurementConversationSummaryDTO'
-    ProcurementMarketPriceBasisDTO:
-      type: object
-      properties:
-        freshnessStatus:
-          type: string
-        priceLayer:
-          type: string
-        regionName:
-          type: string
-        scope:
-          type: string
-        sourceDataAsOf:
-          type: string
-        supportingMarketCount:
-          type: string
     ProcurementOfferedQualityDTO:
       type: object
       properties:
@@ -36483,19 +36418,6 @@ components:
         quantity:
           type: string
         quantityUnit:
-          type: string
-        upperBoundAmount:
-          type: string
-    ProcurementReferencePriceRangeDTO:
-      type: object
-      properties:
-        basisQuantity:
-          type: string
-        basisUnit:
-          type: string
-        lowerBoundAmount:
-          type: string
-        midpointAmount:
           type: string
         upperBoundAmount:
           type: string
@@ -36539,6 +36461,8 @@ components:
           type: string
     ProcurementRfqPricePreviewRequest:
       type: object
+      required:
+      - buyerRequestedRange
       properties:
         buyerRequestedRange:
           $ref: '#/components/schemas/ProcurementBuyerRequestedRangeDTO'
@@ -36548,31 +36472,19 @@ components:
           type: string
         expectedRevisionId:
           type: string
-        pricingMode:
-          type: string
     ProcurementRfqPricePreviewResponseDTO:
       type: object
       properties:
         buyerRequestedRange:
           $ref: '#/components/schemas/ProcurementBuyerRequestedRangeDTO'
-        dealTemperature:
-          $ref: '#/components/schemas/ProcurementDealTemperatureDTO'
-        marketPriceBasis:
-          $ref: '#/components/schemas/ProcurementMarketPriceBasisDTO'
         payloadHash:
           type: string
         pricePreviewId:
-          type: string
-        pricingMode:
           type: string
         qualityKnowledgeState:
           type: string
         quoteTotalRange:
           $ref: '#/components/schemas/ProcurementQuoteTotalRangeDTO'
-        referenceAvailability:
-          type: string
-        referencePriceRange:
-          $ref: '#/components/schemas/ProcurementReferencePriceRangeDTO'
         version:
           type: string
     ProcurementRfqPublicationExecuteRequest:
@@ -36638,8 +36550,6 @@ components:
         audiencePolicyId:
           type: string
         audiencePolicyVersion:
-          type: string
-        dealTemperatureStatus:
           type: string
         expiresAt:
           type: string
@@ -36764,22 +36674,9 @@ components:
           description: 空字串＝本欄加入前建立的 approval，前端當「未知」處理，不得補值。
         quantity:
           type: string
-        referencePriceRange:
-          $ref: '#/components/schemas/ProcurementSellerFacingPriceRangeDTO'
         responseDeadline:
           type: string
         unit:
-          type: string
-    ProcurementSellerFacingPriceRangeDTO:
-      type: object
-      properties:
-        basisQuantity:
-          type: string
-        basisUnit:
-          type: string
-        lowerBoundAmount:
-          type: string
-        upperBoundAmount:
           type: string
     ProcurementSellerIdentityDTO:
       type: object
@@ -39716,7 +39613,7 @@ components:
           type: string
         item_resolution:
           description: |-
-            ItemResolution 是品項的解析結果——買家原話被判定成 Pricebook 分類體系裡的
+            ItemResolution 是品項的解析結果——買家原話被判定成分類體系裡的
             哪一層，以及那個判定是誰做的。它跟 item 原話同一個 revision（ADR
             2026-09-04-crop-resolution-into-slots），所以住在 slots 而不是另一個頂層欄位。
           allOf:
@@ -40530,22 +40427,9 @@ components:
           description: 空字串＝本欄加入前建立的 approval，前端當「未知」處理，不得補值。
         quantity:
           type: string
-        referencePriceRange:
-          $ref: '#/components/schemas/VendorPortalReferencePriceRangeDTO'
         responseDeadline:
           type: string
         unit:
-          type: string
-    VendorPortalReferencePriceRangeDTO:
-      type: object
-      properties:
-        basisQuantity:
-          type: string
-        basisUnit:
-          type: string
-        lowerBoundAmount:
-          type: string
-        upperBoundAmount:
           type: string
     VendorPortalRequestedPriceRangeDTO:
       type: object

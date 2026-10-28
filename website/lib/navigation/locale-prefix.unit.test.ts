@@ -57,7 +57,6 @@ const ROUTES = [
 	"/seller-center/messages/4",
 	"/seller/onboarding",
 	"/seller/measures/1",
-	"/hawkr-agent-rfq-preview/external-vendor/x",
 	"/adm/1/products",
 	"/checkout",
 	"/login",

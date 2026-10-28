@@ -21,14 +21,13 @@ type ProcurementSelectionRequest struct {
 }
 
 type ProcurementAnswerRequest struct {
-	SlotKey                string `json:"slotKey"`
-	OptionID               string `json:"optionId"`
-	FreeText               string `json:"freeText"`
-	UnitOptionID           string `json:"unitOptionId"`
-	Skip                   bool   `json:"skip"`
-	ExpectedRevisionID     string `json:"expectedRevisionId"`
-	ClientRequestID        string `json:"clientRequestId"`
-	SelfEnteredPriceAmount string `json:"selfEnteredPriceAmount"`
+	SlotKey            string `json:"slotKey"`
+	OptionID           string `json:"optionId"`
+	FreeText           string `json:"freeText"`
+	UnitOptionID       string `json:"unitOptionId"`
+	Skip               bool   `json:"skip"`
+	ExpectedRevisionID string `json:"expectedRevisionId"`
+	ClientRequestID    string `json:"clientRequestId"`
 }
 
 type ProcurementRewindRequest struct {
@@ -49,7 +48,7 @@ type ProcurementRfqPricePreviewRequest struct {
 	ExpectedRevisionID  string                             `json:"expectedRevisionId"`
 	ClientRequestID     string                             `json:"clientRequestId"`
 	DeliveryCity        string                             `json:"deliveryCity"`
-	BuyerRequestedRange *ProcurementBuyerRequestedRangeDTO `json:"buyerRequestedRange,omitempty"`
+	BuyerRequestedRange *ProcurementBuyerRequestedRangeDTO `json:"buyerRequestedRange"`
 }
 
 func (r ProcurementRfqPricePreviewRequest) toProto(requestID string) *pb.RfqPricePreviewRequest {

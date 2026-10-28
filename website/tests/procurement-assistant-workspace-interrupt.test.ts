@@ -16,7 +16,7 @@ const source = readFileSync(
 	"utf8",
 );
 
-test("crop 消歧卡的選項點擊：pendingInterrupt 存在時呼叫 resume({optionId})，否則維持既有 chooseCropDisambiguation(option)", () => {
+test("crop 消歧卡的選項點擊：只在 pendingInterrupt 存在時提供，並呼叫 resume({optionId})", () => {
 	const clarifyChatStart = source.indexOf("<ProcurementClarifyChat");
 	const clarifyChatEnd = source.indexOf("{/* 還有問題", clarifyChatStart);
 	assert.ok(clarifyChatStart > -1, "ProcurementClarifyChat 應該還在原位");
@@ -30,7 +30,7 @@ test("crop 消歧卡的選項點擊：pendingInterrupt 存在時呼叫 resume({o
 		wiring,
 		/session\.resume\(\{\s*optionId:\s*option\.optionId\s*\}\)/,
 	);
-	assert.match(wiring, /session\.chooseCropDisambiguation\(option\)/);
+	assert.doesNotMatch(wiring, /chooseCropDisambiguation/);
 });
 
 test("pendingInterrupt 存在時鎖住自由輸入 composer——沿用既有『為什麼現在不能打字』的 pending 慣例，不另開新機制", () => {

@@ -1,5 +1,4 @@
 import {
-	priceBasisOf,
 	type RfqConfirmationCommand,
 	type RfqPricePreviewCommand,
 	rfqConfirmationSchema,
@@ -14,7 +13,6 @@ import type { ProcurementCandidateSearch } from "@/lib/api/openapi-types";
 import type {
 	DemoCandidate,
 	DemoContext,
-	DemoMarketReference,
 	DemoPreviewIdentity,
 	DemoQuoteTotalRange,
 	DemoRequirement,
@@ -90,7 +88,6 @@ async function fetchSelectedCandidates(
 }
 
 export interface PricePreviewOutcome {
-	market: DemoMarketReference | null;
 	quoteTotalRange: DemoQuoteTotalRange | null;
 	preview: DemoPreviewIdentity | null;
 	reason: string | null;
@@ -98,10 +95,9 @@ export interface PricePreviewOutcome {
 
 export async function runPricePreview(
 	requirement: DemoRequirement,
-	buyerRange?: { lower: number; upper: number },
+	buyerRange: { lower: number; upper: number },
 ): Promise<PricePreviewOutcome> {
 	const empty: PricePreviewOutcome = {
-		market: null,
 		quoteTotalRange: null,
 		preview: null,
 		reason: null,
@@ -112,18 +108,13 @@ export async function runPricePreview(
 	const command: RfqPricePreviewCommand = {
 		expectedRevisionId: requirement.revisionId,
 		clientRequestId: `rfq-demo-${requirement.revisionId}-${Date.now()}`,
-		pricingMode: "PRICEBOOK_GUIDED",
 		deliveryCity: requirement.deliveryCity,
-		...(buyerRange
-			? {
-					buyerRequestedRange: {
-						currency: "TWD" as const,
-						priceComponent: "GOODS_ONLY" as const,
-						lowerBoundAmount: String(buyerRange.lower),
-						upperBoundAmount: String(buyerRange.upper),
-					},
-				}
-			: {}),
+		buyerRequestedRange: {
+			currency: "TWD" as const,
+			priceComponent: "GOODS_ONLY" as const,
+			lowerBoundAmount: String(buyerRange.lower),
+			upperBoundAmount: String(buyerRange.upper),
+		},
 	};
 	try {
 		const env = await apiClient.authed.post<unknown>(
@@ -146,33 +137,7 @@ export async function runPricePreview(
 					quantityUnit: preview.quoteTotalRange.quantityUnit,
 				}
 			: null;
-		if (
-			preview.referenceAvailability !== "AVAILABLE" ||
-			!preview.referencePriceRange ||
-			!preview.marketPriceBasis
-		) {
-			return {
-				market: null,
-				quoteTotalRange: totals,
-				preview: identity,
-				reason: preview.dealTemperature.reasonCode || "UNAVAILABLE",
-			};
-		}
-		return {
-			market: {
-				lower: Number(preview.referencePriceRange.lowerBoundAmount),
-				midpoint: Number(preview.referencePriceRange.midpointAmount),
-				upper: Number(preview.referencePriceRange.upperBoundAmount),
-				basisQuantity: priceBasisOf(preview).basisQuantity,
-				basisUnit: priceBasisOf(preview).basisUnit,
-				regionName: preview.marketPriceBasis.regionName,
-				sourceDataAsOf: preview.marketPriceBasis.sourceDataAsOf,
-				freshnessStatus: preview.marketPriceBasis.freshnessStatus,
-			},
-			quoteTotalRange: totals,
-			preview: identity,
-			reason: null,
-		};
+		return { quoteTotalRange: totals, preview: identity, reason: null };
 	} catch {
 		return { ...empty, reason: "PREVIEW_REJECTED" };
 	}
@@ -230,14 +195,11 @@ export async function loadDemoContext(requestId: string): Promise<DemoContext> {
 		}
 	}
 
-	const outcome = await runPricePreview(requirement);
 	return {
 		requirement,
 		candidates,
 		candidatesUnavailableReason,
-		market: outcome.market,
-		quoteTotalRange: outcome.quoteTotalRange,
-		preview: outcome.preview,
-		marketUnavailableReason: outcome.reason,
+		quoteTotalRange: null,
+		preview: null,
 	};
 }

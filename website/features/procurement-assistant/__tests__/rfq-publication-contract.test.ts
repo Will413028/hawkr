@@ -13,7 +13,6 @@ const APPROVAL = {
 	sellerFacingPayloadHash: "b".repeat(64),
 	sellerFacingPayloadJson: '{"item":"蘋果"}',
 	expiresAt: "2026-08-22T12:36:00Z",
-	dealTemperatureStatus: "UNKNOWN",
 	audiencePolicyId: "WISH_POOL_ALL_ACTIVE_SELLERS_V1",
 	audiencePolicyVersion: "1",
 	recipientCount: "0",

@@ -27,13 +27,7 @@ test("route transition policy preserves app-tab and persistent-shell continuity"
 });
 
 test("ordinary programmatic routes receive a commit-arrival transition", () => {
-	assert.equal(
-		shouldAnimateProgrammaticRoute(
-			"/hawkr-agent-rfq-preview/rfq-compose",
-			"/hawkr-agent-rfq-preview/seller-inbox",
-		),
-		true,
-	);
+	assert.equal(shouldAnimateProgrammaticRoute("/faq", "/contact"), true);
 	assert.equal(shouldAnimateProgrammaticRoute("/about", "/cart"), true);
 	assert.equal(shouldAnimateProgrammaticRoute("/cart", "/checkout"), true);
 });
@@ -49,7 +43,7 @@ test("routes with their own continuity stay instant", () => {
 		["/market/products", "/products/product-1"],
 		["/about", "/sellers/seller-1"],
 		["/about", "/seller/onboarding/profile"],
-		["/hawkr-agent-rfq-preview/external-vendor", "/about"],
+		["/seller/onboarding", "/about"],
 	];
 
 	for (const [source, target] of excludedRoutes) {

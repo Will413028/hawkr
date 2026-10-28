@@ -31,16 +31,12 @@ export interface ClarifyQuestion {
 export interface CropDisambiguationOption {
 	optionId: string;
 	label: string;
-	cropCode: string | null;
-	groupCode: string | null;
 }
 
 export interface CropDisambiguation {
 	prompt: string;
 	options: CropDisambiguationOption[];
 }
-
-export type PriceAvailability = "MARKET" | "MARKET_STALE" | "UNAVAILABLE";
 
 export interface ProcurementChatTurn {
 	id: string;

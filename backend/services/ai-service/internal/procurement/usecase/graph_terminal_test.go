@@ -15,8 +15,10 @@ import (
 	"google.golang.org/adk/v2/workflow"
 	"google.golang.org/genai"
 
+	"github.com/Will413028/hawkr/ai-service/internal/procurement/cropidentity"
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/domain"
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/repository"
+	"github.com/Will413028/hawkr/ai-service/internal/procurement/testkit"
 )
 
 // TestReadGraphTurnProgress_AbsentKey_ReturnsZeroValue proves the very
@@ -594,33 +596,54 @@ func TestComposeGraphTurnResult_NoSummaryNoJob(t *testing.T) {
 	require.False(t, asked, "沒有摘要就不該打這通 LLM")
 }
 
-// TestComposeGraphTurnResult_ResolveFailed_DoesNotNudgeToPricePreview 是 R07
-// 最後一項殘留的守門（重試那一半已由 cropidentity.WithTransientRetry 與
-// crop_gate.go 的 needsResolution 修掉）。
-//
-// 缺口的形狀：required slots **不含** item_resolution（domain.Slots.MissingRequired
-// 只數六個 slot），所以「買家講了品項、其他條件也齊，但分類服務這一輪查詢失敗」
-// 會算成 Ready ⇒ nextAction 照樣設成 REVIEW_PRICE_PREVIEW。
-// 這一輪還沒有品項分類，正確的下一步是什麼都不催：crop gate 下一輪自己會重查
-// （既有的恢復通道），不需要買家做任何事。
-//
-// 鑑別力：fixture 與上面那個 happy-path 測試**只差 CropResolveFailed 一個欄位**，
-// 兩個測試互為對照組——少了這個旗標的實作會讓兩者拿到同一個 nextAction。
-func TestComposeGraphTurnResult_ResolveFailed_DoesNotNudgeToPricePreview(t *testing.T) {
+// TestComposeGraphTurnResult_CategoryLookupFailed_StillNudgesToPricePreview 守住：
+// 分類查詢出錯（resolver 回 error，不是查無結果）那一輪，品項沒有 ItemResolution，
+// 其他條件齊了照樣進 REVIEW_PRICE_PREVIEW。報價預覽不依賴品項分類。
+func TestComposeGraphTurnResult_CategoryLookupFailed_StillNudgesToPricePreview(t *testing.T) {
 	full := domain.Slots{
 		Item: item("芭樂"), DeliveryCity: strPtr("桃園市"), Unit: strPtr("KG"),
 		Quantity: intPtr(10), DeliveryDate: strPtr("2026-09-30"), Packaging: strPtr("紙箱"), BudgetPerUnit: intPtr(50),
 	}
-	require.Empty(t, full.MissingRequired(),
-		"sanity check：這個 fixture 在 required-slot 的定義下是完整的——缺口正是「完整」不等於「查得到分類」")
-	require.Nil(t, full.ItemResolution,
-		"sanity check：這個 fixture 還沒有品項解析結果")
+	require.Empty(t, full.MissingRequired(), "sanity check：fixture 的 required slots 是完整的")
 
-	progress := graphTurnProgress{NextSlots: full, CropResolveFailed: true}
+	resolver := &testkit.FakeResolver[cropidentity.DisambiguationResult]{ResolveErr: errors.New("category lookup down")}
+	ctx := newTestAgentContext(t, map[string]any{
+		"request_id":          int64(1),
+		"current_slots":       domain.Slots{},
+		"graph_turn_progress": graphTurnProgress{NextSlots: full},
+	})
+	got, err := runFunctionNode[CropGateOutput](t, NewCropGateNode(resolver, seqIDs(9100)), ctx, ValidateSlotsOutput{Slots: full})
+	require.NoError(t, err)
+	require.True(t, got.ResolveFailed, "sanity check：這一輪的分類查詢確實失敗")
+
+	progress, err := readGraphTurnProgress(ctx)
+	require.NoError(t, err)
+	require.Nil(t, progress.NextSlots.ItemResolution, "查詢失敗時品項沒有解析結果")
+
+	slots, _, _, nextAction := composeGraphTurnResult(t.Context(), 1, domain.Slots{}, nil, progress,
+		"都給你了", domain.RfqNone, fakePricePreviewChecker{hasPreview: false}, nil, nil)
+
+	require.Nil(t, slots.ItemResolution)
+	require.Equal(t, "REVIEW_PRICE_PREVIEW", nextAction,
+		"分類查詢失敗時也能進報價預覽")
+}
+
+// TestComposeGraphTurnResult_UnresolvedItem_StillNudgesToPricePreview 守住：報價預覽
+// 不需要品項分類，item_resolution 沒有值（品項沒辨識出來，例如分類查詢失敗）的那一輪，
+// 其他條件齊了照樣進 REVIEW_PRICE_PREVIEW。required slots 不含 item_resolution。
+func TestComposeGraphTurnResult_UnresolvedItem_StillNudgesToPricePreview(t *testing.T) {
+	full := domain.Slots{
+		Item: item("芭樂"), DeliveryCity: strPtr("桃園市"), Unit: strPtr("KG"),
+		Quantity: intPtr(10), DeliveryDate: strPtr("2026-09-30"), Packaging: strPtr("紙箱"), BudgetPerUnit: intPtr(50),
+	}
+	require.Empty(t, full.MissingRequired(), "sanity check：fixture 的 required slots 是完整的")
+	require.Nil(t, full.ItemResolution, "sanity check：fixture 還沒有品項解析結果")
+
+	progress := graphTurnProgress{NextSlots: full}
 
 	_, _, _, nextAction := composeGraphTurnResult(t.Context(), 1, domain.Slots{}, nil, progress,
 		"都給你了", domain.RfqNone, fakePricePreviewChecker{hasPreview: false}, nil, nil)
 
-	require.Empty(t, nextAction,
-		"分類服務這一輪查詢失敗時不得催買家去做價格預覽——那條路上的 guided 模式必然失敗")
+	require.Equal(t, "REVIEW_PRICE_PREVIEW", nextAction,
+		"品項沒辨識出來時也能進報價預覽")
 }

@@ -3405,21 +3405,20 @@ func (x *Slots) GetItemResolution() *ItemResolution {
 	return nil
 }
 
-// ItemResolution 是買家原話（Slots.item）被判定成平台分類樹的哪個節點與買家填的
-// 單價，以及那個判定是誰做的。必須對買家可見且可更正。
+// ItemResolution 是買家原話（Slots.item）被判定成平台分類樹的哪個節點，以及那個
+// 判定是誰做的。必須對買家可見且可更正。
 type ItemResolution struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 目前只有 SELF_PRICED。字串而非 enum。
+	// CATEGORY_CONFIRMED（已確認平台分類，伺服器內部持有分類 ID）或
+	// BUYER_DESCRIBED（買家在「找不到符合的品項」卡上自行描述，沒有分類）。
+	// 字串而非 enum。
 	Kind string `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
-	// 分類名稱。
+	// 分類名稱，或 BUYER_DESCRIBED 時買家的描述。
 	Label string `protobuf:"bytes,3,opt,name=label,proto3" json:"label,omitempty"`
-	// BUYER_CHOICE（買家在消歧卡上親自挑的，含自填價逃生艙）。
+	// BUYER_CHOICE（買家在消歧卡上親自挑的，含自行描述）。
 	Provenance string `protobuf:"bytes,4,opt,name=provenance,proto3" json:"provenance,omitempty"`
-	// 新台幣元／公斤，字串（CLAUDE.md §4：對外金額一律字串）。
-	PricePerKg *string `protobuf:"bytes,5,opt,name=price_per_kg,json=pricePerKg,proto3,oneof" json:"price_per_kg,omitempty"`
-	// 伺服器組好的顯示字串（「自訂品項，單價 95 元／公斤」）。**前端不得自己用
-	// kind＋label 重拼**：那會讓 slots 面板與 recordedThisTurn 的 chip 出現兩套
-	// 文案，而 chip 用的就是這個值。
+	// 伺服器組好的顯示字串。**前端不得自己用 kind＋label 重拼**：那會讓 slots
+	// 面板與 recordedThisTurn 的 chip 出現兩套文案，而 chip 用的就是這個值。
 	DisplayValue  string `protobuf:"bytes,6,opt,name=display_value,json=displayValue,proto3" json:"display_value,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -3472,13 +3471,6 @@ func (x *ItemResolution) GetLabel() string {
 func (x *ItemResolution) GetProvenance() string {
 	if x != nil {
 		return x.Provenance
-	}
-	return ""
-}
-
-func (x *ItemResolution) GetPricePerKg() string {
-	if x != nil && x.PricePerKg != nil {
-		return *x.PricePerKg
 	}
 	return ""
 }
@@ -7818,12 +7810,8 @@ type SubmitAnswerRequest struct {
 	Skip               bool                   `protobuf:"varint,6,opt,name=skip,proto3" json:"skip,omitempty"`
 	ExpectedRevisionId string                 `protobuf:"bytes,7,opt,name=expected_revision_id,json=expectedRevisionId,proto3" json:"expected_revision_id,omitempty"`
 	ClientRequestId    string                 `protobuf:"bytes,8,opt,name=client_request_id,json=clientRequestId,proto3" json:"client_request_id,omitempty"`
-	// self_entered_price_amount 只在 slot_key=="crop_disambiguation" 且
-	// option_id=="crop-other" 時使用（品項不在分類樹內）。
-	// 字串（金額欄位一律字串慣例），空字串表示未提供。
-	SelfEnteredPriceAmount string `protobuf:"bytes,9,opt,name=self_entered_price_amount,json=selfEnteredPriceAmount,proto3" json:"self_entered_price_amount,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *SubmitAnswerRequest) Reset() {
@@ -7908,13 +7896,6 @@ func (x *SubmitAnswerRequest) GetExpectedRevisionId() string {
 func (x *SubmitAnswerRequest) GetClientRequestId() string {
 	if x != nil {
 		return x.ClientRequestId
-	}
-	return ""
-}
-
-func (x *SubmitAnswerRequest) GetSelfEnteredPriceAmount() string {
-	if x != nil {
-		return x.SelfEnteredPriceAmount
 	}
 	return ""
 }
@@ -10390,17 +10371,14 @@ const file_ai_ai_proto_rawDesc = "" +
 	"\x0e_delivery_cityB\x10\n" +
 	"\x0e_delivery_dateB\x17\n" +
 	"\x15_exact_match_requiredB\x12\n" +
-	"\x10_item_resolutionJ\x04\b\x02\x10\x03R\x04spec\"\xc3\x01\n" +
+	"\x10_item_resolutionJ\x04\b\x02\x10\x03R\x04spec\"\x9f\x01\n" +
 	"\x0eItemResolution\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x14\n" +
 	"\x05label\x18\x03 \x01(\tR\x05label\x12\x1e\n" +
 	"\n" +
 	"provenance\x18\x04 \x01(\tR\n" +
-	"provenance\x12%\n" +
-	"\fprice_per_kg\x18\x05 \x01(\tH\x00R\n" +
-	"pricePerKg\x88\x01\x01\x12#\n" +
-	"\rdisplay_value\x18\x06 \x01(\tR\fdisplayValueB\x0f\n" +
-	"\r_price_per_kgJ\x04\b\x02\x10\x03R\x04code\"S\n" +
+	"provenance\x12#\n" +
+	"\rdisplay_value\x18\x06 \x01(\tR\fdisplayValueJ\x04\b\x02\x10\x03J\x04\b\x05\x10\x06R\x04codeR\fprice_per_kg\"S\n" +
 	"\x18CropDisambiguationOption\x12\x14\n" +
 	"\x05label\x18\x01 \x01(\tR\x05labelJ\x04\b\x02\x10\x03J\x04\b\x03\x10\x04R\tcrop_codeR\n" +
 	"group_code\"z\n" +
@@ -10782,7 +10760,7 @@ const file_ai_ai_proto_rawDesc = "" +
 	"\x10candidate_set_id\x18\x02 \x01(\tR\x0ecandidateSetId\x12\x12\n" +
 	"\x04lane\x18\x03 \x01(\tR\x04lane\x12!\n" +
 	"\fcandidate_id\x18\x04 \x01(\tR\vcandidateId\x12\x1a\n" +
-	"\bselected\x18\x05 \x01(\bR\bselected\"\xdc\x02\n" +
+	"\bselected\x18\x05 \x01(\bR\bselected\"\xc2\x02\n" +
 	"\x13SubmitAnswerRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x19\n" +
@@ -10792,8 +10770,8 @@ const file_ai_ai_proto_rawDesc = "" +
 	"\x0eunit_option_id\x18\x05 \x01(\tR\funitOptionId\x12\x12\n" +
 	"\x04skip\x18\x06 \x01(\bR\x04skip\x120\n" +
 	"\x14expected_revision_id\x18\a \x01(\tR\x12expectedRevisionId\x12*\n" +
-	"\x11client_request_id\x18\b \x01(\tR\x0fclientRequestId\x129\n" +
-	"\x19self_entered_price_amount\x18\t \x01(\tR\x16selfEnteredPriceAmount\"u\n" +
+	"\x11client_request_id\x18\b \x01(\tR\x0fclientRequestIdJ\x04\b\t\x10\n" +
+	"R\x19self_entered_price_amount\"u\n" +
 	"\rRewindRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x19\n" +
@@ -11438,7 +11416,6 @@ func file_ai_ai_proto_init() {
 	file_ai_ai_proto_msgTypes[31].OneofWrappers = []any{}
 	file_ai_ai_proto_msgTypes[32].OneofWrappers = []any{}
 	file_ai_ai_proto_msgTypes[48].OneofWrappers = []any{}
-	file_ai_ai_proto_msgTypes[49].OneofWrappers = []any{}
 	file_ai_ai_proto_msgTypes[121].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

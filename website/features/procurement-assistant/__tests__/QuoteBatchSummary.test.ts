@@ -334,9 +334,7 @@ describe("③ 目前交易真相", () => {
 	it("固定講明參考區間與希望價格都不是成交價格", () => {
 		mount();
 		const panel = screen.getByTestId("quote-batch-summary");
-		expect(panel.textContent).toContain(
-			"Pricebook 參考區間與買家希望價格都不是成交價格",
-		);
+		expect(panel.textContent).toContain("買家希望價格不是成交價格");
 	});
 });
 

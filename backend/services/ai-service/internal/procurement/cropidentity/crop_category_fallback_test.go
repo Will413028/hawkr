@@ -72,7 +72,7 @@ func newCategoryResolver(model *categorySuggestFake) *DisambiguationUseCase {
 	return uc
 }
 
-func TestCropCategoryFallback_GroupToItemThenManualPricePreservesCategory(t *testing.T) {
+func TestCropCategoryFallback_GroupToItemThenManualDescriptionPreservesCategory(t *testing.T) {
 	model := &categorySuggestFake{ids: []string{"301"}}
 	uc := newCategoryResolver(model)
 	group := &domain.CropSelection{Stage: domain.CropSelectionGroup}
@@ -89,13 +89,13 @@ func TestCropCategoryFallback_GroupToItemThenManualPricePreservesCategory(t *tes
 	}
 	require.Equal(t, "五花肉", item.Candidates[0].Label)
 
-	price, err := uc.ResolveSelection(context.Background(), "臺灣豬五花", item.Selection, item.Candidates, "category-301", "")
+	final, err := uc.ResolveSelection(context.Background(), "臺灣豬五花", item.Selection, item.Candidates, "category-301", "")
 	require.NoError(t, err)
-	require.True(t, price.Unavailable)
-	require.Equal(t, domain.CropSelectionPrice, price.Selection.Stage)
-	require.Equal(t, "200", price.Selection.ParentCategoryID)
-	require.Equal(t, "301", price.Selection.CategoryID)
-	require.Equal(t, "五花肉", price.Selection.Label)
+	require.True(t, final.Unavailable)
+	require.Equal(t, domain.CropSelectionDescribe, final.Selection.Stage)
+	require.Equal(t, "200", final.Selection.ParentCategoryID)
+	require.Equal(t, "301", final.Selection.CategoryID)
+	require.Equal(t, "五花肉", final.Selection.Label)
 	require.Equal(t, 1, model.calls)
 }
 
@@ -111,10 +111,10 @@ func TestCropCategoryFallback_TypedGroupAndItemRespectStage(t *testing.T) {
 	require.Equal(t, domain.CropSelectionItem, item.Selection.Stage)
 	require.Equal(t, "301", item.Candidates[0].CategoryID)
 	require.Empty(t, item.Selection.CategoryID, "Typed search must wait for explicit confirmation")
-	price, err := uc.ResolveSelection(context.Background(), "五花肉", item.Selection, item.Candidates, "category-301", "")
+	final, err := uc.ResolveSelection(context.Background(), "五花肉", item.Selection, item.Candidates, "category-301", "")
 	require.NoError(t, err)
-	require.Equal(t, "301", price.Selection.CategoryID)
-	require.Equal(t, domain.CropSelectionPrice, price.Selection.Stage)
+	require.Equal(t, "301", final.Selection.CategoryID)
+	require.Equal(t, domain.CropSelectionDescribe, final.Selection.Stage)
 	other, err := uc.ResolveSelection(context.Background(), "五花肉", item.Selection, item.Candidates, "", "牛腩")
 	require.NoError(t, err)
 	require.True(t, other.Unavailable)

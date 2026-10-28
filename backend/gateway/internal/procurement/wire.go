@@ -122,7 +122,7 @@ type SlotsDTO struct {
 	DeliveryCity       *string `json:"delivery_city,omitempty"`
 	DeliveryDate       *string `json:"delivery_date,omitempty"`
 	ExactMatchRequired *bool   `json:"exact_match_required,omitempty"`
-	// ItemResolution 是品項的解析結果——買家原話被判定成 Pricebook 分類體系裡的
+	// ItemResolution 是品項的解析結果——買家原話被判定成分類體系裡的
 	// 哪一層，以及那個判定是誰做的。它跟 item 原話同一個 revision（ADR
 	// 2026-09-04-crop-resolution-into-slots），所以住在 slots 而不是另一個頂層欄位。
 	ItemResolution *ItemResolutionDTO `json:"item_resolution,omitempty"`
@@ -136,15 +136,12 @@ type SlotsDTO struct {
 // 退一級重查大類的內部查詢鍵，買家不需要也無從使用（同 proto 端的決定）。
 // 多一個 display_value：伺服器組好的顯示字串，見 DisplayValue 欄位註解。
 type ItemResolutionDTO struct {
-	// CROP｜GROUP｜SELF_PRICED，三者互斥。
+	// CATEGORY_CONFIRMED 或 BUYER_DESCRIBED。
 	Kind string `json:"kind"`
-	// 分類名稱（「甘藍-初秋」「甘藍」）。SELF_PRICED 時為空。
+	// 分類名稱（「甘藍-初秋」「甘藍」），BUYER_DESCRIBED 時為買家的描述。
 	Label string `json:"label,omitempty"`
-	// SYSTEM（系統依檢索結果直接定案，買家沒被問過）｜BUYER_CHOICE（買家在消歧卡
-	// 上親自挑的）。前端據此分流：SYSTEM 要提示可更正，BUYER_CHOICE 是已確認態。
+	// 目前只有 BUYER_CHOICE（買家在消歧卡上親自挑的）。
 	Provenance string `json:"provenance"`
-	// 只在 Kind == SELF_PRICED 時有值，新台幣元／公斤。
-	PricePerKg *int `json:"price_per_kg,omitempty"`
 	// DisplayValue 是伺服器組好的顯示字串。前端不得自己用 kind＋label 重拼——
 	// recordedThisTurn 的 chip 用的就是同一個值，兩邊各拼一次會漂成兩套文案，
 	// 而它們在畫面上相鄰。
@@ -158,15 +155,6 @@ func itemResolutionFromProto(r *pb.ItemResolution) *ItemResolutionDTO {
 	out := &ItemResolutionDTO{
 		Kind: r.GetKind(), Label: r.GetLabel(),
 		Provenance: r.GetProvenance(), DisplayValue: r.GetDisplayValue(),
-	}
-	// price_per_kg 走 wire 時是十進位字串（同 Quantity／BudgetPerUnit 的既有慣例），
-	// 轉回 *int 讓對外 JSON 是不帶引號的數字，與 SlotsDTO 其餘數值欄位一致。
-	// 解析失敗代表 ai-service 送了非十進位整數字串——留 nil，不因一個顯示欄位
-	// 讓整個回應失敗（同下方 Quantity 的既有處理）。
-	if r.PricePerKg != nil {
-		if v, err := parseSlotInt(r.GetPricePerKg()); err == nil {
-			out.PricePerKg = &v
-		}
 	}
 	return out
 }

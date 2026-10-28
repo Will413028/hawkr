@@ -117,7 +117,7 @@ func TestSummarizeCropGate_PendingWithNoCandidates_HasItsOwnSentence(t *testing.
 func TestSummarizeCropGate_DoesNotNameTheEscapeHatchButton(t *testing.T) {
 	for _, selection := range []*domain.CropSelection{
 		nil,
-		{Stage: domain.CropSelectionPrice},
+		{Stage: domain.CropSelectionDescribe},
 		{Stage: domain.CropSelectionItem, ParentLabel: "豬肉"},
 	} {
 		got := summarizeCropGate(cropidentity.GateResult{

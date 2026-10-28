@@ -13,7 +13,7 @@ func (uc *DisambiguationUseCase) Resolve(ctx context.Context, itemText string) (
 	q := understandQuery(itemText)
 	if len(q.Variants) == 0 {
 		observability.RecordProcurementCropResolverV2(ctx, "escape")
-		return categoryPrice(nil), nil
+		return categoryDescribeStage(nil), nil
 	}
 	pool, err := uc.recallPool(ctx, q)
 	if err != nil {
@@ -71,7 +71,7 @@ func unexpandedGroup(g cropCategory) fuse.Fused {
 func (uc *DisambiguationUseCase) decide(ctx context.Context, itemText string, pool []fuse.Fused) (DisambiguationResult, error) {
 	if len(pool) == 0 {
 		observability.RecordProcurementCropResolverV2(ctx, "escape")
-		return categoryPrice(nil), nil
+		return categoryDescribeStage(nil), nil
 	}
 	var strong []fuse.Fused
 	for _, f := range pool {
@@ -102,16 +102,16 @@ func (uc *DisambiguationUseCase) resolveCategory(ctx context.Context, itemText, 
 			label, parentID, parentLabel = node.Label, node.ParentID, node.ParentLabel
 		}
 	}
-	sel := &domain.CropSelection{Stage: domain.CropSelectionPrice, QueryText: itemText, CategoryID: categoryID, Label: label, ParentCategoryID: parentID, ParentLabel: parentLabel}
+	sel := &domain.CropSelection{Stage: domain.CropSelectionDescribe, QueryText: itemText, CategoryID: categoryID, Label: label, ParentCategoryID: parentID, ParentLabel: parentLabel}
 	observability.RecordProcurementCropResolverV2(ctx, "resolved")
-	return categoryPrice(sel), nil
+	return categoryDescribeStage(sel), nil
 }
 
 func (uc *DisambiguationUseCase) categoryCard(ctx context.Context, itemText string, categoryPool []fuse.Fused) (DisambiguationResult, error) {
 	nodes := uc.categoryNodes(ctx, categoryPool)
 	if len(nodes) == 0 {
 		observability.RecordProcurementCropResolverV2(ctx, "escape")
-		return categoryPrice(nil), nil
+		return categoryDescribeStage(nil), nil
 	}
 	groups := facetGroups(nodes)
 	if facetAsksAtGroup(groups) {
@@ -134,7 +134,7 @@ func (uc *DisambiguationUseCase) categoryCard(ctx context.Context, itemText stri
 		if len(leaves) == 0 {
 
 			observability.RecordProcurementCropResolverV2(ctx, "escape")
-			return categoryPrice(nil), nil
+			return categoryDescribeStage(nil), nil
 		}
 	case len(leaves) == 1:
 		return uc.resolveCategory(ctx, itemText, leaves[0].id, leaves[0].label, g.id, g.label)

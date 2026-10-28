@@ -7,14 +7,9 @@ import type {
 	ProcurementCandidate,
 	ProcurementSlots,
 } from "@/lib/api/openapi-types";
-import {
-	formatTaipeiDate,
-	formatTaipeiDateTime,
-	formatTaipeiIsoDate,
-} from "@/lib/date/taipei";
+import { formatTaipeiDateTime, formatTaipeiIsoDate } from "@/lib/date/taipei";
 import { buyerQualityStateLabel } from "./buyer-quality-state";
 import { countSelectedRecipients } from "./candidate-grouping";
-import { DealTemperature } from "./DealTemperature";
 import {
 	BUYER_NOTE_MAX_LENGTH,
 	hasConfirmablePriceBasis,
@@ -25,7 +20,6 @@ import {
 	type RfqConfirmationCommand,
 	type RfqPricePreview,
 	type RfqPricePreviewCommand,
-	type RfqPricingMode,
 	validateBuyerDesiredRange,
 } from "./rfq-price-contract";
 import {
@@ -101,166 +95,6 @@ function shortIdentity(value: string): string {
 	return value.length <= 12 ? value : `${value.slice(0, 6)}…${value.slice(-6)}`;
 }
 
-function referenceMarkPercent(range: {
-	lowerBoundAmount: string;
-	midpointAmount: string;
-	upperBoundAmount: string;
-}): string | null {
-	if (!range.lowerBoundAmount || !range.upperBoundAmount) return null;
-	const lower = Number(range.lowerBoundAmount);
-	const mid = Number(range.midpointAmount);
-	const upper = Number(range.upperBoundAmount);
-	if (![lower, mid, upper].every(Number.isFinite)) return null;
-	const span = upper - lower;
-	if (span <= 0) return "50";
-	const ratio = ((mid - lower) / span) * 100;
-	return String(Math.round(Math.min(100, Math.max(0, ratio)) * 10) / 10);
-}
-
-function PriceRange({ preview }: { preview: RfqPricePreview }) {
-	const range = preview.referencePriceRange;
-	const { basisQuantity, basisUnit } = priceBasisOf(preview);
-	const basisSuffix =
-		basisQuantity && basisUnit ? `／${basisQuantity} ${basisUnit}` : "";
-	const mark = range ? referenceMarkPercent(range) : null;
-	const hasBand = Boolean(range?.lowerBoundAmount && range?.upperBoundAmount);
-	if (range && !hasBand) {
-		return (
-			<div className="assistant-rfq-guidance__reference">
-				<dl className="assistant-rfq-guidance__reference-values">
-					<div data-edge="mid" data-primary={true}>
-						<dt>市場參考價</dt>
-						<dd>
-							<span>{formatTwd(range.midpointAmount)}</span>
-							{basisSuffix ? <small>{basisSuffix}</small> : null}
-						</dd>
-					</div>
-				</dl>
-				<p className="assistant-rfq-guidance__reference-note">
-					此來源只公布單一成交均價，沒有價格區間。
-				</p>
-			</div>
-		);
-	}
-	return (
-		<div className="assistant-rfq-guidance__reference">
-			<dl className="assistant-rfq-guidance__reference-values">
-				<div data-edge="lower">
-					<dt>區間下限</dt>
-					<dd>
-						<span>{range ? formatTwd(range.lowerBoundAmount) : "無參考"}</span>
-						{range && basisSuffix ? <small>{basisSuffix}</small> : null}
-					</dd>
-				</div>
-				<div data-edge="mid" data-primary={range ? true : undefined}>
-					<dt>中位數</dt>
-					<dd>
-						<span>{range ? formatTwd(range.midpointAmount) : "—"}</span>
-					</dd>
-				</div>
-				<div data-edge="upper">
-					<dt>區間上限</dt>
-					<dd>
-						<span>{range ? formatTwd(range.upperBoundAmount) : "無參考"}</span>
-						{range && basisSuffix ? <small>{basisSuffix}</small> : null}
-					</dd>
-				</div>
-			</dl>
-			{mark ? (
-				<div
-					className="assistant-rfq-guidance__reference-axis"
-					aria-hidden="true"
-				>
-					<span className="assistant-rfq-guidance__reference-track" />
-					<span
-						className="assistant-rfq-guidance__reference-mark"
-						style={{ left: `${mark}%` }}
-					/>
-				</div>
-			) : null}
-		</div>
-	);
-}
-
-const FRESHNESS_NOTICE: Record<string, string> = {
-	stale: "價格為模型推估，僅供參考。",
-	unavailable: "價格為模型推估，僅供參考。",
-};
-
-const PRICE_LAYER_LABELS: Record<string, string> = {
-	wholesale_auction: "批發拍賣價",
-	farmgate: "產地價",
-	live_animal: "活體拍賣價（整頭，非分切）",
-	retail: "零售價",
-	wholesale_bulk: "躉售價",
-};
-
-function mappingLabel(
-	itemName: string,
-	basis: { scope: string; regionName: string },
-): string {
-	const scopeLabel = basis.scope === "NATIONAL" ? "全國" : basis.regionName;
-	if (!scopeLabel) return itemName;
-	return itemName ? `${itemName}／${scopeLabel}` : scopeLabel;
-}
-
-function marketCountLabel(basis: {
-	scope: string;
-	supportingMarketCount: string;
-}): string {
-	if (basis.scope === "NATIONAL") return "全國行情";
-	return `${basis.supportingMarketCount} 個批發市場`;
-}
-
-function MarketPriceBasis({
-	preview,
-	itemName,
-}: {
-	preview: RfqPricePreview;
-	itemName: string;
-}) {
-	const basis = preview.marketPriceBasis;
-	if (!basis) return null;
-	const { basisQuantity, basisUnit } = priceBasisOf(preview);
-	const layerLabel = PRICE_LAYER_LABELS[basis.priceLayer] ?? null;
-	const notice = FRESHNESS_NOTICE[basis.freshnessStatus];
-	return (
-		<div
-			className="assistant-rfq-guidance__market-basis"
-			data-freshness={basis.freshnessStatus}
-		>
-			<div>
-				<small>資料截至</small>
-				<strong>
-					{basis.sourceDataAsOf
-						? formatTaipeiDate(basis.sourceDataAsOf)
-						: "行情來源未提供"}
-				</strong>
-			</div>
-			<div>
-				<small>映射</small>
-				<strong>{mappingLabel(itemName, basis)}</strong>
-			</div>
-			{layerLabel != null ? (
-				<div>
-					<small>價格層級</small>
-					<strong>{layerLabel}</strong>
-				</div>
-			) : null}
-			<div>
-				<small>計價基準</small>
-				<strong>
-					{marketCountLabel(basis)}
-					{basisQuantity && basisUnit
-						? `・每 ${basisQuantity} ${basisUnit}`
-						: ""}
-				</strong>
-			</div>
-			<p>{notice ? notice : "僅供設定詢價範圍，不是供應商報價。"}</p>
-		</div>
-	);
-}
-
 function QuoteTotalRange({ preview }: { preview: RfqPricePreview }) {
 	const total = preview.quoteTotalRange;
 	if (!total) return null;
@@ -298,8 +132,6 @@ export default function RfqDraftFlow({
 }: RfqDraftFlowProps) {
 	const [step, setStep] = React.useState(0);
 	const [furthestStep, setFurthestStep] = React.useState(0);
-	const [pricingMode, setPricingMode] =
-		React.useState<RfqPricingMode>("PRICEBOOK_GUIDED");
 	const [desiredPriceLower, setDesiredPriceLower] = React.useState("");
 	const [desiredPriceUpper, setDesiredPriceUpper] = React.useState("");
 	const [previewState, setPreviewState] = React.useState<
@@ -405,13 +237,7 @@ export default function RfqDraftFlow({
 		responseDeadline && todayTaipei && responseDeadline < todayTaipei
 			? "回覆期限不能早於今天"
 			: null;
-	const hasDesiredRangeInput = Boolean(
-		desiredPriceLower.trim() || desiredPriceUpper.trim(),
-	);
-	const desiredRangeBlocking =
-		pricingMode === "BUYER_ENTERED_NO_REFERENCE"
-			? Boolean(desiredRangeError)
-			: hasDesiredRangeInput && Boolean(desiredRangeError);
+	const desiredRangeBlocking = Boolean(desiredRangeError);
 	const preview = previewState.status === "success" ? previewState.data : null;
 	const confirmationLocked =
 		confirmationState.status === "loading" ||
@@ -481,19 +307,13 @@ export default function RfqDraftFlow({
 
 			const commandInput = {
 				expectedRevisionId: revisionId,
-				pricingMode,
 				deliveryCity,
-				...(pricingMode === "BUYER_ENTERED_NO_REFERENCE" ||
-				(pricingMode === "PRICEBOOK_GUIDED" && hasDesiredRangeInput)
-					? {
-							buyerRequestedRange: {
-								currency: "TWD" as const,
-								priceComponent: "GOODS_ONLY" as const,
-								lowerBoundAmount: desiredPriceLower.trim(),
-								upperBoundAmount: desiredPriceUpper.trim(),
-							},
-						}
-					: {}),
+				buyerRequestedRange: {
+					currency: "TWD" as const,
+					priceComponent: "GOODS_ONLY" as const,
+					lowerBoundAmount: desiredPriceLower.trim(),
+					upperBoundAmount: desiredPriceUpper.trim(),
+				},
 			};
 			const fingerprint = JSON.stringify(commandInput);
 			const existing = previewCommandRef.current;
@@ -515,19 +335,16 @@ export default function RfqDraftFlow({
 				if (previewOperationRef.current !== operation) return;
 				if (
 					result.ok &&
-					(result.data.pricingMode !== command.pricingMode ||
-						(command.buyerRequestedRange &&
-							(!result.data.buyerRequestedRange ||
-								result.data.buyerRequestedRange.lowerBoundAmount !==
-									command.buyerRequestedRange.lowerBoundAmount ||
-								result.data.buyerRequestedRange.upperBoundAmount !==
-									command.buyerRequestedRange.upperBoundAmount)))
+					(result.data.buyerRequestedRange.lowerBoundAmount !==
+						command.buyerRequestedRange.lowerBoundAmount ||
+						result.data.buyerRequestedRange.upperBoundAmount !==
+							command.buyerRequestedRange.upperBoundAmount)
 				) {
 					setPreviewState({
 						status: "error",
 						error: {
 							code: "INVALID_RESPONSE",
-							detail: "取得的價格方式或區間與本次設定不一致，請重試。",
+							detail: "取得的區間與本次設定不一致，請重試。",
 							retryable: true,
 						},
 					});
@@ -538,18 +355,6 @@ export default function RfqDraftFlow({
 						? { status: "success", data: result.data }
 						: { status: "error", error: result.error },
 				);
-				if (
-					result.ok &&
-					result.data.pricingMode === "PRICEBOOK_GUIDED" &&
-					result.data.buyerRequestedRange
-				) {
-					setDesiredPriceLower(
-						result.data.buyerRequestedRange.lowerBoundAmount,
-					);
-					setDesiredPriceUpper(
-						result.data.buyerRequestedRange.upperBoundAmount,
-					);
-				}
 			} finally {
 				if (previewInFlightRef.current === operation) {
 					previewInFlightRef.current = null;
@@ -561,9 +366,7 @@ export default function RfqDraftFlow({
 			desiredPriceLower,
 			desiredPriceUpper,
 			desiredRangeBlocking,
-			hasDesiredRangeInput,
 			onPreviewRfqPrice,
-			pricingMode,
 			quantity,
 			requestId,
 			revisionId,
@@ -571,23 +374,6 @@ export default function RfqDraftFlow({
 			unit,
 		],
 	);
-
-	React.useEffect(() => {
-		if (
-			step !== 2 ||
-			pricingMode !== "PRICEBOOK_GUIDED" ||
-			previewState.status !== "idle" ||
-			hasDesiredRangeInput
-		)
-			return;
-		void runPreview(true);
-	}, [
-		previewState.status,
-		pricingMode,
-		runPreview,
-		step,
-		hasDesiredRangeInput,
-	]);
 
 	React.useEffect(() => {
 		if (
@@ -784,12 +570,6 @@ export default function RfqDraftFlow({
 		setPublicationState({ status: "idle" });
 	};
 
-	const handleModeChange = (mode: RfqPricingMode) => {
-		if (mode === pricingMode || confirmationLocked) return;
-		setPricingMode(mode);
-		clearDerivedPriceState();
-	};
-
 	const handleRefreshSnapshot = async () => {
 		if (refreshingSnapshot) return;
 		setRefreshingSnapshot(true);
@@ -832,7 +612,7 @@ export default function RfqDraftFlow({
 		>
 			<header className="assistant-rfq-draft__intro">
 				<h2 id="assistant-rfq-draft-title">核對需求與價格</h2>
-				<p>參考市場行情設定希望詢價區間；確認後仍需另外發布詢價。</p>
+				<p>設定希望詢價區間；確認後仍需另外發布詢價。</p>
 				<small>{revisionLabel(revisionId)}</small>
 			</header>
 
@@ -864,9 +644,6 @@ export default function RfqDraftFlow({
 							</span>
 							<div>
 								<h3>目前需求版本</h3>
-								<p>
-									行情依品項分類、配送城市與計價單位查詢，數量與交期不影響參考範圍。
-								</p>
 							</div>
 						</header>
 						<div className="assistant-rfq-draft__fields">
@@ -900,19 +677,12 @@ export default function RfqDraftFlow({
 							</div>
 							{itemResolution ? (
 								<label>
-									<span>
-										品項分類
-										{itemResolution.provenance === "SYSTEM"
-											? "（系統判斷）"
-											: "（你已確認）"}
-									</span>
+									<span>品項分類（你已確認）</span>
 									<input value={itemResolution.displayValue} readOnly />
 								</label>
 							) : null}
 							<p className="assistant-rfq-draft__readonly-help">
-								{itemResolution?.provenance === "SYSTEM"
-									? "品項分類是系統依你的描述判斷的，它決定取哪一種行情當價格基準；判斷錯了請回到對話重打品項。要修改數量、單位、城市或交期，同樣請回到對話產生新的需求版本；本畫面不會沿用舊試算，後續需重新確認。"
-									: "要修改數量、單位、城市或交期，請回到對話產生新的需求版本；本畫面不會沿用舊試算，後續需重新確認。"}
+								要修改數量、單位、城市或交期，請回到對話產生新的需求版本；本畫面不會沿用舊試算，後續需重新確認。
 							</p>
 						</div>
 					</section>
@@ -1019,7 +789,7 @@ export default function RfqDraftFlow({
 									<AppIcon name="chart" size={19} aria-hidden="true" />
 								</span>
 								<div>
-									<h3 id="assistant-rfq-guidance-title">參考行情與希望詢價</h3>
+									<h3 id="assistant-rfq-guidance-title">希望詢價區間</h3>
 									<p>
 										請先取得價格試算，再核對本次希望詢價區間；尚未送出的輸入不會納入確認。
 									</p>
@@ -1036,47 +806,13 @@ export default function RfqDraftFlow({
 								</span>
 							</header>
 
-							<fieldset className="assistant-rfq-guidance__modes">
-								<legend>價格方式</legend>
-								<label>
-									<input
-										type="radio"
-										name="rfq-pricing-mode"
-										checked={pricingMode === "PRICEBOOK_GUIDED"}
-										disabled={confirmationLocked}
-										onChange={() => handleModeChange("PRICEBOOK_GUIDED")}
-									/>
-									<span>
-										<strong>參考市場行情</strong>
-										<small>查詢行情並帶入出價參考範圍</small>
-									</span>
-								</label>
-								<label>
-									<input
-										type="radio"
-										name="rfq-pricing-mode"
-										checked={pricingMode === "BUYER_ENTERED_NO_REFERENCE"}
-										disabled={confirmationLocked}
-										onChange={() =>
-											handleModeChange("BUYER_ENTERED_NO_REFERENCE")
-										}
-									/>
-									<span>
-										<strong>自行設定價格</strong>
-										<small>沒有可用參考時明確改用買家輸入</small>
-									</span>
-								</label>
-							</fieldset>
-
 							{previewState.status === "loading" ? (
 								<div
 									className="assistant-rfq-guidance__loading"
 									role="status"
 									aria-live="polite"
 								>
-									{pricingMode === "PRICEBOOK_GUIDED"
-										? "正在查詢市場參考價格…"
-										: "正在建立無參考價試算…"}
+									正在建立無參考價試算…
 								</div>
 							) : null}
 
@@ -1087,16 +823,6 @@ export default function RfqDraftFlow({
 									</h3>
 									<p>{activeError.detail}</p>
 									<div>
-										{activeError.code === "MAPPING_MISSING" ? (
-											<Button
-												variant="bordered"
-												onClick={() =>
-													handleModeChange("BUYER_ENTERED_NO_REFERENCE")
-												}
-											>
-												改用自行設定價格
-											</Button>
-										) : null}
 										{activeError.code === "STALE_REVISION" ||
 										activeError.code === "STALE_CONTEXT" ? (
 											<Button
@@ -1114,7 +840,7 @@ export default function RfqDraftFlow({
 												variant="bordered"
 												onClick={() => void runPreview(false)}
 											>
-												重新取得行情
+												重新試算
 											</Button>
 										) : null}
 										{activeError.retryable ? (
@@ -1155,44 +881,21 @@ export default function RfqDraftFlow({
 							) : null}
 
 							{preview ? (
-								<>
-									<div className="assistant-rfq-guidance__price">
-										<div className="assistant-rfq-guidance__price-copy">
-											<small>Pricebook 參考區間</small>
-											<strong>
-												{preview.referenceAvailability === "AVAILABLE"
-													? "已取得行情參考範圍"
-													: "本次未使用行情參考"}
-											</strong>
-											<p>
-												價格成分為商品本身，不含運費；真正價格由供應商回價、買家接受後形成。
-											</p>
-										</div>
-										<PriceRange preview={preview} />
+								<div className="assistant-rfq-guidance__price">
+									<div className="assistant-rfq-guidance__price-copy">
+										<p>
+											價格成分為商品本身，不含運費；真正價格由供應商回價、買家接受後形成。
+										</p>
 									</div>
-									<MarketPriceBasis
-										preview={preview}
-										itemName={slots.item ?? ""}
-									/>
-								</>
+								</div>
 							) : null}
 
-							{pricingMode === "PRICEBOOK_GUIDED" ||
-							(pricingMode === "BUYER_ENTERED_NO_REFERENCE" &&
-								previewState.status !== "success") ? (
+							{previewState.status !== "success" ? (
 								<div className="assistant-rfq-guidance__desired">
 									<div>
 										<small>新台幣整數</small>
-										<strong>
-											{pricingMode === "PRICEBOOK_GUIDED"
-												? "希望詢價區間（買家期望）"
-												: "自行設定希望詢價區間"}
-										</strong>
-										<p>
-											{pricingMode === "PRICEBOOK_GUIDED"
-												? "已依市場參考行情帶入希望詢價區間，可調整後按「重新試算」；伺服器不會自動限制在參考區間內。"
-												: "送出前不會自動切換價格方式；取得完整的計價單位與數量後才可確認。"}
-										</p>
+										<strong>自行設定希望詢價區間</strong>
+										<p>取得完整的計價單位與數量後才可確認。</p>
 									</div>
 									<div className="assistant-rfq-guidance__desired-fields">
 										<label>
@@ -1239,9 +942,7 @@ export default function RfqDraftFlow({
 											disabled={confirmationLocked || desiredRangeBlocking}
 											onClick={() => void runPreview(false)}
 										>
-											{pricingMode === "PRICEBOOK_GUIDED"
-												? "重新試算"
-												: "取得無參考價試算"}
+											取得無參考價試算
 										</Button>
 									</div>
 									<p
@@ -1259,8 +960,7 @@ export default function RfqDraftFlow({
 
 							{preview ? (
 								<>
-									{preview.pricingMode === "BUYER_ENTERED_NO_REFERENCE" &&
-									preview.buyerRequestedRange ? (
+									{preview.buyerRequestedRange ? (
 										<div className="assistant-rfq-guidance__server-range">
 											<div>
 												<small>你設定的希望詢價區間</small>
@@ -1295,8 +995,6 @@ export default function RfqDraftFlow({
 									<QuoteTotalRange preview={preview} />
 								</>
 							) : null}
-
-							<DealTemperature preview={preview} />
 						</section>
 
 						<section
@@ -1315,7 +1013,7 @@ export default function RfqDraftFlow({
 									>
 										確認本次需求與價格
 									</h3>
-									<p>確認後會固定這一版需求、價格方式與參考／希望區間。</p>
+									<p>確認後會固定這一版需求與希望區間。</p>
 								</div>
 								<span className="assistant-rfq-snapshot__state">
 									{confirmed ? "已確認" : preview ? "可確認" : "等待價格"}
@@ -1325,16 +1023,6 @@ export default function RfqDraftFlow({
 								<div>
 									<small>需求版本</small>
 									<strong>{revisionLabel(revisionId)}</strong>
-								</div>
-								<div>
-									<small>價格方式</small>
-									<strong>
-										{preview?.pricingMode === "PRICEBOOK_GUIDED"
-											? "參考市場行情"
-											: preview
-												? "買家自行設定"
-												: "待取得"}
-									</strong>
 								</div>
 								<div>
 									<small>邀請名單</small>
@@ -1358,7 +1046,7 @@ export default function RfqDraftFlow({
 									<div>
 										<strong>價格基準尚不可確認</strong>
 										<p>
-											價格資料尚未完整，或與目前需求單位不一致。本次只能檢視，請重新查詢行情或修改需求。
+											價格資料尚未完整，或與目前需求單位不一致。本次只能檢視，請重新試算或修改需求。
 										</p>
 									</div>
 								</div>
@@ -1483,58 +1171,29 @@ export default function RfqDraftFlow({
 								<h4 id="assistant-rfq-reconfirm-basis">2. 價格基準</h4>
 								<dl>
 									<div>
-										<dt>模式</dt>
+										<dt>買家希望詢價</dt>
 										<dd>
-											<code className="assistant-rfq-reconfirm__badge">
-												{preview.pricingMode}
-											</code>
+											{`${formatTwd(preview.buyerRequestedRange.lowerBoundAmount)}–${formatTwd(
+												preview.buyerRequestedRange.upperBoundAmount,
+											)}`}
+											<small>{basisSuffix}</small>
 										</dd>
 									</div>
-									{preview.referencePriceRange ? (
-										<div>
-											<dt>參考區間</dt>
-											<dd>
-												{`${formatTwd(preview.referencePriceRange.lowerBoundAmount)}–${formatTwd(
-													preview.referencePriceRange.upperBoundAmount,
-												)}`}
-												<small>{basisSuffix}</small>
-											</dd>
-										</div>
-									) : null}
-									{preview.buyerRequestedRange ? (
-										<div>
-											<dt>買家希望詢價</dt>
-											<dd>
-												{`${formatTwd(preview.buyerRequestedRange.lowerBoundAmount)}–${formatTwd(
-													preview.buyerRequestedRange.upperBoundAmount,
-												)}`}
-												<small>{basisSuffix}</small>
-											</dd>
-										</div>
-									) : null}
 								</dl>
 								<div
 									className="assistant-rfq-draft__notice"
 									data-tone="warning"
 								>
 									<AppIcon name="warning" size={18} aria-hidden="true" />
-									<p>行情／詢價基準，不是成交價格</p>
+									<p>詢價基準，不是成交價格</p>
 								</div>
-							</section>
-
-							<section
-								className="assistant-rfq-reconfirm__block"
-								aria-labelledby="assistant-rfq-reconfirm-temperature"
-							>
-								<h4 id="assistant-rfq-reconfirm-temperature">3. 成交溫度計</h4>
-								<DealTemperature preview={preview} />
 							</section>
 
 							<section
 								className="assistant-rfq-reconfirm__block"
 								aria-labelledby="assistant-rfq-reconfirm-audience"
 							>
-								<h4 id="assistant-rfq-reconfirm-audience">4. 發布受眾</h4>
+								<h4 id="assistant-rfq-reconfirm-audience">3. 發布受眾</h4>
 								<dl>
 									<div>
 										<dt>發布對象</dt>
@@ -1552,7 +1211,7 @@ export default function RfqDraftFlow({
 								className="assistant-rfq-reconfirm__block assistant-rfq-reconfirm__block--trace"
 								aria-labelledby="assistant-rfq-reconfirm-trace"
 							>
-								<h4 id="assistant-rfq-reconfirm-trace">5. 快照追蹤</h4>
+								<h4 id="assistant-rfq-reconfirm-trace">4. 快照追蹤</h4>
 								<dl>
 									<div>
 										<dt>pricePreviewId</dt>
@@ -1564,16 +1223,6 @@ export default function RfqDraftFlow({
 											{shortIdentity(confirmed.payloadHash)}
 										</dd>
 									</div>
-									{preview.marketPriceBasis?.sourceDataAsOf ? (
-										<div>
-											<dt>資料截至</dt>
-											<dd>
-												{`${formatTaipeiDateTime(
-													preview.marketPriceBasis.sourceDataAsOf,
-												)}（Asia/Taipei）`}
-											</dd>
-										</div>
-									) : null}
 									{confirmed.expiresAt ? (
 										<div>
 											<dt>有效至</dt>

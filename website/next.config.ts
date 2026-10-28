@@ -202,7 +202,6 @@ const PAGE_RESPONSE_CACHE_HEADERS = [
  *   /quote-confirm            一次性 token 驅動的報價確認，會觸發不可逆商業操作
  *   /seller/onboarding        開店流程，承接已驗證手機與表單狀態（/seller 與
  *                             /seller/pricing 是公開行銷頁，所以列完整路徑）
- *   /hawkr-agent-rfq-preview  交易預覽 fixture，已 noindex；接真資料前先關門
  *   /api                      route handler 的回應由 handler 自己宣告政策，但
  *                             `headers()` 的同名 header 會蓋過它（見檔尾
  *                             /adm/enter 那條的實測）。/api/health 明寫 no-store
@@ -225,7 +224,6 @@ const NO_STORE_ROUTE_PREFIXES = [
 	"/adm",
 	"/quote-confirm",
 	"/seller/onboarding",
-	"/hawkr-agent-rfq-preview",
 	"/api",
 	"/sentinel",
 ] as const;
@@ -485,16 +483,6 @@ const nextConfig: NextConfig = {
 						{
 							source: "/account/find-sellers",
 							destination: "/account/messages",
-							permanent: false,
-						},
-						{
-							source: "/hawkr-agent-rfq-preview",
-							destination: "/",
-							permanent: false,
-						},
-						{
-							source: "/hawkr-agent-rfq-preview/:path*",
-							destination: "/",
 							permanent: false,
 						},
 					]

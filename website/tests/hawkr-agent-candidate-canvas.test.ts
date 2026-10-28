@@ -106,8 +106,8 @@ test("seller rollup is data-driven, never a toggle that can be empty", () => {
  * 候選的單位是**收件人**不是品項：收斂成商家之後不得再顯示商品層的東西。
  *
  * 這一則是為了擋住「順手把商品名／縮圖／標價加回來」——那些欄位後端刻意沒有交付
- * （backend PR #2702 的說明），而價格尤其不能從這裡長出來：買家該看到的是 Pricebook
- * 對該品項的參考價區間（#2403），不是某個平台商品的標價。
+ * （backend PR #2702 的說明），而價格尤其不能從這裡長出來：買家該看到的是自己設定的
+ * 希望詢價區間（#2403），不是某個平台商品的標價。
  */
 test("seller rows carry recipient identity only, never product-level price", () => {
 	// 不得從候選資料渲染出任何價格數字。判準是「價格欄位與標價用詞」，不是「報價」二字——

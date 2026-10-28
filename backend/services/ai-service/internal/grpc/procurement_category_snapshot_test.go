@@ -12,10 +12,10 @@ import (
 )
 
 func TestGetSnapshot_RestoresCategoryStageFromOpenInterrupt(t *testing.T) {
-	for _, stage := range []string{domain.CropSelectionGroup, domain.CropSelectionItem, domain.CropSelectionPrice} {
+	for _, stage := range []string{domain.CropSelectionGroup, domain.CropSelectionItem, domain.CropSelectionDescribe} {
 		t.Run(stage, func(t *testing.T) {
 			candidates := []domain.CropDisambiguationOption{{CategoryID: "24", CategoryLevel: 3, Label: "五花肉"}}
-			if stage == domain.CropSelectionPrice {
+			if stage == domain.CropSelectionDescribe {
 				candidates = nil
 			}
 			payload, err := json.Marshal(usecase.CropDisambiguationInterruptPayload{
@@ -37,8 +37,8 @@ func TestGetSnapshot_RestoresCategoryStageFromOpenInterrupt(t *testing.T) {
 			q := got.GetOpenConfirmation().GetQuestion()
 			require.NotNil(t, q)
 			require.Equal(t, string(domain.SlotCropDisambiguation), q.GetSlotKey())
-			require.Equal(t, stage != domain.CropSelectionPrice, q.GetAllowFreeText())
-			if stage != domain.CropSelectionPrice {
+			require.Equal(t, stage != domain.CropSelectionDescribe, q.GetAllowFreeText())
+			if stage != domain.CropSelectionDescribe {
 				require.Equal(t, "category-24", q.GetOptions()[0].GetOptionId())
 			}
 		})

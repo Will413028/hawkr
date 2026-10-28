@@ -343,7 +343,7 @@ export default function QuoteBatchSummary({
 					</dl>
 					<p className={styles.truthFootnote}>
 						{
-							"Pricebook 參考區間與買家希望價格都不是成交價格。只有買家接受指定 sellerResponseVersion 並收到伺服器回執後才形成 acceptedDealPrice；付款成功前不得視為正式成交。"
+							"買家希望價格不是成交價格。只有買家接受指定 sellerResponseVersion 並收到伺服器回執後才形成 acceptedDealPrice；付款成功前不得視為正式成交。"
 						}
 					</p>
 					<div className={styles.actions}>

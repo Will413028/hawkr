@@ -20,7 +20,7 @@ func TestCompileSellerFacingPayload_ReadsOnlyCanonicalPayload(t *testing.T) {
 		"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN",
 		"buyerRequestedRange":{"min":"80","max":"120"},
 		"item":"高麗菜",
-		"itemResolution":{"kind":"SELF_PRICED","label":"高麗菜"},
+		"itemResolution":{"kind":"CATEGORY_CONFIRMED","label":"高麗菜"},
 		"quantity":100,
 		"unit":"公斤",
 		"packaging":"紙箱",

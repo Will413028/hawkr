@@ -10,7 +10,6 @@ export type DynamicRouteFixture =
 	| "delegated-workspace"
 	| "order-callback"
 	| "product"
-	| "rfq-prototype"
 	| "seller"
 	| "seller-product";
 
@@ -162,16 +161,6 @@ export const DYNAMIC_ROUTE_CATALOG: readonly DynamicRouteCatalogEntry[] = [
 		pattern: "/account/wallet/[sellerId]",
 		access: "buyer",
 		fixture: "protected-placeholder",
-	},
-	{
-		pattern: "/hawkr-agent-rfq-preview/[screen]",
-		access: "public",
-		fixture: "rfq-prototype",
-	},
-	{
-		pattern: "/hawkr-agent-rfq-preview/external-vendor/[step]",
-		access: "public",
-		fixture: "rfq-prototype",
 	},
 	{
 		pattern: "/orders/[orderNo]",
@@ -377,11 +366,6 @@ export function materializeDynamicRoute(
 				"[id]",
 				requireFixtureId(fixtures, "productId", entry.pattern),
 			);
-			break;
-		case "rfq-prototype":
-			route = route
-				.replace("[screen]", "candidate-handoff")
-				.replace("[step]", "portal");
 			break;
 		case "seller":
 			route = route.replace(

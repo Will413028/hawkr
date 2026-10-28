@@ -2,13 +2,11 @@
 
 import * as React from "react";
 import BrandLogo from "@/components/shared/BrandLogo";
-import type { AgentCapabilities } from "./capabilities";
 import {
 	type AgentCapabilityChip,
 	ENTRY_COMPOSER_PLACEHOLDER,
 	ENTRY_HEADING,
 	ENTRY_SUBHEADING,
-	flaggedCapabilityChips,
 	SLICE_A_CAPABILITY_CHIPS,
 } from "./entry-content";
 import HawkrAgentCapabilityIcon from "./HawkrAgentCapabilityIcon";
@@ -58,7 +56,6 @@ function usePrefill(
 }
 
 interface AgentEntryPanelProps {
-	capabilities: AgentCapabilities;
 	/** 目前草稿——決定 chips／起手卡要不要走「不靜默覆蓋」的兩段式確認。 */
 	draft: string;
 	/** 把文字帶入 composer 並把焦點移過去。 */
@@ -138,17 +135,13 @@ export function CapabilityButton({
  * 不觸發任何 side effect（不建案件、不發詢價、不通知商家）。
  */
 export default function AgentEntryPanel({
-	capabilities,
 	draft,
 	onPrefill,
 	composer,
 }: AgentEntryPanelProps) {
 	const { pendingId, apply } = usePrefill(draft, onPrefill);
 
-	const chips: readonly AgentCapabilityChip[] = [
-		...SLICE_A_CAPABILITY_CHIPS,
-		...flaggedCapabilityChips(capabilities),
-	];
+	const chips: readonly AgentCapabilityChip[] = SLICE_A_CAPABILITY_CHIPS;
 
 	return (
 		<section

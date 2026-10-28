@@ -279,23 +279,17 @@ test.describe("public dynamic route browser health", () => {
 			// Keeping this out of a describe-level beforeAll lets deterministic
 			// order callback tests run even when the current public catalog is
 			// legitimately empty (as production was during this audit).
-			let route: string;
-			if (entry.fixture === "rfq-prototype") {
-				route = materializeDynamicRoute(entry);
-			} else {
-				fixturesPromise ??= discoverFixtureIds(request);
-				const fixtures = await fixturesPromise;
-				// An empty public catalog (pre-launch prod) leaves nothing to
-				// materialize — skip these data-backed routes; they resume
-				// automatically once the catalog carries a product. Deterministic
-				// preview routes above do not depend on this catalog.
-				test.skip(
-					fixtures === null,
-					"public catalog legitimately empty (pre-launch prod)",
-				);
-				if (!fixtures) return;
-				route = materializeDynamicRoute(entry, fixtures);
-			}
+			fixturesPromise ??= discoverFixtureIds(request);
+			const fixtures = await fixturesPromise;
+			// An empty public catalog (pre-launch prod) leaves nothing to
+			// materialize — skip these data-backed routes; they resume
+			// automatically once the catalog carries a product.
+			test.skip(
+				fixtures === null,
+				"public catalog legitimately empty (pre-launch prod)",
+			);
+			if (!fixtures) return;
+			const route = materializeDynamicRoute(entry, fixtures);
 			await assertRenderedRoute(page, route);
 		});
 	}

@@ -56,7 +56,7 @@ func (uc *DisambiguationUseCase) resolveMultiItem(ctx context.Context, itemText 
 	}
 	if len(pool) == 0 {
 		observability.RecordProcurementCropResolverV2(ctx, "escape")
-		return categoryPrice(nil), nil
+		return categoryDescribeStage(nil), nil
 	}
 	return uc.categoryCard(ctx, itemText, pool)
 }

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
-	guidedPreviewData,
+	pricePreviewData,
 	RFQ_APPROVAL_ID,
 	RFQ_CONVERSATION_ID,
 	RFQ_PREVIEW_HASH,
@@ -11,7 +11,7 @@ import {
 	setupRfqPriceReview,
 } from "./helpers/mock-procurement-rfq";
 
-test.describe("procurement assistant — Pricebook RFQ confirmation", {
+test.describe("procurement assistant — RFQ confirmation", {
 	tag: ["@ui"],
 }, () => {
 	test("confirms a guided server projection without publishing a legacy QuoteBatch", async ({
@@ -30,7 +30,7 @@ test.describe("procurement assistant — Pricebook RFQ confirmation", {
 					contentType: "application/json",
 					body: JSON.stringify({
 						code: 0,
-						data: guidedPreviewData(),
+						data: pricePreviewData(),
 					}),
 				});
 			},
@@ -52,10 +52,7 @@ test.describe("procurement assistant — Pricebook RFQ confirmation", {
 			},
 		});
 
-		await expect(page.getByText("已取得行情參考範圍")).toBeVisible();
-		await expect(page.getByText("NT$30.25", { exact: true })).toBeVisible();
-		await expect(page.getByText("NT$35.5", { exact: true })).toBeVisible();
-		await expect(page.getByText("NT$41.75", { exact: true })).toBeVisible();
+		await expect(page.getByText("你設定的希望詢價區間")).toBeVisible();
 		await expect(page.getByText(/品相狀態/)).toHaveCount(0);
 		await page.getByRole("button", { name: /需求版本$/ }).click();
 		await expect(page.getByLabel("需求數量")).toHaveAttribute("readonly", "");
@@ -72,8 +69,13 @@ test.describe("procurement assistant — Pricebook RFQ confirmation", {
 		expect(previewBodies[0]).toEqual({
 			expectedRevisionId: RFQ_REVISION_ID,
 			clientRequestId: expect.any(String),
-			pricingMode: "PRICEBOOK_GUIDED",
 			deliveryCity: "桃園市",
+			buyerRequestedRange: {
+				currency: "TWD",
+				priceComponent: "GOODS_ONLY",
+				lowerBoundAmount: "30",
+				upperBoundAmount: "42",
+			},
 		});
 
 		await page
@@ -97,12 +99,10 @@ test.describe("procurement assistant — Pricebook RFQ confirmation", {
 		await expect(
 			page.getByText("需求版本與價格範圍已固定，等待發布。"),
 		).toBeVisible();
+		// 「重新算一次」只有希望詢價卡上的「取得無參考價試算」一顆，確認鎖定後要停用。
 		await expect(
-			page.getByRole("radio", { name: /參考市場行情/ }),
+			page.getByRole("button", { name: "取得無參考價試算" }),
 		).toBeDisabled();
-		// guided 模式合併重複觸發鈕後（2026-09-09），「重新算一次」只剩希望詢價
-		// 卡上的「重新試算」一顆，確認鎖定後這顆也要停用。
-		await expect(page.getByRole("button", { name: "重新試算" })).toBeDisabled();
 		// toEqual 而不是 toMatchObject 是刻意的：這條擋的是「confirm 的 body 多送了
 		// 買家私有欄位」。⛔ 不要改成寬鬆比對——多一個鍵就該讓它紅。
 		// buyerNote 沒填時送空字串（backend #3410 那側 trim 後視為沒填，
@@ -118,7 +118,7 @@ test.describe("procurement assistant — Pricebook RFQ confirmation", {
 		expect(legacy.calls).toBe(0);
 	});
 
-	test("成果關閉再開啟保留價格流程與行情資料，不產生任務分頁", async ({
+	test("成果關閉再開啟保留價格流程與已取得的價格，不產生任務分頁", async ({
 		page,
 	}) => {
 		test.setTimeout(90_000);
@@ -143,7 +143,7 @@ test.describe("procurement assistant — Pricebook RFQ confirmation", {
 		await expect(
 			panel.getByRole("heading", { name: "確認價格範圍" }),
 		).toBeVisible();
-		await expect(panel.getByText("已取得行情參考範圍")).toBeVisible();
+		await expect(panel.getByText("你設定的希望詢價區間")).toBeVisible();
 	});
 
 	test("窄視窗：面板全幅覆蓋，標頭有一條常駐的路進得去，也回得來", async ({

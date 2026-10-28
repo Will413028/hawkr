@@ -32,6 +32,7 @@ type cropGateGoldenResult struct {
 	Pending       bool                              `json:"pending"`
 	Candidates    []domain.CropDisambiguationOption `json:"candidates"`
 	PendingReason domain.CropPendingReason          `json:"pendingReason"`
+	Resolution    *domain.ItemResolution            `json:"resolution,omitempty"`
 	Evaluated     bool                              `json:"evaluated"`
 	FactsAsOfSet  bool                              `json:"factsAsOfSet"`
 }
@@ -61,9 +62,9 @@ func TestComputeCropGate_GoldenFixtures(t *testing.T) {
 			// 已經有解析結果的品項＝真正的 no-op：不重查分類樹。
 			name: "item_unchanged_already_resolved_no_op",
 			before: domain.Slots{Item: item("芭樂"),
-				ItemResolution: domain.NewSelfPricedItemResolution(95, "芭樂", domain.CategoryAbsent("golden stub 不涵蓋分類來源"))},
+				ItemResolution: domain.NewCategoryConfirmedItemResolution(&domain.CropSelection{CategoryID: "7", Label: "芭樂"})},
 			after: domain.Slots{Item: item("芭樂"),
-				ItemResolution: domain.NewSelfPricedItemResolution(95, "芭樂", domain.CategoryAbsent("golden stub 不涵蓋分類來源"))},
+				ItemResolution: domain.NewCategoryConfirmedItemResolution(&domain.CropSelection{CategoryID: "7", Label: "芭樂"})},
 		},
 		{
 			// 品項沒變、但還沒有解析結果——上一輪失敗過（失敗會清掉既有解析），
@@ -85,6 +86,14 @@ func TestComputeCropGate_GoldenFixtures(t *testing.T) {
 			resolveResult: DisambiguationResult{Unavailable: true},
 			before:        domain.Slots{Item: item("舊品項")},
 			after:         domain.Slots{Item: item("查無此物")},
+		},
+		{
+			name: "tree_confirmed_category_passes_with_resolution",
+			resolveResult: DisambiguationResult{Unavailable: true, Selection: &domain.CropSelection{
+				Stage: domain.CropSelectionDescribe, CategoryID: "24", Label: "五花肉", ParentCategoryID: "8", ParentLabel: "豬肉",
+			}},
+			before: domain.Slots{Item: item("舊品項")},
+			after:  domain.Slots{Item: item("五花肉")},
 		},
 		{
 			name: "ambiguous_keeps_item_and_marks_pending",
@@ -120,7 +129,7 @@ func TestComputeCropGate_GoldenFixtures(t *testing.T) {
 
 			resultOut := cropGateGoldenResult{
 				Item: g.Item, Pending: g.Pending,
-				Candidates: g.Candidates, PendingReason: g.PendingReason,
+				Candidates: g.Candidates, PendingReason: g.PendingReason, Resolution: g.Resolution,
 				Evaluated: g.evaluated, FactsAsOfSet: !g.FactsAsOf.IsZero(),
 			}
 

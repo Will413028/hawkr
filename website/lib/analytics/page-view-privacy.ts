@@ -99,7 +99,6 @@ const STATIC_ANALYTICS_ROUTES = new Set([
 	"/checkout/submitted",
 	"/checkout/success",
 	"/contact",
-	"/hawkr-agent-rfq-preview",
 	"/faq",
 	"/feed",
 	"/login",
@@ -164,14 +163,6 @@ const DYNAMIC_ROUTE_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
 	[
 		/^\/adm\/(?!api(?:\/|$)|enter(?:\/|$)|unavailable(?:\/|$))[^/]+(?:\/.*)?$/,
 		"/adm/:storeId/:area",
-	],
-	[
-		/^\/hawkr-agent-rfq-preview\/external-vendor\/[^/]+(?:\/.*)?$/,
-		"/hawkr-agent-rfq-preview/external-vendor/:step",
-	],
-	[
-		/^\/hawkr-agent-rfq-preview\/[^/]+(?:\/.*)?$/,
-		"/hawkr-agent-rfq-preview/:screen",
 	],
 	[
 		/^\/seller-center\/products\/import\/[^/]+\/items\/[^/]+(?:\/.*)?$/,

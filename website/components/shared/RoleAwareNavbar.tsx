@@ -84,9 +84,6 @@ export default function RoleAwareNavbar({
 	// the seller header as an authenticated escape hatch. Its account menu is the
 	// only safe way to sign out when someone entered with the wrong account.
 	const isSellerOnboardingRoute = isStandaloneFlowPath(effectivePathname);
-	const isExternalVendorPortal = effectivePathname.startsWith(
-		"/hawkr-agent-rfq-preview/external-vendor",
-	);
 	const keepNavbarVisible = shouldKeepNavbarVisible(effectivePathname);
 	// 認證頁（/login、/register…）是身分轉換中的獨立流程，不套賣家工作區 header：
 	// 否則「還登入著的賣家」一停在 /login，賣家導覽列就會疊在登入卡上（跳轉前的
@@ -95,9 +92,6 @@ export default function RoleAwareNavbar({
 		effectivePathname.startsWith("/login") ||
 		effectivePathname.startsWith("/register");
 	const isSellerWorkspaceRoute = effectivePathname.startsWith("/seller-center");
-	// 受邀外部供應商不屬於買家或平台賣家工作區。Portal 自己提供最小必要
-	// 導覽，避免外部角色看到商城、買家帳號或賣家工作區的入口。
-	if (isExternalVendorPortal) return null;
 	// 認證頁上的「已登入者」正在被導去自己的工作區（買家→/account、賣家→
 	// /seller-center）。不渲染任何 navbar，否則買家導覽列會在跳轉落地前閃一下，
 	// 接著才被目的頁的正確列取代——使用者看到的是「怪列先出現再換掉」。未登入

@@ -279,9 +279,8 @@ type resumeDispatchResult struct {
 // response_schema_version="v1" 的唯一 payload schema，欄位與
 // buildCropDisambiguationPatch（answer.go）1:1 對應。
 type cropDisambiguationResponseV1 struct {
-	OptionID               string `json:"optionId"`
-	FreeText               string `json:"freeText,omitempty"`
-	SelfEnteredPriceAmount string `json:"selfEnteredPriceAmount,omitempty"`
+	OptionID string `json:"optionId"`
+	FreeText string `json:"freeText,omitempty"`
 }
 
 // resumeInputRefV1 是落進 procurement_agent_run_inputs.input_ref 的伺服器
@@ -290,12 +289,11 @@ type cropDisambiguationResponseV1 struct {
 // payload；child run 因此是 self-describing 的，不只活在這次 HTTP 請求的
 // goroutine 裡。ID 欄位一律字串（CLAUDE.md §4：對外 ID 避免 JS 精度問題）。
 type resumeInputRefV1 struct {
-	RequestID              string `json:"requestId"`
-	ExpectedRevisionID     string `json:"expectedRevisionId"`
-	SlotKey                string `json:"slotKey"`
-	OptionID               string `json:"optionId"`
-	FreeText               string `json:"freeText,omitempty"`
-	SelfEnteredPriceAmount string `json:"selfEnteredPriceAmount,omitempty"`
+	RequestID          string `json:"requestId"`
+	ExpectedRevisionID string `json:"expectedRevisionId"`
+	SlotKey            string `json:"slotKey"`
+	OptionID           string `json:"optionId"`
+	FreeText           string `json:"freeText,omitempty"`
 }
 
 // ClaimAndDispatchResume 是 ResumeRun gRPC handler（flag on）走的入口——doc57
@@ -346,7 +344,7 @@ func ClaimAndDispatchResume(
 			// payload（`{}`，欄位的 DEFAULT）解得開但 Candidates 是空的，而
 			// buildCropDisambiguationPatch 對「非 nil 但沒有候選」的判定是
 			// UNAVAILABLE——也就是逃生艙可用。少了這道檢查，任何一個 payload 沒寫
-			// 成功的 CLARIFICATION 中斷都會變成「買家可以自填任意品項與價格」的
+			// 成功的 CLARIFICATION 中斷都會變成「買家可以自填任意品項描述」的
 			// 缺口，正是這條白名單存在要擋的東西。
 			var asked CropDisambiguationInterruptPayload
 			if jsonErr := json.Unmarshal(rc.InterruptPayload, &asked); jsonErr != nil {
@@ -358,7 +356,7 @@ func ClaimAndDispatchResume(
 			answerIn = AnswerInput{
 				BuyerID: in.BuyerID, RequestID: rc.RequestID,
 				SlotKey: domain.SlotCropDisambiguation, OptionID: body.OptionID,
-				FreeText: body.FreeText, SelfEnteredPriceAmount: body.SelfEnteredPriceAmount,
+				FreeText:           body.FreeText,
 				ExpectedRevisionID: rc.ExpectedRevisionID, ClientRequestID: in.ClientRequestID,
 				PendingCrop: &asked,
 			}
@@ -368,7 +366,7 @@ func ClaimAndDispatchResume(
 			inputRef, marshalErr := json.Marshal(resumeInputRefV1{
 				RequestID: strconv.FormatInt(rc.RequestID, 10), ExpectedRevisionID: strconv.FormatInt(rc.ExpectedRevisionID, 10),
 				SlotKey: string(domain.SlotCropDisambiguation), OptionID: body.OptionID,
-				FreeText: body.FreeText, SelfEnteredPriceAmount: body.SelfEnteredPriceAmount,
+				FreeText: body.FreeText,
 			})
 			if marshalErr != nil {
 				return repository.ResolvedRunInput{}, marshalErr

@@ -462,22 +462,21 @@ message Slots {
     optional ItemResolution item_resolution = 10;
 }
 
-// ItemResolution 是買家原話（Slots.item）被判定成平台分類樹的哪個節點與買家填的
-// 單價，以及那個判定是誰做的。必須對買家可見且可更正。
+// ItemResolution 是買家原話（Slots.item）被判定成平台分類樹的哪個節點，以及那個
+// 判定是誰做的。必須對買家可見且可更正。
 message ItemResolution {
-    reserved 2;
-    reserved "code";
-    // 目前只有 SELF_PRICED。字串而非 enum。
+    reserved 2, 5;
+    reserved "code", "price_per_kg";
+    // CATEGORY_CONFIRMED（已確認平台分類，伺服器內部持有分類 ID）或
+    // BUYER_DESCRIBED（買家在「找不到符合的品項」卡上自行描述，沒有分類）。
+    // 字串而非 enum。
     string kind = 1;
-    // 分類名稱。
+    // 分類名稱，或 BUYER_DESCRIBED 時買家的描述。
     string label = 3;
-    // BUYER_CHOICE（買家在消歧卡上親自挑的，含自填價逃生艙）。
+    // BUYER_CHOICE（買家在消歧卡上親自挑的，含自行描述）。
     string provenance = 4;
-    // 新台幣元／公斤，字串（CLAUDE.md §4：對外金額一律字串）。
-    optional string price_per_kg = 5;
-    // 伺服器組好的顯示字串（「自訂品項，單價 95 元／公斤」）。**前端不得自己用
-    // kind＋label 重拼**：那會讓 slots 面板與 recordedThisTurn 的 chip 出現兩套
-    // 文案，而 chip 用的就是這個值。
+    // 伺服器組好的顯示字串。**前端不得自己用 kind＋label 重拼**：那會讓 slots
+    // 面板與 recordedThisTurn 的 chip 出現兩套文案，而 chip 用的就是這個值。
     string display_value = 6;
 }
 
@@ -1098,10 +1097,8 @@ message SubmitAnswerRequest {
     bool skip = 6;
     string expected_revision_id = 7;
     string client_request_id = 8;
-    // self_entered_price_amount 只在 slot_key=="crop_disambiguation" 且
-    // option_id=="crop-other" 時使用（品項不在分類樹內）。
-    // 字串（金額欄位一律字串慣例），空字串表示未提供。
-    string self_entered_price_amount = 9;
+    reserved 9;
+    reserved "self_entered_price_amount";
 }
 
 message RewindRequest {

@@ -68,7 +68,6 @@ function sessionWith(state: Partial<ReturnType<typeof initialState>>): Session {
 		startSearch: vi.fn(),
 		retryPolling: vi.fn(),
 		toggleSelection: vi.fn(),
-		chooseCropDisambiguation: vi.fn(),
 		previewRfqPrice: vi.fn(),
 		confirmRfqSnapshot: vi.fn(),
 		previewRfqPublication: vi.fn(),

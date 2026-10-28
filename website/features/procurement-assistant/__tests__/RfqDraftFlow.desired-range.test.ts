@@ -42,22 +42,13 @@ const candidates = [
 	},
 ];
 
-function guidedPreview(
+function preview(
 	overrides: Partial<RfqPricePreview["buyerRequestedRange"]> = {},
 ): RfqPricePreview {
 	return {
 		pricePreviewId: "1",
 		version: "1",
-		pricingMode: "PRICEBOOK_GUIDED",
 		qualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
-		referenceAvailability: "AVAILABLE",
-		referencePriceRange: {
-			lowerBoundAmount: "52",
-			midpointAmount: "61",
-			upperBoundAmount: "74",
-			basisQuantity: "1",
-			basisUnit: "KG",
-		},
 		buyerRequestedRange: {
 			currency: "TWD",
 			priceComponent: "GOODS_ONLY",
@@ -67,11 +58,16 @@ function guidedPreview(
 			basisUnit: "KG",
 			...overrides,
 		},
-		dealTemperature: { status: "UNKNOWN", reasonCode: "BUYER_RANGE_NOT_SET" },
 		payloadHash: "a".repeat(64),
-		marketPriceBasis: null,
 		quoteTotalRange: null,
 	};
+}
+
+function echoPreview(command: RfqPricePreviewCommand): RfqPricePreview {
+	return preview({
+		lowerBoundAmount: command.buyerRequestedRange.lowerBoundAmount,
+		upperBoundAmount: command.buyerRequestedRange.upperBoundAmount,
+	});
 }
 
 async function renderAtStep2(
@@ -102,149 +98,114 @@ async function renderAtStep2(
 	fireEvent.click(screen.getByRole("button", { name: "取得價格範圍" }));
 }
 
-describe("RfqDraftFlow — guided 模式的希望詢價區間", () => {
-	it("第一次 preview（欄位空白）省略 buyerRequestedRange，交由 server 用參考區間預填", async () => {
-		const calls: RfqPricePreviewCommand[] = [];
+function fillRange(lower: string, upper: string) {
+	fireEvent.change(screen.getByLabelText("希望下限", { exact: false }), {
+		target: { value: lower },
+	});
+	fireEvent.change(screen.getByLabelText("希望上限", { exact: false }), {
+		target: { value: upper },
+	});
+}
+
+describe("RfqDraftFlow — 希望詢價區間", () => {
+	it("進入價格步驟時不自動試算，欄位空白", async () => {
 		const onPreviewRfqPrice = vi.fn(async (command: RfqPricePreviewCommand) => {
-			calls.push(command);
 			return {
 				ok: true,
-				data: guidedPreview(),
+				data: echoPreview(command),
 			} as RfqCommandResult<RfqPricePreview>;
 		});
 
 		await renderAtStep2(onPreviewRfqPrice);
 
-		await waitFor(() => expect(calls.length).toBe(1));
-		expect(calls[0].pricingMode).toBe("PRICEBOOK_GUIDED");
-		expect(calls[0]).not.toHaveProperty("buyerRequestedRange");
-
-		await waitFor(() => {
-			expect(
-				(
-					screen.getByLabelText("希望下限", {
-						exact: false,
-					}) as HTMLInputElement
-				).value,
-			).toBe("58");
-			expect(
-				(
-					screen.getByLabelText("希望上限", {
-						exact: false,
-					}) as HTMLInputElement
-				).value,
-			).toBe("70");
-		});
+		await waitFor(() =>
+			expect(screen.getByLabelText("希望下限", { exact: false })).toBeTruthy(),
+		);
+		expect(
+			(screen.getByLabelText("希望下限", { exact: false }) as HTMLInputElement)
+				.value,
+		).toBe("");
+		expect(
+			(screen.getByLabelText("希望上限", { exact: false }) as HTMLInputElement)
+				.value,
+		).toBe("");
+		expect(onPreviewRfqPrice).not.toHaveBeenCalled();
 	});
 
-	it("買家調整區間後按「重新試算」，command 帶上編輯後的 buyerRequestedRange", async () => {
+	it("買家填入區間後取得試算，command 帶上 buyerRequestedRange 且沒有 pricingMode", async () => {
 		const calls: RfqPricePreviewCommand[] = [];
 		const onPreviewRfqPrice = vi.fn(async (command: RfqPricePreviewCommand) => {
 			calls.push(command);
-			if (command.buyerRequestedRange) {
-				return {
-					ok: true,
-					data: guidedPreview({
-						lowerBoundAmount: command.buyerRequestedRange.lowerBoundAmount,
-						upperBoundAmount: command.buyerRequestedRange.upperBoundAmount,
-					}),
-				} as RfqCommandResult<RfqPricePreview>;
-			}
 			return {
 				ok: true,
-				data: guidedPreview(),
+				data: echoPreview(command),
 			} as RfqCommandResult<RfqPricePreview>;
 		});
 
 		await renderAtStep2(onPreviewRfqPrice);
-		await waitFor(() => expect(calls.length).toBe(1));
 		await waitFor(() =>
-			expect(
-				(
-					screen.getByLabelText("希望下限", {
-						exact: false,
-					}) as HTMLInputElement
-				).value,
-			).toBe("58"),
+			expect(screen.getByLabelText("希望下限", { exact: false })).toBeTruthy(),
 		);
 
-		fireEvent.change(screen.getByLabelText("希望下限", { exact: false }), {
-			target: { value: "60" },
-		});
-		fireEvent.change(screen.getByLabelText("希望上限", { exact: false }), {
-			target: { value: "75" },
-		});
-		fireEvent.click(screen.getByRole("button", { name: "重新試算" }));
+		fillRange("60", "75");
+		fireEvent.click(screen.getByRole("button", { name: "取得無參考價試算" }));
 
-		await waitFor(() => expect(calls.length).toBe(2));
-		expect(calls[1].buyerRequestedRange).toEqual({
+		await waitFor(() => expect(calls.length).toBe(1));
+		expect(calls[0].buyerRequestedRange).toEqual({
 			currency: "TWD",
 			priceComponent: "GOODS_ONLY",
 			lowerBoundAmount: "60",
 			upperBoundAmount: "75",
 		});
+		expect(calls[0]).not.toHaveProperty("pricingMode");
 	});
 
-	it("欄位留白（partial 或全空）時，重新試算不會送出 buyerRequestedRange 也不會呼叫 preview", async () => {
-		const calls: RfqPricePreviewCommand[] = [];
+	it("欄位留白（partial 或全空）時，按鈕停用且不會呼叫 preview", async () => {
 		const onPreviewRfqPrice = vi.fn(async (command: RfqPricePreviewCommand) => {
-			calls.push(command);
 			return {
 				ok: true,
-				data: guidedPreview(),
+				data: echoPreview(command),
 			} as RfqCommandResult<RfqPricePreview>;
 		});
 
 		await renderAtStep2(onPreviewRfqPrice);
-		await waitFor(() => expect(calls.length).toBe(1));
 		await waitFor(() =>
-			expect(
-				(
-					screen.getByLabelText("希望下限", {
-						exact: false,
-					}) as HTMLInputElement
-				).value,
-			).toBe("58"),
+			expect(screen.getByLabelText("希望下限", { exact: false })).toBeTruthy(),
 		);
 
-		fireEvent.change(screen.getByLabelText("希望下限", { exact: false }), {
-			target: { value: "" },
-		});
+		fillRange("60", "");
 
 		expect(screen.getByText("請完整填寫希望下限與上限。")).toBeTruthy();
-		expect(
-			(screen.getByRole("button", { name: "重新試算" }) as HTMLButtonElement)
-				.disabled,
-		).toBe(true);
+		const button = screen.getByRole("button", {
+			name: "取得無參考價試算",
+		}) as HTMLButtonElement;
+		expect(button.disabled).toBe(true);
 
-		fireEvent.click(screen.getByRole("button", { name: "重新試算" }));
+		fireEvent.click(button);
 
-		expect(calls.length).toBe(1);
+		expect(onPreviewRfqPrice).not.toHaveBeenCalled();
 	});
 
-	it("guided preview 成功後，重新算一次只有唯一一個觸發點（沒有重複按鈕）", async () => {
+	it("回應的區間與送出的不一致時顯示錯誤，不採用該回應", async () => {
 		const onPreviewRfqPrice = vi.fn(async () => {
 			return {
 				ok: true,
-				data: guidedPreview(),
+				data: preview(),
 			} as RfqCommandResult<RfqPricePreview>;
 		});
 
 		await renderAtStep2(onPreviewRfqPrice);
-		await waitFor(() => expect(onPreviewRfqPrice).toHaveBeenCalledTimes(1));
 		await waitFor(() =>
-			expect(
-				(
-					screen.getByLabelText("希望下限", {
-						exact: false,
-					}) as HTMLInputElement
-				).value,
-			).toBe("58"),
+			expect(screen.getByLabelText("希望下限", { exact: false })).toBeTruthy(),
 		);
 
-		expect(
-			screen.queryAllByRole("button", { name: "重新查詢行情" }),
-		).toHaveLength(0);
-		expect(screen.getAllByRole("button", { name: "重新試算" })).toHaveLength(1);
+		fillRange("60", "75");
+		fireEvent.click(screen.getByRole("button", { name: "取得無參考價試算" }));
+
+		await waitFor(() =>
+			expect(
+				screen.getByText("取得的區間與本次設定不一致，請重試。"),
+			).toBeTruthy(),
+		);
 	});
 });

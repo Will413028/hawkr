@@ -38,8 +38,8 @@ func TestResolveV2_ExactLeafCategoryAutoResolves(t *testing.T) {
 
 	require.NoError(t, err)
 	require.False(t, got.NeedsDisambiguation, "%+v", got)
-	require.True(t, got.Unavailable, "分類確認後下一步是買家填單價")
-	require.Equal(t, domain.CropSelectionPrice, got.Selection.Stage)
+	require.True(t, got.Unavailable, "分類確認後不再往下問，由買家確認或自行描述品項")
+	require.Equal(t, domain.CropSelectionDescribe, got.Selection.Stage)
 	require.Equal(t, "2008", got.Selection.CategoryID)
 	require.Equal(t, "200", got.Selection.ParentCategoryID)
 }
@@ -323,7 +323,7 @@ func TestResolveV2_EmptyRecallEscapesWithoutModel(t *testing.T) {
 
 	require.NoError(t, err)
 	require.True(t, got.Unavailable, "%+v", got)
-	require.Empty(t, model.stages, "索引零命中時不再請模型猜分類，直接讓買家自填價")
+	require.Empty(t, model.stages, "索引零命中時不再請模型猜分類，直接讓買家自行描述品項")
 	id, _ := got.Selection.ConfirmedCategory()
 	require.Empty(t, id)
 }

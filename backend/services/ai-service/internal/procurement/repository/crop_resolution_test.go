@@ -22,10 +22,9 @@ func TestRepo_ItemResolution_RoundTripsThroughSlotsJSON(t *testing.T) {
 	require.NoError(t, err)
 
 	item := "高麗菜"
-	price := 95
 	resolution := &domain.ItemResolution{
-		Kind: domain.ItemResolvedSelfPriced, Label: "高麗菜", CategoryID: "17",
-		PricePerKg: &price, Provenance: domain.ItemResolutionByBuyerChoice,
+		Kind: domain.ItemResolvedCategoryConfirmed, Label: "高麗菜", CategoryID: "17",
+		Provenance: domain.ItemResolutionByBuyerChoice,
 	}
 	_, err = repo.AppendRevision(ctx, AppendInput{
 		RequestID: req.ID, BuyerID: testBuyerID,
@@ -49,7 +48,7 @@ func TestRepo_ItemResolution_RoundTripsThroughSlotsJSON(t *testing.T) {
 		        slots_json -> 'item_resolution' ->> 'provenance'
 		   FROM procurement_request_revisions WHERE id = $1`, rev.ID,
 	).Scan(&kind, &provenance))
-	require.Equal(t, string(domain.ItemResolvedSelfPriced), kind)
+	require.Equal(t, string(domain.ItemResolvedCategoryConfirmed), kind)
 	require.Equal(t, string(domain.ItemResolutionByBuyerChoice), provenance)
 }
 

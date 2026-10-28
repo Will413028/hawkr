@@ -44,10 +44,6 @@ const (
 	// MaxQuantity／MaxBudgetPerUnit 防止離譜值進入後續價格與候選邏輯。
 	MaxQuantity      = 1_000_000
 	MaxBudgetPerUnit = 10_000_000
-	// MaxPricePerKg 是「這個數字不可能是真的單價」的上界（新台幣元／公斤）。
-	// 逃生艙自填價與市場行情取價共用同一個上界——usecase 的 maxPricePerKgNTD
-	// 就是這個常數，不再各自宣告。
-	MaxPricePerKg = 100_000_000
 	// MaxLeadDays 是到貨日可接受的最遠天數。
 	MaxLeadDays = 365
 	// DateLayout 是到貨日的唯一格式。

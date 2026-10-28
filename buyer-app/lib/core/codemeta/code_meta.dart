@@ -1886,8 +1886,6 @@ enum ProcurementErrorReason {
   inviteAlreadyResolved(code: 'INVITE_ALREADY_RESOLVED', value: 'INVITE_ALREADY_RESOLVED', label: '邀請已被處理'),
   /// 報價基準無法解析 — 422。currency/quantity/unit/conversion basis 無法 canonicalize，RFQ 報價預覽的 typed hard block，零 side effect、不建立 preview 列（issue #2403 Slice 2）
   priceBasisUnavailable(code: 'PRICE_BASIS_UNAVAILABLE', value: 'PRICE_BASIS_UNAVAILABLE', label: '報價基準無法解析'),
-  /// 缺乏可靠映射 — 422。RFQ 報價預覽 PricingMode 為 PRICEBOOK_GUIDED 但 Pricebook crop/group mapping 或市場行情不可靠（未解析、非 ready、或缺 P50），須買家改用 BUYER_ENTERED_NO_REFERENCE 明確重新送出，零 side effect、不建立 preview 列；不得靜默成功或誤用 PRICE_BASIS_UNAVAILABLE。與同一支 RPC 200 回應裡 dealTemperature.reasonCode 用的是同一個字面值（同一種「沒有可靠 mapping 可參考」語意），刻意不另創同義詞（issue #2403 Slice 2，2026-08-22 whole-branch review Fix 3）
-  mappingMissing(code: 'MAPPING_MISSING', value: 'MAPPING_MISSING', label: '缺乏可靠映射'),
   /// Run 非執行中 — 409。對非 QUEUED/RUNNING/WAITING_FOR_INPUT 狀態的 run 送出需要 active run 的命令
   runNotActive(code: 'RUN_NOT_ACTIVE', value: 'RUN_NOT_ACTIVE', label: 'Run 非執行中'),
   /// 中斷已逾期 — 409。resume 命令對應的 interrupt 已超過 expiresAt

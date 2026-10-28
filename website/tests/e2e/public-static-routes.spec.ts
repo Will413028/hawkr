@@ -31,7 +31,6 @@ const EXPECTED_PUBLIC_STATIC_ROUTES = [
 	"/faq",
 	"/feed",
 	"/hawkr-agent-rfq-demo",
-	"/hawkr-agent-rfq-preview",
 	"/login",
 	// Clerk 社群登入的回呼頁：登入流程中的訪客落在這裡，必須匿名可達。
 	"/login/sso-callback",
@@ -60,7 +59,6 @@ const EXPECTED_PUBLIC_STATIC_ROUTES = [
  * cannot silently weaken the smoke test.
  */
 const EXPECTED_FINAL_PATHNAME: Partial<Record<string, string>> = {
-	"/hawkr-agent-rfq-preview": "/hawkr-agent-rfq-preview/candidate-handoff",
 	"/payment/return": "/login",
 	"/seller/onboarding": "/login",
 };

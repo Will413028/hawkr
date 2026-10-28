@@ -50,12 +50,6 @@ const PUBLIC_ALLOWLIST = [
 	// 賣家批次匯入精靈 → 商城模擬預覽（新 tab 開啟，刻意脫離 seller-center shell
 	// 讓賣家用「買家視角」看暫存商品；功能鎖在 previewMode，不會誤觸購買 / 收藏）
 	"/seller-product-import-preview",
-	// 受邀外部供應商 portal。⚠️ 這條路徑同時登記在另外兩處，三份必須一起改：
-	// lib/navigation/standalone-flow.ts 的 STANDALONE_FLOW_ROOTS（抑制頁面 chrome）
-	// 與 components/shared/RoleAwareNavbar.tsx 的 isExternalVendorPortal（不渲染
-	// 導覽列）。它一度只登記了前兩處，於是「已登入且 activeRole==='seller'」的
-	// 訪客一進來就被本元件導回 /seller-center —— 而那正是受邀供應商可能的身分。
-	"/hawkr-agent-rfq-preview/external-vendor",
 ];
 
 export default function SellerWorkspaceLock() {

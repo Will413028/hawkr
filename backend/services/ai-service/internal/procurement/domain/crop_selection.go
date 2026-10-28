@@ -1,11 +1,11 @@
 package domain
 
-// CropSelection is taxonomy progress, separate from authoritative price codes.
+// CropSelection is taxonomy progress, separate from the confirmed ItemResolution.
 // The values are internal wizard stages persisted in the existing JSON snapshot.
 const (
-	CropSelectionGroup = "GROUP"
-	CropSelectionItem  = "ITEM"
-	CropSelectionPrice = "PRICE"
+	CropSelectionGroup    = "GROUP"
+	CropSelectionItem     = "ITEM"
+	CropSelectionDescribe = "DESCRIBE"
 )
 
 type CropSelection struct {
@@ -24,10 +24,10 @@ func (s *CropSelection) ConfirmedCategory() (string, string) {
 	if s == nil {
 		return "", ""
 	}
-	if s.Stage == CropSelectionPrice && s.CategoryID != "" {
+	if s.Stage == CropSelectionDescribe && s.CategoryID != "" {
 		return s.CategoryID, s.Label
 	}
-	if s.Stage == CropSelectionItem || s.Stage == CropSelectionPrice {
+	if s.Stage == CropSelectionItem || s.Stage == CropSelectionDescribe {
 		return s.ParentCategoryID, s.ParentLabel
 	}
 	return "", ""

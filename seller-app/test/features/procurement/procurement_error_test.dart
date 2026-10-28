@@ -193,8 +193,8 @@ void main() {
     // `qualityKnowledgeState` 是「買家知不知道品相」的宣告，不是品相本身。
     // `buyerNote` 是買家自己打字、明知會給供應商看的補充說明（backend #3410）
     // ——它是**唯一**一個帶「buyer」而仍然該出現在賣家視野裡的鍵，因為它的內容
-    // 就是買家寫給賣家的。買家私有的 budgetPerUnit／buyerRequestedRange／
-    // referencePriceRange 仍然一律不得出現。
+    // 就是買家寫給賣家的。買家私有的 budgetPerUnit／buyerRequestedRange 仍然
+    // 一律不得出現。
     const allowedDespiteFragment = <String>{
       'qualityKnowledgeState',
       'buyerNote',

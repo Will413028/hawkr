@@ -173,7 +173,7 @@ SellerQuoteValidation validateSellerQuote(
     errors[SellerQuoteField.responseType] = '請選擇回應方式';
   }
 
-  // ⛔ 產品規則 1：實際品相不得由平台、LLM 或 Pricebook 代填。
+  // ⛔ 產品規則 1：實際品相不得由平台或 LLM 代填。
   if (quote.offeredQuality.grade.trim().isEmpty) {
     errors[SellerQuoteField.qualityGrade] = '請填寫這批貨的實際品相等級';
   }

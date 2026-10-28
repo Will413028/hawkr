@@ -124,10 +124,10 @@ func TestGraphStageResumeProtocol_GroupItemPriceComplete(t *testing.T) {
 
 			thirdEvents := resume(second.WorkflowInterruptID, CropGateOutput{
 				Item: item("臺灣豬五花"), Pending: true,
-				Selection: &domain.CropSelection{Stage: domain.CropSelectionPrice, CategoryID: "11", Label: "豬肉"},
+				Selection: &domain.CropSelection{Stage: domain.CropSelectionDescribe, CategoryID: "11", Label: "豬肉"},
 			})
 			third := stageProtocolInterrupt(t, thirdEvents)
-			require.Equal(t, domain.CropSelectionPrice, third.Selection.Stage)
+			require.Equal(t, domain.CropSelectionDescribe, third.Selection.Stage)
 			require.Empty(t, third.Candidates)
 			require.NotEqual(t, second.WorkflowInterruptID, third.WorkflowInterruptID)
 			require.NotEqual(t, first.WorkflowInterruptID, third.WorkflowInterruptID)
@@ -137,7 +137,7 @@ func TestGraphStageResumeProtocol_GroupItemPriceComplete(t *testing.T) {
 			require.Equal(t, third.Selection, thirdProgress.CropSelection)
 			require.Empty(t, thirdProgress.CropCandidates, "old item choices must not leak into the price card")
 
-			chosen := domain.NewSelfPricedItemResolution(220, "", domain.CategoryAbsent("測試"))
+			chosen := testkit.ConfirmedResolution("")
 			completed := resume(third.WorkflowInterruptID, CropGateOutput{Item: item("臺灣豬五花"), Resolution: chosen})
 			for _, ev := range completed {
 				require.Nil(t, ev.RequestedInput, "completed selection must not ask an earlier stage again")

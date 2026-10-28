@@ -12,7 +12,7 @@ interface CropDisambiguationCardProps {
 
 /**
  * 品項消歧問題卡（B-244 Ask 3.5）。跟 ClarifyQuestionCard 是同一組視覺
- * token——差別只在沒有跳過/自由輸入，callback 對象是 cropCode/groupCode
+ * token——差別只在沒有跳過/自由輸入，callback 對象是 optionId
  * 而非 slotKey。故意不重新設計外觀，直接沿用 hawkr-agent-question-card* class。
  */
 export default function CropDisambiguationCard({

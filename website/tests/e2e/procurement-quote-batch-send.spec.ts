@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
-	guidedPreviewData,
+	pricePreviewData,
 	RFQ_CONFIRMED_HASH,
 	RFQ_CONFIRMED_ID,
 	setupRfqPriceReview,
@@ -32,7 +32,7 @@ test.describe("procurement assistant — RFQ confirmation recovery", {
 			},
 		});
 
-		await expect(page.getByText("已取得行情參考範圍")).toBeVisible();
+		await expect(page.getByText("你設定的希望詢價區間")).toBeVisible();
 		await page
 			.getByRole("checkbox", {
 				name: "我已核對這份需求版本與價格範圍",
@@ -73,7 +73,7 @@ test.describe("procurement assistant — RFQ confirmation recovery", {
 				return route.fulfill({
 					status: 200,
 					contentType: "application/json",
-					body: JSON.stringify({ code: 0, data: guidedPreviewData() }),
+					body: JSON.stringify({ code: 0, data: pricePreviewData() }),
 				});
 			},
 			confirmationHandler: (route) => {
@@ -97,12 +97,12 @@ test.describe("procurement assistant — RFQ confirmation recovery", {
 			.check();
 		await page.getByRole("button", { name: "檢視不可變 RFQ 快照" }).click();
 		await expect(
-			page.getByText("找不到這份價格試算，請重新取得行情後再確認。"),
+			page.getByText("找不到這份價格試算，請重新試算後再確認。"),
 		).toBeVisible();
 		await expect(
 			page.getByText("無法讀取先前的需求，請重新開始。"),
 		).toHaveCount(0);
-		await page.getByRole("button", { name: "重新取得行情" }).click();
+		await page.getByRole("button", { name: "重新試算" }).click();
 		await expect.poll(() => previewBodies.length).toBe(2);
 		expect(previewBodies[1]?.clientRequestId).not.toBe(
 			previewBodies[0]?.clientRequestId,

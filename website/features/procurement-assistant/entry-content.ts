@@ -1,4 +1,3 @@
-import type { AgentCapabilities } from "./capabilities";
 import type { HawkrAgentCapabilityIconName } from "./HawkrAgentCapabilityIcon";
 
 /**
@@ -43,9 +42,8 @@ export interface AgentCapabilityChip {
 /**
  * §V.11.0：Slice A 只顯示這三個 chip。
  *
- * 市場價格、報價比較、追蹤與對外聯絡都還沒有真實能力，設計書要求「未啟用時
- * 完全不出現」——所以這張表就只有三筆，而不是有一張完整清單再靠旗標過濾。
- * 需要靠旗標顯示的能力請放進 `flaggedCapabilityChips()`，那裡才有 gate。
+ * 報價比較、追蹤與對外聯絡都還沒有真實能力，設計書要求「未啟用時完全不
+ * 出現」——所以這張表就只有三筆，而不是有一張完整清單再靠旗標過濾。
  */
 export const SLICE_A_CAPABILITY_CHIPS: readonly AgentCapabilityChip[] =
 	Object.freeze([
@@ -71,26 +69,3 @@ export const SLICE_A_CAPABILITY_CHIPS: readonly AgentCapabilityChip[] =
 				"幫我比較幾家能供應有機蔬菜的商家，我最在意產銷履歷、到貨穩定度和單價。",
 		},
 	]);
-
-/**
- * 需要 capability flag 才顯示的 chip。
- *
- * 目前只有「看市場行情」掛在 `WEB_PROCUREMENT_RFQ_PRICE_RANGE_V1` 之後；
- * 預設 OFF 時 Entry 仍嚴格只有使用者定稿的三個 illustrated buttons。這個未配
- * illustration 的 future chip 不可在旗標前露出；後端前置（#2403／#2442／
- * Pricebook visibility ADR）未完成時也不得靠 client 探測自行開啟。
- */
-export function flaggedCapabilityChips(
-	capabilities: AgentCapabilities,
-): readonly AgentCapabilityChip[] {
-	const chips: AgentCapabilityChip[] = [];
-	if (capabilities.WEB_PROCUREMENT_RFQ_PRICE_RANGE_V1) {
-		chips.push({
-			id: "market-price",
-			label: "看市場行情",
-			template:
-				"我想先看看目前的行情價：台灣豬五花 50 公斤，三週後送到台北，大概行情多少？",
-		});
-	}
-	return Object.freeze(chips);
-}

@@ -55,7 +55,7 @@ func (r *stageDispatchResolver) ResolveSelection(_ context.Context, text string,
 	if selection.Stage == domain.CropSelectionItem && optionID == "category-24" {
 		return cropidentity.DisambiguationResult{
 			Unavailable: true,
-			Selection: &domain.CropSelection{Stage: domain.CropSelectionPrice,
+			Selection: &domain.CropSelection{Stage: domain.CropSelectionDescribe,
 				ParentCategoryID: "8", ParentLabel: "豬肉", CategoryID: "24", Label: "豬肉／五花肉"},
 		}, nil
 	}
@@ -139,7 +139,7 @@ func TestGraphStageDispatch_Integration_Postgres_ReparksAndPreservesSnapshot(t *
 		}
 		open, err := repo.FindOpenInterruptForRequest(ctx, requestID, buyerID)
 		if stage == "" {
-			require.ErrorIs(t, err, repository.ErrNotFound, "completed final price must leave no open card")
+			require.ErrorIs(t, err, repository.ErrNotFound, "completed selection must leave no open card")
 			return repository.Interrupt{}
 		}
 		require.NoError(t, err)
@@ -153,9 +153,9 @@ func TestGraphStageDispatch_Integration_Postgres_ReparksAndPreservesSnapshot(t *
 	}
 	firstOpen := assertPersisted(first.Result, 0, domain.CropSelectionGroup)
 
-	resume := func(open repository.Interrupt, key, optionID, text, price string) ResumeResult {
+	resume := func(open repository.Interrupt, key, optionID, text string) ResumeResult {
 		t.Helper()
-		body, err := json.Marshal(cropDisambiguationResponseV1{OptionID: optionID, FreeText: text, SelfEnteredPriceAmount: price})
+		body, err := json.Marshal(cropDisambiguationResponseV1{OptionID: optionID, FreeText: text})
 		require.NoError(t, err)
 		deps.Runner = newRunner() // no in-process workflow state survives a stage
 		deps.ResumeRunner = ResumeRunner{Runner: deps.Runner}
@@ -179,32 +179,26 @@ func TestGraphStageDispatch_Integration_Postgres_ReparksAndPreservesSnapshot(t *
 	}
 	rejectResume(firstOpen, first.Result.RevisionID, "stage-invalid-group", []byte(`{"optionId":"category-forged"}`))
 	require.Zero(t, resolver.selectionCalls.Load())
-	second := resume(firstOpen, "stage-dispatch-group", "category-8", "", "")
+	second := resume(firstOpen, "stage-dispatch-group", "category-8", "")
 	require.Equal(t, domain.RunStatusWaiting(), second.RunStatus)
 	secondOpen := assertPersisted(*second.Result, first.Result.RevisionID, domain.CropSelectionItem)
 	require.NotEqual(t, firstOpen.ID, secondOpen.ID)
 
-	third := resume(secondOpen, "stage-dispatch-item", "category-24", "", "")
-	require.Equal(t, domain.RunStatusWaiting(), third.RunStatus)
-	thirdOpen := assertPersisted(*third.Result, second.Result.RevisionID, domain.CropSelectionPrice)
-	require.NotEqual(t, secondOpen.ID, thirdOpen.ID)
-
-	rejectResume(thirdOpen, third.Result.RevisionID, "stage-invalid-price", []byte(`{"optionId":"crop-other","freeText":"臺灣豬五花"}`))
-	final := resume(thirdOpen, "stage-dispatch-price", domain.CropOtherOptionID, "臺灣豬五花", "220")
+	final := resume(secondOpen, "stage-dispatch-item", "category-24", "")
 	require.Equal(t, domain.RunStatusSucceeded(), final.RunStatus)
-	assertPersisted(*final.Result, third.Result.RevisionID, "")
+	assertPersisted(*final.Result, second.Result.RevisionID, "")
 	require.NotNil(t, final.Result.Slots.ItemResolution)
+	require.Equal(t, domain.ItemResolvedCategoryConfirmed, final.Result.Slots.ItemResolution.Kind)
 	require.Equal(t, "24", final.Result.Slots.ItemResolution.CategoryID)
-	require.Equal(t, 220, *final.Result.Slots.ItemResolution.PricePerKg)
 	require.EqualValues(t, 1, atomic.LoadInt32(&extractor.calls))
 	require.EqualValues(t, 1, resolver.initialCalls.Load())
 	require.EqualValues(t, 2, resolver.selectionCalls.Load())
 
 	// A client retry after completion must return the same child without
 	// rerunning the resolver or creating another revision/interrupt.
-	body := []byte(`{"optionId":"crop-other","freeText":"臺灣豬五花","selfEnteredPriceAmount":"220"}`)
-	replay, err := ClaimAndDispatchResume(ctx, ResumeInput{BuyerID: buyerID, InterruptID: thirdOpen.ID,
-		ClientRequestID: "stage-dispatch-price", ResponsePayload: body}, repo, deps.Dispatcher, deps)
+	body := []byte(`{"optionId":"category-24"}`)
+	replay, err := ClaimAndDispatchResume(ctx, ResumeInput{BuyerID: buyerID, InterruptID: secondOpen.ID,
+		ClientRequestID: "stage-dispatch-item", ResponsePayload: body}, repo, deps.Dispatcher, deps)
 	require.NoError(t, err)
 	require.Equal(t, final.RunID, replay.RunID)
 	require.Equal(t, final.RunStatus, replay.RunStatus)
@@ -284,7 +278,7 @@ func TestGraphStageDispatch_Integration_Postgres_UpgradesLegacyHandoffPause(t *t
 	// resume 走 ResumeRunner，升級後的 graph 也要換過去，否則驗到的是舊 graph。
 	deps.ResumeRunner = ResumeRunner{Runner: deps.Runner}
 	resumed, err := ClaimAndDispatchResume(ctx, ResumeInput{BuyerID: buyerID, InterruptID: open.ID,
-		ClientRequestID: "legacy-handoff-upgraded-answer", ResponsePayload: []byte(`{"optionId":"crop-other","freeText":"高麗菜","selfEnteredPriceAmount":"80"}`)},
+		ClientRequestID: "legacy-handoff-upgraded-answer", ResponsePayload: []byte(`{"optionId":"crop-other","freeText":"高麗菜"}`)},
 		repo, deps.Dispatcher, deps)
 	require.NoError(t, err)
 	require.Equal(t, domain.RunStatusSucceeded(), resumed.RunStatus)
@@ -292,9 +286,6 @@ func TestGraphStageDispatch_Integration_Postgres_UpgradesLegacyHandoffPause(t *t
 	require.Equal(t, item("高麗菜"), resumed.Result.Slots.Item)
 	require.Equal(t, &quantity, resumed.Result.Slots.Quantity)
 	require.Equal(t, item("KG"), resumed.Result.Slots.Unit)
-	require.NotNil(t, resumed.Result.Slots.ItemResolution)
-	require.Equal(t, domain.ItemResolvedSelfPriced, resumed.Result.Slots.ItemResolution.Kind)
-	require.Equal(t, 80, *resumed.Result.Slots.ItemResolution.PricePerKg)
 	require.Equal(t, strconv.FormatInt(requestID, 10)+"-rev"+strconv.FormatInt(first.Result.RevisionID, 10), resumed.Result.DialoguePlan.StateVersion)
 	_, err = repo.FindOpenInterruptForRequest(ctx, requestID, buyerID)
 	require.ErrorIs(t, err, repository.ErrNotFound)

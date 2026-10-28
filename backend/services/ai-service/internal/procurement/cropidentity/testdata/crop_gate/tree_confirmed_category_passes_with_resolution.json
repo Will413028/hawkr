@@ -1,0 +1,35 @@
+{
+  "resolverNil": false,
+  "resolveResult": {
+    "NeedsDisambiguation": false,
+    "Candidates": null,
+    "Unavailable": true,
+    "Selection": {
+      "stage": "DESCRIBE",
+      "parentCategoryId": "8",
+      "parentLabel": "豬肉",
+      "categoryId": "24",
+      "label": "五花肉"
+    }
+  },
+  "before": {
+    "item": "舊品項"
+  },
+  "after": {
+    "item": "五花肉"
+  },
+  "result": {
+    "item": "五花肉",
+    "pending": false,
+    "candidates": null,
+    "pendingReason": "",
+    "resolution": {
+      "kind": "CATEGORY_CONFIRMED",
+      "label": "五花肉",
+      "category_id": "24",
+      "provenance": "BUYER_CHOICE"
+    },
+    "evaluated": true,
+    "factsAsOfSet": true
+  }
+}

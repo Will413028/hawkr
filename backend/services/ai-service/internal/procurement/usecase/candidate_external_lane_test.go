@@ -232,12 +232,11 @@ func (f *fakeAncestors) AncestorIDs(_ context.Context, id string) []string {
 
 func TestExternalLane_ExpandsResolvedCategoryIntoAncestorChain(t *testing.T) {
 	item := "豬五花"
-	price := 120
 	slots := procurementdomain.Slots{
 		Item: &item,
 		ItemResolution: &procurementdomain.ItemResolution{
-			Kind: procurementdomain.ItemResolvedSelfPriced, Label: "豬肉", CategoryID: "2008",
-			PricePerKg: &price, Provenance: procurementdomain.ItemResolutionByBuyerChoice,
+			Kind: procurementdomain.ItemResolvedCategoryConfirmed, Label: "豬肉", CategoryID: "2008",
+			Provenance: procurementdomain.ItemResolutionByBuyerChoice,
 		},
 	}
 	fake := &fakeCandidateLeadSearcher{}
@@ -267,12 +266,11 @@ func TestExternalLane_NoResolvedCategorySendsNoCategoryIDs(t *testing.T) {
 
 func TestExternalLane_CategoryIDsHitIsAMatchedFact(t *testing.T) {
 	item := "豬五花"
-	price := 120
 	slots := procurementdomain.Slots{
 		Item: &item,
 		ItemResolution: &procurementdomain.ItemResolution{
-			Kind: procurementdomain.ItemResolvedSelfPriced, Label: "豬肉", CategoryID: "2008",
-			PricePerKg: &price, Provenance: procurementdomain.ItemResolutionByBuyerChoice,
+			Kind: procurementdomain.ItemResolvedCategoryConfirmed, Label: "豬肉", CategoryID: "2008",
+			Provenance: procurementdomain.ItemResolutionByBuyerChoice,
 		},
 	}
 	fake := &fakeCandidateLeadSearcher{matches: []rootusecase.CandidateMatch{

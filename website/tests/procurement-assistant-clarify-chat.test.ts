@@ -436,7 +436,7 @@ test("quantity 單位追問：allowFreeText:false 沿用既有 gate 隱藏數字
 	);
 });
 
-test("Pricebook 品項分類消歧 gate：D「其他」chip 不直接 onPick，而是展開本地子表單", () => {
+test("品項分類消歧 gate：D「其他」chip 不直接 onPick，而是展開本地子表單", () => {
 	const questionCard = readFileSync(
 		path.join(root, "features/procurement-assistant/ClarifyQuestionCard.tsx"),
 		"utf8",
@@ -458,18 +458,18 @@ test("Pricebook 品項分類消歧 gate：D「其他」chip 不直接 onPick，�
 	);
 });
 
-test("Pricebook 品項分類消歧 gate：D 子表單描述＋價格都填了才能送出，未傳 onSubmitCropOther 時送出鍵也 disabled", () => {
+test("品項分類消歧 gate：D 子表單描述填了才能送出，未傳 onSubmitCropOther 時送出鍵也 disabled", () => {
 	const questionCard = readFileSync(
 		path.join(root, "features/procurement-assistant/ClarifyQuestionCard.tsx"),
 		"utf8",
 	);
 	assert.match(
 		questionCard,
-		/const canSubmitCropOther =\s*isCropDisambiguation &&\s*Boolean\(cropOtherDescription\.trim\(\)\) &&\s*Boolean\(cropOtherPrice\.trim\(\)\) &&\s*!pending;/,
+		/const canSubmitCropOther =\s*isCropDisambiguation &&\s*Boolean\(cropOtherDescription\.trim\(\)\) &&\s*!pending;/,
 	);
 	assert.match(
 		questionCard,
-		/const submitCropOther = \(\) => \{\s*if \(!canSubmitCropOther \|\| !onSubmitCropOther\) return;\s*onSubmitCropOther\(\{\s*description: cropOtherDescription\.trim\(\),\s*priceAmount: cropOtherPrice\.trim\(\),\s*\}\);/,
+		/const submitCropOther = \(\) => \{\s*if \(!canSubmitCropOther \|\| !onSubmitCropOther\) return;\s*onSubmitCropOther\(\{\s*description: cropOtherDescription\.trim\(\),\s*\}\);/,
 	);
 	assert.match(
 		questionCard,
@@ -478,29 +478,17 @@ test("Pricebook 品項分類消歧 gate：D 子表單描述＋價格都填了才
 	// 送出後回到未展開狀態並清空欄位，跟其他問題卡的自由文字表單同一套收尾慣例。
 	assert.match(
 		questionCard,
-		/setShowCropOtherForm\(false\);\s*setCropOtherDescription\(""\);\s*setCropOtherPrice\(""\);/,
+		/setShowCropOtherForm\(false\);\s*setCropOtherDescription\(""\);/,
 	);
 });
 
-test("Pricebook 品項分類消歧 gate：onSubmitCropOther 沿用 onSubmitFreeText 同一種『在 ProcurementClarifyChat 補上 slotKey 再往下傳』慣例，不新造一條平行資料流", () => {
+test("品項分類消歧 gate：onSubmitCropOther 沿用 onSubmitFreeText 同一種『在 ProcurementClarifyChat 補上 slotKey 再往下傳』慣例，不新造一條平行資料流", () => {
 	assert.match(
 		source,
-		/onSubmitCropOther\?: \(payload: \{\s*slotKey: string;\s*description: string;\s*priceAmount: string;\s*\}\) => void;/,
+		/onSubmitCropOther\?: \(payload: \{\s*slotKey: string;\s*description: string;\s*\}\) => void;/,
 	);
 	assert.match(
 		source,
-		/onSubmitCropOther=\{\s*onSubmitCropOther\s*\?\s*\(payload\) =>\s*onSubmitCropOther\(\{\s*slotKey: question\.slotKey,\s*description: payload\.description,\s*priceAmount: payload\.priceAmount,\s*\}\)\s*:\s*undefined\s*\}/,
-	);
-});
-
-test("Pricebook 品項分類消歧 gate：submitAnswer 的 answers request body 帶上 selfEnteredPriceAmount", () => {
-	const session = readFileSync(
-		path.join(root, "features/procurement-assistant/useProcurementSession.ts"),
-		"utf8",
-	);
-	assert.match(session, /selfEnteredPriceAmount\?: string;/);
-	assert.match(
-		session,
-		/json: \{\s*slotKey: answer\.slotKey,\s*optionId: answer\.optionId,\s*freeText: answer\.freeText,\s*unitOptionId: answer\.unitOptionId,\s*skip: answer\.skip,\s*selfEnteredPriceAmount: answer\.selfEnteredPriceAmount,/,
+		/onSubmitCropOther=\{\s*onSubmitCropOther\s*\?\s*\(payload\) =>\s*onSubmitCropOther\(\{\s*slotKey: question\.slotKey,\s*description: payload\.description,\s*\}\)\s*:\s*undefined\s*\}/,
 	);
 });

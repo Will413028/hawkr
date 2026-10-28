@@ -220,8 +220,6 @@ describe("Fix 2（live-stream 路徑）：interrupt outcome 不再整份丟棄�
 				{
 					optionId: "opt-a",
 					label: "紅蘿蔔（進口）",
-					cropCode: null,
-					groupCode: null,
 				},
 			],
 		});
@@ -366,102 +364,6 @@ describe("Fix 3：submitTurn 的兩個 409 handler 對 reason 敏感", () => {
 	});
 });
 
-describe("Fix 4：chooseCropDisambiguation 不再樂觀清空 pendingInterrupt", () => {
-	it("送出 /crop-disambiguation 期間 pendingInterrupt 維持既有值，不在請求送達前就消失", async () => {
-		getMock.mockResolvedValueOnce({ data: SNAPSHOT_WITH_OPEN_CONFIRMATION });
-		const { result } = renderProcurementSession("req-1");
-		await waitFor(() =>
-			expect(result.current.pendingInterrupt).toEqual({
-				interruptId: "int-1",
-				reason: "CLARIFICATION",
-			}),
-		);
-
-		let resolvePost: (value: unknown) => void = () => {};
-		postMock.mockImplementationOnce(
-			() =>
-				new Promise((resolve) => {
-					resolvePost = resolve;
-				}),
-		);
-
-		act(() => {
-			void result.current.chooseCropDisambiguation({
-				optionId: "opt-a",
-				label: "紅蘿蔔（進口）",
-				cropCode: "CARROT_IMPORT",
-				groupCode: null,
-			});
-		});
-
-		await waitFor(() => expect(result.current.pendingTurn).toBe(true));
-		// 樂觀 setState 已經送出，但這通請求本身不解掉 interrupt——維持原值。
-		expect(result.current.pendingInterrupt).toEqual({
-			interruptId: "int-1",
-			reason: "CLARIFICATION",
-		});
-
-		getMock.mockResolvedValueOnce({
-			data: SNAPSHOT_WITHOUT_OPEN_CONFIRMATION,
-		});
-		await act(async () => {
-			resolvePost({
-				data: {
-					requestId: "req-1",
-					revisionId: "rev-2",
-					reply: "好的，已記下紅蘿蔔。",
-					degraded: false,
-					slots: {},
-					missingRequired: [],
-					rejected: [],
-				},
-			});
-			await Promise.resolve();
-		});
-
-		await waitFor(() => expect(result.current.pendingTurn).toBe(false));
-		// applyTurnResult 落地後這一輪不是 interrupt，才由它自然清空。
-		expect(result.current.pendingInterrupt).toBeNull();
-	});
-
-	it("送出後端 409 APPROVAL_PENDING 失敗：呼叫 refreshCurrentSnapshot 校正，而不是留著一個誤導的舊值", async () => {
-		getMock.mockResolvedValueOnce({ data: SNAPSHOT_WITH_OPEN_CONFIRMATION });
-		const { result } = renderProcurementSession("req-1");
-		await waitFor(() =>
-			expect(result.current.pendingInterrupt).toEqual({
-				interruptId: "int-1",
-				reason: "CLARIFICATION",
-			}),
-		);
-
-		postMock.mockRejectedValueOnce(
-			new ApiClientError(
-				"request is parked on an open interrupt",
-				409,
-				undefined,
-				undefined,
-				"APPROVAL_PENDING",
-			),
-		);
-		getMock.mockResolvedValueOnce({ data: SNAPSHOT_WITH_OPEN_CONFIRMATION });
-
-		await act(async () => {
-			await result.current.chooseCropDisambiguation({
-				optionId: "opt-a",
-				label: "紅蘿蔔（進口）",
-				cropCode: "CARROT_IMPORT",
-				groupCode: null,
-			});
-		});
-
-		expect(getMock).toHaveBeenCalledTimes(2);
-		expect(result.current.pendingInterrupt).toEqual({
-			interruptId: "int-1",
-			reason: "CLARIFICATION",
-		});
-	});
-});
-
 /**
  * 2026-09-03 dev 實測補上的路由缺口：品項消歧問句（`question.slotKey ===
  * "crop_disambiguation"`，dialogueActCode ITEM_NEEDS_DISAMBIGUATION）**必然**
@@ -540,7 +442,7 @@ describe("普通選填問句的 snapshot 重試", () => {
 	};
 	const legacyCrop = {
 		prompt: "請重新選擇品項",
-		options: [{ optionId: "legacy-crop", label: "珍珠芭樂", cropCode: "P1" }],
+		options: [{ optionId: "legacy-crop", label: "珍珠芭樂" }],
 	};
 	async function arriveAtOptionalQuestion(question = packagingQuestion) {
 		streamProcurementTurnMock.mockResolvedValueOnce({
@@ -691,12 +593,12 @@ describe("分類中斷的權威問句還原", () => {
 		allowFreeText: true,
 		options: [
 			{ optionId: "category-102", label: "豬五花", value: "豬五花" },
-			{ optionId: "crop-other", label: "自行填寫品項與單價", value: "OTHER" },
+			{ optionId: "crop-other", label: "自行描述品項", value: "OTHER" },
 		],
 	};
 	const legacyCard = {
 		prompt: "舊分類卡",
-		options: [{ optionId: "legacy-crop", label: "舊選項", cropCode: "LA1" }],
+		options: [{ optionId: "legacy-crop", label: "舊選項" }],
 	};
 	const snapshotWithQuestion = (question: unknown) => ({
 		...SNAPSHOT_WITH_OPEN_CONFIRMATION,
@@ -720,7 +622,7 @@ describe("分類中斷的權威問句還原", () => {
 		],
 		["小類", categoryQuestion],
 		[
-			"自填價",
+			"自行描述品項",
 			{
 				...categoryQuestion,
 				allowFreeText: false,
@@ -822,7 +724,6 @@ describe("問題卡答題的傳輸路由：有未回覆的 interrupt 時走 resu
 				optionId: "crop-other",
 				optionLabel: "其他（自己輸入）",
 				freeText: "有機甘藍",
-				selfEnteredPriceAmount: "120",
 			});
 		});
 
@@ -834,7 +735,6 @@ describe("問題卡答題的傳輸路由：有未回覆的 interrupt 時走 resu
 			payload: {
 				optionId: "crop-other",
 				freeText: "有機甘藍",
-				selfEnteredPriceAmount: "120",
 			},
 		});
 	});
@@ -1012,7 +912,7 @@ describe("resume 帶回 TurnResult 時走 applyTurnResult（backend-payuni 2026-
 			allowFreeText: true,
 			options: [
 				{ optionId: "fixture-pork-belly", label: "豬五花", value: "豬五花" },
-				{ optionId: "crop-other", label: "自行填寫品項與單價", value: "OTHER" },
+				{ optionId: "crop-other", label: "自行描述品項", value: "OTHER" },
 			],
 		};
 		postMock.mockResolvedValueOnce({
