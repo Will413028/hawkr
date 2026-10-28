@@ -67,7 +67,7 @@
   - 不能動：根目錄的跨專案契約表的語意、`nextjs-agent-rules` 區塊。
   - 驗收：步驟 1 的腳本通過，例外清單少掉這幾檔；`cd admin && pnpm test tests/admin-design-documentation.test.ts` 通過；`website` 的 visual helper 只在 CI 跑（本機不跑瀏覽器測試），標「待 CI」。
 
-- [ ] **4. 非 seller 的模組（buyer、social、identity、agent、accountdeletion、discovery、delegation、content、reviewqueue、media）**（被擋於：步驟 1、2，D3）
+- [x] **4. 非 seller 的模組（buyer、social、identity、agent、accountdeletion、discovery、delegation、content、reviewqueue、media）**（被擋於：步驟 1、2，D3）
   - 範圍：每個模組一個子步驟（4a…4j），各自驗收、各自 commit。開工前照全域約束檢查未提交改動（2026-10-28 時 reviewqueue 有其他 session 的改動）。照新模板重寫：行為規格搬進 D3 決定的位置，理由搬進 ADR，已知限制搬進同一個規格位置；不變量改成一句規則加守門測試名稱與規格位置。同一個 commit 改掉現行文件、ADR、`CARRYOVER.md`、程式與測試對被移除段落的引用（migration 除外，見全域約束）。
   - 消費端：`rg -n "AGENTS\.md" --glob '!backend/docs/plans/**' --glob '!**/node_modules/**' .` 逐筆分類；特別注意沒寫模組名的「`AGENTS.md`「已知限制」」寫法（例：reviewqueue、agent 的 `CARRYOVER.md`）。
   - 不能動：`pub_*` 的形狀與說明（只能改寫法，不能刪掉）；任何程式。
@@ -124,7 +124,7 @@
 | 1 檢查腳本與 CI | 完成 | 本機：`python3 scripts/check-agents-md.py` exit 0；`python3 -m unittest scripts/test_check_agents_md.py` 8 項 OK；mutation：media 加長到 9,947 bytes 與 600 字元的一行 → exit 1；例外清單放不超限的 buyer-app → exit 1；`actionlint` 通過 ；CI repo-hygiene run 40552353091（commit 41ed095）兩步 success | 無 | e495fe3 |
 | 2 ADR 與模組模板 | 完成 | 本機：`GOWORK=off go test ./cmd/new-module/ ./cmd/hawkr/` ok；`go vet ./cmd/new-module/`、`gofmt -l` 無輸出；新測試 `TestGeneratedAgentsHasOnlyTheFixedSections` 在舊模板上失敗（節是職責…已知限制、讀取模型…）；mutation：模板加回「## 已知限制」→ 失敗，刪掉「## 不負責」→ 失敗；`python3 scripts/check-agents-md.py` exit 0。`backend/AGENTS.md` 單體規則 2 的節名「發布的讀取介面」與 D2 相同，未改；產生器不建 `docs/modules/<模組>.md`，main.go 的下一步提示指向它 | backend-monolith CI（push 後看） | 見 git log |
 | 3 根目錄與子專案 | 完成 | 本機：`python3 scripts/check-agents-md.py` exit 0（EXCEPTIONS 拿掉根目錄、backend、website）；`python3 -m unittest scripts/test_check_agents_md.py` OK；mutation：backend 加長到 10,067 bytes → exit 1。大小（website 不含 nextjs 區塊）：根目錄 10,215、backend 9,945、website 8,254；admin 本來就在上限內，未改。backend 的結構與規則全文搬到 `docs/開發規範/單體開發規範.md`（編號不變），website 的多語系路由全文搬到 `website/docs/i18n-routing.md`，根目錄契約表的細節由既有 ADR／規範／設計文件承接；App 的元件庫維護共用三條留在 buyer-app | 引用節名的 `website/tests/visual/_helpers.ts`（節名未改）只在 CI 跑；`admin-design-documentation.test.ts` 未跑（admin 未改） | 見 git log |
-| 4 非 seller 的模組 | 未開始 | | | |
+| 4 非 seller 的模組 | 完成 | 本機：`python3 scripts/check-agents-md.py` exit 0（EXCEPTIONS 只剩 seller）；unittest OK；`GOWORK=off go test ./cmd/hawkr/ ./internal/arch/ ./cmd/new-module/` ok；10 個 AGENTS.md 2,973–5,557 bytes，七節與模板同序；規格位置抽查（python，比對 AGENTS 裡每個 §N 與 `docs/modules/<模組>.md` 的編號標題）10 個模組 0 缺；AGENTS 引用的守門測試名稱逐一 `rg "func <名稱>("` 0 缺；各模組「原段落 → 新位置」在各自 commit 訊息 | 整合測試（`-tags integration`）只確認名稱存在、未跑（只改文件）；backend-monolith CI 待 push | 見 git log |
 | 5 seller 開工前的確認 | 未開始 | | | |
 | 6 seller 模組 | 未開始 | | | |
 | 7 收尾 | 未開始 | | | |
