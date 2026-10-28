@@ -26,7 +26,7 @@ schema `content`（`db/schema.sql`）：`banners`、`app_version_gates`，以及
 - banner 的點擊行為一定完整，url 只接受 http、https。守門：`TestBannerActionMustBeComplete`、DB 約束 `banners_action_check`。規格：`docs/modules/content.md` §2。
 - banner 的排程是 [開始, 結束)，結束必須晚於開始。守門：`TestBannerScheduleCheckMatchesTheGoRule`、DB 約束 `banners_schedule_check`。規格：§2。
 - 啟用中的 banner 最多 20 則。守門：`TestBannersCanOnlyBeActivatedUpToTheLimit`。規格：§2。
-- 圖片只在 transaction 外 `Finalize`，不建立引用；key 與 asset ID 成對且必填。守門：`TestCreateBannerFinalizesBothImagesAndTheSyncJobLinksThem`、`TestImageKeysAndAssetIDsArePaired`、DB 的 `NOT NULL`。規格：§3。
+- 圖片只在 transaction 外 `Finalize`，不建立引用；key 與 asset ID 成對且必填。守門：`TestCreateBannerFinalizesBothImagesAndTheSyncJobLinksThem`（不建立引用）、`TestImageKeysAndAssetIDsArePaired`、DB 的 `NOT NULL`；transaction 外這一點無守門（只有規格）。規格：§3。
 - 引用只由 `content.media_sync` 同步 job 寫入，job 以 (ref_type, ref_id) 去重；業務列寫入只記退場、不 Link 也不 Unlink。守門：`TestSyncJobIsUniquePerRefAcrossWrites`、`TestSyncRunsAgainWhenTheBannerChangesDuringTheRun`、`TestSyncStaysCorrectWhileWritesInterleaveWithRealRiver`。規格：§3。
 - 退場是寫入前後該 ref 所有資產的集合差；已退場的圖不能寫回。守門：`TestRetiredIsASetDifferenceAcrossAllSlotsOfTheRef`、`TestSharedAssetAcrossBannerColumnsIsNotRetiredWhileStillPointedAt`、`TestUpdateBannerRetiresExactlyTheReplacedImages`。規格：§3。
 - 重試用盡或 job 遺失由保底掃描補排。守門：`TestSweepRecoversALostEnqueueWithRealRiver`。規格：§3。
