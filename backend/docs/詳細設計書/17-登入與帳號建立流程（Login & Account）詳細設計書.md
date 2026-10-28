@@ -699,7 +699,7 @@ sequenceDiagram
 
 ## 6. 資料庫 Schema
 
-> 身份資料模型的單一真實來源：`sellers`、`payuni_registrations` 的欄位與索引是 **[44 號 §5.1/§5.2](44-帳號與賣家買家身份模型（Account%20&%20Seller-Buyer%20Identity）詳細設計書.md)**，帳號表是 `docs/modules/identity.md` §9，`buyers` 是 `internal/modules/buyer/db/schema.sql`；買家關聯表細節見 [39 §3](39-買家服務（Buyer%20Service）詳細設計書.md)。
+> 身份資料模型的單一真實來源：`seller.stores`、`seller.payuni_registrations` 的身份欄位與索引是 **[44 號 §5.1/§5.2](44-帳號與賣家買家身份模型（Account%20&%20Seller-Buyer%20Identity）詳細設計書.md)**，帳號表是 `docs/modules/identity.md` §9，`buyers` 是 `internal/modules/buyer/db/schema.sql`；買家關聯表細節見 [39 §3](39-買家服務（Buyer%20Service）詳細設計書.md)。
 >
 > 登入相關要點：帳號身份鍵 = `email`（partial unique `WHERE deleted_at IS NULL`）+ `auth_providers(provider, provider_sub_id)` UNIQUE；`phone` **非** unique（#944）。登入一律查 `auth_providers`；`accounts` 不持有 `firebase_uid` / `nickname` / `avatar`。
 
@@ -875,7 +875,7 @@ sequenceDiagram
 
 ## 14. 帳號軟刪與 provider 清理
 
-帳號刪除、角色移除與 `AccountDeleted` 事件的生命週期見 `docs/modules/identity.md` §3、§4 與 `docs/modules/accountdeletion.md`；賣家的自助刪除與重新入駐見 **[44 號 §7.1/§7.5](44-帳號與賣家買家身份模型（Account%20&%20Seller-Buyer%20Identity）詳細設計書.md)**。
+帳號刪除、角色移除與 `AccountDeleted` 事件的生命週期見 `docs/modules/identity.md` §3、§4 與 `docs/modules/accountdeletion.md`；賣家的關店與重新入駐見 **[44 號 §7.1/§7.5](44-帳號與賣家買家身份模型（Account%20&%20Seller-Buyer%20Identity）詳細設計書.md)**。
 
 登入相關要點：帳號只經 `accountdeletion` 刪除（ADR `docs/adr/2026-09-30-account-deletion-module.md`），同一個 transaction 關閉買家；移除 SELLER 不刪帳號。刪除的帳號留墓碑，同一個 Clerk 使用者不會再建帳號。以下描述舊服務：**web session 的撤銷走 `DeleteByAccountID`**（刪光該帳號全部 `web_sessions` row，失敗即回錯誤）——那才是撤銷本身；緊接著以該呼叫回傳的 `token_hash` 逐出各自的 Redis 快取副本，即時性由這一步提供（逐出失敗只記 warn，不影響撤銷成立）。同時寫的 Redis 撤銷黑名單覆蓋的是**無狀態 mobile JWT**與逐出打不到 Redis 時的兜底（見 §3「Redis blacklist 的角色」）。（注意：admin/force 的 `SoftDeleteAccount` 路徑**不**清 auth_providers，留孤兒 link，靠登入端 `isLiveAccount` 防呆擋下——見 44 §11.1。）
 

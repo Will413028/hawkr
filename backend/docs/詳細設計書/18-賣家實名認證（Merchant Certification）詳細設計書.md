@@ -1782,9 +1782,6 @@ stateDiagram-v2
 
 本節涵蓋的命中只有一支：**`PayuniSyncWorker`（`internal/worker/payuni_sync.go`）** —— PayUni 註冊狀態的對帳輪詢。它的主通道是 `AGENT_NOTIFY` webhook，這支是**漏收 webhook 的補救**。
 
-> ⚠️ **seller-service 不只這一支排程 —— [規範規則 ⑧](../開發規範/多副本排程搶佔規範.md)要的是該服務排程的**逐支**盤點，不要拿本節當服務級的全集。**
-> 另一支是 **`SellerDeletedOutboxWorker`（`internal/worker/seller_deleted_outbox_worker.go`，每 1 分鐘 tick）**：撈 `seller_deleted_outbox` 的 pending row → publish `seller.deleted` ＋ 呼叫 account-service `RemoveSellerRole`。它的 lease claim（租約欄＝既有的 `next_attempt_at`）與 `RemoveSellerRole` deadline 的 SSOT 在 [44 號 §8.6](./44-帳號與賣家買家身份模型（Account%20&%20Seller-Buyer%20Identity）詳細設計書.md)，本節不重複數字以免兩處漂移。
-> ⇒ **調高 `seller-service` 的 `replicas` 之前，這兩支都要確認過。**
 
 **副本數前提（搶佔緊急度的判定輸入）**：`seller-service` 在 prod 是**單副本**（各服務的現行副本數與查證方式見[規範 §〇](../開發規範/多副本排程搶佔規範.md)，本書不複述以免漂移）⇒ 本節處理的是[規範規則 ⑧](../開發規範/多副本排程搶佔規範.md)的**擴容前置條件**；單副本下唯一的雙 pod 窗口是 rolling update（chart 預設 `maxUnavailable: 0` / `maxSurge: 1`）。
 > ⚠️ **這一支對擴容特別敏感**：若節流活在 process 記憶體裡，「單副本＝正確、多副本＝完全失效」之間沒有中間地帶——`replicas` 一從 1 變 2，節流不是變弱而是**歸零**。這正是本節把節流下沉到 SQL 的理由。

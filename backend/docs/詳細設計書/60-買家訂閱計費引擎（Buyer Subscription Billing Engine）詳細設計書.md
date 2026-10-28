@@ -517,7 +517,7 @@ sequenceDiagram
 沿用既有兩服務 SLO。本文件的路徑皆由背景 webhook 觸發，**不在使用者即時互動路徑上**，唯一的例外是 `CreateMembershipSubscription`（買家在購買頁等待 redirect URL）。
 
 - 內部 gRPC timeout 沿用 `common-core` 的既有預設，不另訂。
-- 🔴 **對 PayUni 的呼叫必須有明確 deadline**：它在 `billing_commands` 的租約內執行，無界呼叫會讓租約的下界無從論證（同 44 號 §8.6 的判準）。
+- 🔴 **對 PayUni 的呼叫必須有明確 deadline**：它在 `billing_commands` 的租約內執行，無界呼叫會讓租約的下界無從論證。
 
 ---
 
