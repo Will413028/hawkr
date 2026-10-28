@@ -64,10 +64,8 @@
 
 > 回填不可拆到下一個 release：拆開＝中間有一段視窗資料是錯的，而讀新欄位的 code 已經上線。
 
-### 反例（本專案真實事故）
+### 反例
 
-`services/buyer-service/db/migrations/20260427044537_add_buyer_deletion_status.sql` 與
-`services/seller-service/db/migrations/20260427052936_add_seller_deletion_status.sql`
 為 `buyers` / `sellers` 加上 `status ... NOT NULL DEFAULT 'active'`，
 卻沒有回填 `deleted_at IS NOT NULL` 的既有列 —— 少的就是這兩句：
 
@@ -77,10 +75,9 @@ UPDATE sellers SET status = 'closed' WHERE deleted_at IS NOT NULL;
 ```
 
 於是「已軟刪除的帳號 `status` 仍是 `active`」：不變式
-`deleted_at IS NOT NULL ⇒ status = 'closed'` 對 migration 之前的列全部不成立，
-直到 2026-08-01 才被發現並人工更正（dev buyers 2 列、sellers 2 列）。
-現已補上 `chk_buyers_deleted_requires_closed` / `chk_sellers_deleted_requires_closed`
-兩條 CHECK 約束：同類漏回填會在 migration 套用當下直接失敗，不再靜默帶過。
+`deleted_at IS NOT NULL ⇒ status = 'closed'` 對 migration 之前的列全部不成立。
+同一個 migration 補上 `CHECK (deleted_at IS NULL OR status = 'closed')` 約束：
+同類漏回填會在 migration 套用當下直接失敗，不再靜默帶過。
 
 ---
 
