@@ -29,7 +29,7 @@
 | `deadlineQuery`＝`AMEGO_HTTP_TIMEOUT_QUERY_MS` | 10 s（保守推定） | 同上 | 逾時對帳段，計入 `INV.op` 下界 |
 | `deadlineList`（`invoice_list`，**每頁獨立**計時） | 20 s | 4.5.12、7.5.2 | **不可併回 `deadlineQuery`**：併了 `INV.op` 下界少算 10 s，而那 20 s 正是下界 60.4 s 遠高於 `INV.rc` 20.3 s 的唯一原因 |
 | 內部 gRPC（ORD／PAY／SHIP／BUY）／`deadlineTime` 校時／`MAIL_HTTP_TIMEOUT_MS` | 3 s／5 s／10 s | 7.5.2、4.5.12、8.5.1(F) | 內部 gRPC 唯讀，失敗由 MQ consumer 重試 3 次後進 DLQ；`MAIL_*` 是通知 worker 租約下界的來源 |
-| MQ publish ＋ confirm | 10 s（`INVOICE_MQ_PUBLISH_TIMEOUT_SECONDS`） | 7.5.2、7.5.4、8.5.1 A-3、9.4.3、12.1 | `INV.ob` 租約下界的唯一輸入（下界 10.2 s ＜ 租約 30 s）。與既有的 `DELEGATION_MQ_PUBLISH_TIMEOUT_SECONDS` 同值（`services/account-service/internal/config/config.go:296`）。落地只認 `mq.WithConfirmTimeout(...)`，在呼叫端包 ctx 無效——`pkg/mq` 的 confirm 等待用 `context.Background`（`pkg/mq/publisher.go:233`），未傳 Option 時實際上界是套件預設 30 s，下界算式會建在一個假數字上 |
+| MQ publish ＋ confirm | 10 s（`INVOICE_MQ_PUBLISH_TIMEOUT_SECONDS`） | 7.5.2、7.5.4、8.5.1 A-3、9.4.3、12.1 | `INV.ob` 租約下界的唯一輸入（下界 10.2 s ＜ 租約 30 s）。落地只認 `mq.WithConfirmTimeout(...)`，在呼叫端包 ctx 無效——`pkg/mq` 的 confirm 等待用 `context.Background`（`pkg/mq/publisher.go:233`），未傳 Option 時實際上界是套件預設 30 s，下界算式會建在一個假數字上 |
 | `invoice_operations.next_attempt_at`／`INV.op` | 120 s | 7.5.4、4.3.3、8.5.1 A-3、5.2.3 | 合法帶 `(60.4 s, 5 min]`：下界 ＝ 30 ＋ 10 ＋ 20 ＋ 0.4（DB），業務上界 ＝ 可容忍補救延遲 5 分鐘。三處必須同值，不同時實際生效的是 env |
 | 同一欄第 2 組／`INV.rc` | 60 s | 7.5.4、4.3.3 | 下界 20.3 s ＝ `max(invoice_query 10 s, invoice_list 一頁 20 s)` ＋ DB 0.3 s，**成立條件是「一次 claim 只做一次外部呼叫」**（拿掉後最壞耗時 `N × 20 s`、無上界）。⚠ 與第 1 組共用同一欄 ⇒ `status` 集合必須不相交，交集非空 ⇒ 60 s 合法搶走 120 s 持有中的列 ⇒ 重複開票 |
 | `invoice_documents.upload_recheck_next_at`／`INV.rc` | 120 s | 7.5.4 | 下界 10.3 s（`invoice_status` 10 s ＋ DB 0.3 s）。與上一列是同一支 worker 的兩組租約、落在不同表 ⇒ 需要兩個不同的 `outbox_name`，同名第二次註冊直接 panic |
@@ -59,7 +59,7 @@
 | 申訴入口開放延遲 | 24 h（`INVOICE_COMPLAINT_OPEN_DELAY_HOURS`） | 6.1.6（9311）、8.5.1 A-4 | 不設此閘 ⇒ 無效申訴灌爆 3 工作天 SLA ⇒ 誤判違規 ⇒ 觸發停權門檻 |
 | 買家異議期 | 72 h | 5.1.12（K02／K06） | 逾期視為同意，是「賣家單方下修退款金額」時折讓合意的唯一來源 |
 | 稅務身分審核寬限／重申冷卻 | 60 天（自**送出審核申請**起算）／7 天 | 8.5.1 A-4（C4、C3） | 單一時鐘：補件不重算，最多延長一次且延長後必有到期日。冷卻反向亦適用（已核定資格可由 ADM 推翻重審） |
-| 違規窗口／停權門檻／停權天數 | 90 天／3 次／14 天 | 8.5.1 A-4（C1、C2） | 窗口是**滑動窗、查詢當下即時算**，禁止維護 `violation_count` 計數器欄；停權與 14 天恢復由 seller-service 既有 cron 執行，發票模組只提建議 |
+| 違規窗口／停權門檻／停權天數 | 90 天／3 次／14 天 | 8.5.1 A-4（C1、C2） | 窗口是**滑動窗、查詢當下即時算**，禁止維護 `violation_count` 計數器欄；停權由 seller 模組的措施處理，發票模組只提建議 |
 | 待審期間接單上限 | 50 單／100,000 元 | 8.5.1 A-4（C5） | **先到者**停接新單；既有訂單仍可履約 |
 
 ### 0.4 容量、批次與速率上限
@@ -158,9 +158,9 @@
 | **05 支付** | 發票日期唯一來源 `payment_transactions`：`provider_paid_at`（PayUni 真實付款時間，卡片取 `AuthDay+AuthTime`、ATM 取 `PaymentDay`，**ATM webhook 常為 NULL**）、`pay_time`（我方 webhook 寫入當下 `nowUtc`）；自動請款模式（`05:3429`）是「授權即收款」的程式碼依據；`is_duplicate` 語意（`V1__init_payment_tables.sql:51-53`）；`ZERO_AMOUNT(2900)` 不呼叫 PayUni | 新增唯讀 internal RPC **`GetPaymentFactsInternal(order_no)`** → `trade_no`／`provider_paid_at`／`pay_time`／`trade_amt`／`payment_type`／`is_duplicate`（52 號 HMAC，client deadline 3s）。現行 proto 只有 admin 面的 `AdminPaymentTransactionDetail` 帶 `provider_paid_at`，服務間直用違反角色分離。**除此之外不改支付服務任何狀態機**，發票側只讀不寫 |
 | **09 售後** | 退款事實來源；`refund_outcome ∈ {FULL_REFUND, PARTIAL_REFUND}`（`V3__add_refund_outcome.sql`）；`AfterSaleCaseStatusRules.isActive` 是「售後是否還活著」的 canonical 判定（禁止自造第二套終態集合）；申訴期公式（`60 → last_rejected_at+72h`、`33 → closed_at+72h`） | **零改動、不新增任何 producer、不新增 RPC**。折讓／作廢的觸發源不在 aftersales 側，收斂到 order-service 新增的 `order.refund.finalized`（訂單層唯一權威退款事件）。逐條「採用／考慮過但不採用」見 §6.3 |
 | **12／13 通知與模板引擎** | 站內訊息投遞管道（inbox ＋ FCM）、DB-driven 模板引擎與 golden key 契約 gate（`tests/contract/golden/event_payload_keys.json`）；`target_user_field` 語意 | ① 新增發票模板列（Atlas migration）＋ 同步 golden；② **新增 email 通道**——`notification_templates` 沒有 `channel` 欄位，需 expand-contract 加欄並回填既有列為站內。`target_user_field` 填錯完全無聲，且 grandfather 恆等（首任 `buyer_id == account_id`）會讓 dev 全綠，只有 re-key 過的使用者永遠收不到 |
-| **18 賣家實名認證** | `certification_applications.tax_id`／`company_name`／`company_type` 是目前唯一存賣方稅籍的地方（`services/seller-service/db/schema/schema.sql:165`）；認證 FSM 的 `EventResetDraft`（`rejected → draft`） | **新增獨立稅務身分軸 `seller_tax_profiles`，不沿用認證申請單當開票依據**（U4）。開票當下取快照，有自己的審核 FSM、有效期與複審觸發 |
+| **18 賣家實名認證** | `seller.kyc_applications` 的 `tax_id`／`company_name`／`seller_type` 是目前唯一存賣方稅籍的地方（`internal/modules/seller/db/schema.sql`）；被退回的申請重送沿用原列，狀態回到 `DRAFT` | **新增獨立稅務身分軸 `seller_tax_profiles`，不沿用認證申請單當開票依據**（U4）。開票當下取快照，有自己的審核 FSM、有效期與複審觸發 |
 | **36 MQ 與事件總覽** | 事件契約 SSOT；exchange／routing key／payload 登記格式與 Idempotency 策略代號 | 同一 PR 回寫三段（缺任一段不會編譯錯、不會測試紅）：① 36 號 §2.1／§2.2 各加一列（`hawkr.invoice` ＋ 手寫的 `hawkr.invoice.dlx`）並新增 §3.6k 發票領域，登記出向 11 條 routing key；② 36 號 §3.1「訂單領域」加一列 `order.refund.finalized`（屬 `hawkr.order`，不屬發票領域）；③ `topology.yaml` 新增三條入向 queue（`invoice.order.paid`／`invoice.order.refund.finalized`／`invoice.order.cancelled`，皆帶 `retry:`）與 invoice 出向資源。⚠️ `order.paid` 的 routing key **就是 `order.paid`，沒有 `.v1`**（`infra/mq/topology/topology.yaml:773`）——綁 `.v1` 收不到任何訊息且不報錯，整條自動開票鏈靜默不啟動 |
-| **44 身分模型** | `account_id` ＝登入 principal；`buyer_id`／`store_id` ＝業務鍵，皆 surrogate、首任 grandfather 相等但禁止假設恆等；store-stint 與 buyer-stint 語意；T+30 PII 清理**跨所有 stint** | ① 新增第三、四個身分概念：發票的 **issuer** 與 **recipient**（§2.3），兩者都可指向不在 `accounts` 表內的對象；② 發票文件、折讓證明、買家同意訊息屬法定 5 年保存，為 PII 清理例外，帳號刪除不連帶刪除、僅關閉對外查詢 |
+| **44 身分模型** | `account_id` ＝登入 principal；`buyer_id`／`store_id` ＝業務鍵，皆 surrogate、首任 grandfather 相等但禁止假設恆等；store-stint 語意（買家一個帳號一生只有一個）；T+30 PII 清理 | ① 新增第三、四個身分概念：發票的 **issuer** 與 **recipient**（§2.3），兩者都可指向不在 `accounts` 表內的對象；② 發票文件、折讓證明、買家同意訊息屬法定 5 年保存，為 PII 清理例外，帳號刪除不連帶刪除、僅關閉對外查詢 |
 | **46 賣家能力層** | deny-by-default、「宣告＝掛載合一」registry、boot 斷言、`GrantedCapabilities` 單一問答點；停權白名單四類；純唯讀查看也鎖 | 新增賣家面發票 capability 並回答 46 號必答題（逐條裁決見 §8.1）。**「自動開票」是系統行為**（排程／MQ，不經 Gateway guard），能力層管不到；能力層只管「賣家在前端查發票／設定稅籍」 |
 | **49／08 多媒體** | DB/MQ/快取只存 objectKey、欄位名必須誠實（`*_key`）、URL 組裝唯一入口 `pkg/mediaurl.BuildURL`；PDF 落 media 的先例（`ShipmentLabelService`） | 新增機敏版後端直傳 RPC **`ServerUploadSecureAndFinalize`**（`ref_type`／`ref_id` 必填、加密落 R2、`is_secure=true`、objectKey 落 `secure/` 前綴）。既有 `ServerUploadAndFinalize` 不可用（硬寫 `public/` 前綴、`is_secure=false`、`uploaderAccountId=NULL` 導致授權述詞兩分支都不通）。**media GC 規則不改**：解法是把「建資產」與「建 `asset_reference`」壓成同一次呼叫。另需 CodeMeta 新增 `AssetReferenceType.INVOICE_DOCUMENT = 7120`（哨兵 `7199 OTHER` 之前），`ref_id` 用 `invoice_documents.id` 不用 `order_no`。⚠️ **加密落 R2 是強制的**：上傳必須 AES-GCM 加密並落 wrapped key，主密鑰不可用時 **fail loud**——退回明文是靜默失效，一旦發生就無從察覺。🔴 **讀取端的明文分支是永久的、不得刪除**：早期寫入的資產 `encryption_key` 為 NULL 而 `is_secure` 仍為 true，刪掉那條分支等於把歷史發票鎖死；**判斷以 `encryption_key` 欄位值為準，不以 `is_secure` 為準**。 |
 | **52 內部授權** | HMAC 四件套；`INTERNAL_AUTH_MODE=enforcing` ＋ per-service NetworkPolicy | 無新增。invoice-service 的 gRPC client **必須自己掛** `interceptor.InternalAuthClientInterceptor("invoice-service", ...)`——server 端由 `pkg/server/grpc.go` 自動裝、client 端不會。repo 內已有漏掛實例（`services/review-service/internal/client/order/client.go:22`，不要照抄） |
@@ -247,8 +247,8 @@ flowchart LR
   ORD["order-service（Java）<br/>訂單快照・買家發票資料<br/>金額恆等式"]
   PAY["payment-service（Java）<br/>付款時間・付款方式<br/>重複付款標記"]
   AFT["aftersales-service（Java）<br/>退款事實・售後終態"]
-  SEL["seller-service（Go）<br/>稅籍快照唯讀 RPC（本案新增）<br/>店家狀態查詢"]
-  BUY["buyer-service（Go）<br/>買家 email／手機"]
+  SEL["seller 模組（單體）<br/>稅籍快照唯讀介面（本案新增）<br/>店家狀態查詢"]
+  BUY["buyer 模組（單體）<br/>買家 profile／手機"]
   MED["media-service（Java）<br/>發票 PDF・稅務證明<br/>（只存 objectKey）"]
   NOTI["notification-service（Go）<br/>站內訊息 ＋ App 推播<br/><b>＋ 本案新增 email 通道</b>"]
 
@@ -303,7 +303,7 @@ flowchart LR
 | 2 | 自動開票（賣家 → 買家）：`AMEGO_AUTO` 訂單自動開 B2C／B2B 電子發票 | invoice-service ＋ `pkg/amego` | 觸發判準＝發貨日與收款日取較早者；零元訂單不開票；冪等鍵送出前先落庫 |
 | 3 | 作廢與折讓：售後進終態時自動判定並執行（賣家零操作） | invoice-service 訂閱退款事件 | 判定樹四層：原發票上傳狀態 → 是否已有折讓 → 是否跨期／過關帳日 → 全額或部分（P4–P6）；累計折讓 ≤ 已開票金額由 DB 層兜底 |
 | 4 | 法定期限管理：`statutory_deadline_at` 倒數、逼近告警、逾期升級 ADM 待辦 | invoice-service | 用自然日不用工作日；末日不因假日延長 |
-| 5 | 賣家稅務身分治理：資格申請、ADM 審核佇列、文件上傳、審核中 60 天可接單、責任條款版本化、免用統一發票資格與收據代製 | invoice-service（資格 SSOT）＋ seller-service（只出一支唯讀稅籍 RPC） | 稅務資格＝Invoice 擁有、店鋪 lifecycle＝Seller 擁有；已代製收據不追溯 |
+| 5 | 賣家稅務身分治理：資格申請、ADM 審核佇列、文件上傳、審核中 60 天可接單、責任條款版本化、免用統一發票資格與收據代製 | invoice-service（資格 SSOT）＋ seller 模組（只出一支唯讀稅籍介面） | 稅務資格＝Invoice 擁有、店鋪 lifecycle＝Seller 擁有；已代製收據不追溯 |
 | 6 | AMEGO 憑證與字軌：per-seller 統編＋AppKey 加密保存、連線驗證、字軌餘量監控與告警 | invoice-service | AppKey **不可回顯**；**先驗證再覆蓋**（否則產出「綠色已啟用＋每筆開票都失敗」）；字軌足夠是 `ACTIVE` 的前置驗證項之一 |
 | 7 | 買家發票資料：結帳採集統編／載具／捐贈碼；買家常用發票資料集合管理 | order-service（採集，建單 hot path）＋ invoice-service（偏好集合） | 法定必要不是可選功能（L9）。AMEGO 完全不驗捐贈碼與自然人憑證的存在性，必須我方驗（P12） |
 | 8 | 買家申訴（未收到發票）：建案、3 工作天 SLA、賣家回覆、ADM 裁決、違規計數 | invoice-service ＋ 既有 violation 路徑 | 工作天由後端算；違規計數只計已確認違規、以**去重後的訂單數**計不以案件數；停權走既有能力層不自建 |
@@ -324,12 +324,12 @@ flowchart LR
 | **Recipient**（受票人／買受人） | 發票開給誰 | 訂單線取買家發票資料快照；ADM 手動線取表單 | `buyers.buyer_id`（會員）／**無 ID**（ADM 手填的非會員，只有抬頭＋統編／載具） | 部分：買家在結帳填自己的統編／載具／捐贈碼（受 P12 驗證約束）；**不能指定別人** |
 | **Actor**（觸發者） | 這一次開立／作廢／折讓是誰發動的 | `system`（自動）／ADM session／賣家 | ADM：`admin_accounts.id`（不在 `accounts` 表）；賣家：`accounts.id` | ❌ |
 | **Account**（登入 principal） | 登入身分 | Gateway 由 JWT 注入 `x-account-id` | `accounts.account_id` | ❌ |
-| **Buyer**（買家業務鍵） | 買家的營運身分 | Gateway `buyerid` resolver 由 `account_id` 解析 | `buyers.buyer_id`（buyer store-stint surrogate） | ❌ |
+| **Buyer**（買家業務鍵） | 買家的營運身分 | Gateway `buyerid` resolver 由 `account_id` 解析 | `buyer.buyers.buyer_id`（surrogate，一個帳號一生一個） | ❌ |
 | **Store**（賣家業務鍵） | 賣家的營運身分 | Gateway `sellerid` resolver 由 `account_id` 解析 | `sellers.store_id`（store-stint surrogate，TSID，永不變動） | ❌ |
 
 | # | 必須寫進實作的事實 | 做錯的後果 |
 |---|---|---|
-| 1 | **`merId` 不是身分鍵，且與發票無關**。格式 `HAWK<store_id>`，只在付款、退款與 PayUni Webhook 使用。發票的賣方主體一律取 `store_id` ＋ 稅籍快照 | 兩者生命週期不同：關店重開會拿到新 `merId`（`services/seller-service/internal/repository/postgres/payuni_repository.go` write-once 語意），而發票要綁的是開票當下那個主體 |
+| 1 | **`merId` 不是身分鍵，且與發票無關**。格式 `HAWK<store_code>`，只在付款、退款與 PayUni Webhook 使用。發票的賣方主體一律取 `store_id` ＋ 稅籍快照 | 兩者生命週期不同：重新入駐會拿到新的 `store_id` 與 `store_code`，所以有新的 `merId`（`seller.payuni_registrations`，一個 stint 一次性），而發票要綁的是開票當下那個主體 |
 | 2 | **`store_id` 不是 `orders.store_id`**。`orders` 裡叫 `store_id` 的欄位是**超商門市代號**（`VARCHAR(20)`，`V1__init_order_tables.sql:40`，proto 已改名 `cvs_store_id`）。賣家 surrogate 在 order-service 的欄位是 `orders.seller_account_id`（名字是舊的、值已是 surrogate） | ⚠️ 填錯完全無聲，且 grandfather 恆等會讓 dev 全綠。設計書與 DB 欄位註解各寫一次 |
 | 3 | **ADM 帳號不在 `accounts` 表**。稽核的 `actor_admin_id` 指向 `admin_accounts.id`、不可下 FK 到 `accounts`，也不得假設兩個 ID space 不相撞 | 三個身分軸必須各有誠實命名的獨立欄位（`actor_kind` ＋ `actor_admin_id`／`actor_account_id`），禁止共用單一 `operator_id` 再靠 type 欄分辨 |
 | 4 | **Recipient 可以沒有任何平台 ID**（ADM 手動開票的受票人可為完全非會員） | 資料模型不得把 `buyer_id` 設 NOT NULL，也不得把 `order_no` 當主鍵或必填 |
@@ -409,11 +409,11 @@ flowchart TD
 
 | # | 事實 | 對設計的約束 | 出處 |
 |---|---|---|---|
-| **M1** | 每個賣家在 PayUni 是以自己名義註冊的獨立合作商店（個人：姓名＋身分證字號；企業：公司名＋統編），買家付款帶的 `MerID = HAWK<store_id>` 就是賣家自己的商店代號，平台只是代理商（`AgentID=HAWK`） | **本平台不是「平台代收」**——在 PayUni 帳上這筆錢從一開始就掛在賣家名下。這比「平台代收」對「延後開票」的主張更不利 | `services/seller-service/internal/client/payuni/client.go:88-102`；`services/java/payment-service/src/main/resources/application.yml:108`；`docs/第三方整合/PayUni 代理商專用 API 總覽.md:97-99` |
+| **M1** | 每個賣家在 PayUni 是以自己名義註冊的獨立合作商店（個人：姓名＋身分證字號；企業：公司名＋統編），買家付款帶的 `MerID = HAWK<store_code>` 就是賣家自己的商店代號，平台只是代理商（`AgentID=HAWK`） | **本平台不是「平台代收」**——在 PayUni 帳上這筆錢從一開始就掛在賣家名下。這比「平台代收」對「延後開票」的主張更不利 | `internal/platform/payuni/client.go`；`services/java/payment-service/src/main/resources/application.yml:108`；`docs/第三方整合/PayUni 代理商專用 API 總覽.md:97-99` |
 | **M2** | PayUni 是自動請款模式，授權成功即請款成功；我方從未呼叫任何 capture／請款 API（12 個端點無一是 capture，`/api/trade/close` 一律 `CloseType=2`＝退款） | 買家付款成功當下，該筆貨款在民法 §309 的意義上已對賣家發生清償效力 ⇒ 落入 L1 但書 ⇒ 開票時點＝付款成功 | `05-支付服務（Payment Service）詳細設計書.md:3428-3429`；`services/java/shared/payuni-java-client/.../PayUniPaymentEndpoint.java` |
 | **M3** | `GrantExport=1` 控制的是「PayUni → 賣家 UNi 帳戶」的撥款，不是「買家 → PayUni」的請款；撥款發生在訂單 `COMPLETED(50)` 之後、PayUni 隔日入帳；平台銀行帳戶完全不經手，repo 內無任何平台銀行帳戶、金流帳本或餘額表 | 明確排除「綁 `granted_at` 開票」——它與稅法收款時點最少差 60 小時 ＋ 1 個工作日，遇售後凍結倒數還會無限延長 | `services/java/shared/payuni-java-client/.../PaymentClient.java:97,128,157,418`；`docs/第三方整合/PayUni 代理商專用 API 總覽.md:326-331` |
 | **M4** | 和單（`consolidated=true`）的程式碼路徑已寫好、只差一個環境變數。`PAYUNI_AGENT_MER_ID` 目前為空，配置面共 4 處：`k8s/values/order-service.yaml:101`（prod overlay 未覆寫）、`.env.template:101`、`docker-compose-local.yml:679`，**真正的讀值處**是 `services/java/order-service/src/main/resources/application.yml:169`（`mer-id: ${PAYUNI_AGENT_MER_ID:}`）。旗標由前端 request 帶入 | 一旦填值，平台就變成代收方、發票的三角關係整個改變（收款方是代理商、賣方是各自的 store），削弱 §3.1 法源前提 ⇒ checkout 加 **fail-closed**：賣家已進 `AMEGO_AUTO` 時拒絕 `consolidated=true`。風險有限：跨賣家結帳本來就被 `DIFFERENT_SELLER` 硬擋 | `api/proto/order/order.proto:716`；`.../order/checkout/CheckoutService.java:454-463` |
-| **M5** | 本平台目前沒有貨到付款（COD），付款方式僅信用卡／Apple Pay／Google Pay／ATM ＋ 零元訂單，且訂單必須先到 `PAID(10)` 才進 `PENDING_SHIPMENT(20)` ⇒ 付款恆早於出貨 | `shipping_method_configs` 已有 `commission_rate`／`commission_min` 兩欄（註解「代收手續費率」、已有初始資料）＝COD 預留位。一旦啟用 COD，發貨在前、收款在後，但書不觸發、開票時點必須落在**發貨時** ⇒ 這是 G1 要求判準寫成「取較早者」的原因 | `services/seller-service/internal/client/payuni/client.go:18`；`.../shipping/V1__init_shipping_tables.sql:269-270,292-293` |
+| **M5** | 本平台目前沒有貨到付款（COD），付款方式僅信用卡／Apple Pay／Google Pay／ATM ＋ 零元訂單，且訂單必須先到 `PAID(10)` 才進 `PENDING_SHIPMENT(20)` ⇒ 付款恆早於出貨 | `shipping_method_configs` 已有 `commission_rate`／`commission_min` 兩欄（註解「代收手續費率」、已有初始資料）＝COD 預留位。一旦啟用 COD，發貨在前、收款在後，但書不觸發、開票時點必須落在**發貨時** ⇒ 這是 G1 要求判準寫成「取較早者」的原因 | `.../shipping/V1__init_shipping_tables.sql:269-270,292-293` |
 | **M6** | 零元訂單（`ZERO_AMOUNT 2900`）完全不呼叫 PayUni，直接以 PAID 建立且 `amount` 恆為 0，DB 有雙向不變式 CHECK | 用「有 PayUni 交易才開票」實作 ⇒ 零元訂單一律漏開，且症狀只在使用高額優惠券時出現 ⇒ 必須是明確裁決的分支（D5），不能是遺漏 | `.../payment/V1__init_payment_tables.sql:73-76`（`chk_amount_valid`） |
 | **M7** | 重複付款會產生第二筆 `is_duplicate=TRUE` 的 PAID row。一張訂單可有多筆 `payment_transactions`（`trade_no = orderNo + 3 位序號`），只有 INIT/PAID 非重複那筆受唯一索引保護 | 冪等鍵不能單用 `order_id` 或 `trade_no`。**重複付款不產生第二張發票，也不產生折讓**（§7.1.2 註 3）：`order.paid` 只在 `0→10` 的 CAS 成功分支內落 outbox ⇒ 一張訂單最多一則事件；第二筆的錢由 payment 側 rescue 自動退還，退的是從未被開票的金額。⇒ 入向冪等鍵取 **`order_no`**；機械保證是「`invoice_documents.total_amount` ＝該訂單 `is_duplicate=FALSE` 那筆的 `trade_amt`」，**不是**所有交易加總 | `.../payment/V1__init_payment_tables.sql:11,51-53,96-98` |
 | **M8** | Phase 1 平台對賣家零收入：無平台服務費、無抽成、無上架費。優惠券要拆兩件事：「折抵不退還」是一回事；ADMIN 全平台券**契約層存在、營運層目前未發行**是另一回事 | ① 沒有平台開票線（N1），但必須在設計書明寫這句，否則法源前提懸空；② 優惠券一律視為賣家負擔、開折扣後金額，不新增 `funded_by`；③ 正因 ADMIN 券在契約層存在，正當性由 **D9a 的 fail-closed 兜底**，不得寫成「PLATFORM 不可能出現」 | 平台向賣家收費的線在 repo 內不存在 |
@@ -425,8 +425,8 @@ flowchart TD
 | **U1** | 一筆訂單＝一個賣家（跨賣家結帳被 `DIFFERENT_SELLER` 硬擋），`orders` 的賣家欄是單值 | 「一張發票對一筆訂單、賣方直接取訂單的賣家 surrogate」是安全的，不需拆單分帳。例外是和單場景（M4），已由 fail-closed 處理 | `.../order/checkout/CheckoutValidator.java:47` |
 | **U2** | `order_items` **沒有計價單位（unit），也沒有稅別**。逐欄：`id／order_no／product_id／product_name／sku_id／sku_name／quantity／list_price／unit_price／share_discount／actual_pay_amount／refund_status／image_object_key／created_at` | AMEGO 的 `Unit` 與 `TaxType` 必須有來源。**定版為固定預設值（§5.1.6）**：`invoice_document_lines.unit` Phase 1 恆為 `NULL`、`tax_category` 恆為 `1`（應稅）、`tax_rate_bps` 恆為 `500`，`order_items` 與 `orders` 一欄都不動。本案動到結帳的是**新增** `order_invoice_snapshots` 表與寫入它的建單流程，結帳 hot path smoke 仍必觸發 | `.../order/V1__init_order_tables.sql:99-116`；`api/proto/order/order.proto`（`OrderItemDetail` 同樣沒有） |
 | **U3** | 金額恆等式 `total_actual_amount = Σ order_items.actual_pay_amount + shipping_fee`，優惠券分攤尾差歸最後一筆 | 發票總額直接取 `orders.total_actual_amount`（＝PayUni 實收，與售後 `refundable_amount` 同基準），**不要自行從品項小計＋運費重算**。折扣尾差沿用同一套 rounding | `.../order/checkout/CheckoutService.java:423,918-921,992-1008` |
-| **U4** | 賣方稅籍資料只存在於「申請單」不是主檔，且可被改回草稿。`sellers` 表逐欄確認無 `tax_id`／公司名／負責人；`tax_id` 只在 `certification_applications`，而該 FSM 有 `EventResetDraft`（`rejected → draft`） | 直接 join 申請單當開票依據會漂：認證單 reset 回 draft 再改之後，已開出的發票抬頭與現在的申請單不一致**且無告警** ⇒ 建立獨立的 `seller_tax_profiles` 並在開票當下取快照 | `services/seller-service/db/schema/schema.sql:12-68`（逐欄無 tax_id）、`:165`；`.../seller/internal/domain/certification_fsm.go` |
-| **U5** | 買家 email 不保證存在、不保證可寄達，且有兩個來源。`accounts.email` nullable（有純手機登入帳號）、Apple 登入可能拿到 private relay 或空字串、`buyers.email` 只在「原本是空」時回填之後不同步 | 當必填 ⇒ 大量訂單開不出票；當 optional 但沒定義無 email 路徑 ⇒ 開票邏輯在 runtime 才發現分支缺失 ⇒ 取用順序與 fallback 寫死（D6）。取買家 profile 用 `GetBuyerProfileByBuyerID`，**不要**用 `BatchGetBuyerMetaByBuyerIDs`（後者沒有 email） | `services/account-service/db/schema/schema.sql:3`；`services/buyer-service/db/schema/schema.sql:6`；`api/proto/buyer/buyer.proto` |
+| **U4** | 賣方稅籍資料只存在於「申請單」不是主檔，且可被改回草稿。`seller.stores` 逐欄確認無 `tax_id`／公司名／負責人；`tax_id` 只在 `seller.kyc_applications`，而被退回的申請重送沿用原列、狀態回到 `DRAFT` | 直接 join 申請單當開票依據會漂：認證單 reset 回 draft 再改之後，已開出的發票抬頭與現在的申請單不一致**且無告警** ⇒ 建立獨立的 `seller_tax_profiles` 並在開票當下取快照 | `internal/modules/seller/db/schema.sql`（`seller.stores` 逐欄無 tax_id；`seller.kyc_applications`） |
+| **U5** | 買家 email 不保證存在、不保證可寄達，且有兩個來源。`accounts.email` nullable（LINE 登入可能沒有）、Apple 登入可能拿到 private relay 或空字串、建帳之後不同步 | 當必填 ⇒ 大量訂單開不出票；當 optional 但沒定義無 email 路徑 ⇒ 開票邏輯在 runtime 才發現分支缺失 ⇒ 取用順序與 fallback 寫死（D6）。買家 email 的來源是 identity 的 `accounts.email`（建帳時 Clerk 回報的 email，可為 NULL，不隨 Clerk 同步，刪帳清為 NULL）；buyer 模組的資料與 `BuyerInfo` 都沒有 email | `internal/modules/identity/db/schema.sql`（`accounts`）；`internal/modules/buyer/db/schema.sql`（`buyer.buyers`） |
 | **U6** | 平台零 email 寄送能力。`grep -rlIE "net/smtp\|gomail\|sendgrid\|mailgun\|jakarta\.mail\|javax\.mail\|spring-boot-starter-mail" services pkg gateway` 零命中；`notification_templates` 連 `channel` 欄位都沒有 | 「發票寄 email 給買家」在後端沒有任何可用實作路徑。新增雲端 email 服務是**平台能力新建案**（選型／secret／退信處理／依賴治理），不是順手接一套 SMTP。13 號模板引擎加 channel 維度是 **expand-contract**，不是加一列 seed | `services/notification-service/db/schema/schema.sql:49-73` |
 | **U7** | `order.paid` 的 payload 不含付款時間與付款方式，但 `event_id` 穩定。欄位＝`eventId／orderNo／shippingMethod／occurredAt／buyerId／notifyBuyerAccountId／storeId／totalActualAmount／sellerName／sellerAvatarKey／buyerNickname／buyerAvatarKey`；`occurredAt` 是事件建立時間，**不是付款時間** | ① 發票日期必須另外經 gRPC 取 `payment_transactions`（U14），不能用事件欄位；② `event_id` 因 payload 在 `order_outbox` 落庫、重投同一列而穩定 | `.../order/mq/dto/OrderPaidPayload.java:37-49`；`.../order/mq/PaymentEventHandler.java:213-235` |
 | **U8** | `aftersales.refund.completed` 的 `event_id` **不穩定**。`RefundSyncWorker`（`@Scheduled(cron = "0 30 * * * ?")`，每小時）把任何 1 小時前的 DONE refund task 重發，payload 每次重建、每次換新 UUID | 用 `event_id` 當折讓冪等鍵 ⇒ 同一筆退款每小時重複開一張折讓單，是真金白銀的稅務錯誤且持續累積。這是不把這條事件當發票觸發源的三個理由之一（另兩個：`FULL_REFUND` 語意不等於全額、不涵蓋 `cancel_id` path）。改訂 `order.refund.finalized` 後規則仍寫死：**入向去重一律用穩定業務鍵、禁用 `event_id`**。既有正例：crm 用 `"AS_REFUND_" + case_no`、order 用 `financial_log.external_txn_id`。註：`external_ref_id`（PayUni refundNo）在 `cancel_id` path 上是 NULL | `.../aftersales/scheduler/RefundSyncWorker.java:56,62`；`.../aftersales/mq/payload/RefundCompletedPayload.java:57` |
@@ -434,7 +434,7 @@ flowchart TD
 | **U10** | 60h/72h 時間窗倒置，這是常規路徑不是例外。訂單自動完成＝`delivered_at + 60h`，申訴期 72h，且 `submitAppeal` 全段無訂單狀態守門 ⇒ 典型時序：送達 → 買家申請 → 賣家拒絕 → 訂單自動完成＋撥款 → 買家在剩餘申訴期提申訴 → Admin 裁決 → 真的退款 | 在「付款成功即開票」下不再是阻擋條件，但仍決定兩件事：① **開票後才發生退款是常規路徑**，作廢／折讓是主線不是 edge case；② 訂單完成後狀態仍會變（`applyFullRefund` 的 allowed-from 含 `COMPLETED(50)`／`PARTIALLY_REFUNDED(60)`）⇒ 發票端不得假設任何訂單狀態是終點 | `.../order/config/OrderConfig.java:23`；`.../order/application.yml:112`；`.../aftersales/config/AfterSalesProperties.java:76`。註：`aftersales.appeal.deadline-hours` 只有 class 預設、yml 與 env 皆未宣告 |
 | **U10a** | 售後參數有一處已知不一致：`application.yml` 寫 `aftersales.case.process-deadline-hours: 24`、class 預設 72 ⇒ **實際生效 72**。成因不是「yml 覆蓋 class」，而是**那行 yml 從未被綁定**：`@ConfigurationProperties("aftersales")` 的欄位名是 `caseConfig` ⇒ relaxed binding 期待 `aftersales.case-config.*`，而 yml 寫 `aftersales.case.*`，全服務 grep `case-config` 零命中、亦無 `@Value` 直讀 | 若任何發票邏輯用到售後時間窗，必須確認**實際生效值**而非文件值或 yml 上看得到的值。本設計刻意不依賴任何售後時間窗。結論來自靜態分析（欄位名 ↔ key 名比對 ＋ 零命中窮舉），未在 runtime 實測 | `.../aftersales/config/AfterSalesProperties.java:10,25`；`.../aftersales/application.yml:112-115` |
 | **U11** | `SHIPPING_ABNORMAL(35)` 只能靠物流商後續貨態事件恢復（→ 30/32/40），平台無任何手動介入 API（29 號明列「手動重試／取消／強制成功 API 不實作」） | 開票條件若掛在訂單狀態上，卡在 35 的訂單會永遠開不出票（售後前置要求 `DELIVERED(40)`，連售後都開不了）⇒ 這是「開票不看訂單狀態」的第二個理由。設計書明寫：**開票的唯一輸入是付款事實與發貨事實，訂單狀態不是輸入** | `03-訂單微服務…:124,134,138`；`29-Admin 異常訂單管理 API 詳細設計書.md:53` |
-| **U12** | store-stint：關店重開會拿到新 `store_id`。`seller.stores` PK 是 `store_id`（永不變動），`account_id` 非唯一，同帳號關店後重新入駐產生新列；`stores_current_account` 唯一索引保證目前的 stint 至多一個。買家側對稱 | ① 發票文件永遠綁開票當下的 `store_id` 快照，不隨 incarnation 轉移；② 舊 incarnation 的未完成 job 由 ADM 工作台顯示並可續處理；③ 同統編跨 incarnation 的憑證指紋重複偵測要例外化（賣家統編通常不變）；④ 明寫「同一 account 的 store 是序列不是並存」 | `internal/modules/seller/db/schema.sql`（`seller.stores`）；44 號 §5.1 |
+| **U12** | store-stint：關店重開會拿到新 `store_id`。`seller.stores` PK 是 `store_id`（永不變動），`account_id` 非唯一，同帳號關店後重新入駐產生新列；`stores_current_account` 唯一索引保證目前的 stint 至多一個。買家不同：一個帳號一生只有一個買家（`UNIQUE (account_id)`） | ① 發票文件永遠綁開票當下的 `store_id` 快照，不隨 incarnation 轉移；② 舊 incarnation 的未完成 job 由 ADM 工作台顯示並可續處理；③ 同統編跨 incarnation 的憑證指紋重複偵測要例外化（賣家統編通常不變）；④ 明寫「同一 account 的 store 是序列不是並存」 | `internal/modules/seller/db/schema.sql`（`seller.stores`）；44 號 §5.1 |
 | **U13** | 兩個既有自動刪除機制會吃掉發票憑證：① `media_asset` 無引用且建立超過 7 天 ⇒ 連同 R2 物件一起刪（`media.gc.orphan-asset-days:7`）；② 帳號關閉 T+30 清 PII 且**跨所有 stint** | 照現況實作，發票 PDF 與稅務證明 7 天後消失、買家關帳號後發票資料被清 ⇒ 發票類資產必須有 `asset_reference`；發票文件列為 PII 清理例外，帳號刪除不連帶刪除、僅關閉對外查詢（D10） | `.../media/scheduler/MediaGarbageCollectionJob.java:28,106-107` |
 | **U14** | 發票日期只能從 `payment_transactions` 取，兩個候選欄位各有陷阱：`provider_paid_at` 是 PayUni 認為的真實付款時間（卡片 `AuthDay+AuthTime`、ATM `PaymentDay`），**但 ATM webhook 常無時間欄位而為 NULL**；`pay_time` 是我方寫入當下的 UTC now（`COALESCE(pay_time, now at time zone 'utc')`＝只寫第一次），webhook 延遲會讓它晚於真實付款時間 | DB 一律存 UTC，而台灣期別是 **UTC+8 雙月制** ⇒ 跨月／跨期邊界會把發票開進錯的期別，錯誤只在每兩個月的邊界日出現、極難重現。取值規則見 D4 | `.../payment/V1__init_payment_tables.sql:39,56-57`；`.../payment/…/PaymentTransactionMapper.java:501` |
 | **U15** | 「所有售後途徑都關閉」在本系統沒有上界。三段皆無程式上界：① Admin 對申訴的裁決無 deadline 欄位、無逾時排程、無自動裁決 ② 退貨運送中 14 天只發告警、永不關案 ③ ATM 退款等買家去 PayUni 頁面填帳號，無期限、無逾時關閉 | 這不只是法遵問題，是工程上根本不可實作為自動觸發條件 ⇒ 「售後結束才開票」被否決的**第二個獨立理由**（第一個是違法），兩者互不依賴 | aftersales 三段售後路徑皆無程式上界 |
@@ -565,7 +565,7 @@ flowchart TD
 由此落下的三條現行約束：
 
 - **解密邊界**：「誰能解密 AppKey」＝「誰能部署 invoice-service」。解密收斂在
-  `internal/repository/postgres/mapper.go` 一層（樣板 `services/seller-service/internal/repository/postgres/mapper.go`）。
+  `internal/repository/postgres/mapper.go` 一層。
 - **`/health` 不得納入 AMEGO 可達性**：AMEGO 中斷時本服務必須仍然健康，最壞情況是「發票延後開立」
   （有法定時限的告警在守），不是「服務被判定不健康而重啟」。
 - **發票文件狀態的唯一 SSOT 是 `invoice_documents`**；order 只提供快照來源，不得新增「這筆訂單有沒有開票」的第二個權威欄位。
@@ -605,7 +605,7 @@ AMEGO 沒有冪等鍵，也沒有伺服器端去重——同一份簽章在 60 �
 | 層 | 機制 | 擋住什麼 |
 |---|---|---|
 | L1 | `invoice_documents` 的複合唯一鍵（欄位組成見 §5） | 同一筆訂單被兩條 code path 同時建立文件 |
-| L2 | outbox row 上的 `*_at` 子步驟 checkpoint（樣板 `services/seller-service/internal/worker/seller_deleted_outbox_worker.go:9-14,102-146`） | **本進程**的重試重複打 AMEGO |
+| L2 | outbox row 上的 `*_at` 子步驟 checkpoint | **本進程**的重試重複打 AMEGO |
 | L3 | AMEGO 端的 `OrderId` 唯一性（重複回 `3040171`） | 跨進程、跨時間、跨部署版本的重複開立 |
 
 L1/L2 都擋不住「我方以為沒開、AMEGO 其實開了」——那條路只有 L3 ＋ 原則二的對帳查詢守得住。
@@ -683,8 +683,8 @@ flowchart TB
 
   subgraph up["上游（事件來源與快照來源）"]
     ORD["order-service（Java）:9915"]
-    SEL["seller-service（Go）:10020"]
-    BUY["buyer-service（Go）:9943"]
+    SEL["seller 模組（單體）"]
+    BUY["buyer 模組（單體）"]
     MED["media-service（Java）:9937"]
   end
 
@@ -706,7 +706,7 @@ flowchart TB
 
 #### 4.2.1 目錄結構
 
-照 `services/review-service`（結構最乾淨）與 `services/seller-service`（唯一同時具備 outbox worker ＋ 排程搶佔 ＋ 監控 metrics 的完整樣本）兩份範本組合：
+照 `services/review-service`（結構最乾淨）的範本組合：
 
 ```
 services/invoice-service/
@@ -757,11 +757,11 @@ services/invoice-service/
 
 **8 支 worker 的代號↔檔名對照表在 §7.0（那是 SSOT），本節不複製第二份。**
 
-`internal/client/amego/` 放在 `client/` 而不是另闢 `provider/`，是照 repo 既有慣例——第三方 HTTP client 與 peer gRPC client 並列在同一層已有兩個先例：`services/seller-service/internal/client/gcis/client.go`（與同層的 `account`／`buyer`／`order` 等 peer gRPC client 並列）、`services/account-service/internal/client/apple/{verifier,revoke,token_exchange}.go`。不為單一新概念多開一層目錄。
+`internal/client/amego/` 放在 `client/` 而不是另闢 `provider/`，因為第三方 HTTP client 與 peer gRPC client 並列在同一層。不為單一新概念多開一層目錄。
 
 #### 4.2.2 fx 分層與模組責任
 
-`internal/app/app.go` 的組裝順序（照 `services/buyer-service/internal/app/app.go:24-50` 的分層註解慣例）：
+`internal/app/app.go` 的組裝順序：
 
 ```go
 func New *fx.App {
@@ -1318,7 +1318,7 @@ Form 編碼用 `url.Values{}.Encode`（標準一次編碼，不要自己拼字�
 | 面向 | 決定 |
 |---|---|
 | 加密 | `pkg/crypto.New(cfg.EncryptionMasterKey)`（AES-256-GCM）。**fail-closed**：空 secret 回 `ErrEmptySecret`，永不退化成明文；`Config.Validate` 缺 key 即拒絕啟動 |
-| 收斂點 | repository ↔ domain 邊界（樣板 `services/seller-service/internal/repository/postgres/mapper.go:19-69`）。三件必抄：密文欄位用 `text` 不猜寬度、空明文映射 `NULL`、解不開就硬錯且不回顯原值 |
+| 收斂點 | repository ↔ domain 邊界。三件必抄：密文欄位用 `text` 不猜寬度、空明文映射 `NULL`、解不開就硬錯且不回顯原值 |
 | 明文 AppKey 的活動範圍 | `repository.mapper`（解密）→ `usecase` → `amego.Credential` → `sign` 的 md5 輸入。**不得出現在**任何 zap 欄位、Prometheus label、MQ payload、gRPC response、error message（含 `%w` 鏈）、Redis、稽核表 |
 | `sign` 也是機敏資料 | 給定已落庫的 `data` 與 `time`，全長 `sign` 就是離線暴力破解 AppKey 的 oracle ⇒ 稽核列只留 `sign` 前 8 碼（足以與客服對單，不足以當破解目標） |
 | 快取 | process 內 TTL 60 秒（`issuer_id → Credential`），**不進 Redis**。TTL 就是「賣家換 key 後最多還會用舊 key 多久」的上界 |
@@ -1574,7 +1574,7 @@ AMEGO 有 `code 14 IP 錯誤`，但白名單如何登記／是否預設啟用／
 |---|---|---|
 | 1 | `serverless/egress-proxy/nginx.conf` 加 **15 條逐支精確 location** | 禁 wildcard（避免 open relay），上游 host 用 per-location 覆蓋。15 條 ＝ §4.5.2 介面涵蓋的 15 支端點，一對一。多一條＝白名單原則被稀釋；少一條＝切換那天該路徑靜默 502。`/json/allowance_list` 刻意不開（折讓側不需要 list 當補救管道） |
 | 2 | 部署走 CI（`deploy-egress-proxy.yml`） | 禁止本機 `deploy.sh` 直上 dev/prod |
-| 3 | 呼叫端掛 SA key | `egress-proxy-caller-credentials` 以 **`secretVolumes`**（**複數**，`k8s/values/account-service.yaml:88` 逐字如此；寫成單數的失敗形狀見 §4.6 W-23）掛 `/secrets/egress-proxy-caller/key.json`；caller SA 追授 Cloud Run invoker |
+| 3 | 呼叫端掛 SA key | `egress-proxy-caller-credentials` 以 **`secretVolumes`**（**複數**；寫成單數的失敗形狀見 §4.6 W-23）掛 `/secrets/egress-proxy-caller/key.json`；caller SA 追授 Cloud Run invoker |
 | 4 | 向光貿登記固定出口 IP | `203.0.113.30` |
 | 5 | 重新量測並提高 deadline | 多一跳 Cloud Run（含冷啟動與 ID token 簽發）⇒ 查詢類 10s 可能不夠；切換時重新量 p99 並回頭調 §4.3.3 的租約下界 |
 | 6 | 補齊 egress-proxy 的 《硬上限依賴接入治理規範》三件套 | 它目前 `--max-instances=2` 且依賴登記表 R4 三件全缺。把有法定時限的開票路徑放到它後面，等於讓一個沒有容量規劃的元件成為法遵路徑的單點 ⇒ 必須同一波補齊，不能只加一段 nginx location 就上線 |
@@ -1751,7 +1751,7 @@ hook 形狀照抄 PayUni（`PayUniRequestLogger` 介面 ＋ NOOP 預設 ＋ fina
 | W-20 | 用「開路期間沒有打到 AMEGO」當斷路器測試的斷言 | 斷言「開路期間 `invoice_operations` 不得出現 `SENDING`」，並變異驗證：把 `tick` 改回直接呼叫 `RunOnce` ⇒ 該測試必須轉紅 | 前者在正確與錯誤兩種寫法下都成立 ⇒ 測試恆綠、零鑑別力，而它守的正是「開路時不得消耗 attempt」這一條 | §4.5.6 |
 | W-21 | 用 `Env == "prod"` 判定「現在准不准開真發票」 | 判定依據是 `AMEGO_ALLOW_REAL_INVOICE`；`Env` 只用在反向斷言（`Env == "production"` 卻沒開 `ALLOW_REAL` ⇒ error） | `Env` 有 `prod`／`production` 兩種寫法、compose 與 k8s 給的值也不一致 ⇒ 金流級守衛押在一個字串比較的拼法上；拼錯的兩邊分別是「dev 打出真發票」與「prod 一張都開不出來」，都不會在啟動時報錯 | §4.5.8 |
 | W-22 | 在 dev 用「跳過憑證解析」之類的捷徑讓開票流程跑起來 | 非 prod 的 seed 把每個賣家的統編都設成 `AMEGO_TEST_INVOICE`，dev 與 prod 走**同一條 code path**、只是資料不同 | 捷徑讓憑證解析、簽章、mapper 這幾段在 dev 從未被執行過 ⇒ prod 第一張發票就是它們的首次上線，而 dev 全綠 | §4.5.8 |
-| W-23 | `egress-proxy-caller-credentials` 用 `secretVolume`（單數）掛載 | 逐字 `secretVolumes`（複數，`k8s/values/account-service.yaml:88`） | 單數會被 helm **靜默忽略**：pod 起得來、`/health` 綠，只有 `/secrets/egress-proxy-caller/key.json` 不存在 ⇒ 到第一次要走固定 IP 出口那一刻才炸 | §4.5.9 |
+| W-23 | `egress-proxy-caller-credentials` 用 `secretVolume`（單數）掛載 | 逐字 `secretVolumes`（複數） | 單數會被 helm **靜默忽略**：pod 起得來、`/health` 綠，只有 `/secrets/egress-proxy-caller/key.json` 不存在 ⇒ 到第一次要走固定 IP 出口那一刻才炸 | §4.5.9 |
 | W-24 | 擴容後沿用 §8.2.4 ② 的 `max(...)` 聚合看 AMEGO 速率上限 | limiter 是**行程內**的 ⇒ `AMEGO_CLIENT_RATE_LIMIT_QPS` 是每副本上限；多副本改用 `sum(...)`（§4.3.3 擴容前置清單第 4 條） | 單副本時 `max` 與 `sum` 等價 ⇒ 這個錯只在擴容那天顯現，把真實上限低估 N 倍，而那天沒有人會去看告警 expr | §4.5.11 |
 | W-25 | 用 AMEGO 回應的 `msg` 內容做程式分支 | `msg` 只落庫供稅務舉證；分支一律用 `provider_code`（`3040171` 是唯一例外，且兩個方向都要有測試釘住） | `msg` 是中文且會內插「第 n 筆」，字面與長度都不可預期 ⇒ 光貿改字之後分支靜默走錯邊，而測試用的是舊字串所以照樣綠 | §4.5.12 |
 
@@ -1850,7 +1850,7 @@ CREATE UNIQUE INDEX "uq_invoice_issuers_ref" ON "invoice_issuers" ("issuer_type"
 
 #### 5.1.2 `seller_tax_profiles`｜賣家稅務資格與治理
 
-一 issuer 一列。稅籍欄位是**核准當下的快照**，不 join `certification_applications`（那張表可被 `EventResetDraft` 改回 draft 再改內容，join 過去會讓已開出的發票抬頭無聲漂移）。治理參數全部落成欄位，不 hardcode。
+一 issuer 一列。稅籍欄位是**核准當下的快照**，不 join `seller.kyc_applications`（被退回的申請重送沿用原列、狀態回到 `DRAFT` 再改內容，join 過去會讓已開出的發票抬頭無聲漂移）。治理參數全部落成欄位，不 hardcode。
 
 ```sql
 CREATE TABLE "seller_tax_profiles" (
@@ -1955,7 +1955,7 @@ CREATE INDEX "idx_stp_recheck_due" ON "seller_tax_profiles" ("approval_valid_unt
 | 規則 | 做錯的後果 |
 |---|---|
 | `SUPPLEMENT_REQUIRED` 在 `chk_stp_review_status` 與 `chk_stp_pending_window` **兩處都要列** | 漏 CHECK ⇒ T05 第一次寫入即 `23514`；漏窗口 ⇒ 補件中的賣家永不逾期 |
-| **不得**新增 `reviewed_at`／`rejected_at`（I-62 同型）或 `suspended_at`／`suspended_until`／`suspension_count`（I-57） | 第二份狀態與第二個時鐘，不一致永遠不會自己發出訊號。停權權威＝`sellers.status`，14 天自動恢復由 seller-service 既有 cron 執行 |
+| **不得**新增 `reviewed_at`／`rejected_at`（I-62 同型）或 `suspended_at`／`suspended_until`／`suspension_count`（I-57） | 第二份狀態與第二個時鐘，不一致永遠不會自己發出訊號。停權權威＝seller 模組的措施（`seller.measures`），停權狀態在讀取時由生效中的措施推導，措施結束時由到期 job 恢復 |
 | 「核准必寫 `approved_at`」由 APP（T07／T08）＋ TEST 守（I-63），**不寫成 CHECK**（`approvalValidUntil` 是選填，null ＝ 無期限） | 綁進同一條蘊含式 ⇒ 核准動作當場 `23514` |
 | `default_tax_category` 是每賣家一個、值由 ADM 依核定函填入（`order_items` 與 `product_sku` 皆無稅別欄位；行級 `tax_category` 已保留，Phase 2 只換 resolver） | — |
 
@@ -2617,8 +2617,6 @@ document」現算。先付款開票、事後才取消的訂單有 document，它
 handler 在同一個交易內還有 `MarkProcessed` 要下）。`rows=0` ＝ 已經記過了，是正常的去重結果。
 
 #### 5.1.10 `invoice_outbox_events`｜出向事件
-
-形狀照抄 `services/seller-service` 的 `seller_deleted_outbox`，因為 `pkg/outbox.Worker[T]` 的泛型契約就是照它長的，照抄可零改動複用含 panic recovery 的 `pkg/outbox.Scheduler`。
 
 ```sql
 CREATE TABLE "invoice_outbox_events" (
@@ -3566,7 +3564,7 @@ COMMENT ON COLUMN order_invoice_snapshots.carrier_selection_mode IS 'USE_BUYER_D
 
 逐表保存期、media GC 與買家 PII 的衝突處理在 §9.5，本節只寫資料層這一側。定案：**發票文件保存 5 年、列為 PII 清理例外；帳號刪除不連帶刪除，僅關閉對外查詢（授權層）。**
 
-- invoice-service **不實作** PII 清理 cron。buyer-service 的 `BuyerPIICleanupJob` 清的是 buyers 表，不會也不得跨庫碰 invoice 表。
+- invoice-service **不實作** PII 清理 cron。buyer 模組的 PII 清理 job 清的是 `buyer.buyers`，不會也不得跨庫碰 invoice 表。
 - 「不刪」已寫進 `invoice_documents` 的表註解（§5.1.5），不是只寫在本節。
 - **只有兩張表會被清理**，且性質不同：
 
@@ -5231,7 +5229,7 @@ func InjectStoreIDHeader(r *storeid.Resolver) gin.HandlerFunc // 失敗 → resp
 | 誰換 | **invoice-service**（`seller_tax_profiles` 的 owner）。stagedToken 不落 DB、不進任何回應，用完即棄 |
 | 什麼時候換 | **端點 18 的請求處理過程中、寫 `seller_tax_profiles` 之前**。不是送審（端點 19）當下——§7.3.3 T02 的守衛讀的是已落庫的 `evidence_object_keys`，草稿階段不換發就永遠送不出去 |
 | 怎麼換 | `pkg/media` 的 `FinalizeImages(stagedTokens, refType)` 取回 `{assetId, objectKey}` → `LinkImages(refType, refId, assetIds)`。**兩步都是致命錯誤**，任一步失敗即中止整個請求、不寫 DB |
-| `refType` | 既有的 `AssetReferenceType.CERTIFICATION`（Value `"7111"`），`refId` ＝ `seller_tax_profiles.id`（TSID 字串）。**不新增 refType 碼值**。副作用：objectKey 因此是 `secure/certification/{accountId}/{yyyyMMdd}/{filename}`，前綴仍是 `secure/`，下載通道不受影響。**`refId` 必須是 `seller_tax_profiles.id`，不可寫成 `store_id`**：`7111` 的 `ref_id` 空間與 seller-service 的商家認證共用，而 `ReleaseReferences` 依 `(ref_type, ref_id)` 批次釋放，用一個兩張表都可能命中的鍵會把別人的引用一起打掉 |
+| `refType` | 既有的 `AssetReferenceType.CERTIFICATION`（Value `"7111"`），`refId` ＝ `seller_tax_profiles.id`（TSID 字串）。**不新增 refType 碼值**。副作用：objectKey 因此是 `secure/certification/{accountId}/{yyyyMMdd}/{filename}`，前綴仍是 `secure/`，下載通道不受影響。**`refId` 必須是 `seller_tax_profiles.id`，不可寫成 `store_id`**：`7111` 的 `ref_id` 空間與 seller 模組的商家認證共用，而 `ReleaseReferences` 依 `(ref_type, ref_id)` 批次釋放，用一個兩張表都可能命中的鍵會把別人的引用一起打掉 |
 | 換完寫哪裡 | `seller_tax_profiles.evidence_object_keys`（jsonb）。寫入值 ＝ request 的 `evidenceObjectKeys[]`（保留清單）∪ 本次換發出的新 objectKey，去重後 ≤ 10 筆。存的是 **objectKey 不是 assetId** |
 | 被移除的檔怎麼回收 | 業務列寫入**之後**呼叫 `ReleaseReferences("7111", [taxProfileId], keepAssetIds=最終清單)`。順序契約：① Link（致命）→ ② 業務列寫入（致命）→ ③ ReleaseReferences（best-effort）。**顛倒順序會讓正在被引用的檔案被 GC 連同 R2 物件實體刪除** |
 | 漏了會怎樣 | 不呼叫 `LinkImages` ⇒ 資產沒有 `asset_reference` ⇒ media GC 第 2 階段在 7 天後連同 R2 物件刪除，而 `evidence_object_keys` 還在、ADM 複審點下去才 404 |
@@ -5783,21 +5781,21 @@ env 同步四處（比照 aftersales）：`.env.template`、`docker-compose-loca
 **§52 內部授權（HMAC）wiring**
 
 - **invoice-service 作為 server：什麼都不用做。** `InternalAuthServerInterceptor` 已內建在 `pkg/server/grpc.go` 的共用 unary chain。服務只要 ① `infrastructure/di.go` 用 `fx.Provide` 給出 `pkgserver.ServerConfig`（`EnableStreamInterceptors: false`，本服務無 stream RPC）與 `pkgserver.NewGRPCServer` ② `grpc/di.go` 用 `fx.Invoke` 呼叫 `pb.RegisterInvoiceServiceServer`。照抄 `services/review-service/internal/infrastructure/di.go:13-26`，**不要自建 server**（自建＝繞過整條 chain，驗簽、trace、recovery 一起消失，且不會編譯錯）。
-- **invoice-service 作為 client：每一條出站連線都必須自己掛兩個 interceptor**，缺一不可：`InternalAuthClientInterceptor("invoice-service", forwardAccountHeaders)`（缺它 ⇒ 對端在 `INTERNAL_AUTH_MODE=enforcing` 下每次呼叫都回 `UNAUTHENTICATED`，而 permissive 期間完全看不出來）＋ `OTelClientStatsHandler`（缺它這一跳從 trace 上消失），另加 `lc.Append(fx.Hook{OnStop: ...conn.Close})`。範本 `services/account-service/internal/client/seller/client.go:48-70`。**repo 內有漏掛的先例，不要照抄**：`services/review-service/internal/client/order/client.go:22` 只掛了 OTel stats handler。
+- **invoice-service 作為 client：每一條出站連線都必須自己掛兩個 interceptor**，缺一不可：`InternalAuthClientInterceptor("invoice-service", forwardAccountHeaders)`（缺它 ⇒ 對端在 `INTERNAL_AUTH_MODE=enforcing` 下每次呼叫都回 `UNAUTHENTICATED`，而 permissive 期間完全看不出來）＋ `OTelClientStatsHandler`（缺它這一跳從 trace 上消失），另加 `lc.Append(fx.Hook{OnStop: ...conn.Close})`。**repo 內有漏掛的先例，不要照抄**：`services/review-service/internal/client/order/client.go:22` 只掛了 OTel stats handler。
 
 | invoice-service 的出站 client | `forwardAccountHeaders` |
 |---|---|
 | → order／aftersales／seller／buyer／payment／notification／shipping | **`false`**（由 MQ／排程觸發的系統呼叫，或以服務身分授權的批次查詢，incoming context 沒有使用者身分） |
 
-**`buyer_masked_name` 的來源與遮罩**：申訴列表／詳情逐頁向 buyer-service 打一次 `BatchGetBuyerDisplayByBuyerIDs`（批次，key ＝ **`buyer_id`**）。
+**`buyer_masked_name` 的來源與遮罩**：申訴列表／詳情逐頁向 buyer 模組打一次 `BatchGetBuyerDisplayByBuyerIDs`（批次，key ＝ **`buyer_id`**）。
 
-🔴 **鍵是 `buyer_id` 不是 `account_id`**（§6 買賣家身分分離）：`invoice_complaints` 存的是 `complainant_buyer_id`。buyer-service 另有一支 `GetBuyerProfileBatch(account_ids)`，拿它來用會在 `buyer_id ≠ account_id` 的買家身上**靜默回不到東西**，而首任買家（grandfather，兩者相等）身上完全看不出來。
+🔴 **鍵是 `buyer_id` 不是 `account_id`**（§6 買賣家身分分離）：`invoice_complaints` 存的是 `complainant_buyer_id`。buyer 模組另有一支 `GetBuyerProfileBatch(account_ids)`，拿它來用會在 `buyer_id ≠ account_id` 的買家身上**靜默回不到東西**，而首任買家（grandfather，兩者相等）身上完全看不出來。
 
 🔴 **遮罩在出向面完成**（`resolveBuyerNames` 回的已經是遮罩後的值）：讓「拿到名字」與「遮罩」在型別上無法拆開，呼叫端拿不到明碼 ⇒ 不可能有人忘了遮。規則見 `usecase.MaskDisplayName`：保留第 1 個字元 ＋ 固定 3 個 `•`（不隨長度變化——暱稱長度沒有業務用途）。
 
 ⚠️ **值是 `buyers.display_name`（暱稱）不是自然人真名**：本服務從不持有買家真名（§5.1.5：B2C 的 `recipient_name` 恆為常數「消費者」，I-45 有測試守著）。但暱稱是使用者自選的可辨識字串，而讀它的是**賣家與平台管理員**，不是資料主體本人 ⇒ 依 58A §0.4 ③ 遮罩。
 
-⚠️ **已註銷 stint 的墓碑字串原樣回傳、不遮罩**：那是 buyer-service 產生的固定文案（不是個資），遮了會變成讀不懂的東西，而它存在的唯一理由就是要讓人讀懂。判斷「是不是墓碑」讀 `BuyerDisplay.deleted`，**不得拿 display_name 去跟墓碑字串做字串比對**（proto 註解明令禁止）。
+⚠️ **已註銷 stint 的墓碑字串原樣回傳、不遮罩**：那是 buyer 模組的 legacy server 產生的固定文案（`已刪除帳號`）（不是個資），遮了會變成讀不懂的東西，而它存在的唯一理由就是要讓人讀懂。判斷「是不是墓碑」讀 `BuyerDisplay.deleted`，**不得拿 display_name 去跟墓碑字串做字串比對**（proto 註解明令禁止）。
 
 ⚠️ **買家自己的視角（端點 13／14／15）刻意不補這一欄**：那是他自己的名字，58A 只在賣家面（S09／S10）與 ADM 面（A06／A07）消費它。
 
@@ -5894,7 +5892,7 @@ env 同步四處（比照 aftersales）：`.env.template`、`docker-compose-loca
 | **order-service（Java）** | ⓪ **`InvoiceGrpcClient` 的兩支 RPC 各自 `withDeadlineAfter(INTERNAL_READ_DEADLINE_SEC, SECONDS)`**（10 s，逐字沿用該服務五支既有 client 的同名常數；⚠️ `withDeadlineAfter` 換算的是**絕對**時間 ⇒ 必須**每次呼叫時**套用，不可在建構子上套一次） ① `application.yml` 加 `hawkr.obs.grpc.targets.invoice` ② checkout preview 呼叫 `ResolveOrderInvoiceModeInternal` 並把結果併入 `CheckoutPreviewResponse` ③ checkout confirm 呼叫 `ValidateOrderInvoiceInputInternal` 並在**付款前**保存發票快照 ④ **新增 `order_invoice_snapshots` 表（Flyway `V12`，DDL 見 §5.4.3）** ⑤ **結帳流程採集買家發票資料**（統編／載具／捐贈碼／通知 email）並寫入該表 ⑥ **新增 `GetOrderInvoiceSnapshotInternal`（52 號 HMAC）** ⑦ **新增 `ReviseOrderInvoiceSnapshotInternal`（§6.2.5；B06／R03 的執行面，52 號 HMAC）＋ Flyway `V13` 加 `order_invoice_snapshots.revision_idempotency_key`（該 RPC 的冪等落點，DDL 見 §6.2.5）** | ⓪→**它會是結帳鏈上唯一沒有 deadline 的 client**：兩支都在 `try/catch` 內 fail-open（拿不到就略過檢查／不帶發票區），而 fail-open 的前提是「失敗會在有界時間內發生」——沒有 deadline 時 invoice-service 半死不活（TCP 通、不回應）會讓每一次 preview／confirm 掛在那裡直到 channel 自己放棄，**症狀是結帳變慢而不是發票功能失效**，歸因會指向錯的服務。⚠️ 這一格**不會被任何測試或 CI 抓到**（fail-open 路徑跑起來一切正常，見 `10-engineering-contracts.md` §14.5.0c）；①→`GrpcChannelRegistry` 啟動拋例外；②→B01 進 `invalid` ⇒ **全站不能結帳**；③→付款後才發現發票資料無效，而發票必須在付款成功即開立；**④⑤⑥ 任一漏掉 ⇒ invoice-service 的 `order.paid` consumer 拿不到品項與買家發票資料，每一則事件重試三次後進 DLQ ⇒「買家付款 → 開出一張發票」完全不成立**（2026-08-30 order.proto 的既有 RPC 全部不碰 invoice、`order_invoice_snapshots` 在 order-service 不存在、買家的統編／載具／捐贈碼在整個系統裡沒有任何欄位承載） |
 | **payment-service（Java）** | **新增唯讀 internal RPC `GetPaymentFactsInternal(order_no)`** → `trade_no`／`provider_paid_at`／`pay_time`／`trade_amt`／`payment_type`／`is_duplicate`（52 號 HMAC，client deadline 3s）。**除此之外不改支付服務任何狀態機**，發票側只讀不寫 | `provider_paid_at` 決定 `invoice_date`（＝法定存證期限與所有告警的基準）。🔴 漏掉它**不會報錯**：消費端的 `ProviderPaidAt` 是 `*time.Time` 而 nil 是**設計上的合法值**（ATM webhook 常為 NULL）⇒「RPC 拿不到」與「本來就沒有」在 runtime 完全分不開，`PaidAt()` 會靜默改用我方 webhook 收單時間。現行 proto 只有 admin 面的 `AdminPaymentTransactionDetail` 帶這一欄，服務間直用違反角色分離（§5.1） |
 | **gateway** | §6.2.0 的四處 wiring ＋ `routes_invoice.go` ＋ `constants.go`（路由常數 ＋ `ServiceInvoice`）＋ `authz/capability.go` 兩個新 capability ＋ `authz/policy.go` 的 `suspendedWhitelist` ＋ `expectedSellerRoutes`（逐條加列）＋ `strictSellerPrefixes` ＋ `envelope_guard_interceptor.go` 的 7＋7 列 ＋ `middleware/idempotency.go` ＋ `middleware/domain_id_header.go` ＋ `proxy/reverse_proxy.go` 的 `services` map ＋ `proxy_failure_status_test.go` | 漏 `AllCapabilities` → **boot panic**（好的失敗）；漏 `expectedSellerRoutes`／`proxy_failure_status_test.go` → CI 紅（完全相等比對）；漏 `suspendedWhitelist` → **不會紅**，停權賣家被鎖在補件路徑外；漏 `strictSellerPrefixes` → **不會紅**，deny-by-default 破一個洞；漏 `services` map → **不會編譯錯**，「下載按鈕點了說找不到」；漏 `domain_id_header.go` → **不會紅**，Tier A 述詞做不出來 |
-| **seller-service（Go）** | **新增 `GetSellerTaxIdentitySnapshotInternal(store_id) → {tax_id, company_name, responsible_name, address_*, source_application_no, approved_at}`**，由 seller-service 在**認證核准的那個交易內**把值快照回寫到一張穩定來源（`sellers` 新欄位或獨立 snapshot 表，由 seller-service 決定），RPC 只讀快照、不 join 申請單 | `tax_id`／`company_name` **只存在於 `certification_applications`**，`sellers` 表逐欄沒有這兩欄。直接 join 申請單會踩兩個問題：① 申請單 FSM 有 `EventResetDraft`，賣家把申請退回草稿就會改動那兩欄 ⇒ **已開立發票的抬頭依據會漂** ② 申請單可以有多筆、狀態各異，沒有「哪一筆是現行有效稅籍」的語意。invoice-service 在建立發票快照當下再抄一份進 `invoice_documents` ⇒ 兩層快照 |
+| **seller 模組（單體）** | **新增 `GetSellerTaxIdentitySnapshotInternal(store_id) → {tax_id, company_name, responsible_name, address_*, source_application_no, approved_at}`**，由 seller 模組在**認證核准的那個交易內**把值快照回寫到一張穩定來源（`seller.stores` 新欄位或獨立 snapshot 表，由 seller 模組決定），介面只讀快照、不 join 申請單 | `tax_id`／`company_name` **只存在於 `seller.kyc_applications`**，`seller.stores` 逐欄沒有這兩欄。直接 join 申請單會踩兩個問題：① 被退回的申請重送沿用原列、狀態回到 `DRAFT`，賣家就會改動那兩欄 ⇒ **已開立發票的抬頭依據會漂** ② 申請單可以有多筆、狀態各異，沒有「哪一筆是現行有效稅籍」的語意。invoice-service 在建立發票快照當下再抄一份進 `invoice_documents` ⇒ 兩層快照 |
 | **aftersales-service（Java）** | 提供「申訴期是否已屆滿」的判定 | 現況 `HasActiveCase` 只答 `isActive`，公式在 `AfterSaleAppealService.java:241-256` 但沒有任何欄位或 API 直接給答案。**開票不需要這個訊號**（採付款成功即開票），但折讓／作廢的觸發需要，屬 §7 範圍 |
 | **CodeMeta** | 逐名清單 ＝ §C.2.1（30 個新增 ＋ 1 個既有修改）：`業務狀態碼.md` 7 個、`業務類型碼.md` **16** 個、`內部技術碼.md` 7 個、`錯誤碼.md` 新增 9300–9399 段與 **43** 個碼。跑 `generate.sh --java --go --go-errors --flutter` | 生成檔被手改會在下次 generate 被覆蓋（曾致執行期 crash） |
 | **API 設計規範** | §14.1 的 Tier A 強制清單加一列 invoice | 該表無機械 gate |
@@ -6514,7 +6512,7 @@ gate 斷言分兩組，**分組判準是「吃不吃 `if !tmpl.Enabled { t.Skip(
 |---|---|---|
 | 1 | routing key / exchange / payload / 冪等鍵 | **一律不變**：email 與站內是同一則事件的兩個投遞通道，不是兩則事件。發票模組不直接呼叫 email 服務 |
 | 2 | `notification_templates` 現在沒有 `channel` 欄 | 加通道是 13 號的 expand-contract（加欄 → 回填既有列為站內 → 才寫 email 列），不是本章模板 migration 順手多插幾列。**`channel` 必須進 `notifications` 的冪等唯一鍵**（現況 `(user_id, user_type, event_type, reference_id)`）——不進去的話 email 與站內共用同一把鍵，先送達的那個會把另一個靜默吞掉。⇒ 本章的 13 列只寫站內＋FCM 那一組 |
-| 3 | 收件地址不上 MQ | payload 只帶 `buyer_id` / `notify_buyer_account_id`，email 位址由 notification-service 在投遞當下向 buyer-service 取。**這需要新接線**：現有的 `BuyerClient` 介面只有 `ListIDsByAccount`，拿不到 email |
+| 3 | 收件地址不上 MQ | payload 只帶 `buyer_id` / `notify_buyer_account_id`，email 位址由 notification-service 在投遞當下取（來源見 U5：identity 的 `accounts.email`）。**這需要新接線**：現有的 `BuyerClient` 介面只有 `ListIDsByAccount`，拿不到 email |
 
 建議走 email 的是買家向且屬「法定憑證送達」語意的 P1 / P3 / P4 / P5 / P6，加上 P9 與 P12。賣家向的 P2 / P7 / P8 / P10 / P11 Phase 1 維持站內＋FCM。**「AMEGO 會寄開立通知信」不能拿來抵這一條**：那條路徑由 `BuyerEmailAddress` 觸發、測試環境不寄、重寄只能人工登入後台，且完全蓋不到收據模式、賣家自行開票模式、開票失敗告知與申訴回覆。
 
@@ -6648,9 +6646,9 @@ gate 斷言分兩組，**分組判準是「吃不吃 `if !tmpl.Enabled { t.Skip(
 | `ORD` | order-service（Java） | 訂單與快照的權威 |
 | `PAY` | payment-service（Java） | 付款事實（`provider_paid_at`／`trade_no`）的權威 |
 | `AS` | aftersales-service（Java） | 售後案件與退款 |
-| `SEL` | seller-service（Go） | 賣家 store-stint 事實；**同時是停權處分的唯一執行者**（M5「違規計數與停權」） |
+| `SEL` | seller 模組（單體） | 賣家 store-stint 事實；**同時是停權處分的唯一執行者**（M5「違規計數與停權」） |
 | `SHIP` | shipping-service（Java） | 台灣國定假日表 `holidays` 的 owner；申訴「3 個工作天」的曆制唯一資料源 |
-| `BUY` | buyer-service（Go） | 買家 email |
+| `BUY` | buyer 模組（單體） | 買家 profile 與手機 |
 | `MED` | media-service（Java） | PDF 落 R2，回 objectKey |
 | `NOTI` | notification-service（Go） | template-driven 通知；本案要新增 channel 維度（`services/notification-service/db/schema/schema.sql:49-74` 現無該欄） |
 | `MAIL` | 寄信通道 | Phase 1 走 `LogMailSender`（只寫 log，買家實際收不到）；Phase 2 換成雲端供應商。**通道存在與否不影響上游**：模板、組裝、附件、紀錄全部照跑（D12） |
@@ -6724,7 +6722,7 @@ gate 斷言分兩組，**分組判準是「吃不吃 `if !tmpl.Enabled { t.Skip(
 
 **註 3｜重複付款不產生第二張發票，也不產生折讓。** 一張訂單可有第二筆 `is_duplicate=TRUE` 的 PAID（`V1__init_payment_tables.sql:51-53,94-98`），但它不觸發第二則 `order.paid`；那筆錢由 payment 側 rescue 自動退還，退的是**從未被開票的金額**。⇒ 每日對帳斷言「`invoice_documents.total_amount` ＝ 該訂單 `is_duplicate=FALSE` 那筆交易的 `trade_amt`」，不是「＝所有交易金額加總」。
 
-**註 4｜履約模式在 `order.paid` 消費當下解析一次，之後永不重算。** 具體 race 是 `automation_cutover_at`：MQ 積壓 5 分鐘 ＋ 賣家在這 5 分鐘內設了 cutover ⇒ 同一批訂單被判成與付款當下不同的模式（consume 時查「當前的 X」會 race，`services/seller-service/internal/domain/seller_deleted_outbox.go:26-40` 已有明文）。`invoice_documents` 保存 `provider_account_version` **這一個**快照版本；**沒有、也不會有 `seller_tax_profile_version` 欄**（§5.1.5 裁決 ＋ §5.5 I-62 靜態守門）——`seller_tax_profiles` 一 issuer 一列、就地更新、無歷史表 ⇒ 版本號 dereference 不了，「開立當下的稅籍資格」改由已複製的值承擔（`issuer_name_snapshot`／`issuer_tax_id_snapshot`／每行 `tax_category`）。
+**註 4｜履約模式在 `order.paid` 消費當下解析一次，之後永不重算。** 具體 race 是 `automation_cutover_at`：MQ 積壓 5 分鐘 ＋ 賣家在這 5 分鐘內設了 cutover ⇒ 同一批訂單被判成與付款當下不同的模式（consume 時查「當前的 X」會 race）。`invoice_documents` 保存 `provider_account_version` **這一個**快照版本；**沒有、也不會有 `seller_tax_profile_version` 欄**（§5.1.5 裁決 ＋ §5.5 I-62 靜態守門）——`seller_tax_profiles` 一 issuer 一列、就地更新、無歷史表 ⇒ 版本號 dereference 不了，「開立當下的稅籍資格」改由已複製的值承擔（`issuer_name_snapshot`／`issuer_tax_id_snapshot`／每行 `tax_category`）。
 
 **註 5｜`f0401`（自動配號）沒有 `InvoiceDate` 參數——發票日期由 AMEGO 開立當下決定，我方指定不了。** 三個後果必須寫進實作：① `invoice_documents` 同時保存 `invoice_date`（我方認定的**應**開立日 ＝ 收款日的 Asia/Taipei 日期，document 建立當下固定、**不隨重試移動**）與 `provider_issue_at`（AMEGO 回的 `invoice_time`，Unix 秒）；② `statutory_deadline_at` **以 `invoice_date` 計**——法定義務的起點是收款日，用 `provider_issue_at` 計會讓「拖越久期限越晚」；③ 必須有一條對帳告警「`provider_issue_at` 的台北日期 ≠ `invoice_date`」，命中代表開票延遲到跨日，跨期別（雙月制）更嚴重。唯一能指定日期的是 `f0401_custom`（API 配號），但換過去要自己管字軌號碼（`track_get`），而 `track_get` 沒有冪等鍵、逾時後無法判斷號段是否已被配走 ⇒ **維持自動配號**，用告警而不是換 API 處理跨日。
 
@@ -7403,7 +7401,7 @@ stateDiagram-v2
 | T07 | `UNDER_REVIEW` / `SELF_ISSUE_PENDING` | ADM 決策 `APPROVE_INVOICE_REQUIRED` | `APPROVED_INVOICE_REQUIRED` | `expectedVersion` CAS | `approved_at`；`approval_valid_until = approved_at + 365 天`（**屆滿不改狀態**，讀者見下方） ；outbox `seller.invoice_profile.changed` |
 | T08 | 同上 | ADM 決策 `APPROVE_INVOICE_EXEMPT` | `APPROVED_INVOICE_EXEMPT` | 同上 ＋ 已取得收據代製授權（S05） | 同上 |
 | T09 | `UNDER_REVIEW` / `SELF_ISSUE_PENDING` | ADM 決策 `REJECT` | `REJECTED` | `expectedVersion` CAS；必填理由 | **`cooldown_until = now() + 7 天`**；outbox 通知 |
-| T10 | `SELF_ISSUE_PENDING` / `SUPPLEMENT_REQUIRED` | `pending_valid_until <= now`（每日掃描） | `EXPIRED` | — | **`cooldown_until = now() + 7 天`**；發布 **P11 `invoice.seller_tax_profile.status_changed`**（§6.3.3.3 已登記的唯一稅務身分事件）＋ 進 ADM 佇列。⚠️ **本轉移不執行任何接單限制**——與 §7.3.5「違規計數與停權」同一裁決：發票模組只發訊號，處分走 seller-service 既有治理流程 |
+| T10 | `SELF_ISSUE_PENDING` / `SUPPLEMENT_REQUIRED` | `pending_valid_until <= now`（每日掃描） | `EXPIRED` | — | **`cooldown_until = now() + 7 天`**；發布 **P11 `invoice.seller_tax_profile.status_changed`**（§6.3.3.3 已登記的唯一稅務身分事件）＋ 進 ADM 佇列。⚠️ **本轉移不執行任何接單限制**——與 §7.3.5「違規計數與停權」同一裁決：發票模組只發訊號，處分走 seller 模組的治理流程 |
 | T11 | `SELF_ISSUE_PENDING` | ADM 延長 | （狀態不變） | **`extension_count = 0`**（只能延一次）；必填原到期日／新到期日／理由／操作者 | **就地改寫 `pending_valid_until`**、`extension_count = 1` |
 | T12 | `EXPIRED` | ADM 受理逾期補件 | `UNDER_REVIEW` | ADM 明示且必填理由 | 免冷卻；同步解除接單限制 |
 | T13 | `APPROVED_*` | ADM 發起複審 | `UNDER_REVIEW` | `expectedVersion` CAS；必填 `recheck_reason` | **已代製收據不追溯**，但複審記錄要留分界時點 |
@@ -8121,7 +8119,7 @@ WHERE id = sqlc.arg(id)
 
 | 項 | 定案 |
 |---|---|
-| 保管方式 | **k8s Secret 一把 master key → `pkg/crypto` AES-256-GCM → Base64 存 `text`**，沿用既有 at-rest 欄位加密（既有案例 `certification_applications.id_card_no`、`bank_account`、`apple_revoke_outbox.refresh_token`） |
+| 保管方式 | **k8s Secret 一把 master key → `pkg/crypto` AES-256-GCM → Base64 存 `text`**，沿用既有 at-rest 欄位加密（既有案例 `seller.kyc_applications.rep_id_card_no_enc`） |
 | key 版本 | current／previous 兩版本並存，支援無停機輪替（見 (e)） |
 
 被否決的方案（KMS、per-record DEK、不加密）與理由見 `docs/adr/2026-09-18-invoice-service-architecture.md`（ADR-18）。
@@ -8148,7 +8146,7 @@ WHERE id = sqlc.arg(id)
 
 ##### (c) 加解密的 choke point 在 repository↔domain 邊界，不在 usecase
 
-放 mapper ⇒「任何讀路徑必經解密、任何寫路徑必經加密」由唯一的映射函式保證；放 usecase 則每新增一個 usecase 就多一次「這次記得加密了嗎」。形態照抄 `services/seller-service/internal/repository/postgres/mapper.go:19-69`。
+放 mapper ⇒「任何讀路徑必經解密、任何寫路徑必經加密」由唯一的映射函式保證；放 usecase 則每新增一個 usecase 就多一次「這次記得加密了嗎」。
 
 ```go
 // services/invoice-service/internal/repository/postgres/mapper.go
@@ -8183,12 +8181,12 @@ func decryptCredential(enc *crypto.Cipher, stored string) (string, error) {
 來源：k8s Secret `hawkr-amego`（§8.5.2）→ env → `Config` → fx provider。
 
 ```go
-// services/invoice-service/internal/config/di.go（範本 services/seller-service/internal/config/di.go:28-30）
+// services/invoice-service/internal/config/di.go
 func newCipher(cfg *Config) (*crypto.Cipher, error) {
 	return crypto.New(cfg.EncryptionMasterKey)   // 空 secret 回 ErrEmptySecret（pkg/crypto/crypto.go:42-46）
 }
 
-// prev cipher 用 fx 具名結果避免與 current 撞型別（慣例：services/content-service/internal/infrastructure/di.go:15-33）。
+// prev cipher 用 fx 具名結果避免與 current 撞型別。
 // 回 nil,nil 讓解密端據此判斷「沒有 fallback 可試」。
 fx.Provide(fx.Annotate(
 	func(cfg *Config) (*crypto.Cipher, error) {
@@ -8242,7 +8240,7 @@ func (k *KeyRing) cipherFor(v int16) (*crypto.Cipher, error) {
 // ——§5.1.3 刻意沒有 pending_key_version 欄，正是因為這個不變式成立。
 ```
 
-`Config.Validate` 必須 fail-closed（完整 12 條在 §8.5.1(D)，加密相關的是 ①–⑦；範本 `services/seller-service/internal/config/config.go:245-246`）。
+`Config.Validate` 必須 fail-closed（完整 12 條在 §8.5.1(D)，加密相關的是 ①–⑦）。
 
 **master key 輪替（無停機，四步）**：
 
@@ -8518,13 +8516,13 @@ func TestUpsertCredential_ResponseNeverEchoesPlaintext(t *testing.T) {
 | **order-scoped**（既有） | 8／9／10 | 該 `order_no` 的 `orders.buyer_id` ＝ 當前買家 ⇒ 才回該訂單底下的文件 |
 | **document-scoped**（本次新增） | 68／69／70／71 | `invoice_documents.recipient_type = 'BUYER' AND recipient_ref_id` ＝ 當前買家。**與訂單無關**，方向三（平台→買家訂閱）就是靠這條 |
 
-> 🔴 **買家換身分（buyer-stint re-key）之後看不到舊發票，是定版的預期行為**（ADR 見 `docs/adr/2026-09-18-invoice-service-architecture.md`）。
+> 🔴 **買家關閉（帳號刪除）之後，新帳號的買家看不到舊發票，是定版的預期行為**（ADR 見 `docs/adr/2026-09-18-invoice-service-architecture.md`）。
 >
-> `recipient_ref_id` 存的是**開票當下**的 `buyer_id`，而 `buyer_id` 是一段任期：買家把買家角色移除再重新取得時會拿到全新的 surrogate。上表的述詞用的是**當前**買家 ⇒ 舊任期開的那些發票對不上。
+> `recipient_ref_id` 存的是**開票當下**的 `buyer_id`。一個帳號一生只有一個買家；帳號刪除時買家關閉，使用者之後以新帳號註冊會得到新的 `buyer_id`。上表的述詞用的是**當前**買家 ⇒ 舊買家開的那些發票對不上。
 >
-> 依「買家軟刪除後重新註冊 ＝ **完全全新開始**」，發票比照 `order／review／social／im／notification／coupon／cart／aftersales` 這 8 個下游辦理，**不做跨任期的可見性**。
+> 依「帳號刪除後以新帳號註冊 ＝ **完全全新開始**」，發票比照 `order／review／social／im／notification／coupon／cart／aftersales` 這 8 個下游辦理，**不做跨買家的可見性**。
 >
-> 裁決時明確評估過而仍選 A 的三個理由：① 買家原本收到的那封發票 email 仍在他信箱，憑證沒有真的消失；② 做例外會讓發票成為唯一跨任期可見的資料，而那正是 notification-service 當初刻意避開的不一致（見 `SoftDeleteRetiredBuyerStintInbox` 的註解）；③ 真的有人來調閱，資料沒有被刪，客服從後台撈得到。
+> 裁決時明確評估過而仍選 A 的三個理由：① 買家原本收到的那封發票 email 仍在他信箱，憑證沒有真的消失；② 做例外會讓發票成為唯一跨買家可見的資料，而那正是 notification-service 當初刻意避開的不一致（見 `SoftDeleteRetiredBuyerStintInbox` 的註解）；③ 真的有人來調閱，資料沒有被刪，客服從後台撈得到。
 >
 > ⚠️ **不要用 `ListBuyerIDsByAccount` 去「修」這件事**：`api/proto/buyer/buyer.proto` 的註解逐字寫著 "Do not call this from any caller-facing feature, authorization check, or display path."（它只給個資清除用）。
 >
@@ -8822,8 +8820,8 @@ media-service 的 GC 第 2 階段會刪除「無 `asset_reference` 且建立超�
 
 | 問 | 答 |
 |---|---|
-| `can_accept_orders` 讀什麼？ | `CanAcceptOrders(certStatus, sellerStatus)` ＝ `certStatus == "approved" && sellerStatus == active`（`services/seller-service/internal/domain/seller.go:101-107`，全 repo 唯一述詞；`usecase/seller.go:668`、`grpc/handler.go:321` 都呼叫它） |
-| 它吃得到 invoice-service 的稅務狀態嗎？ | **吃不到**。兩個輸入都是 seller-service 自己的欄位。invoice-service 唯一能影響它的途徑是讓 `sellers.status` 變成 `suspended_governance`——那是**停權**，不是「停止接單」 |
+| `can_accept_orders` 讀什麼？ | seller 模組的 `Exposable`（可公開曝光；規則只在 SQL `seller.pub_exposable_stores`，條件含店家營運中、KYC 核准，見 `internal/modules/seller/AGENTS.md`；legacy `internal/legacy/sellerserver` 的 `sellerMeta` 以它填 `can_accept_orders`） |
+| 它吃得到 invoice-service 的稅務狀態嗎？ | **吃不到**。輸入都是 seller 模組自己的資料。invoice-service 唯一能影響它的途徑是讓措施使店家進入停權——那是**停權**，不是「停止接單」 |
 | 那 C5 由誰執行？ | **結帳鏈的既有收斂點**：`CheckoutPreview` 回 `intakeLimit` 現況、`CheckoutConfirm` 在既有交易內判定並回 `9326 SELLER_INVOICE_INTAKE_LIMIT_REACHED`（§6.1.2；計數欄位在 `seller_tax_profiles`，§5.1.2）。它與 `can_accept_orders` 是兩個獨立 flag，AND 才放行（T-I03） |
 | C4 的 60 天到期呢？ | 到期＝「停止接受新單」，走**同一個 `9326` 閘門**（上限視為 0），不是把賣家停權。停權只來自 C1 的違規計數 |
 
@@ -8842,7 +8840,7 @@ media-service 的 GC 第 2 階段會刪除「無 `asset_reference` 且建立超�
 | 衝突 | 現況行為 | 本案例外 |
 |---|---|---|
 | media GC | 無 `asset_reference` 且建立超過 7 天的 `media_asset` 連同 R2 物件一起刪（08 號 `:684`） | 由**寫入路徑建立 reference** 解決（§8.1.5(e)），不需要修改 GC 規則 |
-| 買家 PII 清理 | 買家關帳號時跨**所有** stint 清 PII（`docs/modules/buyer.md` §2） | **發票文件、折讓證明、稅務證明列為 PII 清理例外**：帳號刪除不連帶刪除，僅關閉對外查詢（決策 D） |
+| 買家 PII 清理 | 買家關帳號後清 PII（`docs/modules/buyer.md` §2） | **發票文件、折讓證明、稅務證明列為 PII 清理例外**：帳號刪除不連帶刪除，僅關閉對外查詢（決策 D） |
 
 **落實方式（三件，缺一即形同未做）**：
 
@@ -9577,7 +9575,7 @@ message AdminInvoiceOperationView {
 
 #### 8.5.1 環境變數
 
-分兩組：**(A) invoice-service 側**（Go，`services/invoice-service/internal/config/config.go`，沿用既有 `pkgconfig.GetEnvOrDefault` ＋ `Config` struct ＋ `Load` ＋ `Validate` 慣例，範本 `services/seller-service/internal/config/config.go:36-40,175,245-246`）與 **(B) Gateway 側**。落點不同、擁有者不同，不可混為一表。
+分兩組：**(A) invoice-service 側**（Go，`services/invoice-service/internal/config/config.go`，沿用既有 `pkgconfig.GetEnvOrDefault` ＋ `Config` struct ＋ `Load` ＋ `Validate` 慣例）與 **(B) Gateway 側**。落點不同、擁有者不同，不可混為一表。
 
 ##### (A) invoice-service
 
@@ -10590,7 +10588,7 @@ media 若把該值調回 gRPC 預設的 4 MiB，一張 4 MiB 的 PDF 加上 prot
 
 跨服務 PII 清理靠 MQ fan-out（`buyer.deleted` 目前 4 個 consumer、`account.deleted` 5 個）。⇒ **保護 invoice 的機制不是例外清單，是「invoice-service 不訂閱這兩個事件」——缺席即保證。** 清單要靠人維護，缺席只要沒人去加就成立。
 
-因此真正的風險是「日後有人為了一致性去補一個 consumer」，而 buyer-service 消費 `account.deleted` 來**釋放 media 引用**那一列正是最危險的樣板：照抄到 invoice-service ⇒ 釋放發票 PDF 的 `asset_reference` ⇒ 7 天後 media GC 連 R2 物件一起刪 ⇒ 而那時 AMEGO 可能已超過 180 天查詢期 ⇒ **法定憑證永久滅失，且沒有任何錯誤訊息**。
+因此真正的風險是「日後有人為了一致性去補一個 consumer」，而「消費帳號刪除事件來**釋放 media 引用**」正是最危險的樣板：照抄到 invoice-service ⇒ 釋放發票 PDF 的 `asset_reference` ⇒ 7 天後 media GC 連 R2 物件一起刪 ⇒ 而那時 AMEGO 可能已超過 180 天查詢期 ⇒ **法定憑證永久滅失，且沒有任何錯誤訊息**。
 
 | # | 做法 | 落點 |
 |---|---|---|
@@ -10598,7 +10596,7 @@ media 若把該值調回 gRPC 預設的 4 MiB，一張 4 MiB 的 PDF 加上 prot
 | 2 | 36 號的兩列各加一句「invoice-service 刻意不消費：稅務憑證為法定 5 年保存例外」 | 36 號。**寫在事件那一側**，因為下一個人是從事件的 consumer 清單去看「還有誰該加」 |
 | 3 | 買家 `closed` 之後**關閉對外查詢（回 404），不刪資料** | invoice-service 的買家面端點 |
 
-第 3 點的閘門靠 `BUY GetBuyerProfileByBuyerID`（deadline 3s）。**`BuyerInfo` 沒有任何 status／closed／deleted 欄位**（15 個欄位全不是狀態欄）⇒ 判定不是讀欄位，而是**讀 RPC 的結果種類**（`GetBuyerProfile` 只解析得到 CURRENT stint，已關閉的解析不到）。因此判定規則是三分不是二分：
+第 3 點的閘門靠 `BUY GetBuyerProfileByBuyerID`（deadline 3s）。**`BuyerInfo` 沒有任何 status／closed／deleted 欄位**（15 個欄位全不是狀態欄）⇒ 判定不是讀欄位，而是**讀 RPC 的結果種類**（`ProfileByBuyerID` 對已關閉的買家回 NotFound）。因此判定規則是三分不是二分：
 
 | RPC 結果 | 判定 | 回應 | 為什麼 |
 |---|---|---|---|
@@ -10606,7 +10604,7 @@ media 若把該值調回 gRPC 預設的 4 MiB，一張 4 MiB 的 PDF 加上 prot
 | 業務層 NOT_FOUND（`code ≠ 0` 或 `data` 為空） | 買家已 closed | **404** | 這是「查詢已關閉」的正常結果 |
 | 傳輸層失敗（`UNAVAILABLE`／`DEADLINE_EXCEEDED`／連線錯誤） | 判定不出來 | **503，不是 404** | fail-closed（不放行），但不謊稱資源不存在：404 會讓前端／CDN 快取成「這筆沒了」 |
 
-合成一句「失敗就回 404」在兩個方向都出錯：往鬆——「查不到就當作正常買家」會讓 buyer-service 一次抖動就使已刪帳號的發票資料重新可讀；往緊——一律 404 會把暫時性故障寫進快取。這與寫入路徑對同一支 RPC 的寬容（開票時取不到 email ⇒ 開無 email 通知的發票，不停止開票）**方向相反是刻意的**：寫入路徑的法定期限在倒數，讀取路徑涉及 PII 外露。兩處都要在程式碼註解寫明它是刻意的，否則下一個做韌性改善或一致性重構的人會把其中一邊改成另一邊。
+合成一句「失敗就回 404」在兩個方向都出錯：往鬆——「查不到就當作正常買家」會讓 buyer 模組一次抖動就使已刪帳號的發票資料重新可讀；往緊——一律 404 會把暫時性故障寫進快取。這與寫入路徑對同一支 RPC 的寬容（開票時取不到 email ⇒ 開無 email 通知的發票，不停止開票）**方向相反是刻意的**：寫入路徑的法定期限在倒數，讀取路徑涉及 PII 外露。兩處都要在程式碼註解寫明它是刻意的，否則下一個做韌性改善或一致性重構的人會把其中一邊改成另一邊。
 
 #### 9.5.4 5 年到期後怎麼清（維運 SQL，不是排程任務）
 
@@ -10793,7 +10791,7 @@ WHERE d.created_at < now() - interval '1826 days'
 | X9 | 光貿商戶後台逐頁盤點（字軌類型設定、關帳日、API 指定代碼、多公司管理） | 登入後逐頁截圖 | 「哪些事只能在後台做、沒有 API」目前全部是文件推論 |
 | X10 | `notification_templates` 的現況欄位 | 落筆前直接 `SELECT` dev 現況 | 模板 migration 建立在過期的欄位假設上 ⇒ 通知靜默不發 |
 | X11 | order-service 的 Flyway 版號是否已被其他 PR 占用 | 開 PR 當下 `gh pr list --search "V12__" --state open` ＋ `git log origin/dev -- .../db/migration/` | 版號衝突擋部署。**這是會變的事實，不能用今天的答案** |
-| X12 | `sellers.seller_type` 與 `certification_applications.seller_type` 的同步寫入路徑 | 逐一 grep 兩處欄位的寫入點 | 賣家稅務身分的權威來源選錯；認證單可被打回草稿再改 ⇒ 開票依據會漂且無告警 |
+| X12 | `seller.kyc_applications.seller_type` 的寫入路徑 | 逐一 grep 兩處欄位的寫入點 | 賣家稅務身分的權威來源選錯；被退回的認證單重送會回到草稿再改 ⇒ 開票依據會漂且無告警 |
 | X13 | `/json/barcode` 對手機條碼的存在性驗證行為 | 以測試統編實打一個格式合法但不存在的手機條碼 | 我方 validator 不知道該擋到什麼程度。若 AMEGO 也不驗，載具打錯就是成功開票 ＋ 載具落空 ＋ 不可逆 |
 | X14 | M8 的述詞能不能覆蓋「事件根本沒送達」 | dev 把 `invoice.order.paid` 的 binding key 打錯成 `order.paid.v1`，下一筆付款後看 M8／M12／order 側 outbox 哪一支會動 | 三支都不動 ⇒ M8 是一道恆綠的假 gate，而它守的正是「訂單付了款但發票流程完全沒起跑」 |
 
@@ -10959,7 +10957,7 @@ INVOICE_ISSUE_LEASE_SECONDS = 120 是唯一同時滿足兩章算式的值：
 
 | 環境變數 | 值 | 讀取位置 |
 |---|---|---|
-| `ORDER_SERVICE_ADDR` / `SELLER_SERVICE_ADDR` / `BUYER_SERVICE_ADDR` / `SHIPPING_SERVICE_ADDR` | `order-service:9915` / `seller-service:10020` / `buyer-service:9943` / `shipping-service:9931` | `values.config` |
+| `ORDER_SERVICE_ADDR` / `SELLER_SERVICE_ADDR` / `BUYER_SERVICE_ADDR` / `SHIPPING_SERVICE_ADDR` | `order-service:9915` / 單體 / 單體 / `shipping-service:9931` | `values.config` |
 | `MEDIA_SERVICE_HOST` ＋ `MEDIA_SERVICE_GRPC_PORT` | `media-service` ＋ `9937`（media 的既有例外形狀） | `values.config` |
 | `MEDIA_BASE_URL` | dev `https://test-media.example.com`；prod 由 `overlays/prod/common.yaml` 提供 | `values.config`（dev）／`overlays/prod` |
 | `DB_HOST` / `DB_PORT` / `DB_NAME` | `postgresql` / `5432` / `hawkr_invoice`（**只寫 dev 的 host/port**） | `values.config` |
@@ -11064,7 +11062,7 @@ echo "  hawkr-amego"
 | 2 | `Dockerfile` | 三 stage 照抄 review-service，換服務名與 port（`ENV HTTP_PORT=10040`／`GRPC_PORT=10041`／`INVOICE_SERVICE_FILE_PORT=10042`／`EXPOSE 10040 10041 10042`） | **服務不會被 CI 偵測到 ⇒ 從不 build、從不部署，且不轉紅** |
 | 3 | `.air.toml` ／ 4 `Makefile` | 照抄 review-service（`migrate-diff`／`migrate-apply`／`migrate-status`／`sqlc-generate`） | 只是不方便 |
 | 5 | `cmd/invoice-service/main.go` | 9 行，只呼叫 `app.New.Run` | — |
-| 6 | `internal/**` | 分層見 §4.2.1；**`infrastructure/di.go` 照抄 content-service 的共用版 `pkgserver.NewInternalHTTPServer`**，不要照抄 review-service 那份自寫 HTTP server（它只是尚未遷移） | 自寫一份要自己維護 `/health`／`/metrics`／pprof |
+| 6 | `internal/**` | 分層見 §4.2.1；**`infrastructure/di.go` 用共用版 `pkgserver.NewInternalHTTPServer`**，不要照抄 review-service 那份自寫 HTTP server（它只是尚未遷移） | 自寫一份要自己維護 `/health`／`/metrics`／pprof |
 | 7 | `db/atlas.hcl` | §5.4.1 全文（四個細節寫錯任一個會擋下**全部**服務的 deploy job） | deploy job 全紅 |
 | 8 | `db/{sqlc.yaml,schema/schema.sql,queries/*.sql}` | §5.4.2（**每個 jsonb 欄位一條 override**）＋ §5.1 全部 DDL | jsonb override 漏掉 ⇒ 不會編譯錯、不會測試紅，**寫入時 runtime `22P02`** |
 
@@ -11759,7 +11757,7 @@ COMMIT;
 | | **平台代收（本平台不是）** | **賣家自收（本平台的實況）** |
 |---|---|---|
 | PayUni 上的商店 | 平台一家 | **每個賣家各自以自己名義註冊的獨立合作商店**，平台只是代理商 |
-| 買家付款帶的 `MerID` | 平台的 | **`HAWK<store_id>` ＝賣家自己的商店代號** |
+| 買家付款帶的 `MerID` | 平台的 | **`HAWK<store_code>` ＝賣家自己的商店代號** |
 | 錢掛在誰帳上 / 平台銀行帳戶 | 平台 / 經手 | **賣家那家商店** / **完全不經手**（repo 內沒有任何平台銀行帳戶、金流帳本或餘額表） |
 | 對開票的影響 | 平台可能被推進「受託代銷」，那時**每一筆訂單都要由平台就全額開發票** | 買家付款成功的當下貨款已對賣家發生清償效力 ⇒ 落入時限表但書 ⇒ **開票時點＝付款成功** |
 
