@@ -73,10 +73,10 @@
 | 23 | [門市管理模組（Store Pickup Management）](詳細設計書/23-門市管理模組%EF%BC%88Store%20Pickup%20Management%EF%BC%89詳細設計書.md) | `services/java/shipping-service/` |
 | 24 | [節假日管理（Holiday Management）](詳細設計書/24-節假日管理%EF%BC%88Holiday%20Management%EF%BC%89詳細設計書.md) | `services/java/shipping-service/` |
 | 26 | [輸入驗證模組（Java InputValidator）](詳細設計書/26-輸入驗證模組%EF%BC%88Java%20InputValidator%EF%BC%89詳細設計書.md) | `services/java/shared/common-core/` |
-| 28 | [商品瀏覽統計（Product View Stats）](詳細設計書/28-商品瀏覽統計%EF%BC%88Product%20View%20Stats%EF%BC%89詳細設計書.md) | `services/seller-service/`、`gateway/` |
+| 28 | [商品瀏覽統計（Product View Stats）](詳細設計書/28-商品瀏覽統計%EF%BC%88Product%20View%20Stats%EF%BC%89詳細設計書.md) | `internal/modules/seller/`、`gateway/` |
 | 29 | [Admin 異常訂單管理 API](詳細設計書/29-Admin%20異常訂單管理%20API%20詳細設計書.md) | 跨 Payment / Shipping / AfterSales / Order |
 | 31 | [內容檢舉與封鎖（Content Reporting & Block）](詳細設計書/31-內容檢舉與封鎖%EF%BC%88Content%20Reporting%20&%20Block%EF%BC%89詳細設計書.md) | `gateway/`、`services/{social,im,review}-service/`、`pkg/{blocklist,moderation}` |
-| 32 | [商家治理與食安通報（Seller Governance & Food Safety）](詳細設計書/32-商家治理與食安通報%EF%BC%88Seller%20Governance%20&%20Food%20Safety%EF%BC%89詳細設計書.md) | `gateway/`、`services/seller-service/`、`pkg/mq` |
+| 32 | [商家治理與食安通報（Seller Governance & Food Safety）](詳細設計書/32-商家治理與食安通報%EF%BC%88Seller%20Governance%20&%20Food%20Safety%EF%BC%89詳細設計書.md) | `gateway/`、`internal/modules/seller/`、`pkg/mq` |
 | 33 | [商品 Hashtag 模組（Product Hashtag）](詳細設計書/33-商品%20Hashtag%20模組%EF%BC%88Product%20Hashtag%EF%BC%89詳細設計書.md) | `services/java/product-service/` |
 | 34 | [貼文 Hashtag 模組（Post Hashtag）](詳細設計書/34-貼文%20Hashtag%20模組%EF%BC%88Post%20Hashtag%EF%BC%89詳細設計書.md) | `services/social-service/` |
 | 35 | [商品列表排序與銷量反正規化（Product Sort & Sales Count）](詳細設計書/35-商品列表排序與銷量反正規化%EF%BC%88Product%20Sort%20&%20Sales%20Count%EF%BC%89詳細設計書.md) | `services/java/product-service/`、`services/java/order-service/`、`gateway/` |
@@ -86,7 +86,7 @@
 | 41 | [Realtime SSE 推播平台（Realtime SSE Push Platform）](詳細設計書/41-Realtime%20SSE%20推播平台%EF%BC%88Realtime%20SSE%20Push%20Platform%EF%BC%89詳細設計書.md) | `gateway/`、`services/social-service/`、`services/notification-service/` |
 | 43 | [評論微服務（Review Service）](詳細設計書/43-評論微服務%EF%BC%88Review%20Service%EF%BC%89詳細設計書.md) | `services/review-service/`、`gateway/` |
 | 44 | [帳號與賣家買家身份模型（Account & Seller-Buyer Identity）](詳細設計書/44-帳號與賣家買家身份模型%EF%BC%88Account%20&%20Seller-Buyer%20Identity%EF%BC%89詳細設計書.md) | `internal/modules/seller`（身份部分）、`gateway/`、跨角色守衛（單體 identity、buyer、accountdeletion 的規格在 `docs/modules/`） |
-| 46 | [賣家能力權限層（Seller Capability Authorization）](詳細設計書/46-賣家能力權限層%EF%BC%88Seller%20Capability%20Authorization%EF%BC%89詳細設計書.md) | `gateway/internal/authz/`、`services/seller-service/` |
+| 46 | [賣家能力權限層（Seller Capability Authorization）](詳細設計書/46-賣家能力權限層%EF%BC%88Seller%20Capability%20Authorization%EF%BC%89詳細設計書.md) | `gateway/internal/authz/`、`internal/modules/seller/` |
 | 47 | [GA4 分析追蹤（GA4 Cross-Platform Analytics）](詳細設計書/47-GA4%20分析追蹤%EF%BC%88GA4%20Cross-Platform%20Analytics%EF%BC%89詳細設計書.md) | `hawkr-website/`、`hawkr_buyer/`、`hawkr_seller/` |
 | 48 | [SEO 優化與現況（SEO Optimization）](詳細設計書/48-SEO%20優化與現況%EF%BC%88SEO%20Optimization%EF%BC%89詳細設計書.md) | `hawkr-website/lib/seo/`、`hawkr-admin/` |
 | 49 | [多媒體儲存與圖片服務（Cloudflare R2 & Image Gateway）](詳細設計書/49-多媒體儲存與圖片服務%EF%BC%88Cloudflare%20R2%20&%20Image%20Gateway%EF%BC%89詳細設計書.md) | `services/java/media-service/`、`workers/image-gateway/` |
