@@ -572,20 +572,85 @@ export const ExitEmptyListItem: Story = {
 			setCaret(item, "end");
 			await user.keyboard("{Enter}離開清單後的文字");
 			// 編輯器的 onChange 是在輸入之後才非同步送出；受載的 CI runner 上預設的 1 秒會停在輸入到一半的快照。
-			await waitFor(() => {
-				const value = args.onChange.mock.lastCall?.[0] ?? args.value;
+			await waitFor(
+				() => {
+					const value = args.onChange.mock.lastCall?.[0] ?? args.value;
+					expect(
+						JSON.parse(
+							value.blocks.find((block) => block.type === "list")?.listJson ??
+								"null",
+						),
+					).toEqual({
+						ordered: false,
+						items: [{ runs: [{ text: "保留的清單項目" }] }],
+					});
+					expect(documentText(value)).toEqual(["離開清單後的文字"]);
+					expect(editableText(dialog, "離開清單後的文字")).toBeVisible();
+				},
+				{ timeout: 10_000 },
+			);
+		}),
+};
+
+// 讓段落的存檔一直失敗，直到 Editor.js 自己的 onChange 觸發的那次也失敗為止。
+// 每次按鍵會觸發兩次存檔：下一個畫面的即時存檔（連同它的重試在幾十毫秒內），
+// 以及 Editor.js 批次約 400ms 後的 onChange。兩段都失敗才是「最後一次存檔失敗」；
+// 和上一次失敗隔超過 150ms 的那次就是第二段。Saver 會吞掉錯誤並回傳 undefined。
+function failSavesThroughOnChange(editable: HTMLElement) {
+	const descriptor = Object.getOwnPropertyDescriptor(
+		Element.prototype,
+		"innerHTML",
+	);
+	if (!descriptor?.get || !descriptor.set)
+		throw new Error("缺少 innerHTML 存取子");
+	const { get, set } = descriptor;
+	let lastFailureAt: number | undefined;
+	let onChangeFailed = false;
+	Object.defineProperty(editable, "innerHTML", {
+		configurable: true,
+		get() {
+			if (!onChangeFailed && new Error().stack?.includes("save")) {
+				const now = performance.now();
+				if (lastFailureAt !== undefined && now - lastFailureAt > 150)
+					onChangeFailed = true;
+				lastFailureAt = now;
+				throw new Error("模擬存檔失敗");
+			}
+			return get.call(this);
+		},
+		set(value: string) {
+			set.call(this, value);
+		},
+	});
+	return () => onChangeFailed;
+}
+
+export const LastSaveFailureRetries: Story = {
+	name: "最後一次存檔失敗 · 補存後 onChange 跟上",
+	args: { value: paragraphs("第一段") },
+	play: async ({ canvasElement, args, globals }) =>
+		nativeDeletionTest(canvasElement, globals, async (dialog, user) => {
+			const paragraph = editableText(dialog, "第一段");
+			await user.click(paragraph);
+			setCaret(paragraph, "end");
+			await user.keyboard("補");
+			await waitFor(() =>
 				expect(
-					JSON.parse(
-						value.blocks.find((block) => block.type === "list")?.listJson ??
-							"null",
-					),
-				).toEqual({
-					ordered: false,
-					items: [{ runs: [{ text: "保留的清單項目" }] }],
-				});
-				expect(documentText(value)).toEqual(["離開清單後的文字"]);
-				expect(editableText(dialog, "離開清單後的文字")).toBeVisible();
-			}, { timeout: 10_000 });
+					documentText(args.onChange.mock.lastCall?.[0] ?? args.value),
+				).toEqual(["第一段補"]),
+			);
+			const saveFailed = failSavesThroughOnChange(paragraph);
+			await user.keyboard("存");
+			// 失敗後不再有輸入；沒有補存的話 onChange 會一直停在「第一段補」。
+			await waitFor(
+				() => {
+					expect(saveFailed()).toBe(true);
+					expect(
+						documentText(args.onChange.mock.lastCall?.[0] ?? args.value),
+					).toEqual(["第一段補存"]);
+				},
+				{ timeout: 5_000 },
+			);
 		}),
 };
 

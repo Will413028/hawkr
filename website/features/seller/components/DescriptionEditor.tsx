@@ -1730,9 +1730,11 @@ export function DescriptionEditorCanvas({
 
 			// 最後一次存檔失敗時沒有更新的存檔會接手，輸入停下後就不會再有
 			// 下一次存檔；由這裡補存，否則 onChange 會停在失敗前的舊快照。
+			// 重試額度每次新的存檔觸發都重算，前一次觸發用掉的不影響這次。
 			const MAX_SAVE_RETRIES = 3;
 			let saveRetries = 0;
-			const saveCurrentEditor = async () => {
+			const saveCurrentEditor = async (retry = false) => {
+				if (!retry) saveRetries = 0;
 				const currentEditor = editorRef.current;
 				if (
 					!currentEditor ||
@@ -1751,7 +1753,6 @@ export function DescriptionEditorCanvas({
 						generation !== saveGenerationRef.current
 					)
 						return;
-					saveRetries = 0;
 					commitEditorValue(fromEditorData(data));
 				} catch {
 					// A pending save may settle after a block/editor was destroyed.
@@ -1763,7 +1764,7 @@ export function DescriptionEditorCanvas({
 					)
 						return;
 					saveRetries += 1;
-					requestAnimationFrame(() => void saveCurrentEditor());
+					requestAnimationFrame(() => void saveCurrentEditor(true));
 				}
 			};
 
