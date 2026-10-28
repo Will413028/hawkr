@@ -68,3 +68,7 @@ seller-service 的推薦賣家（`GetRecommendedSellers`，盤點於 7d 開工�
 **脈絡**：店家卡片帶即時評分（ADR `2026-10-03-public-store-identity-and-visibility.md` 的 2026-10-07 修訂）之後，`RecommendedSeller` 的快照評分讓同一家店在推薦清單上有兩個可能不同的數字（最多差一次重算）。業界基準（Etsy、Amazon）是全站卡片顯示同一個評分，排名用的訊號不對外；「與排名一致」是本 ADR 自己的選擇，不是外部約束。
 
 **決策**：刪除 `RecommendedSeller.review_count`、`rating_average`（號碼 reserved）；推薦清單的評分由卡片提供，與其他清單同一份批次組裝。排名用的評價數與平均只留在 discovery 的快照內，不對外。
+
+## 修訂（2026-10-28）
+
+設計書 45 已刪除，上表「設計書 45 的 `featured_sellers`」指向已刪除的文件，內容見 git 歷史。
