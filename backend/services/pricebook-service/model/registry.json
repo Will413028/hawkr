@@ -1,8 +1,0 @@
-{
-  "model_version": "direct-ridge-v2-97d244a3e166be63",
-  "r2_object_key": "pricebook-models/direct-ridge-v2-97d244a3e166be63/model.json",
-  "sha256": "cbc7bef14daad09be81c4a421bce66e445f0388e01c22257a1a6142635b6b19b",
-  "trained_at": "2026-08-07T03:46:47.151097+00:00",
-  "dataset_digest": "5dc95a3d651949e9a50bb6551a6cc030717271026ed8cc96803bc20616339a7a",
-  "series_count": 13287
-}

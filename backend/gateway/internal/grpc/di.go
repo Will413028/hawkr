@@ -31,7 +31,6 @@ var Module = fx.Module("grpc",
 	fx.Provide(NewOrderReviewServiceClient),
 	fx.Provide(NewAftersalesClient),
 	fx.Provide(NewProductImportClient),
-	fx.Provide(NewPricebookClient),
 	fx.Provide(NewInvoiceServiceClient),
 	fx.Invoke(registerLifecycle),
 )
@@ -58,7 +57,6 @@ type clientClosers struct {
 	OrderReview   *OrderReviewServiceClient
 	Aftersales    *AftersalesClient
 	ProductImport *ProductImportClient
-	Pricebook     *PricebookClient
 	Invoice       *InvoiceServiceClient
 }
 
@@ -71,7 +69,7 @@ func registerLifecycle(lc fx.Lifecycle, l *zap.Logger, c clientClosers) {
 				c.Payment, c.Media, c.Cart, c.Social, c.IM,
 				c.Notification, c.Shipping,
 				c.Coupon, c.Crm, c.AIServiceConn, c.Category, c.Review,
-				c.OrderReview, c.Aftersales, c.ProductImport, c.Pricebook,
+				c.OrderReview, c.Aftersales, c.ProductImport,
 				c.Invoice,
 			}
 			for _, cl := range closers {

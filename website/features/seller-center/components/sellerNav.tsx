@@ -125,11 +125,6 @@ export const SELLER_NAV_GROUPS: NavGroup[] = [
 				icon: <SellerSidebarIcon name="truck" />,
 			},
 			{
-				href: "/seller-center/insights",
-				label: "市場行情",
-				icon: <SellerSidebarIcon name="chart" />,
-			},
-			{
 				href: "/seller/measures",
 				label: "措施與申覆",
 				icon: <SellerSidebarIcon name="shield" />,

@@ -170,7 +170,6 @@ class TestExpandedCountsAgainstRealTopology(unittest.TestCase):
         # queues_json_args  6 →   6 (+0)  本條目沒有 args_json
         # bindings        235 → 238 (+3) procurement.events→queue（key=#）＋
         # retry fanout→queue ＋ procurement.events.dlx→.dlq
-        # #2785 pricebook.seller.deleted: +1 retry exchange, +2 queues, +3 bindings.
         # 2026-09-12 66 號 W2-2：新增 shipping.uber.webhook（帶 dlq: via shipping.webhook.dlx，
         # 一條 binding payuni.events/uber.shipping.status）。逐項對帳：
         # exchanges        91 →  91 (+0)  沿用既有 payuni.events 與 shipping.webhook.dlx，
@@ -219,14 +218,20 @@ class TestExpandedCountsAgainstRealTopology(unittest.TestCase):
         # queues          187 → 185 (-2)  queue ＋ .dlq
         # queues_json_args  6 →   6 (+0)
         # bindings        238 → 235 (-3)  來源 binding ＋ .retry→queue ＋ .dlx→.dlq
-        self.assertEqual(len(out["exchanges"]), 114, "exchanges 數量與 pin 不符")
-        self.assertEqual(len(out["queues"]), 185, "queues 數量與 pin 不符")
+        #
+        # 刪一條帶 retry: 的 seller.deleted 消費 queue（服務已刪）：
+        # exchanges       114 → 112 (-2)  .retry ＋ .dlx（fanout）
+        # queues          185 → 183 (-2)  queue ＋ .dlq
+        # queues_json_args  6 →   6 (+0)
+        # bindings        235 → 232 (-3)  來源 binding ＋ .retry→queue ＋ .dlx→.dlq
+        self.assertEqual(len(out["exchanges"]), 112, "exchanges 數量與 pin 不符")
+        self.assertEqual(len(out["queues"]), 183, "queues 數量與 pin 不符")
         self.assertEqual(
             len(out["queues_json_args"]), 6, "queues_json_args 數量與 pin 不符"
         )
-        self.assertEqual(len(out["bindings"]), 235, "bindings 數量與 pin 不符")
-        # 114 + 185 + 6 + 235 = 540
-        self.assertEqual(sum(len(v) for v in out.values()), 540)
+        self.assertEqual(len(out["bindings"]), 232, "bindings 數量與 pin 不符")
+        # 112 + 183 + 6 + 232 = 533
+        self.assertEqual(sum(len(v) for v in out.values()), 533)
 
 
 @unittest.skipUnless(

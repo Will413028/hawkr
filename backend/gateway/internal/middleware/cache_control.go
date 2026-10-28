@@ -11,8 +11,8 @@ import (
 // gate 早退的 401／403。**不**涵蓋 engine 全域鏈在它之前就 abort 的回應——
 // infrastructure/di.go 的 gin.Recovery()（panic 500）、CORS()（preflight 204）
 // 與分級限流（429）都排在 group 之前。這三者的 body 都不帶使用者內容（通用錯誤
-// envelope／空 preflight），所以刻意不往上搬：把這支掛到全域會連帶覆蓋 pricebook
-// 與 seller_city_summary 刻意可快取的回應。
+// envelope／空 preflight），所以刻意不往上搬：把這支掛到全域會連帶覆蓋
+// seller_city_summary 刻意可快取的回應。
 //
 // 掛法有兩條硬性要求，順序寫錯不會編譯失敗、只會靜默漏掉一部分回應：
 //

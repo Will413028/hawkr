@@ -76,7 +76,7 @@
   - [x] `cmd/hawkr/modules.go` 登記每個模組；測試保證 `internal/modules` 底下的每個模組都有登記。
   - [x] 開發時產生 migration 用的 Atlas 設定（每個模組自己的 `db/`：schema、migrations、`atlas.sum`），隨 A1 試點建立並實際跑一次。
     - Atlas 以 database 範圍執行，產生的 DDL 帶 schema 名稱；`schema.sql` 要寫 `CREATE SCHEMA IF NOT EXISTS public;`，否則 Atlas 會產生 `DROP SCHEMA public`。
-    - 目前沒有模組使用 Postgres extension，platform 也沒有對應的機制。content 原本的 pg_trgm 索引拿掉了，理由見 content 模組的 `AGENTS.md`（兩個字的中文關鍵字用不到索引）。第一個真正需要 extension 的模組搬進來時（social 的 hashtag 搜尋用 `similarity()`，A7；pricebook 的 trigram 索引，A4），照這個已經在 2026-09-25 實測過的做法加上：
+    - 目前沒有模組使用 Postgres extension，platform 也沒有對應的機制。content 原本的 pg_trgm 索引拿掉了，理由見 content 模組的 `AGENTS.md`（兩個字的中文關鍵字用不到索引）。第一個真正需要 extension 的模組搬進來時（social 的 hashtag 搜尋用 `similarity()`，A7），照這個已經在 2026-09-25 實測過的做法加上：
       - extension 是整個 database 共用的，不屬於任何模組，裝在共用的 `extensions` schema，引用時寫完整名稱（例如 `extensions.gin_trgm_ops`）。
       - Atlas 社群版不管理 extension：模組 migration 目錄開頭放一個手寫的 migration，冪等地建立（`CREATE SCHEMA IF NOT EXISTS extensions` 加 `CREATE EXTENSION IF NOT EXISTS … WITH SCHEMA extensions`），`atlas migrate hash` 後再 diff；`schema.sql` 也寫同樣兩句。模組之間因此沒有套用順序的依賴。Atlas docker 的 `baseline` 需要登入 Pro，不採用。
       - `ForeignObjects` 接受 `extensions` schema，但要列出其中不屬於 extension 的物件（`pg_depend.deptype = 'e'`），並檢查 `pg_extension` 都裝在 `extensions`：裝在別的 schema 時，其他模組的 `CREATE EXTENSION IF NOT EXISTS … WITH SCHEMA extensions` 會變成 no-op，引用就找不到。
@@ -199,7 +199,7 @@
   - 申請成為商家：舊 gateway 的 `POST /app/sellers` 在 seller-service 建店並授予 SELLER 之後，才驗證城市代碼，驗證失敗回 400 而商店與角色已經寫入（A2 的 compose 驗收，2026-09-29）。搬進 seller 模組時，輸入驗證放在建店之前，建店與授予角色同一個 transaction。
 
 A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主鍵照 ID 策略的過渡規則暫用 `bigint GENERATED ALWAYS AS IDENTITY`，不用 TSID；最後一個 Java 消費者改寫後，以一個 migration 換成 uuid。
-- [ ] **A4 pricebook**：取消，不搬。pricebook 整個刪除（ADR `2026-10-27-general-ecommerce-scope-cut.md` D1），執行在 `2026-10-27-ecommerce-scope-cut.md` 步驟 5、6；完成時勾掉這一項。
+- [x] **A4 pricebook**：取消，不搬。pricebook 整個刪除（ADR `2026-10-27-general-ecommerce-scope-cut.md` D1），執行在 `2026-10-27-ecommerce-scope-cut.md` 步驟 5、6；完成時勾掉這一項。
 - [ ] **A5 invoice**：先不接手發票快照，等 B8 的 ordering。
   - 機敏檔的後台讀取（A3 計畫 8f-1 留下的終點）：稅籍佐證與發票 PDF 改由 invoice 模組的 `/api/files/admin/invoice/...` 端點提供，網址由擁有者的 Connect 方法回傳，讀取經 `media.Media.ReadSecure`，存取紀錄進 invoice 模組（先寫再讀，寫不進去就不送），admin 的檢視不帶 asset ID。舊 invoice-service 的 admin 發票 PDF 下載目前不記讀取者，搬遷時一併補上。
 - [ ] **A6 review、im、crm**（緊接 A7，排在 A4、A5、A8 之前：A7 不寫往舊 im／review 的橋（S3），聊天與評價的封鎖、檢舉在 A7-4e 到 A6 的 client 步驟之間本機會失敗，Will 2026-10-18 接受（A7 計畫 Q1）；步驟草案見 `2026-10-18-a7-social/decision-brief.md` §4 的 A6-0 到 A6-7，A6-0 照 A7-0 的格式重做盤點與計畫）

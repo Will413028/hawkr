@@ -41,10 +41,8 @@ func TestButtonSpecialistKey_Contract(t *testing.T) {
 	want := map[string]string{
 		"inventory":    "seller:inventory",
 		"payment":      "seller:payment",
-		"price":        "seller:price",
 		"orders":       "buyer:order",
 		"tracking":     "buyer:tracking",
-		"seasonal":     "buyer:seasonal",
 		"seller-match": "buyer:seller_match",
 	}
 	if len(ButtonSpecialistKey) != len(want) {

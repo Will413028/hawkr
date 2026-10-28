@@ -122,7 +122,6 @@ describe("isPageAvailable", () => {
 			"/seller-center/wallet",
 			"/seller-center/coupons",
 			"/seller-center/customers",
-			"/seller-center/insights",
 			"/seller-center/ai",
 			"/seller-center/preview",
 			"/seller-center/me/certifications",

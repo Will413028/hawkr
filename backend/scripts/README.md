@@ -103,7 +103,6 @@ DB_PASSWORD=<本機 postgres 密碼> ./scripts/init-databases.sh local
 | im-service | hawkr_im |
 | invoice-service | hawkr_invoice |
 | notification-service | hawkr_notification |
-| pricebook-service | hawkr_pricebook |
 | review-service | hawkr_review |
 | seller-service | hawkr_seller |
 | social-service | hawkr_social |

@@ -103,7 +103,6 @@ DATABASES=(
   "hawkr_webhook"
   "hawkr_notification"
   "hawkr_coupon"
-  "hawkr_pricebook"
   "hawkr_invoice"
 )
 

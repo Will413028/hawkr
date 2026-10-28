@@ -11,7 +11,7 @@
 // KYCSubmitted／KYCApproved／KYCCancelled／PayUniBindFailed（舊系統沒有對應的 routing key）、治理事件（A8 的 notification 訂閱）。
 // review.created、review.hidden 的 consumer 單體不新增（seller 沒有 rating 欄位）。
 //
-// 隨 seller 的消費者（Java product、order、coupon，Go 的 im、social、pricebook、notification、cart）搬進單體而退場。
+// 隨 seller 的消費者（Java product、order、coupon，Go 的 im、social、notification、cart）搬進單體而退場。
 package sellerrelay
 
 import (
@@ -49,7 +49,7 @@ type storeFields struct {
 }
 
 // StoreRetiredArgs 轉成 seller.deleted。關店可逆（終止合作的申覆期間內可以恢復），所以 StoreClosed 不轉送；退場（第一段清理）發的 StoreRetired
-// 才是不可逆的點，下游（product、social、im、notification、pricebook）此時才刪除店家的資料。
+// 才是不可逆的點，下游（product、social、im、notification）此時才刪除店家的資料。
 type StoreRetiredArgs struct{ storeFields }
 
 // StoreSuspendedArgs 轉成 seller.suspended；PeriodID 是 wire 的 suspensionId。

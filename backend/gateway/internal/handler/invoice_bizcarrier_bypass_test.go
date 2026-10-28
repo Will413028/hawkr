@@ -1,11 +1,8 @@
 package handler
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/json"
-	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -468,19 +465,12 @@ func convProbeData(resp *pb.GetProviderAccountForAdminResponse) gin.H {
 	}
 }
 
-// ⑫ 自己組 Envelope ＋ 用非 JSON writer 寫出（真實形態，非合成）。
+// 自己組 Envelope ＋ 用非 JSON writer 寫出。
 //
-// 🔴 這一支對應的是 repo 裡**今天就在 prod 路徑上**的一條路：
-// pricebook.go 的 writeGzippedIfAccepted 自己 json.Marshal(response.Envelope{Code:0,…})
-// 再用 c.Data 寫出。兩條 ruleguard lint 都不命中（banDirectJSON 認 c.JSON、
-// banEnvelopeSuccessEmitters 認 envelope.OK/Page/…），實跑 0 issues。
-//
-// carrier 對這條路是**偵測不是阻擋**（carrier.go 檔頭失效模式 4）——除非那條路徑
-// 自己問一次 Emit。本測試守的就是「它有問」這件事。
-//
-// ⚠️ 本支測的是**形狀**（合成 handler），不是 pricebook 那支函式本身 ——
-// 動 pricebook.go 不會讓它轉紅。守住真實呼叫點的是下面的
-// TestWriteGzippedIfAcceptedAsksCarrier，兩支分工不同、缺一不可。
+// 兩條 ruleguard lint 都不命中這個形狀（banDirectJSON 認 c.JSON、
+// banEnvelopeSuccessEmitters 認 envelope.OK/Page/…）。carrier 對這條路是
+// **偵測不是阻擋**（carrier.go 檔頭失效模式 4）——除非那條路徑自己問一次 Emit。
+// 本測試守的是「問過 carrier 才組 Envelope」這個形狀會被接住。
 func TestBypass12_HandRolledEnvelopeWithDataWriter(t *testing.T) {
 	w := runProbe(t, func(h *Holder) gin.HandlerFunc {
 		return func(c *gin.Context) {
@@ -488,7 +478,7 @@ func TestBypass12_HandRolledEnvelopeWithDataWriter(t *testing.T) {
 			if !ok {
 				return
 			}
-			// 照 pricebook.go 的形狀：問過 carrier 才組 Envelope。
+			// 問過 carrier 才組 Envelope。
 			code, msg, rewrite := bizcarrier.Emit(c, 0)
 			if !rewrite {
 				code, msg = 0, "success"
@@ -507,41 +497,5 @@ func TestBypass12_HandRolledEnvelopeWithDataWriter(t *testing.T) {
 	if code, _ := body["code"].(float64); int32(code) != bypassProbeCode {
 		t.Fatalf("envelope code = %v, want %d —— 自己組 Envelope 的路徑沒有問 carrier，"+
 			"非零業務碼被寫成假成功；body=%s", body["code"], bypassProbeCode, w.Body.String())
-	}
-}
-
-// TestWriteGzippedIfAcceptedAsksCarrier 直接打 pricebook.go 的那支函式本身。
-//
-// 🔴 與上面的 ⑫ 分工：⑫ 守「這個形狀會被 carrier 接住」，本支守「repo 裡真的
-// 那一條路有問 carrier」。只有 ⑫ 的話，pricebook.go 改回不問也不會轉紅 —— 我
-// 第一版就是這樣寫的，變異當場證明它零鑑別力（06 §3.10：機制的觀測窗要涵蓋
-// 它宣稱守住的東西）。
-func TestWriteGzippedIfAcceptedAsksCarrier(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
-	r.Use(bizcarrier.Middleware())
-	r.GET("/probe", func(c *gin.Context) {
-		if !bizcarrier.Arm(c.Request.Context(), "/probe.Svc/M", bypassProbeCode, "credential invalid") {
-			t.Fatal("Arm 失敗——carrier 沒掛上")
-		}
-		writeGzippedIfAccepted(c, json.RawMessage(`{"k":"v"}`))
-	})
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/probe", nil)
-	req.Header.Set("Accept-Encoding", "gzip")
-	r.ServeHTTP(w, req)
-
-	gz, err := gzip.NewReader(bytes.NewReader(w.Body.Bytes()))
-	if err != nil {
-		t.Fatalf("回應不是 gzip：%v", err)
-	}
-	raw, _ := io.ReadAll(gz)
-	var body map[string]any
-	if err := json.Unmarshal(raw, &body); err != nil {
-		t.Fatalf("decode: %v；raw=%s", err, raw)
-	}
-	if code, _ := body["code"].(float64); int32(code) != bypassProbeCode {
-		t.Fatalf("envelope code = %v, want %d —— writeGzippedIfAccepted 沒有問 carrier，"+
-			"非零業務碼被寫成假成功；raw=%s", body["code"], bypassProbeCode, raw)
 	}
 }

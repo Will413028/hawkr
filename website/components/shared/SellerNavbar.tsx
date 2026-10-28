@@ -246,14 +246,6 @@ const sellerWorkspaceRoutes: SellerWorkspaceRoute[] = [
 		inRail: true,
 	},
 	{
-		label: "市場行情",
-		href: "/seller-center/insights",
-		icon: "chart",
-		inNav: true,
-		inMenu: true,
-		inRail: false,
-	},
-	{
 		label: "商店設定",
 		href: "/seller-center/me",
 		icon: "settings",

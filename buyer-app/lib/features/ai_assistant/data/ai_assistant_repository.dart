@@ -41,8 +41,7 @@ enum BuyerAssistantEndpoint {
   chat('/app/buyers/me/assistant/chat'),
   orders('/app/buyers/me/assistant/orders'),
   tracking('/app/buyers/me/assistant/tracking'),
-  returnPolicy('/app/buyers/me/assistant/return-policy'),
-  seasonal('/app/buyers/me/assistant/seasonal');
+  returnPolicy('/app/buyers/me/assistant/return-policy');
 
   const BuyerAssistantEndpoint(this.path);
   final String path;

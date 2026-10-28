@@ -41,7 +41,6 @@ const PAGES: readonly PageRule[] = [
 	{ prefix: "/seller-center/coupons", capability: C.MARKETING },
 	{ prefix: "/seller-center/customers", capability: C.MARKETING },
 	{ prefix: "/seller-center/ai", capability: C.MARKETING },
-	{ prefix: "/seller-center/insights", capability: C.MARKETING },
 	{ prefix: "/seller-center/messages", capability: C.CHAT_READ },
 	{ prefix: "/seller-center/wallet", capability: C.STOREFRONT_WRITE },
 	{ prefix: "/seller-center/invoices", capability: C.INVOICE_MANAGE },

@@ -10,7 +10,7 @@
 // ——而 deploy-k8s.yml 的 `go test ./...` 沒有 -v，Go 的 skip 一行都不印，package
 // 照樣顯示 ok。缺席被當成了綠燈。
 //
-// 因此改成與 account / buyer / pricebook 相同的 testcontainers harness：
+// 因此改成與 account / buyer 相同的 testcontainers harness：
 // 拿不到 DB 就是紅的（require.NoError），不再有 skip 這個選項。
 package postgres_test
 

@@ -22,14 +22,12 @@ import (
 func provideToolDeps(
 	orders usecase.OrderClient,
 	products usecase.ProductClient,
-	pricebookC usecase.PricebookClient,
 	categoryIndex *cache.CategoryIndex,
 	candidateLeadSearcher usecase.CandidateLeadSearcher,
 ) *ToolDeps {
 	return &ToolDeps{
 		OrderClient:           orders,
 		ProductClient:         products,
-		PricebookClient:       pricebookC,
 		CategoryIndex:         categoryIndex,
 		CandidateLeadSearcher: candidateLeadSearcher,
 	}

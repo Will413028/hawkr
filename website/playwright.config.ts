@@ -149,7 +149,7 @@ export default defineConfig({
 				"e2e-dummy-client-id.apps.googleusercontent.com",
 			// RFQ specs exercise the enabled cohort explicitly. Production/default
 			// remains fail-safe OFF in capabilities.ts; the browser fixture turns on
-			// only the two Web presentation gates. The tests exercise Pricebook
+			// only the two Web presentation gates. The tests exercise price
 			// preview and immutable confirmation; formal publication remains a
 			// separate, visibly disabled capability in the UI.
 			WEB_PROCUREMENT_RFQ_PRICE_RANGE_V1: "true",

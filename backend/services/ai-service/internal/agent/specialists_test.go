@@ -8,7 +8,6 @@ func TestSellerSpecialistSpecs(t *testing.T) {
 		"order":     "", // /orders 特例，Phase 1 無按鈕
 		"inventory": "inventory",
 		"payment":   "payment",
-		"price":     "price",
 	}
 	if len(specs) != len(wantKeys) {
 		t.Fatalf("seller specs 應有 %d 筆，得 %d", len(wantKeys), len(specs))
@@ -33,7 +32,7 @@ func TestSellerSpecialistSpecs(t *testing.T) {
 
 func TestBuyerSpecialistSpecs(t *testing.T) {
 	specs := buyerSpecialistSpecs()
-	want := map[string]string{"order": "orders", "tracking": "tracking", "seasonal": "seasonal", "seller_match": "seller-match"}
+	want := map[string]string{"order": "orders", "tracking": "tracking", "seller_match": "seller-match"}
 	if len(specs) != len(want) {
 		t.Fatalf("buyer specs 應有 %d 筆，得 %d", len(want), len(specs))
 	}

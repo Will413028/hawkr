@@ -7,10 +7,8 @@
 #   seller:order      查詢賣家訂單清單與單筆訂單詳情（依日期/狀態）
 #   seller:inventory  檢查賣家庫存是否足以滿足未出貨訂單，列出不足品項
 #   seller:payment    查詢賣家收款統計（已收/待收）與待收款訂單明細
-#   seller:price      查詢農產品市場行情並給定價建議
 #   buyer:order       查詢買家訂單清單與單筆訂單詳情
 #   buyer:tracking    查詢買家配送中包裹的物流狀態
-#   buyer:seasonal    推薦平台當季水果商品（含名稱、價格）
 #
 # buyer:seller_match 刻意不在集合內：它被 buyerCoordinatorFallbackExcluded 排除在
 # coordinator 與 fallback 之外（只走按鈕路徑），放進來會測到一個不存在的委派。
@@ -36,12 +34,6 @@ seller_single:
     expect: [seller:payment]
   - q: "哪些訂單還沒付款給我"
     expect: [seller:payment]
-  - q: "高麗菜現在行情多少？"
-    expect: [seller:price]
-  - q: "我的番茄該賣多少錢"
-    expect: [seller:price]
-  - q: "最近青蔥的market價格"
-    expect: [seller:price]
 
 seller_multi:
   - q: "這週待收多少？順便看庫存夠不夠"
@@ -50,8 +42,6 @@ seller_multi:
     expect: [seller:order, seller:inventory]
   - q: "幫我看這個月的訂單和收款狀況"
     expect: [seller:order, seller:payment]
-  - q: "番茄行情如何？我手上的庫存夠賣嗎"
-    expect: [seller:price, seller:inventory]
 
 buyer_single:
   - q: "我的訂單在哪裡看"
@@ -66,27 +56,10 @@ buyer_single:
     expect: [buyer:tracking]
   - q: "查一下物流進度"
     expect: [buyer:tracking]
-  - q: "現在有什麼當季水果"
-    expect: [buyer:seasonal]
-  - q: "推薦一些這個季節好吃的水果"
-    expect: [buyer:seasonal]
-  - q: "當季的水果多少錢"
-    expect: [buyer:seasonal]
 
-# ⚠️ 2026-09-20 第一版有兩條是**我自己寫錯的**，不是 coordinator 選錯：
-#   「我的訂單到哪了？順便推薦當季水果」 expect 寫 order，實際選 tracking
-#   「當季有什麼水果，我之前的訂單送到沒」 expect 寫 tracking，實際選 order
-# 「訂單到哪了」「訂單送到沒」同時落在 buyer:order（訂單清單與詳情）與
-# buyer:tracking（配送中包裹的物流狀態）兩個 Description 之間，我兩條各指定了
-# 相反的答案，於是 coordinator 兩次都「答錯」。
-#
-# 教訓：eval corpus 的 expect 必須是**從 Description 唯一推得出來**的；一句話能
-# 合理落到兩個 specialist 時，它量到的是我的主觀偏好，不是路由品質。下面兩條已
-# 改寫成無歧義版本。這個 order／tracking 的邊界本身值得產品端釐清，另記。
+# eval corpus 的 expect 必須是**從 Description 唯一推得出來**的；一句話能合理落到
+# 兩個 specialist 時（例如「訂單到哪了」同時落在 buyer:order 與 buyer:tracking 的
+# Description 之間），它量到的是主觀偏好，不是路由品質。
 buyer_multi:
-  - q: "我上週買了什麼？順便推薦當季水果"
-    expect: [buyer:order, buyer:seasonal]
   - q: "包裹進度如何，還有我上次買什麼"
     expect: [buyer:tracking, buyer:order]
-  - q: "當季有什麼水果，我的包裹配送到哪個站點了"
-    expect: [buyer:seasonal, buyer:tracking]

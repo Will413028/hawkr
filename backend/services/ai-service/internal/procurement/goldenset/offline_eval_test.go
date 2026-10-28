@@ -44,8 +44,7 @@ var seedTree = []seedCategory{
 	{"30", "高山烏龍", "14"}, {"31", "鮮蚵", "33"}, {"32", "芒果乾", "16"},
 }
 
-// categoryTreeFake 回傳固定的種子分類樹；pricebook 在這裡沒有任何替身，因為解析路徑
-// 不該有它。
+// categoryTreeFake 回傳固定的種子分類樹。
 type categoryTreeFake struct{}
 
 func (categoryTreeFake) GetCategoryTree(context.Context, string) (*categorypb.GetCategoryTreeResponse, error) {

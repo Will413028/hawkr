@@ -19,7 +19,7 @@ interface UseSellerDashboardResult {
 }
 
 /** 賣家總覽 KPI（`GetMyDashboard`）的單一 server-state 來源。
- *  InsightsClient / SellerOrdersPage / DashboardPage / SellerCenterShell /
+ *  SellerOrdersPage / DashboardPage / SellerCenterShell /
  *  WalletClient 全部走這個 hook，共用同一條 identity-scoped query——TanStack
  *  自動去重、共用快取，任一處 refresh() 都會即時更新所有消費者的畫面。
  *  queryFn 是無快取的純 fetcher（repo 層 dedupe 已移除）：新鮮度由 staleTime

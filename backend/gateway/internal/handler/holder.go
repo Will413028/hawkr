@@ -34,7 +34,6 @@ type Holder struct {
 	OrderReview   *grpcclient.OrderReviewServiceClient
 	Aftersales    *grpcclient.AftersalesClient
 	ProductImport *grpcclient.ProductImportClient
-	Pricebook     *grpcclient.PricebookClient
 	Invoice       *grpcclient.InvoiceServiceClient
 	Store         *storeid.Resolver
 	BuyerID       *buyerid.Resolver

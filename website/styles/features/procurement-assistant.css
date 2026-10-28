@@ -1908,7 +1908,7 @@
 }
 
 /* V6 pricing guidance -------------------------------------------------
-	* Pricebook values and confirmation evidence are server-owned. The browser
+	* Price preview values and confirmation evidence are server-owned. The browser
 	* renders the typed projection but never derives a price basis or publication. */
 .assistant-rfq-guidance__head,
 .assistant-rfq-snapshot > header {

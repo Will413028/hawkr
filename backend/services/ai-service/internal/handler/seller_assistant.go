@@ -26,7 +26,6 @@ import (
 var DefaultMessages = map[string]string{
 	"inventory": "檢查庫存狀態",
 	"payment":   "查詢本週收款狀況",
-	"price":     "當季商品與價格建議",
 }
 
 // ButtonSpecialistKey 把按鈕 endpointKey 對映到 Runners.Specialists 的 map key（role:specKey）。
@@ -34,10 +33,8 @@ var DefaultMessages = map[string]string{
 var ButtonSpecialistKey = map[string]string{
 	"inventory":    "seller:inventory",
 	"payment":      "seller:payment",
-	"price":        "seller:price",
 	"orders":       "buyer:order",
 	"tracking":     "buyer:tracking",
-	"seasonal":     "buyer:seasonal",
 	"seller-match": "buyer:seller_match",
 }
 

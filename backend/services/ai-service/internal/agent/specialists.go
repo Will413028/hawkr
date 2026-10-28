@@ -26,13 +26,9 @@ const inventorySpecialistInstruction = `你是賣家庫存檢查助手。收到�
 
 const paymentSpecialistInstruction = `你是賣家收款對帳助手。收到訊息後直接使用 query_payment_summary 工具查詢收款狀況，不需要確認。收款統計為估算值（基於訂單狀態推算）。使用繁體中文回覆，適度使用 emoji。`
 
-const priceSpecialistInstruction = `你是農產品行情分析助手。收到訊息後直接使用 get_seasonal_price_suggestion 工具查詢市場行情，並給出定價建議。使用繁體中文回覆，適度使用 emoji。`
-
 const buyerOrderSpecialistInstruction = `你是買家訂單查詢助手。依 request 使用 get_my_orders 查訂單、get_buyer_order_detail 查單筆詳情，不需要確認。使用繁體中文回覆，適度使用 emoji。`
 
 const buyerTrackingSpecialistInstruction = `你是買家包裹追蹤助手。收到訊息後直接使用 track_my_package 工具查詢配送中包裹的物流狀態，不需要確認。使用繁體中文回覆，適度使用 emoji。`
-
-const buyerSeasonalSpecialistInstruction = `你是當季水果推薦助手。收到訊息後直接使用 recommend_seasonal_fruits 工具查詢平台上架的水果商品，並整理成吸引人的推薦文案（含名稱、價格）。使用繁體中文回覆，適度使用 emoji。`
 
 const buyerSellerMatchSpecialistInstruction = `你是幫買家找供應商的採購助手。讀買家描述的需求，判斷分類（category）、關鍵字（keywords）、地區（region），呼叫 search_candidate_sellers 查詢候選廠商。
 若買家的描述完全無法判斷分類或關鍵字，直接反問「想找哪一類商品？」，不要用空條件查詢。
@@ -67,15 +63,6 @@ func sellerSpecialistSpecs() []specialistSpec {
 				return []adktool.Tool{NewQueryPaymentSummaryTool(d)}
 			},
 		},
-		{
-			Key: "price", Name: "price_specialist",
-			Description: "查詢農產品市場行情並給定價建議",
-			Instruction: priceSpecialistInstruction,
-			ButtonKey:   "price", Temperature: 0.5,
-			buildTools: func(d *ToolDeps) []adktool.Tool {
-				return []adktool.Tool{NewGetSeasonalPriceSuggestionTool(d)}
-			},
-		},
 	}
 }
 
@@ -97,15 +84,6 @@ func buyerSpecialistSpecs() []specialistSpec {
 			ButtonKey:   "tracking", Temperature: 0.3,
 			buildTools: func(d *ToolDeps) []adktool.Tool {
 				return []adktool.Tool{NewTrackMyPackageTool(d)}
-			},
-		},
-		{
-			Key: "seasonal", Name: "buyer_seasonal_specialist",
-			Description: "推薦平台當季水果商品（含名稱、價格）",
-			Instruction: buyerSeasonalSpecialistInstruction,
-			ButtonKey:   "seasonal", Temperature: 0.5,
-			buildTools: func(d *ToolDeps) []adktool.Tool {
-				return []adktool.Tool{NewRecommendSeasonalFruitsTool(d)}
 			},
 		},
 		{

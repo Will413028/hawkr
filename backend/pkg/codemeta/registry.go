@@ -44,122 +44,6 @@ func CommonStatusFromValue(value string) (CommonStatus, bool) {
 	return CommonStatus{}, false
 }
 
-// ===== PricebookOverviewScope =====
-// 官方行情雷達的查詢範圍；Value 沿用官網雷達小寫契約。
-
-type PricebookOverviewScope struct {
-	Code        string
-	Value       string
-	Label       string
-	Description string
-}
-
-var (
-	PricebookOverviewScopeAll       = PricebookOverviewScope{Code: "ALL", Value: "all", Label: "全部品項", Description: "依目前市場範圍列出 active 品項"}
-	PricebookOverviewScopeWatchlist = PricebookOverviewScope{Code: "WATCHLIST", Value: "watchlist", Label: "追蹤清單", Description: "依帳號保存的品項與市場身分列出"}
-)
-
-var AllPricebookOverviewScopes = []PricebookOverviewScope{
-	PricebookOverviewScopeAll,
-	PricebookOverviewScopeWatchlist,
-}
-
-func PricebookOverviewScopeFromCode(code string) (PricebookOverviewScope, bool) {
-	for _, v := range AllPricebookOverviewScopes {
-		if v.Code == code {
-			return v, true
-		}
-	}
-	return PricebookOverviewScope{}, false
-}
-
-func PricebookOverviewScopeFromValue(value string) (PricebookOverviewScope, bool) {
-	for _, v := range AllPricebookOverviewScopes {
-		if v.Value == value {
-			return v, true
-		}
-	}
-	return PricebookOverviewScope{}, false
-}
-
-// ===== PricebookChangeDirection =====
-// 官方行情最近兩個有效成交日的 NUMERIC 漲跌方向；Value 沿用官網契約。
-
-type PricebookChangeDirection struct {
-	Code        string
-	Value       string
-	Label       string
-	Description string
-}
-
-var (
-	PricebookChangeDirectionUp      = PricebookChangeDirection{Code: "UP", Value: "up", Label: "上漲", Description: "本期成交均價高於前期"}
-	PricebookChangeDirectionDown    = PricebookChangeDirection{Code: "DOWN", Value: "down", Label: "下跌", Description: "本期成交均價低於前期"}
-	PricebookChangeDirectionFlat    = PricebookChangeDirection{Code: "FLAT", Value: "flat", Label: "持平", Description: "本期與前期成交均價相同"}
-	PricebookChangeDirectionUnknown = PricebookChangeDirection{Code: "UNKNOWN", Value: "unknown", Label: "無法比較", Description: "尚無兩個有效成交日可比較"}
-)
-
-var AllPricebookChangeDirections = []PricebookChangeDirection{
-	PricebookChangeDirectionUp,
-	PricebookChangeDirectionDown,
-	PricebookChangeDirectionFlat,
-	PricebookChangeDirectionUnknown,
-}
-
-func PricebookChangeDirectionFromCode(code string) (PricebookChangeDirection, bool) {
-	for _, v := range AllPricebookChangeDirections {
-		if v.Code == code {
-			return v, true
-		}
-	}
-	return PricebookChangeDirection{}, false
-}
-
-func PricebookChangeDirectionFromValue(value string) (PricebookChangeDirection, bool) {
-	for _, v := range AllPricebookChangeDirections {
-		if v.Value == value {
-			return v, true
-		}
-	}
-	return PricebookChangeDirection{}, false
-}
-
-// ===== PricebookChangeBasis =====
-// 官方行情漲跌比較的期間定義；不以休市日前一個日曆日補值。
-
-type PricebookChangeBasis struct {
-	Code        string
-	Value       string
-	Label       string
-	Description string
-}
-
-var (
-	PricebookChangeBasisLatestVsPreviousObservedTradeDate = PricebookChangeBasis{Code: "LATEST_VS_PREVIOUS_OBSERVED_TRADE_DATE", Value: "latest_vs_previous_observed_trade_date", Label: "最近兩個有效成交日", Description: "最新有效成交日與前一有效成交日的價格差異"}
-)
-
-var AllPricebookChangeBasiss = []PricebookChangeBasis{
-	PricebookChangeBasisLatestVsPreviousObservedTradeDate,
-}
-
-func PricebookChangeBasisFromCode(code string) (PricebookChangeBasis, bool) {
-	for _, v := range AllPricebookChangeBasiss {
-		if v.Code == code {
-			return v, true
-		}
-	}
-	return PricebookChangeBasis{}, false
-}
-
-func PricebookChangeBasisFromValue(value string) (PricebookChangeBasis, bool) {
-	for _, v := range AllPricebookChangeBasiss {
-		if v.Value == value {
-			return v, true
-		}
-	}
-	return PricebookChangeBasis{}, false
-}
-
 // ===== LogisticsReceivableStatus =====
 // 賣家物流應收的生命週期（承 70 §3.2）。
 
@@ -628,7 +512,7 @@ var (
 	ProcurementErrorReasonRfqCheckoutAlreadyActive    = ProcurementErrorReason{Code: "RFQ_CHECKOUT_ALREADY_ACTIVE", Value: "RFQ_CHECKOUT_ALREADY_ACTIVE", Label: "已有進行中的成交", Description: "409。同一 request 已有 ACTIVE 的 acceptance。回既有 orderNo 讓買家去付款，**不是**叫他重新接受（v6.0 Part III §13.1，#2538）"}
 	ProcurementErrorReasonRfqAlreadyAwarded           = ProcurementErrorReason{Code: "RFQ_ALREADY_AWARDED", Value: "RFQ_ALREADY_AWARDED", Label: "本詢價已成交", Description: "409。同一 request 已有 payment-finalized 的成交。這是真正的終局封鎖，與 RFQ_CHECKOUT_ALREADY_ACTIVE 的差別是後者仍可付款、本碼不可（v6.0 Part III §13.1，#2538）"}
 	ProcurementErrorReasonQuoteAmountInconsistent     = ProcurementErrorReason{Code: "QUOTE_AMOUNT_INCONSISTENT", Value: "QUOTE_AMOUNT_INCONSISTENT", Label: "報價金額不一致", Description: "422。totalAmount ≠ goodsAmount + shippingAmount + taxAmount，或金額／幣別無法 canonicalize。零 side effect，不建立版本列（#2538）"}
-	ProcurementErrorReasonQuoteQualityRequired        = ProcurementErrorReason{Code: "QUOTE_QUALITY_REQUIRED", Value: "QUOTE_QUALITY_REQUIRED", Label: "未填實際品相", Description: "422。正式回價未填 offeredQuality 的等級或驗收說明。⛔ 平台、LLM 或 Pricebook 不得代填——未填就不得成為買家可接受的版本（v6.0 V.7.8，#2538）"}
+	ProcurementErrorReasonQuoteQualityRequired        = ProcurementErrorReason{Code: "QUOTE_QUALITY_REQUIRED", Value: "QUOTE_QUALITY_REQUIRED", Label: "未填實際品相", Description: "422。正式回價未填 offeredQuality 的等級或驗收說明。⛔ 平台或 LLM 不得代填——未填就不得成為買家可接受的版本（v6.0 V.7.8，#2538）"}
 )
 
 var AllProcurementErrorReasons = []ProcurementErrorReason{

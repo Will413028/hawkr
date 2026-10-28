@@ -88,3 +88,7 @@ A3 把 buyer、seller 搬進單體，入口在單體（A2），gateway 只剩還
 
 - 「宣告＝掛載」的原則不變，但不再限於 `SellerAppService`：資源被買家與店家共用的模組（A7 的 `SocialAppService`）在自己的方法宣告「以店家身分動作時需要的賣家能力」（`seller.Cap*`），或明列豁免與理由。由擁有資料的模組先依資源歸屬推導這次是不是店家身分，是才向 seller 公開 API 檢查能力（`seller.ActingStore` 或 `CapabilitiesOf`），不是則不查；handler 仍不自己檢查。啟動時的雙向對照照舊，各 service 各一張宣告表。
 - 停權時的分類（D3）：新增類能力（`CapMarketing`）被停權擋下，收縮類能力（`CapContentContract`）與收縮需要的讀取放行；被拒的回應照舊（`permission_denied`＋`SELLER_SUSPENDED`）。
+
+## 修訂：pricebook 刪除（2026-10-28，ADR `2026-10-27-general-ecommerce-scope-cut` D1；計畫 `plans/2026-10-27-ecommerce-scope-cut.md` 步驟 6）
+
+脈絡裡列的「帶營業類宣告的 gateway 路由」不再包含 pricebook：那些路由已刪除。

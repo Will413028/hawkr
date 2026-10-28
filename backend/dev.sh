@@ -12,7 +12,7 @@ COMPOSE="docker compose -f $COMPOSE_FILE"
 INFRA_SERVICES=(postgres redis rabbitmq otel-collector)
 
 # Go 服務（Air hot-reload，改完自動生效）
-GO_SERVICES=(gateway social-service ai-service im-service review-service crm-service notification-service pricebook-service invoice-service)
+GO_SERVICES=(gateway social-service ai-service im-service review-service crm-service notification-service invoice-service)
 
 # Java 服務（需 rebuild image 才能更新）
 JAVA_SERVICES=(payment-service media-service product-service order-service cart-service coupon-service shipping-service aftersales-service payuni-webhook-service product-import-service)
@@ -77,10 +77,9 @@ air_running_stale_binary() {
 #
 # 為何需要：scripts/init-databases.sh 是資料庫清單的唯一真實來源，但它掛在
 # postgres 的 /docker-entrypoint-initdb.d/ 下，**只有在 data volume 初次建立那一次**
-# 會被執行。之後新增的服務（pricebook 是第一個踩到的：清單裡有 hawkr_pricebook，
-# 但所有既存開發機的 volume 都早於它建立）在既存開發機上永遠拿不到自己的 DB，
-# 服務啟動時直接 `database "..." does not exist` 死在 Fx。這不是 pricebook 專屬問題，
-# 是「volume 已存在 + 之後才加服務」這整類的結構性缺口，所以補在 up 的共用路徑上。
+# 會被執行。之後新增的服務在既存開發機上永遠拿不到自己的 DB（所有既存開發機的 volume
+# 都早於它建立），服務啟動時直接 `database "..." does not exist` 死在 Fx。
+# 這是「volume 已存在 + 之後才加服務」這整類的結構性缺口，所以補在 up 的共用路徑上。
 #
 # 直接在容器內重跑同一份腳本而不是在 dev.sh 複製一份清單：清單留在單一位置，
 # 不會有 dev.sh 與 init-databases.sh 各自漂移的第二份真實來源。該腳本本身以
@@ -628,15 +627,11 @@ cmd_status() {
 #     的方式；就地 apply 需要幫已污染的歷史狀態猜 baseline，等於把污染攤平成「已驗證」。
 #   - Java 服務：Flyway 於服務啟動時自動套用，seed 不代勞、不重放。
 # 全程 fail-loud（無 `|| true` / 錯誤吞噬）：任何一步失敗立即中止並印出真實錯誤。
-#   - pricebook-service（#2034）：只建 schema，沒有 fixture。行情／休市／作物分類全部
-#     由 internal/app/cron 的每日排程自農業部 OpenData 拉取寫入（見該服務 cron/di.go），
-#     沒有任何「平台自己造」的種子資料可灌；本地要有資料就手動觸發匯入，不是 seed 的事。
-GO_SEED_SERVICES=(notification-service pricebook-service ai-service crm-service im-service review-service social-service invoice-service)
+GO_SEED_SERVICES=(notification-service ai-service crm-service im-service review-service social-service invoice-service)
 
 go_seed_db_for() {
   case "$1" in
     notification-service) echo "hawkr_notification" ;;
-    pricebook-service)    echo "hawkr_pricebook" ;;
     ai-service)           echo "hawkr_ai" ;;
     crm-service)          echo "hawkr_crm" ;;
     im-service)           echo "hawkr_im" ;;
@@ -791,7 +786,7 @@ cmd_help() {
 
     Go 服務（改 code 自動生效，無需任何操作）：
       gateway, seller, social, crm,
-      ai, im, review, notification, pricebook
+      ai, im, review, notification
 
     單體（content 等已搬進的模組，不在 compose 裡）：
       在本機另外跑 make infra-up、make migrate、make serve（:8080），

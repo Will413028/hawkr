@@ -8,8 +8,8 @@ export const metadata = {
 };
 
 /**
- * 需要一個真實的 request_id：demo 的買家那半吃這個帳號自己的 snapshot 與
- * Pricebook 行情，沒有 id 就沒有東西可以載。id 在採購助手對話的網址上。
+ * 需要一個真實的 request_id：demo 的買家那半吃這個帳號自己的 snapshot，
+ * 沒有 id 就沒有東西可以載。id 在採購助手對話的網址上。
  *
  * 路由登記在 `tests/e2e/public-static-routes.spec.ts` 的公開靜態清冊裡
  * （2026-09-07 `bbfe47ec`）。它需要買家 session 才有內容，匿名進來只會看到

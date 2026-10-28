@@ -23,39 +23,6 @@ manually. Re-check the relevant entry whenever a patched dependency is bumped
 
 ---
 
-## `@vis.gl__react-maplibre@8.1.2.patch` — async container lifecycle guard
-
-- **Files patched**: `src/components/map.tsx`, `dist/components/map.js`, and
-  `dist/index.cjs`.
-- **What it does**: snapshots and validates the map container after the
-  asynchronous `mapLib` resolution, before calling `Maplibre.reuse` or the
-  constructor. During a rapid React 19 unmount, the DOM ref can already be
-  cleared while the passive-effect cleanup has not yet flipped `isMounted`;
-  passing that null ref to MapLibre otherwise logs `Invalid type: 'container'
-  must be a String or HTMLElement.`
-- **Upstream**: `visgl/react-map-gl` issue **#1960** tracks this exact
-  `Invalid type: 'container'` async ref-cleanup race and remains open. Issue
-  **#2584** is a related React 19 / Next.js 16 navigation lifecycle race.
-  Version `8.1.2` does not guard the container after its async boundary.
-- **Installed version**: `@vis.gl/react-maplibre 8.1.2`, pulled transitively by
-  `react-map-gl 8.1.2`.
-- **Redemption condition**: a released `react-map-gl` version snapshots or
-  validates `containerRef.current` after async module resolution, before both
-  reuse and construction.
-- **How to check**: 讀目標版本的 `src/components/map.tsx`（`rg -n 'containerRef.current' node_modules/@vis.gl/react-maplibre/src/components/map.tsx`），
-  確認 `Promise.resolve(mapLib ...).then(...)` 內，在 `Maplibre.reuse` 與 `new Maplibre` 之前已檢查
-  `containerRef.current`。`website/tests/price-topography-contract.test.ts` 會斷言 patch 檔與
-  `patchedDependencies` 的登記，拿掉 patch 時要同步改它。
-  行為面：未確認。`tests/e2e/insights-optional-market.spec.ts` 沒有收集 `console.error`／`pageerror`，
-  也沒有快速切換 map 與 overview 的情境；缺的是這個 E2E。退場前先補一個
-  （切換後斷言沒有 `Invalid type: 'container'` 的 console error），並在有 patch 與無 patch
-  兩種狀態下各跑一次，確認它能抓到問題。
-- **Redemption action**: upgrade `react-map-gl` → remove this patch and its
-  `patchedDependencies` entry → install with a frozen lockfile (workspace root) → run the
-  structural, browser, typecheck, and production-build gates.
-
----
-
 ## `@opennextjs__cloudflare.patch` — hunk A: queue.js treat-as-success
 
 - **File patched**: `dist/api/durable-objects/queue.js`

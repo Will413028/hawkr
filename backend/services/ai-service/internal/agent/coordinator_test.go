@@ -13,11 +13,11 @@ func TestCoordinatorInstruction_KeyPhrases(t *testing.T) {
 		phrases []string
 	}{
 		{"seller", sellerCoordinatorInstruction, []string{
-			"order_specialist", "inventory_specialist", "payment_specialist", "price_specialist",
+			"order_specialist", "inventory_specialist", "payment_specialist",
 			"依序呼叫", "退款", "禁止自行編造",
 		}},
 		{"buyer", buyerCoordinatorInstruction, []string{
-			"buyer_order_specialist", "buyer_tracking_specialist", "buyer_seasonal_specialist",
+			"buyer_order_specialist", "buyer_tracking_specialist",
 			"依序呼叫", "禁止自行編造", "轉接真人",
 		}},
 	}

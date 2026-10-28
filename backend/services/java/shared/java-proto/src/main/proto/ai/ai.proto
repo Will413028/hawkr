@@ -201,7 +201,6 @@ service AIAssistantService {
     rpc SellerOrders(AssistantRequest) returns (stream StreamEvent);
     rpc SellerInventory(AssistantRequest) returns (stream StreamEvent);
     rpc SellerPayment(AssistantRequest) returns (stream StreamEvent);
-    rpc SellerPrice(AssistantRequest) returns (stream StreamEvent);
     rpc SellerProductListingChat(AssistantRequest) returns (stream StreamEvent);
     rpc SellerProductAutofill(SellerProductAutofillRequest) returns (SellerProductAutofillResponse);
     rpc SellerLatestSession(LatestSessionRequest) returns (LatestSessionResponse);
@@ -210,7 +209,6 @@ service AIAssistantService {
     rpc BuyerOrders(AssistantRequest) returns (stream StreamEvent);
     rpc BuyerTracking(AssistantRequest) returns (stream StreamEvent);
     rpc BuyerReturnPolicy(AssistantRequest) returns (stream StreamEvent);
-    rpc BuyerSeasonal(AssistantRequest) returns (stream StreamEvent);
     rpc BuyerSellerMatch(AssistantRequest) returns (stream StreamEvent);
     rpc BuyerChat(AssistantRequest) returns (stream StreamEvent);
     rpc BuyerLatestSession(LatestSessionRequest) returns (LatestSessionResponse);

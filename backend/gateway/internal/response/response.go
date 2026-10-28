@@ -25,8 +25,7 @@ import (
 )
 
 // Envelope 是 pkg/envelope.Envelope 的型別別名（非結構相同的獨立型別）：
-// gateway 既有的 response.Envelope{...} 字面值建構（如 proxy/reverse_proxy.go、
-// handler/pricebook.go）與 swag `@Success 200 {object} response.Envelope`
+// gateway 既有的 response.Envelope{...} 字面值建構（如 proxy/reverse_proxy.go）與 swag `@Success 200 {object} response.Envelope`
 // 標註無需改動即可繼續編譯／解析。
 type Envelope = envelope.Envelope
 
@@ -341,8 +340,7 @@ func TooManyRequests(c *gin.Context, message string) {
 // 比原本的 no-cache（允許寫入、只要求重新驗證）強一級（#2447 BE-01A）。
 //
 // 這是 AI／採購端點 Cache-Control 的唯一來源：middleware.PrivateNoStore 與兩處
-// SSE header 都引用這個常數，不各自寫字面值。pricebook 的 `private, max-age=N`
-// + ETag/304 與 seller_city_summary 的 `public, max-age=300` 是刻意不同的快取
+// SSE header 都引用這個常數，不各自寫字面值。seller_city_summary 的 `public, max-age=300` 是刻意不同的快取
 // 政策（可共享的公開資料），不要合併過來。判準見 API 設計規範「回應快取政策」。
 const CacheControlPrivateNoStore = "private, no-store"
 

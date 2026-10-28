@@ -163,9 +163,8 @@ export interface ProcurementSlots {
 	deliveryCity?: string;
 	deliveryDate?: string;
 	exactMatchRequired?: boolean;
-	/** 品項的解析結果——買家原話（item）被判定成 Pricebook 分類體系裡的哪一層。
-	 *  它決定報價的價格基準（同一大類內品種實測差 2.96 倍），跟 item 原話同一個
-	 *  revision，所以住在 slots 裡而不是另一個頂層欄位。尚未解析時不帶。 */
+	/** 品項的解析結果：買家原話（item）對到平台分類樹的哪個分類，或由買家自行描述。
+	 *  跟 item 原話同一個 revision，所以住在 slots 裡而不是另一個頂層欄位。尚未解析時不帶。 */
 	itemResolution?: ProcurementItemResolution;
 }
 
@@ -215,8 +214,7 @@ export interface ProcurementCandidate {
 	// 「一筆都沒有」的情況下正常運作（見 candidate-grouping.ts 的 canGroupBySeller）。
 	//
 	// 刻意沒有商品層欄位（圖片／標價）：候選的單位是**收件人**不是品項，EXTERNAL lane
-	// 也沒有平台商品。價格由 Pricebook 對該品項的參考價區間承接（#2403），不是商品標價
-	// ——設計書 57 §1.1-2 只認四種價格事實，商品標價不在其中。
+	// 也沒有平台商品。價格只看供應商報的價，不是商品標價。
 	//
 	// ⚠️ 欄名是 storeId 不是 sellerId：這個值是 store-stint surrogate（`sellers.store_id`），
 	//    DB／proto／對外 JSON 三層同名。B-246 內文寫的 `sellerId` 已被後端 PR #2702 改掉。

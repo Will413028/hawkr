@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/ai-service/internal/cache"
 	"github.com/Will413028/hawkr/ai-service/internal/usecase"
 	"github.com/Will413028/hawkr/go-pkg/identity"
-	pkglogger "github.com/Will413028/hawkr/go-pkg/logger"
 	"go.uber.org/zap"
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/tool"
@@ -124,23 +123,6 @@ type PaymentSummaryOutput struct {
 	TotalAmount     int64           `json:"total_amount"`
 }
 
-// SeasonalPriceInput 農產品行情
-type SeasonalPriceInput struct {
-	ProductName string `json:"product_name,omitempty" jsonschema:"指定查詢的農產品名稱，不填則自動比對賣家所有商品"`
-}
-
-// CropResult 單一品項行情
-type CropResult struct {
-	CropName string                  `json:"crop_name"`
-	Error    string                  `json:"error,omitempty"`
-	Prices   []usecase.ObservedPrice `json:"prices,omitempty"`
-}
-
-// SeasonalPriceOutput 農產品行情結果
-type SeasonalPriceOutput struct {
-	Crops []CropResult `json:"crops"`
-}
-
 // BuyerOrderQueryInput 買家訂單查詢
 type BuyerOrderQueryInput struct {
 	DateRange string `json:"date_range" jsonschema:"日期範圍：today, last_7_days, all"`
@@ -170,7 +152,6 @@ type BuyerOrderQueryOutput struct {
 type ToolDeps struct {
 	OrderClient           usecase.OrderClient
 	ProductClient         usecase.ProductClient
-	PricebookClient       usecase.PricebookClient
 	CategoryIndex         *cache.CategoryIndex
 	CandidateLeadSearcher usecase.CandidateLeadSearcher
 }
@@ -368,53 +349,6 @@ func NewQueryPaymentSummaryTool(deps *ToolDeps) tool.Tool {
 	return t
 }
 
-// NewGetSeasonalPriceSuggestionTool 建立農產品行情 tool
-func NewGetSeasonalPriceSuggestionTool(deps *ToolDeps) tool.Tool {
-	t, err := functiontool.New(functiontool.Config{
-		Name:        "get_seasonal_price_suggestion",
-		Description: "查詢農委會公開市場的當季農產品批發行情，結合賣家商品給出定價建議",
-	}, func(ctx agent.Context, input SeasonalPriceInput) (SeasonalPriceOutput, error) {
-		storeID := getStoreID(ctx)
-		var cropNames []string
-		if input.ProductName != "" {
-			cropNames = []string{input.ProductName}
-		} else {
-			products, err := deps.ProductClient.ListSellerProducts(ctx, storeID, 1, 50)
-			if err != nil {
-				return SeasonalPriceOutput{}, fmt.Errorf("查詢賣家商品失敗: %w", err)
-			}
-			for _, p := range products {
-				cropNames = append(cropNames, p.Name)
-			}
-		}
-		if len(cropNames) == 0 {
-			return SeasonalPriceOutput{Crops: []CropResult{{CropName: "", Error: "目前沒有上架商品"}}}, nil
-		}
-
-		results := make([]CropResult, 0, len(cropNames))
-		for _, name := range cropNames {
-			observations, err := deps.PricebookClient.GetObservedPrice(ctx, name)
-			if err != nil {
-				pkglogger.Warn(ctx, "[Agent] pricebook-service 查詢失敗", zap.String("crop", name), zap.Error(err))
-				results = append(results, CropResult{CropName: name, Error: "行情資料查詢失敗，請稍後再試"})
-				continue
-			}
-			if len(observations) == 0 {
-				// pricebook-service 的 GetObservedPrice 不區分「作物名無法解析」與
-				// 「已解析但近期無成交行情」，兩者皆回空 observations、無 error。
-				results = append(results, CropResult{CropName: name, Error: "查無行情資料，可能是商品名稱無法對應到官方作物名，或近期無成交紀錄"})
-				continue
-			}
-			results = append(results, CropResult{CropName: name, Prices: observations})
-		}
-		return SeasonalPriceOutput{Crops: results}, nil
-	})
-	if err != nil {
-		zap.S().Fatalf("建立 get_seasonal_price_suggestion tool 失敗: %v", err)
-	}
-	return t
-}
-
 // NewGetMyOrdersTool 建立買家訂單查詢 tool
 func NewGetMyOrdersTool(deps *ToolDeps) tool.Tool {
 	t, err := functiontool.New(functiontool.Config{
@@ -545,58 +479,6 @@ func NewTrackMyPackageTool(deps *ToolDeps) tool.Tool {
 	})
 	if err != nil {
 		zap.S().Fatalf("建立 track_my_package tool 失敗: %v", err)
-	}
-	return t
-}
-
-// --- Buyer: 當季水果推薦 ---
-
-// SeasonalRecommendInput 當季水果推薦（無參數）
-type SeasonalRecommendInput struct{}
-
-// SeasonalProduct 推薦商品
-type SeasonalProduct struct {
-	Name     string `json:"name"`
-	ImageURL string `json:"image_url"`
-	PriceMin int64  `json:"price_min"`
-	PriceMax int64  `json:"price_max"`
-}
-
-// SeasonalRecommendOutput 推薦結果
-type SeasonalRecommendOutput struct {
-	Message  string            `json:"message,omitempty"`
-	Products []SeasonalProduct `json:"products"`
-}
-
-// NewRecommendSeasonalFruitsTool 建立當季水果推薦 tool
-func NewRecommendSeasonalFruitsTool(deps *ToolDeps) tool.Tool {
-	t, err := functiontool.New(functiontool.Config{
-		Name:        "recommend_seasonal_fruits",
-		Description: "從平台上架的水果類商品中推薦當季品項，回傳商品名稱與價格",
-	}, func(ctx agent.Context, _ SeasonalRecommendInput) (SeasonalRecommendOutput, error) {
-		// 查詢水果類商品（status=4004 上架中）
-		products, _, err := deps.ProductClient.GetProductList(ctx, 1, 20)
-		if err != nil {
-			return SeasonalRecommendOutput{}, fmt.Errorf("查詢商品失敗: %w", err)
-		}
-		if len(products) == 0 {
-			return SeasonalRecommendOutput{Message: "目前沒有上架的水果商品"}, nil
-		}
-
-		items := make([]SeasonalProduct, 0, len(products))
-		for _, p := range products {
-			items = append(items, SeasonalProduct{
-				Name:     p.Name,
-				ImageURL: p.ImageURL,
-				PriceMin: p.PriceMin,
-				PriceMax: p.PriceMax,
-			})
-		}
-
-		return SeasonalRecommendOutput{Products: items}, nil
-	})
-	if err != nil {
-		zap.S().Fatalf("建立 recommend_seasonal_fruits tool 失敗: %v", err)
 	}
 	return t
 }

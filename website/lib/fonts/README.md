@@ -212,38 +212,3 @@ PY
 ```
 
 Roboto's variable font returns the same file for every weight, so the script keeps just one (`-latin.woff2`).
-
-## Noto Serif TC（seller-center insights 卡片標題，自建子集）
-
-`files/noto-serif-tc-subset.woff2` 是 [google/fonts](https://github.com/google/fonts/tree/main/ofl/notoseriftc) 的 Noto Serif TC Regular 子集，只含 `/seller-center/insights` 頁面 `SectionEyebrow` 標題會用到的字（目前 4 個固定字串，約 20 字），只在該頁使用（見 `lib/fonts/notoSerifTC.ts`），不是全站字體。
-
-### Regenerate the subset
-
-只在 `SectionEyebrow` 多了新的 title 字串（新的固定標題文案，不是動態內容）時才需要重跑。
-
-```bash
-mkdir -p /tmp/noto-serif-tc && curl -fsSL \
-  -o /tmp/noto-serif-tc/source.ttf \
-  "https://raw.githubusercontent.com/google/fonts/main/ofl/notoseriftc/NotoSerifTC-Regular.ttf"
-# 2026-08-05 起這個 URL 404（google/fonts 把靜態字重合併成單一 variable
-# font `NotoSerifTC[wght].ttf`，不再有獨立的 -Regular.ttf）。改抓
-# https://github.com/notofonts/noto-cjk/releases 的 Serif2.003 release
-# asset `15_NotoSerifTC.zip`，解壓後取 `SubsetOTF/TC/NotoSerifTC-Regular.otf`
-# 存到同一個 /tmp/noto-serif-tc/source.ttf 路徑（.otf 也可以，pyftsubset 兩種
-# 都吃）。這個 zip 只有 ~47 MB（vs. 完整 CJK variable font 動輒 200+ MB）。
-
-python3 - <<'PY'
-titles = ["歷史行情", "七日價格區間", "同商品跨市場", "每日狀態與價格區間"]  # 把新標題加進這個列表
-chars = sorted(set("".join(titles)))
-open("/tmp/noto-serif-tc/text.txt", "w", encoding="utf-8").write("".join(chars))
-PY
-
-pyftsubset /tmp/noto-serif-tc/source.ttf \
-  --text-file=/tmp/noto-serif-tc/text.txt \
-  --unicodes="U+0020-007E,U+3000-303F,U+FF00-FFEF" \
-  --layout-features='*' --no-hinting --desubroutinize \
-  --output-file=lib/fonts/files/noto-serif-tc-subset.woff2 \
-  --flavor=woff2
-```
-
-跟舊版固定 subset 一樣的限制：這是靜態掃描，只覆蓋寫在上面清單裡的固定字串，不會自動涵蓋任何 runtime 內容——但這個字體本來就只設計來渲染固定標題，不會有這個問題。

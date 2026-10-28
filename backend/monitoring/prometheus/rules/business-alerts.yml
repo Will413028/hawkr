@@ -894,7 +894,7 @@ groups:
           channel: business
         annotations:
           summary: "env={{ $labels.env }}：業務碼 {{ $labels.code }} 從 {{ $labels.path }} 逃逸（回應未經 internal/response）"
-          description: "env={{ $labels.env }}：這條路徑的回應不是任何 response 出口寫的（c.JSON／c.Data／c.Render／直呼 pkg/envelope），所以 carrier 沒有機會改寫它 ⇒ **前端很可能收到 code:0 的假成功**。先看 path 找到 handler，確認它怎麼寫回應；已知的合法形狀只有一種：非 JSON 端點（HTML 導回頁、SSE、檔案下載），那些不該有 preserveData 碼掛著。⚠️ 現成的反例在 internal/handler/pricebook.go 的 writeGzippedIfAccepted —— 它自己組 response.Envelope{Code:0} 再用 c.Data 寫出，兩條 ruleguard lint 都不命中。修法是讓那條路徑在寫出前先問 bizcarrier.Emit(c, 0)。⚠️ 不得靠加 lint pattern 宣告這一格已關閉：lint 只縮小這條路、關不掉它（carrier.go 檔頭失效模式 4 有實測反例）。"
+          description: "env={{ $labels.env }}：這條路徑的回應不是任何 response 出口寫的（c.JSON／c.Data／c.Render／直呼 pkg/envelope），所以 carrier 沒有機會改寫它 ⇒ **前端很可能收到 code:0 的假成功**。先看 path 找到 handler，確認它怎麼寫回應；已知的合法形狀只有一種：非 JSON 端點（HTML 導回頁、SSE、檔案下載），那些不該有 preserveData 碼掛著。⚠️ 這類路徑自己組 response.Envelope{Code:0} 再用 c.Data 寫出，兩條 ruleguard lint 都不命中。修法是讓那條路徑在寫出前先問 bizcarrier.Emit(c, 0)。⚠️ 不得靠加 lint pattern 宣告這一格已關閉：lint 只縮小這條路、關不掉它（carrier.go 檔頭失效模式 4 有實測反例）。"
 
       - alert: GatewayBizCodeSwallowedSustained
         expr: sum by (env, code, path) (increase(gateway_bizcode_swallowed_total[1h])) > 0
@@ -905,98 +905,6 @@ groups:
         annotations:
           summary: "env={{ $labels.env }}：{{ $labels.path }} 持續讓業務碼 {{ $labels.code }} 走到成功出口（已被 carrier 改寫）"
           description: "env={{ $labels.env }}：**這不是使用者面的事故** —— carrier 已經把回應改寫成正確的業務碼回應，前端收到的是對的。它是一個**程式碼衛生**訊號：該 handler 拿著非零 code 走到 response.OK/Page/GrpcResult，代表少了 `if resp.GetCode() != 0 { response.Biz(...); return }` 那一段。修法：照 path 找到 handler，補上守門（invoice 三個檔的 71 個呼叫點是現成範例）。⚠️ 這條刻意用 for: 30m 而不是立即告警 —— 一次性的路徑（例如剛上線的新端點）不值得吵醒人，持續出現才代表有人漏寫。⚠️ 若這個數字長期非零而沒人處理，carrier 就從安全網退化成常態依賴，那正是 06 §3.9 外殼 6 的形狀。"
-
-  # ── Pricebook 行情資料完整性（ADR pricebook-ingest-window-resilience-scope D1）──
-  #
-  # D1 原本寫的是「告警 ingest_run 的 Failed/NeedsAttention 狀態」，這裡不那樣做，
-  # 兩個理由：① ingest_run 已被實證會騙人（2026-08-14 記 succeeded、零錯誤訊息，
-  # 而上游 3 個大市場整批空手，見 wiki stale-record-vs-live-state-verification）；
-  # ② 照字面做會天天響——dev 自 2026-08-15 起連續 18 次 NeedsAttention，而永遠亮著
-  # 的告警會在第一週被靜音。
-  #
-  # 🔴 但「資料多舊」也不能單獨拿來告警——這是 2026-09-02 實測校準出來的。MOA 上架
-  # 延遲是長尾的（近 40 天 646 個市場-交易日：42% 當天、28% 落後 1 天、17% 兩天、
-  # 11% 三天，尾巴到 6 天），任一時刻總有一批市場還沒到齊，那是**正常狀態**，而
-  # 分區模型的 pending 狀態正是為了吃它。對「最新資料距今幾天」設門檻，等於對常態
-  # 延遲告警，跟 ① 是同一個病。
-  #
-  # 真正要叫人的是**再也救不回來的缺口**：某一格重試用盡（MaxIngestAttempts=14）
-  # 被標成 abandoned，排程就再也不會撿它，只能人工跑 cmd/pricebook-backfill。
-  # 這正是 D1 的原始關切，而 NeedsAttention 報不出來——
-  # 它報的是長尾（天天有），漏的是永久缺口。
-  # §22：偵測歸 observability，補資料走 cmd/pricebook-backfill（維運）。
-  - name: pricebook-data-integrity-alerts
-    interval: 300s
-    rules:
-      # 健康時恆為 0，所以門檻就是 > 0，不需要猜。for 1h 只為避開部署／scrape 抖動。
-      - alert: PricebookMarketDataGap
-        expr: hawkr_pricebook_market_unrecoverable_gap_days > 0
-        for: 1h
-        labels:
-          severity: warning
-          channel: business
-        annotations:
-          summary: "env={{ $labels.env }}：{{ $labels.market_name }}（{{ $labels.market_code }}）有 {{ $value }} 個交易日的行情永久缺漏"
-          description: "env={{ $labels.env }}：這些交易日的攝取分區已經用盡 MaxIngestAttempts=14 次嘗試被標成 abandoned（終態），每日排程再也不會去撿它們——不處理就是永久空洞，買家找貨與預測對這些日子只能降級。先用農業部 API 確認上游現在有沒有那幾天的資料（curl AgriProductsTransType 帶 MarketCode 與單日區間），有就跑 cmd/pricebook-backfill 補。**上游真的沒出**時這一格永遠補不回來，這條也就永遠不會自己解除——用 `cmd/pricebook-backfill --accept-gap --market <code> --date <YYYY-MM-DD> --by <你> --reason <查證結果>` 把它標成已接受的缺口（該指令會在寫入前重新向 MOA 查一次，查得到就改成正常寫入並拒絕接受，所以不會誤蓋掉真缺口）。⚠️ 這條跟『資料有點舊』不同——還在重試中的格子是 pending，是 MOA 常態長尾，不會觸發這條。"
-
-      # 多個市場同時出現永久缺口 ⇒ 那幾天整條 ingest 線斷過，不是個別市場的上游問題。
-      # 2026-09-02 實測 dev 就有一例：2026-07-24 全部 21 個市場皆缺。
-      - alert: PricebookDataGapFleetWide
-        expr: count(hawkr_pricebook_market_unrecoverable_gap_days > 0) by (env) >= 11
-        for: 1h
-        labels:
-          severity: critical
-          channel: business
-        annotations:
-          summary: "env={{ $labels.env }}：{{ $value }} 個市場同時有永久缺漏，那段期間 ingest 線疑似整條斷過"
-          description: "env={{ $labels.env }}：21 個 active 市場裡有 {{ $value }} 個同時存在已放棄的缺口。個別市場的上游停更不會長這樣——先查 ingest_run 在那段期間有沒有執行紀錄（缺紀錄 ⇒ 排程沒跑／pod 沒起來），再決定 backfill 的區間。"
-
-      # 🔴 取代 PricebookIngestNotWriting（2026-09-03）。舊條件是「距上一次有
-      # inserted/revised 超過 30 小時」，把寫入量當成活性的代理——在 digest-dedupe
-      # 之下那是錯的代理，最近 10 次排程有 4 次 inserted=0 而完全健康，08-29～08-31
-      # 連兩次 0 寫入會讓它誤報約 42 小時。活性、健康、完整度三件事在這裡拆成三條。
-      - alert: PricebookIngestNotRunning
-        expr: hawkr_pricebook_ingest_last_run_age_hours > 30 or hawkr_pricebook_ingest_last_run_age_hours < 0
-        for: 1h
-        labels:
-          severity: warning
-          channel: business
-        annotations:
-          summary: "env={{ $labels.env }}：排程 ingest 已 {{ $value }} 小時沒有啟動過"
-          description: "env={{ $labels.env }}：kind=1 的排程匯入距上一次**啟動**已超過 30 小時（-1 = 從未跑過）；每日排程是 20:00 UTC，正常最多 24 小時。這條只問活性，不問寫了多少——排程跑了但上游沒有新資料是常態，不會觸發它。亮了就去看 CronJob／pod 有沒有起來，而不是先看資料。"
-
-      - alert: PricebookIngestLastRunFailed
-        expr: hawkr_pricebook_ingest_last_run_failed > 0
-        for: 1h
-        labels:
-          severity: warning
-          channel: business
-        annotations:
-          summary: "env={{ $labels.env }}：最近一次排程 ingest 以失敗收場"
-          description: "env={{ $labels.env }}：最新的 kind=1 ingest_run 是 status=3(Failed)，錯誤在該列的 error_message。ingest 是 fail-fast 的，已抓到的段落不回滾、分區狀態由 defer 寫回，所以資料不會半套；但那一輪剩下的市場沒被處理，那些格子留在 pending 等下一輪。連續兩天亮 ⇒ 不是偶發逾時，要查上游或我方。"
-
-      # 早期預警：整條線斷掉時，只靠 abandoned 要 14 天才叫得出人。
-      - alert: PricebookIngestBacklogFleetWide
-        expr: hawkr_pricebook_partition_overdue_markets >= 11
-        for: 2h
-        labels:
-          severity: warning
-          channel: business
-        annotations:
-          summary: "env={{ $labels.env }}：{{ $value }} 個市場的分區已落後 4 天以上還沒補齊"
-          description: "env={{ $labels.env }}：pending 分區 attempt_count >= 4（已超出實測上架延遲長尾，落後 4 天以上實測只佔 3% 且分散）的市場數達到 {{ $value }}。個別市場的上游延遲不會長這樣——同時這麼多市場落後代表抓取整條線有問題。這條刻意早於 PricebookMarketDataGap：後者要 MaxIngestAttempts=14 次嘗試耗盡才亮，等於斷線 14 天後才叫人。"
-
-      # backfill CLI 中斷後那一列永遠停在 status=Running，沒有東西會收尾它。
-      # dev 上 2026-08-05~07 就留了 18 列。純衛生訊號，不緊急。
-      - alert: PricebookIngestRunStuck
-        expr: hawkr_pricebook_ingest_stuck_running_total > 0
-        for: 1h
-        labels:
-          severity: warning
-          channel: business
-        annotations:
-          summary: "env={{ $labels.env }}：有 {{ $value }} 筆 ingest_run 卡在 Running 超過 6 小時"
-          description: "env={{ $labels.env }}：ingest_run 有列停在 status=1(Running) 逾 6 小時。通常是 cmd/pricebook-backfill 被中斷後留下的殘骸——沒有任何程式會收尾它，稽核表會愈積愈髒且讓「這次有沒有在跑」變得難判讀。確認該次匯入確實已結束後用維運 SQL 收掉。"
 
   # ==========================================================================
   # 物流履約（shipping-service）

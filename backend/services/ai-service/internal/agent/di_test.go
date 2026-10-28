@@ -15,8 +15,8 @@ func TestButtonRunnerKeys(t *testing.T) {
 			got["buyer:"+s.Key] = true
 		}
 	}
-	want := []string{"seller:inventory", "seller:payment", "seller:price",
-		"buyer:order", "buyer:tracking", "buyer:seasonal", "buyer:seller_match"}
+	want := []string{"seller:inventory", "seller:payment",
+		"buyer:order", "buyer:tracking", "buyer:seller_match"}
 	if len(got) != len(want) {
 		t.Fatalf("button runner 應有 %d 個，得 %d：%v", len(want), len(got), got)
 	}

@@ -309,6 +309,6 @@ async function route(
  */
 export const config = {
 	matcher: [
-		"/((?!api/|adm/api/|_next/|(?:brand|data|generated|placeholders|templates)/|(?:robots\\.txt|sitemap\\.xml|manifest\\.webmanifest|icon\\.svg)$).*)",
+		"/((?!api/|adm/api/|_next/|(?:brand|placeholders|templates)/|(?:robots\\.txt|sitemap\\.xml|manifest\\.webmanifest|icon\\.svg)$).*)",
 	],
 };

@@ -410,51 +410,6 @@ export const queryKeys = {
 		// 的那些——沒有讀取端的 key 工廠是死碼，會讓下一個人以為對應畫面已經接上了。
 		// S03–S05 落地時各自帶上自己那一支。
 	},
-	// 賣家市場行情查詢（P6+P7）。全體賣家看到同一份品項清單/歷史/預測，內容
-	// 不因人而異，但仍走 identity-scoped key（比照其他 seller.* query）避免
-	// 帳號/角色切換時沿用前一個身分快取——這批端點掛在 /app/sellers/* 認證
-	// 群組下，語意上仍是「登入賣家看到的資料」。
-	pricebook: {
-		categoryResolution: (id: QueryIdentity, categoryId: string) =>
-			[
-				"pricebook",
-				...idPrefix(id),
-				"category-resolution",
-				categoryId,
-			] as const,
-		categoryPriceRollup: (id: QueryIdentity, categoryId: string) =>
-			[
-				"pricebook",
-				...idPrefix(id),
-				"category-price-rollup",
-				categoryId,
-			] as const,
-		overviews: (id: QueryIdentity) =>
-			["pricebook", ...idPrefix(id), "overview"] as const,
-		overview: (id: QueryIdentity, params: Record<string, unknown>) =>
-			["pricebook", ...idPrefix(id), "overview", params] as const,
-		observedPriceHistory: (id: QueryIdentity, selectionKey: string) =>
-			[
-				"pricebook",
-				...idPrefix(id),
-				"observed-price-history",
-				selectionKey,
-			] as const,
-		forecastCurve: (id: QueryIdentity, selectionKey: string) =>
-			["pricebook", ...idPrefix(id), "forecast-curve", selectionKey] as const,
-		spatialSurface: (
-			id: QueryIdentity,
-			spatialSelectionKey: string,
-			horizonDays: number,
-		) =>
-			[
-				"pricebook",
-				...idPrefix(id),
-				"spatial-surface",
-				spatialSelectionKey,
-				horizonDays,
-			] as const,
-	},
 	products: {
 		list: (params?: Record<string, unknown>) =>
 			["products", "list", params ?? {}] as const,

@@ -29,8 +29,6 @@ type Config struct {
 	BuyerServicePort       string `env:"BUYER_SERVICE_GRPC_PORT" default:"9941"`
 	MediaServiceHost       string `env:"MEDIA_SERVICE_HOST" default:"127.0.0.1"`
 	MediaServicePort       string `env:"MEDIA_SERVICE_GRPC_PORT" default:"9937"`
-	PricebookServiceHost   string `env:"PRICEBOOK_SERVICE_HOST" default:"127.0.0.1"`
-	PricebookServicePort   string `env:"PRICEBOOK_SERVICE_GRPC_PORT" default:"10039"`
 
 	// ProcurementSettlementStoreID 是 EXTERNAL lane 的訂單賣方——站外業者不是平台
 	// 賣家，RFQ 訂單的賣方記為平台結算 store（doc 64 §6.4、§6.4.8）。

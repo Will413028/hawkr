@@ -77,7 +77,6 @@ var expectedSellerRoutes = []routeCap{
 	{"POST", "/api/v1/app/sellers/me/assistant/inventory", authz.CapMarketing},
 	{"POST", "/api/v1/app/sellers/me/assistant/orders", authz.CapMarketing},
 	{"POST", "/api/v1/app/sellers/me/assistant/payment", authz.CapMarketing},
-	{"POST", "/api/v1/app/sellers/me/assistant/price", authz.CapMarketing},
 	{"POST", "/api/v1/app/sellers/me/assistant/product-autofill", authz.CapMarketing},
 	{"POST", "/api/v1/app/sellers/me/assistant/product-listing/chat", authz.CapMarketing},
 	{"GET", "/api/v1/app/sellers/me/assistant/sessions/latest", authz.CapMarketing},
@@ -125,17 +124,6 @@ var expectedSellerRoutes = []routeCap{
 	// 非賣家專屬資料，只掛 JWTAuth 不掛 capability——2026-08-27 推翻，改採「其餘
 	// 全鎖含純唯讀查看」原則（46 §3.4 dashboard/CRM 查詢/報表同款裁決）收斂進
 	// CAP_MARKETING（BLOCK-if-suspended，停權賣家不可見）。
-	{"GET", "/api/v1/app/sellers/pricebook/category-price-rollup", authz.CapMarketing},
-	{"GET", "/api/v1/app/sellers/pricebook/category-resolution", authz.CapMarketing},
-	{"GET", "/api/v1/app/sellers/pricebook/crop-catalog/search", authz.CapMarketing},
-	{"GET", "/api/v1/app/sellers/pricebook/forecast-curve", authz.CapMarketing},
-	{"GET", "/api/v1/app/sellers/pricebook/observed-price", authz.CapMarketing},
-	{"GET", "/api/v1/app/sellers/pricebook/overview", authz.CapMarketing},
-	{"POST", "/api/v1/app/sellers/pricebook/watch-targets", authz.CapMarketing},
-	{"DELETE", "/api/v1/app/sellers/pricebook/watch-targets/:watch_id", authz.CapMarketing},
-	{"GET", "/api/v1/app/sellers/pricebook/regional-comparison", authz.CapMarketing},
-	{"GET", "/api/v1/app/sellers/pricebook/spatial-surface", authz.CapMarketing},
-	{"GET", "/api/v1/app/sellers/pricebook/trend-summary", authz.CapMarketing},
 	{"POST", "/api/v1/app/sellers/reviews/:id/reply", authz.CapMarketing},
 	{"POST", "/api/v1/app/shipments/:order_no/call_tcat", authz.CapOrderFulfill},
 	{"POST", "/api/v1/app/shipments/:order_no/confirm", authz.CapOrderFulfill},

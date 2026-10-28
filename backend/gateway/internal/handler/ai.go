@@ -667,36 +667,6 @@ func (h *Holder) ProxySellerPaymentSSE(c *gin.Context) {
 	})
 }
 
-// ProxySellerPriceSSE proxies the seller seasonal price query to ai-service.
-//
-// @Summary      賣家 AI 小幫手 — 農產品行情（SSE）
-// @Description  確定性呼叫農產品行情工具，查詢市場行情與定價建議。
-// @Tags         AI
-// @Accept       json
-// @Produce      text/event-stream
-// @Security     BearerAuth
-// @Param        request  body  SellerAssistantSSERequest  true  "查詢請求"
-// @Success      200  {string}  string  "SSE stream"
-// @Failure      401  {object}  object{code=int,message=string}
-// @Failure      403  {object}  object{code=int,message=string}
-// @Failure      502  {object}  object{code=int,message=string}
-// @Router       /app/sellers/me/assistant/price [post]
-func (h *Holder) ProxySellerPriceSSE(c *gin.Context) {
-	var req assistantStreamRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, err.Error())
-		return
-	}
-	storeID, ok := h.resolveStoreID(c)
-	if !ok {
-		return
-	}
-	pbReq := req.toProto()
-	proxy.ServeAIAssistantStream(c, req.SessionID, func(ctx context.Context) (grpcclient.AssistantStream, error) {
-		return h.AIAssistant.SellerPrice(grpcclient.WithStoreID(ctx, storeID), pbReq)
-	})
-}
-
 // ProxyBuyerAssistantSSE proxies the buyer SSE chat request to ai-service.
 //
 // @Summary      買家 AI 小幫手 — 自由聊天（SSE）
@@ -809,34 +779,6 @@ func (h *Holder) ProxyBuyerReturnPolicySSE(c *gin.Context) {
 	pbReq := req.toProto()
 	proxy.ServeAIAssistantStream(c, req.SessionID, func(ctx context.Context) (grpcclient.AssistantStream, error) {
 		return h.AIAssistant.BuyerReturnPolicy(grpcclient.WithBuyerID(ctx, buyerID), pbReq)
-	})
-}
-
-// ProxyBuyerSeasonalSSE proxies the seasonal fruit recommendation to ai-service.
-//
-// @Summary      買家 AI 小幫手 — 當季水果推薦（SSE）
-// @Tags         AI
-// @Accept       json
-// @Produce      text/event-stream
-// @Security     BearerAuth
-// @Param        request  body  SellerAssistantSSERequest  true  "查詢請求"
-// @Success      200  {string}  string  "SSE stream"
-// @Failure      401  {object}  object{code=int,message=string}
-// @Failure      502  {object}  object{code=int,message=string}
-// @Router       /app/buyers/me/assistant/seasonal [post]
-func (h *Holder) ProxyBuyerSeasonalSSE(c *gin.Context) {
-	var req assistantStreamRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, err.Error())
-		return
-	}
-	buyerID, ok := h.resolveBuyerID(c)
-	if !ok {
-		return
-	}
-	pbReq := req.toProto()
-	proxy.ServeAIAssistantStream(c, req.SessionID, func(ctx context.Context) (grpcclient.AssistantStream, error) {
-		return h.AIAssistant.BuyerSeasonal(grpcclient.WithBuyerID(ctx, buyerID), pbReq)
 	})
 }
 

@@ -9,7 +9,7 @@
 // 測試從寫下來到現在一次都沒執行過。加上 deploy-k8s.yml 的 `go test ./...` 沒有
 // -v，Go 的 skip 一行都不印，package 照樣顯示 ok，所以沒有人看得出來。
 //
-// 現在改成與 account / buyer / pricebook / crm 相同的 testcontainers harness：
+// 現在改成與 account / buyer / crm 相同的 testcontainers harness：
 // 拿不到 DB 就是紅的，不再有 skip 這個選項。
 package postgres
 

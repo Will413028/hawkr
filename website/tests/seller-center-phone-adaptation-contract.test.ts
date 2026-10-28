@@ -81,14 +81,6 @@ test("shared phone controls stay single-line and meet the touch target", () => {
 	);
 	assert.match(
 		adaptation,
-		/\.seller-price-lookup__workspace-tabs[\s\S]*overflow-x:\s*auto/,
-	);
-	assert.match(
-		adaptation,
-		/\.seller-price-lookup__day-switch[\s\S]*grid-auto-flow:\s*column/,
-	);
-	assert.match(
-		adaptation,
 		/\.seller-import-detail__filter-rail[\s\S]*flex-wrap:\s*nowrap/,
 	);
 	assert.match(

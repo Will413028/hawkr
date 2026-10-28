@@ -73,8 +73,6 @@ export function isNonLocalizedPath(pathname: string): boolean {
  */
 export const PUBLIC_DIRECTORIES = [
 	"brand",
-	"data",
-	"generated",
 	"placeholders",
 	"templates",
 ] as const;

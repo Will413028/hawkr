@@ -116,3 +116,7 @@ vendor portal 讓沒有帳號的供應商從採購詢價（RFQ）的邀請信進
 - 觸發：`GOOGLE_CLIENT_IDS` 要加第二個 client 時，先確認所有 Google 驗證的呼叫方都帶 nonce。
 
 **受邀供應商的使用者類別提前到 8i**：前一個修訂把它排在 A9，但這只是排程，類別與 handler 都在單體內。client 需要在重新整理後讀到 session 的驗證狀態與 nonce，這個讀取是 cookie 認證的，不能放在 `PublicService` 的 GET（第九節）。決策：新增以 cookie 認證的 service（回應一律 `private, no-store`，讀取可以 GET），提供讀取 session 的方法並收下 `VerifySession`；`VendorPortalPublicService` 只留以 secret 為憑證的 Preview 與 Exchange。A9 把 RFQ 路由改成 Connect 時加到這個 service。
+
+## 修訂：pricebook 刪除（2026-10-28，ADR `2026-10-27-general-ecommerce-scope-cut` D1；計畫 `plans/2026-10-27-ecommerce-scope-cut.md` 步驟 6）
+
+邀請信內容那一條提到的「Pricebook 參考區間」不存在：pricebook 已刪除，報價只看供應商報的價，信件與 preview 都沒有參考區間。

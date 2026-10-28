@@ -602,20 +602,6 @@ const (
 	SellerPostReports   = "/posts/:id/reports"
 	SellerMePosts       = "/me/posts"
 
-	// 賣家市場行情查詢（P6+P7，JWT-only，無 capability gate——見該 plan 的
-	// Global Constraints）
-	PricebookCropCatalogSearch   = "/pricebook/crop-catalog/search"
-	PricebookObservedPrice       = "/pricebook/observed-price"
-	PricebookOverview            = "/pricebook/overview"
-	PricebookWatchTargets        = "/pricebook/watch-targets"
-	PricebookWatchTarget         = "/pricebook/watch-targets/:watch_id"
-	PricebookForecastCurve       = "/pricebook/forecast-curve"
-	PricebookTrendSummary        = "/pricebook/trend-summary"
-	PricebookSpatialSurface      = "/pricebook/spatial-surface"
-	PricebookRegionalComparison  = "/pricebook/regional-comparison"
-	PricebookCategoryResolution  = "/pricebook/category-resolution"
-	PricebookCategoryPriceRollup = "/pricebook/category-price-rollup"
-
 	// Service names
 	ServiceProduct    = "product"
 	ServiceOrder      = "order"

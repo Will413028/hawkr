@@ -51,7 +51,7 @@ public enum ProcurementErrorReason implements CodeMeta {
     RFQ_CHECKOUT_ALREADY_ACTIVE("RFQ_CHECKOUT_ALREADY_ACTIVE", "RFQ_CHECKOUT_ALREADY_ACTIVE", "已有進行中的成交", "409。同一 request 已有 ACTIVE 的 acceptance。回既有 orderNo 讓買家去付款，**不是**叫他重新接受（v6.0 Part III §13.1，#2538）"),
     RFQ_ALREADY_AWARDED("RFQ_ALREADY_AWARDED", "RFQ_ALREADY_AWARDED", "本詢價已成交", "409。同一 request 已有 payment-finalized 的成交。這是真正的終局封鎖，與 RFQ_CHECKOUT_ALREADY_ACTIVE 的差別是後者仍可付款、本碼不可（v6.0 Part III §13.1，#2538）"),
     QUOTE_AMOUNT_INCONSISTENT("QUOTE_AMOUNT_INCONSISTENT", "QUOTE_AMOUNT_INCONSISTENT", "報價金額不一致", "422。totalAmount ≠ goodsAmount + shippingAmount + taxAmount，或金額／幣別無法 canonicalize。零 side effect，不建立版本列（#2538）"),
-    QUOTE_QUALITY_REQUIRED("QUOTE_QUALITY_REQUIRED", "QUOTE_QUALITY_REQUIRED", "未填實際品相", "422。正式回價未填 offeredQuality 的等級或驗收說明。⛔ 平台、LLM 或 Pricebook 不得代填——未填就不得成為買家可接受的版本（v6.0 V.7.8，#2538）");
+    QUOTE_QUALITY_REQUIRED("QUOTE_QUALITY_REQUIRED", "QUOTE_QUALITY_REQUIRED", "未填實際品相", "422。正式回價未填 offeredQuality 的等級或驗收說明。⛔ 平台或 LLM 不得代填——未填就不得成為買家可接受的版本（v6.0 V.7.8，#2538）");
 
     private final String code;
     private final String value;

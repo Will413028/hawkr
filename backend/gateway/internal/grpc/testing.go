@@ -12,7 +12,6 @@ import (
 	notificationpb "github.com/Will413028/hawkr/go-pkg/proto/notification"
 	orderpb "github.com/Will413028/hawkr/go-pkg/proto/order"
 	paymentpb "github.com/Will413028/hawkr/go-pkg/proto/payment"
-	pricebookpb "github.com/Will413028/hawkr/go-pkg/proto/pricebook"
 	productpb "github.com/Will413028/hawkr/go-pkg/proto/product"
 	productimportpb "github.com/Will413028/hawkr/go-pkg/proto/product_import"
 	reviewpb "github.com/Will413028/hawkr/go-pkg/proto/review"
@@ -216,11 +215,4 @@ func NewShippingClientForTest(c shippingpb.ShippingServiceClient) *ShippingClien
 // NewProductImportClientForTest creates a ProductImportClient with the given mock proto client.
 func NewProductImportClientForTest(c productimportpb.ProductImportServiceClient) *ProductImportClient {
 	return &ProductImportClient{client: c}
-}
-
-// ==================== Pricebook ====================
-
-// NewPricebookClientForTest creates a PricebookClient with the given mock proto client.
-func NewPricebookClientForTest(c pricebookpb.PricebookServiceClient) *PricebookClient {
-	return &PricebookClient{client: c}
 }

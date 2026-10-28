@@ -18,7 +18,7 @@ import (
 func TestDefaultMessages_SellerKeys(t *testing.T) {
 	// "orders" 已改為直接查詢，seller 端不再需要此 key；
 	// 但 buyer init() 會把 "orders" merge 進來，故此處只驗證賣家 LLM 端點的 keys
-	expected := []string{"inventory", "payment", "price"}
+	expected := []string{"inventory", "payment"}
 	for _, key := range expected {
 		if _, ok := DefaultMessages[key]; !ok {
 			t.Errorf("DefaultMessages missing seller key %q", key)
@@ -28,7 +28,7 @@ func TestDefaultMessages_SellerKeys(t *testing.T) {
 
 func TestDefaultMessages_BuyerKeys(t *testing.T) {
 	// buyer init() 會把 buyerDefaultMessages 合併到 DefaultMessages
-	expected := []string{"orders", "tracking", "seasonal"}
+	expected := []string{"orders", "tracking"}
 	for _, key := range expected {
 		if _, ok := DefaultMessages[key]; !ok {
 			t.Errorf("DefaultMessages missing buyer key %q", key)

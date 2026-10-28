@@ -15,7 +15,6 @@ import (
 	"google.golang.org/adk/v2/session"
 	"google.golang.org/genai"
 
-	"github.com/Will413028/hawkr/ai-service/internal/client/pricebook"
 	"github.com/Will413028/hawkr/ai-service/internal/config"
 	"github.com/Will413028/hawkr/ai-service/internal/llmprovider"
 	"github.com/Will413028/hawkr/ai-service/internal/usecase"
@@ -33,7 +32,6 @@ func TestAllToolsCreation(t *testing.T) {
 		{func() { NewGetOrderDetailTool(deps) }, "get_order_detail"},
 		{func() { NewCheckInventoryShortageTool(deps) }, "check_inventory_shortage"},
 		{func() { NewQueryPaymentSummaryTool(deps) }, "query_payment_summary"},
-		{func() { NewGetSeasonalPriceSuggestionTool(deps) }, "get_seasonal_price_suggestion"},
 
 		{func() { NewSearchCategoryTool(deps) }, "search_category"},
 		{func() { NewUpdateDraftTool(deps) }, "update_draft"},
@@ -41,7 +39,6 @@ func TestAllToolsCreation(t *testing.T) {
 		{func() { NewGetMyOrdersTool(deps) }, "get_my_orders"},
 		{func() { NewGetBuyerOrderDetailTool(deps) }, "get_buyer_order_detail"},
 		{func() { NewTrackMyPackageTool(deps) }, "track_my_package"},
-		{func() { NewRecommendSeasonalFruitsTool(deps) }, "recommend_seasonal_fruits"},
 		{func() { NewSearchCandidateSellersTool(deps) }, "search_candidate_sellers"},
 	}
 
@@ -243,11 +240,7 @@ func TestAllAgentsCreation(t *testing.T) {
 		t.Skip("GEMINI_API_KEY not set, skipping agent creation test")
 	}
 
-	pricebookC, err := pricebook.NewPricebookClient(cfg)
-	if err != nil {
-		t.Fatalf("NewPricebookClient failed: %v", err)
-	}
-	deps := &ToolDeps{PricebookClient: pricebookC}
+	deps := &ToolDeps{}
 
 	agents, err := NewAgents(llmprovider.NewAssistant(cfg, zap.NewNop()), deps)
 	if err != nil {

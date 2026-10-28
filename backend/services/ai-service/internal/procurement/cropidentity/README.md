@@ -21,7 +21,7 @@ understandQuery（原文 → 變體）
     下鑽到模型建議的 L2 時才展開（expandGroup：一個子類直接問、多個走確定性比對→LLM ITEM）
 ```
 
-沒有 pricebook：建構子只收分類樹與模型，`no_pricebook_test.go` 守解析路徑不得 import pricebook 的 client 或型別。
+建構子只收分類樹與模型。
 `Resolve` 只有兩種結果：`NeedsDisambiguation`（要買家挑分類）與 `Unavailable`（沒有更多要問的：分類已確認，
 `Selection.CategoryID` 非空；或查無，`Selection` 沒有分類 → 買家自行描述品項）。分類已確認時 gate 直接通過並產生 `CATEGORY_CONFIRMED` 解析結果，不出卡片。
 

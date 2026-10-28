@@ -107,8 +107,6 @@ services:
       PRODUCT_IMPORT_SERVICE_GRPC_PORT: 9961
       NOTIFICATION_SERVICE_HOST: notification-service
       NOTIFICATION_SERVICE_GRPC_PORT: 10037
-      PRICEBOOK_SERVICE_HOST: pricebook-service
-      PRICEBOOK_SERVICE_GRPC_PORT: 10039
       # invoice-service（58 號設計書 §12.1.2 F）。三個 INVOICE_SERVICE_* 必須一起加：
       # 只漏第三個 ⇒ 發票查得到、PDF 下載不了，其餘全正常。
       INVOICE_SERVICE_HOST: invoice-service
@@ -1614,98 +1612,6 @@ services:
 
     healthcheck:
       test: ["CMD-SHELL", "cd /app/services/notification-service && go run ./cmd/grpc-healthcheck -addr 127.0.0.1:10037"]
-      interval: 60s
-      timeout: 5s
-      retries: 3
-      start_period: 60s
-    networks:
-      - hawkr-network
-
-  # ==========================================
-  # Pricebook Service (gRPC 10039；final architecture，無 HTTP management port)
-  # ==========================================
-  # 農產行情資料層：自農業部 OpenData 拉取行情與休市日曆寫入自己的 DB。
-  # 對內提供 gRPC（行情查詢與管理 RPC，供 gateway/ai-service 呼叫）。
-
-  pricebook-service:
-    build:
-      context: .
-      dockerfile: services/pricebook-service/Dockerfile
-      target: dev
-      args:
-        GO_VERSION: ${GO_VERSION:?用 ./dev.sh 執行（從 .go-version 帶入）}
-    image: hawkr/pricebook-service:latest
-    container_name: pricebook-service
-    restart: unless-stopped
-    ports:
-      - "10039:10039"
-    volumes:
-      - ./services/pricebook-service:/app/services/pricebook-service
-      - ./pkg:/app/pkg
-      - go-build-cache:/root/.cache/go-build
-      - go-mod-cache:/go/pkg/mod
-    environment:
-      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
-      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
-      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
-      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
-      TZ: UTC
-      GRPC_PORT: 10039
-
-      # Downstream gRPC dependencies (key names mirror k8s/values/pricebook-service.yaml + config.go)
-      PRODUCT_SERVICE_HOST: product-service
-      PRODUCT_SERVICE_GRPC_PORT: "9913"
-
-      # 種子表路徑（internal/config.MappingSeedCSVPath 等，Task 4）。
-      # ⚠️ 值刻意跟 k8s/values/pricebook-service.yaml 不同（那邊是
-      # "reference/..."）：dev container 的 WORKDIR 是 /app、bind mount 把
-      # 整個 services/pricebook-service（含 reference/）掛在
-      # /app/services/pricebook-service，但 Air 不會 chdir 到該目錄再啟動
-      # binary（air-verse/air util_unix.go StartCommand 沒有設 cmd.Dir，
-      # 進程 cwd 維持在容器啟動時的 /app）——相對路徑若照抄 k8s 的
-      # "reference/..." 會在 /app/reference 找不到檔案，讓 fx 啟動失敗
-      # （provideMappingSeed 是硬錯誤，見 internal/usecase/di.go）。prod
-      # image 因為 Dockerfile 直接把 reference/ COPY 到 /app/reference，
-      # 用短路徑沒問題；dev 這裡改用相對 /app 的完整路徑對齊實際掛載點。
-      MAPPING_SEED_CSV_PATH: services/pricebook-service/reference/product_crop_seed.csv
-      MAPPING_SEED_MANIFEST_PATH: services/pricebook-service/reference/product_crop_seed.manifest.json
-
-      # Database
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: hawkr_pricebook
-      DB_USER: dbadmin
-      DB_PASSWORD: Hawkr2024Admin
-
-      # 農業部 OpenData
-      MOA_API_BASE_URL: https://data.moa.gov.tw/api/v1
-      # 糧價（RicepriceData.aspx）不在 api/v1 之下，是另一棵樹。
-      MOA_OPENDATA_BASE_URL: https://data.moa.gov.tw/Service/OpenData/FromM
-
-      # 推論門檻（internal/config.InferenceConfig，Task 11）。值與 config.go
-      # 的預設相同，跟 k8s/values/pricebook-service.yaml 的 config: 保持一致
-      # （scripts/check-compose-k8s-align.sh 要求 k8s config key ⊆ compose
-      # environment key）。
-      MIN_RIDGE_SAMPLE_COUNT: 100
-      FRESH_WITHIN_HOURS: 36
-      STALE_WITHIN_HOURS: 72
-      GROUP_VOLUME_WINDOW_DAYS: 28
-      OBSERVED_WINDOW_DAYS: 30
-
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
-
-      # Dev Configs
-      NACOS_ENABLED: "false"
-      TRACING_ENABLED: "true"
-      GOPROXY: "https://proxy.golang.org,direct"   # 見檔頭「Go 服務 dev container 契約」：dev 嚴禁 off
-      GONOSUMDB: "*"
-
-      # OpenTelemetry
-      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
-      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
-
-    healthcheck:
-      test: ["CMD-SHELL", "cd /app/services/pricebook-service && go run ./cmd/grpc-healthcheck -addr 127.0.0.1:10039"]
       interval: 60s
       timeout: 5s
       retries: 3

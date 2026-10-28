@@ -384,7 +384,7 @@ func startSchedulers(
 			// 理由不是「方便驗證」，是正確性：行事曆鏡像每日整段覆蓋，而 pod 在
 			// UTC 16:00 之後才第一次啟動的話，鏡像要空到隔天——首次上線那一天尤其。
 			// 而空鏡像 = 零涵蓋 = 那段期間每一筆申訴的 SLA 都退到 14 自然日的硬上限，
-			// **完全靜默**。同形狀見 pricebook 的 forecast job（catchUp 之後才 Start）。
+			// **完全靜默**。catchUp 要在 Start 之前完成。
 			//
 			// 放在自己的 goroutine：RunOnce 會打一次跨服務 RPC（8 s deadline），
 			// 而 OnStart 阻塞超過 fx 的 start timeout 會讓整個服務起不來。

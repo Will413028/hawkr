@@ -29,9 +29,9 @@ func TestNextOccurrence_TargetAlreadyPassedToday_ReturnsTomorrow(t *testing.T) {
 
 func TestNextOccurrence_ExactlyAtTarget_ReturnsTomorrow(t *testing.T) {
 	// now == target instant: !next.After(now) is true (they're equal, not
-	// after), so this must roll to tomorrow — matches all three pre-existing
-	// hand-rolled implementations this type replaces (buyer-service,
-	// seller-service, pricebook-service all use the identical !next.After(now)
+	// after), so this must roll to tomorrow — matches both pre-existing
+	// hand-rolled implementations this type replaces (buyer-service
+	// and seller-service both use the identical !next.After(now)
 	// check), not a behavior this consolidation is free to redefine.
 	now := time.Date(2026, 8, 15, 19, 5, 0, 0, time.UTC)
 	got := NextOccurrence(now, 19, 5)
@@ -120,8 +120,7 @@ func TestDailyScheduler_StopBeforeTargetPreventsRun(t *testing.T) {
 }
 
 // TestDailyScheduler_ConcurrentAsyncStartAndStop_NoDataRace reproduces
-// pricebook-service's forecast job call pattern: a slow startup step runs in
-// its own goroutine before Start is ever called, while Stop can fire
+// a caller pattern where a slow startup step runs in its own goroutine before Start is ever called, while Stop can fire
 // concurrently from a different goroutine (fx's OnStop) — e.g.
 // `go func() { catchUp(ctx); scheduler.Start(ctx) }()` racing an OnStop that
 // calls `scheduler.Stop()` before the goroutine reaches Start. Before the
@@ -138,7 +137,7 @@ func TestDailyScheduler_ConcurrentAsyncStartAndStop_NoDataRace(t *testing.T) {
 
 		startCalled := make(chan struct{})
 		go func() {
-			// Simulate a slow startup step (pricebook's catchUpIfNeeded) that
+			// Simulate a slow startup step (a catch-up step) that
 			// delays the real Start() call, exactly like the production call
 			// site — no synchronization with Stop below is intentional, that
 			// absence is the scenario under test.

@@ -16,7 +16,6 @@ const sellerCoordinatorInstruction = `你是「生鮮賣家小幫手」，服務
 - order_specialist：查訂單清單、單筆訂單詳情
 - inventory_specialist：檢查庫存是否足以滿足未出貨訂單
 - payment_specialist：收款統計與待收款明細
-- price_specialist：農產品市場行情與定價建議
 
 委派規則：
 - 任何需要真實資料的問題，一律呼叫對應專職助手，禁止自行編造數據。
@@ -25,7 +24,6 @@ const sellerCoordinatorInstruction = `你是「生鮮賣家小幫手」，服務
   子問句常以逗號、頓號、問號、「順便」「還有」「另外」「以及」分隔，也可能只是兩個並列的疑問：
   - 「這個月賣了幾單、錢都收到了嗎」→ order_specialist ＋ payment_specialist
   - 「今天要出的貨有哪些，備得齊嗎」→ order_specialist ＋ inventory_specialist（**兩個都要**，不是只查訂單）
-  - 「小黃瓜最近多少錢？我還有多少可以出」→ price_specialist ＋ inventory_specialist
 - 先判斷意圖再呼叫；不確定就請賣家澄清，不要亂猜助手。
 
 一般注意事項：
@@ -41,7 +39,6 @@ const buyerCoordinatorInstruction = `你是「Hawkr 購物小幫手」，服務�
 可委派的專職助手（以工具形式呼叫，request 傳你要它做的事）：
 - buyer_order_specialist：查買家訂單清單、單筆訂單詳情
 - buyer_tracking_specialist：查配送中包裹物流狀態
-- buyer_seasonal_specialist：推薦當季水果商品
 
 委派規則：
 - 需要真實資料一律呼叫對應專職助手，禁止自行編造數據。

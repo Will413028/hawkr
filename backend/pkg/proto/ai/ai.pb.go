@@ -10975,21 +10975,19 @@ const file_ai_ai_proto_rawDesc = "" +
 	"\rUpdateAiQuota\x12\x1e.hawkr.ai.UpdateAiQuotaRequest\x1a\x19.hawkr.ai.AiQuotaResponse\x12J\n" +
 	"\rDeleteAiQuota\x12\x1e.hawkr.ai.DeleteAiQuotaRequest\x1a\x19.hawkr.ai.AiQuotaResponse2x\n" +
 	"\x15RecommendationService\x12_\n" +
-	"\x15PersonalizedRecommend\x12\x1d.hawkr.ai.PersonalizedRequest\x1a'.hawkr.ai.PersonalizedRecommendResponse2\xfd\b\n" +
+	"\x15PersonalizedRecommend\x12\x1d.hawkr.ai.PersonalizedRequest\x1a'.hawkr.ai.PersonalizedRecommendResponse2\xf3\a\n" +
 	"\x12AIAssistantService\x12A\n" +
 	"\n" +
 	"SellerChat\x12\x1a.hawkr.ai.AssistantRequest\x1a\x15.hawkr.ai.StreamEvent0\x01\x12C\n" +
 	"\fSellerOrders\x12\x1a.hawkr.ai.AssistantRequest\x1a\x15.hawkr.ai.StreamEvent0\x01\x12F\n" +
 	"\x0fSellerInventory\x12\x1a.hawkr.ai.AssistantRequest\x1a\x15.hawkr.ai.StreamEvent0\x01\x12D\n" +
-	"\rSellerPayment\x12\x1a.hawkr.ai.AssistantRequest\x1a\x15.hawkr.ai.StreamEvent0\x01\x12B\n" +
-	"\vSellerPrice\x12\x1a.hawkr.ai.AssistantRequest\x1a\x15.hawkr.ai.StreamEvent0\x01\x12O\n" +
+	"\rSellerPayment\x12\x1a.hawkr.ai.AssistantRequest\x1a\x15.hawkr.ai.StreamEvent0\x01\x12O\n" +
 	"\x18SellerProductListingChat\x12\x1a.hawkr.ai.AssistantRequest\x1a\x15.hawkr.ai.StreamEvent0\x01\x12h\n" +
 	"\x15SellerProductAutofill\x12&.hawkr.ai.SellerProductAutofillRequest\x1a'.hawkr.ai.SellerProductAutofillResponse\x12V\n" +
 	"\x13SellerLatestSession\x12\x1e.hawkr.ai.LatestSessionRequest\x1a\x1f.hawkr.ai.LatestSessionResponse\x12B\n" +
 	"\vBuyerOrders\x12\x1a.hawkr.ai.AssistantRequest\x1a\x15.hawkr.ai.StreamEvent0\x01\x12D\n" +
 	"\rBuyerTracking\x12\x1a.hawkr.ai.AssistantRequest\x1a\x15.hawkr.ai.StreamEvent0\x01\x12H\n" +
-	"\x11BuyerReturnPolicy\x12\x1a.hawkr.ai.AssistantRequest\x1a\x15.hawkr.ai.StreamEvent0\x01\x12D\n" +
-	"\rBuyerSeasonal\x12\x1a.hawkr.ai.AssistantRequest\x1a\x15.hawkr.ai.StreamEvent0\x01\x12G\n" +
+	"\x11BuyerReturnPolicy\x12\x1a.hawkr.ai.AssistantRequest\x1a\x15.hawkr.ai.StreamEvent0\x01\x12G\n" +
 	"\x10BuyerSellerMatch\x12\x1a.hawkr.ai.AssistantRequest\x1a\x15.hawkr.ai.StreamEvent0\x01\x12@\n" +
 	"\tBuyerChat\x12\x1a.hawkr.ai.AssistantRequest\x1a\x15.hawkr.ai.StreamEvent0\x01\x12U\n" +
 	"\x12BuyerLatestSession\x12\x1e.hawkr.ai.LatestSessionRequest\x1a\x1f.hawkr.ai.LatestSessionResponse2\x8e\x1b\n" +
@@ -11281,116 +11279,112 @@ var file_ai_ai_proto_depIdxs = []int32{
 	0,   // 92: hawkr.ai.AIAssistantService.SellerOrders:input_type -> hawkr.ai.AssistantRequest
 	0,   // 93: hawkr.ai.AIAssistantService.SellerInventory:input_type -> hawkr.ai.AssistantRequest
 	0,   // 94: hawkr.ai.AIAssistantService.SellerPayment:input_type -> hawkr.ai.AssistantRequest
-	0,   // 95: hawkr.ai.AIAssistantService.SellerPrice:input_type -> hawkr.ai.AssistantRequest
-	0,   // 96: hawkr.ai.AIAssistantService.SellerProductListingChat:input_type -> hawkr.ai.AssistantRequest
-	17,  // 97: hawkr.ai.AIAssistantService.SellerProductAutofill:input_type -> hawkr.ai.SellerProductAutofillRequest
-	11,  // 98: hawkr.ai.AIAssistantService.SellerLatestSession:input_type -> hawkr.ai.LatestSessionRequest
-	0,   // 99: hawkr.ai.AIAssistantService.BuyerOrders:input_type -> hawkr.ai.AssistantRequest
-	0,   // 100: hawkr.ai.AIAssistantService.BuyerTracking:input_type -> hawkr.ai.AssistantRequest
-	0,   // 101: hawkr.ai.AIAssistantService.BuyerReturnPolicy:input_type -> hawkr.ai.AssistantRequest
-	0,   // 102: hawkr.ai.AIAssistantService.BuyerSeasonal:input_type -> hawkr.ai.AssistantRequest
-	0,   // 103: hawkr.ai.AIAssistantService.BuyerSellerMatch:input_type -> hawkr.ai.AssistantRequest
-	0,   // 104: hawkr.ai.AIAssistantService.BuyerChat:input_type -> hawkr.ai.AssistantRequest
-	11,  // 105: hawkr.ai.AIAssistantService.BuyerLatestSession:input_type -> hawkr.ai.LatestSessionRequest
-	52,  // 106: hawkr.ai.AIProcurementService.SubmitTurn:input_type -> hawkr.ai.TurnRequest
-	52,  // 107: hawkr.ai.AIProcurementService.SubmitTurnStream:input_type -> hawkr.ai.TurnRequest
-	58,  // 108: hawkr.ai.AIProcurementService.GetSnapshot:input_type -> hawkr.ai.GetSnapshotRequest
-	97,  // 109: hawkr.ai.AIProcurementService.StartCandidateSearch:input_type -> hawkr.ai.StartCandidateSearchRequest
-	99,  // 110: hawkr.ai.AIProcurementService.GetCandidateSearch:input_type -> hawkr.ai.GetCandidateSearchRequest
-	103, // 111: hawkr.ai.AIProcurementService.ToggleSelection:input_type -> hawkr.ai.ToggleSelectionRequest
-	105, // 112: hawkr.ai.AIProcurementService.SubmitAnswer:input_type -> hawkr.ai.SubmitAnswerRequest
-	106, // 113: hawkr.ai.AIProcurementService.Rewind:input_type -> hawkr.ai.RewindRequest
-	116, // 114: hawkr.ai.AIProcurementService.PreviewRfqPrice:input_type -> hawkr.ai.RfqPricePreviewRequest
-	119, // 115: hawkr.ai.AIProcurementService.ConfirmRfqSnapshot:input_type -> hawkr.ai.RfqConfirmationRequest
-	121, // 116: hawkr.ai.AIProcurementService.PreviewRfqPublication:input_type -> hawkr.ai.RfqPublicationPreviewRequest
-	123, // 117: hawkr.ai.AIProcurementService.ExecuteRfqPublication:input_type -> hawkr.ai.RfqPublicationExecuteRequest
-	125, // 118: hawkr.ai.AIProcurementService.GetRfqPublicationInviteSellerView:input_type -> hawkr.ai.GetRfqPublicationInviteSellerViewRequest
-	107, // 119: hawkr.ai.AIProcurementService.ListConversations:input_type -> hawkr.ai.ListConversationsRequest
-	110, // 120: hawkr.ai.AIProcurementService.GetConversationMessages:input_type -> hawkr.ai.GetConversationMessagesRequest
-	94,  // 121: hawkr.ai.AIProcurementService.GetRuntimeSnapshot:input_type -> hawkr.ai.GetRuntimeSnapshotRequest
-	80,  // 122: hawkr.ai.AIProcurementService.ListSellerPublications:input_type -> hawkr.ai.ListSellerPublicationsRequest
-	84,  // 123: hawkr.ai.AIProcurementService.GetSellerPublication:input_type -> hawkr.ai.GetSellerPublicationRequest
-	72,  // 124: hawkr.ai.AIProcurementService.UpsertSellerResponseDraft:input_type -> hawkr.ai.UpsertSellerResponseDraftRequest
-	74,  // 125: hawkr.ai.AIProcurementService.GetVendorPortalResponseDraft:input_type -> hawkr.ai.GetVendorPortalResponseDraftRequest
-	75,  // 126: hawkr.ai.AIProcurementService.UpsertVendorPortalResponseDraft:input_type -> hawkr.ai.UpsertVendorPortalResponseDraftRequest
-	77,  // 127: hawkr.ai.AIProcurementService.SubmitVendorPortalResponse:input_type -> hawkr.ai.SubmitVendorPortalResponseRequest
-	78,  // 128: hawkr.ai.AIProcurementService.WithdrawVendorPortalResponse:input_type -> hawkr.ai.WithdrawVendorPortalResponseRequest
-	79,  // 129: hawkr.ai.AIProcurementService.DeclineVendorPortalRfqPublication:input_type -> hawkr.ai.DeclineVendorPortalRfqPublicationRequest
-	67,  // 130: hawkr.ai.AIProcurementService.SubmitSellerResponse:input_type -> hawkr.ai.SubmitSellerResponseRequest
-	69,  // 131: hawkr.ai.AIProcurementService.WithdrawSellerResponse:input_type -> hawkr.ai.WithdrawSellerResponseRequest
-	70,  // 132: hawkr.ai.AIProcurementService.DeclineRfqPublication:input_type -> hawkr.ai.DeclineRfqPublicationRequest
-	86,  // 133: hawkr.ai.AIProcurementService.ListSellerResponses:input_type -> hawkr.ai.ListSellerResponsesRequest
-	90,  // 134: hawkr.ai.AIProcurementService.PutShortlistEntry:input_type -> hawkr.ai.ShortlistEntryRequest
-	90,  // 135: hawkr.ai.AIProcurementService.DeleteShortlistEntry:input_type -> hawkr.ai.ShortlistEntryRequest
-	92,  // 136: hawkr.ai.AIProcurementService.AcceptSellerQuote:input_type -> hawkr.ai.BuyerQuoteAcceptanceRequest
-	113, // 137: hawkr.ai.AIProcurementService.RenameConversation:input_type -> hawkr.ai.RenameConversationRequest
-	114, // 138: hawkr.ai.AIProcurementService.DeleteConversation:input_type -> hawkr.ai.DeleteConversationRequest
-	128, // 139: hawkr.ai.AIProcurementService.WatchRunEvents:input_type -> hawkr.ai.WatchRunEventsRequest
-	130, // 140: hawkr.ai.AIProcurementService.CancelRun:input_type -> hawkr.ai.CancelRunRequest
-	132, // 141: hawkr.ai.AIProcurementService.ResumeRun:input_type -> hawkr.ai.ResumeRunRequest
-	41,  // 142: hawkr.ai.AIImageService.TransformImage:output_type -> hawkr.ai.TransformImageResponse
-	27,  // 143: hawkr.ai.AIImageService.ListAiStyles:output_type -> hawkr.ai.ListAiStylesResponse
-	30,  // 144: hawkr.ai.AIAdminService.ListAiStylesForAdmin:output_type -> hawkr.ai.ListAiStylesForAdminResponse
-	34,  // 145: hawkr.ai.AIAdminService.CreateAiStyle:output_type -> hawkr.ai.AiStyleResponse
-	34,  // 146: hawkr.ai.AIAdminService.UpdateAiStyle:output_type -> hawkr.ai.AiStyleResponse
-	34,  // 147: hawkr.ai.AIAdminService.DeleteAiStyle:output_type -> hawkr.ai.AiStyleResponse
-	38,  // 148: hawkr.ai.AIAdminService.GetAiQuota:output_type -> hawkr.ai.AiQuotaResponse
-	38,  // 149: hawkr.ai.AIAdminService.UpdateAiQuota:output_type -> hawkr.ai.AiQuotaResponse
-	38,  // 150: hawkr.ai.AIAdminService.DeleteAiQuota:output_type -> hawkr.ai.AiQuotaResponse
-	23,  // 151: hawkr.ai.RecommendationService.PersonalizedRecommend:output_type -> hawkr.ai.PersonalizedRecommendResponse
-	10,  // 152: hawkr.ai.AIAssistantService.SellerChat:output_type -> hawkr.ai.StreamEvent
-	10,  // 153: hawkr.ai.AIAssistantService.SellerOrders:output_type -> hawkr.ai.StreamEvent
-	10,  // 154: hawkr.ai.AIAssistantService.SellerInventory:output_type -> hawkr.ai.StreamEvent
-	10,  // 155: hawkr.ai.AIAssistantService.SellerPayment:output_type -> hawkr.ai.StreamEvent
-	10,  // 156: hawkr.ai.AIAssistantService.SellerPrice:output_type -> hawkr.ai.StreamEvent
-	10,  // 157: hawkr.ai.AIAssistantService.SellerProductListingChat:output_type -> hawkr.ai.StreamEvent
-	18,  // 158: hawkr.ai.AIAssistantService.SellerProductAutofill:output_type -> hawkr.ai.SellerProductAutofillResponse
-	13,  // 159: hawkr.ai.AIAssistantService.SellerLatestSession:output_type -> hawkr.ai.LatestSessionResponse
-	10,  // 160: hawkr.ai.AIAssistantService.BuyerOrders:output_type -> hawkr.ai.StreamEvent
-	10,  // 161: hawkr.ai.AIAssistantService.BuyerTracking:output_type -> hawkr.ai.StreamEvent
-	10,  // 162: hawkr.ai.AIAssistantService.BuyerReturnPolicy:output_type -> hawkr.ai.StreamEvent
-	10,  // 163: hawkr.ai.AIAssistantService.BuyerSeasonal:output_type -> hawkr.ai.StreamEvent
-	10,  // 164: hawkr.ai.AIAssistantService.BuyerSellerMatch:output_type -> hawkr.ai.StreamEvent
-	10,  // 165: hawkr.ai.AIAssistantService.BuyerChat:output_type -> hawkr.ai.StreamEvent
-	13,  // 166: hawkr.ai.AIAssistantService.BuyerLatestSession:output_type -> hawkr.ai.LatestSessionResponse
-	56,  // 167: hawkr.ai.AIProcurementService.SubmitTurn:output_type -> hawkr.ai.TurnResult
-	10,  // 168: hawkr.ai.AIProcurementService.SubmitTurnStream:output_type -> hawkr.ai.StreamEvent
-	63,  // 169: hawkr.ai.AIProcurementService.GetSnapshot:output_type -> hawkr.ai.SnapshotResponse
-	98,  // 170: hawkr.ai.AIProcurementService.StartCandidateSearch:output_type -> hawkr.ai.StartCandidateSearchResponse
-	102, // 171: hawkr.ai.AIProcurementService.GetCandidateSearch:output_type -> hawkr.ai.CandidateSetResponse
-	104, // 172: hawkr.ai.AIProcurementService.ToggleSelection:output_type -> hawkr.ai.ToggleSelectionResponse
-	56,  // 173: hawkr.ai.AIProcurementService.SubmitAnswer:output_type -> hawkr.ai.TurnResult
-	56,  // 174: hawkr.ai.AIProcurementService.Rewind:output_type -> hawkr.ai.TurnResult
-	118, // 175: hawkr.ai.AIProcurementService.PreviewRfqPrice:output_type -> hawkr.ai.RfqPricePreviewResponse
-	120, // 176: hawkr.ai.AIProcurementService.ConfirmRfqSnapshot:output_type -> hawkr.ai.RfqConfirmationResponse
-	122, // 177: hawkr.ai.AIProcurementService.PreviewRfqPublication:output_type -> hawkr.ai.RfqPublicationPreviewResponse
-	124, // 178: hawkr.ai.AIProcurementService.ExecuteRfqPublication:output_type -> hawkr.ai.RfqPublicationExecuteResponse
-	127, // 179: hawkr.ai.AIProcurementService.GetRfqPublicationInviteSellerView:output_type -> hawkr.ai.RfqPublicationInviteSellerViewResponse
-	109, // 180: hawkr.ai.AIProcurementService.ListConversations:output_type -> hawkr.ai.ListConversationsResponse
-	112, // 181: hawkr.ai.AIProcurementService.GetConversationMessages:output_type -> hawkr.ai.ConversationMessagesResponse
-	96,  // 182: hawkr.ai.AIProcurementService.GetRuntimeSnapshot:output_type -> hawkr.ai.RuntimeSnapshotResponse
-	83,  // 183: hawkr.ai.AIProcurementService.ListSellerPublications:output_type -> hawkr.ai.ListSellerPublicationsResponse
-	85,  // 184: hawkr.ai.AIProcurementService.GetSellerPublication:output_type -> hawkr.ai.SellerPublicationDetailResponse
-	73,  // 185: hawkr.ai.AIProcurementService.UpsertSellerResponseDraft:output_type -> hawkr.ai.SellerResponseDraftResponse
-	73,  // 186: hawkr.ai.AIProcurementService.GetVendorPortalResponseDraft:output_type -> hawkr.ai.SellerResponseDraftResponse
-	73,  // 187: hawkr.ai.AIProcurementService.UpsertVendorPortalResponseDraft:output_type -> hawkr.ai.SellerResponseDraftResponse
-	68,  // 188: hawkr.ai.AIProcurementService.SubmitVendorPortalResponse:output_type -> hawkr.ai.SellerResponseVersionResponse
-	71,  // 189: hawkr.ai.AIProcurementService.WithdrawVendorPortalResponse:output_type -> hawkr.ai.SellerResponseClosureResponse
-	71,  // 190: hawkr.ai.AIProcurementService.DeclineVendorPortalRfqPublication:output_type -> hawkr.ai.SellerResponseClosureResponse
-	68,  // 191: hawkr.ai.AIProcurementService.SubmitSellerResponse:output_type -> hawkr.ai.SellerResponseVersionResponse
-	71,  // 192: hawkr.ai.AIProcurementService.WithdrawSellerResponse:output_type -> hawkr.ai.SellerResponseClosureResponse
-	71,  // 193: hawkr.ai.AIProcurementService.DeclineRfqPublication:output_type -> hawkr.ai.SellerResponseClosureResponse
-	87,  // 194: hawkr.ai.AIProcurementService.ListSellerResponses:output_type -> hawkr.ai.ListSellerResponsesResponse
-	91,  // 195: hawkr.ai.AIProcurementService.PutShortlistEntry:output_type -> hawkr.ai.ShortlistEntryResponse
-	91,  // 196: hawkr.ai.AIProcurementService.DeleteShortlistEntry:output_type -> hawkr.ai.ShortlistEntryResponse
-	93,  // 197: hawkr.ai.AIProcurementService.AcceptSellerQuote:output_type -> hawkr.ai.BuyerQuoteAcceptanceResponse
-	137, // 198: hawkr.ai.AIProcurementService.RenameConversation:output_type -> google.protobuf.Empty
-	137, // 199: hawkr.ai.AIProcurementService.DeleteConversation:output_type -> google.protobuf.Empty
-	129, // 200: hawkr.ai.AIProcurementService.WatchRunEvents:output_type -> hawkr.ai.RunEvent
-	131, // 201: hawkr.ai.AIProcurementService.CancelRun:output_type -> hawkr.ai.CancelRunResponse
-	133, // 202: hawkr.ai.AIProcurementService.ResumeRun:output_type -> hawkr.ai.ResumeRunResponse
-	142, // [142:203] is the sub-list for method output_type
-	81,  // [81:142] is the sub-list for method input_type
+	0,   // 95: hawkr.ai.AIAssistantService.SellerProductListingChat:input_type -> hawkr.ai.AssistantRequest
+	17,  // 96: hawkr.ai.AIAssistantService.SellerProductAutofill:input_type -> hawkr.ai.SellerProductAutofillRequest
+	11,  // 97: hawkr.ai.AIAssistantService.SellerLatestSession:input_type -> hawkr.ai.LatestSessionRequest
+	0,   // 98: hawkr.ai.AIAssistantService.BuyerOrders:input_type -> hawkr.ai.AssistantRequest
+	0,   // 99: hawkr.ai.AIAssistantService.BuyerTracking:input_type -> hawkr.ai.AssistantRequest
+	0,   // 100: hawkr.ai.AIAssistantService.BuyerReturnPolicy:input_type -> hawkr.ai.AssistantRequest
+	0,   // 101: hawkr.ai.AIAssistantService.BuyerSellerMatch:input_type -> hawkr.ai.AssistantRequest
+	0,   // 102: hawkr.ai.AIAssistantService.BuyerChat:input_type -> hawkr.ai.AssistantRequest
+	11,  // 103: hawkr.ai.AIAssistantService.BuyerLatestSession:input_type -> hawkr.ai.LatestSessionRequest
+	52,  // 104: hawkr.ai.AIProcurementService.SubmitTurn:input_type -> hawkr.ai.TurnRequest
+	52,  // 105: hawkr.ai.AIProcurementService.SubmitTurnStream:input_type -> hawkr.ai.TurnRequest
+	58,  // 106: hawkr.ai.AIProcurementService.GetSnapshot:input_type -> hawkr.ai.GetSnapshotRequest
+	97,  // 107: hawkr.ai.AIProcurementService.StartCandidateSearch:input_type -> hawkr.ai.StartCandidateSearchRequest
+	99,  // 108: hawkr.ai.AIProcurementService.GetCandidateSearch:input_type -> hawkr.ai.GetCandidateSearchRequest
+	103, // 109: hawkr.ai.AIProcurementService.ToggleSelection:input_type -> hawkr.ai.ToggleSelectionRequest
+	105, // 110: hawkr.ai.AIProcurementService.SubmitAnswer:input_type -> hawkr.ai.SubmitAnswerRequest
+	106, // 111: hawkr.ai.AIProcurementService.Rewind:input_type -> hawkr.ai.RewindRequest
+	116, // 112: hawkr.ai.AIProcurementService.PreviewRfqPrice:input_type -> hawkr.ai.RfqPricePreviewRequest
+	119, // 113: hawkr.ai.AIProcurementService.ConfirmRfqSnapshot:input_type -> hawkr.ai.RfqConfirmationRequest
+	121, // 114: hawkr.ai.AIProcurementService.PreviewRfqPublication:input_type -> hawkr.ai.RfqPublicationPreviewRequest
+	123, // 115: hawkr.ai.AIProcurementService.ExecuteRfqPublication:input_type -> hawkr.ai.RfqPublicationExecuteRequest
+	125, // 116: hawkr.ai.AIProcurementService.GetRfqPublicationInviteSellerView:input_type -> hawkr.ai.GetRfqPublicationInviteSellerViewRequest
+	107, // 117: hawkr.ai.AIProcurementService.ListConversations:input_type -> hawkr.ai.ListConversationsRequest
+	110, // 118: hawkr.ai.AIProcurementService.GetConversationMessages:input_type -> hawkr.ai.GetConversationMessagesRequest
+	94,  // 119: hawkr.ai.AIProcurementService.GetRuntimeSnapshot:input_type -> hawkr.ai.GetRuntimeSnapshotRequest
+	80,  // 120: hawkr.ai.AIProcurementService.ListSellerPublications:input_type -> hawkr.ai.ListSellerPublicationsRequest
+	84,  // 121: hawkr.ai.AIProcurementService.GetSellerPublication:input_type -> hawkr.ai.GetSellerPublicationRequest
+	72,  // 122: hawkr.ai.AIProcurementService.UpsertSellerResponseDraft:input_type -> hawkr.ai.UpsertSellerResponseDraftRequest
+	74,  // 123: hawkr.ai.AIProcurementService.GetVendorPortalResponseDraft:input_type -> hawkr.ai.GetVendorPortalResponseDraftRequest
+	75,  // 124: hawkr.ai.AIProcurementService.UpsertVendorPortalResponseDraft:input_type -> hawkr.ai.UpsertVendorPortalResponseDraftRequest
+	77,  // 125: hawkr.ai.AIProcurementService.SubmitVendorPortalResponse:input_type -> hawkr.ai.SubmitVendorPortalResponseRequest
+	78,  // 126: hawkr.ai.AIProcurementService.WithdrawVendorPortalResponse:input_type -> hawkr.ai.WithdrawVendorPortalResponseRequest
+	79,  // 127: hawkr.ai.AIProcurementService.DeclineVendorPortalRfqPublication:input_type -> hawkr.ai.DeclineVendorPortalRfqPublicationRequest
+	67,  // 128: hawkr.ai.AIProcurementService.SubmitSellerResponse:input_type -> hawkr.ai.SubmitSellerResponseRequest
+	69,  // 129: hawkr.ai.AIProcurementService.WithdrawSellerResponse:input_type -> hawkr.ai.WithdrawSellerResponseRequest
+	70,  // 130: hawkr.ai.AIProcurementService.DeclineRfqPublication:input_type -> hawkr.ai.DeclineRfqPublicationRequest
+	86,  // 131: hawkr.ai.AIProcurementService.ListSellerResponses:input_type -> hawkr.ai.ListSellerResponsesRequest
+	90,  // 132: hawkr.ai.AIProcurementService.PutShortlistEntry:input_type -> hawkr.ai.ShortlistEntryRequest
+	90,  // 133: hawkr.ai.AIProcurementService.DeleteShortlistEntry:input_type -> hawkr.ai.ShortlistEntryRequest
+	92,  // 134: hawkr.ai.AIProcurementService.AcceptSellerQuote:input_type -> hawkr.ai.BuyerQuoteAcceptanceRequest
+	113, // 135: hawkr.ai.AIProcurementService.RenameConversation:input_type -> hawkr.ai.RenameConversationRequest
+	114, // 136: hawkr.ai.AIProcurementService.DeleteConversation:input_type -> hawkr.ai.DeleteConversationRequest
+	128, // 137: hawkr.ai.AIProcurementService.WatchRunEvents:input_type -> hawkr.ai.WatchRunEventsRequest
+	130, // 138: hawkr.ai.AIProcurementService.CancelRun:input_type -> hawkr.ai.CancelRunRequest
+	132, // 139: hawkr.ai.AIProcurementService.ResumeRun:input_type -> hawkr.ai.ResumeRunRequest
+	41,  // 140: hawkr.ai.AIImageService.TransformImage:output_type -> hawkr.ai.TransformImageResponse
+	27,  // 141: hawkr.ai.AIImageService.ListAiStyles:output_type -> hawkr.ai.ListAiStylesResponse
+	30,  // 142: hawkr.ai.AIAdminService.ListAiStylesForAdmin:output_type -> hawkr.ai.ListAiStylesForAdminResponse
+	34,  // 143: hawkr.ai.AIAdminService.CreateAiStyle:output_type -> hawkr.ai.AiStyleResponse
+	34,  // 144: hawkr.ai.AIAdminService.UpdateAiStyle:output_type -> hawkr.ai.AiStyleResponse
+	34,  // 145: hawkr.ai.AIAdminService.DeleteAiStyle:output_type -> hawkr.ai.AiStyleResponse
+	38,  // 146: hawkr.ai.AIAdminService.GetAiQuota:output_type -> hawkr.ai.AiQuotaResponse
+	38,  // 147: hawkr.ai.AIAdminService.UpdateAiQuota:output_type -> hawkr.ai.AiQuotaResponse
+	38,  // 148: hawkr.ai.AIAdminService.DeleteAiQuota:output_type -> hawkr.ai.AiQuotaResponse
+	23,  // 149: hawkr.ai.RecommendationService.PersonalizedRecommend:output_type -> hawkr.ai.PersonalizedRecommendResponse
+	10,  // 150: hawkr.ai.AIAssistantService.SellerChat:output_type -> hawkr.ai.StreamEvent
+	10,  // 151: hawkr.ai.AIAssistantService.SellerOrders:output_type -> hawkr.ai.StreamEvent
+	10,  // 152: hawkr.ai.AIAssistantService.SellerInventory:output_type -> hawkr.ai.StreamEvent
+	10,  // 153: hawkr.ai.AIAssistantService.SellerPayment:output_type -> hawkr.ai.StreamEvent
+	10,  // 154: hawkr.ai.AIAssistantService.SellerProductListingChat:output_type -> hawkr.ai.StreamEvent
+	18,  // 155: hawkr.ai.AIAssistantService.SellerProductAutofill:output_type -> hawkr.ai.SellerProductAutofillResponse
+	13,  // 156: hawkr.ai.AIAssistantService.SellerLatestSession:output_type -> hawkr.ai.LatestSessionResponse
+	10,  // 157: hawkr.ai.AIAssistantService.BuyerOrders:output_type -> hawkr.ai.StreamEvent
+	10,  // 158: hawkr.ai.AIAssistantService.BuyerTracking:output_type -> hawkr.ai.StreamEvent
+	10,  // 159: hawkr.ai.AIAssistantService.BuyerReturnPolicy:output_type -> hawkr.ai.StreamEvent
+	10,  // 160: hawkr.ai.AIAssistantService.BuyerSellerMatch:output_type -> hawkr.ai.StreamEvent
+	10,  // 161: hawkr.ai.AIAssistantService.BuyerChat:output_type -> hawkr.ai.StreamEvent
+	13,  // 162: hawkr.ai.AIAssistantService.BuyerLatestSession:output_type -> hawkr.ai.LatestSessionResponse
+	56,  // 163: hawkr.ai.AIProcurementService.SubmitTurn:output_type -> hawkr.ai.TurnResult
+	10,  // 164: hawkr.ai.AIProcurementService.SubmitTurnStream:output_type -> hawkr.ai.StreamEvent
+	63,  // 165: hawkr.ai.AIProcurementService.GetSnapshot:output_type -> hawkr.ai.SnapshotResponse
+	98,  // 166: hawkr.ai.AIProcurementService.StartCandidateSearch:output_type -> hawkr.ai.StartCandidateSearchResponse
+	102, // 167: hawkr.ai.AIProcurementService.GetCandidateSearch:output_type -> hawkr.ai.CandidateSetResponse
+	104, // 168: hawkr.ai.AIProcurementService.ToggleSelection:output_type -> hawkr.ai.ToggleSelectionResponse
+	56,  // 169: hawkr.ai.AIProcurementService.SubmitAnswer:output_type -> hawkr.ai.TurnResult
+	56,  // 170: hawkr.ai.AIProcurementService.Rewind:output_type -> hawkr.ai.TurnResult
+	118, // 171: hawkr.ai.AIProcurementService.PreviewRfqPrice:output_type -> hawkr.ai.RfqPricePreviewResponse
+	120, // 172: hawkr.ai.AIProcurementService.ConfirmRfqSnapshot:output_type -> hawkr.ai.RfqConfirmationResponse
+	122, // 173: hawkr.ai.AIProcurementService.PreviewRfqPublication:output_type -> hawkr.ai.RfqPublicationPreviewResponse
+	124, // 174: hawkr.ai.AIProcurementService.ExecuteRfqPublication:output_type -> hawkr.ai.RfqPublicationExecuteResponse
+	127, // 175: hawkr.ai.AIProcurementService.GetRfqPublicationInviteSellerView:output_type -> hawkr.ai.RfqPublicationInviteSellerViewResponse
+	109, // 176: hawkr.ai.AIProcurementService.ListConversations:output_type -> hawkr.ai.ListConversationsResponse
+	112, // 177: hawkr.ai.AIProcurementService.GetConversationMessages:output_type -> hawkr.ai.ConversationMessagesResponse
+	96,  // 178: hawkr.ai.AIProcurementService.GetRuntimeSnapshot:output_type -> hawkr.ai.RuntimeSnapshotResponse
+	83,  // 179: hawkr.ai.AIProcurementService.ListSellerPublications:output_type -> hawkr.ai.ListSellerPublicationsResponse
+	85,  // 180: hawkr.ai.AIProcurementService.GetSellerPublication:output_type -> hawkr.ai.SellerPublicationDetailResponse
+	73,  // 181: hawkr.ai.AIProcurementService.UpsertSellerResponseDraft:output_type -> hawkr.ai.SellerResponseDraftResponse
+	73,  // 182: hawkr.ai.AIProcurementService.GetVendorPortalResponseDraft:output_type -> hawkr.ai.SellerResponseDraftResponse
+	73,  // 183: hawkr.ai.AIProcurementService.UpsertVendorPortalResponseDraft:output_type -> hawkr.ai.SellerResponseDraftResponse
+	68,  // 184: hawkr.ai.AIProcurementService.SubmitVendorPortalResponse:output_type -> hawkr.ai.SellerResponseVersionResponse
+	71,  // 185: hawkr.ai.AIProcurementService.WithdrawVendorPortalResponse:output_type -> hawkr.ai.SellerResponseClosureResponse
+	71,  // 186: hawkr.ai.AIProcurementService.DeclineVendorPortalRfqPublication:output_type -> hawkr.ai.SellerResponseClosureResponse
+	68,  // 187: hawkr.ai.AIProcurementService.SubmitSellerResponse:output_type -> hawkr.ai.SellerResponseVersionResponse
+	71,  // 188: hawkr.ai.AIProcurementService.WithdrawSellerResponse:output_type -> hawkr.ai.SellerResponseClosureResponse
+	71,  // 189: hawkr.ai.AIProcurementService.DeclineRfqPublication:output_type -> hawkr.ai.SellerResponseClosureResponse
+	87,  // 190: hawkr.ai.AIProcurementService.ListSellerResponses:output_type -> hawkr.ai.ListSellerResponsesResponse
+	91,  // 191: hawkr.ai.AIProcurementService.PutShortlistEntry:output_type -> hawkr.ai.ShortlistEntryResponse
+	91,  // 192: hawkr.ai.AIProcurementService.DeleteShortlistEntry:output_type -> hawkr.ai.ShortlistEntryResponse
+	93,  // 193: hawkr.ai.AIProcurementService.AcceptSellerQuote:output_type -> hawkr.ai.BuyerQuoteAcceptanceResponse
+	137, // 194: hawkr.ai.AIProcurementService.RenameConversation:output_type -> google.protobuf.Empty
+	137, // 195: hawkr.ai.AIProcurementService.DeleteConversation:output_type -> google.protobuf.Empty
+	129, // 196: hawkr.ai.AIProcurementService.WatchRunEvents:output_type -> hawkr.ai.RunEvent
+	131, // 197: hawkr.ai.AIProcurementService.CancelRun:output_type -> hawkr.ai.CancelRunResponse
+	133, // 198: hawkr.ai.AIProcurementService.ResumeRun:output_type -> hawkr.ai.ResumeRunResponse
+	140, // [140:199] is the sub-list for method output_type
+	81,  // [81:140] is the sub-list for method input_type
 	81,  // [81:81] is the sub-list for extension type_name
 	81,  // [81:81] is the sub-list for extension extendee
 	0,   // [0:81] is the sub-list for field type_name

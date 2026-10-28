@@ -75,7 +75,6 @@ var aiRouteTiers = []aiRoute{
 	{"POST", "/api/v1/app/sellers/me/assistant/orders", "default", costModel},
 	{"POST", "/api/v1/app/sellers/me/assistant/inventory", "default", costModel},
 	{"POST", "/api/v1/app/sellers/me/assistant/payment", "default", costModel},
-	{"POST", "/api/v1/app/sellers/me/assistant/price", "default", costModel},
 	{"POST", "/api/v1/app/sellers/me/assistant/product-listing/chat", "default", costModel},
 	// Not SSE (one-shot JSON) but still a model call — 「AI 解析並回傳結構化商品草稿」.
 	{"POST", "/api/v1/app/sellers/me/assistant/product-autofill", "default", costModel},
@@ -86,7 +85,6 @@ var aiRouteTiers = []aiRoute{
 	{"POST", "/api/v1/app/buyers/me/assistant/orders", "default", costModel},
 	{"POST", "/api/v1/app/buyers/me/assistant/tracking", "default", costModel},
 	{"POST", "/api/v1/app/buyers/me/assistant/return-policy", "default", costModel},
-	{"POST", "/api/v1/app/buyers/me/assistant/seasonal", "default", costModel},
 	{"POST", "/api/v1/app/buyers/me/assistant/seller-match", "default", costModel},
 	{"GET", "/api/v1/app/buyers/me/assistant/sessions/latest", "default", costData},
 
@@ -101,7 +99,7 @@ var aiRouteTiers = []aiRoute{
 	{"GET", "/api/v1/app/buyers/me/procurement/requests/:id/candidate-searches/:runId", "default", costData},
 	{"GET", "/api/v1/app/buyers/me/procurement/requests/:id/snapshot", "default", costData},
 	// RFQ price preview (issue #2403 Slice 2): PreviewRfqPriceUseCase.PreviewRfqPrice
-	// reads DB + calls pricebook-service's GetRegionalComparison, no LLM — same cost
+	// reads DB, no LLM — same cost
 	// shape as quote-batches/preview below, not the ReplyComposer-driven rows above.
 	{"POST", "/api/v1/app/buyers/me/procurement/requests/:id/rfq-price-previews", "default", costData},
 	// RFQ confirmation (issue #2403 Slice 3): ConfirmRfqSnapshotUseCase.ConfirmRfqSnapshot

@@ -95,9 +95,6 @@ tests/hawkr-bd-outreach.test.ts
 tests/hawkr-bd-sheet-dry-run.test.ts
 .pnpm-store/
 
-# Generated from the installed MapLibre package during Next build/dev startup.
-/public/generated/maplibre/
-
 # 本機驗證用的截圖與腳本（含 dev 環境資料，不得提交）
 .claude-verify/
 .impeccable/critique/2026-08-04T22-55-22Z__features-seller-components-descriptioneditor-tsx.md

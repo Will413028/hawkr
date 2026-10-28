@@ -122,3 +122,7 @@ Gateway 零顯式入口的 5 條 ai-service HTTP 端點（recommend×3、chat×2
 - gateway 的 header 只放啟用的動作類能力，`CAP_SHIPPING_SETUP` 是新增的 token；物流建店、啟用與關閉（`shipping_onboardings` 的 POST 與 toggle）改宣告它，列表與查詢仍是 `CAP_PRODUCT_MANAGE`。舊 REST 受 CodeMeta 凍結，前置條件造成的拒絕只回通用 403；client 先看能力，這只是後備，物流搬進單體後 Connect 方法宣告 `SHIPPING_SETUP`、回 `SELLER_REQUIREMENT_MISSING`。
 
 **觸發。** PayUni sandbox 確認 C2C 與宅配可在審核中建店時，`SHIPPING_SETUP` 的條件放寬成「PayUni 已註冊」（只改伺服器）；優惠券、金流若有前置條件同樣加進能力。
+
+## 修訂：pricebook 刪除（2026-10-28，ADR `2026-10-27-general-ecommerce-scope-cut` D1；計畫 `plans/2026-10-27-ecommerce-scope-cut.md` 步驟 6）
+
+D8（賣家 pricebook 市場行情端點的歸屬）作廢：這些端點隨 pricebook 刪除，`CAP_MARKETING` 的其餘宣告不變。

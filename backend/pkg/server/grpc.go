@@ -42,8 +42,7 @@ type ServerConfig struct {
 	// conflicting service-level environment sources.
 	Env string
 	// EnableStreamInterceptors registers grpc.ChainStreamInterceptor. Leave
-	// false (the zero value) for gRPC services with no streaming RPCs — e.g.
-	// pricebook-service's GetObservedPrice is unary-only.
+	// false (the zero value) for gRPC services with no streaming RPCs.
 	EnableStreamInterceptors bool
 	// LoggingOptions customizes interceptor.LoggingInterceptor per service —
 	// e.g. account-service's WithExpectedCodes(accountgrpc.ExpectedStatusCodes)

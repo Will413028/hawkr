@@ -167,7 +167,6 @@ describe("localizeHref", () => {
 			"/icon.svg",
 			"/placeholders/avatar.svg",
 			"/brand/wordmark.svg",
-			"/data/taiwan.geojson",
 			"/templates/hawkr_import_template.csv",
 			"/_next/static/chunks/main.js",
 		]) {

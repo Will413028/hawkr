@@ -55,8 +55,8 @@ func TestNewAgents_MapsPopulated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewAgents: %v", err)
 	}
-	for _, k := range []string{"seller:order", "seller:inventory", "seller:payment", "seller:price",
-		"buyer:order", "buyer:tracking", "buyer:seasonal", "buyer:seller_match"} {
+	for _, k := range []string{"seller:order", "seller:inventory", "seller:payment",
+		"buyer:order", "buyer:tracking", "buyer:seller_match"} {
 		if agents.Specialists[k] == nil {
 			t.Errorf("Specialists[%q] 為 nil", k)
 		}

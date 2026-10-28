@@ -71,7 +71,6 @@ groups:
           or absent(server_start_total{job="crm-service", env="prod"})
           or absent(server_start_total{job="im-service", env="prod"})
           or absent(server_start_total{job="notification-service", env="prod"})
-          or absent(server_start_total{job="pricebook-service", env="prod"})
           or absent(server_start_total{job="review-service", env="prod"})
           or absent(server_start_total{job="seller-service", env="prod"})
           or absent(server_start_total{job="social-service", env="prod"})

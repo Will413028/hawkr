@@ -105,8 +105,7 @@
 //     出口留下痕跡」並告警 —— **這是偵測不是阻擋，而且沒有任何東西能把它變成阻擋**。
 //
 //     🔴 **兩條 lint（banDirectJSON／banEnvelopeSuccessEmitters）只縮小這條路，關不掉它。**
-//     現成反例就在 repo 裡、今天就在 prod 路徑上：internal/handler/pricebook.go 的
-//     writeGzippedIfAccepted 自己組 response.Envelope{Code: 0, ...} 再用 c.Data 寫出，
+//     典型反例：handler 自己組 response.Envelope{Code: 0, ...} 再用 c.Data 寫出，
 //     兩條 lint 都不命中（一條認 c.JSON、一條認 envelope.OK/Page/...），實跑 0 issues。
 //     同形狀的出口還有 c.Render／c.String／直接寫 Writer。
 //

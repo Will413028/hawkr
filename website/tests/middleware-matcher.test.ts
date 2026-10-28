@@ -81,7 +81,6 @@ test("the navigation layer's file lists are the matcher's: what the middleware s
 		"/icon.svg",
 		"/placeholders/products/1.png",
 		"/brand/wordmark.svg",
-		"/data/taiwan.geojson",
 		"/templates/x.csv",
 		"/_next/static/x.js",
 		"/api/v1/x",

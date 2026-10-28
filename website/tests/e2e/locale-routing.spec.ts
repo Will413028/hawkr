@@ -219,7 +219,6 @@ test.describe("locale routing", { tag: ["@ui"] }, () => {
 			"/sitemap.xml",
 			"/manifest.webmanifest",
 			"/icon.svg",
-			"/data/taiwan.geojson",
 		]) {
 			expect((await request.get(path)).status(), path).toBe(200);
 		}

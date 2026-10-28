@@ -62,16 +62,14 @@ func TestBuyerTracking_RegistersActorBuyer(t *testing.T) {
 	}
 }
 
-func TestAllTenGenericStreamingMethods_Registered(t *testing.T) {
+func TestAllEightGenericStreamingMethods_Registered(t *testing.T) {
 	want := []string{
 		"/hawkr.ai.AIAssistantService/SellerChat",
 		"/hawkr.ai.AIAssistantService/SellerInventory",
 		"/hawkr.ai.AIAssistantService/SellerPayment",
-		"/hawkr.ai.AIAssistantService/SellerPrice",
 		"/hawkr.ai.AIAssistantService/SellerProductListingChat",
 		"/hawkr.ai.AIAssistantService/BuyerOrders",
 		"/hawkr.ai.AIAssistantService/BuyerTracking",
-		"/hawkr.ai.AIAssistantService/BuyerSeasonal",
 		"/hawkr.ai.AIAssistantService/BuyerSellerMatch",
 		"/hawkr.ai.AIAssistantService/BuyerChat",
 	}

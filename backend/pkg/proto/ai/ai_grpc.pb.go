@@ -618,14 +618,12 @@ const (
 	AIAssistantService_SellerOrders_FullMethodName             = "/hawkr.ai.AIAssistantService/SellerOrders"
 	AIAssistantService_SellerInventory_FullMethodName          = "/hawkr.ai.AIAssistantService/SellerInventory"
 	AIAssistantService_SellerPayment_FullMethodName            = "/hawkr.ai.AIAssistantService/SellerPayment"
-	AIAssistantService_SellerPrice_FullMethodName              = "/hawkr.ai.AIAssistantService/SellerPrice"
 	AIAssistantService_SellerProductListingChat_FullMethodName = "/hawkr.ai.AIAssistantService/SellerProductListingChat"
 	AIAssistantService_SellerProductAutofill_FullMethodName    = "/hawkr.ai.AIAssistantService/SellerProductAutofill"
 	AIAssistantService_SellerLatestSession_FullMethodName      = "/hawkr.ai.AIAssistantService/SellerLatestSession"
 	AIAssistantService_BuyerOrders_FullMethodName              = "/hawkr.ai.AIAssistantService/BuyerOrders"
 	AIAssistantService_BuyerTracking_FullMethodName            = "/hawkr.ai.AIAssistantService/BuyerTracking"
 	AIAssistantService_BuyerReturnPolicy_FullMethodName        = "/hawkr.ai.AIAssistantService/BuyerReturnPolicy"
-	AIAssistantService_BuyerSeasonal_FullMethodName            = "/hawkr.ai.AIAssistantService/BuyerSeasonal"
 	AIAssistantService_BuyerSellerMatch_FullMethodName         = "/hawkr.ai.AIAssistantService/BuyerSellerMatch"
 	AIAssistantService_BuyerChat_FullMethodName                = "/hawkr.ai.AIAssistantService/BuyerChat"
 	AIAssistantService_BuyerLatestSession_FullMethodName       = "/hawkr.ai.AIAssistantService/BuyerLatestSession"
@@ -640,7 +638,6 @@ type AIAssistantServiceClient interface {
 	SellerOrders(ctx context.Context, in *AssistantRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error)
 	SellerInventory(ctx context.Context, in *AssistantRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error)
 	SellerPayment(ctx context.Context, in *AssistantRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error)
-	SellerPrice(ctx context.Context, in *AssistantRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error)
 	SellerProductListingChat(ctx context.Context, in *AssistantRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error)
 	SellerProductAutofill(ctx context.Context, in *SellerProductAutofillRequest, opts ...grpc.CallOption) (*SellerProductAutofillResponse, error)
 	SellerLatestSession(ctx context.Context, in *LatestSessionRequest, opts ...grpc.CallOption) (*LatestSessionResponse, error)
@@ -648,7 +645,6 @@ type AIAssistantServiceClient interface {
 	BuyerOrders(ctx context.Context, in *AssistantRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error)
 	BuyerTracking(ctx context.Context, in *AssistantRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error)
 	BuyerReturnPolicy(ctx context.Context, in *AssistantRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error)
-	BuyerSeasonal(ctx context.Context, in *AssistantRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error)
 	BuyerSellerMatch(ctx context.Context, in *AssistantRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error)
 	BuyerChat(ctx context.Context, in *AssistantRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error)
 	BuyerLatestSession(ctx context.Context, in *LatestSessionRequest, opts ...grpc.CallOption) (*LatestSessionResponse, error)
@@ -738,28 +734,9 @@ func (c *aIAssistantServiceClient) SellerPayment(ctx context.Context, in *Assist
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type AIAssistantService_SellerPaymentClient = grpc.ServerStreamingClient[StreamEvent]
 
-func (c *aIAssistantServiceClient) SellerPrice(ctx context.Context, in *AssistantRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &AIAssistantService_ServiceDesc.Streams[4], AIAssistantService_SellerPrice_FullMethodName, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &grpc.GenericClientStream[AssistantRequest, StreamEvent]{ClientStream: stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type AIAssistantService_SellerPriceClient = grpc.ServerStreamingClient[StreamEvent]
-
 func (c *aIAssistantServiceClient) SellerProductListingChat(ctx context.Context, in *AssistantRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &AIAssistantService_ServiceDesc.Streams[5], AIAssistantService_SellerProductListingChat_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &AIAssistantService_ServiceDesc.Streams[4], AIAssistantService_SellerProductListingChat_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -798,7 +775,7 @@ func (c *aIAssistantServiceClient) SellerLatestSession(ctx context.Context, in *
 
 func (c *aIAssistantServiceClient) BuyerOrders(ctx context.Context, in *AssistantRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &AIAssistantService_ServiceDesc.Streams[6], AIAssistantService_BuyerOrders_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &AIAssistantService_ServiceDesc.Streams[5], AIAssistantService_BuyerOrders_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -817,7 +794,7 @@ type AIAssistantService_BuyerOrdersClient = grpc.ServerStreamingClient[StreamEve
 
 func (c *aIAssistantServiceClient) BuyerTracking(ctx context.Context, in *AssistantRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &AIAssistantService_ServiceDesc.Streams[7], AIAssistantService_BuyerTracking_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &AIAssistantService_ServiceDesc.Streams[6], AIAssistantService_BuyerTracking_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -836,7 +813,7 @@ type AIAssistantService_BuyerTrackingClient = grpc.ServerStreamingClient[StreamE
 
 func (c *aIAssistantServiceClient) BuyerReturnPolicy(ctx context.Context, in *AssistantRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &AIAssistantService_ServiceDesc.Streams[8], AIAssistantService_BuyerReturnPolicy_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &AIAssistantService_ServiceDesc.Streams[7], AIAssistantService_BuyerReturnPolicy_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -853,28 +830,9 @@ func (c *aIAssistantServiceClient) BuyerReturnPolicy(ctx context.Context, in *As
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type AIAssistantService_BuyerReturnPolicyClient = grpc.ServerStreamingClient[StreamEvent]
 
-func (c *aIAssistantServiceClient) BuyerSeasonal(ctx context.Context, in *AssistantRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &AIAssistantService_ServiceDesc.Streams[9], AIAssistantService_BuyerSeasonal_FullMethodName, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &grpc.GenericClientStream[AssistantRequest, StreamEvent]{ClientStream: stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type AIAssistantService_BuyerSeasonalClient = grpc.ServerStreamingClient[StreamEvent]
-
 func (c *aIAssistantServiceClient) BuyerSellerMatch(ctx context.Context, in *AssistantRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &AIAssistantService_ServiceDesc.Streams[10], AIAssistantService_BuyerSellerMatch_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &AIAssistantService_ServiceDesc.Streams[8], AIAssistantService_BuyerSellerMatch_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -893,7 +851,7 @@ type AIAssistantService_BuyerSellerMatchClient = grpc.ServerStreamingClient[Stre
 
 func (c *aIAssistantServiceClient) BuyerChat(ctx context.Context, in *AssistantRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &AIAssistantService_ServiceDesc.Streams[11], AIAssistantService_BuyerChat_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &AIAssistantService_ServiceDesc.Streams[9], AIAssistantService_BuyerChat_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -929,7 +887,6 @@ type AIAssistantServiceServer interface {
 	SellerOrders(*AssistantRequest, grpc.ServerStreamingServer[StreamEvent]) error
 	SellerInventory(*AssistantRequest, grpc.ServerStreamingServer[StreamEvent]) error
 	SellerPayment(*AssistantRequest, grpc.ServerStreamingServer[StreamEvent]) error
-	SellerPrice(*AssistantRequest, grpc.ServerStreamingServer[StreamEvent]) error
 	SellerProductListingChat(*AssistantRequest, grpc.ServerStreamingServer[StreamEvent]) error
 	SellerProductAutofill(context.Context, *SellerProductAutofillRequest) (*SellerProductAutofillResponse, error)
 	SellerLatestSession(context.Context, *LatestSessionRequest) (*LatestSessionResponse, error)
@@ -937,7 +894,6 @@ type AIAssistantServiceServer interface {
 	BuyerOrders(*AssistantRequest, grpc.ServerStreamingServer[StreamEvent]) error
 	BuyerTracking(*AssistantRequest, grpc.ServerStreamingServer[StreamEvent]) error
 	BuyerReturnPolicy(*AssistantRequest, grpc.ServerStreamingServer[StreamEvent]) error
-	BuyerSeasonal(*AssistantRequest, grpc.ServerStreamingServer[StreamEvent]) error
 	BuyerSellerMatch(*AssistantRequest, grpc.ServerStreamingServer[StreamEvent]) error
 	BuyerChat(*AssistantRequest, grpc.ServerStreamingServer[StreamEvent]) error
 	BuyerLatestSession(context.Context, *LatestSessionRequest) (*LatestSessionResponse, error)
@@ -963,9 +919,6 @@ func (UnimplementedAIAssistantServiceServer) SellerInventory(*AssistantRequest, 
 func (UnimplementedAIAssistantServiceServer) SellerPayment(*AssistantRequest, grpc.ServerStreamingServer[StreamEvent]) error {
 	return status.Error(codes.Unimplemented, "method SellerPayment not implemented")
 }
-func (UnimplementedAIAssistantServiceServer) SellerPrice(*AssistantRequest, grpc.ServerStreamingServer[StreamEvent]) error {
-	return status.Error(codes.Unimplemented, "method SellerPrice not implemented")
-}
 func (UnimplementedAIAssistantServiceServer) SellerProductListingChat(*AssistantRequest, grpc.ServerStreamingServer[StreamEvent]) error {
 	return status.Error(codes.Unimplemented, "method SellerProductListingChat not implemented")
 }
@@ -983,9 +936,6 @@ func (UnimplementedAIAssistantServiceServer) BuyerTracking(*AssistantRequest, gr
 }
 func (UnimplementedAIAssistantServiceServer) BuyerReturnPolicy(*AssistantRequest, grpc.ServerStreamingServer[StreamEvent]) error {
 	return status.Error(codes.Unimplemented, "method BuyerReturnPolicy not implemented")
-}
-func (UnimplementedAIAssistantServiceServer) BuyerSeasonal(*AssistantRequest, grpc.ServerStreamingServer[StreamEvent]) error {
-	return status.Error(codes.Unimplemented, "method BuyerSeasonal not implemented")
 }
 func (UnimplementedAIAssistantServiceServer) BuyerSellerMatch(*AssistantRequest, grpc.ServerStreamingServer[StreamEvent]) error {
 	return status.Error(codes.Unimplemented, "method BuyerSellerMatch not implemented")
@@ -1060,17 +1010,6 @@ func _AIAssistantService_SellerPayment_Handler(srv interface{}, stream grpc.Serv
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type AIAssistantService_SellerPaymentServer = grpc.ServerStreamingServer[StreamEvent]
-
-func _AIAssistantService_SellerPrice_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(AssistantRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
-	}
-	return srv.(AIAssistantServiceServer).SellerPrice(m, &grpc.GenericServerStream[AssistantRequest, StreamEvent]{ServerStream: stream})
-}
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type AIAssistantService_SellerPriceServer = grpc.ServerStreamingServer[StreamEvent]
 
 func _AIAssistantService_SellerProductListingChat_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(AssistantRequest)
@@ -1151,17 +1090,6 @@ func _AIAssistantService_BuyerReturnPolicy_Handler(srv interface{}, stream grpc.
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type AIAssistantService_BuyerReturnPolicyServer = grpc.ServerStreamingServer[StreamEvent]
-
-func _AIAssistantService_BuyerSeasonal_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(AssistantRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
-	}
-	return srv.(AIAssistantServiceServer).BuyerSeasonal(m, &grpc.GenericServerStream[AssistantRequest, StreamEvent]{ServerStream: stream})
-}
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type AIAssistantService_BuyerSeasonalServer = grpc.ServerStreamingServer[StreamEvent]
 
 func _AIAssistantService_BuyerSellerMatch_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(AssistantRequest)
@@ -1245,11 +1173,6 @@ var AIAssistantService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 		{
-			StreamName:    "SellerPrice",
-			Handler:       _AIAssistantService_SellerPrice_Handler,
-			ServerStreams: true,
-		},
-		{
 			StreamName:    "SellerProductListingChat",
 			Handler:       _AIAssistantService_SellerProductListingChat_Handler,
 			ServerStreams: true,
@@ -1267,11 +1190,6 @@ var AIAssistantService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "BuyerReturnPolicy",
 			Handler:       _AIAssistantService_BuyerReturnPolicy_Handler,
-			ServerStreams: true,
-		},
-		{
-			StreamName:    "BuyerSeasonal",
-			Handler:       _AIAssistantService_BuyerSeasonal_Handler,
 			ServerStreams: true,
 		},
 		{

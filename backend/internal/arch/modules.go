@@ -21,7 +21,6 @@ var Dependencies = map[string][]string{
 	"fulfillment":     {"buyer", "seller", "media"},
 	"catalog":         {"seller", "buyer", "media", "fulfillment"},
 	"productimport":   {"catalog", "media", "fulfillment"},
-	"pricebook":       {"catalog"},
 	"invoice":         {"payment", "fulfillment", "buyer", "seller", "media"},
 	"cart":            {"catalog", "buyer", "seller"},
 	"coupon":          {"identity", "buyer", "seller"},
@@ -36,7 +35,7 @@ var Dependencies = map[string][]string{
 	"delegation":      {"identity", "seller", "ordering", "catalog", "social", "media"}, // 授權、session、稽核與編排全由 delegation 擁有。
 	"accountdeletion": {"identity", "buyer", "seller"},                                  // 刪除帳號的流程管理者。
 	"reviewqueue":     {"seller"},                                                       // 後台待辦：讀各來源發布的 pub_*_review_items 排序分頁。
-	"agent":           {"ordering", "catalog", "pricebook", "buyer", "seller", "media"},
+	"agent":           {"ordering", "catalog", "buyer", "seller", "media"},
 	"notification": {
 		"identity", "buyer", "seller", "catalog", "ordering", "fulfillment", "payment", "invoice",
 		"coupon", "aftersales", "review", "im", "social", "agent", "finance", "delegation",

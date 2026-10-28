@@ -39,7 +39,7 @@ func NewAIAssistantClient(shared *aiServiceConn) *AIAssistantClient {
 	}
 }
 
-// ---- 6 支賣家 stream RPC ----
+// ---- 5 支賣家 stream RPC ----
 
 func (c *AIAssistantClient) SellerChat(ctx context.Context, req *aipb.AssistantRequest) (AssistantStream, error) {
 	return c.client.SellerChat(ctx, req)
@@ -57,15 +57,11 @@ func (c *AIAssistantClient) SellerPayment(ctx context.Context, req *aipb.Assista
 	return c.client.SellerPayment(ctx, req)
 }
 
-func (c *AIAssistantClient) SellerPrice(ctx context.Context, req *aipb.AssistantRequest) (AssistantStream, error) {
-	return c.client.SellerPrice(ctx, req)
-}
-
 func (c *AIAssistantClient) SellerProductListingChat(ctx context.Context, req *aipb.AssistantRequest) (AssistantStream, error) {
 	return c.client.SellerProductListingChat(ctx, req)
 }
 
-// ---- 6 支買家 stream RPC ----
+// ---- 5 支買家 stream RPC ----
 
 func (c *AIAssistantClient) BuyerChat(ctx context.Context, req *aipb.AssistantRequest) (AssistantStream, error) {
 	return c.client.BuyerChat(ctx, req)
@@ -81,10 +77,6 @@ func (c *AIAssistantClient) BuyerTracking(ctx context.Context, req *aipb.Assista
 
 func (c *AIAssistantClient) BuyerReturnPolicy(ctx context.Context, req *aipb.AssistantRequest) (AssistantStream, error) {
 	return c.client.BuyerReturnPolicy(ctx, req)
-}
-
-func (c *AIAssistantClient) BuyerSeasonal(ctx context.Context, req *aipb.AssistantRequest) (AssistantStream, error) {
-	return c.client.BuyerSeasonal(ctx, req)
 }
 
 func (c *AIAssistantClient) BuyerSellerMatch(ctx context.Context, req *aipb.AssistantRequest) (AssistantStream, error) {

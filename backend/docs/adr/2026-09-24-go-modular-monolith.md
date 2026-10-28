@@ -369,3 +369,7 @@
 ## 修訂：模組 `AGENTS.md` 的角色（2026-10-28，Will）
 
 原決策「說明：自己的 `AGENTS.md`，寫明職責、擁有的資料、不變量、讀取模型、不負責什麼」改為：模組 `AGENTS.md` 只放改這個模組前必須知道的規則（固定七節，每條不變量一句規則加守門測試與規格位置），大小上限 6,000 bytes；行為規格的唯一來源是 `docs/modules/<模組>.md`。原決策段保留歷史。理由與否決的方案見 ADR `2026-10-28-agents-md-layering.md`。
+
+## 修訂：pricebook 刪除（2026-10-28，ADR `2026-10-27-general-ecommerce-scope-cut` D1；計畫 `plans/2026-10-27-ecommerce-scope-cut.md` 步驟 6）
+
+模組表的 `pricebook` 列取消，`agent` 的依賴拿掉 `pricebook`；主計畫的 A4 取消，不搬進單體。

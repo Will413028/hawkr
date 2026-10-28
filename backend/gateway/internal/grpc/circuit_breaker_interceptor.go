@@ -31,7 +31,7 @@ type breakerConfig struct {
 // 不健康的服務繼續打」。業務規則拒絕、資料未就緒、下游的下游失敗——都不是那個證據。
 //
 // 🔴 codes.ResourceExhausted 刻意**不**計入失敗（#3230）。本 repo 用它承載的全是業務
-// 語意，六處無一例外：invoice 的 9352 重寄節流、pricebook 的 watch 目標上限、ai 的配額、
+// 語意，五處無一例外：invoice 的 9352 重寄節流、ai 的配額、
 // social 的檢舉限流、product-import 的兩條匯入 job 上限（Java 側，走同一套 DefaultDialOpts）。
 // 讓它 trip 一顆 per-target 共用 breaker 的後果是：**單一使用者踩滿自己的業務配額，
 // 就能讓全體使用者的該服務所有端點 503**。這與 pkg/sms 的 IsExcluded 是同一課

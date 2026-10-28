@@ -91,10 +91,6 @@ func (m *mockAIAssistantStreamClientMulti) SellerPayment(ctx context.Context, in
 	m.calls["SellerPayment"] = in
 	return m.stream, nil
 }
-func (m *mockAIAssistantStreamClientMulti) SellerPrice(ctx context.Context, in *aipb.AssistantRequest, opts ...grpc.CallOption) (aipb.AIAssistantService_SellerPriceClient, error) {
-	m.calls["SellerPrice"] = in
-	return m.stream, nil
-}
 func (m *mockAIAssistantStreamClientMulti) SellerProductListingChat(ctx context.Context, in *aipb.AssistantRequest, opts ...grpc.CallOption) (aipb.AIAssistantService_SellerProductListingChatClient, error) {
 	m.calls["SellerProductListingChat"] = in
 	return m.stream, nil
@@ -109,7 +105,6 @@ func TestSellerSSEHandlers_CallCorrectRPC(t *testing.T) {
 		{"orders", func(h *Holder, c *gin.Context) { h.ProxySellerOrdersSSE(c) }, "SellerOrders"},
 		{"inventory", func(h *Holder, c *gin.Context) { h.ProxySellerInventorySSE(c) }, "SellerInventory"},
 		{"payment", func(h *Holder, c *gin.Context) { h.ProxySellerPaymentSSE(c) }, "SellerPayment"},
-		{"price", func(h *Holder, c *gin.Context) { h.ProxySellerPriceSSE(c) }, "SellerPrice"},
 		{"product-listing", func(h *Holder, c *gin.Context) { h.ProxySellerProductListingSSE(c) }, "SellerProductListingChat"},
 	}
 	for _, tt := range tests {
@@ -158,10 +153,6 @@ func (m *mockAIAssistantBuyerStreamClient) BuyerTracking(ctx context.Context, in
 	m.calls["BuyerTracking"] = in
 	return m.stream, nil
 }
-func (m *mockAIAssistantBuyerStreamClient) BuyerSeasonal(ctx context.Context, in *aipb.AssistantRequest, opts ...grpc.CallOption) (aipb.AIAssistantService_BuyerSeasonalClient, error) {
-	m.calls["BuyerSeasonal"] = in
-	return m.stream, nil
-}
 func (m *mockAIAssistantBuyerStreamClient) BuyerSellerMatch(ctx context.Context, in *aipb.AssistantRequest, opts ...grpc.CallOption) (aipb.AIAssistantService_BuyerSellerMatchClient, error) {
 	m.calls["BuyerSellerMatch"] = in
 	return m.stream, nil
@@ -180,7 +171,6 @@ func TestBuyerSSEHandlers_CallCorrectRPC(t *testing.T) {
 		{"chat", func(h *Holder, c *gin.Context) { h.ProxyBuyerAssistantSSE(c) }, "BuyerChat"},
 		{"orders", func(h *Holder, c *gin.Context) { h.ProxyBuyerOrdersSSE(c) }, "BuyerOrders"},
 		{"tracking", func(h *Holder, c *gin.Context) { h.ProxyBuyerTrackingSSE(c) }, "BuyerTracking"},
-		{"seasonal", func(h *Holder, c *gin.Context) { h.ProxyBuyerSeasonalSSE(c) }, "BuyerSeasonal"},
 		{"seller-match", func(h *Holder, c *gin.Context) { h.ProxyBuyerSellerMatchSSE(c) }, "BuyerSellerMatch"},
 		{"return-policy", func(h *Holder, c *gin.Context) { h.ProxyBuyerReturnPolicySSE(c) }, "BuyerReturnPolicy"},
 	}

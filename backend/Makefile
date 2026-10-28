@@ -9,7 +9,6 @@ GO_SERVICES := \
 	services/im-service \
 	services/invoice-service \
 	services/notification-service \
-	services/pricebook-service \
 	services/review-service \
 	services/seller-service \
 	services/social-service

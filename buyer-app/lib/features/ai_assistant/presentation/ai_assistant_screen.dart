@@ -149,12 +149,6 @@ class AiAssistantScreen extends HookConsumerWidget {
               '如何申請退貨',
             ),
           ),
-          AiFunctionMenuItem(
-            icon: AppIcons.ecoOutlined,
-            label: '推薦當季水果',
-            onTap: () =>
-                triggerQuickAction(BuyerAssistantEndpoint.seasonal, '推薦當季水果'),
-          ),
         ],
       );
     }

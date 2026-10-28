@@ -165,5 +165,4 @@ allowBuilds:
 patchedDependencies:
   '@editorjs/editorjs': patches/@editorjs__editorjs.patch
   '@opennextjs/cloudflare': patches/@opennextjs__cloudflare.patch
-  '@vis.gl/react-maplibre@8.1.2': patches/@vis.gl__react-maplibre@8.1.2.patch
   next: patches/next.patch

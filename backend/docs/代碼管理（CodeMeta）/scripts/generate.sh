@@ -66,7 +66,6 @@ GO_LABEL_ENUMS=(ProductStatus PostPublishStatus OrderStatus DelegationReasonCode
 # 會產生同名符號（例如 OrderStatusPaid）而編譯失敗。
 GO_REGISTRY_ENUMS=(
     CommonStatus
-    PricebookOverviewScope PricebookChangeDirection PricebookChangeBasis
     ProcurementRunStatus ProcurementStepStatus ProcurementLaneStatus ProcurementArtifactStatus
     ProcurementConfirmationStatus ProcurementRunFailureReason ProcurementErrorReason
     ProcurementLedgerEventType ProcurementArtifactType

@@ -93,22 +93,6 @@ hawkr.order.GetSellerOrderStatusCountsResponse.in_progress_count
 hawkr.order.GetSellerOrderStatusCountsResponse.pending_shipment_count
 hawkr.order.SellerRevenue.order_count
 hawkr.order.SellerRevenue.total_revenue
-# §6.2 #3 exception — price/volume metrics kept double end-to-end (not
-# IDs/counts subject to JS Number precision loss at 2^53). Originally
-# justified as "never gateway-exposed" (ai-service → pricebook-service
-# only); that changed with the P6+P7 seller market lookup work adding a
-# gateway route for GetObservedPrice — rationale updated accordingly, still
-# NOT Track-1 backlog.
-hawkr.pricebook.PriceObservation.avg_price
-hawkr.pricebook.PriceObservation.upper_price
-hawkr.pricebook.PriceObservation.middle_price
-hawkr.pricebook.PriceObservation.lower_price
-hawkr.pricebook.PriceObservation.volume_kg
-# §6.2 #3 exception — same rationale as PriceObservation above: pure
-# service-to-service RPC, no gateway route exists yet. NOT Track-1 backlog.
-hawkr.pricebook.GetEstimatedItemPriceResponse.low
-hawkr.pricebook.GetEstimatedItemPriceResponse.median
-hawkr.pricebook.GetEstimatedItemPriceResponse.high
 hawkr.review.OrderReviewInfo.rating
 hawkr.review.ProductReviewsResponse.page
 hawkr.review.ProductReviewsResponse.page_size
@@ -260,108 +244,6 @@ hawkr.social.Report.resolved_at_ms
 hawkr.social.Report.resolved_by
 hawkr.social.SharePostResponse.share_count
 hawkr.social.UserBlock.create_time_ms
-# §6.2 #3 exception — gateway-exposed forecast bands (TWD/kg), added
-# alongside GetObservedPrice's own gateway route in the P6+P7 seller
-# market lookup work. Not an ID/count subject to JS Number precision loss
-# (max safe integer 2^53) — a TWD/kg price band never approaches that
-# magnitude. NOT Track-1 backlog.
-hawkr.pricebook.ForecastCurvePoint.p10
-hawkr.pricebook.ForecastCurvePoint.p50
-hawkr.pricebook.ForecastCurvePoint.p90
-# §6.2 #3 exception — horizon_days (1-7 range) is a count, not an ID
-# subject to JS Number precision loss (2^53); part of gateway-exposed
-# forecast curve added in P6+P7 seller market lookup work. NOT Track-1 backlog.
-hawkr.pricebook.ForecastCurvePoint.horizon_days
-# §6.2 #3 exception — same rationale as ForecastCurvePoint.p10/p50/p90
-# above: gateway-exposed forecast price (TWD/kg), added in the v2 seller
-# market lookup work (cross-market comparison panel). Not an ID/count
-# subject to JS Number precision loss. NOT Track-1 backlog.
-hawkr.pricebook.MarketComparisonEntry.p50
-# §6.2 #3 exception — gateway-exposed trend-summary series (issue #2249
-# Slice B, GetTrendSummary RPC): TWD/kg price/volume fields, same rationale
-# as ForecastCurvePoint.p10/p50/p90 and MarketComparisonEntry.p50 above (not
-# an ID/count subject to JS Number precision loss at 2^53). sample_count and
-# observed_market_count are small bounded counts, same rationale as
-# ForecastCurvePoint.horizon_days above. NOT Track-1 backlog.
-hawkr.pricebook.TrendPoint.observed_average_twd_per_kg
-hawkr.pricebook.TrendPoint.volume_kg
-hawkr.pricebook.TrendPoint.sample_count
-hawkr.pricebook.TrendPoint.observed_market_count
-hawkr.pricebook.TrendComparisonEntry.current_value_twd_per_kg
-hawkr.pricebook.TrendComparisonEntry.baseline_value_twd_per_kg
-hawkr.pricebook.TrendComparisonEntry.change_amount_twd_per_kg
-hawkr.pricebook.TrendComparisonEntry.change_percent
-# §6.2 #3 exception — gateway-exposed spatial surface (issue #2248,
-# GetSpatialSurface RPC). Same rationale as ForecastCurvePoint.p10/p50/p90
-# and TrendPoint above: TWD/kg prices, colour-scale break values and small
-# bounded counts, none of them an ID subject to JS Number precision loss at
-# 2^53. These are also the numbers a MapLibre client feeds straight into
-# colour ramps and axis maths — stringifying them would only move the parse
-# to the browser. (The four *_geojson fields are google.protobuf.Struct, so
-# their RFC 7946 coordinates never reach this gate at all; keeping the
-# sibling scalars numeric keeps one consistent numeric contract across the
-# whole response.) NOT Track-1 backlog.
-hawkr.pricebook.GetSpatialSurfaceResponse.horizon_days
-hawkr.pricebook.PriceScaleInfo.breaks
-hawkr.pricebook.SpatialMarketPrice.p10
-hawkr.pricebook.SpatialMarketPrice.p50
-hawkr.pricebook.SpatialMarketPrice.p90
-hawkr.pricebook.SpatialMarketPrice.recent_volume_kg
-hawkr.pricebook.SpatialStatistics.priced_market_count
-hawkr.pricebook.SpatialStatistics.closed_market_count
-hawkr.pricebook.SpatialStatistics.total_market_count
-hawkr.pricebook.SpatialStatistics.surface_cell_count
-hawkr.pricebook.SpatialStatistics.contour_segment_count
-# §6.2 #3 exception — same GetSpatialSurfaceResponse RPC and rationale as
-# the spatial-surface block above: TWD/kg cross-market prices (issue #2248
-# follow-up, 2026-08-08), same category as SpatialMarketPrice.p10/p50/p90.
-# NOT Track-1 backlog.
-hawkr.pricebook.SpatialStatistics.p50
-hawkr.pricebook.SpatialStatistics.minimum_p50
-hawkr.pricebook.SpatialStatistics.maximum_p50
-# §6.2 #3 exception — same GetSpatialSurfaceResponse RPC and rationale as
-# the spatial-surface block above (issue #2248's boundary/land-area-ratio
-# addition): supported_land_area_ratio is a 0-1 fraction, not an ID subject
-# to JS Number precision loss at 2^53. bbox_wgs84 is the
-# [minLon, minLat, maxLon, maxLat] WGS84 envelope the MapLibre client feeds
-# straight into fitBounds() — same "number the client does axis maths with"
-# category as PriceScaleInfo.breaks above, stringifying would only move the
-# parse to the browser. NOT Track-1 backlog.
-hawkr.pricebook.GetSpatialSurfaceResponse.supported_land_area_ratio
-hawkr.pricebook.SpatialBoundary.bbox_wgs84
-# §6.2 #3 exception — issue #2249 Slice C, GetRegionalComparison RPC (per-
-# county price comparison table). This proto-only commit has no handler or
-# Gateway route wired yet (Task 5/6 of the same plan), but Task 6 already
-# specifies `GET /pricebook/regional-comparison` serializing this response
-# straight to JSON, so these fields do cross the gateway boundary once that
-# lands. horizon_days is a small bounded count (1-7), same rationale as
-# GetSpatialSurfaceResponse.horizon_days/ForecastCurvePoint.horizon_days
-# above. p10/p50/p90 are TWD/kg price-band values, same rationale as
-# SpatialMarketPrice.p10/p50/p90/ForecastCurvePoint.p10/p50/p90 above.
-# supporting_market_count is a small bounded count (number of markets
-# assigned to one county), not an ID subject to JS Number precision loss at
-# 2^53, same category as SpatialStatistics.priced_market_count above. NOT
-# Track-1 backlog.
-hawkr.pricebook.GetRegionalComparisonResponse.horizon_days
-hawkr.pricebook.RegionalComparisonRegion.p10
-hawkr.pricebook.RegionalComparisonRegion.p50
-hawkr.pricebook.RegionalComparisonRegion.p90
-hawkr.pricebook.RegionalComparisonRegion.supporting_market_count
-# §6.2 #3 exception — GetCategoryPriceRollup RPC (category price rollup
-# read API, foundation plan Task 10). level is a bounded tree-depth enum
-# (1|2|3), not an ID subject to JS Number precision loss at 2^53.
-# source_group_count is a small bounded count (number of L3 groups feeding
-# this category's rollup), same category as
-# RegionalComparisonRegion.supporting_market_count /
-# SpatialStatistics.priced_market_count above. NOT Track-1 backlog.
-hawkr.pricebook.GetCategoryPriceRollupResponse.level
-hawkr.pricebook.GetCategoryPriceRollupResponse.source_group_count
-# §6.2 #3 exception — GetCategoryPriceRollup RPC (category L1/L2 forecast curves,
-# foundation plan Task 1). horizon_days (1-7 range) is a small bounded count, not
-# an ID subject to JS Number precision loss at 2^53, same category as
-# ForecastCurvePoint.horizon_days / GetRegionalComparisonResponse.horizon_days
-# above. NOT Track-1 backlog.
-hawkr.pricebook.CategoryForecastPoint.horizon_days
 # §6.2 #3 exception — gateway-exposed StreamEvent oneof member (AIAssistantService
 # SellerChat, BuyerChat, etc. return stream StreamEvent directly; StepEvent is a
 # oneof case). seq is a small sequence number (1-N range), not an ID subject to

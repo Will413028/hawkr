@@ -14,8 +14,8 @@ import (
 // fixed-interval ticker, each cycle computes the next occurrence of
 // hourUTC:minuteUTC and sleeps until then rather than firing on a regular
 // interval — the shape every "run once a day at a fixed wall-clock time" cron
-// job in this repo already hand-rolled independently (buyer-service,
-// seller-service, pricebook-service each had their own copy of this exact
+// job in this repo already hand-rolled independently (buyer-service
+// and seller-service each had their own copy of this exact
 // nextOccurrence/runDailyAt/runWithRecover trio before this type existed).
 //
 // fn does not return an error: none of the three call sites this type
@@ -41,7 +41,7 @@ type DailyScheduler struct {
 // fields) — this is the only observability these jobs have today (no
 // Prometheus metrics for any of the three call sites this type replaces),
 // and matches the log shape already proven in seller-service's
-// governance_jobs.go/di.go and pricebook-service's daily.go/forecast_job.go
+// governance_jobs.go/di.go
 // verbatim (field names "job"/"recovered"/"stack", debug.Stack() not
 // zap.Stack()) so existing log-based alerting/dashboards keyed on those
 // fields are unaffected by the migration.
@@ -59,9 +59,9 @@ func NewDailyScheduler(hourUTC, minuteUTC int, jobName string, run func(ctx cont
 // calling Start from inside its own goroutine, while OnStop fires from fx's
 // own goroutine) — the mutex below makes that safe. Without it, a Stop()
 // racing a concurrent Start() would be a genuine data race on the cancel
-// field (found via `go test -race` against pricebook-service's forecast job,
-// which does exactly this: `go func() { catchUp(ctx); Start(ctx) }()` while
-// OnStop can fire concurrently).
+// field (found via `go test -race` with a caller that runs
+// `go func() { catchUp(ctx); Start(ctx) }()` while OnStop can fire
+// concurrently).
 func (s *DailyScheduler) Start(ctx context.Context) {
 	runCtx, cancel := context.WithCancel(ctx)
 	s.mu.Lock()

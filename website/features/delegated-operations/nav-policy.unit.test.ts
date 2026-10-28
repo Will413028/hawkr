@@ -24,7 +24,6 @@ const DELEGATED_VISIBLE_HREFS = new Set([
 	"/seller-center/posts",
 	"/seller-center/coupons",
 	"/seller-center/customers",
-	"/seller-center/insights",
 	"/seller-center/me",
 	"/seller-center/messages",
 ]);

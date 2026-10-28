@@ -7,7 +7,6 @@ import (
 	categoryClient "github.com/Will413028/hawkr/ai-service/internal/client/category"
 	mediaClient "github.com/Will413028/hawkr/ai-service/internal/client/media"
 	orderClient "github.com/Will413028/hawkr/ai-service/internal/client/order"
-	pricebookClient "github.com/Will413028/hawkr/ai-service/internal/client/pricebook"
 	productClient "github.com/Will413028/hawkr/ai-service/internal/client/product"
 	sellerClient "github.com/Will413028/hawkr/ai-service/internal/client/seller"
 	"github.com/Will413028/hawkr/ai-service/internal/config"
@@ -34,7 +33,6 @@ func modules() []fx.Option {
 		productClient.Module,               // Provides usecase.ProductClient
 		sellerClient.Module,                // Provides usecase.SellerClient
 		buyerClient.Module,                 // Provides buyer.Client（買家會員 entitlement／quota）
-		pricebookClient.Module,             // Provides usecase.PricebookClient（農產品行情）
 		mediaClient.Module,                 // Provides media.Client（AI 風格縮圖 finalize）
 		agentpkg.Module,                    // Provides agent.Agents + agent.Runners + session.Service（adk-go）
 		usecase.Module,                     // Provides UseCases（通用聊天/推薦）

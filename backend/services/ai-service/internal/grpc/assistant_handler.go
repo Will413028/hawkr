@@ -81,9 +81,6 @@ func (s *AIAssistantGrpcServer) SellerInventory(req *pb.AssistantRequest, stream
 func (s *AIAssistantGrpcServer) SellerPayment(req *pb.AssistantRequest, stream pb.AIAssistantService_SellerPaymentServer) error {
 	return s.genericStreamRPC(stream, req, s.runners.Specialists[handler.ButtonSpecialistKey["payment"]], "payment")
 }
-func (s *AIAssistantGrpcServer) SellerPrice(req *pb.AssistantRequest, stream pb.AIAssistantService_SellerPriceServer) error {
-	return s.genericStreamRPC(stream, req, s.runners.Specialists[handler.ButtonSpecialistKey["price"]], "price")
-}
 func (s *AIAssistantGrpcServer) SellerProductListingChat(req *pb.AssistantRequest, stream pb.AIAssistantService_SellerProductListingChatServer) error {
 	return s.genericStreamRPC(stream, req, s.runners.ProductListing, "")
 }
@@ -92,9 +89,6 @@ func (s *AIAssistantGrpcServer) BuyerOrders(req *pb.AssistantRequest, stream pb.
 }
 func (s *AIAssistantGrpcServer) BuyerTracking(req *pb.AssistantRequest, stream pb.AIAssistantService_BuyerTrackingServer) error {
 	return s.genericStreamRPC(stream, req, s.runners.Specialists[handler.ButtonSpecialistKey["tracking"]], "tracking")
-}
-func (s *AIAssistantGrpcServer) BuyerSeasonal(req *pb.AssistantRequest, stream pb.AIAssistantService_BuyerSeasonalServer) error {
-	return s.genericStreamRPC(stream, req, s.runners.Specialists[handler.ButtonSpecialistKey["seasonal"]], "seasonal")
 }
 func (s *AIAssistantGrpcServer) BuyerSellerMatch(req *pb.AssistantRequest, stream pb.AIAssistantService_BuyerSellerMatchServer) error {
 	return s.genericStreamRPC(stream, req, s.runners.Specialists[handler.ButtonSpecialistKey["seller-match"]], "seller-match")
@@ -320,12 +314,10 @@ func init() {
 	registerMethodPolicy("/hawkr.ai.AIAssistantService/SellerChat", MethodPolicy{Actor: seller})
 	registerMethodPolicy("/hawkr.ai.AIAssistantService/SellerInventory", MethodPolicy{Actor: seller})
 	registerMethodPolicy("/hawkr.ai.AIAssistantService/SellerPayment", MethodPolicy{Actor: seller})
-	registerMethodPolicy("/hawkr.ai.AIAssistantService/SellerPrice", MethodPolicy{Actor: seller})
 	registerMethodPolicy("/hawkr.ai.AIAssistantService/SellerProductListingChat", MethodPolicy{Actor: seller})
 	registerMethodPolicy("/hawkr.ai.AIAssistantService/SellerOrders", MethodPolicy{Actor: seller})
 	registerMethodPolicy("/hawkr.ai.AIAssistantService/BuyerOrders", MethodPolicy{Actor: buyer})
 	registerMethodPolicy("/hawkr.ai.AIAssistantService/BuyerTracking", MethodPolicy{Actor: buyer})
-	registerMethodPolicy("/hawkr.ai.AIAssistantService/BuyerSeasonal", MethodPolicy{Actor: buyer})
 	registerMethodPolicy("/hawkr.ai.AIAssistantService/BuyerSellerMatch", MethodPolicy{Actor: buyer})
 	registerMethodPolicy("/hawkr.ai.AIAssistantService/BuyerChat", MethodPolicy{Actor: buyer})
 	registerMethodPolicy("/hawkr.ai.AIAssistantService/BuyerReturnPolicy", MethodPolicy{Actor: buyer})

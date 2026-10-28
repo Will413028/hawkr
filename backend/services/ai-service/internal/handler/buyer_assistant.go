@@ -23,7 +23,6 @@ const ReturnPolicyText = `🔄 退貨申請流程說明：
 var buyerDefaultMessages = map[string]string{
 	"orders":       "查詢我的訂單",
 	"tracking":     "查詢包裹狀態",
-	"seasonal":     "推薦當季水果",
 	"seller-match": "幫我找適合的供應商",
 }
 

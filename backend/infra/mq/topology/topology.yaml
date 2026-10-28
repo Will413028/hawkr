@@ -230,12 +230,6 @@ queues:
   bindings:
   - exchange: hawkr.seller
     key: seller.deleted
-- name: pricebook.seller.deleted
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.seller
-    key: seller.deleted
 - name: im.seller.suspended
   retry:
     max_attempts: 3

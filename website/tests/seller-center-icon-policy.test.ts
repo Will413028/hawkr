@@ -22,8 +22,6 @@ function source(path: string): string {
 test("seller-center feature code does not own SVG icon geometry", () => {
 	const files = filesUnder("features/seller-center");
 	const allowedGraphics = new Map([
-		// This is a plotted observed-price series, not an interface icon.
-		["features/seller-center/insights/ObservedPriceSparkline.tsx", 1],
 		["features/seller-center/inventory/InventoryPage.tsx", 1],
 	]);
 

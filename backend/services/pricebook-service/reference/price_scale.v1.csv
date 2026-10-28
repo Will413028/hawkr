@@ -1,4 +1,0 @@
-scale_version,selection_kind,selection_code,scale_id,policy_version,breaks,note
-price-scale-2026-08-v1,group,N04,N04-price-scale-v1,v1,"35|70|135|260",
-price-scale-2026-08-v1,group,N05,N05-price-scale-v1,v1,"65|180|400|900",
-price-scale-2026-08-v1,group,N06,N06-price-scale-v1,v1,"50|100|160|250","breaks 基於品名推斷為論支/束計價，尚未確認實際單位欄位；上線前需確認若實際為 TWD/kg 則 breaks 需重算"

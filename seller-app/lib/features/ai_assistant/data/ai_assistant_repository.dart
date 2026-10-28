@@ -35,8 +35,7 @@ enum SellerAssistantEndpoint {
   chat('/api/v1/app/sellers/me/assistant/chat'),
   orders('/api/v1/app/sellers/me/assistant/orders'),
   inventory('/api/v1/app/sellers/me/assistant/inventory'),
-  payment('/api/v1/app/sellers/me/assistant/payment'),
-  price('/api/v1/app/sellers/me/assistant/price');
+  payment('/api/v1/app/sellers/me/assistant/payment');
 
   const SellerAssistantEndpoint(this.path);
   final String path;

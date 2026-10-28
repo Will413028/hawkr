@@ -151,12 +151,6 @@ class AiAssistantScreen extends HookConsumerWidget {
             onTap: () =>
                 triggerQuickAction(SellerAssistantEndpoint.payment, '收款與對帳'),
           ),
-          AiFunctionMenuItem(
-            icon: AppIcons.insightsOutlined,
-            label: '商品分析與建議',
-            onTap: () =>
-                triggerQuickAction(SellerAssistantEndpoint.price, '商品分析與建議'),
-          ),
         ],
       );
     }

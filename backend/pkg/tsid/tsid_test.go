@@ -105,7 +105,7 @@ func TestGenerator_SequenceOverflowRollsToNextMillisecond(t *testing.T) {
 }
 
 // TestNewGenerator_SingleGeneratorRapidCallsUnique reproduces the original
-// pricebook-service batch-import collision scenario: a single generator
+// batch-import collision scenario: a single generator
 // called tightly in a loop with no delay, so most calls land in the same
 // millisecond (or a handful of adjacent ones). With the old pure-random
 // design this had a near-100% collision probability at this volume

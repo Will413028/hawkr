@@ -15,12 +15,10 @@ import {
 	withWebSocketSiblings,
 } from "./lib/security/csp";
 import { PRIVATE_PREFIXES } from "./lib/seo/indexability";
-import { prepareMapLibreWorker } from "./scripts/prepare-maplibre-worker.mjs";
 
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 // pnpm workspace 的依賴在 repo 根目錄的 node_modules/.pnpm，bundler 與 file tracing 的根都要涵蓋它
 const workspaceRoot = resolve(projectRoot, "..");
-prepareMapLibreWorker(projectRoot);
 const withBundleAnalyzer = bundleAnalyzer({
 	enabled: process.env.ANALYZE === "true",
 });

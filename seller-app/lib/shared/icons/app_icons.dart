@@ -81,7 +81,6 @@ abstract final class AppIcons {
   static const imageNotSupportedOutlined = Icons.image_not_supported_outlined;
   static const imageOutlined = Icons.image_outlined;
   static const infoOutline = Icons.info_outline;
-  static const insightsOutlined = Icons.insights_outlined;
   static const chartOutlined = Icons.bar_chart_outlined;
   static const chart = Icons.bar_chart;
   static const inventory2Outlined = Icons.inventory_2_outlined;

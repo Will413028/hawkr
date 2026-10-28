@@ -2,7 +2,7 @@
 
 | 項目 | 值 |
 |---|---|
-| 狀態 | accepted（Will 2026-09-14） |
+| 狀態 | superseded by `2026-10-27-general-ecommerce-scope-cut.md`（D1：pricebook-service 整個刪除，新鮮度標籤與預測狀態隨之退場） |
 | 日期 | 2026-09-14 |
 | 影響範圍 | `services/pricebook-service`（`SeriesForecast`、`GroupForecast`）、ai-service 的 `PreviewRfqPrice`（被動受益）、website 採購助手的新鮮度提示 |
 | 來源 | `backend/docs/superpowers/specs/2026-09-14-pricebook-freshness-override-removal-design.md`（私人封存）、`backend/docs/superpowers/plans/2026-09-14-pricebook-freshness-override-removal.md`（私人封存） |

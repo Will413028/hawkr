@@ -120,8 +120,6 @@ const (
 
 	QueueIMSellerDeleted = "im.seller.deleted"
 
-	QueuePricebookSellerDeleted = "pricebook.seller.deleted"
-
 	QueueNotificationAccountDeleted = "notification.account.deleted"
 
 	QueueNotificationBuyerDeleted = "notification.buyer.deleted"

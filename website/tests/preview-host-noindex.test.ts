@@ -136,8 +136,6 @@ test("middleware stays off the asset layer and the API proxy", () => {
 		"/_next/data/x/y.json",
 		"/brand/logo-mark.svg",
 		"/placeholders/a/b.png",
-		"/data/taiwan.geojson",
-		"/generated/maplibre/x/y.mjs",
 		"/templates/jobs.csv",
 		"/robots.txt",
 		"/sitemap.xml",

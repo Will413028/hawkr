@@ -9,7 +9,7 @@ import (
 // 是人手維護的表格。這幾條不變式全部被 procurement 契約文件明文倚賴，卻沒有任何
 // 機制擋住打錯：
 //
-//   - Value == Code：這 7 組是字串碼（同 ClientType／PricebookQualityReasonCode 慣例），
+//   - Value == Code：這 7 組是字串碼（同 ClientType 慣例），
 //     不是數字碼。但同一份 Markdown 的多數 enum 用數字 Value（OrderStatus 是 0/10/50），
 //     照那個慣例編輯就會產出 Code="SUCCEEDED"、Value="50" 而全綠通過——DB 存的是 Value、
 //     契約比對的是 Code，兩者一分家就是靜默的資料寫錯。
