@@ -125,8 +125,10 @@ NOT RUN 與負載造成的假失敗見 `ci-local-map.md` 最後一節。
   - 申請商標與網域。觸發條件：要部署 demo 時；屆時把反向 DNS 前綴改成自己的網域。
   - 刪除舊 repo。觸發條件：新 repo 用滿 3 個月，而且沒有回頭查舊歷史的需要；刪除前問 Will。
   - 兩支 App 既有的圖片載入失敗佔位（各數十處以色塊加 `AppIcons.imageOutlined`、`brokenImage` 等手寫，`rg -n "AppIcons\.(imageOutlined|imageNotSupported|brokenImage)" lib`）改用 5e 的佔位元件。它們不是 G11 素材，與授權無關；5e 只統一自己碰到的位置與 `AppCachedImage`。觸發條件：改到那些元件時順手換，或新 repo 的 CI 視覺回歸建立基準之後一次換。
+  - website e2e 缺視覺基準時以 `--update-snapshots` 產生並判通過（`website-e2e.yml`）：觸發條件是 CI 產生的基準 commit 進版控；同一次刪掉這條分支，缺基準改成失敗（design-review 2026-10-28）。
+  - website e2e 的 8 份 shard 各自 build 一次（建置參數相同）：觸發條件是單次 e2e 超過 15 分鐘或 runner 排隊變長；改成 build 一次、以 artifact 傳給各 shard（Will 2026-10-28）。
   - 品牌色的設計延伸（D11 收斂規則；觸發條件：新 repo 的 CI 視覺回歸建立基準之後）：
-    - 暗色模式沒有覆寫的 25 條規則（`contrast.py` 的 `KNOWN_DARK_GAPS`，只擋增加），以及 seller-center 暗色 `.is-info` 圖示在卡片底上 2.72–2.98（未到 3:1；腳本以 page 底合成，判成 3.39）。
+    - 暗色模式沒有覆寫的 25 條規則（`contrast.py` 的 `KNOWN_DARK_GAPS`；`contrast.py` 是計畫附件，沒有接進任何關卡，要守住就先把它搬進 `scripts/` 並接 CI），以及 seller-center 暗色 `.is-info` 圖示在卡片底上 2.72–2.98（未到 3:1；腳本以 page 底合成，判成 3.39）。
     - 星星評分圖示用輔色，對 cream 約 2.0（舊金色也差不多；`color_policy_test` 釘住 `rating`、`gold` 等於輔色）。
     - 危險色 `#B33A0B` 與品牌橘 `#B8441F` 同色相，seller dashboard 的正負成長色幾乎同色（數字有 +/- 號）；rich text 色盤有兩格幾乎同色。
     - `contrast.py` 的偵測缺口：CSS 註解裡的逗號會被當成選擇器（`KNOWN_DARK_GAPS` 的 seller-center 2 筆中有 1 筆是誤判）；暗色檢查用 page 底，不是元件所在的卡片底。
@@ -366,7 +368,7 @@ NOT RUN 與負載造成的假失敗見 `ci-local-map.md` 最後一節。
     - 例外（Will 2026-10-27）：計畫基線的三項既有失敗（單體 golangci-lint 的 `exhaustive`、`pnpm audit`、pricebook integration）等一般電商裁減計畫刪掉 pricebook 之後再處理，不擋本步驟；列在「延後」。（更正 2026-10-28：先前看到的裁減範圍 spec 失敗是 e2e 的 Clerk 登入替身造成的，修好後全部通過，不需要交給裁減計畫。）
   - 停止條件：轉 public 前，scan 或 gitleaks 任何一類大於 0。
   - 需要人做的事：授權轉 public 與封存舊 repo；在 GitHub 上檢視一次新 repo。
-- [ ] **9. 收尾**：
+- [x] **9. 收尾**：
   - 完成定義逐項核對。
   - 做獨立的設計審查（design-review skill）。
   - 移除本機的名字檢查 hook 與計畫附件的掃描腳本（D7 修訂：名字檢查只在切換前後暫用），以及舊端點檢查 `scripts/check-legacy-endpoints.py` 與它的 hook、引用（根目錄 `AGENTS.md` 的地圖列與「不連到舊公司」的檢查說明、`backend/AGENTS.md` 規則 7、`ci-local-map.md`）（Will 2026-10-27）。
@@ -476,4 +478,4 @@ NOT RUN 與負載造成的假失敗見 `ci-local-map.md` 最後一節。
 | 6 文件、測試資料、個資與指令檔 | 未開始 | | | |
 | 7 守門與 e2e 的 CI | 完成：7a、7b（7b 的 workflow 待步驟 8 實跑） | 7a（`ea9fc5f373`–`0dbf945608`，2026-10-27）：主 session 在合併前的 branch 重跑：`check-legacy-endpoints.py` 全樹 exit 0（29 秒）；`check-denylist.py` 全樹 exit 0（62 秒，高負載）；mutation（暫存檔 `git add -N`）：舊網域 → 舊端點檢查 exit 1、名字檢查 exit 1；中文舊名、縮寫後接小寫單字、camelCase 結尾的縮寫 → 名字檢查各 exit 1（中文舊名不在舊端點檢查的範圍，依 D7 名字只在名字檢查）。主 session 修正：舊端點檢查從每次 commit 改到 pre-push、名字檢查略過自身（縮寫補漏規則對自己的說明誤報）、步驟 6 漏掉的 13 個檔的舊 org 參照改成 `#編號` 或 `<org>/`（pricebook-service `go test ./...` 通過）。implementer：baseline 檔與 `--update`、`ZERO_TOLERANCE` 刪除，`legacy-endpoints.yml` 刪除，`.pre-commit-config.yaml` 加 pre-commit、pre-push hook type（兩個 hook 註明步驟 9 移除），根目錄與 backend `AGENTS.md` 改成本機 hook。7b（`74943d43dd`）：`actionlint` 全部 workflow exit 0；其餘 workflow 原本都有 `workflow_dispatch`；新增 `website-e2e.yml`（build 後跑 `test:e2e:hermetic` 兩個 project、`storybook:test`，缺視覺基準時以 `--update-snapshots` 產生並上傳 artifact）；admin 沒有 e2e 套件 | `website-e2e.yml` 實跑（步驟 8 的第一輪 CI）；目前沒有 spec 呼叫 `toHaveScreenshot`，第一輪不會產生基準；`website/.gitignore` 忽略 `tests/visual/**/*-snapshots/`，commit 基準前要改；`test:seo` 未納入（不同 build flavor） | `ea9fc5f373`–`74943d43dd` |
 | 8 切換 | 完成（三項基線失敗依決定延後） | 2026-10-27–28：`scan.py --all` 守門類別 0、gitleaks 0；初始 commit 與舊 HEAD 逐 blob 相同、`rev-list --count` 為 1；API 查回 public、外部 PR 需核准、secret scanning 與 push protection 開啟、ruleset（禁止 force push 與刪除）；舊 repo 改名 `<舊名>-archive` 並封存；274 個 issue 轉換後重建（scan 守門類別與 gitleaks 0）。CI 修正輪：6a 換資料後的 integration 斷言、website lint、buyer 盤點、iOS Podfile／Gemfile lock、seller 覆蓋率 baseline、seller 錢包篩選溢出（5e1 回歸）、對比不足的淡橘底、sqlc 生成檔、e2e 改官方 Playwright 映像並拆 8 份、Clerk 登入替身（middleware 帶 `CLERK_JWT_KEY`）、Connect 共用 mock、賣家頁首樣式基準跟上品牌色；`1e8c6d5` 的 website e2e（8 份 Playwright 與 Storybook）全綠 | 三項基線失敗（golangci-lint `exhaustive`、`pnpm audit`、pricebook integration）依 Will 決定等 pricebook 刪除；Storybook「空白清單項目 · Enter 回到內文」時好時壞（未修）。8.13：second-brain 現況頁改指新路徑（second-brain `cd015af7`）；Storybook 那項的原因推論為 `DescriptionEditor.tsx` 最後一次存檔失敗被 `catch {}` 吞掉、沒有重試，修正待做 | `9f23df5`–`1e8c6d5` |
-| 9 收尾 | 未開始 | | | |
+| 9 收尾 | 完成 | 2026-10-28：`scan.py --all` 守門類別（brand、brand-abbr、brand-path、colleague、pii、endpoint、assets、merchant、private）都是 0；`gitleaks dir` 0（e2e workflow 的假 Clerk publishable key 原本被判中，之後隨 gitleaks 設定一起移除）；移除名字檢查 hook、`check-denylist.py`、`scan.py`、依賴它們的 `rename.py`／`gen_rename_map.py`／`gen_inventory.py`、`scripts/check-legacy-endpoints.py` 與引用（根 `AGENTS.md`、`backend/AGENTS.md` 與 `單體開發規範.md` 規則 7）；`.gitleaks.toml`、`.gitleaksignore` 依 Will 刪除（沒有關卡在跑；GitHub secret scanning 與 push protection 已開）。design-review：4 項發現——gitleaks 設定 → 刪（Will）；規則 7 失去守門 → 駁回：「不連舊公司」是行為約束，暫時檢查依計畫移除，規則本身仍成立；視覺基準 fallback → 記進延後；8 份 shard 重複 build → 記進延後（Will）；另把 `contrast.py`「只擋增加」的說法改成沒有關卡。延後項搬到 second-brain 專案頁 Pending。A7 計畫沒有舊路徑，不需改；`AGENTS.local.md` 的 e2e 那條改成指向 CI | 新 repo CI 見推送後的 run | 本 commit |

@@ -25,7 +25,7 @@
 | `packages/hawkr-ui-text-ts/` | 共用文案目錄（契約值到使用者面文字）的 TypeScript 版，套件名 `@hawkr/ui-text`；`src/**/*.gen.*` 與 `tests/*.gen.*` 由 `backend/cmd/uitext-gen` 生成，不得手改，`src/format.ts` 與守門工具 `tools/check-enum-text.ts` 是手寫的。website 與 admin 共用 | `.github/workflows/ts-packages.yml`、`.github/workflows/ui-text-generated-diff.yml` |
 | `packages/hawkr_ui_text/` | 共用文案目錄的 Dart 版（純 Dart）；`lib/src/ui_text.g.dart`、`tool/enum_manifest.g.json`、`test/golden.g.json`、`test/golden_calls.g.dart` 由 `backend/cmd/uitext-gen` 生成，不得手改，`UiLocale` 與守門工具 `tool/check_enum_text.dart` 是手寫的。兩支 App 共用 | `.github/workflows/dart-packages.yml`、`.github/workflows/ui-text-generated-diff.yml` |
 | `brand/` | 作品集改名後的品牌素材（`brand/hawkr/`：logo 的 SVG 與用法） | 無 |
-| `scripts/` | 跨專案的檢查 | `.github/workflows/repo-hygiene.yml`（`check-legacy-endpoints.py` 只在本機 pre-push hook 跑） |
+| `scripts/` | 跨專案的檢查 | `.github/workflows/repo-hygiene.yml` |
 
 
 - `packages/hawkr-*-ts` 只發佈 TS 原始碼：消費端以 `transpilePackages` 編譯，用 subpath exports，不做 barrel（集中匯出的 `index.ts`）。
