@@ -825,7 +825,7 @@ SPB2CCharge=0.005,SPB2CFee=50
 
 ## 12. Hawkr 實作對照
 
-> 以下為 Hawkr（seller-service）串接代理商合作商店 API（`bind_merchant` / `update_merchant`）的實作對照。多功能收付／撥款相關 API 目前由 payment 側視需求串接，非本節範圍。
+> 以下為 Hawkr（單體 seller 模組）串接代理商合作商店 API（`bind_merchant` / `update_merchant`）的實作對照。多功能收付／撥款相關 API 目前由 payment 側視需求串接，非本節範圍。
 
 ### 12.1 加解密機制（AES-256-GCM）
 
@@ -849,111 +849,79 @@ HashInfo = SHA256( HashKey + EncryptInfo + HashIV ).toUpperCase()
 ### 12.2 MerID 格式
 
 MerID = `HAWK` + `store_code`（例：`HAWK2612345678`）。
-由 `domain.FormatMerID(storeCode int64) string`（`services/seller-service/internal/domain/payuni.go`）產生，確定性計算。`merId` 僅限 PayUni 付款／退款／Webhook 情境使用，不得當作業務身分鍵，見[Java 微服務開發規範 §5.2](../開發規範/Java%20微服務開發規範.md)。
+由 `model.FormatMerID(storeCode int64) string`（`internal/modules/seller/internal/model/payuni.go`）產生，確定性計算。`merId` 僅限 PayUni 付款／退款／Webhook 情境使用，不得當作業務身分鍵，見[Java 微服務開發規範 §5.2](../開發規範/Java%20微服務開發規範.md)。
 
 ### 12.3 PAYUNi 註冊流程
 
 ```
-賣家提交認證 → CertificationUseCase.Submit()
-  → FSM: draft → submitted
-平台審核核准 → CertificationUseCase.Approve()
-  → FSM: submitted → forwarded（bind 失敗則 forward_failed）
-  → CertificationUseCase.registerPayuni()
-      → 組裝 BindSellerRequest（含 email、地址、英文名等）
-      → payuniClient.BindSeller()
-      → payuniRepo.Upsert(status=pending, payuni_mer_id=HAWK{store_code})
+KYC 審核核准（seller 模組，同一個 transaction）
+  → 建立 seller.payuni_registrations（bind_status = PENDING，MerID = HAWK{store_code}）
+  → 排入 River job seller.payuni_sync（以 store_id 為唯一鍵）
+
+seller.payuni_sync（internal/modules/seller/internal/payuni，Sync）
+  1. transaction：鎖註冊列、記下 intent_seq
+  2. transaction 外：讀 KYC（解密）與店家資料，呼叫 PayUni（有 deadline，不存請求本體）
+       PENDING → bind_merchant；BOUND 而且有資料沒送出 → update_merchant
+  3. transaction：寫結果與事件（鎖順序：店家列、註冊列）
 ```
 
-### 12.4 SyncPayuniStatus
+- 暫時性失敗（傳輸錯誤、PayUni 的暫時性錯誤碼）交給 River 退避重試；最後一次仍失敗，綁定記為 `FAILED`（`PAYUNI_UNAVAILABLE`）。永久失敗（驗證類錯誤碼、資料不完整、沒有設定）直接記錄；`FAILED` 由管理員重新綁定。
+- 店家改聯絡資料或地址、核准、重新綁定都讓 `intent_seq` 加一；`synced_seq` 是 job 上次送出時讀到的值，兩者不等表示有東西還沒送。
 
-```
-worker goroutine (每 5 分鐘) → PayuniUseCase.SyncPendingStatuses()
-  → payuniRepo.GetPending(ctx, 50)
-  → for each: payuniClient.GetSellerStatus(merID)
-      → MerStatus=="1"  → SetActive → CertFSM.PayuniApprove() → under_review
-      → MerStatus=="91" → PayuniMerStatusPendingInfo
-      → MerStatus=="92" → SetFailed → CertFSM.PayuniReject() → rejected
-      → payuniRepo.Update（含 raw_response）
-```
+### 12.4 審核狀態同步
 
-### 12.5 欄位對應（CertificationApplication → PAYUNi）
+- `seller.payuni_poll`：向 PayUni 查一次審核狀態（來源是輪詢或手動刷新），以 `store_id` 為唯一鍵。
+- `seller.payuni_observe`：套用一則 PayUni 通知（`AGENT_NOTIFY`），以 `event_key` 為唯一鍵；MerID 形狀不合回 InvalidInput，格式合法但沒有這個店家則取消、不重試。
+- `seller.payuni_sweep`：啟動即執行、每 15 分鐘的掃描，補排遺失的 sync 並排輪詢。
+- PayUni 回報的原碼（`mer_status`、`member_status`）與推導的 `outcome` 由同一個條件式 UPDATE 寫入，只有 `executed_at` 比 `status_observed_at` 新的觀測會更新。
 
-| CertificationApplication 欄位 | PayUni 參數 | 備註 |
+### 12.5 欄位對應（KYC 申請與店家 → PAYUNi）
+
+| 來源 | PayUni 參數 | 備註 |
 |------|------|------|
-| `RealName` | `Name`（個人）/ `MCName`（企業）/ `ContactName` | |
-| `IDCardNo` | `UBN`（個人）/ `MCID`（企業） | |
-| `CompanyName` | `Name`（企業） | |
-| `TaxID` | `UBN`（企業） | |
-| `CompanyPhone` | `ContactTel` / `MBCTel` | |
-| `CompanyCity + CompanyDistrict + CompanyAddressDetail` | `MerAddr`（企業） | |
-| 從 account-service 取 `Email` | `Email` / `MerEmail` | 以帳號 Email 為主 |
-| 從 account-service 取 `Phone` | `ContactMobile` | |
-| `EnglishName` | `MerEngName` | 需符合 §7.3.4 字元集 |
-| `HAWK + store_code` | `MerID` | `domain.MerIDFromAccountID()` |
-| `seller.StoreName` | `MerName` | 長度 ≤ 20，BIG5 |
-| `seller.Description` | `MerDesc` | |
-| `seller.FullAddress()` | `MerAddr`（個人） | |
-| twaddr 查表 | `MerAddrPost` | 取前 3 碼 |
-| 硬編碼 `2` | `MerType` | Hawkr = 實體商品 |
-| 硬編碼 `3` | `MerMCC` | 食品 |
-| 硬編碼 `100,0,0,0` | `GoodsRate` | 全非預付 |
-| 硬編碼 `CREDIT,ApplePay,GooglePay,ATM` | `Payment` | |
-| 硬編碼 `7` | `DeliverTime` | 7 個月 |
-| 硬編碼 `1` | `EscrowType` | 履保 |
-| 硬編碼 `1000` | `MerUnitPrice` | |
-| 硬編碼 `1` | `SellType` | 網路商店 |
+| KYC `RealName` | `Name`（個人）/ `MCName`（企業）/ `MBCName` | |
+| KYC `IDNumber` | `UBN`（個人）/ `MCID`（企業） | |
+| KYC `CompanyName` | `Name`（企業） | |
+| KYC `TaxID` | `UBN`（企業） | |
+| KYC 公司電話 | `ContactTel` / `MBCTel` | |
+| 店家 `SupportEmail` | `Email` / `MerEmail` / `MBCMail` | |
+| 店家 `ContactName` | `ContactName` | |
+| 店家 `ContactMobile` | `ContactMobile` | |
+| 店家 `ContactPhone` | `MerTel` | |
+| 店家 `TownCode` + `AddressDetail` | `MerAddr`、`MerAddrPost`（twaddr 查表，3 碼郵遞區號） | |
+| KYC `EnglishName` | `MerEngName` | 需符合 §7.3.4 字元集 |
+| `HAWK + store_code` | `MerID` | `model.FormatMerID` |
+| 店家 `StoreName` | `MerName` | |
+| 店家 `Description`，空則 KYC `ProductType`，再空則店名 | `MerDesc` | |
+| KYC 官網，空則店面頁網址 | `MerURL` | 兩者都沒有則缺項，不補預設值 |
+| 固定 `2` | `MerType` | Hawkr = 實體商品 |
+| 固定 `3` | `MerMCC` | 食品 |
+| 固定 `100,0,0,0` | `GoodsRate` | 全非預付 |
+| 固定 `CREDIT,ApplePay,GooglePay,ATM` | `Payment` | |
+| 固定 `7` | `DeliverTime` | 7 個月 |
+| 固定 `1` | `EscrowType` | 履保 |
+| 固定 `1000` | `MerUnitPrice` | |
+| 固定 `1` | `SellType` | 網路商店 |
 
-### 12.6 錯誤碼 → gRPC Status Code 對應建議
+`bind_merchant` 建立後，核心身分欄位（`Name`、`UBN`、`MerName`、`MerEngName`、`MerURL`、`MerDesc`、`MerType`、`MerMCC`、`MCName`、`MCID` 等）不可變更；`update_merchant` 只送聯絡方式與地址。
 
-Hawkr 端呼叫 PayUni API 失敗時，按錯誤類型對映到對應的 gRPC status code，由 Gateway 自動對映為 HTTP 狀態碼：
+### 12.6 錯誤碼處置
 
-| PayUni 錯誤類型 | 錯誤碼範圍 | 建議 gRPC Code | HTTP Code | 說明 |
-|------|------|------|------|------|
-| 金鑰/解密錯誤 | `AGENT01003`/`01004`/`01005` | `Internal` | 500 | 設定錯誤，非使用者問題 |
-| 會員/商店格式驗證 | `AGENT03001`~`03017`、`03027`~`03029`、`AGENT04000`~`04029` | `InvalidArgument` | 400 | 使用者輸入格式不符 |
-| 會員重複 | `AGENT03019` | `AlreadyExists` | 409 | 帳號/手機/Email 已有他人註冊 |
-| 商店代號已存在 | `AGENT04017` | — | — | **特殊處理**：改呼叫 `search_merchant_status` 反查並自癒（見 §12.8） |
-| 會員停權 | `AGENT03031` | `FailedPrecondition` | 409 | 無法建立商店 |
-| 代理商設定 | `AGENT05*` | `Internal` | 500 | 設定錯誤 |
-| 支付方式/手續費設定 | `AGENT07001`~`07002`、`07004`~`07005`、`07018`~`07031` | `InvalidArgument` | 400 | |
-| PayUni 系統錯誤 | `AGENT07003`/`07006`/`07007`/`07008` | `Unavailable` | 503 | 可重試 |
-| 負責人/主聯絡人 | `AGENT08*`、`AGENT09*` | `InvalidArgument` | 400 | |
+PayUni 錯誤碼由 `ClassifyPayUniCode`（`internal/modules/seller/internal/model/payuni.go`）分類為使用者該採取的動作（`PayUniRemedy`）：`PayUniRetryable` 的暫時性碼由 job 重試，`AGENT04017` 走 §12.8 認領，其餘永久失敗記錄碼。
 
 ### 12.7 相關程式碼位置
 
 | 角色 | 檔案路徑 |
 |------|---------|
-| PayUni HTTP Client | `pkg/payuni/client.go` |
-| 加解密 | `pkg/payuni/crypto.go` |
-| Client Adapter | `services/seller-service/internal/client/payuni/client.go` |
-| Client Interface | `services/seller-service/internal/usecase/payuni_client.go` |
-| PayUni Use Case | `services/seller-service/internal/usecase/payuni.go` |
-| Certification Use Case | `services/seller-service/internal/usecase/certification.go` |
-| PayUni Domain | `services/seller-service/internal/domain/payuni.go` |
-| PayUni Repository | `services/seller-service/internal/repository/postgres/payuni_repository.go` |
-| gRPC Handler | `services/seller-service/internal/grpc/handler.go` |
-| DB Schema | `services/seller-service/db/schema/schema.sql`（`payuni_registrations` 表） |
+| PayUni HTTP Client | `internal/platform/payuni/client.go` |
+| 加解密 | `internal/platform/payuni/crypto.go` |
+| 綁定、同步、輪詢、通知 | `internal/modules/seller/internal/payuni/` |
+| PayUni Domain（MerID、錯誤碼分類、審核結果推導） | `internal/modules/seller/internal/model/payuni.go` |
+| DB Schema | `internal/modules/seller/db/schema.sql`（`seller.payuni_registrations`） |
 
-### 12.8 MerID 衝突自癒（AGENT04017）
+### 12.8 MerID 衝突認領（AGENT04017）
 
-當 `bind_merchant` 回傳 `AGENT04017`（商店代號已存在）時，改呼叫 `search_merchant_status` 反查商店狀態並自癒，處理邏輯見 `services/seller-service/internal/usecase/certification.go`。
-
-### 12.9 歷史問題清單（P0/P1/P2，已解決）
-
-> 以下為 2026-02 首次串接時盤點的問題清單，**已全數解決**；保留作為欄位映射與踩坑對照。
-
-**P0（API 必填欄位未傳送）**：Email、ContactName、ContactMobile/ContactTel、MerEmail、MerEngName、MerURL、MerAddr、MerAddrPost、MerDesc 早期未從認證申請帶入 → 已於 `BindSellerRequest` 全數補齊。
-
-**P1（邏輯錯誤）**：
-
-| # | 問題 | 修正 |
-|---|------|------|
-| 10 | `MerType` 曾誤映射為 Individual→1／Business→2 | Hawkr 是食品電商，固定為 `2`（實體商品） |
-| 11 | `MerName` 曾誤映射自 `RealName`（個人真實姓名） | 應為商店中文名稱 `StoreName` |
-| 12 | `Name` 曾一律映射自 `CompanyName`，個人商戶為空 | 依 SellerType 分別映射（個人=RealName、企業=CompanyName） |
-| 13 | `Payment` 曾送 `"1"` | 應送代碼 `CREDIT` 等（見 §9.1） |
-
-**P2（功能缺失，皆已實作）**：PAYUNi 註冊觸發點、SyncPayuniStatus worker、GetSellerStatus 回應解析（CreditStatus/ApplepayStatus/GooglepayStatus/ATMStatus）、raw_response 存儲、企業會員欄位（MBCName/MBCTel/MBCMail/MCName/MCID）、BindSellerRequest 完整欄位。
+當 `bind_merchant` 回傳 `AGENT04017`（商店代號已存在）時，改呼叫 `search_merchant_status` 查詢商店狀態並認領（`claimExisting`），所以結果不明（逾時）之後重送一律安全。
 
 ---
 
