@@ -19,7 +19,7 @@
 
 - 角色只有 `SELLER`，帳號另外申請，由 seller 授予與移除；移除角色不刪帳號。買家不是角色：帳號活著就是買家。
 - 不是角色的值（例如 `BUYER`）授予或移除都回 InvalidInput；DB CHECK `account_roles_role_check` 只允許 `SELLER`。
-- `account_roles.source_id` 是 seller-service 以非同步方式移除 SELLER 時的柵欄：移除帶來源，目前的授予屬於較新的來源就不移除。
+- `account_roles.source_id` 是移除 SELLER 時的柵欄：移除帶來源，目前的授予屬於較新的來源就不移除。
   - 授予帶來源（該次開店的 `store_id`）；帳號已有同角色時 `source_id` 改指到這次授予帶的值，值相同則沒有變化（回傳 0 列）。授予不帶來源也會把既有的來源改成 NULL，呼叫方永遠帶當下的來源。
   - 移除的條件是目前的授予沒有來源、或來源等於呼叫帶的來源，比對在同一句 `DELETE` 內。被柵欄擋下時（有角色但沒有移除）呼叫端視為成功，帳號保留。
 - 授予、移除角色與刪帳號都先鎖住帳號列。
