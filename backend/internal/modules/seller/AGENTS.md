@@ -70,32 +70,6 @@ SQL 的 view 與函式（寫在 `db/objects.sql`、手寫 migration，單體規�
 - 瀏覽數以 `store_id` 與台北日計，請求路徑不呼叫商品服務。守門：`TestRollupBucketsByStoreAndTaipeiDayOfOccurrence`。規格：§16。
 - 事件與快取失效在寫入的 transaction 內；儲存代碼 UPPER_SNAKE 加 CHECK 等於 `Values()`。守門：`TestEventFailuresRollBackTheWholeCommand`、`TestChecksMatchGo`。規格：§18、§20。
 
-## 已知限制
-
-- Java 仍以 BIGINT 存 `store_id` 與停權期間的 `period_id`（product 的停權快照以 `period_id` 為 scope），兩者暫用 IDENTITY；最後一個數字 ID 的消費者改寫時依 row-identity ADR 換 UUID（階段 C）。措施與請求的 ID 沒有 Java 的消費者，是 UUIDv7。
-- 店家的未結訂單檢查（`Orders` port，見 `docs/modules/seller.md` §11）有一個保留的時間窗：它在 transaction 外問 ordering 的現況，與之後鎖帳號、關店之間仍可能有新訂單成立（舊服務的訂單不在單體的鎖裡）；訂單搬進單體之後以 ordering 自己的判斷在同一個 transaction 內檢查（CARRYOVER「7c 審查後的結論」）。
-- 新轉正的資產要在 media GC 的 7 天寬限內被同步 job Link（轉正之後、同步完成之前沒有引用）；job 失敗由 River 重試並記 error log。B1 把引用移進業務列的 transaction 後，同步 job 與退場表消失。
-- 不在這次清理範圍：治理的通報、違規與停權紀錄（自由文字、處分原因）不在這次清理範圍，各有自己的保留規則（匿名檢舉人的聯絡欄位 `greatest(建立 + 90 天, 結果 + 30 天)`、其餘結論見上一則）；`kyc_reviews.reason` 與 `kyc_reveals.reason` 是審核員的文字、不含申請人的欄位值，保留。
-- 清理不處理對未來處分的覆蓋：見 `CARRYOVER.md`「處分的身分快照與清理的關係」。
-- 商家名單：公司時期的名單資料沒有搬（repo 沒有資料，上線前不受相容性約束）；邀請子系統整套不搬（沒有消費者，盤點 Q8），admin 的邀請面板在步驟 10 移除；`category`、`region` 的自由文字與分類樹 ID 並存（盤點 Q10，結構化需要整份名單重標）；ILIKE 搜尋是全表掃描，名單在數千列以內不是問題，成長之後再加索引；分類標註工具 `cmd/prospect-category-gen` 隨 A9 處理；分類由後台 `CreateProspect`、`UpdateProspect` 的 `category_ids` 寫入；共用平台的排除清單（`prospectSharedHosts`）只有匯入資料裡已知的 `linktr.ee` 與 `pinkoi.com`，新的共用平台出現時加進去。
-- 商家名單的合併不搬圖片（引用依 `prospect_id` 登記，沒有搬移的操作）：輸家的圖片釋放，贏家沒有圖片時要重新上傳。
-- 身分比對（`SubmitKYC`）是身分證號、統編存在與否的探測面（泛用錯誤不夠，攻擊面是重複送出），所以頻率限制在入口：`internal/httpapi/seller` 的宣告表給 `SubmitKYC` 每個帳號每小時 5 次的額度（`limitedTo`，在能力檢查通過之後、handler 之前計數）。計數在 serve 程序的記憶體內，多個 instance 各自計數；模組本身不限流，直接呼叫模組的程式（job、測試）不受它約束。
-- 瀏覽數的匿名打點入口是 `SellerPublicService.RecordProductView`（步驟 8c）：只計訪客，有呼叫者時回成功但不寫入（登入買家由 `RecordVisit` 計，所以 website 在步驟 10 之前繼續對登入者送 beacon 也不會算兩次），每個來源 IP 每分鐘 120 次（`internal/httpapi/ratelimit.go` 的 `procedureTiers`，在這個程序的記憶體內計數）；website 的 beacon 只給未登入者在步驟 10（盤點 D11、D14）。商品層級的排行屬後續：重用這張原始事件表、另加彙總維度，不改彙總表。
-- 管理員的自由文字理由（措施的 `statement_to_seller` 與內部註記 `governance_notes`、後台刪帳號的 `request_attempts.reason`）是稽核文字，可能夾帶賣家的個資（結論：保留，個資清理不動它們）。重新評估：隱私政策定稿時，或 A8（notification 與資料保存期限）。
-- 後台清單的店名與電話搜尋是全表掃描（上線前的資料量不是問題）；觸發條件在 `CARRYOVER.md` 的觸發條件表（店家超過 1 萬列或 p95 超過 200 ms 時加 pg_trgm GIN）。
-- 證件圖片的讀取（`ReadDocument`）經 media 的 `ServerReadSecureAsset`，整份內容在記憶體（media 的 RPC 不串流），只適合證件大小的檔案；這個 RPC 要求 `secure/` 前綴的物件，所以轉正時要求 media 回報 `is_secure`（草稿存檔拒絕非機敏的證件），讀取時 media 回 400（不是機敏資產）是 `media.ErrNotSecure`，與找不到分開。終點：每次讀取都要記錄（Will 2026-10-04），簽章網址記不到讀取、R2 存的又是 media 加密過的密文，所以 B1 之後擁有者的端點仍然代理，只有 `media.Media.ReadSecure` 後面的 adapter 從 Java 的 gRPC 換成單體內的 media。沒有通用的 admin 機敏下載：證件影像只經這條端點。
-- 證件讀取的 media 失敗分三種（`mediaref.ReadSecure`，佐證共用；`TestKYCDocumentReadFailuresAreDistinguished`）：引用的同步還沒結算（`media_ref_sync.synced_seq < seq`，新轉正的證件，job 最多落後一個週期）是 `ErrFileNotSynced`，端點回 503 加 `Retry-After`（warn）；同步過了、我們的資料庫有這張證件而 media 說沒有是 `ErrFileMissing`，不是機敏資產是 `media.ErrNotSecure`，兩者都是資料不一致，端點回 404 並記 error（要人處理）。三種都已經先寫了讀取紀錄。
-- 佇列為什麼篩選審核中是舊到新：審核的服務水準以等待時間計，等最久的先看（SLA）；其他狀態與全部是回頭查紀錄，新的在前。兩支 query 的篩選條件必須一致，`TestAdminKYCQueueVariantsFilterIdentically` 驗證；KYC 佇列的 ILIKE 搜尋（姓名、公司名稱、統編）是全表掃描，觸發條件在 `CARRYOVER.md`。
-- 本模組的事件由 `internal/legacy/sellerrelay`（`cmd/hawkr` 的 `subscribeSellerRelay`，serve、worker 與 `reannounce-exposures` 都訂閱）轉成 RabbitMQ 訊息給 Java 與晚搬的 Go：`seller.deleted`（由 `StoreRetired`，關店 30 天後的退場時；`StoreClosed` 與 `StoreReopened` 不轉送：關店可逆，曝光與停權的變化各有事件）、`seller.suspended`、`seller.unsuspended`、`seller.profile.changed`、可曝光變化的 `seller.exposure.changed`（Java 依它在讀取時隱藏不可曝光的店的商品，等待刪除也由它涵蓋；ADR `2026-10-05-store-exposure-to-legacy.md`）與 `merchant.verification.*`；不轉送的事件（`StoreOpened`、`StoreClosed`、`StoreReopened`、`StorePendingDeletion`、`KYCSubmitted`、`KYCApproved`、`KYCCancelled`、`PayUniBindFailed`）與原因在 sellerrelay 的套件說明。治理事件（`ReportReceived`、`ReportResolved`（每筆通報有了結果發一次：個別設定、案件結案帶入都算）、`MeasureCreated`、`MeasureRevised`、`MeasureEnded`、`MeasureRevoked`、`MeasureRequestSubmitted`、`MeasureRequestDecided`、`MeasureRequestClosed`）由 A8 的 notification 訂閱並保存送達紀錄；在那之前賣家、檢舉人與 admin 都以拉取的方式看到結果。
-- 登入檢舉人的 `reporter_buyer_id` 不隨買家刪除清掉（結論：保留）：它是指向買家墓碑列的擬名鍵，買家的個資由 buyer 自己的刪除流程清除，seller 不依賴 buyer；清掉它會讓檢舉人無法查自己的檢舉、也讓去重失效。匿名通報與補充的描述是自由文字，可能含個資（結論：保留）：它們是通報的實質內容，後續調查需要它；保留期限的清理只動聯絡欄位。重新評估：隱私政策定稿時，或 A8（notification 與資料保存期限）時。
-- 開店只鎖帳號列、不鎖舊 stint：開店與「延長舊 stint 上已到期的處分」併發時，新 stint 已經停權（能力在讀取時推導，即時正確），但停權期間與 `StoreSuspended` 要等每小時的對帳補上。只影響事件的時間，不影響權限；若下游需要即時，開店改成先 `LockAccountOf`。
-- 入口、gateway 與舊服務都讀本模組，店家只有一份資料。SELLER 角色與現任店家成對（開店與授予、關店與移除各在同一個 transaction）：有 SELLER 卻沒有現任店家是不變量被破壞，`gatewayproxy` 回 500、`accountdeletion` 回 internal，不當成「沒有店家」。
-- KYC 的身分比對只擋「同一個身分」：用別人的證件、人頭入駐不在防線內（ADR 後果）。處分建立之後才由被處分帳號新增的申請不在快照裡（被處分的帳號開不了新店，既有的申請核准要求帳號沒有停權，所以不會被核准）。核准與「另一個帳號的處分同時寫入」不需要額外的鎖：處分在核准讀取之後才 commit，結果等於「先核准、後處分」，是合法的序列順序，之後的核准都會看到快照。快照只能取到處分當下還沒清理的 KYC：舊 stint 關閉滿 184 天（第二段清理）、KYC 已清理之後才被處分時，舊 stint 用過的身分不在快照裡（目前 stint 的身分仍在）；這是「關店 184 天後清註冊與身分資料」的代價（ADR 的資料最小化），不另外保留 hash。
-- KYC 金鑰（`KYC_ENCRYPTION_KEYS`、`KYC_HASH_KEYS`）必填；啟動檢查（serve 與 worker，`CheckKYCKeys`）：資料庫參照的每一把金鑰 ID（KYC 密文開頭、申請的 hash、處分身分快照）都要在金鑰環裡，缺了就不啟動（`TestStartupChecksThatEveryKeyReferencedByTheDatabaseIsConfigured`）。**第一次輪替任何 KYC 金鑰之前，要先有重算 hash 的 job**（申請的 blind index 與處分快照的 hash 以新金鑰重算，否則新的比對查不到舊金鑰寫入的列以外的新值；加密金鑰輪替則是解密後重寫）。快照沒有明文可以重算，用來算快照 hash 的舊 HMAC 金鑰要留在金鑰環直到對應的處分結束；輪替加密金鑰時以解密後重寫的 job 遷移（沒有資料之前不做）。
-- identity 的 `source_id` 柵欄還在（只為 seller-service 的非同步移除）：開店與關店照樣帶 `store_id` 當來源，步驟 11 拿掉。
-- PayUni：webhook 的 consumer（`sellerconsumer`）跑在 worker，`merchant.verification.*` 由 relay 轉送（`PayUniBindFailed` 沒有舊 routing key，不轉送）。`ExecuteTime` 的格式（`yyyyMMddHHmmss`）與時區（台北）取自 Java 測試的樣本與 PayUni 慣例，沒有對真實的通知驗證；輪詢（事件時間用我們的時鐘）與 webhook（PayUni 的時鐘）混用，假設兩邊的時差遠小於狀態改變的間隔。沒有 sandbox 與真實呼叫：`platform/payuni` 只以本機的 httptest 驗證，欄位名稱、`search_merchant_status` 的回應格式與 AES-GCM 的格式照舊 `pkg/payuni`（PayUni 規格要求固定的 IV，同一把金鑰下相同的明文產生相同的密文，是規格的限制）；2 QPS 的外部限制由 `platform/payuni` 的 `golang.org/x/time/rate` 限流器守住（`PAYUNI_MAX_QPS`，預設 2，burst 1，一個程序一個 client，**限流器只在程序內：只能有一個 worker 程序，第二個 worker 需要共用的限流器才能開**；排不進 deadline 的呼叫回暫時性錯誤、由 River 重試）。
-- PayUni：`seller.payuni_sync` 結果寫入之後、River 標記完成之前的空檔內到達的改動，因為唯一鍵含 `running`，不會另排 job；`seller.payuni_sweep` 在閒置 10 分鐘後補排（最多延遲約一個掃描週期）。同步被 PayUni 永久拒絕（`sync_error_code`）時賣家要再改一次才會重送，沒有自動重試。
-
 ## 讀取模型
 
 無。`CurrentStore` 與 `Store` 回傳完整的 stint（含已關閉的，`Status` 標示）；對外怎麼呈現由 ADR `2026-10-03-public-store-identity-and-visibility.md` 決定：店面頁只給可公開曝光的店家，卡片只給曾經公開過的店家（`first_exposed_at` 有值，或此刻可公開曝光）。

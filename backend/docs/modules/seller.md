@@ -16,6 +16,10 @@
 
 - 地址以內政部的 8 碼鄉鎮市區代碼（`town_code`，縣市是前 5 碼）表示：寫入端以 `platform/twaddr` 檢查是現行的代碼，DB 的 `stores_town_code_check` 檢查格式；地址要有鄉鎮市區（`stores_address_detail_check`）。網站網址的 scheme 與主機在寫入前轉成小寫（DB 的 CHECK 區分大小寫）。文字欄位不存空字串（沒有值是 NULL）。
 
+- 開店只鎖帳號列、不鎖舊 stint：開店與「延長舊 stint 上已到期的處分」併發時，新 stint 已經停權（能力在讀取時推導，即時正確），但停權期間與 `StoreSuspended` 要等每小時的對帳補上；只影響事件的時間，不影響權限。下游需要即時時，開店改成先 `LockAccountOf`。
+
+- 入口、gateway 與舊服務都讀本模組，店家只有一份資料。有 SELLER 卻沒有現任店家是不變量被破壞：`gatewayproxy` 回 500、`accountdeletion` 回 internal，不當成「沒有店家」。
+
 ## 3. 店家 profile、logo 與封面
 
 - profile 是部分更新：nil 保留原值，空字串清成沒有值，合併後整體再驗證一次；換圖時所有不需寫入的拒絕（能力、版本、合併後的驗證、店名鎖）都在 staged token 轉正之前，被拒的請求不消耗 token（`TestRejectedProfileUpdateDoesNotConsumeTheStagedToken`）；完成新手引導是獨立的 `CompleteOnboarding`（只設旗標、冪等、不重新驗證其他欄位，`TestCompleteOnboardingDoesNotRevalidateStoredFields`）；合併後沒有任何改變時不寫入（版本、etag 不變，不發事件，過期的版本照樣衝突）。`TestUpdateProfileKeepsOmittedFieldsAndClearsExplicitEmpty`、`TestUpdateProfileWithoutChangesIsANoOp` 驗證。
@@ -90,6 +94,10 @@
 
 - 佐證是機敏檔（ADR 2026-10-18-seller-governance-consolidated「決策」的「佐證」）：轉正時 media 必須回報 `is_secure`，公開上傳的在寫入之前回 InvalidInput（`EvidenceTokens`），什麼都不寫（`TestEvidenceMustBeSecureAssets`）。後台以 `ReadEvidence(adminID, kind, refID, position)` 讀（`kind` 是 `REPORT` 以通報 ID、`REQUEST` 以申訴請求 ID、`INQUIRY` 以詢問 ID 定址）：授權是後台的權限（`httpapi/adminauth`），模組只要求管理員 ID，沒有理由或限時授權；紀錄不存在、位置沒有佐證、種類與 ID 對不上都是 NotFound，不寫紀錄、不問 media；transaction 內先寫一列 `evidence_accesses`（`(report_id, position)` 或 `(request_id, position)` 剛好一個，以複合外鍵指向那一張佐證：佐證不可改，所以就是送出的檔；管理員、時間；不含內容），commit 之後才經 `mediaref.ReadSecure`（與 KYC 證件共用）取內容，紀錄寫不進去就不讀，media 失敗時紀錄仍在；media 讀不到時分成 `ErrFileNotSynced`（引用的同步還沒結算，`MediaSyncSettled` 在呼叫之前讀）、`ErrFileMissing`、`media.ErrNotSecure`。`TestEvidenceReadIsRecordedBeforeTheBytesAreRead`、`TestEvidenceReadFailuresAreDistinguished`。佐證的 asset ID 與 object key 不對外：API 只回位置與檢視網址（`httpapi/seller.AdminEvidence`）。
 
+- 證件圖片的讀取（`ReadDocument`）經 media 的 `ServerReadSecureAsset`，整份內容在記憶體（media 的 RPC 不串流），只適合證件大小的檔案。該 RPC 要求 `secure/` 前綴的物件，所以轉正時要求 media 回報 `is_secure`（草稿存檔拒絕非機敏的證件）；讀取時 media 回 400（不是機敏資產）是 `media.ErrNotSecure`，與找不到分開。每次讀取都要記錄，簽章網址記不到讀取、R2 存的又是 media 加密過的密文，所以由擁有者的端點代理；沒有通用的 admin 機敏下載，證件影像只經這條端點。
+
+- 證件與佐證讀取時 media 的失敗分三種（`mediaref.ReadSecure`，兩者共用；`TestKYCDocumentReadFailuresAreDistinguished`）：引用的同步還沒結算（`media_ref_sync.synced_seq < seq`，新轉正的證件，job 最多落後一個週期）是 `ErrFileNotSynced`，端點回 503 加 `Retry-After`（warn）；同步過了、資料庫有這張證件而 media 說沒有是 `ErrFileMissing`，與 `media.ErrNotSecure` 都是資料不一致，端點回 404 並記 error（要人處理）。三種都已經先寫了讀取紀錄。
+
 ## 10. 能力與權限
 
 - 能力只由 `model.CapabilitiesOf(store)` 推導（store 的 `Sanctions` 與 `Conditions` 是讀店家時由 SQL 帶上的這一刻的結果：`stint.Load` 與批次讀取都經 `stint.WithConditions`；沒有推導過的條件一律不滿足），回傳 `model.AllCapabilities()` 每一項的 `{Active, Missing}`，缺的條件依 `Requirements()` 的順序。每個能力需要哪些條件只寫在 `model/capability.go` 的 `needs` 表（停權白名單 `GrantedWhenSuspended` 與缺項都由它推導，不另寫規則），結果是：停權（不論依據，設計書 46 §3）時只剩能力檢查 ADR 的白名單，其餘缺 `NOT_SUSPENDED`；等待刪除時經營類（`CAP_STOREFRONT_WRITE`、`CAP_PRODUCT_MANAGE`、`CAP_MARKETING`、`CAP_INVOICE_MANAGE`、`CAP_SHIPPING_SETUP`）與 `CAP_ACCOUNT_CLOSE`（它由刪帳流程關閉）缺 `NOT_PENDING_DELETION`；物流建店（`CAP_SHIPPING_SETUP`）另缺 `KYC_APPROVED`（`Conditions.KYCApproved` 為假）；關閉時每個能力缺 `STORE_ACTIVE`。`CAP_PUBLIC_LISTING` 是店家狀態不是動作：只在 `CapabilitiesOf` 的結果，不在 `Capabilities()`（方法不能宣告它，`checkDeclarations` 拒絕），不進 gateway 的 header（`ActiveCapabilities` 只回啟用的動作類能力）。`Store.Can` 與 `CapabilitiesOf` 同一個推導（`TestStoreCanAgreesWithCapabilitiesOf`），非動作類能力 panic（程式錯誤，`TestStoreCanRejectsCapabilitiesItCannotAnswer`）。`Authorize(store, capability)` 是檢查：已關閉 NotFound；停權 PermissionDenied（帶 `ReasonSellerSuspended`）；其他前置條件沒有滿足 FailedPrecondition（帶 `ReasonSellerRequirementMissing`，metadata `missingRequirements` 是缺的條件的值名（不加前綴），依列舉的數字由小到大以逗號連接）；條件沒有推導過的店家一律拒絕（程式錯誤，`TestStoreWithoutDerivedConditionsHasNoCapability`）。profile、logo、封面的寫入要 `CAP_STOREFRONT_WRITE`，`CloseCurrent` 要 `CAP_ACCOUNT_CLOSE`。`TestCapabilitiesOf*`、`TestPublicListingMirrorsMissingExposure`、`TestAuthorizeDenialsCarryTheirReason`、`TestActingStoreRequiresAnApprovedKYCFlowForShippingSetup`、`TestCapabilitiesGateStoreWrites` 驗證。
@@ -109,6 +117,8 @@
 - 恢復營業（可逆關店，`closing.ReopenPlan`／`closing.Reopen`，在撤銷、接受申訴與連帶撤銷的同一個 transaction）：恢復 ⇔ 帳號最近的 stint 是由 `TERMINATION` 關閉的、未清理、造成關店的那一筆（目前關店紀錄的 `closed_by_measure_id`）已撤銷（這次撤銷之前就已撤銷，或在這個 transaction 要撤銷的措施裡）、撤銷之後（同一個 transaction 要撤銷的措施不算，含連帶撤銷的）帳號沒有任何 ACTIVE 的終止合作、`¬RetireDue`（`RetireDueStores` 不選它，與清理同一個判斷式）（預定生效的預告終止與已結束的不算：`stint.Effective`）、帳號是存活的（不在等待刪除）；動作是 `CLOSED → ACTIVE`（同一個 `store_id` 與店號，商品與 KYC 欄位都在）、結束目前的關店紀錄、重新授予 SELLER、重新公告可曝光、發 `StoreReopened`、補排 PayUni 被放棄的綁定（`payuni.Resume`：sync job 對已關閉的店不做事、PENDING 的綁定會被放棄）、`Recompute`。**恢復與否在改動任何請求之前決定**（`measure.planRevoke`）：否則期滿前提出、期滿後裁定的申覆，會因為同一個 transaction 裡待處理申覆結案、legal hold 消失而不能恢復。帳號已開新店（21.2 允許，最近的 stint 不是已關閉的）、帳號在等待刪除、保留期已滿而清理還沒跑、帳號還有別的生效中終止、或撤銷的不是造成關店的那一筆（預告終止先關店，之後在同一個已關閉的店建立並撤銷 21.3，店仍因預告終止而關閉）時只撤銷（`TestRevokingATerminationThatDidNotCloseTheStoreNeverReopensIt`、`TestTwoTerminationsKeepTheStoreClosedUntilTheLastOneIsRevoked`、`TestCascadeRevocationReopensOnlyAccountsWithNoOtherEffectiveTermination`）。清理與恢復都鎖帳號全部的 stint，互相串行。`TestRevokingATerminationInsideTheAppealWindowReopensTheSameStore`、`TestAnAppealFiledInTimeAndDecidedAfterTheDeadlineStillReopensTheStore`、`TestRevokingAfterTheRetentionButBeforeThePurgeJobDoesNotReopen`、`TestRevokeDoesNotReopenWhenTheAccountHasANewStoreOrIsLeaving`、`TestRetentionDependsOnWhoClosedTheStore`、`TestLegalHoldCoversTheWholeAccountAndLinkedAccounts`、`TestReopenRequeuesThePayUniBindThatWasDroppedWhileClosed`。
 
 - 兩段清理只在期滿後做：第一段（退場）的候選必須是 `CLOSED`、還沒退場、`now > retire_after`，第二段的候選必須已退場、個資還沒清理、`now` 晚於同一個式子以 `StoreRetention` 計的期限；兩段的時間條件只有 `RetireDueStores` 一支查詢（清理與恢復營業共用），保存條件只有 `StoreHolds` 一支。資料庫保證：`stores_retired_check`（已退場 ⇒ 已關閉、說明、獎項、網站是 NULL）、`stores_closed_images_check`（已退場的店沒有圖片）、`stores_pii_purged_check`（已清理 ⇒ 已退場、已關閉、店名與聯絡地址是 NULL），都不檢查時間。`retire_after`：`closed_by = TERMINATION` 是 `greatest(關閉時間 + 段的時數, 帳號上未撤銷的終止合作中最晚的 starts_at + 申覆期間 4416 小時)`（已撤銷的終止不延長，造成關店的那一筆撤銷後也不再延長；關店之後才發現的 21.3 事由、關聯終止的申覆期限可能比較晚；`TestRetentionFollowsTheLatestAppealDeadlineAmongAllTerminations`、`TestARevokedClosingTerminationDoesNotExtendTheRetention`），其他是關閉時間 + 段的時數（第一段 720 小時、第二段 4416 小時）；`appeal_hold`：帳號上未撤銷的 `TERMINATION` 措施有待處理申覆，或帳號上未撤銷的 `LINKED_ACCOUNT` 終止其來源措施有待處理申覆時，帳號全部已關閉的 stint 兩段都暫停（`TestRevokedLinkedTerminationDoesNotHoldThePurge`）。退場的同一個 transaction 釋放 logo 與封面（記成退場、排入同步）並發 `StoreRetired`。KYC 與 PayUni 的子表只清店家列已清理的列，清理過的列由 `*_purged_check` 保證被清的欄位是 NULL。批次以 `store_id` 做 keyset、沒有上限，重跑是 no-op，處分的身分快照不受影響，關店之後才到的 PayUni 通知不把 `reason` 寫回。清理與寫入保存條件的競態（READ COMMITTED 下候選語句的快照看不到在它開始之後、掃到那一列之前才 commit 的 hold，那一列也沒有被寫入方鎖過）：每一段在候選鎖住（`FOR UPDATE SKIP LOCKED`）之後，以新的語句再判斷時間（同一支查詢限定在候選上）並問 `StoreHolds`，只處理成立而且沒有被保存的；寫入保存條件的一方（終止的申覆、關聯終止來源的申覆、來函的登記、完成與延長）都先鎖被保護帳號的店家列，所以候選鎖住之後不會再出現新的保存，寫入方鎖到時店家已退場或已清理就是登記太晚。`submitRequest`（申覆）在鎖之後才取 `now`，並重讀措施所在店家的 `retired_at`：只在措施是終止合作、而且店家目前這次關閉是它造成的（`store_closures` 目前那列 `closed_by = TERMINATION` 且 `closed_by_measure_id` 是它）時，已退場就回「申覆期限已過」（那種關閉的退場只在 `now > retire_after ≥ 申覆期限` 時發生，第二段一定在退場之後，所以結果不依賴時鐘）；其他措施不套這個檢查：停權與警告沒有申覆期限，賣家自己關店的退場只看關店後 30 天，預告終止的期限（生效後 184 天）可能還沒到（`TestSuspensionAppealStillWorksAfterTheSelfClosedStoreWasRetired`、`TestNoticeTerminationAppealStillWorksAfterTheSelfClosedStoreWasRetired`）；只看措施所在的店家，帳號早先自己關閉而退場的舊 stint 不算：`TestAppealStillWorksWhenAnOlderStintOfTheAccountWasRetired`。賣家請求（申覆、解除請求）對終止合作先鎖措施所在帳號與以它為來源的關聯終止所在帳號（`lockForRequest`：不加鎖預讀、依 account_id 升序鎖 stint、鎖措施列後重讀，範圍變了回 `errScopeChanged`，`retryScope` 整個 transaction 重來最多 5 次，用完回模組句子 `measure.retry_exhausted`）。固定交錯的測試 hook 只在 `integration` build tag 下編譯（`purge/hooks_integration.go` 的 `Service.SetAfterCandidates`〔第一段〕、`SetAfterPurgeCandidates`〔第二段〕，`measure/hooks_integration.go` 的 `Service.SetRequestHooks`〔預讀之後、鎖成功之後〕，正式程式是各自的 `hooks_prod.go` 空實作；module 層的 setter 在帶同一個 tag 的 `export_test.go`）：`TestPurgeRechecksTheAppealHoldAfterLockingTheCandidates`、`TestAppealAfterTheRetirementLockedTheStoreSeesItRetired`、`TestLinkedSourceAppealBlocksThePurgeOfTheLinkedAccount`、`TestLinkedSourceAppealLockedFirstMakesThePurgeSkipTheLinkedAccount`、`TestAppealRetriesWhenALinkedTerminationAppearsAfterThePreRead`、`TestPurgeStageTwoRechecksTheAuthorityHoldAfterLockingTheCandidates`、`TestPurgeStageTwoRechecksTheAppealHoldAfterLockingTheCandidates`。`TestRetirementAtThirtyDaysAndPersonalDataPurgeAtOneHundredEightyFourDays`、`TestRetirementAndPurgeSchemaConstraints`、`TestHoldsBlockEachStageAndReleaseWhenTheyEnd`、`TestARetiredStoreIsNeverReopened`、`TestPurgeClearsEveryPersonalColumn`、`TestPurgeOnlyTouchesStintsClosedForMoreThanTheStoreRetention`、`TestSanctionSnapshotSurvivesThePurgeOfItsSourceKYC`、`TestPurgeIsIdempotentAndLateNotificationsStayClean`、`TestPurgeIsNotCappedAtOneBatch`。清理後 `Store.StoreName` 是空字串，墓碑文字由呈現層依 `Status` 決定。
+
+- 兩段清理不處理的資料：治理的通報、違規與停權紀錄（自由文字、處分原因）各有自己的保留規則（匿名檢舉人的聯絡欄位 `greatest(建立 + 90 天, 結果 + 30 天)`，見 §7）；`kyc_reviews.reason` 與 `kyc_reveals.reason` 是審核員的文字、不含申請人的欄位值，保留。清理也不處理對未來處分的覆蓋：身分快照與清理的關係見 `CARRYOVER.md`「處分的身分快照與清理的關係」。
 
 ## 12. 可曝光公告
 
@@ -142,6 +152,12 @@
 
 - 流程狀態是推導的（`model.DeriveKYCFlow`，不存）：`DRAFT`、`SUBMITTED`、`REJECTED`、`NOT_STARTED`，以及核准之後由綁定與 PayUni 結果合成的 `BINDING`、`BIND_FAILED`、`FORWARDED`、`UNDER_REVIEW`、`PENDING_INFO`、`APPROVED`、`PAYUNI_REJECTED`；`CanResubmit` 是草稿、被退回、已取消（與沒有申請相同，`SaveKYCDraft` 版本 0 建立新的），或已核准而且 `SellerPayUniOf` 是 FIXABLE（依序：不是 `NeedsReonboarding`、`PaymentEnabled` 還沒成立；PayUni 拒絕而且補救方式不是聯絡客服，即會員層級的整份表單碼 `MEMBER_8`、`MEMBER_92`；或綁定失敗、補救方式是賣家可修、而且依賣家型態與身分鎖過濾後仍有申請欄位）。`MEMBER_99`（會員關閉或停權，聯絡客服）、`MER_91`／`MEMBER_5` 補件（PENDING_INFO）、`PAYUNI_UNAVAILABLE`（RETRY_LATER）、只指出店家欄位（FIX_VIA_SUPPORT）都不能重送，各有一個 `resubmit_unavailabilities` 原因。能重送時賣家可以直接 `SubmitKYC`（`Submit` 接受草稿與 `CanResubmit` 的申請，已核准的在鎖內以 `payuni.CheckResubmit` 重查；不必先 `SaveKYCDraft`；`CanResubmit` 為假的狀態回 FailedPrecondition），或先 `SaveKYCDraft` 更正再送出，再核准時：還沒綁定過的註冊回到 `PENDING`；已綁定的（PayUni 端已有這個商店，再 bind 只會得到 `AGENT04017`）維持 `BOUND`，記下 `resubmitted_at`，由 job 以 `update_merchant` 送修正後的聯絡欄位與地址，輪詢在 7 天內繼續問新的結果（拒絕是舊的狀態；PayUni 的狀態與觀測保留，`TestReapprovalAfterAMemberRejectionSendsTheCorrectedDataAndResumesPolling`）；改回草稿修正時只能改聯絡資料與地址，身分欄位仍鎖住（`KYCFlow.IdentityLocked`；此時 `CanResubmit` 只表示聯絡與地址更正，身分的錯誤只能關店重新入駐；`SaveKYCDraft`、`UpdateProfile` 與 `CancelKYC` 是身分鎖的強制點，鎖定時取消回 FailedPrecondition，鎖順序是店家、申請、PayUni 註冊列）；商家層級的終止狀態（`NeedsReonboarding`，TERMINATED）不行：同一個 stint 只能關店、以新的 `store_code` 重新入駐。流程隨申請的檢視回傳（`KYCApplication.Flow`，清單不帶）。`TestFlowStatusAndResubmissionAfterAPayUniRejection`、`TestTerminalPayUniStatusCannotBeResubmitted` 驗證。
 
+- 身分比對（`SubmitKYC`）是身分證號、統編存在與否的探測面（泛用錯誤不夠，攻擊面是重複送出），所以頻率限制在入口：`internal/httpapi/seller` 的宣告表給 `SubmitKYC` 每個帳號每小時 5 次（`limitedTo`，在能力檢查通過之後、handler 之前計數）。模組本身不限流，直接呼叫模組的程式（job、測試）不受它約束。
+
+- 審核佇列篩選審核中是送出時間舊到新：審核的服務水準以等待時間計，等最久的先看；其他狀態與沒有篩選是回頭查紀錄，新的在前。兩支 query 的篩選條件必須一致（`TestAdminKYCQueueVariantsFilterIdentically`）。
+
+- KYC 金鑰（`KYC_ENCRYPTION_KEYS`、`KYC_HASH_KEYS`）必填。啟動檢查（serve 與 worker，`CheckKYCKeys`）：資料庫參照的每一把金鑰 ID（KYC 密文開頭、申請的 hash、處分身分快照）都要在金鑰環裡，缺了就不啟動（`TestStartupChecksThatEveryKeyReferencedByTheDatabaseIsConfigured`）。金鑰環新增 HMAC 金鑰（輪替）之後，serve 與 worker 在 `CheckKYCKeys` 之後呼叫 `RehashKYCIdentities`，只解密缺新金鑰那一列的申請、補算 blind index，可重複執行，沒有輪替時什麼都不做（`TestRehashFillsTheKeysAddedByARotation`）。處分的身分快照沒有明文可以重算，用來算快照 hash 的舊 HMAC 金鑰要留在金鑰環直到對應的處分結束。
+
 ## 14. PayUni 子商店
 
 - PayUni 註冊以 `store_id` 為鍵（主鍵），一個 stint 一列，那一列就是綁定意圖：`bind_status` 是 `PENDING`／`BOUND`／`FAILED`（`FAILED` ⇔ 有 `bind_error_code`，DB CHECK），只記綁定；PayUni 的審核結果是原碼（`mer_status`、`member_status` 等，外部事實）加推導的 `outcome`（`NONE`／`UNDER_REVIEW`／`PENDING_INFO`／`APPROVED`／`REJECTED`／`UNRECOGNIZED`），兩者由同一個條件式 UPDATE 寫入；付款能力（`PaymentEnabled`）不存，已綁定而且 `APPROVED` 才有。註冊列的鎖順序：店家列先、註冊列後（核准、重新綁定、賣家改資料、job 的結果寫入一致；寫觀測列的外鍵會對店家列取 KEY SHARE，先鎖註冊列會互鎖）。**沒有 raw_request**，也不存任何請求或回應本文：請求在 job 執行時由 KYC（解密）、店家與聯絡欄位組出來，送出就丟。`TestPayUniTablesNeverStoreTheRequestOrTheIdentity`、`TestPayUniSchemaConstraints`、`TestPayUniChecksMatchGo`、`TestStoredOutcomeAlwaysMatchesTheDerivation` 驗證。
@@ -166,6 +182,10 @@
 
 - PayUni 事件（`PayUniForwarded`、`PayUniApproved`、`PayUniPendingInfo`、`PayUniUnderReview`、`PayUniRejected`，加沒有舊 routing key 的 `PayUniBindFailed`）在寫入的 transaction 內發出，`EventID` 是寫進去的那筆觀測的 UUIDv7（穩定），wire 的 `{event_id, status, reason?, merchant_id（= AccountID）, store_id}` 與 routing key 照舊（`tests/contract/golden/event_payload_keys.json`），由 `internal/legacy/sellerrelay` 轉送；`pending_info` 與 `rejected` 的 reason 是 PayUni 的審核意見（沒有時空字串，預設文案由 relay 依舊的規則補）。`TestBindSendsTheCurrentDataAndRecordsTheForwardedEvent` 驗證。
 
+- 2 QPS 的外部限制由 `platform/payuni` 的 `golang.org/x/time/rate` 限流器守住（`PAYUNI_MAX_QPS`，預設 2，burst 1，一個程序一個 client）；排不進 deadline 的呼叫回暫時性錯誤，由 River 重試。限流器只在程序內，所以只能有一個 worker 程序，第二個 worker 需要共用的限流器才能開。PayUni 規格要求固定的 IV，同一把金鑰下相同的明文產生相同的密文。
+
+- `seller.payuni_sync` 結果寫入之後、River 標記完成之前到達的改動，因為唯一鍵含 `running`，不會另排 job；`seller.payuni_sweep` 在閒置 10 分鐘後補排（最多延遲約一個掃描週期）。同步被 PayUni 永久拒絕（`sync_error_code`）時賣家要再改一次才會重送，沒有自動重試。webhook 的 consumer（`sellerconsumer`）跑在 worker；`PayUniBindFailed` 沒有舊 routing key，不轉送。
+
 ## 15. 商家名單
 
 - 商家名單的聯絡方式（ADR `2026-10-04-prospect-contact-points-and-matching`）：`prospect_contacts` 每列是類型（`EMAIL`、`PHONE`、`WEBSITE`、`SOCIAL`）、管理員輸入的原值、解析器 `model.ContactMatchKey` 推導的比對鍵（帶種類前綴；佔位值、共用平台的網域、短網址、貼文路徑、社群平台的裸網域都是 NULL，不參與比對）與是否主要的；Create 與 Update 整批替換（`Contacts` 在 Update 為 nil 保留、空清單清空）。某類型有聯絡方式時恰好一個主要的：同類型至多一個由 partial 唯一約束 `prospect_contacts_primary`、至少一個由 deferred 自我參照外鍵 `prospect_contacts_has_primary`，模組的 `model.NormalizeContacts` 在寫入前檢查（同類型多列必須恰好一列標主要的，只有一列時它就是主要的）。`ProspectContact` 回主要的 email，搜尋結果帶主要的網站。`TestExactlyOnePrimaryContactPerKindIsEnforcedByTheDatabase`、`TestUpdateProspectReplacesTheContactListAndKeepsOmittedFields`、`TestProspectContactReturnsThePrimaryEmail`、`TestSearchProspectsReturnsThePrimaryWebsite`、`internal/model` 的 `TestNormalizeContacts`、`TestContactMatchKey`。
@@ -184,6 +204,10 @@
 
 - 採購候選搜尋：只看 ACTIVE（已入駐、封存、被合併的不出現），填了的條件是加權 OR、不是 AND，分類、地區、關鍵字是部分比對（使用者的 `%`、`_` 不當萬用字元，舊實作會），分類樹 ID 走子表，結果不排序（算分是 ai-service 的事），`Limit` 預設 500、上限 1000 只是安全上限。`TestSearchProspectsSemantics` 驗證。
 
+- 範圍邊界：模組不含邀請子系統（沒有消費者）；`category`、`region` 的自由文字與分類樹 ID 並存，分類由後台 `CreateProspect`、`UpdateProspect` 的 `category_ids` 寫入，分類標註工具是 `services/ai-service/cmd/prospect-category-gen`。共用平台的排除清單（`prospectSharedHosts`）只有已知的 `linktr.ee` 與 `pinkoi.com`，新的共用平台出現時加進去。
+
+- 合併不搬圖片（引用依 `prospect_id` 登記，沒有搬移的操作）：輸家的圖片釋放，贏家沒有圖片時要重新上傳。
+
 ## 16. 商品瀏覽數
 
 - 商品瀏覽數以 `store_id` 為鍵，日以台北時間為界（`internal/platform/twtime`），期間由呼叫者給（賣家儀表板是最近 7 個完整台北日對前 7 日）；總次數、不去重（設計書 28）；不回百分比，比較的呈現在 client。沒有商品與來源欄位（沒有讀取者）、`product_views_daily.store_id` 參照 `seller.stores`，列數隨店數乘天數成長。`TestRecordProductViewOnlyAppendsAnEvent`、`TestRollupBucketsByStoreAndTaipeiDayOfOccurrence`、`TestProductViewsBetweenCountsTaipeiDaysHalfOpen`、`TestProductViewsBetweenIsIsolatedPerStoreAndValidatesInput`、`TestViewRange`、`TestViewDayUsesTaipeiBoundaries` 驗證。
@@ -200,6 +224,8 @@
 
 - 驗證：`TestRollup*`、`TestRebuild*`、`TestPurgeOnlyDeletesProcessedEventsOlderThanRetention`，以及 `cmd/hawkr` 的 `TestLoggedInProductViewSucceedsWithoutProductServiceAndIsRolledUpLater`（商品服務不通時瀏覽照樣成功，port 不在請求路徑上被呼叫）。
 
+- 匿名打點入口是 `SellerPublicService.RecordProductView`：只計訪客，有呼叫者時回成功但不寫入（登入買家由 `RecordVisit` 計，同一次瀏覽不會算兩次），每個來源 IP 每分鐘 120 次（`internal/httpapi/ratelimit.go` 的 `procedureTiers`，在程序的記憶體內計數）。
+
 ## 17. 後台店家清單與措施生效中的定義
 
 - 後台清單固定五次查詢（店家、處分、條件、KYC 申請、PayUni 註冊），每頁的停權經 `stint.EffectiveMany`、條件經 `stint.WithConditions`、顯示用的 KYC 流程經 `exposure.KYCFlows`；翻頁用 `(created_at, store_id)` 的 keyset，同一個建立時間的店家以 `store_id` 定序。篩選：帳號（完全相符）、目前那一筆還沒取消的 KYC 申請的狀態（`APPROVED`、`REJECTED`；審核中、草稿與已取消回 InvalidInput：「待審核」不是儲存的事實）、`KYCAwaitingReview`（商家認證申請在後台待辦裡，是 `seller.review_kyc_application` 的成員；統計的 `KYCAwaitingReview`、待辦與 `decide_deadline` 讀同一支函式，待審核只有這一個定義）、PayUni 註冊的 `bind_status`（儲存的事實）、帳號此刻是否停權。**「措施生效中」的 SQL 定義有兩支查詢，存取路徑不同、定義相同（`starts_at <= now ∧ (ends_at IS NULL ∨ ends_at > now)`，種類 `SUSPENSION` 與 `TERMINATION`），「預定生效」是 `ScheduledMeasureIDs`（`starts_at > now ∧ (ends_at IS NULL ∨ ends_at > now)`；措施列表的 SCHEDULED 篩選用它，ENDED 篩選是不在生效中也不在預定生效），`seller.account_sanction_lifted_at(account_id, at)` 是第五種讀法（帳號最近一次停權結束的時間：在 at 以前已結束的停權與終止措施的結束時間最大值，到期是 `ends_at`、撤銷是 `revoked_at`，只算真的生效過的；只給 `review_kyc_application` 算暫停審核的起點，`TestKYCReviewPausesDuringSuspensionAndResumesWhenItEnds` 在 `ends_at`、`revoked_at` 等於 at 的瞬間鎖住它與 `effective_measures` 一致），`StateOf` 是第四種寫法（順序：已撤銷、警告、已結束、預定生效、生效中，不認得的種類 panic；預告期間內因店家關閉而結束的措施 `ends_at` 早於 `starts_at`，是 ENDED；devseed 不寫自己的措施 SQL，種子檢查問 `EffectiveMeasures`，`TestDevSeedHasNoMeasureSQLOfItsOwn`）**：指定帳號的 `EffectiveMeasures`（能力檢查、讀店家、身分快照的清理，走 `measures_enforced_suspension`）與問全部帳號的 `EffectiveMeasuresAll`（清單的停權篩選 `stint.SuspendedAccounts`，結果當陣列參數傳給清單；措施清單的 ACTIVE、ENDED 篩選 `stint.ActiveMeasureIDs`；每小時的對帳；讀取量隨生效中的措施成長，不隨歷史成長）；`model.StateOf` 是同一個定義的 Go 寫法（讀取時推導措施的 `state`），以 `TestEffectiveMeasuresAndStateAgreeAtTheBoundaries`、`TestTerminationShapesAgreeAcrossStateOfAndTheStateQueries` 鎖住在邊界一致，`TestEffectiveMeasuresReadsScaleWithTheEffectiveSetNotTheHistory` 鎖住兩支查詢的結果一致與索引的使用。統計是一句查詢，只算目前的店家，本月以台北時間的日曆月為界。`TestAdminStoresKeysetPagesHaveNoGapsOrDuplicates`、`TestAdminStoresFiltersAndDerivedFields`、`TestAdminStoresFilterByKYCStatusAndShowTheFlow`、`TestAdminStoresKYCFilterOnlyMatchesTheCurrentApplication`、`TestAdminStoresFilterByAccountBindStatusAndSuspension`、`TestAdminStoreStats`、`TestStoreKYC`。
@@ -209,6 +235,8 @@
 - 鎖順序：identity 帳號列先於店家列，店家列是帳號全部的 stint（依 `store_id`，`LockAccountStores`；所有關店路徑都鎖它，不先鎖目前的 stint 再寫措施（會與措施寫入的升序鎖互鎖）），再來是通報列（多筆依 id 升序）、案件列（多筆依 id 升序）、詢問列、措施列（發詢問、記下回覆與撤回：店家列 → 案件列 → 詢問列；決定與移動造成的 `NO_REPORTS` 關閉在鎖案件之後以一個 UPDATE 撤回還沒結束的詢問，同時鎖住它）。分案、移動、決定與建立措施都先鎖店家列：同一家店、同一個類別的開案由它串行（`cases_one_open` 只是保底，撞到時是 invalid_argument，不是 23505）；決定在店家列之後先讀成員、鎖成員通報、最後鎖案件；補充只鎖原通報列（不鎖案件、不改案件的版本）；建立措施的來源通報（`measure.lockSourceReports`）在店家列之後依 id 升序鎖，連到案件（`source_case_id`）時不鎖案件：關閉案件的指令都先鎖同一組店家列。`TestConcurrentTriageOfTheSameStoreAndCategoryOpensExactlyOneCase`、`TestDecideAndAConcurrentTriageNeverLeaveAnUnresolvedMemberInAClosedCase`、`TestDecideAndMoveNeverDeadlockWithASupplementToTheSameReport`、`TestTriageAndDecideNeverDeadlockWithCreatingMeasures`（壓力測試，各 200 輪）。開店、`CloseCurrent` 與終止合作的關店自己先鎖帳號；`BeginDeletion`／`CloseForDeletion` 只由 `accountdeletion` 在已鎖住帳號列的 transaction 內呼叫，本模組不再鎖帳號。跨帳號的寫入（建立關聯終止、撤銷有關聯終止的來源）一律依 `account_id` 升序先鎖 identity 帳號列再鎖各帳號的 stint；撤銷在鎖之前預讀要碰的帳號、鎖住之後重讀，範圍變了（剛好有新的關聯終止）整個 transaction 重來（`retryScope`）。賣家對終止合作措施的申覆（`measure.lockForRequest`）同一套：不加鎖預讀以它為來源的關聯終止所在的帳號，與來源帳號依 `account_id` 升序鎖（`stint.LockAccounts`），鎖措施列之後重讀，範圍變了回 `errScopeChanged` 由 `retryScope` 重來，因為個資清理的 legal hold 含「關聯終止的來源有待處理的申覆」，被關聯帳號的清理要和這筆申覆競爭同一組店家列（`TestLinkedSourceAppealBlocksThePurgeOfTheLinkedAccount`）。`TestConcurrentSourceRevokeAndLinkedCreateNeverDeadlock`、`TestConcurrentMeasureCreationAndCloseOnAnAccountWithTwoStintsNeverDeadlock`（壓力測試，各 200 次）。主管機關來函的登記、完成與延長保存先依 `account_id` 升序鎖被指名帳號的店家列（`stint.LockAccounts`），再鎖來函列，讓寫入保存條件的一方和個資清理在同一組店家列上競爭；登記時鎖住之後把已清理的店家記進 `authority_order_prepurged_stores`，涵蓋狀態 `PURGED_BEFORE_REGISTRATION` 只看這份快照，不比較清理與登記的時鐘（多實例時鐘有差）；來函對象的位置連續由 `prev_position` 外鍵保證。
 
 - 事件與快取失效都在寫入的 transaction 內：handler 失敗或 job 排入失敗，整筆回滾。進入等待刪除只在真的從 ACTIVE 轉移時發一次 `StorePendingDeletion`（`TestDeletionParticipantIdempotency`）。
+
+- 本模組的事件由 `internal/legacy/sellerrelay`（`cmd/hawkr` 的 `subscribeSellerRelay`，serve、worker 與 `reannounce-exposures` 都訂閱）轉成 RabbitMQ 訊息給 Java 與晚搬的 Go：`seller.deleted`（由 `StoreRetired`，關店 30 天後的退場時；`StoreClosed` 與 `StoreReopened` 不轉送：關店可逆，曝光與停權的變化各有事件）、`seller.suspended`、`seller.unsuspended`、`seller.profile.changed`、可曝光變化的 `seller.exposure.changed`（Java 依它在讀取時隱藏不可曝光的店的商品，等待刪除也由它涵蓋；ADR `2026-10-05-store-exposure-to-legacy.md`）與 `merchant.verification.*`。不轉送的事件（`StoreOpened`、`StoreClosed`、`StoreReopened`、`StorePendingDeletion`、`KYCSubmitted`、`KYCApproved`、`KYCCancelled`、`PayUniBindFailed`）與原因在 sellerrelay 的套件說明。治理事件（`ReportReceived`、`ReportResolved`（每筆通報有了結果發一次：個別設定、案件結案帶入都算）、`MeasureCreated`、`MeasureRevised`、`MeasureEnded`、`MeasureRevoked`、`MeasureRequestSubmitted`、`MeasureRequestDecided`、`MeasureRequestClosed`）沒有轉送，賣家、檢舉人與 admin 都以拉取的方式看到結果。
 
 ## 19. 本機開發種子
 
@@ -228,4 +256,29 @@
 
 ## 23. 已知限制
 
-（6b/6c 補上）
+每條寫現況與解除條件；搜尋沒有索引的觸發條件在 `CARRYOVER.md` 的觸發條件表。
+
+- **數字 ID**：`store_id` 與停權期間的 `period_id` 是 IDENTITY（BIGINT），因為 Java 的消費者（coupon-service 的 `SellerSuspendedConsumer`、`SellerUnsuspendedConsumer`）仍以 BIGINT 存（product 的停權快照以 `period_id` 為 scope，Java 稱它 suspensionId）。最後一個數字 ID 的消費者改寫時，依 row-identity ADR 換 UUID。通報、認定、措施、請求、KYC 申請與審核、稽核列的 ID 是應用層產生的 UUIDv7，沒有 Java 的消費者。
+
+- **未結訂單檢查的時間窗**：`Orders` port（§11）在 transaction 外問 ordering 的現況（現在的實作是 `internal/legacy/orderservice`），與之後鎖帳號、關店之間仍可能有新訂單成立，舊服務的訂單不在單體的鎖裡。解除條件：訂單搬進單體，以 ordering 自己的判斷在同一個 transaction 內檢查（`CARRYOVER.md`「7c 審查後的結論」）。
+
+- **media 引用有同步空窗**：新轉正的資產要在 media GC 的 7 天寬限內被同步 job Link，轉正之後、同步完成之前沒有引用；job 失敗由 River 重試並記 error log。解除條件：引用移進業務列的 transaction，同步 job 與退場表消失。
+
+- **identity 的 `source_id` 柵欄**：只為 seller-service 的非同步移除而存在，開店與關店照樣帶 `store_id` 當來源。解除條件：seller-service 退場。
+
+- **治理事件沒有訂閱者**：§18 的治理事件還沒有 notification 的訂閱與送達紀錄。解除條件：notification 與資料保存期限搬進單體。
+
+- **website 沒有呼叫匿名打點**：`RecordProductView`（§16）只有端點，website 尚未接上。解除條件：website 改走 Connect 時，只對未登入者送。
+
+- **PayUni 沒有對真實環境驗證**：沒有 sandbox 與真實呼叫，`platform/payuni` 只以本機的 httptest 驗證，欄位名稱、`search_merchant_status` 的回應格式與 AES-GCM 的格式照舊的 `pkg/payuni`。`ExecuteTime` 的格式（`yyyyMMddHHmmss`）與時區（台北）取自 Java 測試的樣本與 PayUni 慣例，沒有對真實通知驗證；輪詢（事件時間用我們的時鐘）與 webhook（PayUni 的時鐘）混用，假設兩邊的時差遠小於狀態改變的間隔。解除條件：取得 PayUni 的 sandbox 或第一筆真實通知。
+
+- **KYC 加密金鑰輪替沒有遷移 job**：HMAC 金鑰輪替有 `RehashKYCIdentities`（§13），加密金鑰輪替則要解密後重寫，這支 job 還沒有。解除條件：第一次輪替加密金鑰之前要先有它（沒有資料之前不做）。
+
+- **身分比對的防線邊界**：只擋「同一個身分」，用別人的證件、人頭入駐不在防線內（ADR 後果）。處分建立之後才由被處分帳號新增的申請不在快照裡；被處分的帳號開不了新店，既有申請的核准要求帳號沒有停權，所以不會被核准。核准與「另一個帳號的處分同時寫入」不需要額外的鎖：處分在核准讀取之後才 commit，結果等於「先核准、後處分」，是合法的序列順序，之後的核准都會看到快照。快照只能取到處分當下還沒清理的 KYC：舊 stint 關閉滿 184 天（第二段清理）、KYC 已清理之後才被處分時，舊 stint 用過的身分不在快照裡（目前 stint 的身分仍在）；這是「關店 184 天後清註冊與身分資料」的代價（ADR 的資料最小化），不另外保留 hash。
+
+- **`SubmitKYC` 的限流只在程序內**：計數在 serve 程序的記憶體內，多個 instance 各自計數。解除條件：單體跑超過一個 instance 之前，換成共用的計數（入口的 IP 限流不是它的補償）。
+
+- **保留的自由文字**：管理員的自由文字理由（措施的 `statement_to_seller` 與內部註記 `governance_notes`、後台刪帳號的 `request_attempts.reason`）是稽核文字，可能夾帶賣家的個資，保留，個資清理不動它們。登入檢舉人的 `reporter_buyer_id` 不隨買家刪除清掉：它是指向買家墓碑列的擬名鍵，買家的個資由 buyer 自己的刪除流程清除，seller 不依賴 buyer，清掉它會讓檢舉人無法查自己的檢舉、也讓去重失效。匿名通報與補充的描述是自由文字，可能含個資，保留：它們是通報的實質內容，後續調查需要，保留期限的清理只動聯絡欄位。重新評估的條件：隱私政策定稿時，或 notification 與資料保存期限搬進單體時。
+
+- **搜尋是全表掃描**：後台店家清單的店名與電話、KYC 佇列的姓名、公司名稱與統編、商家名單的 ILIKE 搜尋都沒有索引，上線前的資料量不是問題；超過 1 萬列或 p95 超過 200 ms 時加 pg_trgm GIN（`CARRYOVER.md` 觸發條件表）。
+
