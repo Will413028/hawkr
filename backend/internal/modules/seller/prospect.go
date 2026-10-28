@@ -8,7 +8,7 @@ import (
 
 // 商家名單（站外業者的 BD 名單，遷移計畫 A3b 步驟 7c 階段 4）的公開型別與方法。方法由呼叫方（admin 的 Connect 方法、ai-service
 // 的 legacy 轉接、7d 的 vendor portal）先確認呼叫者的身分；操作者是管理員（AdminID）。比對、合併與唯一性的規則見
-// `internal/prospect` 的套件說明、ADR `2026-10-04-prospect-contact-points-and-matching` 與 AGENTS.md。
+// `internal/prospect` 的套件說明、ADR `2026-10-04-prospect-contact-points-and-matching` 與 docs/modules/seller.md §15。
 
 // ProspectStatus 是業者的狀態（進行中、封存或被合併、已轉成店家）。
 type ProspectStatus = model.ProspectStatus

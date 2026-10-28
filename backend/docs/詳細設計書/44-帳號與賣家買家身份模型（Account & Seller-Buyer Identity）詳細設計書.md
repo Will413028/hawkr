@@ -2,7 +2,7 @@
 
 > 本文涵蓋兩塊還在運作的內容：（1）賣家身份的資料模型（stint、`store_id`、`store_code`、`ResolvePrincipals`），實作在單體的 seller 模組（`internal/modules/seller`）；seller 模組沒有自己的規格檔，本文在規格檔建立前是它的身份規格。（2）gateway 的買家與店家身份解析，以及跨角色自我操作守衛（im、social、cart、coupon、order）。
 >
-> 單體的帳號與買家不在本文：identity 見 `docs/modules/identity.md`，buyer 見 `docs/modules/buyer.md`，刪帳流程見 `docs/modules/accountdeletion.md`。seller 模組的業務行為（profile、KYC、PayUni、治理、關店與清理）以 `internal/modules/seller/AGENTS.md` 為準。
+> 單體的帳號與買家不在本文：identity 見 `docs/modules/identity.md`，buyer 見 `docs/modules/buyer.md`，刪帳流程見 `docs/modules/accountdeletion.md`。seller 模組的業務行為（profile、KYC、PayUni、治理、關店與清理）以 `docs/modules/seller.md` 為準。
 >
 > 刪除時機：賣家身份的部分在 seller 規格檔建立後搬進去；gateway 的身份解析與守衛服務搬進單體時，其餘刪除。
 >
@@ -17,7 +17,7 @@
 | 狀態 | `active` |
 | 維護者 | Will |
 | 對應程式碼 | `internal/modules/seller`（stint、`store_id`／`store_code`）、`internal/legacy/sellerserver`（`ResolvePrincipals` 等 legacy 讀取）、`gateway/internal/{middleware,buyerid,storeid}`（還沒搬的路徑的身份解析）、跨角色守衛 `services/im-service`、`services/social-service`、`services/java/{cart,coupon,order}-service` |
-| 相關 doc | [18 賣家實名認證](18-賣家實名認證（Merchant%20Certification）詳細設計書.md)（PayUni MerID 綁定源頭）、[32 商家治理](32-商家治理與食安通報（Seller%20Governance%20&%20Food%20Safety）詳細設計書.md)（違規停權）、[36 MQ 與事件總覽](36-MQ%20與事件總覽（MQ%20&%20Event%20Catalog）.md)；單體模組規格 `docs/modules/{identity,buyer,accountdeletion}.md`、`internal/modules/seller/AGENTS.md` |
+| 相關 doc | [18 賣家實名認證](18-賣家實名認證（Merchant%20Certification）詳細設計書.md)（PayUni MerID 綁定源頭）、[32 商家治理](32-商家治理與食安通報（Seller%20Governance%20&%20Food%20Safety）詳細設計書.md)（違規停權）、[36 MQ 與事件總覽](36-MQ%20與事件總覽（MQ%20&%20Event%20Catalog）.md)；單體模組規格 `docs/modules/{identity,buyer,accountdeletion,seller}.md` |
 
 ---
 
@@ -25,7 +25,7 @@
 
 ### 1.1 文件定位
 
-本文描述**賣家身份的資料模型與生命週期**，以及依賴它的 gateway 身份解析與跨角色守衛：賣家身份（`store_id`）如何建立、關閉與重新入駐，以及在「同一個人同時是買家與賣家」時如何避免自己對自己下單／發券／私訊。目標讀者為後端全體。**不涵蓋**登入憑證機制（見 17）、實名認證細節（見 18）、單體 identity／buyer／accountdeletion 的行為（見上列模組規格）、seller 模組其餘業務行為（見 `internal/modules/seller/AGENTS.md`）。
+本文描述**賣家身份的資料模型與生命週期**，以及依賴它的 gateway 身份解析與跨角色守衛：賣家身份（`store_id`）如何建立、關閉與重新入駐，以及在「同一個人同時是買家與賣家」時如何避免自己對自己下單／發券／私訊。目標讀者為後端全體。**不涵蓋**登入憑證機制（見 17）、實名認證細節（見 18）、單體 identity／buyer／accountdeletion 的行為（見上列模組規格）、seller 模組其餘業務行為（見 `docs/modules/seller.md`）。
 
 ### 1.2 一句話定位
 
@@ -43,7 +43,7 @@
 
 - **上游**：`docs/modules/identity.md` 負責憑證驗證與 session；本文承接其產出的 `account_id` 與角色（SELLER）。
 - **下游**：[18 賣家實名認證](18-賣家實名認證（Merchant%20Certification）詳細設計書.md) 消費 `store_code` 推導 MerID；[36 MQ Catalog](36-MQ%20與事件總覽（MQ%20&%20Event%20Catalog）.md) 定義 `account.deleted` / `seller.deleted` 契約。
-- **姊妹**：違規停權走 [32 商家治理](32-商家治理與食安通報（Seller%20Governance%20&%20Food%20Safety）詳細設計書.md)；停權由措施在讀取時推導，不是 stint 的狀態（見 `internal/modules/seller/AGENTS.md`）。
+- **姊妹**：違規停權走 [32 商家治理](32-商家治理與食安通報（Seller%20Governance%20&%20Food%20Safety）詳細設計書.md)；停權由措施在讀取時推導，不是 stint 的狀態（見 `docs/modules/seller.md` §5）。
 
 ---
 
@@ -65,7 +65,7 @@ flowchart LR
 | | 涵蓋 (In-scope) | 不涵蓋 (Out-of-scope，由誰負責) |
 |---|---|---|
 | 單體 identity、buyer、accountdeletion | （不在本文） | 帳號、角色、買家與刪帳流程：`docs/modules/{identity,buyer,accountdeletion}.md` |
-| 單體 seller 模組 | `store_id`、`store_code`、stint 的建立與重新入駐、PayUni MerID 推導鍵、legacy `ResolvePrincipals` | 認證流程（見 18）、治理停權（見 32）、其餘業務行為（`internal/modules/seller/AGENTS.md`） |
+| 單體 seller 模組 | `store_id`、`store_code`、stint 的建立與重新入駐、PayUni MerID 推導鍵、legacy `ResolvePrincipals` | 認證流程（見 18）、治理停權（見 32）、其餘業務行為（`docs/modules/seller.md`） |
 | 守衛 5 服務 | 呼叫 `ResolvePrincipals` 做 resolve-to-principal 後比對 | 各自的下單 / 發券 / 私訊業務邏輯 |
 | gateway | 還沒搬的路徑的身份解析（`buyerid`／`storeid` resolver）、`requireSeller` 能力檢查、下游 header 注入 | 憑證驗證（見 17） |
 
@@ -256,7 +256,7 @@ stateDiagram-v2
   CLOSED --> [*]: 退場與個資清理（保留 row）
 ```
 
-> **只有賣家走 insert-new-stint**：帳號再次申請開店另開新列、舊列保留，而且新列必須鑄新 `store_code`，否則新 MerID 會撞上舊綁定（`AGENT04017`）。買家與帳號同生命週期，不重新授予。關店的保留期、退場與清理規則以 `internal/modules/seller/AGENTS.md` 為準。
+> **只有賣家走 insert-new-stint**：帳號再次申請開店另開新列、舊列保留，而且新列必須鑄新 `store_code`，否則新 MerID 會撞上舊綁定（`AGENT04017`）。買家與帳號同生命週期，不重新授予。關店的保留期、退場與清理規則以 `docs/modules/seller.md` §11 為準。
 >
 > ⚠️ **social-service 是唯一刻意不改鍵的下游**：`cms_comment.user_id` / `reports.reporter_id` / `user_blocks.blocker_id` 維持泛型命名，因為同一欄位可能裝賣家操作帶來的未 re-key 值，**不是單一 id space**。
 

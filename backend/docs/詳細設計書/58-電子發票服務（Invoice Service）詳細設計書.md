@@ -8820,7 +8820,7 @@ media-service 的 GC 第 2 階段會刪除「無 `asset_reference` 且建立超�
 
 | 問 | 答 |
 |---|---|
-| `can_accept_orders` 讀什麼？ | seller 模組的 `Exposable`（可公開曝光；規則只在 SQL `seller.pub_exposable_stores`，條件含店家營運中、KYC 核准，見 `internal/modules/seller/AGENTS.md`；legacy `internal/legacy/sellerserver` 的 `sellerMeta` 以它填 `can_accept_orders`） |
+| `can_accept_orders` 讀什麼？ | seller 模組的 `Exposable`（可公開曝光；規則只在 SQL `seller.pub_exposable_stores`，條件含店家營運中、KYC 核准，見 `docs/modules/seller.md` §12；legacy `internal/legacy/sellerserver` 的 `sellerMeta` 以它填 `can_accept_orders`） |
 | 它吃得到 invoice-service 的稅務狀態嗎？ | **吃不到**。輸入都是 seller 模組自己的資料。invoice-service 唯一能影響它的途徑是讓措施使店家進入停權——那是**停權**，不是「停止接單」 |
 | 那 C5 由誰執行？ | **結帳鏈的既有收斂點**：`CheckoutPreview` 回 `intakeLimit` 現況、`CheckoutConfirm` 在既有交易內判定並回 `9326 SELLER_INVOICE_INTAKE_LIMIT_REACHED`（§6.1.2；計數欄位在 `seller_tax_profiles`，§5.1.2）。它與 `can_accept_orders` 是兩個獨立 flag，AND 才放行（T-I03） |
 | C4 的 60 天到期呢？ | 到期＝「停止接受新單」，走**同一個 `9326` 閘門**（上限視為 0），不是把賣家停權。停權只來自 C1 的違規計數 |
