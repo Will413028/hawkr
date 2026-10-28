@@ -90,7 +90,7 @@
 | **46 賣家能力層** | deny-by-default 原則、「宣告＝掛載合一」的 registry、boot 斷言的三條既有檢查、`GrantedCapabilities` 單一問答點的形狀；`CapOrderFulfill` 是「永不核發給代行」清單的機械依據 | 把 `authz` package 從「只管賣家」擴充為**賣家＋admin 雙軌**：新增 admin capability 型別與 `GrantedAdminCapabilities`，boot 斷言新增**四條**檢查（① 凡經 `delegatedHandle(...)` 註冊的路由，capability 必須非空 ② `delegatedRoutes` registry 內任一路徑不得命中履約禁字清單 ③ `/admin` 下禁 wildcard ④ `/admin` 下凡不經 `requireAdmin()` 的路由必須命中具名白名單，恰 26 支）。斷言 ①② 的作用域**以註冊方式為準、不以路徑前綴為準**：Session API 與既有治理路由都不經 `delegatedHandle`，皆不受約束（§8.1）。**既有 12 個賣家 capability 的語意與掛載一律不動** |
 | **52 微服務間內部授權** | HMAC 四件套保證「呼叫方確實是內部服務」。`INTERNAL_AUTH_MODE=enforcing` 是本書把 proto `DelegationContext` 當可信輸入的**前提**：五支服務的生效值必須為 `enforcing`（§3.3 A2、§8.1.4） | 無。canonical 不變、不新增 header、不新增驗簽路徑。信任模型與既有 `SuspendSellerForAdminRequest.AdminId` 完全相同（§8.1） |
 | **29 Admin 異常訂單管理 API** | ADM 訂單唯讀查詢的既有欄位取捨、分頁與錯誤慣例 | 29 號是**跨賣家的平台治理視角**；本書的訂單唯讀是**單一目標店家視角且每次查詢綁 Operation Session**。兩者路由、DTO 與稽核落點都不同，不可互相取代 |
-| **32 商家治理與食安通報** | `sellers.status` 是停權權威來源（停權中的店家不可被代行，preflight 判定）；「admin actor 走 proto 明示欄位而非 metadata」的既有慣例（`SuspendSellerForAdminRequest.AdminId`）；`seller_suspensions` 的 partial unique 冪等範式 | 明確劃出「治理 vs 代營運」分流：認證、停權、強制下架、違規處分**留在 32 號的既有入口**，不進代行工作區；兩類動作落在**不同的稽核表**（治理稽核 vs 代行稽核） |
+| **32 商家治理與食安通報** | seller 模組的措施是停權權威來源（停權中的店家不可被代行，preflight 判定）；「admin actor 走 proto 明示欄位而非 metadata」的既有慣例（`SuspendSellerForAdminRequest.AdminId`）；`seller_suspensions` 的 partial unique 冪等範式 | 明確劃出「治理 vs 代營運」分流：認證、停權、強制下架、違規處分**留在 32 號的既有入口**，不進代行工作區；兩類動作落在**不同的稽核表**（治理稽核 vs 代行稽核） |
 | **36 MQ 與事件總覽** | 事件契約 SSOT；exchange／routing key／payload 的登記格式 | 新增 exchange `hawkr.delegation` 與**唯一事件** `delegation.operation.completed`（§6.3；本期不發 session 生命週期事件）。**同一個 PR 必須回寫 36 號並新增 `infra/mq/topology/topology.yaml` 條目**，否則訂閱靜默失效 |
 | **12／13 通知** | **站內訊息**的既有投遞管道（inbox ＋ FCM，`push_mode='visible'`）、DB-driven 模板引擎與 golden key 契約 gate。這兩本設計書**沒有定義 email 通道** —— 本書因此只承諾站內訊息（§1.3 Non-Goal） | 新增代行完成通知的事件消費與模板（**一列** `notification_templates`，走 Atlas migration）；同步 `tests/contract/golden/event_payload_keys.json` |
 
@@ -3918,7 +3918,7 @@ flowchart TD
         P3C -- 否 --> DN12["DELEGATION_TARGET_MISMATCH<br/>必落稽核（result=FAILED）"]
         P3C -- 是 --> P3D{"Q3 路由 capability<br/>命中 snapshot？"}
         P3D -- 否 --> DN13["DELEGATION_CAPABILITY_DENIED<br/>必落稽核（result=FAILED）"]
-        P3D -- 是 --> P3G{"Q3b 目標店家仍可代行？<br/>sellers.status / deleted_at"}
+        P3D -- 是 --> P3G{"Q3b 目標店家仍可代行？<br/>legacy GetSeller 的 lifecycle_status"}
         P3G -->|"停權／關店"| DN16["DELEGATION_STORE_NOT_OPERABLE<br/>＋把工作階段轉 revoked<br/>不落稽核"]
         P3G -->|"已刪除／查無"| DN17["DELEGATION_STORE_NOT_DELEGABLE<br/>＋把工作階段轉 revoked<br/>不落稽核"]
         P3G -->|"問不到答案"| DN18["DELEGATION_UPSTREAM_UNAVAILABLE<br/>可重試，工作階段維持 active"]
@@ -5055,7 +5055,7 @@ flowchart TD
     H -- 否 --> E403d[403 能力不足]
     H -- 是 --> I{7. 授權來源仍有效?<br/>seller_delegation_authorizations}
     I -- 否 --> E403e[403 授權已撤回]
-    I -- 是 --> K{8. 目標店家狀態仍可代行?<br/>sellers.status / deleted_at}
+    I -- 是 --> K{8. 目標店家狀態仍可代行?<br/>legacy GetSeller 的 lifecycle_status}
     K -- 停權／關店 --> E422["422 · 9272 店家狀態不允許代行<br/>＋把本工作階段轉 revoked"]
     K -- 已刪除／查無 --> E403f["403 · 9265 此店家目前不可代行<br/>＋把本工作階段轉 revoked"]
     K -- 問不到答案 --> E424["424 · 9280 上游不可用<br/>本次拒絕，但不轉終態"]
@@ -5102,7 +5102,7 @@ flowchart TD
 
 | 判什麼 | 值 |
 |---|---|
-| **查什麼** | 目標店家的 `sellers.status`（生命週期值 `active`／`suspended`／`suspended_governance`／`closed`）與 `deleted_at` |
+| **查什麼** | 目標店家經 legacy `SellerService.GetSeller` 回的 `lifecycle_status`（由 seller 模組的店家與措施推導，值 `active`／`suspended`／`suspended_governance`／`closed`）與 `deleted_at` |
 | **判定規則** | **deny-by-default：只有 `status='active'` 且未刪除才放行。** 其餘一律拒絕——包含日後新增的任何 `status` 值。⚠️ 反過來寫成「命中 `suspended`／`closed` 才拒」的黑名單形式是錯的：新增一個生命週期值時，黑名單會**靜默放行**它，而白名單只會誤擋（誤擋看得見、靜默放行看不見） |
 | **判定的唯一實作** | `pkg/delegation.StoreOperable(lifecycleStatus string, deleted bool) (ok bool, deniedCode int32)`（與 `Validate` 同 package）。**本項呼叫這一份**（`gateway/internal/router/delegated_capability.go` 的 `enforceStoreOperable`）。判定只放在 `pkg/delegation`，不在呼叫點各寫一份，否則各份會各自演化，於是「入口說不可以、寫入說可以」這種矛盾遲早出現；規則只有一份，才談得上「這家店能不能被代行」有唯一答案 |
 | **資料來源** | 單體 seller 的 legacy `SellerService.GetSeller`（`internal/legacy/sellerserver`）。**這句只涵蓋 Gateway 這一跳**——preflight 的同一份判定由單體 delegation 在行程內讀 seller 取得（`docs/modules/delegation.md` §5）。**刻意不為此另立一支輕量 RPC**：第二支 RPC ＝ 第二個「店家可否代行」的答案來源，兩邊的欄位取用與判定就會各自漂移 |
