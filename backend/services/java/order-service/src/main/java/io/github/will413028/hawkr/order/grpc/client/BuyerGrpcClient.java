@@ -84,7 +84,7 @@ public class BuyerGrpcClient {
     }
 
     /**
-     * 取單一收件地址（66 §6.1.3：Uber 報價的 dropoff 來源）。
+     * 取單一收件地址（：Uber 報價的 dropoff 來源）。
      *
      * <p>🔴 <b>歸屬由 buyer-service 保證</b>：{@code GetAddress} 的底層是
      * {@code addressUC.GetByID(ctx, buyerId, addressId)}，兩個鍵一起進 where ⇒

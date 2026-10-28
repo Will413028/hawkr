@@ -4043,14 +4043,14 @@ AfterSales 發布 `aftersales.refund.completed` 事件，Order Service 消費後
 |---------|------|---------|-------------|
 | 店到店（SEVEN_ELEVEN_STORE_PICKUP） | 3 天（自然日） | `shipment.createdAt + 72 小時` | `label_print_status = '4103'`（賣家已觸發出貨便取號） |
 | 宅配（TAQBIN） | 3 個工作日 | `HolidayService.nextBusinessDay(createdDateTaipei, 3)` 的當天 **23:59:59 台北（＝ 15:59:59 UTC）** | `tcat_call_status = '4203'`（賣家已呼叫黑貓取件） |
-| **Uber 即時配送（UBER_INSTANT）** | 🔴 **公式已定版**；V1 預設值 `seller_prep_sla_default = 15m`、`platform_grace = 15m`，🔴 **兩者皆 configurable**（依 sandbox／production 實測調整），**不得宣稱為 Uber 官方 SLA** | 🔴 **`processing_deadline = paid_at + seller_prep_sla_snapshot + platform_grace`**（[66 基設 §9.4](../基本設計書/66-Uber%20Direct%20即時配送整合基本設計書.md)）。<br/>⚠️ **中間有一個非取消的里程碑**：`prep_sla` 到期只做賣家逾期標記／warning／operational alert，🔴 **強制取消點只有 `processing_deadline`**。<br/>🔴 **時鐘一律持續走，不因賣家的不可接單時段暫停**（`service_hours` 管的是「這筆單能不能被受理」，在結帳 eligibility 就判完，**不是履約時鐘開關**）。<br/>⚠️ **`seller_prep_sla_snapshot` 取報價／付款當下的 snapshot**，賣家日後修改不回溯（66 詳設 §5.1.4a G） | 🔴 **賣家已回報備妥**（`REPORT_READY`）——與 3001 的 `tcat_call_status`、3002 的 `label_print_status` 同一種定義：**賣家做完自己那一步**。⚠️ **不是**「Uber 已指派外送員」，那是 provider 的進度不是賣家的動作 |
+| **Uber 即時配送（UBER_INSTANT）** | 🔴 **公式已定版**；V1 預設值 `seller_prep_sla_default = 15m`、`platform_grace = 15m`，🔴 **兩者皆 configurable**（依 sandbox／production 實測調整），**不得宣稱為 Uber 官方 SLA** | 🔴 **`processing_deadline = paid_at + seller_prep_sla_snapshot + platform_grace`**。<br/>⚠️ **中間有一個非取消的里程碑**：`prep_sla` 到期只做賣家逾期標記／warning／operational alert，🔴 **強制取消點只有 `processing_deadline`**。<br/>🔴 **時鐘一律持續走，不因賣家的不可接單時段暫停**（`service_hours` 管的是「這筆單能不能被受理」，在結帳 eligibility 就判完，**不是履約時鐘開關**）。<br/>⚠️ **`seller_prep_sla_snapshot` 取報價／付款當下的 snapshot**，賣家日後修改不回溯 | 🔴 **賣家已回報備妥**（`REPORT_READY`）——與 3001 的 `tcat_call_status`、3002 的 `label_print_status` 同一種定義：**賣家做完自己那一步**。⚠️ **不是**「Uber 已指派外送員」，那是 provider 的進度不是賣家的動作 |
 
 > **createdAt 近似 payTime**：物流單由 `order.paid` MQ 事件觸發自動建立，`createdAt` 與付款時間差距僅毫秒級，足夠作為期限起算點。
 
 🔴 **`UBER_INSTANT` 必須有處理期限。**
 
 **現行履約模型是 payment-time future-pickup**：付款成功後平台**即刻**向 provider 建立配送，取件時間帶 `pickup_ready_at_snapshot`（報價當下凍結的絕對時間）。
-⇒ **賣家在履約鏈上的必要一步是 `REPORT_READY`（回報備妥）**：配送在付款當下就已建立，provider 會依約定時間前來取件，**賣家不自行發動取件，該做的是在約定時間前把貨備妥並回報**（[66 基設 §3.2](../基本設計書/66-Uber%20Direct%20即時配送整合基本設計書.md)、[65 §7 Provider 憲法](../基本設計書/65-物流履約平台（Fulfillment%20Platform）基本設計書.md)）。
+⇒ **賣家在履約鏈上的必要一步是 `REPORT_READY`（回報備妥）**：配送在付款當下就已建立，provider 會依約定時間前來取件，**賣家不自行發動取件，該做的是在約定時間前把貨備妥並回報**（[65 §7 Provider 憲法](../基本設計書/65-物流履約平台（Fulfillment%20Platform）基本設計書.md)）。
 ⇒ 賣家仍是履約鏈上的必要一步，而 §5.9 正是「賣家不動作時買家怎麼辦」的唯一出口。
 ⚠️ **正因為 provider 會如期前來，賣家不備妥的後果比 3001／3002 更即時**：外送員撲空、產生 provider 成本、買家在等一份永遠不會被取走的訂單。
 
@@ -4069,10 +4069,10 @@ AfterSales 發布 `aftersales.refund.completed` 事件，Order Service 消費後
 🔴 **`processing_deadline` 不得改用 provider 取件時鐘推算，`pickup_ready_dt` 也不得在付款當下用 `paid_at + prep_sla` 重算**——那會讓報價時給買家看到的 ETA 與實際送出去的取件時間分岔。
 
 起算點、「已處理」定義、逾期處置三者皆與既有兩種配送方式**同形**，不新增機制；賣家設 `prep_sla`、**不得直接設 `processing_deadline`**。
-⚠️ **不得沿用 72 小時或 3 工作日**——理由見 [66 基設 §9.4](../基本設計書/66-Uber%20Direct%20即時配送整合基本設計書.md)（那兩個數字本身沒有來源，且營運形態不同）。
+⚠️ **不得沿用 72 小時或 3 工作日**——（那兩個數字本身沒有來源，且營運形態不同）。
 
 🔴 **3003 的逾期取消必須先收斂 provider 側，不得直接退款**：3001／3002 在賣家未處理時**還沒有實體履約**，取消只是不出貨；而 3003 **已經有一筆存在的 delivery**。
-⇒ 逾期取消必須走 provider 取消收斂鏈（`Get Delivery` → `Cancel Delivery` → **再確認 provider terminal**，見 [66 詳設](66-Uber%20Direct%20即時配送整合詳細設計書.md)），**確認 terminal 之後**才進本服務的取消退款流程（§5.7）。
+⇒ 逾期取消必須走 provider 取消收斂鏈（`Get Delivery` → `Cancel Delivery` → **再確認 provider terminal**），**確認 terminal 之後**才進本服務的取消退款流程（§5.7）。
 🔴 **provider 取消結果未確定時，不得逕自退款、也不得逕自判定為失敗**——那會在「錢已退、車還在路上」的窗口造成雙重損失。
 ⚠️ 本路徑的責任成因是 `SELLER_CAUSED`（賣家未在期限內備妥）⇒ 依 §2.5.3 `refund_to_buyer = full`，與 3001／3002 的既有行為一致。
 
@@ -4244,7 +4244,7 @@ if (ShippingMethod.TAQBIN.value().equals(shippingMethod)) {
 
 // 🔴 Uber 即時配送：期限由公式推導
 //     processing_deadline = paid_at + seller_prep_sla_snapshot + platform_grace
-//     🔴 seller_prep_sla_snapshot 取「報價／付款當下」的 snapshot，賣家日後修改不回溯（66 詳設 §5.1.4a G）
+//     🔴 seller_prep_sla_snapshot 取「報價／付款當下」的 snapshot，賣家日後修改不回溯
 //     🔴 兩個數值皆 configurable：V1 預設 seller_prep_sla_default = 15m、platform_grace = 15m（見 §5.9.1）
 //     ⚠️ prep SLA 到期不在此取消；它只觸發提醒／告警。強制取消點只有 processing_deadline
 //     🔴 3003 有賣家處理期限，錨在賣家的 REPORT_READY（回報備妥）這一步：

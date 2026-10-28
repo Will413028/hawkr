@@ -431,15 +431,14 @@ OnboardingService.onboardCvs()
 | 2 | 退貨門市資訊透過**現有建店 API** 設定/修改，不新增獨立 API |
 | 3 | `returnStoreName` 和 `returnStoreAddress` 為**選填**欄位，首次建店時可以只傳 `returnStoreCode`，之後再補填完整資訊 |
 | 4 | 修改退貨門市（ACTIVE 狀態重送建店 API）**僅更新本地 DB，不同步 PayUni**（詳見 §6） |
-| 5 | 退貨門市**只適用 7-ELEVEN C2C**（`3651`）。同一 `store_id` 不得同時存在 `3651`（C2C）與 `3653`（B2C 大宗寄倉）的 ACTIVE 建店列——此排他性由 `seller_shipment_settings` 的部分唯一索引在**資料層**擋住（見 [68 號](68-7-ELEVEN%20大宗寄倉%EF%BC%88B2C%EF%BC%89詳細設計書.md) §5.4），不是靠 UI 隱藏 |
+| 5 | 退貨門市**只適用 7-ELEVEN C2C**（`3651`）。同一 `store_id` 不得同時存在 `3651`（C2C）與 `3653`（B2C 大宗寄倉）的 ACTIVE 建店列——此排他性由 `seller_shipment_settings` 的部分唯一索引在**資料層**擋住，不是靠 UI 隱藏 |
 | 6 | 已開通 B2C 的賣家沒有可設定的退貨門市：B2C 建單不傳 `storeId`／`refundStoreId`，退貨去向由母子廠商代號與指定物流中心決定 |
 
 ---
 
 ### **6. PayUni 退貨門市同步策略**
 
-> 🔴 **本節只適用 7-ELEVEN C2C（`3002`）。B2C 大宗寄倉（`3004`）不適用**——
-> 見 [68 號](68-7-ELEVEN%20大宗寄倉%EF%BC%88B2C%EF%BC%89詳細設計書.md) §6.1.3：
+> 🔴 **本節只適用 7-ELEVEN C2C（`3002`）。B2C 大宗寄倉（`3004`）不適用**：
 > `storeId`（退貨門市代碼）**C2C 專用、B2C 不得傳**；`refundStoreId` 也**不傳**。
 > B2C 的退貨去向由**母子廠商代號與指定物流中心**決定，不是由賣家設定的退貨門市。
 >

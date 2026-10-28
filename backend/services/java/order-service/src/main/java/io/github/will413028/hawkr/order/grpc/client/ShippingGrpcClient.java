@@ -128,7 +128,7 @@ public class ShippingGrpcClient {
     }
 
     /**
-     * 取得（或沿用）一筆 Uber 即時報價（66 §6.1.3；Stage 8B W2-2）。
+     * 取得（或沿用）一筆 Uber 即時報價（Stage 8B W2-2）。
      *
      * <p>🔴 <b>回應恆為 {@code code=0}</b>：業務不可用（賣家未開通 / 地址解不出 / 承載超限 /
      * Uber 報價失敗）由 {@code data.available=false} ＋ {@code unavailable_reason} 表達，

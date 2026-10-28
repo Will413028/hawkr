@@ -66,3 +66,7 @@
 - **已落實於**：`2026-09-11-ledger-carrier-model-compatibility.md`／`2026-09-11-channel-fee-grossup-in-adapter.md`；66 詳設 §1.6.1 的 punt 由本 ADR 承接；
   [70 號](70-物流財務結算%EF%BC%88Logistics%20Settlement%20%26%20Receivable%EF%BC%89詳細設計書.md) §1 的 Runtime Owner 標示；
   `services/java/payment-service/src/main/resources/db/migration/V9__add_logistics_finance_tables.sql`。
+
+## 修訂：設計書 65A、66、68、69 已刪除（2026-10-29）
+
+物流履約前端實作規格（65A）、Uber Direct 整合（66）、7-ELEVEN 大宗寄倉（68）、商家自有出貨（69）的詳細與基本設計書已刪除：65A、68、69 未實作且不在任何計畫內，66 的 Uber 已由 ADR `2026-10-27-general-ecommerce-scope-cut.md` D4 決定刪除。本文中「65A」「66」「68」「69」號設計書與它們的章節編號指向已刪除的文件，內容見 git 歷史。設計書 65 只保留已實作的部分。

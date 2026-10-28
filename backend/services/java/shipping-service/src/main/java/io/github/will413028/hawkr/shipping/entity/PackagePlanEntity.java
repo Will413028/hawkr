@@ -10,10 +10,10 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 分箱結果（66 §5.1.8）。
+ * 分箱結果。
  *
  * <p>三問：寫入＝報價時的分箱演算法（與 {@code uber_quotes} 同一次寫入）｜
- * 讀取＝建單時組 Uber {@code packages} 欄位 ＋ 承載檢查（66 §7.4 道 3／4／5）｜
+ * 讀取＝建單時組 Uber {@code packages} 欄位 ＋ 承載檢查｜
  * 推走＝🔴 生命週期<b>掛在 quote 上</b>：quote 保留 90 天，本表的列隨該 quote 一同由既有的
  * 資料清理排程移除。列本身沒有狀態要推。
  */

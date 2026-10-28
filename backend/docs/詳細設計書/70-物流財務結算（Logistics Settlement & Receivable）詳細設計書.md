@@ -4,7 +4,6 @@
 > **平台對 provider 的月結對帳**（線 C）在系統裡長什麼樣。
 >
 > **業務敘述在 [70 基本設計書](../基本設計書/70-物流財務結算（Logistics%20Settlement%20%26%20Receivable）基本設計書.md)**（本書的外部設計）；
-> Uber 專屬的商流背景在 [66 基本設計書 §2／§4／§5](../基本設計書/66-Uber%20Direct%20即時配送整合基本設計書.md)；
 > 決策依據是 [`ADR-003`](../adr/2026-09-11-uber-logistics-fee-charge-trigger.md)～[`ADR-014`](../adr/2026-09-14-uber-create-idempotency-precommit-key.md)（`docs/adr/`）。
 > **本書不重述業務規則，只落成施工契約。**
 
@@ -29,7 +28,7 @@
 | | |
 |---|---|
 | ✅ **解決** | 賣家物流應收的建立／收款／失敗處置／true-up／貸記；provider 帳單匯入與對帳；**五個**新帳本科目；線 B 的憑證觸發 |
-| ❌ **不解決** | 配送履約本身（66）／買家付款與退款（05／09）／**撥款鏈本身**（在 03；本書只**唯讀引用**其結果，見下）／發票的開立機制（58） |
+| ❌ **不解決** | 配送履約本身（65）／買家付款與退款（05／09）／**撥款鏈本身**（在 03；本書只**唯讀引用**其結果，見下）／發票的開立機制（58） |
 
 🔴 **線 B 與撥款軸不共用任何一條寫入路徑**：`SELLER_DIRECT` 下平台沒有代收**物流費**，
 就沒有物流款可撥（`PayoutEligibility` 的 G0 軸對每一筆都回 `NOT_APPLICABLE`）。
@@ -80,10 +79,8 @@ flowchart LR
 
 ## 2. 十個金額維度的落點（承 [`ADR-006`](../adr/2026-09-11-logistics-amount-semantics-separation.md)）
 
-⚠️ **本表的編號是本書自己的，與另外兩本不對應**：
-66 基設 §2.3 用 1–10 的平面編號（其 #2＝**實際**成本、#9＝**估計**成本），
-66 詳設 §1.6.1 用 9 列（`5a`／`5b`、`6a`／`6b`／`6c` 是拆列），本表以**落點**為軸。
-🔴 **跨書對讀一律以「語意名稱」為錨，不要用編號**——三套編號互相錯位，而
+⚠️ **本表以落點為軸。**
+🔴 **跨書對讀一律以「語意名稱」為錨，不要用編號**，而
 本書 §3.1 的欄位註解引用的是**本表**的編號。
 
 🔴 **不要求十個 DB column**，要求的是**無歧義保存十種業務語意**。
@@ -96,18 +93,18 @@ flowchart LR
 | 3 | **實際 provider 成本** | `logistics_receivables.actual_cost`（NULL＝尚未對帳）＋ `provider_settlement_lines.amount`〔既有表〕 | Logistics Finance（ADM 匯入後） |
 | 4 | **賣家物流服務費** | `logistics_receivables.target_net`（Collection Target Net）。🔴 **送出給通道的 `gross_amount` 不在 domain 表裡**——它在 `logistics_collection_attempts`，由 adapter 依費率反推（[`ADR-011`](../adr/2026-09-11-channel-fee-grossup-in-adapter.md)） | Logistics Finance |
 | 5 | **收款通道實際手續費** | `logistics_collection_attempts.actual_fee`（來自 `agent_fee_query` 的 `Fee`）。🔴 **正常路徑不進帳本**——手續費由賣家負擔（[`ADR-005`](../adr/2026-09-11-payuni-channel-fee-bearer.md)）⇒ 對平台不是費用，而是「應收未收足的原因」，未收足的部分自然留在 `SELLER_LOGISTICS_RECEIVABLE` 餘額裡（§3.8）。科目 `PLATFORM_COLLECTION_FEE_EXPENSE` **僅限 `PLATFORM_CAUSED` 例外** | Logistics Finance（查詢後） |
-| 6 | 賣家補貼 | 🔴 **尚不存在**——`orders` 側須新增 `seller_subsidy`（**本書不擁有**，屬結帳波次；66 §1.6.1 row 5a 逐字「不存在」） | order-service |
+| 6 | 賣家補貼 | 🔴 **尚不存在**——`orders` 側須新增 `seller_subsidy`（**本書不擁有**，屬結帳波次） | order-service |
 | 7 | 平台補貼 | `logistics_receivables.platform_subsidy` | Logistics Finance |
 | 8 | **責任歸屬（重分類）調整** | `logistics_adjustments{kind=RESPONSIBILITY, responsibility_cause}`。🔴 **只用於「已成立之後改判」**——首次成立的 provider 成本一律走維度 2／3 ＋ `logistics_receivables`（觸發見 §3.1.1、界線見 §3.5.1） | Logistics Finance |
 | 9 | **對帳調整** | `logistics_adjustments{kind=RECONCILIATION}` | Logistics Finance |
 | 10 | **賣家物流貸記** | `seller_logistics_accounts.credit_balance` ＋ 科目 `SELLER_LOGISTICS_CREDIT` | Logistics Finance |
 
-🔴 **第 4 項不等於第 1 項，也不等於第 2 項**——`INV-U-FEE`（66 §1.6.1）的機械形式：
+🔴 **第 4 項不等於第 1 項，也不等於第 2 項**——`INV-U-FEE` 的機械形式：
 
 > `logistics_receivables` 的建立**不讀** `orders.shipping_fee`。
 
 **變異測試（鑑別力）**：把某筆訂單的 `orders.shipping_fee` 改成 0，斷言 `target_net` **不變**。
-⚠️ 若跟著變 0，就是 66 基設 Case B 會讓平台默默吸收成本的那條路徑。
+⚠️ 若跟著變 0，就是會讓平台默默吸收成本的那條路徑。
 
 ---
 
@@ -538,7 +535,7 @@ N16 不帶金額，憑空造一個 `estimated_cost` 正是 §14.1 禁止的那�
 
 🔴 **平台不得向買家二次收款。**
 🔴 **它與「不向 Buyer 退款（`refund_to_buyer = 0`）」是兩件不同的事**：
-前者是「不另外跟買家要錢」，後者是「原本收的不退」（該政策在 66／03，**本書不定義它**）。
+前者是「不另外跟買家要錢」，後者是「原本收的不退」（該政策在 03，**本書不定義它**）。
 **兩句必須並存，刪掉任何一句都會讓另一句被讀成全部。**
 
 🔴 **KPI 的機械形式**：KPI 輸入**必須讀 `ResponsibilityCause`**，
@@ -579,7 +576,7 @@ classification 本身是 **5 值**，而本欄的 DB CHECK **只允許 4 個 res
 🔴 **某項 evidence 系統不存在時不得假裝存在，也不得為此新增大型 evidence subsystem**；
 **缺證據就落 `RESPONSIBILITY_UNRESOLVED`**，而不是落一個看起來比較具體的值。
 
-🔴 **classification 只在一個地方分流**（配送 Lifecycle 的 provider 終局處置格，66 詳設）
+🔴 **classification 只在一個地方分流**（配送 Lifecycle 的 provider 終局處置格）
 ——**本書不重複 classification 邏輯**；本書的 scope 是「**已 resolved 為某一值之後**，錢怎麼走」。
 ⚠️ 這一格的可判定性取決於 provider statement 的真實欄位（§10 **EV-U2**）。
 
@@ -979,7 +976,7 @@ payment adapter（PayUni 專屬）
 要驗的是**「不該被停用的沒有被停用」**（陰性驗證，`02-judgment.md` §2.0 第 3 問）。
 
 🔴 **停用走能力層、不走計費**：計費解決「這一筆誰付」，權限層解決「要不要讓他繼續用」。
-**兩者並存不互相取代**（66 基設 §6.2 同一條）。
+**兩者並存不互相取代**。
 ⚠️ **門檻值（3／7／14）是本書提出的起始值，不是既有規則** ⇒ 上線後以實際帳齡分布校準。
 
 🔴 **不得做的三件事**：① 從賣家的**其他**款項自動扣抵（平台在 `SELLER_DIRECT` 下沒有代收，沒有可扣的款）
@@ -1249,7 +1246,7 @@ wire key 為 **snake_case**（`@JsonNaming(SnakeCaseStrategy)`，對齊同 excha
   🔴 **不得為 true-up 建第二筆 receivable。**
 
 🔴 **單位：新台幣「元」整數。** provider 的 minor unit 不得滲透進本 wire——
-Uber 官方 `fee` 是 **cents**，換算只在 uber-adapter 邊界做（具名轉換函式 ＋ 契約測試，66）。
+Uber 官方 `fee` 是 **cents**，換算只在 uber-adapter 邊界做（具名轉換函式 ＋ 契約測試）。
 ⚠️ 這不是假設性風險：入站**直接取值不換算就是金額差 100 倍**，而那個值正是要向賣家收的錢。
 
 #### 刻意不加的欄位
@@ -1360,9 +1357,9 @@ sequenceDiagram
 
 ---
 
-## 9. 前端（承 65A 的 `allowedActions[]` 原則）
+## 9. 前端（`allowedActions[]` 原則）
 
-🔴 **線 B 的四類畫面在 65A 不存在對應項，本節是它們的唯一規格來源。**
+🔴 **本節是線 B 四類畫面的唯一規格來源。**
 
 | 端 | 畫面 | 必須顯示 |
 |---|---|---|
@@ -1372,7 +1369,7 @@ sequenceDiagram
 | **ADM** | 帳單匯入與對帳 | `provider_settlement_lines` 的四態；差異案件 |
 | **ADM** | 賣家帳戶 | 兩個餘額**分開顯示**（🔴 不得合成淨額） |
 
-🔴 **動作一律由後端 `allowedActions[]` 授權，前端不得從 status 自行推按鈕**（65A 硬規則）。
+🔴 **動作一律由後端 `allowedActions[]` 授權，前端不得從 status 自行推按鈕**。
 ⚠️ **`gross_amount` 與 `carried_residual` 不顯示的話，賣家會算出與我方不同的數字** ⇒ 這兩欄是客服成本的分水嶺。
 🔴 尤其 `gross_amount`：賣家銀行帳上看到的是**它**，而不是我方帳上的應收。
 
@@ -1399,7 +1396,7 @@ sequenceDiagram
 |---|---|---|
 | **EV-U1** | 是否有 statement／invoice API | §6.1 **人工匯入**——🔴 **那是設計，不是暫代**；**沒有來源就不要造排程** |
 | **EV-U2** | statement／adjustment 的**真實欄位** | 決定 `ResponsibilityCause` 判得出多少；🔴 **判不出 ⇒ `RESPONSIBILITY_UNRESOLVED`**（§3.6），不得為了讓欄位有值而挑一個看起來具體的 |
-| **EV-U3** | quote 是否為最終價、wait／cancellation／return fee 欄位 | 66 的設計**不依賴 API 回應、不造欄位** |
+| **EV-U3** | quote 是否為最終價、wait／cancellation／return fee 欄位 | 本設計**不依賴 API 回應、不造欄位** |
 | **EV-U4** | 台灣 Direct API／契約真實能力 | 整條擋在**啟用**前（不擋實作） |
 
 🔴 **`external_id` 是備援對帳鍵，`provider_delivery_ref` 才是主鍵。**
@@ -1478,7 +1475,7 @@ sequenceDiagram
 
 ### 12.1 🔴 線 B 應收 producer 的 dev 驗收
 
-🔴 **`logistics.cost.incurred` 的 producer 未上線時不得開啟 3003**（對應 66 §12.2 步 8h）：
+🔴 **`logistics.cost.incurred` 的 producer 未上線時不得開啟 3003**：
 沒有 producer ⇒ **每一筆 Uber 單都是 100% 淨流出**——無應收、無報表、無告警，
 要等 provider 的月結帳單寄來才知道花了多少。
 
@@ -1530,7 +1527,7 @@ sequenceDiagram
 ## 14. 介面契約（gRPC ／ REST）
 
 > ⚠️ **本章刻意放在文末而不是範本的 §6 位置**：本書的章節依「線 B／線 C 的邏輯流」組織，
-> 而 65／66／65A 已經引用了 §2（金額維度）／§6（對帳）／§9（前端）等編號
+> 而其他設計書已經引用了 §2（金額維度）／§6（對帳）／§9（前端）等編號
 > ⇒ **重編號會讓那些交叉引用全部指錯**，代價大於對齊範本的收益。
 > 範本對應：本章 ＝ 範本 §6；§4.2 ＝ 範本 §7；§8 ＝ 範本 §8；§11 ＝ 範本 §13。
 
@@ -1552,7 +1549,7 @@ sequenceDiagram
 
 🔴 **本 module 不提供任何「建立應收」的 RPC**——應收只能由 `logistics.cost.incurred` 事件建立。
 理由：開一個 RPC 等於開一條繞過 §3.1.1 觸發條件的路徑，
-而那正是 `INV-U-FEE` 與 66 `INV-U1` 要防的形狀。
+而那正是 `INV-U-FEE` 與 `INV-U1` 要防的形狀。
 
 ### 14.2 payment-service 既有 channel 層新增（`agent_fee` 通道）
 

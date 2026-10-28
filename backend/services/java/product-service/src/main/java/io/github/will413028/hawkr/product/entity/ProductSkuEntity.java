@@ -94,13 +94,13 @@ public class ProductSkuEntity implements Serializable {
     private List<ShippingMethodItem> shippingMethod;
 
     /**
-     * 禁運品／品類標記 JSONB（66 §5.1.9 ②）。
+     * 禁運品／品類標記 JSONB（②）。
      *
      * <p>結構：{@code ["<RestrictedGoodsCategory value>", ...]}；空陣列 = 未標記任何受限品類。
      *
-     * <p>🔴 <b>本波零消費者是預期狀態</b>：寫入者是 66 §5.1.9 ③ 的賣家上架 UI，
+     * <p>🔴 <b>本波零消費者是預期狀態</b>：寫入者是 ③ 的賣家上架 UI，
      * 讀取者是 §7.4 道 6 的結帳檢查，兩者都在後續波次。欄位先存在，是為了讓那兩件接上來時
-     * 不是「檢查照跑但每筆都是空陣列 ⇒ 恆為通過」——66 §5.1.9 逐字把那個組合稱為最糟的組合。
+     * 不是「檢查照跑但每筆都是空陣列 ⇒ 恆為通過」—— 逐字把那個組合稱為最糟的組合。
      *
      * <p>🔴 <b>值域待 UP-4</b>：CodeMeta 尚未建立 {@code RestrictedGoodsCategory}，
      * DB 的 {@code chk_product_sku_restricted_category_codes} 因此只允許空陣列

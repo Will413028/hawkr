@@ -6,7 +6,7 @@ import {
 import { ShippingMethod } from "@/lib/codemeta/enums";
 
 /**
- * 回歸測試：購物車／結帳的「未知配送方式 fail-open」（65A §1.10 ／ §12.1 W7・W8）。
+ * 回歸測試：購物車／結帳的「未知配送方式 fail-open」。
  *
  * 舊行為是三元的最後一支 `: true` —— 沒見過的配送方式就完全不驗收件資訊。
  * 這裡的斷言一律是「未知值**不得**取得與已知 provider 相同的放行結果」。

@@ -372,7 +372,7 @@ class LogisticsStatusCode {
   /// 明確 `null`（未知），呼叫端負責決定「未知進度」怎麼呈現。
   ///
   /// ⚠️ 這個算式在 `hawkr-website/lib/seller/shipment.ts:progressPercentFor`
-  /// 有**逐值相同的第二份**，兩份之間沒有任何 gate 比對（65A §12.2）。改這裡時
+  /// 有**逐值相同的第二份**，兩份之間沒有任何 gate 比對。改這裡時
   /// 必須同步改那一份，否則兩份各自演化而無人知道。
   static int? getProgressPercent(int code, String lgsType) {
     switch (lgsType) {

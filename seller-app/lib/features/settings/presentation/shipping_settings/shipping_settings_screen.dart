@@ -161,7 +161,7 @@ class ShippingSettingsScreen extends HookConsumerWidget {
             // 其餘 ShippingType（3653 超商大宗寄倉 / 3654 商家自送 / 後端新增值）
             // 沒有對應的區塊可以承載 —— 原本是**靜默忽略**（既不顯示也不報錯），
             // 這裡至少讓它在 log 留痕。
-            // 真正的修法是 registry + slot（65A §12.5 E1），本波不做。
+            // 真正的修法是 registry + slot，本波不做。
             HKLog.logW(
               '[ShippingSettings] 未支援的 onboarding shippingType=$type '
               '（本版僅支援 3651 CVS_C2C / 3652 HOME_DELIVERY），該筆設定不會顯示',

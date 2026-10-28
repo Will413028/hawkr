@@ -15,7 +15,7 @@ import {
 } from "@/lib/seller/shipment";
 
 /**
- * 回歸測試：物流 provider 的二元 fallback（65A §1.10 ／ §12.1 類型 A）。
+ * 回歸測試：物流 provider 的二元 fallback。
  *
  * 舊行為是「不是黑貓就當 7-11」——`isTaqbin ? … : …`。它對 `3003`（已刪除的 Uber）、
  * `3004` 7-11 大宗寄倉、`3005` 商家自送回的都是**合法值**：型別對、不拋例外、

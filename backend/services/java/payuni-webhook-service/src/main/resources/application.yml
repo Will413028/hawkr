@@ -103,7 +103,7 @@ logging:
     io.github.will413028.hawkr: ${LOG_LEVEL:INFO}
     org.flywaydb: INFO
 
-# Uber Direct webhook 驗簽（66 §8.5）
+# Uber Direct webhook 驗簽
 #
 # 🔴 **一組不是一個**：{webhookId: key} 的 JSON map。只放一把 ⇒ 多註冊一個 webhook
 #    就靜默驗簽失敗，而失敗的下場是我方回 401 ⇒ Uber 不重試 4xx ⇒ 該來源的事件全丟。

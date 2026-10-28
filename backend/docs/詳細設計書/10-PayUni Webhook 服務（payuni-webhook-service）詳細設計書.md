@@ -674,7 +674,7 @@ inbox 可能永久停在 `RECEIVED` / `FAILED`，事件無法投遞。
 | `payuni.refund.accepted` | `payuni.events` | PayUni 退款 sync 受理 | payment-service 寫入 estimated_refund_date |
 | `payuni.unknown.fallback` | `payuni.events` | 無法分類的 webhook | payment-service + aftersales-service 保守 stamp |
 | `seller.review.result` | `seller.events` | 商家審核結果（AGENT_NOTIFY 唯一投遞通道） | 單體 seller 模組商家狀態變更 |
-| `uber.shipping.status` | `payuni.events` | Uber Direct 貨態通知（66 號） | shipping-service，queue `shipping.uber.webhook` |
+| `uber.shipping.status` | `payuni.events` | Uber Direct 貨態通知 | shipping-service，queue `shipping.uber.webhook` |
 
 > **AGENT_NOTIFY 單通道**：含 `MerStatus` 欄位時寫入 `seller.events / seller.review.result` 供 Seller Service 消費；**沒有 `payuni.events / payuni.agent.notify` 這條路由**。無 `MerStatus` 時不發任何 route。
 
@@ -685,7 +685,7 @@ inbox 可能永久停在 `RECEIVED` / `FAILED`，事件無法投遞。
 | JSON 鍵（wire） | Java accessor | 型別 | 說明 |
 |------|------|------|------|
 | `event_id` | `eventId()` | `String` | UUID（全局唯一） |
-| `provider` | `provider()` | `String` | 🔴 **不是常數 `"PAYUNI"`**——Uber slice 共用同一個 `PayUniWebhookEnvelope`（66 §6.4.1）。下游路由**必須**帶 provider 維度，見 §5.3 第 2 條 |
+| `provider` | `provider()` | `String` | 🔴 **不是常數 `"PAYUNI"`**——Uber slice 共用同一個 `PayUniWebhookEnvelope`。下游路由**必須**帶 provider 維度，見 §5.3 第 2 條 |
 | `webhook_type` | `webhookType()` | `String` | `PAYMENT_UOP` / `SHIPPING_STATUS` / `AGENT_NOTIFY` / `REFUND_NOTIFY` 等 |
 | `mer_id` | `merId()` | `String` | 商家編號 |
 | `event_key` | `eventKey()` | `String` | 去重鍵（同 Inbox eventKey；§2.4） |
@@ -939,7 +939,7 @@ services/java/payuni-webhook-service/
     │       ├── entity/{WebhookInbox,OutboxEvent}.java   — BIGSERIAL Entity
     │       ├── mapper/{WebhookInboxMapper,OutboxEventMapper}.java
     │       └── typehandler/JsonbStringTypeHandler.java
-    ├── uber/                                   — Uber Direct slice（見 66 號 §5.1.6）
+    ├── uber/                                   — Uber Direct slice
     │   ├── UberWebhookReceiveService.java
     │   ├── UberWebhookParser.java
     │   ├── UberWebhookEvent.java

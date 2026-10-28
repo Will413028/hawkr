@@ -17,7 +17,7 @@
 | **角色** | 集中管理規範文件，類似 CodeMeta 的 SSOT |
 | **依據** | `docs/開發規範/MQ 與事件管理規範.md` 為流程規範；本文件為內容 SSOT |
 | **更新時機** | 新增、修改、刪除任何 MQ Producer / Consumer / Exchange / Queue / Routing Key 時 |
-| **contract 邊界** | 🔴 **routing key／exchange／queue／DLQ 一律以本書為準**：其他設計書（03／65／66／70 等）只**引用**本書對應章節，不得複製一份平行定義——複製出來的那份漂移時不會有任何東西報錯 |
+| **contract 邊界** | 🔴 **routing key／exchange／queue／DLQ 一律以本書為準**：其他設計書（03／65／70 等）只**引用**本書對應章節，不得複製一份平行定義——複製出來的那份漂移時不會有任何東西報錯 |
 | **不在範圍** | gRPC（屬同步通訊，見各服務設計書）、Redis Pub/Sub、Webhook HTTP（PayUni 入口見 §10 設計書） |
 
 ### 1.1.1 與其他服務設計書的關係（重要）
@@ -383,12 +383,6 @@ docker exec hawkr-rabbitmq rabbitmqctl list_queues name messages \
 | `shipment.processing.timeout` | shipping-service `ShippingEventPublisher.publishProcessingTimeout` | aftersales-service `ProcessingTimeoutConsumer.onProcessingTimeout` | Map（orderNo, sellerAccountId, buyerAccountId） | ✅ aftersales.events.dlq | cancel state machine |
 | `shipment.processing.cleared` | shipping-service `ShippingEventPublisher.publishProcessingCleared` | order-service `ShippingEventConsumer.onProcessingCleared` | Map（orderNo） | ✅ order.shipment.processing.cleared.dlq | processing_deadline 已 NULL 則跳過 |
 | `shipment.anomaly.detected` | shipping-service `ShipmentAnomalyEventPublisher.publishAnomalyDetected`（由 `TcatCallStuckAlertScheduler` / `ShipmentLabelReconcileScheduler` / `ShipmentStatusReconcileScheduler` 共用） + aftersales-service `ShipmentLabelConsumer`（B-143 即時偵測點）/ `ReturnStuckAlertScheduler`（退貨 14 天無進展；**經 `ObsRabbitPublisher.publishConfirmed`，confirm 上限 5 秒**，回 `false` 即釋放 `return_stuck_alerted_at` 租約 ⇒ 隔日重發，見 [09 號 §8.5](./09-售後微服務（AfterSales%20Service）詳細設計書.md#85-多副本排程搶佔語意scheduler-claimissue-2294) L6） | notification-service DB-driven template（賣家 FCM + inbox，push_mode='visible'；推送節奏由 template 端依 `severity` 處理） | `ShipmentAnomalyDetectedPayload`（含 orderNo / sellerAccountId / buyerAccountId / anomalyType / severity / detectedAt） | ✅ `topology.yaml` `retry:` 展開的 `notification.shipment.anomaly.detected.dlq`（DLX=`hawkr.shipping.dlx` 手動宣告，§2.2 已列）；MaxRetries=3 超上限即直投該 DLQ（重試／直投語意見 §1.5）；DLQ 端 alert ops 介入 | `reference_id_template = '#{orderNo}\|#{anomalyType}'` 達 (orderNo, anomalyType) 對應 1 筆 inbox + 1 次 FCM；scheduler 每輪重複 publish 由 reference_id 自然去重。⚠️ **RETURN_STUCK 另有一條「confirm timeout ⇒ 訊息可能已送達但租約被釋放 ⇒ 隔日再發一次」的路徑**：payload 每次帶新的 `UUID`，**不是**可用 event id 去重的重放，跨日收斂完全依賴本欄的 `reference_id` |
-| 🆕 `shipment.batch.opened` | shipping-service `B2cBatchService`（68 號） | notification-service（`notification.shipping` 的 `'#'` binding 已涵蓋 ⇒ **queue／binding 皆 +0**） | `ShipmentBatchPayload` | ✅ notification.shipping.dlq | `batch_id` ＋ 狀態 |
-| 🆕 `shipment.batch.closed` | 同上 | 同上 | 同上 | ✅ | 同上 |
-| 🆕 `shipment.batch.dispatched` | 同上 | 同上 | 同上 | ✅ | 同上 |
-| 🆕 `shipment.batch.dc_received` | 同上 | 同上 | 同上 | ✅ | 同上 |
-| 🆕 `shipment.batch.reconciling` | 同上 | notification ＋ ADM 佇列 | 同上 | ✅ | 同上 |
-| 🆕 `shipment.batch.reconciled` | 同上 | notification | 同上 | ✅ | 同上 |
 | 🆕 `fulfillment.seller.ready`（`N11`，65 §6A.1.2） | shipping-service `ShippingEventPublisher.publish`（`S-13 report_ready` 寫入 `shipments.seller_ready_at` 同交易） | order-service（🆕 queue `order.fulfillment.seller.ready`，賣家出貨 SLA 的「已處理」判定）＋ notification-service（既有 `notification.shipping` 的 `'#'` binding ⇒ **queue／binding 皆 +0**；買家：備貨完成、預計取件時間） | `FulfillmentSellerReadyPayload` | ✅ `order.fulfillment.seller.ready.dlq`（`dlq:` 形狀，via `hawkr.order.dlx` —— DLQ 跟著 consumer 服務，見 §6.2 註） | 策略 3：`{order_no}:SELLER_READY` |
 | 🆕 `fulfillment.provider.courier_assigned`（`N12`） | shipping-service `ShippingEventPublisher.publish`（webhook normalize 後：`status = pickup` **AND** `courier != null`） | notification-service（既有 `notification.shipping` 的 `'#'` binding ⇒ **queue／binding 皆 +0**；買家 Push：外送員已指派＋ETA）＋ gateway SSE | `FulfillmentProviderCourierAssignedPayload` | ✅ `notification.shipping.dlq` | 策略 3：`{order_no}:{provider_delivery_ref}:COURIER_ASSIGNED` |
 | 🆕 `fulfillment.provider.pickup_imminent`（`N13`） | 同上（`courier_imminent = true`） | notification-service（同上，**零 topology 改動**）；🔴 `seller_ready_at IS NULL` 時額外走 Seller high-priority ＋ ADM urgent | `FulfillmentProviderPickupImminentPayload` | ✅ `notification.shipping.dlq` | 策略 3：`{order_no}:{provider_delivery_ref}:IMMINENT` |
@@ -412,7 +406,7 @@ docker exec hawkr-rabbitmq rabbitmqctl list_queues name messages \
 只做其中一面的症狀是**訂閱靜默失效**：passive declare 之下查不到 queue 不 crash、不進 DLQ、不報錯。
 
 **Java 對應 Enum**：`ShippingEventType`（9 個值）——
-＝ 本節前 9 列（8 條有專屬 binding ＋ `shipment.anomaly.detected`）。`shipment.batch.*` 六條屬 68 號、`fulfillment.*` 七條屬 65 號，本 enum 暫不涵蓋。
+＝ 本節前 9 列（8 條有專屬 binding ＋ `shipment.anomaly.detected`）。`fulfillment.*` 七條屬 65 號，本 enum 暫不涵蓋。
 ⚠️ **`fulfillment.*` 七條需要自己的 EventType 碼值**（36 §7.4.1 要求 `event_type` 對齊 CodeMeta `內部技術碼.md`）——它們**不會**破壞下方那支雙向契約測試，因為該測試的掃描面逐字是「值以 `shipment.` 起頭的常數」，`fulfillment.` 前綴落在集合外。🔴 **反過來說，那支測試對 `fulfillment.*` 是零鑑別力**：新家族漏登記 `MqConstants` 常數不會轉紅，要靠 §3.3.1 的四面登記自檢。
 
 🔴 **`Code` 與 `Value` 各自對應一個 `MqConstants` 常數家族，不是二選一**：
@@ -438,7 +432,7 @@ DLQ 因此是 **`notification.shipping.dlq`**。
 ⚠️ **三條共用 `ShippingEventPayload` 的事件**（`shipment.status.changed`／`shipment.delivered`／
 `shipment.return.status_changed`）的 payload 欄位為：`commerce_model`／`provider`／
 `previous_status`／`occurred_at`（65 §6A.1.1）＋ `outcome_reason`
-（值域 [`UberDeliveryOutcome`](../代碼管理（CodeMeta）/業務類型碼.md)，66 號要求）。
+（值域 [`UberDeliveryOutcome`](../代碼管理（CodeMeta）/業務類型碼.md)）。
 **擴充這三條的 payload 時不新增 routing key**——它們共用同一個 payload class。
 
 #### 3.3.1 責任判定 final 事件契約（`fulfillment.responsibility.finalized`）
@@ -750,9 +744,9 @@ generic path 不得含任何 payment 業務 metric。
 | `payuni.refund.notify` | 同上 | payment-service `PayUniRefundNotifyConsumer.onRefundNotify` | 同上 | ✅ payment.payuni.refund.notify.dlq | `payment_webhooks` 表 |
 | `payuni.refund.accepted` | 同上 | payment-service `PayUniRefundAcceptedConsumer.onRefundAccepted` | 同上 | ✅ payment.payuni.refund.accepted.dlq | `payment_webhooks` 表 |
 | `payuni.unknown.fallback` | 同上 | payment-service `UnknownPaymentFallbackConsumer.onUnknownFallback` + aftersales-service `UnknownRefundFallbackConsumer.onUnknownFallback` | 同上 | ✅ payment.payuni.unknown.fallback.dlq + aftersales.payuni.unknown.fallback.dlq | DB 樂觀鎖（保守失敗 stamp）|
-| 🆕 `uber.shipping.status` | payuni-webhook-service 的 **uber slice**（同 image 同 values，非新服務；66 §3）：`UberWebhookController` → `UberWebhookReceiveService` → `outbox_events` → `OutboxPublisher.publish` | shipping-service `UberWebhookConsumer.onUberWebhook`，queue 🆕 `shipping.uber.webhook` | 🔴 **`ProviderWebhookEnvelope`（新型別，不是 `PayUniWebhookEnvelope`）** —— 見下方說明 | ✅ shipping.uber.webhook.dlq | ① ingress `webhook_inbox`（`uq_inbox_event`，擋 Uber 重送）② consumer `shipping_webhook_dedup`（擋 MQ at-least-once）|
+| 🆕 `uber.shipping.status` | payuni-webhook-service 的 **uber slice**（同 image 同 values，非新服務）：`UberWebhookController` → `UberWebhookReceiveService` → `outbox_events` → `OutboxPublisher.publish` | shipping-service `UberWebhookConsumer.onUberWebhook`，queue 🆕 `shipping.uber.webhook` | 🔴 **`ProviderWebhookEnvelope`（新型別，不是 `PayUniWebhookEnvelope`）** —— 見下方說明 | ✅ shipping.uber.webhook.dlq | ① ingress `webhook_inbox`（`uq_inbox_event`，擋 Uber 重送）② consumer `shipping_webhook_dedup`（擋 MQ at-least-once）|
 
-> 🆕 2026-09-07（66 號）：Uber webhook 沿用本領域的 inbox/outbox 兩張表與同一條垂直切片形狀。
+> Uber webhook 沿用本領域的 inbox/outbox 兩張表與同一條垂直切片形狀。
 > 🔴 **三個連帶改動，缺一即靜默失效**：① `WebhookProvider` CodeMeta 新增 `UBER`（漏了 ⇒ 寫入被
 > `CodeMetaValidator` 擋下）—— ✅ **已落地 2026-09-12，Value `8242`**；② `webhook_inbox.mer_id` 必須放寬成 nullable（**Uber 沒有 MerID，
 > 現況 V1 是 `VARCHAR(32) NOT NULL` ⇒ 第一筆就 23502**）—— ✅ **已落地 2026-09-12，
@@ -782,7 +776,7 @@ generic path 不得含任何 payment 業務 metric。
 > ① `PayUniWebhookEnvelope.payload` 的型別是 `Map<String,String>` ⇒ Uber 的巢狀物件
 > （`courier`／`manifest`）與陣列（`related_deliveries`）**塞不進去**；
 > ② 更致命的是 **raw bytes 在第一跳就遺失**，而 Uber 驗簽是 HMAC-SHA256 over raw body
-> —— 先 parse 再 re-serialize 會因欄位順序不同而**偶發**失敗、測不出來、上線才炸（66 §6.3.1 陷阱 A2）。
+> —— 先 parse 再 re-serialize 會因欄位順序不同而**偶發**失敗、測不出來、上線才炸。
 > 新型別 `io.github.will413028.hawkr.common.mq.ProviderWebhookEnvelope` 的欄位：
 > `provider`／`webhook_type`／`event_key`／`form_params`／**`raw_body_base64`**／`headers`／`received_at`
 > （envelope 層一律 snake_case，同 §7.4）。`raw_body_base64` 走 base64 而非字串：JSON body 可含任意位元組，
@@ -792,7 +786,7 @@ generic path 不得含任何 payment 業務 metric。
 > ⚠️ **`headers` 是白名單不是全量轉發**：只轉 `x-uber-signature`／`x-postmates-signature`（API 總覽 §6.1 的兩個名字）。
 > MQ 訊息會被持久化、被 log、被 re-drive，全量轉發等於把任意上游 header 寫進佇列（10 檔 §10.3）。
 >
-> ⚠️ **四種事件裡只有 `delivery_status` 進 MQ**（66 §6.3.2）：`courier_update` 每 20 秒一發，
+> ⚠️ **四種事件裡只有 `delivery_status` 進 MQ**：`courier_update` 每 20 秒一發，
 > 全進 MQ ＝ 流量放大 14 倍而零 consumer 需要它（陷阱 A3）⇒ 只落 `webhook_inbox` 並標 IGNORED；
 > `refund_request` **只落 inbox 並 log 到告警級，不自動建案**——錢的事不自動化
 > （落點 `fulfillment_exception_cases` 雖然存在，本線不自動寫入它）；`shopping_progress` 我方未訂閱。
@@ -1462,7 +1456,7 @@ fan-out、查無訂閱者不產生任何錯誤或 log（2026-09-03 修復前即�
 | Consumer Class | Listener Method | 監聽 Queue | Ack | Idempotency |
 |----------------|----------------|------------|-----|-------------|
 | `ShippingWebhookConsumer` | `onShippingWebhook` | `shipping.payuni.webhook` | MANUAL | `shipping_webhook_dedup` 表 |
-| 🆕 `UberWebhookConsumer`（66 §6.4.1） | `onUberWebhook` | `shipping.uber.webhook` | MANUAL | `shipping_webhook_dedup` 表（去重鍵由 adapter `InboundCapability.dedupKey` 產生；🔴 跨 provider 必須不撞——PayUni 的一律以 `merId` 開頭、Uber 的是 provider event id）|
+| 🆕 `UberWebhookConsumer` | `onUberWebhook` | `shipping.uber.webhook` | MANUAL | `shipping_webhook_dedup` 表（去重鍵由 adapter `InboundCapability.dedupKey` 產生；🔴 跨 provider 必須不撞——PayUni 的一律以 `merId` 開頭、Uber 的是 provider event id）|
 | `OrderPaidConsumer` | `onOrderPaid` | `shipping.order.paid` | MANUAL | shipment_no IS NULL |
 | `OrderReceiptConfirmedConsumer` | `onOrderReceiptConfirmed` | `shipping.order.receipt.confirmed` | **AUTO**（無 DLQ，異常僅 log） | mapper 冪等 |
 
@@ -1587,7 +1581,7 @@ grep -cE '^\s+(retry|dlq):' infra/mq/topology/topology.yaml
 
 | 表名 | 服務 | 用途 | 唯一約束 |
 |------|------|------|---------|
-| `webhook_inbox` | payuni-webhook-service | **多 provider 共用**的 webhook 入口去重（PayUni ＋ 🆕 Uber，66 §5.1.6 決議不新建 `uber_webhook_inbox`）| `(provider, webhook_type, event_key)` ⚠️ `mer_id` 自 `V2` 起 nullable —— Uber 沒有 MerID，**不得塞 sentinel** |
+| `webhook_inbox` | payuni-webhook-service | **多 provider 共用**的 webhook 入口去重（PayUni ＋ 🆕 Uber，不新建 `uber_webhook_inbox`）| `(provider, webhook_type, event_key)` ⚠️ `mer_id` 自 `V2` 起 nullable —— Uber 沒有 MerID，**不得塞 sentinel** |
 | `payment_webhooks` | payment-service | PayUni payment/refund webhook inbox | `idempotency_key`（handler 提取） |
 | `shipping_webhook_dedup` | shipping-service | PayUni 物流 webhook 去重 | `event_key = MerID:ShipTradeNo:ApiType/ShipStatus` |
 | `payment_event_dedup` | order-service | 支付事件 dedup | `transaction_id`（payment 的 trade_no） |

@@ -13,8 +13,7 @@
 > **錢與發票怎麼走**（買家 → PayUni → 賣家子商店；寄件費由 PayUni 自賣家帳戶扣；平台不在資金線上）、
 > 一張配送單的業務階段、畫面地圖。**先讀它，本書每一章都會好讀很多。**
 
-跨配送方式的共用骨架在 [65 物流履約平台基本設計書](../基本設計書/65-物流履約平台（Fulfillment%20Platform）基本設計書.md)；
-各配送方式另有自己的一本（[66](../基本設計書/66-Uber%20Direct%20即時配送整合基本設計書.md)／[68](../基本設計書/68-7-ELEVEN%20大宗寄倉（B2C）基本設計書.md)／[69](../基本設計書/69-商家自有出貨（Merchant%20Self-Delivery）基本設計書.md)）。
+跨配送方式的共用骨架在 [65 物流履約平台基本設計書](../基本設計書/65-物流履約平台（Fulfillment%20Platform）基本設計書.md)。
 
 ⚠️ **基本設計書不含任何可施工的細節**（無 DDL、無端點、無述詞）⇒ **不得拿它當契約來源**。
 
@@ -194,7 +193,7 @@ graph TD
 | 配送中 | IN_TRANSIT, WAITING_PICKUP | 終態（PICKED_UP / CANCELLED）、異常群組、其他配送中（如 31↔32）；**禁止**倒退到出貨前 |
 | 異常相關 | ABNORMAL~PENDING_HOME_RETURN（isAbnormal=true） | 異常互轉、終態、重回配送中（門市關轉後重回）；**禁止**倒退到出貨前 |
 | 終態 | PICKED_UP, CANCELLED | 不可再轉移 |
-| **建單未知**（65 §7.1.2.1） | `CREATE_UNKNOWN(991)` | `991` 屬 `ShipmentStatusMapper.PRE_SHIPMENT` ⇒ `isValidTransition` 對它是 **blanket `return true`**，出邊不受列舉限制。回查排程的落點是 **provider-aware** 的：3001／3002／3003 → `91`，**3004 → `92`**（`/trade` 成功 ＝ `PROVIDER_CREATED`，68 §7.2 M2／§7.3.2 X1）；另可落 `990`／`41` |
+| **建單未知**（65 §7.1.2.1） | `CREATE_UNKNOWN(991)` | `991` 屬 `ShipmentStatusMapper.PRE_SHIPMENT` ⇒ `isValidTransition` 對它是 **blanket `return true`**，出邊不受列舉限制。回查排程的落點是 **provider-aware** 的：3001／3002／3003 → `91`，**3004 → `92`**（`/trade` 成功 ＝ `PROVIDER_CREATED`）；另可落 `990`／`41` |
 | **建單失敗**（65 §7.1.2.1） | `CREATE_FAILED(990)` | 🔴 **`990` 不在 `PRE_SHIPMENT`**，走自己的列舉分支 ⇒ 出邊只有列舉的兩條：`91`（Admin 重建）／`41`（Admin 取消＋退款鏈） |
 | **取消處理中**（65 §7.1.2.1） | `CANCEL_PENDING(992)` | provider 確認 → `41`；provider 拒絕 → **回退到任何非終態**（全值域唯一允許回退者）；入邊 from ＝ 全部非終態 |
 | **理賠處理中**（65 §7.1.2.1） | `CLAIM_PENDING(993)` | 成立 → `43`；不成立 → `33` 或原異常值。入邊 ← `44`／`932`／`33`／ADM 建案 |
@@ -211,13 +210,13 @@ graph TD
 
 由於 ShippingStatus.value() 直接對應 PayUni 狀態碼，映射為 `ShippingStatus.fromValue(payUniCode)`，不再需要額外的映射表。
 
-**Uber 狀態碼映射以 [66 Uber Direct 即時配送整合詳細設計書](./66-Uber%20Direct%20即時配送整合詳細設計書.md) §7.3 為準**
+**Uber 狀態碼映射以 `UberStatusMapper` 為準**
 （該表另有述詞集合歸屬、訂單軸推進值、`allowedActions[]` 三欄，且**正向／逆向 leg 各一張表**，本節都沒有）。
 
 🔴 **`returned` 是最容易誤讀的一格，兩條不變式必須同時成立。**
 
 **不變式一：`returned` ≠ 我方「已送達」。** 它在正向 leg 是**失敗**（→ `ABNORMAL(33)`，
-同一次處理內續推 `41`），在逆向 leg 才是 `RETURN_FAILED(28)`（66 §7.3.3）。
+同一次處理內續推 `41`），在逆向 leg 才是 `RETURN_FAILED(28)`。
 🔴 **不得映到 `RETURN_GENERAL(51)`**：`51`／`53` 的「適用」欄**不含 3003**（65 §7.1.2.1），
 `33` 才是唯一「適用：全」的異常匯集點。
 
@@ -229,7 +228,7 @@ graph TD
 **≠ `CANCELLED`、≠ `DELIVERED`**）／`SELLER_CAUSED`／`PROVIDER_CAUSED`／`PLATFORM_CAUSED` ⇒ **向 Buyer 全額退款**／
 `RESPONSIBILITY_UNRESOLVED` ⇒ **暫不決定**，Order 軸停在 `SHIPPING_ABNORMAL(35)` 等 ADM 裁決。
 🔴 **嚴禁**把 provider 的 `returned`／`undeliverable` 當成 `BUYER_CAUSED` 的捷徑——那等於做了一個沒有證據的判定。
-責任分類與退款政策的權威在 [66 詳細](./66-Uber%20Direct%20即時配送整合詳細設計書.md) 與
+責任分類與退款政策的權威在
 [09 售後](./09-售後微服務（AfterSales%20Service）詳細設計書.md)；本服務只負責把配送軸推到 `41` 並帶上 provider 事實。
 
 ⚠️ **平台自訂值一律三位數、PayUni 原生值一律兩位數**（見
@@ -692,7 +691,7 @@ sequenceDiagram
 > 🔴 **`shipments` 是 provider-neutral 表，只放對所有 provider 都有一致業務語意的事實。**
 > 即時配送（3003）衍生的 provider-specific 資料一律落 `uber_deliveries`／provider extension table，**不得污染本表**：
 > courier identity／`courier.public_phone_info`（匿名轉接號 ＋ `pin_code`）／rematch episode／Uber-specific ETA／
-> `pickup_ready_at_snapshot`／`seller_prep_sla_snapshot` 皆屬此類（落點見 [66 詳細](./66-Uber%20Direct%20即時配送整合詳細設計書.md)）。
+> `pickup_ready_at_snapshot`／`seller_prep_sla_snapshot` 皆屬此類。
 > 🔴 **不得新增 `courier_assigned BOOLEAN`** —— `status = 933 COURIER_ASSIGNED` 已經表達這件事，加了就是兩份 truth。
 > ⚠️ **`pickup_ready_at`／`pickup_deadline_at` 不升上本表**：它們今天只有 3003 有語意，
 > 要等確認其他 provider 也有一致業務語意時才升；在那之前一律留在 provider extension table。
@@ -1463,7 +1462,7 @@ message OnboardShippingResponse {
 message ShippingOnboardingView {
     string onboarding_id = 1;         // 建店設定 ID（TSID 數字字串）= seller_shipment_settings.id
                                   // 🔴 僅 PayUni 軸（CVS／宅配）有值；Uber（3003）沒有這張表的列
-                                  //    ⇒ 賣家 Uber 狀態走 ListSellerShippingMethods（66 §6.1.5 S-U6）
+                                  //    ⇒ 賣家 Uber 狀態走 ListSellerShippingMethods
     string shipping_type = 2;         // CVS_C2C / HOME_DELIVERY
     string goods_type = 3;            // 寄件型態（超商用，宅配為空字串）
     string onboarding_status = 4;     // 內部建店狀態碼（數字字串，如 "0", "10"）
@@ -1835,7 +1834,7 @@ sequenceDiagram
         Note over Ship: pickup_ready_dt = pickup_ready_at_snapshot<br/>（報價當下凍結的絕對時間，直接讀、不重算）<br/>pickup_deadline_dt / dropoff_ready_dt / dropoff_deadline_dt 一律 OMIT
         Ship->>Uber: E2 Create Delivery
         Uber-->>Ship: delivery_id（成功）／錯誤（失敗 → 990 CREATE_FAILED，結果不明 → 991 CREATE_UNKNOWN）
-        Note over Ship: 建單成功 = FL-1，不代表 Uber 當場派車<br/>（我方尚未觀察到 courier assignment）<br/>詳見 66 詳細
+        Note over Ship: 建單成功 = FL-1，不代表 Uber 當場派車<br/>（我方尚未觀察到 courier assignment）
     end
 
     alt PayUni 呼叫成功
@@ -2990,7 +2989,7 @@ sequenceDiagram
 
 **用途**：回傳賣家所有可能的配送方式（固定槽位），用於前端商品建立時篩選配送選項、賣家後台查看物流開通狀態。與 `ListShippingOnboardings` 差異在於本 API 包含所有可能的配送方式（含未建店的），而非僅已建店的記錄。
 
-🔴 **本 API 是「賣家 Uber（3003）setup／health／availability」的唯一對外載體**（66 §6.1.5 **S-U6**）。
+🔴 **本 API 是「賣家 Uber（3003）setup／health／availability」的唯一對外載體**。
 它的 request 只需要 **store identity**（`store_id` ＋ `account_type`）；
 `GET /app/shipping_onboardings/:onboarding_id` **對 3003 不適用**——那個 `:onboarding_id` ＝
 `seller_shipment_settings.id`（§5.6），而 Uber 的 onboarding 落在
@@ -3003,7 +3002,7 @@ sequenceDiagram
 | 1 | TAQBIN | — | 黑貓宅急便 | true (HOME_DELIVERY) | ACTIVE + enabled |
 | 2 | SEVEN_ELEVEN_STORE_PICKUP | AMBIENT | 7-11店到店（常溫） | true (CVS_C2C + AMBIENT) | ACTIVE + enabled |
 | 3 | SEVEN_ELEVEN_STORE_PICKUP | FROZEN | 7-11店到店（冷凍） | true (CVS_C2C + FROZEN) | ACTIVE + enabled |
-| 4 | UBER_INSTANT | — | Uber 即時配送 | 🔴 **true**（66 **U8**：沒有 onboarding 就沒有 `external_store_id`，而它是 Create Quote 的必填） | 平台層開關 **AND** 該賣家的 Uber onboarding 狀態（見下方） |
+| 4 | UBER_INSTANT | — | Uber 即時配送 | 🔴 **true**（沒有 onboarding 就沒有 `external_store_id`，而它是 Create Quote 的必填） | 平台層開關 **AND** 該賣家的 Uber onboarding 狀態（見下方） |
 
 ⚠️ 🔴 **第 4 槽的 `onboardingRequired=true` 不代表它走 `seller_shipment_settings` 那條 generic 分支**
 ——Uber 的 onboarding SSOT 是 `uber_*` 三張表。
@@ -3020,7 +3019,7 @@ sequenceDiagram
    - 🔴 **Uber 槽位（3003）→ 不查 `seller_shipment_settings`，改查 Uber 專屬表**：
      - **平台層**：`shipping_method_configs` 有無啟用的 3003 列（＝「平台開放了嗎」）
      - **賣家層**：該賣家的 `uber_store_mapping`／`uber_organization`（＝「這個賣家設定好了嗎」），
-       可用的判定欄位已在 schema 內：`active`／`blocked`／`health_status`／`tax_form_required`（66 §5.1.3）
+       可用的判定欄位已在 schema 內：`active`／`blocked`／`health_status`／`tax_form_required`
      - `available` ＝ 兩層皆通過；任一層不通過都要回**指得出是哪一層**的 `unavailableReason` ＋ `unavailableMessage`
    - 🔴 **`onboardingId` 對 Uber 恆為空**：它的語意是 `seller_shipment_settings.id`（§5.6），
      **不得**為了讓前端有東西可帶而替 Uber 造一個假值，也不得改用 `uber_store_mapping.id` 冒充它
@@ -3029,7 +3028,7 @@ sequenceDiagram
 🔴 **任一層不通過都必須回「指得出是哪一層」的 `unavailableReason` ＋ `unavailableMessage`，
 禁止塌縮成單一 `available=false`**——「平台還沒開放」與「這個賣家還沒設定」在買家端症狀完全相同
 （都叫不到車），而賣家該做的事完全相反（前者只能等、後者要去設定）。
-⚠️ `unavailableReason` 的值域權威在 66 §6.1.2a，**任何一端不得自行新增、改名或省略**。
+⚠️ `unavailableReason` 的值域權威在 `unavailableReason` 的 proto 定義，**任何一端不得自行新增、改名或省略**。
 
 **回應範例：**
 
@@ -4033,7 +4032,7 @@ WHERE status NOT IN (11, 41)
 |---------|------|-------|
 | 店到店（SEVEN_ELEVEN_STORE_PICKUP） | 建單時間 + 72 小時 | `CvsShipmentStrategy.createShipment()` 寫入 `shipments.processing_deadline` |
 | 宅配（TAQBIN） | 第 3 個工作日 23:59:59 台北時間（注入 `HolidayService`） | `HomeShipmentStrategy.createShipment()` 寫入 `shipments.processing_deadline` |
-| **Uber 即時配送（UBER_INSTANT）** | **`paid_at + seller_prep_sla_snapshot + platform_grace`**。<br/>🔴 **`seller_prep_sla_snapshot` 是報價／下單當下凍結的快照**，不是即時讀賣家設定——賣家事後改設定**不得回溯**既有已付款訂單的期限。<br/>V1 預設 `seller_prep_sla_default` ＝ **15 分鐘**、`platform_grace` ＝ **15 分鐘**，**兩者皆 configurable**（依 sandbox／production 實測調整）；🔴 **不得宣稱這是 Uber 官方 SLA**（[66 詳細](./66-Uber%20Direct%20即時配送整合詳細設計書.md)） | `UberShipmentStrategy.createShipment()` 寫入 `shipments.processing_deadline`（🔴 **寫入的是推導後的值，不是賣家直接設定的值**）；「已處理」＝**賣家已宣告備妥**（`REPORT_READY`，見 §5.20.2）。<br/>⚠️ **`prep_sla` 到期只發提醒／告警，不取消訂單**；強制取消點只有 `processing_deadline`。 |
+| **Uber 即時配送（UBER_INSTANT）** | **`paid_at + seller_prep_sla_snapshot + platform_grace`**。<br/>🔴 **`seller_prep_sla_snapshot` 是報價／下單當下凍結的快照**，不是即時讀賣家設定——賣家事後改設定**不得回溯**既有已付款訂單的期限。<br/>V1 預設 `seller_prep_sla_default` ＝ **15 分鐘**、`platform_grace` ＝ **15 分鐘**，**兩者皆 configurable**（依 sandbox／production 實測調整）；🔴 **不得宣稱這是 Uber 官方 SLA** | `UberShipmentStrategy.createShipment()` 寫入 `shipments.processing_deadline`（🔴 **寫入的是推導後的值，不是賣家直接設定的值**）；「已處理」＝**賣家已宣告備妥**（`REPORT_READY`，見 §5.20.2）。<br/>⚠️ **`prep_sla` 到期只發提醒／告警，不取消訂單**；強制取消點只有 `processing_deadline`。 |
 
 > 🔴 **3003 有兩個時鐘、兩個基準，刻意不合併**
 >
@@ -4054,7 +4053,7 @@ WHERE status NOT IN (11, 41)
 |---------|--------|------|
 | 店到店 | `ShippingService.processWebhookPrint()`（PayUni 列印 Webhook 回填代碼後，§5.6） | `UPDATE shipments SET label_print_status='4103', processing_deadline=NULL ... WHERE label_print_status IN ('4102','4101')` → `publishProcessingCleared(orderNo)` |
 | 宅配 | `ShippingService.callTcat()` markSucceeded（賣家呼叫黑貓成功後，§5.4） | `UPDATE shipments SET tcat_call_status='4203', processing_deadline=NULL ... WHERE tcat_call_status='4202'` → `publishProcessingCleared(orderNo)` |
-| **即時配送（3003）** | 賣家 **`REPORT_READY`**（宣告備妥；由 provider-neutral 命名的賣家 Ready RPC 承載） | `UPDATE shipments SET seller_ready_at=NOW(), processing_deadline=NULL ... WHERE seller_ready_at IS NULL` → `publishProcessingCleared(orderNo)`。<br/>若 `now < pickup_ready_at_snapshot`（**提早備妥**）另走 `E5 Update Delivery` 前移 `pickup_ready_dt`；🔴 **`E5` 失敗一律不得升級為取消**（保留原 Delivery ＋ 原取件窗 ＋ bounded retry ＋ 維運告警），詳見 [66 詳細](./66-Uber%20Direct%20即時配送整合詳細設計書.md) |
+| **即時配送（3003）** | 賣家 **`REPORT_READY`**（宣告備妥；由 provider-neutral 命名的賣家 Ready RPC 承載） | `UPDATE shipments SET seller_ready_at=NOW(), processing_deadline=NULL ... WHERE seller_ready_at IS NULL` → `publishProcessingCleared(orderNo)`。<br/>若 `now < pickup_ready_at_snapshot`（**提早備妥**）另走 `E5 Update Delivery` 前移 `pickup_ready_dt`；🔴 **`E5` 失敗一律不得升級為取消**（保留原 Delivery ＋ 原取件窗 ＋ bounded retry ＋ 維運告警） |
 
 > Order Service 消費 `shipment.processing.cleared` 後清空 `orders.processing_deadline`，前端倒數立即消失。
 
@@ -4108,7 +4107,7 @@ LIMIT :batchSize
 delivery 在付款當下就已 Create。直接 publish timeout ⇒ AfterSales 取消訂單並退款，
 而 **Uber 的車照樣依 `pickup_ready_dt` 來取貨** ⇒ 錢已退給買家、貨還是被載走了。
 
-固定順序，四步缺一不可（時序圖見 [66 詳細 **SD-07**](./66-Uber%20Direct%20即時配送整合詳細設計書.md)）：
+固定順序，四步缺一不可：
 
 1. **`E4 Get Delivery`** —— 先回查 provider 現況，判斷「這次取消會不會產生費用」以及「是不是已經取件」。
    - `status ∈ {pickup_complete, dropoff}` ⇒ 🔴 **岔出 post-pickup 分支**：貨已被取走，**不得**走「未出貨 timeout」。
@@ -4157,8 +4156,8 @@ AfterSales Service 消費 `shipment.processing.timeout` 後執行 `cancelShipmen
 | `hawkr.shipping.processing-deadline.enabled` | `true` | 排程開關 |
 
 > **3003 的兩個時長參數不在本表**：`seller_prep_sla_default`（V1 **15 分鐘**）與 `platform_grace`（V1 **15 分鐘**）
-> 由 [66 詳細](./66-Uber%20Direct%20即時配送整合詳細設計書.md) 統一定義與持有，本服務讀的是**下單當下凍結的 snapshot**
-> （`seller_prep_sla_snapshot`），不是即時值。兩者皆 configurable，SSOT 在 66。
+> 由 shipping-service 統一定義與持有，本服務讀的是**下單當下凍結的 snapshot**
+> （`seller_prep_sla_snapshot`），不是即時值。兩者皆 configurable。
 
 ### 5.21 配送異常賣家通知
 
@@ -5413,7 +5412,7 @@ payuni:
 | 物流貨態補收（L2） | `ShipmentStatusReconcileScheduler`（`scheduler/`） | `fixedDelay` 600000ms（`hawkr.shipping.reconcile.interval-ms`） | 主動向 PayUni 查詢未終態物流單貨態，補救 Webhook 漏收。詳見 §5.19 |
 | 列印狀態機補收（L3） | `ShipmentLabelReconcileScheduler`（`scheduler/`） | `fixedDelay` 600000ms（`hawkr.shipping.reconcile.label.interval-ms`） | 掃 `label_print_status IN ('4102','4104')`，向 PayUni `/api/logistics/query` 補拉三段碼。詳見 §5.19.3.B |
 | 黑貓叫件卡死告警（L4） | `TcatCallStuckAlertScheduler`（`scheduler/`） | `fixedDelay` 600000ms（`hawkr.shipping.alert.tcat-stuck.interval-ms`） | 掃 `tcat_call_status='4202'` 卡死者，publish `shipment.anomaly.detected`（`TCAT_CALL_FAILED`）。詳見 §5.19.3.C |
-| **Provider 取件逾時／rematch 偵測（L5）** | `ProviderPickupDeadlineScheduler`（`scheduler/`） | `fixedDelay` ＝ `provider_poll_interval`（V1 **5 分鐘**，configurable） | **3003 專用**。Create Delivery 成功後持續 `E4 Get Delivery` 回查：①`status='pickup' AND courier IS NULL` ⇒ `PROVIDER_REMATCHING`（🔴 Uber 對 rematch **完全靜默**，主動回查是唯一偵測手段）②`provider_pickup_warn_after`（V1 **10 分鐘**）⇒ 維運告警 ③`provider_pickup_hard_deadline`（V1 **30 分鐘**）到期仍未取件 ⇒ Cancel Saga → 確認 provider terminal → 退款收斂（責任 ＝ `PROVIDER_CAUSED` ⇒ 向 Buyer 全額退款）。**必須 lease**，租約欄落 provider extension table（🔴 不進 `shipments`）。詳見 [§8.5](#85-多副本排程搶佔語意scheduler-claim) 與 [66 詳細](./66-Uber%20Direct%20即時配送整合詳細設計書.md) |
+| **Provider 取件逾時／rematch 偵測（L5）** | `ProviderPickupDeadlineScheduler`（`scheduler/`） | `fixedDelay` ＝ `provider_poll_interval`（V1 **5 分鐘**，configurable） | **3003 專用**。Create Delivery 成功後持續 `E4 Get Delivery` 回查：①`status='pickup' AND courier IS NULL` ⇒ `PROVIDER_REMATCHING`（🔴 Uber 對 rematch **完全靜默**，主動回查是唯一偵測手段）②`provider_pickup_warn_after`（V1 **10 分鐘**）⇒ 維運告警 ③`provider_pickup_hard_deadline`（V1 **30 分鐘**）到期仍未取件 ⇒ Cancel Saga → 確認 provider terminal → 退款收斂（責任 ＝ `PROVIDER_CAUSED` ⇒ 向 Buyer 全額退款）。**必須 lease**，租約欄落 provider extension table（🔴 不進 `shipments`）。詳見 [§8.5](#85-多副本排程搶佔語意scheduler-claim) |
 | 建店送審卡死告警 | `PayUniSubmitStuckAlertScheduler`（`scheduler/`） | `fixedDelay` 600000ms（`hawkr.shipping.alert.submit-stuck.interval-ms`） | 掃 `payuni_submit_status='4302'` 卡死者，**僅 `log.warn`**（無 publish／無第三方呼叫）。詳見 §5.19.3.D |
 | Webhook 冪等表清理 | `DedupCleanupScheduler`（`scheduler/`） | `0 0 3 * * ?`（每日 03:00） | 整批刪除 7 天前的 `shipping_webhook_dedup` 記錄 |
 | PayUni 稽核表清理 | `PayUniAuditCleanupScheduler`（`scheduler/`） | `0 30 3 * * ?`（`shipping.cleanup.payuni-audit-cron`） | 整批刪除保留期外的 `payuni_audit_logs`，保留 **7 年（2555 天，`shipping.cleanup.payuni-audit-retention-days`）**；`shipping.cleanup.payuni-audit-enabled` 可停用。詳見 §10 |
@@ -5602,7 +5601,7 @@ sequenceDiagram
 | Enum | 值 | 定義來源 |
 |------|----|---------|
 | ShippingStatus | 兩位數屬 PayUni 原生、三位數屬平台自訂（65 §7.1.2.0）。逐值對照見 65 §7.1.2.1；**SSOT 是 CodeMeta，本欄不列舉** | [業務狀態碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/業務狀態碼.md) |
-| ShippingMethod | TAQBIN(3001) / SEVEN_ELEVEN_STORE_PICKUP(3002) / UBER_INSTANT(3003) / 7-ELEVEN 大宗寄倉 B2C(3004) / 商家自行配送(3005)。<br/>🔴 **`OnboardingService.mapShippingMethodToType` 對 3004／3005 回 `null`** ⇒ 這兩個 method 走 `findActiveSetting` 會拿到 null 並拋 `SHIPMENT_SELLER_NOT_ONBOARDED`；要啟用它們必須先讓該 mapping 有對應的 `ShippingType` 值（68／69 各自的設計書） | [業務類型碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/業務類型碼.md) |
+| ShippingMethod | TAQBIN(3001) / SEVEN_ELEVEN_STORE_PICKUP(3002) / UBER_INSTANT(3003) / 7-ELEVEN 大宗寄倉 B2C(3004) / 商家自行配送(3005)。<br/>🔴 **`OnboardingService.mapShippingMethodToType` 對 3004／3005 回 `null`** ⇒ 這兩個 method 走 `findActiveSetting` 會拿到 null 並拋 `SHIPMENT_SELLER_NOT_ONBOARDED`；要啟用它們必須先讓該 mapping 有對應的 `ShippingType` 值 | [業務類型碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/業務類型碼.md) |
 | OnboardingStatus | PENDING_REVIEW / ACTIVE / REJECTED / CLOSED / PERMANENTLY_CLOSED | [業務狀態碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/業務狀態碼.md) |
 | PayUniAuditDirection | OUTBOUND / INBOUND | [內部技術碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/內部技術碼.md) |
 | GrpcResponseCode | 見 §4.6 | [錯誤碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/錯誤碼.md) |

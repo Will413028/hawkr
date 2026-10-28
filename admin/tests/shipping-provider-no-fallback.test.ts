@@ -10,7 +10,7 @@ import {
 } from "../src/lib/codemeta";
 
 /**
- * 物流 provider 的「二元 fallback」禁令（65A §1.10、§12.1）。
+ * 物流 provider 的「二元 fallback」禁令。
  *
  * ## 這支在防什麼
  *
@@ -22,7 +22,7 @@ import {
  * ```
  *
  * 它對未知值回的是一個**合法值**：型別對、不拋例外、測試全綠，只有使用者看得到。
- * website 與兩個 Flutter repo 各有一批這種寫法（65A §12.1 共 8 列）。
+ * website 與兩個 Flutter repo 各有一批這種寫法（共 8 列）。
  *
  * ## ADM 現在是零，這支是要讓它保持零
  *
@@ -111,7 +111,7 @@ test("src/ 沒有任何物流 provider 的二元 fallback", () => {
 			"發現 provider 二元 fallback：",
 			...offenders,
 			"",
-			"分流一律 switch + default，default 走「未知配送方式」顯示（65A §1.10）：",
+			"分流一律 switch + default，default 走「未知配送方式」顯示：",
 			"  switch (method) { case ShippingMethod.TAQBIN: …; default: /* 未知 */ }",
 			"顯示文字一律 codeLabel(SHIPPING_METHOD_LABEL, method) —— 空回「—」、未知回原碼。",
 		].join("\n"),

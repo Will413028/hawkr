@@ -132,7 +132,7 @@ public class ReturnShipmentStatusConsumer {
             // 🔴 ADR-013：分類走 common-core 的 canonical 分類器，入參是 ShippingStatus 枚舉。
             //    值域外一律 fail-loud（fromValue 拋例外 → 下方 catch → MqErrorHandler → 重試耗盡進 DLQ），
             //    **對齊正向 leg**。修復前這裡是 `else` ＋ log.info ＋ ACK ＝ 靜默丟棄，
-            //    而代價是買家已交件卻被判定沒寄回、7 天後自動關成「不退款」終態（66 §7.3.2 U5）。
+            //    而代價是買家已交件卻被判定沒寄回、7 天後自動關成「不退款」終態。
             ShippingStatus normalized = ShippingStatus.fromValue(shippingStatus);
             ReturnShippingRules.Disposition disposition = ReturnShippingRules.dispositionOf(normalized);
 
@@ -148,7 +148,7 @@ public class ReturnShipmentStatusConsumer {
                         log.info("ReturnShipmentStatusConsumer.noop",
                                 "逆向 leg 明確不處理此貨態, status=" + shippingStatus, "caseNo", caseNo);
                 case REQUIRES_MANUAL_REVIEW ->
-                        // 🔴 值域內但逆向 leg 無對應售後語意（66 詳設 UP-8：Uber 逆向 canceled）。
+                        // 🔴 值域內但逆向 leg 無對應售後語意（Uber 逆向 canceled）。
                         //    誠實標註交人工，**不猜**一個狀態推進去。
                         log.warn("ReturnShipmentStatusConsumer.requiresManualReview",
                                 "逆向 leg 收到無對應售後語意的貨態，需人工處置（66 UP-8）, status="

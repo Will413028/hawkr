@@ -128,7 +128,7 @@ public class ShipmentEntity {
      * 66 P1：Uber 未終態回查（tick 5 分／租約 5 分）的<b>租約到期時間</b>。
      * <p>🔴 <b>不是「已回查旗標」</b>：NULL 或 &lt;= NOW() 表示可搶佔。語意與約束同
      * {@link #createQueryNextAt}；V13 刻意不回填既有列（回填成 NOW() 會讓它們沉默一個租約週期）。
-     * <p>⚠️ P1 不是 reconciliation job（66 §12.5）：webhook 只重試 3 次（窗口約 100 秒），
+     * <p>⚠️ P1 不是 reconciliation job：webhook 只重試 3 次（窗口約 100 秒），
      * 回查是我方唯一的收斂手段，屬業務流程的一部分。
      */
     private LocalDateTime uberStatusReconcileNextAt;

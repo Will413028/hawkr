@@ -160,7 +160,7 @@ class ShipmentStatusMachineContractTest {
          *
          * <p>後果是 QA 在 dev 實測到的矛盾：契約回 {@code handover enabled=false（9527）}，
          * 而同一時刻 {@code POST /shipments/&#123;no&#125;/confirm} 回 200 並把 920 推到 921。
-         * 前端一旦依 65A §1.7 改由 {@code allowedActions} 驅動，<b>超商賣家將永遠無法確認出貨</b>。
+         * 前端一旦依 改由 {@code allowedActions} 驅動，<b>超商賣家將永遠無法確認出貨</b>。
          *
          * <p>⚠️ <b>不是「放寬 LOCAL_PROCESSING_DONE 的內部轉移」</b>——舊註解擔心的是
          * provider 的出貨前狀態倒退覆蓋本地進度，而這裡加的是一條<b>具名的單向邊</b>

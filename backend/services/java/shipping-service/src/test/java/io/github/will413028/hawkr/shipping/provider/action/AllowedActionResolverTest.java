@@ -99,7 +99,7 @@ class AllowedActionResolverTest {
         }
 
         /**
-         * 🔴 <b>Uber 的 dispatch 只在 {@code 990 CREATE_FAILED} 時可用</b>（66 §4.5.0 E2 逐字）。
+         * 🔴 <b>Uber 的 dispatch 只在 {@code 990 CREATE_FAILED} 時可用</b>。
          *
          * <p>⚠️ 本條原本斷言的是「capability 真的 empty ⇒ 不可用（9503）」。W2-1 把
          * {@code UberDirectAdapter.dispatch()} 換成 E2 的真實實作之後，那個前提不再成立
@@ -126,7 +126,7 @@ class AllowedActionResolverTest {
                     .isEqualTo(GrpcResponseCode.SHIPMENT_STATE_TRANSITION_REJECTED.code());
 
             assertThat(uberDispatchAt(ShippingStatus.CREATE_FAILED).enabled())
-                    .as("990 是 66 §4.5.0 E2 明訂唯一 enabled 的那一格（賣家重新建單的入口）")
+                    .as("990 是唯一 enabled 的那一格（賣家重新建單的入口）")
                     .isTrue();
 
             ActionAvailability at991 = uberDispatchAt(ShippingStatus.CREATE_UNKNOWN);

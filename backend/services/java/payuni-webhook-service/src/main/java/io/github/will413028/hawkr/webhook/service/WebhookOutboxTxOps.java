@@ -48,7 +48,7 @@ public class WebhookOutboxTxOps {
     /**
      * 同上，但由呼叫端指定 {@code aggregate_type}。
      *
-     * <p>66 §5.1.6：Uber webhook 共用本服務的 inbox／outbox 兩張表，
+     * <p>：Uber webhook 共用本服務的 inbox／outbox 兩張表，
      * 而 {@code aggregate_type} 是「這批 outbox 列屬於哪個 provider」的唯一線索
      * —— 原本的單參數多載把它寫死成 PayUni，Uber 的列會被標成 PayUni 的，
      * 而那正是之後查問題時第一個會被相信的欄位。

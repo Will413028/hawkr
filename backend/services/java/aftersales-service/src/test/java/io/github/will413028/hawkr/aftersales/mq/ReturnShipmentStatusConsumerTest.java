@@ -241,7 +241,7 @@ class ReturnShipmentStatusConsumerTest {
      *
      * <p>修復前 {@code 930} 落 {@code else} ＋ {@code log.info} ＋ ACK ⇒ 案件永停
      * {@code RETURN_PENDING(20)} ⇒ 7 天後自動關成「不退款」終態
-     * ⇒ <b>買家已交件卻拿不到退款，零告警</b>（66 §7.3.2 U5）。
+     * ⇒ <b>買家已交件卻拿不到退款，零告警</b>。
      */
     @Test
     void uberReverseHandedOver930_advancesCaseToReturnShipping() throws Exception {

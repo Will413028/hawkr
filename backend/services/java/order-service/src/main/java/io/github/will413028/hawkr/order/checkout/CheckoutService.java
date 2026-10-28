@@ -272,7 +272,7 @@ public class CheckoutService {
     // ==================== Uber 即時報價中繼 ====================
 
     /**
-     * 取一筆 Uber 即時報價（66 §6.1.3；Stage 8B W2-2）。
+     * 取一筆 Uber 即時報價（Stage 8B W2-2）。
      *
      * <h2>🔴 業務失敗一律回 {@code available=false} ＋ 理由碼，不拋例外</h2>
      * 呼叫端是結帳頁的配送選項區。「Uber 算不出價」不是結帳失敗——買家還有黑貓與超商可選，
@@ -1063,7 +1063,7 @@ public class CheckoutService {
 
         String orderNo = orderService.createOrderFromCheckout(params);
 
-        // 66 §9「確認 → 重驗 TTL>180s ＋ hash → CHECKOUT_ACCEPTED → 收款」：
+        //「確認 → 重驗 TTL>180s ＋ hash → CHECKOUT_ACCEPTED → 收款」：
         // 建單成功才鎖報價（CAS 需要 order_no）。鎖不到就取消這張單，見方法 javadoc。
         if (uberProbe != null) {
             acceptUberQuoteOrCancel(uberProbe, option.uberQuoteId(), orderNo, buyerId);

@@ -28,7 +28,7 @@ import { normalizeShippingMethod, ShippingMethod } from "@/lib/codemeta/enums";
 
 // 配送方式的值域**只有一個來源**：`lib/codemeta/generated.ts` 的 `ShippingMethod`
 // （CodeMeta SSOT 生成，含 3001～3005）。本檔曾自帶一份手寫的 `SHIPPING_METHOD`
-// 三值副本，於是後端加 3004／3005 時本檔完全不會知道（65A §12.4 D2）。
+// 三值副本，於是後端加 3004／3005 時本檔完全不會知道。
 
 /**
  * Carrier shipment-status values — sourced from the seller App's authoritative
@@ -60,12 +60,12 @@ export type LgsType = (typeof LGS_TYPE)[keyof typeof LGS_TYPE];
 /**
  * 配送方式（CodeMeta `ShippingMethod`）→ PayUni 配送軸（`LgsType`）。
  *
- * 🔴 **認不得就回 `null`，不得 fallback 成 `C2C`**（65A §1.10）。舊寫法
+ * 🔴 **認不得就回 `null`，不得 fallback 成 `C2C`**。舊寫法
  * `isTaqbin ? HOME : C2C` 對 `3003`／`3004`／`3005` 回的是一個**合法值**，
  * 於是進度條照畫、狀態照查、測試全綠，畫面卻是別人家物流的形狀。
  *
  * ⚠️ 這條對映本身是過渡物：正解是後端回 normalized 配送值（65 §7.1.2 的 31 值），
- * 前端不再持有 PayUni 的軸（65A §12.3／§12.4 D3）。
+ * 前端不再持有 PayUni 的軸。
  */
 export function lgsTypeForShippingMethod(
 	method: string | undefined,
@@ -328,13 +328,13 @@ export function isErrorShipStatus(code: number): boolean {
 /**
  * PayUni 原始 shipStatus → 進度百分比。
  *
- * 🔴 **`lgsType` 認不得就回 `null`（＝進度未知），不得 fallback 到超商那張表**
- * （65A §1.10）。舊寫法是 `if (HOME) {宅配表} else {超商表}`，於是 `B2C`／`C2B`／
+ * 🔴 **`lgsType` 認不得就回 `null`（＝進度未知），不得 fallback 到超商那張表**。
+ * 舊寫法是 `if (HOME) {宅配表} else {超商表}`，於是 `B2C`／`C2B`／
  * 空字串／後端新增的任何軸全部走超商百分比 —— 型別對、不拋例外、測試全綠，
  * 只有畫面上的進度條是錯的。
  *
  * ⚠️ `B2C`（超商大宗寄倉）與 `C2B`（超商退貨便）**刻意不列 case**：它們的進度
- * 對應表尚未定義（68 號才會給），現在猜一個等於製造第二個靜默錯誤。
+ * 對應表尚未定義（尚未定義），現在猜一個等於製造第二個靜默錯誤。
  */
 export function progressPercentFor(
 	code: number,
@@ -862,7 +862,7 @@ export function nextShipmentAction(
 	if (orderStatus !== "paid" && orderStatus !== "preparing") {
 		return { kind: "none" };
 	}
-	// 🔴 provider 分流一律 switch + default（65A §1.10）。舊版是
+	// 🔴 provider 分流一律 switch + default。舊版是
 	// `if (isTaqbinMethod) {黑貓} else {超商}` —— 那個 else 吞掉了 3003、
 	// 3004 大宗寄倉、3005 商家自送與後端未來新增的每一個 provider。
 	switch (normalizeShippingMethod(shipping.method)) {

@@ -126,7 +126,7 @@ payuni:
     store-map-return-url: ${PAYUNI_STORE_MAP_RETURN_URL:}
     store-map-mer-id: ${PAYUNI_STORE_MAP_MER_ID:HAWK}
 
-# ===== Uber Direct 即時配送（66 §8.5）=====
+# ===== Uber Direct 即時配送=====
 # 🔴 每個 placeholder 都必須帶 `:` 預設值，理由與上面的 payuni 區塊逐字相同（backend#3329）：
 #    沒有預設值時，env 缺席 ⇒ Spring 解析 @Value 當下丟 Could not resolve placeholder
 #    ⇒ uberConfig bean 建不起來 ⇒ context refresh 失敗 ⇒ 整個 shipping-service 起不來。
@@ -136,9 +136,9 @@ payuni:
 #    值來自 k8s secret `uber-direct-credentials`，**不得**在這裡或 values.yaml 寫明文預設。
 uber:
   # ⚠️ 切成 true 而程式還在 Phase 1 ＝ 66 陷阱 A1（買家付錢、建出沒人送的單、零告警）。
-  #    上線順序見 66 §12.2。
+  #    上線順序。
   enabled: ${UBER_ENABLED:false}
-  # base 含 /v1：66 §4.5.2 端點表的路徑相對於它
+  # base 含 /v1： 端點表的路徑相對於它
   base-url: ${UBER_BASE_URL:https://api.uber.com/v1}
   auth-url: ${UBER_AUTH_URL:https://auth.uber.com/oauth/v2/token}
   # Direct API 的 scope（官方：Direct API＝eats.deliveries；Org API＝direct.organizations）
@@ -146,7 +146,7 @@ uber:
   client-id: ${UBER_CLIENT_ID:}
   client-secret: ${UBER_CLIENT_SECRET:}
   webhook:
-    # 🔴 **一組不是一個**：JSON map {"<webhookId>": "<key>"}（66 §8.5）。
+    # 🔴 **一組不是一個**：JSON map {"<webhookId>": "<key>"}。
     #    只放一把 ⇒ 多註冊一個 webhook 就靜默驗簽失敗 ⇒ 我方回 401
     #    ⇒ Uber 不重試 4xx ⇒ 該 webhook 的事件全丟（陷阱 C1）。
     signing-keys: ${UBER_WEBHOOK_SIGNING_KEYS:}

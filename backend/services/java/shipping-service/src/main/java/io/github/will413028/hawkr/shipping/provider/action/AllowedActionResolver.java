@@ -173,7 +173,7 @@ public class AllowedActionResolver {
                 // 🔴 顯式 allowed-from 優先（本波新增，為了 dispatch@3003）。
                 //    有宣告就**以它為完整閘門**，不再疊加下面兩格——下面兩格是黑貓叫件的性質
                 //    （目標狀態 210、標籤須取號），而 Uber 兩者都不成立：
-                //    3003 不經過 210（66 §7.3.2 A-4），也沒有標籤概念。
+                //    3003 不經過 210，也沒有標籤概念。
                 //    理由與 991 為什麼必須被擋，寫在 FulfillmentActionPolicy.EXPLICIT_ALLOWED_FROM。
                 java.util.Set<ShippingStatus> explicitFrom =
                         FulfillmentActionPolicy.explicitAllowedFrom(action, method);

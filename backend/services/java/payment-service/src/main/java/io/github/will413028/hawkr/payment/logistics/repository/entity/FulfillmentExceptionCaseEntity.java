@@ -12,7 +12,7 @@ import lombok.Data;
  * {@code fulfillment_exception_cases}（V9）—— 通用維運例外案件。
  *
  * <p>⚠️ 它<b>完全不綁 commerce_model</b>：{@code source_service} 三值、{@code subject_type} 四值，
- * 與商流無關。66 §6.3.6 指名它是 Uber refund_request 的 compensation case 落點。
+ * 與商流無關。它是 Uber refund_request 的 compensation case 落點。
  *
  * <p>🔴 兩個 JSONB 欄位掛 {@link JsonbStringTypeHandler} ⇒ 本類別<b>必須</b>
  * {@code autoResultMap = true}；任何自訂 {@code @Select} 另需

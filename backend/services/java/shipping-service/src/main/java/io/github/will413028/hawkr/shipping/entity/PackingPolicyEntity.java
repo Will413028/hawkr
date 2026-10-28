@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 分箱政策（版本化，66 §5.1.8）。
+ * 分箱政策（版本化）。
  *
  * <p>三問：寫入＝維運／ADM 新增版本（append-only，🔴 <b>不 UPDATE 既有版本</b>）｜
  * 讀取＝報價時的分箱演算法 ＋ 歷史訂單以 {@code uber_quotes.packing_policy_version} 回溯｜
@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
  * <p>🔴 <b>政策版本進 quote 快照</b>：改政策<b>不回溯既有訂單</b>，否則同一張訂單在不同時間
  * 算出不同運費，而運費已經收過了。
  *
- * <p>⚠️ 66 §5.1.8 原文把 {@code version} 寫成 PK；本 repo 的主鍵慣例是 TSID ⇒
+ * <p>⚠️ {@code version} 不作 PK；本 repo 的主鍵慣例是 TSID ⇒
  * {@code version} 落為 UNIQUE 業務鍵，語意完全等價。
  */
 @Data
@@ -38,7 +38,7 @@ public class PackingPolicyEntity {
      * DB 型別 {@code NUMERIC(4,2)}，預設 {@code 1.25}）。
      *
      * <p>⚠️ 它是<b>估計不是事實</b> ⇒ 體積檢查是「下界估計 × 係數」⇒ 失敗文案必須是
-     * 「超過限制」而不是「箱子放不下」（66 §5.1.8／§7.4 道 3）。
+     * 「超過限制」而不是「箱子放不下」。
      * <p>DB CHECK 守住 {@code > 0}：{@code <= 0} 會讓體積檢查恆過，而且完全無聲。
      */
     private BigDecimal voidFactor;

@@ -829,7 +829,7 @@ export default function CartClient() {
 	/* ───── Stale revalidate before checkout ───── */
 
 	const checkoutHref = isLoggedIn ? "/checkout" : "/login?redirect=/checkout";
-	// 🔴 未知配送方式一律 fail-closed（65A §1.10／§1.8）。舊寫法三元的最後一支是
+	// 🔴 未知配送方式一律 fail-closed。舊寫法三元的最後一支是
 	// `: true` —— 語意等於「沒見過的配送方式就不用選收件地址也不用選門市」，
 	// 於是 3004 大宗寄倉／3005 商家自送可以直接進結帳。
 	const addressReady = isShippingDestinationReady(shippingMethod, {

@@ -2636,7 +2636,7 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
         return value != null ? value : "";
     }
 
-    // ==================== Uber 即時報價（66 §6.1.3／§6.1.4；Stage 8B W2-2）====================
+    // ==================== Uber 即時報價（Stage 8B W2-2）====================
 
     /**
      * 取得（或沿用）一筆 Uber 報價。
@@ -2672,7 +2672,7 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
      *
      * <p>🔴 {@code accept=true} 而 CAS 未命中 ⇒ 回 {@code valid=false} ＋
      * {@code QUOTE_NOT_ACCEPTABLE}。呼叫端<b>必須</b>當成失敗——那代表這筆報價
-     * 已經被換手／過期／被接受過，而錢可能已經收了（66 §5.1.4 的
+     * 已經被換手／過期／被接受過，而錢可能已經收了（
      * 「{@code CHECKOUT_ACCEPTED} 超過 30 分未 {@code CONSUMED} ＝ 收了錢沒建單」
      * 講的就是這條軸）。
      */

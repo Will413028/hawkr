@@ -120,8 +120,8 @@ flowchart LR
 |---|---|:---:|:---:|
 | `CAP_ACCOUNT_SELF_READ` | 看自己 profile / 停權狀態 | ✓ | ✓ |
 | `CAP_STOREFRONT_WRITE` | 店面設定寫入（profile/logo/封面/onboarding/KYC 草稿、送出與取消） | ✓ | ✗ |
-| `CAP_PRODUCT_MANAGE` | **供給定義**：商品建立/編輯/上下架/匯入/分類/運費試算/認證/hashtag；物流方案供給（68 大宗寄倉開通、69 商家自送 profile） | ✓ | ✗ |
-| `CAP_ORDER_FULFILL` | **既有契約的履約**：出貨/物流/售後/訂單查詢/PayUni 狀態；結算與撥款檢視（65）、批次出貨（68）、商家自送日常營運（69） | ✓ | ✓ |
+| `CAP_PRODUCT_MANAGE` | **供給定義**：商品建立/編輯/上下架/匯入/分類/運費試算/認證/hashtag；物流方案供給 | ✓ | ✗ |
+| `CAP_ORDER_FULFILL` | **既有契約的履約**：出貨/物流/售後/訂單查詢/PayUni 狀態；結算與撥款檢視（65） | ✓ | ✓ |
 | `CAP_ORDER_CONTRACT` | 收縮型：cancelShipment（取消出貨+退款受理） | ✓ | ✓ |
 | `CAP_MARKETING` | 行銷經營：優惠券建立/CRM 寫入+查詢/貼文發佈/AI 助理/dashboard/報表/賣家市場行情查詢、雷達與追蹤增刪（Pricebook） | ✓ | ✗ |
 | `CAP_CONTENT_CONTRACT` | 收縮型：刪自己貼文、自行下架貼文、撤自己券 | ✓ | ✓ |
@@ -227,7 +227,6 @@ sequenceDiagram
 | image 工具（transform 等） | JWTAuth-only | 同 media，純工具 | 同上，上游業務入口阻斷 |
 | 通知收件箱/偏好/device-token | JWTAuth-only 或白名單 | 停權賣家仍須收停權/訂單通知；device-token 絕不能擋（否則壞登入推播） | CAP_NOTIFICATION 白名單語意，不 deny |
 | 登入 / session | JWTAuth-only | 帳號層路由，非賣家專屬功能 | 白名單語意，不 deny |
-| `POST /webhook/merchant_delivery/v1/events`（69 §6.2.3） | top-level，**非** `public`／`app`／`admin` 三 namespace | 來源是物流商而非賣家，無 JWT 可解析；身分由**簽章**承擔 | 不適用（無賣家 principal） |
 
 **IM 訂單關聯細分（usecase 單點例外）**：停權後僅**訂單關聯**對話可用。判準**綁定對話雙端、order_no 不信任 client 輸入**（一律伺服器端推導）：
 - 綁定寫入僅兩條伺服器端路徑：① 訂單情境發起 → im-service 以 order-service internal gRPC 驗 `order.seller==對話賣家 AND order.buyer==對話買家`，三方一致才寫綁定；② 既有對話回填 → im-service 以 `(對話買家, 對話賣家)` 反查 `HasOrderBetween(buyerId, sellerId)`（internal RPC，只回 bool + 最近 order_no）。

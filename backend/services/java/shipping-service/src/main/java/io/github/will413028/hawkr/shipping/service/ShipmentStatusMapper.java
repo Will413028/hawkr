@@ -217,7 +217,7 @@ public class ShipmentStatusMapper {
             //    而本方法拒絕它。在只有 provider 回報路徑呼叫本方法時，那個不一致沒有症狀；
             //    Shared Foundation 讓 allowedActions 也開始問本方法之後，它變成
             //    「契約說 handover 不可用（9527）、端點照做並成功」——
-            //    前端一旦依 65A §1.7 改由 allowedActions 驅動，超商賣家將永遠無法確認出貨。
+            //    前端一旦依 改由 allowedActions 驅動，超商賣家將永遠無法確認出貨。
             //    ⚠️ 修的是**本表**不是端點：端點的行為是對的，錯的是這份判定漏了一條合法邊。
             if (from == ShippingStatus.CVS_CODE_RECEIVED && to == ShippingStatus.SELLER_CONFIRMED) {
                 return true;

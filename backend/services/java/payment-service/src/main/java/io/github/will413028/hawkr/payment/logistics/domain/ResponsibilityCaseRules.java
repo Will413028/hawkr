@@ -57,7 +57,7 @@ public final class ResponsibilityCaseRules {
      * 兩張表由 payment-service 擁有、`INSERT` 也由它執行——但那<b>不代表</b>
      * {@code source_service} 就是 {@code payment}。責任判定的觸發來源可能是：
      * <ul>
-     *   <li>{@code shipping} —— provider 終局處置格判不出成因（66 §7.3.4）</li>
+     *   <li>{@code shipping} —— provider 終局處置格判不出成因</li>
      *   <li>{@code order} —— 訂單軸偵測到的履約異常</li>
      *   <li>{@code payment} —— 對帳／金流側發現的異常（既有 {@code LogisticsReconciliationService} 走這一格）</li>
      * </ul>
@@ -122,7 +122,7 @@ public final class ResponsibilityCaseRules {
      * （36 §3.3 逐字）。不得為了「看起來完整」而新增它。
      *
      * <p>⚠️ 本集合<b>從 CodeMeta 推導</b>而不是硬寫四個字串：{@link ResponsibilityCause} 日後
-     * 新增第五值（66 §1.6.1 已登記 {@code RESPONSIBILITY_UNRESOLVED}）時，這裡會自動把它排除，
+     * 新增第五值（已登記 {@code RESPONSIBILITY_UNRESOLVED}）時，這裡會自動把它排除，
      * 而 V12 的 CHECK 是硬寫的 ⇒ 兩者的差異由 {@code LogisticsSchemaContractTest} 逐字對拍抓出來。
      */
     public static final Set<String> FINALIZABLE_CAUSES = Set.of(

@@ -1233,7 +1233,7 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
     }
 
     /**
-     * Uber 即時報價中繼（66 §6.1.3；Stage 8B W2-2）。
+     * Uber 即時報價中繼（Stage 8B W2-2）。
      *
      * <p>🔴 沒有 {@code OrderBusinessException} 分支<b>是刻意的</b>：
      * {@code CheckoutService.uberQuote} 的契約是「業務失敗回 {@code available=false} ＋ 理由碼」，

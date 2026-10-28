@@ -165,7 +165,7 @@ class DeliveryStatusPresentation {
   /// （`OrderLogisticsSection._TrackBody._isAbnormal`）。兩份一旦分岔，
   /// 症狀是同一張訂單在列表上是紅的、在詳情頁是正常的——而沒有東西會報錯。
   ///
-  /// ⚠️ `991`（建單結果未知）**刻意不在內**：66 §7.2 逐字寫著它「不是失敗」，
+  /// ⚠️ `991`（建單結果未知）**刻意不在內**： 逐字寫著它「不是失敗」，
   /// 由回查排程收斂成 `91`／`990`。把它標成異常會讓買家在一個會自動好轉的
   /// 中間狀態上被嚇到，並且去開一張不需要的客服單。
   /// ⚠️ `992`（取消處理中）同理：那是一個申請已受理的正常中間狀態。
@@ -325,7 +325,7 @@ class DeliveryStatusPresentation {
       ShippingStatus.tcatCalled => '已預約宅配取件，等待司機收件。',
       ShippingStatus.cvsCodeReceived => '已取得超商寄件碼，等待賣家交寄。',
       ShippingStatus.sellerConfirmed => '賣家已確認交寄，等待物流更新。',
-      // ── 68／69 新增的狀態（3004 大宗寄倉／3005 自送）──
+      // ── 3004 大宗寄倉／3005 自送的狀態 ──
       ShippingStatus.handedOver => '包裹已交運，正在前往收件地址。',
       ShippingStatus.dcAccepted => '物流中心已驗收，準備配送。',
       // 991／992 不是異常（見 abnormalValues 的說明），但也不能沿用

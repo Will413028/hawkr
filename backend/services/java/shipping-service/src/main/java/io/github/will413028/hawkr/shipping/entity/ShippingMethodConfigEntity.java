@@ -26,7 +26,7 @@ public class ShippingMethodConfigEntity {
      * 體積上限（立方公分 L×W×H），0 表示不限（沿用同表既有慣例）。
      *
      * <p>⚠️ 與 {@link #maxDimensionSumCm} <b>量綱不同</b>：後者是 L+W+H 相加（cm），本欄是相乘（cm³）。
-     * 兩者都存在不是重複——黑貓走材積和、Uber 走體積（66 §7.4 道 3：repo 現況完全沒有體積概念）。
+     * 兩者都存在不是重複——黑貓走材積和、Uber 走體積（repo 現況完全沒有體積概念）。
      */
     private Long maxVolumeCm3;
     private Integer estimatedDays;

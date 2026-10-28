@@ -52,12 +52,12 @@ public final class ReturnShippingRules {
         /**
          * 明確不處理：包裹還沒離開買家手上，或屬於中繼狀態。
          * 🔴 <b>是「明確的 no-op 分支」不是 else</b>——要分得出「我們決定不做事」
-         * 與「我們沒認出這個值」（66 §7.3.2 U6）。
+         * 與「我們沒認出這個值」。
          */
         NO_OP,
         /**
          * 值域內、但逆向 leg 沒有對應的售後語意 ⇒ <b>建案件交人工，不猜</b>。
-         * 目前唯一成員是 {@code CANCELLED(41)}（66 詳設 open item {@code UP-8}）。
+         * 目前唯一成員是 {@code CANCELLED(41)}。
          */
         REQUIRES_MANUAL_REVIEW
     }
@@ -70,11 +70,11 @@ public final class ReturnShippingRules {
      *   <li>{@code 930 HANDED_OVER} → {@code RETURN_IN_TRANSIT}：Uber 逆向 {@code pickup_complete}
      *       ＝外送員已從買家手中取件 ＝ 買家已寄出。<b>不決定就是靜默丟棄</b>，而代價是案件永停
      *       {@code RETURN_PENDING(20)} ⇒ 7 天後自動關成「不退款」終態
-     *       ⇒ 🔴 <b>買家已交件卻拿不到退款，零告警</b>（66 §7.3.2 U5 完整推導）。</li>
+     *       ⇒ 🔴 <b>買家已交件卻拿不到退款，零告警</b>。</li>
      *   <li>{@code 933 COURIER_ASSIGNED} → {@code NO_OP}：外送員已指派但尚未取件，包裹還在買家手上。</li>
      *   <li>{@code 31}／{@code 92}／{@code 11}／{@code 32}／{@code 33}／{@code 53}／{@code 44}／{@code 55}
      *       沿用既有 {@code PAYUNI_RETURN_*} 的分類，<b>行為不變</b>——本類是搬家與補洞，不是改語意。</li>
-     *   <li>{@code 41 CANCELLED} → {@code REQUIRES_MANUAL_REVIEW}：66 詳設 {@code UP-8} 明載無對應
+     *   <li>{@code 41 CANCELLED} → {@code REQUIRES_MANUAL_REVIEW}：無對應
      *       {@code AfterSaleCaseStatus}。<b>誠實標註，不假裝已處理。</b></li>
      * </ul>
      */

@@ -6,9 +6,6 @@
   - [58 電子發票服務（Invoice Service）](基本設計書/58-電子發票服務%EF%BC%88Invoice%20Service%EF%BC%89基本設計書.md)
   - [06 物流微服務（Shipping Service）](基本設計書/06-物流微服務%EF%BC%88Shipping%20Service%EF%BC%89基本設計書.md)
   - [65 物流履約平台（Fulfillment Platform）](基本設計書/65-物流履約平台%EF%BC%88Fulfillment%20Platform%EF%BC%89基本設計書.md)
-  - [66 Uber Direct 即時配送整合](基本設計書/66-Uber%20Direct%20即時配送整合基本設計書.md)
-  - [68 7-ELEVEN 大宗寄倉](基本設計書/68-7-ELEVEN%20大宗寄倉（B2C）基本設計書.md)
-  - [69 商家自有出貨（Merchant Self-Delivery）](基本設計書/69-商家自有出貨%EF%BC%88Merchant%20Self-Delivery%EF%BC%89基本設計書.md)
   - [70 物流財務結算（Logistics Settlement & Receivable）](基本設計書/70-物流財務結算%EF%BC%88Logistics%20Settlement%20%26%20Receivable%EF%BC%89基本設計書.md)
 
 - 詳細設計書
@@ -63,10 +60,6 @@
   - [58A 電子發票前端實作規格](詳細設計書/58A-電子發票前端實作規格.md)
   - [64 Hawkr Agent 商務線（RFQ Publication、Seller Quote、Buyer Acceptance）](詳細設計書/64-Hawkr%20Agent%20%E5%95%86%E5%8B%99%E7%B7%9A%EF%BC%88RFQ%20Publication%E3%80%81Seller%20Quote%E3%80%81Buyer%20Acceptance%EF%BC%89%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88%E6%9B%B8.md)
   - [65 物流履約平台（Fulfillment Platform）](詳細設計書/65-物流履約平台%EF%BC%88Fulfillment%20Platform%EF%BC%89詳細設計書.md)
-  - [65A 物流履約前端實作規格](詳細設計書/65A-物流履約前端實作規格.md)
-  - [66 Uber Direct 即時配送整合](詳細設計書/66-Uber%20Direct%20即時配送整合詳細設計書.md)
-  - [68 7-ELEVEN 大宗寄倉（B2C）](詳細設計書/68-7-ELEVEN%20大宗寄倉%EF%BC%88B2C%EF%BC%89詳細設計書.md)
-  - [69 商家自有出貨（Merchant Self-Delivery）](詳細設計書/69-商家自有出貨%EF%BC%88Merchant%20Self-Delivery%EF%BC%89詳細設計書.md)
   - [70 物流財務結算（Logistics Settlement & Receivable）](詳細設計書/70-物流財務結算%EF%BC%88Logistics%20Settlement%20%26%20Receivable%EF%BC%89詳細設計書.md)
 
 - ADR（架構決策記錄）

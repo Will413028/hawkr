@@ -168,7 +168,7 @@ public final class FulfillmentActionPolicy {
     private static final Set<String> NOT_APPLICABLE = Set.of(
             // 黑貓宅配：司機到府取件，沒有「賣家確認出貨」這一步。
             FulfillmentAction.HANDOVER.value() + "@" + ShippingMethod.TAQBIN.value(),
-            // Uber 即時配送：66 號的交付確認走 POD，不走我方的「賣家確認出貨」。
+            // Uber 即時配送：交付確認走 POD，不走我方的「賣家確認出貨」。
             // ⚠️ 66 尚未落地；列在這裡是因為端點側本來就拒絕它，而兩層必須給同一個答案。
             //    66 實作時若確認 Uber 有這一步，改的是這一行——不是在端點再加一個 if。
             FulfillmentAction.HANDOVER.value() + "@" + ShippingMethod.UBER_INSTANT.value());
@@ -180,7 +180,7 @@ public final class FulfillmentActionPolicy {
      * 預設判準是「這個動作實際會把單子推到哪個狀態，那條邊合不合法」，而它對 Uber 答錯兩次：
      * <ul>
      *   <li><b>目標狀態不對</b>：預設目標是 {@code 210 TCAT_CALLED}（黑貓叫件），
-     *       而 66 §7.3.2 的 A-4 自檢逐字列出 3003 <b>不經過</b> {@code 210}。
+     *       而 的 A-4 自檢逐字列出 3003 <b>不經過</b> {@code 210}。
      *       Uber 的「派車」就是<b>建單本身</b>，成功後回到 {@code 91 UNPROCESSED}</li>
      *   <li>🔴 <b>{@code 991} 會被放行</b>：{@code 991 CREATE_UNKNOWN} 在
      *       {@code ShipmentStatusMapper} 裡屬 {@code PRE_SHIPMENT} ⇒
@@ -188,7 +188,7 @@ public final class FulfillmentActionPolicy {
      *       而 {@code 991} 的語意正是「<b>可能已經建成功了</b>」——再建一次就是
      *       66 陷阱 A8：<b>兩趟車、重複計費</b>。它的收斂手段是 T-8 回查，不是重建</li>
      * </ul>
-     * ⇒ 66 §4.5.0 E2 逐字：{@code dispatch}「🔴 <b>只在 {@code 990 CREATE_FAILED} 時 enabled</b>」。
+     * ⇒ {@code dispatch}「🔴 <b>只在 {@code 990 CREATE_FAILED} 時 enabled</b>」。
      *
      * <p>⚠️ 用表而不是在 {@code AllowedActionResolver} 裡寫 {@code method == UBER_INSTANT}：
      * 那個 if 正是整個 adapter 模型要消滅的東西，而本檔的其他三張表已經是這個形狀。

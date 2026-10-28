@@ -119,7 +119,7 @@ public class BuyerGrpcClient {
     }
 
     /**
-     * 地址驗證與地理編碼（Uber 報價用，66 §6.5）。
+     * 地址驗證與地理編碼（Uber 報價用）。
      *
      * <h2>🔴 為什麼是打 buyer-service 而不是自己接 TGOS</h2>
      * 這支底下是 TGOS，而 TGOS 是<b>來源 IP 白名單</b>的第三方

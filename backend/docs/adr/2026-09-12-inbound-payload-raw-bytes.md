@@ -46,3 +46,7 @@ String             dedupKey(InboundPayload raw);
   2. 驗簽從 ingress 下放到 adapter ⇒ 硬規則「provider 專屬知識不留在 consumer」**多守住一格**
   3. 68 的檔案交換與 69 的商家 webhook 也受益（兩者都不是 form-encoded）
 - **已落實於**：66 詳設 §4.5.0 的 `inbound()` 那一列（方法名同批更正）。
+
+## 修訂：設計書 65A、66、68、69 已刪除（2026-10-29）
+
+物流履約前端實作規格（65A）、Uber Direct 整合（66）、7-ELEVEN 大宗寄倉（68）、商家自有出貨（69）的詳細與基本設計書已刪除：65A、68、69 未實作且不在任何計畫內，66 的 Uber 已由 ADR `2026-10-27-general-ecommerce-scope-cut.md` D4 決定刪除。本文中「65A」「66」「68」「69」號設計書與它們的章節編號指向已刪除的文件，內容見 git 歷史。設計書 65 只保留已實作的部分。

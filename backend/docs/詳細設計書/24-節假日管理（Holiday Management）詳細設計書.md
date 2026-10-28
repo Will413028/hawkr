@@ -6,7 +6,7 @@
 |---|---|
 | 對應程式碼 | `services/java/shipping-service/.../service/HolidayService.java`、`.../service/ShippingService.java`（日期驗證呼叫點）、`monitoring/sql-exporter/`、`monitoring/prometheus/rules/business-alerts.yml` |
 | 相關 ADR | [2026-09-18-holiday-cache-and-coverage-monitoring](../adr/2026-09-18-holiday-cache-and-coverage-monitoring.md) |
-| 相關 doc | [06-物流微服務](./06-物流微服務（Shipping%20Service）詳細設計書.md)、68 號《7-ELEVEN 大宗寄倉（B2C）》§6.1.3（第二個消費者） |
+| 相關 doc | [06-物流微服務](./06-物流微服務（Shipping%20Service）詳細設計書.md) |
 
 ---
 
@@ -33,7 +33,6 @@
 |------|------|
 | `generate_home_label` 日期驗證 | shipDate / deliveryDate 必須為工作天 |
 | 前台日曆元件 | 查詢可出貨日期範圍，標記非工作天為不可選 |
-| B2C 大宗寄倉 `print_label` | `ShipDate ≥ 今日+1` 的工作天判定（68 號 §6.1.3 E3） |
 
 ---
 
@@ -85,7 +84,7 @@ holidays 資料特性：**量少（每年約 120 筆）、變動極低（每年�
 | `name()` | `"shipping-holiday"` |
 | 影響 | shipping-service `/actuator/health/readiness` 在 cache 未 ready 時報 `DOWN`，K8s 不導流量進來 |
 
-**為什麼需要**：假日資料未載入時，`isBusinessDay()` 會錯誤地把所有日期判定為工作天，導致日期驗證失準。冷啟動視窗必須阻擋。這道阻擋保護兩條路徑：宅配 `generate_home_label` 與 B2C 大宗寄倉 `print_label`（68 §6.1.3 E3）。
+**為什麼需要**：假日資料未載入時，`isBusinessDay()` 會錯誤地把所有日期判定為工作天，導致日期驗證失準。冷啟動視窗必須阻擋。這道阻擋保護宅配 `generate_home_label`。
 
 ### 3.3 月排程 refresh（強制）
 
@@ -343,19 +342,7 @@ message BusinessDay {
 
 ## 6. 日期驗證邏輯（`generate_home_label` ＋ `print_label` 使用）
 
-> 本章的工作天判定有**兩個消費者**。[68 §6.1.3 E3](68-7-ELEVEN%20大宗寄倉（B2C）詳細設計書.md)
-> 的 B2C 標籤列印 `/api/logistics/print_label` 要求「`ShipDate` 不得為當日（`ShipDate ≥ 今日+1`），
-> 且必須是可出貨工作天 ⇒ 走 `ShippingBusinessDaysPath` 的節假日判定」，違反回
-> `B2C_LABEL_SHIP_DATE_INVALID`。
->
-> **兩者共用 §6.1 的工作天判定，但額外約束不同**（細節不在本書重複，一行指標）：
->
-> | 消費者 | `shipDate`／`ShipDate` 額外約束 | 權威 |
-> |---|---|---|
-> | `generate_home_label`（宅配） | 本章 §6.1 全部 5 條（含「7 個工作天內」上限） | 本書 |
-> | `print_label`（B2C 大宗寄倉） | `≥ 今日+1` ＋ 工作天；另有「同一次呼叫四參數一致、≤50 筆」的分組規則 | [68 §6.1.3](68-7-ELEVEN%20大宗寄倉（B2C）詳細設計書.md) |
->
-> ⚠️ 68 §8 另立一條不變式：`ShipStatusTime` **只存不判**，只有 `ShipDate`（列印用）走節假日判定，
+> `ShipStatusTime` **只存不判**，只有 `ShipDate`（列印用）走節假日判定，
 > **兩者是不同的東西不可混用**。
 
 ### 6.1 shipDate 驗證
@@ -430,7 +417,7 @@ Subject,Start Date,Start Time,End Date,End Time,All Day Event,Description,Locati
 
 ## 8. 資料覆蓋度監測
 
-`holidays` 由 admin 人工從政府 CSV 匯入（§4.1）。若下年度資料未在跨年前上傳，§6 的 `shipDate`／`deliveryDate` 工作天驗證會 fail：宅配 `generate_home_label` 與 B2C `print_label` **兩條路徑一起卡死**。故需監測「假日資料還剩幾天覆蓋」並在耗盡前提醒。
+`holidays` 由 admin 人工從政府 CSV 匯入（§4.1）。若下年度資料未在跨年前上傳，§6 的 `shipDate`／`deliveryDate` 工作天驗證會 fail：宅配 `generate_home_label` **卡死**。故需監測「假日資料還剩幾天覆蓋」並在耗盡前提醒。
 
 ### 8.1 監測資料來源
 

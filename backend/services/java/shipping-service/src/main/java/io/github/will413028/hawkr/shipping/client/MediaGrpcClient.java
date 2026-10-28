@@ -54,7 +54,7 @@ public class MediaGrpcClient {
      * 那一支硬寫 {@code public/} 前綴 ⇒ 任何拿到 objectKey 的人都取得到。
      * 而 Uber 的送達證明是<b>收件地址與門口實景</b>（66 陷阱 A6），用 public 上傳
      * <b>沒有任何訊號</b>：上傳成功、圖片看得到、一切正常，只是全世界都看得到。
-     * ⇒ 唯一的防線是 66 §13.3 T10「斷言 objectKey 以 {@code secure/} 開頭」。
+     * ⇒ 唯一的防線是「斷言 objectKey 以 {@code secure/} 開頭」。
      *
      * <p>先例：invoice-service 的發票 PDF 走同一支 RPC
      * （{@code AssetReferenceType.INVOICE_DOCUMENT} 的 description 逐字記載）。
@@ -78,7 +78,7 @@ public class MediaGrpcClient {
         ServerUploadSecureAndFinalizeResponse response = executeWithRetry("ServerUploadSecureAndFinalize",
                 () -> getStub().serverUploadSecureAndFinalize(request));
 
-        // ⚠️ objectKey 本身是**憑證等級**的值（66 §8.6：拿到它就取得到那張圖）
+        // ⚠️ objectKey 本身是**憑證等級**的值（：拿到它就取得到那張圖）
         //    ⇒ 這裡只記 assetId 與長度，不記 objectKey 本身。
         //    （對照上面那支 public 的：它記了 objectKey，而 public 前綴本來就沒有秘密。）
         log.info("MediaGrpcClient.serverUploadSecureAndFinalize.success",

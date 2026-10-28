@@ -248,9 +248,9 @@ export function validationMatchesSelection(
  * 🔴 本頁只寫死渲染兩張卡：黑貓宅配（3652）與 7-11 店到店（3651）。後端若回
  * `3653` 超商大宗寄倉、`3654` 商家自送，或未來任何新值，那筆 onboarding 在 UI
  * 上**完全不存在** —— 賣家看不到、關不掉、也不知道自己開著它。那是「靜默丟棄」，
- * 與「猜成別的 provider」是同一條禁令的兩面（65A §1.8：不得憑空消失）。
+ * 與「猜成別的 provider」是同一條禁令的兩面（：不得憑空消失）。
  *
- * 這個函式不解決渲染問題（那要 provider slot registry，65A §12.5 E2），
+ * 這個函式不解決渲染問題（那要 provider slot registry），
  * 它只保證那些列**會被說出來**。
  */
 export function unsupportedOnboardingTypes(

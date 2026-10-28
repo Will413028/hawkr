@@ -708,7 +708,7 @@ class LogisticsSchemaContractTest {
         }
 
         // 期望＝CodeMeta 的四個 resolved 值。🔴 刻意不硬寫四個字串：
-        //    ResponsibilityCause 日後新增第 5 值（66 §1.6.1 已登記 RESPONSIBILITY_UNRESOLVED）時，
+        //    ResponsibilityCause 日後新增第 5 值（已登記 RESPONSIBILITY_UNRESOLVED）時，
         //    這裡會把它算進來而 DDL 沒有 ⇒ 轉紅 ⇒ 逼人回來決定那個值該不該能結案。
         Set<String> expected = new TreeSet<>();
         for (ResponsibilityCause c : ResponsibilityCause.values()) {

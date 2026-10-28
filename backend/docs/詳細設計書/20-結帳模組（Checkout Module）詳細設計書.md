@@ -308,7 +308,7 @@ message CheckoutShippingFeeData {
 **運費路線推導**：
 - 宅配：`ShippingAreaResolver.resolveRoute(setting.sender_postal_code, receiverZipCode)` → ShippingRoute
 - 店到店：固定 `DOMESTIC`（統一價，不分區域）
-- 🔴 **Uber 即時配送（`3003`）：不走這條路線推導**（66 §6.1.2b）。
+- 🔴 **Uber 即時配送（`3003`）：不走這條路線推導**。
   它的運費來自 **Uber Create Quote 的即時報價**，寄件點來自 **Uber 專屬門市映射 ＋ 凍結快照**，
   ⇒ 🔴 **3003 必須在 `getSenderPostalCode()` ／ traditional ShippingRoute 需求之前明確分流**。
   ⚠️ **沒有分流的後果是靜默的**：`seller_shipment_settings` 依設計**不會有** Uber 的列

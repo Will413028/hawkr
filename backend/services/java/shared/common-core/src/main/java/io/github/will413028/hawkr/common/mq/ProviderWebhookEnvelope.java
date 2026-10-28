@@ -28,8 +28,8 @@ import java.util.Map;
  * 驗簽對的是<b>那些位元組</b>。JSON body 可以帶任意位元組（{@code &#92;uXXXX} 逸出、
  * 非 NFC 的 Unicode、CRLF 與縮排），經過 {@code String} 來回、或經過
  * 「parse 成 JsonNode 再 re-serialize」都會改變它 ——
- * 而那種失敗是<b>偶發</b>的（失敗率取決於資料內容的欄位順序）⇒ 測不出來、上線才炸
- * （66 §6.3.1 陷阱 A2）。base64 是唯一能在 JSON 字串欄位裡無損攜帶任意位元組的形式。
+ * 而那種失敗是<b>偶發</b>的（失敗率取決於資料內容的欄位順序）⇒ 測不出來、上線才炸。
+ * base64 是唯一能在 JSON 字串欄位裡無損攜帶任意位元組的形式。
  *
  * <h2>🔴 producer 與 consumer 共用同一份鍵名</h2>
  * {@link #toWireMap()}（producer 側）與 {@link #parse(byte[])}（consumer 側）

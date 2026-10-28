@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import io.github.will413028.hawkr.shipping.entity.PackingPolicyEntity;
 
 /**
- * 分箱政策（版本化，66 §5.1.8）。
+ * 分箱政策（版本化）。
  *
  * <p>本波（Stage 8B W1，資料層）刻意<b>不加任何自訂 {@code @Select}</b>：
  * 狀態轉換的 CAS 述詞、租約 claim、TTL 掃描都屬 W2，寫在這裡會變成沒有呼叫端的死碼。

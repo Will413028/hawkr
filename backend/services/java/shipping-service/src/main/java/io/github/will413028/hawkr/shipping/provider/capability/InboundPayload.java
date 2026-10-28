@@ -13,8 +13,8 @@ import java.util.Map;
  *
  * <h2>為什麼 rawBody 必須到得了 adapter</h2>
  * Uber webhook 的驗簽是 HMAC-SHA256 over <b>raw bytes</b>。先 parse 再 re-serialize
- * 會因欄位順序不同而<b>偶發</b>失敗——失敗率取決於資料內容，測不出來、上線才炸
- * （66 §6.3.1 陷阱 A2）。而「怎麼驗簽」是 provider 專屬知識，正是本介面的職責
+ * 會因欄位順序不同而<b>偶發</b>失敗——失敗率取決於資料內容，測不出來、上線才炸。
+ * 而「怎麼驗簽」是 provider 專屬知識，正是本介面的職責
  * ⇒ raw bytes 在介面層遺失，驗簽就只能留在 ingress。
  */
 public record InboundPayload(Map<String, String> formParams,

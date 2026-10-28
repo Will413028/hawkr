@@ -541,7 +541,7 @@ export default function OrderDetailClient({
 			</Button>
 		);
 	} else if (action.kind === "unsupported") {
-		// 🔴 未知配送方式：不猜成黑貓也不猜成 7-11，明說不支援＋原碼（65A §1.8）。
+		// 🔴 未知配送方式：不猜成黑貓也不猜成 7-11，明說不支援＋原碼。
 		// 舊版在這裡會畫出「預約取號」，按下去真的打超商取號 API。
 		primaryCta = (
 			<p className="seller-order-detail__tracking-error" role="alert">
@@ -1201,7 +1201,7 @@ function LogisticsTracking({
 	// 物流單號時用 resetKey 確保前次錯誤不殘留。
 	const [error, setError] = useResettableError(shipTradeNo);
 
-	// 🔴 認不得的配送方式回 null（65A §1.10）。舊寫法 `isTaqbin ? HOME : C2C`
+	// 🔴 認不得的配送方式回 null。舊寫法 `isTaqbin ? HOME : C2C`
 	// 讓 3003／3004／3005 走 7-11 的進度表 —— 型別對、不拋例外、只有進度條是錯的。
 	const lgsType = lgsTypeForShippingMethod(method);
 

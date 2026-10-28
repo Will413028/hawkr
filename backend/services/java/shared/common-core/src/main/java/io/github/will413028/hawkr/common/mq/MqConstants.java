@@ -263,7 +263,7 @@ public final class MqConstants {
     public static final String QUEUE_SHIPPING_PAYUNI_WEBHOOK = "shipping.payuni.webhook";
     public static final String QUEUE_SHIPPING_PAYUNI_WEBHOOK_DLQ = "shipping.payuni.webhook.dlq";
     public static final String EXCHANGE_SHIPPING_WEBHOOK_DLX = "shipping.webhook.dlx";
-    /** Uber Direct 貨態回調 queue（66 §6.4.1；綁 {@link #ROUTING_KEY_UBER_SHIPPING_STATUS}）。 */
+    /** Uber Direct 貨態回調 queue（綁 {@link #ROUTING_KEY_UBER_SHIPPING_STATUS}）。 */
     public static final String QUEUE_SHIPPING_UBER_WEBHOOK = "shipping.uber.webhook";
     public static final String QUEUE_SHIPPING_UBER_WEBHOOK_DLQ = "shipping.uber.webhook.dlq";
 
@@ -348,11 +348,11 @@ public final class MqConstants {
     public static final String ROUTING_KEY_PAYUNI_UNKNOWN_FALLBACK = "payuni.unknown.fallback";
 
     /**
-     * Uber Direct 貨態回調（66 §6.4.1，本波唯一新增的 routing key）。
+     * Uber Direct 貨態回調（本波唯一新增的 routing key）。
      *
      * <p>🔴 <b>exchange 沿用 {@link #EXCHANGE_PAYUNI_WEBHOOK}</b>（{@code payuni.events}）：
-     * 66 §6.4.1 逐字「沿用既有 PayUni 的形狀（那條路徑已經證明可行）」，36 §3.5 註記
-     * 「exchange 名 66 §6.4.1 未逐字指定（沿用 payuni.events 家族形狀）⇒ 待坐實」。
+     * 沿用既有 PayUni 的形狀（那條路徑已經證明可行），36 §3.5 註記
+     * 「exchange 名 未逐字指定（沿用 payuni.events 家族形狀）⇒ 待坐實」。
      * 本常數即為那個坐實。取捨：
      * <ul>
      *   <li>✅ 不新增 exchange ⇒ topology pin 的 exchanges 不動、broker 少一個要先建的前置</li>

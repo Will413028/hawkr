@@ -27,7 +27,7 @@ public class CheckoutValidator {
     private final ShippingFeeCacheClient shippingFeeCache;
 
     /**
-     * Uber Direct 資格閘門（66 §7.4 明定落點就是本類別）。
+     * Uber Direct 資格閘門（明定落點就是本類別）。
      *
      * <p>🔴 兩個接點各擋不同的東西，<b>缺一都會漏</b>：
      * <ul>
@@ -117,7 +117,7 @@ public class CheckoutValidator {
             ShippingMethod method = ShippingMethod.fromValue(parts[0]);
             ShippingTemperature temp = ShippingTemperature.fromValue(parts[1]);
 
-            // Uber Direct 資格閘門（顯示層，66 §3.4 fail-closed 第 ③ 層）。
+            // Uber Direct 資格閘門（顯示層 fail-closed 第 ③ 層）。
             // 🔴 放在 config／級距查找**之前**：Uber 今天「關閉」的機制是資料面缺 config 列，
             //    那條路徑走的是下一行的 `if (config == null) continue;`——靜默跳過、零 log 零指標，
             //    而且有人補上那一列的當天就自動變成放行。這裡先用程式面的具名規則排除它，
@@ -169,7 +169,7 @@ public class CheckoutValidator {
      * （它沒有級距表），運費是一筆<b>會過期的即時報價</b>。所以本方法對 Uber 不查費率表，
      * 直接採用 {@code uberContext} 這一次判定回來的
      * {@link UberOrderEligibilityGuard.Assessment#feeAmount()}——
-     * 「買家看到的選項」與「按下去的價格」必須來自同一次求值（66 §8 INV-U1）。
+     * 「買家看到的選項」與「按下去的價格」必須來自同一次求值（INV-U1）。
      *
      * @param uberContext 本次判定的報價 context。<b>沒有多載</b>：每個呼叫端都必須明寫
      *                    自己有沒有 probe（{@link UberOrderEligibilityGuard.Context#of} ／
@@ -253,7 +253,7 @@ public class CheckoutValidator {
     }
 
     /**
-     * 建單成功後把報價鎖定成 {@code CHECKOUT_ACCEPTED}（66 §9）。
+     * 建單成功後把報價鎖定成 {@code CHECKOUT_ACCEPTED}。
      *
      * <p>🔴 <b>它是 {@code UberDirectAdapter.acceptedQuote(orderNo)} 的唯一寫入端。</b>
      * 沒有這一步，建單會走到 {@code markCreateFailed("UBER_QUOTE_NOT_ACCEPTED")}
@@ -465,7 +465,7 @@ public class CheckoutValidator {
             boolean freeShippingEligible,
             // 🔴 只有 3003 非空：本次定價實際採用的 uber_quotes.quote_id。
             //    confirm 要拿它去 CAS 成 CHECKOUT_ACCEPTED，而**重驗允許重報**
-            //    ⇒ 它不一定等於買家送上來的那個（66 §7 的決策樹）。
+            //    ⇒ 它不一定等於買家送上來的那個。
             //    讓它跟著價格一起回來，是為了不讓「定價」與「鎖定」變成兩次求值。
             String uberQuoteId
     ) {

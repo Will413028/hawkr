@@ -55,10 +55,10 @@ ShippingPresentation shippingPresentationOf(String? rawShippingMethod) {
       ShippingPresentation.cvsStorePickup,
     // 3003 Uber 即時配送：功能已刪除（ADR 2026-10-27-general-ecommerce-scope-cut D4）。
     ShippingMethod.uberInstant => ShippingPresentation.unsupported,
-    // 3004 7-11 大宗寄倉：B2C 流程與 3002 的 C2C 不同（68 號設計書），
+    // 3004 7-11 大宗寄倉：B2C 流程與 3002 的 C2C 不同，
     // 借用 C2C 的畫面會顯示錯誤的取件方式與代碼欄位。
     ShippingMethod.sevenElevenBulkWarehouse => ShippingPresentation.unsupported,
-    // 3005 商家自行配送：無外部 provider API（69 號設計書）。
+    // 3005 商家自行配送：無外部 provider API。
     ShippingMethod.merchantDelivery => ShippingPresentation.unsupported,
     null => ShippingPresentation.unsupported,
   };
