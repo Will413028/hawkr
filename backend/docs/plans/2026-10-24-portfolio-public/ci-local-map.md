@@ -139,7 +139,7 @@ Go 的模組有兩種執行方式：單體（`backend/go.mod`，CI 設 `GOWORK=o
 | `changes`（paths-filter） | 手動觸發時 `ALL=true` | 無對應 | 無 | NOT RUN（選取邏輯） | |
 | `ios-lockfile-check` `<app>`（矩陣：`buyer-app`、`seller-app`；`macos-15`） | 手動 | 對每個 App：<br>`cd $ROOT/<app> && fvm flutter pub get`<br>`cd ios && bundle install --quiet && bundle exec pod install --deployment` | macOS、Ruby 3.2、Bundler、CocoaPods 的 spec repo 網路 | NOT RUN（只手動跑，基線不跑；`AGENTS.local.md` 指定，且要下載 CocoaPods 規格庫，不是便宜的離線檢查） | 步驟 8 在新 repo 以 `gh workflow run` 手動觸發一次。 |
 
-### `legacy-endpoints.yml`（步驟 7a 已刪：不在 CI 跑，改由本機 pre-commit 的 hook 跑，全樹零容忍、無 baseline）
+### `legacy-endpoints.yml`（步驟 7a 已刪 workflow；腳本與本機 hook 在步驟 9 移除）
 
 | job | 觸發 paths | 本機等價指令 | 前置 | 基線 | 備註 |
 |---|---|---|---|---|---|

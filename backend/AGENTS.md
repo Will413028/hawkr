@@ -32,7 +32,7 @@
 4. 下層通知上層、而且需要原子性時用 `events.Publish`（transaction 內）；同 transaction 的訂閱者只做原子的狀態變更（含把擁有者的事實複製進自己的表）或 `Enqueue` job／寫 inbox，其餘副作用用 `jobs.Enqueue`。跨模組 transaction 由下往上鎖列：identity 帳號 → buyer → seller → 上層模組 → 編排者自己的列。
 5. 外部 provider（PayUni、AMEGO、Apple、R2、FCM、LLM）不在 DB transaction 內呼叫：transaction 內寫業務列並排入帶冪等鍵的 job，由 worker 在外面呼叫；webhook 先寫 inbox。
 6. `db/schema.sql` 只放表、約束、索引與 enum（migration 由 `atlas migrate diff` 產生）；view、函式與複合型別（含 `pub_*`）放 `db/objects.sql`（`atlas migrate new` 手寫）。函式一律 `BEGIN ATOMIC`（觸發函式除外）、只參照自己的表；已套用的 migration 不得修改或刪除（`TestDesiredStateIsSplitBetweenSchemaAndObjects`、`TestSchemaFileMatchesMigrations`）。模組登記在 `cmd/hawkr/modules.go`；沒有自己資料的（`reviewqueue`）登記在 `withoutData`。
-7. 不得出現舊公司的端點或帳號識別碼（根目錄 `scripts/check-legacy-endpoints.py`，本機 pre-push hook 跑）。
+7. 不得出現舊公司的端點或帳號識別碼。
 8. 刪除一個舊服務之前，它在搬遷清單裡的 RPC、事件、副本都要填好 `disposition`（`scripts/check-migration-inventory.py`）。
 9. 頭尾空白只有 `internal/platform/trimtext` 一個定義：寫入端用 `trimtext.Trim` 或 `strings.TrimSpace`，DB 的 CHECK 用 `trimtext.Check` 並登記在 `cmd/hawkr` 的 `trimmedColumns`；SQL 不用 `btrim`／`trim`，也不自己定義空白（`TestTrimmedTextChecksUseTheCanonicalPattern`、`TestModuleSQLDoesNotTrim`）。
 
