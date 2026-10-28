@@ -242,7 +242,7 @@ var eventTypeToCategory = map[string]string{
     "post.created":                 "post",
     "comment.created":              "message",
     "shipment.anomaly.detected":    "shipment_anomaly",  // 僅 seller target_user_type
-    "RESTOCK_AVAILABLE":            "restock",            // 補貨通知（買家專屬，event_type 採 UPPER_SNAKE 對齊 NotificationType.RESTOCK_AVAILABLE，由 buyer-service fan-out 發 product.restock.target；mapping 不影響推播流程，由 template 端 category=restock 直接決定）
+    "RESTOCK_AVAILABLE":            "restock",            // 補貨通知（買家專屬，event_type 採 UPPER_SNAKE 對齊 NotificationType.RESTOCK_AVAILABLE，由單體 buyer 模組 fan-out 發 product.restock.target；mapping 不影響推播流程，由 template 端 category=restock 直接決定）
 }
 ```
 
@@ -273,8 +273,8 @@ var eventTypeToCategory = map[string]string{
 | 4 | 訂單完成 | `hawkr.order` | `order.completed` | `notification.order` | `order.ORDER_COMPLETED` | `order_update` | 訂單已完成 | 訂單 #{orderSn} 已完成，感謝您的購買！ | 訂單完成 | order-service |
 | 5 | 訂單取消 | `hawkr.order` | `order.cancelled` | `notification.order` | `order.ORDER_CANCELLED` | `order_update` | 訂單已取消 | 訂單 #{orderSn} 已取消。 | 訂單取消 | order-service |
 | 6 | 系統公告 | — （不經 MQ） | — | — | `notification.announcement` | `system` | {title} | {body} | 平台管理員發布系統公告，走 gRPC `BroadcastAnnouncement` 直接派送（見 13 號 §7） | gateway/admin |
-| 7 | 新追蹤者 | `hawkr.content` | `follow.added` | `notification.content` | `merchant.new_follower` | `follower` | 你有新粉絲！ | {followerName} 開始追蹤你了！ | 買家追蹤賣家 | buyer-service |
-| 8 | 實名認證結果 | `hawkr.merchant` | `merchant.verification.{approved,rejected,pending_info,forwarded}` | `notification.merchant` | 同 routing key | — (always send) | 依審核結果 | （依審核結果） | 管理員審核認證 | seller-service |
+| 7 | 新追蹤者 | `hawkr.content` | `follow.added` | `notification.content` | `merchant.new_follower` | `follower` | 你有新粉絲！ | {followerName} 開始追蹤你了！ | 買家追蹤賣家 | 單體 buyer 模組 |
+| 8 | 實名認證結果 | `hawkr.merchant` | `merchant.verification.{approved,rejected,pending_info,forwarded}` | `notification.merchant` | 同 routing key | — (always send) | 依審核結果 | （依審核結果） | 管理員審核認證 | 單體 seller 模組 |
 | 9 | 貼文留言 | `hawkr.content` | `comment.created` | `notification.content` | `comment.created` | `message` | 你的貼文有新留言 | {commenterName}：{contentPreview} | 買家在賣家貼文留言 | social-service |
 | 10 | 聊天訊息 | `hawkr.im` | `chat.message.sent` | `notification.im` | `chat.message.sent` | `chat` | {senderName} | {contentPreview} | 收到聊天訊息 | im-service |
 | 11 | 配送異常 | `hawkr.shipping` | `shipment.anomaly.detected` | `notification.shipping` | `shipment.anomaly.detected` | `shipment_anomaly` | 配送異常通知 | 訂單 #{orderNo} {anomalyTypeLabel}，請儘速處理。 | shipping-service 偵測到配送異常 | shipping-service |
@@ -454,7 +454,7 @@ var eventTypeToCategory = map[string]string{
 
 > 圖片欄位：payload 來源（`product.restock.target`）帶 `imageKey`（objectKey），模板 `image_key_template` 填 objectKey 佔位，由 notification-service 渲染端組出上例 `imageUrl` 完整 URL（49 號設計書 §5.3／§6.3）。
 
-> 由 product-service 偵測庫存 0→可見 transition（02 §5.13b）→ 發 `product.restock` event → buyer-service `restock_consumer` fan-out 為每個 ACTIVE 訂閱者發 `product.restock.target` event → notification-service template-driven consumer 自動寫 inbox + FCM。
+> 由 product-service 偵測庫存 0→可見 transition（02 §5.13b）→ 發 `product.restock` event → 單體 buyer 模組（`internal/legacy/buyerconsumer`）fan-out 為每個 ACTIVE 訂閱者發 `product.restock.target` event → notification-service template-driven consumer 自動寫 inbox + FCM。
 >
 > **冪等鍵**：notification `reference_id_template = restock_#{subscriptionId}`，搭配 schema 既有 UNIQUE `(user_id, user_type, event_type, reference_id)` 保 inbox 端 fan-out retry 時不重複插入。
 
@@ -579,7 +579,7 @@ var eventTypeToCategory = map[string]string{
 
 ### 7.4 實名認證結果（賣家）
 
-**事件來源**：seller-service 發布 `hawkr.merchant` / `merchant.verification.completed`
+**事件來源**：單體 seller 模組（經 `internal/legacy/sellerrelay`）發布 `hawkr.merchant` / `merchant.verification.completed`
 
 | Payload 欄位 | 型別 | 用途 |
 |---|---|---|
@@ -634,7 +634,7 @@ Gateway 呼叫。它逐一收件人走與模板引擎相同的 `SendPushUseCase`
 
 ### 7.6 新追蹤者（賣家）
 
-**事件來源**：buyer-service 發布 `hawkr.content` / `follow.added`
+**事件來源**：單體 buyer 模組（經 `internal/legacy/buyerrelay`）發布 `hawkr.content` / `follow.added`
 
 | Payload 欄位 | 型別 | 用途 |
 |---|---|---|
@@ -690,7 +690,7 @@ Gateway 呼叫。它逐一收件人走與模板引擎相同的 `SendPushUseCase`
 | `sellerName` | string | 賣家名稱，為空時 title 走 fallback 句 |
 | `contentPreview` | string | 內文摘要，為空時 body 走 fallback 句 |
 
-**扇出規則**：本 template 的推播對象不是單一 payload 欄位——須透過 buyer-service gRPC
+**扇出規則**：本 template 的推播對象不是單一 payload 欄位——須透過單體 buyer 模組的 gRPC
 `GetSubscribersList` 取得追蹤該賣家的所有買家，逐一推播。
 
 | 欄位 | 推播 |
@@ -703,7 +703,7 @@ Gateway 呼叫。它逐一收件人走與模板引擎相同的 `SendPushUseCase`
 | Data | `{"type": "post_created", "post_id": "{PostID}", "seller_name": "{SellerName}"}` |
 
 > **無追蹤者**：正常結束（ACK），不發送推播。
-> **buyer-service 不可用**：記錄 error log，不推播，不回傳錯誤（不進 DLQ）。
+> **單體 buyer 模組不可用**：記錄 error log，不推播，不回傳錯誤（不進 DLQ）。
 
 ---
 
@@ -833,7 +833,7 @@ notification-service 端以 **2 筆 `notification_templates`**（buyer / seller�
 | 必要欄位缺失 | ACK（丟棄），記錄 warn log |
 | SendPush 失敗 | ACK（已在 push_notifications 表記錄），記錄 error log |
 | FCM token 無效 | 自動 deactivate token，不影響其他推播 |
-| buyer-service gRPC 失敗 | ACK，記錄 error log，不推播 |
+| 單體 buyer 模組 gRPC 失敗 | ACK，記錄 error log，不推播 |
 
 > 所有 handler 回傳 `nil`（always ACK），推播是 best-effort。
 
@@ -846,7 +846,7 @@ notification-service 端以 **2 筆 `notification_templates`**（buyer / seller�
 | Service | 語言 | 發布的事件 | Exchange | 發布時機 |
 |---|---|---|---|---|
 | order-service | Java | `order.paid`, `order.shipped`, `order.completed`, `order.cancelled`, `order.refund.requested` | `hawkr.order` | 訂單生命週期變更 |
-| seller-service | Go | `merchant.verification.completed` | `hawkr.merchant` | 管理員審核賣家認證 |
+| 單體 seller 模組 | Go | `merchant.verification.completed` | `hawkr.merchant` | 管理員審核賣家認證 |
 | social-service | Go | `post.created` / `post.liked` / `post.hidden.by_platform` / `comment.created`（fat） / `comment.replied`（fat） / `comment.updated` / `comment.deleted` / `comment.like_changed` | `hawkr.content` | 貼文 / 留言 lifecycle。`comment.updated` / `comment.deleted` / `comment.like_changed` 供 [41 SSE 推播](41-Realtime%20SSE%20推播平台（Realtime%20SSE%20Push%20Platform）詳細設計書.md) realtime 同步；**沒有 `comment.liked` 這個 routing key**，按讚通知一律訂閱 `comment.like_changed` 並過濾 LIKE only |
 | coupon-service | Java | `coupon.issued` | `hawkr.marketing` | 批量發放或買家領取優惠券 |
 | im-service | Go | `chat.message.sent` | `hawkr.im` | 收到聊天訊息 |

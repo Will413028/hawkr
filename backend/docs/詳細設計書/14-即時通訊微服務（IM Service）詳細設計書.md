@@ -48,8 +48,8 @@ flowchart LR
   Web["Web (Next.js)"] -->|WSS / HTTPS| GW
   GW -->|"gRPC unary / bidirectional ChatStream"| IM[IM Service<br/>gRPC :9933]
   IM --> PG[("PostgreSQL<br/>hawkr_im")]
-  IM -->|"gRPC: profile"| BUY[buyer-service]
-  IM -->|"gRPC: profile"| SEL[seller-service]
+  IM -->|"gRPC: profile"| BUY[單體 buyer 模組]
+  IM -->|"gRPC: profile"| SEL[單體 seller 模組]
   IM -->|"gRPC: FinalizeImages"| MED[media-service]
   IM -->|"publish chat.message.sent"| MQ[(RabbitMQ<br/>hawkr.im)]
   MQ --> NOTIF[notification-service] -->|FCM| App
@@ -459,7 +459,7 @@ map 與 error 必須分開判讀：兩者的**處置相同、意義不同**，�
 | 參與者資訊 | 空字串，記 Warn |
 
 ⚠️ **關店守門的 fail-open 是刻意的，不是把錯誤吞掉的副作用**——fail-closed 會讓
-seller-service 一抖動就全站 IM 送不出訊息。有回歸測試釘住這個方向，改成 fail-closed 會轉紅。
+單體 seller 模組一抖動就全站 IM 送不出訊息。有回歸測試釘住這個方向，改成 fail-closed 會轉紅。
 
 ### 8.4 一致性與冪等
 - 投遞語意：WS **at-most-once**（best-effort）；DB 持久化 + seqId 補發保證最終不遺漏。

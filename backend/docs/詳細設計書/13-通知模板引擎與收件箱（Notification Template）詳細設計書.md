@@ -21,7 +21,7 @@
 │  │ (Java)        │  │  order.paid / shipped / completed / cancelled          │
 │  └──────────────┘  │                                                        │
 │  ┌──────────────┐  │                                                        │
-│  │ seller-service│──┤  merchant.verification.completed                       │
+│  │ 單體 seller   │──┤  merchant.verification.completed                       │
 │  │ (Go)          │  │                                                        │
 │  └──────────────┘  │      ┌─────────────────┐                               │
 │  ┌──────────────┐  ├─────▶│   RabbitMQ       │                               │
@@ -664,7 +664,7 @@ Gateway 對 inbox response 頂層的 `refType` / `refId` 採兩段策略：
 
    > 註：`conversation_id → CHAT` 為通用 legacy fallback，僅服務舊資料。聊天模板已遷移至 explicit `refType` / `refId` 契約（`refType=CHAT` + `refId=conversation_id`，見 §5.2），不再依賴此 fallback。
    >
-   > ⚠️ **這四條 fallback 沒有生產者，只服務歷史 row**：所有 enabled template 都走第 1 段的 explicit 契約（§5.2 對 enabled template 是完整的）。其中 `certification_id` 這條從來沒有生產者——`merchant.verification.*` 的 payload 只有 `event_id` / `status` / `reason` / `merchant_id` 四個鍵（`seller-service` 的 `merchant_event_publisher.go`），因此那四支的 explicit refId 取 `merchant_id`。
+   > ⚠️ **這四條 fallback 沒有生產者，只服務歷史 row**：所有 enabled template 都走第 1 段的 explicit 契約（§5.2 對 enabled template 是完整的）。其中 `certification_id` 這條從來沒有生產者——`merchant.verification.*` 的 payload 只有 `event_id` / `status` / `reason` / `merchant_id` 四個鍵（單體 seller 模組經 `internal/legacy/sellerrelay` 發出），因此那四支的 explicit refId 取 `merchant_id`。
    > 🔴 **要移除 fallback 必須先確認 `notifications` 表內的存量 row**：`data` 是寫入當下凍結的，不會隨 template 更新而改變。
 
 前端用 `refType + refId` 做頁面跳轉（FCM 路徑同樣讀 `data.refType` / `data.refId`）。
@@ -1062,7 +1062,7 @@ invoice-service 的 seller template 一律 `store_id`／`identity_migrated=true`
 | `device_tokens`（FCM token 註冊） | **原子**：寫入路徑 ＋ 既有資料（backfill runbook） | 單一 owner（gateway 寫、notification-service 讀），零跨服務 producer 依賴——一次 token 註冊涵蓋該帳號全部通知類型，本來就沒有「逐 event_type」這個維度可分階段。寫入路徑原子化只保證**新**註冊正確，既有列要靠 backfill 才會一次補齊，不是自動發生的 |
 | `notification_preferences`（推播偏好開關） | **原子**：寫入路徑與既有資料一次到位 | 單一 owner（gateway 寫、notification-service 讀寫），零跨服務 producer 依賴；且是「目前設定」表（`UNIQUE (user_id, user_type, category)`），不是像 `notifications` 那樣的 append-only 歷史紀錄——遷移既有列延續的是「使用者本來想要的設定」，不是竄改歷史，不適用 `notifications` 那條「禁止遷移舊列」的規則 |
 
-**被接受的行為（不是缺陷）**：`notification_preferences` 以 store_id 為鍵之後，`user_id` 隨關店重開換掉——賣家若在舊 incarnation 關閉某個通知類別，關店重開後新 store_id 底下沒有對應的偏好列，`GetByCategory` 查不到 ⇒ fail-open ⇒ 該類別悄悄恢復成啟用。這與 §12.2、44 號設計書 §10 D6「重新註冊＝全新開始」的原則一致，是刻意接受的行為。
+**被接受的行為（不是缺陷）**：`notification_preferences` 以 store_id 為鍵之後，`user_id` 隨關店重開換掉——賣家若在舊 incarnation 關閉某個通知類別，關店重開後新 store_id 底下沒有對應的偏好列，`GetByCategory` 查不到 ⇒ fail-open ⇒ 該類別悄悄恢復成啟用。這與 §12.2「重新註冊＝全新開始」的原則一致，是刻意接受的行為。
 
 **額外揭露（文件記錄）**：`push_notifications` 的去重鍵（`ExistsProcessed`／`push_notifications_dedup_idx`，皆含 `user_id`）在 canonical cutover 前後可能因 account_id／store_id 不同而多推一次；範圍限於跨部署邊界重送的訊息，後果是「多推一次」而非漏推或資料外洩。歷史 push record 不回寫，靠窗口外 HISTORIC 分級；完整風險評估見 [backfill runbook](../runbooks/seller-notification-identity-store-id-backfill.md) 的「已知風險」一節。
 
@@ -1070,17 +1070,17 @@ invoice-service 的 seller template 一律 `store_id`／`identity_migrated=true`
 
 ### 12.2 退休 buyer stint 的收件匣歸宿
 
-本節是 **44 號設計書 §10 D6** 在通知領域的落地方式。D6：「買家軟刪除後重新註冊 ＝ 完全全新開始（含過去訂單／售後依據／評論在新身份下不可見）」；買家關閉的規則（帳號刪除時同一個 transaction 關閉買家並清除關聯資料）見 `docs/modules/buyer.md` §2。
+本節是「買家軟刪除後重新註冊 ＝ 完全全新開始（含過去訂單／售後依據／評論在新身份下不可見）」在通知領域的落地方式；買家關閉的規則（帳號刪除時同一個 transaction 關閉買家並清除關聯資料）見 `docs/modules/buyer.md` §2。
 
 | 問題 | 本設計的答案 | 依據 |
 |---|---|---|
-| 新 stint 讀不到舊 stint 的通知，算 bug 嗎？ | **不算，是規格。** `resolveInboxUserID` 以現任 `buyer_id` 查收件匣（§12.1），re-key 之後舊列自然不在結果內 | 44 §10 D6；`docs/modules/buyer.md` §2 |
+| 新 stint 讀不到舊 stint 的通知，算 bug 嗎？ | **不算，是規格。** `resolveInboxUserID` 以現任 `buyer_id` 查收件匣（§12.1），re-key 之後舊列自然不在結果內 | `docs/modules/buyer.md` §2 |
 | 那要不要把舊列遷移到新 `buyer_id`？ | **禁止。** `UPDATE notifications SET user_id = <新 buyer_id>` 會讓通知成為唯一跨 stint 可見的資料，與其餘 7 個下游（order／review／social／im／coupon／cart／aftersales）相反 | 同上 |
 | 那些讀不到的列怎麼辦？ | **soft delete，交給既有的清理 job。** 讀不到 ＋ 永久保留 ＝ 零價值 ＋ 純個資責任（那些列的標題常含訂單號），而使用者當初按的是刪除帳號 | §8.3 |
 
 **清理路徑（不新增任何排程或表）**：
 
-1. buyer-service 關閉買家 stint → 發 `buyer.deleted`（`delete_buyer_account.go` 與 `complete_pending_deletion.go` 兩條路徑都經 outbox 發出）。
+1. accountdeletion 呼叫單體 buyer 模組的 `CloseForDeletion` 關閉買家 stint → 同一個 transaction 發出 `BuyerDeleted`，由 `internal/legacy/buyerrelay` 轉成 `buyer.deleted`（立即刪除與等待中的刪除完成兩條路徑都經 `CloseForDeletion`）。
 2. notification-service 既有的 `buyer.deleted` consumer（`internal/worker/account_deleted.go`）在原本的 chat PII redaction 之後，再呼叫 `SoftDeleteRetiredBuyerStintInbox` 把「**收件人**是該退休 stint」的列 `SET deleted_at = NOW()`。**同一個 handler、同一條寫入路徑**，不新增 consumer、不新增 `@Scheduled`、不新增 task 表（後端服務責任邊界規範）。
 3. `deleted_at` 滿 90 天後由 §8.3 的清理 job 實刪。在此之前列仍在庫，可供稽核。
 

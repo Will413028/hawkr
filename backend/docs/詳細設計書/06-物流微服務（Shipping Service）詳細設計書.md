@@ -581,7 +581,7 @@ PayUni 物流建單 API 對部分欄位有長度約束，違反會回業務錯�
 
 **判斷準則**：欄位**前端可控**（使用者輸入，可回頭要求修正）→ 源頭驗證拒絕，讓使用者結帳時即修正；欄位**系統背景填寫**（撈取既有資料、使用者無法干預）→ 送 PayUni 前自動截斷，不阻斷建單。
 
-**收件人姓名的輸入入口不只結帳**：`recipientName` 有兩個源頭輸入入口——(1) 結帳當下填寫（order-service `CheckoutService`，**權威防線**，依配送方式精確驗證）；(2) 買家地址本（buyer-service `AddAddress`/`UpdateAddress`，**源頭提早提示**，採聯集約束 [4,30]，見 `docs/modules/buyer.md`）。兩入口都驗證，避免「地址本存壞、結帳才被擋」的 UX 斷裂。
+**收件人姓名的輸入入口不只結帳**：`recipientName` 有兩個源頭輸入入口——(1) 結帳當下填寫（order-service `CheckoutService`，**權威防線**，依配送方式精確驗證）；(2) 買家地址本（單體 buyer 模組 `AddAddress`/`UpdateAddress`，**源頭提早提示**，採聯集約束 [4,30]，見 `docs/modules/buyer.md`）。兩入口都驗證，避免「地址本存壞、結帳才被擋」的 UX 斷裂。
 
 驗證 / 截斷統一走 common-core `InputValidator`（`requireDisplayLengthBetween` / `truncateByDisplayLength`，計長規則「英文 1、中文/全形 2」對齊 PayUni），約束值集中於 `PayUniShippingConstraints` 常數。詳見 [26-輸入驗證模組 §2.3 R10/R11](../詳細設計書/26-輸入驗證模組（Java%20InputValidator）詳細設計書.md)。
 
@@ -1673,7 +1673,7 @@ message GetStoreMapRedirectFormResponse {
 - **shipment.created 無 labelUrl**：背景建單時尚未取號 PDF。宅配 PDF 在「安排出貨」時才生成；超商代碼在 Print Webhook 回填時才有。
 - **shipment.created payload 欄位**：除物流單本身的 7 欄外，另含 5 欄（全 String），供 notification-service 渲染賣家推播：
   - `storeId` / `buyerId` / `totalActualAmount`：由 `publishShipmentCreatedEvent(entity, orderInfo)` 從同呼叫端的 `OrderShippingInfo` 直接取得（定位推播對象）。
-  - `buyerNickname` / `buyerAvatar`：由 shipping-service 在 publish 前透過 `BuyerGrpcClient.batchGetBuyerMeta` best-effort enrich 取得（與 order-service `OrderOutboxPublisher.enrich` 同模式）。enrich 失敗（gRPC 異常 / parseLong 失敗）時兩欄為 null，notification template FieldSpec.Resolve 略過該欄位，前端 `_personalize` fallback 至通用「買家」字樣，title/body 主文不受影響。`BuyerMeta.avatar_url` 已由 buyer-service 端轉為絕對 URL，無需再組裝。
+  - `buyerNickname` / `buyerAvatar`：由 shipping-service 在 publish 前透過 `BuyerGrpcClient.batchGetBuyerMeta` best-effort enrich 取得（與 order-service `OrderOutboxPublisher.enrich` 同模式）。enrich 失敗（gRPC 異常 / parseLong 失敗）時兩欄為 null，notification template FieldSpec.Resolve 略過該欄位，前端 `_personalize` fallback 至通用「買家」字樣，title/body 主文不受影響。`BuyerMeta.avatar_url` 已由單體 buyer 模組轉為絕對 URL，無需再組裝。
 - **取號後同步**：宅配 `generateHomeLabelPdf()` 完成後發 `shipment.status.changed`（status=91 不變，帶 labelUrl + labelExpireAt）；超商 `processWebhookPrint()` 完成後同時發 `shipment.label.updated` + `shipment.status.changed`（status=920 CVS_CODE_RECEIVED）。
 - **shipment.label.updated 的 isReturn 必填**：直接取自 `shipments.is_return`；讓 Order / AfterSales 兩端消費者以 queue binding 分流，避免正向出貨代碼被退貨代碼覆寫。
 - **statusDesc 來源**：PayUni Webhook 有 `ShipStatusDesc` 就用真實值；內部動作（callTcat / confirmCvsShipment）用 `ShippingStatus.displayName()`。

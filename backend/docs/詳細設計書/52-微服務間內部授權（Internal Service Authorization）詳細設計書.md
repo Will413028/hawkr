@@ -352,11 +352,11 @@ apply 之後要 `kubectl rollout restart` 呼叫端：gRPC channel 在連線失�
 |---|---|---|---|
 | order `GetOrderForShipping(Internal)` → recipientName/phone/address | 收件人 PII | 內部全域讀（shipping 讀所有賣家訂單） | 僅 orderNo 定位單筆；靠 HMAC+netpol（只 shipping/order 可達），不回整表 |
 | order `getBuyerMerchantSummary`（caller = **coupon-service** `getBuyerMemberSellerIds`） | 買家消費彙總 | 內部 scoped 讀 | 要求 `buyerId > 0`，缺/0 直接拒（`INVALID_ARGUMENT`） |
-| order `getBuyerOrdersForSeller`（caller = **gateway** seller CRM 使用者面 + **buyer-service** 內部面） | 買家在某商家的訂單 | 雙 caller（見下） | 要求 `storeId>0 && buyerId>0`，查詢恆以 (storeId,buyerId) scope |
+| order `getBuyerOrdersForSeller`（caller = **gateway** seller CRM 使用者面 + **單體**（accountdeletion 經 `internal/legacy/orderservice`）內部面） | 買家在某商家的訂單 | 雙 caller（見下） | 要求 `storeId>0 && buyerId>0`，查詢恆以 (storeId,buyerId) scope |
 | shipping `getShipmentsByOrderNos` / `getShipmentByOrderNo` | 出貨/物流資訊 | 內部全域讀（by orderNo） | 靠 HMAC+netpol（只 order/aftersales/product/product-import 等合法 caller 可達） |
 | aftersales `hasActiveCase` / `cancelActiveCaseOnConfirmReceipt`（caller = order 完成/售後鏈） | 售後案件狀態 | 內部全域讀 | 靠 HMAC+netpol（只 order 可達） |
 
-**`getBuyerOrdersForSeller` 雙軌授權**：此 RPC 同時接受「使用者面（gateway，帶 seller 身分 + gateway-resolved storeId、無 internal sig）」與「內部面（buyer-service，有 internal sig）」。server 端本無 `requireAccountType`、純 param-scope 查詢（XML 已 `store_id=#{sellerId} AND buyer_id != #{sellerId}` scope），本層只把 internal 判定從明文改成驗簽、並加 `storeId/buyerId>0` 校驗，**行為不變**。維持單一 RPC 雙軌是預期設計，不拆兩支。gateway seller CRM 路徑的 IDOR 回歸以 `gateway/internal/handler/seller_crm_idor_test.go` 兜底。
+**`getBuyerOrdersForSeller` 雙軌授權**：此 RPC 同時接受「使用者面（gateway，帶 seller 身分 + gateway-resolved storeId、無 internal sig）」與「內部面（單體，有 internal sig）」。server 端本無 `requireAccountType`、純 param-scope 查詢（XML 已 `store_id=#{sellerId} AND buyer_id != #{sellerId}` scope），本層只把 internal 判定從明文改成驗簽、並加 `storeId/buyerId>0` 校驗，**行為不變**。維持單一 RPC 雙軌是預期設計，不拆兩支。gateway seller CRM 路徑的 IDOR 回歸以 `gateway/internal/handler/seller_crm_idor_test.go` 兜底。
 
 ---
 

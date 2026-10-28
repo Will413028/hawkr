@@ -258,9 +258,9 @@ L2 的 carrier event **仍然是商家轉述的**（我方沒有與 carrier 的�
 判準是「誰讀它」：profile 的消費者是①建單（`createShipmentFromOrder`）②費率計算
 ③結帳可用性驗證（`hasAnyEnabledConfig` 的 3005 等價物）④服務區／時段（67 讀）——
 **全部在 shipping-service 內或以 shipping-service 為 gRPC 對端**。
-seller-service 持有的是帳號與店面身分，不持有配送能力。
-⚠️ 🔴 **畫面歸屬 ≠ 資料歸屬**：profile 的**編輯畫面**在賣家後台、與 seller-service 的其他設定並列（65A），
-但資料的 owner 仍是 shipping-service——**不得因為畫面在哪就把表建到 seller-service**。
+單體 seller 模組持有的是店面身分，不持有配送能力。
+⚠️ 🔴 **畫面歸屬 ≠ 資料歸屬**：profile 的**編輯畫面**在賣家後台、與 seller 的其他設定並列（65A），
+但資料的 owner 仍是 shipping-service——**不得因為畫面在哪就把表建到 seller 模組**。
 
 **③ 失聯回查的觸發條件與間隔見 §0.2。**
 

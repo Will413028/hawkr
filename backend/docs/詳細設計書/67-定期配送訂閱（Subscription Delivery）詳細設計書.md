@@ -313,8 +313,8 @@ hold 釋放（由 R-S2／R-S4／取消路徑在同一交易內釋放，非掃描
 | UI 名詞 | Domain | 既有表 | 處置 |
 |---|---|---|---|
 | **定期配送** | `recurring_purchase` | **不存在** | 本書全部新建 |
-| 關注店家 | seller follow | `seller_subscriptions`（buyer-service，`buyer_id`＋`store_id` UNIQUE，bigserial PK） | 🔴 **完全保留**：ID／API／資料不動；只做前端文案與 route 導覽調整（需求書 §20.21 逐字） |
-| 補貨通知 | restock | `restock_subscription`（buyer-service，含 `RestockSubscriptionStatus` 9501/9502/9503） | 🔴 **維持獨立**，不合併 |
+| 關注店家 | seller follow | `buyer.seller_subscriptions`（單體 buyer 模組，`buyer_id`＋`store_id` UNIQUE，bigserial PK） | 🔴 **完全保留**：ID／API／資料不動；只做前端文案與 route 導覽調整（需求書 §20.21 逐字） |
+| 補貨通知 | restock | `buyer.restock_subscriptions`（單體 buyer 模組，含 `RestockSubscriptionStatus` 9501/9502/9503） | 🔴 **維持獨立**，不合併 |
 
 🔴 **不得沿用既有 seller subscription／restock subscription 表與 API**（§20 前言逐字）。
 新 route 為 `/account/recurring-deliveries`（Web）與對應 App route，**不沿用「我的訂閱」商家列表**。
@@ -1436,7 +1436,7 @@ CREATE UNIQUE INDEX uq_rmc_active ON recurring_mandate_consent (contract_id)
   🔴 **不得手寫 migration 繞過 checksum**。
 - **新增能由既有欄位推導的欄位時**，同一個 migration 檔內緊接回填 `UPDATE`（repo §11.2 教訓：
   `ADD COLUMN ... DEFAULT 'x'` 會把**每一列**都填成 `x`，不變式從第一天就破）。
-- 🔴 **不重用 buyer-service 的 `seller_subscriptions`／`restock_subscription`**（§2.5）。
+- 🔴 **不重用單體 buyer 模組的 `seller_subscriptions`／`restock_subscriptions`**（§2.5）。
 
 ### 5.5 不變式清單
 

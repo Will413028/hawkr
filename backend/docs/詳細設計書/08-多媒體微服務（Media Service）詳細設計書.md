@@ -1232,7 +1232,7 @@ message FinalizeImportAssetResponse {
 
 ```
 1. 取 import_asset FOR UPDATE
-2. 校驗擁有者：`import_asset.store_id` 與 request `store_id` 相同即放行（快路徑）；不同時各自經 seller-service `resolvePrincipals` 解析回登入 principal 再比對（賣家在 job 存活期內刪店重開會換 store_id，直接相等比對會誤判越權；解析失敗 fail-closed）。判定不通過 → NOT_FOUND（防枚舉，回應與「import_asset 不存在」一致，API 設計規範 §14.1）
+2. 校驗擁有者：`import_asset.store_id` 與 request `store_id` 相同即放行（快路徑）；不同時各自經單體 seller 模組的 `resolvePrincipals` 解析回登入 principal 再比對（賣家在 job 存活期內刪店重開會換 store_id，直接相等比對會誤判越權；解析失敗 fail-closed）。判定不通過 → NOT_FOUND（防枚舉，回應與「import_asset 不存在」一致，API 設計規範 §14.1）
 3. 校驗 status:
    FINALIZED → 重入語意，直接回 finalized_asset_id（idempotent）
    非 UPLOADED → INVALID_ARGUMENT（"import_asset 尚未下載完成或已失敗"）

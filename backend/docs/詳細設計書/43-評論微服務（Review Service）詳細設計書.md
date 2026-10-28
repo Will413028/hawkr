@@ -28,16 +28,15 @@ review-service 是訂單商品評論的專責微服務，負責「買家對已�
 | 上游（呼叫 review） | social-service | `HideReview`（B-135 內容審核） | gRPC（`x-internal-service`） |
 | 下游（review 呼叫） | order-service | `GetOrderForReview`：訂單資格 + 商品項目 + 權威 product_id | gRPC `ORDER_SERVICE_ADDR` |
 | 下游（review 呼叫） | media-service | `FinalizeAndLink`：評論圖片 staged → permanent + asset_reference | gRPC（`x-internal-service`） |
-| 下游（review 呼叫） | buyer-service | `BatchGetBuyerDisplay`：批量取買家顯示名 / 頭像（已註銷者回墓碑，#2830） | gRPC `BUYER_SERVICE_*` |
+| 下游（review 呼叫） | 單體 buyer 模組（legacy gRPC） | `BatchGetBuyerDisplay`：批量取買家顯示名 / 頭像（已註銷者回墓碑，#2830） | gRPC `BUYER_SERVICE_*` |
 | 下游（review 呼叫） | hawkr-website | `/api/revalidate`：SSR cache bust（product / seller tag） | HTTP（`go-pkg/revalidate`） |
 | 事件消費者 | order-service | `review.created` → markReviewed + `orders.review` 快照 | MQ |
-| 事件消費者 | seller-service | `review.created` / `review.hidden` → 賣家 rating 聚合 | MQ |
 | 事件消費者 | product-service | `review.created` / `review.hidden` → 商品 rating / review_count 聚合（#1156） | MQ |
 
 ### 1.3 非職責範圍
 
 - **不負責**商品本身的 rating / review_count 持久化 → 由 product-service 消費 `review.created` / `review.hidden` 自行落地
-- **不負責**賣家 rating 聚合持久化 → 由 seller-service 消費事件落地
+- **不負責**賣家 rating 的彙總與顯示 → 店家頁與推薦排行向 review 讀取（評分不存在 seller 模組）
 - **不負責**訂單 `is_reviewed` 旗標與 `order_items.review` 快照 → 由 order-service 消費事件落地
 - **不負責**評論圖片儲存 → 委派 media-service（review 只持有最終 objectKey 快照，49 號設計書）
 - **不提供**買家評論本體的「修改 / 刪除」對外 RPC（買家評論不可變；`deleted_at` 為內部軟刪除欄位，目前無對外刪除入口）。賣家回覆（reply）為例外：屬賣家對自己內容的官方回覆，**可編輯覆蓋**，但**不提供刪除回覆**（#1174）
@@ -60,11 +59,10 @@ flowchart TB
     Social[social-service]
     Order[order-service]
     Media[media-service]
-    BuyerSvc[buyer-service]
+    BuyerSvc[單體 buyer 模組]
     Web[hawkr-website]
     MQ{{hawkr.review<br/>Topic Exchange}}
     OrderC[order-service consumer]
-    SellerC[seller-service consumer]
     ProductC[product-service consumer]
 
     Buyer -->|JWT REST| GW
@@ -80,7 +78,6 @@ flowchart TB
     UC --> Pub
     Pub -->|review.created / review.hidden| MQ
     MQ --> OrderC
-    MQ --> SellerC
     MQ --> ProductC
 ```
 
@@ -140,7 +137,7 @@ stateDiagram-v2
 
 ### 2.1a 作者顯示名的三種狀態
 
-`order_item_reviews` **沒有名字快照欄**，作者名一律即時向 buyer-service 解析。
+`order_item_reviews` **沒有名字快照欄**，作者名一律即時向單體 buyer 模組解析。
 買家註銷後仍必須顯示得出來 —— 這是 #2830 的核心。三種狀態必須分得開：
 
 | 狀態 | `user_name` | `user_deleted` | 公開列表顯示 |
@@ -231,7 +228,7 @@ stateDiagram-v2
 
 **範圍邊界（明訂不做）**：
 
-- **不發 MQ event**：reply 不改 rating / review_count / 可見集合，既有 consumer（order `markReviewed`、seller / product rating 聚合）都不需要它。
+- **不發 MQ event**：reply 不改 rating / review_count / 可見集合，既有 consumer（order `markReviewed`、product rating 聚合）都不需要它。
 - **不觸發 revalidate**：賣家回覆不改任何聚合，**不** bust product / seller tag。（對照：`SubmitItemReview` 與 `HideReview` 改聚合，兩者都 bust。）
 - **不發買家通知**：買家主動瀏覽時看到回覆。
 - **order-service `orders.review` JSONB 快照不含 reply**：該快照屬 order-service 範疇。
@@ -355,7 +352,7 @@ message OrderReviewInfo {
 |--------|-----|------|---------|
 | order（`ORDER_SERVICE_ADDR`，預設 `order-service:9915`） | `GetOrderForReview` | 訂單資格 + 商品項目 + 權威 product_id + 快照 | → `ErrOrderNotFound`，評論失敗 |
 | media（`MEDIA_SERVICE_HOST:GRPC_PORT`，預設 `media-service:9937`） | `FinalizeAndLink`（`x-internal-service`） | 圖片永久化 | 失敗 → 評論失敗 |
-| buyer（`BUYER_SERVICE_HOST:GRPC_PORT`，預設 `buyer-service:9943`） | `BatchGetBuyerDisplay` | 買家顯示名 / 頭像 | best-effort，失敗只記 log，欄位留空；**已註銷買家回墓碑字串而非查不到**（#2830） |
+| buyer（`BUYER_SERVICE_HOST:GRPC_PORT`，預設 `127.0.0.1:9941`，指向單體的 legacy gRPC） | `BatchGetBuyerDisplay` | 買家顯示名 / 頭像 | best-effort，失敗只記 log，欄位留空；**已註銷買家回墓碑字串而非查不到**（#2830） |
 
 ### 4.4 MQ 發布事件
 
@@ -485,7 +482,6 @@ flowchart TD
 | Consumer | Queue | 行為 | 冪等 |
 |----------|-------|------|------|
 | order-service `ReviewEventConsumer.onReviewCreated` | `order.review.created` | markReviewed + `orders.review` 快照（most-recent-wins） | 天然冪等；❌ 無 DLQ |
-| seller-service `review_rating_consumer` | `seller.review.created` / `seller.review.hidden` | 賣家 rating full-recompute 覆寫 | 攜權威重算值，無需 dedup |
 | product-service `ReviewStatsConsumer` | （`product.review.stats` + `.dlq`） | 商品 rating / review_count full-recompute（#1156） | full-recompute，✅ 有 DLQ |
 
 ### 6.1 業務冪等保證
@@ -505,9 +501,9 @@ sequenceDiagram
     participant R as review-service
     participant O as order-service
     participant M as media-service
-    participant BU as buyer-service
+    participant BU as 單體 buyer 模組
     participant MQ as hawkr.review
-    participant DS as order/seller/product consumer
+    participant DS as order/product consumer
 
     B->>GW: POST /app/reviews
     GW->>R: SubmitOrderReview(buyer_id 注入)
@@ -535,7 +531,7 @@ sequenceDiagram
     participant V as 訪客
     participant GW as Gateway
     participant R as review-service
-    participant BU as buyer-service
+    participant BU as 單體 buyer 模組
 
     V->>GW: GET /public/sellers/{id}/reviews
     GW->>R: GetSellerOrderReviews(sellerAccountId)
@@ -556,7 +552,7 @@ sequenceDiagram
     participant S as social-service
     participant R as review-service
     participant MQ as hawkr.review
-    participant DS as seller/product consumer
+    participant DS as product consumer
 
     A->>S: AdminResolveReport(HIDE_TARGET, REVIEW)
     S->>R: HideReview(reviewId, reason) [internal]
@@ -606,7 +602,7 @@ sequenceDiagram
 
 ### 8.2 跨服務一致性策略
 
-- review → order/seller/product 的聚合同步**完全經 MQ event**，最終一致
+- review → order/product 的聚合同步**完全經 MQ event**，最終一致
 - review-service 不持有下游聚合的真實來源，僅在 event payload 攜帶**重算後的權威值**（full-recompute），下游覆寫
 - 「查詢聚合失敗則不發 event」保證不以 0 污染下游（#1156）
 
@@ -649,7 +645,7 @@ sequenceDiagram
 | `GRPC_PORT` / `HTTP_PORT` | 10033 / 10032 | 監聽埠 |
 | `ORDER_SERVICE_ADDR` | `order-service:9915` | order client |
 | `MEDIA_SERVICE_HOST` / `MEDIA_SERVICE_GRPC_PORT` | `media-service` / `9937` | media client |
-| `BUYER_SERVICE_HOST` / `BUYER_SERVICE_GRPC_PORT` | `buyer-service` / `9943` | buyer client |
+| `BUYER_SERVICE_HOST` / `BUYER_SERVICE_GRPC_PORT` | `127.0.0.1` / `9941` | buyer client（單體的 legacy gRPC） |
 | `MEDIA_BASE_URL` | `""` | 評論圖 URL 前綴（原 `CDN_BASE_URL`；經 `pkg/mediaurl.BuildURL` 組出 Image Gateway URL，49 號設計書 §8.5） |
 | `WEB_REVALIDATE_BASE_URL` / `WEB_REVALIDATE_SECRET` | `""` | SSR cache bust |
 | `RABBITMQ_URL` | `amqp://guest:guest@localhost:5672/` | MQ |

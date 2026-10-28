@@ -150,7 +150,7 @@ order-service/
 
 購物車頁面每次勾選/取消/數量變更時呼叫。不產生 checkout_id、不檢查庫存。回傳可用配送方式 Grid 與**預設運費（本島→本島基準）**。
 
-> **自買防護（short-circuit，業務規則）**：在輕量驗證最前段執行。任一 item 的賣家 store 經 `SellerService.resolvePrincipals` 解析出的登入 principal == `buyerId` → 整個 validate 失敗，回 `code=4015`（`SELF_PURCHASE_NOT_ALLOWED`）+ `message`「不可購買自己上架的商品」+ 空 `data`。**不**進入 `errors` 陣列（與其他 cross-cutting 錯誤分離），與 cart-service `AddItem` 端 `6006` 互為早晚兩道防線。詳見 §4.1 步驟 3。
+> **自買防護（short-circuit，業務規則）**：在輕量驗證最前段執行。任一 item 的賣家 store 經單體 seller 模組的 `ResolvePrincipals` 解析出的登入 principal == `buyerId` → 整個 validate 失敗，回 `code=4015`（`SELF_PURCHASE_NOT_ALLOWED`）+ `message`「不可購買自己上架的商品」+ 空 `data`。**不**進入 `errors` 陣列（與其他 cross-cutting 錯誤分離），與 cart-service `AddItem` 端 `6006` 互為早晚兩道防線。詳見 §4.1 步驟 3。
 
 ```protobuf
 message CheckoutValidateRequest {
@@ -548,7 +548,7 @@ message CheckoutPriceChangedDetail {
    → 取得 shipping_method[], store_id, status, price
    → 重量/單位轉換（空值防護：weight="0"/unit="" 時跳過）
    → 異常 → valid=false + INVALID_ITEM
-3. **自買防護（short-circuit）**：任一 item 的賣家 store principal（`SellerService.resolvePrincipals`）== `buyerId`
+3. **自買防護（short-circuit）**：任一 item 的賣家 store principal（單體 seller 模組的 `ResolvePrincipals`）== `buyerId`
    → 拋 OrderBusinessException(SELF_PURCHASE_NOT_ALLOWED)（4015）
    → 不進入後續驗證，不填 errors / unavailable_items
    → **設計取捨**：自買防護先於 unavailable 短路。Phase 1 接受「修自買後才看到 unavailable」兩階段 UX，不擴大 self-purchase 重構 scope

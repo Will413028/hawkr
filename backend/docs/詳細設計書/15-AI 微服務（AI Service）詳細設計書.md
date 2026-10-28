@@ -40,7 +40,7 @@
 | **Goal** | 「決定放行」的路徑一律 fail-closed，「只做顯示」的路徑維持寬鬆——同一份資料兩種嚴格度，這是設計而非不一致 |
 | **Goal** | 採購子系統保有「整包抽離成獨立服務」的退路：獨立 package、獨立 schema 檔、獨立 sqlc entry、獨立連線池，與既有 AI 表**零外鍵** |
 | **Non-Goal** | **不**做採購助手的產品邏輯與 domain 規則——本服務是宿主，產品行為歸 55 號、runtime 契約歸 57 號 |
-| **Non-Goal** | **不**自行解析登入 `account_id`。解析在 Gateway 完成，服務端只收已解析的代理鍵；原先由本服務 callback seller-service／buyer-service 自解的做法已整包刪除，不再恢復 |
+| **Non-Goal** | **不**自行解析登入 `account_id`。解析在 Gateway 完成，服務端只收已解析的代理鍵；本服務不 callback 單體 seller／buyer 模組解析登入身分 |
 | **Non-Goal** | **不**替換 ADK 的 session service。第三方套件的建構簽名只接受 `gorm.Dialector`，四張 session 表的讀寫全在套件內部；自製 pgx 版是獨立專案量級，「移除 gorm」不是可達終點 |
 | **Non-Goal** | **不**對外提供業務 HTTP 端點。HTTP port 只剩 `/health` 與 `/metrics`，且**刻意不留 HTTP fallback**——留了會讓 gRPC 的問題被舊路徑掩蓋 |
 | **Non-Goal** | **不**建 retry scheduler 或 DLQ 來處理 provider 失敗。**provider 呼叫**一律只做最多一次的同步重試，**但「重試哪一類失敗」逐個外部呼叫各自決定，不是同一組條件套在兩處**——影像模型只重試模型的非決定性拒絕，抽取 provider 只重試基礎設施性失敗，兩者條件恰好相反（逐條見 §7.3）。共同的判準只有一句：重送不會變好的失敗一律不重試。範圍限定在 provider 呼叫：分類索引的啟動 warm-up 是**登記過的例外**，它會重試數次（§7.3、§9.3） |
@@ -83,7 +83,7 @@ flowchart LR
   AI -->|HTTPS| ALT["DeepSeek / OpenRouter<br/>抽取 provider，三者擇一"]
   AI -->|gRPC| ORD["order-service"]
   AI -->|gRPC| PRD["product-service<br/>（商品 + 分類）"]
-  AI -->|gRPC| SLR["seller-service"]
+  AI -->|gRPC| SLR["單體 seller 模組"]
   AI -->|gRPC| MED["media-service"]
   AI -->|gRPC| PBK["pricebook-service"]
   AI --> DB[("PostgreSQL<br/>hawkr_ai")]
@@ -164,7 +164,7 @@ flowchart LR
 上面兩條規則各有一個例外。**例外必須登記在這裡**——把反例登記起來，規則才維持絕對；靠放寬規則來容納反例，這一節就沒有價值了。
 
 1. **Agent 回答配額以 `account` 為軸**，是「業務表不以 `account_id` 為鍵」的例外。定義與實作歸 **57 號**，本文件不重述，只在此標明它是例外而非漂移。
-2. **商品推薦路徑上的賣家中繼資料帶有 `account_id`**，是「`account_id` 不進入本服務的業務路徑」的例外。seller-service 在批次查賣家中繼資料時回的是賣家的**登入身分**，該欄位因此刻意保留 `AccountID` 型別、不跟著同一個 map 的 key（store 代理鍵）改成 `StoreID`——型別化的價值在於區分，不在於統一。它是**展示用的資料，不是身分判定的輸入**：推薦結果的擁有權與可見性一律由 `store_id` 決定（推薦 DTO 只取賣家名稱與 logo）。
+2. **商品推薦路徑上的賣家中繼資料帶有 `account_id`**，是「`account_id` 不進入本服務的業務路徑」的例外。單體 seller 模組在批次查賣家中繼資料時回的是賣家的**登入身分**，該欄位因此刻意保留 `AccountID` 型別、不跟著同一個 map 的 key（store 代理鍵）改成 `StoreID`——型別化的價值在於區分，不在於統一。它是**展示用的資料，不是身分判定的輸入**：推薦結果的擁有權與可見性一律由 `store_id` 決定（推薦 DTO 只取賣家名稱與 logo）。
 
 ---
 
@@ -952,7 +952,7 @@ log 欄位的那種自由文字**。⇒ 替任何出站呼叫接上憑證之前�
 1. 抽取 provider 的憑證在 k8s 宣告上是 optional，而被選中的那個 provider 在 application 層對空憑證 fail fast。把關留在 application 層，不交給 k8s 決定（§8.5）。
 2. base values 已把抽取 provider 切成一個**需要人工建立憑證**的選項，而 code 層的 fallback 仍是另一個。這代表**部署前必須先確認叢集裡有那把憑證**，否則保證起不來——values 檔自己就寫了這句警告。
 
-**部署設定注入了服務端沒有欄位讀的變數**（都不是隱藏依賴，是既有 chart 的形狀），其中包含 §10 D4 把 callback 整包刪掉之後遺留的 buyer-service 位址。
+**部署設定注入了服務端沒有欄位讀的變數**（都不是隱藏依賴，是既有 chart 的形狀）。
 
 🔴 **這裡刻意不列完整清單**：手抄的清單在落筆當天就會漏。**清單一律以 config struct 對 values 的 diff 為準**：拿 `k8s/values/ai-service.yaml` 的 `config` ＋ `secretRef` 全部鍵名，減去 `services/ai-service` 與 `pkg` 裡實際出現的環境變數名，差集就是它。清理時大多是純刪除；牽涉 port 的那種必須連著 probe 與 Service 一起看，不能只刪一行。
 

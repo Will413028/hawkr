@@ -60,8 +60,8 @@ CRM Service 負責管理「賣家 → 買家」之間的 CRM 關係，採**多�
 | `customer_type` | VARCHAR(20) DEFAULT 'normal' | `normal` / `vip` / `blocklist` |
 | `total_spent` | BIGINT DEFAULT 0 | 累計消費金額（台幣，整數元） |
 | `order_count` | INT DEFAULT 0 | 累計訂單數 |
-| `nickname` | VARCHAR(100) DEFAULT '' | 快取自 buyer-service（搜尋用） |
-| `phone` | VARCHAR(20) DEFAULT '' | 快取自 buyer-service（搜尋用） |
+| `nickname` | VARCHAR(100) DEFAULT '' | 快取自單體 buyer 模組（搜尋用） |
+| `phone` | VARCHAR(20) DEFAULT '' | 快取自單體 buyer 模組（搜尋用） |
 | `created_at` | TIMESTAMPTZ DEFAULT NOW() | |
 | `updated_at` | TIMESTAMPTZ DEFAULT NOW() | |
 
@@ -157,7 +157,7 @@ INDEX idx_crm_customer_tags_tag (tag_id)
 | `GET` | `/api/v1/app/sellers/me/customers` | 取得客戶列表（分頁、篩選、排序） |
 | `GET` | `/api/v1/app/sellers/me/customers/:buyerId` | 取得單一客戶詳情（含標籤） |
 | `PATCH` | `/api/v1/app/sellers/me/customers/:buyerId` | 更新客戶分類（VIP / 黑名單） |
-| `GET` | `/api/v1/app/sellers/me/customers/:buyerId/meta` | 查詢買家基本資訊（不限 CRM 客戶，透過 buyer-service） |
+| `GET` | `/api/v1/app/sellers/me/customers/:buyerId/meta` | 查詢買家基本資訊（不限 CRM 客戶，透過單體 buyer 模組） |
 
 > URL 路徑參數統一使用 `:buyerId`，不使用 `:customerId`。收到的值就是 `buyers.buyer_id`（per-stint PK，永不等於 account_id），Gateway 不做任何解析，直接透傳給 crm-service（見 §4.2「客戶識別碼是 buyerId」）。
 
@@ -263,14 +263,14 @@ message CrmCustomer {
     string customer_type = 4;       // "normal" / "vip" / "blocklist"
     string total_spent = 6;
     string order_count = 7;
-    string nickname = 11;           // 即時從 buyer-service BatchGetBuyerMeta enrichment
-    string avatar_key = 12;         // 即時從 buyer-service BatchGetBuyerMeta enrichment（objectKey，非 URL）
+    string nickname = 11;           // 即時從單體 buyer 模組 BatchGetBuyerMeta enrichment
+    string avatar_key = 12;         // 即時從單體 buyer 模組 BatchGetBuyerMeta enrichment（objectKey，非 URL）
     repeated Tag tags = 13;
     string coupon_count = 17;       // 從 coupon-service enrichment
 }
 ```
 
-> **Enrichment 機制**：CRM 本地 DB 僅快取 nickname/phone 供搜尋用。`ListCustomers` 時批量呼叫 buyer-service `BatchGetBuyerMeta` 取得最新的 nickname + 頭像 objectKey。Avatar 不存在 CRM DB 中，每次查詢即時取得。
+> **Enrichment 機制**：CRM 本地 DB 僅快取 nickname/phone 供搜尋用。`ListCustomers` 時批量呼叫單體 buyer 模組的 `BatchGetBuyerMeta` 取得最新的 nickname + 頭像 objectKey。Avatar 不存在 CRM DB 中，每次查詢即時取得。
 >
 > **頭像欄位契約（49 §6.1／§6.6 S9）**：crm-service 只透傳 objectKey（`avatar_key`），**URL 一律由 Gateway 在對外回應層組**，顧客列表與詳情都以 `avatarKey` + `avatarUrl` 成對輸出（`http` 開頭的外部頭像由 `mediaurl.BuildURL` passthrough）。兩支端點的 wire shape 由 gateway golden test（`seller_customer_list_success` / `seller_customer_detail_success`）鎖定。
 >
@@ -278,7 +278,7 @@ message CrmCustomer {
 >
 > ⚠️ **客戶識別碼是 `buyerId`**——`id` 是 crm row 主鍵、`storeId` 是賣家自己的 store surrogate，前端拿這兩個當客戶 ID 都會指向別的對象且無任何錯誤訊號。`buyerId` 的值是 `buyers.buyer_id`（per-stint PK，永不等於 `account_id`），可直接回頭打 `/customers/{buyerId}` 系列端點。
 >
-> `{buyerId}/meta` 的識別碼欄位對外叫 `buyerId`（**不是 `storeId`**）。⚠️ 它的值取自 buyer-service `BatchGetBuyerMetaByBuyerIDs` 的 `BuyerMeta.account_id`——**那個 proto 欄位裝的其實是 buyer_id**（沿用 seller-service `GetSellerBatch` 慣例）。proto 的錯名屬 buyer-service，Gateway 負責不讓它滲進對外契約：對外只能是 `buyerId`。
+> `{buyerId}/meta` 的識別碼欄位對外叫 `buyerId`（**不是 `storeId`**）。⚠️ 它的值取自單體 buyer 模組 `BatchGetBuyerMetaByBuyerIDs` 的 `BuyerMeta.account_id`——**那個 proto 欄位裝的其實是 buyer_id**（沿用單體 seller 模組 `GetSellerBatch` 慣例）。proto 的錯名屬 buyer 的 `BatchGetBuyerMetaByBuyerIDs`，Gateway 負責不讓它滲進對外契約：對外只能是 `buyerId`。
 >
 > ⚠️ **前端一律只讀 `buyerId`，不得補 fallback chain**。多層 `??` 在 wire contract 上不是韌性，是把 breaking change 從 fail-fast 降級成 silent-wrong：讀不到就該壞，不該悄悄拿到別人的 ID。
 
@@ -301,7 +301,7 @@ services/crm-service/
 │   │   └── errors.go              # ErrCustomerNotFound, ErrTagNotFound, ...
 │   ├── worker/                    # MQ consumer（order.completed / aftersales.refund.completed）
 │   ├── usecase/
-│   │   ├── crm.go                 # CrmUseCase（客戶、標籤、客戶標籤業務邏輯 + ledger 套用 + buyer-service enrichment）
+│   │   ├── crm.go                 # CrmUseCase（客戶、標籤、客戶標籤業務邏輯 + ledger 套用 + 單體 buyer 模組 enrichment）
 │   │   ├── di.go
 │   │   └── dto/
 │   │       ├── customer_req.go    # ListCustomersReq, UpdateCustomerStatusReq
@@ -457,6 +457,6 @@ CRM 不提供 service-local HTTP `/health`、`/metrics` 或 `/debug/pprof/*`；�
 
 ## 10. 備註
 
-- **Enrichment**：`nickname` / `avatar_key` 由 buyer-service `BatchGetBuyerMeta` 即時取得（是 objectKey，不是 URL），`coupon_count` 由 coupon-service 取得。CRM 本地 DB 的 nickname／phone 只是搜尋用快取。
+- **Enrichment**：`nickname` / `avatar_key` 由單體 buyer 模組的 `BatchGetBuyerMeta` 即時取得（是 objectKey，不是 URL），`coupon_count` 由 coupon-service 取得。CRM 本地 DB 的 nickname／phone 只是搜尋用快取。
 - **客戶統計更新**：由 CRM 自己消費 MQ 事件維護（見 §6.2），Order Service 不呼叫 CRM 推進統計。
 - **`/customers/:buyerId/meta`**：直接查買家基本資訊，**不限該買家是不是這個賣家的 CRM 客戶**（用於優惠券指定買家等場景）。

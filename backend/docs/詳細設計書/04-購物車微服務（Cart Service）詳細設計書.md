@@ -283,11 +283,11 @@ EXECUTE FUNCTION update_updated_at_column();
 - `logoUrl` 欄名沿用舊名，**值為 objectKey**（來源 `SellerMeta.logo_key`，49 號設計書 §6.6：Gateway 端組 URL）。
 - `storeCode` 為完整性判準：`sellers.store_code` 為 NOT NULL，故空值只代表這份快取殘缺（舊 schema / 寫入時上游降級）。讀取端 `hasStoreCode()` 為 false 即視為 Cache Miss 回源自癒，寫入端亦拒絕寫入殘缺條目。
 
-- **TTL**：1 天，作為 **safety net**。一致性主要靠 **event-driven evict**：seller-service 改店名 / logo 成功後 emit `seller.profile.changed`，cart-service consumer 收到即主動 evict `seller:meta:{storeId}`（見下方 **seller.profile.changed consumer**）。TTL 僅兜住 event 遺失 / consumer 停機的殘留（miss 時本就經 gRPC lazy 回填）。🔴 **不得**改成「每次 GetCart 即時打 seller-service」——那會把 seller-service 變成 cart 熱路徑的同步依賴。
+- **TTL**：1 天，作為 **safety net**。一致性主要靠 **event-driven evict**：單體 seller 模組改店名 / logo 成功後發出 `seller.profile.changed`，cart-service consumer 收到即主動 evict `seller:meta:{storeId}`（見下方 **seller.profile.changed consumer**）。TTL 僅兜住 event 遺失 / consumer 停機的殘留（miss 時本就經 gRPC lazy 回填）。🔴 **不得**改成「每次 GetCart 即時打單體 seller 模組」——那會把單體 seller 模組變成 cart 熱路徑的同步依賴。
 
 **seller.profile.changed consumer**
 
-- **來源事件**：seller-service（Go）於 `UpdateProfile` / `UpdateLogo` / `UpdateCover` 成功後 best-effort emit `seller.profile.changed`（exchange `hawkr.seller`，payload `{ event_id, event_type=SELLER_PROFILE_CHANGED, store_id(string), occurred_at }`，見 [36 §3.6f](36-MQ%20與事件總覽（MQ%20%26%20Event%20Catalog）.md)）。
+- **來源事件**：單體 seller 模組在 profile、logo、封面寫入的 transaction 內發出 `StoreProfileChanged`，由 `internal/legacy/sellerrelay` 轉成 `seller.profile.changed`（exchange `hawkr.seller`，payload `{ event_id, event_type=SELLER_PROFILE_CHANGED, store_id(string), occurred_at }`，見 [36 §3.6f](36-MQ%20與事件總覽（MQ%20%26%20Event%20Catalog）.md)）。
 - **消費行為**：`SellerProfileChangedConsumer` → `CartCacheService.evictSellerMeta(storeId)`（`DEL seller:meta:{id}`）。evict（delete key）**天然冪等**，重放同 key 0 副作用 → **不需 dedup 表**。
 - **基礎設施**：cart 新增 `spring-boot-starter-amqp` 依賴（common-core 的 amqp 為 `provided` scope 非傳遞）；`RabbitMqConfig` 宣告 `hawkr.seller` exchange + queue `cart.seller.profile.changed` + binding + cart 自有 DLX `hawkr.cart.dlx` + DLQ `cart.seller.profile.changed.dlq`；listener 用 common-core `manualAckContainerFactory`。
   - ⚠️ **broker 上的資源不由本服務建立**：exchange / queue / binding 的唯一 owner 是 `infra/mq/topology/topology.yaml`（Terraform，經 CI apply），dev/prod 服務端一律 **passive declare**（`SPRING_RABBITMQ_DYNAMIC=false`）。上面那些 `@Bean` 只是意圖宣告，**不會**在全新 RabbitMQ 上自建資源；queue 不存在時該訂閱會**靜默失效**（不 crash、不進 DLQ）。新增或修改 consumer 必須在同一個 PR 補上 topology 條目（Java 側無 CI gate，只能靠 review），見 [MQ Topology 管理（Terraform）](../基礎建設/MQ%20Topology%20管理（Terraform）.md)。
@@ -610,7 +610,7 @@ Cart 業務碼（6001~6099）完整定義詳見 [錯誤碼](../代碼管理%EF%B
 4. **補齊 Seller 資訊（Lazy + Cache-Aside，強制單次批次）**：
    - 收集所有 `store_id`
    - Redis 使用 `MGET`（或 pipeline）批次查詢 `seller:meta:{id}`
-   - 收集 Cache Miss 的 `store_id` 集合，**單次**呼叫 `SellerService.BatchGetSellerMeta(miss_ids)`；**禁止** per-seller RPC
+   - 收集 Cache Miss 的 `store_id` 集合，**單次**呼叫 單體 seller 模組的 `BatchGetSellerMeta(miss_ids)`；**禁止** per-seller RPC
    - Seller service 失敗降級為空值，不得報錯
 5. **批次查詢 SKU 購物車資訊**：呼叫 `ProductGrpcClient.batchGetSkuCartInfo(allSkuIds)` 取得即時 `stock_qty`、`delivery_temps`、`is_active`、`price`、`list_price`，合併至 CartItemView 回傳。
    - **Product Service 失敗（gRPC error / timeout）**：caller 降級回**空 map**（**禁止**把缺失 SKU 偽造成 `is_active=false`、`stock_qty=0`，那會誤導 UX 顯示假 DELISTED / OUT_OF_STOCK；應讓判定鏈走 `skuInfo==null → LOOKUP_FAILED`，含義是「暫時無法確認，請稍後重試」）

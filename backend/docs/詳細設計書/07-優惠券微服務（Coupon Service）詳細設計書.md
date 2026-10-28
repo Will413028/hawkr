@@ -147,7 +147,7 @@ else:
 ```
 switch template.target_type:
   case ALL:
-    buyer_created_at = AccountService.GetAccountInfo(buyer_id).created_at
+    buyer_created_at = identity 模組（legacy gRPC `AccountService.GetAccountInfo`）的 `created_at`
     if buyer_created_at > template.created_at:
         reject TARGET_NOT_ELIGIBLE
   case MEMBER:
@@ -609,7 +609,7 @@ service CouponService {
 | Order Service | `GetBuyerMerchantSummary` | MEMBER target_type 資格判定 |
 | Account Service | `GetAccountInfo` | ALL target_type 資格判定（取 `created_at`） |
 | Account Service | `GetAccountInfoBatch` | DESIGNATED/COMPENSATION 詳情帳號名稱 + 電話聚合 |
-| Seller Service | `BatchGetSellerMeta` | 列表 / 詳情聚合賣家頭像 + 店名（`TemplateInfo.seller_avatar_url` / `InstanceInfo.seller_avatar_url` 來源；上游 seller-service 已組好完整 CDN URL，mapper 直接透傳） |
+| Seller Service | `BatchGetSellerMeta` | 列表 / 詳情聚合賣家頭像 + 店名（`TemplateInfo.seller_avatar_url` / `InstanceInfo.seller_avatar_url` 來源；單體 seller 模組已組好完整 CDN URL，mapper 直接透傳） |
 
 ### 4.3 gRPC 錯誤處理規範
 
@@ -1203,7 +1203,7 @@ WHERE ta.template_id = :template_id
 
 ### 5.19 買家刪除自動作廢 UNUSED Coupon（BuyerDeletedConsumer）
 
-觸發源：buyer-service 在**買家角色自身**的 DELETE transition 發布的 `buyer.deleted` 事件（`pkg/mq/events.go` `BuyerDeletedEvent`）。
+觸發源：單體 buyer 模組在**買家角色自身**關閉時發出的 `BuyerDeleted` 事件，由 `internal/legacy/buyerrelay` 轉成 `buyer.deleted` 發到 RabbitMQ（`pkg/mq/events.go` `BuyerDeletedEvent`）。
 
 🔴 **必須綁 `buyer.deleted`，不得改綁 `account.deleted`**：後者只在帳號「最後一個」active role 被移除時才發 ⇒ 買家角色單獨關閉、而帳號因其他角色（例如同一人也是賣家）而存活時事件不會發出，該買家的 UNUSED 券不會被作廢，並在買家重新註冊後原樣冒回來。`buyer.deleted` 在買家角色關閉時**無條件**發出，與帳號是否存活無關。
 
@@ -1228,7 +1228,7 @@ WHERE ta.template_id = :template_id
 ```mermaid
 sequenceDiagram
     autonumber
-    participant BS as buyer-service<br/>BuyerDeletedOutboxWorker
+    participant BS as 單體 buyer 模組<br/>buyerrelay
     participant MQ as RabbitMQ<br/>hawkr.buyer
     participant CS as coupon-service<br/>BuyerDeletedConsumer
     participant DB as coupon DB
@@ -1257,18 +1257,18 @@ sequenceDiagram
 | 失敗策略 | DB 錯誤 → 拋出 → `MqErrorHandler` 走 retry / DLQ 流程；DLQ 累積由 ops 監控 |
 | 稽核 | **僅在 `affected > 0` 時**寫一筆 `coupon_redemption_logs` 彙總紀錄（`action=ANNUL`、`instance_id=0`、`template_id=0`），`detail` 含 affected 數量與來源（`buyer.deleted batch void N instances by buyerId=…`）。affected = 0 不寫，避免重放灌爆稽核表 |
 
-**Producer 端**：coupon-service 不被任何人直接呼叫。產製鏈（**outbox 必達**，非 fire-and-forget）：
+**Producer 端**：coupon-service 不被任何人直接呼叫。產製鏈（**必達**，非 fire-and-forget）：
 
 ```
-buyer-service.DeleteBuyerAccount / CompletePendingDeletion
-  → 關閉交易內 INSERT buyer_deleted_outbox（buyerId 於此刻快照）
-    → BuyerDeletedOutboxWorker 輪詢發布 buyer.deleted（失敗指數退避重試）
+accountdeletion 呼叫 buyer.CloseForDeletion（與刪除帳號同一個 transaction）
+  → 同一個 transaction 內發出 BuyerDeleted 模組事件並排入 legacy.buyer_deleted job（buyerId 於此刻快照）
+    → internal/legacy/buyerrelay 的 job 發布 buyer.deleted 到 hawkr.buyer（River 失敗退避重試）
       → coupon-service.BuyerDeletedConsumer
 ```
 
-> `buyerId` 在**關閉交易當下快照**進 outbox row，而不是消費時再回查「當前 buyer」——後者會與買家重新開業競態，把新 stint 的券一起作廢。
+> `buyerId` 在**關閉交易當下快照**進 job 參數，而不是消費時再回查「當前 buyer」——後者會與買家重新開業競態，把新 stint 的券一起作廢。
 
-**送達保證**：producer 側 outbox ＋ consumer 側 DLQ/retry 已構成送達保證，coupon 端**不得**再加 application-level reconciliation（[後端服務責任邊界規範](../開發規範/後端服務責任邊界規範.md)）。coupon 作廢失敗**不阻擋**買家角色關閉——買家此時已失去 token，無法再使用 coupon。`buyer.deleted` 另有 im / notification / social 三個 consumer。
+**送達保證**：producer 側 River job（與關閉同一個 transaction 排入）＋ consumer 側 DLQ/retry 已構成送達保證，coupon 端**不得**再加 application-level reconciliation（[後端服務責任邊界規範](../開發規範/後端服務責任邊界規範.md)）。coupon 作廢失敗**不阻擋**買家角色關閉——買家此時已失去 token，無法再使用 coupon。`buyer.deleted` 另有 im / notification / social 三個 consumer。
 
 ---
 
@@ -1293,7 +1293,7 @@ buyer-service.DeleteBuyerAccount / CompletePendingDeletion
 |------|---------|------|------|
 | `suspensionId` | `suspensionId` | ✅ | TSID，string 序列化 |
 | `accountId` | `accountId` | ✅ | 賣家登入 `account_id`（**本節不以此為操作鍵**） |
-| `storeId` | **`store_id`** | ✅ | 停權當下由 seller-service 快照的 store surrogate；**本節模板停用／還原的實際操作鍵** |
+| `storeId` | **`store_id`** | ✅ | 停權當下由單體 seller 模組快照的 store surrogate；**本節模板停用／還原的實際操作鍵** |
 | `reasonCode` | `reasonCode` | — | CodeMeta `SellerSuspensionReason` 的 Value（數字碼）；coupon 端僅記錄不分流 |
 
 > **`store_id` 是唯一的 snake_case key，且刻意必填**：其餘欄位沿用較早期的 camelCase，`store_id` 隨後續事件慣例採 snake_case——因為本 record 是手動解析、沒有 struct-wide casing 一致性需要維護。三個必填欄位任一缺失 → `fromJson` 回 `null` → consumer 記 WARN + ACK 丟棄。這是**刻意的 fail-closed**：與其在事件缺 `store_id` 時誤用 0 值去比對 `issuer_store_id`（會掃到錯誤的賣家），不如丟棄訊息。

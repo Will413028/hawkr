@@ -163,7 +163,7 @@ CONSTRAINT uq_outbox_aggregate_route UNIQUE (aggregate_id, exchange, topic)
 | `PAYMENT_UOP` | `payuni.events` | `payuni.payment.uop` | 付款結果通知 |
 | `SHIPPING_STATUS` | `payuni.events` | `payuni.shipping.status` | 物流貨態通知 |
 | `SHIPPING_PRINT` | `payuni.events` | `payuni.shipping.status` | 超商列印通知（與 STATUS 共用 routing key，下游按 ApiType 分流）。下游 Shipping Service 消費後 transition `shipments.label_print_status` 為 `SUCCEEDED`（4103）並回填 `partner_id / odno / validation_no`，詳見 06-Shipping §2.4 / §5.6 |
-| `AGENT_NOTIFY` | `seller.events` | `seller.review.result` | 代理商通知。含 MerStatus 時單通道發此路由，由 seller-service 消費；無 MerStatus 則不發任何 route |
+| `AGENT_NOTIFY` | `seller.events` | `seller.review.result` | 代理商通知。含 MerStatus 時單通道發此路由，由單體 seller 模組消費；無 MerStatus 則不發任何 route |
 | `REFUND_NOTIFY` | `payuni.events` | `payuni.refund.notify` | ATM 退款轉匯結果 |
 | `REFUND_ACCEPTED` | `payuni.events` | `payuni.refund.accepted` | 退款受理通知 |
 | `UNKNOWN` | — | — | 無法辨識的 PayUni Webhook，僅寫入 inbox 稽核，不投遞 MQ |
@@ -673,7 +673,7 @@ inbox 可能永久停在 `RECEIVED` / `FAILED`，事件無法投遞。
 | `payuni.refund.notify` | `payuni.events` | PayUni 退款 async webhook | payment-service 推進 refund state |
 | `payuni.refund.accepted` | `payuni.events` | PayUni 退款 sync 受理 | payment-service 寫入 estimated_refund_date |
 | `payuni.unknown.fallback` | `payuni.events` | 無法分類的 webhook | payment-service + aftersales-service 保守 stamp |
-| `seller.review.result` | `seller.events` | 商家審核結果（AGENT_NOTIFY 唯一投遞通道） | seller-service 商家狀態變更 |
+| `seller.review.result` | `seller.events` | 商家審核結果（AGENT_NOTIFY 唯一投遞通道） | 單體 seller 模組商家狀態變更 |
 | `uber.shipping.status` | `payuni.events` | Uber Direct 貨態通知（66 號） | shipping-service，queue `shipping.uber.webhook` |
 
 > **AGENT_NOTIFY 單通道**：含 `MerStatus` 欄位時寫入 `seller.events / seller.review.result` 供 Seller Service 消費；**沒有 `payuni.events / payuni.agent.notify` 這條路由**。無 `MerStatus` 時不發任何 route。
@@ -797,7 +797,7 @@ FAILED(2) ─超過上限─→ DEAD(3)
 
 ### **8. 下游 Consumer 實作**
 
-> 下游 Consumer（payment-service / shipping-service / aftersales-service / seller-service）的消費配置、處理流程、Handler 介面、Idempotency 機制，屬於各下游服務的設計範圍：
+> 下游 Consumer（payment-service / shipping-service / aftersales-service / 單體 seller 模組）的消費配置、處理流程、Handler 介面、Idempotency 機制，屬於各下游服務的設計範圍：
 >
 > - **payment-service** consumer（PayUniWebhookConsumer / PayUniRefundAcceptedConsumer / PayUniRefundNotifyConsumer / UnknownPaymentFallbackConsumer / RescueRefundConsumer）：見 [05 號設計書 §4.5 / §6](./05-支付服務（Payment%20Service）詳細設計書.md)
 > - **shipping-service** consumer（ShippingWebhookConsumer）：見 [06 號設計書 §4.5 / §6](./06-物流微服務（Shipping%20Service）詳細設計書.md)

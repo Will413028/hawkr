@@ -213,7 +213,7 @@
 
 ## 4. API 規格
 
-> **§4 型別合規（前端可控 request id 一律 string）**：經 Gateway 暴露給前端的 request body / path 業務 ID 欄位為 **string**（TSID 18-19 位 > 2^53，JSON number 會精度丟失）。涉及：`CreateViolationReport`(`target_seller_id`/`target_product_id`/`target_post_id`)、`CreateFoodSafetyReport`(`target_seller_id`/`target_product_id`)、`SellerSubmitAppeal`/`SellerGetAppeal`/`AdminDecideAppeal`(`violation_id`)、`GetPublicSellerViolations`(`seller_id` path)、`AdminPatchReportStatus`/`AdminAcknowledge`/`AdminGenerateFDAReport`/`AdminMarkFDAReported`/`AdminNotifySeller`(`report_id`)、`AdminCreateViolation`(`seller_id`/`source_seller_report_id`/`source_food_safety_report_id`)、`AdminUpdateViolation`/`AdminRevokeViolation`(`id`)。`reporter_account_id` / appeal 的 `seller_id` / `admin_id` / `created_by_admin_id` 由 Gateway JWT 注入，屬 §4.1 例外①，維持 int64。buyer-service 同模式：gRPC mapper 邊界 ParseInt 成 int64 給 usecase（DB bigint 不變）。
+> **§4 型別合規（前端可控 request id 一律 string）**：經 Gateway 暴露給前端的 request body / path 業務 ID 欄位為 **string**（TSID 18-19 位 > 2^53，JSON number 會精度丟失）。涉及：`CreateViolationReport`(`target_seller_id`/`target_product_id`/`target_post_id`)、`CreateFoodSafetyReport`(`target_seller_id`/`target_product_id`)、`SellerSubmitAppeal`/`SellerGetAppeal`/`AdminDecideAppeal`(`violation_id`)、`GetPublicSellerViolations`(`seller_id` path)、`AdminPatchReportStatus`/`AdminAcknowledge`/`AdminGenerateFDAReport`/`AdminMarkFDAReported`/`AdminNotifySeller`(`report_id`)、`AdminCreateViolation`(`seller_id`/`source_seller_report_id`/`source_food_safety_report_id`)、`AdminUpdateViolation`/`AdminRevokeViolation`(`id`)。`reporter_account_id` / appeal 的 `seller_id` / `admin_id` / `created_by_admin_id` 由 Gateway JWT 注入，屬 §4.1 例外①，維持 int64。buyer 模組同模式：gRPC mapper 邊界 ParseInt 成 int64 給 usecase（DB bigint 不變）。
 
 ### 4.1 統一回應格式
 
@@ -350,7 +350,7 @@ GetViolation / ListViolations          認定（唯讀）
 ### 5.2 食安公開通報（含 silent drop）
 
 ```
-公開使用者              Gateway          seller-service           Postgres
+公開使用者              Gateway          單體 seller 模組         Postgres
   │                       │                   │                      │
   │ POST /public/food_safety_reports          │                      │
   ├──────────────────────▶│ 雙層 IP rate limit                       │
@@ -496,7 +496,7 @@ Admin UI 頁面（全部走單體的 Connect；舊的兩頁與 gateway 的 7 條
 - Runbook 三份：`docs/runbooks/{food-safety-incident-runbook,seller-violation-management-runbook,seller-governance-shared}.md`
 - Postmortem 模板：`docs/postmortems/food-safety/_template.md`
 - 31 號（B-135 內容檢舉）：互補 — UGC vs 商家實體治理
-- 46 號（賣家能力權限層）：停權的 Gateway enforcement、能力層、收斂點 backstop、業務碼分流（其中 `seller_suspensions` 與 `SuspendSellerForAdmin` 是舊 seller-service 的寫法）
+- 46 號（賣家能力權限層）：停權的 Gateway enforcement、能力層、收斂點 backstop、業務碼分流
 - 36 號（MQ & Event Catalog）：`seller.suspended` / `seller.unsuspended` 事件條目與 consumer 清單
 - 02 / 03 / 07 / 12 / 14 號：停權連動 saga 各服務落地（商品下架 / 未付款取消 / 券停用 / 通知 / IM）
 

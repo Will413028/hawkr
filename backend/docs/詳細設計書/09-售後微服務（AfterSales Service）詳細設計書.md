@@ -1590,7 +1590,7 @@ message AfterSaleCaseSummary {
     string created_at = 6;
     bool need_refund_page = 7;               // ATM 退款需買家前往 PayUni 頁面（前端據此顯示「前往退款」按鈕）
     string buyer_name = 8;                   // 買家姓名（建立 case 時自 order 快照至 aftersale_cases.buyer_name）
-    string buyer_avatar_url = 9;             // 買家頭像完整 CDN URL，列表時呼叫 buyer-service BatchGetBuyerDisplay 批次取得（不快照；已註銷者回空），與 order-service 列表邏輯一致
+    string buyer_avatar_url = 9;             // 買家頭像完整 CDN URL，列表時呼叫單體 buyer 模組的 `BatchGetBuyerDisplay` 批次取得（不快照；已註銷者回空），與 order-service 列表邏輯一致
     string shipping_address = 10;            // 收件地址，由 aftersales-service 組裝 buyer_city + buyer_district + buyer_address_detail（不含郵遞區號），前端直接顯示
     string return_shipping_method = 11;      // ShippingMethod value（3001=TAQBIN / 3002=SEVEN_ELEVEN_STORE_PICKUP），來自 aftersale_cases.return_shipping_method
     string temperature_code = 12;            // ShippingTemperature value（3201/3202/3203），來自 aftersale_cases.delivery_temp
@@ -1611,7 +1611,7 @@ message AfterSaleCaseSummary {
 
 > **欄位來源說明**（賣家列表 `GetSellerAfterSaleCases` 專用）：
 > - 大部分欄位直接來自 `aftersale_cases` 表（建立 case 時已從 order 快照）
-> - 買家頭像不快照，於列表時批次呼叫 `buyer-service.BatchGetBuyerDisplayByBuyerIDs(buyerIds)` 取得（PK 版本：case 上持久化的是 `buyer_id` 而非登入 account_id，不可用 account_id 版本，否則對已重新註冊的帳號靜默查空），仿 order-service `OrderGrpcService.getSellerOrders` 寫法
+> - 買家頭像不快照，於列表時批次呼叫 單體 buyer 模組的 `BatchGetBuyerDisplayByBuyerIDs(buyerIds)` 取得（PK 版本：case 上持久化的是 `buyer_id` 而非登入 account_id，不可用 account_id 版本，否則對已重新註冊的帳號靜默查空），仿 order-service `OrderGrpcService.getSellerOrders` 寫法
 > - ⚠️ 頭像走 `BatchGetBuyerDisplayByBuyerIDs`：對已註銷買家回**空頭像 ＋ 墓碑名**（不得改用帶 `deleted_at IS NULL` 的 Meta 版，那會讓註銷買家的頭像解不出來）。
 > - ⚠️ **本 case 的 `buyer_name` 不走該 RPC**：它來自 `OrderForAfterSales.buyer_name`，是**收件人**快照（退貨物流寄件人用），與買家顯示名是兩件事
 > - `shipping_address` 在 Java service 端組裝後回傳單一字串，前端不需自行組合
@@ -5445,7 +5445,7 @@ MQ 事件發布在 TX 外（best-effort）：若 MQ 發布失敗但 DB 已更新
 > **硬性邊界（四步，缺一不成立）**：
 > 1. worker 在**進 tx 之前**呼叫 `AfterSalesEventPublisher.resolveEventPrincipals(storeId, buyerId)`，把結果 `EventPrincipals` 當參數傳進 tx 內的 publish；publisher 對這三支提供**零 gRPC** 的多載（`emitSellerAfterSaleUpdated` 一併改吃預解值，不再自己重打）。
 > 2. **反解失敗 ⇒ 拋 `PrincipalResolutionFailedException` ⇒ 該筆本 tick 跳過**。此時尚未進 tx ⇒ 沒有 CAS、沒有事件、沒有 row lock，候選述詞（`status='20'` ／ `process_deadline < NOW()` ／ `auto_escalated=false`）完全未觸碰 ⇒ **下一 tick 必然重撈**。
-> 3. ⚠️ **不得降級成「帶 `null`／`0` 把事件照發」**：那會用一則永遠路由不到收件人的通知，換掉一次本來會成功的重試。best-effort 降級（seller→`null`、buyer→`0L`）**只保留給 API 路徑**——那裡沒有下一個 tick，使用者的操作不該因為 buyer-service 抖一下就整批失敗。兩種語意刻意分成 `resolveEventPrincipals`（strict）與內部 `resolveBestEffort` 兩支。
+> 3. ⚠️ **不得降級成「帶 `null`／`0` 把事件照發」**：那會用一則永遠路由不到收件人的通知，換掉一次本來會成功的重試。best-effort 降級（seller→`null`、buyer→`0L`）**只保留給 API 路徑**——那裡沒有下一個 tick，使用者的操作不該因為單體 buyer 模組抖一下就整批失敗。兩種語意刻意分成 `resolveEventPrincipals`（strict）與內部 `resolveBestEffort` 兩支。
 > 4. 失敗一律 `log.error`（`*.resolve_principals.failed`），跳過不等於靜默。
 >
 > **機械保證**：`EventPrincipalPreResolutionTest`（tx 內 publish 對兩個 gRPC client `verifyNoInteractions` ＋ strict 語意）＋ `SchedulerPrincipalPreResolutionTest`（反解失敗時 tx service 零呼叫、同批下一筆照常處理、`InOrder` 斷言反解先於 tx service）。缺這兩支，反解會在下一次重構時被無聲地搬回 tx 內。
@@ -5908,14 +5908,14 @@ Gateway middleware：既有 `admin` 路由群組已套用 `JWTAuth()` + `require
 - `decidedByAdminId`：僅 `appeal_state=30`（RESOLVED）時有值（從 `aftersale_platform_decisions` 取）
 - `buyerAppealReason` / `buyerAppealDescription`：從 `aftersale_cases.appeal_reason` / `appeal_description` 欄位直接讀（SubmitAppeal 時分欄寫入，**不再解析 events.description 字串**）
 - `sellerRejectReason` / `sellerRejectMessage`：見上
-- `buyerName` / `sellerName`：買家從 `aftersale_cases.buyer_name` 快照；賣家從 SellerService gRPC 查 `SellerInfo.name`
-- `avatarKey`／`avatarUrl`（買家頭像）與 `logoKey`／`logoUrl`（商家 logo）：向 BuyerService / SellerService 查 profile 取 objectKey，`*Key` 為裸 objectKey、`*Url` 由 Gateway 以 `MEDIA_BASE_URL` 組（49 §6.1 扁平成對）；同一物件內兩者語意不同故不撞名，買家側不加 `buyer` 前綴（49 §6.6 preamble：禁對外透傳主體前綴）。**查詢失敗不 fail 整個請求**，回空字串（既有 `toSummary` 模式）
+- `buyerName` / `sellerName`：買家從 `aftersale_cases.buyer_name` 快照；賣家從單體 seller 模組的 `SellerInfo.name` 查
+- `avatarKey`／`avatarUrl`（買家頭像）與 `logoKey`／`logoUrl`（商家 logo）：向單體 buyer／seller 模組查 profile 取 objectKey，`*Key` 為裸 objectKey、`*Url` 由 Gateway 以 `MEDIA_BASE_URL` 組（49 §6.1 扁平成對）；同一物件內兩者語意不同故不撞名，買家側不加 `buyer` 前綴（49 §6.6 preamble：禁對外透傳主體前綴）。**查詢失敗不 fail 整個請求**，回空字串（既有 `toSummary` 模式）
 
 **效能與降級策略**：
 
 | 場景 | 行為 |
 |---|---|
-| BuyerService / SellerService 失敗 | 對應欄位回空字串，不影響主資料回傳 |
+| 單體 buyer／seller 模組失敗 | 對應欄位回空字串，不影響主資料回傳 |
 | Admin 列表（#16）| 同樣補 profile 欄位，批次查詢（`GetBuyerProfiles` / `GetSellerBatch`） |
 
 > 依 [Java 微服務開發規範 §4（gRPC RPC 角色分離）](../開發規範/Java%20微服務開發規範.md)，買 / 賣 / Admin 各自獨立 RPC（`GetArbitration` / `GetSellerArbitration` / `ListAppealsForAdmin`），禁止共用 + 條件分流。
@@ -6122,9 +6122,9 @@ message AppealSummaryView {
     string refundable_amount = 8;
     // §10.6.6 Admin 列表補 profile 欄位
     string buyer_name = 9;             // 從 aftersale_cases.buyer_name 快照
-    string buyer_avatar_url = 10;      // 向 BuyerService 查，失敗回空字串
-    string seller_name = 11;           // 向 SellerService 查 SellerInfo.name，失敗回空字串
-    string seller_avatar_url = 12;     // 向 SellerService 查 `SellerInfo.logo`（上游已組好完整 CDN URL，mapper 直接透傳）；失敗回空字串
+    string buyer_avatar_url = 10;      // 向單體 buyer 模組查，失敗回空字串
+    string seller_name = 11;           // 向單體 seller 模組查 SellerInfo.name，失敗回空字串
+    string seller_avatar_url = 12;     // 向單體 seller 模組查 `SellerInfo.logo`（上游已組好完整 CDN URL，mapper 直接透傳）；失敗回空字串
 }
 
 message DecideAppealForAdminRequest {

@@ -46,15 +46,15 @@
 
 ### 0.2 Activation gate 七項（**AND，缺一即不可建單**）
 
-> 🔴 **這七項分屬兩個服務、兩個資料庫**（seller-service `payuni_registrations` ／ shipping-service
+> 🔴 **這七項分屬兩個服務、兩個資料庫**（單體 seller 模組的 `seller.payuni_registrations` ／ shipping-service
 > `seller_shipment_settings`）⇒ **不可能在一個交易內求值**。判定點固定在 shipping-service，
 > 跨服務那兩項走既有 gRPC（§4.5.11），取回值存成快照並帶 `checked_at`，不得當成即時真相。
 
 | # | 項目 | 求值來源（repo 實測欄位） | 通過條件 | 漏了會怎樣 |
 |---|---|---|---|---|
 | ① | **商務資格：母子廠商代號** | `seller_shipment_settings.partner_id` / `.eship_id`（V1 既有欄） | 兩欄皆非空 | 建單被 provider 退，錯誤碼落在 `AGENT02001`（查無符合商店物流資料） |
-| ② | **PayUni 會員層** | seller-service `payuni_registrations.member_status` | `= '1'` | 商業會員資格未成立，B2C 本來就不開放 |
-| ③ | **PayUni 商店層** | seller-service `payuni_registrations.mer_status` | `= '1'`（`91`＝待補件、`92`＝退件，repo 實測《代理商 API 總覽》§12 對應邏輯） | 同上 |
+| ② | **PayUni 會員層** | 單體 seller 模組 `seller.payuni_registrations.member_status` | `= '1'` | 商業會員資格未成立，B2C 本來就不開放 |
+| ③ | **PayUni 商店層** | 單體 seller 模組 `seller.payuni_registrations.mer_status` | `= '1'`（`91`＝待補件、`92`＝退件，repo 實測《代理商 API 總覽》§12 對應邏輯） | 同上 |
 | ④ | **服務產品層（溫層各自）** | `seller_shipment_settings.provider_status`，**該溫層那一列** | 常溫列＝`SPB2C` 已開通、冷凍列＝`SPB2CFrz` 已開通 | 🔴 **兩者完全分開**：常溫過了不代表冷凍過了（§3.3） |
 | ⑤ | **建店層** | `seller_shipment_settings.onboarding_status` | `= '3602' ACTIVE`（repo 實測 CodeMeta：3601 待審核／3602 已啟用／3603 審核不通過／3604 已關閉／3605 永久關閉） | `findActiveSetting` 回 null ⇒ 建單拋 `SHIPMENT_SELLER_NOT_ONBOARDED(5004)` |
 | ⑥ | **賣家本地開關** | `seller_shipment_settings.enabled` | `= true` | 賣家關掉了仍能建單＝違反 06 號 §2.3.1 的寫路徑語意 |
@@ -194,7 +194,7 @@ Buyer /app/*  Seller /app/*  Admin·CS /admin/*
                                  ├ 批次編排器／標籤分組器
                                  └ event inbox／每日對帳五層
                                      │ gRPC          │ HTTP（payuni-java-client）
-                       seller-service（gate ②③）      ▼
+                       單體 seller（gate ②③）       ▼
                        media-service（標籤資產）    PAYUNi
                                                       │ 商務資格核准（非 API 連線）
                                                       ▼
@@ -301,7 +301,7 @@ Buyer /app/*  Seller /app/*  Admin·CS /admin/*
 
 #### 3.2.5 🔴 分支 B 的狀態同步結構性缺口
 `search_merchant_status` 的回應**不含 `BackSetShipping`**（repo 對照：`MerStatus`／`MemberStatus`
-在 seller-service 的 `payuni_registrations` 有對應欄位，而 `BackSetShipping` 全 repo **零命中**
+在單體 seller 模組的 `seller.payuni_registrations` 有對應欄位，而 `BackSetShipping` 全 repo **零命中**
 ⇒ 查詢有效，它真的不存在）。
 ⇒ **賣家在後台申請完成後，我方唯一得知的途徑是那一次 Notify。漏收＝該賣家永久卡住且無 API 可自我修復。**
 
@@ -434,8 +434,8 @@ adapter **不得寫任何業務表**（只組參數、解回應、丟 domain 物
 ⇒ **落在既有 `shipping-service`（HTTP 9930 ／ gRPC 9931，TSID node base 600，repo 實測 65 §7.2 表）**，
 不新增 port、不新增 release、不動 `k8s/values/`。
 
-⚠️ **唯一的跨服務新呼叫是 gate ②③ 讀 seller-service**，依 65 §6.1.5 三件同批：
-① NetworkPolicy 放行 shipping→seller ② values 的 `SELLER_SERVICE_HOST`／`_GRPC_PORT`
+⚠️ **唯一的跨服務新呼叫是 gate ②③ 讀單體 seller 模組（legacy gRPC）**，依 65 §6.1.5 三件同批：
+① NetworkPolicy 放行 shipping→單體 ② values 的 `SELLER_SERVICE_HOST`／`_GRPC_PORT` 指向單體的 legacy gRPC
 ③ 檢查對方 policy 註解有沒有寫「只有 X 會呼叫」。
 🔴 **必須 fail-closed**（讀不到 ⇒ gate 回 `UNKNOWN` ⇒ 擋建單）。fail-open 會產生
 65 §6.1.5 的完全無聲失效：測試綠、CI 綠、部署成功、smoke 綠，而 gate 從未執行過。
@@ -485,7 +485,7 @@ repo 既有欄名 `partner_id`／`eship_id`（snake，正確）。
 | §6.5 **#8**（provider `E3`） | `/api/logistics/print_label` | `label()` 🔴 **批次型** | ✅ | `label().printBatch(ctx, items)` | `print_label`／`reprint_label` | **true** | `print_label`（批次 `OPEN` 以外不可用）／`reprint_label` | `B5 POST /app/shipment_batches/:batch_no/labels`／`C1 .../b2c_label` | 冪等 `(shipTradeNo, shipDate)`；bounded 3 次；60s（租約 300s）；整組失敗 ⇒ 整組不改 `label_print_status`；🔴 **不得整批重印**（會產生與包裹上不同的第二份標籤）（§7.1.3） |
 | — | **批次約束由 capability 攜帶** | `label()` 的 constraint | ✅ | `label().constraints()` → `maxBatchSize=50`／`groupingKeys=[LgsType, ShipType, GoodsType, ShipDate]` | — | — | — | — | 🔴 **65 §4.4.1a 判準**：出現在業務層的 provider 數字（50、180 min、30s）都是漏出 adapter 的約束。`C-GRP B2cLabelGrouper` 只讀 `constraints()`，**不得寫死 50** |
 | §6.5 **#9**（provider `E4`） | `/api/logistics/query` | `track()` | ✅ | `track().fetch(ctx)` | `requery` | **true** | `requery`（ADM 側） | `E4 POST /admin/shipments/:id/requery` | 天然冪等；bounded；10s；🔴 **查無 ≠ 不存在（INV-3）**，不得據此重建；套用必過 `isValidTransition`，不得倒退覆蓋 `LOCAL_PROCESSING_DONE`（§6.1.3） |
-| §6.5 **#5**（provider `E1`）＋ **#4** | `/api/logistics/setting` 建店 ＋ `search_merchant_status` 查開通 | `onboard()` | ✅ | `onboard().apply(ctx)`／`onboard().status(ctx)` | —（建店不走 `allowedActions`） | **true** | 不出現 | `A2 POST /app/shipping_onboardings/cvs_b2c/apply`（端點刻意保留 provider 名，65 §6.2.1 硬約束 1 的例外） | P5 **不自動重試**（無更新端點，重送＝開出第二個子商店）；30s；未知 ⇒ 保留 `REQUESTED`／`UNKNOWN` ＋ 人工查證佇列。⚠️ **P4 的擁有者是 seller-service（Go），不是 shipping-service** ⇒ `onboard().status()` 是**跨服務**讀取，adapter 只翻譯不持有（§6.1.2） |
+| §6.5 **#5**（provider `E1`）＋ **#4** | `/api/logistics/setting` 建店 ＋ `search_merchant_status` 查開通 | `onboard()` | ✅ | `onboard().apply(ctx)`／`onboard().status(ctx)` | —（建店不走 `allowedActions`） | **true** | 不出現 | `A2 POST /app/shipping_onboardings/cvs_b2c/apply`（端點刻意保留 provider 名，65 §6.2.1 硬約束 1 的例外） | P5 **不自動重試**（無更新端點，重送＝開出第二個子商店）；30s；未知 ⇒ 保留 `REQUESTED`／`UNKNOWN` ＋ 人工查證佇列。⚠️ **P4 的擁有者是單體 seller 模組（Go），不是 shipping-service** ⇒ `onboard().status()` 是**跨服務**讀取，adapter 只翻譯不持有（§6.1.2） |
 | §6.3.1／§6.3.2／§6.3.4／§6.3.5 | 貨態 Notify ／`ApiType=Print` 回填 ／ Agent Notify（`BackSetShipping`）／ 檔案交換 importer | `inbound()` 🔴 **三個來源** | ✅ | `inbound().parse(raw)`／`inbound().toNormalized(...)` | — | — | 不出現 | `POST /webhook/...`（落 payuni-webhook-service）／`E3 POST /admin/shipment_batches/reimport`／`E7 .../back_set_shipping` | 驗簽 raw bytes、`HashInfo` `equalsIgnoreCase`、`Timestamp` >15 min 拒收；🔴 **驗簽失敗回 200 不回 5xx**；🔴 **表外的貨態碼一律拋錯不得靜默**（§4.5.7-8）；importer 完整性三件缺一即整檔不處理、**序號跳號 FAIL 不是 SKIP**（§6.3.5） |
 | §6.5 **#7**（provider `E5`） | `/api/logistics/ship_map` | `storeLocator()` | ✅ | `storeLocator().buildParams(ctx)`／`decryptResult(...)` | `reselect_store` | **true** | `reselect_store` | 買家 checkout（**零新端點**） | 天然冪等（前景 Form POST）；由使用者重試，**不設後端 retry**（§6.1.3） |
 | B6 | **交倉回報** | `dispatch()` | ❌ **empty** | —（無 adapter 呼叫） | `handover` | 🔴 **false** | `handover` ✅ **照常 enabled** | `B6 POST /app/shipment_batches/:batch_no/handoff`（骨幹入口 65 `S-3`） | 🔴 **provider 端無交倉 API**（§4.1 逐字：provider 沒有 batch／manifest／交倉 API）⇒ 純本地寫 `930 HANDED_OVER` ＋ 同交易寫 outbox。**`dispatch()` 為 `empty()` 完全不影響這顆按鈕** |
@@ -530,7 +530,7 @@ repo 既有欄名 `partner_id`／`eship_id`（snake，正確）。
 | 4.5.7–8 | 兩類 Notify | `MerStatus`（`1` 正常／`91` 待補件／`92` 退件），🔴 不含 `BackSetShipping`；貨態值域是官方 21 碼，🔴 **表外的碼一律拋錯不得靜默** |
 | 4.5.9 | 錯誤映射 **6 類** | `retryable`／`business_reject`／`auth_config`／`rate_limit`／`provider_outage`／`manual_review`。🔴 **不得把所有非 200 當同一種失敗**——`AGENT02002`（B2C 未開通）要停下來，網路逾時要重試；混在一起＝對已被明確拒絕的請求重試到耗盡 |
 | 4.5.10 | client 必備 | timeout／bounded retry／breaker／rate limit／correlation id／**redacted audit**（`payuni_audit_logs`，憑證欄遮罩、**二進位 PDF 不落內容**）／sandbox 與 production 憑證隔離 |
-| 4.5.11 | seller-service gRPC | 🆕 `SellerShippingProfile` 擴 **2 欄**（`mer_status = 10`／`member_status = 11`，皆 `string`）——expand-only、沿用既有 `GetSellerShippingProfile` RPC，**不新開 RPC**。⚠️ 依 §3 Proto 規範：只改 `api/proto/seller/seller.proto`，生成後盤點所有 Go/Java caller |
+| 4.5.11 | 單體 seller 模組 gRPC（legacy） | 🆕 `SellerShippingProfile` 擴 **2 欄**（`mer_status = 10`／`member_status = 11`，皆 `string`）——expand-only、沿用既有 `GetSellerShippingProfile` RPC，**不新開 RPC**。⚠️ 依 §3 Proto 規範：只改 `api/proto/seller/seller.proto`，生成後盤點所有 Go/Java caller |
 
 ⚠️ **§4.5.1～4.5.11 的編號即上表第一欄**，骨架的五個空子節已併回表格（理由同 §3.5）。
 **逐支的完整契約（必填欄逐字、回應、冪等、重試、逾時處置）在 §6.1.3，本節不重複**；
@@ -892,7 +892,7 @@ INSERT INTO shipping_method_configs
 | # | 端點 | 證據 | 處置 |
 |---|---|---|---|
 | E6 | `/api/logistics/update`（限未列印前修改） | `PayUniShippingEndpoint` 無此常數 | **本書新增** client 方法；正式路徑與版本號屬 RFI-3，未取得前 **fail-closed**（不開放「已取號後修改」入口） |
-| E7 | `search_merchant_status`（查子商店開通狀態） | 🔴 **它不在 `PayUniShippingEndpoint`（Java），而在 `seller-service`（Go）**：`services/seller-service/internal/usecase/payuni.go` 的 `observationFromAPI` 與 `certification.go` | 🔴 **不是「本書新增」，是「本書要擴的既有能力」，且擁有者是 seller-service 不是 shipping-service**（逐條處置見 §6.5）；⚠️ §3.2.5 已載明它**不回 `BackSetShipping`** ⇒ 它救不了 §6A.6 的單點風險 |
+| E7 | `search_merchant_status`（查子商店開通狀態） | 🔴 **它不在 `PayUniShippingEndpoint`（Java），而在單體 Go**：`internal/platform/payuni/client.go` 的 `MerchantStatus`，由 seller 模組的 `payuni.go` 呼叫並寫入 `seller.payuni_registrations`／`seller.payuni_observations` | 🔴 **不是「本書新增」，是「本書要擴的既有能力」，且擁有者是單體 seller 模組不是 shipping-service**（逐條處置見 §6.5）；⚠️ §3.2.5 已載明它**不回 `BackSetShipping`** ⇒ 它救不了 §6A.6 的單點風險 |
 | E8–E10 | 需求書 §21.3.1 宣稱「已文件化 10 支」，其餘 3 支未在任何版控文件逐字轉錄 | — | 🔴 **open item**：P5 收尾前回需求書補齊，未補齊者不得進 §13.3 契約測試清單 |
 
 #### 6.1.3 逐支契約（必填／回應／錯誤／冪等／重試）
@@ -946,7 +946,7 @@ INSERT INTO shipping_method_configs
 **E6 `/api/logistics/update`（本書新增，fail-closed）**：僅允許 `label_print_status = 4101 NONE` 的 shipment；已列印一律回業務碼拒絕（§6.4）。正式契約未到齊前**整支不啟用**。
 
 **E7 `search_merchant_status`（🔴 既有能力，本書只擴欄位）**：每日一次的 onboarding 對帳來源（§7.8 **L0**）。
-🔴 **呼叫方是 seller-service（Go）不是 shipping-service**，本書要做的是「解析回應時擴出 `SPB2C`／`SPB2CFrz`」而非新增一支 client——三件逐條見 §6.5 末段。
+🔴 **呼叫方是單體 seller 模組（Go）不是 shipping-service**，本書要做的是「解析回應時擴出 `SPB2C`／`SPB2CFrz`」而非新增一支 client——三件逐條見 §6.5 末段。
 ⚠️ 它不回 `BackSetShipping` ⇒ **不能**當成 §6A.6 的補償手段。
 
 #### 6.1.4 我方對外端點
@@ -1498,30 +1498,26 @@ Notify 網域是**每個賣家送件當下凍結的值**，不是一個全域設
 | sandbox／production 憑證隔離 | 兩套 secret、兩個 `NotifyURL`（§6.3.4）；🔴 混用時 sandbox 的 Notify 會驗簽通過並打進 production inbox |
 
 🔴 **實測修正一條 §6.1.2 的推論（對照組已驗）**：E7 `search_merchant_status`
-在 `PayUniShippingEndpoint`（Java）確實零命中，**但它在 `seller-service`（Go）已經實作並在跑**
-（`services/seller-service/internal/usecase/payuni.go` 的 `observationFromAPI`；
-`payuni_registrations` 已存 `mer_status`／`member_status`／`credit_status` 等六欄，
-另有 `payuni_status_history` 保存每次轉換）。
-⇒ **它不是「本書新增」，而是「本書要擴的既有能力」**，且**擁有者是 seller-service 不是 shipping-service**。
+在 `PayUniShippingEndpoint`（Java）確實零命中，**但它在單體 seller 模組（Go）已經實作並在跑**
+（`internal/platform/payuni/client.go` 的 `MerchantStatus`，seller 模組 `payuni.go` 呼叫；
+`seller.payuni_registrations` 已存 `mer_status`／`member_status`／`credit_status` 等六欄，
+另有 `seller.payuni_observations` 保存每次轉換）。
+⇒ **它不是「本書新增」，而是「本書要擴的既有能力」**，且**擁有者是單體 seller 模組不是 shipping-service**。
 
 | 事實 | 證據 |
 |---|---|
-| 呼叫已存在 | `services/seller-service/internal/usecase/payuni.go`（對照組：`search_merchant_status` 在 `services/` 命中 5 檔 ⇒ 查詢有效） |
+| 呼叫已存在 | `internal/platform/payuni/client.go`（`MerchantStatus` 呼叫 `/api/agent/search_merchant_status`） |
 | 🔴 `SPB2C`／`SPB2CFrz`／`BackSetShipping` **全 repo 零命中** | 同一支 grep、同一個範圍；對照組 `LgsType` 在 `payuni-java-client` 命中 11 檔 ⇒ 查詢有效 |
-| `payuni_registrations` 無服務產品欄 | `services/seller-service/db/schema/schema.sql` 的欄位清單無 `sp_b2c`／`back_set_shipping` |
+| `seller.payuni_registrations` 無服務產品欄 | `internal/modules/seller/db/schema.sql` 的欄位清單無 `sp_b2c`／`back_set_shipping` |
 
 ⇒ **本書真正要做的是三件，不是「新增一支 client」**：
-① seller-service 的 `search_merchant_status` 回應解析**擴出** `SPB2C`／`SPB2CFrz` 兩欄（Go／Atlas）；
-② 這兩欄要不要落 `payuni_registrations`，取決於 gate ④ 的判定點——本書 §0.2 已定
+① 單體 `internal/platform/payuni` 的 `search_merchant_status` 回應解析**擴出** `SPB2C`／`SPB2CFrz` 兩欄（Go／Atlas）；
+② 這兩欄要不要落 `seller.payuni_registrations`，取決於 gate ④ 的判定點——本書 §0.2 已定
 **判定點在 shipping-service 的 `seller_shipment_settings.provider_status`**
-⇒ seller-service 只做**傳遞**不做真相（否則同一個事實有兩個表，而它們會分岔）；
+⇒ 單體 seller 模組只做**傳遞**不做真相（否則同一個事實有兩個表，而它們會分岔）；
 ③ `BackSetShipping` **API 根本不回** ⇒ 只能走 §6A.6 的補償三件，不在本表任何一列裡。
 
-⚠️ 這一格同時修正 §4.3 的一句話：跨服務呼叫的三件（65 §6.1.5）在 repo 內**已經齊了兩件**——
-`k8s/values/shipping-service.yaml` 已有 `SELLER_SERVICE_HOST`／`SELLER_SERVICE_GRPC_PORT`，
-`k8s/values/seller-service.yaml` 的 `networkPolicy.grpcAllowedCallers` 已含 `shipping-service`。
-⇒ 剩下的是第三件：**seller-service 那份 policy 的註解列出了每個 caller 的理由，本書要補一行**
-（不補 ⇒ 下一個人清理白名單時看不出 shipping 為什麼在裡面）。
+⚠️ 這一格同時修正 §4.3 的一句話：shipping-service 讀單體 seller 模組走 legacy gRPC，`SELLER_SERVICE_HOST`／`SELLER_SERVICE_GRPC_PORT` 指向單體的 legacy gRPC 位址。
 
 ## 6A. 事件（provider 貨態的接收與去重）
 
@@ -2851,7 +2847,7 @@ gateway 的 `sensitiveKeys`（§8.6.1）完全管不到它。
 | S2 | `/trade` p95 延遲 | ≤ **3 s**（deadline 10 s） | C-ADPT histogram | 同上 |
 | S3 | `/print_label` 50 筆 p95 | ≤ **15 s** | K68-2 | 同上 |
 | S4 | 貨態 Notify 端到端（收到 → normalized 落地）p95 | ≤ **30 s** | `hawkr_b2c_inbox_lag_seconds` | ⚠️ C2C 同一條 queue 上量得到，可當**下界參考**（B2C 只會更慢不會更快） |
-| S5 | capability 判定成功率（gate 不回 `UNKNOWN` 的比例） | ≥ **99.9%** | C-GATE | 🔴 依賴 seller-service gRPC 可用性，**不是本服務單獨決定** |
+| S5 | capability 判定成功率（gate 不回 `UNKNOWN` 的比例） | ≥ **99.9%** | C-GATE | 🔴 依賴單體 seller 模組 gRPC 可用性，**不是本服務單獨決定** |
 | S6 | 交倉到驗收（`930` → `931`）| 🔴 **不設 SLO** | §7.3.1 第 8 列 | 🔴 **推進者是人或檔案**（§6A.3）⇒ 設一個我方無法影響的目標，只會製造一條永遠紅的告警 |
 | S7 | 驗收到到店（`931` → `32`） | 🔴 **不設 SLO** | 同上 | provider 的配送時間；我方只量分布不承諾 |
 
@@ -2919,7 +2915,7 @@ B2C 上線＝那條 queue 的流量疊加，而它**沒有獨立的積壓指標*
 
 | 動作 | 總預算 | 拆給誰 | 剩餘餘裕 |
 |---|---|---|---|
-| `/trade` 一筆 | **3 s** (p95) | C-GATE 求值 200 ms（含 seller-service gRPC，deadline 10 s 但正常 < 100 ms）／參數組裝 < 10 ms／provider HTTP **2.5 s**／寫 `provider_shipments` ＋ `shipments` 同交易 200 ms | ≈ 90 ms |
+| `/trade` 一筆 | **3 s** (p95) | C-GATE 求值 200 ms（含單體 seller 模組 gRPC，deadline 10 s 但正常 < 100 ms）／參數組裝 < 10 ms／provider HTTP **2.5 s**／寫 `provider_shipments` ＋ `shipments` 同交易 200 ms | ≈ 90 ms |
 | `/print_label` 一組 50 筆 | **15 s** (p95) | provider HTTP **10 s**／PDF 下載 2 s／media 上傳 2 s／算 SHA-256 ＋ 寫欄 500 ms | ≈ 500 ms |
 | 貨態 Notify 端到端 | **30 s** (p95) | 驗簽 ＋ 落 inbox < 200 ms（回 200 給 provider）／C-INBOX tick 等待 **≤ 10 s**（`fixedDelay 10s`，K68-9）／處理 ＋ 狀態轉換 ＋ outbox 300 ms／MQ 投遞 < 1 s | ≈ 18 s |
 | B1 建立批次（200 筆） | **5 s** | 訂單重新載入 ＋ 歸屬驗證 2 s／逐筆 gate 求值（批次化，一次 gRPC）500 ms／寫 `shipment_batch_items` 1 s | ≈ 1.5 s |

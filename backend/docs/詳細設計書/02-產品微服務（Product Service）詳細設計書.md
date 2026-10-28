@@ -203,7 +203,7 @@ stateDiagram-v2
 | PENDING_REVIEW (4002) | 同上 | 可查看 | 可查看 |
 | INACTIVE (4003) | 同上 | 可查看 | 可查看 |
 | 賣家軟刪除商品（`deleted_at` 非空） | 404（`PRODUCT_REMOVED` / 3023） | 404 | 404 |
-| 賣家帳號已刪除（`seller_deleted_at` 非空） | 404（`PRODUCT_REMOVED` / 3023） | 非 ACTIVE 者 404（帳號復活後舊商品對其隱形，44 §11） | 可查看（但不得轉 ACTIVE，見 §5.10） |
+| 賣家帳號已刪除（`seller_deleted_at` 非空） | 404（`PRODUCT_REMOVED` / 3023） | 非 ACTIVE 者 404（帳號復活後舊商品對其隱形） | 可查看（但不得轉 ACTIVE，見 §5.10） |
 
 > **匿名列的判準是 `first_published_at`，不是 `status`**：`GetPublicProduct` 依 §2.9 的 `ProductPublicationState` 判定——`NEVER_PUBLISHED` / `REMOVED` 才是 404，`TEMPORARILY_UNAVAILABLE`（曾公開、目前下架）**回 200 並附完整內容**。這是刻意的：商品網址一旦對外散播（分享連結、搜尋引擎、社群貼文），下架不該讓它變成死連結。
 >
@@ -702,7 +702,7 @@ Enum 定義見 [業務狀態碼 § ProductPublicationState](../代碼管理%EF%B
   - `idx_product_active_favorite_count`: `(favorite_count DESC, created_at DESC) WHERE deleted_at IS NULL AND status = '4004'` — 預留收藏熱度排序；目前 ProductSort 未啟用此維度，欄位仍即時供應前端顯示
   - `idx_product_shipping_methods_gin`: `GIN (shipping_methods jsonb_path_ops)` — 預留依配送方式聯集篩選用；現階段僅前端讀取顯示
 
-**Extension 需求**：本表索引依賴 `pg_trgm`，`V1__init_product_schema.sql` 開頭以 `CREATE EXTENSION IF NOT EXISTS pg_trgm;` 啟用（與 `content-service` 既有用法一致）。
+**Extension 需求**：本表索引依賴 `pg_trgm`，`V1__init_product_schema.sql` 開頭以 `CREATE EXTENSION IF NOT EXISTS pg_trgm;` 啟用。
 
 ### 3.3 商品 SKU 表 product_sku
 
@@ -755,7 +755,7 @@ Enum 定義見 [業務狀態碼 § ProductPublicationState](../代碼管理%EF%B
 
 | 欄位名 | 欄位邏輯名 | 資料型態 | Nullable | PK | Default | 備註 |
 |--------|-----------|---------|----------|-----|---------|------|
-| event_id | 事件 ID | uuid | N | Y | | 由 buyer-service publisher 生成（UUID v4 字串）。**Java entity 以 `String` 表示**，SQL 端透過 `#{eventId}::uuid` cast — MyBatis-Plus 對 `java.util.UUID` 無對應 typeHandler，採 String + cast 避免引入額外 typeHandler |
+| event_id | 事件 ID | uuid | N | Y | | 由單體 buyer 模組生成（UUID v4 字串）。**Java entity 以 `String` 表示**，SQL 端透過 `#{eventId}::uuid` cast — MyBatis-Plus 對 `java.util.UUID` 無對應 typeHandler，採 String + cast 避免引入額外 typeHandler |
 | event_type | 事件類型 | varchar(40) | N | | | `BUYER_FAVORITE_ADDED` / `BUYER_FAVORITE_REMOVED`，對應 `BuyerEventType` Enum（CodeMeta 內部技術碼）|
 | product_id | 商品 ID | bigint | N | | | 目標商品 |
 | consumed_at | 消費時間 | TIMESTAMPTZ | N | | now() | 用於排程清理 |
@@ -1344,7 +1344,7 @@ message ProductListItem {
 
 語意一致性：
 - `stock_qty` = `SUM(product_sku.stock_qty WHERE product_id = p.id)`；寫入路徑見 §5.1 / §5.2 / §5.8（CRUD + 庫存原子操作同事務 cascade）。
-- `favorite_count` = `COUNT(buyer-service.favorites WHERE product_id = p.id)`；寫入路徑見 §5.14（MQ 事件同事務 ±1）。
+- `favorite_count` = `COUNT(buyer.favorites WHERE product_id = p.id)`；寫入路徑見 §5.14（MQ 事件同事務 ±1）。
 - `shipping_methods` = `DISTINCT (type, temperature)` 自所有 SKU `product_sku.shipping_method` JSONB；同組合下 `free_threshold` 取最低（最寬鬆，行銷友善）、`fee_payer` 取 SKU id ASC 順序第一筆；寫入路徑見 §5.1 / §5.2 / §5.13a。
 
 **delivery_temp（field 28）派生規則**：`delivery_temp` 由 `product.shipping_methods` 反正規化欄位 derive（`distinct(temperature)`），**不得**從 `product_sku` 即時 GROUP BY —— list / detail 兩路徑必須共用同一個 source-of-truth。
@@ -1568,7 +1568,7 @@ Proto 檔案：`api/proto/category/category.proto`
 
 ##### `Buyer Service → ListFavoritedProductIds` / `ListSubscribedSellerIds`
 
-Product Service 為實作 viewer-aware filter（`followed_product_only` / `followed_seller_only`），需 buyer-service 提供「批次查詢使用者收藏 / 追蹤 id 列表」兩個專用 RPC。既有 `GetFavoriteList` / `GetSubscriptionList` 是分頁 + 完整 `FavoriteInfo` / `SubscriptionItem` 設計，作為 server-side filter 之用會引入冗餘負載；既有 `BatchCheckFavorites` 要求先有候選 ID 列表，亦不適用。
+Product Service 為實作 viewer-aware filter（`followed_product_only` / `followed_seller_only`），需單體 buyer 模組（legacy gRPC `BuyerService`）提供「批次查詢使用者收藏 / 追蹤 id 列表」兩個專用 RPC。既有 `GetFavoriteList` / `GetSubscriptionList` 是分頁 + 完整 `FavoriteInfo` / `SubscriptionItem` 設計，作為 server-side filter 之用會引入冗餘負載；既有 `BatchCheckFavorites` 要求先有候選 ID 列表，亦不適用。
 
 ```protobuf
 // api/proto/buyer/buyer.proto
@@ -1599,21 +1599,11 @@ message ListSubscribedSellerIdsResponse {
 }
 ```
 
-**SQL 來源（buyer-service 內部實作）**：
-
-```sql
--- favorites
--- sqlc: ListFavoriteProductIDsByBuyerID
-SELECT product_id FROM favorites WHERE buyer_id = :buyerId;
-
--- seller_subscriptions（回傳的 seller_ids 取自 store_id 欄）
--- sqlc: ListSubscribedSellerIDsByBuyerID
-SELECT store_id FROM seller_subscriptions WHERE buyer_id = :buyerId;
-```
+**資料來源（單體 buyer 模組實作）**：`FavoritedProductIDs` 讀 `buyer.favorites`、`FollowedStoreIDs` 讀 `buyer.seller_subscriptions`（回傳的 seller_ids 取自 `store_id` 欄），皆以 `buyer_id` 為鍵。
 
 **身分空間**：
 
-buyer-service 全部 8 支 favorite/follow 讀寫 RPC（`GetFavoriteList` / `CheckFavorite` /
+單體 buyer 模組全部 8 支 favorite/follow 讀寫 RPC（`GetFavoriteList` / `CheckFavorite` /
 `BatchCheckFavorites` / `AddFavorite` / `RemoveFavorite` / `GetFavoriteCount` /
 `ListFavoritedProductIds` / `ListSubscribedSellerIds`）的 request 欄位皆為 `buyer_id`，
 由 **gateway** 的 `resolveBuyerID`（Redis 快取）解析後傳入。
@@ -1621,7 +1611,7 @@ buyer-service 全部 8 支 favorite/follow 讀寫 RPC（`GetFavoriteList` / `Che
 `ListFavoritedProductIds` / `ListSubscribedSellerIds` 的呼叫方是 product-service，
 不是 gateway 本身：product-service 手上的 `GetProductListRequest.viewer_buyer_id`
 （field 17）由 gateway 在 `GetProductList` handler 內解析 JWT 注入的
-`accountId` → `resolveBuyerID` 一次性得到，逐層往下傳到 buyer-service，buyer-service
+`accountId` → `resolveBuyerID` 一次性得到，逐層往下傳到單體 buyer 模組，buyer 模組
 不再對這兩支 RPC 做任何 account_id → buyer_id 的內部解析（只用
 `GetCurrentByBuyerID` 驗證該 buyer_id 對應的 stint 仍有效）。
 
@@ -1629,9 +1619,9 @@ buyer-service 全部 8 支 favorite/follow 讀寫 RPC（`GetFavoriteList` / `Che
 - 純讀，無副作用
 - 不分頁（業務面：單一買家收藏上限 5000、追蹤賣家上限 1000；product service 於 §5.3.4 cap 處理）
 - 內部 RPC 走 `x-internal-service` metadata 免權限驗證（§6.2）
-- buyer-service Go 端走 sqlc：favorites `ListFavoriteProductIDsByBuyerID`；seller_subscriptions `ListSubscribedSellerIDsByBuyerID`（兩者皆吃 buyer_id，呼叫方已保證是 gateway 解析過的值）
+- 兩者皆吃 buyer_id，呼叫方已保證是 gateway 解析過的值
 
-**錯誤碼**：buyer-service 直接回 gRPC 標準（`INVALID_ARGUMENT` / `INTERNAL`）；product-service 收到任何非 OK 都翻成 `FAILED_PRECONDITION` 回 gateway → 503，不嘗試降級。
+**錯誤碼**：單體 buyer 模組直接回 gRPC 標準（`INVALID_ARGUMENT` / `INTERNAL`）；product-service 收到任何非 OK 都翻成 `FAILED_PRECONDITION` 回 gateway → 503，不嘗試降級。
 
 > **欄位型別說明**：本 RPC 為「buyer → 內部」呼叫，沿用 buyer.proto 既有的 `int64` 風格以避免擴大範圍。[《Java 微服務開發規範》§2.1 數字欄位](../開發規範/Java%20微服務開發規範.md)的例外清單第 3 項「純微服務間 gRPC 欄位」允許此例外。若未來 buyer.proto 進行全面 string 化重構，本 RPC 同步調整。
 
@@ -1677,7 +1667,7 @@ buyer-service 全部 8 支 favorite/follow 讀寫 RPC（`GetFavoriteList` / `Che
 
 | 欄位 | 必填 | 說明 |
 |------|------|------|
-| `eventId` | Y | UUID v4，buyer-service publish 時生成；FavoriteCountConsumer 寫 `favorite_count_event_dedup` 用於冪等 |
+| `eventId` | Y | UUID v4，單體 buyer 模組發布時生成；FavoriteCountConsumer 寫 `favorite_count_event_dedup` 用於冪等 |
 | `eventType` | Y | `BUYER_FAVORITE_ADDED` / `BUYER_FAVORITE_REMOVED` |
 | `productId` | Y | 目標商品 ID（數字字串） |
 | `accountId` | Y | 操作者帳號 ID（數字字串）；僅作審計用，計數邏輯不依賴 |
@@ -1697,13 +1687,12 @@ buyer-service 全部 8 支 favorite/follow 讀寫 RPC（`GetFavoriteList` / `Che
 
 **賣家刪除下架消費邏輯**（`seller.deleted`，`SellerDeletedConsumer` → `SellerProductOffShelfService.offShelfAllByMerchant`）：
 
-賣家自助刪除時 seller-service 只標記 `sellers.status='deleted'`，但商品 `status` 仍停在 ACTIVE，導致公開面向（列表 / 商品詳情 / 相關商品 / 產地彙總）洩漏已刪除賣家的商品。consumer 把該賣家名下 ACTIVE 商品下架為 INACTIVE，一次解決所有面向：
+賣家自助刪除時單體 seller 模組只標記店家已退場，但商品 `status` 仍停在 ACTIVE，導致公開面向（列表 / 商品詳情 / 相關商品 / 產地彙總）洩漏已刪除賣家的商品。consumer 把該賣家名下 ACTIVE 商品下架為 INACTIVE，一次解決所有面向：
 - `findProductIdsBySellerAndStatus(storeId, ACTIVE)` 取 id → `batchUpdateStatusByIds(ids, INACTIVE, storeId)`（同事務）
 - 每筆 `hashtagService.adjustCountersForStatusChange(id, -1)` + `evictProductDetail(id)`；再 `evictProductListForWrite(storeId)`（owner bucket + 公開 bucket 0）
 - **冪等**：只挑 ACTIVE 處理，重送選到 0 筆 → 0 副作用，無需 dedup 表
 - payload 缺 `accountId` / `eventType` 不符 → 記 WARN + ACK（不重試）；DB 異常 → NACK 進 DLQ
 - 為何用 `seller.deleted` 而非 `account.deleted`：見 [36 號 §3.6f](36-MQ%20與事件總覽（MQ%20%26%20Event%20Catalog）.md#36f-賣家領域seller-domain)
-- 存量已刪賣家由 `seller-service/cmd/backfill-seller-deleted` 重發 `seller.deleted` 走同路徑回填
 
 **賣家停權下架/還原消費邏輯**（`seller.suspended` / `seller.unsuspended`）：詳見 §5.10a。與 `seller.deleted` 的差異：停權下架**可逆**——`SellerSuspendedConsumer` 走 `offShelfForSuspension(storeId, suspensionId)`（非不可逆的 `offShelfAllByMerchant`），在同事務內把「本次因停權下架」的精確 ids 寫入 `product_suspension_snapshot`（scope=suspensionId）；解除時 `SellerUnsuspendedConsumer` 依快照以 `product.store_id` 精準還原。兩者共用底層 `batchUpdateStatusByIds`。
 
@@ -2291,7 +2280,7 @@ detail / list / admin 三條路徑必須共用這一份映射規則。
 
 ### 5.5.1 批次商品查詢 (GetProductsByIDs) — `include_inactive` 與 favorites 殘魂列支援
 
-`GetProductsByIDs` 供 buyer-service 在以下兩種路徑使用：
+`GetProductsByIDs` 供單體 buyer 模組在以下兩種路徑使用：
 
 | 使用場景 | `include_inactive` 值 | 行為 |
 |---------|----------------------|------|
@@ -2311,7 +2300,7 @@ message GetProductsByIDsRequest {
 
 #### Favorites 殘魂列（zombie favorites）處理策略
 
-**問題定義**：買家收藏商品後，賣家將其下架（status → 4003）或軟刪除，favorites row 仍存在於 buyer-service DB（且應該存在 — 「曾經收藏」是使用者事實，不該被推刪）。但若 buyer-service 用 `include_inactive=false` 拉 enrichment，會：
+**問題定義**：買家收藏商品後，賣家將其下架（status → 4003）或軟刪除，favorites row 仍存在於 `buyer.favorites`（且應該存在 — 「曾經收藏」是使用者事實，不該被推刪）。但若 buyer 模組用 `include_inactive=false` 拉 enrichment，會：
 
 - inactive 商品：完全拿不到 metadata → 卡片顯示空白
 - 軟刪除商品：同上
@@ -2321,13 +2310,13 @@ message GetProductsByIDsRequest {
 
 | 層級 | 行為 |
 |------|------|
-| product-service | 提供 `include_inactive=true`，buyer-service 能拿到 inactive 商品的快照與 status |
-| buyer-service `enrichWithProductInfo` | 用 `include_inactive=true` 拉；對拿不到的 productId（軟刪除）寫 `available=false, status_code=""`；對拿到的依 `status == "4004"` 寫 `available` 並帶 `status_code` |
+| product-service | 提供 `include_inactive=true`，buyer 模組能拿到 inactive 商品的快照與 status |
+| 單體 buyer 模組的商品資訊補值 | 用 `include_inactive=true` 拉；對拿不到的 productId（軟刪除）寫 `available=false, status_code=""`；對拿到的依 `status == "4004"` 寫 `available` 並帶 `status_code` |
 | `FavoriteInfo` 對外契約 | 新增 `bool available = 13;` + `string status_code = 14;` 兩欄位 |
 | 前端 `/account/favorites` | 不再啟發式隱藏殘魂列；`available=false` 渲染為 disabled 卡片 + 「商品已下架」標籤 + 不可點 + 保留移除按鈕 |
 | 前端 `/products/{id}` 404 fallback | 既有 `ProductUnavailableView` 已實作（含「移除這筆收藏」按鈕），不變 |
 
-🔴 **禁止**以 `product.status.changed` 事件驅動 buyer-service 刪除 `favorites` row：跨服務 drift cleanup 屬資料層動作，不寫進 application code（[後端服務責任邊界規範](../開發規範/後端服務責任邊界規範.md)）。商品下架後收藏仍保留，前端以 404 fallback 呈現。
+🔴 **禁止**以 `product.status.changed` 事件驅動 buyer 模組刪除 `favorites` row：跨服務 drift cleanup 屬資料層動作，不寫進 application code（[後端服務責任邊界規範](../開發規範/後端服務責任邊界規範.md)）。商品下架後收藏仍保留，前端以 404 fallback 呈現。
 
 #### 邊界情境
 
@@ -2336,20 +2325,20 @@ message GetProductsByIDsRequest {
 | 商品 ACTIVE | `true` | `"4004"` | 完整 |
 | 商品 INACTIVE（已下架） | `false` | `"4003"` | 完整 |
 | 商品 DRAFT / PENDING_REVIEW | `false` | `"4001"` / `"4002"` | 完整 |
-| 商品軟刪除 | `false` | `""` | 空（buyer-service 無 product 端 metadata，由 caller 自行 fallback `商品 #{productId}`） |
+| 商品軟刪除 | `false` | `""` | 空（buyer 模組無 product 端 metadata，由 caller 自行 fallback `商品 #{productId}`） |
 | product-service 暫時不可用（gRPC error） | `false`（zero value） | `""` | 空（既有 enrich 失敗降級邏輯：log warn 不 set） |
 | 商品從 INACTIVE 重新上架為 ACTIVE | 下次讀列表自然恢復 `true` | `"4004"` | 完整 |
 
 #### 不刪 row
 
-favorites row 在任何情況下都不由系統自動刪除，僅使用者主動移除（既有 `RemoveFavorite` RPC）。即使商品已軟刪除，`RemoveFavorite` 仍能正常 DELETE row（buyer-service 純看 `buyer_id + product_id` 鍵）。
+favorites row 在任何情況下都不由系統自動刪除，僅使用者主動移除（既有 `RemoveFavorite` RPC）。即使商品已軟刪除，`RemoveFavorite` 仍能正常 DELETE row（buyer 模組純看 `buyer_id + product_id` 鍵）。
 
 #### 既有 caller 影響
 
 | Caller | 是否受影響 |
 |--------|-----------|
-| buyer-service `VisitUseCase.enrichWithProductInfo`（瀏覽紀錄） | 否 — 顯式傳 `include_inactive=false`，行為與既有完全一致 |
-| buyer-service `FavoriteUseCase.Add` 觸發 `product.favorited` event | 否 — 僅取單筆即時資料用於 publish，邏輯上商品剛加入收藏應仍為 ACTIVE，繼續 `include_inactive=false` |
+| 單體 buyer 模組的瀏覽紀錄補值 | 否 — 顯式傳 `include_inactive=false`，行為與既有完全一致 |
+| 單體 buyer 模組新增收藏時觸發 `product.favorited` event | 否 — 僅取單筆即時資料用於 publish，邏輯上商品剛加入收藏應仍為 ACTIVE，繼續 `include_inactive=false` |
 | Gateway / 其他 caller | 本 RPC 為內部 RPC，不經 Gateway 暴露 |
 
 ### 5.5.2 結帳鏈路批次商品查詢 (BatchGetProductForCheckout)
@@ -2940,7 +2929,7 @@ public final class ProductAggregateRules {
 
 ### 5.13b 補貨 transition 偵測與 product.restock event 發布
 
-承接 §5.13a，本節定義 `product.stock_qty` 由 0 增加為 >0（補貨 transition）或商品從不可見變為可見（4003→4004 + stock>0）時，product-service 對外發布 `product.restock` event 的設計。Fan-out 由 buyer-service `restock_consumer` 處理（見 `docs/modules/buyer.md`），product-service 不持訂閱表也不知道訂閱者。
+承接 §5.13a，本節定義 `product.stock_qty` 由 0 增加為 >0（補貨 transition）或商品從不可見變為可見（4003→4004 + stock>0）時，product-service 對外發布 `product.restock` event 的設計。Fan-out 由 單體 buyer 模組（`internal/legacy/buyerconsumer`） 處理（見 `docs/modules/buyer.md`），product-service 不持訂閱表也不知道訂閱者。
 
 #### 5.13b.1 觸發條件
 
@@ -3008,17 +2997,17 @@ flowchart TD
 #### 5.13b.5 一致性 / 不引入清單
 
 - **不引入 application-level outbox**（§22）— `TransactionSynchronizationManager.registerSynchronization` afterCommit 處理；isSynchronizationActive=false 時 eager publish + WARN；接受極端情況 commit 後 publish 失敗 → 該次補貨通知遺失 → 下次補貨 transition 自動補發（不引入 outbox 表 / outbox worker）
-- **不在 publisher 端 fan-out / 不持訂閱表**（§22 服務責任邊界）— subscription 由 buyer-service own，product-service 發中性 event
-- **不引入「query 訂閱數」做 cheap filter** — consumer 端空 query return 即可，cycle 浪費可接受；publisher 端不反向 query buyer-service
+- **不在 publisher 端 fan-out / 不持訂閱表**（§22 服務責任邊界）— subscription 由單體 buyer 模組 own，product-service 發中性 event
+- **不引入「query 訂閱數」做 cheap filter** — consumer 端空 query return 即可，cycle 浪費可接受；publisher 端不反向 query buyer 模組
 - **不引入防抖 window** — one-shot (NOTIFIED) 由 subscription owner 端 UNIQUE partial index 天然解決重複轟炸；本端不引入 5–10 分鐘 debounce 表
 - **trigger 條件兩處一次到位** — 庫存 + 上下架兩條路徑同 detect 規則，禁分階段「先做庫存後做上下架」
 - **partial projection 禁令**（§11.3） — reflow 前查 `(stock_qty, status, name, image)` 必須用 `record SkuStockTransition(Long productId, Integer oldStock, String oldStatus, String productName, String imageKey)` 而非 Entity；參考 [《Java 微服務開發規範》§9.2 Partial Projection 反模式禁令](../開發規範/Java%20微服務開發規範.md) 的教訓避免 NPE
 
 ### 5.13c 有公開上架商品的店家集合 (ListStoreIDsWithPublicProductsInternal)
 
-**用途**：內部 RPC，回傳「至少有一件公開上架商品」的 `store_id` 全集。呼叫方為 seller-service 的推薦賣家用例（`GetRecommendedSellers`，同時餵 `/public/sellers/recommended` 與 `/public/marketplace` 的商家 rail），用來把 **0 件在架商品的空店排除在推薦名單外**。不對前端暴露、Gateway 無對應路由。
+**用途**：內部 RPC，回傳「至少有一件公開上架商品」的 `store_id` 全集。呼叫方為 discovery 模組的推薦排名重算（`internal/modules/discovery/internal/ranking` 的 `Products.StoresWithPublicProducts`，由 `internal/legacy/productservice` 的 client 接上），用來把 **0 件在架商品的空店排除在推薦名單外**。不對前端暴露、Gateway 無對應路由。
 
-🔴 **過濾的 owner 是 seller-service，不是本服務**：推薦名單的兩條進榜路徑（近 30 天營收排名、最新核准賣家 fallback）都由 seller-service 擁有，商品條件只是其中一個述詞。把整份名單搬進 product-service 會讓「賣家可不可公開」的 SSOT 從 seller-service 漏出去。
+🔴 **過濾的 owner 是 discovery 模組，不是本服務**：候選店家 =「有公開商品」∩「可公開曝光」，商品條件只是其中一個述詞（見 `docs/modules/discovery.md`）。把整份名單搬進 product-service 會讓「賣家可不可公開」的 SSOT 從 seller 模組漏出去。
 
 **請求／回應**：
 
@@ -3044,26 +3033,22 @@ GROUP BY store_id;
 
 | 情況 | 回應 | 呼叫端行為 |
 |------|------|-----------|
-| 正常 | `code=0` + N 筆 | 濾掉不在集合內的店 |
+| 正常 | `code=0` + N 筆 | 候選店家只留在集合內的店 |
 | 全平台無公開商品 | `code=0` + 0 筆 | 濾掉**所有**店（這是答案，不是降級） |
-| 查詢失敗 | 非零 code | **fail-open：完全不過濾**，維持加此過濾之前的行為 |
+| 查詢失敗 | 非零 code | 整次重算失敗並以 error 記錄上游名稱，上一份快照不變（不降級成不過濾） |
 
-空集合與失敗必須可分辨：把例外降級成 `code=0` + 空 `store_ids`，會讓首頁商家 rail 整個消失且無任何訊號。seller-service 側對應以 `domain.PublicProductStores`（unknown / resolved-empty / resolved-N 三態，零值為 unknown）承載，並在 fallback 查詢把集合下推成 SQL 述詞——`LIMIT` 在述詞之後才套用，改在 Go 端過濾會讓推薦欄少掉剛好等於空店數量的卡片。
-
-**快取**：無。兩個呼叫端的快取條件不同，結論一致：web SSR 以 `sellers:list` tag ＋ 900s TTL 快取整份推薦結果，此處再加一層只會讓失效路徑多一個要對齊的地方；買家 App 首頁（`hawkr_buyer/lib/features/home/presentation/marketplace_screen.dart` → `/public/marketplace?seller_limit=10`）**沒有這層 SSR 快取**，每次進頁都實打，所以它付的就是本 RPC 的原始成本——與城市聚合共用的同一句 `GROUP BY store_id` 聚合，不值得為它引入一個還要對齊失效的快取。
-
-**前端快取失效**：此過濾讓 `sellers:list` 的**成員**（非排序）與商品公開狀態連動，而會改變成員的四類 mutation（建立即上架／刪除 ACTIVE 商品／上下架跨 ACTIVE／賣家批次下架）本來就共發 `seller:<id>`，展開含 `sellers:list`，失效面不需新增。詳見 [53 號 §4.3](53-Web%20前端快取架構與版本一致性%EF%BC%88Web%20Frontend%20Cache%20%26%20Deployment%20Consistency%EF%BC%89詳細設計書.md)。
+空集合與失敗必須可分辨：把例外降級成 `code=0` + 空 `store_ids`，會讓整份推薦名單被清空且無任何訊號；呼叫端的 port 因此規定失敗一律回 error。
 
 ### 5.14 收藏計數同步消費 (FavoriteCountConsumer)
 
-**用途**：消費 buyer-service 發布的 `buyer.favorite.added` / `buyer.favorite.removed` MQ 事件，同事務維護 `product.favorite_count`，作為列表 / 詳情顯示「收藏人次」的唯一真實來源（§3.2）。
+**用途**：消費單體 buyer 模組（經 `internal/legacy/buyerrelay`）發布的 `buyer.favorite.added` / `buyer.favorite.removed` MQ 事件，同事務維護 `product.favorite_count`，作為列表 / 詳情顯示「收藏人次」的唯一真實來源（§3.2）。
 
 #### 5.14.1 觸發來源
 
-| Routing Key | Producer | 對應 buyer-service 動作 |
+| Routing Key | Producer | 對應 buyer 模組動作 |
 |---|---|---|
-| `buyer.favorite.added` | buyer-service `FavoriteUseCase.Add` | 新增收藏成功後 publish |
-| `buyer.favorite.removed` | buyer-service `FavoriteUseCase.Remove` | 取消收藏成功後 publish |
+| `buyer.favorite.added` | 單體 buyer 模組新增收藏 | 新增收藏成功後 publish |
+| `buyer.favorite.removed` | 單體 buyer 模組取消收藏 | 取消收藏成功後 publish |
 
 詳細 publisher 設計見 `docs/modules/buyer.md`。
 
@@ -3110,7 +3095,7 @@ DLQ：`product.buyer.favorite.added.dlq` / `product.buyer.favorite.removed.dlq`�
 - Service（事務邊界，獨立 class 避免 self-invocation）：`services/java/product-service/src/main/java/io/github/will413028/hawkr/product/service/FavoriteCountService.java` — `@Transactional public boolean applyCountUpdate(...)`，consumer 透過 DI 注入呼叫
 - Repository：`FavoriteCountEventDedupRepository`（MyBatis-Plus）+ `ProductRepository.incrementFavoriteCount(productId, delta)` 原子 SQL
 - RabbitMqConfig：**宣告 `hawkr.buyer` exchange**（topic，由本 consumer 端負責宣告）+ `product.buyer.favorite.added` / `product.buyer.favorite.removed` queue + binding；listener 用 `manualAckContainerFactory`（[《MQ 與事件管理規範》](../開發規範/MQ%20與事件管理規範.md)）。
-  - 為何 consumer 端宣告 exchange：buyer-service publisher 透過 `pkg/mq.Publisher.Publish` 發訊息，內部不會 `ExchangeDeclare`；若雙方都不宣告，hawkr.buyer exchange 永遠不存在，首批 publish 會被 RabbitMQ silently drop（confirm 不會 fail，因為 confirm 只代表訊息進入 broker）。Consumer 啟動時宣告 queue 必須先存在綁定 exchange，因此 consumer 是合理的宣告端。
+  - 為何 consumer 端宣告 exchange：單體 buyer 模組經 `internal/legacy/buyerrelay` 以 `pkg/mq.Publisher.Publish` 發訊息，內部不會 `ExchangeDeclare`；若雙方都不宣告，hawkr.buyer exchange 永遠不存在，首批 publish 會被 RabbitMQ silently drop（confirm 不會 fail，因為 confirm 只代表訊息進入 broker）。Consumer 啟動時宣告 queue 必須先存在綁定 exchange，因此 consumer 是合理的宣告端。
 - **Cache invalidation**：`FavoriteCountService.applyCountUpdate` 內 UPDATE 成功後呼叫 `cacheService.evictProductDetail(productId)`。`StockService.deductStock` / `restoreStock` 的 product cascade（`cascadeProductStock`）走 **afterCommit 單一入口**：在該 `@Transactional` 方法內 `TransactionSynchronizationManager.registerSynchronization` 註冊 `afterCommit` callback，於**交易 commit 後**一次清除 detail + list；三條庫存寫路徑（DeductStock / RestoreStock gRPC + OrderCancelledConsumer）共用此入口，**gRPC handler 不得二次 evict**。無 active transaction（防禦路徑）時 fallback 直接 evict。這些反正規化欄位（`favorite_count` / `stock_qty`）**必須**反查 owner 後同步 evict **list cache**（owner bucket + 公開聚合 bucket 0）—— `favoriteCount` / `stockQty` 都出現在 `ProductListItemDTO`，只 evict detail 會讓列表卡陳舊至 `LIST_TTL`。
 
 > ⚠️ **為何把 transactional 邏輯抽到獨立 Service**：Spring CGLIB `@Transactional` proxy 對 **self-invocation**（同 class 內呼叫）**失效**，且預設只 advise `public` method。若把 `@Transactional` 寫在 consumer 同 class 的 `protected` method 並由本 class 的 listener 呼叫，事務不會被正確開啟 — 結果是 dedup INSERT 與 product UPDATE 變成 2 個獨立的 implicit transaction，UPDATE 失敗時 dedup 已 commit 阻擋後續重試，造成計數永久漏失。本設計透過獨立 `FavoriteCountService` 注入消除此風險。
@@ -3150,13 +3135,13 @@ flowchart TD
 
 #### 5.14a.3 冪等與一致性（full-recompute 覆寫，**非**增量）
 
-> ⚠️ 與 §5.14 收藏計數的關鍵差異：收藏是 **±1 增量**（非冪等 → 需 `favorite_count_event_dedup` 表去重）；評論聚合採 **full-recompute 覆寫**（event 帶 review-service 權威重算的當前快照，consumer 直接覆寫）→ **天然冪等，不需 dedup 表**。此設計與 seller-service `review_rating_consumer`（覆寫 `sellers.rating`）一致。
+> ⚠️ 與 §5.14 收藏計數的關鍵差異：收藏是 **±1 增量**（非冪等 → 需 `favorite_count_event_dedup` 表去重）；評論聚合採 **full-recompute 覆寫**（event 帶 review-service 權威重算的當前快照，consumer 直接覆寫）→ **天然冪等，不需 dedup 表**。
 
 | 場景 | 行為 |
 |---|---|
 | 重複 event（同內容重送） | UPDATE 覆寫為相同值 → 結果不變 → ACK（冪等） |
 | 商品不存在 / 已軟刪除 | UPDATE rowsAffected = 0 → 記 WARN + ACK，不重試 |
-| event 亂序抵達（A:count=N 晚於 B:count=N+1） | last-writer-wins，可能短暫寫回較舊值；下一次 create / hide 事件再次 full-recompute 覆寫自癒。與 seller-service 同等暴露面，評論頻率低，可接受（不引入 version 欄位或 dedup） |
+| event 亂序抵達（A:count=N 晚於 B:count=N+1） | last-writer-wins，可能短暫寫回較舊值；下一次 create / hide 事件再次 full-recompute 覆寫自癒。評論頻率低，可接受（不引入 version 欄位或 dedup） |
 | 隱藏評論（review.hidden） | review-service 排除 hidden 列重算 → 商品 rating / review_count 同步下修 |
 | 商品評論歸零（隱藏最後一筆） | consumer 寫 `review_count=0` 且 `rating=NULL`（**非 0.00**），與「從未評論」狀態一致 → converter null → API 回 `"0"`（避免兩種「無評論」狀態回不同字串） |
 
@@ -3395,7 +3380,7 @@ sequenceDiagram
 sequenceDiagram
     participant GW as Gateway
     participant PS as ProductService
-    participant BS as BuyerService
+    participant BS as 單體 buyer 模組
     participant Redis as Redis
     participant DB as PostgreSQL
 
@@ -3546,7 +3531,7 @@ sequenceDiagram
   - `favorite_count` 由 FavoriteCountConsumer（§5.14）同事務 ± 1，buyer publish 時生成 event_id 保冪等
   - `shipping_methods` 由 CreateProduct / UpdateProduct 同事務以 §5.13a 聚合規則重算
 - **不引入 reconciliation job / drift detection / backfill CLI**：寫入路徑就是真實來源（[《後端服務責任邊界規範》](../開發規範/後端服務責任邊界規範.md)）
-⚠️ `favorite_count` 的權威資料在 buyer-service 的 `favorites`，與 product-service 不同 DB；本欄只由 `FavoriteCountConsumer` 的事件推進，**不得**在 product-service 內建立跨 DB 查詢或同步機制。
+⚠️ `favorite_count` 的權威資料在 `buyer.favorites`，與 product-service 不同 DB；本欄只由 `FavoriteCountConsumer` 的事件推進，**不得**在 product-service 內建立跨 DB 查詢或同步機制。
 - **不引入跨服務 reconciliation 排程**：偵測 drift 是 ops / observability 責任，不是 application code 責任（§22）
 
 ### 7.5b 補貨 transition event 發布一致性

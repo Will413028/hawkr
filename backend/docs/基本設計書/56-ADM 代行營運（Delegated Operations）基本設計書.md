@@ -29,7 +29,7 @@ flowchart LR
     A["ADM 管理員"] -->|開啟代行工作階段<br/>改店面商品貼文<br/>看訂單| GW["Gateway<br/>授權層"]
     GW --> ACC["delegation 模組<br/>授權 ＋ 工作階段 ＋ 稽核"]
     GW --> P["product-service"]
-    GW --> SL["seller-service"]
+    GW --> SL["單體 seller 模組"]
     GW --> SO["social-service"]
     GW --> OR["order-service<br/>唯讀"]
 

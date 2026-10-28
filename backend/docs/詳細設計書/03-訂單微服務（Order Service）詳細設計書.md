@@ -1395,7 +1395,7 @@ rpc BatchGetBuyerDisplayByBuyerIDs(BatchGetBuyerDisplayByBuyerIDsRequest) return
 🔴 **不得改用 `BatchGetBuyerMetaByBuyerIDs`**：那支底層帶
 `deleted_at IS NULL`，是刻意的 PII 邊界，買家註銷後解不出來 ⇒ 賣家訂單列表的
 買家名整片空白。Display 版讓已註銷的 stint 也解得出來，但只回墓碑字串
-「已刪除帳號」、頭像清空，真名不離開 buyer-service。詳見 `docs/modules/buyer.md`。
+「已刪除帳號」、頭像清空，真名不離開單體 buyer 模組。詳見 `docs/modules/buyer.md`。
 
 #### Payment Service — 撥款指示
 

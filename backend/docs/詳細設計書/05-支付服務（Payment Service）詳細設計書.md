@@ -37,7 +37,7 @@
 - 不直接面對使用者介面
 - **不直接接收 PayUni HTTP Webhook**（由 `payuni-webhook-service` 統一接收、驗簽、解密、去重後透過 MQ 分發）
 - 🔴 **不決定第三方手續費的經濟負擔方**：本服務只負責「把正確的金額用正確的通道送出去」。手續費**由誰吸收**是業務決策（Uber 物流服務費的 `agent_fee` 手續費＝賣家負擔，65 稽核附錄 `ADR-005`），本書不得自行推定、也不得把費率寫成常數
-- **不處理商家狀態異動（MerStatus）Webhook**（由 `payuni-webhook-service` 發布至 `seller.review.result`，由 seller-service 消費，AGENT_NOTIFY 單通道）
+- **不處理商家狀態異動（MerStatus）Webhook**（由 `payuni-webhook-service` 發布至 `seller.review.result`，由單體 seller 模組消費，AGENT_NOTIFY 單通道）
 
 ### 1.4 系統架構圖
 

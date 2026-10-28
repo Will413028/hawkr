@@ -1300,7 +1300,7 @@ public interface FulfillmentProviderAdapter {
 | `track()` | ✅ `/api/logistics/query` | ✅ **E4** Get Delivery（＋E3 List） | ✅ **P9** `/api/logistics/query` | L0 ❌／**L1 ❌**（🔴 對方沒有查詢端點）／**L2 ✅**（失聯回查） |
 | `returns()` | ✅ 逆物流建單〔既有〕 | ❌ empty（逆向 leg 的 `canceled` 無對應處置，66 open item UP-8） | ❌ **empty**（驗退／未取退回／買家退貨皆非我方建單；C2B 退貨便是 provider 副作用） | ❌ empty（三級皆無；退貨走 aftersales） |
 | `pod()` | ❌ empty | ✅ **E7** Get POD（窗口 7 天） | ❌ **empty**（全書零 POD 概念；`11 PICKED_UP` 由買家門市取貨代替簽收） | L0 ❌（賣家上傳）／**L1 ✅**／**L2 ✅**（商家帶 metadata，我方抓回自存） |
-| `onboard()` 🆕 | ✅ `onboardCvsShipping` | ✅ **S-U1** store mapping | ✅ **P5** `/setting` ＋ **P4** `search_merchant_status`　⚠️ **擁有者跨 seller-service**（68 §6.1.2） | ❌ empty（profile 是我方資料，無外部 API） |
+| `onboard()` 🆕 | ✅ `onboardCvsShipping` | ✅ **S-U1** store mapping | ✅ **P5** `/setting` ＋ **P4** `search_merchant_status`　⚠️ **擁有者跨單體 seller 模組**（68 §6.1.2） | ❌ empty（profile 是我方資料，無外部 API） |
 | `inbound()` 🆕 | ✅ PayUni 貨態 Notify | ✅ webhook（`delivery_status`／`courier_update`／`refund_request`…） | ✅ **三個來源**：貨態 Notify ＋ Agent Notify（`BackSetShipping`）＋ 檔案交換 importer | L0 ❌／**L1 ✅**／**L2 ✅**（商家 webhook，HMAC＋`event_seq_watermark`） |
 | `storeLocator()` 🆕 | ✅ `/api/logistics/ship_map` | ❌ empty | ✅ **P7** `/api/logistics/ship_map` | ❌ empty |
 
@@ -2440,7 +2440,7 @@ CREATE INDEX "idx_sethold_aging" ON "settlement_holds" ("status", "status_entere
 ```
 
 ⚠️ **`created_by_account_id` 是 `account_id` 不是 `store_id`**（§3.9 一：ADM 操作者的登入 principal）。
-本表是唯一刻意存 `account_id` 的欄位，先例是 seller-service 對「後台操作者」的同款處置。
+本表是唯一刻意存 `account_id` 的欄位，先例是單體 seller 模組對「後台操作者」的同款處置。
 
 #### 5.4.5 inbox／outbox／稽核三表
 
@@ -4975,7 +4975,7 @@ repository 亦在該服務）⇒ **shipping-service 無法在同一個交易內�
 
 ⚠️ **這讓 payment-service 成為 `hawkr.shipping` 上的第二個 publisher，這是允許的**：
 36 §1.4 禁止的是「**同一條 routing key 對應多個 publisher**」，不是「一個 exchange 只能有一個 publisher」
-（既有先例：`hawkr.product` ＝ product-service ＋ buyer-service；
+（既有先例：`hawkr.product` ＝ product-service ＋ 單體 buyer 模組（`internal/legacy/buyerrelay`）；
 `hawkr.seller_workspace` ＝ order-service ＋ aftersales-service）
 ⇒ **36 §2.1 該列的 Publisher 欄要一併補上 payment-service**（§6A.5）。
 
