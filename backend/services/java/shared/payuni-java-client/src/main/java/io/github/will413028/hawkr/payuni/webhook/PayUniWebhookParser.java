@@ -75,10 +75,11 @@ public class PayUniWebhookParser {
             return WebhookType.REFUND_ACCEPTED;
         }
 
-        // 續期收款（page_id=306）：PeriodTradeNo 是 provider subscription identity。
-        // 必須先於 PAYMENT_UOP，因為 PayUni 續期 payload 也可能帶 TradeAmt／TradeStatus。
+        // 週期扣款通知（含 PeriodTradeNo）：系統沒有任何定期定額流程，不處理。
+        // 必須先於 PAYMENT_UOP，否則帶 TradeAmt／TradeStatus 的週期 payload 會被誤判成一次性付款；
+        // 判成 UNKNOWN 後走既有的未知類型處理（寫 inbox 稽核）。
         if (data.containsKey("PeriodTradeNo")) {
-            return WebhookType.PAYMENT_RECURRING;
+            return WebhookType.UNKNOWN;
         }
 
         // 含 TradeAmt + TradeStatus → 付款結果
@@ -152,16 +153,6 @@ public class PayUniWebhookParser {
                     data.get("RefundAmt"),
                     data.get("PaymentType"),
                     data.get("EstimatedRefundDate")
-            );
-            case PAYMENT_RECURRING -> new RecurringPaymentEvent(
-                    data.get("MerID"),
-                    data.get("PeriodTradeNo"),
-                    data.get("PeriodOrderNo"),
-                    data.get("ThisPeriod"),
-                    data.get("TradeNo"),
-                    data.get("TradeStatus"),
-                    data.get("TradeAmt"),
-                    data.get("Message")
             );
             case UNKNOWN -> null;
         };

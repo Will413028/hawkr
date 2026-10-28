@@ -3,7 +3,6 @@ package io.github.will413028.hawkr.payuni.webhook;
 import io.github.will413028.hawkr.payuni.crypto.PayUniCryptoService;
 import io.github.will413028.hawkr.payuni.webhook.event.AgentNotifyEvent;
 import io.github.will413028.hawkr.payuni.webhook.event.PaymentUopEvent;
-import io.github.will413028.hawkr.payuni.webhook.event.RecurringPaymentEvent;
 import io.github.will413028.hawkr.payuni.webhook.event.ShippingStatusEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -144,41 +143,14 @@ class PayUniWebhookParserTest {
     }
 
     @Nested
-    @DisplayName("週期扣款通知 (PAYMENT_RECURRING)")
-    class RecurringPaymentTest {
+    @DisplayName("週期扣款通知（不處理）")
+    class PeriodNotificationTest {
 
         @Test
-        @DisplayName("含 PeriodTradeNo／PeriodOrderNo／ThisPeriod → RecurringPaymentEvent")
-        void recurringPayment() {
+        @DisplayName("含 PeriodTradeNo 的通知即使帶 TradeAmt／TradeStatus 也判為 UNKNOWN，不誤判成 PAYMENT_UOP")
+        void periodNotificationIsUnknown() {
             Map<String, String> params = new LinkedHashMap<>();
             params.put("MerID", "HAWK9");
-            params.put("PeriodTradeNo", "PT001");
-            params.put("PeriodOrderNo", "M123-S1_1");
-            params.put("ThisPeriod", "1");
-            params.put("TradeNo", "P20260216003");
-            params.put("TradeStatus", "1");
-            params.put("TradeAmt", "990");
-
-            String encrypted = cryptoService.encrypt(params);
-            String hash = cryptoService.calculateHash(encrypted);
-
-            WebhookParseResult result = parser.parse(encrypted, hash);
-
-            assertEquals(WebhookType.PAYMENT_RECURRING, result.type());
-            assertInstanceOf(RecurringPaymentEvent.class, result.event());
-
-            RecurringPaymentEvent event = (RecurringPaymentEvent) result.event();
-            assertEquals("PT001", event.periodTradeNo());
-            assertEquals("M123-S1_1", event.periodOrderNo());
-            assertEquals("1", event.thisPeriod());
-            assertEquals("1", event.tradeStatus());
-            assertEquals("990", event.tradeAmt());
-        }
-
-        @Test
-        @DisplayName("週期通知即使含 TradeAmt／TradeStatus 也不可誤判成 PAYMENT_UOP")
-        void recurringTakesPrecedenceOverOneTimePayment() {
-            Map<String, String> params = new LinkedHashMap<>();
             params.put("PeriodTradeNo", "PT002");
             params.put("PeriodOrderNo", "M123-S1_2");
             params.put("ThisPeriod", "2");
@@ -188,7 +160,10 @@ class PayUniWebhookParserTest {
             String encrypted = cryptoService.encrypt(params);
             String hash = cryptoService.calculateHash(encrypted);
 
-            assertEquals(WebhookType.PAYMENT_RECURRING, parser.parse(encrypted, hash).type());
+            WebhookParseResult result = parser.parse(encrypted, hash);
+
+            assertEquals(WebhookType.UNKNOWN, result.type());
+            assertNull(result.event());
         }
     }
 

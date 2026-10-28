@@ -335,7 +335,6 @@ public final class MqConstants {
     // PayUni Webhook Events（由 payuni-webhook-service 發布）
     public static final String EXCHANGE_PAYUNI_WEBHOOK = "payuni.events";
     public static final String ROUTING_KEY_PAYUNI_PAYMENT_UOP = "payuni.payment.uop";
-    public static final String ROUTING_KEY_PAYUNI_PAYMENT_RECURRING = "payuni.payment.recurring";
     public static final String ROUTING_KEY_PAYUNI_SHIPPING_STATUS = "payuni.shipping.status";
     // AGENT_NOTIFY 的 payuni.events 路由常數已於 #1757 移除（無 consumer 的過渡期冗餘路由）；
     // AGENT_NOTIFY 改單通道走 seller.events/seller.review.result。
@@ -367,7 +366,6 @@ public final class MqConstants {
 
     // PayUni Webhook Event Types
     public static final String EVENT_TYPE_PAYUNI_PAYMENT_UOP = "PAYUNI_PAYMENT_UOP";
-    public static final String EVENT_TYPE_PAYUNI_PAYMENT_RECURRING = "PAYUNI_PAYMENT_RECURRING";
     public static final String EVENT_TYPE_PAYUNI_SHIPPING_STATUS = "PAYUNI_SHIPPING_STATUS";
     public static final String EVENT_TYPE_PAYUNI_AGENT_NOTIFY = "PAYUNI_AGENT_NOTIFY";
     public static final String EVENT_TYPE_PAYUNI_REFUND_NOTIFY = "PAYUNI_REFUND_NOTIFY";

@@ -14,7 +14,7 @@ public enum FulfillmentAction implements CodeMeta {
 
     DISPATCH("DISPATCH", "dispatch", "派車／叫件", "配送推進群。3001 黑貓叫件、3003 Uber 建單即派車"),
     HANDOVER("HANDOVER", "handover", "回報交運", "配送推進群。B2C 交倉／自送出發，`requiresProviderCall=false`"),
-    CANCEL("CANCEL", "cancel", "取消配送單", "配送推進群。🔴 四個 provider 中只有 3003 的 `requiresProviderCall=true`；其餘寫 992 或本地終態。**與 RecurringAction.CANCEL 是不同資源軸的同名動作，文案不得共用**"),
+    CANCEL("CANCEL", "cancel", "取消配送單", "配送推進群。🔴 四個 provider 中只有 3003 的 `requiresProviderCall=true`；其餘寫 992 或本地終態。"),
     RESUBMIT("RESUBMIT", "resubmit", "重新建單", "配送推進群。只有 990 建單失敗的配送單可重建"),
     UPDATE("UPDATE", "update", "修改配送資料", "配送推進群。⚠️ 在 provider 的 update 契約到位前**恆 disabled**"),
     PRINT_LABEL("PRINT_LABEL", "print_label", "列印標籤", "標籤群。3004 為批次型（單批上限與分組鍵由 capability 攜帶，呼叫端不得寫死數字）"),

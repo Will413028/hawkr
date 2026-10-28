@@ -61,3 +61,7 @@ buyer-service 排程 cron），以及「寬限狀態要不要反映在 `buyer_me
   晚到的矛盾結果只留成稽核列，不改寫已做出的處置。
 - 若日後要加回重試，**先回來推翻這份 ADR**——重試會同時改變資料模型（需要 Task 表）
   與 `buyer_memberships` 的狀態語意。
+
+## 修訂：會員計費與 PAYMENT_RECURRING 已刪除（2026-10-29）
+
+會員計費不做，會員付款流程與設計書 60 已刪除。第 3 節新增的 `PAYMENT_RECURRING` webhook 型別一併刪除：解析器不再辨識週期扣款通知，含 `PeriodTradeNo` 的 payload 判為 `UNKNOWN`，走既有的未知類型處理（寫 inbox 稽核，含 `MerID` 時投遞 `payuni.unknown.fallback`）。本文其餘各節描述的是已刪除的流程，內容見 git 歷史。

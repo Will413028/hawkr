@@ -18,7 +18,6 @@ public enum PayUniEventType implements CodeMeta {
     AGENT_NOTIFY("AGENT_NOTIFY", "8254", "代理通知", "PayUni 代理通知（賣家 onboarding 等）→ seller.review.result"),
     REFUND_NOTIFY("REFUND_NOTIFY", "8255", "退款結果", "PayUni ATM 退款結果通知（含 RefundStatus / BankDate，匯款完成 / 失敗）→ payuni.refund.notify"),
     REFUND_ACCEPTED("REFUND_ACCEPTED", "8256", "退款受理", "PayUni ATM 退款受理通知（含 EstimatedRefundDate 無 RefundStatus；sync return URL 的 async 副本）→ payuni.refund.accepted"),
-    PAYMENT_RECURRING("PAYMENT_RECURRING", "8257", "會員週期扣款", "PayUni 會員週期扣款結果通知（page_id=306）→ payuni.payment.recurring"),
     UNKNOWN("UNKNOWN", "8259", "未知事件", "無法由 payload 辨識的 PayUni webhook，仍寫入 inbox 稽核並打印 warning，由人工或重送處理");
 
     private final String code;

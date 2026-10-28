@@ -21,7 +21,6 @@ public final class PayUniEventRouting {
     public static String topic(PayUniEventType type) {
         return switch (type) {
             case PAYMENT_UOP     -> MqConstants.ROUTING_KEY_PAYUNI_PAYMENT_UOP;
-            case PAYMENT_RECURRING -> MqConstants.ROUTING_KEY_PAYUNI_PAYMENT_RECURRING;
             case SHIPPING_STATUS -> MqConstants.ROUTING_KEY_PAYUNI_SHIPPING_STATUS;
             // 超商列印與貨態共用 routing key，由下游按 ApiType 分流
             case SHIPPING_PRINT  -> MqConstants.ROUTING_KEY_PAYUNI_SHIPPING_STATUS;

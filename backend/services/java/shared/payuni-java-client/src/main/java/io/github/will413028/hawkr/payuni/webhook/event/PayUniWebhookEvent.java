@@ -7,5 +7,5 @@ package io.github.will413028.hawkr.payuni.webhook.event;
  */
 public sealed interface PayUniWebhookEvent
         permits PaymentUopEvent, ShippingStatusEvent, ShippingPrintEvent, AgentNotifyEvent,
-                RefundNotifyEvent, RefundAcceptedEvent, RecurringPaymentEvent {
+                RefundNotifyEvent, RefundAcceptedEvent {
 }

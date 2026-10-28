@@ -110,8 +110,7 @@ services/java/shared/payuni-java-client/
 │           ├── ShippingPrintEvent.java
 │           ├── AgentNotifyEvent.java
 │           ├── RefundNotifyEvent.java
-│           ├── RefundAcceptedEvent.java
-│           └── RecurringPaymentEvent.java
+│           └── RefundAcceptedEvent.java
 └── src/test/java/io/github/will413028/hawkr/payuni/
     ├── crypto/PayUniCryptoServiceTest.java      Golden Test + 邊界測試
     ├── http/PayUniApiResponseDualFormatTest.java v1.x 頂層 / v2.0 Result[] 雙格式
@@ -964,12 +963,11 @@ public ShippingClient(PayUniHttpClient httpClient, String notifyUrl)
 |---------|---|------|
 | `REFUND_NOTIFY` | payload 含 `RefundStatus` | 退款結果通知（ATM async webhook，含 `RefundStatus` / `BankDate`；匯款完成／失敗）。🔴 **必須先於 `PAYMENT_UOP` 判斷**——退款 webhook 同樣帶外層 `TradeStatus`，唯一鍵是內層 `RefundStatus` |
 | `REFUND_ACCEPTED` | 含 `EstimatedRefundDate` 且無 `RefundStatus` | 退款受理通知（sync return URL 的 async 副本） |
-| `PAYMENT_RECURRING` | `page_id=306` | 續期收款結果通知（含 `PeriodTradeNo` / `PeriodOrderNo` / `ThisPeriod`）。`PeriodTradeNo` 是 provider 側的 subscription identity |
 | `PAYMENT_UOP` | 其餘含付款欄位者 | 付款結果通知（UOP） |
 | `SHIPPING_STATUS` | 含物流貨態欄位 | 物流貨態通知（建單結果 / 狀態變更） |
 | `SHIPPING_PRINT` | `ApiType=Print` | 超商列印結果通知（含交貨便代碼） |
 | `AGENT_NOTIFY` | 含商家狀態欄位 | 代理商通知（商家狀態異動） |
-| `UNKNOWN` | 以上皆不命中 | 無法辨識的類型。分派見 10 號 §4.5.3 |
+| `UNKNOWN` | 含 `PeriodTradeNo`（週期扣款通知），或以上皆不命中 | 無法辨識的類型。🔴 週期扣款通知必須先於 `PAYMENT_UOP` 判為 `UNKNOWN`，否則帶 `TradeAmt`／`TradeStatus` 的 payload 會被誤判成一次性付款。分派見 10 號 §4.5.3 |
 
 #### **10.2 PayUniWebhookParser**
 
@@ -1054,7 +1052,7 @@ public WebhookVerifyException(String message)
 ```java
 public sealed interface PayUniWebhookEvent
     permits PaymentUopEvent, ShippingStatusEvent, ShippingPrintEvent, AgentNotifyEvent,
-            RefundNotifyEvent, RefundAcceptedEvent, RecurringPaymentEvent
+            RefundNotifyEvent, RefundAcceptedEvent
 ```
 
 `UNKNOWN` 沒有對應 Record——它不是事件，是「解析不出型別」的結果，由 `WebhookParseResult` 承載原始 map。
@@ -1129,19 +1127,6 @@ public sealed interface PayUniWebhookEvent
 | `paymentType` | `String` | 原付款方式 |
 | `estimatedRefundDate` | `String` | 預計退款日（本型別的唯一判別鍵） |
 
-**RecurringPaymentEvent (Record)**：
-
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| `merId` | `String` | 商家編號 |
-| `periodTradeNo` | `String` | provider 側 subscription identity |
-| `periodOrderNo` | `String` | 本期訂單編號 |
-| `thisPeriod` | `String` | 第幾期 |
-| `tradeNo` | `String` | PayUni 交易編號 |
-| `tradeStatus` | `String` | 交易狀態 |
-| `tradeAmt` | `String` | 交易金額 |
-| `message` | `String` | 回應訊息 |
-
 ---
 
 ### **11. 錯誤模型總覽**
@@ -1189,7 +1174,7 @@ public sealed interface PayUniWebhookEvent
 | 商家狀態異動 | `AGENT_NOTIFY` ＋ `AgentNotifyEvent` |
 | 🔴 退款判別優先序 | 同時含 `TradeStatus` 與 `RefundStatus` 的 payload **必須**分類成 `REFUND_NOTIFY` 而非 `PAYMENT_UOP` |
 | 退款受理 | 含 `EstimatedRefundDate` 無 `RefundStatus` ⇒ `REFUND_ACCEPTED` |
-| 續期收款 | `page_id=306` ⇒ `PAYMENT_RECURRING` |
+| 週期扣款通知 | 含 `PeriodTradeNo`（即使同時含 `TradeAmt`／`TradeStatus`）⇒ `UNKNOWN` ＋ event 為 null，不得判成 `PAYMENT_UOP` |
 | 驗簽失敗 | 拋 `WebhookVerifyException` |
 | 無法辨識 | `UNKNOWN` ＋ event 為 null |
 

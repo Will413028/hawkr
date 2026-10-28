@@ -230,7 +230,6 @@ public class WebhookReceiveService {
             case AGENT_NOTIFY -> PayUniEventType.AGENT_NOTIFY;
             case REFUND_NOTIFY -> PayUniEventType.REFUND_NOTIFY;
             case REFUND_ACCEPTED -> PayUniEventType.REFUND_ACCEPTED;
-            case PAYMENT_RECURRING -> PayUniEventType.PAYMENT_RECURRING;
             case UNKNOWN -> PayUniEventType.UNKNOWN;
         };
     }

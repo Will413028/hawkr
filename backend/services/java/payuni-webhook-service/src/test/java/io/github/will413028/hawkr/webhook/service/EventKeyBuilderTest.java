@@ -170,20 +170,6 @@ class EventKeyBuilderTest {
     class FormatVerification {
 
         @Test
-        @DisplayName("PAYMENT_RECURRING 格式包含訂閱、期數與終態")
-        void recurringPayment_format() {
-            String key = EventKeyBuilder.build(PayUniEventType.PAYMENT_RECURRING, Map.of(
-                    "MerID", "HAWK9",
-                    "PeriodTradeNo", "PT001",
-                    "PeriodOrderNo", "M123-S1_1",
-                    "TradeNo", "P20260216003",
-                    "ThisPeriod", "1",
-                    "TradeStatus", "1"
-            ));
-            assertEquals("HAWK9:PT001:P20260216003:1:1", key);
-        }
-
-        @Test
         @DisplayName("PAYMENT_UOP 格式為 {merId}:{merTradeNo}:{tradeNo}:{tradeStatus}")
         void paymentUop_format() {
             String key = EventKeyBuilder.build(PayUniEventType.PAYMENT_UOP, Map.of(

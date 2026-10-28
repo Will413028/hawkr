@@ -23,9 +23,6 @@ public enum WebhookType {
     /** 退款受理通知（ATM async webhook，含 EstimatedRefundDate 無 RefundStatus；sync return URL 的 async 副本） */
     REFUND_ACCEPTED,
 
-    /** 續期收款結果通知（PayUni page_id=306；含 PeriodTradeNo／PeriodOrderNo／ThisPeriod） */
-    PAYMENT_RECURRING,
-
     /** 無法辨識的類型 */
     UNKNOWN
 }
