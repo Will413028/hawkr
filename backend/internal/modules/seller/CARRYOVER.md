@@ -461,3 +461,7 @@ ADR `2026-10-27-general-ecommerce-scope-cut` D3：食品業者登錄（`internal
 - 商品瀏覽數（7c 階段 4，後續重做）：`seller.product_view_events`（7 天保留的原始事件）加 `seller.product_views_daily(store_id, day)`（儀表板唯一讀取的彙總）取代 `seller_product_view_log`，鍵是 `store_id`、日與週以台北時間為界；彙總沒有 `product_id`、`source`、`seller_store_visitors`。
 - 事件在寫入的 transaction 內發出，只在停權期間真的開始或結束時發停權事件；沒有 outbox、Redis、會員方案。
 - 治理：檢舉與食安通報合成一張 `reports`（通報人是登入的買家或匿名者，嚴重度由 admin 決定，去重以台北日／週為界，匿名聯絡欄位到期清成 NULL）；違規（認定）與處分分開，處分是 `measures`（警告或停權，依據一到多筆認定或風險類型），停權不論依據都發停權事件；處分種類只有警告與停權；沒有公開違規列表、`seller_notification_log`、評分與 review 的 consumer；升級規則鎖店家列，不用 advisory lock；停權狀態讀取時推導，期間與事件由排在 `ends_at` 的 job 與只掃有進行中期間或此刻生效中停權措施的帳號的對帳維護；申訴的資格是帳號擁有措施，不看目前的店家。
+
+## 特性測試
+
+不採用雙跑的特性測試（遷移計畫 A3 決定第 11 項，比照 identity、buyer）：舊的一側要起 seller-service、gateway 與它們的資料庫，成本高；API 在步驟 8 重新設計後 REST 與 Connect 兩個 driver 對不上；而且盤點刻意修正的缺陷（先建店後驗證、整筆覆寫清掉電話、以 account_id 釋放圖片、停權的賣家不能關店）會讓兩側得到不同的結果。行為由本目錄與 `internal/closing` 的 integration 測試覆蓋，盤點的缺陷各有一個會在舊行為失敗的回歸測試；Connect handler 的測試在步驟 8。

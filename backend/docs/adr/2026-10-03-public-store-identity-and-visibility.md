@@ -11,7 +11,7 @@
 
 舊的 `GET /public/sellers/{id}` 同時做三件事：店面頁、各處店家卡片的補資料（收藏、追蹤、聊天、訂單、貼文）、把 `store_id` 或 `store_code` 解析成店家。它不分狀態，回傳任何店家，包括已關閉與還沒通過 KYC 的。buyer-app 的收藏與追蹤逐店呼叫它。
 
-7c 決定以「可公開曝光」取代 KYC 的內容前置條件（`model.Exposable`：營運中、沒有停權、KYC 與 PayUni 流程核准、店名＋logo＋所在地齊全）；seller `AGENTS.md` 留下「對外隱藏已關閉店家的資料由呈現層決定（步驟 8）」。
+7c 決定以「可公開曝光」取代 KYC 的內容前置條件（`model.Exposable`：營運中、沒有停權、KYC 與 PayUni 流程核准、店名＋logo＋所在地齊全）；seller 模組規格（`docs/modules/seller.md` §1.3）寫明已關閉店家的資料怎麼對外呈現由本 ADR 決定。
 
 約束：
 - 繼承：`store_id` 在過渡期是 `bigint IDENTITY`（Java 以 BIGINT 保存），連號、可以逐號列舉；最後一個 Java 消費者退場後換成 uuid（ADR `2026-09-25-row-identity-by-data-kind.md` 的過渡規則）。仍成立，這是外部約束。

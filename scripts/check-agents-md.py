@@ -28,9 +28,7 @@ NEXTJS_BLOCK = re.compile(
 )
 
 # 超限的檔與清掉它的步驟（backend/docs/plans/2026-10-28-agents-md-layering.md）。
-EXCEPTIONS = {
-    "backend/internal/modules/seller/AGENTS.md": "步驟 6（之後由 seller 拆模組計畫清掉，D4）",
-}
+EXCEPTIONS: dict[str, str] = {}
 
 
 def limit_for(path: str) -> int:
