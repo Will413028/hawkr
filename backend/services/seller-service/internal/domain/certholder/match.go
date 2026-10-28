@@ -3,7 +3,7 @@
 // deciding whether the 業者名稱 a government certificate lookup returns actually
 // belongs to the seller who submitted that certificate number.
 //
-// Why this lives inside seller-service: real_name is PII (18 號設計書 lists it as a
+// Why this lives inside seller-service: real_name is PII (docs/modules/seller.md §13 lists it as a
 // plaintext-retained column) and must not cross a service boundary. Callers send a
 // store_id plus the holder name and get back a boolean and the *name* of the field
 // that matched — never the value.

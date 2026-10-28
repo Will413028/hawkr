@@ -31,7 +31,7 @@ type CertHolderMatchResult struct {
 //
 // 🔴 The seller's names never leave this call: only the verdict and the name of
 // the field that matched are returned, and only those are logged. real_name is
-// PII (18 號設計書) and holderName is third-party data about a possibly unrelated
+// PII (docs/modules/seller.md §13) and holderName is third-party data about a possibly unrelated
 // business; neither belongs in a log line or a trace attribute.
 //
 // A repository failure is returned as an error rather than being flattened into a

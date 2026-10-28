@@ -1,4 +1,4 @@
-// Package views 是商品瀏覽數（設計書 28）：寫入端只追加原始事件（product_view_events），背景的彙總 job 在請求的關鍵路徑之外
+// Package views 是商品瀏覽數（`docs/modules/seller.md` §16）：寫入端只追加原始事件（product_view_events），背景的彙總 job 在請求的關鍵路徑之外
 // 解析商品所屬的店家，並彙總成每家店每個台北日一列的 product_views_daily；儀表板（本週與上週，週日起算）只讀這張彙總表，
 // 是顯示數字的唯一事實來源。總次數、不去重。來源是 seller-service 的 seller_product_view_log（遷移計畫 A3b 步驟 7c 階段 4）。
 //

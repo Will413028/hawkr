@@ -171,8 +171,8 @@ N/A——店家資料變動的快取失效走 §6.4 的 revalidate webhook，非
 | 呼叫方 | 單體的 seller 模組（`internal/platform/revalidate`，River job），與 `review-service`／`product-service` 共用同一套 webhook 契約（見「後端服務責任邊界規範」§9.7） |
 | 端點 | `hawkr-website` `POST /api/revalidate` |
 | Payload | cache tag 清單（本情境為 `seller:{store_id}` 與 `seller:{store_code}`） |
-| 觸發時機 | 店家「可公開曝光」的任一輸入（店名、介紹、logo、所在地等）寫入的 transaction 內排入 job，commit 之後才送出 |
-| 失敗行為 | 暫時性的失敗（連線錯誤、timeout、5xx、429）由 River 退避重試；若 `WEB_REVALIDATE_BASE_URL`/`WEB_REVALIDATE_SECRET` 未設定，啟動時記 warn log 且 revalidate 停用（前端快取不失效，需等 `cacheLife("seller")` TTL 到期）——屬既有降級行為，非本文件新增風險 |
+| 觸發時機 | 由 seller 模組決定，見 `docs/modules/seller.md` §12.1 |
+| 失敗行為 | 重試與停用條件見 `docs/modules/seller.md` §12.1；停用或重試用盡時前端快取不失效，需等 `cacheLife("seller")` TTL 到期 |
 
 ### 6.5 Next.js Route Handler（非後端 API）
 
@@ -209,7 +209,7 @@ sequenceDiagram
 
 | 外部呼叫 | 逾時/重試 | 冪等 | 降級行為 |
 |---|---|---|---|
-| revalidate job → `/api/revalidate` | 每次 5 秒 timeout、最多 5 次嘗試 | 冪等（bust 同一 tag 重複執行無副作用） | Webhook 未設定或重試用盡 → 前端維持舊快取直到 `cacheLife("seller")` TTL 到期，非阻斷性降級 |
+| revalidate job → `/api/revalidate` | 逾時與重試次數見 `docs/modules/seller.md` §12.1 | 冪等（bust 同一 tag 重複執行無副作用） | Webhook 未設定或重試用盡 → 前端維持舊快取直到 `cacheLife("seller")` TTL 到期，非阻斷性降級 |
 | JSON-LD 缺資料欄位 | N/A | N/A | `productSchema()`/`sellerSchema()` 缺 price/rating 等資料時直接省略該欄位，不捏造假值（理由見 [ADR](../adr/2026-09-18-seo-structured-data-and-canonical-source.md)） |
 
 ### 7.4 並發與順序

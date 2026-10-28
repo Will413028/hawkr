@@ -19,7 +19,7 @@ type ProductView struct {
 	OccurredAt time.Time
 }
 
-// RecordProductView 追加一筆原始瀏覽事件（匿名的打點入口用，步驟 8；總次數、不去重，設計書 28）。只有一句 insert，不解析
+// RecordProductView 追加一筆原始瀏覽事件（匿名的打點入口用，步驟 8；總次數、不去重，`docs/modules/seller.md` §16）。只有一句 insert，不解析
 // 商品所屬的店家（由彙總 job 在背景做），可以在 transaction 內或外呼叫。
 func (m *Module) RecordProductView(ctx context.Context, productID int64) error {
 	return m.views.Record(ctx, productID)

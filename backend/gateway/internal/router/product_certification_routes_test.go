@@ -82,7 +82,7 @@ func TestReverifyRouteIsPostOnly(t *testing.T) {
 	}
 }
 
-// /admin/certifications* 與 GET /admin/sellers/:store_id 是商家實名認證（KYC，18 號設計書）的前綴，KYC 審核在單體
+// /admin/certifications* 與 GET /admin/sellers/:store_id 是商家實名認證（KYC，`docs/modules/seller.md` §13）的前綴，KYC 審核在單體
 // （SellerAdminService.GetKYCApplication、ApproveKYC、RejectKYC…），商品認證刻意不佔用同一段（路由前綴共用會讓 gin 的
 // param 衝突在啟動時才爆，或安靜地讓其中一組蓋住另一組）。這條測試守「不會復活」：gateway 不得註冊 KYC 的後台路由
 // （一旦有人在 /admin/certifications 底下加路由，不論是不是商品認證，同一份申請就有兩個審核入口），

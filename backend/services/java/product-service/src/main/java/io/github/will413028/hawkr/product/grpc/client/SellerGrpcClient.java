@@ -64,7 +64,7 @@ public class SellerGrpcClient {
      * 被自動核准到另一家的文旦禮盒上）。
      *
      * <p>🔴 <b>比對在 seller-service 內部完成</b>，這裡只拿得到布林與命中欄位名——
-     * {@code real_name} 是 PII（18 號設計書列為明文保留欄），不跨服務傳輸。
+     * {@code real_name} 是 PII（`docs/modules/seller.md` §13 列為明文保留欄），不跨服務傳輸。
      *
      * <p>🔴 <b>失敗一律 fail-closed</b>：回 {@link HolderMatch#unavailable()}，
      * 讓呼叫端轉人工審核。這與本類其他方法「降級回空值繼續跑」的慣例<b>相反</b>——

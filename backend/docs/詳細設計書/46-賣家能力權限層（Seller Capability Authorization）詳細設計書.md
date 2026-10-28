@@ -1,13 +1,17 @@
 # 賣家能力權限層（Seller Capability Authorization）詳細設計書
 
+> 本檔是 gateway 賣家面路由的能力檢查（`requireSeller`、豁免清單）、IM 與 social 的停權細分、停權連動 saga 的消費端與收斂點 backstop（order、product）的現行規格；這些服務搬進單體時刪除。
+>
+> 能力的推導（`CapabilitiesOf`、能力表、停權白名單）、Connect 宣告表、轉給 gateway 的 header 契約與停權狀態傳播由單體的 seller 模組擁有，以 `docs/modules/seller.md` §10 為準。
+
 ## 0. 文件元資訊 (Metadata)
 
 | 項目 | 值 |
 |---|---|
 | 維護者 | 維護團隊 |
-| 對應程式碼 | 推導：`internal/modules/seller/internal/model/capability.go`（`CapabilitiesOf`、`Authorize`）；Connect 宣告與執行：`internal/httpapi/seller/declaration.go`（`SellerAppService` 的宣告表與 interceptor）；轉給 gateway 的 header：`internal/legacy/gatewayproxy/proxy.go`；gateway 解析：`gateway/internal/middleware/auth.go`；gateway 檢查：`gateway/internal/authz/*`（capability／registry）、`gateway/internal/router/seller_capability.go`（`requireSeller(cap)` 掛載）、`gateway/internal/router/seller_route_assert.go`（boot 斷言） |
+| 對應程式碼 | gateway 解析：`gateway/internal/middleware/auth.go`；gateway 檢查：`gateway/internal/authz/*`（capability／registry）、`gateway/internal/router/seller_capability.go`（`requireSeller(cap)` 掛載）、`gateway/internal/router/seller_route_assert.go`（boot 斷言） |
 | 相關 ADR | [2026-09-18-seller-capability-authorization](../adr/2026-09-18-seller-capability-authorization.md)、[2026-09-29-seller-suspension-and-business-identity-in-monolith](../adr/2026-09-29-seller-suspension-and-business-identity-in-monolith.md) |
-| 相關 doc | 32（商家治理，停權的來源）、02（product 收斂點 backstop）、03（order 結帳收斂點）、20（結帳模組）、14（IM 訂單關聯細分）、36（MQ 事件）、44（身份模型，角色 bitmask 來源）、56（ADM 代行營運，`AdminCapability` 的 owner）、58（發票 capability）、65（物流履約，`CAP_ORDER_FULFILL`／`CAP_PRODUCT_MANAGE` 的下游語意）、開發規範《賣家能力權限層規範》 |
+| 相關 doc | 02（product 收斂點 backstop）、03（order 結帳收斂點）、20（結帳模組）、14（IM 訂單關聯細分）、36（MQ 事件）、44（gateway 身份解析與守衛）、56（ADM 代行營運，`AdminCapability` 的 owner）、58（發票 capability）、65（物流履約，`CAP_ORDER_FULFILL`／`CAP_PRODUCT_MANAGE` 的下游語意）、開發規範《賣家能力權限層規範》 |
 
 ---
 
@@ -15,28 +19,25 @@
 
 ### 1.1 文件定位
 
-本文件描述賣家能力權限層（Seller Capability Authorization Layer）——一個 deny-by-default 的橫切授權架構，回答唯一問題：「這個賣家當前能不能做這件事」。目標讀者為單體 seller 模組、Connect 入口、gateway 與各連動服務的實作者。本文件**不涵蓋**停權的商業判定規則（何時該停權由 32 號商家治理與 admin 決策決定）、亦不涵蓋各連動 saga 的內部細節（在對應服務設計書擴充）。
+本文件描述賣家能力權限層（Seller Capability Authorization Layer）在 gateway 與連動服務的部分：一個 deny-by-default 的橫切授權架構，回答唯一問題：「這個賣家當前能不能做這件事」。目標讀者為 gateway 與各連動服務的實作者。本文件**不涵蓋**能力的推導與 Connect 入口（`docs/modules/seller.md` §10）、停權的商業判定規則（`docs/modules/seller.md` §5）、亦不涵蓋各連動 saga 的內部細節（在對應服務設計書）。
 
 ### 1.2 一句話定位
 
-賣家能做哪些動作**只在 seller 模組推導一次**（`CapabilitiesOf`）；每個賣家入口在**註冊處宣告**它需要的能力，執行處只檢查能力集合的成員，不自己從停權或生命週期推導。賣家 gating 判斷不得散落在 handler 或各 `routes_*.go` 內。
+賣家能做哪些動作只在 seller 模組推導一次（`docs/modules/seller.md` §10）；gateway 的每個賣家入口在**註冊處宣告**它需要的能力，執行處只檢查能力集合的成員，不自己從停權或生命週期推導。賣家 gating 判斷不得散落在 handler 或各 `routes_*.go` 內。
 
 ### 1.3 設計目標 (Goals) 與 非目標 (Non-Goals)
 
 | 類型 | 項目 |
 |---|---|
-| **Goal** | 「賣家能不能做某事」只有一個推導點：seller 模組的 `CapabilitiesOf`；Connect 入口與 gateway 都消費它的結果 |
-| **Goal** | deny-by-default：入口必須顯式宣告能力才可被賣家存取，且此保證**可被機器驗證**（Connect 在服務啟動時雙向對照宣告表與 descriptor；gateway 在 boot 斷言路由歸類） |
-| **Goal** | 停權「寫入即生效」（下一個賣家請求生效），不需重鑄 token：能力在每個請求由權威資料推導 |
-| **Goal** | fail-closed：推導或查詢出錯一律拒絕（Connect 回錯誤；轉給 gateway 的請求不轉發；gateway 缺能力集合或 header 不合法一律拒絕）。停權狀態沒有快取 |
-| **Non-Goal** | **不**在能力層承載「何時停權」的商業判定（由 32 號 + admin 決策） |
-| **Non-Goal** | **不**實作會員分級。能力推導沒有 tier 維度 |
+| **Goal** | deny-by-default：gateway 入口必須顯式宣告能力才可被賣家存取，且此保證可被機器驗證（gateway 在 boot 斷言路由歸類） |
+| **Goal** | fail-closed：gateway 缺能力集合或 header 不合法一律拒絕 |
+| **Non-Goal** | **不**在能力層承載「何時停權」的商業判定（`docs/modules/seller.md` §5 + admin 決策） |
 | **Non-Goal** | **不**涵蓋 Admin RBAC。`requireAdmin()` 無 capability 參數，admin 端的授權 token 是另一個型別 `AdminCapability`（`gateway/internal/authz/admin_capability.go`），owner 是 56 號《ADM 代行營運》。兩型兩 registry 刻意不合併，理由見相關 ADR |
 
 ### 1.4 與其他設計書／服務的關係
 
-- **上游身份**：賣家角色（accountType 2/3、role bitmask）來源見 44 號身份模型；能力檢查在角色檢查通過後做。
-- **停權來源**：seller 模組的有效措施（`seller.effective_measures`）；治理的措施與認定見 32 號。
+- **上游身份**：賣家角色（accountType 2/3、role bitmask）來源見 44 號 gateway 身份解析；能力檢查在角色檢查通過後做。
+- **停權來源**：seller 模組的有效措施（`seller.effective_measures`）；治理的措施與認定見 `docs/modules/seller.md` §5。
 - **連動 saga**：停權事件驅動 product 下架、order 取消未付款、coupon 停券、notification 通知——事件定義見 36 號，各服務動作見 02/03/07/12 號。本文件只描述能力層與收斂點兜底部分。
 - **收斂點兜底**：結帳鏈 CheckoutValidate（03/20 號）與 product ACTIVE transition（02 號）是正確性的 fail-closed backstop（§6）。
 
@@ -66,7 +67,7 @@ flowchart LR
 
 | | 涵蓋 (In-scope) | 不涵蓋 (Out-of-scope，由誰負責) |
 |---|---|---|
-| 責任 | 賣家能力的推導；Connect 賣家方法與 gateway 賣家路由的能力宣告與 deny 判定；停權狀態傳給 gateway 的契約；收斂點兜底的接線點界定 | 停權商業判定 → 32 號 + admin；連動 saga 各服務動作 → 02/03/07/12；停權原因/業務碼的 CodeMeta 值 → CodeMeta 文件 |
+| 責任 | gateway 賣家路由的能力宣告與 deny 判定；收斂點兜底的接線點界定 | 停權商業判定 → `docs/modules/seller.md` §5 + admin；連動 saga 各服務動作 → 02/03/07/12；停權原因/業務碼的 CodeMeta 值 → CodeMeta 文件 |
 
 **gateway 的 enforcement 邊界**：`requireSeller(cap)` 掛載的賣家面路由全集 ∪ `sellerViewGuard` 的 `?view=` 路由。JWTAuth-only 買賣共用路由**不受 guard 保護**，其停權處置逐條列於 §4.4 豁免清單並附理由。admin proxy（`routes_seller.go` PATCH /sellers/:id，admin JWT）非賣家自助入口，不在邊界內。
 
@@ -82,18 +83,12 @@ flowchart LR
 
 ### 3.1 解法總綱 (Solution Strategy)
 
-能力由 seller 模組單點推導：`CapabilitiesOf(Store)` 依店家的條件（生命週期、KYC 流程核准、店名、logo、鄉鎮市區）與停權（有效措施）回傳每個能力的狀態與缺的條件。每個入口宣告所需能力並只做集合成員檢查：
-
-- **Connect（`SellerAppService`）**：宣告表（key 是生成的 procedure 常數）由 interceptor 讀取並執行，呼叫 `seller.ActingStore`，把店家放進 ctx；handler 不自己檢查能力。宣告表與方法必須一一對應，缺宣告或指向不存在的方法都使 service 不能啟動。模組的 API 對 KYC 等寫入再以 `Authorize` 檢查一次同一個能力（深度防禦）。
-- **gateway（尚未搬進單體的服務的 REST）**：單體轉發時帶已解析的 `X-Store-Id`、`X-Seller-Capabilities`（現任店家目前啟用的動作類能力，逗號分隔）與 `X-Seller-Suspended`；`requireSeller(cap)` 只檢查 cap 是否在集合內。
+能力由 seller 模組單點推導（`docs/modules/seller.md` §10）。gateway（尚未搬進單體的服務的 REST）收單體轉發時帶的已解析 `X-Store-Id`、`X-Seller-Capabilities`（現任店家目前啟用的動作類能力，逗號分隔）與 `X-Seller-Suspended`；`requireSeller(cap)` 只檢查 cap 是否在集合內。
 
 ### 3.2 元件
 
 | 元件 | 責任 |
 |---|---|
-| `seller/internal/model/capability.go` | 能力常數、能力對條件的對應表（`needs`）、`CapabilitiesOf`（唯一推導點）、`Authorize`（缺能力時的錯誤） |
-| `httpapi/seller/declaration.go` | `SellerAppService` 每個方法的宣告（需要的能力，或明列理由的豁免），啟動時雙向對照 descriptor |
-| `legacy/gatewayproxy/proxy.go` | 每個轉發的登入請求解析呼叫者的買家與店家，組出三個 header；查詢失敗時不轉發 |
 | `gateway/internal/middleware/auth.go` | 解析 header：`X-Store-Id` 與 `X-Seller-Capabilities` 必須同時存在或同時不存在；空值、不認得的 token、不合法的停權原因都是契約錯誤，一律拒絕 |
 | `gateway/internal/authz/capability.go`、`registry.go` | gateway 的能力 token（與 seller 模組的能力名稱是同一組字串，`TestCapabilityTokensMatchGateway` 守）；`(method, path, cap)` 註冊表 |
 | `router/requireSeller(cap)` | 角色檢查 + 能力集合成員檢查合一的 middleware；cap 是必填參數 |
@@ -114,56 +109,13 @@ flowchart LR
 
 ### 3.4 Capability 定義（語意分組）
 
-**存放位置**：seller 模組的 `model.Capability` 是推導的來源；gateway 的 `authz.Capability` 是同一組字串，是 gateway 內部授權 token，不進 CodeMeta（§8.1）。Connect 的 `GetMyStore` 回傳呼叫者目前的能力（`SellerCapability`），client 事前即知哪些操作可用，伺服器仍逐方法檢查。粒度選型理由見[相關 ADR](../adr/2026-09-18-seller-capability-authorization.md) D2。
+**存放位置**：seller 模組的 `model.Capability` 是推導的來源，能力表、停權白名單與分派判準見 `docs/modules/seller.md` §10.1；gateway 的 `authz.Capability` 是同一組字串，是 gateway 內部授權 token，不進 CodeMeta（§8.1）。
 
-| Capability | 語意 | active | suspended |
-|---|---|:---:|:---:|
-| `CAP_ACCOUNT_SELF_READ` | 看自己 profile / 停權狀態 | ✓ | ✓ |
-| `CAP_STOREFRONT_WRITE` | 店面設定寫入（profile/logo/封面/onboarding/KYC 草稿、送出與取消） | ✓ | ✗ |
-| `CAP_PRODUCT_MANAGE` | **供給定義**：商品建立/編輯/上下架/匯入/分類/運費試算/認證/hashtag；物流方案供給 | ✓ | ✗ |
-| `CAP_ORDER_FULFILL` | **既有契約的履約**：出貨/物流/售後/訂單查詢/PayUni 狀態；結算與撥款檢視（65） | ✓ | ✓ |
-| `CAP_ORDER_CONTRACT` | 收縮型：cancelShipment（取消出貨+退款受理） | ✓ | ✓ |
-| `CAP_MARKETING` | 行銷經營：優惠券建立/CRM 寫入+查詢/貼文發佈/AI 助理/dashboard/報表/賣家市場行情查詢、雷達與追蹤增刪（Pricebook） | ✓ | ✗ |
-| `CAP_CONTENT_CONTRACT` | 收縮型：刪自己貼文、自行下架貼文、撤自己券 | ✓ | ✓ |
-| `CAP_CHAT_SEND` | IM 送訊（停權時 im-service 再做訂單關聯細分） | ✓ | ✓(受限) |
-| `CAP_CHAT_READ` | IM 讀取（history/conversations/unread/已讀） | ✓ | ✓ |
-| `CAP_NOTIFICATION` | 通知收件箱/偏好/device-token | ✓ | ✓ |
-| `CAP_ACCOUNT_CLOSE` | 收縮型：關店 | ✓ | ✓ |
-| `CAP_INVOICE_MANAGE` | 發票／稅務憑證的查詢與設定（總覽、AMEGO 憑證、收據代製授權、發票紀錄與明細、異常詳情、進項發票）；擴張型與唯讀查看（58 §8.1.6(a)） | ✓ | ✗ |
-| `CAP_INVOICE_TAX_REMEDY` | 稅務身分申請／補件／延長申請／自行開票責任條款同意＋自行開立回報（58 §8.1.6(a)）——救濟管道 | ✓ | ✓ |
-| `CAP_SHIPPING_SETUP` | 物流建店、啟用與關閉配送方式；前置條件是 KYC 流程核准（含 PayUni 核准） | ✓（KYC 核准後） | ✗ |
-| `CAP_PUBLIC_LISTING` | **狀態不是動作**：買家看得到店面、可以結帳。只出現在 `CapabilitiesOf` 的結果（缺的條件就是 MissingExposure），方法不能宣告它，也不進 `X-Seller-Capabilities` | 條件齊全時 | ✗ |
+### 3.4 「新增入口忘記宣告」的結構性防呆
 
-> **唯讀 ≠ 放行**：dashboard / CRM 查詢 / 報表 / AI 助理 / 發票查詢即使純唯讀也歸 BLOCK 類（suspended=✗）。
-
-> **`CAP_PRODUCT_MANAGE` vs `CAP_ORDER_FULFILL` 的分派判準**（物流履約各模組一律照此判，不逐模組再議）：碰**供給定義**（方案／版本／發布／上下架／開通）→ `CAP_PRODUCT_MANAGE`（**不在**白名單）；碰**既有契約的履約**（日曆／例外／承載／出貨／結算檢視）→ `CAP_ORDER_FULFILL`（**在**白名單）。依據：停權賣家必須處理得完既有訂單，但不得再產生新的供給。
-
-> **發票軸必須是兩個 token 而不是一個**：白名單成員資格由「能力需不需要 NOT_SUSPENDED 條件」編碼 ⇒ 同一個 token 不可能既 BLOCK 又放行，而發票模組同時需要兩類。漏把 `CAP_INVOICE_TAX_REMEDY` 設成需要 NOT_SUSPENDED 是**靜默失效**：只有停權賣家會遇到，症狀是死結（補不了稅務件 ⇒ 審核不完成 ⇒ 恢復後依然接不了單）。
-
-### 3.5 能力推導（條件 → 能力）
-
-每個能力對應自己需要的條件（Stripe Connect 的 requirements 模型），能力的啟用、缺項與停權白名單都由 `needs` 這一張表推導：
-
-| 條件 | 意義 | 需要它的能力 |
-|---|---|---|
-| `STORE_ACTIVE` | 店家未關閉 | 全部（關閉的店家沒有任何能力；`Authorize` 回 NotFound） |
-| `NOT_SUSPENDED` | 沒有生效中的停權措施 | 經營類：`STOREFRONT_WRITE`、`PRODUCT_MANAGE`、`MARKETING`、`INVOICE_MANAGE`、`SHIPPING_SETUP`、`PUBLIC_LISTING` |
-| `NOT_PENDING_DELETION` | 店家沒有隨帳號進入等待刪除 | 經營類與 `ACCOUNT_CLOSE`（等待刪除時只剩履約類；關店由刪帳流程負責） |
-| `KYC_APPROVED` | KYC 流程核准（含 PayUni 核准） | `SHIPPING_SETUP`、`PUBLIC_LISTING` |
-| `STORE_NAME`、`LOGO`、`TOWN_CODE` | 公開曝光需要的店面資料 | `PUBLIC_LISTING` |
-
-- **停權白名單**（`GrantedWhenSuspended`）= 動作類能力中不需要 `NOT_SUSPENDED` 的那些：`ACCOUNT_SELF_READ`、`ORDER_FULFILL`、`ORDER_CONTRACT`、`CHAT_SEND`、`CHAT_READ`、`NOTIFICATION`、`CONTENT_CONTRACT`、`ACCOUNT_CLOSE`、`INVOICE_TAX_REMEDY`。
-- **白名單的納入判準（不是列舉，是規則）**：只有四類語意合格——① 既有訂單／出貨／售後的處理 ② 收縮型操作（只減不增） ③ 救濟管道（申訴、補件） ④ 通知與看自己狀態。**純唯讀查看不合格**。新增能力時照這四類判，判不進去就不能放進不需要 `NOT_SUSPENDED` 的那一類。
-- **`Authorize` 的拒絕形狀**：店家已關閉 → NotFound；停權造成的缺項 → `permission_denied` + `ErrorInfo.reason` `SELLER_SUSPENDED`；其他缺項（等待刪除、KYC 流程未核准）→ `failed_precondition` + `SELLER_REQUIREMENT_MISSING`，缺的條件在 metadata 的 `missingRequirements`。店家的條件沒有經 stint 讀出推導過一律拒絕。
-- **停權的兩類來源**共用同一個白名單：依據風險類型的措施與只依據認定的措施，差異只在生命週期（見 32 號）。轉給 gateway 時：管理員停權是原因碼 9601、9602、9603，治理停權是 `SUSPENDED_GOVERNANCE`；不認得的措施回錯誤，不當成有效值往下傳。
-- 店家關閉後沒有任何能力（缺 `STORE_ACTIVE`），所以能力層不需要另外的「已刪除」狀態。
-
-### 3.6 「新增入口忘記宣告」的結構性防呆
-
-1. **Connect**：`CheckDeclarations` 在建構 interceptor 時雙向對照宣告表與 `SellerAppService` descriptor；缺宣告、多餘宣告、宣告不合法（既無能力也無豁免理由）任一項都使 service 不能啟動。豁免必須附理由字串。
-2. **gateway 編譯期**：`requireSeller` 唯一簽章是 `requireSeller(cap Capability)`，`sellerHandle` 掛載時自動註冊到 registry；`authz.Register` 遇到不認得的 token 直接 panic。
-3. **gateway 啟動期斷言（boot fail-fast）**：router 建構完成後 walk `engine.Routes()`，斷言 `/api/v1/app` 下不存在未豁免的 wildcard 路由，且 `strictSellerPrefixes`（整個都是賣家面的區域，例如 `/products`、`/shipments`、`/seller/invoices`）下每條路由都已宣告 capability，不一致 **panic**。
-4. **CI**：`seller_capability_test.go` 枚舉 `/api/v1/app` 全部路由逐條斷言歸屬；`IsSeller(` 與停權判斷只允許出現在 authz package。
+1. **gateway 編譯期**：`requireSeller` 唯一簽章是 `requireSeller(cap Capability)`，`sellerHandle` 掛載時自動註冊到 registry；`authz.Register` 遇到不認得的 token 直接 panic。
+2. **gateway 啟動期斷言（boot fail-fast）**：router 建構完成後 walk `engine.Routes()`，斷言 `/api/v1/app` 下不存在未豁免的 wildcard 路由，且 `strictSellerPrefixes`（整個都是賣家面的區域，例如 `/products`、`/shipments`、`/seller/invoices`）下每條路由都已宣告 capability，不一致 **panic**。
+3. **CI**：`seller_capability_test.go` 枚舉 `/api/v1/app` 全部路由逐條斷言歸屬；`IsSeller(` 與停權判斷只允許出現在 authz package。
 
 **殘餘風險**：「新增一條賣家路由但完全不掛 `requireSeller` 也不進豁免清單」會被上述斷言抓到；若開發者同時把它加進豁免清單，則屬 review 層語意錯誤，機器不可判定——故 §4.4 豁免清單每條附「為何豁免」理由，靠 review 檢核。
 
@@ -173,12 +125,7 @@ flowchart LR
 
 ### 4.1 傳播機制
 
-停權狀態**沒有快取，也沒有標記**：能力在每個賣家請求由權威資料推導。
-
-- **Connect**：interceptor 呼叫 `seller.ActingStore`，由讀店家時帶上的條件（`seller.store_requirement_flags`）與有效措施（`seller.effective_measures`）一次推導 `CapabilitiesOf`，缺能力時回 `Authorize` 的錯誤。
-- **轉發到 gateway 的請求**：`legacy/gatewayproxy` 對每個轉發的登入請求解析 `X-Buyer-Id`、`X-Store-Id`，並帶 `X-Seller-Capabilities`（只放啟用的動作類能力，不含狀態 `CAP_PUBLIC_LISTING`）與 `X-Seller-Suspended`（缺省表示未停權）。同一個請求先清掉呼叫者自帶的這些 header 再設值。現任店家沒有任何能力（已關閉）卻出現、能力 token 不認得、停權原因不認得，一律回錯誤，請求不轉發。
-- **停權寫入點**：停權狀態只由 seller 模組的措施決定；寫入措施的 transaction 發出 `StoreSuspended`／`StoreUnsuspended` 模組事件，舊契約的 `seller.suspended`／`seller.unsuspended` MQ 訊息由 `internal/legacy/sellerrelay` 轉出。
-- 傳播延遲 = 0：下一個請求即以新的措施推導。
+停權狀態沒有快取也沒有標記，傳播機制（Connect 的 interceptor、轉發到 gateway 的 header 契約、停權寫入點）見 `docs/modules/seller.md` §10.2；傳播延遲為 0。gateway 收到的 header 不合法（`X-Store-Id` 與 `X-Seller-Capabilities` 不成對、能力 token 不認得、停權原因不認得）一律拒絕。
 
 ### 4.2 授權判定時序
 
@@ -240,9 +187,9 @@ sequenceDiagram
 
 ## 5. 停權生命週期與連動（能力層相關部分）
 
-> 完整 saga、資料表、各 consumer 動作見 32/02/03/07/12/36 號；本章只述與能力層/狀態傳播相關者。
+> 完整 saga、資料表、各 consumer 動作見 02/03/07/12/36 號；本章只述與能力層/狀態傳播相關者。
 
-- **停權來源**：seller 模組的有效措施（措施的建立、撤銷、結束、申覆與到期見 32 號）。措施生效或結束的 transaction 內發出 `StoreSuspended`／`StoreUnsuspended`，同一個 transaction 之後的請求即以新狀態推導能力。
+- **停權來源**：seller 模組的有效措施（措施的建立、撤銷、結束、申覆與到期見 `docs/modules/seller.md` §5）。措施生效或結束的 transaction 內發出 `StoreSuspended`／`StoreUnsuspended`，同一個 transaction 之後的請求即以新狀態推導能力。
 - **事件**：`hawkr.seller` exchange，routing key `seller.suspended` / `seller.unsuspended`（producer = 單體的 `sellerrelay`；consumers = product/order/coupon/notification/im）。詳見 36 號。
 - **連動摘要**：product 下架 ACTIVE→INACTIVE + 可逆快照、order 批次取消未付款（`OrderCancelReason.SELLER_SUSPENDED`）、coupon 停用模板（`disabled_by_suspension` 旗標）、notification 通知賣家+買家、im 斷 WS。
 
@@ -254,7 +201,7 @@ sequenceDiagram
 - `REPEATED_WARNING_IGNORED`（屢勸不改）
 - `OTHER`（其他）
 
-**不含 `FOOD_SAFETY`**（食安通報由 32 號治理路徑處理）。
+**不含 `FOOD_SAFETY`**。
 
 **傳輸值形態**：`X-Seller-Suspended`、MQ payload、gRPC/HTTP 傳輸**一律是 CodeMeta Value 數字碼**（`9601`/`9602`/`9603`）；治理停權是固定 sentinel `SUSPENDED_GOVERNANCE`（非 CodeMeta 列舉值，純顯示用途）。**輸出原樣透傳，不得加轉換層**。MQ `seller.suspended` payload 的 `reasonCode` 同為 Value；consumer 不得對 reasonCode 的值做判斷（im 只寫 log、notification 模板只渲染 `reasonLabel`）。`reasonLabel`（人類可讀 label，由 Value 查表）供 notification-service 的模板引擎字面代入。
 
@@ -301,7 +248,7 @@ product-service 的 `UpdateSellerProductStatus`（上架）與 CreateProduct 的
 | 9240 | `SELLER_SUSPENDED_OPERATION_BLOCKED` | gateway 能力層 deny（Go，REST） | 賣家（「賣家帳號停權中，無法執行此操作」） |
 | 9241 | `SELLER_SUSPENDED_PRODUCT_UNAVAILABLE` | 結帳收斂點（Java） | 買家（「賣家停權中，商品暫停販售」） |
 
-Connect 的賣家方法不使用業務碼：停權拒絕是 `permission_denied` + `ErrorInfo.reason` `SELLER_SUSPENDED`，其他缺項是 `failed_precondition` + `SELLER_REQUIREMENT_MISSING`（§3.5）。
+Connect 的賣家方法不使用業務碼：停權拒絕是 `permission_denied` + `ErrorInfo.reason` `SELLER_SUSPENDED`，其他缺項是 `failed_precondition` + `SELLER_REQUIREMENT_MISSING`（`docs/modules/seller.md` §10）。
 
 ### 7.2 REST 前端分流策略
 
@@ -362,7 +309,7 @@ CodeMeta SSOT 對象是「跨服務/前端可見的共享代碼值」。
 
 | 項目 | 嚴重度 | 影響 | 緩解 / 追蹤 |
 |---|---|---|---|
-| 豁免清單語意錯誤機器不可判定 | 中 | 誤把賣家路由加進豁免 = deny-by-default 漏洞 | §4.4 每條附理由 + review 檢核（§3.6 殘餘風險） |
+| 豁免清單語意錯誤機器不可判定 | 中 | 誤把賣家路由加進豁免 = deny-by-default 漏洞 | §4.4 每條附理由 + review 檢核（§3.4 殘餘風險） |
 | gateway 信任單體帶的 header | 中 | 能連到 gateway 的其他程序可偽造能力集合 | 只有單體連得到 gateway；gateway 的 header 解析對不合法值一律拒絕 |
 
 ---
@@ -370,7 +317,7 @@ CodeMeta SSOT 對象是「跨服務/前端可見的共享代碼值」。
 ## 12. 部署與維運 (Deployment)
 
 - **hot path smoke（強制）**：PR 動 product/order/cart/shipping 的 service/repository/gRPC/MQ Consumer → push 前必跑 `infra/smoke-checkout.sh` 全綠（[《開發工作流程》](../開發規範/開發工作流程.md) §6）。
-- **啟動斷言即部署守門**：任何漏宣告的 Connect 方法使單體啟動失敗、任何漏宣告的 gateway 路由使 gateway boot panic，不會帶病上線。
+- **啟動斷言即部署守門**：任何漏宣告的 gateway 路由使 gateway boot panic，不會帶病上線（Connect 方法的宣告檢查見 `docs/modules/seller.md` §10.2）。
 
 ---
 
@@ -378,8 +325,6 @@ CodeMeta SSOT 對象是「跨服務/前端可見的共享代碼值」。
 
 | 層級 | 覆蓋 | 關鍵場景 |
 |---|---|---|
-| unit | `CapabilitiesOf`／`Authorize` | active 全授予、停權只剩白名單、等待刪除只剩履約類、KYC 未核准缺 `SHIPPING_SETUP`、關閉的店家沒有能力 |
-| unit | Connect 宣告 | 宣告表與 descriptor 雙向對照（缺、多、不合法） |
 | unit | gateway boot 斷言 | `strictSellerPrefixes` 下逐條斷言已宣告；wildcard 存在 → panic；`TestCapabilityTokensMatchGateway` |
 | unit | header 契約 | `X-Store-Id` 與 `X-Seller-Capabilities` 成對；不合法 token、不合法停權原因一律拒絕 |
 | e2e | 停權端到端 | 停權 → 賣家上架被擋（9240／`SELLER_SUSPENDED`）、買家結帳停權商品被擋（9241）、出貨/售後仍可用；解除 → 商品精準還原 |
@@ -392,7 +337,7 @@ CodeMeta SSOT 對象是「跨服務/前端可見的共享代碼值」。
 | 術語 | 定義 |
 |---|---|
 | Capability | 語意分組的授權 token，標記「賣家能做的一類事」；推導來源是 seller 模組的 `model.Capability` |
-| `CapabilitiesOf` | 店家能力唯一的推導點：由店家的條件與有效措施，回傳每個能力的狀態與缺的條件 |
+| `CapabilitiesOf` | 店家能力唯一的推導點（`docs/modules/seller.md` §10） |
 | deny-by-default | 入口未顯式宣告 capability 則賣家不可存取；由啟動斷言機器驗證 |
 | 白名單能力 | 停權時仍授予的動作類能力（不需要 `NOT_SUSPENDED`） |
 | 收斂點 backstop | CheckoutValidate 與 product ACTIVE transition 的 fail-closed 檢查 |

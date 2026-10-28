@@ -4709,7 +4709,7 @@ ATM 退款一律走 PayUni 頁面版（UPP）：買家在 PayUni 頁面自行填
 >
 > `PaymentClient.offlineRefund()`（需後端提供銀行資訊的 API 版）同樣無任何呼叫端，ATM 退款只有頁面版一條路徑。
 
-**平台實際持有的銀行帳號**不在退款路徑，而在賣家實名認證的 `certification_applications.bank_account`（賣家收款帳戶，18 號設計書）。
+**平台實際持有的銀行帳號**不在退款路徑，而在賣家實名認證的 `certification_applications.bank_account`（賣家收款帳戶，`docs/modules/seller.md` §13）。
 
 ### 9.4 排程任務清單
 

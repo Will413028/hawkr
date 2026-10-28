@@ -22,7 +22,7 @@ const (
 // (issue #1176): event_id / merchant_id. EventID is the owning outbox row's
 // own TSID as a decimal string (issue #2806) — it doubles as the MQ event
 // identifier and the notification-service reference_id_template ingredient
-// (see 18 §5.7.1), replacing the previous uuid.NewString() value.
+// (see docs/modules/seller.md §14.2), replacing the previous uuid.NewString() value.
 //
 // StoreID is additive (issue #2707 followup, Phase A): the seller's current
 // store_id, threaded through alongside the pre-existing account_id-space

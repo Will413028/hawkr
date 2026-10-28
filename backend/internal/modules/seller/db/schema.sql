@@ -1466,7 +1466,7 @@ CREATE TABLE seller.prospect_categories (
 );
 CREATE INDEX prospect_categories_category ON seller.prospect_categories (category_id);
 
--- 商品瀏覽數的原始事件（設計書 28；ADR 2026-09-18 的修訂）：寫入端只追加（登入買家的 ProductViewed 與匿名的打點各一列，
+-- 商品瀏覽數的原始事件（`docs/modules/seller.md` §16；ADR 2026-09-18 的修訂）：寫入端只追加（登入買家的 ProductViewed 與匿名的打點各一列，
 -- event_id 是 UUIDv7，由產生端給，重送的事件不會多一列）。store_id、processed_at、outcome 由背景的彙總 job 補上：商品→店家
 -- 的解析在請求的關鍵路徑之外。outcome：COUNTED 是已解析並記進每日彙總（store_id 必有），UNRESOLVED 是商品不存在或沒有
 -- 店家（不計入任何地方，留著除錯，不重試）。已處理的事件滿 7 天由清理 job 刪除；重算只涵蓋保留期內。product_id 不建 FK
@@ -1491,10 +1491,10 @@ CREATE INDEX product_view_events_pending ON seller.product_view_events (occurred
 -- 清理 job 與重算依發生時間掃已處理的事件。
 CREATE INDEX product_view_events_processed ON seller.product_view_events (occurred_at) WHERE processed_at IS NOT NULL;
 
--- 商品瀏覽數的每日彙總（設計書 28；Q1 選項 A）：一家店一天一列，台北日曆日；儀表板只讀這張表（唯一事實來源），由彙總 job 依
+-- 商品瀏覽數的每日彙總（`docs/modules/seller.md` §16；Q1 選項 A）：一家店一天一列，台北日曆日；儀表板只讀這張表（唯一事實來源），由彙總 job 依
 -- 事件的 occurred_at（不是處理時間）累加，也可以由 RebuildProductViews 在原始事件的保留期內重算。只留店家與日期：沒有商品、
 -- 來源欄位（沒有讀取者）。store_id 參照 seller.stores：商品 port 解析出來的店家不在 seller.stores 時，彙總把事件標成
--- UNRESOLVED（不計入），不讓一個不認得的店家卡住整批；「總次數、不去重」是設計書 28 的產品規格。
+-- UNRESOLVED（不計入），不讓一個不認得的店家卡住整批；「總次數、不去重」是`docs/modules/seller.md` §16 的產品規格。
 CREATE TABLE seller.product_views_daily (
     store_id BIGINT NOT NULL REFERENCES seller.stores (store_id),
     day      DATE NOT NULL,

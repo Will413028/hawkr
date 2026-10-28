@@ -11,7 +11,7 @@ import (
 // ADM 端的商品認證審核（19 號設計書 §9.2 / §9.3）。
 //
 // 🔴 路徑用 /admin/product_certification_applications 而不是 /admin/certifications：
-// 後者已經被商家實名認證（KYC，18 號設計書）佔用，兩者是完全不同的東西。
+// 後者已經被商家實名認證（KYC，`docs/modules/seller.md` §13）佔用，兩者是完全不同的東西。
 //
 // 🔴 掛在 admin group（JWTAuth + requireAdmin），不是 adminNoAuth——那個 sibling group
 // 是代行營運專用，掛錯會在 boot 斷言直接 panic。

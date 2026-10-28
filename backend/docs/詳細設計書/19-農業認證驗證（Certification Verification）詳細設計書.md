@@ -1,5 +1,7 @@
 # 農業認證申請與審核（Product Certification Application & Review）設計書
 
+> **本檔是 product-service（Java）與 gateway 的現行規格**，該服務搬進單體時刪除。其中屬 seller 模組的持有人歸屬比對（`MatchCertificateHolder`）以 `docs/modules/seller.md` §1.3 為準，本檔只保留呼叫端的行為。
+
 > **檔名與標題刻意不一致**：本檔沿用原檔名 `19-農業認證驗證（Certification Verification）詳細設計書.md`
 > ——重新命名會斷掉 `docs/index.md`、`docs/_sidebar.md`、`00-總覽.md` 與其他設計書的既有連結。
 > 三處索引的**顯示標籤**已同步為本標題；引用本檔一律用**檔名或編號（19 號）**，不要用舊標題「農業認證驗證」。
@@ -1186,19 +1188,7 @@ principal、`SYSTEM` 的契約明寫「**不得拿 `store_id` 頂替**」⇒ 記
 而平台兩者都可能有。已核准 KYC 的賣家絕大多數有 `real_name`、僅少數有 `company_name`
 ⇒ 主要靠 `real_name`，公司名為補充。
 
-**正規化（寬鬆比對）**：比對前雙方皆去除空白與全形空白、全形轉半形、統一大小寫、
-去除公司型態後綴（股份有限公司／有限公司／企業社／商行／農場／Co., Ltd. 等）。
-寬鬆的方向是**減少誤判為不符**（誤判只會多送一筆人工審，代價可控）。
-
-**比對基準必須是「已通過實名認證」的名稱**：只取店家目前這個 stint 上人工核准（`seller.kyc_applications.status = 'APPROVED'`）的申請，名稱欄位是 `real_name` 與 `company_name`（不是「最新建立的那筆」——店家重新開店之後，舊 stint 的核准申請不得再代表這個店家）。PayUni 核准是金流開通，不是身分驗證，所以不是條件。店家不存在、已關閉、沒有申請、申請不是 `APPROVED` 都是沒有基準（`has_reference = false`），不是錯誤；讀取失敗回錯誤，呼叫方 fail-closed。
-🔴 **未通過審核的 KYC 名稱是賣家自己填的、平台沒驗過**，拿它當比對基準等於讓賣家填一個
-假名字去匹配任意一張他人的證書 —— 那會讓本節的防護完全失效。
-KYC 未通過的賣家 ⇒ `has_reference = false` ⇒ 轉人工，這是正確結果而非誤傷。
-
-**跨服務路徑（PII 不外流）**：比對在**單體的 seller 模組內部完成**（`internal/modules/seller/internal/kyc` 的 `MatchCertHolder`，規則在 `internal/modules/seller/internal/model/certholder.go`），
-product-service 只送 `store_id` + `holder_name`、拿回布林與命中欄位名。
-`real_name` 屬 PII（`seller.kyc_applications.real_name` 為明文欄），**不得跨服務傳輸**，
-亦不得寫入 `product_certification_application` 或稽核事件。
+**比對規則在 seller 模組**：基準只取店家目前 stint 上人工核准的 KYC 申請的 `real_name` 與 `company_name`，正規化與判定見 `docs/modules/seller.md` §1.3 的 `MatchCertificateHolder`。product-service 只送 `store_id` 與 `holder_name`，拿回布林與命中欄位名；`real_name` 屬 PII，不得跨服務傳輸，亦不得寫入 `product_certification_application` 或稽核事件。
 
 RPC 契約見 §10（`MatchCertificateHolder`）；稽核只記命中欄位名（`REAL_NAME`／`COMPANY_NAME`／`NONE`），不記值。
 

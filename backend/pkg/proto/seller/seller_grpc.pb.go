@@ -156,7 +156,7 @@ type SellerServiceClient interface {
 	//
 	// 🔴 比對在本服務內部完成，只回布林與命中欄位名：real_name 是 PII
 	//
-	//	（18 號設計書列為明文保留欄），不得跨服務傳輸。
+	//	（`docs/modules/seller.md` §13 列為明文保留欄），不得跨服務傳輸。
 	MatchCertificateHolder(ctx context.Context, in *MatchCertificateHolderRequest, opts ...grpc.CallOption) (*MatchCertificateHolderResponse, error)
 	// 創建商家 (Apply)
 	CreateSeller(ctx context.Context, in *CreateSellerRequest, opts ...grpc.CallOption) (*SellerResponse, error)
@@ -1319,7 +1319,7 @@ type SellerServiceServer interface {
 	//
 	// 🔴 比對在本服務內部完成，只回布林與命中欄位名：real_name 是 PII
 	//
-	//	（18 號設計書列為明文保留欄），不得跨服務傳輸。
+	//	（`docs/modules/seller.md` §13 列為明文保留欄），不得跨服務傳輸。
 	MatchCertificateHolder(context.Context, *MatchCertificateHolderRequest) (*MatchCertificateHolderResponse, error)
 	// 創建商家 (Apply)
 	CreateSeller(context.Context, *CreateSellerRequest) (*SellerResponse, error)

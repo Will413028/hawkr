@@ -39,7 +39,7 @@
 
 ### 1.4 與其他設計書／服務的關係
 
-- **28-商品瀏覽統計（Product View Stats）**：獨立的內部瀏覽次數統計（賣家 dashboard 用），與本文件的 GA4 是完全分開的兩套系統，不要混淆——28 是自建 DB 計數，本文件是送外部 GA4。
+- **商品瀏覽數（`docs/modules/seller.md` §16）**：獨立的內部瀏覽次數統計（賣家 dashboard 用），與本文件的 GA4 是完全分開的兩套系統，不要混淆——它是自建 DB 計數，本文件是送外部 GA4。
 - **36-MQ 與事件總覽**：backend backstop 掛載的 `order.paid` 事件契約（exchange/routing key/publisher/既有 consumer）由該文件定義，本文件 §6.3 只描述新增消費端的設計。
 - **03-訂單微服務（Order Service）**：backstop 依附的 `orders` 表 schema、`OrderEventPublisher` 皆屬該服務。
 

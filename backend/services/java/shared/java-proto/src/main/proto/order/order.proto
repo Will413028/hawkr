@@ -1475,7 +1475,7 @@ message OrderInvoiceSnapshotData {
     // 不是 fallback 成無載具（後者會把 IDOR 靜默吞掉）。
     // 非空 ⟺ carrier_selection_mode == "EXPLICIT_PREFERENCE"（chk_ois_pref_pair 保證）。
     string buyer_invoice_preference_id = 5;
-    // 公司統編（8 碼數字；"" ＝ NULL）。屬公開營業登記資訊，非 PII（18 號同一裁定）。
+    // 公司統編（8 碼數字；"" ＝ NULL）。屬公開營業登記資訊，非 PII。
     string buyer_tax_id = 6;
     // 買方抬頭（AMEGO BuyerName 上限 60 字元；"" ＝ NULL）。
     string buyer_title = 7;

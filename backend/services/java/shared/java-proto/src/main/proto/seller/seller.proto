@@ -59,7 +59,7 @@ service SellerService {
     // 判斷政府查驗回的「業者名稱」是否屬於這個賣家（19 號設計書 §8.5.1，供 product-service 使用）。
     //
     // 🔴 比對在本服務內部完成，只回布林與命中欄位名：real_name 是 PII
-    //    （18 號設計書列為明文保留欄），不得跨服務傳輸。
+    //    （`docs/modules/seller.md` §13 列為明文保留欄），不得跨服務傳輸。
     rpc MatchCertificateHolder(MatchCertificateHolderRequest) returns (MatchCertificateHolderResponse);
 
     // 創建商家 (Apply)

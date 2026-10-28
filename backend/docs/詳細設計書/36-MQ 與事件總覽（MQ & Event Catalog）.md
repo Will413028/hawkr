@@ -1398,7 +1398,7 @@ fan-out、查無訂閱者不產生任何錯誤或 log（2026-09-03 修復前即�
 
 | 服務 | Publisher | Exchange | Routing Keys |
 |------|-----------|----------|--------------|
-| 單體 `seller` 模組 | `internal/legacy/sellerrelay`（事件在 transaction 內排 River job，worker 轉成 RabbitMQ 訊息）| `hawkr.merchant` | `merchant.verification.approved` / `merchant.verification.rejected` / `merchant.verification.pending_info` / `merchant.verification.forwarded`（2026-07 新增，通知模板「平台審核通過」，18 §5.7.1）/ **`merchant.verification.under_review`（通知模板「補件已收到」，18 §5.7.1）** |
+| 單體 `seller` 模組 | `internal/legacy/sellerrelay`（事件在 transaction 內排 River job，worker 轉成 RabbitMQ 訊息）| `hawkr.merchant` | `merchant.verification.approved` / `merchant.verification.rejected` / `merchant.verification.pending_info` / `merchant.verification.forwarded`（2026-07 新增，通知模板「平台審核通過」，`docs/modules/seller.md` §14.2）/ **`merchant.verification.under_review`（通知模板「補件已收到」，`docs/modules/seller.md` §14.2）** |
 | 單體 `seller` 模組 | 同上 | `hawkr.seller` | `seller.deleted` / `seller.suspended` / `seller.unsuspended` / `seller.profile.changed` / `seller.exposure.changed` |
 | review-service | `publisher.go` | `hawkr.review` | `review.created` / **`review.hidden`** |
 | social-service | `publisher.go` | `hawkr.content` | 9 個事件：PostCreated / PostLiked / PostHiddenByPlatform / CommentCreated（補欄位 + fat 化）/ CommentReplied（補欄位 + fat 化）/ **CommentUpdated**（新）/ **CommentDeleted**（新）/ **CommentLikeChanged**（新，取代 CommentLiked，無過渡期）/ **CounterDelta**（新，2026-07-31，非同步 comment_count/like_count/reply_count 維護，見 §3.6d） |

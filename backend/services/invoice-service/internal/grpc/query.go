@@ -577,7 +577,7 @@ func toSellerTaxIdentity(p domain.SellerTaxProfile) *pb.SellerTaxIdentity {
 	return &pb.SellerTaxIdentity{
 		EntityType: str(p.EntityTaxType),
 		// 🔴 tax_id 不遮罩：O 類（公開營業登記資訊），§8.1.3(b) 三端皆完整，
-		// 本 repo 早有同一裁定（18 號設計書「tax_id 屬公開登記資訊，加密買不到安全性」）。
+		// tax_id 是公開營業登記資訊。
 		TaxId:           str(p.TaxID),
 		LegalName:       str(p.LegalName),
 		ResponsibleName: str(p.ResponsiblePerson),

@@ -213,7 +213,7 @@ const (
 // ==================== Admin Product Certification（19 號設計書 §9.2 / §9.3）====================
 
 // ⚠️ 路徑刻意是 product_certification_applications 而不是 certifications：
-// /admin/certifications* 是商家實名認證（KYC，18 號設計書）的前綴，兩者是不同的東西；KYC 審核在單體
+// /admin/certifications* 是商家實名認證（KYC，`docs/modules/seller.md` §13）的前綴，兩者是不同的東西；KYC 審核在單體
 // （SellerAdminService），gateway 不註冊這個前綴，見 TestLegacyKYCAdminRoutesStayDeleted。
 const (
 	AdminProductCertificationApplications      = "/product_certification_applications"

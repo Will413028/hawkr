@@ -42,4 +42,4 @@ seller-service 已經擁有 Dashboard gRPC，賣家層級的聚合數據集中�
 - **重新評估條件**：瀏覽量成長到查詢時聚合撐不住，或出現「只要總數、不要時段」的單一需求。
 
 現行規格（表結構、consumer 行為、統計時窗、失敗處置）見
-`docs/詳細設計書/28-商品瀏覽統計（Product View Stats）詳細設計書.md`。
+`docs/modules/seller.md` §16。

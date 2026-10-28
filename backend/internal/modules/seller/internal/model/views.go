@@ -7,7 +7,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
 
-// 商品瀏覽數（設計書 28）：寫入端只追加原始事件，背景 job 解析店家並彙總成每家店每個台北日一列，總次數、不去重。
+// 商品瀏覽數（`docs/modules/seller.md` §16）：寫入端只追加原始事件，背景 job 解析店家並彙總成每家店每個台北日一列，總次數、不去重。
 
 // ViewEventRetention 是已處理的原始瀏覽事件的保留期（依 occurred_at）；重算只涵蓋完整落在保留期內的台北日。
 const ViewEventRetention = 7 * 24 * time.Hour

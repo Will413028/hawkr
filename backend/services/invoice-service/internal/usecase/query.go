@@ -394,8 +394,7 @@ func (u *Query) GetSellerTaxProfile(ctx context.Context, storeID int64) (SellerT
 // GetTaxReviewForAdmin 是同一份資料的 ADM 視角（端點 39）。
 //
 // 不留 INVOICE_PII_REVEAL：稅務資格的欄位（統編、法人名稱、負責人、營業地址）是 O 類
-// ——公開營業登記資訊，§8.1.3(b) 三端皆完整、不列入 P 類（本 repo 早有同一裁定，
-// 18 號設計書：「tax_id 屬公開登記資訊，加密買不到安全性」）。
+// ——公開營業登記資訊，§8.1.3(b) 三端皆完整、不列入 P 類。
 func (u *Query) GetTaxReviewForAdmin(ctx context.Context, storeID int64) (SellerTaxProfileView, error) {
 	return u.GetSellerTaxProfile(ctx, storeID)
 }

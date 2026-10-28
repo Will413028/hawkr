@@ -9775,7 +9775,7 @@ type OrderInvoiceSnapshotData struct {
 	// 不是 fallback 成無載具（後者會把 IDOR 靜默吞掉）。
 	// 非空 ⟺ carrier_selection_mode == "EXPLICIT_PREFERENCE"（chk_ois_pref_pair 保證）。
 	BuyerInvoicePreferenceId string `protobuf:"bytes,5,opt,name=buyer_invoice_preference_id,json=buyerInvoicePreferenceId,proto3" json:"buyer_invoice_preference_id,omitempty"`
-	// 公司統編（8 碼數字；"" ＝ NULL）。屬公開營業登記資訊，非 PII（18 號同一裁定）。
+	// 公司統編（8 碼數字；"" ＝ NULL）。屬公開營業登記資訊，非 PII。
 	BuyerTaxId string `protobuf:"bytes,6,opt,name=buyer_tax_id,json=buyerTaxId,proto3" json:"buyer_tax_id,omitempty"`
 	// 買方抬頭（AMEGO BuyerName 上限 60 字元；"" ＝ NULL）。
 	BuyerTitle string `protobuf:"bytes,7,opt,name=buyer_title,json=buyerTitle,proto3" json:"buyer_title,omitempty"`

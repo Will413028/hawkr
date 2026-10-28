@@ -55,7 +55,6 @@
 
 | 編號 | 設計書 | 對應程式碼 |
 |------|--------|-----------|
-| 18 | [賣家實名認證（Merchant Certification）](詳細設計書/18-賣家實名認證%EF%BC%88Merchant%20Certification%EF%BC%89詳細設計書.md) | `services/java/product-service/` |
 | 19 | [農業認證申請與審核（Product Certification Application & Review）](詳細設計書/19-農業認證驗證%EF%BC%88Certification%20Verification%EF%BC%89詳細設計書.md) | `services/java/product-service/` |
 
 ### 功能模組與跨服務主題（20-56）
@@ -68,7 +67,6 @@
 | 23 | [門市管理模組（Store Pickup Management）](詳細設計書/23-門市管理模組%EF%BC%88Store%20Pickup%20Management%EF%BC%89詳細設計書.md) | `services/java/shipping-service/` |
 | 24 | [節假日管理（Holiday Management）](詳細設計書/24-節假日管理%EF%BC%88Holiday%20Management%EF%BC%89詳細設計書.md) | `services/java/shipping-service/` |
 | 26 | [輸入驗證模組（Java InputValidator）](詳細設計書/26-輸入驗證模組%EF%BC%88Java%20InputValidator%EF%BC%89詳細設計書.md) | `services/java/shared/common-core/` |
-| 28 | [商品瀏覽統計（Product View Stats）](詳細設計書/28-商品瀏覽統計%EF%BC%88Product%20View%20Stats%EF%BC%89詳細設計書.md) | `internal/modules/seller/`、`gateway/` |
 | 29 | [Admin 異常訂單管理 API](詳細設計書/29-Admin%20異常訂單管理%20API%20詳細設計書.md) | 跨 Payment / Shipping / AfterSales / Order |
 | 31 | [內容檢舉與封鎖（Content Reporting & Block）](詳細設計書/31-內容檢舉與封鎖%EF%BC%88Content%20Reporting%20&%20Block%EF%BC%89詳細設計書.md) | `gateway/`、`services/{social,im,review}-service/`、`pkg/{blocklist,moderation}` |
 | 32 | [商家治理與食安通報（Seller Governance & Food Safety）](詳細設計書/32-商家治理與食安通報%EF%BC%88Seller%20Governance%20&%20Food%20Safety%EF%BC%89詳細設計書.md) | `gateway/`、`internal/modules/seller/`、`pkg/mq` |
