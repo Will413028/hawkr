@@ -1,5 +1,7 @@
 # 帳號與賣家買家身份模型（Account & Seller-Buyer Identity）詳細設計書
 
+> 單體模組的現行規格見 `docs/modules/identity.md`；本文只當歷史參考。
+
 > **單體（遷移計畫 A2，2026-09-27 起）**：account 的部分搬進單體的 identity 模組（`internal/modules/identity`）。角色只存集合（`account_roles`，沒有 `account_type` bitmask；舊服務要的 bitmask 由 `internal/legacy` 投影）；`account_id` 過渡期由資料庫發號（IDENTITY），不再是兩位年份加亂數；刪除帳號當下清掉 email 與手機（T+30 的清除從未實作）。buyer 的部分是單體的 buyer 模組（`internal/modules/buyer`，遷移計畫 A3a），本文件的買家段落以它為準。seller 的部分（stint、`ResolvePrincipals`）仍是舊服務，遷移計畫 A3b 搬遷。差異與理由見 identity 模組的 `CARRYOVER.md`。
 
 > 跨服務身份主題文件：描述 Hawkr 平台「登入身份（account）」「買家身份（buyer）」「賣家身份（seller）」三者如何建模、建立、角色升級、軟刪除、復活，以及在單人雙角色下如何用 `ResolvePrincipals` 維持跨角色守衛。
