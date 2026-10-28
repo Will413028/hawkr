@@ -71,3 +71,5 @@
 ## 修訂（2026-10-28）
 
 設計書 54（App 版本檢查與強制更新）已刪除，內容由 `docs/modules/content.md`（後端）、`packages/hawkr_app_update/docs/spec.md`（App 端）與 `docs/runbooks/app-version-gate.md`（排查與放行判準）承接。本文中「設計書 54」與它的章節編號（§3.1、§4.6、§9.2 等）指向已刪除的文件，內容見 git 歷史。
+
+設計書 50（食譜內容管理）已刪除（食譜功能已移除）。本文中「設計書 50 §7.4」指向已刪除的文件，內容見 git 歷史。

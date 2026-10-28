@@ -6,7 +6,7 @@ const PRESIGNED_PUT_TIMEOUT_MS = 120_000;
 
 /**
  * Upload an image through the Media Service staged-upload flow and return the
- * resulting stagedToken (design book 49 §media staging / 50 §7.1).
+ * resulting stagedToken (design book 49 §media staging).
  *
  * Shared by the admin editors that upload images (§15 重複實作防護 — extracted
  * from the original inline copy in BannerEditorClient):

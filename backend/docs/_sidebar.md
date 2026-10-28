@@ -56,7 +56,6 @@
   - [47 GA4 分析追蹤（GA4 Cross-Platform Analytics）](詳細設計書/47-GA4%20分析追蹤%EF%BC%88GA4%20Cross-Platform%20Analytics%EF%BC%89詳細設計書.md)
   - [48 SEO 優化與現況（SEO Optimization）](詳細設計書/48-SEO%20優化與現況%EF%BC%88SEO%20Optimization%EF%BC%89詳細設計書.md)
   - [49 多媒體儲存與圖片服務（Cloudflare R2 & Image Gateway）](詳細設計書/49-多媒體儲存與圖片服務%EF%BC%88Cloudflare%20R2%20&%20Image%20Gateway%EF%BC%89詳細設計書.md)
-  - [50 食譜內容管理（Recipe Content Management）](詳細設計書/50-食譜內容管理%EF%BC%88Recipe%20Content%20Management%EF%BC%89詳細設計書.md)
   - [51 簡訊發送與手機 OTP（Mitake SMS & Phone OTP）](詳細設計書/51-簡訊發送與手機%20OTP%EF%BC%88Mitake%20SMS%20&%20Phone%20OTP%EF%BC%89詳細設計書.md)
   - [52 微服務間內部授權（Internal Service Authorization）](詳細設計書/52-微服務間內部授權%EF%BC%88Internal%20Service%20Authorization%EF%BC%89詳細設計書.md)
   - [53 Web 前端快取架構與版本一致性（Web Frontend Cache & Deployment Consistency）](詳細設計書/53-Web%20前端快取架構與版本一致性%EF%BC%88Web%20Frontend%20Cache%20%26%20Deployment%20Consistency%EF%BC%89詳細設計書.md)
