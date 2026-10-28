@@ -21,7 +21,7 @@
 | outbox、RabbitMQ、角色遠端 RPC | 微服務跨庫可靠傳遞 | 不成立 | 單體 transaction 內 events.Publish、River job | 不搬；buyer 與 identity 公開 API 共用 db.InTx |
 | PII、地址、收藏清理 | 關閉買家身分需要 | 成立 | 由擁有資料的 participant 做 | buyer.CloseForDeletion 保留既有清理與事件；鎖順序改由本模組保證（交易內先 `identity.LockAccount` 再呼叫它），buyer 不再自己鎖帳號，也不訂閱 `AccountDeleted`：關閉買家只有本模組一條路徑（ADR `2026-09-30-account-deletion-module.md` 修訂） |
 | CodeMeta／bizcode | 舊 wire 契約 | 只有過渡訂單狀態成立 | 模組使用具名字串型別與 CHECK，邊界轉 Connect code | Requester／State 用 UPPER_SNAKE＋DB CHECK；錯誤用 apperr |
-| 定期收斂 pending | order.completed 事件可能早於申請 commit 或遺失 | 成立 | 定期掃描持久流程狀態並重試 | 每小時 River job 啟動即補跑、有界 keyset 掃描、逐筆錯誤不中斷；步驟 4 event consumer 只加速，先經 buyer.ProfileByBuyerID 由 buyer_id 解析 account_id 再呼叫 CompletePending |
+| 定期收斂 pending | order.completed 事件可能早於申請 commit 或遺失 | 成立 | 定期掃描持久流程狀態並重試 | 每小時 River job 啟動即補跑、有界 keyset 掃描、逐筆錯誤不中斷；步驟 4 event consumer 只加速，先經 buyer.ProfileByBuyerID 由 buyer_id 解析 account_id 再呼叫 CompletePending；一小時符合訂單結案非即時刪帳的需求，並限制過渡期 Java 訂單服務的負載 |
 | 同帳號申請與角色寫入的序列化 | 交易外查遠端訂單後，SELLER 可能在交易開始前授予、帳號可能被刪除；買家不會換成另一個（一個帳號一生一個買家） | 成立 | 所有參與者共用同一個帳號列鎖（PostgreSQL row lock，`SELECT … FOR UPDATE`）；不另建只保護單一模組的 advisory lock | 交易內先呼叫 `identity.LockAccount`（與 GrantRole、RemoveRole、DeleteAccount 同一把鎖），再重讀帳號與買家；帳號本人的申請在 SELLER 出現時拒絕、管理員的申請改為連同店家一起處理，已刪除就記完成。buyer_id 比對與重試迴圈已刪除（走不到）；交易內不再重讀「還有其他角色」（SELLER 剛在同一把鎖下檢查過）；partial UNIQUE 保底 |
 | schema FK 跨模組 | 跨 schema 資料擁有權 | 不成立 | 模組資料庫邊界以 ID 關聯 | account_id bigint，不設跨 schema FK；partial UNIQUE 保護 pending |
 
@@ -43,3 +43,4 @@
 - 帳號本人的申請在有 SELLER 時拒絕；管理員的申請把店家當參與者，在同一個 transaction 關閉。管理員的申請把店家的未結訂單與買家的一樣當成等待條件（7c 階段 3），本人的關店在 seller 的 `CloseCurrent` 檢查同一個 port，不保留 gateway 那種永久的強制覆寫。
 - 申請進入等待時帳號變成 PENDING_DELETION（identity 保存的狀態），等待期間不能授予角色。
 - 不依賴 Redis、outbox、舊公司服務或既有正式資料 migration。
+- 管理員的理由是管理員的稽核文字，由本模組驗證與正規化（`platform/auditreason`，與 seller 的後台關店理由同一條規則），個資清理不動它；重新評估的時機：隱私政策定稿時，或 A8。
