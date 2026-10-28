@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 /// Cart-only semantic roles. 22/28 follows Material 3 titleLarge and 24/32
 /// follows headlineSmall, adapted to Hawkr's platform font and colors.
 /// TextScaler remains owned by the existing AppMediaQueryPolicy / AppTextSize.
-/// This does not change the global type ramp or temperature badge styling.
+/// This does not change the global type ramp.
 abstract final class CartTypography {
   static TextStyle get section => AppTypography.sectionTitle.copyWith(
     fontSize: 22,

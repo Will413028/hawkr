@@ -67,7 +67,6 @@ test("購物車缺圖與載入失敗縮圖不裁切，正常圖片及數量／�
 		specName: "KG",
 		stockQty: "20",
 		purchasable: true,
-		deliveryTemps: ["CHILLED"],
 	}));
 	const mutations: { method: string; skuId: string; quantity?: string }[] = [];
 	await page.route("**/images/cart-image-fallback-e2e-broken.png", (route) =>

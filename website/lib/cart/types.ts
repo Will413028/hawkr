@@ -4,7 +4,7 @@
  *
  * Backend item fields (handler.CartItemResponse):
  *   skuId, productId, name, price, quantity, status, imageKey, imageUrl,
- *   specName, deliveryTemps[], stockQty
+ *   specName, stockQty
  *
  * Backend group fields (handler.CartGroupResponse):
  *   storeId, sellerName, logo_url, sellerCity, sellerDistrict, items[]
@@ -22,7 +22,6 @@ export interface CartItemWire {
 	imageUrl?: string;
 	specName?: string;
 	productId?: string | number;
-	deliveryTemps?: string[];
 	stockQty?: string;
 	// row 級可購買性（backend issue #1127）。purchasable=false 時前端反灰 + disable checkbox；
 	// unavailableReason ∈ {DELISTED, OUT_OF_STOCK, INSUFFICIENT_STOCK, LOOKUP_FAILED}
@@ -75,7 +74,6 @@ export interface CartItem {
 	sellerCity?: string;
 	sellerDistrict?: string;
 	href?: string;
-	deliveryTemps?: string[];
 	stockQty?: number;
 	purchasable?: boolean;
 	unavailableReason?: string;
@@ -123,7 +121,6 @@ export function flattenGroups(groups: CartGroupWire[]): CartItem[] {
 				sellerCity: g.sellerCity,
 				sellerDistrict: g.sellerDistrict,
 				href,
-				deliveryTemps: it.deliveryTemps,
 				stockQty: Number.isFinite(stock) ? stock : undefined,
 				// 後端缺欄位時（舊版 backend / 訪客舊本地快取）forward-compat：default purchasable=true
 				purchasable: it.purchasable !== false,
@@ -153,7 +150,6 @@ export function groupBySeller(items: CartItem[]): CartGroupWire[] {
 			specName: it.unit,
 			productId: it.productId,
 			href: it.href,
-			deliveryTemps: it.deliveryTemps,
 			stockQty:
 				typeof it.stockQty === "number" ? String(it.stockQty) : undefined,
 		};

@@ -15,7 +15,6 @@ import '../../../config/image_config.dart';
 import '../../../shared/icons/app_icon_colors.dart';
 import '../../../shared/widgets/hk_icon.dart';
 import '../../../shared/widgets/common_snackbar.dart';
-import '../../../shared/widgets/hk_temperature_tag.dart';
 import '../../../shared/widgets/hk_tap_target.dart';
 import '../../../shared/widgets/oss_image.dart';
 import '../../../shared/widgets/product_card_hero.dart';
@@ -467,10 +466,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
               ),
             ),
           ),
-          if (order.deliveryTemp.trim().isNotEmpty) ...[
-            SizedBox(width: AppSpacing.xs),
-            HkTemperatureTag(value: order.deliveryTemp),
-          ],
           SizedBox(width: AppSpacing.sm),
           Text(
             '${delivery.progressStep + 1}/4',

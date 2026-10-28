@@ -39,12 +39,7 @@ import {
 	isShippingDestinationReady,
 	shippingDestinationKind,
 } from "@/lib/checkout/shipping-requirements";
-import {
-	formatUnitLabel,
-	SHIPPING_TEMPERATURE_LABEL,
-	ShippingMethod,
-	type ShippingTemperatureValue,
-} from "@/lib/codemeta/enums";
+import { formatUnitLabel, ShippingMethod } from "@/lib/codemeta/enums";
 import type { CartAvailableCoupon } from "@/lib/coupons/repo";
 import { useAddresses } from "@/lib/hooks/useAddresses";
 import { useCart } from "@/lib/hooks/useCart";
@@ -557,33 +552,6 @@ export default function CartClient() {
 		});
 		void cart.refresh();
 	}, [shippingState.errorCode, cart.refresh]);
-
-	/* ───── Cold-chain warning ───── */
-
-	const coldChainConflict = React.useMemo(() => {
-		// If validate returned valid=false AND temp intersection is empty AND
-		// the buyer has selected items with multiple temp classes, we surface
-		// a "can't ship together" hint.
-		if (shippingState.loading) return null;
-		const temps = new Set<string>();
-		for (const it of selectedPurchasableItems) {
-			for (const t of it.deliveryTemps ?? []) temps.add(t);
-		}
-		const intersection = shippingState.deliveryTempIntersection;
-		if (
-			temps.size > 1 &&
-			shippingOptions.length === 0 &&
-			(intersection.length === 0 || intersection.length < temps.size)
-		) {
-			return Array.from(temps);
-		}
-		return null;
-	}, [
-		selectedPurchasableItems,
-		shippingState.loading,
-		shippingOptions.length,
-		shippingState.deliveryTempIntersection,
-	]);
 
 	/* ───── Cart-context coupons ───── */
 
@@ -1144,24 +1112,6 @@ export default function CartClient() {
 
 				<div className="grid grid-cols-[minmax(0,1fr)_minmax(320px,380px)] items-start gap-6 max-[960px]:grid-cols-1">
 					<div className="flex flex-col gap-5">
-						{coldChainConflict ? (
-							<div className="cart-page__cold-warning" role="alert">
-								<strong>無法一起出貨</strong>
-								<span>
-									已選的商品包含
-									{coldChainConflict
-										.map(
-											(t) =>
-												SHIPPING_TEMPERATURE_LABEL[
-													t as ShippingTemperatureValue
-												] ?? t,
-										)
-										.join(" / ")}
-									不同溫層，請分批選購後分次下單。
-								</span>
-							</div>
-						) : null}
-
 						<CartRowOperationContext.Provider value={rowOperationCoordinator}>
 							<div className="flex flex-col gap-4">
 								{cart.itemsBySeller.map((group) => {

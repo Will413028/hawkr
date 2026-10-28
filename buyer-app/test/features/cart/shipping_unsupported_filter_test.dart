@@ -78,6 +78,16 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('同一配送方式的選項 label 原樣顯示，溫層括號不被剝除', (tester) async {
+    await _pump(tester, const [
+      {'shippingMethod': '3001', 'label': '黑貓宅急便（常溫）', 'fee': 100},
+      {'shippingMethod': '3001', 'label': '黑貓宅急便（冷藏）', 'fee': 160},
+    ]);
+
+    expect(find.text('黑貓宅急便（常溫）'), findsOneWidget);
+    expect(find.text('黑貓宅急便（冷藏）'), findsOneWidget);
+  });
+
   testWidgets('validate 判定整車超限時顯示「無法配送」錯誤卡', (tester) async {
     await _pump(tester, const [
       {'shippingMethod': '3001', 'label': '黑貓宅配', 'fee': 100},

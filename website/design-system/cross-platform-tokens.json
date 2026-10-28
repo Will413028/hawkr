@@ -1823,63 +1823,6 @@
 				}
 			],
 			"migration": "Compare modal and sheet geometry, then update existing production primitives together; do not create another radius scale."
-		},
-		{
-			"id": "temperatureTag.ambient",
-			"type": "color",
-			"classification": "requested-web-legacy-parity",
-			"reason": "This release explicitly aligns both Apps with the current production Web TemperatureTag. These legacy shades are a tracked component exception, not canonical semantic colors; chilled and frozen small text have a known contrast limitation on light surfaces.",
-			"bindings": [
-				{
-					"source": "buyer.colors",
-					"key": "AppColors.temperatureAmbient",
-					"value": "#6b6b6b"
-				},
-				{
-					"source": "seller.colors",
-					"key": "AppColors.temperatureAmbient",
-					"value": "#6b6b6b"
-				}
-			],
-			"migration": "Revisit the Web and both App components together when the temperature semantic roles and contrast treatment are redesigned. Keep the explicit labels, text scaling, and separate accessible selection targets; do not propagate these shades into unrelated components."
-		},
-		{
-			"id": "temperatureTag.chilled",
-			"type": "color",
-			"classification": "requested-web-legacy-parity",
-			"reason": "This release explicitly aligns both Apps with the current production Web TemperatureTag. These legacy shades are a tracked component exception, not canonical semantic colors; chilled and frozen small text have a known contrast limitation on light surfaces.",
-			"bindings": [
-				{
-					"source": "buyer.colors",
-					"key": "AppColors.temperatureChilled",
-					"value": "#ee964b"
-				},
-				{
-					"source": "seller.colors",
-					"key": "AppColors.temperatureChilled",
-					"value": "#ee964b"
-				}
-			],
-			"migration": "Revisit the Web and both App components together when the temperature semantic roles and contrast treatment are redesigned. Keep the explicit labels, text scaling, and separate accessible selection targets; do not propagate these shades into unrelated components."
-		},
-		{
-			"id": "temperatureTag.frozen",
-			"type": "color",
-			"classification": "requested-web-legacy-parity",
-			"reason": "This release explicitly aligns both Apps with the current production Web TemperatureTag. These legacy shades are a tracked component exception, not canonical semantic colors; chilled and frozen small text have a known contrast limitation on light surfaces.",
-			"bindings": [
-				{
-					"source": "buyer.colors",
-					"key": "AppColors.temperatureFrozen",
-					"value": "#51a2ff"
-				},
-				{
-					"source": "seller.colors",
-					"key": "AppColors.temperatureFrozen",
-					"value": "#51a2ff"
-				}
-			],
-			"migration": "Revisit the Web and both App components together when the temperature semantic roles and contrast treatment are redesigned. Keep the explicit labels, text scaling, and separate accessible selection targets; do not propagate these shades into unrelated components."
 		}
 	],
 	"unmappedPolicies": [

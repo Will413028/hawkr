@@ -24,7 +24,6 @@ function detail(over: Partial<DelegatedProductDetail> = {}) {
 		description: { version: "1.0" as const, blocks: [] },
 		images: [{ assetId: "5001", imageKey: "product/new.jpg" }],
 		origin: "台灣 梨山（賣家已改）",
-		certifications: [{ name: "3701", certNo: "A1（賣家已改）" }],
 		hashtags: [],
 		skus: [
 			{
@@ -57,7 +56,6 @@ const mine = {
 		version: "1.0" as const,
 		blocks: [{ type: "text" as const, content: "我寫的說明" }],
 	},
-	certifications: [{ name: "3702", certNo: "B2（我打的）" }],
 	skus: {
 		"184": {
 			spec: "3 台斤裝",
@@ -74,18 +72,7 @@ describe("版本衝突的合流", () => {
 		const draft = draftFromDetail(detail());
 		expect(draft.name).toBe("梨山高麗菜（賣家已改）");
 		expect(draft.categoryId).toBe("527");
-		expect(draft.certifications).toEqual([
-			{ name: "3701", certNo: "A1（賣家已改）" },
-		]);
 		expect(draft.skus["184"].price).toBe("300");
-	});
-
-	it("draftFromDetail 的認證是複本，就地增刪不會污染 detail", () => {
-		const latest = detail();
-		const draft = draftFromDetail(latest);
-		draft.certifications.push({ name: "3703", certNo: "C3" });
-		// detail 那一份被一起改掉的話，「有沒有改過」的比較會恆為 false ⇒ 送不出去。
-		expect(latest.certifications).toHaveLength(1);
 	});
 
 	it("複製我的內容：我填過的欄位留我的，版本基底換成最新的", () => {
@@ -96,9 +83,6 @@ describe("版本衝突的合流", () => {
 		expect(merged.categoryId).toBe("531");
 		expect(merged.origin).toBe("台灣 和平區（我打的）");
 		expect(merged.description.blocks).toHaveLength(1);
-		expect(merged.certifications).toEqual([
-			{ name: "3702", certNo: "B2（我打的）" },
-		]);
 		expect(merged.skus["184"].price).toBe("280");
 	});
 

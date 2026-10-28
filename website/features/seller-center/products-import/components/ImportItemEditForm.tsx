@@ -11,13 +11,10 @@
  *   - errors / warnings 頂部總覽（紅 + 黃）+ DuplicateNameWarning。
  *
  * 元件組合：CategorySelector / DescriptionEditor / ProductImageUploader /
- * ImportItemSkuEditor / 認證欄位（共用 `ProductCertificationRow`，以 `mode="draft"`
- * 表示這一面的認證還沒有商品可掛、因此不得顯示任何審核狀態）全部 reuse 正式 form
- * 的視覺語彙。
+ * ImportItemSkuEditor 全部 reuse 正式 form 的視覺語彙。
  */
 
 import * as React from "react";
-import { ProductCertificationRow } from "@/components/shared/ProductCertificationRow";
 import Button from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { Input } from "@/components/ui/Input";
@@ -25,7 +22,6 @@ import CategorySelector from "@/features/seller/components/CategorySelector";
 import DescriptionEditor from "@/features/seller/components/DescriptionEditor";
 import ProductImageUploader from "@/features/seller/components/ProductImageUploader";
 import { SectionHeader } from "@/features/seller-center/products/components/SectionHeader";
-import { PRODUCT_CERT_CATALOG } from "@/lib/products/certifications";
 import { parseDescription } from "@/lib/products/seller-repo";
 import type { useImportItemForm } from "../hooks/useImportItemForm";
 import {
@@ -130,7 +126,6 @@ export default function ImportItemEditForm({
 		updateSku,
 		addSku,
 		removeSku,
-		toggleCert,
 		handleImagesChange,
 		submit,
 	} = form;
@@ -572,28 +567,7 @@ export default function ImportItemEditForm({
 						</ul>
 					</section>
 
-					{/* 認證 / 信任標章 — 與商品表單共用 ProductCertificationRow */}
-					<section className={CARD} id="section-trust">
-						<SectionHeader
-							title="認證 / 信任標章"
-							desc="CSV 帶進來的認證尚未送審；商品匯入後可在商品編輯頁送出申請並追蹤審核狀態。"
-						/>
-						<ul className="list-none m-0 p-0 flex flex-col gap-2">
-							{PRODUCT_CERT_CATALOG.map((c) => (
-								<li key={c.code}>
-									<ProductCertificationRow
-										item={c}
-										mode="draft"
-										entry={draft.certifications?.find((e) => e.code === c.code)}
-										onToggle={() => toggleCert(c.code)}
-										idPrefix="import-cert"
-									/>
-								</li>
-							))}
-						</ul>
-					</section>
-
-					{/* CSV 來源溫層摘要（純資訊，唯讀） */}
+					{/* CSV 來源運送摘要（純資訊，唯讀） */}
 					<section className={CARD} id="section-csv-shipping-hint">
 						<SectionHeader
 							title="CSV 原始運送設定"
@@ -601,12 +575,12 @@ export default function ImportItemEditForm({
 						/>
 						<div className="flex flex-col gap-1.5 text-xs text-hk-muted">
 							{(item.skus ?? []).slice(0, 3).map((sku, i) => {
-								// Backend 用 shippingMethods 陣列 `{ method, temperature }` 攜帶，
-								// method/temperature 為 code value（如 "3001"/"3201"），這裡只
-								// 列原始 code 對照（label 對應仍在下方 SKU 卡內顯示）。
-								const carriers = (sku.shippingMethods ?? []).map(
-									(m) => `${m.method}/${m.temperature}`,
-								);
+								// Backend 用 shippingMethods 陣列攜帶，method 為 code value
+								// （如 "3001"），這裡只列原始 code 對照（label 對應仍在下方
+								// SKU 卡內顯示）。
+								const carriers = [
+									...new Set((sku.shippingMethods ?? []).map((m) => m.method)),
+								];
 								return (
 									<div
 										// biome-ignore lint/suspicious/noArrayIndexKey: ordered csv rows
@@ -638,8 +612,7 @@ export default function ImportItemEditForm({
 						{draft.name || "未命名商品"}
 					</strong>
 					<span className="text-xs text-hk-muted">
-						{draft.skus?.length ?? 0} 規格 · {draft.certifications?.length ?? 0}{" "}
-						認證
+						{draft.skus?.length ?? 0} 規格
 					</span>
 				</div>
 				<div className="seller-import-item__action-rail flex gap-2 flex-wrap justify-end">

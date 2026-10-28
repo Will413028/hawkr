@@ -184,7 +184,6 @@ const _order = OrderSummary(
   recipientName: '陳小日',
   shippingAddress: '桃園市桃園區鎮撫街1號',
   shippingMethod: '3001',
-  deliveryTemp: '3203',
   shipmentStatus: '31',
   shippingStatus: '31',
   items: [

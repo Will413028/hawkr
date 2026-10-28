@@ -9,7 +9,6 @@ import 'package:hawkr_buyer/core/session/session_model.dart';
 import 'package:hawkr_buyer/core/session/session_provider.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/core/theme/hk_tokens.dart';
-import 'package:hawkr_buyer/features/cart/presentation/widgets/temperature_tags.dart';
 import 'package:hawkr_buyer/features/category/presentation/category_screen.dart';
 import 'package:hawkr_buyer/features/visit/data/visit_repository.dart';
 import 'package:hawkr_buyer/shared/widgets/buyer_floating_navigation_layout.dart';
@@ -271,30 +270,8 @@ void main() {
       );
       await tester.pump();
       expect(tester.takeException(), isNull);
-      expect(
-        tester.getSize(find.byKey(const ValueKey('market-temp-3201'))).height,
-        greaterThanOrEqualTo(48),
-      );
-      final temperatureChoices = [
-        find.byKey(const ValueKey('market-temp-3201')),
-        find.byKey(const ValueKey('market-temp-3202')),
-        find.byKey(const ValueKey('market-temp-3203')),
-      ];
-      final expectedTemperatureColors = [
-        AppColors.temperatureAmbient,
-        AppColors.temperatureChilled,
-        AppColors.temperatureFrozen,
-      ];
-      final firstChoiceRect = tester.getRect(temperatureChoices.first);
-      for (var index = 0; index < temperatureChoices.length; index++) {
-        final choice = temperatureChoices[index];
-        final rect = tester.getRect(choice);
-        expect(rect.top, closeTo(firstChoiceRect.top, 0.1));
-        expect(rect.width, lessThan(100));
-        final chip = tester.widget<TemperatureChoiceChip>(choice);
-        expect(chip.temperatureColor, expectedTemperatureColors[index]);
-        expect(chip.selected, isFalse);
-      }
+      expect(find.byKey(const ValueKey('market-temp-3201')), findsNothing);
+      expect(find.byKey(const ValueKey('market-cert-3702')), findsNothing);
 
       await _tapVisible(
         tester,
@@ -524,7 +501,7 @@ void main() {
     );
   }
 
-  testWidgets('search/category/temp/price/sort use the backend contract', (
+  testWidgets('search/category/price/sort use the backend contract', (
     tester,
   ) async {
     final adapter = await _pumpMarket(tester, width: 390);
@@ -558,18 +535,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(adapter.lastProductsRequest.query['category_id'], '101,102');
 
-    await _tapVisible(tester, find.byKey(const ValueKey('market-temp-3203')));
-    await tester.pump(const Duration(milliseconds: 50));
-    expect(adapter.lastProductsRequest.query['delivery_temp'], '3203');
-    expect(
-      tester
-          .widget<TemperatureChoiceChip>(
-            find.byKey(const ValueKey('market-temp-3203')),
-          )
-          .selected,
-      isTrue,
-    );
-
     final minField = find.descendant(
       of: find.byKey(const ValueKey('market-price-min')),
       matching: find.byType(TextField),
@@ -586,10 +551,6 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
     expect(adapter.lastProductsRequest.query['price_min'], '100');
     expect(adapter.lastProductsRequest.query['price_max'], '500');
-
-    await _tapVisible(tester, find.byKey(const ValueKey('market-cert-3702')));
-    await tester.pump(const Duration(milliseconds: 50));
-    expect(adapter.lastProductsRequest.query['certification_types'], '3702');
 
     await _tapVisible(
       tester,

@@ -30,7 +30,6 @@ const DETAIL: DelegatedProductDetail = {
 		{ assetId: "a2", imageKey: "public/product/two.jpg" },
 	],
 	origin: "台中市和平區",
-	certifications: [{ name: "3701", certNo: "ORG-2024-001" }],
 	hashtags: ["高山茶"],
 	skus: [
 		{
@@ -47,7 +46,6 @@ const DETAIL: DelegatedProductDetail = {
 			shippingMethods: [
 				{
 					type: "3001",
-					temperature: "3201",
 					freeThreshold: "1200",
 					feePayer: "3101",
 				},
@@ -67,14 +65,12 @@ const DETAIL: DelegatedProductDetail = {
 			shippingMethods: [
 				{
 					type: "3002",
-					temperature: "3202",
 					freeThreshold: "1500",
 					feePayer: "3101",
 				},
 				// 與上一筆逐欄相同 → 聚合時去重（公開端的商品層 shippingMethods 是聯集）。
 				{
 					type: "3001",
-					temperature: "3201",
 					freeThreshold: "1200",
 					feePayer: "3101",
 				},
@@ -145,12 +141,7 @@ test("預覽映射：skus[].spec → skuName（漏掉＝規格名變成「規格
 	);
 });
 
-/* ── 兩處由 SKU 聚合（公開端是後端算好才下發的） ──────────────────────── */
-
-test("預覽聚合：deliveryTemp 取所有 SKU 的溫層聯集，常溫→冷藏→冷凍", () => {
-	assert.deepEqual(derive().supportedTempCodes, ["3201", "3202"]);
-	assert.deepEqual(derive().supportedTemps, ["常溫", "冷藏"]);
-});
+/* ── 一處由 SKU 聚合（公開端是後端算好才下發的） ──────────────────────── */
 
 test("預覽聚合：商品層 shippingMethods 取聯集並去重，配送業者 icon 因此畫得出來", () => {
 	assert.deepEqual(
@@ -175,18 +166,6 @@ test("預覽不借用評價：rating／reviewCount／reviews 全部缺席 → �
 	assert.equal(product.reviews, undefined);
 	assert.deepEqual(derived.reviews, []);
 	assert.equal(derived.reviewTotal, 0);
-});
-
-/* ── 認證：props 帶碼值，解析交給共用 layout ────────────────────────── */
-
-test("預覽的認證原樣帶碼值，不在 props 層套 certLabel（與公開 PDP 走同一條路）", () => {
-	// 後端存的就是 CertificationType 碼值（gateway `product.go` 的 CertificationItem
-	// 原樣轉發），碼值→顯示名由 `ProductDetailLayout` 解析，而預覽與公開 PDP 共用那支
-	// layout。在 props 層先解析等於讓預覽走一條公開頁不會走的路，兩邊就可能分岔。
-	// ⚠️ 斷言的是**碼值**：改成中文名的那一刻，預覽就不再是「買家會看到什麼」。
-	assert.deepEqual(derive().certifications, [
-		{ name: "3701", certNo: "ORG-2024-001" },
-	]);
 });
 
 /* ── 賣家卡的鍵 ─────────────────────────────────────────────────────── */

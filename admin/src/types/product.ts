@@ -40,7 +40,6 @@ export interface GalleryItem {
 
 export interface ShippingMethod {
 	type: string;
-	temperature: string;
 	freeThreshold: string;
 	feePayer: string;
 }

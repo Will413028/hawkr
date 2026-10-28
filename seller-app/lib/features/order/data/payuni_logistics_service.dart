@@ -136,7 +136,6 @@ class LogisticsInfo {
   final String tradeNo;
   final String shipTradeNo;
   final String odno; // 出貨單編號/宅配託運單號
-  final int goodsType; // 1=常溫, 2=冷凍, 3=冷藏
   final String lgsType; // B2C, C2C, HOME
   final int shipType; // 1=7-ELEVEN, 2=黑貓宅配
   final int serviceType; // 1=取貨付款, 3=取貨不付款
@@ -172,7 +171,6 @@ class LogisticsInfo {
     required this.tradeNo,
     required this.shipTradeNo,
     required this.odno,
-    required this.goodsType,
     required this.lgsType,
     required this.shipType,
     required this.serviceType,
@@ -208,8 +206,6 @@ class LogisticsInfo {
       tradeNo: (map['tradeNo'] ?? map['TradeNo'] ?? '').toString(),
       shipTradeNo: (map['shipTradeNo'] ?? map['ShipTradeNo'] ?? '').toString(),
       odno: (map['odno'] ?? map['Odno'] ?? '').toString(),
-      goodsType:
-          _parseInt(map['goodsType']) ?? _parseInt(map['GoodsType']) ?? 0,
       lgsType: lgsType,
       shipType: _parseInt(map['shipType']) ?? _parseInt(map['ShipType']) ?? 0,
       serviceType:
@@ -254,20 +250,6 @@ class LogisticsInfo {
     if (value is int) return value;
     if (value is String) return int.tryParse(value);
     return null;
-  }
-
-  /// 取得寄件類型文字
-  String get goodsTypeText {
-    switch (goodsType) {
-      case 1:
-        return ShippingTemperature.ambient.label;
-      case 2:
-        return ShippingTemperature.frozen.label;
-      case 3:
-        return ShippingTemperature.chilled.label;
-      default:
-        return '未知';
-    }
   }
 
   /// 取得物流商名稱

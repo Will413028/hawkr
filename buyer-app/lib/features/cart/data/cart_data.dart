@@ -44,18 +44,12 @@ class CartData {
     required List<CartMerchantGroup> groups,
     required List<CartItem> items,
     required Map<int, int> stockBySku,
-    required Map<int, List<String>> deliveryTempsBySku,
     required Map<int, String> productIdsBySku,
     required Set<int> lockedSkuIds,
     required this.estimatedTotalAmount,
   }) : groups = List<CartMerchantGroup>.unmodifiable(groups),
        items = List<CartItem>.unmodifiable(items),
        stockBySku = UnmodifiableMapView<int, int>(Map.of(stockBySku)),
-       deliveryTempsBySku = UnmodifiableMapView<int, List<String>>(
-         deliveryTempsBySku.map(
-           (key, value) => MapEntry(key, List<String>.unmodifiable(value)),
-         ),
-       ),
        productIdsBySku = UnmodifiableMapView<int, String>(
          Map.of(productIdsBySku),
        ),
@@ -65,7 +59,6 @@ class CartData {
     groups: const [],
     items: const [],
     stockBySku: const {},
-    deliveryTempsBySku: const {},
     productIdsBySku: const {},
     lockedSkuIds: const {},
     estimatedTotalAmount: 0,
@@ -74,7 +67,6 @@ class CartData {
   final List<CartMerchantGroup> groups;
   final List<CartItem> items;
   final Map<int, int> stockBySku;
-  final Map<int, List<String>> deliveryTempsBySku;
   final Map<int, String> productIdsBySku;
   final Set<int> lockedSkuIds;
   final int estimatedTotalAmount;
@@ -98,7 +90,6 @@ class CartData {
           .toList(),
       items: items.map(update).toList(),
       stockBySku: stockBySku,
-      deliveryTempsBySku: deliveryTempsBySku,
       productIdsBySku: productIdsBySku,
       lockedSkuIds: lockedSkuIds,
       estimatedTotalAmount: estimatedTotalAmount,

@@ -16,13 +16,11 @@
  */
 
 import AppIcon from "@/components/shared/AppIcon";
-import { ProductCertificationRow } from "@/components/shared/ProductCertificationRow";
 import { DatePicker } from "@/components/ui";
 import { Input } from "@/components/ui/Input";
 import CategorySelector from "@/features/seller/components/CategorySelector";
 import DescriptionEditor from "@/features/seller/components/DescriptionEditor";
 import ProductImageUploader from "@/features/seller/components/ProductImageUploader";
-import { PRODUCT_CERT_CATALOG } from "@/lib/products/certifications";
 import { parseDescription } from "@/lib/products/seller-repo";
 import type { useProductForm } from "../hooks/useProductForm";
 import ProductFormSkuEditor from "./ProductFormSkuEditor";
@@ -169,44 +167,6 @@ export default function ProductFormSections({ form, variant = "page" }: Props) {
 
 	const errorBlock = <ProductFormErrors errors={form.errors} />;
 
-	const trustSection = (
-		<section className={CARD} {...stepAttrs(variant, 3, "section-trust")}>
-			<SectionHeader
-				title="認證 / 信任標章"
-				desc={
-					form.mode === "edit"
-						? "送出後由管理員人工審核，通過的標章才會顯示在商品頁；取消勾選會撤回該筆申請。"
-						: "選擇認證並填寫證書編號，商品建立成功後會自動送出申請；審核通過才會顯示標章。"
-				}
-			/>
-			<ul className="list-none m-0 p-0 flex flex-col gap-2">
-				{PRODUCT_CERT_CATALOG.map((c) => (
-					<li key={c.code}>
-						<ProductCertificationRow
-							item={c}
-							mode={form.mode === "edit" ? "review" : "draft"}
-							entry={(form.mode === "create"
-								? form.certificationDrafts
-								: form.draft.certifications
-							)?.find((e) => e.code === c.code)}
-							applications={form.certApplications}
-							onToggle={() => form.toggleCert(c.code)}
-							onSubmit={(certNo) => form.submitCert(c.code, certNo)}
-							onDraftChange={
-								form.mode === "create"
-									? (certNo) => form.updateCertificationDraft(c.code, certNo)
-									: undefined
-							}
-							busy={form.submitting || form.certBusyCode === c.code}
-							error={form.certErrors[c.code]}
-							idPrefix={variant === "drawer" ? "drawer-cert" : "cert"}
-						/>
-					</li>
-				))}
-			</ul>
-		</section>
-	);
-
 	const advancedSection = (
 		<section
 			className={`${CARD} relative overflow-hidden`}
@@ -316,7 +276,6 @@ export default function ProductFormSections({ form, variant = "page" }: Props) {
 				{basicSection}
 				{imagesSection}
 				{skuSection}
-				{trustSection}
 				{advancedSection}
 				{errorBlock}
 			</div>
@@ -338,10 +297,7 @@ export default function ProductFormSections({ form, variant = "page" }: Props) {
 			</div>
 
 			{/* ───────── 右側欄：認證與進階設定 ───────── */}
-			<aside className="flex flex-col gap-5 min-w-0">
-				{trustSection}
-				{advancedSection}
-			</aside>
+			<aside className="flex flex-col gap-5 min-w-0">{advancedSection}</aside>
 		</>
 	);
 }

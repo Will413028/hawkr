@@ -27,9 +27,6 @@ import {
 import DelegatedAreaUnauthorized from "../components/DelegatedAreaUnauthorized";
 import { targetStoreLabel } from "../confirm-content";
 import { useDelegatedSession } from "../state/DelegatedSessionContext";
-import CertificationEditor from "./CertificationEditor";
-import { certificationsSummary } from "./certifications";
-import type { DelegatedProductCertification } from "./repo";
 
 /**
  * 代行工作區・上架新商品（mockup §4.4.2 的 `＋ 上架新商品`／§6.1.8 `POST .../products`）。
@@ -163,7 +160,6 @@ function toWriteBody(
 	categoryId: string,
 	origin: string,
 	description: ProductDescription,
-	certifications: DelegatedProductCertification[],
 	images: ImageDraft[],
 	skus: SkuDraft[],
 ): ProductWriteBody {
@@ -184,11 +180,6 @@ function toWriteBody(
 		origin: origin.trim(),
 		// 空文件也送：`blocks: []` 是合法的「沒有描述」，而不送它與送空是同一個結果。
 		description,
-		// `name` 是 CertificationType 碼值，不是中文名（見 `./certifications`）。
-		certifications: certifications.map((cert) => ({
-			name: cert.name,
-			certNo: cert.certNo,
-		})),
 		images: images.map((image) => ({ stagedToken: image.stagedToken })),
 		skus: skuInputs,
 	};
@@ -214,9 +205,6 @@ export default function DelegatedProductCreatePage() {
 		version: "1.0",
 		blocks: [],
 	});
-	const [certifications, setCertifications] = React.useState<
-		DelegatedProductCertification[]
-	>([]);
 	const [images, setImages] = React.useState<ImageDraft[]>([]);
 	const [skus, setSkus] = React.useState<SkuDraft[]>(() => [emptySku()]);
 	const [errors, setErrors] = React.useState<string[]>([]);
@@ -278,19 +266,9 @@ export default function DelegatedProductCreatePage() {
 				after: `${description.blocks.length} 個區塊`,
 			});
 		}
-		// 認證是法規宣稱：只要掛了就逐項列出（不摺成「N 個」），操作者要看到的是
-		// 自己替賣家宣稱了什麼、編號是多少。
-		if (certifications.length > 0) {
-			rows.push({
-				field: "認證標章",
-				before: "（新增）",
-				after: certificationsSummary(certifications),
-			});
-		}
 		return rows;
 	}, [
 		categoryId,
-		certifications,
 		description.blocks.length,
 		images.length,
 		l3Options,
@@ -340,10 +318,6 @@ export default function DelegatedProductCreatePage() {
 				publish
 					? "建立與上架是兩次寫入：先建立未上架的商品，再以建立回應的版本執行上架。"
 					: "建立後為未上架，買家看不到；賣家可自行上架，或由代行者另外執行一次上架。"
-			}${
-				certifications.length > 0
-					? "本次會掛上認證標章 —— 那是賣家對買家的法規宣稱，錯誤由賣家承擔責任，請再次核對類型與證書編號。"
-					: ""
 			}`,
 			reasonPlaceholder: "例：協助賣家補上季節新品",
 			changes,
@@ -360,15 +334,7 @@ export default function DelegatedProductCreatePage() {
 		setError(null);
 		try {
 			const created = await scope.repos.products.createProduct(
-				toWriteBody(
-					name,
-					categoryId,
-					origin,
-					description,
-					certifications,
-					images,
-					skus,
-				),
+				toWriteBody(name, categoryId, origin, description, images, skus),
 				decision.meta,
 			);
 			const productId = created.id == null ? "" : String(created.id);
@@ -506,7 +472,7 @@ export default function DelegatedProductCreatePage() {
 
 						<section className="seller-card adm-product-edit__card">
 							<header className="adm-product-edit__card-head">
-								<h2>分類與認證</h2>
+								<h2>分類與產地</h2>
 								<p>
 									分類需選到最後一層。代行工作階段只能選既有分類，不能新增分類。
 								</p>
@@ -565,13 +531,6 @@ export default function DelegatedProductCreatePage() {
 									分類暫時無法載入，請稍後再試。
 								</p>
 							) : null}
-							<div className="adm-product-edit__field">
-								<span className="adm-product-edit__label">認證標章</span>
-								<CertificationEditor
-									value={certifications}
-									onChange={setCertifications}
-								/>
-							</div>
 							<Input
 								variant="bordered"
 								size="lg"

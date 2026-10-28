@@ -6,6 +6,7 @@ import {
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { TOWNS, townByName } from "@hawkr/twaddr/lookup";
 import { describe, expect, it } from "vitest";
+import { AMBIENT_TEMPERATURE_CODE } from "@/lib/seller/ambient-temperature";
 import {
 	getDistrictOptions,
 	getKnownDistrict,
@@ -13,13 +14,11 @@ import {
 	toLogisticsName,
 } from "@/lib/seller/certification-options";
 import {
-	GOODS_TYPE,
 	PAYUNI_SUBMIT_STATUS,
 	SHIPPING_TYPE,
 	type ShippingOnboarding,
 } from "@/lib/seller/shipping";
 import {
-	cvsReferenceRow,
 	cvsSenderInitial,
 	homeFormInitial,
 	senderPostalCodeOf,
@@ -61,7 +60,7 @@ const FULL_STORE = storeOf({
 
 const HOME_ROW: ShippingOnboarding = {
 	shippingType: SHIPPING_TYPE.HOME_DELIVERY,
-	goodsType: GOODS_TYPE.AMBIENT,
+	goodsType: AMBIENT_TEMPERATURE_CODE,
 	payuniSubmitStatus: PAYUNI_SUBMIT_STATUS.SUCCEEDED,
 	senderName: "紀錄人",
 	senderPhone: "0987654321",
@@ -178,31 +177,24 @@ describe("homeFormInitial", () => {
 describe("cvsSenderInitial", () => {
 	const ambient: ShippingOnboarding = {
 		shippingType: SHIPPING_TYPE.CVS,
-		goodsType: GOODS_TYPE.AMBIENT,
-		senderName: "常溫人",
+		goodsType: AMBIENT_TEMPERATURE_CODE,
+		senderName: "寄件人",
 		senderPhone: "0911111111",
 	};
-	const frozen: ShippingOnboarding = {
-		shippingType: SHIPPING_TYPE.CVS,
-		goodsType: GOODS_TYPE.FROZEN,
-		senderName: "冷凍人",
-		senderPhone: "0922222222",
-	};
 
-	it("selects one row, ambient first, then frozen", () => {
-		expect(cvsReferenceRow(ambient, frozen)).toBe(ambient);
-		expect(cvsReferenceRow(undefined, frozen)).toBe(frozen);
-		expect(cvsReferenceRow(undefined, undefined)).toBeUndefined();
-		expect(
-			cvsSenderInitial(cvsReferenceRow(ambient, frozen), FULL_STORE),
-		).toEqual({ senderName: "常溫人", senderPhone: "0911111111" });
+	it("uses the row's sender when it has one", () => {
+		expect(cvsSenderInitial(ambient, FULL_STORE)).toEqual({
+			senderName: "寄件人",
+			senderPhone: "0911111111",
+		});
 	});
 
-	it("when the selected ambient row has no sender, uses the store and never the frozen row's sender", () => {
+	it("when the row has no sender, uses the store", () => {
 		const emptyAmbient = { ...ambient, senderName: "", senderPhone: "" };
-		expect(
-			cvsSenderInitial(cvsReferenceRow(emptyAmbient, frozen), FULL_STORE),
-		).toEqual({ senderName: "王小明", senderPhone: "0912345678" });
+		expect(cvsSenderInitial(emptyAmbient, FULL_STORE)).toEqual({
+			senderName: "王小明",
+			senderPhone: "0912345678",
+		});
 	});
 
 	it("uses a failed row's values rather than the store", () => {
@@ -210,7 +202,7 @@ describe("cvsSenderInitial", () => {
 			...ambient,
 			payuniSubmitStatus: PAYUNI_SUBMIT_STATUS.FAILED,
 		};
-		expect(cvsSenderInitial(failed, FULL_STORE).senderName).toBe("常溫人");
+		expect(cvsSenderInitial(failed, FULL_STORE).senderName).toBe("寄件人");
 	});
 
 	it("falls back to the store, leaving missing fields empty", () => {

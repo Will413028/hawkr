@@ -15,6 +15,8 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/production_layout_test_harness.dart';
 
 class _CheckoutPreviewAdapter implements HttpClientAdapter {
+  final List<Map<String, dynamic>> previewBodies = [];
+
   @override
   Future<ResponseBody> fetch(
     RequestOptions options,
@@ -24,6 +26,7 @@ class _CheckoutPreviewAdapter implements HttpClientAdapter {
     if (options.path != '/app/checkout/preview') {
       return ResponseBody.fromString('{}', 404);
     }
+    previewBodies.add(Map<String, dynamic>.from(options.data as Map));
     return ResponseBody.fromString(
       jsonEncode({
         'code': 0,
@@ -70,6 +73,7 @@ Future<void> _pumpCheckoutSheet(
   required ValueChanged<String> onPayMethodChanged,
   // 預設維持 '3001'，既有 case 行為不變；unsupported 那組 case 才覆寫它。
   String shippingMethod = '3001',
+  String deliveryTemp = '3203',
 }) {
   return pumpProductionLayoutTestApp(
     tester,
@@ -86,7 +90,7 @@ Future<void> _pumpCheckoutSheet(
               // `opt.method().value()` 產出，`HOME_DELIVERY` 是 ShippingType 的
               // code、不是這個軸的值）
               'shippingMethod': shippingMethod,
-              'deliveryTemp': '3203',
+              'deliveryTemp': deliveryTemp,
             },
             selectedAddress: const Address(
               id: 1,
@@ -128,6 +132,29 @@ Future<void> _pumpCheckoutSheet(
 }
 
 void main() {
+  testWidgets('preview sends the selected shipping option deliveryTemp as is', (
+    tester,
+  ) async {
+    final adapter = _CheckoutPreviewAdapter();
+    final dio = Dio(BaseOptions(baseUrl: 'https://checkout.test'))
+      ..httpClientAdapter = adapter;
+    addTearDown(dio.close);
+
+    await _pumpCheckoutSheet(
+      tester,
+      dio: dio,
+      onPayMethodChanged: (_) {},
+      deliveryTemp: ShippingTemperature.frozen.value,
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(adapter.previewBodies, isNotEmpty);
+    expect(adapter.previewBodies.map((body) => body['deliveryTemp']).toSet(), {
+      ShippingTemperature.frozen.value,
+    });
+  });
+
   testWidgets(
     'checkout amounts reflow and payment methods expose selected radio semantics',
     (tester) async {

@@ -8,7 +8,6 @@ import Button from "@/components/ui/Button";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { Input } from "@/components/ui/Input";
 import Switch from "@/components/ui/Switch";
-import { TemperatureTag } from "@/features/cart/components/TemperatureTag";
 import { AddressAutocompleteField } from "@/features/seller/components/AddressAutocompleteField";
 import { SellerCertGate } from "@/features/seller-center";
 import {
@@ -18,6 +17,7 @@ import {
 import { SHIPPING_TYPE_LABEL } from "@/lib/codemeta/enums";
 import { useResettableError } from "@/lib/hooks/useResettableError";
 import { useShippingOnboardings } from "@/lib/hooks/useShippingOnboardings";
+import { AMBIENT_TEMPERATURE_CODE } from "@/lib/seller/ambient-temperature";
 import { useCertGate } from "@/lib/seller/cert-gate";
 import {
 	getDistrictOptions,
@@ -27,9 +27,6 @@ import {
 } from "@/lib/seller/certification-options";
 import {
 	findOnboarding,
-	GOODS_TYPE,
-	type GoodsType,
-	goodsTypeLabel,
 	isApproved,
 	isFailed,
 	isLocked,
@@ -48,7 +45,6 @@ import {
 import { type MyStore, STORE_STATE_UNKNOWN_MESSAGE } from "@/lib/seller/store";
 import { checkDisplayLength } from "@/lib/validation/display-length";
 import {
-	cvsReferenceRow,
 	cvsSenderInitial,
 	type HomeForm,
 	homeFormInitial,
@@ -60,8 +56,8 @@ import {
  * 三件事一頁完成：
  *   1) 物流 gate — 伺服器的 `SHIPPING_SETUP` 能力沒有啟用時擋住：缺 KYC_APPROVED 引導到
  *      /seller-center/me/certifications 完成認證；缺停權、等待刪除顯示對應說明。
- *   2) 黑貓宅配 — 一個 onboarding row，溫層多選（常溫/冷藏/冷凍）。
- *   3) 7-11 店到店 — 常溫 / 冷凍兩個獨立 row（mobile 同邏輯）。
+ *   2) 黑貓宅配 — 一個 onboarding row。
+ *   3) 7-11 店到店 — 一個 onboarding row。
  *
  * 訂單實際出貨在訂單頁（per-row 預約 / 下載託運單 / 取號）— 此頁只
  * 處理「我這個賣家能不能用哪些配送方式」。
@@ -69,13 +65,6 @@ import {
  * 視覺上沿用商家認證頁（seller-cert）的 `seller-card` + Dropdown/Input
  * UI 一致，縣市/區域改為下拉選單。
  */
-
-const HOME_DELIVERY_GOODS: GoodsType[] = [
-	GOODS_TYPE.AMBIENT,
-	GOODS_TYPE.CHILLED,
-	GOODS_TYPE.FROZEN,
-];
-const CVS_GOODS: GoodsType[] = [GOODS_TYPE.AMBIENT, GOODS_TYPE.FROZEN];
 
 /**
  * 地址驗證沒過時給賣家看的訊息。
@@ -204,8 +193,7 @@ function HomeDeliverySection({
 	store: MyStore | null;
 	onChange: () => void | Promise<void>;
 }) {
-	// 黑貓 mobile 一次提交涵蓋多個溫層；我們以單一 home_delivery row 為主，
-	// 顯示「目前已開通 / 處理中 / 失敗」三態之一。
+	// 以單一 home_delivery row 為主，顯示「目前已開通 / 處理中 / 失敗」三態之一。
 	const row = findOnboarding(rows, SHIPPING_TYPE.HOME_DELIVERY);
 	const locked = isLocked(row);
 	const processing = isProcessing(row);
@@ -385,7 +373,7 @@ function HomeDeliverySection({
 					</span>
 					<div>
 						<h2>黑貓宅急便</h2>
-						<p>常溫 / 冷藏 / 冷凍三種溫層配送，地址審核後即可使用</p>
+						<p>地址審核後即可使用</p>
 					</div>
 				</div>
 				<StatusPill row={row} />
@@ -547,16 +535,14 @@ function CvsSection({
 	store: MyStore | null;
 	onChange: () => void | Promise<void>;
 }) {
-	// 7-11 mobile 是「每個溫層獨立一筆 row」。先取常溫那筆做為「sender + 退貨門市」
-	// 共用資料來源；如果常溫沒申請，退到冷凍那筆；都沒有就是空的。
-	const ambientRow = findOnboarding(
+	const reference = findOnboarding(
 		rows,
 		SHIPPING_TYPE.CVS,
-		GOODS_TYPE.AMBIENT,
+		AMBIENT_TEMPERATURE_CODE,
 	);
-	const frozenRow = findOnboarding(rows, SHIPPING_TYPE.CVS, GOODS_TYPE.FROZEN);
-	const reference = cvsReferenceRow(ambientRow, frozenRow);
 	const locked = isLocked(reference);
+	const approved = isApproved(reference);
+	const processing = isProcessing(reference);
 
 	// 初值只算一次；之後重新讀取不覆蓋使用者尚未送出的輸入。
 	const [form, setForm] = React.useState<CvsForm>(() => ({
@@ -565,8 +551,8 @@ function CvsSection({
 		returnStoreName: reference?.returnStoreName ?? "",
 	}));
 	const [openingMap, setOpeningMap] = React.useState(false);
-	const [submitting, setSubmitting] = React.useState<GoodsType | null>(null);
-	const [toggling, setToggling] = React.useState<GoodsType | null>(null);
+	const [submitting, setSubmitting] = React.useState(false);
+	const [toggling, setToggling] = React.useState(false);
 	const [submitError, setSubmitError] = useResettableError();
 
 	const update = (patch: Partial<CvsForm>) =>
@@ -609,7 +595,7 @@ function CvsSection({
 				})
 			: null;
 
-	const submitFor = async (goods: GoodsType) => {
+	const submit = async () => {
 		setSubmitError(null);
 		if (
 			!form.senderName.trim() ||
@@ -629,30 +615,25 @@ function CvsSection({
 			setSubmitError(nameLengthError);
 			return;
 		}
-		setSubmitting(goods);
+		setSubmitting(true);
 		try {
 			await submitCvsOnboarding({
 				senderName: form.senderName,
 				senderPhone: form.senderPhone,
 				returnStoreCode: form.returnStoreCode,
 				returnStoreName: form.returnStoreName || undefined,
-				goodsType: goods,
 			});
 			await onChange();
 		} catch (e) {
 			setSubmitError(e instanceof Error ? e.message : "送出失敗");
 		} finally {
-			setSubmitting(null);
+			setSubmitting(false);
 		}
 	};
 
-	const toggleFor = async (
-		row: ShippingOnboarding,
-		goods: GoodsType,
-		enabled: boolean,
-	) => {
+	const toggle = async (row: ShippingOnboarding, enabled: boolean) => {
 		if (!row.onboardingId) return;
-		setToggling(goods);
+		setToggling(true);
 		setSubmitError(null);
 		try {
 			await toggleOnboarding(row.onboardingId, enabled);
@@ -660,7 +641,7 @@ function CvsSection({
 		} catch (e) {
 			setSubmitError(e instanceof Error ? e.message : "切換失敗");
 		} finally {
-			setToggling(null);
+			setToggling(false);
 		}
 	};
 
@@ -678,7 +659,7 @@ function CvsSection({
 					</span>
 					<div>
 						<h2>7-11 店到店</h2>
-						<p>常溫 / 冷凍兩種溫層獨立開通，買家可從超商取貨</p>
+						<p>買家可從超商取貨</p>
 					</div>
 				</div>
 			</header>
@@ -756,58 +737,43 @@ function CvsSection({
 			)}
 
 			<div className="shipping-cvs__rows">
-				{CVS_GOODS.map((g) => {
-					const r = findOnboarding(rows, SHIPPING_TYPE.CVS, g);
-					const approved = isApproved(r);
-					const processing = isProcessing(r);
-					const goodsType = r?.goodsType ?? g;
-					return (
-						<div key={g} className="shipping-cvs__row">
-							<div className="shipping-cvs__row-label">
-								<span className="shipping-cvs__row-temp">
-									<TemperatureTag value={goodsType} />
-								</span>
-								<small aria-live="polite">
-									{toggling === g ? "更新中…" : statusLabel(r)}
-								</small>
-							</div>
-							<div className="shipping-cvs__row-action">
-								{!r ||
-								(!approved &&
-									!processing &&
-									r?.payuniSubmitStatus !== PAYUNI_SUBMIT_STATUS.SUCCEEDED) ? (
-									<Button
-										size="sm"
-										onClick={() => void submitFor(g)}
-										disabled={submitting === g}
-										isLoading={submitting === g}
-										loadingLabel={`開通${goodsTypeLabel(goodsType)}店到店中…`}
-										loadingIndicator={
-											<TruckSpinner
-												size={16}
-												label={`開通${goodsTypeLabel(goodsType)}店到店中`}
-											/>
-										}
-									>
-										開通
-									</Button>
-								) : approved ? (
-									<Switch
-										checked={r.enabled === "true"}
-										onCheckedChange={(enabled) => void toggleFor(r, g, enabled)}
-										disabled={toggling !== null}
-										busy={toggling === g}
-										ariaLabel={`${goodsTypeLabel(goodsType)}配送${
-											r.enabled === "true" ? "已啟用" : "已停用"
-										}`}
-									/>
-								) : (
-									<span className="shipping-cvs__pending">處理中</span>
-								)}
-							</div>
-						</div>
-					);
-				})}
+				<div className="shipping-cvs__row">
+					<div className="shipping-cvs__row-label">
+						<small aria-live="polite">
+							{toggling ? "更新中…" : statusLabel(reference)}
+						</small>
+					</div>
+					<div className="shipping-cvs__row-action">
+						{!reference ||
+						(!approved &&
+							!processing &&
+							reference.payuniSubmitStatus !==
+								PAYUNI_SUBMIT_STATUS.SUCCEEDED) ? (
+							<Button
+								size="sm"
+								onClick={() => void submit()}
+								disabled={submitting}
+								isLoading={submitting}
+								loadingLabel="開通店到店中…"
+								loadingIndicator={
+									<TruckSpinner size={16} label="開通店到店中" />
+								}
+							>
+								開通
+							</Button>
+						) : approved ? (
+							<Switch
+								checked={reference.enabled === "true"}
+								onCheckedChange={(enabled) => void toggle(reference, enabled)}
+								disabled={toggling}
+								busy={toggling}
+								ariaLabel={`配送${reference.enabled === "true" ? "已啟用" : "已停用"}`}
+							/>
+						) : (
+							<span className="shipping-cvs__pending">處理中</span>
+						)}
+					</div>
+				</div>
 			</div>
 		</section>
 	);
@@ -884,8 +850,3 @@ function HomeDeliveryIcon() {
 function CvsStoreIcon() {
 	return <CarrierIconBox name="bag" />;
 }
-
-// Avoid the `HOME_DELIVERY_GOODS` constant being flagged as unused when the
-// caption text is the only place that lists temperature layers; consumers may
-// want to switch to per-layer rows on home_delivery in a follow-up.
-void HOME_DELIVERY_GOODS;

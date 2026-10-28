@@ -33,13 +33,12 @@ import '../data/category_model.dart';
 import '../data/category_repository.dart';
 import '../data/product_item_model.dart';
 import '../../home/presentation/home_widget/product_add_to_cart_sheet.dart';
-import '../../cart/presentation/widgets/temperature_tags.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 
 /// Hawkr 市集商品列表。
 ///
 /// 行動版互動與 Web `/market/products` 對齊：搜尋、L1/L2/L3 多選分類、
-/// 溫層、價格、認證、熱門 hashtag、排序與無限載入共用
+/// 價格、熱門 hashtag、排序與無限載入共用
 /// `GET /public/products` contract。
 class CategoryScreen extends ConsumerStatefulWidget {
   const CategoryScreen({
@@ -83,11 +82,9 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen>
   final TextEditingController _searchCtrl = TextEditingController();
   Timer? _searchDebounce;
 
-  // Sort / delivery temperature / price range.
+  // Sort / price range.
   String _sortBy = '';
-  String _deliveryTemp = '';
   Set<String> _selectedHashtags = <String>{};
-  Set<String> _selectedCertificationTypes = <String>{};
   String _priceMin = '';
   String _priceMax = '';
   String? _priceError;
@@ -235,11 +232,9 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen>
         pageSize: 20,
         keyword: _keyword.isEmpty ? null : _keyword,
         sort: _sortBy.isEmpty ? null : _sortBy,
-        deliveryTemp: _deliveryTemp.isEmpty ? null : _deliveryTemp,
         priceMin: _priceMin.isEmpty ? null : _priceMin,
         priceMax: _priceMax.isEmpty ? null : _priceMax,
         hashtags: _selectedHashtags.toList(growable: false),
-        certificationTypes: _selectedCertificationTypes.toList(growable: false),
         followedSellerOnly: _storyTab == _MarketStoryTab.following,
       );
 
@@ -381,15 +376,6 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen>
     _loadProducts(reset: true);
   }
 
-  void _toggleCertification(String certificationType) {
-    final next = Set<String>.from(_selectedCertificationTypes);
-    next.contains(certificationType)
-        ? next.remove(certificationType)
-        : next.add(certificationType);
-    setState(() => _selectedCertificationTypes = next);
-    _loadProducts(reset: true);
-  }
-
   void _onSearchChanged(String query) {
     final trimmed = query.trim();
     if (trimmed == _keyword) return;
@@ -427,12 +413,6 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen>
     if (changesProductScope) _loadProducts(reset: true);
   }
 
-  void _setDeliveryTemp(String temp) {
-    final next = temp == _deliveryTemp ? '' : temp;
-    setState(() => _deliveryTemp = next);
-    _loadProducts(reset: true);
-  }
-
   void _applyPriceRange() {
     final minText = _priceMinCtrl.text.trim();
     final maxText = _priceMaxCtrl.text.trim();
@@ -465,9 +445,7 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen>
     setState(() {
       _keyword = '';
       _selectedCategoryIds = <String>{};
-      _deliveryTemp = '';
       _selectedHashtags = <String>{};
-      _selectedCertificationTypes = <String>{};
       _priceMin = '';
       _priceMax = '';
       _priceError = null;
@@ -524,10 +502,8 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen>
                       expanded: true,
                       activeFilterLabels: _activeFilterLabels,
                       selectedCategoryCount: _selectedCategoryIds.length,
-                      deliveryTemp: _deliveryTemp,
                       popularHashtags: _popularHashtags,
                       selectedHashtags: _selectedHashtags,
-                      selectedCertificationTypes: _selectedCertificationTypes,
                       priceMinController: _priceMinCtrl,
                       priceMaxController: _priceMaxCtrl,
                       priceError: _priceError,
@@ -536,16 +512,8 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen>
                         await _openCategoryPicker();
                         setSheetState(() {});
                       },
-                      onDeliveryTempSelected: (value) {
-                        _setDeliveryTemp(value);
-                        setSheetState(() {});
-                      },
                       onHashtagSelected: (value) {
                         _toggleHashtag(value);
-                        setSheetState(() {});
-                      },
-                      onCertificationSelected: (value) {
-                        _toggleCertification(value);
                         setSheetState(() {});
                       },
                       onApplyPrice: () {
@@ -692,11 +660,6 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen>
       final path = _findCategoryPath(_l1Categories, categoryId);
       labels.add('分類：${path?.join(' › ') ?? categoryId}');
     }
-    final tempLabel = _deliveryTempOptions
-        .where((option) => option.value == _deliveryTemp)
-        .map((option) => option.label)
-        .firstOrNull;
-    if (tempLabel != null) labels.add('溫層：$tempLabel');
     if (_priceMin.isNotEmpty || _priceMax.isNotEmpty) {
       labels.add(
         '價格：${_priceMin.isEmpty ? '0' : _priceMin}–${_priceMax.isEmpty ? '不限' : _priceMax}',
@@ -704,13 +667,6 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen>
     }
     for (final hashtag in _selectedHashtags) {
       labels.add('#$hashtag');
-    }
-    for (final certification in _selectedCertificationTypes) {
-      final label = _certificationOptions
-          .where((option) => option.value == certification)
-          .map((option) => option.label)
-          .firstOrNull;
-      labels.add('認證：${label ?? certification}');
     }
     return labels;
   }
@@ -877,21 +833,6 @@ const _sortOptions = [
   _FilterOption('RATING', '評分最高'),
 ];
 
-const _deliveryTempOptions = [
-  _FilterOption('3201', '常溫'),
-  _FilterOption('3202', '冷藏'),
-  _FilterOption('3203', '冷凍'),
-];
-
-const _certificationOptions = [
-  _FilterOption('3701', '有機農產品'),
-  _FilterOption('3702', '產銷履歷'),
-  _FilterOption('3703', 'CAS'),
-  _FilterOption('3704', 'HACCP'),
-  _FilterOption('3705', 'ISO'),
-  _FilterOption('3706', 'GMP'),
-];
-
 enum _MarketStoryTab {
   recommended('推薦'),
   following('追蹤中'),
@@ -1041,18 +982,14 @@ class _MarketFilterPanel extends StatelessWidget {
     required this.expanded,
     required this.activeFilterLabels,
     required this.selectedCategoryCount,
-    required this.deliveryTemp,
     required this.popularHashtags,
     required this.selectedHashtags,
-    required this.selectedCertificationTypes,
     required this.priceMinController,
     required this.priceMaxController,
     required this.priceError,
     required this.onToggleExpanded,
     required this.onOpenCategoryPicker,
-    required this.onDeliveryTempSelected,
     required this.onHashtagSelected,
-    required this.onCertificationSelected,
     required this.onApplyPrice,
     required this.onClearAll,
   });
@@ -1060,18 +997,14 @@ class _MarketFilterPanel extends StatelessWidget {
   final bool expanded;
   final List<String> activeFilterLabels;
   final int selectedCategoryCount;
-  final String deliveryTemp;
   final List<String> popularHashtags;
   final Set<String> selectedHashtags;
-  final Set<String> selectedCertificationTypes;
   final TextEditingController priceMinController;
   final TextEditingController priceMaxController;
   final String? priceError;
   final VoidCallback onToggleExpanded;
   final VoidCallback onOpenCategoryPicker;
-  final ValueChanged<String> onDeliveryTempSelected;
   final ValueChanged<String> onHashtagSelected;
-  final ValueChanged<String> onCertificationSelected;
   final VoidCallback onApplyPrice;
   final VoidCallback onClearAll;
 
@@ -1240,54 +1173,12 @@ class _MarketFilterPanel extends StatelessWidget {
                             ),
                             const SizedBox(height: HkSpace.lg),
                             _FilterSection(
-                              title: '配送溫層',
-                              child: Wrap(
-                                spacing: HkSpace.sm,
-                                runSpacing: HkSpace.sm,
-                                children: [
-                                  for (final option in _deliveryTempOptions)
-                                    TemperatureChoiceChip(
-                                      key: ValueKey(
-                                        'market-temp-${option.value}',
-                                      ),
-                                      code: option.value,
-                                      label: option.label,
-                                      selected: deliveryTemp == option.value,
-                                      onTap: () =>
-                                          onDeliveryTempSelected(option.value),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: HkSpace.lg),
-                            _FilterSection(
                               title: '價格範圍',
                               child: _MarketPriceRange(
                                 minimumController: priceMinController,
                                 maximumController: priceMaxController,
                                 errorText: priceError,
                                 onApply: onApplyPrice,
-                              ),
-                            ),
-                            const SizedBox(height: HkSpace.lg),
-                            _FilterSection(
-                              title: '認證',
-                              child: Wrap(
-                                spacing: HkSpace.sm,
-                                runSpacing: HkSpace.sm,
-                                children: [
-                                  for (final option in _certificationOptions)
-                                    HkChoiceChip(
-                                      key: ValueKey(
-                                        'market-cert-${option.value}',
-                                      ),
-                                      label: option.label,
-                                      selected: selectedCertificationTypes
-                                          .contains(option.value),
-                                      onTap: () =>
-                                          onCertificationSelected(option.value),
-                                    ),
-                                ],
                               ),
                             ),
                             if (popularHashtags.isNotEmpty) ...[
@@ -2056,7 +1947,7 @@ class _MarketSortSheet extends StatelessWidget {
                     const SizedBox(height: HkSpace.sm),
                     Wrap(
                       key: const ValueKey('market-browse-options'),
-                      // 與同一張表單裡的其他選擇列一致（認證／hashtag 都是 sm），
+                      // 與同一張表單裡的其他選擇列一致（hashtag 都是 sm），
                       // 也對齊網頁的 --hkui-filter-gap-sm。4px 在 32px 膠囊之間
                       // 會讀成整排黏在一起。
                       spacing: HkSpace.sm,

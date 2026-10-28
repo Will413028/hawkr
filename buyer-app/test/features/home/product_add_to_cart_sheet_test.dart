@@ -5,7 +5,6 @@ import 'package:hawkr_buyer/features/product/data/product_repository.dart';
 import 'package:hawkr_buyer/features/product/presentation/widgets/product_purchase_panel.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_icon.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -29,7 +28,7 @@ void main() {
     );
   });
 
-  testWidgets('summary grows naturally and does not crop temperature content', (
+  testWidgets('summary grows naturally and does not crop delivery metadata', (
     tester,
   ) async {
     await _pumpLoadedSheet(tester, width: 320, textScale: 1.4);
@@ -37,17 +36,11 @@ void main() {
     final summaryRect = tester.getRect(
       find.byKey(const ValueKey('product-purchase-summary')),
     );
-    final temperatureRowRect = tester.getRect(
+    final deliveryRowRect = tester.getRect(
       find.byKey(const ValueKey('product-purchase-delivery-metadata')),
     );
-    final temperatureTagRect = tester.getRect(
-      find.byKey(const ValueKey('product-purchase-temperature-3203')),
-    );
 
-    _expectRectInside(summaryRect, temperatureRowRect);
-    _expectRectInside(summaryRect, temperatureTagRect);
-    _expectTextHasNaturalHeight(tester, '配送溫層');
-    _expectTextHasNaturalHeight(tester, '冷凍');
+    _expectRectInside(summaryRect, deliveryRowRect);
     expect(tester.takeException(), isNull);
   });
 
@@ -82,32 +75,16 @@ void main() {
       reason: 'the frame must not squeeze the mark below its requested size',
     );
     _expectRectInside(carrierFrameRect.deflate(1), carrierIconRect);
-    final metadataIcon = tester.widget<HkIcon>(
-      find
-          .descendant(
-            of: find.byKey(
-              const ValueKey('product-purchase-delivery-metadata'),
-            ),
-            matching: find.byType(HkIcon),
-          )
-          .first,
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('product-purchase-delivery-metadata')),
+        matching: find.text('配送方式'),
+      ),
+      findsOneWidget,
     );
-    expect(metadataIcon.name, HkIconName.document);
-    expect(metadataIcon.size, 16);
 
     _expectTextTier(tester, '冷凍烏魚子', AppTypography.productName);
-    _expectTextTier(tester, '配送溫層', AppTypography.meta);
-    _expectTextTier(
-      tester,
-      '冷凍',
-      const TextStyle(
-        fontSize: 11,
-        height: 16 / 11,
-        letterSpacing: 0,
-        fontWeight: FontWeight.w700,
-        color: AppColors.temperatureFrozen,
-      ),
-    );
+    expect(find.text('配送溫層'), findsNothing);
     _expectTextTier(tester, '暫無評價', AppTypography.metaMuted);
     _expectTextTier(tester, '選擇規格', AppTypography.sectionTitle);
     _expectTextTier(
@@ -178,7 +155,6 @@ void main() {
       await _pumpLoadedSheet(tester, width: width, textScale: 1.4);
 
       expect(find.text('冷凍烏魚子'), findsOneWidget);
-      expect(find.text('冷凍'), findsOneWidget);
       expect(find.text('約300g/包'), findsOneWidget);
       final specChip = tester.getSize(
         find.byKey(const ValueKey('product-purchase-spec-11')),
@@ -269,7 +245,6 @@ const _productDetail = <String, dynamic>{
   'shippingMethods': <Map<String, dynamic>>[
     <String, dynamic>{'type': '3001'},
   ],
-  'deliveryTemp': <String>['3203'],
   'rating': 0,
   'reviews': <Map<String, dynamic>>[],
   'skus': <Map<String, dynamic>>[
@@ -308,16 +283,6 @@ List<Size> _visibleDragHandles(WidgetTester tester) {
     }
   }
   return result;
-}
-
-void _expectTextHasNaturalHeight(WidgetTester tester, String label) {
-  final paragraph = tester.renderObject<RenderParagraph>(find.text(label));
-  final naturalHeight = paragraph.getMinIntrinsicHeight(paragraph.size.width);
-  expect(
-    paragraph.size.height,
-    greaterThanOrEqualTo(naturalHeight - 0.1),
-    reason: '$label must receive its natural scaled line height',
-  );
 }
 
 void _expectTextTier(

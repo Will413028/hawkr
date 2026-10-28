@@ -1,4 +1,3 @@
-import '../../../shared/widgets/hk_temperature_tag.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
@@ -10,7 +9,6 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../config/image_config.dart';
-import '../../../core/codemeta/code_meta.dart';
 import '../../../core/codemeta/code_meta_display.dart';
 import '../../../core/codemeta/shipping_presentation.dart';
 import '../../../core/theme/app_typography.dart';
@@ -627,22 +625,12 @@ class _DeliveryProgressCard extends StatelessWidget {
       order?.shippingMethod ?? '',
       fallback: '尚未指定',
     );
-    final temperature =
-        ShippingTemperature.fromValue(order?.deliveryTemp ?? '')?.label ??
-        ((order?.deliveryTemp ?? '').isEmpty ? '尚未指定' : order!.deliveryTemp);
     final shipmentCode = [
       order?.odno.trim() ?? '',
       order?.validationNo.trim() ?? '',
     ].where((value) => value.isNotEmpty).join(' ');
     final rows = <Widget>[
       _OrderDetailInfoLine(label: '配送方式', value: shippingMethod),
-      _OrderDetailInfoLine(
-        label: '配送溫層',
-        value: temperature,
-        valueWidget: (order?.deliveryTemp.trim().isNotEmpty ?? false)
-            ? HkTemperatureTag(value: order!.deliveryTemp)
-            : null,
-      ),
       _OrderDetailInfoLine(
         label: '物流貨態',
         value: delivery.label,
@@ -769,14 +757,12 @@ class _OrderDetailInfoLine extends StatelessWidget {
     required this.value,
     this.copyValue,
     this.valueColor,
-    this.valueWidget,
   });
 
   final String label;
   final String value;
   final String? copyValue;
   final Color? valueColor;
-  final Widget? valueWidget;
 
   @override
   Widget build(BuildContext context) {
@@ -798,18 +784,16 @@ class _OrderDetailInfoLine extends StatelessWidget {
         ),
         SizedBox(width: 10.w),
         Expanded(
-          child: valueWidget != null
-              ? Align(alignment: Alignment.centerRight, child: valueWidget)
-              : Text(
-                  normalized,
-                  textAlign: TextAlign.end,
-                  style: TextStyle(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w500,
-                    color: valueColor ?? AppColors.textEmphasis,
-                    height: 1.45,
-                  ),
-                ),
+          child: Text(
+            normalized,
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w500,
+              color: valueColor ?? AppColors.textEmphasis,
+              height: 1.45,
+            ),
+          ),
         ),
         if (copyText.isNotEmpty) ...[
           SizedBox(width: 6.w),

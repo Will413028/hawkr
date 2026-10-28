@@ -98,14 +98,6 @@ const navGroups: Array<{ section: string; items: NavItem[] }> = [
 			{ href: "/admin/members", label: "買家管理", icon: "group" },
 			{ href: "/admin/products", label: "商品管理", icon: "nutrition" },
 			{
-				// 商品認證審核佇列。緊鄰「商品管理」是刻意的：兩者的對象都是商品，
-				// 而這一頁是「賣家宣稱的認證能不能公開」的唯一裁決入口——沒有這個
-				// 選單項，頁面存在但沒有人找得到，所有待審申請會永遠停在佇列裡。
-				href: "/admin/product-certifications",
-				label: "商品認證審核",
-				icon: "verified",
-			},
-			{
 				href: "/admin/category-audit",
 				label: "分類審核",
 				icon: "library_add_check",

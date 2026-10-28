@@ -43,10 +43,9 @@ export async function loadMarketProductsSection({
 			!fetchParams.categoryId &&
 			!fetchParams.sort &&
 			!fetchParams.hashtags?.length &&
-			!fetchParams.temp &&
 			fetchParams.priceMin == null &&
-			fetchParams.priceMax == null &&
-			!fetchParams.certificationTypes?.length;
+			fetchParams.priceMax == null;
+
 		// Cache only the canonical anonymous first page. Filter values come from
 		// the URL and are intentionally fetched directly so arbitrary queries do
 		// not create an unbounded OpenNext/R2 key space. Use the shared 100-item
@@ -62,10 +61,8 @@ export async function loadMarketProductsSection({
 					fetchParams.sort,
 					{
 						hashtags: fetchParams.hashtags,
-						temp: fetchParams.temp,
 						priceMin: fetchParams.priceMin,
 						priceMax: fetchParams.priceMax,
-						certificationTypes: fetchParams.certificationTypes,
 					},
 				)
 		).catch(() => ({ data: { records: [] as unknown[] } }));

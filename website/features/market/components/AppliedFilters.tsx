@@ -11,10 +11,10 @@ import { useObservedRouter } from "@/lib/navigation/use-observed-router";
  */
 export interface AppliedChip {
 	/** Stable identity across navigations so AnimatePresence can match enter /
-	 * exit (e.g. `cat-鳳梨`, `hashtag-產銷履歷`, `temp`). */
+	 * exit (e.g. `cat-鳳梨`, `price`). */
 	key: string;
-	kind: "keyword" | "category" | "temp" | "price" | "hashtag" | "certification";
-	/** Small grey prefix (關鍵字 / 分類 / 溫層 …). Omitted for hashtag chips. */
+	kind: "keyword" | "category" | "price" | "hashtag";
+	/** Small grey prefix (關鍵字 / 分類 / 價格 …). Omitted for hashtag chips. */
 	label?: string;
 	/** Main chip text. For `hashtag` it is the raw tag name (rendered with #). */
 	value: string;

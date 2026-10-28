@@ -9,7 +9,6 @@ import {
 	imageDraftsOf,
 	type ProductEditForm,
 	sameDescription,
-	saveHint,
 } from "./edit-patch";
 import type { DelegatedProductDetail } from "./repo";
 
@@ -38,7 +37,6 @@ function detail(over: Partial<DelegatedProductDetail> = {}) {
 		description: { version: "1.0" as const, blocks: [] },
 		images: [{ assetId: "5001", imageKey: "product/a.jpg" }],
 		origin: "台灣 梨山",
-		certifications: [{ name: "3701", certNo: "A1" }],
 		hashtags: [],
 		skus: [
 			{
@@ -73,7 +71,6 @@ function formOf(
 		categoryId: base.categoryId,
 		origin: base.origin,
 		description: base.description,
-		certifications: base.certifications.map((cert) => ({ ...cert })),
 		images: imageDraftsOf(base),
 		skus: Object.fromEntries(
 			base.skus.map((sku) => [
@@ -111,34 +108,6 @@ describe("buildProductPatch：沒改就不送", () => {
 		expect(buildProductPatch(base, formOf(base, { categoryId: "" }))).toEqual(
 			{},
 		);
-	});
-
-	it("只改認證：只送 certifications，且是整份新陣列", () => {
-		const base = detail();
-		const next = [
-			{ name: "3701", certNo: "A1" },
-			{ name: "3702", certNo: "B2" },
-		];
-		const patch = buildProductPatch(
-			base,
-			formOf(base, { certifications: next }),
-		);
-		expect(patch).toEqual({ certifications: next });
-	});
-
-	it("把認證全部移除送的是空陣列（不是不送）—— 不送等於 Gateway 以 before 回填", () => {
-		const base = detail();
-		const patch = buildProductPatch(base, formOf(base, { certifications: [] }));
-		expect(patch.certifications).toEqual([]);
-	});
-
-	it("只改證書編號也要送：整份替換之下不送就是把編號留在舊值", () => {
-		const base = detail();
-		const patch = buildProductPatch(
-			base,
-			formOf(base, { certifications: [{ name: "3701", certNo: "A2" }] }),
-		);
-		expect(patch.certifications).toEqual([{ name: "3701", certNo: "A2" }]);
 	});
 
 	it("唯讀觀察欄位不出現在 patch 裡（status／priceMin／priceMax／商品層 stockQty）", () => {
@@ -201,41 +170,6 @@ describe("buildProductChanges：三欄表", () => {
 			categoryNameOf,
 		);
 		expect(rows[0]?.after).toBe("999");
-	});
-
-	it("認證列逐項列出類型與編號（不是摺成「N 個」）", () => {
-		const base = detail();
-		const form = formOf(base, {
-			certifications: [
-				{ name: "3701", certNo: "A1" },
-				{ name: "3702", certNo: "B2" },
-			],
-		});
-		const rows = buildProductChanges(
-			base,
-			form,
-			buildProductPatch(base, form),
-			categoryNameOf,
-		);
-		expect(rows).toEqual([
-			{
-				field: "認證標章",
-				before: "有機農產品・A1",
-				after: "有機農產品・A1、產銷履歷 TAP・B2",
-			},
-		]);
-	});
-
-	it("全部移除時 after 是空字串，交給抽屜畫成破折號", () => {
-		const base = detail();
-		const form = formOf(base, { certifications: [] });
-		const rows = buildProductChanges(
-			base,
-			form,
-			buildProductPatch(base, form),
-			categoryNameOf,
-		);
-		expect(rows[0]?.after).toBe("");
 	});
 
 	it("沒改到的欄位不列（三欄表只列這一次真的會送的東西）", () => {
@@ -434,17 +368,5 @@ describe("sameDescription：真實的描述變更一律不得被判成相同", (
 			API_BLOCKS[1],
 		]);
 		expect(sameDescription(before, doc(EDITOR_BLOCKS))).toBe(false);
-	});
-});
-
-describe("saveHint：動到認證才多說一句", () => {
-	it("沒動認證就是基本那句", () => {
-		expect(saveHint({ name: "改名" })).toBe("請確認以下變更內容無誤後儲存。");
-	});
-
-	it("動到認證時提醒法規宣稱與責任歸屬", () => {
-		const hint = saveHint({ certifications: [] });
-		expect(hint).toContain("法規宣稱");
-		expect(hint).toContain("賣家承擔");
 	});
 });

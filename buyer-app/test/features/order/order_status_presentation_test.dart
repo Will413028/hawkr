@@ -1,8 +1,6 @@
 import "dart:io";
 
-import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/features/order/data/order_model.dart';
-import 'package:hawkr_buyer/features/order/data/order_status.dart';
 import 'package:hawkr_buyer/features/order/order_color_tokens.dart';
 import 'package:hawkr_buyer/features/order/presentation/order_status_presentation.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_icon.dart';
@@ -206,14 +204,6 @@ void main() {
         reason: 'delivery ${order.status}/${order.shippingStatus}',
       );
     }
-  });
-
-  test('溫層標籤依 Web 常溫灰、冷藏橘、冷凍藍顯示', () {
-    expect(DeliveryTempLabel.labelFor(' 冷藏 '), '冷藏');
-    expect(DeliveryTempLabel.colorFor(' 冷藏 '), AppColors.temperatureChilled);
-    expect(DeliveryTempLabel.colorFor('3201'), AppColors.temperatureAmbient);
-    expect(DeliveryTempLabel.colorFor('3202'), AppColors.temperatureChilled);
-    expect(DeliveryTempLabel.colorFor('3203'), AppColors.temperatureFrozen);
   });
 
   test('核心訂單 UI 不可直接引用額外語意色', () {

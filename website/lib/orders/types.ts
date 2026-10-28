@@ -60,8 +60,6 @@ export interface OrderShipping {
 	storeCode?: string;
 	/** 取件門市名稱（7-11） */
 	storeName?: string;
-	/** 配送溫層（"3201" 常溫 / "3202" 冷藏 / "3203" 冷凍）。wire `deliveryTemp`。 */
-	deliveryTemp?: string;
 	/** 託運單到期時間（黑貓 PDF 過期前須出貨）。wire `labelExpireAt`。 */
 	labelExpireAt?: string;
 	/** 賣家出貨建單照片 URL 陣列。wire `shipmentPhotoUrls`。 */

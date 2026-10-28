@@ -1,5 +1,4 @@
 import '../../../features/seller/data/current_store.dart';
-import 'widgets/product_temperature_tags.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
@@ -12,7 +11,6 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../config/image_config.dart';
-import '../data/product_certification_meta.dart';
 import '../data/product_description_parser.dart';
 import '../data/product_repository.dart';
 import '../../../shared/utils/price_display.dart';
@@ -237,10 +235,8 @@ class ProductPreviewScreen extends HookConsumerWidget {
     final imageUrls = useState<List<String>>([]);
     final grades = useState<List<Map<String, dynamic>>>([]);
     final reviews = useState<List<Map<String, dynamic>>>([]);
-    final certifications = useState<List<Map<String, dynamic>>>([]);
     final selectedGradeIndex = useState<int?>(null);
     final loading = useState(true);
-    final deliveryTemp = useState<Object?>(product['deliveryTemp']);
     final avgRating = useState<double?>(null);
     final reviewCount = useState<int?>(null);
     final mine = ref.watch(myStoreSnapshotProvider);
@@ -266,14 +262,6 @@ class ProductPreviewScreen extends HookConsumerWidget {
         return reviewList;
       } catch (e) {
         return [];
-      }
-    }
-
-    void loadCertifications() {
-      final p = product;
-      final tags = p['tags'] ?? p['certifications'] ?? p['_loadedTags'] ?? [];
-      if (tags is List) {
-        certifications.value = tags.whereType<Map<String, dynamic>>().toList();
       }
     }
 
@@ -318,16 +306,6 @@ class ProductPreviewScreen extends HookConsumerWidget {
         debugPrint(
           '[ProductPreview] Product detail loaded, keys: ${productData.keys}',
         );
-
-        final loadedDeliveryTemp = productData['deliveryTemp'];
-        // apiGet resolves transport failures as an error envelope. Missing or
-        // invalid detail fields must not erase the caller's known temperature.
-        if (productResult['code'] == 0 &&
-            (loadedDeliveryTemp is String ||
-                loadedDeliveryTemp is List ||
-                loadedDeliveryTemp is num)) {
-          deliveryTemp.value = loadedDeliveryTemp;
-        }
 
         List<String> resolvedImageUrls = extractProductImageUrls(productData);
         debugPrint(
@@ -375,13 +353,6 @@ class ProductPreviewScreen extends HookConsumerWidget {
         final loadedBlocks = parsedDescription.blocks.isNotEmpty
             ? parsedDescription.blocks
             : null;
-
-        final certs = productData['certifications'];
-        if (certs is List && certs.isNotEmpty && context.mounted) {
-          certifications.value = certs
-              .whereType<Map<String, dynamic>>()
-              .toList();
-        }
 
         final categoryId =
             productData['category_id'] ?? productData['categoryId'];
@@ -462,10 +433,6 @@ class ProductPreviewScreen extends HookConsumerWidget {
           selectedGradeIndex.value = 0;
         }
         loading.value = false;
-
-        if (certifications.value.isEmpty) {
-          loadCertifications();
-        }
       } catch (e) {
         debugPrint('[ProductPreview] Error loading details: $e');
         if (context.mounted) {
@@ -823,34 +790,6 @@ class ProductPreviewScreen extends HookConsumerWidget {
                 ),
               ],
             ),
-            SizedBox(height: 8.h),
-            Row(
-              children: [
-                Icon(
-                  AppIcons.thermostatOutlined,
-                  size: 24.sp,
-                  color: AppIconColors.defaultColor,
-                ),
-                SizedBox(width: 5.w),
-                Expanded(
-                  child: Wrap(
-                    spacing: 4,
-                    runSpacing: 4,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Text(
-                        '配送溫層：',
-                        style: TextStyle(
-                          fontSize: 16.sp,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      ProductTemperatureTags(deliveryTemp: deliveryTemp.value),
-                    ],
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
       );
@@ -1102,115 +1041,6 @@ class ProductPreviewScreen extends HookConsumerWidget {
       );
     }
 
-    Widget buildCertificationItem(Map<String, dynamic> cert) {
-      final rawName = (cert['name'] ?? cert['label'] ?? '').toString();
-      final name = certificationLabelForRaw(rawName);
-      final certDescription = cert['description'] ?? cert['desc'] ?? '';
-      final imageUrl = cert['imageUrl'] ?? cert['image'] ?? cert['icon'];
-
-      return Container(
-        margin: EdgeInsets.only(bottom: 16.h),
-        padding: EdgeInsets.all(8.w),
-        decoration: BoxDecoration(
-          color: AppColors.bgPrimary,
-          borderRadius: BorderRadius.circular(12.r),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 60.w,
-              height: 60.h,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12.r),
-                color: AppColors.bgCard,
-              ),
-              child: imageUrl != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(12.r),
-                      child: OptimizedNetworkImage(
-                        imageUrl: imageUrl,
-                        scene: ImageScene.productThumbnail,
-                        fit: BoxFit.cover,
-                        errorWidget: Icon(
-                          AppIcons.verifiedOutlined,
-                          color: AppIconColors.secondary,
-                          size: 32.sp,
-                        ),
-                      ),
-                    )
-                  : Icon(
-                      AppIcons.verifiedOutlined,
-                      color: AppIconColors.secondary,
-                      size: 32.sp,
-                    ),
-            ),
-            SizedBox(width: 6.w),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: TextStyle(
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  SizedBox(height: 4.h),
-                  Text(
-                    certDescription,
-                    style: TextStyle(
-                      fontSize: 14.sp,
-                      color: AppColors.textPrimary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    Widget buildCertificationSection() {
-      return Container(
-        margin: EdgeInsets.symmetric(horizontal: 24.w),
-        padding: EdgeInsets.all(16.w),
-        decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          borderRadius: BorderRadius.circular(16.r),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.cardShadow,
-              blurRadius: 12,
-              offset: Offset(0, 4.h),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '標籤認證',
-              style: TextStyle(
-                fontSize: 16.sp,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textEmphasis,
-              ),
-            ),
-            SizedBox(height: 8.h),
-            ...List.generate(certifications.value.length.clamp(0, 3), (index) {
-              final cert = certifications.value[index];
-              return buildCertificationItem(cert);
-            }),
-          ],
-        ),
-      );
-    }
-
     Widget buildSpecSection() {
       final gradesVal = grades.value;
       final selIdx = selectedGradeIndex.value;
@@ -1412,10 +1242,6 @@ class ProductPreviewScreen extends HookConsumerWidget {
                   SizedBox(height: 16.h),
                   buildReviewSection(),
                   SizedBox(height: 16.h),
-                  if (certifications.value.isNotEmpty) ...[
-                    buildCertificationSection(),
-                    SizedBox(height: 16.h),
-                  ],
                   buildSpecSection(),
                 ],
               ),

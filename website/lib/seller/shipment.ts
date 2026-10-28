@@ -112,7 +112,6 @@ export interface LogisticsInfo {
 	message: string;
 	shipTradeNo: string;
 	odno: string;
-	goodsType: number; // 1 常溫 / 2 冷凍 / 3 冷藏
 	lgsType: string;
 	shipType: number; // 1 7-ELEVEN / 2 黑貓
 	serviceType: number;
@@ -272,7 +271,6 @@ export async function queryLogistics(
 		message: "",
 		shipTradeNo: String(d.shipTradeNo ?? ""),
 		odno: "",
-		goodsType: 0,
 		lgsType: "",
 		shipType: 0,
 		serviceType: 0,

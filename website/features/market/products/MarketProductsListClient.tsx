@@ -48,11 +48,9 @@ export default function MarketProductsListClient({
 			q: search.get("q") ?? undefined,
 			category: search.get("category") ?? undefined,
 			categories: search.get("categories") ?? undefined,
-			temp: search.get("temp") ?? undefined,
 			priceMin: search.get("priceMin") ?? undefined,
 			priceMax: search.get("priceMax") ?? undefined,
 			hashtags: search.get("hashtags") ?? undefined,
-			certification_types: search.get("certification_types") ?? undefined,
 			sort: search.get("sort") ?? undefined,
 			tab: search.get("tab") ?? undefined,
 		}),
@@ -95,11 +93,9 @@ export default function MarketProductsListClient({
 			categories={categoryList}
 			sellerStories={sellerStories}
 			currentCategories={view.currentCategories}
-			currentTemp={view.currentTemp}
 			currentPriceMin={view.currentPriceMin}
 			currentPriceMax={view.currentPriceMax}
 			currentHashtags={view.currentHashtags}
-			currentCertificationTypes={view.currentCertificationTypes}
 			currentSort={view.currentSort}
 			currentQuery={view.currentQuery}
 			currentTab={view.currentTab}
@@ -108,10 +104,7 @@ export default function MarketProductsListClient({
 			appliedChips={view.appliedChips}
 			clearAllHref={view.clearAllHref}
 			sortLinks={view.sortLinks}
-			tempLinks={view.tempLinks}
-			certLinks={view.certLinks}
 			hashtagLinks={view.hashtagLinks}
-			clearTempHref={view.clearTempHref}
 			products={products}
 			initialDone={initialDone}
 			seedInitialData={seedInitialData}

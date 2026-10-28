@@ -33,7 +33,6 @@ void main() {
     (symbol: 'ProductRoutes.picker', path: ProductRoutes.picker),
     (symbol: 'ProductRoutes.info', path: ProductRoutes.info),
     (symbol: 'ProductRoutes.images', path: ProductRoutes.images),
-    (symbol: 'ProductRoutes.tags', path: ProductRoutes.tags),
     (symbol: 'ProductRoutes.specs', path: ProductRoutes.specs),
     (symbol: 'ProductRoutes.mediaPicker', path: ProductRoutes.mediaPicker),
     (symbol: 'ProductRoutes.preview', path: ProductRoutes.preview),
@@ -98,9 +97,9 @@ void main() {
     ),
   ];
 
-  test('all 61 seller routes remain unique and declared', () {
-    expect(routes, hasLength(61));
-    expect(routes.map((route) => route.path).toSet(), hasLength(61));
+  test('all 60 seller routes remain unique and declared', () {
+    expect(routes, hasLength(60));
+    expect(routes.map((route) => route.path).toSet(), hasLength(60));
     expect(routes.every((route) => route.path.startsWith('/')), isTrue);
   });
 

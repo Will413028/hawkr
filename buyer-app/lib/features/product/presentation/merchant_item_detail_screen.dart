@@ -5,7 +5,6 @@ import 'dart:ui' as ui;
 import 'package:hawkr_buyer/shared/widgets/hk_frosted_icon_button.dart';
 import 'package:hawkr_buyer/core/codemeta/code_meta.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
-import 'package:hawkr_buyer/features/product/data/product_certification_display.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_icon.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
@@ -143,12 +142,9 @@ class _MerchantItemDetailScreenState
   }
 
   String _location = '';
-  List<String> _temperatureCodes = const [];
   List<String> _shippingMethodCodes = const [];
   // 由 /public/products/{id} 的 skus 載入的規格列表
   List<Map<String, dynamic>>? _grades;
-  // 由 /public/products/{id} 的 certifications 載入的標章認證
-  List<Map<String, dynamic>> _certifications = [];
 
   @override
   void initState() {
@@ -425,16 +421,6 @@ class _MerchantItemDetailScreenState
       }
 
       // 配送資訊保留後端原始 code，與快速選購彈窗共用同一個語意元件。
-      final temperatureCodes = <String>[];
-      final deliveryTemps = info['deliveryTemp'];
-      if (deliveryTemps is List) {
-        temperatureCodes.addAll(
-          deliveryTemps
-              .map((e) => e.toString())
-              .map((code) => code.trim())
-              .where((code) => code.isNotEmpty),
-        );
-      }
       final shippingMethodCodes = <String>[];
       final shippingMethods = info['shippingMethods'];
       if (shippingMethods is List) {
@@ -532,7 +518,6 @@ class _MerchantItemDetailScreenState
         _subCategory = categoryLv3;
         _origin = (info['origin'] ?? '').toString();
         _location = sellerLocation;
-        _temperatureCodes = temperatureCodes.toSet().toList(growable: false);
         _shippingMethodCodes = shippingMethodCodes.toSet().toList(
           growable: false,
         );
@@ -547,14 +532,6 @@ class _MerchantItemDetailScreenState
         _isFavorite = isFavorited;
         _selfOwned = isSelfOwned;
         _isRestockSubscribed = isRestockSubscribed;
-        // 標章認證：從 certifications 欄位取出
-        final rawCerts = info['certifications'];
-        if (rawCerts is List && rawCerts.isNotEmpty) {
-          _certifications = rawCerts
-              .whereType<Map>()
-              .map((c) => Map<String, dynamic>.from(c))
-              .toList();
-        }
         if (_resolvedMerchantId.isEmpty && sellerId.isNotEmpty) {
           _resolvedMerchantId = sellerId;
         }
@@ -744,7 +721,6 @@ class _MerchantItemDetailScreenState
                     subCategory: _subCategory,
                     origin: _origin,
                     location: _location,
-                    temperatureCodes: _temperatureCodes,
                     shippingMethodCodes: _shippingMethodCodes,
                   ),
                   if (_selfOwned) ...[
@@ -799,10 +775,6 @@ class _MerchantItemDetailScreenState
                     skuId: widget.skuId,
                     productName: widget.title,
                   ),
-                  if (_certifications.isNotEmpty) ...[
-                    const _ProductDetailSectionDivider(),
-                    _CertificationSectionNew(certifications: _certifications),
-                  ],
                   const SizedBox(height: HkSpace.sm),
                 ],
               ),
@@ -1448,7 +1420,6 @@ class _ProductInfoCardNew extends StatelessWidget {
     required this.subCategory,
     required this.origin,
     required this.location,
-    required this.temperatureCodes,
     required this.shippingMethodCodes,
   });
 
@@ -1457,7 +1428,6 @@ class _ProductInfoCardNew extends StatelessWidget {
   final String subCategory;
   final String origin;
   final String location;
-  final List<String> temperatureCodes;
   final List<String> shippingMethodCodes;
 
   @override
@@ -1505,10 +1475,7 @@ class _ProductInfoCardNew extends StatelessWidget {
             ],
           ),
           SizedBox(height: 8.h),
-          ProductDeliveryMetadata(
-            temperatureCodes: temperatureCodes,
-            shippingMethodCodes: shippingMethodCodes,
-          ),
+          ProductDeliveryMetadata(shippingMethodCodes: shippingMethodCodes),
         ],
       ),
     );
@@ -2618,76 +2585,6 @@ class _ProductReviewCardNewState extends ConsumerState<_ProductReviewCardNew> {
           ],
         ],
       ),
-    );
-  }
-}
-
-/// 4️⃣ 標章認證區（直接使用 /public/products/{id} 回傳的 certifications 欄位）
-class _CertificationSectionNew extends StatelessWidget {
-  const _CertificationSectionNew({required this.certifications});
-  final List<Map<String, dynamic>> certifications;
-
-  @override
-  Widget build(BuildContext context) {
-    if (certifications.isEmpty) return const SizedBox.shrink();
-
-    return Padding(
-      key: const ValueKey('product-detail-certification-section'),
-      padding: EdgeInsets.all(16.w),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('標章認證', style: AppTypography.sectionTitle),
-          SizedBox(height: 16.h),
-          Wrap(
-            spacing: 16,
-            runSpacing: 12,
-            children: certifications.map(_buildCertBadge).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCertBadge(Map<String, dynamic> cert) {
-    // `cert['name']` 存的是 CertificationType 的**碼值**（`3701`…），不是顯示名。
-    // 直接印它會在買家面前把一個法規宣稱變成一串數字（hawkr-website#507 的
-    // App 側同病）。標籤一律查生成的 CodeMeta，不自己維護第二份對照表。
-    final String raw = (cert['name'] ?? cert['title'] ?? cert['label'] ?? '')
-        .toString();
-    final String title = certDisplayTitle(raw);
-
-    return Column(
-      children: [
-        Container(
-          width: 60.w,
-          height: 60.h,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8.r),
-            color: AppColors.gray100,
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Container(
-            color: AppColors.successSoft,
-            child: Icon(
-              AppIcons.verifiedRounded,
-              color: AppIconColors.secondary,
-              size: 32.sp,
-            ),
-          ),
-        ),
-        SizedBox(height: 8.h),
-        SizedBox(
-          width: 70.w,
-          child: Text(
-            title,
-            textAlign: TextAlign.center,
-            style: AppTypography.meta,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
     );
   }
 }

@@ -20,10 +20,10 @@ void main() {
   }
 
   test('sticker layer keeps its badge through copyWith', () {
-    final layer = StickerLayer(badge: StickerBadge.organic);
+    final layer = StickerLayer(badge: StickerBadge.fresh);
     final moved = layer.copyWith(x: 10, y: 20);
 
-    expect(moved.badge, StickerBadge.organic);
+    expect(moved.badge, StickerBadge.fresh);
     expect(moved.isBadgeSticker, isTrue);
     expect(StickerLayer(emoji: '🏆').isBadgeSticker, isFalse);
   });

@@ -22,7 +22,7 @@ import {
  * PATCH 的三條整份替換規則（照抄 Gateway `UpdateDelegatedProduct` 的實作，
  * `admin_delegated_product.go:455-520`）：
  * - **未送的欄位由 Gateway 以 before 快照回填**（`name`／`categoryId`／`origin`／
- *   `images`／`certifications`／每個 SKU 的未送欄位）⇒ 前端只送「真的改了的」欄位
+ *   `images`／每個 SKU 的未送欄位）⇒ 前端只送「真的改了的」欄位
  *   是安全的，而且是唯一能讓稽核 `changedFields` 誠實的送法。
  * - **`images` 有送就是整份替換**：要保留的原圖必須以 `{assetId}` 回送，而 `assetId`
  *   必須來自這一次 GET（Gateway 拿 intent 之前讀到的原始資源比對，不在其中即 9275）。
@@ -39,7 +39,6 @@ export interface DelegatedProductImage {
 /** SKU 的配送設定。本期唯讀（代行 UI 不編輯它，未送即由 Gateway 回填原值）。 */
 export interface DelegatedProductShippingMethod {
 	type: string;
-	temperature: string;
 	freeThreshold: string;
 	feePayer: string;
 }
@@ -64,11 +63,6 @@ export interface DelegatedProductSku {
 	shippingMethods: DelegatedProductShippingMethod[];
 }
 
-export interface DelegatedProductCertification {
-	name: string;
-	certNo: string;
-}
-
 export interface DelegatedProductDetail {
 	productId: string;
 	/** `expectedVersion` 的唯一來源。缺它每一次 PATCH 都是 9260。 */
@@ -86,7 +80,6 @@ export interface DelegatedProductDetail {
 	description: ProductDescription;
 	images: DelegatedProductImage[];
 	origin: string;
-	certifications: DelegatedProductCertification[];
 	hashtags: string[];
 	skus: DelegatedProductSku[];
 	/**
@@ -126,7 +119,6 @@ export interface DelegatedProductPatch {
 	description?: ProductDescription;
 	images?: DelegatedProductImageInput[];
 	skus?: DelegatedProductSkuInput[];
-	certifications?: DelegatedProductCertification[];
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -152,7 +144,6 @@ function readShippingMethod(value: unknown): DelegatedProductShippingMethod {
 	const raw = isRecord(value) ? value : {};
 	return {
 		type: str(raw.type),
-		temperature: str(raw.temperature),
 		freeThreshold: str(raw.freeThreshold),
 		feePayer: str(raw.feePayer),
 	};
@@ -175,11 +166,6 @@ function readSku(value: unknown): DelegatedProductSku {
 			? raw.shippingMethods.map(readShippingMethod)
 			: [],
 	};
-}
-
-function readCertification(value: unknown): DelegatedProductCertification {
-	const raw = isRecord(value) ? value : {};
-	return { name: str(raw.name), certNo: str(raw.certNo) };
 }
 
 /**
@@ -244,9 +230,6 @@ export function readDelegatedProductDetail(
 		description: readDescription(raw.description),
 		images: Array.isArray(raw.images) ? raw.images.map(readImage) : [],
 		origin: str(raw.origin),
-		certifications: Array.isArray(raw.certifications)
-			? raw.certifications.map(readCertification)
-			: [],
 		hashtags: strings(raw.hashtags),
 		skus: Array.isArray(raw.skus) ? raw.skus.map(readSku) : [],
 		priceMin: str(raw.priceMin),
@@ -310,9 +293,6 @@ export function createDelegatedProductEditRepo(
 			}
 			if (patch.images !== undefined) body.images = patch.images;
 			if (patch.skus !== undefined) body.skus = patch.skus;
-			if (patch.certifications !== undefined) {
-				body.certifications = patch.certifications;
-			}
 			await fetcher(`${root}/${encodeURIComponent(productId)}`, {
 				method: "PATCH",
 				json: body,

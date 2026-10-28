@@ -7,7 +7,6 @@ import '../../../../core/codemeta/code_meta_display.dart';
 import '../../../../core/codemeta/shipping_presentation.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
-import '../../../../shared/widgets/temperature_tag.dart';
 import '../../../../shared/widgets/hk_icon.dart';
 import '../../data/order_model.dart';
 
@@ -117,7 +116,7 @@ class OrderInfoColumn extends ConsumerWidget {
               if (displayTime.isNotEmpty) time,
             ],
 
-            // 地址使用自己的完整寬度，不能被長門市名或溫層擠掉。
+            // 地址使用自己的完整寬度，不能被長門市名擠掉。
             if (displayAddress.isNotEmpty)
               Text(
                 displayAddress,
@@ -162,9 +161,8 @@ class OrderInfoColumn extends ConsumerWidget {
                 ),
               ),
 
-            // 配送品牌、門市與溫層保留原圖示；空間不足時自然換行。
-            if (order.shippingMethod.isNotEmpty ||
-                order.deliveryTemp.isNotEmpty)
+            // 配送品牌與門市保留原圖示；空間不足時自然換行。
+            if (order.shippingMethod.isNotEmpty)
               Wrap(
                 spacing: 8.w,
                 runSpacing: 4.h,
@@ -209,8 +207,6 @@ class OrderInfoColumn extends ConsumerWidget {
                         ],
                       ),
                     ),
-                  if (order.deliveryTemp.isNotEmpty)
-                    TemperatureTag(code: order.deliveryTemp),
                 ],
               ),
           ],

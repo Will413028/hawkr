@@ -316,7 +316,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
             caseData: c,
             pickupAddress: order?.shippingAddress ?? '',
             contactPhone: order?.recipientPhone ?? '',
-            temperatureCode: order?.deliveryTemp ?? '',
           ),
           if (c.needRefundPage) ...[
             SizedBox(height: AppSpacing.sm),

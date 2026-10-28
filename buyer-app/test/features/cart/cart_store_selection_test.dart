@@ -382,10 +382,6 @@ CartData _cart() {
     ],
     items: [first, second, unavailable],
     stockBySku: const {101: 20, 202: 5, 203: 0},
-    deliveryTempsBySku: const {
-      101: ['3201'],
-      202: ['3203'],
-    },
     productIdsBySku: const {
       101: 'product-101',
       202: 'product-202',

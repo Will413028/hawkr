@@ -105,8 +105,6 @@ export interface AfterSaleCase {
 	 * past the deadline the case auto-closes into status=33 and refund eligibility
 	 * is revoked. */
 	shipBackDeadlineAt?: string;
-	/** 溫層代碼 (codemeta DeliveryTemp "3201"/"3202"/"3203"). */
-	temperatureCode?: string;
 	/** Return/shipping address text (seller-supplied for home return). */
 	shippingAddress?: string;
 }

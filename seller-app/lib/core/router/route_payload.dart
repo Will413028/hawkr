@@ -45,18 +45,6 @@ List<Map<String, dynamic>>? routeMapList(
   return result;
 }
 
-Map<int, String>? routeIntStringMap(Map<String, dynamic> payload, String key) {
-  final value = payload[key];
-  if (value is! Map) return null;
-
-  final result = <int, String>{};
-  for (final entry in value.entries) {
-    if (entry.key is! int || entry.value is! String) return null;
-    result[entry.key as int] = entry.value as String;
-  }
-  return result;
-}
-
 /// Adapts both the typed in-app payload and legacy map payload to the current
 /// order details model. A query ID is enough to restore the route safely.
 OrderSummary? orderSummaryFromRoutePayload(

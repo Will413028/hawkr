@@ -44,11 +44,9 @@ void main() {
       categoryId: '2201',
       keyword: '虱目魚',
       sort: 'PRICE_ASC',
-      deliveryTemp: '3203',
       priceMin: '100',
       priceMax: '500',
       hashtags: const ['冷凍水產', '當季'],
-      certificationTypes: const ['3701', '3702'],
       followedSellerOnly: true,
       page: 2,
       pageSize: 24,
@@ -62,13 +60,13 @@ void main() {
       'category_id': '2201',
       'keyword': '虱目魚',
       'sort': 'PRICE_ASC',
-      'delivery_temp': '3203',
       'price_min': '100',
       'price_max': '500',
       'hashtags': '冷凍水產,當季',
-      'certification_types': '3701,3702',
       'followed_seller_only': true,
     });
+    expect(request.queryParameters, isNot(contains('delivery_temp')));
+    expect(request.queryParameters, isNot(contains('certification_types')));
     expect(request.queryParameters, isNot(contains('origin')));
     expect(request.queryParameters, isNot(contains('distance')));
   });
@@ -83,7 +81,6 @@ void main() {
       categoryId: '0',
       keyword: '',
       sort: '',
-      deliveryTemp: '',
       priceMin: '',
       priceMax: '',
     );

@@ -26,7 +26,7 @@ node --test tests/check-cross-platform-tokens.test.mjs
 - 已一致的 12／14／16／18／20／24 字級、正文與強調字重、正文行高。
 - 標準／強調 easing，以及 Web UI kit 與 App 共用的 200ms 動效時間。
 
-目前共 **72 個三端共同 token**。兩 App 的 3 個溫層標籤色票另列為沿用 Web 舊外觀的追蹤例外。各平台 binding 都有來源檔案、CSS 變數或 Dart `Class.member`；TextStyle 再指向 `fontSize`／`fontWeight`／`height`。checker 會解析 alias，避免只檢查色票卻漏掉已改色的 semantic role。
+目前共 **72 個三端共同 token**。各平台 binding 都有來源檔案、CSS 變數或 Dart `Class.member`；TextStyle 再指向 `fontSize`／`fontWeight`／`height`。checker 會解析 alias，避免只檢查色票卻漏掉已改色的 semantic role。
 
 | Runtime 來源 | 責任 |
 | --- | --- |
@@ -61,25 +61,6 @@ node --test tests/check-cross-platform-tokens.test.mjs
 3. **陰影與字體縮放**：Flutter `blurRadius` 與 CSS blur 的渲染 API 不同；Web foundation／UI kit 也仍有兩套陰影。字級以 16px Web root 與未縮放 Flutter logical px／sp 比對，並不關閉或驗證使用者字體縮放。
 
 目前 `DESIGN.md` 部分元件現況段落落後於程式：例如 Button 文件寫 md 40，但 `Button.tsx` 已是 44；Card 文件記錄鍵盤啟動缺口，但 `Card.tsx` 已有 Enter／Space 處理。依品牌入口所訂的 source authority，元件庫應呈現實際 production 元件，不能複製過期描述當成驗收結果。
-
-## 溫層標籤對齊 Web（2026-09-12）
-
-買家與商家 App 的顯示型溫層標籤統一沿用 Web 正式 [`TemperatureTag`](../features/cart/components/TemperatureTag.tsx) 的樣式，透過各端 `HkTemperatureTag(value:)` 提供；不再保留各端原本的 12／14px、大框線或不同溫層色票。
-
-| 顯示規則 | 三端基準 |
-| --- | --- |
-| 常溫／3201 | `#6b6b6b` |
-| 冷藏／3202 | `#ee964b` |
-| 冷凍／3203 | `#51a2ff` |
-| 標籤 | 透明底、同色 1px 外框、完整膠囊、11px／700 文字、左右內距 8px |
-| 排版 | 基準高度 18px，多標籤間距 4px，可換列，標籤內沒有圖示 |
-| 未知資料 | 保留後端原文並採灰色，不推測成常溫；未提供的溫層不能補造 |
-
-Web Storybook 的正式商品列已量測三種兩字標籤皆為 40×18 CSS px，文字行高 16.5px。Flutter 保留平台字型與使用者文字縮放，標籤高度可隨文字增長；不能以固定高度、FittedBox 或關閉縮放換取像素相同。顯示型標籤不新增按鈕語意；溫層選擇器維持原有選取回呼、狀態及至少 48px 點擊範圍。
-
-Web 實際顏色位於 TSX 的 Tailwind class，與 `DESIGN.md` 的溫層 semantic roles 及 `--temp-*` foundation aliases 不同。本次依明確指定的 Web 外觀對齊，`cross-platform-tokens.json` 將三個 `temperatureTag.*` binding 列為 `requested-web-legacy-parity` 例外，僅檢查兩 App 的現況，不提升為 canonical 色票。Web 對照依正式元件與渲染量測，不能宣稱現行 CSS／Dart checker 已解析 TSX。
-
-已知可讀性限制：在 App cream `#fffdf7` 上，冷藏／冷凍文字的對比約為 2.27:1／2.59:1；11px 文字未達 [WCAG 一般文字 4.5:1](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html) 的要求。這是本次沿用 Web 外觀的設計差異，不能以元件庫 a11y 測試通過宣稱已解決。未來調整須同時更新 Web 與兩 App 的溫層前景／底色並重新檢查對比；不可把這組舊色擴散到其他元件。
 
 ## 購物車操作與文字層級
 

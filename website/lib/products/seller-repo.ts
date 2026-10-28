@@ -14,9 +14,6 @@
 import { fetchProducts } from "../api";
 import { apiClient, authedFetch } from "../api/client";
 import type { DelegatedMutationMeta, RepoFetcher } from "../api/delegated";
-import type { ProductCertificationCode } from "./certifications";
-
-export type { ProductCertificationCode } from "./certifications";
 
 export interface SellerProductListItem {
 	// Snowflake IDs exceed Number.MAX_SAFE_INTEGER, so api/json.ts hands them
@@ -91,71 +88,6 @@ export interface SellerProductListItem {
 	created_at?: number | string;
 }
 
-/**
- * Legacy single-temp keyword kept readable for any old hydration paths that
- * still receive it. The canonical shape is now `delivery_temp: string[]`
- * (codes "3201"/"3202"/"3203"), matching the Flutter app's multi-select
- * "可配送溫層（可複選）" model. New code should not write this field.
- *
- * @deprecated use `delivery_temp` (string[] of codes) instead.
- */
-export type ProductTempLayer = "ambient" | "chilled" | "frozen";
-
-/** Canonical delivery-temp codes from `lib/codemeta/enums` ShippingTemperature. */
-export const DELIVERY_TEMP_CODES = {
-	AMBIENT: "3201",
-	CHILLED: "3202",
-	FROZEN: "3203",
-} as const;
-export type DeliveryTempCode =
-	(typeof DELIVERY_TEMP_CODES)[keyof typeof DELIVERY_TEMP_CODES];
-
-/**
- * Coerce the various wire shapes the backend has historically emitted for a
- * product's temp set into a canonical `string[]` of codes. Accepts:
- *   - array of codes:        ["3201","3202","3203"]
- *   - comma-delimited string: "3201,3202,3203"
- *   - single code:           "3203"
- *   - legacy keyword:        "frozen" / "chilled" / "ambient"
- * Returns an empty array if nothing recognisable is present.
- */
-export function parseDeliveryTempCodes(value: unknown): string[] {
-	if (Array.isArray(value)) {
-		return value
-			.map((v) => String(v).trim())
-			.filter((v) => v === "3201" || v === "3202" || v === "3203");
-	}
-	if (typeof value === "string") {
-		const trimmed = value.trim();
-		if (!trimmed) return [];
-		// Legacy single-keyword
-		if (trimmed === "ambient") return ["3201"];
-		if (trimmed === "chilled") return ["3202"];
-		if (trimmed === "frozen") return ["3203"];
-		// Comma-delimited codes
-		return trimmed
-			.split(",")
-			.map((s) => s.trim())
-			.filter((s) => s === "3201" || s === "3202" || s === "3203");
-	}
-	return [];
-}
-
-/**
- * A certification the seller attached to the product.
- *   - `code`     CertificationType value ("3701"…"3706"); sent to the backend
- *                as `certifications[].name`.
- *   - `certNo`   seller-entered certificate number.
- *
- * The legacy product wire carries no review status. Do not add a local
- * `verified`/`approved` flag here: only the planned manual-review API may supply
- * authoritative review state.
- */
-export interface ProductCertificationEntry {
-	code: ProductCertificationCode;
-	certNo?: string;
-}
-
 export interface SellerProductDetail extends SellerProductListItem {
 	/**
 	 * Backend now returns the structured shape; legacy listings may still come
@@ -169,14 +101,8 @@ export interface SellerProductDetail extends SellerProductListItem {
 	/** Free-form / preset tags (#當季、#禮盒、#媽媽推薦…) used for search,
 	 *  filter chips, and product-card badges. */
 	tags?: string[];
-	/** Canonical multi-value delivery temp set. Codes "3201"/"3202"/"3203". */
-	delivery_temp?: string[];
-	/** @deprecated single-temp legacy mirror; new code should write `delivery_temp`. */
-	temp_layer?: ProductTempLayer;
 	/** ISO 3166-2 region or city/county; surfaced as 「產地」 on PDP. */
 	origin?: string;
-	/** Quality marks shown as trust badges (有機 / 履歷 …). */
-	certifications?: ProductCertificationEntry[];
 	/** Pre-order: ship-after-order date in ISO yyyy-mm-dd. */
 	preorder_ship_at?: string | null;
 	/** Lower bound for "low stock" warning in seller dashboard. */
@@ -200,8 +126,6 @@ export interface SellerProductDetail extends SellerProductListItem {
 export interface SkuShippingMethod {
 	/** ShippingMethod value: "3001" 黑貓宅急便 / "3002" 7-11店到店 */
 	type: string;
-	/** ShippingTemperature value: "3201" 常溫 / "3202" 冷藏 / "3203" 冷凍。 */
-	temperature: string;
 	/** ShippingFeePayer value: "3101" 買方 / "3102" 賣方。 */
 	fee_payer: string;
 	/** 免運門檻（新台幣元字串；僅賣家負擔時有效，"0" = 無條件免運）。 */
@@ -956,168 +880,9 @@ export function upsertCategoryNode(
 	return foundParent ? next : tree;
 }
 
-/**
- * Verify a seller-entered certification number against the 農業部 open-data
- * platform via `GET /app/products/certifications/verify`. Only the verifiable
- * types (3701 有機 / 3702 產銷履歷 / 3703 CAS) are supported — 3704–3706 return
- * 501. Returns `false` on any non-OK / not-found response so the form can show
- * 「查無此編號」without throwing.
- */
-export async function verifyProductCertification(
-	certNo: string,
-	type: ProductCertificationCode,
-): Promise<boolean> {
-	const qs = new URLSearchParams({ cert_no: certNo, type });
-	const env = await authedFetch<{ exists?: boolean }>(
-		`/app/products/certifications/verify?${qs}`,
-		{ throwOnHttpError: false },
-	);
-	return Boolean(env.data?.exists);
-}
-
-/* ===== 商品認證申請（19 號設計書 §9.1） ===== */
-
-/**
- * 一筆認證申請 —— `GET /app/products/{id}/certification_applications` 的
- * `data.records[]` 元素（19 §9.1）。
- *
- * ⚠️ `id` / `productId` / `version` **一律是字串**：TSID 為 18 位十進位，超出
- * `Number.MAX_SAFE_INTEGER`；宣告成 number 會在解析時靜默掉精度，而撤回帶著錯的
- * `expectedVersion` 只會回 409，看起來像後端有問題。
- *
- * 🔴 賣家 DTO **不含** `internalNote` 與 `govVerifyPayload` 原文（19 §9.1）：賣家這一面
- * 只需要「狀態徽章 + 駁回原因」，多要一個欄位就是把 ADM 內部註記與政府原始資料外流。
- */
-export interface ProductCertificationApplication {
-	id: string;
-	productId: string;
-	/** `CertificationType` 值（"3701"…"3706"）。 */
-	certificationType: string;
-	certificateNo: string;
-	/** `ProductCertificationStatus`（SUBMITTED / APPROVED / …）。 */
-	status: string;
-	/** `ProductCertificationGovVerifyState`。與 `status` 是兩件事，不可互相推導。 */
-	govVerifyState?: string | null;
-	govVerifiedAt?: string | null;
-	submittedAt?: string | null;
-	reviewedAt?: string | null;
-	/** `ProductCertificationRejectReason`（駁回／撤銷才有）。 */
-	reasonCode?: string | null;
-	/** ADM 自由填寫、直接給賣家看的補充說明。 */
-	publicReason?: string | null;
-	/** 樂觀鎖版本；撤回必帶。 */
-	version: string;
-}
-
-function mapWireCertificationApplication(
-	raw: unknown,
-): ProductCertificationApplication {
-	const r = (raw ?? {}) as Record<string, unknown>;
-	const str = (v: unknown): string =>
-		typeof v === "string" ? v : typeof v === "number" ? String(v) : "";
-	const nullable = (v: unknown): string | null => {
-		const s = str(v);
-		return s === "" ? null : s;
-	};
-	return {
-		id: str(r.id),
-		productId: str(r.productId),
-		certificationType: str(r.certificationType).trim(),
-		certificateNo: str(r.certificateNo),
-		status: str(r.status).trim(),
-		govVerifyState: nullable(r.govVerifyState),
-		govVerifiedAt: nullable(r.govVerifiedAt),
-		submittedAt: nullable(r.submittedAt),
-		reviewedAt: nullable(r.reviewedAt),
-		reasonCode: nullable(r.reasonCode),
-		publicReason: nullable(r.publicReason),
-		version: str(r.version),
-	};
-}
-
-/**
- * 這個商品的全部認證申請。
- *
- * ⚠️ 這一支是**唯一**能看到「待審」與「被駁回」那些筆的地方：`product.certifications`
- * 自 19 號起只是 approved-only 公開投影，賣家剛送出的申請不在裡面。只讀商品而不讀這
- * 一支，賣家送完會以為沒存到（19 §14.2）。
- *
- * ⚠️ 分頁欄位（`total` / `page` / `pageSize`）在 wire 上是**字串**（`pkg/envelope.Page`
- * 的簽章就是 string），不要照數字解讀。這裡只取 `records`，所以不受影響。
- *
- * 端點不存在或無權時回空陣列而非丟例外：表單少了徽章仍可編輯，硬擋住整頁比較糟。
- */
-export async function fetchProductCertificationApplications(
-	productId: number | string,
-): Promise<ProductCertificationApplication[]> {
-	const env = await authedFetch<{ records?: unknown[] } | unknown[]>(
-		`/app/products/${encodeURIComponent(String(productId))}/certification_applications`,
-		// 兩個開關都要關：HTTP 狀態與 envelope 業務碼是**兩道獨立的丟出點**，只關前者
-		// 的話，一個 `{"code":404}` 的 200 回應（Gateway 對未登錄業務碼會塌縮成這種形狀）
-		// 仍然會丟例外，整張表單就被一個「只是少了徽章」的情況擋住。
-		{ throwOnHttpError: false, throwOnEnvelopeError: false },
-	);
-	const raw = Array.isArray(env.data) ? env.data : (env.data?.records ?? []);
-	return Array.isArray(raw) ? raw.map(mapWireCertificationApplication) : [];
-}
-
-/**
- * 送出一筆認證申請（19 §9.1 的 POST）。
- *
- * ⚠️ 單筆端點**不走剔除語意**：非法輸入回 typed 業務碼而不是靜默跳過（19 §6.2.10），
- * 所以這裡刻意讓錯誤往上丟，由呼叫端顯示訊息。吞掉它就回到「送出成功但清單沒有這筆」
- * ——那正是本設計書全篇在防的失效形狀。
- */
-export async function submitProductCertificationApplication(
-	productId: number | string,
-	input: {
-		certificationType: string;
-		certificateNo: string;
-		/** Reuse for a retry of the same application after an uncertain response. */
-		idempotencyKey?: string;
-	},
-): Promise<ProductCertificationApplication | null> {
-	const env = await authedFetch<unknown>(
-		`/app/products/${encodeURIComponent(String(productId))}/certification_applications`,
-		{
-			method: "POST",
-			json: {
-				certificationType: input.certificationType,
-				certificateNo: input.certificateNo,
-				idempotencyKey: input.idempotencyKey ?? `cert-${newIdempotencyKey()}`,
-			},
-		},
-	);
-	return env.data ? mapWireCertificationApplication(env.data) : null;
-}
-
-/**
- * 撤回一筆認證申請（19 §9.1 的 withdraw）。
- *
- * 🔴 取消勾選必須走這一支，**不能靠「全量取代時不送」來移除**：全量取代的「沒送」是
- * 以 `certification_type` 為粒度（19 §6.4），而待審中的申請在那條路徑上是**保留**的
- * ——只把它從商品 payload 拿掉，賣家看到勾選消失、後端的申請卻還在佇列裡。
- */
-export async function withdrawProductCertificationApplication(
-	productId: number | string,
-	applicationId: string,
-	expectedVersion: string,
-): Promise<void> {
-	await authedFetch(
-		`/app/products/${encodeURIComponent(String(productId))}/certification_applications/${encodeURIComponent(applicationId)}/withdraw`,
-		{
-			method: "POST",
-			json: {
-				expectedVersion,
-				idempotencyKey: `cert-wd-${newIdempotencyKey()}`,
-			},
-		},
-	);
-}
-
 /* ===== Shipping quotes ===== */
 
-/** One carrier × 溫層 option the backend says fits a given package. Mirrors
+/** One carrier option the backend says fits a given package. Mirrors
  *  `handler.ShippingOptionItem` (camelCase, all-string). */
 export interface ShippingQuoteOption {
 	/** ShippingMethod value ("3001" 黑貓 / "3002" 7-11)。 */
@@ -1244,7 +1009,6 @@ export interface ProductWriteBody {
 	origin?: string;
 	images?: ProductImageInput[];
 	hashtags?: string[];
-	certifications?: Array<{ certNo: string; name: string }>;
 	skus?: SkuWriteInput[];
 	status?: string | number;
 	/** UpdateProductRequest only: replace hashtags wholesale when true. */

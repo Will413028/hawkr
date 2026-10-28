@@ -422,13 +422,8 @@
 }
 
 /* ============================================================
-   New cart components (Temperature, Tile, Sheet, ShippingGroup, etc.)
+   New cart components (Tile, Sheet, ShippingGroup, etc.)
    ============================================================ */
-
-/* Temperature-tag chip styles lifted to `styles/components/temperature-tag.css`
- * (loaded globally) so the same `<TemperatureTag>` component renders with
- * pill chrome on every surface that uses it — PDP shipping row, cart, etc.
- * The class names (`.cart-temp-tag*`) are kept for backward compatibility. */
 
 /* ───── Cart product tile ───── */
 
@@ -552,26 +547,6 @@
 	letter-spacing: normal;
 	white-space: normal;
 	overflow-wrap: anywhere;
-	line-height: calc(20 / 14);
-}
-
-.cart-tile__temps {
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-	color: var(--ink-soft);
-	flex-wrap: wrap;
-}
-
-.cart-tile__temp-icon {
-	color: var(--ink-soft);
-}
-
-.cart-tile__temps small {
-	font-size: var(--cart-type-support);
-	font-weight: var(--cart-weight-body);
-	letter-spacing: normal;
-	color: var(--ink-body);
 	line-height: calc(20 / 14);
 }
 
@@ -733,27 +708,6 @@
 	color: #b25e1f;
 	font-weight: var(--cart-weight-emphasis);
 	font-size: var(--cart-type-support);
-}
-
-.cart-page__cold-warning {
-	padding: 14px 16px;
-	border-radius: 14px;
-	background: rgba(255, 152, 0, 0.08);
-	border: 1px solid rgba(255, 152, 0, 0.3);
-	color: #b25e00;
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
-}
-
-.cart-page__cold-warning strong {
-	font-size: var(--cart-type-body);
-}
-
-.cart-page__cold-warning span {
-	font-size: var(--cart-type-support);
-	color: #794800;
-	line-height: 1.55;
 }
 
 /* ───── Shipping method group (collapsible by carrier) ───── */

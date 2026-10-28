@@ -187,7 +187,7 @@ export default function AiAssistantPanel({ open, onClose, onPatch }: Props) {
 							<p>
 								例：「我要上架埔里溫室小番茄，600g 一盒，280 元，限量 50 盒」
 							</p>
-							<p>例：「幫我寫一個有機青花菜的商品描述，強調冷鏈宅配」</p>
+							<p>例：「幫我寫一個青花菜的商品描述」</p>
 						</div>
 					) : (
 						messages.map((m) => (

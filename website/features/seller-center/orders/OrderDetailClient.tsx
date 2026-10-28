@@ -27,7 +27,6 @@ import PaymentGlyph from "@/components/shared/PaymentGlyph";
 import { TruckSpinner } from "@/components/shared/TruckSpinner";
 import Button, { buttonClasses } from "@/components/ui/Button";
 import { DrawerSkeleton } from "@/components/ui/DrawerSkeleton";
-import { TemperatureTag } from "@/features/cart/components/TemperatureTag";
 import OrderStatusTimeline from "@/features/orders/components/OrderStatusTimeline";
 import {
 	CallTcatDialog,
@@ -81,11 +80,7 @@ import {
 	shipStatusLabel,
 } from "@/lib/seller/shipment";
 import { useChatDrawerStore } from "@/lib/state/chat-drawer-store";
-import {
-	deliveryTempLabel,
-	formatDeadline,
-	formatLabelExpire,
-} from "./orderDisplay";
+import { formatDeadline, formatLabelExpire } from "./orderDisplay";
 import {
 	isShipmentOperationExpired,
 	SHIPMENT_FALLBACK_REFRESH_DELAY_MS,
@@ -457,12 +452,11 @@ export default function OrderDetailClient({
 		0,
 	);
 
-	// 出貨/取消期限 + 溫層 + 託運單到期 + 出貨照片 — 對齊列表頁與 App OrderInfoColumn。
+	// 出貨/取消期限 + 託運單到期 + 出貨照片 — 對齊列表頁與 App OrderInfoColumn。
 	// 待出貨(paid/preparing) 顯示「出貨期限」(amber)，其餘顯示「取消期限」(red)。
 	const isShipDeadline =
 		order.status === "paid" || order.status === "preparing";
 	const deadlineLabel = formatDeadline(order.autoCancelAt);
-	const tempLabel = deliveryTempLabel(order.shipping?.deliveryTemp);
 	const labelExpireLabel = formatLabelExpire(order.shipping?.labelExpireAt);
 	// 取號後 4 天失效（對齊 App）：失效的託運單一律不再提供下載。
 	const labelExpired = isLabelExpired(order.shipping);
@@ -897,17 +891,7 @@ export default function OrderDetailClient({
 							<dl className="seller-order-detail__info">
 								<div>
 									<dt>配送方式</dt>
-									<dd>
-										{formatShippingMethodLabel(shippingMethod)}
-										{tempLabel && (
-											<>
-												{" "}
-												<TemperatureTag
-													value={order.shipping?.deliveryTemp ?? ""}
-												/>
-											</>
-										)}
-									</dd>
+									<dd>{formatShippingMethodLabel(shippingMethod)}</dd>
 								</div>
 								{order.shipping?.shipmentNo && (
 									<div>

@@ -20,7 +20,7 @@ interface UseShippingOnboardingsResult {
 }
 
 /**
- * The seller's 物流設定 onboarding rows (黑貓 / 7-11 × 溫層). Lets the商品上架
+ * The seller's 物流設定 onboarding rows (黑貓 / 7-11). Lets the商品上架
  * 可配送方案 picker tell「已開通」from「尚未開通」instead of blaming every
  * unavailable combination on size / weight. Shared, read-only and small, so the
  * per-SKU editors all read from one cached query.

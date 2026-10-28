@@ -6,7 +6,7 @@ part 'product_listing_draft_controller.g.dart';
 
 /// AI 對話助手累積的商品草稿。
 ///
-/// Merge 策略：覆蓋單一欄位；tags / skus / certifications 收到新值時整體替換。
+/// Merge 策略：覆蓋單一欄位；tags / skus 收到新值時整體替換。
 /// patchVersion 每次 merge 遞增，各 step screen 用它當 useEffect 的 dep。
 @riverpod
 class ProductListingDraftController extends _$ProductListingDraftController {
@@ -58,15 +58,6 @@ class ProductListingDraftController extends _$ProductListingDraftController {
       filled.add('skus');
     }
 
-    List<CertificationPending> nextCerts = next.certifications;
-    if (patch['certifications'] is List) {
-      nextCerts = (patch['certifications'] as List)
-          .whereType<Map<String, dynamic>>()
-          .map(CertificationPending.fromJson)
-          .toList();
-      filled.add('certifications');
-    }
-
     state = next.copyWith(
       name: nextName,
       origin: nextOrigin,
@@ -74,7 +65,6 @@ class ProductListingDraftController extends _$ProductListingDraftController {
       description: nextDescription,
       tags: nextTags,
       skus: nextSkus,
-      certifications: nextCerts,
       filledFields: filled,
       patchVersion: next.patchVersion + 1,
     );

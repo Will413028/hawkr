@@ -36,7 +36,6 @@ function item(
 		specName: "KG",
 		stockQty: "20",
 		purchasable: true,
-		deliveryTemps: [ShippingTemperature.CHILLED],
 		...extra,
 	};
 }
@@ -191,7 +190,6 @@ async function setupCart(page: Page, baseURL: string | undefined) {
 				data: {
 					valid: true,
 					errors: [],
-					deliveryTempIntersection: [ShippingTemperature.CHILLED],
 					availableShippingOptions: [
 						{
 							shippingMethod: ShippingMethod.TAQBIN,

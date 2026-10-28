@@ -30,20 +30,6 @@ import { useLocalizedHref } from "@/lib/intl/use-router";
 import type { CategoryNode, MarketFetchParams } from "@/lib/market/listFilters";
 import { useObservedRouter } from "@/lib/navigation/use-observed-router";
 
-export interface SidebarTempLink {
-	value: string;
-	label: string;
-	href: string;
-	active: boolean;
-}
-
-export interface SidebarCertLink {
-	code: string;
-	label: string;
-	href: string;
-	active: boolean;
-}
-
 export interface SidebarHashtagLink {
 	name: string;
 	label: string;
@@ -57,11 +43,9 @@ export interface MarketProductsListLayoutProps {
 
 	// 當前篩選狀態（hidden field 與 active 標記用）
 	currentCategories: string[];
-	currentTemp: string;
 	currentPriceMin: string;
 	currentPriceMax: string;
 	currentHashtags: string[];
-	currentCertificationTypes: string[];
 	currentSort: string;
 	currentQuery: string;
 	currentTab: "recommend" | "follow" | "nearby";
@@ -72,11 +56,7 @@ export interface MarketProductsListLayoutProps {
 	appliedChips: AppliedChip[];
 	clearAllHref: string;
 	sortLinks: Array<{ value: string; label: string; href: string }>;
-	tempLinks: SidebarTempLink[];
-	certLinks: SidebarCertLink[];
 	hashtagLinks: SidebarHashtagLink[];
-	/** 配送溫層「全部」link 的 href（清空 temp 後的目的地）。 */
-	clearTempHref: string;
 
 	/**
 	 * The live route passes serialisable product props so this client boundary
@@ -101,11 +81,9 @@ export default function MarketProductsListLayout({
 	categories,
 	sellerStories,
 	currentCategories,
-	currentTemp,
 	currentPriceMin,
 	currentPriceMax,
 	currentHashtags,
-	currentCertificationTypes,
 	currentSort,
 	currentQuery,
 	currentTab,
@@ -114,10 +92,7 @@ export default function MarketProductsListLayout({
 	appliedChips,
 	clearAllHref,
 	sortLinks,
-	tempLinks,
-	certLinks,
 	hashtagLinks,
-	clearTempHref,
 	products,
 	initialDone,
 	seedInitialData = true,
@@ -132,66 +107,16 @@ export default function MarketProductsListLayout({
 			<CategoryFilterPopover tree={categories} selected={currentCategories} />
 
 			<details open className="market-list-sidebar__section">
-				<summary>配送溫層</summary>
-				<ul className="market-list-sidebar__list">
-					<li>
-						<Link
-							href={clearTempHref}
-							scroll={false}
-							data-active={!currentTemp}
-							aria-current={!currentTemp ? "page" : undefined}
-						>
-							全部
-						</Link>
-					</li>
-					{tempLinks.map((opt) => (
-						<li key={opt.value}>
-							<Link
-								href={opt.href}
-								scroll={false}
-								data-active={opt.active}
-								aria-current={opt.active ? "page" : undefined}
-							>
-								{opt.label}
-							</Link>
-						</li>
-					))}
-				</ul>
-			</details>
-
-			<details open className="market-list-sidebar__section">
 				<summary>價格範圍</summary>
 				<PriceRangeForm
 					currentCategories={currentCategories}
-					currentTemp={currentTemp}
 					currentPriceMin={currentPriceMin}
 					currentPriceMax={currentPriceMax}
 					currentHashtags={currentHashtags}
-					currentCertificationTypes={currentCertificationTypes}
 					currentSort={currentSort}
 					currentQuery={currentQuery}
 					currentTab={currentTab}
 				/>
-			</details>
-
-			<details open className="market-list-sidebar__section">
-				<summary>認證</summary>
-				<div className="market-list-sidebar__hashtags">
-					{certLinks.map((cert) => (
-						<Link
-							// cert.code is empty for codeless certs (e.g. 友善農法); the
-							// href is unique per filter link, so key on that instead.
-							key={cert.href}
-							href={cert.href}
-							scroll={false}
-							className="market-list-sidebar__hashtag"
-							data-active={cert.active}
-							aria-pressed={cert.active}
-						>
-							{cert.label}
-						</Link>
-					))}
-				</div>
 			</details>
 
 			{hashtagLinks.length > 0 ? (
@@ -250,11 +175,9 @@ export default function MarketProductsListLayout({
 type PriceRangeFormProps = Pick<
 	MarketProductsListLayoutProps,
 	| "currentCategories"
-	| "currentTemp"
 	| "currentPriceMin"
 	| "currentPriceMax"
 	| "currentHashtags"
-	| "currentCertificationTypes"
 	| "currentSort"
 	| "currentQuery"
 	| "currentTab"
@@ -262,11 +185,9 @@ type PriceRangeFormProps = Pick<
 
 function PriceRangeForm({
 	currentCategories,
-	currentTemp,
 	currentPriceMin,
 	currentPriceMax,
 	currentHashtags,
-	currentCertificationTypes,
 	currentSort,
 	currentQuery,
 	currentTab,
@@ -301,12 +222,8 @@ function PriceRangeForm({
 			const next = new URLSearchParams();
 			if (currentCategories.length)
 				next.set("categories", currentCategories.join(","));
-			if (currentTemp) next.set("temp", currentTemp);
 			if (currentHashtags.length)
 				next.set("hashtags", currentHashtags.join(","));
-			if (currentCertificationTypes.length) {
-				next.set("certification_types", currentCertificationTypes.join(","));
-			}
 			if (currentSort !== "推薦") next.set("sort", currentSort);
 			if (currentQuery) next.set("q", currentQuery);
 			if (currentTab !== "recommend") next.set("tab", currentTab);
@@ -323,12 +240,10 @@ function PriceRangeForm({
 		},
 		[
 			currentCategories,
-			currentCertificationTypes,
 			currentHashtags,
 			currentQuery,
 			currentSort,
 			currentTab,
-			currentTemp,
 			maximum,
 			minimum,
 			router,
@@ -349,21 +264,11 @@ function PriceRangeForm({
 					value={currentCategories.join(",")}
 				/>
 			) : null}
-			{currentTemp ? (
-				<input type="hidden" name="temp" value={currentTemp} />
-			) : null}
 			{currentHashtags.length ? (
 				<input
 					type="hidden"
 					name="hashtags"
 					value={currentHashtags.join(",")}
-				/>
-			) : null}
-			{currentCertificationTypes.length ? (
-				<input
-					type="hidden"
-					name="certification_types"
-					value={currentCertificationTypes.join(",")}
 				/>
 			) : null}
 			{currentSort !== "推薦" ? (

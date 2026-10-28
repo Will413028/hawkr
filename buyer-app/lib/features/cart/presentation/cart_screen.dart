@@ -92,8 +92,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   Set<int> get _checkedSkuIds => _cartState.checkedSkuIds;
   Map<int, int> get _skuStock =>
       _cartState.data?.stockBySku ?? const <int, int>{};
-  Map<int, List<String>> get _itemDeliveryTemps =>
-      _cartState.data?.deliveryTempsBySku ?? const <int, List<String>>{};
   List<Address> get _userAddresses => _cartState.userAddresses;
   int? get _selectedAddressId => _cartState.selectedAddressId;
   List<Map<String, dynamic>> get _storePickups => _cartState.storePickups;
@@ -718,7 +716,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                       group: group,
                                       checkedSkuIds: _checkedSkuIds,
                                       skuStock: _skuStock,
-                                      itemDeliveryTemps: _itemDeliveryTemps,
                                       onGroupCheckChanged: _onGroupCheckChanged,
                                       onItemCheckChanged: _onItemCheckChanged,
                                       onQuantityChanged:

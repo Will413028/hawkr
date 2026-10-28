@@ -6,7 +6,6 @@ import {
 	PAYMENT_METHOD_LABEL,
 	SHIPPING_METHOD_LABEL,
 	SHIPPING_STATUS_LABEL,
-	SHIPPING_TEMPERATURE_LABEL,
 } from "@/lib/codemeta/enums";
 import { formatTaipeiDateTime } from "@/lib/date/taipei";
 import { type DelegatedOrderFilters, hasDelegatedOrderFilter } from "./filters";
@@ -201,10 +200,6 @@ export function formatOrderDateTime(raw: string): string {
 
 export function shippingMethodText(code: string): string {
 	return code ? (SHIPPING_METHOD_LABEL[code] ?? "") : "";
-}
-
-export function deliveryTempText(code: string): string {
-	return code ? (SHIPPING_TEMPERATURE_LABEL[code] ?? "") : "";
 }
 
 export function paymentMethodText(code: string): string {

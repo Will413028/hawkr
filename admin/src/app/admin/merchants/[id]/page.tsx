@@ -34,7 +34,6 @@ import {
 	OrderStatus,
 	PRODUCT_STATUS_LABEL,
 	SHIPPING_METHOD_LABEL,
-	SHIPPING_TEMPERATURE_LABEL,
 } from "@/lib/codemeta";
 import { type ActionResult, runAction } from "@/lib/connect-action";
 import { connectErrorText } from "@/lib/error-text";
@@ -151,7 +150,6 @@ interface OrderItem {
 	itemCount: string;
 	totalActualAmount: string;
 	shippingMethod: string;
-	deliveryTemp: string;
 	status: string;
 	statusSummary: string;
 }
@@ -1401,7 +1399,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 									<th>買家</th>
 									<th>商品數量</th>
 									<th>訂單金額</th>
-									<th>物流/溫層</th>
+									<th>物流</th>
 									<th>訂單狀態</th>
 									<th>操作</th>
 								</tr>
@@ -1442,22 +1440,11 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 											<td>
 												NT${Number(o.totalActualAmount || 0).toLocaleString()}
 											</td>
-											{/* shippingMethod／deliveryTemp 是 CodeMeta 的數字 Value（3001＝黑貓宅急便、
-											    3201＝常溫），不是可讀字串。修前這裡直接把值印出來，畫面上就是
-											    「3001」配一顆寫著「3201」的溫層徽章。 */}
 											<td>
 												<div className="order-logistics">
 													<span>
 														{codeLabel(SHIPPING_METHOD_LABEL, o.shippingMethod)}
 													</span>
-													{o.deliveryTemp && (
-														<span className="temp-badge">
-															{codeLabel(
-																SHIPPING_TEMPERATURE_LABEL,
-																o.deliveryTemp,
-															)}
-														</span>
-													)}
 												</div>
 											</td>
 											<td>

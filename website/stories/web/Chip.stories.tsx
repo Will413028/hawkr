@@ -4,7 +4,7 @@ import { Chip } from "@/components/ui/Chip";
 const meta = {
 	title: "Web/Data Display/Chip",
 	component: Chip,
-	args: { children: "冷藏配送", color: "primary", variant: "flat" },
+	args: { children: "宅配", color: "primary", variant: "flat" },
 } satisfies Meta<typeof Chip>;
 export default meta;
 type Story = StoryObj<typeof meta>;

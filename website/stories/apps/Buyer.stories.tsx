@@ -32,10 +32,6 @@ export const Cards: Story = { args: { component: "cards" } };
 export const States: Story = { args: { component: "states" } };
 export const Commerce: Story = { args: { component: "commerce" } };
 export const Cart: Story = { args: { component: "cart" } };
-export const TemperatureTags: Story = { args: { component: "chips" } };
-export const TemperatureTagsLargeText: Story = {
-	args: { component: "chips", width: 320, textScale: "1.4" },
-};
 export const CompactLargeText: Story = {
 	args: { width: 320, textScale: "1.4" },
 };

@@ -1,5 +1,3 @@
-import 'package:hawkr_seller/features/order/presentation/order_card_widgets/order_info_column.dart';
-import 'package:hawkr_seller/shared/widgets/hk_temperature_tag.dart';
 import 'package:hawkr_seller/features/order/data/order_model.dart';
 import 'package:hawkr_seller/features/order/presentation/shared_order_detail_screen.dart';
 import 'package:flutter/material.dart';
@@ -33,46 +31,15 @@ void main() {
     });
   }
 
-  testWidgets(
-    'order delivery temperature uses the shared label without guessing',
-    (tester) async {
-      await tester.pumpWidget(
-        _TestApp(order: _detailedOrder.copyWith(deliveryTemp: '3202')),
-      );
-      await tester.pump();
-      await tester.dragUntilVisible(
-        find.text('配送溫層'),
-        find.byType(ListView).first,
-        const Offset(0, -200),
-      );
-      expect(find.widgetWithText(HkTemperatureTag, '冷藏'), findsOneWidget);
-      expect(find.widgetWithText(HkTemperatureTag, '常溫'), findsNothing);
-    },
-  );
-
-  testWidgets('order card retains known temperature when carrier is missing', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        child: ScreenUtilInit(
-          designSize: const Size(390, 844),
-          builder: (_, _) => MaterialApp(
-            home: Scaffold(
-              body: OrderInfoColumn(
-                order: _detailedOrder.copyWith(
-                  deliveryTemp: '3203',
-                  shippingMethod: '',
-                  shippingAddress: '',
-                  address: '',
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
+  testWidgets('order detail shows no delivery temperature row', (tester) async {
+    await tester.pumpWidget(const _TestApp(order: _detailedOrder));
+    await tester.pump();
+    await tester.dragUntilVisible(
+      find.text('配送方式'),
+      find.byType(ListView).first,
+      const Offset(0, -200),
     );
-    expect(find.widgetWithText(HkTemperatureTag, '冷凍'), findsOneWidget);
+    expect(find.text('配送溫層'), findsNothing);
   });
 
   testWidgets('買家卡、訂單資訊與新操作文案保持在同一頁', (tester) async {

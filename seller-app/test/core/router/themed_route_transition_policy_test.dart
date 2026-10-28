@@ -14,7 +14,6 @@ void main() {
       'ProductRoutes.picker',
       'ProductRoutes.info',
       'ProductRoutes.images',
-      'ProductRoutes.tags',
       'ProductRoutes.specs',
     ];
 

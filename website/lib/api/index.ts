@@ -175,7 +175,6 @@ export async function fetchMarketplace(
  *
  * Backend B-182 / B-183 (May 2026) promoted what used to be client-side
  * post-filters into real server query params:
- *   - `delivery_temp`            CSV of "3201" | "3202" | "3203" (ambient/chilled/frozen)
  *   - `price_min` / `price_max`  numeric bounds (interval-overlap semantics)
  *   - `store_ids`                CSV of account ids
  *   - `followed_product_only`    bool — buyer's favourited products
@@ -187,29 +186,17 @@ export async function fetchMarketplace(
  *   - `sort` (LATEST / PRICE_ASC / PRICE_DESC / RATING / SALES)
  *   - `category_id` / `keyword` / `page` / `page_size`
  *
- * `temp` (single value) stays as a convenience input for the sidebar
- * radio group; we map it to the CSV form before sending.
- *
  * Each field is omitted from the request when empty so the URL stays
  * byte-identical for callers who don't supply an option.
  */
 export interface FetchProductsOptions {
 	hashtags?: string[];
 	match?: "any" | "all";
-	/** Sidebar single-value temp ("ambient" / "chilled" / "frozen") — gets
-	 * mapped to the backend's numeric code ("3201" / "3202" / "3203"). */
-	temp?: string;
-	/** Explicit numeric codes (mostly for tests / power callers). Either
-	 * a single string ("3201,3202") or an array. */
-	deliveryTemps?: string[];
 	priceMin?: string | number;
 	priceMax?: string | number;
 	/** Multi-seller filter — replaces the legacy client-side
 	 * post-filter that walked the products list. */
 	sellerStoreIds?: Array<string | number>;
-	/** Product certification filter — CertificationType values (e.g. "3701"
-	 * 有機 / "3702" 產銷履歷). Matches `certifications[].name`; any match. */
-	certificationTypes?: string[];
 	/** When true, asks backend to keep only products the buyer has
 	 * favourited (heart icon). Backend returns 400 if user isn't logged
 	 * in; fetcher sends the Clerk token as Bearer for the viewer-aware filter. */
@@ -229,12 +216,6 @@ export interface FetchProductsOptions {
 	 *  a legitimate empty catalog and committed as fresh. */
 	strict?: boolean;
 }
-
-const TEMP_CODE_BY_KEY: Record<string, string> = {
-	ambient: "3201",
-	chilled: "3202",
-	frozen: "3203",
-};
 
 export async function fetchProducts(
 	keyword: string,
@@ -257,21 +238,6 @@ export async function fetchProducts(
 	if (options?.match) {
 		params.set("match", options.match);
 	}
-	// Delivery temp — accept either the sidebar key ("ambient") or
-	// already-resolved numeric codes; emit the backend's CSV form.
-	const tempCodes: string[] = [];
-	if (options?.temp) {
-		const code = TEMP_CODE_BY_KEY[options.temp];
-		if (code) tempCodes.push(code);
-	}
-	if (options?.deliveryTemps?.length) {
-		for (const t of options.deliveryTemps) {
-			if (t && !tempCodes.includes(t)) tempCodes.push(t);
-		}
-	}
-	if (tempCodes.length > 0) {
-		params.set("delivery_temp", tempCodes.join(","));
-	}
 	if (options?.priceMin !== undefined && options.priceMin !== "") {
 		params.set("price_min", String(options.priceMin));
 	}
@@ -280,9 +246,6 @@ export async function fetchProducts(
 	}
 	if (options?.sellerStoreIds?.length) {
 		params.set("store_ids", options.sellerStoreIds.map(String).join(","));
-	}
-	if (options?.certificationTypes?.length) {
-		params.set("certification_types", options.certificationTypes.join(","));
 	}
 	if (options?.followedProductOnly) {
 		params.set("followed_product_only", "true");

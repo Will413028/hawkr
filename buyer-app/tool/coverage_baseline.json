@@ -78,7 +78,6 @@
     "lib/features/cart/presentation/widgets/merchant_group_card.dart",
     "lib/features/cart/presentation/widgets/payment_details_section.dart",
     "lib/features/cart/presentation/widgets/shipping_section.dart",
-    "lib/features/cart/presentation/widgets/temperature_tags.dart",
     "lib/features/category/data/category_marketplace_model.dart",
     "lib/features/category/data/category_model.dart",
     "lib/features/category/data/category_repository.dart",

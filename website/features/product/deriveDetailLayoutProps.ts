@@ -17,7 +17,6 @@ import type { PurchaseBoxSku } from "@/features/product/components/ProductPurcha
 import { formatUnitLabel, ShippingMethod } from "@/lib/codemeta/enums";
 import { formatTaipeiDate } from "@/lib/date/taipei";
 import { parseRating, parseReviewCount } from "@/lib/products/rating";
-import { parseDeliveryTempCodes } from "@/lib/products/seller-repo";
 import type { ProductReview } from "./ProductDetailLayout";
 
 export type { ProductReview };
@@ -50,9 +49,6 @@ export interface DerivedLayoutProps {
 	>;
 	thumbnails: string[];
 	skus: PurchaseBoxSku[];
-	certifications: Array<Record<string, unknown>>;
-	supportedTempCodes: string[];
-	supportedTemps: string[];
 	enabledCarriers: ReadonlyArray<{
 		method: string;
 		label: string;
@@ -208,12 +204,6 @@ function shippingNoteFromMethods(methods: unknown): string {
 	return `滿 NT$ ${min.toLocaleString()} 免運`;
 }
 
-const TEMP_LABEL: Record<string, string> = {
-	"3201": "常溫",
-	"3202": "冷藏",
-	"3203": "冷凍",
-};
-
 /**
  * Normalise the live reviews endpoint payload (`getCachedProductReviews`) into
  * the `ProductReview` shape the layout renders. Shared by the synchronous derive
@@ -354,12 +344,6 @@ export function deriveDetailLayoutProps(
 		};
 	});
 
-	const certifications: Array<Record<string, unknown>> = Array.isArray(
-		product.certifications,
-	)
-		? (product.certifications as unknown[]).map(asRecord)
-		: [];
-
 	const { reviews: liveReviews, total: liveReviewTotal } =
 		mapLiveReviews(reviewsResult);
 	const rawProductReviews: unknown[] = Array.isArray(product.reviews)
@@ -379,28 +363,6 @@ export function deriveDetailLayoutProps(
 			? liveReviewTotal
 			: reviews.length;
 	const purchasable = product.purchasable !== false;
-
-	// 收 product 支援的所有 delivery 溫層 code（多選；對齊 Flutter 買家 PDP 與
-	// seller spec form 行為）。
-	const supportedTempCodes: string[] = (() => {
-		const candidates = [product.deliveryTemp, product.deliveryTemps];
-		for (const c of candidates) {
-			const codes = parseDeliveryTempCodes(c);
-			if (codes.length > 0) {
-				const order: Record<string, number> = {
-					"3201": 0,
-					"3202": 1,
-					"3203": 2,
-				};
-				return [...codes].sort((a, b) => order[a] - order[b]);
-			}
-		}
-		return [];
-	})();
-
-	const supportedTemps: string[] = supportedTempCodes.map(
-		(code) => TEMP_LABEL[code] ?? code,
-	);
 
 	const firstSkuRecord = asRecord(rawSkus[0]);
 	const firstSkuUnit = formatUnitLabel(
@@ -430,9 +392,6 @@ export function deriveDetailLayoutProps(
 		descriptionImageDims,
 		thumbnails,
 		skus,
-		certifications,
-		supportedTempCodes,
-		supportedTemps,
 		enabledCarriers,
 		shippingNote,
 		categoryName,

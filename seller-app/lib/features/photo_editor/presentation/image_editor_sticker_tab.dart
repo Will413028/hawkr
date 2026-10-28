@@ -28,7 +28,6 @@ class ImageEditorStickerTab extends StatefulWidget {
 
 class _ImageEditorStickerTabState extends State<ImageEditorStickerTab> {
   static const List<StickerBadge> _freshStickers = [
-    StickerBadge.organic,
     StickerBadge.naturalDrop,
     StickerBadge.naturalWave,
     StickerBadge.freshPicked,

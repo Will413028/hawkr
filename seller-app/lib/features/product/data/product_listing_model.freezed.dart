@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$PendingAiDraft {
 
- String? get name; String? get origin; String? get categoryId; String? get description; List<String> get tags; List<SpecDraftPending> get skus; List<CertificationPending> get certifications; Set<String> get filledFields; int get patchVersion;
+ String? get name; String? get origin; String? get categoryId; String? get description; List<String> get tags; List<SpecDraftPending> get skus; Set<String> get filledFields; int get patchVersion;
 /// Create a copy of PendingAiDraft
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $PendingAiDraftCopyWith<PendingAiDraft> get copyWith => _$PendingAiDraftCopyWith
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is PendingAiDraft&&(identical(other.name, name) || other.name == name)&&(identical(other.origin, origin) || other.origin == origin)&&(identical(other.categoryId, categoryId) || other.categoryId == categoryId)&&(identical(other.description, description) || other.description == description)&&const DeepCollectionEquality().equals(other.tags, tags)&&const DeepCollectionEquality().equals(other.skus, skus)&&const DeepCollectionEquality().equals(other.certifications, certifications)&&const DeepCollectionEquality().equals(other.filledFields, filledFields)&&(identical(other.patchVersion, patchVersion) || other.patchVersion == patchVersion));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is PendingAiDraft&&(identical(other.name, name) || other.name == name)&&(identical(other.origin, origin) || other.origin == origin)&&(identical(other.categoryId, categoryId) || other.categoryId == categoryId)&&(identical(other.description, description) || other.description == description)&&const DeepCollectionEquality().equals(other.tags, tags)&&const DeepCollectionEquality().equals(other.skus, skus)&&const DeepCollectionEquality().equals(other.filledFields, filledFields)&&(identical(other.patchVersion, patchVersion) || other.patchVersion == patchVersion));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,name,origin,categoryId,description,const DeepCollectionEquality().hash(tags),const DeepCollectionEquality().hash(skus),const DeepCollectionEquality().hash(certifications),const DeepCollectionEquality().hash(filledFields),patchVersion);
+int get hashCode => Object.hash(runtimeType,name,origin,categoryId,description,const DeepCollectionEquality().hash(tags),const DeepCollectionEquality().hash(skus),const DeepCollectionEquality().hash(filledFields),patchVersion);
 
 @override
 String toString() {
-  return 'PendingAiDraft(name: $name, origin: $origin, categoryId: $categoryId, description: $description, tags: $tags, skus: $skus, certifications: $certifications, filledFields: $filledFields, patchVersion: $patchVersion)';
+  return 'PendingAiDraft(name: $name, origin: $origin, categoryId: $categoryId, description: $description, tags: $tags, skus: $skus, filledFields: $filledFields, patchVersion: $patchVersion)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $PendingAiDraftCopyWith<$Res>  {
   factory $PendingAiDraftCopyWith(PendingAiDraft value, $Res Function(PendingAiDraft) _then) = _$PendingAiDraftCopyWithImpl;
 @useResult
 $Res call({
- String? name, String? origin, String? categoryId, String? description, List<String> tags, List<SpecDraftPending> skus, List<CertificationPending> certifications, Set<String> filledFields, int patchVersion
+ String? name, String? origin, String? categoryId, String? description, List<String> tags, List<SpecDraftPending> skus, Set<String> filledFields, int patchVersion
 });
 
 
@@ -65,7 +65,7 @@ class _$PendingAiDraftCopyWithImpl<$Res>
 
 /// Create a copy of PendingAiDraft
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? name = freezed,Object? origin = freezed,Object? categoryId = freezed,Object? description = freezed,Object? tags = null,Object? skus = null,Object? certifications = null,Object? filledFields = null,Object? patchVersion = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? name = freezed,Object? origin = freezed,Object? categoryId = freezed,Object? description = freezed,Object? tags = null,Object? skus = null,Object? filledFields = null,Object? patchVersion = null,}) {
   return _then(_self.copyWith(
 name: freezed == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String?,origin: freezed == origin ? _self.origin : origin // ignore: cast_nullable_to_non_nullable
@@ -73,8 +73,7 @@ as String?,categoryId: freezed == categoryId ? _self.categoryId : categoryId // 
 as String?,description: freezed == description ? _self.description : description // ignore: cast_nullable_to_non_nullable
 as String?,tags: null == tags ? _self.tags : tags // ignore: cast_nullable_to_non_nullable
 as List<String>,skus: null == skus ? _self.skus : skus // ignore: cast_nullable_to_non_nullable
-as List<SpecDraftPending>,certifications: null == certifications ? _self.certifications : certifications // ignore: cast_nullable_to_non_nullable
-as List<CertificationPending>,filledFields: null == filledFields ? _self.filledFields : filledFields // ignore: cast_nullable_to_non_nullable
+as List<SpecDraftPending>,filledFields: null == filledFields ? _self.filledFields : filledFields // ignore: cast_nullable_to_non_nullable
 as Set<String>,patchVersion: null == patchVersion ? _self.patchVersion : patchVersion // ignore: cast_nullable_to_non_nullable
 as int,
   ));
@@ -161,10 +160,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String? name,  String? origin,  String? categoryId,  String? description,  List<String> tags,  List<SpecDraftPending> skus,  List<CertificationPending> certifications,  Set<String> filledFields,  int patchVersion)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String? name,  String? origin,  String? categoryId,  String? description,  List<String> tags,  List<SpecDraftPending> skus,  Set<String> filledFields,  int patchVersion)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _PendingAiDraft() when $default != null:
-return $default(_that.name,_that.origin,_that.categoryId,_that.description,_that.tags,_that.skus,_that.certifications,_that.filledFields,_that.patchVersion);case _:
+return $default(_that.name,_that.origin,_that.categoryId,_that.description,_that.tags,_that.skus,_that.filledFields,_that.patchVersion);case _:
   return orElse();
 
 }
@@ -182,10 +181,10 @@ return $default(_that.name,_that.origin,_that.categoryId,_that.description,_that
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String? name,  String? origin,  String? categoryId,  String? description,  List<String> tags,  List<SpecDraftPending> skus,  List<CertificationPending> certifications,  Set<String> filledFields,  int patchVersion)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String? name,  String? origin,  String? categoryId,  String? description,  List<String> tags,  List<SpecDraftPending> skus,  Set<String> filledFields,  int patchVersion)  $default,) {final _that = this;
 switch (_that) {
 case _PendingAiDraft():
-return $default(_that.name,_that.origin,_that.categoryId,_that.description,_that.tags,_that.skus,_that.certifications,_that.filledFields,_that.patchVersion);case _:
+return $default(_that.name,_that.origin,_that.categoryId,_that.description,_that.tags,_that.skus,_that.filledFields,_that.patchVersion);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -202,10 +201,10 @@ return $default(_that.name,_that.origin,_that.categoryId,_that.description,_that
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String? name,  String? origin,  String? categoryId,  String? description,  List<String> tags,  List<SpecDraftPending> skus,  List<CertificationPending> certifications,  Set<String> filledFields,  int patchVersion)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String? name,  String? origin,  String? categoryId,  String? description,  List<String> tags,  List<SpecDraftPending> skus,  Set<String> filledFields,  int patchVersion)?  $default,) {final _that = this;
 switch (_that) {
 case _PendingAiDraft() when $default != null:
-return $default(_that.name,_that.origin,_that.categoryId,_that.description,_that.tags,_that.skus,_that.certifications,_that.filledFields,_that.patchVersion);case _:
+return $default(_that.name,_that.origin,_that.categoryId,_that.description,_that.tags,_that.skus,_that.filledFields,_that.patchVersion);case _:
   return null;
 
 }
@@ -217,7 +216,7 @@ return $default(_that.name,_that.origin,_that.categoryId,_that.description,_that
 @JsonSerializable()
 
 class _PendingAiDraft implements PendingAiDraft {
-  const _PendingAiDraft({this.name, this.origin, this.categoryId, this.description, final  List<String> tags = const [], final  List<SpecDraftPending> skus = const [], final  List<CertificationPending> certifications = const [], final  Set<String> filledFields = const {}, this.patchVersion = 0}): _tags = tags,_skus = skus,_certifications = certifications,_filledFields = filledFields;
+  const _PendingAiDraft({this.name, this.origin, this.categoryId, this.description, final  List<String> tags = const [], final  List<SpecDraftPending> skus = const [], final  Set<String> filledFields = const {}, this.patchVersion = 0}): _tags = tags,_skus = skus,_filledFields = filledFields;
   factory _PendingAiDraft.fromJson(Map<String, dynamic> json) => _$PendingAiDraftFromJson(json);
 
 @override final  String? name;
@@ -236,13 +235,6 @@ class _PendingAiDraft implements PendingAiDraft {
   if (_skus is EqualUnmodifiableListView) return _skus;
   // ignore: implicit_dynamic_type
   return EqualUnmodifiableListView(_skus);
-}
-
- final  List<CertificationPending> _certifications;
-@override@JsonKey() List<CertificationPending> get certifications {
-  if (_certifications is EqualUnmodifiableListView) return _certifications;
-  // ignore: implicit_dynamic_type
-  return EqualUnmodifiableListView(_certifications);
 }
 
  final  Set<String> _filledFields;
@@ -267,16 +259,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PendingAiDraft&&(identical(other.name, name) || other.name == name)&&(identical(other.origin, origin) || other.origin == origin)&&(identical(other.categoryId, categoryId) || other.categoryId == categoryId)&&(identical(other.description, description) || other.description == description)&&const DeepCollectionEquality().equals(other._tags, _tags)&&const DeepCollectionEquality().equals(other._skus, _skus)&&const DeepCollectionEquality().equals(other._certifications, _certifications)&&const DeepCollectionEquality().equals(other._filledFields, _filledFields)&&(identical(other.patchVersion, patchVersion) || other.patchVersion == patchVersion));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PendingAiDraft&&(identical(other.name, name) || other.name == name)&&(identical(other.origin, origin) || other.origin == origin)&&(identical(other.categoryId, categoryId) || other.categoryId == categoryId)&&(identical(other.description, description) || other.description == description)&&const DeepCollectionEquality().equals(other._tags, _tags)&&const DeepCollectionEquality().equals(other._skus, _skus)&&const DeepCollectionEquality().equals(other._filledFields, _filledFields)&&(identical(other.patchVersion, patchVersion) || other.patchVersion == patchVersion));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,name,origin,categoryId,description,const DeepCollectionEquality().hash(_tags),const DeepCollectionEquality().hash(_skus),const DeepCollectionEquality().hash(_certifications),const DeepCollectionEquality().hash(_filledFields),patchVersion);
+int get hashCode => Object.hash(runtimeType,name,origin,categoryId,description,const DeepCollectionEquality().hash(_tags),const DeepCollectionEquality().hash(_skus),const DeepCollectionEquality().hash(_filledFields),patchVersion);
 
 @override
 String toString() {
-  return 'PendingAiDraft(name: $name, origin: $origin, categoryId: $categoryId, description: $description, tags: $tags, skus: $skus, certifications: $certifications, filledFields: $filledFields, patchVersion: $patchVersion)';
+  return 'PendingAiDraft(name: $name, origin: $origin, categoryId: $categoryId, description: $description, tags: $tags, skus: $skus, filledFields: $filledFields, patchVersion: $patchVersion)';
 }
 
 
@@ -287,7 +279,7 @@ abstract mixin class _$PendingAiDraftCopyWith<$Res> implements $PendingAiDraftCo
   factory _$PendingAiDraftCopyWith(_PendingAiDraft value, $Res Function(_PendingAiDraft) _then) = __$PendingAiDraftCopyWithImpl;
 @override @useResult
 $Res call({
- String? name, String? origin, String? categoryId, String? description, List<String> tags, List<SpecDraftPending> skus, List<CertificationPending> certifications, Set<String> filledFields, int patchVersion
+ String? name, String? origin, String? categoryId, String? description, List<String> tags, List<SpecDraftPending> skus, Set<String> filledFields, int patchVersion
 });
 
 
@@ -304,7 +296,7 @@ class __$PendingAiDraftCopyWithImpl<$Res>
 
 /// Create a copy of PendingAiDraft
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? name = freezed,Object? origin = freezed,Object? categoryId = freezed,Object? description = freezed,Object? tags = null,Object? skus = null,Object? certifications = null,Object? filledFields = null,Object? patchVersion = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? name = freezed,Object? origin = freezed,Object? categoryId = freezed,Object? description = freezed,Object? tags = null,Object? skus = null,Object? filledFields = null,Object? patchVersion = null,}) {
   return _then(_PendingAiDraft(
 name: freezed == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String?,origin: freezed == origin ? _self.origin : origin // ignore: cast_nullable_to_non_nullable
@@ -312,8 +304,7 @@ as String?,categoryId: freezed == categoryId ? _self.categoryId : categoryId // 
 as String?,description: freezed == description ? _self.description : description // ignore: cast_nullable_to_non_nullable
 as String?,tags: null == tags ? _self._tags : tags // ignore: cast_nullable_to_non_nullable
 as List<String>,skus: null == skus ? _self._skus : skus // ignore: cast_nullable_to_non_nullable
-as List<SpecDraftPending>,certifications: null == certifications ? _self._certifications : certifications // ignore: cast_nullable_to_non_nullable
-as List<CertificationPending>,filledFields: null == filledFields ? _self._filledFields : filledFields // ignore: cast_nullable_to_non_nullable
+as List<SpecDraftPending>,filledFields: null == filledFields ? _self._filledFields : filledFields // ignore: cast_nullable_to_non_nullable
 as Set<String>,patchVersion: null == patchVersion ? _self.patchVersion : patchVersion // ignore: cast_nullable_to_non_nullable
 as int,
   ));
@@ -596,272 +587,6 @@ as int,unit: null == unit ? _self.unit : unit // ignore: cast_nullable_to_non_nu
 as String,weight: null == weight ? _self.weight : weight // ignore: cast_nullable_to_non_nullable
 as int,stockQty: null == stockQty ? _self.stockQty : stockQty // ignore: cast_nullable_to_non_nullable
 as int,
-  ));
-}
-
-
-}
-
-
-/// @nodoc
-mixin _$CertificationPending {
-
- String get name; String get certNo;
-/// Create a copy of CertificationPending
-/// with the given fields replaced by the non-null parameter values.
-@JsonKey(includeFromJson: false, includeToJson: false)
-@pragma('vm:prefer-inline')
-$CertificationPendingCopyWith<CertificationPending> get copyWith => _$CertificationPendingCopyWithImpl<CertificationPending>(this as CertificationPending, _$identity);
-
-  /// Serializes this CertificationPending to a JSON map.
-  Map<String, dynamic> toJson();
-
-
-@override
-bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is CertificationPending&&(identical(other.name, name) || other.name == name)&&(identical(other.certNo, certNo) || other.certNo == certNo));
-}
-
-@JsonKey(includeFromJson: false, includeToJson: false)
-@override
-int get hashCode => Object.hash(runtimeType,name,certNo);
-
-@override
-String toString() {
-  return 'CertificationPending(name: $name, certNo: $certNo)';
-}
-
-
-}
-
-/// @nodoc
-abstract mixin class $CertificationPendingCopyWith<$Res>  {
-  factory $CertificationPendingCopyWith(CertificationPending value, $Res Function(CertificationPending) _then) = _$CertificationPendingCopyWithImpl;
-@useResult
-$Res call({
- String name, String certNo
-});
-
-
-
-
-}
-/// @nodoc
-class _$CertificationPendingCopyWithImpl<$Res>
-    implements $CertificationPendingCopyWith<$Res> {
-  _$CertificationPendingCopyWithImpl(this._self, this._then);
-
-  final CertificationPending _self;
-  final $Res Function(CertificationPending) _then;
-
-/// Create a copy of CertificationPending
-/// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? name = null,Object? certNo = null,}) {
-  return _then(_self.copyWith(
-name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
-as String,certNo: null == certNo ? _self.certNo : certNo // ignore: cast_nullable_to_non_nullable
-as String,
-  ));
-}
-
-}
-
-
-/// Adds pattern-matching-related methods to [CertificationPending].
-extension CertificationPendingPatterns on CertificationPending {
-/// A variant of `map` that fallback to returning `orElse`.
-///
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case final Subclass value:
-///     return ...;
-///   case _:
-///     return orElse();
-/// }
-/// ```
-
-@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _CertificationPending value)?  $default,{required TResult orElse(),}){
-final _that = this;
-switch (_that) {
-case _CertificationPending() when $default != null:
-return $default(_that);case _:
-  return orElse();
-
-}
-}
-/// A `switch`-like method, using callbacks.
-///
-/// Callbacks receives the raw object, upcasted.
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case final Subclass value:
-///     return ...;
-///   case final Subclass2 value:
-///     return ...;
-/// }
-/// ```
-
-@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _CertificationPending value)  $default,){
-final _that = this;
-switch (_that) {
-case _CertificationPending():
-return $default(_that);case _:
-  throw StateError('Unexpected subclass');
-
-}
-}
-/// A variant of `map` that fallback to returning `null`.
-///
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case final Subclass value:
-///     return ...;
-///   case _:
-///     return null;
-/// }
-/// ```
-
-@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _CertificationPending value)?  $default,){
-final _that = this;
-switch (_that) {
-case _CertificationPending() when $default != null:
-return $default(_that);case _:
-  return null;
-
-}
-}
-/// A variant of `when` that fallback to an `orElse` callback.
-///
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case Subclass(:final field):
-///     return ...;
-///   case _:
-///     return orElse();
-/// }
-/// ```
-
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String name,  String certNo)?  $default,{required TResult orElse(),}) {final _that = this;
-switch (_that) {
-case _CertificationPending() when $default != null:
-return $default(_that.name,_that.certNo);case _:
-  return orElse();
-
-}
-}
-/// A `switch`-like method, using callbacks.
-///
-/// As opposed to `map`, this offers destructuring.
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case Subclass(:final field):
-///     return ...;
-///   case Subclass2(:final field2):
-///     return ...;
-/// }
-/// ```
-
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String name,  String certNo)  $default,) {final _that = this;
-switch (_that) {
-case _CertificationPending():
-return $default(_that.name,_that.certNo);case _:
-  throw StateError('Unexpected subclass');
-
-}
-}
-/// A variant of `when` that fallback to returning `null`
-///
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case Subclass(:final field):
-///     return ...;
-///   case _:
-///     return null;
-/// }
-/// ```
-
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String name,  String certNo)?  $default,) {final _that = this;
-switch (_that) {
-case _CertificationPending() when $default != null:
-return $default(_that.name,_that.certNo);case _:
-  return null;
-
-}
-}
-
-}
-
-/// @nodoc
-@JsonSerializable()
-
-class _CertificationPending implements CertificationPending {
-  const _CertificationPending({required this.name, required this.certNo});
-  factory _CertificationPending.fromJson(Map<String, dynamic> json) => _$CertificationPendingFromJson(json);
-
-@override final  String name;
-@override final  String certNo;
-
-/// Create a copy of CertificationPending
-/// with the given fields replaced by the non-null parameter values.
-@override @JsonKey(includeFromJson: false, includeToJson: false)
-@pragma('vm:prefer-inline')
-_$CertificationPendingCopyWith<_CertificationPending> get copyWith => __$CertificationPendingCopyWithImpl<_CertificationPending>(this, _$identity);
-
-@override
-Map<String, dynamic> toJson() {
-  return _$CertificationPendingToJson(this, );
-}
-
-@override
-bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CertificationPending&&(identical(other.name, name) || other.name == name)&&(identical(other.certNo, certNo) || other.certNo == certNo));
-}
-
-@JsonKey(includeFromJson: false, includeToJson: false)
-@override
-int get hashCode => Object.hash(runtimeType,name,certNo);
-
-@override
-String toString() {
-  return 'CertificationPending(name: $name, certNo: $certNo)';
-}
-
-
-}
-
-/// @nodoc
-abstract mixin class _$CertificationPendingCopyWith<$Res> implements $CertificationPendingCopyWith<$Res> {
-  factory _$CertificationPendingCopyWith(_CertificationPending value, $Res Function(_CertificationPending) _then) = __$CertificationPendingCopyWithImpl;
-@override @useResult
-$Res call({
- String name, String certNo
-});
-
-
-
-
-}
-/// @nodoc
-class __$CertificationPendingCopyWithImpl<$Res>
-    implements _$CertificationPendingCopyWith<$Res> {
-  __$CertificationPendingCopyWithImpl(this._self, this._then);
-
-  final _CertificationPending _self;
-  final $Res Function(_CertificationPending) _then;
-
-/// Create a copy of CertificationPending
-/// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? name = null,Object? certNo = null,}) {
-  return _then(_CertificationPending(
-name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
-as String,certNo: null == certNo ? _self.certNo : certNo // ignore: cast_nullable_to_non_nullable
-as String,
   ));
 }
 

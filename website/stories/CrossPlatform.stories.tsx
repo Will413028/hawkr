@@ -49,7 +49,7 @@ function Comparison({
 						{component === "chips" && (
 							<div className="catalog-row">
 								<Chip color="primary" variant="flat">
-									冷藏配送
+									宅配
 								</Chip>
 								<Chip color="success" variant="dot">
 									已完成

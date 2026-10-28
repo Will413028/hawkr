@@ -67,16 +67,8 @@ export function homeFormInitial(
 	};
 }
 
-/** 7-11 常溫、冷凍兩筆 row 中被選定的那一筆：常溫優先，沒有才冷凍。寄件人、鎖定、狀態都取自它。 */
-export function cvsReferenceRow(
-	ambientRow: ShippingOnboarding | undefined,
-	frozenRow: ShippingOnboarding | undefined,
-): ShippingOnboarding | undefined {
-	return ambientRow ?? frozenRow;
-}
-
 /**
- * 7-11 的寄件人：`reference` 是選定的那一筆 row（常溫，沒有才冷凍；鎖定與狀態也取自同一筆）。
+ * 7-11 的寄件人：`reference` 是 7-11 的那一筆 row（鎖定與狀態也取自它）。
  * 該筆有寄件人紀錄就用紀錄，沒有才用店家。
  */
 export function cvsSenderInitial(

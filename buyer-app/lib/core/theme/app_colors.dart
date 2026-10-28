@@ -175,12 +175,6 @@ class AppColors {
   /// 輔色只當底色或裝飾；上面的字用 brandInk，不得當文字色（白底對比約 2.0:1）。
   static const Color accentFill = brandSecondary;
 
-  // Product delivery-temperature tones. These mirror the website's
-  // TemperatureTag component instead of reusing broader semantic colours.
-  static const Color temperatureAmbient = Color(0xFF6B6B6B);
-  static const Color temperatureChilled = Color(0xFFEE964B);
-  static const Color temperatureFrozen = Color(0xFF51A2FF);
-
   // ── 卡片 / 元件 ───────────────────────────────────────────
   static const Color cardBorder = Color(0x141F2933);
   static const Color cardShadow = Color(0x121F2933);

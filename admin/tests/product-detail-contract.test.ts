@@ -53,10 +53,9 @@ const PRODUCT_DETAIL_FIXTURE: ProductDetail = {
 	],
 	shippingMethods: [
 		{
-			// CodeMeta Value：3001=黑貓宅急便、3202=冷藏、3102=賣方
+			// CodeMeta Value：3001=黑貓宅急便、3102=賣方
 			// （backend-payuni services/java/shared/common-core .../code/ShippingMethod.java 等）
 			type: "3001",
-			temperature: "3202",
 			freeThreshold: "1000",
 			feePayer: "3102",
 		},

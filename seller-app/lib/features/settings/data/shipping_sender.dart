@@ -18,7 +18,7 @@ bool isShippingRowLocked(Map<String, dynamic> row) {
   return status == payuniSubmitRequested || status == payuniSubmitSucceeded;
 }
 
-/// 這筆 onboarding 已建店且核准（有 onboardingId 且 4303），可用 toggle 增減溫層。
+/// 這筆 onboarding 已建店且核准（有 onboardingId 且 4303），可用 toggle 啟停。
 bool isShippingRowToggleable(Map<String, dynamic> row) {
   final id =
       row['onboardingId']?.toString() ??

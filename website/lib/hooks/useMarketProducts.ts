@@ -125,10 +125,8 @@ export async function fetchMarketProductsPage({
 		fetchParams.sort,
 		{
 			hashtags: fetchParams.hashtags,
-			temp: fetchParams.temp,
 			priceMin: fetchParams.priceMin,
 			priceMax: fetchParams.priceMax,
-			certificationTypes: fetchParams.certificationTypes,
 			followedProductOnly: fetchParams.followedProductOnly,
 			followedSellerOnly: fetchParams.followedSellerOnly,
 			signal,

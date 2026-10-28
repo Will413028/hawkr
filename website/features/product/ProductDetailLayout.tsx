@@ -22,9 +22,7 @@ import AppImage from "@/components/shared/AppImage";
 import Link from "@/components/shared/Link";
 import SellerSidebarIcon from "@/components/shared/SellerSidebarIcon";
 import { Stars } from "@/components/ui/Stars";
-import { TemperatureTag } from "@/features/cart/components/TemperatureTag";
 import ProductBackButton from "@/features/product/components/ProductBackButton";
-import ProductCertificationSection from "@/features/product/components/ProductCertificationSection";
 import ProductGallery from "@/features/product/components/ProductGallery";
 import ProductPurchaseBox, {
 	type PurchaseBoxSku,
@@ -51,9 +49,6 @@ export interface ProductDetailLayoutProps {
 	>;
 	thumbnails: string[];
 	skus: PurchaseBoxSku[];
-	certifications: Array<Record<string, unknown>>;
-	supportedTempCodes: string[];
-	supportedTemps: string[];
 	enabledCarriers: ReadonlyArray<{
 		method: string;
 		label: string;
@@ -300,8 +295,6 @@ export default function ProductDetailLayout({
 	descriptionImageDims,
 	thumbnails,
 	skus,
-	certifications,
-	supportedTemps,
 	enabledCarriers,
 	shippingNote,
 	categoryName,
@@ -445,9 +438,6 @@ export default function ProductDetailLayout({
 									className="shrink-0 text-[var(--action-primary)]"
 									focusable="false"
 								/>
-								{supportedTemps.map((t) => (
-									<TemperatureTag key={t} value={t} />
-								))}
 								{enabledCarriers.map((c) => (
 									<span
 										key={c.method}
@@ -638,8 +628,6 @@ export default function ProductDetailLayout({
 					</div>
 				</div>
 			) : null}
-
-			<ProductCertificationSection certifications={certifications} />
 
 			{reviewsSlot ?? (
 				<ProductReviewsSection reviews={reviews} reviewTotal={reviewTotal} />

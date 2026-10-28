@@ -3,10 +3,10 @@ import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/widgets/hk_icon.dart';
 import 'package:flutter/material.dart';
 
-/// 商品編輯共用步驟列：類別 → 資訊 → 圖片 → 認證 → 規格。
+/// 商品編輯共用步驟列：類別 → 資訊 → 圖片 → 規格。
 class ProductSetupProgressBar extends StatelessWidget {
   const ProductSetupProgressBar({super.key, required this.currentStep})
-    : assert(currentStep >= 1 && currentStep <= 5);
+    : assert(currentStep >= 1 && currentStep <= 4);
 
   final int currentStep;
 
@@ -14,7 +14,6 @@ class ProductSetupProgressBar extends StatelessWidget {
     ('類別', HkIconName.market),
     ('資訊', HkIconName.edit),
     ('圖片', HkIconName.photoAdd),
-    ('認證', HkIconName.tag),
     ('規格', HkIconName.goods),
   ];
 

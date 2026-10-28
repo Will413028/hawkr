@@ -5,7 +5,6 @@ import type {
 	ProductDescriptionBlock,
 } from "@/lib/products/seller-repo";
 import type { SellerMutationChange } from "@/lib/seller-data/scope";
-import { certificationsSummary, sameCertifications } from "./certifications";
 import type { DelegatedProductFormDraft } from "./conflict";
 import type {
 	DelegatedProductDetail,
@@ -153,9 +152,6 @@ export function buildProductPatch(
 	if (!sameDescription(detail.description, form.description)) {
 		next.description = form.description;
 	}
-	if (!sameCertifications(detail.certifications, form.certifications)) {
-		next.certifications = [...form.certifications];
-	}
 	if (!sameImages(imageDraftsOf(detail), form.images)) {
 		next.images = toImageInputs(form.images);
 	}
@@ -229,13 +225,6 @@ export function buildProductChanges(
 			after: `${form.description.blocks.length} 個區塊`,
 		});
 	}
-	if (patch.certifications !== undefined) {
-		rows.push({
-			field: "認證標章",
-			before: certificationsSummary(detail.certifications),
-			after: certificationsSummary(patch.certifications),
-		});
-	}
 	if (patch.images !== undefined) {
 		rows.push({
 			field: "商品圖片",
@@ -277,16 +266,4 @@ export function buildProductChanges(
 		}
 	}
 	return rows;
-}
-
-/**
- * 送出前抽屜要說的話。
- *
- * 認證是法規宣稱（§4.1 對高風險操作的確認要求：diff＋二次確認＋通知），所以提示要在
- * **改到它的時候**多說一句 —— 一句永遠都在的警語會被讀成版面的一部分。
- */
-export function saveHint(patch: DelegatedProductPatch): string {
-	const base = "請確認以下變更內容無誤後儲存。";
-	if (patch.certifications === undefined) return base;
-	return `${base}本次會變更認證標章 —— 那是賣家對買家的法規宣稱，錯誤由賣家承擔責任，請再次核對類型與證書編號。`;
 }

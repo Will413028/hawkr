@@ -153,11 +153,6 @@ class AppColors {
   static const Color accentFill = brandSecondary;
   static Color get disabled => gray1_30;
 
-  // 配送溫層標籤：與 Web TemperatureTag 使用相同的語意色。
-  static const Color temperatureAmbient = Color(0xFF6B6B6B);
-  static const Color temperatureChilled = Color(0xFFEE964B);
-  static const Color temperatureFrozen = Color(0xFF51A2FF);
-
   // ── 邊框與 elevation ──────────────────────────────────────
   static Color get border => gray1_20;
   static Color get divider => gray1_20;

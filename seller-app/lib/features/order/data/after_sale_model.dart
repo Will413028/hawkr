@@ -39,7 +39,6 @@ abstract class AfterSaleCase with _$AfterSaleCase {
     /// （49 §6.1；舊名 `buyerAvatarUrl` 已於 2026-08-05 收斂移除）。
     @Default('') String avatarUrl,
     @Default('') String shippingAddress,
-    @Default('') String temperatureCode,
     @Default('') String status,
     @Default('') String reason,
     @Default('') String description,

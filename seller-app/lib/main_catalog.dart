@@ -1,5 +1,3 @@
-import 'shared/widgets/hk_temperature_tag.dart';
-import 'features/product/presentation/widgets/product_temperature_tags.dart';
 import 'features/post/presentation/widgets/page_header.dart';
 import 'package:flutter/material.dart';
 import 'package:hawkr_seller/shared/widgets/hk_icon.dart';
@@ -32,7 +30,6 @@ import 'shared/widgets/fruit_spinner.dart';
 import 'shared/widgets/green_header_bar.dart';
 import 'shared/widgets/linked_product_card.dart';
 import 'shared/widgets/step_indicator.dart';
-import 'shared/widgets/temperature_tag.dart';
 
 /// Runs real seller widgets without app bootstrap, authentication, or APIs.
 void main() {
@@ -233,7 +230,6 @@ class _CatalogExamplesState extends State<_CatalogExamples> {
   int _step = 1;
   int _photoIndex = 0;
   String _selection = '全部';
-  String _temperature = '冷藏';
   String? _category;
   bool _enabled = true;
   bool _saved = false;
@@ -772,40 +768,6 @@ class _CatalogExamplesState extends State<_CatalogExamples> {
   ]);
 
   Widget _commerce() => _stack([
-    _section(
-      '配送溫層標籤 · HkTemperatureTag',
-      const ProductTemperatureTags(deliveryTemp: ['3201', '3202', '3203']),
-      description: '與 Web 相同的透明圓角 pill；常溫灰、冷藏橘、冷凍藍，標籤隨字級增高。',
-    ),
-    _section(
-      '缺值與未知溫層',
-      const Wrap(
-        spacing: 4,
-        runSpacing: 4,
-        children: [
-          ProductTemperatureTags(deliveryTemp: null),
-          HkTemperatureTag(value: '待確認'),
-        ],
-      ),
-    ),
-    _section(
-      '配送溫層選擇 · TemperatureTag',
-      Wrap(
-        spacing: HkSpace.sm,
-        runSpacing: HkSpace.sm,
-        children: [
-          for (final label in ['常溫', '冷藏', '冷凍'])
-            TemperatureTag.selectable(
-              key: ValueKey('temperature-select-$label'),
-              label: label,
-              isSelected: _temperature == label,
-              onTap: () => setState(() => _temperature = label),
-            ),
-        ],
-      ),
-    ),
-    Text('選擇溫層：$_temperature', key: const ValueKey('temperature-value')),
-    const SizedBox(height: HkSpace.lg),
     _section(
       '關聯商品 · LinkedProductCard',
       LinkedProductCard(

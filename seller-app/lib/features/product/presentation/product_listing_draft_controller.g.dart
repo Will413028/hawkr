@@ -10,7 +10,7 @@ part of 'product_listing_draft_controller.dart';
 // ignore_for_file: type=lint, type=warning
 /// AI 對話助手累積的商品草稿。
 ///
-/// Merge 策略：覆蓋單一欄位；tags / skus / certifications 收到新值時整體替換。
+/// Merge 策略：覆蓋單一欄位；tags / skus 收到新值時整體替換。
 /// patchVersion 每次 merge 遞增，各 step screen 用它當 useEffect 的 dep。
 
 @ProviderFor(ProductListingDraftController)
@@ -19,13 +19,13 @@ final productListingDraftControllerProvider =
 
 /// AI 對話助手累積的商品草稿。
 ///
-/// Merge 策略：覆蓋單一欄位；tags / skus / certifications 收到新值時整體替換。
+/// Merge 策略：覆蓋單一欄位；tags / skus 收到新值時整體替換。
 /// patchVersion 每次 merge 遞增，各 step screen 用它當 useEffect 的 dep。
 final class ProductListingDraftControllerProvider
     extends $NotifierProvider<ProductListingDraftController, PendingAiDraft> {
   /// AI 對話助手累積的商品草稿。
   ///
-  /// Merge 策略：覆蓋單一欄位；tags / skus / certifications 收到新值時整體替換。
+  /// Merge 策略：覆蓋單一欄位；tags / skus 收到新值時整體替換。
   /// patchVersion 每次 merge 遞增，各 step screen 用它當 useEffect 的 dep。
   ProductListingDraftControllerProvider._()
     : super(
@@ -55,11 +55,11 @@ final class ProductListingDraftControllerProvider
 }
 
 String _$productListingDraftControllerHash() =>
-    r'e2e5de4ec0c9b19173344eba43e6417911c3202c';
+    r'd825e346fe6eb43ce9ad493da03af02115212de1';
 
 /// AI 對話助手累積的商品草稿。
 ///
-/// Merge 策略：覆蓋單一欄位；tags / skus / certifications 收到新值時整體替換。
+/// Merge 策略：覆蓋單一欄位；tags / skus 收到新值時整體替換。
 /// patchVersion 每次 merge 遞增，各 step screen 用它當 useEffect 的 dep。
 
 abstract class _$ProductListingDraftController

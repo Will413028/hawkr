@@ -80,7 +80,6 @@ class _ProductAddToCartSheetState
   bool _addLoading = false;
   bool _buyLoading = false;
   bool _selfOwned = false;
-  List<String> _temperatureCodes = const [];
   List<String> _shippingMethodCodes = const [];
   double _rating = 0;
   int _reviewCount = 0;
@@ -152,14 +151,6 @@ class _ProductAddToCartSheetState
                 .toSet()
                 .toList(growable: false)
           : const <String>[];
-      final deliveryTemperatures = info['deliveryTemp'];
-      final temperatureCodes = deliveryTemperatures is List
-          ? deliveryTemperatures
-                .map((temperature) => temperature.toString())
-                .where((code) => code.isNotEmpty)
-                .toSet()
-                .toList(growable: false)
-          : const <String>[];
       final specs = normalizeProductPurchaseSpecs(info['skus']);
       final initialSpec =
           firstAvailablePurchaseSpec(specs) ??
@@ -169,7 +160,6 @@ class _ProductAddToCartSheetState
 
       setState(() {
         _shippingMethodCodes = shippingCodes;
-        _temperatureCodes = temperatureCodes;
         _specs = specs;
         _selectedSpecId = initialSpec?['id']?.toString();
         _quantity = 1;
@@ -274,7 +264,6 @@ class _ProductAddToCartSheetState
                     imageUrl: widget.imageUrl,
                     rating: _rating,
                     reviewCount: _reviewCount,
-                    temperatureCodes: _temperatureCodes,
                     shippingMethodCodes: _shippingMethodCodes,
                     loading: _loading,
                   ),

@@ -33,7 +33,6 @@ abstract class OrderSummary with _$OrderSummary {
     @Default('') String atmExpireDate,
     @Default('') String totalActualAmount,
     @Default('') String shippingMethod,
-    @Default('') String deliveryTemp,
     @Default('') String pickupStoreName,
     @Default('') String shippingStatus,
     @Default('') String statusTime,

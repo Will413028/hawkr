@@ -243,11 +243,6 @@
 	--ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
 	--ease-linear-out: cubic-bezier(0.5, 0, 0.5, 1);
 
-	/* === Temperature Label Tokens === */
-	--temp-frozen: var(--color-status-info);
-	--temp-chilled: var(--color-primary);
-	--temp-ambient: var(--color-brand-ink);
-
 	/* === Legacy support === */
 	--intro-shift-x: 22px;
 }

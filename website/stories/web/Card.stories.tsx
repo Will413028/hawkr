@@ -21,7 +21,7 @@ const meta = {
 			<CardBody>每日餐桌上的安心選擇。</CardBody>
 			<CardFooter>
 				<Chip variant="flat" color="primary">
-					常溫配送
+					宅配
 				</Chip>
 			</CardFooter>
 		</Card>

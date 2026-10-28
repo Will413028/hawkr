@@ -9,7 +9,6 @@ import {
 	PRODUCT_STATUS_LABEL,
 	SHIPPING_FEE_PAYER_LABEL,
 	SHIPPING_METHOD_LABEL,
-	SHIPPING_TEMPERATURE_LABEL,
 	WEIGHT_UNIT_LABEL,
 } from "@/lib/codemeta";
 import { formatCategoryBreadcrumb } from "@/lib/product-description";
@@ -218,7 +217,6 @@ export default function ProductDetailPage() {
 								<thead>
 									<tr>
 										<th>類型</th>
-										<th>溫層</th>
 										<th>免運門檻</th>
 										<th>運費負擔方</th>
 									</tr>
@@ -228,12 +226,6 @@ export default function ProductDetailPage() {
 										// biome-ignore lint/suspicious/noArrayIndexKey: shipping methods are positional, no stable id from backend
 										<tr key={`${method.type}-${i}`}>
 											<td>{codeLabel(SHIPPING_METHOD_LABEL, method.type)}</td>
-											<td>
-												{codeLabel(
-													SHIPPING_TEMPERATURE_LABEL,
-													method.temperature,
-												)}
-											</td>
 											<td>NT$ {method.freeThreshold}</td>
 											<td>
 												{codeLabel(SHIPPING_FEE_PAYER_LABEL, method.feePayer)}

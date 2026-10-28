@@ -26,7 +26,6 @@ import 'merchant_group.dart';
 /// [group] 商家分組數據。
 /// [checkedSkuIds] 當前勾選的 SKU ID 集合。
 /// [skuStock] SKU 庫存 map。
-/// [itemDeliveryTemps] 各 SKU 的溫層資料。
 /// [onGroupCheckChanged] 整組勾選/取消勾選。
 /// [onItemCheckChanged] 單品勾選/取消勾選。
 /// [onQuantityChanged] 數量變更（item, newQty）。
@@ -39,7 +38,6 @@ class MerchantGroupCard extends StatelessWidget {
     required this.group,
     required this.checkedSkuIds,
     required this.skuStock,
-    required this.itemDeliveryTemps,
     required this.onGroupCheckChanged,
     required this.onItemCheckChanged,
     required this.onQuantityChanged,
@@ -54,7 +52,6 @@ class MerchantGroupCard extends StatelessWidget {
   final MerchantGroup group;
   final Set<int> checkedSkuIds;
   final Map<int, int> skuStock;
-  final Map<int, List<String>> itemDeliveryTemps;
   final void Function(MerchantGroup group, bool checked) onGroupCheckChanged;
   final void Function(int skuId, bool checked) onItemCheckChanged;
   final void Function(CartItem item, int newQuantity) onQuantityChanged;
@@ -121,7 +118,6 @@ class MerchantGroupCard extends StatelessWidget {
                     isChecked: checkedSkuIds.contains(item.skuId),
                     remainingStock: skuStock[item.skuId],
                     imageProvider: resolveImageProvider(item.image),
-                    itemDeliveryTemps: itemDeliveryTemps,
                     onCheckChanged: (value) =>
                         onItemCheckChanged(item.skuId, value),
                     onQuantityChanged: (quantity) =>

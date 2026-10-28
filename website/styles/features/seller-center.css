@@ -4690,9 +4690,6 @@ body .page-content:has(.seller-shell) {
 	color: var(--color-status-danger);
 }
 
-/* 配送溫層徽章改用共用元件 <TemperatureTag>（features/cart/components）— 與
- * PDP / 購物車同一套設計，這裡不再自訂 .seller-orders__temp。 */
-
 .seller-orders__pay {
 	display: inline-block;
 	padding: 4px 10px;
@@ -6430,17 +6427,12 @@ button.seller-inventory__stat:focus-visible {
 
 .shipping-card__foot {
 	display: flex;
-	justify-content: space-between;
+	justify-content: flex-end;
 	align-items: center;
 	gap: var(--hkui-space-3);
 	flex-wrap: wrap;
 	padding-top: var(--hkui-space-3);
 	border-top: 1px solid var(--hkui-divider);
-}
-
-.shipping-card__layers {
-	font-size: var(--text-xs);
-	color: var(--hkui-foreground-soft);
 }
 
 .shipping-pill {
@@ -6533,12 +6525,6 @@ button.seller-inventory__stat:focus-visible {
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
-}
-
-.shipping-cvs__row-temp {
-	display: inline-flex;
-	align-items: center;
-	min-height: 22px;
 }
 
 .shipping-cvs__row-label strong {
@@ -15139,7 +15125,7 @@ html[data-theme="dark"] body .seller-shell .seller-sidebar {
 
 	.seller-orders__mobile-card-toggle {
 		display: grid;
-		grid-template-columns: 32px minmax(0, 1fr) auto auto 44px;
+		grid-template-columns: 32px minmax(0, 1fr) auto 44px;
 		width: 100%;
 		min-width: 0;
 		min-height: 56px;
@@ -15171,36 +15157,6 @@ html[data-theme="dark"] body .seller-shell .seller-sidebar {
 		border-radius: 9px;
 		background: var(--theme-surface-elevated);
 		color: var(--hkui-foreground-muted);
-	}
-
-	.seller-orders__mobile-card-temperature {
-		display: inline-flex;
-		min-width: 0;
-		align-items: center;
-	}
-
-	[data-theme="dark"]
-		.seller-orders__mobile-card-temperature
-		[data-temperature="常溫"] {
-		border-color: rgba(232, 226, 211, 0.46);
-		background: rgba(232, 226, 211, 0.08);
-		color: #e8e2d3;
-	}
-
-	[data-theme="dark"]
-		.seller-orders__mobile-card-temperature
-		[data-temperature="冷藏"] {
-		border-color: rgba(245, 178, 122, 0.52);
-		background: rgba(245, 178, 122, 0.09);
-		color: #f5b27a;
-	}
-
-	[data-theme="dark"]
-		.seller-orders__mobile-card-temperature
-		[data-temperature="冷凍"] {
-		border-color: rgba(143, 197, 255, 0.52);
-		background: rgba(143, 197, 255, 0.09);
-		color: #8fc5ff;
 	}
 
 	.seller-orders__mobile-card-chevron {

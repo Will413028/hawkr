@@ -154,3 +154,41 @@ test("previewCheckout keeps legacy string quantities for backend preview validat
 	]);
 	assert.equal(typeof body.items[0].quantity, "string");
 });
+
+test("checkout requests echo the selected shipping option deliveryTemp unchanged", async () => {
+	const { calculateShippingFee, confirmCheckout, previewCheckout } =
+		await import("../lib/checkout/repo");
+	const items = [
+		{ skuId: "101", productId: "843856384063471760", quantity: 1 },
+	];
+
+	for (const deliveryTemp of ["3202", "3203"]) {
+		calls = [];
+		await previewCheckout({
+			items,
+			shippingMethod: "3001",
+			deliveryTemp,
+			receiverZipCode: "330",
+		});
+		await confirmCheckout({
+			checkoutId: "checkout-123",
+			items,
+			shippingMethod: "3001",
+			deliveryTemp,
+		});
+		await calculateShippingFee({
+			items,
+			shippingMethod: "3001",
+			deliveryTemp,
+			receiverZipCode: "330",
+		});
+
+		assert.equal(calls.length, 3);
+		for (const call of calls) {
+			assert.equal(
+				JSON.parse(String(call.init.body)).deliveryTemp,
+				deliveryTemp,
+			);
+		}
+	}
+});

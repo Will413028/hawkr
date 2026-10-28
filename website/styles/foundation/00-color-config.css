@@ -483,16 +483,6 @@
 	--page-restock-ring-on-dark: rgb(245 222 165 / 0.16);
 	--page-restock-on-bg-on-dark: var(--color-ink-500);
 
-	/* 認證勾選列 (ProductCertificationRow). */
-	--page-cert-tint: rgb(var(--color-ink-600-rgb) / 0.08);
-	--page-cert-ring: rgb(var(--color-ink-600-rgb) / 0.12);
-	--page-cert-accent-on-dark: var(--color-ink-200);
-	--page-cert-tint-on-dark: rgb(var(--color-ink-300-rgb) / 0.22);
-	--page-cert-tint-fade-on-dark: rgb(255 255 255 / 0.05);
-	--page-cert-border-on-dark: rgb(245 222 165 / 0.18);
-	--page-cert-title-on-dark: var(--color-ink-100);
-	--page-cert-error-on-dark: #e6a3a3;
-
 	/* Truck loading overlay. The scrim/message pill are painted the same in both
 	   themes (they sit above the page, not in it), so no dark override. */
 	--page-truck-scrim: rgb(var(--color-ink-950-rgb) / 0.42);

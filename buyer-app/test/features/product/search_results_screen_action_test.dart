@@ -285,7 +285,6 @@ Dio _searchDio({List<RequestOptions>? requests}) {
                   'shippingMethods': [
                     {'type': 'HOME_DELIVERY'},
                   ],
-                  'deliveryTemp': ['REFRIGERATED'],
                 },
               },
             ),

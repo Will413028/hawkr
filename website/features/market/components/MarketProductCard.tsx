@@ -161,24 +161,6 @@ function MarketProductCard({
 						className="object-cover"
 					/>
 				</div>
-				{product.certifications && product.certifications.length > 0 ? (
-					<ul
-						className="market-product-card__certs absolute left-[22px] top-[22px] flex flex-wrap gap-1 min-h-0 m-0 p-0 list-none bg-transparent pointer-events-none max-[840px]:left-2 max-[840px]:top-2 max-[840px]:gap-[3px]"
-						aria-label="認證"
-					>
-						{product.certifications.map((cert, index) => (
-							<li
-								// cert.code is empty for certifications with no backend code
-								// (e.g. 友善農法), so two codeless certs would collide on
-								// key="". Fall back to the label, then the index.
-								key={cert.code || cert.label || `cert-${index}`}
-								className="market-product-card__cert inline-flex items-center h-[22px] px-[9px] rounded-[11px] border-[0.5px] border-hk-primary-strong/30 bg-hk-primary-strong text-white text-[0.6875rem] font-bold tracking-[0.01em] whitespace-nowrap backdrop-blur-[2px] shadow-[0_1px_4px_rgba(0,0,0,0.22)] max-[840px]:h-[18px] max-[840px]:px-[6px] max-[840px]:text-[0.625rem] max-[840px]:rounded-[9px]"
-							>
-								{cert.label}
-							</li>
-						))}
-					</ul>
-				) : null}
 				{product.hashtags.length > 0 ? (
 					<ul
 						className="market-product-card__tags absolute left-[22px] right-[22px] bottom-[22px] flex flex-wrap gap-1 min-h-0 m-0 p-0 list-none rounded-none bg-transparent pointer-events-none max-[840px]:left-2 max-[840px]:right-2 max-[840px]:bottom-2 max-[840px]:gap-[3px]"

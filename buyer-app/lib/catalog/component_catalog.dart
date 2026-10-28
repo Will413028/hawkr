@@ -25,8 +25,6 @@ import '../shared/icons/app_icons.dart';
 import '../shared/widgets/hk_empty_state.dart';
 import '../shared/widgets/hk_button_label.dart';
 import '../shared/widgets/hk_choice_chip.dart';
-import '../shared/widgets/hk_temperature_tag.dart';
-import '../features/cart/presentation/widgets/temperature_tags.dart';
 import '../shared/widgets/hk_frosted_card_surface.dart';
 import '../shared/widgets/hk_frosted_icon_button.dart';
 import '../shared/widgets/hk_post_card_surface.dart';
@@ -55,8 +53,7 @@ const _searchTerms = <String, String>{
   'buttons':
       'HkButtonLabel HkRoundActionButton HkFrostedIconButton FilledButton OutlinedButton TextButton CTA 霧面 送出 儲存 更多',
   'inputs': 'TextFormField TextField 表單 驗證 停用',
-  'chips':
-      'HkChoiceChip HkSecondaryCtaTabs HkTemperatureTag TemperatureChoiceChip 篩選 頁籤 單選 溫層',
+  'chips': 'HkChoiceChip HkSecondaryCtaTabs 篩選 頁籤 單選',
   'cards': 'HkFrostedCardSurface HkPostCardSurface Card 玻璃 貼文',
   'states':
       'HkBrandLoader HkSkeletonShimmer HkEmptyState LinearProgressIndicator 載入 骨架屏 空狀態 錯誤',
@@ -532,37 +529,6 @@ class _CatalogExamplesState extends State<_CatalogExamples> {
 
   Widget _chips() => _stack([
     _example(
-      '配送溫層標籤',
-      'shared/widgets/hk_temperature_tag.dart · HkTemperatureTag',
-      const Wrap(
-        spacing: 4,
-        runSpacing: 4,
-        children: [
-          HkTemperatureTag(value: '3201'),
-          HkTemperatureTag(value: '3202'),
-          HkTemperatureTag(value: '3203'),
-          HkTemperatureTag(value: '未提供的溫層'),
-        ],
-      ),
-    ),
-    _example(
-      '配送溫層選擇',
-      'features/cart/presentation/widgets/temperature_tags.dart · TemperatureChoiceChip',
-      Wrap(
-        spacing: 4,
-        runSpacing: 4,
-        children: [
-          for (final label in ['常溫', '冷藏', '冷凍'])
-            TemperatureChoiceChip(
-              code: label,
-              label: label,
-              selected: _choice == label,
-              onTap: () => setState(() => _choice = label),
-            ),
-        ],
-      ),
-    ),
-    _example(
       '單選篩選',
       'shared/widgets/hk_choice_chip.dart · HkChoiceChip',
       _stack([
@@ -926,10 +892,6 @@ class _CatalogExamplesState extends State<_CatalogExamples> {
           group: group,
           checkedSkuIds: _cartSelectedSkuIds,
           skuStock: const {101: 5, 202: 5, 203: 0},
-          itemDeliveryTemps: const {
-            101: ['3201'],
-            202: ['3203'],
-          },
           onGroupCheckChanged: selectGroup,
           onItemCheckChanged: (skuId, selected) =>
               selectItem(group, skuId, selected),

@@ -362,9 +362,6 @@ export function createDelegatedProductRepo(
 						...(body.images === undefined ? {} : { images: body.images }),
 						skus: (body.skus ?? []).map(toDelegatedSkuInput),
 						...(body.origin === undefined ? {} : { origin: body.origin }),
-						...(body.certifications === undefined
-							? {}
-							: { certifications: body.certifications }),
 						...(body.hashtags === undefined ? {} : { hashtags: body.hashtags }),
 					},
 				),

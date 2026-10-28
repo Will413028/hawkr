@@ -54,7 +54,6 @@ final Map<String, SellerCapability?> routeCapabilities = {
   ProductRoutes.picker: _productManage,
   ProductRoutes.info: _productManage,
   ProductRoutes.images: _productManage,
-  ProductRoutes.tags: _productManage,
   ProductRoutes.specs: _productManage,
   ProductRoutes.mediaPicker: _productManage,
   ProductRoutes.preview: _productManage,

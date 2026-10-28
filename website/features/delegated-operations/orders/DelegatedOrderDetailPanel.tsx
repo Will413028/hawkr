@@ -9,7 +9,6 @@ import { buildImageUrl } from "@/lib/media/cdn";
 import { useDelegatedSession } from "../state/DelegatedSessionContext";
 import { delegatedAnomalyUrl } from "../state/session";
 import {
-	deliveryTempText,
 	formatCancelNote,
 	formatOrderAmount,
 	formatOrderDateTime,
@@ -131,12 +130,7 @@ export default function DelegatedOrderDetailPanel({
 							: maskedAddress}
 					</span>
 					{shippingMethodText(order.shippingMethod) ? (
-						<span>
-							{shippingMethodText(order.shippingMethod)}
-							{deliveryTempText(order.deliveryTemp)
-								? `（${deliveryTempText(order.deliveryTemp)}）`
-								: ""}
-						</span>
+						<span>{shippingMethodText(order.shippingMethod)}</span>
 					) : null}
 					{order.shippingStatusLabel ? (
 						<span>物流狀態：{order.shippingStatusLabel}</span>

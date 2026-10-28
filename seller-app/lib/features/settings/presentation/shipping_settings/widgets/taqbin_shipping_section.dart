@@ -26,9 +26,7 @@ class TaqbinShippingSection extends HookConsumerWidget {
     required this.expanded,
     this.onToggleExpanded,
     this.enabled = false,
-    required this.frozen,
-    required this.chilled,
-    required this.ambient,
+    required this.selected,
     required this.nameCtrl,
     required this.phoneCtrl,
     required this.city,
@@ -46,9 +44,7 @@ class TaqbinShippingSection extends HookConsumerWidget {
   final ValueNotifier<bool> expanded;
   final VoidCallback? onToggleExpanded;
   final bool enabled;
-  final ValueNotifier<bool> frozen;
-  final ValueNotifier<bool> chilled;
-  final ValueNotifier<bool> ambient;
+  final ValueNotifier<bool> selected;
   final TextEditingController nameCtrl;
   final TextEditingController phoneCtrl;
   final ValueNotifier<String?> city;
@@ -65,7 +61,6 @@ class TaqbinShippingSection extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     useListenable(addressCtrl);
-    final hasTaqbin = frozen.value || chilled.value || ambient.value;
     final canVerify =
         !enabled &&
         !addressVerified.value &&
@@ -95,14 +90,9 @@ class TaqbinShippingSection extends HookConsumerWidget {
                   child: Row(
                     children: [
                       CustomCheckbox(
-                        checked: hasTaqbin,
+                        checked: selected.value,
                         enabled: !enabled,
-                        onTap: () {
-                          final next = !hasTaqbin;
-                          frozen.value = next;
-                          chilled.value = next;
-                          ambient.value = next;
-                        },
+                        onTap: () => selected.value = !selected.value,
                         semanticLabel: '黑貓宅急便',
                       ),
                       const SizedBox(width: HkSpace.sm),
@@ -154,42 +144,6 @@ class TaqbinShippingSection extends HookConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const _FieldLabel('配送溫層'),
-                          const SizedBox(height: HkSpace.sm),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TemperaturePill(
-                                  label: '冷凍',
-                                  code: 'FROZEN',
-                                  active: frozen.value,
-                                  enabled: !enabled,
-                                  onTap: () => frozen.value = !frozen.value,
-                                ),
-                              ),
-                              const SizedBox(width: HkSpace.sm),
-                              Expanded(
-                                child: TemperaturePill(
-                                  label: '冷藏',
-                                  code: 'CHILLED',
-                                  active: chilled.value,
-                                  enabled: !enabled,
-                                  onTap: () => chilled.value = !chilled.value,
-                                ),
-                              ),
-                              const SizedBox(width: HkSpace.sm),
-                              Expanded(
-                                child: TemperaturePill(
-                                  label: '常溫',
-                                  code: 'AMBIENT',
-                                  active: ambient.value,
-                                  enabled: !enabled,
-                                  onTap: () => ambient.value = !ambient.value,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: HkSpace.xl),
                           Row(
                             children: [
                               const HkIcon(

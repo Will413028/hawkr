@@ -13,7 +13,7 @@ const _deadEndpointFragments = <String, String>{
   // 正解：GET /public/products/{id} 的 imageKeys / imageUrls
   '/products/\$skuId/images': '/public/sellers/{id}/products/{sku}/images',
   '/products/\$productId/images': '/public/sellers/{id}/products/{sku}/images',
-  // 正解：GET /public/products/{id} 的 shippingMethods / deliveryTemp
+  // 正解：GET /public/products/{id} 的 shippingMethods
   '/products/\$skuId/delivery': '/public/sellers/{id}/products/{sku}/delivery',
   // 正解：GET /public/posts/{id} 的 comment_count
   '/comments/count': '/public/posts/{id}/comments/count',

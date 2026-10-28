@@ -17,10 +17,6 @@ const shipmentDialogsSource = readFileSync(
 	new URL("../../seller/components/ShipmentDialogs.tsx", import.meta.url),
 	"utf8",
 );
-const temperatureTagSource = readFileSync(
-	new URL("../../cart/components/TemperatureTag.tsx", import.meta.url),
-	"utf8",
-);
 const sellerCss = readFileSync(
 	new URL("../../../styles/features/seller-center.css", import.meta.url),
 	"utf8",
@@ -73,7 +69,6 @@ describe("seller order mobile work list", () => {
 		expect(mobileCard).toContain("nextShipmentAction(");
 		expect(mobileCard).toContain("ACTION_LABEL[action.kind]");
 		expect(mobileCard).toContain("formatDeadline(order.autoCancelAt)");
-		expect(mobileCard).toContain("deliveryTempLabel(");
 		expect(mobileCard).toContain("<OrderStatusSummary");
 	});
 
@@ -147,14 +142,14 @@ describe("seller order mobile work list", () => {
 		expect(mobileCard).toContain("hidden={!expanded || selectionMode}");
 		expect(mobileCard).toContain("if (!selectionMode) onToggleExpanded()");
 		expect(sellerCss).toMatch(
-			/\.seller-orders__mobile-card-toggle\s*\{[\s\S]*?grid-template-columns:\s*32px minmax\(0, 1fr\) auto auto 44px;[\s\S]*?min-height:\s*56px/,
+			/\.seller-orders__mobile-card-toggle\s*\{[\s\S]*?grid-template-columns:\s*32px minmax\(0, 1fr\) auto 44px;[\s\S]*?min-height:\s*56px/,
 		);
 		expect(sellerCss).toMatch(
 			/\.seller-orders__mobile-card-details\[hidden\]\s*\{[\s\S]*?display:\s*none/,
 		);
 	});
 
-	it("reuses authoritative carrier artwork and the temperature tag", () => {
+	it("reuses authoritative carrier artwork", () => {
 		const mobileCard = sourceRegion(
 			ordersSource,
 			"function MobileOrderCard",
@@ -164,7 +159,6 @@ describe("seller order mobile work list", () => {
 		expect(mobileCard).toContain("ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP");
 		expect(mobileCard).toContain("<ShippingBrandLogo brand={brand} compact />");
 		expect(mobileCard).toContain('<AppIcon name="truck"');
-		expect(mobileCard).toContain("<TemperatureTag");
 		expect(mobileCard).toContain("const hasMobileFacts = Boolean(");
 		expect(mobileCard).toContain("{hasMobileFacts && (");
 		expect(mobileCard).not.toContain(
@@ -172,8 +166,6 @@ describe("seller order mobile work list", () => {
 		);
 		expect(shipmentDialogsSource).toContain('tcat: { text: "黑貓"');
 		expect(shipmentDialogsSource).toContain('711: { text: "7-11"');
-		expect(temperatureTagSource).toContain("data-temperature={label}");
-		expect(temperatureTagSource).toContain("whitespace-nowrap");
 	});
 
 	it("uses named media presets without invoking the width-based Next image loader", () => {

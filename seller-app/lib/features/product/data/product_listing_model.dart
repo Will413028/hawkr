@@ -14,7 +14,6 @@ abstract class PendingAiDraft with _$PendingAiDraft {
     String? description,
     @Default([]) List<String> tags,
     @Default([]) List<SpecDraftPending> skus,
-    @Default([]) List<CertificationPending> certifications,
     @Default({}) Set<String> filledFields,
     @Default(0) int patchVersion,
   }) = _PendingAiDraft;
@@ -37,17 +36,6 @@ abstract class SpecDraftPending with _$SpecDraftPending {
 
   factory SpecDraftPending.fromJson(Map<String, dynamic> json) =>
       _$SpecDraftPendingFromJson(json);
-}
-
-@freezed
-abstract class CertificationPending with _$CertificationPending {
-  const factory CertificationPending({
-    required String name,
-    required String certNo,
-  }) = _CertificationPending;
-
-  factory CertificationPending.fromJson(Map<String, dynamic> json) =>
-      _$CertificationPendingFromJson(json);
 }
 
 /// SSE 單一事件（text / draft_patch / tool_result / done / error）

@@ -4,12 +4,12 @@
  * Per-SKU 可配送方案 picker — the web port of the seller app's product-spec
  * shipping section (product_setup_spec_screen.dart). The seller enters the
  * package 長/寬/高 + 重量; we debounce-call `POST /app/shipping_quotes`, which
- * returns the carrier × 溫層 combinations that actually fit the package (黑貓 /
- * 7-11, per-carrier size & weight limits) with their fees.
+ * returns the carriers that actually fit the package (黑貓 / 7-11, per-carrier
+ * size & weight limits) with their fees.
  *
- * We always render the FULL carrier × 溫層 matrix so the seller sees every
- * possible option up-front; only the combinations the quote says fit are
- * enabled (with fee + ETA), the rest stay greyed until the dimensions change.
+ * We always render every carrier so the seller sees every possible option
+ * up-front; only the ones the quote says fit are enabled (with fee + ETA), the
+ * rest stay greyed until the dimensions change.
  * Each selected option carries one coherent shipping rule: the buyer pays, or
  * the seller provides free shipping (optionally above a spending threshold).
  * That rule is persisted onto `sku.shipping_methods`.
@@ -18,14 +18,12 @@
 import * as React from "react";
 import { Dropdown } from "@/components/ui";
 import { Input } from "@/components/ui/Input";
-import { TemperatureTag } from "@/features/cart/components/TemperatureTag";
 import {
 	coerceWeightUnitCode,
 	SHIPPING_METHOD_LABEL,
 	ShippingFeePayer,
 	ShippingMethod,
 	type ShippingMethodValue,
-	ShippingTemperature,
 	WEIGHT_UNIT_LABEL,
 	type WeightUnitValue,
 } from "@/lib/codemeta/enums";
@@ -36,6 +34,7 @@ import {
 	type ShippingQuoteOption,
 	type SkuShippingMethod,
 } from "@/lib/products/seller-repo";
+import { AMBIENT_TEMPERATURE_CODE } from "@/lib/seller/ambient-temperature";
 import {
 	type ShippingMethodOpenState,
 	shippingMethodOpenState,
@@ -48,27 +47,13 @@ interface Props {
 }
 
 /** Carriers offered in the product form (mirrors the seller app: 黑貓 + 7-11). */
-const CARRIERS: ShippingMethodValue[] = [
+const CARRIERS: string[] = [
 	ShippingMethod.TAQBIN,
 	ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP,
 ];
-const TEMPS: string[] = [
-	ShippingTemperature.AMBIENT,
-	ShippingTemperature.CHILLED,
-	ShippingTemperature.FROZEN,
-];
-/** Full carrier × 溫層 grid, always rendered so every option is visible. */
-const FULL_MATRIX: Array<{ type: string; temperature: string }> =
-	CARRIERS.flatMap((type) =>
-		TEMPS.map((temperature) => ({ type, temperature })),
-	);
-
 const WEIGHT_UNIT_ITEMS: ReadonlyArray<{ value: string; label: string }> = (
 	Object.keys(WEIGHT_UNIT_LABEL) as WeightUnitValue[]
 ).map((code) => ({ value: code, label: WEIGHT_UNIT_LABEL[code] }));
-
-const optionKey = (type: string, temperature: string) =>
-	`${type}|${temperature}`;
 
 function methodLabel(m: string, fallback?: string): string {
 	return (
@@ -99,7 +84,7 @@ export default function SkuShippingEditor({ sku, index, onUpdate }: Props) {
 	const unitLabel = WEIGHT_UNIT_LABEL[unitCode];
 
 	// Seller's 物流設定 onboarding rows — so an unavailable combination reads
-	// 「尚未開通」when the carrier × 溫層 isn't opened, instead of always blaming
+	// 「尚未開通」when the carrier isn't opened, instead of always blaming
 	// size / weight. Until the fetch resolves we treat everything as opened so a
 	// pending load can't flash a wrong「未開通」on every row.
 	const { rows: onboardingRows, loaded: onboardingLoaded } =
@@ -157,21 +142,14 @@ export default function SkuShippingEditor({ sku, index, onUpdate }: Props) {
 	const setShipping = (next: SkuShippingMethod[]) =>
 		onUpdate(index, { shipping_methods: next.length ? next : undefined });
 
-	const toggle = (type: string, temperature: string) => {
-		const key = optionKey(type, temperature);
-		const exists = selected.some(
-			(m) => optionKey(m.type, m.temperature) === key,
-		);
-		if (exists) {
-			setShipping(
-				selected.filter((m) => optionKey(m.type, m.temperature) !== key),
-			);
+	const toggle = (type: string) => {
+		if (selected.some((m) => m.type === type)) {
+			setShipping(selected.filter((m) => m.type !== type));
 		} else {
 			setShipping([
 				...selected,
 				{
 					type,
-					temperature,
 					fee_payer: ShippingFeePayer.BUYER,
 					free_threshold: "0",
 				},
@@ -179,26 +157,17 @@ export default function SkuShippingEditor({ sku, index, onUpdate }: Props) {
 		}
 	};
 
-	const patchEntry = (key: string, patch: Partial<SkuShippingMethod>) =>
+	const patchEntry = (type: string, patch: Partial<SkuShippingMethod>) =>
 		setShipping(
-			selected.map((m) =>
-				optionKey(m.type, m.temperature) === key ? { ...m, ...patch } : m,
-			),
+			selected.map((m) => (m.type === type ? { ...m, ...patch } : m)),
 		);
 
-	// Full matrix + any already-selected combo that's outside it (e.g. an
-	// option created on mobile with a carrier we don't list), so nothing the
+	// Every listed carrier + any already-selected carrier outside the list (e.g.
+	// an option created on mobile with a carrier we don't list), so nothing the
 	// seller saved silently disappears.
 	const cards = [
-		...FULL_MATRIX,
-		...selected
-			.filter(
-				(m) =>
-					!FULL_MATRIX.some(
-						(c) => c.type === m.type && c.temperature === m.temperature,
-					),
-			)
-			.map((m) => ({ type: m.type, temperature: m.temperature })),
+		...CARRIERS,
+		...selected.map((m) => m.type).filter((t) => !CARRIERS.includes(t)),
 	];
 
 	const selectedCount = selected.length;
@@ -283,30 +252,28 @@ export default function SkuShippingEditor({ sku, index, onUpdate }: Props) {
 				)}
 
 				<ul className="list-none m-0 p-0 flex flex-col gap-2">
-					{cards.map(({ type, temperature }) => {
-						const key = optionKey(type, temperature);
+					{cards.map((type) => {
 						const option = quotes.find(
-							(o) => optionKey(o.shippingMethod, o.temperature) === key,
+							(o) =>
+								o.shippingMethod === type &&
+								o.temperature === AMBIENT_TEMPERATURE_CODE,
 						);
-						const method = selected.find(
-							(m) => optionKey(m.type, m.temperature) === key,
-						);
+						const method = selected.find((m) => m.type === type);
 						const openState: ShippingMethodOpenState = onboardingLoaded
-							? shippingMethodOpenState(onboardingRows, type, temperature)
+							? shippingMethodOpenState(onboardingRows, type)
 							: "open";
 						return (
 							<ShippingOptionCard
-								key={key}
+								key={type}
 								type={type}
-								temperature={temperature}
 								option={option}
 								method={method}
 								available={!!option}
 								openState={openState}
 								status={state}
-								onToggle={() => toggle(type, temperature)}
+								onToggle={() => toggle(type)}
 								onFundingChange={(sellerPays) =>
-									patchEntry(key, {
+									patchEntry(type, {
 										fee_payer: sellerPays
 											? ShippingFeePayer.SELLER
 											: ShippingFeePayer.BUYER,
@@ -321,7 +288,7 @@ export default function SkuShippingEditor({ sku, index, onUpdate }: Props) {
 									})
 								}
 								onThreshold={(v) =>
-									patchEntry(key, {
+									patchEntry(type, {
 										fee_payer: ShippingFeePayer.SELLER,
 										free_threshold: v || "0",
 									})
@@ -381,7 +348,6 @@ function UnitField({
 
 function ShippingOptionCard({
 	type,
-	temperature,
 	option,
 	method,
 	available,
@@ -392,7 +358,6 @@ function ShippingOptionCard({
 	onThreshold,
 }: {
 	type: string;
-	temperature: string;
 	option?: ShippingQuoteOption;
 	method?: SkuShippingMethod;
 	available: boolean;
@@ -403,7 +368,7 @@ function ShippingOptionCard({
 	onThreshold: (v: string) => void;
 }) {
 	const isSelected = !!method;
-	// A carrier × 溫層 the seller hasn't opened in 物流設定 can never ship this
+	// A carrier the seller hasn't opened in 物流設定 can never ship this
 	// product, so block it regardless of the size / weight quote — and say why.
 	const blockedByOnboarding =
 		openState === "not_opened" || openState === "disabled";
@@ -461,7 +426,6 @@ function ShippingOptionCard({
 					<strong className="text-sm font-bold text-foreground">
 						{methodLabel(type, option?.displayName)}
 					</strong>
-					<TemperatureTag value={temperature} />
 					<span className={`text-xs ${subtextTone}`}>{subtext}</span>
 				</span>
 			</label>

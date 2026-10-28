@@ -20,13 +20,6 @@ _PendingAiDraft _$PendingAiDraftFromJson(Map<String, dynamic> json) =>
               ?.map((e) => SpecDraftPending.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
-      certifications:
-          (json['certifications'] as List<dynamic>?)
-              ?.map(
-                (e) => CertificationPending.fromJson(e as Map<String, dynamic>),
-              )
-              .toList() ??
-          const [],
       filledFields:
           (json['filledFields'] as List<dynamic>?)
               ?.map((e) => e as String)
@@ -43,7 +36,6 @@ Map<String, dynamic> _$PendingAiDraftToJson(_PendingAiDraft instance) =>
       'description': instance.description,
       'tags': instance.tags,
       'skus': instance.skus,
-      'certifications': instance.certifications,
       'filledFields': instance.filledFields.toList(),
       'patchVersion': instance.patchVersion,
     };
@@ -67,14 +59,3 @@ Map<String, dynamic> _$SpecDraftPendingToJson(_SpecDraftPending instance) =>
       'weight': instance.weight,
       'stockQty': instance.stockQty,
     };
-
-_CertificationPending _$CertificationPendingFromJson(
-  Map<String, dynamic> json,
-) => _CertificationPending(
-  name: json['name'] as String,
-  certNo: json['certNo'] as String,
-);
-
-Map<String, dynamic> _$CertificationPendingToJson(
-  _CertificationPending instance,
-) => <String, dynamic>{'name': instance.name, 'certNo': instance.certNo};

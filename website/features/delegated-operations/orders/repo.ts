@@ -75,7 +75,6 @@ export interface DelegatedOrderListItem {
 	shippingStatus: string;
 	shippingStatusLabel: string;
 	shippingMethod: string;
-	deliveryTemp: string;
 	buyer: DelegatedOrderBuyer;
 	recipient: DelegatedOrderListRecipient;
 }
@@ -120,7 +119,6 @@ export interface DelegatedOrderDetail {
 	shippingStatusLabel: string;
 	paymentMethod: string;
 	shippingMethod: string;
-	deliveryTemp: string;
 	itemCount: string;
 	/** 商品小計（上游 `total_original_amount`）。運費／折扣／訂單金額少了它湊不起來。 */
 	itemsSubtotal: string;
@@ -229,7 +227,6 @@ function readListItem(value: unknown): DelegatedOrderListItem {
 		shippingStatus: str(raw.shippingStatus),
 		shippingStatusLabel: str(raw.shippingStatusLabel),
 		shippingMethod: str(raw.shippingMethod),
-		deliveryTemp: str(raw.deliveryTemp),
 		buyer: readBuyer(raw.buyer),
 		recipient: readListRecipient(raw.recipient),
 	};
@@ -270,7 +267,6 @@ function readDetail(value: unknown): DelegatedOrderDetail {
 		shippingStatusLabel: str(raw.shippingStatusLabel),
 		paymentMethod: str(raw.paymentMethod),
 		shippingMethod: str(raw.shippingMethod),
-		deliveryTemp: str(raw.deliveryTemp),
 		itemCount: str(raw.itemCount),
 		itemsSubtotal: str(raw.itemsSubtotal),
 		totalAmount: str(raw.totalAmount),

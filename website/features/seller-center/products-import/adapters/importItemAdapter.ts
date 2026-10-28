@@ -13,20 +13,18 @@
  * Backend contract 對齊（v2，2026-06）：
  *  - `ImportItemDetailResponse.brief` 攜帶 name / category / cover / blocking / dup
  *  - `descriptionJson` 是 JSON 字串（內部結構為 ImportDescription）
- *  - `skus[].shippingMethods: [{ method, temperature }]`（取代舊的逐配送方式欄位）
+ *  - `skus[].shippingMethods: [{ method, temperature }]`（取代舊的逐配送方式欄位）；送出一律帶 `AMBIENT_TEMPERATURE_CODE`
  *  - `galleryAssets[].sourceUrl / previewUrl` 取代舊 cdn_url
  */
 
 import { coerceWeightUnitCode, WeightUnit } from "@/lib/codemeta/enums";
-import { PRODUCT_CERT_CATALOG } from "@/lib/products/certifications";
 import type {
-	ProductCertificationCode,
-	ProductCertificationEntry,
 	ProductImageDraft,
 	ProductSku,
 	SellerProductDetail,
 	SkuShippingMethod,
 } from "@/lib/products/seller-repo";
+import { AMBIENT_TEMPERATURE_CODE } from "@/lib/seller/ambient-temperature";
 import {
 	type ImportDescription,
 	type ImportDescriptionBlock,
@@ -40,10 +38,6 @@ import {
 	type UpdateImportItemInput,
 	type UpdateImportSkuInput,
 } from "../types";
-
-/* ===== 常數 ===== */
-
-const VALID_CERT_CODES = new Set(PRODUCT_CERT_CATALOG.map((c) => c.code));
 
 /* ===== 小工具 ===== */
 
@@ -166,9 +160,10 @@ function galleryAssetToDraftImage(asset: ImportItemAsset): ProductImageDraft {
 
 /** Import SKU → form ProductSku。 */
 export function importSkuToDraft(sku: ImportItemSku): ProductSku {
-	const methods: SkuShippingMethod[] = (sku.shippingMethods ?? []).map((m) => ({
-		type: m.method,
-		temperature: m.temperature,
+	const methods: SkuShippingMethod[] = [
+		...new Set((sku.shippingMethods ?? []).map((m) => m.method)),
+	].map((type) => ({
+		type,
 		fee_payer: "3101", // ShippingFeePayer.BUYER（import 無此欄位，預設買家）
 		free_threshold: "0",
 	}));
@@ -197,7 +192,7 @@ export function draftSkuToImportSku(sku: ProductSku): UpdateImportSkuInput {
 	const methods = sku.shipping_methods ?? [];
 	const shippingMethods: ShippingMethodInput[] = methods.map((m) => ({
 		method: m.type,
-		temperature: m.temperature,
+		temperature: AMBIENT_TEMPERATURE_CODE,
 	}));
 
 	const out: UpdateImportSkuInput = {
@@ -215,35 +210,6 @@ export function draftSkuToImportSku(sku: ProductSku): UpdateImportSkuInput {
 	// skuId 只有在編輯既有 SKU 才有意義；新 SKU 為 `""` 不送回後端。
 	if (sku.id) out.skuId = sku.id;
 	return out;
-}
-
-/* ===== Certifications ===== */
-
-/**
- * Import 端 `{ certNo, name }` 形狀（`name` 是 CertificationType value "3701"…）。
- * 轉成 form 的 ProductCertificationEntry。
- */
-function importCertsToDraft(
-	certs: Array<{ certNo: string; name: string }> | undefined,
-): ProductCertificationEntry[] {
-	if (!Array.isArray(certs)) return [];
-	return certs
-		.filter((c): c is { certNo: string; name: ProductCertificationCode } =>
-			VALID_CERT_CODES.has(c.name as ProductCertificationCode),
-		)
-		.map((c) => ({
-			code: c.name,
-			certNo: c.certNo ?? "",
-		}));
-}
-
-/** Form certifications → import wire `{ certNo, name }`，僅送有號碼的條目。 */
-function draftCertsToImport(
-	entries: ProductCertificationEntry[] | undefined,
-): Array<{ certNo: string; name: string }> {
-	return (entries ?? [])
-		.filter((c) => (c.certNo ?? "").trim())
-		.map((c) => ({ certNo: (c.certNo ?? "").trim(), name: c.code }));
 }
 
 /* ===== Main: ImportItemDetail → ProductForm draft ===== */
@@ -275,11 +241,7 @@ export function importItemToDraft(item: ImportItemDetail): SellerProductDetail {
 				: undefined,
 		category_name: brief?.catL3Name,
 		tags: Array.isArray(item.hashtags) ? [...item.hashtags] : [],
-		// delivery_temp 在 import 場景由每個 SKU 的 shipping_methods 推斷，
-		// product 層級不再單獨設定。
-		delivery_temp: [],
 		origin: item.origin ?? "",
-		certifications: importCertsToDraft(item.certifications),
 		preorder_ship_at: null,
 		low_stock_threshold: 5,
 		expiry_days: 7,
@@ -405,7 +367,6 @@ export function draftToImportUpdateInput(
 	const newName = (draft.name ?? "").trim();
 	const newOrigin = draft.origin ?? "";
 	const newHashtags = draft.tags ?? [];
-	const newCerts = draftCertsToImport(draft.certifications);
 	const newDescStr = JSON.stringify(description);
 	const newSkus = (draft.skus ?? []).map(draftSkuToImportSku);
 
@@ -416,7 +377,6 @@ export function draftToImportUpdateInput(
 	const originDirty = newOrigin !== (original.origin ?? "");
 	const targetStatusDirty = targetStatus !== original.targetStatus;
 	const hashtagsDirty = !arrayEquals(newHashtags, original.hashtags ?? []);
-	const certificationsDirty = !certsEqual(newCerts, original.certifications);
 	const descriptionDirty =
 		newDescStr !== normalizeDescJson(original.descriptionJson);
 	const galleryDirty = !galleryEqual(galleryImages, original.galleryAssets);
@@ -429,7 +389,6 @@ export function draftToImportUpdateInput(
 		originSet: originDirty,
 		targetStatusSet: targetStatusDirty,
 		hashtagsSet: hashtagsDirty,
-		certificationsSet: certificationsDirty,
 		descriptionSet: descriptionDirty,
 		galleryImagesSet: galleryDirty,
 		skusSet: skusDirty,
@@ -440,7 +399,6 @@ export function draftToImportUpdateInput(
 	if (originDirty) input.origin = newOrigin;
 	if (targetStatusDirty) input.targetStatus = targetStatus;
 	if (hashtagsDirty) input.hashtags = newHashtags;
-	if (certificationsDirty) input.certifications = newCerts;
 	if (descriptionDirty) input.description = newDescStr;
 	if (galleryDirty) input.galleryImages = galleryImages;
 	if (skusDirty) input.skus = newSkus;
@@ -459,18 +417,6 @@ function arrayEquals(a: readonly string[], b: readonly string[]): boolean {
 	if (a.length !== b.length) return false;
 	for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
 	return true;
-}
-
-function certsEqual(
-	a: Array<{ certNo: string; name: string }>,
-	b: Array<{ certNo: string; name: string }> | undefined,
-): boolean {
-	const norm = (arr: Array<{ certNo: string; name: string }>) =>
-		arr
-			.map((c) => `${c.name}|${c.certNo}`)
-			.sort()
-			.join(",");
-	return norm(a) === norm(b ?? []);
 }
 
 function normalizeDescJson(json: string | undefined): string {
@@ -519,9 +465,7 @@ function skusEqual(
 			l: s.lengthCm ?? "",
 			wi: s.widthCm ?? "",
 			h: s.heightCm ?? "",
-			sm: (s.shippingMethods ?? [])
-				.map((m) => `${m.method}|${m.temperature}`)
-				.sort(),
+			sm: [...new Set((s.shippingMethods ?? []).map((m) => m.method))].sort(),
 		});
 	const canonEx = (s: ImportItemSku) =>
 		JSON.stringify({
@@ -535,16 +479,10 @@ function skusEqual(
 			l: s.lengthCm ?? "",
 			wi: s.widthCm ?? "",
 			h: s.heightCm ?? "",
-			sm: (s.shippingMethods ?? [])
-				.map((m) => `${m.method}|${m.temperature}`)
-				.sort(),
+			sm: [...new Set((s.shippingMethods ?? []).map((m) => m.method))].sort(),
 		});
 	for (let i = 0; i < input.length; i++) {
 		if (canon(input[i]) !== canonEx(ex[i])) return false;
 	}
 	return true;
 }
-
-/* ===== Re-exports（供 hook / 元件用） ===== */
-
-export { VALID_CERT_CODES };

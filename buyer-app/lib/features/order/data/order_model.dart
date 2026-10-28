@@ -128,7 +128,6 @@ abstract class Order with _$Order {
     @Default('') String shipmentNo,
     @Default('') String transactionId,
     @Default('') String buyerId,
-    @Default('') String deliveryTemp,
     @Default('') String shippingMethod,
     @Default('') String shippingFee,
     @Default('') String shippingFeePayer,

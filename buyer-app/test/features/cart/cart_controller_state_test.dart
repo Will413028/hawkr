@@ -375,9 +375,6 @@ CartData _cart({required int quantity}) {
     ],
     items: [item],
     stockBySku: const {101: 20},
-    deliveryTempsBySku: const {
-      101: ['3201'],
-    },
     productIdsBySku: const {101: 'product-101'},
     lockedSkuIds: const {},
     estimatedTotalAmount: 120 * quantity,

@@ -6,11 +6,11 @@ import 'package:uuid/uuid.dart';
 
 import 'package:dio/dio.dart';
 import '../../../core/analytics/analytics_events.dart';
+import '../../../core/networking/ambient_shipping_temperature.dart';
 import '../../../core/networking/dio_provider.dart';
 import '../../../shared/utils/secret_redaction.dart';
 import '../../media/data/media_repository.dart';
 import 'hashtag_extractor.dart';
-import 'product_certification_meta.dart';
 
 /// 商品上傳任務狀態
 enum UploadStatus { pending, uploading, success, failed }
@@ -86,7 +86,6 @@ class ProductUploadData {
   final String? description;
   final List<Map<String, dynamic>>? descriptionBlocks;
   final List<String> descriptionStagedTokens;
-  final Map<int, String> selectedTags;
   final bool isEditMode;
   final Map<String, dynamic>? existingProduct;
   final List<SpecData> specs;
@@ -110,7 +109,6 @@ class ProductUploadData {
     this.description,
     this.descriptionBlocks,
     this.descriptionStagedTokens = const [],
-    required this.selectedTags,
     this.isEditMode = false,
     this.existingProduct,
     required this.specs,
@@ -163,6 +161,17 @@ class SpecData {
     this.heightCm,
     this.shippingMethods = const [],
   });
+
+  static Map<String, String> shippingMethodJson({
+    required String type,
+    required String feePayer,
+    required String freeThreshold,
+  }) => {
+    'type': type,
+    'temperature': kAmbientShippingTemperature,
+    'feePayer': feePayer,
+    'freeThreshold': freeThreshold,
+  };
 
   /// 轉換為後端 SKU API 格式 (camelCase)
   ///
@@ -259,7 +268,6 @@ class ProductUploadService {
     List<Map<String, dynamic>>? descriptionBlocks,
     List<Map<String, dynamic>>? images,
     List<Map<String, dynamic>>? skus,
-    List<Map<String, dynamic>>? certifications,
     String? status,
     List<String>? hashtags,
   }) async {
@@ -286,8 +294,6 @@ class ProductUploadService {
           if (descriptionInput != null) 'description': descriptionInput,
           if (images != null && images.isNotEmpty) 'images': images,
           if (skus != null && skus.isNotEmpty) 'skus': skus,
-          if (certifications != null && certifications.isNotEmpty)
-            'certifications': certifications,
           if (status != null) 'status': status,
           if (hashtags != null) 'hashtags': hashtags,
         },
@@ -310,7 +316,6 @@ class ProductUploadService {
     List<Map<String, dynamic>>? descriptionBlocks,
     List<Map<String, dynamic>>? images,
     List<Map<String, dynamic>>? skus,
-    List<Map<String, dynamic>>? certifications,
     String? status,
     List<String>? hashtags,
     bool updateHashtags = false,
@@ -338,7 +343,6 @@ class ProductUploadService {
           if (descriptionInput != null) 'description': descriptionInput,
           if (images != null) 'images': images,
           if (skus != null) 'skus': skus,
-          if (certifications != null) 'certifications': certifications,
           if (status != null) 'status': status,
           if (hashtags != null) 'hashtags': hashtags,
           // updateHashtags 用 explicit boolean，false 也要傳，避免後端解讀為「不變更」
@@ -531,22 +535,17 @@ class ProductUploadService {
       _notifyListeners();
     }
 
-    // ── Step 2: 建立認證列表 ──
-    final certifications = data.selectedTags.entries
-        .map((e) => certificationInputForSelection(e.key, e.value))
-        .toList();
-
-    // ── Step 3: 建立 SKU 列表 ──
+    // ── Step 2: 建立 SKU 列表 ──
     final skus = data.specs.map((s) => s.toSkuJson()).toList();
 
-    // ── Step 4: 決定分類 ID ──
+    // ── Step 3: 決定分類 ID ──
     // 優先使用 catalogId（L3 分類），否則嘗試 l2Id、l1Id
     final categoryId = data.catalogId ?? data.l2Id ?? data.l1Id ?? 0;
     if (categoryId == 0) {
       throw Exception('缺少商品分類 ID');
     }
 
-    // ── Step 5: 組裝並呼叫新 API ──
+    // ── Step 4: 組裝並呼叫新 API ──
     final idempotencyKey = _uuid.v4();
     debugPrint(
       '[Upload] Creating product via new API (idempotency=$idempotencyKey)',
@@ -570,7 +569,6 @@ class ProductUploadService {
       descriptionBlocks: data.descriptionBlocks,
       images: imageInputs,
       skus: skus,
-      certifications: certifications,
       status: '4002', // PENDING_REVIEW — 提交審核
       hashtags: hashtags,
     );
@@ -664,9 +662,6 @@ class ProductUploadService {
       categoryId = data.catalogId ?? data.l2Id ?? data.l1Id;
     }
     final skus = data.specs.map((s) => s.toSkuJson()).toList();
-    final certifications = data.selectedTags.entries
-        .map((e) => certificationInputForSelection(e.key, e.value))
-        .toList();
 
     final idempotencyKey = _uuid.v4();
 
@@ -691,7 +686,6 @@ class ProductUploadService {
       descriptionBlocks: data.descriptionBlocks,
       images: imageInputs.isNotEmpty ? imageInputs : null,
       skus: skus,
-      certifications: certifications.isNotEmpty ? certifications : null,
       hashtags: hashtags,
       updateHashtags: true,
     );

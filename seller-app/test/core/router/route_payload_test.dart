@@ -49,7 +49,6 @@ void main() {
           {'type': 'paragraph'},
           <Object, Object>{3: 'ignored', 'text': '內容'},
         ],
-        'tags': {1: '有機', 'wrong': 2},
       });
 
       expect(payload, isNot(contains(7)));
@@ -59,7 +58,6 @@ void main() {
         {'type': 'paragraph'},
         {'text': '內容'},
       ]);
-      expect(routeIntStringMap(payload, 'tags'), isNull);
       expect(orderSummaryFromRoutePayload({1: 'only malformed key'}), isNull);
     });
   });

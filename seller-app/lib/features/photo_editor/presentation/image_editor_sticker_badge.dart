@@ -6,12 +6,6 @@ enum StickerBadgeShape { circle, label }
 
 /// 貼圖標籤：以色塊、圖示與文字畫出，匯出圖片時隨圖層一起合成。
 enum StickerBadge {
-  organic(
-    label: '有機',
-    icon: AppIcons.ecoOutlined,
-    background: AppColors.success,
-    shape: StickerBadgeShape.circle,
-  ),
   naturalDrop(
     label: '天然',
     icon: AppIcons.waterDropOutlined,

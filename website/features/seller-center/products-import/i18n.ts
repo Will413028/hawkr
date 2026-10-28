@@ -10,8 +10,6 @@ import {
 	IMPORT_JOB_STATUS,
 	type ImportItemStatusCode,
 	type ImportJobStatusCode,
-	SHIPPING_TEMPERATURE,
-	type ShippingTemperatureValue,
 	TARGET_STATUS,
 	type TargetStatusValue,
 } from "./types";
@@ -76,13 +74,7 @@ export const TARGET_STATUS_LABEL: Record<TargetStatusValue, string> = {
 	[TARGET_STATUS.PENDING_REVIEW]: "送審",
 };
 
-/* ===== Shipping 溫層 + 配送類型 ===== */
-export const SHIPPING_TEMP_LABEL: Record<ShippingTemperatureValue, string> = {
-	[SHIPPING_TEMPERATURE.AMBIENT]: "常溫",
-	[SHIPPING_TEMPERATURE.CHILLED]: "冷藏",
-	[SHIPPING_TEMPERATURE.FROZEN]: "冷凍",
-};
-
+/* ===== 配送類型 ===== */
 export const SHIPPING_TYPE_LABEL: Record<"TAQBIN" | "SEVEN", string> = {
 	TAQBIN: "黑貓宅配",
 	SEVEN: "7-11 店到店",

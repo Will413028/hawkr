@@ -1,30 +1,40 @@
 import { describe, expect, it } from "vitest";
-import type { ImportItemDetail } from "../types";
-import { importItemToDraft } from "./importItemAdapter";
+import { AMBIENT_TEMPERATURE_CODE } from "@/lib/seller/ambient-temperature";
+import { draftSkuToImportSku, importSkuToDraft } from "./importItemAdapter";
 
-describe("importItemToDraft certifications", () => {
-	it("keeps the certificate number without inferring review approval", () => {
-		const item = {
-			brief: { name: "香蕉" },
-			descriptionJson: "",
-			skus: [],
-			galleryAssets: [],
-			descriptionAssets: [],
-			errors: [],
-			warnings: [],
-			commitRevision: "0",
-			origin: "",
-			hashtags: [],
-			certifications: [{ name: "3702", certNo: "58589605051" }],
-			targetStatus: "DRAFT",
-		} as unknown as ImportItemDetail;
+describe("import SKU shipping methods", () => {
+	it("sends the ambient temperature code for every carrier", () => {
+		const out = draftSkuToImportSku({
+			id: "",
+			sku_name: "規格",
+			price: "100",
+			stock: 1,
+			unit: "3301",
+			shipping_methods: [
+				{ type: "3001", fee_payer: "3101", free_threshold: "0" },
+				{ type: "3002", fee_payer: "3101", free_threshold: "0" },
+			],
+		});
 
-		const draft = importItemToDraft(item);
-
-		expect(draft.certifications).toEqual([
-			{ code: "3702", certNo: "58589605051" },
+		expect(out.shippingMethods).toEqual([
+			{ method: "3001", temperature: AMBIENT_TEMPERATURE_CODE },
+			{ method: "3002", temperature: AMBIENT_TEMPERATURE_CODE },
 		]);
-		expect(draft.certifications?.[0]).not.toHaveProperty("verified");
-		expect(draft.certifications?.[0]).not.toHaveProperty("approved");
+	});
+
+	it("collapses per-temperature rows from the server into one row per carrier", () => {
+		const draft = importSkuToDraft({
+			skuId: "1",
+			shippingMethods: [
+				{ method: "3001", temperature: "3201" },
+				{ method: "3001", temperature: "3202" },
+				{ method: "3002", temperature: "3201" },
+			],
+		} as never);
+
+		expect(draft.shipping_methods?.map((m) => m.type)).toEqual([
+			"3001",
+			"3002",
+		]);
 	});
 });

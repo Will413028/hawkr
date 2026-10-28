@@ -60,11 +60,9 @@ class CategoryRepository {
     int pageSize = 20,
     String? keyword,
     String? sort,
-    String? deliveryTemp,
     String? priceMin,
     String? priceMax,
     List<String> hashtags = const [],
-    List<String> certificationTypes = const [],
     bool followedSellerOnly = false,
   }) async {
     final params = <String, dynamic>{'page': page, 'page_size': pageSize};
@@ -73,9 +71,6 @@ class CategoryRepository {
     }
     if (keyword != null && keyword.isNotEmpty) params['keyword'] = keyword;
     if (sort != null && sort.isNotEmpty) params['sort'] = sort;
-    if (deliveryTemp != null && deliveryTemp.isNotEmpty) {
-      params['delivery_temp'] = deliveryTemp;
-    }
     if (priceMin != null && priceMin.isNotEmpty) {
       params['price_min'] = priceMin;
     }
@@ -83,9 +78,6 @@ class CategoryRepository {
       params['price_max'] = priceMax;
     }
     if (hashtags.isNotEmpty) params['hashtags'] = hashtags.join(',');
-    if (certificationTypes.isNotEmpty) {
-      params['certification_types'] = certificationTypes.join(',');
-    }
     if (followedSellerOnly) params['followed_seller_only'] = true;
 
     final resp = await _dio.get('/public/products', queryParameters: params);

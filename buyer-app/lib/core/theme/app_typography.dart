@@ -20,7 +20,7 @@ import 'app_colors.dart';
 /// Text('立即下單',  style: AppTypography.buttonLarge);
 /// Text('加入購物車',style: AppTypography.buttonMedium);
 /// Text('數量',      style: AppTypography.body);
-/// Text('配送溫層',  style: AppTypography.meta);
+/// Text('庫存',      style: AppTypography.meta);
 /// Text('暫無評價',  style: AppTypography.metaMuted);
 /// ```
 class AppTypography {
@@ -136,7 +136,7 @@ class AppTypography {
   );
 
   // ── S: Meta (14px Regular, primary) ──────────────────────────────────────
-  /// 次要文字 — 例：「配送溫層」、「4.8 (326則評價)」
+  /// 次要文字 — 例：「庫存」、「4.8 (326則評價)」
   static TextStyle get meta => TextStyle(
     fontFamily: family,
     fontSize: 14,

@@ -1,10 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ShippingType } from "@/lib/codemeta/enums";
+import { AMBIENT_TEMPERATURE_CODE } from "@/lib/seller/ambient-temperature";
 import {
 	SHIPPING_TYPE,
 	type ShippingOnboarding,
+	submitCvsOnboarding,
 	unsupportedOnboardingTypes,
 } from "@/lib/seller/shipping";
+
+const authedFetch = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/api/client", () => ({ authedFetch }));
 
 /**
  * 回歸測試：物流設定頁「靜默丟棄」。
@@ -46,5 +51,25 @@ describe("unsupportedOnboardingTypes", () => {
 		expect(
 			unsupportedOnboardingTypes([row(""), { goodsType: "3201" }]),
 		).toEqual([]);
+	});
+});
+
+describe("submitCvsOnboarding", () => {
+	beforeEach(() => {
+		authedFetch.mockReset();
+		authedFetch.mockResolvedValue({ data: {} });
+	});
+
+	it("always posts the ambient goodsType", async () => {
+		await submitCvsOnboarding({
+			senderName: "王小明",
+			senderPhone: "0912345678",
+			returnStoreCode: "123456",
+		});
+
+		expect(authedFetch).toHaveBeenCalledTimes(1);
+		const [path, init] = authedFetch.mock.calls[0];
+		expect(path).toBe("/app/shipping_onboardings/cvs");
+		expect(init.json.goodsType).toBe(AMBIENT_TEMPERATURE_CODE);
 	});
 });

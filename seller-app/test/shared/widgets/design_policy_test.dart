@@ -13,14 +13,7 @@ void main() {
       final values = fontSize
           .allMatches(file.readAsStringSync())
           .map((match) => int.parse(match.group(1)!));
-      // Web TemperatureTag uses 11px; this exception is limited to that badge.
-      final isTemperatureTag = file.path.endsWith(
-        '/shared/widgets/hk_temperature_tag.dart',
-      );
-      if (values.any(
-        (value) =>
-            !allowed.contains(value) && !(isTemperatureTag && value == 11),
-      )) {
+      if (values.any((value) => !allowed.contains(value))) {
         violations.add(file.path);
       }
     }

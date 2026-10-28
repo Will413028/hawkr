@@ -8,7 +8,6 @@ import 'package:hawkr_seller/features/order/presentation/order_card_widgets/pill
 import 'package:hawkr_seller/features/order/presentation/tcat_reservation_dialog.dart';
 import 'package:hawkr_seller/features/shipment_anomaly/data/shipment_anomaly_providers.dart';
 import 'package:hawkr_seller/shared/widgets/hk_icon.dart';
-import 'package:hawkr_seller/shared/widgets/hk_temperature_tag.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -58,7 +57,7 @@ void main() {
         final amount = tester.widget<Text>(find.text(r'NT$ 123456789.99'));
         expect(amount.maxLines, isNull);
         expect(amount.overflow, isNull);
-        expect(find.widgetWithText(HkTemperatureTag, '冷凍'), findsOneWidget);
+        expect(find.text('冷凍'), findsNothing);
         expect(find.text('共 1 件'), findsOneWidget);
         expect(find.text('預約取號'), findsOneWidget);
         expect(find.byTooltip('查看出貨說明'), findsOneWidget);
@@ -264,7 +263,6 @@ const _order = OrderSummary(
   recipientName: '陳小日',
   shippingAddress: '桃園市桃園區鎮撫街1號',
   shippingMethod: '3001',
-  deliveryTemp: '3203',
   shipmentStatus: '91',
   shippingStatus: '91',
   items: [OrderItem(name: '當季水果', price: '125', quantity: 2)],

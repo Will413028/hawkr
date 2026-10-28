@@ -1,4 +1,5 @@
 import '../../../core/exceptions/app_exception.dart';
+import '../../../core/networking/ambient_shipping_temperature.dart';
 
 typedef CvsMutationSender =
     Future<Map<String, dynamic>> Function(
@@ -6,20 +7,14 @@ typedef CvsMutationSender =
       Map<String, dynamic> body,
     );
 
-enum CvsGoodsType { frozen, ambient }
-
 class CvsGoodsTypeMutation {
   const CvsGoodsTypeMutation({
-    required this.type,
-    required this.goodsType,
     required this.initialEnabled,
     required this.targetEnabled,
     required this.onboardingId,
     required this.createBody,
   });
 
-  final CvsGoodsType type;
-  final String goodsType;
   final bool initialEnabled;
   final bool targetEnabled;
   final String? onboardingId;
@@ -28,10 +23,7 @@ class CvsGoodsTypeMutation {
   bool get requiresRequest => initialEnabled != targetEnabled;
   bool get hasOnboardingId => (onboardingId?.trim() ?? '').isNotEmpty;
 
-  String get label => switch (type) {
-    CvsGoodsType.frozen => '冷凍',
-    CvsGoodsType.ambient => '常溫',
-  };
+  String get label => '7-11';
 
   String get requestPath {
     final id = onboardingId?.trim() ?? '';
@@ -44,7 +36,7 @@ class CvsGoodsTypeMutation {
   Map<String, dynamic> get requestBody {
     final id = onboardingId?.trim() ?? '';
     if (id.isNotEmpty) return {'enabled': targetEnabled};
-    return {...createBody, 'goodsType': goodsType};
+    return {...createBody, 'goodsType': kAmbientShippingTemperature};
   }
 }
 
@@ -100,8 +92,7 @@ class CvsShippingMutationOutcome {
 }
 
 /// Applies 7-11 goods-type changes sequentially and retains a checkpoint for
-/// every successful step. A retry can rebuild its plan from those checkpoints,
-/// so a successful first mutation is never sent again after the second fails.
+/// every successful step.
 class CvsShippingMutationCoordinator {
   CvsShippingMutationCoordinator(this._send);
 

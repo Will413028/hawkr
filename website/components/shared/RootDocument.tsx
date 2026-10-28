@@ -3,7 +3,6 @@ import type { Viewport } from "next";
 import { Suspense } from "react";
 import { ViewTransitions } from "@/components/shared/view-transitions";
 import "@/styles/globals.css";
-import "@/styles/components/product-certification.css";
 import "@/styles/components/product-modal.css";
 import "@/styles/components/ui-kit.css";
 import "@/styles/components/input-field-fx.css";

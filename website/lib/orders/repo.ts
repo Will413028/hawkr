@@ -886,9 +886,6 @@ export function normalizeOrder(raw: Record<string, unknown>): Order {
 							"pickupStoreName",
 							"pickup_store_name",
 						]),
-					deliveryTemp:
-						pickFirst<string>(shipping, ["deliveryTemp", "delivery_temp"]) ??
-						pickFirst<string>(raw, ["deliveryTemp", "delivery_temp"]),
 					labelExpireAt:
 						pickFirst<string>(shipping, ["labelExpireAt", "label_expire_at"]) ??
 						pickFirst<string>(raw, ["labelExpireAt", "label_expire_at"]),

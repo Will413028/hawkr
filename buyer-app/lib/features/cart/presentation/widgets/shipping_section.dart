@@ -10,8 +10,6 @@ import 'package:hawkr_buyer/core/codemeta/shipping_presentation.dart';
 
 import '../../../../shared/widgets/location_icon.dart';
 import '../../../address/data/address_model.dart';
-import 'temperature_tags.dart';
-import 'package:hawkr_buyer/shared/widgets/hk_temperature_tag.dart';
 
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 
@@ -372,7 +370,7 @@ class _ShippingSectionState extends State<ShippingSection> {
               children: [
                 Text('先選擇要結帳的商品', style: CartTypography.subtitle),
                 const SizedBox(height: HkSpace.xs),
-                Text('配送方式會依商家與溫層自動整理。', style: CartTypography.supportMuted),
+                Text('配送方式會依商家自動整理。', style: CartTypography.supportMuted),
               ],
             ),
           ),
@@ -552,23 +550,16 @@ class _ShippingSectionState extends State<ShippingSection> {
   Widget _buildOptionRow(MapEntry<int, Map<String, dynamic>> entry) {
     final idx = entry.key;
     final opt = entry.value;
-    final rawLabel = opt['label']?.toString() ?? '';
-    final label = rawLabel.replaceAll(RegExp(r'[（(].+?[）)]'), '').trim();
+    final label = opt['label']?.toString() ?? '';
     final fee = opt['fee']?.toString() ?? '0';
-    final deliveryTemp = opt['deliveryTemp']?.toString() ?? '';
     final freeEligible = opt['freeShippingEligible'] as bool? ?? false;
     final isSelected = widget.selectedShippingIdx == idx;
 
-    final tempLabel = tempLabelMap[deliveryTemp] ?? deliveryTemp;
     final feeLabel = freeEligible ? '免運' : 'NT\$ $fee';
     return Semantics(
       button: true,
       selected: isSelected,
-      label: [
-        label,
-        if (deliveryTemp.isNotEmpty) tempLabel,
-        feeLabel,
-      ].join('，'),
+      label: [label, feeLabel].join('，'),
       onTap: () => widget.onShippingIdxChanged(idx),
       child: ExcludeSemantics(
         child: Material(
@@ -625,18 +616,7 @@ class _ShippingSectionState extends State<ShippingSection> {
                             : AppIconColors.disabled,
                       ),
                       const SizedBox(width: HkSpace.sm),
-                      Expanded(
-                        child: Wrap(
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: HkSpace.sm,
-                          runSpacing: HkSpace.xs,
-                          children: [
-                            Text(label, style: labelStyle),
-                            if (deliveryTemp.isNotEmpty)
-                              HkTemperatureTag(value: deliveryTemp),
-                          ],
-                        ),
-                      ),
+                      Expanded(child: Text(label, style: labelStyle)),
                       if (!stackAmount) ...[
                         const SizedBox(width: HkSpace.sm),
                         amount,

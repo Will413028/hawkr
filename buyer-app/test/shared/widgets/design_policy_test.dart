@@ -27,17 +27,11 @@ TextStyle(
       final source = file.readAsStringSync();
       for (final expression in _fontSizeExpressions(source)) {
         final invalidValues = _numericLiterals(expression.value).where((value) {
-          // Web TemperatureTag is a scoped 11dp badge role, not body copy.
-          final temperatureBadge =
-              file.path == 'lib/shared/widgets/hk_temperature_tag.dart' &&
-              value == 11;
           final cartSection =
               file.path ==
                   'lib/features/cart/presentation/cart_typography.dart' &&
               value == 22;
-          return !_websiteTypeScale.contains(value) &&
-              !temperatureBadge &&
-              !cartSection;
+          return !_websiteTypeScale.contains(value) && !cartSection;
         }).toList();
         if (invalidValues.isNotEmpty) {
           violations.add(

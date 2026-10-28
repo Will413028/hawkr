@@ -56,9 +56,6 @@ vi.mock("@/features/seller-center", async () => {
 		},
 	};
 });
-vi.mock("@/features/cart/components/TemperatureTag", () => ({
-	TemperatureTag: () => null,
-}));
 vi.mock("@/components/shared/SellerPageShell", () => ({
 	SellerPageShell: ({ children }: { children: React.ReactNode }) =>
 		React.createElement("div", null, children),
@@ -327,7 +324,7 @@ describe("ShippingClient 黑貓 submit", () => {
 });
 
 describe("ShippingClient 7-11 prefill", () => {
-	it("prefills the sender from the store and prefers the ambient row", () => {
+	it("prefills the sender from the store, then from the row", () => {
 		setData({});
 		const view = render(React.createElement(ShippingClient));
 		const cvsName = inputs("寄件人姓名")[1];
@@ -336,12 +333,6 @@ describe("ShippingClient 7-11 prefill", () => {
 
 		setData({
 			rows: [
-				{
-					shippingType: "3651",
-					goodsType: "3203",
-					senderName: "冷凍人",
-					senderPhone: "0922222222",
-				},
 				{
 					shippingType: "3651",
 					goodsType: "3201",
@@ -354,15 +345,9 @@ describe("ShippingClient 7-11 prefill", () => {
 		expect(inputs("寄件人姓名")[1].value).toBe("常溫人");
 	});
 
-	it("takes sender and lock from the same row: a locked ambient row without sender shows the store, not the frozen row's sender", () => {
+	it("takes sender and lock from the same row: a locked row without sender shows the store", () => {
 		setData({
 			rows: [
-				{
-					shippingType: "3651",
-					goodsType: "3203",
-					senderName: "冷凍人",
-					senderPhone: "0922222222",
-				},
 				{
 					shippingType: "3651",
 					goodsType: "3201",

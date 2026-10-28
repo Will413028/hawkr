@@ -2,7 +2,6 @@ import 'package:hawkr_buyer/config/image_config.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/core/theme/app_typography.dart';
 import 'package:hawkr_buyer/core/theme/hk_tokens.dart';
-import 'package:hawkr_buyer/shared/widgets/hk_temperature_tag.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_icon.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
@@ -72,16 +71,11 @@ Map<String, dynamic>? firstAvailablePurchaseSpec(List<Map> specs) {
 
 /// The canonical delivery row used by every product-purchase surface.
 ///
-/// Temperature pills and carrier marks share one natural-height [Wrap], so
-/// longer text and multiple delivery methods never get clipped.
+/// Carrier marks share one natural-height [Wrap], so multiple delivery
+/// methods never get clipped.
 class ProductDeliveryMetadata extends StatelessWidget {
-  const ProductDeliveryMetadata({
-    super.key,
-    required this.temperatureCodes,
-    required this.shippingMethodCodes,
-  });
+  const ProductDeliveryMetadata({super.key, required this.shippingMethodCodes});
 
-  final List<String> temperatureCodes;
   final List<String> shippingMethodCodes;
 
   @override
@@ -92,22 +86,11 @@ class ProductDeliveryMetadata extends StatelessWidget {
       runSpacing: HkSpace.xs,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        const HkIcon(
-          HkIconName.document,
-          key: ValueKey('product-purchase-delivery-icon'),
-          size: 16,
-          color: AppIconColors.active,
-        ),
         Text(
-          '配送溫層',
+          '配送方式',
           key: const ValueKey('product-purchase-delivery-label'),
           style: AppTypography.meta,
         ),
-        for (final code in temperatureCodes)
-          HkTemperatureTag(
-            value: code,
-            key: ValueKey('product-purchase-temperature-$code'),
-          ),
         for (final code in shippingMethodCodes)
           ShippingMethodMark(
             key: ValueKey('product-purchase-carrier-$code'),
@@ -157,7 +140,6 @@ class ProductPurchaseSummaryCard extends StatelessWidget {
     required this.imageUrl,
     required this.rating,
     required this.reviewCount,
-    required this.temperatureCodes,
     required this.shippingMethodCodes,
     required this.loading,
   });
@@ -166,7 +148,6 @@ class ProductPurchaseSummaryCard extends StatelessWidget {
   final String imageUrl;
   final double rating;
   final int reviewCount;
-  final List<String> temperatureCodes;
   final List<String> shippingMethodCodes;
   final bool loading;
 
@@ -232,7 +213,6 @@ class ProductPurchaseSummaryCard extends StatelessWidget {
                       )
                     else
                       ProductDeliveryMetadata(
-                        temperatureCodes: temperatureCodes,
                         shippingMethodCodes: shippingMethodCodes,
                       ),
                     const SizedBox(height: HkSpace.xs),

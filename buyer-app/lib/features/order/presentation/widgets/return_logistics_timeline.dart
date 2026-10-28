@@ -1,4 +1,3 @@
-import 'package:hawkr_buyer/shared/widgets/hk_temperature_tag.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -9,7 +8,6 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../shared/widgets/hk_icon.dart';
 import '../../data/after_sale_model.dart';
-import '../../data/order_status.dart';
 import 'after_sale_vertical_timeline.dart';
 
 /// 黑貓退貨退款狀態摘要卡。
@@ -120,21 +118,19 @@ class BlackcatAfterSaleStatusCard extends StatelessWidget {
 
 /// 黑貓退貨退款物流卡，對齊設計稿的淺綠資訊面板。
 ///
-/// OpenAPI 售後詳情沒有預計取件日，因此不渲染該欄位；地址、電話、
-/// 溫層由訂單詳情帶入，若沒有值就不顯示。
+/// OpenAPI 售後詳情沒有預計取件日，因此不渲染該欄位；地址、電話
+/// 由訂單詳情帶入，若沒有值就不顯示。
 class BlackcatReturnLogisticsCard extends StatelessWidget {
   const BlackcatReturnLogisticsCard({
     super.key,
     required this.caseData,
     this.pickupAddress = '',
     this.contactPhone = '',
-    this.temperatureCode = '',
   });
 
   final AfterSaleCase caseData;
   final String pickupAddress;
   final String contactPhone;
-  final String temperatureCode;
 
   static bool shouldShowFor(AfterSaleCase c) {
     if (c.returnShippingMethod != ReturnShippingMethod.kuroneko) return false;
@@ -145,19 +141,12 @@ class BlackcatReturnLogisticsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tempLabel = DeliveryTempLabel.labelFor(temperatureCode);
     final logisticsNo = caseData.shipTradeNo.isNotEmpty
         ? caseData.shipTradeNo
         : caseData.returnShipmentNo;
 
     final infoTiles = <Widget>[
       _InfoTile(label: '預約出車', value: '賣家已預約', valueColor: AppColors.primary),
-      if (tempLabel.isNotEmpty)
-        _InfoTile(
-          label: '溫層',
-          value: tempLabel,
-          valueWidget: HkTemperatureTag(value: temperatureCode),
-        ),
       if (contactPhone.trim().isNotEmpty)
         _InfoTile(label: '聯繫電話', value: contactPhone.trim()),
     ];
@@ -263,17 +252,11 @@ class _InfoTileGrid extends StatelessWidget {
 }
 
 class _InfoTile extends StatelessWidget {
-  const _InfoTile({
-    required this.label,
-    required this.value,
-    this.valueColor,
-    this.valueWidget,
-  });
+  const _InfoTile({required this.label, required this.value, this.valueColor});
 
   final String label;
   final String value;
   final Color? valueColor;
-  final Widget? valueWidget;
 
   @override
   Widget build(BuildContext context) {
@@ -296,15 +279,14 @@ class _InfoTile extends StatelessWidget {
             style: AppTypography.meta.copyWith(color: AppColors.gray500),
           ),
           SizedBox(height: 2.h),
-          valueWidget ??
-              Text(
-                value,
-                style: AppTypography.bodyBold.copyWith(
-                  color: valueColor ?? AppColors.gray700,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
+          Text(
+            value,
+            style: AppTypography.bodyBold.copyWith(
+              color: valueColor ?? AppColors.gray700,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );

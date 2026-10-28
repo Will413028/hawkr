@@ -361,9 +361,6 @@ void main() {
     expect(find.text('目前篩選：草稿'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
     await pumpCatalog(tester, component: 'commerce');
-    await tester.tap(find.byKey(const ValueKey('temperature-select-冷凍')));
-    await tester.pump();
-    expect(find.text('選擇溫層：冷凍'), findsOneWidget);
     await tester.ensureVisible(find.byKey(const ValueKey('next-step')));
     await tester.tap(find.byKey(const ValueKey('next-step')));
     await tester.pump();

@@ -1,5 +1,3 @@
-import type { ProductCertBadge } from "@/lib/products/certifications";
-
 export interface MarketProductItem {
 	id: string;
 	name: string;
@@ -22,8 +20,6 @@ export interface MarketProductItem {
 	 *  `lib/market/categoryGroups` — the wire carries no lv1. */
 	categoryId?: string;
 	categoryName?: string;
-	/** Product certification badges (有機 / 產銷履歷 …) from certifications[]. */
-	certifications?: ProductCertBadge[];
 	unit: string;
 	rating: number | null;
 	reviews: number;

@@ -2034,10 +2034,7 @@ function SectionDocuments({
 		>
 			<header>
 				<h2>補充文件（選填）</h2>
-				<p>
-					農產驗證 / 產地證明 / 食品檢驗 /
-					冷鏈配送等可上傳作為加分；未上傳也可送審。
-				</p>
+				<p>農產驗證 / 產地證明 / 食品檢驗等可上傳作為加分；未上傳也可送審。</p>
 			</header>
 			{issues.companyDocuments && (
 				<p className="seller-cert__error" role="alert">

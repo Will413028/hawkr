@@ -141,7 +141,6 @@ abstract final class AppIcons {
   static const sync = Icons.sync_outlined;
   static const taskAltOutlined = Icons.task_alt_outlined;
   static const textFields = Icons.text_fields;
-  static const thermostatOutlined = Icons.thermostat_outlined;
   static const tune = Icons.tune_outlined;
   static const verifiedOutlined = Icons.verified_outlined;
   static const verifiedRounded = Icons.verified_rounded;

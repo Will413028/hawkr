@@ -161,7 +161,6 @@ Map<String, Object> _order(String id, int status) => {
   'recipientName': '訂單列表測試買家',
   'shippingAddress': '臺北市南港區經貿二路1號12樓之3（測試地址）',
   'shippingMethod': '3001',
-  'deliveryTemp': '3203',
   'shippingStatus': status == 30 ? '31' : '10',
   'totalActualAmount': '1860',
   'items': [

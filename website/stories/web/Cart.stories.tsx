@@ -44,7 +44,6 @@ const products: CartItem[] = [
 		quantity: 2,
 		stockQty: 8,
 		unit: "1 公斤／包",
-		deliveryTemps: [ShippingTemperature.AMBIENT],
 	},
 	{
 		id: "preview-fish",
@@ -55,7 +54,6 @@ const products: CartItem[] = [
 		quantity: 1,
 		stockQty: 3,
 		unit: "200 公克 × 6 包／組",
-		deliveryTemps: [ShippingTemperature.CHILLED, ShippingTemperature.FROZEN],
 	},
 ];
 
@@ -496,19 +494,6 @@ const meta = {
 	title: "Web/Cart/Cart",
 	component: CartProductTile,
 	parameters: {
-		a11y: {
-			config: {
-				rules: [
-					{
-						id: "color-contrast",
-						// User-requested original temperature-tag palette/dimensions.
-						// Keep its existing contrast limitation explicit; all other
-						// cart text and all other accessibility rules remain checked.
-						selector: ":not(.cart-tile__temps [data-temperature])",
-					},
-				],
-			},
-		},
 		docs: {
 			description: {
 				component:
@@ -604,7 +589,7 @@ async function expectProductTextScale(
 		);
 	});
 	for (const text of canvasElement.querySelectorAll<HTMLElement>(
-		".cart-tile__name, .cart-tile__spec, .cart-tile__temps, .cart-tile__actions",
+		".cart-tile__name, .cart-tile__spec, .cart-tile__actions",
 	)) {
 		await expect(text.scrollWidth).toBeLessThanOrEqual(text.clientWidth + 1);
 	}

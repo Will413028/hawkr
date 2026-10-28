@@ -471,8 +471,6 @@ production component 是語意、狀態與無障礙行為的集合，不只是�
 - **Chip:** 用於狀態、分類、標籤或可移除資訊，現有高度 24 / 28 / 32px，支援 solid、flat、bordered、dot。Chip 不負責頁面導覽，也不應承載完整句子。
 - **Badge:** 疊在 icon、avatar 或物件上表達數量／新狀態；數量過大時採既定縮寫，不讓 badge 撐壞宿主。若資訊重要，宿主旁仍要有可讀文字。
 - **Filter rail:** URL／狀態篩選優先使用 `ScFilters + ScPill`：單軌橫向捲動、tablist 語意、選中項目可見且自動置中。不要把 Chip、Tabs 與 navigation 混成同一列。
-- **Temperature:** frozen 使用冷鏈藍、chilled 使用 primary、ambient 使用栗棕；顏色必須跟著溫層文字與圖示，不可當裝飾 chip。
-- **Current divergence:** `TemperatureTag` 仍含舊版 literal 顏色與 18px 尺寸，尚未成為 canonical primitive；Chip close 目前只有 20px 命中區。不得複製其色碼或觸控債務建立新 variant。
 
 ### Tabs, segmented controls and switches
 

@@ -6,14 +6,13 @@
  *   - `features/market/components/MarketProductsList.tsx`   (client load-more)
  *
  * Backend B-182 (May 2026) now accepts every filter on the server —
- * `delivery_temp`, `price_min`, `price_max`, `store_ids`,
+ * `price_min`, `price_max`, `store_ids`,
  * `hashtags`, `subscribed_only` — plus all 5 sort modes. The legacy
  * client-side `postFilterRecords` + `applySort` fallbacks were removed
  * once the server contract was confirmed; this file only keeps the
- * record-shape normalisers + the sidebar→wire sort/temp mappings.
+ * record-shape normalisers + the sidebar→wire sort mapping.
  */
 
-import { toCertBadges } from "@/lib/products/certifications";
 import {
 	getProductPriceDisplay,
 	type PriceFields,
@@ -21,16 +20,6 @@ import {
 import { parseRating, parseReviewCount } from "@/lib/products/rating";
 import { readCategory } from "./categoryGroups";
 import type { MarketProductItem } from "./types";
-
-/**
- * Temperature filter values map to backend deliveryTemp codes:
- * 3201=ambient (常溫), 3202=chilled (冷藏), 3203=frozen (冷凍).
- */
-export const TEMP_CODE_BY_VALUE: Record<string, string> = {
-	ambient: "3201",
-	chilled: "3202",
-	frozen: "3203",
-};
 
 export interface ProductRecord extends PriceFields {
 	id?: string | number;
@@ -64,8 +53,6 @@ export interface ProductRecord extends PriceFields {
 	categoryId?: string | number;
 	categoryName?: string;
 	categoryLv2Id?: string | number;
-	certifications?: Array<{ name?: string; certNo?: string }>;
-	deliveryTemp?: string[];
 	unit?: string;
 	skuNames?: string[];
 	rating?: string | number;
@@ -201,7 +188,6 @@ export function mapProduct(
 		isOnSale: priceDisplay.isOnSale,
 		hashtags: normaliseHashtags(product?.hashtags),
 		...readCategory(product),
-		certifications: toCertBadges(product?.certifications),
 		unit: product?.skuNames?.[0] || product?.unit || "",
 		rating: parseRating(product?.rating),
 		reviews: parseReviewCount(product?.reviewCount),
@@ -316,13 +302,9 @@ export interface MarketFetchParams {
 	keyword: string;
 	categoryId?: string;
 	sort?: string;
-	temp?: string;
 	priceMin?: number;
 	priceMax?: number;
 	hashtags?: string[];
-	/** Product certification filter — CertificationType values (有機=3701 /
-	 * 產銷履歷=3702). Matches certifications[].name; any match. */
-	certificationTypes?: string[];
 	/** B-183: viewer-aware filter — backend reads buyer JWT to filter
 	 * by either the buyer's favourited products (followedProductOnly)
 	 * or the buyer's followed sellers' entire catalogue

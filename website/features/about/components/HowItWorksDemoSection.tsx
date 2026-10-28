@@ -99,7 +99,7 @@ export default function HowItWorksDemoSection() {
 						<div className="step-num">02</div>
 						<h3>看清楚來源</h3>
 						<p>
-							商品頁清楚顯示產地、商家、保存方式與配送溫層。喜歡這間店，也可以直接追蹤，下次上架不漏接。
+							商品頁清楚顯示產地、商家、保存方式。喜歡這間店，也可以直接追蹤，下次上架不漏接。
 						</p>
 					</div>
 				</article>

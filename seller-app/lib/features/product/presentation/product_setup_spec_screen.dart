@@ -15,11 +15,11 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../core/analytics/analytics_providers.dart';
 import '../../../core/codemeta/code_meta.dart';
+import '../../../core/networking/ambient_shipping_temperature.dart';
 import '../../../shared/utils/floating_toast.dart';
 import '../../../shared/widgets/app_toggle_switch.dart';
 import '../../../shared/widgets/setup_bottom_bar.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
-import '../../../shared/widgets/temperature_tag.dart';
 import '../data/product_repository.dart';
 import 'ai_assistant_button.dart';
 import 'product_listing_draft_controller.dart';
@@ -49,7 +49,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
     this.description,
     this.descriptionBlocks,
     this.descriptionStagedTokens = const [],
-    required this.selectedTags,
     this.isEditMode = false,
     this.existingProduct,
   });
@@ -72,7 +71,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
   final String? description;
   final List<Map<String, dynamic>>? descriptionBlocks;
   final List<String> descriptionStagedTokens;
-  final Map<int, String> selectedTags;
   final bool isEditMode;
   final Map<String, dynamic>? existingProduct;
 
@@ -100,17 +98,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
           ),
         ),
       ],
-    );
-  }
-
-  static Widget _buildSectionLabel(String label) {
-    return Text(
-      label,
-      style: TextStyle(
-        fontSize: 14.sp,
-        fontWeight: FontWeight.w700,
-        color: AppColors.textEmphasis,
-      ),
     );
   }
 
@@ -152,15 +139,11 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
     // 多規格列表
     final specs = useState<List<_SpecData>>([_SpecData()]);
 
-    // 溫層選擇 — 從 shipping_quotes API 的 availableTemperatures 取得
-    final selectedTemperatures = useState<Set<String>>({});
-    final availableTemperatures = useState<List<Map<String, dynamic>>>([]);
-
     // 運送方式選擇（多選）— 從 POST /app/shipping_quotes API 取得
     final selectedShippingMethods = useState<Set<String>>({});
-    // 每個運送方式的 feePayer: per-spec List，index 對應 specs index，內層 key = 'method|temp'
+    // 每個運送方式的 feePayer: per-spec List，index 對應 specs index，內層 key = method
     final specFeePayers = useState<List<Map<String, String>>>([{}]);
-    // 每個運送方式的 freeThreshold: per-spec List，index 對應 specs index，內層 key = 'method|temp'
+    // 每個運送方式的 freeThreshold: per-spec List，index 對應 specs index，內層 key = method
     final specFreeThresholds = useState<List<Map<String, String>>>([{}]);
     final shippingOptions = useState<List<Map<String, dynamic>>>([]);
     final shippingLoading = useState(false);
@@ -255,7 +238,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
       if (length.isEmpty || width.isEmpty || height.isEmpty || weight.isEmpty) {
         if (!context.mounted) return;
         shippingOptions.value = [];
-        availableTemperatures.value = [];
         shippingError.value = null;
         return;
       }
@@ -280,16 +262,8 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
         if (resp['code'] == 4301) {
           shippingError.value = '所有配送方式都超過尺寸或重量限制';
           shippingOptions.value = [];
-          availableTemperatures.value = [];
-        } else if (resp['code'] == 0) {
+          } else if (resp['code'] == 0) {
           final data = resp['data'] as Map<String, dynamic>? ?? {};
-          final temps =
-              (data['availableTemperatures'] as List?)
-                  ?.whereType<Map<String, dynamic>>()
-                  .toList() ??
-              [];
-          availableTemperatures.value = temps;
-
           final options =
               (data['shippingOptions'] as List?)
                   ?.whereType<Map<String, dynamic>>()
@@ -299,18 +273,15 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
         } else {
           shippingError.value = resp['message']?.toString() ?? '查詢失敗';
           shippingOptions.value = [];
-          availableTemperatures.value = [];
-        }
+          }
       } on TimeoutException {
         if (!context.mounted) return;
         shippingError.value = '載入逾時，請重試';
         shippingOptions.value = [];
-        availableTemperatures.value = [];
       } catch (_) {
         if (!context.mounted) return;
         shippingError.value = '載入失敗';
         shippingOptions.value = [];
-        availableTemperatures.value = [];
       }
       if (!context.mounted) return;
       shippingLoading.value = false;
@@ -376,21 +347,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
         specs.value = newSpecs;
       }
 
-      // Pre-fill temperatures from deliveryTemp
-      final deliveryTemps = p['deliveryTemp'];
-      if (deliveryTemps is List && deliveryTemps.isNotEmpty) {
-        selectedTemperatures.value = deliveryTemps
-            .map((t) => t.toString())
-            .where((t) => t.isNotEmpty)
-            .toSet();
-      } else if (deliveryTemps is String && deliveryTemps.isNotEmpty) {
-        selectedTemperatures.value = deliveryTemps
-            .split(',')
-            .map((t) => t.trim())
-            .where((t) => t.isNotEmpty)
-            .toSet();
-      }
-
       // 用第一個 spec 的尺寸重量觸發 shipping quotes
       final firstSpec = specs.value.first;
       if (firstSpec.lengthController.text.isNotEmpty &&
@@ -409,9 +365,8 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
         for (final sm in existingShipping) {
           if (sm is Map) {
             final type = (sm['type'] ?? '').toString();
-            final temp = (sm['temperature'] ?? '').toString();
-            if (type.isNotEmpty && temp.isNotEmpty) {
-              final key = '$type|$temp';
+            if (type.isNotEmpty) {
+              final key = type;
               selectedKeys.add(key);
               feePayerMap[key] =
                   (sm['feePayer'] ?? ShippingFeePayer.buyer.value).toString();
@@ -784,7 +739,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
         description: description,
         descriptionBlocks: descriptionBlocks,
         descriptionStagedTokens: descriptionStagedTokens,
-        selectedTags: selectedTags,
         isEditMode: isEditMode,
         existingProduct: existingProduct,
         sellerId: sellerId,
@@ -798,18 +752,13 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
               ? specFeePayers.value[idx]
               : <String, String>{};
           final specShippingMethods = selectedShippingMethods.value
-              .expand<Map<String, String>>((key) {
-                final parts = key.split('|');
-                if (parts.length < 2) return [];
-                return [
-                  {
-                    'type': parts[0],
-                    'temperature': parts[1],
-                    'feePayer': feePayers[key] ?? ShippingFeePayer.buyer.value,
-                    'freeThreshold': thresholds[key] ?? '0',
-                  },
-                ];
-              })
+              .map<Map<String, String>>(
+                (key) => SpecData.shippingMethodJson(
+                  type: key,
+                  feePayer: feePayers[key] ?? ShippingFeePayer.buyer.value,
+                  freeThreshold: thresholds[key] ?? '0',
+                ),
+              )
               .toList();
           return SpecData(
             skuId: s.skuId,
@@ -1233,7 +1182,7 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
               ),
 
               if (!keyboardVisible)
-                const ProductSetupProgressBar(currentStep: 5),
+                const ProductSetupProgressBar(currentStep: 4),
 
               Expanded(
                 child: Column(
@@ -1297,105 +1246,12 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
                                   children: [
                                     if (keyboardVisible)
                                       const ProductSetupProgressBar(
-                                        currentStep: 5,
+                                        currentStep: 4,
                                       ),
                                     // ── Spec fields ──────────────────────────────────
                                     Padding(
                                       padding: EdgeInsets.all(16.w),
                                       child: buildSpecCard(spec, idx),
-                                    ),
-                                    Container(
-                                      height: 1,
-                                      color: AppColors.gray100,
-                                    ),
-                                    // ── Temperature section ──────────────────────────
-                                    Padding(
-                                      padding: EdgeInsets.fromLTRB(
-                                        16.w,
-                                        16.h,
-                                        16.w,
-                                        16.h,
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          _buildSectionLabel('可配送溫層（可複選）'),
-                                          SizedBox(height: 10.h),
-                                          if (availableTemperatures
-                                              .value
-                                              .isEmpty)
-                                            Text(
-                                              '請先填寫包裝尺寸與重量',
-                                              style: TextStyle(
-                                                fontSize: 14.sp,
-                                                color: AppColors.gray300,
-                                              ),
-                                            )
-                                          else
-                                            Wrap(
-                                              spacing: 4,
-                                              runSpacing: 4,
-                                              children: availableTemperatures.value.map((
-                                                t,
-                                              ) {
-                                                final code =
-                                                    (t['temperature'] ?? '')
-                                                        .toString();
-                                                final rawLabel =
-                                                    (t['label'] ?? '')
-                                                        .toString()
-                                                        .trim();
-                                                final label =
-                                                    rawLabel.isNotEmpty &&
-                                                        rawLabel != code
-                                                    ? rawLabel
-                                                    : TemperatureTag.codeToLabel(
-                                                        code,
-                                                      );
-                                                final isSelected =
-                                                    selectedTemperatures.value
-                                                        .contains(code);
-                                                return Padding(
-                                                  padding: EdgeInsets.only(
-                                                    right: 12.w,
-                                                  ),
-                                                  child: TemperatureTag.selectable(
-                                                    label: label,
-                                                    isSelected: isSelected,
-                                                    onTap: () {
-                                                      if (isSelected) {
-                                                        selectedTemperatures
-                                                            .value = {
-                                                          ...selectedTemperatures
-                                                              .value,
-                                                        }..remove(code);
-                                                        selectedShippingMethods
-                                                                .value =
-                                                            selectedShippingMethods
-                                                                .value
-                                                                .where(
-                                                                  (key) => !key
-                                                                      .endsWith(
-                                                                        '|$code',
-                                                                      ),
-                                                                )
-                                                                .toSet();
-                                                      } else {
-                                                        selectedTemperatures
-                                                            .value = {
-                                                          ...selectedTemperatures
-                                                              .value,
-                                                          code,
-                                                        };
-                                                      }
-                                                    },
-                                                  ),
-                                                );
-                                              }).toList(),
-                                            ),
-                                        ],
-                                      ),
                                     ),
                                     Container(
                                       height: 1,
@@ -1503,7 +1359,7 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
                                                   ),
                                                 );
                                               }
-                                              // 依溫層 + 賣家已開通狀態雙重過濾
+                                              // 依 Java 必填的固定值與賣家已開通狀態過濾
                                               final filteredOptions =
                                                   shippingOptions.value.where((
                                                     o,
@@ -1515,20 +1371,12 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
                                                     final temp =
                                                         (o['temperature'] ?? '')
                                                             .toString();
-                                                    final tempOk =
-                                                        selectedTemperatures
-                                                            .value
-                                                            .isEmpty ||
-                                                        selectedTemperatures
-                                                            .value
-                                                            .contains(temp);
-                                                    final onboardedOk =
+                                                    return temp ==
+                                                            kAmbientShippingTemperature &&
                                                         isShippingMethodOnboarded(
                                                           method,
                                                           temp,
                                                         );
-                                                    return tempOk &&
-                                                        onboardedOk;
                                                   }).toList();
 
                                               // 賣家完全沒開通任何配送方式（fetch 完成且集合為空）
@@ -1566,7 +1414,7 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
                                               }
                                               if (filteredOptions.isEmpty) {
                                                 return Text(
-                                                  '此尺寸/溫層下，您尚未開通對應的配送方式。可至「物流設定」開通對應的配送方式。',
+                                                  '此尺寸下，您尚未開通對應的配送方式。可至「物流設定」開通對應的配送方式。',
                                                   style: TextStyle(
                                                     fontSize: 14.sp,
                                                     color: const Color(
@@ -1606,21 +1454,13 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
                                                         (option['shippingMethod'] ??
                                                                 '')
                                                             .toString();
-                                                    final temp =
-                                                        (option['temperature'] ??
-                                                                '')
-                                                            .toString();
-                                                    final key = '$method|$temp';
+                                                    final key = method;
                                                     final name =
                                                         (option['label'] ??
                                                                 _shippingTypeName(
                                                                   method,
                                                                 ))
                                                             .toString();
-                                                    final tempLabel =
-                                                        TemperatureTag.codeToLabel(
-                                                          temp,
-                                                        );
                                                     final price =
                                                         option['fee'] ?? 0;
                                                     final days =
@@ -1635,7 +1475,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
                                                         '$idx|$key',
                                                       ),
                                                       name: name,
-                                                      tempLabel: tempLabel,
                                                       price: price,
                                                       days: days,
                                                       isSelected: isSelected,
@@ -2077,7 +1916,6 @@ class _ShippingMethodCard extends StatefulWidget {
   const _ShippingMethodCard({
     super.key,
     required this.name,
-    required this.tempLabel,
     required this.price,
     required this.days,
     required this.isSelected,
@@ -2089,7 +1927,6 @@ class _ShippingMethodCard extends StatefulWidget {
   });
 
   final String name;
-  final String tempLabel;
   final dynamic price;
   final dynamic days;
   final bool isSelected;
@@ -2138,7 +1975,7 @@ class _ShippingMethodCardState extends State<_ShippingMethodCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Row 1: checkbox | name | temp tag | price
+            // Row 1: checkbox | name | price
             Row(
               children: [
                 Container(
@@ -2175,9 +2012,6 @@ class _ShippingMethodCardState extends State<_ShippingMethodCard> {
                     ),
                   ),
                 ),
-                SizedBox(width: 6.w),
-                if (widget.tempLabel.isNotEmpty)
-                  TemperatureTag(label: widget.tempLabel),
                 const Spacer(),
                 Text(
                   'NT\$ ${widget.price}',

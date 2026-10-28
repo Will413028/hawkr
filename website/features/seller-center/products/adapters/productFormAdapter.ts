@@ -3,7 +3,6 @@
  *
  *   - emptyDraft()           initial draft for `mode === "create"`
  *   - applyAiPatch()         merge an AI assistant draft_patch into a draft
- *   - normaliseCertName()    map free-form cert strings ("有機", "tap") to enum
  *   - draftToCreateBody()    strip empty trailing description blocks before
  *                            POST /app/products
  *
@@ -20,26 +19,20 @@ import {
 	WeightUnit,
 } from "@/lib/codemeta/enums";
 import { resolveCdnUrl } from "@/lib/media/cdn";
-import { PRODUCT_CERT_CATALOG } from "@/lib/products/certifications";
 import {
 	compactDescription,
-	DELIVERY_TEMP_CODES,
 	type ImageGalleryUpdate,
-	type ProductCertificationCode,
-	type ProductCertificationEntry,
 	type ProductDescription,
 	type ProductImageDraft,
 	type ProductImageInput,
 	type ProductSku,
 	type ProductWriteBody,
-	parseDeliveryTempCodes,
 	parseDescription,
 	type SellerProductDetail,
 	type SkuWriteInput,
 } from "@/lib/products/seller-repo";
 import type { AiDraftPatch } from "@/lib/seller/ai-listing-chat";
-
-const VALID_CERT_CODES = new Set(PRODUCT_CERT_CATALOG.map((c) => c.code));
+import { AMBIENT_TEMPERATURE_CODE } from "@/lib/seller/ambient-temperature";
 
 const toNum = (v: unknown): number | undefined => {
 	if (v === null || v === undefined || v === "") return undefined;
@@ -58,20 +51,21 @@ const toStr = (v: unknown): string | undefined =>
 function normaliseSkuFromApi(raw: unknown): ProductSku {
 	const r = (raw ?? {}) as Record<string, unknown>;
 	// Shipping methods (handler.ShippingMethodResponse) wire camelCase
-	// `{ type, temperature, feePayer, freeThreshold }`; map onto the draft's
-	// snake_case shape so the 可配送方案 picker re-hydrates on edit.
+	// `{ type, feePayer, freeThreshold }`; map onto the draft's snake_case
+	// shape so the 可配送方案 picker re-hydrates on edit.
 	const rawShipping = Array.isArray(r.shippingMethods) ? r.shippingMethods : [];
 	const shipping_methods = rawShipping
 		.map((m) => {
 			const e = (m ?? {}) as Record<string, unknown>;
 			return {
 				type: toStr(e.type) ?? "",
-				temperature: toStr(e.temperature) ?? "",
 				fee_payer: toStr(e.feePayer) ?? "",
 				free_threshold: toStr(e.freeThreshold) ?? "0",
 			};
 		})
-		.filter((m) => m.type && m.temperature);
+		.filter(
+			(m, i, all) => m.type && all.findIndex((o) => o.type === m.type) === i,
+		);
 	// wire 端一律 camelCase（`handler.SellerSkuResponse`，seller_sku.go:22-33，
 	// dev 實測 `GET /app/products/{id}` 的 skus[] key 集合完全吻合）。左手邊的
 	// snake 是本地草稿型別 `ProductSku` 自己的形狀，與 wire 無關。
@@ -101,9 +95,7 @@ export function emptyDraft(): SellerProductDetail {
 		main_image: "",
 		images: [],
 		tags: [],
-		delivery_temp: [DELIVERY_TEMP_CODES.CHILLED],
 		origin: "",
-		certifications: [],
 		preorder_ship_at: null,
 		low_stock_threshold: 5,
 		expiry_days: 7,
@@ -125,26 +117,6 @@ export function emptyDraft(): SellerProductDetail {
 			},
 		],
 	};
-}
-
-/**
- * Map AI-supplied free-form cert names ("有機", "TAP產銷履歷", etc.) onto the
- * backend CertificationType value ("3701"…). Returns null for unknown strings
- * so we drop them rather than save garbage. Note 友善農法 has no backend code,
- * so it is intentionally dropped.
- */
-export function normaliseCertName(
-	raw: string | undefined,
-): ProductCertificationCode | null {
-	if (!raw) return null;
-	const text = raw.toLowerCase().replace(/\s+/g, "");
-	if (text.includes("organic") || text.includes("有機")) return "3701";
-	if (text.includes("tap") || text.includes("履歷")) return "3702";
-	if (text.includes("cas")) return "3703";
-	if (text.includes("haccp")) return "3704";
-	if (text.includes("iso")) return "3705";
-	if (text.includes("gmp")) return "3706";
-	return null;
 }
 
 /**
@@ -172,9 +144,7 @@ export function applyImagesUpdate(
  * Apply an AI draft_patch event onto an existing draft.
  *   - scalar fields (name / origin / categoryId / description) overwrite
  *   - array fields (tags / skus) replace entirely
- *   - certifications stay unchanged until the manual-review API can own them
- * Mirrors mobile's `mergePatch()` semantics except for the temporary
- * fail-closed certification boundary.
+ * Mirrors mobile's `mergePatch()` semantics.
  */
 export function applyAiPatch(
 	prev: SellerProductDetail,
@@ -191,8 +161,6 @@ export function applyAiPatch(
 		next.description = parseDescription(patch.description);
 	}
 	if (Array.isArray(patch.tags)) next.tags = [...patch.tags];
-	// Manual-review API 尚未上線時，AI draft_patch 也不能繞過唯讀表單新增
-	// 裸認證宣稱；保留既有值，等後端能回傳正式審核狀態後再接申請流程。
 	if (Array.isArray(patch.skus)) {
 		next.skus = patch.skus.map((s, i) => ({
 			id: "",
@@ -258,9 +226,7 @@ export function draftToSubmitBody(
 		if (widthCm) out.widthCm = widthCm;
 		if (heightCm) out.heightCm = heightCm;
 		// 可配送方案 → camelCase `handler.CreateShippingMethodInput`.
-		const shipping = (sku.shipping_methods ?? []).filter(
-			(m) => m.type && m.temperature,
-		);
+		const shipping = (sku.shipping_methods ?? []).filter((m) => m.type);
 		if (shipping.length) {
 			out.shippingMethods = shipping.map((m) => {
 				const feePayer =
@@ -269,7 +235,7 @@ export function draftToSubmitBody(
 						: ShippingFeePayer.BUYER;
 				return {
 					type: m.type,
-					temperature: m.temperature,
+					temperature: AMBIENT_TEMPERATURE_CODE,
 					feePayer,
 					// A threshold is a seller's subsidy condition, never a
 					// buyer-paid shipping rule. Normalise legacy contradictory
@@ -294,47 +260,16 @@ export function draftToSubmitBody(
 		// `ProductUploadService` body and the public list response).
 		hashtags: draft.tags ?? [],
 		origin: draft.origin,
-		// Wire shape is `[{ certNo, name }]` where `name` is the
-		// CertificationType value ("3701"…) — the backend treats it as an
-		// opaque string and the PDP reads it back the same way. Drop entries
-		// with no number.
-		certifications: (draft.certifications ?? [])
-			.filter((c) => (c.certNo ?? "").trim())
-			.map((c) => ({ certNo: (c.certNo ?? "").trim(), name: c.code })),
 		skus,
 		status,
 	};
 	return body;
 }
 
-/**
- * Reconcile an incoming product response into the form's canonical shape.
- *
- * Different backend revisions have shipped the temp field under several
- * names — `deliveryTemp` (camelCase array, current public/Flutter contract),
- * `delivery_temp` (snake_case array, hopeful seller-side mirror), or
- * `temp_layer` (legacy single keyword). Collapse all of them into
- * `delivery_temp: string[]` so the form, validator and submitter only
- * need to think about one shape.
- */
+/** Reconcile an incoming product response into the form's canonical shape. */
 export function normaliseDraftFromApi(
 	raw: SellerProductDetail & Record<string, unknown>,
 ): SellerProductDetail {
-	const tempCandidates = [
-		raw.delivery_temp,
-		(raw as Record<string, unknown>).deliveryTemp,
-		(raw as Record<string, unknown>).deliveryTemps,
-		raw.temp_layer,
-	];
-	let codes: string[] = [];
-	for (const c of tempCandidates) {
-		const parsed = parseDeliveryTempCodes(c);
-		if (parsed.length > 0) {
-			codes = parsed;
-			break;
-		}
-	}
-
 	// Hashtags: backend canonical key is `hashtags` (matches Flutter
 	// `product_upload_service.dart` write and `/public/products` read);
 	// legacy `tags` is the form's old local field name. Accept either
@@ -355,30 +290,6 @@ export function normaliseDraftFromApi(
 				})
 				.map((s) => s.trim())
 				.filter(Boolean)
-		: [];
-
-	// Certifications come back as `[{ certNo, name }]` where `name` is the
-	// CertificationType value ("3701"…). This legacy wire has no review status,
-	// so hydration must not infer that the claim is verified or approved.
-	const rawCerts = (raw as Record<string, unknown>).certifications;
-	const certifications: ProductCertificationEntry[] = Array.isArray(rawCerts)
-		? rawCerts
-				.map((c) => {
-					const rec = (c ?? {}) as Record<string, unknown>;
-					const code = String(rec.name ?? rec.code ?? "").trim();
-					const certNo =
-						typeof rec.certNo === "string"
-							? rec.certNo
-							: typeof rec.cert_no === "string"
-								? rec.cert_no
-								: "";
-					return { code, certNo };
-				})
-				.filter((e) => VALID_CERT_CODES.has(e.code as ProductCertificationCode))
-				.map((e) => ({
-					code: e.code as ProductCertificationCode,
-					certNo: e.certNo,
-				}))
 		: [];
 
 	// 商品分類：detail wire is camelCase (`categoryId` + `categoryLv1/2/3Id`) but
@@ -441,9 +352,7 @@ export function normaliseDraftFromApi(
 		status,
 		category_id,
 		skus,
-		delivery_temp: codes,
 		tags: hashtags,
-		certifications,
 		images,
 		// 主圖 = gallery 第一張；後端另有權威的 `imageKey`（主圖 objectKey，49 §6.1）
 		// 當 gallery 缺圖或該筆組不出 URL 時的來源。

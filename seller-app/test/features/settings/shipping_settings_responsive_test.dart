@@ -1,4 +1,5 @@
 import 'package:hawkr_seller/core/layout/app_media_query_policy.dart';
+import 'package:hawkr_seller/features/settings/presentation/shipping_settings/widgets/common_widgets.dart';
 import 'package:hawkr_seller/features/settings/presentation/shipping_settings/widgets/taqbin_shipping_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -16,9 +17,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     final expanded = ValueNotifier(true);
-    final frozen = ValueNotifier(true);
-    final chilled = ValueNotifier(false);
-    final ambient = ValueNotifier(false);
+    final selected = ValueNotifier(true);
     final city = ValueNotifier<String?>(null);
     final district = ValueNotifier<String?>(null);
     final verified = ValueNotifier(false);
@@ -28,9 +27,7 @@ void main() {
     final address = TextEditingController();
     addTearDown(() {
       expanded.dispose();
-      frozen.dispose();
-      chilled.dispose();
-      ambient.dispose();
+      selected.dispose();
       city.dispose();
       district.dispose();
       verified.dispose();
@@ -59,9 +56,7 @@ void main() {
                   padding: const EdgeInsets.all(16),
                   child: TaqbinShippingSection(
                     expanded: expanded,
-                    frozen: frozen,
-                    chilled: chilled,
-                    ambient: ambient,
+                    selected: selected,
                     nameCtrl: name,
                     phoneCtrl: phone,
                     city: city,
@@ -84,17 +79,11 @@ void main() {
     expect(MediaQuery.textScalerOf(settingsContext).scale(10), 14);
     expect(find.text('聯絡人姓名'), findsOneWidget);
     expect(find.text('驗證地址'), findsOneWidget);
-    final frozenTop = tester.getTopLeft(find.text('冷凍'));
-    final chilledTop = tester.getTopLeft(find.text('冷藏'));
-    final ambientTop = tester.getTopLeft(find.text('常溫'));
-    expect(chilledTop.dy, closeTo(frozenTop.dy, 1));
-    expect(ambientTop.dy, closeTo(frozenTop.dy, 1));
-    expect(frozenTop.dx, lessThan(chilledTop.dx));
-    expect(chilledTop.dx, lessThan(ambientTop.dx));
+    expect(find.text('配送溫層'), findsNothing);
     expect(tester.takeException(), isNull);
-    await tester.tap(find.bySemanticsLabel('配送溫層 冷藏'));
+    await tester.tap(find.byType(CustomCheckbox));
     await tester.pump();
-    expect(chilled.value, isTrue);
+    expect(selected.value, isFalse);
     await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
     await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));

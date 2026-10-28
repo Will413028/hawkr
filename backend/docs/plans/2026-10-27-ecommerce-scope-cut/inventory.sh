@@ -38,5 +38,5 @@ unit="${1:-all}"
 [[ "${unit}" == all || "${unit}" == pricebook ]] &&
 	count pricebook 'pricebook'
 [[ "${unit}" == all || "${unit}" == clientfields ]] &&
-	count clientfields 'temperature|溫層|CHILLED|FROZEN|traceab|產銷履歷|organic|有機|ProductCertification|product-certification'
+	count clientfields '(?<!color)temperature|溫層|CHILLED|(?<![-_a-z])FROZEN(?![-_])|deliveryTemp|delivery_temp|goodsType|goods_type|traceab|產銷履歷|organic|有機(?!會|械)|ProductCertification|product[-_]?certification|certification_types' --pcre2
 exit 0

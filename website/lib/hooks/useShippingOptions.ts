@@ -20,7 +20,6 @@ interface ShippingOptionsState {
 	 * 未知/非 ApiClientError 的失敗維持 undefined，呼叫端不可誤判為某個特定碼。 */
 	errorCode?: number;
 	validationErrors: CheckoutValidationError[];
-	deliveryTempIntersection: string[];
 }
 
 const EMPTY_STATE: ShippingOptionsState = {
@@ -29,7 +28,6 @@ const EMPTY_STATE: ShippingOptionsState = {
 	error: null,
 	errorCode: undefined,
 	validationErrors: [],
-	deliveryTempIntersection: [],
 };
 
 function delay(ms: number, signal?: AbortSignal): Promise<void> {
@@ -91,7 +89,6 @@ export function useShippingOptions(
 				loading: false,
 				error: null,
 				validationErrors: result.errors,
-				deliveryTempIntersection: result.deliveryTempIntersection,
 			};
 		},
 		enabled: ready,

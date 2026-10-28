@@ -132,7 +132,7 @@ void main() {
       expect(sender.phone, '0912345678');
     });
 
-    test('參考紀錄的寄件人值全空時用店家，不去翻另一個溫層', () {
+    test('參考紀錄的寄件人值全空時用店家，不去翻另一筆紀錄', () {
       final sender = cvsSender(_cvsRow('3201'), store);
       expect(sender.name, '王店長');
     });

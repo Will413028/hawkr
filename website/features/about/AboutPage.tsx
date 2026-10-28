@@ -32,7 +32,7 @@ export default function AboutPage() {
 						<div className="hero-copy about-hero-body">
 							<p className="lede">
 								{
-									"「Hawkr」把在地小農、職人商家與冷鏈配送接在一起。從蔬菜水果、蛋奶肉品，到地方工夫食品 ——我們不種田、不下田，只是把好東西從產地誠實地搬到你家。"
+									"「Hawkr」把在地小農、職人商家與配送接在一起。從蔬菜水果、蛋奶肉品，到地方工夫食品 ——我們不種田、不下田，只是把好東西從產地誠實地搬到你家。"
 								}
 							</p>
 
@@ -49,10 +49,6 @@ export default function AboutPage() {
 								<li>
 									<i aria-hidden="true" />
 									在地商家直送
-								</li>
-								<li>
-									<i aria-hidden="true" />
-									冷藏冷凍配送
 								</li>
 								<li>
 									<i aria-hidden="true" />

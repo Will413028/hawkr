@@ -56,7 +56,6 @@ import '../../features/product/presentation/product_setup_info_screen.dart';
 import '../../features/product/presentation/product_setup_media_picker_screen.dart';
 import '../../features/product/presentation/product_setup_picker/product_setup_picker_screen.dart';
 import '../../features/product/presentation/product_setup_spec_screen.dart';
-import '../../features/product/presentation/product_setup_tag_screen.dart';
 import '../../features/report/presentation/block_list_screen.dart';
 import '../../features/report/presentation/my_reports_screen.dart';
 import '../../features/shipment_anomaly/presentation/shipment_anomaly_dashboard_screen.dart';
@@ -128,7 +127,6 @@ class ProductRoutes {
   static const picker = '/product/picker';
   static const info = '/product/info';
   static const images = '/product/images';
-  static const tags = '/product/tags';
   static const specs = '/product/specs';
   static const mediaPicker = '/product/media-picker';
   static const preview = '/product/preview';
@@ -292,10 +290,6 @@ List<Map<String, dynamic>>? _extraMapList(
   String key,
 ) {
   return routeMapList(extra, key);
-}
-
-Map<int, String>? _extraIntStringMap(Map<String, dynamic> extra, String key) {
-  return routeIntStringMap(extra, key);
 }
 
 Widget _invalidRouteData(String label) {
@@ -828,7 +822,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
-        path: ProductRoutes.tags,
+        path: ProductRoutes.specs,
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) {
           final extra = _extractExtraMap(state);
@@ -840,55 +834,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               productName == null ||
               category == null ||
               subCategory == null) {
-            return _invalidRouteData('商品標章');
-          }
-          return ProductSetupTagScreen(
-            images: images,
-            skuId: extra['skuId'],
-            productName: productName,
-            category: category,
-            subCategory: subCategory,
-            catalogId: _extraMapValue<int>(extra, 'catalogId'),
-            isCandidateCategory: _extractExtraValueWithDefault(
-              state,
-              'isCandidateCategory',
-              false,
-            ),
-            l1Id: _extraMapValue<int>(extra, 'l1Id'),
-            l1Name: _extraMapValue<String>(extra, 'l1Name'),
-            l2Id: _extraMapValue<int>(extra, 'l2Id'),
-            l2Name: _extraMapValue<String>(extra, 'l2Name'),
-            l3Name: _extraMapValue<String>(extra, 'l3Name'),
-            origin: _extraMapValue<String>(extra, 'origin'),
-            description: _extraMapValue<String>(extra, 'description'),
-            descriptionBlocks: _extraMapList(extra, 'descriptionBlocks'),
-            descriptionStagedTokens:
-                _extraTypedList<String>(extra, 'descriptionStagedTokens') ??
-                const [],
-            isEditMode: _extractExtraValueWithDefault(
-              state,
-              'isEditMode',
-              false,
-            ),
-            existingProduct: _extraNestedMap(extra, 'existingProduct'),
-          );
-        },
-      ),
-      GoRoute(
-        path: ProductRoutes.specs,
-        parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) {
-          final extra = _extractExtraMap(state);
-          final images = _extraTypedList<Uint8List>(extra, 'images');
-          final productName = _extraMapValue<String>(extra, 'productName');
-          final category = _extraMapValue<String>(extra, 'category');
-          final subCategory = _extraMapValue<String>(extra, 'subCategory');
-          final selectedTags = _extraIntStringMap(extra, 'selectedTags');
-          if (images == null ||
-              productName == null ||
-              category == null ||
-              subCategory == null ||
-              selectedTags == null) {
             return _invalidRouteData('商品規格');
           }
           return ProductSetupSpecScreen(
@@ -914,7 +859,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             descriptionStagedTokens:
                 _extraTypedList<String>(extra, 'descriptionStagedTokens') ??
                 const [],
-            selectedTags: selectedTags,
             isEditMode: _extractExtraValueWithDefault(
               state,
               'isEditMode',

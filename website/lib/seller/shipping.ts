@@ -3,9 +3,7 @@
  *
  * Mirrors the Flutter seller app's shipping_settings flow. Backend has
  * two carriers — 黑貓宅配（home_delivery） and 7-11 店到店（cvs） — both
- * gated by PayUni's KYC pipeline. Each carrier × temperature layer is a
- * separate onboarding row (e.g. 7-11 + 常溫 and 7-11 + 冷凍 are two
- * independent toggles).
+ * gated by PayUni's KYC pipeline. Each carrier is one onboarding row.
  *
  * State machine (payuni_submit_status):
  *   ""    → 4301 NONE       initial; show "開通"
@@ -19,6 +17,7 @@
 
 import { authedFetch } from "@/lib/api/client";
 import { ShippingMethod } from "@/lib/codemeta/enums";
+import { AMBIENT_TEMPERATURE_CODE } from "@/lib/seller/ambient-temperature";
 import { toLogisticsName } from "@/lib/seller/certification-options";
 
 /* ===== Code-meta enums (mirroring Flutter codemeta) ===== */
@@ -28,13 +27,6 @@ export const SHIPPING_TYPE = {
 	CVS: "3651", // 7-11 店到店
 } as const;
 export type ShippingType = (typeof SHIPPING_TYPE)[keyof typeof SHIPPING_TYPE];
-
-export const GOODS_TYPE = {
-	AMBIENT: "3201", // 常溫
-	CHILLED: "3202", // 冷藏
-	FROZEN: "3203", // 冷凍
-} as const;
-export type GoodsType = (typeof GOODS_TYPE)[keyof typeof GOODS_TYPE];
 
 export const PAYUNI_SUBMIT_STATUS = {
 	NONE: "4301",
@@ -60,7 +52,7 @@ export type OnboardingStatus =
 export interface ShippingOnboarding {
 	onboardingId?: string;
 	shippingType?: string; // ShippingType but tolerate strings from older payloads
-	goodsType?: string; // GoodsType
+	goodsType?: string;
 	enabled?: string; // "true" / "false"
 	payuniSubmitStatus?: string; // PayuniSubmitStatus
 	providerMessage?: string;
@@ -120,7 +112,6 @@ export interface SubmitCvsInput {
 	senderPhone: string;
 	returnStoreCode: string;
 	returnStoreName?: string;
-	goodsType: GoodsType;
 }
 
 export async function submitCvsOnboarding(
@@ -128,13 +119,16 @@ export async function submitCvsOnboarding(
 ): Promise<ShippingOnboarding> {
 	const env = await authedFetch<ShippingOnboarding>(
 		"/app/shipping_onboardings/cvs",
-		{ method: "POST", json: body },
+		{
+			method: "POST",
+			json: { ...body, goodsType: AMBIENT_TEMPERATURE_CODE },
+		},
 	);
 	return env.data ?? {};
 }
 
 /**
- * Flip a previously-onboarded carrier × goodsType row on/off without
+ * Flip a previously-onboarded carrier row on/off without
  * resubmitting to PayUni. Only valid when `onboardingId` exists.
  */
 export async function toggleOnboarding(
@@ -269,7 +263,7 @@ export function unsupportedOnboardingTypes(
 export function findOnboarding(
 	rows: ShippingOnboarding[],
 	shippingType: ShippingType,
-	goodsType?: GoodsType,
+	goodsType?: string,
 ): ShippingOnboarding | undefined {
 	return rows.find(
 		(r) =>
@@ -323,51 +317,34 @@ export function statusLabel(o: ShippingOnboarding | undefined): string {
 export type ShippingMethodOpenState =
 	| "open" // 已開通且啟用，可選
 	| "disabled" // 已開通但在物流設定停用
-	| "not_opened" // 尚未開通
-	| "unsupported"; // 此物流商不提供此溫層（如 7-11 冷藏）
+	| "not_opened"; // 尚未開通
 
 /**
- * 判斷賣家是否已在「物流設定」開通某個 物流商 × 溫層，給商品上架的可配送方案
+ * 判斷賣家是否已在「物流設定」開通某個物流商，給商品上架的可配送方案
  * picker 用：未開通的方案要顯示「尚未開通」而不是「此尺寸 / 重量不可配送」。
  *
- * - 黑貓宅急便（TAQBIN）是單一 home_delivery onboarding，審核通過即涵蓋全部溫層，
- *   物流設定頁也沒有 per-溫層 停用開關，故 approved 即視為 open。
- * - 7-11 店到店（SEVEN_ELEVEN）為 per-溫層 onboarding，且只支援常溫 / 冷凍；
- *   冷藏無法開通 → "unsupported"，其餘溫層依 approved + enabled 判斷。
+ * - 黑貓宅急便（TAQBIN）是單一 home_delivery onboarding，物流設定頁也沒有停用開關，
+ *   故 approved 即視為 open。
+ * - 7-11 店到店（SEVEN_ELEVEN）依 approved + enabled 判斷。
  *
  * 未知物流商回 "open"，讓呼叫端維持既有（尺寸 / 重量）文案、不誤報未開通。
  */
 export function shippingMethodOpenState(
 	rows: ShippingOnboarding[],
 	method: string,
-	temperature: string,
 ): ShippingMethodOpenState {
 	if (method === ShippingMethod.TAQBIN) {
 		const row = findOnboarding(rows, SHIPPING_TYPE.HOME_DELIVERY);
 		return isApproved(row) ? "open" : "not_opened";
 	}
 	if (method === ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP) {
-		if (temperature === GOODS_TYPE.CHILLED) return "unsupported";
 		const row = findOnboarding(
 			rows,
 			SHIPPING_TYPE.CVS,
-			temperature as GoodsType,
+			AMBIENT_TEMPERATURE_CODE,
 		);
 		if (!isApproved(row)) return "not_opened";
 		return isEnabled(row) ? "open" : "disabled";
 	}
 	return "open";
-}
-
-export function goodsTypeLabel(g: GoodsType | string | undefined): string {
-	switch (g) {
-		case GOODS_TYPE.AMBIENT:
-			return "常溫";
-		case GOODS_TYPE.CHILLED:
-			return "冷藏";
-		case GOODS_TYPE.FROZEN:
-			return "冷凍";
-		default:
-			return String(g ?? "");
-	}
 }

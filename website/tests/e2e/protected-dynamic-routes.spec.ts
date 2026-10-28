@@ -365,7 +365,6 @@ const IMPORT_ITEM_DETAIL = {
 	commitRevision: "0",
 	origin: "台灣",
 	hashtags: ["路由測試"],
-	certifications: [],
 	targetStatus: "DRAFT",
 };
 
@@ -456,7 +455,6 @@ const IMPORT_PREVIEW_DETAIL = {
 		origin: "台灣",
 		description: '{"version":"1.0","blocks":[]}',
 		gallery: [],
-		certifications: [],
 		priceMin: "120",
 		priceMax: "120",
 		skus: [
@@ -1116,9 +1114,7 @@ const ROUTE_CASES: readonly DynamicRouteCase[] = [
 					categoryId: 301,
 					categoryName: "葉菜類",
 					tags: ["路由測試"],
-					deliveryTemp: [],
 					origin: "台灣",
-					certifications: [],
 					status: 0,
 					skus: [
 						{

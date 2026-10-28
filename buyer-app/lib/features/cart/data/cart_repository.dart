@@ -64,7 +64,6 @@ class CartRepository {
       final groups = <CartMerchantGroup>[];
       final allItems = <CartItem>[];
       final stockBySku = <int, int>{};
-      final deliveryTempsBySku = <int, List<String>>{};
       final productIdsBySku = <int, String>{};
       final lockedSkuIds = <int>{};
 
@@ -92,11 +91,6 @@ class CartRepository {
 
           final stock = _asInt(item['stockQty'] ?? item['stock']);
           if (stock != null) stockBySku[skuId] = stock;
-
-          final deliveryTemps = _stringList(item['deliveryTemps']);
-          if (deliveryTemps.isNotEmpty) {
-            deliveryTempsBySku[skuId] = deliveryTemps;
-          }
 
           final productId = item['productId']?.toString().trim() ?? '';
           if (productId.isNotEmpty) productIdsBySku[skuId] = productId;
@@ -142,7 +136,6 @@ class CartRepository {
         groups: groups,
         items: allItems,
         stockBySku: stockBySku,
-        deliveryTempsBySku: deliveryTempsBySku,
         productIdsBySku: productIdsBySku,
         lockedSkuIds: lockedSkuIds,
         estimatedTotalAmount: _moneyAsInt(data['estimatedTotalAmount']),
@@ -410,14 +403,6 @@ class CartRepository {
     return List<Map<String, dynamic>>.unmodifiable(
       value.map(_asStringMap).whereType<Map<String, dynamic>>(),
     );
-  }
-
-  static List<String> _stringList(Object? value) {
-    if (value == null) return const [];
-    if (value is List) {
-      return value.map((item) => item.toString()).toList(growable: false);
-    }
-    return [value.toString()];
   }
 
   static int? _asInt(Object? value) => int.tryParse(value?.toString() ?? '');

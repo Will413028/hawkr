@@ -19,7 +19,7 @@ import 'app_colors.dart';
 /// Text('小蕃茄',   style: AppTypography.productName);
 /// Text('NT$ 999',  style: AppTypography.priceTotal);
 /// Text('數量',     style: AppTypography.body);
-/// Text('配送溫層', style: AppTypography.meta);
+/// Text('配送方式', style: AppTypography.meta);
 /// Text('暫無評價', style: AppTypography.metaMuted);
 /// ```
 class AppTypography {

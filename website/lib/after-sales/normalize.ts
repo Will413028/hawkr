@@ -101,7 +101,6 @@ export function normalizeCase(raw: Wire): AfterSaleCase {
 			raw.shipBackDeadlineAt,
 			raw.ship_back_deadline_at,
 		),
-		temperatureCode: optStr(raw.temperatureCode, raw.temperature_code),
 		shippingAddress: optStr(raw.shippingAddress, raw.shipping_address),
 	};
 }

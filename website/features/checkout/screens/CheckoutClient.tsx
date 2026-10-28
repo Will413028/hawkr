@@ -46,7 +46,6 @@ import {
 	PAYMENT_METHOD_INELIGIBLE_REASON_LABEL,
 	PaymentMethod as PaymentMethodCode,
 	SHIPPING_METHOD_LABEL,
-	SHIPPING_TEMPERATURE_LABEL,
 	ShippingMethod as ShippingMethodCode,
 } from "@/lib/codemeta/enums";
 import { getEnv } from "@/lib/config/env";
@@ -217,15 +216,6 @@ function shippingMethodLabel(value: string, fallback?: string) {
 		fallback ||
 		SHIPPING_METHOD_LABEL[value as keyof typeof SHIPPING_METHOD_LABEL] ||
 		value
-	);
-}
-
-function temperatureLabel(value?: string) {
-	if (!value) return "";
-	return (
-		SHIPPING_TEMPERATURE_LABEL[
-			value as keyof typeof SHIPPING_TEMPERATURE_LABEL
-		] ?? value
 	);
 }
 
@@ -1555,12 +1545,9 @@ export default function CheckoutClient() {
 									draft.shipping.method,
 									draft.shipping.label,
 								)}
-								detail={[
-									temperatureLabel(draft.shipping.deliveryTemp),
-									draft.shipping.fee === 0 ? "免運" : money(draft.shipping.fee),
-								]
-									.filter(Boolean)
-									.join(" · ")}
+								detail={
+									draft.shipping.fee === 0 ? "免運" : money(draft.shipping.fee)
+								}
 							/>
 							<LockedCard
 								label={isStorePickup ? "取貨門市" : "收件資料"}

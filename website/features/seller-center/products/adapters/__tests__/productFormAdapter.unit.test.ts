@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { __setEnvForTest, getEnv } from "@/lib/config/env";
 import type { SellerProductDetail } from "@/lib/products/seller-repo";
+import { AMBIENT_TEMPERATURE_CODE } from "@/lib/seller/ambient-temperature";
 import {
 	applyAiPatch,
 	applyImagesUpdate,
@@ -40,6 +41,31 @@ describe("draftToSubmitBody status", () => {
 	it("passes through an existing CodeMeta string status", () => {
 		const draft = { ...emptyDraft(), status: "4003" as unknown as number };
 		expect(draftToSubmitBody(draft).status).toBe("4003");
+	});
+});
+
+describe("shipping methods per carrier", () => {
+	it("loads one entry per carrier and submits it once with the ambient constant", () => {
+		const draft = normaliseDraftFromApi({
+			...emptyDraft(),
+			skus: [
+				{
+					shippingMethods: [
+						{ type: "3001", temperature: "3201", feePayer: "3101" },
+						{ type: "3001", temperature: "3202", feePayer: "3101" },
+						{ type: "3001", temperature: "3203", feePayer: "3101" },
+					],
+				},
+			],
+		} as never);
+		const body = draftToSubmitBody(draft);
+		const sent = (body.skus?.[0] as { shippingMethods: unknown[] })
+			.shippingMethods;
+		expect(sent).toHaveLength(1);
+		expect(sent[0]).toMatchObject({
+			type: "3001",
+			temperature: AMBIENT_TEMPERATURE_CODE,
+		});
 	});
 });
 
@@ -110,36 +136,6 @@ describe("normaliseDraftFromApi status", () => {
 	it("coerces 4003 (下架) → 2", () => expect(norm("4003")).toBe(2));
 	it("coerces 4001 (草稿) → 0", () => expect(norm("4001")).toBe(0));
 	it("maps 審核中/unknown → 0 (draft)", () => expect(norm("4002")).toBe(0));
-});
-
-describe("normaliseDraftFromApi certifications", () => {
-	it("hydrates a legacy certificate without inventing verified or approved state", () => {
-		const draft = normaliseDraftFromApi({
-			...emptyDraft(),
-			certifications: [{ name: "3702", certNo: "58589605051" }],
-		} as never);
-
-		expect(draft.certifications).toEqual([
-			{ code: "3702", certNo: "58589605051" },
-		]);
-		expect(draft.certifications?.[0]).not.toHaveProperty("verified");
-		expect(draft.certifications?.[0]).not.toHaveProperty("approved");
-	});
-});
-
-describe("applyAiPatch certifications", () => {
-	it("does not let an AI patch bypass the manual-review application boundary", () => {
-		const existing = { code: "3702" as const, certNo: "58589605051" };
-		const draft = { ...emptyDraft(), certifications: [existing] };
-
-		const next = applyAiPatch(draft, {
-			certifications: [{ name: "有機" }],
-		});
-
-		expect(next.certifications).toEqual([existing]);
-		expect(next.certifications?.[0]).not.toHaveProperty("verified");
-		expect(next.certifications?.[0]).not.toHaveProperty("approved");
-	});
 });
 
 /**

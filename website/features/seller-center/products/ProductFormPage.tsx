@@ -20,7 +20,6 @@ import AiAssistantPanel, {
 } from "@/features/seller/components/AiAssistantPanel";
 import ShelfStatusControl from "../components/ShelfStatusControl";
 import { resolveStatusButtons } from "./adapters/productFormAdapter";
-import ProductCreationCertifications from "./components/ProductCreationCertifications";
 import ProductFormSections, {
 	LOCKED_SURFACE_CLASS,
 	LockedOverlay,
@@ -63,8 +62,6 @@ export default function ProductFormPage({ mode, productId }: Props) {
 		setStep(Math.min(LAST_STEP, Math.max(1, next)));
 		if (typeof window !== "undefined") window.scrollTo({ top: 0 });
 	};
-
-	if (form.createdProduct) return <ProductCreationCertifications form={form} />;
 
 	if (form.loading) {
 		// Skeleton silhouette mirroring the real form (header + stacked section
@@ -249,11 +246,7 @@ export default function ProductFormPage({ mode, productId }: Props) {
 						{form.draft.name || "未命名商品"}
 					</strong>
 					<span className="text-xs text-hk-muted">
-						{form.draft.skus?.length ?? 0} 規格 ·{" "}
-						{mode === "create"
-							? form.certificationDrafts.length
-							: (form.draft.certifications?.length ?? 0)}{" "}
-						認證{mode === "create" ? "待送出" : ""}
+						{form.draft.skus?.length ?? 0} 規格
 					</span>
 				</div>
 				<div className="flex gap-2 flex-wrap justify-end">

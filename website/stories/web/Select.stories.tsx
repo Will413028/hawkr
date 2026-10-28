@@ -6,15 +6,14 @@ const meta = {
 	title: "Web/Forms/Select",
 	component: Select,
 	args: {
-		label: "配送溫層",
-		placeholder: "請選擇溫層",
+		label: "配送方式",
+		placeholder: "請選擇配送方式",
 		defaultValue: "",
 		isRequired: true,
 		children: (
 			<>
-				<option value="ambient">常溫</option>
-				<option value="chilled">冷藏</option>
-				<option value="frozen">冷凍</option>
+				<option value="home">宅配</option>
+				<option value="store">超商取貨</option>
 			</>
 		),
 	},
@@ -36,30 +35,30 @@ const meta = {
 } satisfies Meta<typeof Select>;
 export default meta;
 type Story = StoryObj<typeof meta>;
-export const ChooseTemperature: Story = {
+export const ChooseDeliveryMethod: Story = {
 	play: async ({ canvas }) => {
-		const select = canvas.getByRole("combobox", { name: /配送溫層/ });
-		await userEvent.selectOptions(select, "chilled");
-		await expect(select).toHaveValue("chilled");
+		const select = canvas.getByRole("combobox", { name: /配送方式/ });
+		await userEvent.selectOptions(select, "store");
+		await expect(select).toHaveValue("store");
 	},
 };
 export const Invalid: Story = {
-	args: { isInvalid: true, errorMessage: "請選擇配送溫層" },
+	args: { isInvalid: true, errorMessage: "請選擇配送方式" },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("combobox")).toHaveAttribute(
 			"aria-invalid",
 			"true",
 		);
 		await expect(canvas.getByRole("combobox")).toHaveAccessibleDescription(
-			"請選擇配送溫層",
+			"請選擇配送方式",
 		);
 	},
 };
 export const Disabled: Story = {
 	args: {
 		disabled: true,
-		defaultValue: "frozen",
-		description: "此商品的溫層已固定",
+		defaultValue: "store",
+		description: "此商品的配送方式已固定",
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("combobox")).toBeDisabled();

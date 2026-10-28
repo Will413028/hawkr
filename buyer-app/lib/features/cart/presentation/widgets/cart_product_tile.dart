@@ -1,20 +1,16 @@
-import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'dart:math' as math;
 
 import '../cart_typography.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
-import 'package:hawkr_buyer/core/theme/app_typography.dart';
 import 'package:hawkr_buyer/core/theme/hk_tokens.dart';
-import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/widgets/quantity_stepper.dart';
 import 'package:flutter/material.dart';
 
 import '../../data/cart_model.dart';
-import 'temperature_tags.dart';
 
 /// 購物車商品列。
 ///
-/// 手機版將數量與價格放在縮圖旁，品名、規格與原溫層標籤保留完整寬度；
+/// 手機版將數量與價格放在縮圖旁，品名與規格保留完整寬度；
 /// 寬螢幕再合併為橫向商品列。
 class CartProductTile extends StatelessWidget {
   const CartProductTile({
@@ -23,7 +19,6 @@ class CartProductTile extends StatelessWidget {
     required this.isChecked,
     this.remainingStock,
     this.imageProvider,
-    required this.itemDeliveryTemps,
     required this.onCheckChanged,
     required this.onQuantityChanged,
   });
@@ -32,7 +27,6 @@ class CartProductTile extends StatelessWidget {
   final bool isChecked;
   final int? remainingStock;
   final ImageProvider? imageProvider;
-  final Map<int, List<String>> itemDeliveryTemps;
   final ValueChanged<bool> onCheckChanged;
   final ValueChanged<int> onQuantityChanged;
 
@@ -365,8 +359,6 @@ class CartProductTile extends StatelessWidget {
             overflow: expanded ? TextOverflow.visible : TextOverflow.ellipsis,
           ),
         ],
-        const SizedBox(height: HkSpace.xs),
-        _buildDeliveryTempRow(),
       ],
     );
   }
@@ -447,26 +439,6 @@ class CartProductTile extends StatelessWidget {
             fontWeight: lowStock ? FontWeight.w600 : FontWeight.w400,
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildDeliveryTempRow() {
-    final temps = itemDeliveryTemps[item.skuId];
-    final hasTags = temps != null && temps.isNotEmpty;
-
-    return Wrap(
-      crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: HkSpace.xs,
-      runSpacing: HkSpace.xs,
-      children: [
-        const Icon(
-          AppIcons.thermostatOutlined,
-          size: 16,
-          color: AppIconColors.muted,
-        ),
-        Text('配送溫層', style: AppTypography.metaMuted),
-        if (hasTags) buildTemperatureTags(item.skuId, itemDeliveryTemps),
       ],
     );
   }

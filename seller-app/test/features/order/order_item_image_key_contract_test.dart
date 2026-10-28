@@ -36,7 +36,6 @@ Map<String, dynamic> _liveListOrder() => <String, dynamic>{
   'sellerCity': '桃園市',
   'sellerDistrict': '中壢區',
   'shippingMethod': '3001',
-  'deliveryTemp': '3201',
   'buyerId': '2623900520',
   'statusTime': '2026-07-28T15:49:27.346782Z',
   'statusSummary': '訂單已取消。',

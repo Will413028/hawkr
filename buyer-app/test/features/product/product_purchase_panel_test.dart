@@ -1,5 +1,3 @@
-import 'package:hawkr_buyer/shared/widgets/hk_temperature_tag.dart';
-
 import 'package:hawkr_buyer/core/layout/app_media_query_policy.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/core/theme/app_typography.dart';
@@ -87,7 +85,7 @@ void main() {
     });
   });
 
-  testWidgets('delivery metadata uses document icon and exact carrier mark', (
+  testWidgets('delivery metadata shows the label and exact carrier mark', (
     tester,
   ) async {
     await _pumpAt(
@@ -95,21 +93,18 @@ void main() {
       width: 320,
       textScale: 1.4,
       child: const ProductDeliveryMetadata(
-        temperatureCodes: <String>['3201', '3202', '3203'],
         shippingMethodCodes: <String>['3001'],
       ),
     );
 
-    final icon = tester.widget<HkIcon>(
-      find.byKey(const ValueKey('product-purchase-delivery-icon')),
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('product-purchase-delivery-metadata')),
+        matching: find.text('配送方式'),
+      ),
+      findsOneWidget,
     );
-    expect(icon.name, HkIconName.document);
-    expect(icon.size, 16);
-    expect(find.text('配送溫層'), findsOneWidget);
-    expect(find.text('常溫'), findsOneWidget);
-    expect(find.text('冷藏'), findsOneWidget);
-    expect(find.text('冷凍'), findsOneWidget);
-    expect(find.byType(HkTemperatureTag), findsNWidgets(3));
+    expect(find.text('配送溫層'), findsNothing);
 
     final carrier = find.byKey(const ValueKey('product-purchase-carrier-3001'));
     expect(tester.getSize(carrier), const Size.square(24));
@@ -138,7 +133,6 @@ void main() {
               imageUrl: '',
               rating: 4.8,
               reviewCount: 326,
-              temperatureCodes: <String>['3203'],
               shippingMethodCodes: <String>['3001'],
               loading: false,
             ),

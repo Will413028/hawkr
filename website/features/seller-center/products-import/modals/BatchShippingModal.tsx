@@ -4,13 +4,10 @@ import * as React from "react";
 import Button from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { useNotificationToast } from "@/lib/notifications/toast-context";
-import { SHIPPING_TEMP_LABEL, SHIPPING_TYPE_LABEL, UI_TEXT } from "../i18n";
+import { AMBIENT_TEMPERATURE_CODE } from "@/lib/seller/ambient-temperature";
+import { SHIPPING_TYPE_LABEL, UI_TEXT } from "../i18n";
 import { batchUpdateItemsShipping } from "../repo";
-import {
-	type BatchShippingMethod,
-	SHIPPING_TEMPERATURE,
-	type ShippingTemperatureValue,
-} from "../types";
+import type { BatchShippingMethod } from "../types";
 
 interface Props {
 	open: boolean;
@@ -24,21 +21,13 @@ type ShippingTypeKey = "TAQBIN" | "SEVEN";
 
 interface RowState {
 	enabled: boolean;
-	temperature: ShippingTemperatureValue;
 	freeThreshold: string;
 }
 
 const SHIPPING_TYPES: ShippingTypeKey[] = ["TAQBIN", "SEVEN"];
-const TEMP_OPTIONS: ShippingTemperatureValue[] = [
-	SHIPPING_TEMPERATURE.AMBIENT,
-	SHIPPING_TEMPERATURE.CHILLED,
-	SHIPPING_TEMPERATURE.FROZEN,
-];
-
 function initialRow(): RowState {
 	return {
 		enabled: false,
-		temperature: SHIPPING_TEMPERATURE.AMBIENT,
 		freeThreshold: "",
 	};
 }
@@ -79,7 +68,10 @@ export function BatchShippingModal({
 			(k) => rows[k].enabled,
 		).map((k) => {
 			const r = rows[k];
-			const m: BatchShippingMethod = { type: k, temperature: r.temperature };
+			const m: BatchShippingMethod = {
+				type: k,
+				temperature: AMBIENT_TEMPERATURE_CODE,
+			};
 			const trimmed = r.freeThreshold.trim();
 			if (trimmed !== "") m.freeThreshold = trimmed;
 			return m;
@@ -166,28 +158,7 @@ export function BatchShippingModal({
 									<span>套用此運送方式：{SHIPPING_TYPE_LABEL[k]}</span>
 								</label>
 								{r.enabled ? (
-									<div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-										<label className="space-y-1 text-xs">
-											<span className="block text-[var(--hkui-default-600)]">
-												溫層
-											</span>
-											<select
-												value={r.temperature}
-												onChange={(e) =>
-													patch(k, {
-														temperature: e.target
-															.value as ShippingTemperatureValue,
-													})
-												}
-												className="h-9 w-full rounded border border-[var(--hkui-default-300)] bg-white px-2 text-sm"
-											>
-												{TEMP_OPTIONS.map((t) => (
-													<option key={t} value={t}>
-														{SHIPPING_TEMP_LABEL[t]}
-													</option>
-												))}
-											</select>
-										</label>
+									<div className="mt-3 grid grid-cols-1 gap-3">
 										<label className="space-y-1 text-xs">
 											<span className="block text-[var(--hkui-default-600)]">
 												{UI_TEXT.shippingModal.freeThresholdLabel}

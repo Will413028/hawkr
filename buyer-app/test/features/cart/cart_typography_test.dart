@@ -8,7 +8,6 @@ import 'package:hawkr_buyer/features/cart/presentation/widgets/cart_product_tile
 import 'package:hawkr_buyer/features/cart/presentation/widgets/cart_top_bar.dart';
 import 'package:hawkr_buyer/features/cart/presentation/widgets/delivery_notes_section.dart';
 import 'package:hawkr_buyer/features/cart/presentation/widgets/payment_details_section.dart';
-import 'package:hawkr_buyer/features/cart/presentation/widgets/temperature_tags.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -69,9 +68,6 @@ void main() {
                                 ),
                                 isChecked: true,
                                 remainingStock: 5,
-                                itemDeliveryTemps: const {
-                                  101: ['3202'],
-                                },
                                 onCheckChanged: (_) {},
                                 onQuantityChanged: (_) {},
                               ),
@@ -182,17 +178,6 @@ void main() {
               actualBody.textScaler.scale(body.fontSize!),
               closeTo(16 * expectedScale, 0.001),
             );
-            // The Web-aligned temperature badge is an independent type role.
-            final temperature = tester.widget<Text>(find.text('冷藏')).style!;
-            expect(
-              (
-                temperature.fontSize,
-                temperature.height,
-                temperature.fontWeight,
-              ),
-              (11, 16 / 11, FontWeight.w700),
-            );
-            expect(temperature.color, tempColorMap['3202']);
             expect(
               tester.getSize(find.bySemanticsLabel('增加數量')),
               const Size.square(48),

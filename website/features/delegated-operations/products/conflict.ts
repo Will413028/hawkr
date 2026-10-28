@@ -1,8 +1,5 @@
 import type { ProductDescription } from "@/lib/products/seller-repo";
-import type {
-	DelegatedProductCertification,
-	DelegatedProductDetail,
-} from "./repo";
+import type { DelegatedProductDetail } from "./repo";
 
 /**
  * 版本衝突（9266）的合流規則（§3.4 版本衝突契約／設計書 L5346）。
@@ -31,7 +28,6 @@ export interface DelegatedProductFormDraft {
 	origin: string;
 	description: ProductDescription;
 	/** `name` 存的是 `CertificationType` 碼值，不是中文名（見 `./certifications`）。 */
-	certifications: DelegatedProductCertification[];
 	skus: Record<string, DelegatedSkuDraft>;
 }
 
@@ -56,7 +52,6 @@ export function draftFromDetail(
 		description: detail.description,
 		// 複製一份：表單會就地增刪，共用同一個陣列會讓「有沒有改過」的比較恆為 true
 		// （detail 那一份跟著一起變）⇒ 送出鍵永遠可按、送出去卻是一筆空變更。
-		certifications: detail.certifications.map((cert) => ({ ...cert })),
 		skus,
 	};
 }
@@ -65,8 +60,7 @@ export function draftFromDetail(
  * 「複製我的內容」：以 `latest` 為基底，保留 `mine` 打過的欄位。
  *
  * 四條規則，每一條都對應一個「不這樣做就會壞資料」的理由：
- * 1. **我自己填的欄位保留我的**（`name`／`categoryId`／`origin`／`description`／
- *    `certifications`）—— 那正是操作者不想白打的東西；差異會出現在下一次確認抽屜的
+ * 1. **我自己填的欄位保留我的**（`name`／`categoryId`／`origin`／`description`）—— 那正是操作者不想白打的東西；差異會出現在下一次確認抽屜的
  *    三欄表裡，由他自己判斷要不要蓋過去。
  * 2. **規格以 `latest` 為準集合**：賣家在這段期間新增的規格要出現（否則我送出的
  *    `skus` 陣列少一筆，而 product-service 對非空 `skus` 是**整份對齊** ⇒ 那一筆
@@ -92,7 +86,6 @@ export function keepMyEdits(
 		categoryId: mine.categoryId || base.categoryId,
 		origin: mine.origin,
 		description: mine.description,
-		certifications: mine.certifications.map((cert) => ({ ...cert })),
 		skus,
 	};
 }

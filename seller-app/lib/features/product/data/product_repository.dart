@@ -42,7 +42,6 @@ class ProductRepository with ApiRequestHelper {
     List<Map<String, dynamic>>? descriptionBlocks,
     List<Map<String, dynamic>>? images,
     List<Map<String, dynamic>>? skus,
-    List<Map<String, dynamic>>? certifications,
     String? status,
   }) async {
     Map<String, dynamic>? descriptionInput;
@@ -67,8 +66,6 @@ class ProductRepository with ApiRequestHelper {
         if (descriptionInput != null) 'description': descriptionInput,
         if (images != null && images.isNotEmpty) 'images': images,
         if (skus != null && skus.isNotEmpty) 'skus': skus,
-        if (certifications != null && certifications.isNotEmpty)
-          'certifications': certifications,
         if (status != null) 'status': status,
       },
     );
@@ -84,7 +81,6 @@ class ProductRepository with ApiRequestHelper {
     List<Map<String, dynamic>>? descriptionBlocks,
     List<Map<String, dynamic>>? images,
     List<Map<String, dynamic>>? skus,
-    List<Map<String, dynamic>>? certifications,
     String? status,
   }) async {
     Map<String, dynamic>? descriptionInput;
@@ -109,7 +105,6 @@ class ProductRepository with ApiRequestHelper {
         if (descriptionInput != null) 'description': descriptionInput,
         if (images != null) 'images': images,
         if (skus != null) 'skus': skus,
-        if (certifications != null) 'certifications': certifications,
         if (status != null) 'status': status,
       },
     );
@@ -133,24 +128,6 @@ class ProductRepository with ApiRequestHelper {
 
   Future<Map<String, dynamic>> getProductSkus(dynamic productId) async {
     return apiGet('/api/v1/app/products/$productId/skus');
-  }
-
-  Future<bool> verifyCertification({
-    required String certNo,
-    required String type,
-  }) async {
-    final result = await apiGet(
-      '/api/v1/app/products/certifications/verify',
-      queryParams: {'cert_no': certNo, 'type': type},
-    );
-    final data = result['data'];
-    if (data is Map<String, dynamic>) {
-      final exists = data['exists'];
-      if (exists is bool) return exists;
-      final normalized = exists?.toString().toLowerCase().trim() ?? '';
-      return normalized == 'true' || normalized == '1';
-    }
-    return false;
   }
 
   // ── 評論 ─────────────────────────────────────────────
@@ -194,7 +171,7 @@ class ProductRepository with ApiRequestHelper {
 
   /// 查詢配送報價
   /// POST /app/shipping_quotes
-  /// 根據包裝尺寸與重量回傳可用配送方式、運費、溫層
+  /// 根據包裝尺寸與重量回傳可用配送方式與運費
   Future<Map<String, dynamic>> getShippingQuotes({
     required String length,
     required String width,

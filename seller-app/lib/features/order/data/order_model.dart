@@ -147,7 +147,6 @@ abstract class OrderSummary with _$OrderSummary {
     @Default('') String recipientName,
     @Default('') String shippingAddress,
     @Default('') String shippingMethod,
-    @Default('') String deliveryTemp,
     @Default('') String buyerAvatar,
     @Default('') String pickupStoreName,
     @Default('') String statusSummary,
@@ -304,7 +303,6 @@ abstract class OrderSummary with _$OrderSummary {
     // Gateway 的 json tag 一律 camelCase。
     final recipientName = OrderSummary._str(j['recipientName']);
     final shippingMethod = OrderSummary._str(j['shippingMethod']);
-    final deliveryTemp = OrderSummary._str(j['deliveryTemp']);
     final pickupStoreName = OrderSummary._str(j['pickupStoreName']);
     final statusSummary = OrderSummary._str(j['statusSummary']);
     final cancelReason = OrderSummary._str(j['cancelReason']);
@@ -363,7 +361,6 @@ abstract class OrderSummary with _$OrderSummary {
       recipientName: recipientName,
       shippingAddress: address,
       shippingMethod: shippingMethod,
-      deliveryTemp: deliveryTemp,
       pickupStoreName: pickupStoreName,
       buyerAvatar: buyerAvatar,
       statusSummary: statusSummary,

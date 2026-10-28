@@ -270,7 +270,6 @@ const _order = Order(
   shippingAddress: '桃園市桃園區鎮撫街1號',
   shippingMethod: '3001',
   shippingStatus: '210',
-  deliveryTemp: '3203',
   itemCount: '2',
   items: [
     OrderItem(

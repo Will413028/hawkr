@@ -1,4 +1,3 @@
-import 'package:hawkr_buyer/shared/widgets/hk_temperature_tag.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/core/theme/app_typography.dart';
 import 'package:hawkr_buyer/core/theme/hk_tokens.dart';
@@ -1177,17 +1176,11 @@ class _AfterSaleCaseSection extends StatelessWidget {
 }
 
 class _InfoLine extends StatelessWidget {
-  const _InfoLine({
-    required this.label,
-    required this.value,
-    this.valueColor,
-    this.valueWidget,
-  });
+  const _InfoLine({required this.label, required this.value, this.valueColor});
 
   final String label;
   final String value;
   final Color? valueColor;
-  final Widget? valueWidget;
 
   @override
   Widget build(BuildContext context) {
@@ -1203,15 +1196,13 @@ class _InfoLine extends StatelessWidget {
         ),
         SizedBox(width: 10.w),
         Expanded(
-          child:
-              valueWidget ??
-              Text(
-                value.ifEmpty('—'),
-                textAlign: TextAlign.end,
-                style: _valueStyle().copyWith(
-                  color: valueColor ?? AppColors.textEmphasis,
-                ),
-              ),
+          child: Text(
+            value.ifEmpty('—'),
+            textAlign: TextAlign.end,
+            style: _valueStyle().copyWith(
+              color: valueColor ?? AppColors.textEmphasis,
+            ),
+          ),
         ),
       ],
     );
@@ -1509,15 +1500,6 @@ class _OrderInfoCard extends StatelessWidget {
         _InfoLine(label: '聯絡電話', value: order.recipientPhone),
       if (deliveryText.isNotEmpty)
         _InfoLine(label: '配送方式', value: deliveryText),
-      if (order.deliveryTemp.trim().isNotEmpty)
-        _InfoLine(
-          label: '配送溫層',
-          value: '',
-          valueWidget: Align(
-            alignment: Alignment.centerRight,
-            child: HkTemperatureTag(value: order.deliveryTemp),
-          ),
-        ),
       if (order.shipmentNo.isNotEmpty)
         _CopyableInfoRow(label: '物流單號', value: order.shipmentNo),
     ];

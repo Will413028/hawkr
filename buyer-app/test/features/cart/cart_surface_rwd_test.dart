@@ -32,9 +32,6 @@ void main() {
                   item: _firstItem.copyWith(count: quantity),
                   isChecked: selected,
                   remainingStock: 99,
-                  itemDeliveryTemps: const {
-                    101: ['3203'],
-                  },
                   onCheckChanged: (value) => setState(() => selected = value),
                   onQuantityChanged: (value) =>
                       setState(() => quantity = value),
@@ -48,7 +45,6 @@ void main() {
           expect(find.text('NT\$999'), findsOneWidget);
           expect(find.text('NT\$1299'), findsOneWidget);
           expect(find.text('庫存 99 件'), findsOneWidget);
-          expect(find.text('冷凍'), findsOneWidget);
 
           final selection = find.bySemanticsLabel('取消選取台東嚴選茂谷柑禮盒');
           final selectionSize = tester.getSize(selection);
@@ -112,9 +108,6 @@ void main() {
                   ),
                   checkedSkuIds: const {101},
                   skuStock: const {101: 2000},
-                  itemDeliveryTemps: const {
-                    101: ['3203'],
-                  },
                   onGroupCheckChanged: (_, _) => selectionChanges++,
                   onItemCheckChanged: (_, _) => selectionChanges++,
                   onQuantityChanged: (_, value) => nextQuantity = value,
@@ -163,7 +156,6 @@ void main() {
             await tester.tap(plus);
             expect(nextQuantity, count + 1);
             expect(selectionChanges, 0);
-            expect(find.text('冷凍'), findsOneWidget);
             expect(tester.takeException(), isNull);
           } finally {
             semantics.dispose();
@@ -195,9 +187,6 @@ void main() {
                   ),
                   isChecked: purchasable,
                   remainingStock: purchasable ? count + 1 : 0,
-                  itemDeliveryTemps: const {
-                    101: ['3203'],
-                  },
                   onCheckChanged: (_) => selectionChanges++,
                   onQuantityChanged: (_) => quantityChanges++,
                 ),
@@ -258,10 +247,6 @@ void main() {
           group: _merchantGroup,
           checkedSkuIds: const {101},
           skuStock: const {101: 99, 102: 93},
-          itemDeliveryTemps: const {
-            101: ['3203'],
-            102: ['3203'],
-          },
           onGroupCheckChanged: (_, _) {},
           onItemCheckChanged: (_, _) {},
           onQuantityChanged: (_, _) {},
@@ -383,7 +368,7 @@ void main() {
     );
 
     expect(find.text('產地低溫專車配送'), findsWidgets);
-    expect(find.text('冷凍'), findsOneWidget);
+    expect(find.text('冷凍'), findsNothing);
     expect(find.text('NT\$ 12345'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

@@ -3,6 +3,7 @@ import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/core/theme/app_typography.dart';
 import 'package:hawkr_seller/core/theme/hk_tokens.dart';
 import 'package:hawkr_seller/core/codemeta/code_meta.dart';
+import 'package:hawkr_seller/core/networking/ambient_shipping_temperature.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/utils/hk_log.dart';
 import 'package:hawkr_seller/shared/utils/floating_toast.dart';
@@ -45,9 +46,7 @@ class ShippingSettingsScreen extends HookConsumerWidget {
 
     // 黑貓宅急便狀態
     final taqbinExpanded = useState(true);
-    final taqbinFrozen = useState(false);
-    final taqbinChilled = useState(false);
-    final taqbinAmbient = useState(false);
+    final taqbinSelected = useState(false);
     final taqbinLocked = useState(false); // 寄件資料已交給 PayUni（4302、4303）
     // backend-payuni#666 四態：'' / '4301' NONE / '4302' REQUESTED / '4303' SUCCEEDED / '4304' FAILED
     final taqbinPayuniStatus = useState<String>('');
@@ -62,8 +61,7 @@ class ShippingSettingsScreen extends HookConsumerWidget {
 
     // 7-11店到店狀態
     final cvsExpanded = useState(true);
-    final cvsFrozen = useState(false);
-    final cvsAmbient = useState(false);
+    final cvsSelected = useState(false);
     final cvsEnabled = useState(false); // 7-11是否已启用
     final cvsSenderLocked = useState(false); // 參考列已交給 PayUni（4302、4303）
     final cvsProcessing = useState(false); // 參考列 4302 處理中
@@ -72,12 +70,10 @@ class ShippingSettingsScreen extends HookConsumerWidget {
     final selectedStoreName = useState<String?>(null);
     final selectedStoreCode = useState<String?>(null);
     final cvsInitialSnapshot = useState<String>('');
-    // 已建店後增刪溫層改用 toggle endpoint，所以要記每個 goodsType 的 onboarding_id
+    // 已建店後啟停改用 toggle endpoint，所以要記 onboarding_id
     // 與初始啟用狀態，才能跟使用者目前勾選比對出 enable / disable。
-    final cvsFrozenOnboardingId = useState<String?>(null);
-    final cvsAmbientOnboardingId = useState<String?>(null);
-    final cvsFrozenInitialEnabled = useState(false);
-    final cvsAmbientInitialEnabled = useState(false);
+    final cvsOnboardingId = useState<String?>(null);
+    final cvsInitialEnabled = useState(false);
     final shippingController = ref.read(
       shippingSettingsControllerProvider.notifier,
     );
@@ -90,8 +86,7 @@ class ShippingSettingsScreen extends HookConsumerWidget {
 
     String buildCvsSnapshot() {
       return [
-        cvsFrozen.value ? '1' : '0',
-        cvsAmbient.value ? '1' : '0',
+        cvsSelected.value ? '1' : '0',
         normalizeText(cvsNameCtrl.text),
         normalizeText(cvsPhoneCtrl.text),
         normalizeText(selectedStoreCode.value),
@@ -108,10 +103,8 @@ class ShippingSettingsScreen extends HookConsumerWidget {
           '[ShippingSettings] onboardings loaded: '
           '${bootstrap.onboardings.length}',
         );
-        // 同 website 的 findOnboarding：黑貓取第一筆，7-11 以常溫為準、沒有才用冷凍。
         Map<String, dynamic>? homeRow;
-        Map<String, dynamic>? cvsAmbientRow;
-        Map<String, dynamic>? cvsFrozenRow;
+        Map<String, dynamic>? cvsRow;
         var cvsToggleable = false;
         for (final o in bootstrap.onboardings) {
           final type = o['shippingType']?.toString() ?? '';
@@ -130,7 +123,7 @@ class ShippingSettingsScreen extends HookConsumerWidget {
           } else if (onboardingType == ShippingType.cvsC2c) {
             // 後端有兩個獨立維度：
             //  - payuniSubmitStatus 4303 且有 onboardingId = 已建店（一次性，跟 PayUni 對接結果）
-            //  - enabled "true"/"false" = 各溫層 toggle 狀態（用 toggle endpoint 切換）
+            //  - enabled "true"/"false" = toggle 狀態（用 toggle endpoint 切換）
             // checkbox 應反映 enabled 字串，而非從 payuniSubmitStatus 推算。
             final actualEnabled = o['enabled']?.toString() == 'true';
             final onboardingId =
@@ -138,21 +131,13 @@ class ShippingSettingsScreen extends HookConsumerWidget {
                 o['onboarding_id']?.toString() ??
                 o['id']?.toString() ??
                 '';
-            if (goods == ShippingTemperature.frozen.value) {
-              cvsFrozenRow ??= o;
+            if (goods == kAmbientShippingTemperature) {
+              cvsRow ??= o;
               if (onboardingId.isNotEmpty) {
-                cvsFrozenOnboardingId.value = onboardingId;
+                cvsOnboardingId.value = onboardingId;
               }
-              cvsFrozenInitialEnabled.value = actualEnabled;
-              cvsFrozen.value = actualEnabled;
-            }
-            if (goods == ShippingTemperature.ambient.value) {
-              cvsAmbientRow ??= o;
-              if (onboardingId.isNotEmpty) {
-                cvsAmbientOnboardingId.value = onboardingId;
-              }
-              cvsAmbientInitialEnabled.value = actualEnabled;
-              cvsAmbient.value = actualEnabled;
+              cvsInitialEnabled.value = actualEnabled;
+              cvsSelected.value = actualEnabled;
             }
             // 已建店 → 後續 add/remove 走 toggle endpoint
             if (isShippingRowToggleable(o)) cvsToggleable = true;
@@ -178,13 +163,11 @@ class ShippingSettingsScreen extends HookConsumerWidget {
           }
           // 只有 4302、4303 鎖定；失敗與其他狀態可以重新送出。
           if (isShippingRowLocked(homeRow)) {
-            taqbinFrozen.value = true;
-            taqbinChilled.value = true;
-            taqbinAmbient.value = true;
+            taqbinSelected.value = true;
             taqbinLocked.value = true;
           }
         }
-        final cvsReference = cvsAmbientRow ?? cvsFrozenRow;
+        final cvsReference = cvsRow;
         if (cvsReference != null) {
           cvsEnabled.value = cvsToggleable;
           cvsSenderLocked.value = isShippingRowLocked(cvsReference);
@@ -284,9 +267,8 @@ class ShippingSettingsScreen extends HookConsumerWidget {
       }
     }
 
-    final hasTaqbin =
-        taqbinFrozen.value || taqbinChilled.value || taqbinAmbient.value;
-    final hasCvs = cvsFrozen.value || cvsAmbient.value;
+    final hasTaqbin = taqbinSelected.value;
+    final hasCvs = cvsSelected.value;
     final cvsDirty = cvsInitialSnapshot.value != buildCvsSnapshot();
     void toggleTaqbinExpanded() {
       taqbinExpanded.value = !taqbinExpanded.value;
@@ -301,7 +283,7 @@ class ShippingSettingsScreen extends HookConsumerWidget {
       final confirmed = await showAppConfirmDialog(
         context,
         title: '確認開通黑貓物流？',
-        message: '開通後，黑貓的溫層與收貨 / 退貨地址將不可在 App 內修改。',
+        message: '開通後，黑貓的收貨 / 退貨地址將不可在 App 內修改。',
         cancelText: '返回修改',
         confirmText: '確認開通',
       );
@@ -380,8 +362,8 @@ class ShippingSettingsScreen extends HookConsumerWidget {
     // 開通7-11物流
     //
     // 規則：
-    // - 第一次啟用某個 goodsType（沒有 onboarding_id）→ POST /shipping_onboardings/cvs 建店
-    // - 已建店後增刪溫層 → POST /shipping_onboardings/{onboarding_id}/toggle 切換啟用
+    // - 第一次啟用（沒有 onboarding_id）→ POST /shipping_onboardings/cvs 建店
+    // - 已建店後啟停 → POST /shipping_onboardings/{onboarding_id}/toggle 切換啟用
     Future<void> onActivateCvs() async {
       if (saving.value || cvsMutationCoordinator.isRunning) return;
 
@@ -419,38 +401,18 @@ class ShippingSettingsScreen extends HookConsumerWidget {
 
         final outcome = await cvsMutationCoordinator.apply([
           CvsGoodsTypeMutation(
-            type: CvsGoodsType.frozen,
-            goodsType: ShippingTemperature.frozen.value,
-            initialEnabled: cvsFrozenInitialEnabled.value,
-            targetEnabled: cvsFrozen.value,
-            onboardingId: cvsFrozenOnboardingId.value,
-            createBody: cvsBody,
-          ),
-          CvsGoodsTypeMutation(
-            type: CvsGoodsType.ambient,
-            goodsType: ShippingTemperature.ambient.value,
-            initialEnabled: cvsAmbientInitialEnabled.value,
-            targetEnabled: cvsAmbient.value,
-            onboardingId: cvsAmbientOnboardingId.value,
+            initialEnabled: cvsInitialEnabled.value,
+            targetEnabled: cvsSelected.value,
+            onboardingId: cvsOnboardingId.value,
             createBody: cvsBody,
           ),
         ]);
 
         if (!context.mounted) return;
-        // Checkpoint each successful step immediately. If the next step fails,
-        // rebuilding the plan from these values retries only the pending step.
         for (final applied in outcome.completed) {
-          switch (applied.mutation.type) {
-            case CvsGoodsType.frozen:
-              cvsFrozenInitialEnabled.value = applied.mutation.targetEnabled;
-              if (applied.onboardingId case final id?) {
-                cvsFrozenOnboardingId.value = id;
-              }
-            case CvsGoodsType.ambient:
-              cvsAmbientInitialEnabled.value = applied.mutation.targetEnabled;
-              if (applied.onboardingId case final id?) {
-                cvsAmbientOnboardingId.value = id;
-              }
+          cvsInitialEnabled.value = applied.mutation.targetEnabled;
+          if (applied.onboardingId case final id?) {
+            cvsOnboardingId.value = id;
           }
         }
         if (outcome.completed.any((item) => item.mutation.targetEnabled)) {
@@ -465,17 +427,10 @@ class ShippingSettingsScreen extends HookConsumerWidget {
           return;
         }
 
-        final failedLabel = outcome.failedMutation?.label ?? '物流';
-        final completedLabels = outcome.completed
-            .map((item) => item.mutation.label)
-            .join('、');
-        final checkpointMessage = completedLabels.isEmpty
-            ? ''
-            : '$completedLabels已更新；';
         FloatingToast.error(
           context,
-          '$checkpointMessage$failedLabel更新失敗：'
-          '${outcome.error?.message ?? '請稍後再試'}。請重試未完成項目',
+          '${outcome.failedMutation?.label ?? '物流'}更新失敗：'
+          '${outcome.error?.message ?? '請稍後再試'}。請重試',
         );
       } finally {
         if (context.mounted) saving.value = false;
@@ -524,7 +479,7 @@ class ShippingSettingsScreen extends HookConsumerWidget {
                           children: [
                             const HkPageSection(
                               title: '配送方式',
-                              description: '選擇商品可使用的配送溫層；開通前請確認聯絡人與退貨資料。',
+                              description: '開通前請確認聯絡人與退貨資料。',
                             ),
                             const SizedBox(height: HkSpace.lg),
 
@@ -533,9 +488,7 @@ class ShippingSettingsScreen extends HookConsumerWidget {
                               expanded: taqbinExpanded,
                               onToggleExpanded: toggleTaqbinExpanded,
                               enabled: taqbinLocked.value,
-                              frozen: taqbinFrozen,
-                              chilled: taqbinChilled,
-                              ambient: taqbinAmbient,
+                              selected: taqbinSelected,
                               nameCtrl: homeNameCtrl,
                               phoneCtrl: homePhoneCtrl,
                               city: homeCity,
@@ -772,8 +725,7 @@ class ShippingSettingsScreen extends HookConsumerWidget {
                               onToggleExpanded: toggleCvsExpanded,
                               enabled: cvsEnabled.value,
                               senderLocked: cvsSenderLocked.value,
-                              frozen: cvsFrozen,
-                              ambient: cvsAmbient,
+                              selected: cvsSelected,
                               nameCtrl: cvsNameCtrl,
                               phoneCtrl: cvsPhoneCtrl,
                               selectedStoreName: selectedStoreName,
@@ -792,7 +744,7 @@ class ShippingSettingsScreen extends HookConsumerWidget {
                                 SizedBox(height: 16.h),
                               ] else if (!cvsEnabled.value || cvsDirty) ...[
                                 SaveButton(
-                                  // 已開通後，即使全部取消（disable 兩個溫層）也要允許 toggle save
+                                  // 已開通後，即使取消勾選也要允許 toggle save
                                   canSave: cvsEnabled.value || hasCvs,
                                   saving: saving.value,
                                   onSave: onActivateCvs,

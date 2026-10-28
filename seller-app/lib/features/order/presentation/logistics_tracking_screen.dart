@@ -1,4 +1,3 @@
-import '../../../shared/widgets/hk_temperature_tag.dart';
 import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
@@ -285,8 +284,6 @@ class _LogisticsTrackingScreenState
                   ),
                 ),
               ),
-              SizedBox(width: 8.w),
-              HkTemperatureTag(value: info.goodsTypeText),
               const Spacer(),
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),

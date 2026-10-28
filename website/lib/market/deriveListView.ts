@@ -12,11 +12,7 @@
  */
 
 import type { AppliedChip } from "@/features/market/components/AppliedFilters";
-import type {
-	SidebarCertLink,
-	SidebarHashtagLink,
-	SidebarTempLink,
-} from "@/features/market/products/MarketProductsListLayout";
+import type { SidebarHashtagLink } from "@/features/market/products/MarketProductsListLayout";
 import {
 	type CategoryNode,
 	findCategoryId,
@@ -25,13 +21,6 @@ import {
 	mapSort,
 	normaliseCategorySelections,
 } from "@/lib/market/listFilters";
-import { CERTIFICATION_LABEL_BY_VALUE } from "@/lib/products/certifications";
-
-const TEMP_OPTIONS: Array<{ value: string; label: string }> = [
-	{ value: "ambient", label: "常溫" },
-	{ value: "chilled", label: "冷藏" },
-	{ value: "frozen", label: "冷凍" },
-];
 
 const SORT_OPTIONS: Array<{ value: string; label: string }> = [
 	{ value: "推薦", label: "推薦" },
@@ -48,11 +37,9 @@ export interface MarketListParams {
 	/** Legacy single-value category param, merged with `categories` (csv). */
 	category?: string;
 	categories?: string;
-	temp?: string;
 	priceMin?: string;
 	priceMax?: string;
 	hashtags?: string;
-	certification_types?: string;
 	sort?: string;
 	tab?: string;
 }
@@ -64,11 +51,9 @@ export interface MarketListData {
 
 export interface MarketListView {
 	currentCategories: string[];
-	currentTemp: string;
 	currentPriceMin: string;
 	currentPriceMax: string;
 	currentHashtags: string[];
-	currentCertificationTypes: string[];
 	currentSort: string;
 	currentQuery: string;
 	currentTab: "recommend" | "follow" | "nearby";
@@ -78,10 +63,7 @@ export interface MarketListView {
 	appliedChips: AppliedChip[];
 	clearAllHref: string;
 	sortLinks: Array<{ value: string; label: string; href: string }>;
-	tempLinks: SidebarTempLink[];
-	certLinks: SidebarCertLink[];
 	hashtagLinks: SidebarHashtagLink[];
-	clearTempHref: string;
 }
 
 function readCsv(value: string | undefined): string[] {
@@ -132,11 +114,9 @@ export function deriveMarketListView(
 		}
 		return list;
 	})();
-	const currentTemp = params.temp ?? "";
 	const currentPriceMin = params.priceMin ?? "";
 	const currentPriceMax = params.priceMax ?? "";
 	const currentHashtags = readCsv(params.hashtags);
-	const currentCertificationTypes = readCsv(params.certification_types);
 	const currentSort = params.sort ?? "推薦";
 	const currentQuery = params.q ?? "";
 	const rawTab = (params.tab ?? "").toLowerCase();
@@ -166,16 +146,6 @@ export function deriveMarketListView(
 		return buildHref({ hashtags: next.length ? next.join(",") : undefined });
 	};
 
-	const toggleCertHref = (code: string) => {
-		const has = currentCertificationTypes.includes(code);
-		const next = has
-			? currentCertificationTypes.filter((c) => c !== code)
-			: [...currentCertificationTypes, code];
-		return buildHref({
-			certification_types: next.length ? next.join(",") : undefined,
-		});
-	};
-
 	// New category-picker writes stable ids. Older links that carry names are
 	// canonicalised here after the tree arrives, so both schemas keep working.
 	const currentCategories = normaliseCategorySelections(
@@ -184,11 +154,9 @@ export function deriveMarketListView(
 	);
 	const hasActiveFilters = Boolean(
 		currentCategories.length ||
-			currentTemp ||
 			currentPriceMin ||
 			currentPriceMax ||
 			currentHashtags.length ||
-			currentCertificationTypes.length ||
 			currentQuery,
 	);
 	// Resolve every selection token to a backend id, drop nulls, join as CSV.
@@ -229,32 +197,12 @@ export function deriveMarketListView(
 		keyword: currentQuery,
 		categoryId: categoryIdCsv,
 		sort: mapSort(currentSort),
-		temp: currentTemp || undefined,
 		priceMin: priceMinNumOpt,
 		priceMax: priceMaxNumOpt,
 		hashtags: currentHashtags.length ? currentHashtags : undefined,
-		certificationTypes: currentCertificationTypes.length
-			? currentCertificationTypes
-			: undefined,
 		followedSellerOnly: isFollowTab || undefined,
 	};
 
-	const tempLinks: SidebarTempLink[] = TEMP_OPTIONS.map((opt) => ({
-		value: opt.value,
-		label: opt.label,
-		href: buildHref({
-			temp: opt.value === currentTemp ? undefined : opt.value,
-		}),
-		active: opt.value === currentTemp,
-	}));
-	const certLinks: SidebarCertLink[] = Object.entries(
-		CERTIFICATION_LABEL_BY_VALUE,
-	).map(([code, label]) => ({
-		code,
-		label,
-		href: toggleCertHref(code),
-		active: currentCertificationTypes.includes(code),
-	}));
 	const hashtagLinks: SidebarHashtagLink[] = trendingHashtags.map((tag) => ({
 		name: tag.name,
 		label: tag.label || `#${tag.name}`,
@@ -262,8 +210,7 @@ export function deriveMarketListView(
 		active: currentHashtags.includes(tag.name),
 	}));
 
-	// Applied chips — order preserved: keyword → category → temp →
-	// price → hashtags → certification.
+	// Applied chips — order preserved: keyword → category → price → hashtags.
 	const appliedChips: AppliedChip[] = [];
 	if (currentQuery) {
 		appliedChips.push({
@@ -289,18 +236,6 @@ export function deriveMarketListView(
 			ariaLabel: `移除分類 ${parent ? `${parent} > ${name}` : name}`,
 		});
 	}
-	if (currentTemp) {
-		const label =
-			TEMP_OPTIONS.find((o) => o.value === currentTemp)?.label ?? currentTemp;
-		appliedChips.push({
-			key: "temp",
-			kind: "temp",
-			label: "溫層",
-			value: label,
-			href: buildHref({ temp: undefined }),
-			ariaLabel: `移除溫層 ${label}`,
-		});
-	}
 	if (currentPriceMin || currentPriceMax) {
 		const value = `${currentPriceMin ? `NT$ ${currentPriceMin}` : "NT$ 0"} – ${
 			currentPriceMax ? `NT$ ${currentPriceMax}` : "不限"
@@ -323,17 +258,6 @@ export function deriveMarketListView(
 			ariaLabel: `移除標籤 ${tag}`,
 		});
 	}
-	for (const code of currentCertificationTypes) {
-		const label = CERTIFICATION_LABEL_BY_VALUE[code] ?? code;
-		appliedChips.push({
-			key: `cert-${code}`,
-			kind: "certification",
-			label: "認證",
-			value: label,
-			href: toggleCertHref(code),
-			ariaLabel: `移除認證 ${label}`,
-		});
-	}
 	const clearAllHref = (() => {
 		const next = new URLSearchParams();
 		if (currentSort !== "推薦") next.set("sort", currentSort);
@@ -350,11 +274,9 @@ export function deriveMarketListView(
 
 	return {
 		currentCategories,
-		currentTemp,
 		currentPriceMin,
 		currentPriceMax,
 		currentHashtags,
-		currentCertificationTypes,
 		currentSort,
 		currentQuery,
 		currentTab,
@@ -364,9 +286,6 @@ export function deriveMarketListView(
 		appliedChips,
 		clearAllHref,
 		sortLinks,
-		tempLinks,
-		certLinks,
 		hashtagLinks,
-		clearTempHref: buildHref({ temp: undefined }),
 	};
 }

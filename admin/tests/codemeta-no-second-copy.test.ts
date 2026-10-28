@@ -600,18 +600,11 @@ test("稽核內容對話框走共用 Dialog（a11y 三件套在 Dialog 內），
  *   修好之後該長的樣子，完整性改由型別與 review 守（同 `product-status.ts` 的處境）。
  * - 收齊的手抄表（六個值一個不漏地重打一次）。那種不會有「某個值顯示成原碼」的症狀，
  *   代價是漂移；靠 review。
- *   （2026-08-27 實測坐實：把 `ProductCertificationValidity` 六個值一字不漏手抄成
- *   `Record<string, string>` 取代 `codeLabel`，`pnpm test` 仍是 exit 0。）
  * - 🔴 **只有 3 個成員的值域：這道 gate 對它不存在任何「會被抓到」的狀態**——是結構性的，
  *   不是漏網。`incompleteDomains` 的判定是 `present.length >= 3 && missing.length > 0`，
  *   而這兩個條件對 3 成員值域互斥：手抄完整表 ⇒ `missing = 0` 不報；漏掉一個 ⇒
  *   `present = 2 < 3` 也不報。同一個 `>= 3` 門檻由三支共用（數字鍵 `findPartialTables`、
  *   字串鍵 `findPartialStringTables`、`<option>` 下拉），所以三支對它同時失明。
- *
- *   現有實例：`ProductCertificationActorRole`（SYSTEM／SELLER／ADMIN）。2026-08-27 在
- *   `product-certifications/[id]` 的審核紀錄「操作者」欄實測，手抄完整 3/3 表與漏掉
- *   ADMIN 的 2/3 表（畫面會顯示 undefined）都是 exit 0。
- *   ⚠️ **那個值域的正確性目前只有 code review 在守，不是機制——這支綠燈不代表它安全。**
  *
  *   為什麼不把門檻降到 2：那三個標籤（系統／賣家／管理員）都是通用詞，降門檻會讓大量
  *   無關頁面誤報——實測 `Sidebar.tsx` 的導覽區塊標題 `section: "系統"` 與

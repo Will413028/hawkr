@@ -425,7 +425,7 @@ class ProductSetupImageScreen extends HookConsumerWidget {
       if (!context.mounted) return;
 
       final result = await context.push(
-        '/product/tags',
+        '/product/specs',
         extra: {
           'images': renderedImages,
           'skuId': skuId,

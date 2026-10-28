@@ -21,8 +21,7 @@ class CvsShippingSection extends HookConsumerWidget {
     this.onToggleExpanded,
     this.enabled = false,
     this.senderLocked = false,
-    required this.frozen,
-    required this.ambient,
+    required this.selected,
     required this.nameCtrl,
     required this.phoneCtrl,
     required this.selectedStoreName,
@@ -36,8 +35,7 @@ class CvsShippingSection extends HookConsumerWidget {
 
   /// 寄件人與退貨門市已交給 PayUni（4302、4303），不可修改。
   final bool senderLocked;
-  final ValueNotifier<bool> frozen;
-  final ValueNotifier<bool> ambient;
+  final ValueNotifier<bool> selected;
   final TextEditingController nameCtrl;
   final TextEditingController phoneCtrl;
   final ValueNotifier<String?> selectedStoreName;
@@ -46,8 +44,6 @@ class CvsShippingSection extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hasCvs = frozen.value || ambient.value;
-
     return HkContentCard(
       key: const ValueKey('shipping-cvs-card'),
       padding: EdgeInsets.zero,
@@ -69,12 +65,8 @@ class CvsShippingSection extends HookConsumerWidget {
                   child: Row(
                     children: [
                       CustomCheckbox(
-                        checked: hasCvs,
-                        onTap: () {
-                          final next = !hasCvs;
-                          frozen.value = next;
-                          ambient.value = next;
-                        },
+                        checked: selected.value,
+                        onTap: () => selected.value = !selected.value,
                         semanticLabel: '7-11 店到店',
                       ),
                       const SizedBox(width: HkSpace.sm),
@@ -87,7 +79,7 @@ class CvsShippingSection extends HookConsumerWidget {
                             Text('7-11 店到店', style: AppTypography.sectionTitle),
                             const SizedBox(height: HkSpace.xs),
                             Text(
-                              enabled ? '已開通，可調整配送溫層' : '超商取貨與退貨門市',
+                              enabled ? '已開通' : '超商取貨與退貨門市',
                               style: AppTypography.metaMuted,
                             ),
                           ],
@@ -122,41 +114,6 @@ class CvsShippingSection extends HookConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('配送溫層', style: _labelStyle),
-                      const SizedBox(height: HkSpace.sm),
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceMuted,
-                          borderRadius: BorderRadius.circular(HkRadius.lg),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: HkSpace.md,
-                            vertical: HkSpace.xs,
-                          ),
-                          child: Column(
-                            children: [
-                              CvsRow(
-                                tempLabel: '冷凍',
-                                code: 'FROZEN',
-                                checked: frozen.value,
-                                onTap: () => frozen.value = !frozen.value,
-                              ),
-                              const Divider(
-                                height: 1,
-                                color: AppColors.cardBorder,
-                              ),
-                              CvsRow(
-                                tempLabel: '常溫',
-                                code: 'AMBIENT',
-                                checked: ambient.value,
-                                onTap: () => ambient.value = !ambient.value,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: HkSpace.xl),
                       Row(
                         children: [
                           const HkIcon(

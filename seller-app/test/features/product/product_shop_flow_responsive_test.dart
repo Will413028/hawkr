@@ -1,5 +1,3 @@
-import 'dart:ui' show Tristate;
-
 import 'package:hawkr_seller/core/theme/app_theme.dart';
 import 'package:hawkr_seller/features/product/data/product_repository.dart';
 import 'package:hawkr_seller/features/product/presentation/product_preview_screen.dart';
@@ -9,7 +7,6 @@ import 'package:hawkr_seller/features/product/presentation/product_setup_picker/
 import 'package:hawkr_seller/features/product/presentation/product_setup_picker/picker_category_search_row.dart';
 import 'package:hawkr_seller/features/product/presentation/product_setup_info_screen.dart';
 import 'package:hawkr_seller/features/product/presentation/product_setup_image_screen.dart';
-import 'package:hawkr_seller/features/product/presentation/product_setup_tag_screen.dart';
 import 'package:hawkr_seller/features/seller/data/seller_repository.dart';
 import 'package:hawkr_seller/features/product/presentation/product_setup_spec_screen.dart';
 import 'package:dio/dio.dart';
@@ -44,7 +41,6 @@ class _FixtureRepository extends ProductRepository {
           'stockQty': 99999999,
         },
       ],
-      'deliveryTemp': ['3201', '3202', '3203'],
     },
   };
 
@@ -164,18 +160,11 @@ void main() {
       category: '蔬果',
       subCategory: '水果',
     ),
-    'tags': const ProductSetupTagScreen(
-      images: [],
-      productName: _longName,
-      category: '蔬果',
-      subCategory: '水果',
-    ),
     'specs': const ProductSetupSpecScreen(
       images: [],
       productName: _longName,
       category: '蔬果',
       subCategory: '水果',
-      selectedTags: {},
     ),
   };
 
@@ -275,42 +264,6 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
-
-  testWidgets('certification dialog remains scrollable above the keyboard', (
-    tester,
-  ) async {
-    await _pump(tester, screens['tags']!, size: const Size(320, 700));
-    await tester.tap(find.text('有機農產品標章'));
-    await tester.pumpAndSettle();
-    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
-    addTearDown(tester.view.resetViewInsets);
-    await tester.pumpAndSettle();
-    expect(tester.takeException(), isNull);
-    final confirmation = tester.getSemantics(find.bySemanticsLabel('確認認證'));
-    expect(
-      confirmation.getSemanticsData().flagsCollection.isEnabled,
-      Tristate.isFalse,
-    );
-    await tester.ensureVisible(find.byType(TextField));
-    await tester.enterText(find.byType(TextField), '1-001-123456');
-    await tester.pump();
-    expect(find.text('1-001-123456'), findsOneWidget);
-    expect(
-      tester
-          .getSemantics(find.bySemanticsLabel('確認認證'))
-          .getSemanticsData()
-          .flagsCollection
-          .isEnabled,
-      Tristate.isTrue,
-    );
-    final cancel = find.bySemanticsLabel('取消認證');
-    await tester.ensureVisible(cancel);
-    expect(tester.getSize(cancel).height, greaterThanOrEqualTo(48));
-    await tester.tap(cancel);
-    await tester.pumpAndSettle();
-    expect(find.byType(Dialog), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
 
   for (final size in [const Size(320, 700), const Size(874, 402)]) {
     testWidgets('info keyboard fits $size and focused field stays reachable', (

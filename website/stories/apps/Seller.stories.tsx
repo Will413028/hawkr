@@ -28,10 +28,6 @@ export const Chips: Story = { args: { component: "chips" } };
 export const Cards: Story = { args: { component: "cards" } };
 export const States: Story = { args: { component: "states" } };
 export const Commerce: Story = { args: { component: "commerce" } };
-export const TemperatureTags: Story = { args: { component: "commerce" } };
-export const TemperatureTagsLargeText: Story = {
-	args: { component: "commerce", width: 320, textScale: "1.4" },
-};
 export const CompactLargeText: Story = {
 	args: { width: 320, textScale: "1.4" },
 };

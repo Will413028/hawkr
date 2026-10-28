@@ -10,14 +10,13 @@ import { useDragScroll } from "@/lib/hooks/useDragScroll";
 type CompactCategoryItem = {
 	label: string;
 	href: string;
-	highlight?: boolean;
 	separatorBefore?: boolean;
 	/** Registry glyph inside a circular frame. */
 	icon?: AppIconName;
 	/** Tailwind class for the icon's circular frame — lets each icon chip
 	 * carry a distinct accent ring. */
 	frameClass?: string;
-	/** One of the nine food categories; never used by promo/cert chips. */
+	/** One of the nine food categories; never used by promo chips. */
 	categoryId?: HawkrAgentCategoryId;
 };
 
@@ -80,26 +79,6 @@ const compactCategories: CompactCategoryItem[] = [
 		href: "/market/products?categories=花卉",
 		categoryId: "flowers",
 	},
-	// Right-side cert block — separated visually from the categories so
-	// it reads as a "trust filter" group rather than another taxonomy.
-	// Routed via ?certification_types=<CertificationType value> so it filters
-	// on product certifications (有機=3701 / 產銷履歷=3702), matching what
-	// sellers store in certifications[].name.
-	{
-		label: "有機",
-		href: "/market/products?certification_types=3701",
-		icon: "leaf",
-		frameClass: "home-chip-frame--primary",
-		highlight: true,
-		separatorBefore: true,
-	},
-	{
-		label: "產銷履歷",
-		href: "/market/products?certification_types=3702",
-		icon: "verified",
-		frameClass: "home-chip-frame--primary",
-		highlight: true,
-	},
 ];
 
 export default function HomeCompactCategoryNav() {
@@ -152,13 +131,7 @@ function CompactCategoryChip({ item }: CompactCategoryChipProps) {
 					</span>
 				) : null}
 			</span>
-			<span
-				className={
-					item.highlight
-						? "whitespace-nowrap text-xs font-black text-hk-primary"
-						: "whitespace-nowrap text-xs font-bold text-hk-heading"
-				}
-			>
+			<span className="whitespace-nowrap text-xs font-bold text-hk-heading">
 				{item.label}
 			</span>
 		</>

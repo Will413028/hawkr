@@ -291,7 +291,6 @@ export interface UnavailableItem {
 
 export interface CheckoutValidateResult {
 	valid: boolean;
-	deliveryTempIntersection: string[];
 	availableShippingOptions: AvailableShippingOption[];
 	errors: CheckoutValidationError[];
 	unavailableItems: UnavailableItem[];
@@ -317,7 +316,6 @@ interface UnavailableItemWire {
 
 interface ValidateWireData {
 	availableShippingOptions?: AvailableShippingOptionWire[];
-	deliveryTempIntersection?: string[];
 	errors?: Array<{ errorCode?: string; errorMessage?: string }>;
 	unavailableItems?: UnavailableItemWire[];
 	valid?: boolean;
@@ -462,7 +460,6 @@ export async function validateCheckoutItems(
 	const data = env.data ?? {};
 	return {
 		valid: Boolean(data.valid),
-		deliveryTempIntersection: data.deliveryTempIntersection ?? [],
 		availableShippingOptions: (data.availableShippingOptions ?? []).map(
 			(o): AvailableShippingOption => ({
 				shippingMethod: String(o.shippingMethod ?? ""),

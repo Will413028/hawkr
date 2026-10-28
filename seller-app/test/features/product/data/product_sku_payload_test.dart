@@ -23,6 +23,31 @@ void main() {
     heightCm: 10,
   );
 
+  group('SpecData shipping methods', () {
+    test('every submitted shipping method carries the ambient temperature', () {
+      final json = SpecData(
+        grade: '大顆裝',
+        price: 300,
+        stock: 10,
+        shippingMethods: [
+          SpecData.shippingMethodJson(
+            type: '3651',
+            feePayer: '3101',
+            freeThreshold: '0',
+          ),
+        ],
+      ).toSkuJson();
+
+      final methods = json['shippingMethods'] as List;
+      expect(methods.single, {
+        'type': '3651',
+        'temperature': '3201',
+        'feePayer': '3101',
+        'freeThreshold': '0',
+      });
+    });
+  });
+
   group('SpecData.toSkuJson', () {
     test('既有 SKU：id 與 expectedVersion 成對送出', () {
       final json = spec(

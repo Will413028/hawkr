@@ -238,7 +238,6 @@
     "lib/features/product/data/hashtag_extractor.dart",
     "lib/features/product/data/hashtag_model.dart",
     "lib/features/product/data/hashtag_repository.dart",
-    "lib/features/product/data/product_certification_meta.dart",
     "lib/features/product/data/product_description_parser.dart",
     "lib/features/product/data/product_listing_chat_repository.dart",
     "lib/features/product/data/product_listing_model.dart",
@@ -263,9 +262,7 @@
     "lib/features/product/presentation/product_setup_picker/product_setup_picker_screen.dart",
     "lib/features/product/presentation/product_setup_progress_bar.dart",
     "lib/features/product/presentation/product_setup_spec_screen.dart",
-    "lib/features/product/presentation/product_setup_tag_screen.dart",
     "lib/features/product/presentation/product_setup_top_bar.dart",
-    "lib/features/product/presentation/widgets/product_temperature_tags.dart",
     "lib/features/product/presentation/widgets/review_image_gallery.dart",
     "lib/features/product/presentation/widgets/shipping_spec_card.dart",
     "lib/features/report/data/block_model.dart",
@@ -411,7 +408,6 @@
     "lib/shared/widgets/hk_round_action_button.dart",
     "lib/shared/widgets/hk_status_badge.dart",
     "lib/shared/widgets/hk_tap_target.dart",
-    "lib/shared/widgets/hk_temperature_tag.dart",
     "lib/shared/widgets/hover_icon.dart",
     "lib/shared/widgets/linked_product_card.dart",
     "lib/shared/widgets/location_icon.dart",
@@ -432,7 +428,6 @@
     "lib/shared/widgets/share_bottom_sheet.dart",
     "lib/shared/widgets/step_indicator.dart",
     "lib/shared/widgets/storefront_top_bar_icon_button.dart",
-    "lib/shared/widgets/temperature_tag.dart",
     "lib/shared/widgets/truck_loading_overlay.dart"
   ],
   "legacyUninstrumentedFiles": [

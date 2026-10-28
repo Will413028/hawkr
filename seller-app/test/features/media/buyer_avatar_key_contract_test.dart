@@ -108,7 +108,6 @@ const Map<String, dynamic> _sellerOrderRecord = {
   'sellerCity': '台南市',
   'sellerDistrict': '新化區',
   'shippingMethod': '3001',
-  'deliveryTemp': '3202',
   'shippingStatus': '91',
   'buyerId': '2001',
   'recipientName': 'Smoke Test',

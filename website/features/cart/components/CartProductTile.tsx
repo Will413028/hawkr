@@ -7,7 +7,6 @@ import Button from "@/components/ui/Button";
 import type { CartItem } from "@/lib/cart";
 import { formatUnitLabel } from "@/lib/codemeta/enums";
 import { resolveCdnUrl } from "@/lib/media/cdn";
-import { TemperatureTagRow } from "./TemperatureTag";
 
 // 後端 issue #1127：cart 透過 purchasable + unavailableReason 表達 row 級可購買性，
 // reason ∈ {DELISTED, OUT_OF_STOCK, INSUFFICIENT_STOCK, LOOKUP_FAILED}（CartItemUnavailableReason）。
@@ -201,25 +200,6 @@ export function CartProductTile({
 						</small>
 					) : null}
 				</div>
-
-				{item.deliveryTemps && item.deliveryTemps.length > 0 ? (
-					<div className="cart-tile__temps">
-						<svg
-							className="cart-tile__temp-icon"
-							viewBox="0 0 24 24"
-							width="20"
-							height="20"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="1.8"
-							aria-hidden="true"
-						>
-							<path d="M14 4v10.5a3.5 3.5 0 1 1-4 0V4a2 2 0 1 1 4 0Z" />
-						</svg>
-						<small>配送溫層</small>
-						<TemperatureTagRow values={item.deliveryTemps} />
-					</div>
-				) : null}
 
 				<div className="cart-tile__meta">
 					<div className="cart-tile__price-line">

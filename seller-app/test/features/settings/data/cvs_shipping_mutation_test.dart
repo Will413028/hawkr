@@ -1,85 +1,53 @@
 import 'dart:async';
 
 import 'package:hawkr_seller/core/exceptions/app_exception.dart';
+import 'package:hawkr_seller/core/networking/ambient_shipping_temperature.dart';
 import 'package:hawkr_seller/features/settings/data/cvs_shipping_mutation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('CvsShippingMutationCoordinator', () {
-    test('first failure keeps both goods types pending', () async {
+    test('activation request carries the ambient goodsType', () async {
+      String? path;
+      Map<String, dynamic>? body;
+      final coordinator = CvsShippingMutationCoordinator((
+        requestPath,
+        requestBody,
+      ) async {
+        path = requestPath;
+        body = requestBody;
+        return {
+          'code': 0,
+          'data': {'onboardingId': 'cvs-onboarding'},
+        };
+      });
+
+      final outcome = await coordinator.apply([
+        _mutation(initialEnabled: false),
+      ]);
+
+      expect(outcome.isSuccess, isTrue);
+      expect(path, '/api/v1/app/shipping_onboardings/cvs');
+      expect(body?['goodsType'], '3201');
+      expect(body?['goodsType'], kAmbientShippingTemperature);
+      expect(outcome.completed.single.onboardingId, 'cvs-onboarding');
+    });
+
+    test('failure keeps the mutation pending', () async {
       final coordinator = CvsShippingMutationCoordinator(
-        (_, __) => throw const ApiException(code: 9240, message: '冷凍開通失敗'),
+        (_, __) => throw const ApiException(code: 9240, message: '開通失敗'),
       );
 
-      final outcome = await coordinator.apply(_bothEnableMutations());
+      final outcome = await coordinator.apply([
+        _mutation(initialEnabled: false),
+      ]);
 
       expect(outcome.isSuccess, isFalse);
       expect(outcome.completed, isEmpty);
-      expect(outcome.pending.map((item) => item.type), [
-        CvsGoodsType.frozen,
-        CvsGoodsType.ambient,
-      ]);
+      expect(outcome.pending, hasLength(1));
       expect(outcome.error, isA<ApiException>());
       expect(coordinator.isRunning, isFalse);
     });
-
-    test(
-      'second failure checkpoints first success and retry sends only pending step',
-      () async {
-        final sentGoodsTypes = <String>[];
-        var ambientAttempts = 0;
-        final coordinator = CvsShippingMutationCoordinator((_, body) async {
-          final goodsType = body['goodsType'] as String;
-          sentGoodsTypes.add(goodsType);
-          if (goodsType == 'AMBIENT' && ambientAttempts++ == 0) {
-            throw const ServerException(message: '服務暫時不可用', statusCode: 503);
-          }
-          return {
-            'code': 0,
-            'data': {
-              'onboardingId': goodsType == 'FROZEN'
-                  ? 'frozen-onboarding'
-                  : 'ambient-onboarding',
-            },
-          };
-        });
-
-        final firstOutcome = await coordinator.apply(_bothEnableMutations());
-
-        expect(firstOutcome.isSuccess, isFalse);
-        expect(firstOutcome.completed, hasLength(1));
-        expect(
-          firstOutcome.completed.single.mutation.type,
-          CvsGoodsType.frozen,
-        );
-        expect(firstOutcome.completed.single.onboardingId, 'frozen-onboarding');
-        expect(firstOutcome.pending.map((item) => item.type), [
-          CvsGoodsType.ambient,
-        ]);
-
-        final retryOutcome = await coordinator.apply([
-          _mutation(
-            type: CvsGoodsType.frozen,
-            goodsType: 'FROZEN',
-            initialEnabled: true,
-          ),
-          _mutation(
-            type: CvsGoodsType.ambient,
-            goodsType: 'AMBIENT',
-            initialEnabled: false,
-          ),
-        ]);
-
-        expect(retryOutcome.isSuccess, isTrue);
-        expect(sentGoodsTypes, ['FROZEN', 'AMBIENT', 'AMBIENT']);
-        expect(
-          sentGoodsTypes.where((value) => value == 'FROZEN'),
-          hasLength(1),
-          reason: 'successful first step must not be resent on retry',
-        );
-        expect(coordinator.isRunning, isFalse);
-      },
-    );
 
     test('double submit performs only one HTTP mutation', () async {
       final response = Completer<Map<String, dynamic>>();
@@ -88,13 +56,7 @@ void main() {
         requestCount++;
         return response.future;
       });
-      final mutations = [
-        _mutation(
-          type: CvsGoodsType.frozen,
-          goodsType: 'FROZEN',
-          initialEnabled: false,
-        ),
-      ];
+      final mutations = [_mutation(initialEnabled: false)];
 
       final first = coordinator.apply(mutations);
       final duplicate = await coordinator.apply(mutations);
@@ -122,16 +84,14 @@ void main() {
 
       final outcome = await coordinator.apply([
         _mutation(
-          type: CvsGoodsType.ambient,
-          goodsType: 'AMBIENT',
           initialEnabled: true,
           targetEnabled: false,
-          onboardingId: 'ambient-id',
+          onboardingId: 'cvs-id',
         ),
       ]);
 
       expect(outcome.isSuccess, isTrue);
-      expect(path, '/api/v1/app/shipping_onboardings/ambient-id/toggle');
+      expect(path, '/api/v1/app/shipping_onboardings/cvs-id/toggle');
       expect(body, {'enabled': false});
     });
 
@@ -145,16 +105,11 @@ void main() {
         });
 
         final outcome = await coordinator.apply([
-          _mutation(
-            type: CvsGoodsType.frozen,
-            goodsType: 'FROZEN',
-            initialEnabled: true,
-            targetEnabled: false,
-          ),
+          _mutation(initialEnabled: true, targetEnabled: false),
         ]);
 
         expect(outcome.isSuccess, isFalse);
-        expect(outcome.pending.single.type, CvsGoodsType.frozen);
+        expect(outcome.pending, hasLength(1));
         expect(outcome.error, isA<ApiException>());
         expect(outcome.error!.message, contains('請重新載入'));
         expect(requestCount, 0);
@@ -163,29 +118,12 @@ void main() {
   });
 }
 
-List<CvsGoodsTypeMutation> _bothEnableMutations() => [
-  _mutation(
-    type: CvsGoodsType.frozen,
-    goodsType: 'FROZEN',
-    initialEnabled: false,
-  ),
-  _mutation(
-    type: CvsGoodsType.ambient,
-    goodsType: 'AMBIENT',
-    initialEnabled: false,
-  ),
-];
-
 CvsGoodsTypeMutation _mutation({
-  required CvsGoodsType type,
-  required String goodsType,
   required bool initialEnabled,
   bool targetEnabled = true,
   String? onboardingId,
 }) {
   return CvsGoodsTypeMutation(
-    type: type,
-    goodsType: goodsType,
     initialEnabled: initialEnabled,
     targetEnabled: targetEnabled,
     onboardingId: onboardingId,

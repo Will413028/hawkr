@@ -27,7 +27,6 @@ import { TruckOverlay, TruckSpinner } from "@/components/shared/TruckSpinner";
 import UploadLoadingIndicator from "@/components/shared/UploadLoadingIndicator";
 import Button from "@/components/ui/Button";
 import { ImageUploader } from "@/components/ui/ImageUploader";
-import { TemperatureTag } from "@/features/cart/components/TemperatureTag";
 import {
 	CartIcon,
 	NoteIcon,
@@ -95,7 +94,7 @@ import { SellerOrdersSkeletonRows } from "../components/SellerPageSkeletons";
 import { SummaryStatCard } from "../components/SummaryStatCard";
 import { AfterSalePanel } from "./AfterSalePanel";
 import CancelOrderDialog from "./CancelOrderDialog";
-import { deliveryTempLabel, formatDeadline } from "./orderDisplay";
+import { formatDeadline } from "./orderDisplay";
 import {
 	SELLER_ORDER_TAB_LABEL,
 	type SellerOrderTabKey,
@@ -2431,7 +2430,6 @@ function MobileOrderCard({
 	const isShipDeadline =
 		order.status === "paid" || order.status === "preparing";
 	const deadlineLabel = formatDeadline(order.autoCancelAt);
-	const tempLabel = deliveryTempLabel(order.shipping?.deliveryTemp);
 	const anomalyStatusReason = formatShipmentAnomalyStatusReason(anomaly);
 	const shipmentProcessing = Boolean(shipmentOperation);
 	const shipmentProcessingLabel = shipmentOperation
@@ -2495,11 +2493,6 @@ function MobileOrderCard({
 				<strong id={headingId} className="seller-orders__mobile-card-order">
 					{order.orderNo}
 				</strong>
-				<span className="seller-orders__mobile-card-temperature">
-					{tempLabel && (
-						<TemperatureTag value={order.shipping?.deliveryTemp ?? ""} />
-					)}
-				</span>
 				<OrderStatusSummary
 					order={order}
 					anomaly={anomaly}
@@ -2774,7 +2767,6 @@ function OrderRow({
 	const isShipDeadline =
 		order.status === "paid" || order.status === "preparing";
 	const deadlineLabel = formatDeadline(order.autoCancelAt);
-	const tempLabel = deliveryTempLabel(order.shipping?.deliveryTemp);
 	const shipmentProcessing = Boolean(shipmentOperation);
 	const shipmentProcessingLabel = shipmentOperation
 		? shipmentOperationLabel(shipmentOperation)
@@ -2874,9 +2866,6 @@ function OrderRow({
 				<span className="seller-orders__shipping-method">
 					{shippingMethodLabel(order.shipping?.method)}
 				</span>
-				{tempLabel && (
-					<TemperatureTag value={order.shipping?.deliveryTemp ?? ""} />
-				)}
 			</td>
 			<td className="is-center">
 				<OrderStatusSummary

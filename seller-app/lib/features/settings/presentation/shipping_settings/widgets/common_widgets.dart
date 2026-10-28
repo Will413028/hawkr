@@ -7,9 +7,8 @@ import '../../../../../shared/icons/app_icon_colors.dart';
 import '../../../../../shared/widgets/hk_button_label.dart';
 import '../../../../../shared/widgets/hk_icon.dart';
 import '../../../../../shared/widgets/hk_tap_target.dart';
-import '../../../../../shared/widgets/temperature_tag.dart';
 
-/// 物流方式與溫層共用的勾選控制。
+/// 物流方式共用的勾選控制。
 class CustomCheckbox extends StatelessWidget {
   const CustomCheckbox({
     super.key,
@@ -77,89 +76,6 @@ class IconBox extends StatelessWidget {
           padding: const EdgeInsets.all(HkSpace.xs),
           child: Center(
             child: HkIcon(icon, size: 20, color: AppIconColors.defaultColor),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 可點選的配送溫層標籤，視覺維持精簡但觸控區至少 48pt。
-class TemperaturePill extends StatelessWidget {
-  const TemperaturePill({
-    super.key,
-    required this.label,
-    required this.code,
-    required this.active,
-    required this.onTap,
-    this.enabled = true,
-  });
-
-  final String label;
-  final String code;
-  final bool active;
-  final VoidCallback onTap;
-  final bool enabled;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedOpacity(
-      duration: HkMotion.duration,
-      opacity: enabled ? 1 : 0.36,
-      child: TemperatureTag.selectable(
-        code: code,
-        label: label,
-        isSelected: active,
-        onTap: enabled ? onTap : null,
-      ),
-    );
-  }
-}
-
-/// 7-11 單一溫層選項列。
-class CvsRow extends StatelessWidget {
-  const CvsRow({
-    super.key,
-    required this.tempLabel,
-    required this.code,
-    required this.checked,
-    required this.onTap,
-  });
-
-  final String tempLabel;
-  final String code;
-  final bool checked;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: checked,
-      label: '7-11 店到店 $tempLabel',
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(HkRadius.md),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: HkControl.minTap),
-            child: Row(
-              children: [
-                CustomCheckbox(
-                  checked: checked,
-                  onTap: onTap,
-                  semanticLabel: '7-11 $tempLabel',
-                ),
-                const SizedBox(width: HkSpace.sm),
-                const IconBox(icon: HkIconName.store),
-                const SizedBox(width: HkSpace.sm),
-                Expanded(
-                  child: Text('7-11 店到店', style: AppTypography.bodyBold),
-                ),
-                TemperatureTag(code: code),
-              ],
-            ),
           ),
         ),
       ),

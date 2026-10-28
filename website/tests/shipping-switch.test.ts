@@ -19,7 +19,7 @@ test("shared switch uses HeroUI accessible switch behavior and brand tokens", ()
 	assert.match(sharedSwitch, /<HeroSwitch\.Thumb/);
 });
 
-test("shipping temperature rows use the shared switch and lock during updates", () => {
+test("shipping rows use the shared switch and lock during updates", () => {
 	const shipping = source(
 		"../features/seller-center/profile/shipping/ShippingClient.tsx",
 	);
@@ -27,10 +27,13 @@ test("shipping temperature rows use the shared switch and lock during updates", 
 
 	assert.match(shipping, /import Switch from "@\/components\/ui\/Switch"/);
 	assert.match(shipping, /const \[toggling, setToggling\]/);
-	assert.match(shipping, /<Switch[\s\S]*checked=\{r\.enabled === "true"\}/);
-	assert.match(shipping, /disabled=\{toggling !== null\}/);
-	assert.match(shipping, /busy=\{toggling === g\}/);
-	assert.match(shipping, /toggling === g \? "更新中…"/);
+	assert.match(
+		shipping,
+		/<Switch[\s\S]*checked=\{reference\.enabled === "true"\}/,
+	);
+	assert.match(shipping, /disabled=\{toggling\}/);
+	assert.match(shipping, /busy=\{toggling\}/);
+	assert.match(shipping, /toggling \? "更新中…"/);
 	assert.doesNotMatch(shipping, /className=.*shipping-toggle/);
 	assert.doesNotMatch(styles, /\.shipping-toggle/);
 });

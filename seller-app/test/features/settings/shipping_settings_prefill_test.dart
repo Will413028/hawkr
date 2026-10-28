@@ -4,6 +4,7 @@ import 'package:hawkr_seller/features/seller/data/current_store.dart';
 import 'package:hawkr_seller/features/settings/data/shipping_settings_repository.dart';
 import 'package:hawkr_seller/features/settings/data/tgos_address_service.dart';
 import 'package:hawkr_seller/features/settings/presentation/shipping_settings/shipping_settings_screen.dart';
+import 'package:hawkr_seller/features/settings/presentation/shipping_settings/widgets/common_widgets.dart';
 import 'package:hawkr_twaddr/hawkr_twaddr.dart' as twaddr;
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -251,7 +252,7 @@ void main() {
     );
     expect(find.text('開通7-11物流'), findsNothing);
     expect(find.text('更新7-11物流'), findsNothing);
-    expect(find.text('已開通，可調整配送溫層'), findsOneWidget);
+    expect(find.text('已開通'), findsOneWidget);
   });
 
   testWidgets('7-11 紀錄 4302 顯示處理中、鎖寄件人且不能送出', (tester) async {
@@ -411,7 +412,12 @@ void main() {
   });
 
   Future<void> activateHome(WidgetTester tester) async {
-    await tester.tap(find.text('冷凍').first);
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('shipping-taqbin-card')),
+        matching: find.byType(CustomCheckbox),
+      ),
+    );
     await tester.pump();
     await tester.tap(find.text('驗證地址'));
     await tester.pumpAndSettle();

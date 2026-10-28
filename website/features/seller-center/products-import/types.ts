@@ -70,16 +70,6 @@ export const TARGET_STATUS = {
 export type TargetStatusValue =
 	(typeof TARGET_STATUS)[keyof typeof TARGET_STATUS];
 
-/* ===== ShippingTemperature ===== */
-export const SHIPPING_TEMPERATURE = {
-	AMBIENT: "AMBIENT",
-	CHILLED: "CHILLED",
-	FROZEN: "FROZEN",
-} as const;
-
-export type ShippingTemperatureValue =
-	(typeof SHIPPING_TEMPERATURE)[keyof typeof SHIPPING_TEMPERATURE];
-
 /* ===== Validation Error（L1 CSV header / row 級錯誤） ===== */
 export interface ValidationError {
 	/** CSV 行號（header=1）；header 級錯誤回 "0"。 */
@@ -228,7 +218,6 @@ export interface ImportItemBrief {
 /* ===== Shipping method 於 item SKU（response 形狀） ===== */
 export interface ImportShippingMethodResponse {
 	method: string; // ShippingMethod value（如 "3001" / "3002" / "3003"）
-	temperature: string; // ShippingTemperature value（如 "3201" / "3202" / "3203"）
 }
 
 /* ===== SKU on item detail ===== */
@@ -300,7 +289,6 @@ export interface ImportItemDetail {
 	commitRevision: string;
 	origin: string;
 	hashtags: string[];
-	certifications: Array<{ name: string; certNo: string }>;
 	targetStatus: TargetStatusValue;
 }
 
@@ -327,7 +315,6 @@ export interface ProductDetailPresentation {
 	/** Backend 是 JSON 字串（ImportDescription 序列化）— 在 page 內 JSON.parse + 防呆。 */
 	description: string;
 	gallery: GalleryItem[];
-	certifications: Array<{ name: string; certNo: string }>;
 	priceMin: string;
 	priceMax: string;
 	skus: ImportItemSku[];
@@ -401,16 +388,10 @@ export interface ImportItemImageInput {
 	stagedToken?: string;
 }
 
-/* ===== Certification input ===== */
-export interface CertificationInput {
-	name: string;
-	certNo: string;
-}
-
 /* ===== SKU input（PUT items/{id} 用） ===== */
 export interface ShippingMethodInput {
 	method: string; // ShippingMethod value
-	temperature: string; // ShippingTemperature value
+	temperature: string; // 固定 AMBIENT_TEMPERATURE_CODE（B4 刪）
 }
 
 export interface UpdateImportSkuInput {
@@ -444,8 +425,6 @@ export interface UpdateImportItemInput {
 	description?: string;
 	hashtagsSet?: boolean;
 	hashtags?: string[];
-	certificationsSet?: boolean;
-	certifications?: CertificationInput[];
 	galleryImagesSet?: boolean;
 	galleryImages?: ImportItemImageInput[];
 	skusSet?: boolean;
@@ -457,7 +436,7 @@ export interface UpdateImportItemInput {
 /* ===== Batch update shipping input ===== */
 export interface BatchShippingMethod {
 	type: string; // ShippingMethod value
-	temperature: ShippingTemperatureValue;
+	temperature: string;
 	freeThreshold?: string;
 }
 

@@ -8,16 +8,13 @@ import MarketProductsList, {
 	type MarketProductItem,
 } from "@/features/market/components/MarketProductsList";
 import MarketProductsListLayout, {
-	type SidebarCertLink,
 	type SidebarHashtagLink,
-	type SidebarTempLink,
 } from "@/features/market/products/MarketProductsListLayout";
 import { fetchCategoryTree, fetchSeller, fetchSellers } from "@/lib/api";
 import { ApiClientError } from "@/lib/api/client";
 import { useSellerSelf } from "@/lib/hooks/useSellerSelf";
 import type { CategoryNode, MarketFetchParams } from "@/lib/market/listFilters";
 import { useNotificationToast } from "@/lib/notifications/toast-context";
-import { CERTIFICATION_LABEL_BY_VALUE } from "@/lib/products/certifications";
 import { fetchPopularHashtags } from "@/lib/search/repo";
 import { recommendedSellerLogoUrl } from "@/lib/seller/recommended-logo";
 import { storeIdOf } from "@/lib/seller/store";
@@ -42,12 +39,6 @@ const SORT_OPTIONS: Array<{ value: string; label: string }> = [
 	{ value: "價格高到低", label: "價格高到低" },
 	{ value: "評分最高", label: "評分最高" },
 ];
-const TEMP_OPTIONS: Array<{ value: string; label: string }> = [
-	{ value: "ambient", label: "常溫" },
-	{ value: "chilled", label: "冷藏" },
-	{ value: "frozen", label: "冷凍" },
-];
-
 /**
  * 把 preview 列表 record 轉成 MarketProductItem — 純欄位 rename + 當下登入賣家資訊。
  *
@@ -243,20 +234,6 @@ export function PreviewListingPage({ jobId }: Props) {
 		label: opt.label,
 		href: "#",
 	}));
-	const tempLinks: SidebarTempLink[] = TEMP_OPTIONS.map((opt) => ({
-		value: opt.value,
-		label: opt.label,
-		href: `/market/products?temp=${opt.value}`,
-		active: false,
-	}));
-	const certLinks: SidebarCertLink[] = Object.entries(
-		CERTIFICATION_LABEL_BY_VALUE,
-	).map(([code, label]) => ({
-		code,
-		label,
-		href: `/market/products?certification_types=${code}`,
-		active: false,
-	}));
 	const hashtagLinks: SidebarHashtagLink[] = trendingHashtags.map((tag) => ({
 		name: tag.name,
 		label: tag.label || `#${tag.name}`,
@@ -335,21 +312,16 @@ export function PreviewListingPage({ jobId }: Props) {
 				categories={categories}
 				sellerStories={stories}
 				currentCategories={[]}
-				currentTemp=""
 				currentPriceMin=""
 				currentPriceMax=""
 				currentHashtags={[]}
-				currentCertificationTypes={[]}
 				currentSort="推薦"
 				currentQuery=""
 				currentTab="recommend"
 				appliedChips={[]}
 				clearAllHref="/market/products"
 				sortLinks={sortLinks}
-				tempLinks={tempLinks}
-				certLinks={certLinks}
 				hashtagLinks={hashtagLinks}
-				clearTempHref="/market/products"
 				productGrid={productGrid}
 			/>
 

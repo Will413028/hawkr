@@ -23,7 +23,6 @@ import * as React from "react";
 import { ApiClientError } from "@/lib/api/client";
 import type {
 	ImageGalleryUpdate,
-	ProductCertificationCode,
 	ProductSku,
 	SellerProductDetail,
 } from "@/lib/products/seller-repo";
@@ -71,7 +70,6 @@ export interface UseImportItemFormResult {
 	updateSku(index: number, patch: Partial<ProductSku>): void;
 	addSku(): void;
 	removeSku(index: number): void;
-	toggleCert(code: ProductCertificationCode): void;
 	handleImagesChange(next: ImageGalleryUpdate): void;
 	/** 儲存。回傳更新後的 item（成功）或 null（失敗，error 已寫進 state）。 */
 	submit(): Promise<ImportItemDetail | null>;
@@ -100,9 +98,7 @@ export function useImportItemForm({
 		main_image: "",
 		images: [],
 		tags: [],
-		delivery_temp: [],
 		origin: "",
-		certifications: [],
 		preorder_ship_at: null,
 		low_stock_threshold: 5,
 		expiry_days: 7,
@@ -200,23 +196,6 @@ export function useImportItemForm({
 				...prev,
 				skus: (prev.skus ?? []).filter((_, i) => i !== index),
 			}));
-			markDirty();
-		},
-		[markDirty],
-	);
-
-	const toggleCert = React.useCallback(
-		(code: ProductCertificationCode) => {
-			setDraft((prev) => {
-				const list = prev.certifications ?? [];
-				// Manual-review API 尚未上線：匯入編輯器也只能移除既有值，
-				// 不能成為正式商品表單之外的新增繞道。
-				if (!list.some((c) => c.code === code)) return prev;
-				return {
-					...prev,
-					certifications: list.filter((c) => c.code !== code),
-				};
-			});
 			markDirty();
 		},
 		[markDirty],
@@ -347,7 +326,6 @@ export function useImportItemForm({
 		updateSku,
 		addSku,
 		removeSku,
-		toggleCert,
 		handleImagesChange,
 		submit,
 		clearError,

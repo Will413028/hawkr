@@ -17,7 +17,6 @@ import type { DelegatedMutationMeta } from "@/lib/api/delegated";
 import {
 	PRODUCT_STATUS_LABEL,
 	SHIPPING_METHOD_LABEL,
-	SHIPPING_TEMPERATURE_LABEL,
 } from "@/lib/codemeta/enums";
 import { takePickedFiles } from "@/lib/media/pick-files";
 import {
@@ -36,7 +35,6 @@ import {
 	delegatedProductLoadFailureCopy,
 } from "../load-failure";
 import { useDelegatedSession } from "../state/DelegatedSessionContext";
-import CertificationEditor from "./CertificationEditor";
 import {
 	type DelegatedProductFormDraft,
 	type DelegatedSkuDraft,
@@ -48,12 +46,10 @@ import {
 	buildProductPatch,
 	type ImageDraft,
 	imageDraftsOf,
-	saveHint,
 	unitText,
 } from "./edit-patch";
 import {
 	createDelegatedProductEditRepo,
-	type DelegatedProductCertification,
 	type DelegatedProductDetail,
 } from "./repo";
 
@@ -94,12 +90,6 @@ const IMAGE_MAX = 10;
 /** 表單上一個規格的可編輯欄位（型別與合流規則同住 `./conflict`）。 */
 type SkuDraft = DelegatedSkuDraft;
 
-function shippingMethodText(type: string, temperature: string): string {
-	const method = SHIPPING_METHOD_LABEL[type] ?? type;
-	const temp = SHIPPING_TEMPERATURE_LABEL[temperature] ?? temperature;
-	return temp ? `${method}（${temp}）` : method;
-}
-
 export default function DelegatedProductEditPage({
 	productId,
 }: {
@@ -139,9 +129,6 @@ export default function DelegatedProductEditPage({
 		version: "1.0",
 		blocks: [],
 	});
-	const [certifications, setCertifications] = React.useState<
-		DelegatedProductCertification[]
-	>([]);
 	const [images, setImages] = React.useState<ImageDraft[]>([]);
 	const [skuDrafts, setSkuDrafts] = React.useState<Record<string, SkuDraft>>(
 		{},
@@ -182,7 +169,6 @@ export default function DelegatedProductEditPage({
 			setCategoryId(view.categoryId);
 			setOrigin(view.origin);
 			setDescription(view.description);
-			setCertifications(view.certifications);
 			setImages(imageDraftsOf(next));
 			setSkuDrafts(view.skus);
 			setConflict(false);
@@ -247,7 +233,6 @@ export default function DelegatedProductEditPage({
 					categoryId,
 					origin,
 					description,
-					certifications,
 					skus: skuDrafts,
 				}),
 			);
@@ -256,7 +241,6 @@ export default function DelegatedProductEditPage({
 		}
 	}, [
 		categoryId,
-		certifications,
 		description,
 		hydrate,
 		name,
@@ -276,11 +260,10 @@ export default function DelegatedProductEditPage({
 			categoryId,
 			origin,
 			description,
-			certifications,
 			images,
 			skus: skuDrafts,
 		}),
-		[categoryId, certifications, description, images, name, origin, skuDrafts],
+		[categoryId, description, images, name, origin, skuDrafts],
 	);
 
 	/** 只送真的改了的欄位：未送的欄位由 Gateway 以 before 快照回填（見 repo.ts）。 */
@@ -329,7 +312,7 @@ export default function DelegatedProductEditPage({
 			title: "檢視變更並儲存",
 			intent: `以 ADM 身分替「${targetStore}」編輯「${detail.name || "未命名商品"}」`,
 			// 動到認證標章時多一句法規宣稱的提醒（§4.1 高風險確認要求的第二道）。
-			hint: saveHint(patch),
+			hint: "請確認以下變更內容無誤後儲存。",
 			reasonPlaceholder: "例：協助修正商品說明與售價",
 			changes,
 			expectedVersion: detail.version,
@@ -654,7 +637,7 @@ export default function DelegatedProductEditPage({
 
 						<section className="seller-card adm-product-edit__card">
 							<header className="adm-product-edit__card-head">
-								<h2>分類與認證</h2>
+								<h2>分類與產地</h2>
 								<p>
 									分類需選到最後一層。代行工作階段只能選既有分類，不能新增分類。
 								</p>
@@ -727,14 +710,6 @@ export default function DelegatedProductEditPage({
 									分類尚未選到最後一層，本次不會變更商品分類。
 								</p>
 							) : null}
-							<div className="adm-product-edit__field">
-								<span className="adm-product-edit__label">認證標章</span>
-								<CertificationEditor
-									value={certifications}
-									onChange={setCertifications}
-									disabled={!editable}
-								/>
-							</div>
 							<Input
 								variant="bordered"
 								size="lg"
@@ -838,14 +813,15 @@ export default function DelegatedProductEditPage({
 										<dd>
 											{sku.shippingMethods.length === 0
 												? "—"
-												: sku.shippingMethods
-														.map((method) =>
-															shippingMethodText(
-																method.type,
-																method.temperature,
+												: [
+														...new Set(
+															sku.shippingMethods.map(
+																(method) =>
+																	SHIPPING_METHOD_LABEL[method.type] ??
+																	method.type,
 															),
-														)
-														.join("、")}
+														),
+													].join("、")}
 										</dd>
 									</div>
 								</dl>
