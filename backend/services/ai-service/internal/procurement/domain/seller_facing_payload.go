@@ -29,14 +29,13 @@ type SellerFacingRequestedRange struct {
 type SellerFacingPayload struct {
 	// 賣家要知道買家沒指定品相，否則會自己假設一個等級去報價（docx V.7.5 的
 	// seller-facing 排除清單不含本欄）。
-	QualityKnowledgeState string  `json:"qualityKnowledgeState"`
-	Item                  string  `json:"item"`
-	ItemLabel             string  `json:"itemLabel,omitempty"`
-	Quantity              *int    `json:"quantity,omitempty"`
-	Unit                  *string `json:"unit,omitempty"`
-	Packaging             *string `json:"packaging,omitempty"`
-	DeliveryCity          *string `json:"deliveryCity,omitempty"`
-	DeliveryDate          *string `json:"deliveryDate,omitempty"`
+	Item         string  `json:"item"`
+	ItemLabel    string  `json:"itemLabel,omitempty"`
+	Quantity     *int    `json:"quantity,omitempty"`
+	Unit         *string `json:"unit,omitempty"`
+	Packaging    *string `json:"packaging,omitempty"`
+	DeliveryCity *string `json:"deliveryCity,omitempty"`
+	DeliveryDate *string `json:"deliveryDate,omitempty"`
 	// ResponseDeadline 是 publication 的屬性，由 preview 的參數帶入，不從 canonical
 	// payload 讀（doc 64 §3.1：confirm 當下它還不存在）。賣家要知道何時前要回覆，
 	// 所以它屬於 seller-facing 內容、並因此被 seller_facing_payload_hash 涵蓋。
@@ -53,9 +52,8 @@ type SellerFacingPayload struct {
 // 漏掉的欄位就是**不該**流進賣家視野的欄位（budgetPerUnit 一開始就不在 canonical
 // payload 裡）。
 type canonicalRfqPayload struct {
-	QualityKnowledgeState string  `json:"qualityKnowledgeState"`
-	Item                  *string `json:"item"`
-	ItemResolution        *struct {
+	Item           *string `json:"item"`
+	ItemResolution *struct {
 		Kind  string `json:"kind"`
 		Label string `json:"label"`
 	} `json:"itemResolution"`
@@ -85,8 +83,7 @@ func CompileSellerFacingPayload(canonicalPayloadJSON []byte, responseDeadline *s
 	}
 
 	out := SellerFacingPayload{
-		QualityKnowledgeState: src.QualityKnowledgeState,
-		Quantity:              src.Quantity, Unit: src.Unit, Packaging: src.Packaging,
+		Quantity: src.Quantity, Unit: src.Unit, Packaging: src.Packaging,
 		DeliveryCity: src.DeliveryCity, DeliveryDate: src.DeliveryDate,
 		ResponseDeadline: responseDeadline, BuyerNote: src.BuyerNote,
 	}

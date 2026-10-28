@@ -73,7 +73,6 @@ const meta = {
 			deliveryCity: "臺北市",
 			deliveryDate: "2026-08-25",
 		},
-		qualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
 		buyerRequestedRange: {
 			currency: "TWD",
 			priceComponent: "GOODS_ONLY",

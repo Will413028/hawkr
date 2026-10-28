@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/Will413028/hawkr/ai-service/internal/observability"
-	"github.com/Will413028/hawkr/ai-service/internal/procurement/cropidentity/fuse"
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/cropidentity/recall"
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/domain"
 )
@@ -15,7 +14,7 @@ func (uc *DisambiguationUseCase) Resolve(ctx context.Context, itemText string) (
 		observability.RecordProcurementCropResolverV2(ctx, "escape")
 		return categoryDescribeStage(nil), nil
 	}
-	pool, err := uc.recallPool(ctx, q)
+	pool, err := uc.taxonomyCandidates(ctx, q)
 	if err != nil {
 		observability.RecordProcurementCropResolverV2(ctx, "error")
 		return DisambiguationResult{}, err
@@ -28,7 +27,7 @@ func (uc *DisambiguationUseCase) Resolve(ctx context.Context, itemText string) (
 	return uc.decide(ctx, itemText, pool)
 }
 
-func hasExactMatch(pool []fuse.Fused) bool {
+func hasExactMatch(pool []recall.Candidate) bool {
 	for _, f := range pool {
 		if f.Quality == recall.Strong {
 			return true
@@ -37,17 +36,8 @@ func hasExactMatch(pool []fuse.Fused) bool {
 	return false
 }
 
-func (uc *DisambiguationUseCase) recallPool(ctx context.Context, q recall.Query) ([]fuse.Fused, error) {
-	retriever := taxonomyRetriever{uc: uc}
-	cands, err := retriever.Recall(ctx, q)
-	if err != nil {
-		return nil, err
-	}
-	return fuse.RRF(map[string][]recall.Candidate{retriever.Name(): cands}), nil
-}
-
-func (uc *DisambiguationUseCase) narrowToGroup(ctx context.Context, pool []fuse.Fused, groupID string) []fuse.Fused {
-	out := make([]fuse.Fused, 0, len(pool))
+func (uc *DisambiguationUseCase) narrowToGroup(ctx context.Context, pool []recall.Candidate, groupID string) []recall.Candidate {
+	out := make([]recall.Candidate, 0, len(pool))
 	for _, f := range pool {
 		ids := append([]string{f.Code}, f.CategoryIDs...)
 		for _, id := range ids {
@@ -61,19 +51,18 @@ func (uc *DisambiguationUseCase) narrowToGroup(ctx context.Context, pool []fuse.
 	return out
 }
 
-func unexpandedGroup(g cropCategory) fuse.Fused {
-	return fuse.Fused{Candidate: recall.Candidate{
-		Key: recall.CandidateKey(recall.KindCategory, g.ID), Kind: recall.KindCategory, Code: g.ID,
-		Label: g.Label, CategoryLevel: 2, MatchedBy: g.Label, Quality: recall.Weak,
-	}}
+func unexpandedGroup(g cropCategory) recall.Candidate {
+	return recall.Candidate{
+		Code: g.ID, Label: g.Label, CategoryLevel: 2, MatchedBy: g.Label, Quality: recall.Weak,
+	}
 }
 
-func (uc *DisambiguationUseCase) decide(ctx context.Context, itemText string, pool []fuse.Fused) (DisambiguationResult, error) {
+func (uc *DisambiguationUseCase) decide(ctx context.Context, itemText string, pool []recall.Candidate) (DisambiguationResult, error) {
 	if len(pool) == 0 {
 		observability.RecordProcurementCropResolverV2(ctx, "escape")
 		return categoryDescribeStage(nil), nil
 	}
-	var strong []fuse.Fused
+	var strong []recall.Candidate
 	for _, f := range pool {
 		if f.Quality == recall.Strong {
 			strong = append(strong, f)
@@ -92,7 +81,7 @@ func (uc *DisambiguationUseCase) decide(ctx context.Context, itemText string, po
 	return uc.categoryCard(ctx, itemText, cands)
 }
 
-func (uc *DisambiguationUseCase) resolveOne(ctx context.Context, itemText string, c fuse.Fused) (DisambiguationResult, error) {
+func (uc *DisambiguationUseCase) resolveOne(ctx context.Context, itemText string, c recall.Candidate) (DisambiguationResult, error) {
 	return uc.resolveCategory(ctx, itemText, c.Code, c.Label, c.ParentID, c.ParentLabel)
 }
 
@@ -107,7 +96,7 @@ func (uc *DisambiguationUseCase) resolveCategory(ctx context.Context, itemText, 
 	return categoryDescribeStage(sel), nil
 }
 
-func (uc *DisambiguationUseCase) categoryCard(ctx context.Context, itemText string, categoryPool []fuse.Fused) (DisambiguationResult, error) {
+func (uc *DisambiguationUseCase) categoryCard(ctx context.Context, itemText string, categoryPool []recall.Candidate) (DisambiguationResult, error) {
 	nodes := uc.categoryNodes(ctx, categoryPool)
 	if len(nodes) == 0 {
 		observability.RecordProcurementCropResolverV2(ctx, "escape")
@@ -151,7 +140,7 @@ func (uc *DisambiguationUseCase) categoryCard(ctx context.Context, itemText stri
 	return DisambiguationResult{NeedsDisambiguation: true, Candidates: options, Selection: &sel}, nil
 }
 
-func (uc *DisambiguationUseCase) categoryNodes(ctx context.Context, pool []fuse.Fused) []categoryNode {
+func (uc *DisambiguationUseCase) categoryNodes(ctx context.Context, pool []recall.Candidate) []categoryNode {
 	var nodes []categoryNode
 	seen := map[string]bool{}
 	for _, f := range pool {

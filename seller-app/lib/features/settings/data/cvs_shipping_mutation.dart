@@ -1,5 +1,4 @@
 import '../../../core/exceptions/app_exception.dart';
-import '../../../core/networking/ambient_shipping_temperature.dart';
 
 typedef CvsMutationSender =
     Future<Map<String, dynamic>> Function(
@@ -36,7 +35,7 @@ class CvsGoodsTypeMutation {
   Map<String, dynamic> get requestBody {
     final id = onboardingId?.trim() ?? '';
     if (id.isNotEmpty) return {'enabled': targetEnabled};
-    return {...createBody, 'goodsType': kAmbientShippingTemperature};
+    return createBody;
   }
 }
 

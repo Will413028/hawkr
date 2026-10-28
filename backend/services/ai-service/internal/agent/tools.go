@@ -636,21 +636,14 @@ type SkuPatch struct {
 	StockQty int64  `json:"stockQty,omitempty" jsonschema:"庫存數量"`
 }
 
-// CertificationPatch 認證編號
-type CertificationPatch struct {
-	Name   string `json:"name" jsonschema:"認證名稱，例如「有機農產品標章」"`
-	CertNo string `json:"certNo" jsonschema:"認證編號"`
-}
-
 // ProductDraftPatch 商品草稿的部分更新（本輪新得到的欄位）
 type ProductDraftPatch struct {
-	Name           string               `json:"name,omitempty" jsonschema:"商品名稱，最多 60 字元"`
-	Origin         string               `json:"origin,omitempty" jsonschema:"產地，例如 台灣 / 紐西蘭"`
-	CategoryID     string               `json:"categoryId,omitempty" jsonschema:"L3 分類 ID，必須從 search_category 工具回傳的 catalogId 取得，禁止自行猜測"`
-	Description    string               `json:"description,omitempty" jsonschema:"商品描述，最多 2000 字元"`
-	Tags           []string             `json:"tags,omitempty" jsonschema:"商品標籤，最多 8 個"`
-	Skus           []SkuPatch           `json:"skus,omitempty" jsonschema:"商品規格清單（覆蓋式更新，有變更時請送出完整清單）"`
-	Certifications []CertificationPatch `json:"certifications,omitempty" jsonschema:"農業認證編號清單"`
+	Name        string     `json:"name,omitempty" jsonschema:"商品名稱，最多 60 字元"`
+	Origin      string     `json:"origin,omitempty" jsonschema:"產地，例如 台灣 / 紐西蘭"`
+	CategoryID  string     `json:"categoryId,omitempty" jsonschema:"L3 分類 ID，必須從 search_category 工具回傳的 catalogId 取得，禁止自行猜測"`
+	Description string     `json:"description,omitempty" jsonschema:"商品描述，最多 2000 字元"`
+	Tags        []string   `json:"tags,omitempty" jsonschema:"商品標籤，最多 8 個"`
+	Skus        []SkuPatch `json:"skus,omitempty" jsonschema:"商品規格清單（覆蓋式更新，有變更時請送出完整清單）"`
 }
 
 // UpdateDraftInput 更新草稿輸入

@@ -4,7 +4,6 @@ import { rfqPricePreviewSchema } from "./rfq-price-contract";
 const preview = {
 	pricePreviewId: "7506912040892497920",
 	version: "1",
-	qualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
 	buyerRequestedRange: {
 		currency: "TWD",
 		priceComponent: "GOODS_ONLY",

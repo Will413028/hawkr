@@ -54,7 +54,7 @@ func notWritable(fd protoreflect.FieldDescriptor) bool {
 //   - OUTPUT_ONLY 與 IDENTIFIER 的欄位略過（列在 mask 裡也不回錯）；這個判斷只在這裡（notWritable）。
 //   - IMMUTABLE 的欄位：第二種做法拿不到目前值，無法比對新舊，所以 mask 明列它時回 INVALID_ARGUMENT；沒帶 mask 或 "*"
 //     展開時略過。
-//   - 巢狀路徑只支援下到 oneof 的子訊息（例如 individual.id_card_no）；其他子訊息（食品業者、日期、證件）整個換掉，路徑停在
+//   - 巢狀路徑只支援下到 oneof 的子訊息（例如 individual.id_card_no）；其他子訊息（日期、證件）整個換掉，路徑停在
 //     那個欄位。列到 oneof 的子訊息本身（individual）是它全部可寫的欄位。
 //   - 沒帶 mask：src 裡有值的最上層欄位。"*"：所有最上層欄位，oneof 只展開有設定的那一支。
 func WritableFields(src proto.Message, mask *fieldmaskpb.FieldMask) ([]string, error) {

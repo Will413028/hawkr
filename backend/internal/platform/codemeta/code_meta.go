@@ -1762,7 +1762,8 @@ var (
 	ProcurementErrorReasonCandidateFactsStale         = ProcurementErrorReason{Code: "CANDIDATE_FACTS_STALE", Value: "CANDIDATE_FACTS_STALE", Label: "候選資料已過期", Description: "409。候選事實的 factsAsOf 已早於現行需求版本，須重新比對"}
 	ProcurementErrorReasonLaneMismatch                = ProcurementErrorReason{Code: "LANE_MISMATCH", Value: "LANE_MISMATCH", Label: "通道不符", Description: "400。指定的 lane 與候選實際所屬通道不一致"}
 	ProcurementErrorReasonInviteAlreadyResolved       = ProcurementErrorReason{Code: "INVITE_ALREADY_RESOLVED", Value: "INVITE_ALREADY_RESOLVED", Label: "邀請已被處理", Description: "409。該報價邀請已被確認或已失效（先到先得）"}
-	ProcurementErrorReasonPriceBasisUnavailable       = ProcurementErrorReason{Code: "PRICE_BASIS_UNAVAILABLE", Value: "PRICE_BASIS_UNAVAILABLE", Label: "報價基準無法解析", Description: "422。currency/quantity/unit/conversion basis 無法 canonicalize，RFQ 報價預覽的 typed hard block，零 side effect、不建立 preview 列（issue #2403 Slice 2）"}
+	ProcurementErrorReasonBuyerRequestedRangeRequired = ProcurementErrorReason{Code: "BUYER_REQUESTED_RANGE_REQUIRED", Value: "BUYER_REQUESTED_RANGE_REQUIRED", Label: "缺少買家預期價格範圍", Description: "422。RFQ 報價預覽沒有帶 buyerRequestedRange，或範圍不合法（非 TWD、非正整數、下界大於上界），零 side effect、不建立 preview 列"}
+	ProcurementErrorReasonQuantityUnitUnconvertible   = ProcurementErrorReason{Code: "QUANTITY_UNIT_UNCONVERTIBLE", Value: "QUANTITY_UNIT_UNCONVERTIBLE", Label: "數量與單位無法換算", Description: "422。需求已有數量與單位，但算不出報價總額範圍，零 side effect、不建立 preview 列"}
 	ProcurementErrorReasonRunNotActive                = ProcurementErrorReason{Code: "RUN_NOT_ACTIVE", Value: "RUN_NOT_ACTIVE", Label: "Run 非執行中", Description: "409。對非 QUEUED/RUNNING/WAITING_FOR_INPUT 狀態的 run 送出需要 active run 的命令"}
 	ProcurementErrorReasonInterruptExpired            = ProcurementErrorReason{Code: "INTERRUPT_EXPIRED", Value: "INTERRUPT_EXPIRED", Label: "中斷已逾期", Description: "409。resume 命令對應的 interrupt 已超過 expiresAt"}
 	ProcurementErrorReasonApprovalStale               = ProcurementErrorReason{Code: "APPROVAL_STALE", Value: "APPROVAL_STALE", Label: "核准依據已過期", Description: "409。resume/確認命令帶的 expectedVersion 與現行版本不符"}
@@ -1805,7 +1806,8 @@ var AllProcurementErrorReasons = []ProcurementErrorReason{
 	ProcurementErrorReasonCandidateFactsStale,
 	ProcurementErrorReasonLaneMismatch,
 	ProcurementErrorReasonInviteAlreadyResolved,
-	ProcurementErrorReasonPriceBasisUnavailable,
+	ProcurementErrorReasonBuyerRequestedRangeRequired,
+	ProcurementErrorReasonQuantityUnitUnconvertible,
 	ProcurementErrorReasonRunNotActive,
 	ProcurementErrorReasonInterruptExpired,
 	ProcurementErrorReasonApprovalStale,

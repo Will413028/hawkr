@@ -17,12 +17,6 @@ type CalculateShippingOptionsRequest struct {
 	ReceiverArea string `json:"receiverArea,omitempty"`        // 收件區域（選填，由 Product Service 決定預設值）
 }
 
-// AvailableTemperatureItem 可配送溫層
-type AvailableTemperatureItem struct {
-	Temperature string `json:"temperature"` // 溫層 Enum code
-	DisplayName string `json:"displayName"` // 溫層顯示名
-}
-
 // ShippingLimitsItem 配送限制
 type ShippingLimitsItem struct {
 	MaxDimensionSum string `json:"maxDimensionSum"` // 材積上限 L+W+H (cm)
@@ -30,11 +24,10 @@ type ShippingLimitsItem struct {
 	MaxWeightGrams  string `json:"maxWeightGrams"`  // 重量上限 (g)
 }
 
-// ShippingOptionItem 運送方式選項（method × temperature 組合）
+// ShippingOptionItem 運送方式選項
 type ShippingOptionItem struct {
 	ShippingMethod string             `json:"shippingMethod"` // 配送方式 Enum code
 	DisplayName    string             `json:"displayName"`    // 配送方式顯示名
-	Temperature    string             `json:"temperature"`    // 溫層 Enum code
 	Fee            string             `json:"fee"`            // 運費（TWD）
 	EstimatedDays  string             `json:"estimatedDays"`  // 預計到貨天數（暫空）
 	Limits         ShippingLimitsItem `json:"limits"`         // 尺寸/重量限制
@@ -42,12 +35,11 @@ type ShippingOptionItem struct {
 
 // ShippingCalculationDataItem 運費計算結果
 type ShippingCalculationDataItem struct {
-	VolumeSize            string                     `json:"volumeSize"`
-	WeightGrams           string                     `json:"weightGrams"`
-	DimensionSum          string                     `json:"dimensionSum"`
-	LongestSide           string                     `json:"longestSide"`
-	AvailableTemperatures []AvailableTemperatureItem `json:"availableTemperatures"`
-	ShippingOptions       []ShippingOptionItem       `json:"shippingOptions"`
+	VolumeSize      string               `json:"volumeSize"`
+	WeightGrams     string               `json:"weightGrams"`
+	DimensionSum    string               `json:"dimensionSum"`
+	LongestSide     string               `json:"longestSide"`
+	ShippingOptions []ShippingOptionItem `json:"shippingOptions"`
 }
 
 // CalculateShippingOptions 計算可用配送選項與運費
@@ -104,20 +96,14 @@ func (h *Holder) CalculateShippingOptions(c *gin.Context) {
 
 	data := resp.Data
 
-	temps := make([]AvailableTemperatureItem, 0, len(data.AvailableTemperatures))
-	for _, t := range data.AvailableTemperatures {
-		temps = append(temps, AvailableTemperatureItem{
-			Temperature: t.Temperature,
-			DisplayName: t.DisplayName,
-		})
-	}
-
 	options := make([]ShippingOptionItem, 0, len(data.ShippingOptions))
 	for _, o := range data.ShippingOptions {
+		if o.Temperature != ambientShippingTemperature {
+			continue
+		}
 		item := ShippingOptionItem{
 			ShippingMethod: o.ShippingMethod,
 			DisplayName:    o.DisplayName,
-			Temperature:    o.Temperature,
 			Fee:            o.Fee,
 			EstimatedDays:  o.EstimatedDays,
 		}
@@ -132,11 +118,10 @@ func (h *Holder) CalculateShippingOptions(c *gin.Context) {
 	}
 
 	response.OK(c, ShippingCalculationDataItem{
-		AvailableTemperatures: temps,
-		ShippingOptions:       options,
-		VolumeSize:            data.VolumeSize,
-		WeightGrams:           data.WeightGrams,
-		DimensionSum:          data.DimensionSum,
-		LongestSide:           data.LongestSide,
+		ShippingOptions: options,
+		VolumeSize:      data.VolumeSize,
+		WeightGrams:     data.WeightGrams,
+		DimensionSum:    data.DimensionSum,
+		LongestSide:     data.LongestSide,
 	})
 }

@@ -130,7 +130,6 @@ func TestCategoryManualDescription_NoConfirmedCategory_RecordsBuyerDescribed(t *
 			require.Equal(t, strings.TrimSpace(tc.description), *out.Item)
 			require.Equal(t, &domain.ItemResolution{
 				Kind: domain.ItemResolvedBuyerDescribed, Label: strings.TrimSpace(tc.description),
-				Provenance: domain.ItemResolutionByBuyerChoice,
 			}, out.Resolution)
 			require.Equal(t, originalSelection, *question.Selection, "the stored question remains immutable")
 		})
@@ -150,7 +149,6 @@ func TestCategoryManualDescription_ConfirmedParent_FallsBackToParentCategory(t *
 			require.False(t, out.Pending)
 			require.Equal(t, &domain.ItemResolution{
 				Kind: domain.ItemResolvedCategoryConfirmed, Label: "臺灣豬五花（去皮）", CategoryID: "8",
-				Provenance: domain.ItemResolutionByBuyerChoice,
 			}, out.Resolution)
 			require.Equal(t, originalSelection, *question.Selection, "the stored question remains immutable")
 		})

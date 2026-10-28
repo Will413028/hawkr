@@ -10,7 +10,7 @@ import (
 	"unicode"
 
 	"github.com/Will413028/hawkr/ai-service/internal/cache"
-	"github.com/Will413028/hawkr/ai-service/internal/procurement/cropidentity/fuse"
+	"github.com/Will413028/hawkr/ai-service/internal/procurement/cropidentity/recall"
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/domain"
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/zhtw"
 	"github.com/Will413028/hawkr/go-pkg/codemeta"
@@ -413,19 +413,19 @@ func (uc *DisambiguationUseCase) ResolveSelection(ctx context.Context, itemText 
 }
 
 func (uc *DisambiguationUseCase) resolveWithinGroup(ctx context.Context, query string, group cropCategory) (DisambiguationResult, error) {
-	pool, err := uc.recallPool(ctx, understandQuery(query))
+	pool, err := uc.taxonomyCandidates(ctx, understandQuery(query))
 	if err != nil {
 		return DisambiguationResult{}, err
 	}
 	pool = uc.narrowToGroup(ctx, pool, group.ID)
 	if len(pool) == 0 {
-		pool = []fuse.Fused{unexpandedGroup(group)}
+		pool = []recall.Candidate{unexpandedGroup(group)}
 	}
 	return uc.categoryCard(ctx, query, pool)
 }
 
 func (uc *DisambiguationUseCase) suggestWithinStage(ctx context.Context, text string, selection *domain.CropSelection, allowed []cropCategory) ([]cropCategory, error) {
-	pool, err := uc.recallPool(ctx, understandQuery(text))
+	pool, err := uc.taxonomyCandidates(ctx, understandQuery(text))
 	if err != nil {
 		return nil, err
 	}
@@ -438,7 +438,7 @@ func (uc *DisambiguationUseCase) suggestWithinStage(ctx context.Context, text st
 	return uc.suggestCategories(ctx, text, selection.Stage, selection.ParentLabel, allowed), nil
 }
 
-func (uc *DisambiguationUseCase) stageCategories(ctx context.Context, pool []fuse.Fused, stage string) []cropCategory {
+func (uc *DisambiguationUseCase) stageCategories(ctx context.Context, pool []recall.Candidate, stage string) []cropCategory {
 	var out []cropCategory
 	seen := map[string]bool{}
 	for _, n := range uc.categoryNodes(ctx, pool) {

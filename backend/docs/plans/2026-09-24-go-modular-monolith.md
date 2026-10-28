@@ -224,6 +224,9 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - **確認信地址不得留在 job 參數裡**（A3b 3c-a 設計審查 #10，Will 2026-10-18）：`ReportReceived.ConfirmationEmail`（匿名送出留的 email）只在事件與 A8 同一個 transaction 排入的 job 參數裡，seller 不落表（`seller/events.go` 的註解寫同一條）。River v0.47.0（`backend/go.mod`）預設保留完成的 job 24 小時、丟棄（寄送失敗用盡重試）的 job 7 天（`rivershared/riversharedmaintenance/river_shared_maintenance.go:35-37`；專案沒有覆寫 `*JobRetentionPeriod`），參數裡的地址會跟著留那麼久。所以寄送 job 必須在完成或丟棄時清掉參數裡的地址，或參數只放 report／supplement 的參照、執行時再讀（地址就落在 seller，回到 365 天的聯絡方式保留規則管得到的範圍）。觸發：A8 訂閱 `ReportReceived` 的那一刀；驗收要有測試證明 job 完成與丟棄之後參數不含地址。
 - [ ] **A9 agent**
   - AI 助理與 procurement 的串流（AG-UI，12 支 SSE）：依 ADR `2026-09-26-external-contract-protobuf-connect.md` D7 在這一步決定改成 proto 的 server streaming，或保留 AG-UI 的 SSE 並明列為第二套契約（AG-UI 是外部的開放格式）。
+  - 採購不再依賴 pricebook（`2026-10-27-ecommerce-scope-cut` 步驟 5、6，ADR `2026-10-27-general-ecommerce-scope-cut.md` D2）：品項只解析到平台分類樹與 LLM 召回，報價只看供應商報的價，沒有行情依據與價格冷熱判斷；`procurement_price_previews` 已刪行情欄位。A9 搬採購時不接 pricebook，也不恢復農產行情。
+  - 延後項（`2026-10-27-ecommerce-scope-cut`「延後」，2026-10-29）：
+    - ai-service `cmd/resolver-eval` 的觀察邏輯（`observe` 仍照拿掉行情前的回應形狀解析），以及 `Unavailable` 與 `categoryDescribeStage` 的命名在拿掉 pricebook 後是否仍名實相符、`cropidentity.GateOption` 以 variadic 保留舊簽章的寫法。觸發：A9 搬採購、或下一次要跑線上 `resolver-eval` 時先審查。
 - [ ] **A10 delegation**：從 gateway 搬出代行編排；session 與稽核資料留在 identity。
   - 代行寫入搬進單體時，在領域寫入的同一個 transaction 以 `FOR SHARE` 讀 session 列檢查狀態，再寫入與寫稽核（撤銷與寫入序列化）。理由：撤銷以 session 為準，gateway 與領域服務不同 DB 時無法保證撤銷前後的順序，同 DB 後成本只是一次加鎖讀取。
   - 代行貼文的 6 條路由排在 A7-2d 改走單體 Connect（A7 計畫 S1），A10 只剩商品與訂單的路由；A7-2d 完成後，代行 Connect 的第一版形狀（credential、能力、`request_id`、限流）記在 ADR `2026-09-27-delegation-module.md` 的修訂段，A10 沿用或修訂。
@@ -254,10 +257,13 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
 
 - [ ] **B1 media**
   - media 改成不認識業務（ADR `2026-10-03-media-references-owner-side.md`，Will 2026-10-03）：只存資產與生命週期（暫存→確認→刪除），引用只在擁有者的表；刪除是擁有者經 outbox 送出的明確指令，GC 只清過期沒確認的暫存檔；機敏下載由擁有者授權後向 media 要短效的簽章網址；拿掉 `asset_reference` 與 media 端的 `(ref_type, ref_id)`。B1 之前的做法（每個 ref 只有一個同步 job 寫引用、只精準解除退場的圖）在 B1 時換成確認／刪除的介面。
+  - 延後項（`2026-10-27-ecommerce-scope-cut`「延後」，2026-10-29）：CodeMeta `AssetReferenceType` 的食譜值（content 的食譜已刪）還被 Java media-service 使用，也鏡像在 Go 的 `media/ref_type.go`、`pkg/media/ref_type.go` 與 `media/finalize_args.go`。觸發：B1 把 media 改成不認識業務（拿掉 `(ref_type, ref_id)`）時，連同 CodeMeta 值與生成物一起刪。
 - [ ] **B2 payment**：物流財務與責任判定先留在 Java，B10 再處理。
   - `createRefund` 依 D5 修正。
 - [ ] **B3 fulfillment**
   - 刪除 Uber 即時配送（ADR `2026-10-27-general-ecommerce-scope-cut.md` D4）：Java shipping 的 Uber 程式、payuni-webhook-service 的 Uber webhook、只服務它們的 proto RPC 與生成物、CodeMeta 的 Uber 值域、`.env.template` 與 `docker-compose-local.yml` 的 Uber 設定、`docs/runbooks/uber-quote-retention/`，4 份 Uber ADR 標 superseded；設計書 03、06、09、58 描述 3003（Uber）的段落與 `docs/runbooks/uber-quote-retention.md` 一併刪除；清單見 `docs/plans/2026-10-27-ecommerce-scope-cut.md`「延後」（Will 2026-10-29）。
+  - 上一項的清單與觸發條件的來源是 `2026-10-27-ecommerce-scope-cut`「延後」；補充範圍：CodeMeta 的 Uber 值域是 `ShippingMethod` 3003、`UberDeliveryOutcome`、`ShipmentAnomalyType` 的 4 個 UBER 值與錯誤碼 9024（`pkg/errors/bizcode`），Java 仍實作的 proto（order、shipping、product_import）裡的 Uber 欄位與 RPC 隨之刪除，client 裡斷言「3003 一律 unsupported」的回歸測試（website `lib/checkout/shipping-requirements.unit.test.ts`、`lib/seller/shipment-provider.unit.test.ts`，buyer-app `test/core/codemeta/shipping_presentation_test.dart`）在值域刪除時一起改。
+  - 4 份 Uber ADR 在 B3 刪 Java 程式時標 superseded（指向 ADR `2026-10-27-general-ecommerce-scope-cut.md` D4）：`2026-09-11-uber-commerce-model-seller-direct`、`2026-09-11-uber-logistics-fee-charge-trigger`、`2026-09-14-uber-create-idempotency-precommit-key`、`2026-09-06-uber-webhook-slice-in-payuni-webhook-service`。
 - [ ] **B4 catalog**
   - 不建 `store_state` 讀取模型：catalog 的列表在 SQL 內 join `seller.pub_exposable_stores(at)`（時間用請求的 clock），取代停權快照（ADR 2026-09-24 修訂段，2026-10-18；簡報 `docs/plans/2026-10-18-a7-social/d3-read-model-brief.md` §4.2）。
     - 2026-10-19：`seller.pub_exposable_stores(at)` 已建（A′(i)）。B4 把 product 搬進單體、`rg -n "OnStoreExposureChanged" cmd` 歸零時一起刪除 `seller.store_exposures`、`StoreExposureChanged`、`seller.reconcile_exposure` 與 `make reannounce-exposures`，`ListPublicStores` 改以 `pub_exposable_stores($now)` 做 keyset，`first_exposed_at` 改由週期 job 讀 `pub_exposable_stores(now)` 寫入（seller `CARRYOVER.md`「A′(i)」）。
@@ -265,8 +271,15 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - content 的 banner 點擊行為（`product`）改成經 catalog 的公開 API 確認商品存在，ID 格式同時換成 UUID：依賴表的 content 加上 catalog，並更新 ADR D2 的表（同上）。
   - 賣家中心的低庫存徽章改由伺服器提供數量：website 現在只從前 100 筆商品算（`SellerCenterShell`），超過就少算（A3 計畫第 4C 刀的決定）。
   - 商品限制措施（A3b `step10e-reports-brief.md` R6、`step10e-measure-brief.md` D7，Will 2026-10-18）：seller 的措施對象加商品（`measure_contents.content_kind` 加 PRODUCT），有理由、可以申覆、擋住重新上架；admin 的強制下架對話框改成建立這個措施；主管機關來函指名的商品頁資料依保存期限保存（R5，食安法修正草案第 43-1 條）。第一次部署前一定要有。
+  - 延後項（`2026-10-27-ecommerce-scope-cut`「延後」，2026-10-29）：Java 的配送溫層、產銷履歷與有機標章、商品認證欄位（`product.proto` 的 `certification_types`、`ProductCertification*`，catalog 的認證申請與審核流程、通知模板 `product_certification_*`）改寫時不帶，契約上一起消失；client 已拿掉介面（步驟 7）。觸發：B4 catalog 改寫，以及 B3 fulfillment、B6 cart 改寫配送方式聚合。同時刪除：
+    - gateway 替賣家端承接的常溫處理（`2026-10-27-ecommerce-scope-cut` D9）：`backend/gateway/internal/handler/shipping_ambient.go` 的常數、商品建立／更新／匯入／批次／代操作的 `temperature` 補值、超商開通 `goodsType` 補值，以及運費試算、物流開通與配送方式清單只回常溫列的過濾；程式註解寫明 B4 刪除。
+    - CSV 匯入的溫層欄位由 Java 解析（`CsvParseService.java:478-499`），gateway 不過濾匯入預覽的列（只拿掉溫層欄位，`2026-10-27-ecommerce-scope-cut` D9），賣家仍可能存進冷藏或冷凍。B4 改寫匯入時一併決定：解析端只接受常溫，或拒絕非常溫的 CSV 列。
+    - Java 組好的配送選項名稱含溫層字樣（例如「黑貓宅急便（常溫）」，ADR 計畫 D8）：伺服器端改成不帶；買家端 client 目前原樣顯示，不改寫。
+    - gateway 的商品認證路由與 handler（`routes_product.go`、`admin_product_certification.go`、`seller_product_certification.go` 與其測試、`router/constants.go`）和 OpenAPI operation：兩端的 client 呼叫已刪，Java 認證流程退場時一起刪。
+    - CodeMeta `ShippingTemperature`、`ProductCertification*` 值域與 design token 之外的生成物。
 - [ ] **B5 productimport**
 - [ ] **B6 cart**
+  - 延後項（`2026-10-27-ecommerce-scope-cut`「延後」，2026-10-29）：購物車與結帳契約裡的配送溫層（`cart.proto` 的 `delivery_temp`、`溫層`，order 的 `deliveryTemp`）。買家端 client 現在原樣回傳伺服器配送選項的 `deliveryTemp`（計畫 D8：Java 以它查運費、材積上限、免運與運費負擔，寫死常溫會讓冷藏、冷凍商品算錯）：website `lib/checkout/draft.ts`、`lib/checkout/repo.ts`、`features/cart/cartUiStore.ts`、`features/checkout/screens/CheckoutClient.tsx`，buyer-app `features/cart/data/cart_repository.dart`、`checkout_payment_sheet.dart`。觸發：B6 cart 改寫（與 B8 ordering 的結帳）不帶溫層欄位時，三處 client 的欄位與測試一起刪。
 - [ ] **B7 coupon**
 - [ ] **B8 ordering**
   - checkout 在單一 transaction 內完成：鎖購物車、扣庫存、建單、鎖定優惠券。
@@ -301,11 +314,13 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - identity 的 `20260927071536_clerk_identity.sql` 為了既有列把 `accounts.clerk_user_id` 與 `admins.clerk_user_id`（之後改名為 `access_subject`）填成 `unlinked:<id>`：壓成 baseline 時這兩句一起消失，兩個欄位直接是 NOT NULL，沒有佔位值（A2 C9 的 design-review）。
 - [ ] CodeMeta 生成器（`docs/代碼管理（CodeMeta）/scripts/generate.sh`）的 Go 輸出改成先寫出、再交給 `gofmt`，不再自己計算對齊（Will 2026-09-25 決定）：自算對齊是為了在沒有 Go 的 runner 上重跑生成比對，monorepo 的 CI 跑生成器時都有 Go。
 - [ ] 刪除 CodeMeta：沒有任何值域的擁有者是 CodeMeta、也沒有舊的消費端時，刪除 `docs/代碼管理（CodeMeta）/`、生成器、`internal/platform/codemeta`、`pkg/codemeta`、`pkg/errors/bizcode`、gateway 的鏡像與各 client 的 CodeMeta 生成物（ADR `2026-09-25-codemeta-retirement.md` 過渡第 4 步）。
+  - 延後項（`2026-10-27-ecommerce-scope-cut`「延後」，2026-10-29）：CodeMeta 裡同時被 Java 用到、所以沒在該計畫刪的值域（`AssetReferenceType` 的食譜值、`ShippingTemperature`、`ProductCertification*`、Uber 的 `ShippingMethod` 3003 等；清單見上面 B1、B3、B4）。觸發：各值域隨最後一個 Java 消費者退場時刪；剩下沒有擁有者的值域，隨本項刪除 CodeMeta 一起消失。
 - [ ] 賣家入駐文件改版時的重新同意（`pending_agreements`、`AcceptSellerAgreements`）：上線之前，或版本第一次在有真實賣家之後改版時加上，處理已入駐的賣家與換申請主體的情況（ADR `2026-10-19-seller-kyc-payuni-consolidated.md`「入駐同意紀錄」）。
 - [ ] 賣家入駐文件上線前的條文工作（ADR `2026-10-19-seller-kyc-payuni-consolidated.md`「入駐同意紀錄」）：
   - 律師確認三份條文（賣家契約、KYC 個資蒐集告知、PayUni 條款的取得方式）。
   - 填入營運主體、聯絡信箱、平台網址等佔位符（`〔營運者名稱〕`、`〔聯絡信箱〕`、`〔平台網址〕` 等）：這是條文改變，正本的版本行要遞增，再跑 `pnpm gen:legal`。
   - 依代理商契約更正 PAYUNI_TERMS：取得條款正本存進 `website/docs/legal/`，manifest 改用 `doc`，版本改用正本的日期。
+- [ ] website 首頁與關於頁整體的生鮮行銷調性文案改寫（`2026-10-27-ecommerce-scope-cut`「延後」，2026-10-29；步驟 7 只刪了溫層、冷鏈、有機、認證等字句，沒有重寫整體語氣）。觸發：品牌文案改寫（作品集的品牌改名素材 `brand/` 定案後）。
 - [ ] 文件：
   - MQ 事件總覽（36 號）、Proto 管理規範封存。
   - 設計書與模組的對應寫進各模組的 `AGENTS.md`。

@@ -3,7 +3,6 @@ import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/core/theme/app_typography.dart';
 import 'package:hawkr_seller/core/theme/hk_tokens.dart';
 import 'package:hawkr_seller/core/codemeta/code_meta.dart';
-import 'package:hawkr_seller/core/networking/ambient_shipping_temperature.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/utils/hk_log.dart';
 import 'package:hawkr_seller/shared/utils/floating_toast.dart';
@@ -108,9 +107,8 @@ class ShippingSettingsScreen extends HookConsumerWidget {
         var cvsToggleable = false;
         for (final o in bootstrap.onboardings) {
           final type = o['shippingType']?.toString() ?? '';
-          final goods = o['goodsType']?.toString() ?? '';
           HKLog.logD(
-            '[ShippingSettings] record: shippingType=$type goodsType=$goods '
+            '[ShippingSettings] record: shippingType=$type '
             'payuniSubmitStatus=${o['payuniSubmitStatus']} '
             'onboardingStatus=${o['onboardingStatus']} senderName=${o['senderName']}',
           );
@@ -131,14 +129,12 @@ class ShippingSettingsScreen extends HookConsumerWidget {
                 o['onboarding_id']?.toString() ??
                 o['id']?.toString() ??
                 '';
-            if (goods == kAmbientShippingTemperature) {
-              cvsRow ??= o;
-              if (onboardingId.isNotEmpty) {
-                cvsOnboardingId.value = onboardingId;
-              }
-              cvsInitialEnabled.value = actualEnabled;
-              cvsSelected.value = actualEnabled;
+            cvsRow ??= o;
+            if (onboardingId.isNotEmpty) {
+              cvsOnboardingId.value = onboardingId;
             }
+            cvsInitialEnabled.value = actualEnabled;
+            cvsSelected.value = actualEnabled;
             // 已建店 → 後續 add/remove 走 toggle endpoint
             if (isShippingRowToggleable(o)) cvsToggleable = true;
           } else {

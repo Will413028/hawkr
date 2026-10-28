@@ -32,7 +32,6 @@ import {
 	type SkuWriteInput,
 } from "@/lib/products/seller-repo";
 import type { AiDraftPatch } from "@/lib/seller/ai-listing-chat";
-import { AMBIENT_TEMPERATURE_CODE } from "@/lib/seller/ambient-temperature";
 
 const toNum = (v: unknown): number | undefined => {
 	if (v === null || v === undefined || v === "") return undefined;
@@ -235,7 +234,6 @@ export function draftToSubmitBody(
 						: ShippingFeePayer.BUYER;
 				return {
 					type: m.type,
-					temperature: AMBIENT_TEMPERATURE_CODE,
 					feePayer,
 					// A threshold is a seller's subsidy condition, never a
 					// buyer-paid shipping rule. Normalise legacy contradictory

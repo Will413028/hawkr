@@ -3415,8 +3415,6 @@ type ItemResolution struct {
 	Kind string `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
 	// 分類名稱，或 BUYER_DESCRIBED 時買家的描述。
 	Label string `protobuf:"bytes,3,opt,name=label,proto3" json:"label,omitempty"`
-	// BUYER_CHOICE（買家在消歧卡上親自挑的，含自行描述）。
-	Provenance string `protobuf:"bytes,4,opt,name=provenance,proto3" json:"provenance,omitempty"`
 	// 伺服器組好的顯示字串。**前端不得自己用 kind＋label 重拼**：那會讓 slots
 	// 面板與 recordedThisTurn 的 chip 出現兩套文案，而 chip 用的就是這個值。
 	DisplayValue  string `protobuf:"bytes,6,opt,name=display_value,json=displayValue,proto3" json:"display_value,omitempty"`
@@ -3464,13 +3462,6 @@ func (x *ItemResolution) GetKind() string {
 func (x *ItemResolution) GetLabel() string {
 	if x != nil {
 		return x.Label
-	}
-	return ""
-}
-
-func (x *ItemResolution) GetProvenance() string {
-	if x != nil {
-		return x.Provenance
 	}
 	return ""
 }
@@ -8718,10 +8709,8 @@ type RfqPricePreviewResponse struct {
 	PayloadHash         string                 `protobuf:"bytes,8,opt,name=payload_hash,json=payloadHash,proto3" json:"payload_hash,omitempty"`
 	// 可為 null（條件見 QuoteTotalRange）。
 	QuoteTotalRange *QuoteTotalRange `protobuf:"bytes,10,opt,name=quote_total_range,json=quoteTotalRange,proto3" json:"quote_total_range,omitempty"`
-	// 空字串＝本欄加入前建立的 preview，呼叫端當「未知」處理，不得補值。
-	QualityKnowledgeState string `protobuf:"bytes,11,opt,name=quality_knowledge_state,json=qualityKnowledgeState,proto3" json:"quality_knowledge_state,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *RfqPricePreviewResponse) Reset() {
@@ -8787,13 +8776,6 @@ func (x *RfqPricePreviewResponse) GetQuoteTotalRange() *QuoteTotalRange {
 		return x.QuoteTotalRange
 	}
 	return nil
-}
-
-func (x *RfqPricePreviewResponse) GetQualityKnowledgeState() string {
-	if x != nil {
-		return x.QualityKnowledgeState
-	}
-	return ""
 }
 
 // RfqConfirmationRequest is the body of POST .../rfq-confirmations (issue
@@ -9499,17 +9481,15 @@ func (x *SellerFacingRequestedRange) GetUpperBoundAmount() string {
 }
 
 type RfqPublicationInviteSellerViewResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// 空字串＝本欄加入前建立的 approval，呼叫端當「未知」處理，不得補值。
-	QualityKnowledgeState string `protobuf:"bytes,9,opt,name=quality_knowledge_state,json=qualityKnowledgeState,proto3" json:"quality_knowledge_state,omitempty"`
-	Item                  string `protobuf:"bytes,1,opt,name=item,proto3" json:"item,omitempty"`
-	ItemLabel             string `protobuf:"bytes,2,opt,name=item_label,json=itemLabel,proto3" json:"item_label,omitempty"`
-	Quantity              string `protobuf:"bytes,3,opt,name=quantity,proto3" json:"quantity,omitempty"`
-	Unit                  string `protobuf:"bytes,4,opt,name=unit,proto3" json:"unit,omitempty"`
-	Packaging             string `protobuf:"bytes,5,opt,name=packaging,proto3" json:"packaging,omitempty"`
-	DeliveryCity          string `protobuf:"bytes,6,opt,name=delivery_city,json=deliveryCity,proto3" json:"delivery_city,omitempty"`
-	DeliveryDate          string `protobuf:"bytes,7,opt,name=delivery_date,json=deliveryDate,proto3" json:"delivery_date,omitempty"`
-	ResponseDeadline      string `protobuf:"bytes,8,opt,name=response_deadline,json=responseDeadline,proto3" json:"response_deadline,omitempty"`
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Item             string                 `protobuf:"bytes,1,opt,name=item,proto3" json:"item,omitempty"`
+	ItemLabel        string                 `protobuf:"bytes,2,opt,name=item_label,json=itemLabel,proto3" json:"item_label,omitempty"`
+	Quantity         string                 `protobuf:"bytes,3,opt,name=quantity,proto3" json:"quantity,omitempty"`
+	Unit             string                 `protobuf:"bytes,4,opt,name=unit,proto3" json:"unit,omitempty"`
+	Packaging        string                 `protobuf:"bytes,5,opt,name=packaging,proto3" json:"packaging,omitempty"`
+	DeliveryCity     string                 `protobuf:"bytes,6,opt,name=delivery_city,json=deliveryCity,proto3" json:"delivery_city,omitempty"`
+	DeliveryDate     string                 `protobuf:"bytes,7,opt,name=delivery_date,json=deliveryDate,proto3" json:"delivery_date,omitempty"`
+	ResponseDeadline string                 `protobuf:"bytes,8,opt,name=response_deadline,json=responseDeadline,proto3" json:"response_deadline,omitempty"`
 	// 空字串＝買家沒有補充說明（或這張 approval 建立於本欄加入前）。原文照登，
 	// 伺服器不解析也不驗證內容。
 	BuyerNote           string                      `protobuf:"bytes,10,opt,name=buyer_note,json=buyerNote,proto3" json:"buyer_note,omitempty"`
@@ -9556,13 +9536,6 @@ func (x *RfqPublicationInviteSellerViewResponse) ProtoReflect() protoreflect.Mes
 // Deprecated: Use RfqPublicationInviteSellerViewResponse.ProtoReflect.Descriptor instead.
 func (*RfqPublicationInviteSellerViewResponse) Descriptor() ([]byte, []int) {
 	return file_ai_ai_proto_rawDescGZIP(), []int{127}
-}
-
-func (x *RfqPublicationInviteSellerViewResponse) GetQualityKnowledgeState() string {
-	if x != nil {
-		return x.QualityKnowledgeState
-	}
-	return ""
 }
 
 func (x *RfqPublicationInviteSellerViewResponse) GetItem() string {
@@ -10371,14 +10344,12 @@ const file_ai_ai_proto_rawDesc = "" +
 	"\x0e_delivery_cityB\x10\n" +
 	"\x0e_delivery_dateB\x17\n" +
 	"\x15_exact_match_requiredB\x12\n" +
-	"\x10_item_resolutionJ\x04\b\x02\x10\x03R\x04spec\"\x9f\x01\n" +
+	"\x10_item_resolutionJ\x04\b\x02\x10\x03R\x04spec\"\x91\x01\n" +
 	"\x0eItemResolution\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x14\n" +
-	"\x05label\x18\x03 \x01(\tR\x05label\x12\x1e\n" +
-	"\n" +
-	"provenance\x18\x04 \x01(\tR\n" +
-	"provenance\x12#\n" +
-	"\rdisplay_value\x18\x06 \x01(\tR\fdisplayValueJ\x04\b\x02\x10\x03J\x04\b\x05\x10\x06R\x04codeR\fprice_per_kg\"S\n" +
+	"\x05label\x18\x03 \x01(\tR\x05label\x12#\n" +
+	"\rdisplay_value\x18\x06 \x01(\tR\fdisplayValueJ\x04\b\x02\x10\x03J\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\x04codeR\n" +
+	"provenanceR\fprice_per_kg\"S\n" +
 	"\x18CropDisambiguationOption\x12\x14\n" +
 	"\x05label\x18\x01 \x01(\tR\x05labelJ\x04\b\x02\x10\x03J\x04\b\x03\x10\x04R\tcrop_codeR\n" +
 	"group_code\"z\n" +
@@ -10834,16 +10805,15 @@ const file_ai_ai_proto_rawDesc = "" +
 	"\x12lower_bound_amount\x18\x02 \x01(\tR\x10lowerBoundAmount\x12,\n" +
 	"\x12upper_bound_amount\x18\x03 \x01(\tR\x10upperBoundAmount\x12\x1a\n" +
 	"\bquantity\x18\x04 \x01(\tR\bquantity\x12#\n" +
-	"\rquantity_unit\x18\x05 \x01(\tR\fquantityUnit\"\xd3\x03\n" +
+	"\rquantity_unit\x18\x05 \x01(\tR\fquantityUnit\"\xba\x03\n" +
 	"\x17RfqPricePreviewResponse\x12(\n" +
 	"\x10price_preview_id\x18\x01 \x01(\tR\x0epricePreviewId\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12Q\n" +
 	"\x15buyer_requested_range\x18\x06 \x01(\v2\x1d.hawkr.ai.BuyerRequestedRangeR\x13buyerRequestedRange\x12!\n" +
 	"\fpayload_hash\x18\b \x01(\tR\vpayloadHash\x12E\n" +
 	"\x11quote_total_range\x18\n" +
-	" \x01(\v2\x19.hawkr.ai.QuoteTotalRangeR\x0fquoteTotalRange\x126\n" +
-	"\x17quality_knowledge_state\x18\v \x01(\tR\x15qualityKnowledgeStateJ\x04\b\x03\x10\x04J\x04\b\x04\x10\x05J\x04\b\x05\x10\x06J\x04\b\a\x10\bJ\x04\b\t\x10\n" +
-	"R\fpricing_modeR\x16reference_availabilityR\x15reference_price_rangeR\x10deal_temperatureR\x12market_price_basis\"\xb5\x02\n" +
+	" \x01(\v2\x19.hawkr.ai.QuoteTotalRangeR\x0fquoteTotalRangeJ\x04\b\x03\x10\x04J\x04\b\x04\x10\x05J\x04\b\x05\x10\x06J\x04\b\a\x10\bJ\x04\b\t\x10\n" +
+	"J\x04\b\v\x10\fR\fpricing_modeR\x16reference_availabilityR\x15reference_price_rangeR\x10deal_temperatureR\x12market_price_basisR\x17quality_knowledge_state\"\xb5\x02\n" +
 	"\x16RfqConfirmationRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12*\n" +
@@ -10910,9 +10880,8 @@ const file_ai_ai_proto_rawDesc = "" +
 	"\n" +
 	"basis_unit\x18\x04 \x01(\tR\tbasisUnit\x12,\n" +
 	"\x12lower_bound_amount\x18\x05 \x01(\tR\x10lowerBoundAmount\x12,\n" +
-	"\x12upper_bound_amount\x18\x06 \x01(\tR\x10upperBoundAmount\"\x9f\x04\n" +
-	"&RfqPublicationInviteSellerViewResponse\x126\n" +
-	"\x17quality_knowledge_state\x18\t \x01(\tR\x15qualityKnowledgeState\x12\x12\n" +
+	"\x12upper_bound_amount\x18\x06 \x01(\tR\x10upperBoundAmount\"\x86\x04\n" +
+	"&RfqPublicationInviteSellerViewResponse\x12\x12\n" +
 	"\x04item\x18\x01 \x01(\tR\x04item\x12\x1d\n" +
 	"\n" +
 	"item_label\x18\x02 \x01(\tR\titemLabel\x12\x1a\n" +
@@ -10926,7 +10895,8 @@ const file_ai_ai_proto_rawDesc = "" +
 	"buyer_note\x18\n" +
 	" \x01(\tR\tbuyerNote\x12X\n" +
 	"\x15buyer_requested_range\x18\f \x01(\v2$.hawkr.ai.SellerFacingRequestedRangeR\x13buyerRequestedRange\x12/\n" +
-	"\x13publication_version\x18\r \x01(\tR\x12publicationVersionJ\x04\b\v\x10\fR\x15reference_price_range\"j\n" +
+	"\x13publication_version\x18\r \x01(\tR\x12publicationVersionJ\x04\b\t\x10\n" +
+	"J\x04\b\v\x10\fR\x17quality_knowledge_stateR\x15reference_price_range\"j\n" +
 	"\x15WatchRunEventsRequest\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x1d\n" +
 	"\n" +

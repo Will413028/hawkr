@@ -19,7 +19,7 @@ func (f *FakePricePreviewRepo) InsertPricePreview(ctx context.Context, in reposi
 	f.InsertCalls++
 	row := repository.PricePreview{
 		ID: int64(f.InsertCalls), BuyerID: in.BuyerID, RequestID: in.RequestID,
-		RequestRevisionID: in.RequestRevisionID, QualityKnowledgeState: in.QualityKnowledgeState,
+		RequestRevisionID:       in.RequestRevisionID,
 		BuyerRequestedRangeJSON: in.BuyerRequestedRangeJSON, QuoteTotalRangeJSON: in.QuoteTotalRangeJSON,
 		ClientRequestID:  in.ClientRequestID,
 		PreviewInputHash: in.PreviewInputHash, PayloadHash: in.PayloadHash,

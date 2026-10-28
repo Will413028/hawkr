@@ -20,7 +20,7 @@ const (
 	pubSnapshotID  = int64(5100)
 	pubPreviewID   = int64(6100)
 	pubCandSetID   = int64(900)
-	pubCanonical   = `{"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","buyerRequestedRange":{"min":"80","max":"120"},"item":"高麗菜","quantity":100,"unit":"公斤","deliveryCity":"台中市"}`
+	pubCanonical   = `{"buyerRequestedRange":{"min":"80","max":"120"},"item":"高麗菜","quantity":100,"unit":"公斤","deliveryCity":"台中市"}`
 	pubSnapshotSum = "snapshot-hash"
 )
 
@@ -118,13 +118,11 @@ func newPublicationPreviewFixture() (*PublicationPreviewUseCase, *fakePublicatio
 		fakeConfirmedRfqSnapshotByIDReader{snap: repository.ConfirmedRfqSnapshot{
 			ID: pubSnapshotID, BuyerID: pubBuyerID, RequestID: pubRequestID,
 			RequestRevisionID: pubRevisionID, PricePreviewID: pubPreviewID, PricePreviewVersion: 1,
-			QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
-			CanonicalPayloadJSON:  json.RawMessage(pubCanonical), PayloadHash: pubSnapshotSum,
+			CanonicalPayloadJSON: json.RawMessage(pubCanonical), PayloadHash: pubSnapshotSum,
 		}},
 		fakePricePreviewByIDReader{preview: repository.PricePreview{
 			ID: pubPreviewID, BuyerID: pubBuyerID, RequestID: pubRequestID,
 			RequestRevisionID:       pubRevisionID,
-			QualityKnowledgeState:   "BUYER_QUALITY_UNKNOWN",
 			BuyerRequestedRangeJSON: json.RawMessage(`{"min":"80","max":"120"}`),
 			PreviewInputHash:        "preview-input-hash", PayloadHash: "preview-payload-hash",
 			Version: 1,
@@ -343,13 +341,11 @@ func TestPreviewRfqPublication_CandidateIdentityUnresolved_WritesNothing(t *test
 		fakeConfirmedRfqSnapshotByIDReader{snap: repository.ConfirmedRfqSnapshot{
 			ID: pubSnapshotID, BuyerID: pubBuyerID, RequestID: pubRequestID,
 			RequestRevisionID: pubRevisionID, PricePreviewID: pubPreviewID, PricePreviewVersion: 1,
-			QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
-			CanonicalPayloadJSON:  json.RawMessage(pubCanonical), PayloadHash: pubSnapshotSum,
+			CanonicalPayloadJSON: json.RawMessage(pubCanonical), PayloadHash: pubSnapshotSum,
 		}},
 		fakePricePreviewByIDReader{preview: repository.PricePreview{
 			ID: pubPreviewID, BuyerID: pubBuyerID, RequestID: pubRequestID,
 			RequestRevisionID:       pubRevisionID,
-			QualityKnowledgeState:   "BUYER_QUALITY_UNKNOWN",
 			BuyerRequestedRangeJSON: json.RawMessage(`{"min":"80","max":"120"}`),
 			PreviewInputHash:        "preview-input-hash", PayloadHash: "preview-payload-hash",
 			Version: 1,

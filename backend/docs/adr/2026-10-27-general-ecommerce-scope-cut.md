@@ -41,3 +41,19 @@
 - 採購的品項解析會變粗：同一個分類下的不同作物不再分開（例如「蘋果」只到分類，不分品種）；報價沒有市場行情可以對照。
 - D5 的過渡期間，client 送的常溫值是假資料；它在階段 B 改寫 catalog（B4）時隨欄位一起刪除，不留到上線。
 - 重新評估的條件：平台要賣受管制品類（食品、保健品、化妝品、醫療器材）時，再依基準做品類資格審核；採購需要價格參考時，另選一般商品的價格來源，不恢復農產行情。
+
+## 取代與修訂的 ADR
+
+每一份在對方檔案裡也有指回本 ADR 的標記（`rg -n "general-ecommerce-scope-cut" backend/docs/adr` 可核對）。
+
+| ADR | 關係 | 依據 |
+|---|---|---|
+| `2026-09-14-pricebook-freshness-describes-age-not-usability` | superseded | D1 |
+| `2026-09-18-deal-temperature-outcome-definition` | superseded | D2 |
+| `2026-09-13-procurement-category-fallback` | 部分取代（Pricebook 搜尋、行情映射與行情驗證） | D1、D2 |
+| `2026-10-18-seller-governance-consolidated` | 修訂段（FDA 轉報刪除；pricebook 刪除） | D3 |
+| `2026-10-19-seller-kyc-payuni-consolidated` | 修訂段（食品業者登錄刪除；pricebook 刪除） | D3 |
+| `2026-10-20-admin-review-queue` | 修訂段（刪除兩種待辦） | D3 |
+| `2026-10-02-seller-kyc-payuni-in-monolith`、`2026-09-24-go-modular-monolith`、`2026-09-18-seller-capability-authorization`、`2026-09-29-seller-suspension-and-business-identity-in-monolith`、`2026-10-03-vendor-portal-invite-scoped-access`、`2026-09-13-category-alias-offline-generation` | 修訂段（pricebook 刪除） | D1 |
+| `2026-09-06-fulfillment-docs-split-into-six`、`2026-09-11-logistics-finance-domain-ownership`、`2026-09-11-logistics-amount-semantics-separation`、`2026-09-11-channel-fee-grossup-in-adapter`、`2026-09-12-inbound-payload-raw-bytes`、`2026-09-12-return-leg-classifier-canonical`、`2026-09-11-uber-logistics-fee-charge-trigger`、`2026-09-14-uber-create-idempotency-precommit-key` | 註記（設計書 66 的 Uber 決定刪除） | D4 |
+| `2026-09-11-uber-commerce-model-seller-direct`、`2026-09-11-uber-logistics-fee-charge-trigger`、`2026-09-14-uber-create-idempotency-precommit-key`、`2026-09-06-uber-webhook-slice-in-payuni-webhook-service` | 待標 superseded：Java 的 Uber 程式還在，等主計畫 B3 刪除時一起標（`docs/plans/2026-09-24-go-modular-monolith.md` B3） | D4、D5 |

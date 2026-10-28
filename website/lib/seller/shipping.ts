@@ -17,7 +17,6 @@
 
 import { authedFetch } from "@/lib/api/client";
 import { ShippingMethod } from "@/lib/codemeta/enums";
-import { AMBIENT_TEMPERATURE_CODE } from "@/lib/seller/ambient-temperature";
 import { toLogisticsName } from "@/lib/seller/certification-options";
 
 /* ===== Code-meta enums (mirroring Flutter codemeta) ===== */
@@ -52,7 +51,6 @@ export type OnboardingStatus =
 export interface ShippingOnboarding {
 	onboardingId?: string;
 	shippingType?: string; // ShippingType but tolerate strings from older payloads
-	goodsType?: string;
 	enabled?: string; // "true" / "false"
 	payuniSubmitStatus?: string; // PayuniSubmitStatus
 	providerMessage?: string;
@@ -121,7 +119,7 @@ export async function submitCvsOnboarding(
 		"/app/shipping_onboardings/cvs",
 		{
 			method: "POST",
-			json: { ...body, goodsType: AMBIENT_TEMPERATURE_CODE },
+			json: body,
 		},
 	);
 	return env.data ?? {};
@@ -263,13 +261,8 @@ export function unsupportedOnboardingTypes(
 export function findOnboarding(
 	rows: ShippingOnboarding[],
 	shippingType: ShippingType,
-	goodsType?: string,
 ): ShippingOnboarding | undefined {
-	return rows.find(
-		(r) =>
-			r.shippingType === shippingType &&
-			(goodsType === undefined || r.goodsType === goodsType),
-	);
+	return rows.find((r) => r.shippingType === shippingType);
 }
 
 export function isLocked(o: ShippingOnboarding | undefined): boolean {
@@ -338,11 +331,7 @@ export function shippingMethodOpenState(
 		return isApproved(row) ? "open" : "not_opened";
 	}
 	if (method === ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP) {
-		const row = findOnboarding(
-			rows,
-			SHIPPING_TYPE.CVS,
-			AMBIENT_TEMPERATURE_CODE,
-		);
+		const row = findOnboarding(rows, SHIPPING_TYPE.CVS);
 		if (!isApproved(row)) return "not_opened";
 		return isEnabled(row) ? "open" : "disabled";
 	}

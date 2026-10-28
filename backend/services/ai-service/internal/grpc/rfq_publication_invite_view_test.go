@@ -35,7 +35,7 @@ func TestGetRfqPublicationInviteSellerView_ReturnsWhitelistedFieldsOnly(t *testi
 		view: repository.InviteSellerView{
 			Item: "台灣蘋果", ItemLabel: "蘋果", Quantity: "50", Unit: "BOX",
 			Packaging: "紙箱", DeliveryCity: "桃園市", DeliveryDate: "2026-09-16",
-			ResponseDeadline: "2026-09-14", QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
+			ResponseDeadline: "2026-09-14",
 		},
 	})
 
@@ -45,19 +45,6 @@ func TestGetRfqPublicationInviteSellerView_ReturnsWhitelistedFieldsOnly(t *testi
 	require.Equal(t, "台灣蘋果", got.Item)
 	require.Equal(t, "桃園市", got.DeliveryCity)
 	require.Equal(t, "2026-09-14", got.ResponseDeadline)
-	require.Equal(t, "BUYER_QUALITY_UNKNOWN", got.QualityKnowledgeState)
-}
-
-// 舊 approval 讀回空字串，RPC 必須原樣傳遞，不得補成 BUYER_QUALITY_UNKNOWN。
-func TestGetRfqPublicationInviteSellerView_KeepsLegacyEmptyQualityState(t *testing.T) {
-	h := newInviteSellerViewHandler(&stubInviteViewRepo{
-		view: repository.InviteSellerView{Item: "台灣蘋果", DeliveryCity: "桃園市"},
-	})
-
-	got, err := h.GetRfqPublicationInviteSellerView(context.Background(),
-		&pb.GetRfqPublicationInviteSellerViewRequest{InviteId: "123"})
-	require.NoError(t, err)
-	require.Empty(t, got.QualityKnowledgeState)
 }
 
 func TestGetRfqPublicationInviteSellerView_UnknownInviteIsNotFound(t *testing.T) {

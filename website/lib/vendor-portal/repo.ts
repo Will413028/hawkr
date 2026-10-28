@@ -42,10 +42,8 @@ export interface VendorRfqRequestedPriceRange {
 	upperBoundAmount: string;
 }
 
-/** gateway `VendorPortalRFQDTO` 的 deny-by-default 白名單，就這十二欄。 */
+/** gateway `VendorPortalRFQDTO` 的 deny-by-default 白名單，就這十一欄。 */
 export interface VendorRfqSummary {
-	/** 空字串＝這筆 approval 建立於後端加這個欄位之前，當「未知」處理、不得補值。 */
-	qualityKnowledgeState: string;
 	item: string;
 	itemLabel: string;
 	quantity: string;

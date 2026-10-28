@@ -10,8 +10,7 @@
     "item_resolution": {
       "kind": "CATEGORY_CONFIRMED",
       "label": "芭樂",
-      "category_id": "7",
-      "provenance": "BUYER_CHOICE"
+      "category_id": "7"
     }
   },
   "after": {
@@ -19,8 +18,7 @@
     "item_resolution": {
       "kind": "CATEGORY_CONFIRMED",
       "label": "芭樂",
-      "category_id": "7",
-      "provenance": "BUYER_CHOICE"
+      "category_id": "7"
     }
   },
   "result": {

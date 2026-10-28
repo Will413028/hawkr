@@ -65,7 +65,6 @@ export const SLICE_A_CAPABILITY_CHIPS: readonly AgentCapabilityChip[] =
 			id: "compare-candidates",
 			label: "比較候選",
 			icon: "compare-candidates",
-			template:
-				"幫我比較幾家能供應有機蔬菜的商家，我最在意產銷履歷、到貨穩定度和單價。",
+			template: "幫我比較幾家能供應有機蔬菜的商家，我最在意到貨穩定度和單價。",
 		},
 	]);

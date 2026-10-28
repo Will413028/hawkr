@@ -1626,8 +1626,10 @@ enum ProcurementErrorReason {
   laneMismatch(code: 'LANE_MISMATCH', value: 'LANE_MISMATCH', label: '通道不符'),
   /// 邀請已被處理 — 409。該報價邀請已被確認或已失效（先到先得）
   inviteAlreadyResolved(code: 'INVITE_ALREADY_RESOLVED', value: 'INVITE_ALREADY_RESOLVED', label: '邀請已被處理'),
-  /// 報價基準無法解析 — 422。currency/quantity/unit/conversion basis 無法 canonicalize，RFQ 報價預覽的 typed hard block，零 side effect、不建立 preview 列（issue #2403 Slice 2）
-  priceBasisUnavailable(code: 'PRICE_BASIS_UNAVAILABLE', value: 'PRICE_BASIS_UNAVAILABLE', label: '報價基準無法解析'),
+  /// 缺少買家預期價格範圍 — 422。RFQ 報價預覽沒有帶 buyerRequestedRange，或範圍不合法（非 TWD、非正整數、下界大於上界），零 side effect、不建立 preview 列
+  buyerRequestedRangeRequired(code: 'BUYER_REQUESTED_RANGE_REQUIRED', value: 'BUYER_REQUESTED_RANGE_REQUIRED', label: '缺少買家預期價格範圍'),
+  /// 數量與單位無法換算 — 422。需求已有數量與單位，但算不出報價總額範圍，零 side effect、不建立 preview 列
+  quantityUnitUnconvertible(code: 'QUANTITY_UNIT_UNCONVERTIBLE', value: 'QUANTITY_UNIT_UNCONVERTIBLE', label: '數量與單位無法換算'),
   /// Run 非執行中 — 409。對非 QUEUED/RUNNING/WAITING_FOR_INPUT 狀態的 run 送出需要 active run 的命令
   runNotActive(code: 'RUN_NOT_ACTIVE', value: 'RUN_NOT_ACTIVE', label: 'Run 非執行中'),
   /// 中斷已逾期 — 409。resume 命令對應的 interrupt 已超過 expiresAt

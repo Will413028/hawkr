@@ -70,7 +70,6 @@ type ConfirmedRfqSnapshotResult struct {
 // PricePreviewResult 本身就不帶 Slots.BudgetPerUnit／MarkupRateByLane，白名單
 // struct 只挑選其中已核准欄位，兩層防線疊加。
 type confirmedRfqPayload struct {
-	QualityKnowledgeState string `json:"qualityKnowledgeState"`
 	// BuyerNote 是這次擴大 preimage 唯一的例外，而它**不是**破壞性變更：
 	// omitempty ＋ 沒填時為 nil ⇒ 序列化結果與本欄加入前逐位元相同，既有的
 	// payload_hash 一個都不會改。這正是 §3.1 那次（一律出現的欄位）做不到的事。
@@ -87,8 +86,6 @@ type confirmedRfqPayload struct {
 	//
 	// ⛔ 白名單紀律不變，擴大範圍不等於把整包 slots 倒進來。刻意不收：
 	//   - BudgetPerUnit：買家私有預算，既有紅線（design spec D2 §V.7.4）。
-	//   - ItemResolution.Provenance：「誰決定的」稽核欄位，不是賣家報價要看的
-	//     識別內容。
 	//   - ExactMatchRequired：買家給候選比對用的匹配偏好，不是賣家報價時要看的
 	//     需求內容。
 	//
@@ -112,7 +109,7 @@ type confirmedRfqPayload struct {
 // confirmedRfqItemIdentity 是 domain.ItemResolution 的 seller-facing 白名單投影：
 // 只留「這是哪一個品項」需要的欄位。不直接內嵌 domain.ItemResolution，理由跟
 // confirmedRfqPayload 不直接內嵌 PricePreviewResult 一樣——那個型別帶著
-// Provenance（稽核）與內部分類 ID，序列化進來就是把非 seller-facing 的資料
+// 內部分類 ID，序列化進來就是把非 seller-facing 的資料
 // 寫進賣家看得到的 payload。
 type confirmedRfqItemIdentity struct {
 	Kind  string `json:"kind"`
@@ -321,16 +318,15 @@ func (uc *ConfirmRfqSnapshotUseCase) ConfirmRfqSnapshot(ctx context.Context, in 
 	}
 
 	payload := confirmedRfqPayload{
-		QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
-		BuyerRequestedRange:   preview.BuyerRequestedRange,
-		Item:                  slots.Item,
-		ItemResolution:        sellerFacingItemIdentity(slots.ItemResolution),
-		Quantity:              slots.Quantity,
-		Unit:                  slots.Unit,
-		Packaging:             slots.Packaging,
-		DeliveryCity:          slots.DeliveryCity,
-		DeliveryDate:          slots.DeliveryDate,
-		BuyerNote:             normalizedBuyerNote(buyerNote),
+		BuyerRequestedRange: preview.BuyerRequestedRange,
+		Item:                slots.Item,
+		ItemResolution:      sellerFacingItemIdentity(slots.ItemResolution),
+		Quantity:            slots.Quantity,
+		Unit:                slots.Unit,
+		Packaging:           slots.Packaging,
+		DeliveryCity:        slots.DeliveryCity,
+		DeliveryDate:        slots.DeliveryDate,
+		BuyerNote:           normalizedBuyerNote(buyerNote),
 	}
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
@@ -342,8 +338,7 @@ func (uc *ConfirmRfqSnapshotUseCase) ConfirmRfqSnapshot(ctx context.Context, in 
 	inserted, err := uc.repo.InsertConfirmedRfqSnapshot(ctx, repository.InsertConfirmedRfqSnapshotInput{
 		BuyerID: in.BuyerID, RequestID: in.RequestID, RequestRevisionID: activeRevisionID,
 		PricePreviewID: in.PricePreviewID, PricePreviewVersion: in.PricePreviewVersion,
-		QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
-		CanonicalPayloadJSON:  payloadBytes, PayloadHash: payloadHash,
+		CanonicalPayloadJSON: payloadBytes, PayloadHash: payloadHash,
 		ClientRequestID: in.ClientRequestID, ExpiresAt: time.Now().Add(confirmedRfqSnapshotTTL),
 	})
 	if err != nil {

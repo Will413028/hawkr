@@ -173,7 +173,7 @@ func TestSlots_Apply_RejectsDeliveryDateMissingYear_WithClearReason(t *testing.T
 // unit 於 2026-08-23 併入 requiredSlots 後，這個 golden 句子（原話沒講單位）現在
 // 會真的落在 missing 裡：這正是新語意——不像 delivery_date（選填、缺值不強行補
 // 問），unit 缺席時買家必須被再問一次才能到 REQUIREMENT_READY（否則會撞進
-// price-preview 的 ErrPriceBasisUnavailable，見 slots.go requiredSlots 的 doc
+// price-preview 的總額換算失敗，見 slots.go requiredSlots 的 doc
 // comment）。
 func TestSlots_Apply_GoldenRequestFromFlow19(t *testing.T) {
 	got, rejected := Slots{}.Apply(SlotPatch{

@@ -255,7 +255,7 @@
 	--hkui-accent-700: #b56629;
 	--hkui-accent-foreground: var(--color-neutral-ink);
 
-	/* info = cold-chain blue — "frozen" / "in transit" */
+	/* info = blue — "in transit" */
 	--hkui-info-50: #e3eff8;
 	--hkui-info-100: #b8d3eb;
 	--hkui-info-200: #7eaedb;

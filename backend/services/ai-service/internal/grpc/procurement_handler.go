@@ -161,7 +161,6 @@ func toItemResolutionProto(r *domain.ItemResolution) *aipb.ItemResolution {
 	out := &aipb.ItemResolution{
 		Kind:         string(r.Kind),
 		Label:        r.Label,
-		Provenance:   string(r.Provenance),
 		DisplayValue: r.DisplayValue(),
 	}
 	return out
@@ -852,8 +851,10 @@ func (s *AIProcurementGrpcServer) PreviewRfqPrice(ctx context.Context, req *aipb
 
 func previewRfqPriceErrorStatus(ctx context.Context, err error) error {
 	switch {
-	case errors.Is(err, pricing.ErrPriceBasisUnavailable):
-		return procurementStatus(codes.FailedPrecondition, "PRICE_BASIS_UNAVAILABLE", "currency/quantity/unit/conversion basis cannot be canonicalized")
+	case errors.Is(err, pricing.ErrBuyerRequestedRangeRequired):
+		return procurementStatus(codes.FailedPrecondition, codemeta.ProcurementErrorReasonBuyerRequestedRangeRequired.Value, "buyerRequestedRange is missing or invalid")
+	case errors.Is(err, pricing.ErrQuantityUnitUnconvertible):
+		return procurementStatus(codes.FailedPrecondition, codemeta.ProcurementErrorReasonQuantityUnitUnconvertible.Value, "quantity and unit cannot be converted to a quote total range")
 	case errors.Is(err, pricing.ErrStalePricePreviewRevision):
 		return procurementStatus(codes.Aborted, "STALE_REVISION", "需求已被其他裝置改動")
 	default:
@@ -868,8 +869,7 @@ func formatPriceAmount(f float64) string {
 func toRfqPricePreviewResponseProto(r pricing.PricePreviewResult) *aipb.RfqPricePreviewResponse {
 	resp := &aipb.RfqPricePreviewResponse{
 		PricePreviewId: itoa64(r.PricePreviewID), Version: itoa64(r.Version),
-		QualityKnowledgeState: r.QualityKnowledgeState,
-		PayloadHash:           r.PayloadHash,
+		PayloadHash: r.PayloadHash,
 	}
 	if !r.BuyerRequestedRange.IsUnset() {
 		resp.BuyerRequestedRange = &aipb.BuyerRequestedRange{
@@ -1101,9 +1101,6 @@ func executeRfqPublicationErrorStatus(ctx context.Context, err error) error {
 	case errors.Is(err, commerce.ErrRevisionStale):
 		return procurementStatus(codes.Aborted, codemeta.ProcurementErrorReasonStaleRevision.Value,
 			"需求已被其他裝置改動")
-	case errors.Is(err, pricing.ErrPriceBasisUnavailable):
-		return procurementStatus(codes.FailedPrecondition, codemeta.ProcurementErrorReasonPriceBasisUnavailable.Value,
-			"這份核准沒有可用的價格依據，請重新試算價格後再核准一次")
 	case errors.Is(err, repository.ErrPublicationCommandConflict):
 		return procurementStatus(codes.Aborted, codemeta.ProcurementErrorReasonIdempotencyKeyConflict.Value,
 			"clientRequestId 已用於其他發布，請改用新的 clientRequestId")

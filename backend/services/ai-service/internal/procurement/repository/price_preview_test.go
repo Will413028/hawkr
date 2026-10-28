@@ -21,7 +21,6 @@ func TestRepo_InsertPricePreview_CreatesRow(t *testing.T) {
 		BuyerID:                 testBuyerID,
 		RequestID:               1,
 		RequestRevisionID:       1,
-		QualityKnowledgeState:   "BUYER_QUALITY_UNKNOWN",
 		BuyerRequestedRangeJSON: []byte(`{}`),
 		ClientRequestID:         "preview-key-1",
 		PreviewInputHash:        "hash-in",
@@ -53,7 +52,6 @@ func TestRepo_InsertPricePreview_ConcurrentSameClientRequestID_IsIdempotent(t *t
 
 	input := InsertPricePreviewInput{
 		BuyerID: testBuyerID, RequestID: 1, RequestRevisionID: 1,
-		QualityKnowledgeState:   "BUYER_QUALITY_UNKNOWN",
 		BuyerRequestedRangeJSON: []byte(`{}`),
 		ClientRequestID:         "preview-key-race",
 		PreviewInputHash:        "hash-in", PayloadHash: "hash-out", ExpiresAt: refTime().Add(15 * time.Minute),
@@ -105,7 +103,6 @@ func TestRepo_InsertPricePreview_SameClientRequestIDDifferentPayload_ReturnsIdem
 
 	first := InsertPricePreviewInput{
 		BuyerID: testBuyerID, RequestID: 1, RequestRevisionID: 1,
-		QualityKnowledgeState:   "BUYER_QUALITY_UNKNOWN",
 		BuyerRequestedRangeJSON: []byte(`{}`),
 		ClientRequestID:         "preview-key-conflict",
 		PreviewInputHash:        "hash-in-1", PayloadHash: "hash-out-1", ExpiresAt: refTime().Add(15 * time.Minute),
@@ -142,7 +139,6 @@ func TestRepo_FindPricePreviewByIDAndBuyer_WrongBuyerID_ReturnsNotFound(t *testi
 		BuyerID:                 testBuyerID,
 		RequestID:               1,
 		RequestRevisionID:       1,
-		QualityKnowledgeState:   "BUYER_QUALITY_UNKNOWN",
 		BuyerRequestedRangeJSON: []byte(`{}`),
 		ClientRequestID:         "preview-key-owner-check",
 		PreviewInputHash:        "hash-in",

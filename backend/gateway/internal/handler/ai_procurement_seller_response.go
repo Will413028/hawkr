@@ -192,33 +192,30 @@ type ProcurementSellerRequestedPriceRangeDTO struct {
 // 內容與 vendor portal 的 VendorPortalRFQDTO 相同，但**刻意是獨立型別**——public 與
 // app 兩個 namespace 不共用 DTO（API 設計規範 §十）。
 type ProcurementSellerFacingPayloadDTO struct {
-	// 空字串＝本欄加入前建立的 approval，前端當「未知」處理，不得補值。
-	QualityKnowledgeState string                                   `json:"qualityKnowledgeState"`
-	Item                  string                                   `json:"item"`
-	ItemLabel             string                                   `json:"itemLabel"`
-	Quantity              string                                   `json:"quantity"`
-	Unit                  string                                   `json:"unit"`
-	Packaging             string                                   `json:"packaging"`
-	DeliveryCity          string                                   `json:"deliveryCity"`
-	DeliveryDate          string                                   `json:"deliveryDate"`
-	ResponseDeadline      string                                   `json:"responseDeadline"`
-	BuyerNote             string                                   `json:"buyerNote"`
-	BuyerRequestedRange   *ProcurementSellerRequestedPriceRangeDTO `json:"buyerRequestedRange"`
+	Item                string                                   `json:"item"`
+	ItemLabel           string                                   `json:"itemLabel"`
+	Quantity            string                                   `json:"quantity"`
+	Unit                string                                   `json:"unit"`
+	Packaging           string                                   `json:"packaging"`
+	DeliveryCity        string                                   `json:"deliveryCity"`
+	DeliveryDate        string                                   `json:"deliveryDate"`
+	ResponseDeadline    string                                   `json:"responseDeadline"`
+	BuyerNote           string                                   `json:"buyerNote"`
+	BuyerRequestedRange *ProcurementSellerRequestedPriceRangeDTO `json:"buyerRequestedRange"`
 }
 
 func sellerFacingPayloadFromProto(p *pb.RfqPublicationInviteSellerViewResponse) ProcurementSellerFacingPayloadDTO {
 	return ProcurementSellerFacingPayloadDTO{
-		QualityKnowledgeState: p.GetQualityKnowledgeState(),
-		Item:                  p.GetItem(),
-		ItemLabel:             p.GetItemLabel(),
-		Quantity:              p.GetQuantity(),
-		Unit:                  p.GetUnit(),
-		Packaging:             p.GetPackaging(),
-		DeliveryCity:          p.GetDeliveryCity(),
-		DeliveryDate:          p.GetDeliveryDate(),
-		ResponseDeadline:      p.GetResponseDeadline(),
-		BuyerNote:             p.GetBuyerNote(),
-		BuyerRequestedRange:   sellerRequestedRangeFromProto(p.GetBuyerRequestedRange()),
+		Item:                p.GetItem(),
+		ItemLabel:           p.GetItemLabel(),
+		Quantity:            p.GetQuantity(),
+		Unit:                p.GetUnit(),
+		Packaging:           p.GetPackaging(),
+		DeliveryCity:        p.GetDeliveryCity(),
+		DeliveryDate:        p.GetDeliveryDate(),
+		ResponseDeadline:    p.GetResponseDeadline(),
+		BuyerNote:           p.GetBuyerNote(),
+		BuyerRequestedRange: sellerRequestedRangeFromProto(p.GetBuyerRequestedRange()),
 	}
 }
 

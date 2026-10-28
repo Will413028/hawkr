@@ -48,7 +48,6 @@ function preview(
 	return {
 		pricePreviewId: "1",
 		version: "1",
-		qualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
 		buyerRequestedRange: {
 			currency: "TWD",
 			priceComponent: "GOODS_ONLY",

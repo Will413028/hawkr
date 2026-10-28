@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { AMBIENT_TEMPERATURE_CODE } from "@/lib/seller/ambient-temperature";
 import { draftSkuToImportSku, importSkuToDraft } from "./importItemAdapter";
 
 describe("import SKU shipping methods", () => {
-	it("sends the ambient temperature code for every carrier", () => {
+	it("sends no temperature field for any carrier", () => {
 		const out = draftSkuToImportSku({
 			id: "",
 			sku_name: "規格",
@@ -17,8 +16,8 @@ describe("import SKU shipping methods", () => {
 		});
 
 		expect(out.shippingMethods).toEqual([
-			{ method: "3001", temperature: AMBIENT_TEMPERATURE_CODE },
-			{ method: "3002", temperature: AMBIENT_TEMPERATURE_CODE },
+			{ method: "3001" },
+			{ method: "3002" },
 		]);
 	});
 

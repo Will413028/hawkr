@@ -17,7 +17,6 @@ import (
 // 十一欄，需要的識別內容全部在裡面。
 func TestCompileSellerFacingPayload_ReadsOnlyCanonicalPayload(t *testing.T) {
 	canonical := []byte(`{
-		"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN",
 		"buyerRequestedRange":{"min":"80","max":"120"},
 		"item":"高麗菜",
 		"itemResolution":{"kind":"CATEGORY_CONFIRMED","label":"高麗菜"},
@@ -42,7 +41,6 @@ func TestCompileSellerFacingPayload_ReadsOnlyCanonicalPayload(t *testing.T) {
 
 func TestCompileSellerFacingPayload_ExcludesBuyerBudget(t *testing.T) {
 	canonical := []byte(`{
-		"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN",
 		"item":"高麗菜",
 		"budgetPerUnit":"95",
 		"buyerRequestedRange":{
@@ -66,7 +64,6 @@ func TestCompileSellerFacingPayload_ExcludesBuyerBudget(t *testing.T) {
 // 不是 passthrough。這條擋住「把整包 canonical 直接 marshal 出去」這個改法。
 func TestCompileSellerFacingPayload_IsWhitelistNotPassthrough(t *testing.T) {
 	canonical := []byte(`{
-		"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN",
 		"item":"高麗菜",
 		"budgetPerUnit":"95",
 		"marketQuote":{"midpoint":100},
@@ -86,8 +83,8 @@ func TestCompileSellerFacingPayload_IsWhitelistNotPassthrough(t *testing.T) {
 
 // 內容不同就要 hash 不同——這是 #2538 買家接受時 CAS 的基礎。
 func TestSellerFacingPayloadHash_DiscriminatesContent(t *testing.T) {
-	base := []byte(`{"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","buyerRequestedRange":{"min":"80","max":"120"},"item":"高麗菜","quantity":100}`)
-	other := []byte(`{"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","buyerRequestedRange":{"min":"80","max":"120"},"item":"高麗菜","quantity":200}`)
+	base := []byte(`{"buyerRequestedRange":{"min":"80","max":"120"},"item":"高麗菜","quantity":100}`)
+	other := []byte(`{"buyerRequestedRange":{"min":"80","max":"120"},"item":"高麗菜","quantity":200}`)
 
 	p1, err := CompileSellerFacingPayload(base, nil)
 	require.NoError(t, err)
@@ -105,7 +102,7 @@ func TestSellerFacingPayloadHash_DiscriminatesContent(t *testing.T) {
 // 所以必須被 seller_facing_payload_hash 涵蓋——execute 時才 CAS 得到「賣家看到的
 // 截止日」有沒有被換掉。
 func TestSellerFacingPayloadHash_CoversResponseDeadline(t *testing.T) {
-	canonical := []byte(`{"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","item":"高麗菜"}`)
+	canonical := []byte(`{"item":"高麗菜"}`)
 
 	p1, err := CompileSellerFacingPayload(canonical, ptr("2026-09-15"))
 	require.NoError(t, err)
@@ -132,46 +129,9 @@ func TestCompileSellerFacingPayload_RejectsMalformedJSON(t *testing.T) {
 	require.Error(t, err)
 }
 
-// 品相狀態要給賣家看（docx V.7.5 的排除清單不含它）；wire 上的 key 是 gateway
-// DTO 與 web 共用的契約，key 錯與值錯一樣致命。
-func TestCompileSellerFacingPayload_CarriesQualityKnowledgeState(t *testing.T) {
-	canonical := []byte(`{
-		"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN",
-		"buyerRequestedRange":{"min":"80","max":"120"},
-		"item":"高麗菜"
-	}`)
-
-	got, err := CompileSellerFacingPayload(canonical, nil)
-	require.NoError(t, err)
-	require.Equal(t, "BUYER_QUALITY_UNKNOWN", got.QualityKnowledgeState)
-
-	b, err := json.Marshal(got)
-	require.NoError(t, err)
-	require.Contains(t, string(b), `"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN"`)
-}
-
-// 進 preimage；順帶釘住相容性：舊 approval 沒有這個 key，hash 因此不同。既有 row
-// 的 hash 是存下來的不重算，受影響的只有跨部署重送同一個 previewClientRequestId
-// 的 preview 冪等比對（repository/publication_approval.go）。
-func TestSellerFacingPayloadHash_CoversQualityKnowledgeState(t *testing.T) {
-	withState := []byte(`{"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","item":"高麗菜"}`)
-	withoutState := []byte(`{"item":"高麗菜"}`)
-
-	p1, err := CompileSellerFacingPayload(withState, nil)
-	require.NoError(t, err)
-	p2, err := CompileSellerFacingPayload(withoutState, nil)
-	require.NoError(t, err)
-
-	h1, err := p1.Hash()
-	require.NoError(t, err)
-	h2, err := p2.Hash()
-	require.NoError(t, err)
-	require.NotEqual(t, h1, h2, "賣家看得到的品相狀態必須被 preimage 涵蓋")
-}
-
 func TestSellerFacingPayload_OmitsBuyerNoteWhenAbsent(t *testing.T) {
 	payload, err := CompileSellerFacingPayload([]byte(`{
-		"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","item":"珍珠芭樂"
+		"item":"珍珠芭樂"
 	}`), nil)
 	if err != nil {
 		t.Fatalf("compile: %v", err)
@@ -191,14 +151,14 @@ func TestSellerFacingPayload_OmitsBuyerNoteWhenAbsent(t *testing.T) {
 }
 
 func TestSellerFacingPayloadHash_CoversBuyerNote(t *testing.T) {
-	const canonical = `{"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","item":"珍珠芭樂"}`
+	const canonical = `{"item":"珍珠芭樂"}`
 
 	without, err := CompileSellerFacingPayload([]byte(canonical), nil)
 	if err != nil {
 		t.Fatalf("compile: %v", err)
 	}
 	with, err := CompileSellerFacingPayload(
-		[]byte(`{"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","item":"珍珠芭樂","buyerNote":"中大果，不要有壓傷"}`), nil)
+		[]byte(`{"item":"珍珠芭樂","buyerNote":"中大果，不要有壓傷"}`), nil)
 	if err != nil {
 		t.Fatalf("compile: %v", err)
 	}
@@ -220,7 +180,6 @@ func TestSellerFacingPayloadHash_CoversBuyerNote(t *testing.T) {
 }
 
 const canonicalWithRanges = `{
-  "qualityKnowledgeState": "BUYER_QUALITY_UNKNOWN",
   "item": "甘藍-初秋",
   "buyerRequestedRange": {
     "currency": "TWD", "priceComponent": "GOODS_ONLY",
@@ -243,7 +202,7 @@ func TestCompileSellerFacingPayload_CarriesPriceRanges(t *testing.T) {
 
 func TestCompileSellerFacingPayload_OmitsPriceRangeKeysWhenAbsent(t *testing.T) {
 	payload, err := CompileSellerFacingPayload(
-		[]byte(`{"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","item":"珍珠芭樂"}`), nil)
+		[]byte(`{"item":"珍珠芭樂"}`), nil)
 	require.NoError(t, err)
 	require.Nil(t, payload.BuyerRequestedRange)
 
@@ -254,7 +213,7 @@ func TestCompileSellerFacingPayload_OmitsPriceRangeKeysWhenAbsent(t *testing.T) 
 
 func TestSellerFacingPayloadHash_CoversPriceRanges(t *testing.T) {
 	without, err := CompileSellerFacingPayload(
-		[]byte(`{"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","item":"甘藍-初秋"}`), nil)
+		[]byte(`{"item":"甘藍-初秋"}`), nil)
 	require.NoError(t, err)
 	with, err := CompileSellerFacingPayload([]byte(canonicalWithRanges), nil)
 	require.NoError(t, err)

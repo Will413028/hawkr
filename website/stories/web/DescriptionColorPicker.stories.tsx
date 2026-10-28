@@ -145,9 +145,7 @@ export const CancelAndEscape: Story = {
 		await expect(panel.getByRole("button", { name: "套用顏色" })).toHaveFocus();
 		await userEvent.tab();
 		await expect(panel.getByRole("button", { name: "關閉色盤" })).toHaveFocus();
-		await userEvent.click(
-			panel.getByRole("button", { name: "深藍 #1e5fab" }),
-		);
+		await userEvent.click(panel.getByRole("button", { name: "深藍 #1e5fab" }));
 		await userEvent.keyboard("{Escape}");
 		await expect(
 			body.queryByRole("dialog", { name: "文字顏色" }),
@@ -196,9 +194,7 @@ export const NarrowDarkAndDisabled: Story = {
 		await userEvent.click(enabled);
 		const element = await waitForPalette(canvasElement);
 		const panel = within(element);
-		await userEvent.click(
-			panel.getByRole("button", { name: "深藍 #1e5fab" }),
-		);
+		await userEvent.click(panel.getByRole("button", { name: "深藍 #1e5fab" }));
 		await expect(
 			panel.getByRole("button", { name: "深藍 #1e5fab" }),
 		).toHaveAttribute("aria-pressed", "true");

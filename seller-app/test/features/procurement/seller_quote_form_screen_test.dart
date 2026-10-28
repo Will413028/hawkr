@@ -25,10 +25,9 @@ const _publication = SellerFacingPublication(
   publishedAt: '2026-09-13T02:00:00Z',
 );
 
-/// 需求內容的十欄。型別本身就是 deny-by-default：買家預算、可接受區間、
+/// 需求內容的九欄。型別本身就是 deny-by-default：買家預算、可接受區間、
 /// 候選排序連進到 model 的路都沒有（那一層在 procurement_error_test 驗）。
 const _payload = SellerFacingPayload(
-  qualityKnowledgeState: 'BUYER_SPECIFIED',
   item: '高麗菜',
   itemLabel: '梨山高麗菜',
   quantity: '200',
@@ -121,7 +120,6 @@ void main() {
     ]) {
       expect(find.text(value), findsOneWidget, reason: value);
     }
-    expect(find.text('買家品相說明：BUYER_SPECIFIED'), findsOneWidget);
     // 這張 fixture 沒有補充說明 ⇒ 整個區塊不得出現。空字串畫成一個標著標題的
     // 空框，賣家會以為載入失敗。
     expect(find.text('買家的補充說明'), findsNothing);
@@ -135,8 +133,6 @@ void main() {
 
     expect(find.text('買家的補充說明'), findsOneWidget);
     expect(find.text('中大果，不要有壓傷'), findsOneWidget);
-    // ⛔ 有補充說明不改變品相那張卡片講的話：實際品相仍然只能由賣家自己填。
-    expect(find.text('買家品相說明：BUYER_SPECIFIED'), findsOneWidget);
   });
 
   testWidgets('產品規則 3：畫面上沒有預算／區間／排序這類字眼', (tester) async {
@@ -154,16 +150,13 @@ void main() {
     expect(find.text('送出正式回價'), findsOneWidget);
   });
 
-  testWidgets('qualityKnowledgeState 空字串＝未知，畫面照實說並要賣家別自己假設', (tester) async {
+  testWidgets('需求說明不顯示買家品相說明', (tester) async {
     await _pumpScreen(
       tester,
       _repoWith(payload: const SellerFacingPayload(item: '高麗菜')),
     );
 
-    expect(find.text('買家品相說明：未知'), findsOneWidget);
-    expect(find.textContaining('不要自己假設一個等級去報價'), findsOneWidget);
-    // ⛔ 不得補值成「買家沒指定」之類的推斷結論。
-    expect(find.textContaining('買家沒有指定'), findsNothing);
+    expect(find.textContaining('買家品相說明'), findsNothing);
   });
 
   testWidgets('產品規則 2：選了「接受非價格條款」也不會少問任何金額欄位', (tester) async {

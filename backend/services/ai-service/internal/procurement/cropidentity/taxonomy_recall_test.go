@@ -38,63 +38,61 @@ func newTaxonomyUC(tree cropCategoryReader) *DisambiguationUseCase {
 }
 
 func TestTaxonomyRetriever_ExactLeafIsStrongSiblingsWeak(t *testing.T) {
-	got, err := taxonomyRetriever{uc: newTaxonomyUC(v2CategoryTree())}.Recall(context.Background(), understandQuery("豬肉"))
+	got, err := newTaxonomyUC(v2CategoryTree()).taxonomyCandidates(context.Background(), understandQuery("豬肉"))
 
 	require.NoError(t, err)
 	require.NotEmpty(t, got)
-	require.Equal(t, "CATEGORY|2008", got[0].Key)
-	require.Equal(t, recall.KindCategory, got[0].Kind)
+	require.Equal(t, "2008", got[0].Code)
 	require.Equal(t, recall.Strong, got[0].Quality)
 	require.Equal(t, 3, got[0].CategoryLevel)
 	require.Equal(t, []string{"2008"}, got[0].CategoryIDs)
 	require.Equal(t, "200", got[0].ParentID, "L3 候選要帶 L2 父節點，ITEM 卡靠它")
 	require.Equal(t, "豬肉", got[0].ParentLabel)
-	require.Equal(t, 1, got[0].Rank)
 	require.False(t, got[0].Pinned, "豬肉 不是經人工 synonym 改寫來的")
 	keys := map[string]recall.Quality{}
 	for _, c := range got {
-		keys[c.Key] = c.Quality
+		keys[c.Code] = c.Quality
 	}
-	require.Contains(t, keys, "CATEGORY|2257", "L2 豬肉 精確命中 ⇒ 子節點 生鮮豬肉 也進來")
-	require.Equal(t, recall.Weak, keys["CATEGORY|2257"], "但只是弱訊號")
-	require.NotContains(t, keys, "CATEGORY|2011")
+	require.Contains(t, keys, "2257", "L2 豬肉 精確命中 ⇒ 子節點 生鮮豬肉 也進來")
+	require.Equal(t, recall.Weak, keys["2257"], "但只是弱訊號")
+	require.NotContains(t, keys, "2011")
 }
 
 func TestTaxonomyRetriever_ManualSynonymIsPinned(t *testing.T) {
 
-	got, err := taxonomyRetriever{uc: newTaxonomyUC(v2CategoryTree())}.Recall(context.Background(), understandQuery("白肉雞"))
+	got, err := newTaxonomyUC(v2CategoryTree()).taxonomyCandidates(context.Background(), understandQuery("白肉雞"))
 
 	require.NoError(t, err)
 	require.NotEmpty(t, got)
-	require.Equal(t, "CATEGORY|2011", got[0].Key)
+	require.Equal(t, "2011", got[0].Code)
 	require.Equal(t, recall.Strong, got[0].Quality)
 	require.True(t, got[0].Pinned)
 	for _, c := range got[1:] {
-		require.False(t, c.Pinned, "只有改寫後精確命中的那一個是 pinned：%s", c.Key)
+		require.False(t, c.Pinned, "只有改寫後精確命中的那一個是 pinned：%s", c.Code)
 	}
 }
 
 func TestTaxonomyRetriever_ContainmentIsWeak(t *testing.T) {
-	got, err := taxonomyRetriever{uc: newTaxonomyUC(v2CategoryTree())}.Recall(context.Background(), understandQuery("生鮮豬"))
+	got, err := newTaxonomyUC(v2CategoryTree()).taxonomyCandidates(context.Background(), understandQuery("生鮮豬"))
 	require.NoError(t, err)
 	require.Len(t, got, 1)
-	require.Equal(t, "CATEGORY|2257", got[0].Key)
+	require.Equal(t, "2257", got[0].Code)
 	require.Equal(t, recall.Weak, got[0].Quality)
 }
 
 func TestTaxonomyRetriever_NoMatchIsEmptyNotError(t *testing.T) {
-	got, err := taxonomyRetriever{uc: newTaxonomyUC(v2CategoryTree())}.Recall(context.Background(), understandQuery("水泥"))
+	got, err := newTaxonomyUC(v2CategoryTree()).taxonomyCandidates(context.Background(), understandQuery("水泥"))
 	require.NoError(t, err)
 	require.Empty(t, got)
 }
 
 func TestTaxonomyRetriever_TreeUnavailableIsErrorForCallerToDegrade(t *testing.T) {
-	_, err := taxonomyRetriever{uc: newTaxonomyUC(&categoryTreeFake{err: errors.New("down")})}.Recall(context.Background(), understandQuery("豬肉"))
+	_, err := newTaxonomyUC(&categoryTreeFake{err: errors.New("down")}).taxonomyCandidates(context.Background(), understandQuery("豬肉"))
 	require.Error(t, err)
 }
 
 func TestTaxonomyRetriever_NilTreeReaderIsEmpty(t *testing.T) {
-	got, err := taxonomyRetriever{uc: newTaxonomyUC(nil)}.Recall(context.Background(), understandQuery("豬肉"))
+	got, err := newTaxonomyUC(nil).taxonomyCandidates(context.Background(), understandQuery("豬肉"))
 	require.NoError(t, err)
 	require.Empty(t, got)
 }
@@ -119,12 +117,12 @@ func fruitTree() *categoryTreeFake {
 }
 
 func TestTaxonomyRetriever_ExactL1EmitsItsGroupsAsStrongCandidates(t *testing.T) {
-	got, err := taxonomyRetriever{uc: newTaxonomyUC(fruitTree())}.Recall(context.Background(), recall.Query{Text: "水果", Variants: []string{"水果"}})
+	got, err := newTaxonomyUC(fruitTree()).taxonomyCandidates(context.Background(), recall.Query{Text: "水果", Variants: []string{"水果"}})
 
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(got), 2)
-	require.Equal(t, recall.CandidateKey(recall.KindCategory, "133"), got[0].Key)
-	require.Equal(t, recall.CandidateKey(recall.KindCategory, "134"), got[1].Key)
+	require.Equal(t, "133", got[0].Code)
+	require.Equal(t, "134", got[1].Code)
 	for _, c := range got[:2] {
 		require.Equal(t, 2, c.CategoryLevel, "L1 命中給的是未展開的 L2")
 		require.Equal(t, recall.Strong, c.Quality, "買家打的就是這個大分類名")
@@ -135,7 +133,7 @@ func TestTaxonomyRetriever_ExactL1EmitsItsGroupsAsStrongCandidates(t *testing.T)
 }
 
 func TestTaxonomyRetriever_L1HitOutranksSubstringLeaf(t *testing.T) {
-	got, err := taxonomyRetriever{uc: newTaxonomyUC(fruitTree())}.Recall(context.Background(), recall.Query{Text: "水果", Variants: []string{"水果"}})
+	got, err := newTaxonomyUC(fruitTree()).taxonomyCandidates(context.Background(), recall.Query{Text: "水果", Variants: []string{"水果"}})
 
 	require.NoError(t, err)
 	var leaf *recall.Candidate

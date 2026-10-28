@@ -320,11 +320,7 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 							/>
 						</label>
 					</div>
-					<p className={styles.boundary}>
-						品質期待這一欄本 demo 不提供。後端的 qualityKnowledgeState
-						目前在三個生產檔案裡寫死成 BUYER_QUALITY_UNKNOWN，全 repo
-						沒有第二個值也沒有買家輸入來源——放一個選了不會生效的選單比不放更誤導。
-					</p>
+					<p className={styles.boundary}>品質期待這一欄本 demo 不提供。</p>
 					{priceError ? <p className={styles.error}>{priceError}</p> : null}
 					{submitError ? <p className={styles.error}>{submitError}</p> : null}
 					<button

@@ -96,7 +96,6 @@ type Props = React.ComponentProps<typeof QuoteBatchSummary>;
 function mount(overrides: Partial<Props> = {}) {
 	const props: Props = {
 		slots,
-		qualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
 		publication,
 		counts: zeroCounts,
 		acceptance: null,
@@ -134,10 +133,10 @@ describe("① 詢價快照", () => {
 		).toBeTruthy();
 	});
 
-	it("品相顯示「買家尚未指定」，不補預設等級", () => {
+	it("不顯示品相列", () => {
 		mount();
-		const quality = screen.getByText("品相").parentElement as HTMLElement;
-		expect(quality.textContent).toContain("買家尚未指定");
+		expect(screen.queryByText("品相")).toBeNull();
+		expect(screen.queryByText("買家尚未指定")).toBeNull();
 	});
 
 	// budgetPerUnit 是買家私有預算（v6.0 §V.7 不得等同 buyerRequestedRange），

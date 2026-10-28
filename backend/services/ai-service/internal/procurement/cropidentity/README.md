@@ -14,8 +14,7 @@
 
 ```
 understandQuery（原文 → 變體）
-  → taxonomyRetriever（分類樹；人工 synonym 命中＝pinned）
-  → fuse.RRF（單一來源，名次即 retriever 的名次；pinned 排最前）
+  → taxonomyCandidates（分類樹；人工 synonym 命中＝pinned，排最前，其餘依命中順序）
   → decide（匹配品質分層：恰好一個強訊號定案／唯一候選定案／其餘問）
   → 分類卡由 adaptive facet 決定問哪一層（facet.go）：L2 分組 ≥2 且最大組 <80% 問 L2，否則下鑽最大組問 L3；
     下鑽到模型建議的 L2 時才展開（expandGroup：一個子類直接問、多個走確定性比對→LLM ITEM）

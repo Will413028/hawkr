@@ -1249,6 +1249,6 @@ func TestBuildCropDisambiguationPatch_EscapeReplacesItemAndDropsStaleResolution(
 	require.Empty(t, rejected)
 	require.Equal(t, "紫蘇", *after.Item)
 	require.Equal(t, &domain.ItemResolution{
-		Kind: domain.ItemResolvedBuyerDescribed, Label: "紫蘇", Provenance: domain.ItemResolutionByBuyerChoice,
+		Kind: domain.ItemResolvedBuyerDescribed, Label: "紫蘇",
 	}, after.ItemResolution, "舊品項的分類不得沿用到買家改寫的描述")
 }

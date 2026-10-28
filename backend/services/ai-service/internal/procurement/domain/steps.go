@@ -22,10 +22,10 @@ var stepStatusSucceeded = codemeta.ProcurementStepStatusSucceeded.Value
 //
 // 候選搜尋階段（T23，2026-09-05）：只有 SEARCH_CANDIDATES 與它底下的
 // SEARCH_PLATFORM／SEARCH_EXTERNAL 兩條子列、加上末碼 SUMMARIZE 共 4 碼會被
-// emit，清單見 CandidateSearchRailPlan。**READ_SELLER／COMPARE／VERIFY_CERT／
-// VERIFY_ORIGIN／CHECK_STOCK／RANK_CANDIDATES 這 6 碼刻意維持零 emit**：
+// emit，清單見 CandidateSearchRailPlan。**READ_SELLER／COMPARE／VERIFY_ORIGIN／
+// CHECK_STOCK／RANK_CANDIDATES 這 5 碼刻意維持零 emit**：
 // usecase.CandidateSearchUseCase.run 全部的工作就是 claim → 兩條 lane 併發搜尋
-// → finalize，沒有逐家讀賣家、規格比對、履歷／產地／供應量查核，排序也是在各
+// → finalize，沒有逐家讀賣家、規格比對、產地／供應量查核，排序也是在各
 // lane 的 Search 內部就做完（candidate_platform_lane.go 的 relevance＋tier 加權
 // 排序），不是跨 lane 的獨立階段。為這些不存在的工作發步驟等於替買家編造進度，
 // 正是 doc57 §1.1 evidence contract 要擋的事——等它們命名的工作真的存在再接。
@@ -64,7 +64,6 @@ const (
 	StepSearchExternal   StepCode = "SEARCH_EXTERNAL"
 	StepReadSeller       StepCode = "READ_SELLER"
 	StepCompare          StepCode = "COMPARE"
-	StepVerifyCert       StepCode = "VERIFY_CERT"
 	StepVerifyOrigin     StepCode = "VERIFY_ORIGIN"
 	StepCheckStock       StepCode = "CHECK_STOCK"
 	StepRankCandidates   StepCode = "RANK_CANDIDATES"
@@ -87,7 +86,6 @@ var StepLabels = map[StepCode]string{
 	StepSearchExternal:   "找平台外的業者",
 	StepReadSeller:       "讀這家賣家的資料",
 	StepCompare:          "把規格和報價擺一起比",
-	StepVerifyCert:       "查產銷履歷",
 	StepVerifyOrigin:     "查產地對不對",
 	StepCheckStock:       "看供應量夠不夠",
 	StepRankCandidates:   "排出最合適的順序",

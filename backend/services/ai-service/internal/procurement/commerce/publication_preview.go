@@ -240,7 +240,6 @@ func (uc *PublicationPreviewUseCase) PreviewRfqPublication(ctx context.Context, 
 		PricePreviewPayloadHash: preview.PayloadHash,
 		PricePreviewInputHash:   preview.PreviewInputHash,
 
-		QualityKnowledgeState:   snap.QualityKnowledgeState,
 		BuyerRequestedRangeHash: pricing.HashJSON(json.RawMessage(preview.BuyerRequestedRangeJSON)),
 
 		AudienceMode:              audience.Mode,

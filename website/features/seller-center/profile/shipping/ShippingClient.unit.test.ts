@@ -181,7 +181,6 @@ describe("ShippingClient prefill", () => {
 			rows: [
 				{
 					shippingType: "3652",
-					goodsType: "3201",
 					payuniSubmitStatus: "4304",
 					senderName: "紀錄人",
 					senderPhone: "0987654321",
@@ -209,7 +208,6 @@ describe("ShippingClient initial values wait for this mount's data", () => {
 			rows: [
 				{
 					shippingType: "3652",
-					goodsType: "3201",
 					payuniSubmitStatus: "4303",
 					senderName: "紀錄人",
 					senderPhone: "0987654321",
@@ -335,7 +333,6 @@ describe("ShippingClient 7-11 prefill", () => {
 			rows: [
 				{
 					shippingType: "3651",
-					goodsType: "3201",
 					senderName: "常溫人",
 					senderPhone: "0911111111",
 				},
@@ -350,7 +347,6 @@ describe("ShippingClient 7-11 prefill", () => {
 			rows: [
 				{
 					shippingType: "3651",
-					goodsType: "3201",
 					payuniSubmitStatus: "4303",
 				},
 			],

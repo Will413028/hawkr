@@ -42,7 +42,7 @@ func (f *fakeConfirmedRfqSnapshotRepo) InsertConfirmedRfqSnapshot(ctx context.Co
 	row := repository.ConfirmedRfqSnapshot{
 		ID: int64(f.insertCalls), BuyerID: in.BuyerID, RequestID: in.RequestID,
 		RequestRevisionID: in.RequestRevisionID, PricePreviewID: in.PricePreviewID,
-		PricePreviewVersion: in.PricePreviewVersion, QualityKnowledgeState: in.QualityKnowledgeState,
+		PricePreviewVersion:  in.PricePreviewVersion,
 		CanonicalPayloadJSON: in.CanonicalPayloadJSON,
 		PayloadHash:          in.PayloadHash, ClientRequestID: in.ClientRequestID, ExpiresAt: in.ExpiresAt,
 	}
@@ -403,7 +403,6 @@ func confirmSlotsFixture(item string, quantity int, city string) domain.Slots {
 		ItemResolution: &domain.ItemResolution{
 			Kind:  domain.ItemResolvedCategoryConfirmed,
 			Label: "甘藍-初秋", CategoryID: "17",
-			Provenance: domain.ItemResolutionByBuyerChoice,
 		},
 		Quantity:           testkit.Ptr(quantity),
 		Unit:               testkit.Ptr("KG"),
@@ -530,7 +529,6 @@ func TestConfirmRfqSnapshot_ExpandedPayload_StillExcludesBuyerPrivateSlots(t *te
 	for _, forbidden := range []string{
 		"budgetPerUnit", "budget_per_unit", "BudgetPerUnit",
 		"exactMatchRequired", "exact_match_required",
-		"provenance", "Provenance",
 	} {
 		if strings.Contains(string(payload), forbidden) {
 			t.Errorf("canonical_payload_json 含非 seller-facing 欄位 %q，內容：%s", forbidden, payload)

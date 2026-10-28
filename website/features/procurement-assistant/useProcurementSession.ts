@@ -115,6 +115,12 @@ const CANDIDATE_SELECTION_UNCONFIRMED: ProcurementError = Object.freeze({
 	detail: "無法確認這筆候選的選取狀態，請重新搜尋後再操作。",
 });
 
+const priceBasisUnavailable: RfqCommandFailure = {
+	code: "PRICE_INPUT_INVALID",
+	detail: "目前數量或單位無法形成可確認的價格基準。",
+	retryable: false,
+};
+
 function rfqCommandFailure(
 	error: unknown,
 	operation: "preview" | "confirmation",
@@ -128,11 +134,8 @@ function rfqCommandFailure(
 	}
 
 	const byReason: Partial<Record<string, RfqCommandFailure>> = {
-		PRICE_BASIS_UNAVAILABLE: {
-			code: "PRICE_BASIS_UNAVAILABLE",
-			detail: "目前數量或單位無法形成可確認的價格基準。",
-			retryable: false,
-		},
+		BUYER_REQUESTED_RANGE_REQUIRED: priceBasisUnavailable,
+		QUANTITY_UNIT_UNCONVERTIBLE: priceBasisUnavailable,
 		STALE_REVISION:
 			operation === "confirmation"
 				? {

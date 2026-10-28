@@ -231,7 +231,6 @@ func TestCropGateNode_Resolved_RecordsResolutionAndLeavesItemRejectedUntouched(t
 	require.Equal(t, seedRejected, progress.Rejected, "crop_gate 不得疊加 Rejected")
 	want := &domain.ItemResolution{
 		Kind: domain.ItemResolvedCategoryConfirmed, Label: "高麗菜", CategoryID: "17",
-		Provenance: domain.ItemResolutionByBuyerChoice,
 	}
 	require.Equal(t, want, progress.NextSlots.ItemResolution, "分類樹已確認的品項由 crop_gate 直接寫入解析結果")
 	require.Equal(t, want, progress.Patch.ItemResolution)

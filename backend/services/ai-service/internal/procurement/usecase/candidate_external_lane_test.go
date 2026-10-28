@@ -236,7 +236,6 @@ func TestExternalLane_ExpandsResolvedCategoryIntoAncestorChain(t *testing.T) {
 		Item: &item,
 		ItemResolution: &procurementdomain.ItemResolution{
 			Kind: procurementdomain.ItemResolvedCategoryConfirmed, Label: "豬肉", CategoryID: "2008",
-			Provenance: procurementdomain.ItemResolutionByBuyerChoice,
 		},
 	}
 	fake := &fakeCandidateLeadSearcher{}
@@ -270,7 +269,6 @@ func TestExternalLane_CategoryIDsHitIsAMatchedFact(t *testing.T) {
 		Item: &item,
 		ItemResolution: &procurementdomain.ItemResolution{
 			Kind: procurementdomain.ItemResolvedCategoryConfirmed, Label: "豬肉", CategoryID: "2008",
-			Provenance: procurementdomain.ItemResolutionByBuyerChoice,
 		},
 	}
 	fake := &fakeCandidateLeadSearcher{matches: []rootusecase.CandidateMatch{

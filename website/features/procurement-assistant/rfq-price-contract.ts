@@ -88,7 +88,6 @@ export const rfqPricePreviewSchema = z
 	.object({
 		pricePreviewId: idSchema,
 		version: idSchema,
-		qualityKnowledgeState: z.string().default(""),
 		buyerRequestedRange: rfqBuyerRequestedRangeSchema,
 		payloadHash: payloadHashSchema,
 		quoteTotalRange: rfqQuoteTotalRangeSchema.nullable().default(null),
@@ -144,7 +143,7 @@ export interface RfqConfirmationCommand {
 export const BUYER_NOTE_MAX_LENGTH = 200;
 
 export type RfqCommandFailureCode =
-	| "PRICE_BASIS_UNAVAILABLE"
+	| "PRICE_INPUT_INVALID"
 	| "STALE_REVISION"
 	| "PRICE_PREVIEW_STALE"
 	| "IDEMPOTENCY_KEY_CONFLICT"

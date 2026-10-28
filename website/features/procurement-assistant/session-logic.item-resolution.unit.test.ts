@@ -6,7 +6,7 @@ import { mapSlots } from "./session-logic";
  *
  *  1. wire 的 snake_case → camelCase 轉換不能漏欄位（漏了畫面上就少一行，沒有錯誤）
  *  2. 不合契約的內容要丟掉這個欄位、**不能**讓整包 slots 失敗
- *  3. kind／provenance 是白名單，不是 `as` 斷言
+ *  3. kind 是白名單，不是 `as` 斷言
  */
 describe("mapSlots 的 item_resolution", () => {
 	it.each([
@@ -17,7 +17,6 @@ describe("mapSlots 的 item_resolution", () => {
 			item: "阿嬤自種特殊品種高麗菜",
 			item_resolution: {
 				kind,
-				provenance: "BUYER_CHOICE",
 				label: "阿嬤自種特殊品種高麗菜",
 				display_value: "阿嬤自種特殊品種高麗菜",
 			},
@@ -25,7 +24,6 @@ describe("mapSlots 的 item_resolution", () => {
 
 		expect(got.itemResolution).toEqual({
 			kind,
-			provenance: "BUYER_CHOICE",
 			label: "阿嬤自種特殊品種高麗菜",
 			displayValue: "阿嬤自種特殊品種高麗菜",
 		});
@@ -39,14 +37,13 @@ describe("mapSlots 的 item_resolution", () => {
 	});
 
 	it("內容不合契約時只丟掉這個欄位，不讓整包 slots 變空", () => {
-		// 未知的 provenance——後端日後新增第二種值時就是這個形狀。
+		// 未知的 kind——後端日後新增第三種值時就是這個形狀。
 		const got = mapSlots({
 			item: "高麗菜",
 			quantity: 20,
 			delivery_city: "台中市",
 			item_resolution: {
-				kind: "CATEGORY_CONFIRMED",
-				provenance: "SOMETHING_NEW",
+				kind: "SOMETHING_NEW",
 				display_value: "自訂品項",
 			},
 		});
@@ -62,7 +59,6 @@ describe("mapSlots 的 item_resolution", () => {
 			item: "高麗菜",
 			item_resolution: {
 				kind: "CATEGORY_CONFIRMED",
-				provenance: "BUYER_CHOICE",
 			},
 		});
 
@@ -76,22 +72,10 @@ describe("mapSlots 的 item_resolution", () => {
 			const got = mapSlots({
 				item_resolution: {
 					kind,
-					provenance: "BUYER_CHOICE",
 					display_value: "甘藍",
 				},
 			});
 			expect(got.itemResolution, kind).toBeUndefined();
 		}
-	});
-
-	it("已移除的 provenance SYSTEM 被擋下", () => {
-		const got = mapSlots({
-			item_resolution: {
-				kind: "CATEGORY_CONFIRMED",
-				provenance: "SYSTEM",
-				display_value: "甘藍",
-			},
-		});
-		expect(got.itemResolution).toBeUndefined();
 	});
 });

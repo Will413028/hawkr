@@ -49,7 +49,6 @@ Map<String, dynamic> _cvsRow(
   String status = '4303',
 }) => {
   'shippingType': '3651',
-  'goodsType': goods,
   'onboardingId': 'ob-$goods',
   'payuniSubmitStatus': status,
   'senderName': name,

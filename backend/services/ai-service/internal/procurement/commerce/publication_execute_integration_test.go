@@ -141,7 +141,6 @@ func seedExecutablePublicationApproval(ctx context.Context, t *testing.T, pool *
 
 	preview, err := repo.InsertPricePreview(ctx, repository.InsertPricePreviewInput{
 		BuyerID: pubExecBuyerID, RequestID: req.ID, RequestRevisionID: rev.ID,
-		QualityKnowledgeState:   "BUYER_QUALITY_UNKNOWN",
 		BuyerRequestedRangeJSON: json.RawMessage(`{"min":"80","max":"120"}`),
 		ClientRequestID:         "pubexec-preview",
 		PreviewInputHash:        "pubexec-input-hash",
@@ -150,12 +149,11 @@ func seedExecutablePublicationApproval(ctx context.Context, t *testing.T, pool *
 	})
 	require.NoError(t, err)
 
-	canonical := json.RawMessage(`{"qualityKnowledgeState":"BUYER_QUALITY_UNKNOWN","buyerRequestedRange":{"min":"80","max":"120"},"item":"高麗菜","quantity":100,"unit":"公斤","deliveryCity":"台中市"}`)
+	canonical := json.RawMessage(`{"buyerRequestedRange":{"min":"80","max":"120"},"item":"高麗菜","quantity":100,"unit":"公斤","deliveryCity":"台中市"}`)
 	snap, err := repo.InsertConfirmedRfqSnapshot(ctx, repository.InsertConfirmedRfqSnapshotInput{
 		BuyerID: pubExecBuyerID, RequestID: req.ID, RequestRevisionID: rev.ID,
 		PricePreviewID: preview.ID, PricePreviewVersion: preview.Version,
-		QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
-		CanonicalPayloadJSON:  canonical, PayloadHash: "pubexec-snapshot-hash",
+		CanonicalPayloadJSON: canonical, PayloadHash: "pubexec-snapshot-hash",
 		ClientRequestID: "pubexec-snapshot", ExpiresAt: pubExecNow.Add(time.Hour),
 	})
 	require.NoError(t, err)
@@ -170,7 +168,6 @@ func seedExecutablePublicationApproval(ctx context.Context, t *testing.T, pool *
 		ConfirmedRfqSnapshotID: snap.ID, ConfirmedRfqPayloadHash: snap.PayloadHash,
 		PricePreviewID: preview.ID, PricePreviewVersion: preview.Version,
 		PricePreviewPayloadHash: preview.PayloadHash, PricePreviewInputHash: preview.PreviewInputHash,
-		QualityKnowledgeState:   "BUYER_QUALITY_UNKNOWN",
 		BuyerRequestedRangeHash: "pubexec-range-hash",
 
 		AudienceMode: "DIRECT_RECIPIENTS", AudiencePolicyID: "", AudiencePolicyVersion: 0,

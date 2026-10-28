@@ -391,7 +391,6 @@ export interface ImportItemImageInput {
 /* ===== SKU input（PUT items/{id} 用） ===== */
 export interface ShippingMethodInput {
 	method: string; // ShippingMethod value
-	temperature: string; // 固定 AMBIENT_TEMPERATURE_CODE（B4 刪）
 }
 
 export interface UpdateImportSkuInput {
@@ -436,7 +435,6 @@ export interface UpdateImportItemInput {
 /* ===== Batch update shipping input ===== */
 export interface BatchShippingMethod {
 	type: string; // ShippingMethod value
-	temperature: string;
 	freeThreshold?: string;
 }
 

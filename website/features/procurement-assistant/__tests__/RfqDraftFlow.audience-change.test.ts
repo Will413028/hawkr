@@ -51,7 +51,6 @@ function preview(): RfqPricePreview {
 	return {
 		pricePreviewId: "1234567890123456799",
 		version: "1",
-		qualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
 		buyerRequestedRange: {
 			currency: "TWD",
 			priceComponent: "GOODS_ONLY",

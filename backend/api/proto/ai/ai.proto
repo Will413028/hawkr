@@ -463,16 +463,14 @@ message Slots {
 // ItemResolution 是買家原話（Slots.item）被判定成平台分類樹的哪個節點，以及那個
 // 判定是誰做的。必須對買家可見且可更正。
 message ItemResolution {
-    reserved 2, 5;
-    reserved "code", "price_per_kg";
+    reserved 2, 4, 5;
+    reserved "code", "provenance", "price_per_kg";
     // CATEGORY_CONFIRMED（已確認平台分類，伺服器內部持有分類 ID）或
     // BUYER_DESCRIBED（買家在「找不到符合的品項」卡上自行描述，沒有分類）。
     // 字串而非 enum。
     string kind = 1;
     // 分類名稱，或 BUYER_DESCRIBED 時買家的描述。
     string label = 3;
-    // BUYER_CHOICE（買家在消歧卡上親自挑的，含自行描述）。
-    string provenance = 4;
     // 伺服器組好的顯示字串。**前端不得自己用 kind＋label 重拼**：那會讓 slots
     // 面板與 recordedThisTurn 的 chip 出現兩套文案，而 chip 用的就是這個值。
     string display_value = 6;
@@ -1206,14 +1204,12 @@ message QuoteTotalRange {
 message RfqPricePreviewResponse {
     string price_preview_id = 1;
     string version = 2;
-    reserved 3, 4, 5, 7, 9;
-    reserved "pricing_mode", "reference_availability", "reference_price_range", "deal_temperature", "market_price_basis";
+    reserved 3, 4, 5, 7, 9, 11;
+    reserved "pricing_mode", "reference_availability", "reference_price_range", "deal_temperature", "market_price_basis", "quality_knowledge_state";
     BuyerRequestedRange buyer_requested_range = 6;
     string payload_hash = 8;
     // 可為 null（條件見 QuoteTotalRange）。
     QuoteTotalRange quote_total_range = 10;
-    // 空字串＝本欄加入前建立的 preview，呼叫端當「未知」處理，不得補值。
-    string quality_knowledge_state = 11;
 }
 
 // RfqConfirmationRequest is the body of POST .../rfq-confirmations (issue
@@ -1322,8 +1318,8 @@ message SellerFacingRequestedRange {
 }
 
 message RfqPublicationInviteSellerViewResponse {
-    // 空字串＝本欄加入前建立的 approval，呼叫端當「未知」處理，不得補值。
-    string quality_knowledge_state = 9;
+    reserved 9;
+    reserved "quality_knowledge_state";
     string item = 1;
     string item_label = 2;
     string quantity = 3;

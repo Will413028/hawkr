@@ -119,17 +119,16 @@ func toPublicationInviteEntity(row gen.ProcurementRfqPublicationInvite) Publicat
 
 // InviteSellerView 是站外賣家看得到的 RFQ 摘要。
 type InviteSellerView struct {
-	QualityKnowledgeState string
-	Item                  string
-	ItemLabel             string
-	Quantity              string
-	Unit                  string
-	Packaging             string
-	DeliveryCity          string
-	DeliveryDate          string
-	ResponseDeadline      string
-	BuyerNote             string
-	BuyerRequestedRange   *domain.SellerFacingRequestedRange
+	Item                string
+	ItemLabel           string
+	Quantity            string
+	Unit                string
+	Packaging           string
+	DeliveryCity        string
+	DeliveryDate        string
+	ResponseDeadline    string
+	BuyerNote           string
+	BuyerRequestedRange *domain.SellerFacingRequestedRange
 
 	// PublicationVersion 是十進位字串（"" ＝ 未知）。站外業者正式送出報價時原樣帶
 	// 回來做 CAS：把報價綁在「業者當時看到的那一版 RFQ」上。
@@ -165,18 +164,17 @@ func toInviteSellerView(payloadJSON json.RawMessage, responseDeadline pgtype.Dat
 		return InviteSellerView{}, err
 	}
 	return InviteSellerView{
-		QualityKnowledgeState: payload.QualityKnowledgeState,
-		Item:                  payload.Item,
-		ItemLabel:             payload.ItemLabel,
-		Quantity:              intPtrValue(payload.Quantity),
-		Unit:                  stringValue(payload.Unit),
-		Packaging:             stringValue(payload.Packaging),
-		DeliveryCity:          stringValue(payload.DeliveryCity),
-		DeliveryDate:          stringValue(payload.DeliveryDate),
-		ResponseDeadline:      stringValue(dateValue(responseDeadline)),
-		BuyerNote:             stringValue(payload.BuyerNote),
-		BuyerRequestedRange:   payload.BuyerRequestedRange,
-		PublicationVersion:    strconv.FormatInt(int64(publicationVersion), 10),
+		Item:                payload.Item,
+		ItemLabel:           payload.ItemLabel,
+		Quantity:            intPtrValue(payload.Quantity),
+		Unit:                stringValue(payload.Unit),
+		Packaging:           stringValue(payload.Packaging),
+		DeliveryCity:        stringValue(payload.DeliveryCity),
+		DeliveryDate:        stringValue(payload.DeliveryDate),
+		ResponseDeadline:    stringValue(dateValue(responseDeadline)),
+		BuyerNote:           stringValue(payload.BuyerNote),
+		BuyerRequestedRange: payload.BuyerRequestedRange,
+		PublicationVersion:  strconv.FormatInt(int64(publicationVersion), 10),
 	}, nil
 }
 

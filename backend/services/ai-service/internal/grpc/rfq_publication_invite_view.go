@@ -39,18 +39,17 @@ func (h *inviteSellerViewHandler) GetRfqPublicationInviteSellerView(ctx context.
 	}
 
 	return &aipb.RfqPublicationInviteSellerViewResponse{
-		QualityKnowledgeState: view.QualityKnowledgeState,
-		Item:                  view.Item,
-		ItemLabel:             view.ItemLabel,
-		Quantity:              view.Quantity,
-		Unit:                  view.Unit,
-		Packaging:             view.Packaging,
-		DeliveryCity:          view.DeliveryCity,
-		DeliveryDate:          view.DeliveryDate,
-		ResponseDeadline:      view.ResponseDeadline,
-		BuyerNote:             view.BuyerNote,
-		PublicationVersion:    view.PublicationVersion,
-		BuyerRequestedRange:   toSellerFacingRequestedRangeProto(view.BuyerRequestedRange),
+		Item:                view.Item,
+		ItemLabel:           view.ItemLabel,
+		Quantity:            view.Quantity,
+		Unit:                view.Unit,
+		Packaging:           view.Packaging,
+		DeliveryCity:        view.DeliveryCity,
+		DeliveryDate:        view.DeliveryDate,
+		ResponseDeadline:    view.ResponseDeadline,
+		BuyerNote:           view.BuyerNote,
+		PublicationVersion:  view.PublicationVersion,
+		BuyerRequestedRange: toSellerFacingRequestedRangeProto(view.BuyerRequestedRange),
 	}, nil
 }
 

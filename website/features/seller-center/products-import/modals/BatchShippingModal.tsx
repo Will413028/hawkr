@@ -4,7 +4,6 @@ import * as React from "react";
 import Button from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { useNotificationToast } from "@/lib/notifications/toast-context";
-import { AMBIENT_TEMPERATURE_CODE } from "@/lib/seller/ambient-temperature";
 import { SHIPPING_TYPE_LABEL, UI_TEXT } from "../i18n";
 import { batchUpdateItemsShipping } from "../repo";
 import type { BatchShippingMethod } from "../types";
@@ -68,10 +67,7 @@ export function BatchShippingModal({
 			(k) => rows[k].enabled,
 		).map((k) => {
 			const r = rows[k];
-			const m: BatchShippingMethod = {
-				type: k,
-				temperature: AMBIENT_TEMPERATURE_CODE,
-			};
+			const m: BatchShippingMethod = { type: k };
 			const trimmed = r.freeThreshold.trim();
 			if (trimmed !== "") m.freeThreshold = trimmed;
 			return m;

@@ -16,8 +16,9 @@ import (
 )
 
 var (
-	ErrPriceBasisUnavailable     = errors.New("procurement: currency/quantity/unit/conversion basis cannot be canonicalized")
-	ErrStalePricePreviewRevision = errors.New("procurement: expectedRevisionId doesn't match current active revision")
+	ErrBuyerRequestedRangeRequired = errors.New("procurement: buyerRequestedRange is missing or invalid")
+	ErrQuantityUnitUnconvertible   = errors.New("procurement: quantity and unit cannot be converted to a quote total range")
+	ErrStalePricePreviewRevision   = errors.New("procurement: expectedRevisionId doesn't match current active revision")
 )
 
 const pricePreviewTTL = 15 * time.Minute
@@ -54,15 +55,14 @@ type PreviewRfqPriceInput struct {
 }
 
 type PricePreviewResult struct {
-	PricePreviewID        int64
-	Version               int64
-	QualityKnowledgeState string
-	BuyerRequestedRange   BuyerRequestedRange
-	PayloadHash           string
-	RequestID             int64
-	RequestRevisionID     int64
-	ExpiresAt             time.Time
-	QuoteTotalRange       *QuoteTotalRange
+	PricePreviewID      int64
+	Version             int64
+	BuyerRequestedRange BuyerRequestedRange
+	PayloadHash         string
+	RequestID           int64
+	RequestRevisionID   int64
+	ExpiresAt           time.Time
+	QuoteTotalRange     *QuoteTotalRange
 }
 
 type PricePreviewRepo interface {
@@ -117,6 +117,9 @@ func (uc *PreviewRfqPriceUseCase) PreviewRfqPrice(ctx context.Context, in Previe
 	}
 
 	result.QuoteTotalRange = quoteTotalRange(result.BuyerRequestedRange, slots.Quantity)
+	if slots.Unit != nil && slots.Quantity != nil && *slots.Quantity > 0 && result.QuoteTotalRange == nil {
+		return PricePreviewResult{}, ErrQuantityUnitUnconvertible
+	}
 
 	result.PayloadHash = HashJSON(result)
 
@@ -128,7 +131,6 @@ func (uc *PreviewRfqPriceUseCase) PreviewRfqPrice(ctx context.Context, in Previe
 
 	inserted, err := uc.repo.InsertPricePreview(ctx, repository.InsertPricePreviewInput{
 		BuyerID: in.BuyerID, RequestID: in.RequestID, RequestRevisionID: activeRevisionID,
-		QualityKnowledgeState:   "BUYER_QUALITY_UNKNOWN",
 		BuyerRequestedRangeJSON: buyerRangeJSON, QuoteTotalRangeJSON: quoteTotalRangeJSON,
 		ClientRequestID:  in.ClientRequestID,
 		PreviewInputHash: HashJSON(in), PayloadHash: result.PayloadHash,
@@ -146,8 +148,8 @@ func (uc *PreviewRfqPriceUseCase) PreviewRfqPrice(ctx context.Context, in Previe
 func ToPricePreviewResult(row repository.PricePreview) PricePreviewResult {
 	r := PricePreviewResult{
 		PricePreviewID: row.ID, Version: row.Version,
-		QualityKnowledgeState: row.QualityKnowledgeState, PayloadHash: row.PayloadHash,
-		RequestID: row.RequestID, RequestRevisionID: row.RequestRevisionID, ExpiresAt: row.ExpiresAt,
+		PayloadHash: row.PayloadHash,
+		RequestID:   row.RequestID, RequestRevisionID: row.RequestRevisionID, ExpiresAt: row.ExpiresAt,
 	}
 	if len(row.QuoteTotalRangeJSON) > 0 {
 		r.QuoteTotalRange = &QuoteTotalRange{}
@@ -159,18 +161,18 @@ func ToPricePreviewResult(row repository.PricePreview) PricePreviewResult {
 
 func validateBuyerRequestedRange(r *BuyerRequestedRange) error {
 	if r == nil || r.Currency != "TWD" {
-		return ErrPriceBasisUnavailable
+		return ErrBuyerRequestedRangeRequired
 	}
 	lower, err := strconv.ParseInt(r.LowerBoundAmount, 10, 64)
 	if err != nil || lower <= 0 {
-		return ErrPriceBasisUnavailable
+		return ErrBuyerRequestedRangeRequired
 	}
 	upper, err := strconv.ParseInt(r.UpperBoundAmount, 10, 64)
 	if err != nil || upper <= 0 {
-		return ErrPriceBasisUnavailable
+		return ErrBuyerRequestedRangeRequired
 	}
 	if lower > upper {
-		return ErrPriceBasisUnavailable
+		return ErrBuyerRequestedRangeRequired
 	}
 	return nil
 }

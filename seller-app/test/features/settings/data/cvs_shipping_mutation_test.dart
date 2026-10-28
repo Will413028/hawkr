@@ -1,13 +1,12 @@
 import 'dart:async';
 
 import 'package:hawkr_seller/core/exceptions/app_exception.dart';
-import 'package:hawkr_seller/core/networking/ambient_shipping_temperature.dart';
 import 'package:hawkr_seller/features/settings/data/cvs_shipping_mutation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('CvsShippingMutationCoordinator', () {
-    test('activation request carries the ambient goodsType', () async {
+    test('activation request does not carry goodsType', () async {
       String? path;
       Map<String, dynamic>? body;
       final coordinator = CvsShippingMutationCoordinator((
@@ -28,8 +27,8 @@ void main() {
 
       expect(outcome.isSuccess, isTrue);
       expect(path, '/api/v1/app/shipping_onboardings/cvs');
-      expect(body?['goodsType'], '3201');
-      expect(body?['goodsType'], kAmbientShippingTemperature);
+      expect(body, isNotNull);
+      expect(body!.containsKey('goodsType'), isFalse);
       expect(outcome.completed.single.onboardingId, 'cvs-onboarding');
     });
 

@@ -100,7 +100,6 @@ export interface RawProcurementSlots {
 export interface RawProcurementItemResolution {
 	kind?: string;
 	label?: string;
-	provenance?: string;
 	display_value?: string;
 }
 
@@ -108,7 +107,6 @@ const ITEM_RESOLUTION_KINDS = [
 	"CATEGORY_CONFIRMED",
 	"BUYER_DESCRIBED",
 ] as const;
-const ITEM_RESOLUTION_PROVENANCES = ["BUYER_CHOICE"] as const;
 
 /** 解析 item_resolution。回傳 undefined 有兩種情況，呼叫端不需要分辨：欄位不在，
  *  或內容不符合契約。
@@ -117,7 +115,7 @@ const ITEM_RESOLUTION_PROVENANCES = ["BUYER_CHOICE"] as const;
  *  刻意不同：它們是需求內容（數量錯了就不能拿去報價），這個是顯示用的解析結果，
  *  為了它讓整個 session 快照解析失敗，代價遠大於少顯示一行分類。
  *
- *  kind／provenance 用白名單而不是 `as` 斷言：後端日後新增第三種 provenance 時，
+ *  kind 用白名單而不是 `as` 斷言：後端日後新增第三種 kind 時，
  *  這裡會安靜地退成 undefined（少一行提示），而不是讓一個 TypeScript 型別上不
  *  存在的值流進 switch 造成 UI 走到沒定義的分支。 */
 function normalizeItemResolution(
@@ -125,10 +123,7 @@ function normalizeItemResolution(
 ): ProcurementItemResolution | undefined {
 	if (!isRecord(raw)) return undefined;
 	const kind = ITEM_RESOLUTION_KINDS.find((k) => k === raw.kind);
-	const provenance = ITEM_RESOLUTION_PROVENANCES.find(
-		(p) => p === raw.provenance,
-	);
-	if (!kind || !provenance) return undefined;
+	if (!kind) return undefined;
 	if (typeof raw.display_value !== "string" || raw.display_value === "") {
 		// display_value 是這個型別存在的理由（顯示字串由伺服器組）。缺了它就沒有
 		// 東西可顯示，其餘欄位單獨留著沒有意義。
@@ -138,7 +133,6 @@ function normalizeItemResolution(
 		typeof v === "string" && v !== "" ? v : undefined;
 	return {
 		kind,
-		provenance,
 		displayValue: raw.display_value,
 		label: optionalString(raw.label),
 	};

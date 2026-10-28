@@ -29,7 +29,6 @@ function preview(overrides: Partial<RfqPricePreview> = {}): RfqPricePreview {
 	return {
 		pricePreviewId: "1",
 		version: "1",
-		qualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
 		buyerRequestedRange: {
 			currency: "TWD",
 			priceComponent: "GOODS_ONLY",
@@ -89,30 +88,15 @@ async function renderAtStep2(data: RfqPricePreview) {
 	fireEvent.click(screen.getByRole("button", { name: "取得無參考價試算" }));
 }
 
-// 稿 P-01 的頂部四格：品項／數量／配送城市／品相。前三格買家自己填過，第四格
-// 是買家唯一看不到自己填過什麼的事實——系統把它記成「未指定」而不是默默補一個
-// 等級，買家必須看得到這件事（docx Part V 總則）。
 describe("RfqDraftFlow — P-01 頂部需求摘要", () => {
-	it("顯示品項、數量、配送城市，以及「買家尚未指定」的品相", async () => {
+	it("顯示品項、數量、配送城市，不顯示品相", async () => {
 		await renderAtStep2(preview());
 
 		await waitFor(() => {
-			expect(screen.getByText("買家尚未指定")).toBeTruthy();
-		});
-		expect(screen.getByText("品相")).toBeTruthy();
-		expect(screen.getByText("100 KG")).toBeTruthy();
-	});
-
-	// 後端加這個欄位之前建立的 preview 回空字串。補成「買家尚未指定」等於替一份
-	// 沒有記錄這件事的舊資料發明事實。
-	it("品相為空字串時整格不顯示", async () => {
-		await renderAtStep2(preview({ qualityKnowledgeState: "" }));
-
-		// 先確定真的走到了價格確認這一步，否則「找不到品相」會是假綠。
-		await waitFor(() => {
 			expect(screen.getByText("希望詢價區間")).toBeTruthy();
 		});
-		expect(screen.queryByText("買家尚未指定")).toBeNull();
+		expect(screen.getByText("100 KG")).toBeTruthy();
 		expect(screen.queryByText("品相")).toBeNull();
+		expect(screen.queryByText("買家尚未指定")).toBeNull();
 	});
 });

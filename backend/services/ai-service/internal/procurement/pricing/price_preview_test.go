@@ -58,8 +58,8 @@ func TestPreviewRfqPrice_NilBuyerRequestedRange_RejectsBeforeAnyWrite(t *testing
 	in := previewInput("preview-nil-range")
 	in.BuyerRequestedRange = nil
 	_, err := uc.PreviewRfqPrice(context.Background(), in)
-	if !errors.Is(err, ErrPriceBasisUnavailable) {
-		t.Errorf("err = %v, want ErrPriceBasisUnavailable", err)
+	if !errors.Is(err, ErrBuyerRequestedRangeRequired) {
+		t.Errorf("err = %v, want ErrBuyerRequestedRangeRequired", err)
 	}
 	if repo.InsertCalls != 0 {
 		t.Errorf("insertCalls = %d, want 0（零 side effect，nil buyerRequestedRange 不得被持久化）", repo.InsertCalls)
@@ -88,8 +88,8 @@ func TestPreviewRfqPrice_InvalidBuyerRequestedRange_RejectsBeforeAnyWrite(t *tes
 			in := previewInput("preview-invalid-range-" + tc.name)
 			in.BuyerRequestedRange = &bound
 			_, err := uc.PreviewRfqPrice(context.Background(), in)
-			if !errors.Is(err, ErrPriceBasisUnavailable) {
-				t.Errorf("err = %v, want ErrPriceBasisUnavailable", err)
+			if !errors.Is(err, ErrBuyerRequestedRangeRequired) {
+				t.Errorf("err = %v, want ErrBuyerRequestedRangeRequired", err)
 			}
 			if repo.InsertCalls != 0 {
 				t.Errorf("insertCalls = %d, want 0（零 side effect）", repo.InsertCalls)
@@ -250,25 +250,17 @@ func TestQuoteTotalRange_RoundsHalfUpWithoutFloat(t *testing.T) {
 	}
 }
 
-func TestPreviewRfqPrice_CarriesQualityKnowledgeState(t *testing.T) {
+func TestPreviewRfqPrice_QuantityTimesAmountOverflow_RejectsAsUnconvertible(t *testing.T) {
 	repo := &testkit.FakePricePreviewRepo{}
-	uc := newPreviewUC(repo, domain.Slots{Unit: testkit.Ptr("KG"), DeliveryCity: testkit.Ptr("桃園市"), Quantity: testkit.Ptr(50)}, 1)
+	uc := newPreviewUC(repo, domain.Slots{Unit: testkit.Ptr("KG"), Quantity: testkit.Ptr(1 << 30)}, 1)
 
-	in := previewInput("preview-quality")
-	first, err := uc.PreviewRfqPrice(context.Background(), in)
-	if err != nil {
-		t.Fatalf("PreviewRfqPrice() error = %v, want nil", err)
+	in := previewInput("preview-overflow")
+	in.BuyerRequestedRange = &BuyerRequestedRange{Currency: "TWD", PriceComponent: "GOODS_ONLY", LowerBoundAmount: "9000000000000000000", UpperBoundAmount: "9000000000000000001"}
+	_, err := uc.PreviewRfqPrice(context.Background(), in)
+	if !errors.Is(err, ErrQuantityUnitUnconvertible) {
+		t.Errorf("err = %v, want ErrQuantityUnitUnconvertible", err)
 	}
-	if first.QualityKnowledgeState != "BUYER_QUALITY_UNKNOWN" {
-		t.Errorf("QualityKnowledgeState = %q, want BUYER_QUALITY_UNKNOWN", first.QualityKnowledgeState)
-	}
-
-	replay, err := uc.PreviewRfqPrice(context.Background(), in)
-	if err != nil {
-		t.Fatalf("replay PreviewRfqPrice() error = %v, want nil", err)
-	}
-	if replay.QualityKnowledgeState != first.QualityKnowledgeState {
-		t.Errorf("replay QualityKnowledgeState = %q, want %q",
-			replay.QualityKnowledgeState, first.QualityKnowledgeState)
+	if repo.InsertCalls != 0 {
+		t.Errorf("insertCalls = %d, want 0", repo.InsertCalls)
 	}
 }

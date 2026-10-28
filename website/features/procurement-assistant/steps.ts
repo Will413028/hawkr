@@ -81,7 +81,6 @@ export const STEP_ICON: Record<string, AppIconName> = {
 	READ_SELLER: "user",
 	// 暫代：待天平／比較 glyph。
 	COMPARE: "reorder",
-	VERIFY_CERT: "shield",
 	VERIFY_ORIGIN: "location",
 	CHECK_STOCK: "stock",
 	// 暫代：待排序／排名 glyph。
@@ -122,7 +121,6 @@ export const STEP_FALLBACK_LABELS: Record<string, string> = {
 	SEARCH_EXTERNAL: "找平台外的公開候選資料",
 	READ_SELLER: "讀這筆候選的公開資料",
 	COMPARE: "把公開條件放在一起比",
-	VERIFY_CERT: "整理產銷履歷欄位",
 	VERIFY_ORIGIN: "整理產地欄位",
 	CHECK_STOCK: "標出仍需商家確認的供貨資訊",
 	RANK_CANDIDATES: "整理候選資料順序",

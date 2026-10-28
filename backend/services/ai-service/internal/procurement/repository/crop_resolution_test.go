@@ -24,7 +24,6 @@ func TestRepo_ItemResolution_RoundTripsThroughSlotsJSON(t *testing.T) {
 	item := "高麗菜"
 	resolution := &domain.ItemResolution{
 		Kind: domain.ItemResolvedCategoryConfirmed, Label: "高麗菜", CategoryID: "17",
-		Provenance: domain.ItemResolutionByBuyerChoice,
 	}
 	_, err = repo.AppendRevision(ctx, AppendInput{
 		RequestID: req.ID, BuyerID: testBuyerID,
@@ -42,14 +41,12 @@ func TestRepo_ItemResolution_RoundTripsThroughSlotsJSON(t *testing.T) {
 
 	// 真的存成 jsonb：用 jsonb 運算子直接取巢狀欄位。裸 []byte 被當成 bytea 送出時
 	// 這一段會失敗，而 Go 端的 Unmarshal 仍然會過——所以這個斷言不是重複。
-	var kind, provenance string
+	var kind string
 	require.NoError(t, pool.QueryRow(ctx,
-		`SELECT slots_json -> 'item_resolution' ->> 'kind',
-		        slots_json -> 'item_resolution' ->> 'provenance'
+		`SELECT slots_json -> 'item_resolution' ->> 'kind'
 		   FROM procurement_request_revisions WHERE id = $1`, rev.ID,
-	).Scan(&kind, &provenance))
+	).Scan(&kind))
 	require.Equal(t, string(domain.ItemResolvedCategoryConfirmed), kind)
-	require.Equal(t, string(domain.ItemResolutionByBuyerChoice), provenance)
 }
 
 // TestRepo_SlotsWithoutItemResolution_OmitsTheKey 釘住「兄弟 key 而非巢狀」這個決定

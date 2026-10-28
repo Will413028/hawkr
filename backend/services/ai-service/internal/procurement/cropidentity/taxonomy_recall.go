@@ -10,14 +10,9 @@ import (
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/cropidentity/recall"
 )
 
-type taxonomyRetriever struct {
-	uc *DisambiguationUseCase
-}
-
-func (taxonomyRetriever) Name() string { return "taxonomy" }
-
-func (t taxonomyRetriever) Recall(ctx context.Context, q recall.Query) ([]recall.Candidate, error) {
-	groups, err := t.uc.categoryGroups(ctx)
+// taxonomyCandidates 回傳依優先序排好的候選：人工覆寫（pinned）在前，其餘依命中順序。
+func (uc *DisambiguationUseCase) taxonomyCandidates(ctx context.Context, q recall.Query) ([]recall.Candidate, error) {
+	groups, err := uc.categoryGroups(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("taxonomy retriever: %w", err)
 	}
@@ -38,11 +33,10 @@ func (t taxonomyRetriever) Recall(ctx context.Context, q recall.Query) ([]recall
 	var out []recall.Candidate
 	seen := map[string]bool{}
 	add := func(c recall.Candidate) {
-		if seen[c.Key] {
+		if seen[c.Code] {
 			return
 		}
-		seen[c.Key] = true
-		c.Rank = len(out) + 1
+		seen[c.Code] = true
 		out = append(out, c)
 	}
 	for _, g := range groups {
@@ -50,7 +44,7 @@ func (t taxonomyRetriever) Recall(ctx context.Context, q recall.Query) ([]recall
 			continue
 		}
 		add(recall.Candidate{
-			Key: recall.CandidateKey(recall.KindCategory, g.ID), Kind: recall.KindCategory, Code: g.ID,
+			Code:  g.ID,
 			Label: g.Label, CategoryLevel: 2, ParentID: g.ParentID, ParentLabel: g.L1Label,
 			MatchedBy: g.L1Label, Quality: recall.Strong,
 		})
@@ -63,7 +57,7 @@ func (t taxonomyRetriever) Recall(ctx context.Context, q recall.Query) ([]recall
 			for _, child := range g.Children {
 				cNorm := NormalizeCategoryText(child.Label)
 				cand := recall.Candidate{
-					Key: recall.CandidateKey(recall.KindCategory, child.ID), Kind: recall.KindCategory, Code: child.ID,
+					Code:  child.ID,
 					Label: child.Label, CategoryIDs: []string{child.ID}, CategoryLevel: 3,
 					ParentID: g.ID, ParentLabel: g.Label, MatchedBy: child.Label,
 				}
@@ -82,5 +76,14 @@ func (t taxonomyRetriever) Recall(ctx context.Context, q recall.Query) ([]recall
 			}
 		}
 	}
+	slices.SortStableFunc(out, func(a, b recall.Candidate) int {
+		switch {
+		case a.Pinned == b.Pinned:
+			return 0
+		case a.Pinned:
+			return -1
+		}
+		return 1
+	})
 	return out, nil
 }

@@ -280,18 +280,17 @@ type ProcurementQuoteTotalRangeDTO struct {
 }
 
 type ProcurementRfqPricePreviewResponseDTO struct {
-	PricePreviewID        string                             `json:"pricePreviewId"`
-	Version               string                             `json:"version"`
-	QualityKnowledgeState string                             `json:"qualityKnowledgeState"`
-	BuyerRequestedRange   *ProcurementBuyerRequestedRangeDTO `json:"buyerRequestedRange"`
-	PayloadHash           string                             `json:"payloadHash"`
-	QuoteTotalRange       *ProcurementQuoteTotalRangeDTO     `json:"quoteTotalRange"`
+	PricePreviewID      string                             `json:"pricePreviewId"`
+	Version             string                             `json:"version"`
+	BuyerRequestedRange *ProcurementBuyerRequestedRangeDTO `json:"buyerRequestedRange"`
+	PayloadHash         string                             `json:"payloadHash"`
+	QuoteTotalRange     *ProcurementQuoteTotalRangeDTO     `json:"quoteTotalRange"`
 }
 
 func rfqPricePreviewResponseFromProto(r *pb.RfqPricePreviewResponse) ProcurementRfqPricePreviewResponseDTO {
 	dto := ProcurementRfqPricePreviewResponseDTO{
 		PricePreviewID: r.GetPricePreviewId(), Version: r.GetVersion(),
-		QualityKnowledgeState: r.GetQualityKnowledgeState(), PayloadHash: r.GetPayloadHash(),
+		PayloadHash: r.GetPayloadHash(),
 	}
 	if br := r.GetBuyerRequestedRange(); br != nil {
 		dto.BuyerRequestedRange = &ProcurementBuyerRequestedRangeDTO{

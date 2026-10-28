@@ -198,7 +198,7 @@ describe("RFQ confirmation and manual input", () => {
 		expect(result.expiresAt).toBe("2026-08-22T12:36:00Z");
 	});
 
-	// 與 qualityKnowledgeState 同一個慣例：後端加這個欄位之前確認的快照沒有它，
+	// 慣例：後端加這個欄位之前確認的快照沒有它，
 	// 畫面整列不顯示，而不是補一個當下時間假裝快照有到期日。
 	it("normalises a missing snapshot expiry to an empty string", () => {
 		const result = rfqConfirmationSchema.parse({

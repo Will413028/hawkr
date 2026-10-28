@@ -291,18 +291,17 @@ type ProcurementCandidateSet struct {
 }
 
 type ProcurementConfirmedRfqSnapshot struct {
-	ID                    int64              `db:"id" json:"id"`
-	BuyerID               int64              `db:"buyer_id" json:"buyer_id"`
-	RequestID             int64              `db:"request_id" json:"request_id"`
-	RequestRevisionID     int64              `db:"request_revision_id" json:"request_revision_id"`
-	PricePreviewID        int64              `db:"price_preview_id" json:"price_preview_id"`
-	PricePreviewVersion   int64              `db:"price_preview_version" json:"price_preview_version"`
-	QualityKnowledgeState string             `db:"quality_knowledge_state" json:"quality_knowledge_state"`
-	CanonicalPayloadJson  []byte             `db:"canonical_payload_json" json:"canonical_payload_json"`
-	PayloadHash           string             `db:"payload_hash" json:"payload_hash"`
-	ClientRequestID       string             `db:"client_request_id" json:"client_request_id"`
-	ExpiresAt             pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
-	CreatedAt             pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ID                   int64              `db:"id" json:"id"`
+	BuyerID              int64              `db:"buyer_id" json:"buyer_id"`
+	RequestID            int64              `db:"request_id" json:"request_id"`
+	RequestRevisionID    int64              `db:"request_revision_id" json:"request_revision_id"`
+	PricePreviewID       int64              `db:"price_preview_id" json:"price_preview_id"`
+	PricePreviewVersion  int64              `db:"price_preview_version" json:"price_preview_version"`
+	CanonicalPayloadJson []byte             `db:"canonical_payload_json" json:"canonical_payload_json"`
+	PayloadHash          string             `db:"payload_hash" json:"payload_hash"`
+	ClientRequestID      string             `db:"client_request_id" json:"client_request_id"`
+	ExpiresAt            pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type ProcurementConversation struct {
@@ -345,7 +344,6 @@ type ProcurementPricePreview struct {
 	BuyerID                 int64              `db:"buyer_id" json:"buyer_id"`
 	RequestID               int64              `db:"request_id" json:"request_id"`
 	RequestRevisionID       int64              `db:"request_revision_id" json:"request_revision_id"`
-	QualityKnowledgeState   string             `db:"quality_knowledge_state" json:"quality_knowledge_state"`
 	BuyerRequestedRangeJson []byte             `db:"buyer_requested_range_json" json:"buyer_requested_range_json"`
 	QuoteTotalRangeJson     []byte             `db:"quote_total_range_json" json:"quote_total_range_json"`
 	ClientRequestID         string             `db:"client_request_id" json:"client_request_id"`
@@ -410,7 +408,6 @@ type ProcurementRfqPublicationApproval struct {
 	PricePreviewVersion       int64              `db:"price_preview_version" json:"price_preview_version"`
 	PricePreviewPayloadHash   string             `db:"price_preview_payload_hash" json:"price_preview_payload_hash"`
 	PricePreviewInputHash     string             `db:"price_preview_input_hash" json:"price_preview_input_hash"`
-	QualityKnowledgeState     string             `db:"quality_knowledge_state" json:"quality_knowledge_state"`
 	BuyerRequestedRangeHash   string             `db:"buyer_requested_range_hash" json:"buyer_requested_range_hash"`
 	ResponseDeadline          pgtype.Date        `db:"response_deadline" json:"response_deadline"`
 	AudienceMode              string             `db:"audience_mode" json:"audience_mode"`

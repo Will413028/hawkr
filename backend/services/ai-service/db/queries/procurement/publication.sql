@@ -4,7 +4,6 @@ INSERT INTO procurement_rfq_publication_approvals (
     confirmed_rfq_snapshot_id, confirmed_rfq_payload_hash,
     price_preview_id, price_preview_version,
     price_preview_payload_hash, price_preview_input_hash,
-    quality_knowledge_state,
     buyer_requested_range_hash, response_deadline,
     audience_mode, audience_policy_id, audience_policy_version, audience_hash,
     candidate_set_id, candidate_set_policy_version,
@@ -13,8 +12,8 @@ INSERT INTO procurement_rfq_publication_approvals (
     preview_client_request_id, generated_at, expires_at
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-    $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-    $21, $22, $23, $24, $25, $26
+    $11, $12, $13, $14, $15, $16, $17, $18, $19,
+    $20, $21, $22, $23, $24, $25
 ) -- 撞冪等鍵不拋錯（PostgreSQL 規範第十二章）：DO UPDATE 把冪等鍵寫回自己，不改內容
 -- 但保證一定 RETURNING 一列，呼叫端用「回傳的 id 是不是這次產的」區分插入與既有列。
 ON CONFLICT (buyer_id, preview_client_request_id)

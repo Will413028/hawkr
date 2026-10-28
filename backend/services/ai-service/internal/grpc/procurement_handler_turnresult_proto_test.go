@@ -93,14 +93,12 @@ func TestToSlotsProto_ItemResolution_ReachesTheWire(t *testing.T) {
 		Item: &item,
 		ItemResolution: &domain.ItemResolution{
 			Kind: domain.ItemResolvedCategoryConfirmed, Label: "高麗菜", CategoryID: "17",
-			Provenance: domain.ItemResolutionByBuyerChoice,
 		},
 	})
 
 	require.NotNil(t, got.ItemResolution)
 	require.Equal(t, "CATEGORY_CONFIRMED", got.ItemResolution.GetKind())
 	require.Equal(t, "高麗菜", got.ItemResolution.GetLabel())
-	require.Equal(t, "BUYER_CHOICE", got.ItemResolution.GetProvenance())
 	require.Equal(t, "高麗菜", got.ItemResolution.GetDisplayValue(),
 		"顯示字串由伺服器組——前端拿 kind＋label 自己拼會跟 chip 漂成兩套文案")
 }

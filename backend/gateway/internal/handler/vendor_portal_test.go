@@ -179,32 +179,24 @@ func TestVendorPortalWrites_ForwardTheVerificationEvidenceFromHeaders(t *testing
 // 白名單映射漏一欄在型別上完全合法，症狀只是瀏覽器上少一行。
 func TestVendorPortalRFQDTOFromProto_MapsWhitelistedFields(t *testing.T) {
 	dto := vendorPortalRFQDTOFromProto(&aipb.RfqPublicationInviteSellerViewResponse{
-		QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
-		Item:                  "APPLE",
-		ItemLabel:             "台灣蘋果",
-		Quantity:              "50",
-		Unit:                  "BOX",
-		Packaging:             "紙箱",
-		DeliveryCity:          "桃園市",
-		DeliveryDate:          "2026-09-16",
-		ResponseDeadline:      "2026-09-14",
+		Item:             "APPLE",
+		ItemLabel:        "台灣蘋果",
+		Quantity:         "50",
+		Unit:             "BOX",
+		Packaging:        "紙箱",
+		DeliveryCity:     "桃園市",
+		DeliveryDate:     "2026-09-16",
+		ResponseDeadline: "2026-09-14",
 	})
 
 	require.Equal(t, VendorPortalRFQDTO{
-		QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
-		Item:                  "APPLE",
-		ItemLabel:             "台灣蘋果",
-		Quantity:              "50",
-		Unit:                  "BOX",
-		Packaging:             "紙箱",
-		DeliveryCity:          "桃園市",
-		DeliveryDate:          "2026-09-16",
-		ResponseDeadline:      "2026-09-14",
+		Item:             "APPLE",
+		ItemLabel:        "台灣蘋果",
+		Quantity:         "50",
+		Unit:             "BOX",
+		Packaging:        "紙箱",
+		DeliveryCity:     "桃園市",
+		DeliveryDate:     "2026-09-16",
+		ResponseDeadline: "2026-09-14",
 	}, dto)
-}
-
-// 舊 approval 沒有這個 key，必須原樣回空字串。
-func TestVendorPortalRFQDTOFromProto_KeepsLegacyEmptyQualityState(t *testing.T) {
-	dto := vendorPortalRFQDTOFromProto(&aipb.RfqPublicationInviteSellerViewResponse{Item: "APPLE"})
-	require.Empty(t, dto.QualityKnowledgeState)
 }

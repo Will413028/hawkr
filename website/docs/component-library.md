@@ -6,7 +6,7 @@
 
 ## 本次 UI 更新
 
-- 採購分類重查：`crop_disambiguation` 在後端 `allowFreeText=true` 時，同時顯示分類選項與重新描述欄位。`onSubmitFreeText(text)` 只送文字重查；`onSubmitCropOther({ description, priceAmount })` 保留自填價語意。只有 `crop-other` 且 `allowFreeText=false` 才直接顯示自填價表單。大類、小類與自填價即使共用 `slotKey`，題目內容改變也會清除上一題草稿；單純 pending 更新保留草稿。新增相容行為，SemVer 記為 minor 意圖；分類內容、查找順序與行情可用性由後端決定。
+- 採購分類重查：`crop_disambiguation` 在後端 `allowFreeText=true` 時，同時顯示分類選項與重新描述欄位。`onSubmitFreeText(text)` 只送文字重查；`onSubmitCropOther({ description })` 送買家的描述。只有 `crop-other` 且 `allowFreeText=false` 才直接顯示描述表單。大類與小類即使共用 `slotKey`，題目內容改變也會清除上一題草稿；單純 pending 更新保留草稿。新增相容行為，SemVer 記為 minor 意圖；分類內容與查找順序由後端決定。
 - 採購自訂品項：`ClarifyQuestionCard` 使用正式 `Input`、`Textarea` 與 `Button`，整理描述、字數與單價單位。`crop_disambiguation` 僅含 `crop-other` 時直接顯示表單；有其他候選時保留原選項與展開操作。公開 props 不變，`onSubmitCropOther({ description, priceAmount })` 仍提交 trim 後字串，兩欄非空、非 pending 且有 callback 才能送出；不新增價格格式契約。`ProcurementClarifyQuestion.stories.tsx` 以固定資料展示，沒有真實交易或 API 請求。
 - 共用欄位：`Input`、`Textarea`、`Select` 預設改為 App 對齊的描邊外觀，包含尺寸、浮動標籤、焦點、錯誤與停用狀態；`Input.stories.tsx` 提供 App 外觀、大字級及保留變體。完整差異見 [跨平台契約](../design-system/cross-platform.md)。預設外觀與尺寸改變依維護規範記為 major 意圖；需維持舊畫面的使用端應明確指定變體，並檢查固定高度與密集布局。
 - 貼文輸入：高亮文字與 textarea 使用相同排版和捲動範圍，hashtag 不再因字重不同而偏離游標；`PostContent.stories.tsx` 覆蓋原畫面、浮動標籤、輸入選取、長文捲動、深色及窄版大字級，記為相容修正。

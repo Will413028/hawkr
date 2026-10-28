@@ -565,16 +565,15 @@ func toSellerQuoteProto(v repository.SellerResponseVersion) *aipb.SellerQuotePay
 
 func toSellerFacingPayloadProto(v repository.InviteSellerView) *aipb.RfqPublicationInviteSellerViewResponse {
 	return &aipb.RfqPublicationInviteSellerViewResponse{
-		QualityKnowledgeState: v.QualityKnowledgeState,
-		Item:                  v.Item,
-		ItemLabel:             v.ItemLabel,
-		Quantity:              v.Quantity,
-		Unit:                  v.Unit,
-		Packaging:             v.Packaging,
-		DeliveryCity:          v.DeliveryCity,
-		DeliveryDate:          v.DeliveryDate,
-		ResponseDeadline:      v.ResponseDeadline,
-		BuyerNote:             v.BuyerNote,
+		Item:             v.Item,
+		ItemLabel:        v.ItemLabel,
+		Quantity:         v.Quantity,
+		Unit:             v.Unit,
+		Packaging:        v.Packaging,
+		DeliveryCity:     v.DeliveryCity,
+		DeliveryDate:     v.DeliveryDate,
+		ResponseDeadline: v.ResponseDeadline,
+		BuyerNote:        v.BuyerNote,
 	}
 }
 

@@ -265,7 +265,6 @@ describe("fetchVendorRfq", () => {
 						code: 0,
 						message: "success",
 						data: {
-							qualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
 							item: "LETTUCE",
 							itemLabel: "結球萵苣",
 							quantity: "300",
@@ -281,7 +280,6 @@ describe("fetchVendorRfq", () => {
 		);
 
 		await expect(fetchVendorRfq(RECIPIENT_ID)).resolves.toEqual({
-			qualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
 			item: "LETTUCE",
 			itemLabel: "結球萵苣",
 			quantity: "300",

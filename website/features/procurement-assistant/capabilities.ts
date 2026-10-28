@@ -23,7 +23,7 @@ export const WEB_AGENT_FLAGS = [
 	"WEB_PROCUREMENT_AGENT_RUNTIME_V1",
 	/** assistant-ui／Task／Tool／artifact renderer（回退：保留 canonical runtime，退回既有 renderer）。 */
 	"WEB_PROCUREMENT_AGENT_UI_V1",
-	/** 市場參考、詢價上下限與 update-trial flow。 */
+	/** 買家價格區間輸入與詢價草稿。 */
 	"WEB_PROCUREMENT_RFQ_PRICE_RANGE_V1",
 	/** Web #489／P0-13C Quote companion。 */
 	"WEB_PROCUREMENT_RFQ_APPROVAL_V1",

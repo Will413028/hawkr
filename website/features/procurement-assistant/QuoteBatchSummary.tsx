@@ -6,7 +6,6 @@ import { Button } from "@/components/ui";
 import type { ProcurementSlots } from "@/lib/api/openapi-types";
 import { formatTaipeiDate, formatTaipeiDateTime } from "@/lib/date/taipei";
 import styles from "@/styles/features/procurement-assistant/quote-batch-summary.module.css";
-import { buyerQualityStateLabel } from "./buyer-quality-state";
 import {
 	type BuyerQuoteAcceptanceResponse,
 	formatTwdAmount,
@@ -28,11 +27,6 @@ interface QuoteBatchSummaryProps {
 	 * 不從別處反推。
 	 */
 	slots?: ProcurementSlots;
-	/**
-	 * 買家品相狀態（CodeMeta `BUYER_QUALITY_UNKNOWN` 等）。空字串＝伺服器沒給，
-	 * 整列不顯示；⛔ 不得補成「一般品」或任何預設等級（v6.0 §V.7）。
-	 */
-	qualityKnowledgeState?: string;
 	/**
 	 * 伺服器算出的希望詢價區間。
 	 *
@@ -116,7 +110,6 @@ function orderCellText(acceptance: BuyerQuoteAcceptanceResponse): string {
  */
 export default function QuoteBatchSummary({
 	slots,
-	qualityKnowledgeState = "",
 	buyerRequestedRange = null,
 	publication = null,
 	counts = EMPTY_COUNTS,
@@ -219,10 +212,6 @@ export default function QuoteBatchSummary({
 							<Fact label="品項" value={itemText} />
 							<Fact label="數量" value={quantityText} />
 							<Fact label="配送" value={deliveryText} />
-							<Fact
-								label="品相"
-								value={buyerQualityStateLabel(qualityKnowledgeState)}
-							/>
 							<Fact label="希望詢價" value={rangeText} />
 							{/* ⛔ 這裡沒有「截止」列：回覆期限的買家側來源隨 legacy
 							 * quoteDeadline 一起下架，而 slots.deliveryDate 是交期不是

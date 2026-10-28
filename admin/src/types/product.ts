@@ -89,7 +89,6 @@ export interface ProductDetail {
 	favoriteCount: string;
 	reviewCount: string;
 	shippingMethods?: ShippingMethod[];
-	deliveryTemp?: string[];
 	skus?: ProductSku[];
 	createdAt?: string;
 	updatedAt?: string;

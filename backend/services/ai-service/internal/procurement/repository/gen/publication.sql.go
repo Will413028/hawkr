@@ -17,7 +17,7 @@ const claimProcurementRfqPublicationApprovalForExecute = `-- name: ClaimProcurem
 UPDATE procurement_rfq_publication_approvals
    SET state = 'EXECUTING', version = version + 1, updated_at = now()
  WHERE id = $1 AND version = $2 AND buyer_id = $3 AND state = 'PENDING'
-RETURNING id, version, buyer_id, request_id, request_revision_id, confirmed_rfq_snapshot_id, confirmed_rfq_payload_hash, price_preview_id, price_preview_version, price_preview_payload_hash, price_preview_input_hash, quality_knowledge_state, buyer_requested_range_hash, response_deadline, audience_mode, audience_policy_id, audience_policy_version, audience_hash, candidate_set_id, candidate_set_policy_version, seller_facing_payload_json, seller_facing_payload_hash, state, schema_version, preview_client_request_id, generated_at, expires_at, created_at, updated_at
+RETURNING id, version, buyer_id, request_id, request_revision_id, confirmed_rfq_snapshot_id, confirmed_rfq_payload_hash, price_preview_id, price_preview_version, price_preview_payload_hash, price_preview_input_hash, buyer_requested_range_hash, response_deadline, audience_mode, audience_policy_id, audience_policy_version, audience_hash, candidate_set_id, candidate_set_policy_version, seller_facing_payload_json, seller_facing_payload_hash, state, schema_version, preview_client_request_id, generated_at, expires_at, created_at, updated_at
 `
 
 type ClaimProcurementRfqPublicationApprovalForExecuteParams struct {
@@ -41,7 +41,6 @@ func (q *Queries) ClaimProcurementRfqPublicationApprovalForExecute(ctx context.C
 		&i.PricePreviewVersion,
 		&i.PricePreviewPayloadHash,
 		&i.PricePreviewInputHash,
-		&i.QualityKnowledgeState,
 		&i.BuyerRequestedRangeHash,
 		&i.ResponseDeadline,
 		&i.AudienceMode,
@@ -90,7 +89,7 @@ func (q *Queries) FindLatestProcurementRfqPublicationByRequest(ctx context.Conte
 }
 
 const findProcurementRfqPublicationApprovalByIdempotencyKey = `-- name: FindProcurementRfqPublicationApprovalByIdempotencyKey :one
-SELECT id, version, buyer_id, request_id, request_revision_id, confirmed_rfq_snapshot_id, confirmed_rfq_payload_hash, price_preview_id, price_preview_version, price_preview_payload_hash, price_preview_input_hash, quality_knowledge_state, buyer_requested_range_hash, response_deadline, audience_mode, audience_policy_id, audience_policy_version, audience_hash, candidate_set_id, candidate_set_policy_version, seller_facing_payload_json, seller_facing_payload_hash, state, schema_version, preview_client_request_id, generated_at, expires_at, created_at, updated_at FROM procurement_rfq_publication_approvals
+SELECT id, version, buyer_id, request_id, request_revision_id, confirmed_rfq_snapshot_id, confirmed_rfq_payload_hash, price_preview_id, price_preview_version, price_preview_payload_hash, price_preview_input_hash, buyer_requested_range_hash, response_deadline, audience_mode, audience_policy_id, audience_policy_version, audience_hash, candidate_set_id, candidate_set_policy_version, seller_facing_payload_json, seller_facing_payload_hash, state, schema_version, preview_client_request_id, generated_at, expires_at, created_at, updated_at FROM procurement_rfq_publication_approvals
 WHERE buyer_id = $1 AND preview_client_request_id = $2
 `
 
@@ -114,7 +113,6 @@ func (q *Queries) FindProcurementRfqPublicationApprovalByIdempotencyKey(ctx cont
 		&i.PricePreviewVersion,
 		&i.PricePreviewPayloadHash,
 		&i.PricePreviewInputHash,
-		&i.QualityKnowledgeState,
 		&i.BuyerRequestedRangeHash,
 		&i.ResponseDeadline,
 		&i.AudienceMode,
@@ -354,7 +352,6 @@ INSERT INTO procurement_rfq_publication_approvals (
     confirmed_rfq_snapshot_id, confirmed_rfq_payload_hash,
     price_preview_id, price_preview_version,
     price_preview_payload_hash, price_preview_input_hash,
-    quality_knowledge_state,
     buyer_requested_range_hash, response_deadline,
     audience_mode, audience_policy_id, audience_policy_version, audience_hash,
     candidate_set_id, candidate_set_policy_version,
@@ -363,12 +360,12 @@ INSERT INTO procurement_rfq_publication_approvals (
     preview_client_request_id, generated_at, expires_at
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-    $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-    $21, $22, $23, $24, $25, $26
+    $11, $12, $13, $14, $15, $16, $17, $18, $19,
+    $20, $21, $22, $23, $24, $25
 ) -- 撞冪等鍵不拋錯（PostgreSQL 規範第十二章）：DO UPDATE 把冪等鍵寫回自己，不改內容
 ON CONFLICT (buyer_id, preview_client_request_id)
 DO UPDATE SET preview_client_request_id = EXCLUDED.preview_client_request_id
-RETURNING id, version, buyer_id, request_id, request_revision_id, confirmed_rfq_snapshot_id, confirmed_rfq_payload_hash, price_preview_id, price_preview_version, price_preview_payload_hash, price_preview_input_hash, quality_knowledge_state, buyer_requested_range_hash, response_deadline, audience_mode, audience_policy_id, audience_policy_version, audience_hash, candidate_set_id, candidate_set_policy_version, seller_facing_payload_json, seller_facing_payload_hash, state, schema_version, preview_client_request_id, generated_at, expires_at, created_at, updated_at
+RETURNING id, version, buyer_id, request_id, request_revision_id, confirmed_rfq_snapshot_id, confirmed_rfq_payload_hash, price_preview_id, price_preview_version, price_preview_payload_hash, price_preview_input_hash, buyer_requested_range_hash, response_deadline, audience_mode, audience_policy_id, audience_policy_version, audience_hash, candidate_set_id, candidate_set_policy_version, seller_facing_payload_json, seller_facing_payload_hash, state, schema_version, preview_client_request_id, generated_at, expires_at, created_at, updated_at
 `
 
 type InsertProcurementRfqPublicationApprovalParams struct {
@@ -382,7 +379,6 @@ type InsertProcurementRfqPublicationApprovalParams struct {
 	PricePreviewVersion       int64              `db:"price_preview_version" json:"price_preview_version"`
 	PricePreviewPayloadHash   string             `db:"price_preview_payload_hash" json:"price_preview_payload_hash"`
 	PricePreviewInputHash     string             `db:"price_preview_input_hash" json:"price_preview_input_hash"`
-	QualityKnowledgeState     string             `db:"quality_knowledge_state" json:"quality_knowledge_state"`
 	BuyerRequestedRangeHash   string             `db:"buyer_requested_range_hash" json:"buyer_requested_range_hash"`
 	ResponseDeadline          pgtype.Date        `db:"response_deadline" json:"response_deadline"`
 	AudienceMode              string             `db:"audience_mode" json:"audience_mode"`
@@ -413,7 +409,6 @@ func (q *Queries) InsertProcurementRfqPublicationApproval(ctx context.Context, a
 		arg.PricePreviewVersion,
 		arg.PricePreviewPayloadHash,
 		arg.PricePreviewInputHash,
-		arg.QualityKnowledgeState,
 		arg.BuyerRequestedRangeHash,
 		arg.ResponseDeadline,
 		arg.AudienceMode,
@@ -443,7 +438,6 @@ func (q *Queries) InsertProcurementRfqPublicationApproval(ctx context.Context, a
 		&i.PricePreviewVersion,
 		&i.PricePreviewPayloadHash,
 		&i.PricePreviewInputHash,
-		&i.QualityKnowledgeState,
 		&i.BuyerRequestedRangeHash,
 		&i.ResponseDeadline,
 		&i.AudienceMode,
@@ -676,7 +670,7 @@ const markProcurementRfqPublicationApprovalSucceeded = `-- name: MarkProcurement
 UPDATE procurement_rfq_publication_approvals
    SET state = 'SUCCEEDED', version = version + 1, updated_at = now()
  WHERE id = $1 AND version = $2 AND state = 'EXECUTING'
-RETURNING id, version, buyer_id, request_id, request_revision_id, confirmed_rfq_snapshot_id, confirmed_rfq_payload_hash, price_preview_id, price_preview_version, price_preview_payload_hash, price_preview_input_hash, quality_knowledge_state, buyer_requested_range_hash, response_deadline, audience_mode, audience_policy_id, audience_policy_version, audience_hash, candidate_set_id, candidate_set_policy_version, seller_facing_payload_json, seller_facing_payload_hash, state, schema_version, preview_client_request_id, generated_at, expires_at, created_at, updated_at
+RETURNING id, version, buyer_id, request_id, request_revision_id, confirmed_rfq_snapshot_id, confirmed_rfq_payload_hash, price_preview_id, price_preview_version, price_preview_payload_hash, price_preview_input_hash, buyer_requested_range_hash, response_deadline, audience_mode, audience_policy_id, audience_policy_version, audience_hash, candidate_set_id, candidate_set_policy_version, seller_facing_payload_json, seller_facing_payload_hash, state, schema_version, preview_client_request_id, generated_at, expires_at, created_at, updated_at
 `
 
 type MarkProcurementRfqPublicationApprovalSucceededParams struct {
@@ -699,7 +693,6 @@ func (q *Queries) MarkProcurementRfqPublicationApprovalSucceeded(ctx context.Con
 		&i.PricePreviewVersion,
 		&i.PricePreviewPayloadHash,
 		&i.PricePreviewInputHash,
-		&i.QualityKnowledgeState,
 		&i.BuyerRequestedRangeHash,
 		&i.ResponseDeadline,
 		&i.AudienceMode,

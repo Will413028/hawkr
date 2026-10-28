@@ -27,7 +27,7 @@ func TestVendorPortalRFQDTOFieldSet(t *testing.T) {
 	// buyerNote 是買家自己打字、明知會給供應商看的補充說明——它進白名單是刻意的
 	// 決定，不是漏擋。⛔ 買家私有預算 budgetPerUnit 仍然一律不得出現在這裡。
 	//
-	// publicationVersion 是第 13 欄，同樣是刻意加的：業者正式送出報價時要原樣帶回來
+	// publicationVersion 同樣是刻意加的：業者正式送出報價時要原樣帶回來
 	// 做 CAS，把報價綁在「他當時看到的那一版 RFQ」上。它只說「你看到的是第幾版」，
 	// 不洩漏任何買家內容。
 	// ⛔ **sellerFacingPayloadHash 不得加進來**——那是我方的內部完整性摘要，交給站外
@@ -35,7 +35,7 @@ func TestVendorPortalRFQDTOFieldSet(t *testing.T) {
 	require.Equal(t, []string{
 		"buyerNote", "buyerRequestedRange", "deliveryCity", "deliveryDate",
 		"item", "itemLabel", "packaging", "publicationVersion",
-		"qualityKnowledgeState", "quantity",
+		"quantity",
 		"responseDeadline", "unit",
 	}, got)
 }

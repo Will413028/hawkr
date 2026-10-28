@@ -6,8 +6,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAllActCodes_Has18UniqueValues(t *testing.T) {
-	require.Len(t, AllActCodes, 18)
+func TestAllActCodes_Has17UniqueValues(t *testing.T) {
+	require.Len(t, AllActCodes, 17)
 	seen := map[ActCode]bool{}
 	for _, c := range AllActCodes {
 		require.False(t, seen[c], "duplicate ActCode: %s", c)

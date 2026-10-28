@@ -64,7 +64,6 @@ const Map<String, dynamic> _publicationJson = <String, dynamic>{
 };
 
 const Map<String, dynamic> _sellerFacingPayloadJson = <String, dynamic>{
-  'qualityKnowledgeState': '',
   'item': '高麗菜',
   'itemLabel': '梨山高麗菜',
   'quantity': '200',
@@ -401,7 +400,7 @@ void main() {
       expect(publication.publishedAt, '2026-09-13T02:00:00Z');
     });
 
-    test('sellerFacingPayload 是頂層 key，十欄逐欄解析', () async {
+    test('sellerFacingPayload 是頂層 key，九欄逐欄解析', () async {
       final harness = _repo(
         body: {
           'publication': _publicationJson,
@@ -418,8 +417,6 @@ void main() {
       expect(payload.deliveryCity, '臺北市');
       expect(payload.deliveryDate, '2026-09-20');
       expect(payload.responseDeadline, '2026-09-18');
-      expect(payload.qualityKnowledgeState, '');
-      expect(payload.hasQualityKnowledge, isFalse);
     });
 
     test('個別欄位是空字串不算載入失敗，只是這張 RFQ 沒填', () async {
@@ -435,7 +432,6 @@ void main() {
             'deliveryCity': '',
             'deliveryDate': '',
             'responseDeadline': '',
-            'qualityKnowledgeState': '',
           },
         },
       );
@@ -459,7 +455,7 @@ void main() {
       );
       final detail = await harness.repo.getPublicationDetail(_publicationId);
       final serialized = detail.sellerFacingPayload.toJson();
-      expect(serialized.keys, hasLength(10));
+      expect(serialized.keys, hasLength(9));
       for (final leaked in const ['38', '35-40', '0912345678']) {
         expect(
           serialized.values.map((v) => '$v'),
@@ -728,7 +724,7 @@ void main() {
       expect(rows.single.publication.publicationId, _publicationId);
     });
 
-    test('清單列的 sellerFacingPayload 一樣是 deny-by-default 的十欄', () async {
+    test('清單列的 sellerFacingPayload 一樣是 deny-by-default 的九欄', () async {
       final harness = _repo(
         body: {
           'publications': [
@@ -745,7 +741,7 @@ void main() {
       );
       final rows = await harness.repo.listPublications();
       final serialized = rows.single.sellerFacingPayload.toJson();
-      expect(serialized.keys, hasLength(10));
+      expect(serialized.keys, hasLength(9));
       expect(serialized.values.map((v) => '$v'), isNot(contains('38')));
     });
   });

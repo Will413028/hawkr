@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/Will413028/hawkr/ai-service/internal/procurement/cropidentity/fuse"
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/cropidentity/recall"
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/domain"
 	"github.com/Will413028/hawkr/go-pkg/codemeta"
@@ -126,17 +125,17 @@ func facetTree() *categoryTreeFake {
 	}}}
 }
 
-func weakLeaf(id, label, parentID, parentLabel string) fuse.Fused {
-	return fuse.Fused{Candidate: recall.Candidate{
-		Key: recall.CandidateKey(recall.KindCategory, id), Kind: recall.KindCategory, Code: id, Label: label,
+func weakLeaf(id, label, parentID, parentLabel string) recall.Candidate {
+	return recall.Candidate{
+		Code: id, Label: label,
 		CategoryIDs: []string{id}, CategoryLevel: 3, ParentID: parentID, ParentLabel: parentLabel,
 		MatchedBy: label, Quality: recall.Weak,
-	}}
+	}
 }
 
 func TestResolveV2_FacetDominantGroupSkipsGroupQuestion(t *testing.T) {
 	uc := v2UC(facetTree(), nil)
-	pool := []fuse.Fused{
+	pool := []recall.Candidate{
 		weakLeaf("2008", "豬肉", "200", "豬肉"), weakLeaf("2257", "生鮮豬肉", "200", "豬肉"),
 		weakLeaf("2301", "豬里肌", "200", "豬肉"), weakLeaf("2302", "豬五花", "200", "豬肉"),
 		weakLeaf("2011", "雞肉", "210", "雞肉"),
@@ -162,18 +161,18 @@ func TestResolveV2_FacetBalancedGroupsAskGroupCard(t *testing.T) {
 	require.ElementsMatch(t, []string{"category-200", "category-210"}, optionIDs(got.Candidates))
 }
 
-func llmL2(id, label string) fuse.Fused {
-	return fuse.Fused{Candidate: recall.Candidate{
-		Key: recall.CandidateKey(recall.KindCategory, id), Kind: recall.KindCategory, Code: id, Label: label,
+func llmL2(id, label string) recall.Candidate {
+	return recall.Candidate{
+		Code: id, Label: label,
 		CategoryLevel: 2, MatchedBy: label, Quality: recall.Weak,
-	}, Sources: []string{"llm"}}
+	}
 }
 
 func TestCategoryCard_LLMMultipleGroupsAskGroupCardWithoutExpanding(t *testing.T) {
 	model := &categorySuggestFake{}
 	uc := v2UC(v2CategoryTree(), model)
 
-	got, err := uc.categoryCard(context.Background(), "臺灣豬五花", []fuse.Fused{llmL2("200", "豬肉"), llmL2("210", "雞肉")})
+	got, err := uc.categoryCard(context.Background(), "臺灣豬五花", []recall.Candidate{llmL2("200", "豬肉"), llmL2("210", "雞肉")})
 
 	require.NoError(t, err)
 	require.True(t, got.NeedsDisambiguation, "%+v", got)
@@ -189,7 +188,7 @@ func TestCategoryCard_LLMSingleGroupExpandsToItemCard(t *testing.T) {
 	model := &categorySuggestFake{idsByStage: map[string][]string{"ITEM": {"2257"}}}
 	uc := v2UC(v2CategoryTree(), model)
 
-	got, err := uc.categoryCard(context.Background(), "臺灣豬五花", []fuse.Fused{llmL2("200", "豬肉")})
+	got, err := uc.categoryCard(context.Background(), "臺灣豬五花", []recall.Candidate{llmL2("200", "豬肉")})
 
 	require.NoError(t, err)
 	require.True(t, got.NeedsDisambiguation, "%+v", got)
@@ -206,7 +205,7 @@ func TestCategoryCard_LLMSingleChildGroupSkipsItemCall(t *testing.T) {
 	model := &categorySuggestFake{}
 	uc := v2UC(v2CategoryTree(), model)
 
-	got, err := uc.categoryCard(context.Background(), "在來米", []fuse.Fused{llmL2("220", "米")})
+	got, err := uc.categoryCard(context.Background(), "在來米", []recall.Candidate{llmL2("220", "米")})
 
 	require.NoError(t, err)
 	require.True(t, got.NeedsDisambiguation, "%+v", got)
@@ -220,7 +219,7 @@ func TestCategoryCard_LLMGroupWithNoUsableChildIsEscapeWithoutConfirmedCategory(
 	model := &categorySuggestFake{idsByStage: map[string][]string{"ITEM": nil}}
 	uc := v2UC(v2CategoryTree(), model)
 
-	got, err := uc.categoryCard(context.Background(), "臺灣豬五花", []fuse.Fused{llmL2("200", "豬肉")})
+	got, err := uc.categoryCard(context.Background(), "臺灣豬五花", []recall.Candidate{llmL2("200", "豬肉")})
 
 	require.NoError(t, err)
 	require.True(t, got.Unavailable, "%+v", got)
@@ -230,10 +229,10 @@ func TestCategoryCard_LLMGroupWithNoUsableChildIsEscapeWithoutConfirmedCategory(
 
 func TestCategoryCard_LLMGroupCorroboratesExistingLeavesWithoutDoubleCounting(t *testing.T) {
 	uc := v2UC(v2CategoryTree(), &categorySuggestFake{})
-	porkLeaf := fuse.Fused{Candidate: recall.Candidate{Key: "CATEGORY|2008", Kind: recall.KindCategory, Code: "2008", Label: "豬肉", CategoryIDs: []string{"2008"}, CategoryLevel: 3, ParentID: "200", ParentLabel: "豬肉", Quality: recall.Weak}}
-	chickenLeaf := fuse.Fused{Candidate: recall.Candidate{Key: "CATEGORY|2011", Kind: recall.KindCategory, Code: "2011", Label: "雞肉", CategoryIDs: []string{"2011"}, CategoryLevel: 3, ParentID: "210", ParentLabel: "雞肉", Quality: recall.Weak}}
+	porkLeaf := recall.Candidate{Code: "2008", Label: "豬肉", CategoryIDs: []string{"2008"}, CategoryLevel: 3, ParentID: "200", ParentLabel: "豬肉", Quality: recall.Weak}
+	chickenLeaf := recall.Candidate{Code: "2011", Label: "雞肉", CategoryIDs: []string{"2011"}, CategoryLevel: 3, ParentID: "210", ParentLabel: "雞肉", Quality: recall.Weak}
 
-	got, err := uc.categoryCard(context.Background(), "肉", []fuse.Fused{porkLeaf, llmL2("200", "豬肉"), chickenLeaf})
+	got, err := uc.categoryCard(context.Background(), "肉", []recall.Candidate{porkLeaf, llmL2("200", "豬肉"), chickenLeaf})
 
 	require.NoError(t, err)
 	require.Equal(t, domain.CropSelectionGroup, got.Selection.Stage)
@@ -271,20 +270,19 @@ func TestResolveV2_RiceSynonymAsksBetweenRiceAndLychee(t *testing.T) {
 
 func TestNarrowToGroup_KeepsOnlyCandidatesUnderThatL2(t *testing.T) {
 	uc := v2UC(facetTree(), nil)
-	pork := fuse.Fused{Candidate: recall.Candidate{Key: "CATEGORY|2008", Kind: recall.KindCategory, Code: "2008", Label: "豬肉", CategoryIDs: []string{"2008"}, CategoryLevel: 3, ParentID: "200"}}
-	chicken := fuse.Fused{Candidate: recall.Candidate{Key: "CATEGORY|2011", Kind: recall.KindCategory, Code: "2011", Label: "雞肉", CategoryIDs: []string{"2011"}, CategoryLevel: 3, ParentID: "210"}}
-	porkLoin := fuse.Fused{Candidate: recall.Candidate{Key: "CATEGORY|2301", Kind: recall.KindCategory, Code: "2301", Label: "豬里肌", CategoryIDs: []string{"2301"}, CategoryLevel: 3, ParentID: "200"}}
-	orphan := fuse.Fused{Candidate: recall.Candidate{Key: "CATEGORY|9999", Kind: recall.KindCategory, Code: "9999", Label: "不在樹裡"}}
+	pork := recall.Candidate{Code: "2008", Label: "豬肉", CategoryIDs: []string{"2008"}, CategoryLevel: 3, ParentID: "200"}
+	chicken := recall.Candidate{Code: "2011", Label: "雞肉", CategoryIDs: []string{"2011"}, CategoryLevel: 3, ParentID: "210"}
+	porkLoin := recall.Candidate{Code: "2301", Label: "豬里肌", CategoryIDs: []string{"2301"}, CategoryLevel: 3, ParentID: "200"}
+	orphan := recall.Candidate{Code: "9999", Label: "不在樹裡"}
 
-	got := uc.narrowToGroup(context.Background(), []fuse.Fused{pork, chicken, porkLoin, orphan}, "200")
+	got := uc.narrowToGroup(context.Background(), []recall.Candidate{pork, chicken, porkLoin, orphan}, "200")
 
 	require.Len(t, got, 2)
-	require.Equal(t, []string{"CATEGORY|2008", "CATEGORY|2301"}, []string{got[0].Key, got[1].Key})
+	require.Equal(t, []string{"2008", "2301"}, []string{got[0].Code, got[1].Code})
 }
 
 func TestUnexpandedGroup_IsAWeakLevelTwoCandidate(t *testing.T) {
 	got := unexpandedGroup(cropCategory{ID: "200", Label: "豬肉", Level: 2})
-	require.Equal(t, recall.KindCategory, got.Kind)
 	require.Equal(t, "200", got.Code)
 	require.Equal(t, 2, got.CategoryLevel)
 	require.Equal(t, recall.Weak, got.Quality)

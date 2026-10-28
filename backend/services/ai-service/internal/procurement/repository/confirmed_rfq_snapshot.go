@@ -32,46 +32,43 @@ var ErrConfirmedRfqSnapshotIdempotencyConflict = errors.New("procurement: idempo
 // PricePreviewID／PricePreviewVersion 記錄確認的是哪一版試算；CanonicalPayloadJSON 是
 // 確認當下的完整定案內容快照，見 schema procurement.sql 的表註解。
 type ConfirmedRfqSnapshot struct {
-	ID                    int64
-	BuyerID               identity.BuyerID
-	RequestID             int64
-	RequestRevisionID     int64
-	PricePreviewID        int64
-	PricePreviewVersion   int64
-	QualityKnowledgeState string
-	CanonicalPayloadJSON  json.RawMessage
-	PayloadHash           string
-	ClientRequestID       string
-	ExpiresAt             time.Time
-	CreatedAt             time.Time
+	ID                   int64
+	BuyerID              identity.BuyerID
+	RequestID            int64
+	RequestRevisionID    int64
+	PricePreviewID       int64
+	PricePreviewVersion  int64
+	CanonicalPayloadJSON json.RawMessage
+	PayloadHash          string
+	ClientRequestID      string
+	ExpiresAt            time.Time
+	CreatedAt            time.Time
 }
 
 // InsertConfirmedRfqSnapshotInput 是一次確認寫入的完整輸入。
 type InsertConfirmedRfqSnapshotInput struct {
-	BuyerID               identity.BuyerID
-	RequestID             int64
-	RequestRevisionID     int64
-	PricePreviewID        int64
-	PricePreviewVersion   int64
-	QualityKnowledgeState string
-	CanonicalPayloadJSON  json.RawMessage
-	PayloadHash           string
-	ClientRequestID       string
-	ExpiresAt             time.Time
+	BuyerID              identity.BuyerID
+	RequestID            int64
+	RequestRevisionID    int64
+	PricePreviewID       int64
+	PricePreviewVersion  int64
+	CanonicalPayloadJSON json.RawMessage
+	PayloadHash          string
+	ClientRequestID      string
+	ExpiresAt            time.Time
 }
 
 func toConfirmedRfqSnapshotEntity(row gen.ProcurementConfirmedRfqSnapshot) ConfirmedRfqSnapshot {
 	return ConfirmedRfqSnapshot{
 		ID: row.ID, BuyerID: identity.BuyerID(row.BuyerID), RequestID: row.RequestID,
-		RequestRevisionID:     row.RequestRevisionID,
-		PricePreviewID:        row.PricePreviewID,
-		PricePreviewVersion:   row.PricePreviewVersion,
-		QualityKnowledgeState: row.QualityKnowledgeState,
-		CanonicalPayloadJSON:  row.CanonicalPayloadJson,
-		PayloadHash:           row.PayloadHash,
-		ClientRequestID:       row.ClientRequestID,
-		ExpiresAt:             row.ExpiresAt.Time,
-		CreatedAt:             row.CreatedAt.Time,
+		RequestRevisionID:    row.RequestRevisionID,
+		PricePreviewID:       row.PricePreviewID,
+		PricePreviewVersion:  row.PricePreviewVersion,
+		CanonicalPayloadJSON: row.CanonicalPayloadJson,
+		PayloadHash:          row.PayloadHash,
+		ClientRequestID:      row.ClientRequestID,
+		ExpiresAt:            row.ExpiresAt.Time,
+		CreatedAt:            row.CreatedAt.Time,
 	}
 }
 
@@ -88,14 +85,13 @@ func (r *Repo) InsertConfirmedRfqSnapshot(ctx context.Context, in InsertConfirme
 	id := r.newID()
 	row, err := r.q(ctx).InsertConfirmedRfqSnapshot(ctx, gen.InsertConfirmedRfqSnapshotParams{
 		ID: id, BuyerID: int64(in.BuyerID), RequestID: in.RequestID,
-		RequestRevisionID:     in.RequestRevisionID,
-		PricePreviewID:        in.PricePreviewID,
-		PricePreviewVersion:   in.PricePreviewVersion,
-		QualityKnowledgeState: in.QualityKnowledgeState,
-		CanonicalPayloadJson:  in.CanonicalPayloadJSON,
-		PayloadHash:           in.PayloadHash,
-		ClientRequestID:       in.ClientRequestID,
-		ExpiresAt:             timestamptzParam(in.ExpiresAt),
+		RequestRevisionID:    in.RequestRevisionID,
+		PricePreviewID:       in.PricePreviewID,
+		PricePreviewVersion:  in.PricePreviewVersion,
+		CanonicalPayloadJson: in.CanonicalPayloadJSON,
+		PayloadHash:          in.PayloadHash,
+		ClientRequestID:      in.ClientRequestID,
+		ExpiresAt:            timestamptzParam(in.ExpiresAt),
 	})
 	if err != nil {
 		return ConfirmedRfqSnapshot{}, err

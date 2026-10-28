@@ -57,7 +57,6 @@ Map<String, dynamic> _cvsRow(
   String status = '4303',
 }) => {
   'shippingType': '3651',
-  'goodsType': goods,
   'enabled': 'true',
   'payuniSubmitStatus': status,
   'onboardingId': 'ob-$goods',
@@ -371,20 +370,6 @@ void main() {
     expect(locked.absorbing, isTrue);
     expect(_enabled(tester, '聯絡人姓名'), isFalse);
     expect(find.text('開通黑貓物流'), findsNothing);
-  });
-
-  testWidgets('7-11 兩筆紀錄時常溫優先', (tester) async {
-    await _pump(
-      tester,
-      rows: [
-        _cvsRow('3203', name: '冷凍人', phone: '0922222222'),
-        _cvsRow('3201', name: '常溫人', phone: '0911111111'),
-      ],
-      store: _store(),
-    );
-
-    expect(_text(tester, '退貨人姓名'), '常溫人');
-    expect(_text(tester, '退貨手機'), '0911111111');
   });
 
   testWidgets('7-11 姓名依顯示長度即時提示', (tester) async {

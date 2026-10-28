@@ -151,7 +151,6 @@ Map<String, dynamic> _$SellerFacingPublicationToJson(
 
 _SellerFacingPayload _$SellerFacingPayloadFromJson(Map<String, dynamic> json) =>
     _SellerFacingPayload(
-      qualityKnowledgeState: json['qualityKnowledgeState'] as String? ?? '',
       item: json['item'] as String? ?? '',
       itemLabel: json['itemLabel'] as String? ?? '',
       quantity: json['quantity'] as String? ?? '',
@@ -166,7 +165,6 @@ _SellerFacingPayload _$SellerFacingPayloadFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$SellerFacingPayloadToJson(
   _SellerFacingPayload instance,
 ) => <String, dynamic>{
-  'qualityKnowledgeState': instance.qualityKnowledgeState,
   'item': instance.item,
   'itemLabel': instance.itemLabel,
   'quantity': instance.quantity,

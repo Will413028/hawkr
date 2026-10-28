@@ -24,7 +24,7 @@ void main() {
   );
 
   group('SpecData shipping methods', () {
-    test('every submitted shipping method carries the ambient temperature', () {
+    test('submitted shipping methods do not carry a temperature', () {
       final json = SpecData(
         grade: '大顆裝',
         price: 300,
@@ -41,7 +41,6 @@ void main() {
       final methods = json['shippingMethods'] as List;
       expect(methods.single, {
         'type': '3651',
-        'temperature': '3201',
         'feePayer': '3101',
         'freeThreshold': '0',
       });

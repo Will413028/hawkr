@@ -142,7 +142,6 @@ const RFQ_BODY = {
 	code: 0,
 	message: "success",
 	data: {
-		qualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
 		// 白名單第 13 欄：正式送出時原樣帶回去做 version-only CAS。
 		publicationVersion: "7",
 		item: "LETTUCE",

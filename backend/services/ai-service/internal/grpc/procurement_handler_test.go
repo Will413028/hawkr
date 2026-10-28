@@ -554,7 +554,8 @@ func TestPreviewRfqPriceErrorStatus_MapsTypedUsecaseErrors(t *testing.T) {
 		wantCode   codes.Code
 		wantReason string
 	}{
-		{"price basis unavailable", pricing.ErrPriceBasisUnavailable, codes.FailedPrecondition, "PRICE_BASIS_UNAVAILABLE"},
+		{"buyer requested range required", pricing.ErrBuyerRequestedRangeRequired, codes.FailedPrecondition, "BUYER_REQUESTED_RANGE_REQUIRED"},
+		{"quantity unit unconvertible", pricing.ErrQuantityUnitUnconvertible, codes.FailedPrecondition, "QUANTITY_UNIT_UNCONVERTIBLE"},
 		{"stale revision", pricing.ErrStalePricePreviewRevision, codes.Aborted, "STALE_REVISION"},
 		{"not found falls through to default mapping", repository.ErrNotFound, codes.NotFound, "REQUEST_NOT_FOUND"},
 	}
@@ -723,8 +724,7 @@ func TestToRfqPricePreviewResponseProto_CarriesQuoteTotal(t *testing.T) {
 			Currency: "TWD", LowerBoundAmount: "32500", UpperBoundAmount: "42500",
 			Quantity: "50", QuantityUnit: "KG",
 		},
-		QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
-		PayloadHash:           "jkl",
+		PayloadHash: "jkl",
 	}
 	resp := toRfqPricePreviewResponseProto(result)
 
@@ -736,8 +736,8 @@ func TestToRfqPricePreviewResponseProto_CarriesQuoteTotal(t *testing.T) {
 		total.GetQuantity() != "50" || total.GetQuantityUnit() != "KG" || total.GetCurrency() != "TWD" {
 		t.Errorf("QuoteTotalRange = %+v, want {TWD 32500 42500 50 KG}", total)
 	}
-	if resp.GetQualityKnowledgeState() != "BUYER_QUALITY_UNKNOWN" || resp.GetPayloadHash() != "jkl" {
-		t.Errorf("QualityKnowledgeState/PayloadHash = %q/%q", resp.GetQualityKnowledgeState(), resp.GetPayloadHash())
+	if resp.GetPayloadHash() != "jkl" {
+		t.Errorf("PayloadHash = %q", resp.GetPayloadHash())
 	}
 }
 
@@ -1326,7 +1326,6 @@ func TestExecuteRfqPublicationErrorStatus_MapsTypedErrors(t *testing.T) {
 		{"approval stale", commerce.ErrApprovalStale, codes.Aborted, "APPROVAL_STALE"},
 		{"revision stale", commerce.ErrRevisionStale, codes.Aborted, "STALE_REVISION"},
 		{"payload hash mismatch", commerce.ErrPayloadHashMismatch, codes.Aborted, "APPROVAL_STALE"},
-		{"price basis unavailable", pricing.ErrPriceBasisUnavailable, codes.FailedPrecondition, "PRICE_BASIS_UNAVAILABLE"},
 		{"approval expired", commerce.ErrApprovalExpired, codes.Aborted, "APPROVAL_STALE"},
 		{"idempotency conflict", repository.ErrPublicationCommandConflict, codes.Aborted, "IDEMPOTENCY_KEY_CONFLICT"},
 		{"unknown audience mode", commerce.ErrUnknownAudienceMode, codes.Internal, "INTERNAL_ERROR"},

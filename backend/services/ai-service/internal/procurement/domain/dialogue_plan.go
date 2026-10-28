@@ -17,7 +17,6 @@ const (
 	ActRequestBasicsReady          ActCode = "REQUEST_BASICS_READY"
 	ActPricePreviewAvailable       ActCode = "PRICE_PREVIEW_AVAILABLE"
 	ActNoReferenceNeedsBuyerRange  ActCode = "NO_REFERENCE_NEEDS_BUYER_RANGE" // Phase 1 不可達：見 spec §3.4（#2403 端點零持久化）
-	ActPriceBasisUnavailable       ActCode = "PRICE_BASIS_UNAVAILABLE"        // Phase 1 不可達：同上
 	ActRfqReconfirmRequired        ActCode = "RFQ_RECONFIRM_REQUIRED"
 	ActRfqConfirmed                ActCode = "RFQ_CONFIRMED" // Phase 1 不可達：見 dialogue_planner.go selectActCode 的 ruling（readinessGate 一旦達到 RFQ_CONFIRMATION_READY 立刻前進到 PUBLICATION_READY，取代成 PublicationApprovalRequired）
 	ActPublicationApprovalRequired ActCode = "PUBLICATION_APPROVAL_REQUIRED"
@@ -26,18 +25,18 @@ const (
 	ActNoCandidatesOfferWishPool   ActCode = "NO_CANDIDATES_OFFER_WISH_POOL" // 同上
 	ActSellerResponsesReady        ActCode = "SELLER_RESPONSES_READY"        // 同上（#2538/#2539 未開工）
 	ActExactAcceptanceConfirmed    ActCode = "EXACT_ACCEPTANCE_CONFIRMED"    // 同上
-	// ActItemNeedsDisambiguation 是 issue #2549 §B 原始 17 值清單之外的第 18 個
-	// 值——核准依據是 PM 2026-08-23 的產品需求（品項須落在平台分類樹），
+	// ActItemNeedsDisambiguation 是 issue #2549 §B 原始清單之外的值，
+	// 核准依據是 PM 2026-08-23 的產品需求（品項須落在平台分類樹），
 	// 不是 #2549 原始範圍。
 	ActItemNeedsDisambiguation ActCode = "ITEM_NEEDS_DISAMBIGUATION"
 )
 
-// AllActCodes 是完整 18 值，供 dialogue_templates.go 的安全網測試窮舉
+// AllActCodes 是完整 17 值，供 dialogue_templates.go 的安全網測試窮舉
 // （RenderPlan 對任一值都不能 panic／回空字串）。
 var AllActCodes = []ActCode{
 	ActAckAndAskRequired, ActAckAndAskOptional, ActCorrectionApplied,
 	ActInputRejected, ActExtractionDegraded, ActRequestBasicsReady,
-	ActPricePreviewAvailable, ActNoReferenceNeedsBuyerRange, ActPriceBasisUnavailable,
+	ActPricePreviewAvailable, ActNoReferenceNeedsBuyerRange,
 	ActRfqReconfirmRequired, ActRfqConfirmed, ActPublicationApprovalRequired,
 	ActSearchRunAccepted, ActCandidatesReady, ActNoCandidatesOfferWishPool,
 	ActSellerResponsesReady, ActExactAcceptanceConfirmed, ActItemNeedsDisambiguation,

@@ -159,7 +159,6 @@ abstract class SellerFacingPublication with _$SellerFacingPublication {
 @freezed
 abstract class SellerFacingPayload with _$SellerFacingPayload {
   const factory SellerFacingPayload({
-    @Default('') String qualityKnowledgeState,
     @Default('') String item,
     @Default('') String itemLabel,
     @Default('') String quantity,
@@ -176,8 +175,6 @@ abstract class SellerFacingPayload with _$SellerFacingPayload {
 
   factory SellerFacingPayload.fromJson(Map<String, dynamic> json) =>
       _$SellerFacingPayloadFromJson(json);
-
-  bool get hasQualityKnowledge => qualityKnowledgeState.trim().isNotEmpty;
 
   bool get hasBuyerNote => buyerNote.trim().isNotEmpty;
 

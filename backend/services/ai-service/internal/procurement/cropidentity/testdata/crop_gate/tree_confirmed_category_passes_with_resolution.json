@@ -26,8 +26,7 @@
     "resolution": {
       "kind": "CATEGORY_CONFIRMED",
       "label": "五花肉",
-      "category_id": "24",
-      "provenance": "BUYER_CHOICE"
+      "category_id": "24"
     },
     "evaluated": true,
     "factsAsOfSet": true

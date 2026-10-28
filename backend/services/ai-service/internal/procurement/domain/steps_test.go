@@ -12,13 +12,10 @@ func TestStepLabels_CoversAllStepCodes(t *testing.T) {
 	allCodes := []StepCode{
 		StepUnderstandInput, StepExtractSlots, StepValidateSlots, StepCropGate, StepSlotsRejected,
 		StepPickNextQuestion, StepRequirementReady, StepSearchCandidates, StepSearchPlatform,
-		StepSearchExternal, StepReadSeller, StepCompare, StepVerifyCert, StepVerifyOrigin,
+		StepSearchExternal, StepReadSeller, StepCompare, StepVerifyOrigin,
 		StepCheckStock, StepRankCandidates, StepSummarize, StepDegradedFallback,
 	}
-	// 18 碼：原 17 碼 − FAILED（T23 移到 status 軸）＋ SEARCH_CANDIDATES（T23 父列）
-	// ＋ CROP_GATE（這份列表原本漏了它，const 與 StepLabels 一直都有——「防呆」
-	// 的數字本身曾經失效過，這次一併補回）。
-	require.Len(t, allCodes, 18, "白名單應為 18 碼——這個數字本身也是防呆：新增/刪除 code 卻忘記更新這份列表會在這裡先炸")
+	require.Len(t, allCodes, 17, "白名單應為 17 碼——這個數字本身也是防呆：新增/刪除 code 卻忘記更新這份列表會在這裡先炸")
 	require.Len(t, StepLabels, len(allCodes), "StepLabels 不得有這份列表之外的成員——否則刪 code 忘了刪 label 不會被上面那條抓到")
 	for _, code := range allCodes {
 		require.NotEmpty(t, StepLabels[code], "StepCode %q 缺少對應的 label", code)
@@ -263,7 +260,7 @@ func TestCandidateSearchRailPlan_ShapeAndNesting(t *testing.T) {
 
 // TestCandidateSearchRailPlan_OmitsStepsWithNoRealWork 是本輪最重要的一條防線：
 // usecase.CandidateSearchUseCase.run 全部的工作是 claim → 兩條 lane 併發 →
-// finalize，這 6 碼命名的工作在碼上完全不存在（沒有逐家讀賣家、規格比對、
+// finalize，這 5 碼命名的工作在碼上完全不存在（沒有逐家讀賣家、規格比對、
 // 履歷／產地／供應量查核；排序是在各 lane 的 Search 內部做完的，不是跨 lane
 // 的獨立階段）。把它們排進 rail 等於替買家編造進度——doc57 §1.1 evidence
 // contract 擋的正是這件事。
@@ -276,7 +273,7 @@ func TestCandidateSearchRailPlan_OmitsStepsWithNoRealWork(t *testing.T) {
 		inPlan[row.Code] = true
 	}
 	for _, code := range []StepCode{
-		StepReadSeller, StepCompare, StepVerifyCert,
+		StepReadSeller, StepCompare,
 		StepVerifyOrigin, StepCheckStock, StepRankCandidates,
 	} {
 		require.False(t, inPlan[code],

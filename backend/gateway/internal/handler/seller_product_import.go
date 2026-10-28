@@ -87,8 +87,7 @@ type UpdateSkuInputDTO struct {
 
 // ShippingMethodInputDTO 編輯 SKU 用的運送方式（sku 層無 freeThreshold）
 type ShippingMethodInputDTO struct {
-	Method      string `json:"method"`      // ShippingMethod value
-	Temperature string `json:"temperature"` // ShippingTemperature value
+	Method string `json:"method"` // ShippingMethod value
 }
 
 // CertificationInputDTO 認證輸入
@@ -130,7 +129,6 @@ type BatchUpdateItemsShippingRequest struct {
 // BatchShippingMethodInputDTO 批次設定運送的單一方式（含 freeThreshold）
 type BatchShippingMethodInputDTO struct {
 	Type          string `json:"type"`          // ShippingMethod value
-	Temperature   string `json:"temperature"`   // ShippingTemperature value
 	FreeThreshold string `json:"freeThreshold"` // 空 = 不免運；"0" = 永遠免運；正整數 = 滿 X 元免運
 }
 
@@ -277,10 +275,9 @@ type CertificationDTOResponse struct {
 }
 
 // ImportShippingMethodResponse 運送方式（import sku 層；與 product.ShippingMethodResponse 區別：
-// import 階段尚未確定 fee_payer / free_threshold，僅展示 method+temperature 配對）
+// import 階段尚未確定 fee_payer / free_threshold，僅展示 method）
 type ImportShippingMethodResponse struct {
-	Method      string `json:"method"`
-	Temperature string `json:"temperature"`
+	Method string `json:"method"`
 }
 
 // ImportItemSkuResponse SKU
@@ -641,10 +638,7 @@ func convertShippingMethods(list []*pb.ShippingMethodDto) []ImportShippingMethod
 		if m == nil {
 			continue
 		}
-		result = append(result, ImportShippingMethodResponse{
-			Method:      m.GetMethod(),
-			Temperature: m.GetTemperature(),
-		})
+		result = append(result, ImportShippingMethodResponse{Method: m.GetMethod()})
 	}
 	return result
 }
@@ -842,7 +836,7 @@ func toPbCertifications(list []CertificationInputDTO) []*pb.CertificationDto {
 func toPbShippingMethods(list []ShippingMethodInputDTO) []*pb.ShippingMethodDto {
 	result := make([]*pb.ShippingMethodDto, 0, len(list))
 	for _, m := range list {
-		result = append(result, &pb.ShippingMethodDto{Method: m.Method, Temperature: m.Temperature})
+		result = append(result, &pb.ShippingMethodDto{Method: m.Method, Temperature: ambientShippingTemperature})
 	}
 	return result
 }
@@ -887,7 +881,7 @@ func toPbBatchShippingMethods(list []BatchShippingMethodInputDTO) []*pb.Shipping
 	for _, m := range list {
 		result = append(result, &pb.ShippingMethodInput{
 			Type:          m.Type,
-			Temperature:   m.Temperature,
+			Temperature:   ambientShippingTemperature,
 			FreeThreshold: m.FreeThreshold,
 		})
 	}

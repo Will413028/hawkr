@@ -208,7 +208,6 @@ class SellerQuoteRepository {
   static SellerFacingPayload _parseSellerFacingPayload(dynamic raw) {
     if (raw is! Map) return const SellerFacingPayload();
     return SellerFacingPayload(
-      qualityKnowledgeState: _string(raw['qualityKnowledgeState']),
       item: _string(raw['item']),
       itemLabel: _string(raw['itemLabel']),
       quantity: _string(raw['quantity']),

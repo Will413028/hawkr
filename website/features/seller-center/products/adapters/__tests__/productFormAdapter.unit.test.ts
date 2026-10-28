@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { __setEnvForTest, getEnv } from "@/lib/config/env";
 import type { SellerProductDetail } from "@/lib/products/seller-repo";
-import { AMBIENT_TEMPERATURE_CODE } from "@/lib/seller/ambient-temperature";
 import {
 	applyAiPatch,
 	applyImagesUpdate,
@@ -62,10 +61,8 @@ describe("shipping methods per carrier", () => {
 		const sent = (body.skus?.[0] as { shippingMethods: unknown[] })
 			.shippingMethods;
 		expect(sent).toHaveLength(1);
-		expect(sent[0]).toMatchObject({
-			type: "3001",
-			temperature: AMBIENT_TEMPERATURE_CODE,
-		});
+		expect(sent[0]).toMatchObject({ type: "3001" });
+		expect(sent[0]).not.toHaveProperty("temperature");
 	});
 });
 

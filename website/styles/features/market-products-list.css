@@ -389,7 +389,7 @@ details.market-list-sidebar__section:not([open]) > summary {
 	letter-spacing: 0;
 }
 /* Caret matches the section-header summary chevron exactly so the
- * category row sits flush with the temperature / price / origin rows
+ * category row sits flush with the price rows
  * below it in the rhythm. Same rotation contract as
  * `.market-list-sidebar__section > summary::after`:
  *   default → -135deg (up, "click to open")

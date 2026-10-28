@@ -887,8 +887,6 @@ export function upsertCategoryNode(
 export interface ShippingQuoteOption {
 	/** ShippingMethod value ("3001" 黑貓 / "3002" 7-11)。 */
 	shippingMethod: string;
-	/** ShippingTemperature value ("3201"/"3202"/"3203")。 */
-	temperature: string;
 	/** Carrier display name from the backend ("黑貓宅急便"…)。 */
 	displayName: string;
 	/** 運費（新台幣元字串）。 */
@@ -898,7 +896,6 @@ export interface ShippingQuoteOption {
 }
 
 export interface ShippingQuoteResult {
-	availableTemperatures: Array<{ temperature: string; displayName?: string }>;
 	shippingOptions: ShippingQuoteOption[];
 }
 
@@ -914,7 +911,7 @@ export interface ShippingQuoteInput {
 
 /**
  * `POST /app/shipping_quotes` — given package dimensions + weight, the backend
- * returns the carrier × 溫層 combinations that fit (per-carrier size / weight
+ * returns the carrier options that fit (per-carrier size / weight
  * limits) plus their fees. Drives the product form's 可配送方案 picker exactly
  * like the seller app's spec screen. Throws with the backend message on a 4xx
  * (e.g. 4301「所有配送方式都超過尺寸或重量限制」) so the UI can surface it.
@@ -922,51 +919,35 @@ export interface ShippingQuoteInput {
 export async function fetchShippingQuotes(
 	input: ShippingQuoteInput,
 ): Promise<ShippingQuoteResult> {
-	const env = await authedFetch<{
-		availableTemperatures?: unknown[];
-		shippingOptions?: unknown[];
-	}>("/app/shipping_quotes", {
-		method: "POST",
-		json: input,
-		throwOnHttpError: false,
-	});
-	const data = env.data as
-		| { availableTemperatures?: unknown[]; shippingOptions?: unknown[] }
-		| null
-		| undefined;
-	const temps = Array.isArray(data?.availableTemperatures)
-		? data.availableTemperatures
-		: [];
+	const env = await authedFetch<{ shippingOptions?: unknown[] }>(
+		"/app/shipping_quotes",
+		{
+			method: "POST",
+			json: input,
+			throwOnHttpError: false,
+		},
+	);
+	const data = env.data as { shippingOptions?: unknown[] } | null | undefined;
 	const opts = Array.isArray(data?.shippingOptions) ? data.shippingOptions : [];
-	if (temps.length === 0 && opts.length === 0) {
+	if (opts.length === 0) {
 		// No options → either a real backend error (surface its message) or an
 		// empty result for an out-of-range package.
 		const msg = env.message ?? env.msg;
 		if (msg) throw new Error(msg);
-		return { availableTemperatures: [], shippingOptions: [] };
+		return { shippingOptions: [] };
 	}
 	return {
-		availableTemperatures: temps
-			.map((t) => {
-				const r = (t ?? {}) as Record<string, unknown>;
-				return {
-					temperature: String(r.temperature ?? ""),
-					displayName: str(r.displayName) ?? str(r.label),
-				};
-			})
-			.filter((t) => t.temperature),
 		shippingOptions: opts
 			.map((o) => {
 				const r = (o ?? {}) as Record<string, unknown>;
 				return {
 					shippingMethod: String(r.shippingMethod ?? r.type ?? ""),
-					temperature: String(r.temperature ?? ""),
 					displayName: String(r.displayName ?? r.label ?? ""),
 					fee: String(r.fee ?? ""),
 					estimatedDays: String(r.estimatedDays ?? ""),
 				};
 			})
-			.filter((o) => o.shippingMethod && o.temperature),
+			.filter((o) => o.shippingMethod),
 	};
 }
 
@@ -988,7 +969,6 @@ export interface SkuWriteInput {
 	heightCm?: string;
 	shippingMethods?: Array<{
 		type: string;
-		temperature: string;
 		feePayer: string;
 		freeThreshold: string;
 	}>;

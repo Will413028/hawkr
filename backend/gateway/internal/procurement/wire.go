@@ -140,8 +140,6 @@ type ItemResolutionDTO struct {
 	Kind string `json:"kind"`
 	// 分類名稱（「甘藍-初秋」「甘藍」），BUYER_DESCRIBED 時為買家的描述。
 	Label string `json:"label,omitempty"`
-	// 目前只有 BUYER_CHOICE（買家在消歧卡上親自挑的）。
-	Provenance string `json:"provenance"`
 	// DisplayValue 是伺服器組好的顯示字串。前端不得自己用 kind＋label 重拼——
 	// recordedThisTurn 的 chip 用的就是同一個值，兩邊各拼一次會漂成兩套文案，
 	// 而它們在畫面上相鄰。
@@ -153,8 +151,7 @@ func itemResolutionFromProto(r *pb.ItemResolution) *ItemResolutionDTO {
 		return nil
 	}
 	out := &ItemResolutionDTO{
-		Kind: r.GetKind(), Label: r.GetLabel(),
-		Provenance: r.GetProvenance(), DisplayValue: r.GetDisplayValue(),
+		Kind: r.GetKind(), Label: r.GetLabel(), DisplayValue: r.GetDisplayValue(),
 	}
 	return out
 }

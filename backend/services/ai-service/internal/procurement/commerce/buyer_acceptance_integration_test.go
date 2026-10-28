@@ -54,11 +54,10 @@ func seedAcceptableSellerResponse(ctx context.Context, t *testing.T, pool *pgxpo
 	_, err = repo.InsertConfirmedRfqSnapshot(ctx, repository.InsertConfirmedRfqSnapshotInput{
 		BuyerID: acceptRaceBuyerID, RequestID: req.ID, RequestRevisionID: rev.ID,
 		PricePreviewID: 8001, PricePreviewVersion: 1,
-		QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
-		CanonicalPayloadJSON:  json.RawMessage(`{"item":"芭樂","quantity":100,"unit":"KG"}`),
-		PayloadHash:           acceptRaceSnapshotHash,
-		ClientRequestID:       "accept-race-snapshot",
-		ExpiresAt:             sellerResponseTestNow.Add(time.Hour),
+		CanonicalPayloadJSON: json.RawMessage(`{"item":"芭樂","quantity":100,"unit":"KG"}`),
+		PayloadHash:          acceptRaceSnapshotHash,
+		ClientRequestID:      "accept-race-snapshot",
+		ExpiresAt:            sellerResponseTestNow.Add(time.Hour),
 	})
 	require.NoError(t, err)
 

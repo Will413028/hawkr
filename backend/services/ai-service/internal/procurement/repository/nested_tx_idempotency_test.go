@@ -65,8 +65,8 @@ func nestedTxIdempotencySnapshotInput(clientRequestID string) InsertConfirmedRfq
 	return InsertConfirmedRfqSnapshotInput{
 		BuyerID: testBuyerID, RequestID: 1, RequestRevisionID: 1,
 		PricePreviewID: 1, PricePreviewVersion: 1,
-		QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN", CanonicalPayloadJSON: json.RawMessage(`{"item":"寶島梨"}`),
-		PayloadHash: "hash-snapshot", ClientRequestID: clientRequestID,
+		CanonicalPayloadJSON: json.RawMessage(`{"item":"寶島梨"}`),
+		PayloadHash:          "hash-snapshot", ClientRequestID: clientRequestID,
 		ExpiresAt: refTime().Add(24 * time.Hour),
 	}
 }
@@ -340,7 +340,6 @@ func TestInsertPricePreview_ReplaysInsideCallerTransaction(t *testing.T) {
 
 	in := InsertPricePreviewInput{
 		BuyerID: testBuyerID, RequestID: req.ID, RequestRevisionID: rev.ID,
-		QualityKnowledgeState:   "BUYER_QUALITY_UNKNOWN",
 		BuyerRequestedRangeJSON: json.RawMessage(`{"min":"80","max":"120"}`),
 		ClientRequestID:         "preview-key-nested",
 		PreviewInputHash:        "nested-input-hash",

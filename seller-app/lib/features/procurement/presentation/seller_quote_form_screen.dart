@@ -286,8 +286,6 @@ class _PublicationContextCard extends StatelessWidget {
             const SizedBox(height: HkSpace.sm),
             _BuyerNoteBlock(note: payload.buyerNote),
           ],
-          const SizedBox(height: HkSpace.sm),
-          _QualityKnowledgeNotice(payload: payload),
         ],
       ),
     );
@@ -297,8 +295,7 @@ class _PublicationContextCard extends StatelessWidget {
 /// 買家自己打的一段補充說明，原文照登。
 ///
 /// ⛔ 不進 contextFields：那是「標籤＋短值」的結構化事實，一段兩百字的自由文字
-/// 塞進 96px 標籤旁邊的 Expanded 會擠成一團。⛔ 也不是品相宣告——實際品相仍然
-/// 只能由賣家自己填，下面那張卡片講的話不因為這裡有字而改變。
+/// 塞進 96px 標籤旁邊的 Expanded 會擠成一團。⛔ 也不是品相宣告——實際品相只能由賣家自己填。
 class _BuyerNoteBlock extends StatelessWidget {
   const _BuyerNoteBlock({required this.note});
 
@@ -313,47 +310,6 @@ class _BuyerNoteBlock extends StatelessWidget {
         const SizedBox(height: HkSpace.xs),
         Text(note, style: AppTypography.meta),
       ],
-    );
-  }
-}
-
-/// 買家有沒有指定品相。
-///
-/// ⛔ 空字串是「未知」（這張詢價建立於本欄位加入之前），畫面照實說未知，
-/// **不補值也不推斷成「買家沒指定」**。不論哪一種，實際品相都必須由賣家自己填，
-/// 所以這張卡片直接把話講到底：不要自己假設一個等級去報價。
-class _QualityKnowledgeNotice extends StatelessWidget {
-  const _QualityKnowledgeNotice({required this.payload});
-
-  final SellerFacingPayload payload;
-
-  @override
-  Widget build(BuildContext context) {
-    final known = payload.hasQualityKnowledge;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(HkSpace.md),
-      decoration: BoxDecoration(
-        color: AppColors.infoSoft,
-        borderRadius: BorderRadius.circular(HkRadius.md),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            known ? '買家品相說明：${payload.qualityKnowledgeState}' : '買家品相說明：未知',
-            style: AppTypography.meta,
-          ),
-          const SizedBox(height: HkSpace.xs),
-          Text(
-            known
-                ? '這只是買家的說明。實際品相仍要由你自己填，下面兩欄不能省。'
-                : '這張詢價沒有買家的品相說明，平台也不會替你猜。'
-                      '不要自己假設一個等級去報價——實際品相請照這批貨的真實狀況填。',
-            style: AppTypography.metaMuted,
-          ),
-        ],
-      ),
     );
   }
 }

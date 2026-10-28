@@ -4,7 +4,6 @@ import {
 	draftToSubmitBody,
 	emptyDraft,
 } from "../features/seller-center/products/adapters/productFormAdapter";
-import { AMBIENT_TEMPERATURE_CODE } from "../lib/seller/ambient-temperature";
 
 test("product submit body keeps stock on create and omits it on edit", () => {
 	const draft = {
@@ -71,7 +70,6 @@ test("product submit body serialises categoryId and shipping methods camelCase",
 	assert.deepEqual(sku?.shippingMethods, [
 		{
 			type: "3001",
-			temperature: AMBIENT_TEMPERATURE_CODE,
 			feePayer: "3102",
 			freeThreshold: "500",
 		},
@@ -103,15 +101,13 @@ test("product submit body clears a threshold when the buyer pays shipping", () =
 	assert.deepEqual(draftToSubmitBody(draft).skus?.[0].shippingMethods, [
 		{
 			type: "3001",
-			temperature: AMBIENT_TEMPERATURE_CODE,
 			feePayer: "3101",
 			freeThreshold: "0",
 		},
 	]);
 });
 
-test("seller product submission always sends the ambient temperature code", () => {
-	assert.equal(AMBIENT_TEMPERATURE_CODE, "3201");
+test("seller product submission does not send a shipping temperature", () => {
 	const draft = {
 		...emptyDraft(),
 		name: "Test product",
@@ -133,6 +129,6 @@ test("seller product submission always sends the ambient temperature code", () =
 	const methods = draftToSubmitBody(draft).skus?.[0].shippingMethods ?? [];
 	assert.equal(methods.length, 2);
 	for (const method of methods) {
-		assert.equal(method.temperature, AMBIENT_TEMPERATURE_CODE);
+		assert.equal("temperature" in method, false);
 	}
 });

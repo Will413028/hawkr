@@ -49,7 +49,6 @@ type PublicationApproval struct {
 	PricePreviewPayloadHash string
 	PricePreviewInputHash   string
 
-	QualityKnowledgeState   string
 	BuyerRequestedRangeHash string
 
 	AudienceMode          string
@@ -90,7 +89,6 @@ type InsertPublicationApprovalInput struct {
 	PricePreviewPayloadHash string
 	PricePreviewInputHash   string
 
-	QualityKnowledgeState   string
 	BuyerRequestedRangeHash string
 
 	AudienceMode              string
@@ -131,7 +129,6 @@ func toPublicationApprovalEntity(row gen.ProcurementRfqPublicationApproval) Publ
 		PricePreviewPayloadHash: row.PricePreviewPayloadHash,
 		PricePreviewInputHash:   row.PricePreviewInputHash,
 
-		QualityKnowledgeState:   row.QualityKnowledgeState,
 		BuyerRequestedRangeHash: row.BuyerRequestedRangeHash,
 
 		AudienceMode:              row.AudienceMode,
@@ -198,7 +195,6 @@ func (r *Repo) InsertPublicationApproval(ctx context.Context, in InsertPublicati
 			PricePreviewPayloadHash: in.PricePreviewPayloadHash,
 			PricePreviewInputHash:   in.PricePreviewInputHash,
 
-			QualityKnowledgeState:   in.QualityKnowledgeState,
 			BuyerRequestedRangeHash: in.BuyerRequestedRangeHash,
 			ResponseDeadline:        dateParam(in.ResponseDeadline),
 

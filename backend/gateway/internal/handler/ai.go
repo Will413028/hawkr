@@ -1234,14 +1234,14 @@ func (h *Holder) ProxyProcurementRewind(c *gin.Context) {
 // @Description  依買家給的 `buyerRequestedRange` 算出這次 RFQ 詢價的價格預覽（含 `quoteTotalRange`）。
 // @Description  不建立 immutable RFQ confirmation、不通知任何供應商、除了寫入這筆 preview 本身沒有其他 side effect。
 // @Description
-// @Description  `buyerRequestedRange` 必填；缺少時回 422 `PRICE_BASIS_UNAVAILABLE`。Server 原樣回顯，不 clamp。
+// @Description  `buyerRequestedRange` 必填且須合法；缺少或不合法時回 422 `BUYER_REQUESTED_RANGE_REQUIRED`。Server 原樣回顯，不 clamp。
 // @Description
 // @Description  Idempotency：同一買家同一 `clientRequestId` 重送回同一筆既有結果（不重算）。
 // @Description
 // @Description  `quoteTotalRange` 是伺服器依本次單價範圍與需求數量算出的詢價總額區間；需求數量是選填 slot，
 // @Description  未填時為 `null`，client 應隱藏總額區塊而不是顯示 0。
 // @Description
-// @Description  422 `PRICE_BASIS_UNAVAILABLE`：currency/quantity/unit/conversion basis 無法 canonicalize 的 typed hard block，
+// @Description  422 `QUANTITY_UNIT_UNCONVERTIBLE`：需求已有數量與單位，但算不出 `quoteTotalRange`，
 // @Description  零 side effect、不建立 preview 列。
 // @Description
 // @Description  409 `STALE_REVISION`：`expectedRevisionId` 與目前的 active revision 不符（需求已被其他裝置改動），
@@ -1404,8 +1404,6 @@ func (h *Holder) ProxyProcurementRfqPublicationPreview(c *gin.Context) {
 // @Description  409 `APPROVAL_STALE`：`approvalId`／`approvalVersion` 對不上目前狀態（已被消費、已過期、
 // @Description  或 `payloadHash` 跟 preview 當時編譯出來的不一致），請重新呼叫 `/rfq-publications/preview`。
 // @Description  409 `STALE_REVISION`：`expectedRevisionId` 與目前的 active revision 不符，請重讀 snapshot 再送。
-// @Description  422 `PRICE_BASIS_UNAVAILABLE`：沿用 preview 既有的映射，核准當下已經擋過一次，
-// @Description  這裡是防禦性保留，理論上不會再被觸發。
 // @Description  500：伺服器狀態不一致（`audience_mode` 落在值域外，或冪等回放讀不到本該同一交易內
 // @Description  寫入的 publication），不是買家可修正的輸入問題，理論上不會被觸發。
 // @Tags         AI

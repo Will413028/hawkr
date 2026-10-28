@@ -10,18 +10,12 @@ const (
 	ItemResolvedBuyerDescribed ItemResolutionKind = "BUYER_DESCRIBED"
 )
 
-type ItemResolutionProvenance string
-
-const ItemResolutionByBuyerChoice ItemResolutionProvenance = "BUYER_CHOICE"
-
 type ItemResolution struct {
 	Kind ItemResolutionKind `json:"kind"`
 
 	Label string `json:"label,omitempty"`
 
 	CategoryID string `json:"category_id,omitempty"`
-
-	Provenance ItemResolutionProvenance `json:"provenance"`
 }
 
 func (r ItemResolution) DisplayValue() string {
@@ -51,9 +45,6 @@ func validateItemResolution(r ItemResolution) string {
 	default:
 		return "未知的品項解析類型"
 	}
-	if r.Provenance != ItemResolutionByBuyerChoice {
-		return "未知的品項解析來源"
-	}
 	return ""
 }
 
@@ -63,7 +54,7 @@ func NewCategoryConfirmedItemResolution(sel *CropSelection) *ItemResolution {
 	}
 	return &ItemResolution{
 		Kind: ItemResolvedCategoryConfirmed, Label: sel.Label,
-		CategoryID: sel.CategoryID, Provenance: ItemResolutionByBuyerChoice,
+		CategoryID: sel.CategoryID,
 	}
 }
 
@@ -77,10 +68,10 @@ func NewBuyerDescribedItemResolution(sel *CropSelection, description string) *It
 	if id, _ := sel.ConfirmedCategory(); id != "" {
 		return &ItemResolution{
 			Kind: ItemResolvedCategoryConfirmed, Label: description,
-			CategoryID: id, Provenance: ItemResolutionByBuyerChoice,
+			CategoryID: id,
 		}
 	}
 	return &ItemResolution{
-		Kind: ItemResolvedBuyerDescribed, Label: description, Provenance: ItemResolutionByBuyerChoice,
+		Kind: ItemResolvedBuyerDescribed, Label: description,
 	}
 }

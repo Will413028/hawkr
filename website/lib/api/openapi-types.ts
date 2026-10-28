@@ -174,8 +174,6 @@ export interface ProcurementItemResolution {
 	kind: "CATEGORY_CONFIRMED" | "BUYER_DESCRIBED";
 	/** 分類名稱（「甘藍-初秋」「甘藍」），BUYER_DESCRIBED 時為買家的描述。 */
 	label?: string;
-	/** 目前只有 BUYER_CHOICE＝買家在消歧卡上親自挑的（含自行描述）。 */
-	provenance: "BUYER_CHOICE";
 	/** 伺服器組好的顯示字串。**不要**自己用 kind＋label 重拼——recordedThisTurn
 	 *  的「品項分類」chip 用的就是這個值，兩邊各拼一次會漂成兩套文案，而它們在
 	 *  畫面上相鄰。 */

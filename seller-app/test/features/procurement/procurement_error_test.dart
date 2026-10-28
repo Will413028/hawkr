@@ -162,9 +162,8 @@ void main() {
   });
 
   group('產品規則 3：賣家端不得出現買家預算、PII、他人報價與排序', () {
-    test('需求內容的型別就是十欄，是 deny-by-default 的那道防線', () {
+    test('需求內容的型別就是九欄，是 deny-by-default 的那道防線', () {
       const payload = SellerFacingPayload(
-        qualityKnowledgeState: 'BUYER_SPECIFIED',
         item: '高麗菜',
         itemLabel: '梨山高麗菜',
         quantity: '200',
@@ -175,7 +174,6 @@ void main() {
         responseDeadline: '2026-09-18',
       );
       expect(payload.toJson().keys.toList(), <String>[
-        'qualityKnowledgeState',
         'item',
         'itemLabel',
         'quantity',
@@ -188,19 +186,15 @@ void main() {
       ]);
     });
 
-    // ⛔ 只有這兩個鍵獲准帶上面那些片語，其餘一律視為漏擋。
+    // ⛔ 只有這個鍵獲准帶上面那些片語，其餘一律視為漏擋。
     //
-    // `qualityKnowledgeState` 是「買家知不知道品相」的宣告，不是品相本身。
     // `buyerNote` 是買家自己打字、明知會給供應商看的補充說明（backend #3410）
     // ——它是**唯一**一個帶「buyer」而仍然該出現在賣家視野裡的鍵，因為它的內容
     // 就是買家寫給賣家的。買家私有的 budgetPerUnit／buyerRequestedRange 仍然
     // 一律不得出現。
-    const allowedDespiteFragment = <String>{
-      'qualityKnowledgeState',
-      'buyerNote',
-    };
+    const allowedDespiteFragment = <String>{'buyerNote'};
 
-    test('十欄裡沒有買家預算、可接受區間、候選排序這類鍵', () {
+    test('九欄裡沒有買家預算、可接受區間、候選排序這類鍵', () {
       const forbidden = [
         'budget',
         'price',
@@ -226,12 +220,11 @@ void main() {
 
     test('豁免清單本身不得長大：每一個都要是刻意的決定', () {
       expect(allowedDespiteFragment, <String>{
-        'qualityKnowledgeState',
         'buyerNote',
-      }, reason: '要放行第三個鍵，先在這裡寫下它為什麼該給賣家看');
+      }, reason: '要放行第二個鍵，先在這裡寫下它為什麼該給賣家看');
     });
 
-    test('fromJson 只認那十個鍵，回應多出來的敏感欄位進不了 model', () {
+    test('fromJson 只認那九個鍵，回應多出來的敏感欄位進不了 model', () {
       final payload = SellerFacingPayload.fromJson(<String, dynamic>{
         'item': '高麗菜',
         'quantity': '200',
@@ -253,30 +246,6 @@ void main() {
       const payload = SellerFacingPayload(item: '高麗菜', packaging: '   ');
       expect(payload.contextFields.map((f) => f.label), <String>['品項']);
       expect(const SellerFacingPayload().contextFields, isEmpty);
-    });
-  });
-
-  group('qualityKnowledgeState', () {
-    test('空字串＝未知，不補值也不推斷成「買家沒指定」', () {
-      const payload = SellerFacingPayload();
-      expect(payload.qualityKnowledgeState, '');
-      expect(payload.hasQualityKnowledge, isFalse);
-    });
-
-    test('有值就是有值，原樣保留', () {
-      const payload = SellerFacingPayload(
-        qualityKnowledgeState: 'BUYER_SPECIFIED',
-      );
-      expect(payload.hasQualityKnowledge, isTrue);
-      expect(payload.qualityKnowledgeState, 'BUYER_SPECIFIED');
-    });
-
-    test('它不混進需求欄位列表，畫面另外處理', () {
-      const payload = SellerFacingPayload(
-        qualityKnowledgeState: 'BUYER_SPECIFIED',
-        item: '高麗菜',
-      );
-      expect(payload.contextFields.map((f) => f.value), <String>['高麗菜']);
     });
   });
 }

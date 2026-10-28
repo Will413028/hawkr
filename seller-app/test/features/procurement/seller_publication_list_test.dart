@@ -48,7 +48,6 @@ SellerPublicationListItem _row({
         publishedAt: '2026-09-13T02:00:00Z',
       ),
       sellerFacingPayload: SellerFacingPayload(
-        qualityKnowledgeState: 'BUYER_SPECIFIED',
         item: item,
         itemLabel: itemLabel,
         quantity: quantity,

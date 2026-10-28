@@ -1770,7 +1770,7 @@ as String,
 /// @nodoc
 mixin _$SellerFacingPayload {
 
- String get qualityKnowledgeState; String get item; String get itemLabel; String get quantity; String get unit; String get packaging; String get deliveryCity; String get deliveryDate; String get responseDeadline; String get buyerNote;
+ String get item; String get itemLabel; String get quantity; String get unit; String get packaging; String get deliveryCity; String get deliveryDate; String get responseDeadline; String get buyerNote;
 /// Create a copy of SellerFacingPayload
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -1783,16 +1783,16 @@ $SellerFacingPayloadCopyWith<SellerFacingPayload> get copyWith => _$SellerFacing
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is SellerFacingPayload&&(identical(other.qualityKnowledgeState, qualityKnowledgeState) || other.qualityKnowledgeState == qualityKnowledgeState)&&(identical(other.item, item) || other.item == item)&&(identical(other.itemLabel, itemLabel) || other.itemLabel == itemLabel)&&(identical(other.quantity, quantity) || other.quantity == quantity)&&(identical(other.unit, unit) || other.unit == unit)&&(identical(other.packaging, packaging) || other.packaging == packaging)&&(identical(other.deliveryCity, deliveryCity) || other.deliveryCity == deliveryCity)&&(identical(other.deliveryDate, deliveryDate) || other.deliveryDate == deliveryDate)&&(identical(other.responseDeadline, responseDeadline) || other.responseDeadline == responseDeadline)&&(identical(other.buyerNote, buyerNote) || other.buyerNote == buyerNote));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SellerFacingPayload&&(identical(other.item, item) || other.item == item)&&(identical(other.itemLabel, itemLabel) || other.itemLabel == itemLabel)&&(identical(other.quantity, quantity) || other.quantity == quantity)&&(identical(other.unit, unit) || other.unit == unit)&&(identical(other.packaging, packaging) || other.packaging == packaging)&&(identical(other.deliveryCity, deliveryCity) || other.deliveryCity == deliveryCity)&&(identical(other.deliveryDate, deliveryDate) || other.deliveryDate == deliveryDate)&&(identical(other.responseDeadline, responseDeadline) || other.responseDeadline == responseDeadline)&&(identical(other.buyerNote, buyerNote) || other.buyerNote == buyerNote));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,qualityKnowledgeState,item,itemLabel,quantity,unit,packaging,deliveryCity,deliveryDate,responseDeadline,buyerNote);
+int get hashCode => Object.hash(runtimeType,item,itemLabel,quantity,unit,packaging,deliveryCity,deliveryDate,responseDeadline,buyerNote);
 
 @override
 String toString() {
-  return 'SellerFacingPayload(qualityKnowledgeState: $qualityKnowledgeState, item: $item, itemLabel: $itemLabel, quantity: $quantity, unit: $unit, packaging: $packaging, deliveryCity: $deliveryCity, deliveryDate: $deliveryDate, responseDeadline: $responseDeadline, buyerNote: $buyerNote)';
+  return 'SellerFacingPayload(item: $item, itemLabel: $itemLabel, quantity: $quantity, unit: $unit, packaging: $packaging, deliveryCity: $deliveryCity, deliveryDate: $deliveryDate, responseDeadline: $responseDeadline, buyerNote: $buyerNote)';
 }
 
 
@@ -1803,7 +1803,7 @@ abstract mixin class $SellerFacingPayloadCopyWith<$Res>  {
   factory $SellerFacingPayloadCopyWith(SellerFacingPayload value, $Res Function(SellerFacingPayload) _then) = _$SellerFacingPayloadCopyWithImpl;
 @useResult
 $Res call({
- String qualityKnowledgeState, String item, String itemLabel, String quantity, String unit, String packaging, String deliveryCity, String deliveryDate, String responseDeadline, String buyerNote
+ String item, String itemLabel, String quantity, String unit, String packaging, String deliveryCity, String deliveryDate, String responseDeadline, String buyerNote
 });
 
 
@@ -1820,10 +1820,9 @@ class _$SellerFacingPayloadCopyWithImpl<$Res>
 
 /// Create a copy of SellerFacingPayload
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? qualityKnowledgeState = null,Object? item = null,Object? itemLabel = null,Object? quantity = null,Object? unit = null,Object? packaging = null,Object? deliveryCity = null,Object? deliveryDate = null,Object? responseDeadline = null,Object? buyerNote = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? item = null,Object? itemLabel = null,Object? quantity = null,Object? unit = null,Object? packaging = null,Object? deliveryCity = null,Object? deliveryDate = null,Object? responseDeadline = null,Object? buyerNote = null,}) {
   return _then(_self.copyWith(
-qualityKnowledgeState: null == qualityKnowledgeState ? _self.qualityKnowledgeState : qualityKnowledgeState // ignore: cast_nullable_to_non_nullable
-as String,item: null == item ? _self.item : item // ignore: cast_nullable_to_non_nullable
+item: null == item ? _self.item : item // ignore: cast_nullable_to_non_nullable
 as String,itemLabel: null == itemLabel ? _self.itemLabel : itemLabel // ignore: cast_nullable_to_non_nullable
 as String,quantity: null == quantity ? _self.quantity : quantity // ignore: cast_nullable_to_non_nullable
 as String,unit: null == unit ? _self.unit : unit // ignore: cast_nullable_to_non_nullable
@@ -1917,10 +1916,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String qualityKnowledgeState,  String item,  String itemLabel,  String quantity,  String unit,  String packaging,  String deliveryCity,  String deliveryDate,  String responseDeadline,  String buyerNote)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String item,  String itemLabel,  String quantity,  String unit,  String packaging,  String deliveryCity,  String deliveryDate,  String responseDeadline,  String buyerNote)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _SellerFacingPayload() when $default != null:
-return $default(_that.qualityKnowledgeState,_that.item,_that.itemLabel,_that.quantity,_that.unit,_that.packaging,_that.deliveryCity,_that.deliveryDate,_that.responseDeadline,_that.buyerNote);case _:
+return $default(_that.item,_that.itemLabel,_that.quantity,_that.unit,_that.packaging,_that.deliveryCity,_that.deliveryDate,_that.responseDeadline,_that.buyerNote);case _:
   return orElse();
 
 }
@@ -1938,10 +1937,10 @@ return $default(_that.qualityKnowledgeState,_that.item,_that.itemLabel,_that.qua
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String qualityKnowledgeState,  String item,  String itemLabel,  String quantity,  String unit,  String packaging,  String deliveryCity,  String deliveryDate,  String responseDeadline,  String buyerNote)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String item,  String itemLabel,  String quantity,  String unit,  String packaging,  String deliveryCity,  String deliveryDate,  String responseDeadline,  String buyerNote)  $default,) {final _that = this;
 switch (_that) {
 case _SellerFacingPayload():
-return $default(_that.qualityKnowledgeState,_that.item,_that.itemLabel,_that.quantity,_that.unit,_that.packaging,_that.deliveryCity,_that.deliveryDate,_that.responseDeadline,_that.buyerNote);case _:
+return $default(_that.item,_that.itemLabel,_that.quantity,_that.unit,_that.packaging,_that.deliveryCity,_that.deliveryDate,_that.responseDeadline,_that.buyerNote);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -1958,10 +1957,10 @@ return $default(_that.qualityKnowledgeState,_that.item,_that.itemLabel,_that.qua
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String qualityKnowledgeState,  String item,  String itemLabel,  String quantity,  String unit,  String packaging,  String deliveryCity,  String deliveryDate,  String responseDeadline,  String buyerNote)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String item,  String itemLabel,  String quantity,  String unit,  String packaging,  String deliveryCity,  String deliveryDate,  String responseDeadline,  String buyerNote)?  $default,) {final _that = this;
 switch (_that) {
 case _SellerFacingPayload() when $default != null:
-return $default(_that.qualityKnowledgeState,_that.item,_that.itemLabel,_that.quantity,_that.unit,_that.packaging,_that.deliveryCity,_that.deliveryDate,_that.responseDeadline,_that.buyerNote);case _:
+return $default(_that.item,_that.itemLabel,_that.quantity,_that.unit,_that.packaging,_that.deliveryCity,_that.deliveryDate,_that.responseDeadline,_that.buyerNote);case _:
   return null;
 
 }
@@ -1973,10 +1972,9 @@ return $default(_that.qualityKnowledgeState,_that.item,_that.itemLabel,_that.qua
 @JsonSerializable()
 
 class _SellerFacingPayload extends SellerFacingPayload {
-  const _SellerFacingPayload({this.qualityKnowledgeState = '', this.item = '', this.itemLabel = '', this.quantity = '', this.unit = '', this.packaging = '', this.deliveryCity = '', this.deliveryDate = '', this.responseDeadline = '', this.buyerNote = ''}): super._();
+  const _SellerFacingPayload({this.item = '', this.itemLabel = '', this.quantity = '', this.unit = '', this.packaging = '', this.deliveryCity = '', this.deliveryDate = '', this.responseDeadline = '', this.buyerNote = ''}): super._();
   factory _SellerFacingPayload.fromJson(Map<String, dynamic> json) => _$SellerFacingPayloadFromJson(json);
 
-@override@JsonKey() final  String qualityKnowledgeState;
 @override@JsonKey() final  String item;
 @override@JsonKey() final  String itemLabel;
 @override@JsonKey() final  String quantity;
@@ -2000,16 +1998,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SellerFacingPayload&&(identical(other.qualityKnowledgeState, qualityKnowledgeState) || other.qualityKnowledgeState == qualityKnowledgeState)&&(identical(other.item, item) || other.item == item)&&(identical(other.itemLabel, itemLabel) || other.itemLabel == itemLabel)&&(identical(other.quantity, quantity) || other.quantity == quantity)&&(identical(other.unit, unit) || other.unit == unit)&&(identical(other.packaging, packaging) || other.packaging == packaging)&&(identical(other.deliveryCity, deliveryCity) || other.deliveryCity == deliveryCity)&&(identical(other.deliveryDate, deliveryDate) || other.deliveryDate == deliveryDate)&&(identical(other.responseDeadline, responseDeadline) || other.responseDeadline == responseDeadline)&&(identical(other.buyerNote, buyerNote) || other.buyerNote == buyerNote));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SellerFacingPayload&&(identical(other.item, item) || other.item == item)&&(identical(other.itemLabel, itemLabel) || other.itemLabel == itemLabel)&&(identical(other.quantity, quantity) || other.quantity == quantity)&&(identical(other.unit, unit) || other.unit == unit)&&(identical(other.packaging, packaging) || other.packaging == packaging)&&(identical(other.deliveryCity, deliveryCity) || other.deliveryCity == deliveryCity)&&(identical(other.deliveryDate, deliveryDate) || other.deliveryDate == deliveryDate)&&(identical(other.responseDeadline, responseDeadline) || other.responseDeadline == responseDeadline)&&(identical(other.buyerNote, buyerNote) || other.buyerNote == buyerNote));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,qualityKnowledgeState,item,itemLabel,quantity,unit,packaging,deliveryCity,deliveryDate,responseDeadline,buyerNote);
+int get hashCode => Object.hash(runtimeType,item,itemLabel,quantity,unit,packaging,deliveryCity,deliveryDate,responseDeadline,buyerNote);
 
 @override
 String toString() {
-  return 'SellerFacingPayload(qualityKnowledgeState: $qualityKnowledgeState, item: $item, itemLabel: $itemLabel, quantity: $quantity, unit: $unit, packaging: $packaging, deliveryCity: $deliveryCity, deliveryDate: $deliveryDate, responseDeadline: $responseDeadline, buyerNote: $buyerNote)';
+  return 'SellerFacingPayload(item: $item, itemLabel: $itemLabel, quantity: $quantity, unit: $unit, packaging: $packaging, deliveryCity: $deliveryCity, deliveryDate: $deliveryDate, responseDeadline: $responseDeadline, buyerNote: $buyerNote)';
 }
 
 
@@ -2020,7 +2018,7 @@ abstract mixin class _$SellerFacingPayloadCopyWith<$Res> implements $SellerFacin
   factory _$SellerFacingPayloadCopyWith(_SellerFacingPayload value, $Res Function(_SellerFacingPayload) _then) = __$SellerFacingPayloadCopyWithImpl;
 @override @useResult
 $Res call({
- String qualityKnowledgeState, String item, String itemLabel, String quantity, String unit, String packaging, String deliveryCity, String deliveryDate, String responseDeadline, String buyerNote
+ String item, String itemLabel, String quantity, String unit, String packaging, String deliveryCity, String deliveryDate, String responseDeadline, String buyerNote
 });
 
 
@@ -2037,10 +2035,9 @@ class __$SellerFacingPayloadCopyWithImpl<$Res>
 
 /// Create a copy of SellerFacingPayload
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? qualityKnowledgeState = null,Object? item = null,Object? itemLabel = null,Object? quantity = null,Object? unit = null,Object? packaging = null,Object? deliveryCity = null,Object? deliveryDate = null,Object? responseDeadline = null,Object? buyerNote = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? item = null,Object? itemLabel = null,Object? quantity = null,Object? unit = null,Object? packaging = null,Object? deliveryCity = null,Object? deliveryDate = null,Object? responseDeadline = null,Object? buyerNote = null,}) {
   return _then(_SellerFacingPayload(
-qualityKnowledgeState: null == qualityKnowledgeState ? _self.qualityKnowledgeState : qualityKnowledgeState // ignore: cast_nullable_to_non_nullable
-as String,item: null == item ? _self.item : item // ignore: cast_nullable_to_non_nullable
+item: null == item ? _self.item : item // ignore: cast_nullable_to_non_nullable
 as String,itemLabel: null == itemLabel ? _self.itemLabel : itemLabel // ignore: cast_nullable_to_non_nullable
 as String,quantity: null == quantity ? _self.quantity : quantity // ignore: cast_nullable_to_non_nullable
 as String,unit: null == unit ? _self.unit : unit // ignore: cast_nullable_to_non_nullable

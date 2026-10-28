@@ -6,7 +6,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/Will413028/hawkr/ai-service/internal/observability"
-	"github.com/Will413028/hawkr/ai-service/internal/procurement/cropidentity/fuse"
+	"github.com/Will413028/hawkr/ai-service/internal/procurement/cropidentity/recall"
 )
 
 var itemConjunctions = []string{"、", "和", "與", "跟", "及"}
@@ -34,23 +34,23 @@ func splitItems(text string) []string {
 }
 
 func (uc *DisambiguationUseCase) resolveMultiItem(ctx context.Context, itemText string, parts []string) (DisambiguationResult, error) {
-	pool := make([]fuse.Fused, 0, len(parts)*2)
+	pool := make([]recall.Candidate, 0, len(parts)*2)
 	seen := map[string]bool{}
 	for _, part := range parts {
 		q := understandQuery(part)
 		if len(q.Variants) == 0 {
 			continue
 		}
-		usable, err := uc.recallPool(ctx, q)
+		usable, err := uc.taxonomyCandidates(ctx, q)
 		if err != nil {
 			observability.RecordProcurementCropResolverV2(ctx, "error")
 			return DisambiguationResult{}, err
 		}
 		for _, f := range usable {
-			if seen[f.Key] {
+			if seen[f.Code] {
 				continue
 			}
-			seen[f.Key] = true
+			seen[f.Code] = true
 			pool = append(pool, f)
 		}
 	}

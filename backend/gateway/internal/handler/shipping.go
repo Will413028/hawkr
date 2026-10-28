@@ -148,7 +148,6 @@ type CallTcatDataResp struct {
 
 // OnboardCvsReq 超商建店請求
 type OnboardCvsReq struct {
-	GoodsType          string `json:"goodsType" binding:"required"`
 	ReturnStoreCode    string `json:"returnStoreCode" binding:"required"`
 	ReturnStoreName    string `json:"returnStoreName"`
 	ReturnStoreAddress string `json:"returnStoreAddress"`
@@ -182,7 +181,6 @@ type ToggleShippingOnboardingReq struct {
 type ShippingOnboardingViewResp struct {
 	OnboardingId        string `json:"onboardingId"`
 	ShippingType        string `json:"shippingType"`     // 物流類型（CVS_C2C=超商店到店, HOME_DELIVERY=宅配）
-	GoodsType           string `json:"goodsType"`        // 商品溫層（3201=常溫, 3203=冷凍）（超商才有）
 	OnboardingStatus    string `json:"onboardingStatus"` // 建店狀態碼
 	ProviderStatus      string `json:"providerStatus"`   // PayUni 原始啟用狀態（收斂規範 §4.1 SoT；欄位原名 setStatus 已改名）
 	ProviderMessage     string `json:"providerMessage"`  // PayUni 原始訊息
@@ -510,7 +508,7 @@ func (h *Holder) CallTcat(c *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Param        body  body  OnboardCvsReq  true  "goodsType: 3201(常溫)/3203(冷凍)，returnStoreCode: 6碼退貨門市，senderName: 寄件人姓名，senderPhone: 寄件人電話"
+// @Param        body  body  OnboardCvsReq  true  "returnStoreCode: 6碼退貨門市，senderName: 寄件人姓名，senderPhone: 寄件人電話"
 // @Success      200  {object}  object{code=int,message=string}
 // @Failure      400  {object}  object{code=int,message=string}
 // @Failure      401  {object}  object{code=int,message=string}
@@ -525,13 +523,13 @@ func (h *Holder) OnboardCvsShipping(c *gin.Context) {
 
 	var req OnboardCvsReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "invalid request body: goodsType, returnStoreCode, senderName and senderPhone are required")
+		response.BadRequest(c, "invalid request body: returnStoreCode, senderName and senderPhone are required")
 		return
 	}
 
 	resp, err := h.Shipping.OnboardCvsShipping(c.Request.Context(), &pb.OnboardCvsShippingRequest{
 		StoreId:            int64(storeID),
-		GoodsType:          req.GoodsType,
+		GoodsType:          ambientShippingTemperature,
 		ReturnStoreCode:    req.ReturnStoreCode,
 		ReturnStoreName:    req.ReturnStoreName,
 		ReturnStoreAddress: req.ReturnStoreAddress,
@@ -628,6 +626,9 @@ func (h *Holder) ListShippingOnboardings(c *gin.Context) {
 
 	var items []ShippingOnboardingViewResp
 	for _, v := range resp.Onboardings {
+		if !isAmbientOrUntyped(v.GetGoodsType()) {
+			continue
+		}
 		items = append(items, convertOnboardingView(v))
 	}
 	response.GrpcResult(c, resp.Code, resp.Message, items)
@@ -726,7 +727,6 @@ func (h *Holder) ToggleShippingOnboarding(c *gin.Context) {
 // SellerShippingMethodResp 賣家配送方式回應
 type SellerShippingMethodResp struct {
 	ShippingMethod     string `json:"shippingMethod"`
-	GoodsType          string `json:"goodsType"`
 	DisplayName        string `json:"displayName"`
 	Description        string `json:"description"`
 	OnboardingStatus   string `json:"onboardingStatus"`
@@ -740,7 +740,7 @@ type SellerShippingMethodResp struct {
 
 // ListSellerShippingMethods 查詢賣家可用配送方式
 // @Summary      查詢賣家可用配送方式
-// @Description  回傳賣家所有可能的配送方式槽位（宅配/超商常溫/超商冷凍），含各自的啟用狀態與建店資訊
+// @Description  回傳賣家所有可能的配送方式槽位（宅配/超商），含各自的啟用狀態與建店資訊
 // @Tags         物流 (Shipping)
 // @Produce      json
 // @Security     BearerAuth
@@ -778,9 +778,11 @@ func (h *Holder) ListSellerShippingMethods(c *gin.Context) {
 
 	var items []SellerShippingMethodResp
 	for _, m := range resp.Methods {
+		if !isAmbientOrUntyped(m.GetGoodsType()) {
+			continue
+		}
 		items = append(items, SellerShippingMethodResp{
 			ShippingMethod:     m.GetShippingMethod(),
-			GoodsType:          m.GetGoodsType(),
 			DisplayName:        m.GetDisplayName(),
 			Description:        m.GetDescription(),
 			Available:          m.GetAvailable(),
@@ -1054,7 +1056,6 @@ func convertOnboardingView(v *pb.ShippingOnboardingView) ShippingOnboardingViewR
 	return ShippingOnboardingViewResp{
 		OnboardingId:        v.GetOnboardingId(),
 		ShippingType:        v.GetShippingType(),
-		GoodsType:           v.GetGoodsType(),
 		OnboardingStatus:    v.GetOnboardingStatus(),
 		ProviderStatus:      v.GetProviderStatus(),
 		ProviderMessage:     v.GetProviderMessage(),

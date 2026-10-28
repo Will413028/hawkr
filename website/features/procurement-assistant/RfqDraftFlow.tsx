@@ -8,7 +8,6 @@ import type {
 	ProcurementSlots,
 } from "@/lib/api/openapi-types";
 import { formatTaipeiDateTime, formatTaipeiIsoDate } from "@/lib/date/taipei";
-import { buyerQualityStateLabel } from "./buyer-quality-state";
 import { countSelectedRecipients } from "./candidate-grouping";
 import {
 	BUYER_NOTE_MAX_LENGTH,
@@ -756,18 +755,6 @@ export default function RfqDraftFlow({
 									<dt>配送城市</dt>
 									<dd>{deliveryCity || "—"}</dd>
 								</div>
-								{buyerQualityStateLabel(
-									preview?.qualityKnowledgeState ?? "",
-								) ? (
-									<div>
-										<dt>品相</dt>
-										<dd>
-											{buyerQualityStateLabel(
-												preview?.qualityKnowledgeState ?? "",
-											)}
-										</dd>
-									</div>
-								) : null}
 							</dl>
 							<p>供應商回價時提供實際品相與驗收條件。</p>
 						</section>
@@ -867,7 +854,7 @@ export default function RfqDraftFlow({
 												建立新的操作
 											</Button>
 										) : null}
-										{activeError.code === "PRICE_BASIS_UNAVAILABLE" ||
+										{activeError.code === "PRICE_INPUT_INVALID" ||
 										activeError.code === "REQUEST_NOT_FOUND" ? (
 											<Button
 												variant="bordered"
@@ -1150,14 +1137,6 @@ export default function RfqDraftFlow({
 										<div>
 											<dt>希望到貨</dt>
 											<dd>{slots.deliveryDate}</dd>
-										</div>
-									) : null}
-									{buyerQualityStateLabel(preview.qualityKnowledgeState) ? (
-										<div>
-											<dt>品相</dt>
-											<dd>
-												{buyerQualityStateLabel(preview.qualityKnowledgeState)}
-											</dd>
 										</div>
 									) : null}
 								</dl>

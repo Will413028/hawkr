@@ -159,8 +159,7 @@ func TestSlotsFromProto_ItemResolution_ShapeAndTypes(t *testing.T) {
 		t.Run(kind, func(t *testing.T) {
 			dto := SlotsFromProto(&pb.Slots{
 				ItemResolution: &pb.ItemResolution{
-					Kind: kind, Label: "甘藍-初秋",
-					Provenance: "BUYER_CHOICE", DisplayValue: "甘藍-初秋",
+					Kind: kind, Label: "甘藍-初秋", DisplayValue: "甘藍-初秋",
 				},
 			})
 
@@ -181,8 +180,8 @@ func TestSlotsFromProto_ItemResolution_ShapeAndTypes(t *testing.T) {
 			if !strings.Contains(got, `"display_value":"甘藍-初秋"`) {
 				t.Errorf("display_value 必須由伺服器組好送出，got %s", got)
 			}
-			if !strings.Contains(got, `"provenance":"BUYER_CHOICE"`) {
-				t.Errorf("provenance 是前端分流呈現的依據，got %s", got)
+			if strings.Contains(got, "provenance") {
+				t.Errorf("provenance 不得進對外契約，got %s", got)
 			}
 		})
 	}

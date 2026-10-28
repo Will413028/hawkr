@@ -6,7 +6,6 @@ import 'package:uuid/uuid.dart';
 
 import 'package:dio/dio.dart';
 import '../../../core/analytics/analytics_events.dart';
-import '../../../core/networking/ambient_shipping_temperature.dart';
 import '../../../core/networking/dio_provider.dart';
 import '../../../shared/utils/secret_redaction.dart';
 import '../../media/data/media_repository.dart';
@@ -166,12 +165,7 @@ class SpecData {
     required String type,
     required String feePayer,
     required String freeThreshold,
-  }) => {
-    'type': type,
-    'temperature': kAmbientShippingTemperature,
-    'feePayer': feePayer,
-    'freeThreshold': freeThreshold,
-  };
+  }) => {'type': type, 'feePayer': feePayer, 'freeThreshold': freeThreshold};
 
   /// 轉換為後端 SKU API 格式 (camelCase)
   ///

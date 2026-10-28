@@ -17,7 +17,6 @@ import {
 import { SHIPPING_TYPE_LABEL } from "@/lib/codemeta/enums";
 import { useResettableError } from "@/lib/hooks/useResettableError";
 import { useShippingOnboardings } from "@/lib/hooks/useShippingOnboardings";
-import { AMBIENT_TEMPERATURE_CODE } from "@/lib/seller/ambient-temperature";
 import { useCertGate } from "@/lib/seller/cert-gate";
 import {
 	getDistrictOptions,
@@ -535,11 +534,7 @@ function CvsSection({
 	store: MyStore | null;
 	onChange: () => void | Promise<void>;
 }) {
-	const reference = findOnboarding(
-		rows,
-		SHIPPING_TYPE.CVS,
-		AMBIENT_TEMPERATURE_CODE,
-	);
+	const reference = findOnboarding(rows, SHIPPING_TYPE.CVS);
 	const locked = isLocked(reference);
 	const approved = isApproved(reference);
 	const processing = isProcessing(reference);

@@ -13,7 +13,7 @@
  * Backend contract 對齊（v2，2026-06）：
  *  - `ImportItemDetailResponse.brief` 攜帶 name / category / cover / blocking / dup
  *  - `descriptionJson` 是 JSON 字串（內部結構為 ImportDescription）
- *  - `skus[].shippingMethods: [{ method, temperature }]`（取代舊的逐配送方式欄位）；送出一律帶 `AMBIENT_TEMPERATURE_CODE`
+ *  - `skus[].shippingMethods: [{ method }]`（取代舊的逐配送方式欄位）
  *  - `galleryAssets[].sourceUrl / previewUrl` 取代舊 cdn_url
  */
 
@@ -24,7 +24,6 @@ import type {
 	SellerProductDetail,
 	SkuShippingMethod,
 } from "@/lib/products/seller-repo";
-import { AMBIENT_TEMPERATURE_CODE } from "@/lib/seller/ambient-temperature";
 import {
 	type ImportDescription,
 	type ImportDescriptionBlock,
@@ -192,7 +191,6 @@ export function draftSkuToImportSku(sku: ProductSku): UpdateImportSkuInput {
 	const methods = sku.shipping_methods ?? [];
 	const shippingMethods: ShippingMethodInput[] = methods.map((m) => ({
 		method: m.type,
-		temperature: AMBIENT_TEMPERATURE_CODE,
 	}));
 
 	const out: UpdateImportSkuInput = {

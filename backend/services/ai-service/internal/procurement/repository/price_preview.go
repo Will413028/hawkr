@@ -33,7 +33,6 @@ type PricePreview struct {
 	BuyerID                 identity.BuyerID
 	RequestID               int64
 	RequestRevisionID       int64
-	QualityKnowledgeState   string
 	BuyerRequestedRangeJSON json.RawMessage
 	// QuoteTotalRangeJSON 在需求數量未填時為 nil。
 	QuoteTotalRangeJSON json.RawMessage
@@ -52,7 +51,6 @@ type InsertPricePreviewInput struct {
 	BuyerID                 identity.BuyerID
 	RequestID               int64
 	RequestRevisionID       int64
-	QualityKnowledgeState   string
 	BuyerRequestedRangeJSON json.RawMessage
 	QuoteTotalRangeJSON     json.RawMessage
 	ClientRequestID         string
@@ -65,7 +63,6 @@ func toPricePreviewEntity(row gen.ProcurementPricePreview) PricePreview {
 	return PricePreview{
 		ID: row.ID, BuyerID: identity.BuyerID(row.BuyerID), RequestID: row.RequestID,
 		RequestRevisionID:       row.RequestRevisionID,
-		QualityKnowledgeState:   row.QualityKnowledgeState,
 		BuyerRequestedRangeJSON: row.BuyerRequestedRangeJson,
 		QuoteTotalRangeJSON:     row.QuoteTotalRangeJson,
 		ClientRequestID:         row.ClientRequestID,
@@ -91,7 +88,6 @@ func (r *Repo) InsertPricePreview(ctx context.Context, in InsertPricePreviewInpu
 	row, err := r.q(ctx).InsertPricePreview(ctx, gen.InsertPricePreviewParams{
 		ID: id, BuyerID: int64(in.BuyerID), RequestID: in.RequestID,
 		RequestRevisionID:       in.RequestRevisionID,
-		QualityKnowledgeState:   in.QualityKnowledgeState,
 		BuyerRequestedRangeJson: in.BuyerRequestedRangeJSON,
 		QuoteTotalRangeJson:     in.QuoteTotalRangeJSON,
 		ClientRequestID:         in.ClientRequestID,

@@ -6,7 +6,6 @@ import {
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { TOWNS, townByName } from "@hawkr/twaddr/lookup";
 import { describe, expect, it } from "vitest";
-import { AMBIENT_TEMPERATURE_CODE } from "@/lib/seller/ambient-temperature";
 import {
 	getDistrictOptions,
 	getKnownDistrict,
@@ -60,7 +59,6 @@ const FULL_STORE = storeOf({
 
 const HOME_ROW: ShippingOnboarding = {
 	shippingType: SHIPPING_TYPE.HOME_DELIVERY,
-	goodsType: AMBIENT_TEMPERATURE_CODE,
 	payuniSubmitStatus: PAYUNI_SUBMIT_STATUS.SUCCEEDED,
 	senderName: "紀錄人",
 	senderPhone: "0987654321",
@@ -177,7 +175,6 @@ describe("homeFormInitial", () => {
 describe("cvsSenderInitial", () => {
 	const ambient: ShippingOnboarding = {
 		shippingType: SHIPPING_TYPE.CVS,
-		goodsType: AMBIENT_TEMPERATURE_CODE,
 		senderName: "寄件人",
 		senderPhone: "0911111111",
 	};

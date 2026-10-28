@@ -1006,10 +1006,10 @@ func TestProxyProcurementRfqPricePreview_NilQuoteTotalRange_IsExplicitNull(t *te
 	}
 }
 
-func TestProxyProcurementRfqPricePreview_PriceBasisUnavailable_ReturnsUnprocessableEntity(t *testing.T) {
+func TestProxyProcurementRfqPricePreview_BuyerRequestedRangeRequired_ReturnsUnprocessableEntity(t *testing.T) {
 	mock := &mockAIProcurementServiceClient{
 		previewRfqPriceErr: mustWithDetails(t, codes.FailedPrecondition, "currency/quantity/unit/conversion basis cannot be canonicalized",
-			&aipb.BusinessError{Reason: "PRICE_BASIS_UNAVAILABLE", Message: "currency/quantity/unit/conversion basis cannot be canonicalized"}),
+			&aipb.BusinessError{Reason: "BUYER_REQUESTED_RANGE_REQUIRED", Message: "currency/quantity/unit/conversion basis cannot be canonicalized"}),
 	}
 	h := newProcurementTestHolder(mock)
 
@@ -1023,7 +1023,29 @@ func TestProxyProcurementRfqPricePreview_PriceBasisUnavailable_ReturnsUnprocessa
 	assertHTTPStatus(t, w, http.StatusUnprocessableEntity)
 	respBody := parseJSON(t, w.Body)
 	assertCode(t, respBody, 422)
-	if respBody["reason"] != "PRICE_BASIS_UNAVAILABLE" {
+	if respBody["reason"] != "BUYER_REQUESTED_RANGE_REQUIRED" {
+		t.Fatalf("reason = %v", respBody["reason"])
+	}
+}
+
+func TestProxyProcurementRfqPricePreview_QuantityUnitUnconvertible_ReturnsUnprocessableEntity(t *testing.T) {
+	mock := &mockAIProcurementServiceClient{
+		previewRfqPriceErr: mustWithDetails(t, codes.FailedPrecondition, "currency/quantity/unit/conversion basis cannot be canonicalized",
+			&aipb.BusinessError{Reason: "QUANTITY_UNIT_UNCONVERTIBLE", Message: "currency/quantity/unit/conversion basis cannot be canonicalized"}),
+	}
+	h := newProcurementTestHolder(mock)
+
+	body := `{"expectedRevisionId":"3","clientRequestId":"c-3","deliveryCity":"台北市"}`
+	req, _ := http.NewRequest(http.MethodPost, "/api/v1/app/buyers/me/procurement/requests/77/rfq-price-previews", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Account-Id", "99")
+	w := httptest.NewRecorder()
+	setupProcurementUnaryRouter(h).ServeHTTP(w, req)
+
+	assertHTTPStatus(t, w, http.StatusUnprocessableEntity)
+	respBody := parseJSON(t, w.Body)
+	assertCode(t, respBody, 422)
+	if respBody["reason"] != "QUANTITY_UNIT_UNCONVERTIBLE" {
 		t.Fatalf("reason = %v", respBody["reason"])
 	}
 }

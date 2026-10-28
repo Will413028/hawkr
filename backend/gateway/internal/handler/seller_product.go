@@ -174,7 +174,6 @@ type UpdateSkuInput struct {
 // CreateShippingMethodInput 運送方式輸入結構
 type CreateShippingMethodInput struct {
 	Type          string `json:"type"`
-	Temperature   string `json:"temperature"`
 	FreeThreshold string `json:"freeThreshold"`
 	FeePayer      string `json:"feePayer"`
 }
@@ -483,7 +482,7 @@ func (h *Holder) CreateSellerProduct(c *gin.Context) {
 		for _, sm := range v.ShippingMethods {
 			skuShippingMethods = append(skuShippingMethods, &pb.ShippingMethod{
 				Type:          sm.Type,
-				Temperature:   sm.Temperature,
+				Temperature:   ambientShippingTemperature,
 				FreeThreshold: sm.FreeThreshold,
 				FeePayer:      sm.FeePayer,
 			})
@@ -611,7 +610,7 @@ func (h *Holder) UpdateSellerProduct(c *gin.Context) {
 		for _, sm := range v.ShippingMethods {
 			skuShippingMethods = append(skuShippingMethods, &pb.ShippingMethod{
 				Type:          sm.Type,
-				Temperature:   sm.Temperature,
+				Temperature:   ambientShippingTemperature,
 				FreeThreshold: sm.FreeThreshold,
 				FeePayer:      sm.FeePayer,
 			})

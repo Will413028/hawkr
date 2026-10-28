@@ -6,6 +6,5 @@ import "github.com/Will413028/hawkr/ai-service/internal/procurement/domain"
 func ConfirmedResolution(label string) *domain.ItemResolution {
 	return &domain.ItemResolution{
 		Kind: domain.ItemResolvedCategoryConfirmed, Label: label, CategoryID: "9001",
-		Provenance: domain.ItemResolutionByBuyerChoice,
 	}
 }

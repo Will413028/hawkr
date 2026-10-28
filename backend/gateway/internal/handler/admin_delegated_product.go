@@ -142,19 +142,26 @@ type DelegatedProductImageInput struct {
 	AssetID     string `json:"assetId"`
 }
 
+// DelegatedShippingMethodInput 沒有溫層：閘道一律補常溫。
+type DelegatedShippingMethodInput struct {
+	Type          string `json:"type"`
+	FreeThreshold string `json:"freeThreshold"`
+	FeePayer      string `json:"feePayer"`
+}
+
 // DelegatedProductSkuInput is one element of skus[].
 type DelegatedProductSkuInput struct {
-	SkuID           string                   `json:"skuId"`
-	Spec            *string                  `json:"spec"`
-	Price           *string                  `json:"price"`
-	SalePrice       *string                  `json:"salePrice"`
-	StockQty        *string                  `json:"stockQty"`
-	Unit            *string                  `json:"unit"`
-	Weight          *string                  `json:"weight"`
-	LengthCm        *string                  `json:"lengthCm"`
-	WidthCm         *string                  `json:"widthCm"`
-	HeightCm        *string                  `json:"heightCm"`
-	ShippingMethods []ShippingMethodResponse `json:"shippingMethods"`
+	SkuID           string                         `json:"skuId"`
+	Spec            *string                        `json:"spec"`
+	Price           *string                        `json:"price"`
+	SalePrice       *string                        `json:"salePrice"`
+	StockQty        *string                        `json:"stockQty"`
+	Unit            *string                        `json:"unit"`
+	Weight          *string                        `json:"weight"`
+	LengthCm        *string                        `json:"lengthCm"`
+	WidthCm         *string                        `json:"widthCm"`
+	HeightCm        *string                        `json:"heightCm"`
+	ShippingMethods []DelegatedShippingMethodInput `json:"shippingMethods"`
 }
 
 // DelegatedProductCreateRequest is POST .../products.
@@ -1066,7 +1073,7 @@ func newProductSkuProto(in DelegatedProductSkuInput, before *DelegatedProductSku
 		sku.HeightCm = *in.HeightCm
 	}
 	if in.ShippingMethods != nil {
-		sku.ShippingMethods = toShippingMethodProtos(in.ShippingMethods)
+		sku.ShippingMethods = toShippingMethodProtosFromInput(in.ShippingMethods)
 	}
 	return sku
 }
@@ -1074,14 +1081,26 @@ func newProductSkuProto(in DelegatedProductSkuInput, before *DelegatedProductSku
 func toShippingMethodProtos(methods []ShippingMethodResponse) []*productpb.ShippingMethod {
 	out := make([]*productpb.ShippingMethod, 0, len(methods))
 	for _, m := range methods {
-		out = append(out, &productpb.ShippingMethod{
-			Type:          m.Type,
-			Temperature:   m.Temperature,
-			FreeThreshold: m.FreeThreshold,
-			FeePayer:      m.FeePayer,
-		})
+		out = append(out, shippingMethodProto(m.Type, m.FreeThreshold, m.FeePayer))
 	}
 	return out
+}
+
+func toShippingMethodProtosFromInput(methods []DelegatedShippingMethodInput) []*productpb.ShippingMethod {
+	out := make([]*productpb.ShippingMethod, 0, len(methods))
+	for _, m := range methods {
+		out = append(out, shippingMethodProto(m.Type, m.FreeThreshold, m.FeePayer))
+	}
+	return out
+}
+
+func shippingMethodProto(methodType, freeThreshold, feePayer string) *productpb.ShippingMethod {
+	return &productpb.ShippingMethod{
+		Type:          methodType,
+		Temperature:   ambientShippingTemperature,
+		FreeThreshold: freeThreshold,
+		FeePayer:      feePayer,
+	}
 }
 
 func findBeforeSku(before *DelegatedProductDetail, skuID string) *DelegatedProductSku {

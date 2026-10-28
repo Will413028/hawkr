@@ -22,8 +22,8 @@ func TestRepo_InsertConfirmedRfqSnapshot_CreatesRow(t *testing.T) {
 	got, err := r.InsertConfirmedRfqSnapshot(context.Background(), InsertConfirmedRfqSnapshotInput{
 		BuyerID: testBuyerID, RequestID: 1, RequestRevisionID: 1,
 		PricePreviewID: 1, PricePreviewVersion: 1,
-		QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN", CanonicalPayloadJSON: json.RawMessage(`{"item":"寶島梨"}`),
-		PayloadHash: "hash-snapshot", ClientRequestID: "confirm-key-1",
+		CanonicalPayloadJSON: json.RawMessage(`{"item":"寶島梨"}`),
+		PayloadHash:          "hash-snapshot", ClientRequestID: "confirm-key-1",
 		ExpiresAt: refTime().Add(24 * time.Hour),
 	})
 	if err != nil {
@@ -52,8 +52,8 @@ func TestRepo_InsertConfirmedRfqSnapshot_ConcurrentSameClientRequestID_IsIdempot
 	input := InsertConfirmedRfqSnapshotInput{
 		BuyerID: testBuyerID, RequestID: 1, RequestRevisionID: 1,
 		PricePreviewID: 1, PricePreviewVersion: 1,
-		QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN", CanonicalPayloadJSON: json.RawMessage(`{"item":"寶島梨"}`),
-		PayloadHash: "hash-snapshot", ClientRequestID: "confirm-key-race",
+		CanonicalPayloadJSON: json.RawMessage(`{"item":"寶島梨"}`),
+		PayloadHash:          "hash-snapshot", ClientRequestID: "confirm-key-race",
 		ExpiresAt: refTime().Add(24 * time.Hour),
 	}
 
@@ -103,8 +103,8 @@ func TestRepo_InsertConfirmedRfqSnapshot_SameClientRequestIDDifferentTarget_Retu
 	first := InsertConfirmedRfqSnapshotInput{
 		BuyerID: testBuyerID, RequestID: 1, RequestRevisionID: 1,
 		PricePreviewID: 1, PricePreviewVersion: 1,
-		QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN", CanonicalPayloadJSON: json.RawMessage(`{"item":"寶島梨"}`),
-		PayloadHash: "hash-snapshot-1", ClientRequestID: "confirm-key-conflict",
+		CanonicalPayloadJSON: json.RawMessage(`{"item":"寶島梨"}`),
+		PayloadHash:          "hash-snapshot-1", ClientRequestID: "confirm-key-conflict",
 		ExpiresAt: refTime().Add(24 * time.Hour),
 	}
 	if _, err := r.InsertConfirmedRfqSnapshot(context.Background(), first); err != nil {
@@ -149,7 +149,7 @@ func TestRepo_FindLatestConfirmedRfqSnapshotByRequestID_ReturnsMostRecent(t *tes
 	_, err = repo.InsertConfirmedRfqSnapshot(ctx, InsertConfirmedRfqSnapshotInput{
 		BuyerID: testBuyerID, RequestID: req.ID, RequestRevisionID: 1,
 		PricePreviewID: 1, PricePreviewVersion: 1,
-		QualityKnowledgeState: "KNOWN", CanonicalPayloadJSON: json.RawMessage(`{}`), PayloadHash: "h1",
+		CanonicalPayloadJSON: json.RawMessage(`{}`), PayloadHash: "h1",
 		ClientRequestID: "cr-1", ExpiresAt: time.Now().Add(time.Hour),
 	})
 	require.NoError(t, err)
@@ -157,7 +157,7 @@ func TestRepo_FindLatestConfirmedRfqSnapshotByRequestID_ReturnsMostRecent(t *tes
 	second, err := repo.InsertConfirmedRfqSnapshot(ctx, InsertConfirmedRfqSnapshotInput{
 		BuyerID: testBuyerID, RequestID: req.ID, RequestRevisionID: 2,
 		PricePreviewID: 2, PricePreviewVersion: 1,
-		QualityKnowledgeState: "KNOWN", CanonicalPayloadJSON: json.RawMessage(`{}`), PayloadHash: "h2",
+		CanonicalPayloadJSON: json.RawMessage(`{}`), PayloadHash: "h2",
 		ClientRequestID: "cr-2", ExpiresAt: time.Now().Add(time.Hour),
 	})
 	require.NoError(t, err)

@@ -1,4 +1,4 @@
-h1:eg8KBmxC5pycFdt7GyVkdUYkoFNSFO+tHPmCt2zOMs4=
+h1:XJanlV8cOxJYEQ0DwRYsPkvq+G55RlqEoSfSYNbS3/E=
 20260406093514_init_session_tables.sql h1:bK89HLaGKQDy5RUXy/m79anLdPtXC9Ybw6otgDFTKwQ=
 20260406200000_add_ai_styles_and_usage.sql h1:tSA8eIqLTaY+U/3IwOGrhqjc/8lhnuInTUk71UvHf5A=
 20260408000001_ai_styles_id_bigint.sql h1:hFvjGwySxr2Q/tsD3XT9jkwBwEDFXkOpo6u0qOe5y1U=
@@ -62,3 +62,4 @@ h1:eg8KBmxC5pycFdt7GyVkdUYkoFNSFO+tHPmCt2zOMs4=
 20261004124052_add_seller_response_command_evidence.sql h1:25PdVSkHQNRK0CG46vSe6lsjKr9TVzbdbnDF+qUmuDc=
 20261027181357_drop_procurement_market_reference.sql h1:pLgbx1Na28k7B2vHEYgGwwgqQN+72RQou0SefSGsjVI=
 20261028100000_drop_seller_ranking_facts.sql h1:9RfcDXThyqb581m5XfNIutQtlUc1kFN2vb9qxi77smk=
+20261028164119_drop_quality_knowledge_state.sql h1:/7rufzU3nW6Djb3RdbR9MFHnxPTbKykTVzDeivTpx44=

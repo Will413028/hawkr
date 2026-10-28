@@ -53,7 +53,6 @@ func TestComputeCropGate_TreeConfirmedCategory_PassesWithoutCard(t *testing.T) {
 	require.True(t, g.Evaluated())
 	require.Equal(t, &domain.ItemResolution{
 		Kind: domain.ItemResolvedCategoryConfirmed, Label: "五花肉", CategoryID: "24",
-		Provenance: domain.ItemResolutionByBuyerChoice,
 	}, g.Resolution)
 }
 

@@ -321,7 +321,6 @@ CREATE TABLE procurement_price_previews (
     buyer_id                   BIGINT      NOT NULL,
     request_id                 BIGINT      NOT NULL,
     request_revision_id        BIGINT      NOT NULL,
-    quality_knowledge_state    TEXT        NOT NULL,
     buyer_requested_range_json JSONB       NOT NULL,
     quote_total_range_json     JSONB,
     client_request_id          TEXT        NOT NULL,
@@ -359,7 +358,6 @@ CREATE TABLE procurement_confirmed_rfq_snapshots (
     request_revision_id     BIGINT      NOT NULL,
     price_preview_id        BIGINT      NOT NULL,
     price_preview_version   BIGINT      NOT NULL,
-    quality_knowledge_state TEXT        NOT NULL,
     canonical_payload_json  JSONB       NOT NULL,
     payload_hash            TEXT        NOT NULL,
     client_request_id       TEXT        NOT NULL,
@@ -402,7 +400,6 @@ CREATE TABLE procurement_rfq_publication_approvals (
     -- 定價事實的兩個真實 hash。
     price_preview_payload_hash   TEXT        NOT NULL,
     price_preview_input_hash     TEXT        NOT NULL,
-    quality_knowledge_state      TEXT        NOT NULL,
     buyer_requested_range_hash   TEXT        NOT NULL,
     -- 報價截止：publication 自己的屬性，不在 confirmed snapshot 裡（doc 64 §3.1）。
     -- 它進 seller_facing_payload，所以已被 seller_facing_payload_hash 涵蓋。

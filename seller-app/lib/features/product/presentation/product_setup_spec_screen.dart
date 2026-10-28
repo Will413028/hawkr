@@ -15,7 +15,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../core/analytics/analytics_providers.dart';
 import '../../../core/codemeta/code_meta.dart';
-import '../../../core/networking/ambient_shipping_temperature.dart';
 import '../../../shared/utils/floating_toast.dart';
 import '../../../shared/widgets/app_toggle_switch.dart';
 import '../../../shared/widgets/setup_bottom_bar.dart';
@@ -29,6 +28,18 @@ import 'product_setup_top_bar.dart';
 import 'widgets/shipping_spec_card.dart';
 
 /// 商品上架第 5 步：設定規格等級、價格、庫存、配送方式，完成後觸發後台上傳
+
+/// 只留賣家已開通的運送方式；伺服器回哪些選項就列哪些，不依溫層過濾。
+@visibleForTesting
+List<Map<String, dynamic>> filterOnboardedShippingOptions(
+  List<Map<String, dynamic>> options,
+  Set<String> onboardedMethods,
+) => options
+    .where(
+      (o) => onboardedMethods.contains((o['shippingMethod'] ?? '').toString()),
+    )
+    .toList();
+
 class ProductSetupSpecScreen extends HookConsumerWidget {
   const ProductSetupSpecScreen({
     super.key,
@@ -150,20 +161,10 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
     final shippingError = useState<String?>(null);
 
     // 賣家當前已開通（available=true）的配送方式 key 集合，
-    // key 格式："$shippingMethod|$goodsType"（黑貓 goodsType 為空）。
     // 由 GET /app/shipping_methods 載入，用來過濾 shipping_quotes 回傳的選項，
     // 避免顯示「賣家未開通卻送出後被後端 400 退」的選項。
     final onboardedMethodKeys = useState<Set<String>>({});
     final onboardedFetched = useState(false);
-
-    bool isShippingMethodOnboarded(String method, String temperature) {
-      final keys = onboardedMethodKeys.value;
-      if (keys.contains('$method|$temperature')) return true;
-      // 黑貓在 GET /app/shipping_methods 內 goodsType 為空，
-      // 配對單一 "method|" key 即代表該方式整體已開通。
-      if (keys.contains('$method|')) return true;
-      return false;
-    }
 
     useEffect(() {
       Future<void> fetchOnboardedMethods() async {
@@ -177,8 +178,7 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
             if (m['available'] != true) continue;
             final method = (m['shippingMethod'] ?? '').toString();
             if (method.isEmpty) continue;
-            final goodsType = (m['goodsType'] ?? '').toString();
-            keys.add('$method|$goodsType');
+            keys.add(method);
           }
           onboardedMethodKeys.value = keys;
         } catch (_) {
@@ -1359,25 +1359,11 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
                                                   ),
                                                 );
                                               }
-                                              // 依 Java 必填的固定值與賣家已開通狀態過濾
                                               final filteredOptions =
-                                                  shippingOptions.value.where((
-                                                    o,
-                                                  ) {
-                                                    final method =
-                                                        (o['shippingMethod'] ??
-                                                                '')
-                                                            .toString();
-                                                    final temp =
-                                                        (o['temperature'] ?? '')
-                                                            .toString();
-                                                    return temp ==
-                                                            kAmbientShippingTemperature &&
-                                                        isShippingMethodOnboarded(
-                                                          method,
-                                                          temp,
-                                                        );
-                                                  }).toList();
+                                                  filterOnboardedShippingOptions(
+                                                    shippingOptions.value,
+                                                    onboardedMethodKeys.value,
+                                                  );
 
                                               // 賣家完全沒開通任何配送方式（fetch 完成且集合為空）
                                               if (onboardedFetched.value &&

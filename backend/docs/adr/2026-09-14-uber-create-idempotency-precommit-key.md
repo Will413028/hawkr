@@ -2,7 +2,7 @@
 
 | 項目 | 值 |
 |---|---|
-| 狀態 | accepted |
+| 狀態 | accepted；Java 的 Uber 程式刪除時（主計畫 B3）標 superseded by `2026-10-27-general-ecommerce-scope-cut.md`（D4）；在那之前 Java 仍依本檔運作 |
 | 日期 | 2026-09-14 |
 | 影響範圍 | shipping-service Uber Direct 建單 |
 

@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ShippingType } from "@/lib/codemeta/enums";
-import { AMBIENT_TEMPERATURE_CODE } from "@/lib/seller/ambient-temperature";
 import {
 	SHIPPING_TYPE,
 	type ShippingOnboarding,
@@ -20,7 +19,7 @@ vi.mock("@/lib/api/client", () => ({ authedFetch }));
  */
 
 function row(shippingType: string): ShippingOnboarding {
-	return { shippingType, goodsType: "3201", enabled: "true" };
+	return { shippingType, enabled: "true" };
 }
 
 describe("unsupportedOnboardingTypes", () => {
@@ -48,9 +47,7 @@ describe("unsupportedOnboardingTypes", () => {
 	});
 
 	it("空的 shippingType 不算（那是缺欄位，不是新 provider）", () => {
-		expect(
-			unsupportedOnboardingTypes([row(""), { goodsType: "3201" }]),
-		).toEqual([]);
+		expect(unsupportedOnboardingTypes([row(""), {}])).toEqual([]);
 	});
 });
 
@@ -60,7 +57,7 @@ describe("submitCvsOnboarding", () => {
 		authedFetch.mockResolvedValue({ data: {} });
 	});
 
-	it("always posts the ambient goodsType", async () => {
+	it("does not post goodsType", async () => {
 		await submitCvsOnboarding({
 			senderName: "王小明",
 			senderPhone: "0912345678",
@@ -70,6 +67,6 @@ describe("submitCvsOnboarding", () => {
 		expect(authedFetch).toHaveBeenCalledTimes(1);
 		const [path, init] = authedFetch.mock.calls[0];
 		expect(path).toBe("/app/shipping_onboardings/cvs");
-		expect(init.json.goodsType).toBe(AMBIENT_TEMPERATURE_CODE);
+		expect(init.json).not.toHaveProperty("goodsType");
 	});
 });

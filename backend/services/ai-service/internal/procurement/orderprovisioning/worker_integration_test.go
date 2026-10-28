@@ -111,9 +111,9 @@ func seed(ctx context.Context, t *testing.T, pool *pgxpool.Pool, lane string, st
 	_, err = pool.Exec(ctx, `
 		INSERT INTO procurement_confirmed_rfq_snapshots (
 			id, buyer_id, request_id, request_revision_id, price_preview_id, price_preview_version,
-			quality_knowledge_state, canonical_payload_json, payload_hash,
+			canonical_payload_json, payload_hash,
 			client_request_id, expires_at
-		) VALUES ($1, $2, $3, 1, 1, 1, 'KNOWN',
+		) VALUES ($1, $2, $3, 1, 1, 1,
 			$4, 'hash-snapshot', 'seed-snapshot', $5)`,
 		snapshotID, int64(buyerID), requestID,
 		// ⚠️ 傳 string 不是 []byte：DSN 帶 default_query_exec_mode=exec，參數以文字送出，

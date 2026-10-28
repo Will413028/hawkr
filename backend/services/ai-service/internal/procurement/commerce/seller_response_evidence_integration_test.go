@@ -45,9 +45,8 @@ func seedEvidenceFixture(ctx context.Context, t *testing.T, pool *pgxpool.Pool) 
 	_, err = repo.InsertConfirmedRfqSnapshot(ctx, repository.InsertConfirmedRfqSnapshotInput{
 		BuyerID: evidenceBuyerID, RequestID: req.ID, RequestRevisionID: rev.ID,
 		PricePreviewID: 8001, PricePreviewVersion: 1,
-		QualityKnowledgeState: "BUYER_QUALITY_UNKNOWN",
-		CanonicalPayloadJSON:  json.RawMessage(`{"item":"芭樂","quantity":100,"unit":"KG"}`),
-		PayloadHash:           evidenceSnapHash, ClientRequestID: "evidence-snapshot",
+		CanonicalPayloadJSON: json.RawMessage(`{"item":"芭樂","quantity":100,"unit":"KG"}`),
+		PayloadHash:          evidenceSnapHash, ClientRequestID: "evidence-snapshot",
 		ExpiresAt: sellerResponseTestNow.Add(time.Hour),
 	})
 	require.NoError(t, err)

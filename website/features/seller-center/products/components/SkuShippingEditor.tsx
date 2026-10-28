@@ -34,7 +34,6 @@ import {
 	type ShippingQuoteOption,
 	type SkuShippingMethod,
 } from "@/lib/products/seller-repo";
-import { AMBIENT_TEMPERATURE_CODE } from "@/lib/seller/ambient-temperature";
 import {
 	type ShippingMethodOpenState,
 	shippingMethodOpenState,
@@ -59,6 +58,14 @@ function methodLabel(m: string, fallback?: string): string {
 	return (
 		fallback?.trim() || SHIPPING_METHOD_LABEL[m as ShippingMethodValue] || m
 	);
+}
+
+/** 伺服器回哪些選項就列哪些；client 不再自己過濾。 */
+export function quoteOptionFor(
+	quotes: ShippingQuoteOption[],
+	type: string,
+): ShippingQuoteOption | undefined {
+	return quotes.find((o) => o.shippingMethod === type);
 }
 
 /** 量測欄齊全（長寬高+重量皆 > 0）才值得打試算 API。 */
@@ -253,11 +260,7 @@ export default function SkuShippingEditor({ sku, index, onUpdate }: Props) {
 
 				<ul className="list-none m-0 p-0 flex flex-col gap-2">
 					{cards.map((type) => {
-						const option = quotes.find(
-							(o) =>
-								o.shippingMethod === type &&
-								o.temperature === AMBIENT_TEMPERATURE_CODE,
-						);
+						const option = quoteOptionFor(quotes, type);
 						const method = selected.find((m) => m.type === type);
 						const openState: ShippingMethodOpenState = onboardingLoaded
 							? shippingMethodOpenState(onboardingRows, type)

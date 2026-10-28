@@ -221,7 +221,7 @@ class TestExpandedCountsAgainstRealTopology(unittest.TestCase):
         #
         # 刪除沒有 producer 或 consumer 已不存在的 8 條帶 retry: 的 queue（ai_service.order.completed、
         # ai_service.seller.membership_changed、seller.account.deleted、seller.product.viewed、
-        # seller.review.created、seller.review.hidden、seller.review.result，以及 pricebook 的 seller.deleted 消費 queue）：
+        # seller.review.created、seller.review.hidden、seller.review.result，以及已刪除服務的 seller.deleted 消費 queue）：
         # exchanges       114 →  98 (-16)  每條的 .retry ＋ .dlx（fanout）
         # queues          185 → 169 (-16)  每條的 queue ＋ .dlq
         # queues_json_args  6 →   6 (+0)
