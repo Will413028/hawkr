@@ -215,6 +215,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - content 的 banner 點擊行為（`post`）改成經 social 的公開 API 確認貼文存在，ID 格式同時換成 UUID：依賴表的 content 加上 social，並更新 ADR D2 的表（content 模組 `CARRYOVER.md` 的沿用盤點；現在只檢查非空）。
   - 賣家中心的動態數徽章改由伺服器提供數量：website 現在只從前 50 筆貼文算（`useSellerPosts`），超過就少算（A3 計畫第 4C 刀的決定）。
 - [ ] **A8 notification**：依 ADR `2026-10-05-notification-module.md`：通知型別定義在程式碼、逐一明確訂閱，不照搬 wildcard。
+  - identity 接 Clerk 的 `user.updated` webhook（驗證簽章）同步已驗證的主要 email，作為 email 渠道的寄件地址；不在寄信時呼叫 Clerk Backend API（ADR `2026-09-27-identity-clerk.md` 文末〈修訂：email 作為通知的寄件地址〉）。完成時 `docs/modules/identity.md` 的 email 從「建帳時的快照」改成同步後的規格。
   - `notifications/stream` 的 SSE 依 D7 改成 server streaming，續傳用游標欄位取代 `Last-Event-ID`，保留每個帳號的串流上限。
   - 治理的通知（A3b `step10e-reports-brief.md` R4、R7、R9，Will 2026-10-18）：訂閱 seller 的 `ReportReceived`、`ReportResolved`（通報人：登入的用站內通知、匿名但留了 email 的用 email，確認信依收件 email 節流），以及在 seller 加上詢問的事件並訂閱（賣家；3c-b 預先發出的 `CaseInquiryCreated` 因沒有消費者已刪除，A8 依「消費者出現時再加事件」在這一刀加）；食安事件通知某個商品過去 6 個月的購買者，前提是查得到購買者（B8）。
   - **確認信地址不得留在 job 參數裡**（A3b 3c-a 設計審查 #10，Will 2026-10-18）：`ReportReceived.ConfirmationEmail`（匿名送出留的 email）只在事件與 A8 同一個 transaction 排入的 job 參數裡，seller 不落表（`seller/events.go` 的註解寫同一條）。River v0.47.0（`backend/go.mod`）預設保留完成的 job 24 小時、丟棄（寄送失敗用盡重試）的 job 7 天（`rivershared/riversharedmaintenance/river_shared_maintenance.go:35-37`；專案沒有覆寫 `*JobRetentionPeriod`），參數裡的地址會跟著留那麼久。所以寄送 job 必須在完成或丟棄時清掉參數裡的地址，或參數只放 report／supplement 的參照、執行時再讀（地址就落在 seller，回到 365 天的聯絡方式保留規則管得到的範圍）。觸發：A8 訂閱 `ReportReceived` 的那一刀；驗收要有測試證明 job 完成與丟棄之後參數不含地址。
