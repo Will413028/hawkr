@@ -1,6 +1,8 @@
 # Banner 動作跳轉（Banner Action）詳細設計書
 
-> **單體（遷移計畫 A1，2026-09-26 起是現行實作）**：content-service 已刪除，現行實作在單體的 `internal/modules/content`。點擊行為不再是原樣透傳的 JSONB：對外契約是 proto 的 `oneof`（根目錄 `api/`），DB 是 `action_type`、`action_target` 兩欄加 `banners_action_check`，值域是封閉的四種，新增動作類型要同時改 proto、模組與 CHECK。url 只接受 http、https。本文件的「各層契約」是舊設計，以 content 模組的 `AGENTS.md`（不變量）與 `CARRYOVER.md`（沿用盤點）為準；動作的語意與 App 的分派規則仍以本文件為準。
+> 單體模組的現行規格見 `docs/modules/content.md`；本文只當歷史參考。
+
+> **單體（遷移計畫 A1，2026-09-26 起是現行實作）**：content-service 已刪除，現行實作在單體的 `internal/modules/content`。點擊行為不再是原樣透傳的 JSONB：對外契約是 proto 的 `oneof`（根目錄 `api/`），DB 是 `action_type`、`action_target` 兩欄加 `banners_action_check`，值域是封閉的四種，新增動作類型要同時改 proto、模組與 CHECK。url 只接受 http、https。本文件的「各層契約」是舊設計，以 `docs/modules/content.md`（現行規格）與 content 模組的 `CARRYOVER.md`（沿用盤點）為準；動作的語意與 App 的分派規則仍以本文件為準。
 
 ## 概述
 

@@ -1,5 +1,7 @@
 # App 版本檢查與強制更新（App Version Gate）詳細設計書
 
+> 單體模組的現行規格見 `docs/modules/content.md`；本文只當歷史參考。
+
 > **2026-09-26 更新**：App 只發 iOS。平台維度（`AppPlatform`、`platform` 欄位、`X-App-Platform` header）已拿掉，門檻改以 `app_type` 識別；現行實作在單體的 `internal/modules/content`，決策見 ADR `2026-09-26-app-ios-only.md`。本文件以下有關 Android、`AppPlatform` 與「四組」的描述是舊設計，以該 ADR 為準。
 >
 > **2026-09-27 更新**：兩支 App 的檢查邏輯（只在 iOS、3 秒逾時、fail-open、回到前景的節流）改成共用的 `packages/hawkr_app_update`，D10 與 Non-Goal 的「不做共用 package」已由 ADR `2026-09-27-app-version-gate-shared-package.md` 取代；§4.6 只剩畫面、路由與共用檔的對照。

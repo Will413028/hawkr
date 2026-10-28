@@ -1,6 +1,6 @@
 # content 模組的沿用盤點
 
-從 content-service 沿用的每個機制重新判斷的結論（遷移計畫「模組完成的定義」），以及與 content-service 的差異。模組現行的職責、資料與不變量在同目錄的 `AGENTS.md`。
+從 content-service 沿用的每個機制重新判斷的結論（遷移計畫「模組完成的定義」），以及與 content-service 的差異。模組現行的職責、資料與不變量在同目錄的 `AGENTS.md`，行為規格在 `docs/modules/content.md`。
 
 ## 沿用盤點
 
@@ -20,7 +20,7 @@ content-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 | 點擊行為的商品、貼文 ID 只檢查非空，不確認存在 | 擁有者模組能被查詢 | 不成立：catalog、social 還是舊服務，ID 格式也會隨它們搬進單體從 TSID 改成 UUID | 經擁有者模組的公開 API 確認存在（ADR D2） | 現在只檢查非空；catalog、social 搬進單體時，依賴表加上它們並以公開 API 確認存在 |
 | 商店網址 `store_url` 可為 NULL，NULL 表示沒有設定 | 需要區分 NULL 與空字串 | 不成立：沒有地方區分，proto 也以空字串表示沒有設定 | 「沒有設定」只有一種表示法 | 改 `NOT NULL DEFAULT ''`（同一個 migration） |
 | 站點文案 `site_contents` 的後台 CRUD | 前台有地方讀 | 不成立：website 的 `lib/site-content` 已退役並被 `check-architecture.ts` 禁止 import，App 沒讀，gateway 也沒有公開的 endpoint。唯一的讀取方是 gateway 的退貨文案 SSE（key `return-policy`，沒有值時退回 ai-service 的固定文案 `ReturnPolicyFacts`），盤點時漏列；後台頁刪除後已經寫不進值 | 同上 | 拿掉（Will 2026-09-25，同一個 migration）；admin 的文案頁在試點步驟 6 刪除，退貨文案 SSE 在刪除 content-service 時改成一律由 ai-service 回固定文案。真的需要以 key 管理文案時，連讀取端一起設計 |
-| 並發修改：最後寫入者獲勝（設計書 50 §7.4、54 §5.3，不加樂觀鎖） | 修改頻率低，而且衝突無害 | 不成立：頻率低只讓衝突少見；整筆覆寫會靜默蓋掉別人的修改，換圖時還會讓 GC 刪掉正在顯示的圖 | 資源帶 etag，修改時比對（Google AIP-154、RFC 9110 的 `If-Match`） | 改成 etag（ADR `2026-09-25-optimistic-concurrency-etag.md`，Will 2026-09-25 決定）：`version` 欄與條件式 UPDATE（migration `etag_versions`），見 `AGENTS.md` 的「不變量」 |
+| 並發修改：最後寫入者獲勝（設計書 50 §7.4、54 §5.3，不加樂觀鎖） | 修改頻率低，而且衝突無害 | 不成立：頻率低只讓衝突少見；整筆覆寫會靜默蓋掉別人的修改，換圖時還會讓 GC 刪掉正在顯示的圖 | 資源帶 etag，修改時比對（Google AIP-154、RFC 9110 的 `If-Match`） | 改成 etag（ADR `2026-09-25-optimistic-concurrency-etag.md`，Will 2026-09-25 決定）：`version` 欄與條件式 UPDATE（migration `etag_versions`），見 `docs/modules/content.md` §4 |
 | 版本門檻的 upsert（`ON CONFLICT DO UPDATE`） | 設定只有一份，覆寫無害 | 不成立：兩個人同時設定時，後寫入的一方靜默蓋掉前一方 | 以 key 建立只建立、修改帶版本（ADR 的 D3；RFC 9110 的 `If-None-Match: *` 與 `If-Match`） | 拆成 `CreateAppVersionGate` 與 `UpdateAppVersionGate` |
 | 次要索引：`banners` 的 `(is_active, display_order)` | 表大到全表掃描太慢 | 不成立：由後台維護、筆數少 | 小表不建次要索引，等 EXPLAIN 證明需要 | 拿掉（migration `drop_unmeasured_indexes`）；EXPLAIN 顯示需要時再加 |
 | 分頁用頁碼加 `OFFSET`（`go-pkg/pagination`） | 前端以頁碼跳頁、需要總數 | 不成立：沒有畫面跳頁或讀總數，後台清單寫死第一頁 | 對外用不透明的 page token（Google AIP-158）；內部用 keyset，翻頁途中有新增或刪除也不重複、不漏 | 模組收上一頁最後一筆的排序鍵（`BannerCursor`），多取一筆判斷有沒有下一頁；token 的編碼在 http 層。每頁筆數照 AIP-158（0 用預設值、超過上限以上限計、負數是錯誤）。不回總數 |
