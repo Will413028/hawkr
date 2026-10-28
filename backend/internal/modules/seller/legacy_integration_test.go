@@ -199,7 +199,7 @@ func TestMatchCertificateHolder(t *testing.T) {
 	}
 }
 
-// 比對基準是人工核准的 KYC（設計書 19 §8.5.1「已通過實名認證」）：PayUni 還沒核准、甚至被拒絕，基準都還在；申請還沒核准則沒有基準。
+// 比對基準是人工核准的 KYC（`docs/modules/seller.md` §1.3「已通過實名認證」）：PayUni 還沒核准、甚至被拒絕，基準都還在；申請還沒核准則沒有基準。
 func TestMatchCertificateHolderDoesNotNeedThePayUniApproval(t *testing.T) {
 	t.Parallel()
 	f := setup(t)

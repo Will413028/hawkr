@@ -111,7 +111,11 @@ flowchart LR
 
 **存放位置**：seller 模組的 `model.Capability` 是推導的來源，能力表、停權白名單與分派判準見 `docs/modules/seller.md` §10.1；gateway 的 `authz.Capability` 是同一組字串，是 gateway 內部授權 token，不進 CodeMeta（§8.1）。
 
-### 3.4 「新增入口忘記宣告」的結構性防呆
+### 3.5 能力推導（條件 → 能力）
+
+能力表、條件對應、停權白名單與 `Authorize` 的拒絕形狀由 seller 模組擁有，見 `docs/modules/seller.md` §10、§10.1。
+
+### 3.6 「新增入口忘記宣告」的結構性防呆
 
 1. **gateway 編譯期**：`requireSeller` 唯一簽章是 `requireSeller(cap Capability)`，`sellerHandle` 掛載時自動註冊到 registry；`authz.Register` 遇到不認得的 token 直接 panic。
 2. **gateway 啟動期斷言（boot fail-fast）**：router 建構完成後 walk `engine.Routes()`，斷言 `/api/v1/app` 下不存在未豁免的 wildcard 路由，且 `strictSellerPrefixes`（整個都是賣家面的區域，例如 `/products`、`/shipments`、`/seller/invoices`）下每條路由都已宣告 capability，不一致 **panic**。
@@ -309,7 +313,7 @@ CodeMeta SSOT 對象是「跨服務/前端可見的共享代碼值」。
 
 | 項目 | 嚴重度 | 影響 | 緩解 / 追蹤 |
 |---|---|---|---|
-| 豁免清單語意錯誤機器不可判定 | 中 | 誤把賣家路由加進豁免 = deny-by-default 漏洞 | §4.4 每條附理由 + review 檢核（§3.4 殘餘風險） |
+| 豁免清單語意錯誤機器不可判定 | 中 | 誤把賣家路由加進豁免 = deny-by-default 漏洞 | §4.4 每條附理由 + review 檢核（§3.6 殘餘風險） |
 | gateway 信任單體帶的 header | 中 | 能連到 gateway 的其他程序可偽造能力集合 | 只有單體連得到 gateway；gateway 的 header 解析對不合法值一律拒絕 |
 
 ---

@@ -604,7 +604,7 @@ func errNoGrant() error {
 }
 
 // MatchCertHolder 回報 holderName（政府證書查驗回的業者名稱）是否屬於店家目前已核准的 KYC 的姓名或公司名稱（規則在
-// model.MatchCertHolder，名字不出這個函式）。基準只有目前的 stint 上人工核准（KYC APPROVED）的申請（設計書 19 §8.5.1：「已通過
+// model.MatchCertHolder，名字不出這個函式）。基準只有目前的 stint 上人工核准（KYC APPROVED）的申請（`docs/modules/seller.md` §1.3：「已通過
 // 實名認證」的名稱；PayUni 核准是金流開通，不是身分驗證，所以不是條件）：店家不存在、已關閉、沒有申請、申請不是 APPROVED 都是沒有基準
 // （HasReference=false，呼叫方轉人工），不是錯誤；讀取失敗回錯誤，呼叫方必須 fail-closed。
 func (s *Service) MatchCertHolder(ctx context.Context, storeID int64, holderName string) (model.CertHolderMatch, error) {

@@ -74,7 +74,7 @@ func ManualRevokeReasonValues() []RevokeReason {
 	return []RevokeReason{RevokeAdminCorrection, RevokeExternalDecision, RevokeOther}
 }
 
-// ContactRetention 是匿名檢舉人聯絡欄位的保留期限（設計書 32 的 90 天），從建立時間起算；有結果的，清除時間是 greatest(建立 + ContactRetention, 結果 + ContactRetentionAfterOutcome)；
+// ContactRetention 是匿名檢舉人聯絡欄位的保留期限（`docs/modules/seller.md` §7 的 90 天），從建立時間起算；有結果的，清除時間是 greatest(建立 + ContactRetention, 結果 + ContactRetentionAfterOutcome)；
 // 不論有沒有結果，建立滿 ContactRetentionCap 一律清除。
 const ContactRetention = 90 * 24 * time.Hour
 
