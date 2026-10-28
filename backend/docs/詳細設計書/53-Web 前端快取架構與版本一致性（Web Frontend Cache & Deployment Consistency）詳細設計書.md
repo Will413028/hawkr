@@ -268,7 +268,7 @@ expansion 霰彈式失效全站 landing（例：改一個商品價格會失效�
 
 ### 4.2 失效鏈流程
 
-1. **後端觸發**（責任邊界規範 §9）：Java（product-service）、Go（seller/review service）於 price/stock/publish/profile mutation commit 後 `POST /api/revalidate`，header `x-revalidate-secret`，body `{tags:[...], event_id?}`（`app/api/revalidate/route.ts:31`）。**producer 只發 entity tag**（`product:<id>` / `seller:<id>`）；domain-collection 失效由步驟 3 的 web expansion 產生，producer 不直接發 domain-collection tag。⚠️ **賣家的 entity tag 必須涵蓋公開網址接受的全部識別碼空間**：店鋪頁片段可以是 `store_id`（2026-07-23 前的連結）或 `store_code`（現行 canonical），而 web 是拿**網址片段**當快取鍵（`lib/api/cached.ts` `sellerTag(id)`），`store_code` 為獨立鑄造、與 `store_id`／`account_id` 無函數關係。因此 seller-service 一律經 `pkg/revalidate.SellerTags(...)` 發出全部 id 空間並去重（收斂點：`services/seller-service/internal/usecase/seller.go` `sellerCacheTags`／`bustSellerCache`）；只發單一 id 空間的賣家，其店鋪頁會 stale 到 TTL（1800s）。共用 helper：Java `RevalidateClient.bustAfterCommit`、Go `pkg/revalidate/Client`（§9.6）。
+1. **後端觸發**（責任邊界規範 §9）：Java（product-service）、Go（單體的 seller 模組、review-service）於 price/stock/publish/profile mutation commit 後 `POST /api/revalidate`，header `x-revalidate-secret`，body `{tags:[...], event_id?}`（`app/api/revalidate/route.ts:31`）。**producer 只發 entity tag**（`product:<id>` / `seller:<id>`）；domain-collection 失效由步驟 3 的 web expansion 產生，producer 不直接發 domain-collection tag。⚠️ **賣家的 entity tag 必須涵蓋公開網址接受的全部識別碼空間**：店鋪頁片段可以是 `store_id`（2026-07-23 前的連結）或 `store_code`（現行 canonical），而 web 是拿**網址片段**當快取鍵（`lib/api/cached.ts` `sellerTag(id)`），`store_code` 為獨立鑄造、與 `store_id`／`account_id` 無函數關係。因此 seller 模組在每個「可公開曝光」輸入的寫入者的 transaction 內，以 `internal/platform/revalidate.StoreTags(store_id, store_code)` 排入 River job `revalidate`，一次發出 `store_id` 與 `store_code` 兩個 tag（不發 account 的 tag：沒有讀者）；只發單一 id 空間的賣家，其店鋪頁會 stale 到 TTL（1800s）。共用 helper：Java `RevalidateClient.bustAfterCommit`、單體 `internal/platform/revalidate`、其餘 Go 服務 `pkg/revalidate/Client`（§9.6）。
 2. **驗證 + 解析**（`lib/api/revalidate-request.ts`）：secret timing-safe、body ≤64KB、tags ≤128；支援的 tag = `STATIC_PUBLIC_TAGS`（`PUBLIC_CACHE_TAGS` 全部）+ `ENTITY_TAG` regex `^(product|seller|post|category|hashtag|recipe):...`。**任一 tag 非白名單 → 400，整包 tag 全不失效（first-invalid-fails-all）**。🔴 由此得到一條跨 repo 約束：**任一時刻 web 的白名單必須 ⊇ backend 會發的 tag 集合**——backend 先加新 tag 而 web 沒跟上，會讓同一包裡原本有效的 tag 一起失效不了。retired 的 `mode` 欄位一律忽略（拒收會連帶丟掉同包的有效 tag）；`revalidatePath` 被 `softTagFilter` 禁用。
 3. **aggregate 展開**（`expandAggregateTags`）：entity tag → 它被嵌入的 domain-collection tag（精準映射，見 §4.3）。
 4. **逐 tag `revalidateTag`，profile 由 tag 形狀決定**（`lib/api/revalidate-request.ts` `revalidationProfileFor`，producer 無從選擇）：
@@ -290,7 +290,7 @@ expansion 只展開 entity「實際被嵌入」的 domain-collection tag，**不
 | `hashtag:<id>` | `hashtags:list` | 熱門標籤列表 |
 | `category:<id>` | `categories` | 分類樹 |
 
-映射實作於 `lib/api/revalidate-request.ts:93-119`。今日僅 product-service／seller-service／review-service 為 producer，只發 `product:<id>` 與 `seller:<id>`（`pkg/revalidate/tags.go` 只有 `ProductTag`／`SellerTag`）；`post`／`recipe`／`hashtag`／`category` 四條展開邊為契約先備，producer 補齊（例：`category:<id>` 見 `backend-payuni#1919`）即生效，web 端無須再改。
+映射實作於 `lib/api/revalidate-request.ts:93-119`。今日 producer 有 product-service、單體的 seller 模組與 review-service，只發 `product:<id>` 與 `seller:<id>`（單體的 `internal/platform/revalidate` 的 `StoreTags`；Go 服務的 `pkg/revalidate/tags.go` 只有 `ProductTag`／`SellerTag`）；`post`／`recipe`／`hashtag`／`category` 四條展開邊為契約先備，producer 補齊（例：`category:<id>` 見 `backend-payuni#1919`）即生效，web 端無須再改。
 
 **收斂後不再有的展開邊**（收斂前假失效，坐實不含對應 entity 欄位 → 移除）：
 - 全部 `product/seller/post/recipe → tab:*`：`tab:*` 唯一「額外」命中的 fetcher（食譜／推薦賣家／熱門標籤／分類）皆不嵌對應 entity 欄位。
@@ -309,15 +309,15 @@ expansion 只展開 entity「實際被嵌入」的 domain-collection tag，**不
 
 | fetcher | 後端資料源 | 是否因商品 mutation 過時 |
 |---|---|---|
-| `getCachedSeller`（`cached.ts:151`） | `/public/sellers/{id}` → 賣家 profile 欄位（`seller-service/internal/grpc/mapper.go:14`） | ❌ 無任何商品衍生欄位 |
-| `getCachedSellerStats`（`cached.ts:181`） | `/public/sellers/{id}/stats` → `seller-service/internal/grpc/handler.go:298-315` **只填** rating／followers／reviewCount；proto 的 `total_products`／`total_orders`／`total_sales` 全 repo 無賦值點（gateway `seller.go:288` 讀到的恆為零值），web 亦只讀 `followers`（`SellerProfileV2.tsx:85`） | ❌ |
+| `getCachedSeller`（`cached.ts:151`） | `/public/sellers/{id}` → 賣家 profile 欄位（seller 模組經 `internal/legacy/sellerserver/server.go` 的 `GetSeller` 提供） | ❌ 無任何商品衍生欄位 |
+| `getCachedSellerStats`（`cached.ts:181`） | `/public/sellers/{id}/stats` → `internal/legacy/sellerserver/server.go` 的 `GetSellerStats` **只填** rating／followers／reviewCount；proto 的 `total_products`／`total_orders`／`total_sales` 全 repo 無賦值點（gateway `seller.go:288` 讀到的恆為零值），web 亦只讀 `followers`（`SellerProfileV2.tsx:85`） | ❌ |
 | `getCachedSellerReviewStats` / `getCachedSellerReviews` | review-service 評論列與統計；`sku_name`／`item_image_key` 為**訂單快照欄位**（`review-service/db/schema/schema.sql:15-16`），非商品即時查詢 | ❌ |
 | `getCachedSellerProducts` / `getCachedSellerStorefrontProducts` | 商品列表 | ✅ 但同掛 `products:list`，由 `product:<id>` 展開命中 |
-| `getCachedRecommendedSellers`（`sellers:list`） | `/public/sellers/recommended` → 近 30 天 order 營收排名 + 賣家 profile + 訂閱數 + **「有無公開上架商品」過濾**（`seller-service/internal/usecase/recommended_sellers.go` 的 `GetRecommendedSellers`；集合來自 product-service `ListStoreIDsWithPublicProductsInternal`） | ✅ 但**只對「改變賣家公開商品集合」的 mutation**，而那批本來就共發 `seller:<id>`（見下） |
+| `getCachedRecommendedSellers`（`sellers:list`） | `/public/sellers/recommended` → discovery 模組的排行快照（每 15 分鐘重算；候選 =「有公開商品」∩「可公開曝光」，分數用近 30 天訂單與評價，見 `docs/modules/discovery.md` §3、§5）+ 讀取時即時檢查曝光資格 + 賣家 profile + 訂閱數 | ✅ 但**只對「改變賣家公開商品集合」的 mutation**，而那批本來就共發 `seller:<id>`（見下） |
 
 🔴 **共發 `seller:<id>` 的判準是「該 mutation 是否改變賣家有哪些公開商品」**（責任邊界 §9.3 ★）——對不改變該集合的 mutation 共發 `seller:<id>` 是純 over-invalidation：欄位編輯（`updateProduct`）／庫存（`StockService`）／改分類（`batchChangeProductCategory`、`CategoryService` cascade）／未跨 ACTIVE 的狀態變更／非 ACTIVE 商品刪除 → **只發 `product:<id>`**；建立即上架／刪除 ACTIVE 商品／上下架跨 ACTIVE／賣家批次下架 → 仍共發 `seller:<id>`。一次商品價格編輯或一次下單扣庫存的假失效因此歸零。
 
-> **推薦賣家的「有無公開上架商品」過濾不改變本判準**：該過濾把 `sellers:list` 的成員集合綁在「賣家有沒有公開商品」上，而集合會變動的時機恰好等於上面判準為真的那四種——`ProductService.createProduct`（`isActive` 分支）／`updateProductStatus`／`updateSellerProductStatus`（皆走 `crossesActiveBoundary`）／`deleteProduct`（`wasActive` 分支）走 `revalidateProductAndSeller`，`SellerProductOffShelfService` 的批次下架／復架走 `revalidateProductsWithSellers`，`ProductImportService` commit 亦共發。⇒ 過濾是**成員**變動、不是**排序**變動，而成員變動的每一個 producer 都已共發 `seller:<id>`，展開含 `sellers:list`，失效面完整。
+> **推薦賣家的「有無公開上架商品」過濾不改變本判準**：該過濾把 `sellers:list` 的成員集合綁在「賣家有沒有公開商品」上，而集合會變動的時機恰好等於上面判準為真的那四種——`ProductService.createProduct`（`isActive` 分支）／`updateProductStatus`／`updateSellerProductStatus`（皆走 `crossesActiveBoundary`）／`deleteProduct`（`wasActive` 分支）走 `revalidateProductAndSeller`，`SellerProductOffShelfService` 的批次下架／復架走 `revalidateProductsWithSellers`，`ProductImportService` commit 亦共發。⇒ 過濾是**成員**變動、不是**排序**變動，而成員變動的每一個 producer 都已共發 `seller:<id>`，展開含 `sellers:list`，失效面完整。排行快照本身每 15 分鐘重算一次（`docs/modules/discovery.md` §3、§7），失效只讓 web 重取當下的快照。
 
 ### 4.5 失效後收斂：合成讀者（Warm）
 
