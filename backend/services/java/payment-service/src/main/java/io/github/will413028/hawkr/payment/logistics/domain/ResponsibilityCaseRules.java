@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * 責任判定案件的 lifecycle 規則（65 §5.5.2 E0／E0.1／E0.2）。
+ * 責任判定案件的 lifecycle 規則（65）。
  *
  * <p>🔴 <b>碼值本身住在 CodeMeta</b>（{@link FulfillmentExceptionCategory}／
  * {@link FulfillmentCaseResolutionType}／{@link ResponsibilityCause}）。本類別只放規則——
@@ -28,7 +28,7 @@ import java.util.Set;
  *
  * <p>⚠️ <b>不得</b>因為 DB 已經守住就把這一層拿掉：DB 的拒絕沒有業務語意，而責任判定的拒絕
  * 需要讓 ADM 操作者知道發生了什麼。反過來也<b>不得</b>因為這一層存在就不加 DB 約束——
- * 應用層的 if 會在下一次重構被抽掉而沒有人發現（65 §6.4.2 硬約束 1 逐字）。
+ * 應用層的 if 會在下一次重構被抽掉而沒有人發現（65 硬約束 1 逐字）。
  */
 public final class ResponsibilityCaseRules {
 
@@ -44,7 +44,7 @@ public final class ResponsibilityCaseRules {
     /**
      * 責任判定案件的 subject 軸：一個 provider 配送 leg。
      *
-     * <p>🔴 <b>不是 order、不是 shipment PK</b>（65 §5.5.2 D）：同一張訂單可以有正逆向兩條 leg，
+     * <p>🔴 <b>不是 order、不是 shipment PK</b>（65 D）：同一張訂單可以有正逆向兩條 leg，
      * 各自的責任判定互不相干；把 subject 定成 order 會讓第二條 leg 的案件建不出來，
      * 而 lifetime UNIQUE 使它<b>完全靜默</b>。
      */

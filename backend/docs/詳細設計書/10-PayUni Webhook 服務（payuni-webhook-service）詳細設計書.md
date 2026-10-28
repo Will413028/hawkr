@@ -69,7 +69,7 @@ graph TD
 | **欄位名稱** | **類型** | **必填** | **說明 / 備註** |
 |---|---|---|---|
 | id | BIGSERIAL | PK | 自增主鍵 |
-| provider | VARCHAR(20) | YES | `WebhookProvider` 的 **Value**（數字碼字串：PayUni=`8241`、Uber=`8242`），DEFAULT `'8241'`。🔴 **存 Value 不存 code name**——寫 `'UBER'` 會讓 consumer 拿字串去比數字碼。本表為多 provider 共用（66 號 Uber slice 沿用本表，不另建 `uber_webhook_inbox`） |
+| provider | VARCHAR(20) | YES | `WebhookProvider` 的 **Value**（數字碼字串：PayUni=`8241`、Uber=`8242`），DEFAULT `'8241'`。🔴 **存 Value 不存 code name**——寫 `'UBER'` 會讓 consumer 拿字串去比數字碼。本表為多 provider 共用（Uber slice 沿用本表，不另建 `uber_webhook_inbox`） |
 | mer_id | VARCHAR(32) | NO | PayUni 商家代號（`HAWK<store_id>`）。**僅 `provider=PayUni` 適用；其他 provider 為 NULL，不得填 sentinel** |
 | webhook_type | VARCHAR(50) | YES | `provider` 原生事件型別，值域依 provider 而異：PayUni 為 `PayUniEventType` 的 Value（8251-8254、8259=UNKNOWN）；Uber 為 webhook 原生 kind（例 `event.delivery_status`）。🔴 **跨 provider 刻意不做統一正規化**——正規化是 consumer 側的職責 |
 | event_key | VARCHAR(255) | YES | 去重鍵，見下方組合規則 |

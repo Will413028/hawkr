@@ -16,7 +16,7 @@ import java.util.List;
  * <p>所有狀態機 transition 都帶 WHERE 前置狀態，作為樂觀鎖兼狀態合法性檢查。
  * <p>禁用 {@code updateById()} 全欄位覆蓋（06 §2.4 INV-3）。
  *
- * <p>🔴 <b>任何寫 {@code status} 的 SQL 必須同句推進 {@code status_entered_at}</b>（65 §7.1.1.5，V11 ②）：
+ * <p>🔴 <b>任何寫 {@code status} 的 SQL 必須同句推進 {@code status_entered_at}</b>（65，V11 ②）：
  * 它是 aging 指標的唯一錨，不寫就永遠停在建單當下的值——而那是<b>靜默</b>的，
  * 沒有 CHECK、沒有測試、沒有錯誤訊息會告訴你 aging 是假的。
  * 寫法一律 {@code status_entered_at = CASE WHEN status IS DISTINCT FROM <新值> THEN NOW() ELSE status_entered_at END}

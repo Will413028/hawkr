@@ -37,7 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>🔴 <b>本 handler 不觸發任何退款</b>：不建 {@code auto_refund_tasks}、不呼叫退款 RPC、
  * 不寫退款類 {@code financial_logs}。{@code BUYER_CAUSED} 的財務結論就是
- * {@code refund_to_buyer = 0}（65 §5.5.2 F），而「不退款」不是一個要執行的動作。
+ * {@code refund_to_buyer = 0}（65 F），而「不退款」不是一個要執行的動作。
  *
  * <p>🔴 <b>也不寫收貨相關欄位</b>：不寫 {@code confirmed_at}／{@code confirm_type}／
  * {@code receipt_photo_keys}、不發 {@code order.receipt.confirmed}。

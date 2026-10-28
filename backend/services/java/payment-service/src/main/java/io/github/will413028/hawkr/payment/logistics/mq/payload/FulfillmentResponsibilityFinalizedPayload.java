@@ -9,7 +9,7 @@ import com.fasterxml.jackson.databind.annotation.JsonNaming;
  *
  * <p>語意：責任判定 <b>financially final</b>——不再有任何會改變 {@code refund_to_buyer} 的
  * 待覆核提案。🔴 只有 resolution {@code APPROVED} <b>且</b> case {@code RESOLVED} 的那一次
- * 交易才會產生它（65 §5.5.2 E0.1 ②③ 兩道 CAS 都 rows=1）。
+ * 交易才會產生它（65 ②③ 兩道 CAS 都 rows=1）。
  *
  * <p>🔴 <b>{@code responsibilityCause} 只能是四個 resolved 值</b>；
  * {@code RESPONSIBILITY_UNRESOLVED} 不會出現在本事件——未 final 就不發。
@@ -24,7 +24,7 @@ import com.fasterxml.jackson.databind.annotation.JsonNaming;
  * 不需要額外索引，也不會因為有人改了鍵的組成字串而失效。
  *
  * <p>🔴 <b>{@code shipmentId} 是 nullable {@code String}（TSID 十進位字串），不是 JSON 數字。</b>
- * 65 §6A.1.3 的跨語言通則逐字「新事件的 id 與金額一律 {@code string}」，理由不是風格：
+ * 65 的跨語言通則逐字「新事件的 id 與金額一律 {@code string}」，理由不是風格：
  * notification-service 的 {@code matchesFilter(filter, payload map[string]interface{})} 把 payload
  * 解進 {@code map[string]interface{}}，而 {@code encoding/json} 對 {@code any} 用 <b>float64</b>
  * ⇒ 超過 2^53 的 TSID 會被靜默截斷，而本事件的 consumer 正好包含 notification-service。

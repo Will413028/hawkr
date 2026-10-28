@@ -111,7 +111,7 @@ class OutboxProducerExchangeContractTest {
     }
 
     /**
-     * 🔴 36 §3.3.1 / 65 §6A.1.2 G3：業務 metric 不得下沉到 generic path。
+     * 🔴 36 §3.3.1 / 65：業務 metric 不得下沉到 generic path。
      *
      * <p>{@code hawkr_payment_total} 是 {@code business-alerts.yml} 的
      * {@code PaymentFailureSpike} 的分母。未來 fulfillment 事件若走 generic enqueue 而它會計數，

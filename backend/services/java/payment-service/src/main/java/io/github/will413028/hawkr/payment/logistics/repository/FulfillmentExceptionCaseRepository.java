@@ -47,7 +47,7 @@ public class FulfillmentExceptionCaseRepository {
      *
      * <p>🔴 走的是<b>不指名 conflict target</b> 的那一支（{@code insertResponsibilityCaseIfAbsent}）：
      * 責任判定案件同時受兩條唯一約束拘束，指名 dedup_key 的那一支撞到 lifetime UNIQUE 時會拋
-     * 23505 並讓整個交易 aborted ⇒ 建案 500。理由全文見 mapper 的 javadoc（65 §5.5.2 E0 G4）。
+     * 23505 並讓整個交易 aborted ⇒ 建案 500。理由全文見 mapper 的 javadoc（65 G4）。
      *
      * @return {@code true} = 這次真的開了（<b>只有這一次</b>才可以 INSERT N17 outbox）；
      *         {@code false} = 該 leg 已有責任案件（含已結案者）⇒ 不得發第二筆事件

@@ -1309,7 +1309,7 @@ public class OrderService {
              */
             io.github.will413028.hawkr.order.checkout.InvoiceIntakeResolver.Snapshot invoiceSnapshot,
             /**
-             * 訂單政策快照五欄（65 §5.1.3a）。<b>恆非 null</b>——preview 決定、confirm 讀回，
+             * 訂單政策快照五欄（65）。<b>恆非 null</b>——preview 決定、confirm 讀回，
              * 缺欄位在 {@code CheckoutService.extractPolicySnapshot} 就已 fail-closed。
              */
             io.github.will413028.hawkr.order.checkout.OrderPolicySnapshot policySnapshot

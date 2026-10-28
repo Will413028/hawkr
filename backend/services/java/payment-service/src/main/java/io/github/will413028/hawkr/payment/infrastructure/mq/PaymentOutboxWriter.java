@@ -135,7 +135,7 @@ public class PaymentOutboxWriter {
      * <b>不</b>決定投遞時機、<b>不</b>含任何 payment 業務 metric。
      * <p>
      * 🔴 <b>本方法不得遞增 {@code hawkr_payment_total} / {@code hawkr_payment_failed_total}</b>
-     * （36 §3.3.1 / 65 §6A.1.2 G3）：那兩個 Counter 餵 {@code business-alerts.yml} 的
+     * （36 §3.3.1 / 65）：那兩個 Counter 餵 {@code business-alerts.yml} 的
      * {@code PaymentFailureSpike}，非 payment 事件若進入分母，付款失敗率會被稀釋
      * ⇒ 告警在最需要的時候不響。業務 metric 一律留在 {@link #enqueueAndDispatch} 這個
      * payment-specific wrapper 的 afterCommit 內。

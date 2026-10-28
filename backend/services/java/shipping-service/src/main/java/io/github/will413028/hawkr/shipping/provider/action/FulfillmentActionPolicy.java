@@ -118,7 +118,7 @@ public final class FulfillmentActionPolicy {
      * 這個領域動作<b>哪些身分可以執行</b>——actor eligibility 的唯一 SSOT。
      *
      * <p>🔴 這是集合而非單值，因為「同一個動作買賣家都能做、只是看到的端點不同」
-     * （{@code track} / {@code view_only}）是常態而非例外：65 §6.1.1 的端點表裡，
+     * （{@code track} / {@code view_only}）是常態而非例外：65 的端點表裡，
      * {@code cancel}（買家 B-3 / 賣家 S-4）與未來的下鑽都是同一形狀。
      *
      * <p>先前這件事有<b>兩份</b>：本表宣告 {@code TRACK → BUYER}，而 gateway 的
@@ -143,7 +143,7 @@ public final class FulfillmentActionPolicy {
             // 唯讀動作：買賣雙方都有，各自指向自己的端點（買家 B-1 / 賣家 S-9）
             Map.entry(FulfillmentAction.TRACK, BUYER_AND_SELLER),
             Map.entry(FulfillmentAction.VIEW_ONLY, BUYER_AND_SELLER),
-            // VIEW_POD 是賣家動作：65 §6.1.1 唯一的 pod 端點 S-12
+            // VIEW_POD 是賣家動作：65 唯一的 pod 端點 S-12
             // GET /app/shipments/:order_no/pod 掛在 sellerHandle 上；買家側的 POD 是
             // B-1 回應內嵌的 delivery.podImageKeys，不是一個 action。
             // （本表先前宣告 BUYER，與設計書矛盾；該格今天不在 SUPPORTED 內尚未引爆。）

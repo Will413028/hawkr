@@ -163,11 +163,11 @@ graph TD
 超商：91 → 920(代碼回填/Webhook+內部) → 921(賣家確認/內部) → 31(配送中/Webhook)
 ```
 
-輔助方法（權威實作 `common-core .../utils/code/helper/ShippingStatusRules.java`，成員以 65 §7.1.2.3 為準）：
+輔助方法（權威實作 `common-core .../utils/code/helper/ShippingStatusRules.java`，成員以 65 為準）：
 - `isPendingShipment()` — 91/92/21/920 ＋ **933**，推進訂單至待出貨(20)
 - `isConfirmedShipment()` — 210/921 ＋ **930／931**，推進訂單至配送中(30)
 - `isAbnormal()` — 33/43/44/46/51~56/81/82 ＋ **932／993**，推進訂單至物流異常
-- `isTerminal()` — 11/41，終態（🔴 **不得新增成員**——65 的 A-1a 斷言釘住這一點）
+- `isTerminal()` — 11/41，終態（🔴 **不得新增成員**）
 - 🔴 **「不屬任一述詞」** — `98`／`22`／`990`／`991`／`992`。
   ⚠️ **`CREATE_FAILED(990)` 同樣不屬任一述詞**：四個 predicate 的成員為
   `isTerminal`＝`PICKED_UP`／`CANCELLED`、`isAbnormal`＝11 個異常值、`isPendingShipment`＝
@@ -181,7 +181,7 @@ graph TD
   ⇒ **`11`／`41` 雖然屬 `isTerminal`，同樣落到最後的 `else`、同樣不推進訂單軸**。
   ⇒ **不推進訂單軸的完整集合 ＝ `98`／`22`／`11`／`41`／`990`／`991`／`992`**。
   症狀是**只更新 `shipping_status`、訂單軸不動、也不報錯**。
-- ⚠️ `990` 雖不推進訂單軸，**不代表沒有出口**：65 §6A.1.2 **N1** 在 C 軸進入
+- ⚠️ `990` 雖不推進訂單軸，**不代表沒有出口**：65 在 C 軸進入
   `FAILED`／`CREATE_FAILED(990)` 且判定不再重試時發 `order.fulfillment.failed`，
   由 aftersales `cancelShipmentBySystem(FULFILLMENT_FAILED)` 走履約失敗鏈（見 [36 §3.1](36-MQ%20與事件總覽（MQ%20&%20Event%20Catalog）.md)）
 
@@ -193,14 +193,14 @@ graph TD
 | 配送中 | IN_TRANSIT, WAITING_PICKUP | 終態（PICKED_UP / CANCELLED）、異常群組、其他配送中（如 31↔32）；**禁止**倒退到出貨前 |
 | 異常相關 | ABNORMAL~PENDING_HOME_RETURN（isAbnormal=true） | 異常互轉、終態、重回配送中（門市關轉後重回）；**禁止**倒退到出貨前 |
 | 終態 | PICKED_UP, CANCELLED | 不可再轉移 |
-| **建單未知**（65 §7.1.2.1） | `CREATE_UNKNOWN(991)` | `991` 屬 `ShipmentStatusMapper.PRE_SHIPMENT` ⇒ `isValidTransition` 對它是 **blanket `return true`**，出邊不受列舉限制。回查排程的落點是 **provider-aware** 的：3001／3002／3003 → `91`，**3004 → `92`**（`/trade` 成功 ＝ `PROVIDER_CREATED`）；另可落 `990`／`41` |
-| **建單失敗**（65 §7.1.2.1） | `CREATE_FAILED(990)` | 🔴 **`990` 不在 `PRE_SHIPMENT`**，走自己的列舉分支 ⇒ 出邊只有列舉的兩條：`91`（Admin 重建）／`41`（Admin 取消＋退款鏈） |
-| **取消處理中**（65 §7.1.2.1） | `CANCEL_PENDING(992)` | provider 確認 → `41`；provider 拒絕 → **回退到任何非終態**（全值域唯一允許回退者）；入邊 from ＝ 全部非終態 |
-| **理賠處理中**（65 §7.1.2.1） | `CLAIM_PENDING(993)` | 成立 → `43`；不成立 → `33` 或原異常值。入邊 ← `44`／`932`／`33`／ADM 建案 |
+| **建單未知**（65） | `CREATE_UNKNOWN(991)` | `991` 屬 `ShipmentStatusMapper.PRE_SHIPMENT` ⇒ `isValidTransition` 對它是 **blanket `return true`**，出邊不受列舉限制。回查排程的落點是 **provider-aware** 的：3001／3002／3003 → `91`，**3004 → `92`**（`/trade` 成功 ＝ `PROVIDER_CREATED`）；另可落 `990`／`41` |
+| **建單失敗**（65） | `CREATE_FAILED(990)` | 🔴 **`990` 不在 `PRE_SHIPMENT`**，走自己的列舉分支 ⇒ 出邊只有列舉的兩條：`91`（Admin 重建）／`41`（Admin 取消＋退款鏈） |
+| **取消處理中**（65） | `CANCEL_PENDING(992)` | provider 確認 → `41`；provider 拒絕 → **回退到任何非終態**（全值域唯一允許回退者）；入邊 from ＝ 全部非終態 |
+| **理賠處理中**（65） | `CLAIM_PENDING(993)` | 成立 → `43`；不成立 → `33` 或原異常值。入邊 ← `44`／`932`／`33`／ADM 建案 |
 
 🔴 **這幾個三位數值不屬上表前四個分組，而 `isValidTransition()` 對「不屬任何一組」的 `from`／`to`
 一律 `return false`** ⇒ 不加分組的話：端點回 9520、DB 不動、日誌只有一行 warn，
-而前端已經顯示「已受理」。**這是本節最貴的一格**（65 §6.4.3 逐條列了症狀）。
+而前端已經顯示「已受理」。**這是本節最貴的一格**（65 逐條列了症狀）。
 
 > **嚴格規則**：所有「向下游」（PRE_SHIPMENT → IN_DELIVERY → 異常/TERMINAL）皆放行；「倒退到出貨前」（IN_DELIVERY → PRE_SHIPMENT、異常 → PRE_SHIPMENT）一律拒絕。理由：物流進入配送中或異常後，PayUni 不會推送回「出貨前」狀態，若收到視為錯誤推送，必須擋下避免狀態回退污染下游事件流。
 
@@ -217,7 +217,7 @@ graph TD
 
 **不變式一：`returned` ≠ 我方「已送達」。** 它在正向 leg 是**失敗**（→ `ABNORMAL(33)`，
 同一次處理內續推 `41`），在逆向 leg 才是 `RETURN_FAILED(28)`。
-🔴 **不得映到 `RETURN_GENERAL(51)`**：`51`／`53` 的「適用」欄**不含 3003**（65 §7.1.2.1），
+🔴 **不得映到 `RETURN_GENERAL(51)`**：`51`／`53` 的「適用」欄**不含 3003**（65），
 `33` 才是唯一「適用：全」的異常匯集點。
 
 **不變式二：`returned` ≠ 退款觸發。**
@@ -232,8 +232,8 @@ graph TD
 [09 售後](./09-售後微服務（AfterSales%20Service）詳細設計書.md)；本服務只負責把配送軸推到 `41` 並帶上 provider 事實。
 
 ⚠️ **平台自訂值一律三位數、PayUni 原生值一律兩位數**（見
-[65 §7.1.2.0](./65-物流履約平台%EF%BC%88Fulfillment%20Platform%EF%BC%89詳細設計書.md)）。
-值域逐值對照見 65 §7.1.2.1。
+[65](./65-物流履約平台%EF%BC%88Fulfillment%20Platform%EF%BC%89詳細設計書.md)）。
+值域逐值對照見 65。
 
 ### 2.3 建店狀態機（OnboardingStatus）
 
@@ -1727,7 +1727,7 @@ message GetStoreMapRedirectFormResponse {
 | 超商 `label_print_status='4103'` 再次呼叫 `PrintCvsLabel` | **冪等回傳 DB 既有的 `partner_id` / `odno` / `validation_no`**（`webhookReceived=true`），**不重打 PayUni、不會產生新代碼** |
 | 宅配 `label_print_status='4103'` 再次呼叫 `GenerateHomeLabelPdf` | **直接拒絕**，拋 `SHIPMENT_ALREADY_LABELED`(5003)「已取號，不可重複產生」 |
 
-> ⚠️ 兩者都**沒有**「重新向 PayUni 要一組新代碼／新 PDF」的路徑。🔴 **本服務不提供重新取號路徑**；該能力的權威設計是 [65 物流履約平台](./65-物流履約平台%EF%BC%88Fulfillment%20Platform%EF%BC%89詳細設計書.md) §6.4 的 `A-6`（`POST /admin/shipments/:id/recreations`）。
+> ⚠️ 兩者都**沒有**「重新向 PayUni 要一組新代碼／新 PDF」的路徑。🔴 **本服務不提供重新取號路徑**。
 
 ### 4.7 冪等鍵與重試語意
 
@@ -5600,7 +5600,7 @@ sequenceDiagram
 
 | Enum | 值 | 定義來源 |
 |------|----|---------|
-| ShippingStatus | 兩位數屬 PayUni 原生、三位數屬平台自訂（65 §7.1.2.0）。逐值對照見 65 §7.1.2.1；**SSOT 是 CodeMeta，本欄不列舉** | [業務狀態碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/業務狀態碼.md) |
+| ShippingStatus | 兩位數屬 PayUni 原生、三位數屬平台自訂（65）。逐值對照見 65；**SSOT 是 CodeMeta，本欄不列舉** | [業務狀態碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/業務狀態碼.md) |
 | ShippingMethod | TAQBIN(3001) / SEVEN_ELEVEN_STORE_PICKUP(3002) / UBER_INSTANT(3003) / 7-ELEVEN 大宗寄倉 B2C(3004) / 商家自行配送(3005)。<br/>🔴 **`OnboardingService.mapShippingMethodToType` 對 3004／3005 回 `null`** ⇒ 這兩個 method 走 `findActiveSetting` 會拿到 null 並拋 `SHIPMENT_SELLER_NOT_ONBOARDED`；要啟用它們必須先讓該 mapping 有對應的 `ShippingType` 值 | [業務類型碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/業務類型碼.md) |
 | OnboardingStatus | PENDING_REVIEW / ACTIVE / REJECTED / CLOSED / PERMANENTLY_CLOSED | [業務狀態碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/業務狀態碼.md) |
 | PayUniAuditDirection | OUTBOUND / INBOUND | [內部技術碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/內部技術碼.md) |

@@ -58,7 +58,7 @@ class ShippingEventTypeMqConstantsContractTest {
      * 本領域 routing key 的唯一辨識條件——錨在<b>值</b>不錨在<b>欄位名</b>（欄位名可以亂取，值是契約）。
      *
      * <p>🔴 <b>刻意只有 {@code shipment.} 一個前綴，不得擴成集合。</b>
-     * {@code fulfillment.*}（65 §6A.1.2 的 C 群）屬<b>另一個 owner domain</b>，由
+     * {@code fulfillment.*}（65 的 C 群）屬<b>另一個 owner domain</b>，由
      * {@link FulfillmentEventType} 與 {@code FulfillmentEventTypeMqConstantsContractTest} 負責
      * ——65 附錄 C.4 逐字「不讓一個 enum 同時服務三個 owner」。
      *

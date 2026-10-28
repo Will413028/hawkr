@@ -188,7 +188,7 @@ order-service/
 >
 > **未 final 期間的對外呈現**：訂單仍在 `35` ⇒ 落在買家／賣家列表的「配送中」tab（**不在任何終態桶**）。買家面只能顯示「配送未完成，正在確認處理結果」，🔴 **不得**顯示「最終不退款」／「最終已退款」／「訂單已取消」；賣家面只能顯示處理中。**只有 final `BUYER_CAUSED` 之後**，買家才會收到 no-refund 的最終結果。
 >
-> 🔴 **不得預先建造推測性的 reversal 子系統**：本終態不可逆是現行規格。若未來法規或政策要求可逆申訴窗，那是一次明確的 Design Amendment（會同時改變 financial finality、撥款時點、法律揭露與 payout hold），屆時依 [65 §3.4.1](65-物流履約平台%EF%BC%88Fulfillment%20Platform%EF%BC%89詳細設計書.md) 的結論落地。**先造一套「以防萬一」的 reversal 路徑，等於在沒有規格的情況下決定 refund entitlement。**
+> 🔴 **不得預先建造推測性的 reversal 子系統**：本終態不可逆是現行規格。若未來法規或政策要求可逆申訴窗，那是一次明確的 Design Amendment（會同時改變 financial finality、撥款時點、法律揭露與 payout hold），屆時依 [65](65-物流履約平台%EF%BC%88Fulfillment%20Platform%EF%BC%89詳細設計書.md) 的結論落地。**先造一套「以防萬一」的 reversal 路徑，等於在沒有規格的情況下決定 refund entitlement。**
 
 **誰執行這條邊（🔴 不得留成沒有執行者的狀態）**
 
@@ -677,7 +677,7 @@ WHERE 條件均要求 task 處於 `PROCESSING(10)`，避免：
 | receipt_status_entered_at | TIMESTAMPTZ | NO | 進入當前 `receipt_status` 的時刻 |
 | receipt_review_due_at | TIMESTAMPTZ | NO | 人工裁決期限（D+7），由 `ReceiptReviewDeadlineScheduler` 掃描 |
 
-> 🔴 **政策快照的意義：訂單成立後，不因賣家後續修改物流／收款設定而改變既有訂單的履約、收款或結算語意。** 這七欄一律在建單時寫定，**不得**在訂單生命週期中被重寫。完整定義見 [65 §5.1／§5.7](65-物流履約平台%EF%BC%88Fulfillment%20Platform%EF%BC%89詳細設計書.md)，本書不重述。
+> 🔴 **政策快照的意義：訂單成立後，不因賣家後續修改物流／收款設定而改變既有訂單的履約、收款或結算語意。** 這七欄一律在建單時寫定，**不得**在訂單生命週期中被重寫。完整定義見 [65](65-物流履約平台%EF%BC%88Fulfillment%20Platform%EF%BC%89詳細設計書.md)，本書不重述。
 >
 > ⚠️ **第 5 個維度（provider）不在這六欄內**：`orders.shipping_method` 已經承載它。再開一欄 provider 就是製造第二個真相。
 
@@ -2743,7 +2743,7 @@ flowchart TD
 
 **觀測**：`hawkr_grant_payout_held_total{reason=NONE|ACTIVE_CASE|APPEAL_WINDOW_OPEN|APPEAL_IN_FLIGHT|LOOKUP_FAILED}`；告警 `GrantPayoutHoldLookupFailing` / `GrantPayoutHeldIndefinitely`（`monitoring/prometheus/rules/business-alerts.yml`，`payout-hold-alerts` group）。`APPEAL_WINDOW_OPEN` 刻意不告警——那是正確行為。
 
-🔴 **本節的閘門是現行唯一的撥款資格閘門**：`settlement-service` 不存在，65 §7.7.1.3 的 `PayoutEligibility` 不在現行路徑上——不要把撥款資格的判定推遲給一個不存在的接手方。
+🔴 **本節的閘門是現行唯一的撥款資格閘門**：`settlement-service` 不存在——不要把撥款資格的判定推遲給一個不存在的接手方。
 
 ### 8.9 評論快照一致性（orders.review）
 
@@ -2835,8 +2835,6 @@ PayUni `createHomeShipment`／`createCvsShipment` 取得物流單號（`FL-1`，
 🔴 **不是**「物流商還沒開始安排」——本書**不得**再寫「Create Delivery 就代表當場派車／開始計費」這類對 provider 內部行為的推測。
 ⚠️ 賣家在 3003 的動作是**宣告備妥**（`REPORT_READY`），它觸發的是**更新既有 Delivery 的取件時間**，
 **不是建單、也不是派車**；`FL-2` 的 actor 是物流商依約定取件時間排程，**不是賣家**。
-依據：[65 §7 Provider 憲法](../基本設計書/65-物流履約平台（Fulfillment%20Platform）基本設計書.md)
-＋ [65 §4.4.1a `FL-N`](65-物流履約平台（Fulfillment%20Platform）詳細設計書.md)。
 
 🔴 **本節不要求改動 3001／3002 的付款後建單流程**——那是既有且正確的業務流程。
 要改的只有**候選述詞的錨點**：它目前錨在「有沒有物流商側的單號」，而那個錨對 3003 天生為空。
@@ -2915,7 +2913,7 @@ WHERE order_no=? AND shipment_no IS NULL
 > Shipping 正在對 `991` 做 `/query` 回查收斂，而 Order 同時重新發 `order.shipment.create_requested`
 > ⇒ **可能建出第二張物流單、重複計費**（逐字：
 > 「`991` 期間**不得**建第二筆 `provider_shipments`；`/query` 回查無**不構成**重建理由」），
-> 或在回查查到「其實建單成功」之前就先取消＋全額退款（65 §0.1.6 不等式 ⑥ 的症狀欄）。
+> 或在回查查到「其實建單成功」之前就先取消＋全額退款。
 >
 > 🔴 **這條 contract 不逐 provider 分支，也不列舉狀態值。** 它只問一件事：
 > **Shipping 有沒有把 lifecycle 投影回來。** 新增任何 provider、任何新狀態值，都不需要回來改本述詞。
@@ -2933,7 +2931,7 @@ WHERE order_no=? AND shipment_no IS NULL
 若施工者把 `/trade` 取號讀成 `FL-1`、因而把 `shipment.created` 延到取號成功才發，
 則**每一筆 3004 訂單在賣家取號之前 `orders.shipping_status` 都是 `NULL`**
 ⇒ 全部落進兜底候選 ⇒ 在放棄門檻（付款後約 3 小時）被系統自動取消＋全額退款。
-⚠️ **3004 的 `FL-1` 止於本地配送單**（[65 §7.1.2.1](65-物流履約平台（Fulfillment%20Platform）詳細設計書.md) `UNPROCESSED(91)` 的語意欄逐字「**`FL-1` 已完成、`FL-2` 尚未發動**」，適用欄＝`全`）。🔴 **不得**以「與 3003 同形」當理由——3003 的 `FL-1` **包含**向物流商建單，兩者只是「`91` 都代表 `FL-1` 已完成」，`FL-1` 的**內容**並不相同。
+⚠️ **3004 的 `FL-1` 止於本地配送單**（`UNPROCESSED(91)` 的語意是「**`FL-1` 已完成、`FL-2` 尚未發動**」）。🔴 **不得**以「與 3003 同形」當理由——3003 的 `FL-1` **包含**向物流商建單，兩者只是「`91` 都代表 `FL-1` 已完成」，`FL-1` 的**內容**並不相同。
 
 🔴 **這個性質由「誰會發出 `shipment.created`」保證，不是由「有沒有列」保證。**
 （[06 §8.1 本地交易邊界](06-物流微服務（Shipping%20Service）詳細設計書.md) 逐字：

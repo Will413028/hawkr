@@ -39,7 +39,7 @@ func TestLogisticsFinanceRoutesAreMounted(t *testing.T) {
 		"GET /api/v1/admin/logistics/provider_statements",
 		"GET /api/v1/admin/logistics/provider_statements/:statement_no",
 		"GET /api/v1/admin/logistics/exception_cases",
-		// 責任判定 maker-checker（WP2B，65 §6.1.1 A-2／A-4／A-5）。少任何一支，責任
+		// 責任判定 maker-checker（WP2B，65）。少任何一支，責任
 		// 判定案件就永遠沒有人推得走：訂單卡在 SHIPPING_ABNORMAL(35)、買家的錢無限期
 		// 卡住，而全鏈路沒有任何錯誤訊息。
 		"GET /api/v1/admin/logistics/exception_cases/:case_no",
@@ -83,7 +83,7 @@ func TestLogisticsFinanceRoutesAreMounted(t *testing.T) {
 
 // ==================== 寫入路由的冪等鍵覆蓋 ====================
 //
-// 65 §6.1.4 對 A-1～A-16 的所有寫入路由逐字要求 `Idempotency-Key`。少掛一條的後果不是
+// 65 對 A-1～A-16 的所有寫入路由逐字要求 `Idempotency-Key`。少掛一條的後果不是
 // 「重送會失敗」而是**重送會成功第二次**：maker 重送多開一張提案、checker 重送多做一次
 // 覆核，而兩者都是不可回復的稽核事實——事後看起來就像真的有人做了兩次。
 //

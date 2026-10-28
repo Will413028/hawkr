@@ -91,7 +91,7 @@ public interface FulfillmentExceptionCaseMapper extends BaseMapper<FulfillmentEx
      * <p>🔴 <b>與 {@link #insertIfNoOpenDuplicate} 的差別只有一處，而那一處是必要的</b>：
      * 本句的 {@code ON CONFLICT} <b>不指名 conflict target</b>。
      *
-     * <p>理由（65 §5.5.2 E0 的 <b>G4</b>）：V12 之後責任判定案件同時受兩條唯一約束拘束——
+     * <p>理由（65 的 <b>G4</b>）：V12 之後責任判定案件同時受兩條唯一約束拘束——
      * {@code uq_exc_open_dedup}（dedup_key，僅未結案之間）與 {@code uq_exc_responsibility_subject}
      * （subject，<b>lifetime</b>）。指名 {@code (dedup_key) WHERE …} 的那一支只認得前者，
      * 撞到後者時<b>不會</b>走 {@code DO NOTHING} 而是拋 {@code 23505}；而 PostgreSQL 交易內
@@ -129,7 +129,7 @@ public interface FulfillmentExceptionCaseMapper extends BaseMapper<FulfillmentEx
     /**
      * 取一列並鎖住（{@code SELECT … FOR UPDATE}）。
      *
-     * <p>🔴 <b>proposal 與 finalization 都必須先走這一句</b>（65 §5.5.2 E0.1 ⓪、36 §3.3 Atomic
+     * <p>🔴 <b>proposal 與 finalization 都必須先走這一句</b>（65 ⓪、36 §3.3 Atomic
      * Boundary ⓪）。它把同一張 case 上的提案與定案序列化——少了它，兩個並行的 finalization
      * 各自讀到同一份狀態、各自往下走，而<b>每一步單獨看都是成功的</b>。
      *
@@ -152,7 +152,7 @@ public interface FulfillmentExceptionCaseMapper extends BaseMapper<FulfillmentEx
      *   <li>定案 vs 提案 → 上面兩者合起來，READ COMMITTED 下兩種順序都收斂到一致結果</li>
      * </ul>
      * <b>這不是「可以拿掉」的理由，而是「拿掉之後不會有人發現」的警告。</b>
-     * 它仍然必須留著：① 65 §5.5.2 E0.1 ⓪ 與 36 §3.3 Atomic Boundary ⓪ 逐字要求
+     * 它仍然必須留著：① 65 ⓪ 與 36 §3.3 Atomic Boundary ⓪ 逐字要求
      * ② 上述三道接住它的東西<b>都是可以被改掉的</b>——任何未來的路徑若不走 CAS
      * （例如「讀出來、在 Java 裡判斷、再寫回去」），序列化就只剩這一句
      * ③ 它讓「先鎖後判」成為這條路徑的形狀，而不是每個 caller 各自記得。
@@ -183,7 +183,7 @@ public interface FulfillmentExceptionCaseMapper extends BaseMapper<FulfillmentEx
      *
      * <p>🔴 <b>不帶 {@code FOR UPDATE}</b>：它服務唯讀詳情，以及 maker-checker 端點在
      * <b>進入交易之前</b>把 {@code case_no} 換成 {@code case_id}／{@code order_no} 的那一步。
-     * 真正的序列化仍然由 {@link #findByIdForUpdate} 在交易內做（65 §5.5.2 E0.1 ⓪）——
+     * 真正的序列化仍然由 {@link #findByIdForUpdate} 在交易內做（65 ⓪）——
      * 在這裡加鎖會把鎖的持有時間拉長到涵蓋一次跨服務 gRPC（讀 order 的退款基準），
      * 那正是 36 §3.3.1 明令禁止的「交易內做 enrich」。
      *

@@ -214,9 +214,9 @@ public final class MqConstants {
     public static final String ROUTING_KEY_SHIPMENT_ANOMALY_DETECTED = "shipment.anomaly.detected";
     public static final String EVENT_TYPE_SHIPMENT_ANOMALY_DETECTED = "SHIPMENT_ANOMALY_DETECTED";
 
-    // ── 履約責任判定（N16／N17，65 §5.5.2／36 §3.3）─────────────────────────
+    // ── 履約責任判定（N16／N17，65 §3.3）─────────────────────────
     // 🔴 producer 是 **payment-service**，不是 shipping-service：fulfillment_exception_cases
-    //    與 fulfillment_case_resolutions 由它擁有（65 §5.0 T12），而事件必須與那兩筆寫入
+    //    與 fulfillment_case_resolutions 由它擁有（65），而事件必須與那兩筆寫入
     //    同交易（INV-E1）⇒ shipping-service 無法在同一個交易內寫那兩張表。
     //    exchange 仍是 hawkr.shipping——值域錨在 routing key ＋ exchange，不在 publisher
     //    服務（ShippingEventType 值域邊界第 4 條）。

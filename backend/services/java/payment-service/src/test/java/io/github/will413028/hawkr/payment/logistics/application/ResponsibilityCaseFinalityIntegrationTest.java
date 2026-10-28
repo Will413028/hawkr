@@ -204,7 +204,7 @@ class ResponsibilityCaseFinalityIntegrationTest {
      *
      * <p>用小數字（例如 12345）測 {@code shipment_id} 的型別<b>零鑑別力</b>：
      * JSON number 與 quoted string 在那個範圍內往返都不會失真，
-     * 而真正的 TSID 正好落在 float64 精確整數範圍之外——那才是 65 §6A.1.3 要防的東西。
+     * 而真正的 TSID 正好落在 float64 精確整數範圍之外——那才是 65 要防的東西。
      */
     private static final long BIG_TSID = 7_200_000_000_000_000_001L;
 
@@ -664,7 +664,7 @@ class ResponsibilityCaseFinalityIntegrationTest {
         }
     }
 
-    // ═══════════════════ E 群：lifecycle 閉環（65 §5.5.2 E0.2 的八項）═══════════════════
+    // ═══════════════════ E 群：lifecycle 閉環（65 的八項）═══════════════════
 
     @Nested
     @DisplayName("E 群：lifecycle 閉環")
@@ -1023,7 +1023,7 @@ class ResponsibilityCaseFinalityIntegrationTest {
 
         /**
          * 🔴 <b>{@code shipment_id} 在 wire 上必須是 quoted string，不得是 JSON 數字</b>
-         * （65 §6A.1.3 的跨語言通則）。
+         * （65 的跨語言通則）。
          *
          * <p><b>為什麼一定要用 &gt; 2^53 的 TSID</b>：notification-service 把 payload 解進
          * {@code map[string]interface{}}，{@code encoding/json} 對 {@code any} 用 float64
@@ -1099,7 +1099,7 @@ class ResponsibilityCaseFinalityIntegrationTest {
         }
     }
 
-    // ═══════════ M 群：maker-checker 語意綁定（WP2A-R2，65 §6.4.2 A-4／A-5）═══════════
+    // ═══════════ M 群：maker-checker 語意綁定（WP2A-R2，65）═══════════
 
     /**
      * 🔴 <b>這一群守的是「覆核者批准的，正是提案者提出的那一個」。</b>
@@ -1529,11 +1529,11 @@ class ResponsibilityCaseFinalityIntegrationTest {
     // ═══════════ P 群：ResponsibilityImpactPreview 與 9575 stale guard（WP2A-R2）═══════════
 
     /**
-     * 🔴 <b>這一群守的是 65 §6.4.2 硬約束 2</b>：
+     * 🔴 <b>這一群守的是 65 硬約束 2</b>：
      * 「覆核者看到的金額與實際執行的金額不同，就是 maker-checker 在保護的那件事本身失效」。
      *
      * <p>⚠️ 預覽<b>只有 refundAmount 一個金額</b>。{@code platformFeeDelta}／{@code sellerNetDelta}
-     * 不是 0，而是<b>不屬於這個 contract</b>——它們的唯一權威公式在 65 §5A（已裁決 dormant），
+     * 不是 0，而是<b>不屬於這個 contract</b>——它們的唯一權威公式在 65（已裁決 dormant），
      * 且 {@code SELLER_DIRECT} 下平台沒有代收 ⇒ 訂單層平台費語意不成立。
      * 填 0 會讓覆核者看到「平台與賣家都不受影響」的假結論，比不顯示更糟。
      */
@@ -1635,7 +1635,7 @@ class ResponsibilityCaseFinalityIntegrationTest {
         /**
          * 🔴 <b>P8：呼叫端沒有任何路徑可以提供金額。</b>
          *
-         * <p>65 §6.4.2 的 A-4 原本把 {@code impactPreview} 放在 <b>request body</b> 由前端送，
+         * <p>65 的 A-4 原本把 {@code impactPreview} 放在 <b>request body</b> 由前端送，
          * PM 已裁決撤銷：對責任判定，預覽必須是 backend 算出來的。
          * 這裡用反射釘死 {@code ProposeCommand} 沒有任何金額／預覽欄位。
          */

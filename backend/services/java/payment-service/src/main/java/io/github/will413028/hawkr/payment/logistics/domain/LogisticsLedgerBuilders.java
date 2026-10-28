@@ -156,7 +156,7 @@ public final class LogisticsLedgerBuilders {
      *
      * <pre>DEBIT  PROVIDER_PAYABLE ／ CREDIT PLATFORM_OPERATING_CASH</pre>
      *
-     * <p>🔴 <b>CREDIT 與舊商流不同，這一格最容易抄錯</b>：65 §5.3.1a 寫的是
+     * <p>🔴 <b>CREDIT 與舊商流不同，這一格最容易抄錯</b>：65 寫的是
      * {@code PLATFORM_COLLECTED_CASH}（平台<b>代理商戶收到買家款</b>），而
      * {@code SELLER_DIRECT} 下平台<b>沒有代收</b> ⇒ 該科目在新商流裡沒有語意
      * ⇒ 對手科目必須是 {@code PLATFORM_OPERATING_CASH}。

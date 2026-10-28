@@ -100,7 +100,7 @@ public class ShippingService {
     private final ProviderCallExecutor providerCallExecutor;
 
     /**
-     * provider 能力的唯一問答點（65 §4.4.1）。
+     * provider 能力的唯一問答點（65）。
      *
      * <p>🔴 本類別內<b>不得</b>再出現 {@code ShippingMethod.XXX.equals(...)} 形式的
      * provider 分支——那些判斷一律改成問這裡拿到的 adapter「這個 provider 有沒有這個能力」。
@@ -2365,7 +2365,7 @@ public class ShippingService {
      * 按 (action, provider) 給 href，不會再產出跨 provider 的連結；但 write path 必須自己再驗一次，
      * 因為端點是公開的、而正確性不能建立在「沒有人會直接打它」上。
      *
-     * <p>REMOVE-WHEN：65 §6.2 的 provider-neutral 端點（S-10 {@code /dispatch}、
+     * <p>REMOVE-WHEN：65 的 provider-neutral 端點（S-10 {@code /dispatch}、
      * S-11 {@code /cancel}、S-12 {@code /pod}）落地並取代這些 provider-specific 端點之後，
      * 本守衛連同它守的端點一起移除。
      */

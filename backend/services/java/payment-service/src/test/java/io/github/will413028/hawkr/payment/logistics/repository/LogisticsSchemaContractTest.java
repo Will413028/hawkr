@@ -1026,7 +1026,7 @@ class LogisticsSchemaContractTest {
     /**
      * 🔴 <b>{@code findByIdForUpdate} 的 SQL 必須含 {@code FOR UPDATE}——綁在<b>那一支 method 本身</b>。</b>
      *
-     * <p><b>這一支為什麼非有不可</b>：`FOR UPDATE` 是 65 §5.5.2 E0.1 ⓪ 與 36 §3.3 Atomic Boundary ⓪
+     * <p><b>這一支為什麼非有不可</b>：`FOR UPDATE` 是 65 ⓪ 與 36 §3.3 Atomic Boundary ⓪
      * 的逐字要求，但 WP2A 實測發現——把它拿掉之後，責任判定的並發測試組<b>連跑 5 次全綠</b>
      * （每條競態都先被 resolution 的 CAS 與 {@code uq_fcr_open_per_case} 接住了）。
      * ⇒ <b>在本測試存在之前，沒有任何東西會在這條 lock 被刪掉時出聲。</b>

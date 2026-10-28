@@ -32,7 +32,7 @@ import org.junit.jupiter.api.Test;
  * （事件一份、N16 一份）——而「向賣家收錯錢」在雙 SSOT 下是<b>沒有訊號</b>的。
  *
  * <h2>型別：id 與金額一律 {@code String}</h2>
- * 65 §6A.1.3 通則。理由不是風格：notification-service 把 payload 解進
+ * 65 通則。理由不是風格：notification-service 把 payload 解進
  * {@code map[string]interface{}}，{@code encoding/json} 對 {@code any} 用 <b>float64</b>
  * ⇒ 超過 2^53 的 TSID 會被<b>靜默截斷</b>。
  */
@@ -105,7 +105,7 @@ class LogisticsCostIncurredWireContractTest {
     void idsAndAmountsAreStrings() {
         for (RecordComponent c : LogisticsCostIncurredPayload.class.getRecordComponents()) {
             assertEquals(String.class, c.getType(),
-                    "🔴 " + c.getName() + " 不是 String。65 §6A.1.3 通則：新事件的 id 與金額一律 string"
+                    "🔴 " + c.getName() + " 不是 String。65 通則：新事件的 id 與金額一律 string"
                             + "——notification-service 把 payload 解進 map[string]interface{}，"
                             + "encoding/json 對 any 用 float64 ⇒ 超過 2^53 的 TSID 會被靜默截斷");
         }

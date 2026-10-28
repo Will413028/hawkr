@@ -15,7 +15,7 @@ import java.util.List;
 
 /**
  * {@code product_sku.restricted_category_codes} 的 JSONB TypeHandler
- * （66 號詳細設計書 §5.1.9 ②：禁運品／品類守門的 SKU 標記欄）。
+ * （禁運品／品類守門的 SKU 標記欄）。
  *
  * <p>內容是 {@code RestrictedGoodsCategory} 的 Value 字串陣列，例如 {@code ["...", "..."]}；
  * 空陣列 = 未標記任何受限品類。

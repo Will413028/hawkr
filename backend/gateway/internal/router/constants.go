@@ -258,7 +258,7 @@ const (
 	AdminProviderStatementDetail     = "/logistics/provider_statements/:statement_no"
 	AdminLogisticsExceptionCasesPath = "/logistics/exception_cases"
 
-	// Admin 面：單一例外案件詳情與責任判定 maker-checker（65 §6.1.1 A-2／A-4／A-5）。
+	// Admin 面：單一例外案件詳情與責任判定 maker-checker（65）。
 	//
 	// 🔴 以 case_no 定位而不是 case_id：case_no 是對外業務單號（uq_exc_no），ADM 佇列與
 	// 稽核紀錄引用的都是它；case_id 是 TSID 內部主鍵。形狀與

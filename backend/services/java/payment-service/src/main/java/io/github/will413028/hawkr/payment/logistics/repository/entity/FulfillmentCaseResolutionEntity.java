@@ -39,7 +39,7 @@ public class FulfillmentCaseResolutionEntity {
      * 保證它忠實反映該 case 真正的 category——填錯會被 DB 以 23503 擋下，而不是靜默存進一個謊。
      *
      * <p>它存在的理由是把<b>跨表</b>判定變成同列判定：{@code chk_fcr_responsibility_type_binding}
-     * 因此得以在 DB 層雙向綁定 {@code resolutionType} 與案件 category（65 §5.5.2 E0.2 第 5 項的
+     * 因此得以在 DB 層雙向綁定 {@code resolutionType} 與案件 category（65 第 5 項的
      * 「第二扇門」）。少了這個投影，那道綁定只能留在應用層，而應用層的 if 會在下一次重構被抽掉。
      *
      * <p>⚠️ 附帶保證：複合 FK 的 {@code ON UPDATE} 預設 {@code NO ACTION} ⇒ 案件一旦有提案，

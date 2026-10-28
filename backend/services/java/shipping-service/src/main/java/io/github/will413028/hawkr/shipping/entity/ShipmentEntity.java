@@ -30,7 +30,7 @@ public class ShipmentEntity {
     private String uberDeliveryId;
     private String status;
     /**
-     * 本筆<b>進入當前 {@code status} 的時間</b>；aging 指標的唯一錨（65 §7.1.1.5）。
+     * 本筆<b>進入當前 {@code status} 的時間</b>；aging 指標的唯一錨（65）。
      * <p>🔴 禁用 {@code updated_at} 當 aging 基準——任何無關欄位的 UPDATE（標籤重印、
      * 租約續期）都會重置它，於是「卡在某狀態多久」會被一次次洗掉。
      * <p>DB 為 {@code NOT NULL DEFAULT NOW()}：INSERT 留 null 由 DB 補；

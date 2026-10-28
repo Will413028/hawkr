@@ -149,7 +149,7 @@ public class LogisticsCostIncurredConsumer {
     /**
      * 🔴 金額必須是正整數字串。
      *
-     * <p>wire 上是 {@code String}（65 §6A.1.3 通則：id 與金額一律 string，
+     * <p>wire 上是 {@code String}（65 通則：id 與金額一律 string，
      * 因為 notification-service 把 payload 解進 {@code map[string]interface{}}，
      * {@code encoding/json} 對 {@code any} 用 float64 ⇒ 大數會被靜默截斷）。
      *

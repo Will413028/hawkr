@@ -6,11 +6,11 @@ import java.time.LocalDateTime;
 /**
  * 責任判定的財務影響預覽（WP2A-R2 PM Decision）。
  *
- * <p>🔴 <b>刻意只有一個金額</b>。65 §6.4.2 的 A-4 原本列了三個
+ * <p>🔴 <b>刻意只有一個金額</b>。65 的 A-4 原本列了三個
  * （{@code refundAmount}／{@code platformFeeDelta}／{@code sellerNetDelta}），
  * 但後兩者在現行商流下<b>沒有 canonical 算法，而且語意不成立</b>：
  * <ul>
- *   <li>唯一權威公式 {@code PayoutInstructionFee} 只存在於 65 §5A 的文件虛擬碼，
+ *   <li>唯一權威公式 {@code PayoutInstructionFee} 只存在於 65 的文件虛擬碼，
  *       該章自述「零消費者」，整條代銷／撥款軸已由 {@code DEC-20260912-184025} 判定 dormant</li>
  *   <li>{@code OrderPolicyResolver.resolve()} 寫死回 {@code SELLER_DIRECT}，
  *       而該商流下<b>平台沒有代收</b> ⇒ 訂單層的「平台費差額」根本不存在</li>
@@ -31,7 +31,7 @@ public record ResponsibilityImpactPreview(long refundAmount, LocalDateTime compu
     /**
      * 依責任成因與權威退款基準算出預覽。
      *
-     * <p>🔴 <b>規則是二元的，不是公式</b>（65 §5.5.2 F 逐字：「沒有第三種拆分公式…
+     * <p>🔴 <b>規則是二元的，不是公式</b>（65 F 逐字：「沒有第三種拆分公式…
      * 本設計不引入 refund component model」）：
      * <table border="1">
      *   <caption>成因 → 退款金額</caption>
@@ -61,7 +61,7 @@ public record ResponsibilityImpactPreview(long refundAmount, LocalDateTime compu
     /**
      * stale 比較：<b>只比業務影響值</b>，不比 {@link #computedAt}。
      *
-     * <p>🔴 這是 65 §6.4.2 硬約束 2 的實質：「覆核者看到的金額與實際執行的金額不同，
+     * <p>🔴 這是 65 硬約束 2 的實質：「覆核者看到的金額與實際執行的金額不同，
      * 就是 maker-checker 在保護的那件事本身失效」。
      */
     public boolean sameBusinessImpactAs(ResponsibilityImpactPreview other) {

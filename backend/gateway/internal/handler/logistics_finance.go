@@ -391,7 +391,7 @@ type AdminFulfillmentExceptionCaseListResp struct {
 	PageSize string                              `json:"pageSize"`
 }
 
-// ---- 責任判定 maker-checker 的 request／response DTO（65 §6.1.1 A-4／A-5）----
+// ---- 責任判定 maker-checker 的 request／response DTO（65）----
 
 // 覆核決定的兩個合法值。🔴 只有這兩個——沒有 SKIP／DEFER／NEED_INFO：那些都是
 // 「還沒決定」，而還沒決定的正確表示法是提案維持 AWAITING_REVIEW，不是第三個決定值。

@@ -19,7 +19,7 @@
 >
 > 🔴 **併入同一個服務不等於併入同一個 domain**：
 > **business payment hot path 與 logistics reconciliation 不得彼此直接耦合**
-> ——拆成兩個服務時網路邊界會替你擋住，合併之後只剩 package 邊界與 gate（65 [`ADR-009`](../adr/2026-09-11-logistics-finance-domain-ownership.md) 驗證二）。
+> ——拆成兩個服務時網路邊界會替你擋住，合併之後只剩 package 邊界與 gate（[`ADR-009`](../adr/2026-09-11-logistics-finance-domain-ownership.md) 驗證二）。
 
 ---
 
@@ -161,11 +161,11 @@ flowchart LR
 | ② `settlement counterparty = SELLER` | 這筆 provider 成本最後走**向賣家結算**這條既有物流結算鏈（載體 ＝ 既有 `Bearer`） | `responsibility = SELLER`／`fault = SELLER`／`economic responsibility = SELLER` |
 
 🔴 **條件 ② 有一個前置：settlement counterparty 只在 responsibility `financially final` 之後才算 resolved。**
-`financially final` 的**語意 SSOT ＝ [65 §5.5.2 E0](65-物流履約平台%EF%BC%88Fulfillment%20Platform%EF%BC%89詳細設計書.md)**：
+`financially final` 的**語意 SSOT ＝ [65](65-物流履約平台%EF%BC%88Fulfillment%20Platform%EF%BC%89詳細設計書.md) §5.2、§6**：
 該 fulfillment leg 上**只能存在一張**會改變 `refund_to_buyer` 的 Responsibility Case，
 它走完 resolution `APPROVED` ＋ case `RESOLVED` 之後即為 financially final，
 此後**不得再開第二張**（lifetime invariant）。
-🔴 **本書不複述它的機械保證**——`financially final` 的語意與其約束一律以 65 §5.5.2 E0 為準；事件面由 **36** 定義。
+🔴 **本書不複述它的機械保證**——`financially final` 的語意與其約束一律以 65 為準；事件面由 **36** 定義。
 ⇒ 🔴 **未 financially final 期間不得建立 Seller logistics receivable**——
 此時 counterparty **尚未 resolved**，而不是「先暫時算成賣家、之後再改」。
 ⚠️ **這不是改變 trigger**（trigger 仍是 `provider cost incurred` **AND** `settlement counterparty = SELLER`），
@@ -594,7 +594,7 @@ classification 本身是 **5 值**，而本欄的 DB CHECK **只允許 4 個 res
 > 🔴 **每個新 `txn_type` 都必須在本表有借貸科目對，只給名稱等於沒給。**
 > `ledger_transactions` 有 `CONSTRAINT TRIGGER trg_ledger_balanced`（`Σ DEBIT = Σ CREDIT`）
 > ⇒ 施工者猜錯科目對就是 **INSERT 當下 500**，而症狀會出現在呼叫端（收款流程／帳單匯入）。
-> 既有 11 值的科目對在 65 §5.3.1a，本節列 `SELLER_DIRECT` 這一側。
+> `PLATFORM_CONSIGNMENT` 側的科目對以 `LogisticsLedgerBuilders` 與 `LedgerTxn` 為準，本節列 `SELLER_DIRECT` 這一側。
 
 | `txn_type` | DEBIT | CREDIT | 什麼時候 post |
 |---|---|---|---|
@@ -610,7 +610,7 @@ classification 本身是 **5 值**，而本欄的 DB CHECK **只允許 4 個 res
 | `MANUAL_ADJUSTMENT` | 依方向 | 依方向 | ADM 可稽核調整（強制填理由） |
 
 🔴 **`PROVIDER_SETTLEMENT` 的 CREDIT 與舊商流不同，這一格最容易抄錯**：
-65 §5.3.1a 寫的是 `PLATFORM_COLLECTED_CASH`（平台**代理商戶收到買家款**），
+`PLATFORM_CONSIGNMENT` 商流的 `PROVIDER_SETTLEMENT` CREDIT 是 `PLATFORM_COLLECTED_CASH`（平台**代理商戶收到買家款**），
 而 **`SELLER_DIRECT` 下平台沒有代收** ⇒ 該科目在新商流裡沒有語意
 ⇒ 對手科目是 **`PLATFORM_OPERATING_CASH`**（平台自有現金，[`ADR-010`](../adr/2026-09-11-ledger-carrier-model-compatibility.md) 新增）。
 ⚠️ **同一個 `txn_type` 在兩個商流下是同名的兩種分錄**，科目對由
@@ -780,7 +780,7 @@ payout-hold 閘門（fail-closed）的**機制**沿用於新終態的 task（同
 那會把 `V10` 以上的版號藏起來而撞號，Flyway 同版號 ＝ 服務起不來。
 🔴 **欄位擴充、fail-closed 規則與其 rollout 順序（① migration ② publisher 改讀該欄並全部 pod 完成 rollout ③ 才啟用本事件的寫入路徑）
 的權威定義**，本書不另寫一份——**contract 語意（模型／值／fail-closed）見 36 §3.3.1「Outbox persisted exchange」；
-payment-service 端的實作 impact 清單（migration／entity／factory／writer／publisher／mapper／scheduler／tests）與 rollout 順序見 65 §6A.1.2**。
+payment-service 端的實作 impact 清單（migration／entity／factory／writer／publisher／mapper／scheduler／tests）由 payment-service 的 `PaymentOutboxWriter` 與 `OutboxProducerExchangeContractTest` 為準**。
 🔴 **contract（routing key／exchange／queue／DLQ／payload／版本／冪等）的 SSOT ＝ 36**，本書不另寫一份（§7）。
 
 ⚠️ 🔴 **這不是第二條撥款路徑**：本書在這裡**只發事件**。
@@ -989,7 +989,7 @@ payment adapter（PayUni 專屬）
 
 ### 6.1 provider 帳單匯入
 
-🔴 **人工匯入，不做自動比對排程**（沿用 65 `D-1` 的裁決，且與《後端服務責任邊界規範》一致：
+🔴 **人工匯入，不做自動比對排程**（且與《後端服務責任邊界規範》一致：
 禁止 `*ReconciliationJob`／drift scanner 進 application code）。
 ⚠️ **這不是偷懶**：Uber 是否提供 statement／invoice API **完全沒有證據**
 （`statement`／`invoice` 在 Uber 總覽各 **0 命中**，EV-U1）。**沒有來源就不要造排程。**
@@ -1122,7 +1122,7 @@ sequenceDiagram
 
 ## 7. MQ 事件
 
-> 🔴 **四面登記的唯一定義**（36／65／70 共用同一份清單，逐字如下；CLAUDE.md 紅線 8 ＋ 10 檔 §23）：
+> 🔴 **四面登記的唯一定義**（36／70 共用同一份清單，逐字如下；CLAUDE.md 紅線 8 ＋ 10 檔 §23）：
 > ① **36 號 Event Catalog 條目**
 > ② **擁有該事件的詳細設計書事件清單**（＋ 資源數量／pin 對帳，若適用）
 > ③ **常數來源**：Java `MqConstants`／Go `pkg/mq`
@@ -1132,7 +1132,7 @@ sequenceDiagram
 > ⚠️ **consumer 註冊不是第五面**——它是 ③ 的使用端，由 `scripts/mq-consumer-registration-check.py` 與 ④ 雙向檢查。
 
 ⚠️ **本書射程內的 ② 是誰**：三條 `logistics.*` ＝ 下表（本書 §7，payload 契約在 §7.1）；
-`fulfillment.responsibility.finalized` ＝ 65 §6A 事件清單（本書不持有，見下方）。
+`fulfillment.responsibility.finalized` ＝ 65 §6 的事件（本書不持有，見下方）。
 
 | routing key | producer | consumer | 用途 |
 |---|---|---|---|
@@ -1169,7 +1169,7 @@ publisher 走 `obsRabbitPublisher.publish(...)`、consumer 走 `manualAckContain
 而**漏登記 topology 的症狀是訂閱靜默失效**（passive declare：不 crash、不進 DLQ，
 唯一線索是 Go 在連線當下印一行 `skipping queue X (NOT consumed)`）。
 ⚠️ 施工時 `test_expand.py` 的**資源數量 pin 會變**（每條帶 `retry:`／`dlq:` 的新 queue 各有不同增量）
-⇒ **先對帳增減量再改數字**，不得只為了讓測試變綠而改（65 §6A.4.2）。
+⇒ **先對帳增減量再改數字**，不得只為了讓測試變綠而改。
 
 🔴 **`logistics.cost.incurred` 是新的，不能用 `shipment.delivered` 代替**：
 後者是**物流事實**、consumer 是 order／aftersales；本書要的是**帶成本維度**的事件。
@@ -1211,7 +1211,7 @@ wire key 為 **snake_case**（`@JsonNaming(SnakeCaseStrategy)`，對齊同 excha
 | `shipment_id` | `shipmentId` | **String**（TSID 十進位字串） | ✅ | 溯源。🔴 **取消可能發生在 shipment 建立之前** ⇒ 這個事件真的可能沒有 shipment ⇒ 必須表達得了「沒有」 |
 | `estimated_cost` | `estimatedCost` | **String**（十進位整數字串） | ❌ | 維度 2；**新台幣「元」整數，禁浮點**。🔴 值的來源見下方「金額語意」 |
 
-🔴 **id 與金額一律 `String`**（65 §6A.1.3 通則；N16 同一口徑）。
+🔴 **id 與金額一律 `String`**（與 N16 同一口徑）。
 ⚠️ **理由不是風格**：notification-service 把 payload 解進 `map[string]interface{}`，
 `encoding/json` 對 `any` 用 **float64** ⇒ 超過 2^53 的 TSID 會被**靜默截斷**。
 🔴 **`storeId`／`shipmentId`／`estimatedCost` 在 wire 上是字串，consumer 端不得宣告成數值型別。**
@@ -1306,7 +1306,7 @@ sequenceDiagram
 
 ## 8. 可觀測性
 
-> 65 §3.10 四問：① 觀測窗 ＝ 一句 SQL 的述詞範圍（`sql_exporter`）
+> 四問：① 觀測窗 ＝ 一句 SQL 的述詞範圍（`sql_exporter`）
 > ② 🔴 **窗外必須輸出**：期望恆 0 的指標空表回 `0`；**齡類指標空表回 `-1`**（否則與 exporter 掛掉無法分辨）
 > ③ 誰能合法移到窗外 ⇒ 狀態值改名／維運 SQL 推到未列舉狀態
 > ④ 🔴 目標不存在 ⇒ **FAIL**，不得靜默無序列
@@ -1611,7 +1611,7 @@ URL／query `snake_case`、JSON body／response `camelCase`、
 | `UNCONFIRMED` | 🔴 **可能收了也可能沒收**——PayUni 查詢分不出來 | ❌ 失敗 |
 | **fulfillment leg** | provider 的**一趟**履約，由它自己的 `provider_delivery_ref` 識別。去程與返程是**兩個 leg** | ❌ 一張訂單／一個 shipment |
 | **settlement counterparty** | 這筆 provider 成本**最後向誰結算**（載體 ＝ 既有 `Bearer`） | ❌ 責任方／`economic responsibility` |
-| **financially final** | 該 fulfillment leg 上**唯一一張**會改變 `refund_to_buyer` 的 Responsibility Case 已走完 `APPROVED` ＋ `RESOLVED`，且**不得再開第二張**（語意 SSOT ＝ 65 §5.5.2 E0；🔴 本書不複述其機械保證） | ❌ 「已經有人判了」——判了之後若還開得出第二張會改 entitlement 的案，那就還不是 final |
+| **financially final** | 該 fulfillment leg 上**唯一一張**會改變 `refund_to_buyer` 的 Responsibility Case 已走完 `APPROVED` ＋ `RESOLVED`，且**不得再開第二張**（語意 SSOT ＝ 65；🔴 本書不複述其機械保證） | ❌ 「已經有人判了」——判了之後若還開得出第二張會改 entitlement 的案，那就還不是 final |
 | **`ResponsibilityCause`** | **誰造成**履約失敗（**四個 resolved 值**，§3.6） | ❌ 誰付錢（那是 settlement counterparty）；❌ 「還沒判」（那是案件分類） |
 | `RESPONSIBILITY_UNRESOLVED` | 🔴 **evidence 不足、尚未判定**——一個正式且明確的狀態 | ❌ 「暫時沒填」／❌ 等同 `PROVIDER_CAUSED` |
 

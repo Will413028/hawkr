@@ -319,7 +319,7 @@ docker exec hawkr-rabbitmq rabbitmqctl list_queues name messages \
 
 | Routing Key | Producer | Consumer | Payload Class | DLQ | Idempotency |
 |-------------|----------|----------|---------------|-----|-------------|
-| `order.paid` | order-service `OrderEventPublisher.publishOrderPaid` | shipping-service `OrderPaidConsumer.onOrderPaid`（🔴 **語意定版 2026-09-13：本 consumer 的處理止於 `FL-1`，不得由此觸發任何 provider 的 `FL-2`（派車／預約取件／實體交寄）**——`FL-2` 由賣家透過 `S-10` 發動，見 [65 §4.4.1a](65-物流履約平台（Fulfillment%20Platform）詳細設計書.md)。⚠️ **「止於 `FL-1`」不等於「只能寫本地資料」**：3001／3002 在此呼叫 PayUni `createHomeShipment`／`createCvsShipment` 取得物流單號，那是**既有且正確**的 `FL-1`；3003 因為 Uber 沒有「只建資料不派車」的 API，才只能建本地列。⚠️ 這條約束適用**所有** provider，但各 provider 的 `FL-1` 做多少事**本來就不一樣**） | `OrderPaidPayload`（outbox 派送時 enrich 的 seller/buyer meta 圖片欄位依 49 號設計書 §6.3 帶 objectKey＋`*Key` 欄位名，顯示 URL 由消費端組出） | ✅ shipping.order.paid.dlq | shipments.shipment_no IS NULL 樂觀鎖 |
+| `order.paid` | order-service `OrderEventPublisher.publishOrderPaid` | shipping-service `OrderPaidConsumer.onOrderPaid`（🔴 **語意定版 2026-09-13：本 consumer 的處理止於 `FL-1`，不得由此觸發任何 provider 的 `FL-2`（派車／預約取件／實體交寄）**——`FL-2` 由賣家發動。⚠️ **「止於 `FL-1`」不等於「只能寫本地資料」**：3001／3002 在此呼叫 PayUni `createHomeShipment`／`createCvsShipment` 取得物流單號，那是**既有且正確**的 `FL-1`；3003 因為 Uber 沒有「只建資料不派車」的 API，才只能建本地列。⚠️ 這條約束適用**所有** provider，但各 provider 的 `FL-1` 做多少事**本來就不一樣**） | `OrderPaidPayload`（outbox 派送時 enrich 的 seller/buyer meta 圖片欄位依 49 號設計書 §6.3 帶 objectKey＋`*Key` 欄位名，顯示 URL 由消費端組出） | ✅ shipping.order.paid.dlq | shipments.shipment_no IS NULL 樂觀鎖 |
 | `order.paid` | 同上 | notification-service（Go，動態 binding 至 `notification.order.paid` queue，**僅買家**「訂單付款成功」推播） | 同上 | — | DB seed 配置 |
 | `order.cancelled` | order-service **`order_outbox`（取消事務內 `OrderService.insertCancelledOutbox`，`OrderOutboxPublisherScheduler` 投遞）** ⚠️ **不是每一次取消都會發**：`insertCancelledOutbox` 在「查不到 `status=SUCCESS` 的扣庫存紀錄」時直接 return、不落 outbox ⇒ 本事件的實際語意是「**有庫存要歸還的**訂單取消了」 | product-service `OrderCancelledConsumer.onOrderCancelled` | `OrderCancelledPayload`（`sellerAvatar` 等圖片欄位依 49 號設計書 §6.3 帶 objectKey＋`*Key` 欄位名，顯示 URL 由消費端組出） | ✅ product.order.cancelled.dlq | `(stockTxId, RESTORE)` 複合鍵 |
 | `order.completed` | order-service **`order_outbox`（同 tx 寫入，`OrderOutboxPublisherScheduler` 投遞）** | notification-service（Go，binding 至 `notification.order.events`）；**crm-service（Go，`crm.order.completed` queue，CRM 客戶消費統計 `total_spent` 累加）**；**單體 buyer 模組（`internal/legacy/buyerconsumer`，queue `hawkr.monolith.buyer.order.completed`，訂單結案後加速完成買家與店家兩側等待中的刪帳）** | `OrderCompletedPayload` ⚠️ 缺 event_id（F2） | notification：—；crm / buyer：✅ `topology.yaml` `retry: {max_attempts: 3}` 展開出 queue-scoped `{queue}.dlx`（fanout）與 `{queue}.dlq`；`pkg/mq` 負責重試／直投語意（§1.5） | notification：Best-effort（推播容忍重複）；**crm：exactly-once effect——`crm_processed_orders` 表 tx 內 claim（`MarkOrderProcessed` rows==0 即不累加，策略 1 dedup 表），金額累加不容忍重複**；buyer：`IsPendingDeletion` guard 天然冪等（刪號完成後 status≠`pending_deletion`，重投遞為 no-op） |
@@ -334,8 +334,6 @@ docker exec hawkr-rabbitmq rabbitmqctl list_queues name messages \
 | `order.cancelled` | order-service（重複展示，見上） | + **invoice-service `invoice.order.cancelled` queue（`OrderCancelledConsumer`）** | `OrderCancelledPayload` ⚠️ **`buyer_id`／`store_id`／`notify_*_account_id` 是 `Long` ⇒ wire 上是 JSON 數字**，與同表 `order.refund.finalized`（16 個 component 全 `String`）相反；照另一支抄會讓 consumer 對每一則訊息 `json.Unmarshal` 失敗 | ✅ `invoice.order.cancelled.dlq`（由 `topology.yaml` `retry:` 展開） | **策略 2（`invoice_inbox_events`，鍵 `ORDER_CANCELLED:{order_no}`）**。用途是讓端點 8 對已取消的訂單不再回「付款完成後會立即開立發票」，**不碰 `invoice_documents`／`invoice_adjustments`**。🔴 handler 全程單交易（去重列＋業務寫入＋終態標記）⇒ 失敗時整批 rollback、重投真的會重跑、打滿 3 次**真的進 DLQ**——與同服務的 `invoice.order.paid`／`invoice.order.refund.finalized` 相反（那兩條的 DLQ 結構上恆為 0，失敗歸宿是 inbox 兜底掃描） |
 | `review.created` | review-service（Go）`PublishReviewCreated` | order-service `ReviewEventConsumer.onReviewCreated`；**product-service `ReviewStatsConsumer`（商品 rating / review_count 聚合）** | `ReviewCreatedEvent`（擴充：`orderItemId` / `content` / `imageKeys`（objectKey 陣列，原 `imageUrls`，依 49 號設計書 §5.3） / `createdAt` 供 order 快照；seller 統計 `avgRating` / `totalCount`（單體 seller 不消費）；**商品層級 `productId` / `productAvgRating` / `productReviewCount`**） | order：❌ 無 DLQ；product：✅ `product.review.stats.dlq` | order：markReviewed 冪等 + `orders.review` most-recent-wins；product：**full-recompute 覆寫**（策略 4 變形：直接以 event 攜帶的權威重算值 UPDATE，無 CAS 終態檢查，天然冪等，無需 dedup 表） |
 | `review.hidden` | review-service（Go）`PublishReviewHidden`（admin `HideReview` 隱藏評論後） | product-service `ReviewStatsConsumer`（重算商品 rating / review_count） | `ReviewHiddenEvent`（`reviewId` / `sellerAccountId` / `productId` / `avgRating` / `totalCount`（seller 級）/ `productAvgRating` / `productReviewCount`） | product：✅ `product.review.stats.dlq` | full-recompute 覆寫天然冪等（隱藏後排除 hidden 列重算聚合，反映於賣家 / 商品評分） |
-| 🆕 `order.fulfillment.failed` | order-service（`order_outbox`；65 §6A.1.2 群 A） | aftersales-service（新 queue `aftersales.order.fulfillment.failed`，handler ＝ `SellerCancelService.cancelShipmentBySystem(orderNo, FULFILLMENT_FAILED)`）＋ notification-service（既有 `notification.order`，`'#'` 綁定 ⇒ **binding +0**） | `OrderFulfillmentFailedPayload` | ✅ aftersales.events.dlq | `order_no` ＋ 失敗原因 |
-| 🆕 `order.receipt.disputed` | order-service（**B-5** 買家申訴，65 §6.1.2） | notification-service（既有 `notification.order`） | `OrderReceiptDisputedPayload` | ✅ | `order_no` ＋ `dispute_source` |
 
 **Java 對應 Enum**：`OrderEventType`（[內部技術碼](../代碼管理（CodeMeta）/內部技術碼.md)）
 
@@ -383,14 +381,13 @@ docker exec hawkr-rabbitmq rabbitmqctl list_queues name messages \
 | `shipment.processing.timeout` | shipping-service `ShippingEventPublisher.publishProcessingTimeout` | aftersales-service `ProcessingTimeoutConsumer.onProcessingTimeout` | Map（orderNo, sellerAccountId, buyerAccountId） | ✅ aftersales.events.dlq | cancel state machine |
 | `shipment.processing.cleared` | shipping-service `ShippingEventPublisher.publishProcessingCleared` | order-service `ShippingEventConsumer.onProcessingCleared` | Map（orderNo） | ✅ order.shipment.processing.cleared.dlq | processing_deadline 已 NULL 則跳過 |
 | `shipment.anomaly.detected` | shipping-service `ShipmentAnomalyEventPublisher.publishAnomalyDetected`（由 `TcatCallStuckAlertScheduler` / `ShipmentLabelReconcileScheduler` / `ShipmentStatusReconcileScheduler` 共用） + aftersales-service `ShipmentLabelConsumer`（B-143 即時偵測點）/ `ReturnStuckAlertScheduler`（退貨 14 天無進展；**經 `ObsRabbitPublisher.publishConfirmed`，confirm 上限 5 秒**，回 `false` 即釋放 `return_stuck_alerted_at` 租約 ⇒ 隔日重發，見 [09 號 §8.5](./09-售後微服務（AfterSales%20Service）詳細設計書.md#85-多副本排程搶佔語意scheduler-claimissue-2294) L6） | notification-service DB-driven template（賣家 FCM + inbox，push_mode='visible'；推送節奏由 template 端依 `severity` 處理） | `ShipmentAnomalyDetectedPayload`（含 orderNo / sellerAccountId / buyerAccountId / anomalyType / severity / detectedAt） | ✅ `topology.yaml` `retry:` 展開的 `notification.shipment.anomaly.detected.dlq`（DLX=`hawkr.shipping.dlx` 手動宣告，§2.2 已列）；MaxRetries=3 超上限即直投該 DLQ（重試／直投語意見 §1.5）；DLQ 端 alert ops 介入 | `reference_id_template = '#{orderNo}\|#{anomalyType}'` 達 (orderNo, anomalyType) 對應 1 筆 inbox + 1 次 FCM；scheduler 每輪重複 publish 由 reference_id 自然去重。⚠️ **RETURN_STUCK 另有一條「confirm timeout ⇒ 訊息可能已送達但租約被釋放 ⇒ 隔日再發一次」的路徑**：payload 每次帶新的 `UUID`，**不是**可用 event id 去重的重放，跨日收斂完全依賴本欄的 `reference_id` |
-| 🆕 `fulfillment.seller.ready`（`N11`，65 §6A.1.2） | shipping-service `ShippingEventPublisher.publish`（`S-13 report_ready` 寫入 `shipments.seller_ready_at` 同交易） | order-service（🆕 queue `order.fulfillment.seller.ready`，賣家出貨 SLA 的「已處理」判定）＋ notification-service（既有 `notification.shipping` 的 `'#'` binding ⇒ **queue／binding 皆 +0**；買家：備貨完成、預計取件時間） | `FulfillmentSellerReadyPayload` | ✅ `order.fulfillment.seller.ready.dlq`（`dlq:` 形狀，via `hawkr.order.dlx` —— DLQ 跟著 consumer 服務，見 §6.2 註） | 策略 3：`{order_no}:SELLER_READY` |
 | 🆕 `fulfillment.provider.courier_assigned`（`N12`） | shipping-service `ShippingEventPublisher.publish`（webhook normalize 後：`status = pickup` **AND** `courier != null`） | notification-service（既有 `notification.shipping` 的 `'#'` binding ⇒ **queue／binding 皆 +0**；買家 Push：外送員已指派＋ETA）＋ gateway SSE | `FulfillmentProviderCourierAssignedPayload` | ✅ `notification.shipping.dlq` | 策略 3：`{order_no}:{provider_delivery_ref}:COURIER_ASSIGNED` |
 | 🆕 `fulfillment.provider.pickup_imminent`（`N13`） | 同上（`courier_imminent = true`） | notification-service（同上，**零 topology 改動**）；🔴 `seller_ready_at IS NULL` 時額外走 Seller high-priority ＋ ADM urgent | `FulfillmentProviderPickupImminentPayload` | ✅ `notification.shipping.dlq` | 策略 3：`{order_no}:{provider_delivery_ref}:IMMINENT` |
 | 🆕 `fulfillment.provider.rematching`（`N14`） | 同上（進入 `PROVIDER_REMATCHING`：`status = pickup` AND `courier = null`，由回查偵測） | notification-service（同上；**買家＋賣家各一次**：正在重新安排外送員） | `FulfillmentProviderRematchingPayload` | ✅ `notification.shipping.dlq` | 策略 3：`{order_no}:{provider_delivery_ref}:REMATCH:{episode_seq}`（**`episode_seq` 不可省**：同一趟配送可能重配多次） |
 | 🆕 `fulfillment.provider.rematch_recovered`（`N15`） | 同上（`courier` 恢復 non-null） | 🔴 **SSE ＋ ETA update only，不再 Push**（避免重配切換 spam）；notification-service 仍由 `'#'` binding 收到，由 template 端決定不推播 | `FulfillmentProviderRematchRecoveredPayload` | ✅ `notification.shipping.dlq` | 策略 3：`{order_no}:{provider_delivery_ref}:REMATCH_OK:{episode_seq}` |
 | 🆕 `fulfillment.responsibility.finalized`（`N16`）<br/>🔴 **語意＝責任判定 financially final**（已不存在任何會改變 `refund_to_buyer` 的 pending review／dispute／未覆核 resolution），**不是**「有人做了判定」 | 🔴 **payment-service（Logistics Finance）**：既有 `outbox_events` ＋ `PaymentOutboxWriter`（afterCommit 即時投遞）＋ `OutboxEventPublisherScheduler`（5 秒兜底掃描）；判定落列與 outbox INSERT **同交易**（§3.3.1）。<br/>🔴 **exchange 必須是 outbox 列上的 explicit persisted 值**：`outbox_events` 需擴充 `exchange` 欄，本事件的列 `exchange='hawkr.shipping'`。`PaymentOutboxPublisher.publish` 讀該列的 `exchange` 欄；exchange 為 null／空白時 **fail-closed**（不投遞、標 FAILED，不得 fallback 到任何預設 exchange）。producer ＝ `ResponsibilityCaseService.finalizeResponsibility`，在同一交易內完成 `鎖 → CAS resolution → CAS case → INSERT outbox`。擴充內容與 fail-closed 語意見 §3.3.1 | order-service（queue `order.fulfillment.responsibility_finalized`，binding key `fulfillment.responsibility.finalized`，🔴 **`35 → 54` 與建撥款任務的唯一入口**）＋ payment-service Logistics Finance（queue `payment.fulfillment.responsibility_finalized`，同一 binding key，settlement counterparty resolved ⇒ 決定是否建 logistics receivable）＋ notification-service（既有 `notification.shipping` 的 `'#'` binding ⇒ **queue／binding 皆 +0**；買家：結果＋政策說明＋申訴管道） | `FulfillmentResponsibilityFinalizedPayload`（逐欄見 §3.3.1） | ✅ `order.fulfillment.responsibility_finalized.dlq`（via `hawkr.order.dlx`）＋ `payment.fulfillment.responsibility_finalized.dlq`（via `payment.events.dlx`）——皆 `dlq:` 形狀，**DLX 跟著 consumer 服務走，不是跟著來源 exchange**（§6.2 註）；notification 端 `notification.shipping.dlq` | L1 `event_id`；L2 **guarded finalization transition**（🔴 **不是去重鍵**——`outbox_events` 沒有 `idempotency_key` 欄也沒有對應 UNIQUE，逐層說明見 §3.3.1）；L3 order-service **策略 4（CAS 終態）**；L3 notification `reference_id` 必含 `case_no`／`resolution_id`（§3.3.1） |
 | 🆕 `logistics.cost.incurred`<br/>🔴 **語意＝provider 這條 leg 已產生成本**，**不是**「送達完成」——送達／取件後取消／買家無法投遞／返程 leg 四種情形都算（70 §3.1.1）。🔴 **Cost Fact ≠ Responsibility Decision**：本事件**不攜帶** `responsibility_cause`，唯一的 responsibility authority 是 `N16`；兩個事實的 durable join 見 70 §3.1.4 | 🔴 **shipping-service**（domain ownership：「這趟配送 provider 成本多少」是 shipping domain fact，payment 不得自行估算）。🔴 **provider-neutral**——Uber 只是第一個 producer path | payment-service（Logistics Finance，🆕 queue `payment.logistics.cost_incurred`）：與既有責任案件 durable join ⇒ 決定是否建立 `logistics_receivable` | `LogisticsCostIncurredPayload`（🔴 **逐欄契約在 [70 §7.1](70-物流財務結算%EF%BC%88Logistics%20Settlement%20%26%20Receivable%EF%BC%89詳細設計書.md)**，id 與金額一律 `String`；`estimated_cost` 為**新台幣元整數**，provider 的 minor unit 不得滲透進 wire） | ✅ `payment.logistics.cost_incurred.dlq`（via `payment.events.dlx`——**DLX 跟著 consumer 服務走**，§6.2 註） | L1 `event_id`；L3 consumer ＝ **DB 唯一性**：`uq_logrecv_delivery_ref`（一條 leg 一筆應收）＋ `chk_logrecv_idem_anchor` 強制冪等鍵錨在 `logistics_receivable:{provider}:{provider_delivery_ref}`（🔴 **`shipment_id` 不能當冪等鍵——它可以是 null**） |
-| 🆕 `fulfillment.responsibility.unresolved`（`N17`） | 🔴 **payment-service（Logistics Finance）**：`fulfillment_exception_cases` 建列與 `outbox_events` INSERT 同交易（表 owner 同上）。🔴 **exchange 前置與 `N16` 同一條**（`exchange='hawkr.shipping'`）。producer ＝ `ResponsibilityCaseService.openUnresolved`，在同一交易內完成建案與 outbox INSERT，🔴 走**不指名 conflict target** 的 `ON CONFLICT DO NOTHING`（G4）。見 §3.3.1「Outbox persisted exchange」，不在此重複 | notification-service（既有 `notification.shipping` 的 `'#'` binding ⇒ **queue／binding 皆 +0**；買家：「配送失敗，正在確認原因」＋預計回覆時間／賣家：同上＋請求提供佐證） | `FulfillmentResponsibilityUnresolvedPayload` | ✅ `notification.shipping.dlq` | 🔴 **這是 consumer 側去重，不是 producer 側 outbox 去重**（`outbox_events` 沒有 `idempotency_key` 欄也沒有對應 UNIQUE，與 `N16` 同一條）：L2 producer ＝ 建案的 `INSERT … ON CONFLICT DO NOTHING` 真的寫進一列那一次才 INSERT outbox（65 §6A.1.2）；L3 consumer ＝ **策略 3**，notification-service `notifications` 既有 `(user_id, user_type, event_type, reference_id)` UNIQUE，`reference_id` ＝ `{order_no}:{case_no}:UNRESOLVED`（買家與賣家各一筆由 `user_id`／`user_type` 分開，**不需**另加收件人後綴） |
+| 🆕 `fulfillment.responsibility.unresolved`（`N17`） | 🔴 **payment-service（Logistics Finance）**：`fulfillment_exception_cases` 建列與 `outbox_events` INSERT 同交易（表 owner 同上）。🔴 **exchange 前置與 `N16` 同一條**（`exchange='hawkr.shipping'`）。producer ＝ `ResponsibilityCaseService.openUnresolved`，在同一交易內完成建案與 outbox INSERT，🔴 走**不指名 conflict target** 的 `ON CONFLICT DO NOTHING`（G4）。見 §3.3.1「Outbox persisted exchange」，不在此重複 | notification-service（既有 `notification.shipping` 的 `'#'` binding ⇒ **queue／binding 皆 +0**；買家：「配送失敗，正在確認原因」＋預計回覆時間／賣家：同上＋請求提供佐證） | `FulfillmentResponsibilityUnresolvedPayload` | ✅ `notification.shipping.dlq` | 🔴 **這是 consumer 側去重，不是 producer 側 outbox 去重**（`outbox_events` 沒有 `idempotency_key` 欄也沒有對應 UNIQUE，與 `N16` 同一條）：L2 producer ＝ 建案的 `INSERT … ON CONFLICT DO NOTHING` 真的寫進一列那一次才 INSERT outbox（65）；L3 consumer ＝ **策略 3**，notification-service `notifications` 既有 `(user_id, user_type, event_type, reference_id)` UNIQUE，`reference_id` ＝ `{order_no}:{case_no}:UNRESOLVED`（買家與賣家各一筆由 `user_id`／`user_type` 分開，**不需**另加收件人後綴） |
 
 ##### 線 B 物流財務 routing key（同 exchange，自成一組）
 
@@ -406,8 +403,8 @@ docker exec hawkr-rabbitmq rabbitmqctl list_queues name messages \
 只做其中一面的症狀是**訂閱靜默失效**：passive declare 之下查不到 queue 不 crash、不進 DLQ、不報錯。
 
 **Java 對應 Enum**：`ShippingEventType`（9 個值）——
-＝ 本節前 9 列（8 條有專屬 binding ＋ `shipment.anomaly.detected`）。`fulfillment.*` 七條屬 65 號，本 enum 暫不涵蓋。
-⚠️ **`fulfillment.*` 七條需要自己的 EventType 碼值**（36 §7.4.1 要求 `event_type` 對齊 CodeMeta `內部技術碼.md`）——它們**不會**破壞下方那支雙向契約測試，因為該測試的掃描面逐字是「值以 `shipment.` 起頭的常數」，`fulfillment.` 前綴落在集合外。🔴 **反過來說，那支測試對 `fulfillment.*` 是零鑑別力**：新家族漏登記 `MqConstants` 常數不會轉紅，要靠 §3.3.1 的四面登記自檢。
+＝ 本節前 9 列（8 條有專屬 binding ＋ `shipment.anomaly.detected`）。`fulfillment.*` 兩條屬 65 號，本 enum 暫不涵蓋。
+⚠️ **`fulfillment.*` 兩條使用 `FulfillmentEventType` 碼值**（36 §7.4.1 要求 `event_type` 對齊 CodeMeta `內部技術碼.md`）——它們**不會**破壞下方那支雙向契約測試，因為該測試的掃描面逐字是「值以 `shipment.` 起頭的常數」，`fulfillment.` 前綴落在集合外。🔴 **反過來說，那支測試對 `fulfillment.*` 是零鑑別力**：新家族漏登記 `MqConstants` 常數不會轉紅，要靠 §3.3.1 的四面登記自檢。
 
 🔴 **`Code` 與 `Value` 各自對應一個 `MqConstants` 常數家族，不是二選一**：
 `ObsRabbitPublisher.publish(exchange, routingKey, body, eventType)` 的 **routing key 與 event type 是兩個獨立參數**
@@ -431,7 +428,7 @@ DLQ 因此是 **`notification.shipping.dlq`**。
 
 ⚠️ **三條共用 `ShippingEventPayload` 的事件**（`shipment.status.changed`／`shipment.delivered`／
 `shipment.return.status_changed`）的 payload 欄位為：`commerce_model`／`provider`／
-`previous_status`／`occurred_at`（65 §6A.1.1）＋ `outcome_reason`
+`previous_status`／`occurred_at`（65）＋ `outcome_reason`
 （值域 [`UberDeliveryOutcome`](../代碼管理（CodeMeta）/業務類型碼.md)）。
 **擴充這三條的 payload 時不新增 routing key**——它們共用同一個 payload class。
 
@@ -500,11 +497,11 @@ producer 只能是 payment-service。`fulfillment.responsibility.unresolved`（`
 | `trace_id` | `traceId` | String | ✅ | 觀測性透傳 |
 | `correlation_id` | `correlationId` | String | ✅ | 觀測性透傳 |
 | `order_no` | `orderNo` | String | ❌ | Order 軸錨點，consumer 的 CAS 依據 |
-| `shipment_id` | `shipmentId` | **`String`**（TSID 十進位字串） | ✅ | 🔴 **wire 上是 quoted string 或 `null`，不得是 JSON 數字**（65 §6A.1.3 通則：新事件的 id 一律 `string`）。理由不是風格——notification-service 把 payload 解進 `map[string]interface{}`，`encoding/json` 對 `any` 用 **float64** ⇒ 超過 2^53 的 TSID 會被**靜默截斷**，而本事件的 consumer 正好包含它。<br/>🔴 **必須是 nullable**：取消可能發生在 shipment 建立之前，此時本欄為 `null`。**不得用 primitive 數值型別**——它會把「沒有」靜默寫成 `0`，而 `0` 看起來像合法 TSID。<br/>⚠️ consumer 端不得宣告成必填、也不得宣告成數值 |
+| `shipment_id` | `shipmentId` | **`String`**（TSID 十進位字串） | ✅ | 🔴 **wire 上是 quoted string 或 `null`，不得是 JSON 數字**（65 通則：新事件的 id 一律 `string`）。理由不是風格——notification-service 把 payload 解進 `map[string]interface{}`，`encoding/json` 對 `any` 用 **float64** ⇒ 超過 2^53 的 TSID 會被**靜默截斷**，而本事件的 consumer 正好包含它。<br/>🔴 **必須是 nullable**：取消可能發生在 shipment 建立之前，此時本欄為 `null`。**不得用 primitive 數值型別**——它會把「沒有」靜默寫成 `0`，而 `0` 看起來像合法 TSID。<br/>⚠️ consumer 端不得宣告成必填、也不得宣告成數值 |
 | `shipping_method` | `shippingMethod` | String | ❌ | 碼值（`3003`…）；**provider-neutral**，本事件不限 Uber |
 | `provider_delivery_ref` | `providerDeliveryRef` | String | ✅ | fulfillment leg 識別；無 provider leg 時為 `null` |
 | `order_no`／`shipment_id`／`shipping_method` | — | — | — | 🔴 **三欄一律取自 `fulfillment_exception_cases` 建案當下凍結的那一列，不得由呼叫端各傳一次**。`order_no` 是 order-service `35→54` CAS 的錨 ⇒ 同一個 leg 的 `N16` 與 `N17` 若帶不同的 `order_no`，**Order 永遠停在 35 且無任何訊號**。 |
-| `responsibility_cause` | `responsibilityCause` | String | ❌ | 🔴 **值的來源是 maker 的提案列**（`fulfillment_case_resolutions.proposed_responsibility_cause`，V13），不是覆核者當下輸入的值——覆核者只能 APPROVE／REJECT 這個成因（65 §6.4.2 A-4／A-5）。🔴 **只能是 4 個 resolved 值之一**（`BUYER_CAUSED`／`SELLER_CAUSED`／`PROVIDER_CAUSED`／`PLATFORM_CAUSED`，值域以 65 的 `ResponsibilityCause` 為準）；平台／系統原因一律歸 `PLATFORM_CAUSED`，🔴 **不存在 `SYSTEM_CAUSED`**；`ResponsibilityCause` 的第 5 個值 `RESPONSIBILITY_UNRESOLVED` **不會**出現在本事件——未 final 就不發 |
+| `responsibility_cause` | `responsibilityCause` | String | ❌ | 🔴 **值的來源是 maker 的提案列**（`fulfillment_case_resolutions.proposed_responsibility_cause`，V13），不是覆核者當下輸入的值——覆核者只能 APPROVE／REJECT 這個成因（65）。🔴 **只能是 4 個 resolved 值之一**（`BUYER_CAUSED`／`SELLER_CAUSED`／`PROVIDER_CAUSED`／`PLATFORM_CAUSED`，值域以 65 的 `ResponsibilityCause` 為準）；平台／系統原因一律歸 `PLATFORM_CAUSED`，🔴 **不存在 `SYSTEM_CAUSED`**；`ResponsibilityCause` 的第 5 個值 `RESPONSIBILITY_UNRESOLVED` **不會**出現在本事件——未 final 就不發 |
 | `financially_final` | `financiallyFinal` | Boolean | ❌ | 🔴 恆為 `true`。保留此欄是為了讓 consumer 的契約測試**斷言得到它**，而不是靠「這個 routing key 應該只在 final 時發」的紀律 |
 | `case_no` | `caseNo` | String | ❌ | 責任案件編號（`fulfillment_exception_cases.case_no`）——evidence reference |
 | `resolution_id` | `resolutionId` | String | ❌ | `fulfillment_case_resolutions.id`（TSID，**字串**）——final decision 的可指認 reference |
@@ -518,7 +515,7 @@ producer 只能是 payment-service。`fulfillment.responsibility.unresolved`（`
 | 層 | 鍵 ／ 機制 |
 |---|---|
 | **L1 broker 重投** | `event_id`：同一筆 outbox 列的每次重送都攜同一個 `event_id` 與**同一份凍結的 payload bytes** ⇒ 重送完全一致，consumer 可據它去重 |
-| **L2 業務重放（producer 側業務冪等）** | 🔴 **機制是 guarded finalization transition 本身，不是任何去重鍵**：只有 resolution `AWAITING_REVIEW → APPROVED` **且** case → `RESOLVED` 兩道 CAS 都真正成功的那一次 transaction 才 INSERT outbox；commit 之後的 retry 讀到 case／resolution 已是 final ⇒ **CAS `rows=0` ⇒ 不會 INSERT 第二筆**（同一交易的序列化要求見下方 Atomic Boundary 與 65 §5.5.2）。<br/>⚠️ **本欄先前寫的 `{order_no}:{case_no}:{resolution_id}` 是一個不存在的機械保證，已刪除**——`outbox_events` 沒有 `idempotency_key` 欄、也沒有對應 UNIQUE（`OutboxEventEntity` 欄位僅 `id`／`eventType`／`routingKey`／`payload`／`status`／`retryCount`／`nextRetryAt`／`sentAt`／`lastError`／`createdAt`）。`case_no`／`resolution_id` 仍是 **payload 欄位**（final decision 的可指認 reference），與去重無關。<br/>🔴 **也不得改用 `event_id` 當業務去重鍵**——既有教訓：重發時每次換新 UUID ⇒ 每小時對同一筆開一張新單 |
+| **L2 業務重放（producer 側業務冪等）** | 🔴 **機制是 guarded finalization transition 本身，不是任何去重鍵**：只有 resolution `AWAITING_REVIEW → APPROVED` **且** case → `RESOLVED` 兩道 CAS 都真正成功的那一次 transaction 才 INSERT outbox；commit 之後的 retry 讀到 case／resolution 已是 final ⇒ **CAS `rows=0` ⇒ 不會 INSERT 第二筆**（同一交易的序列化要求見下方 Atomic Boundary 與 65）。<br/>⚠️ **本欄先前寫的 `{order_no}:{case_no}:{resolution_id}` 是一個不存在的機械保證，已刪除**——`outbox_events` 沒有 `idempotency_key` 欄、也沒有對應 UNIQUE（`OutboxEventEntity` 欄位僅 `id`／`eventType`／`routingKey`／`payload`／`status`／`retryCount`／`nextRetryAt`／`sentAt`／`lastError`／`createdAt`）。`case_no`／`resolution_id` 仍是 **payload 欄位**（final decision 的可指認 reference），與去重無關。<br/>🔴 **也不得改用 `event_id` 當業務去重鍵**——既有教訓：重發時每次換新 UUID ⇒ 每小時對同一筆開一張新單 |
 | **L3 order-service** | **策略 4（SQL CAS 終態）**：`UPDATE orders SET status='54' WHERE order_no=? AND status='35'`；`affected = 0` 即 no-op。🔴 **但不得因為 `affected = 0` 就跳過既有終態的驗證**（見下方 consumer 重送處置） |
 | **L3 notification 去重** | 既有 `(user_id, user_type, event_type, reference_id)`。🔴 `reference_id` **必須含 `case_no` 或 `resolution_id`**，只填 `order_no` 會被 dedup index 靜默吞掉（同一張訂單先前的物流通知已占用該鍵） |
 
@@ -536,20 +533,20 @@ producer 只能是 payment-service。`fulfillment.responsibility.unresolved`（`
 ③ INSERT outbox_events（fulfillment.responsibility.finalized，exchange='hawkr.shipping'）
 ```
 
-⇒ **⓪～③ 同一個交易**（65 §5.5.2 E0.1 的四件事）；投遞由既有 `PaymentOutboxWriter` afterCommit 即時履約、排程器兜底補投。
+⇒ **⓪～③ 同一個交易**（65 的四件事）；投遞由既有 `PaymentOutboxWriter` afterCommit 即時履約、排程器兜底補投。
 
-🔴 **⓪ 的 `FOR UPDATE` 不可省**：它把同一張 case 上的 proposal 與 finalization 序列化。少了它，兩個並行的 finalization 各自讀到同一份狀態、各自往下走，而**每一步單獨看都是成功的**。proposal 側的對稱守衛（拿到鎖之後才確認 case 仍 `∈ (OPEN, IN_PROGRESS)`，而不是先查再寫）見 65 §5.5.2 E0.1。
+🔴 **⓪ 的 `FOR UPDATE` 不可省**：它把同一張 case 上的 proposal 與 finalization 序列化。少了它，兩個並行的 finalization 各自讀到同一份狀態、各自往下走，而**每一步單獨看都是成功的**。proposal 側的對稱守衛（拿到鎖之後才確認 case 仍 `∈ (OPEN, IN_PROGRESS)`，而不是先查再寫）見 65。
 ⚠️ **鎖的範圍是「同一張 case」不是「同一個 subject」**——跨 subject 的責任判定本來就該並行。
 
 🔴 **① 的 `resolution_type` 述詞不可省**：`chk_fcr_type` 現行六值**沒有一個是責任判定**，而本段是這條事件的 contract——
 少了它，任何型別的 resolution 走到 `APPROVED` 都會走到 ③ 發出本事件，而本事件的 `responsibility_cause`
 **根本沒有值可填**（`resolution_code` 那時不是 `ResponsibilityCause`）。更糟的是它同時製造一條死路：
 case 進了 `RESOLVED` 而「**責任** resolution `APPROVED`」永遠不成立 ⇒ Order 永久停在 `35`。
-值域、型別↔category 綁定與完整失效鏈見 **65 §5.5.2 E0.2**（本書不重複定義）。
+值域、型別↔category 綁定與完整失效鏈見 **65（本書不重複定義）。
 
 🔴 **①② 必須是 CAS（帶 allowed-from 述詞），不是無條件 UPDATE**：`rows=0` 代表狀態已被別人推進 ⇒ **整個交易 rollback**，不得當成「別人先做過了」就放行走到 ③——那會對同一張 case 發出第二筆 final 事件。這一組 CAS 同時就是上表 L2 的機制本體：只有它們真正成功的那一次交易才走得到 ③。
 
-🔴 **不得改用 snapshot 判定**：「先掃一次、看這張 case 上還有沒有 `AWAITING_REVIEW` 的 resolution」或「看同一 subject 還有沒有其他 `OPEN` 案件」是 read-then-act——兩個並行交易會**同時讀到「沒有」**然後同時往下走，快照在讀完到寫入之間就過期了，而且不會有任何錯誤訊息。已由 65 §5.5.2 E0.1 明令廢除。
+🔴 **不得改用 snapshot 判定**：「先掃一次、看這張 case 上還有沒有 `AWAITING_REVIEW` 的 resolution」或「看同一 subject 還有沒有其他 `OPEN` 案件」是 read-then-act——兩個並行交易會**同時讀到「沒有」**然後同時往下走，快照在讀完到寫入之間就過期了，而且不會有任何錯誤訊息。已由 65 明令廢除。
 
 **Consumer 側（order-service）——同一個交易（`BUYER_CAUSED`）：**
 
@@ -583,7 +580,7 @@ case 進了 `RESOLVED` 而「**責任** resolution `APPROVED`」永遠不成立 
 | wire key（L1） | Java 欄位 | 型別 | 可 null | 說明 |
 |---|---|---|---|---|
 | `event_id` | `eventId` | String（UUID v4） | ❌ | §7.4.1 必含 |
-| `event_type` | `eventType` | String | ❌ | `FULFILLMENT_RESPONSIBILITY_UNRESOLVED`。🔴 **碼值住在 `FulfillmentEventType`，不是 `ShippingEventType`**——`fulfillment.*` 是另一個 owner domain（65 附錄 C.4 逐字「不讓一個 enum 同時服務三個 owner」），且 `ShippingEventType` 的守門測試只掃 `shipment.` 前綴、看不到這些值 |
+| `event_type` | `eventType` | String | ❌ | `FULFILLMENT_RESPONSIBILITY_UNRESOLVED`。🔴 **碼值住在 `FulfillmentEventType`，不是 `ShippingEventType`**——`fulfillment.*` 是另一個 owner domain（不讓一個 enum 同時服務三個 owner），且 `ShippingEventType` 的守門測試只掃 `shipment.` 前綴、看不到這些值 |
 | `event_version` | `eventVersion` | String | ❌ | `v1` |
 | `occurred_at` | `occurredAt` | String（ISO 8601 UTC，帶 `Z`） | ❌ | 🔴 **建案的業務時間**（來源端 `occurred_at`），不得用發送時間 |
 | `trace_id` | `traceId` | String | ✅ | 觀測性透傳；空字串是正常值 |
@@ -613,7 +610,7 @@ case 進了 `RESOLVED` 而「**責任** resolution `APPROVED`」永遠不成立 
    rows = 0 ⇒ 該 leg 已有責任案件（含已結案者）⇒ **不發第二筆事件**，回讀既有案件即可
 ```
 
-🔴 **① 不得指名 conflict target**（65 §5.5.2 E0 的 **G4**）：責任判定案件同時受兩條唯一約束拘束——
+🔴 **① 不得指名 conflict target**（65 的 **G4**）：責任判定案件同時受兩條唯一約束拘束——
 `uq_exc_open_dedup`（dedup_key，僅未結案之間）與 `uq_exc_responsibility_subject`（subject，**lifetime**）。
 指名 `(dedup_key) WHERE …` 的那一支只認得前者，撞到後者時**不會**走 `DO NOTHING` 而是拋 `23505`，
 而 PostgreSQL 交易內任一句 SQL 失敗 ⇒ 整個交易 aborted（`25P02`）⇒ **建案交易 500**。
@@ -634,7 +631,7 @@ case 進了 `RESOLVED` 而「**責任** resolution `APPROVED`」永遠不成立 
 | 面 | 本族的內容 |
 |---|---|
 | ① 36 號 Event Catalog 條目 | 本節：routing key／exchange／queue／DLQ／payload／版本／冪等 |
-| ② 擁有該事件的詳細設計書事件清單 | 65 §6A：`N16`／`N17` 的 routing key、producer、consumer 與本節逐字一致；並同步更新 `infra/mq/tools/test_expand.py` 的資源數量 pin（先對帳增減量再改數字） |
+| ② 擁有該事件的詳細設計書事件清單 | 65：`N16`／`N17` 的 routing key、producer、consumer 與本節逐字一致；並同步更新 `infra/mq/tools/test_expand.py` 的資源數量 pin（先對帳增減量再改數字） |
 | ③ 常數來源 | Java `MqConstants`（routing key ＋ event type 兩個常數家族，見 §3.3 的 `Code`／`Value` 說明）／Go `pkg/mq`；EventType 值先進 CodeMeta `內部技術碼.md` 再 `generate.sh`。🔴 **`fulfillment.*` 的 EventType 屬 `FulfillmentEventType`**，**不得**併進 `ShippingEventType`——後者的守門測試只掃 `shipment.` 前綴，併進去等於「值域被撐開、守門的測試卻看不到新成員」 |
 | ④ `infra/mq/topology/topology.yaml` | 兩條新 queue ＋ 其 `dlq:` 條目 ＋ binding |
 
@@ -660,7 +657,7 @@ case 進了 `RESOLVED` 而「**責任** resolution `APPROVED`」永遠不成立 
 
 
 > 🔴 **本小節是 `outbox_events` 上 exchange 這一欄的 contract 來源**——模型（explicit persisted exchange）、哪條 routing key 落哪個 exchange、fail-closed 語意，由本節定義。
-> **payment-service 端的逐項實作 impact 清單與 rollout 順序另由 [65 §6A.1.2](65-物流履約平台（Fulfillment%20Platform）詳細設計書.md) 的「Outbox persisted exchange」段持有**——它與下表是同一件事的兩個視角（本節＝契約，65＝要改哪幾個 class）；[70 §3.8.1](70-物流財務結算%EF%BC%88Logistics%20Settlement%20%26%20Receivable%EF%BC%89詳細設計書.md) 只引用，兩份都不持有。
+> **payment-service 端的逐項實作 impact 清單與 rollout 順序另由 [65](65-物流履約平台（Fulfillment%20Platform）詳細設計書.md) 的「Outbox persisted exchange」段持有**——它與下表是同一件事的兩個視角（本節＝契約，65＝要改哪幾個 class）；[70 §3.8.1](70-物流財務結算%EF%BC%88Logistics%20Settlement%20%26%20Receivable%EF%BC%89詳細設計書.md) 只引用，兩份都不持有。
 > 🔴 **兩邊都不得各自增列新的契約語意**（新的 exchange 值、新的 fail-closed 分支、新的 rollout 步驟）；改動任一方必須在**同一個 PR** 內回灌另一方，否則兩份副本會各自漂移而沒有任何東西會說出來。
 
 模型：`outbox_events` 加一欄 `exchange varchar(64) NOT NULL DEFAULT 'payment.events'`。
@@ -1780,7 +1777,7 @@ flowchart TD
 | `SellerWorkspaceEventType` | 同上目錄 | 2 個（`SELLER_ORDER_UPDATED` / `SELLER_AFTER_SALE_UPDATED`），exchange `hawkr.seller_workspace`，gateway SSE 賣家工作區 realtime（§3.6i）|
 | `DelegationEventType` | 同上目錄（[內部技術碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/內部技術碼.md#DelegationEventType)）| 1 個 `DELEGATION_OPERATION_COMPLETED`（routing key `delegation.operation.completed`），exchange `hawkr.delegation`（56 號設計書，§3.6j）|
 | `InvoiceEventType` | 同上目錄（[內部技術碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/內部技術碼.md#InvoiceEventType)）| 12 個 `invoice.*`（routing key 點分式、event_type UPPER_SNAKE），exchange `hawkr.invoice`（58 號設計書，§3.6k）|
-| `ShippingEventType` | 同上目錄（[內部技術碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/內部技術碼.md#shippingeventtype)）| **9 個 `shipment.*`**，exchange `hawkr.shipping`（65 附錄 C.4，§3.3）。`Value` ＝點分式 routing key（對應 `MqConstants.ROUTING_KEY_SHIPMENT_*`）、`Code` ＝ `UPPER_SNAKE`（對應 `EVENT_TYPE_SHIPMENT_*`），兩軸同時承載。⚠️ 值域邊界錨在**契約**（routing key ＋ exchange）不錨在 topology binding ⇒ 只靠 `#` 收的 `shipment.anomaly.detected` **仍屬本領域**；而 `order.shipment.create_requested` / `order.shipment.creation_failed`（`hawkr.order`，見 `OrderEventType`）與 `payuni.shipping.status`（`payuni.events`）**不在**值域內 |
+| `ShippingEventType` | 同上目錄（[內部技術碼](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/內部技術碼.md#shippingeventtype)）| **9 個 `shipment.*`**，exchange `hawkr.shipping`（§3.3）。`Value` ＝點分式 routing key（對應 `MqConstants.ROUTING_KEY_SHIPMENT_*`）、`Code` ＝ `UPPER_SNAKE`（對應 `EVENT_TYPE_SHIPMENT_*`），兩軸同時承載。⚠️ 值域邊界錨在**契約**（routing key ＋ exchange）不錨在 topology binding ⇒ 只靠 `#` 收的 `shipment.anomaly.detected` **仍屬本領域**；而 `order.shipment.create_requested` / `order.shipment.creation_failed`（`hawkr.order`，見 `OrderEventType`）與 `payuni.shipping.status`（`payuni.events`）**不在**值域內 |
 
 ### 8.2 CodeMeta SSOT 流程
 

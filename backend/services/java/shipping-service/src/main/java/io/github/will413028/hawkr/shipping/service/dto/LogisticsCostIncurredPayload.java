@@ -27,7 +27,7 @@ import com.fasterxml.jackson.databind.annotation.JsonNaming;
  * 在物理上不可能發生。兩個事實如何 durable join（且<b>抵達順序不影響最終結果</b>）見 70 §3.1.4。
  *
  * <h2>🔴 型別：id 與金額一律 {@code String}</h2>
- * 65 §6A.1.3 通則；36 已於 2026-09-16 對 N16 統一。<b>理由不是風格</b>：
+ * 65 通則；36 已於 2026-09-16 對 N16 統一。<b>理由不是風格</b>：
  * notification-service 把 payload 解進 {@code map[string]interface{}}，
  * 而 {@code encoding/json} 對 {@code any} 用 <b>float64</b>
  * ⇒ 超過 2^53 的 TSID 會被<b>靜默截斷</b>。

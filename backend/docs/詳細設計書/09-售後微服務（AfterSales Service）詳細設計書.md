@@ -4050,7 +4050,7 @@ AfterSales 發布 `aftersales.refund.completed` 事件，Order Service 消費後
 🔴 **`UBER_INSTANT` 必須有處理期限。**
 
 **現行履約模型是 payment-time future-pickup**：付款成功後平台**即刻**向 provider 建立配送，取件時間帶 `pickup_ready_at_snapshot`（報價當下凍結的絕對時間）。
-⇒ **賣家在履約鏈上的必要一步是 `REPORT_READY`（回報備妥）**：配送在付款當下就已建立，provider 會依約定時間前來取件，**賣家不自行發動取件，該做的是在約定時間前把貨備妥並回報**（[65 §7 Provider 憲法](../基本設計書/65-物流履約平台（Fulfillment%20Platform）基本設計書.md)）。
+⇒ **賣家在履約鏈上的必要一步是 `REPORT_READY`（回報備妥）**：配送在付款當下就已建立，provider 會依約定時間前來取件，**賣家不自行發動取件，該做的是在約定時間前把貨備妥並回報**。
 ⇒ 賣家仍是履約鏈上的必要一步，而 §5.9 正是「賣家不動作時買家怎麼辦」的唯一出口。
 ⚠️ **正因為 provider 會如期前來，賣家不備妥的後果比 3001／3002 更即時**：外送員撲空、產生 provider 成本、買家在等一份永遠不會被取走的訂單。
 
@@ -4677,7 +4677,7 @@ UPDATE 走 status 變更天然防多實例 race：先到的 worker 把 status �
 
 §5.1.1 的入口條件是 `order.status = DELIVERED(40)` **AND** `order.delivered_at IS NOT NULL` 兩個 AND 條件，配送失敗的訂單**兩個都不成立** ⇒ `CreateAfterSaleCase` 必然被拒。🔴 **本節不放寬這兩個條件**——那會讓「未送達」的訂單走進一條為「已送達」設計的流程（60 小時時效、退貨逆物流、驗貨扣款全部無意義）。
 
-⇒ 🔴 **會改變 `ResponsibilityCause` 或 refund entitlement 的 review／dispute／maker-checker，一律必須在 `SHIPPING_ABNORMAL(35)` 階段完成**，走 §5.11.2 的例外案件機制（`fulfillment_exception_cases` ＋ `fulfillment_case_resolutions`）。`35` 是它**唯一的窗口**——判定 financially final 的那一刻窗口就關上（語意 SSOT ＝ [65 §5.5.2 E0](65-物流履約平台%EF%BC%88Fulfillment%20Platform%EF%BC%89詳細設計書.md)）。
+⇒ 🔴 **會改變 `ResponsibilityCause` 或 refund entitlement 的 review／dispute／maker-checker，一律必須在 `SHIPPING_ABNORMAL(35)` 階段完成**，走 §5.11.2 的例外案件機制（`fulfillment_exception_cases` ＋ `fulfillment_case_resolutions`）。`35` 是它**唯一的窗口**——判定 financially final 的那一刻窗口就關上（語意 SSOT ＝ [65](65-物流履約平台%EF%BC%88Fulfillment%20Platform%EF%BC%89詳細設計書.md)）。
 
 🔴 **`54` 之後不存在會翻案的救濟管道。** 對已 financially final 的 `BUYER_CAUSED`，買家仍可取得**客服申訴管道／協助說明**（goodwill request、人工優惠券或補償，§5.5／§5.8），但它 **① 不修改 `ResponsibilityCause` ② 不修改 Order terminal ③ 不修改 refund entitlement ④ 不建立 `refund_task`（也不進 `REFUND_PROCESSING(40)`、不補開售後單）⑤ 不向賣家追討（clawback）**——②～⑤ 就是 §5.11.3 末段那條 goodwill 界線，① 是本節補上的：**判定本身在 `35` 已經關窗**。
 
@@ -4697,7 +4697,7 @@ UPDATE 走 status 變更天然防多實例 race：先到的 worker 把 status �
 
 ⇒ 兩條路都得不到「post-`54` 的責任判定申訴」。🔴 **它不是「還沒做」，是設計上不存在。**
 
-⚠️ **唯一的出口是 `LV-05`，而它是 Design Amendment、不是實作**：若 Taiwan Legal 最終判定「正式 no-refund policy 必須存在可逆申訴窗」（列管在 65 §3.4.1 的 LV 表，🔴 本檔不另持一份，見 §2.5.3 末的 `LV-*` 段）⇒ **production activation blocked**，屆時另開 Design Amendment 重新設計 finality 與 `54` 的可逆性。🔴 **不得現在先 speculative build 一條「以後可能會用到」的翻案路徑**——那條路徑一旦存在，`54` 的 immutable 就只剩文件上的宣稱。
+⚠️ **唯一的出口是 `LV-05`，而它是 Design Amendment、不是實作**：若 Taiwan Legal 最終判定「正式 no-refund policy 必須存在可逆申訴窗」（列管在 65 的 LV 表，🔴 本檔不另持一份，見 §2.5.3 末的 `LV-*` 段）⇒ **production activation blocked**，屆時另開 Design Amendment 重新設計 finality 與 `54` 的可逆性。🔴 **不得現在先 speculative build 一條「以後可能會用到」的翻案路徑**——那條路徑一旦存在，`54` 的 immutable 就只剩文件上的宣稱。
 
 ⚠️ **三者不是同一件事，不得互相代用**：
 

@@ -4,7 +4,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 維運例外案件的處置提案型別。🔴 **型別與案件 category 綁定**：`RESPONSIBILITY_ATTRIBUTE` 只能用在 `RESPONSIBILITY_UNRESOLVED` 的案件上，其餘六值只能用在非責任判定案件上——**雙向**（65 §5.5.2 E0.2 的「第二扇門」）。拿 `CLAIM_DISMISS` 去結一張責任案件，會讓案件進入 `RESOLVED` 而 finality 條件永遠不成立 ⇒ `N16` 永不發出 ⇒ Order 永遠停在 `35`，且每一步都「照規則成功」、沒有任何錯誤訊號。⚠️ `chk_fcr_review_required` 逐字 `requires_review = (resolution_type <> 'ANOMALY_RESUME')` ⇒ **新型別自動就是 `requires_review = true`**，不得為了省一個人而放行單人結案（`APPROVED` 的雙人保證正是靠它）。
+ * 維運例外案件的處置提案型別。🔴 **型別與案件 category 綁定**：`RESPONSIBILITY_ATTRIBUTE` 只能用在 `RESPONSIBILITY_UNRESOLVED` 的案件上，其餘六值只能用在非責任判定案件上——**雙向**（65 的「第二扇門」）。拿 `CLAIM_DISMISS` 去結一張責任案件，會讓案件進入 `RESOLVED` 而 finality 條件永遠不成立 ⇒ `N16` 永不發出 ⇒ Order 永遠停在 `35`，且每一步都「照規則成功」、沒有任何錯誤訊號。⚠️ `chk_fcr_review_required` 逐字 `requires_review = (resolution_type <> 'ANOMALY_RESUME')` ⇒ **新型別自動就是 `requires_review = true`**，不得為了省一個人而放行單人結案（`APPROVED` 的雙人保證正是靠它）。
  *
  * ⚠ 此檔案由 generate.sh 自動生成，請勿手動修改。
  * 業務輔助邏輯請在使用該 enum 的服務或模組內建立 helper class

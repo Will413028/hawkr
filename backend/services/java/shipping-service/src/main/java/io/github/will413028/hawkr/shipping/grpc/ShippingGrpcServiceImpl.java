@@ -77,7 +77,7 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
      */
     private final io.github.will413028.hawkr.shipping.provider.FulfillmentProviderRegistry fulfillmentProviders;
 
-    /** 領域動作可用性的計算（65 §4.4.1a 兩層模型的下層）。 */
+    /** 領域動作可用性的計算（65 兩層模型的下層）。 */
     private final io.github.will413028.hawkr.shipping.provider.action.AllowedActionResolver allowedActionResolver;
     private final UberQuoteService uberQuoteService;
 

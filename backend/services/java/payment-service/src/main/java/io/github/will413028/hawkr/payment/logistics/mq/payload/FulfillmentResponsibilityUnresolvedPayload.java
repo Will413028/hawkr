@@ -17,8 +17,8 @@ import com.fasterxml.jackson.databind.annotation.JsonNaming;
  * 而此時「退不退」尚未決定；N16 的語意是「已經 financially final」。兩條都借不到
  * ⇒「正在確認原因」這件事沒有任何既有 key 表達得了，所以 N17 必須是獨立的一條。
  *
- * <p>⚠️ <b>欄位集合由 WP2A 定案</b>：36 §3.3 與 65 §6A.1.3 當時只給了 class 名、envelope 三欄
- * 與冪等層級，<b>沒有逐欄表</b>（實查 65 §6A.1.3 只有 N1／N2／N3-N6／N7-N9 四張）。
+ * <p>⚠️ <b>欄位集合由 WP2A 定案</b>：36 §3.3 與 65 當時只給了 class 名、envelope 三欄
+ * 與冪等層級，<b>沒有逐欄表</b>（實查 65 只有 N1／N2／N3-N6／N7-N9 四張）。
  * 本實作取 N16 的欄位集合<b>減去全部 final-only 欄位</b>（{@code responsibilityCause}／
  * {@code resolutionId}／{@code resolvedAt}），並保留 {@code financiallyFinal} 恆 {@code false}
  * ——與 N16 保留該欄的理由對稱：讓 consumer 的契約測試斷言得到它，而不是靠紀律。

@@ -94,7 +94,7 @@ func (c *PaymentClient) ListFulfillmentExceptionCasesForAdmin(ctx context.Contex
 	return c.logisticsFinance().ListFulfillmentExceptionCasesForAdmin(ctx, req)
 }
 
-// GetFulfillmentExceptionCaseForAdmin Admin 單一例外案件詳情（65 §6.1.1 A-2）。
+// GetFulfillmentExceptionCaseForAdmin Admin 單一例外案件詳情（65）。
 //
 // 15s 而非 30s：它展開的是單一案件的提案列（個位數），屬檔頭說的「唯讀聚合查詢」，
 // 不是帳單詳情那種會攤開全部明細列的查詢。

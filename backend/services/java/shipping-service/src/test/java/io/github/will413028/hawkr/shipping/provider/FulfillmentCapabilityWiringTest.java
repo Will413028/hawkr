@@ -57,7 +57,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 65 §4.4.1 判準 1 的行為面守衛：**每一處被消滅的 {@code shipping_method} 字面分支，
+ * 65 判準 1 的行為面守衛：**每一處被消滅的 {@code shipping_method} 字面分支，
  * 換上的 capability 真的在同一個位置做同一件事。**
  *
  * <h2>🔴 這支測試要抓的是什麼</h2>

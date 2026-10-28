@@ -753,7 +753,7 @@ public class CheckoutService {
         // 計算最終實付總額
         long totalActualAmount = Math.max(0, orderSubtotal + finalShippingFee - discountAmount);
 
-        // 政策快照：伺服端推導，**不讀** request 的 consolidated（65 §5.1.3a）。
+        // 政策快照：伺服端推導，**不讀** request 的 consolidated（65）。
         // ⚠️ consolidated 參數仍留在簽章與 proto 上：移除它是跨 repo 的破壞性契約變更，
         //    要走擴張—收縮（後端先不讀 → 前端停送 → 再移欄）。**本波只做「不讀」這一半**，
         //    留著不讀比留著讀更安全，但它是一個尚未收縮的欄位，登記在此以免被當成 target design。
@@ -849,7 +849,7 @@ public class CheckoutService {
         // confirm 不重新決策，避免 preview/confirm drift
         String paymentMerIdFromSnapshot = extractPaymentMerIdFromSnapshot(snapshotJson);
 
-        // 🔴 政策快照同樣只從 preview 讀回，**不在 confirm 重算**（65 §5.1.3a）。
+        // 🔴 政策快照同樣只從 preview 讀回，**不在 confirm 重算**（65）。
         //    重算會讓「preview 顯示的運費／收款主體」與「訂單實際寫入的政策」來自兩次求值；
         //    而 confirm 的 request 是可以帶不同 shippingMethod 的（見下方 assertPolicyMatchesMethod）。
         //    缺欄位一律 fail-closed：讓買家重新 preview，而不是靜默吃 DB DEFAULT。

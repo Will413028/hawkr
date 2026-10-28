@@ -3011,7 +3011,7 @@ function statusClass(status: string): string {
 /** Map backend shipping method code ("3001" / "3002" / …) to a human label.
  *
  * 🔴 空值回 `"—"`，**不得回「宅配」**：那是憑空捏造一個物流商，而空值真正的
- * 意思是「後端沒給」。未知碼一律照顯原碼（65A §1.3 第 4 條：不猜、不隱藏）。
+ * 意思是「後端沒給」。未知碼一律照顯原碼（不猜、不隱藏）。
  * 值域與別名表都在 `lib/codemeta/enums.ts`（CodeMeta 生成檔為 SSOT）。 */
 function shippingMethodLabel(raw: string | undefined): string {
 	return formatShippingMethodLabel(raw);

@@ -81,7 +81,7 @@ const (
 // 「這顆按鈕現在能不能按、誰能按」是業務判斷（微服務算，含 actor），
 // 「它對應哪支 URL」是**路由知識**。Gateway 是唯一對外入口、路由表在它身上。
 //
-// ⚠️ 路徑樣板仍映射到現況的 provider-specific 端點。65 §6.2 的目標是 neutral 端點
+// ⚠️ 路徑樣板仍映射到現況的 provider-specific 端點。65 的目標是 neutral 端點
 // （S-10 /dispatch、S-11 /cancel、S-12 /pod），那需要 shipping-service 先有對應的 RPC。
 // 在那之前，**正確性由這張表的 provider 維度承擔**：沒有登錄的組合一律丟棄，不猜路徑。
 var actionRoute = map[routeKey]routeTarget{

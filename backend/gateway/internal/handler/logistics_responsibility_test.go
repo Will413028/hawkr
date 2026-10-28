@@ -16,7 +16,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// 責任判定 maker-checker（65 §6.1.1 A-4／A-5）在 Gateway 側的守衛。
+// 責任判定 maker-checker（65）在 Gateway 側的守衛。
 //
 // 🔴 這裡驗的是**保證**不是改動：A-5 的保證是「只有真的被人批准或駁回的提案才會往下走」。
 // 它的反面（未知 decision 不得抵達下游）才是那個保證的實質內容——只斷言 400 而不斷言

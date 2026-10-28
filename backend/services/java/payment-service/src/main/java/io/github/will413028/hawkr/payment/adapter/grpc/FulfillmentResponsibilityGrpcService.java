@@ -78,7 +78,7 @@ import net.devh.boot.grpc.server.service.GrpcService;
  * {@code chk_fcr_type} 另外六個型別（{@code CLAIM_SETTLE}／{@code CLAIM_DISMISS}／
  * {@code SHIPMENT_CANCEL}／{@code SHIPMENT_CANCEL_CONFIRM}／
  * {@code SHIPMENT_CANCEL_AND_REFUND}／{@code ANOMALY_RESUME}）的副作用全部落在
- * shipping-service 的配送軸狀態邊上（65 §6.4.2 對照表），本波不實作。
+ * shipping-service 的配送軸狀態邊上（65 對照表），本波不實作。
  * ⇒ 一律 <b>fail-closed 拒絕（9571）</b>，而不是先收下來——收下一個沒有人會執行副作用的
  * 提案，等於製造一張永遠結不了的案件，而失效形狀是完全靜默的。
  */
@@ -168,7 +168,7 @@ public class FulfillmentResponsibilityGrpcService
             //    重算出來的 computedAt 與 DB 內的必然差幾毫秒，而 ADM 之後按「覆核」時，
             //    stale guard 比的是 **DB 裡那一份**。兩個數字只要有任何一天不一致，
             //    畫面上的預覽就不是被保護的那一份——而 maker-checker 保護的正是
-            //    「覆核者看到的金額 ＝ 實際會執行的金額」這件事本身（65 §6.4.2 硬約束 2）。
+            //    「覆核者看到的金額 ＝ 實際會執行的金額」這件事本身（65 硬約束 2）。
             var stored = cases.findByCaseNo(c.getCaseNo()).orElse(c);
             var persisted = resolutions.findById(resolutionId).orElse(null);
             ResponsibilityImpactPreview preview = persisted == null ? null

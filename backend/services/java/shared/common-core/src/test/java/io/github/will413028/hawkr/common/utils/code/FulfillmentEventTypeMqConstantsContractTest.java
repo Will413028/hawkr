@@ -28,7 +28,7 @@ import org.junit.jupiter.api.Test;
  * <p>⚠️ <b>更關鍵的是守門測試的鑑別力</b>：那一支的掃描面逐字是「值以 {@code shipment.} 起頭的常數」
  * ⇒ 把 {@code fulfillment.*} 硬塞進 {@code ShippingEventType}，會造成
  * 「<b>值域被撐開、守門的測試卻看不到新成員</b>」——漏登記常數不會轉紅。
- * 65 §6A.1.2 對這一點有逐字記載。
+ * 65 對這一點有逐字記載。
  *
  * <p>⚠️ <b>同 exchange 不是同 family 的理由</b>：{@code hawkr.shipping} 上可以有多個 publisher
  * （36 §1.4 禁止的是「同一條 routing key 多個 publisher」，不是「一個 exchange 一個 publisher」）。
@@ -145,7 +145,7 @@ class FulfillmentEventTypeMqConstantsContractTest {
     /**
      * 幽靈值 ＝ 碼表裡有、卻沒有人發得出這條事件。
      *
-     * <p>⚠️ 這一條同時守住 65 §6A.1.2 C 群「七條只收已落碼的兩條」那個決定：
+     * <p>⚠️ 這一條同時守住 65 C 群「七條只收已落碼的兩條」那個決定：
      * 若有人為了「文件說有七條」而把 {@code N11}～{@code N15} 先加進 enum，本測試會立刻轉紅。
      */
     @Test

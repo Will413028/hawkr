@@ -469,7 +469,7 @@ public class LogisticsFinanceQueryService {
     }
 
     /**
-     * Admin 單一例外案件詳情（65 §6.1.1 A-2）。
+     * Admin 單一例外案件詳情（65）。
      *
      * <p>🔴 <b>查無案件回 {@code null} 而不是空的 {@code AdminCaseView}</b>：呼叫端要能把
      * 「沒有這張案件」映成 {@code 9570}，而一個欄位全空的 view 會被前端渲染成一張

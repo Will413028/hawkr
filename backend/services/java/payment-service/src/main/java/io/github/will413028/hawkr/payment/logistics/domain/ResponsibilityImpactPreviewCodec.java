@@ -13,13 +13,13 @@ import java.time.format.DateTimeParseException;
  *
  * <p>🔴 <b>存在的理由</b>：在此之前 {@code impact_preview} 是「呼叫端給什麼就存什麼」的
  * 原始 JSON 字串（null 就存 {@code "{}"}），零驗證、零解析、零讀取。
- * 那讓覆核時<b>無從重算比對</b>——而重算比對正是 65 §6.4.2 硬約束 2 的全部內容。
+ * 那讓覆核時<b>無從重算比對</b>——而重算比對正是 65 硬約束 2 的全部內容。
  *
  * <p>🔴 <b>嚴格 parse</b>：欄位缺一、型別不對、多出不認得的欄位一律拒絕。
  * 寬鬆 parse 會讓一份壞掉的快照在覆核當下「看起來還能用」，
  * 而那時錢已經要退出去了。
  *
- * <p>⚠️ <b>金額在 JSON 裡是字串</b>（CLAUDE.md §4／65 §6.4.2 的 A-4 逐字 {@code refundAmount: string}）：
+ * <p>⚠️ <b>金額在 JSON 裡是字串</b>（CLAUDE.md §4／65 的 A-4 逐字 {@code refundAmount: string}）：
  * 這份快照最終會被 ADM 讀去顯示，而 JSON number 在 JavaScript 端超過 2^53 會失真。
  * 內部型別仍是 {@code long}，只在這個邊界轉換。
  */

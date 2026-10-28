@@ -53,7 +53,7 @@ class FulfillmentResponsibilityGrpcContractTest {
                 // 影響預覽由 server 依成因 ＋ orders.total_actual_amount 算。
                 // client 給金額 ＝ 讓被覆核的數字由被覆核者自己決定。
                 "impact_preview", "impact_preview_refund_amount", "refund_amount",
-                // 65 §6.4.2 原列的兩個維度：在現行商流下沒有 canonical 算法且語意不成立
+                // 65 原列的兩個維度：在現行商流下沒有 canonical 算法且語意不成立
                 // （訂單層沒有平台代收）⇒ 它們不是 0，而是不屬於本 contract。
                 // 填 0 會讓覆核者看到「平台與賣家都不受影響」的假結論，比不顯示更糟。
                 "platform_fee_delta", "seller_net_delta",

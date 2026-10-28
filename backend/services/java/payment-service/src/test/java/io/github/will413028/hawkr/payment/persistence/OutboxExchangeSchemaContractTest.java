@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * {@code V11__add_outbox_events_exchange.sql} ↔ {@link OutboxEventEntity} 的 schema 契約釘樁
- * （36 §3.3.1 / 65 §6A.1.2 測試項 ③，形狀照抄 {@code LogisticsSchemaContractTest}）。
+ * （36 §3.3.1 / 65 測試項 ③，形狀照抄 {@code LogisticsSchemaContractTest}）。
  *
  * <p><b>它證明什麼</b>：DDL 上真的有 {@code exchange} 欄、寬度與 DEFAULT 與契約一致、
  * DB 層擋得住 whitespace-only，而且 entity 側有對應欄位。

@@ -58,7 +58,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * <p>🔴 <b>WP2B 不得讓 ADM client 提供這個值</b>：它是 server 從 order-service 讀到的事實，
  * 不是使用者輸入。與 {@code sourceService} 同一個 trust boundary。
  *
- * <p>🔴 <b>四個 primitive 的不變式（65 §5.5.2 E0／E0.1／E0.2、36 §3.3）</b>：
+ * <p>🔴 <b>四個 primitive 的不變式（65、36 §3.3）</b>：
  * <ol>
  *   <li><b>同一 fulfillment leg 終其一生只有一張責任案件</b>——由 {@code uq_exc_responsibility_subject}
  *       承擔，<b>不靠鎖</b>（鎖的範圍是同一張 case，跨 subject 本來就該並行）。</li>
@@ -175,7 +175,7 @@ public class ResponsibilityCaseService {
     /**
      * Checker 的覆核決定。
      *
-     * <p>🔴 <b>刻意只有四個欄位</b>（65 §6.4.2 A-5 ＝ {@code decision} ＋ {@code comment}）。
+     * <p>🔴 <b>刻意只有四個欄位</b>（65 ＝ {@code decision} ＋ {@code comment}）。
      * 覆核者能表達的只有「批准或駁回<b>這一筆提案</b>」，其餘一切都是 server 端事實：
      *
      * <table border="1">
@@ -221,7 +221,7 @@ public class ResponsibilityCaseService {
         APPLIED,
         STALE,
         /**
-         * 🔴 影響預覽已過期（65 §6.4.2 硬約束 2）。
+         * 🔴 影響預覽已過期（65 硬約束 2）。
          *
          * <p>提案當下算出的 {@code refundAmount} 與覆核當下重算的結果不一致
          * ⇒ <b>覆核者看到的金額與實際會執行的金額不同</b>，而那正是 maker-checker
@@ -339,7 +339,7 @@ public class ResponsibilityCaseService {
     /**
      * 建立責任判定提案。
      *
-     * <p>🔴 <b>先鎖後判，不是先查再寫</b>（65 §5.5.2 E0.1 proposal path）。
+     * <p>🔴 <b>先鎖後判，不是先查再寫</b>（65 proposal path）。
      * <p>⚠️ 案件仍在 {@code OPEN} 時，本方法會同時把它推進 {@code IN_PROGRESS} 並指派提案者為
      * 承辦人——{@code chk_exc_owner} 要求「離開 OPEN ⇒ 必有承辦人與指派時間」，三件同一句寫。
      *
@@ -381,7 +381,7 @@ public class ResponsibilityCaseService {
         // 🔴 maker 主張的成因：approve 時會原封不動被拿去結案，覆核者改不了它。
         r.setProposedResponsibilityCause(cmd.proposedResponsibilityCause());
         r.setReason(cmd.reason());
-        // 🔴 預覽由 **server 算**，不收呼叫端給的金額（65 §6.4.2 A-4 的 client-provided
+        // 🔴 預覽由 **server 算**，不收呼叫端給的金額（65 的 client-provided
         //    impactPreview 已由 PM 裁決撤銷）。算式的兩個輸入都不是呼叫端說了算：
         //      成因      ← 上面剛驗過、即將寫進同一列的 maker 主張
         //      退款基準  ← 交易外從 order-service 讀到的 orders.total_actual_amount
@@ -412,7 +412,7 @@ public class ResponsibilityCaseService {
 
     /**
      * 定案：{@code 鎖 → CAS resolution → CAS case → INSERT outbox}，<b>四者同一個交易</b>
-     * （65 §5.5.2 E0.1、36 §3.3 Atomic Boundary）。
+     * （65、36 §3.3 Atomic Boundary）。
      *
      * <p>🔴 <b>只有兩道 CAS 都 rows=1 才走到 outbox</b>。任一道 {@code rows=0} ⇒ 回
      * {@link Outcome#STALE} 且<b>不發事件</b>——那既是並行下的正確行為，也是 retry 的冪等來源。
@@ -464,7 +464,7 @@ public class ResponsibilityCaseService {
                             + "不得改以覆核者提供的值代替");
         }
 
-        // 🔴 <b>stale guard</b>（65 §6.4.2 硬約束 2）：以**剛剛在交易外讀到的權威退款基準**
+        // 🔴 <b>stale guard</b>（65 硬約束 2）：以**剛剛在交易外讀到的權威退款基準**
         //    重算一次，與提案當下存下的快照比對。不一致 ⇒ 不進任何 CAS、不發 N16。
         //    ⚠️ 只比 refundAmount（業務影響），**不比 computedAt**——重算必然產生新時間戳，
         //       把它納入 equality 會讓每一次覆核都判 stale，那道守衛就永遠是狼來了。
@@ -550,7 +550,7 @@ public class ResponsibilityCaseService {
      * 駁回提案。
      *
      * <p>🔴 <b>案件維持 {@code IN_PROGRESS}、owner 保留、不 DISMISSED、不 RESOLVED、不另開第二張</b>
-     * （65 §5.5.2 E0.2 transition 表逐字）。正確的續行方式是<b>在同一張 case 上重提</b>——
+     * （65 transition 表逐字）。正確的續行方式是<b>在同一張 case 上重提</b>——
      * {@code uq_fcr_open_per_case} 只擋 {@code AWAITING_REVIEW}，前一筆已 REJECTED ⇒ 新提案寫得進去。
      *
      * <p>🔴 <b>不發任何事件</b>：駁回不是 financially final，N16 的唯一產生點是 APPROVED ＋ RESOLVED。
@@ -648,7 +648,7 @@ public class ResponsibilityCaseService {
     /**
      * TSID → wire 字串；{@code null} 保持 {@code null}。
      *
-     * <p>🔴 <b>這是 internal 型別與 wire 契約的唯一轉換點</b>（65 §6A.1.3：新事件的 id 一律
+     * <p>🔴 <b>這是 internal 型別與 wire 契約的唯一轉換點</b>（65：新事件的 id 一律
      * {@code string}）。domain／command 側維持 {@code Long} 與 DB 一致，只在這裡跨邊界。
      * <p>⚠️ 不得改用 {@code String.valueOf(Long)}——它會把 {@code null} 變成字面字串 {@code "null"}，
      * 而那在 wire 上是一個<b>看起來像值的東西</b>，consumer 分不出「沒有 shipment」與「有一個叫 null 的」。

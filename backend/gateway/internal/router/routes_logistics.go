@@ -21,12 +21,12 @@ import (
 // 🔴 **應收與收款軸全部是 GET**——應收金額與其狀態只能由送達事件與 scheduler 推進，
 // 在那條軸上開寫入會是一條繞過 idempotency key 與 lease 的第二路徑（CLAUDE.md §22）。
 //
-// 🔴 **例外是責任判定軸的兩條 POST**（65 §6.1.1 A-4／A-5，WP2B）。它們不碰
+// 🔴 **例外是責任判定軸的兩條 POST**（65，WP2B）。它們不碰
 // logistics_receivables 一個欄位：寫的是 fulfillment_exception_cases 與
 // fulfillment_case_resolutions，而那兩張表的推進本來就只能由人做（誰該負責這次履約
 // 失敗，沒有任何事件算得出來）。沒有這兩條端點，責任判定案件永遠沒有人推得走，
 // 訂單會卡在 SHIPPING_ABNORMAL(35)、買家的錢無限期卡住，而全鏈路沒有任何錯誤訊息。
-// ⚠️ 兩條都掛 RequireIdempotencyKey（65 §6.1.4 對 A-1～A-16 的逐字要求）：maker 重送
+// ⚠️ 兩條都掛 RequireIdempotencyKey（65 對 A-1～A-16 的逐字要求）：maker 重送
 // 會多開一張提案、checker 重送會多一次覆核，而兩者都是**不可回復**的稽核事實。
 func registerLogisticsFinanceRoutes(app *gin.RouterGroup, admin *gin.RouterGroup, h *handler.Holder) {
 	// ── 賣家面 ────────────────────────────────────────────────────────────

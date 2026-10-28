@@ -64,7 +64,7 @@ export type LgsType = (typeof LGS_TYPE)[keyof typeof LGS_TYPE];
  * `isTaqbin ? HOME : C2C` 對 `3003`／`3004`／`3005` 回的是一個**合法值**，
  * 於是進度條照畫、狀態照查、測試全綠，畫面卻是別人家物流的形狀。
  *
- * ⚠️ 這條對映本身是過渡物：正解是後端回 normalized 配送值（65 §7.1.2 的 31 值），
+ * ⚠️ 這條對映本身是過渡物：正解是後端回 normalized 配送值（65 的 31 值），
  * 前端不再持有 PayUni 的軸。
  */
 export function lgsTypeForShippingMethod(
