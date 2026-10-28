@@ -474,7 +474,7 @@ Admin UI 頁面（全部走單體的 Connect；舊的兩頁與 gateway 的 7 條
 | `docs/runbooks/seller-governance-shared.md` | 共用內容（措施種類與依據選用 / 給賣家的理由撰寫指引 / 申訴決議標準 / 升級規則） |
 | `docs/postmortems/food-safety/_template.md` | 8 sections postmortem 模板 |
 
-措施與認定沒有 SQL 後備流程：直接改表會繞過推導點、事件與稽核，也會讓停權期間與措施不一致；寫入只經 admin 的 Connect 方法（§4.6）。舊的 SQL SOP（`docs/runbooks/food-safety/sql/`）改的是 seller-service 的舊表，隨 seller-service 在步驟 11 刪除。
+措施與認定沒有 SQL 後備流程：直接改表會繞過推導點、事件與稽核，也會讓停權期間與措施不一致；寫入只經 admin 的 Connect 方法（§4.6）。
 
 ---
 

@@ -108,7 +108,7 @@
 | 台灣手機的正規化在 domain | — | 成立 | 單一擁有者 | `platform/phone`（接受市話，DB CHECK `^0[0-9]{8,9}$`） |
 | CodeMeta `AssetReferenceType.GOVERNANCE_EVIDENCE`（7118） | media 的引用類型 | 成立到 B1 | — | 沿用 `media.RefTypeGovernanceEvidence`，`ref_id` 改成通報或請求的 UUID |
 | runbook 的 SQL SOP 直接 `UPDATE sellers.status` | admin UI 掛掉時的後備 | 不成立：繞過推導點與事件（盤點 §9-12） | 只經模組的 API 改狀態 | 不搬；停權期間與事件只由 `Recompute` 寫入 |
-| `docs/runbooks/food-safety/sql/`（`06-restore-suspension`、`07-decide-appeal` 等 SQL SOP，設計書 32 曾列為 admin UI 不可用時的 fallback） | 直接改 seller-service 的表 | 不成立：直接改表繞過處分與停權期間的一致性、事件與稽核 | 修改只經模組的 API（admin 的 Connect 方法，步驟 8） | 設計書 32 不再列為後備；建立認定與措施的兩支（`04-create-violation-warning`、`05-create-violation-suspend`）已在 10e 第 3b 刀刪除，其餘的 SQL 隨 seller-service **在步驟 11 刪除** |
+| `docs/runbooks/food-safety/sql/`（`06-restore-suspension`、`07-decide-appeal` 等 SQL SOP，設計書 32 曾列為 admin UI 不可用時的 fallback） | 直接改 seller-service 的表 | 不成立：直接改表繞過處分與停權期間的一致性、事件與稽核 | 修改只經模組的 API（admin 的 Connect 方法，步驟 8） | 設計書 32 不再列為後備；建立認定與措施的兩支（`04-create-violation-warning`、`05-create-violation-suspend`）已在 10e 第 3b 刀刪除，其餘的 SQL 已刪除 |
 | KYC、GCIS、TGOS、PayUni、商家名單、商品瀏覽數 | 各自的設計書 | 成立（TGOS 依決定第 9 項拿掉） | — | KYC 認證與身分比對：7c 階段 1，見下面「7c 階段 1」的各列；PayUni 見下面「7c 階段 2」；商家名單與商品瀏覽數見下面「7c 階段 4」的各列；GCIS 統編查詢在步驟 8b 以 `internal/platform/gcis` 完成（見「傳輸層的沿用盤點」8b 的各列）；vendor portal 與推薦排行 **去向 7d**；`seller_store_visitors`、會員方案、沒有呼叫方的 7 支 RPC 依決定第 7 項與 D8 刪除 |
 | `GetByAccountIDForUpdate` 在 transaction 外（盤點 §6-9） | — | 不成立 | 鎖在最上層 use case 的 transaction 內 | 所有列鎖都在 `db.InTx` 內，repository 只用 `db.Conn` |
 | 停權紀錄以 limit／offset 分頁 | 舊後台頁碼 | 不成立 | AIP-158 keyset | 措施列表 `AdminMeasures`、`AccountMeasures` 以 `(created_at, id)` keyset，待裁定的申訴收件匣以 `(申訴提出時間, id)`、複審收件匣以 `(review_by, id)`，預設 20、上限 100（取代 `Suspensions`） |

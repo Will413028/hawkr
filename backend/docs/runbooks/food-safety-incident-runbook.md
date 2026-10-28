@@ -163,14 +163,12 @@ Content-Type: application/json
 
 ## Ch2: 沒有 SQL 後備
 
-舊流程在 admin UI 不可用時用 SQL 直接改 `food_safety_reports`（`docs/runbooks/food-safety/sql/`）。新的通報、案件、措施與認定都不再有 SQL 後備：直接改表會繞過推導點、事件、通知與稽核，也會讓停權期間與措施不一致。寫入只經 admin 的 Connect 方法。
+通報、案件、措施與認定都沒有 SQL 後備：直接改表會繞過推導點、事件、通知與稽核，也會讓停權期間與措施不一致。寫入只經 admin 的 Connect 方法。
 
 admin UI 不可用時：
 1. 先確認是不是頁面問題：重新整理、換瀏覽器；伺服器句子與錯誤文字會直接顯示在頁面上。
 2. 仍不可用：由能呼叫 admin API 的人用 Connect 方法送出（`TriageReport`、`ResolveReport`、`MoveReport`、`DecideCase`、`RecordFDAReferral`、`CreateMeasure`），帶 `etag`／`request_id` 的規則同 UI；欄位以 `api/hawkr/admin/seller/v1alpha1/governance.proto` 為準。
 3. 恢復後在案件的內部註記補記這次是怎麼處理的。
-
-`docs/runbooks/food-safety/sql/` 是舊 seller-service 表的 SQL，隨 seller-service 在步驟 11 刪除，不要執行。
 
 ---
 

@@ -184,8 +184,6 @@
 - 查待處理的請求（申訴與補正）：`ListMeasures(request_state=PENDING)`，只看申訴或補正再加 `request_kind`
 - 查複審到期的 RISK 措施：`ListMeasures(review_due=true)`
 
-`docs/runbooks/food-safety/sql/` 是舊 seller-service 表的 SQL，不適用於通報、案件、措施與認定，隨 seller-service 刪除。
-
 ---
 
 ## 8. Footer
