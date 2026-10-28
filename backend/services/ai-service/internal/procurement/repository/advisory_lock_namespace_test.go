@@ -13,13 +13,12 @@ import (
 	// (services/ai-service/db/sqlc.yaml has two, see its comment) than this
 	// package's own gen below, but both point at the same physical
 	// hawkr_ai database (module.go's newProcurementPool). Importing it
-	// from here follows the existing precedent in ranking_facts.go: it is a
-	// Go-level code-generation boundary, not a connectivity or layering one.
+	// from here is a Go-level code-generation boundary, not a connectivity
+	// or layering one.
 	// scripts/check-layer-imports.py's ALLOW table only scopes the eight
 	// top-level architecture layers (domain/usecase/repository/...);
 	// internal/procurement/** is not one of them, so files under it —
-	// sources and imports alike — are outside that gate's enforcement, same
-	// as ranking_facts.go's existing import of this exact package.
+	// sources and imports alike — are outside that gate's enforcement.
 	aigen "github.com/Will413028/hawkr/ai-service/internal/repository/postgres/gen"
 
 	"github.com/Will413028/hawkr/ai-service/internal/procurement/repository/gen"

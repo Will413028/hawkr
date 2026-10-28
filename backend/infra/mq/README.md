@@ -73,11 +73,10 @@ publisher **不知道有誰在聽**，也不指定 queue——它只說「我發
 publish("hawkr.account", "account.deleted", {...})
         │
         ├──→ im.account.deleted             （im-service：聊天記錄 PII 抹除）
-        ├──→ notification.account.deleted   （notification：清通知匣 PII）
-        └──→ seller.account.deleted         （seller-service：釋放 logo/封面）
+        └──→ notification.account.deleted   （notification：清通知匣 PII）
 ```
 
-**3 條 queue 各收到一份自己的複本**，各自獨立 ack、獨立重試、互不影響。這就是「同一個 exchange
+**2 條 queue 各收到一份自己的複本**，各自獨立 ack、獨立重試、互不影響。這就是「同一個 exchange
 綁多條 queue」的意義。
 
 #### topic exchange 的萬用字元

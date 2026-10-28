@@ -81,8 +81,8 @@ var Module = fx.Module("procurement",
 		return cropidentity.WithTransientRetry(uc)
 	}),
 
-	fx.Provide(func(client rootusecase.ProductClient, seller rootusecase.SellerClient, rankingFacts repository.RankingFactsRepository, now func() time.Time) *usecase.PlatformLaneSearcher {
-		return usecase.NewPlatformLaneSearcher(client, seller, rankingFacts, now)
+	fx.Provide(func(client rootusecase.ProductClient, seller rootusecase.SellerClient, now func() time.Time) *usecase.PlatformLaneSearcher {
+		return usecase.NewPlatformLaneSearcher(client, seller, now)
 	}),
 	fx.Provide(func(searcher rootusecase.CandidateLeadSearcher, categories *cache.CategoryIndex) *usecase.ExternalLaneSearcher {
 		return usecase.NewExternalLaneSearcher(searcher, categories)

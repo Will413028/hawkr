@@ -140,33 +140,3 @@ CREATE TABLE candidate_leads (
 
 CREATE INDEX idx_candidate_leads_category ON candidate_leads (category);
 
--- ========================================================================
--- Seller Ranking Facts (子系統 1) — 2026-08-29
--- ========================================================================
-
--- 一店一列的本地物化表，供 candidate_platform_lane.go 排序讀取（零跨服務同步呼叫）。
--- tier_rank/monthly_order_cap 可為 NULL：代表這家店還沒收過 seller.membership_changed
--- 事件（例如新上架、從未被人工指派方案）。排序邏輯把 NULL tier_rank 當作 0（等同免費
--- 方案），NULL monthly_order_cap 當作「未知上限，不排除」——fail-open，不會因為缺資料
--- 就讓一家店消失在候選裡（同 attachSellerMeta 對 seller-service 掛掉時的降級哲學）。
--- tier_effective_at 是寫入當下那筆 seller.membership_changed 事件的 effectiveAt，只用來
--- 擋亂序：RabbitMQ 的 retry/DLQ requeue 可能讓一個較舊的事件在一個較新的事件之後才真正
--- 被處理完成（例如較新事件先被 ack，較舊事件因暫時性錯誤被 nack+requeue，重新投遞時排在
--- 後面）。UpsertSellerRankingTier 只在新事件的 effectiveAt >= 目前存的值（或目前是
--- NULL，代表這店還沒收過任何 membership_changed）時才覆寫，否則整筆 UPDATE 不生效——
--- 沒有這個欄位就無法分辨「這次收到的事件比較新」還是「比較舊但比較晚被處理」。
-CREATE TABLE "seller_ranking_facts" (
-  "store_id"                 bigint PRIMARY KEY,
-  "tier_rank"                int,
-  "monthly_order_cap"        int,
-  "tier_effective_at"        timestamptz,
-  "monthly_completed_orders" int NOT NULL DEFAULT 0,
-  "count_period"             varchar(7) NOT NULL DEFAULT '', -- 'YYYY-MM'
-  "updated_at"                timestamptz NOT NULL DEFAULT now()
-);
-
--- order.completed consumer 的冪等鍵（crm-service crm_processed_orders 的同款 dedup 表模式）。
-CREATE TABLE "seller_ranking_processed_events" (
-  "event_id"     text PRIMARY KEY,
-  "processed_at" timestamptz NOT NULL DEFAULT now()
-);

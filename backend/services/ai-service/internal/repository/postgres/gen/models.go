@@ -569,21 +569,6 @@ type ProcurementUsageReservation struct {
 	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
-type SellerRankingFact struct {
-	StoreID                int64              `db:"store_id" json:"store_id"`
-	TierRank               *int32             `db:"tier_rank" json:"tier_rank"`
-	MonthlyOrderCap        *int32             `db:"monthly_order_cap" json:"monthly_order_cap"`
-	TierEffectiveAt        *time.Time         `db:"tier_effective_at" json:"tier_effective_at"`
-	MonthlyCompletedOrders int32              `db:"monthly_completed_orders" json:"monthly_completed_orders"`
-	CountPeriod            string             `db:"count_period" json:"count_period"`
-	UpdatedAt              pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-}
-
-type SellerRankingProcessedEvent struct {
-	EventID     string             `db:"event_id" json:"event_id"`
-	ProcessedAt pgtype.Timestamptz `db:"processed_at" json:"processed_at"`
-}
-
 type Session struct {
 	AppName    string             `db:"app_name" json:"app_name"`
 	UserID     string             `db:"user_id" json:"user_id"`

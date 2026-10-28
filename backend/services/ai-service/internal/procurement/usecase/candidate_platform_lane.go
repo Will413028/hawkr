@@ -27,28 +27,18 @@ import (
 // store_code），讓網頁把候選呈現成「找到哪幾家商家」，不必逐候選反查 product-service。
 // 店家資料一律走一次 BatchGetSellerMeta（呼叫次數是 O(1)，不隨候選數或商家數成長）。
 //
-// 子系統 1（2026-08-29）：新增 rankingFacts 讀取本地 seller_ranking_facts（同樣 O(1)
-// 呼叫，同一批 storeIDs 一次查完），做三件事——① 依 store_id 去重候選（修 T16：
-// procurement_candidates 沒有 UNIQUE index，同店多商品會產生多筆重複候選）；② 用真正
-// 隨查詢字詞變化的相關性分數取代原本恆定的 len(matched)*3（修 T15）；③ 曝光門檻過濾
-// ＋等級加權排序。rankingFacts 查詢失敗 fail-open（同 attachSellerMeta 的降級哲學）：
-// 排序退化成只看相關性，候選不會因為這張表打不到就整批消失。
+// 候選依 store_id 去重（修 T16：procurement_candidates 沒有 UNIQUE index，同店多商品
+// 會產生多筆重複候選），分數是隨查詢字詞變化的相關性（修 T15：原本恆定的
+// len(matched)*3）。
 type PlatformLaneSearcher struct {
-	client       usecase.ProductClient
-	seller       usecase.SellerClient
-	rankingFacts repository.RankingFactsRepository
-	now          func() time.Time
+	client usecase.ProductClient
+	seller usecase.SellerClient
+	now    func() time.Time
 }
 
-func NewPlatformLaneSearcher(client usecase.ProductClient, seller usecase.SellerClient, rankingFacts repository.RankingFactsRepository, now func() time.Time) *PlatformLaneSearcher {
-	return &PlatformLaneSearcher{client: client, seller: seller, rankingFacts: rankingFacts, now: now}
+func NewPlatformLaneSearcher(client usecase.ProductClient, seller usecase.SellerClient, now func() time.Time) *PlatformLaneSearcher {
+	return &PlatformLaneSearcher{client: client, seller: seller, now: now}
 }
-
-// platformLaneTierWeight is how many relevance-score points one tier_rank
-// level is worth. 已知延後決定的事項（spec §7）：實際數值待實測資料調整，這裡先
-// 給一個讓等級明顯可見、但不會完全蓋過相關性的起始值——搜「香蕉」時，一個完全不
-// 相關的高等級賣家（relevance=0）加權後仍不會贏過一個中等相關度的免費賣家。
-const platformLaneTierWeight = 2
 
 // relevanceScore 計算 item 名稱與查詢關鍵字的重疊 token 數（修 T15：舊版
 // len(matched)*3 在同一次查詢下對所有候選恆定，因為 matched 只反映「用了哪些
@@ -140,37 +130,9 @@ func (s *PlatformLaneSearcher) Search(ctx context.Context, slots domain.Slots) (
 		}
 	}
 
-	facts, err := s.rankingFacts.BatchGet(ctx, storeOrder)
-	if err != nil {
-		pkglogger.Warn(ctx, "procurement: seller_ranking_facts BatchGet failed; ranking falls back to relevance only",
-			zap.Error(err), zap.Int("storeCount", len(storeOrder)))
-		facts = nil
-	}
-
-	// 曝光門檻只認「本月」的計數。seller_ranking_facts 的歸零是寫端順帶做的
-	// （下一筆 order.completed 進來時才 `CASE WHEN count_period = $2 … ELSE 1`），
-	// 沒有排程器會在月初主動把每一列歸零，所以某店在 M 月撞到上限、M+1 月完全沒有
-	// 成交時，那一列會原封不動停在 M 月的計數上。少了這個期間比對，它會在 M+1 月
-	// 乃至往後每一個沒有成交的月份持續被排除——愈是賣不動就愈永遠不被看見。
-	// 期間不符時視同計數為 0（只是還沒歸零，不是本月真的賣到上限）。
-	// 用注入的 s.now() 而非 time.Now()，維持可測試性。
-	currentPeriod := now.UTC().Format("2006-01")
-
 	out := make([]repository.Candidate, 0, len(storeOrder))
 	for _, storeID := range storeOrder {
-		sc := byStore[storeID]
-		fact, hasFact := facts[storeID]
-		if hasFact && fact.MonthlyOrderCap != nil &&
-			fact.CountPeriod == currentPeriod &&
-			fact.MonthlyCompletedOrders >= *fact.MonthlyOrderCap {
-			continue // 曝光門檻：本月已達上限的店家不出現（spec §6 步驟 3）
-		}
-		tierRank := 0
-		if hasFact {
-			tierRank = fact.TierRank
-		}
-		sc.candidate.Score = sc.relevance + tierRank*platformLaneTierWeight
-		out = append(out, sc.candidate)
+		out = append(out, byStore[storeID].candidate)
 	}
 
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Score > out[j].Score })

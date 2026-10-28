@@ -12,7 +12,6 @@ import (
 	"github.com/Will413028/hawkr/ai-service/internal/config"
 	grpcLayer "github.com/Will413028/hawkr/ai-service/internal/grpc"
 	"github.com/Will413028/hawkr/ai-service/internal/infrastructure"
-	aimq "github.com/Will413028/hawkr/ai-service/internal/mq"
 	"github.com/Will413028/hawkr/ai-service/internal/procurement"
 	"github.com/Will413028/hawkr/ai-service/internal/usecase"
 	"go.uber.org/fx"
@@ -38,7 +37,6 @@ func modules() []fx.Option {
 		usecase.Module,                     // Provides UseCases（通用聊天/推薦）
 		fx.Provide(cache.NewCategoryIndex), // Provides *cache.CategoryIndex（分類 in-memory index）
 		procurement.Module,                 // Hawkr 幫找採購助手（procurement 域，含 repository/usecase/handler 三層）
-		aimq.Module,                        // RabbitMQ consumers（Task 9 骨架，Task 11/12 補上真實 subscription）
 		grpcLayer.Module,                   // gRPC handlers
 	}
 }

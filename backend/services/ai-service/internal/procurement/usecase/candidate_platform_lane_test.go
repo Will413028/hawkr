@@ -67,31 +67,6 @@ func (f *fakeSellerClient) SearchProspects(context.Context, usecase.ProspectSear
 	return nil, nil
 }
 
-// fakeRankingFactsRepo is the fake for repository.RankingFactsRepository
-// (Task 11) used by Search's tier-weighting/exposure-cap/dedup tests below.
-// Only BatchGet is exercised by PlatformLaneSearcher; the write-side methods
-// (UpsertOrderCompleted/UpsertTier) are irrelevant on the read path this
-// searcher is on, so they're stubbed to satisfy the interface only.
-type fakeRankingFactsRepo struct {
-	facts map[identity.StoreID]domain.SellerRankingFact
-	err   error
-}
-
-func (f *fakeRankingFactsRepo) BatchGet(context.Context, []identity.StoreID) (map[identity.StoreID]domain.SellerRankingFact, error) {
-	if f.err != nil {
-		return nil, f.err
-	}
-	return f.facts, nil
-}
-
-func (f *fakeRankingFactsRepo) UpsertOrderCompleted(context.Context, identity.StoreID, string, string) error {
-	return nil
-}
-
-func (f *fakeRankingFactsRepo) UpsertTier(context.Context, identity.StoreID, int, int, time.Time) error {
-	return nil
-}
-
 func intPtr(i int) *int {
 	return &i
 }
@@ -107,7 +82,7 @@ func TestPlatformLane_MatchesItemAndBudget(t *testing.T) {
 
 	client := &fakeProductClient{items: []*usecase.ProductItem{{ID: 42, Name: "寶島梨禮盒", PriceMax: 750}}}
 	fixedNow := time.Date(2026, 8, 8, 12, 0, 0, 0, time.UTC)
-	searcher := NewPlatformLaneSearcher(client, &fakeSellerClient{}, &fakeRankingFactsRepo{}, func() time.Time { return fixedNow })
+	searcher := NewPlatformLaneSearcher(client, &fakeSellerClient{}, func() time.Time { return fixedNow })
 
 	got, err := searcher.Search(context.Background(), slots)
 	if err != nil {
@@ -169,7 +144,7 @@ func TestPlatformLane_EmptyFactListsSerializeAsArraysNotNull(t *testing.T) {
 	slots := domain.Slots{Item: &item} // 其餘 slot 全部留空
 
 	client := &fakeProductClient{items: []*usecase.ProductItem{{ID: 42, Name: "寶島梨禮盒", PriceMax: 750}}}
-	searcher := NewPlatformLaneSearcher(client, &fakeSellerClient{}, &fakeRankingFactsRepo{}, func() time.Time {
+	searcher := NewPlatformLaneSearcher(client, &fakeSellerClient{}, func() time.Time {
 		return time.Date(2026, 8, 8, 12, 0, 0, 0, time.UTC)
 	})
 
@@ -192,7 +167,7 @@ func TestPlatformLane_EmptyFactListsSerializeAsArraysNotNull(t *testing.T) {
 
 func TestPlatformLane_ReturnsEmptyWhenNoItemSlot(t *testing.T) {
 	client := &fakeProductClient{}
-	searcher := NewPlatformLaneSearcher(client, &fakeSellerClient{}, &fakeRankingFactsRepo{}, time.Now)
+	searcher := NewPlatformLaneSearcher(client, &fakeSellerClient{}, time.Now)
 
 	got, err := searcher.Search(context.Background(), domain.Slots{})
 	if err != nil {
@@ -228,7 +203,7 @@ func TestPlatformLane_CarriesStoreIdentity_DedupedAcrossStores(t *testing.T) {
 		2002: {SellerName: "青果行 B", LogoKey: "seller/2002/logo.jpg", StoreCode: "25IJKLMNOP"},
 	}}
 	fixedNow := time.Date(2026, 8, 22, 12, 0, 0, 0, time.UTC)
-	searcher := NewPlatformLaneSearcher(client, seller, &fakeRankingFactsRepo{}, func() time.Time { return fixedNow })
+	searcher := NewPlatformLaneSearcher(client, seller, func() time.Time { return fixedNow })
 
 	got, err := searcher.Search(context.Background(), slots)
 	if err != nil {
@@ -276,7 +251,7 @@ func TestPlatformLane_SellerMetaIsSingleBatchCall(t *testing.T) {
 		{ID: 44, Name: "B1", StoreID: 2002},
 	}}
 	seller := &fakeSellerClient{metas: map[identity.StoreID]*usecase.SellerMetaItem{}}
-	searcher := NewPlatformLaneSearcher(client, seller, &fakeRankingFactsRepo{}, time.Now)
+	searcher := NewPlatformLaneSearcher(client, seller, time.Now)
 
 	if _, err := searcher.Search(context.Background(), slots); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -298,7 +273,7 @@ func TestPlatformLane_SellerMetaFailure_KeepsStoreIdAndDoesNotFailLane(t *testin
 
 	client := &fakeProductClient{items: []*usecase.ProductItem{{ID: 42, Name: "A1", StoreID: 1001}}}
 	seller := &fakeSellerClient{err: errors.New("seller-service unavailable")}
-	searcher := NewPlatformLaneSearcher(client, seller, &fakeRankingFactsRepo{}, time.Now)
+	searcher := NewPlatformLaneSearcher(client, seller, time.Now)
 
 	got, err := searcher.Search(context.Background(), slots)
 	if err != nil {
@@ -346,87 +321,12 @@ func TestRelevanceScore_VariesAcrossItems_FixingT15(t *testing.T) {
 	require.Greater(t, high, low)
 }
 
-// 曝光門檻測試共用的注入時鐘與其對應的 count_period。用固定時間而非
-// time.Now()，否則測試會在跨月當下變得不穩定（期間比對本來就是被測邏輯）。
-func fixedNow() time.Time { return time.Date(2026, 8, 29, 10, 0, 0, 0, time.UTC) }
-
-const fixedNowPeriod = "2026-08"
-
-func TestSearch_ExcludesStoreAtMonthlyOrderCap(t *testing.T) {
-	orderCap := 10
-	rankingFacts := &fakeRankingFactsRepo{facts: map[identity.StoreID]domain.SellerRankingFact{
-		// CountPeriod 必須等於當月，計數才代表「本月」而可用於排除。
-		100: {StoreID: 100, TierRank: 0, MonthlyOrderCap: &orderCap, MonthlyCompletedOrders: 10, CountPeriod: fixedNowPeriod},
-	}}
-	client := &fakeProductClient{items: []*usecase.ProductItem{{ID: 1, Name: "台灣香蕉", StoreID: 100}}}
-	s := NewPlatformLaneSearcher(client, &fakeSellerClient{}, rankingFacts, fixedNow)
-
-	out, err := s.Search(context.Background(), domain.Slots{Item: strPtr("香蕉")})
-	require.NoError(t, err)
-	require.Empty(t, out, "store at its monthly_order_cap must not appear")
-}
-
-// I1 迴歸：seller_ranking_facts 的歸零是寫端順帶做的（下一筆 order.completed 進來
-// 時才 `CASE WHEN count_period = $2 … ELSE 1`），沒有排程器會在月初主動歸零。
-// 所以某店在 M 月撞到上限、M+1 月完全沒有成交時，那一列會原封不動停在 M 月的
-// 計數上。讀端若不比對 count_period，就會把上個月的舊帳當成本月，讓它在 M+1 月
-// 乃至往後每一個沒有成交的月份持續被排除——愈賣不動就愈永遠不被看見。
-func TestSearch_DoesNotExcludeStoreWhoseCappedCountIsFromAPastPeriod(t *testing.T) {
-	orderCap := 10
-	rankingFacts := &fakeRankingFactsRepo{facts: map[identity.StoreID]domain.SellerRankingFact{
-		// 計數早已達上限，但那是上個月（2026-07）的帳；本月一筆都還沒成交。
-		100: {StoreID: 100, TierRank: 0, MonthlyOrderCap: &orderCap, MonthlyCompletedOrders: 10, CountPeriod: "2026-07"},
-	}}
-	client := &fakeProductClient{items: []*usecase.ProductItem{{ID: 1, Name: "台灣香蕉", StoreID: 100}}}
-	s := NewPlatformLaneSearcher(client, &fakeSellerClient{}, rankingFacts, fixedNow)
-
-	out, err := s.Search(context.Background(), domain.Slots{Item: strPtr("香蕉")})
-	require.NoError(t, err)
-	require.Len(t, out, 1,
-		"上個月的計數不代表本月，不得用來排除——否則賣家在沒有成交的月份會被永久排除")
-	require.Equal(t, identity.StoreID(100), out[0].StoreID)
-}
-
-// 期間為空（例如只被 seller.membership_changed 建列、還沒有任何 order.completed
-// 寫過計數）同樣不得排除：那一列的計數不屬於本月。
-func TestSearch_DoesNotExcludeStoreWithEmptyCountPeriod(t *testing.T) {
-	orderCap := 10
-	rankingFacts := &fakeRankingFactsRepo{facts: map[identity.StoreID]domain.SellerRankingFact{
-		100: {StoreID: 100, TierRank: 0, MonthlyOrderCap: &orderCap, MonthlyCompletedOrders: 10, CountPeriod: ""},
-	}}
-	client := &fakeProductClient{items: []*usecase.ProductItem{{ID: 1, Name: "台灣香蕉", StoreID: 100}}}
-	s := NewPlatformLaneSearcher(client, &fakeSellerClient{}, rankingFacts, fixedNow)
-
-	out, err := s.Search(context.Background(), domain.Slots{Item: strPtr("香蕉")})
-	require.NoError(t, err)
-	require.Len(t, out, 1, "沒有期間的計數不屬於本月，不得用來排除")
-}
-
-func TestSearch_HigherTierRanksAboveLowerTierAtEqualRelevance(t *testing.T) {
-	orderCap := 1000
-	rankingFacts := &fakeRankingFactsRepo{facts: map[identity.StoreID]domain.SellerRankingFact{
-		100: {StoreID: 100, TierRank: 0, MonthlyOrderCap: &orderCap},
-		200: {StoreID: 200, TierRank: 2, MonthlyOrderCap: &orderCap},
-	}}
-	client := &fakeProductClient{items: []*usecase.ProductItem{
-		{ID: 1, Name: "台灣香蕉", StoreID: 100},
-		{ID: 2, Name: "台灣香蕉", StoreID: 200}, // identical name → identical relevance
-	}}
-	s := NewPlatformLaneSearcher(client, &fakeSellerClient{}, rankingFacts, func() time.Time { return time.Now() })
-
-	out, err := s.Search(context.Background(), domain.Slots{Item: strPtr("香蕉")})
-	require.NoError(t, err)
-	require.Len(t, out, 2)
-	require.Equal(t, identity.StoreID(200), out[0].StoreID, "equal relevance, higher tier must rank first")
-}
-
 func TestSearch_DedupsMultipleProductsFromSameStore(t *testing.T) {
-	rankingFacts := &fakeRankingFactsRepo{facts: map[identity.StoreID]domain.SellerRankingFact{}}
 	client := &fakeProductClient{items: []*usecase.ProductItem{
 		{ID: 1, Name: "台灣香蕉", StoreID: 100},
 		{ID: 2, Name: "香蕉禮盒", StoreID: 100}, // same store, second product
 	}}
-	s := NewPlatformLaneSearcher(client, &fakeSellerClient{}, rankingFacts, func() time.Time { return time.Now() })
+	s := NewPlatformLaneSearcher(client, &fakeSellerClient{}, func() time.Time { return time.Now() })
 
 	out, err := s.Search(context.Background(), domain.Slots{Item: strPtr("香蕉")})
 	require.NoError(t, err)
@@ -482,7 +382,7 @@ func (f *filteringProductClient) SearchProducts(_ context.Context, filter usecas
 func TestPlatformLane_BudgetIsNotAPriceFilter(t *testing.T) {
 	budget := 800
 	client := &fakeProductClient{items: []*usecase.ProductItem{{ID: 42, Name: "寶島梨禮盒", PriceMax: 750}}}
-	lane := NewPlatformLaneSearcher(client, &fakeSellerClient{}, &fakeRankingFactsRepo{}, func() time.Time { return budgetLaneNow })
+	lane := NewPlatformLaneSearcher(client, &fakeSellerClient{}, func() time.Time { return budgetLaneNow })
 
 	_, err := lane.Search(context.Background(), domain.Slots{
 		Item: strPtr("寶島梨禮盒"), Unit: strPtr("KG"), BudgetPerUnit: &budget,
@@ -509,7 +409,7 @@ func TestPlatformLane_EquivalentBudgetsYieldTheSameCandidates(t *testing.T) {
 		client := &filteringProductClient{items: []*usecase.ProductItem{
 			{ID: 42, Name: "寶島梨禮盒", PriceMin: 90, PriceMax: 90}, // 1 KG 售價 90
 		}}
-		lane := NewPlatformLaneSearcher(client, &fakeSellerClient{}, &fakeRankingFactsRepo{}, func() time.Time { return budgetLaneNow })
+		lane := NewPlatformLaneSearcher(client, &fakeSellerClient{}, func() time.Time { return budgetLaneNow })
 		got, err := lane.Search(context.Background(), domain.Slots{
 			Item: strPtr("寶島梨禮盒"), Unit: strPtr(unit), BudgetPerUnit: &budget,
 		})
@@ -532,7 +432,7 @@ func TestPlatformLane_EquivalentBudgetsYieldTheSameCandidates(t *testing.T) {
 func TestPlatformLane_BudgetIsReportedAsUnverified(t *testing.T) {
 	budget := 800
 	client := &fakeProductClient{items: []*usecase.ProductItem{{ID: 42, Name: "寶島梨禮盒", PriceMax: 750}}}
-	lane := NewPlatformLaneSearcher(client, &fakeSellerClient{}, &fakeRankingFactsRepo{}, func() time.Time { return budgetLaneNow })
+	lane := NewPlatformLaneSearcher(client, &fakeSellerClient{}, func() time.Time { return budgetLaneNow })
 
 	got, err := lane.Search(context.Background(), domain.Slots{
 		Item: strPtr("寶島梨禮盒"), Unit: strPtr("KG"), BudgetPerUnit: &budget,

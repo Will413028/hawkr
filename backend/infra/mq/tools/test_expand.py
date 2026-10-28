@@ -219,19 +219,21 @@ class TestExpandedCountsAgainstRealTopology(unittest.TestCase):
         # queues_json_args  6 →   6 (+0)
         # bindings        238 → 235 (-3)  來源 binding ＋ .retry→queue ＋ .dlx→.dlq
         #
-        # 刪一條帶 retry: 的 seller.deleted 消費 queue（服務已刪）：
-        # exchanges       114 → 112 (-2)  .retry ＋ .dlx（fanout）
-        # queues          185 → 183 (-2)  queue ＋ .dlq
+        # 刪除沒有 producer 或 consumer 已不存在的 8 條帶 retry: 的 queue（ai_service.order.completed、
+        # ai_service.seller.membership_changed、seller.account.deleted、seller.product.viewed、
+        # seller.review.created、seller.review.hidden、seller.review.result，以及 pricebook 的 seller.deleted 消費 queue）：
+        # exchanges       114 →  98 (-16)  每條的 .retry ＋ .dlx（fanout）
+        # queues          185 → 169 (-16)  每條的 queue ＋ .dlq
         # queues_json_args  6 →   6 (+0)
-        # bindings        235 → 232 (-3)  來源 binding ＋ .retry→queue ＋ .dlx→.dlq
-        self.assertEqual(len(out["exchanges"]), 112, "exchanges 數量與 pin 不符")
-        self.assertEqual(len(out["queues"]), 183, "queues 數量與 pin 不符")
+        # bindings        235 → 211 (-24)  每條的來源 binding ＋ .retry→queue ＋ .dlx→.dlq
+        self.assertEqual(len(out["exchanges"]), 98, "exchanges 數量與 pin 不符")
+        self.assertEqual(len(out["queues"]), 169, "queues 數量與 pin 不符")
         self.assertEqual(
             len(out["queues_json_args"]), 6, "queues_json_args 數量與 pin 不符"
         )
-        self.assertEqual(len(out["bindings"]), 232, "bindings 數量與 pin 不符")
-        # 112 + 183 + 6 + 232 = 533
-        self.assertEqual(sum(len(v) for v in out.values()), 533)
+        self.assertEqual(len(out["bindings"]), 211, "bindings 數量與 pin 不符")
+        # 98 + 169 + 6 + 211 = 484
+        self.assertEqual(sum(len(v) for v in out.values()), 484)
 
 
 @unittest.skipUnless(

@@ -135,18 +135,6 @@ queues:
   bindings:
   - exchange: hawkr.shipping
     key: shipment.return.status_changed
-- name: ai_service.order.completed
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.order
-    key: order.completed
-- name: ai_service.seller.membership_changed
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.seller
-    key: seller.membership_changed
 - name: cart.seller.profile.changed
   dlq:
     via: hawkr.cart.dlx
@@ -752,36 +740,6 @@ queues:
   bindings:
   - exchange: hawkr.seller
     key: seller.exposure.changed
-- name: seller.account.deleted
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.account
-    key: account.deleted
-- name: seller.product.viewed
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.content
-    key: product.viewed
-- name: seller.review.created
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.review
-    key: review.created
-- name: seller.review.hidden
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.review
-    key: review.hidden
-- name: seller.review.result
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: seller.events
-    key: seller.review.result
 - name: shipping.order.paid
   dlq:
     via: shipping.webhook.dlx
