@@ -122,7 +122,7 @@ public class BuyerGrpcClient {
      * 地址驗證與地理編碼（Uber 報價用，66 §6.5）。
      *
      * <h2>🔴 為什麼是打 buyer-service 而不是自己接 TGOS</h2>
-     * 這支底下是 TGOS（27 號設計書），而 TGOS 是<b>來源 IP 白名單</b>的第三方
+     * 這支底下是 TGOS，而 TGOS 是<b>來源 IP 白名單</b>的第三方
      * ⇒ 直連必須走 egress-proxy（10 檔 §26）。shipping-service 目前沒有那條出口，
      * 而 buyer-service 已經有、且已經在用。再接一條等於把同一個第三方的憑證、
      * 斷路器與白名單複製第二份（10 檔 §15／§26 ③ 逐字禁止為單一第三方另開 proxy）。

@@ -20,9 +20,9 @@
 | 認證 | IAM-only（`--no-allow-unauthenticated`）；呼叫端以 SA `egress-proxy-caller` 簽 Google ID token |
 | SA key 掛載 | k8s secret `egress-proxy-caller-credentials` → `/secrets/egress-proxy-caller/key.json` |
 | 代碼位置 | `serverless/egress-proxy/`（Dockerfile／nginx.conf／deploy.sh／README） |
-| 已收編路徑 | `/api/mtk/SmSend`、`/api/mtk/SmQuery`（三竹簡訊，51 號設計書）；`/addrws/v40/QueryAddr.asmx/QueryAddr`（TGOS 地址驗證，27 號設計書） |
+| 已收編路徑 | `/api/mtk/SmSend`、`/api/mtk/SmQuery`（三竹簡訊，51 號設計書）；`/addrws/v40/QueryAddr.asmx/QueryAddr`（TGOS 地址驗證） |
 
-> **TGOS 收編已完成（2026-07-28）**：`tgos-proxy`（地址驗證，27 號設計書）原為獨立服務，已收編進 egress-proxy 並退役——`serverless/tgos-proxy/` 已從版控移除（源碼存證於 git 歷史，退役 commit `3f47cf908`），buyer-service／seller-service 的 `TGOS_BASE_URL` 皆已指向 egress-proxy。呼叫端 SA 仍沿用 `tgos-proxy-caller`（由 egress-proxy 追授 invoker，故 code 與 secret 皆零改動），secret `tgos-proxy-caller-credentials` 續用。egress-proxy 是 TGOS 的唯一入口。
+> **TGOS 收編已完成（2026-07-28）**：`tgos-proxy`（地址驗證）原為獨立服務，已收編進 egress-proxy 並退役——`serverless/tgos-proxy/` 已從版控移除（源碼存證於 git 歷史，退役 commit `3f47cf908`），buyer-service／seller-service 的 `TGOS_BASE_URL` 皆已指向 egress-proxy。呼叫端 SA 仍沿用 `tgos-proxy-caller`（由 egress-proxy 追授 invoker，故 code 與 secret 皆零改動），secret `tgos-proxy-caller-credentials` 續用。egress-proxy 是 TGOS 的唯一入口。
 
 ## 3. 新第三方接入流程（強制）
 
@@ -49,5 +49,4 @@
 ## 6. 相關文件
 
 - 51 號《簡訊發送與手機 OTP》——首個收編案例（三竹）的完整設計
-- 27 號《地址搜尋與驗證（Address Proxy）》——TGOS 地址驗證（原獨立 tgos-proxy 已收編退役）
 - `serverless/egress-proxy/README.md`——部署與維運操作面

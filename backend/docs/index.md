@@ -73,7 +73,6 @@
 | 23 | [門市管理模組（Store Pickup Management）](詳細設計書/23-門市管理模組%EF%BC%88Store%20Pickup%20Management%EF%BC%89詳細設計書.md) | `services/java/shipping-service/` |
 | 24 | [節假日管理（Holiday Management）](詳細設計書/24-節假日管理%EF%BC%88Holiday%20Management%EF%BC%89詳細設計書.md) | `services/java/shipping-service/` |
 | 26 | [輸入驗證模組（Java InputValidator）](詳細設計書/26-輸入驗證模組%EF%BC%88Java%20InputValidator%EF%BC%89詳細設計書.md) | `services/java/shared/common-core/` |
-| 27 | [地址搜尋與驗證（Address Proxy）](詳細設計書/27-地址搜尋與驗證%EF%BC%88Address%20Proxy%EF%BC%89詳細設計書.md) | `gateway/` |
 | 28 | [商品瀏覽統計（Product View Stats）](詳細設計書/28-商品瀏覽統計%EF%BC%88Product%20View%20Stats%EF%BC%89詳細設計書.md) | `services/seller-service/`、`gateway/` |
 | 29 | [Admin 異常訂單管理 API](詳細設計書/29-Admin%20異常訂單管理%20API%20詳細設計書.md) | 跨 Payment / Shipping / AfterSales / Order |
 | 30 | [Sign in with Apple 認證（Apple OAuth）](詳細設計書/30-Sign%20in%20with%20Apple%20認證%EF%BC%88Apple%20OAuth%EF%BC%89詳細設計書.md) | `internal/modules/identity/`、`internal/httpapi/identity/` |
