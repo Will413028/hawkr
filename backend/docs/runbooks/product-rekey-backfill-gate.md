@@ -2,7 +2,7 @@
 
 > 對應 design doc `docs/superpowers/specs/2026-07-11-seller-store-aggregate-rekey-design.md` §3.2（**未入版控，僅本機**；身分模型的版控權威為[44-帳號與賣家買家身份模型](../詳細設計書/44-帳號與賣家買家身份模型%EF%BC%88Account%20&%20Seller-Buyer%20Identity%EF%BC%89詳細設計書.md)）。
 > **何時跑**：部署 product-service V8（owner column）之前（G1/G2）與之後、解除 write-freeze 之前（G3 + repair）。
-> **欄位名**：本文一律使用現行名 `store_id`（`sellers` 與 `product` 兩表皆是；V8 建立時原名 `seller_account_id`，`product` 於 V9、`sellers` 於 seller-service `20260711155335` 更名，值不變）。
+> **欄位名**：本文一律使用現行名 `store_id`（`sellers` 與 `product` 兩表皆是；V8 建立時原名 `seller_account_id`，`product` 於 V9、`sellers` 於 migration `20260711155335` 更名，值不變）。
 > **DB 連線**：透過 bastion + 1Password 取憑證（同 food-safety runbook §2 慣例）；dev 與 stage 各跑一輪。
 > **兩個 DB**：`hawkr_seller`（sellers 表）與 `hawkr_product`（product 表）— 跨 DB，無法在單一 migration 內判定，故為明確的人工 gate（stated, not assumed）。
 
