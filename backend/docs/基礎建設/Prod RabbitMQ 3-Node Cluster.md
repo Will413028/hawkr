@@ -164,10 +164,9 @@ queue，這個變數對 `pkg/mq.ResilientConsumer` 已完全沒有作用，加�
    deploy workflow 重 build image：
    ```bash
    # 第一批：Go 服務（啟動快）
-   kubectl -n hawkr rollout restart deployment/gateway deployment/account-service \
-     deployment/ai-service deployment/buyer-service deployment/content-service \
+   kubectl -n hawkr rollout restart deployment/gateway deployment/ai-service \
      deployment/crm-service deployment/im-service deployment/notification-service \
-     deployment/review-service deployment/seller-service deployment/social-service
+     deployment/review-service deployment/social-service
    # 第二批：Java 服務（啟動需 115-133 秒，等 Go 就緒再推，避免搶 CPU 拖長啟動）
    kubectl -n hawkr rollout restart deployment/aftersales-service \
      deployment/cart-service deployment/coupon-service deployment/media-service \
