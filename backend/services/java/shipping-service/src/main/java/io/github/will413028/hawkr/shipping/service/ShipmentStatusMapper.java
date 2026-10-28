@@ -12,7 +12,7 @@ import java.util.Set;
  * provider 原生貨態 → 正規化配送狀態（{@link ShippingStatus}）的映射，以及狀態轉移的 allowed-from 判定。
  *
  * <h2>🔴 為什麼 PayUni 的映射是恆等的，卻仍然必須顯式寫出來</h2>
- * 既有 24 值中有 20 個就是 PayUni 的 wire code，所以 {@code normalized ≡ raw}。
+ * 正規化值域中有 19 個兩位數值就是 PayUni 的 wire code，所以 {@code normalized ≡ raw}。
  * 舊實作因此寫成一句 {@code ShippingStatus.fromValue(payUniCode)}——沒有轉換表。
  * 那有兩個後果：
  * <ul>
@@ -54,16 +54,11 @@ public class ShipmentStatusMapper {
             Map.entry("81", ShippingStatus.STORE_TRANSFER),
             Map.entry("82", ShippingStatus.PENDING_HOME_RETURN),
             Map.entry("91", ShippingStatus.UNPROCESSED),
-            Map.entry("92", ShippingStatus.PROCESSING),
-            Map.entry("98", ShippingStatus.PROCESSING_ACCEPTED)
+            Map.entry("92", ShippingStatus.PROCESSING)
     );
 
     /**
      * 出貨前狀態（可互相轉移，PayUni 可能跳號推進）。
-     *
-     * <p>🔴 {@code PROCESSING_ACCEPTED(98)} <b>已移出本集合</b>：在 B2C 大宗寄倉語意下它是
-     * 「我方已受理進倉」＝本地處理完成，不是「等 provider 出貨」。留在這裡會讓
-     * {@code 920 → 98} 被判為非法 ⇒ B2C 批次流程在第一步就卡住。
      *
      * <p>{@code CREATE_UNKNOWN(991)} 加入本集合：建單結果未知時，回查排程查到答案後要能寫回
      * {@code 91}（成功）或 {@code 990}（失敗）。不加就是「回查永遠寫不進去」，
@@ -83,14 +78,12 @@ public class ShipmentStatusMapper {
      * <p>這些狀態不是 provider 查詢會回傳的主貨態，代表平台已完成賣家側動作。
      * 主動查詢時 provider 可能仍回 21/92 等出貨前狀態；<b>不可因此覆蓋本地進度</b>。
      *
-     * <p>本波加入：{@code PROCESSING_ACCEPTED(98)}（B2C 我方受理進倉）、
-     * {@code COURIER_ASSIGNED(933)}（已指派外送員——不加會被 provider 的出貨前狀態倒退覆蓋）。
+     * <p>本波加入：{@code COURIER_ASSIGNED(933)}（已指派外送員——不加會被 provider 的出貨前狀態倒退覆蓋）。
      */
     private static final Set<ShippingStatus> LOCAL_PROCESSING_DONE = Set.of(
             ShippingStatus.TCAT_CALLED,
             ShippingStatus.CVS_CODE_RECEIVED,
             ShippingStatus.SELLER_CONFIRMED,
-            ShippingStatus.PROCESSING_ACCEPTED,
             ShippingStatus.COURIER_ASSIGNED
     );
 
@@ -148,7 +141,7 @@ public class ShipmentStatusMapper {
      *   <li><b>取消申請（992）的出邊</b>：全值域唯一允許回退的狀態</li>
      *   <li><b>建單失敗（990）的出邊</b>：只有 Admin 重建（91）與 Admin 取消（41）</li>
      *   <li>出貨前 → 任何狀態合法（流程可能跳號，例如直接 91→31）</li>
-     *   <li>本地處理完成 → 配送中／終態／異常，＋ B2C 批次的三條顯式邊</li>
+     *   <li>本地處理完成 → 配送中／終態／異常，＋ 920 → 921</li>
      *   <li>配送中 → 終態、異常、其他配送中；<b>禁止</b>倒退到出貨前</li>
      *   <li>異常 → 異常互轉、終態、重回配送中；<b>禁止</b>倒退到出貨前</li>
      * </ul>
@@ -202,15 +195,6 @@ public class ShipmentStatusMapper {
 
         // 平台本地處理完成 → 只能接收實際物流進展，禁止被出貨前狀態倒退覆蓋
         if (LOCAL_PROCESSING_DONE.contains(from)) {
-            // B2C 大宗寄倉的三條顯式邊：920 → 98（我方受理進倉）、98 → 920（批次仍 OPEN 時退回取號）、
-            // 98 → 930（交運）。前兩條都是 LOCAL_PROCESSING_DONE 內部轉移，
-            // 不顯式列出就會落到下面的 return 而被拒。
-            if (from == ShippingStatus.CVS_CODE_RECEIVED && to == ShippingStatus.PROCESSING_ACCEPTED) {
-                return true;
-            }
-            if (from == ShippingStatus.PROCESSING_ACCEPTED && to == ShippingStatus.CVS_CODE_RECEIVED) {
-                return true;
-            }
             // 🔴 920 → 921「超商賣家確認出貨」（BLOCKER 3，2026-09-10 補）。
             //    這條邊 production **一直在走**（ShippingService.confirmCvsShipment 的 CAS 接受它），
             //    而本方法拒絕它。在只有 provider 回報路徑呼叫本方法時，那個不一致沒有症狀；

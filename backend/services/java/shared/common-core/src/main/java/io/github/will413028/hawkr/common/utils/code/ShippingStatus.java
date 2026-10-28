@@ -4,7 +4,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 正規化配送域（normalized delivery）狀態碼，31 值。**號碼慣例：兩位數＝PayUni 原生值，三位數＝平台自訂值**——新增值一律取三位，佔用兩位號碼會在 PayUni 日後新增狀態碼時被 `fromValue()` 解析成語意完全不同但合法的值。每個 provider 都必須走顯式映射表（PayUni 那張是恆等映射但必須存在），provider 原生值另存 `shipments.provider_status`
+ * 正規化配送域（normalized delivery）狀態碼，30 值。**號碼慣例：兩位數＝PayUni 原生值，三位數＝平台自訂值**——新增值一律取三位，佔用兩位號碼會在 PayUni 日後新增狀態碼時被 `fromValue()` 解析成語意完全不同但合法的值。每個 provider 都必須走顯式映射表（PayUni 那張是恆等映射但必須存在），provider 原生值另存 `shipments.provider_status`
  *
  * ⚠ 此檔案由 generate.sh 自動生成，請勿手動修改。
  * 業務輔助邏輯請在使用該 enum 的服務或模組內建立 helper class
@@ -14,7 +14,6 @@ public enum ShippingStatus implements CodeMeta {
 
     UNPROCESSED("UNPROCESSED", "91", "未處理", "尚未取得出貨單編號"),
     PROCESSING("PROCESSING", "92", "處理中", "出貨單編號傳送至上游廠商確認中（僅限超商）"),
-    PROCESSING_ACCEPTED("PROCESSING_ACCEPTED", "98", "處理中(已接收)", "已配出貨單編號，待傳送至物流中心（僅限超商 B2C）"),
     PENDING_SHIPMENT("PENDING_SHIPMENT", "21", "待出貨", "等待商店出貨"),
     LOGISTICS_CHECK("LOGISTICS_CHECK", "22", "物流驗收", "物流中心驗收中（僅限超商）"),
     IN_TRANSIT("IN_TRANSIT", "31", "配送中", "安排出貨中"),

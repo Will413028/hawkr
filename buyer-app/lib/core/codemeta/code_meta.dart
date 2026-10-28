@@ -538,14 +538,12 @@ enum PayuniMerchantVerificationStatus {
   }
 }
 
-/// 正規化配送域（normalized delivery）狀態碼，31 值。**號碼慣例：兩位數＝PayUni 原生值，三位數＝平台自訂值**——新增值一律取三位，佔用兩位號碼會在 PayUni 日後新增狀態碼時被 `fromValue()` 解析成語意完全不同但合法的值。每個 provider 都必須走顯式映射表（PayUni 那張是恆等映射但必須存在），provider 原生值另存 `shipments.provider_status`
+/// 正規化配送域（normalized delivery）狀態碼，30 值。**號碼慣例：兩位數＝PayUni 原生值，三位數＝平台自訂值**——新增值一律取三位，佔用兩位號碼會在 PayUni 日後新增狀態碼時被 `fromValue()` 解析成語意完全不同但合法的值。每個 provider 都必須走顯式映射表（PayUni 那張是恆等映射但必須存在），provider 原生值另存 `shipments.provider_status`
 enum ShippingStatus {
   /// 未處理 — 尚未取得出貨單編號
   unprocessed(code: 'UNPROCESSED', value: '91', label: '未處理'),
   /// 處理中 — 出貨單編號傳送至上游廠商確認中（僅限超商）
   processing(code: 'PROCESSING', value: '92', label: '處理中'),
-  /// 處理中(已接收) — 已配出貨單編號，待傳送至物流中心（僅限超商 B2C）
-  processingAccepted(code: 'PROCESSING_ACCEPTED', value: '98', label: '處理中(已接收)'),
   /// 待出貨 — 等待商店出貨
   pendingShipment(code: 'PENDING_SHIPMENT', value: '21', label: '待出貨'),
   /// 物流驗收 — 物流中心驗收中（僅限超商）

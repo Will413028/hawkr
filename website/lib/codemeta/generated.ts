@@ -262,11 +262,10 @@ export const PAYUNI_MERCHANT_VERIFICATION_STATUS_LABEL: Record<string, string> =
 	"99": "其它關閉",
 };
 
-/** 正規化配送域（normalized delivery）狀態碼，31 值。**號碼慣例：兩位數＝PayUni 原生值，三位數＝平台自訂值**——新增值一律取三位，佔用兩位號碼會在 PayUni 日後新增狀態碼時被 `fromValue()` 解析成語意完全不同但合法的值。每個 provider 都必須走顯式映射表（PayUni 那張是恆等映射但必須存在），provider 原生值另存 `shipments.provider_status` */
+/** 正規化配送域（normalized delivery）狀態碼，30 值。**號碼慣例：兩位數＝PayUni 原生值，三位數＝平台自訂值**——新增值一律取三位，佔用兩位號碼會在 PayUni 日後新增狀態碼時被 `fromValue()` 解析成語意完全不同但合法的值。每個 provider 都必須走顯式映射表（PayUni 那張是恆等映射但必須存在），provider 原生值另存 `shipments.provider_status` */
 export const ShippingStatus = {
 	UNPROCESSED: "91",
 	PROCESSING: "92",
-	PROCESSING_ACCEPTED: "98",
 	PENDING_SHIPMENT: "21",
 	LOGISTICS_CHECK: "22",
 	IN_TRANSIT: "31",
@@ -300,7 +299,6 @@ export type ShippingStatusValue = (typeof ShippingStatus)[ShippingStatusCode];
 export const SHIPPING_STATUS_LABEL: Record<string, string> = {
 	"91": "未處理",
 	"92": "處理中",
-	"98": "處理中(已接收)",
 	"21": "待出貨",
 	"22": "物流驗收",
 	"31": "配送中",

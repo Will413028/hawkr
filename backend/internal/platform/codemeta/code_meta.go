@@ -591,7 +591,7 @@ func PayuniMerchantVerificationStatusFromValue(value string) (PayuniMerchantVeri
 }
 
 // ===== ShippingStatus =====
-// 正規化配送域（normalized delivery）狀態碼，31 值。**號碼慣例：兩位數＝PayUni 原生值，三位數＝平台自訂值**——新增值一律取三位，佔用兩位號碼會在 PayUni 日後新增狀態碼時被 `fromValue()` 解析成語意完全不同但合法的值。每個 provider 都必須走顯式映射表（PayUni 那張是恆等映射但必須存在），provider 原生值另存 `shipments.provider_status`
+// 正規化配送域（normalized delivery）狀態碼，30 值。**號碼慣例：兩位數＝PayUni 原生值，三位數＝平台自訂值**——新增值一律取三位，佔用兩位號碼會在 PayUni 日後新增狀態碼時被 `fromValue()` 解析成語意完全不同但合法的值。每個 provider 都必須走顯式映射表（PayUni 那張是恆等映射但必須存在），provider 原生值另存 `shipments.provider_status`
 
 type ShippingStatus struct {
 	Code        string
@@ -603,7 +603,6 @@ type ShippingStatus struct {
 var (
 	ShippingStatusUnprocessed          = ShippingStatus{Code: "UNPROCESSED", Value: "91", Label: "未處理", Description: "尚未取得出貨單編號"}
 	ShippingStatusProcessing           = ShippingStatus{Code: "PROCESSING", Value: "92", Label: "處理中", Description: "出貨單編號傳送至上游廠商確認中（僅限超商）"}
-	ShippingStatusProcessingAccepted   = ShippingStatus{Code: "PROCESSING_ACCEPTED", Value: "98", Label: "處理中(已接收)", Description: "已配出貨單編號，待傳送至物流中心（僅限超商 B2C）"}
 	ShippingStatusPendingShipment      = ShippingStatus{Code: "PENDING_SHIPMENT", Value: "21", Label: "待出貨", Description: "等待商店出貨"}
 	ShippingStatusLogisticsCheck       = ShippingStatus{Code: "LOGISTICS_CHECK", Value: "22", Label: "物流驗收", Description: "物流中心驗收中（僅限超商）"}
 	ShippingStatusInTransit            = ShippingStatus{Code: "IN_TRANSIT", Value: "31", Label: "配送中", Description: "安排出貨中"}
@@ -635,7 +634,6 @@ var (
 var AllShippingStatuss = []ShippingStatus{
 	ShippingStatusUnprocessed,
 	ShippingStatusProcessing,
-	ShippingStatusProcessingAccepted,
 	ShippingStatusPendingShipment,
 	ShippingStatusLogisticsCheck,
 	ShippingStatusInTransit,

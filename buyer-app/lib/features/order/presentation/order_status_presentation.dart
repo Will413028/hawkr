@@ -310,7 +310,6 @@ class DeliveryStatusPresentation {
     return switch (status) {
       ShippingStatus.unprocessed => '賣家尚未建立物流單。',
       ShippingStatus.processing => '物流單正在建立，請稍候更新。',
-      ShippingStatus.processingAccepted => '物流已接單，等待賣家交寄。',
       ShippingStatus.pendingShipment => '物流單已建立，等待賣家出貨。',
       ShippingStatus.logisticsCheck => '包裹已交寄，物流中心正在驗收。',
       ShippingStatus.inTransit => '包裹正在前往收件地址。',

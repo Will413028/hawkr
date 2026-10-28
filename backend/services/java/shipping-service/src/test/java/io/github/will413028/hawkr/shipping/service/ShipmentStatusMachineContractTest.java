@@ -233,40 +233,8 @@ class ShipmentStatusMachineContractTest {
     }
 
     @Nested
-    @DisplayName("M-1：B2C 批次的三條顯式邊")
+    @DisplayName("M-1：本地處理完成狀態不被倒退覆蓋")
     class BatchExplicitEdges {
-
-        @Test
-        @DisplayName("920 → 98（我方受理進倉）")
-        void codeReceivedToAccepted() {
-            assertTrue(mapper.isValidTransition(
-                    ShippingStatus.CVS_CODE_RECEIVED, ShippingStatus.PROCESSING_ACCEPTED));
-        }
-
-        @Test
-        @DisplayName("98 → 920（批次仍 OPEN 時退回取號）")
-        void acceptedBackToCodeReceived() {
-            assertTrue(mapper.isValidTransition(
-                    ShippingStatus.PROCESSING_ACCEPTED, ShippingStatus.CVS_CODE_RECEIVED));
-        }
-
-        @Test
-        @DisplayName("98 → 930（交運）")
-        void acceptedToHandedOver() {
-            assertTrue(mapper.isValidTransition(
-                    ShippingStatus.PROCESSING_ACCEPTED, ShippingStatus.HANDED_OVER));
-        }
-
-        /**
-         * 🔴 98 移出 PRE_SHIPMENT 的直接後果：它不再能被 provider 的出貨前狀態倒退覆蓋。
-         * 這正是把它移進 LOCAL_PROCESSING_DONE 的理由。
-         */
-        @Test
-        @DisplayName("98 不得被出貨前狀態倒退覆蓋")
-        void acceptedIsNotOverwrittenByPreShipment() {
-            assertFalse(mapper.isValidTransition(ShippingStatus.PROCESSING_ACCEPTED, ShippingStatus.PENDING_SHIPMENT));
-            assertFalse(mapper.isValidTransition(ShippingStatus.PROCESSING_ACCEPTED, ShippingStatus.PROCESSING));
-        }
 
         @Test
         @DisplayName("933 不得被出貨前狀態倒退覆蓋")
@@ -281,11 +249,11 @@ class ShipmentStatusMachineContractTest {
     class PayUniMapping {
 
         @Test
-        @DisplayName("20 個原生兩位數碼全部映射到自己")
+        @DisplayName("19 個原生兩位數碼全部映射到自己")
         void identityMappingIsExplicitAndComplete() {
             Set<String> codes = ShipmentStatusMapper.payUniWireCodes();
-            assertEquals(20, codes.size(),
-                    "PayUni 原生碼應為 20 個（既有 24 值中的兩位數）；數量變了表示有人動了映射表");
+            assertEquals(19, codes.size(),
+                    "PayUni 原生碼應為 19 個（正規化值域中的兩位數）；數量變了表示有人動了映射表");
             for (String code : codes) {
                 ShippingStatus mapped = mapper.mapPayUniStatus(code);
                 assertNotNull(mapped, () -> "PayUni 碼 " + code + " 映射不出結果");

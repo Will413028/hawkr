@@ -48,8 +48,7 @@ public final class ShippingStatusRules {
                 // 933：已指派外送員、前往取件——仍在「等貨出門」階段，訂單軸留在待出貨(20)。
                 || status == ShippingStatus.COURIER_ASSIGNED;
     }
-    // ⚠️ 刻意不含的三個本波新值，理由逐一寫出來（免得下一個人以為是漏的）：
-    //   98  PROCESSING_ACCEPTED：本地處理完成軸，**不推進訂單**
+    // ⚠️ 刻意不含的兩個本波新值，理由逐一寫出來（免得下一個人以為是漏的）：
     //   991 CREATE_UNKNOWN     ：建單結果未知，訂單軸不得因「不知道」而前進
     //   992 CANCEL_PENDING     ：取消處理中，provider 可能拒絕 ⇒ 訂單軸不動，等實際結果
 

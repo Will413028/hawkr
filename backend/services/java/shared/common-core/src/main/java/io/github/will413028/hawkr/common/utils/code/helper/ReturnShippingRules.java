@@ -94,7 +94,7 @@ public final class ReturnShippingRules {
             // ── 賣家未取 ──
             case SELLER_NOT_PICKED -> Disposition.SELLER_NOT_PICKED;
             // ── 明確不處理（包裹尚未離開買家，或與逆向 leg 無關的正向／中繼狀態）──
-            case UNPROCESSED, PROCESSING_ACCEPTED, PENDING_SHIPMENT, LOGISTICS_CHECK,
+            case UNPROCESSED, PENDING_SHIPMENT, LOGISTICS_CHECK,
                  COURIER_ASSIGNED, TCAT_CALLED, CVS_CODE_RECEIVED, SELLER_CONFIRMED,
                  CREATE_FAILED, CREATE_UNKNOWN, CANCEL_PENDING,
                  CLAIM_PENDING, COMPENSATION, PACKAGE_ABANDONED, RETURN_GENERAL,

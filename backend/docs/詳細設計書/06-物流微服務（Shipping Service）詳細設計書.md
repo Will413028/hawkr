@@ -189,7 +189,7 @@ graph TD
 
 | **分組** | **包含的 ShippingStatus** | **允許轉移至** |
 |---------|-------------------------|-------------|
-| 出貨前 | UNPROCESSED, PROCESSING, PROCESSING_ACCEPTED, PENDING_SHIPMENT, LOGISTICS_CHECK, TCAT_CALLED, CVS_CODE_RECEIVED, **SELLER_CONFIRMED** | 任何狀態（PayUni 可能跳號推進，例如 91→31 直接前進）|
+| 出貨前 | UNPROCESSED, PROCESSING, PENDING_SHIPMENT, LOGISTICS_CHECK, TCAT_CALLED, CVS_CODE_RECEIVED, **SELLER_CONFIRMED** | 任何狀態（PayUni 可能跳號推進，例如 91→31 直接前進）|
 | 配送中 | IN_TRANSIT, WAITING_PICKUP | 終態（PICKED_UP / CANCELLED）、異常群組、其他配送中（如 31↔32）；**禁止**倒退到出貨前 |
 | 異常相關 | ABNORMAL~PENDING_HOME_RETURN（isAbnormal=true） | 異常互轉、終態、重回配送中（門市關轉後重回）；**禁止**倒退到出貨前 |
 | 終態 | PICKED_UP, CANCELLED | 不可再轉移 |

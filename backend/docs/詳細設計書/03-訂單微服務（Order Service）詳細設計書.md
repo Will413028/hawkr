@@ -291,7 +291,6 @@ PayUni 物流貨態狀態碼定義詳見 `../第三方整合/PayUni 物流官方
 | 56 | 已轉宅配退回 | RETURN_BY_HOME_DELIVERY | → 物流異常(35) |
 | 81 | 門市關轉 | STORE_TRANSFER | → 物流異常(35) |
 | 82 | 待轉宅配退回 | PENDING_HOME_RETURN | → 物流異常(35) |
-| 98 | 處理中(已接收) | PROCESSING_ACCEPTED | 不推進（僅更新 shipping_status） |
 | 22 | 物流驗收 | LOGISTICS_CHECK | 不推進（僅更新 shipping_status） |
 | 41 | 已取消 | CANCELLED | 不推進（人工 API 推進訂單取消） |
 
