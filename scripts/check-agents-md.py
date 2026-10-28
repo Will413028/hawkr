@@ -30,7 +30,6 @@ NEXTJS_BLOCK = re.compile(
 # 超限的檔與清掉它的步驟（backend/docs/plans/2026-10-28-agents-md-layering.md）。
 EXCEPTIONS = {
     "backend/internal/modules/buyer/AGENTS.md": "步驟 4",
-    "backend/internal/modules/delegation/AGENTS.md": "步驟 4",
     "backend/internal/modules/identity/AGENTS.md": "步驟 4",
     "backend/internal/modules/social/AGENTS.md": "步驟 4",
     "backend/internal/modules/seller/AGENTS.md": "步驟 6（之後由 seller 拆模組計畫清掉，D4）",

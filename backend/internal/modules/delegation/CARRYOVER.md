@@ -1,6 +1,6 @@
 # delegation 模組的沿用盤點
 
-從 account-service 沿用的每個機制重新判斷的結論（遷移計畫「模組完成的定義」），以及與 account-service 的差異。模組現行的職責、資料與不變量在同目錄的 `AGENTS.md`。
+從 account-service 沿用的每個機制重新判斷的結論（遷移計畫「模組完成的定義」），以及與 account-service 的差異。模組現行的職責、資料與不變量在同目錄的 `AGENTS.md`，行為規格在 `docs/modules/delegation.md`。
 
 ## 沿用盤點
 

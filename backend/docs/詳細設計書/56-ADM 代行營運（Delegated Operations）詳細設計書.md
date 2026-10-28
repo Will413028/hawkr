@@ -1,6 +1,8 @@
 # ADM 代行營運（Delegated Operations）詳細設計書
 
-> **單體（遷移計畫 0.12）**：代行的 session、授權、稽核與管理員代行資格位於 `delegation` 模組與 schema；identity 只擁有管理員身分，代行表只存管理員 ID、不下跨 schema FK。舊的 DelegationService 由單體在 legacy 的 gRPC listener 提供（`internal/legacy/delegationservice`），店家狀態經 `internal/legacy/sellerservice` 讀取後傳入；gateway 的代行編排照舊，到 A10 搬進單體。本文件以下的 account-service、outbox 與 `DELEGATION_*` 環境變數描述舊服務形狀；單體的現行物理 schema 與設定以 delegation 模組的 `db/schema.sql` 和 `AGENTS.md` 為準。
+> 單體模組的現行規格見 `docs/modules/delegation.md`；本文只當歷史參考。
+
+> **單體（遷移計畫 0.12）**：代行的 session、授權、稽核與管理員代行資格位於 `delegation` 模組與 schema；identity 只擁有管理員身分，代行表只存管理員 ID、不下跨 schema FK。舊的 DelegationService 由單體在 legacy 的 gRPC listener 提供（`internal/legacy/delegationservice`），店家狀態經 `internal/legacy/sellerservice` 讀取後傳入；gateway 的代行編排照舊，到 A10 搬進單體。本文件以下的 account-service、outbox 與 `DELEGATION_*` 環境變數描述舊服務形狀；單體的現行物理 schema 與設定以 delegation 模組的 `db/schema.sql` 和 `docs/modules/delegation.md` 為準。
 
 ## 0. 文件元資訊 (Metadata)
 
