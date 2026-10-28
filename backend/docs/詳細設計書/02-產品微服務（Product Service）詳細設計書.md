@@ -2617,7 +2617,7 @@ flowchart TD
 
 ### 5.10a 賣家停權觸發下架與還原（可逆快照）
 
-停權連動 saga 的 product 落地。與 §4.3.1 `seller.deleted`（不可逆）並列的**可逆**下架路徑：停權下架後，解除停權須精準還原「確實因本次停權而下架、且期間無其他變更」的商品。事件與 consumer 清單以 36 號 §3.6f 為 SSOT，整體 saga 概述見 32 號 §13.5、46 號 §5。
+停權連動 saga 的 product 落地。與 §4.3.1 `seller.deleted`（不可逆）並列的**可逆**下架路徑：停權下架後，解除停權須精準還原「確實因本次停權而下架、且期間無其他變更」的商品。事件與 consumer 清單以 36 號 §3.6f 為 SSOT，整體 saga 概述見 seller 模組規格 §10.2（`docs/modules/seller.md`）、46 號 §5。
 
 #### 5.10a.1 快照表 `product_suspension_snapshot`（product-service DB，Flyway V{N+1}）
 

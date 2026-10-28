@@ -286,7 +286,7 @@ Payload（camelCase，ID string）:
 
 ### 6.5 賣家停權下的訊息綁定與 gating
 
-停權連動的 IM 落地。裁決：**停權後賣家僅「訂單關聯」對話可用**（能力層白名單 `CAP_CHAT_SEND` 受限，見 46 號 §3.4）。IM domain 原無 order 綁定，本次以**伺服器端推導**建立綁定並在 `SendMessage` gating。整體 saga 見 32 號 §13.5、事件見 36 號 §3.6f。
+停權連動的 IM 落地。裁決：**停權後賣家僅「訂單關聯」對話可用**（能力層白名單 `CAP_CHAT_SEND` 受限，見 46 號 §3.4）。IM domain 原無 order 綁定，本次以**伺服器端推導**建立綁定並在 `SendMessage` gating。整體 saga 見 seller 模組規格 §10.2（`docs/modules/seller.md`）、事件見 36 號 §3.6f。
 
 #### 6.5.1 綁定寫入（僅伺服器端兩條路徑，client 無 API 可直寫 `order_no`）
 

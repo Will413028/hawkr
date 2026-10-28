@@ -467,7 +467,7 @@
 
 - 驗證：`TestRollup*`、`TestRebuild*`、`TestPurgeOnlyDeletesProcessedEventsOlderThanRetention`，以及 `cmd/hawkr` 的 `TestLoggedInProductViewSucceedsWithoutProductServiceAndIsRolledUpLater`（商品服務不通時瀏覽照樣成功，port 不在請求路徑上被呼叫）。
 
-- 匿名打點入口是 `SellerPublicService.RecordProductView`：只計訪客，有呼叫者時回成功但不寫入（登入買家由 `RecordVisit` 計，同一次瀏覽不會算兩次），每個來源 IP 每分鐘 120 次（`internal/httpapi/ratelimit.go` 的 `procedureTiers`，在程序的記憶體內計數）。
+- 匿名打點入口是 `SellerPublicService.RecordProductView`：只計訪客，有呼叫者時回成功但不寫入（登入買家由 `RecordVisit` 計，同一次瀏覽不會算兩次），不檢查商品是否存在（只有一句 insert，不存在的商品不回錯，彙總 job 解析不到店家的事件標為 `UNRESOLVED`，不計入也不重試），每個來源 IP 每分鐘 120 次（`internal/httpapi/ratelimit.go` 的 `procedureTiers`，在程序的記憶體內計數）。
 
 - 匿名打點寫入失敗時回錯誤給 client（client 對打點 fire-and-forget、靜默忽略）；打點被爬蟲觸發時計數會失真，現行防線只有每個來源 IP 的額度，沒有 bot detection。
 
@@ -537,7 +537,7 @@
 
 - **KYC 加密金鑰輪替沒有遷移 job**：HMAC 金鑰輪替有 `RehashKYCIdentities`（§13），加密金鑰輪替則要解密後重寫，這支 job 還沒有。解除條件：第一次輪替加密金鑰之前要先有它（沒有資料之前不做）。
 
-- **身分比對的防線邊界**：只擋「同一個身分」，用別人的證件、人頭入駐不在防線內（ADR 後果）。處分建立之後才由被處分帳號新增的申請不在快照裡；被處分的帳號開不了新店，既有申請的核准要求帳號沒有停權，所以不會被核准。核准與「另一個帳號的處分同時寫入」不需要額外的鎖：處分在核准讀取之後才 commit，結果等於「先核准、後處分」，是合法的序列順序，之後的核准都會看到快照。快照只能取到處分當下還沒清理的 KYC：舊 stint 關閉滿 184 天（第二段清理）、KYC 已清理之後才被處分時，舊 stint 用過的身分不在快照裡（目前 stint 的身分仍在）；這是「關店 184 天後清註冊與身分資料」的代價（ADR 的資料最小化），不另外保留 hash。
+- **身分比對的防線邊界**：只擋「同一個身分」，用別人的證件、人頭入駐不在防線內（ADR 後果）。處分建立之後才由被處分帳號新增的申請不在快照裡；被處分的帳號開不了新店，既有申請的核准要求帳號沒有停權，所以不會被核准。核准與「另一個帳號的處分同時寫入」不需要額外的鎖：處分在核准讀取之後才 commit，結果等於「先核准、後處分」，是合法的序列順序，之後的核准都會看到快照。快照只能取到處分當下還沒清理的 KYC：舊 stint 關閉滿 184 天（第二段清理）、KYC 已清理之後才被處分時，舊 stint 用過的身分不在快照裡（目前 stint 的身分仍在）；這是「關店 184 天後清註冊與身分資料」的代價（ADR 的資料最小化），不另外保留 hash。重新評估的條件：第二段清理的 184 天改動，或要開始擋借證件、人頭入駐時。
 
 - **`SubmitKYC` 的限流只在程序內**：計數在 serve 程序的記憶體內，多個 instance 各自計數。解除條件：單體跑超過一個 instance 之前，換成共用的計數（入口的 IP 限流不是它的補償）。
 

@@ -1274,7 +1274,7 @@ accountdeletion 呼叫 buyer.CloseForDeletion（與刪除帳號同一個 transac
 
 ### 5.20 賣家停權連動模板停用／還原（SellerSuspendedConsumer / SellerUnsuspendedConsumer）
 
-停權連動 saga 的 coupon 落地。整體 saga 概述見 32 號 §13.5、46 號 §5；事件以 36 號 §3.6f 為 SSOT。
+停權連動 saga 的 coupon 落地。整體 saga 概述見 seller 模組規格 §10.2（`docs/modules/seller.md`）、46 號 §5；事件以 36 號 §3.6f 為 SSOT。
 
 **訂閱契約**：
 

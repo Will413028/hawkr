@@ -255,7 +255,7 @@ export function revokeDetailText(
 
 export const STATEMENT_MAX_LENGTH = 2000;
 export const NOTE_MAX_LENGTH = 2000;
-/** 複審期限的預設與上限（設計書 32 §1.1、CreateMeasureRequest.review_by：晚於現在、不超過 30 天）。 */
+/** 複審期限的預設與上限（`docs/modules/seller.md` §5、CreateMeasureRequest.review_by：晚於現在、不超過 30 天）。 */
 export const REVIEW_DEFAULT_DAYS = 7;
 export const REVIEW_MAX_DAYS = 30;
 

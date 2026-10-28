@@ -860,7 +860,7 @@ generic path 不得含任何 payment 業務 metric。
 
 - `seller.deleted` 在店家退場時發，與帳號是否刪除無關；下游（product、social、im、notification、pricebook）此時才刪店家資料，不得以 `account.deleted` 替代。
 - `seller.profile.changed`：cart 快取 `seller:meta` 24h TTL 僅作 safety net，賣家改店名 / logo 後靠本 event 主動 evict 消除最長 24h stale；選 event-driven 而非縮短 TTL / 每次即時 gRPC，換取「不對 cart 熱路徑 GetCart 加同步依賴」。cart-service 有自己的 DLX。`store_id` wire 為 string（TSID 精度，見 §7.4）。
-- `seller.suspended` / `seller.unsuspended`（賣家停權 saga）：**必達語意**（下架/取消/停券為停權正確性連動，非 fail-and-forget）→ 單體 seller 模組在停權的 transaction 內發事件，relay 以 River job 送出（`event_id` 為唯一鍵，失敗重試不重複）；`suspensionId`（= `seller.suspension_periods` 的 `period_id`）綁定本次停權期間，coupon 據此還原本次停用的模板。整體方案見 46 號、32 號 §13。
+- `seller.suspended` / `seller.unsuspended`（賣家停權 saga）：**必達語意**（下架/取消/停券為停權正確性連動，非 fail-and-forget）→ 單體 seller 模組在停權的 transaction 內發事件，relay 以 River job 送出（`event_id` 為唯一鍵，失敗重試不重複）；`suspensionId`（= `seller.suspension_periods` 的 `period_id`）綁定本次停權期間，coupon 據此還原本次停用的模板。整體方案見 46 號、seller 模組規格 §10.2（`docs/modules/seller.md`）。
 - **Java consumer 對應 EventType**（內部技術碼）：`SELLER_DELETED` / `SELLER_PROFILE_CHANGED` / `SELLER_SUSPENDED` / `SELLER_UNSUSPENDED`（[CodeMeta SellerEventType](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/內部技術碼.md#SellerEventType)）。
 
 ---

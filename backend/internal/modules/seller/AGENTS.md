@@ -13,7 +13,7 @@ schema `seller`（`db/schema.sql`，view 與函式在 `db/objects.sql`）：`sto
 形狀在 `db/pub.sql`，定義在 `db/objects.sql` 與手寫 migration；消費端只能呼叫函式，改形狀要在同一次變更內更新 `pub.sql` 與所有消費端。守門：`TestPubContractsMatchMigrations`（cmd/hawkr）。語意見規格 §21。
 
 - `seller.pub_exposable_stores(at timestamptz) RETURNS SETOF seller.pub_exposable_store (store_id bigint)`：`at` 這一刻可公開曝光的店家，曝光規則唯一的家。
-- `seller.pub_review_items(at timestamptz) RETURNS SETOF seller.pub_review_item (kind, item_id, 對象的鍵, store_id, store_name, start_at, due_at)`：`at` 這一刻的全部待辦（12 種），給 `reviewqueue`。守門：`TestPubReviewItemsIsTheUnionOfTheReviewFunctions`。
+- `seller.pub_review_items(at timestamptz) RETURNS SETOF seller.pub_review_item (kind, item_id, 對象的鍵, store_id, store_name, start_at, due_at)`：`at` 這一刻的全部待辦（10 種），給 `reviewqueue`。守門：`TestPubReviewItemsIsTheUnionOfTheReviewFunctions`。
 
 ## 模組內部結構
 
@@ -22,8 +22,6 @@ schema `seller`（`db/schema.sql`，view 與函式在 `db/objects.sql`）：`sto
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`；增加子領域時同步修改。各子領域在自己套件宣告最小的 `Deps`，由根套件組裝。
 
 ## 不變量
-
-守門測試在本模組；規格見 `docs/modules/seller.md`。
 
 守門測試在本模組；規格唯一來源是 `docs/modules/seller.md`。
 - 一帳號最多一個目前 stint，SELLER 與它成對授予、移除。守門：`stores_current_account`、`TestApplyRejectsSecondStoreAndReonboardsWithNewStint`。規格：§2。

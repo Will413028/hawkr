@@ -1725,7 +1725,7 @@ switch (opStatus) {
 
 ### 5.1a 賣家停權相關流程（結帳收斂點 backstop + 未付款批次取消）
 
-停權連動 saga 的 order 落地，分兩部分：收斂點阻斷「對停權賣家下新單」、consumer 批次取消「停權當下該賣家既有未付款單」。整體 saga 概述見 32 號 §13.5、46 號 §5/§6；事件以 36 號 §3.6f 為 SSOT。
+停權連動 saga 的 order 落地，分兩部分：收斂點阻斷「對停權賣家下新單」、consumer 批次取消「停權當下該賣家既有未付款單」。整體 saga 概述見 seller 模組規格 §10.2（`docs/modules/seller.md`）、46 號 §5/§6；事件以 36 號 §3.6f 為 SSOT。
 
 #### 5.1a.1 CheckoutValidate 收斂點 backstop（首次接線 A5，fail-closed）
 

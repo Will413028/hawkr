@@ -738,7 +738,7 @@ Gateway 呼叫。它逐一收件人走與模板引擎相同的 `SendPushUseCase`
 
 ### 7.10 賣家停權相關通知（DB-driven template，無需改 Go code）
 
-停權連動 saga 的 notification 落地。三個通知全部走既有模板引擎（`notification_templates` rows + `payload_filter`），**無需新增 Go handler**。整體 saga 概述見 32 號 §13.5、46 號 §5；事件以 36 號 §3.6f 為 SSOT。
+停權連動 saga 的 notification 落地。三個通知全部走既有模板引擎（`notification_templates` rows + `payload_filter`），**無需新增 Go handler**。整體 saga 概述見 seller 模組規格 §10.2（`docs/modules/seller.md`）、46 號 §5；事件以 36 號 §3.6f 為 SSOT。
 
 | # | 觸發事件 | 對象 | template（`event_type` / `payload_filter`） | 內容摘要 |
 |---|---|---|---|---|
