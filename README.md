@@ -6,8 +6,10 @@ An e-commerce platform serving buyers, sellers, and platform operators (no longe
 
 | Directory | Original repository | Stack |
 |---|---|---|
-| `backend/` | backend-payuni | Go / Java microservices, Gateway, k8s |
+| `backend/` | backend-payuni | Go modular monolith, being migrated from the Go / Java microservices and REST gateway that remain alongside it |
 | `website/` | hawkr-website | Next.js consumer website |
 | `admin/` | hawkr-admin | Next.js admin |
 | `buyer-app/` | hawkr_buyer | Flutter |
 | `seller-app/` | hawkr_seller | Flutter |
+| `api/` | — | Protobuf + Connect contract for the external API |
+| `packages/` | — | Shared packages: generated API clients (TypeScript, Dart), auth, UI text, icons, address codes |

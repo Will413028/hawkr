@@ -6,8 +6,10 @@
 
 | 目錄 | 原 repository | 技術 |
 |---|---|---|
-| `backend/` | backend-payuni | Go／Java microservices、Gateway、k8s |
+| `backend/` | backend-payuni | Go modular monolith，正從仍並存的 Go／Java microservices 與 REST gateway 遷移過來 |
 | `website/` | hawkr-website | Next.js consumer website |
 | `admin/` | hawkr-admin | Next.js admin |
 | `buyer-app/` | hawkr_buyer | Flutter |
 | `seller-app/` | hawkr_seller | Flutter |
+| `api/` | — | 對外 API 的 Protobuf＋Connect 契約 |
+| `packages/` | — | 共用套件：API 生成碼（TypeScript、Dart）、登入、介面文字、圖示、行政區代碼 |
