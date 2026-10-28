@@ -26,11 +26,8 @@ void main() {
         routes: [
           GoRoute(
             path: '/',
-            builder: (_, _) => Scaffold(
-              body: Center(
-                child: ProfileDeleteAccountSection(),
-              ),
-            ),
+            builder: (_, _) =>
+                Scaffold(body: Center(child: ProfileDeleteAccountSection())),
           ),
           GoRoute(
             path: '/auth',
