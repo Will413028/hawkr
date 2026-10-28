@@ -1190,16 +1190,14 @@ principal、`SYSTEM` 的契約明寫「**不得拿 `store_id` 頂替**」⇒ 記
 去除公司型態後綴（股份有限公司／有限公司／企業社／商行／農場／Co., Ltd. 等）。
 寬鬆的方向是**減少誤判為不符**（誤判只會多送一筆人工審，代價可控）。
 
-**比對基準必須是「已通過實名認證」的名稱**：query 限定 `certification_applications.status = 'approved'`
-且經 `sellers.current_certification_id` 定位當前 stint（不是「最新建立的那筆」——re-onboard 之後
-舊 stint 的 approved 列不得再代表這個賣家，理由見 `GetCurrentApplication` 的註解）。
+**比對基準必須是「已通過實名認證」的名稱**：只取店家目前這個 stint 上人工核准（`seller.kyc_applications.status = 'APPROVED'`）的申請，名稱欄位是 `real_name` 與 `company_name`（不是「最新建立的那筆」——店家重新開店之後，舊 stint 的核准申請不得再代表這個店家）。PayUni 核准是金流開通，不是身分驗證，所以不是條件。店家不存在、已關閉、沒有申請、申請不是 `APPROVED` 都是沒有基準（`has_reference = false`），不是錯誤；讀取失敗回錯誤，呼叫方 fail-closed。
 🔴 **未通過審核的 KYC 名稱是賣家自己填的、平台沒驗過**，拿它當比對基準等於讓賣家填一個
 假名字去匹配任意一張他人的證書 —— 那會讓本節的防護完全失效。
 KYC 未通過的賣家 ⇒ `has_reference = false` ⇒ 轉人工，這是正確結果而非誤傷。
 
-**跨服務路徑（PII 不外流）**：比對在 **seller-service 內部完成**，
+**跨服務路徑（PII 不外流）**：比對在**單體的 seller 模組內部完成**（`internal/modules/seller/internal/kyc` 的 `MatchCertHolder`，規則在 `internal/modules/seller/internal/model/certholder.go`），
 product-service 只送 `store_id` + `holder_name`、拿回布林與命中欄位名。
-`real_name` 屬 PII（18 號設計書列為明文保留欄），**不得跨服務傳輸**，
+`real_name` 屬 PII（`seller.kyc_applications.real_name` 為明文欄），**不得跨服務傳輸**，
 亦不得寫入 `product_certification_application` 或稽核事件。
 
 RPC 契約見 §10（`MatchCertificateHolder`）；稽核只記命中欄位名（`REAL_NAME`／`COMPANY_NAME`／`NONE`），不記值。
@@ -1874,15 +1872,15 @@ message ReviewProductCertificationForAdminRequest {
 > proto 若宣告成 `int32` 會在邊界多一次轉換、而且**兩層型別不一致正是前端拿到 `undefined` 的常見來源**。
 > ⇒ 一律 `string`，Gateway 直接透傳。
 
-### 10.2.1 跨服務依賴：`MatchCertificateHolder`（seller-service 提供）
+### 10.2.1 跨服務依賴：`MatchCertificateHolder`（單體的 seller 模組提供）
 
-檔案：`api/proto/seller/seller.proto`（**不在 product.proto**——這支 RPC 由 seller-service 實作）。
+檔案：`api/proto/seller/seller.proto`（**不在 product.proto**——這支 RPC 由單體的 seller 模組實作，經 `internal/legacy/sellerserver` 以 SellerService 的舊契約提供給 product-service）。
 
 ```protobuf
 // 判斷政府查驗回的「業者名稱」是否屬於這個賣家（§8.5.1 自動核准的第五個條件）。
 //
-// 🔴 比對在 seller-service 內部完成，只回布林與命中欄位名。
-//    real_name 是 PII（18 號設計書列為明文保留欄），不得跨服務傳輸。
+// 🔴 比對在 seller 模組內部完成，只回布林與命中欄位名。
+//    real_name 是 PII（kyc_applications 的明文欄），不得跨服務傳輸。
 rpc MatchCertificateHolder(MatchCertificateHolderRequest)
     returns (MatchCertificateHolderResponse);
 
