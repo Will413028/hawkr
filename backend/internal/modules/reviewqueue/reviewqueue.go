@@ -1,6 +1,6 @@
 // Package reviewqueue 是 reviewqueue 模組的公開 API。
 //
-// 職責、擁有的資料與不變量見同目錄的 AGENTS.md。
+// 職責、擁有的資料與不變量見同目錄的 AGENTS.md，行為規格見 docs/modules/reviewqueue.md。
 package reviewqueue
 
 import (
