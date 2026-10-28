@@ -238,7 +238,7 @@ function isStorePickupMethod(method: string) {
  *
  * 🔴 **未知配送方式一律回 `false`（fail-closed／§1.8）。** 舊寫法是
  * 三元的最後一支 `: true` —— 語意等於「沒見過的配送方式就不必收件資料」，
- * 於是 `3004` 大宗寄倉／`3005` 商家自送可以一路結帳完成，
+ * 於是 `3005` 商家自送可以一路結帳完成，
  * 後端拿到的訂單既無收件地址也無取貨門市，而畫面上沒有任何異常。
  */
 function hasRequiredRecipientFor(draft: CheckoutDraft): boolean {

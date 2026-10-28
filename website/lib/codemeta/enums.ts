@@ -107,7 +107,7 @@ export type AfterSaleEvidenceTypeValue =
  * 把後端送來的配送方式值正規化成 CodeMeta `ShippingMethod` value。
  *
  * 🔴 **未知值回 `undefined`，呼叫端必須自己 fail-safe，不得 fallback 成任何既有
- * provider**（65A §1.10）。`3003` Uber（已刪除的功能）、`3004` 7-11 大宗寄倉、`3005` 商家自送，
+ * provider**（65A §1.10）。`3003` Uber（已刪除的功能）、`3005` 商家自送，
  * 以及後端未來新增的任何 provider，都會走到 `undefined` 這條路——舊寫法
  * `isTaqbin ? 黑貓 : 7-11` 會把它們全部靜默畫成 7-11，型別正確、不拋例外、
  * 測試全綠，只有使用者看得到。

@@ -25,7 +25,7 @@ public class ProviderSettlementLineEntity {
     @TableId(type = IdType.INPUT)
     private Long id;
 
-    /** ShippingMethod 碼值 {@code '3003'}／{@code '3004'}（同 ledger {@code owner_ref_id} 口徑）。 */
+    /** ShippingMethod 碼值 {@code '3003'}（同 ledger {@code owner_ref_id} 口徑）。 */
     private String provider;
 
     private String statementRef;

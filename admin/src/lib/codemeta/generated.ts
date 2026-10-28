@@ -208,8 +208,6 @@ export const ShippingStatus = {
 	SELLER_CONFIRMED: "921",
 	CREATE_FAILED: "990",
 	HANDED_OVER: "930",
-	DC_ACCEPTED: "931",
-	DC_REJECTED: "932",
 	COURIER_ASSIGNED: "933",
 	CREATE_UNKNOWN: "991",
 	CANCEL_PENDING: "992",
@@ -244,8 +242,6 @@ export const SHIPPING_STATUS_LABEL: Record<string, string> = {
 	"921": "賣家確認出貨",
 	"990": "建單失敗",
 	"930": "已交運",
-	"931": "物流中心已驗收",
-	"932": "物流中心驗退",
 	"933": "已指派外送員",
 	"991": "建單結果未知",
 	"992": "取消處理中",
@@ -970,7 +966,6 @@ export const ShippingMethod = {
 	TAQBIN: "3001",
 	SEVEN_ELEVEN_STORE_PICKUP: "3002",
 	UBER_INSTANT: "3003",
-	SEVEN_ELEVEN_BULK_WAREHOUSE: "3004",
 	MERCHANT_DELIVERY: "3005",
 } as const;
 export type ShippingMethodCode = keyof typeof ShippingMethod;
@@ -980,7 +975,6 @@ export const SHIPPING_METHOD_LABEL: Record<string, string> = {
 	"3001": "黑貓宅急便",
 	"3002": "7-11店到店",
 	"3003": "Uber 即時配送",
-	"3004": "7-11大宗寄倉",
 	"3005": "商家自行配送",
 };
 
@@ -988,7 +982,6 @@ export const SHIPPING_METHOD_LABEL: Record<string, string> = {
 export const ShippingType = {
 	CVS_C2C: "3651",
 	HOME_DELIVERY: "3652",
-	CVS_B2C: "3653",
 	MERCHANT_DELIVERY: "3654",
 } as const;
 export type ShippingTypeCode = keyof typeof ShippingType;
@@ -997,7 +990,6 @@ export type ShippingTypeValue = (typeof ShippingType)[ShippingTypeCode];
 export const SHIPPING_TYPE_LABEL: Record<string, string> = {
 	"3651": "超商店到店",
 	"3652": "宅配到府",
-	"3653": "超商大宗寄倉",
 	"3654": "商家自送",
 };
 
@@ -1678,7 +1670,7 @@ export const PRODUCT_CERTIFICATION_REJECT_REASON_LABEL: Record<string, string> =
 	"OTHER": "其他原因",
 };
 
-/** 商流模式——**這筆錢誰收、誰開票**，決定整條帳務軸。訂單快照六欄之一：付款後鎖定，改政策不得回溯既有訂單。取**短名**（不把 provider 綁進商流維度），與 `provider` 維度正交。🔴 **本值域是三條商流帳務軸互斥的分界線**，65 定版、66／68／69 只引用。 */
+/** 商流模式——**這筆錢誰收、誰開票**，決定整條帳務軸。訂單快照六欄之一：付款後鎖定，改政策不得回溯既有訂單。取**短名**（不把 provider 綁進商流維度），與 `provider` 維度正交。🔴 **本值域是三條商流帳務軸互斥的分界線**，65 定版、66 只引用。 */
 export const CommerceModel = {
 	SELLER_DIRECT: "SELLER_DIRECT",
 	PLATFORM_CONSIGNMENT: "PLATFORM_CONSIGNMENT",
@@ -1734,7 +1726,7 @@ export const INVOICE_MODEL_LABEL: Record<string, string> = {
 	"PLATFORM_TO_BUYER": "平台對買家開立",
 };
 
-/** **配送／履約軸**的領域動作值域，27 值。🔴 **fail-closed**：表上沒列的 action 一律不可用，前端只准 fallback 到 `view_only`，**不得自行猜測或退化成其他動作**。🔴 **與 provider capability 是兩層**：capability 回答「這個 provider 的 API 有沒有這個能力」，本 enum 的動作回答「這顆按鈕現在能不能按」；銜接兩層的是每個 action 自己宣告的 `requiresProviderCall`（且逐 provider 可覆寫）——`requiresProviderCall=false` 的動作（如 3004 的 handover／cancel、3005 L0 的取消）**不因 capability 為 empty 而消失**。URL 一律走 `allowedActions[].href`，前端不得自行組路徑。 */
+/** **配送／履約軸**的領域動作值域，19 值。🔴 **fail-closed**：表上沒列的 action 一律不可用，前端只准 fallback 到 `view_only`，**不得自行猜測或退化成其他動作**。🔴 **與 provider capability 是兩層**：capability 回答「這個 provider 的 API 有沒有這個能力」，本 enum 的動作回答「這顆按鈕現在能不能按」；銜接兩層的是每個 action 自己宣告的 `requiresProviderCall`（且逐 provider 可覆寫）——`requiresProviderCall=false` 的動作（如 handover，以及 3002／3005 的 cancel）**不因 capability 為 empty 而消失**。URL 一律走 `allowedActions[].href`，前端不得自行組路徑。 */
 export const FulfillmentAction = {
 	DISPATCH: "dispatch",
 	HANDOVER: "handover",
@@ -1743,17 +1735,9 @@ export const FulfillmentAction = {
 	UPDATE: "update",
 	PRINT_LABEL: "print_label",
 	REPRINT_LABEL: "reprint_label",
-	ASSIGN_BATCH: "assign_batch",
-	REMOVE_FROM_BATCH: "remove_from_batch",
-	SCAN_BIND: "scan_bind",
-	CLOSE_BATCH: "close_batch",
 	TRACK: "track",
 	VIEW_POD: "view_pod",
-	UPLOAD_POD: "upload_pod",
 	REQUERY: "requery",
-	REPORT_PROGRESS: "report_progress",
-	REPORT_DELIVERED: "report_delivered",
-	REPORT_EXCEPTION: "report_exception",
 	ARRANGE_RETURN: "arrange_return",
 	ACCEPT_RETURN: "accept_return",
 	SELLER_PICKUP: "seller_pickup",
@@ -1775,17 +1759,9 @@ export const FULFILLMENT_ACTION_LABEL: Record<string, string> = {
 	"update": "修改配送資料",
 	"print_label": "列印標籤",
 	"reprint_label": "重印標籤",
-	"assign_batch": "加入批次",
-	"remove_from_batch": "移出批次",
-	"scan_bind": "掃描綁定",
-	"close_batch": "封箱關批",
 	"track": "查詢物流狀態",
 	"view_pod": "檢視送達證明",
-	"upload_pod": "上傳送達證明",
 	"requery": "重新查詢",
-	"report_progress": "回報配送進度",
-	"report_delivered": "回報已送達",
-	"report_exception": "回報配送異常",
 	"arrange_return": "安排退貨物流",
 	"accept_return": "接受退貨",
 	"seller_pickup": "賣家領回",

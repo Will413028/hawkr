@@ -267,7 +267,7 @@ void main() {
   // 萬一有路徑把 unsupported 的 option 帶進結帳表單，它必須**明白拒絕**，
   // 而不是帶著錯誤欄位去打 `/app/checkout/preview`。
   //
-  // 🔴 為什麼只能在這一層驗：本波新增的 `3004`（7-11 大宗寄倉）與 `3005`
+  // 🔴 為什麼只能在這一層驗：`3003`（Uber 即時配送，已刪除）與 `3005`
   // （商家自行配送）在 dev 上**造不出來**——`chk_shipping_type CHECK
   // (shipping_type IN ('3651','3652'))` 擋住了 ⇒ E2E 與截圖都驗不到。
   //
@@ -286,8 +286,8 @@ void main() {
       tester,
       dio: dio,
       onPayMethodChanged: (_) {},
-      // 3004：7-11 大宗寄倉。本波新增，App 端無對應 UI。
-      shippingMethod: '3004',
+      // 3003：Uber 即時配送（已刪除的功能），App 端無對應 UI。
+      shippingMethod: '3003',
     );
     await tester.pumpAndSettle();
 
@@ -295,7 +295,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('3005 商家自行配送同樣被擋下（不是只有 3004 被特判）', (tester) async {
+  testWidgets('3005 商家自行配送同樣被擋下（不是只有 3003 被特判）', (tester) async {
     final dio = Dio(BaseOptions(baseUrl: 'https://checkout.test'))
       ..httpClientAdapter = _CheckoutPreviewAdapter();
 
@@ -307,8 +307,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // ⚠️ 這一條刻意與上一條分開：只測 3004 的話，
-    //    「把 3004 寫死成特例」與「走 shippingPresentationOf 的通用判定」
+    // ⚠️ 這一條刻意與上一條分開：只測 3003 的話，
+    //    「把 3003 寫死成特例」與「走 shippingPresentationOf 的通用判定」
     //    兩種實作都會過，鑑別力為 0。
     expect(find.textContaining('此配送方式暫不支援'), findsWidgets);
     expect(tester.takeException(), isNull);

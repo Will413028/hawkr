@@ -7,10 +7,9 @@ import io.github.will413028.hawkr.shipping.entity.ShipmentEntity;
  * capability 解析的上下文。
  *
  * <p>🔴 <b>為什麼 capability 的 getter 必須帶 context，而不是無參數</b>：
- * capability 集合對 {@code 3001}／{@code 3002}／{@code 3003}／{@code 3004} 是 per-method 常數，
- * 但對 {@code 3005}（商家自送）是 <b>per-store</b>——同一個 provider 在 L0／L1／L2 三種成熟度下
- * 能力集合完全不同（L0 沒有取消、沒有回查；L1 有 dispatch／cancel／pod 但沒有 track；L2 全有）。
- * 無參數的 getter 表達不出這件事，而表達不出的後果是 69 落地時只能在 service 層再加一組 if。
+ * capability 集合目前對 {@code 3001}／{@code 3002}／{@code 3003} 是 per-method 常數，
+ * 但同一個 provider 的能力集合可能隨店家或配送單而異。
+ * 無參數的 getter 表達不出這件事，而表達不出的後果是日後只能在 service 層再加一組 if。
  *
  * <p>⚠️ 因此 <b>回傳值不得快取成 per-method 單例</b>。adapter 實作若要快取，
  * 只能以 (method, storeId) 為鍵，且要能被賣家設定變更失效。

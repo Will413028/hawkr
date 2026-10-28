@@ -34,7 +34,7 @@ import java.util.function.Function;
  *       allowed-from，或列印狀態機）。不通過 ⇒ {@code enabled=false} ＋ 狀態類 reason code</li>
  *   <li><b>capability 閘門</b>：<b>只在</b>
  *       {@link FulfillmentActionPolicy#requiresProviderCall} 為 {@code true} 時才問。
- *       🔴 {@code false} 的動作（B2C 交倉、自送 L0 的取消）<b>完全不受 capability 影響</b>
+ *       🔴 {@code false} 的動作（賣家確認出貨、商家自送的取消）<b>完全不受 capability 影響</b>
  *       ——把 {@code Optional.empty()} 直接接到「按鈕不可用」，會讓使用者最常按的那幾顆整條消失</li>
  * </ol>
  *

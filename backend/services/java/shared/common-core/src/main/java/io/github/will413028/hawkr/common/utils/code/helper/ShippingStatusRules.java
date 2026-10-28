@@ -34,9 +34,8 @@ public final class ShippingStatusRules {
                 || status == ShippingStatus.RETURN_BY_HOME_DELIVERY
                 || status == ShippingStatus.STORE_TRANSFER
                 || status == ShippingStatus.PENDING_HOME_RETURN
-                // 本波新增（65 物流履約平台）：兩者都是「配送出了事、需要人工處置」的匯集點，
+                // 本波新增（65 物流履約平台）：「配送出了事、需要人工處置」的匯集點，
                 // 訂單軸要跟著進 SHIPPING_ABNORMAL(35)。
-                || status == ShippingStatus.DC_REJECTED      // 932 物流中心驗退
                 || status == ShippingStatus.CLAIM_PENDING;   // 993 理賠受理中
     }
 
@@ -59,7 +58,6 @@ public final class ShippingStatusRules {
         return status == ShippingStatus.TCAT_CALLED
                 || status == ShippingStatus.SELLER_CONFIRMED
                 // 本波新增：貨已經離開賣家手上，訂單軸推進到配送中(30)。
-                || status == ShippingStatus.HANDED_OVER   // 930 已交運（B2C 司機交接／自送出發／Uber 取件完成）
-                || status == ShippingStatus.DC_ACCEPTED;  // 931 物流中心驗收通過（才算真的進倉）
+                || status == ShippingStatus.HANDED_OVER;  // 930 已交運（Uber 取件完成）
     }
 }

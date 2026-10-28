@@ -8593,7 +8593,7 @@ type ListProviderStatementsForAdminRequest struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	Page     string                 `protobuf:"bytes,1,opt,name=page,proto3" json:"page,omitempty"`
 	PageSize string                 `protobuf:"bytes,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	// CodeMeta ShippingMethod value（'3003' / '3004'）。
+	// CodeMeta ShippingMethod value（'3003'）。
 	Provider string `protobuf:"bytes,3,opt,name=provider,proto3" json:"provider,omitempty"`
 	// 'YYYY-MM'。
 	StatementPeriod string `protobuf:"bytes,4,opt,name=statement_period,json=statementPeriod,proto3" json:"statement_period,omitempty"`

@@ -49,8 +49,7 @@ public class OrderPolicyResolver {
     private static final java.util.Set<String> PLATFORM_LOGISTICS_METHODS = java.util.Set.of(
             ShippingMethod.TAQBIN.value(),
             ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value(),
-            ShippingMethod.UBER_INSTANT.value(),
-            ShippingMethod.SEVEN_ELEVEN_BULK_WAREHOUSE.value());
+            ShippingMethod.UBER_INSTANT.value());
 
     /**
      * 推導本次結帳的政策快照。

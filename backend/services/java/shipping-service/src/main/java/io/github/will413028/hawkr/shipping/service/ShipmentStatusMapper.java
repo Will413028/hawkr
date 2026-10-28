@@ -97,14 +97,13 @@ public class ShipmentStatusMapper {
     /**
      * 配送中狀態。
      *
-     * <p>本波加入：{@code HANDED_OVER(930)}（已交運）、{@code DC_ACCEPTED(931)}（物流中心驗收通過）。
-     * 不加的話 {@code 933 → 930}（Uber 取件完成）與 {@code 930 → 931}（B2C 驗收）都會被拒。
+     * <p>本波加入：{@code HANDED_OVER(930)}（已交運）。
+     * 不加的話 {@code 933 → 930}（Uber 取件完成）會被拒。
      */
     private static final Set<ShippingStatus> IN_DELIVERY = Set.of(
             ShippingStatus.IN_TRANSIT,
             ShippingStatus.WAITING_PICKUP,
-            ShippingStatus.HANDED_OVER,
-            ShippingStatus.DC_ACCEPTED
+            ShippingStatus.HANDED_OVER
     );
 
     /** 終態（不可再轉移）。 */

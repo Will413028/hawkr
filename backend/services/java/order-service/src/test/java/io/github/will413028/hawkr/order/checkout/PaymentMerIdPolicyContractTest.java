@@ -249,7 +249,7 @@ class PaymentMerIdPolicyContractTest {
         void platformChannelsAreePlatformLogistics() {
             for (ShippingMethod m : new ShippingMethod[]{
                     ShippingMethod.TAQBIN, ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP,
-                    ShippingMethod.UBER_INSTANT, ShippingMethod.SEVEN_ELEVEN_BULK_WAREHOUSE}) {
+                    ShippingMethod.UBER_INSTANT}) {
                 assertThat(resolver.resolve(m.value()).fulfillmentMode())
                         .as("配送方式 " + m.value())
                         .isEqualTo(FulfillmentMode.PLATFORM_LOGISTICS.value());

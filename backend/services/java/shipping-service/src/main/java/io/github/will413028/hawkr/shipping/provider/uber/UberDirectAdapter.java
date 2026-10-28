@@ -459,7 +459,7 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
              * 🔴 回 {@code null}：Uber <b>沒有建店槽位</b>。
              *
              * <p>{@code ShippingType} 的值域是 {@code CVS_C2C}／{@code HOME_DELIVERY}／
-             * {@code CVS_B2C}／{@code MERCHANT_DELIVERY}，沒有 Uber 的格子，
+             * {@code MERCHANT_DELIVERY}，沒有 Uber 的格子，
              * 而 {@code OnboardingService.mapShippingMethodToType} 對 null 的處理
              * （{@code Optional.map} ⇒ empty ⇒ {@code orElse(null)}）正是我們要的：
              * 建單不去查 {@code seller_shipment_settings}。

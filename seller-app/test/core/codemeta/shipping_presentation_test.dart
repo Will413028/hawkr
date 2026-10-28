@@ -28,8 +28,8 @@ void main() {
       );
     });
 
-    test('3003 / 3004 / 3005 → unsupported（不得落到黑貓或 7-11）', () {
-      for (final value in const ['3003', '3004', '3005']) {
+    test('3003 / 3005 → unsupported（不得落到黑貓或 7-11）', () {
+      for (final value in const ['3003', '3005']) {
         expect(
           shippingPresentationOf(value),
           ShippingPresentation.unsupported,

@@ -583,7 +583,9 @@ class LogisticsReconciliationServiceTest {
         @DisplayName("🔴 provider 必須是 ShippingMethod 的 value —— 直接 parse 會讓任何數字通過")
         void providerMustBeAKnownShippingMethod() {
             assertEquals(3003L, LogisticsReconciliationService.providerRefId("3003"));
-            assertEquals(3004L, LogisticsReconciliationService.providerRefId("3004"));
+            assertEquals(3005L, LogisticsReconciliationService.providerRefId("3005"));
+            assertThrows(IllegalArgumentException.class,
+                    () -> LogisticsReconciliationService.providerRefId("3004"));
             assertThrows(IllegalArgumentException.class,
                     () -> LogisticsReconciliationService.providerRefId("9999"));
             assertThrows(IllegalArgumentException.class,

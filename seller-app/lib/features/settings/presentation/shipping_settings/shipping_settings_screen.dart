@@ -158,7 +158,7 @@ class ShippingSettingsScreen extends HookConsumerWidget {
             if (isShippingRowToggleable(o)) cvsToggleable = true;
           } else {
             // 🔴 本畫面只有「黑貓宅配」「7-11 店到店」兩張硬編卡片，
-            // 其餘 ShippingType（3653 超商大宗寄倉 / 3654 商家自送 / 後端新增值）
+            // 其餘 ShippingType（3654 商家自送 / 後端新增值）
             // 沒有對應的區塊可以承載 —— 原本是**靜默忽略**（既不顯示也不報錯），
             // 這裡至少讓它在 log 留痕。
             // 真正的修法是 registry + slot，本波不做。

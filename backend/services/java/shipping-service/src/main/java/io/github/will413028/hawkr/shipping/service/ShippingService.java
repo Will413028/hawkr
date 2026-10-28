@@ -160,7 +160,7 @@ public class ShippingService {
      * 於是每個 pod 生命週期內的第一筆會靜默，而「第一筆」正是最需要被看到的那一筆。
      * 展開 0 之後，0→1 是真的 increase。
      *
-     * <p>基數：5 個配送方式 × 1 = 5 條恆存在的序列，遠低於 invoice 先例刻意避開的「數百條」。
+     * <p>基數：4 個配送方式 × 1 = 4 條恆存在的序列，遠低於 invoice 先例刻意避開的「數百條」。
      * {@code source} 與 {@code outcome} 刻意<b>不</b>放進 label——它們在 WARN log 裡，
      * 而告警需要的只是「哪條產品線開始出現看不懂的貨態」。
      */
@@ -168,7 +168,6 @@ public class ShippingService {
             ShippingMethod.TAQBIN.value(),
             ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value(),
             ShippingMethod.UBER_INSTANT.value(),
-            ShippingMethod.SEVEN_ELEVEN_BULK_WAREHOUSE.value(),
             ShippingMethod.MERCHANT_DELIVERY.value());
 
     private final io.micrometer.core.instrument.MeterRegistry meterRegistry;

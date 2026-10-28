@@ -28,16 +28,12 @@ describe("unsupportedOnboardingTypes", () => {
 		).toEqual([]);
 	});
 
-	it("[禁 fallback] 3653 大宗寄倉 / 3654 商家自送不得被靜默吃掉", () => {
+	it("[禁 fallback] 3654 商家自送不得被靜默吃掉", () => {
 		const found = unsupportedOnboardingTypes([
 			row(SHIPPING_TYPE.CVS),
-			row(ShippingType.CVS_B2C),
 			row(ShippingType.MERCHANT_DELIVERY),
 		]);
-		expect(found).toEqual([
-			ShippingType.CVS_B2C,
-			ShippingType.MERCHANT_DELIVERY,
-		]);
+		expect(found).toEqual([ShippingType.MERCHANT_DELIVERY]);
 	});
 
 	it("後端未來新增的任何值同樣會被說出來；重複只算一次", () => {

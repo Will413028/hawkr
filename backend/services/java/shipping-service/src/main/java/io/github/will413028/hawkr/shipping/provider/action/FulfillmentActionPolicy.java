@@ -28,10 +28,10 @@ import java.util.Set;
  * <p>🔴 <b>把 {@code Optional.empty()} 直接接到「按鈕不可用」是本模型要防的頭號錯誤</b>：
  * 四個 provider 中只有 Uber 有真正的 cancel API，其餘三條線的取消都是
  * {@code requiresProviderCall = false} 的 domain action（寫 {@code 992} 或本地終態）。
- * 直接接的話，7-11 大宗寄倉與商家自送的取消按鈕會<b>整條消失</b>，而那是使用者最常按的按鈕之一。
+ * 直接接的話，7-11 店到店與商家自送的取消按鈕會<b>整條消失</b>，而那是使用者最常按的按鈕之一。
  *
  * <p>⚠️ 宣告<b>逐 provider 可覆寫</b>：{@code cancel} 對 Uber 是 {@code true}、
- * 對超商與自送 L0 是 {@code false}。這是 action 的屬性隨 provider 變動，不是兩個不同的 action
+ * 對超商與商家自送是 {@code false}。這是 action 的屬性隨 provider 變動，不是兩個不同的 action
  * ——這也是為什麼設計把 {@code cancel_request} 併回 {@code cancel}：
  * 同一個領域動作，差別只在這個布林。
  */
@@ -45,7 +45,7 @@ public final class FulfillmentActionPolicy {
      */
     private static final Set<FulfillmentAction> DEFAULT_REQUIRES_PROVIDER_CALL = Set.of(
             FulfillmentAction.DISPATCH,        // 派車／叫件：不打 provider 就沒有司機
-            FulfillmentAction.CANCEL,          // 預設要打；超商與自送 L0 由 OVERRIDES 改成 false
+            FulfillmentAction.CANCEL,          // 預設要打；超商與商家自送由 OVERRIDES 改成 false
             FulfillmentAction.PRINT_LABEL,     // 標籤由 provider 產生
             FulfillmentAction.REPRINT_LABEL,
             FulfillmentAction.TRACK,           // 主動回查
@@ -57,10 +57,7 @@ public final class FulfillmentActionPolicy {
     );
 
     // ⚠️ 刻意**不在**上面集合裡的，逐群寫下理由（免得下一個人以為是漏的）：
-    //   handover                                   ── B2C 交倉／自送出發只寫我方狀態，provider 端沒有交倉 API
-    //   assign_batch/remove_from_batch/scan_bind/close_batch ── 批次編排是我方 domain model，provider 端無對應物
-    //   report_progress/report_delivered/report_exception    ── 賣家自送的回報，provider 就是賣家自己
-    //   upload_pod                                 ── 賣家上傳，不是向 provider 取
+    //   handover                                   ── 賣家確認出貨只寫我方狀態，provider 端沒有對應 API
     //   seller_pickup / reselect_store             ── 我方狀態轉換；門市重選的 provider 側同步走取消重建
     //   open_case / claim / admin_resolve / admin_close_case ── ADM 的案件流程，與 provider 無關
     //   view_only                                  ── 兜底值，本來就不打任何東西
@@ -78,7 +75,6 @@ public final class FulfillmentActionPolicy {
             //    其餘三條線寫 992 CANCEL_PENDING 或本地終態，由回調／人工補上 provider 側確認。
             //    ⚠️ 這幾格漏掉的後果不是「多打一次 API」，是那些取消按鈕被 capability 的 empty 整條 gate 掉。
             Map.entry(FulfillmentAction.CANCEL.value() + "@" + ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value(), false),
-            Map.entry(FulfillmentAction.CANCEL.value() + "@" + ShippingMethod.SEVEN_ELEVEN_BULK_WAREHOUSE.value(), false),
             Map.entry(FulfillmentAction.CANCEL.value() + "@" + ShippingMethod.MERCHANT_DELIVERY.value(), false),
             Map.entry(FulfillmentAction.CANCEL.value() + "@" + ShippingMethod.TAQBIN.value(), false),
 
@@ -139,7 +135,6 @@ public final class FulfillmentActionPolicy {
             Map.entry(FulfillmentAction.ARRANGE_RETURN, SELLER_ONLY),
             Map.entry(FulfillmentAction.UPDATE, SELLER_ONLY),
             Map.entry(FulfillmentAction.RESUBMIT, SELLER_ONLY),
-            Map.entry(FulfillmentAction.UPLOAD_POD, SELLER_ONLY),
             // 唯讀動作：買賣雙方都有，各自指向自己的端點（買家 B-1 / 賣家 S-9）
             Map.entry(FulfillmentAction.TRACK, BUYER_AND_SELLER),
             Map.entry(FulfillmentAction.VIEW_ONLY, BUYER_AND_SELLER),

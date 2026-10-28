@@ -172,18 +172,17 @@ class AllowedActionResolverTest {
         @DisplayName("Uber（capability 幾乎全 empty）：handover／view_only 照樣可用")
         void actionsWithoutProviderCallSurviveEmptyCapabilities() {
             ShipmentEntity e = cvs(ShippingStatus.UNPROCESSED, LabelPrintStatus.SUCCEEDED);
-            // 🔴 用 3004（7-11 大宗寄倉）而不是 3003（Uber）：
-            //    設計書 §4.4.1a 的例子就是 68 的 handover（交倉寫 930，provider 端無 API），
-            //    而 66 的 Uber 交付確認走 POD、不走賣家確認出貨
+            // 🔴 用 3005（商家自行配送）而不是 3003（Uber）：
+            //    Uber 的交付確認走 POD、不走賣家確認出貨
             //    ⇒ handover@3003 已明列為「這條線上不存在這個動作」。
             //    本測試要守的是「requiresProviderCall=false 不受 capability 為 empty 影響」，
-            //    3004 同樣沒有註冊 adapter，論證力相同而不與那條明列衝突。
-            e.setShippingMethod(ShippingMethod.SEVEN_ELEVEN_BULK_WAREHOUSE.value());
+            //    3005 沒有註冊 adapter，論證力相同而不與那條明列衝突。
+            e.setShippingMethod(ShippingMethod.MERCHANT_DELIVERY.value());
 
             Map<String, ActionAvailability> actions = resolve(e);
 
             assertThat(FulfillmentActionPolicy.requiresProviderCall(
-                    FulfillmentAction.HANDOVER, ShippingMethod.SEVEN_ELEVEN_BULK_WAREHOUSE))
+                    FulfillmentAction.HANDOVER, ShippingMethod.MERCHANT_DELIVERY))
                     .as("前提：handover 本來就不需要打 provider")
                     .isFalse();
             assertThat(actions.get(FulfillmentAction.HANDOVER.value()).enabled())
@@ -201,13 +200,13 @@ class AllowedActionResolverTest {
          * <ul>
          *   <li>{@code print_label@3003}：{@code label()} 是<b>永久</b> empty
          *       （即時配送無標籤概念）——這一格不會隨施工波次改變</li>
-         *   <li>{@code track@3004}：7-11 大宗寄倉<b>沒有註冊 adapter</b>
+         *   <li>{@code print_label@3005}：商家自行配送<b>沒有註冊 adapter</b>
          *       ⇒ {@code hasCapabilityFor} 走「查無 adapter」那一支。
          *       少了它，把 {@code adapter.isEmpty()} 改成 {@code return true} 也會綠</li>
          * </ul>
          */
         @Test
-        @DisplayName("capability 閘門還在：print_label@3003（永久 empty）與 track@3004（無 adapter）")
+        @DisplayName("capability 閘門還在：print_label@3003（永久 empty）與 print_label@3005（無 adapter）")
         void actionsRequiringProviderCallAreGated() {
             // ⚠️ labelPrintStatus 刻意用 NONE：SUCCEEDED 會先撞上狀態閘門的
             //    「已取號且不支援重印 ⇒ 5003」而根本走不到 capability 閘門
@@ -222,14 +221,14 @@ class AllowedActionResolverTest {
             assertThat(printLabel.disabledReasonCode())
                     .isEqualTo(GrpcResponseCode.FULFILLMENT_PROVIDER_NOT_ENABLED.code());
 
-            ShipmentEntity bulk = cvs(ShippingStatus.UNPROCESSED, LabelPrintStatus.SUCCEEDED);
-            bulk.setShippingMethod(ShippingMethod.SEVEN_ELEVEN_BULK_WAREHOUSE.value());
+            ShipmentEntity merchant = cvs(ShippingStatus.UNPROCESSED, LabelPrintStatus.NONE);
+            merchant.setShippingMethod(ShippingMethod.MERCHANT_DELIVERY.value());
 
-            ActionAvailability track = resolve(bulk).get(FulfillmentAction.TRACK.value());
-            assertThat(track.enabled())
-                    .as("3004 沒有註冊 adapter ⇒ 需要打 provider 的動作一律不可用")
+            ActionAvailability merchantLabel = resolve(merchant).get(FulfillmentAction.PRINT_LABEL.value());
+            assertThat(merchantLabel.enabled())
+                    .as("3005 沒有註冊 adapter ⇒ 需要打 provider 的動作一律不可用")
                     .isFalse();
-            assertThat(track.disabledReasonCode())
+            assertThat(merchantLabel.disabledReasonCode())
                     .isEqualTo(GrpcResponseCode.FULFILLMENT_PROVIDER_NOT_ENABLED.code());
         }
 

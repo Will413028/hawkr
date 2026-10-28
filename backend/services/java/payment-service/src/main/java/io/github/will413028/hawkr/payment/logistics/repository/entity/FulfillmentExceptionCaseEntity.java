@@ -101,7 +101,7 @@ public class FulfillmentExceptionCaseEntity {
     private Long shipmentId;
 
     /**
-     * 🔴 Immutable event context（V14）。ShippingMethod 碼值（{@code '3003'}／{@code '3004'}），
+     * 🔴 Immutable event context（V14）。ShippingMethod 碼值（{@code '3003'}），
      * 與 {@code logistics_receivables.provider} <b>同一個碼域</b>、不同欄名——
      * 本欄存在的唯一理由是餵 N16／N17 的 {@code shipping_method}（36 §3.3.1 的 wire key）。
      * <p>🔴 責任判定案件必填（{@code chk_exc_responsibility_context}）。

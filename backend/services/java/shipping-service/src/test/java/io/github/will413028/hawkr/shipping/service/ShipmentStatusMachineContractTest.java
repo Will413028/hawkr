@@ -202,30 +202,6 @@ class ShipmentStatusMachineContractTest {
         }
 
         @Test
-        @DisplayName("3004 超商 B2C：91 → 92 → 98 → 920 → 930 → 931 → 31 → 32 → 11")
-        void cvsB2cChain() {
-            assertChainReachable("3004 超商 B2C", List.of(
-                    ShippingStatus.UNPROCESSED,
-                    ShippingStatus.PROCESSING,
-                    ShippingStatus.PROCESSING_ACCEPTED,
-                    ShippingStatus.CVS_CODE_RECEIVED,
-                    ShippingStatus.HANDED_OVER,
-                    ShippingStatus.DC_ACCEPTED,
-                    ShippingStatus.IN_TRANSIT,
-                    ShippingStatus.WAITING_PICKUP,
-                    ShippingStatus.PICKED_UP));
-        }
-
-        @Test
-        @DisplayName("3004 驗退分支：930 → 932 → 53")
-        void cvsB2cRejectedChain() {
-            assertChainReachable("3004 驗退", List.of(
-                    ShippingStatus.HANDED_OVER,
-                    ShippingStatus.DC_REJECTED,
-                    ShippingStatus.RETURN_TO_WAREHOUSE));
-        }
-
-        @Test
         @DisplayName("3003 Uber 即時：91 → 933 → 930 → 31 → 11")
         void uberChain() {
             assertChainReachable("3003 Uber", List.of(
@@ -321,7 +297,7 @@ class ShipmentStatusMachineContractTest {
         @Test
         @DisplayName("三位數是平台自訂值，PayUni 永遠不會回傳 ⇒ 不在映射表內")
         void platformOwnCodesAreNotProviderCodes() {
-            for (String platformCode : List.of("210", "920", "921", "930", "931", "932", "933", "990", "991", "992", "993")) {
+            for (String platformCode : List.of("210", "920", "921", "930", "933", "990", "991", "992", "993")) {
                 assertNull(mapper.mapPayUniStatus(platformCode),
                         () -> "平台自訂碼 " + platformCode + " 不該被當成 PayUni 原生碼接受——"
                                 + "收進來會讓「provider 回了一個它不可能回的值」變成合法輸入");

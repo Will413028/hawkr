@@ -14,8 +14,7 @@ public enum ShippingType implements CodeMeta {
 
     CVS_C2C("CVS_C2C", "3651", "超商店到店", "超商 C2C 取貨流程"),
     HOME_DELIVERY("HOME_DELIVERY", "3652", "宅配到府", "宅配 / 黑貓等到府配送"),
-    CVS_B2C("CVS_B2C", "3653", "超商大宗寄倉", "超商 B2C 批次交寄流程。**必須與 3651 分開**：`OnboardingService.buildSlotKey(shippingType, goodsType)` 以本值當鍵，共用 3651 會與 C2C 兩槽撞號，而 `Collectors.toMap` 的 `(a,b)->a` 會靜默取到 C2C 的設定"),
-    MERCHANT_DELIVERY("MERCHANT_DELIVERY", "3654", "商家自送", "商家自有配送流程。**不加則 3005 一單都建不出來**：`mapShippingMethodToType` 對 3005 回 null ⇒ `findActiveSetting` 兩處的 `if (shippingType == null) return null` 讓建單永遠取不到設定");
+    MERCHANT_DELIVERY("MERCHANT_DELIVERY", "3654", "商家自送", "商家自有配送流程，對應運送方式 3005（RFQ 訂單的站外業者自行出貨）");
 
     private final String code;
     private final String value;

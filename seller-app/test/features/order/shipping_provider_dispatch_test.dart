@@ -10,7 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// 鑑別力來源：**未知 `shippingMethod` 不得被畫成超商段**。把
 /// `OrderExpandedSection._buildInfoContent` 改回 `if (!isTaqbin) 超商段`，
-/// 下面「3003/3004/3005/未知不得出現出貨便代碼」那幾條會立刻轉紅。
+/// 下面「3003/3005/未知不得出現出貨便代碼」那幾條會立刻轉紅。
 OrderSummary _order(String shippingMethod) => OrderSummary(
   id: 'O-TEST-1',
   orderSn: 'O-TEST-1',
@@ -58,7 +58,7 @@ void main() {
       expect(find.textContaining('出貨便代碼'), findsOneWidget);
     });
 
-    for (final unknown in const ['3003', '3004', '3005', '', '9999']) {
+    for (final unknown in const ['3003', '3005', '', '9999']) {
       testWidgets(
         'shippingMethod=${unknown.isEmpty ? "(空)" : unknown} → 不得走超商段',
         (tester) async {
@@ -117,7 +117,7 @@ void main() {
     test('只有 3001 / 3002 有專屬出貨 UI', () {
       expect(shippingPresentationOf('3001').isSupported, isTrue);
       expect(shippingPresentationOf('3002').isSupported, isTrue);
-      for (final v in const ['3003', '3004', '3005', '', '9999']) {
+      for (final v in const ['3003', '3005', '', '9999']) {
         expect(shippingPresentationOf(v).isSupported, isFalse);
       }
     });

@@ -1389,14 +1389,14 @@ class ResponsibilityCaseFinalityIntegrationTest {
 
             // 繞過應用層直接改那一列（模擬「case row 才是權威」）
             jdbc.update("UPDATE fulfillment_exception_cases SET order_no = ?, shipping_method = ?"
-                    + " WHERE id = ?", "O-REWRITTEN", "3004", opened.caseId());
+                    + " WHERE id = ?", "O-REWRITTEN", "3002", opened.caseId());
 
             service.finalizeResponsibility(finalizeCmd(opened.caseId(), r1), FULL_REFUND);
 
             String rk = "fulfillment.responsibility.finalized";
             assertEquals("O-REWRITTEN", payloadFieldOf(rk, "order_no"),
                     "🔴 N16 的 order_no 不是取自 case row ⇒ 呼叫端仍有機會讓它與 N17 漂開");
-            assertEquals("3004", payloadFieldOf(rk, "shipping_method"),
+            assertEquals("3002", payloadFieldOf(rk, "shipping_method"),
                     "🔴 N16 的 shipping_method 不是取自 case row");
         }
 

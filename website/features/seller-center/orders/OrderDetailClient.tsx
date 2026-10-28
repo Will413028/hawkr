@@ -272,7 +272,7 @@ export default function OrderDetailClient({
 	}, [pruneExpiredShipmentOperations, shipmentOperationExpiryAt]);
 
 	// 配送方式原碼。**不再算 isTaqbin 這個布林** —— 它只答得出「是不是黑貓」，
-	// 而畫面拿它當二分法用（不是黑貓就當 7-11），3003／3004／3005 全被畫成 7-11。
+	// 而畫面拿它當二分法用（不是黑貓就當 7-11），3003／3005 全被畫成 7-11。
 	const shippingMethod = order?.shipping?.method ?? "";
 
 	/* ===== Action handlers ===== */
@@ -1202,7 +1202,7 @@ function LogisticsTracking({
 	const [error, setError] = useResettableError(shipTradeNo);
 
 	// 🔴 認不得的配送方式回 null。舊寫法 `isTaqbin ? HOME : C2C`
-	// 讓 3003／3004／3005 走 7-11 的進度表 —— 型別對、不拋例外、只有進度條是錯的。
+	// 讓 3003／3005 走 7-11 的進度表 —— 型別對、不拋例外、只有進度條是錯的。
 	const lgsType = lgsTypeForShippingMethod(method);
 
 	const fetchInfo = React.useCallback(async () => {

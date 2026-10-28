@@ -31,11 +31,11 @@ class OrderPolicyResolverTest {
 
     private final OrderPolicyResolver resolver = new OrderPolicyResolver();
 
-    // ===== 履約模式：逐一列舉 ShippingMethod 的全部五個值 =====
+    // ===== 履約模式：逐一列舉 ShippingMethod 的全部四個值 =====
 
     @ParameterizedTest(name = "shipping_method={0} → PLATFORM_LOGISTICS")
-    @ValueSource(strings = {"3001", "3002", "3003", "3004"})
-    @DisplayName("平台物流白名單四碼（黑貓／7-11店到店／Uber／7-11大宗寄倉）→ PLATFORM_LOGISTICS")
+    @ValueSource(strings = {"3001", "3002", "3003"})
+    @DisplayName("平台物流白名單三碼（黑貓／7-11店到店／Uber）→ PLATFORM_LOGISTICS")
     void platformLogisticsMethods(String shippingMethod) {
         assertThat(resolver.resolve(shippingMethod).fulfillmentMode()).isEqualTo("PLATFORM_LOGISTICS");
     }
@@ -58,7 +58,7 @@ class OrderPolicyResolverTest {
     }
 
     @ParameterizedTest(name = "值域外 shipping_method={0} → 拋 9504")
-    @ValueSource(strings = {"3006", "9999", "", "3001 ", "TAQBIN", "3003.0"})
+    @ValueSource(strings = {"3004", "3006", "9999", "", "3001 ", "TAQBIN", "3003.0"})
     @DisplayName("值域外一律 fail-closed 拋 9504——「看不懂的配送方式」不得被記成平台履約")
     void unknownShippingMethodThrows9504(String shippingMethod) {
         OrderBusinessException ex = catchThrowableOfType(
@@ -77,7 +77,7 @@ class OrderPolicyResolverTest {
     // ===== 其餘五欄：本波恆定值 =====
 
     @ParameterizedTest(name = "shipping_method={0} 的其餘五欄")
-    @ValueSource(strings = {"3001", "3002", "3003", "3004", "3005"})
+    @ValueSource(strings = {"3001", "3002", "3003", "3005"})
     @DisplayName("商流／收款／發票／政策版本／代銷附約五欄與配送方式無關，本波恆定")
     void nonFulfillmentColumnsAreConstantThisWave(String shippingMethod) {
         OrderPolicySnapshot snapshot = resolver.resolve(shippingMethod);

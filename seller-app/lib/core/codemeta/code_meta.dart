@@ -588,19 +588,15 @@ enum ShippingStatus {
   sellerConfirmed(code: 'SELLER_CONFIRMED', value: '921', label: '賣家確認出貨'),
   /// 建單失敗 — 建單重試後**確定**失敗（provider_status/message 落地供 Admin 閉環）。出口：Admin 重建→91／Admin 取消→41
   createFailed(code: 'CREATE_FAILED', value: '990', label: '建單失敗'),
-  /// 已交運 — 已交運：B2C 司機交接／自送出發／Uber 取件完成。適用 3003／3004／3005
+  /// 已交運 — 已交運：Uber 取件完成。適用 3003
   handedOver(code: 'HANDED_OVER', value: '930', label: '已交運'),
-  /// 物流中心已驗收 — 物流中心驗收通過，才算真的進倉。適用 3004；批次聚合讀它（單向，不得反推個件）
-  dcAccepted(code: 'DC_ACCEPTED', value: '931', label: '物流中心已驗收'),
-  /// 物流中心驗退 — 物流中心驗退，保存原因／照片 ref／責任方／費用。適用 3004
-  dcRejected(code: 'DC_REJECTED', value: '932', label: '物流中心驗退'),
   /// 已指派外送員 — 已指派外送員、前往取件（對應 Uber 狀態值 pickup）。適用 3003
   courierAssigned(code: 'COURIER_ASSIGNED', value: '933', label: '已指派外送員'),
   /// 建單結果未知 — 建單呼叫逾時或非確定性錯誤——**不是失敗**。由回查排程收斂：查到成功→91／查到失敗→990／超出回查窗仍未知→41＋人工
   createUnknown(code: 'CREATE_UNKNOWN', value: '991', label: '建單結果未知'),
-  /// 取消處理中 — 取消申請已受理，待 provider 確認。適用 3002／3003／3004／3005（限 L1／L2）。**唯一允許回退到非終態的狀態**
+  /// 取消處理中 — 取消申請已受理，待 provider 確認。適用 3002／3003／3005。**唯一允許回退到非終態的狀態**
   cancelPending(code: 'CANCEL_PENDING', value: '992', label: '取消處理中'),
-  /// 理賠受理中 — 理賠受理中（遺失／毀損／驗退爭議）。適用 3001／3002／3004。case 關閉：成立→43／不成立→33 或原異常值
+  /// 理賠受理中 — 理賠受理中（遺失／毀損爭議）。適用 3001／3002。case 關閉：成立→43／不成立→33 或原異常值
   claimPending(code: 'CLAIM_PENDING', value: '993', label: '理賠受理中');
 
   const ShippingStatus({
@@ -2512,9 +2508,7 @@ enum ShippingMethod {
   sevenElevenStorePickup(code: 'SEVEN_ELEVEN_STORE_PICKUP', value: '3002', label: '7-11店到店'),
   /// Uber 即時配送 — 即時外送到府
   uberInstant(code: 'UBER_INSTANT', value: '3003', label: 'Uber 即時配送'),
-  /// 7-11大宗寄倉 — 賣家批次交寄至指定物流中心，買家至門市取貨（B2C）。與 3002 走同一組 PayUni 端點，差別在 LgsType
-  sevenElevenBulkWarehouse(code: 'SEVEN_ELEVEN_BULK_WAREHOUSE', value: '3004', label: '7-11大宗寄倉'),
-  /// 商家自行配送 — 賣家自有車隊或承運商配送，無外部 provider API
+  /// 商家自行配送 — RFQ 訂單的站外業者自行出貨，平台不安排物流，無外部 provider API
   merchantDelivery(code: 'MERCHANT_DELIVERY', value: '3005', label: '商家自行配送');
 
   const ShippingMethod({
@@ -2550,9 +2544,7 @@ enum ShippingType {
   cvsC2c(code: 'CVS_C2C', value: '3651', label: '超商店到店'),
   /// 宅配到府 — 宅配 / 黑貓等到府配送
   homeDelivery(code: 'HOME_DELIVERY', value: '3652', label: '宅配到府'),
-  /// 超商大宗寄倉 — 超商 B2C 批次交寄流程。**必須與 3651 分開**：`OnboardingService.buildSlotKey(shippingType, goodsType)` 以本值當鍵，共用 3651 會與 C2C 兩槽撞號，而 `Collectors.toMap` 的 `(a,b)->a` 會靜默取到 C2C 的設定
-  cvsB2c(code: 'CVS_B2C', value: '3653', label: '超商大宗寄倉'),
-  /// 商家自送 — 商家自有配送流程。**不加則 3005 一單都建不出來**：`mapShippingMethodToType` 對 3005 回 null ⇒ `findActiveSetting` 兩處的 `if (shippingType == null) return null` 讓建單永遠取不到設定
+  /// 商家自送 — 商家自有配送流程，對應運送方式 3005（RFQ 訂單的站外業者自行出貨）
   merchantDelivery(code: 'MERCHANT_DELIVERY', value: '3654', label: '商家自送');
 
   const ShippingType({
@@ -4688,7 +4680,7 @@ enum ProductCertificationRejectReason {
   }
 }
 
-/// 商流模式——**這筆錢誰收、誰開票**，決定整條帳務軸。訂單快照六欄之一：付款後鎖定，改政策不得回溯既有訂單。取**短名**（不把 provider 綁進商流維度），與 `provider` 維度正交。🔴 **本值域是三條商流帳務軸互斥的分界線**，65 定版、66／68／69 只引用。
+/// 商流模式——**這筆錢誰收、誰開票**，決定整條帳務軸。訂單快照六欄之一：付款後鎖定，改政策不得回溯既有訂單。取**短名**（不把 provider 綁進商流維度），與 `provider` 維度正交。🔴 **本值域是三條商流帳務軸互斥的分界線**，65 定版、66 只引用。
 enum CommerceModel {
   /// 賣家直營 — 賣家為收款主體與開票人。**既有全部訂單皆為本值**（merId = 'HAWK' ‖ store_id）。撥款資格述詞對本值回 NOT_APPLICABLE——不是「不合格」，是不在撥款軸上
   sellerDirect(code: 'SELLER_DIRECT', value: 'SELLER_DIRECT', label: '賣家直營'),
@@ -4764,7 +4756,7 @@ enum CollectionModel {
 enum FulfillmentMode {
   /// 賣家自行履約 — 賣家自己出貨或自行配送。3005 必然落在本值
   sellerManaged(code: 'SELLER_MANAGED', value: 'SELLER_MANAGED', label: '賣家自行履約'),
-  /// 平台物流履約 — 由平台安排的物流通道履約（3001／3002／3003／3004）
+  /// 平台物流履約 — 由平台安排的物流通道履約（3001／3002／3003）
   platformLogistics(code: 'PLATFORM_LOGISTICS', value: 'PLATFORM_LOGISTICS', label: '平台物流履約');
 
   const FulfillmentMode({
@@ -4828,11 +4820,11 @@ enum InvoiceModel {
   }
 }
 
-/// **配送／履約軸**的領域動作值域，27 值。🔴 **fail-closed**：表上沒列的 action 一律不可用，前端只准 fallback 到 `view_only`，**不得自行猜測或退化成其他動作**。🔴 **與 provider capability 是兩層**：capability 回答「這個 provider 的 API 有沒有這個能力」，本 enum 的動作回答「這顆按鈕現在能不能按」；銜接兩層的是每個 action 自己宣告的 `requiresProviderCall`（且逐 provider 可覆寫）——`requiresProviderCall=false` 的動作（如 3004 的 handover／cancel、3005 L0 的取消）**不因 capability 為 empty 而消失**。URL 一律走 `allowedActions[].href`，前端不得自行組路徑。
+/// **配送／履約軸**的領域動作值域，19 值。🔴 **fail-closed**：表上沒列的 action 一律不可用，前端只准 fallback 到 `view_only`，**不得自行猜測或退化成其他動作**。🔴 **與 provider capability 是兩層**：capability 回答「這個 provider 的 API 有沒有這個能力」，本 enum 的動作回答「這顆按鈕現在能不能按」；銜接兩層的是每個 action 自己宣告的 `requiresProviderCall`（且逐 provider 可覆寫）——`requiresProviderCall=false` 的動作（如 handover，以及 3002／3005 的 cancel）**不因 capability 為 empty 而消失**。URL 一律走 `allowedActions[].href`，前端不得自行組路徑。
 enum FulfillmentAction {
   /// 派車／叫件 — 配送推進群。3001 黑貓叫件、3003 Uber 建單即派車
   dispatch(code: 'DISPATCH', value: 'dispatch', label: '派車／叫件'),
-  /// 回報交運 — 配送推進群。B2C 交倉／自送出發，`requiresProviderCall=false`
+  /// 回報交運 — 配送推進群。賣家確認出貨，`requiresProviderCall=false`
   handover(code: 'HANDOVER', value: 'handover', label: '回報交運'),
   /// 取消配送單 — 配送推進群。🔴 四個 provider 中只有 3003 的 `requiresProviderCall=true`；其餘寫 992 或本地終態。
   cancel(code: 'CANCEL', value: 'cancel', label: '取消配送單'),
@@ -4840,32 +4832,16 @@ enum FulfillmentAction {
   resubmit(code: 'RESUBMIT', value: 'resubmit', label: '重新建單'),
   /// 修改配送資料 — 配送推進群。⚠️ 在 provider 的 update 契約到位前**恆 disabled**
   update(code: 'UPDATE', value: 'update', label: '修改配送資料'),
-  /// 列印標籤 — 標籤群。3004 為批次型（單批上限與分組鍵由 capability 攜帶，呼叫端不得寫死數字）
+  /// 列印標籤 — 標籤群
   printLabel(code: 'PRINT_LABEL', value: 'print_label', label: '列印標籤'),
   /// 重印標籤 — 標籤群。🔴 不得整批重印
   reprintLabel(code: 'REPRINT_LABEL', value: 'reprint_label', label: '重印標籤'),
-  /// 加入批次 — 批次群（3004）。provider 端無對應 API，`requiresProviderCall` 恆 false
-  assignBatch(code: 'ASSIGN_BATCH', value: 'assign_batch', label: '加入批次'),
-  /// 移出批次 — 批次群。同上
-  removeFromBatch(code: 'REMOVE_FROM_BATCH', value: 'remove_from_batch', label: '移出批次'),
-  /// 掃描綁定 — 批次群。同上
-  scanBind(code: 'SCAN_BIND', value: 'scan_bind', label: '掃描綁定'),
-  /// 封箱關批 — 批次群。同上
-  closeBatch(code: 'CLOSE_BATCH', value: 'close_batch', label: '封箱關批'),
   /// 查詢物流狀態 — 追蹤與證明群
   track(code: 'TRACK', value: 'track', label: '查詢物流狀態'),
   /// 檢視送達證明 — 追蹤與證明群。⚠️ 全值域統一 snake_case，不使用 camelCase
   viewPod(code: 'VIEW_POD', value: 'view_pod', label: '檢視送達證明'),
-  /// 上傳送達證明 — 追蹤與證明群。3005 L0 由賣家上傳
-  uploadPod(code: 'UPLOAD_POD', value: 'upload_pod', label: '上傳送達證明'),
   /// 重新查詢 — 追蹤與證明群。主動向 provider 回查
   requery(code: 'REQUERY', value: 'requery', label: '重新查詢'),
-  /// 回報配送進度 — 賣家回報群（3005 三級共用），`requiresProviderCall` 恆 false
-  reportProgress(code: 'REPORT_PROGRESS', value: 'report_progress', label: '回報配送進度'),
-  /// 回報已送達 — 賣家回報群。同上
-  reportDelivered(code: 'REPORT_DELIVERED', value: 'report_delivered', label: '回報已送達'),
-  /// 回報配送異常 — 賣家回報群。同上
-  reportException(code: 'REPORT_EXCEPTION', value: 'report_exception', label: '回報配送異常'),
   /// 安排退貨物流 — 逆向與門市群
   arrangeReturn(code: 'ARRANGE_RETURN', value: 'arrange_return', label: '安排退貨物流'),
   /// 接受退貨 — 逆向與門市群。🔴 冷凍逆向（3203）一律移除本動作

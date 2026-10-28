@@ -263,7 +263,7 @@ const ACTION_TONE: Record<ShipmentAction["kind"], "primary" | "info"> = {
 };
 
 // 🔴 批次列只收「真的按得下去」的動作。`unsupported`（未知配送方式）不能進來——
-// 一旦進來，賣家可以把一批大宗寄倉／商家自送的訂單勾起來一次送超商取號。
+// 一旦進來，賣家可以把一批商家自送的訂單勾起來一次送超商取號。
 type BulkKind = RunnableShipmentActionKind;
 type RunBatchOptions = { skipPhoto?: boolean };
 

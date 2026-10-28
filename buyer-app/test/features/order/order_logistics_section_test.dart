@@ -70,14 +70,14 @@ void main() {
         orderSn: 'O3',
         status: '35',
         shipmentNo: 'SP002',
-        shippingMethod: '3004',
-        shippingStatus: '932',
+        shippingMethod: '3002',
+        shippingStatus: '55',
       ),
       body: _trackBody(
-        shippingMethod: '3004',
-        // 932 物流中心驗退：本波新增進 DeliveryStatusPresentation.abnormalValues。
-        status: '932',
-        statusLabel: '物流中心驗退',
+        shippingMethod: '3002',
+        // 55 賣家未取：在 DeliveryStatusPresentation.abnormalValues 內。
+        status: '55',
+        statusLabel: '賣家未取',
         providerMessage: '外包裝破損，退回物流中心',
       ),
     );

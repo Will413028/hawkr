@@ -15,8 +15,7 @@ public enum ShippingMethod implements CodeMeta {
     TAQBIN("TAQBIN", "3001", "黑貓宅急便", "宅配到府"),
     SEVEN_ELEVEN_STORE_PICKUP("SEVEN_ELEVEN_STORE_PICKUP", "3002", "7-11店到店", "超商門市取貨"),
     UBER_INSTANT("UBER_INSTANT", "3003", "Uber 即時配送", "即時外送到府"),
-    SEVEN_ELEVEN_BULK_WAREHOUSE("SEVEN_ELEVEN_BULK_WAREHOUSE", "3004", "7-11大宗寄倉", "賣家批次交寄至指定物流中心，買家至門市取貨（B2C）。與 3002 走同一組 PayUni 端點，差別在 LgsType"),
-    MERCHANT_DELIVERY("MERCHANT_DELIVERY", "3005", "商家自行配送", "賣家自有車隊或承運商配送，無外部 provider API");
+    MERCHANT_DELIVERY("MERCHANT_DELIVERY", "3005", "商家自行配送", "RFQ 訂單的站外業者自行出貨，平台不安排物流，無外部 provider API");
 
     private final String code;
     private final String value;

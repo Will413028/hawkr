@@ -100,7 +100,7 @@ extension LogisticsTrackX on LogisticsTrack {
   /// 3. 🔴 **原樣顯示碼值**——不是「配送中」這種猜測。
   ///    App 的 CodeMeta 是拷貝，後端新增狀態時它一定比較舊；
   ///    那時猜一個最接近的文案，等於對使用者陳述一件沒有發生的事。
-  ///    顯示 `狀態 931` 難看但誠實，而且客服搜得到。
+  ///    顯示 `狀態 999` 難看但誠實，而且客服搜得到。
   String get normalizedStatusLabel {
     if (statusLabel.isNotEmpty) return statusLabel;
     final known = ShippingStatus.fromValue(status);

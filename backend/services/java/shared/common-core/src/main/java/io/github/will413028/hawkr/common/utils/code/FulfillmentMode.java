@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 public enum FulfillmentMode implements CodeMeta {
 
     SELLER_MANAGED("SELLER_MANAGED", "SELLER_MANAGED", "賣家自行履約", "賣家自己出貨或自行配送。3005 必然落在本值"),
-    PLATFORM_LOGISTICS("PLATFORM_LOGISTICS", "PLATFORM_LOGISTICS", "平台物流履約", "由平台安排的物流通道履約（3001／3002／3003／3004）");
+    PLATFORM_LOGISTICS("PLATFORM_LOGISTICS", "PLATFORM_LOGISTICS", "平台物流履約", "由平台安排的物流通道履約（3001／3002／3003）");
 
     private final String code;
     private final String value;

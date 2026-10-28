@@ -1440,7 +1440,7 @@ message AdminLogisticsAdjustmentRecord {
 message ListProviderStatementsForAdminRequest {
   string page = 1;
   string page_size = 2;
-  // CodeMeta ShippingMethod value（'3003' / '3004'）。
+  // CodeMeta ShippingMethod value（'3003'）。
   string provider = 3;
   // 'YYYY-MM'。
   string statement_period = 4;

@@ -836,7 +836,7 @@ func (h *Holder) ListLogisticsAdjustmentsForAdmin(c *gin.Context) {
 // @Security     BearerAuth
 // @Param        page              query  string  false  "頁碼"  default(1)
 // @Param        page_size         query  string  false  "每頁筆數，最大 100"  default(20)
-// @Param        provider          query  string  false  "ShippingMethod value（3003 / 3004）"
+// @Param        provider          query  string  false  "ShippingMethod value（3003）"
 // @Param        statement_period  query  string  false  "帳單期別，格式 YYYY-MM"
 // @Param        unsettled_only    query  string  false  "只列仍有未比對或爭議明細者；合法值：true / false"  default(false)
 // @Success      200  {object}  object{code=int,message=string,data=AdminProviderStatementListResp}
@@ -876,7 +876,7 @@ func (h *Holder) ListProviderStatementsForAdmin(c *gin.Context) {
 // @Produce      json
 // @Security     BearerAuth
 // @Param        statement_no  path   string  true  "帳單編號（statement_ref）"
-// @Param        provider      query  string  true  "ShippingMethod value（3003 / 3004）"
+// @Param        provider      query  string  true  "ShippingMethod value（3003）"
 // @Success      200  {object}  object{code=int,message=string,data=AdminProviderStatementDetailResp}
 // @Failure      400  {object}  object{code=int,message=string}
 // @Failure      404  {object}  object{code=int,message=string}

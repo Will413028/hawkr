@@ -201,7 +201,7 @@ class UberCheckoutWiringTest {
     }
 
     @Test
-    @DisplayName("🔴 陰性：其餘三個平台物流碼（3002／3004／3005）都不被閘門擋")
+    @DisplayName("🔴 陰性：其餘兩個平台物流碼（3002／3005）都不被閘門擋")
     void lookupSingleOptionAllowsEveryOtherMethod() {
         for (ShippingMethod method : ShippingMethod.values()) {
             if (ShippingMethod.UBER_INSTANT == method) {

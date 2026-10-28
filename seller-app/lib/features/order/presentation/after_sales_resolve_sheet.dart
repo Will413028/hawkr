@@ -800,7 +800,7 @@ class _ReturnRefundDialogState extends State<_ReturnRefundDialog> {
     super.initState();
     final allowed = widget.allowedReturnShippingMethod;
     // 🔴 原本是 `allowed == 3002 ? 3002 : 3001` —— 後端指定了一個本 App 不支援的
-    // 退貨方式（3003/3004/3005 或任何新碼值）時會**預設選取黑貓並一鍵建出黑貓
+    // 退貨方式（3003/3005 或任何新碼值）時會**預設選取黑貓並一鍵建出黑貓
     // 逆物流單**。改為：只有兩個支援值才預選，其餘留空並由 build 擋住送出。
     final allowedPresentation = shippingPresentationOf(allowed);
     _shippingMethod = switch (allowedPresentation) {

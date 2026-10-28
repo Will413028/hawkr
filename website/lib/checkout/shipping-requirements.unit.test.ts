@@ -19,7 +19,6 @@ import { ShippingMethod } from "@/lib/codemeta/enums";
  */
 const NEW_PROVIDERS = [
 	ShippingMethod.UBER_INSTANT,
-	ShippingMethod.SEVEN_ELEVEN_BULK_WAREHOUSE,
 	ShippingMethod.MERCHANT_DELIVERY,
 ] as const;
 

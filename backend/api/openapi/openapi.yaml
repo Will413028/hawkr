@@ -5652,7 +5652,7 @@ paths:
           default: '20'
       - name: provider
         in: query
-        description: ShippingMethod value（3003 / 3004）
+        description: ShippingMethod value（3003）
         schema:
           type: string
       - name: statement_period
@@ -5709,7 +5709,7 @@ paths:
           type: string
       - name: provider
         in: query
-        description: ShippingMethod value（3003 / 3004）
+        description: ShippingMethod value（3003）
         required: true
         schema:
           type: string

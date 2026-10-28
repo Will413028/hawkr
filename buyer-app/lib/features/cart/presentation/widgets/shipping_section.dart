@@ -151,7 +151,7 @@ class _ShippingSectionState extends State<ShippingSection> {
   /// 將 `availableShippingOptions` 按 shippingMethod 分組。
   ///
   /// 🔴 只留本版 App 有對應 UI 的方式（[ShippingPresentationX.isSupported]）：
-  /// 擋住 3003／3004／3005 與任何後端新增的碼值。選得到卻組不出正確
+  /// 擋住 3003／3005 與任何後端新增的碼值。選得到卻組不出正確
   /// payload 才是真正的 P0（見 [CartScreen] 結帳前置檢查與 checkout preview 的分派）。
   Map<String, List<MapEntry<int, Map<String, dynamic>>>> _groupOptions() {
     final grouped = <String, List<MapEntry<int, Map<String, dynamic>>>>{};

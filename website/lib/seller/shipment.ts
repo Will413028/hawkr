@@ -28,7 +28,7 @@ import { normalizeShippingMethod, ShippingMethod } from "@/lib/codemeta/enums";
 
 // 配送方式的值域**只有一個來源**：`lib/codemeta/generated.ts` 的 `ShippingMethod`
 // （CodeMeta SSOT 生成，含 3001～3005）。本檔曾自帶一份手寫的 `SHIPPING_METHOD`
-// 三值副本，於是後端加 3004／3005 時本檔完全不會知道。
+// 三值副本，於是後端加 3005 時本檔完全不會知道。
 
 /**
  * Carrier shipment-status values — sourced from the seller App's authoritative
@@ -61,7 +61,7 @@ export type LgsType = (typeof LGS_TYPE)[keyof typeof LGS_TYPE];
  * 配送方式（CodeMeta `ShippingMethod`）→ PayUni 配送軸（`LgsType`）。
  *
  * 🔴 **認不得就回 `null`，不得 fallback 成 `C2C`**。舊寫法
- * `isTaqbin ? HOME : C2C` 對 `3003`／`3004`／`3005` 回的是一個**合法值**，
+ * `isTaqbin ? HOME : C2C` 對 `3003`／`3005` 回的是一個**合法值**，
  * 於是進度條照畫、狀態照查、測試全綠，畫面卻是別人家物流的形狀。
  *
  * ⚠️ 這條對映本身是過渡物：正解是後端回 normalized 配送值（65 的 31 值），
@@ -757,7 +757,7 @@ export type ShipmentAction =
 	/**
 	 * 🔴 認不得的配送方式。**不是** `none`：`none` 是「這張單現在沒事可做」，
 	 * 這個是「我不知道這張單該怎麼出貨」。兩者分開才擋得住舊行為——舊版把所有
-	 * 非黑貓的方式一律當成 7-11，於是一張大宗寄倉／商家自送的單會畫出
+	 * 非黑貓的方式一律當成 7-11，於是一張商家自送的單會畫出
 	 * 「預約取號」按鈕，按下去真的打 `POST /app/shipments/{no}/print_cvs_label`。
 	 */
 	| { kind: "unsupported"; method: string };
@@ -816,7 +816,7 @@ export function isLabelExpired(
  * True when a shipping method is 黑貓宅配 (TAQBIN).
  *
  * ⚠️ 這是個**肯定**判斷（是不是黑貓），不是分流器。回 `false` 只代表「不是黑貓」，
- * **不代表「是超商」** —— 曾經被當成後者用，那正是 3003／3004／3005 被靜默畫成
+ * **不代表「是超商」** —— 曾經被當成後者用，那正是 3003／3005 被靜默畫成
  * 7-11 的單點根因。要分流請用 `nextShipmentAction`／`normalizeShippingMethod`。
  *
  * 別名（"TAQBIN"／"home"／"宅配"）的正規化統一在 `lib/codemeta/enums.ts`。
@@ -864,7 +864,7 @@ export function nextShipmentAction(
 	}
 	// 🔴 provider 分流一律 switch + default。舊版是
 	// `if (isTaqbinMethod) {黑貓} else {超商}` —— 那個 else 吞掉了 3003、
-	// 3004 大宗寄倉、3005 商家自送與後端未來新增的每一個 provider。
+	// 3005 商家自送與後端未來新增的每一個 provider。
 	switch (normalizeShippingMethod(shipping.method)) {
 		case ShippingMethod.TAQBIN:
 			return taqbinAction(shipping);

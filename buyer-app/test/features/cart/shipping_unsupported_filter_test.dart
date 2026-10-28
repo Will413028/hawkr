@@ -10,9 +10,8 @@ import '../../support/production_layout_test_harness.dart';
 ///
 /// ## 為什麼需要這一支
 ///
-/// 本波（物流 Shared Foundation）在 CodeMeta 新增了 `3004`（7-11 大宗寄倉）與
-/// `3005`（商家自行配送），兩者在 App 端都是 `ShippingPresentation.unsupported`
-/// ——它們的流程與既有 3002 C2C 不同，借用同一個畫面會顯示錯誤的取件方式與代碼欄位。
+/// `3005`（商家自行配送）在 App 端是 `ShippingPresentation.unsupported`
+/// ——它的流程與既有 3002 C2C 不同，借用同一個畫面會顯示錯誤的取件方式與代碼欄位。
 ///
 /// `3003`（Uber 即時配送）已刪除（ADR 2026-10-27-general-ecommerce-scope-cut D4），
 /// 值域仍在 CodeMeta，同樣是 unsupported。
@@ -32,13 +31,12 @@ void main() {
   ) async {
     await _pump(
       tester,
-      // 🔴 四個選項的 label 刻意互不相同，且 supported 與 unsupported 各有其一：
+      // 🔴 三個選項的 label 刻意互不相同，且 supported 與 unsupported 各有其一：
       //    過濾若整個失效（全顯示）或反向（只顯示 unsupported），兩種都會被抓到。
-      //    若四者共用同一個 label，這支測試對「濾錯邊」零鑑別力。
+      //    若三者共用同一個 label，這支測試對「濾錯邊」零鑑別力。
       const [
         {'shippingMethod': '3001', 'label': '黑貓宅配', 'fee': 100},
         {'shippingMethod': '3003', 'label': 'UberInstant', 'fee': 150},
-        {'shippingMethod': '3004', 'label': 'BulkWarehouse', 'fee': 60},
         {'shippingMethod': '3005', 'label': 'MerchantSelf', 'fee': 0},
       ],
     );
@@ -46,10 +44,9 @@ void main() {
     // supported：3001 必須出現
     expect(find.textContaining('黑貓宅配'), findsWidgets);
 
-    // unsupported：三個都不得出現。分開寫而不是合成一條，
+    // unsupported：兩個都不得出現。分開寫而不是合成一條，
     // 是為了讓失敗訊息直接指出「哪一個碼值漏濾了」。
     expect(find.textContaining('UberInstant'), findsNothing);
-    expect(find.textContaining('BulkWarehouse'), findsNothing);
     expect(find.textContaining('MerchantSelf'), findsNothing);
   });
 

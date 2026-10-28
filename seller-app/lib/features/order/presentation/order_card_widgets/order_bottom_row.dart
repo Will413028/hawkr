@@ -59,7 +59,7 @@ class OrderBottomRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final displayId = _orderId();
     // 🔴 出貨動作依配送方式**明確分派**。原本是 `isTaqbin` 以外一律走超商，
-    // 於是 3003/3004/3005 與任何後端新碼值都會被畫出「預約取號」，
+    // 於是 3003/3005 與任何後端新碼值都會被畫出「預約取號」，
     // 點下去打的是 POST /app/shipments/{no}/print_cvs_label。
     final shipping = shippingPresentationOf(order.shippingMethod);
 

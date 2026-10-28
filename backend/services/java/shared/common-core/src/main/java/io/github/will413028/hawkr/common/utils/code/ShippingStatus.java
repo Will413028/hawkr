@@ -36,13 +36,11 @@ public enum ShippingStatus implements CodeMeta {
     CVS_CODE_RECEIVED("CVS_CODE_RECEIVED", "920", "已取得交貨便代碼", "超商 Print Webhook 已回填出貨便代碼"),
     SELLER_CONFIRMED("SELLER_CONFIRMED", "921", "賣家確認出貨", "超商賣家手動確認已出貨"),
     CREATE_FAILED("CREATE_FAILED", "990", "建單失敗", "建單重試後**確定**失敗（provider_status/message 落地供 Admin 閉環）。出口：Admin 重建→91／Admin 取消→41"),
-    HANDED_OVER("HANDED_OVER", "930", "已交運", "已交運：B2C 司機交接／自送出發／Uber 取件完成。適用 3003／3004／3005"),
-    DC_ACCEPTED("DC_ACCEPTED", "931", "物流中心已驗收", "物流中心驗收通過，才算真的進倉。適用 3004；批次聚合讀它（單向，不得反推個件）"),
-    DC_REJECTED("DC_REJECTED", "932", "物流中心驗退", "物流中心驗退，保存原因／照片 ref／責任方／費用。適用 3004"),
+    HANDED_OVER("HANDED_OVER", "930", "已交運", "已交運：Uber 取件完成。適用 3003"),
     COURIER_ASSIGNED("COURIER_ASSIGNED", "933", "已指派外送員", "已指派外送員、前往取件（對應 Uber 狀態值 pickup）。適用 3003"),
     CREATE_UNKNOWN("CREATE_UNKNOWN", "991", "建單結果未知", "建單呼叫逾時或非確定性錯誤——**不是失敗**。由回查排程收斂：查到成功→91／查到失敗→990／超出回查窗仍未知→41＋人工"),
-    CANCEL_PENDING("CANCEL_PENDING", "992", "取消處理中", "取消申請已受理，待 provider 確認。適用 3002／3003／3004／3005（限 L1／L2）。**唯一允許回退到非終態的狀態**"),
-    CLAIM_PENDING("CLAIM_PENDING", "993", "理賠受理中", "理賠受理中（遺失／毀損／驗退爭議）。適用 3001／3002／3004。case 關閉：成立→43／不成立→33 或原異常值");
+    CANCEL_PENDING("CANCEL_PENDING", "992", "取消處理中", "取消申請已受理，待 provider 確認。適用 3002／3003／3005。**唯一允許回退到非終態的狀態**"),
+    CLAIM_PENDING("CLAIM_PENDING", "993", "理賠受理中", "理賠受理中（遺失／毀損爭議）。適用 3001／3002。case 關閉：成立→43／不成立→33 或原異常值");
 
     private final String code;
     private final String value;

@@ -274,7 +274,7 @@ class UberOrderEligibilityGuardTest {
     // ===== 🔴 陰性二：非 3003 完全不受影響 =====
 
     @ParameterizedTest(name = "shipping_method={0} 不受本閘門影響")
-    @ValueSource(strings = {"3001", "3002", "3004", "3005", "9999", "", "UBER_INSTANT", "30031", "003"})
+    @ValueSource(strings = {"3001", "3002", "3005", "9999", "", "UBER_INSTANT", "30031", "003"})
     @NullSource
     @DisplayName("非 3003（含 null／值域外／相近字串）：applicable=false、allowed=true、六項全 NOT_APPLICABLE")
     void nonUberIsUntouched(String shippingMethod) {
@@ -292,7 +292,7 @@ class UberOrderEligibilityGuardTest {
     }
 
     @ParameterizedTest(name = "requireEligible({0}) 不拋")
-    @ValueSource(strings = {"3001", "3002", "3004", "3005", "9999", ""})
+    @ValueSource(strings = {"3001", "3002", "3005", "9999", ""})
     @NullSource
     @DisplayName("requireEligible 對非 3003 靜默放行——本閘門不兼任配送方式合法性驗證（那是 OrderPolicyResolver 的 9504）")
     void requireEligibleDoesNotThrowForNonUber(String shippingMethod) {

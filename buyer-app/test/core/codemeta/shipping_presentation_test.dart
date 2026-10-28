@@ -28,9 +28,9 @@ void main() {
       );
     });
 
-    test('3003 / 3004 / 3005 → unsupported（不得落到黑貓或 7-11）', () {
+    test('3003 / 3005 → unsupported（不得落到黑貓或 7-11）', () {
       // 3003 是已刪除的 Uber 即時配送（值域仍在 CodeMeta）。
-      for (final value in const ['3003', 'UBER_INSTANT', '3004', '3005']) {
+      for (final value in const ['3003', 'UBER_INSTANT', '3005']) {
         expect(
           shippingPresentationOf(value),
           ShippingPresentation.unsupported,
@@ -82,7 +82,7 @@ void main() {
     test('3002 超商取貨與未支援的配送方式都不帶收件地址', () {
       expect(shippingPresentationOf('3002').usesRecipientAddress, isFalse);
       expect(shippingPresentationOf('3003').usesRecipientAddress, isFalse);
-      expect(shippingPresentationOf('3004').usesRecipientAddress, isFalse);
+      expect(shippingPresentationOf('3005').usesRecipientAddress, isFalse);
       expect(shippingPresentationOf('9999').usesRecipientAddress, isFalse);
     });
   });

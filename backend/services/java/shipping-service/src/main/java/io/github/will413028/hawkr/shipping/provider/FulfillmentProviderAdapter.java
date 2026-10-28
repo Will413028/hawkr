@@ -34,9 +34,9 @@ import java.util.Set;
  * 銜接兩層的是每個 action 自己宣告的 {@code requiresProviderCall}（且逐 provider 可覆寫）：
  * <ul>
  *   <li>{@code true}（例：Uber 的 cancel）→ capability 為 empty 時 {@code enabled=false}</li>
- *   <li>{@code false}（例：B2C 的交倉、自送 L0 的取消——只寫我方狀態）→ <b>完全不受 capability 影響</b></li>
+ *   <li>{@code false}（例：賣家確認出貨、商家自送的取消——只寫我方狀態）→ <b>完全不受 capability 影響</b></li>
  * </ul>
- * ⚠️ 把 {@code Optional.empty()} 直接接到「按鈕不可用」，會讓 7-11 B2C 的取消與商家自送 L0 的取消
+ * ⚠️ 把 {@code Optional.empty()} 直接接到「按鈕不可用」，會讓 7-11 店到店的取消與商家自送的取消
  * 整條消失，而那是使用者最常按的按鈕之一。
  *
  * <h2>🔴 為什麼是 Optional 而不是丟例外</h2>
@@ -85,7 +85,7 @@ public interface FulfillmentProviderAdapter {
     /** 送達證明。 */
     Optional<PodCapability> pod(FulfillmentContext ctx);
 
-    /** 建店／開通。⚠️ 7-11 B2C 的擁有者跨到 seller-service，本介面只負責 provider 側的送審。 */
+    /** 建店／開通。⚠️ 7-11 的擁有者跨到 seller-service，本介面只負責 provider 側的送審。 */
     Optional<OnboardCapability> onboard(FulfillmentContext ctx);
 
     /**

@@ -18,7 +18,7 @@ import {
  * 回歸測試：物流 provider 的二元 fallback。
  *
  * 舊行為是「不是黑貓就當 7-11」——`isTaqbin ? … : …`。它對 `3003`（已刪除的 Uber）、
- * `3004` 7-11 大宗寄倉、`3005` 商家自送回的都是**合法值**：型別對、不拋例外、
+ * `3005` 商家自送回的都是**合法值**：型別對、不拋例外、
  * 當時全部測試都是綠的，畫面卻把別人家的物流畫成 7-11，而且按鈕按下去會真的
  * 打 `POST /app/shipments/{no}/print_cvs_label`。
  *
@@ -28,10 +28,9 @@ import {
  * 值域取自 CodeMeta 生成檔（`lib/codemeta/generated.ts`），不在本檔手寫碼值。
  */
 
-/** 前端沒有實作的三個通路（Uber 已刪除，值域仍在 CodeMeta）。 */
+/** 前端沒有實作的兩個通路（Uber 已刪除，值域仍在 CodeMeta）。 */
 const NEW_PROVIDERS = [
 	ShippingMethod.UBER_INSTANT,
-	ShippingMethod.SEVEN_ELEVEN_BULK_WAREHOUSE,
 	ShippingMethod.MERCHANT_DELIVERY,
 ] as const;
 
@@ -43,7 +42,7 @@ function shipping(method: string, extra: Partial<ShipmentLike> = {}) {
 }
 
 describe("normalizeShippingMethod", () => {
-	it("CodeMeta 的五個 value 全部認得（含本波新增的 3004 / 3005）", () => {
+	it("CodeMeta 的四個 value 全部認得（含 3005）", () => {
 		for (const value of Object.values(ShippingMethod)) {
 			expect(normalizeShippingMethod(value)).toBe(value);
 		}
@@ -74,15 +73,15 @@ describe("formatShippingMethodLabel", () => {
 		}
 	});
 
-	it("認得的碼查 CodeMeta 標籤；3004 不得顯示成 7-11 店到店", () => {
+	it("認得的碼查 CodeMeta 標籤；3005 不得顯示成 7-11 店到店", () => {
 		expect(formatShippingMethodLabel(ShippingMethod.TAQBIN)).toBe(
 			SHIPPING_METHOD_LABEL[ShippingMethod.TAQBIN],
 		);
+		expect(formatShippingMethodLabel(ShippingMethod.MERCHANT_DELIVERY)).toBe(
+			SHIPPING_METHOD_LABEL[ShippingMethod.MERCHANT_DELIVERY],
+		);
 		expect(
-			formatShippingMethodLabel(ShippingMethod.SEVEN_ELEVEN_BULK_WAREHOUSE),
-		).toBe(SHIPPING_METHOD_LABEL[ShippingMethod.SEVEN_ELEVEN_BULK_WAREHOUSE]);
-		expect(
-			formatShippingMethodLabel(ShippingMethod.SEVEN_ELEVEN_BULK_WAREHOUSE),
+			formatShippingMethodLabel(ShippingMethod.MERCHANT_DELIVERY),
 		).not.toBe(SHIPPING_METHOD_LABEL[ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP]);
 	});
 
@@ -152,7 +151,7 @@ describe("nextShipmentAction", () => {
 		).toBe("cvs-confirm");
 	});
 
-	it("[禁 fallback] 3003 / 3004 / 3005 不得跑出任何超商或黑貓的動作", () => {
+	it("[禁 fallback] 3003 / 3005 不得跑出任何超商或黑貓的動作", () => {
 		for (const method of NEW_PROVIDERS) {
 			const action = nextShipmentAction("O1", shipping(method), "preparing");
 			expect(action.kind).toBe("unsupported");

@@ -432,7 +432,7 @@ class _PickupTimelineStep extends StatelessWidget {
 /// 7-11 3 步（至門市 ibon → 列印寄件單 → 交門市人員），
 /// 未知 / 本版未支援者走 provider-neutral 3 步。
 ///
-/// 🔴 禁止改回 `_isCvs ? 超商 : 黑貓`：那會把 3003/3004/3005 與任何後端新碼值
+/// 🔴 禁止改回 `_isCvs ? 超商 : 黑貓`：那會把 3003/3005 與任何後端新碼值
 /// 靜默標成「黑貓宅配收件流程」並畫出黑貓 4 步。
 ///
 /// 步驟完成狀態由 `case.status` 推算：

@@ -9,7 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// 這支測試的鑑別力來源：**未知 `returnShippingMethod` 不得被畫成任何一家物流商**。
 /// 把 `ReturnLogisticsTimeline.build` 改回 `_isCvs ? 超商 : 黑貓` 之後，
-/// 「3003/3004/3005/空值不得出現黑貓字樣」那幾條會立刻轉紅。
+/// 「3003/3005/空值不得出現黑貓字樣」那幾條會立刻轉紅。
 Future<void> _pump(WidgetTester tester, AfterSaleCase c) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = const Size(390, 1400);
@@ -54,7 +54,7 @@ void main() {
     expect(find.text('交付門市人員'), findsOneWidget);
   });
 
-  for (final unknown in const ['3003', '3004', '3005', '', '9999']) {
+  for (final unknown in const ['3003', '3005', '', '9999']) {
     testWidgets('returnShippingMethod=${unknown.isEmpty ? "(空)" : unknown} '
         '→ 不得畫成黑貓、也不得畫成 7-11', (tester) async {
       await _pump(tester, _caseWith(unknown));

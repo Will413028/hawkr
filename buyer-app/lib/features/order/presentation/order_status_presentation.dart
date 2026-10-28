@@ -179,10 +179,8 @@ class DeliveryStatusPresentation {
     '55',
     '81',
     '82',
-    // 物流中心驗退（3004）：包裹被退回，買家收不到。
-    '932',
     '990',
-    // 理賠受理中（遺失／毀損／驗退爭議）：已經出事，正在處理。
+    // 理賠受理中（遺失／毀損爭議）：已經出事，正在處理。
     '993',
   };
 
@@ -305,7 +303,6 @@ class DeliveryStatusPresentation {
         ShippingStatus.buyerNotPicked => '已超過取貨期限，包裹正在退回。',
         ShippingStatus.storeTransfer => '原門市暫停服務，請依通知重新選擇門市。',
         ShippingStatus.createFailed => '物流單建立失敗，請聯繫客服協助。',
-        ShippingStatus.dcRejected => '物流中心驗退這批包裹，客服將協助後續處理。',
         ShippingStatus.claimPending => '理賠案件處理中，客服將與您聯繫。',
         _ => '配送發生異常，請查看通知或聯繫客服。',
       };
@@ -325,9 +322,7 @@ class DeliveryStatusPresentation {
       ShippingStatus.tcatCalled => '已預約宅配取件，等待司機收件。',
       ShippingStatus.cvsCodeReceived => '已取得超商寄件碼，等待賣家交寄。',
       ShippingStatus.sellerConfirmed => '賣家已確認交寄，等待物流更新。',
-      // ── 3004 大宗寄倉／3005 自送的狀態 ──
       ShippingStatus.handedOver => '包裹已交運，正在前往收件地址。',
-      ShippingStatus.dcAccepted => '物流中心已驗收，準備配送。',
       // 991／992 不是異常（見 abnormalValues 的說明），但也不能沿用
       // 「請留意後續物流通知」——那句話對「系統正在自己確認」沒有說明力。
       ShippingStatus.createUnknown => '物流單建立結果確認中，稍後會自動更新。',

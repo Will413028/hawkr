@@ -17,7 +17,7 @@ import {
  * 前端的分流一旦寫成「不是 A 就當 B」，後端新增的每一個配送方式都會被靜默畫成 B：
  *
  * ```ts
- * const lgsType = isTaqbin ? LGS_TYPE.HOME : LGS_TYPE.C2C;  // 3003/3004/3005 全變 C2C
+ * const lgsType = isTaqbin ? LGS_TYPE.HOME : LGS_TYPE.C2C;  // 3003/3005 全變 C2C
  * {isTaqbin ? "黑貓宅配" : "7-11 賣貨便"}                     // 標題顯示別人家的物流
  * ```
  *
@@ -161,13 +161,10 @@ test("codeLabel 對未知／空的配送方式不得回傳任何已知物流商�
 	}
 });
 
-test("本波兩個新通路各有自己的標籤，不會被畫成 7-11 店到店", () => {
-	// 碼表沒同步的話，3004/3005 會落到「原碼照顯」——那是安全的，但也代表 ADM 的
+test("新通路各有自己的標籤，不會被畫成 7-11 店到店", () => {
+	// 碼表沒同步的話，3005 會落到「原碼照顯」——那是安全的，但也代表 ADM 的
 	// 物流欄位會顯示一串數字。這支釘住「拷貝已同步」這件事。
-	for (const value of [
-		ShippingMethod.SEVEN_ELEVEN_BULK_WAREHOUSE,
-		ShippingMethod.MERCHANT_DELIVERY,
-	]) {
+	for (const value of [ShippingMethod.MERCHANT_DELIVERY]) {
 		const label = codeLabel(SHIPPING_METHOD_LABEL, value);
 		assert.notEqual(label, value, `${value} 沒有標籤（碼表拷貝未同步？）`);
 		assert.notEqual(

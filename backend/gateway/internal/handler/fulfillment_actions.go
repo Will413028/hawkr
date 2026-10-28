@@ -71,8 +71,7 @@ type routeTarget struct {
 const (
 	providerTaqbin   = "3001" // 黑貓宅配
 	providerCvs      = "3002" // 7-11 交貨便 C2C
-	providerCvsB2B   = "3004" // 7-11 大宗寄倉（本波未啟用）
-	providerMerchant = "3005" // 商家自送（本波未啟用）
+	providerMerchant = "3005" // 商家自行配送（RFQ 訂單的站外業者自行出貨）
 )
 
 // actionRoute：(action, provider) → (HTTP method, 路徑樣板)。
@@ -116,12 +115,10 @@ var actionRoute = map[routeKey]routeTarget{
 var viewerScopedRoute = map[routeKey]map[string]routeTarget{
 	{"track", providerTaqbin}:   trackTargets(),
 	{"track", providerCvs}:      trackTargets(),
-	{"track", providerCvsB2B}:   trackTargets(),
 	{"track", providerMerchant}: trackTargets(),
 
 	{"view_only", providerTaqbin}:   trackTargets(),
 	{"view_only", providerCvs}:      trackTargets(),
-	{"view_only", providerCvsB2B}:   trackTargets(),
 	{"view_only", providerMerchant}: trackTargets(),
 }
 

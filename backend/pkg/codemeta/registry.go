@@ -938,7 +938,7 @@ var (
 	InvoiceComplaintStatusOverdue            = InvoiceComplaintStatus{Code: "OVERDUE", Value: "OVERDUE", Label: "已逾期", Description: "超過 3 個工作天未回覆；24 小時後自動升級 ADM"}
 	InvoiceComplaintStatusEscalatedToAdm     = InvoiceComplaintStatus{Code: "ESCALATED_TO_ADM", Value: "ESCALATED_TO_ADM", Label: "待平台判定", Description: "賣家請求協助／買家不接受／逾期自動升級"}
 	InvoiceComplaintStatusResolved           = InvoiceComplaintStatus{Code: "RESOLVED", Value: "RESOLVED", Label: "已解決", Description: "ADM 判定已解決、買家確認、或系統偵測發票已送達。**非終態**（可於 24 小時後重開，最多 2 次）"}
-	InvoiceComplaintStatusViolationConfirmed = InvoiceComplaintStatus{Code: "VIOLATION_CONFIRMED", Value: "VIOLATION_CONFIRMED", Label: "判定賣家違規", Description: "計入 90 天違規窗口；發票模組只發建議，停權處分由 seller-service 執行（終態）"}
+	InvoiceComplaintStatusViolationConfirmed = InvoiceComplaintStatus{Code: "VIOLATION_CONFIRMED", Value: "VIOLATION_CONFIRMED", Label: "判定賣家違規", Description: "計入 90 天違規窗口；發票模組只發建議，停權處分由 seller 模組的措施執行（終態）"}
 	InvoiceComplaintStatusWithdrawn          = InvoiceComplaintStatus{Code: "WITHDRAWN", Value: "WITHDRAWN", Label: "買家已撤回", Description: "不計入違規計數（終態）"}
 )
 
@@ -2347,7 +2347,7 @@ func InvoiceTaxRiskFlagFromValue(value string) (InvoiceTaxRiskFlag, bool) {
 }
 
 // ===== CommerceModel =====
-// 商流模式——**這筆錢誰收、誰開票**，決定整條帳務軸。訂單快照六欄之一：付款後鎖定，改政策不得回溯既有訂單。取**短名**（不把 provider 綁進商流維度），與 `provider` 維度正交。🔴 **本值域是三條商流帳務軸互斥的分界線**，65 定版、66／68／69 只引用。
+// 商流模式——**這筆錢誰收、誰開票**，決定整條帳務軸。訂單快照六欄之一：付款後鎖定，改政策不得回溯既有訂單。取**短名**（不把 provider 綁進商流維度），與 `provider` 維度正交。🔴 **本值域是三條商流帳務軸互斥的分界線**，65 定版、66 只引用。
 
 type CommerceModel struct {
 	Code        string
@@ -2438,7 +2438,7 @@ type FulfillmentMode struct {
 
 var (
 	FulfillmentModeSellerManaged     = FulfillmentMode{Code: "SELLER_MANAGED", Value: "SELLER_MANAGED", Label: "賣家自行履約", Description: "賣家自己出貨或自行配送。3005 必然落在本值"}
-	FulfillmentModePlatformLogistics = FulfillmentMode{Code: "PLATFORM_LOGISTICS", Value: "PLATFORM_LOGISTICS", Label: "平台物流履約", Description: "由平台安排的物流通道履約（3001／3002／3003／3004）"}
+	FulfillmentModePlatformLogistics = FulfillmentMode{Code: "PLATFORM_LOGISTICS", Value: "PLATFORM_LOGISTICS", Label: "平台物流履約", Description: "由平台安排的物流通道履約（3001／3002／3003）"}
 )
 
 var AllFulfillmentModes = []FulfillmentMode{
@@ -2503,7 +2503,7 @@ func InvoiceModelFromValue(value string) (InvoiceModel, bool) {
 }
 
 // ===== FulfillmentAction =====
-// **配送／履約軸**的領域動作值域，27 值。🔴 **fail-closed**：表上沒列的 action 一律不可用，前端只准 fallback 到 `view_only`，**不得自行猜測或退化成其他動作**。🔴 **與 provider capability 是兩層**：capability 回答「這個 provider 的 API 有沒有這個能力」，本 enum 的動作回答「這顆按鈕現在能不能按」；銜接兩層的是每個 action 自己宣告的 `requiresProviderCall`（且逐 provider 可覆寫）——`requiresProviderCall=false` 的動作（如 3004 的 handover／cancel、3005 L0 的取消）**不因 capability 為 empty 而消失**。URL 一律走 `allowedActions[].href`，前端不得自行組路徑。
+// **配送／履約軸**的領域動作值域，19 值。🔴 **fail-closed**：表上沒列的 action 一律不可用，前端只准 fallback 到 `view_only`，**不得自行猜測或退化成其他動作**。🔴 **與 provider capability 是兩層**：capability 回答「這個 provider 的 API 有沒有這個能力」，本 enum 的動作回答「這顆按鈕現在能不能按」；銜接兩層的是每個 action 自己宣告的 `requiresProviderCall`（且逐 provider 可覆寫）——`requiresProviderCall=false` 的動作（如 handover，以及 3002／3005 的 cancel）**不因 capability 為 empty 而消失**。URL 一律走 `allowedActions[].href`，前端不得自行組路徑。
 
 type FulfillmentAction struct {
 	Code        string
@@ -2513,33 +2513,25 @@ type FulfillmentAction struct {
 }
 
 var (
-	FulfillmentActionDispatch        = FulfillmentAction{Code: "DISPATCH", Value: "dispatch", Label: "派車／叫件", Description: "配送推進群。3001 黑貓叫件、3003 Uber 建單即派車"}
-	FulfillmentActionHandover        = FulfillmentAction{Code: "HANDOVER", Value: "handover", Label: "回報交運", Description: "配送推進群。B2C 交倉／自送出發，`requiresProviderCall=false`"}
-	FulfillmentActionCancel          = FulfillmentAction{Code: "CANCEL", Value: "cancel", Label: "取消配送單", Description: "配送推進群。🔴 四個 provider 中只有 3003 的 `requiresProviderCall=true`；其餘寫 992 或本地終態。"}
-	FulfillmentActionResubmit        = FulfillmentAction{Code: "RESUBMIT", Value: "resubmit", Label: "重新建單", Description: "配送推進群。只有 990 建單失敗的配送單可重建"}
-	FulfillmentActionUpdate          = FulfillmentAction{Code: "UPDATE", Value: "update", Label: "修改配送資料", Description: "配送推進群。⚠️ 在 provider 的 update 契約到位前**恆 disabled**"}
-	FulfillmentActionPrintLabel      = FulfillmentAction{Code: "PRINT_LABEL", Value: "print_label", Label: "列印標籤", Description: "標籤群。3004 為批次型（單批上限與分組鍵由 capability 攜帶，呼叫端不得寫死數字）"}
-	FulfillmentActionReprintLabel    = FulfillmentAction{Code: "REPRINT_LABEL", Value: "reprint_label", Label: "重印標籤", Description: "標籤群。🔴 不得整批重印"}
-	FulfillmentActionAssignBatch     = FulfillmentAction{Code: "ASSIGN_BATCH", Value: "assign_batch", Label: "加入批次", Description: "批次群（3004）。provider 端無對應 API，`requiresProviderCall` 恆 false"}
-	FulfillmentActionRemoveFromBatch = FulfillmentAction{Code: "REMOVE_FROM_BATCH", Value: "remove_from_batch", Label: "移出批次", Description: "批次群。同上"}
-	FulfillmentActionScanBind        = FulfillmentAction{Code: "SCAN_BIND", Value: "scan_bind", Label: "掃描綁定", Description: "批次群。同上"}
-	FulfillmentActionCloseBatch      = FulfillmentAction{Code: "CLOSE_BATCH", Value: "close_batch", Label: "封箱關批", Description: "批次群。同上"}
-	FulfillmentActionTrack           = FulfillmentAction{Code: "TRACK", Value: "track", Label: "查詢物流狀態", Description: "追蹤與證明群"}
-	FulfillmentActionViewPod         = FulfillmentAction{Code: "VIEW_POD", Value: "view_pod", Label: "檢視送達證明", Description: "追蹤與證明群。⚠️ 全值域統一 snake_case，不使用 camelCase"}
-	FulfillmentActionUploadPod       = FulfillmentAction{Code: "UPLOAD_POD", Value: "upload_pod", Label: "上傳送達證明", Description: "追蹤與證明群。3005 L0 由賣家上傳"}
-	FulfillmentActionRequery         = FulfillmentAction{Code: "REQUERY", Value: "requery", Label: "重新查詢", Description: "追蹤與證明群。主動向 provider 回查"}
-	FulfillmentActionReportProgress  = FulfillmentAction{Code: "REPORT_PROGRESS", Value: "report_progress", Label: "回報配送進度", Description: "賣家回報群（3005 三級共用），`requiresProviderCall` 恆 false"}
-	FulfillmentActionReportDelivered = FulfillmentAction{Code: "REPORT_DELIVERED", Value: "report_delivered", Label: "回報已送達", Description: "賣家回報群。同上"}
-	FulfillmentActionReportException = FulfillmentAction{Code: "REPORT_EXCEPTION", Value: "report_exception", Label: "回報配送異常", Description: "賣家回報群。同上"}
-	FulfillmentActionArrangeReturn   = FulfillmentAction{Code: "ARRANGE_RETURN", Value: "arrange_return", Label: "安排退貨物流", Description: "逆向與門市群"}
-	FulfillmentActionAcceptReturn    = FulfillmentAction{Code: "ACCEPT_RETURN", Value: "accept_return", Label: "接受退貨", Description: "逆向與門市群。🔴 冷凍逆向（3203）一律移除本動作"}
-	FulfillmentActionSellerPickup    = FulfillmentAction{Code: "SELLER_PICKUP", Value: "seller_pickup", Label: "賣家領回", Description: "逆向與門市群"}
-	FulfillmentActionReselectStore   = FulfillmentAction{Code: "RESELECT_STORE", Value: "reselect_store", Label: "重選門市", Description: "逆向與門市群。門市關轉（81）時使用"}
-	FulfillmentActionOpenCase        = FulfillmentAction{Code: "OPEN_CASE", Value: "open_case", Label: "建立異常案件", Description: "ADM 群"}
-	FulfillmentActionClaim           = FulfillmentAction{Code: "CLAIM", Value: "claim", Label: "受理理賠", Description: "ADM 群。🔴 是**理賠**（993 CLAIM_PENDING），**不是案件認領**——ADM 文案必須寫「受理理賠」，寫「認領」會與不存在的認領動作混淆"}
-	FulfillmentActionAdminResolve    = FulfillmentAction{Code: "ADMIN_RESOLVE", Value: "admin_resolve", Label: "處置提案", Description: "ADM 群"}
-	FulfillmentActionAdminCloseCase  = FulfillmentAction{Code: "ADMIN_CLOSE_CASE", Value: "admin_close_case", Label: "關閉案件", Description: "ADM 群"}
-	FulfillmentActionViewOnly        = FulfillmentAction{Code: "VIEW_ONLY", Value: "view_only", Label: "僅檢視", Description: "兜底群。🔴 **唯一允許的 fallback 值**"}
+	FulfillmentActionDispatch       = FulfillmentAction{Code: "DISPATCH", Value: "dispatch", Label: "派車／叫件", Description: "配送推進群。3001 黑貓叫件、3003 Uber 建單即派車"}
+	FulfillmentActionHandover       = FulfillmentAction{Code: "HANDOVER", Value: "handover", Label: "回報交運", Description: "配送推進群。賣家確認出貨，`requiresProviderCall=false`"}
+	FulfillmentActionCancel         = FulfillmentAction{Code: "CANCEL", Value: "cancel", Label: "取消配送單", Description: "配送推進群。🔴 四個 provider 中只有 3003 的 `requiresProviderCall=true`；其餘寫 992 或本地終態。"}
+	FulfillmentActionResubmit       = FulfillmentAction{Code: "RESUBMIT", Value: "resubmit", Label: "重新建單", Description: "配送推進群。只有 990 建單失敗的配送單可重建"}
+	FulfillmentActionUpdate         = FulfillmentAction{Code: "UPDATE", Value: "update", Label: "修改配送資料", Description: "配送推進群。⚠️ 在 provider 的 update 契約到位前**恆 disabled**"}
+	FulfillmentActionPrintLabel     = FulfillmentAction{Code: "PRINT_LABEL", Value: "print_label", Label: "列印標籤", Description: "標籤群"}
+	FulfillmentActionReprintLabel   = FulfillmentAction{Code: "REPRINT_LABEL", Value: "reprint_label", Label: "重印標籤", Description: "標籤群。🔴 不得整批重印"}
+	FulfillmentActionTrack          = FulfillmentAction{Code: "TRACK", Value: "track", Label: "查詢物流狀態", Description: "追蹤與證明群"}
+	FulfillmentActionViewPod        = FulfillmentAction{Code: "VIEW_POD", Value: "view_pod", Label: "檢視送達證明", Description: "追蹤與證明群。⚠️ 全值域統一 snake_case，不使用 camelCase"}
+	FulfillmentActionRequery        = FulfillmentAction{Code: "REQUERY", Value: "requery", Label: "重新查詢", Description: "追蹤與證明群。主動向 provider 回查"}
+	FulfillmentActionArrangeReturn  = FulfillmentAction{Code: "ARRANGE_RETURN", Value: "arrange_return", Label: "安排退貨物流", Description: "逆向與門市群"}
+	FulfillmentActionAcceptReturn   = FulfillmentAction{Code: "ACCEPT_RETURN", Value: "accept_return", Label: "接受退貨", Description: "逆向與門市群。🔴 冷凍逆向（3203）一律移除本動作"}
+	FulfillmentActionSellerPickup   = FulfillmentAction{Code: "SELLER_PICKUP", Value: "seller_pickup", Label: "賣家領回", Description: "逆向與門市群"}
+	FulfillmentActionReselectStore  = FulfillmentAction{Code: "RESELECT_STORE", Value: "reselect_store", Label: "重選門市", Description: "逆向與門市群。門市關轉（81）時使用"}
+	FulfillmentActionOpenCase       = FulfillmentAction{Code: "OPEN_CASE", Value: "open_case", Label: "建立異常案件", Description: "ADM 群"}
+	FulfillmentActionClaim          = FulfillmentAction{Code: "CLAIM", Value: "claim", Label: "受理理賠", Description: "ADM 群。🔴 是**理賠**（993 CLAIM_PENDING），**不是案件認領**——ADM 文案必須寫「受理理賠」，寫「認領」會與不存在的認領動作混淆"}
+	FulfillmentActionAdminResolve   = FulfillmentAction{Code: "ADMIN_RESOLVE", Value: "admin_resolve", Label: "處置提案", Description: "ADM 群"}
+	FulfillmentActionAdminCloseCase = FulfillmentAction{Code: "ADMIN_CLOSE_CASE", Value: "admin_close_case", Label: "關閉案件", Description: "ADM 群"}
+	FulfillmentActionViewOnly       = FulfillmentAction{Code: "VIEW_ONLY", Value: "view_only", Label: "僅檢視", Description: "兜底群。🔴 **唯一允許的 fallback 值**"}
 )
 
 var AllFulfillmentActions = []FulfillmentAction{
@@ -2550,17 +2542,9 @@ var AllFulfillmentActions = []FulfillmentAction{
 	FulfillmentActionUpdate,
 	FulfillmentActionPrintLabel,
 	FulfillmentActionReprintLabel,
-	FulfillmentActionAssignBatch,
-	FulfillmentActionRemoveFromBatch,
-	FulfillmentActionScanBind,
-	FulfillmentActionCloseBatch,
 	FulfillmentActionTrack,
 	FulfillmentActionViewPod,
-	FulfillmentActionUploadPod,
 	FulfillmentActionRequery,
-	FulfillmentActionReportProgress,
-	FulfillmentActionReportDelivered,
-	FulfillmentActionReportException,
 	FulfillmentActionArrangeReturn,
 	FulfillmentActionAcceptReturn,
 	FulfillmentActionSellerPickup,

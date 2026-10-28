@@ -4,9 +4,9 @@ import 'code_meta.dart';
 ///
 /// ## 為什麼需要它
 ///
-/// `ShippingMethod` 是五元（`3001` 黑貓／`3002` 7-11 店到店／`3003` Uber 即時配送（已刪除的功能）／
-/// `3004` 7-11 大宗寄倉／`3005` 商家自行配送），而畫面層長期寫的是
-/// `isTaqbin ? 黑貓 : 超商` 這種二元式 —— 於是 `3003`／`3004`／`3005` 與任何後端
+/// `ShippingMethod` 是四元（`3001` 黑貓／`3002` 7-11 店到店／`3003` Uber 即時配送（已刪除的功能）／
+/// `3005` 商家自行配送），而畫面層長期寫的是
+/// `isTaqbin ? 黑貓 : 超商` 這種二元式 —— 於是 `3003`／`3005` 與任何後端
 /// 新增的碼值都會被**靜默畫成 7-11 或黑貓**：型別正確、不拋例外、測試全綠，
 /// 使用者看到的卻是另一家物流商的 logo、代碼欄位與操作按鈕。
 ///
@@ -21,7 +21,7 @@ import 'code_meta.dart';
 /// ## 這個機制擋得住什麼
 ///
 /// [shippingPresentationOf] 內是**沒有 `default` / `_` 的 switch expression**，
-/// 所以 CodeMeta 新增第六個 `ShippingMethod` 成員時**編譯直接失敗**，
+/// 所以 CodeMeta 新增第五個 `ShippingMethod` 成員時**編譯直接失敗**，
 /// 逼人回到本檔決定它該走哪一套；擋不住的是「畫面層自己另外寫一次二元判斷」，
 /// 那一種只能靠 review 與 `test/core/codemeta/shipping_presentation_test.dart`
 /// 的變異驗證。
@@ -32,7 +32,7 @@ enum ShippingPresentation {
   /// 超商店到店（7-11 店到店 `3002`）—— 取號 / 出貨便代碼 / ibon 那一套。
   cvsStorePickup,
 
-  /// 本版 App 沒有對應 UI 的配送方式：`3003`／`3004`／`3005`、空字串、
+  /// 本版 App 沒有對應 UI 的配送方式：`3003`／`3005`、空字串、
   /// 以及任何不在 [ShippingMethod] 值域內的碼值。
   unsupported,
 }
@@ -55,10 +55,7 @@ ShippingPresentation shippingPresentationOf(String? rawShippingMethod) {
       ShippingPresentation.cvsStorePickup,
     // 3003 Uber 即時配送：功能已刪除（ADR 2026-10-27-general-ecommerce-scope-cut D4）。
     ShippingMethod.uberInstant => ShippingPresentation.unsupported,
-    // 3004 7-11 大宗寄倉：B2C 流程與 3002 的 C2C 不同，
-    // 借用 C2C 的畫面會顯示錯誤的取件方式與代碼欄位。
-    ShippingMethod.sevenElevenBulkWarehouse => ShippingPresentation.unsupported,
-    // 3005 商家自行配送：無外部 provider API。
+    // 3005 商家自行配送：RFQ 訂單的站外業者自行出貨，無外部 provider API。
     ShippingMethod.merchantDelivery => ShippingPresentation.unsupported,
     null => ShippingPresentation.unsupported,
   };
