@@ -1,10 +1,12 @@
 # Hawkr
 
-生鮮電商平台（已結束營運）。本 repo 合併自原本五個獨立 repository 的 `dev` 分支，保留完整 commit 歷史；憑證與金鑰已從歷史中移除或替換為 `REDACTED`。
+English | [繁體中文](README.zh-TW.md)
 
-| 目錄 | 原 repository | 技術 |
+An e-commerce platform serving buyers, sellers, and platform operators (no longer in operation). This repository merges the `dev` branches of five formerly separate repositories with their full commit history; credentials and keys have been removed from history or replaced with `REDACTED`.
+
+| Directory | Original repository | Stack |
 |---|---|---|
-| `backend/` | backend-payuni | Go／Java microservices、Gateway、k8s |
+| `backend/` | backend-payuni | Go / Java microservices, Gateway, k8s |
 | `website/` | hawkr-website | Next.js consumer website |
 | `admin/` | hawkr-admin | Next.js admin |
 | `buyer-app/` | hawkr_buyer | Flutter |
