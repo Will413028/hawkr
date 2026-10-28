@@ -75,9 +75,6 @@
 | Key Pattern | TTL（2026-07-30 dev 實測） | 用途 | 實作位置 |
 |-------------|------|------|---------|
 | `im:account:deleted:{accountId}` | **無（TTL=-1）** | 帳號已刪除標記 | `services/im-service/internal/usecase/message.go:906` |
-| `ban:lookup:{ban}` | ≈11 天（實測剩餘 935,578~949,647s） | 統編查詢結果 | `services/seller-service/internal/infrastructure/business_registration_cache.go:29` |
-| `addr:sug:v3:{county}:{district}:{query}` | ≈22.5 小時（實測剩餘 80,852s） | 地址建議（TGOS） | `services/{buyer,seller}-service/internal/usecase/address_geocode.go:60` |
-| `addr:val:v3:{address}` | ≈22.5 小時 | 地址驗證（TGOS） | `services/{buyer,seller}-service/internal/usecase/address_geocode.go:64` |
 | `cat:all` | ≈10 分鐘 | 整張商品分類表（**單把 512KB，見 §5**） | `services/java/product-service/.../CacheKeyConstants.java:26` |
 | `seller:violations:public:*` | — | 賣家違規公開資訊 | 清除 API group `seller` |
 | `search:hot_keywords` | **無（TTL=-1）** | **孤兒 key**：repo 內零引用，search-service 已退役；1,177 bytes 永久殘留 | 無（可安全刪除，屬維運動作） |
