@@ -32,7 +32,13 @@ test.describe("navbar reach on the narrowest phone", { tag: ["@ui"] }, () => {
 		await installProviderMocks(page);
 	});
 
-	test("a signed-in buyer can reach the account menu", async ({ page }) => {
+	test("a signed-in buyer can reach the account menu", async ({
+		page,
+		isMobile,
+	}) => {
+		// 這支量的是手機：桌機瀏覽器縮到 393px 會有 15px 的常駐捲軸吃掉寬度，
+		// 手機的捲軸是浮在內容上的，所以只在 mobile project 跑。
+		test.skip(!isMobile, "只量手機（浮動捲軸）的寬度");
 		// 登入狀態是 Clerk 的（ADR 2026-09-27-identity-clerk）：session: "identity" 直接讓瀏覽器帶著 Clerk session 進站。
 		await setupGatewayMocks(page, { identity: BUYER, session: "identity" });
 
