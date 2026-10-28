@@ -1,6 +1,6 @@
 // Package social 是 social 模組的公開 API：貼文、留言、讚、店家討論區、hashtag、計數、瀏覽與分享、買家的社群處分與隱藏。
 //
-// 職責、擁有的資料與不變量見同目錄的 AGENTS.md。互動者 (kind, id) 由伺服器依資源歸屬推導（model.Caller）；店家身分的寫入收已經解析好的
+// 職責、擁有的資料與不變量見同目錄的 AGENTS.md，行為規格見 docs/modules/social.md。互動者 (kind, id) 由伺服器依資源歸屬推導（model.Caller）；店家身分的寫入收已經解析好的
 // seller.Store，能力在模組內以 seller.Authorize 檢查。
 package social
 
