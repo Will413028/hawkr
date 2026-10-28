@@ -76,7 +76,6 @@ services/java/shared/payuni-java-client/
 │   │   ├── LgsType.java                     通路類型（B2C / C2C / HOME / C2B）
 │   │   ├── GoodsType.java                   商品溫層（常溫 / 冷凍 / 冷藏）
 │   │   ├── ServiceType.java                 服務類型（取貨付款 / 取貨不付款）
-│   │   ├── ShipStatusCode.java              貨態碼
 │   │   ├── DeliveryTimeTag.java             配送時段
 │   │   ├── request/                         請求物件 (Records)
 │   │   │   ├── CallTcatRequest.java
@@ -918,34 +917,7 @@ public ShippingClient(PayUniHttpClient httpClient, String notifyUrl)
 | `CASH_ON_DELIVERY` | `"1"` | 取貨付款 |
 | `NO_CASH_ON_DELIVERY` | `"3"` | 取貨不付款 |
 
-#### **9.5 ShipStatusCode（貨態碼，20 種）**
-
-| Enum 值 | Code | 說明 | 分類 |
-|---------|------|------|------|
-| `ORDER_CREATED` | `"81"` | 物流單建立成功 | 訂單 |
-| `ORDER_VOIDED` | `"82"` | 物流單作廢 | 訂單 |
-| `STORE_PICKED_UP` | `"91"` | 門市已取件 | 超商配送 |
-| `IN_TRANSIT` | `"92"` | 配送中 | 超商配送 |
-| `ARRIVED_STORE` | `"98"` | 已送達門市 | 超商配送 |
-| `CONSUMER_PICKED_UP` | `"21"` | 消費者已取件 | 超商取件 |
-| `PICKUP_EXPIRED` | `"22"` | 取件逾期 | 超商取件 |
-| `RETURN_IN_TRANSIT` | `"31"` | 退貨配送中 | 超商退貨 |
-| `RETURN_ARRIVED` | `"32"` | 退貨已送達 | 超商退貨 |
-| `RETURN_COMPLETED` | `"33"` | 退貨完成 | 超商退貨 |
-| `HOME_SHIPPED` | `"11"` | 宅配出貨 | 宅配配送 |
-| `HOME_DELIVERED` | `"41"` | 宅配已送達 | 宅配配送 |
-| `HOME_DELIVERY_FAILED` | `"43"` | 宅配配送失敗 | 宅配配送 |
-| `HOME_IN_TRANSIT` | `"44"` | 宅配轉運中 | 宅配配送 |
-| `HOME_CANCELLED` | `"46"` | 宅配已取消 | 宅配配送 |
-| `HOME_RETURN_IN_TRANSIT` | `"51"` | 宅配退貨中 | 宅配退貨 |
-| `HOME_RETURN_ARRIVED` | `"52"` | 宅配退貨已送達 | 宅配退貨 |
-| `HOME_RETURN_COMPLETED` | `"53"` | 宅配退貨完成 | 宅配退貨 |
-| `HOME_RETURN_CANCELLED` | `"55"` | 宅配退貨取消 | 宅配退貨 |
-| `HOME_RETURN_FAILED` | `"56"` | 宅配退貨失敗 | 宅配退貨 |
-
-所有 Enum 皆提供 `code()`、`description()` 與 `static fromCode(String)` 方法。`fromCode()` 找不到時回傳 `null`。
-
-#### **9.6 DeliveryTimeTag（配送時段）**
+#### **9.5 DeliveryTimeTag（配送時段）**
 
 | Enum 值 | Code | 說明 |
 |---------|------|------|
