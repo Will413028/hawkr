@@ -4,7 +4,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 代行營運領域 MQ 事件類型，由 account-service 的 outbox dispatcher 發布到 `hawkr.delegation` exchange。Code 與 Value 一致（UPPER_SNAKE_CASE），與 routing key 不同 — routing key 為點分式 `delegation.operation.completed`，寫於 `pkg/mq/exchanges.go`；event_type 僅作 metadata。對齊 OrderEventType / SocialEventType 設計。
+ * 代行營運領域 MQ 事件類型，由 delegation 模組的 `DelegationOperationCompleted` 經 `internal/legacy/delegationservice` 排入 job 發布到 `hawkr.delegation` exchange。Code 與 Value 一致（UPPER_SNAKE_CASE），與 routing key 不同 — routing key 為點分式 `delegation.operation.completed`，寫於 `pkg/mq/exchanges.go`；event_type 僅作 metadata。對齊 OrderEventType / SocialEventType 設計。
  *
  * ⚠ 此檔案由 generate.sh 自動生成，請勿手動修改。
  * 業務輔助邏輯請在使用該 enum 的服務或模組內建立 helper class

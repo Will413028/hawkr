@@ -4,7 +4,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * ADM 代行**授權列本身**的治理動作類型（誰、在什麼時候、把哪家店的代行授權開通／復權／改範圍／撤回）。與 `DelegationAuditAction`（工作階段內對賣家資源的操作）是兩個不同的稽核事實，落在兩張不同的表，不得互相取代。Code 與 Value 一致（UPPER_SNAKE_CASE，直接存讀可辨識文字），對齊 EventType 系列字串式 value 設計；寫入前以 `CodeMetaValidator.validate` 驗證。Label 由後端隨稽核列下發（前端不得自建對照表），故本 enum 列入 `scripts/generate.sh` 的 `GO_LABEL_ENUMS`。「哪些 action 必須帶 `source_reference`」這類判定不是本 enum 的欄位，由 account-service `internal/delegation/rules` 的純函式決定；CodeMeta enum 內禁止放業務輔助邏輯。
+ * ADM 代行**授權列本身**的治理動作類型（誰、在什麼時候、把哪家店的代行授權開通／復權／改範圍／撤回）。與 `DelegationAuditAction`（工作階段內對賣家資源的操作）是兩個不同的稽核事實，落在兩張不同的表，不得互相取代。Code 與 Value 一致（UPPER_SNAKE_CASE，直接存讀可辨識文字），對齊 EventType 系列字串式 value 設計；寫入前以 `CodeMetaValidator.validate` 驗證。Label 由後端隨稽核列下發（前端不得自建對照表），故本 enum 列入 `scripts/generate.sh` 的 `GO_LABEL_ENUMS`。「哪些 action 必須帶 `source_reference`」這類判定不是本 enum 的欄位，由 delegation 模組的純函式決定；CodeMeta enum 內禁止放業務輔助邏輯。
  *
  * ⚠ 此檔案由 generate.sh 自動生成，請勿手動修改。
  * 業務輔助邏輯請在使用該 enum 的服務或模組內建立 helper class

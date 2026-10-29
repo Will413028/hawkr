@@ -4,7 +4,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 管理員建立代行工作階段時必選的事由。Value 是小寫 snake_case（不同於多數 CodeMeta enum 的 UPPER_SNAKE）：ADM 以 opaque id 規則驗證並原字串回音比對，值一旦大寫化就 502。caseReferenceRequired 不是本 enum 的欄位，由 account-service 的 DelegationReasonRules.CaseReferenceRequired(code) 純函式決定後隨 preflight 下發；CodeMeta enum 內禁止放業務輔助邏輯。Label 是後端唯一來源（preflight 的 reason.label 與 admin_operation_sessions.reason_label 都取自這裡），改這一格即全站生效。詳見 [56 §6.5.3](../詳細設計書/56-ADM%20代行營運（Delegated%20Operations）詳細設計書.md)。
+ * 管理員建立代行工作階段時必選的事由。Value 是小寫 snake_case（不同於多數 CodeMeta enum 的 UPPER_SNAKE）：ADM 以 opaque id 規則驗證並原字串回音比對，值一旦大寫化就 502。caseReferenceRequired 不是本 enum 的欄位，由 delegation 模組的純函式決定後隨 preflight 下發；CodeMeta enum 內禁止放業務輔助邏輯。Label 是後端唯一來源（preflight 的 reason.label 與 admin_operation_sessions.reason_label 都取自這裡），改這一格即全站生效。詳見 [56 §6.5.3](../詳細設計書/56-ADM%20代行營運（Delegated%20Operations）詳細設計書.md)。
  *
  * ⚠ 此檔案由 generate.sh 自動生成，請勿手動修改。
  * 業務輔助邏輯請在使用該 enum 的服務或模組內建立 helper class

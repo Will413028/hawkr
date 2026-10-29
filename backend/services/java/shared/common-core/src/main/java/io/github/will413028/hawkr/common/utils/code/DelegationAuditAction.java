@@ -4,7 +4,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * ADM 代行營運的稽核動作類型。Code 與 Value 一致（UPPER_SNAKE_CASE，直接存讀可辨識文字），對齊 EventType 系列字串式 value 設計。`riskLevel` 不是本 enum 的欄位，由 account-service `DelegationActionRules.RiskLevel(action)` 純函式決定（未登錄的 action 一律回 high，忘記登記的後果必須是多記一次高風險而非靜默降級）；CodeMeta enum 內禁止放業務輔助邏輯。四個 READ 動作只在讀取被拒絕時寫入，result 恆為 FAILED、biz_code 僅 9262 / 9263 / 9275 三者，讀取成功一律不落稽核（可觀測性由 access log 承擔）。
+ * ADM 代行營運的稽核動作類型。Code 與 Value 一致（UPPER_SNAKE_CASE，直接存讀可辨識文字），對齊 EventType 系列字串式 value 設計。`riskLevel` 不是本 enum 的欄位，由 delegation 模組的 `RiskLevel()`（`internal/modules/delegation/internal/model`）純函式決定（未登錄的 action 一律回 high，忘記登記的後果必須是多記一次高風險而非靜默降級）；CodeMeta enum 內禁止放業務輔助邏輯。四個 READ 動作只在讀取被拒絕時寫入，result 恆為 FAILED、biz_code 僅 9262 / 9263 / 9275 三者，讀取成功一律不落稽核（可觀測性由 access log 承擔）。
  *
  * ⚠ 此檔案由 generate.sh 自動生成，請勿手動修改。
  * 業務輔助邏輯請在使用該 enum 的服務或模組內建立 helper class

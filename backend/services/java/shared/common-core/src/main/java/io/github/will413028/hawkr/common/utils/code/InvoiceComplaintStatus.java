@@ -17,7 +17,7 @@ public enum InvoiceComplaintStatus implements CodeMeta {
     OVERDUE("OVERDUE", "OVERDUE", "已逾期", "超過 3 個工作天未回覆；24 小時後自動升級 ADM"),
     ESCALATED_TO_ADM("ESCALATED_TO_ADM", "ESCALATED_TO_ADM", "待平台判定", "賣家請求協助／買家不接受／逾期自動升級"),
     RESOLVED("RESOLVED", "RESOLVED", "已解決", "ADM 判定已解決、買家確認、或系統偵測發票已送達。**非終態**（可於 24 小時後重開，最多 2 次）"),
-    VIOLATION_CONFIRMED("VIOLATION_CONFIRMED", "VIOLATION_CONFIRMED", "判定賣家違規", "計入 90 天違規窗口；發票模組只發建議，停權處分由 seller-service 執行（終態）"),
+    VIOLATION_CONFIRMED("VIOLATION_CONFIRMED", "VIOLATION_CONFIRMED", "判定賣家違規", "計入 90 天違規窗口；發票模組只發建議，停權處分由 seller 模組的措施執行（終態）"),
     WITHDRAWN("WITHDRAWN", "WITHDRAWN", "買家已撤回", "不計入違規計數（終態）");
 
     private final String code;
