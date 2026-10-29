@@ -26,14 +26,20 @@ func TestValuesAreDistinctUpperSnakeCodes(t *testing.T) {
 }
 
 func TestSubsetsAreSubsetsOfValues(t *testing.T) {
-	for name, subset := range map[string][]Category{"ReporterSelectable": ReporterSelectable(), "Assessable": Assessable()} {
-		for _, v := range subset {
+	for name, c := range map[string]struct {
+		subset []Category
+		want   int
+	}{
+		"ReporterSelectable": {ReporterSelectable(), len(Values()) - len(Community()) - 1},
+		"Assessable":         {Assessable(), len(Values()) - 1},
+	} {
+		for _, v := range c.subset {
 			if !slices.Contains(Values(), v) {
 				t.Errorf("%s 的 %q 不在 Values()", name, v)
 			}
 		}
-		if want := len(Values()) - len(Community()) - 1; len(subset) != want {
-			t.Errorf("%s 有 %d 個值，預期 %d 個（少一個入口專屬的值與社群類別）", name, len(subset), want)
+		if len(c.subset) != c.want {
+			t.Errorf("%s 有 %d 個值，預期 %d 個", name, len(c.subset), c.want)
 		}
 	}
 }
@@ -56,14 +62,14 @@ func TestOtherIsOnlyForReportersAndPlatformAbuseOnlyForAssessment(t *testing.T) 
 	}
 }
 
-// 社群類別只給社群內容的隱藏與警告：店家治理的兩個子集都不接受；社群的子集不含 Other。
-func TestCommunityCategoriesAreOnlyForCommunityContent(t *testing.T) {
+// 社群類別不給店家治理的檢舉人選，但店家治理的認定與案件類別接受（內容下架的認定）；社群的子集不含 Other。
+func TestCommunityCategoriesAreNotReporterSelectable(t *testing.T) {
 	if got := Community(); !slices.Equal(got, []Category{Spam, Harassment, Hate}) {
 		t.Fatalf("Community() = %v", got)
 	}
 	for _, v := range Community() {
-		if !slices.Contains(Values(), v) || slices.Contains(ReporterSelectable(), v) || slices.Contains(Assessable(), v) {
-			t.Errorf("%q 只能在 Values() 與 CommunityAssessable()", v)
+		if !slices.Contains(Values(), v) || slices.Contains(ReporterSelectable(), v) || !slices.Contains(Assessable(), v) {
+			t.Errorf("%q 要在 Values() 與 Assessable()，不在 ReporterSelectable()", v)
 		}
 		if !slices.Contains(CommunityAssessable(), v) || !v.CommunityAssessable() || !v.Community() {
 			t.Errorf("%q 要在社群內容的子集", v)

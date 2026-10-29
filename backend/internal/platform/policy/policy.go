@@ -4,12 +4,11 @@
 // 各入口只接受自己的子集，伺服器照樣驗證（C3：client 的常數只是呈現順序）：
 //   - ReporterSelectable：店家治理的檢舉人可以選的類別，除了 PlatformAbuse；
 //   - Assessable：店家治理的平台判定類別與認定（含案件的類別）可用的類別，除了 Other（Other 只給檢舉人選，理由要指到條款，
-//     所以分案時要改判成有依據的類別，或直接設定結果）；
+//     所以分案時要改判成有依據的類別，或直接設定結果）；含社群類別，因為內容下架措施的認定用它們；
 //   - CommunityAssessable：社群內容（買家寫的留言、討論區留言）的隱藏與警告可用的類別：社群類別 Community 加上對買家言論成立的類別，
 //     不含只對商品或賣家成立的類別（FoodSafety、ProhibitedGoods、UnlicensedSale、FakeCertification、Counterfeit）與 Other。
 //
-// 社群類別（Spam、Harassment、Hate）還不屬於 ReporterSelectable 與 Assessable：店家治理的資料表（reports、cases、violations）
-// 的 CHECK 沒有它們，seller 的子集由 A7-1c 決定時再加入。
+// 社群類別（Spam、Harassment、Hate）不屬於 ReporterSelectable：店家本身的檢舉走 seller 通報表單，檢舉人選不到它們。
 //
 // 值與契約 api/hawkr/common/v1alpha1/policy_category.proto 的 PolicyCategory 一一對應（proto 的值名去掉
 // POLICY_CATEGORY_ 前綴）；儲存的代碼是 UPPER_SNAKE，各表的 CHECK 對自己的子集（模組的 TestChecksMatchGo）。platform 不得依賴任何模組。
@@ -71,8 +70,8 @@ func ReporterSelectable() []Category {
 	return without(without(Values(), PlatformAbuse), Community()...)
 }
 
-// Assessable 回傳店家治理的平台判定類別與認定可用的類別（全部除了 Other 與社群類別），與 violations.category、cases.category 的 CHECK 一致。
-func Assessable() []Category { return without(without(Values(), Other), Community()...) }
+// Assessable 回傳店家治理的平台判定類別與認定可用的類別（全部除了 Other，含社群類別），與 violations.category、cases.category 的 CHECK 一致。
+func Assessable() []Category { return without(Values(), Other) }
 
 // CommunityAssessable 回傳社群內容的隱藏與警告可用的類別，與 social.hides、social.sanctions 的 CHECK 一致：社群類別（Spam、
 // Harassment、Hate）加上對買家言論成立的類別（MisleadingInfo、IPInfringement、Fraud、OffPlatformTrade、Privacy、Impersonation、
@@ -89,7 +88,7 @@ func CommunityAssessable() []Category {
 func (c Category) ReporterSelectable() bool { return c != PlatformAbuse && !c.Community() && c.valid() }
 
 // Assessable 說明店家治理的平台判定與認定可不可以用這個類別。
-func (c Category) Assessable() bool { return c != Other && !c.Community() && c.valid() }
+func (c Category) Assessable() bool { return c != Other && c.valid() }
 
 // CommunityAssessable 說明社群內容的隱藏與警告可不可以用這個類別。
 func (c Category) CommunityAssessable() bool { return slices.Contains(CommunityAssessable(), c) }

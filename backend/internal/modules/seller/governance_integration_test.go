@@ -258,7 +258,7 @@ func TestReportCategoryIsLimitedToWhatAReporterCanPick(t *testing.T) {
 		accepted++
 	}
 	if accepted != 12 {
-		t.Fatalf("檢舉人可選的類別 %d 個，預期 12 個", accepted)
+		t.Fatalf("檢舉人可選的類別 %d 個，預期 15 個", accepted)
 	}
 	if n := f.count(t, "SELECT count(*) FROM seller.reports"); n != 12 {
 		t.Fatalf("寫入了 %d 筆通報，預期 12 筆", n)
@@ -1006,7 +1006,7 @@ func TestFindingCategoryIsLimitedToWhatThePlatformCanAssess(t *testing.T) {
 		})
 		return err
 	}
-	rejected := []policy.Category{policy.Other, "", "UNAUTHORIZED_SALE", policy.Spam, policy.Harassment, policy.Hate}
+	rejected := []policy.Category{policy.Other, "", "UNAUTHORIZED_SALE"}
 	for _, c := range rejected {
 		if err := create(c); apperr.KindOf(err) != apperr.KindInvalidInput {
 			t.Errorf("認定的類別 %q：%v，預期 invalid_argument", c, err)
@@ -1025,11 +1025,11 @@ func TestFindingCategoryIsLimitedToWhatThePlatformCanAssess(t *testing.T) {
 		}
 		accepted++
 	}
-	if accepted != 12 {
-		t.Fatalf("認定可用的類別 %d 個，預期 12 個", accepted)
+	if accepted != 15 {
+		t.Fatalf("認定可用的類別 %d 個，預期 15 個", accepted)
 	}
-	if n := f.count(t, "SELECT count(*) FROM seller.violations"); n != 12 {
-		t.Fatalf("寫入了 %d 筆認定，預期 12 筆", n)
+	if n := f.count(t, "SELECT count(*) FROM seller.violations"); n != 15 {
+		t.Fatalf("寫入了 %d 筆認定，預期 15 筆", n)
 	}
 }
 
