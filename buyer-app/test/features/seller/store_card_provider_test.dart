@@ -56,4 +56,37 @@ void main() {
     expect(await container.read(storeCardProvider('  ').future), isNull);
     expect(batches, isEmpty);
   });
+
+  test(
+    'a failed read is an error, not a cached missing card, and retries',
+    () async {
+      var down = true;
+      final batches = <List<String>>[];
+      final container = ProviderContainer(
+        overrides: [
+          sellerRepositoryProvider.overrideWithValue(
+            fakeSellerRepository(
+              batches: batches,
+              cards: [StoreCard(id: '1', name: 'A')],
+              failing: () => down,
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await expectLater(
+        container.read(storeCardProvider('1').future),
+        throwsA(isA<StateError>()),
+      );
+      expect(container.read(storeCardProvider('1')).hasError, isTrue);
+
+      down = false;
+      container.invalidate(storeCardProvider('1'));
+      final card = await container.read(storeCardProvider('1').future);
+
+      expect(card?.name, 'A');
+      expect(batches, hasLength(2));
+    },
+  );
 }

@@ -52,11 +52,15 @@ final class StoreCardLoaderProvider
 String _$storeCardLoaderHash() => r'60119d8751143dccc9dd6c7ad9cd50df885185ee';
 
 /// 一家店的卡片，同一個畫面同時要的店家共用一次批次讀取。
+///
+/// 沒有卡片是資料 null；讀取失敗是 AsyncError（不快取成 null），`ref.invalidate` 或下一次重新建立時重讀。
 
 @ProviderFor(storeCard)
 final storeCardProvider = StoreCardFamily._();
 
 /// 一家店的卡片，同一個畫面同時要的店家共用一次批次讀取。
+///
+/// 沒有卡片是資料 null；讀取失敗是 AsyncError（不快取成 null），`ref.invalidate` 或下一次重新建立時重讀。
 
 final class StoreCardProvider
     extends
@@ -67,6 +71,8 @@ final class StoreCardProvider
         >
     with $FutureModifier<StoreCard?>, $FutureProvider<StoreCard?> {
   /// 一家店的卡片，同一個畫面同時要的店家共用一次批次讀取。
+  ///
+  /// 沒有卡片是資料 null；讀取失敗是 AsyncError（不快取成 null），`ref.invalidate` 或下一次重新建立時重讀。
   StoreCardProvider._({
     required StoreCardFamily super.from,
     required String super.argument,
@@ -113,6 +119,8 @@ final class StoreCardProvider
 String _$storeCardHash() => r'644f8c60411e9c3e01dcba80440db93e08bda31b';
 
 /// 一家店的卡片，同一個畫面同時要的店家共用一次批次讀取。
+///
+/// 沒有卡片是資料 null；讀取失敗是 AsyncError（不快取成 null），`ref.invalidate` 或下一次重新建立時重讀。
 
 final class StoreCardFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<StoreCard?>, String> {
@@ -126,6 +134,8 @@ final class StoreCardFamily extends $Family
       );
 
   /// 一家店的卡片，同一個畫面同時要的店家共用一次批次讀取。
+  ///
+  /// 沒有卡片是資料 null；讀取失敗是 AsyncError（不快取成 null），`ref.invalidate` 或下一次重新建立時重讀。
 
   StoreCardProvider call(String storeId) =>
       StoreCardProvider._(argument: storeId, from: this);

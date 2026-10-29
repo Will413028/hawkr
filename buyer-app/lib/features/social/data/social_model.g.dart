@@ -10,6 +10,7 @@ _Post _$PostFromJson(Map<String, dynamic> json) => _Post(
   id: tsidToInt(json['id']),
   content: json['content'] as String? ?? '',
   merchantId: tsidToIntOrNull(json['sellerId']),
+  storeCode: json['storeCode'] as String? ?? '',
   merchantName: json['sellerName'] as String?,
   merchantAvatar: json['logoUrl'] as String?,
   imageKeys:
@@ -31,6 +32,7 @@ Map<String, dynamic> _$PostToJson(_Post instance) => <String, dynamic>{
   'id': instance.id,
   'content': instance.content,
   'sellerId': instance.merchantId,
+  'storeCode': instance.storeCode,
   'sellerName': instance.merchantName,
   'logoUrl': instance.merchantAvatar,
   'imageKeys': instance.imageKeys,

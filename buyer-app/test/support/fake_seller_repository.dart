@@ -4,10 +4,11 @@ import 'package:mocktail/mocktail.dart';
 
 class _MockSellerRepository extends Mock implements SellerRepository {}
 
-/// 只會回 [cards] 的 SellerRepository。[batches] 記下每次 BatchGetStores 的 id。
+/// 只會回 [cards] 的 SellerRepository。[batches] 記下每次 BatchGetStores 的 id；[failing] 回 true 時該次讀取丟錯。
 SellerRepository fakeSellerRepository({
   Iterable<StoreCard> cards = const [],
   List<List<String>>? batches,
+  bool Function()? failing,
 }) {
   final repository = _MockSellerRepository();
   final byId = {for (final card in cards) card.id: card};
@@ -15,6 +16,7 @@ SellerRepository fakeSellerRepository({
     final ids = (invocation.positionalArguments.first as Iterable<String>)
         .toList();
     batches?.add(ids);
+    if (failing?.call() ?? false) throw StateError('network down');
     return {
       for (final id in ids)
         if (byId.containsKey(id)) id: byId[id]!,

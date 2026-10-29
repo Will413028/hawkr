@@ -13,6 +13,8 @@ abstract class Post with _$Post {
     @JsonKey(fromJson: tsidToInt) required int id,
     @Default('') String content,
     @JsonKey(name: 'sellerId', fromJson: tsidToIntOrNull) int? merchantId,
+    // 店面網址的路徑段（列表端點由 gateway 從 seller 批次回填；詳情端點沒有）。空字串代表沒有可進的店面。
+    @JsonKey(name: 'storeCode') @Default('') String storeCode,
     @JsonKey(name: 'sellerName') String? merchantName,
     @JsonKey(name: 'logoUrl') String? merchantAvatar,
     // 49 §6.1 成對契約：貼文圖只有複數欄。social 的 posts.image 是單一 TEXT 欄，

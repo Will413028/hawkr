@@ -1,28 +1,25 @@
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pb.dart';
 import 'package:hawkr_api/images.dart' show ImagePreset, ImageUri;
 import 'package:hawkr_twaddr/hawkr_twaddr.dart';
-
-/// 名稱不設時的顯示（個資清除之後的已關閉店家）。
-const closedStoreName = '已關閉的店家';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
 /// 店家卡片在 App 各處的呈現：名稱、營業狀態、所在地與圖片。
 extension StoreCardDisplay on StoreCard {
-  /// 名稱不設或空白時是 [closedStoreName]。
-  String get displayName {
+  /// 名稱不設或空白時是共用文案目錄的已關閉店家（個資清除之後的店家）。
+  String displayName(UiLocale l) {
     final value = hasName() ? name.trim() : '';
-    return value.isEmpty ? closedStoreName : value;
+    return value.isEmpty ? commonStoreCardClosedStore(l) : value;
   }
 
   /// 營業中且有店面網址：可點、以 `store_code` 導頁。
   bool get isOpen =>
       status == StoreCardStatus.STORE_CARD_STATUS_OPEN && storeCode.isNotEmpty;
 
-  /// 暫停或已關閉時的標籤；營業中與未知的狀態沒有標籤。
-  String? get statusLabel => switch (status) {
-    StoreCardStatus.STORE_CARD_STATUS_PAUSED => '暫停營業',
-    StoreCardStatus.STORE_CARD_STATUS_CLOSED => '已關閉',
-    _ => null,
-  };
+  /// 暫停或已關閉時的標籤（共用文案目錄）；營業中與未知的狀態沒有標籤。
+  String? statusLabel(UiLocale l) =>
+      status == StoreCardStatus.STORE_CARD_STATUS_OPEN
+      ? null
+      : status.uiText(l);
 
   /// 縣市加鄉鎮市區；沒有代碼或不認得時是空字串。
   String get location => townLocation(townCode);

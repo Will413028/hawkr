@@ -15,7 +15,8 @@ T _$identity<T>(T value) => value;
 mixin _$MemberCard {
 
  String get sellerId; String get sellerName;/// 店面網址的路徑段；店家不是營業中時是空字串。
- String get storeCode;/// 賣家 logo 的 objectKey（49 §6.1 成對契約中的 SSOT 那一半）。
+ String get storeCode;/// 店家暫停營業或已關閉時的標籤（共用文案目錄）；營業中是空字串。
+ String get statusLabel;/// 賣家 logo 的 objectKey（49 §6.1 成對契約中的 SSOT 那一半）。
 /// 顯示 URL 一律由 OssImage / buildImageUrl 於渲染期組出，不存完整 URL。
  String get sellerLogoKey;/// 賣家封面的 objectKey（同上）。
  String get sellerCoverKey; String get totalSpending;
@@ -29,16 +30,16 @@ $MemberCardCopyWith<MemberCard> get copyWith => _$MemberCardCopyWithImpl<MemberC
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is MemberCard&&(identical(other.sellerId, sellerId) || other.sellerId == sellerId)&&(identical(other.sellerName, sellerName) || other.sellerName == sellerName)&&(identical(other.storeCode, storeCode) || other.storeCode == storeCode)&&(identical(other.sellerLogoKey, sellerLogoKey) || other.sellerLogoKey == sellerLogoKey)&&(identical(other.sellerCoverKey, sellerCoverKey) || other.sellerCoverKey == sellerCoverKey)&&(identical(other.totalSpending, totalSpending) || other.totalSpending == totalSpending));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is MemberCard&&(identical(other.sellerId, sellerId) || other.sellerId == sellerId)&&(identical(other.sellerName, sellerName) || other.sellerName == sellerName)&&(identical(other.storeCode, storeCode) || other.storeCode == storeCode)&&(identical(other.statusLabel, statusLabel) || other.statusLabel == statusLabel)&&(identical(other.sellerLogoKey, sellerLogoKey) || other.sellerLogoKey == sellerLogoKey)&&(identical(other.sellerCoverKey, sellerCoverKey) || other.sellerCoverKey == sellerCoverKey)&&(identical(other.totalSpending, totalSpending) || other.totalSpending == totalSpending));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,sellerId,sellerName,storeCode,sellerLogoKey,sellerCoverKey,totalSpending);
+int get hashCode => Object.hash(runtimeType,sellerId,sellerName,storeCode,statusLabel,sellerLogoKey,sellerCoverKey,totalSpending);
 
 @override
 String toString() {
-  return 'MemberCard(sellerId: $sellerId, sellerName: $sellerName, storeCode: $storeCode, sellerLogoKey: $sellerLogoKey, sellerCoverKey: $sellerCoverKey, totalSpending: $totalSpending)';
+  return 'MemberCard(sellerId: $sellerId, sellerName: $sellerName, storeCode: $storeCode, statusLabel: $statusLabel, sellerLogoKey: $sellerLogoKey, sellerCoverKey: $sellerCoverKey, totalSpending: $totalSpending)';
 }
 
 
@@ -49,7 +50,7 @@ abstract mixin class $MemberCardCopyWith<$Res>  {
   factory $MemberCardCopyWith(MemberCard value, $Res Function(MemberCard) _then) = _$MemberCardCopyWithImpl;
 @useResult
 $Res call({
- String sellerId, String sellerName, String storeCode, String sellerLogoKey, String sellerCoverKey, String totalSpending
+ String sellerId, String sellerName, String storeCode, String statusLabel, String sellerLogoKey, String sellerCoverKey, String totalSpending
 });
 
 
@@ -66,11 +67,12 @@ class _$MemberCardCopyWithImpl<$Res>
 
 /// Create a copy of MemberCard
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? sellerId = null,Object? sellerName = null,Object? storeCode = null,Object? sellerLogoKey = null,Object? sellerCoverKey = null,Object? totalSpending = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? sellerId = null,Object? sellerName = null,Object? storeCode = null,Object? statusLabel = null,Object? sellerLogoKey = null,Object? sellerCoverKey = null,Object? totalSpending = null,}) {
   return _then(_self.copyWith(
 sellerId: null == sellerId ? _self.sellerId : sellerId // ignore: cast_nullable_to_non_nullable
 as String,sellerName: null == sellerName ? _self.sellerName : sellerName // ignore: cast_nullable_to_non_nullable
 as String,storeCode: null == storeCode ? _self.storeCode : storeCode // ignore: cast_nullable_to_non_nullable
+as String,statusLabel: null == statusLabel ? _self.statusLabel : statusLabel // ignore: cast_nullable_to_non_nullable
 as String,sellerLogoKey: null == sellerLogoKey ? _self.sellerLogoKey : sellerLogoKey // ignore: cast_nullable_to_non_nullable
 as String,sellerCoverKey: null == sellerCoverKey ? _self.sellerCoverKey : sellerCoverKey // ignore: cast_nullable_to_non_nullable
 as String,totalSpending: null == totalSpending ? _self.totalSpending : totalSpending // ignore: cast_nullable_to_non_nullable
@@ -159,10 +161,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String sellerId,  String sellerName,  String storeCode,  String sellerLogoKey,  String sellerCoverKey,  String totalSpending)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String sellerId,  String sellerName,  String storeCode,  String statusLabel,  String sellerLogoKey,  String sellerCoverKey,  String totalSpending)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _MemberCard() when $default != null:
-return $default(_that.sellerId,_that.sellerName,_that.storeCode,_that.sellerLogoKey,_that.sellerCoverKey,_that.totalSpending);case _:
+return $default(_that.sellerId,_that.sellerName,_that.storeCode,_that.statusLabel,_that.sellerLogoKey,_that.sellerCoverKey,_that.totalSpending);case _:
   return orElse();
 
 }
@@ -180,10 +182,10 @@ return $default(_that.sellerId,_that.sellerName,_that.storeCode,_that.sellerLogo
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String sellerId,  String sellerName,  String storeCode,  String sellerLogoKey,  String sellerCoverKey,  String totalSpending)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String sellerId,  String sellerName,  String storeCode,  String statusLabel,  String sellerLogoKey,  String sellerCoverKey,  String totalSpending)  $default,) {final _that = this;
 switch (_that) {
 case _MemberCard():
-return $default(_that.sellerId,_that.sellerName,_that.storeCode,_that.sellerLogoKey,_that.sellerCoverKey,_that.totalSpending);case _:
+return $default(_that.sellerId,_that.sellerName,_that.storeCode,_that.statusLabel,_that.sellerLogoKey,_that.sellerCoverKey,_that.totalSpending);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -200,10 +202,10 @@ return $default(_that.sellerId,_that.sellerName,_that.storeCode,_that.sellerLogo
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String sellerId,  String sellerName,  String storeCode,  String sellerLogoKey,  String sellerCoverKey,  String totalSpending)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String sellerId,  String sellerName,  String storeCode,  String statusLabel,  String sellerLogoKey,  String sellerCoverKey,  String totalSpending)?  $default,) {final _that = this;
 switch (_that) {
 case _MemberCard() when $default != null:
-return $default(_that.sellerId,_that.sellerName,_that.storeCode,_that.sellerLogoKey,_that.sellerCoverKey,_that.totalSpending);case _:
+return $default(_that.sellerId,_that.sellerName,_that.storeCode,_that.statusLabel,_that.sellerLogoKey,_that.sellerCoverKey,_that.totalSpending);case _:
   return null;
 
 }
@@ -215,13 +217,15 @@ return $default(_that.sellerId,_that.sellerName,_that.storeCode,_that.sellerLogo
 
 
 class _MemberCard implements MemberCard {
-  const _MemberCard({required this.sellerId, required this.sellerName, this.storeCode = '', this.sellerLogoKey = '', this.sellerCoverKey = '', required this.totalSpending});
+  const _MemberCard({required this.sellerId, required this.sellerName, this.storeCode = '', this.statusLabel = '', this.sellerLogoKey = '', this.sellerCoverKey = '', required this.totalSpending});
   
 
 @override final  String sellerId;
 @override final  String sellerName;
 /// 店面網址的路徑段；店家不是營業中時是空字串。
 @override@JsonKey() final  String storeCode;
+/// 店家暫停營業或已關閉時的標籤（共用文案目錄）；營業中是空字串。
+@override@JsonKey() final  String statusLabel;
 /// 賣家 logo 的 objectKey（49 §6.1 成對契約中的 SSOT 那一半）。
 /// 顯示 URL 一律由 OssImage / buildImageUrl 於渲染期組出，不存完整 URL。
 @override@JsonKey() final  String sellerLogoKey;
@@ -239,16 +243,16 @@ _$MemberCardCopyWith<_MemberCard> get copyWith => __$MemberCardCopyWithImpl<_Mem
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _MemberCard&&(identical(other.sellerId, sellerId) || other.sellerId == sellerId)&&(identical(other.sellerName, sellerName) || other.sellerName == sellerName)&&(identical(other.storeCode, storeCode) || other.storeCode == storeCode)&&(identical(other.sellerLogoKey, sellerLogoKey) || other.sellerLogoKey == sellerLogoKey)&&(identical(other.sellerCoverKey, sellerCoverKey) || other.sellerCoverKey == sellerCoverKey)&&(identical(other.totalSpending, totalSpending) || other.totalSpending == totalSpending));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _MemberCard&&(identical(other.sellerId, sellerId) || other.sellerId == sellerId)&&(identical(other.sellerName, sellerName) || other.sellerName == sellerName)&&(identical(other.storeCode, storeCode) || other.storeCode == storeCode)&&(identical(other.statusLabel, statusLabel) || other.statusLabel == statusLabel)&&(identical(other.sellerLogoKey, sellerLogoKey) || other.sellerLogoKey == sellerLogoKey)&&(identical(other.sellerCoverKey, sellerCoverKey) || other.sellerCoverKey == sellerCoverKey)&&(identical(other.totalSpending, totalSpending) || other.totalSpending == totalSpending));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,sellerId,sellerName,storeCode,sellerLogoKey,sellerCoverKey,totalSpending);
+int get hashCode => Object.hash(runtimeType,sellerId,sellerName,storeCode,statusLabel,sellerLogoKey,sellerCoverKey,totalSpending);
 
 @override
 String toString() {
-  return 'MemberCard(sellerId: $sellerId, sellerName: $sellerName, storeCode: $storeCode, sellerLogoKey: $sellerLogoKey, sellerCoverKey: $sellerCoverKey, totalSpending: $totalSpending)';
+  return 'MemberCard(sellerId: $sellerId, sellerName: $sellerName, storeCode: $storeCode, statusLabel: $statusLabel, sellerLogoKey: $sellerLogoKey, sellerCoverKey: $sellerCoverKey, totalSpending: $totalSpending)';
 }
 
 
@@ -259,7 +263,7 @@ abstract mixin class _$MemberCardCopyWith<$Res> implements $MemberCardCopyWith<$
   factory _$MemberCardCopyWith(_MemberCard value, $Res Function(_MemberCard) _then) = __$MemberCardCopyWithImpl;
 @override @useResult
 $Res call({
- String sellerId, String sellerName, String storeCode, String sellerLogoKey, String sellerCoverKey, String totalSpending
+ String sellerId, String sellerName, String storeCode, String statusLabel, String sellerLogoKey, String sellerCoverKey, String totalSpending
 });
 
 
@@ -276,11 +280,12 @@ class __$MemberCardCopyWithImpl<$Res>
 
 /// Create a copy of MemberCard
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? sellerId = null,Object? sellerName = null,Object? storeCode = null,Object? sellerLogoKey = null,Object? sellerCoverKey = null,Object? totalSpending = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? sellerId = null,Object? sellerName = null,Object? storeCode = null,Object? statusLabel = null,Object? sellerLogoKey = null,Object? sellerCoverKey = null,Object? totalSpending = null,}) {
   return _then(_MemberCard(
 sellerId: null == sellerId ? _self.sellerId : sellerId // ignore: cast_nullable_to_non_nullable
 as String,sellerName: null == sellerName ? _self.sellerName : sellerName // ignore: cast_nullable_to_non_nullable
 as String,storeCode: null == storeCode ? _self.storeCode : storeCode // ignore: cast_nullable_to_non_nullable
+as String,statusLabel: null == statusLabel ? _self.statusLabel : statusLabel // ignore: cast_nullable_to_non_nullable
 as String,sellerLogoKey: null == sellerLogoKey ? _self.sellerLogoKey : sellerLogoKey // ignore: cast_nullable_to_non_nullable
 as String,sellerCoverKey: null == sellerCoverKey ? _self.sellerCoverKey : sellerCoverKey // ignore: cast_nullable_to_non_nullable
 as String,totalSpending: null == totalSpending ? _self.totalSpending : totalSpending // ignore: cast_nullable_to_non_nullable

@@ -1,3 +1,4 @@
+import 'package:hawkr_buyer/core/l10n/ui_locale.dart';
 import 'cart_typography.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/core/theme/hk_tokens.dart';
@@ -722,7 +723,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                       storeCode: card != null && card.isOpen
                                           ? card.storeCode
                                           : '',
-                                      storeStatusLabel: card?.statusLabel,
+                                      storeStatusLabel: card?.statusLabel(
+                                        ref.watch(uiLocaleProvider),
+                                      ),
                                       checkedSkuIds: _checkedSkuIds,
                                       skuStock: _skuStock,
                                       onGroupCheckChanged: _onGroupCheckChanged,

@@ -11,6 +11,9 @@ abstract class MemberCard with _$MemberCard {
     /// 店面網址的路徑段；店家不是營業中時是空字串。
     @Default('') String storeCode,
 
+    /// 店家暫停營業或已關閉時的標籤（共用文案目錄）；營業中是空字串。
+    @Default('') String statusLabel,
+
     /// 賣家 logo 的 objectKey（49 §6.1 成對契約中的 SSOT 那一半）。
     /// 顯示 URL 一律由 OssImage / buildImageUrl 於渲染期組出，不存完整 URL。
     @Default('') String sellerLogoKey,

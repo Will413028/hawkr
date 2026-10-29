@@ -1,3 +1,4 @@
+import 'package:hawkr_buyer/core/l10n/ui_locale.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
@@ -459,8 +460,9 @@ class ChatThreadScreen extends HookConsumerWidget {
         if (card == null || !context.mounted) return;
         final logo = card.logoUri;
         avatarUrl.value = logo.isNotEmpty ? logo : null;
-        merchantNameState.value = card.displayName;
-        storeStatusLabel.value = card.statusLabel;
+        final locale = ref.read(uiLocaleProvider);
+        merchantNameState.value = card.displayName(locale);
+        storeStatusLabel.value = card.statusLabel(locale);
       } catch (_) {
         if (!context.mounted) return;
         if ((merchantNameState.value ?? '').isEmpty &&

@@ -1,3 +1,5 @@
+import 'package:hawkr_buyer/core/l10n/ui_locale.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hawkr_api/images.dart';
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pb.dart' as buyer;
@@ -12,11 +14,14 @@ part 'member_card_repository.g.dart';
 @riverpod
 MemberCardRepository memberCardRepository(Ref ref) => MemberCardRepository(
   BuyerAppServiceClient(ref.watch(connectAuthTransportProvider)),
+  locale: ref.watch(uiLocaleProvider),
 );
 
 class MemberCardRepository {
   final BuyerAppServiceClient _buyer;
-  MemberCardRepository(this._buyer);
+  final UiLocale _locale;
+  MemberCardRepository(this._buyer, {UiLocale locale = UiLocale.zhTW})
+    : _locale = locale;
 
   Future<({List<MemberCard> records, String nextPageToken})> getMemberCards({
     String pageToken = '',
@@ -30,7 +35,8 @@ class MemberCardRepository {
           .map(
             (card) => MemberCard(
               sellerId: card.storeId,
-              sellerName: card.store.displayName,
+              sellerName: card.store.displayName(_locale),
+              statusLabel: card.store.statusLabel(_locale) ?? '',
               storeCode: card.store.isOpen ? card.store.storeCode : '',
               sellerLogoKey: card.store.hasLogo()
                   ? card.store.logo.uri(ImagePreset.avatar)

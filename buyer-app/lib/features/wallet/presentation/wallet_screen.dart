@@ -570,6 +570,7 @@ class _MyWalletTabState extends ConsumerState<_MyWalletTab> {
               child: _NewLoyaltyCard(
                 merchantId: card.sellerId,
                 storeCode: card.storeCode,
+                statusLabel: card.statusLabel,
                 merchantName: card.sellerName,
                 merchantAvatarRaw: card.sellerLogoKey.isNotEmpty
                     ? card.sellerLogoKey
@@ -624,6 +625,7 @@ class _NewLoyaltyCard extends StatefulWidget {
   const _NewLoyaltyCard({
     required this.merchantId,
     required this.storeCode,
+    this.statusLabel = '',
     required this.merchantName,
     this.merchantAvatarRaw,
     this.coverUrl,
@@ -634,6 +636,9 @@ class _NewLoyaltyCard extends StatefulWidget {
 
   /// 店面網址的路徑段；店家不是營業中時是空字串，不能進店。
   final String storeCode;
+
+  /// 店家暫停營業或已關閉時的標籤（B11）；營業中是空字串。
+  final String statusLabel;
   final String merchantName;
   final String? merchantAvatarRaw;
   final String? coverUrl;
@@ -829,6 +834,24 @@ class _NewLoyaltyCardState extends State<_NewLoyaltyCard> {
                                   ],
                                 ),
                               ),
+                              if (widget.statusLabel.isNotEmpty)
+                                Text(
+                                  widget.statusLabel,
+                                  key: const ValueKey('member-card-status'),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: AppColors.bgCard,
+                                    fontSize: 12,
+                                    shadows: const [
+                                      Shadow(
+                                        blurRadius: 4,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               SizedBox(height: isSmallScreen ? 2 : 4),
                               // 白色分隔線
                               Container(

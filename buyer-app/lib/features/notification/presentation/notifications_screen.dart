@@ -1,3 +1,4 @@
+import 'package:hawkr_buyer/core/l10n/ui_locale.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/core/theme/hk_tokens.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
@@ -58,7 +59,7 @@ final _notificationSenderMetaProvider =
       if (kind == 'seller') {
         final card = await ref.watch(storeCardProvider(id).future);
         if (card == null) return null;
-        final name = card.displayName;
+        final name = card.displayName(ref.watch(uiLocaleProvider));
         final avatar = card.logoUri;
         return _NotificationSenderMeta(name: name, avatarUrl: avatar);
       }

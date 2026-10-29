@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pb.dart';
 import 'package:hawkr_buyer/config/flavor.dart';
+import 'package:hawkr_buyer/features/seller/data/seller_repository.dart';
 import 'package:hawkr_buyer/core/networking/dio_provider.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/features/social/presentation/post_detail_screen.dart';
@@ -14,6 +16,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+
+import '../../support/fake_seller_repository.dart';
 
 bool _hasSoftTopDivider(Widget widget) {
   if (widget is! DecoratedBox || widget.decoration is! BoxDecoration) {
@@ -105,9 +109,9 @@ void main() {
           ),
         ),
         GoRoute(
-          path: '/merchant/:sellerId',
+          path: '/merchant/:storeCode',
           builder: (_, state) =>
-              Scaffold(body: Text('店舖 ${state.pathParameters['sellerId']}')),
+              Scaffold(body: Text('店舖 ${state.pathParameters['storeCode']}')),
         ),
         GoRoute(
           path: '/marketplace',
@@ -120,7 +124,22 @@ void main() {
     await HttpOverrides.runZoned(
       () => tester.pumpWidget(
         ProviderScope(
-          overrides: [dioProvider.overrideWithValue(dio)],
+          overrides: [
+            dioProvider.overrideWithValue(dio),
+            // 詳情端點沒有 storeCode：sellerId 7 經店家卡片換成 nanmu。
+            sellerRepositoryProvider.overrideWithValue(
+              fakeSellerRepository(
+                cards: [
+                  StoreCard(
+                    id: '7',
+                    storeCode: 'nanmu',
+                    name: '南畝王生技',
+                    status: StoreCardStatus.STORE_CARD_STATUS_OPEN,
+                  ),
+                ],
+              ),
+            ),
+          ],
           child: ScreenUtilInit(
             designSize: const Size(390, 844),
             enableScaleWH: () => false,
@@ -306,6 +325,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.text('店舖 7'), findsOneWidget);
+    expect(find.text('店舖 nanmu'), findsOneWidget);
+    expect(find.text('店舖 7'), findsNothing);
   });
 }

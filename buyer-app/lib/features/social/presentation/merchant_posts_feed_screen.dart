@@ -346,11 +346,14 @@ class MerchantPostsFeedScreen extends HookConsumerWidget {
         .read(productRepositoryProvider)
         .getShareUrl(type: 'post', id: postId);
     if (!context.mounted) return;
+    final storeCode = post.storeCode;
     final url =
         data?['url'] ??
-        AppConstants.shareFallbackUrl(
-          '/sellers/$merchantId/posts#post-$postId',
-        );
+        (storeCode.isEmpty
+            ? null
+            : AppConstants.shareFallbackUrl(
+                '/sellers/$storeCode/posts#post-$postId',
+              ));
     if (url == null) return;
     showShareSheet(
       context,
@@ -744,7 +747,7 @@ class _PostContentPanel extends StatelessWidget {
             username: username,
             dateStr: dateStr,
             avatarUrl: post.merchantAvatar ?? fallbackMerchantAvatar,
-            sellerId: sellerId,
+            storeCode: post.storeCode,
           ),
           if (hasProduct) ...[
             SizedBox(height: 8.h),
@@ -779,18 +782,20 @@ class _MerchantLink extends StatelessWidget {
     required this.username,
     required this.dateStr,
     required this.avatarUrl,
-    required this.sellerId,
+    required this.storeCode,
   });
 
   final int postId;
   final String username;
   final String dateStr;
   final String? avatarUrl;
-  final String sellerId;
+
+  /// 店面網址的路徑段；空字串時連結停用（不退回用 id 定址）。
+  final String storeCode;
 
   @override
   Widget build(BuildContext context) {
-    final enabled = sellerId.isNotEmpty;
+    final enabled = storeCode.isNotEmpty;
 
     return Semantics(
       button: enabled,
@@ -799,7 +804,7 @@ class _MerchantLink extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           key: ValueKey('post-merchant-link-$postId'),
-          onTap: enabled ? () => context.push('/merchant/$sellerId') : null,
+          onTap: enabled ? () => context.push('/merchant/$storeCode') : null,
           borderRadius: BorderRadius.circular(HkRadius.md),
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: HkControl.minTap),

@@ -1,3 +1,4 @@
+import 'package:hawkr_buyer/core/l10n/ui_locale.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/core/theme/app_typography.dart';
 import 'package:hawkr_buyer/core/theme/hk_tokens.dart';
@@ -819,7 +820,7 @@ class _SellerInfoCard extends ConsumerWidget {
                     ),
                     const SizedBox(width: HkSpace.xs),
                     Text(
-                      card?.statusLabel ?? '店舖',
+                      card?.statusLabel(ref.watch(uiLocaleProvider)) ?? '店舖',
                       style: AppTypography.buttonMedium.copyWith(
                         color: AppColors.textInverse,
                         height: 1,

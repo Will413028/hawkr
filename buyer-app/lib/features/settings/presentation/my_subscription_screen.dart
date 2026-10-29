@@ -1,3 +1,5 @@
+import 'package:hawkr_buyer/core/l10n/ui_locale.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'dart:async';
 
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pb.dart' as buyer;
@@ -469,29 +471,31 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
   /// 追蹤店家卡片的顯示資料，全部來自 API 回的店家卡片。
   Map<String, dynamic> _followingItem(buyer.Follow row) {
     final card = row.store;
+    final l = ref.read(uiLocaleProvider);
     return {
       'merchantId': row.storeId,
-      'name': card.displayName,
+      'name': card.displayName(l),
       'avatar': card.logoUri,
       'address': card.location,
       'rating': card.hasRatingStats ? card.ratingAverage.toDouble() : 0.0,
       'reviewCount': card.hasRatingStats ? card.reviewCount : 0,
       'storeCode': card.isOpen ? card.storeCode : '',
-      'statusLabel': card.statusLabel ?? '',
+      'statusLabel': card.statusLabel(l) ?? '',
     };
   }
 
   Map<String, dynamic> _favoriteItem(buyer.Favorite favorite) {
     final product = favorite.product;
     final store = product.store;
+    final l = ref.read(uiLocaleProvider);
     return {
       'id': product.id,
       'productId': product.id,
       'productName': product.name,
       'imageKey': product.hasImage() ? product.image.uri(ImagePreset.card) : '',
       'sellerId': product.storeId,
-      'sellerName': store.displayName,
-      'storeName': store.displayName,
+      'sellerName': store.displayName(l),
+      'storeName': store.displayName(l),
       'sellerAvatar': store.logoUri,
       'distance': store.location,
       'storeCode': store.isOpen ? store.storeCode : '',
@@ -507,14 +511,15 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
 
   Map<String, dynamic> _visitItem(buyer.Visit visit) {
     final product = visit.product;
+    final l = ref.read(uiLocaleProvider);
     return {
       'id': product.id,
       'productId': product.id,
       'productName': product.name,
       'imageKey': product.hasImage() ? product.image.uri(ImagePreset.card) : '',
       'sellerId': product.storeId,
-      'sellerName': product.store.displayName,
-      'storeName': product.store.displayName,
+      'sellerName': product.store.displayName(l),
+      'storeName': product.store.displayName(l),
       'sellerAvatar': product.store.logoUri,
       'distance': product.store.location,
       'storeCode': product.store.isOpen ? product.store.storeCode : '',
@@ -1339,7 +1344,9 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
     final rating = _parseRatingValue(item['rating']);
     final reviewCount = _parseIntValue(item['reviewCount']);
     final merchantId = (item['merchantId'] ?? '').toString().trim();
-    final merchantName = name.isNotEmpty ? name : closedStoreName;
+    final merchantName = name.isNotEmpty
+        ? name
+        : commonStoreCardClosedStore(ref.read(uiLocaleProvider));
     final storeCode = (item['storeCode'] ?? '').toString().trim();
     final statusLabel = (item['statusLabel'] ?? '').toString().trim();
     final canOpenMerchant = storeCode.isNotEmpty;

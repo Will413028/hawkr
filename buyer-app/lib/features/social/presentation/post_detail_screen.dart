@@ -13,6 +13,8 @@ import 'package:hawkr_buyer/core/theme/hk_tokens.dart';
 import 'package:hawkr_buyer/features/product/data/product_repository.dart';
 import 'package:hawkr_buyer/features/product/presentation/merchant_item_detail_screen.dart';
 import 'package:hawkr_buyer/features/seller/data/seller_repository.dart';
+import 'package:hawkr_buyer/features/seller/data/store_card_display.dart';
+import 'package:hawkr_buyer/features/seller/data/store_card_provider.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'package:hawkr_buyer/shared/utils/hashtag_spans.dart';
@@ -166,6 +168,14 @@ class PostDetailScreen extends HookConsumerWidget {
             : resolvedMerchantAvatar.value;
         final sellerId =
             post.merchantId?.toString() ?? merchantId?.trim() ?? '';
+        // 詳情端點不帶 storeCode：sellerId 就是 store_id，經店家卡片（BatchGetStores）取得；
+        // 沒有營業中的店面網址時不給連結，也不退回用 id 定址。
+        final card = sellerId.isEmpty
+            ? null
+            : ref.watch(storeCardProvider(sellerId)).value;
+        final storeCode = post.storeCode.isNotEmpty
+            ? post.storeCode
+            : (card != null && card.isOpen ? card.storeCode : '');
         final imageUrl = _toAbsolute(post.imageUrl);
         final date = _formatDate(post.createdAt);
 
@@ -193,9 +203,11 @@ class PostDetailScreen extends HookConsumerWidget {
           if (!context.mounted) return;
           final url =
               data?['url'] ??
-              AppConstants.shareFallbackUrl(
-                '/sellers/$sellerId/posts#post-$postId',
-              );
+              (storeCode.isEmpty
+                  ? null
+                  : AppConstants.shareFallbackUrl(
+                      '/sellers/$storeCode/posts#post-$postId',
+                    ));
           if (url == null) return;
           showShareSheet(
             context,
@@ -234,9 +246,9 @@ class PostDetailScreen extends HookConsumerWidget {
               blockUserLabel: displayName,
             );
           },
-          onMerchantTap: sellerId.isEmpty
+          onMerchantTap: storeCode.isEmpty
               ? null
-              : () => context.push('/merchant/$sellerId'),
+              : () => context.push('/merchant/$storeCode'),
           onCaptionToggle: () {
             captionExpanded.value = !captionExpanded.value;
           },

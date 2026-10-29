@@ -16,6 +16,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 bool _hasSoftTopDivider(Widget widget) {
@@ -32,6 +33,10 @@ bool _hasSoftTopDivider(Widget widget) {
 }
 
 class _SocialFeedAdapter implements HttpClientAdapter {
+  _SocialFeedAdapter({this.withStoreCode = true});
+
+  final bool withStoreCode;
+
   @override
   Future<ResponseBody> fetch(
     RequestOptions options,
@@ -43,6 +48,7 @@ class _SocialFeedAdapter implements HttpClientAdapter {
         {
           'id': 101,
           'sellerId': 7,
+          if (withStoreCode) 'storeCode': 'nanmu',
           'sellerName': '南崁王生技',
           'logoUrl': '',
           'imageKeys': ['post/101.jpg'],
@@ -124,6 +130,91 @@ class _GuestSession extends Session {
 
 void main() {
   if (!F.isInitialized) F.init(Flavor.dev);
+
+  testWidgets('商家連結以貼文的 storeCode 導頁，沒有 storeCode 的貼文連結停用', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final dio = Dio(BaseOptions(baseUrl: 'https://example.test'))
+      ..httpClientAdapter = _SocialFeedAdapter();
+    addTearDown(dio.close);
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, __) => const MerchantPostsFeedScreen(merchantId: '7'),
+        ),
+        GoRoute(
+          path: '/merchant/:storeCode',
+          builder: (_, state) =>
+              Scaffold(body: Text('店舖 ${state.pathParameters['storeCode']}')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          dioProvider.overrideWithValue(dio),
+          sessionProvider.overrideWith(_GuestSession.new),
+        ],
+        child: ScreenUtilInit(
+          designSize: const Size(390, 844),
+          enableScaleWH: () => false,
+          enableScaleText: () => false,
+          builder: (_, __) => MaterialApp.router(routerConfig: router),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump();
+
+    await tester.tap(find.byKey(const ValueKey('post-merchant-link-101')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('店舖 nanmu'), findsOneWidget);
+    expect(find.text('店舖 7'), findsNothing);
+  });
+
+  testWidgets('貼文沒有 storeCode 時商家連結不能點', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final dio = Dio(BaseOptions(baseUrl: 'https://example.test'))
+      ..httpClientAdapter = _SocialFeedAdapter(withStoreCode: false);
+    addTearDown(dio.close);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          dioProvider.overrideWithValue(dio),
+          sessionProvider.overrideWith(_GuestSession.new),
+        ],
+        child: ScreenUtilInit(
+          designSize: const Size(390, 844),
+          enableScaleWH: () => false,
+          enableScaleText: () => false,
+          builder: (_, __) =>
+              const MaterialApp(home: MerchantPostsFeedScreen(merchantId: '7')),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump();
+
+    final link = tester.widget<InkWell>(
+      find.byKey(const ValueKey('post-merchant-link-101')),
+    );
+    expect(link.onTap, isNull);
+  });
 
   for (final scenario in <({double width, double textScale})>[
     (width: 320, textScale: 1.4),

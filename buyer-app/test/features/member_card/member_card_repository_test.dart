@@ -47,6 +47,45 @@ void main() {
     expect(result.records.single.sellerId, '2');
   });
 
+  test('a paused store keeps its status label and cannot be opened', () async {
+    final transport = FakeTransportBuilder()
+        .unary(
+          BuyerAppService.listMemberCards,
+          (_, _) => buyer.ListMemberCardsResponse(
+            memberCards: [
+              buyer.MemberCard(
+                storeId: '1',
+                store: common.StoreCard(
+                  id: '1',
+                  storeCode: 'a',
+                  name: '甲',
+                  status: common.StoreCardStatus.STORE_CARD_STATUS_PAUSED,
+                ),
+              ),
+              buyer.MemberCard(
+                storeId: '2',
+                store: common.StoreCard(
+                  id: '2',
+                  storeCode: 'b',
+                  name: '乙',
+                  status: common.StoreCardStatus.STORE_CARD_STATUS_OPEN,
+                ),
+              ),
+            ],
+          ),
+        )
+        .build();
+
+    final result = await MemberCardRepository(
+      BuyerAppServiceClient(transport),
+    ).getMemberCards();
+
+    expect(result.records[0].statusLabel, '暫停營業');
+    expect(result.records[0].storeCode, isEmpty);
+    expect(result.records[1].statusLabel, isEmpty);
+    expect(result.records[1].storeCode, 'b');
+  });
+
   test('spending failures remain visible to the caller', () async {
     final transport = FakeTransportBuilder()
         .unary(

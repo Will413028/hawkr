@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pb.dart';
 import 'package:hawkr_buyer/features/seller/data/store_card_display.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
 void main() {
   test('an open store with a code is openable and has no status label', () {
@@ -12,8 +13,8 @@ void main() {
     );
 
     expect(card.isOpen, isTrue);
-    expect(card.statusLabel, isNull);
-    expect(card.displayName, '金湖水產');
+    expect(card.statusLabel(UiLocale.zhTW), isNull);
+    expect(card.displayName(UiLocale.zhTW), '金湖水產');
   });
 
   test('paused and closed stores are not openable and carry their label', () {
@@ -31,16 +32,16 @@ void main() {
     );
 
     expect(paused.isOpen, isFalse);
-    expect(paused.statusLabel, '暫停營業');
+    expect(paused.statusLabel(UiLocale.zhTW), '暫停營業');
     expect(closed.isOpen, isFalse);
-    expect(closed.statusLabel, '已關閉');
+    expect(closed.statusLabel(UiLocale.zhTW), '已關閉');
   });
 
   test('an unspecified status is neither openable nor labelled', () {
     final card = StoreCard(id: '1', storeCode: 'a', name: 'A');
 
     expect(card.isOpen, isFalse);
-    expect(card.statusLabel, isNull);
+    expect(card.statusLabel(UiLocale.zhTW), isNull);
   });
 
   test('an open store without a store code is not openable', () {
@@ -54,8 +55,8 @@ void main() {
   });
 
   test('an unset or blank name shows the closed store name', () {
-    expect(StoreCard(id: '1').displayName, closedStoreName);
-    expect(StoreCard(id: '1', name: '  ').displayName, closedStoreName);
+    expect(StoreCard(id: '1').displayName(UiLocale.zhTW), '已關閉的店家');
+    expect(StoreCard(id: '1', name: '  ').displayName(UiLocale.zhTW), '已關閉的店家');
   });
 
   test('location is the county and town of a known town code', () {

@@ -1,3 +1,5 @@
+import 'package:hawkr_buyer/core/l10n/ui_locale.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:dio/dio.dart';
 import 'package:hawkr_api/gen/hawkr/discovery/v1alpha1/discovery.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/discovery/v1alpha1/discovery.pb.dart'
@@ -33,12 +35,18 @@ class MarketSellerPreview {
 CategoryRepository categoryRepository(Ref ref) => CategoryRepository(
   ref.watch(dioProvider),
   ref.watch(discoveryPublicClientProvider),
+  locale: ref.watch(uiLocaleProvider),
 );
 
 class CategoryRepository {
   final Dio _dio;
   final DiscoveryPublicServiceClient _discovery;
-  CategoryRepository(this._dio, this._discovery);
+  final UiLocale _locale;
+  CategoryRepository(
+    this._dio,
+    this._discovery, {
+    UiLocale locale = UiLocale.zhTW,
+  }) : _locale = locale;
 
   List<CategoryMarketplaceProduct>? _marketplaceRecommendationCache;
   Future<List<CategoryMarketplaceProduct>>? _marketplaceRecommendationRequest;
@@ -151,7 +159,7 @@ class CategoryRepository {
           MarketSellerPreview(
             id: seller.store.id,
             storeCode: seller.store.storeCode,
-            name: seller.store.displayName,
+            name: seller.store.displayName(_locale),
             avatarUrl: seller.store.logoUri,
             location: seller.store.location,
           ),

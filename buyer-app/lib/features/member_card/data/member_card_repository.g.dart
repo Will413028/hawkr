@@ -55,4 +55,4 @@ final class MemberCardRepositoryProvider
 }
 
 String _$memberCardRepositoryHash() =>
-    r'3b9e76cc86543fbd54df85957c4c0dc41aaf5bd4';
+    r'7a131967d30e8f82b3b72dcb14898b273d03707f';
