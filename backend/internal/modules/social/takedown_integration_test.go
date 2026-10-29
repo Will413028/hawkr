@@ -232,7 +232,7 @@ func TestTakedownCopyRollsBackWithTheCallersTransaction(t *testing.T) {
 		}
 		return errRollback
 	})
-	if err != errRollback {
+	if !errors.Is(err, errRollback) {
 		t.Fatal(err)
 	}
 	if n := f.scalar(t, "SELECT count(*) FROM social.content_takedowns"); n != 0 {

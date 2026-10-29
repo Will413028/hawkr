@@ -95,7 +95,7 @@ func TestCreateContentTakedownValidates(t *testing.T) {
 	for name, mutate := range map[string]func(in *CreateMeasureInput){
 		"沒有對象":    func(in *CreateMeasureInput) { in.Takedown = nil },
 		"對象為空":    func(in *CreateMeasureInput) { in.Takedown.Contents = nil },
-		"對象重複":    func(in *CreateMeasureInput) { in.Takedown.Contents = append(dup, dup...) },
+		"對象重複":    func(in *CreateMeasureInput) { in.Takedown.Contents = append(slices.Clone(dup), dup...) },
 		"對象超過上限":  func(in *CreateMeasureInput) { in.Takedown.Contents = takedownContents(21) },
 		"對象種類不合法": func(in *CreateMeasureInput) { in.Takedown.Contents = []ContentRef{{Kind: "STORE", ID: uuid.NewV7()}} },
 		"有結束時間":   func(in *CreateMeasureInput) { in.EndsAt = &ends },
@@ -542,9 +542,9 @@ func TestMeasureListStateFilterAgreesWithStateOfForTakedowns(t *testing.T) {
 	takedown := f.takedown(t, s.StoreID, takedownContents(1))
 	idsOf := func(state MeasureState) []uuid.UUID {
 		t.Helper()
-		var ids []uuid.UUID
 		account, err := f.module.AccountMeasures(ctx, AccountMeasureListInput{AccountID: accountID, State: &state})
 		must(t, err)
+		ids := make([]uuid.UUID, 0, len(account.Items))
 		for _, m := range account.Items {
 			ids = append(ids, m.ID)
 			if m.State != state {
@@ -553,7 +553,7 @@ func TestMeasureListStateFilterAgreesWithStateOfForTakedowns(t *testing.T) {
 		}
 		admin, err := f.module.AdminMeasures(ctx, AdminMeasureListInput{State: &state, PageSize: 50})
 		must(t, err)
-		var adminIDs []uuid.UUID
+		adminIDs := make([]uuid.UUID, 0, len(admin.Items))
 		for _, m := range admin.Items {
 			adminIDs = append(adminIDs, m.ID)
 		}
