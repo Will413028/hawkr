@@ -59,6 +59,11 @@ class AnimatedOrbsBackground extends StatefulWidget {
     this.currentTime,
   });
 
+  /// 沒有傳 [currentTime] 時的時間來源；測試設定（`test/flutter_test_config.dart`）
+  /// 固定它，讓晝夜分支不隨測試執行的時刻改變。
+  @visibleForTesting
+  static DateTime Function() debugNow = DateTime.now;
+
   @override
   State<AnimatedOrbsBackground> createState() => _AnimatedOrbsBackgroundState();
 }
@@ -274,7 +279,7 @@ class _AnimatedOrbsBackgroundState extends State<AnimatedOrbsBackground>
   double _time = 0;
 
   // 真實時鐘：每分鐘更新一次，驅動晝夜背景色 / 季節落葉
-  DateTime _now = DateTime.now();
+  DateTime _now = AnimatedOrbsBackground.debugNow();
   Timer? _clockTimer;
 
   // 繁星：固定位置 + 各自閃爍相位
@@ -325,11 +330,11 @@ class _AnimatedOrbsBackgroundState extends State<AnimatedOrbsBackground>
   void _syncClock() {
     _clockTimer?.cancel();
     _clockTimer = null;
-    _now = widget.currentTime ?? DateTime.now();
+    _now = widget.currentTime ?? AnimatedOrbsBackground.debugNow();
     if (widget.currentTime != null) return;
     // 每分鐘 tick 一次：背景色、夜色與新生成落葉的季節 tint 同步更新。
     _clockTimer = Timer.periodic(const Duration(minutes: 1), (_) {
-      if (mounted) setState(() => _now = DateTime.now());
+      if (mounted) setState(() => _now = AnimatedOrbsBackground.debugNow());
     });
   }
 
