@@ -156,7 +156,7 @@
   - 根目錄 `AGENTS.md`：monorepo 地圖、與 CI 相同的檢查、跨專案契約、共通規則。原本分散在各子專案「跨 Repo 共識」裡仍然有效的規則集中到這裡；`dev` 分支、promote、跨 repo session 這些公司時期的流程移除。
   - `backend/AGENTS.md` 改寫：單體的結構與規則、指令、仍然有效的契約規則。舊程式註解引用的「`CLAUDE.md` §N」指向私人封存的 `backend/CLAUDE.md`。
   - `docs/開發規範/` 裡只適用舊服務或已不再適用的 9 份規範，檔頭加上適用範圍與退場時間；責任邊界規範 §七 加註單體內 saga 與 outbox 的例外已不成立。
-- [ ] **0.11 CI**：新增 `backend-monolith` workflow，涵蓋 build、vet、`test -race`、arch、SQL、Atlas、Connect 生成物 drift、D9 gate、盤點 gate、integration 測試（OpenAPI drift 於 2026-09-26 隨 Connect 定案移除）。
+- [x] **0.11 CI**：新增 `backend-monolith` workflow，涵蓋 build、vet、`test -race`、arch、SQL、Atlas、Connect 生成物 drift、D9 gate、盤點 gate、integration 測試（OpenAPI drift 於 2026-09-26 隨 Connect 定案移除）。
 
 **驗收**
 
