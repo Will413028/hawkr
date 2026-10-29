@@ -74,7 +74,7 @@
   - 停止條件：SG 帳號無法建立 Custom 或 connected account 時，換 D8 的其他國別重試一次，仍不行就停下回報給 D7、D8。
   - 需要人做的事：Will 建立 Stripe 測試帳號（國別 SG），把測試金鑰與 webhook signing secret 存在本機 `secrets/` 並回覆 done；不貼出金鑰。
 
-- [ ] **2. B 階段需求**（被擋於：無；可與步驟 1 並行）
+- [x] **2. B 階段需求**（被擋於：無；可與步驟 1 並行）
   - 範圍：在單體計畫加需求並指向本計畫：B2（付款經 payment port、Stripe；`internal/legacy/sellerserver` 的 `payuni_mer_id` 由 port 的外部帳戶 ID 取代）、B3（物流改綠界，PayUni 物流退場）、B8–B10（退款、撥款、對帳經 port；撥款模型與手續費重審）。
   - 驗收：`git grep -n "2026-10-29-payment-onboarding-stripe" backend/docs/plans/2026-09-24-go-modular-monolith.md` 在 B2、B3、B8、B9、B10 各至少一筆。
 
@@ -160,7 +160,7 @@
 | 步驟 | 狀態 | 已跑的驗收 | 未跑的驗收與原因 | commit |
 |---|---|---|---|---|
 | 1 Spike 與 CI 基線 | 未開始 | | | |
-| 2 B 階段需求 | 未開始 | | | |
+| 2 B 階段需求 | 完成 | `git grep -c "2026-10-29-payment-onboarding-stripe" backend/docs/plans/2026-09-24-go-modular-monolith.md` = 5（B2、B3、B8、B9、B10 各一） | 無 | 見 git log |
 | 3 防詐雜湊與銀行帳號關聯 | 未開始 | | | |
 | 4 payment port、中立契約與改名 | 未開始 | | | |
 | 5 Stripe 金流商代收 | 未開始 | | | |

@@ -260,7 +260,9 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - 延後項（`2026-10-27-ecommerce-scope-cut`「延後」，2026-10-29）：CodeMeta `AssetReferenceType` 的食譜值（content 的食譜已刪）還被 Java media-service 使用，也鏡像在 Go 的 `media/ref_type.go`、`pkg/media/ref_type.go` 與 `media/finalize_args.go`。觸發：B1 把 media 改成不認識業務（拿掉 `(ref_type, ref_id)`）時，連同 CodeMeta 值與生成物一起刪。
 - [ ] **B2 payment**：物流財務與責任判定先留在 Java，B10 再處理。
   - `createRefund` 依 D5 修正。
+  - 換金流（計畫 `2026-10-29-payment-onboarding-stripe` D1、D5）：付款不再走 PayUni，改經 payment port，作品集的 adapter 是 Stripe Connect 測試模式；付款建立、webhook（先寫 inbox、event id 去重）都走 port。`internal/legacy/sellerserver` 回給 Java 的 `payuni_mer_id` 改由 port 的外部帳戶 ID 取代；Java 與 Go 舊服務的 PayUni 程式隨本步刪除。
 - [ ] **B3 fulfillment**
+  - 物流供應商改綠界（`2026-10-24-portfolio-public.md` 前提；計畫 `2026-10-29-payment-onboarding-stripe` D5）：超商與宅配的建單、列印、貨態 webhook 不再走 PayUni 的 MerID 與 `payuni-webhook-service`；開工前先查綠界測試帳號與平台條件（daily 2026-10-29 2350 的 Followup）。
   - 刪除 Uber 即時配送（ADR `2026-10-27-general-ecommerce-scope-cut.md` D4）：Java shipping 的 Uber 程式、payuni-webhook-service 的 Uber webhook、只服務它們的 proto RPC 與生成物、CodeMeta 的 Uber 值域、`.env.template` 與 `docker-compose-local.yml` 的 Uber 設定、`docs/runbooks/uber-quote-retention/`，4 份 Uber ADR 標 superseded；設計書 03、06、09、58 描述 3003（Uber）的段落與 `docs/runbooks/uber-quote-retention.md` 一併刪除；清單見 `docs/plans/2026-10-27-ecommerce-scope-cut.md`「延後」（Will 2026-10-29）。
   - 上一項的清單與觸發條件的來源是 `2026-10-27-ecommerce-scope-cut`「延後」；補充範圍：CodeMeta 的 Uber 值域是 `ShippingMethod` 3003、`UberDeliveryOutcome`、`ShipmentAnomalyType` 的 4 個 UBER 值與錯誤碼 9024（`pkg/errors/bizcode`），Java 仍實作的 proto（order、shipping、product_import）裡的 Uber 欄位與 RPC 隨之刪除，client 裡斷言「3003 一律 unsupported」的回歸測試（website `lib/checkout/shipping-requirements.unit.test.ts`、`lib/seller/shipment-provider.unit.test.ts`，buyer-app `test/core/codemeta/shipping_presentation_test.dart`）在值域刪除時一起改。
   - 4 份 Uber ADR 在 B3 刪 Java 程式時標 superseded（指向 ADR `2026-10-27-general-ecommerce-scope-cut.md` D4）：`2026-09-11-uber-commerce-model-seller-direct`、`2026-09-11-uber-logistics-fee-charge-trigger`、`2026-09-14-uber-create-idempotency-precommit-key`、`2026-09-06-uber-webhook-slice-in-payuni-webhook-service`。
@@ -285,14 +287,17 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - checkout 在單一 transaction 內完成：鎖購物車、扣庫存、建單、鎖定優惠券。
   - 發票快照移交給 invoice。
   - 訂單上的物流投影欄與付款副本刪除。
+  - 訂單的付款經 payment port（計畫 `2026-10-29-payment-onboarding-stripe`）；`order.proto` 的 `shipping_status` 不再是 PayUni 狀態碼字串。
   - 訂單號重新設計，不照搬 `OrderNoGenerator`：`"O" + TSID % 10^9` 加上 `UNIQUE(order_no)`，約 3.7 萬筆訂單就有一半機率撞號（生日界）。訂單號是給人看的編號，另開 `UNIQUE` 欄，不由 ID 截斷或取模（PostgreSQL 設計規範 §二）。
   - agent 的「接受報價 → 建單」改在同一個 transaction 內完成，並標記 RFQ ADR 為 superseded。
 - [ ] **B9 aftersales**
   - 取消、退款任務、優惠券補償在同一個 transaction 內完成。
   - 設定「進行中售後」旗標。
   - `refund_tasks`、`auto_refund_tasks`、`payment_refunds` 收斂成一張退款命令表。
+  - 退款經 payment port（計畫 `2026-10-29-payment-onboarding-stripe`）；PayUni 的超商與 ATM 轉帳退款不再適用，非原路退款依 port 的能力描述處理。
 - [ ] **B10 finance**
   - 賣家撥款從 ordering 移入。
+  - 撥款與對帳經 payment port（計畫 `2026-10-29-payment-onboarding-stripe`）：PayUni 的「代理商先收、訂單完成後撥款」改對應 Stripe Connect 的 separate charges and transfers；代理商費反推與 ADR `payuni-channel-fee-bearer` 在本步重審。
   - 物流財務與責任判定從 Java payment-service 移入，Java payment-service 就此退場。
 
 **階段驗收**
