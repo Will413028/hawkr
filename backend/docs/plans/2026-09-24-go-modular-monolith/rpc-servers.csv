@@ -455,22 +455,22 @@ PaymentService,ListRefundsForAdmin,payment-service,
 PaymentService,GetRefundForAdmin,payment-service,
 PaymentService,ListGrantsForAdmin,payment-service,
 PaymentService,GetPaymentFactsInternal,payment-service,
-PricebookService,GetMarketOverview,pricebook-service,
-PricebookService,CreateMarketWatchTarget,pricebook-service,
-PricebookService,DeleteMarketWatchTarget,pricebook-service,
-PricebookService,GetObservedPrice,pricebook-service,
-PricebookService,GetEstimatedItemPrice,pricebook-service,
-PricebookService,GetForecastCurve,pricebook-service,
-PricebookService,GetTrendSummary,pricebook-service,
-PricebookService,SearchCropCatalog,pricebook-service,
-PricebookService,SearchPriceableEntities,pricebook-service,
-PricebookService,ListGroupCropOptions,pricebook-service,
-PricebookService,GetSpatialSurface,pricebook-service,
-PricebookService,GetRegionalComparison,pricebook-service,
-PricebookService,ResolveCategoryMapping,pricebook-service,
-PricebookService,UpsertCategoryMapping,pricebook-service,
-PricebookService,ListCategoryMappingWorklist,pricebook-service,
-PricebookService,GetCategoryPriceRollup,pricebook-service,
+PricebookService,GetMarketOverview,pricebook-service,removed: 行情、預測與產地地圖不在一般電商範圍，pricebook-service 整個刪除（ADR 2026-10-27-general-ecommerce-scope-cut，計畫 2026-10-27-ecommerce-scope-cut 步驟 6）
+PricebookService,CreateMarketWatchTarget,pricebook-service,removed: 行情、預測與產地地圖不在一般電商範圍，pricebook-service 整個刪除（ADR 2026-10-27-general-ecommerce-scope-cut，計畫 2026-10-27-ecommerce-scope-cut 步驟 6）
+PricebookService,DeleteMarketWatchTarget,pricebook-service,removed: 行情、預測與產地地圖不在一般電商範圍，pricebook-service 整個刪除（ADR 2026-10-27-general-ecommerce-scope-cut，計畫 2026-10-27-ecommerce-scope-cut 步驟 6）
+PricebookService,GetObservedPrice,pricebook-service,removed: 行情、預測與產地地圖不在一般電商範圍，pricebook-service 整個刪除（ADR 2026-10-27-general-ecommerce-scope-cut，計畫 2026-10-27-ecommerce-scope-cut 步驟 6）
+PricebookService,GetEstimatedItemPrice,pricebook-service,removed: 行情、預測與產地地圖不在一般電商範圍，pricebook-service 整個刪除（ADR 2026-10-27-general-ecommerce-scope-cut，計畫 2026-10-27-ecommerce-scope-cut 步驟 6）
+PricebookService,GetForecastCurve,pricebook-service,removed: 行情、預測與產地地圖不在一般電商範圍，pricebook-service 整個刪除（ADR 2026-10-27-general-ecommerce-scope-cut，計畫 2026-10-27-ecommerce-scope-cut 步驟 6）
+PricebookService,GetTrendSummary,pricebook-service,removed: 行情、預測與產地地圖不在一般電商範圍，pricebook-service 整個刪除（ADR 2026-10-27-general-ecommerce-scope-cut，計畫 2026-10-27-ecommerce-scope-cut 步驟 6）
+PricebookService,SearchCropCatalog,pricebook-service,removed: 行情、預測與產地地圖不在一般電商範圍，pricebook-service 整個刪除（ADR 2026-10-27-general-ecommerce-scope-cut，計畫 2026-10-27-ecommerce-scope-cut 步驟 6）
+PricebookService,SearchPriceableEntities,pricebook-service,removed: 行情、預測與產地地圖不在一般電商範圍，pricebook-service 整個刪除（ADR 2026-10-27-general-ecommerce-scope-cut，計畫 2026-10-27-ecommerce-scope-cut 步驟 6）
+PricebookService,ListGroupCropOptions,pricebook-service,removed: 行情、預測與產地地圖不在一般電商範圍，pricebook-service 整個刪除（ADR 2026-10-27-general-ecommerce-scope-cut，計畫 2026-10-27-ecommerce-scope-cut 步驟 6）
+PricebookService,GetSpatialSurface,pricebook-service,removed: 行情、預測與產地地圖不在一般電商範圍，pricebook-service 整個刪除（ADR 2026-10-27-general-ecommerce-scope-cut，計畫 2026-10-27-ecommerce-scope-cut 步驟 6）
+PricebookService,GetRegionalComparison,pricebook-service,removed: 行情、預測與產地地圖不在一般電商範圍，pricebook-service 整個刪除（ADR 2026-10-27-general-ecommerce-scope-cut，計畫 2026-10-27-ecommerce-scope-cut 步驟 6）
+PricebookService,ResolveCategoryMapping,pricebook-service,removed: 行情、預測與產地地圖不在一般電商範圍，pricebook-service 整個刪除（ADR 2026-10-27-general-ecommerce-scope-cut，計畫 2026-10-27-ecommerce-scope-cut 步驟 6）
+PricebookService,UpsertCategoryMapping,pricebook-service,removed: 行情、預測與產地地圖不在一般電商範圍，pricebook-service 整個刪除（ADR 2026-10-27-general-ecommerce-scope-cut，計畫 2026-10-27-ecommerce-scope-cut 步驟 6）
+PricebookService,ListCategoryMappingWorklist,pricebook-service,removed: 行情、預測與產地地圖不在一般電商範圍，pricebook-service 整個刪除（ADR 2026-10-27-general-ecommerce-scope-cut，計畫 2026-10-27-ecommerce-scope-cut 步驟 6）
+PricebookService,GetCategoryPriceRollup,pricebook-service,removed: 行情、預測與產地地圖不在一般電商範圍，pricebook-service 整個刪除（ADR 2026-10-27-general-ecommerce-scope-cut，計畫 2026-10-27-ecommerce-scope-cut 步驟 6）
 ProductImportService,CreateImportJob,product-import-service,
 ProductImportService,ReuploadImportJobCsv,product-import-service,
 ProductImportService,ListImportJobs,product-import-service,

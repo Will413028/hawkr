@@ -99,10 +99,10 @@ test.describe("procurement assistant — RFQ confirmation", {
 		await expect(
 			page.getByText("需求版本與價格範圍已固定，等待發布。"),
 		).toBeVisible();
-		// 「重新算一次」只有希望詢價卡上的「取得無參考價試算」一顆，確認鎖定後要停用。
+		// 「重新算一次」只有希望詢價卡上的「取得無參考價試算」一顆；試算成功後整張卡收起，確認鎖定後不能再試算。
 		await expect(
 			page.getByRole("button", { name: "取得無參考價試算" }),
-		).toBeDisabled();
+		).toHaveCount(0);
 		// toEqual 而不是 toMatchObject 是刻意的：這條擋的是「confirm 的 body 多送了
 		// 買家私有欄位」。⛔ 不要改成寬鬆比對——多一個鍵就該讓它紅。
 		// buyerNote 沒填時送空字串（backend #3410 那側 trim 後視為沒填，

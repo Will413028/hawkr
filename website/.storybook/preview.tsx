@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { sb } from "storybook/test";
 import { defaultLocale, messagesFor } from "../lib/intl/config";
 import "../styles/globals.css";
-import "../styles/components/product-certification.css";
 import "../styles/components/product-modal.css";
 import "../styles/components/ui-kit.css";
 import "../styles/components/input-field-fx.css";

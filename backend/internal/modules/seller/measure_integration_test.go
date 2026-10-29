@@ -240,7 +240,7 @@ func TestMeasureSchemaConstraints(t *testing.T) {
 	id := uuid.NewV7()
 	tx, err := f.db.Pool().Begin(ctx)
 	must(t, err)
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	_, err = tx.Exec(ctx, `INSERT INTO seller.measures (id, account_id, store_id, kind, basis, lead_finding_id, statement_to_seller, current_revision, created_by_admin_id, created_at, updated_at, starts_at)
 		VALUES ($1, $4, $2, 'WARNING', 'VIOLATION', $3, 'x', 1, 1, now(), now(), now())`, id, s.StoreID, m.Findings[0].ID, accountID)
 	must(t, err)
@@ -279,7 +279,7 @@ func TestMeasureSchemaConstraints(t *testing.T) {
 	// 認定一定有建立它的措施（commit 時檢查）。
 	tx, err = f.db.Pool().Begin(ctx)
 	must(t, err)
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	_, err = tx.Exec(ctx, `INSERT INTO seller.violations (id, store_id, account_id, category, severity, origin_measure_id, created_by_admin_id, created_at, updated_at)
 		VALUES (uuidv7(), $1, $2, 'FRAUD', 'LOW', uuidv7(), 1, now(), now())`, s.StoreID, accountID)
 	must(t, err)
