@@ -27,7 +27,7 @@ schema `social`（`db/schema.sql`）：貼文與 hashtag、留言與讚、討論
 - 計數只由 trigger 與 `reevaluate_*` 維護，「是否計入」只有那一份定義；stats 有 `CHECK (>= 0)`。守門：`TestStatsMatchTheDatasetAfterRandomWrites`、`TestConcurrentReevaluatesDoNotCountTwice`、`TestReevaluateHasNoDeadlocksAndEndsConsistent`、`TestStatsRejectNegativeCounts`。規格：§6。
 - 每日對帳先修旗標再覆寫計數，且不蓋掉並行的加減。守門：`TestReconcileRepairsFlagsBeforeCounts`、`TestRecountDoesNotOverwriteConcurrentLikes`。規格：§6。
 - 買家刪帳的事實有複本，由訂閱者在同一個 transaction 同步寫並重新求值。守門：`TestBuyerDeletionRequestUncountsTheContentInTheSameTransaction`、`TestDirectCloseStillHidesUncountsAndPurges`。規格：§7。
-- 內容下架的事實有複本 `content_takedowns`，由 seller 措施事件的同 transaction 訂閱者寫入或刪除並重新求值，每日對帳雙向核對 `seller.pub_content_takedowns()`。守門：`TestContentTakedownHidesTheContentAndRevokeRestoresItImmediately`、`TestReconcileAddsTheTakedownsTheSubscriberMissed`、`TestReconcileRemovesTheTakedownsTheSubscriberMissedRevoking`。規格：§4、§6。
+- 內容下架的事實有複本 `content_takedowns`，由 seller 措施事件的同 transaction 訂閱者維護，每日對帳雙向核對 `seller.pub_content_takedowns()`；建立時訂閱者核對內容存在、未刪除、作者是措施的店家（`TakedownContentError`）。守門：`TestTakedownRejectsContentThatIsNotTheMeasureStoresOwn`、`TestReconcileAddsTheTakedownsTheSubscriberMissed`。規格：§4、§6。
 - 跨模組鎖順序見 `backend/AGENTS.md` 單體規則 4（social 在 seller 之後）；本模組內：內容列 → 貼文 stats → 父項 stats，各依 ID 由小到大。守門：`TestMarkAuthorInactiveLocksStatsInTheSameOrderAsTheTriggers`、`TestEditLocksTheBuyerBeforeTheContentRow`。規格：§6、§7。
 - 隱藏與還原先鎖目標內容列。守門：`TestDirectHideRowRacingADeleteCountsOnce`。規格：§8。
 - 回覆的 partial index 述詞是旗標。守門：`TestReplyIndexesAreOnTheCountedFlag`。規格：§4。

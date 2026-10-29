@@ -95,8 +95,8 @@
   - 解除：只走申覆（接受申覆撤銷措施）。延長、縮短、結束的可用性原因只有 `CONTENT_TAKEDOWN_REVOKE_ONLY`，已撤銷的只有 `REVOKED`；補正請求只收 RISK。
   - 認定的類別：`policy.Assessable()` 是全部除了 `Other`，含社群的 `SPAM`、`HARASSMENT`、`HATE`（`violations` 與 `cases` 的 CHECK 跟著）；`ReporterSelectable()` 不含它們（`reports` 不變）。內容下架的認定可引用 moderation 的檢舉（`finding_moderation_reports`，每個認定最多 20 筆）；升級規則照常累計，社群類別的 MEDIUM 計入。
   - 建立入口：`CreateInTx`（`CreateMeasureInTx`）加入呼叫方的 transaction，建立者是傳入的管理員，不收 `request_id`，給 moderation 讓處理與措施同生共死；handler 路徑的 `request_id` 在同一個 transaction 內先鎖目標帳號的全部 stint，再查 `(admin, request_id)` 重送（重送先於關店店家的檢查，已建立的措施重送仍成功），插入用 `ON CONFLICT DO NOTHING`，落空（只剩目標在不同帳號的並行請求）回 `InvalidInput` 並回滾。
-  - 內容屬於哪個店家不在本模組驗證：admin 的 `CreateMeasure(content_takedown)` 由 httpapi 經 `social.ContentOwner` 核對每則內容屬於目標店家（找不到或不屬於回 `InvalidInput`，欄位 `content_takedown.contents[i]`，social 未接上時拒絕）；`CreateInTx` 的呼叫方（moderation）自己驗證。
-  - 賣家端的 `Measure` 目前不帶 `contents`，後台的類別下拉還沒有社群類別，都在 A7-4。
+  - 內容屬於哪個店家不在本模組驗證，而在 social 的 `MeasureCreated` 同 transaction 訂閱者（`social.md` §4）：每則內容必須存在、沒有刪除、作者就是措施的店家（買家寫的走隱藏），不成立回 `social.TakedownContentError` 讓措施回滾。後台 handler、`CreateInTx` 的呼叫方（moderation）共用這一條檢查；admin 的 `CreateMeasure(content_takedown)` 把這個錯誤對到 `InvalidInput`、欄位 `content_takedown.contents[i]`。對象的種類代碼（`POST`、`COMMENT`、`FORUM_ENTRY`）由 `platform/contentkind` 擁有，seller 的 `ContentKind` 與 social 共用；不認得的種類是錯誤，不略過。
+  - 賣家端的 `Measure` 帶 `contents`（`ContentRef`，依種類、id 排序，與後台同一份），賣家據此知道被下架與申覆的是哪些內容；後台的類別下拉還沒有社群類別，在 A7-4。
 
 - 停權期間（`suspension_periods`）與 `StoreSuspended`／`StoreUnsuspended` 只由 `suspension.Recompute` 寫入：帳號從未停權變成停權時在**帳號目前的 stint** 上開始一段期間並發 `StoreSuspended`，恢復時結束它、發帶同一個 `PeriodID` 的 `StoreUnsuspended`；持續停權中新增、結束或撤銷其中一個措施（只要還有一個生效中）是同一段、不發事件，所以事件不帶停權的種類。沒有目前的 stint（所有 stint 都關閉）時沿用已經進行中的那一段，沒有進行中的就不開始。`TestRiskAndViolationMeasuresShareThePeriod`、`TestTwoRiskMeasuresOnOneAccountBothSucceedAndShareOnePeriod`、`TestExpiryOnAnAccountWithoutAStintEndsThePeriodOnTheClosedStint`。
 
