@@ -449,6 +449,7 @@ const MeasureKind$json = {
     {'1': 'MEASURE_KIND_WARNING', '2': 1},
     {'1': 'MEASURE_KIND_SUSPENSION', '2': 2},
     {'1': 'MEASURE_KIND_TERMINATION', '2': 3},
+    {'1': 'MEASURE_KIND_CONTENT_TAKEDOWN', '2': 4},
   ],
 };
 
@@ -456,7 +457,24 @@ const MeasureKind$json = {
 final $typed_data.Uint8List measureKindDescriptor = $convert.base64Decode(
     'CgtNZWFzdXJlS2luZBIcChhNRUFTVVJFX0tJTkRfVU5TUEVDSUZJRUQQABIYChRNRUFTVVJFX0'
     'tJTkRfV0FSTklORxABEhsKF01FQVNVUkVfS0lORF9TVVNQRU5TSU9OEAISHAoYTUVBU1VSRV9L'
-    'SU5EX1RFUk1JTkFUSU9OEAM=');
+    'SU5EX1RFUk1JTkFUSU9OEAMSIQodTUVBU1VSRV9LSU5EX0NPTlRFTlRfVEFLRURPV04QBA==');
+
+@$core.Deprecated('Use contentKindDescriptor instead')
+const ContentKind$json = {
+  '1': 'ContentKind',
+  '2': [
+    {'1': 'CONTENT_KIND_UNSPECIFIED', '2': 0},
+    {'1': 'CONTENT_KIND_POST', '2': 1},
+    {'1': 'CONTENT_KIND_COMMENT', '2': 2},
+    {'1': 'CONTENT_KIND_FORUM_ENTRY', '2': 3},
+  ],
+};
+
+/// Descriptor for `ContentKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List contentKindDescriptor = $convert.base64Decode(
+    'CgtDb250ZW50S2luZBIcChhDT05URU5UX0tJTkRfVU5TUEVDSUZJRUQQABIVChFDT05URU5UX0'
+    'tJTkRfUE9TVBABEhgKFENPTlRFTlRfS0lORF9DT01NRU5UEAISHAoYQ09OVEVOVF9LSU5EX0ZP'
+    'UlVNX0VOVFJZEAM=');
 
 @$core.Deprecated('Use measureBasisDescriptor instead')
 const MeasureBasis$json = {
@@ -2307,6 +2325,28 @@ final $typed_data.Uint8List lookupBusinessRegistrationResponseDescriptor =
         'EoCzIrLmhhd2tyLnNlbGxlci52MWFscGhhMS5CdXNpbmVzc1JlZ2lzdHJhdGlvblIMcmVnaXN0'
         'cmF0aW9u');
 
+@$core.Deprecated('Use contentRefDescriptor instead')
+const ContentRef$json = {
+  '1': 'ContentRef',
+  '2': [
+    {
+      '1': 'kind',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.seller.v1alpha1.ContentKind',
+      '8': {},
+      '10': 'kind'
+    },
+    {'1': 'id', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'id'},
+  ],
+};
+
+/// Descriptor for `ContentRef`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List contentRefDescriptor = $convert.base64Decode(
+    'CgpDb250ZW50UmVmEjsKBGtpbmQYASABKA4yIi5oYXdrci5zZWxsZXIudjFhbHBoYTEuQ29udG'
+    'VudEtpbmRCA+BBAlIEa2luZBITCgJpZBgCIAEoCUID4EECUgJpZA==');
+
 @$core.Deprecated('Use remediationUnavailabilityDescriptor instead')
 const RemediationUnavailability$json = {
   '1': 'RemediationUnavailability',
@@ -2666,6 +2706,15 @@ const Measure$json = {
       '8': {},
       '10': 'appealUnavailabilities'
     },
+    {
+      '1': 'contents',
+      '3': 25,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.seller.v1alpha1.ContentRef',
+      '8': {},
+      '10': 'contents'
+    },
   ],
   '9': [
     {'1': 9, '2': 10},
@@ -2707,9 +2756,11 @@ final $typed_data.Uint8List measureDescriptor = $convert.base64Decode(
     'NSEXRlcm1pbmF0aW9uR3JvdW5kElEKFGFwcGVhbF9kZWFkbGluZV90aW1lGBUgASgLMhouZ29v'
     'Z2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUhJhcHBlYWxEZWFkbGluZVRpbWUSaQoXYXBwZW'
     'FsX3VuYXZhaWxhYmlsaXRpZXMYGCADKAsyKy5oYXdrci5zZWxsZXIudjFhbHBoYTEuQXBwZWFs'
-    'VW5hdmFpbGFiaWxpdHlCA+BBA1IWYXBwZWFsVW5hdmFpbGFiaWxpdGllc0oECAkQCkoECA4QD0'
-    'oECBMQFEoECBYQF1IGYXBwZWFsUhRyZW1lZGlhdGlvbl9yZXF1ZXN0c1IfcmVtZWRpYXRpb25f'
-    'dW5hdmFpbGFibGVfcmVhc29uc1IaYXBwZWFsX3VuYXZhaWxhYmxlX3JlYXNvbnM=');
+    'VW5hdmFpbGFiaWxpdHlCA+BBA1IWYXBwZWFsVW5hdmFpbGFiaWxpdGllcxJCCghjb250ZW50cx'
+    'gZIAMoCzIhLmhhd2tyLnNlbGxlci52MWFscGhhMS5Db250ZW50UmVmQgPgQQNSCGNvbnRlbnRz'
+    'SgQICRAKSgQIDhAPSgQIExAUSgQIFhAXUgZhcHBlYWxSFHJlbWVkaWF0aW9uX3JlcXVlc3RzUh'
+    '9yZW1lZGlhdGlvbl91bmF2YWlsYWJsZV9yZWFzb25zUhphcHBlYWxfdW5hdmFpbGFibGVfcmVh'
+    'c29ucw==');
 
 @$core.Deprecated('Use listMyMeasuresRequestDescriptor instead')
 const ListMyMeasuresRequest$json = {
@@ -3321,6 +3372,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.seller.v1alpha1.RemediationUnavailability':
       RemediationUnavailability$json,
   '.hawkr.seller.v1alpha1.AppealUnavailability': AppealUnavailability$json,
+  '.hawkr.seller.v1alpha1.ContentRef': ContentRef$json,
   '.hawkr.seller.v1alpha1.GetMyMeasureRequest': GetMyMeasureRequest$json,
   '.hawkr.seller.v1alpha1.GetMyMeasureResponse': GetMyMeasureResponse$json,
   '.hawkr.seller.v1alpha1.SubmitAppealRequest': SubmitAppealRequest$json,

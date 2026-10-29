@@ -66,8 +66,11 @@ type RevokeReason = model.RevokeReason
 // EvidenceKind 是佐證屬於通報還是措施上的請求。
 type EvidenceKind = model.EvidenceKind
 
-// MeasureKind 是措施的種類（警告、停權、終止合作）。
+// MeasureKind 是措施的種類（警告、停權、終止合作、內容下架）。
 type MeasureKind = model.MeasureKind
+
+// ContentKind 是內容下架措施的對象種類（貼文、留言、討論區留言）。
+type ContentKind = model.ContentKind
 
 // MeasureBasis 是措施的依據（認定、風險類型、契約條款）。
 type MeasureBasis = model.Basis
@@ -190,6 +193,10 @@ const (
 	MeasureWarning                   = model.MeasureWarning
 	MeasureSuspension                = model.MeasureSuspension
 	MeasureTermination               = model.MeasureTermination
+	MeasureContentTakedown           = model.MeasureContentTakedown
+	ContentPost                      = model.ContentPost
+	ContentComment                   = model.ContentComment
+	ContentForumEntry                = model.ContentForumEntry
 	BasisViolation                   = model.BasisViolation
 	BasisRisk                        = model.BasisRisk
 	BasisContract                    = model.BasisContract
@@ -324,6 +331,9 @@ func RevokeReasonValues() []RevokeReason { return model.RevokeReasonValues() }
 
 // ManualRevokeReasonValues 回傳管理員撤銷措施時可以選的原因（契約的 AdminRevokeReason）。
 func ManualRevokeReasonValues() []RevokeReason { return model.ManualRevokeReasonValues() }
+
+// ContentKindValues 回傳全部內容下架的對象種類。
+func ContentKindValues() []ContentKind { return model.ContentKindValues() }
 
 // MeasureKindValues 回傳全部措施種類。
 func MeasureKindValues() []MeasureKind { return model.MeasureKindValues() }
@@ -526,6 +536,10 @@ type (
 	RiskBasis = model.RiskBasis
 	// TerminationBasis 是終止合作的事由與依據。
 	TerminationBasis = model.TerminationBasis
+	// ContentTakedown 是內容下架措施的對象。
+	ContentTakedown = model.ContentTakedown
+	// ContentRef 是內容下架措施的一個對象（種類加 social 的列 ID）。
+	ContentRef = model.ContentRef
 	// TerminationEffect 是建立終止合作之後措施何時生效（立即或排程）。
 	TerminationEffect = model.TerminationEffect
 	// LinkedAccount 是措施詳情上相同身分的其他帳號。
@@ -672,6 +686,12 @@ func (m *Module) CaseNotes(ctx context.Context, in CaseNoteListInput) (NotePage,
 // CreateMeasure 建立措施（警告或停權）；停權時同一個 transaction 快照身分並重算停權狀態。帶 RequestID 的重送回傳原本的措施。
 func (m *Module) CreateMeasure(ctx context.Context, in CreateMeasureInput) (CreateMeasureResult, error) {
 	return m.measure.Create(ctx, in)
+}
+
+// CreateMeasureInTx 在呼叫方已開的 transaction 內建立措施（跨模組的上層 use case，例如 moderation 處理檢舉）：不開自己的 transaction，不收 RequestID
+// （冪等由呼叫方的狀態轉移擁有），建立者是 in.AdminID。ctx 沒有 transaction 回錯誤。
+func (m *Module) CreateMeasureInTx(ctx context.Context, in CreateMeasureInput) (CreateMeasureResult, error) {
+	return m.measure.CreateInTx(ctx, in)
 }
 
 // CreateMeasureNote 新增措施的一則內部註記（只新增、不帶版本、不改措施的任何 etag）；措施可以是已撤銷的。

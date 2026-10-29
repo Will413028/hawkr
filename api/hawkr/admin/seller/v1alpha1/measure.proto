@@ -175,6 +175,8 @@ message Measure {
   // 複審的期限，只在風險類型（RISK）的措施、生效中、而且已進入 review_by 前 24 小時時設：開始時間是 review_by 前 24 小時，期限是 review_by；
   // review_by 過了之後仍在，直到措施結束或撤銷。review_by 本身是事實欄位，撤銷後仍輸出。
   hawkr.common.v1alpha1.Deadline review_deadline = 44 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 內容下架（kind 是 CONTENT_TAKEDOWN）的對象，依種類、id 排序；其他種類沒有。建立後不能改（UpdateMeasure 不收），要改就撤銷再建立。
+  repeated hawkr.seller.v1alpha1.ContentRef contents = 46 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // MeasureActionUnavailability 是 admin 此刻不能對措施做某個動作（改理由、延長、縮短、結束或撤銷）的一個原因。與對應方法的前置檢查是同一個規則
@@ -206,6 +208,8 @@ enum MeasureActionUnavailableReason {
   MEASURE_ACTION_UNAVAILABLE_REASON_VIOLATION_BASIS = 7;
   // 結束：有待處理的解除請求，要先裁定（接受解除請求就是結束）。
   MEASURE_ACTION_UNAVAILABLE_REASON_REMEDIATION_PENDING = 8;
+  // 內容下架沒有結束時間，也沒有結束入口（延長、縮短、結束）；要讓內容恢復只能撤銷，或接受申覆。取代警告、不在生效中與依據違規認定這三個原因在內容下架的說法。
+  MEASURE_ACTION_UNAVAILABLE_REASON_CONTENT_TAKEDOWN_REVOKE_ONLY = 9;
 }
 
 // LinkedIdentity 是兩個帳號相同的身分類別。

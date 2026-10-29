@@ -51,6 +51,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
 )
 
@@ -68,6 +69,8 @@ type Deps struct {
 	ReviewQueue *reviewqueue.Module
 	Identity    *identity.Module
 	Seller      *seller.Module
+	// Social 給後台建立內容下架措施前核對內容歸屬（SellerGovernanceAdminService.CreateMeasure）。
+	Social *social.Module
 	// Agent 是 vendor portal 的邀請與 session（VendorPortalPublicService、VendorPortalInviteeService）；Google 的 step-up 經 Identity。
 	Agent *agent.Module
 	// Stats 是店家統計與卡片評分的組裝（粉絲、評價；review 還在舊服務），必填：店面頁、賣家自己的店與所有店家卡片共用同一份，由組裝點以
@@ -133,6 +136,9 @@ func NewHandler(deps Deps) (http.Handler, error) {
 	}
 	if deps.ReviewQueue == nil {
 		return nil, fmt.Errorf("httpapi：ReviewQueueAdminService 需要 ReviewQueue")
+	}
+	if deps.Social == nil {
+		return nil, fmt.Errorf("httpapi：SellerGovernanceAdminService 需要 Social")
 	}
 	if deps.Now == nil {
 		deps.Now = time.Now

@@ -1,7 +1,11 @@
 SELECT (EXISTS (
           SELECT p.id AS "p.id"
           FROM social.posts AS p
-          WHERE ((((p.status = 'PUBLISHED') AND (p.deleted_at IS NULL)) AND (EXISTS (SELECT 1 FROM seller.pub_exposable_stores($1::timestamp with time zone) AS pub WHERE pub.store_id = p.store_id))) AND (NOT (EXISTS (SELECT 1 FROM buyer.pub_blocked_stores() AS pub WHERE pub.blocker_buyer_id = $2::bigint AND ((store_id = p.store_id)))))) AND (p.id = $3::uuid)
+          WHERE (((((p.status = 'PUBLISHED') AND (p.deleted_at IS NULL)) AND (NOT (EXISTS (
+                     SELECT td.post_id AS "td.post_id"
+                     FROM social.content_takedowns AS td
+                     WHERE td.post_id = p.id
+                )))) AND (EXISTS (SELECT 1 FROM seller.pub_exposable_stores($1::timestamp with time zone) AS pub WHERE pub.store_id = p.store_id))) AND (NOT (EXISTS (SELECT 1 FROM buyer.pub_blocked_stores() AS pub WHERE pub.blocker_buyer_id = $2::bigint AND ((store_id = p.store_id)))))) AND (p.id = $3::uuid)
      )) AS "value";
 
 -- args:

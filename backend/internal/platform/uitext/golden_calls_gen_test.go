@@ -48,6 +48,8 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return m.Text, ok
 	case "common.unknown":
 		return t.CommonUnknown(), true
+	case "seller.ContentKind":
+		return t.SellerContentKind(goldenEnum(c.Value, "CONTENT_KIND_"))
 	case "seller.KYCField":
 		return t.SellerKYCField(goldenEnum(c.Value, "KYC_FIELD_"))
 	case "seller.KYCFlowStatus":

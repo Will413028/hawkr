@@ -4698,6 +4698,76 @@ class LookupBusinessRegistrationResponse extends $pb.GeneratedMessage {
   BusinessRegistration ensureRegistration() => $_ensure(0);
 }
 
+/// ContentRef 是內容下架措施的一個對象：種類加上該內容的 ID（不透明的字串）。
+class ContentRef extends $pb.GeneratedMessage {
+  factory ContentRef({
+    ContentKind? kind,
+    $core.String? id,
+  }) {
+    final result = ContentRef._();
+    if (kind != null) result.kind = kind;
+    if (id != null) result.id = id;
+    return result;
+  }
+
+  ContentRef._();
+
+  factory ContentRef.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ContentRef()..mergeFromBuffer(data, registry);
+  factory ContentRef.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ContentRef()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ContentRef',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: ContentRef.$_createMessage)
+    ..aE<ContentKind>(1, _omitFieldNames ? '' : 'kind',
+        enumValues: ContentKind.values)
+    ..aOS(2, _omitFieldNames ? '' : 'id')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ContentRef clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ContentRef copyWith(void Function(ContentRef) updates) =>
+      super.copyWith((message) => updates(message as ContentRef)) as ContentRef;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ContentRef() / ContentRef.new instead')
+  static ContentRef create() => ContentRef._();
+  static $pb.GeneratedMessage $_createMessage() => ContentRef._();
+  @$core.override
+  ContentRef createEmptyInstance() => ContentRef._();
+  @$core.pragma('dart2js:noInline')
+  static ContentRef getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ContentRef>(ContentRef.$_createMessage);
+  static ContentRef? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  ContentKind get kind => $_getN(0);
+  @$pb.TagNumber(1)
+  set kind(ContentKind value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKind() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKind() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get id => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set id($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearId() => $_clearField(2);
+}
+
 /// RemediationUnavailability 是賣家此刻不能對措施請求解除的一個原因。與 RequestRemediation 的前置檢查是同一個規則，message 與該方法被拒絕時錯誤的
 /// LocalizedMessage 是同一份文字（同一個 Go 函式）。
 class RemediationUnavailability extends $pb.GeneratedMessage {
@@ -5219,6 +5289,7 @@ class Measure extends $pb.GeneratedMessage {
     $1.Timestamp? appealDeadlineTime,
     $core.Iterable<RemediationUnavailability>? remediationUnavailabilities,
     $core.Iterable<AppealUnavailability>? appealUnavailabilities,
+    $core.Iterable<ContentRef>? contents,
   }) {
     final result = Measure._();
     if (id != null) result.id = id;
@@ -5246,6 +5317,7 @@ class Measure extends $pb.GeneratedMessage {
       result.remediationUnavailabilities.addAll(remediationUnavailabilities);
     if (appealUnavailabilities != null)
       result.appealUnavailabilities.addAll(appealUnavailabilities);
+    if (contents != null) result.contents.addAll(contents);
     return result;
   }
 
@@ -5300,6 +5372,8 @@ class Measure extends $pb.GeneratedMessage {
     ..pPM<AppealUnavailability>(
         24, _omitFieldNames ? '' : 'appealUnavailabilities',
         subBuilder: AppealUnavailability.$_createMessage)
+    ..pPM<ContentRef>(25, _omitFieldNames ? '' : 'contents',
+        subBuilder: ContentRef.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -5513,6 +5587,10 @@ class Measure extends $pb.GeneratedMessage {
   /// 規則（與 SubmitAppeal 的前置檢查相同），client 顯示第一個的 message，不自己推導。
   @$pb.TagNumber(24)
   $pb.PbList<AppealUnavailability> get appealUnavailabilities => $_getList(19);
+
+  /// 內容下架（kind 是 CONTENT_TAKEDOWN）的對象，依種類、id 排序，賣家據此知道被下架的是哪些內容、申覆什麼；其他種類沒有。建立後不能改。
+  @$pb.TagNumber(25)
+  $pb.PbList<ContentRef> get contents => $_getList(20);
 }
 
 class ListMyMeasuresRequest extends $pb.GeneratedMessage {

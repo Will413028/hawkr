@@ -54,8 +54,8 @@ CREATE TRIGGER posts_published_at_once AFTER UPDATE OF published_at ON social.po
     EXECUTE FUNCTION social.posts_published_at_once();
 
 -- 「是否計入」的唯一定義，與維護它的方式：一則內容計入貼文的留言數與父項的回覆數，若且唯若它的旗標 counted 為真；旗標只由 reevaluate_* 設，
--- 讀取直接用旗標，重算把旗標加總。定義的輸入全是 social 自己的表：內容的 deleted_at、hides、inactive_authors（買家刪帳的事實由 social 的訂閱者
--- 在同一個 transaction 寫進這張表，再讓該作者的內容重新求值）。reevaluate_* 對一批內容（ids）求值，與旗標不同才更新旗標並同一個 transaction
+-- 讀取直接用旗標，重算把旗標加總。定義的輸入全是 social 自己的表：內容的 deleted_at、hides、content_takedowns（seller 的內容下架措施，由 social 的訂閱者在同一個 transaction 寫進複本，建立與撤銷都讓該內容重新求值）、
+-- inactive_authors（買家刪帳的事實由 social 的訂閱者在同一個 transaction 寫進這張表，再讓該作者的內容重新求值）。reevaluate_* 對一批內容（ids）求值，與旗標不同才更新旗標並同一個 transaction
 -- 加減計數，回傳旗標改變的筆數；冪等：求值相同就什麼都不做。
 -- 鎖的順序固定，不依呼叫方（與寫入端相同，counts-brief.md §4.6）：內容列（id 由小到大）→ 貼文的 stats（id 由小到大）→ 父項的 stats（id 由小到大）。
 -- 先鎖再求值：函式是 VOLATILE，body 的每個語句各取新的 snapshot（READ COMMITTED 下看得到別的 transaction 已提交的改動），求值是鎖之後的新語句，
@@ -73,6 +73,7 @@ BEGIN ATOMIC
         SELECT c.id, c.counted AS was,
                (c.deleted_at IS NULL
                 AND NOT EXISTS (SELECT 1 FROM social.hides AS h WHERE h.comment_id = c.id AND h.restored_at IS NULL)
+                AND NOT EXISTS (SELECT 1 FROM social.content_takedowns AS t WHERE t.comment_id = c.id)
                 AND NOT (c.actor_kind = 'BUYER' AND EXISTS (SELECT 1 FROM social.inactive_authors AS ia WHERE ia.buyer_id = c.actor_id))
                ) AS now_counted
           FROM social.comments AS c
@@ -109,6 +110,7 @@ BEGIN ATOMIC
         SELECT c.id, c.counted AS was,
                (c.deleted_at IS NULL
                 AND NOT EXISTS (SELECT 1 FROM social.hides AS h WHERE h.forum_entry_id = c.id AND h.restored_at IS NULL)
+                AND NOT EXISTS (SELECT 1 FROM social.content_takedowns AS t WHERE t.forum_entry_id = c.id)
                 AND NOT (c.actor_kind = 'BUYER' AND EXISTS (SELECT 1 FROM social.inactive_authors AS ia WHERE ia.buyer_id = c.actor_id))
                ) AS now_counted
           FROM social.forum_entries AS c

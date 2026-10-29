@@ -2,7 +2,7 @@
 import { Code } from "@connectrpc/connect";
 import type { Gender } from "@hawkr/api/gen/hawkr/buyer/v1alpha1/buyer_pb";
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
-import type { KYCField, KYCFlowStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, PayUniState, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
+import type { ContentKind, KYCField, KYCFlowStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, PayUniState, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import type { UiMessage } from "./message";
 
 export type { DefaultErrorText, UiMessage } from "./message";
@@ -44,6 +44,9 @@ export type UiTextKey =
 	| "common.error.UNIMPLEMENTED"
 	| "common.error.UNKNOWN"
 	| "common.unknown"
+	| "seller.ContentKind.CONTENT_KIND_COMMENT"
+	| "seller.ContentKind.CONTENT_KIND_FORUM_ENTRY"
+	| "seller.ContentKind.CONTENT_KIND_POST"
 	| "seller.KYCField.KYC_FIELD_BANK_ACCOUNT"
 	| "seller.KYCField.KYC_FIELD_BANK_BOOK"
 	| "seller.KYCField.KYC_FIELD_BANK_CODE"
@@ -124,6 +127,7 @@ export type UiTextKey =
 	| "seller.MeasureBasis.MEASURE_BASIS_CONTRACT"
 	| "seller.MeasureBasis.MEASURE_BASIS_RISK"
 	| "seller.MeasureBasis.MEASURE_BASIS_VIOLATION"
+	| "seller.MeasureKind.MEASURE_KIND_CONTENT_TAKEDOWN"
 	| "seller.MeasureKind.MEASURE_KIND_SUSPENSION"
 	| "seller.MeasureKind.MEASURE_KIND_TERMINATION"
 	| "seller.MeasureKind.MEASURE_KIND_WARNING"
@@ -203,6 +207,7 @@ export const SELLER_MEASURE_KIND_NAME: Readonly<Record<number, string>> = {
 	1: "MEASURE_KIND_WARNING",
 	2: "MEASURE_KIND_SUSPENSION",
 	3: "MEASURE_KIND_TERMINATION",
+	4: "MEASURE_KIND_CONTENT_TAKEDOWN",
 };
 
 /** seller.MeasureRequestKind 的值號到值名；ICU select 的分支用值名。 */
@@ -282,6 +287,19 @@ export function commonError(code: Code): UiMessage | undefined {
 /** 不認得的值與 UNSPECIFIED 一律顯示的文字。 */
 export function commonUnknown(): UiMessage {
 	return { key: "common.unknown" };
+}
+
+const SELLER_CONTENT_KIND: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "seller.ContentKind.CONTENT_KIND_POST",
+	2: "seller.ContentKind.CONTENT_KIND_COMMENT",
+	3: "seller.ContentKind.CONTENT_KIND_FORUM_ENTRY",
+};
+
+/** seller.ContentKind 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function sellerContentKind(v: ContentKind): UiMessage | undefined {
+	const key = SELLER_CONTENT_KIND[v];
+	if (key === undefined) return undefined;
+	return { key };
 }
 
 const SELLER_KYCFIELD: Readonly<Partial<Record<number, UiTextKey>>> = {
@@ -512,6 +530,7 @@ const SELLER_MEASURE_KIND: Readonly<Partial<Record<number, UiTextKey>>> = {
 	1: "seller.MeasureKind.MEASURE_KIND_WARNING",
 	2: "seller.MeasureKind.MEASURE_KIND_SUSPENSION",
 	3: "seller.MeasureKind.MEASURE_KIND_TERMINATION",
+	4: "seller.MeasureKind.MEASURE_KIND_CONTENT_TAKEDOWN",
 };
 
 /** seller.MeasureKind 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */

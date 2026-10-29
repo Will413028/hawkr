@@ -21,6 +21,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
@@ -604,7 +605,7 @@ func (s *Service) ExtendAuthorityOrderHold(ctx context.Context, in model.ExtendA
 	if err := model.Positive(in.AdminID); err != nil {
 		return model.AdminAuthorityOrder{}, err
 	}
-	reason := strings.TrimSpace(in.Reason)
+	reason := trimtext.Trim(in.Reason)
 	if n := utf8.RuneCountInString(reason); n == 0 || n > model.AuthorityNoteMaxRunes {
 		return model.AdminAuthorityOrder{}, invalidOn("Reason", text.AuthorityOrderHoldReasonLength())
 	}
@@ -700,7 +701,7 @@ func (s *Service) RevokeAuthorityOrder(ctx context.Context, in model.RevokeAutho
 	if err := model.Positive(in.AdminID); err != nil {
 		return model.RevokeAuthorityOrderResult{}, err
 	}
-	reason := strings.TrimSpace(in.Reason)
+	reason := trimtext.Trim(in.Reason)
 	if n := utf8.RuneCountInString(reason); n == 0 || n > model.AuthorityNoteMaxRunes {
 		return model.RevokeAuthorityOrderResult{}, invalidOn("Reason", text.AuthorityOrderRevokeReasonLength())
 	}

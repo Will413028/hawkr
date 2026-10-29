@@ -302,3 +302,17 @@ BEGIN ATOMIC
     UNION ALL
     SELECT * FROM seller.review_payuni_bind_retry(at);
 END;
+
+-- 發布的讀取介面（pub_*，形狀宣告在 db/pub.sql，契約測試比對兩者）：此刻生效中的內容下架措施的對象，一列是一個（措施，內容）。內容下架建立即生效、
+-- 沒有結束時間，生效與否只看 status，所以不收 at。給 social 的每日對帳核對它自己的複本 social.content_takedowns 有沒有漏或多（Go 查詢；
+-- social 的讀取不 join 它，D-sync）。
+CREATE TYPE seller.pub_content_takedown AS (measure_id UUID, content_kind TEXT, content_id UUID);
+
+CREATE FUNCTION seller.pub_content_takedowns() RETURNS SETOF seller.pub_content_takedown
+LANGUAGE sql STABLE
+BEGIN ATOMIC
+    SELECT c.measure_id, c.content_kind, c.content_id
+    FROM seller.measures m
+    JOIN seller.measure_contents c ON c.measure_id = m.id
+    WHERE m.status = 'ENFORCED' AND m.kind = 'CONTENT_TAKEDOWN';
+END;

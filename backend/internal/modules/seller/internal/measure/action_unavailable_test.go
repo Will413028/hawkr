@@ -21,7 +21,7 @@ func TestActionUnavailableErrorSaysTheFirstReasonText(t *testing.T) {
 	var cells []cell
 	for _, kind := range model.MeasureKindValues() {
 		cells = append(cells, cell{model.MeasureStatusRevoked, kind, model.StateRevoked})
-		if kind == model.MeasureWarning {
+		if !kind.Restrictive() {
 			cells = append(cells, cell{model.MeasureStatusEnforced, kind, model.StateIssued})
 			continue
 		}

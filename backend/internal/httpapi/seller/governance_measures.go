@@ -2,6 +2,7 @@ package seller
 
 import (
 	"context"
+	"errors"
 	"time"
 	"uuid"
 
@@ -14,6 +15,7 @@ import (
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
@@ -131,6 +133,9 @@ func toAdminMeasure(m model.Measure) *adminpb.Measure {
 	}
 	for _, f := range m.Findings {
 		out.Findings = append(out.Findings, toAdminViolation(f))
+	}
+	for _, c := range m.Contents {
+		out.Contents = append(out.Contents, &pb.ContentRef{Kind: rpc.EnumToProto[pb.ContentKind](c.Kind), Id: c.ID.String()})
 	}
 	for _, r := range m.Revisions {
 		out.Revisions = append(out.Revisions, toRevision(r))
@@ -329,14 +334,47 @@ func (h *Governance) CreateMeasure(ctx context.Context, req *connect.Request[adm
 			t.SourceMeasureID = &source
 		}
 		in.Termination = t
+	case *adminpb.CreateMeasureRequest_ContentTakedown:
+		in.Kind, paths = model.MeasureContentTakedown, createTakedownPaths
+		if in.Violation, err = violationBasisFrom(input.ContentTakedown.GetViolation(), "content_takedown.violation"); err != nil {
+			return nil, err
+		}
+		t := &model.ContentTakedown{}
+		for i, ref := range input.ContentTakedown.GetContents() {
+			id, err := rpc.ParseUUID(apperr.IndexedField("content_takedown.contents", i)+".id", ref.GetId())
+			if err != nil {
+				return nil, err
+			}
+			t.Contents = append(t.Contents, model.ContentRef{Kind: rpc.EnumFromProto[model.ContentKind](ref.GetKind()), ID: id})
+		}
+		in.Takedown = t
 	default:
-		return nil, rpc.RequiredField("warning", "必須指定措施種類（warning、suspension 或 termination）")
+		return nil, rpc.RequiredField("warning", "必須指定措施種類（warning、suspension、termination 或 content_takedown）")
 	}
 	result, err := h.m.CreateMeasure(ctx, in)
 	if err != nil {
+		if in.Takedown != nil {
+			if mapped, ok := takedownContentError(err, in.Takedown.Contents); ok {
+				return nil, mapped
+			}
+		}
 		return nil, rpc.WithFieldPaths(err, paths)
 	}
 	return connect.NewResponse(&adminpb.CreateMeasureResponse{Measure: toAdminMeasure(result.Measure)}), nil
+}
+
+// takedownContentError 把 social 訂閱者回的歸屬錯誤對到請求裡那一則內容的欄位路徑；找不到對應的項目時原樣回傳。
+func takedownContentError(err error, contents []model.ContentRef) (error, bool) {
+	var bad *social.TakedownContentError
+	if !errors.As(err, &bad) {
+		return err, false
+	}
+	for i, c := range contents {
+		if c.Kind == bad.Kind && c.ID == bad.ID {
+			return rpc.WithFieldPaths(apperr.InvalidInputOn([]string{apperr.IndexedField("Takedown.Contents", i)}, "內容不存在、已刪除，或不是這家店自己寫的"), createTakedownPaths), true
+		}
+	}
+	return err, false
 }
 
 func (h *Governance) GetMeasure(ctx context.Context, req *connect.Request[adminpb.GetMeasureRequest]) (*connect.Response[adminpb.GetMeasureResponse], error) {

@@ -17,7 +17,11 @@ SELECT p.id AS "id",
      s.share_count AS "share_count"
 FROM social.posts AS p
      INNER JOIN social.post_stats AS s ON (s.post_id = p.id)
-WHERE (((((p.status = 'PUBLISHED') AND (p.deleted_at IS NULL)) AND (EXISTS (SELECT 1 FROM seller.pub_exposable_stores($1::timestamp with time zone) AS pub WHERE pub.store_id = p.store_id))) AND (NOT (EXISTS (SELECT 1 FROM buyer.pub_blocked_stores() AS pub WHERE pub.blocker_buyer_id = $2::bigint AND ((store_id = p.store_id)))))) AND (p.store_id = $3::bigint)) AND (ROW(p.published_at, p.id) < ROW($4::timestamp with time zone, $5::uuid))
+WHERE ((((((p.status = 'PUBLISHED') AND (p.deleted_at IS NULL)) AND (NOT (EXISTS (
+           SELECT td.post_id AS "td.post_id"
+           FROM social.content_takedowns AS td
+           WHERE td.post_id = p.id
+      )))) AND (EXISTS (SELECT 1 FROM seller.pub_exposable_stores($1::timestamp with time zone) AS pub WHERE pub.store_id = p.store_id))) AND (NOT (EXISTS (SELECT 1 FROM buyer.pub_blocked_stores() AS pub WHERE pub.blocker_buyer_id = $2::bigint AND ((store_id = p.store_id)))))) AND (p.store_id = $3::bigint)) AND (ROW(p.published_at, p.id) < ROW($4::timestamp with time zone, $5::uuid))
 ORDER BY p.published_at DESC, p.id DESC
 LIMIT $6;
 

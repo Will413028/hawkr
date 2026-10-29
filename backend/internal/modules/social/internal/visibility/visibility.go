@@ -2,7 +2,7 @@
 // 讀取內容的 query 用 go-jet 建，所有規則都從這裡組：
 //
 //   - Counted：內容「計入」的旗標（comments.counted、forum_entries.counted）。定義只有一份，在資料庫的 reevaluate_*（db/objects.sql），
-//     輸入全是 social 自己的表（deleted_at、hides、inactive_authors）；寫入的 trigger、買家刪帳的訂閱者與每日對帳讓旗標保持正確，讀取與重算直接用旗標，
+//     輸入全是 social 自己的表（deleted_at、hides、content_takedowns、inactive_authors）；寫入的 trigger、買家刪帳的訂閱者與每日對帳讓旗標保持正確，讀取與重算直接用旗標，
 //     不重新推導（A7-1a，ADR 2026-10-23-social-counts-in-stats-tables 的修訂）。計數與旗標不依觀看者。
 //   - 觀看者的規則（個人封鎖，A7-1b）：入口型別必帶的條件，不併進 Counted。觀看者封鎖的店，它的貼文與討論區對觀看者整個不出現
 //     （ReadablePosts、ReadableForum）；與觀看者任一方向有個人封鎖的買家，他的留言與討論區留言（含底下的回覆）對觀看者整則不出現，
@@ -104,10 +104,17 @@ func PostPublished(p *table.PostsTable) BoolExpression {
 	return p.Status.EQ(NewEnumValue("PUBLISHED")).AND(p.DeletedAt.IS_NULL())
 }
 
-// ReadablePosts 是觀看者可讀的貼文：已發布、沒有刪除、店家可曝光，而且觀看者沒有封鎖這家店。
+// postNotTakenDown 是貼文沒有被內容下架：social.content_takedowns（seller 措施的複本，訂閱者同 transaction 維護）沒有這篇貼文的列。
+// 貼文沒有計入旗標，所以直接探測複本，走 content_takedowns_post。貼文底下的留言與討論區以外的內容跟著貼文：讀取留言要求貼文是 Posts 入口讀得到的。
+func postNotTakenDown(p *table.PostsTable) BoolExpression {
+	t := table.ContentTakedowns.AS("td")
+	return NOT(EXISTS(SELECT(t.PostID).FROM(t).WHERE(t.PostID.EQ(p.ID))))
+}
+
+// ReadablePosts 是觀看者可讀的貼文：已發布、沒有刪除、沒有被內容下架、店家可曝光，而且觀看者沒有封鎖這家店。
 func ReadablePosts(alias string, at time.Time, v Viewer) Posts {
 	p := table.Posts.AS(alias)
-	return Posts{T: p, cond: and(PostPublished(p), StoreExposable(at, p.StoreID), storeNotBlocked(v, p.StoreID))}
+	return Posts{T: p, cond: and(PostPublished(p), postNotTakenDown(p), StoreExposable(at, p.StoreID), storeNotBlocked(v, p.StoreID))}
 }
 
 // OwnerPosts 是店主讀自己的貼文：任何狀態，不含刪除；店主以店家身分讀，不套個人封鎖。

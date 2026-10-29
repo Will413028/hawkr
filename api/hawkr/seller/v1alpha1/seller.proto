@@ -975,6 +975,26 @@ enum MeasureKind {
   // 終止賣家合作條款（第二十一條）。生效時（period.start_time）店家暫停營業，未結訂單完成後店家關閉；沒有固定結束時間，
   // 也沒有解除請求、複審或結束，只能由撤銷、申覆成立解除。事由看 Measure.termination_ground；申覆期間到 appeal_deadline_time 為止。
   MEASURE_KIND_TERMINATION = 3;
+  // 內容下架：店家指定的內容（貼文、留言、討論區留言）不再公開；建立即生效，沒有期間、不限制帳號，也不影響店家的曝光。對象看 Measure.contents，建立後不能改，
+  // 要改就撤銷再建立；內容只能由撤銷或申覆成立恢復。
+  MEASURE_KIND_CONTENT_TAKEDOWN = 4;
+}
+
+// ContentKind 是內容下架措施對象的種類，對應社群內容的三種寫入。
+enum ContentKind {
+  CONTENT_KIND_UNSPECIFIED = 0;
+  // 店家貼文。
+  CONTENT_KIND_POST = 1;
+  // 貼文底下的留言。
+  CONTENT_KIND_COMMENT = 2;
+  // 討論區留言。
+  CONTENT_KIND_FORUM_ENTRY = 3;
+}
+
+// ContentRef 是內容下架措施的一個對象：種類加上該內容的 ID（不透明的字串）。
+message ContentRef {
+  ContentKind kind = 1 [(google.api.field_behavior) = REQUIRED];
+  string id = 2 [(google.api.field_behavior) = REQUIRED];
 }
 
 // MeasureBasis 是措施的依據：VIOLATION 依據違規的認定（有固定期間的處分），RISK 依據條款第 17.1 條的風險類型或第 17.5 條
@@ -1011,7 +1031,7 @@ enum RiskGround {
 // MeasureState 是措施此刻的狀態，由伺服器在讀取時推導，不儲存：時間到了不改變 etag，只改變 state。
 enum MeasureState {
   MEASURE_STATE_UNSPECIFIED = 0;
-  // 警告，未撤銷（不是「生效中」，沒有限制）。
+  // 警告或內容下架，未撤銷（不是「生效中」，沒有限制）。
   MEASURE_STATE_ISSUED = 1;
   // 停權生效中。終止合作生效後（含店家已關閉）也是 ACTIVE。
   MEASURE_STATE_ACTIVE = 2;
@@ -1213,6 +1233,8 @@ message Measure {
   // 不能申覆的原因，依優先序排列（已撤銷、已申覆過、申覆期限已過、有審核中的請求）；can_appeal 是 true 時是空的，反之不為空，兩者來自同一個
   // 規則（與 SubmitAppeal 的前置檢查相同），client 顯示第一個的 message，不自己推導。
   repeated AppealUnavailability appeal_unavailabilities = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 內容下架（kind 是 CONTENT_TAKEDOWN）的對象，依種類、id 排序，賣家據此知道被下架的是哪些內容、申覆什麼；其他種類沒有。建立後不能改。
+  repeated ContentRef contents = 25 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 message ListMyMeasuresRequest {

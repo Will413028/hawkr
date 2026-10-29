@@ -714,6 +714,7 @@ message CreateMeasureRequest {
     WarningInput warning = 11;
     SuspensionInput suspension = 12;
     TerminationInput termination = 13;
+    ContentTakedownInput content_takedown = 16;
   }
   // 選填：從案件建立時帶案件 id。任何種類與依據都可以帶；措施的店家必須是案件的店家（invalid_argument），案件必須進行中（failed_precondition）。
   // 之後這個措施算是案件導出的措施（ListMeasuresRequest.source_case_id）。同一個 request_id 帶不同的案件是不同的請求。
@@ -738,6 +739,13 @@ message SuspensionInput {
   google.protobuf.Timestamp end_time = 3;
   // RISK 必填：複審期限，必須晚於現在、不超過 30 天；VIOLATION 依據不可以設。
   google.protobuf.Timestamp review_by = 4;
+}
+
+// ContentTakedownInput 是內容下架：依據違規的認定，立即生效，沒有結束時間，只能撤銷或申覆成立恢復。
+message ContentTakedownInput {
+  // 下架的內容，1 到 20 則、不可重複，是集合（順序沒有意義）。伺服器向 social 核對每一則：id 存在而且內容屬於 store_id 這家店，否則回 invalid_argument 指到 content_takedown.contents[i]。
+  repeated hawkr.seller.v1alpha1.ContentRef contents = 1 [(google.api.field_behavior) = REQUIRED];
+  ViolationBasis violation = 2 [(google.api.field_behavior) = REQUIRED];
 }
 
 // TerminationInput 是終止合作（賣家合作條款第 21.2、21.3 條）的事由與依據。措施的依據（Measure.basis）由伺服器推導：有 violation 是 VIOLATION，

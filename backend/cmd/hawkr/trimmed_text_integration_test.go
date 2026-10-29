@@ -33,6 +33,8 @@ type trimmedColumn struct {
 // hideTarget 讓 social.hides 的 hides_target_check（恰好一個目標）在只填一欄時成立；暫時表沒有外鍵。
 const hideTarget = "00000000-0000-7000-8000-000000000001"
 
+var sellerEpoch = time.Date(2026, 10, 29, 0, 0, 0, 0, time.UTC)
+
 var trimmedColumns = []trimmedColumn{
 	{table: "identity.admin_role_events", column: "reason", constraint: "admin_role_events_reason_check"},
 	{table: "accountdeletion.request_attempts", column: "reason", constraint: "request_attempts_reason_check",
@@ -41,6 +43,15 @@ var trimmedColumns = []trimmedColumn{
 	{table: "seller.stores", column: "store_name", constraint: "stores_store_name_check"},
 	{table: "seller.stores", column: "contact_name", constraint: "stores_contact_name_check", extra: map[string]any{"store_name": "店"}},
 	{table: "seller.kyc_applications", column: "real_name", constraint: "kyc_applications_real_name_check"},
+	{table: "seller.measures", column: "statement_to_seller", constraint: "measures_statement_check"},
+	{table: "seller.measure_revisions", column: "statement_to_seller", constraint: "measure_revisions_statement_check", extra: map[string]any{"admin_id": int64(1)}},
+	{table: "seller.measure_requests", column: "reason", constraint: "measure_requests_reason_check"},
+	{table: "seller.measure_requests", column: "decision_reason", constraint: "measure_requests_decision_reason_text_check",
+		extra: map[string]any{"state": "ACCEPTED", "decided_by_admin_id": int64(1), "decided_at": sellerEpoch, "submitted_at": sellerEpoch}},
+	{table: "seller.authority_orders", column: "revoke_reason", constraint: "authority_orders_revoke_reason_text_check",
+		extra: map[string]any{"revoked_at": sellerEpoch, "registered_at": sellerEpoch, "revoked_by_admin_id": int64(1)}},
+	{table: "seller.cases", column: "decision_note", constraint: "cases_decision_note_text_check",
+		extra: map[string]any{"closed_at": sellerEpoch, "opened_at": sellerEpoch, "closed_by_admin_id": int64(1), "close_reason": "DECIDED", "decision": "ACTION_TAKEN"}},
 	{table: "seller.prospects", column: "display_name", constraint: "prospects_display_name_check"},
 	{table: "seller.prospect_contacts", column: "value", constraint: "prospect_contacts_value_check"},
 	{table: "social.hides", column: "reason_text", constraint: "hides_reason_text_check", extra: map[string]any{"comment_id": hideTarget}},

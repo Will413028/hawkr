@@ -894,6 +894,10 @@ func TestCanFlagsMatchWhetherTheActionSucceeds(t *testing.T) {
 			return accountID, f.terminate(t, s.StoreID, ground)
 		}
 	}
+	takedown := func() (int64, Measure) {
+		accountID, s := f.open(t)
+		return accountID, f.takedown(t, s.StoreID, takedownContents(2))
+	}
 	appealed := func(inner func() (int64, Measure)) func() (int64, Measure) {
 		return func() (int64, Measure) {
 			accountID, m := inner()
@@ -938,6 +942,9 @@ func TestCanFlagsMatchWhetherTheActionSucceeds(t *testing.T) {
 	}
 	scenarios := []scenario{
 		{"警告", 0, violation(MeasureWarning, nil)},
+		{"內容下架", 0, takedown},
+		{"內容下架，申訴待裁定", 0, appealed(takedown)},
+		{"內容下架，申訴已駁回", 0, rejected(takedown)},
 		{"認定停權", 0, violation(MeasureSuspension, long())},
 		{"認定停權，申訴待裁定", 0, appealed(violation(MeasureSuspension, long()))},
 		{"認定停權，申訴已駁回", 0, rejected(violation(MeasureSuspension, long()))},
@@ -983,6 +990,12 @@ func TestCanFlagsMatchWhetherTheActionSucceeds(t *testing.T) {
 		{"風險停權，已由平台結束", time.Microsecond, func() (int64, Measure) {
 			accountID, m := risk(nil)()
 			return accountID, f.endRisk(t, m)
+		}},
+		{"內容下架，已撤銷", 0, func() (int64, Measure) {
+			accountID, m := takedown()
+			_, err := f.module.RevokeMeasure(ctx, RevokeMeasureInput{MeasureID: m.ID, ExpectedVersion: m.Version, AdminID: 7, Reason: RevokeOther})
+			must(t, err)
+			return accountID, f.measureOf(t, m.ID)
 		}},
 		{"已撤銷", 0, func() (int64, Measure) {
 			accountID, m := violation(MeasureSuspension, long())()

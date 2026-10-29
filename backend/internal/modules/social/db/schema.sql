@@ -89,7 +89,7 @@ CREATE INDEX comments_replies ON social.comments (parent_id, created_at, id) WHE
 -- 買家的清除 job 與「我的留言」：以作者找。
 CREATE INDEX comments_actor ON social.comments (actor_kind, actor_id, id);
 
-COMMENT ON COLUMN social.comments.counted IS '此刻是否計入貼文的留言數與父留言的回覆數（沒有刪除、沒有未還原的隱藏、作者不在 inactive_authors，在 social.reevaluate_comments 求值）；只由 social.reevaluate_comments 維護，讀取直接用它，貼文的 comment_count 與留言的 reply_count 是這個旗標的加總';
+COMMENT ON COLUMN social.comments.counted IS '此刻是否計入貼文的留言數與父留言的回覆數（沒有刪除、沒有未還原的隱藏、沒有內容下架、作者不在 inactive_authors，在 social.reevaluate_comments 求值）；只由 social.reevaluate_comments 維護，讀取直接用它，貼文的 comment_count 與留言的 reply_count 是這個旗標的加總';
 COMMENT ON COLUMN social.comments.body IS '內文；作者自己刪除時保留，買家刪帳的清除 job 之後設為 NULL（保留列讓討論串結構與佔位項目還在），所以 NULL 一定是已刪除的列（comments_scrubbed_check）';
 COMMENT ON COLUMN social.comments.actor_kind IS '互動者的種類：BUYER（actor_id 是 buyer_id）、STORE（actor_id 是 store_id）；買家與店家各自連號，同一個數值在兩邊是不同的人';
 
@@ -142,7 +142,7 @@ CREATE TABLE social.forum_entries (
     CONSTRAINT forum_entries_parent_check CHECK (parent_id IS NULL OR parent_id <> id),
     CONSTRAINT forum_entries_reply_to_check CHECK (reply_to_id IS NULL OR (parent_id IS NOT NULL AND reply_to_id <> id))
 );
-COMMENT ON COLUMN social.forum_entries.counted IS '此刻是否計入父討論區留言的回覆數（沒有刪除、沒有未還原的隱藏、作者不在 inactive_authors，在 social.reevaluate_forum_entries 求值）；只由 social.reevaluate_forum_entries 維護，讀取直接用它，父項的 reply_count 是這個旗標的加總';
+COMMENT ON COLUMN social.forum_entries.counted IS '此刻是否計入父討論區留言的回覆數（沒有刪除、沒有未還原的隱藏、沒有內容下架、作者不在 inactive_authors，在 social.reevaluate_forum_entries 求值）；只由 social.reevaluate_forum_entries 維護，讀取直接用它，父項的 reply_count 是這個旗標的加總';
 COMMENT ON COLUMN social.forum_entries.body IS '內文；作者自己刪除時保留，買家刪帳的清除 job 之後設為 NULL（保留列讓討論串結構與佔位項目還在），所以 NULL 一定是已刪除的列（forum_entries_scrubbed_check）';
 CREATE INDEX forum_entries_top_level ON social.forum_entries (store_id, created_at, id) WHERE parent_id IS NULL;
 CREATE INDEX forum_entries_replies ON social.forum_entries (parent_id, created_at, id) WHERE counted;
@@ -203,6 +203,27 @@ CREATE UNIQUE INDEX hides_active_forum_entry ON social.hides (forum_entry_id) WH
 -- 還原後可以再隱藏，歷史的列要能依內容找：作者讀「我被隱藏的內容」、管理員看紀錄。
 CREATE INDEX hides_comment ON social.hides (comment_id, hidden_at) WHERE comment_id IS NOT NULL;
 CREATE INDEX hides_forum_entry ON social.hides (forum_entry_id, hidden_at) WHERE forum_entry_id IS NOT NULL;
+
+-- 內容下架的複本：seller 擁有措施（seller.measures、measure_contents），social 在同一個 transaction 的訂閱者（MeasureCreated、MeasureRevoked 中的
+-- 內容下架）裡寫一列一個（措施，內容），所以貼文的公開讀取與留言、討論區留言的 counted 旗標只依 social 自己的表求值。與 inactive_authors 同一個形狀，
+-- 差別是措施可以撤銷：建立插入，撤銷刪除，並讓受影響的內容重新求值。同一則內容可以同時被多個措施下架，所以內容不是主鍵，(措施, 內容) 才是（三個部分唯一索引）；
+-- 每日對帳拿 seller.pub_content_takedowns() 雙向核對。貼文沒有計入旗標，公開讀取的述詞對 post_id 做 NOT EXISTS（visibility.ReadablePosts）；
+-- 貼文底下的留言跟著父貼文，不另寫列。
+CREATE TABLE social.content_takedowns (
+    measure_id     UUID        NOT NULL,
+    post_id        UUID        REFERENCES social.posts (id),
+    comment_id     UUID        REFERENCES social.comments (id),
+    forum_entry_id UUID        REFERENCES social.forum_entries (id),
+    created_at     TIMESTAMPTZ NOT NULL,
+    CONSTRAINT content_takedowns_target_check CHECK (num_nonnulls(post_id, comment_id, forum_entry_id) = 1)
+);
+CREATE UNIQUE INDEX content_takedowns_measure_post ON social.content_takedowns (measure_id, post_id) WHERE post_id IS NOT NULL;
+CREATE UNIQUE INDEX content_takedowns_measure_comment ON social.content_takedowns (measure_id, comment_id) WHERE comment_id IS NOT NULL;
+CREATE UNIQUE INDEX content_takedowns_measure_forum_entry ON social.content_takedowns (measure_id, forum_entry_id) WHERE forum_entry_id IS NOT NULL;
+-- 讀取與重新求值依內容探測「有沒有下架」，撤銷依措施找列。
+CREATE INDEX content_takedowns_post ON social.content_takedowns (post_id) WHERE post_id IS NOT NULL;
+CREATE INDEX content_takedowns_comment ON social.content_takedowns (comment_id) WHERE comment_id IS NOT NULL;
+CREATE INDEX content_takedowns_forum_entry ON social.content_takedowns (forum_entry_id) WHERE forum_entry_id IS NOT NULL;
 
 -- 買家的社群處分紀錄（處分紀錄與效果在同一個模組、同一個 transaction，只有一個寫入者，10e R12）。kind 初始只有 WARNING；之後加限制
 -- 種類只加值與規則（買家條款訂出後）。ends_at 目前沒有讀者（警告不限制參與），為有期限的參與限制保留。

@@ -22,7 +22,10 @@ export const REPORTER_CATEGORIES: readonly PolicyCategory[] = [
 	PolicyCategory.OTHER,
 ];
 
-/** 店家治理的平台判定類別與認定可用的類別（Assessable）：全部除了 OTHER 與社群內容的類別（OTHER 只給檢舉人選，理由要指到條款）。 */
+/**
+ * 店家治理的平台判定類別與認定可用的類別：全部除了 OTHER 與社群內容的類別（OTHER 只給檢舉人選，理由要指到條款）。伺服器的 `Assessable` 另外收社群內容的
+ * SPAM、HARASSMENT、HATE（內容下架的認定用）；這份下拉是子集，社群類別的選項隨 A7-4 的內容下架畫面加入。
+ */
 export const ASSESSABLE_CATEGORIES: readonly PolicyCategory[] = [
 	PolicyCategory.FOOD_SAFETY,
 	PolicyCategory.PROHIBITED_GOODS,

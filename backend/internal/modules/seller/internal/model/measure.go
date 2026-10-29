@@ -4,12 +4,15 @@ import (
 	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/text"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/contentkind"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 	"uuid"
 )
 
-// MeasureKind 是措施的種類：警告沒有限制，停權在期間內限制帳號，終止合作（賣家合作條款第 21 條）從生效起限制帳號、沒有固定結束時間。
+// MeasureKind 是措施的種類：警告沒有限制，停權在期間內限制帳號，終止合作（賣家合作條款第 21 條）從生效起限制帳號、沒有固定結束時間，
+// 內容下架讓店家的指定內容不再公開、不影響帳號的能力與曝光。
 type MeasureKind string
 
 const (
@@ -19,15 +22,65 @@ const (
 	MeasureSuspension MeasureKind = "SUSPENSION"
 	// MeasureTermination 終止合作：未撤銷、開始之後帳號被限制（停權的效果），未結訂單完成後店家關閉；只能撤銷或申覆成立解除。
 	MeasureTermination MeasureKind = "TERMINATION"
+	// MeasureContentTakedown 內容下架：建立即生效、沒有結束時間、不限制帳號；對象是 Measure.Contents 的內容，建立後不可修訂；解除只走申覆。
+	MeasureContentTakedown MeasureKind = "CONTENT_TAKEDOWN"
 )
 
 // MeasureKindValues 回傳全部措施種類，與 DB 的 measures_kind_check 一致。
 func MeasureKindValues() []MeasureKind {
-	return []MeasureKind{MeasureWarning, MeasureSuspension, MeasureTermination}
+	return []MeasureKind{MeasureWarning, MeasureSuspension, MeasureTermination, MeasureContentTakedown}
 }
 
 // Restrictive 回報這個種類的措施有沒有限制帳號的效果（停權與終止合作），是「生效中」讀取的 kind 條件（EffectiveMeasures 的 kind IN）。
 func (k MeasureKind) Restrictive() bool { return k == MeasureSuspension || k == MeasureTermination }
+
+// HasEndTime 回報這個種類的措施可以有結束時間：停權與終止合作（終止合作只在預告期間內店家關閉時由系統寫入）；警告與內容下架沒有。
+func (k MeasureKind) HasEndTime() bool { return k == MeasureSuspension || k == MeasureTermination }
+
+// ContentKind 是內容下架措施的對象種類，儲存的代碼（measure_contents_content_kind_check）；值由 platform/contentkind 擁有，與 social 共用同一份。
+type ContentKind = contentkind.Kind
+
+const (
+	// ContentPost 店家貼文。
+	ContentPost = contentkind.Post
+	// ContentComment 留言。
+	ContentComment = contentkind.Comment
+	// ContentForumEntry 討論區留言。
+	ContentForumEntry = contentkind.ForumEntry
+)
+
+// ContentKindValues 回傳全部內容種類，與 DB 的 measure_contents_content_kind_check 一致。
+func ContentKindValues() []ContentKind { return contentkind.Values() }
+
+// ContentRef 是內容下架措施的一個對象：種類加上 social 的列 ID（不透明的外部參照，seller 不讀 social）。
+type ContentRef struct {
+	Kind ContentKind
+	ID   uuid.UUID
+}
+
+// MaxTakedownContents 是一個內容下架措施最多的對象數。
+const MaxTakedownContents = 20
+
+// ValidateContentTargets 檢查內容下架對象清單的形狀：1 到 MaxTakedownContents 筆、種類合法、ID 不為空、(種類, ID) 不重複。內容屬於哪個店家由呼叫方（moderation）驗證。
+func ValidateContentTargets(field string, refs []ContentRef) error {
+	if n := len(refs); n == 0 || n > MaxTakedownContents {
+		return apperr.InvalidInputOn([]string{field}, "內容下架的對象必須是 1 到 %d 則內容", MaxTakedownContents)
+	}
+	seen := make(map[ContentRef]bool, len(refs))
+	for i, r := range refs {
+		at := apperr.IndexedField(field, i)
+		switch {
+		case !r.Kind.Valid():
+			return apperr.InvalidInputOn([]string{at}, "內容種類不合法")
+		case r.ID == uuid.Nil():
+			return apperr.InvalidInputOn([]string{at}, "內容 ID 不可為空")
+		case seen[r]:
+			return apperr.InvalidInputOn([]string{at}, "內容不可重複")
+		}
+		seen[r] = true
+	}
+	return nil
+}
 
 // Basis 是措施的依據：VIOLATION 依據違規的認定（固定期間的處分），RISK 依據條款第 17.1、17.5 條的風險類型（沒有固定期間時
 // 由平台定期複審）。
@@ -197,7 +250,7 @@ func MeasureStatusValues() []MeasureStatus {
 type MeasureState string
 
 const (
-	// StateIssued 警告，未撤銷。
+	// StateIssued 沒有限制效果的措施（警告、內容下架），未撤銷。
 	StateIssued MeasureState = "ISSUED"
 	// StateActive 停權生效中。
 	StateActive MeasureState = "ACTIVE"
@@ -224,7 +277,7 @@ func StateOf(status MeasureStatus, kind MeasureKind, startsAt time.Time, endsAt 
 		return StateRevoked
 	}
 	switch {
-	case kind == MeasureWarning:
+	case kind == MeasureWarning || kind == MeasureContentTakedown:
 		return StateIssued
 	case !kind.Restrictive():
 		panic("seller/model：StateOf 遇到不認得的措施種類 " + string(kind))
@@ -310,6 +363,9 @@ const ReviewWindow = 30 * 24 * time.Hour
 
 // MaxCitedFindings 是一個措施一次最多引用的既有認定數。
 const MaxCitedFindings = 20
+
+// MaxSourceModerationReports 是一個認定最多的 moderation 來源檢舉數。
+const MaxSourceModerationReports = 20
 
 // MaxSourceReports 是一個認定最多的來源通報數。
 const MaxSourceReports = 20
@@ -407,6 +463,8 @@ type Measure struct {
 	// StoreName 是店名；個資清理之後是空字串。
 	StoreName string
 	Findings  []Violation
+	// Contents 是內容下架的對象（measure_contents，依種類、ID 排序）；其他種類沒有。
+	Contents  []ContentRef
 	Requests  []MeasureRequest
 	Revisions []MeasureRevision
 	// LinkedAccounts 是與這筆措施的帳號使用同一個身分證明文件或統一編號的其他帳號（身分快照反查）；只有 admin 讀取單筆時載入。
@@ -702,6 +760,9 @@ const (
 	ActionReasonViolationBasis MeasureActionUnavailableReason = "VIOLATION_BASIS"
 	// ActionReasonRemediationPending 有待處理的解除請求，要先裁定；接受解除請求就是結束（只出現在結束）。
 	ActionReasonRemediationPending MeasureActionUnavailableReason = "REMEDIATION_PENDING"
+	// ActionReasonContentTakedownRevokeOnly 內容下架沒有結束時間，也沒有結束入口（延長、縮短、結束）；要讓內容恢復只能撤銷或接受申覆。
+	// 未撤銷的內容下架在延長、縮短與結束只回這一個原因（取代警告、不在生效中與依據違規認定的說法）。
+	ActionReasonContentTakedownRevokeOnly MeasureActionUnavailableReason = "CONTENT_TAKEDOWN_REVOKE_ONLY"
 )
 
 // MeasureActionUnavailableReasonValues 回傳全部不能修改或撤銷的原因（與 API 的 MeasureActionUnavailableReason 一致）。
@@ -709,6 +770,7 @@ func MeasureActionUnavailableReasonValues() []MeasureActionUnavailableReason {
 	return []MeasureActionUnavailableReason{
 		ActionReasonRevoked, ActionReasonNotActive, ActionReasonKindHasNoEndTime, ActionReasonTerminationRecreate,
 		ActionReasonRequestPendingFrozen, ActionReasonAppealPending, ActionReasonViolationBasis, ActionReasonRemediationPending,
+		ActionReasonContentTakedownRevokeOnly,
 	}
 }
 
@@ -775,6 +837,8 @@ func ActionUnavailableText(reason MeasureActionUnavailableReason, action Measure
 		return text.ActionUnavailableViolationBasis()
 	case ActionReasonRemediationPending:
 		return text.ActionUnavailableRemediationPending()
+	case ActionReasonContentTakedownRevokeOnly:
+		return text.ActionUnavailableContentTakedownRevokeOnly()
 	}
 	return uitext.Message{}
 }
@@ -801,12 +865,24 @@ func (m Measure) UpdateStatementUnavailableReasons() []MeasureActionUnavailableR
 // CanUpdateStatement 判斷 admin 此刻能不能改給賣家的理由：沒有任何不能改的原因（UpdateStatementUnavailableReasons）。
 func (m Measure) CanUpdateStatement() bool { return len(m.UpdateStatementUnavailableReasons()) == 0 }
 
-// endTimeUnavailableReasons 是結束時間可調的結構性前置，全部列出並依優先序：已撤銷、警告（沒有結束時間）、終止合作（未撤銷時，要撤銷後重建）、停權不在生效中；
+// takedownRevokeOnly 補上內容下架在延長、縮短與結束的唯一結構性原因：未撤銷時是 CONTENT_TAKEDOWN_REVOKE_ONLY；已撤銷的只有 REVOKED（out 已帶），
+// 同終止合作，已經不能再撤銷，不再多說「只能撤銷」。
+func (m Measure) takedownRevokeOnly(out []MeasureActionUnavailableReason) []MeasureActionUnavailableReason {
+	if m.Status == MeasureStatusEnforced {
+		out = append(out, ActionReasonContentTakedownRevokeOnly)
+	}
+	return out
+}
+
+// endTimeUnavailableReasons 是結束時間可調的結構性前置，全部列出並依優先序：已撤銷、內容下架（未撤銷時只能撤銷，其餘原因都不列）、警告（沒有結束時間）、終止合作（未撤銷時，要撤銷後重建）、停權不在生效中；
 // 空表示結構上可以調整。
 func (m Measure) endTimeUnavailableReasons() []MeasureActionUnavailableReason {
 	var out []MeasureActionUnavailableReason
 	if m.Status != MeasureStatusEnforced {
 		out = append(out, ActionReasonRevoked)
+	}
+	if m.Kind == MeasureContentTakedown {
+		return m.takedownRevokeOnly(out)
 	}
 	if m.Kind == MeasureWarning {
 		out = append(out, ActionReasonKindHasNoEndTime)
@@ -824,7 +900,7 @@ func (m Measure) endTimeUnavailableReasons() []MeasureActionUnavailableReason {
 // 造成的凍結；空表示可以延長。已結束的措施不能延長，再限制要另立措施。CanExtend 與 UpdateMeasure 的前置檢查、API 的 can_extend 都只看這一份。
 func (m Measure) ExtendUnavailableReasons() []MeasureActionUnavailableReason {
 	out := m.endTimeUnavailableReasons()
-	if m.frozenByRequest() {
+	if m.frozenByRequest() && m.Kind != MeasureContentTakedown { // 內容下架沒有結束時間可延長，凍結不是它的原因
 		out = append(out, ActionReasonRequestPendingFrozen)
 	}
 	return out
@@ -849,6 +925,9 @@ func (m Measure) EndUnavailableReasons() []MeasureActionUnavailableReason {
 	var out []MeasureActionUnavailableReason
 	if m.Status != MeasureStatusEnforced {
 		out = append(out, ActionReasonRevoked)
+	}
+	if m.Kind == MeasureContentTakedown {
+		return m.takedownRevokeOnly(out)
 	}
 	if m.State != StateActive {
 		out = append(out, ActionReasonNotActive)
@@ -1004,6 +1083,9 @@ type NewFinding struct {
 	// SourceAuthorityOrderIDs 是成立它的主管機關來函（最多 MaxSourceAuthorityOrders 筆、不重複，是集合）；每一筆都必須指名這個措施的帳號
 	// （指名店家時只算措施的那一家）。
 	SourceAuthorityOrderIDs []uuid.UUID
+	// SourceModerationReportIDs 是成立它的 moderation 檢舉（最多 MaxSourceModerationReports 筆、不重複，是集合）：不透明的外部參照，seller 不驗證它們存在，
+	// 驗證與冪等由呼叫方（moderation）擁有。
+	SourceModerationReportIDs []uuid.UUID
 }
 
 // RiskBasis 是 RISK 依據。
@@ -1030,7 +1112,12 @@ type CreateMeasureInput struct {
 	// Termination 是終止合作（Kind 是 MeasureTermination）的事由與依據；其他種類不可以設。依據由事由與 Violation 推導（有 Violation 是
 	// VIOLATION，否則 CONTRACT）。
 	Termination *TerminationBasis
+	// Takedown 是內容下架（Kind 是 MeasureContentTakedown）的對象；其他種類不可以設。依據一定是 Violation。
+	Takedown *ContentTakedown
 }
+
+// ContentTakedown 是內容下架措施的對象。
+type ContentTakedown struct{ Contents []ContentRef }
 
 // TerminationBasis 是終止合作的事由與依據：Violation 只有第 21.3 條的事由可以帶（MATERIAL_BREACH 必帶），SourceMeasureID 只有
 // LINKED_ACCOUNT 帶（也必帶）。
@@ -1223,6 +1310,8 @@ type MeasureCreated struct {
 	TerminationGround  *TerminationGround
 	StartsAt           time.Time
 	EndsAt             *time.Time
+	// Contents 是內容下架的對象（其他種類是空）。
+	Contents []ContentRef
 }
 
 // MeasureRevised 在賣家可見的內容（理由、結束時間）實際改變的 transaction 內發出；Revision 是新的那一版。結束（EndMeasure）
@@ -1252,6 +1341,8 @@ type MeasureRevoked struct {
 	MeasureID          uuid.UUID
 	StoreID, AccountID int64
 	Reason             RevokeReason
+	// Contents 是撤銷的內容下架措施的對象（其他種類是空）。
+	Contents []ContentRef
 }
 
 // MeasureRequestSubmitted 在賣家提出請求的 transaction 內發出（A8 的 notification 提醒 admin）。

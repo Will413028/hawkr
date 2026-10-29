@@ -21,6 +21,7 @@ func (f *fixture) expectedCommentCount(t *testing.T, postID uuidT) int64 {
 	return f.scalar(t, `SELECT count(*) FROM social.comments c
 		WHERE c.post_id = $1 AND c.deleted_at IS NULL
 		  AND NOT EXISTS (SELECT 1 FROM social.hides h WHERE h.comment_id = c.id AND h.restored_at IS NULL)
+			  AND NOT EXISTS (SELECT 1 FROM social.content_takedowns t WHERE t.comment_id = c.id)
 		  AND NOT (c.actor_kind = 'BUYER' AND EXISTS (SELECT 1 FROM buyer.buyers b WHERE b.buyer_id = c.actor_id AND b.status <> 'ACTIVE'))`, postID)
 }
 
@@ -32,12 +33,15 @@ func (f *fixture) assertStatsMatchTheDataset(t *testing.T, label string) {
 		{"貼文的留言數", `SELECT count(*) FROM social.post_stats s WHERE s.comment_count <> (
 			SELECT count(*) FROM social.comments c WHERE c.post_id = s.post_id AND c.deleted_at IS NULL
 			  AND NOT EXISTS (SELECT 1 FROM social.hides h WHERE h.comment_id = c.id AND h.restored_at IS NULL)
+			  AND NOT EXISTS (SELECT 1 FROM social.content_takedowns t WHERE t.comment_id = c.id)
 			  AND NOT (c.actor_kind = 'BUYER' AND EXISTS (SELECT 1 FROM buyer.buyers b WHERE b.buyer_id = c.actor_id AND b.status <> 'ACTIVE')))`},
 		{"留言的計入旗標", `SELECT count(*) FROM social.comments c WHERE c.counted <> (c.deleted_at IS NULL
 			  AND NOT EXISTS (SELECT 1 FROM social.hides h WHERE h.comment_id = c.id AND h.restored_at IS NULL)
+			  AND NOT EXISTS (SELECT 1 FROM social.content_takedowns t WHERE t.comment_id = c.id)
 			  AND NOT (c.actor_kind = 'BUYER' AND EXISTS (SELECT 1 FROM buyer.buyers b WHERE b.buyer_id = c.actor_id AND b.status <> 'ACTIVE')))`},
 		{"討論區留言的計入旗標", `SELECT count(*) FROM social.forum_entries c WHERE c.counted <> (c.deleted_at IS NULL
 			  AND NOT EXISTS (SELECT 1 FROM social.hides h WHERE h.forum_entry_id = c.id AND h.restored_at IS NULL)
+			  AND NOT EXISTS (SELECT 1 FROM social.content_takedowns t WHERE t.forum_entry_id = c.id)
 			  AND NOT (c.actor_kind = 'BUYER' AND EXISTS (SELECT 1 FROM buyer.buyers b WHERE b.buyer_id = c.actor_id AND b.status <> 'ACTIVE')))`},
 		{"貼文的讚數", `SELECT count(*) FROM social.post_stats s WHERE s.like_count <> (SELECT count(*) FROM social.post_likes l WHERE l.post_id = s.post_id)`},
 		{"貼文的分享數", `SELECT count(*) FROM social.post_stats s WHERE s.share_count <> (SELECT count(*) FROM social.post_shares l WHERE l.post_id = s.post_id)`},
@@ -45,10 +49,12 @@ func (f *fixture) assertStatsMatchTheDataset(t *testing.T, label string) {
 		{"留言的回覆數", `SELECT count(*) FROM social.comment_stats s WHERE s.reply_count <> (
 			SELECT count(*) FROM social.comments c WHERE c.parent_id = s.comment_id AND c.deleted_at IS NULL
 			  AND NOT EXISTS (SELECT 1 FROM social.hides h WHERE h.comment_id = c.id AND h.restored_at IS NULL)
+			  AND NOT EXISTS (SELECT 1 FROM social.content_takedowns t WHERE t.comment_id = c.id)
 			  AND NOT (c.actor_kind = 'BUYER' AND EXISTS (SELECT 1 FROM buyer.buyers b WHERE b.buyer_id = c.actor_id AND b.status <> 'ACTIVE')))`},
 		{"討論區留言的回覆數", `SELECT count(*) FROM social.forum_entry_stats s WHERE s.reply_count <> (
 			SELECT count(*) FROM social.forum_entries c WHERE c.parent_id = s.forum_entry_id AND c.deleted_at IS NULL
 			  AND NOT EXISTS (SELECT 1 FROM social.hides h WHERE h.forum_entry_id = c.id AND h.restored_at IS NULL)
+			  AND NOT EXISTS (SELECT 1 FROM social.content_takedowns t WHERE t.forum_entry_id = c.id)
 			  AND NOT (c.actor_kind = 'BUYER' AND EXISTS (SELECT 1 FROM buyer.buyers b WHERE b.buyer_id = c.actor_id AND b.status <> 'ACTIVE')))`},
 	} {
 		if n := f.scalar(t, q.sql); n != 0 {

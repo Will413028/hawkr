@@ -5,7 +5,7 @@
 ## 1. 範圍與公開介面
 
 - 模組目前只有根套件 API 與 job，沒有對外入口（Connect handler）。
-- 資料在 schema `social`（`db/schema.sql`）：`posts`、`post_hashtags`、`comments`、`comment_likes`、`post_likes`、`forum_entries`、`hides`、`sanctions`、`inactive_authors`（買家刪帳的複本）、`post_stats`、`comment_stats`、`forum_entry_stats`、`post_views`、`view_salts`、`post_shares`，以及 media 引用的同步狀態 `media_ref_sync` 與退場資產 `retired_assets`。函式與 trigger 在 `db/objects.sql`，沒有 view。
+- 資料在 schema `social`（`db/schema.sql`）：`posts`、`post_hashtags`、`comments`、`comment_likes`、`post_likes`、`forum_entries`、`hides`、`sanctions`、`inactive_authors`（買家刪帳的複本）、`content_takedowns`（seller 內容下架措施的複本）、`post_stats`、`comment_stats`、`forum_entry_stats`、`post_views`、`view_salts`、`post_shares`，以及 media 引用的同步狀態 `media_ref_sync` 與退場資產 `retired_assets`。函式與 trigger 在 `db/objects.sql`，沒有 view。
 - migration 是兩支基線：`social_baseline`（Atlas 從 `schema.sql` 生成，含 `CREATE SCHEMA`）與手寫的 `social_objects`（`objects.sql` 的函式與 trigger）；部署後不得改已套用的 migration。
 - 模組事件 `PostPublished`、`CommentCreated`、`CommentReplied`、`PostLiked` 只帶領域鍵。
 - 買家的社群處分（`sanctions`）與隱藏紀錄（`hides`）對 moderation 提供 `Hide`、`Restore`、`Warn`、`ContentOwner`，對作者提供 `MySanctions`、`MyHiddenContent`。
@@ -23,13 +23,19 @@
 
 - 留言與店家討論區都是兩層。互動者 (kind, id) 由伺服器依資源歸屬推導；店家身分只用在自己的貼文與自己的討論區。
 - 作者可編輯自己的內容（已被隱藏的內容不可編輯）；作者或該店可刪除，刪除冪等。
-- 頂層項目不可見而底下有可見回覆時，列表回佔位項目（只有 ID、時間、狀態；state 為 DELETED 或 HIDDEN），回覆照常顯示並計入；沒有可見回覆時整則不出現。佔位只有刪除與隱藏，對所有觀看者一致。
+- 頂層項目不可見而底下有可見回覆時，列表回佔位項目（只有 ID、時間、狀態；state 為 DELETED 或 HIDDEN），回覆照常顯示並計入；沒有可見回覆時整則不出現。佔位只有刪除與隱藏，對所有觀看者一致。被內容下架的頂層留言或討論區留言與被隱藏相同：底下有可見回覆時回 state 為 HIDDEN 的佔位項目（不是 DELETED），回覆照常顯示並計入。
 - 讚：貼文只有買家（`post_likes (post_id, buyer_id)`），留言與討論區帶 `actor_kind`。瀏覽每日換 salt 去重；分享同一位買家同一篇只算一次。
 - 使用者看得到的錯誤句子都在 `internal/text`（`zh-TW.json`、`en.json`，`make uitext` 生成 `text_gen.go`，不得手改），語系取自 `uitext.LocaleFrom(ctx)`。`apperr.*` 的參數不得有字串字面值，只許 `"%s", text.X(locale)`；商品驗證的 port 回 `ErrProductNotAvailable`／`ErrProductNotOwned`，句子由 social 給。
 
 ## 4. 公開可讀與讀取規則
 
-- **公開可讀**：一則內容公開可讀，若且唯若店家可曝光（`seller.pub_exposable_stores`）、貼文已發布、內容自己的旗標 `counted` 為真。
+- **公開可讀**：一則內容公開可讀，若且唯若店家可曝光（`seller.pub_exposable_stores`）、貼文已發布且沒有被內容下架、內容自己的旗標 `counted` 為真；留言與討論區留言的旗標含「沒有被內容下架」，貼文底下的留言跟著父貼文。
+- **內容下架**：社群內容被 seller 的內容下架措施（`CONTENT_TAKEDOWN`，規格 `seller.md` §5）下架後，所有公開讀取都看不到它，措施被撤銷後立即回來。
+  - 複本：social 有 `content_takedowns(measure_id, post_id | comment_id | forum_entry_id, created_at)`，一列一個（措施，內容），恰好一個內容欄位非空（CHECK），內容欄位是外鍵，內容不存在時措施的建立回滾。同一則內容可被多個措施下架，內容只要有任一列就算下架。這是複本而不是讀取時 join `seller.pub_content_takedowns()`：旗標與 `reevaluate_*` 是資料庫函式，不能參照 seller 的表。
+  - 訂閱者：`OnMeasureCreated`、`OnMeasureRevoked` 在 seller 建立與撤銷措施的同一個 transaction 執行，只處理帶 `Contents` 的內容下架。建立時插入並讓被下架的留言與討論區留言重新求值，排貼文與店面頁的快取失效；撤銷時只刪該措施的列並重新求值，另一個措施仍下架同一則內容時維持隱藏。呼叫方回滾時複本跟著回滾。**建立時核對歸屬**：訂閱者鎖住留言與討論區留言的列之後，核對每則內容存在、沒有刪除、作者是 `MeasureCreated.StoreID`（貼文的作者是所屬店家；留言與討論區留言的 `actor_kind = STORE` 且 `actor_id` 相同），不成立回 `TakedownContentError`（內容種類與 ID），整個措施回滾；每一條建立入口共用這一條，買家寫的內容走 `Hide`。貼文不加鎖：作者不可變，核對之後被店家軟刪只多一列複本。不認得的內容種類（值域在 `platform/contentkind`）同樣是錯誤。守門：`TestTakedownRejectsContentThatIsNotTheMeasureStoresOwn`、`TestTakedownOfUnknownContentKindFailsTheCallersTransaction`。
+  - 讀取：貼文沒有計入旗標，`visibility.ReadablePosts` 對 `post_id` 加 NOT EXISTS（走 `content_takedowns_post`，`TestTakedownPredicateKeepsTheReadPlansIndexed` 守住 feed、店面頁、hashtag 與單篇讀取的計畫）。留言與討論區留言走旗標，計數同旗標。
+  - 店主讀自己的店（`OwnerPosts`、`ListOwnPosts` 等不套公開條件的讀取）仍看得到被下架的貼文，沒有標記；賣家端的下架標記在 A7-4。
+  - 對帳：每日對帳（`Reconcile` 與 `RecountAll`，在修旗標之前）雙向核對 `seller.pub_content_takedowns()`：複本缺的補上（`TakedownsAdded`）、多的刪除（`TakedownsRemoved`），都計入漂移。seller 有、但 social 找不到內容的列略過（插入會違反外鍵）。補漏不核對歸屬（措施已生效，內容之後可以被作者刪除），寫入的那一句自己再看一次 `seller.pub_content_takedowns()`，讀到「缺」的清單之後才被撤銷的措施不會被寫回（`TestReconcileInsertRechecksThatTheMeasureIsStillActive`）；撤銷的 transaction 與這一句同時進行且尚未提交時仍可能寫入一次，下一次對帳的「多」那一步刪除。
 - 容器的規則（店家可曝光、貼文已發布）與觀看者的規則在 `internal/visibility` 寫一次（`ReadablePosts`、`ReadableForum`、`CommentsOf`／`ForumEntriesOf` 的 `Where`）；帶這些規則的讀取（`internal/reads`）用 go-jet 在上面組成；沒有 view。
 - 讀取不 join `buyer.pub_inactive_buyers`：買家刪帳的事實是 social 自己的複本 `inactive_authors`，只有佔位項目的 state（DELETED 或 HIDDEN）才讀它。
 - 公開表（posts、comments、forum_entries）只經 `visibility` 的入口取得；原始 SQL 的逃生口只許出現在 `pubsql` 的生成檔。
@@ -55,7 +61,7 @@
 
 - 計數存在獨立的 stats 表（`post_stats`、`comment_stats`、`forum_entry_stats`），`CHECK (>= 0)`：維護出錯時寫入失敗，不漂移成負數。留言數含回覆，每則頂層留言另有回覆數；所有觀看者看到同一個數字。
 - **維護路徑只有 trigger 與 reevaluate**（`db/objects.sql`）。寫入端不直接改 stats；重算例外：依 ID 由小到大 `SELECT … FOR UPDATE` 鎖一批 stats 列，再用另一個語句分組計數、只覆寫不同的列。
-- 「是否計入」唯一的定義是 `social.reevaluate_comments`／`reevaluate_forum_entries`（`LANGUAGE sql BEGIN ATOMIC`）。輸入只有 social 自己的表：`deleted_at`、`hides`、`inactive_authors`。Go 沒有第二份述詞，`visibility.Counted` 只讀旗標。
+- 「是否計入」唯一的定義是 `social.reevaluate_comments`／`reevaluate_forum_entries`（`LANGUAGE sql BEGIN ATOMIC`）。輸入只有 social 自己的表：`deleted_at`、`hides`、`content_takedowns`、`inactive_authors`。Go 沒有第二份述詞，`visibility.Counted` 只讀旗標。
 - 每則留言與討論區留言存旗標 `counted`。reevaluate 對一批內容鎖定後求值，旗標不同才改旗標並加減貼文的留言數與父項的回覆數；冪等。
 - trigger（留言與討論區留言的建立與 `deleted_at` 改變、隱藏的新增與還原）、買家刪帳的訂閱者（`stats.MarkAuthorInactive`）與每日對帳都只呼叫 reevaluate。stats 是旗標之和，旗標只由 reevaluate 改，所以讀取與重算不重新推導。
 - 鎖的順序固定：內容列 → 貼文的 stats → 父項的 stats，各自依 ID 由小到大（reevaluate 自己取，不依呼叫方）。

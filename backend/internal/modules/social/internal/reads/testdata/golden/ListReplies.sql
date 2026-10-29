@@ -13,7 +13,11 @@ SELECT c.id AS "id",
 FROM social.comments AS c
      INNER JOIN social.posts AS p ON (p.id = c.post_id)
      INNER JOIN social.comment_stats AS s ON (s.comment_id = c.id)
-WHERE (((c.parent_id = $1::uuid) AND c.counted) AND (((p.status = 'PUBLISHED') AND (p.deleted_at IS NULL)) AND (EXISTS (SELECT 1 FROM seller.pub_exposable_stores($2::timestamp with time zone) AS pub WHERE pub.store_id = p.store_id)))) AND (ROW(c.created_at, c.id) > ROW($3::timestamp with time zone, $4::uuid))
+WHERE (((c.parent_id = $1::uuid) AND c.counted) AND ((((p.status = 'PUBLISHED') AND (p.deleted_at IS NULL)) AND (NOT (EXISTS (
+           SELECT td.post_id AS "td.post_id"
+           FROM social.content_takedowns AS td
+           WHERE td.post_id = p.id
+      )))) AND (EXISTS (SELECT 1 FROM seller.pub_exposable_stores($2::timestamp with time zone) AS pub WHERE pub.store_id = p.store_id)))) AND (ROW(c.created_at, c.id) > ROW($3::timestamp with time zone, $4::uuid))
 ORDER BY c.created_at ASC, c.id ASC
 LIMIT $5;
 

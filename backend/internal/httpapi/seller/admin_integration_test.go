@@ -20,6 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/gcis"
 
 	"connectrpc.com/connect"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
@@ -27,6 +28,7 @@ import (
 	adminidentityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/identity/v1alpha1/identityv1alpha1connect"
 	adminsellerpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/seller/v1alpha1"
 	adminsellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/seller/v1alpha1/sellerv1alpha1connect"
+	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 	identitypb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
@@ -38,6 +40,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
@@ -90,6 +93,7 @@ type adminFixture struct {
 	identityOther     adminidentityconnect.IdentityAdminServiceClient
 	identityAnon      adminidentityconnect.IdentityAdminServiceClient
 	module            *seller.Module
+	social            *social.Module
 	id                *identity.Module
 	deletion          *accountdeletion.Module
 	db                *db.DB
@@ -121,7 +125,7 @@ func setupAdmin(t *testing.T) *adminFixture {
 	ctx := context.Background()
 	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
 		migrate.Module{Name: "identity", Dir: identity.Migrations()}, migrate.Module{Name: "buyer", Dir: buyer.Migrations()}, migrate.Module{Name: "seller", Dir: seller.Migrations()},
-		migrate.Module{Name: "accountdeletion", Dir: accountdeletion.Migrations()}, migrate.Module{Name: "delegation", Dir: delegation.Migrations()},
+		migrate.Module{Name: "accountdeletion", Dir: accountdeletion.Migrations()}, migrate.Module{Name: "delegation", Dir: delegation.Migrations()}, migrate.Module{Name: "social", Dir: social.Migrations()},
 	))
 	queue, err := jobs.NewInsertOnly(d)
 	if err != nil {
@@ -147,12 +151,17 @@ func setupAdmin(t *testing.T) *adminFixture {
 		ProductStores: noProducts{}, Registry: f.registry, Now: f.now, Logger: log,
 	})
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Identity: id, Buyer: buyers, Seller: m, Orders: orders, Now: time.Now, Logger: log})
+	socialModule := social.New(social.Deps{
+		DB: d, Events: bus, Media: mediaFake, Jobs: queue, Buyers: buyers, Stores: m, StoreBlocks: m, NewID: uuid.NewV7, Now: f.now, Logger: log,
+	})
+	events.Subscribe(bus, socialModule.OnMeasureCreated)
+	events.Subscribe(bus, socialModule.OnMeasureRevoked)
 	images, err := rpc.NewImages("https://media.example.test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	h, err := httpapi.NewHandler(httpapi.Deps{
-		Ready: d.Ping, Identity: id, Seller: m, Buyer: buyers, Images: images, Logger: log, Deletion: deletion,
+		Ready: d.Ping, Identity: id, Seller: m, Social: socialModule, Buyer: buyers, Images: images, Logger: log, Deletion: deletion,
 		Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: m, Now: time.Now, Logger: log}), Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, Agent: &agent.Module{}, ReviewQueue: &reviewqueue.Module{},
 	})
 	if err != nil {
@@ -193,7 +202,7 @@ func setupAdmin(t *testing.T) *adminFixture {
 	f.identityAdmin = adminidentityconnect.NewIdentityAdminServiceClient(server.Client(), server.URL, clientOptions(adminToken)...)
 	f.identityOther = adminidentityconnect.NewIdentityAdminServiceClient(server.Client(), server.URL, clientOptions(customerToken)...)
 	f.identityAnon = adminidentityconnect.NewIdentityAdminServiceClient(server.Client(), server.URL)
-	f.module, f.id, f.deletion, f.db, f.bus, f.orders, f.dev = m, id, deletion, d, bus, orders, dev
+	f.module, f.social, f.id, f.deletion, f.db, f.bus, f.orders, f.dev = m, socialModule, id, deletion, d, bus, orders, dev
 	f.adminID, f.customerID = authenticatedAdmin.Principal.ID, authenticatedCustomer.Principal.ID
 	return f
 }
@@ -905,5 +914,64 @@ func (f *adminFixture) submitKYC(t *testing.T, storeID int64, idCard, bank strin
 	}
 	if _, err := f.module.SubmitKYC(ctx, seller.SubmitKYCInput{AcceptedAgreements: seller.CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: draft.Version}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// 內容下架經 Connect 建立：對象與社群類別的認定寫進模組、回應帶對象與不可延長／結束的原因；重送同一個 request_id 回原本那筆；不合格的對象在模組被拒絕，欄位路徑指到 content_takedown。
+func TestAdminCreatesAContentTakedownOverConnect(t *testing.T) {
+	t.Parallel()
+	f := setupAdmin(t)
+	ctx := context.Background()
+	_, s := f.newSeller(t, "有貼文的店")
+	content := f.seedContent(t, s.StoreID)
+	post, forum := content.post, content.entry
+	req := &adminsellerpb.CreateMeasureRequest{
+		RequestId: uuid.New().String(), StoreId: sid(s.StoreID), Statement: "貼文含垃圾訊息", Note: "內部紀錄",
+		Measure: &adminsellerpb.CreateMeasureRequest_ContentTakedown{ContentTakedown: &adminsellerpb.ContentTakedownInput{
+			Contents: []*pb.ContentRef{
+				{Kind: pb.ContentKind_CONTENT_KIND_FORUM_ENTRY, Id: forum.String()},
+				{Kind: pb.ContentKind_CONTENT_KIND_POST, Id: post.String()},
+			},
+			Violation: &adminsellerpb.ViolationBasis{Finding: &adminsellerpb.NewFinding{
+				Category: commonpb.PolicyCategory_POLICY_CATEGORY_SPAM, Severity: pb.ViolationSeverity_VIOLATION_SEVERITY_LOW}},
+		}},
+	}
+	created, err := f.governance.CreateMeasure(ctx, connect.NewRequest(req))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := created.Msg.GetMeasure()
+	if m.GetKind() != pb.MeasureKind_MEASURE_KIND_CONTENT_TAKEDOWN || m.GetState() != pb.MeasureState_MEASURE_STATE_ISSUED || m.GetEndTime() != nil ||
+		len(m.GetFindings()) != 1 || m.GetFindings()[0].GetCategory() != commonpb.PolicyCategory_POLICY_CATEGORY_SPAM ||
+		len(m.GetContents()) != 2 || m.GetContents()[0].GetKind() != pb.ContentKind_CONTENT_KIND_FORUM_ENTRY || m.GetContents()[0].GetId() != forum.String() ||
+		m.GetContents()[1].GetId() != post.String() || m.GetCanEnd() || m.GetCanExtend() || !m.GetCanRevoke() ||
+		len(m.GetEndUnavailabilities()) != 1 || m.GetEndUnavailabilities()[0].GetReason() != adminsellerpb.MeasureActionUnavailableReason_MEASURE_ACTION_UNAVAILABLE_REASON_CONTENT_TAKEDOWN_REVOKE_ONLY {
+		t.Fatalf("measure=%v", m)
+	}
+	again, err := f.governance.CreateMeasure(ctx, connect.NewRequest(req))
+	if err != nil || again.Msg.GetMeasure().GetId() != m.GetId() {
+		t.Fatalf("重送 err=%v id=%v want %v", err, again.Msg.GetMeasure().GetId(), m.GetId())
+	}
+	got, err := f.governance.GetMeasure(ctx, connect.NewRequest(&adminsellerpb.GetMeasureRequest{Id: m.GetId()}))
+	if err != nil || len(got.Msg.GetMeasure().GetContents()) != 2 {
+		t.Fatalf("GetMeasure err=%v measure=%v", err, got.Msg.GetMeasure())
+	}
+	req.RequestId = uuid.New().String()
+	req.GetContentTakedown().Contents = nil
+	_, err = f.governance.CreateMeasure(ctx, connect.NewRequest(req))
+	var fields []string
+	if ce := (*connect.Error)(nil); errors.As(err, &ce) {
+		for _, d := range ce.Details() {
+			if v, e := d.Value(); e == nil {
+				if br, ok := v.(*errdetails.BadRequest); ok {
+					for _, fv := range br.GetFieldViolations() {
+						fields = append(fields, fv.GetField())
+					}
+				}
+			}
+		}
+	}
+	if connect.CodeOf(err) != connect.CodeInvalidArgument || !slices.Equal(fields, []string{"content_takedown.contents"}) {
+		t.Fatalf("沒有對象 err=%v fields=%v", err, fields)
 	}
 }

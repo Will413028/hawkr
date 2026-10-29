@@ -1,6 +1,10 @@
 SELECT p.store_id AS "store_id",
      (p.deleted_at IS NULL) AS "exists_now",
-     (((p.status = 'PUBLISHED') AND (p.deleted_at IS NULL)) AND (EXISTS (SELECT 1 FROM seller.pub_exposable_stores($1::timestamp with time zone) AS pub WHERE pub.store_id = p.store_id))) AS "readable"
+     ((((p.status = 'PUBLISHED') AND (p.deleted_at IS NULL)) AND (NOT (EXISTS (
+          SELECT td.post_id AS "td.post_id"
+          FROM social.content_takedowns AS td
+          WHERE td.post_id = p.id
+     )))) AND (EXISTS (SELECT 1 FROM seller.pub_exposable_stores($1::timestamp with time zone) AS pub WHERE pub.store_id = p.store_id))) AS "readable"
 FROM social.posts AS p
 WHERE p.id = $2::uuid;
 

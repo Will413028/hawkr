@@ -43,6 +43,9 @@ const DEFAULT: Readonly<Partial<Record<UiTextKey, Formatter>>> = {
 	"common.error.UNIMPLEMENTED": () => "功能暫不支援",
 	"common.error.UNKNOWN": () => "系統錯誤",
 	"common.unknown": () => "未知",
+	"seller.ContentKind.CONTENT_KIND_POST": () => "貼文",
+	"seller.ContentKind.CONTENT_KIND_COMMENT": () => "留言",
+	"seller.ContentKind.CONTENT_KIND_FORUM_ENTRY": () => "討論區留言",
 	"seller.KYCField.KYC_FIELD_REAL_NAME": () => "真實姓名",
 	"seller.KYCField.KYC_FIELD_BIRTH_DATE": () => "出生日期",
 	"seller.KYCField.KYC_FIELD_ID_CARD_ISSUE_DATE": () => "發證日期",
@@ -126,6 +129,7 @@ const DEFAULT: Readonly<Partial<Record<UiTextKey, Formatter>>> = {
 	"seller.MeasureKind.MEASURE_KIND_WARNING": () => "警告",
 	"seller.MeasureKind.MEASURE_KIND_SUSPENSION": () => "停權",
 	"seller.MeasureKind.MEASURE_KIND_TERMINATION": () => "終止合作",
+	"seller.MeasureKind.MEASURE_KIND_CONTENT_TAKEDOWN": () => "內容下架",
 	"seller.MeasureRequest.reply_note": (v) => "平台回覆：" + String(v.reason),
 	"seller.MeasureRequestKind.MEASURE_REQUEST_KIND_APPEAL": () => "申覆",
 	"seller.MeasureRequestKind.MEASURE_REQUEST_KIND_REMEDIATION": () => "解除請求",
@@ -168,10 +172,12 @@ return "請求已駁回";
 	"seller.MeasureState.MEASURE_STATE_ISSUED": () => "已發出",
 	"seller.MeasureState.MEASURE_STATE_ACTIVE": (v) => (() => {
 switch (v.kind) {
+case "MEASURE_KIND_SUSPENSION":
+return "停權中";
 case "MEASURE_KIND_TERMINATION":
 return "合作已終止";
 default:
-return "停權中";
+return "生效中";
 }
 })(),
 	"seller.MeasureState.MEASURE_STATE_ENDED": () => "已結束",

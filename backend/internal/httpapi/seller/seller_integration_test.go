@@ -36,6 +36,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -158,7 +159,7 @@ func setup(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log})
-	h, err := httpapi.NewHandler(httpapi.Deps{
+	h, err := httpapi.NewHandler(httpapi.Deps{Social: &social.Module{},
 		Ready: d.Ping, Identity: id, Seller: m, Buyer: buyers, Images: images, Logger: log,
 		Deletion: &accountdeletion.Module{}, Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}}), Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, DashboardBudget: time.Minute, Discovery: &discovery.Module{}, Agent: &agent.Module{}, ReviewQueue: &reviewqueue.Module{},
 	})

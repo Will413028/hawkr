@@ -13,7 +13,7 @@ export const file_hawkr_common_v1alpha1_policy_category: GenFile = /*@__PURE__*/
 
 /**
  * PolicyCategory 是平台的政策分類（step10e-reports-brief R10）：檢舉人選的類別、平台判定類別與認定的類別共用一份，
- * 各入口只接受自己的子集（見各值的「入口」）。店家治理的值對應賣家合作條款的依據，給賣家的理由要能指到條款；社群內容的值（SPAM、HARASSMENT、HATE）給買家寫的內容的隱藏與警告用，買家條款訂出後補條款依據。
+ * 各入口只接受自己的子集（見各值的「入口」）。店家治理的值對應賣家合作條款的依據，給賣家的理由要能指到條款；社群內容的值（SPAM、HARASSMENT、HATE）給買家寫的內容的隱藏與內容下架用，買家條款訂出後補條款依據；檢舉人選不到，認定與案件類別可以用。
  *
  * @generated from enum hawkr.common.v1alpha1.PolicyCategory
  */
@@ -115,21 +115,21 @@ export enum PolicyCategory {
   OTHER = 13,
 
   /**
-   * 社群內容的垃圾訊息：重複、無關或以廣告洗版的貼文、留言與討論區留言（社群，A7）。入口：社群內容的平台判定與認定。
+   * 社群內容的垃圾訊息：重複、無關或以廣告洗版的貼文、留言與討論區留言（社群，A7）。入口：平台判定與認定（含內容下架措施的認定）。
    *
    * @generated from enum value: POLICY_CATEGORY_SPAM = 14;
    */
   SPAM = 14,
 
   /**
-   * 社群內容的騷擾或霸凌：針對特定的人或店家的辱罵、威脅或持續打擾（社群，A7）。入口：社群內容的平台判定與認定。
+   * 社群內容的騷擾或霸凌：針對特定的人或店家的辱罵、威脅或持續打擾（社群，A7）。入口：平台判定與認定（含內容下架措施的認定）。
    *
    * @generated from enum value: POLICY_CATEGORY_HARASSMENT = 15;
    */
   HARASSMENT = 15,
 
   /**
-   * 社群內容的仇恨或歧視言論：以身分、族群或特徵攻擊他人（社群，A7）。入口：社群內容的平台判定與認定。
+   * 社群內容的仇恨或歧視言論：以身分、族群或特徵攻擊他人（社群，A7）。入口：平台判定與認定（含內容下架措施的認定）。
    *
    * @generated from enum value: POLICY_CATEGORY_HATE = 16;
    */

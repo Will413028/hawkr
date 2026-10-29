@@ -138,6 +138,9 @@ func (s *Service) hydrate(ctx context.Context, q *store.Queries, rows []store.Se
 		at := index[f.MeasureID]
 		out[at].Findings = append(out[at].Findings, violations[i])
 	}
+	if err := loadContents(ctx, q, out, index); err != nil {
+		return nil, err
+	}
 	requests, err := q.RequestsByMeasures(ctx, ids)
 	if err != nil {
 		return nil, err
@@ -189,6 +192,28 @@ func (s *Service) hydrate(ctx context.Context, q *store.Queries, rows []store.Se
 		}
 	}
 	return out, nil
+}
+
+// loadContents 載入內容下架措施的對象（其他種類沒有，整批沒有內容下架時不查）。
+func loadContents(ctx context.Context, q *store.Queries, measures []model.Measure, index map[uuid.UUID]int) error {
+	var ids []uuid.UUID
+	for _, m := range measures {
+		if m.Kind == model.MeasureContentTakedown {
+			ids = append(ids, m.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	rows, err := q.MeasureContents(ctx, ids)
+	if err != nil {
+		return err
+	}
+	for _, r := range rows {
+		at := index[r.MeasureID]
+		measures[at].Contents = append(measures[at].Contents, model.ContentRef{Kind: model.ContentKind(r.ContentKind), ID: r.ContentID})
+	}
+	return nil
 }
 
 // read 讀一筆措施的目前狀態（目前值在 measures、依據與請求）；不存在回 NotFound。

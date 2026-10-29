@@ -18,7 +18,7 @@ SELECT m.id, m.account_id, m.store_id, m.kind, m.basis, m.risk_ground, m.lead_fi
 FROM seller.measures m
 WHERE m.account_id = $1
   AND ($2::text IS NULL
-    OR ($2::text = 'ISSUED' AND m.status = 'ENFORCED' AND m.kind = 'WARNING')
+    OR ($2::text = 'ISSUED' AND m.status = 'ENFORCED' AND m.kind IN ('WARNING', 'CONTENT_TAKEDOWN'))
     OR ($2::text = 'REVOKED' AND m.status = 'REVOKED')
     OR ($2::text = 'ACTIVE' AND m.id = ANY($3::uuid[]))
     OR ($2::text = 'SCHEDULED' AND m.id = ANY($4::uuid[]))
@@ -125,7 +125,7 @@ WHERE ($1::bigint IS NULL OR m.store_id = $1)
       AND ($7::text IS NULL OR $7::text =
         CASE WHEN r.state = 'PENDING' AND r.kind = 'REMEDIATION' AND m.id <> ALL($9::uuid[]) THEN 'CLOSED' ELSE r.state END)))
   AND ($10::text IS NULL
-    OR ($10::text = 'ISSUED' AND m.status = 'ENFORCED' AND m.kind = 'WARNING')
+    OR ($10::text = 'ISSUED' AND m.status = 'ENFORCED' AND m.kind IN ('WARNING', 'CONTENT_TAKEDOWN'))
     OR ($10::text = 'REVOKED' AND m.status = 'REVOKED')
     OR ($10::text = 'ACTIVE' AND m.id = ANY($9::uuid[]))
     OR ($10::text = 'SCHEDULED' AND m.id = ANY($11::uuid[]))
@@ -243,7 +243,7 @@ WHERE ($2::bigint IS NULL OR m.store_id = $2)
   AND ($7::text IS NULL OR m.basis = $7)
   AND ($8::text IS NULL OR q.kind = $8::text)
   AND ($9::text IS NULL
-    OR ($9::text = 'ISSUED' AND m.status = 'ENFORCED' AND m.kind = 'WARNING')
+    OR ($9::text = 'ISSUED' AND m.status = 'ENFORCED' AND m.kind IN ('WARNING', 'CONTENT_TAKEDOWN'))
     OR ($9::text = 'REVOKED' AND m.status = 'REVOKED')
     OR ($9::text = 'ACTIVE' AND m.id = ANY($1::uuid[]))
     OR ($9::text = 'SCHEDULED' AND m.id = ANY($10::uuid[]))
@@ -368,7 +368,7 @@ WHERE m.id IN (SELECT r.measure_id FROM seller.review_measure_review($1::timesta
       AND ($8::text IS NULL OR $8::text =
         CASE WHEN r.state = 'PENDING' AND r.kind = 'REMEDIATION' AND m.id <> ALL($10::uuid[]) THEN 'CLOSED' ELSE r.state END)))
   AND ($11::text IS NULL
-    OR ($11::text = 'ISSUED' AND m.status = 'ENFORCED' AND m.kind = 'WARNING')
+    OR ($11::text = 'ISSUED' AND m.status = 'ENFORCED' AND m.kind IN ('WARNING', 'CONTENT_TAKEDOWN'))
     OR ($11::text = 'REVOKED' AND m.status = 'REVOKED')
     OR ($11::text = 'ACTIVE' AND m.id = ANY($10::uuid[]))
     OR ($11::text = 'SCHEDULED' AND m.id = ANY($12::uuid[]))
@@ -954,6 +954,22 @@ func (q *Queries) FindingReportIDs(ctx context.Context, violationIds []uuid.UUID
 	return items, nil
 }
 
+const insertFindingModerationReports = `-- name: InsertFindingModerationReports :exec
+INSERT INTO seller.finding_moderation_reports (violation_id, report_id)
+SELECT $1, unnest($2::uuid[])
+`
+
+type InsertFindingModerationReportsParams struct {
+	ViolationID uuid.UUID
+	ReportIds   []uuid.UUID
+}
+
+// 認定的來源 moderation 檢舉（不透明的外部參照，沒有 FK；與 InsertViolation 同一個 transaction）。
+func (q *Queries) InsertFindingModerationReports(ctx context.Context, arg InsertFindingModerationReportsParams) error {
+	_, err := q.db.Exec(ctx, insertFindingModerationReports, arg.ViolationID, arg.ReportIds)
+	return err
+}
+
 const insertFindingReports = `-- name: InsertFindingReports :exec
 INSERT INTO seller.finding_reports (violation_id, report_id)
 SELECT $1, unnest($2::uuid[])
@@ -1026,6 +1042,7 @@ WITH created AS (
         $12, $13, $14, $15,
         1, $16, $17, $18, $19, $19
     )
+    ON CONFLICT (created_by_admin_id, request_id) WHERE request_id IS NOT NULL DO NOTHING
     RETURNING id, account_id, store_id, kind, basis, risk_ground, lead_finding_id, review_by, statement_to_seller, starts_at, ends_at, termination_ground, source_measure_id, source_case_id, status, version, current_revision, request_id, request_hash, created_by_admin_id, created_at, updated_at, revoked_reason, revoked_by_admin_id, revoked_at, source_authority_order_id
 ), history AS (
     INSERT INTO seller.measure_revisions (measure_id, revision, statement_to_seller, ends_at, admin_id, created_at)
@@ -1087,7 +1104,8 @@ type InsertMeasureRow struct {
 
 // 新增措施：目前值寫進 measures，同一個語句追加第 1 版的歷史快照（SQL:2011 系統版本表：目前值與歷史由同一個寫入路徑維持一致）。
 // 依據與 current_revision 的外鍵延遲到 commit 才檢查（依據在同一個 transaction 稍後寫入）。starts_at 由呼叫方算（停權與立即生效的終止是 now，
-// 預告終止是 now 加 720 小時；CHECK 保證）。
+// 預告終止是 now 加 720 小時；CHECK 保證）。同一個 (管理員, request_id) 已存在時 0 列（DO NOTHING，不丟 23505）：呼叫方已鎖住目標帳號的 stint 並查過
+// request_id，所以只有目標不同帳號的並行請求會走到這裡，再讀既有那筆比對內容。
 func (q *Queries) InsertMeasure(ctx context.Context, arg InsertMeasureParams) (InsertMeasureRow, error) {
 	row := q.db.QueryRow(ctx, insertMeasure,
 		arg.ID,
@@ -1140,6 +1158,24 @@ func (q *Queries) InsertMeasure(ctx context.Context, arg InsertMeasureParams) (I
 		&i.SourceAuthorityOrderID,
 	)
 	return i, err
+}
+
+const insertMeasureContents = `-- name: InsertMeasureContents :exec
+INSERT INTO seller.measure_contents (measure_id, content_kind, content_id)
+SELECT $1, ($2::text[])[i], ($3::uuid[])[i]
+FROM generate_series(1, cardinality($3::uuid[])) AS i
+`
+
+type InsertMeasureContentsParams struct {
+	MeasureID uuid.UUID
+	Kinds     []string
+	Ids       []uuid.UUID
+}
+
+// 內容下架措施的對象（與 InsertMeasure 同一個 transaction；種類與 ID 是平行陣列，呼叫方已驗證形狀）。
+func (q *Queries) InsertMeasureContents(ctx context.Context, arg InsertMeasureContentsParams) error {
+	_, err := q.db.Exec(ctx, insertMeasureContents, arg.MeasureID, arg.Kinds, arg.Ids)
+	return err
 }
 
 const insertMeasureFinding = `-- name: InsertMeasureFinding :exec
@@ -1307,6 +1343,26 @@ func (q *Queries) LinkedMeasureAccounts(ctx context.Context, sourceIds []uuid.UU
 		return nil, err
 	}
 	return items, nil
+}
+
+const linkedMeasureExists = `-- name: LinkedMeasureExists :one
+SELECT EXISTS (
+    SELECT 1 FROM seller.measures
+    WHERE source_measure_id = $1 AND account_id = $2 AND status = 'ENFORCED'
+)
+`
+
+type LinkedMeasureExistsParams struct {
+	SourceMeasureID *uuid.UUID
+	AccountID       int64
+}
+
+// 這個帳號是否已有以這筆措施為來源、仍生效的關聯終止（measures_linked_source 的檢查版；呼叫方已鎖住來源與目標帳號）。
+func (q *Queries) LinkedMeasureExists(ctx context.Context, arg LinkedMeasureExistsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, linkedMeasureExists, arg.SourceMeasureID, arg.AccountID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const linkedMeasuresOf = `-- name: LinkedMeasuresOf :many
@@ -1522,6 +1578,34 @@ func (q *Queries) MeasureByRequest(ctx context.Context, arg MeasureByRequestPara
 		&i.SourceAuthorityOrderID,
 	)
 	return i, err
+}
+
+const measureContents = `-- name: MeasureContents :many
+SELECT measure_id, content_kind, content_id
+FROM seller.measure_contents
+WHERE measure_id = ANY($1::uuid[])
+ORDER BY measure_id, content_kind COLLATE "C", content_id
+`
+
+// 一批措施的內容下架對象，依措施、種類、ID 排序（種類以位元組順序，不依 collation）。
+func (q *Queries) MeasureContents(ctx context.Context, measureIds []uuid.UUID) ([]SellerMeasureContent, error) {
+	rows, err := q.db.Query(ctx, measureContents, measureIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SellerMeasureContent{}
+	for rows.Next() {
+		var i SellerMeasureContent
+		if err := rows.Scan(&i.MeasureID, &i.ContentKind, &i.ContentID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const measureFindings = `-- name: MeasureFindings :many

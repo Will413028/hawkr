@@ -173,10 +173,10 @@ CREATE TABLE seller.cases (
     updated_at         TIMESTAMPTZ NOT NULL,
     CONSTRAINT cases_report_key UNIQUE (id, store_id, category),
     CONSTRAINT cases_store_key UNIQUE (id, store_id),
-    -- 政策分類（platform/policy）中平台判定與認定可用的值：全部除了 OTHER。
+    -- 政策分類（platform/policy）中平台判定與認定可用的值：全部除了 OTHER（含社群類別，內容下架措施的認定用它們）。
     CONSTRAINT cases_category_check CHECK (category IN (
         'FOOD_SAFETY', 'PROHIBITED_GOODS', 'UNLICENSED_SALE', 'MISLEADING_INFO', 'FAKE_CERTIFICATION', 'COUNTERFEIT',
-        'IP_INFRINGEMENT', 'FRAUD', 'OFF_PLATFORM_TRADE', 'PRIVACY', 'IMPERSONATION', 'PLATFORM_ABUSE'
+        'IP_INFRINGEMENT', 'FRAUD', 'OFF_PLATFORM_TRADE', 'PRIVACY', 'IMPERSONATION', 'PLATFORM_ABUSE', 'SPAM', 'HARASSMENT', 'HATE'
     )),
     CONSTRAINT cases_severity_check CHECK (severity IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
     -- 結案欄位只有三種組合。整個式子要是 TRUE（IS TRUE）：close_reason 或 decision 是 NULL 時，各個比較都是 NULL，CHECK 對 NULL 是放行的，
@@ -187,6 +187,7 @@ CREATE TABLE seller.cases (
          (decision_note IS NULL OR char_length(decision_note) BETWEEN 1 AND 2000)) OR
         (closed_at >= opened_at AND closed_by_admin_id > 0 AND close_reason = 'NO_REPORTS' AND decision IS NULL AND decision_note IS NULL)
     ) IS TRUE),
+    CONSTRAINT cases_decision_note_text_check CHECK (decision_note !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
     CONSTRAINT cases_admin_check CHECK (opened_by_admin_id > 0),
     CONSTRAINT cases_version_check CHECK (version >= 1),
     CONSTRAINT cases_updated_check CHECK (updated_at >= opened_at)
@@ -426,10 +427,10 @@ CREATE TABLE seller.violations (
     revoked_by_admin_id BIGINT,
     revoked_at          TIMESTAMPTZ,
     CONSTRAINT violations_store_account_fkey FOREIGN KEY (store_id, account_id) REFERENCES seller.stores (store_id, account_id),
-    -- 政策分類（platform/policy）中平台判定與認定可用的值：全部除了 OTHER（OTHER 只給檢舉人選）。
+    -- 政策分類（platform/policy）中平台判定與認定可用的值：全部除了 OTHER（OTHER 只給檢舉人選；含社群類別，內容下架措施的認定用它們）。
     CONSTRAINT violations_category_check CHECK (category IN (
         'FOOD_SAFETY', 'PROHIBITED_GOODS', 'UNLICENSED_SALE', 'MISLEADING_INFO', 'FAKE_CERTIFICATION', 'COUNTERFEIT',
-        'IP_INFRINGEMENT', 'FRAUD', 'OFF_PLATFORM_TRADE', 'PRIVACY', 'IMPERSONATION', 'PLATFORM_ABUSE'
+        'IP_INFRINGEMENT', 'FRAUD', 'OFF_PLATFORM_TRADE', 'PRIVACY', 'IMPERSONATION', 'PLATFORM_ABUSE', 'SPAM', 'HARASSMENT', 'HATE'
     )),
     CONSTRAINT violations_severity_check CHECK (severity IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
     CONSTRAINT violations_status_check CHECK (status IN ('ENFORCED', 'REVOKED')),
@@ -456,6 +457,15 @@ CREATE TABLE seller.finding_reports (
     PRIMARY KEY (violation_id, report_id)
 );
 CREATE INDEX finding_reports_report ON seller.finding_reports (report_id);
+
+-- 認定與成立它的 moderation 檢舉（多對多，結構同 finding_reports）：report_id 是 moderation 檢舉的不透明外部參照（seller 不讀 moderation，也不建跨 schema FK），
+-- 不加 FK，也不能合進 finding_reports（那會失去它對 seller.reports 的 FK）。只在建立措施的 transaction 寫入，之後只讀。
+CREATE TABLE seller.finding_moderation_reports (
+    violation_id UUID NOT NULL REFERENCES seller.violations (id),
+    report_id    UUID NOT NULL,
+    PRIMARY KEY (violation_id, report_id)
+);
+CREATE INDEX finding_moderation_reports_report ON seller.finding_moderation_reports (report_id);
 
 -- 主管機關來函（step10e-reports-brief R5、step10e-3cb-design §2.3）：主管機關給平台的公文，獨立的收件，不是通報。期限與保存都從收文時間（received_at，管理員填）起算；
 -- 完成不解除保存。hold_until 是保存期限：指名的帳號或店家在 seller 的個資到這時之前不被 RetireDueStores 的清理（apply_preservation_hold）選中，預設收文後 184 天，
@@ -496,6 +506,7 @@ CREATE TABLE seller.authority_orders (
     CONSTRAINT authority_orders_revoke_check CHECK ((
         (revoked_at IS NULL AND revoked_by_admin_id IS NULL AND revoke_reason IS NULL) OR
         (revoked_at >= registered_at AND revoked_by_admin_id > 0 AND char_length(revoke_reason) BETWEEN 1 AND 2000)) IS TRUE),
+    CONSTRAINT authority_orders_revoke_reason_text_check CHECK (revoke_reason !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
     CONSTRAINT authority_orders_terminal_check CHECK (completed_at IS NULL OR revoked_at IS NULL)
 );
 -- 3d「主管機關來函」與清單 OPEN 的來源：還沒完成也沒撤銷的來函依期限。
@@ -641,7 +652,7 @@ CREATE TABLE seller.measures (
     source_authority_order_id UUID REFERENCES seller.authority_orders (id),
     CONSTRAINT measures_store_account_fkey FOREIGN KEY (store_id, account_id) REFERENCES seller.stores (store_id, account_id),
     CONSTRAINT measures_source_case_fkey FOREIGN KEY (source_case_id, store_id) REFERENCES seller.cases (id, store_id),
-    CONSTRAINT measures_kind_check CHECK (kind IN ('WARNING', 'SUSPENSION', 'TERMINATION')),
+    CONSTRAINT measures_kind_check CHECK (kind IN ('WARNING', 'SUSPENSION', 'TERMINATION', 'CONTENT_TAKEDOWN')),
     CONSTRAINT measures_basis_value_check CHECK (basis IN ('VIOLATION', 'RISK', 'CONTRACT')),
     CONSTRAINT measures_termination_ground_check CHECK (termination_ground IN (
         'NOTICE', 'MATERIAL_BREACH', 'CEASED_BUSINESS', 'DISSOLUTION', 'BANKRUPTCY', 'LICENSE_REVOKED', 'FOOD_SAFETY_INCIDENT', 'FRAUD',
@@ -670,7 +681,9 @@ CREATE TABLE seller.measures (
         (basis = 'RISK') = (review_by IS NOT NULL) AND (basis <> 'RISK' OR kind = 'SUSPENSION')
     ),
     CONSTRAINT measures_review_check CHECK (review_by IS NULL OR review_by > created_at),
-    CONSTRAINT measures_statement_check CHECK (char_length(statement_to_seller) BETWEEN 1 AND 2000),
+    CONSTRAINT measures_statement_check CHECK (char_length(statement_to_seller) >= 1 AND char_length(statement_to_seller) <= 2000 AND statement_to_seller !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
+    -- 內容下架：依據一定是認定，立即生效（沒有未來的開始時間）而且沒有結束時間，解除只走申覆。
+    CONSTRAINT measures_takedown_check CHECK (kind <> 'CONTENT_TAKEDOWN' OR (basis = 'VIOLATION' AND starts_at = created_at AND ends_at IS NULL)),
     CONSTRAINT measures_period_check CHECK (
         (kind <> 'WARNING' OR ends_at IS NULL) AND (basis <> 'VIOLATION' OR kind <> 'SUSPENSION' OR ends_at IS NOT NULL)
     ),
@@ -707,6 +720,8 @@ CREATE INDEX measures_source_authority_order ON seller.measures (source_authorit
 CREATE UNIQUE INDEX measures_linked_source ON seller.measures (source_measure_id, account_id) WHERE source_measure_id IS NOT NULL AND status = 'ENFORCED';
 -- 複審到期的收件匣。
 CREATE INDEX measures_review ON seller.measures (review_by) WHERE status = 'ENFORCED' AND basis = 'RISK';
+-- 生效中的內容下架（pub_content_takedowns，social 每日對帳讀它）：內容下架不影響能力與曝光，不在上面兩個停權索引裡；只含未撤銷的列，隨目前生效的下架成長，不隨歷史成長。
+CREATE INDEX measures_active_takedown ON seller.measures (id) WHERE status = 'ENFORCED' AND kind = 'CONTENT_TAKEDOWN';
 
 -- 措施依據的認定：全部依據（含引用既有的認定），是集合，沒有順序（主要依據記在 measures.lead_finding_id）。一筆認定可以被多個措施引用；
 -- 它只被建立它的措施（violations.origin_measure_id）撤銷，撤銷時引用它的其他措施連帶撤銷。
@@ -716,6 +731,17 @@ CREATE TABLE seller.measure_findings (
     PRIMARY KEY (measure_id, violation_id)
 );
 CREATE INDEX measure_findings_violation ON seller.measure_findings (violation_id);
+
+-- 內容下架措施（kind = 'CONTENT_TAKEDOWN'）的對象：一個措施可以對應多則內容（content_kind 是 POST、COMMENT 或 FORUM_ENTRY，content_id 是 social 的列）。
+-- content_id 是社群內容的不透明外部參照（seller 不讀 social，不建跨 schema FK）。只在建立措施的 transaction 寫入，建立後不可修訂（要改就撤銷再建立）；
+-- 只有內容下架措施有列（模組保證）。pub_content_takedowns 發布此刻生效中措施的對象。
+CREATE TABLE seller.measure_contents (
+    measure_id   UUID NOT NULL REFERENCES seller.measures (id),
+    content_kind TEXT NOT NULL,
+    content_id   UUID NOT NULL,
+    PRIMARY KEY (measure_id, content_kind, content_id),
+    CONSTRAINT measure_contents_content_kind_check CHECK (content_kind IN ('POST', 'COMMENT', 'FORUM_ENTRY'))
+);
 
 -- 措施的版本歷史（append-only，SQL:2011 系統版本表的歷史表）：每一版的完整快照（給賣家的理由、結束時間；警告沒有結束時間），
 -- 含目前那一版，記誰、何時寫的（作者是管理員；店家關閉時結束預告終止（條款 21.2）的版本由系統寫入，沒有管理員，system_cause 記原因，比照
@@ -731,7 +757,7 @@ CREATE TABLE seller.measure_revisions (
     created_at          TIMESTAMPTZ NOT NULL,
     PRIMARY KEY (measure_id, revision),
     CONSTRAINT measure_revisions_revision_check CHECK (revision >= 1),
-    CONSTRAINT measure_revisions_statement_check CHECK (char_length(statement_to_seller) BETWEEN 1 AND 2000),
+    CONSTRAINT measure_revisions_statement_check CHECK (char_length(statement_to_seller) >= 1 AND char_length(statement_to_seller) <= 2000 AND statement_to_seller !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
     CONSTRAINT measure_revisions_admin_check CHECK (admin_id > 0),
     CONSTRAINT measure_revisions_system_cause_check CHECK (system_cause IN ('STORE_CLOSED')),
     CONSTRAINT measure_revisions_author_check CHECK ((system_cause IS NULL) = (admin_id IS NOT NULL))
@@ -801,7 +827,8 @@ CREATE TABLE seller.measure_requests (
     CONSTRAINT measure_requests_state_check CHECK (state IN ('PENDING', 'ACCEPTED', 'REJECTED', 'CLOSED')),
     CONSTRAINT measure_requests_close_cause_check CHECK (close_cause IN ('REVOKED', 'ENDED')),
     CONSTRAINT measure_requests_remediation_basis_check CHECK (kind <> 'REMEDIATION' OR basis = 'RISK'),
-    CONSTRAINT measure_requests_reason_check CHECK (char_length(reason) BETWEEN 1 AND 2000),
+    CONSTRAINT measure_requests_reason_check CHECK (char_length(reason) >= 1 AND char_length(reason) <= 2000 AND reason !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
+    CONSTRAINT measure_requests_decision_reason_text_check CHECK (decision_reason !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
     CONSTRAINT measure_requests_decision_check CHECK (
         (state = 'PENDING' AND decision_reason IS NULL AND decided_by_admin_id IS NULL AND decided_at IS NULL AND close_cause IS NULL) OR
         (state IN ('ACCEPTED', 'REJECTED') AND decision_reason IS NOT NULL AND char_length(decision_reason) BETWEEN 1 AND 2000 AND

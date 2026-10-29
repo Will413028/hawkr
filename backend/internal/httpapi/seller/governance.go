@@ -69,7 +69,7 @@ type Governance struct {
 
 var _ sellerv1alpha1connect.SellerGovernanceAdminServiceHandler = (*Governance)(nil)
 
-// NewGovernance 建立後台治理的 handler；images 給轉報資料裡店家的 logo 與封面。
+// NewGovernance 建立後台治理的 handler；images 給轉報資料裡店家的 logo 與封面。內容下架的歸屬核對在 social 的同 transaction 訂閱者，這裡不重複。
 func NewGovernance(m GovernanceModule, images rpc.Images) *Governance {
 	return &Governance{m: m, images: images}
 }
@@ -89,6 +89,9 @@ var (
 	createSuspensionPaths  = createMeasurePaths(violationPaths("Violation", "suspension.violation"), rpc.FieldPaths{"Risk.Ground": "suspension.risk.ground", "EndsAt": "suspension.end_time", "ReviewBy": "suspension.review_by"})
 	createTerminationPaths = createMeasurePaths(violationPaths("Termination.Violation", "termination.violation"), rpc.FieldPaths{
 		"Termination": "termination", "Termination.Ground": "termination.ground", "Termination.SourceMeasureID": "termination.source_measure_id",
+	})
+	createTakedownPaths = createMeasurePaths(violationPaths("Violation", "content_takedown.violation"), rpc.FieldPaths{
+		"Takedown": "content_takedown", "Takedown.Contents": "content_takedown.contents", "Takedown.Contents[]": "content_takedown.contents[]",
 	})
 	updateMeasurePaths     = rpc.FieldPaths{"StatementToSeller": "measure.statement", "EndsAt": "measure.end_time", "ExpectedVersion": "measure.etag"}
 	endMeasurePaths        = rpc.FieldPaths{"ExpectedVersion": "etag"}

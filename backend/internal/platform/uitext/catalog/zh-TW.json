@@ -34,11 +34,11 @@
     },
     "common.PolicyCategory.POLICY_CATEGORY_HARASSMENT": {
       "message": "騷擾或霸凌",
-      "description": "社群內容的騷擾或霸凌：針對特定的人或店家的辱罵、威脅或持續打擾（社群，A7）。入口：社群內容的平台判定與認定。"
+      "description": "社群內容的騷擾或霸凌：針對特定的人或店家的辱罵、威脅或持續打擾（社群，A7）。入口：平台判定與認定（含內容下架措施的認定）。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_HATE": {
       "message": "仇恨或歧視言論",
-      "description": "社群內容的仇恨或歧視言論：以身分、族群或特徵攻擊他人（社群，A7）。入口：社群內容的平台判定與認定。"
+      "description": "社群內容的仇恨或歧視言論：以身分、族群或特徵攻擊他人（社群，A7）。入口：平台判定與認定（含內容下架措施的認定）。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_IMPERSONATION": {
       "message": "冒用或誤導交易主體",
@@ -74,7 +74,7 @@
     },
     "common.PolicyCategory.POLICY_CATEGORY_SPAM": {
       "message": "垃圾訊息",
-      "description": "社群內容的垃圾訊息：重複、無關或以廣告洗版的貼文、留言與討論區留言（社群，A7）。入口：社群內容的平台判定與認定。"
+      "description": "社群內容的垃圾訊息：重複、無關或以廣告洗版的貼文、留言與討論區留言（社群，A7）。入口：平台判定與認定（含內容下架措施的認定）。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_UNLICENSED_SALE": {
       "message": "未經許可販售",
@@ -143,6 +143,18 @@
     "common.unknown": {
       "message": "未知",
       "description": "不認得的值與 UNSPECIFIED 一律顯示這個字。"
+    },
+    "seller.ContentKind.CONTENT_KIND_COMMENT": {
+      "message": "留言",
+      "description": "貼文底下的留言。"
+    },
+    "seller.ContentKind.CONTENT_KIND_FORUM_ENTRY": {
+      "message": "討論區留言",
+      "description": "討論區留言。"
+    },
+    "seller.ContentKind.CONTENT_KIND_POST": {
+      "message": "貼文",
+      "description": "店家貼文。"
     },
     "seller.KYCField.KYC_FIELD_BANK_ACCOUNT": {
       "message": "銀行帳號",
@@ -542,6 +554,10 @@
       "message": "違規認定",
       "description": "MeasureBasis 是措施的依據：VIOLATION 依據違規的認定（有固定期間的處分），RISK 依據條款第 17.1 條的風險類型或第 17.5 條\n的外部要求（沒有固定期間時由平台定期複審），CONTRACT 依據契約條款（只配終止合作，無過錯或與認定無關）。（值 MEASURE_BASIS_VIOLATION）"
     },
+    "seller.MeasureKind.MEASURE_KIND_CONTENT_TAKEDOWN": {
+      "message": "內容下架",
+      "description": "內容下架：店家指定的內容（貼文、留言、討論區留言）不再公開；建立即生效，沒有期間、不限制帳號，也不影響店家的曝光。對象看 Measure.contents，建立後不能改，\n要改就撤銷再建立；內容只能由撤銷或申覆成立恢復。"
+    },
     "seller.MeasureKind.MEASURE_KIND_SUSPENSION": {
       "message": "停權",
       "description": "帳號在期間內被限制。"
@@ -623,7 +639,7 @@
       "description": "請求的種類與狀態合成的狀態標籤。（值 MEASURE_REQUEST_STATE_REJECTED）"
     },
     "seller.MeasureState.MEASURE_STATE_ACTIVE": {
-      "message": "{kind, select, MEASURE_KIND_TERMINATION {合作已終止} other {停權中}}",
+      "message": "{kind, select, MEASURE_KIND_SUSPENSION {停權中} MEASURE_KIND_TERMINATION {合作已終止} other {生效中}}",
       "params": {
         "kind": {
           "enum": "seller.MeasureKind"
@@ -638,7 +654,7 @@
     },
     "seller.MeasureState.MEASURE_STATE_ISSUED": {
       "message": "已發出",
-      "description": "警告，未撤銷（不是「生效中」，沒有限制）。"
+      "description": "警告或內容下架，未撤銷（不是「生效中」，沒有限制）。"
     },
     "seller.MeasureState.MEASURE_STATE_REVOKED": {
       "message": "已撤銷",

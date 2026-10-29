@@ -29,7 +29,7 @@
 1. 模組只能 import 依賴表允許的其他模組，而且只能 import 對方的根套件。依賴表在 `internal/arch/modules.go`；改它等於改架構，先說明理由並更新 ADR 或計畫。
 2. SQL 只碰自己模組的 schema，不建跨 schema FK，表寫完整名稱（`content.banners`）。跨模組讀取先問資料是不是放錯了擁有者，再依序用：對方 API、httpapi 的 keyset composition、擁有者發布的唯讀 `<owner>.pub_*`；讀取模型只在量測觸發後才建。`pub.sql` 只放 `CREATE SCHEMA` 與 `pub_*` 的形狀（`internal/arch/sqlc_test.go`、`TestPubContractsMatchMigrations`）。現有的 `pub_*` 見擁有者的 `AGENTS.md`「發布的讀取介面」。
 3. transaction 由最上層的 use case 用 `db.InTx` 開，需要一致快照的唯讀讀取用 `db.InReadSnapshot`（不能開在 `InTx` 內）；repository 一律用 `db.Conn(ctx)`。會被別的模組呼叫的方法不用 `InReadSnapshot`，撞唯一鍵後不在同一個 transaction 繼續下 SQL。
-4. 下層通知上層、而且需要原子性時用 `events.Publish`（transaction 內）；同 transaction 的訂閱者只做原子的狀態變更（含把擁有者的事實複製進自己的表）或 `Enqueue` job／寫 inbox，其餘副作用用 `jobs.Enqueue`。跨模組 transaction 由下往上鎖列：identity 帳號 → buyer → seller → 上層模組 → 編排者自己的列。
+4. 下層通知上層、而且需要原子性時用 `events.Publish`（transaction 內）；同 transaction 的訂閱者只做原子的狀態變更（含把擁有者的事實複製進自己的表）或 `Enqueue` job／寫 inbox，其餘副作用用 `jobs.Enqueue`。跨模組 transaction 由下往上鎖列，全域順序：identity 帳號列 → buyer → seller（店家與 stint 列 → 申請 → 登記 → 公告列；措施與通報在店家列之後）→ 依依賴表由下往上的上層模組（social 等）→ 編排者（moderation、accountdeletion）自己的列；同一層的多列依 ID 升序。各模組內的順序在其 `docs/modules/` 的鎖順序與計數節（seller §18、social §6）。
 5. 外部 provider（PayUni、AMEGO、Apple、R2、FCM、LLM）不在 DB transaction 內呼叫：transaction 內寫業務列並排入帶冪等鍵的 job，由 worker 在外面呼叫；webhook 先寫 inbox。
 6. `db/schema.sql` 只放表、約束、索引與 enum（migration 由 `atlas migrate diff` 產生）；view、函式與複合型別（含 `pub_*`）放 `db/objects.sql`（`atlas migrate new` 手寫）。函式一律 `BEGIN ATOMIC`（觸發函式除外）、只參照自己的表；已套用的 migration 不得修改或刪除（`TestDesiredStateIsSplitBetweenSchemaAndObjects`、`TestSchemaFileMatchesMigrations`）。模組登記在 `cmd/hawkr/modules.go`；沒有自己資料的（`reviewqueue`）登記在 `withoutData`。
 7. 不得出現舊公司的端點或帳號識別碼。

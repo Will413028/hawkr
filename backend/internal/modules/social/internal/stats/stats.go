@@ -1,8 +1,8 @@
 // Package stats 是計數的重算與每日對帳（counts-brief.md §4 第 8 點）。計數平常由資料庫的 trigger 在寫入的 transaction 內維護
 // （db/objects.sql）：每則留言存一個旗標，記它此刻是否計入，trigger 讓受影響的內容重新求值（reevaluate_*），旗標改變才加減計數。
 // 「計入」的輸入全是 social 自己的表；買家刪帳這個外部事實由訂閱者在買家刪帳的 transaction 內經 MarkAuthorInactive 記進 inactive_authors，
-// 並讓他的內容重新求值（一次集合呼叫，鎖的順序在 reevaluate_* 裡）。每日對帳與手動全量重算（子命令 social-recount）分三步：先核對複本與 buyer.pub_inactive_buyers
-// （補漏），再讓全部內容重新求值（修旗標），最後把計數覆寫成旗標的加總（reads 的重算語句）。
+// 並讓他的內容重新求值（一次集合呼叫，鎖的順序在 reevaluate_* 裡）。每日對帳與手動全量重算（子命令 social-recount）分三步：先核對複本與 buyer.pub_inactive_buyers、seller.pub_content_takedowns()
+// （補漏與刪多），再讓全部內容重新求值（修旗標），最後把計數覆寫成旗標的加總（reads 的重算語句）。
 // 重算先 SELECT ... FOR UPDATE 鎖 stats 列，再用另一個語句計數，不蓋掉並行的加減。瀏覽數是只增的事件計數，沒有可重算的來源，不在範圍。
 package stats
 
@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/readcache"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/reads"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -28,6 +29,8 @@ type Deps struct {
 	DB     *db.DB
 	Logger *slog.Logger
 	Now    func() time.Time
+	// Cache 排內容下架影響的貼文與店面頁的快取失效。
+	Cache readcache.Cache
 }
 
 // Service 重算計數。
@@ -51,8 +54,10 @@ type Report struct {
 	FlagsFixed                    int
 	// AuthorsAdded 是複本（inactive_authors）缺、由 buyer.pub_inactive_buyers 補上的買家數（訂閱者漏了，正常是 0）。
 	AuthorsAdded int
-	Drifted      int
-	Drifts       []Drift
+	// TakedownsAdded、TakedownsRemoved 是內容下架的複本與 seller.pub_content_takedowns() 不一致、對帳補上與刪除的列數（訂閱者漏了，正常是 0）。
+	TakedownsAdded, TakedownsRemoved int
+	Drifted                          int
+	Drifts                           []Drift
 }
 
 const (
@@ -239,6 +244,9 @@ func (s *Service) RecountAll(ctx context.Context) (Report, error) {
 	if err := s.syncInactiveAuthors(ctx, &rep); err != nil {
 		return rep, err
 	}
+	if err := s.syncTakedowns(ctx, &rep); err != nil {
+		return rep, err
+	}
 	if err := s.reevaluateAll(ctx, &rep); err != nil {
 		return rep, err
 	}
@@ -352,7 +360,7 @@ func (s *Service) Reconcile(ctx context.Context) (Report, error) {
 		return rep, err
 	}
 	if rep.Drifted > 0 {
-		s.d.Logger.WarnContext(ctx, "social 計數對帳發現漂移並已覆寫", "drifted", rep.Drifted, "flags_fixed", rep.FlagsFixed, "authors_added", rep.AuthorsAdded, "examples", rep.Drifts)
+		s.d.Logger.WarnContext(ctx, "social 計數對帳發現漂移並已覆寫", "drifted", rep.Drifted, "flags_fixed", rep.FlagsFixed, "authors_added", rep.AuthorsAdded, "takedowns_added", rep.TakedownsAdded, "takedowns_removed", rep.TakedownsRemoved, "examples", rep.Drifts)
 	}
 	return rep, nil
 }

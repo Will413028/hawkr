@@ -14,6 +14,11 @@ func ActionUnavailableAppealPending() uitext.Message {
 	return uitext.Message{Text: "申覆待裁定，請先裁定", Locale: uitext.ZhTW}
 }
 
+// ActionUnavailableContentTakedownRevokeOnly 是後台員工受眾的模組句子 action_unavailable.content_takedown_revoke_only（只有 zh-TW）。
+func ActionUnavailableContentTakedownRevokeOnly() uitext.Message {
+	return uitext.Message{Text: "內容下架沒有結束時間，要讓內容恢復請撤銷措施，或接受賣家的申覆", Locale: uitext.ZhTW}
+}
+
 // ActionUnavailableKindHasNoEndTime 是後台員工受眾的模組句子 action_unavailable.kind_has_no_end_time（只有 zh-TW）。
 func ActionUnavailableKindHasNoEndTime() uitext.Message {
 	return uitext.Message{Text: "警告沒有結束時間", Locale: uitext.ZhTW}

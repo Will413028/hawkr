@@ -438,6 +438,19 @@ ADR `2026-10-27-general-ecommerce-scope-cut` D3：食品業者登錄（`internal
 | 食安案件轉報主管機關（記錄、不轉報、回覆、追蹤日期、轉報資料匯出） | 食安法的轉報義務 | 不成立：只在平台賣食品時成立 | 同上 | 刪除：表、函式 `review_case_fda_referral`、待辦種類 `CASE_FDA_REFERRAL`、`cases_category_key` 與 `cases_decided_food_safety`；`review_item` 與 `pub_review_item` 少了 `food_registration_id` |
 | 清理與來函保存共用店家列鎖 | 寫入保存條件的一方與清理要在同一組列上競爭 | 成立：參與者剩兩段清理（`RetireDueStores`）與來函的登記、完成、延長、申覆 | 鎖住之後再判斷 | 不變；`TestAuthorityOrderRegisteredAfterThePurgeShowsAlreadyPurged` 守住「來函登記先鎖帳號的店家列」 |
 
+## A7-1c：內容下架措施的特例（2026-10-29）
+
+A7-D7：社群內容（店家貼文、留言、討論區留言）的下架是店家的處分，要有理由、可以申覆（賣家條款 §18.4，SELF-IMPOSED 的產品承諾，保留），所以沿用 `measures` 當處分效果的唯一來源，種類 `CONTENT_TAKEDOWN`，不另開一套下架機制。它在 `measures` 裡有下列特例；每一項都因為內容下架不限制帳號：
+
+| 沿用的機制 | 必要條件 | 今天是否成立 | 業界在同樣條件下的做法 | 決定 |
+|---|---|---|---|---|
+| 措施的種類帶期間與限制效果（警告以外的種類有開始與結束、`Restrictive` 進停權期間與曝光） | 措施限制帳號的能力或曝光 | 對內容下架不成立：只讓指定內容不再公開，帳號與店家的曝光不變 | 平台對單則內容的處置（Meta、YouTube 的內容移除加申訴）與帳號停權分開記錄、分開生效 | 內容下架不算 `Restrictive`：不進 `effective_measures`、停權期間、身分快照與 `pub_exposable_stores`；索引 `measures_active_takedown` 另服務 `pub_content_takedowns`；`StateOf` 未撤銷時是 `ISSUED`（與警告同一個無限制狀態），列表的 `ISSUED` 篩選含它 |
+| 措施有結束時間或預定生效 | 停權與預告終止要有期間 | 不成立：下架建立即生效，內容恢復只靠撤銷 | 下架到申覆成立為止，沒有自動到期 | `measures_takedown_check`：依據是認定、`starts_at = created_at`、沒有 `ends_at`；`pub_content_takedowns()` 不收 `at`；延長、縮短與結束的原因是專屬的 `CONTENT_TAKEDOWN_REVOKE_ONLY`（`MeasureActionUnavailableReason`；「沒有結束時間」與「依據違規認定」都不是這個種類的實情，要讓內容恢復只能撤銷或接受申覆，所以不沿用 `KIND_HAS_NO_END_TIME`、`VIOLATION_BASIS`） |
+| 解除有申覆、補正（`REMEDIATION`）與結束（`End`）三條路 | 補正與結束只給 RISK 依據 | 內容下架只剩申覆：依據一定是認定，補正解除不適用；店家想換回內容可以自己刪掉再發合規的新貼文 | 內容移除通知的申覆（DSA 第 20 條的內部申訴）是唯一的救濟 | 結束的原因同上（`CONTENT_TAKEDOWN_REVOKE_ONLY`），補正請求本來就只收 RISK；接受申覆撤銷措施，由 `MeasureRevoked` 帶對象通知 social 還原；`RevokeMeasure` 只收手動原因，`SOURCE_REVOKED` 照舊被拒 |
+| 措施的內容可以修訂（理由、結束時間） | 賣家看得到的理由會改 | 對象不成立：對象是「下架了什麼」的事實，改了等於改寫處分 | 內容移除的範圍改變要撤銷再重新通知 | `UpdateMeasure` 沒有對象欄位，`measure_contents` 只有建立時的寫入；要改就撤銷再建立（`TestUpdatingATakedownNeverChangesItsTargets`） |
+| 措施的建立自己開 transaction、冪等靠先插入撞唯一鍵再重讀（`measures_request`） | 單一 use case 自己的請求重送 | 對跨模組建立不成立：moderation 的處理與措施要同生共死，冪等由處理的狀態轉移擁有；重送的舊寫法在撞唯一鍵之後繼續下 SQL，違反單體規則 3 | 先鎖聚合再查冪等鍵，插入用 `ON CONFLICT DO NOTHING` | `CreateInTx` 加入呼叫方的 transaction、不收 `request_id`、建立者是傳入的管理員；handler 路徑改成同一個 transaction 內先鎖目標帳號的 stint 再查 `(admin, request_id)`，插入落空（只剩目標在不同帳號的並行請求）回 `InvalidInput` 並回滾；關聯終止的唯一鍵改成鎖住後先檢查（`LinkedMeasureExists`），索引只是保底 |
+| 認定的類別限於店家治理的 12 個值、來源只有 `finding_reports` | 認定指稱的是店家的行為 | 內容下架的認定指稱社群內容：類別含 `SPAM`、`HARASSMENT`、`HATE`，來源是 moderation 的檢舉 | 內部審核系統的違規分類與檢舉案件多對多 | `Assessable()` 是全部除了 `Other`，`violations` 與 `cases` 的 CHECK 跟著改；`ReporterSelectable()` 不含社群類別（`reports` 不變）；`finding_moderation_reports(violation_id, report_id)` 不加 FK（moderation 在別的 schema，單體規則 2 不建跨 schema FK；結構同 `finding_reports`，不合成一張帶 `source_kind` 的表，免得失去 `finding_reports` 對 `seller.reports` 的 FK）；升級規則只有一條累計，社群類別的 MEDIUM 照樣計入 |
+
 ## Will 的決定（2026-10-01）與能力表的對照
 
 - W-A：停權紀錄以 store_id 記來源，效果以帳號為單位；W-B：能力由生命週期與停權推導；W-C：等待刪除是 identity 的帳號狀態（accountdeletion ADR 的修訂）；W-D：地址存內政部鄉鎮市區代碼。帳號本人刪帳號時店家也是參與者，不必先關店。
