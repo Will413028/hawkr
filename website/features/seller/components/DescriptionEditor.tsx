@@ -35,6 +35,7 @@ import {
 	cleanupDescriptionEditorData,
 	parseDescriptionMarkdownPaste,
 } from "@/lib/products/descriptionEditorCleanup";
+import { DescriptionEditorEcho } from "@/lib/products/descriptionEditorEcho";
 import {
 	fromEditorData,
 	TABLE_CELL_ALIGN_ATTRIBUTE,
@@ -61,9 +62,10 @@ interface Props {
  * Editor.js owns its own (uncontrolled) DOM, so we bridge it to React's
  * controlled `value` / `onChange` via {@link fromEditorData} / {@link
  * toEditorData}, which keep the persisted shape identical to the mobile app's
- * `{ version, blocks }` format. The `selfUpdate` ref distinguishes edits the
- * user typed here (skip re-render) from external mutations such as an AI patch
- * (re-render the editor with the new value).
+ * `{ version, blocks }` format. A {@link DescriptionEditorEcho} tracks the
+ * signatures this editor reported through `onChange`, so the user's own edits
+ * coming back as `value` (skip re-render) are told apart from external
+ * mutations such as an AI patch (re-render the editor with the new value).
  *
  * UI is localised to 繁中 via Editor.js's `i18n` config; the top toolbar drives
  * the same APIs the inline toolbar / slash menu use (block convert + native
@@ -1133,8 +1135,7 @@ export function DescriptionEditorCanvas({
 	// 放大編輯 dialog（原生 <dialog>）。宣告在最上面，undo/redo 的
 	// ⌘Z keydown effect（下面）跟展開狀態的 effect（檔案後段）都要用。
 	const dialogRef = React.useRef<HTMLDialogElement>(null);
-	const selfUpdate = React.useRef(false);
-	const lastSig = React.useRef<string>(JSON.stringify(value));
+	const echo = React.useRef(new DescriptionEditorEcho(JSON.stringify(value)));
 	// editor.render() 是 async 的（清空再逐塊重建）——外部變動（undo/redo
 	// 連點、AI patch）觸發的 render 必須串成一條 chain 逐一跑，兩發重疊
 	// 會清掉一半又插一半，內容直接壞掉。
@@ -1251,7 +1252,7 @@ export function DescriptionEditorCanvas({
 
 	/* ---- undo/redo：對 `value`（controlled ProductDescription）做快照。
 	 *      跳轉時同步呼叫 onChange 更新表單 state，並用 applySnapshotToEditor
-	 *      對編輯器做「區塊級」套用（即時、不閃爍）——跳轉前先把 lastSig 寫成
+	 *      對編輯器做「區塊級」套用（即時、不閃爍）——跳轉前先把 echo 的 signature 寫成
 	 *      快照 sig，套用過程的 editor onChange echo 與父層 value echo 都會被
 	 *      sig 擋掉，不會變成新編輯。合併規則接近 Word：同一區塊的連續字元
 	 *      合併；空白/標點後的新字、輸入與刪除切換、換段、貼上、格式操作、
@@ -1301,7 +1302,7 @@ export function DescriptionEditorCanvas({
 			const { stack, index } = historyRef.current;
 			// 內容跟目前所在的快照一樣就不佔步驟 —— Editor.js 初始 render 後
 			// 會補發一次 onChange（存檔輸出是 canonical 形，跟 mount 時的
-			// lastSig 不同、擋不掉），沒有這條會在堆疊裡多出一格「按了沒
+			// echo 的 signature 不同、擋不掉），沒有這條會在堆疊裡多出一格「按了沒
 			// 反應」的重複初始狀態。
 			if (JSON.stringify(stack[index]) === JSON.stringify(next)) return;
 			const forceNewAction = forceNextHistoryCheckpointRef.current;
@@ -1328,10 +1329,9 @@ export function DescriptionEditorCanvas({
 	const commitEditorValue = React.useCallback(
 		(next: ProductDescription) => {
 			const sig = JSON.stringify(next);
-			if (sig === lastSig.current) return;
+			if (echo.current.isCurrent(sig)) return;
 			saveGenerationRef.current++;
-			lastSig.current = sig;
-			selfUpdate.current = true;
+			echo.current.emit(sig);
 			onChangeRef.current(next);
 			checkpointHistory(next);
 		},
@@ -1367,7 +1367,7 @@ export function DescriptionEditorCanvas({
 					historyRef.current.index = nextIndex;
 					lastCheckpointAtRef.current = 0;
 					markHistoryActionBoundary();
-					lastSig.current = JSON.stringify(snapshot);
+					echo.current.adopt(JSON.stringify(snapshot));
 					try {
 						await applySnapshotToEditor(editor, prev, snapshot);
 					} catch {
@@ -1375,7 +1375,7 @@ export function DescriptionEditorCanvas({
 					}
 					inlineRangeRef.current = null;
 					toolbarSelectionRef.current = null;
-					selfUpdate.current = true;
+					echo.current.emit(JSON.stringify(snapshot));
 					onChangeRef.current(snapshot);
 					syncHistoryFlags();
 				})
@@ -2301,23 +2301,9 @@ export function DescriptionEditorCanvas({
 	// Re-render the editor only for *external* value changes (undo/redo 跳轉、
 	// AI patch)。
 	React.useEffect(() => {
-		const sig = JSON.stringify(value);
-		if (sig === lastSig.current) {
-			// 自己 onChange 打出去、經父層繞回來的 echo（內容相同）。旗標必須
-			// 在這裡消化掉——否則殘留到「下一次」真正的外部變動（第一下
-			// undo/redo）會被誤判成 self-update 吞掉，畫面完全不動。
-			selfUpdate.current = false;
-			return;
-		}
-		if (selfUpdate.current) {
-			selfUpdate.current = false;
-			lastSig.current = sig;
-			return;
-		}
+		if (echo.current.receive(JSON.stringify(value)) === "echo") return;
 		const editor = editorRef.current;
 		if (!editor?.render) return;
-		console.warn("[DEBUG-echo] external render", sig.slice(0, 160));
-		lastSig.current = sig;
 		renderChainRef.current = renderChainRef.current
 			.then(() => editor.isReady)
 			.then(() => editor.render(toEditorData(value)))
