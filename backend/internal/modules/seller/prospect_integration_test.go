@@ -1356,7 +1356,10 @@ func TestProspectContactInTransactionBlocksArchiveUntilCommit(t *testing.T) {
 	close(release)
 	<-committed
 	for range 2 {
-		<-archived // 一個成功、另一個依狀態成功或回 FailedPrecondition，這裡只確認都放行了
+		// 一個成功、另一個依狀態成功或回 FailedPrecondition，這裡只確認都放行了。
+		if err := <-archived; err != nil {
+			t.Logf("放行後的結果：%v", err)
+		}
 	}
 	c, err := f.module.ProspectContact(ctx, p.ID)
 	must(t, err)

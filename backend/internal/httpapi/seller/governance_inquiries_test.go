@@ -65,6 +65,7 @@ func inquiryFixture(state model.InquiryState) model.AdminInquiry {
 		DueAt: governanceNow.Add(model.InquiryDefaultDue),
 	}
 	switch state {
+	case model.InquiryStateOpen:
 	case model.InquiryStateReplied:
 		i.Reply = &model.InquiryReply{
 			Body: "已附上", Channel: model.InquiryChannelMessaging, ReceivedAt: governanceNow.Add(time.Hour), RecordedAt: governanceNow.Add(2 * time.Hour), RecordedByAdminID: 8,

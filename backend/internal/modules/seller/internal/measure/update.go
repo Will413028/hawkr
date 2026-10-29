@@ -148,6 +148,7 @@ func requestedEnds(current model.Measure, requested *time.Time, now time.Time) (
 			return nil, errActionUnavailable(current, model.MeasureActionExtend)
 		case endsShortened:
 			return nil, errActionUnavailable(current, model.MeasureActionShorten)
+		case endsUnchanged:
 		}
 		return current.EndsAt, nil
 	}

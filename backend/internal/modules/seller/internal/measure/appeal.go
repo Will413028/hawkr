@@ -286,7 +286,7 @@ func (s *Service) DecideAppeal(ctx context.Context, in model.DecideAppealInput) 
 			if err != nil {
 				return err
 			}
-			after := row
+			var after store.SellerMeasure
 			if in.Outcome == model.RequestAccepted {
 				if after, err = s.revoke(ctx, q, plan, row, in.AdminID, model.RevokeAppealAccepted, now); err != nil {
 					return err

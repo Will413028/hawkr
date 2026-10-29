@@ -170,6 +170,8 @@ func KYCActionUnavailableReasons(s Store, app KYCApplicationState, a StoreAction
 	switch a {
 	case StoreActionApproveKYC, StoreActionRejectKYC, StoreActionRequeryKYC:
 		return unavailableReasons(a, storeActionFacts{Store: s, KYC: app})
+	case StoreActionCreateMeasure, StoreActionDelegate, StoreActionRebindPayUni:
+		return nil
 	}
 	return nil
 }

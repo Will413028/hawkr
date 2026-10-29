@@ -42,6 +42,7 @@ func NewAdminEvidence(m EvidenceModule, kind model.EvidenceKind, log *slog.Logge
 	}
 	idParam := "report_id"
 	switch kind {
+	case model.EvidenceReport:
 	case model.EvidenceRequest:
 		idParam = "request_id"
 	case model.EvidenceInquiry:

@@ -109,6 +109,7 @@ func suspensionCode(st seller.Store) (string, error) {
 	case sellerreason.Admin:
 		code, _, err := sellerreason.Of(st.Sanctions)
 		return code, err
+	case sellerreason.None:
 	}
 	return "", nil
 }

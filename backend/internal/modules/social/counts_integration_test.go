@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand/v2"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -86,7 +87,7 @@ func TestStatsMatchTheDatasetAfterRandomWrites(t *testing.T) {
 	posts := []social.Post{f.publishedPost(t, storeID, "一"), f.publishedPost(t, storeID, "二")}
 	var comments []social.Comment
 	var entries []social.ForumEntry
-	rng := rand.New(rand.NewPCG(20261023, 7))
+	rng := rand.New(rand.NewPCG(20261023, 7)) //nolint:gosec // G404：固定種子，隨機操作序列要可重現，不是安全用途
 	steps := 0
 	step := func(name string, err error) {
 		t.Helper()
@@ -211,8 +212,7 @@ func TestStatsMatchTheDatasetAfterRandomWrites(t *testing.T) {
 
 // ignoreNotFound 吞掉資料集的隨機操作遇到的業務拒絕（目標已不可見、身分不符等）；其他錯誤照回。
 func ignoreNotFound(err error) error {
-	switch kindOf(err) {
-	case apperr.KindNotFound, apperr.KindPermissionDenied, apperr.KindInvalidInput, apperr.KindFailedPrecondition:
+	if slices.Contains([]apperr.Kind{apperr.KindNotFound, apperr.KindPermissionDenied, apperr.KindInvalidInput, apperr.KindFailedPrecondition}, kindOf(err)) {
 		return nil
 	}
 	return err

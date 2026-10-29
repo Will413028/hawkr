@@ -37,7 +37,7 @@ func TestAgreementAcceptancesAreAppendOnly(t *testing.T) {
 			}
 			purgeSeen = true
 			set := setClause.FindStringSubmatch(stmt)
-			if set == nil || !regexp.MustCompile(`(?is)^\s*client_ip\s*=\s*NULL\s*,\s*user_agent\s*=\s*NULL\s*,\s*pii_purged_at\s*=\s*sqlc\.arg\(now\)\s*$`).MatchString(set[1]) {
+			if len(set) < 2 || !regexp.MustCompile(`(?is)^\s*client_ip\s*=\s*NULL\s*,\s*user_agent\s*=\s*NULL\s*,\s*pii_purged_at\s*=\s*sqlc\.arg\(now\)\s*$`).MatchString(set[1]) {
 				t.Errorf("PurgeAgreementSources 只能把 client_ip、user_agent 清成 NULL 並記下 pii_purged_at：%q", stmt)
 			}
 		}

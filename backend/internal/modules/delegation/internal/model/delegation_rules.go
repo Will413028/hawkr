@@ -244,7 +244,8 @@ func DeniedLabel(d DelegationDenial) string {
 	case DenialInvalidCommand, DenialAdminRequired, DenialCapabilityDenied,
 		DenialIdempotencyKeyReused, DenialSessionExpired, DenialSessionRevoked,
 		DenialCredentialInvalid, DenialSessionNotFound, DenialAuditIntentFailed,
-		DenialHandoffInvalid, DenialAuthorizationAlreadyActive:
+		DenialHandoffInvalid, DenialAuthorizationAlreadyActive,
+		DenialStoreNotOperable, DenialStoreClosed:
 		return "目前不可代行"
 	default:
 		return "目前不可代行"

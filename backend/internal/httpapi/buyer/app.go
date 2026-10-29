@@ -171,6 +171,7 @@ func genderModel(g pb.Gender) (model.Gender, error) {
 		return model.Female, nil
 	case pb.Gender_GENDER_OTHER:
 		return model.Other, nil
+	case pb.Gender_GENDER_UNSPECIFIED:
 	}
 	return "", rpc.Error(connect.CodeInvalidArgument, "%s", "gender 不合法")
 }

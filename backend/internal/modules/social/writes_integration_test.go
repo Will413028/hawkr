@@ -467,7 +467,7 @@ func TestPostImageReplacementRetiresTheOldAsset(t *testing.T) {
 	if n := len(f.media.Referenced(ref)); n != 1 {
 		t.Fatalf("舊的引用已解除、只剩新的：%d", n)
 	}
-	var retired int64 = f.scalar(t, "SELECT count(*) FROM social.retired_assets WHERE ref_id = $1", p.ID.String())
+	retired := f.scalar(t, "SELECT count(*) FROM social.retired_assets WHERE ref_id = $1", p.ID.String())
 	if retired != 1 {
 		t.Fatalf("舊圖記成退場：%d", retired)
 	}

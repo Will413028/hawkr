@@ -91,7 +91,7 @@ func TestSellerPayUniOf(t *testing.T) {
 		if (tc.noFields || (tc.fix == nil && tc.want != PayUniStateFixable)) && len(got.FixFields) != 0 {
 			t.Errorf("%s：FixFields 要是空的：%v", name, got.FixFields)
 		}
-		if !slices.Equal(got.FixStoreFields, tc.store) && !(len(got.FixStoreFields) == 0 && len(tc.store) == 0) {
+		if !slices.Equal(got.FixStoreFields, tc.store) && (len(got.FixStoreFields) != 0 || len(tc.store) != 0) {
 			t.Errorf("%s：FixStoreFields %v，要 %v", name, got.FixStoreFields, tc.store)
 		}
 	}

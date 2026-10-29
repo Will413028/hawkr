@@ -830,6 +830,7 @@ func ActionUnavailableText(reason MeasureActionUnavailableReason, action Measure
 			return text.ActionUnavailableRequestPendingFrozenUpdateStatement()
 		case MeasureActionExtend:
 			return text.ActionUnavailableRequestPendingFrozenExtend()
+		case MeasureActionShorten, MeasureActionRevoke, MeasureActionEnd:
 		}
 	case ActionReasonAppealPending:
 		return text.ActionUnavailableAppealPending()

@@ -340,10 +340,9 @@ func TestAdminReadsTheTerminationClosureOfAStore(t *testing.T) {
 		}
 		// 依據的需求與說明句都由事由決定（model.TerminationGround.ViolationRequirement、TerminationEffect.Message）。
 		wantReq := adminsellerpb.TerminationViolationRequirement_TERMINATION_VIOLATION_REQUIREMENT_OPTIONAL
-		switch o.GetGround() {
-		case pb.TerminationGround_TERMINATION_GROUND_NOTICE:
+		if o.GetGround() == pb.TerminationGround_TERMINATION_GROUND_NOTICE {
 			wantReq = adminsellerpb.TerminationViolationRequirement_TERMINATION_VIOLATION_REQUIREMENT_FORBIDDEN
-		case pb.TerminationGround_TERMINATION_GROUND_MATERIAL_BREACH:
+		} else if o.GetGround() == pb.TerminationGround_TERMINATION_GROUND_MATERIAL_BREACH {
 			wantReq = adminsellerpb.TerminationViolationRequirement_TERMINATION_VIOLATION_REQUIREMENT_REQUIRED
 		}
 		if o.GetViolationRequirement() != wantReq {

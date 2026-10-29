@@ -1141,15 +1141,3 @@ func TestImageFailureAfterFinalizeLeavesNoReference(t *testing.T) {
 }
 
 func day(y int, m time.Month, d int) time.Time { return time.Date(y, m, d, 0, 0, 0, 0, time.UTC) }
-
-// kycApprovedStore 開店並讓 KYC 核准。
-func (f *fixture) kycApprovedStore(t *testing.T, idCard, bank string) Store {
-	t.Helper()
-	_, s := f.approvedWith(t, idCard, bank)
-	return s
-}
-
-func (f *fixture) kycApprovedStoreWithAccount(t *testing.T, idCard, bank string) (int64, Store) {
-	t.Helper()
-	return f.approvedWith(t, idCard, bank)
-}

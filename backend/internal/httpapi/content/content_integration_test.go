@@ -621,8 +621,6 @@ func TestTraceIDAndRequestLimit(t *testing.T) {
 	}
 }
 
-func ptr[T any](v T) *T { return &v }
-
 // noDashboardOrders 是這個測試不讀儀表板的訂單時的替身：NewHandler 要求提供儀表板訂單的來源。
 type noDashboardOrders struct{}
 

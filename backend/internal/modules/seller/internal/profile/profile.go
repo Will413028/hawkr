@@ -184,14 +184,6 @@ func publicStore(e exposedStore, updatedAt time.Time, firstExposedAt, announcedA
 	return model.PublicStore{Store: e.store, UpdateTime: model.PublicStoreUpdateTime(updatedAt, firstExposedAt, announcedAt)}
 }
 
-func storeIDsOf(rows []store.SellerStore) []int64 {
-	ids := make([]int64, len(rows))
-	for i, r := range rows {
-		ids[i] = r.StoreID
-	}
-	return ids
-}
-
 type exposedStore struct {
 	store       model.Store
 	publishedAt time.Time

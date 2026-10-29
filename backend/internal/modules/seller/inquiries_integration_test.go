@@ -78,7 +78,7 @@ func TestCreateInquiryStartsTheWaitAndAllowsOnlyOneOpenInquiry(t *testing.T) {
 	ctx := context.Background()
 	_, s := f.open(t)
 	c := f.foodCase(t, s.StoreID)
-	if !(c.Open() && !c.AwaitingSeller()) || c.AwaitingSeller() || len(c.Availability.CreateInquiry) != 0 {
+	if !c.Open() || c.AwaitingSeller() || len(c.Availability.CreateInquiry) != 0 {
 		t.Fatalf("發詢問之前：%+v", c.Case)
 	}
 	f.now = f.now.Add(time.Hour)
@@ -780,7 +780,7 @@ func TestCaseListAwaitingSellerAgreesWithTheGoPredicates(t *testing.T) {
 	// 待決定的開始時間（seller.review_case_decision，清單與單筆）等於由 fixture 的事實（開案、詢問回覆收到、管理員撤回）算出的 max；
 	// 等賣家的案件沒有期限。
 	for _, c := range all {
-		if !(c.Open() && !c.AwaitingSeller()) {
+		if !c.Open() || c.AwaitingSeller() {
 			if c.DecideDeadline != nil {
 				t.Errorf("案件 %s 不是待決定，不該有決定期限：%+v", c.ID, c.DecideDeadline)
 			}

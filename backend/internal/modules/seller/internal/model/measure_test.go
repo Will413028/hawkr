@@ -597,7 +597,7 @@ func legacyActionPredicates(m Measure) (update, extend, shorten, revoke bool) {
 	extend = m.Kind == MeasureSuspension && m.State == StateActive && m.Appeal() == nil && m.PendingRemediation() == nil
 	shorten = m.Kind == MeasureSuspension && m.State == StateActive
 	pending := m.Pending()
-	revoke = m.Status == MeasureStatusEnforced && !(pending != nil && pending.Kind == RequestKindAppeal)
+	revoke = m.Status == MeasureStatusEnforced && (pending == nil || pending.Kind != RequestKindAppeal)
 	return update, extend, shorten, revoke
 }
 
