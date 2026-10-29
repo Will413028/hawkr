@@ -109,8 +109,6 @@ func wantKind(t *testing.T, err error, want apperr.Kind) {
 	}
 }
 
-func ptr[T any](v T) *T { return &v }
-
 // ==================== banner ====================
 
 func bannerInput() content.BannerInput {

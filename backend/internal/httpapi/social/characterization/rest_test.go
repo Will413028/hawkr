@@ -22,22 +22,6 @@ type restDriver struct {
 
 var _ Driver = (*restDriver)(nil)
 
-func newRESTDriver(base string, tokens map[ch.Caller]string, client *http.Client) *restDriver {
-	return &restDriver{
-		rest:   ch.REST{Base: base, Tokens: tokens, HTTP: client, Business: restBusinessKind},
-		images: map[string]string{},
-	}
-}
-
-// restBusinessKind 對應 social 的業務碼：hashtag 規則（3015 字元、3016 長度、3017 數量）與社群守則（9210）都是輸入不合法。
-func restBusinessKind(code int32) error {
-	switch code {
-	case 3015, 3016, 3017, 9210:
-		return ch.ErrInvalid
-	}
-	return nil
-}
-
 func (d *restDriver) Legacy() bool { return true }
 
 type wirePost struct {

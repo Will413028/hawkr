@@ -340,7 +340,9 @@ func (f *fixture) runWorkers(t *testing.T, done func() bool) {
 	go func() { stopped <- c.Run(ctx) }()
 	defer func() {
 		cancel()
-		<-stopped
+		if err := <-stopped; err != nil {
+			t.Errorf("worker 停止：%v", err)
+		}
 	}()
 	deadline := time.Now().Add(30 * time.Second)
 	for !done() {

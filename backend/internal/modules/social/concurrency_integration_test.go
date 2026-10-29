@@ -4,6 +4,7 @@ package social_test
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -88,11 +89,7 @@ func (f *fixture) race(t *testing.T, op func() error, hold func(ctx context.Cont
 }
 
 func businessRejection(err error) bool {
-	switch kindOf(err) {
-	case apperr.KindNotFound, apperr.KindFailedPrecondition:
-		return true
-	}
-	return false
+	return slices.Contains([]apperr.Kind{apperr.KindNotFound, apperr.KindFailedPrecondition}, kindOf(err))
 }
 
 // F1：隱藏與還原要鎖住目標列，與刪除序列化。「是否計入」同時取決於內容的 deleted_at 與 hides，兩個寫入不序列化時各自的 trigger 都看不到對方

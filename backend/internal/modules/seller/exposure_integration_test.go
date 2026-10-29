@@ -337,12 +337,11 @@ func TestPublicListingReportsAStoreThatIsWaitingForDeletion(t *testing.T) {
 	must(t, err)
 	got := CapabilitiesOf(cur)
 	for _, st := range got {
-		switch {
-		case st.Capability == CapPublicListing:
+		if st.Capability == CapPublicListing {
 			if st.Active || !slices.Equal(st.Missing, []Requirement{RequirementNotPendingDeletion}) {
 				t.Fatalf("public listing=%+v", st)
 			}
-		case st.Capability == CapProductManage || st.Capability == CapShippingSetup || st.Capability == CapAccountClose:
+		} else if slices.Contains([]Capability{CapProductManage, CapShippingSetup, CapAccountClose}, st.Capability) {
 			if st.Active || !slices.Equal(st.Missing, []Requirement{RequirementNotPendingDeletion}) {
 				t.Fatalf("%s=%+v", st.Capability, st)
 			}

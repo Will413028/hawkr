@@ -237,7 +237,7 @@ func TestExchangeDefersSavingOnTransientFailures(t *testing.T) {
 }
 
 func (f *exchangeFixture) workSave(blob grantBlob, verified bool, attempt int) error {
-	raw, _ := json.Marshal(blob)
+	raw, _ := json.Marshal(blob) //nolint:gosec // G117：測試資料，欄位名 refresh_token 是 Apple 的 token 名
 	sealed, _ := (testSealer{}).Seal(raw, grantAAD(7))
 	args := saveAppleTokenArgs{AccountID: 7, ClientID: buyerClient, Subject: "apple-A", Verified: verified, Grant: sealed}
 	return (&saveAppleTokenWorker{m: f.m}).Work(context.Background(), &river.Job[saveAppleTokenArgs]{JobRow: &rivertype.JobRow{Attempt: attempt, MaxAttempts: saveAppleTokenMaxAttempts}, Args: args})
@@ -282,8 +282,10 @@ func TestSaveJobRetriesThenGivesUpWithoutRevoking(t *testing.T) {
 		t.Fatalf("err=%v revoked=%v saved=%v", err, f.tokens.revoked, f.saver.saved)
 	}
 
-	f = newExchangeFixture() // 重新驗證發現身分不符：撤銷
-	if err := f.workSave(grantBlob{RefreshToken: "rt-code-B", IDToken: "id-code-B"}, false, 1); !isCancel(err) || len(f.tokens.revoked) != 1 || len(f.saver.saved) != 0 {
+	// 重新驗證發現身分不符：撤銷
+	f = newExchangeFixture()
+	mismatched := grantBlob{RefreshToken: "rt-code-B", IDToken: "id-code-B"} //nolint:gosec // G101：測試資料，不是憑證
+	if err := f.workSave(mismatched, false, 1); !isCancel(err) || len(f.tokens.revoked) != 1 || len(f.saver.saved) != 0 {
 		t.Fatalf("err=%v revoked=%v", err, f.tokens.revoked)
 	}
 

@@ -83,9 +83,9 @@ func TestEveryKindHasACurrentVersionAndURL(t *testing.T) {
 }
 
 func TestSourceTextsNormalizeToStoredValues(t *testing.T) {
-	for in, want := range map[string]string{"203.0.113.9": "203.0.113.9", " 203.0.113.9 ": "203.0.113.9", "::ffff:203.0.113.9": "203.0.113.9", "2001:db8::1": "2001:db8::1", "fe80::1%eth0": "fe80::1"} {
-		if got := ClientIPAddr(in); got == nil || got.String() != want {
-			t.Errorf("ClientIPAddr(%q) = %v，預期 %q", in, got, want)
+	for _, tc := range []struct{ in, want string }{{"203.0.113.9", "203.0.113.9"}, {" 203.0.113.9 ", "203.0.113.9"}, {"::ffff:203.0.113.9", "203.0.113.9"}, {"2001:db8::1", "2001:db8::1"}, {"fe80::1%eth0", "fe80::1"}} {
+		if got := ClientIPAddr(tc.in); got == nil || got.String() != tc.want {
+			t.Errorf("ClientIPAddr(%q) = %v，預期 %q", tc.in, got, tc.want)
 		}
 	}
 	for _, in := range []string{"", "  ", "unknown", "203.0.113.9, 10.0.0.1", "203.0.113.9:443"} {

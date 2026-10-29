@@ -26,7 +26,6 @@ import (
 	httpsellerpkg "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
-	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/gcis"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
@@ -990,7 +989,7 @@ func kycAgreementsPB() []*pb.AgreementAcceptance {
 	return pbAcceptances(seller.CurrentKYCAcceptances())
 }
 
-func pbAcceptances(in []model.AgreementAcceptance) []*pb.AgreementAcceptance {
+func pbAcceptances(in []seller.AgreementAcceptance) []*pb.AgreementAcceptance {
 	out := make([]*pb.AgreementAcceptance, 0, len(in))
 	for _, a := range in {
 		out = append(out, &pb.AgreementAcceptance{Kind: rpc.EnumToProto[pb.AgreementKind](a.Kind), Version: a.Version})
