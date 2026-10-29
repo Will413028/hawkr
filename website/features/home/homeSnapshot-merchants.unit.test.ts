@@ -56,6 +56,7 @@ describe("home recommended merchants", () => {
 			followers: 30,
 		});
 		expect(mappedSellers[0].location).toContain("臺北市");
+		expect(mappedSellers[0].location).not.toContain("本週推薦");
 		expect(mappedSellers[0]).not.toHaveProperty("certified");
 		expect(mappedSellers[0]).not.toHaveProperty("prize");
 	});
@@ -82,5 +83,12 @@ describe("home hot products", () => {
 			),
 		);
 		expect(editorRecommendedProducts[0]?.id).toBe("hot-1");
+	});
+
+	it("leaves the location empty when the town code is unknown; the label is the view's job", () => {
+		const { mappedSellers } = buildHomeSnapshot(
+			bootstrap([store({ townCode: "" })]),
+		);
+		expect(mappedSellers[0].location).toBe("");
 	});
 });

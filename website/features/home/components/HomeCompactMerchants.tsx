@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import AppImage from "@/components/shared/AppImage";
 import Avatar from "@/components/shared/Avatar";
@@ -13,6 +14,7 @@ import { useObservedRouter } from "@/lib/navigation/use-observed-router";
 export interface HomeMerchantItem {
 	id: string;
 	name: string;
+	/** 縣市區；讀不到鄉鎮市區代碼時為空字串（標籤由呈現層補）。 */
 	location: string;
 	image: string;
 	logo_url: string;
@@ -41,6 +43,7 @@ export default function HomeCompactMerchants({
 	title = "推薦商家",
 	href = "/market/products?tab=nearby",
 }: HomeCompactMerchantsProps) {
+	const t = useTranslations("home.merchants");
 	const railRef = React.useRef<HTMLDivElement | null>(null);
 	const router = useObservedRouter("home_merchants");
 	const [scrollState, setScrollState] = React.useState({
@@ -243,12 +246,12 @@ export default function HomeCompactMerchants({
 										fetchPriority="low"
 										className="object-cover object-center"
 									/>
-									{seller.location ? (
-										<span className="absolute left-2.5 top-2.5 z-[2] inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-1 text-[0.625rem] font-black text-white backdrop-blur-sm">
-											<LocationPin />
-											{seller.location}
-										</span>
-									) : null}
+									<span className="absolute left-2.5 top-2.5 z-[2] inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-1 text-[0.625rem] font-black text-white backdrop-blur-sm">
+										<LocationPin />
+										{seller.location || t("localMerchants")}
+										<span aria-hidden="true">·</span>
+										{t("weeklyPick")}
+									</span>
 								</Link>
 								<div className="flex flex-1 flex-col px-2.5 pb-2.5 pt-0">
 									{/* Keep the avatar just below the location chip on the shallow

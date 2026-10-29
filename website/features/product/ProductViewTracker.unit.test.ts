@@ -9,7 +9,7 @@ const beacon = vi.hoisted(() => ({
 	outcome: "ok" as "ok" | "reject",
 }));
 vi.mock("@/lib/connect/seller-public", () => ({
-	sellerPublicClient: () => ({
+	sellerBeaconClient: () => ({
 		recordProductView: (req: unknown) => {
 			beacon.calls.push(req);
 			return beacon.outcome === "ok"

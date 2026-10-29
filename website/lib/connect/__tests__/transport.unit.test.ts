@@ -23,6 +23,7 @@ import {
 	ListLiveBannersResponseSchema,
 } from "@hawkr/api/gen/hawkr/content/v1alpha1/content_pb";
 import { IdentityAppService } from "@hawkr/api/gen/hawkr/identity/v1alpha1/identity_pb";
+import { SellerPublicService } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SELLER_SUSPENDED_EVENT } from "@/lib/api/client";
 import {
@@ -41,6 +42,7 @@ import {
 	connectBaseUrl,
 	type FailureContext,
 	FIRST_PARTY_CONNECT_PATH,
+	optionalAuthTransport,
 	publicTransport,
 	reportInterceptor,
 	SUPPRESS_AUTH_EXPIRED,
@@ -200,6 +202,63 @@ describe("publicTransport", () => {
 		expect(connectBaseUrl(false)).not.toMatch(/\/api\/v1$/);
 		expect(init?.method).toBe("GET");
 		expect(init?.credentials).toBe("omit");
+	});
+});
+
+describe("optionalAuthTransport", () => {
+	const fetchMock = vi.fn<typeof fetch>();
+	const send = () =>
+		createClient(
+			SellerPublicService,
+			optionalAuthTransport({ locale: "zh-TW" }),
+		).recordProductView({ productId: "p1" });
+	beforeEach(() => {
+		fetchMock.mockImplementation(
+			async () =>
+				new Response("{}", {
+					status: 200,
+					headers: { "content-type": "application/json" },
+				}),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+		vi.stubGlobal("window", globalThis);
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		fetchMock.mockReset();
+	});
+
+	it("登入時帶 Bearer 與 cookie，POST 寫入", async () => {
+		vi.stubGlobal("Clerk", {
+			loaded: true,
+			session: { getToken: vi.fn().mockResolvedValue("clerk-session-token") },
+		});
+		await send();
+		const [, init] = fetchMock.mock.calls[0];
+		expect(init?.method).toBe("POST");
+		expect(init?.credentials).toBe("include");
+		expect(new Headers(init?.headers).get("Authorization")).toBe(
+			"Bearer clerk-session-token",
+		);
+	});
+
+	it("沒登入（Clerk 已載入、沒有 session）匿名送出，不丟錯", async () => {
+		vi.stubGlobal("Clerk", { loaded: true, session: null });
+		await send();
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		const [, init] = fetchMock.mock.calls[0];
+		expect(new Headers(init?.headers).has("Authorization")).toBe(false);
+	});
+
+	it("Clerk 取 token 失敗時仍匿名送出", async () => {
+		vi.stubGlobal("Clerk", {
+			loaded: true,
+			session: { getToken: vi.fn().mockRejectedValue(new Error("offline")) },
+		});
+		await send();
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		const [, init] = fetchMock.mock.calls[0];
+		expect(new Headers(init?.headers).has("Authorization")).toBe(false);
 	});
 });
 

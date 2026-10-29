@@ -277,11 +277,12 @@ function toProduct(product: ProductSource, index: number): MarketProductItem {
 
 function toSeller(store: RecommendedStore): HomeMerchantItem {
 	const location = storeLocation(store.townCode);
-	const place = location ? `${location.city} ${location.district}` : "在地商家";
+	// 標籤（「本週推薦」等）屬呈現層，由 HomeCompactMerchants 依語系渲染；這裡只給地點，沒有就空字串。
+	const place = location ? `${location.city} ${location.district}` : "";
 	return {
 		id: store.id,
 		name: store.name,
-		location: `${place} · 本週推薦`,
+		location: place,
 		image: store.coverUrl || FALLBACK_SELLER_COVER,
 		logo_url: store.logoUrl,
 		rating: store.ratingAverage,

@@ -544,8 +544,6 @@
 
 - **治理事件沒有訂閱者**：§18 的治理事件還沒有 notification 的訂閱與送達紀錄。解除條件：notification 與資料保存期限搬進單體。
 
-- **登入的買家被算兩次**：website 的 `ProductViewTracker` 對所有訪客呼叫 `RecordProductView`（§16），但公開 transport 不帶憑證，伺服器看不到登入者，所以登入的買家同一次瀏覽仍會被 beacon 與 `RecordVisit` 各算一次；buyer-app 尚未接上。解除條件：website 對登入者以帶憑證的 transport 呼叫，buyer-app 接上。
-
 - **PayUni 沒有對真實環境驗證**：沒有 sandbox 與真實呼叫，`platform/payuni` 只以本機的 httptest 驗證，欄位名稱、`search_merchant_status` 的回應格式與 AES-GCM 的格式照舊的 `pkg/payuni`。`ExecuteTime` 的格式（`yyyyMMddHHmmss`）與時區（台北）取自 Java 測試的樣本與 PayUni 慣例，沒有對真實通知驗證；輪詢（事件時間用我們的時鐘）與 webhook（PayUni 的時鐘）混用，假設兩邊的時差遠小於狀態改變的間隔。解除條件：取得 PayUni 的 sandbox 或第一筆真實通知。
 
 - **KYC 加密金鑰輪替沒有遷移 job**：HMAC 金鑰輪替有 `RehashKYCIdentities`（§13），加密金鑰輪替則要解密後重寫，這支 job 還沒有。解除條件：第一次輪替加密金鑰之前要先有它（沒有資料之前不做）。

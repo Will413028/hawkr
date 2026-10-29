@@ -15,5 +15,11 @@
 	"navigation": {},
 	"product": {},
 	"seller": {},
-	"order": {}
+	"order": {},
+	"home": {
+		"merchants": {
+			"localMerchants": "Local shop",
+			"weeklyPick": "Featured this week"
+		}
+	}
 }

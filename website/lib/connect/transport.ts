@@ -134,6 +134,51 @@ export function publicTransport(opts: PublicTransportOptions = {}): Transport {
 }
 
 /**
+ * 登入與否都能呼叫的寫入型 beacon（例如 SellerPublicService.RecordProductView：登入者不計數，由伺服器判斷，
+ * client 不判斷登入狀態）。有 Clerk session 時帶同 authedTransport 的 Bearer 與 cookie；沒登入、Clerk 還沒載入完
+ * 或取不到 token 都照常匿名送出，不丟錯、不發 AUTH_EXPIRED_EVENT、不導向登入。
+ * 只給寫入用：讀取（GET）仍走 publicTransport，才能共用快取。server 端沒有 session，等同匿名。
+ */
+export function optionalAuthTransport(
+	opts: PublicTransportOptions = {},
+): Transport {
+	const isBrowser = typeof window !== "undefined";
+	return createConnectTransport({
+		baseUrl: connectBaseUrl(isBrowser),
+		useHttpGet: true,
+		defaultTimeoutMs: getEnv().apiTimeoutMs,
+		fetch: optionalAuthFetch(isBrowser, opts.visitorIp),
+		interceptors: [
+			languageInterceptor(opts),
+			reportInterceptor(),
+			retryInterceptor({ server: !isBrowser }),
+		],
+	});
+}
+
+function optionalAuthFetch(
+	isBrowser: boolean,
+	visitorIp: string | undefined,
+): typeof fetch {
+	if (!isBrowser) return publicFetch(false, visitorIp);
+	return async (input, init) => {
+		const headers = new Headers(init?.headers);
+		try {
+			await withClerkAuthorization(headers, {}, init?.signal);
+		} catch {
+			// 取不到 token 就匿名送出；beacon 不該因登入狀態失敗。
+			headers.delete("Authorization");
+		}
+		return fetch(input, {
+			...init,
+			headers,
+			credentials: "include",
+			cache: "no-store",
+		});
+	};
+}
+
+/**
  * 帶登入憑證的 transport：*AppService 的方法。瀏覽器端以 `Authorization: Bearer` 帶 Clerk 的 session token。
  *
  * 讀取（NO_SIDE_EFFECTS）照〈API 設計規範（Connect）〉§三、§九以 GET 呼叫：GET 不受 CSRF 檢查、可以安全

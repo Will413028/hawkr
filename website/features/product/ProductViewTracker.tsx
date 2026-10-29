@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { sellerPublicClient } from "@/lib/connect/seller-public";
+import { sellerBeaconClient } from "@/lib/connect/seller-public";
 import { useRecordHistory } from "@/lib/hooks/useRecordHistory";
 
 export function ProductViewTracker({ productId }: { productId: string }) {
@@ -9,7 +9,7 @@ export function ProductViewTracker({ productId }: { productId: string }) {
 	const recordedFor = useRef<string | null>(null);
 
 	useEffect(() => {
-		sellerPublicClient()
+		sellerBeaconClient()
 			.recordProductView({ productId })
 			.catch(() => {});
 	}, [productId]);

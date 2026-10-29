@@ -15,5 +15,11 @@
 	"navigation": {},
 	"product": {},
 	"seller": {},
-	"order": {}
+	"order": {},
+	"home": {
+		"merchants": {
+			"localMerchants": "在地商家",
+			"weeklyPick": "本週推薦"
+		}
+	}
 }
