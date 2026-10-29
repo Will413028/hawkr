@@ -15,27 +15,27 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'identity.pb.dart' as $0;
+import 'identity.pb.dart' as $1;
 import 'identity.pbjson.dart';
 
 export 'identity.pb.dart';
 
 abstract class IdentityAppServiceBase extends $pb.GeneratedService {
-  $async.Future<$0.GetSessionResponse> getSession(
-      $pb.ServerContext ctx, $0.GetSessionRequest request);
-  $async.Future<$0.LinkAppleCredentialResponse> linkAppleCredential(
-      $pb.ServerContext ctx, $0.LinkAppleCredentialRequest request);
-  $async.Future<$0.DeleteAccountResponse> deleteAccount(
-      $pb.ServerContext ctx, $0.DeleteAccountRequest request);
+  $async.Future<$1.GetSessionResponse> getSession(
+      $pb.ServerContext ctx, $1.GetSessionRequest request);
+  $async.Future<$1.LinkAppleCredentialResponse> linkAppleCredential(
+      $pb.ServerContext ctx, $1.LinkAppleCredentialRequest request);
+  $async.Future<$1.DeleteAccountResponse> deleteAccount(
+      $pb.ServerContext ctx, $1.DeleteAccountRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
       case 'GetSession':
-        return $0.GetSessionRequest();
+        return $1.GetSessionRequest();
       case 'LinkAppleCredential':
-        return $0.LinkAppleCredentialRequest();
+        return $1.LinkAppleCredentialRequest();
       case 'DeleteAccount':
-        return $0.DeleteAccountRequest();
+        return $1.DeleteAccountRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -45,12 +45,12 @@ abstract class IdentityAppServiceBase extends $pb.GeneratedService {
       $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
       case 'GetSession':
-        return getSession(ctx, request as $0.GetSessionRequest);
+        return getSession(ctx, request as $1.GetSessionRequest);
       case 'LinkAppleCredential':
         return linkAppleCredential(
-            ctx, request as $0.LinkAppleCredentialRequest);
+            ctx, request as $1.LinkAppleCredentialRequest);
       case 'DeleteAccount':
-        return deleteAccount(ctx, request as $0.DeleteAccountRequest);
+        return deleteAccount(ctx, request as $1.DeleteAccountRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }

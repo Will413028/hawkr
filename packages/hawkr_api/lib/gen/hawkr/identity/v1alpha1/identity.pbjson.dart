@@ -15,6 +15,9 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
+import 'package:protobuf/well_known_types/google/protobuf/timestamp.pbjson.dart'
+    as $0;
+
 @$core.Deprecated('Use roleDescriptor instead')
 const Role$json = {
   '1': 'Role',
@@ -83,6 +86,15 @@ const GetSessionResponse$json = {
       '6': '.hawkr.identity.v1alpha1.Account',
       '10': 'account'
     },
+    {
+      '1': 'suspension',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.identity.v1alpha1.Suspension',
+      '8': {},
+      '10': 'suspension'
+    },
   ],
   '9': [
     {'1': 1, '2': 2},
@@ -92,7 +104,29 @@ const GetSessionResponse$json = {
 /// Descriptor for `GetSessionResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List getSessionResponseDescriptor = $convert.base64Decode(
     'ChJHZXRTZXNzaW9uUmVzcG9uc2USOgoHYWNjb3VudBgCIAEoCzIgLmhhd2tyLmlkZW50aXR5Ln'
-    'YxYWxwaGExLkFjY291bnRSB2FjY291bnRKBAgBEAI=');
+    'YxYWxwaGExLkFjY291bnRSB2FjY291bnQSSAoKc3VzcGVuc2lvbhgDIAEoCzIjLmhhd2tyLmlk'
+    'ZW50aXR5LnYxYWxwaGExLlN1c3BlbnNpb25CA+BBA1IKc3VzcGVuc2lvbkoECAEQAg==');
+
+@$core.Deprecated('Use suspensionDescriptor instead')
+const Suspension$json = {
+  '1': 'Suspension',
+  '2': [
+    {
+      '1': 'suspended_at',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '8': {},
+      '10': 'suspendedAt'
+    },
+  ],
+};
+
+/// Descriptor for `Suspension`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List suspensionDescriptor = $convert.base64Decode(
+    'CgpTdXNwZW5zaW9uEkIKDHN1c3BlbmRlZF9hdBgBIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW'
+    '1lc3RhbXBCA+BBA1ILc3VzcGVuZGVkQXQ=');
 
 @$core.Deprecated('Use linkAppleCredentialRequestDescriptor instead')
 const LinkAppleCredentialRequest$json = {
@@ -197,6 +231,8 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.identity.v1alpha1.GetSessionRequest': GetSessionRequest$json,
   '.hawkr.identity.v1alpha1.GetSessionResponse': GetSessionResponse$json,
   '.hawkr.identity.v1alpha1.Account': Account$json,
+  '.hawkr.identity.v1alpha1.Suspension': Suspension$json,
+  '.google.protobuf.Timestamp': $0.Timestamp$json,
   '.hawkr.identity.v1alpha1.LinkAppleCredentialRequest':
       LinkAppleCredentialRequest$json,
   '.hawkr.identity.v1alpha1.LinkAppleCredentialResponse':

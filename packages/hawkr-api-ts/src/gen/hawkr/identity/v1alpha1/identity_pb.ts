@@ -15,13 +15,15 @@
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_google_api_field_behavior } from "../../../google/api/field_behavior_pb";
+import type { Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file hawkr/identity/v1alpha1/identity.proto.
  */
 export const file_hawkr_identity_v1alpha1_identity: GenFile = /*@__PURE__*/
-  fileDesc("CiZoYXdrci9pZGVudGl0eS92MWFscGhhMS9pZGVudGl0eS5wcm90bxIXaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEieQoHQWNjb3VudBIPCgJpZBgBIAEoCUID4EEIEjEKBXJvbGVzGAIgAygOMh0uaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuUm9sZUID4EEDSgQIAxAESgQIBBAFSgQIBRAGUgthY3RpdmVfcm9sZVILcGVyc3BlY3RpdmUiEwoRR2V0U2Vzc2lvblJlcXVlc3QiTQoSR2V0U2Vzc2lvblJlc3BvbnNlEjEKB2FjY291bnQYAiABKAsyIC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5BY2NvdW50SgQIARACIlQKGkxpbmtBcHBsZUNyZWRlbnRpYWxSZXF1ZXN0EhUKCGlkX3Rva2VuGAEgASgJQgPgQQISHwoSYXV0aG9yaXphdGlvbl9jb2RlGAIgASgJQgPgQQIiHQobTGlua0FwcGxlQ3JlZGVudGlhbFJlc3BvbnNlIhYKFERlbGV0ZUFjY291bnRSZXF1ZXN0ItQBChVEZWxldGVBY2NvdW50UmVzcG9uc2USSwoFc3RhdGUYASABKA4yPC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5EZWxldGVBY2NvdW50UmVzcG9uc2UuRGVsZXRpb25TdGF0ZSJuCg1EZWxldGlvblN0YXRlEh4KGkRFTEVUSU9OX1NUQVRFX1VOU1BFQ0lGSUVEEAASGgoWREVMRVRJT05fU1RBVEVfREVMRVRFRBABEiEKHURFTEVUSU9OX1NUQVRFX1BFTkRJTkdfT1JERVJTEAIqPwoEUm9sZRIUChBST0xFX1VOU1BFQ0lGSUVEEAASDwoLUk9MRV9TRUxMRVIQAiIECAEQASoKUk9MRV9CVVlFUjL4AgoSSWRlbnRpdHlBcHBTZXJ2aWNlEmoKCkdldFNlc3Npb24SKi5oYXdrci5pZGVudGl0eS52MWFscGhhMS5HZXRTZXNzaW9uUmVxdWVzdBorLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkdldFNlc3Npb25SZXNwb25zZSIDkAIBEoUBChNMaW5rQXBwbGVDcmVkZW50aWFsEjMuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTGlua0FwcGxlQ3JlZGVudGlhbFJlcXVlc3QaNC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5MaW5rQXBwbGVDcmVkZW50aWFsUmVzcG9uc2UiA5ACAhJuCg1EZWxldGVBY2NvdW50Ei0uaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuRGVsZXRlQWNjb3VudFJlcXVlc3QaLi5oYXdrci5pZGVudGl0eS52MWFscGhhMS5EZWxldGVBY2NvdW50UmVzcG9uc2ViBnByb3RvMw", [file_google_api_field_behavior]);
+  fileDesc("CiZoYXdrci9pZGVudGl0eS92MWFscGhhMS9pZGVudGl0eS5wcm90bxIXaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEieQoHQWNjb3VudBIPCgJpZBgBIAEoCUID4EEIEjEKBXJvbGVzGAIgAygOMh0uaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuUm9sZUID4EEDSgQIAxAESgQIBBAFSgQIBRAGUgthY3RpdmVfcm9sZVILcGVyc3BlY3RpdmUiEwoRR2V0U2Vzc2lvblJlcXVlc3QiiwEKEkdldFNlc3Npb25SZXNwb25zZRIxCgdhY2NvdW50GAIgASgLMiAuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuQWNjb3VudBI8CgpzdXNwZW5zaW9uGAMgASgLMiMuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuU3VzcGVuc2lvbkID4EEDSgQIARACIkMKClN1c3BlbnNpb24SNQoMc3VzcGVuZGVkX2F0GAEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDIlQKGkxpbmtBcHBsZUNyZWRlbnRpYWxSZXF1ZXN0EhUKCGlkX3Rva2VuGAEgASgJQgPgQQISHwoSYXV0aG9yaXphdGlvbl9jb2RlGAIgASgJQgPgQQIiHQobTGlua0FwcGxlQ3JlZGVudGlhbFJlc3BvbnNlIhYKFERlbGV0ZUFjY291bnRSZXF1ZXN0ItQBChVEZWxldGVBY2NvdW50UmVzcG9uc2USSwoFc3RhdGUYASABKA4yPC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5EZWxldGVBY2NvdW50UmVzcG9uc2UuRGVsZXRpb25TdGF0ZSJuCg1EZWxldGlvblN0YXRlEh4KGkRFTEVUSU9OX1NUQVRFX1VOU1BFQ0lGSUVEEAASGgoWREVMRVRJT05fU1RBVEVfREVMRVRFRBABEiEKHURFTEVUSU9OX1NUQVRFX1BFTkRJTkdfT1JERVJTEAIqPwoEUm9sZRIUChBST0xFX1VOU1BFQ0lGSUVEEAASDwoLUk9MRV9TRUxMRVIQAiIECAEQASoKUk9MRV9CVVlFUjL4AgoSSWRlbnRpdHlBcHBTZXJ2aWNlEmoKCkdldFNlc3Npb24SKi5oYXdrci5pZGVudGl0eS52MWFscGhhMS5HZXRTZXNzaW9uUmVxdWVzdBorLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkdldFNlc3Npb25SZXNwb25zZSIDkAIBEoUBChNMaW5rQXBwbGVDcmVkZW50aWFsEjMuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTGlua0FwcGxlQ3JlZGVudGlhbFJlcXVlc3QaNC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5MaW5rQXBwbGVDcmVkZW50aWFsUmVzcG9uc2UiA5ACAhJuCg1EZWxldGVBY2NvdW50Ei0uaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuRGVsZXRlQWNjb3VudFJlcXVlc3QaLi5oYXdrci5pZGVudGl0eS52MWFscGhhMS5EZWxldGVBY2NvdW50UmVzcG9uc2ViBnByb3RvMw", [file_google_api_field_behavior, file_google_protobuf_timestamp]);
 
 /**
  * Account 是登入的帳號。
@@ -70,6 +72,14 @@ export type GetSessionResponse = Message<"hawkr.identity.v1alpha1.GetSessionResp
    * @generated from field: hawkr.identity.v1alpha1.Account account = 2;
    */
   account?: Account | undefined;
+
+  /**
+   * 帳號被停權時的狀態；沒有停權時不設。停權的帳號仍能登入、讀取與刪除帳號，寫入回 permission_denied 與
+   * hawkr.common.v1alpha1.ErrorReason.ACCOUNT_SUSPENDED。
+   *
+   * @generated from field: hawkr.identity.v1alpha1.Suspension suspension = 3;
+   */
+  suspension?: Suspension | undefined;
 };
 
 /**
@@ -78,6 +88,27 @@ export type GetSessionResponse = Message<"hawkr.identity.v1alpha1.GetSessionResp
  */
 export const GetSessionResponseSchema: GenMessage<GetSessionResponse> = /*@__PURE__*/
   messageDesc(file_hawkr_identity_v1alpha1_identity, 2);
+
+/**
+ * Suspension 是帳號的停權狀態。
+ *
+ * @generated from message hawkr.identity.v1alpha1.Suspension
+ */
+export type Suspension = Message<"hawkr.identity.v1alpha1.Suspension"> & {
+  /**
+   * 停權的時間。
+   *
+   * @generated from field: google.protobuf.Timestamp suspended_at = 1;
+   */
+  suspendedAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message hawkr.identity.v1alpha1.Suspension.
+ * Use `create(SuspensionSchema)` to create a new message.
+ */
+export const SuspensionSchema: GenMessage<Suspension> = /*@__PURE__*/
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 3);
 
 /**
  * @generated from message hawkr.identity.v1alpha1.LinkAppleCredentialRequest
@@ -103,7 +134,7 @@ export type LinkAppleCredentialRequest = Message<"hawkr.identity.v1alpha1.LinkAp
  * Use `create(LinkAppleCredentialRequestSchema)` to create a new message.
  */
 export const LinkAppleCredentialRequestSchema: GenMessage<LinkAppleCredentialRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_identity_v1alpha1_identity, 3);
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 4);
 
 /**
  * @generated from message hawkr.identity.v1alpha1.LinkAppleCredentialResponse
@@ -116,7 +147,7 @@ export type LinkAppleCredentialResponse = Message<"hawkr.identity.v1alpha1.LinkA
  * Use `create(LinkAppleCredentialResponseSchema)` to create a new message.
  */
 export const LinkAppleCredentialResponseSchema: GenMessage<LinkAppleCredentialResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_identity_v1alpha1_identity, 4);
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 5);
 
 /**
  * @generated from message hawkr.identity.v1alpha1.DeleteAccountRequest
@@ -129,7 +160,7 @@ export type DeleteAccountRequest = Message<"hawkr.identity.v1alpha1.DeleteAccoun
  * Use `create(DeleteAccountRequestSchema)` to create a new message.
  */
 export const DeleteAccountRequestSchema: GenMessage<DeleteAccountRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_identity_v1alpha1_identity, 5);
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 6);
 
 /**
  * @generated from message hawkr.identity.v1alpha1.DeleteAccountResponse
@@ -146,7 +177,7 @@ export type DeleteAccountResponse = Message<"hawkr.identity.v1alpha1.DeleteAccou
  * Use `create(DeleteAccountResponseSchema)` to create a new message.
  */
 export const DeleteAccountResponseSchema: GenMessage<DeleteAccountResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_identity_v1alpha1_identity, 6);
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 7);
 
 /**
  * DeletionState 是申請之後帳號的狀態。
@@ -178,7 +209,7 @@ export enum DeleteAccountResponse_DeletionState {
  * Describes the enum hawkr.identity.v1alpha1.DeleteAccountResponse.DeletionState.
  */
 export const DeleteAccountResponse_DeletionStateSchema: GenEnum<DeleteAccountResponse_DeletionState> = /*@__PURE__*/
-  enumDesc(file_hawkr_identity_v1alpha1_identity, 6, 0);
+  enumDesc(file_hawkr_identity_v1alpha1_identity, 7, 0);
 
 /**
  * Role 是帳號另外申請的角色。買家不是角色：每個帳號都是買家。

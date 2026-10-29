@@ -77,6 +77,12 @@ class ErrorReason extends $pb.ProtobufEnum {
   static const ErrorReason ACCOUNT_HAS_STORE =
       ErrorReason._(11, _omitEnumNames ? '' : 'ACCOUNT_HAS_STORE');
 
+  /// 帳號停權中，這個操作是寫入，不在停權時仍可做的範圍（搭配 permission_denied）。停權的帳號仍能登入、讀取與刪除帳號：
+  /// client 轉成帳號的受限狀態，顯示停權通知，並以 identity.v1alpha1.IdentityAppService.GetSession 的 suspension 讀停權的狀態。
+  /// 舊 gateway 的 REST 路徑（/api/v1）沒有 ErrorInfo，停權的非 GET／HEAD 請求只回 403。
+  static const ErrorReason ACCOUNT_SUSPENDED =
+      ErrorReason._(12, _omitEnumNames ? '' : 'ACCOUNT_SUSPENDED');
+
   static const $core.List<ErrorReason> values = <ErrorReason>[
     ERROR_REASON_UNSPECIFIED,
     VERSION_CONFLICT,
@@ -88,10 +94,11 @@ class ErrorReason extends $pb.ProtobufEnum {
     STORE_OPENING_SUSPENDED,
     STORE_OPENING_TERMINATED,
     ACCOUNT_HAS_STORE,
+    ACCOUNT_SUSPENDED,
   ];
 
   static final $core.List<ErrorReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 11);
+      $pb.ProtobufEnum.$_initByValueList(values, 12);
   static ErrorReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

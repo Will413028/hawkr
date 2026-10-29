@@ -14,6 +14,8 @@ import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
+import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart'
+    as $0;
 
 import 'identity.pbenum.dart';
 
@@ -133,9 +135,11 @@ class GetSessionRequest extends $pb.GeneratedMessage {
 class GetSessionResponse extends $pb.GeneratedMessage {
   factory GetSessionResponse({
     Account? account,
+    Suspension? suspension,
   }) {
     final result = GetSessionResponse._();
     if (account != null) result.account = account;
+    if (suspension != null) result.suspension = suspension;
     return result;
   }
 
@@ -155,6 +159,8 @@ class GetSessionResponse extends $pb.GeneratedMessage {
       createEmptyInstance: GetSessionResponse.$_createMessage)
     ..aOM<Account>(2, _omitFieldNames ? '' : 'account',
         subBuilder: Account.$_createMessage)
+    ..aOM<Suspension>(3, _omitFieldNames ? '' : 'suspension',
+        subBuilder: Suspension.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -189,6 +195,80 @@ class GetSessionResponse extends $pb.GeneratedMessage {
   void clearAccount() => $_clearField(2);
   @$pb.TagNumber(2)
   Account ensureAccount() => $_ensure(0);
+
+  /// 帳號被停權時的狀態；沒有停權時不設。停權的帳號仍能登入、讀取與刪除帳號，寫入回 permission_denied 與
+  /// hawkr.common.v1alpha1.ErrorReason.ACCOUNT_SUSPENDED。
+  @$pb.TagNumber(3)
+  Suspension get suspension => $_getN(1);
+  @$pb.TagNumber(3)
+  set suspension(Suspension value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSuspension() => $_has(1);
+  @$pb.TagNumber(3)
+  void clearSuspension() => $_clearField(3);
+  @$pb.TagNumber(3)
+  Suspension ensureSuspension() => $_ensure(1);
+}
+
+/// Suspension 是帳號的停權狀態。
+class Suspension extends $pb.GeneratedMessage {
+  factory Suspension({
+    $0.Timestamp? suspendedAt,
+  }) {
+    final result = Suspension._();
+    if (suspendedAt != null) result.suspendedAt = suspendedAt;
+    return result;
+  }
+
+  Suspension._();
+
+  factory Suspension.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Suspension()..mergeFromBuffer(data, registry);
+  factory Suspension.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Suspension()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Suspension',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.identity.v1alpha1'),
+      createEmptyInstance: Suspension.$_createMessage)
+    ..aOM<$0.Timestamp>(1, _omitFieldNames ? '' : 'suspendedAt',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Suspension clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Suspension copyWith(void Function(Suspension) updates) =>
+      super.copyWith((message) => updates(message as Suspension)) as Suspension;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use Suspension() / Suspension.new instead')
+  static Suspension create() => Suspension._();
+  static $pb.GeneratedMessage $_createMessage() => Suspension._();
+  @$core.override
+  Suspension createEmptyInstance() => Suspension._();
+  @$core.pragma('dart2js:noInline')
+  static Suspension getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<Suspension>(Suspension.$_createMessage);
+  static Suspension? _defaultInstance;
+
+  /// 停權的時間。
+  @$pb.TagNumber(1)
+  $0.Timestamp get suspendedAt => $_getN(0);
+  @$pb.TagNumber(1)
+  set suspendedAt($0.Timestamp value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSuspendedAt() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSuspendedAt() => $_clearField(1);
+  @$pb.TagNumber(1)
+  $0.Timestamp ensureSuspendedAt() => $_ensure(0);
 }
 
 class LinkAppleCredentialRequest extends $pb.GeneratedMessage {
