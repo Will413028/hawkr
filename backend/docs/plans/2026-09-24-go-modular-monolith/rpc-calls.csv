@@ -582,7 +582,6 @@ gateway,seller-service,SellerService,ListSellerMembershipPlans,1,gateway/interna
 gateway,seller-service,SellerService,ListSellerSuspensionsForAdmin,1,gateway/internal/grpc/governance_client.go:155
 gateway,seller-service,SellerService,ListSellersForAdmin,1,gateway/internal/grpc/seller_client.go:404
 gateway,seller-service,SellerService,LookupBusinessRegistration,1,gateway/internal/grpc/seller_client.go:580
-gateway,seller-service,SellerService,RecordProductView,1,gateway/internal/grpc/seller_client.go:370
 gateway,seller-service,SellerService,RecordStoreVisit,1,gateway/internal/grpc/seller_client.go:344
 gateway,seller-service,SellerService,RejectCertification,1,gateway/internal/grpc/seller_client.go:322
 gateway,seller-service,SellerService,ResolveSellerAccountID,1,gateway/internal/grpc/seller_client.go:61

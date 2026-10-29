@@ -104,18 +104,6 @@ func (c *SellerClient) RecordStoreVisit(ctx context.Context, storeID, visitorBuy
 	return err
 }
 
-// ==================== Product View Stats ====================
-
-// RecordProductView records a web-anonymous product view event.
-func (c *SellerClient) RecordProductView(ctx context.Context, productID string) (*pb.RecordProductViewResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
-	return c.client.RecordProductView(ctx, &pb.RecordProductViewRequest{
-		ProductId: productID,
-	})
-}
-
 // ==================== Recommended Sellers ====================
 
 // GetRecommendedSellers gets recommended sellers from seller service

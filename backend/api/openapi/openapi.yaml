@@ -27202,36 +27202,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/public/products/{id}/view:
-    post:
-      operationId: recordProductView
-      summary: 記錄商品瀏覽（匿名）
-      description: 網頁端在商品詳情頁 mount 時呼叫，記錄一次匿名瀏覽事件；失敗時靜默忽略
-      tags:
-      - Product
-      parameters:
-      - name: id
-        in: path
-        description: 商品 ID
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  message:
-                    type: string
   /api/v1/public/recommendations:
     get:
       operationId: getRecommendations
@@ -27464,82 +27434,6 @@ paths:
                     type: string
         '400':
           description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '503':
-          description: Service Unavailable
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/public/sellers/recommended:
-    get:
-      operationId: getRecommendedSellers
-      summary: 取得推薦商家列表
-      description: 依近 30 天營收排名回傳推薦商家，不暴露營收金額，僅回傳排序後的商家資訊
-      tags:
-      - Seller
-      parameters:
-      - name: limit
-        in: query
-        description: 回傳筆數（預設 10，上限 50）
-        schema:
-          type: integer
-          default: 10
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    type: object
-                    properties:
-                      records:
-                        type: array
-                        items:
-                          type: object
-                          properties:
-                            certified:
-                              type: boolean
-                            city:
-                              type: string
-                            coverKey:
-                              type: string
-                            coverUrl:
-                              type: string
-                            description:
-                              type: string
-                            district:
-                              type: string
-                            followers:
-                              type: integer
-                            logoKey:
-                              type: string
-                            logoUrl:
-                              type: string
-                            rating:
-                              type: number
-                            storeCode:
-                              type: string
-                            storeId:
-                              type: string
-                            storeName:
-                              type: string
-                  message:
-                    type: string
-        '500':
-          description: Internal Server Error
           content:
             application/json:
               schema:

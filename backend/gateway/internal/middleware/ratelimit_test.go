@@ -28,7 +28,6 @@ func rlEngine(limiter *ratelimit.Limiter, policy middleware.RateLimitPolicy) *gi
 	r.GET("/api/v1/app/chat/ws", ok)
 	r.GET("/api/v1/app/notifications/stream", ok)
 	r.GET("/api/v1/public/posts/:id/comments/stream", ok)
-	r.POST("/api/v1/public/products/:id/view", ok)
 	r.POST("/webhook/payuni/notify", ok)
 	r.GET("/payment/return", ok)
 	r.POST("/store_map/return", ok)
@@ -76,7 +75,6 @@ func TestRateLimiter_ExemptPathsNeverLimited(t *testing.T) {
 		{"GET", "/api/v1/app/chat/ws"},
 		{"GET", "/api/v1/app/notifications/stream"},
 		{"GET", "/api/v1/public/posts/42/comments/stream"},
-		{"POST", "/api/v1/public/products/42/view"},
 		{"POST", "/webhook/payuni/notify"},
 		{"GET", "/payment/return"},
 		{"POST", "/store_map/return"},

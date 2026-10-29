@@ -24,7 +24,6 @@ func registerProductRoutes(public *gin.RouterGroup, app *gin.RouterGroup, admin 
 		pubProducts.GET(ProductSkus, h.ListSellerSkus)         // 列出商品的規格
 		pubProducts.GET(ProductsRating, h.GetProductRating)    // 取得商品評分
 		pubProducts.GET(ProductsRelated, h.GetRelatedProducts) // 取得相關商品
-		pubProducts.POST(ProductsView, h.RecordProductView)    // 記錄商品瀏覽（匿名）
 	}
 
 	// 公開 hashtag auto-complete /api/v1/public/hashtags（02 §5.12）

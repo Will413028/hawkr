@@ -14,8 +14,6 @@ func registerSellerRoutes(public, app *gin.RouterGroup, h *handler.Holder) {
 	// ------------------------------------------
 	// 公開商家資訊
 	// ------------------------------------------
-	// 推薦商家（必須在 /:id 之前，避免被 /:id 攔截）
-	public.GET(SellersRecommended, h.GetRecommendedSellers)
 
 	pubSellers := public.Group(SellersPath)
 	pubSellers.Use(middleware.OptionalJWTAuth())

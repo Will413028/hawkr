@@ -103,7 +103,6 @@ var exemptExact = map[string]struct{}{
 	"/api/v1/app/chat/ws":                      {}, // IM WebSocket upgrade
 	"/api/v1/app/notifications/stream":         {}, // notification SSE
 	"/api/v1/public/posts/:id/comments/stream": {}, // post comments SSE
-	"/api/v1/public/products/:id/view":         {}, // fire-and-forget view beacon
 	"/webhook/payuni/notify":                   {}, // PayUni server-to-server callback
 	"/payment/return":                          {}, // PayUni return (GET + POST)
 	"/payment/redirect":                        {}, // WebView payment-page opener

@@ -69,7 +69,6 @@ const (
 	ProductsReviews = "/:id/reviews"
 	ProductsRating  = "/:id/rating"
 	ProductsRelated = "/:id/related"
-	ProductsView    = "/:id/view"
 
 	// 賣家商品狀態
 	ProductStatus = "/:id/status"
@@ -293,18 +292,17 @@ const (
 
 // 商家相關
 const (
-	SellersPath        = "/sellers"
-	SellersIDPath      = "/sellers/:id"
-	SellersStats       = "/sellers/:id/stats"
-	SellersRating      = "/sellers/:id/rating"
-	SellersProducts    = "/sellers/:id/products"
-	SellersPosts       = "/sellers/:id/posts"
-	SellersRecommended = "/sellers/recommended"
-	SellersForum       = "/sellers/:id/forum"
-	ForumPath          = "/sellers/forum"
-	ForumIDReplies     = "/:id/replies"
-	ForumIDReply       = "/:id/reply"
-	ForumID            = "/:id"
+	SellersPath     = "/sellers"
+	SellersIDPath   = "/sellers/:id"
+	SellersStats    = "/sellers/:id/stats"
+	SellersRating   = "/sellers/:id/rating"
+	SellersProducts = "/sellers/:id/products"
+	SellersPosts    = "/sellers/:id/posts"
+	SellersForum    = "/sellers/:id/forum"
+	ForumPath       = "/sellers/forum"
+	ForumIDReplies  = "/:id/replies"
+	ForumIDReply    = "/:id/reply"
+	ForumID         = "/:id"
 )
 
 const (
