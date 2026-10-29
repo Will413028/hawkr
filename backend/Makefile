@@ -48,9 +48,12 @@ lint-all:
 	done
 	@echo "=== All services linted ==="
 
+GOLANGCI_LINT_VERSION := $(shell cat .golangci-version)
+GOLANGCI_LINT_MONOLITH := GOWORK=off go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+
 lint-monolith:
-	GOWORK=off golangci-lint run -c .golangci.monolith.yml ./cmd/... ./internal/...
-	GOWORK=off golangci-lint run -c .golangci.monolith.yml --build-tags=integration ./cmd/... ./internal/...
+	$(GOLANGCI_LINT_MONOLITH) run -c .golangci.monolith.yml ./cmd/... ./internal/...
+	$(GOLANGCI_LINT_MONOLITH) run -c .golangci.monolith.yml --build-tags=integration ./cmd/... ./internal/...
 
 # Lint only Go service modules that contain staged .go files (fast pre-commit check)
 #
