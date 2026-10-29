@@ -276,7 +276,7 @@ func TestGovernanceEnumsMatchTheModule(t *testing.T) {
 func TestGovernanceResponsesCarryEvidenceOnlyAsViewURIs(t *testing.T) {
 	report, measure := anonymousFoodSafetyReport(), riskMeasureFixture()
 	m := &governanceModule{report: report, measure: measure}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	got, err := h.GetReport(adminCtx(1), connect.NewRequest(&adminpb.GetReportRequest{Id: report.ID.String()}))
 	if err != nil {
 		t.Fatal(err)
@@ -442,7 +442,7 @@ func TestAdminMeasureCarriesTheRemediationRequests(t *testing.T) {
 func TestGovernanceCommandsUseTheCallingAdmin(t *testing.T) {
 	report, measure := anonymousFoodSafetyReport(), riskMeasureFixture()
 	m := &governanceModule{report: report, measure: measure, cases: caseFixture(model.CaseFacts{})}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	ctx := adminCtx(42)
 	id := report.ID.String()
 	second := uuid.NewV7()
@@ -543,7 +543,7 @@ func TestGovernanceCommandsUseTheCallingAdmin(t *testing.T) {
 // 建立措施的 request_id 必須是 UUIDv4；依據一定要指定；不合格的請求不呼叫模組。
 func TestCreateMeasureRejectsBadRequestsBeforeTheModule(t *testing.T) {
 	m := &governanceModule{measure: riskMeasureFixture()}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	risk := &adminpb.CreateMeasureRequest_Suspension{Suspension: &adminpb.SuspensionInput{Basis: &adminpb.SuspensionInput_Risk{Risk: &adminpb.RiskBasis{Ground: pb.RiskGround_RISK_GROUND_FRAUD}}}}
 	for name, req := range map[string]*adminpb.CreateMeasureRequest{
 		"request_id 不是 UUID": {RequestId: "x", StoreId: "12", Measure: risk},
@@ -574,7 +574,7 @@ func TestCreateMeasureRejectsBadRequestsBeforeTheModule(t *testing.T) {
 func TestMeasureCommandsRequireAnEtag(t *testing.T) {
 	measure := riskMeasureFixture()
 	m := &governanceModule{measure: measure}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	ctx := adminCtx(42)
 	id := measure.ID.String()
 	_, err := h.RevokeMeasure(ctx, connect.NewRequest(&adminpb.RevokeMeasureRequest{Id: id, Reason: adminpb.AdminRevokeReason_ADMIN_REVOKE_REASON_OTHER}))
@@ -602,7 +602,7 @@ func TestMeasureCommandsRequireAnEtag(t *testing.T) {
 func TestUpdateMeasureAppliesTheMaskAndSendsOnlyAChangedEndTime(t *testing.T) {
 	measure := riskMeasureFixture()
 	m := &governanceModule{measure: measure}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	update := func(v *adminpb.Measure, paths ...string) error {
 		_, err := h.UpdateMeasure(adminCtx(9), connect.NewRequest(&adminpb.UpdateMeasureRequest{Measure: v, UpdateMask: &fieldmaskpb.FieldMask{Paths: paths}}))
 		return err
@@ -640,7 +640,7 @@ func TestUpdateMeasureAppliesTheMaskAndSendsOnlyAChangedEndTime(t *testing.T) {
 func TestCreateMeasureNoteUsesTheCallingAdmin(t *testing.T) {
 	measure := riskMeasureFixture()
 	m := &governanceModule{measure: measure}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	got, err := h.CreateMeasureNote(adminCtx(42), connect.NewRequest(&adminpb.CreateMeasureNoteRequest{
 		MeasureId: measure.ID.String(), Note: &adminpb.GovernanceNote{Body: "補充", CreatedByAdminId: "1"},
 	}))
@@ -659,7 +659,7 @@ func TestListMeasureNotesPagesTheSubCollectionPerMeasure(t *testing.T) {
 	m := &governanceModule{measure: measure, notePage: model.NotePage{
 		Items: []model.GovernanceNote{{ID: uuid.NewV7(), AdminID: 7, Body: "內部", CreatedAt: governanceNow}}, Next: cursor,
 	}}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	req := &adminpb.ListMeasureNotesRequest{MeasureId: measure.ID.String(), PageSize: 1}
 	got, err := h.ListMeasureNotes(adminCtx(1), connect.NewRequest(req))
 	if err != nil {
@@ -680,7 +680,7 @@ func TestListMeasureNotesPagesTheSubCollectionPerMeasure(t *testing.T) {
 // 措施清單的篩選照轉給模組，page token 綁在篩選上。
 func TestListMeasuresMapsFiltersAndBindsThePageToken(t *testing.T) {
 	m := &governanceModule{}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	if _, err := h.ListMeasures(adminCtx(1), connect.NewRequest(&adminpb.ListMeasuresRequest{})); err != nil {
 		t.Fatal(err)
 	}
@@ -718,7 +718,7 @@ func TestListMeasuresMapsFiltersAndBindsThePageToken(t *testing.T) {
 func TestListReportsBindsThePageTokenToTheFilters(t *testing.T) {
 	cursor := &model.ReportCursor{CreatedAt: governanceNow, ID: uuid.NewV7()}
 	m := &governanceModule{reportPage: model.AdminReportPage{Items: []model.AdminReport{anonymousFoodSafetyReport()}, Next: cursor}}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	caseID := uuid.NewV7()
 	req := &adminpb.ListReportsRequest{
 		State: adminpb.ReportState_REPORT_STATE_IN_CASE, Category: commonpb.PolicyCategory_POLICY_CATEGORY_OTHER, StoreId: "12", CaseId: caseID.String(), CitableAsSource: true, PageSize: 1,
@@ -890,7 +890,7 @@ func terminationFixture(ground model.TerminationGround, basis model.MeasureBasis
 // 終止合作建立請求的對應：事由、依據的認定與來源措施都交給模組，依據由事由推導（不在傳輸層決定）；種類就是設定的是哪一支輸入。
 func TestCreateMeasureMapsTheTerminationInput(t *testing.T) {
 	m := &governanceModule{measure: terminationFixture(model.GroundNotice, model.BasisContract)}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	source := uuid.NewV7()
 	cited := uuid.NewV7()
 	_, err := h.CreateMeasure(adminCtx(42), connect.NewRequest(&adminpb.CreateMeasureRequest{
@@ -991,7 +991,7 @@ func TestCreateMeasureKindIsTheInputThatIsSet(t *testing.T) {
 			Ground: pb.TerminationGround_TERMINATION_GROUND_NOTICE}}}, model.MeasureTermination, false, false, true, false},
 	} {
 		m := &governanceModule{measure: riskMeasureFixture()}
-		h := NewGovernance(m, nil, rpc.Images{})
+		h := NewGovernance(m, rpc.Images{})
 		tc.input.StoreId, tc.input.Statement, tc.input.Note = "12", "s", "n"
 		if _, err := h.CreateMeasure(adminCtx(42), connect.NewRequest(tc.input)); err != nil {
 			t.Fatalf("%s：%v", name, err)
@@ -1006,7 +1006,7 @@ func TestCreateMeasureKindIsTheInputThatIsSet(t *testing.T) {
 	call := func(t *testing.T, req *adminpb.CreateMeasureRequest, moduleErr error) []string {
 		t.Helper()
 		m := &governanceModule{measure: riskMeasureFixture(), createErr: moduleErr}
-		h := NewGovernance(m, nil, rpc.Images{})
+		h := NewGovernance(m, rpc.Images{})
 		wrapped := rpc.NewInterceptor(slog.New(slog.DiscardHandler)).WrapUnary(func(ctx context.Context, _ connect.AnyRequest) (connect.AnyResponse, error) {
 			return h.CreateMeasure(ctx, connect.NewRequest(req))
 		})
@@ -1049,7 +1049,7 @@ func TestCreateMeasureKindIsTheInputThatIsSet(t *testing.T) {
 func TestMarkReportSupplementsSeenForwardsTheEtag(t *testing.T) {
 	report := anonymousFoodSafetyReport()
 	m := &governanceModule{report: report}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	got, err := h.MarkReportSupplementsSeen(adminCtx(42), connect.NewRequest(&adminpb.MarkReportSupplementsSeenRequest{Id: report.ID.String(), Etag: "9"}))
 	if err != nil || m.markSeen.ReportID != report.ID || m.markSeen.ExpectedVersion != 9 || got.Msg.GetReport().GetId() != report.ID.String() {
 		t.Fatalf("in=%+v err=%v", m.markSeen, err)
@@ -1060,14 +1060,6 @@ func TestMarkReportSupplementsSeenForwardsTheEtag(t *testing.T) {
 	}
 }
 
-// contentStores 是 social.ContentOwner 的替身：內容 ID 屬於哪家店；沒有的 ID 是不存在（零值歸屬）。
-type contentStores map[uuid.UUID]int64
-
-func (c contentStores) ContentOwner(_ context.Context, t social.Target) (social.ContentOwner, error) {
-	store, ok := c[t.ID]
-	return social.ContentOwner{Exists: ok, StoreID: store}, nil
-}
-
 // 內容下架的分支：種類與對象交給模組，依據一定是認定；模組的欄位錯誤對應到 content_takedown 的路徑；回應帶對象。
 func TestCreateContentTakedownMapsTheBranchAndTheTargets(t *testing.T) {
 	measure := riskMeasureFixture()
@@ -1076,7 +1068,7 @@ func TestCreateContentTakedownMapsTheBranchAndTheTargets(t *testing.T) {
 	measure.Contents = []model.ContentRef{{Kind: model.ContentPost, ID: uuid.NewV7()}, {Kind: model.ContentForumEntry, ID: uuid.NewV7()}}
 	m := &governanceModule{measure: measure}
 	post, forum := uuid.NewV7(), uuid.NewV7()
-	h := NewGovernance(m, contentStores{post: 12, forum: 12}, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	got, err := h.CreateMeasure(adminCtx(42), connect.NewRequest(&adminpb.CreateMeasureRequest{
 		StoreId: "12", Statement: "s", Note: "d",
 		Measure: &adminpb.CreateMeasureRequest_ContentTakedown{ContentTakedown: &adminpb.ContentTakedownInput{
@@ -1113,45 +1105,27 @@ func TestCreateContentTakedownMapsTheBranchAndTheTargets(t *testing.T) {
 	}
 }
 
-// 內容下架：內容不屬於目標店家、不存在，或沒有 social 可核對時，模組一次都不呼叫。
-func TestCreateContentTakedownChecksOwnershipBeforeCallingTheModule(t *testing.T) {
-	own, foreign, missing := uuid.NewV7(), uuid.NewV7(), uuid.NewV7()
-	req := func(ids ...uuid.UUID) *connect.Request[adminpb.CreateMeasureRequest] {
-		var refs []*pb.ContentRef
-		for _, id := range ids {
-			refs = append(refs, &pb.ContentRef{Kind: pb.ContentKind_CONTENT_KIND_POST, Id: id.String()})
-		}
-		return connect.NewRequest(&adminpb.CreateMeasureRequest{
-			StoreId: "12", Statement: "s", Note: "d",
-			Measure: &adminpb.CreateMeasureRequest_ContentTakedown{ContentTakedown: &adminpb.ContentTakedownInput{
-				Contents: refs,
-				Violation: &adminpb.ViolationBasis{Finding: &adminpb.NewFinding{
-					Category: commonpb.PolicyCategory_POLICY_CATEGORY_SPAM, Severity: pb.ViolationSeverity_VIOLATION_SEVERITY_LOW}},
-			}},
-		})
+// 內容下架：social 的訂閱者回歸屬錯誤時，欄位路徑指到請求裡那一則（不依賴排序後的順序）；其他錯誤不被改寫。
+func TestCreateContentTakedownMapsTheOwnershipErrorToTheOffendingItem(t *testing.T) {
+	own, bad := uuid.NewV7(), uuid.NewV7()
+	req := &adminpb.CreateMeasureRequest{
+		StoreId: "12", Statement: "s", Note: "d",
+		Measure: &adminpb.CreateMeasureRequest_ContentTakedown{ContentTakedown: &adminpb.ContentTakedownInput{
+			Contents: []*pb.ContentRef{
+				{Kind: pb.ContentKind_CONTENT_KIND_POST, Id: own.String()},
+				{Kind: pb.ContentKind_CONTENT_KIND_COMMENT, Id: bad.String()},
+			},
+			Violation: &adminpb.ViolationBasis{Finding: &adminpb.NewFinding{
+				Category: commonpb.PolicyCategory_POLICY_CATEGORY_SPAM, Severity: pb.ViolationSeverity_VIOLATION_SEVERITY_LOW}},
+		}},
 	}
-	owners := contentStores{own: 12, foreign: 99}
-	for name, tc := range map[string]struct {
-		content ContentOwners
-		ids     []uuid.UUID
-		field   string
-	}{
-		"別家店": {owners, []uuid.UUID{own, foreign}, "content_takedown.contents[1]"},
-		"不存在": {owners, []uuid.UUID{missing}, "content_takedown.contents[0]"},
-	} {
-		m := &governanceModule{}
-		h := NewGovernance(m, tc.content, rpc.Images{})
-		wrapped := rpc.NewInterceptor(slog.New(slog.DiscardHandler)).WrapUnary(func(ctx context.Context, _ connect.AnyRequest) (connect.AnyResponse, error) {
-			return h.CreateMeasure(ctx, req(tc.ids...))
-		})
-		_, err := wrapped(adminCtx(42), fakeRequest{procedure: sellerv1alpha1connect.SellerGovernanceAdminServiceCreateMeasureProcedure})
-		got := reportErrFields(t, err)
-		if connect.CodeOf(err) != connect.CodeInvalidArgument || !slices.Equal(got, []string{tc.field}) || m.calls != 0 {
-			t.Fatalf("%s：err=%v fields=%v calls=%d", name, err, got, m.calls)
-		}
-	}
-	m := &governanceModule{}
-	if _, err := NewGovernance(m, nil, rpc.Images{}).CreateMeasure(adminCtx(42), req(own)); err == nil || m.calls != 0 {
-		t.Fatalf("沒有 social 要關閉：err=%v calls=%d", err, m.calls)
+	m := &governanceModule{createErr: fmt.Errorf("events：處理 MeasureCreated：%w", &social.TakedownContentError{Kind: model.ContentComment, ID: bad})}
+	h := NewGovernance(m, rpc.Images{})
+	wrapped := rpc.NewInterceptor(slog.New(slog.DiscardHandler)).WrapUnary(func(ctx context.Context, _ connect.AnyRequest) (connect.AnyResponse, error) {
+		return h.CreateMeasure(ctx, connect.NewRequest(req))
+	})
+	_, err := wrapped(adminCtx(42), fakeRequest{procedure: sellerv1alpha1connect.SellerGovernanceAdminServiceCreateMeasureProcedure})
+	if got := reportErrFields(t, err); connect.CodeOf(err) != connect.CodeInvalidArgument || !slices.Equal(got, []string{"content_takedown.contents[1]"}) {
+		t.Fatalf("err=%v fields=%v", err, got)
 	}
 }

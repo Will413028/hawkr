@@ -17,14 +17,8 @@ import (
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
-	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
-
-// ContentOwners 是內容下架向 social 核對內容歸屬的公開 API（social.Module）。
-type ContentOwners interface {
-	ContentOwner(ctx context.Context, t social.Target) (social.ContentOwner, error)
-}
 
 // GovernanceModule 是後台治理 handler 使用的模組方法（ADR 2026-10-18-seller-governance-consolidated）。
 type GovernanceModule interface {
@@ -69,17 +63,15 @@ type GovernanceModule interface {
 
 // Governance 是 SellerGovernanceAdminService 的 handler。授權（管理員、每支方法的權限）由 adminauth 的 interceptor 檢查。
 type Governance struct {
-	m       GovernanceModule
-	content ContentOwners
-	images  rpc.Images
+	m      GovernanceModule
+	images rpc.Images
 }
 
 var _ sellerv1alpha1connect.SellerGovernanceAdminServiceHandler = (*Governance)(nil)
 
-// NewGovernance 建立後台治理的 handler；content 在建立內容下架措施前核對每則內容屬於目標店家（seller 不讀 social，A7-D7 第 10 項：核對經 social 的公開 API，
-// httpapi 是組裝層）；images 給轉報資料裡店家的 logo 與封面。
-func NewGovernance(m GovernanceModule, content ContentOwners, images rpc.Images) *Governance {
-	return &Governance{m: m, content: content, images: images}
+// NewGovernance 建立後台治理的 handler；images 給轉報資料裡店家的 logo 與封面。內容下架的歸屬核對在 social 的同 transaction 訂閱者，這裡不重複。
+func NewGovernance(m GovernanceModule, images rpc.Images) *Governance {
+	return &Governance{m: m, images: images}
 }
 
 // 模組輸入的欄位對應到請求的路徑。

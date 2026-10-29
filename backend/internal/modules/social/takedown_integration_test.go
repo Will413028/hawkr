@@ -4,6 +4,7 @@ package social_test
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"testing"
 	"uuid"
@@ -78,12 +79,11 @@ func (f *fixture) takedownWorld(t *testing.T) takedownWorld {
 	t.Helper()
 	ctx := context.Background()
 	storeID, _ := f.exposableStore(t)
-	b := f.newBuyer(t)
 	w := takedownWorld{storeID: storeID}
 	w.post = f.publishedPost(t, storeID, "會被下架的貼文", "organic")
 	w.other = f.publishedPost(t, storeID, "另一篇貼文", "organic")
-	w.comment = mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(b), social.CommentInput{PostID: w.other.ID, Body: "會被下架的留言"}))
-	w.entry = mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(b), social.ForumInput{StoreID: storeID, Body: "會被下架的討論"}))
+	w.comment = mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asStore(t, storeID), social.CommentInput{PostID: w.other.ID, Body: "會被下架的留言"}))
+	w.entry = mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asStore(t, storeID), social.ForumInput{StoreID: storeID, Body: "會被下架的討論"}))
 	return w
 }
 
@@ -349,5 +349,48 @@ func TestTakedownOfUnknownContentKindFailsTheCallersTransaction(t *testing.T) {
 	}
 	if n := f.scalar(t, "SELECT count(*) FROM social.content_takedowns"); n != 0 {
 		t.Fatalf("回滾後複本還在：%d", n)
+	}
+}
+
+// 歸屬核對在訂閱者：買家寫的留言與討論區留言、別家店的內容、已刪除與不存在的內容都讓建立失敗，回 *TakedownContentError 指出是哪一則，措施回滾、旗標不動。
+func TestTakedownRejectsContentThatIsNotTheMeasureStoresOwn(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	f.takedowns(t)
+	w := f.takedownWorld(t)
+	otherStore, _ := f.exposableStore(t)
+	foreign := f.publishedPost(t, otherStore, "別家店的貼文", "organic")
+	buyer := f.asBuyer(f.newBuyer(t))
+	buyerComment := mustV[social.Comment](t)(f.module.CreateComment(ctx, buyer, social.CommentInput{PostID: w.post.ID, Body: "買家在店家貼文下的留言"}))
+	buyerEntry := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, buyer, social.ForumInput{StoreID: w.storeID, Body: "買家的討論"}))
+	deletedPost := f.publishedPost(t, w.storeID, "已刪除的貼文", "organic")
+	must(t, f.module.DeletePost(ctx, f.store(t, w.storeID), deletedPost.ID, deletedPost.Version))
+	deletedComment := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asStore(t, w.storeID), social.CommentInput{PostID: w.post.ID, Body: "待刪的留言"}))
+	must(t, f.module.DeleteComment(ctx, f.asStore(t, w.storeID), deletedComment.ID))
+	for name, tc := range map[string]seller.ContentRef{
+		"別家店的貼文":    ref(seller.ContentPost, foreign.ID),
+		"買家的留言":     ref(seller.ContentComment, buyerComment.ID),
+		"買家的討論區留言":  ref(seller.ContentForumEntry, buyerEntry.ID),
+		"已刪除的貼文":    ref(seller.ContentPost, deletedPost.ID),
+		"已刪除的留言":    ref(seller.ContentComment, deletedComment.ID),
+		"不存在的討論區留言": ref(seller.ContentForumEntry, uuid.NewV7()),
+	} {
+		err := f.db.InTx(ctx, func(ctx context.Context) error {
+			return events.Publish(ctx, f.bus, seller.MeasureCreated{
+				MeasureID: uuid.NewV7(), StoreID: w.storeID, OccurredAt: f.clock(),
+				Contents: []seller.ContentRef{ref(seller.ContentPost, w.post.ID), tc},
+			})
+		})
+		var bad *social.TakedownContentError
+		if !errors.As(err, &bad) || bad.Kind != tc.Kind || bad.ID != tc.ID {
+			t.Fatalf("%s：err=%v，預期 *TakedownContentError 指向 %v", name, err, tc)
+		}
+	}
+	if n := f.scalar(t, "SELECT count(*) FROM social.content_takedowns"); n != 0 {
+		t.Fatalf("被拒絕後不該有複本：%d", n)
+	}
+	if get, feed, _, _ := f.postVisible(t, w.post.ID); !get || !feed {
+		t.Fatal("被拒絕後貼文照常可讀")
 	}
 }

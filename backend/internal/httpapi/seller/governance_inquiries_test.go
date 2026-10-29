@@ -171,7 +171,7 @@ func TestCaseCarriesTheAwaitingSellerFacts(t *testing.T) {
 func TestCreateCaseInquiryUsesTheCallingAdminAndMapsTheInput(t *testing.T) {
 	inquiry := inquiryFixture(model.InquiryStateOpen)
 	m := &inquiryModule{createRes: model.CreateCaseInquiryResult{Inquiry: inquiry, Case: caseFixture(model.CaseFacts{})}}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	caseID := uuid.NewV7()
 	req := uuid.NewV4()
 	due := governanceNow.Add(5 * 24 * time.Hour)
@@ -226,7 +226,7 @@ func TestCreateCaseInquiryUsesTheCallingAdminAndMapsTheInput(t *testing.T) {
 func TestListCaseInquiriesBindsThePageTokenToTheCase(t *testing.T) {
 	cursor := &model.InquiryCursor{CreatedAt: governanceNow, ID: uuid.NewV7()}
 	m := &inquiryModule{page: model.AdminInquiryPage{Items: []model.AdminInquiry{inquiryFixture(model.InquiryStateOpen)}, Next: cursor}}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	caseID := uuid.NewV7()
 	req := &adminpb.ListCaseInquiriesRequest{CaseId: caseID.String(), PageSize: 2}
 	got, err := h.ListCaseInquiries(adminCtx(1), connect.NewRequest(req))
@@ -252,7 +252,7 @@ func TestListCaseInquiriesBindsThePageTokenToTheCase(t *testing.T) {
 func TestRecordAndWithdrawInquiryUseTheCallingAdmin(t *testing.T) {
 	inquiry := inquiryFixture(model.InquiryStateReplied)
 	m := &inquiryModule{replyRes: model.RecordCaseInquiryReplyResult{Inquiry: inquiry, Case: caseFixture(model.CaseFacts{}), AlreadyRecorded: true}, withRes: model.WithdrawCaseInquiryResult{Inquiry: inquiry, Case: caseFixture(model.CaseFacts{}), AlreadyWithdrawn: true}}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	id := uuid.NewV7()
 	received := governanceNow.Add(-time.Hour)
 	got, err := h.RecordCaseInquiryReply(adminCtx(43), connect.NewRequest(&adminpb.RecordCaseInquiryReplyRequest{
@@ -319,7 +319,7 @@ func TestListCasesAwaitingSellerReachesTheModuleAndBindsThePageToken(t *testing.
 	cursor := &model.CaseCursor{OpenedAt: governanceNow, ID: uuid.NewV7()}
 	c := caseFixture(model.CaseFacts{})
 	m := &governanceModule{casePage: model.AdminCasePage{Items: []model.AdminCase{c}, Next: cursor}}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	req := &adminpb.ListCasesRequest{AwaitingSeller: true, PageSize: 2}
 	got, err := h.ListCases(adminCtx(1), connect.NewRequest(req))
 	if err != nil || !m.caseList.AwaitingSeller {

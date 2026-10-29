@@ -161,7 +161,7 @@ func TestAuthorityOrderCarriesDueCoverageAndNotice(t *testing.T) {
 
 func TestCreateAuthorityOrderParsesTargetsAndRequestID(t *testing.T) {
 	m := &authorityModule{order: authorityFixture(false)}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	req := uuid.NewV4()
 	due := governanceNow.Add(5 * 24 * time.Hour)
 	_, err := h.CreateAuthorityOrder(adminCtx(42), connect.NewRequest(&adminpb.CreateAuthorityOrderRequest{
@@ -197,7 +197,7 @@ func TestCreateAuthorityOrderParsesTargetsAndRequestID(t *testing.T) {
 // 模組的欄位錯誤（含索引欄位）指到請求的路徑。
 func TestAuthorityFieldErrorsPointToRequestPaths(t *testing.T) {
 	m := &authorityModule{order: authorityFixture(false)}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	id := uuid.NewV7().String()
 	type call func(ctx context.Context) error
 	cases := []struct {
@@ -249,7 +249,7 @@ func TestAuthorityFieldErrorsPointToRequestPaths(t *testing.T) {
 // 完成、延長與記下告知都要 etag；告知的日期與時間轉成模組的形狀；暫不告知的日期不是有效日期時交給模組（零值）。
 func TestAuthorityCommandsRequireEtagAndConvertNotices(t *testing.T) {
 	m := &authorityModule{order: authorityFixture(true)}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	id := uuid.NewV7()
 	at := governanceNow.Add(-time.Hour)
 	provide := governanceNow.Add(-2 * time.Hour)
@@ -320,7 +320,7 @@ func TestAuthorityCommandsRequireEtagAndConvertNotices(t *testing.T) {
 func TestListAuthorityOrdersBindsThePageTokenToTheFilter(t *testing.T) {
 	cursor := &model.AuthorityCursor{At: governanceNow, ID: uuid.NewV7()}
 	m := &authorityModule{page: model.AdminAuthorityOrderPage{Items: []model.AdminAuthorityOrder{authorityFixture(false)}, Next: cursor}}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	req := &adminpb.ListAuthorityOrdersRequest{PageSize: 2, State: adminpb.AuthorityOrderState_AUTHORITY_ORDER_STATE_OPEN, AccountId: "5"}
 	got, err := h.ListAuthorityOrders(adminCtx(1), connect.NewRequest(req))
 	if err != nil {
@@ -349,7 +349,7 @@ func TestListAuthorityOrdersBindsThePageTokenToTheFilter(t *testing.T) {
 // 建立措施帶來源來函：解析成 UUID 放進輸入，認定引用的來函同；不是 UUID 回 invalid_argument。
 func TestCreateMeasureCarriesTheSourceAuthorityOrders(t *testing.T) {
 	m := &measureCapture{}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	order, cited := uuid.NewV7(), uuid.NewV7()
 	_, _ = h.CreateMeasure(adminCtx(42), connect.NewRequest(&adminpb.CreateMeasureRequest{
 		StoreId: "12", Statement: "x", Note: "n", SourceAuthorityOrderId: order.String(),
@@ -395,7 +395,7 @@ func (m *measureCapture) AdminMeasures(_ context.Context, in model.AdminMeasureL
 // 清單的 page token 也綁來源來函：換一份來函從第一頁開始。
 func TestListMeasuresPageTokenIsBoundToTheSourceAuthorityOrder(t *testing.T) {
 	m := &measureCapture{}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	order := uuid.NewV7()
 	scope := rpc.FilterScope(sellerv1alpha1connect.SellerGovernanceAdminServiceListMeasuresProcedure, "", "", "MEASURE_STATE_UNSPECIFIED",
 		"MEASURE_BASIS_UNSPECIFIED", "MEASURE_REQUEST_STATE_UNSPECIFIED", "MEASURE_REQUEST_KIND_UNSPECIFIED", "false", "", "", order.String())
@@ -441,7 +441,7 @@ func TestAuthorityOrderCarriesRevocationAndServerDerivedAvailability(t *testing.
 	}
 
 	m := &authorityModule{order: authorityFixture(false)}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	id := m.order.ID.String()
 	resp, err := h.RevokeAuthorityOrder(adminCtx(42), connect.NewRequest(&adminpb.RevokeAuthorityOrderRequest{Id: id, Etag: "3", Reason: "登記錯誤"}))
 	if err != nil {

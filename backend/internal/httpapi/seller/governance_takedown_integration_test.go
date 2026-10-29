@@ -21,13 +21,16 @@ import (
 )
 
 type seededContent struct {
-	post, comment, entry uuid.UUID
+	post, comment, entry                  uuid.UUID
+	buyerComment, deletedPost, deletedCmt uuid.UUID
+	buyerEntry, deletedEntry              uuid.UUID
 }
 
 // seedContent 直接寫 social 的列（店家身分的貼文、留言、討論區留言）：這組測試要的是內容存在而且屬於這家店，不經 social 的寫入規則。
 func (f *adminFixture) seedContent(t *testing.T, storeID int64) seededContent {
 	t.Helper()
-	c := seededContent{post: uuid.NewV7(), comment: uuid.NewV7(), entry: uuid.NewV7()}
+	c := seededContent{post: uuid.NewV7(), comment: uuid.NewV7(), entry: uuid.NewV7(), buyerComment: uuid.NewV7(), deletedPost: uuid.NewV7(),
+		deletedCmt: uuid.NewV7(), buyerEntry: uuid.NewV7(), deletedEntry: uuid.NewV7()}
 	now := time.Now()
 	for _, q := range []struct {
 		sql  string
@@ -36,6 +39,11 @@ func (f *adminFixture) seedContent(t *testing.T, storeID int64) seededContent {
 		{`INSERT INTO social.posts (id, store_id, body, status, published_at, created_at, updated_at) VALUES ($1, $2, '貼文', 'PUBLISHED', $3, $3, $3)`, []any{c.post, storeID, now}},
 		{`INSERT INTO social.comments (id, post_id, actor_kind, actor_id, body, created_at, updated_at) VALUES ($1, $2, 'STORE', $3, '留言', $4, $4)`, []any{c.comment, c.post, storeID, now}},
 		{`INSERT INTO social.forum_entries (id, store_id, actor_kind, actor_id, body, created_at, updated_at) VALUES ($1, $2, 'STORE', $2, '討論', $3, $3)`, []any{c.entry, storeID, now}},
+		{`INSERT INTO social.comments (id, post_id, actor_kind, actor_id, body, created_at, updated_at) VALUES ($1, $2, 'BUYER', 7, '買家的留言', $3, $3)`, []any{c.buyerComment, c.post, now}},
+		{`INSERT INTO social.forum_entries (id, store_id, actor_kind, actor_id, body, created_at, updated_at) VALUES ($1, $2, 'BUYER', 7, '買家的討論', $3, $3)`, []any{c.buyerEntry, storeID, now}},
+		{`INSERT INTO social.posts (id, store_id, body, status, published_at, created_at, updated_at, deleted_at) VALUES ($1, $2, '已刪除的貼文', 'PUBLISHED', $3, $3, $3, $3)`, []any{c.deletedPost, storeID, now}},
+		{`INSERT INTO social.comments (id, post_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at) VALUES ($1, $2, 'STORE', $3, NULL, $4, $4, $4)`, []any{c.deletedCmt, c.post, storeID, now}},
+		{`INSERT INTO social.forum_entries (id, store_id, actor_kind, actor_id, body, created_at, updated_at, deleted_at) VALUES ($1, $2, 'STORE', $2, NULL, $3, $3, $3)`, []any{c.deletedEntry, storeID, now}},
 	} {
 		if _, err := f.db.Conn(context.Background()).Exec(context.Background(), q.sql, q.args...); err != nil {
 			t.Fatal(err)
@@ -78,7 +86,7 @@ func (f *adminFixture) count(t *testing.T, sql string, args ...any) int64 {
 	return n
 }
 
-// 內容下架建立前向 social 核對：別家店的內容、不存在的內容都被拒絕，欄位路徑指到那一則，措施與複本都不存在。
+// 內容下架由 social 的同 transaction 訂閱者核對：別家店的內容、買家寫的內容、已刪除與不存在的內容都被拒絕，欄位路徑指到那一則，措施與複本都不存在。
 func TestCreateContentTakedownRejectsContentOfAnotherStoreOrMissing(t *testing.T) {
 	t.Parallel()
 	f := setupAdmin(t)
@@ -90,11 +98,16 @@ func TestCreateContentTakedownRejectsContentOfAnotherStoreOrMissing(t *testing.T
 		refs []*pb.ContentRef
 		want string
 	}{
-		"別家店的貼文": {[]*pb.ContentRef{{Kind: pb.ContentKind_CONTENT_KIND_POST, Id: mine.post.String()}, {Kind: pb.ContentKind_CONTENT_KIND_POST, Id: theirs.post.String()}}, "content_takedown.contents[1]"},
-		"別家店的留言": {[]*pb.ContentRef{{Kind: pb.ContentKind_CONTENT_KIND_COMMENT, Id: theirs.comment.String()}}, "content_takedown.contents[0]"},
-		"別家店的討論": {[]*pb.ContentRef{{Kind: pb.ContentKind_CONTENT_KIND_FORUM_ENTRY, Id: theirs.entry.String()}}, "content_takedown.contents[0]"},
-		"不存在的貼文": {[]*pb.ContentRef{{Kind: pb.ContentKind_CONTENT_KIND_POST, Id: uuid.NewV7().String()}}, "content_takedown.contents[0]"},
-		"種類對不上":  {[]*pb.ContentRef{{Kind: pb.ContentKind_CONTENT_KIND_COMMENT, Id: mine.post.String()}}, "content_takedown.contents[0]"},
+		"別家店的貼文":       {[]*pb.ContentRef{{Kind: pb.ContentKind_CONTENT_KIND_POST, Id: mine.post.String()}, {Kind: pb.ContentKind_CONTENT_KIND_POST, Id: theirs.post.String()}}, "content_takedown.contents[1]"},
+		"別家店的留言":       {[]*pb.ContentRef{{Kind: pb.ContentKind_CONTENT_KIND_COMMENT, Id: theirs.comment.String()}}, "content_takedown.contents[0]"},
+		"別家店的討論":       {[]*pb.ContentRef{{Kind: pb.ContentKind_CONTENT_KIND_FORUM_ENTRY, Id: theirs.entry.String()}}, "content_takedown.contents[0]"},
+		"不存在的貼文":       {[]*pb.ContentRef{{Kind: pb.ContentKind_CONTENT_KIND_POST, Id: uuid.NewV7().String()}}, "content_takedown.contents[0]"},
+		"種類對不上":        {[]*pb.ContentRef{{Kind: pb.ContentKind_CONTENT_KIND_COMMENT, Id: mine.post.String()}}, "content_takedown.contents[0]"},
+		"買家在這家店貼文下的留言": {[]*pb.ContentRef{{Kind: pb.ContentKind_CONTENT_KIND_COMMENT, Id: mine.buyerComment.String()}}, "content_takedown.contents[0]"},
+		"買家的討論區留言":     {[]*pb.ContentRef{{Kind: pb.ContentKind_CONTENT_KIND_POST, Id: mine.post.String()}, {Kind: pb.ContentKind_CONTENT_KIND_FORUM_ENTRY, Id: mine.buyerEntry.String()}}, "content_takedown.contents[1]"},
+		"已刪除的貼文":       {[]*pb.ContentRef{{Kind: pb.ContentKind_CONTENT_KIND_POST, Id: mine.deletedPost.String()}}, "content_takedown.contents[0]"},
+		"已刪除的留言":       {[]*pb.ContentRef{{Kind: pb.ContentKind_CONTENT_KIND_COMMENT, Id: mine.deletedCmt.String()}}, "content_takedown.contents[0]"},
+		"已刪除的討論區留言":    {[]*pb.ContentRef{{Kind: pb.ContentKind_CONTENT_KIND_FORUM_ENTRY, Id: mine.deletedEntry.String()}}, "content_takedown.contents[0]"},
 	} {
 		_, err := f.governance.CreateMeasure(ctx, connect.NewRequest(f.takedownRequest(target.StoreID, tc.refs...)))
 		if connect.CodeOf(err) != connect.CodeInvalidArgument || !slices.Equal(fieldsOf(err), []string{tc.want}) {
@@ -188,4 +201,38 @@ func (f *adminFixture) countIn(ctx context.Context, sql string) int64 {
 		return -1
 	}
 	return n
+}
+
+// 不經 admin handler 的入口（CreateMeasureInTx，之後的 moderation）一樣被擋：歸屬核對在 social 的訂閱者，不在 handler。
+func TestContentTakedownThroughCreateInTxRejectsContentThatIsNotTheStoresOwn(t *testing.T) {
+	t.Parallel()
+	f := setupAdmin(t)
+	ctx := context.Background()
+	_, target := f.newSeller(t, "被處分的店")
+	_, other := f.newSeller(t, "別家的店")
+	mine, theirs := f.seedContent(t, target.StoreID), f.seedContent(t, other.StoreID)
+	finding := seller.ViolationBasis{Finding: &seller.NewFinding{Category: policy.Spam, Severity: seller.SeverityLow}}
+	for name, ref := range map[string]seller.ContentRef{
+		"別家店的貼文":  {Kind: seller.ContentPost, ID: theirs.post},
+		"買家的留言":   {Kind: seller.ContentComment, ID: mine.buyerComment},
+		"已刪除的貼文":  {Kind: seller.ContentPost, ID: mine.deletedPost},
+		"不存在的討論區": {Kind: seller.ContentForumEntry, ID: uuid.NewV7()},
+	} {
+		err := f.db.InTx(ctx, func(ctx context.Context) error {
+			_, err := f.module.CreateMeasureInTx(ctx, seller.CreateMeasureInput{
+				AdminID: f.adminID, StoreID: target.StoreID, Kind: seller.MeasureContentTakedown, StatementToSeller: "內容違規", Note: "內部紀錄", Violation: &finding,
+				Takedown: &seller.ContentTakedown{Contents: []seller.ContentRef{ref}},
+			})
+			return err
+		})
+		if err == nil {
+			t.Fatalf("%s：應被拒絕", name)
+		}
+	}
+	if n := f.count(t, "SELECT count(*) FROM seller.measures"); n != 0 {
+		t.Fatalf("被拒絕後不該有措施：%d", n)
+	}
+	if n := f.count(t, "SELECT count(*) FROM social.content_takedowns"); n != 0 {
+		t.Fatalf("被拒絕後不該有複本：%d", n)
+	}
 }

@@ -655,7 +655,7 @@ func TestAppealAndGovernanceCommandsCarryTheMeasureEtag(t *testing.T) {
 		t.Fatal("申訴重送不能寫入")
 	}
 
-	gov := httpsellerpkg.NewGovernance(f.module, nil, rpc.Images{})
+	gov := httpsellerpkg.NewGovernance(f.module, rpc.Images{})
 	admin := rpc.WithPrincipal(ctx, identity.Principal{Kind: identity.PrincipalAdmin, ID: 1})
 	decide := func(etag string) (*connect.Response[adminpb.DecideAppealResponse], error) {
 		return gov.DecideAppeal(admin, connect.NewRequest(&adminpb.DecideAppealRequest{

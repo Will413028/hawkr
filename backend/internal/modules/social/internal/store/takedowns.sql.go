@@ -132,6 +132,56 @@ func (q *Queries) InsertTakedowns(ctx context.Context, arg InsertTakedownsParams
 	return result.RowsAffected(), nil
 }
 
+const invalidTakedownContents = `-- name: InvalidTakedownContents :many
+SELECT 'POST'::text AS content_kind, p::uuid AS content_id FROM unnest($1::uuid[]) AS p
+WHERE NOT EXISTS (SELECT 1 FROM social.posts AS x WHERE x.id = p AND x.store_id = $2::bigint AND x.deleted_at IS NULL)
+UNION ALL
+SELECT 'COMMENT'::text, c::uuid FROM unnest($3::uuid[]) AS c
+WHERE NOT EXISTS (SELECT 1 FROM social.comments AS x WHERE x.id = c AND x.actor_kind = 'STORE' AND x.actor_id = $2::bigint AND x.deleted_at IS NULL)
+UNION ALL
+SELECT 'FORUM_ENTRY'::text, f::uuid FROM unnest($4::uuid[]) AS f
+WHERE NOT EXISTS (SELECT 1 FROM social.forum_entries AS x WHERE x.id = f AND x.actor_kind = 'STORE' AND x.actor_id = $2::bigint AND x.deleted_at IS NULL)
+ORDER BY 1, 2
+`
+
+type InvalidTakedownContentsParams struct {
+	PostIds       []uuid.UUID
+	StoreID       int64
+	CommentIds    []uuid.UUID
+	ForumEntryIds []uuid.UUID
+}
+
+type InvalidTakedownContentsRow struct {
+	ContentKind string
+	ContentID   uuid.UUID
+}
+
+// 內容下架的歸屬核對（建立措施的同一個 transaction，留言與討論區留言的列已經鎖住）：回傳不存在、已刪除、或不是該店家自己寫的內容。貼文的作者是它所屬的店家。
+func (q *Queries) InvalidTakedownContents(ctx context.Context, arg InvalidTakedownContentsParams) ([]InvalidTakedownContentsRow, error) {
+	rows, err := q.db.Query(ctx, invalidTakedownContents,
+		arg.PostIds,
+		arg.StoreID,
+		arg.CommentIds,
+		arg.ForumEntryIds,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []InvalidTakedownContentsRow{}
+	for rows.Next() {
+		var i InvalidTakedownContentsRow
+		if err := rows.Scan(&i.ContentKind, &i.ContentID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockCommentsByID = `-- name: LockCommentsByID :many
 SELECT id FROM social.comments WHERE id = ANY($1::uuid[]) ORDER BY id FOR NO KEY UPDATE
 `

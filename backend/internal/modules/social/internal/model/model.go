@@ -2,11 +2,13 @@
 package model
 
 import (
+	"fmt"
 	"time"
 	"unicode/utf8"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/contentkind"
 )
 
 // 內容文字的長度上限（字元數，rune）。DB 的 CHECK 是第二道防線（schema.sql 的 posts_body_check、comments_body_check、
@@ -398,4 +400,15 @@ type ContentOwner struct {
 	Author   Actor
 	StoreID  int64
 	Readable bool
+}
+
+// TakedownContentError 是內容下架的對象不成立：內容不存在、已刪除，或不是措施的店家自己寫的（買家寫的內容走隱藏）。訂閱者回這個錯誤讓建立措施的
+// transaction 回滾；呼叫方用 errors.As 取出是哪一則。
+type TakedownContentError struct {
+	Kind contentkind.Kind
+	ID   uuid.UUID
+}
+
+func (e *TakedownContentError) Error() string {
+	return fmt.Sprintf("social：內容下架的對象不存在、已刪除或不是這家店寫的：%s %s", e.Kind, e.ID)
 }

@@ -10,6 +10,18 @@ UNION ALL
 SELECT sqlc.arg(measure_id)::uuid, NULL::uuid, NULL::uuid, f, sqlc.arg(created_at)::timestamptz FROM unnest(sqlc.arg(forum_entry_ids)::uuid[]) AS f
 ON CONFLICT DO NOTHING;
 
+-- name: InvalidTakedownContents :many
+-- 內容下架的歸屬核對（建立措施的同一個 transaction，留言與討論區留言的列已經鎖住）：回傳不存在、已刪除、或不是該店家自己寫的內容。貼文的作者是它所屬的店家。
+SELECT 'POST'::text AS content_kind, p::uuid AS content_id FROM unnest(sqlc.arg(post_ids)::uuid[]) AS p
+WHERE NOT EXISTS (SELECT 1 FROM social.posts AS x WHERE x.id = p AND x.store_id = sqlc.arg(store_id)::bigint AND x.deleted_at IS NULL)
+UNION ALL
+SELECT 'COMMENT'::text, c::uuid FROM unnest(sqlc.arg(comment_ids)::uuid[]) AS c
+WHERE NOT EXISTS (SELECT 1 FROM social.comments AS x WHERE x.id = c AND x.actor_kind = 'STORE' AND x.actor_id = sqlc.arg(store_id)::bigint AND x.deleted_at IS NULL)
+UNION ALL
+SELECT 'FORUM_ENTRY'::text, f::uuid FROM unnest(sqlc.arg(forum_entry_ids)::uuid[]) AS f
+WHERE NOT EXISTS (SELECT 1 FROM social.forum_entries AS x WHERE x.id = f AND x.actor_kind = 'STORE' AND x.actor_id = sqlc.arg(store_id)::bigint AND x.deleted_at IS NULL)
+ORDER BY 1, 2;
+
 -- name: TakedownsOfMeasure :many
 SELECT post_id, comment_id, forum_entry_id FROM social.content_takedowns
 WHERE measure_id = sqlc.arg(measure_id);

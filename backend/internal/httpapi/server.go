@@ -289,7 +289,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	add(adminsellerconnect.NewSellerAdminServiceHandler(httpseller.NewAdmin(deps.Seller, deps.Images), opts...))
 	add(sellerconnect.NewSellerPublicServiceHandler(sellerPublic, opts...))
 	add(sellerconnect.NewSellerAppServiceHandler(sellerApp, append(slices.Clone(opts), connect.WithInterceptors(acting))...))
-	add(adminsellerconnect.NewSellerGovernanceAdminServiceHandler(httpseller.NewGovernance(deps.Seller, deps.Social, deps.Images), opts...))
+	add(adminsellerconnect.NewSellerGovernanceAdminServiceHandler(httpseller.NewGovernance(deps.Seller, deps.Images), opts...))
 	// 通報人是買家或匿名者，不是店家：這兩個 service 不掛賣家能力的 interceptor。
 	reports, err := httpseller.NewReports(deps.Seller, deps.Buyer, accounts)
 	if err != nil {

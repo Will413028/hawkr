@@ -137,7 +137,7 @@ func TestAvailabilityIsNeverSerializedAsReasons(t *testing.T) {
 // 改狀態的指令一律要帶 etag（決定依據通報或案件的內容，補充會在狀態不變時改變內容）；沒帶的請求不呼叫模組。
 func TestStateChangingReportAndCaseCommandsRequireAnEtag(t *testing.T) {
 	m := &governanceModule{report: anonymousFoodSafetyReport(), cases: caseFixture(model.CaseFacts{})}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	ctx, id, caseID := adminCtx(7), uuid.NewV7().String(), uuid.NewV7().String()
 	for name, call := range map[string]func() error{
 		"triage": func() error {
@@ -176,7 +176,7 @@ func TestStateChangingReportAndCaseCommandsRequireAnEtag(t *testing.T) {
 func TestMoveReportReportsTheClosedSourceCase(t *testing.T) {
 	report := anonymousFoodSafetyReport()
 	m := &governanceModule{report: report, moveResult: model.MoveReportResult{Report: report, SourceCaseClosed: true}}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	got, err := h.MoveReport(adminCtx(3), connect.NewRequest(&adminpb.MoveReportRequest{
 		Id: report.ID.String(), AssessedCategory: commonpb.PolicyCategory_POLICY_CATEGORY_FRAUD, Etag: "9",
 		Target: &adminpb.CaseTarget{Target: &adminpb.CaseTarget_OpenNew{OpenNew: &adminpb.OpenNewCase{Severity: pb.ViolationSeverity_VIOLATION_SEVERITY_MEDIUM}}},
@@ -197,7 +197,7 @@ func TestListCasesBindsThePageTokenAndGetCaseCarriesMoves(t *testing.T) {
 	c.Moves = []model.ReportMove{{ReportID: uuid.NewV7(), FromCaseID: uuid.NewV7(), ToCaseID: c.ID, AdminID: 5, MovedAt: governanceNow}}
 	c.Availability = model.CaseFacts{Case: c.Case}.Availability()
 	m := &governanceModule{cases: c, casePage: model.AdminCasePage{Items: []model.AdminCase{c}, Next: cursor}}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	req := &adminpb.ListCasesRequest{State: adminpb.CaseState_CASE_STATE_OPEN, Category: commonpb.PolicyCategory_POLICY_CATEGORY_FOOD_SAFETY, StoreId: "12", PageSize: 2}
 	got, err := h.ListCases(adminCtx(1), connect.NewRequest(req))
 	if err != nil {
@@ -238,7 +238,7 @@ func TestCaseNotesUseTheCallingAdminAndCarryTheSeverityChange(t *testing.T) {
 		{ID: uuid.NewV7(), AdminID: 7, Body: "改嚴重度", CreatedAt: governanceNow, SeverityChange: &model.SeverityChange{From: model.SeverityMedium, To: model.SeverityHigh}},
 		{ID: uuid.NewV7(), AdminID: 8, Body: "一般註記", CreatedAt: governanceNow},
 	}, Next: cursor}}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	created, err := h.CreateCaseNote(adminCtx(42), connect.NewRequest(&adminpb.CreateCaseNoteRequest{
 		CaseId: caseID.String(), Note: &adminpb.GovernanceNote{
 			Body: "補充", CreatedByAdminId: "1", SeverityChange: &adminpb.SeverityChange{FromSeverity: pb.ViolationSeverity_VIOLATION_SEVERITY_LOW, ToSeverity: pb.ViolationSeverity_VIOLATION_SEVERITY_HIGH},
@@ -272,7 +272,7 @@ func TestCaseNotesUseTheCallingAdminAndCarryTheSeverityChange(t *testing.T) {
 // 建立措施與措施清單的新欄位：source_case_id 進模組輸入、格式不對不呼叫模組；兩個來源篩選綁在 page token 上。
 func TestSourceCaseAndReportFiltersReachTheModule(t *testing.T) {
 	m := &governanceModule{measure: riskMeasureFixture()}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	caseID, reportID := uuid.NewV7(), uuid.NewV7()
 	if _, err := h.ListMeasures(adminCtx(1), connect.NewRequest(&adminpb.ListMeasuresRequest{SourceCaseId: caseID.String(), SourceReportId: reportID.String()})); err != nil {
 		t.Fatal(err)
@@ -338,7 +338,7 @@ func TestCreateMeasureSourceCaseErrorsPointAtSourceCaseIDForEveryKind(t *testing
 		}}}),
 	} {
 		m := &governanceModule{measure: riskMeasureFixture(), createErr: apperr.InvalidInputOn([]string{"SourceCaseID"}, "找不到這個案件。")}
-		h := NewGovernance(m, nil, rpc.Images{})
+		h := NewGovernance(m, rpc.Images{})
 		var logs strings.Builder
 		call := rpc.NewInterceptor(slog.New(slog.NewTextHandler(&logs, nil))).WrapUnary(func(ctx context.Context, _ connect.AnyRequest) (connect.AnyResponse, error) {
 			return h.CreateMeasure(ctx, connect.NewRequest(req))
@@ -405,7 +405,7 @@ func TestReportCarriesTheDerivedFactsTheClientUsedToCompute(t *testing.T) {
 func TestTriageAndMoveForwardTheExplicitTarget(t *testing.T) {
 	report := anonymousFoodSafetyReport()
 	m := &governanceModule{report: report, moveResult: model.MoveReportResult{Report: report}}
-	h := NewGovernance(m, nil, rpc.Images{})
+	h := NewGovernance(m, rpc.Images{})
 	caseID := uuid.NewV7()
 	join := func(id, etag string) *adminpb.CaseTarget {
 		return &adminpb.CaseTarget{Target: &adminpb.CaseTarget_Join{Join: &adminpb.JoinCase{CaseId: id, Etag: etag}}}
