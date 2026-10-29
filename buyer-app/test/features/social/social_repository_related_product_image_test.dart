@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:hawkr_buyer/features/social/data/social_repository.dart';
+import '../../support/fake_seller_repository.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -52,7 +53,10 @@ void main() {
         ..httpClientAdapter = _RelatedProductAdapter();
       addTearDown(dio.close);
 
-      final posts = await SocialRepository(dio).getPosts();
+      final posts = await SocialRepository(
+        dio,
+        sellers: fakeSellerRepository(),
+      ).getPosts();
 
       expect(
         posts.single.product?['image'],

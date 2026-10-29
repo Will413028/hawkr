@@ -6,6 +6,7 @@ import 'package:hawkr_buyer/core/exceptions/app_exception.dart';
 import 'package:hawkr_buyer/core/networking/dio_provider.dart';
 import 'package:hawkr_buyer/features/social/data/social_repository.dart';
 import 'package:hawkr_buyer/features/social/presentation/post_detail_screen.dart';
+import '../../support/fake_seller_repository.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -147,11 +148,11 @@ void main() {
     addTearDown(dio.close);
 
     await expectLater(
-      SocialRepository(dio).getPostDetail(101),
+      SocialRepository(dio, sellers: fakeSellerRepository()).getPostDetail(101),
       throwsA(isA<NetworkException>()),
     );
     await expectLater(
-      SocialRepository(dio).getComments(101),
+      SocialRepository(dio, sellers: fakeSellerRepository()).getComments(101),
       throwsA(isA<NetworkException>()),
     );
   });

@@ -22,9 +22,10 @@ const _postNotFound = '找不到這則貼文';
 class SocialRepository {
   final Dio _dio;
 
-  /// 補貼文的店家名稱與頭像；不給時略過補齊（貼文照原樣顯示）。
-  final SellerRepository? _sellers;
-  SocialRepository(this._dio, {SellerRepository? sellers}) : _sellers = sellers;
+  /// 補貼文的店家名稱與頭像。
+  final SellerRepository _sellers;
+  SocialRepository(this._dio, {required SellerRepository sellers})
+    : _sellers = sellers;
 
   Future<List<Post>> getPosts({
     int? merchantId,
@@ -133,11 +134,9 @@ class SocialRepository {
       sellerPosts.putIfAbsent(key, () => []).add(raw);
     }
     if (sellerPosts.isEmpty) return;
-    final sellers = _sellers;
-    if (sellers == null) return;
     try {
       // 店家名稱與頭像一律走店家卡片（BatchGetStores，上限內合批）。
-      final cards = await sellers.batchGetStores(sellerPosts.keys);
+      final cards = await _sellers.batchGetStores(sellerPosts.keys);
       for (final MapEntry(:key, :value) in sellerPosts.entries) {
         final card = cards[key];
         if (card == null) continue;

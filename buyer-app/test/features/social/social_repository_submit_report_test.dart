@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:hawkr_buyer/core/exceptions/app_exception.dart';
 import 'package:hawkr_buyer/features/social/data/social_repository.dart';
+import '../../support/fake_seller_repository.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -47,15 +48,19 @@ void main() {
       final dio = _dioWith(adapter);
       addTearDown(dio.close);
 
-      final reportId = await SocialRepository(dio).submitReport(
-        targetType: 'POST',
-        targetId: '456',
-        reasonCode: 'SPAM',
-        description: '測試說明',
-        // 裸 objectKey，不是完整 URL：Gateway 對外來域名與非 public/ 前綴回 400
-        // （C3，10 檔 §25）。這裡放 URL 等於替「欄位名在說謊」的舊契約背書。
-        evidenceKeys: ['public/report/2623900520/1.png'],
-      );
+      final reportId =
+          await SocialRepository(
+            dio,
+            sellers: fakeSellerRepository(),
+          ).submitReport(
+            targetType: 'POST',
+            targetId: '456',
+            reasonCode: 'SPAM',
+            description: '測試說明',
+            // 裸 objectKey，不是完整 URL：Gateway 對外來域名與非 public/ 前綴回 400
+            // （C3，10 檔 §25）。這裡放 URL 等於替「欄位名在說謊」的舊契約背書。
+            evidenceKeys: ['public/report/2623900520/1.png'],
+          );
 
       expect(adapter.lastRequest?.method, 'POST');
       expect(adapter.lastRequest?.path, '/app/reports');
@@ -76,7 +81,7 @@ void main() {
       final dio = _dioWith(adapter);
       addTearDown(dio.close);
 
-      await SocialRepository(dio).submitReport(
+      await SocialRepository(dio, sellers: fakeSellerRepository()).submitReport(
         targetType: 'REVIEW',
         targetId: '789',
         reasonCode: 'FRAUD',
@@ -99,6 +104,7 @@ void main() {
       await expectLater(
         SocialRepository(
           dio,
+          sellers: fakeSellerRepository(),
         ).submitReport(targetType: 'POST', targetId: '1', reasonCode: 'OTHER'),
         throwsA(
           isA<ServerException>().having((e) => e.message, 'message', 'M1'),
@@ -114,6 +120,7 @@ void main() {
       await expectLater(
         SocialRepository(
           dio,
+          sellers: fakeSellerRepository(),
         ).submitReport(targetType: 'POST', targetId: '1', reasonCode: 'OTHER'),
         throwsA(
           isA<ServerException>().having((e) => e.message, 'message', '舉報失敗'),
@@ -129,6 +136,7 @@ void main() {
       await expectLater(
         SocialRepository(
           dio,
+          sellers: fakeSellerRepository(),
         ).submitReport(targetType: 'POST', targetId: '1', reasonCode: 'OTHER'),
         throwsA(isA<UnauthorizedException>()),
       );
@@ -142,6 +150,7 @@ void main() {
       await expectLater(
         SocialRepository(
           dio,
+          sellers: fakeSellerRepository(),
         ).submitReport(targetType: 'POST', targetId: '1', reasonCode: 'OTHER'),
         throwsA(
           isA<ServerException>().having(
@@ -161,6 +170,7 @@ void main() {
       await expectLater(
         SocialRepository(
           dio,
+          sellers: fakeSellerRepository(),
         ).submitReport(targetType: 'POST', targetId: '1', reasonCode: 'OTHER'),
         throwsA(
           isA<ServerException>().having((e) => e.message, 'message', '檢舉目標不存在'),
@@ -176,6 +186,7 @@ void main() {
       await expectLater(
         SocialRepository(
           dio,
+          sellers: fakeSellerRepository(),
         ).submitReport(targetType: 'POST', targetId: '1', reasonCode: 'OTHER'),
         throwsA(isA<NetworkException>()),
       );
@@ -192,7 +203,7 @@ void main() {
       addTearDown(dio.close);
 
       await expectLater(
-        SocialRepository(dio).getMyReports(),
+        SocialRepository(dio, sellers: fakeSellerRepository()).getMyReports(),
         throwsA(
           isA<ServerException>().having(
             (e) => e.message,
@@ -209,7 +220,7 @@ void main() {
       addTearDown(dio.close);
 
       await expectLater(
-        SocialRepository(dio).getMyReports(),
+        SocialRepository(dio, sellers: fakeSellerRepository()).getMyReports(),
         throwsA(isA<UnauthorizedException>()),
       );
     });
