@@ -146,3 +146,14 @@
 ## 修訂：FDA 轉報刪除（2026-10-28，ADR `2026-10-27-general-ecommerce-scope-cut` D3；計畫 `plans/2026-10-27-ecommerce-scope-cut.md` 步驟 4）
 
 示範品類改成一般電商，食安法的轉報義務不成立。本 ADR 的轉報（「通報與案件」的轉報、2026-10-19「轉報紀錄加追蹤日期、主管機關的回覆與不轉報」修訂整段）不再適用：`case_referrals`、`case_referral_replies`、`RecordFDAReferral`、`WaiveFDAReferral`、`RecordFDAReferralReply`、`GetFDAExport`、待辦種類 `CASE_FDA_REFERRAL` 與案件的 `fda_referral_deadline` 一併刪除；案件的可用性少了記錄轉報、不轉報、記回覆與匯出，「已記錄轉報的案件最後一筆通報不能移走」也跟著拿掉。通報（含檢舉人選的食安類別與它的 4 小時分案期限）、案件、處分、申訴與主管機關來函不變；清理與來函保存的鎖順序不變（清理的參與者剩兩段清理）。
+
+## 修訂：內容下架措施與社群認定類別（2026-10-29，A7 步驟 A7-1c；計畫 `plans/2026-10-18-a7-social.md`、A7-D7）
+
+社群內容（貼文、留言、討論區留言）的下架是店家的處分，要有理由、可以申覆，所以沿用本 ADR 的認定、措施與申覆，不另開一套下架機制。
+
+- **措施種類 `CONTENT_TAKEDOWN`**：不限制帳號，不算 `Restrictive`，不進停權期間與曝光；建立即生效、沒有結束時間；依據一定是認定；解除只走申覆（補正與結束本來就只給 RISK 依據）。對象存在 `measure_contents`，建立後不可修訂，要改就撤銷再建立（不可變，因為對象是處分「下架了什麼」的事實，改了等於改寫處分）。逐項特例與理由在 seller `CARRYOVER.md`「A7-1c」。
+- **社群類別進認定與案件**：`policy.Assessable()` 是全部除了 `Other`，含 `SPAM`、`HARASSMENT`、`HATE`，`violations` 與 `cases` 的類別 CHECK 跟著改；檢舉人在 seller 通報可選的子集不含它們。認定可引用 moderation 的檢舉（`finding_moderation_reports`，不透明的外部參照，不加 FK，因為單體規則 2 不建跨 schema FK；不合併進 `finding_reports`，免得失去它對 `seller.reports` 的 FK）。升級規則仍是單一累計，社群類別的 MEDIUM 照樣計入。
+- **同 transaction 的建立入口 `CreateInTx`**：給 moderation 讓處理與措施同生共死；加入呼叫方的 transaction、不收 `request_id`。
+- **`request_id` 流程改寫**：舊流程在同一個 use case 內「先插入、撞唯一鍵、再重讀」，撞鍵之後在同一個 transaction 繼續下 SQL，違反單體規則 3。改成先鎖目標帳號的全部 stint、再查 `(admin, request_id)` 重送、插入用 `ON CONFLICT DO NOTHING`；落空（只剩目標在不同帳號的並行請求）回 `InvalidInput` 並回滾。關聯終止的唯一鍵改成鎖住後先檢查，索引只是保底。
+- **對象不可變**：見第一項；`UpdateMeasure` 沒有對象欄位。
+- **social 以 D-sync 複本取代讀取時 join**：原設計是 social 的讀取 join `seller.pub_content_takedowns(at)`。改成 social 的同 transaction 訂閱者維護自己的 `content_takedowns`（建立插入、撤銷刪除、同則內容被多個措施下架時只刪該措施的列），旗標與讀取只看自己的表；`seller.pub_content_takedowns()` 不收 `at`，只給每日對帳核對。理由：social 的旗標與 `reevaluate_*` 是資料庫函式，不能參照 seller 的表，而 join 會讓每個公開讀取多一次跨 schema 探測；撤銷要立即生效（SD13）。與買家刪帳的 `inactive_authors` 同形，差別是可刪除。

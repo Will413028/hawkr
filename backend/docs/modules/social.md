@@ -23,13 +23,19 @@
 
 - 留言與店家討論區都是兩層。互動者 (kind, id) 由伺服器依資源歸屬推導；店家身分只用在自己的貼文與自己的討論區。
 - 作者可編輯自己的內容（已被隱藏的內容不可編輯）；作者或該店可刪除，刪除冪等。
-- 頂層項目不可見而底下有可見回覆時，列表回佔位項目（只有 ID、時間、狀態；state 為 DELETED 或 HIDDEN），回覆照常顯示並計入；沒有可見回覆時整則不出現。佔位只有刪除與隱藏，對所有觀看者一致。
+- 頂層項目不可見而底下有可見回覆時，列表回佔位項目（只有 ID、時間、狀態；state 為 DELETED 或 HIDDEN），回覆照常顯示並計入；沒有可見回覆時整則不出現。佔位只有刪除與隱藏，對所有觀看者一致。被內容下架的頂層留言或討論區留言與被隱藏相同：底下有可見回覆時回 state 為 HIDDEN 的佔位項目（不是 DELETED），回覆照常顯示並計入。
 - 讚：貼文只有買家（`post_likes (post_id, buyer_id)`），留言與討論區帶 `actor_kind`。瀏覽每日換 salt 去重；分享同一位買家同一篇只算一次。
 - 使用者看得到的錯誤句子都在 `internal/text`（`zh-TW.json`、`en.json`，`make uitext` 生成 `text_gen.go`，不得手改），語系取自 `uitext.LocaleFrom(ctx)`。`apperr.*` 的參數不得有字串字面值，只許 `"%s", text.X(locale)`；商品驗證的 port 回 `ErrProductNotAvailable`／`ErrProductNotOwned`，句子由 social 給。
 
 ## 4. 公開可讀與讀取規則
 
-- **公開可讀**：一則內容公開可讀，若且唯若店家可曝光（`seller.pub_exposable_stores`）、貼文已發布、內容自己的旗標 `counted` 為真。
+- **公開可讀**：一則內容公開可讀，若且唯若店家可曝光（`seller.pub_exposable_stores`）、貼文已發布且沒有被內容下架、內容自己的旗標 `counted` 為真；留言與討論區留言的旗標含「沒有被內容下架」，貼文底下的留言跟著父貼文。
+- **內容下架**：社群內容被 seller 的內容下架措施（`CONTENT_TAKEDOWN`，規格 `seller.md` §5）下架後，所有公開讀取都看不到它，措施被撤銷後立即回來。
+  - 複本：social 有 `content_takedowns(measure_id, post_id | comment_id | forum_entry_id, created_at)`，一列一個（措施，內容），恰好一個內容欄位非空（CHECK），內容欄位是外鍵，內容不存在時措施的建立回滾。同一則內容可被多個措施下架，內容只要有任一列就算下架。這是複本而不是讀取時 join `seller.pub_content_takedowns()`：旗標與 `reevaluate_*` 是資料庫函式，不能參照 seller 的表。
+  - 訂閱者：`OnMeasureCreated`、`OnMeasureRevoked` 在 seller 建立與撤銷措施的同一個 transaction 執行，只處理帶 `Contents` 的內容下架。建立時插入並讓被下架的留言與討論區留言重新求值，排貼文與店面頁的快取失效；撤銷時只刪該措施的列並重新求值，另一個措施仍下架同一則內容時維持隱藏。呼叫方回滾時複本跟著回滾。
+  - 讀取：貼文沒有計入旗標，`visibility.ReadablePosts` 對 `post_id` 加 NOT EXISTS（走 `content_takedowns_post`，`TestTakedownPredicateKeepsTheReadPlansIndexed` 守住 feed、店面頁、hashtag 與單篇讀取的計畫）。留言與討論區留言走旗標，計數同旗標。
+  - 店主讀自己的店（`OwnerPosts`、`ListOwnPosts` 等不套公開條件的讀取）仍看得到被下架的貼文，沒有標記；賣家端的下架標記在 A7-4。
+  - 對帳：每日對帳（`Reconcile` 與 `RecountAll`，在修旗標之前）雙向核對 `seller.pub_content_takedowns()`：複本缺的補上（`TakedownsAdded`）、多的刪除（`TakedownsRemoved`），都計入漂移。seller 有、但 social 找不到內容的列略過（插入會違反外鍵）。
 - 容器的規則（店家可曝光、貼文已發布）與觀看者的規則在 `internal/visibility` 寫一次（`ReadablePosts`、`ReadableForum`、`CommentsOf`／`ForumEntriesOf` 的 `Where`）；帶這些規則的讀取（`internal/reads`）用 go-jet 在上面組成；沒有 view。
 - 讀取不 join `buyer.pub_inactive_buyers`：買家刪帳的事實是 social 自己的複本 `inactive_authors`，只有佔位項目的 state（DELETED 或 HIDDEN）才讀它。
 - 公開表（posts、comments、forum_entries）只經 `visibility` 的入口取得；原始 SQL 的逃生口只許出現在 `pubsql` 的生成檔。
@@ -66,7 +72,6 @@
 ## 7. 買家刪帳
 
 - 買家刪帳的事實在 social 有複本 `inactive_authors(buyer_id PK, since)`，只增不刪（`ON CONFLICT DO NOTHING`）。
-- 內容下架的事實在 social 有複本 `content_takedowns(measure_id, post_id | comment_id | forum_entry_id, created_at)`，一列一個（措施，內容），恰好一個內容欄位非空（CHECK）。seller 建立內容下架措施（`MeasureCreated` 帶 `Contents`）時訂閱者在同一個 transaction 插入、讓被下架的留言與討論區留言重新求值並排貼文與店面頁的快取失效；撤銷（`MeasureRevoked`）刪除該措施的列並重新求值，內容立即回到公開讀取；另一個措施仍下架同一則內容時維持隱藏。貼文沒有計入旗標：`visibility.ReadablePosts` 對 `post_id` 加 NOT EXISTS，貼文底下的留言跟著父貼文。每日對帳（`Reconcile`、`RecountAll` 的第一步）雙向核對 `seller.pub_content_takedowns()`：缺的補上、多的刪除，並計入漂移（`TakedownsAdded`、`TakedownsRemoved`）。
 - `OnBuyerDeletionRequested` 與 `OnBuyerDeleted` 在買家刪帳的同一個 transaction 呼叫 `stats.MarkAuthorInactive`：插入複本，並讓該作者的全部內容（含已刪除的）集合式重新求值，再排清除 job。沒有開啟中訂單的買家直接從營運中關閉，只發 `BuyerDeleted`。
 - `MarkAuthorInactive` 先依 id 鎖內容列；求值是一次集合呼叫，`reevaluate_*` 在寫入前依同一個順序鎖整批 stats（貼文 stats → 父留言 stats → 討論區 stats，各依 id），不需要 `stats.Service.Lock`。
 - 資料庫與 API 的讀取、計數在申請提交的同一刻改好，沒有 job 的延遲。網站的快取頁不在其內：清除 job 在同 transaction 排入、立即可跑，由它的 `finish` 失效快取，晚秒級，快取 TTL 保底。

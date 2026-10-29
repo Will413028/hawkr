@@ -10,11 +10,11 @@ schema `seller`（`db/schema.sql`，view 與函式在 `db/objects.sql`）：`sto
 
 ## 發布的讀取介面
 
-形狀在 `db/pub.sql`，定義在 `db/objects.sql` 與手寫 migration；消費端只能呼叫函式，改形狀要在同一次變更內更新 `pub.sql` 與所有消費端。守門：`TestPubContractsMatchMigrations`（cmd/hawkr）。語意見規格 §21。
+形狀在 `db/pub.sql`，定義在 `db/objects.sql`；消費端只能呼叫函式，改形狀要同一次變更更新 `pub.sql` 與消費端。守門：`TestPubContractsMatchMigrations`（cmd/hawkr）。語意與各函式的守門測試見規格 §21。
 
-- `seller.pub_exposable_stores(at timestamptz) RETURNS SETOF seller.pub_exposable_store (store_id bigint)`：`at` 這一刻可公開曝光的店家，曝光規則唯一的家。
-- `seller.pub_review_items(at timestamptz) RETURNS SETOF seller.pub_review_item (kind, item_id, 對象的鍵, store_id, store_name, start_at, due_at)`：`at` 這一刻的全部待辦（10 種），給 `reviewqueue`。守門：`TestPubReviewItemsIsTheUnionOfTheReviewFunctions`。
-- `seller.pub_content_takedowns() RETURNS SETOF seller.pub_content_takedown (measure_id, content_kind, content_id)`：此刻生效中的內容下架措施的對象，一列一個（措施，內容）；不收 `at`（下架建立即生效、沒有結束時間）。給 social 每日對帳核對自己的複本，social 的讀取不 join 它。守門：`TestPubContentTakedownsListsOnlyActiveTakedownTargets`。
+- `seller.pub_exposable_stores(at timestamptz) RETURNS SETOF seller.pub_exposable_store (store_id bigint)`：`at` 這一刻可公開曝光的店家。
+- `seller.pub_review_items(at timestamptz) RETURNS SETOF seller.pub_review_item (kind, item_id, 對象的鍵, store_id, store_name, start_at, due_at)`：`at` 這一刻的全部待辦（10 種），給 `reviewqueue`。
+- `seller.pub_content_takedowns() RETURNS SETOF seller.pub_content_takedown (measure_id, content_kind, content_id)`：生效中的內容下架對象，一列一個（措施，內容），不收 `at`；給 social 每日對帳核對複本。守門：`TestPubContentTakedownsListsOnlyActiveTakedownTargets`。
 
 ## 模組內部結構
 
@@ -26,17 +26,17 @@ schema `seller`（`db/schema.sql`，view 與函式在 `db/objects.sql`）：`sto
 
 守門測試在本模組；規格唯一來源是 `docs/modules/seller.md`。
 - 一帳號最多一個目前 stint，SELLER 與它成對授予、移除。守門：`stores_current_account`、`TestApplyRejectsSecondStoreAndReonboardsWithNewStint`。規格：§2。
-- 鎖順序：identity 帳號列、帳號全部 stint（`LockAccountStores`）、通報／案件／詢問／措施列（依 id 升序）、公告列。守門：`TestConcurrentSourceRevokeAndLinkedCreateNeverDeadlock`。規格：§18。
-- 停權不存，推導點只有 `stint.Derive`；措施「生效中」的 SQL 定義（`EffectiveMeasures`、`EffectiveMeasuresAll`、`ScheduledMeasureIDs`、`account_sanction_lifted_at`）與 `StateOf` 在邊界一致。守門：`TestEffectiveMeasuresAndStateAgreeAtTheBoundaries`。規格：§5、§17。
+- 鎖順序：全域順序見 `backend/AGENTS.md` 單體規則 4；本模組內：帳號全部 stint、通報／案件／詢問／措施列（依 id 升序）、公告列。守門：`TestConcurrentSourceRevokeAndLinkedCreateNeverDeadlock`。規格：§18。
+- 停權不存，推導點只有 `stint.Derive`；措施「生效中」的各處 SQL 定義與 `StateOf` 在邊界一致。守門：`TestEffectiveMeasuresAndStateAgreeAtTheBoundaries`。規格：§5、§17。
 - 措施版本只經 `InsertMeasure`／`AdvanceMeasureRevision`；停權期間只由 `suspension.Recompute` 寫，先鎖再讀。守門：`TestRecomputeReadsMeasuresAfterLockingTheStores`。規格：§5。
 - 動作可用性各只有一處來源（`Can*`、`*UnavailableReasons`、`BlockFor`），API 的 `can_*` 共用。守門：`TestCanFlagsMatchWhetherTheActionSucceeds`。規格：§5–§8。
-- 能力只由 `model.CapabilitiesOf` 推導，`ActingStore` fail-closed；停權不擋關店與刪帳。守門：`TestActingStoreFailsClosed`。規格：§10。
+- 能力只由 `model.CapabilitiesOf` 推導；停權不擋關店與刪帳。守門：`TestActingStoreFailsClosed`。規格：§10。
 - 關店只走 `closing.close()`，紀錄只在 `store_closures`，自己關店先查未結訂單。守門：`TestEveryClosePathRecordsWhoClosedTheStore`。規格：§11。
 - 兩段清理只在期滿且無保存條件時做，候選鎖住後重判。守門：`TestPurgeRechecksTheAppealHoldAfterLockingTheCandidates`。規格：§11。
 - 可曝光公告只經 `exposure.Announce`，先鎖再算。守門：`TestAnnouncementLocksBeforeItComputes`。規格：§12。
 - media 引用只由 `seller.media_sync` 寫，transaction 外只 `Finalize`，退場資產不能寫回。守門：`TestImagesLinkByStoreIDAndUseVersion`。規格：§9。
 - 寫入以版本樂觀鎖，拒絕都在 token 轉正之前。守門：`TestRejectedProfileUpdateDoesNotConsumeTheStagedToken`。規格：§3。
-- 通報只指向公開過的店，重複送出併成補充；佐證與證件先寫讀取紀錄才讀。守門：`TestSupplementsAttachToTheOriginalReport`、`TestEvidenceReadIsRecordedBeforeTheBytesAreRead`。規格：§7、§9。
+- 通報只指向公開過的店，重複送出併成補充；佐證與證件先寫讀取紀錄才讀。守門：`TestEvidenceReadIsRecordedBeforeTheBytesAreRead`。規格：§7、§9。
 - KYC 個資只存密文，型別不帶明文，顯示全文先稽核。守門：`TestKYCNeverReturnsOrStoresPlaintext`。規格：§13。
 - PayUni 外部呼叫不在 transaction 內，一店一個 sync job。守門：`TestSyncJobIsUniquePerStoreInRiver`。規格：§14。
 - 商家名單統編在未封存業者間唯一。守門：`TestTaxIDIsUniqueAmongLiveProspects`。規格：§15。
