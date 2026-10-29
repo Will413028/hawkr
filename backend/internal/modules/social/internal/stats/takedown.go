@@ -6,10 +6,20 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/contentkind"
 )
+
+// TakedownContentError 是內容下架的對象不成立：內容不存在、已刪除，或不是措施的店家自己寫的（買家寫的內容走隱藏）。訂閱者回這個錯誤讓建立措施的
+// transaction 回滾；呼叫方用 errors.As 取出是哪一則。
+type TakedownContentError struct {
+	Kind contentkind.Kind
+	ID   uuid.UUID
+}
+
+func (e *TakedownContentError) Error() string {
+	return fmt.Sprintf("social：內容下架的對象不存在、已刪除或不是這家店寫的：%s %s", e.Kind, e.ID)
+}
 
 // Content 是內容下架的一個對象：種類加 social 的列 ID。
 type Content struct {
@@ -106,7 +116,7 @@ func (s *Service) checkTakedownOwnership(ctx context.Context, storeID int64, set
 		return fmt.Errorf("social：核對內容下架的歸屬：%w", err)
 	}
 	if len(bad) > 0 {
-		return &model.TakedownContentError{Kind: contentkind.Kind(bad[0].ContentKind), ID: bad[0].ContentID}
+		return &TakedownContentError{Kind: contentkind.Kind(bad[0].ContentKind), ID: bad[0].ContentID}
 	}
 	return nil
 }

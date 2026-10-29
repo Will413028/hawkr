@@ -120,7 +120,7 @@ type (
 	HiddenPage      = model.HiddenPage
 	ContentOwner    = model.ContentOwner
 	// TakedownContentError 是內容下架的對象不成立（不存在、已刪除、不是措施的店家寫的）；OnMeasureCreated 回這個錯誤讓措施回滾。
-	TakedownContentError = model.TakedownContentError
+	TakedownContentError = stats.TakedownContentError
 	Viewer               = engage.Viewer
 	RecountReport        = stats.Report
 	CountDrift           = stats.Drift
