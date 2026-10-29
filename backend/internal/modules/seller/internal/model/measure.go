@@ -1,11 +1,11 @@
 package model
 
 import (
-	"slices"
 	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/contentkind"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 	"uuid"
@@ -37,22 +37,20 @@ func (k MeasureKind) Restrictive() bool { return k == MeasureSuspension || k == 
 // HasEndTime 回報這個種類的措施可以有結束時間：停權與終止合作（終止合作只在預告期間內店家關閉時由系統寫入）；警告與內容下架沒有。
 func (k MeasureKind) HasEndTime() bool { return k == MeasureSuspension || k == MeasureTermination }
 
-// ContentKind 是內容下架措施的對象種類，儲存的代碼（measure_contents_content_kind_check）與社群內容的種類一一對應。
-type ContentKind string
+// ContentKind 是內容下架措施的對象種類，儲存的代碼（measure_contents_content_kind_check）；值由 platform/contentkind 擁有，與 social 共用同一份。
+type ContentKind = contentkind.Kind
 
 const (
 	// ContentPost 店家貼文。
-	ContentPost ContentKind = "POST"
+	ContentPost = contentkind.Post
 	// ContentComment 留言。
-	ContentComment ContentKind = "COMMENT"
+	ContentComment = contentkind.Comment
 	// ContentForumEntry 討論區留言。
-	ContentForumEntry ContentKind = "FORUM_ENTRY"
+	ContentForumEntry = contentkind.ForumEntry
 )
 
 // ContentKindValues 回傳全部內容種類，與 DB 的 measure_contents_content_kind_check 一致。
-func ContentKindValues() []ContentKind {
-	return []ContentKind{ContentPost, ContentComment, ContentForumEntry}
-}
+func ContentKindValues() []ContentKind { return contentkind.Values() }
 
 // ContentRef 是內容下架措施的一個對象：種類加上 social 的列 ID（不透明的外部參照，seller 不讀 social）。
 type ContentRef struct {
@@ -72,7 +70,7 @@ func ValidateContentTargets(field string, refs []ContentRef) error {
 	for i, r := range refs {
 		at := apperr.IndexedField(field, i)
 		switch {
-		case !slices.Contains(ContentKindValues(), r.Kind):
+		case !r.Kind.Valid():
 			return apperr.InvalidInputOn([]string{at}, "內容種類不合法")
 		case r.ID == uuid.Nil():
 			return apperr.InvalidInputOn([]string{at}, "內容 ID 不可為空")

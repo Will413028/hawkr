@@ -334,3 +334,20 @@ func TestTakedownOfMissingContentFailsTheCallersTransaction(t *testing.T) {
 	}
 	_ = td
 }
+
+// 不認得的內容種類：訂閱者回錯誤，措施跟著回滾，不是靜默略過。
+func TestTakedownOfUnknownContentKindFailsTheCallersTransaction(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	f.takedowns(t)
+	w := f.takedownWorld(t)
+	err := f.db.InTx(context.Background(), func(ctx context.Context) error {
+		return events.Publish(ctx, f.bus, seller.MeasureCreated{MeasureID: uuid.NewV7(), StoreID: w.storeID, OccurredAt: f.clock(), Contents: []seller.ContentRef{ref("BOGUS", w.post.ID)}})
+	})
+	if err == nil {
+		t.Fatal("不認得的內容種類要讓建立失敗")
+	}
+	if n := f.scalar(t, "SELECT count(*) FROM social.content_takedowns"); n != 0 {
+		t.Fatalf("回滾後複本還在：%d", n)
+	}
+}

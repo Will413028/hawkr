@@ -447,7 +447,7 @@ func (m *Module) OnMeasureRevoked(ctx context.Context, e seller.MeasureRevoked) 
 func takedownContents(refs []seller.ContentRef) []stats.Content {
 	out := make([]stats.Content, len(refs))
 	for i, r := range refs {
-		out[i] = stats.Content{Kind: string(r.Kind), ID: r.ID}
+		out[i] = stats.Content{Kind: r.Kind, ID: r.ID}
 	}
 	return out
 }

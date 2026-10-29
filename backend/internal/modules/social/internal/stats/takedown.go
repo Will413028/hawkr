@@ -7,18 +7,12 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/store"
-)
-
-// 內容下架的對象種類（與 seller.ContentKind 的值相同，seller.measure_contents.content_kind 與 pub_content_takedowns 的 content_kind）。
-const (
-	ContentPost       = "POST"
-	ContentComment    = "COMMENT"
-	ContentForumEntry = "FORUM_ENTRY"
+	"github.com/Will413028/hawkr/backend/internal/platform/contentkind"
 )
 
 // Content 是內容下架的一個對象：種類加 social 的列 ID。
 type Content struct {
-	Kind string
+	Kind contentkind.Kind
 	ID   uuid.UUID
 }
 
@@ -26,20 +20,22 @@ type contentSet struct {
 	posts, comments, entries []uuid.UUID
 }
 
-func splitContents(cs []Content) contentSet {
+func splitContents(cs []Content) (contentSet, error) {
 	var out contentSet
 	for _, c := range cs {
 		switch c.Kind {
-		case ContentPost:
+		case contentkind.Post:
 			out.posts = append(out.posts, c.ID)
-		case ContentComment:
+		case contentkind.Comment:
 			out.comments = append(out.comments, c.ID)
-		case ContentForumEntry:
+		case contentkind.ForumEntry:
 			out.entries = append(out.entries, c.ID)
+		default:
+			return contentSet{}, fmt.Errorf("social：不認得的內容下架種類 %q（%s）", c.Kind, c.ID)
 		}
 	}
 	out.posts, out.comments, out.entries = Sorted(out.posts), Sorted(out.comments), Sorted(out.entries)
-	return out
+	return out, nil
 }
 
 func (c contentSet) empty() bool { return len(c.posts)+len(c.comments)+len(c.entries) == 0 }
@@ -49,7 +45,10 @@ func (c contentSet) empty() bool { return len(c.posts)+len(c.comments)+len(c.ent
 // 鎖的順序同 MarkAuthorInactive：先依 id 鎖內容列，再寫複本，再以兩次集合呼叫求值（函式依序鎖整批 stats），不另呼叫 Lock。
 // 貼文沒有計入旗標，公開讀取的述詞直接看複本。冪等：複本已經有的列不重複寫，沒有新增時不重新求值。
 func (s *Service) ApplyTakedowns(ctx context.Context, measureID uuid.UUID, at time.Time, contents []Content) error {
-	set := splitContents(contents)
+	set, err := splitContents(contents)
+	if err != nil {
+		return err
+	}
 	if set.empty() {
 		return nil
 	}
@@ -162,7 +161,7 @@ func (s *Service) syncTakedowns(ctx context.Context, rep *Report) error {
 		if _, ok := byMeasure[m.MeasureID]; !ok {
 			order = append(order, m.MeasureID)
 		}
-		byMeasure[m.MeasureID] = append(byMeasure[m.MeasureID], Content{Kind: m.ContentKind, ID: m.ContentID})
+		byMeasure[m.MeasureID] = append(byMeasure[m.MeasureID], Content{Kind: contentkind.Kind(m.ContentKind), ID: m.ContentID})
 	}
 	for _, id := range order {
 		if err := s.ApplyTakedowns(ctx, id, s.d.Now().UTC(), byMeasure[id]); err != nil {
