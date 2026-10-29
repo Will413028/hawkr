@@ -568,27 +568,43 @@ export const ExitEmptyListItem: Story = {
 		nativeDeletionTest(canvasElement, globals, async (dialog, user) => {
 			const item = dialog.querySelector<HTMLElement>(".cdx-list li:last-child");
 			if (!item) throw new Error("找不到空白清單項目");
+			const diagList = dialog.querySelector(".cdx-list");
 			await user.click(item);
 			setCaret(item, "end");
 			await user.keyboard("{Enter}離開清單後的文字");
 			// 編輯器的 onChange 是在輸入之後才非同步送出；受載的 CI runner 上預設的 1 秒會停在輸入到一半的快照。
-			await waitFor(
-				() => {
-					const value = args.onChange.mock.lastCall?.[0] ?? args.value;
-					expect(
-						JSON.parse(
-							value.blocks.find((block) => block.type === "list")?.listJson ??
-								"null",
+			try {
+				await waitFor(
+					() => {
+						const value = args.onChange.mock.lastCall?.[0] ?? args.value;
+						expect(
+							JSON.parse(
+								value.blocks.find((block) => block.type === "list")?.listJson ??
+									"null",
+							),
+						).toEqual({
+							ordered: false,
+							items: [{ runs: [{ text: "保留的清單項目" }] }],
+						});
+						expect(documentText(value)).toEqual(["離開清單後的文字"]);
+						expect(editableText(dialog, "離開清單後的文字")).toBeVisible();
+					},
+					{ timeout: 10_000 },
+				);
+			} catch (e) {
+				console.error(
+					"[DEBUG-echo] story",
+					JSON.stringify({
+						dom: [...dialog.querySelectorAll(".ce-paragraph")].map(
+							(el) => el.textContent,
 						),
-					).toEqual({
-						ordered: false,
-						items: [{ runs: [{ text: "保留的清單項目" }] }],
-					});
-					expect(documentText(value)).toEqual(["離開清單後的文字"]);
-					expect(editableText(dialog, "離開清單後的文字")).toBeVisible();
-				},
-				{ timeout: 10_000 },
-			);
+						listConnected: diagList?.isConnected,
+						active: dialog.ownerDocument.activeElement?.className,
+						calls: args.onChange.mock.calls.length,
+					}),
+				);
+				throw e;
+			}
 		}),
 };
 

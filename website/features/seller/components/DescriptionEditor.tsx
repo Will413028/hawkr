@@ -2316,6 +2316,7 @@ export function DescriptionEditorCanvas({
 		}
 		const editor = editorRef.current;
 		if (!editor?.render) return;
+		console.warn("[DEBUG-echo] external render", sig.slice(0, 160));
 		lastSig.current = sig;
 		renderChainRef.current = renderChainRef.current
 			.then(() => editor.isReady)
