@@ -1233,6 +1233,8 @@ message Measure {
   // 不能申覆的原因，依優先序排列（已撤銷、已申覆過、申覆期限已過、有審核中的請求）；can_appeal 是 true 時是空的，反之不為空，兩者來自同一個
   // 規則（與 SubmitAppeal 的前置檢查相同），client 顯示第一個的 message，不自己推導。
   repeated AppealUnavailability appeal_unavailabilities = 24 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 內容下架（kind 是 CONTENT_TAKEDOWN）的對象，依種類、id 排序，賣家據此知道被下架的是哪些內容、申覆什麼；其他種類沒有。建立後不能改。
+  repeated ContentRef contents = 25 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 message ListMyMeasuresRequest {

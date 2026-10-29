@@ -289,3 +289,19 @@ func containsAdminID(text string) bool {
 	}
 	return false
 }
+
+// 內容下架的對象給賣家看（賣家據此知道申覆的是哪些內容），其他種類沒有。
+func TestMeasureResponseCarriesTheTakedownContents(t *testing.T) {
+	m := measureFixture()
+	post, comment := uuid.MustParse("0192f1c0-0000-7000-8000-0000000000a1"), uuid.MustParse("0192f1c0-0000-7000-8000-0000000000a2")
+	m.Kind = model.MeasureContentTakedown
+	m.Contents = []model.ContentRef{{Kind: model.ContentPost, ID: post}, {Kind: model.ContentComment, ID: comment}}
+	got := toMeasure(uitext.ZhTW, m).GetContents()
+	if len(got) != 2 || got[0].GetKind() != pb.ContentKind_CONTENT_KIND_POST || got[0].GetId() != post.String() ||
+		got[1].GetKind() != pb.ContentKind_CONTENT_KIND_COMMENT || got[1].GetId() != comment.String() {
+		t.Fatalf("contents=%v", got)
+	}
+	if n := len(toMeasure(uitext.ZhTW, measureFixture()).GetContents()); n != 0 {
+		t.Fatalf("其他種類不帶對象：%d", n)
+	}
+}

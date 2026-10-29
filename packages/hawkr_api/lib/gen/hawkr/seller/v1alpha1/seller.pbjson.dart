@@ -2706,6 +2706,15 @@ const Measure$json = {
       '8': {},
       '10': 'appealUnavailabilities'
     },
+    {
+      '1': 'contents',
+      '3': 25,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.seller.v1alpha1.ContentRef',
+      '8': {},
+      '10': 'contents'
+    },
   ],
   '9': [
     {'1': 9, '2': 10},
@@ -2747,9 +2756,11 @@ final $typed_data.Uint8List measureDescriptor = $convert.base64Decode(
     'NSEXRlcm1pbmF0aW9uR3JvdW5kElEKFGFwcGVhbF9kZWFkbGluZV90aW1lGBUgASgLMhouZ29v'
     'Z2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUhJhcHBlYWxEZWFkbGluZVRpbWUSaQoXYXBwZW'
     'FsX3VuYXZhaWxhYmlsaXRpZXMYGCADKAsyKy5oYXdrci5zZWxsZXIudjFhbHBoYTEuQXBwZWFs'
-    'VW5hdmFpbGFiaWxpdHlCA+BBA1IWYXBwZWFsVW5hdmFpbGFiaWxpdGllc0oECAkQCkoECA4QD0'
-    'oECBMQFEoECBYQF1IGYXBwZWFsUhRyZW1lZGlhdGlvbl9yZXF1ZXN0c1IfcmVtZWRpYXRpb25f'
-    'dW5hdmFpbGFibGVfcmVhc29uc1IaYXBwZWFsX3VuYXZhaWxhYmxlX3JlYXNvbnM=');
+    'VW5hdmFpbGFiaWxpdHlCA+BBA1IWYXBwZWFsVW5hdmFpbGFiaWxpdGllcxJCCghjb250ZW50cx'
+    'gZIAMoCzIhLmhhd2tyLnNlbGxlci52MWFscGhhMS5Db250ZW50UmVmQgPgQQNSCGNvbnRlbnRz'
+    'SgQICRAKSgQIDhAPSgQIExAUSgQIFhAXUgZhcHBlYWxSFHJlbWVkaWF0aW9uX3JlcXVlc3RzUh'
+    '9yZW1lZGlhdGlvbl91bmF2YWlsYWJsZV9yZWFzb25zUhphcHBlYWxfdW5hdmFpbGFibGVfcmVh'
+    'c29ucw==');
 
 @$core.Deprecated('Use listMyMeasuresRequestDescriptor instead')
 const ListMyMeasuresRequest$json = {
@@ -3361,6 +3372,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.seller.v1alpha1.RemediationUnavailability':
       RemediationUnavailability$json,
   '.hawkr.seller.v1alpha1.AppealUnavailability': AppealUnavailability$json,
+  '.hawkr.seller.v1alpha1.ContentRef': ContentRef$json,
   '.hawkr.seller.v1alpha1.GetMyMeasureRequest': GetMyMeasureRequest$json,
   '.hawkr.seller.v1alpha1.GetMyMeasureResponse': GetMyMeasureResponse$json,
   '.hawkr.seller.v1alpha1.SubmitAppealRequest': SubmitAppealRequest$json,

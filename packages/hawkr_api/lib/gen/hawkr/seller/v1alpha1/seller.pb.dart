@@ -5289,6 +5289,7 @@ class Measure extends $pb.GeneratedMessage {
     $1.Timestamp? appealDeadlineTime,
     $core.Iterable<RemediationUnavailability>? remediationUnavailabilities,
     $core.Iterable<AppealUnavailability>? appealUnavailabilities,
+    $core.Iterable<ContentRef>? contents,
   }) {
     final result = Measure._();
     if (id != null) result.id = id;
@@ -5316,6 +5317,7 @@ class Measure extends $pb.GeneratedMessage {
       result.remediationUnavailabilities.addAll(remediationUnavailabilities);
     if (appealUnavailabilities != null)
       result.appealUnavailabilities.addAll(appealUnavailabilities);
+    if (contents != null) result.contents.addAll(contents);
     return result;
   }
 
@@ -5370,6 +5372,8 @@ class Measure extends $pb.GeneratedMessage {
     ..pPM<AppealUnavailability>(
         24, _omitFieldNames ? '' : 'appealUnavailabilities',
         subBuilder: AppealUnavailability.$_createMessage)
+    ..pPM<ContentRef>(25, _omitFieldNames ? '' : 'contents',
+        subBuilder: ContentRef.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -5583,6 +5587,10 @@ class Measure extends $pb.GeneratedMessage {
   /// 規則（與 SubmitAppeal 的前置檢查相同），client 顯示第一個的 message，不自己推導。
   @$pb.TagNumber(24)
   $pb.PbList<AppealUnavailability> get appealUnavailabilities => $_getList(19);
+
+  /// 內容下架（kind 是 CONTENT_TAKEDOWN）的對象，依種類、id 排序，賣家據此知道被下架的是哪些內容、申覆什麼；其他種類沒有。建立後不能改。
+  @$pb.TagNumber(25)
+  $pb.PbList<ContentRef> get contents => $_getList(20);
 }
 
 class ListMyMeasuresRequest extends $pb.GeneratedMessage {

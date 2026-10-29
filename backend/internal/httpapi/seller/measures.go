@@ -151,6 +151,9 @@ func toMeasure(l uitext.Locale, m model.Measure) *pb.Measure {
 			Severity: rpc.EnumToProto[pb.ViolationSeverity](f.Severity), CreateTime: timestamppb.New(f.CreatedAt),
 		})
 	}
+	for _, c := range m.Contents {
+		out.Contents = append(out.Contents, &pb.ContentRef{Kind: rpc.EnumToProto[pb.ContentKind](c.Kind), Id: c.ID.String()})
+	}
 	if m.Kind.Restrictive() {
 		out.Period = &pb.MeasurePeriod{StartTime: timestamppb.New(m.StartsAt)}
 		if m.EndsAt != nil {
