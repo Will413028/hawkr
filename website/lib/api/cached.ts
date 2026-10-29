@@ -1,6 +1,8 @@
 import * as Sentry from "@sentry/nextjs";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
+import { fetchRecommendedStores } from "@/lib/discovery/recommended";
+import { defaultLocale } from "@/lib/intl/locales";
 import type { ProductRecord } from "@/lib/market/listFilters";
 import { fetchTrendingPostTags } from "@/lib/post-tags/repo";
 import { fetchProductReviews } from "@/lib/reviews/repo";
@@ -8,7 +10,7 @@ import { fetchPopularHashtags } from "@/lib/search/repo";
 import { PUBLIC_CACHE_TAGS, productTag, sellerTag } from "@/lib/seo/tags";
 import {
 	fetchCategoryTree,
-	fetchMarketplace,
+	fetchHotProducts,
 	fetchProducts,
 	fetchPublicProduct,
 	fetchSeller,
@@ -16,7 +18,6 @@ import {
 	fetchSellerReviewStats,
 	fetchSellerReviews,
 	fetchSellerStats,
-	fetchSellers,
 } from "./index";
 import { fetchPublicPostsTyped } from "./posts";
 import { prerenderSafe } from "./prerender";
@@ -392,47 +393,24 @@ export const getCachedSellerProducts = cache(
  * instead of committing a synthetic empty payload as fresh.
  */
 
-export const getCachedMarketplace = cache(
-	async (sellerLimit = 8, postLimit = 6, productLimit = 8) => {
-		return cachedRead(
-			() =>
-				timedFetch(
-					"marketplace",
-					() =>
-						fetchMarketplace(
-							sellerLimit,
-							postLimit,
-							productLimit,
-							undefined,
-							true,
-						),
-					{
-						key: [
-							"marketplace",
-							String(sellerLimit),
-							String(postLimit),
-							String(productLimit),
-						],
-						endpoint: "/public/marketplace",
-					},
-				),
-			[
-				"marketplace",
-				String(sellerLimit),
-				String(postLimit),
-				String(productLimit),
-			],
-			{
-				tags: [
-					PUBLIC_CACHE_TAGS.products,
-					PUBLIC_CACHE_TAGS.sellers,
-					PUBLIC_CACHE_TAGS.posts,
-				],
-				revalidate: CACHE_TTL.COMMERCE_LIVE,
-			},
-		);
-	},
-);
+export const getCachedHotProducts = cache(async (limit = 8) => {
+	return cachedRead(
+		() =>
+			timedFetch(
+				"hot-products",
+				() => fetchHotProducts(limit, { strict: true }),
+				{
+					key: ["hot-products", String(limit)],
+					endpoint: "/public/products?sort=SALES",
+				},
+			),
+		["hot-products", String(limit)],
+		{
+			tags: [PUBLIC_CACHE_TAGS.products],
+			revalidate: CACHE_TTL.COMMERCE_LIVE,
+		},
+	);
+});
 
 /** First page of the unfiltered public products list (keyword ""). The home
  *  shelves and the origin-map aggregation share this single read. */
@@ -492,10 +470,10 @@ export const getCachedRecommendedSellers = cache(async (limit = 8) => {
 		() =>
 			timedFetch(
 				"recommended-sellers",
-				() => fetchSellers(limit, undefined, true),
+				() => fetchRecommendedStores(limit, { locale: defaultLocale }),
 				{
 					key: ["recommended-sellers", String(limit)],
-					endpoint: "/public/sellers/recommended",
+					endpoint: "DiscoveryPublicService/SuggestRecommendedSellers",
 				},
 			),
 		["recommended-sellers", String(limit)],

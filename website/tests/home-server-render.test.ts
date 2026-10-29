@@ -59,7 +59,7 @@ test("home page keeps the strict-throw / prerenderSafe freshness contract", asyn
 	// The server bootstrap uses the strict cached helpers with the exact same args
 	// as the browser route, and must NOT swallow errors into an empty payload.
 	assert.match(bootstrap, /import "server-only"/);
-	assert.match(bootstrap, /getCachedMarketplace\(8, 6, 8\)/);
+	assert.match(bootstrap, /getCachedHotProducts\(8\)/);
 	assert.match(bootstrap, /getCachedProductsFirstPage\(100\)/);
 	assert.match(bootstrap, /getCachedRecommendedSellers\(24\)/);
 	assert.match(bootstrap, /getCachedPublicPosts\(1, 8\)/);
@@ -77,6 +77,5 @@ test("home snapshot builder stays a pure, client-safe module", async () => {
 	assert.doesNotMatch(source, /\bfetch\(|window\./);
 	assert.match(source, /export function buildHomeSnapshot\(/);
 	assert.match(source, /export function homeSnapshotProductIds\(/);
-	// The canonical seller-logo transform moved here with the builder.
-	assert.match(source, /logo_url: recommendedSellerLogoUrl\(seller\)/);
+	assert.match(source, /logo_url: store\.logoUrl/);
 });

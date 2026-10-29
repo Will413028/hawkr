@@ -4,19 +4,20 @@ import { notFound } from "next/navigation";
 import * as React from "react";
 import Button from "@/components/ui/Button";
 import type { StoryItem } from "@/features/feed/components/StoryRail";
+import { recommendedStoriesFromStores } from "@/features/feed/recommendedStories";
 import MarketProductsList, {
 	type MarketProductItem,
 } from "@/features/market/components/MarketProductsList";
 import MarketProductsListLayout, {
 	type SidebarHashtagLink,
 } from "@/features/market/products/MarketProductsListLayout";
-import { fetchCategoryTree, fetchSeller, fetchSellers } from "@/lib/api";
+import { fetchCategoryTree, fetchSeller } from "@/lib/api";
 import { ApiClientError } from "@/lib/api/client";
+import { fetchRecommendedStores } from "@/lib/discovery/recommended";
 import { useSellerSelf } from "@/lib/hooks/useSellerSelf";
 import type { CategoryNode, MarketFetchParams } from "@/lib/market/listFilters";
 import { useNotificationToast } from "@/lib/notifications/toast-context";
 import { fetchPopularHashtags } from "@/lib/search/repo";
-import { recommendedSellerLogoUrl } from "@/lib/seller/recommended-logo";
 import { storeIdOf } from "@/lib/seller/store";
 import { PreviewBanner } from "../components/PreviewBanner";
 import { UI_TEXT } from "../i18n";
@@ -169,29 +170,8 @@ export function PreviewListingPage({ jobId }: Props) {
 				if (Array.isArray(tree)) setCategories(tree as CategoryNode[]);
 			})
 			.catch(() => undefined);
-		void fetchSellers(12)
-			.then((sellers) => {
-				const items: StoryItem[] = (sellers as Array<Record<string, unknown>>)
-					.filter((s) => s?.storeId && s?.storeName)
-					.map((s) => ({
-						id: String(s.storeId),
-						// Same snake_case segment as the market rail. The route is
-						// noindex + seller-guarded, so no crawler sees these hrefs — but
-						// FeedStories renders StoryRail without `onSelect`, so they are
-						// real <Link>s a seller can click. Omitting the code would cost
-						// that seller a 308 (#365).
-						storeCode:
-							typeof s.storeCode === "string"
-								? s.storeCode.trim() || undefined
-								: undefined,
-						name: String(s.storeName),
-						avatar: recommendedSellerLogoUrl(s),
-						city: typeof s.city === "string" ? s.city : undefined,
-						district: typeof s.district === "string" ? s.district : undefined,
-					}))
-					.slice(0, 12);
-				setStories(items);
-			})
+		void fetchRecommendedStores(12)
+			.then((stores) => setStories(recommendedStoriesFromStores(stores)))
 			.catch(() => undefined);
 		void fetchPopularHashtags({ limit: 8 })
 			.then((tags) => setTrendingHashtags(tags))

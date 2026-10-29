@@ -8,7 +8,7 @@ import type { CartItem } from "@/lib/cart";
 import { isFreeShippingForSubtotal } from "@/lib/checkout/free-shipping";
 import type { AvailableShippingOption } from "@/lib/checkout/repo";
 import { useShippingOptions } from "@/lib/hooks/useShippingOptions";
-import { sellerPath } from "@/lib/seo/urls";
+import type { StoreCardView } from "@/lib/seller/storeCardView";
 import { CartProductTile } from "./CartProductTile";
 
 interface SellerGroup {
@@ -26,6 +26,8 @@ interface SellerGroup {
 
 interface Props {
 	group: SellerGroup;
+	/** 店家卡片（BatchGetStores）的呈現；還沒讀到或沒有卡片時是 undefined，此時不顯示進店連結。 */
+	storeView?: StoreCardView;
 	groupKey: string;
 	isLocked: boolean;
 	isLoggedIn: boolean;
@@ -56,6 +58,7 @@ function ntFormat(n: number) {
  */
 export function SellerGroupCard({
 	group,
+	storeView,
 	groupKey,
 	isLocked,
 	isLoggedIn,
@@ -146,12 +149,19 @@ export function SellerGroupCard({
 						fallback="empty"
 					/>
 					<div className="cart-page__seller-name">
-						<strong className="cart-type-subtitle">{group.sellerName}</strong>
+						<strong className="cart-type-subtitle">
+							{storeView?.name ?? group.sellerName}
+						</strong>
+						{storeView?.labelText ? (
+							<small className="cart-page__seller-location">
+								{storeView.labelText}
+							</small>
+						) : null}
 					</div>
 				</div>
-				{group.sellerStoreId || group.sellerStoreCode ? (
+				{storeView?.href ? (
 					<Button
-						href={sellerPath(group.sellerStoreCode, group.sellerStoreId)}
+						href={storeView.href}
 						variant="light"
 						size="md"
 						className="cart-page__shop-link"

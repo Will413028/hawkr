@@ -12,12 +12,13 @@
  * reach the server HTML for SEO.
  */
 
-import type { MarketSellerItem } from "@/features/market/components/MarketSellerCard";
-import type { MarketplaceProduct, MarketplaceSeller } from "@/lib/api";
+import type { HomeMerchantItem } from "@/features/home/components/HomeCompactMerchants";
+import type { MarketplaceProduct } from "@/lib/api";
 import type { PostListItem } from "@/lib/api/openapi-types";
 import { normalizePost } from "@/lib/api/posts";
 import type { HomeTabBootstrapV1 } from "@/lib/api/tab-bootstrap";
 import { formatUnitLabel } from "@/lib/codemeta/enums";
+import type { RecommendedStore } from "@/lib/discovery/recommended";
 import {
 	type CategoryGroup,
 	categoryGroupMemberIds,
@@ -30,7 +31,7 @@ import {
 	type PriceFields,
 } from "@/lib/products/pricing";
 import { parseRating, parseReviewCount } from "@/lib/products/rating";
-import { recommendedSellerLogoUrl } from "@/lib/seller/recommended-logo";
+import { storeLocation } from "@/lib/seller/store-location";
 import { sellerPath } from "@/lib/seo/urls";
 
 /**
@@ -274,48 +275,19 @@ function toProduct(product: ProductSource, index: number): MarketProductItem {
 	};
 }
 
-function hasRealSellerIdentity(seller: MarketplaceSeller): boolean {
-	return (
-		seller.storeId !== undefined &&
-		seller.storeId !== null &&
-		String(seller.storeId).trim().length > 0 &&
-		sellerDisplayName(seller).length > 0
-	);
-}
-
-/** Both recommended-seller sources emit the店名 as `storeName` (gateway
- *  `recommended_sellers.go` / `marketplace.go`). No aliases: a name that stops
- *  arriving must surface as an empty card, not be papered over by a sibling key. */
-function sellerDisplayName(seller: MarketplaceSeller): string {
-	return (seller.storeName ?? "").trim();
-}
-
-function toSeller(seller: MarketplaceSeller, index: number): MarketSellerItem {
-	const id = String(seller.storeId || index);
-	const name = sellerDisplayName(seller);
-	const location =
-		[seller.city, seller.district].filter(Boolean).join(" ") || "在地商家";
-	const certification = seller.certified ? "商家認證" : "本週推薦";
+function toSeller(store: RecommendedStore): HomeMerchantItem {
+	const location = storeLocation(store.townCode);
+	const place = location ? `${location.city} ${location.district}` : "在地商家";
 	return {
-		id,
-		name,
-		location: `${location} · ${certification}`,
-		image: seller.coverUrl || FALLBACK_SELLER_COVER,
-		logo_url: recommendedSellerLogoUrl(seller),
-		desc:
-			seller.description?.trim() ||
-			"追蹤喜歡的店，下一次上架、出貨與新品動態不漏接。",
-		rating: Number(seller.rating) || 0,
-		followers: seller.followers ?? 0,
-		products: 0,
-		posts: 0,
-		// Every seller payload now carries the canonical segment as camelCase
-		// `storeCode` (backend#2235). Reading the wrong case here would silently
-		// fall back to the storeId and buy a 308 on every tap of the home 推薦商家
-		// rail (#365).
-		href: sellerPath(seller.storeCode, id),
-		certified: Boolean(seller.certified),
-		prize: typeof seller.prize === "string" ? seller.prize.trim() : "",
+		id: store.id,
+		name: store.name,
+		location: `${place} · 本週推薦`,
+		image: store.coverUrl || FALLBACK_SELLER_COVER,
+		logo_url: store.logoUrl,
+		rating: store.ratingAverage,
+		reviewCount: store.reviewCount,
+		followers: store.followerCount,
+		href: sellerPath(store.storeCode),
 	};
 }
 
@@ -353,40 +325,6 @@ function dedupeProducts(products: MarketProductItem[]): MarketProductItem[] {
 		if (!product.id || seen.has(product.id)) continue;
 		seen.add(product.id);
 		out.push(product);
-	}
-	return out;
-}
-
-/**
- * 推薦 rail 的品質分：後端排序是「30 天營收榜 → 不足以最新核准補位」，
- * 測試/冷啟環境幾乎全靠補位，導致無封面、無描述、零評價的空殼店照建立
- * 時間佔滿版位。在既有候選池內以檔案完整度＋口碑重排——有封面、有描述、
- * 有評價的店先可見。平分時 sort 穩定性保留後端順序，營收榜的次序訊號
- * 不會被抹掉。
- */
-function sellerQualityScore(seller: MarketplaceSeller): number {
-	let score = 0;
-	if (seller.coverUrl?.trim()) score += 3;
-	if (seller.certified) score += 3;
-	if (seller.description?.trim()) score += 2;
-	if (recommendedSellerLogoUrl(seller)) score += 1;
-	if (typeof seller.prize === "string" && seller.prize.trim()) score += 1;
-	score += Math.min(5, Number(seller.rating) || 0);
-	score += Math.min(5, (seller.followers ?? 0) / 10);
-	return score;
-}
-
-function dedupeSellers(sellers: MarketplaceSeller[]): MarketplaceSeller[] {
-	const seen = new Set<string>();
-	const out: MarketplaceSeller[] = [];
-	for (const seller of sellers) {
-		const id =
-			seller.storeId === undefined || seller.storeId === null
-				? ""
-				: String(seller.storeId).trim();
-		if (!id || seen.has(id)) continue;
-		seen.add(id);
-		out.push(seller);
 	}
 	return out;
 }
@@ -450,7 +388,7 @@ export interface HomeSnapshot {
 	newArrivalProducts: MarketProductItem[];
 	dealProducts: MarketProductItem[];
 	originProducts: MarketProductItem[];
-	mappedSellers: MarketSellerItem[];
+	mappedSellers: HomeMerchantItem[];
 	compactUpdates: PostListItem[];
 	discoveryShelves: HomeDiscoveryShelf[];
 }
@@ -463,7 +401,7 @@ export interface HomeSnapshot {
  */
 export function buildHomeSnapshot(bootstrap: HomeTabBootstrapV1): HomeSnapshot {
 	const {
-		marketplace,
+		hotProducts,
 		products: productsJson,
 		recommendedSellers,
 		posts,
@@ -471,8 +409,9 @@ export function buildHomeSnapshot(bootstrap: HomeTabBootstrapV1): HomeSnapshot {
 
 	const productRecords = getProductRecords(productsJson);
 	const realProductRecords = productRecords.filter(hasRealProductIdentity);
-	const marketplaceHotProductRecords =
-		marketplace?.hotProducts?.filter(hasRealProductIdentity) ?? [];
+	const marketplaceHotProductRecords = (hotProducts ?? []).filter(
+		hasRealProductIdentity,
+	);
 	const marketplaceHotProducts = marketplaceHotProductRecords.map(toProduct);
 	const fetchedProducts = dedupeProducts([
 		...realProductRecords.map(toProduct),
@@ -503,17 +442,9 @@ export function buildHomeSnapshot(bootstrap: HomeTabBootstrapV1): HomeSnapshot {
 		(product) => product.origin,
 	);
 	const originProducts = cycleProducts(realOriginProducts, 16, 8);
-	const mappedSellers: MarketSellerItem[] = dedupeSellers([
-		...(marketplace?.recommendedSellers ?? []),
-		...recommendedSellers,
-	])
-		.filter(hasRealSellerIdentity)
-		.sort((a, b) => sellerQualityScore(b) - sellerQualityScore(a))
+	const mappedSellers: HomeMerchantItem[] = recommendedSellers
 		.slice(0, 8)
 		.map(toSeller);
-	// Do not fan this into another 2 × seller-count API wave. The
-	// recommended-seller payload is sufficient for this compact rail; richer
-	// stats still load on storefronts.
 	const feedPosts: PostListItem[] = (posts.records ?? []).map((raw) =>
 		normalizePost(raw),
 	);

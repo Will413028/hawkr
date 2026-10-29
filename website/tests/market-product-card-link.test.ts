@@ -30,10 +30,7 @@ test("the card exposes one full-card product link without nesting controls", asy
 	assert.match(source, /className="absolute[^"]*z-20[^"]*"/);
 	// The seller anchor sits above the full-card link and points at the
 	// CANONICAL storefront segment — see tests/seller-link-canonical.test.ts.
-	assert.match(
-		source,
-		/href=\{sellerPath\(product\.sellerStoreCode, product\.sellerId\)\}/,
-	);
+	assert.match(source, /href=\{sellerHref\}/);
 	assert.match(source, /className="relative z-20 flex min-w-0/);
 	assert.match(source, /market-product-card__qty relative z-20/);
 	assert.match(source, /market-product-card__cart-btn relative z-20/);

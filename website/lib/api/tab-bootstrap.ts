@@ -1,5 +1,6 @@
-import type { MarketplaceData, MarketplaceSeller } from "@/lib/api";
+import type { MarketplaceProduct } from "@/lib/api";
 import type { Paginated, PostListItem } from "@/lib/api/openapi-types";
+import type { RecommendedStore } from "@/lib/discovery/recommended";
 import type { CategoryGroup } from "@/lib/market/categoryGroups";
 
 /**
@@ -11,10 +12,10 @@ import type { CategoryGroup } from "@/lib/market/categoryGroups";
  * other cookie-derived fields must never be added here.
  */
 export interface HomeTabBootstrapV1 {
-	schemaVersion: "home.v1";
-	marketplace: MarketplaceData | null;
+	schemaVersion: "home.v2";
+	hotProducts: MarketplaceProduct[];
 	products: unknown;
-	recommendedSellers: MarketplaceSeller[];
+	recommendedSellers: RecommendedStore[];
 	posts: Paginated<PostListItem>;
 	/** lv1 categories with their descendant ids, from `/public/categories/tree`
 	 *  (see `lib/market/categoryGroups`). Empty when the tree was unsupplied —
@@ -43,7 +44,7 @@ const TAB_DATA_WARM_DEADLINE_MS = 4_500;
 /** Domains the route can report as unsupplied, and therefore the only keys a
  *  degraded payload may carry forward from the previous answer. */
 const RETAINABLE_DOMAINS = [
-	"marketplace",
+	"hotProducts",
 	"products",
 	"posts",
 	"recommendedSellers",
@@ -128,7 +129,7 @@ async function requestHomeTabBootstrap(): Promise<HomeTabBootstrapV1> {
 	const payload = (await response.json()) as Partial<HomeTabBootstrapV1> & {
 		degraded?: unknown;
 	};
-	if (payload.schemaVersion !== "home.v1") {
+	if (payload.schemaVersion !== "home.v2") {
 		throw new Error("unsupported home bootstrap schema");
 	}
 	const validated = payload as HomeTabBootstrapV1;

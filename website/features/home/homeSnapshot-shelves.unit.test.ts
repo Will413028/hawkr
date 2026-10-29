@@ -23,8 +23,8 @@ const bootstrap = (
 	records: Record<string, unknown>[],
 	categoryGroups: HomeTabBootstrapV1["categoryGroups"],
 ): HomeTabBootstrapV1 => ({
-	schemaVersion: "home.v1",
-	marketplace: null,
+	schemaVersion: "home.v2",
+	hotProducts: [],
 	products: { data: { records } },
 	recommendedSellers: [],
 	posts: { page: 1, pageSize: 8, total: 0, records: [] },

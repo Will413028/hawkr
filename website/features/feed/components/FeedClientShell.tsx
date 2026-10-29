@@ -9,8 +9,9 @@ import FeedStories, {
 import InfiniteFeed from "@/features/feed/components/InfiniteFeed";
 import type { StoryItem } from "@/features/feed/components/StoryRail";
 import { useFeedUiStore } from "@/features/feed/feedUiStore";
-import { fetchSellers, type MarketplaceSeller } from "@/lib/api";
+import { recommendedStoriesFromStores } from "@/features/feed/recommendedStories";
 import type { PostListItem } from "@/lib/api/openapi-types";
+import { fetchRecommendedStores } from "@/lib/discovery/recommended";
 import {
 	type FeedListSnapshot,
 	feedListSnapshotForInitialRender,
@@ -19,7 +20,6 @@ import {
 } from "@/lib/feed/listSnapshot";
 import { useHydrationSafeClientRender } from "@/lib/hooks/useHydrationSafeClientRender";
 import { queryKeys } from "@/lib/query/keys";
-import { recommendedSellerLogoUrl } from "@/lib/seller/recommended-logo";
 
 interface FeedClientShellProps {
 	stories: StoryItem[];
@@ -40,47 +40,6 @@ interface FeedClientShellProps {
 	/** Client-fetched deep-linked post (ISR route reads `?post` on the client);
 	 *  prepended into the feed so the viewer can open it. */
 	deepLinkPost?: PostListItem | null;
-}
-
-function readNumber(
-	source: Record<string, unknown>,
-	keys: string[],
-): number | undefined {
-	for (const key of keys) {
-		const raw = source[key];
-		const value = typeof raw === "string" ? Number(raw) : raw;
-		if (typeof value === "number" && Number.isFinite(value)) return value;
-	}
-	return undefined;
-}
-
-function buildSellerStories(sellers: MarketplaceSeller[]): StoryItem[] {
-	return sellers
-		.map((seller, index) => {
-			const raw = seller as MarketplaceSeller & Record<string, unknown>;
-			const rawId = seller.storeId;
-			const id =
-				typeof rawId === "string" || typeof rawId === "number" ? rawId : index;
-			return {
-				id,
-				// StoryRail feeds this straight into `sellerPath()`, so omitting it
-				// silently drops every avatar in the feed rail back onto its storeId
-				// — one 308 per tap (#365).
-				storeCode: seller.storeCode?.trim() || undefined,
-				name: seller.storeName || "Hawkr 商家",
-				avatar: recommendedSellerLogoUrl(seller),
-				city: seller.city,
-				district: seller.district,
-				// 推薦商家 record 沒有座標欄（recommended_sellers.go:40-54）；
-				// 保留這兩個讀取是為了與 /market 的同一條 rail 共用形狀。
-				latitude: readNumber(raw, ["latitude", "lat"]),
-				longitude: readNumber(raw, ["longitude", "lng"]),
-				// 刻意不設 hasUnread：推薦商家清單沒有「未讀 / 有新動態」訊號，
-				// 全部設 true 會讓整排都亮著狀態環（環就失去語意），而且
-				// /market 走同一份資料卻沒有這個欄位 → 兩個頁面長得不一樣。
-			} satisfies StoryItem;
-		})
-		.slice(0, 12);
 }
 
 /**
@@ -129,7 +88,7 @@ export default function FeedClientShell({
 		!sellerId && !hashtag && (!initialSeedFailed || Boolean(restoredSnapshot));
 	const sellersQuery = useQuery({
 		queryKey: queryKeys.feed.recommendedSellers(),
-		queryFn: ({ signal }) => fetchSellers(24, signal, true),
+		queryFn: ({ signal }) => fetchRecommendedStores(24, { signal }),
 		enabled: canEnrichStories,
 		staleTime: 10 * 60 * 1000,
 		gcTime: 30 * 60 * 1000,
@@ -137,7 +96,7 @@ export default function FeedClientShell({
 	});
 	const enrichedStories = React.useMemo(() => {
 		const sellers = sellersQuery.data ?? [];
-		return sellers.length > 0 ? buildSellerStories(sellers) : stories;
+		return sellers.length > 0 ? recommendedStoriesFromStores(sellers) : stories;
 	}, [sellersQuery.data, stories]);
 	const feedScopeKey = `${sellerId ?? ""}:${hashtag ?? ""}`;
 	const storeActiveTab = useFeedUiStore((state) =>

@@ -1,7 +1,6 @@
 "use client";
 
 import "@/styles/features/messages.css";
-import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
@@ -21,7 +20,6 @@ import {
 import ChatContextPanel from "@/features/messages/components/ChatContextPanel";
 import ChatPeerAvatar from "@/features/messages/components/ChatPeerAvatar";
 import SendButton from "@/features/messages/components/SendButton";
-import { fetchSeller } from "@/lib/api";
 import { chatWorkspaceRole } from "@/lib/chat/workspace";
 import { formatTaipeiTime } from "@/lib/date/taipei";
 import { useChatThread, useConversations } from "@/lib/hooks/useChat";
@@ -30,8 +28,7 @@ import { useKeyboardInset } from "@/lib/hooks/useKeyboardInset";
 import { usePathname } from "@/lib/intl/navigation";
 import { buildImageUrl } from "@/lib/media/cdn";
 import { useObservedRouter } from "@/lib/navigation/use-observed-router";
-import { queryKeys } from "@/lib/query/keys";
-import { sellerPath } from "@/lib/seo/urls";
+import { useStoreCardViews } from "@/lib/seller/useStoreCardViews";
 
 const QUICK_REPLIES = ["你好！", "請問還有現貨嗎？", "想了解出貨時間"];
 
@@ -220,48 +217,18 @@ export default function ThreadClient({
 		null,
 	);
 
-	// Conversation entries only exist after at least one message has been
-	// exchanged — first-time visitors landing here from the seller page
-	// have `activeConversation` undefined, which used to fall through to
-	// `對話對象 #<id>`. Fetch the seller's public profile as a fallback
-	// so the header shows a real name. Buyer-side only: when the local
-	// user is a seller talking to a buyer, `/public/sellers/{id}` returns
-	// nothing and we keep the numeric placeholder.
-	const peerFallbackQuery = useQuery({
-		queryKey: queryKeys.sellers.detail(targetId),
-		queryFn: () => fetchSeller(targetId),
-		enabled: !activeConversation && !isSeller && Boolean(targetId),
-	});
-	const peerFallback = peerFallbackQuery.data
-		? {
-				name: peerFallbackQuery.data.name || "",
-				logo_url:
-					typeof peerFallbackQuery.data.logo_url === "string"
-						? peerFallbackQuery.data.logo_url
-						: "",
-				// Wire name (gateway `PublicSellerInfo.storeCode`, backend#2235);
-				// `fetchSeller` passes it through unrenamed.
-				storeCode:
-					typeof peerFallbackQuery.data.storeCode === "string"
-						? peerFallbackQuery.data.storeCode
-						: "",
-			}
-		: null;
+	const { views: peerViews } = useStoreCardViews(
+		!isSeller && targetId ? [targetId] : [],
+	);
+	const peerView = peerViews.get(String(targetId));
 
 	const peerNickname =
-		activeConversation?.targetNickname ||
-		peerFallback?.name ||
-		hintedName ||
-		"";
+		activeConversation?.targetNickname || peerView?.name || hintedName || "";
 	const peerAvatar = isSeller
 		? activeConversation?.targetAvatar || hintedAvatar || ""
-		: activeConversation?.logo_url || peerFallback?.logo_url || "";
-	// 賣場連結走 canonical store_code：targetId 是 store_id（內部代理鍵），連它
-	// 每次點擊都要多吃一次 middleware 308。對話列表本來就帶著短碼；還沒有對話
-	// 紀錄時退回同樣已經在查的公開賣家 profile，兩者都取不到才不渲染連結。
-	const peerShopHref = sellerPath(
-		activeConversation?.storeCode || peerFallback?.storeCode,
-	);
+		: activeConversation?.logo_url || peerView?.logoUrl || "";
+	const peerShopHref = peerView?.href ?? "";
+	const peerLabel = peerView?.labelText;
 	const lastMessageKey =
 		messages.length > 0
 			? (messages[messages.length - 1]?.id ?? `${messages.length}`)
@@ -424,6 +391,9 @@ export default function ThreadClient({
 								<Link href={peerShopHref} className="thread-intro__shop">
 									查看賣場
 								</Link>
+							) : null}
+							{!isSeller && peerLabel ? (
+								<span className="thread-intro__copy">{peerLabel}</span>
 							) : null}
 						</div>
 					) : (

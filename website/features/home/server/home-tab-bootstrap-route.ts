@@ -1,18 +1,13 @@
 import "server-only";
 
 import { unstable_cache } from "next/cache";
-import {
-	fetchCategoryTree,
-	fetchMarketplace,
-	fetchProducts,
-	fetchSellers,
-	type MarketplaceSeller,
-} from "@/lib/api";
+import type { MarketplaceProduct } from "@/lib/api";
+import { fetchCategoryTree, fetchHotProducts, fetchProducts } from "@/lib/api";
 import {
 	CACHE_TTL,
 	coalesceRead,
 	getCachedCategoryTree,
-	getCachedMarketplace,
+	getCachedHotProducts,
 	getCachedProductsFirstPage,
 	getCachedPublicPosts,
 	getCachedRecommendedSellers,
@@ -22,6 +17,11 @@ import type { Paginated, PostListItem } from "@/lib/api/openapi-types";
 import { fetchPublicPostsTyped } from "@/lib/api/posts";
 import type { HomeTabBootstrapV1 } from "@/lib/api/tab-bootstrap";
 import { homeBootstrapBudget } from "@/lib/config/env";
+import {
+	fetchRecommendedStores,
+	type RecommendedStore,
+} from "@/lib/discovery/recommended";
+import { defaultLocale } from "@/lib/intl/locales";
 import {
 	type CategoryGroup,
 	categoryGroupsFromTree,
@@ -35,7 +35,7 @@ const EMPTY_POSTS: Paginated<PostListItem> = {
 	records: [],
 };
 
-type HomeLiveBootstrap = Pick<HomeTabBootstrapV1, "marketplace" | "products">;
+type HomeLiveBootstrap = Pick<HomeTabBootstrapV1, "hotProducts" | "products">;
 type HomeDiscoveryBootstrap = Pick<
 	HomeTabBootstrapV1,
 	"recommendedSellers" | "posts" | "categoryGroups"
@@ -43,7 +43,7 @@ type HomeDiscoveryBootstrap = Pick<
 
 /** The live wave carries the commerce surface: an empty one reads to a visitor
  *  as "this shop has no products", so it is never fabricated (see GET). */
-type LiveDomain = "marketplace" | "products";
+type LiveDomain = "hotProducts" | "products";
 /**
  * Community posts sit here, not in the live wave, and that is a deliberate
  * product call: an empty story rail reads as "nothing posted lately" — a state
@@ -57,7 +57,7 @@ type LiveDomain = "marketplace" | "products";
 type DiscoveryDomain = "recommendedSellers" | "posts" | "categoryGroups";
 type BootstrapDomain = LiveDomain | DiscoveryDomain;
 
-const LIVE_DOMAINS: readonly BootstrapDomain[] = ["marketplace", "products"];
+const LIVE_DOMAINS: readonly BootstrapDomain[] = ["hotProducts", "products"];
 
 /** A wave plus the domains inside it that no source could supply. */
 interface Degradable<T> {
@@ -132,28 +132,20 @@ const getCachedHomeLiveBootstrap = unstable_cache(
 		timedFetch(
 			"home-live-bootstrap",
 			async () => {
-				const [marketplace, products] = await Promise.all([
-					fetchMarketplace(8, 6, 8, undefined, true),
+				const [hotProducts, products] = await Promise.all([
+					fetchHotProducts(8, { strict: true }),
 					fetchProducts("", 1, 100, undefined, undefined, { strict: true }),
 				]);
-				return { marketplace, products };
+				return { hotProducts, products };
 			},
 			{
 				key: ["home-live-bootstrap"],
-				endpoint: "/public/marketplace, /public/products",
+				endpoint: "/public/products?sort=SALES, /public/products",
 			},
 		),
 	["home-live-bootstrap"],
 	{
-		// The marketplace payload folded in here embeds recommended sellers and
-		// latest posts alongside its hot-product list, so all three domains tag
-		// this entry even though the standalone seller / post lists live in the
-		// discovery aggregate.
-		tags: [
-			PUBLIC_CACHE_TAGS.products,
-			PUBLIC_CACHE_TAGS.sellers,
-			PUBLIC_CACHE_TAGS.posts,
-		],
+		tags: [PUBLIC_CACHE_TAGS.products],
 		revalidate: CACHE_TTL.COMMERCE_LIVE,
 	},
 );
@@ -164,7 +156,7 @@ const getCachedHomeDiscoveryBootstrap = unstable_cache(
 			"home-discovery-bootstrap",
 			async () => {
 				const [recommendedSellers, posts, categoryTree] = await Promise.all([
-					fetchSellers(24, undefined, true),
+					fetchRecommendedStores(24, { locale: defaultLocale }),
 					fetchPublicPostsTyped({ page: 1, pageSize: 8, strict: true }),
 					fetchCategoryTree(true),
 				]);
@@ -179,7 +171,7 @@ const getCachedHomeDiscoveryBootstrap = unstable_cache(
 			{
 				key: ["home-discovery-bootstrap"],
 				endpoint:
-					"/public/sellers/recommended, /public/posts, /public/categories/tree",
+					"DiscoveryPublicService/SuggestRecommendedSellers, /public/posts, /public/categories/tree",
 			},
 		),
 	["home-discovery-bootstrap"],
@@ -208,14 +200,19 @@ const getCachedHomeDiscoveryBootstrap = unstable_cache(
 async function fallbackLiveBootstrap(
 	budgetMs: number,
 ): Promise<Degradable<HomeLiveBootstrap>> {
-	const [marketplace, products] = await Promise.allSettled([
-		withDeadline(getCachedMarketplace(8, 6, 8), budgetMs, "marketplace"),
+	const [hotProducts, products] = await Promise.allSettled([
+		withDeadline(getCachedHotProducts(8), budgetMs, "hotProducts"),
 		withDeadline(getCachedProductsFirstPage(100), budgetMs, "products"),
 	]);
 	const degraded: BootstrapDomain[] = [];
 	return {
 		value: {
-			marketplace: orDegraded(marketplace, "marketplace", degraded, null),
+			hotProducts: orDegraded(
+				hotProducts,
+				"hotProducts",
+				degraded,
+				[] as MarketplaceProduct[],
+			),
 			products: orDegraded<unknown>(products, "products", degraded, {
 				data: { records: [] },
 			}),
@@ -243,7 +240,7 @@ async function fallbackDiscoveryBootstrap(
 				recommendedSellers,
 				"recommendedSellers",
 				degraded,
-				[] as MarketplaceSeller[],
+				[] as RecommendedStore[],
 			),
 			posts: orDegraded(posts, "posts", degraded, EMPTY_POSTS),
 			categoryGroups: orDegraded(
@@ -328,13 +325,12 @@ export async function GET() {
 		);
 	}
 
-	// Discovery is recoverable rather than load-bearing: marketplace already
-	// carries recommended sellers, and an absent story rail is a state
+	// Discovery is recoverable rather than load-bearing: an absent story rail is a state
 	// the page renders normally. So a missing discovery wave stays a 200 — but it
 	// is labelled, and `lib/api/tab-bootstrap.ts` reads the label to keep the rail
 	// it already holds instead of caching the gap as the new truth.
 	const payload: HomeTabBootstrapV1 & { degraded?: BootstrapDomain[] } = {
-		schemaVersion: "home.v1",
+		schemaVersion: "home.v2",
 		...live.value,
 		...discovery.value,
 		...(degraded.length > 0 ? { degraded } : {}),

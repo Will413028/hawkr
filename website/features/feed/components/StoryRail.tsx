@@ -10,10 +10,7 @@ export interface StoryItem {
 	id: number | string;
 	/**
 	 * Canonical storefront segment (`store_code`) when the payload that built
-	 * this item carried one — see `sellerPath` (#365). Producers reading a
-	 * recommended-seller payload take it from snake_case `store_code`; the rail
-	 * itself only ever sees this camelCase property. Omitted producers keep the
-	 * id path, which middleware answers with a 308.
+	 * this item carried one — see `sellerPath`.
 	 */
 	storeCode?: string;
 	name: string;
@@ -21,8 +18,6 @@ export interface StoryItem {
 	hasUnread?: boolean;
 	city?: string;
 	district?: string;
-	latitude?: number;
-	longitude?: number;
 }
 
 export interface StoryTab {
@@ -243,6 +238,7 @@ export default function StoryRail({
 				>
 					{items.map((s) => {
 						const region = regionLabel(s);
+						const href = sellerPath(s.storeCode);
 						const frameClass = `${AVATAR_FRAME} ${
 							s.hasUnread ? AVATAR_FRAME_UNREAD : AVATAR_FRAME_DEFAULT
 						}`;
@@ -250,10 +246,8 @@ export default function StoryRail({
 						 * Per the 2026-05 buyer-spec: the small store-badge icon at
 						 * the avatar's bottom-right is removed, and clicking the
 						 * avatar takes the buyer straight to the storefront
-						 * (`/sellers/:id`), not the seller's posts list. The segment is
-						 * the seller's store_code whenever the producer carried one, so
-						 * the tap lands on the canonical URL instead of paying for the
-						 * middleware 308 (#365).
+						 * (`/sellers/:store_code`), not the seller's posts list. An item
+						 * without a store_code has no storefront link.
 						 */
 						const inner = (
 							<>
@@ -296,14 +290,16 @@ export default function StoryRail({
 									>
 										{inner}
 									</button>
-								) : (
+								) : href ? (
 									<Link
-										href={sellerPath(s.storeCode, s.id)}
+										href={href}
 										className={btnClass}
 										aria-label={`進入 ${s.name} 的店家頁`}
 									>
 										{inner}
 									</Link>
+								) : (
+									<div className={btnClass}>{inner}</div>
 								)}
 							</li>
 						);

@@ -1,6 +1,6 @@
 import {
 	getCachedCategoryTree,
-	getCachedMarketplace,
+	getCachedHotProducts,
 	getCachedPopularHashtags,
 	getCachedProductsFirstPage,
 	getCachedRecommendedSellers,
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
 			getCachedRecommendedSellers(12).catch(() => null),
 		]);
 	} else {
-		await getCachedMarketplace(4, 4, 8).catch(() => null);
+		await getCachedHotProducts(8).catch(() => null);
 	}
 
 	return new Response(null, {

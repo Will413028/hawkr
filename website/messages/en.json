@@ -15,5 +15,10 @@
 	"navigation": {},
 	"product": {},
 	"seller": {},
-	"order": {}
+	"order": {},
+	"storeCard": {
+		"paused": "Temporarily closed",
+		"closed": "Closed",
+		"closedStore": "Closed store"
+	}
 }

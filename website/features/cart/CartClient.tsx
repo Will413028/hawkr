@@ -47,6 +47,7 @@ import { useCartCoupons } from "@/lib/hooks/useCartCoupons";
 import { useShippingOptions } from "@/lib/hooks/useShippingOptions";
 import { useStorePickups } from "@/lib/hooks/useStorePickups";
 import { ossImageUrl } from "@/lib/media/cdn";
+import { useStoreCardViews } from "@/lib/seller/useStoreCardViews";
 import { CartPageHeader } from "./components/CartPageHeader";
 
 const STALE_VALIDATE_MS = 60_000;
@@ -87,6 +88,9 @@ function sameSelection(
 export default function CartClient() {
 	const { isLoggedIn, hydrated: authHydrated } = useAuth();
 	const cart = useCart();
+	const { views: storeViews } = useStoreCardViews(
+		cart.itemsBySeller.map((group) => group.sellerStoreId),
+	);
 	const [mounted, setMounted] = React.useState(false);
 	const [saved, setSaved] = React.useState<CartItem[]>([]);
 
@@ -1122,6 +1126,7 @@ export default function CartClient() {
 										<SellerGroupCard
 											key={groupKey}
 											group={group}
+											storeView={storeViews.get(group.sellerStoreId)}
 											groupKey={groupKey}
 											isLocked={isLocked}
 											isLoggedIn={isLoggedIn}

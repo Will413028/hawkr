@@ -7,7 +7,7 @@ import CartClient from "@/features/cart/CartClient";
 import MarketProductCard from "@/features/market/components/MarketProductCard";
 import type { MarketProductItem } from "@/features/market/components/MarketProductsList";
 import type { MarketplaceProduct } from "@/lib/api";
-import { getCachedMarketplace } from "@/lib/api/cached";
+import { getCachedHotProducts } from "@/lib/api/cached";
 import { getProductPriceDisplay } from "@/lib/products/pricing";
 import { parseRating, parseReviewCount } from "@/lib/products/rating";
 
@@ -33,7 +33,7 @@ function normaliseHashtags(raw: MarketplaceProduct["hashtags"]): string[] {
 }
 
 /**
- * Map a marketplace `hot_products[]` entry into the market grid's card
+ * Map a hot-products entry into the market grid's card
  * shape so the "KEEP SHOPPING" rail renders the same `MarketProductCard`
  * the Hawkr 市集 list uses (favourite heart, qty stepper, add-to-cart).
  * `priceValue`/`createdAt`/`salesCount` only feed the market page's
@@ -73,13 +73,12 @@ function toRecommendedProduct(
 }
 
 export default async function CartPage() {
-	// Pull a small slice of marketplace recommendations so the
+	// Pull a small slice of hot products so the
 	// "KEEP SHOPPING" rail surfaces real products. Best-effort: if the
 	// call fails or returns nothing we render NOTHING — never fall back
 	// to hard-coded placeholder bundles. An empty cart-recommendation
 	// rail showing fake "五月蔬果" cards is worse than no rail at all.
-	const marketplace = await getCachedMarketplace(0, 0, 6).catch(() => null);
-	const hotProducts = marketplace?.hotProducts ?? [];
+	const hotProducts = await getCachedHotProducts(6).catch(() => []);
 	const cards: MarketProductItem[] = hotProducts
 		.slice(0, 6)
 		.map(toRecommendedProduct);

@@ -50,27 +50,18 @@ import {
 	type NativePayAvailability,
 	useNativePayAvailability,
 } from "@/lib/payment/useNativePayAvailability";
-import { sellerPath } from "@/lib/seo/urls";
-
-/** 排除空值與 "0"/"null"/"undefined" 等 sentinel 值，避免連到 /sellers/0 之類的壞頁。 */
-function navigableSegment(raw: string | undefined): string {
-	const id = raw?.trim() ?? "";
-	if (!id || id === "0" || id === "null" || id === "undefined") return "";
-	return id;
-}
+import { useStoreCardViews } from "@/lib/seller/useStoreCardViews";
 
 /**
  * 賣家列：訂單為單一賣家模型，顯示在商品清單上方。
- * 有 canonical 短碼時整列可點進賣家店面 /sellers/{store_code}，
- * 對齊購物車 SellerGroupCard、商品頁 ProductSellerIntro 的進店 pattern。
- *
- * 只吃 storeCode、不回退 storeId：storeId 路徑要多吃一次 middleware 308，而
- * order-service 為了店名本來就會查賣家，storeCode 與 sellerName 同源。真的
- * 取不到時（賣家服務降級）連名字也一起沒有，此時不渲染連結只留文字。
+ * 店家卡片（BatchGetStores）顯示營業中時整列可點進賣家店面 /sellers/{store_code}；
+ * 暫停營業、已關閉或沒有卡片時只留文字（B11），暫停與已關閉另標標籤。
  */
 function OrderSellerRow({ order }: { order: Order }) {
-	const name = order.sellerName?.trim() || "";
-	const sellerHref = sellerPath(navigableSegment(order.storeCode));
+	const { views } = useStoreCardViews([order.storeId]);
+	const view = views.get(order.storeId);
+	const name = view?.name || order.sellerName?.trim() || "";
+	const sellerHref = view?.href ?? "";
 
 	// 完全沒有賣家資訊就不顯示，避免空白列
 	if (!sellerHref && !name) return null;
@@ -92,6 +83,11 @@ function OrderSellerRow({ order }: { order: Order }) {
 	const label = (
 		<strong className="min-w-0 flex-1 truncate text-base font-semibold group-hover:underline">
 			{displayName}
+			{view?.labelText ? (
+				<small className="ml-2 font-normal text-foreground-muted">
+					{view.labelText}
+				</small>
+			) : null}
 		</strong>
 	);
 

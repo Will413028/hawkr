@@ -1,20 +1,30 @@
 "use client";
 
 import * as React from "react";
-import AppIcon from "@/components/shared/AppIcon";
 import AppImage from "@/components/shared/AppImage";
 import Avatar from "@/components/shared/Avatar";
 import Link from "@/components/shared/Link";
-import HomeMerchantPrizeIcon from "@/features/home/components/HomeMerchantPrizeIcon";
-import type { MarketSellerItem } from "@/features/market/components/MarketSellerCard";
 import SellerFollowChip from "@/features/seller/components/SellerFollowChip";
 import { resolveCdnUrl } from "@/lib/media/cdn";
 import { SELLER_COVER_ASPECT } from "@/lib/media/seller-cover";
 import { canPrefetchMainNav } from "@/lib/navigation/main-nav-prefetch";
 import { useObservedRouter } from "@/lib/navigation/use-observed-router";
 
+export interface HomeMerchantItem {
+	id: string;
+	name: string;
+	location: string;
+	image: string;
+	logo_url: string;
+	/** 評分、評價數、粉絲數沒有設定表示伺服器讀不到，不顯示該段。 */
+	rating?: number;
+	reviewCount?: number;
+	followers?: number;
+	href: string;
+}
+
 type HomeCompactMerchantsProps = {
-	sellers: MarketSellerItem[];
+	sellers: HomeMerchantItem[];
 	title?: string;
 	href?: string;
 };
@@ -268,33 +278,15 @@ export default function HomeCompactMerchants({
 										<span className="truncate text-sm font-black leading-snug text-hk-heading">
 											{seller.name}
 										</span>
-										{seller.certified ? (
-											<AppIcon
-												className="shrink-0 text-[var(--icon-accent)]"
-												name="shield"
-												size={16}
-												title="已通過商家認證"
-											/>
-										) : null}
 									</Link>
-									{seller.prize ? (
-										<span
-											className="mt-1 inline-flex w-fit max-w-full items-center gap-1 rounded-full bg-warning-50 py-[3px] pl-1.5 pr-2 text-[0.625rem] font-black text-warning-700 dark:bg-[#f1cd70]/14 dark:text-[#f1cd70]"
-											title={seller.prize}
-										>
-											<HomeMerchantPrizeIcon />
-											<span className="truncate">{seller.prize}</span>
-										</span>
-									) : null}
 									<div className="mt-1 truncate text-[0.6875rem] font-bold text-hk-muted">
-										{/* 商品數只在後端真的給正數時顯示 — stats 的
-										    total_products 目前一律回 0，顯示會變成謊報。 */}
 										{[
-											seller.products > 0 ? `商品 ${seller.products}` : null,
-											seller.rating > 0
-												? `評分 ${seller.rating.toFixed(1)}`
-												: "尚無評價",
-											seller.followers > 0
+											seller.reviewCount === 0
+												? "尚無評價"
+												: seller.rating !== undefined
+													? `評分 ${seller.rating.toFixed(1)}`
+													: null,
+											seller.followers !== undefined && seller.followers > 0
 												? `追蹤人數 ${seller.followers.toLocaleString()}`
 												: null,
 										]

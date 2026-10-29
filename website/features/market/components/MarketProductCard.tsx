@@ -93,6 +93,8 @@ function MarketProductCard({
 		href: product.href,
 	};
 
+	const sellerHref = sellerPath(product.sellerStoreCode);
+
 	return (
 		<article
 			className="market-product-card relative isolate overflow-hidden border border-hk-border-soft rounded-hk-xl bg-hk-surface-card text-inherit no-underline shadow-hk-card max-[840px]:rounded-hk-lg dark:bg-white/4 dark:backdrop-blur-md dark:saturate-[1.2] dark:border-[rgba(245,222,165,0.12)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_12px_28px_rgba(0,0,0,0.32)]"
@@ -184,9 +186,9 @@ function MarketProductCard({
 					{product.name}
 				</h2>
 				<p className="m-0 flex items-center gap-1.5 text-hk-muted text-xs leading-[1.45] max-[840px]:gap-1 max-[840px]:text-[0.6875rem] max-[840px]:leading-[1.35]">
-					{product.sellerId ? (
+					{sellerHref ? (
 						<Link
-							href={sellerPath(product.sellerStoreCode, product.sellerId)}
+							href={sellerHref}
 							className="relative z-20 flex min-w-0 items-center gap-1.5 text-inherit no-underline transition-colors hover:text-hk-primary max-[840px]:gap-1"
 						>
 							<Avatar

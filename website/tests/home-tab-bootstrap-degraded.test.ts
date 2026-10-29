@@ -15,13 +15,22 @@ const POSTS = {
 	records: [{ id: "8001" }],
 };
 const EMPTY_POSTS = { page: 1, pageSize: 8, total: 0, records: [] };
-const SELLERS = [{ storeId: 7001 }];
+const SELLERS = [
+	{
+		id: "7001",
+		storeCode: "shop7001",
+		name: "店",
+		logoUrl: "",
+		coverUrl: "",
+		townCode: "",
+	},
+];
 
 /** A healthy answer: every domain supplied, no label. */
 function intact(productId: string) {
 	return {
-		schemaVersion: "home.v1",
-		marketplace: { hot_products: [], recommended_sellers: [] },
+		schemaVersion: "home.v2",
+		hotProducts: [],
 		products: { data: { records: [{ id: productId }] } },
 		recommendedSellers: SELLERS,
 		posts: POSTS,

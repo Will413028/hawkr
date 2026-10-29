@@ -8,8 +8,8 @@ import {
 } from "../lib/api/tab-bootstrap";
 
 const PAYLOAD = {
-	schemaVersion: "home.v1",
-	marketplace: null,
+	schemaVersion: "home.v2",
+	hotProducts: [],
 	products: { data: { records: [] } },
 	recommendedSellers: [],
 	posts: { page: 1, pageSize: 8, total: 0, records: [] },
@@ -106,7 +106,7 @@ test("home bootstrap shares inflight work, respects TTL and isolates caller abor
 
 	resolveShared?.(jsonResponse());
 	const warmed = await survivingPreload;
-	assert.equal(warmed.schemaVersion, "home.v1");
+	assert.equal(warmed.schemaVersion, "home.v2");
 	assert.strictEqual(await fetchHomeTabBootstrap(), warmed);
 	assert.equal(fetchCalls, 4, "surviving preload must populate memory");
 });

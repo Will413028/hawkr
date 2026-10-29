@@ -11,12 +11,12 @@ import { __setFlavorForTest, type Flavor } from "@/lib/config/flavor";
 vi.mock("server-only", () => ({}));
 
 const mocks = vi.hoisted(() => ({
-	fetchMarketplace: vi.fn(),
+	fetchHotProducts: vi.fn(),
 	fetchProducts: vi.fn(),
-	fetchSellers: vi.fn(),
+	fetchRecommendedStores: vi.fn(),
 	fetchPublicPostsTyped: vi.fn(),
 	fetchCategoryTree: vi.fn(),
-	getCachedMarketplace: vi.fn(),
+	getCachedHotProducts: vi.fn(),
 	getCachedProductsFirstPage: vi.fn(),
 	getCachedPublicPosts: vi.fn(),
 	getCachedRecommendedSellers: vi.fn(),
@@ -30,10 +30,13 @@ vi.mock("next/cache", () => ({
 }));
 
 vi.mock("@/lib/api", () => ({
-	fetchMarketplace: mocks.fetchMarketplace,
+	fetchHotProducts: mocks.fetchHotProducts,
 	fetchProducts: mocks.fetchProducts,
-	fetchSellers: mocks.fetchSellers,
 	fetchCategoryTree: mocks.fetchCategoryTree,
+}));
+
+vi.mock("@/lib/discovery/recommended", () => ({
+	fetchRecommendedStores: mocks.fetchRecommendedStores,
 }));
 
 vi.mock("@/lib/api/posts", () => ({
@@ -47,17 +50,17 @@ vi.mock("@/lib/api/cached", () => ({
 	// these cases assert budget/degradation for a single read. The real helper has
 	// its own coverage in lib/api/cached-single-flight.unit.test.ts.
 	coalesceRead: <T>(_key: string[], run: () => Promise<T>) => run(),
-	getCachedMarketplace: mocks.getCachedMarketplace,
+	getCachedHotProducts: mocks.getCachedHotProducts,
 	getCachedProductsFirstPage: mocks.getCachedProductsFirstPage,
 	getCachedPublicPosts: mocks.getCachedPublicPosts,
 	getCachedRecommendedSellers: mocks.getCachedRecommendedSellers,
 	getCachedCategoryTree: mocks.getCachedCategoryTree,
 }));
 
-const MARKETPLACE = { hot_products: [], recommended_sellers: [] };
+const HOT_PRODUCTS = [{ id: "9002" }];
 const PRODUCTS = { data: { records: [{ id: "9001" }] } };
 const POSTS = { page: 1, pageSize: 8, total: 1, records: [{ id: "8001" }] };
-const SELLERS = [{ store_id: 7001 }];
+const SELLERS = [{ id: "7001", storeCode: "shop7001", name: "店" }];
 const CATEGORY_TREE = [
 	{ id: "5", name: "海鮮", children: [{ id: "206", name: "魚類" }] },
 ];
@@ -69,15 +72,15 @@ function stalled(): Promise<never> {
 }
 
 function primaryResolves(): void {
-	mocks.fetchMarketplace.mockResolvedValue(MARKETPLACE);
+	mocks.fetchHotProducts.mockResolvedValue(HOT_PRODUCTS);
 	mocks.fetchProducts.mockResolvedValue(PRODUCTS);
 	mocks.fetchPublicPostsTyped.mockResolvedValue(POSTS);
-	mocks.fetchSellers.mockResolvedValue(SELLERS);
+	mocks.fetchRecommendedStores.mockResolvedValue(SELLERS);
 	mocks.fetchCategoryTree.mockResolvedValue(CATEGORY_TREE);
 }
 
 function cacheResolves(): void {
-	mocks.getCachedMarketplace.mockResolvedValue(MARKETPLACE);
+	mocks.getCachedHotProducts.mockResolvedValue(HOT_PRODUCTS);
 	mocks.getCachedProductsFirstPage.mockResolvedValue(PRODUCTS);
 	mocks.getCachedPublicPosts.mockResolvedValue(POSTS);
 	mocks.getCachedRecommendedSellers.mockResolvedValue(SELLERS);
@@ -114,21 +117,21 @@ describe("home bootstrap request budget", () => {
 
 		expect(response.status).toBe(200);
 		expect(Date.now() - startedAt).toBe(0);
-		expect(body.schemaVersion).toBe("home.v1");
+		expect(body.schemaVersion).toBe("home.v2");
 		// The tree is rolled up server-side: the browser gets the lv1 index only.
 		expect(body.categoryGroups).toEqual(CATEGORY_GROUPS);
 		expect(body.degraded).toBeUndefined();
 		expect(response.headers.get("x-bootstrap-degraded")).toBeNull();
-		expect(mocks.getCachedMarketplace).not.toHaveBeenCalled();
+		expect(mocks.getCachedHotProducts).not.toHaveBeenCalled();
 		expect(mocks.getCachedProductsFirstPage).not.toHaveBeenCalled();
 	});
 
 	it("falls back after the primary deadline and answers inside the shared budget", async () => {
 		allStalled([
-			mocks.fetchMarketplace,
+			mocks.fetchHotProducts,
 			mocks.fetchProducts,
 			mocks.fetchPublicPostsTyped,
-			mocks.fetchSellers,
+			mocks.fetchRecommendedStores,
 			mocks.fetchCategoryTree,
 		]);
 		cacheResolves();
@@ -153,12 +156,12 @@ describe("home bootstrap request budget", () => {
 
 	it("stops at the budget cap instead of stacking a second full wait", async () => {
 		allStalled([
-			mocks.fetchMarketplace,
+			mocks.fetchHotProducts,
 			mocks.fetchProducts,
 			mocks.fetchPublicPostsTyped,
-			mocks.fetchSellers,
+			mocks.fetchRecommendedStores,
 			mocks.fetchCategoryTree,
-			mocks.getCachedMarketplace,
+			mocks.getCachedHotProducts,
 			mocks.getCachedProductsFirstPage,
 			mocks.getCachedPublicPosts,
 			mocks.getCachedRecommendedSellers,
@@ -184,7 +187,7 @@ describe("home bootstrap request budget", () => {
 		expect(response.headers.get("retry-after")).toBe("1");
 		expect(body.error).toBe("bootstrap_unavailable");
 		// Only the commerce surface makes an outage; posts are labelled, not fatal.
-		expect(body.unavailable.sort()).toEqual(["marketplace", "products"]);
+		expect(body.unavailable.sort()).toEqual(["hotProducts", "products"]);
 	});
 
 	it("keeps a posts-only outage a labelled 200 so commerce still refreshes", async () => {
@@ -202,7 +205,7 @@ describe("home bootstrap request budget", () => {
 		// whole reason the visitor reloads Home.
 		expect(response.status).toBe(200);
 		expect(body.products).toEqual(PRODUCTS);
-		expect(body.marketplace).toEqual(MARKETPLACE);
+		expect(body.hotProducts).toEqual(HOT_PRODUCTS);
 		expect(body.degraded).toEqual(["posts"]);
 		expect(response.headers.get("x-bootstrap-degraded")).toBe("posts");
 	});
@@ -211,7 +214,10 @@ describe("home bootstrap request budget", () => {
 		primaryResolves();
 		mocks.getCachedPublicPosts.mockResolvedValue(POSTS);
 		mocks.getCachedCategoryTree.mockResolvedValue(CATEGORY_TREE);
-		allStalled([mocks.fetchSellers, mocks.getCachedRecommendedSellers]);
+		allStalled([
+			mocks.fetchRecommendedStores,
+			mocks.getCachedRecommendedSellers,
+		]);
 
 		const pending = GET();
 		await vi.advanceTimersByTimeAsync(budget.totalMs);

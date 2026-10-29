@@ -95,14 +95,7 @@ test("public landing reads tag exactly the domains they embed", async () => {
 	};
 	const TAG_REF = /PUBLIC_CACHE_TAGS\.(\w+)/g;
 	const expected: Array<[string, string[]]> = [
-		[
-			"getCachedMarketplace",
-			[
-				"PUBLIC_CACHE_TAGS.products",
-				"PUBLIC_CACHE_TAGS.sellers",
-				"PUBLIC_CACHE_TAGS.posts",
-			],
-		],
+		["getCachedHotProducts", ["PUBLIC_CACHE_TAGS.products"]],
 		["getCachedProductsFirstPage", ["PUBLIC_CACHE_TAGS.products"]],
 		["getCachedStrictProductsPage", ["PUBLIC_CACHE_TAGS.products"]],
 		["getCachedRecommendedSellers", ["PUBLIC_CACHE_TAGS.sellers"]],
@@ -150,7 +143,7 @@ test("canonical navbar destinations keep Feed bounded and reuse safe cache entri
 	assert.doesNotMatch(feed, /fetchSellers/);
 	assert.doesNotMatch(feed, /getCachedStrictPublicPostsPage/);
 	assert.match(market, /getCachedProductsFirstPage\(100\)/);
-	assert.match(search, /getCachedMarketplace\(4, 4, 8\)/);
+	assert.match(search, /getCachedHotProducts\(8\)/);
 	assert.match(search, /fetchPublicPostsTyped\(\{ page: 1, pageSize: 8 \}\)/);
 	// Live, query-aware hashtags (not the cached popular set) — now client-side.
 	assert.match(searchHashtagNav, /searchHashtags\(query\)/);
@@ -177,10 +170,10 @@ test("home bootstrap is versioned, anonymous and browser no-store", async () => 
 		route,
 		/export \{ GET \} from "@\/features\/home\/server\/home-tab-bootstrap-route"/,
 	);
-	assert.doesNotMatch(route, /unstable_cache|fetchMarketplace|function GET/);
+	assert.doesNotMatch(route, /unstable_cache|fetchHotProducts|function GET/);
 	assert.match(handler, /^import "server-only";/);
-	assert.match(handler, /schemaVersion: "home\.v1"/);
-	assert.match(handler, /fetchMarketplace\(8, 6, 8, undefined, true\)/);
+	assert.match(handler, /schemaVersion: "home\.v2"/);
+	assert.match(handler, /fetchHotProducts\(8, \{ strict: true \}\)/);
 	assert.match(
 		handler,
 		/fetchProducts\("", 1, 100, undefined, undefined, \{ strict: true \}\)/,
@@ -203,7 +196,7 @@ test("home bootstrap is versioned, anonymous and browser no-store", async () => 
 	assert.ok(fallbackStart > discoveryStart);
 	assert.doesNotMatch(
 		handler.slice(liveStart, fallbackStart),
-		/\bgetCached(?:Marketplace|Products|PublicPosts|Recommended)/,
+		/\bgetCached(?:HotProducts|Products|PublicPosts|Recommended)/,
 		"aggregate cache owners must call raw fetchers, not nested SWR caches",
 	);
 	assert.match(handler, /PUBLIC_CACHE_TAGS\.products/);
@@ -263,13 +256,13 @@ test("idle route warming avoids an extra data warm while Feed and touch retain t
 	assert.match(warmRoute, /tab === "market"/);
 	assert.doesNotMatch(warmRoute, /fetchPublicPostsTyped|fetchSellers/);
 	assert.doesNotMatch(warmRoute, /getCachedStrictPublicPostsPage/);
-	assert.match(warmRoute, /getCachedMarketplace\(4, 4, 8\)/);
+	assert.match(warmRoute, /getCachedHotProducts\(8\)/);
 	assert.match(warmRoute, /status: 204/);
 	assert.match(warmRoute, /"cache-control": "private, no-store"/);
 	assert.doesNotMatch(tabBootstrapClient, /"\/feed": "feed"/);
 	assert.match(feedShell, /initialSeedFailed/);
 	assert.match(feedShell, /queryKeys\.feed\.recommendedSellers\(\)/);
-	assert.match(feedShell, /fetchSellers\(24, signal, true\)/);
+	assert.match(feedShell, /fetchRecommendedStores\(24, \{ signal \}\)/);
 	assert.match(feedHook, /initialData: hasInitialData[\s\S]*: undefined/);
 	assert.match(feedHook, /initialLoading: query\.isPending/);
 	assert.match(navPrefetch, /if \(intent === "touch"\)/);

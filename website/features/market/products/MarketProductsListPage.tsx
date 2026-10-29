@@ -11,7 +11,7 @@
  */
 
 import JsonLd from "@/components/seo/JsonLd";
-import type { StoryItem } from "@/features/feed/components/StoryRail";
+import { recommendedStoriesFromStores } from "@/features/feed/recommendedStories";
 import { loadMarketProductsSection } from "@/features/market/components/MarketProductsSection";
 import {
 	getCachedCategoryTree,
@@ -21,7 +21,6 @@ import {
 import { type AppLocale, defaultLocale } from "@/lib/intl/locales";
 import { deriveMarketListView } from "@/lib/market/deriveListView";
 import type { CategoryNode } from "@/lib/market/listFilters";
-import { recommendedSellerLogoUrl } from "@/lib/seller/recommended-logo";
 import { itemListSchema } from "@/lib/seo/jsonld";
 import { productUrl } from "@/lib/seo/urls";
 import MarketProductsListClient from "./MarketProductsListClient";
@@ -42,58 +41,7 @@ export default async function MarketProductsListPage({
 		getCachedPopularHashtags(8).catch(() => []),
 		getCachedRecommendedSellers(12).catch(() => []),
 	]);
-	// Populate city / lat / lng so the 附近商家 tab in FeedStories can sort the
-	// rail by browser location (same shape as the feed page).
-	const sellerStories: StoryItem[] = (
-		recommendedSellers as Array<Record<string, unknown>>
-	)
-		.filter((seller) => seller?.storeId && seller?.storeName)
-		.map((seller) => {
-			// `/public/sellers/recommended` 的 record 沒有座標欄
-			// （recommended_sellers.go:40-54 的 gin.H 就是全部欄位）——這裡讀
-			// `latitude`/`lng` 是為了與 feed rail 共用同一個 StoryItem 形狀，
-			// 目前恆為 undefined。
-			const latRaw = seller.latitude ?? seller.lat ?? null;
-			const lngRaw = seller.longitude ?? seller.lng ?? null;
-			const latitude =
-				typeof latRaw === "number"
-					? latRaw
-					: typeof latRaw === "string" && latRaw
-						? Number(latRaw)
-						: undefined;
-			const longitude =
-				typeof lngRaw === "number"
-					? lngRaw
-					: typeof lngRaw === "string" && lngRaw
-						? Number(lngRaw)
-						: undefined;
-			// `/public/sellers/recommended` 自 backend#2235 起全欄 camelCase
-			// （`recommended_sellers.go:40-42`：storeId / storeCode / storeName）。
-			// StoryRail 拿 `storeCode` 走 `sellerPath()`；讀錯名字會靜默 fallback
-			// 回 storeId，代價是推薦商家 rail 每點一次多一個 308（#365）。
-			// rows 是 Record<string, unknown>，讀錯名字**不會**型別錯誤——只會
-			// 恆為 undefined，所以這條靠 tests/seller-link-canonical 釘住。
-			const storeCode =
-				typeof seller.storeCode === "string" ? seller.storeCode.trim() : "";
-			return {
-				id: String(seller.storeId),
-				storeCode: storeCode || undefined,
-				name: String(seller.storeName),
-				avatar: recommendedSellerLogoUrl(seller),
-				city: typeof seller.city === "string" ? seller.city : undefined,
-				district:
-					typeof seller.district === "string" ? seller.district : undefined,
-				latitude:
-					latitude !== undefined && Number.isFinite(latitude)
-						? latitude
-						: undefined,
-				longitude:
-					longitude !== undefined && Number.isFinite(longitude)
-						? longitude
-						: undefined,
-			} satisfies StoryItem;
-		})
-		.slice(0, 12);
+	const sellerStories = recommendedStoriesFromStores(recommendedSellers);
 	const categoryList = Array.isArray(categories)
 		? (categories as CategoryNode[])
 		: [];

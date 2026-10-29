@@ -731,7 +731,7 @@ body:has(.hkh-page) .site-nav {
    they land inside .prod-rail (rounded card + hover lift). */
 
 /* =====================================================================
-   MERCHANTS — uses the real <MarketSellerCard /> grid variant. Card
+   MERCHANTS — uses the HomeCompactMerchants card. Card
    visuals come from styles/features/market.css (.market-seller-card);
    this section only owns the grid layout + the hover lift that the
    design's postcard rhythm expects.

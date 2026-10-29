@@ -20,7 +20,8 @@ import { AccountEmptyStateIcon } from "@/features/account/components/AccountEmpt
 import { browsableFavorites } from "@/lib/favorites/visible";
 import { useFavorites, useFollowing } from "@/lib/hooks/useAccount";
 import { imageUri } from "@/lib/media/image";
-import { sellerPath } from "@/lib/seo/urls";
+import { storeCardView } from "@/lib/seller/storeCardView";
+import { useStoreCardText } from "@/lib/seller/useStoreCardViews";
 
 const TAB_LABELS: Record<string, string> = {
 	products: "商品",
@@ -46,6 +47,7 @@ function formatPriceRange(min?: number, max?: number): string {
 }
 
 export default function FavoritesClient() {
+	const storeCardText = useStoreCardText();
 	const [tab, setTab] = React.useState<"products" | "sellers">("products");
 	const [pendingAction, setPendingAction] = React.useState<string | null>(null);
 	const [actionError, setActionError] = React.useState<string | null>(null);
@@ -281,45 +283,64 @@ export default function FavoritesClient() {
 							</ScEmpty>
 						) : (
 							<ul className="list-none m-0 p-0 flex flex-col gap-2">
-								{visibleSellers.map((it: Follow) => (
-									<li
-										key={it.storeId}
-										className="flex justify-between items-center bg-content1 border border-divider rounded-hkui-lg py-3 px-4"
-									>
-										<Link
-											href={sellerPath(it.store?.storeCode, it.storeId)}
-											className="flex items-center gap-3 text-inherit no-underline flex-1 min-w-0"
-										>
+								{visibleSellers.map((it: Follow) => {
+									const storeView = storeCardView(it.store, storeCardText);
+									const storeIdentity = (
+										<>
 											<Avatar
-												src={imageUri(it.store?.logo, "avatar")}
-												name={it.store?.name ?? ""}
+												src={storeView?.logoUrl}
+												name={storeView?.name ?? ""}
 												alt=""
 												entity="seller"
 												className="w-11 h-11 rounded-full object-cover bg-default-100 shrink-0"
 												fallback="empty"
 											/>
-											<strong className="text-base">{it.store?.name}</strong>
-										</Link>
-										<Button
-											variant="bordered"
-											color="default"
-											size="sm"
-											disabled={pendingAction !== null}
-											isLoading={
-												pendingAction === `unfollow-seller:${it.storeId}`
-											}
-											loadingLabel="取消追蹤商家中…"
-											onClick={() =>
-												void runPendingAction(
-													`unfollow-seller:${it.storeId}`,
-													() => following.unfollow(it.storeId),
-												)
-											}
+											<strong className="text-base">
+												{storeView?.name ?? storeCardText.closedStore}
+											</strong>
+											{storeView?.labelText ? (
+												<small>{storeView.labelText}</small>
+											) : null}
+										</>
+									);
+									return (
+										<li
+											key={it.storeId}
+											className="flex justify-between items-center bg-content1 border border-divider rounded-hkui-lg py-3 px-4"
 										>
-											取消追蹤
-										</Button>
-									</li>
-								))}
+											{storeView?.href ? (
+												<Link
+													href={storeView.href}
+													className="flex items-center gap-3 text-inherit no-underline flex-1 min-w-0"
+												>
+													{storeIdentity}
+												</Link>
+											) : (
+												<div className="flex items-center gap-3 flex-1 min-w-0">
+													{storeIdentity}
+												</div>
+											)}
+											<Button
+												variant="bordered"
+												color="default"
+												size="sm"
+												disabled={pendingAction !== null}
+												isLoading={
+													pendingAction === `unfollow-seller:${it.storeId}`
+												}
+												loadingLabel="取消追蹤商家中…"
+												onClick={() =>
+													void runPendingAction(
+														`unfollow-seller:${it.storeId}`,
+														() => following.unfollow(it.storeId),
+													)
+												}
+											>
+												取消追蹤
+											</Button>
+										</li>
+									);
+								})}
 							</ul>
 						)}
 						{following.hasMore && (

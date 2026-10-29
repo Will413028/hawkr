@@ -5,6 +5,7 @@ import StoryRail, {
 	type StoryItem,
 	type StoryTab,
 } from "@/features/feed/components/StoryRail";
+import { sortNearbyStories } from "@/features/feed/nearbyStories";
 import { useAuth } from "@/lib/auth/context";
 import { useLoginRequiredOverlay } from "@/lib/state/use-login-required-overlay";
 
@@ -15,31 +16,6 @@ export const FEED_TABS: StoryTab[] = [
 	{ key: "follow", label: "追蹤中" },
 	{ key: "nearby", label: "附近商家" },
 ];
-
-const TAIWAN_CITY_CENTERS: Record<string, { lat: number; lng: number }> = {
-	台北市: { lat: 25.0375, lng: 121.5637 },
-	新北市: { lat: 25.012, lng: 121.4657 },
-	桃園市: { lat: 24.9937, lng: 121.3009 },
-	新竹縣: { lat: 24.8387, lng: 121.0177 },
-	新竹市: { lat: 24.8138, lng: 120.9675 },
-	苗栗縣: { lat: 24.5602, lng: 120.8214 },
-	台中市: { lat: 24.1477, lng: 120.6736 },
-	彰化縣: { lat: 24.0685, lng: 120.5575 },
-	南投縣: { lat: 23.9609, lng: 120.9719 },
-	雲林縣: { lat: 23.7092, lng: 120.4313 },
-	嘉義縣: { lat: 23.4518, lng: 120.2555 },
-	嘉義市: { lat: 23.4801, lng: 120.4491 },
-	台南市: { lat: 22.9998, lng: 120.227 },
-	高雄市: { lat: 22.6273, lng: 120.3014 },
-	屏東縣: { lat: 22.5519, lng: 120.5488 },
-	宜蘭縣: { lat: 24.7021, lng: 121.7378 },
-	花蓮縣: { lat: 23.9872, lng: 121.6015 },
-	台東縣: { lat: 22.7972, lng: 121.0714 },
-	基隆市: { lat: 25.1276, lng: 121.7392 },
-	連江縣: { lat: 26.1608, lng: 119.9517 },
-	金門縣: { lat: 24.4321, lng: 118.3171 },
-	澎湖縣: { lat: 23.5711, lng: 119.5793 },
-};
 
 interface FeedStoriesProps {
 	items: StoryItem[];
@@ -62,15 +38,6 @@ interface FeedStoriesProps {
 	reserveRegion?: boolean;
 }
 
-function normalizeCity(value?: string) {
-	return (value ?? "")
-		.trim()
-		.replace(/^臺北市/, "台北市")
-		.replace(/^臺中市/, "台中市")
-		.replace(/^臺南市/, "台南市")
-		.replace(/^臺東縣/, "台東縣");
-}
-
 function requestBrowserLocation(): Promise<GeolocationPosition> {
 	return new Promise((resolve, reject) => {
 		if (!navigator.geolocation) {
@@ -82,55 +49,6 @@ function requestBrowserLocation(): Promise<GeolocationPosition> {
 			maximumAge: 1000 * 60 * 10,
 			timeout: 8000,
 		});
-	});
-}
-
-function distanceKm(
-	from: { lat: number; lng: number },
-	to: { lat: number; lng: number },
-) {
-	const radiusKm = 6371;
-	const dLat = ((to.lat - from.lat) * Math.PI) / 180;
-	const dLng = ((to.lng - from.lng) * Math.PI) / 180;
-	const lat1 = (from.lat * Math.PI) / 180;
-	const lat2 = (to.lat * Math.PI) / 180;
-	const a =
-		Math.sin(dLat / 2) ** 2 +
-		Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-	return radiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function storyPoint(item: StoryItem) {
-	if (
-		Number.isFinite(item.latitude) &&
-		Number.isFinite(item.longitude) &&
-		item.latitude !== undefined &&
-		item.longitude !== undefined
-	) {
-		return { lat: item.latitude, lng: item.longitude };
-	}
-	const city = normalizeCity(item.city);
-	return city ? TAIWAN_CITY_CENTERS[city] : undefined;
-}
-
-function sortNearbyStories(
-	items: StoryItem[],
-	position: GeolocationPosition,
-): StoryItem[] {
-	const current = {
-		lat: position.coords.latitude,
-		lng: position.coords.longitude,
-	};
-	return [...items].sort((a, b) => {
-		const aPoint = storyPoint(a);
-		const bPoint = storyPoint(b);
-		const aDistance = aPoint
-			? distanceKm(current, aPoint)
-			: Number.POSITIVE_INFINITY;
-		const bDistance = bPoint
-			? distanceKm(current, bPoint)
-			: Number.POSITIVE_INFINITY;
-		return aDistance - bDistance;
 	});
 }
 
@@ -192,7 +110,10 @@ export default function FeedStories({
 		setEmptyMessage(null);
 		try {
 			const position = await requestBrowserLocation();
-			const sorted = sortNearbyStories(items, position);
+			const sorted = sortNearbyStories(items, {
+				lat: position.coords.latitude,
+				lng: position.coords.longitude,
+			});
 			setNearbyItems(sorted);
 			setEmptyMessage(
 				sorted.length

@@ -451,8 +451,8 @@ test("market list card yields no image when only the retired names are present",
 
 test("home snapshot cards read the objectKey, not the composed URL", () => {
 	const snapshot = buildHomeSnapshot({
-		schemaVersion: "home.v1",
-		marketplace: null,
+		schemaVersion: "home.v2",
+		hotProducts: [],
 		products: { records: [LIVE_PRODUCT_CARD] },
 		recommendedSellers: [],
 		posts: { records: [], total: 0 },
@@ -466,8 +466,8 @@ test("home snapshot cards read the objectKey, not the composed URL", () => {
 
 test("home snapshot yields no image when only the retired names are present", () => {
 	const snapshot = buildHomeSnapshot({
-		schemaVersion: "home.v1",
-		marketplace: null,
+		schemaVersion: "home.v2",
+		hotProducts: [],
 		products: { records: [RETIRED_ONLY_PRODUCT] },
 		recommendedSellers: [],
 		posts: { records: [], total: 0 },

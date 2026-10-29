@@ -135,7 +135,7 @@ type LiveEntityPayload = {
 	data?: {
 		records?: Array<{
 			id?: unknown;
-			/** `/public/sellers/recommended` 的賣家鍵（backend#2235 起 camelCase）。 */
+			/** `/public/products` 商品列的店家鍵（camelCase）。 */
 			storeId?: unknown;
 		}>;
 	};
@@ -146,7 +146,7 @@ export function extractLiveEntityId(
 	kind: "product" | "seller",
 ): string | null {
 	const rec = json?.data?.records?.[0];
-	const id = kind === "product" ? rec?.id : (rec?.storeId ?? rec?.id);
+	const id = kind === "product" ? rec?.id : rec?.storeId;
 	return id == null ? null : String(id);
 }
 
@@ -155,7 +155,7 @@ export const SEO_API_BASE =
 	process.env.API_BASE_URL ?? "http://127.0.0.1:9/api/v1";
 
 /**
- * Discover one live product/seller id from the recommended-products listing API
+ * Discover one live product/seller id from the public products listing API
  * so the entity-template specs can navigate a real page. Returns null when the
  * backend is unreachable/empty (the caller test.skip()s with a logged reason
  * — never a silent pass). API base is process.env.API_BASE_URL, loopback by default.
@@ -165,10 +165,7 @@ export async function discoverLiveEntity(
 	kind: "product" | "seller",
 ): Promise<string | null> {
 	const base = `${SEO_API_BASE}/public`;
-	const url =
-		kind === "product"
-			? `${base}/products?keyword=&page=1&page_size=1`
-			: `${base}/sellers/recommended?limit=1`;
+	const url = `${base}/products?keyword=&page=1&page_size=1`;
 	const res = await request.get(url).catch(() => null);
 	if (!res?.ok()) return null;
 	const json = (await res.json().catch(() => null)) as LiveEntityPayload | null;

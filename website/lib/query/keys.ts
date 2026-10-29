@@ -476,11 +476,12 @@ export const queryKeys = {
 			[...delegatedPrefix(id), "audit-logs", params ?? {}] as const,
 	},
 	sellers: {
-		detail: (id: string | number) => ["sellers", "detail", String(id)] as const,
 		/** 公開商品列表（/sellers/{id}/products）——非 identity-scoped，與認證版
 		 * queryKeys.seller.products（/app/products）是不同鍵空間。 */
 		products: (id: string | number, params?: Record<string, unknown>) =>
 			["sellers", "products", String(id), params ?? {}] as const,
 		productsRoot: () => ["sellers", "products"] as const,
+		/** 參照入口的店家卡片（BatchGetStores）；ids 排序去重後當鍵。 */
+		cards: (ids: readonly string[]) => ["sellers", "cards", ...ids] as const,
 	},
 };

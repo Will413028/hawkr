@@ -3,12 +3,9 @@ import { apiClient } from "./client";
 
 export interface MarketplaceProduct {
 	/**
-	 * Backend issue #2110: `hotProducts[]` carries the seller's **store
-	 * surrogate** (product.store_id) under `storeId`, aligned with
-	 * `/public/products`'s ProductItem. It is NOT the login account_id —
-	 * do not look it up against accounts. `recommendedSellers[]` uses its
-	 * own `storeId` field; `latestPosts[]` carries its seller identity on
-	 * `MarketplacePost.sellerId` below.
+	 * Backend issue #2110: `/public/products` carries the seller's **store
+	 * surrogate** (product.store_id) under `storeId`. It is NOT the login
+	 * account_id — do not look it up against accounts.
 	 */
 	storeId?: string;
 	id: string | number;
@@ -59,57 +56,6 @@ export interface MarketplaceProduct {
 	skuNames?: string[];
 }
 
-export interface MarketplacePost {
-	sellerId?: number | string;
-	id: string | number;
-	/** 貼文圖 objectKey 陣列（無圖為 `[]`）。單數 `imageKey`/`imageUrl` 已於
-	 *  backend#2235 移除 —— 見 openapi-types.ts `PostListItem.imageKeys`。 */
-	imageKeys?: string[];
-	content?: string;
-	/** B-238 canonical seller-logo display URL for post-shaped responses. */
-	logoUrl?: string;
-	sellerName?: string;
-	likeCount?: number;
-	commentCount?: number;
-	shareCount?: number;
-	viewCount?: number;
-	product?: MarketplaceProduct | null;
-}
-
-export interface MarketplaceSeller {
-	storeId?: number | string;
-	/**
-	 * Canonical storefront path segment (#365). Both recommended-seller sources
-	 * (`/public/sellers/recommended` records and `/public/marketplace`'s
-	 * `recommendedSellers`) emit it camelCase, same as the product wire's
-	 * embedded seller block.
-	 *
-	 * Absent for a seller with no minted code; `sellerPath()` then keeps the
-	 * storeId path, which middleware serves without a redirect.
-	 */
-	storeCode?: string;
-	coverUrl?: string;
-	description?: string;
-	city?: string;
-	district?: string;
-	/** Canonical display URL returned by both recommended-seller endpoints. */
-	logoUrl?: string;
-	rating?: string | number;
-	storeName?: string;
-	followers?: number;
-	certified?: boolean;
-	/** 賣家自填獎項 — 目前 recommended / marketplace 列表不回傳，
-	 *  首頁改從 /public/sellers/{id}（getCachedSeller）補；列表哪天
-	 *  帶了就直接生效。 */
-	prize?: string;
-}
-
-export interface MarketplaceData {
-	hotProducts?: MarketplaceProduct[];
-	latestPosts?: MarketplacePost[];
-	recommendedSellers?: MarketplaceSeller[];
-}
-
 function emptyRecords() {
 	return { records: [], total: 0, totalPages: 0 };
 }
@@ -142,33 +88,6 @@ function stringArray(value: unknown): string[] | undefined {
  */
 // biome-ignore lint/suspicious/noExplicitAny: Transitional untyped gateway entities require arbitrary property access until OpenAPI codegen lands.
 type LooseJson = Record<string, any>;
-
-// Both server callers own their own cache window — getCachedMarketplace and the
-// home tab-bootstrap route's live aggregate, each an `unstable_cache` entry
-// carrying the product/seller/post tags plus the COMMERCE_LIVE TTL — so there is
-// no inner next:{revalidate} here. A fetch-level window would only re-cache the
-// same payload under Next's implicit tags, which POST /api/revalidate cannot
-// bust, and would swallow a tag invalidation for its own duration (#339 M4).
-export async function fetchMarketplace(
-	sellerLimit = 4,
-	postLimit = 4,
-	productLimit = 6,
-	signal?: AbortSignal,
-	strict = false,
-): Promise<MarketplaceData | null> {
-	const { data } = await apiClient.public.get<MarketplaceData>("/marketplace", {
-		query: {
-			seller_limit: String(sellerLimit),
-			post_limit: String(postLimit),
-			product_limit: String(productLimit),
-		},
-		credentials: "omit",
-		softFail: !strict,
-		signal,
-	});
-	if (strict && data == null) throw new Error("marketplace payload missing");
-	return data ?? null;
-}
 
 /**
  * Optional filters for `/public/products`.
@@ -286,6 +205,23 @@ export async function fetchProducts(
 		throw new Error("products payload missing");
 	}
 	return envelope.data != null ? envelope : { code: 0, data: { records: [] } };
+}
+
+/**
+ * 熱門商品：`/public/products?sort=SALES` 的第一頁，伺服器依銷量排序。回傳商品列，不含分頁資訊；
+ * `strict` 時讀不到就丟錯，讓呼叫端的快取保留前一份而不是把空清單當成新資料。
+ */
+export async function fetchHotProducts(
+	limit: number,
+	options?: { signal?: AbortSignal; strict?: boolean },
+): Promise<MarketplaceProduct[]> {
+	const envelope = await fetchProducts("", 1, limit, undefined, "SALES", {
+		signal: options?.signal,
+		strict: options?.strict,
+	});
+	const records = (envelope as { data?: { records?: unknown } } | null)?.data
+		?.records;
+	return Array.isArray(records) ? (records as MarketplaceProduct[]) : [];
 }
 
 function isSellerAccountId(id: string): boolean {
@@ -442,24 +378,6 @@ export async function fetchPublicProduct(id: string) {
 		softFailNotFound: true,
 	});
 	return data ?? null;
-}
-
-export async function fetchSellers(
-	limit = 50,
-	signal?: AbortSignal,
-	strict = false,
-): Promise<MarketplaceSeller[]> {
-	const { data } = await apiClient.public.get<{
-		records?: MarketplaceSeller[];
-	}>("/sellers/recommended", {
-		query: { limit: String(limit) },
-		credentials: "omit",
-		softFail: !strict,
-		signal,
-	});
-	if (strict && data == null)
-		throw new Error("recommended sellers payload missing");
-	return data?.records ?? [];
 }
 
 /** `GET /public/sellers/{id}/stats` —— gateway `seller.go:137-144`。 */

@@ -62,18 +62,6 @@ function canonicalOnly(storeCode: string | undefined): string {
 
 const STORE_ID = "2636840881";
 const STORE_CODE = "2649605557";
-/**
- * A seller whose recommended-seller row reaches the rail without a store_code,
- * standing in for any payload that omits the field.
- *
- * Not a claim about this id on dev: `2685914682` does have a store_code there —
- * it simply equals its store_id, because rows backfilled from an already-bound
- * PayUni merchant_code copy it rather than minting a fresh one. The case being
- * pinned is "the field is absent from the payload", which is what
- * `recommendedSellers: [{ store_id, store_name }]` below actually constructs.
- */
-const CODELESS_STORE_ID = "2685914682";
-
 function source(relativePath: string): string {
 	return readFileSync(new URL(`../${relativePath}`, import.meta.url), "utf8");
 }
@@ -82,9 +70,6 @@ function source(relativePath: string): string {
 const CANONICAL_LINK_SOURCES = [
 	"features/product/components/ProductSellerIntro.tsx",
 	"features/market/components/MarketProductCard.tsx",
-	"features/cart/components/SellerGroupCard.tsx",
-	"features/account/screens/favorites/FavoritesClient.tsx",
-	"features/messages/components/ChatContextPanel.tsx",
 	"features/feed/components/StoryRail.tsx",
 	"features/home/homeSnapshot.ts",
 	// The two post-card surfaces, canonical since #2098 phase 3 taught
@@ -94,12 +79,8 @@ const CANONICAL_LINK_SOURCES = [
 	// #2137: the four surfaces whose owning service already had the seller in
 	// hand. These pass the code alone — a missing code means no link, not a
 	// store_id link.
-	"features/account/screens/orders/OrderDetailClient.tsx",
-	"features/account/screens/orders/OrderQuickActionDrawer.tsx",
 	"features/account/screens/overview/AccountOverviewClient.tsx",
-	"features/account/screens/coupons/CouponsClient.tsx",
 	"features/account/screens/recent/RecentClient.tsx",
-	"features/account/screens/messages/ThreadClient.tsx",
 ];
 
 /**
@@ -187,6 +168,33 @@ test("seller links on store_code-bearing surfaces are built through sellerPath()
 	}
 });
 
+/** 參照入口（購物車、訂單、優惠券、聊天、追蹤清單）：進店連結與狀態來自 BatchGetStores 的店家卡片，不讀快照裡的店網址。 */
+const CARD_REFERENCE_SOURCES = [
+	"features/cart/CartClient.tsx",
+	"features/account/screens/favorites/FavoritesClient.tsx",
+	"features/messages/components/ChatContextPanel.tsx",
+	"features/account/screens/orders/OrderDetailClient.tsx",
+	"features/account/screens/orders/OrderQuickActionDrawer.tsx",
+	"features/account/screens/coupons/CouponsClient.tsx",
+	"features/account/screens/messages/ThreadClient.tsx",
+];
+
+test("reference entries take their store link from the store card, not the snapshot code", () => {
+	for (const path of CARD_REFERENCE_SOURCES) {
+		const code = source(path);
+		assert.match(
+			code,
+			/useStoreCardViews|storeCardView\(/,
+			`${path} must resolve its store link through the BatchGetStores card`,
+		);
+		assert.doesNotMatch(
+			code,
+			/sellerPath\(/,
+			`${path} must not build a seller href from the snapshot's store code`,
+		);
+	}
+});
+
 test("sellerPath prefers the store_code and falls back to the key it was given", async () => {
 	const { sellerPath } = await import("../lib/seo/urls");
 	assert.equal(sellerPath(STORE_CODE, STORE_ID), `/sellers/${STORE_CODE}`);
@@ -241,35 +249,33 @@ test("cart groups carry the seller store_code alongside storeId", () => {
 test("home recommended-seller cards link the canonical store_code", async () => {
 	const { buildHomeSnapshot } = await import("../features/home/homeSnapshot");
 	const snapshot = buildHomeSnapshot({
-		schemaVersion: "home.v1",
-		// The rail is fed from BOTH recommended sources, so one seller enters
-		// through each: the marketplace aggregate and the recommended endpoint.
-		marketplace: {
-			recommendedSellers: [
-				{ storeId: STORE_ID, storeCode: STORE_CODE, storeName: "有短碼" },
-			],
-		},
+		schemaVersion: "home.v2",
+		hotProducts: [],
 		products: { data: { records: [] } },
-		recommendedSellers: [{ storeId: CODELESS_STORE_ID, storeName: "無短碼" }],
+		recommendedSellers: [
+			{
+				id: STORE_ID,
+				storeCode: STORE_CODE,
+				name: "有短碼",
+				logoUrl: "",
+				coverUrl: "",
+				townCode: "",
+			},
+		],
 		posts: { page: 1, pageSize: 8, total: 0, records: [] },
+		categoryGroups: [],
 	});
 
 	const coded = snapshot.mappedSellers.find((s) => s.name === "有短碼");
-	// The canonical segment, NOT the store_id it arrived keyed by — linking
-	// the id is what buys a 308 on every tap of the rail.
 	assert.equal(coded?.href, `/sellers/${STORE_CODE}`);
 	assert.notEqual(coded?.href, `/sellers/${STORE_ID}`);
-
-	// No minted code → the store_id path, which middleware serves directly.
-	const codeless = snapshot.mappedSellers.find((s) => s.name === "無短碼");
-	assert.equal(codeless?.href, `/sellers/${CODELESS_STORE_ID}`);
 });
 
 test("every StoryRail producer carries the seller store_code", () => {
 	const producers = discoverStoryItemProducers();
 	// Without this the loop below would pass vacuously if discovery ever broke.
 	assert.ok(
-		producers.length >= 4,
+		producers.length >= 2,
 		`expected to discover the known StoryItem producers, got ${producers.length}: ${producers.join(", ")}`,
 	);
 
@@ -321,18 +327,9 @@ test("the posts pipeline carries store_code from the wire onto the feed rail", a
 	assert.match(feed, /storeCode: p\.storeCode \|\| undefined/);
 });
 
-test("the market 推薦商家 rail carries store_code onto its story items", () => {
+test("the market 推薦商家 rail is built from the recommended stores' store_code", () => {
 	const code = source("features/market/products/MarketProductsListPage.tsx");
-	// The rows are read as Record<string, unknown>, so reading the product
-	// wire's camelCase `storeCode` here would type-check and resolve to
-	// undefined — every item silently back on its store_id.
-	assert.match(code, /typeof seller\.storeCode === "string"/);
-	assert.match(code, /storeCode: storeCode \|\| undefined/);
-	assert.doesNotMatch(
-		code,
-		/seller\.store_code/,
-		"backend#2235 之後推薦商家的 segment 是 camelCase，snake 讀不到值",
-	);
+	assert.match(code, /recommendedStoriesFromStores\(/);
 });
 
 test("followed-seller rows keep store_code alongside the seller_id the API keys on", () => {

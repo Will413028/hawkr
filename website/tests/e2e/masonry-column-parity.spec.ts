@@ -258,7 +258,7 @@ async function discoverStorefront(page: Page): Promise<string> {
 	await page.waitForSelector(CARD, { timeout: 20_000 });
 	// ⚠️ 只從**商品卡片內**取賣家連結，不要拿頁面上任何 `a[href^="/sellers/"]`。
 	//
-	// 市集頁除了商品卡，還有「推薦商家」欄，而 `/public/sellers/recommended`
+	// 市集頁除了商品卡，還有「推薦商家」欄，而推薦商家排行
 	// **不過濾商品數**：dev 上第一名 `2662192214` 的商品數是 0。原本的寫法掃
 	// 整份文件，於是挑中那家空店 —— 店面渲染正常（`ready=true`、頁面寫著
 	// 「沒有商品」），但 grid 與 card 都是 0，`waitForStableCardCount` 要求

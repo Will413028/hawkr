@@ -4,9 +4,9 @@ import * as React from "react";
 import AppImage from "@/components/shared/AppImage";
 import Link from "@/components/shared/Link";
 import ChatPeerAvatar from "@/features/messages/components/ChatPeerAvatar";
-import { fetchSeller, fetchSellerProducts } from "@/lib/api";
+import { fetchSellerProducts } from "@/lib/api";
 import { resolveCdnUrl } from "@/lib/media/cdn";
-import { sellerPath } from "@/lib/seo/urls";
+import { useStoreCardViews } from "@/lib/seller/useStoreCardViews";
 
 /**
  * Third-column context panel for buyer↔seller threads — the Airbnb
@@ -55,33 +55,18 @@ function normalizeProduct(raw: Record<string, unknown>): ProductLite {
 }
 
 export default function ChatContextPanel({ sellerId }: { sellerId: string }) {
-	const [seller, setSeller] = React.useState<{
-		name: string;
-		logo_url: string;
-		/** Wire name (gateway `PublicSellerInfo.storeCode`, backend#2235). `fetchSeller`
-		 *  passes it through unrenamed — only `logo_url` is a display alias. */
-		storeCode: string;
-	} | null>(null);
+	const { views } = useStoreCardViews(sellerId ? [sellerId] : []);
+	const seller = views.get(String(sellerId));
 	const [products, setProducts] = React.useState<ProductLite[]>([]);
 
 	React.useEffect(() => {
 		if (!sellerId) return;
 		let cancelled = false;
 		void (async () => {
-			const [profile, catalog] = await Promise.all([
-				fetchSeller(sellerId).catch(() => null),
-				fetchSellerProducts(sellerId, 1, 3).catch(() => null),
-			]);
+			const catalog = await fetchSellerProducts(sellerId, 1, 3).catch(
+				() => null,
+			);
 			if (cancelled) return;
-			if (profile) {
-				setSeller({
-					name: profile.name || "",
-					logo_url:
-						typeof profile.logo_url === "string" ? profile.logo_url : "",
-					storeCode:
-						typeof profile.storeCode === "string" ? profile.storeCode : "",
-				});
-			}
 			const records = (catalog?.records ?? []) as Record<string, unknown>[];
 			setProducts(records.map(normalizeProduct).filter((p) => p.id && p.name));
 		})();
@@ -92,31 +77,31 @@ export default function ChatContextPanel({ sellerId }: { sellerId: string }) {
 
 	if (!seller) return null;
 
-	// The panel already holds the seller's public profile, so the CTA can point
-	// straight at the canonical storefront rather than eat a 308 (#365).
-	const shopHref = sellerPath(seller.storeCode, sellerId);
-
 	return (
 		<aside className="chat-context" aria-label="賣家資訊">
 			<div className="chat-context__seller">
 				<ChatPeerAvatar
-					src={seller.logo_url}
+					src={seller.logoUrl}
 					alt={seller.name}
 					className="chat-context__avatar"
 					fallback="empty"
 				/>
-				<strong className="chat-context__name">{seller.name || "賣家"}</strong>
-				<Link
-					href={shopHref}
-					// `.chat-context__cta` is a filled pill with a
-					// `--hkui-primary-foreground` label (0-1-0); without this marker
-					// `[data-theme="dark"] body a:not([data-hkui-button])` (0-2-2)
-					// repaints it olive `--color-ink-200`.
-					data-hkui-button=""
-					className="chat-context__cta"
-				>
-					前往賣場
-				</Link>
+				<strong className="chat-context__name">{seller.name}</strong>
+				{seller.href ? (
+					<Link
+						href={seller.href}
+						// `.chat-context__cta` is a filled pill with a
+						// `--hkui-primary-foreground` label (0-1-0); without this marker
+						// `[data-theme="dark"] body a:not([data-hkui-button])` (0-2-2)
+						// repaints it olive `--color-ink-200`.
+						data-hkui-button=""
+						className="chat-context__cta"
+					>
+						前往賣場
+					</Link>
+				) : seller.labelText ? (
+					<span className="chat-context__name">{seller.labelText}</span>
+				) : null}
 			</div>
 			{products.length > 0 ? (
 				<section className="chat-context__section" aria-label="店內商品">

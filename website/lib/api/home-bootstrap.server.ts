@@ -2,7 +2,7 @@ import "server-only";
 
 import {
 	getCachedCategoryTree,
-	getCachedMarketplace,
+	getCachedHotProducts,
 	getCachedProductsFirstPage,
 	getCachedPublicPosts,
 	getCachedRecommendedSellers,
@@ -17,8 +17,8 @@ import { categoryGroupsFromTree } from "@/lib/market/categoryGroups";
  * the first runtime request. Never used at runtime (see `loadHomeRenderBootstrap`).
  */
 export const EMPTY_HOME_BOOTSTRAP: HomeTabBootstrapV1 = {
-	schemaVersion: "home.v1",
-	marketplace: null,
+	schemaVersion: "home.v2",
+	hotProducts: [],
 	products: { data: { records: [] } },
 	recommendedSellers: [],
 	posts: { page: 1, pageSize: 8, total: 0, records: [] },
@@ -46,17 +46,17 @@ export const EMPTY_HOME_BOOTSTRAP: HomeTabBootstrapV1 = {
  * tag-invalidated by POST /api/revalidate, so no home-only cache is introduced.
  */
 export async function loadHomeRenderBootstrap(): Promise<HomeTabBootstrapV1> {
-	const [marketplace, products, recommendedSellers, posts, categoryTree] =
+	const [hotProducts, products, recommendedSellers, posts, categoryTree] =
 		await Promise.all([
-			getCachedMarketplace(8, 6, 8),
+			getCachedHotProducts(8),
 			getCachedProductsFirstPage(100),
 			getCachedRecommendedSellers(24),
 			getCachedPublicPosts(1, 8),
 			getCachedCategoryTree(),
 		]);
 	return {
-		schemaVersion: "home.v1",
-		marketplace,
+		schemaVersion: "home.v2",
+		hotProducts,
 		products,
 		recommendedSellers,
 		posts,

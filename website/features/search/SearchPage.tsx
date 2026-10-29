@@ -5,7 +5,7 @@ import "@/styles/features/market-products-list.css";
  * Without this import the card chrome collapses to a plain block stack. */
 import "@/styles/features/feed-components.css";
 import "@/styles/features/search-agent-entry.css";
-import { getCachedMarketplace } from "@/lib/api/cached";
+import { getCachedHotProducts } from "@/lib/api/cached";
 import { fetchPublicPostsTyped } from "@/lib/api/posts";
 import type { SearchProductHit } from "@/lib/search/repo";
 import RecommendedPostRail from "./components/RecommendedPostRail";
@@ -23,8 +23,8 @@ import SearchClient from "./SearchClient";
 export default async function SearchPage() {
 	// The two landing rails fetch concurrently but commit as one server tree,
 	// then ship inside the static HTML.
-	const [marketplace, landingPosts] = await Promise.all([
-		getCachedMarketplace(4, 4, 8).catch(() => null),
+	const [hotProducts, landingPosts] = await Promise.all([
+		getCachedHotProducts(8).catch(() => []),
 		fetchPublicPostsTyped({ page: 1, pageSize: 8 }).catch(() => ({
 			page: 1,
 			pageSize: 8,
@@ -38,9 +38,7 @@ export default async function SearchPage() {
 			className="w-[min(1440px,calc(100%-48px))] mx-auto max-md:w-[min(100%-28px,680px)] flex flex-col gap-10 pt-2"
 			aria-label="探索內容"
 		>
-			<RecommendedProductRail
-				products={(marketplace?.hotProducts ?? []) as SearchProductHit[]}
-			/>
+			<RecommendedProductRail products={hotProducts as SearchProductHit[]} />
 			<RecommendedPostRail posts={landingPosts.records ?? []} />
 		</section>
 	);

@@ -17,7 +17,7 @@ import {
 	type Order,
 	STATUS_LABEL,
 } from "@/lib/orders/types";
-import { sellerPath } from "@/lib/seo/urls";
+import { useStoreCardViews } from "@/lib/seller/useStoreCardViews";
 
 /**
  * Buyer order quick-action drawer — the list-page counterpart of the seller
@@ -60,6 +60,9 @@ export default function OrderQuickActionDrawer({
 		setBusy(false);
 		setError(null);
 	}, [orderNo]);
+
+	const { views } = useStoreCardViews(order?.storeId ? [order.storeId] : []);
+	const storeView = order?.storeId ? views.get(order.storeId) : undefined;
 
 	const detailHref = orderNo ? `/account/orders/${orderNo}` : "#";
 
@@ -143,9 +146,9 @@ export default function OrderQuickActionDrawer({
 			{order ? (
 				<div className="flex flex-col gap-4">
 					<div className="flex items-center justify-between gap-3">
-						{order.storeCode ? (
+						{storeView?.href ? (
 							<Link
-								href={sellerPath(order.storeCode)}
+								href={storeView.href}
 								onClick={onClose}
 								className="text-base font-semibold text-inherit no-underline hover:text-hk-primary"
 							>
@@ -154,6 +157,11 @@ export default function OrderQuickActionDrawer({
 						) : (
 							<strong className="text-base font-semibold">
 								{order.sellerName || "未知賣家"}
+								{storeView?.labelText ? (
+									<small className="ml-2 font-normal text-foreground-muted">
+										{storeView.labelText}
+									</small>
+								) : null}
 							</strong>
 						)}
 						<span className="inline-flex shrink-0 items-center gap-2">

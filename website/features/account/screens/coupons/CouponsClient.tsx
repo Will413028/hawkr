@@ -15,7 +15,7 @@ import {
 import { formatTaipeiDate } from "@/lib/date/taipei";
 import { useQueryIdentity } from "@/lib/hooks/useQueryIdentity";
 import { queryKeys } from "@/lib/query/keys";
-import { sellerPath } from "@/lib/seo/urls";
+import { useStoreCardViews } from "@/lib/seller/useStoreCardViews";
 
 // Note: 「全站可領」 tab is intentionally hidden — the backend's
 // `/app/coupons/available` endpoint requires both `store_id`
@@ -75,6 +75,9 @@ export default function CouponsClient() {
 		placeholderData: keepPreviousData,
 	});
 	const list: Array<MyCouponItem | CouponItem> = query.data ?? [];
+	const { views: storeViews } = useStoreCardViews(
+		list.flatMap((c) => (c.applicableStoreId ? [c.applicableStoreId] : [])),
+	);
 	const loading = query.isLoading;
 	const error = query.error instanceof Error ? query.error.message : null;
 
@@ -144,11 +147,10 @@ export default function CouponsClient() {
 							// pre-normalization legacy alias. Prefer the camelCase one
 							// since `normalizeCoupon` writes it explicitly.
 							const sellerName = c.sellerName ?? c.seller_name;
-							// 賣家頁 canonical 網址走 store_code；applicableStoreId 只是
-							// 內部代理鍵，連它每次點擊都要多吃一次 308。coupon-service
-							// 為了 sellerName 本來就查了賣家，兩者同源，所以取不到
-							// store_code（全平台券／賣家服務降級）就不連結。
-							const sellerHref = sellerPath(c.storeCode) || null;
+							const storeView = c.applicableStoreId
+								? storeViews.get(c.applicableStoreId)
+								: undefined;
+							const sellerHref = storeView?.href || null;
 
 							// Per-kind badge tint (was the CSS `data-kind` attribute); a
 							// used/expired coupon overrides every kind to the muted chip.
@@ -220,6 +222,11 @@ export default function CouponsClient() {
 													<span className="truncate min-w-0 group-hover:underline">
 														{sellerName}
 													</span>
+													{storeView?.labelText ? (
+														<span className="shrink-0">
+															{storeView.labelText}
+														</span>
+													) : null}
 												</span>
 											)
 										) : (
