@@ -97,6 +97,44 @@ func (q *Queries) ExtraTakedowns(ctx context.Context) ([]ExtraTakedownsRow, erro
 	return items, nil
 }
 
+const insertActiveTakedowns = `-- name: InsertActiveTakedowns :execrows
+INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id, created_at)
+SELECT t.measure_id,
+       CASE WHEN t.content_kind = 'POST' THEN t.content_id END,
+       CASE WHEN t.content_kind = 'COMMENT' THEN t.content_id END,
+       CASE WHEN t.content_kind = 'FORUM_ENTRY' THEN t.content_id END,
+       $1::timestamptz
+FROM seller.pub_content_takedowns() AS t
+WHERE t.measure_id = $2::uuid
+  AND ((t.content_kind = 'POST' AND t.content_id = ANY($3::uuid[]))
+    OR (t.content_kind = 'COMMENT' AND t.content_id = ANY($4::uuid[]))
+    OR (t.content_kind = 'FORUM_ENTRY' AND t.content_id = ANY($5::uuid[])))
+ON CONFLICT DO NOTHING
+`
+
+type InsertActiveTakedownsParams struct {
+	CreatedAt     time.Time
+	MeasureID     uuid.UUID
+	PostIds       []uuid.UUID
+	CommentIds    []uuid.UUID
+	ForumEntryIds []uuid.UUID
+}
+
+// 對帳補漏：只寫此刻 seller.pub_content_takedowns() 仍生效的列（在寫入的語句裡再看一次，讀到「缺」的清單之後措施才被撤銷時不寫回）。冪等：已有的列略過。
+func (q *Queries) InsertActiveTakedowns(ctx context.Context, arg InsertActiveTakedownsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, insertActiveTakedowns,
+		arg.CreatedAt,
+		arg.MeasureID,
+		arg.PostIds,
+		arg.CommentIds,
+		arg.ForumEntryIds,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const insertTakedowns = `-- name: InsertTakedowns :execrows
 
 INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id, created_at)

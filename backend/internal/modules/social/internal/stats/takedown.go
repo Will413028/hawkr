@@ -50,11 +50,24 @@ func (c contentSet) empty() bool { return len(c.posts)+len(c.comments)+len(c.ent
 func (s *Service) ApplyTakedowns(ctx context.Context, measureID uuid.UUID, storeID int64, at time.Time, contents []Content) error {
 	return s.applyTakedowns(ctx, measureID, at, contents, func(ctx context.Context, set contentSet) error {
 		return s.checkTakedownOwnership(ctx, storeID, set)
+	}, func(ctx context.Context, q *store.Queries, p store.InsertTakedownsParams) (int64, error) {
+		return q.InsertTakedowns(ctx, p)
 	})
 }
 
-// applyTakedowns 是 ApplyTakedowns 與對帳補漏共用的寫入：鎖內容列、check（建立入口核對歸屬；對帳不核對，措施已經生效）、寫複本、求值。
-func (s *Service) applyTakedowns(ctx context.Context, measureID uuid.UUID, at time.Time, contents []Content, check func(context.Context, contentSet) error) error {
+// ApplyMissingTakedowns 是每日對帳的補漏：把 seller 發布的生效中下架裡複本沒有的列補上。不核對歸屬（措施已經生效，內容之後可以被作者刪除）；
+// 寫入的語句自己再看一次 seller.pub_content_takedowns()，所以讀到「缺」的清單之後才被撤銷的措施不會被寫回。撤銷的 transaction 若與這一句同時進行（尚未提交），
+// 仍可能寫入一次，由下一次對帳的「多」那一步刪除。
+func (s *Service) ApplyMissingTakedowns(ctx context.Context, measureID uuid.UUID, at time.Time, contents []Content) error {
+	return s.applyTakedowns(ctx, measureID, at, contents, nil, func(ctx context.Context, q *store.Queries, p store.InsertTakedownsParams) (int64, error) {
+		return q.InsertActiveTakedowns(ctx, store.InsertActiveTakedownsParams{
+			MeasureID: p.MeasureID, CreatedAt: p.CreatedAt, PostIds: p.PostIds, CommentIds: p.CommentIds, ForumEntryIds: p.ForumEntryIds,
+		})
+	})
+}
+
+// applyTakedowns 是 ApplyTakedowns 與對帳補漏共用的寫入：鎖內容列、check（建立入口核對歸屬；對帳不核對，措施已經生效）、insert 寫複本、求值。
+func (s *Service) applyTakedowns(ctx context.Context, measureID uuid.UUID, at time.Time, contents []Content, check func(context.Context, contentSet) error, insert func(context.Context, *store.Queries, store.InsertTakedownsParams) (int64, error)) error {
 	set, err := splitContents(contents)
 	if err != nil {
 		return err
@@ -72,7 +85,7 @@ func (s *Service) applyTakedowns(ctx context.Context, measureID uuid.UUID, at ti
 				return err
 			}
 		}
-		n, err := q.InsertTakedowns(ctx, store.InsertTakedownsParams{
+		n, err := insert(ctx, q, store.InsertTakedownsParams{
 			MeasureID: measureID, CreatedAt: at, PostIds: set.posts, CommentIds: set.comments, ForumEntryIds: set.entries,
 		})
 		if err != nil {
@@ -192,7 +205,7 @@ func (s *Service) syncTakedowns(ctx context.Context, rep *Report) error {
 		byMeasure[m.MeasureID] = append(byMeasure[m.MeasureID], Content{Kind: contentkind.Kind(m.ContentKind), ID: m.ContentID})
 	}
 	for _, id := range order {
-		if err := s.applyTakedowns(ctx, id, s.d.Now().UTC(), byMeasure[id], nil); err != nil {
+		if err := s.ApplyMissingTakedowns(ctx, id, s.d.Now().UTC(), byMeasure[id]); err != nil {
 			return err
 		}
 		rep.TakedownsAdded += len(byMeasure[id])

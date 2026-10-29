@@ -5,13 +5,16 @@ package social_test
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"slices"
 	"testing"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
+	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/stats"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/contentkind"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
 )
@@ -392,5 +395,27 @@ func TestTakedownRejectsContentThatIsNotTheMeasureStoresOwn(t *testing.T) {
 	}
 	if get, feed, _, _ := f.postVisible(t, w.post.ID); !get || !feed {
 		t.Fatal("被拒絕後貼文照常可讀")
+	}
+}
+
+// 對帳補漏在寫入的語句裡再看一次 seller.pub_content_takedowns()：先讀到「缺」的清單、寫入之前措施被撤銷時，不把已撤銷措施的複本寫回去。
+// （撤銷的 transaction 與對帳的讀取交錯無法在不加 hook 的情況下穩定重現；這裡直接把過期的清單交給補漏入口。）
+func TestReconcileInsertRechecksThatTheMeasureIsStillActive(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	td := f.takedowns(t)
+	w := f.takedownWorld(t)
+	refs := []seller.ContentRef{ref(seller.ContentPost, w.post.ID), ref(seller.ContentComment, w.comment.ID)}
+	id := td.seed(t, w.storeID, refs)
+	f.exec(t, "UPDATE seller.measures SET status = 'REVOKED' WHERE id = $1", id)
+	svc := stats.New(stats.Deps{DB: f.db, Logger: slog.New(slog.DiscardHandler), Now: f.clock})
+	stale := []stats.Content{{Kind: contentkind.Post, ID: w.post.ID}, {Kind: contentkind.Comment, ID: w.comment.ID}}
+	must(t, svc.ApplyMissingTakedowns(ctx, id, f.clock(), stale))
+	if n := f.scalar(t, "SELECT count(*) FROM social.content_takedowns"); n != 0 {
+		t.Fatalf("已撤銷的措施不該被補回複本：%d", n)
+	}
+	if get, feed, _, _ := f.postVisible(t, w.post.ID); !get || !feed {
+		t.Fatal("貼文照常可讀")
 	}
 }

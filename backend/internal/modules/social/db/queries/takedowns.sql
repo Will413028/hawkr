@@ -22,6 +22,21 @@ SELECT 'FORUM_ENTRY'::text, f::uuid FROM unnest(sqlc.arg(forum_entry_ids)::uuid[
 WHERE NOT EXISTS (SELECT 1 FROM social.forum_entries AS x WHERE x.id = f AND x.actor_kind = 'STORE' AND x.actor_id = sqlc.arg(store_id)::bigint AND x.deleted_at IS NULL)
 ORDER BY 1, 2;
 
+-- name: InsertActiveTakedowns :execrows
+-- 對帳補漏：只寫此刻 seller.pub_content_takedowns() 仍生效的列（在寫入的語句裡再看一次，讀到「缺」的清單之後措施才被撤銷時不寫回）。冪等：已有的列略過。
+INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id, created_at)
+SELECT t.measure_id,
+       CASE WHEN t.content_kind = 'POST' THEN t.content_id END,
+       CASE WHEN t.content_kind = 'COMMENT' THEN t.content_id END,
+       CASE WHEN t.content_kind = 'FORUM_ENTRY' THEN t.content_id END,
+       sqlc.arg(created_at)::timestamptz
+FROM seller.pub_content_takedowns() AS t
+WHERE t.measure_id = sqlc.arg(measure_id)::uuid
+  AND ((t.content_kind = 'POST' AND t.content_id = ANY(sqlc.arg(post_ids)::uuid[]))
+    OR (t.content_kind = 'COMMENT' AND t.content_id = ANY(sqlc.arg(comment_ids)::uuid[]))
+    OR (t.content_kind = 'FORUM_ENTRY' AND t.content_id = ANY(sqlc.arg(forum_entry_ids)::uuid[])))
+ON CONFLICT DO NOTHING;
+
 -- name: TakedownsOfMeasure :many
 SELECT post_id, comment_id, forum_entry_id FROM social.content_takedowns
 WHERE measure_id = sqlc.arg(measure_id);
