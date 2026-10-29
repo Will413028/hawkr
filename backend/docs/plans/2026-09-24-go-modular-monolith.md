@@ -63,15 +63,15 @@
       - `--go-media` 另外輸出到 `internal/modules/media/ref_type.go`，CI 檢查 `--go`、`--go-media` 生成物的 drift。
     - [x] **ID 策略**（2026-09-25 決定）：`pkg/tsid` 沒有 node 位元，serve 的多個 replica 加上 worker 同一毫秒會撞號。改成依資料性質決定識別：實體用 UUIDv7，值的集合與關聯表用複合鍵，不需要任何部署協調（ADR `2026-09-25-row-identity-by-data-kind.md`）。content 已照做。
   - [ ] 帶業務語意的套件不進 platform，隨所屬模組搬：delegation、rolestate、payuni、moderation、blocklist、geocode、sms、mail。
-  - [ ] 沒人使用的套件刪除：`membershipkernel`、`csvutil`、`cmd`。
+  - [x] 沒人使用的套件刪除：`membershipkernel`、`csvutil`。`pkg/cmd` 不刪：`protonumericlint` 是 `make` 的 proto 數字型別檢查（`backend/Makefile`），隨 proto 契約退場。
   - 外部呼叫的 intent（D5）由 River job 承載：業務列與帶冪等鍵的 job 在同一個 transaction 內寫入，worker 在 transaction 外呼叫 provider。共用的 helper 在第一個外部整合搬進來時，依實際需要抽出。
-- [ ] **0.3 arch 檢查**（Go test）
+- [x] **0.3 arch 檢查**（Go test）
   - [x] 依賴表是單一檔案（`internal/arch/modules.go`），由 ADR D2 的表轉成。每個模組的實際 import 必須在表內。
   - [x] 模組不得 import `internal/legacy`；platform 不得 import 模組。
   - [x] migration 的隔離：每個模組的 migration 單獨套用在空的 database 上，參照別的模組（例如跨 schema FK）就套用失敗，把物件建在自己的 schema 以外就被列出來。由 Postgres 本身判斷，不另寫 SQL parser。
   - [x] query 的隔離：每個模組的 sqlc 只讀自己的 `db/schema.sql`，參照別的模組的 query 在 `sqlc generate` 時就失敗。`make sqlc` 以 `scripts/gen-sqlc.sh` 的同一個 image 生成；`backend-monolith` 重新生成並比對，並確認 `internal/arch/testdata/sqlc-foreign-schema` 這份故意違規的 fixture 因為 schema 不存在而失敗。
   - [x] 每條規則都附一份故意違規的 fixture，而且這份 fixture 必須讓檢查失敗。
-- [ ] **0.4 Atlas 與 migration**
+- [x] **0.4 Atlas 與 migration**
   - [x] `internal/platform/migrate`：migration 檔 embed 進 binary，`hawkr migrate` 依登記順序套用全部模組。套用前驗證 `atlas.sum`（以 Go 重新實作 Atlas 的演算法，已用 12 個服務的 `atlas.sum` 逐位元比對）；已套用的檔案不得修改或刪除；新檔案的版本不得早於已套用的版本；以 advisory lock 保證同時只有一個 migrate。執行期與 CI 都不需要 Atlas CLI。
   - [x] `cmd/hawkr/modules.go` 登記每個模組；測試保證 `internal/modules` 底下的每個模組都有登記。
   - [x] 開發時產生 migration 用的 Atlas 設定（每個模組自己的 `db/`：schema、migrations、`atlas.sum`），隨 A1 試點建立並實際跑一次。
