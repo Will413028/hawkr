@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { apiClient } from "@/lib/api/client";
+import { sellerPublicClient } from "@/lib/connect/seller-public";
 import { useRecordHistory } from "@/lib/hooks/useRecordHistory";
 
 export function ProductViewTracker({ productId }: { productId: string }) {
@@ -9,9 +9,9 @@ export function ProductViewTracker({ productId }: { productId: string }) {
 	const recordedFor = useRef<string | null>(null);
 
 	useEffect(() => {
-		// Fire-and-forget view beacon, routed through apiClient.public for its
-		// timeout policy and the environment's API base.
-		apiClient.public.post(`/products/${productId}/view`).catch(() => {});
+		sellerPublicClient()
+			.recordProductView({ productId })
+			.catch(() => {});
 	}, [productId]);
 
 	useEffect(() => {
