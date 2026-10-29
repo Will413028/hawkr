@@ -108,6 +108,7 @@ func (f *fixture) postVisible(t *testing.T, id uuid.UUID) (get, feed, store, tag
 }
 
 func (f *fixture) storeOf(t *testing.T, postID uuid.UUID) int64 {
+	t.Helper()
 	return f.scalar(t, "SELECT store_id FROM social.posts WHERE id = $1", postID)
 }
 
