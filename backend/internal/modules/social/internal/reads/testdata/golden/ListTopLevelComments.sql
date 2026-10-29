@@ -22,7 +22,11 @@ FROM social.comments AS c
 WHERE ((((c.post_id = $4::uuid) AND (c.parent_id IS NULL)) AND (EXISTS (
            SELECT cp.id AS "cp.id"
            FROM social.posts AS cp
-           WHERE (((cp.status = 'PUBLISHED') AND (cp.deleted_at IS NULL)) AND (EXISTS (SELECT 1 FROM seller.pub_exposable_stores($5::timestamp with time zone) AS pub WHERE pub.store_id = cp.store_id))) AND (cp.id = $6::uuid)
+           WHERE ((((cp.status = 'PUBLISHED') AND (cp.deleted_at IS NULL)) AND (NOT (EXISTS (
+                      SELECT td.post_id AS "td.post_id"
+                      FROM social.content_takedowns AS td
+                      WHERE td.post_id = cp.id
+                 )))) AND (EXISTS (SELECT 1 FROM seller.pub_exposable_stores($5::timestamp with time zone) AS pub WHERE pub.store_id = cp.store_id))) AND (cp.id = $6::uuid)
       ))) AND (v.visible OR (EXISTS (
            SELECT r.id AS "r.id"
            FROM social.comments AS r

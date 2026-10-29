@@ -13,6 +13,7 @@ func UseSchema(schema string) {
 	CommentLikes = CommentLikes.FromSchema(schema)
 	CommentStats = CommentStats.FromSchema(schema)
 	Comments = Comments.FromSchema(schema)
+	ContentTakedowns = ContentTakedowns.FromSchema(schema)
 	ForumEntries = ForumEntries.FromSchema(schema)
 	ForumEntryStats = ForumEntryStats.FromSchema(schema)
 	Hides = Hides.FromSchema(schema)

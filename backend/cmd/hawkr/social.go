@@ -64,11 +64,13 @@ func newSocial(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, buyers *buyer.Module
 }
 
 // subscribeSocial 讓買家進入刪除中與關閉在同一個 transaction 寫 social 的複本、重新求值並排清除 job（單體規則 4 的原子狀態變更），
-// 店家退場只排清除 job（訂閱者只 Enqueue）。
+// 店家退場只排清除 job（訂閱者只 Enqueue），seller 建立與撤銷內容下架措施在同一個 transaction 寫複本、重新求值並排快取失效。
 func subscribeSocial(bus *events.Bus, m *social.Module) {
 	events.Subscribe(bus, m.OnBuyerDeletionRequested)
 	events.Subscribe(bus, m.OnBuyerDeleted)
 	events.Subscribe(bus, m.OnStoreRetired)
+	events.Subscribe(bus, m.OnMeasureCreated)
+	events.Subscribe(bus, m.OnMeasureRevoked)
 }
 
 // runSocialRecount 是子命令 social-recount：對全部可重算的計數（貼文的讚、留言與分享數，留言的讚與回覆數，討論區留言的回覆數）跑重算與覆寫，

@@ -24,6 +24,34 @@ type BuyerPubInactiveBuyer struct {
 	BuyerID int64
 }
 
+type SellerPubContentTakedown struct {
+	MeasureID   uuid.UUID
+	ContentKind string
+	ContentID   uuid.UUID
+}
+
+type SellerPubExposableStore struct {
+	StoreID int64
+}
+
+type SellerPubReviewItem struct {
+	Kind             string
+	ItemID           string
+	ReportID         *uuid.UUID
+	CaseID           *uuid.UUID
+	InquiryID        *uuid.UUID
+	AuthorityOrderID *uuid.UUID
+	TargetPosition   *int16
+	AccountID        *int64
+	MeasureID        *uuid.UUID
+	RequestID        *uuid.UUID
+	KycApplicationID *uuid.UUID
+	StoreID          *int64
+	StoreName        *string
+	StartAt          time.Time
+	DueAt            time.Time
+}
+
 type SocialComment struct {
 	ID        uuid.UUID
 	PostID    uuid.UUID
@@ -38,7 +66,7 @@ type SocialComment struct {
 	UpdatedAt time.Time
 	DeletedAt *time.Time
 	ThreadID  uuid.UUID
-	// 此刻是否計入貼文的留言數與父留言的回覆數（沒有刪除、沒有未還原的隱藏、作者不在 inactive_authors，在 social.reevaluate_comments 求值）；只由 social.reevaluate_comments 維護，讀取直接用它，貼文的 comment_count 與留言的 reply_count 是這個旗標的加總
+	// 此刻是否計入貼文的留言數與父留言的回覆數（沒有刪除、沒有未還原的隱藏、沒有內容下架、作者不在 inactive_authors，在 social.reevaluate_comments 求值）；只由 social.reevaluate_comments 維護，讀取直接用它，貼文的 comment_count 與留言的 reply_count 是這個旗標的加總
 	Counted bool
 }
 
@@ -55,6 +83,14 @@ type SocialCommentStat struct {
 	ReplyCount int64
 }
 
+type SocialContentTakedown struct {
+	MeasureID    uuid.UUID
+	PostID       *uuid.UUID
+	CommentID    *uuid.UUID
+	ForumEntryID *uuid.UUID
+	CreatedAt    time.Time
+}
+
 type SocialForumEntry struct {
 	ID        uuid.UUID
 	StoreID   int64
@@ -68,7 +104,7 @@ type SocialForumEntry struct {
 	UpdatedAt time.Time
 	DeletedAt *time.Time
 	ThreadID  uuid.UUID
-	// 此刻是否計入父討論區留言的回覆數（沒有刪除、沒有未還原的隱藏、作者不在 inactive_authors，在 social.reevaluate_forum_entries 求值）；只由 social.reevaluate_forum_entries 維護，讀取直接用它，父項的 reply_count 是這個旗標的加總
+	// 此刻是否計入父討論區留言的回覆數（沒有刪除、沒有未還原的隱藏、沒有內容下架、作者不在 inactive_authors，在 social.reevaluate_forum_entries 求值）；只由 social.reevaluate_forum_entries 維護，讀取直接用它，父項的 reply_count 是這個旗標的加總
 	Counted bool
 }
 

@@ -5,7 +5,7 @@
 ## 1. 範圍與公開介面
 
 - 模組目前只有根套件 API 與 job，沒有對外入口（Connect handler）。
-- 資料在 schema `social`（`db/schema.sql`）：`posts`、`post_hashtags`、`comments`、`comment_likes`、`post_likes`、`forum_entries`、`hides`、`sanctions`、`inactive_authors`（買家刪帳的複本）、`post_stats`、`comment_stats`、`forum_entry_stats`、`post_views`、`view_salts`、`post_shares`，以及 media 引用的同步狀態 `media_ref_sync` 與退場資產 `retired_assets`。函式與 trigger 在 `db/objects.sql`，沒有 view。
+- 資料在 schema `social`（`db/schema.sql`）：`posts`、`post_hashtags`、`comments`、`comment_likes`、`post_likes`、`forum_entries`、`hides`、`sanctions`、`inactive_authors`（買家刪帳的複本）、`content_takedowns`（seller 內容下架措施的複本）、`post_stats`、`comment_stats`、`forum_entry_stats`、`post_views`、`view_salts`、`post_shares`，以及 media 引用的同步狀態 `media_ref_sync` 與退場資產 `retired_assets`。函式與 trigger 在 `db/objects.sql`，沒有 view。
 - migration 是兩支基線：`social_baseline`（Atlas 從 `schema.sql` 生成，含 `CREATE SCHEMA`）與手寫的 `social_objects`（`objects.sql` 的函式與 trigger）；部署後不得改已套用的 migration。
 - 模組事件 `PostPublished`、`CommentCreated`、`CommentReplied`、`PostLiked` 只帶領域鍵。
 - 買家的社群處分（`sanctions`）與隱藏紀錄（`hides`）對 moderation 提供 `Hide`、`Restore`、`Warn`、`ContentOwner`，對作者提供 `MySanctions`、`MyHiddenContent`。
@@ -55,7 +55,7 @@
 
 - 計數存在獨立的 stats 表（`post_stats`、`comment_stats`、`forum_entry_stats`），`CHECK (>= 0)`：維護出錯時寫入失敗，不漂移成負數。留言數含回覆，每則頂層留言另有回覆數；所有觀看者看到同一個數字。
 - **維護路徑只有 trigger 與 reevaluate**（`db/objects.sql`）。寫入端不直接改 stats；重算例外：依 ID 由小到大 `SELECT … FOR UPDATE` 鎖一批 stats 列，再用另一個語句分組計數、只覆寫不同的列。
-- 「是否計入」唯一的定義是 `social.reevaluate_comments`／`reevaluate_forum_entries`（`LANGUAGE sql BEGIN ATOMIC`）。輸入只有 social 自己的表：`deleted_at`、`hides`、`inactive_authors`。Go 沒有第二份述詞，`visibility.Counted` 只讀旗標。
+- 「是否計入」唯一的定義是 `social.reevaluate_comments`／`reevaluate_forum_entries`（`LANGUAGE sql BEGIN ATOMIC`）。輸入只有 social 自己的表：`deleted_at`、`hides`、`content_takedowns`、`inactive_authors`。Go 沒有第二份述詞，`visibility.Counted` 只讀旗標。
 - 每則留言與討論區留言存旗標 `counted`。reevaluate 對一批內容鎖定後求值，旗標不同才改旗標並加減貼文的留言數與父項的回覆數；冪等。
 - trigger（留言與討論區留言的建立與 `deleted_at` 改變、隱藏的新增與還原）、買家刪帳的訂閱者（`stats.MarkAuthorInactive`）與每日對帳都只呼叫 reevaluate。stats 是旗標之和，旗標只由 reevaluate 改，所以讀取與重算不重新推導。
 - 鎖的順序固定：內容列 → 貼文的 stats → 父項的 stats，各自依 ID 由小到大（reevaluate 自己取，不依呼叫方）。
@@ -66,6 +66,7 @@
 ## 7. 買家刪帳
 
 - 買家刪帳的事實在 social 有複本 `inactive_authors(buyer_id PK, since)`，只增不刪（`ON CONFLICT DO NOTHING`）。
+- 內容下架的事實在 social 有複本 `content_takedowns(measure_id, post_id | comment_id | forum_entry_id, created_at)`，一列一個（措施，內容），恰好一個內容欄位非空（CHECK）。seller 建立內容下架措施（`MeasureCreated` 帶 `Contents`）時訂閱者在同一個 transaction 插入、讓被下架的留言與討論區留言重新求值並排貼文與店面頁的快取失效；撤銷（`MeasureRevoked`）刪除該措施的列並重新求值，內容立即回到公開讀取；另一個措施仍下架同一則內容時維持隱藏。貼文沒有計入旗標：`visibility.ReadablePosts` 對 `post_id` 加 NOT EXISTS，貼文底下的留言跟著父貼文。每日對帳（`Reconcile`、`RecountAll` 的第一步）雙向核對 `seller.pub_content_takedowns()`：缺的補上、多的刪除，並計入漂移（`TakedownsAdded`、`TakedownsRemoved`）。
 - `OnBuyerDeletionRequested` 與 `OnBuyerDeleted` 在買家刪帳的同一個 transaction 呼叫 `stats.MarkAuthorInactive`：插入複本，並讓該作者的全部內容（含已刪除的）集合式重新求值，再排清除 job。沒有開啟中訂單的買家直接從營運中關閉，只發 `BuyerDeleted`。
 - `MarkAuthorInactive` 先依 id 鎖內容列；求值是一次集合呼叫，`reevaluate_*` 在寫入前依同一個順序鎖整批 stats（貼文 stats → 父留言 stats → 討論區 stats，各依 id），不需要 `stats.Service.Lock`。
 - 資料庫與 API 的讀取、計數在申請提交的同一刻改好，沒有 job 的延遲。網站的快取頁不在其內：清除 job 在同 transaction 排入、立即可跑，由它的 `finish` 失效快取，晚秒級，快取 TTL 保底。

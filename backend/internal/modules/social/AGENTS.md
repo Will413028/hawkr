@@ -6,7 +6,7 @@
 
 ## 擁有的資料
 
-schema `social`（`db/schema.sql`）：貼文與 hashtag、留言與讚、討論區、`hides`、`sanctions`、`inactive_authors`（買家刪帳的複本）、三張 stats 表、瀏覽與分享的去重表、media 引用的同步狀態；函式與 trigger 在 `db/objects.sql`，沒有 view。完整表單見 `docs/modules/social.md` §1。讀取模型：無。
+schema `social`（`db/schema.sql`）：貼文與 hashtag、留言與讚、討論區、`hides`、`sanctions`、`inactive_authors`（買家刪帳的複本）、`content_takedowns`（seller 內容下架措施的複本）、三張 stats 表、瀏覽與分享的去重表、media 引用的同步狀態；函式與 trigger 在 `db/objects.sql`，沒有 view。完整表單見 `docs/modules/social.md` §1。讀取模型：無。
 
 ## 發布的讀取介面
 
@@ -21,12 +21,13 @@ schema `social`（`db/schema.sql`）：貼文與 hashtag、留言與讚、討論
 
 ## 不變量
 
-- 公開可讀 = 店家可曝光、貼文已發布、旗標 `counted` 為真；規則只在 `visibility`，公開表只經它的入口取得。守門：`TestPublicTablesAreOnlyReachedThroughVisibility`、`TestRawSQLEscapesOnlyAppearInGeneratedPubWrappers`、`TestEveryQueryIsRegistered`。規格：`docs/modules/social.md` §4。
+- 公開可讀 = 店家可曝光、貼文已發布且沒有被內容下架、旗標 `counted` 為真（留言與討論區留言的旗標含「沒有內容下架」；貼文底下的留言跟著父貼文）；規則只在 `visibility`，公開表只經它的入口取得。守門：`TestPublicTablesAreOnlyReachedThroughVisibility`、`TestRawSQLEscapesOnlyAppearInGeneratedPubWrappers`、`TestEveryQueryIsRegistered`。規格：`docs/modules/social.md` §4。
 - 個人封鎖是依觀看者的獨立條件，不併進 `counted`、不影響計數；匿名語句沒有封鎖子句。守門：`TestAnonymousReadsCarryNoBlockClause`、`TestViewerReadsCarryTheBlockPredicates`、`TestBlocksDoNotChangeCounts`。規格：§5。
 - 買家身分的寫入一律經 `actor.Resolver` 的 `ForWrite`／`ForAuthor`／`ForBuyerWrite` 檢查店家封鎖；`Deps.StoreBlocks` 缺了 `New` 就 panic。守門：`TestNewSocialWiresStoreBlocks`（`cmd/hawkr`）、`TestBuyerBlockingAStoreHidesItsContentAndStopsWrites`。規格：§5。
 - 計數只由 trigger 與 `reevaluate_*` 維護，「是否計入」只有那一份定義；stats 有 `CHECK (>= 0)`。守門：`TestStatsMatchTheDatasetAfterRandomWrites`、`TestConcurrentReevaluatesDoNotCountTwice`、`TestReevaluateHasNoDeadlocksAndEndsConsistent`、`TestStatsRejectNegativeCounts`。規格：§6。
 - 每日對帳先修旗標再覆寫計數，且不蓋掉並行的加減。守門：`TestReconcileRepairsFlagsBeforeCounts`、`TestRecountDoesNotOverwriteConcurrentLikes`。規格：§6。
 - 買家刪帳的事實有複本，由訂閱者在同一個 transaction 同步寫並重新求值。守門：`TestBuyerDeletionRequestUncountsTheContentInTheSameTransaction`、`TestDirectCloseStillHidesUncountsAndPurges`。規格：§7。
+- 內容下架的事實有複本 `content_takedowns`，由訂閱者（`OnMeasureCreated`、`OnMeasureRevoked`，只處理帶 `Contents` 的內容下架）在 seller 建立與撤銷措施的同一個 transaction 寫入或刪除，並讓留言與討論區留言重新求值、排貼文與店面頁的快取失效；每日對帳雙向核對 `seller.pub_content_takedowns()`。守門：`TestContentTakedownHidesTheContentAndRevokeRestoresItImmediately`、`TestRevokingOneOfTwoTakedownsKeepsTheContentHidden`、`TestTakedownAndRevokeEnqueueCacheInvalidation`、`TestTakedownCopyRollsBackWithTheCallersTransaction`、`TestReconcileAddsTheTakedownsTheSubscriberMissed`、`TestReconcileRemovesTheTakedownsTheSubscriberMissedRevoking`、`TestTakedownPredicateKeepsTheReadPlansIndexed`。
 - 鎖的順序固定：identity → buyer → seller → social；內容列 → 貼文 stats → 父項 stats，各依 ID 由小到大。守門：`TestMarkAuthorInactiveLocksStatsInTheSameOrderAsTheTriggers`、`TestEditLocksTheBuyerBeforeTheContentRow`。規格：§6、§7。
 - 隱藏與還原先鎖目標內容列。守門：`TestDirectHideRowRacingADeleteCountsOnce`。規格：§8。
 - 回覆的 partial index 述詞是旗標。守門：`TestReplyIndexesAreOnTheCountedFlag`。規格：§4。
@@ -38,7 +39,7 @@ schema `social`（`db/schema.sql`）：貼文與 hashtag、留言與讚、討論
 ## 不負責
 
 - 檢舉、案件與處置：moderation；social 只存隱藏與警告的紀錄，案件以不透明的 `source_ref` 參照。
-- 內容下架的過濾、排程發布、Connect 與 handler、推播 relay：尚未在本模組（見 `docs/plans/2026-10-18-a7-social.md`）。
+- 排程發布、Connect 與 handler、推播 relay：尚未在本模組（見 `docs/plans/2026-10-18-a7-social.md`）。
 - 店家與買家的名稱、頭像：讀取時由 seller、buyer 批次補，social 不存快照。
 
 ## 決策紀錄

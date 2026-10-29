@@ -28,7 +28,7 @@ type forumEntriesTable struct {
 	UpdatedAt postgres.ColumnTimestampz
 	DeletedAt postgres.ColumnTimestampz
 	ThreadID  postgres.ColumnString
-	Counted   postgres.ColumnBool // 此刻是否計入父討論區留言的回覆數（沒有刪除、沒有未還原的隱藏、作者不在 inactive_authors，在 social.reevaluate_forum_entries 求值）；只由 social.reevaluate_forum_entries 維護，讀取直接用它，父項的 reply_count 是這個旗標的加總
+	Counted   postgres.ColumnBool // 此刻是否計入父討論區留言的回覆數（沒有刪除、沒有未還原的隱藏、沒有內容下架、作者不在 inactive_authors，在 social.reevaluate_forum_entries 求值）；只由 social.reevaluate_forum_entries 維護，讀取直接用它，父項的 reply_count 是這個旗標的加總
 
 	AllColumns     postgres.ColumnList
 	MutableColumns postgres.ColumnList

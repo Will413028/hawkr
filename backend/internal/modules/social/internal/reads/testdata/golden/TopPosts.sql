@@ -18,13 +18,21 @@ SELECT p.id AS "id",
 FROM (
           SELECT p0.id AS "id"
           FROM social.posts AS p0
-          WHERE ((p0.status = 'PUBLISHED') AND (p0.deleted_at IS NULL)) AND (EXISTS (SELECT 1 FROM seller.pub_exposable_stores($1::timestamp with time zone) AS pub WHERE pub.store_id = p0.store_id))
+          WHERE (((p0.status = 'PUBLISHED') AND (p0.deleted_at IS NULL)) AND (NOT (EXISTS (
+                     SELECT td.post_id AS "td.post_id"
+                     FROM social.content_takedowns AS td
+                     WHERE td.post_id = p0.id
+                )))) AND (EXISTS (SELECT 1 FROM seller.pub_exposable_stores($1::timestamp with time zone) AS pub WHERE pub.store_id = p0.store_id))
           ORDER BY p0.published_at DESC, p0.id DESC
           LIMIT $2
      ) AS latest
      INNER JOIN social.posts AS p ON (p.id = latest.id)
      INNER JOIN social.post_stats AS s ON (s.post_id = p.id)
-WHERE ((p.status = 'PUBLISHED') AND (p.deleted_at IS NULL)) AND (EXISTS (SELECT 1 FROM seller.pub_exposable_stores($3::timestamp with time zone) AS pub WHERE pub.store_id = p.store_id))
+WHERE (((p.status = 'PUBLISHED') AND (p.deleted_at IS NULL)) AND (NOT (EXISTS (
+           SELECT td.post_id AS "td.post_id"
+           FROM social.content_takedowns AS td
+           WHERE td.post_id = p.id
+      )))) AND (EXISTS (SELECT 1 FROM seller.pub_exposable_stores($3::timestamp with time zone) AS pub WHERE pub.store_id = p.store_id))
 ORDER BY s.view_count DESC, p.published_at DESC, p.id DESC
 LIMIT $4;
 

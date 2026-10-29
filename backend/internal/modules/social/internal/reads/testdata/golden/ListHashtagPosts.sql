@@ -18,7 +18,11 @@ SELECT p.id AS "id",
 FROM social.post_hashtags AS h
      INNER JOIN social.posts AS p ON (p.id = h.post_id)
      INNER JOIN social.post_stats AS s ON (s.post_id = p.id)
-WHERE (((((p.status = 'PUBLISHED') AND (p.deleted_at IS NULL)) AND (EXISTS (SELECT 1 FROM seller.pub_exposable_stores($1::timestamp with time zone) AS pub WHERE pub.store_id = p.store_id))) AND (h.name = $2::text)) AND (h.published_at IS NOT NULL)) AND (ROW(h.published_at, h.post_id) < ROW($3::timestamp with time zone, $4::uuid))
+WHERE ((((((p.status = 'PUBLISHED') AND (p.deleted_at IS NULL)) AND (NOT (EXISTS (
+           SELECT td.post_id AS "td.post_id"
+           FROM social.content_takedowns AS td
+           WHERE td.post_id = p.id
+      )))) AND (EXISTS (SELECT 1 FROM seller.pub_exposable_stores($1::timestamp with time zone) AS pub WHERE pub.store_id = p.store_id))) AND (h.name = $2::text)) AND (h.published_at IS NOT NULL)) AND (ROW(h.published_at, h.post_id) < ROW($3::timestamp with time zone, $4::uuid))
 ORDER BY h.published_at DESC, h.post_id DESC
 LIMIT $5;
 

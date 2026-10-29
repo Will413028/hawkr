@@ -22,7 +22,11 @@ FROM social.comments AS c
 WHERE ((((((c.actor_kind != 'BUYER') OR ((NOT (EXISTS (SELECT 1 FROM buyer.pub_blocked_buyers() AS pub WHERE pub.blocker_buyer_id = $4::bigint AND ((blocked_buyer_id = c.actor_id))))) AND (NOT (EXISTS (SELECT 1 FROM buyer.pub_blocked_buyers() AS pub WHERE pub.blocker_buyer_id = c.actor_id AND ((blocked_buyer_id = $5::bigint))))))) AND (c.post_id = $6::uuid)) AND (c.parent_id IS NULL)) AND (EXISTS (
            SELECT cp.id AS "cp.id"
            FROM social.posts AS cp
-           WHERE ((((cp.status = 'PUBLISHED') AND (cp.deleted_at IS NULL)) AND (EXISTS (SELECT 1 FROM seller.pub_exposable_stores($7::timestamp with time zone) AS pub WHERE pub.store_id = cp.store_id))) AND (NOT (EXISTS (SELECT 1 FROM buyer.pub_blocked_stores() AS pub WHERE pub.blocker_buyer_id = $8::bigint AND ((store_id = cp.store_id)))))) AND (cp.id = $9::uuid)
+           WHERE (((((cp.status = 'PUBLISHED') AND (cp.deleted_at IS NULL)) AND (NOT (EXISTS (
+                      SELECT td.post_id AS "td.post_id"
+                      FROM social.content_takedowns AS td
+                      WHERE td.post_id = cp.id
+                 )))) AND (EXISTS (SELECT 1 FROM seller.pub_exposable_stores($7::timestamp with time zone) AS pub WHERE pub.store_id = cp.store_id))) AND (NOT (EXISTS (SELECT 1 FROM buyer.pub_blocked_stores() AS pub WHERE pub.blocker_buyer_id = $8::bigint AND ((store_id = cp.store_id)))))) AND (cp.id = $9::uuid)
       ))) AND (v.visible OR (EXISTS (
            SELECT r.id AS "r.id"
            FROM social.comments AS r

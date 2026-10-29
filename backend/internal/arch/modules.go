@@ -64,7 +64,7 @@ var InternalDependencies = map[string]InternalGraph{
 		"reads":      {"jet/table", "store", "visibility"},
 		"readcache":  {},
 		"sanction":   {"model", "reads", "readcache", "store", "text"},
-		"stats":      {"reads", "store"},
+		"stats":      {"readcache", "reads", "store"},
 		"store":      {},
 		"text":       {},
 		"textcheck":  {"text"},

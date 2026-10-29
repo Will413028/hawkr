@@ -28,7 +28,7 @@ type commentsTable struct {
 	UpdatedAt postgres.ColumnTimestampz
 	DeletedAt postgres.ColumnTimestampz
 	ThreadID  postgres.ColumnString
-	Counted   postgres.ColumnBool // 此刻是否計入貼文的留言數與父留言的回覆數（沒有刪除、沒有未還原的隱藏、作者不在 inactive_authors，在 social.reevaluate_comments 求值）；只由 social.reevaluate_comments 維護，讀取直接用它，貼文的 comment_count 與留言的 reply_count 是這個旗標的加總
+	Counted   postgres.ColumnBool // 此刻是否計入貼文的留言數與父留言的回覆數（沒有刪除、沒有未還原的隱藏、沒有內容下架、作者不在 inactive_authors，在 social.reevaluate_comments 求值）；只由 social.reevaluate_comments 維護，讀取直接用它，貼文的 comment_count 與留言的 reply_count 是這個旗標的加總
 
 	AllColumns     postgres.ColumnList
 	MutableColumns postgres.ColumnList
