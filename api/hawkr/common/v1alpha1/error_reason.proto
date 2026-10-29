@@ -42,6 +42,9 @@ enum ErrorReason {
   // 帳號有生效中的終止合作（條款第 21.3 條；終止撤銷之前同一個帳號不能再開店），不能申請開店（搭配 failed_precondition）。client 顯示 LocalizedMessage，
   // 並導向措施與申覆。換身分認證被另一個帳號的終止擋下的情形不用它（隱私：不透露命中的帳號或欄位），那條路徑維持通用的 failed_precondition 與文字。
   STORE_OPENING_TERMINATED = 9;
+  // 帳號擁有商店，不能被停權（搭配 failed_precondition）：停權對店家、未結訂單與撥款的效果由賣家條款決定，條款定出之前有店的帳號不停權。
+  // 只出現在後台與內部的處分路徑；client 顯示 LocalizedMessage，請營運先處理店家（措施或關店），再停權帳號。
+  ACCOUNT_HAS_STORE = 11;
   // 2 是刪掉的 PHONE_CODE_EXPIRED（新帳號不驗證手機，ADR 2026-09-27-identity-clerk）。
   reserved 2;
   reserved "PHONE_CODE_EXPIRED";

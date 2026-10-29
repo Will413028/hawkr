@@ -288,3 +288,23 @@ func (q *Queries) SuspendAccount(ctx context.Context, arg SuspendAccountParams) 
 	}
 	return result.RowsAffected(), nil
 }
+
+const unsuspendAccount = `-- name: UnsuspendAccount :execrows
+UPDATE identity.accounts
+SET suspended_at = NULL, updated_at = $1::timestamptz
+WHERE id = $2 AND deleted_at IS NULL AND suspended_at IS NOT NULL
+`
+
+type UnsuspendAccountParams struct {
+	Now time.Time
+	ID  int64
+}
+
+// 沒有停權時沒有列被更新（冪等）。
+func (q *Queries) UnsuspendAccount(ctx context.Context, arg UnsuspendAccountParams) (int64, error) {
+	result, err := q.db.Exec(ctx, unsuspendAccount, arg.Now, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}

@@ -16,8 +16,10 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/accounttype"
 	pb "github.com/Will413028/hawkr/backend/internal/legacy/gen/account"
 	"github.com/Will413028/hawkr/backend/internal/legacy/gen/account/accountconnect"
+	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
 // 舊的業務碼（go-pkg/errors）。
@@ -26,17 +28,25 @@ const (
 	codeNotFound     = 404
 )
 
+// Suspender 是停權的入口（accountsuspension.Module）。
+type Suspender interface {
+	Suspend(ctx context.Context, accountID int64, rec accountsuspension.Record) (accountsuspension.Suspension, error)
+}
+
 // Server 實作 AccountService 的子集。
 type Server struct {
 	accountconnect.UnimplementedAccountServiceHandler
-	m   *identity.Module
-	log *slog.Logger
+	m         *identity.Module
+	suspender Suspender
+	log       *slog.Logger
 }
 
 var _ accountconnect.AccountServiceHandler = (*Server)(nil)
 
 // New 建立 server。
-func New(m *identity.Module, log *slog.Logger) *Server { return &Server{m: m, log: log} }
+func New(m *identity.Module, suspender Suspender, log *slog.Logger) *Server {
+	return &Server{m: m, suspender: suspender, log: log}
+}
 
 // businessCode 把模組的錯誤轉成舊的業務碼；沒有分類的錯誤回 error（gRPC 的 internal）。
 func businessCode(err error) (int32, string, error) {
@@ -137,11 +147,15 @@ func (s *Server) RemoveRole(ctx context.Context, req *connect.Request[pb.RemoveR
 	return connect.NewResponse(&pb.RemoveRoleResponse{}), nil
 }
 
-// SuspendAccount 是 social 的 BAN_USER：舊的實作在錯誤時回 gRPC 的錯誤（沒有業務碼），這裡照舊。
+// SuspendAccount 是 social 的 BAN_USER：舊的實作在錯誤時回 gRPC 的錯誤（沒有業務碼），這裡照舊。理由類別一律是 OTHER，舊的
+// reason 字串是說明。
 func (s *Server) SuspendAccount(ctx context.Context, req *connect.Request[pb.SuspendAccountRequest]) (*connect.Response[pb.SuspendAccountResponse], error) {
-	if err := s.m.SuspendAccount(ctx, req.Msg.GetAccountId(), req.Msg.GetReason()); err != nil {
-		if apperr.KindOf(err) == apperr.KindNotFound {
+	_, err := s.suspender.Suspend(ctx, req.Msg.GetAccountId(), accountsuspension.Record{Category: policy.Other, Reason: req.Msg.GetReason()})
+	if err != nil {
+		if k := apperr.KindOf(err); k == apperr.KindNotFound {
 			return nil, connect.NewError(connect.CodeNotFound, err)
+		} else if k == apperr.KindFailedPrecondition {
+			return nil, connect.NewError(connect.CodeFailedPrecondition, err)
 		}
 		return nil, err
 	}

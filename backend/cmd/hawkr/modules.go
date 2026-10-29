@@ -40,5 +40,6 @@ var apiOnly = []string{
 // withoutData 是已在單體裡、但沒有自己資料的模組：不建 schema、沒有 migration（backend/AGENTS.md 規則 6），
 // sqlc 只讀依賴表允許的 pub.sql。第一次要存自己的資料時，建 schema 與 migration，從這裡移到 modules()。
 var withoutData = []string{
-	"reviewqueue", // 待辦由各來源模組的資料推導，讀 seller 發布的 pub_review_items
+	"reviewqueue",       // 待辦由各來源模組的資料推導，讀 seller 發布的 pub_review_items
+	"accountsuspension", // 停權紀錄在 identity，這個模組只編排：鎖帳號、確認沒有店家、呼叫 identity、發事件
 }

@@ -72,6 +72,11 @@ class ErrorReason extends $pb.ProtobufEnum {
   static const ErrorReason STORE_OPENING_TERMINATED =
       ErrorReason._(9, _omitEnumNames ? '' : 'STORE_OPENING_TERMINATED');
 
+  /// 帳號擁有商店，不能被停權（搭配 failed_precondition）：停權對店家、未結訂單與撥款的效果由賣家條款決定，條款定出之前有店的帳號不停權。
+  /// 只出現在後台與內部的處分路徑；client 顯示 LocalizedMessage，請營運先處理店家（措施或關店），再停權帳號。
+  static const ErrorReason ACCOUNT_HAS_STORE =
+      ErrorReason._(11, _omitEnumNames ? '' : 'ACCOUNT_HAS_STORE');
+
   static const $core.List<ErrorReason> values = <ErrorReason>[
     ERROR_REASON_UNSPECIFIED,
     VERSION_CONFLICT,
@@ -82,10 +87,11 @@ class ErrorReason extends $pb.ProtobufEnum {
     SELLER_REQUIREMENT_MISSING,
     STORE_OPENING_SUSPENDED,
     STORE_OPENING_TERMINATED,
+    ACCOUNT_HAS_STORE,
   ];
 
   static final $core.List<ErrorReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 10);
+      $pb.ProtobufEnum.$_initByValueList(values, 11);
   static ErrorReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

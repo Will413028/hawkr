@@ -92,6 +92,18 @@ type Providers = model.Providers
 // Account 是帳號，已刪除時只保留墓碑。
 type Account = model.Account
 
+// SuspendInput 是停權帳號的輸入。
+type SuspendInput = model.SuspendInput
+
+// AccountSuspension 是帳號的一筆停權紀錄。
+type AccountSuspension = model.AccountSuspension
+
+// SuspensionKind 是停權的型別，目前只有永久。
+type SuspensionKind = model.SuspensionKind
+
+// ReleaseReasonAccountDeleted 是帳號刪除時解除未解除紀錄的 release_reason。
+const ReleaseReasonAccountDeleted = model.ReleaseReasonAccountDeleted
+
 // RemoveRoleInput 是移除角色的輸入。
 type RemoveRoleInput = model.RemoveRoleInput
 
@@ -141,6 +153,7 @@ const (
 	AdminRoleActionGrant     = model.AdminRoleActionGrant
 	AdminRoleActionRevoke    = model.AdminRoleActionRevoke
 	AdminRoleSourceCLI       = model.AdminRoleSourceCLI
+	SuspensionPermanent      = model.SuspensionPermanent
 )
 
 // ErrInvalidToken 表示 token 的簽章、issuer、audience 或期限無效。
@@ -214,12 +227,25 @@ func (m *Module) LockAccount(ctx context.Context, id int64) error {
 	return m.account.LockAccount(ctx, id)
 }
 
-// SuspendAccount 停權帳號並在同一個 transaction 排入 Clerk 停用 job；已停權時成功。reason 只寫入 log。
-func (m *Module) SuspendAccount(ctx context.Context, accountID int64, reason string) error {
-	return m.account.SuspendAccount(ctx, accountID, reason)
+// SuspendAccount 永久停權帳號：停權紀錄與 suspended_at 在同一個 transaction 寫入，並排入 Clerk 停用 job。已停權時不寫第二筆紀錄，
+// 回傳原本的紀錄與 created=false。只由 accountsuspension 呼叫（internal/arch 的 TestSuspensionEntriesAreOnlyCalledByAccountsuspension）：
+// 擁有商店的帳號不能停權的檢查在那裡，這裡不查。類別不是政策分類回 InvalidInput，帳號不存在或已刪除回 NotFound。
+func (m *Module) SuspendAccount(ctx context.Context, in SuspendInput) (AccountSuspension, bool, error) {
+	return m.account.SuspendAccount(ctx, in)
 }
 
-// DeleteAccount 刪除帳號並排入 Clerk 刪除 job；已刪除時成功，從未存在時回 NotFound。
+// UnsuspendAccount 手動解除停權：清 suspended_at 並把解除時間與原因記在目前的紀錄上（同一個 transaction）。沒有停權時成功、
+// 回傳 released=false。reason 必填。只由 accountsuspension 呼叫。
+func (m *Module) UnsuspendAccount(ctx context.Context, accountID int64, reason string) (AccountSuspension, bool, error) {
+	return m.account.UnsuspendAccount(ctx, accountID, reason)
+}
+
+// CurrentSuspension 回傳帳號目前未解除的停權紀錄；沒有停權時 ok 是 false，帳號不存在回 NotFound。給 A7-2 的「讀自己目前的停權」。
+func (m *Module) CurrentSuspension(ctx context.Context, accountID int64) (AccountSuspension, bool, error) {
+	return m.account.CurrentSuspension(ctx, accountID)
+}
+
+// DeleteAccount 刪除帳號、解除未解除的停權紀錄並排入 Clerk 刪除 job；已刪除時成功，從未存在時回 NotFound。
 func (m *Module) DeleteAccount(ctx context.Context, accountID int64) error {
 	return m.account.DeleteAccount(ctx, accountID)
 }

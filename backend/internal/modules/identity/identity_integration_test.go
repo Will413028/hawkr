@@ -29,6 +29,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
+	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
 
@@ -458,7 +459,7 @@ func TestSuspensionEndsAuthenticationAndBansTheClerkUser(t *testing.T) {
 	ctx := context.Background()
 	id := f.account(t, "user_1")
 	for range 2 { // 冪等：已經停權時不再排 job
-		if err := f.m.SuspendAccount(ctx, id, "檢舉成立"); err != nil {
+		if _, _, err := f.m.SuspendAccount(ctx, SuspendInput{AccountID: id, Category: policy.Other, Reason: "檢舉成立"}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -823,6 +824,8 @@ func TestCodeValueChecksMatchTheGoTypes(t *testing.T) {
 		want       []string
 	}{
 		{"account_roles_role_check", []string{string(RoleSeller)}},
+		{"account_suspensions_kind_check", []string{string(SuspensionPermanent)}},
+		{"account_suspensions_reason_category_check", categoryValues()},
 		{"admin_roles_role_check", adminRoleValues()},
 		{"admin_role_events_role_check", adminRoleValues()},
 		{"admin_role_events_action_check", []string{string(AdminRoleActionGrant), string(AdminRoleActionRevoke)}},
@@ -847,6 +850,14 @@ func TestCodeValueChecksMatchTheGoTypes(t *testing.T) {
 			t.Errorf("%s 允許 %v，Go 的值域是 %v（%s）", c.constraint, got, c.want, strings.TrimSpace(def))
 		}
 	}
+}
+
+func categoryValues() []string {
+	var out []string
+	for _, c := range policy.Values() {
+		out = append(out, string(c))
+	}
+	return out
 }
 
 func adminRoleValues() []string {

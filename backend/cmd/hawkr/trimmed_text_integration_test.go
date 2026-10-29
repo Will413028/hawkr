@@ -37,6 +37,10 @@ var sellerEpoch = time.Date(2026, 10, 29, 0, 0, 0, 0, time.UTC)
 
 var trimmedColumns = []trimmedColumn{
 	{table: "identity.admin_role_events", column: "reason", constraint: "admin_role_events_reason_check"},
+	{table: "identity.account_suspensions", column: "reason_text", constraint: "account_suspensions_reason_text_check"},
+	{table: "identity.account_suspensions", column: "source_ref", constraint: "account_suspensions_source_ref_check"},
+	{table: "identity.account_suspensions", column: "release_reason", constraint: "account_suspensions_release_reason_check",
+		extra: map[string]any{"released_at": sellerEpoch, "suspended_at": sellerEpoch}},
 	{table: "accountdeletion.request_attempts", column: "reason", constraint: "request_attempts_reason_check",
 		extra: map[string]any{"requester": "ADMIN", "operator_admin_id": 1}},
 	{table: "agent.vendor_portal_invites", column: "invited_email", constraint: "vendor_portal_invites_email_check"},

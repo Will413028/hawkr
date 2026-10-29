@@ -22,10 +22,13 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/gen/account/accountconnect"
 	"github.com/Will413028/hawkr/backend/internal/legacy/grpcclient"
 	"github.com/Will413028/hawkr/backend/internal/legacy/rabbitmq"
+	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
+	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
 
@@ -33,7 +36,24 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
+// fakeSuspender 替代 accountsuspension（它需要 seller 模組）：記下收到的紀錄，直接停權；err 不是 nil 時回它。
+type fakeSuspender struct {
+	m       *identity.Module
+	records []accountsuspension.Record
+	err     error
+}
+
+func (s *fakeSuspender) Suspend(ctx context.Context, accountID int64, rec accountsuspension.Record) (accountsuspension.Suspension, error) {
+	s.records = append(s.records, rec)
+	if s.err != nil {
+		return accountsuspension.Suspension{}, s.err
+	}
+	rows, _, err := s.m.SuspendAccount(ctx, identity.SuspendInput{AccountID: accountID, Category: rec.Category, Reason: rec.Reason, SourceRef: rec.SourceRef})
+	return rows, err
+}
+
 type fixture struct {
+	suspender *fakeSuspender
 	m         *identity.Module
 	dev       *identity.DevAuth
 	client    accountconnect.AccountServiceClient
@@ -64,7 +84,8 @@ func setup(t *testing.T) *fixture {
 		Now: time.Now, Logger: log,
 	})
 	mux := http.NewServeMux()
-	mux.Handle(accountconnect.NewAccountServiceHandler(New(f.m, log)))
+	f.suspender = &fakeSuspender{m: f.m}
+	mux.Handle(accountconnect.NewAccountServiceHandler(New(f.m, f.suspender, log)))
 	srv := httptest.NewUnstartedServer(mux)
 	srv.Config.Protocols = new(http.Protocols)
 	srv.Config.Protocols.SetUnencryptedHTTP2(true)
@@ -115,7 +136,7 @@ func TestGetAccountInfo(t *testing.T) {
 	if err != nil || resp.Msg.GetData().GetAccountType() != 1 {
 		t.Fatalf("沒有另外申請角色的帳號 = %v, %v", resp, err)
 	}
-	if err := f.m.SuspendAccount(ctx, id, "檢舉成立"); err != nil {
+	if _, _, err := f.m.SuspendAccount(ctx, identity.SuspendInput{AccountID: id, Category: policy.Other, Reason: "檢舉成立"}); err != nil {
 		t.Fatal(err)
 	}
 	resp, _ = f.client.GetAccountInfo(ctx, connect.NewRequest(&pb.GetAccountInfoRequest{AccountId: id}))
@@ -226,10 +247,22 @@ func TestSuspendAccount(t *testing.T) {
 	if s, err := f.client.SuspendAccount(ctx, connect.NewRequest(&pb.SuspendAccountRequest{AccountId: id, Reason: "BAN_USER"})); err != nil || !s.Msg.GetSuccess() {
 		t.Fatalf("SuspendAccount = %v, %v", s, err)
 	}
+	if got := f.suspender.records; len(got) != 1 || got[0] != (accountsuspension.Record{Category: policy.Other, Reason: "BAN_USER"}) {
+		t.Fatalf("交給 accountsuspension 的紀錄 = %+v，預期類別 OTHER、說明 BAN_USER", got)
+	}
+	if cur, ok, err := f.m.CurrentSuspension(ctx, id); err != nil || !ok || cur.Category != policy.Other {
+		t.Fatalf("CurrentSuspension = %+v, %v, %v", cur, ok, err)
+	}
 	_, err := f.client.SuspendAccount(ctx, connect.NewRequest(&pb.SuspendAccountRequest{AccountId: 999}))
 	if connect.CodeOf(err) != connect.CodeNotFound {
 		t.Fatalf("停權不存在的帳號 = %v", err)
 	}
+	f.suspender.err = apperr.FailedPrecondition("帳號擁有商店，不能停權").WithReason(apperr.ReasonAccountHasStore)
+	_, err = f.client.SuspendAccount(ctx, connect.NewRequest(&pb.SuspendAccountRequest{AccountId: id}))
+	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("有店的帳號停權 = %v，預期 failed precondition", err)
+	}
+	f.suspender.err = nil
 	// 還沒實作的方法（已經搬到 Connect 或刪除）回 unimplemented。
 	_, err = f.client.GoogleOAuth(ctx, connect.NewRequest(&pb.GoogleOAuthRequest{}))
 	var ce *connect.Error

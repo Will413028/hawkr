@@ -6,7 +6,7 @@
 
 ## 擁有的資料
 
-schema `identity`（`db/schema.sql`）：`accounts`（`clerk_user_id` UNIQUE，墓碑也保留）、`account_roles`、`admins`（`access_subject` UNIQUE）、`admin_roles`、`admin_role_events`（只追加）、`apple_tokens`。帳號與管理員的主鍵過渡期是 IDENTITY，見 `CARRYOVER.md`。讀取模型：無。
+schema `identity`（`db/schema.sql`）：`accounts`（`clerk_user_id` UNIQUE，墓碑也保留）、`account_roles`、`account_suspensions`（停權紀錄）、`admins`（`access_subject` UNIQUE）、`admin_roles`、`admin_role_events`（只追加）、`apple_tokens`。帳號與管理員的主鍵過渡期是 IDENTITY，見 `CARRYOVER.md`。讀取模型：無。
 
 ## 發布的讀取介面
 
@@ -25,6 +25,7 @@ schema `identity`（`db/schema.sql`）：`accounts`（`clerk_user_id` UNIQUE，�
 - 認證以 token 的 issuer 選 verifier：顧客 token 只認證成帳號，後台 Access/dev admin token 只認證成管理員。守門：`TestAuthenticationErrors`、`TestServicesAreSeparatedByAudience`（httpapi/identity）。規格：`docs/modules/identity.md` §1。
 - 同一個 Clerk 使用者同時的第一個請求只建一個帳號，不授予角色。守門：`TestConcurrentFirstAuthenticationsShareAnAccount`；`accounts.clerk_user_id` UNIQUE。規格：§2。
 - 停權、刪帳與排入停用或刪除 Clerk 使用者的 job 在同一個 transaction，刪帳留下墓碑並發出 `AccountDeleted`。守門：`TestSuspensionEndsAuthenticationAndBansTheClerkUser`、`TestDeletionLeavesATombstoneAndDeletesTheClerkUser`；`accounts_deleted_check`。規格：§4。
+- 停權紀錄與 `suspended_at` 同一個 transaction，未解除的紀錄最多一筆；停權、解除入口只由 `accountsuspension` 呼叫。守門：`TestFailureAfterTheRecordRollsTheRecordBack`、`TestRepeatedSuspendKeepsTheFirstRecord`、arch 的 `TestSuspensionEntriesAreOnlyCalledByAccountsuspension`。規格：§4。
 - 帳號生命週期 ACTIVE → PENDING_DELETION → DELETED；等待刪除時 `GrantRole` 回 FailedPrecondition。守門：`TestDeletionPendingRefusesGrantRole`；`accounts_deletion_pending_check`。規格：§4。
 - 授予、移除角色與刪帳都先鎖帳號列；`DeleteAccount` 只由 accountdeletion 呼叫。守門：無（只有規格）。規格：§3、§4。
 - 不是角色的值（例如 `BUYER`）授予或移除回 InvalidInput。守門：`TestRemoveRole`；`account_roles_role_check`。規格：§3。

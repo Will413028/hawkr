@@ -50,6 +50,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/sellerrelay"
 	"github.com/Will413028/hawkr/backend/internal/legacy/sellerserver"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
+	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
@@ -245,6 +246,7 @@ func runServe(ctx context.Context) error {
 		return err
 	}
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Buyer: buyerModule, Seller: sellerModule, Identity: id, Orders: orders, Now: time.Now, NewID: uuid.NewV7, Logger: log})
+	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
 	del := newDelegation(bus, delegation.Deps{
 		DB: d, Identity: id, Seller: sellerModule,
 		NewID: uuid.NewV7, Now: time.Now, Logger: log,
@@ -294,7 +296,7 @@ func runServe(ctx context.Context) error {
 		return err
 	}
 	legacyMux := http.NewServeMux()
-	legacyMux.Handle(accountconnect.NewAccountServiceHandler(accountservice.New(id, log)))
+	legacyMux.Handle(accountconnect.NewAccountServiceHandler(accountservice.New(id, suspension, log)))
 	legacyMux.Handle(buyerconnect.NewBuyerServiceHandler(buyerserver.New(buyerModule)))
 	legacyMux.Handle(sellerconnect.NewSellerServiceHandler(sellerserver.New(sellerModule, legacySellerRatings{reviews}, buyerModule, agentModule, log)))
 	legacyMux.Handle(accountconnect.NewDelegationServiceHandler(delegationservice.New(del, log)))

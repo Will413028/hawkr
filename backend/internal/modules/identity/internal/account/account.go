@@ -7,15 +7,19 @@ import (
 	"log/slog"
 	"slices"
 	"time"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/identity/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/auditreason"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
+	"github.com/Will413028/hawkr/backend/internal/platform/policy"
+	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 )
 
 func errAccountNotFound(id int64) error { return apperr.NotFound("帳號 %d 不存在", id) }
@@ -192,29 +196,134 @@ func (m *Service) isDeleted(ctx context.Context, q *store.Queries, id int64) (bo
 	return a.DeletedAt != nil, nil
 }
 
-// SuspendAccount 停權帳號：下一個請求起回 PermissionDenied（認證時讀停權的狀態），並在同一個 transaction 排入 job 停用
-// Clerk 的使用者（撤銷他的 session、之後不能再登入）。已經停權時成功（冪等）。reason 只寫進 log。
-func (m *Service) SuspendAccount(ctx context.Context, accountID int64, reason string) error {
-	err := m.d.DB.InTx(ctx, func(ctx context.Context) error {
+// SuspendAccount 永久停權帳號：同一個 transaction 寫停權紀錄與 accounts.suspended_at，並排入 job 停用 Clerk 的使用者
+// （撤銷他的 session、之後不能再登入）。已經停權時不寫第二筆紀錄、不改理由，回傳原本的紀錄與 created=false。紀錄寫入失敗時
+// 整個 transaction 回滾，suspended_at 不變。
+func (m *Service) SuspendAccount(ctx context.Context, in model.SuspendInput) (rec model.AccountSuspension, created bool, err error) {
+	row, err := suspensionRow(in)
+	if err != nil {
+		return rec, false, err
+	}
+	err = m.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := m.q(ctx)
-		a, err := lockLiveAccount(ctx, q, accountID)
+		a, err := lockLiveAccount(ctx, q, in.AccountID)
 		if err != nil {
 			return err
 		}
-		n, err := q.SuspendAccount(ctx, store.SuspendAccountParams{ID: accountID, Now: m.d.Now()})
+		if a.SuspendedAt != nil {
+			cur, err := q.CurrentAccountSuspension(ctx, in.AccountID)
+			if err != nil {
+				return fmt.Errorf("identity：讀取停權紀錄：%w", err)
+			}
+			rec, created = suspensionOf(cur), false
+			return nil
+		}
+		now := m.d.Now()
+		row.Now = now
+		inserted, err := q.InsertAccountSuspension(ctx, row)
 		if err != nil {
+			return fmt.Errorf("identity：寫入停權紀錄：%w", err)
+		}
+		if _, err := q.SuspendAccount(ctx, store.SuspendAccountParams{ID: in.AccountID, Now: now}); err != nil {
 			return fmt.Errorf("identity：停權：%w", err)
 		}
-		if n == 0 {
-			return nil // 已經停權
+		if err := m.enqueueClerkUserJob(ctx, clerkUserActionBan, a.ClerkUserID); err != nil {
+			return err
 		}
-		return m.enqueueClerkUserJob(ctx, clerkUserActionBan, a.ClerkUserID)
+		rec, created = suspensionOf(inserted), true
+		return nil
 	})
 	if err != nil {
-		return err
+		return model.AccountSuspension{}, false, err
 	}
-	m.d.Logger.InfoContext(ctx, "identity：停權帳號", "account_id", accountID, "reason", reason)
-	return nil
+	if created {
+		m.d.Logger.InfoContext(ctx, "identity：停權帳號", "account_id", in.AccountID, "category", in.Category)
+	}
+	return rec, created, nil
+}
+
+// UnsuspendAccount 手動解除停權：同一個 transaction 清 accounts.suspended_at，並把解除時間與原因記在目前的紀錄上。帳號沒有停權時
+// 成功、不做任何事，回傳 released=false。reason 必填，規則同 platform/auditreason。
+func (m *Service) UnsuspendAccount(ctx context.Context, accountID int64, reason string) (rec model.AccountSuspension, released bool, err error) {
+	reason, err = auditreason.Required(reason, "Reason")
+	if err != nil {
+		return rec, false, err
+	}
+	err = m.d.DB.InTx(ctx, func(ctx context.Context) error {
+		q := m.q(ctx)
+		if _, err := lockLiveAccount(ctx, q, accountID); err != nil {
+			return err
+		}
+		now := m.d.Now()
+		n, err := q.UnsuspendAccount(ctx, store.UnsuspendAccountParams{ID: accountID, Now: now})
+		if err != nil {
+			return fmt.Errorf("identity：解除停權：%w", err)
+		}
+		if n == 0 {
+			return nil
+		}
+		row, err := q.ReleaseAccountSuspension(ctx, store.ReleaseAccountSuspensionParams{AccountID: accountID, Now: now, ReleaseReason: &reason})
+		if err != nil {
+			return fmt.Errorf("identity：記錄解除停權：%w", err)
+		}
+		rec, released = suspensionOf(row), true
+		return nil
+	})
+	if err != nil {
+		return model.AccountSuspension{}, false, err
+	}
+	if released {
+		m.d.Logger.InfoContext(ctx, "identity：解除停權", "account_id", accountID)
+	}
+	return rec, released, nil
+}
+
+// CurrentSuspension 回傳帳號目前未解除的停權紀錄；沒有停權時 ok 是 false。帳號不存在回 NotFound。
+func (m *Service) CurrentSuspension(ctx context.Context, accountID int64) (rec model.AccountSuspension, ok bool, err error) {
+	q := m.q(ctx)
+	row, err := q.CurrentAccountSuspension(ctx, accountID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		if _, err := m.Account(ctx, accountID); err != nil {
+			return rec, false, err
+		}
+		return rec, false, nil
+	}
+	if err != nil {
+		return rec, false, fmt.Errorf("identity：讀取停權紀錄：%w", err)
+	}
+	return suspensionOf(row), true, nil
+}
+
+// suspensionRow 驗證輸入並轉成寫入的參數：類別必須是政策分類的值，說明與來源參照去掉前後空白。
+func suspensionRow(in model.SuspendInput) (store.InsertAccountSuspensionParams, error) {
+	if !slices.Contains(policy.Values(), in.Category) {
+		return store.InsertAccountSuspensionParams{}, apperr.InvalidInputOn([]string{"Category"}, "停權的理由類別 %q 不是政策分類", in.Category)
+	}
+	reason, err := auditreason.Optional(in.Reason, "Reason")
+	if err != nil {
+		return store.InsertAccountSuspensionParams{}, err
+	}
+	var ref *string
+	if r := trimtext.Trim(in.SourceRef); r != "" {
+		if utf8.RuneCountInString(r) > maxSourceRefRunes {
+			return store.InsertAccountSuspensionParams{}, apperr.InvalidInputOn([]string{"SourceRef"}, "來源參照不得超過 %d 字", maxSourceRefRunes)
+		}
+		ref = &r
+	}
+	return store.InsertAccountSuspensionParams{
+		AccountID: in.AccountID, ReasonCategory: string(in.Category), ReasonText: reason, SourceRef: ref,
+	}, nil
+}
+
+// maxSourceRefRunes 是 account_suspensions.source_ref 的字數上限（CHECK 以 char_length，即字元數計）。
+const maxSourceRefRunes = 200
+
+func suspensionOf(r store.IdentityAccountSuspension) model.AccountSuspension {
+	return model.AccountSuspension{
+		ID: r.ID, AccountID: r.AccountID, Kind: model.SuspensionKind(r.Kind), Category: policy.Category(r.ReasonCategory),
+		Reason: r.ReasonText, SourceRef: deref(r.SourceRef), SuspendedAt: r.SuspendedAt,
+		ReleasedAt: r.ReleasedAt, ReleaseReason: deref(r.ReleaseReason),
+	}
 }
 
 // DeleteAccount 刪除帳號（`docs/modules/identity.md` §4）。已經刪除時成功（冪等）；從來不存在時回 NotFound。
@@ -235,11 +344,17 @@ func (m *Service) DeleteAccount(ctx context.Context, accountID int64) error {
 	})
 }
 
-// deleteAccount 在呼叫方的 transaction 內刪除已鎖定的帳號：刪角色，帳號只留沒有個資的墓碑（保留 clerk_user_id，
+// deleteAccount 在呼叫方的 transaction 內刪除已鎖定的帳號：解除未解除的停權紀錄（release_reason 為 ACCOUNT_DELETED），刪角色，帳號只留沒有個資的墓碑（保留 clerk_user_id，
 // 同一個 Clerk 使用者不會再建一個帳號），排入 job 刪除 Clerk 的使用者，並發出 AccountDeleted。帳號保存的 Sign in with Apple
 // refresh token 在同一個 transaction 內取走並排入撤銷的 job（Clerk 不會代為撤銷）；所有刪除路徑都經過這裡。
 func (m *Service) deleteAccount(ctx context.Context, q *store.Queries, a store.IdentityAccount) error {
 	now := m.d.Now()
+	if a.SuspendedAt != nil {
+		reason := model.ReleaseReasonAccountDeleted
+		if _, err := q.ReleaseAccountSuspension(ctx, store.ReleaseAccountSuspensionParams{AccountID: a.ID, Now: now, ReleaseReason: &reason}); err != nil {
+			return fmt.Errorf("identity：解除停權紀錄：%w", err)
+		}
+	}
 	if err := q.DeleteAccountRoles(ctx, a.ID); err != nil {
 		return fmt.Errorf("identity：刪除角色：%w", err)
 	}

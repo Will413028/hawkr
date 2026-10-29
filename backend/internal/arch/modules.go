@@ -12,30 +12,31 @@ const ModulePath = "github.com/Will413028/hawkr/backend"
 // 「依賴」只能是 import 對方的根套件（internal/modules/<名稱>），也就是它的公開 API；
 // 對方的子套件一律不得 import。notification 依賴的是它訂閱事件的發布方。
 var Dependencies = map[string][]string{
-	"identity":        {},
-	"media":           {},
-	"payment":         {},
-	"buyer":           {"identity", "media"},
-	"seller":          {"identity", "media"},
-	"content":         {"media"},
-	"fulfillment":     {"buyer", "seller", "media"},
-	"catalog":         {"seller", "buyer", "media", "fulfillment"},
-	"productimport":   {"catalog", "media", "fulfillment"},
-	"invoice":         {"payment", "fulfillment", "buyer", "seller", "media"},
-	"cart":            {"catalog", "buyer", "seller"},
-	"coupon":          {"identity", "buyer", "seller"},
-	"ordering":        {"cart", "coupon", "catalog", "fulfillment", "payment", "invoice", "buyer", "seller", "identity", "media"},
-	"aftersales":      {"ordering", "coupon", "payment", "fulfillment", "buyer", "seller", "media"},
-	"review":          {"ordering", "catalog", "buyer", "seller", "media"},
-	"im":              {"ordering", "buyer", "seller", "media"},
-	"crm":             {"ordering", "coupon", "buyer", "identity"},
-	"finance":         {"aftersales", "ordering", "payment", "fulfillment"},
-	"social":          {"buyer", "seller", "media"},
-	"discovery":       {"ordering", "catalog", "buyer", "seller", "review"},
-	"delegation":      {"identity", "seller", "ordering", "catalog", "social", "media"}, // 授權、session、稽核與編排全由 delegation 擁有。
-	"accountdeletion": {"identity", "buyer", "seller"},                                  // 刪除帳號的流程管理者。
-	"reviewqueue":     {"seller"},                                                       // 後台待辦：讀各來源發布的 pub_*_review_items 排序分頁。
-	"agent":           {"ordering", "catalog", "buyer", "seller", "media"},
+	"identity":          {},
+	"media":             {},
+	"payment":           {},
+	"buyer":             {"identity", "media"},
+	"seller":            {"identity", "media"},
+	"content":           {"media"},
+	"fulfillment":       {"buyer", "seller", "media"},
+	"catalog":           {"seller", "buyer", "media", "fulfillment"},
+	"productimport":     {"catalog", "media", "fulfillment"},
+	"invoice":           {"payment", "fulfillment", "buyer", "seller", "media"},
+	"cart":              {"catalog", "buyer", "seller"},
+	"coupon":            {"identity", "buyer", "seller"},
+	"ordering":          {"cart", "coupon", "catalog", "fulfillment", "payment", "invoice", "buyer", "seller", "identity", "media"},
+	"aftersales":        {"ordering", "coupon", "payment", "fulfillment", "buyer", "seller", "media"},
+	"review":            {"ordering", "catalog", "buyer", "seller", "media"},
+	"im":                {"ordering", "buyer", "seller", "media"},
+	"crm":               {"ordering", "coupon", "buyer", "identity"},
+	"finance":           {"aftersales", "ordering", "payment", "fulfillment"},
+	"social":            {"buyer", "seller", "media"},
+	"discovery":         {"ordering", "catalog", "buyer", "seller", "review"},
+	"delegation":        {"identity", "seller", "ordering", "catalog", "social", "media"}, // 授權、session、稽核與編排全由 delegation 擁有。
+	"accountdeletion":   {"identity", "buyer", "seller"},                                  // 刪除帳號的流程管理者。
+	"accountsuspension": {"identity", "seller"},                                           // 停權與解除的唯一入口：鎖帳號、確認沒有店家、再呼叫 identity。
+	"reviewqueue":       {"seller"},                                                       // 後台待辦：讀各來源發布的 pub_*_review_items 排序分頁。
+	"agent":             {"ordering", "catalog", "buyer", "seller", "media"},
 	"notification": {
 		"identity", "buyer", "seller", "catalog", "ordering", "fulfillment", "payment", "invoice",
 		"coupon", "aftersales", "review", "im", "social", "agent", "finance", "delegation",
@@ -154,5 +155,8 @@ var InternalDependencies = map[string]InternalGraph{
 	},
 	"media": {
 		Packages: map[string][]string{"model": {}, "refsync": {"model"}},
+	},
+	"accountsuspension": {
+		Packages: map[string][]string{}, // 只有根套件：編排，沒有內部套件。
 	},
 }

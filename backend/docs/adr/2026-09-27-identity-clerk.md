@@ -4,7 +4,7 @@
 |---|---|
 | 狀態 | accepted |
 | 日期 | 2026-09-27 |
-| 修訂 | 2026-09-27：D1、D2 後台改用 Cloudflare Access（Will，見文末〈修訂：後台改用 Cloudflare Access〉）；2026-10-05：email 以 webhook 同步、作為通知的寄件地址（Will，見文末〈修訂：email 作為通知的寄件地址〉）；2026-10-08：Apple 授權的撤銷改回伺服器保存 refresh token、刪帳時撤銷（Will，見文末〈修訂：Apple 授權由伺服器保存並在刪帳時撤銷〉） |
+| 修訂 | 2026-09-27：D1、D2 後台改用 Cloudflare Access（Will，見文末〈修訂：後台改用 Cloudflare Access〉）；2026-10-05：email 以 webhook 同步、作為通知的寄件地址（Will，見文末〈修訂：email 作為通知的寄件地址〉）；2026-10-08：Apple 授權的撤銷改回伺服器保存 refresh token、刪帳時撤銷（Will，見文末〈修訂：Apple 授權由伺服器保存並在刪帳時撤銷〉）；2026-10-29：停權不再停用 Clerk 使用者（Will，見文末〈修訂：受限登入〉） |
 | 影響範圍 | 單體的 identity 模組與 `internal/httpapi` 的認證；四個 client 的登入；設計書 17、51 |
 | 上層決策 | `2026-09-24-go-modular-monolith.md` D1、D5；`2026-09-26-external-contract-protobuf-connect.md` D6 |
 
@@ -128,3 +128,12 @@ A2 把 account-service 搬進單體時，登入、session、手機驗證都是�
 ## 修訂（2026-10-28）
 
 設計書 17（登入與帳號建立流程）已刪除，登入、帳號與 session 見 `docs/modules/identity.md`，買家建立見 `docs/modules/buyer.md`。本文中「設計書 17」與它的章節編號指向已刪除的文件，內容見 git 歷史。
+
+## 修訂：受限登入（2026-10-29，Will）
+
+脈絡：停權時 identity 排入 job 呼叫 Clerk Backend API 停用（ban）使用者，撤銷 session、之後不能登入；單體另在認證時對停權帳號回 `PermissionDenied`。被停權者因此讀不到停權理由，也不能自己刪除帳號，與處分紀錄「作者讀得到理由」矛盾（ADR `2026-10-29-account-suspension-and-moderation.md`，A7-D17）。
+
+決策：停權不再停用 Clerk 使用者。被停權帳號可以登入，identity 的認證結果帶停權狀態而不是回錯誤；伺服器只放行允許清單（讀自己的停權狀態、刪除帳號，登出是 client 端的 Clerk），其餘回 `ACCOUNT_SUSPENDED`，允許清單在 `internal/httpapi/rpc` 層。D3 的 session 與 D7 的期限不變。刪除帳號仍排入 job 刪除 Clerk 使用者（刪帳的 job 不變）。
+
+落地順序：A7-1d′ 先建停權紀錄與 `accountsuspension`，Clerk ban job 與認證的 `PermissionDenied` 暫時不動；A7-1d″ 移除停權時排 ban 的 job、認證改帶停權狀態、加上允許清單。在 A7-1d″ 完成之前，手動解除只清資料庫的停權狀態，Clerk 使用者若已被停用不會自動恢復。原決策段保留歷史。
+

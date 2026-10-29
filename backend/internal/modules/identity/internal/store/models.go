@@ -28,6 +28,18 @@ type IdentityAccountRole struct {
 	GrantedAt time.Time
 }
 
+type IdentityAccountSuspension struct {
+	ID             uuid.UUID
+	AccountID      int64
+	Kind           string
+	ReasonCategory string
+	ReasonText     string
+	SourceRef      *string
+	SuspendedAt    time.Time
+	ReleasedAt     *time.Time
+	ReleaseReason  *string
+}
+
 type IdentityAdmin struct {
 	ID            int64
 	AccessSubject string

@@ -6,8 +6,10 @@ import (
 	"net/http"
 	"slices"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
+	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
 // Role 是帳號另外申請的角色。值等於 account_roles.role 的 CHECK（TestCodeValueChecksMatchTheGoTypes）。買家不是角色：
@@ -167,6 +169,41 @@ const (
 	// LifecycleDeleted 已刪除，只留墓碑。
 	LifecycleDeleted Lifecycle = "DELETED"
 )
+
+// SuspensionKind 是停權的型別。值等於 account_suspensions.kind 的 CHECK。
+type SuspensionKind string
+
+// SuspensionPermanent 是永久停權，只能手動解除；A7 沒有定期停權（A7-D16）。
+const SuspensionPermanent SuspensionKind = "PERMANENT"
+
+// SuspendInput 是停權帳號的輸入。
+type SuspendInput struct {
+	AccountID int64
+	// Category 是停權的理由類別，必須是 policy.Values() 的值。
+	Category policy.Category
+	// Reason 是理由的說明，選填，規則同 platform/auditreason。
+	Reason string
+	// SourceRef 是來源（例如 moderation 的案件）的不透明參照，identity 不解讀它；選填，去掉前後空白後 1 到 200 字。
+	SourceRef string
+}
+
+// AccountSuspension 是帳號的一筆停權紀錄。
+type AccountSuspension struct {
+	ID        uuid.UUID
+	AccountID int64
+	Kind      SuspensionKind
+	Category  policy.Category
+	Reason    string
+	// SourceRef 沒有來源時是空字串。
+	SourceRef   string
+	SuspendedAt time.Time
+	// ReleasedAt 與 ReleaseReason 在未解除時是 nil 與空字串。
+	ReleasedAt    *time.Time
+	ReleaseReason string
+}
+
+// ReleaseReasonAccountDeleted 是帳號刪除時解除未解除紀錄的 release_reason；手動解除的原因由呼叫方說明，不會是這個值。
+const ReleaseReasonAccountDeleted = "ACCOUNT_DELETED"
 
 // RemoveRoleInput 是移除角色的輸入。移除角色不會刪除帳號：帳號活著就是買家，刪帳由 accountdeletion 編排。
 type RemoveRoleInput struct {

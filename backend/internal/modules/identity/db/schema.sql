@@ -42,6 +42,36 @@ CREATE TABLE identity.accounts (
 
 CREATE UNIQUE INDEX uidx_accounts_clerk_user_id ON identity.accounts (clerk_user_id);
 
+-- 帳號的停權紀錄（A7-D9：處分紀錄歸執行效果的模組）：停權的理由、來源與解除在同一處，與 accounts.suspended_at 在同一個 transaction 寫入，
+-- 入口只有 accountsuspension（internal/arch 的 TestSuspensionEntriesAreOnlyCalledByAccountsuspension）。解除留列不刪，之後可以再停權。
+-- kind 只有 PERMANENT，沒有 ends_at（A7-D16：A7 只有永久停權與手動解除）。reason_category 是 platform/policy.Category 的全部值（模組的
+-- TestCodeValueChecksMatchTheGoTypes）；source_ref 是來源（moderation 的案件）的不透明參照，identity 不讀它。同一帳號未解除的紀錄最多一筆，
+-- 且若且唯若 accounts.suspended_at 不是 NULL。帳號刪除時未解除的紀錄以 release_reason = 'ACCOUNT_DELETED' 解除。
+CREATE TABLE identity.account_suspensions (
+    id              UUID        PRIMARY KEY DEFAULT uuidv7(),
+    account_id      BIGINT      NOT NULL REFERENCES identity.accounts (id),
+    kind            TEXT        NOT NULL DEFAULT 'PERMANENT',
+    reason_category TEXT        NOT NULL,
+    reason_text     TEXT        NOT NULL DEFAULT '',
+    source_ref      TEXT,
+    suspended_at    TIMESTAMPTZ NOT NULL,
+    released_at     TIMESTAMPTZ,
+    release_reason  TEXT,
+    CONSTRAINT account_suspensions_kind_check CHECK (kind::text IN ('PERMANENT')),
+    CONSTRAINT account_suspensions_reason_category_check CHECK (reason_category::text IN ('FOOD_SAFETY', 'PROHIBITED_GOODS', 'UNLICENSED_SALE', 'MISLEADING_INFO', 'FAKE_CERTIFICATION', 'COUNTERFEIT', 'IP_INFRINGEMENT', 'FRAUD', 'OFF_PLATFORM_TRADE', 'PRIVACY', 'IMPERSONATION', 'PLATFORM_ABUSE', 'OTHER', 'SPAM', 'HARASSMENT', 'HATE')),
+    CONSTRAINT account_suspensions_reason_text_check CHECK (char_length(reason_text) <= 1000 AND reason_text !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
+    CONSTRAINT account_suspensions_source_ref_check CHECK (source_ref IS NULL OR (char_length(source_ref) >= 1 AND char_length(source_ref) <= 200 AND source_ref !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$')),
+    CONSTRAINT account_suspensions_release_check CHECK (
+        (released_at IS NULL AND release_reason IS NULL)
+        OR (released_at IS NOT NULL AND release_reason IS NOT NULL AND released_at >= suspended_at)
+    ),
+    CONSTRAINT account_suspensions_release_reason_check CHECK (release_reason IS NULL OR (char_length(release_reason) >= 1 AND char_length(release_reason) <= 1000 AND release_reason !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'))
+);
+
+CREATE UNIQUE INDEX uidx_account_suspensions_active ON identity.account_suspensions (account_id) WHERE released_at IS NULL;
+
+CREATE INDEX idx_account_suspensions_account_id_suspended_at ON identity.account_suspensions (account_id, suspended_at DESC);
+
 -- 帳號另外申請的角色：seller 開店時授予。買家不是角色：帳號活著就是買家（ADR 2026-09-30-account-created-provisions-buyer）。
 --
 -- source_id 是授予這個角色的業務身分（store_id）。舊的 seller-service 以非同步方式移除角色，可能晚於重新入駐：

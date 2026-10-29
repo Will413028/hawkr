@@ -29,6 +29,12 @@ UPDATE identity.accounts
 SET suspended_at = sqlc.arg(now)::timestamptz, updated_at = sqlc.arg(now)::timestamptz
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND suspended_at IS NULL;
 
+-- name: UnsuspendAccount :execrows
+-- 沒有停權時沒有列被更新（冪等）。
+UPDATE identity.accounts
+SET suspended_at = NULL, updated_at = sqlc.arg(now)::timestamptz
+WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND suspended_at IS NOT NULL;
+
 -- name: DeleteAccount :execrows
 -- 留下沒有個資的墓碑（accounts_deleted_check），clerk_user_id 保留。已經刪除時沒有列被更新（冪等）。
 UPDATE identity.accounts
