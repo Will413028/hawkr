@@ -197,6 +197,7 @@
 - [ ] **A3 buyer、seller**：seller 不含推薦排行；buyer 往上的補資料移到 http。步驟、決定與進度在 `2026-09-29-a3-buyer-seller.md`（盤點在同名目錄）；下面兩個子項已併入該檔的步驟 7。
   - seller 第一個 `*AppService`：實作錯誤模型 ADR `2026-09-25-api-error-model.md` D10 的賣家停權（`permission_denied` 加 `ErrorInfo.reason` `SELLER_SUSPENDED`，取代 9240 加 HTTP 409），在同一個變更加入 `ErrorReason` 的值、單體裡能力檢查的產生、client 把它轉成賣家身分的停權狀態，並端到端驗證（Connect 試點的通過條件 7）。能力檢查的做法（逐方法宣告、Redis 快取、fail-open）依模組完成的定義重新評估 ADR `2026-09-18-seller-capability-authorization.md`。
   - 申請成為商家：舊 gateway 的 `POST /app/sellers` 在 seller-service 建店並授予 SELLER 之後，才驗證城市代碼，驗證失敗回 400 而商店與角色已經寫入（A2 的 compose 驗收，2026-09-29）。搬進 seller 模組時，輸入驗證放在建店之前，建店與授予角色同一個 transaction。
+  - 收款開通改走 payment port（PayUni 換 Stripe Connect，作品集為主）：步驟、決定與進度在 `2026-10-29-payment-onboarding-stripe.md`。改的是 A3b 已完成的 7c、8b、8f（KYC、PayUni 綁定、後台審核）；付款、退款、撥款與物流的部分寫在 B2、B3、B8–B10。
 
 A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主鍵照 ID 策略的過渡規則暫用 `bigint GENERATED ALWAYS AS IDENTITY`，不用 TSID；最後一個 Java 消費者改寫後，以一個 migration 換成 uuid。
 - [x] **A4 pricebook**：取消，不搬。pricebook 整個刪除（ADR `2026-10-27-general-ecommerce-scope-cut.md` D1），執行在 `2026-10-27-ecommerce-scope-cut.md` 步驟 5、6；完成時勾掉這一項。
@@ -345,7 +346,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
 | 階段 | 狀態 | 備註 |
 |---|---|---|
 | 0 地基 | 進行中 | 已完成：0.1；0.2 的核心機制；0.3 的依賴方向、migration 與 query 隔離檢查；0.4 的 migration 套用器與 Atlas 開發設定；0.6 的 OpenAPI 規格與生成工具（2026-09-26 由 Connect 取代，規格改為現有 API 清單）；0.7 的 D9 gate；0.8 的盤點 gate；0.9 的本機環境；0.10 的指令檔；0.11 的 `backend-monolith` workflow（含 integration 測試）；0.5 的模組模板與 scaffold（2026-09-27，從 content 抽出）。單體統一使用 Postgres 18。前置修正：CodeMeta 的 Go 輸出從 `docs/` 移到 `internal/platform/codemeta`，因為中文目錄名不是合法的 import path，會讓根 module 無法建置 |
-| A Go 併入 | 進行中 | 對外契約定案為 Connect（2026-09-26），A0 重新定義為 gateway 當過渡入口並已完成；A1 content 完成（2026-09-27）：content-service 已刪除，模板見 0.5。A2 identity 完成（2026-09-29，`2026-09-27-a2-identity.md`）。A3 buyer、seller 的決定完成（2026-09-29），下一步是步驟 1（`2026-09-29-a3-buyer-seller.md`） |
+| A Go 併入 | 進行中 | A0、A1、A2 完成；A4 取消（pricebook 刪除）。A3：步驟 1–9、10a、10b、10c、10e 完成，剩 10d 公開讀取（部分併進 A7）與 10f 信任與安全上線前（`2026-09-29-a3-buyer-seller.md`）；收款開通換 Stripe 在 `2026-10-29-payment-onboarding-stripe.md`（步驟 2 完成，步驟 1 待 Stripe 測試帳號，步驟 3 可先做）。A7：1a、1b 完成，下一步 A7-1c（`2026-10-18-a7-social.md`）。其餘 A5、A6、A8–A11 未開始 |
 | B Java 改寫 | 未開始 | |
 | C 收尾 | 未開始 | |
 | D 前端 client | 取消（2026-09-26） | 併進模組完成的定義，收尾在階段 C |
