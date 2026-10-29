@@ -124,15 +124,14 @@ export const KeyboardSubmit: Story = {
 		const description = canvas.getByRole("textbox", { name: "品項描述" });
 		const submit = canvas.getByRole("button", { name: "確認品項" });
 		await expect(submit).toBeDisabled();
-		await userEvent.type(description, "  有機甘藍  ");
-		await expect(submit).toBeDisabled();
+		await userEvent.type(description, "  切絲高麗菜  ");
 		await expect(submit).toBeEnabled();
 		await userEvent.tab();
 		await expect(submit).toHaveFocus();
 		await userEvent.keyboard("{Enter}");
 		await expect(args.onSubmitCropOther).toHaveBeenCalledOnce();
 		await expect(args.onSubmitCropOther).toHaveBeenCalledWith({
-			description: "有機甘藍",
+			description: "切絲高麗菜",
 		});
 		await expect(args.onPick).not.toHaveBeenCalled();
 	},
