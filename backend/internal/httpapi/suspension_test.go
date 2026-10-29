@@ -20,8 +20,11 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
+	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
+	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
 var suspendedSince = time.Date(2026, 10, 1, 8, 0, 0, 0, time.UTC)
@@ -283,5 +286,74 @@ func TestEffectDeclarationsAgreeWithTheIdempotencyLevels(t *testing.T) {
 	}
 	if !slices.Contains([]Effect{EffectSelfService}, customerEffects[procDeleteAccount]) {
 		t.Errorf("DeleteAccount 要宣告為自助")
+	}
+}
+
+// 要求換協定（WebSocket 升級）的 GET 有副作用，視為寫入：停權的帳號回 gateway 形狀的 403，不轉給 gateway；一般的 GET 照樣放行。
+func TestSuspendedAccountCannotUpgradeALegacyRESTConnection(t *testing.T) {
+	h := suspendedEntry()
+	for name, headers := range map[string]map[string]string{
+		"Upgrade":              {"Upgrade": "websocket"},
+		"Connection":           {"Connection": "keep-alive, Upgrade"},
+		"Connection lowercase": {"Connection": "upgrade"},
+	} {
+		r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/app/chat/ws", http.NoBody)
+		r.Header.Set("Authorization", "Bearer suspended")
+		for k, v := range headers {
+			r.Header.Set(k, v)
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, r)
+		var body struct {
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || rec.Code != http.StatusForbidden || body.Code != http.StatusForbidden || body.Message == "" {
+			t.Fatalf("%s：%d %q，預期 gateway 形狀的 403", name, rec.Code, rec.Body)
+		}
+	}
+	if rec, s := callAs(t, h, "suspended", http.MethodGet, "/api/v1/app/chat/ws"); rec.Code != http.StatusOK || !s.Principal || !s.Suspended {
+		t.Fatalf("沒有升級的 GET：%d %+v", rec.Code, s)
+	}
+}
+
+type recordingReports struct{ submitted []model.SubmitReportInput }
+
+func (m *recordingReports) SubmitReport(_ context.Context, in model.SubmitReportInput) (model.SubmitReportResult, error) {
+	m.submitted = append(m.submitted, in)
+	return model.SubmitReportResult{}, nil
+}
+
+func (*recordingReports) BuyerReports(context.Context, model.BuyerReportListInput) (model.ReportPage, error) {
+	return model.ReportPage{}, nil
+}
+
+type allowAll struct{}
+
+func (allowAll) Allow(...httpseller.Limit) (bool, time.Duration) { return true, 0 }
+
+// 停權的帳號送食安檢舉：經 withSession 與真的 handler，模組收到的檢舉沒有 AccountID（以訪客身分）；沒有停權的帳號照常帶帳號。
+func TestSuspendedAccountFoodSafetyReportCarriesNoAccount(t *testing.T) {
+	for token, wantAccount := range map[string]int64{"suspended": 0, "good": 9} {
+		m := &recordingReports{}
+		reports, err := httpseller.NewReports(m, nil, allowAll{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		mux := http.NewServeMux()
+		path, handler := sellerconnect.NewSellerReportPublicServiceHandler(reports)
+		mux.Handle(path, handler)
+		h := withSession(suspendedAuth{}, slog.New(slog.DiscardHandler), mux)
+		r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, procSubmitFoodSafe, strings.NewReader(`{"storeId":"12","description":"x","phone":"0912345678","name":"王"}`))
+		r.Header.Set("Authorization", "Bearer "+token)
+		r.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, r)
+		if rec.Code != http.StatusOK || len(m.submitted) != 1 {
+			t.Fatalf("%s：%d %q submitted=%d", token, rec.Code, rec.Body, len(m.submitted))
+		}
+		if got := m.submitted[0]; got.AccountID != wantAccount || got.StoreID != 12 {
+			t.Fatalf("%s：模組收到 %+v，預期 AccountID=%d", token, got, wantAccount)
+		}
 	}
 }

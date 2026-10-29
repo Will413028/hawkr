@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"connectrpc.com/connect"
 
@@ -26,7 +27,7 @@ type Authenticator interface {
 //   - 後台的使用者不是允許的帳號：回 permission_denied，不以訪客繼續（否則後台只看到 unauthenticated，一直回到登入）。
 //   - 帳號停權：照樣登入，能做什麼依動作的性質（customerEffects，A7-D18），這裡是唯一的執行點。公開與受邀供應商的 service 以訪客執行
 //     （ctx 沒有 principal）；其他顧客 service 的讀取與自助放行，ctx 另帶停權時間（rpc.SuspensionFrom），寫入回 permission_denied 與
-//     ACCOUNT_SUSPENDED；不是 Connect 的路徑（轉給 gateway 的 REST）只放行 GET、HEAD，其餘回 403。
+//     ACCOUNT_SUSPENDED；不是 Connect 的路徑（轉給 gateway 的 REST）只放行不要求換協定的 GET、HEAD（WebSocket 升級有副作用，視為寫入），其餘回 403。
 //   - 問不到公鑰、資料庫或 Clerk：回 503，不以訪客繼續：「問不到」不等於「沒有登入」，否則 client 會把使用者登出。
 //
 // 業務身分（buyer_id、store_id）不在這裡解析：只有需要它的地方——buyer 的 Connect handler 與轉給 gateway 的請求——
@@ -88,7 +89,7 @@ const (
 func suspendedAccess(r *http.Request) suspendedAccessKind {
 	audience, connectPath := rpc.AudienceOf(r.URL.Path)
 	if !connectPath {
-		if r.Method == http.MethodGet || r.Method == http.MethodHead {
+		if (r.Method == http.MethodGet || r.Method == http.MethodHead) && !asksForUpgrade(r) {
 			return accessAllowed
 		}
 		return accessDenied
@@ -103,6 +104,21 @@ func suspendedAccess(r *http.Request) suspendedAccessKind {
 	case rpc.AudienceAdmin:
 	}
 	return accessAllowed
+}
+
+// asksForUpgrade 回報請求是否要求換協定（WebSocket）：升級後的連線可以持續送訊息，有副作用，視為寫入（A7-D18）。
+func asksForUpgrade(r *http.Request) bool {
+	if r.Header.Get("Upgrade") != "" {
+		return true
+	}
+	for _, v := range r.Header.Values("Connection") {
+		for _, token := range strings.Split(v, ",") {
+			if strings.EqualFold(strings.TrimSpace(token), "upgrade") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // writeUnavailable 回 503：Connect 的請求寫 Connect 的錯誤（unavailable），其他路徑（轉給 gateway 的 REST）寫 gateway
