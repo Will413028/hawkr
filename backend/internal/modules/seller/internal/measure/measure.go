@@ -119,8 +119,8 @@ func (s *Service) hydrate(ctx context.Context, q *store.Queries, rows []store.Se
 			storeNames[n.StoreID] = *n.StoreName
 		}
 	}
-	for i := range out {
-		out[i].StoreName = storeNames[rows[i].StoreID]
+	for i, row := range rows {
+		out[i].StoreName = storeNames[row.StoreID]
 	}
 	findings, err := q.MeasureFindings(ctx, ids)
 	if err != nil {

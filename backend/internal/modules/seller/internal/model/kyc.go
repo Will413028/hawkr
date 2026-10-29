@@ -196,6 +196,8 @@ func IssueAssetRequired(code KYCIssueCode) bool {
 	switch code {
 	case IssueUnreadable, IssueExpired, IssueMismatch, IssueInvalid:
 		return true
+	case IssueMissing, IssueOther:
+		return false
 	}
 	return false
 }

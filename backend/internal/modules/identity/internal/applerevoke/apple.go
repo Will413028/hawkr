@@ -265,7 +265,7 @@ func (w *exchangeAppleCodeWorker) persist(ctx context.Context, log *slog.Logger,
 // 下一次原生登入會再交一個 code。
 func (w *exchangeAppleCodeWorker) deferSave(ctx context.Context, log *slog.Logger, args exchangeAppleCodeArgs, grant model.AppleGrant, verified bool, reason string, cause error) error {
 	log.ErrorContext(ctx, "identity：換得的 Apple token 暫時無法保存，改排保存的 job", "reason", reason, "error", cause)
-	blob, err := json.Marshal(grantBlob{RefreshToken: grant.RefreshToken, IDToken: grant.IDToken})
+	blob, err := json.Marshal(grantBlob{RefreshToken: grant.RefreshToken, IDToken: grant.IDToken}) //nolint:gosec // G117：grantBlob 在 Sealer.Seal 加密後才保存，refresh_token 欄位名是 Apple 的 token 名，不是寫死的憑證
 	if err == nil {
 		blob, err = w.m.d.Sealer.Seal(blob, grantAAD(args.AccountID))
 	}

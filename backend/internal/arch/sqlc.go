@@ -201,7 +201,7 @@ func CheckDesiredStateSplit(module, file, content string) []string {
 			continue
 		}
 		object := desiredStmt.FindStringSubmatch(stmt)
-		if object != nil && strings.EqualFold(object[1], "TYPE") && enumType.MatchString(stmt) {
+		if len(object) > 1 && strings.EqualFold(object[1], "TYPE") && enumType.MatchString(stmt) {
 			object = nil // enum 是 Atlas 社群版會 diff 的 desired state，跟表一樣放 schema.sql
 		}
 		switch file {

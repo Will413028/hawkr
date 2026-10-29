@@ -197,8 +197,9 @@ func (s *Service) planRevoke(ctx context.Context, q *store.Queries, scope revoke
 		}
 		plan.linked = linked
 	}
+	all := slices.Concat(revoking, plan.linked)
 	plan.accounts = []int64{row.AccountID}
-	for _, m := range append(revoking, plan.linked...) {
+	for _, m := range all {
 		if !scope.covers(m.AccountID) || m.Kind == string(model.MeasureTermination) && !scope.identity {
 			return plan, errScopeChanged
 		}
@@ -206,7 +207,6 @@ func (s *Service) planRevoke(ctx context.Context, q *store.Queries, scope revoke
 	}
 	slices.Sort(plan.accounts)
 	plan.accounts = slices.Compact(plan.accounts)
-	all := append(revoking, plan.linked...)
 	revokingIDs := measureIDs(all)
 	planned := map[int64]bool{}
 	for _, m := range all {
