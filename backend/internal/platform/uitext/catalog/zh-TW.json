@@ -639,7 +639,7 @@
       "description": "請求的種類與狀態合成的狀態標籤。（值 MEASURE_REQUEST_STATE_REJECTED）"
     },
     "seller.MeasureState.MEASURE_STATE_ACTIVE": {
-      "message": "{kind, select, MEASURE_KIND_TERMINATION {合作已終止} MEASURE_KIND_CONTENT_TAKEDOWN {內容已下架} other {停權中}}",
+      "message": "{kind, select, MEASURE_KIND_SUSPENSION {停權中} MEASURE_KIND_TERMINATION {合作已終止} other {生效中}}",
       "params": {
         "kind": {
           "enum": "seller.MeasureKind"

@@ -639,12 +639,12 @@ func (t Text) SellerMeasureState(v string, kind string) (string, bool) {
 	case "ACTIVE":
 		return func() string {
 			switch kind {
+			case "SUSPENSION":
+				return "停權中"
 			case "TERMINATION":
 				return "合作已終止"
-			case "CONTENT_TAKEDOWN":
-				return "內容已下架"
 			default:
-				return "停權中"
+				return "生效中"
 			}
 		}(), true
 	case "ENDED":

@@ -555,6 +555,7 @@ describe("請求進度的顯示優先序", () => {
 	const decidedAt = (iso: string) => ({ decideTime: at(iso) });
 	const RISK_ACTIVE = {
 		basis: MeasureBasis.RISK,
+		kind: MeasureKind.SUSPENSION,
 		state: MeasureState.ACTIVE,
 	};
 

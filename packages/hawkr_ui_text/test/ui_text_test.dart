@@ -65,17 +65,24 @@ void main() {
     expect(
       MeasureState.MEASURE_STATE_ACTIVE.uiText(
         UiLocale.zhTW,
-        kind: MeasureKind.MEASURE_KIND_UNSPECIFIED,
+        kind: MeasureKind.MEASURE_KIND_SUSPENSION,
       ),
       '停權中',
     );
-    // 內容下架的狀態是 ISSUED；萬一是 ACTIVE 也不能顯示成停權中。
+    expect(
+      MeasureState.MEASURE_STATE_ACTIVE.uiText(
+        UiLocale.zhTW,
+        kind: MeasureKind.MEASURE_KIND_UNSPECIFIED,
+      ),
+      '生效中',
+    );
+    // 「停權中」只由 SUSPENSION 選出；內容下架的狀態是 ISSUED，萬一是 ACTIVE 也不能顯示成停權中。
     expect(
       MeasureState.MEASURE_STATE_ACTIVE.uiText(
         UiLocale.zhTW,
         kind: MeasureKind.MEASURE_KIND_CONTENT_TAKEDOWN,
       ),
-      '內容已下架',
+      '生效中',
     );
     expect(
       MeasureState.MEASURE_STATE_ISSUED.uiText(

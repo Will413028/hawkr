@@ -172,12 +172,12 @@ return "請求已駁回";
 	"seller.MeasureState.MEASURE_STATE_ISSUED": () => "已發出",
 	"seller.MeasureState.MEASURE_STATE_ACTIVE": (v) => (() => {
 switch (v.kind) {
+case "MEASURE_KIND_SUSPENSION":
+return "停權中";
 case "MEASURE_KIND_TERMINATION":
 return "合作已終止";
-case "MEASURE_KIND_CONTENT_TAKEDOWN":
-return "內容已下架";
 default:
-return "停權中";
+return "生效中";
 }
 })(),
 	"seller.MeasureState.MEASURE_STATE_ENDED": () => "已結束",

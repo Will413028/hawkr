@@ -180,7 +180,7 @@
       }
     },
     "MeasureState": {
-      "MEASURE_STATE_ACTIVE": "{kind, select, MEASURE_KIND_TERMINATION {合作已終止} MEASURE_KIND_CONTENT_TAKEDOWN {內容已下架} other {停權中}}",
+      "MEASURE_STATE_ACTIVE": "{kind, select, MEASURE_KIND_SUSPENSION {停權中} MEASURE_KIND_TERMINATION {合作已終止} other {生效中}}",
       "MEASURE_STATE_ENDED": "已結束",
       "MEASURE_STATE_ISSUED": "已發出",
       "MEASURE_STATE_REVOKED": "已撤銷",

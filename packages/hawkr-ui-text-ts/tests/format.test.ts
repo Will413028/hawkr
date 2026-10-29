@@ -59,15 +59,15 @@ describe("建構函式", () => {
 			"停權中",
 		);
 		expect(zhOf(sellerMeasureState(2, { kind: 999 as MeasureKind }))).toBe(
-			"停權中",
+			"生效中",
 		);
 		expect(zhOf(sellerMeasureState(2, { kind: MeasureKind.UNSPECIFIED }))).toBe(
-			"停權中",
+			"生效中",
 		);
-		// 內容下架的狀態是 ISSUED；萬一是 ACTIVE 也不能顯示成停權中。
+		// 「停權中」只由 SUSPENSION 選出；內容下架的狀態是 ISSUED，萬一是 ACTIVE 也不能顯示成停權中。
 		expect(
 			zhOf(sellerMeasureState(2, { kind: MeasureKind.CONTENT_TAKEDOWN })),
-		).toBe("內容已下架");
+		).toBe("生效中");
 		expect(
 			zhOf(sellerMeasureState(1, { kind: MeasureKind.CONTENT_TAKEDOWN })),
 		).toBe("已發出");

@@ -102,14 +102,10 @@ func TestUnknownValuesHaveNoText(t *testing.T) {
 	if got, ok := For(ZhTW).SellerMeasureTitleRisk("FRAUD"); !ok || got != "風險：詐欺" {
 		t.Errorf("SellerMeasureTitleRisk(FRAUD) = %q, %v", got, ok)
 	}
-	// select 的參數不認得走 other。
-	if got, _ := For(ZhTW).SellerMeasureState("ACTIVE", "NOPE"); got != "停權中" {
-		t.Errorf("ACTIVE + 不認得的 kind = %q", got)
-	}
-	// 內容下架不會是 ACTIVE，萬一出現也不能被說成停權中。
-	for kind, want := range map[string]string{"SUSPENSION": "停權中", "CONTENT_TAKEDOWN": "內容已下架"} {
+	// 「停權中」只由 SUSPENSION 選出；不認得的 kind 與沒有指定的 kind（other）不能被說成停權中，內容下架尤其不能。
+	for kind, want := range map[string]string{"SUSPENSION": "停權中", "TERMINATION": "合作已終止", "NOPE": "生效中", "": "生效中", "CONTENT_TAKEDOWN": "生效中"} {
 		if got, _ := For(ZhTW).SellerMeasureState("ACTIVE", kind); got != want {
-			t.Errorf("ACTIVE + %s = %q，要 %q", kind, got, want)
+			t.Errorf("ACTIVE + %q = %q，要 %q", kind, got, want)
 		}
 	}
 	if got, _ := For(ZhTW).SellerMeasureState("ISSUED", "CONTENT_TAKEDOWN"); got != "已發出" {
@@ -117,9 +113,6 @@ func TestUnknownValuesHaveNoText(t *testing.T) {
 	}
 	if got, ok := For(ZhTW).SellerMeasureKind("CONTENT_TAKEDOWN"); !ok || got != "內容下架" {
 		t.Errorf("CONTENT_TAKEDOWN 的名稱 = %q, %v", got, ok)
-	}
-	if got, _ := For(ZhTW).SellerMeasureState("ACTIVE", "TERMINATION"); got != "合作已終止" {
-		t.Errorf("ACTIVE + TERMINATION = %q", got)
 	}
 	if got, ok := For(ZhTW).CommonError("CANCELED"); ok || got.Text != "" {
 		t.Errorf("CANCELED 不顯示文字：%q, %v", got, ok)

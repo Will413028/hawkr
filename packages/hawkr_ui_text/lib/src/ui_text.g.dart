@@ -284,7 +284,7 @@ extension SellerMeasureRequestStateUiText on hawkr_seller_v1alpha1_seller.Measur
 String? _sellerMeasureState(UiLocale l, int value, hawkr_seller_v1alpha1_seller.MeasureKind kind) {
 return switch ((l, value)) {
 (UiLocale.zhTW || UiLocale.en, 1) => '已發出',
-(UiLocale.zhTW || UiLocale.en, 2) => (switch (kind.value) {3 => '合作已終止',4 => '內容已下架',_ => '停權中',}),
+(UiLocale.zhTW || UiLocale.en, 2) => (switch (kind.value) {2 => '停權中',3 => '合作已終止',_ => '生效中',}),
 (UiLocale.zhTW || UiLocale.en, 3) => '已結束',
 (UiLocale.zhTW || UiLocale.en, 4) => '已撤銷',
 (UiLocale.zhTW || UiLocale.en, 5) => '預定生效',
