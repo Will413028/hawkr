@@ -70,11 +70,13 @@ func (s *Sanctions) Terminated() bool {
 	return false
 }
 
-// OpeningState 是判斷帳號此刻能不能申請開店的全部輸入：帳號有沒有目前的店家、帳號是不是存活的（不在等待刪除）、帳號生效中的措施。
+// OpeningState 是判斷帳號此刻能不能申請開店的全部輸入：帳號有沒有目前的店家、帳號是不是存活的（不在等待刪除）、帳號有沒有被
+// identity 停權（accountsuspension 停權的帳號，開店要等解除）、帳號生效中的措施。
 type OpeningState struct {
-	HasStore      bool
-	AccountActive bool
-	Sanctions     *Sanctions
+	HasStore         bool
+	AccountActive    bool
+	AccountSuspended bool
+	Sanctions        *Sanctions
 }
 
 // OpeningBlocker 是帳號不能申請開店的一個原因。
@@ -83,7 +85,7 @@ type OpeningBlocker string
 const (
 	// OpeningTerminated 帳號有生效中的終止合作（條款第 21.3 條）：終止撤銷之前，解除停權也開不了店。
 	OpeningTerminated OpeningBlocker = "TERMINATED"
-	// OpeningSuspended 帳號停權中（沒有推導過的 nil 也算，fail-closed）。
+	// OpeningSuspended 帳號停權中：identity 的帳號停權，或生效中的非終止措施（沒有推導過的 nil 也算，fail-closed）。
 	OpeningSuspended OpeningBlocker = "SUSPENDED"
 	// OpeningAccountDeleting 帳號正在刪除（等待未結訂單結束），不能再授予角色。
 	OpeningAccountDeleting OpeningBlocker = "ACCOUNT_DELETING"
@@ -103,7 +105,7 @@ func OpeningBlockers(st OpeningState) []OpeningBlocker {
 	if st.Sanctions.Terminated() {
 		out = append(out, OpeningTerminated)
 	}
-	if st.Sanctions == nil || slices.ContainsFunc(st.Sanctions.Measures, func(m EffectiveMeasure) bool { return m.Kind != MeasureTermination }) {
+	if st.AccountSuspended || st.Sanctions == nil || slices.ContainsFunc(st.Sanctions.Measures, func(m EffectiveMeasure) bool { return m.Kind != MeasureTermination }) {
 		out = append(out, OpeningSuspended)
 	}
 	if !st.AccountActive {

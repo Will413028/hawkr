@@ -555,14 +555,16 @@ func TestOpeningBlockersAreOrderedAndExact(t *testing.T) {
 		in   OpeningState
 		want []OpeningBlocker
 	}{
-		"沒有任何原因": {OpeningState{AccountActive: true, Sanctions: NoSanctions()}, nil},
-		"停權":     {OpeningState{AccountActive: true, Sanctions: SanctionedBy(suspension)}, []OpeningBlocker{OpeningSuspended}},
-		"只有終止":   {OpeningState{AccountActive: true, Sanctions: SanctionedBy(termination)}, []OpeningBlocker{OpeningTerminated}},
-		"終止加停權":  {OpeningState{AccountActive: true, Sanctions: SanctionedBy(suspension, termination)}, []OpeningBlocker{OpeningTerminated, OpeningSuspended}},
-		"沒有推導過":  {OpeningState{AccountActive: true}, []OpeningBlocker{OpeningSuspended}},
-		"帳號正在刪除": {OpeningState{Sanctions: NoSanctions()}, []OpeningBlocker{OpeningAccountDeleting}},
-		"已有店家":   {OpeningState{AccountActive: true, HasStore: true, Sanctions: NoSanctions()}, []OpeningBlocker{OpeningStoreExists}},
-		"全部":     {OpeningState{HasStore: true, Sanctions: SanctionedBy(suspension, termination)}, []OpeningBlocker{OpeningTerminated, OpeningSuspended, OpeningAccountDeleting, OpeningStoreExists}},
+		"沒有任何原因":          {OpeningState{AccountActive: true, Sanctions: NoSanctions()}, nil},
+		"停權":              {OpeningState{AccountActive: true, Sanctions: SanctionedBy(suspension)}, []OpeningBlocker{OpeningSuspended}},
+		"帳號被 identity 停權": {OpeningState{AccountActive: true, AccountSuspended: true, Sanctions: NoSanctions()}, []OpeningBlocker{OpeningSuspended}},
+		"帳號停權又有停權措施":      {OpeningState{AccountActive: true, AccountSuspended: true, Sanctions: SanctionedBy(suspension)}, []OpeningBlocker{OpeningSuspended}},
+		"只有終止":            {OpeningState{AccountActive: true, Sanctions: SanctionedBy(termination)}, []OpeningBlocker{OpeningTerminated}},
+		"終止加停權":           {OpeningState{AccountActive: true, Sanctions: SanctionedBy(suspension, termination)}, []OpeningBlocker{OpeningTerminated, OpeningSuspended}},
+		"沒有推導過":           {OpeningState{AccountActive: true}, []OpeningBlocker{OpeningSuspended}},
+		"帳號正在刪除":          {OpeningState{Sanctions: NoSanctions()}, []OpeningBlocker{OpeningAccountDeleting}},
+		"已有店家":            {OpeningState{AccountActive: true, HasStore: true, Sanctions: NoSanctions()}, []OpeningBlocker{OpeningStoreExists}},
+		"全部":              {OpeningState{HasStore: true, Sanctions: SanctionedBy(suspension, termination)}, []OpeningBlocker{OpeningTerminated, OpeningSuspended, OpeningAccountDeleting, OpeningStoreExists}},
 	} {
 		got := OpeningBlockers(tc.in)
 		if len(got) != len(tc.want) {

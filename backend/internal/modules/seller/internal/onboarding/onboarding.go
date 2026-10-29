@@ -146,7 +146,7 @@ func (s *Service) openingState(ctx context.Context, q *store.Queries, accountID 
 	if err != nil {
 		return model.OpeningState{}, err
 	}
-	return model.OpeningState{HasStore: hasStore, AccountActive: account.Lifecycle == identity.LifecycleActive, Sanctions: sanctions}, nil
+	return model.OpeningState{HasStore: hasStore, AccountActive: account.Lifecycle == identity.LifecycleActive, AccountSuspended: account.Suspended, Sanctions: sanctions}, nil
 }
 
 // Opening 回答帳號此刻能不能申請開店與不能的原因（依優先序），與 Apply 的前置條件是同一個狀態與同一個判斷（model.OpeningBlockers）；唯讀，不鎖。
