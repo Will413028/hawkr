@@ -11,10 +11,8 @@ type CardProps = ComponentProps<typeof ClarifyQuestionCard>;
 
 const customQuestion: ClarifyQuestion = {
 	slotKey: "crop_disambiguation",
-	prompt: "找不到吻合的品項分類，可以自己輸入品項描述並填單價：",
-	options: [
-		{ optionId: "crop-other", label: "其他（自己輸入）", value: "OTHER" },
-	],
+	prompt: "找不到符合的品項，請描述你要的品項：",
+	options: [{ optionId: "crop-other", label: "自行描述品項", value: "OTHER" }],
 	allowFreeText: false,
 	source: "FIXED",
 	canSkip: false,
@@ -26,25 +24,25 @@ const choiceQuestion: ClarifyQuestion = {
 	options: [
 		{ optionId: "crop-LA1", label: "甘藍－初秋", value: "甘藍－初秋" },
 		{ optionId: "crop-LA2", label: "甘藍－改良種", value: "甘藍－改良種" },
-		...customQuestion.options,
+		{ optionId: "crop-other", label: "其他（自己輸入）", value: "OTHER" },
 	],
 };
 
 // 模擬後端逐輪回傳的白名單，不代表現行行情目錄或真實價格。
 const broadQuestion: ClarifyQuestion = {
 	...customQuestion,
-	prompt: "先確認你要找的大類：",
+	prompt: "先確認你要採購的大品項，請選擇一項，或輸入品項名稱：",
 	allowFreeText: true,
 	options: [
 		{ optionId: "fixture-group-pork", label: "豬肉", value: "豬肉" },
 		{ optionId: "fixture-group-beef", label: "牛肉", value: "牛肉" },
-		{ optionId: "crop-other", label: "自行填寫品項與單價", value: "OTHER" },
+		{ optionId: "crop-other", label: "自行描述品項", value: "OTHER" },
 	],
 };
 
 const narrowQuestion: ClarifyQuestion = {
 	...broadQuestion,
-	prompt: "豬肉裡，你要找的是哪個品項？",
+	prompt: "接著確認「豬肉」的細項，請選擇一項，或輸入更具體的名稱：",
 	options: [
 		{ optionId: "fixture-item-pork-belly", label: "豬五花", value: "豬五花" },
 		{ optionId: "fixture-item-pork-loin", label: "豬里肌", value: "豬里肌" },
@@ -76,7 +74,7 @@ const meta = {
 		docs: {
 			description: {
 				component:
-					"正式採購問答卡的大類、小類與自填品項情境。allowFreeText 啟用時，文字用來重新查找品項；crop-other 的描述與預期單價則走自填價回呼。選項由後端提供，範例全部為固定資料，不建立採購需求、不連接交易，也不代表真實行情。",
+					"正式採購問答卡的大類、小類與自行描述品項情境。allowFreeText 啟用時，文字用來重新查找品項；找不到符合品項時，買家只填品項描述，走 onSubmitCropOther 回呼。選項由後端提供，範例全部為固定資料，不建立採購需求、不連接交易，也不代表真實行情。",
 			},
 		},
 	},
@@ -98,48 +96,43 @@ export default meta;
 type Story = StoryObj<typeof ClarifyQuestionCard>;
 
 export const CustomOnly: Story = {
-	name: "自填品項 · 空白",
+	name: "自行描述品項 · 空白",
 	play: async ({ canvas, args }) => {
 		await expect(
 			canvas.getByRole("heading", { name: "自訂採購品項" }),
 		).toBeVisible();
 		await expect(canvas.getByText(customQuestion.prompt)).toBeVisible();
 		await expect(
-			canvas.queryByRole("button", { name: "其他（自己輸入）" }),
+			canvas.queryByRole("button", { name: "自行描述品項" }),
 		).not.toBeInTheDocument();
 		await expect(
 			canvas.getByRole("textbox", { name: "品項描述" }),
 		).toBeEnabled();
 		await expect(
-			canvas.getByRole("textbox", { name: "預期單價（新台幣／公斤）" }),
-		).toBeEnabled();
+			canvas.queryByRole("textbox", { name: "預期單價（新台幣／公斤）" }),
+		).not.toBeInTheDocument();
 		await expect(
-			canvas.getByRole("button", { name: "送出自填品項與價格" }),
+			canvas.getByRole("button", { name: "確認品項" }),
 		).toBeDisabled();
 		await expect(args.onPick).not.toHaveBeenCalled();
 	},
 };
 
 export const KeyboardSubmit: Story = {
-	name: "自填品項 · 填妥與鍵盤送出",
+	name: "自行描述品項 · 填妥與鍵盤送出",
 	play: async ({ canvas, args }) => {
 		const description = canvas.getByRole("textbox", { name: "品項描述" });
-		const price = canvas.getByRole("textbox", {
-			name: "預期單價（新台幣／公斤）",
-		});
-		const submit = canvas.getByRole("button", {
-			name: "送出自填品項與價格",
-		});
+		const submit = canvas.getByRole("button", { name: "確認品項" });
 		await expect(submit).toBeDisabled();
 		await userEvent.type(description, "  有機甘藍  ");
 		await expect(submit).toBeDisabled();
-		await userEvent.type(price, " 120 ");
 		await expect(submit).toBeEnabled();
+		await userEvent.tab();
+		await expect(submit).toHaveFocus();
 		await userEvent.keyboard("{Enter}");
 		await expect(args.onSubmitCropOther).toHaveBeenCalledOnce();
 		await expect(args.onSubmitCropOther).toHaveBeenCalledWith({
 			description: "有機甘藍",
-			priceAmount: "120",
 		});
 		await expect(args.onPick).not.toHaveBeenCalled();
 	},
@@ -188,7 +181,7 @@ export const BroadCategoryRetry: Story = {
 };
 
 export const NarrowItemRetry: Story = {
-	name: "小類選擇 · 自由描述與自填價分開",
+	name: "小類選擇 · 重新查找與自行描述分開",
 	args: { question: narrowQuestion },
 	play: async ({ canvas, args }) => {
 		await expect(
@@ -200,30 +193,21 @@ export const NarrowItemRetry: Story = {
 			optionId: "fixture-item-pork-belly",
 			optionLabel: "豬五花",
 		});
-		await userEvent.click(
-			canvas.getByRole("button", { name: "自行填寫品項與單價" }),
-		);
+		await userEvent.click(canvas.getByRole("button", { name: "自行描述品項" }));
 		await userEvent.type(
 			canvas.getByRole("textbox", { name: "品項描述" }),
 			"帶皮五花肉",
 		);
-		await userEvent.type(
-			canvas.getByRole("textbox", { name: "預期單價（新台幣／公斤）" }),
-			"220",
-		);
-		await userEvent.click(
-			canvas.getByRole("button", { name: "送出自填品項與價格" }),
-		);
+		await userEvent.click(canvas.getByRole("button", { name: "確認品項" }));
 		await expect(args.onSubmitCropOther).toHaveBeenCalledWith({
 			description: "帶皮五花肉",
-			priceAmount: "220",
 		});
 		await expect(args.onSubmitFreeText).not.toHaveBeenCalled();
 	},
 };
 
 export const SameSlotStageChange: Story = {
-	name: "同一問題鍵 · 大類到小類到自填價",
+	name: "同一問題鍵 · 大類到小類到自行描述",
 	render: function StagedQuestions(args) {
 		const [stage, setStage] = useState(0);
 		return (
@@ -251,16 +235,10 @@ export const SameSlotStageChange: Story = {
 		await expect(
 			canvas.getByRole("textbox", { name: "重新描述品項" }),
 		).toHaveValue("");
-		await userEvent.click(
-			canvas.getByRole("button", { name: "自行填寫品項與單價" }),
-		);
+		await userEvent.click(canvas.getByRole("button", { name: "自行描述品項" }));
 		await userEvent.type(
 			canvas.getByRole("textbox", { name: "品項描述" }),
 			"第二題草稿",
-		);
-		await userEvent.type(
-			canvas.getByRole("textbox", { name: "預期單價（新台幣／公斤）" }),
-			"220",
 		);
 		await userEvent.click(canvas.getByRole("button", { name: "豬五花" }));
 		await expect(
@@ -272,16 +250,13 @@ export const SameSlotStageChange: Story = {
 		await expect(canvas.getByRole("textbox", { name: "品項描述" })).toHaveValue(
 			"",
 		);
-		await expect(
-			canvas.getByRole("textbox", { name: "預期單價（新台幣／公斤）" }),
-		).toHaveValue("");
 		await expect(args.onPick).toHaveBeenCalledTimes(2);
 		await expect(args.onSubmitCropOther).not.toHaveBeenCalled();
 	},
 };
 
 export const RetryWithoutCandidates: Story = {
-	name: "仍可重新描述 · 不提前改為自填價",
+	name: "仍可重新描述 · 不提前改為自行描述",
 	args: { question: { ...broadQuestion, options: [broadQuestion.options[2]] } },
 	play: async ({ canvas, args }) => {
 		await expect(
@@ -314,7 +289,7 @@ export const BroadCategoryDarkNarrow: Story = {
 };
 
 export const Pending: Story = {
-	name: "自填品項 · 等待中",
+	name: "自行描述品項 · 等待中",
 	args: { question: choiceQuestion },
 	render: function PendingPreview(args) {
 		const [pending, setPending] = useState(false);
@@ -339,10 +314,6 @@ export const Pending: Story = {
 			canvas.getByRole("textbox", { name: "品項描述" }),
 			"有機甘藍",
 		);
-		await userEvent.type(
-			canvas.getByRole("textbox", { name: "預期單價（新台幣／公斤）" }),
-			"120",
-		);
 		await userEvent.click(canvas.getByRole("button", { name: "顯示等待狀態" }));
 		for (const input of canvas.getAllByRole("textbox")) {
 			await expect(input).toBeDisabled();
@@ -358,25 +329,25 @@ export const Pending: Story = {
 };
 
 export const MissingSubmitHandler: Story = {
-	name: "自填品項 · 提交尚未就緒",
+	name: "自行描述品項 · 提交尚未就緒",
 	args: { onSubmitCropOther: undefined },
 	play: async ({ canvas }) => {
 		for (const input of canvas.getAllByRole("textbox")) {
 			await expect(input).toBeDisabled();
 		}
 		await expect(
-			canvas.getByRole("button", { name: "送出自填品項與價格" }),
+			canvas.getByRole("button", { name: "確認品項" }),
 		).toBeDisabled();
 	},
 };
 
 export const Dark: Story = {
-	name: "自填品項 · 深色",
+	name: "自行描述品項 · 深色",
 	globals: { theme: "dark" },
 };
 
 export const NarrowLargeText: Story = {
-	name: "自填品項 · 窄版大字",
+	name: "自行描述品項 · 窄版大字",
 	globals: { theme: "light", textScale: "1.4" },
 	decorators: [
 		(Story) => (
