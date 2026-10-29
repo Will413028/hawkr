@@ -18,6 +18,21 @@ test("a batched parent that only delivers the latest value is an echo", () => {
 	assert.equal(echo.receive("s2"), "echo");
 });
 
+test("an echo also settles the older values sent before it", () => {
+	const echo = new DescriptionEditorEcho("s0");
+	echo.emit("s1");
+	echo.emit("s2");
+	assert.equal(echo.receive("s2"), "echo");
+	assert.equal(echo.receive("s1"), "external");
+});
+
+test("an external value discards the values still waiting to come back", () => {
+	const echo = new DescriptionEditorEcho("s0");
+	echo.emit("s1");
+	assert.equal(echo.receive("ext"), "external");
+	assert.equal(echo.receive("s1"), "external");
+});
+
 test("an external value after the echoes is external and becomes current", () => {
 	const echo = new DescriptionEditorEcho("s0");
 	echo.emit("s1");
