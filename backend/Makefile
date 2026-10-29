@@ -49,7 +49,7 @@ lint-all:
 	@echo "=== All services linted ==="
 
 GOLANGCI_LINT_VERSION := $(shell cat .golangci-version)
-GOLANGCI_LINT_MONOLITH := GOWORK=off go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+GOLANGCI_LINT_MONOLITH := GOWORK=off GOTOOLCHAIN=go$(shell cat .go-version) go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 
 lint-monolith:
 	$(GOLANGCI_LINT_MONOLITH) run -c .golangci.monolith.yml ./cmd/... ./internal/...
