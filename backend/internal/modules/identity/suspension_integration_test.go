@@ -141,6 +141,9 @@ func TestSuspendInputIsValidated(t *testing.T) {
 	if f.suspendedAt(t, id) {
 		t.Fatal("無效的輸入也停權了")
 	}
+	if _, _, err := f.m.UnsuspendAccount(ctx, id, " ACCOUNT_DELETED "); apperr.KindOf(err) != apperr.KindInvalidInput {
+		t.Fatalf("ACCOUNT_DELETED 只有帳號刪除能寫：%v", err)
+	}
 	_, _, err := f.m.UnsuspendAccount(ctx, id, "  ")
 	wantKind(t, err, apperr.KindInvalidInput)
 	_, _, err = f.m.SuspendAccount(ctx, SuspendInput{AccountID: 999, Category: policy.Other})

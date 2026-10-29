@@ -249,6 +249,9 @@ func (m *Service) UnsuspendAccount(ctx context.Context, accountID int64, reason 
 	if err != nil {
 		return rec, false, err
 	}
+	if reason == model.ReleaseReasonAccountDeleted {
+		return rec, false, apperr.InvalidInputOn([]string{"Reason"}, "解除原因不能是帳號刪除保留的值")
+	}
 	err = m.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := m.q(ctx)
 		if _, err := lockLiveAccount(ctx, q, accountID); err != nil {

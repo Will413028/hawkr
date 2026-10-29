@@ -156,6 +156,8 @@ func (s *Server) SuspendAccount(ctx context.Context, req *connect.Request[pb.Sus
 			return nil, connect.NewError(connect.CodeNotFound, err)
 		} else if k == apperr.KindFailedPrecondition {
 			return nil, connect.NewError(connect.CodeFailedPrecondition, err)
+		} else if k == apperr.KindInvalidInput {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
 		}
 		return nil, err
 	}

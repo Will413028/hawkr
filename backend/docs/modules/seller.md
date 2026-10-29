@@ -42,7 +42,7 @@
 
 - 每個帳號最多一個目前的 stint（`status` 不是 `CLOSED`）：DB `stores_current_account` partial UNIQUE；開店在 transaction 內先 `identity.LockAccount` 再檢查，所以 UNIQUE 只是保底。重新入駐建立新的 stint，帶新的 `store_id` 與 `store_code`（PayUni 的 MerID 是一次性的外部綁定）。`TestApplyRejectsSecondStoreAndReonboardsWithNewStint` 驗證。
 
-- SELLER ⇔ 帳號有目前的 stint：開店時在同一個 transaction 授予，任何關閉（`CloseCurrent`、`CloseForDeletion`、終止合作的關店）在同一個 transaction 移除，恢復營業（`closing.Reopen`）在同一個 transaction 重新授予。`accountdeletion` 遇到有 SELLER 卻沒有店家，當成不變量被破壞。
+- SELLER ⇔ 帳號有目前的 stint：開店時在同一個 transaction 授予，任何關閉（`CloseCurrent`、`CloseForDeletion`、終止合作的關店）在同一個 transaction 移除，恢復營業（`closing.Reopen`）在同一個 transaction 重新授予（前提：帳號存活且未被 identity 停權，與開店同一個判斷；被停權的帳號撤銷終止只撤銷紀錄、不重開）。`accountdeletion` 遇到有 SELLER 卻沒有店家，當成不變量被破壞。
 
 - 開店先驗證全部輸入，任何一欄不合法就不建店、不授予角色、不發事件：`TestApplyValidatesEverythingBeforeWriting`、`TestApplyEventFailureRollsBackStoreAndRole`。
 

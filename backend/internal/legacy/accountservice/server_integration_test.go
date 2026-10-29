@@ -262,6 +262,11 @@ func TestSuspendAccount(t *testing.T) {
 	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("有店的帳號停權 = %v，預期 failed precondition", err)
 	}
+	f.suspender.err = apperr.InvalidInput("理由超過 1000 字元")
+	_, err = f.client.SuspendAccount(ctx, connect.NewRequest(&pb.SuspendAccountRequest{AccountId: id}))
+	if connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("理由過長 = %v，預期 invalid argument", err)
+	}
 	f.suspender.err = nil
 	// 還沒實作的方法（已經搬到 Connect 或刪除）回 unimplemented。
 	_, err = f.client.GoogleOAuth(ctx, connect.NewRequest(&pb.GoogleOAuthRequest{}))

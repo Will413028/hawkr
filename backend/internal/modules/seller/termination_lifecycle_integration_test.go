@@ -13,6 +13,7 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/stint"
@@ -291,6 +292,23 @@ func TestRevokingAfterTheRetentionButBeforeThePurgeJobDoesNotReopen(t *testing.T
 	must(t, err)
 	if fresh.StoreID == s.StoreID {
 		t.Fatal("新店有新的 store_id")
+	}
+}
+
+// 帳號被 identity 停權時撤銷終止措施只撤銷紀錄、不重開店（否則會有店且被停權）；解除停權後店家仍是關閉的。
+// mutation：ReopenPlan 拿掉 account.Suspended 的判斷 → 這裡會重開。
+func TestRevokingATerminationOfASuspendedAccountDoesNotReopen(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	accountID, s, m := f.terminated(t, GroundCeasedBusiness)
+	_, _, err := f.identity.SuspendAccount(context.Background(), identity.SuspendInput{AccountID: accountID, Category: policy.Other, Reason: "停權"})
+	must(t, err)
+	revoked := f.revoke(t, m)
+	if revoked.Status != MeasureStatusRevoked {
+		t.Fatalf("revoked=%+v", revoked)
+	}
+	if got := f.storeRow(t, s.StoreID); got.Status != Closed || f.isSeller(t, accountID) || f.storeClosures(t, s.StoreID) != 0 {
+		t.Fatalf("被停權的帳號不重開：%+v", got)
 	}
 }
 

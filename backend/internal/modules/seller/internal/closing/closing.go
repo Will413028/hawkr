@@ -352,7 +352,7 @@ func (s *Service) ReopenPlan(ctx context.Context, q *store.Queries, accountID in
 	if err != nil {
 		return 0, err
 	}
-	if account.Lifecycle != identity.LifecycleActive {
+	if account.Lifecycle != identity.LifecycleActive || account.Suspended {
 		return 0, nil
 	}
 	return target.StoreID, nil

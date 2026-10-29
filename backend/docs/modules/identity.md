@@ -29,7 +29,7 @@
 - 停權、刪帳與排入停用、刪除 Clerk 使用者的 job 在同一個 transaction。停權冪等：已經停權時不再排 job。
 - 停權紀錄（`account_suspensions`，A7-D9）：型別只有 `PERMANENT`（A7-D16，沒有 `ends_at`），理由類別是 `platform/policy.Category` 的值（`TestCodeValueChecksMatchTheGoTypes`），另有說明、不透明的來源參照（identity 不讀它）、停權時間、解除時間與解除原因。`SuspendAccount(SuspendInput)` 在同一個 transaction 寫紀錄、設 `suspended_at` 並排 Clerk 停用 job；已經停權時回傳原本的紀錄（`created=false`），不改理由、不寫第二筆；`uidx_account_suspensions_active` 保證同一帳號未解除的紀錄最多一筆。紀錄與狀態任何一步失敗都整筆回滾（`TestFailedRecordWriteLeavesTheAccountNotSuspended`、`TestFailureAfterTheRecordRollsTheRecordBack`）。
 - `UnsuspendAccount(accountID, reason)`：reason 必填；同一個 transaction 清 `suspended_at`、在目前的紀錄記解除時間與原因；沒有停權時成功並回傳 `released=false`。解除留列不刪，之後可以再停權（新的一筆）。`CurrentSuspension(accountID)` 回傳目前未解除的紀錄，給 A7-2 的「讀自己的停權」。
-- 停權、解除入口只允許 `accountsuspension` 呼叫（`internal/arch` 的 `TestSuspensionEntriesAreOnlyCalledByAccountsuspension` 掃非測試程式）：「擁有商店的帳號不能停權」在那裡檢查，identity 是葉節點、不查店家。刪帳號時未解除的紀錄以 `release_reason = ACCOUNT_DELETED` 解除。
+- 停權、解除入口只允許 `accountsuspension` 呼叫（`internal/arch` 的 `TestSuspensionEntriesAreOnlyCalledByAccountsuspension` 掃非測試程式）：「擁有商店的帳號不能停權」在那裡檢查，identity 是葉節點、不查店家。刪帳號時未解除的紀錄以 `release_reason = ACCOUNT_DELETED` 解除。手動解除（`UnsuspendAccount`）拒絕這個值，只有帳號刪除路徑能寫。
 - 停權不再停用 Clerk 使用者與認證回 `PermissionDenied` 改為受限登入（ADR `2026-10-29-account-suspension-and-moderation.md`）在 A7-1d″ 落地；在那之前 Clerk 停用 job 還在，手動解除不會恢復已被停用的 Clerk 使用者。
 - 刪帳號留下墓碑與 `clerk_user_id`，同一個 Clerk 使用者不會再建一個帳號；`email` 清為 NULL（`accounts_deleted_check`）。刪帳同時發出 `AccountDeleted`。
 - 帳號的生命週期是 ACTIVE → PENDING_DELETION → DELETED（`Account.Lifecycle`；欄位 `deletion_pending_at`、`deleted_at`）。
