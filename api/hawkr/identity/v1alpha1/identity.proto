@@ -12,6 +12,7 @@ syntax = "proto3";
 package hawkr.identity.v1alpha1;
 
 import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
 
 // IdentityAppService 是登入的買家、賣家的方法。
 service IdentityAppService {
@@ -63,6 +64,15 @@ message GetSessionResponse {
   // 1 是刪掉的 session（token 與期限由 Clerk 管理）。
   reserved 1;
   Account account = 2;
+  // 帳號被停權時的狀態；沒有停權時不設。停權的帳號仍能登入、讀取與刪除帳號，寫入回 permission_denied 與
+  // hawkr.common.v1alpha1.ErrorReason.ACCOUNT_SUSPENDED。
+  Suspension suspension = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Suspension 是帳號的停權狀態。
+message Suspension {
+  // 停權的時間。
+  google.protobuf.Timestamp suspended_at = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 message LinkAppleCredentialRequest {

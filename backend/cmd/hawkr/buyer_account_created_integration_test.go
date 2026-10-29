@@ -27,7 +27,6 @@ func (accountCreatedClerk) OwnsUser(id string) bool { return strings.HasPrefix(i
 func (accountCreatedClerk) Verify(_ context.Context, _ string) (identity.ClerkIdentity, error) {
 	return identity.ClerkIdentity{Subject: "user_created", Name: "新買家"}, nil
 }
-func (accountCreatedClerk) BanUser(context.Context, string) error    { return nil }
 func (accountCreatedClerk) DeleteUser(context.Context, string) error { return nil }
 
 func TestAccountCreationProvisionsBuyerInSameTransaction(t *testing.T) {

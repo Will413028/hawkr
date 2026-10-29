@@ -5,6 +5,7 @@ package rpc
 import (
 	"context"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 	"go.opentelemetry.io/otel/trace"
@@ -69,10 +70,23 @@ func WithPrincipal(ctx context.Context, p identity.Principal) context.Context {
 	return context.WithValue(ctx, principalKey{}, p)
 }
 
-// PrincipalFrom 回傳 ctx 裡的呼叫者。App 與 Admin 的 service 一定有；Public 的請求有帶有效的 session 時也有。
+// PrincipalFrom 回傳 ctx 裡的呼叫者。App 與 Admin 的 service 一定有；Public 的請求有帶有效的 session、而且帳號沒有停權時也有。
 func PrincipalFrom(ctx context.Context) (identity.Principal, bool) {
 	p, ok := ctx.Value(principalKey{}).(identity.Principal)
 	return p, ok
+}
+
+type suspensionKey struct{}
+
+// WithSuspension 把呼叫者的帳號被停權的時間放進 ctx；只有入口的認證中介層呼叫，且只在帳號停權、而且請求以登入身分繼續時放。
+func WithSuspension(ctx context.Context, at time.Time) context.Context {
+	return context.WithValue(ctx, suspensionKey{}, at)
+}
+
+// SuspensionFrom 回傳呼叫者的帳號被停權的時間；沒有停權（或請求以訪客執行）時 ok 是 false。
+func SuspensionFrom(ctx context.Context) (at time.Time, ok bool) {
+	at, ok = ctx.Value(suspensionKey{}).(time.Time)
+	return at, ok
 }
 
 // authorize 依 service 的使用者類別檢查 ctx 裡的呼叫者。

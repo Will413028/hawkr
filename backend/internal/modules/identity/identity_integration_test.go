@@ -49,9 +49,7 @@ type fakeClerk struct {
 	issuer  string
 	mu      sync.Mutex
 	users   map[string]ClerkIdentity
-	banned  []string
 	deleted []string
-	rejects bool
 }
 
 type fakeAdmin struct {
@@ -103,16 +101,6 @@ func (c *fakeClerk) Verify(_ context.Context, tok string) (ClerkIdentity, error)
 	u := c.users[claims.Sub]
 	u.Subject = claims.Sub
 	return u, nil
-}
-
-func (c *fakeClerk) BanUser(_ context.Context, id string) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.rejects {
-		return errors.Join(errors.New("401"), ErrRejected)
-	}
-	c.banned = append(c.banned, id)
-	return nil
 }
 
 func (c *fakeClerk) DeleteUser(_ context.Context, id string) error {
@@ -453,24 +441,31 @@ func TestAuthenticationErrors(t *testing.T) {
 	}
 }
 
-func TestSuspensionEndsAuthenticationAndBansTheClerkUser(t *testing.T) {
+func TestSuspendedAccountStillAuthenticatesAndCarriesTheSuspensionTime(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	id := f.account(t, "user_1")
-	for range 2 { // 冪等：已經停權時不再排 job
+	if a, err := f.m.Authenticate(ctx, token(customerIssuer, "user_1")); err != nil || a.SuspendedAt != nil {
+		t.Fatalf("未停權的帳號 = %+v, %v", a, err)
+	}
+	for range 2 { // 冪等：已經停權時不再寫第二筆
 		if _, _, err := f.m.SuspendAccount(ctx, SuspendInput{AccountID: id, Category: policy.Other, Reason: "檢舉成立"}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	_, err := f.m.Authenticate(ctx, token(customerIssuer, "user_1"))
-	wantKind(t, err, apperr.KindPermissionDenied)
-	if kinds := f.jobKinds(t); !slices.Equal(kinds, []string{"identity.clerk_user"}) {
-		t.Fatalf("job = %v", kinds)
+	a, err := f.m.Authenticate(ctx, token(customerIssuer, "user_1"))
+	if err != nil || a.Principal.ID != id || a.Principal.Kind != PrincipalAccount || a.SuspendedAt == nil || !a.SuspendedAt.Equal(f.now) {
+		t.Fatalf("停權的帳號 = %+v, %v，預期認證成功並帶停權時間 %v", a, err, f.now)
 	}
-	args := lastJobArgs[clerkJobArgs](t, f, "identity.clerk_user")
-	if args != (clerkJobArgs{Action: "ban", ClerkUserID: "user_1"}) {
-		t.Fatalf("job 的參數 = %+v", args)
+	if kinds := f.jobKinds(t); len(kinds) != 0 {
+		t.Fatalf("停權排了 job：%v，停權不停用 Clerk 的使用者", kinds)
+	}
+	if _, released, err := f.m.UnsuspendAccount(ctx, id, "申覆成立"); err != nil || !released {
+		t.Fatalf("UnsuspendAccount = %v, %v", released, err)
+	}
+	if a, err := f.m.Authenticate(ctx, token(customerIssuer, "user_1")); err != nil || a.SuspendedAt != nil {
+		t.Fatalf("解除後 = %+v, %v，預期停權時間清除", a, err)
 	}
 }
 

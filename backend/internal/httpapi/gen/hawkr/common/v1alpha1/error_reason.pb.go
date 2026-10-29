@@ -66,6 +66,10 @@ const (
 	// 帳號擁有商店，不能被停權（搭配 failed_precondition）：停權對店家、未結訂單與撥款的效果由賣家條款決定，條款定出之前有店的帳號不停權。
 	// 只出現在後台與內部的處分路徑；client 顯示 LocalizedMessage，請營運先處理店家（措施或關店），再停權帳號。
 	ErrorReason_ACCOUNT_HAS_STORE ErrorReason = 11
+	// 帳號停權中，這個操作是寫入，不在停權時仍可做的範圍（搭配 permission_denied）。停權的帳號仍能登入、讀取與刪除帳號：
+	// client 轉成帳號的受限狀態，顯示停權通知，並以 identity.v1alpha1.IdentityAppService.GetSession 的 suspension 讀停權的狀態。
+	// 舊 gateway 的 REST 路徑（/api/v1）沒有 ErrorInfo，停權的非 GET／HEAD 請求只回 403。
+	ErrorReason_ACCOUNT_SUSPENDED ErrorReason = 12
 )
 
 // Enum value maps for ErrorReason.
@@ -81,6 +85,7 @@ var (
 		8:  "STORE_OPENING_SUSPENDED",
 		9:  "STORE_OPENING_TERMINATED",
 		11: "ACCOUNT_HAS_STORE",
+		12: "ACCOUNT_SUSPENDED",
 	}
 	ErrorReason_value = map[string]int32{
 		"ERROR_REASON_UNSPECIFIED":   0,
@@ -93,6 +98,7 @@ var (
 		"STORE_OPENING_SUSPENDED":    8,
 		"STORE_OPENING_TERMINATED":   9,
 		"ACCOUNT_HAS_STORE":          11,
+		"ACCOUNT_SUSPENDED":          12,
 	}
 )
 
@@ -127,7 +133,7 @@ var File_hawkr_common_v1alpha1_error_reason_proto protoreflect.FileDescriptor
 
 const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\n" +
-	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xcd\x02\n" +
+	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xe4\x02\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10VERSION_CONFLICT\x10\x01\x12\x14\n" +
@@ -139,7 +145,8 @@ const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\x1aSELLER_REQUIREMENT_MISSING\x10\a\x12\x1b\n" +
 	"\x17STORE_OPENING_SUSPENDED\x10\b\x12\x1c\n" +
 	"\x18STORE_OPENING_TERMINATED\x10\t\x12\x15\n" +
-	"\x11ACCOUNT_HAS_STORE\x10\v\"\x04\b\x02\x10\x02\"\x04\b\x05\x10\x05*\x12PHONE_CODE_EXPIRED*\x16ACCOUNT_HAS_OPEN_STOREB\x82\x02\n" +
+	"\x11ACCOUNT_HAS_STORE\x10\v\x12\x15\n" +
+	"\x11ACCOUNT_SUSPENDED\x10\f\"\x04\b\x02\x10\x02\"\x04\b\x05\x10\x05*\x12PHONE_CODE_EXPIRED*\x16ACCOUNT_HAS_OPEN_STOREB\x82\x02\n" +
 	"\x19com.hawkr.common.v1alpha1B\x10ErrorReasonProtoP\x01Z]github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1;commonv1alpha1\xa2\x02\x03HCX\xaa\x02\x15Hawkr.Common.V1alpha1\xca\x02\x15Hawkr\\Common\\V1alpha1\xe2\x02!Hawkr\\Common\\V1alpha1\\GPBMetadata\xea\x02\x17Hawkr::Common::V1alpha1b\x06proto3"
 
 var (

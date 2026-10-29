@@ -43,6 +43,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
+	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/gcis"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
@@ -117,6 +118,7 @@ type fixture struct {
 	http       *http.Client
 	buyerToken string
 	adminToken string
+	db         *db.DB
 	module     *buyer.Module
 	id         *identity.Module
 	dev        *identity.DevAuth
@@ -205,7 +207,7 @@ func setup(t *testing.T) *fixture {
 	server := httptest.NewServer(h)
 	t.Cleanup(server.Close)
 	stores.current = storeSource{s}
-	f := &fixture{stores: stores, seller: sellerModule, base: server.URL, http: server.Client(), buyerToken: buyerToken, adminToken: adminToken, module: m, id: id, dev: dev, accountID: authenticated.Principal.ID, buyerID: profile.BuyerID, source: s}
+	f := &fixture{stores: stores, seller: sellerModule, base: server.URL, http: server.Client(), buyerToken: buyerToken, adminToken: adminToken, db: d, module: m, id: id, dev: dev, accountID: authenticated.Principal.ID, buyerID: profile.BuyerID, source: s}
 	f.app = buyerconnect.NewBuyerAppServiceClient(f.http, f.base, clientOptions(buyerToken)...)
 	f.admin = adminconnect.NewBuyerAdminServiceClient(f.http, f.base, clientOptions(adminToken)...)
 	f.identity = identityconnect.NewIdentityAppServiceClient(f.http, f.base, clientOptions(buyerToken)...)

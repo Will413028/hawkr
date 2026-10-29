@@ -45,6 +45,10 @@ enum ErrorReason {
   // 帳號擁有商店，不能被停權（搭配 failed_precondition）：停權對店家、未結訂單與撥款的效果由賣家條款決定，條款定出之前有店的帳號不停權。
   // 只出現在後台與內部的處分路徑；client 顯示 LocalizedMessage，請營運先處理店家（措施或關店），再停權帳號。
   ACCOUNT_HAS_STORE = 11;
+  // 帳號停權中，這個操作是寫入，不在停權時仍可做的範圍（搭配 permission_denied）。停權的帳號仍能登入、讀取與刪除帳號：
+  // client 轉成帳號的受限狀態，顯示停權通知，並以 identity.v1alpha1.IdentityAppService.GetSession 的 suspension 讀停權的狀態。
+  // 舊 gateway 的 REST 路徑（/api/v1）沒有 ErrorInfo，停權的非 GET／HEAD 請求只回 403。
+  ACCOUNT_SUSPENDED = 12;
   // 2 是刪掉的 PHONE_CODE_EXPIRED（新帳號不驗證手機，ADR 2026-09-27-identity-clerk）。
   reserved 2;
   reserved "PHONE_CODE_EXPIRED";

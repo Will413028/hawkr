@@ -196,8 +196,8 @@ func (m *Service) isDeleted(ctx context.Context, q *store.Queries, id int64) (bo
 	return a.DeletedAt != nil, nil
 }
 
-// SuspendAccount 永久停權帳號：同一個 transaction 寫停權紀錄與 accounts.suspended_at，並排入 job 停用 Clerk 的使用者
-// （撤銷他的 session、之後不能再登入）。已經停權時不寫第二筆紀錄、不改理由，回傳原本的紀錄與 created=false。紀錄寫入失敗時
+// SuspendAccount 永久停權帳號：同一個 transaction 寫停權紀錄與 accounts.suspended_at。不停用 Clerk 的使用者：停權者仍能登入，
+// 能做什麼由入口依動作的性質決定（A7-D17、A7-D18）。已經停權時不寫第二筆紀錄、不改理由，回傳原本的紀錄與 created=false。紀錄寫入失敗時
 // 整個 transaction 回滾，suspended_at 不變。
 func (m *Service) SuspendAccount(ctx context.Context, in model.SuspendInput) (rec model.AccountSuspension, created bool, err error) {
 	row, err := suspensionRow(in)
@@ -226,9 +226,6 @@ func (m *Service) SuspendAccount(ctx context.Context, in model.SuspendInput) (re
 		}
 		if _, err := q.SuspendAccount(ctx, store.SuspendAccountParams{ID: in.AccountID, Now: now}); err != nil {
 			return fmt.Errorf("identity：停權：%w", err)
-		}
-		if err := m.enqueueClerkUserJob(ctx, clerkUserActionBan, a.ClerkUserID); err != nil {
-			return err
 		}
 		rec, created = suspensionOf(inserted), true
 		return nil

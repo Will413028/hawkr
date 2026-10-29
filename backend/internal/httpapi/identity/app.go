@@ -7,6 +7,7 @@ import (
 	"errors"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
@@ -50,7 +51,7 @@ func (h *App) DeleteAccount(ctx context.Context, _ *connect.Request[pb.DeleteAcc
 	return connect.NewResponse(&pb.DeleteAccountResponse{State: result}), nil
 }
 
-// GetSession 回傳登入的帳號；買家身分在建帳交易內建立。
+// GetSession 回傳登入的帳號；買家身分在建帳交易內建立。帳號停權時另帶停權狀態（入口認證時讀的，A7-D17）。
 func (h *App) GetSession(ctx context.Context, _ *connect.Request[pb.GetSessionRequest]) (*connect.Response[pb.GetSessionResponse], error) {
 	p, ok := rpc.PrincipalFrom(ctx)
 	if !ok {
@@ -60,7 +61,11 @@ func (h *App) GetSession(ctx context.Context, _ *connect.Request[pb.GetSessionRe
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&pb.GetSessionResponse{Account: account(a)}), nil
+	resp := &pb.GetSessionResponse{Account: account(a)}
+	if at, suspended := rpc.SuspensionFrom(ctx); suspended {
+		resp.Suspension = &pb.Suspension{SuspendedAt: timestamppb.New(at)}
+	}
+	return connect.NewResponse(resp), nil
 }
 
 // LinkAppleCredential 接收原生 Apple 登入的憑證；換 token 與保存在背景執行。

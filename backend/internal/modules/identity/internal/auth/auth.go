@@ -28,9 +28,10 @@ func errSessionInvalid() error { return apperr.Unauthenticated("登入已失效�
 //
 // token 的 issuer 決定它屬於顧客還是後台。顧客第一次認證時建立帳號（授予買家角色），管理員第一次認證時建列。
 // 停權、角色與刪除以本模組的資料為準，每個請求都讀：token 在 Clerk
-// 撤銷之後的效期內仍驗得過，但帳號停權時回 permission_denied，刪除時回 unauthenticated。
+// 撤銷之後的效期內仍驗得過，但帳號刪除時回 unauthenticated。停權是授權問題，不是認證問題：停權的帳號照樣認證成功，
+// 結果帶停權時間（Authenticated.SuspendedAt），由入口依動作的性質決定能做什麼（A7-D17、A7-D18）。
 //
-// 錯誤：token 無效或帳號刪除回 KindUnauthenticated，停權回 KindPermissionDenied；問不到公鑰或資料庫時回其他錯誤。
+// 錯誤：token 無效或帳號刪除回 KindUnauthenticated；問不到公鑰或資料庫時回其他錯誤。
 func (m *Service) Authenticate(ctx context.Context, token string) (model.Authenticated, error) {
 	if token == "" {
 		return model.Authenticated{}, errSessionInvalid()
@@ -103,10 +104,10 @@ func (m *Service) authenticateAccount(ctx context.Context, u model.ClerkIdentity
 	row, err := q.ResolveAccount(ctx, u.Subject)
 	switch {
 	case err == nil:
-		if err := accountStatus(row.DeletedAt, row.SuspendedAt); err != nil {
+		if err := accountStatus(row.DeletedAt); err != nil {
 			return model.Authenticated{}, err
 		}
-		return model.Authenticated{Principal: model.Principal{Kind: model.PrincipalAccount, ID: row.ID, Roles: toRoles(row.Roles)}}, nil
+		return model.Authenticated{Principal: model.Principal{Kind: model.PrincipalAccount, ID: row.ID, Roles: toRoles(row.Roles)}, SuspendedAt: row.SuspendedAt}, nil
 	case !errors.Is(err, pgx.ErrNoRows):
 		return model.Authenticated{}, fmt.Errorf("identity：讀取帳號：%w", err)
 	}
@@ -119,10 +120,10 @@ func (m *Service) authenticateAccount(ctx context.Context, u model.ClerkIdentity
 		if err != nil {
 			return model.Authenticated{}, fmt.Errorf("identity：讀取剛建立的帳號：%w", err)
 		}
-		if err := accountStatus(row.DeletedAt, row.SuspendedAt); err != nil {
+		if err := accountStatus(row.DeletedAt); err != nil {
 			return model.Authenticated{}, err
 		}
-		return model.Authenticated{Principal: model.Principal{Kind: model.PrincipalAccount, ID: row.ID, Roles: toRoles(row.Roles)}}, nil
+		return model.Authenticated{Principal: model.Principal{Kind: model.PrincipalAccount, ID: row.ID, Roles: toRoles(row.Roles)}, SuspendedAt: row.SuspendedAt}, nil
 	}
 	m.d.Logger.InfoContext(ctx, "identity：建立帳號", "account_id", id)
 	row, err = m.q(ctx).ResolveAccount(ctx, u.Subject)
@@ -195,12 +196,9 @@ func New(d Deps) *Service { return &Service{d: d} }
 
 func (m *Service) q(ctx context.Context) *store.Queries { return store.New(m.d.DB.Conn(ctx)) }
 
-func accountStatus(deleted, suspended *time.Time) error {
+func accountStatus(deleted *time.Time) error {
 	if deleted != nil {
 		return errSessionInvalid()
-	}
-	if suspended != nil {
-		return apperr.PermissionDenied("帳號已停權，請聯絡客服")
 	}
 	return nil
 }

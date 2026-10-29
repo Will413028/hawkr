@@ -51,7 +51,6 @@ type clerkBackend interface {
 	Issuer() string
 	OwnsUser(id string) bool
 	Verify(ctx context.Context, token string) (oidc.Claims, error)
-	BanUser(ctx context.Context, id string) error
 	DeleteUser(ctx context.Context, id string) error
 }
 
@@ -69,9 +68,6 @@ func (a clerkApp) Verify(ctx context.Context, token string) (model.ClerkIdentity
 	return model.ClerkIdentity{Subject: c.Subject, Email: c.Email, Name: c.Name}, err
 }
 
-func (a clerkApp) BanUser(ctx context.Context, id string) error {
-	return rejected(a.c.BanUser(ctx, id))
-}
 func (a clerkApp) DeleteUser(ctx context.Context, id string) error {
 	return rejected(a.c.DeleteUser(ctx, id))
 }

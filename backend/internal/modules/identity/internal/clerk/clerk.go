@@ -130,11 +130,6 @@ func verify(ctx context.Context, v *oidc.Verifier, token string) (oidc.Claims, e
 	return claims, err
 }
 
-// BanUser 停用使用者：Clerk 撤銷他所有的 session，之後不能再登入。使用者不存在時成功。
-func (c *Client) BanUser(ctx context.Context, id string) error {
-	return ignoreNotFound(c.call(ctx, http.MethodPost, "/v1/users/"+url.PathEscape(id)+"/ban"))
-}
-
 // DeleteUser 刪除使用者。已經不存在時成功。
 func (c *Client) DeleteUser(ctx context.Context, id string) error {
 	return ignoreNotFound(c.call(ctx, http.MethodDelete, "/v1/users/"+url.PathEscape(id)))
@@ -229,9 +224,6 @@ func (d *Dev) Verify(ctx context.Context, token string) (oidc.Claims, error) {
 	}
 	return claims, nil
 }
-
-// BanUser 不做任何事：dev 使用者沒有 Clerk 的 session。
-func (d *Dev) BanUser(context.Context, string) error { return nil }
 
 // DeleteUser 不做任何事：dev 使用者不在 Clerk。
 func (d *Dev) DeleteUser(context.Context, string) error { return nil }

@@ -69,6 +69,12 @@ func UserError(code connect.Code, text string) *connect.Error {
 	return toConnect(context.Background(), userError(code, uitext.Message{Text: text, Locale: errorLocale})).err
 }
 
+// ConnectError 把模組的錯誤（apperr）轉成 Connect 的錯誤，與 interceptor 的轉換相同；給入口中介層自己寫回應、
+// 又需要帶 ErrorInfo 的 reason 時用。
+func ConnectError(ctx context.Context, err error) *connect.Error {
+	return toConnect(ctx, err).err
+}
+
 // RetryLater 回傳 resource_exhausted，帶共用文案目錄的預設文字（CommonText，語系取自 ctx）與 RetryInfo（wait 之後再試）；給入口的限流用。
 func RetryLater(ctx context.Context, wait time.Duration) *connect.Error {
 	ce := CommonError(ctx, connect.CodeResourceExhausted)

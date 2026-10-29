@@ -310,21 +310,29 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	if err := checkAdminDeclarations(out); err != nil {
 		return nil, err
 	}
+	if err := checkCustomerEffects(out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
-// adminServiceDescriptors 是掛載的 service 中 audience 為 admin 的 descriptor，由路徑上的 service 全名從 protoregistry 查。
-// 查不到的 admin service 回錯誤：沒有 descriptor 就無法確認它的方法都有授權宣告。
+// adminServiceDescriptors 是掛載的 service 中 audience 為 admin 的 descriptor。
 func adminServiceDescriptors(services []service) ([]protoreflect.ServiceDescriptor, error) {
+	return serviceDescriptors(services, "admin", func(a rpc.Audience) bool { return a == rpc.AudienceAdmin })
+}
+
+// serviceDescriptors 是掛載的 service 中 audience 符合 want 的 descriptor，由路徑上的 service 全名從 protoregistry 查。
+// 查不到的 service 回錯誤：沒有 descriptor 就無法確認它的方法都有授權宣告。
+func serviceDescriptors(services []service, label string, want func(rpc.Audience) bool) ([]protoreflect.ServiceDescriptor, error) {
 	var out []protoreflect.ServiceDescriptor
 	for _, svc := range services {
-		if audience, _ := rpc.AudienceOf(svc.path); audience != rpc.AudienceAdmin {
+		if audience, _ := rpc.AudienceOf(svc.path); !want(audience) {
 			continue
 		}
 		name := protoreflect.FullName(strings.Trim(svc.path, "/"))
 		d, err := protoregistry.GlobalFiles.FindDescriptorByName(name)
 		if err != nil {
-			return nil, fmt.Errorf("httpapi：找不到 admin service %s 的 descriptor：%w", name, err)
+			return nil, fmt.Errorf("httpapi：找不到 %s service %s 的 descriptor：%w", label, name, err)
 		}
 		sd, ok := d.(protoreflect.ServiceDescriptor)
 		if !ok {

@@ -18,16 +18,13 @@ func (m *Service) AddWorkers(w *river.Workers) {
 // clerkUserAction 是對 Clerk 使用者做的事。
 type clerkUserAction string
 
-const (
-	clerkUserActionBan    clerkUserAction = "ban"
-	clerkUserActionDelete clerkUserAction = "delete"
-)
+const clerkUserActionDelete clerkUserAction = "delete"
 
 // clerkUserMaxAttempts：River 預設的退避（attempt^4 秒）下，第 10 次大約在四小時後；都失敗時 job 留在 discarded，
-// 要人工處理。帳號在本模組已經停權或刪除，失敗只影響 Clerk 那邊的 session 與使用者。
+// 要人工處理。帳號在本模組已經刪除，失敗只影響 Clerk 那邊的使用者。
 const clerkUserMaxAttempts = 10
 
-// clerkUserArgs 停用或刪除一個 Clerk 使用者（停權、刪帳的 transaction 內排入）。
+// clerkUserArgs 刪除一個 Clerk 使用者（刪帳的 transaction 內排入）。
 type clerkUserArgs struct {
 	Action      clerkUserAction `json:"action"`
 	ClerkUserID string          `json:"clerk_user_id"`
@@ -60,8 +57,6 @@ func (w *clerkUserWorker) Work(ctx context.Context, job *river.Job[clerkUserArgs
 	}
 	var err error
 	switch job.Args.Action {
-	case clerkUserActionBan:
-		err = c.BanUser(ctx, id)
 	case clerkUserActionDelete:
 		err = c.DeleteUser(ctx, id)
 	default:

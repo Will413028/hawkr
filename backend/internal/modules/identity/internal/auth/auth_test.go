@@ -19,24 +19,12 @@ func TestUnverifiedIssuerOnlySelectsAnApplication(t *testing.T) {
 	}
 }
 
-func TestAccountStatusErrors(t *testing.T) {
+func TestAccountStatusRejectsOnlyDeletedAccounts(t *testing.T) {
 	at := time.Date(2026, 9, 28, 0, 0, 0, 0, time.UTC)
-	for _, tc := range []struct {
-		name               string
-		deleted, suspended *time.Time
-		kind               apperr.Kind
-	}{
-		{"suspended", nil, &at, apperr.KindPermissionDenied},
-		{"deleted", &at, nil, apperr.KindUnauthenticated},
-		{"deleted and suspended", &at, &at, apperr.KindUnauthenticated},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := apperr.KindOf(accountStatus(tc.deleted, tc.suspended)); got != tc.kind {
-				t.Fatalf("kind=%v;want %v", got, tc.kind)
-			}
-		})
+	if got := apperr.KindOf(accountStatus(&at)); got != apperr.KindUnauthenticated {
+		t.Fatalf("deleted kind=%v;want unauthenticated", got)
 	}
-	if err := accountStatus(nil, nil); err != nil {
+	if err := accountStatus(nil); err != nil {
 		t.Fatal(err)
 	}
 }

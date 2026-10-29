@@ -158,7 +158,7 @@ func TestBackendAPIErrorsAreClassified(t *testing.T) {
 		rejected bool
 	}{
 		{http.StatusOK, true, false},
-		{http.StatusNotFound, true, false}, // 已經不存在：刪除、停用都算成功
+		{http.StatusNotFound, true, false}, // 已經不存在：刪除算成功
 		{http.StatusUnprocessableEntity, false, true},
 		{http.StatusTooManyRequests, false, false},
 		{http.StatusInternalServerError, false, false},
@@ -166,7 +166,6 @@ func TestBackendAPIErrorsAreClassified(t *testing.T) {
 		status = tc.status
 		for name, call := range map[string]func() error{
 			"DeleteUser": func() error { return c.DeleteUser(ctx, "user_1") },
-			"BanUser":    func() error { return c.BanUser(ctx, "user_1") },
 		} {
 			err := call()
 			if (err == nil) != tc.wantNil || errors.Is(err, ErrRejected) != tc.rejected {

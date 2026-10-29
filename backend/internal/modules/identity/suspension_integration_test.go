@@ -4,13 +4,10 @@ package identity_test
 
 import (
 	"context"
-	"errors"
 	"slices"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/riverqueue/river"
 
 	. "github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -74,8 +71,8 @@ func TestRepeatedSuspendKeepsTheFirstRecord(t *testing.T) {
 	if all, open := f.suspensionRows(t, id); all != 1 || open != 1 {
 		t.Fatalf("紀錄 %d 筆、未解除 %d 筆，預期 1 與 1", all, open)
 	}
-	if kinds := f.jobKinds(t); len(kinds) != 1 {
-		t.Fatalf("重複停權排了 %d 個 job", len(kinds))
+	if kinds := f.jobKinds(t); len(kinds) != 0 {
+		t.Fatalf("停權排了 job：%v", kinds)
 	}
 }
 
@@ -152,7 +149,7 @@ func TestSuspendInputIsValidated(t *testing.T) {
 	wantKind(t, err, apperr.KindNotFound)
 }
 
-// 紀錄寫入失敗時 suspended_at 不變、不排 Clerk 的 job：兩者在同一個 transaction。
+// 紀錄寫入失敗時 suspended_at 不變：兩者在同一個 transaction。
 func TestFailedRecordWriteLeavesTheAccountNotSuspended(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -169,28 +166,19 @@ func TestFailedRecordWriteLeavesTheAccountNotSuspended(t *testing.T) {
 	if f.suspendedAt(t, id) {
 		t.Fatal("紀錄寫入失敗，suspended_at 卻改了")
 	}
-	if kinds := f.jobKinds(t); len(kinds) != 0 {
-		t.Fatalf("失敗的停權排了 job：%v", kinds)
-	}
 }
 
-type failingJobs struct{}
-
-func (failingJobs) Enqueue(context.Context, river.JobArgs, *river.InsertOpts) error {
-	return errors.New("排入 job 失敗")
-}
-
-// 紀錄之後的步驟失敗時，紀錄也不留下：紀錄與狀態、job 在同一個 transaction。
+// 紀錄之後的步驟（寫 accounts.suspended_at）失敗時，紀錄也不留下：紀錄與狀態在同一個 transaction。
 func TestFailureAfterTheRecordRollsTheRecordBack(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	id := f.account(t, "user_1")
-	deps := f.deps
-	deps.Jobs = failingJobs{}
-	broken := New(deps)
-	if _, _, err := broken.SuspendAccount(ctx, SuspendInput{AccountID: id, Category: policy.Spam}); err == nil {
-		t.Fatal("排入 job 失敗時停權應該失敗")
+	if _, err := f.db.Pool().Exec(ctx, `ALTER TABLE identity.accounts ADD CONSTRAINT never_suspended CHECK (suspended_at IS NULL) NOT VALID`); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := f.m.SuspendAccount(ctx, SuspendInput{AccountID: id, Category: policy.Spam}); err == nil {
+		t.Fatal("寫 suspended_at 失敗時停權應該失敗")
 	}
 	if all, _ := f.suspensionRows(t, id); all != 0 {
 		t.Fatalf("停權失敗後留下 %d 筆紀錄", all)
@@ -219,7 +207,7 @@ func TestDeletingASuspendedAccountReleasesItsRecord(t *testing.T) {
 	}
 	_, _, err := f.m.SuspendAccount(ctx, SuspendInput{AccountID: id, Category: policy.Spam})
 	wantKind(t, err, apperr.KindNotFound)
-	if !slices.Equal(f.jobKinds(t), []string{"identity.clerk_user", "identity.clerk_user"}) {
+	if !slices.Equal(f.jobKinds(t), []string{"identity.clerk_user"}) {
 		t.Fatalf("job = %v", f.jobKinds(t))
 	}
 }

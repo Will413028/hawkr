@@ -51,6 +51,8 @@ func (p Principal) AdminAllows(perm adminperm.Permission) bool {
 // Authenticated 是認證過的請求的呼叫者。
 type Authenticated struct {
 	Principal Principal
+	// SuspendedAt 是帳號被停權的時間；沒有停權時是 nil。管理員不使用它。
+	SuspendedAt *time.Time
 }
 
 // ErrInvalidToken 表示 token 無效：簽章、issuer、audience 或期限不對。其他錯誤表示驗證時 provider 沒有回應。
@@ -64,8 +66,6 @@ type Clerk interface {
 	OwnsUser(id string) bool
 	// Verify 驗證 session token，回傳使用者的 subject 與建帳資料。token 無效時回傳包著 ErrInvalidToken 的錯誤；其他錯誤表示問不到公鑰。
 	Verify(ctx context.Context, token string) (ClerkIdentity, error)
-	// BanUser 停用使用者：撤銷他所有的 session，之後不能再登入。使用者不存在時成功。
-	BanUser(ctx context.Context, id string) error
 	// DeleteUser 刪除使用者。已經不存在時成功。
 	DeleteUser(ctx context.Context, id string) error
 }
