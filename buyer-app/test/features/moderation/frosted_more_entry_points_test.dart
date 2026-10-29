@@ -64,7 +64,6 @@ class _Adapter implements HttpClientAdapter {
         ],
       },
       '/public/products/55' => {'id': '55', 'skus': <Object>[]},
-      '/public/sellers/7' => {'storeName': '測試品牌'},
       _ => <String, Object>{},
     };
     return ResponseBody.fromString(

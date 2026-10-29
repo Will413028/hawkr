@@ -1,19 +1,13 @@
-import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pb.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart' as seller;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/networking/connect_provider.dart';
-import '../../../core/networking/dio_provider.dart';
-import '../../../features/follow/data/follow_repository.dart';
 
 part 'seller_repository.g.dart';
 
 @riverpod
 SellerRepository sellerRepository(Ref ref) => SellerRepository(
-  ref.watch(dioProvider),
-  ref.watch(followRepositoryProvider),
   ref.watch(sellerPublicClientProvider),
   ref.watch(sellerPublicOptionalAuthClientProvider),
 );
@@ -22,16 +16,9 @@ class SellerRepository {
   /// BatchGetStores 一次最多的店家數。
   static const batchGetStoresLimit = 100;
 
-  final Dio _dio;
-  final FollowRepository _follows;
   final SellerPublicServiceClient _public;
   final SellerPublicServiceClient _publicWithSession;
-  SellerRepository(
-    this._dio,
-    this._follows,
-    this._public,
-    this._publicWithSession,
-  );
+  SellerRepository(this._public, this._publicWithSession);
 
   /// 店面頁的店家與統計；不存在或不公開時丟 `ConnectException`（not_found）。
   Future<seller.GetStoreResponse> getStore(String storeCode) =>
@@ -70,25 +57,5 @@ class SellerRepository {
         seller.RecordProductViewRequest(productId: productId),
       );
     } catch (_) {}
-  }
-
-  /// Get merchant info by string ID (public endpoint, no auth wrapper needed).
-  Future<Map<String, dynamic>?> getMerchantInfo(String merchantId) async {
-    try {
-      final resp = await _dio.get<Map<String, dynamic>>(
-        '/public/sellers/$merchantId',
-      );
-      return resp.data;
-    } on DioException catch (e) {
-      debugPrint(
-        '[SellerRepository] getMerchantInfo($merchantId) failed: ${e.response?.statusCode} ${e.message}',
-      );
-      return null;
-    }
-  }
-
-  /// Unfollow a merchant (toggle follow status).
-  Future<bool> unfollowMerchant(String merchantId) async {
-    return _follows.unfollowMerchant(merchantId);
   }
 }

@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pb.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
@@ -6,21 +5,13 @@ import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart' as seller;
 import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_api/transport.dart' show Code, ConnectException;
-import 'package:hawkr_buyer/features/follow/data/follow_repository.dart';
 import 'package:hawkr_buyer/features/seller/data/seller_repository.dart';
-import 'package:mocktail/mocktail.dart';
-
-class _MockFollowRepository extends Mock implements FollowRepository {}
 
 SellerRepository _repository(
   FakeTransportBuilder builder, {
   FakeTransportBuilder? withSession,
 }) {
-  final dio = Dio();
-  addTearDown(dio.close);
   return SellerRepository(
-    dio,
-    _MockFollowRepository(),
     SellerPublicServiceClient(builder.build()),
     SellerPublicServiceClient((withSession ?? builder).build()),
   );

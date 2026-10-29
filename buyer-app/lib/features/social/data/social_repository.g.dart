@@ -53,4 +53,4 @@ final class SocialRepositoryProvider
   }
 }
 
-String _$socialRepositoryHash() => r'afc11b6b151783d79212913f9a781302a977de8e';
+String _$socialRepositoryHash() => r'4daa930c3547a7933bb1af36c5937c57f8e8a582';

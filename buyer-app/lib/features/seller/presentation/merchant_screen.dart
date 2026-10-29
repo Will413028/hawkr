@@ -1,5 +1,7 @@
+import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart' as seller;
 import 'package:hawkr_api/images.dart' show ImagePreset, ImageUri;
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_icon.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
@@ -9,6 +11,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import '../../../core/l10n/ui_locale.dart';
 import '../../../core/networking/dio_provider.dart';
 import '../../../core/session/session_provider.dart';
 import '../../../core/theme/app_colors.dart';
@@ -41,7 +44,9 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
 
   // 商家信息狀態
   bool _isLoading = true;
-  bool _merchantNotFound = false; // GetStore 讀不到（不存在或不公開）→ 顯示 empty state
+  bool _merchantNotFound =
+      false; // GetStore 回 not_found（不存在或不公開）→ 顯示 empty state
+  String? _loadError; // 其他失敗（網路、伺服器）→ 顯示可重試的錯誤，不當成店家不存在
   String _merchantName = '';
   String _merchantBannerUrl = '';
   String _merchantAvatarPayload = '';
@@ -49,8 +54,8 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
   String _merchantLocation = '';
   String _merchantDescription = '';
   String _merchantAward = '';
-  double _merchantRating = 0.0;
-  int _merchantRatingCount = 0;
+  double? _merchantRating; // 沒有評分（讀不到或還沒有評價）是 null，不當成 0
+  int? _merchantRatingCount;
   int _merchantFollowerCount = 0;
   bool _isFollowing = false;
   bool _isTogglingFollow = false;
@@ -90,6 +95,12 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
   }
 
   Future<void> _loadMerchantInfo() async {
+    if (_loadError != null) {
+      setState(() {
+        _loadError = null;
+        _isLoading = true;
+      });
+    }
     try {
       final response = await ref
           .read(sellerRepositoryProvider)
@@ -101,9 +112,17 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
     } catch (e) {
       HKLog.logE('Failed to load merchant info: $e', e);
       if (!mounted) return;
+      final error = ConnectException.from(e);
       setState(() {
         _isLoading = false;
-        _merchantNotFound = true;
+        if (error.code == Code.notFound) {
+          _merchantNotFound = true;
+        } else {
+          _loadError = errorText(
+            error,
+            defaults: ref.read(defaultErrorTextProvider),
+          );
+        }
       });
     }
   }
@@ -124,8 +143,8 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
       _merchantLocation = location;
       _merchantDescription = store.description.trim();
       _merchantAward = store.prize.trim();
-      _merchantRating = stats.hasRatingAverage() ? stats.ratingAverage : 0.0;
-      _merchantRatingCount = stats.hasReviewCount() ? stats.reviewCount : 0;
+      _merchantRating = stats.hasRatingAverage() ? stats.ratingAverage : null;
+      _merchantRatingCount = stats.hasReviewCount() ? stats.reviewCount : null;
       _merchantFollowerCount = stats.hasFollowerCount()
           ? stats.followerCount
           : 0;
@@ -158,8 +177,6 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
       if (!mounted) return;
       final mid = _merchantIdOrEmpty;
       if (mid.isEmpty) return;
-      final intId = int.tryParse(mid);
-      if (intId == null) return;
 
       // 樂觀更新：先切換 UI，再呼叫 API
       final wasFollowing = _isFollowing;
@@ -174,9 +191,9 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
 
       try {
         if (wasFollowing) {
-          await ref.read(followRepositoryProvider).unfollow(intId);
+          await ref.read(followRepositoryProvider).unfollow(mid);
         } else {
-          await ref.read(followRepositoryProvider).follow(intId);
+          await ref.read(followRepositoryProvider).follow(mid);
         }
       } catch (e) {
         // API 失敗 → 回滾
@@ -257,6 +274,48 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
 
   @override
   Widget build(BuildContext context) {
+    // 讀取失敗（非 not_found）→ 可重試的錯誤，不要讓人以為店家不存在
+    final loadError = _loadError;
+    if (!_isLoading && loadError != null) {
+      return Scaffold(
+        backgroundColor: AppColors.bgPrimary,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              AppIcons.arrowBack,
+              color: AppIconColors.defaultColor,
+            ),
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24.w),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  loadError,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textPrimary.withValues(alpha: 0.6),
+                  ),
+                ),
+                SizedBox(height: 16.h),
+                ElevatedButton(
+                  onPressed: _loadMerchantInfo,
+                  child: const HkButtonLabel('重試'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     // 商家不存在 / API 404 → 顯示 empty state，不要 render 整個空白商家頁
     if (!_isLoading && _merchantNotFound) {
       return Scaffold(

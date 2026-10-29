@@ -8,11 +8,11 @@ import 'package:hawkr_buyer/config/image_config.dart';
 import 'package:hawkr_buyer/config/media_image.dart';
 import 'package:hawkr_buyer/core/exceptions/app_exception.dart';
 import 'package:hawkr_buyer/core/extensions/url_extensions.dart';
+import 'package:hawkr_buyer/core/l10n/ui_locale.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/core/theme/hk_tokens.dart';
 import 'package:hawkr_buyer/features/product/data/product_repository.dart';
 import 'package:hawkr_buyer/features/product/presentation/merchant_item_detail_screen.dart';
-import 'package:hawkr_buyer/features/seller/data/seller_repository.dart';
 import 'package:hawkr_buyer/features/seller/data/store_card_display.dart';
 import 'package:hawkr_buyer/features/seller/data/store_card_provider.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
@@ -30,6 +30,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../moderation/data/report_target_type.dart';
@@ -95,40 +96,7 @@ class PostDetailScreen extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detailAsync = ref.watch(postDetailControllerProvider(postId));
-    final resolvedMerchantName = useState(merchantName ?? '');
-    final resolvedMerchantAvatar = useState(merchantAvatar ?? '');
     final captionExpanded = useState(false);
-
-    useEffect(() {
-      final sellerId = merchantId?.trim() ?? '';
-      if (resolvedMerchantName.value.isNotEmpty || sellerId.isEmpty) {
-        return null;
-      }
-      () async {
-        try {
-          final info = await ref
-              .read(sellerRepositoryProvider)
-              .getMerchantInfo(sellerId);
-          if (info == null) return;
-          // getMerchantInfo 回的是**整個 envelope**（`{code,message,data}`），
-          // 要先鑽進 data；舊寫法直接讀頂層，欄位名與巢狀層級兩者皆錯。
-          final data = info['data'];
-          final seller = data is Map<String, dynamic>
-              ? data
-              : info.cast<String, dynamic>();
-          // gateway `PublicSellerResponse`：店名是 storeName / sellerName，
-          // 頭像是成對的 logoKey（裸 objectKey，SSOT）+ logoUrl。
-          // 舊的 `name` / `avatarBase64` / `avatar` 三個 key wire 上都不存在。
-          final name = (seller['storeName'] ?? seller['sellerName'] ?? '')
-              .toString();
-          final avatar = (seller['logoKey'] ?? seller['logoUrl'] ?? '')
-              .toString();
-          if (name.isNotEmpty) resolvedMerchantName.value = name;
-          if (avatar.isNotEmpty) resolvedMerchantAvatar.value = avatar;
-        } catch (_) {}
-      }();
-      return null;
-    }, [merchantId]);
 
     useEffect(() {
       captionExpanded.value = false;
@@ -156,16 +124,6 @@ class PostDetailScreen extends HookConsumerWidget {
       ),
       data: (state) {
         final post = state.post;
-        final apiName = (post.merchantName ?? '').trim();
-        final apiAvatar = (post.merchantAvatar ?? '').trim();
-        final displayName = apiName.isNotEmpty
-            ? apiName
-            : resolvedMerchantName.value.isNotEmpty
-            ? resolvedMerchantName.value
-            : 'Hawkr';
-        final displayAvatar = apiAvatar.isNotEmpty
-            ? apiAvatar
-            : resolvedMerchantAvatar.value;
         final sellerId =
             post.merchantId?.toString() ?? merchantId?.trim() ?? '';
         // 詳情端點不帶 storeCode：sellerId 就是 store_id，經店家卡片（BatchGetStores）取得；
@@ -173,6 +131,24 @@ class PostDetailScreen extends HookConsumerWidget {
         final card = sellerId.isEmpty
             ? null
             : ref.watch(storeCardProvider(sellerId)).value;
+        final uiLocale = ref.watch(uiLocaleProvider);
+        // 名稱與頭像以店家卡片為準；卡片還沒讀到時用手上已有的（貼文詳情、路由帶來的），
+        // 都沒有時是共用文案目錄的已關閉店家，不寫死後備句。
+        final apiName = (post.merchantName ?? '').trim();
+        final routeName = (merchantName ?? '').trim();
+        final displayName = card != null
+            ? card.displayName(uiLocale)
+            : apiName.isNotEmpty
+            ? apiName
+            : routeName.isNotEmpty
+            ? routeName
+            : commonStoreCardClosedStore(uiLocale);
+        final apiAvatar = (post.merchantAvatar ?? '').trim();
+        final displayAvatar = card != null && card.hasLogo()
+            ? card.logoUri
+            : apiAvatar.isNotEmpty
+            ? apiAvatar
+            : (merchantAvatar ?? '').trim();
         final storeCode = post.storeCode.isNotEmpty
             ? post.storeCode
             : (card != null && card.isOpen ? card.storeCode : '');

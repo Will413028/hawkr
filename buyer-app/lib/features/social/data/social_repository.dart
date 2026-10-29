@@ -4,20 +4,27 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/networking/dio_provider.dart';
 import '../../../core/exceptions/app_exception.dart';
 import '../../moderation/data/report_record_model.dart';
+import '../../seller/data/seller_repository.dart';
+import '../../seller/data/store_card_display.dart';
 import 'social_model.dart';
 
 part 'social_repository.g.dart';
 
 @riverpod
-SocialRepository socialRepository(Ref ref) =>
-    SocialRepository(ref.watch(dioProvider));
+SocialRepository socialRepository(Ref ref) => SocialRepository(
+  ref.watch(dioProvider),
+  sellers: ref.watch(sellerRepositoryProvider),
+);
 
 /// 貼文不存在或此刻不公開時詳情頁顯示的說明。
 const _postNotFound = '找不到這則貼文';
 
 class SocialRepository {
   final Dio _dio;
-  SocialRepository(this._dio);
+
+  /// 補貼文的店家名稱與頭像；不給時略過補齊（貼文照原樣顯示）。
+  final SellerRepository? _sellers;
+  SocialRepository(this._dio, {SellerRepository? sellers}) : _sellers = sellers;
 
   Future<List<Post>> getPosts({
     int? merchantId,
@@ -126,25 +133,24 @@ class SocialRepository {
       sellerPosts.putIfAbsent(key, () => []).add(raw);
     }
     if (sellerPosts.isEmpty) return;
-    final futures = sellerPosts.entries.map((entry) async {
-      try {
-        final resp = await _dio.get<dynamic>('/public/sellers/${entry.key}');
-        final data = resp.data;
-        if (data is Map) {
-          final inner = data['data'] ?? data;
-          if (inner is Map) {
-            final sellerName = (inner['sellerName'] ?? inner['storeName'] ?? '')
-                .toString();
-            final logo = (inner['logoKey'] ?? '').toString();
-            for (final post in entry.value) {
-              if (sellerName.isNotEmpty) post['sellerName'] = sellerName;
-              if (logo.isNotEmpty) post['logoUrl'] = logo;
-            }
-          }
+    final sellers = _sellers;
+    if (sellers == null) return;
+    try {
+      // 店家名稱與頭像一律走店家卡片（BatchGetStores，上限內合批）。
+      final cards = await sellers.batchGetStores(sellerPosts.keys);
+      for (final MapEntry(:key, :value) in sellerPosts.entries) {
+        final card = cards[key];
+        if (card == null) continue;
+        final sellerName = card.hasName() ? card.name.trim() : '';
+        final logo = card.logoUri;
+        for (final post in value) {
+          if (sellerName.isNotEmpty) post['sellerName'] = sellerName;
+          if (logo.isNotEmpty) post['logoUrl'] = logo;
         }
-      } catch (_) {}
-    });
-    await Future.wait(futures);
+      }
+    } catch (e) {
+      debugPrint('[SocialRepo] _hydrateSellers error: $e');
+    }
   }
 
   Future<Map<String, dynamic>?> _fetchProductInfo(String productId) async {

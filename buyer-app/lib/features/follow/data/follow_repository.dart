@@ -25,16 +25,13 @@ class FollowRepository {
     buyer.ListFollowsRequest(pageSize: pageSize, pageToken: pageToken),
   );
 
-  Future<void> follow(int merchantId) async {
-    await _buyer.followStore(
-      buyer.FollowStoreRequest(storeId: merchantId.toString()),
-    );
+  /// 店家 id 對 client 是不透明字串（proto `store_id`），原樣送出，不解析。
+  Future<void> follow(String storeId) async {
+    await _buyer.followStore(buyer.FollowStoreRequest(storeId: storeId));
   }
 
-  Future<void> unfollow(int merchantId) async {
-    await _buyer.unfollowStore(
-      buyer.UnfollowStoreRequest(storeId: merchantId.toString()),
-    );
+  Future<void> unfollow(String storeId) async {
+    await _buyer.unfollowStore(buyer.UnfollowStoreRequest(storeId: storeId));
   }
 
   Future<bool> checkFollow(String storeId) async {
@@ -42,17 +39,5 @@ class FollowRepository {
       buyer.CheckFollowRequest(storeId: storeId),
     );
     return response.following;
-  }
-
-  /// Unfollow a merchant by string ID (for legacy screens).
-  Future<bool> unfollowMerchant(String merchantId) async {
-    try {
-      final mid = int.tryParse(merchantId);
-      if (mid == null) return false;
-      await unfollow(mid);
-      return true;
-    } catch (_) {
-      return false;
-    }
   }
 }

@@ -104,4 +104,58 @@ void main() {
     expect(find.text('這家店可能暫停營業、已經關閉，或網址有誤。'), findsOneWidget);
     expect(find.text('返回'), findsOneWidget);
   });
+
+  testWidgets('a store without rating stats shows no rating, not 0.0', (
+    tester,
+  ) async {
+    final repository = _MockSellerRepository();
+    when(() => repository.getStore('jinhu')).thenAnswer(
+      (_) async => seller.GetStoreResponse(
+        store: seller.PublicStore(
+          id: '9001',
+          storeCode: 'jinhu',
+          storeName: '金湖水產',
+        ),
+        stats: seller.StoreStats(followerCount: 12),
+      ),
+    );
+
+    await _pump(tester, repository);
+
+    expect(find.text('尚無評分'), findsOneWidget);
+    expect(find.textContaining('0.0'), findsNothing);
+  });
+
+  testWidgets(
+    'a failure other than not_found offers retry, not the not found page',
+    (tester) async {
+      final repository = _MockSellerRepository();
+      var calls = 0;
+      when(() => repository.getStore('jinhu')).thenAnswer((_) async {
+        calls++;
+        if (calls == 1) throw ConnectException(Code.unavailable, 'down');
+        return seller.GetStoreResponse(
+          store: seller.PublicStore(
+            id: '9001',
+            storeCode: 'jinhu',
+            storeName: '金湖水產',
+          ),
+        );
+      });
+
+      await _pump(tester, repository);
+
+      expect(find.text('找不到這家店'), findsNothing);
+      expect(find.text('重試'), findsOneWidget);
+
+      await tester.tap(find.text('重試'));
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+
+      expect(find.text('金湖水產'), findsWidgets);
+      expect(find.text('重試'), findsNothing);
+      expect(calls, 2);
+    },
+  );
 }

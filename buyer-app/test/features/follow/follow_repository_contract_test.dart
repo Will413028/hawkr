@@ -19,7 +19,7 @@ void main() {
       ).build();
       await FollowRepository(
         BuyerAppServiceClient(transport),
-      ).follow(2675237784);
+      ).follow('2675237784');
 
       expect(received?.storeId, '2675237784');
     },

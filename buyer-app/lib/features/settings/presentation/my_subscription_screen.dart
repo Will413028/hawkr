@@ -36,7 +36,6 @@ import '../../home/presentation/home_widget/product_add_to_cart_sheet.dart';
 import '../../product/data/product_repository.dart';
 import '../../product/presentation/merchant_item_detail_screen.dart';
 import '../../review/data/review_repository.dart';
-import '../../seller/data/seller_repository.dart';
 import '../../seller/data/store_card_display.dart';
 import '../../visit/data/visit_repository.dart';
 import '../../../shared/utils/price_display.dart';
@@ -905,7 +904,12 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
     );
     if (confirmed != true) return;
 
-    final ok = await ref.read(sellerRepositoryProvider).unfollowMerchant(mid);
+    var ok = true;
+    try {
+      await ref.read(followRepositoryProvider).unfollow(mid);
+    } catch (_) {
+      ok = false;
+    }
     if (!mounted) return;
     if (ok) {
       HapticFeedback.lightImpact();
