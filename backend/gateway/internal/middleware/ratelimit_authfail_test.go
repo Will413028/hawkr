@@ -158,7 +158,7 @@ func rlEngineMixed(limiter *ratelimit.Limiter, policy middleware.RateLimitPolicy
 	echo := func(c *gin.Context) { c.String(*status, "") }
 
 	r.DELETE("/api/v1/app/notifications/device-token", echo) // default — needs auth (#106 loop)
-	r.GET("/api/v1/public/marketplace", echo)                // moderate — OptionalJWT, anonymous OK
+	r.GET("/api/v1/public/products", echo)                   // moderate — OptionalJWT, anonymous OK
 	r.GET("/api/v1/public/carts", echo)                      // moderate — OptionalJWT, anonymous OK
 	return r
 }
@@ -196,7 +196,7 @@ func TestRateLimiter_AuthFailureDoesNotBlockPublicReads(t *testing.T) {
 
 	status = http.StatusOK
 	for i := 1; i <= 20; i++ {
-		if code := doMixed(r, http.MethodGet, "/api/v1/public/marketplace"); code != http.StatusOK {
+		if code := doMixed(r, http.MethodGet, "/api/v1/public/products"); code != http.StatusOK {
 			t.Fatalf("public read #%d: got %d, want 200 (anonymous reads must survive an auth-failure block)", i, code)
 		}
 	}
@@ -215,7 +215,7 @@ func TestRateLimiter_AuthFailureStillBlocksAuthenticatedRoutesWhilePublicPasses(
 	// the authenticated route (or vice versa) via shared state.
 	for i := 1; i <= 5; i++ {
 		status = http.StatusOK
-		if code := doMixed(r, http.MethodGet, "/api/v1/public/marketplace"); code != http.StatusOK {
+		if code := doMixed(r, http.MethodGet, "/api/v1/public/products"); code != http.StatusOK {
 			t.Fatalf("interleaved public read #%d: got %d, want 200", i, code)
 		}
 		status = http.StatusUnauthorized
@@ -255,7 +255,7 @@ func TestRateLimiter_AuthFailureCounterIgnoresPublicReads(t *testing.T) {
 	r := rlEngineMixed(limiter, authPolicy(3), &status)
 
 	for i := 1; i <= 20; i++ {
-		if code := doMixed(r, http.MethodGet, "/api/v1/public/marketplace"); code != http.StatusUnauthorized {
+		if code := doMixed(r, http.MethodGet, "/api/v1/public/products"); code != http.StatusUnauthorized {
 			t.Fatalf("public 401 #%d: got %d, want 401 (public reads are out of scope in both directions)", i, code)
 		}
 	}

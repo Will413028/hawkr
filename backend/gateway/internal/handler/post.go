@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"context"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Will413028/hawkr/gateway/internal/response"
 	"github.com/Will413028/hawkr/go-pkg/codemeta"
@@ -1316,5 +1318,67 @@ func toCommentData(base string, c *pb.CommentInfo) commentData {
 		IsLiked:       c.IsLiked,
 		CreatedAt:     c.CreatedAt,
 		Replies:       replies,
+	}
+}
+
+// enrichPostsWithSellerInfo 用 seller 模組的店名/logo 覆蓋貼文的賣家資訊。
+// social-service 從 identity 模組取 nickname，但賣家的顯示名稱應該用 seller 模組的 store_name。
+func (h *Holder) enrichPostsWithSellerInfo(ctx context.Context, posts []PostListItemData) {
+	seen := make(map[int64]struct{})
+	var ids []int64
+	for _, p := range posts {
+		sellerID, err := strconv.ParseInt(p.SellerID, 10, 64)
+		if err != nil || sellerID == 0 {
+			continue
+		}
+		if _, ok := seen[sellerID]; !ok {
+			seen[sellerID] = struct{}{}
+			ids = append(ids, sellerID)
+		}
+	}
+	if len(ids) == 0 {
+		return
+	}
+
+	batchCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	resp, err := h.Seller.GetSellerBatch(batchCtx, ids)
+	if err != nil || resp == nil || resp.GetCode() != 0 {
+		return
+	}
+
+	type sellerInfoView struct {
+		name      string
+		logoKey   string
+		storeCode string
+	}
+	sellerMap := make(map[int64]sellerInfoView, len(resp.Data))
+	for _, s := range resp.Data {
+		storeID, parseErr := strconv.ParseInt(s.GetStoreId(), 10, 64)
+		if parseErr != nil || storeID <= 0 {
+			continue
+		}
+		sellerMap[storeID] = sellerInfoView{name: s.Name, logoKey: s.LogoKey, storeCode: s.StoreCode}
+	}
+
+	for i := range posts {
+		sellerID, err := strconv.ParseInt(posts[i].SellerID, 10, 64)
+		if err != nil {
+			continue
+		}
+		if info, ok := sellerMap[sellerID]; ok {
+			if info.name != "" {
+				posts[i].SellerName = info.name
+			}
+			// 49 §6.1 GW組：seller 回 objectKey，logoKey 與 logoUrl 成對回填，
+			// 避免快照 key 空時 URL 有值、key 空的不對稱。
+			if info.logoKey != "" {
+				posts[i].SellerLogoKey = info.logoKey
+				posts[i].SellerLogoUrl = buildURL(h.MediaBaseURL, info.logoKey)
+			}
+			// canonical 店面定址碼（#2098 階段三）。social-service 不存 store_code，
+			// 這支 batch RPC 本來就為了店名/logo 呼叫，順手帶回來零額外成本。
+			posts[i].StoreCode = info.storeCode
+		}
 	}
 }

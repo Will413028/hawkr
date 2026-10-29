@@ -74,7 +74,7 @@
 
 新增或修改 gRPC RPC 方法時，**必須同步更新 Gateway handler test 的 mock struct**，否則 CI 編譯失敗。
 
-- 每個 gRPC service 的 mock 定義在對應的 `*_test.go`（如 `marketplace_test.go` 定義 `mockProductServiceClient`）
+- 每個 gRPC service 的 mock 定義在對應的 `*_test.go`（如 `grpc_mocks_test.go` 定義 `mockProductServiceClient`）
 - 新增 RPC → mock struct 必須新增對應 stub 方法（回傳 `nil, nil` 即可）
 - 修改後用 `go test -count=1 ./internal/handler/` 驗證（`-count=1` 強制不用 cache）
 

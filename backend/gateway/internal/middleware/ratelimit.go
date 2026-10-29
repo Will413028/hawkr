@@ -217,7 +217,7 @@ func authFailureKey(subject string) string { return "ratelimit:authfail:" + subj
 //
 // The OptionalJWT routes' app counterparts stay in scope: those requests do
 // attempt authentication. The OptionalJWT public routes themselves
-// (/public/carts, /public/marketplace, /public/products…) are deliberately out:
+// (/public/carts, /public/products…) are deliberately out:
 // they never reject a caller for lacking an identity — the request proceeds as
 // anonymous — so there is no failed authentication to throttle and no
 // brute-force payoff to deny.

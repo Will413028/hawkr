@@ -214,7 +214,6 @@ func matrixAssemblies(t *testing.T) []assembly {
 	return []assembly{
 		driveProductList(t),
 		driveProductDetail(t),
-		driveMarketplace(t),
 		driveSearch(t),
 		driveSellerProducts(t),
 	}
@@ -239,16 +238,6 @@ func driveProductDetail(t *testing.T) assembly {
 		t.Fatalf("product detail has no nested seller object: %#v", data)
 	}
 	return assembly{endpoint: "GET /public/products/:id", seller: si, hasFlat: false}
-}
-
-// ③ /public/marketplace —— marketplace.go GetMarketplace（hot_products）
-func driveMarketplace(t *testing.T) assembly {
-	t.Helper()
-	h := setupMarketplaceHolder(defaultSellerMock(), defaultSocialMock(), matrixProductMock())
-	h.MediaBaseURL = matrixMediaBase
-	data := matrixDoGET(t, setupMarketplaceRouter(h), "/api/v1/public/marketplace")
-	rec := matrixFirstOf(t, data, "hotProducts")
-	return assembly{endpoint: "GET /public/marketplace", seller: matrixSellerOf(t, rec), flat: matrixFlatOf(rec), hasFlat: true}
 }
 
 // ④ /public/search/products —— search.go buildSearchResult
