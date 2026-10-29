@@ -7,7 +7,7 @@
 - 顧客的登入、session 與帳號連結由 Clerk 處理；後台的登入與白名單由 Cloudflare Access 處理。
 - 模組依 token 的 issuer 選 verifier：顧客 Clerk token 只會認證成帳號；後台 Access JWT（或本機 dev admin token）只會認證成管理員。Access 驗 team domain 的 JWKS、application AUD tag、`iss`、`exp`、`nbf`。
 - 首次認證建立帳號或管理員。cookie、`Authorization` header 與 CSRF 在 `internal/httpapi`，不在本模組。
-- 停權、刪除與角色以本模組的資料為準，每個請求都讀（token 在 Clerk 撤銷之後的效期內仍驗得過）。停權的帳號在下一個請求回 PermissionDenied，已刪除的帳號回 Unauthenticated。
+- 停權、刪除與角色以本模組的資料為準，每個請求都讀（token 在 Clerk 撤銷之後的效期內仍驗得過）。停權的帳號照樣認證成功，結果帶停權時間（`Authenticated.SuspendedAt`），能做什麼由入口依動作的性質決定（`internal/httpapi` 的 `customerEffects`，A7-D18）；已刪除的帳號回 Unauthenticated。
 
 ## 2. 帳號建立
 
@@ -26,11 +26,11 @@
 
 ## 4. 停權、刪除與生命週期
 
-- 停權、刪帳與排入停用、刪除 Clerk 使用者的 job 在同一個 transaction。停權冪等：已經停權時不再排 job。
-- 停權紀錄（`account_suspensions`，A7-D9）：型別只有 `PERMANENT`（A7-D16，沒有 `ends_at`），理由類別是 `platform/policy.Category` 的值（`TestCodeValueChecksMatchTheGoTypes`），另有說明、不透明的來源參照（identity 不讀它）、停權時間、解除時間與解除原因。`SuspendAccount(SuspendInput)` 在同一個 transaction 寫紀錄、設 `suspended_at` 並排 Clerk 停用 job；已經停權時回傳原本的紀錄（`created=false`），不改理由、不寫第二筆；`uidx_account_suspensions_active` 保證同一帳號未解除的紀錄最多一筆。紀錄與狀態任何一步失敗都整筆回滾（`TestFailedRecordWriteLeavesTheAccountNotSuspended`、`TestFailureAfterTheRecordRollsTheRecordBack`）。
+- 刪帳與排入刪除 Clerk 使用者的 job 在同一個 transaction。停權不排任何 Clerk job（不停用 Clerk 使用者）。停權冪等：已經停權時不寫第二筆。
+- 停權紀錄（`account_suspensions`，A7-D9）：型別只有 `PERMANENT`（A7-D16，沒有 `ends_at`），理由類別是 `platform/policy.Category` 的值（`TestCodeValueChecksMatchTheGoTypes`），另有說明、不透明的來源參照（identity 不讀它）、停權時間、解除時間與解除原因。`SuspendAccount(SuspendInput)` 在同一個 transaction 寫紀錄、設 `suspended_at`；已經停權時回傳原本的紀錄（`created=false`），不改理由、不寫第二筆；`uidx_account_suspensions_active` 保證同一帳號未解除的紀錄最多一筆。紀錄與狀態任何一步失敗都整筆回滾（`TestFailedRecordWriteLeavesTheAccountNotSuspended`、`TestFailureAfterTheRecordRollsTheRecordBack`）。
 - `UnsuspendAccount(accountID, reason)`：reason 必填；同一個 transaction 清 `suspended_at`、在目前的紀錄記解除時間與原因；沒有停權時成功並回傳 `released=false`。解除留列不刪，之後可以再停權（新的一筆）。`CurrentSuspension(accountID)` 回傳目前未解除的紀錄，給 A7-2 的「讀自己的停權」。
 - 停權、解除入口只允許 `accountsuspension` 呼叫（`internal/arch` 的 `TestSuspensionEntriesAreOnlyCalledByAccountsuspension` 掃非測試程式）：「擁有商店的帳號不能停權」在那裡檢查，identity 是葉節點、不查店家。刪帳號時未解除的紀錄以 `release_reason = ACCOUNT_DELETED` 解除。手動解除（`UnsuspendAccount`）拒絕這個值，只有帳號刪除路徑能寫。
-- 停權不再停用 Clerk 使用者與認證回 `PermissionDenied` 改為受限登入（ADR `2026-10-29-account-suspension-and-moderation.md`）在 A7-1d″ 落地；在那之前 Clerk 停用 job 還在，手動解除不會恢復已被停用的 Clerk 使用者。
+- 受限登入（ADR `2026-10-29-account-suspension-and-moderation.md`）：停權不停用 Clerk 使用者，認證不因停權回錯誤。入口 `withSession` 依 `customerEffects` 的宣告（讀取、寫入、自助）處理：公開與受邀供應商的 service 以訪客執行，讀取與自助放行，寫入回 `PermissionDenied` 與 `ACCOUNT_SUSPENDED`，舊 gateway 的 REST 依 HTTP method；`GetSession` 回 `suspension.suspended_at`。守門：`TestSuspendedAccountIsAuthorizedByTheNatureOfTheAction`、`TestSuspendedAccountStillAuthenticatesAndCarriesTheSuspensionTime`、`TestSuspendedAccountHasRestrictedAccess`。
 - 刪帳號留下墓碑與 `clerk_user_id`，同一個 Clerk 使用者不會再建一個帳號；`email` 清為 NULL（`accounts_deleted_check`）。刪帳同時發出 `AccountDeleted`。
 - 帳號的生命週期是 ACTIVE → PENDING_DELETION → DELETED（`Account.Lifecycle`；欄位 `deletion_pending_at`、`deleted_at`）。
   - `BeginDeletion` 只由 accountdeletion 在受理會等待未結訂單的申請時呼叫。

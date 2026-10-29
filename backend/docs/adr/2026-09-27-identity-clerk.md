@@ -133,7 +133,7 @@ A2 把 account-service 搬進單體時，登入、session、手機驗證都是�
 
 脈絡：停權時 identity 排入 job 呼叫 Clerk Backend API 停用（ban）使用者，撤銷 session、之後不能登入；單體另在認證時對停權帳號回 `PermissionDenied`。被停權者因此讀不到停權理由，也不能自己刪除帳號，與處分紀錄「作者讀得到理由」矛盾（ADR `2026-10-29-account-suspension-and-moderation.md`，A7-D17）。
 
-決策：停權不再停用 Clerk 使用者。被停權帳號可以登入，identity 的認證結果帶停權狀態而不是回錯誤；伺服器只放行允許清單（讀自己的停權狀態、刪除帳號，登出是 client 端的 Clerk），其餘回 `ACCOUNT_SUSPENDED`，允許清單在 `internal/httpapi/rpc` 層。D3 的 session 與 D7 的期限不變。刪除帳號仍排入 job 刪除 Clerk 使用者（刪帳的 job 不變）。
+決策：停權不再停用 Clerk 使用者。被停權帳號可以登入，identity 的認證結果帶停權狀態而不是回錯誤；能做什麼依動作的性質（A7-D18）：`internal/httpapi` 的宣告表把每個顧客 procedure 標為讀取、寫入或自助，單一執行點是 `withSession`——公開與受邀供應商的 service 以訪客執行，讀取與自助放行，寫入回 `PermissionDenied` 與 `ACCOUNT_SUSPENDED`，舊 gateway 的 REST 依 HTTP method；登出是 client 端的 Clerk。D3 的 session 與 D7 的期限不變。刪除帳號仍排入 job 刪除 Clerk 使用者（刪帳的 job 不變）。
 
-落地順序：A7-1d′ 先建停權紀錄與 `accountsuspension`，Clerk ban job 與認證的 `PermissionDenied` 暫時不動；A7-1d″ 移除停權時排 ban 的 job、認證改帶停權狀態、加上允許清單。在 A7-1d″ 完成之前，手動解除只清資料庫的停權狀態，Clerk 使用者若已被停用不會自動恢復。原決策段保留歷史。
+落地順序：A7-1d′ 先建停權紀錄與 `accountsuspension`；A7-1d″ 移除停權時排 ban 的 job（連同 `BanUser`）、認證改帶停權狀態、加上宣告表與 `withSession` 的執行。不做 unban job：先前被停用的開發用 Clerk 測試帳號由 Will 在 Clerk dashboard 手動解除。原決策段保留歷史。
 

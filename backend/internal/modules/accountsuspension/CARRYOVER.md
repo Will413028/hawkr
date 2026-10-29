@@ -10,5 +10,5 @@
 | 停權檢查「有沒有店」放在 identity 或 moderation | 有店不能停權要在一處檢查 | 不成立：identity 是葉節點（`internal/arch/modules.go`），不能 import seller；放 moderation 會讓每個呼叫者各寫一份 | 編排層擁有跨聚合的前置條件 | 放本模組，identity 的入口只允許本模組呼叫（arch 測試守），所以不可能繞過 |
 | `accountdeletion` 的形狀：根套件編排 identity、buyer、seller，鎖順序帳號列 → buyer → seller | 跨模組流程要序列化 | 成立 | 編排者先取最上游的鎖，再讀下游 | 同層、同鎖順序；本模組不需要 buyer，只用帳號列與 seller 的非鎖定讀取；沒有自己的資料，所以沒有 schema、沒有 `internal/` |
 | 有店一律拒絕停權 | 停權對店家、未結訂單與撥款的效果未定 | 成立，缺資料（賣家條款與營運政策）；不是因為程式限制 | 停權連帶店鋪與未結訂單（marketplace 的做法） | 暫時拒絕；終態是賣家條款定出效果後連帶對店建立措施，取代拒絕（ADR 2026-10-29 的終態表） |
-| 停權時 Clerk ban job 與認證回 `PermissionDenied` | 停權要擋住被停權者 | 擋住成立；停用 Clerk 使用者與讀不到理由不成立（A7-D17：受限登入） | X、Reddit 的停權帳號可登入、可瀏覽、不可發文 | 本步不動，A7-1d″ 移除 ban、認證帶停權狀態、加允許清單；在那之前手動解除不會恢復已被停用的 Clerk 使用者 |
+| 停權時 Clerk ban job 與認證回 `PermissionDenied` | 停權要擋住被停權者 | 擋住成立；停用 Clerk 使用者與讀不到理由不成立（A7-D17：受限登入） | X、Reddit 的停權帳號可登入、可瀏覽、不可發文 | A7-1d″ 已移除 ban、認證帶停權狀態，入口依動作性質的宣告表授權（A7-D18）；解除前已被停用的 Clerk 測試帳號由 Will 在 Clerk dashboard 手動解除 |
 | 事件 `Suspended`、`Unsuspended` 同 transaction 發出 | 停權時通知被停權者（Will 2026-10-29） | 成立；消費者在 A8，本步不接 | 狀態變更與通知意圖同一個交易（outbox） | `events.Publish` 在同一個 transaction，含理由類別；沒有訂閱者時只是空操作 |

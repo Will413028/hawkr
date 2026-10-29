@@ -50,8 +50,8 @@ account-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 | 軟刪除只改 `deleted_at` 與 `status`，沒有 transaction，不刪 `auth_providers`：同一個 Google 身分每次登入都建一個新帳號（盤點 G5、G13） | — | — | 刪除是一個 transaction | 刪帳號在一個 transaction 內：刪角色、標記刪除並清掉 email、排入 job 刪除 Clerk 的使用者、發出 `AccountDeleted`。墓碑保留 `clerk_user_id`，同一個 Clerk 使用者不會再建一個帳號 |
 | 軟刪除保留 email 與手機，設計書 44 規定 T+30 才清 PII（誤刪緩衝） | 有誤刪復原的功能 | 不成立：T+30 的清除沒有實作，也沒有復原的功能 | 刪除時就清除個資，只留沒有個資的墓碑 | 刪除當下清掉 email（帳號沒有手機）；列保留，讓舊服務查到「已刪除」 |
 | `account.deleted` 在 commit 之後直接 publish、失敗只記 warn，重試時不補發（盤點 G13） | 事件要可靠送達 | 成立 | 同一個 transaction 排入（outbox） | 模組以 `events.Publish` 發出 `AccountDeleted`；過渡期由 `internal/legacy` 在同一個 transaction 排入 River job 送到 RabbitMQ（步驟 5） |
-| 停權：改 status、撤 web session、寫 Redis blacklist，全部 fail-closed；停權理由只寫 log | social 的 `BAN_USER` 與後台會停權 | 停權成立（social）；後台的端點沒有 client；blacklist 不成立 | 同一個 transaction 內改狀態、刪 session | 停權是模組的公開 API：同一個 transaction 改狀態並排入 job 停用 Clerk 的使用者（撤銷他的 session、不能再登入）；認證每個請求都讀狀態，下一個請求就生效。理由原本只寫 log；後台端點刪除（Will 2026-09-27），解除停權沒有呼叫方而不提供（A7-1d′ 改變，見下一列） |
-| 停權理由只寫 log、`accounts` 只有 `suspended_at`；沒有解除入口 | 處分紀錄歸執行效果的模組（A7-D9），被停權者與營運要讀得到理由；A7 的 moderation 會停權與解除 | 成立 | 紀錄與狀態同一個 transaction，append 式保留歷史（DSA Art.17 的理由陳述） | **A7-1d′**：`account_suspensions`（永久、理由類別、說明、來源參照、解除時間與原因，A7-D16 沒有 `ends_at`），`SuspendAccount` 與新的 `UnsuspendAccount` 只由 `accountsuspension` 呼叫（arch 測試守），`CurrentSuspension` 給 A7-2；帳號刪除以 `ACCOUNT_DELETED` 解除未解除的紀錄；停權時 Clerk ban job 暫時不動，A7-1d″ 移除（A7-D17） |
+| 停權：改 status、撤 web session、寫 Redis blacklist，全部 fail-closed；停權理由只寫 log | social 的 `BAN_USER` 與後台會停權 | 停權成立（social）；後台的端點沒有 client；blacklist 不成立 | 同一個 transaction 內改狀態、刪 session | 停權是模組的公開 API：同一個 transaction 改狀態；認證每個請求都讀狀態並帶在結果裡（`Authenticated.SuspendedAt`），下一個請求就生效；不停用 Clerk 的使用者（A7-1d″）。理由原本只寫 log；後台端點刪除（Will 2026-09-27），解除停權沒有呼叫方而不提供（A7-1d′ 改變，見下一列） |
+| 停權理由只寫 log、`accounts` 只有 `suspended_at`；沒有解除入口 | 處分紀錄歸執行效果的模組（A7-D9），被停權者與營運要讀得到理由；A7 的 moderation 會停權與解除 | 成立 | 紀錄與狀態同一個 transaction，append 式保留歷史（DSA Art.17 的理由陳述） | **A7-1d′**：`account_suspensions`（永久、理由類別、說明、來源參照、解除時間與原因，A7-D16 沒有 `ends_at`），`SuspendAccount` 與新的 `UnsuspendAccount` 只由 `accountsuspension` 呼叫（arch 測試守），`CurrentSuspension` 給 A7-2；帳號刪除以 `ACCOUNT_DELETED` 解除未解除的紀錄；**A7-1d″**：移除停權時的 Clerk ban job 與 `BanUser`，認證不因停權回錯誤（A7-D17） |
 | 登入時 `activeLoginRole` 只在帳號已有的角色裡挑；買家角色由 buyer-service 的 EnsureProfile 回呼 `BindBuyer` 授予 | 角色由業務身分的擁有者授予 | 賣家成立；買家不成立（W5：買家不是角色） | 同 | 賣家角色由 seller 開店時授予；買家由 buyer 模組在建帳的 transaction 內（訂閱 `AccountCreated`）建立，不授予角色。legacy `BindBuyer` 對存活的帳號直接成功、不寫入。視角見傳輸層的盤點 |
 | 手機不唯一（#944）；`GetAccountByPhone` 以 `:one` 回傳任意一列 | 多個帳號可以共用手機 | 成立 | 同 | 帳號不再有手機：legacy 的 `GetAccountByPhone` 一律回「找不到」（與原本查無此手機相同）；賣家 CRM 改查 buyer 的聯絡電話（A3 決定 10a，A6 接上） |
 | 公開的「手機是否已註冊」（`CheckPhone`）；seller-app 在 1303 送驗證碼前先查，已被其他帳號使用就擋下 | 一支手機只能屬於一個帳號 | 不成立：手機刻意不唯一（#944），這支不需登入的端點還能用來列舉帳號 | 不提供帳號是否存在的查詢（OWASP Authentication Cheat Sheet） | 刪除端點與 seller-app 的預先檢查（Will 2026-09-27） |
@@ -99,7 +99,7 @@ account-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 - 新帳號不驗證手機：帳號沒有手機、沒有驗證碼與簡訊（原本一定要驗證手機，簡訊經三竹）。
 - email 是建帳時 Clerk session 的 email claim，只給後台顯示與搜尋，不唯一、不同步。
 - 刪除帳號是一個 transaction：刪角色、清掉 email 只留墓碑（保留 `clerk_user_id`）、排入 job 刪除 Clerk 的使用者，發出 `AccountDeleted`（原本刪除時不刪連結，同一個 Google 身分每次登入都會建一個新帳號）。保存的 Apple refresh token 在同一個 transaction 內取走並排入撤銷。
-- 停權時排入 job 停用 Clerk 的使用者；停權的理由只寫 log。
+- 停權時不停用 Clerk 的使用者；認證帶停權時間。
 - 管理員由 Cloudflare Access 的 Google 登入與 email 白名單開通；單體驗 Access JWT，以 `sub` 建管理員列；沒有密碼登入與 `create-admin`。
 - 賣家 CRM 以手機找顧客（legacy 的 `GetAccountByPhone`）一律回「找不到」；CRM 的手機查詢改查 buyer 自己維護的聯絡電話，A6 隨 crm 接上（A3 決定 10a）。
 - 拿掉：provider 的列出、綁定、解綁；`VerifyPhone`；登出全部裝置；持久化 active role；公開的手機檢查；管理員的密碼登入；後台帳號的 get、suspend、unsuspend、stats 端點（停權留在模組的公開 API）；App Review 的 demo 登入與手機 bypass；`auth_audit_log`；Better Auth 的 schema。

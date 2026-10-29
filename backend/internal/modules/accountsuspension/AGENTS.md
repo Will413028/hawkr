@@ -31,7 +31,7 @@ identity 帳號列 → buyer → seller，與 `accountdeletion`、seller 開店�
 ## 不負責
 
 - 停權紀錄、`suspended_at`、Clerk 使用者的停用：identity。
-- 受限登入與允許清單：`internal/httpapi/rpc`（A7-1d″）。
+- 受限登入與動作性質宣告表：`internal/httpapi`（`customerEffects`，A7-D18）。
 - 停權對店家、未結訂單與撥款的效果：賣家條款定出之前，有店的帳號一律拒絕。
 - 誰有權停權、案件與處置：moderation（A7-1d）。通知：A8 消費 `Suspended`、`Unsuspended`。
 
