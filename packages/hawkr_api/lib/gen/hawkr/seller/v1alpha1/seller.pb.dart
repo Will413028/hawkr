@@ -4698,6 +4698,76 @@ class LookupBusinessRegistrationResponse extends $pb.GeneratedMessage {
   BusinessRegistration ensureRegistration() => $_ensure(0);
 }
 
+/// ContentRef 是內容下架措施的一個對象：種類加上該內容的 ID（不透明的字串）。
+class ContentRef extends $pb.GeneratedMessage {
+  factory ContentRef({
+    ContentKind? kind,
+    $core.String? id,
+  }) {
+    final result = ContentRef._();
+    if (kind != null) result.kind = kind;
+    if (id != null) result.id = id;
+    return result;
+  }
+
+  ContentRef._();
+
+  factory ContentRef.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ContentRef()..mergeFromBuffer(data, registry);
+  factory ContentRef.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ContentRef()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ContentRef',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: ContentRef.$_createMessage)
+    ..aE<ContentKind>(1, _omitFieldNames ? '' : 'kind',
+        enumValues: ContentKind.values)
+    ..aOS(2, _omitFieldNames ? '' : 'id')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ContentRef clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ContentRef copyWith(void Function(ContentRef) updates) =>
+      super.copyWith((message) => updates(message as ContentRef)) as ContentRef;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ContentRef() / ContentRef.new instead')
+  static ContentRef create() => ContentRef._();
+  static $pb.GeneratedMessage $_createMessage() => ContentRef._();
+  @$core.override
+  ContentRef createEmptyInstance() => ContentRef._();
+  @$core.pragma('dart2js:noInline')
+  static ContentRef getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ContentRef>(ContentRef.$_createMessage);
+  static ContentRef? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  ContentKind get kind => $_getN(0);
+  @$pb.TagNumber(1)
+  set kind(ContentKind value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKind() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKind() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get id => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set id($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearId() => $_clearField(2);
+}
+
 /// RemediationUnavailability 是賣家此刻不能對措施請求解除的一個原因。與 RequestRemediation 的前置檢查是同一個規則，message 與該方法被拒絕時錯誤的
 /// LocalizedMessage 是同一份文字（同一個 Go 函式）。
 class RemediationUnavailability extends $pb.GeneratedMessage {

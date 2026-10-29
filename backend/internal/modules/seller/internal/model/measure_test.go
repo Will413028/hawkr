@@ -674,9 +674,10 @@ func TestActionUnavailableReasonsAgreeWithTheLegacyPredicatesOnEveryCell(t *test
 	}
 }
 
-// legacyCanEnd 是改成原因清單之前的結束判斷，逐字照舊：只限生效中的 RISK 措施，而且沒有待處理的解除請求。
+// legacyCanEnd 是改成原因清單之前的結束判斷：只限生效中的 RISK 措施，而且沒有待處理的解除請求；加上內容下架一律不能結束（它沒有結束入口，
+// 本來也不會有 ACTIVE 與 RISK，這裡明列是為了讓全部格子的驗證涵蓋這個種類）。
 func legacyCanEnd(m Measure) bool {
-	return m.State == StateActive && m.Basis == BasisRisk && m.PendingRemediation() == nil
+	return m.Kind != MeasureContentTakedown && m.State == StateActive && m.Basis == BasisRisk && m.PendingRemediation() == nil
 }
 
 // 結束的原因清單與舊判斷在每一格都一致（空 ⇔ 可以結束），清單的內容與順序也固定：這是 can_end、End 的前置檢查與 end_unavailabilities 的同一個規則。
@@ -721,6 +722,8 @@ func TestEndUnavailableReasonsAgreeWithTheLegacyPredicateOnEveryCell(t *testing.
 	}{
 		"生效中的風險停權":    {active, nil},
 		"依據違規的停權":     {Measure{Kind: MeasureSuspension, Basis: BasisViolation, Status: MeasureStatusEnforced, State: StateActive, ReadAt: read}, []MeasureActionUnavailableReason{ActionReasonViolationBasis}},
+		"內容下架":        {Measure{Kind: MeasureContentTakedown, Basis: BasisViolation, Status: MeasureStatusEnforced, State: StateIssued, ReadAt: read}, []MeasureActionUnavailableReason{ActionReasonContentTakedownRevokeOnly}},
+		"已撤銷的內容下架":    {Measure{Kind: MeasureContentTakedown, Basis: BasisViolation, Status: MeasureStatusRevoked, State: StateRevoked, ReadAt: read}, []MeasureActionUnavailableReason{ActionReasonRevoked}},
 		"終止合作":        {Measure{Kind: MeasureTermination, Basis: BasisContract, Status: MeasureStatusEnforced, State: StateActive, ReadAt: read}, []MeasureActionUnavailableReason{ActionReasonTerminationRecreate}},
 		"風險停權有待處理的補正": {Measure{Kind: MeasureSuspension, Basis: BasisRisk, Status: MeasureStatusEnforced, State: StateActive, ReadAt: read, Requests: pendingRemediation}, []MeasureActionUnavailableReason{ActionReasonRemediationPending}},
 		"已撤銷的違規停權":    {Measure{Kind: MeasureSuspension, Basis: BasisViolation, Status: MeasureStatusRevoked, State: StateRevoked, ReadAt: read}, []MeasureActionUnavailableReason{ActionReasonRevoked, ActionReasonNotActive, ActionReasonViolationBasis}},
@@ -809,11 +812,11 @@ func TestActionUnavailableReasonsAreExactAndOrdered(t *testing.T) {
 			reasons{ActionReasonRevoked, ActionReasonKindHasNoEndTime, ActionReasonNotActive},
 			reasons{ActionReasonRevoked}},
 		{"警告", warning, nil, reasons{ActionReasonKindHasNoEndTime, ActionReasonNotActive}, reasons{ActionReasonKindHasNoEndTime, ActionReasonNotActive}, nil},
-		{"內容下架：沒有結束時間，可改理由與撤銷", takedown, nil, reasons{ActionReasonKindHasNoEndTime, ActionReasonNotActive}, reasons{ActionReasonKindHasNoEndTime, ActionReasonNotActive}, nil},
+		{"內容下架：沒有結束時間，可改理由與撤銷", takedown, nil, reasons{ActionReasonContentTakedownRevokeOnly}, reasons{ActionReasonContentTakedownRevokeOnly}, nil},
 		{"已撤銷的內容下架", Measure{Kind: MeasureContentTakedown, Status: MeasureStatusRevoked, State: StateRevoked, Basis: BasisViolation},
 			reasons{ActionReasonRevoked, ActionReasonNotActive},
-			reasons{ActionReasonRevoked, ActionReasonKindHasNoEndTime, ActionReasonNotActive},
-			reasons{ActionReasonRevoked, ActionReasonKindHasNoEndTime, ActionReasonNotActive},
+			reasons{ActionReasonRevoked},
+			reasons{ActionReasonRevoked},
 			reasons{ActionReasonRevoked}},
 		{"預定生效的終止", termination(StateScheduled), nil,
 			reasons{ActionReasonTerminationRecreate, ActionReasonNotActive}, reasons{ActionReasonTerminationRecreate, ActionReasonNotActive}, nil},
@@ -879,6 +882,8 @@ func TestActionUnavailableTextIsTheApprovedStaffSentences(t *testing.T) {
 		{ActionReasonRequestPendingFrozen, MeasureActionUpdateStatement, "賣家提出過申覆，或有待處理的解除請求，給賣家的理由不能再改"},
 		{ActionReasonRequestPendingFrozen, MeasureActionExtend, "賣家提出過申覆，或有待處理的解除請求，結束時間不能再延長"},
 		{ActionReasonAppealPending, MeasureActionRevoke, "申覆待裁定，請先裁定"},
+		{ActionReasonContentTakedownRevokeOnly, MeasureActionExtend, "內容下架沒有結束時間，要讓內容恢復請撤銷措施，或接受賣家的申覆"},
+		{ActionReasonContentTakedownRevokeOnly, MeasureActionEnd, "內容下架沒有結束時間，要讓內容恢復請撤銷措施，或接受賣家的申覆"},
 	} {
 		got := ActionUnavailableText(tc.reason, tc.action)
 		if got.Text != tc.want || got.Locale != uitext.ZhTW {
@@ -909,7 +914,7 @@ func TestContentTakedownIsReleasedOnlyThroughAppeal(t *testing.T) {
 	if m.CanEnd() {
 		t.Error("內容下架不能被結束")
 	}
-	if got := m.EndUnavailableReasons(); !slices.Equal(got, []MeasureActionUnavailableReason{ActionReasonNotActive, ActionReasonViolationBasis}) {
+	if got := m.EndUnavailableReasons(); !slices.Equal(got, []MeasureActionUnavailableReason{ActionReasonContentTakedownRevokeOnly}) {
 		t.Errorf("結束的原因 %v", got)
 	}
 	if got := m.AppealUnavailableReasons(); len(got) != 0 {

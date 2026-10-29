@@ -881,19 +881,57 @@ class MeasureKind extends $pb.ProtobufEnum {
   static const MeasureKind MEASURE_KIND_TERMINATION =
       MeasureKind._(3, _omitEnumNames ? '' : 'MEASURE_KIND_TERMINATION');
 
+  /// 內容下架：店家指定的內容（貼文、留言、討論區留言）不再公開；建立即生效，沒有期間、不限制帳號，也不影響店家的曝光。對象看 Measure.contents，建立後不能改，
+  /// 要改就撤銷再建立；內容只能由撤銷或申覆成立恢復。
+  static const MeasureKind MEASURE_KIND_CONTENT_TAKEDOWN =
+      MeasureKind._(4, _omitEnumNames ? '' : 'MEASURE_KIND_CONTENT_TAKEDOWN');
+
   static const $core.List<MeasureKind> values = <MeasureKind>[
     MEASURE_KIND_UNSPECIFIED,
     MEASURE_KIND_WARNING,
     MEASURE_KIND_SUSPENSION,
     MEASURE_KIND_TERMINATION,
+    MEASURE_KIND_CONTENT_TAKEDOWN,
   ];
 
   static final $core.List<MeasureKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 3);
+      $pb.ProtobufEnum.$_initByValueList(values, 4);
   static MeasureKind? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const MeasureKind._(super.value, super.name);
+}
+
+/// ContentKind 是內容下架措施對象的種類，對應社群內容的三種寫入。
+class ContentKind extends $pb.ProtobufEnum {
+  static const ContentKind CONTENT_KIND_UNSPECIFIED =
+      ContentKind._(0, _omitEnumNames ? '' : 'CONTENT_KIND_UNSPECIFIED');
+
+  /// 店家貼文。
+  static const ContentKind CONTENT_KIND_POST =
+      ContentKind._(1, _omitEnumNames ? '' : 'CONTENT_KIND_POST');
+
+  /// 貼文底下的留言。
+  static const ContentKind CONTENT_KIND_COMMENT =
+      ContentKind._(2, _omitEnumNames ? '' : 'CONTENT_KIND_COMMENT');
+
+  /// 討論區留言。
+  static const ContentKind CONTENT_KIND_FORUM_ENTRY =
+      ContentKind._(3, _omitEnumNames ? '' : 'CONTENT_KIND_FORUM_ENTRY');
+
+  static const $core.List<ContentKind> values = <ContentKind>[
+    CONTENT_KIND_UNSPECIFIED,
+    CONTENT_KIND_POST,
+    CONTENT_KIND_COMMENT,
+    CONTENT_KIND_FORUM_ENTRY,
+  ];
+
+  static final $core.List<ContentKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static ContentKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ContentKind._(super.value, super.name);
 }
 
 /// MeasureBasis 是措施的依據：VIOLATION 依據違規的認定（有固定期間的處分），RISK 依據條款第 17.1 條的風險類型或第 17.5 條
@@ -987,7 +1025,7 @@ class MeasureState extends $pb.ProtobufEnum {
   static const MeasureState MEASURE_STATE_UNSPECIFIED =
       MeasureState._(0, _omitEnumNames ? '' : 'MEASURE_STATE_UNSPECIFIED');
 
-  /// 警告，未撤銷（不是「生效中」，沒有限制）。
+  /// 警告或內容下架，未撤銷（不是「生效中」，沒有限制）。
   static const MeasureState MEASURE_STATE_ISSUED =
       MeasureState._(1, _omitEnumNames ? '' : 'MEASURE_STATE_ISSUED');
 

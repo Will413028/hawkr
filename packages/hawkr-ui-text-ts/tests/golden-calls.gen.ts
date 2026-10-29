@@ -1,6 +1,6 @@
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 import { Code } from "@connectrpc/connect";
-import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonUnknown, sellerKYCField, sellerKYCFlowStatus, sellerKYCFlowStatusAction, sellerKYCFlowStatusBannerDescription, sellerKYCFlowStatusBannerTitle, sellerKYCFlowStatusGateHeading, sellerKYCFlowStatusGateMessage, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerPayUniState, sellerRevokeReason, sellerRiskGround, sellerSellerPayUniFixFieldsHeading, sellerSellerPayUniReasonHeading, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity } from "../src/keys.gen";
+import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonUnknown, sellerContentKind, sellerKYCField, sellerKYCFlowStatus, sellerKYCFlowStatusAction, sellerKYCFlowStatusBannerDescription, sellerKYCFlowStatusBannerTitle, sellerKYCFlowStatusGateHeading, sellerKYCFlowStatusGateMessage, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerPayUniState, sellerRevokeReason, sellerRiskGround, sellerSellerPayUniFixFieldsHeading, sellerSellerPayUniReasonHeading, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity } from "../src/keys.gen";
 import { sellerMeasureRequestStateWithKindStaff } from "../src/zh-tw.gen";
 import type { UiMessage } from "../src/message";
 
@@ -15,6 +15,10 @@ export interface GoldenCase {
 }
 
 const ENUM_NUMBER: Readonly<Record<string, number>> = {
+	"CONTENT_KIND_COMMENT": 2,
+	"CONTENT_KIND_FORUM_ENTRY": 3,
+	"CONTENT_KIND_POST": 1,
+	"CONTENT_KIND_UNSPECIFIED": 0,
 	"GENDER_FEMALE": 2,
 	"GENDER_MALE": 1,
 	"GENDER_OTHER": 3,
@@ -58,6 +62,7 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"MEASURE_BASIS_RISK": 2,
 	"MEASURE_BASIS_UNSPECIFIED": 0,
 	"MEASURE_BASIS_VIOLATION": 1,
+	"MEASURE_KIND_CONTENT_TAKEDOWN": 4,
 	"MEASURE_KIND_SUSPENSION": 2,
 	"MEASURE_KIND_TERMINATION": 3,
 	"MEASURE_KIND_UNSPECIFIED": 0,
@@ -193,6 +198,9 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	}
 	case "common.unknown": {
 		return commonUnknown();
+	}
+	case "seller.ContentKind": {
+		return sellerContentKind(num(c.value));
 	}
 	case "seller.KYCField": {
 		return sellerKYCField(num(c.value));

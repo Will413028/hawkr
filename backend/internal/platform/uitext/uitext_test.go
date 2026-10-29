@@ -106,6 +106,18 @@ func TestUnknownValuesHaveNoText(t *testing.T) {
 	if got, _ := For(ZhTW).SellerMeasureState("ACTIVE", "NOPE"); got != "停權中" {
 		t.Errorf("ACTIVE + 不認得的 kind = %q", got)
 	}
+	// 內容下架不會是 ACTIVE，萬一出現也不能被說成停權中。
+	for kind, want := range map[string]string{"SUSPENSION": "停權中", "CONTENT_TAKEDOWN": "內容已下架"} {
+		if got, _ := For(ZhTW).SellerMeasureState("ACTIVE", kind); got != want {
+			t.Errorf("ACTIVE + %s = %q，要 %q", kind, got, want)
+		}
+	}
+	if got, _ := For(ZhTW).SellerMeasureState("ISSUED", "CONTENT_TAKEDOWN"); got != "已發出" {
+		t.Errorf("ISSUED + CONTENT_TAKEDOWN = %q", got)
+	}
+	if got, ok := For(ZhTW).SellerMeasureKind("CONTENT_TAKEDOWN"); !ok || got != "內容下架" {
+		t.Errorf("CONTENT_TAKEDOWN 的名稱 = %q, %v", got, ok)
+	}
 	if got, _ := For(ZhTW).SellerMeasureState("ACTIVE", "TERMINATION"); got != "合作已終止" {
 		t.Errorf("ACTIVE + TERMINATION = %q", got)
 	}

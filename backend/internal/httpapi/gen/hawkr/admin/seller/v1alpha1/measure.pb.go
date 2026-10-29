@@ -100,6 +100,8 @@ const (
 	MeasureActionUnavailableReason_MEASURE_ACTION_UNAVAILABLE_REASON_VIOLATION_BASIS MeasureActionUnavailableReason = 7
 	// 結束：有待處理的解除請求，要先裁定（接受解除請求就是結束）。
 	MeasureActionUnavailableReason_MEASURE_ACTION_UNAVAILABLE_REASON_REMEDIATION_PENDING MeasureActionUnavailableReason = 8
+	// 內容下架沒有結束時間，也沒有結束入口（延長、縮短、結束）；要讓內容恢復只能撤銷，或接受申覆。取代警告、不在生效中與依據違規認定這三個原因在內容下架的說法。
+	MeasureActionUnavailableReason_MEASURE_ACTION_UNAVAILABLE_REASON_CONTENT_TAKEDOWN_REVOKE_ONLY MeasureActionUnavailableReason = 9
 )
 
 // Enum value maps for MeasureActionUnavailableReason.
@@ -114,17 +116,19 @@ var (
 		6: "MEASURE_ACTION_UNAVAILABLE_REASON_APPEAL_PENDING",
 		7: "MEASURE_ACTION_UNAVAILABLE_REASON_VIOLATION_BASIS",
 		8: "MEASURE_ACTION_UNAVAILABLE_REASON_REMEDIATION_PENDING",
+		9: "MEASURE_ACTION_UNAVAILABLE_REASON_CONTENT_TAKEDOWN_REVOKE_ONLY",
 	}
 	MeasureActionUnavailableReason_value = map[string]int32{
-		"MEASURE_ACTION_UNAVAILABLE_REASON_UNSPECIFIED":            0,
-		"MEASURE_ACTION_UNAVAILABLE_REASON_REVOKED":                1,
-		"MEASURE_ACTION_UNAVAILABLE_REASON_NOT_ACTIVE":             2,
-		"MEASURE_ACTION_UNAVAILABLE_REASON_KIND_HAS_NO_END_TIME":   3,
-		"MEASURE_ACTION_UNAVAILABLE_REASON_TERMINATION_RECREATE":   4,
-		"MEASURE_ACTION_UNAVAILABLE_REASON_REQUEST_PENDING_FROZEN": 5,
-		"MEASURE_ACTION_UNAVAILABLE_REASON_APPEAL_PENDING":         6,
-		"MEASURE_ACTION_UNAVAILABLE_REASON_VIOLATION_BASIS":        7,
-		"MEASURE_ACTION_UNAVAILABLE_REASON_REMEDIATION_PENDING":    8,
+		"MEASURE_ACTION_UNAVAILABLE_REASON_UNSPECIFIED":                  0,
+		"MEASURE_ACTION_UNAVAILABLE_REASON_REVOKED":                      1,
+		"MEASURE_ACTION_UNAVAILABLE_REASON_NOT_ACTIVE":                   2,
+		"MEASURE_ACTION_UNAVAILABLE_REASON_KIND_HAS_NO_END_TIME":         3,
+		"MEASURE_ACTION_UNAVAILABLE_REASON_TERMINATION_RECREATE":         4,
+		"MEASURE_ACTION_UNAVAILABLE_REASON_REQUEST_PENDING_FROZEN":       5,
+		"MEASURE_ACTION_UNAVAILABLE_REASON_APPEAL_PENDING":               6,
+		"MEASURE_ACTION_UNAVAILABLE_REASON_VIOLATION_BASIS":              7,
+		"MEASURE_ACTION_UNAVAILABLE_REASON_REMEDIATION_PENDING":          8,
+		"MEASURE_ACTION_UNAVAILABLE_REASON_CONTENT_TAKEDOWN_REVOKE_ONLY": 9,
 	}
 )
 
@@ -778,8 +782,10 @@ type Measure struct {
 	// 複審的期限，只在風險類型（RISK）的措施、生效中、而且已進入 review_by 前 24 小時時設：開始時間是 review_by 前 24 小時，期限是 review_by；
 	// review_by 過了之後仍在，直到措施結束或撤銷。review_by 本身是事實欄位，撤銷後仍輸出。
 	ReviewDeadline *v1alpha1.Deadline `protobuf:"bytes,44,opt,name=review_deadline,json=reviewDeadline,proto3" json:"review_deadline,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// 內容下架（kind 是 CONTENT_TAKEDOWN）的對象，依種類、id 排序；其他種類沒有。建立後不能改（UpdateMeasure 不收），要改就撤銷再建立。
+	Contents      []*v1alpha11.ContentRef `protobuf:"bytes,46,rep,name=contents,proto3" json:"contents,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Measure) Reset() {
@@ -1113,6 +1119,13 @@ func (x *Measure) GetReviewDeadline() *v1alpha1.Deadline {
 	return nil
 }
 
+func (x *Measure) GetContents() []*v1alpha11.ContentRef {
+	if x != nil {
+		return x.Contents
+	}
+	return nil
+}
+
 // MeasureActionUnavailability 是 admin 此刻不能對措施做某個動作（改理由、延長、縮短、結束或撤銷）的一個原因。與對應方法的前置檢查是同一個規則
 // （model/measure.go），message 與該方法被拒絕時錯誤的 LocalizedMessage 是同一份文字（同一個 Go 函式）。
 type MeasureActionUnavailability struct {
@@ -1392,7 +1405,7 @@ const file_hawkr_admin_seller_v1alpha1_measure_proto_rawDesc = "" +
 	" \x01(\x0e2/.hawkr.seller.v1alpha1.MeasureRequestCloseCauseB\x03\xe0A\x03R\n" +
 	"closeCause\x12B\n" +
 	"\x04kind\x18\v \x01(\x0e2).hawkr.seller.v1alpha1.MeasureRequestKindB\x03\xe0A\x03R\x04kind\x12M\n" +
-	"\x0fdecide_deadline\x18\f \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\x0edecideDeadline\"\x96\x16\n" +
+	"\x0fdecide_deadline\x18\f \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\x0edecideDeadline\"\xda\x16\n" +
 	"\aMeasure\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x1e\n" +
 	"\bstore_id\x18\x02 \x01(\tB\x03\xe0A\x03R\astoreId\x12\"\n" +
@@ -1446,7 +1459,8 @@ const file_hawkr_admin_seller_v1alpha1_measure_proto_rawDesc = "" +
 	"\x17revoke_unavailabilities\x18* \x03(\v28.hawkr.admin.seller.v1alpha1.MeasureActionUnavailabilityB\x03\xe0A\x03R\x16revokeUnavailabilities\x12p\n" +
 	"\x14end_unavailabilities\x18- \x03(\v28.hawkr.admin.seller.v1alpha1.MeasureActionUnavailabilityB\x03\xe0A\x03R\x13endUnavailabilities\x123\n" +
 	"\x13can_revoke_findings\x18+ \x01(\bB\x03\xe0A\x03R\x11canRevokeFindings\x12M\n" +
-	"\x0freview_deadline\x18, \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\x0ereviewDeadlineJ\x04\b\x10\x10\x11J\x04\b\x1e\x10\x1fR\x06appealR\x14remediation_requests\"\xb4\x01\n" +
+	"\x0freview_deadline\x18, \x01(\v2\x1f.hawkr.common.v1alpha1.DeadlineB\x03\xe0A\x03R\x0ereviewDeadline\x12B\n" +
+	"\bcontents\x18. \x03(\v2!.hawkr.seller.v1alpha1.ContentRefB\x03\xe0A\x03R\bcontentsJ\x04\b\x10\x10\x11J\x04\b\x1e\x10\x1fR\x06appealR\x14remediation_requests\"\xb4\x01\n" +
 	"\x1bMeasureActionUnavailability\x12X\n" +
 	"\x06reason\x18\x01 \x01(\x0e2;.hawkr.admin.seller.v1alpha1.MeasureActionUnavailableReasonB\x03\xe0A\x03R\x06reason\x12;\n" +
 	"\amessage\x18\x02 \x01(\v2\x1c.google.rpc.LocalizedMessageB\x03\xe0A\x03R\amessage\"\x93\x03\n" +
@@ -1467,7 +1481,7 @@ const file_hawkr_admin_seller_v1alpha1_measure_proto_rawDesc = "" +
 	"\x15violation_requirement\x18\x04 \x01(\x0e2<.hawkr.admin.seller.v1alpha1.TerminationViolationRequirementB\x03\xe0A\x03R\x14violationRequirement*{\n" +
 	"\x1aMeasureRevisionSystemCause\x12-\n" +
 	")MEASURE_REVISION_SYSTEM_CAUSE_UNSPECIFIED\x10\x00\x12.\n" +
-	"*MEASURE_REVISION_SYSTEM_CAUSE_STORE_CLOSED\x10\x01*\x92\x04\n" +
+	"*MEASURE_REVISION_SYSTEM_CAUSE_STORE_CLOSED\x10\x01*\xd6\x04\n" +
 	"\x1eMeasureActionUnavailableReason\x121\n" +
 	"-MEASURE_ACTION_UNAVAILABLE_REASON_UNSPECIFIED\x10\x00\x12-\n" +
 	")MEASURE_ACTION_UNAVAILABLE_REASON_REVOKED\x10\x01\x120\n" +
@@ -1477,7 +1491,8 @@ const file_hawkr_admin_seller_v1alpha1_measure_proto_rawDesc = "" +
 	"8MEASURE_ACTION_UNAVAILABLE_REASON_REQUEST_PENDING_FROZEN\x10\x05\x124\n" +
 	"0MEASURE_ACTION_UNAVAILABLE_REASON_APPEAL_PENDING\x10\x06\x125\n" +
 	"1MEASURE_ACTION_UNAVAILABLE_REASON_VIOLATION_BASIS\x10\a\x129\n" +
-	"5MEASURE_ACTION_UNAVAILABLE_REASON_REMEDIATION_PENDING\x10\b*\x96\x01\n" +
+	"5MEASURE_ACTION_UNAVAILABLE_REASON_REMEDIATION_PENDING\x10\b\x12B\n" +
+	">MEASURE_ACTION_UNAVAILABLE_REASON_CONTENT_TAKEDOWN_REVOKE_ONLY\x10\t*\x96\x01\n" +
 	"\x0eLinkedIdentity\x12\x1f\n" +
 	"\x1bLINKED_IDENTITY_UNSPECIFIED\x10\x00\x12\x1f\n" +
 	"\x1bLINKED_IDENTITY_NATIONAL_ID\x10\x01\x12\x17\n" +
@@ -1532,7 +1547,8 @@ var file_hawkr_admin_seller_v1alpha1_measure_proto_goTypes = []any{
 	(v1alpha11.MeasureState)(0),             // 24: hawkr.seller.v1alpha1.MeasureState
 	(*v1alpha11.MeasurePeriod)(nil),         // 25: hawkr.seller.v1alpha1.MeasurePeriod
 	(v1alpha11.TerminationGround)(0),        // 26: hawkr.seller.v1alpha1.TerminationGround
-	(*errdetails.LocalizedMessage)(nil),     // 27: google.rpc.LocalizedMessage
+	(*v1alpha11.ContentRef)(nil),            // 27: hawkr.seller.v1alpha1.ContentRef
+	(*errdetails.LocalizedMessage)(nil),     // 28: google.rpc.LocalizedMessage
 }
 var file_hawkr_admin_seller_v1alpha1_measure_proto_depIdxs = []int32{
 	12, // 0: hawkr.admin.seller.v1alpha1.Violation.category:type_name -> hawkr.common.v1alpha1.PolicyCategory
@@ -1576,19 +1592,20 @@ var file_hawkr_admin_seller_v1alpha1_measure_proto_depIdxs = []int32{
 	9,  // 38: hawkr.admin.seller.v1alpha1.Measure.revoke_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.MeasureActionUnavailability
 	9,  // 39: hawkr.admin.seller.v1alpha1.Measure.end_unavailabilities:type_name -> hawkr.admin.seller.v1alpha1.MeasureActionUnavailability
 	20, // 40: hawkr.admin.seller.v1alpha1.Measure.review_deadline:type_name -> hawkr.common.v1alpha1.Deadline
-	1,  // 41: hawkr.admin.seller.v1alpha1.MeasureActionUnavailability.reason:type_name -> hawkr.admin.seller.v1alpha1.MeasureActionUnavailableReason
-	27, // 42: hawkr.admin.seller.v1alpha1.MeasureActionUnavailability.message:type_name -> google.rpc.LocalizedMessage
-	2,  // 43: hawkr.admin.seller.v1alpha1.LinkedAccount.matched_identity:type_name -> hawkr.admin.seller.v1alpha1.LinkedIdentity
-	11, // 44: hawkr.admin.seller.v1alpha1.LinkedAccount.termination_option:type_name -> hawkr.admin.seller.v1alpha1.TerminationOption
-	26, // 45: hawkr.admin.seller.v1alpha1.TerminationOption.ground:type_name -> hawkr.seller.v1alpha1.TerminationGround
-	16, // 46: hawkr.admin.seller.v1alpha1.TerminationOption.effective_time:type_name -> google.protobuf.Timestamp
-	27, // 47: hawkr.admin.seller.v1alpha1.TerminationOption.explanation:type_name -> google.rpc.LocalizedMessage
-	3,  // 48: hawkr.admin.seller.v1alpha1.TerminationOption.violation_requirement:type_name -> hawkr.admin.seller.v1alpha1.TerminationViolationRequirement
-	49, // [49:49] is the sub-list for method output_type
-	49, // [49:49] is the sub-list for method input_type
-	49, // [49:49] is the sub-list for extension type_name
-	49, // [49:49] is the sub-list for extension extendee
-	0,  // [0:49] is the sub-list for field type_name
+	27, // 41: hawkr.admin.seller.v1alpha1.Measure.contents:type_name -> hawkr.seller.v1alpha1.ContentRef
+	1,  // 42: hawkr.admin.seller.v1alpha1.MeasureActionUnavailability.reason:type_name -> hawkr.admin.seller.v1alpha1.MeasureActionUnavailableReason
+	28, // 43: hawkr.admin.seller.v1alpha1.MeasureActionUnavailability.message:type_name -> google.rpc.LocalizedMessage
+	2,  // 44: hawkr.admin.seller.v1alpha1.LinkedAccount.matched_identity:type_name -> hawkr.admin.seller.v1alpha1.LinkedIdentity
+	11, // 45: hawkr.admin.seller.v1alpha1.LinkedAccount.termination_option:type_name -> hawkr.admin.seller.v1alpha1.TerminationOption
+	26, // 46: hawkr.admin.seller.v1alpha1.TerminationOption.ground:type_name -> hawkr.seller.v1alpha1.TerminationGround
+	16, // 47: hawkr.admin.seller.v1alpha1.TerminationOption.effective_time:type_name -> google.protobuf.Timestamp
+	28, // 48: hawkr.admin.seller.v1alpha1.TerminationOption.explanation:type_name -> google.rpc.LocalizedMessage
+	3,  // 49: hawkr.admin.seller.v1alpha1.TerminationOption.violation_requirement:type_name -> hawkr.admin.seller.v1alpha1.TerminationViolationRequirement
+	50, // [50:50] is the sub-list for method output_type
+	50, // [50:50] is the sub-list for method input_type
+	50, // [50:50] is the sub-list for extension type_name
+	50, // [50:50] is the sub-list for extension extendee
+	0,  // [0:50] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_admin_seller_v1alpha1_measure_proto_init() }

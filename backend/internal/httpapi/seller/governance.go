@@ -90,6 +90,9 @@ var (
 	createTerminationPaths = createMeasurePaths(violationPaths("Termination.Violation", "termination.violation"), rpc.FieldPaths{
 		"Termination": "termination", "Termination.Ground": "termination.ground", "Termination.SourceMeasureID": "termination.source_measure_id",
 	})
+	createTakedownPaths = createMeasurePaths(violationPaths("Violation", "content_takedown.violation"), rpc.FieldPaths{
+		"Takedown": "content_takedown", "Takedown.Contents": "content_takedown.contents", "Takedown.Contents[]": "content_takedown.contents[]",
+	})
 	updateMeasurePaths     = rpc.FieldPaths{"StatementToSeller": "measure.statement", "EndsAt": "measure.end_time", "ExpectedVersion": "measure.etag"}
 	endMeasurePaths        = rpc.FieldPaths{"ExpectedVersion": "etag"}
 	revokeMeasurePaths     = rpc.FieldPaths{"Reason": "reason", "RevokeFindings": "revoke_findings", "ExpectedVersion": "etag"}

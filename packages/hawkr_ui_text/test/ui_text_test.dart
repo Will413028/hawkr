@@ -69,6 +69,21 @@ void main() {
       ),
       '停權中',
     );
+    // 內容下架的狀態是 ISSUED；萬一是 ACTIVE 也不能顯示成停權中。
+    expect(
+      MeasureState.MEASURE_STATE_ACTIVE.uiText(
+        UiLocale.zhTW,
+        kind: MeasureKind.MEASURE_KIND_CONTENT_TAKEDOWN,
+      ),
+      '內容已下架',
+    );
+    expect(
+      MeasureState.MEASURE_STATE_ISSUED.uiText(
+        UiLocale.zhTW,
+        kind: MeasureKind.MEASURE_KIND_CONTENT_TAKEDOWN,
+      ),
+      '已發出',
+    );
   });
 
   test('名詞參數不認得時整個函式沒有文字', () {

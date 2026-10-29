@@ -316,6 +316,13 @@
       "serverOwned": true
     },
     {
+      "name": "hawkr.seller.v1alpha1.ContentKind",
+      "tsName": "ContentKind",
+      "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.seller.v1alpha1.KYCField",
       "tsName": "KYCField",
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",

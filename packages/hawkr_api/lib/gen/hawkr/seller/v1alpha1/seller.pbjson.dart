@@ -449,6 +449,7 @@ const MeasureKind$json = {
     {'1': 'MEASURE_KIND_WARNING', '2': 1},
     {'1': 'MEASURE_KIND_SUSPENSION', '2': 2},
     {'1': 'MEASURE_KIND_TERMINATION', '2': 3},
+    {'1': 'MEASURE_KIND_CONTENT_TAKEDOWN', '2': 4},
   ],
 };
 
@@ -456,7 +457,24 @@ const MeasureKind$json = {
 final $typed_data.Uint8List measureKindDescriptor = $convert.base64Decode(
     'CgtNZWFzdXJlS2luZBIcChhNRUFTVVJFX0tJTkRfVU5TUEVDSUZJRUQQABIYChRNRUFTVVJFX0'
     'tJTkRfV0FSTklORxABEhsKF01FQVNVUkVfS0lORF9TVVNQRU5TSU9OEAISHAoYTUVBU1VSRV9L'
-    'SU5EX1RFUk1JTkFUSU9OEAM=');
+    'SU5EX1RFUk1JTkFUSU9OEAMSIQodTUVBU1VSRV9LSU5EX0NPTlRFTlRfVEFLRURPV04QBA==');
+
+@$core.Deprecated('Use contentKindDescriptor instead')
+const ContentKind$json = {
+  '1': 'ContentKind',
+  '2': [
+    {'1': 'CONTENT_KIND_UNSPECIFIED', '2': 0},
+    {'1': 'CONTENT_KIND_POST', '2': 1},
+    {'1': 'CONTENT_KIND_COMMENT', '2': 2},
+    {'1': 'CONTENT_KIND_FORUM_ENTRY', '2': 3},
+  ],
+};
+
+/// Descriptor for `ContentKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List contentKindDescriptor = $convert.base64Decode(
+    'CgtDb250ZW50S2luZBIcChhDT05URU5UX0tJTkRfVU5TUEVDSUZJRUQQABIVChFDT05URU5UX0'
+    'tJTkRfUE9TVBABEhgKFENPTlRFTlRfS0lORF9DT01NRU5UEAISHAoYQ09OVEVOVF9LSU5EX0ZP'
+    'UlVNX0VOVFJZEAM=');
 
 @$core.Deprecated('Use measureBasisDescriptor instead')
 const MeasureBasis$json = {
@@ -2306,6 +2324,28 @@ final $typed_data.Uint8List lookupBusinessRegistrationResponseDescriptor =
         'CiJMb29rdXBCdXNpbmVzc1JlZ2lzdHJhdGlvblJlc3BvbnNlEk8KDHJlZ2lzdHJhdGlvbhgBIA'
         'EoCzIrLmhhd2tyLnNlbGxlci52MWFscGhhMS5CdXNpbmVzc1JlZ2lzdHJhdGlvblIMcmVnaXN0'
         'cmF0aW9u');
+
+@$core.Deprecated('Use contentRefDescriptor instead')
+const ContentRef$json = {
+  '1': 'ContentRef',
+  '2': [
+    {
+      '1': 'kind',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.seller.v1alpha1.ContentKind',
+      '8': {},
+      '10': 'kind'
+    },
+    {'1': 'id', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'id'},
+  ],
+};
+
+/// Descriptor for `ContentRef`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List contentRefDescriptor = $convert.base64Decode(
+    'CgpDb250ZW50UmVmEjsKBGtpbmQYASABKA4yIi5oYXdrci5zZWxsZXIudjFhbHBoYTEuQ29udG'
+    'VudEtpbmRCA+BBAlIEa2luZBITCgJpZBgCIAEoCUID4EECUgJpZA==');
 
 @$core.Deprecated('Use remediationUnavailabilityDescriptor instead')
 const RemediationUnavailability$json = {

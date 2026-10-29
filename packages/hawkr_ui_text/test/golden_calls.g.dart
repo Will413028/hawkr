@@ -10,7 +10,11 @@ import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart' as hawkr
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
 const _enumNumber = <String, int>{
-  'GENDER_FEMALE': 2,
+  'CONTENT_KIND_COMMENT': 2,
+	'CONTENT_KIND_FORUM_ENTRY': 3,
+	'CONTENT_KIND_POST': 1,
+	'CONTENT_KIND_UNSPECIFIED': 0,
+	'GENDER_FEMALE': 2,
 	'GENDER_MALE': 1,
 	'GENDER_OTHER': 3,
 	'GENDER_UNSPECIFIED': 0,
@@ -53,6 +57,7 @@ const _enumNumber = <String, int>{
 	'MEASURE_BASIS_RISK': 2,
 	'MEASURE_BASIS_UNSPECIFIED': 0,
 	'MEASURE_BASIS_VIOLATION': 1,
+	'MEASURE_KIND_CONTENT_TAKEDOWN': 4,
 	'MEASURE_KIND_SUSPENSION': 2,
 	'MEASURE_KIND_TERMINATION': 3,
 	'MEASURE_KIND_UNSPECIFIED': 0,
@@ -179,6 +184,8 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return commonErrorText(_codes[value]!, l);
     case 'common.unknown':
       return commonUnknown(l);
+    case 'seller.ContentKind':
+      return hawkr_seller_v1alpha1_seller.ContentKind.valueOf(_n(value))!.uiText(l);
     case 'seller.KYCField':
       return hawkr_seller_v1alpha1_seller.KYCField.valueOf(_n(value))!.uiText(l);
     case 'seller.KYCFlowStatus':

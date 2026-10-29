@@ -156,6 +156,10 @@
       "message": "申覆待裁定，請先裁定",
       "description": "admin 不能做動作：申覆待裁定，要先裁定（APPEAL_PENDING）。"
     },
+    "action_unavailable.content_takedown_revoke_only": {
+      "message": "內容下架沒有結束時間，要讓內容恢復請撤銷措施，或接受賣家的申覆",
+      "description": "admin 不能延長、縮短或結束內容下架：內容下架沒有結束時間，也沒有結束入口，恢復內容只能撤銷或接受申覆（CONTENT_TAKEDOWN_REVOKE_ONLY）。"
+    },
     "action_unavailable.kind_has_no_end_time": {
       "message": "警告沒有結束時間",
       "description": "admin 不能延長或縮短：警告沒有結束時間（KIND_HAS_NO_END_TIME）。"

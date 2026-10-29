@@ -64,6 +64,13 @@ describe("建構函式", () => {
 		expect(zhOf(sellerMeasureState(2, { kind: MeasureKind.UNSPECIFIED }))).toBe(
 			"停權中",
 		);
+		// 內容下架的狀態是 ISSUED；萬一是 ACTIVE 也不能顯示成停權中。
+		expect(
+			zhOf(sellerMeasureState(2, { kind: MeasureKind.CONTENT_TAKEDOWN })),
+		).toBe("內容已下架");
+		expect(
+			zhOf(sellerMeasureState(1, { kind: MeasureKind.CONTENT_TAKEDOWN })),
+		).toBe("已發出");
 	});
 
 	it("名詞參數：巢狀解出，不認得整個回 undefined", () => {
@@ -184,6 +191,6 @@ describe("manifest", () => {
 		).toMatchObject({
 			serverOwned: true,
 		});
-		expect(manifest.enums.filter((e) => e.inCatalog).length).toBe(16);
+		expect(manifest.enums.filter((e) => e.inCatalog).length).toBe(17);
 	});
 });

@@ -130,6 +130,20 @@ func (t Text) CommonUnknown() string {
 	return "未知"
 }
 
+// SellerContentKind 是 seller.ContentKind 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) SellerContentKind(v string) (string, bool) {
+	switch v {
+	case "POST":
+		return "貼文", true
+	case "COMMENT":
+		return "留言", true
+	case "FORUM_ENTRY":
+		return "討論區留言", true
+	}
+	return "", false
+}
+
 // SellerKYCField 是 seller.KYCField 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) SellerKYCField(v string) (string, bool) {
@@ -462,6 +476,8 @@ func (t Text) SellerMeasureKind(v string) (string, bool) {
 		return "停權", true
 	case "TERMINATION":
 		return "終止合作", true
+	case "CONTENT_TAKEDOWN":
+		return "內容下架", true
 	}
 	return "", false
 }
@@ -625,6 +641,8 @@ func (t Text) SellerMeasureState(v string, kind string) (string, bool) {
 			switch kind {
 			case "TERMINATION":
 				return "合作已終止"
+			case "CONTENT_TAKEDOWN":
+				return "內容已下架"
 			default:
 				return "停權中"
 			}

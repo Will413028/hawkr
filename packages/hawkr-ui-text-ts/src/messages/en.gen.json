@@ -48,6 +48,11 @@
     "unknown": "未知"
   },
   "seller": {
+    "ContentKind": {
+      "CONTENT_KIND_COMMENT": "留言",
+      "CONTENT_KIND_FORUM_ENTRY": "討論區留言",
+      "CONTENT_KIND_POST": "貼文"
+    },
     "KYCField": {
       "KYC_FIELD_BANK_ACCOUNT": "銀行帳號",
       "KYC_FIELD_BANK_BOOK": "存摺封面",
@@ -147,6 +152,7 @@
       "MEASURE_BASIS_VIOLATION": "違規認定"
     },
     "MeasureKind": {
+      "MEASURE_KIND_CONTENT_TAKEDOWN": "內容下架",
       "MEASURE_KIND_SUSPENSION": "停權",
       "MEASURE_KIND_TERMINATION": "終止合作",
       "MEASURE_KIND_WARNING": "警告"
@@ -174,7 +180,7 @@
       }
     },
     "MeasureState": {
-      "MEASURE_STATE_ACTIVE": "{kind, select, MEASURE_KIND_TERMINATION {合作已終止} other {停權中}}",
+      "MEASURE_STATE_ACTIVE": "{kind, select, MEASURE_KIND_TERMINATION {合作已終止} MEASURE_KIND_CONTENT_TAKEDOWN {內容已下架} other {停權中}}",
       "MEASURE_STATE_ENDED": "已結束",
       "MEASURE_STATE_ISSUED": "已發出",
       "MEASURE_STATE_REVOKED": "已撤銷",

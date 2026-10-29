@@ -57,6 +57,20 @@ extension CommonPolicyCategoryUiText on hawkr_common_v1alpha1_policy_category.Po
   String? uiText(UiLocale l) => _commonPolicyCategory(l, value);
 }
 
+String? _sellerContentKind(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW || UiLocale.en, 1) => '貼文',
+(UiLocale.zhTW || UiLocale.en, 2) => '留言',
+(UiLocale.zhTW || UiLocale.en, 3) => '討論區留言',
+_ => null,
+};
+}
+
+extension SellerContentKindUiText on hawkr_seller_v1alpha1_seller.ContentKind {
+  /// seller.ContentKind 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _sellerContentKind(l, value);
+}
+
 String? _sellerKYCField(UiLocale l, int value) {
 return switch ((l, value)) {
 (UiLocale.zhTW || UiLocale.en, 1) => '真實姓名',
@@ -206,6 +220,7 @@ return switch ((l, value)) {
 (UiLocale.zhTW || UiLocale.en, 1) => '警告',
 (UiLocale.zhTW || UiLocale.en, 2) => '停權',
 (UiLocale.zhTW || UiLocale.en, 3) => '終止合作',
+(UiLocale.zhTW || UiLocale.en, 4) => '內容下架',
 _ => null,
 };
 }
@@ -269,7 +284,7 @@ extension SellerMeasureRequestStateUiText on hawkr_seller_v1alpha1_seller.Measur
 String? _sellerMeasureState(UiLocale l, int value, hawkr_seller_v1alpha1_seller.MeasureKind kind) {
 return switch ((l, value)) {
 (UiLocale.zhTW || UiLocale.en, 1) => '已發出',
-(UiLocale.zhTW || UiLocale.en, 2) => (switch (kind.value) {3 => '合作已終止',_ => '停權中',}),
+(UiLocale.zhTW || UiLocale.en, 2) => (switch (kind.value) {3 => '合作已終止',4 => '內容已下架',_ => '停權中',}),
 (UiLocale.zhTW || UiLocale.en, 3) => '已結束',
 (UiLocale.zhTW || UiLocale.en, 4) => '已撤銷',
 (UiLocale.zhTW || UiLocale.en, 5) => '預定生效',

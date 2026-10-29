@@ -762,6 +762,9 @@ const (
 	ActionReasonViolationBasis MeasureActionUnavailableReason = "VIOLATION_BASIS"
 	// ActionReasonRemediationPending 有待處理的解除請求，要先裁定；接受解除請求就是結束（只出現在結束）。
 	ActionReasonRemediationPending MeasureActionUnavailableReason = "REMEDIATION_PENDING"
+	// ActionReasonContentTakedownRevokeOnly 內容下架沒有結束時間，也沒有結束入口（延長、縮短、結束）；要讓內容恢復只能撤銷或接受申覆。
+	// 未撤銷的內容下架在延長、縮短與結束只回這一個原因（取代警告、不在生效中與依據違規認定的說法）。
+	ActionReasonContentTakedownRevokeOnly MeasureActionUnavailableReason = "CONTENT_TAKEDOWN_REVOKE_ONLY"
 )
 
 // MeasureActionUnavailableReasonValues 回傳全部不能修改或撤銷的原因（與 API 的 MeasureActionUnavailableReason 一致）。
@@ -769,6 +772,7 @@ func MeasureActionUnavailableReasonValues() []MeasureActionUnavailableReason {
 	return []MeasureActionUnavailableReason{
 		ActionReasonRevoked, ActionReasonNotActive, ActionReasonKindHasNoEndTime, ActionReasonTerminationRecreate,
 		ActionReasonRequestPendingFrozen, ActionReasonAppealPending, ActionReasonViolationBasis, ActionReasonRemediationPending,
+		ActionReasonContentTakedownRevokeOnly,
 	}
 }
 
@@ -835,6 +839,8 @@ func ActionUnavailableText(reason MeasureActionUnavailableReason, action Measure
 		return text.ActionUnavailableViolationBasis()
 	case ActionReasonRemediationPending:
 		return text.ActionUnavailableRemediationPending()
+	case ActionReasonContentTakedownRevokeOnly:
+		return text.ActionUnavailableContentTakedownRevokeOnly()
 	}
 	return uitext.Message{}
 }
@@ -861,14 +867,26 @@ func (m Measure) UpdateStatementUnavailableReasons() []MeasureActionUnavailableR
 // CanUpdateStatement 判斷 admin 此刻能不能改給賣家的理由：沒有任何不能改的原因（UpdateStatementUnavailableReasons）。
 func (m Measure) CanUpdateStatement() bool { return len(m.UpdateStatementUnavailableReasons()) == 0 }
 
-// endTimeUnavailableReasons 是結束時間可調的結構性前置，全部列出並依優先序：已撤銷、警告（沒有結束時間）、終止合作（未撤銷時，要撤銷後重建）、停權不在生效中；
+// takedownRevokeOnly 補上內容下架在延長、縮短與結束的唯一結構性原因：未撤銷時是 CONTENT_TAKEDOWN_REVOKE_ONLY；已撤銷的只有 REVOKED（out 已帶），
+// 同終止合作，已經不能再撤銷，不再多說「只能撤銷」。
+func (m Measure) takedownRevokeOnly(out []MeasureActionUnavailableReason) []MeasureActionUnavailableReason {
+	if m.Status == MeasureStatusEnforced {
+		out = append(out, ActionReasonContentTakedownRevokeOnly)
+	}
+	return out
+}
+
+// endTimeUnavailableReasons 是結束時間可調的結構性前置，全部列出並依優先序：已撤銷、內容下架（未撤銷時只能撤銷，其餘原因都不列）、警告（沒有結束時間）、終止合作（未撤銷時，要撤銷後重建）、停權不在生效中；
 // 空表示結構上可以調整。
 func (m Measure) endTimeUnavailableReasons() []MeasureActionUnavailableReason {
 	var out []MeasureActionUnavailableReason
 	if m.Status != MeasureStatusEnforced {
 		out = append(out, ActionReasonRevoked)
 	}
-	if m.Kind == MeasureWarning || m.Kind == MeasureContentTakedown {
+	if m.Kind == MeasureContentTakedown {
+		return m.takedownRevokeOnly(out)
+	}
+	if m.Kind == MeasureWarning {
 		out = append(out, ActionReasonKindHasNoEndTime)
 	}
 	if m.Kind == MeasureTermination && m.Status == MeasureStatusEnforced {
@@ -884,7 +902,7 @@ func (m Measure) endTimeUnavailableReasons() []MeasureActionUnavailableReason {
 // 造成的凍結；空表示可以延長。已結束的措施不能延長，再限制要另立措施。CanExtend 與 UpdateMeasure 的前置檢查、API 的 can_extend 都只看這一份。
 func (m Measure) ExtendUnavailableReasons() []MeasureActionUnavailableReason {
 	out := m.endTimeUnavailableReasons()
-	if m.frozenByRequest() {
+	if m.frozenByRequest() && m.Kind != MeasureContentTakedown { // 內容下架沒有結束時間可延長，凍結不是它的原因
 		out = append(out, ActionReasonRequestPendingFrozen)
 	}
 	return out
@@ -909,6 +927,9 @@ func (m Measure) EndUnavailableReasons() []MeasureActionUnavailableReason {
 	var out []MeasureActionUnavailableReason
 	if m.Status != MeasureStatusEnforced {
 		out = append(out, ActionReasonRevoked)
+	}
+	if m.Kind == MeasureContentTakedown {
+		return m.takedownRevokeOnly(out)
 	}
 	if m.State != StateActive {
 		out = append(out, ActionReasonNotActive)

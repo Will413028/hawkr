@@ -132,6 +132,9 @@ func toAdminMeasure(m model.Measure) *adminpb.Measure {
 	for _, f := range m.Findings {
 		out.Findings = append(out.Findings, toAdminViolation(f))
 	}
+	for _, c := range m.Contents {
+		out.Contents = append(out.Contents, &pb.ContentRef{Kind: rpc.EnumToProto[pb.ContentKind](c.Kind), Id: c.ID.String()})
+	}
 	for _, r := range m.Revisions {
 		out.Revisions = append(out.Revisions, toRevision(r))
 	}
@@ -329,8 +332,22 @@ func (h *Governance) CreateMeasure(ctx context.Context, req *connect.Request[adm
 			t.SourceMeasureID = &source
 		}
 		in.Termination = t
+	case *adminpb.CreateMeasureRequest_ContentTakedown:
+		in.Kind, paths = model.MeasureContentTakedown, createTakedownPaths
+		if in.Violation, err = violationBasisFrom(input.ContentTakedown.GetViolation(), "content_takedown.violation"); err != nil {
+			return nil, err
+		}
+		t := &model.ContentTakedown{}
+		for i, ref := range input.ContentTakedown.GetContents() {
+			id, err := rpc.ParseUUID(apperr.IndexedField("content_takedown.contents", i)+".id", ref.GetId())
+			if err != nil {
+				return nil, err
+			}
+			t.Contents = append(t.Contents, model.ContentRef{Kind: rpc.EnumFromProto[model.ContentKind](ref.GetKind()), ID: id})
+		}
+		in.Takedown = t
 	default:
-		return nil, rpc.RequiredField("warning", "必須指定措施種類（warning、suspension 或 termination）")
+		return nil, rpc.RequiredField("warning", "必須指定措施種類（warning、suspension、termination 或 content_takedown）")
 	}
 	result, err := h.m.CreateMeasure(ctx, in)
 	if err != nil {

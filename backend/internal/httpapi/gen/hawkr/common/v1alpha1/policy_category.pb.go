@@ -22,7 +22,7 @@ const (
 )
 
 // PolicyCategory 是平台的政策分類（step10e-reports-brief R10）：檢舉人選的類別、平台判定類別與認定的類別共用一份，
-// 各入口只接受自己的子集（見各值的「入口」）。店家治理的值對應賣家合作條款的依據，給賣家的理由要能指到條款；社群內容的值（SPAM、HARASSMENT、HATE）給買家寫的內容的隱藏與警告用，買家條款訂出後補條款依據。
+// 各入口只接受自己的子集（見各值的「入口」）。店家治理的值對應賣家合作條款的依據，給賣家的理由要能指到條款；社群內容的值（SPAM、HARASSMENT、HATE）給買家寫的內容的隱藏與內容下架用，買家條款訂出後補條款依據；檢舉人選不到，認定與案件類別可以用。
 type PolicyCategory int32
 
 const (
@@ -53,11 +53,11 @@ const (
 	PolicyCategory_POLICY_CATEGORY_PLATFORM_ABUSE PolicyCategory = 12
 	// 檢舉人無法歸類時選。理由要指到條款，所以分案時要改判成有依據的類別，或直接設定結果。入口：只有檢舉人。
 	PolicyCategory_POLICY_CATEGORY_OTHER PolicyCategory = 13
-	// 社群內容的垃圾訊息：重複、無關或以廣告洗版的貼文、留言與討論區留言（社群，A7）。入口：社群內容的平台判定與認定。
+	// 社群內容的垃圾訊息：重複、無關或以廣告洗版的貼文、留言與討論區留言（社群，A7）。入口：平台判定與認定（含內容下架措施的認定）。
 	PolicyCategory_POLICY_CATEGORY_SPAM PolicyCategory = 14
-	// 社群內容的騷擾或霸凌：針對特定的人或店家的辱罵、威脅或持續打擾（社群，A7）。入口：社群內容的平台判定與認定。
+	// 社群內容的騷擾或霸凌：針對特定的人或店家的辱罵、威脅或持續打擾（社群，A7）。入口：平台判定與認定（含內容下架措施的認定）。
 	PolicyCategory_POLICY_CATEGORY_HARASSMENT PolicyCategory = 15
-	// 社群內容的仇恨或歧視言論：以身分、族群或特徵攻擊他人（社群，A7）。入口：社群內容的平台判定與認定。
+	// 社群內容的仇恨或歧視言論：以身分、族群或特徵攻擊他人（社群，A7）。入口：平台判定與認定（含內容下架措施的認定）。
 	PolicyCategory_POLICY_CATEGORY_HATE PolicyCategory = 16
 )
 

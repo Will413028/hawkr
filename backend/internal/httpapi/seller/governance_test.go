@@ -256,6 +256,7 @@ func TestGovernanceEnumsMatchTheModule(t *testing.T) {
 		"AppealUnavailableReason":        rpc.EnumMismatches[pb.AppealUnavailableReason](model.AppealUnavailableReasonValues()),
 		"TerminationGround":              rpc.EnumMismatches[pb.TerminationGround](model.TerminationGroundValues()),
 		"MeasureKind":                    rpc.EnumMismatches[pb.MeasureKind](model.MeasureKindValues()),
+		"ContentKind":                    rpc.EnumMismatches[pb.ContentKind](model.ContentKindValues()),
 		"MeasureBasis":                   rpc.EnumMismatches[pb.MeasureBasis](model.BasisValues()),
 		"MeasureState":                   rpc.EnumMismatches[pb.MeasureState](model.MeasureStateValues()),
 		"RevokeReason":                   rpc.EnumMismatches[pb.RevokeReason](model.RevokeReasonValues()),
@@ -551,6 +552,8 @@ func TestCreateMeasureRejectsBadRequestsBeforeTheModule(t *testing.T) {
 		"store_id":           {StoreId: "0", Measure: risk},
 		"引用的認定不是 UUID": {StoreId: "12", Measure: &adminpb.CreateMeasureRequest_Warning{Warning: &adminpb.WarningInput{
 			Violation: &adminpb.ViolationBasis{CitedFindingIds: []string{"x"}}}}},
+		"下架的內容 ID 不是 UUID": {StoreId: "12", Measure: &adminpb.CreateMeasureRequest_ContentTakedown{ContentTakedown: &adminpb.ContentTakedownInput{
+			Contents: []*pb.ContentRef{{Kind: pb.ContentKind_CONTENT_KIND_POST, Id: "x"}}}}},
 		"來源通報不是 UUID": {StoreId: "12", Measure: &adminpb.CreateMeasureRequest_Warning{Warning: &adminpb.WarningInput{
 			Violation: &adminpb.ViolationBasis{Finding: &adminpb.NewFinding{SourceReportIds: []string{uuid.NewV7().String(), "x"}}}}}},
 	} {
@@ -840,6 +843,7 @@ func TestMeasureFieldPathsExistInTheRequests(t *testing.T) {
 		"createWarning":     {createWarningPaths, &adminpb.CreateMeasureRequest{}},
 		"createSuspension":  {createSuspensionPaths, &adminpb.CreateMeasureRequest{}},
 		"createTermination": {createTerminationPaths, &adminpb.CreateMeasureRequest{}},
+		"createTakedown":    {createTakedownPaths, &adminpb.CreateMeasureRequest{}},
 		"note":              {createMeasureNotePaths, &adminpb.CreateMeasureNoteRequest{}},
 		"caseNote":          {createNotePaths, &adminpb.CreateCaseNoteRequest{}},
 		"listReports":       {listReportsPaths, &adminpb.ListReportsRequest{}},
@@ -1052,5 +1056,50 @@ func TestMarkReportSupplementsSeenForwardsTheEtag(t *testing.T) {
 	m.calls = 0
 	if _, err := h.MarkReportSupplementsSeen(adminCtx(42), connect.NewRequest(&adminpb.MarkReportSupplementsSeenRequest{Id: report.ID.String()})); err == nil || m.calls != 0 {
 		t.Fatalf("沒有 etag 不能呼叫模組：calls=%d err=%v", m.calls, err)
+	}
+}
+
+// 內容下架的分支：種類與對象交給模組，依據一定是認定；模組的欄位錯誤對應到 content_takedown 的路徑；回應帶對象。
+func TestCreateContentTakedownMapsTheBranchAndTheTargets(t *testing.T) {
+	measure := riskMeasureFixture()
+	measure.Kind, measure.Basis, measure.RiskGround, measure.EndsAt, measure.ReviewBy, measure.State = model.MeasureContentTakedown, model.BasisViolation, nil, nil, nil, model.StateIssued
+	measure.Requests = nil
+	measure.Contents = []model.ContentRef{{Kind: model.ContentPost, ID: uuid.NewV7()}, {Kind: model.ContentForumEntry, ID: uuid.NewV7()}}
+	m := &governanceModule{measure: measure}
+	h := NewGovernance(m, rpc.Images{})
+	post, forum := uuid.NewV7(), uuid.NewV7()
+	got, err := h.CreateMeasure(adminCtx(42), connect.NewRequest(&adminpb.CreateMeasureRequest{
+		StoreId: "12", Statement: "s", Note: "d",
+		Measure: &adminpb.CreateMeasureRequest_ContentTakedown{ContentTakedown: &adminpb.ContentTakedownInput{
+			Contents: []*pb.ContentRef{
+				{Kind: pb.ContentKind_CONTENT_KIND_POST, Id: post.String()},
+				{Kind: pb.ContentKind_CONTENT_KIND_FORUM_ENTRY, Id: forum.String()},
+			},
+			Violation: &adminpb.ViolationBasis{Finding: &adminpb.NewFinding{
+				Category: commonpb.PolicyCategory_POLICY_CATEGORY_SPAM, Severity: pb.ViolationSeverity_VIOLATION_SEVERITY_LOW}},
+		}},
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := m.create
+	if c.Kind != model.MeasureContentTakedown || c.Takedown == nil || c.Termination != nil || c.Risk != nil || c.EndsAt != nil ||
+		!slices.Equal(c.Takedown.Contents, []model.ContentRef{{Kind: model.ContentPost, ID: post}, {Kind: model.ContentForumEntry, ID: forum}}) ||
+		c.Violation == nil || c.Violation.Finding == nil || c.Violation.Finding.Category != policy.Spam {
+		t.Fatalf("create=%+v takedown=%+v", c, c.Takedown)
+	}
+	out := got.Msg.GetMeasure()
+	if out.GetKind() != pb.MeasureKind_MEASURE_KIND_CONTENT_TAKEDOWN || out.GetPeriod() != nil || len(out.GetContents()) != 2 ||
+		out.GetContents()[1].GetKind() != pb.ContentKind_CONTENT_KIND_FORUM_ENTRY || out.GetContents()[1].GetId() != measure.Contents[1].ID.String() {
+		t.Fatalf("measure=%v", out)
+	}
+	for _, end := range [][]*adminpb.MeasureActionUnavailability{out.GetExtendUnavailabilities(), out.GetShortenUnavailabilities(), out.GetEndUnavailabilities()} {
+		if len(end) != 1 || end[0].GetReason() != adminpb.MeasureActionUnavailableReason_MEASURE_ACTION_UNAVAILABLE_REASON_CONTENT_TAKEDOWN_REVOKE_ONLY ||
+			end[0].GetMessage().GetMessage() != "內容下架沒有結束時間，要讓內容恢復請撤銷措施，或接受賣家的申覆" {
+			t.Fatalf("unavailabilities=%v", end)
+		}
+	}
+	if out.GetCanEnd() || out.GetCanExtend() || out.GetCanShorten() || !out.GetCanRevoke() {
+		t.Fatalf("can_*=%v", out)
 	}
 }
