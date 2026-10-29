@@ -795,6 +795,45 @@ export async function mockBuyerAddresses(
 	});
 }
 
+/** 店家卡片（common.v1alpha1.StoreCard）的 JSON 線上形狀；status 用列舉名稱字串。 */
+export interface MockStoreCard {
+	id: string;
+	storeCode?: string;
+	name?: string;
+	status?:
+		| "STORE_CARD_STATUS_OPEN"
+		| "STORE_CARD_STATUS_PAUSED"
+		| "STORE_CARD_STATUS_CLOSED";
+}
+
+/**
+ * 公開的店家卡片讀取（SellerPublicService.BatchGetStores 與 DiscoveryPublicService.SuggestRecommendedSellers）：
+ * 預設都沒有卡片，沒有被個別 mock 蓋過時不會打到沒有後端的同源代理而 502。
+ * BatchGetStores 是 NO_SIDE_EFFECTS 的 GET，ids 在 query 的 `message`（JSON）裡；只回請求到的、有給卡片的店，
+ * 與伺服器「沒有卡片的店不在結果裡」一致。較晚註冊的 route 會蓋過這裡。
+ */
+export async function mockStoreCards(
+	page: Page,
+	cards: readonly MockStoreCard[] = [],
+) {
+	await page.route(
+		/\/api\/connect\/hawkr\.seller\.v1alpha1\.SellerPublicService\/BatchGetStores(?:\?|$)/,
+		(route) => {
+			const raw = new URL(route.request().url()).searchParams.get("message");
+			const ids: string[] = raw ? (JSON.parse(raw).ids ?? []) : [];
+			void fulfillConnect(route, {
+				stores: cards.filter((card) => ids.includes(card.id)),
+			});
+		},
+	);
+	await page.route(
+		/\/api\/connect\/hawkr\.discovery\.v1alpha1\.DiscoveryPublicService\/SuggestRecommendedSellers(?:\?|$)/,
+		(route) => {
+			void fulfillConnect(route, { sellers: [] });
+		},
+	);
+}
+
 /**
  * 登入頁面共用的買家資料讀取（個人資料與帳號選單、收藏、追蹤、造訪、會員卡、地址）：
  * 預設都回空清單，沒有被個別 mock 蓋過時不會打到沒有後端的同源代理而 502。
@@ -923,6 +962,7 @@ export async function setupGatewayMocks(
 
 	// 2a. 買家資料與賣家儀表板的讀取：預設回空，個別 mock 較晚註冊會蓋過。
 	await mockBuyerDefaults(page, identity.accountId);
+	await mockStoreCards(page);
 	await mockMyDashboard(page, {});
 
 	// 2b. 措施與申覆（ListMyMeasures）：預設空。

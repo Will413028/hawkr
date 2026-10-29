@@ -176,6 +176,12 @@ function SellerSelectionPreview() {
 									0,
 								),
 							}}
+							storeView={{
+								id: seller.sellerStoreId,
+								name: seller.sellerName,
+								logoUrl: "",
+								href: `/sellers/${seller.sellerStoreId}`,
+							}}
 							groupKey={seller.sellerStoreId}
 							isLocked={
 								activeSeller !== null && activeSeller !== seller.sellerStoreId
