@@ -53,4 +53,4 @@ final class SellerRepositoryProvider
   }
 }
 
-String _$sellerRepositoryHash() => r'bb49b6f823b96ad916805c21f8b61ce86906c025';
+String _$sellerRepositoryHash() => r'bf500558fe6943714e66bd1bb3ba4437740d8213';

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart' as seller;
-import 'package:hawkr_api/transport.dart' show Code, ConnectException;
+import 'package:hawkr_buyer/core/exceptions/app_exception.dart';
 import 'package:hawkr_buyer/core/networking/dio_provider.dart';
 import 'package:hawkr_buyer/core/session/session_model.dart';
 import 'package:hawkr_buyer/core/session/session_provider.dart';
@@ -96,7 +96,7 @@ void main() {
     final repository = _MockSellerRepository();
     when(
       () => repository.getStore('jinhu'),
-    ).thenThrow(ConnectException(Code.notFound, 'missing'));
+    ).thenThrow(const NotFoundException('missing'));
 
     await _pump(tester, repository);
 
@@ -133,7 +133,7 @@ void main() {
       var calls = 0;
       when(() => repository.getStore('jinhu')).thenAnswer((_) async {
         calls++;
-        if (calls == 1) throw ConnectException(Code.unavailable, 'down');
+        if (calls == 1) throw const ServerException('down');
         return seller.GetStoreResponse(
           store: seller.PublicStore(
             id: '9001',

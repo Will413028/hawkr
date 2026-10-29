@@ -1,7 +1,5 @@
-import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart' as seller;
 import 'package:hawkr_api/images.dart' show ImagePreset, ImageUri;
-import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_icon.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
@@ -11,7 +9,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../../../core/l10n/ui_locale.dart';
+import '../../../core/exceptions/app_exception.dart';
 import '../../../core/networking/dio_provider.dart';
 import '../../../core/session/session_provider.dart';
 import '../../../core/theme/app_colors.dart';
@@ -112,16 +110,12 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
     } catch (e) {
       HKLog.logE('Failed to load merchant info: $e', e);
       if (!mounted) return;
-      final error = ConnectException.from(e);
       setState(() {
         _isLoading = false;
-        if (error.code == Code.notFound) {
+        if (e is NotFoundException) {
           _merchantNotFound = true;
         } else {
-          _loadError = errorText(
-            error,
-            defaults: ref.read(defaultErrorTextProvider),
-          );
+          _loadError = e is AppException ? e.message : '$e';
         }
       });
     }
