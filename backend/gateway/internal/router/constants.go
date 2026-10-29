@@ -295,7 +295,6 @@ const (
 	SellersPath     = "/sellers"
 	SellersIDPath   = "/sellers/:id"
 	SellersStats    = "/sellers/:id/stats"
-	SellersRating   = "/sellers/:id/rating"
 	SellersProducts = "/sellers/:id/products"
 	SellersPosts    = "/sellers/:id/posts"
 	SellersForum    = "/sellers/:id/forum"

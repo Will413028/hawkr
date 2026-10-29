@@ -31,6 +31,17 @@ const _deadEndpointFragments = <String, String>{
   '/refund_bank_info': 'POST /app/orders/{order_no}/refund_bank_info',
 };
 
+/// 已改走 Connect 或由用戶端組合、不得再以手寫 REST 呼叫的路由。
+final _retiredEndpointPatterns = <RegExp, String>{
+  RegExp(r'/public/sellers/\$[\w{}.]+/rating'):
+      'GET /public/sellers/{id}/rating',
+  RegExp(r'/public/sellers/\$[\w{}.]+/stats'): 'GET /public/sellers/{id}/stats',
+  RegExp(r'/public/marketplace'): 'GET /public/marketplace',
+  RegExp(r'/public/recommended'): 'GET /public/recommended',
+  RegExp(r'/public/products/\$[\w{}.]+/view'):
+      'POST /public/products/{id}/view',
+};
+
 /// 去掉註解，只留下真正會送出請求的程式碼。
 ///
 /// 註解本身可以（也應該）寫出這些死路徑來解釋為什麼不能用，所以不能連註解一起掃，
@@ -62,6 +73,10 @@ void main() {
       _deadEndpointFragments.forEach((fragment, endpoint) {
         if (!source.contains(fragment)) return;
         offenders.add('${entity.path} → $endpoint (命中片段: $fragment)');
+      });
+      _retiredEndpointPatterns.forEach((pattern, endpoint) {
+        if (!pattern.hasMatch(source)) return;
+        offenders.add('${entity.path} → $endpoint (命中: ${pattern.pattern})');
       });
     }
 

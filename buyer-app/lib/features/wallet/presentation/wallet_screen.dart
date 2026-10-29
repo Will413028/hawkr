@@ -569,6 +569,7 @@ class _MyWalletTabState extends ConsumerState<_MyWalletTab> {
               onTap: () => _onCardTap(i),
               child: _NewLoyaltyCard(
                 merchantId: card.sellerId,
+                storeCode: card.storeCode,
                 merchantName: card.sellerName,
                 merchantAvatarRaw: card.sellerLogoKey.isNotEmpty
                     ? card.sellerLogoKey
@@ -622,6 +623,7 @@ class _MyWalletTabState extends ConsumerState<_MyWalletTab> {
 class _NewLoyaltyCard extends StatefulWidget {
   const _NewLoyaltyCard({
     required this.merchantId,
+    required this.storeCode,
     required this.merchantName,
     this.merchantAvatarRaw,
     this.coverUrl,
@@ -629,6 +631,9 @@ class _NewLoyaltyCard extends StatefulWidget {
     this.isExpanded = false,
   });
   final String merchantId;
+
+  /// 店面網址的路徑段；店家不是營業中時是空字串，不能進店。
+  final String storeCode;
   final String merchantName;
   final String? merchantAvatarRaw;
   final String? coverUrl;
@@ -756,10 +761,12 @@ class _NewLoyaltyCardState extends State<_NewLoyaltyCard> {
                             children: [
                               // 商家頭貼 - 展開時可點擊到商家頁
                               GestureDetector(
-                                onTap: widget.isExpanded
+                                onTap:
+                                    widget.isExpanded &&
+                                        widget.storeCode.isNotEmpty
                                     ? () {
                                         context.push(
-                                          '/merchant/${widget.merchantId}',
+                                          '/merchant/${widget.storeCode}',
                                         );
                                       }
                                     : null,

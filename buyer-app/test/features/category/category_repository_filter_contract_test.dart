@@ -4,6 +4,11 @@ import 'dart:typed_data';
 import 'package:hawkr_buyer/features/category/data/category_repository.dart';
 import 'package:hawkr_buyer/features/category/data/product_item_model.dart';
 import 'package:dio/dio.dart';
+import 'package:hawkr_api/gen/hawkr/common/v1alpha1/image.pb.dart';
+import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pb.dart';
+import 'package:hawkr_api/gen/hawkr/discovery/v1alpha1/discovery.pb.dart'
+    as discovery;
+import '../../support/fake_discovery_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _RecordingAdapter implements HttpClientAdapter {
@@ -38,7 +43,7 @@ void main() {
     final dio = Dio(BaseOptions(baseUrl: 'https://test.local'))
       ..httpClientAdapter = adapter;
     addTearDown(() => dio.close());
-    final repository = CategoryRepository(dio);
+    final repository = CategoryRepository(dio, fakeDiscoveryClient());
 
     await repository.fetchProducts(
       categoryId: '2201',
@@ -77,7 +82,7 @@ void main() {
       ..httpClientAdapter = adapter;
     addTearDown(() => dio.close());
 
-    await CategoryRepository(dio).fetchProducts(
+    await CategoryRepository(dio, fakeDiscoveryClient()).fetchProducts(
       categoryId: '0',
       keyword: '',
       sort: '',
@@ -153,57 +158,70 @@ void main() {
       ..httpClientAdapter = adapter;
     addTearDown(() => dio.close());
 
-    final result = await CategoryRepository(dio).fetchPopularHashtags(limit: 6);
+    final result = await CategoryRepository(
+      dio,
+      fakeDiscoveryClient(),
+    ).fetchPopularHashtags(limit: 6);
 
     expect(adapter.lastRequest!.path, '/public/hashtags/popular');
     expect(adapter.lastRequest!.queryParameters, {'limit': 6});
     expect(result, ['冷凍水產', '當季']);
   });
 
-  test('parses recommended seller stories from marketplace', () async {
-    final adapter = _RecordingAdapter()
-      ..responseBody = jsonEncode({
-        'data': {
-          'recommendedSellers': [
-            {
-              'storeId': '9001',
-              'storeName': '金湖水產',
-              // 真實 /public/marketplace 契約回 logo_key（objectKey），非舊 logo。
-              // 讀空→預設牛圖的回歸鎖：誰再改回只讀 logo 這裡就 fail。
-              'logoKey': 'seller.png',
-              'city': '高雄市',
-              'district': '前鎮區',
-            },
-            {
-              'storeId': '9002',
-              'storeName': '只有封面的商家',
-              'coverUrl': 'cover-must-not-be-avatar.png',
-              'city': '基隆市',
-              'district': '信義區',
-            },
-            {'storeId': '', 'storeName': '無效商家'},
+  test(
+    'recommended seller stories come from SuggestRecommendedSellers',
+    () async {
+      final requests = <discovery.SuggestRecommendedSellersRequest>[];
+      final repository = CategoryRepository(
+        Dio(),
+        fakeDiscoveryClient(
+          requests: requests,
+          sellers: [
+            discovery.RecommendedSeller(
+              store: StoreCard(
+                id: '9001',
+                storeCode: 'jinhu',
+                name: '金湖水產',
+                status: StoreCardStatus.STORE_CARD_STATUS_OPEN,
+                townCode: '64000090',
+                logo: Image(
+                  uriTemplate: 'https://cdn.test/seller/{preset}.png',
+                ),
+              ),
+            ),
+            discovery.RecommendedSeller(
+              store: StoreCard(
+                id: '9002',
+                storeCode: 'cover-only',
+                name: '只有封面的商家',
+                status: StoreCardStatus.STORE_CARD_STATUS_OPEN,
+                coverImage: Image(
+                  uriTemplate: 'https://cdn.test/cover/{preset}.png',
+                ),
+              ),
+            ),
+            discovery.RecommendedSeller(
+              store: StoreCard(
+                id: '9003',
+                storeCode: 'paused',
+                name: '暫停的商家',
+                status: StoreCardStatus.STORE_CARD_STATUS_PAUSED,
+              ),
+            ),
           ],
-        },
-      });
-    final dio = Dio(BaseOptions(baseUrl: 'https://test.local'))
-      ..httpClientAdapter = adapter;
-    addTearDown(() => dio.close());
+        ),
+      );
 
-    final result = await CategoryRepository(
-      dio,
-    ).fetchRecommendedSellers(limit: 6);
+      final result = await repository.fetchRecommendedSellers(limit: 6);
 
-    expect(adapter.lastRequest!.path, '/public/marketplace');
-    expect(adapter.lastRequest!.queryParameters, {
-      'seller_limit': 6,
-      'post_limit': 0,
-      'product_limit': 0,
-    });
-    expect(result, hasLength(2));
-    expect(result.first.name, '金湖水產');
-    expect(result.first.avatarUrl, 'seller.png');
-    expect(result.first.location, '高雄市前鎮區');
-    expect(result.last.name, '只有封面的商家');
-    expect(result.last.avatarUrl, isEmpty);
-  });
+      expect(requests.single.maxResults, 6);
+      expect(result.map((s) => s.id), ['9001', '9002']);
+      expect(result.first.storeCode, 'jinhu');
+      expect(result.first.name, '金湖水產');
+      expect(result.first.avatarUrl, 'https://cdn.test/seller/avatar.png');
+      expect(result.first.location, '高雄市前鎮區');
+      expect(result.last.avatarUrl, isEmpty);
+      expect(result.last.location, isEmpty);
+    },
+  );
 }

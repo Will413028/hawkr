@@ -70,9 +70,6 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen>
   int _page = 1;
   bool _hasMore = true;
 
-  // Seller info cache: storeId → (name, logo)
-  final Map<String, ({String name, String logo})> _sellerCache = {};
-
   // Loading
   bool _loadingCategories = true;
   bool _loadingProducts = false;
@@ -192,8 +189,8 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen>
       if (!mounted) return;
       setState(() => _recommendedSellers = sellers);
     } catch (error) {
-      // The seller rail is independently streamed on Web too. Keep product
-      // discovery usable when the marketplace aggregation endpoint is down.
+      // The seller rail is independent. Keep product
+      // discovery usable when the recommendation call fails.
       HKLog.logE(
         '[CategoryScreen] _loadRecommendedSellers error: $error',
         error,
@@ -280,47 +277,11 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen>
             .read(analyticsEventsProvider)
             .trackViewItemList(ga4Items, listId: listId, listName: '市集');
       }
-
-      // Batch-fetch seller info for new products.
-      _fetchSellerInfoForProducts(result.records);
     } catch (e) {
       HKLog.logE('[CategoryScreen] _loadProducts error: $e', e);
       if (!mounted || requestEpoch != _productRequestEpoch) return;
       setState(() => _loadingProducts = false);
     }
-  }
-
-  /// Fetch seller info for products that have storeId but aren't cached yet.
-  Future<void> _fetchSellerInfoForProducts(List<ProductItem> products) async {
-    final repo = ref.read(categoryRepositoryProvider);
-    final uncachedIds = products
-        .map((p) => p.storeId)
-        .where(
-          (id) => id != null && id.isNotEmpty && !_sellerCache.containsKey(id),
-        )
-        .toSet();
-
-    if (uncachedIds.isEmpty) return;
-
-    // Fetch in parallel
-    final futures = uncachedIds.map((id) async {
-      try {
-        final info = await repo.fetchSellerInfo(id!);
-        return MapEntry(id, info);
-      } catch (e) {
-        HKLog.logE('[CategoryScreen] fetchSellerInfo($id) error: $e', e);
-        return MapEntry(id!, (name: '', logo: ''));
-      }
-    });
-
-    final results = await Future.wait(futures);
-    if (!mounted) return;
-
-    setState(() {
-      for (final entry in results) {
-        _sellerCache[entry.key] = entry.value;
-      }
-    });
   }
 
   Future<void> _loadFavorites(Iterable<int> productIds) async {
@@ -632,7 +593,7 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen>
                     child: _MarketSellerRail(
                       sellers: _recommendedSellers,
                       onSellerSelected: (seller) =>
-                          context.push('/merchant/${seller.id}'),
+                          context.push('/merchant/${seller.storeCode}'),
                     ),
                   ),
                 ..._buildProductSlivers(),
@@ -741,11 +702,8 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen>
   }
 
   Widget _buildProductCard(ProductItem product, int index) {
-    final sellerInfo = product.storeId != null
-        ? _sellerCache[product.storeId]
-        : null;
-    final sellerName = product.sellerName ?? sellerInfo?.name ?? '';
-    final sellerAvatar = product.sellerAvatar ?? sellerInfo?.logo ?? '';
+    final sellerName = product.sellerName ?? '';
+    final sellerAvatar = product.sellerAvatar ?? '';
     final heroTag = product.id.isEmpty
         ? null
         : 'product-card:category:${product.id}';

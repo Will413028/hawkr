@@ -5,6 +5,9 @@ import 'package:hawkr_buyer/core/layout/app_media_query_policy.dart';
 import 'package:hawkr_buyer/features/order/data/order_model.dart';
 import 'package:hawkr_buyer/features/order/data/order_repository.dart';
 import 'package:hawkr_buyer/features/order/presentation/order_card.dart';
+import 'package:hawkr_buyer/features/seller/data/seller_repository.dart';
+import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pb.dart';
+import '../../support/fake_seller_repository.dart';
 import 'package:hawkr_buyer/features/order/presentation/order_detail_transition.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_icon.dart';
 import 'package:hawkr_buyer/shared/utils/date_format_utils.dart';
@@ -40,10 +43,10 @@ void main() {
           ),
         ),
         GoRoute(
-          path: '/merchant/:sellerId',
+          path: '/merchant/:storeCode',
           builder: (_, state) => Scaffold(
             body: Text(
-              '商家 ${state.pathParameters['sellerId']}',
+              '商家 ${state.pathParameters['storeCode']}',
               key: const ValueKey('merchant-route'),
             ),
           ),
@@ -54,6 +57,11 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
+        overrides: [
+          sellerRepositoryProvider.overrideWithValue(
+            fakeSellerRepository(cards: [_storeCard]),
+          ),
+        ],
         child: ScreenUtilInit(
           designSize: const Size(390, 844),
           builder: (_, __) => MaterialApp.router(
@@ -184,6 +192,11 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
+        overrides: [
+          sellerRepositoryProvider.overrideWithValue(
+            fakeSellerRepository(cards: [_storeCard]),
+          ),
+        ],
         child: ScreenUtilInit(
           designSize: const Size(390, 844),
           builder: (_, __) => MaterialApp.router(routerConfig: router),
@@ -218,6 +231,9 @@ void main() {
       ProviderScope(
         overrides: [
           orderRepositoryProvider.overrideWithValue(_ImageOrderRepository(dio)),
+          sellerRepositoryProvider.overrideWithValue(
+            fakeSellerRepository(cards: [_storeCard]),
+          ),
         ],
         child: ScreenUtilInit(
           designSize: const Size(390, 844),
@@ -281,4 +297,11 @@ const _order = Order(
       imageUrl: 'products/crab-stick.jpg',
     ),
   ],
+);
+
+final _storeCard = StoreCard(
+  id: 'seller-1',
+  storeCode: 'jinhu',
+  name: '金湖水產',
+  status: StoreCardStatus.STORE_CARD_STATUS_OPEN,
 );

@@ -191,6 +191,9 @@ Future<void> _pumpSearchResults(
         connectAuthTransportProvider.overrideWith(
           (_) => FakeTransportBuilder().build(),
         ),
+        connectTransportProvider.overrideWith(
+          (_) => FakeTransportBuilder().build(),
+        ),
         if (categoryRepository != null)
           categoryRepositoryProvider.overrideWithValue(categoryRepository),
         analyticsEventsProvider.overrideWithValue(analytics),

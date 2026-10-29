@@ -6,6 +6,8 @@ import 'package:hawkr_buyer/core/networking/dio_provider.dart';
 import 'package:hawkr_buyer/features/order/presentation/order_detail_screen.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_icon.dart';
 import 'package:dio/dio.dart';
+import 'package:hawkr_buyer/features/seller/data/seller_repository.dart';
+import '../../support/fake_seller_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -54,7 +56,10 @@ void main() {
 
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [dioProvider.overrideWithValue(dio)],
+          overrides: [
+            dioProvider.overrideWithValue(dio),
+            sellerRepositoryProvider.overrideWithValue(fakeSellerRepository()),
+          ],
           child: ScreenUtilInit(
             designSize: const Size(390, 844),
             enableScaleWH: () => false,
@@ -128,7 +133,10 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [dioProvider.overrideWithValue(dio)],
+        overrides: [
+          dioProvider.overrideWithValue(dio),
+          sellerRepositoryProvider.overrideWithValue(fakeSellerRepository()),
+        ],
         child: ScreenUtilInit(
           designSize: const Size(390, 844),
           enableScaleWH: () => false,

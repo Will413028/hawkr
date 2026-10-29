@@ -13,6 +13,8 @@ import 'package:hawkr_buyer/features/product/presentation/merchant_item_detail_s
 import 'package:hawkr_buyer/features/social/presentation/merchant_posts_feed_screen.dart';
 import 'package:hawkr_buyer/features/social/presentation/post_detail_screen.dart';
 import 'package:dio/dio.dart';
+import 'package:hawkr_buyer/features/seller/data/seller_repository.dart';
+import '../../support/fake_seller_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -96,6 +98,9 @@ void main() {
           final container = ProviderContainer(
             overrides: [
               dioProvider.overrideWithValue(dio),
+              sellerRepositoryProvider.overrideWithValue(
+                fakeSellerRepository(),
+              ),
               sessionProvider.overrideWith(() => _Session(loggedIn)),
             ],
           );

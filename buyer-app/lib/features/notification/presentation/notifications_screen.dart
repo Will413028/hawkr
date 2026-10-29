@@ -22,7 +22,8 @@ import '../../../shared/widgets/hk_tap_target.dart';
 import '../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
 import '../../order/data/order_repository.dart';
-import '../../seller/data/seller_repository.dart';
+import '../../seller/data/store_card_display.dart';
+import '../../seller/data/store_card_provider.dart';
 import '../data/notification_model.dart';
 import '../data/push/manager.dart';
 import 'notification_controller.dart';
@@ -55,31 +56,10 @@ final _notificationSenderMetaProvider =
       }
 
       if (kind == 'seller') {
-        final response = await ref
-            .watch(sellerRepositoryProvider)
-            .getMerchantInfo(id);
-        final raw = response?['data'];
-        final data = raw is Map<String, dynamic>
-            ? raw
-            : response?.cast<String, dynamic>() ?? const <String, dynamic>{};
-        final name = _firstFromMap(data, const [
-          'store_name',
-          'storeName',
-          'merchantName',
-          'sellerName',
-          'name',
-        ]);
-        final avatar = _firstFromMap(data, const [
-          'logoKey',
-          'logoUrl',
-          'sellerAvatarUrl',
-          'merchantAvatar',
-          'avatarUrl',
-          'avatar_url',
-          'avatar',
-          'logo',
-        ]);
-        if (name.isEmpty && avatar.isEmpty) return null;
+        final card = await ref.watch(storeCardProvider(id).future);
+        if (card == null) return null;
+        final name = card.displayName;
+        final avatar = card.logoUri;
         return _NotificationSenderMeta(name: name, avatarUrl: avatar);
       }
 
@@ -821,16 +801,12 @@ class _NotificationCardState extends ConsumerState<_NotificationCard>
       return 'order:$orderNo';
     }
     final sellerId = _firstDataString(n.data, const [
-      'sellerId',
-      'seller_id',
-      'sellerAccountId',
-      'seller_account_id',
-      'merchantId',
-      'merchant_id',
-      'merchantAccountId',
-      'merchant_account_id',
       'storeId',
       'store_id',
+      'sellerId',
+      'seller_id',
+      'merchantId',
+      'merchant_id',
     ]);
     if (sellerId.isNotEmpty) return 'seller:$sellerId';
     return '';

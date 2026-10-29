@@ -34,7 +34,7 @@ enum ProductFavoriteSurfaceStyle {
 /// `/public/sellers/{id}` 補撈——那是列表頁的 N+1（20 張卡＝最多 20 次請求），
 /// 而且補不到東西：`/public/sellers/{id}` 回的是 `storeName` / `logoKey`，
 /// 舊的 `Seller` model 讀的是 `name` / `avatar`，解析必定落空。
-/// `/public/products`、`/public/marketplace`、分類列表三個來源都成對回
+/// `/public/products` 與分類列表都成對回
 /// `sellerName` + `sellerLogoKey`，補撈路徑因此整條移除。
 class ProductCard extends StatefulWidget {
   final String name;

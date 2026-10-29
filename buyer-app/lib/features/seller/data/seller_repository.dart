@@ -1,11 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pb.dart';
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart' as seller;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../../../core/networking/connect_provider.dart';
 import '../../../core/networking/dio_provider.dart';
-import '../../../core/exceptions/app_exception.dart';
 import '../../../features/follow/data/follow_repository.dart';
-import '../../../features/product/data/product_model.dart';
-import 'seller_model.dart';
 
 part 'seller_repository.g.dart';
 
@@ -13,39 +14,62 @@ part 'seller_repository.g.dart';
 SellerRepository sellerRepository(Ref ref) => SellerRepository(
   ref.watch(dioProvider),
   ref.watch(followRepositoryProvider),
+  ref.watch(sellerPublicClientProvider),
+  ref.watch(sellerPublicOptionalAuthClientProvider),
 );
 
 class SellerRepository {
+  /// BatchGetStores 一次最多的店家數。
+  static const batchGetStoresLimit = 100;
+
   final Dio _dio;
   final FollowRepository _follows;
-  SellerRepository(this._dio, this._follows);
+  final SellerPublicServiceClient _public;
+  final SellerPublicServiceClient _publicWithSession;
+  SellerRepository(
+    this._dio,
+    this._follows,
+    this._public,
+    this._publicWithSession,
+  );
 
-  Future<List<Product>> getSellerProducts(int sellerId) async {
+  /// 店面頁的店家與統計；不存在或不公開時丟 `ConnectException`（not_found）。
+  Future<seller.GetStoreResponse> getStore(String storeCode) =>
+      _public.getStore(seller.GetStoreRequest(storeCode: storeCode));
+
+  /// 依店家 id 批次讀卡片，回傳以 id 為鍵的表；沒有卡片的店家（從沒公開過、不存在）不在表裡。
+  Future<Map<String, StoreCard>> batchGetStores(Iterable<String> ids) async {
+    final unique = <String>{
+      for (final id in ids)
+        if (id.trim().isNotEmpty) id.trim(),
+    }.toList();
+    final chunks = <List<String>>[
+      for (var i = 0; i < unique.length; i += batchGetStoresLimit)
+        unique.sublist(
+          i,
+          i + batchGetStoresLimit > unique.length
+              ? unique.length
+              : i + batchGetStoresLimit,
+        ),
+    ];
+    final responses = await Future.wait([
+      for (final chunk in chunks)
+        _public.batchGetStores(seller.BatchGetStoresRequest(ids: chunk)),
+    ]);
+    return {
+      for (final response in responses)
+        for (final card in response.stores) card.id: card,
+    };
+  }
+
+  /// 商品頁的瀏覽 beacon。登入與否由伺服器判斷，失敗不影響頁面。
+  Future<void> recordProductView(String productId) async {
+    if (productId.trim().isEmpty) return;
     try {
-      final resp = await _dio.get<Map<String, dynamic>>(
-        '/public/sellers/$sellerId/products',
+      await _publicWithSession.recordProductView(
+        seller.RecordProductViewRequest(productId: productId),
       );
-      final body = resp.data!;
-      if (body['code'] != 0) {
-        throw ServerException((body['message'] ?? '請求失敗').toString());
-      }
-      final data = body['data'];
-      final list =
-          (data is Map
-                  ? (data['records'] as List?) ??
-                        (data['items'] as List?) ??
-                        (data['list'] as List?) ??
-                        (data['rows'] as List?)
-                  : data)
-              as List? ??
-          [];
-      return list
-          .map((e) => Product.fromJson(e as Map<String, dynamic>))
-          .toList();
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 401) throw const UnauthorizedException();
-      throw const NetworkException();
-    }
+    } catch (_) {}
   }
 
   /// Get merchant info by string ID (public endpoint, no auth wrapper needed).
@@ -66,21 +90,5 @@ class SellerRepository {
   /// Unfollow a merchant (toggle follow status).
   Future<bool> unfollowMerchant(String merchantId) async {
     return _follows.unfollowMerchant(merchantId);
-  }
-
-  Future<RatingStats> getRatingStats(int sellerId) async {
-    try {
-      final resp = await _dio.get<Map<String, dynamic>>(
-        '/public/sellers/$sellerId/rating',
-      );
-      final body = resp.data!;
-      if (body['code'] != 0) {
-        throw ServerException((body['message'] ?? '請求失敗').toString());
-      }
-      return RatingStats.fromJson(body['data'] as Map<String, dynamic>);
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 401) throw const UnauthorizedException();
-      throw const NetworkException();
-    }
   }
 }

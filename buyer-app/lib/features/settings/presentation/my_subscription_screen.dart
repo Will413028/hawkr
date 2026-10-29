@@ -35,6 +35,7 @@ import '../../product/data/product_repository.dart';
 import '../../product/presentation/merchant_item_detail_screen.dart';
 import '../../review/data/review_repository.dart';
 import '../../seller/data/seller_repository.dart';
+import '../../seller/data/store_card_display.dart';
 import '../../visit/data/visit_repository.dart';
 import '../../../shared/utils/price_display.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
@@ -350,9 +351,6 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
   final Set<String> _recentSeen = {};
   Set<String> _favoriteIds = {};
   String? _buyingProductId;
-  // 商家資訊快取（State 生命週期）：三個 tab 的逐項 enrichment 會對同一商家
-  // 重複打 /public/sellers/{id}，快取 Future 讓併發請求共用同一次呼叫
-  final Map<String, Future<Map<String, dynamic>?>> _merchantInfoRequests = {};
 
   @override
   void initState() {
@@ -468,31 +466,20 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
     } catch (_) {}
   }
 
-  /// 取商家資訊（同商家只打一次 /public/sellers/{id}）。
-  /// 失敗（null）時移除快取，之後切 tab 重載可重試。
-  Future<Map<String, dynamic>?> _getMerchantInfoCached(String merchantId) {
-    final pending = _merchantInfoRequests[merchantId];
-    if (pending != null) return pending;
-    final future = ref
-        .read(sellerRepositoryProvider)
-        .getMerchantInfo(merchantId)
-        .then((resp) {
-          if (resp == null) _merchantInfoRequests.remove(merchantId);
-          return resp;
-        });
-    _merchantInfoRequests[merchantId] = future;
-    return future;
+  /// 追蹤店家卡片的顯示資料，全部來自 API 回的店家卡片。
+  Map<String, dynamic> _followingItem(buyer.Follow row) {
+    final card = row.store;
+    return {
+      'merchantId': row.storeId,
+      'name': card.displayName,
+      'avatar': card.logoUri,
+      'address': card.location,
+      'rating': card.hasRatingStats ? card.ratingAverage.toDouble() : 0.0,
+      'reviewCount': card.hasRatingStats ? card.reviewCount : 0,
+      'storeCode': card.isOpen ? card.storeCode : '',
+      'statusLabel': card.statusLabel ?? '',
+    };
   }
-
-  /// 追蹤店家卡片的顯示資料（名稱與 logo 來自 API，地址與評價由下方補齊）。
-  Map<String, dynamic> _followingItem(buyer.Follow row) => {
-    'merchantId': row.storeId,
-    'name': row.store.name,
-    'avatar': row.store.hasLogo() ? row.store.logo.uri(ImagePreset.avatar) : '',
-    'address': '',
-    'rating': 0.0,
-    'reviewCount': 0,
-  };
 
   Map<String, dynamic> _favoriteItem(buyer.Favorite favorite) {
     final product = favorite.product;
@@ -503,11 +490,11 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
       'productName': product.name,
       'imageKey': product.hasImage() ? product.image.uri(ImagePreset.card) : '',
       'sellerId': product.storeId,
-      'sellerName': product.hasStore() ? store.name : '',
-      'logoUrl': product.hasStore() && store.hasLogo()
-          ? store.logo.uri(ImagePreset.avatar)
-          : '',
-      'storeCode': product.hasStore() ? store.storeCode : '',
+      'sellerName': store.displayName,
+      'storeName': store.displayName,
+      'sellerAvatar': store.logoUri,
+      'distance': store.location,
+      'storeCode': store.isOpen ? store.storeCode : '',
       'priceMin': product.minPrice.toInt(),
       'priceMax': product.maxPrice.toInt(),
       'ratingX10': product.hasRating() ? (product.rating * 10).round() : null,
@@ -526,8 +513,11 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
       'productName': product.name,
       'imageKey': product.hasImage() ? product.image.uri(ImagePreset.card) : '',
       'sellerId': product.storeId,
-      'sellerName': product.hasStore() ? product.store.name : '',
-      'storeCode': product.hasStore() ? product.store.storeCode : '',
+      'sellerName': product.store.displayName,
+      'storeName': product.store.displayName,
+      'sellerAvatar': product.store.logoUri,
+      'distance': product.store.location,
+      'storeCode': product.store.isOpen ? product.store.storeCode : '',
       'minPrice': product.minPrice.toString(),
       'maxPrice': product.maxPrice.toString(),
       'rating': product.hasRating() ? product.rating.toString() : '',
@@ -564,7 +554,7 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
     }
   }
 
-  /// 讀一頁追蹤店家並補齊地址與評價。
+  /// 讀一頁追蹤店家。
   Future<({List<Map<String, dynamic>> items, String next, int total})>
   _fetchFollowingPage(String pageToken) async {
     final page = await ref
@@ -574,96 +564,6 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
       for (final row in page.follows)
         if (row.storeId.trim().isNotEmpty) _followingItem(row),
     ];
-
-    // 獲取商家詳細資訊
-    await Future.wait(
-      mapped.asMap().entries.map((entry) async {
-        final i = entry.key;
-        final m = entry.value;
-        final mid = (m['merchantId'] ?? '').toString().trim();
-        if (mid.isEmpty || mid == '0') return;
-
-        // 從 getMerchantInfo 獲取商家資訊（包含 avatarBase64）
-        try {
-          final resp = await _getMerchantInfoCached(mid);
-          debugPrint(
-            '[MySubscription] getMerchantInfo($mid) resp keys: ${resp?.keys.toList()}',
-          );
-          debugPrint(
-            '[MySubscription] getMerchantInfo($mid) resp[data] type: ${resp?['data']?.runtimeType}',
-          );
-          if (resp != null) {
-            final info = resp['data'] is Map<String, dynamic>
-                ? resp['data'] as Map<String, dynamic>
-                : resp;
-            debugPrint(
-              '[MySubscription] Following enrichment info: city=${info['city']}, district=${info['district']}, storeName=${info['storeName']}, rating=${info['rating']}',
-            );
-            // 49 §6.1 成對契約：logoKey（裸 key）優先，logoUrl 退路。
-            // 值一律過 buildImageUrl 顯示。
-            final displayAvatar = (info['logoKey'] ?? info['logoUrl'] ?? '')
-                .toString()
-                .trim();
-            if (displayAvatar.isNotEmpty) {
-              m['avatar'] = displayAvatar;
-            }
-
-            // 獲取商家名稱
-            final needsName = (m['name']?.toString().trim().isEmpty ?? true);
-            if (needsName) {
-              String name = (info['storeName'] ?? '').toString().trim();
-              if (name.isNotEmpty) m['name'] = name;
-            }
-
-            // 獲取地址
-            final needsAddress =
-                (m['address']?.toString().trim().isEmpty ?? true);
-            if (needsAddress) {
-              final city = (info['city'] ?? '').toString().trim();
-              final district = (info['district'] ?? '').toString().trim();
-              final addressDetail = (info['addressDetail'] ?? '')
-                  .toString()
-                  .trim();
-              String address = '';
-              if (city.isNotEmpty || district.isNotEmpty) {
-                address = '$city$district';
-                if (addressDetail.isNotEmpty) address += ' $addressDetail';
-              } else if (addressDetail.isNotEmpty) {
-                address = addressDetail;
-              }
-              if (address.isNotEmpty) m['address'] = address;
-            }
-
-            // 獲取評分（/public/sellers/{id} 不帶評論數，評論數走 rating API）
-            final double rating =
-                double.tryParse((info['rating'] ?? '0').toString()) ?? 0;
-            if (rating > 0) m['rating'] = rating;
-          }
-        } catch (_) {}
-
-        // 評論數只有 /public/sellers/{id}/rating 有（SellerInfo 不帶），
-        // 所以評分或評論數任一缺就補打一次。
-        if ((m['rating'] as num? ?? 0) <= 0 ||
-            (m['reviewCount'] as num? ?? 0) <= 0) {
-          try {
-            final intId = int.tryParse(mid);
-            if (intId != null) {
-              final ratingStats = await ref
-                  .read(sellerRepositoryProvider)
-                  .getRatingStats(intId);
-              if ((ratingStats.average ?? 0) > 0) {
-                m['rating'] = ratingStats.average!;
-              }
-              if ((ratingStats.total ?? 0) > 0) {
-                m['reviewCount'] = ratingStats.total!;
-              }
-            }
-          } catch (_) {}
-        }
-        mapped[i] = Map<String, dynamic>.from(m);
-      }),
-    );
-
     return (items: mapped, next: page.nextPageToken, total: page.totalSize);
   }
 
@@ -725,7 +625,7 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
     }
   }
 
-  /// 讀一頁收藏並補齊評價與商家資訊。
+  /// 讀一頁收藏並補齊評價。
   Future<({List<Map<String, dynamic>> items, String next, int total})>
   _fetchLikesPage(String pageToken) async {
     final page = await ref
@@ -733,59 +633,14 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
         .listFavorites(pageToken: pageToken);
     final enriched = [for (final f in page.favorites) _favoriteItem(f)];
 
-    // API 已回傳 product_name, product_image, price_min, price_max,
-    // rating_x10, seller_id, seller_name, seller_logo，
-    // 只需額外載入商家位置資訊
-    await Future.wait(
-      enriched.asMap().entries.map((entry) async {
-        final i = entry.key;
-        final m = entry.value;
-        final mid = (m['sellerId'] ?? '').toString().trim();
-        final pid = (m['productId'] ?? '').toString().trim();
-        if (pid.isNotEmpty) {
-          await _enrichProductReviewStats(enriched[i], pid);
-        }
-
-        if (mid.isEmpty || mid == '0') return;
-
-        // 載入商家位置資訊與 store_name
-        try {
-          final resp = await _getMerchantInfoCached(mid);
-          if (resp != null) {
-            final info = resp['data'] is Map<String, dynamic>
-                ? resp['data'] as Map<String, dynamic>
-                : resp;
-            final storeName = (info['storeName'] ?? '').toString().trim();
-            if (storeName.isNotEmpty) {
-              enriched[i]['storeName'] = storeName;
-            }
-            final city = (info['city'] ?? '').toString();
-            final district = (info['district'] ?? '').toString();
-            if (city.isNotEmpty || district.isNotEmpty) {
-              enriched[i]['distance'] = '$city$district';
-            }
-            // 商家大頭貼 - 49 號成對契約：優先 logo_key / avatar_key（裸 key）。
-            // 49 §6.1 成對契約：logoKey（裸 key）優先，logoUrl 退路。
-            final displayAvatar = (info['logoKey'] ?? info['logoUrl'] ?? '')
-                .toString()
-                .trim();
-            if (displayAvatar.isNotEmpty) {
-              enriched[i]['sellerAvatar'] = displayAvatar;
-            }
-          }
-        } catch (_) {}
-      }),
-    );
-
-    // 補充 seller_logo（API 原始欄位）作為 fallback
-    for (final m in enriched) {
-      if ((m['sellerAvatar'] ?? '').toString().isEmpty) {
-        final sellerLogo = (m['logoKey'] ?? m['logoUrl'] ?? '')
-            .toString()
-            .trim();
-        if (sellerLogo.isNotEmpty) m['sellerAvatar'] = sellerLogo;
-      }
-    }
+    await Future.wait([
+      for (final item in enriched)
+        if ((item['productId'] ?? '').toString().trim().isNotEmpty)
+          _enrichProductReviewStats(
+            item,
+            (item['productId'] ?? '').toString().trim(),
+          ),
+    ]);
 
     return (items: enriched, next: page.nextPageToken, total: page.totalSize);
   }
@@ -862,8 +717,7 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
         .read(visitRepositoryProvider)
         .listVisits(pageToken: pageToken);
     // 去除重複的商品（根據 seller_id + product_id 組合判斷，跨頁也算）
-    // seller_id == 0 為已刪除商品的幽靈紀錄（欄位全空），直接排除，
-    // 避免後續補抓打出 /public/sellers/0 等必敗請求
+    // seller_id == 0 為已刪除商品的幽靈紀錄（欄位全空），直接排除
     final uniqueVisits = <Map<String, dynamic>>[];
     for (final visit in page.visits) {
       final m = _visitItem(visit);
@@ -952,33 +806,6 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
         }
 
         await _enrichProductReviewStats(enriched[i], pid);
-
-        // 載入商家位置資訊與 store_name
-        try {
-          final resp = await _getMerchantInfoCached(mid);
-          if (resp != null) {
-            final info = resp['data'] is Map<String, dynamic>
-                ? resp['data'] as Map<String, dynamic>
-                : resp;
-            final storeName = (info['storeName'] ?? '').toString().trim();
-            if (storeName.isNotEmpty) {
-              enriched[i]['storeName'] = storeName;
-            }
-            final city = (info['city'] ?? '').toString();
-            final district = (info['district'] ?? '').toString();
-            if (city.isNotEmpty || district.isNotEmpty) {
-              enriched[i]['distance'] = '$city$district';
-            }
-            // 商家大頭貼 - 49 號成對契約：優先 logo_key / avatar_key（裸 key）。
-            // 49 §6.1 成對契約：logoKey（裸 key）優先，logoUrl 退路。
-            final displayAvatar = (info['logoKey'] ?? info['logoUrl'] ?? '')
-                .toString()
-                .trim();
-            if (displayAvatar.isNotEmpty) {
-              enriched[i]['sellerAvatar'] = displayAvatar;
-            }
-          }
-        } catch (_) {}
       }),
     );
 
@@ -1512,10 +1339,12 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
     final rating = _parseRatingValue(item['rating']);
     final reviewCount = _parseIntValue(item['reviewCount']);
     final merchantId = (item['merchantId'] ?? '').toString().trim();
-    final merchantName = name.isNotEmpty ? name : '店家';
-    final canOpenMerchant = int.tryParse(merchantId) != null;
+    final merchantName = name.isNotEmpty ? name : closedStoreName;
+    final storeCode = (item['storeCode'] ?? '').toString().trim();
+    final statusLabel = (item['statusLabel'] ?? '').toString().trim();
+    final canOpenMerchant = storeCode.isNotEmpty;
     final VoidCallback? onOpenMerchant = canOpenMerchant
-        ? () => context.push('/merchant/$merchantId')
+        ? () => context.push('/merchant/$storeCode')
         : null;
 
     return Padding(
@@ -1582,6 +1411,10 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
+                          if (statusLabel.isNotEmpty) ...[
+                            const SizedBox(height: HkSpace.xs),
+                            Text(statusLabel, style: AppTypography.metaMuted),
+                          ],
                           const SizedBox(height: HkSpace.xs),
                           Row(
                             children: [
@@ -1780,9 +1613,9 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
     return '${time.month}/${time.day} 看過';
   }
 
-  void _openMerchant(String merchantId) {
-    final parsedId = int.tryParse(merchantId.trim());
-    if (parsedId != null) context.push('/merchant/$parsedId');
+  void _openMerchant(String storeCode) {
+    final code = storeCode.trim();
+    if (code.isNotEmpty) context.push('/merchant/$code');
   }
 
   void _openProduct(Map<String, dynamic> item) {
@@ -1931,7 +1764,7 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
     Map<String, dynamic> item, {
     bool fromHistory = false,
   }) {
-    final merchantId = (item['sellerId'] ?? '').toString().trim();
+    final storeCode = (item['storeCode'] ?? '').toString().trim();
     final productId = (item['productId'] ?? '').toString().trim();
     final merchantName = (item['storeName'] ?? '').toString().trim();
     final sellerAvatar = (item['sellerAvatar'] ?? '').toString().trim();
@@ -1957,9 +1790,9 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
           child: Column(
             children: [
               InkWell(
-                onTap: int.tryParse(merchantId) == null
+                onTap: storeCode.isEmpty
                     ? null
-                    : () => _openMerchant(merchantId),
+                    : () => _openMerchant(storeCode),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(
                     HkSpace.md,

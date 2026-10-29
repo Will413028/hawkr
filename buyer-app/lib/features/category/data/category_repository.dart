@@ -1,7 +1,12 @@
 import 'package:dio/dio.dart';
+import 'package:hawkr_api/gen/hawkr/discovery/v1alpha1/discovery.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/discovery/v1alpha1/discovery.pb.dart'
+    as discovery;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/exceptions/app_exception.dart';
+import '../../../core/networking/connect_provider.dart';
 import '../../../core/networking/dio_provider.dart';
+import '../../seller/data/store_card_display.dart';
 import 'category_marketplace_model.dart';
 import 'category_model.dart';
 import 'product_item_model.dart';
@@ -11,28 +16,29 @@ part 'category_repository.g.dart';
 class MarketSellerPreview {
   const MarketSellerPreview({
     required this.id,
+    required this.storeCode,
     required this.name,
     required this.avatarUrl,
-    required this.city,
-    required this.district,
+    required this.location,
   });
 
   final String id;
+  final String storeCode;
   final String name;
   final String avatarUrl;
-  final String city;
-  final String district;
-
-  String get location => '$city$district'.trim();
+  final String location;
 }
 
 @riverpod
-CategoryRepository categoryRepository(Ref ref) =>
-    CategoryRepository(ref.watch(dioProvider));
+CategoryRepository categoryRepository(Ref ref) => CategoryRepository(
+  ref.watch(dioProvider),
+  ref.watch(discoveryPublicClientProvider),
+);
 
 class CategoryRepository {
   final Dio _dio;
-  CategoryRepository(this._dio);
+  final DiscoveryPublicServiceClient _discovery;
+  CategoryRepository(this._dio, this._discovery);
 
   List<CategoryMarketplaceProduct>? _marketplaceRecommendationCache;
   Future<List<CategoryMarketplaceProduct>>? _marketplaceRecommendationRequest;
@@ -132,45 +138,28 @@ class CategoryRepository {
     return result;
   }
 
-  /// GET /public/marketplace → Web 市集頂部的推薦商家 story rail。
+  /// SuggestRecommendedSellers → 市集頂部的推薦商家 story rail，順序照伺服器。
   Future<List<MarketSellerPreview>> fetchRecommendedSellers({
     int limit = 10,
   }) async {
-    final resp = await _dio.get(
-      '/public/marketplace',
-      queryParameters: {
-        'seller_limit': limit,
-        'post_limit': 0,
-        'product_limit': 0,
-      },
+    final response = await _discovery.suggestRecommendedSellers(
+      discovery.SuggestRecommendedSellersRequest(maxResults: limit),
     );
-    final body = resp.data;
-    final data = body is Map ? body['data'] : null;
-    final records = data is Map ? data['recommendedSellers'] : null;
-    if (records is! List) return const [];
-    return records
-        .whereType<Map>()
-        .map(
-          (raw) => MarketSellerPreview(
-            id: (raw['storeId'] ?? '').toString(),
-            name: (raw['storeName'] ?? '').toString(),
-            // 頭像取 logoKey/logoUrl（49 §6.1 成對契約）；交
-            // AppCachedImage(merchantAvatar) 套 avatar preset，與市集頂部橫列一致。
-            avatarUrl: (raw['logoKey'] ?? raw['logoUrl'] ?? '').toString(),
-            city: (raw['city'] ?? '').toString(),
-            district: (raw['district'] ?? '').toString(),
+    return [
+      for (final seller in response.sellers)
+        if (seller.store.isOpen)
+          MarketSellerPreview(
+            id: seller.store.id,
+            storeCode: seller.store.storeCode,
+            name: seller.store.displayName,
+            avatarUrl: seller.store.logoUri,
+            location: seller.store.location,
           ),
-        )
-        .where((seller) => seller.id.isNotEmpty && seller.name.isNotEmpty)
-        .toList(growable: false);
+    ];
   }
 
-  /// Category landing's generic product recommendations.
-  ///
-  /// The aggregate response already contains product image and seller fields,
-  /// so this is deliberately the only network request for the section.
-  /// Successful data is retained for this provider container (the current app
-  /// session). Concurrent callers share one in-flight request.
+  /// 分類首頁的商品推薦：依銷量排序的商品列表，一次請求。成功的資料在這個 provider container
+  /// （目前的 App session）內保留，同時發生的呼叫共用同一個請求。
   Future<List<CategoryMarketplaceProduct>> fetchMarketplaceRecommendations({
     int limit = 12,
     bool forceRefresh = false,
@@ -194,20 +183,17 @@ class CategoryRepository {
   Future<List<CategoryMarketplaceProduct>> _fetchMarketplaceRecommendations({
     required int limit,
   }) async {
-    final resp = await _dio.get<Map<String, dynamic>>(
-      '/public/marketplace',
-      queryParameters: {
-        'seller_limit': 0,
-        'post_limit': 0,
-        'product_limit': limit,
-      },
+    final result = await fetchProducts(sort: 'SALES', pageSize: limit);
+    final products = <CategoryMarketplaceProduct>[];
+    for (final item in result.records) {
+      final product = CategoryMarketplaceProduct.fromProductItem(item);
+      if (product != null) products.add(product);
+    }
+    final limited = List<CategoryMarketplaceProduct>.unmodifiable(
+      products.take(limit),
     );
-    final parsed = CategoryMarketplaceData.fromResponse(resp.data);
-    final products = List<CategoryMarketplaceProduct>.unmodifiable(
-      parsed.products.take(limit),
-    );
-    _marketplaceRecommendationCache = products;
-    return products;
+    _marketplaceRecommendationCache = limited;
+    return limited;
   }
 
   /// Clears the category recommendation cache without starting a request.
@@ -279,28 +265,6 @@ class CategoryRepository {
       page: page,
       pageSize: pageSize,
     );
-  }
-
-  /// GET /public/sellers/{id} → seller brief info (name + logo)
-  Future<({String name, String logo})> fetchSellerInfo(String accountId) async {
-    final resp = await _dio.get('/public/sellers/$accountId');
-    final body = resp.data;
-    if (body is Map) {
-      final data = body['data'];
-      if (data is Map) {
-        final storeName = data['storeName']?.toString() ?? '';
-        final sellerName = data['sellerName']?.toString() ?? '';
-        final name = storeName.isNotEmpty ? storeName : sellerName;
-        // 49 §6.1 成對契約：logoKey（裸 key）優先，logoUrl 退路。
-        // 舊碼讀的是 `logo` / `avatar` —— /public/sellers/{id} 從來沒有這兩個
-        // 欄位，所以商家 logo 在這條路徑上一直是空的。
-        final logoVal = data['logoKey']?.toString() ?? '';
-        final urlVal = data['logoUrl']?.toString() ?? '';
-        final logo = logoVal.isNotEmpty ? logoVal : urlVal;
-        return (name: name, logo: logo);
-      }
-    }
-    return (name: '', logo: '');
   }
 
   /// GET /public/search/suggest → autocomplete suggestions

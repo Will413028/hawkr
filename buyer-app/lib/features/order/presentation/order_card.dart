@@ -19,6 +19,8 @@ import '../../../shared/widgets/hk_tap_target.dart';
 import '../../../shared/widgets/oss_image.dart';
 import '../../../shared/widgets/product_card_hero.dart';
 import '../../member_card/presentation/member_card_controller.dart';
+import '../../seller/data/store_card_display.dart';
+import '../../seller/data/store_card_provider.dart';
 import '../data/after_sale_order_lookup.dart';
 import '../data/after_sale_repository.dart';
 import '../data/order_model.dart';
@@ -99,6 +101,10 @@ class _OrderCardState extends ConsumerState<OrderCard> {
     // 用 strokeAlignInside（預設）：邊框畫在 clip path 內側，搭配 Clip.antiAlias
     // 圓角不會出現不連續。strokeAlignOutside 在 antialias clip 下角落會被切。
     final cardBorderSide = BorderSide(width: 1, color: AppColors.cardBorder);
+    final storeCard = ref.watch(storeCardProvider(order.storeId)).value;
+    final storeCode = storeCard != null && storeCard.isOpen
+        ? storeCard.storeCode
+        : '';
 
     final VoidCallback cardOnTap = _canExpand
         ? _toggleExpand
@@ -164,9 +170,9 @@ class _OrderCardState extends ConsumerState<OrderCard> {
                         semanticLabel: '查看商家 ${order.sellerName}',
                         hint: '開啟商家頁面',
                         tooltip: '查看商家',
-                        onTap: order.storeId.isEmpty
+                        onTap: storeCode.isEmpty
                             ? null
-                            : () => context.push('/merchant/${order.storeId}'),
+                            : () => context.push('/merchant/$storeCode'),
                         child: OrderSellerColumn(order: order),
                       ),
                       SizedBox(width: AppSpacing.sm),

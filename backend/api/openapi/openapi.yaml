@@ -27697,44 +27697,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/public/sellers/{id}/rating:
-    get:
-      operationId: getSellerRating
-      summary: 取得商家評分
-      description: 取得商家的評分統計資訊
-      tags:
-      - Seller
-      parameters:
-      - name: id
-        in: path
-        description: 店家 ID（store_id 或 store_code）
-        required: true
-        schema:
-          type: integer
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  message:
-                    type: string
-                  data:
-                    $ref: '#/components/schemas/SellerRating'
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/public/sellers/{id}/reviews:
     get:
       operationId: getPublicSellerReviews
@@ -38199,25 +38161,6 @@ components:
           type: string
         version:
           type: string
-    SellerRating:
-      type: object
-      properties:
-        fiveStarPct:
-          type: number
-        fourStarPct:
-          type: number
-        oneStarPct:
-          type: number
-        rating:
-          type: number
-        reviewCount:
-          type: integer
-        storeId:
-          type: string
-        threeStarPct:
-          type: number
-        twoStarPct:
-          type: number
     SellerReceiptAuthorizationData:
       type: object
       properties:

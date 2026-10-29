@@ -53,4 +53,4 @@ final class FollowRepositoryProvider
   }
 }
 
-String _$followRepositoryHash() => r'476a3b280ff5ff312af34273d566d87e61235ef2';
+String _$followRepositoryHash() => r'ccf971b6b7e6529bd7abcdd551be94d4b40a52c4';

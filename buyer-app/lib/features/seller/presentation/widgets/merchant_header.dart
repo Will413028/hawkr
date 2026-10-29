@@ -39,7 +39,6 @@ class MerchantHeader extends StatelessWidget {
     this.ratingCount,
     this.followerCount,
     this.isFollowing = false,
-    this.isCertified = false,
     this.isLoading = false,
     this.onToggleFollow,
     this.onChat,
@@ -57,7 +56,6 @@ class MerchantHeader extends StatelessWidget {
   final int? ratingCount;
   final int? followerCount;
   final bool isFollowing;
-  final bool isCertified;
   final bool isLoading;
   final VoidCallback? onToggleFollow;
   final VoidCallback? onChat;
@@ -497,30 +495,6 @@ class MerchantHeader extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (isCertified)
-                    Positioned(
-                      right: -1,
-                      bottom: -1,
-                      child: Container(
-                        key: const Key('merchant_certification_badge'),
-                        width: 26,
-                        height: 26,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.actionPrimary,
-                          border: Border.all(
-                            color: AppColors.storefrontProfileSurface,
-                            width: 2,
-                          ),
-                        ),
-                        child: const Icon(
-                          AppIcons.verifiedUser,
-                          size: 15,
-                          color: AppIconColors.onBrand,
-                        ),
-                      ),
-                    ),
                 ],
               ),
             ),

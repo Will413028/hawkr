@@ -20,7 +20,6 @@ func registerSellerRoutes(public, app *gin.RouterGroup, h *handler.Holder) {
 	{
 		pubSellers.GET("/:id", h.GetSellerInfo)
 		pubSellers.GET("/:id/stats", h.GetSellerStats)
-		pubSellers.GET("/:id/rating", h.GetSellerRating)
 		pubSellers.GET("/:id/products", h.GetSellerProducts)
 		pubSellers.GET("/:id/reviews", h.GetPublicSellerReviews)
 		pubSellers.GET("/:id/reviews/stats", h.GetPublicSellerReviewStats)

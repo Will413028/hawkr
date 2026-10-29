@@ -45,10 +45,18 @@ class MerchantGroupCard extends StatelessWidget {
     required this.resolveImageProvider,
     required this.sellerAvatarUrl,
     this.onMerchantTap,
+    this.storeCode = '',
+    this.storeStatusLabel,
   });
 
   /// Optional navigation callback for deterministic previews.
   final VoidCallback? onMerchantTap;
+
+  /// 店面網址的路徑段；空字串表示店家不是營業中（或還沒讀到），不能進店。
+  final String storeCode;
+
+  /// 店家暫停營業或已關閉時的標籤，取代進店按鈕的文字。
+  final String? storeStatusLabel;
   final MerchantGroup group;
   final Set<int> checkedSkuIds;
   final Map<int, int> skuStock;
@@ -160,8 +168,9 @@ class MerchantGroupCard extends StatelessWidget {
     final toggle = enabled
         ? () => onGroupCheckChanged(group, !allChecked)
         : null;
-    final openStore =
-        onMerchantTap ?? () => context.push('/merchant/${group.storeId}');
+    final VoidCallback? openStore =
+        onMerchantTap ??
+        (storeCode.isEmpty ? null : () => context.push('/merchant/$storeCode'));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -233,7 +242,7 @@ class MerchantGroupCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: HkSpace.xs),
                   textStyle: CartTypography.button,
                 ),
-                child: const HkButtonLabel('賣家商店'),
+                child: HkButtonLabel(storeStatusLabel ?? '賣家商店'),
               ),
             ),
           ],

@@ -153,6 +153,57 @@ final class ConnectAuthTransportProvider
 String _$connectAuthTransportHash() =>
     r'dd5e385653b66d1ea73b74316e75114c6fc7decf';
 
+/// 公開的 service 但伺服器依身分決定行為的呼叫（例如 RecordProductView）：有 session 就帶 Bearer，沒有（訪客）
+/// 或換發失敗就不帶，不中斷呼叫。
+
+@ProviderFor(connectOptionalAuthTransport)
+final connectOptionalAuthTransportProvider =
+    ConnectOptionalAuthTransportProvider._();
+
+/// 公開的 service 但伺服器依身分決定行為的呼叫（例如 RecordProductView）：有 session 就帶 Bearer，沒有（訪客）
+/// 或換發失敗就不帶，不中斷呼叫。
+
+final class ConnectOptionalAuthTransportProvider
+    extends $FunctionalProvider<Transport, Transport, Transport>
+    with $Provider<Transport> {
+  /// 公開的 service 但伺服器依身分決定行為的呼叫（例如 RecordProductView）：有 session 就帶 Bearer，沒有（訪客）
+  /// 或換發失敗就不帶，不中斷呼叫。
+  ConnectOptionalAuthTransportProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'connectOptionalAuthTransportProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$connectOptionalAuthTransportHash();
+
+  @$internal
+  @override
+  $ProviderElement<Transport> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  Transport create(Ref ref) {
+    return connectOptionalAuthTransport(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Transport value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Transport>(value),
+    );
+  }
+}
+
+String _$connectOptionalAuthTransportHash() =>
+    r'10b70e08ac1d10a63dec7bef6d7c886063d98919';
+
 @ProviderFor(contentClient)
 final contentClientProvider = ContentClientProvider._();
 
@@ -199,6 +250,156 @@ final class ContentClientProvider
 }
 
 String _$contentClientHash() => r'02a325cac6180f94d43b9770aba7203355e6ed50';
+
+@ProviderFor(sellerPublicClient)
+final sellerPublicClientProvider = SellerPublicClientProvider._();
+
+final class SellerPublicClientProvider
+    extends
+        $FunctionalProvider<
+          SellerPublicServiceClient,
+          SellerPublicServiceClient,
+          SellerPublicServiceClient
+        >
+    with $Provider<SellerPublicServiceClient> {
+  SellerPublicClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'sellerPublicClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$sellerPublicClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<SellerPublicServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SellerPublicServiceClient create(Ref ref) {
+    return sellerPublicClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SellerPublicServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SellerPublicServiceClient>(value),
+    );
+  }
+}
+
+String _$sellerPublicClientHash() =>
+    r'33b02a400574f91d3a4dcb34e3885114f52bb233';
+
+/// RecordProductView：登入與否由伺服器判斷，所以有 session 時帶 Bearer。
+
+@ProviderFor(sellerPublicOptionalAuthClient)
+final sellerPublicOptionalAuthClientProvider =
+    SellerPublicOptionalAuthClientProvider._();
+
+/// RecordProductView：登入與否由伺服器判斷，所以有 session 時帶 Bearer。
+
+final class SellerPublicOptionalAuthClientProvider
+    extends
+        $FunctionalProvider<
+          SellerPublicServiceClient,
+          SellerPublicServiceClient,
+          SellerPublicServiceClient
+        >
+    with $Provider<SellerPublicServiceClient> {
+  /// RecordProductView：登入與否由伺服器判斷，所以有 session 時帶 Bearer。
+  SellerPublicOptionalAuthClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'sellerPublicOptionalAuthClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$sellerPublicOptionalAuthClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<SellerPublicServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SellerPublicServiceClient create(Ref ref) {
+    return sellerPublicOptionalAuthClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SellerPublicServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SellerPublicServiceClient>(value),
+    );
+  }
+}
+
+String _$sellerPublicOptionalAuthClientHash() =>
+    r'4f505af0cb6f075a95f80c461c4f3abf9451d307';
+
+@ProviderFor(discoveryPublicClient)
+final discoveryPublicClientProvider = DiscoveryPublicClientProvider._();
+
+final class DiscoveryPublicClientProvider
+    extends
+        $FunctionalProvider<
+          DiscoveryPublicServiceClient,
+          DiscoveryPublicServiceClient,
+          DiscoveryPublicServiceClient
+        >
+    with $Provider<DiscoveryPublicServiceClient> {
+  DiscoveryPublicClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'discoveryPublicClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$discoveryPublicClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<DiscoveryPublicServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  DiscoveryPublicServiceClient create(Ref ref) {
+    return discoveryPublicClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(DiscoveryPublicServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<DiscoveryPublicServiceClient>(value),
+    );
+  }
+}
+
+String _$discoveryPublicClientHash() =>
+    r'0fb25558c420b2cab6c2080e1e82a1276329ec40';
 
 /// 登入的帳號（GetSession）。登入與登出由 Clerk 處理（`clerkSessionProvider`）。
 

@@ -193,55 +193,6 @@ func (h *Holder) resolveStorefrontSellerID(c *gin.Context, idParam string) (stor
 	return storeID, true
 }
 
-// SellerRating represents seller rating info
-type SellerRating struct {
-	StoreID      string  `json:"storeId"`
-	Rating       float64 `json:"rating"`
-	ReviewCount  int32   `json:"reviewCount"`
-	FiveStarPct  float64 `json:"fiveStarPct,omitempty"`
-	FourStarPct  float64 `json:"fourStarPct,omitempty"`
-	ThreeStarPct float64 `json:"threeStarPct,omitempty"`
-	TwoStarPct   float64 `json:"twoStarPct,omitempty"`
-	OneStarPct   float64 `json:"oneStarPct,omitempty"`
-}
-
-// GetSellerRating returns seller rating statistics
-// @Summary      取得商家評分
-// @Description  取得商家的評分統計資訊
-// @Tags         商家 (Seller)
-// @Accept       json
-// @Produce      json
-// @Param        id   path      int  true  "店家 ID（store_id 或 store_code）"
-// @Success      200  {object}  handler.SellerResponse{data=handler.SellerRating}
-// @Failure      400  {object}  handler.SellerResponse
-// @Router /public/sellers/{id}/rating [get]
-func (h *Holder) GetSellerRating(c *gin.Context) {
-	storeIDStr := c.Param("id")
-	storeID, err := strconv.ParseInt(storeIDStr, 10, 64)
-	if err != nil || storeID <= 0 {
-		response.BadRequest(c, "invalid seller id")
-		return
-	}
-
-	// Use GetSellerStats which includes rating
-	resp, err := h.Seller.GetSellerStatsByStoreID(c.Request.Context(), storeID)
-	if err != nil {
-		pkglogger.Info(c.Request.Context(), "Failed to get seller rating", zap.Error(err))
-		response.GrpcErr(c, "seller", err)
-		return
-	}
-	if resp.Code != 0 {
-		response.GrpcResult(c, resp.Code, resp.Message, nil)
-		return
-	}
-	stats := resp.Data
-	response.OK(c, SellerRating{
-		StoreID:     stats.StoreId,
-		Rating:      stats.Rating,
-		ReviewCount: stats.ReviewCount,
-	})
-}
-
 // GetSellerStats returns merchant statistics
 // @Summary      取得商家統計資料
 // @Description  取得商家的商品數、訂單數、銷售額等統計資料

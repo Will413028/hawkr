@@ -38,6 +38,8 @@ import 'widgets/coupon_selection_sheet.dart';
 import 'widgets/merchant_group_card.dart';
 import 'widgets/delivery_notes_section.dart';
 import 'widgets/payment_details_section.dart';
+import '../../seller/data/store_card_display.dart';
+import '../../seller/data/store_card_provider.dart';
 import 'widgets/shipping_section.dart';
 import 'widgets/checkout_payment_sheet.dart';
 import 'widgets/address_picker_sheet.dart';
@@ -711,9 +713,16 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                       ),
                                     ),
                                   // Merchant group cards
-                                  ..._groups.map(
-                                    (group) => MerchantGroupCard(
+                                  ..._groups.map((group) {
+                                    final card = ref
+                                        .watch(storeCardProvider(group.storeId))
+                                        .value;
+                                    return MerchantGroupCard(
                                       group: group,
+                                      storeCode: card != null && card.isOpen
+                                          ? card.storeCode
+                                          : '',
+                                      storeStatusLabel: card?.statusLabel,
                                       checkedSkuIds: _checkedSkuIds,
                                       skuStock: _skuStock,
                                       onGroupCheckChanged: _onGroupCheckChanged,
@@ -729,8 +738,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                       resolveImageProvider:
                                           _resolveImageProvider,
                                       sellerAvatarUrl: _sellerAvatarUrl,
-                                    ),
-                                  ),
+                                    );
+                                  }),
                                   // Shipping section
                                   ShippingSection(
                                     shippingOptions: _shippingOptions,

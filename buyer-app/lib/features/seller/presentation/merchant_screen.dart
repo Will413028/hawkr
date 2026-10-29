@@ -1,3 +1,5 @@
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart' as seller;
+import 'package:hawkr_api/images.dart' show ImagePreset, ImageUri;
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_icon.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
@@ -12,8 +14,10 @@ import '../../../core/session/session_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/utils/hk_log.dart';
 import '../../../shared/utils/require_login.dart';
+import '../../../shared/widgets/hk_button_label.dart';
 import '../../chat/presentation/chat_focus_policy.dart';
 import '../../follow/data/follow_repository.dart';
+import '../data/store_card_display.dart';
 import '../data/seller_repository.dart';
 import 'widgets/merchant_chat_tab.dart';
 import 'widgets/merchant_common.dart';
@@ -22,11 +26,10 @@ import 'widgets/merchant_home_tab.dart';
 import 'widgets/merchant_shop_tab.dart';
 import 'widgets/merchant_tab_bar.dart';
 
-/// 商家頁（貼文 / 商城 / 留言 三個分頁）
+/// 商家頁（貼文 / 商城 / 留言 三個分頁）。[storeCode] 是店家網址的路徑段，不是 store id。
 class MerchantScreen extends ConsumerStatefulWidget {
-  const MerchantScreen({super.key, this.sellerId, this.sellerIdStr});
-  final int? sellerId;
-  final String? sellerIdStr;
+  const MerchantScreen({super.key, required this.storeCode});
+  final String storeCode;
 
   @override
   ConsumerState<MerchantScreen> createState() => _MerchantScreenState();
@@ -34,17 +37,11 @@ class MerchantScreen extends ConsumerStatefulWidget {
 
 class _MerchantScreenState extends ConsumerState<MerchantScreen>
     with SingleTickerProviderStateMixin {
-  late final TabController _tabController = TabController(
-    length: 3,
-    vsync: this,
-    initialIndex: 1,
-  );
+  late final TabController _tabController;
 
   // 商家信息狀態
-  Map<String, dynamic>? _merchantInfo;
   bool _isLoading = true;
-  bool _merchantNotFound =
-      false; // getMerchantInfo 回 null（404 / 不存在）→ 顯示 empty state
+  bool _merchantNotFound = false; // GetStore 讀不到（不存在或不公開）→ 顯示 empty state
   String _merchantName = '';
   String _merchantBannerUrl = '';
   String _merchantAvatarPayload = '';
@@ -57,8 +54,8 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
   int _merchantFollowerCount = 0;
   bool _isFollowing = false;
   bool _isTogglingFollow = false;
-  bool _isCertified = false;
 
+  // GetStore 回的 store id；商品、貼文、討論區與追蹤都以它為鍵。
   String? _resolvedMerchantId;
 
   // Prefetch cache for Shop tab
@@ -71,14 +68,6 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
   String? get _merchantId {
     final resolved = _resolvedMerchantId?.trim();
     if (resolved != null && resolved.isNotEmpty) return resolved;
-    final fromStr = widget.sellerIdStr?.trim();
-    if (fromStr != null && fromStr.isNotEmpty) return fromStr;
-    final fromWidget = widget.sellerId?.toString();
-    if (fromWidget != null && fromWidget.isNotEmpty) return fromWidget;
-    if (_merchantInfo != null) {
-      final extracted = _extractMerchantId(_merchantInfo!);
-      if (extracted != null && extracted.isNotEmpty) return extracted;
-    }
     return null;
   }
 
@@ -93,121 +82,22 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this, initialIndex: 1);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _skipRouteTransition();
     });
-    final initialId = widget.sellerIdStr?.trim().isNotEmpty == true
-        ? widget.sellerIdStr
-        : widget.sellerId?.toString();
-    if (initialId != null && initialId.isNotEmpty) {
-      _resolvedMerchantId = initialId;
-    }
-    final hasId = _merchantId != null && _merchantId!.isNotEmpty;
-    _loadMerchantInfo().whenComplete(() {
-      if (!mounted) return;
-    });
-    if (hasId) {
-      _checkFollowing();
-    }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _startShopPrefetch();
-    });
-  }
-
-  String? _extractMerchantId(Map<dynamic, dynamic> data) {
-    // 路由 extra 帶進來的可能是本地合成的 merchantId，也可能是 API 原樣的
-    // storeId；兩者都是 store surrogate（44 號）。
-    const candKeys = ['merchantId', 'storeId', 'id'];
-    for (final key in candKeys) {
-      final value = data[key];
-      if (value == null) continue;
-      final s = value.toString().trim();
-      if (s.isNotEmpty) return s;
-    }
-    return null;
+    _loadMerchantInfo();
   }
 
   Future<void> _loadMerchantInfo() async {
-    final currentId = _merchantId;
-    HKLog.logD('[MerchantScreen] _loadMerchantInfo merchantId=$currentId');
-    if (currentId == null || currentId.isEmpty) {
-      HKLog.logD('[MerchantScreen] merchantId is empty, skipping');
-      setState(() {
-        _isLoading = false;
-      });
-      return;
-    }
-
     try {
       final response = await ref
           .read(sellerRepositoryProvider)
-          .getMerchantInfo(currentId);
-      HKLog.logD('[MerchantScreen] getMerchantInfo FULL response: $response');
+          .getStore(widget.storeCode);
       if (!mounted) return;
-      if (response != null) {
-        final dio = ref.read(dioProvider);
-
-        // Rating 與 stats 都是公開資料；stats 已包含 followers，避免再透過
-        // followRepository 重複呼叫同一個 /stats endpoint。
-        double rating = 0.0;
-        int ratingCount = 0;
-        int followerCount = 0;
-        int totalProducts = 0;
-
-        final futures = await Future.wait([
-          // [0] GET /public/sellers/{id}/rating
-          dio
-              .get<Map<String, dynamic>>('/public/sellers/$currentId/rating')
-              .then((r) => r.data)
-              .catchError((_) => null),
-          // [1] GET /public/sellers/{id}/stats → { total_products, followers, ... }
-          dio
-              .get<Map<String, dynamic>>('/public/sellers/$currentId/stats')
-              .then((r) => r.data)
-              .catchError((_) => null),
-        ]);
-
-        // Parse rating
-        final ratingResp = futures[0];
-        final ratingData = ratingResp?['data'] as Map? ?? {};
-        HKLog.logD('[MerchantScreen] rating response: $ratingData');
-        if (ratingData['rating'] != null) {
-          rating = double.tryParse(ratingData['rating'].toString()) ?? 0.0;
-        }
-        if (ratingData['reviewCount'] != null) {
-          ratingCount = int.tryParse(ratingData['reviewCount'].toString()) ?? 0;
-        }
-
-        // Parse stats (handler.SellerStats: totalProducts, followers, totalOrders, totalSales)
-        final statsResp = futures[1];
-        final statsData = statsResp?['data'] as Map? ?? {};
-        HKLog.logD('[MerchantScreen] stats response: $statsData');
-        if (statsData['followers'] != null) {
-          followerCount = int.tryParse(statsData['followers'].toString()) ?? 0;
-        }
-        if (statsData['totalProducts'] != null) {
-          totalProducts =
-              int.tryParse(statsData['totalProducts'].toString()) ?? 0;
-        }
-
-        HKLog.logD(
-          '[MerchantScreen] Enriched: rating=$rating, ratingCount=$ratingCount, followers=$followerCount, totalProducts=$totalProducts',
-        );
-
-        final enrichedResponse = Map<String, dynamic>.from(response);
-        enrichedResponse['_cachedRating'] = rating;
-        enrichedResponse['_cachedRatingCount'] = ratingCount;
-        enrichedResponse['_cachedFollowerCount'] = followerCount;
-        enrichedResponse['_cachedTotalProducts'] = totalProducts;
-
-        if (!mounted) return;
-        _applyMerchantData(enrichedResponse);
-      } else {
-        setState(() {
-          _isLoading = false;
-          _merchantNotFound = true;
-        });
-      }
+      _applyStore(response);
+      _checkFollowing();
+      _startShopPrefetch(force: true);
     } catch (e) {
       HKLog.logE('Failed to load merchant info: $e', e);
       if (!mounted) return;
@@ -218,125 +108,30 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
     }
   }
 
-  void _applyMerchantData(Map<String, dynamic> response) {
-    // ── OpenAPI: handler.SellerResponse { code, data: handler.SellerInfo, msg }
-    final info = response['data'] is Map<String, dynamic>
-        ? response['data'] as Map<String, dynamic>
-        : response;
-
-    HKLog.logD(
-      '[MerchantScreen] _applyMerchantData info keys: ${info.keys.toList()}',
-    );
-    HKLog.logD(
-      '[MerchantScreen] _applyMerchantData address fields: city=${info['city']}, district=${info['district']}, addressDetail=${info['addressDetail']}, address=${info['address']}, postalCode=${info['postalCode']}',
-    );
-
-    // ── handler.SellerInfo 嚴格取用 ──
-    // 名稱
-    final String storeName = (info['storeName'] ?? '').toString().trim();
-    // 地址
-    final String city = (info['city'] ?? '').toString().trim();
-    final String district = (info['district'] ?? '').toString().trim();
-    final String addressDetail = (info['addressDetail'] ?? '')
-        .toString()
-        .trim();
-    final String addressFull = (info['address'] ?? '').toString().trim();
-    final String postalCode = (info['postalCode'] ?? '').toString().trim();
-    final String description = (info['description'] ?? '').toString().trim();
-    // 圖片 — 49 §6.1 成對契約：裸 key 優先（coverKey / logoKey），url 退路；
-    // 顯示端過 buildImageUrl dual-mode。
-    final String coverUrl = (info['coverKey'] ?? info['coverUrl'] ?? '')
-        .toString()
-        .trim();
-    final String avatar = (info['logoKey'] ?? info['logoUrl'] ?? '')
-        .toString()
-        .trim();
-    final String logo = avatar;
-    // 其他
-    final String prize = (info['prize'] ?? '').toString().trim();
-    // 44 號身分分離：賣家業務鍵是 storeId（store surrogate），不是 account_id。
-    final dynamic rawAccountId = info['storeId'];
-    final int accountId = (rawAccountId is num)
-        ? rawAccountId.toInt()
-        : (int.tryParse(rawAccountId?.toString() ?? '') ?? 0);
-    final double infoRating = (info['rating'] is num)
-        ? (info['rating'] as num).toDouble()
-        : (double.tryParse(info['rating']?.toString() ?? '') ?? 0.0);
-    final String certStatus = (info['overallCertificationStatus'] ?? '')
-        .toString()
-        .trim();
-
-    // ── 組合顯示用欄位 ──
-    // 名稱：只使用 store_name
-    final String displayName = storeName;
-
-    // 地址：依序嘗試 city+district, city, address_detail, address (combined), postal_code
-    String displayAddress = '';
-    if (city.isNotEmpty && district.isNotEmpty) {
-      displayAddress = '$city$district';
-      if (addressDetail.isNotEmpty) displayAddress += ' $addressDetail';
-    } else if (city.isNotEmpty) {
-      displayAddress = city;
-      if (addressDetail.isNotEmpty) displayAddress += ' $addressDetail';
-    } else if (addressDetail.isNotEmpty) {
-      displayAddress = addressDetail;
-    } else if (addressFull.isNotEmpty) {
-      displayAddress = addressFull;
-    }
-    final String displaySubtitle = displayAddress.isNotEmpty
-        ? displayAddress
-        : (postalCode.isNotEmpty ? postalCode : '');
-    final String displayLocation = city.isNotEmpty && district.isNotEmpty
-        ? '$city$district'
-        : (city.isNotEmpty ? city : district);
-    HKLog.logD(
-      '[MerchantScreen] displayAddress=$displayAddress, displaySubtitle=$displaySubtitle',
-    );
-
-    // 圖片：直接使用 API 回傳的 URL，不做轉換
-    // handler.SellerInfo: avatar, logo, cover_url
-    final String displayAvatar = avatar.isNotEmpty ? avatar : logo;
-    final String displayBanner = coverUrl;
-
-    // ── rating / stats 來自並行呼叫的 _cachedXxx ──
-    double displayRating = infoRating;
-    int ratingCount = 0;
-    int followerCount = 0;
-    if (response.containsKey('_cachedRating')) {
-      displayRating =
-          (response['_cachedRating'] as num?)?.toDouble() ?? infoRating;
-      ratingCount = (response['_cachedRatingCount'] as num?)?.toInt() ?? 0;
-      followerCount = (response['_cachedFollowerCount'] as num?)?.toInt() ?? 0;
-    }
-
-    // ── resolvedId ──
-    final String resolvedIdStr = accountId > 0 ? accountId.toString() : '';
-    final prevId = _merchantId;
-    final bool idChanged =
-        resolvedIdStr.isNotEmpty && resolvedIdStr != (prevId ?? '');
-
+  void _applyStore(seller.GetStoreResponse response) {
+    final store = response.store;
+    final stats = response.stats;
+    final location = townLocation(store.townCode);
     setState(() {
-      _merchantInfo = response;
-      _merchantName = displayName;
-      _merchantBannerUrl = displayBanner;
-      _merchantAvatarPayload = displayAvatar;
-      _merchantAddress = displayAddress;
-      _merchantLocation = displayLocation;
-      _merchantDescription = description;
-      _merchantAward = prize;
-      _merchantRating = displayRating;
-      _merchantRatingCount = ratingCount;
-      _merchantFollowerCount = followerCount;
-      _isCertified = certStatus == 'approved';
+      _merchantName = store.storeName.trim();
+      _merchantBannerUrl = store.hasCoverImage()
+          ? store.coverImage.uri(ImagePreset.banner)
+          : '';
+      _merchantAvatarPayload = store.hasLogo()
+          ? store.logo.uri(ImagePreset.avatar)
+          : '';
+      _merchantAddress = location;
+      _merchantLocation = location;
+      _merchantDescription = store.description.trim();
+      _merchantAward = store.prize.trim();
+      _merchantRating = stats.hasRatingAverage() ? stats.ratingAverage : 0.0;
+      _merchantRatingCount = stats.hasReviewCount() ? stats.reviewCount : 0;
+      _merchantFollowerCount = stats.hasFollowerCount()
+          ? stats.followerCount
+          : 0;
+      _resolvedMerchantId = store.id;
       _isLoading = false;
-      if (resolvedIdStr.isNotEmpty) {
-        _resolvedMerchantId = resolvedIdStr;
-      }
     });
-
-    if (idChanged) {
-      _startShopPrefetch(force: true);
-    }
   }
 
   Future<void> _checkFollowing() async {
@@ -484,7 +279,7 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
               const HkIcon(HkIconName.emptyMerchantSearch, size: 64),
               SizedBox(height: 16.h),
               Text(
-                '找不到此商家',
+                '找不到這家店',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -493,11 +288,16 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
               ),
               SizedBox(height: 8.h),
               Text(
-                '商家可能已下架或暫停營業',
+                '這家店可能暫停營業、已經關閉，或網址有誤。',
                 style: TextStyle(
                   fontSize: 14,
                   color: AppColors.textPrimary.withValues(alpha: 0.6),
                 ),
+              ),
+              SizedBox(height: 16.h),
+              OutlinedButton(
+                onPressed: () => Navigator.of(context).maybePop(),
+                child: const HkButtonLabel('返回'),
               ),
             ],
           ),
@@ -554,7 +354,6 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
                 ratingCount: _merchantRatingCount,
                 followerCount: _merchantFollowerCount,
                 isFollowing: _isFollowing,
-                isCertified: _isCertified,
                 isLoading: _isLoading,
                 onToggleFollow: _toggleFollow,
                 onChat: chatCallback(),

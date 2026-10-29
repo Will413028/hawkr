@@ -166,15 +166,9 @@ GoRouter appRouter(Ref ref) {
 
       // ── Seller/Merchant ──
       GoRoute(
-        path: '/merchant/:sellerId',
-        builder: (_, state) {
-          final raw = state.pathParameters['sellerId'] ?? '';
-          final asInt = int.tryParse(raw);
-          return MerchantScreen(
-            sellerId: asInt,
-            sellerIdStr: asInt == null ? raw : null,
-          );
-        },
+        path: '/merchant/:storeCode',
+        builder: (_, state) =>
+            MerchantScreen(storeCode: state.pathParameters['storeCode'] ?? ''),
       ),
 
       // ── Category ──

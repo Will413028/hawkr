@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:hawkr_buyer/features/category/data/category_repository.dart';
 import 'package:hawkr_buyer/features/category/presentation/category_landing_screen.dart';
 import 'package:dio/dio.dart';
+import '../../support/fake_discovery_client.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -28,9 +29,11 @@ class _SequenceAdapter implements HttpClientAdapter {
     final index = requests.length <= responses.length
         ? requests.length - 1
         : responses.length - 1;
+    final response = responses[index];
+    final failed = response is Map && response['failStatus'] != null;
     return ResponseBody.fromString(
-      jsonEncode(responses[index]),
-      200,
+      jsonEncode(response),
+      failed ? response['failStatus'] as int : 200,
       headers: {
         Headers.contentTypeHeader: [Headers.jsonContentType],
       },
@@ -42,13 +45,13 @@ class _SequenceAdapter implements HttpClientAdapter {
 }
 
 void main() {
-  testWidgets('shows loading before the single aggregate request completes', (
+  testWidgets('shows loading before the single request completes', (
     tester,
   ) async {
     final gate = Completer<void>();
     final adapter = _SequenceAdapter([
       {
-        'data': {'hotProducts': <Object>[]},
+        'data': {'records': <Object>[]},
       },
     ], gate: gate);
     final dio = _dioWith(adapter);
@@ -63,7 +66,8 @@ void main() {
       findsOneWidget,
     );
     expect(adapter.requests, hasLength(1));
-    expect(adapter.requests.single.path, '/public/marketplace');
+    expect(adapter.requests.single.path, '/public/products');
+    expect(adapter.requests.single.queryParameters['sort'], 'SALES');
 
     gate.complete();
     await tester.pumpAndSettle();
@@ -73,12 +77,12 @@ void main() {
     );
   });
 
-  testWidgets('shows an honest empty state for an omitted product section', (
+  testWidgets('shows an honest empty state for an empty product list', (
     tester,
   ) async {
     final adapter = _SequenceAdapter([
       {
-        'data': {'recommendedSellers': <Object>[]},
+        'data': {'records': <Object>[]},
       },
     ]);
     final dio = _dioWith(adapter);
@@ -95,56 +99,55 @@ void main() {
     expect(adapter.requests, hasLength(1));
   });
 
-  testWidgets('renders valid aggregate cards and ignores malformed records', (
-    tester,
-  ) async {
-    final adapter = _SequenceAdapter([
-      {
-        'data': {
-          'hotProducts': [
-            {'id': '', 'name': '無效商品'},
-            {
-              'id': 'product-1',
-              'name': '高麗菜',
-              'imageUrl': '',
-              'accountId': 'seller-1',
-              'sellerName': '南畝王生技',
-              'priceMin': '500',
-            },
-          ],
+  testWidgets(
+    'renders valid product cards and ignores records without a name',
+    (tester) async {
+      final adapter = _SequenceAdapter([
+        {
+          'data': {
+            'records': [
+              {'id': '', 'name': '無效商品'},
+              {
+                'id': 'product-1',
+                'name': '高麗菜',
+                'imageUrl': '',
+                'accountId': 'seller-1',
+                'sellerName': '南畝王生技',
+                'priceMin': '500',
+              },
+            ],
+          },
         },
-      },
-    ]);
-    final dio = _dioWith(adapter);
-    addTearDown(dio.close);
+      ]);
+      final dio = _dioWith(adapter);
+      addTearDown(dio.close);
 
-    await _pumpSection(tester, dio);
-    await tester.pumpAndSettle();
+      await _pumpSection(tester, dio);
+      await tester.pumpAndSettle();
 
-    expect(
-      find.byKey(const ValueKey('category-marketplace-products')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('category-marketplace-product-product-1')),
-      findsOneWidget,
-    );
-    expect(find.text('高麗菜'), findsOneWidget);
-    expect(find.text('NT\$ 500 / 斤'), findsOneWidget);
-    expect(find.text('無效商品'), findsNothing);
-    expect(adapter.requests, hasLength(1));
-  });
+      expect(
+        find.byKey(const ValueKey('category-marketplace-products')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('category-marketplace-product-product-1')),
+        findsOneWidget,
+      );
+      expect(find.text('高麗菜'), findsOneWidget);
+      expect(find.text('NT\$ 500 / 斤'), findsOneWidget);
+      expect(find.text('無效商品'), findsNothing);
+      expect(adapter.requests, hasLength(1));
+    },
+  );
 
-  testWidgets('malformed aggregate shows retry and refreshes from network', (
+  testWidgets('a failed request shows retry and refreshes from network', (
     tester,
   ) async {
     final adapter = _SequenceAdapter([
-      {
-        'data': {'hotProducts': <String, Object>{}},
-      },
+      {'failStatus': 500},
       {
         'data': {
-          'hotProducts': [
+          'records': [
             {'id': 'recovered', 'name': '重試成功', 'priceMin': '120'},
           ],
         },
@@ -170,7 +173,7 @@ void main() {
     expect(find.text('重試成功'), findsOneWidget);
     expect(adapter.requests, hasLength(2));
     expect(adapter.requests.map((request) => request.path).toSet(), {
-      '/public/marketplace',
+      '/public/products',
     });
   });
 }
@@ -183,7 +186,9 @@ Future<void> _pumpSection(WidgetTester tester, Dio dio) {
   return tester.pumpWidget(
     ProviderScope(
       overrides: [
-        categoryRepositoryProvider.overrideWithValue(CategoryRepository(dio)),
+        categoryRepositoryProvider.overrideWithValue(
+          CategoryRepository(dio, fakeDiscoveryClient()),
+        ),
       ],
       child: ScreenUtilInit(
         designSize: const Size(390, 844),

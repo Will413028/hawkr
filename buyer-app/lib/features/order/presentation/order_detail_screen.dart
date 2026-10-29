@@ -17,6 +17,8 @@ import '../../../shared/widgets/live_countdown_line.dart';
 import 'package:hawkr_buyer/core/codemeta/code_meta.dart'
     hide OrderStatus, OrderItemStatus;
 import 'package:hawkr_buyer/core/codemeta/shipping_presentation.dart';
+import '../../seller/data/store_card_display.dart';
+import '../../seller/data/store_card_provider.dart';
 import 'order_detail_controller.dart';
 import '../data/after_sale_model.dart';
 import '../data/after_sale_repository.dart';
@@ -714,16 +716,10 @@ class _OrderDetailBottomBarState extends ConsumerState<_OrderDetailBottomBar> {
 }
 
 /// 與商品詳情一致的商家資訊卡：店家身份、聯絡與進店操作各自清楚分工。
-class _SellerInfoCard extends StatelessWidget {
+class _SellerInfoCard extends ConsumerWidget {
   const _SellerInfoCard({required this.order});
 
   final Order order;
-
-  void _goToStore(BuildContext context) {
-    final id = order.storeId.trim();
-    if (id.isEmpty) return;
-    context.push('/merchant/$id');
-  }
 
   void _goToChat(BuildContext context) {
     final id = order.storeId.trim();
@@ -735,8 +731,10 @@ class _SellerInfoCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final hasStore = order.storeId.trim().isNotEmpty;
+    final card = ref.watch(storeCardProvider(order.storeId)).value;
+    final storeCode = card != null && card.isOpen ? card.storeCode : '';
     return Container(
       decoration: _cardDecoration(),
       padding: const EdgeInsets.all(HkSpace.lg),
@@ -800,7 +798,9 @@ class _SellerInfoCard extends StatelessWidget {
             const SizedBox(width: HkSpace.sm),
             HkTapTarget(
               semanticLabel: '進入店舖',
-              onTap: () => _goToStore(context),
+              onTap: storeCode.isEmpty
+                  ? null
+                  : () => context.push('/merchant/$storeCode'),
               child: Container(
                 height: 40,
                 padding: const EdgeInsets.symmetric(horizontal: HkSpace.md),
@@ -819,7 +819,7 @@ class _SellerInfoCard extends StatelessWidget {
                     ),
                     const SizedBox(width: HkSpace.xs),
                     Text(
-                      '店舖',
+                      card?.statusLabel ?? '店舖',
                       style: AppTypography.buttonMedium.copyWith(
                         color: AppColors.textInverse,
                         height: 1,

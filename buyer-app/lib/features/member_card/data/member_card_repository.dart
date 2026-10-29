@@ -4,6 +4,7 @@ import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pb.dart' as buyer;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/networking/connect_provider.dart';
+import '../../seller/data/store_card_display.dart';
 import 'member_card_model.dart';
 
 part 'member_card_repository.g.dart';
@@ -29,7 +30,8 @@ class MemberCardRepository {
           .map(
             (card) => MemberCard(
               sellerId: card.storeId,
-              sellerName: card.store.name,
+              sellerName: card.store.displayName,
+              storeCode: card.store.isOpen ? card.store.storeCode : '',
               sellerLogoKey: card.store.hasLogo()
                   ? card.store.logo.uri(ImagePreset.avatar)
                   : '',

@@ -8,7 +8,6 @@ import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_buyer/features/follow/data/follow_repository.dart';
 import 'package:hawkr_buyer/features/member_card/data/member_card_repository.dart';
 import 'package:hawkr_buyer/features/visit/data/visit_repository.dart';
-import 'package:dio/dio.dart';
 import 'package:fixnum/fixnum.dart' show Int64;
 import 'package:flutter_test/flutter_test.dart';
 
@@ -158,9 +157,7 @@ void main() {
   });
 
   test('follows load one cursor page at a time', () async {
-    final dio = Dio();
-    addTearDown(dio.close);
-    final first = await FollowRepository(dio, client).listFollows();
+    final first = await FollowRepository(client).listFollows();
     expect(followRequests.single.pageToken, isEmpty);
     expect(followRequests.single.pageSize, FollowRepository.listPageSize);
     expect(first.follows.single.store.id, '9');

@@ -141,7 +141,6 @@
 |-----|--------|------|
 | `/api/v1/sellers/:id` | GET | 取得商家資訊 |
 | `/api/v1/sellers/:id/stats` | GET | 取得商家統計 |
-| `/api/v1/sellers/:id/rating` | GET | 取得商家評分 |
 | `/api/v1/sellers/:id/products` | GET | 取得商家商品 |
 | `/api/v1/sellers/:id/posts` | GET | 取得商家貼文 |
 | `/api/v1/user/following/:id/check` | GET | 檢查是否關注 |

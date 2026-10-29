@@ -12,7 +12,6 @@ import 'package:hawkr_buyer/core/theme/hk_tokens.dart';
 import 'package:hawkr_buyer/features/follow/data/follow_repository.dart';
 import 'package:hawkr_buyer/features/product/data/product_repository.dart';
 import 'package:hawkr_buyer/features/review/data/review_repository.dart';
-import 'package:hawkr_buyer/features/seller/data/seller_model.dart';
 import 'package:hawkr_buyer/features/seller/data/seller_repository.dart';
 import 'package:hawkr_buyer/features/settings/presentation/my_subscription_screen.dart';
 import 'package:hawkr_buyer/features/visit/data/visit_repository.dart';
@@ -45,14 +44,6 @@ void main() {
     _followRepository = _MockFollowRepository();
     _reviewRepository = _MockReviewRepository();
 
-    when(
-      () => sellerRepository.getMerchantInfo(any()),
-    ).thenAnswer((_) async => _merchantInfo);
-    when(() => sellerRepository.getRatingStats(any())).thenAnswer(
-      (_) async => RatingStats.fromJson(
-        _merchantRating['data']! as Map<String, dynamic>,
-      ),
-    );
     when(
       () => _followRepository.listFollows(pageToken: any(named: 'pageToken')),
     ).thenAnswer(
@@ -379,6 +370,90 @@ void main() {
     },
   );
 
+  testWidgets('following card shows town location and opens by store code', (
+    tester,
+  ) async {
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: [
+        GoRoute(path: '/', builder: (_, __) => const MySubscriptionScreen()),
+        GoRoute(
+          path: '/merchant/:storeCode',
+          builder: (_, state) =>
+              Text('store-${state.pathParameters['storeCode']}'),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await _pumpRouterScreen(
+      tester,
+      router: router,
+      sellerRepository: sellerRepository,
+      productRepository: productRepository,
+    );
+
+    expect(find.text('基隆市中正區'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('following_42')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('store-sea-wind'), findsOneWidget);
+  });
+
+  testWidgets('paused and closed follows show a label and do not open', (
+    tester,
+  ) async {
+    final paused = common.StoreCard(
+      id: '43',
+      name: '休息中的店',
+      storeCode: 'resting',
+      status: common.StoreCardStatus.STORE_CARD_STATUS_PAUSED,
+    );
+    final closed = common.StoreCard(
+      id: '44',
+      storeCode: 'gone',
+      status: common.StoreCardStatus.STORE_CARD_STATUS_CLOSED,
+    );
+    when(
+      () => _followRepository.listFollows(pageToken: any(named: 'pageToken')),
+    ).thenAnswer(
+      (_) async => buyer.ListFollowsResponse(
+        follows: [
+          buyer.Follow(storeId: paused.id, store: paused),
+          buyer.Follow(storeId: closed.id, store: closed),
+        ],
+        totalSize: 2,
+      ),
+    );
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: [
+        GoRoute(path: '/', builder: (_, __) => const MySubscriptionScreen()),
+        GoRoute(
+          path: '/merchant/:storeCode',
+          builder: (_, state) =>
+              Text('store-${state.pathParameters['storeCode']}'),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await _pumpRouterScreen(
+      tester,
+      router: router,
+      sellerRepository: sellerRepository,
+      productRepository: productRepository,
+    );
+
+    expect(find.text('休息中的店'), findsOneWidget);
+    expect(find.text('暫停營業'), findsOneWidget);
+    expect(find.text('已關閉的店家'), findsOneWidget);
+    expect(find.text('已關閉'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('following_43')));
+    await tester.tap(find.byKey(const ValueKey('following_44')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('store-'), findsNothing);
+  });
+
   testWidgets('subscription presents a clear relationship state', (
     tester,
   ) async {
@@ -496,7 +571,11 @@ late _MockReviewRepository _reviewRepository;
 final _store = common.StoreCard(
   id: '42',
   name: '海風水產',
-  storeCode: '42',
+  storeCode: 'sea-wind',
+  status: common.StoreCardStatus.STORE_CARD_STATUS_OPEN,
+  townCode: '10017010',
+  reviewCount: 36,
+  ratingAverage: 4.8,
   logo: api.Image(uriTemplate: ''),
 );
 
@@ -533,18 +612,3 @@ void _stubFavorites(List<buyer.Favorite> favorites) {
     ),
   );
 }
-
-const _merchantInfo = <String, dynamic>{
-  'data': <String, dynamic>{
-    'storeName': '海風水產',
-    'city': '基隆市',
-    'district': '中正區',
-    'rating': 4.8,
-  },
-};
-
-/// `GET /public/sellers/{id}/rating` — 評論數只有這支有，SellerInfo 不帶。
-const _merchantRating = <String, dynamic>{
-  'code': 0,
-  'data': <String, dynamic>{'storeId': '42', 'rating': 4.8, 'reviewCount': 36},
-};

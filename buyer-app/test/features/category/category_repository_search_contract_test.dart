@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:hawkr_buyer/features/category/data/category_repository.dart';
 import 'package:hawkr_buyer/core/exceptions/app_exception.dart';
 import 'package:dio/dio.dart';
+import '../../support/fake_discovery_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// 固定回一份 /public/search/products 的真實 wire 形狀。
@@ -59,7 +60,7 @@ const _wire = {
 CategoryRepository _repo(Object body) {
   final dio = Dio(BaseOptions(baseUrl: 'https://example.test'));
   dio.httpClientAdapter = _FixedAdapter(body);
-  return CategoryRepository(dio);
+  return CategoryRepository(dio, fakeDiscoveryClient());
 }
 
 void main() {

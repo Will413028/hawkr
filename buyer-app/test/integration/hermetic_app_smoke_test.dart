@@ -40,7 +40,6 @@ class _HermeticAdapter implements HttpClientAdapter {
   static const allowedPaths = {
     '/public/categories/tree',
     '/public/hashtags/popular',
-    '/public/marketplace',
     '/public/posts',
     '/public/products',
   };
@@ -65,13 +64,6 @@ class _HermeticAdapter implements HttpClientAdapter {
       '/public/categories/tree' => {'data': <Object>[]},
       '/public/hashtags/popular' => {
         'data': {'records': <Object>[]},
-      },
-      '/public/marketplace' => {
-        'data': {
-          'recommendedSellers': <Object>[],
-          'latestPosts': <Object>[],
-          'hotProducts': <Object>[],
-        },
       },
       '/public/posts' => {
         'data': {'records': <Object>[]},

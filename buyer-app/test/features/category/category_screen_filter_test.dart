@@ -4,6 +4,11 @@ import 'dart:typed_data';
 
 import 'package:hawkr_buyer/core/analytics/analytics_events.dart';
 import 'package:hawkr_buyer/core/analytics/analytics_providers.dart';
+import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pb.dart'
+    as common;
+import 'package:hawkr_api/gen/hawkr/discovery/v1alpha1/discovery.pb.dart'
+    as discovery;
+import 'package:hawkr_buyer/core/networking/connect_provider.dart';
 import 'package:hawkr_buyer/core/networking/dio_provider.dart';
 import 'package:hawkr_buyer/core/session/session_model.dart';
 import 'package:hawkr_buyer/core/session/session_provider.dart';
@@ -24,6 +29,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:mocktail/mocktail.dart';
+
+import '../../support/fake_discovery_client.dart';
 
 class _MockAnalyticsEvents extends Mock implements AnalyticsEvents {}
 
@@ -92,20 +99,6 @@ class _MarketAdapter implements HttpClientAdapter {
           'records': [
             {'hashtag': '冷凍水產', 'count': '8'},
             {'hashtag': '#當季', 'count': '5'},
-          ],
-        },
-      },
-      '/public/marketplace' => {
-        'data': {
-          'recommendedSellers': [
-            {
-              'storeId': '9001',
-              'storeName': '金湖水產',
-              'logoKey': '',
-              'logoUrl': '',
-              'city': '高雄市',
-              'district': '前鎮區',
-            },
           ],
         },
       },
@@ -726,6 +719,21 @@ Future<_MarketAdapter> _pumpMarket(
   final container = ProviderContainer(
     overrides: [
       dioProvider.overrideWithValue(dio),
+      discoveryPublicClientProvider.overrideWithValue(
+        fakeDiscoveryClient(
+          sellers: [
+            discovery.RecommendedSeller(
+              store: common.StoreCard(
+                id: '9001',
+                storeCode: 'jinhu',
+                name: '金湖水產',
+                status: common.StoreCardStatus.STORE_CARD_STATUS_OPEN,
+                townCode: '64000090',
+              ),
+            ),
+          ],
+        ),
+      ),
       analyticsEventsProvider.overrideWithValue(analytics),
       if (signedInFavorites != null) ...[
         sessionProvider.overrideWith(_SignedInSession.new),

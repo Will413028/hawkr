@@ -120,14 +120,14 @@ Dio _stubSearchDio() {
   dio.interceptors.add(
     InterceptorsWrapper(
       onRequest: (options, handler) {
-        if (options.path == '/public/marketplace') {
+        if (options.path == '/public/products') {
           handler.resolve(
             Response<Map<String, dynamic>>(
               requestOptions: options,
               statusCode: 200,
               data: {
                 'data': {
-                  'hotProducts': [
+                  'records': [
                     {
                       'id': 'product-1',
                       'name': '高麗菜',

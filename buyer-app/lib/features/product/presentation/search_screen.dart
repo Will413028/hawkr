@@ -194,19 +194,15 @@ Future<void> _loadRecommendedProducts({
   if (isLoading.value) return;
   isLoading.value = true;
   try {
-    // 用 /public/marketplace 公開聚合端點：訪客與已登入共用，不需要 token、不會 401。
-    // 後端回傳 `data.hot_products`（handler.ProductItem[]）即推薦商品，schema 含
-    // sellerName / priceMin / priceMax 等卡片所需欄位（spec: openspec/預設模組.openapi.json
-    // `/public/marketplace`，security: []）。原本 /app/buyers/me/recommendations
-    // 個人化版可在未來「已登入」分支保留，但目前合併成同一支公開端點。
+    // 推薦商品：依銷量排序的公開商品列表，訪客與已登入共用，不需要 token。
     final resp = await dio.get<Map<String, dynamic>>(
-      '/public/marketplace',
-      queryParameters: const {'product_limit': 12},
+      '/public/products',
+      queryParameters: const {'sort': 'SALES', 'page': 1, 'page_size': 12},
     );
     final flat = <Map<String, dynamic>>[];
-    final hot = resp.data?['data']?['hotProducts'];
-    if (hot is List) {
-      for (final p in hot) {
+    final records = resp.data?['data']?['records'];
+    if (records is List) {
+      for (final p in records) {
         if (p is Map) flat.add(Map<String, dynamic>.from(p));
       }
     }
@@ -216,7 +212,7 @@ Future<void> _loadRecommendedProducts({
     for (final p in flat) {
       if (recommended.length >= 6) break;
 
-      // hotProducts[] 是 gateway ProductItem，欄名全 camelCase。
+      // records[] 是 gateway ProductItem，欄名全 camelCase。
       final skuId = (p['id'] ?? '').toString().trim();
       if (skuId.isEmpty || !seenIds.add(skuId)) continue;
 

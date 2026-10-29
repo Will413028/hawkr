@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -17,7 +18,10 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../data/product_repository.dart';
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart' as seller;
+import 'package:hawkr_api/images.dart' show ImagePreset, ImageUri;
 import '../../seller/data/seller_repository.dart';
+import '../../seller/data/store_card_display.dart';
 import '../../review/data/review_repository.dart';
 import '../../cart/data/cart_repository.dart';
 import '../../cart/data/cart_error_message.dart';
@@ -142,6 +146,10 @@ class _MerchantItemDetailScreenState
   }
 
   String _location = '';
+  String _storeCode = '';
+  String _storeAvatarUrl = '';
+  String _storeName = '';
+  double _storeRating = 0.0;
   List<String> _shippingMethodCodes = const [];
   // 由 /public/products/{id} 的 skus 載入的規格列表
   List<Map<String, dynamic>>? _grades;
@@ -165,6 +173,13 @@ class _MerchantItemDetailScreenState
   }
 
   Future<void> _recordProductVisit() async {
+    // 瀏覽 beacon 一律送出，登入的呼叫者由伺服器略過。
+    final viewedProductId = (widget.skuId ?? '').trim();
+    if (viewedProductId.isNotEmpty) {
+      unawaited(
+        ref.read(sellerRepositoryProvider).recordProductView(viewedProductId),
+      );
+    }
     // 訪客（無 token）打 /app/buyers/me/browse-history 必 401，直接 skip。
     final session = ref.read(sessionProvider).value;
     if (!hasUsableSession(session)) {
@@ -453,16 +468,20 @@ class _MerchantItemDetailScreenState
       final sellerId = _firstNonEmpty([sellerInfo['storeId'], info['storeId']]);
       final sellerName = (sellerInfo['name'] ?? '').toString().trim();
       var sellerLocation = _buildSellerLocation(sellerInfo);
-      if (sellerLocation.isEmpty && sellerId.isNotEmpty) {
-        final merchantResponse = await ref
-            .read(sellerRepositoryProvider)
-            .getMerchantInfo(sellerId);
-        if (merchantResponse != null) {
-          final merchantInfo = merchantResponse['data'] is Map<String, dynamic>
-              ? merchantResponse['data'] as Map<String, dynamic>
-              : merchantResponse;
-          sellerLocation = _buildSellerLocation(merchantInfo);
+      final storeCode = _firstNonEmpty([
+        sellerInfo['storeCode'],
+        info['storeCode'],
+      ]);
+      seller.GetStoreResponse? store;
+      if (storeCode.isNotEmpty) {
+        try {
+          store = await ref.read(sellerRepositoryProvider).getStore(storeCode);
+        } catch (_) {
+          store = null;
         }
+      }
+      if (sellerLocation.isEmpty && store != null) {
+        sellerLocation = townLocation(store.store.townCode);
       }
       var categoryLv1 = (info['categoryLv1Name'] ?? '').toString();
       var categoryLv2 = _firstNonEmpty([
@@ -518,6 +537,16 @@ class _MerchantItemDetailScreenState
         _subCategory = categoryLv3;
         _origin = (info['origin'] ?? '').toString();
         _location = sellerLocation;
+        if (store != null) {
+          _storeCode = store.store.storeCode;
+          _storeName = store.store.storeName.trim();
+          _storeAvatarUrl = store.store.hasLogo()
+              ? store.store.logo.uri(ImagePreset.avatar)
+              : '';
+          _storeRating = store.stats.hasRatingAverage()
+              ? store.stats.ratingAverage
+              : 0.0;
+        }
         _shippingMethodCodes = shippingMethodCodes.toSet().toList(
           growable: false,
         );
@@ -709,10 +738,10 @@ class _MerchantItemDetailScreenState
                     merchantName: _resolvedMerchantName.isNotEmpty
                         ? _resolvedMerchantName
                         : (widget.merchantName ?? ''),
-                    merchantId: _resolvedMerchantId.isNotEmpty
-                        ? _resolvedMerchantId
-                        : widget.merchantId,
-                    rating: 0.0,
+                    storeCode: _storeCode,
+                    storeName: _storeName,
+                    avatarUrl: _storeAvatarUrl,
+                    rating: _storeRating,
                   ),
                   const _ProductDetailSectionDivider(),
                   _ProductInfoCardNew(
@@ -1917,88 +1946,29 @@ class _ProductDescriptionCard extends StatelessWidget {
   }
 }
 
-/// 商家資訊區段。
-class _MerchantInfoCardNew extends ConsumerStatefulWidget {
+/// 商家資訊區段。店家資料來自 GetStore；[storeCode] 空字串表示讀不到店面，不顯示進店連結。
+class _MerchantInfoCardNew extends StatelessWidget {
   const _MerchantInfoCardNew({
     required this.merchantName,
-    this.merchantId,
+    this.storeCode = '',
+    this.storeName = '',
+    this.avatarUrl = '',
     this.rating = 0.0,
   });
 
   final String merchantName;
-  final String? merchantId;
+  final String storeCode;
+  final String storeName;
+  final String avatarUrl;
   final double rating;
 
   @override
-  ConsumerState<_MerchantInfoCardNew> createState() =>
-      _MerchantInfoCardNewState();
-}
-
-class _MerchantInfoCardNewState extends ConsumerState<_MerchantInfoCardNew> {
-  // 緩存資料避免閃爍
-  String? _cachedAvatarRaw;
-  String _cachedName = '';
-  double _cachedRating = 0.0;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadData();
-  }
-
-  Future<void> _loadData() async {
-    final id = (widget.merchantId ?? '').trim();
-    if (id.isEmpty) return;
-    try {
-      final resp = await ref.read(sellerRepositoryProvider).getMerchantInfo(id);
-      if (!mounted || resp is! Map<String, dynamic>) return;
-      final info = resp['data'] is Map<String, dynamic>
-          ? resp['data'] as Map<String, dynamic>
-          : resp;
-      debugPrint(
-        '[MerchantInfoCard] API resp for $id: storeName=${info['storeName']}, sellerName=${info['sellerName']}, logoKey=${info['logoKey']}, rating=${info['rating']}',
-      );
-      // 49 §6.1 成對契約：logoKey（裸 key）優先，logoUrl 退路。
-      final rawPath = (info['logoKey'] ?? info['logoUrl'] ?? '')
-          .toString()
-          .trim();
-      String avatarRaw = '';
-      if (rawPath.isNotEmpty) {
-        // objectKey / URL → 顯示 URL（avatar preset），走唯一組裝入口。
-        avatarRaw = buildImageUrl(rawPath, ImagePreset.avatar);
-      }
-      final nameRaw = (info['storeName'] ?? '').toString().trim();
-      final ratingRaw =
-          double.tryParse((info['rating'] ?? '').toString()) ?? 0.0;
-      setState(() {
-        if (avatarRaw.isNotEmpty) _cachedAvatarRaw = avatarRaw;
-        if (nameRaw.isNotEmpty) _cachedName = nameRaw;
-        if (ratingRaw > 0) _cachedRating = ratingRaw;
-      });
-      debugPrint(
-        '[MerchantInfoCard] After setState: _cachedName=$_cachedName, _cachedRating=$_cachedRating, _cachedAvatarRaw=$_cachedAvatarRaw, avatarRaw="$avatarRaw"',
-      );
-    } catch (e) {
-      debugPrint('[MerchantInfoCard] Error loading data for $id: $e');
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant _MerchantInfoCardNew oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.merchantId != widget.merchantId) {
-      _loadData();
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final avatarRaw = _cachedAvatarRaw ?? '';
-    final merchantId = (widget.merchantId ?? '').trim();
+    final avatarRaw = avatarUrl;
 
     void enterStore() {
-      if (merchantId.isEmpty) return;
-      context.push('/merchant/$merchantId');
+      if (storeCode.isEmpty) return;
+      context.push('/merchant/$storeCode');
     }
 
     // Figma: 40x40 圓形頭像
@@ -2065,11 +2035,9 @@ class _MerchantInfoCardNewState extends ConsumerState<_MerchantInfoCardNew> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                _cachedName.isNotEmpty
-                    ? _cachedName
-                    : (widget.merchantName.isNotEmpty
-                          ? widget.merchantName
-                          : '商家'),
+                storeName.isNotEmpty
+                    ? storeName
+                    : (merchantName.isNotEmpty ? merchantName : '商家'),
                 style: AppTypography.sectionTitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -2080,9 +2048,7 @@ class _MerchantInfoCardNewState extends ConsumerState<_MerchantInfoCardNew> {
                   SizedBox(width: 4.w),
                   Flexible(
                     child: Text(
-                      _cachedRating > 0
-                          ? _cachedRating.toStringAsFixed(1)
-                          : '尚無評分',
+                      rating > 0 ? rating.toStringAsFixed(1) : '尚無評分',
                       style: AppTypography.body,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -2095,12 +2061,12 @@ class _MerchantInfoCardNewState extends ConsumerState<_MerchantInfoCardNew> {
       ],
     );
     final storeButton = MouseRegion(
-      cursor: merchantId.isEmpty
+      cursor: storeCode.isEmpty
           ? SystemMouseCursors.basic
           : SystemMouseCursors.click,
       child: HkTapTarget(
         semanticLabel: '進入店舖',
-        onTap: merchantId.isEmpty ? null : enterStore,
+        onTap: storeCode.isEmpty ? null : enterStore,
         child: Container(
           key: const ValueKey('product-enter-store-button'),
           height: 40,

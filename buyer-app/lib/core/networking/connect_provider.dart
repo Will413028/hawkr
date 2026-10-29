@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:hawkr_api/gen/hawkr/content/v1alpha1/content.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/discovery/v1alpha1/discovery.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
 import 'package:hawkr_api/transport.dart';
 import 'package:hawkr_auth/hawkr_auth.dart' as auth;
 import 'package:flutter/foundation.dart';
@@ -43,9 +45,31 @@ Transport connectAuthTransport(Ref ref) => apiTransport(
   interceptors: connectInterceptors(auth: sessionAuthInterceptor(ref)),
 );
 
+/// 公開的 service 但伺服器依身分決定行為的呼叫（例如 RecordProductView）：有 session 就帶 Bearer，沒有（訪客）
+/// 或換發失敗就不帶，不中斷呼叫。
+@Riverpod(keepAlive: true)
+Transport connectOptionalAuthTransport(Ref ref) => apiTransport(
+  baseUrl: F.appFlavor.gatewayHost,
+  httpClient: ref.watch(connectHttpClientProvider),
+  interceptors: connectInterceptors(auth: optionalSessionInterceptor(ref)),
+);
+
 @Riverpod(keepAlive: true)
 ContentPublicServiceClient contentClient(Ref ref) =>
     ContentPublicServiceClient(ref.watch(connectTransportProvider));
+
+@Riverpod(keepAlive: true)
+SellerPublicServiceClient sellerPublicClient(Ref ref) =>
+    SellerPublicServiceClient(ref.watch(connectTransportProvider));
+
+/// RecordProductView：登入與否由伺服器判斷，所以有 session 時帶 Bearer。
+@Riverpod(keepAlive: true)
+SellerPublicServiceClient sellerPublicOptionalAuthClient(Ref ref) =>
+    SellerPublicServiceClient(ref.watch(connectOptionalAuthTransportProvider));
+
+@Riverpod(keepAlive: true)
+DiscoveryPublicServiceClient discoveryPublicClient(Ref ref) =>
+    DiscoveryPublicServiceClient(ref.watch(connectTransportProvider));
 
 /// 登入的帳號（GetSession）。登入與登出由 Clerk 處理（`clerkSessionProvider`）。
 @Riverpod(keepAlive: true)
@@ -76,6 +100,23 @@ Interceptor sessionAuthInterceptor(Ref ref) => authInterceptor(
     ref.read(forceLogoutProvider.notifier).trigger();
   },
 );
+
+Interceptor optionalSessionInterceptor(Ref ref) {
+  return <I extends Object, O extends Object>(next) {
+    return (req) async {
+      String? token;
+      try {
+        token = await currentSessionToken(ref);
+      } catch (_) {
+        token = null;
+      }
+      if (token != null && token.isNotEmpty) {
+        req.headers['authorization'] = 'Bearer $token';
+      }
+      return next(req);
+    };
+  };
+}
 
 Interceptor sessionBootstrapInterceptor(Ref ref) => authInterceptor(
   sessionToken: () => auth.currentSessionToken(ref),

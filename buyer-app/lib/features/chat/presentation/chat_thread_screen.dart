@@ -16,6 +16,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../media/data/media_repository.dart';
 import '../../order/data/order_repository.dart';
 import '../../seller/data/seller_repository.dart';
+import '../../seller/data/store_card_display.dart';
 import '../../product/data/product_repository.dart';
 import '../../product/presentation/merchant_item_detail_screen.dart';
 import '../../../config/flavor.dart';
@@ -361,6 +362,7 @@ class ChatThreadScreen extends HookConsumerWidget {
     final replyPreview = useState<String?>(null);
     final avatarUrl = useState<String?>(null);
     final merchantNameState = useState<String?>(merchantName);
+    final storeStatusLabel = useState<String?>(null);
 
     useEffect(() {
       ChatFocusPolicy.keepClosedOnEntry(inputFocusNode);
@@ -450,21 +452,15 @@ class ChatThreadScreen extends HookConsumerWidget {
 
     Future<void> loadMerchantProfile() async {
       try {
-        final info = await ref
-            .read(sellerRepositoryProvider)
-            .getMerchantInfo(merchantId);
-        if (info == null || !context.mounted) return;
-        final data = info['data'] is Map<String, dynamic>
-            ? info['data'] as Map<String, dynamic>
-            : info;
-        // gateway `SellerInfo`：logoKey ＋ logoUrl 成對（49 §6.1）、storeName camel。
-        final logo = (data['logoKey'] ?? data['logoUrl'] ?? '')
-            .toString()
-            .trim();
-        final storeName = (data['storeName'] ?? '').toString().trim();
-        // 用商家 logo 覆蓋；若商家沒設 logo，清除錯誤值（讓 _buildAvatar 用 default asset）
+        final cards = await ref.read(sellerRepositoryProvider).batchGetStores([
+          merchantId,
+        ]);
+        final card = cards[merchantId];
+        if (card == null || !context.mounted) return;
+        final logo = card.logoUri;
         avatarUrl.value = logo.isNotEmpty ? logo : null;
-        if (storeName.isNotEmpty) merchantNameState.value = storeName;
+        merchantNameState.value = card.displayName;
+        storeStatusLabel.value = card.statusLabel;
       } catch (_) {
         if (!context.mounted) return;
         if ((merchantNameState.value ?? '').isEmpty &&
@@ -1855,6 +1851,7 @@ class ChatThreadScreen extends HookConsumerWidget {
             merchantId: merchantId,
             avatarUrl: avatarUrl.value,
             isMerchantOnline: isMerchantOnline.value,
+            storeStatusLabel: storeStatusLabel.value,
           ),
         ),
         Expanded(child: messageArea),
@@ -1912,7 +1909,9 @@ class _TopBar extends StatelessWidget {
     this.merchantId,
     this.avatarUrl,
     this.isMerchantOnline = false,
+    this.storeStatusLabel,
   });
+  final String? storeStatusLabel;
   final String? merchantName;
   final String? merchantId;
   final String? avatarUrl;
@@ -2002,8 +2001,8 @@ class _TopBar extends StatelessWidget {
     return ChatConversationHeaderContent(
       avatar: _buildAvatar(),
       title: merchantName ?? 'Farm1',
-      statusLabel: isMerchantOnline ? '線上' : '離線',
-      statusColor: isMerchantOnline
+      statusLabel: storeStatusLabel ?? (isMerchantOnline ? '線上' : '離線'),
+      statusColor: storeStatusLabel == null && isMerchantOnline
           ? AppColors.success.withValues(alpha: 0.85)
           : AppColors.textDisabled,
       onBack: () => context.pop(),

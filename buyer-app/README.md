@@ -160,7 +160,6 @@ lib/
 #### 商家
 - `GET /public/sellers/{id}` - 商家資訊
 - `GET /public/sellers/{id}/products` - 商家商品列表
-- `GET /public/sellers/{id}/rating` - 商家評分
 - `GET /public/sellers/{id}/posts` - 商家貼文
 
 #### 購物車

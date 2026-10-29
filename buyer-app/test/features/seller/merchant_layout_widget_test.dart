@@ -63,7 +63,6 @@ void main() {
                 rating: rating,
                 ratingCount: ratingCount,
                 followerCount: 12500,
-                isCertified: true,
               ),
             ),
           ),
@@ -177,10 +176,7 @@ void main() {
     expect(frame.padding, const EdgeInsets.all(0.5));
     final frameDecoration = frame.decoration! as BoxDecoration;
     expect(frameDecoration.border!.top.width, 0.5);
-    expect(
-      tester.getSize(find.byKey(const Key('merchant_certification_badge'))),
-      const Size.square(26),
-    );
+    expect(find.byKey(const Key('merchant_certification_badge')), findsNothing);
     expect(spec.profileDetailsPaneHeight, lessThan(188));
     expect(tester.takeException(), isNull);
   });

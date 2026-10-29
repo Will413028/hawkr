@@ -120,17 +120,18 @@ void main() {
     }
   });
 
-  test('guest storefront skips private follow lookup and duplicate stats', () {
-    final screen = File(
-      'lib/features/seller/presentation/merchant_screen.dart',
-    ).readAsStringSync();
+  test(
+    'guest storefront skips private follow lookup and reads stats from GetStore',
+    () {
+      final screen = File(
+        'lib/features/seller/presentation/merchant_screen.dart',
+      ).readAsStringSync();
 
-    expect(screen, contains('await ref.read(sessionProvider.future)'));
-    expect(screen, contains('if (!hasUsableSession(session)) return;'));
-    expect(screen, isNot(contains('.getFansCount(')));
-    expect(
-      RegExp(r"'/public/sellers/\$currentId/stats'").allMatches(screen).length,
-      1,
-    );
-  });
+      expect(screen, contains('await ref.read(sessionProvider.future)'));
+      expect(screen, contains('if (!hasUsableSession(session)) return;'));
+      expect(screen, contains('.getStore(widget.storeCode)'));
+      expect(screen, isNot(contains('/stats')));
+      expect(screen, isNot(contains('/rating')));
+    },
+  );
 }
