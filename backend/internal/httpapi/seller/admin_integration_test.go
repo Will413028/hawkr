@@ -40,6 +40,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
@@ -92,6 +93,7 @@ type adminFixture struct {
 	identityOther     adminidentityconnect.IdentityAdminServiceClient
 	identityAnon      adminidentityconnect.IdentityAdminServiceClient
 	module            *seller.Module
+	social            *social.Module
 	id                *identity.Module
 	deletion          *accountdeletion.Module
 	db                *db.DB
@@ -123,7 +125,7 @@ func setupAdmin(t *testing.T) *adminFixture {
 	ctx := context.Background()
 	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
 		migrate.Module{Name: "identity", Dir: identity.Migrations()}, migrate.Module{Name: "buyer", Dir: buyer.Migrations()}, migrate.Module{Name: "seller", Dir: seller.Migrations()},
-		migrate.Module{Name: "accountdeletion", Dir: accountdeletion.Migrations()}, migrate.Module{Name: "delegation", Dir: delegation.Migrations()},
+		migrate.Module{Name: "accountdeletion", Dir: accountdeletion.Migrations()}, migrate.Module{Name: "delegation", Dir: delegation.Migrations()}, migrate.Module{Name: "social", Dir: social.Migrations()},
 	))
 	queue, err := jobs.NewInsertOnly(d)
 	if err != nil {
@@ -149,12 +151,17 @@ func setupAdmin(t *testing.T) *adminFixture {
 		ProductStores: noProducts{}, Registry: f.registry, Now: f.now, Logger: log,
 	})
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Identity: id, Buyer: buyers, Seller: m, Orders: orders, Now: time.Now, Logger: log})
+	socialModule := social.New(social.Deps{
+		DB: d, Events: bus, Media: mediaFake, Jobs: queue, Buyers: buyers, Stores: m, StoreBlocks: m, NewID: uuid.NewV7, Now: f.now, Logger: log,
+	})
+	events.Subscribe(bus, socialModule.OnMeasureCreated)
+	events.Subscribe(bus, socialModule.OnMeasureRevoked)
 	images, err := rpc.NewImages("https://media.example.test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	h, err := httpapi.NewHandler(httpapi.Deps{
-		Ready: d.Ping, Identity: id, Seller: m, Buyer: buyers, Images: images, Logger: log, Deletion: deletion,
+		Ready: d.Ping, Identity: id, Seller: m, Social: socialModule, Buyer: buyers, Images: images, Logger: log, Deletion: deletion,
 		Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: m, Now: time.Now, Logger: log}), Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, Agent: &agent.Module{}, ReviewQueue: &reviewqueue.Module{},
 	})
 	if err != nil {
@@ -195,7 +202,7 @@ func setupAdmin(t *testing.T) *adminFixture {
 	f.identityAdmin = adminidentityconnect.NewIdentityAdminServiceClient(server.Client(), server.URL, clientOptions(adminToken)...)
 	f.identityOther = adminidentityconnect.NewIdentityAdminServiceClient(server.Client(), server.URL, clientOptions(customerToken)...)
 	f.identityAnon = adminidentityconnect.NewIdentityAdminServiceClient(server.Client(), server.URL)
-	f.module, f.id, f.deletion, f.db, f.bus, f.orders, f.dev = m, id, deletion, d, bus, orders, dev
+	f.module, f.social, f.id, f.deletion, f.db, f.bus, f.orders, f.dev = m, socialModule, id, deletion, d, bus, orders, dev
 	f.adminID, f.customerID = authenticatedAdmin.Principal.ID, authenticatedCustomer.Principal.ID
 	return f
 }
@@ -916,7 +923,8 @@ func TestAdminCreatesAContentTakedownOverConnect(t *testing.T) {
 	f := setupAdmin(t)
 	ctx := context.Background()
 	_, s := f.newSeller(t, "有貼文的店")
-	post, forum := uuid.NewV7(), uuid.NewV7()
+	content := f.seedContent(t, s.StoreID)
+	post, forum := content.post, content.entry
 	req := &adminsellerpb.CreateMeasureRequest{
 		RequestId: uuid.New().String(), StoreId: sid(s.StoreID), Statement: "貼文含垃圾訊息", Note: "內部紀錄",
 		Measure: &adminsellerpb.CreateMeasureRequest_ContentTakedown{ContentTakedown: &adminsellerpb.ContentTakedownInput{

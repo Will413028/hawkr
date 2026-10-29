@@ -1721,7 +1721,7 @@ export const SuspensionInputSchema: GenMessage<SuspensionInput> = /*@__PURE__*/
  */
 export type ContentTakedownInput = Message<"hawkr.admin.seller.v1alpha1.ContentTakedownInput"> & {
   /**
-   * 下架的內容，1 到 20 則、不可重複，是集合（順序沒有意義）。內容屬於這家店由呼叫方負責：這支 RPC 不驗證 id 存在，也不驗證內容是這家店的。
+   * 下架的內容，1 到 20 則、不可重複，是集合（順序沒有意義）。伺服器向 social 核對每一則：id 存在而且內容屬於 store_id 這家店，否則回 invalid_argument 指到 content_takedown.contents[i]。
    *
    * @generated from field: repeated hawkr.seller.v1alpha1.ContentRef contents = 1;
    */

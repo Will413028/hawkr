@@ -2,6 +2,7 @@ package seller
 
 import (
 	"context"
+	"errors"
 	"time"
 	"uuid"
 
@@ -14,6 +15,7 @@ import (
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
@@ -349,11 +351,47 @@ func (h *Governance) CreateMeasure(ctx context.Context, req *connect.Request[adm
 	default:
 		return nil, rpc.RequiredField("warning", "必須指定措施種類（warning、suspension、termination 或 content_takedown）")
 	}
+	if in.Takedown != nil {
+		if err := h.checkTakedownContents(ctx, storeID, in.Takedown.Contents); err != nil {
+			return nil, err
+		}
+	}
 	result, err := h.m.CreateMeasure(ctx, in)
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, paths)
 	}
 	return connect.NewResponse(&adminpb.CreateMeasureResponse{Measure: toAdminMeasure(result.Measure)}), nil
+}
+
+var takedownTargetKinds = map[model.ContentKind]social.TargetKind{
+	model.ContentPost:       social.TargetPost,
+	model.ContentComment:    social.TargetComment,
+	model.ContentForumEntry: social.TargetForumEntry,
+}
+
+// checkTakedownContents 向 social 核對每則內容存在而且屬於 storeID（不存在的歸屬是零值，店家 ID 對不上）。核對與建立措施不在同一個 transaction：
+// 帶 request_id 的建立以快照重播，不能加入呼叫方的 transaction；內容的歸屬店家不可變、列不硬刪，核對之後不會變成不成立。沒有 social 時關閉。
+func (h *Governance) checkTakedownContents(ctx context.Context, storeID int64, contents []model.ContentRef) error {
+	if h.content == nil {
+		return errors.New("httpapi/seller：內容下架需要 social 核對內容歸屬")
+	}
+	for i, c := range contents {
+		invalid := func(message string) error {
+			return rpc.WithFieldPaths(apperr.InvalidInputOn([]string{apperr.IndexedField("Takedown.Contents", i)}, "%s", message), createTakedownPaths)
+		}
+		kind, ok := takedownTargetKinds[c.Kind]
+		if !ok {
+			return invalid("內容種類必須是貼文、留言或討論區留言")
+		}
+		owner, err := h.content.ContentOwner(ctx, social.Target{Kind: kind, ID: c.ID})
+		if err != nil {
+			return err
+		}
+		if owner.StoreID != storeID {
+			return invalid("內容不存在，或不屬於這家店")
+		}
+	}
+	return nil
 }
 
 func (h *Governance) GetMeasure(ctx context.Context, req *connect.Request[adminpb.GetMeasureRequest]) (*connect.Response[adminpb.GetMeasureResponse], error) {

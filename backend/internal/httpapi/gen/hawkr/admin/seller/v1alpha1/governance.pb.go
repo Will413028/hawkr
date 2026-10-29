@@ -3549,7 +3549,7 @@ func (*SuspensionInput_Risk) isSuspensionInput_Basis() {}
 // ContentTakedownInput 是內容下架：依據違規的認定，立即生效，沒有結束時間，只能撤銷或申覆成立恢復。
 type ContentTakedownInput struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 下架的內容，1 到 20 則、不可重複，是集合（順序沒有意義）。內容屬於這家店由呼叫方負責：這支 RPC 不驗證 id 存在，也不驗證內容是這家店的。
+	// 下架的內容，1 到 20 則、不可重複，是集合（順序沒有意義）。伺服器向 social 核對每一則：id 存在而且內容屬於 store_id 這家店，否則回 invalid_argument 指到 content_takedown.contents[i]。
 	Contents      []*v1alpha11.ContentRef `protobuf:"bytes,1,rep,name=contents,proto3" json:"contents,omitempty"`
 	Violation     *ViolationBasis         `protobuf:"bytes,2,opt,name=violation,proto3" json:"violation,omitempty"`
 	unknownFields protoimpl.UnknownFields

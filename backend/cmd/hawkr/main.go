@@ -228,7 +228,7 @@ func runServe(ctx context.Context) error {
 	}
 	subscribeSellerViews(bus, sellerModule)
 	subscribeSellerRelay(bus, jc)
-	newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, log)
+	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, log)
 	agentModule := newAgent(d, sellerModule)
 	subscribeAgent(bus, agentModule)
 	discoveryModule := newDiscovery(d, orders, products, reviews, sellerModule, log)
@@ -251,7 +251,8 @@ func runServe(ctx context.Context) error {
 	})
 
 	h, err := httpapi.NewHandler(httpapi.Deps{
-		Ready: d.Ping,
+		Ready:  d.Ping,
+		Social: socialModule,
 		Content: content.New(content.Deps{
 			DB:     d,
 			Media:  med,
