@@ -346,6 +346,9 @@ export default function ThreadClient({
 					/>
 					<div className="thread-page__head-meta">
 						<strong>{peerNickname || `對話對象 #${targetId}`}</strong>
+						{!isSeller && peerLabel ? (
+							<span className="thread-page__head-label">{peerLabel}</span>
+						) : null}
 						<span
 							className="thread-page__head-status"
 							data-state={headStatus.state}
@@ -391,9 +394,6 @@ export default function ThreadClient({
 								<Link href={peerShopHref} className="thread-intro__shop">
 									查看賣場
 								</Link>
-							) : null}
-							{!isSeller && peerLabel ? (
-								<span className="thread-intro__copy">{peerLabel}</span>
 							) : null}
 						</div>
 					) : (

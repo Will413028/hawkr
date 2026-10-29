@@ -39,7 +39,7 @@
       "name": "hawkr.common.v1alpha1.StoreCardStatus",
       "dartClass": "StoreCardStatus",
       "dartLibrary": "package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {

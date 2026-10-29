@@ -1,6 +1,7 @@
 /** BuyerAppService visit methods; history contains product visits. */
 
 import { timestampDate } from "@bufbuild/protobuf/wkt";
+import type { StoreCard } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
 import { buyerAppClient } from "../connect/buyer";
 import { imageUri } from "../media/image";
 
@@ -31,6 +32,8 @@ export interface HistoryItem {
 	storeCode?: string;
 	/** B-238 canonical seller-logo display URL for history rows. */
 	logoUrl?: string;
+	/** 商品隨附的店家卡片；B11 的暫停營業、已關閉由它的 status 決定（`storeCardView`）。 */
+	store?: StoreCard;
 	visitedAt: string;
 	/** Backend may omit; `false` (or a missing productName) means the
 	 *  product is no longer visible/available and should be hidden. */
@@ -65,6 +68,7 @@ export async function fetchHistory({
 				sellerName: store?.name ?? "",
 				storeCode: store?.storeCode,
 				logoUrl: imageUri(store?.logo, "avatar"),
+				store,
 				visitedAt: visit.visitTime
 					? timestampDate(visit.visitTime).toISOString()
 					: "",

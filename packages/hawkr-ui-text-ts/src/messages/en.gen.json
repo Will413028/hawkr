@@ -28,6 +28,14 @@
       "POLICY_CATEGORY_SPAM": "Spam",
       "POLICY_CATEGORY_UNLICENSED_SALE": "未經許可販售"
     },
+    "StoreCard": {
+      "closed_store": "Closed store"
+    },
+    "StoreCardStatus": {
+      "STORE_CARD_STATUS_CLOSED": "Closed",
+      "STORE_CARD_STATUS_OPEN": "Open",
+      "STORE_CARD_STATUS_PAUSED": "Temporarily closed"
+    },
     "error": {
       "ABORTED": "資源衝突",
       "ALREADY_EXISTS": "資源衝突",

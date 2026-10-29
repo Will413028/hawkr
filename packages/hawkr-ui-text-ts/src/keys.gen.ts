@@ -2,6 +2,7 @@
 import { Code } from "@connectrpc/connect";
 import type { Gender } from "@hawkr/api/gen/hawkr/buyer/v1alpha1/buyer_pb";
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
+import type { StoreCardStatus } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
 import type { ContentKind, KYCField, KYCFlowStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, PayUniState, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import type { UiMessage } from "./message";
 
@@ -28,6 +29,10 @@ export type UiTextKey =
 	| "common.PolicyCategory.POLICY_CATEGORY_PROHIBITED_GOODS"
 	| "common.PolicyCategory.POLICY_CATEGORY_SPAM"
 	| "common.PolicyCategory.POLICY_CATEGORY_UNLICENSED_SALE"
+	| "common.StoreCard.closed_store"
+	| "common.StoreCardStatus.STORE_CARD_STATUS_CLOSED"
+	| "common.StoreCardStatus.STORE_CARD_STATUS_OPEN"
+	| "common.StoreCardStatus.STORE_CARD_STATUS_PAUSED"
 	| "common.error.ABORTED"
 	| "common.error.ALREADY_EXISTS"
 	| "common.error.DATA_LOSS"
@@ -256,6 +261,24 @@ const COMMON_POLICY_CATEGORY: Readonly<Partial<Record<number, UiTextKey>>> = {
 /** common.PolicyCategory 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
 export function commonPolicyCategory(v: PolicyCategory): UiMessage | undefined {
 	const key = COMMON_POLICY_CATEGORY[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+/** common.StoreCard.closed_store */
+export function commonStoreCardClosedStore(): UiMessage {
+	return { key: "common.StoreCard.closed_store" };
+}
+
+const COMMON_STORE_CARD_STATUS: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "common.StoreCardStatus.STORE_CARD_STATUS_OPEN",
+	2: "common.StoreCardStatus.STORE_CARD_STATUS_PAUSED",
+	3: "common.StoreCardStatus.STORE_CARD_STATUS_CLOSED",
+};
+
+/** common.StoreCardStatus 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function commonStoreCardStatus(v: StoreCardStatus): UiMessage | undefined {
+	const key = COMMON_STORE_CARD_STATUS[v];
 	if (key === undefined) return undefined;
 	return { key };
 }

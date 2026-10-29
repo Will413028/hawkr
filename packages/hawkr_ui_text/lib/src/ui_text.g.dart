@@ -6,6 +6,7 @@
 import 'package:connectrpc/connect.dart' show Code;
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pbenum.dart' as hawkr_buyer_v1alpha1_buyer;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart' as hawkr_common_v1alpha1_policy_category;
+import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as hawkr_common_v1alpha1_store_card;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart' as hawkr_seller_v1alpha1_seller;
 
 import '../hawkr_ui_text.dart' show UiLocale;
@@ -55,6 +56,23 @@ _ => null,
 extension CommonPolicyCategoryUiText on hawkr_common_v1alpha1_policy_category.PolicyCategory {
   /// common.PolicyCategory 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
   String? uiText(UiLocale l) => _commonPolicyCategory(l, value);
+}
+
+String? _commonStoreCardStatus(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '營業中',
+(UiLocale.en, 1) => 'Open',
+(UiLocale.zhTW, 2) => '暫停營業',
+(UiLocale.en, 2) => 'Temporarily closed',
+(UiLocale.zhTW, 3) => '已關閉',
+(UiLocale.en, 3) => 'Closed',
+_ => null,
+};
+}
+
+extension CommonStoreCardStatusUiText on hawkr_common_v1alpha1_store_card.StoreCardStatus {
+  /// common.StoreCardStatus 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _commonStoreCardStatus(l, value);
 }
 
 String? _sellerContentKind(UiLocale l, int value) {
@@ -428,6 +446,14 @@ String buyerProfileGenderUnset(UiLocale l) {
 return switch (l) {
 UiLocale.zhTW => '尚未設定',
 UiLocale.en => 'Not set',
+};
+}
+
+/// common.StoreCard.closed_store
+String commonStoreCardClosedStore(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '已關閉的店家',
+UiLocale.en => 'Closed store',
 };
 }
 

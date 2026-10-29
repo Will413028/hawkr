@@ -143,7 +143,7 @@ const getCachedHomeLiveBootstrap = unstable_cache(
 				endpoint: "/public/products?sort=SALES, /public/products",
 			},
 		),
-	["home-live-bootstrap"],
+	["home-live-bootstrap", "v2"],
 	{
 		tags: [PUBLIC_CACHE_TAGS.products],
 		revalidate: CACHE_TTL.COMMERCE_LIVE,
@@ -174,7 +174,7 @@ const getCachedHomeDiscoveryBootstrap = unstable_cache(
 					"DiscoveryPublicService/SuggestRecommendedSellers, /public/posts, /public/categories/tree",
 			},
 		),
-	["home-discovery-bootstrap"],
+	["home-discovery-bootstrap", "v2"],
 	{
 		// A post write busts this entry through the posts tag; CACHE_TTL.DISCOVERY
 		// is only the safety net for a missed invalidation, as it is for sellers

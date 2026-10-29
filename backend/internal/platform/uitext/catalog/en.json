@@ -21,6 +21,18 @@
     "common.PolicyCategory.POLICY_CATEGORY_SPAM": {
       "message": "Spam"
     },
+    "common.StoreCard.closed_store": {
+      "message": "Closed store"
+    },
+    "common.StoreCardStatus.STORE_CARD_STATUS_CLOSED": {
+      "message": "Closed"
+    },
+    "common.StoreCardStatus.STORE_CARD_STATUS_OPEN": {
+      "message": "Open"
+    },
+    "common.StoreCardStatus.STORE_CARD_STATUS_PAUSED": {
+      "message": "Temporarily closed"
+    },
     "seller.Measure.suspension_active_open": {
       "message": "Suspended (no end date; under periodic review by the platform)"
     },

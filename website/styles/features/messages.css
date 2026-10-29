@@ -841,6 +841,10 @@ body .page-content:has(.chat-page) {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
+.chat-context__label {
+	font-size: var(--hkui-text-small);
+	color: var(--hkui-foreground-soft);
+}
 .chat-context__cta {
 	margin-top: 4px;
 	display: inline-flex;
@@ -1298,6 +1302,10 @@ body .page-content:has(.chat-page) {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	color: var(--hkui-foreground);
+}
+.thread-page__head-label {
+	font-size: var(--text-xs);
+	color: var(--hkui-foreground-muted);
 }
 .thread-page__head-status {
 	display: inline-flex;

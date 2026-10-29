@@ -28,6 +28,14 @@
       "POLICY_CATEGORY_SPAM": "垃圾訊息",
       "POLICY_CATEGORY_UNLICENSED_SALE": "未經許可販售"
     },
+    "StoreCard": {
+      "closed_store": "已關閉的店家"
+    },
+    "StoreCardStatus": {
+      "STORE_CARD_STATUS_CLOSED": "已關閉",
+      "STORE_CARD_STATUS_OPEN": "營業中",
+      "STORE_CARD_STATUS_PAUSED": "暫停營業"
+    },
     "error": {
       "ABORTED": "資源衝突",
       "ALREADY_EXISTS": "資源衝突",

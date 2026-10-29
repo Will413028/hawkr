@@ -76,11 +76,6 @@ const CANONICAL_LINK_SOURCES = [
 	// `/public/posts` to carry store_code.
 	"features/home/components/HomeStageFeedCard.tsx",
 	"features/feed/components/PostDetailViewer.tsx",
-	// #2137: the four surfaces whose owning service already had the seller in
-	// hand. These pass the code alone — a missing code means no link, not a
-	// store_id link.
-	"features/account/screens/overview/AccountOverviewClient.tsx",
-	"features/account/screens/recent/RecentClient.tsx",
 ];
 
 /**
@@ -177,6 +172,9 @@ const CARD_REFERENCE_SOURCES = [
 	"features/account/screens/orders/OrderQuickActionDrawer.tsx",
 	"features/account/screens/coupons/CouponsClient.tsx",
 	"features/account/screens/messages/ThreadClient.tsx",
+	"features/account/screens/recent/RecentClient.tsx",
+	"features/account/screens/wallet/WalletClient.tsx",
+	"features/account/screens/overview/AccountOverviewClient.tsx",
 ];
 
 test("reference entries take their store link from the store card, not the snapshot code", () => {

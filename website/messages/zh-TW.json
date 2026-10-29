@@ -15,10 +15,5 @@
 	"navigation": {},
 	"product": {},
 	"seller": {},
-	"order": {},
-	"storeCard": {
-		"paused": "暫停營業",
-		"closed": "已關閉",
-		"closedStore": "已關閉的店家"
-	}
+	"order": {}
 }

@@ -1,6 +1,7 @@
 /** BuyerAppService member cards and spending records mapped to wallet views. */
 
 import { timestampDate } from "@bufbuild/protobuf/wkt";
+import type { StoreCard } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
 import { buyerAppClient } from "../connect/buyer";
 import { imageUri } from "../media/image";
 
@@ -16,6 +17,8 @@ export interface MemberCard {
 	 * without a 308. Empty when seller 模組 was unreachable — the same
 	 * degrade that blanks `sellerName`/`sellerLogo`. */
 	storeCode: string;
+	/** 會員卡隨附的店家卡片；B11 的暫停營業、已關閉由它的 status 決定（`storeCardView`）。 */
+	store?: StoreCard;
 	/** Cumulative spend at this seller, kept as a string (backend ships it as one). */
 	totalSpending: string;
 	isVip: boolean;
@@ -74,6 +77,7 @@ export async function fetchMemberCards({
 			sellerLogo: imageUri(card.store?.logo, "avatar") ?? "",
 			coverUrl: imageUri(card.store?.coverImage, "card") ?? "",
 			storeCode: card.store?.storeCode ?? "",
+			store: card.store,
 			totalSpending: String(card.totalSpent),
 			isVip: card.vip,
 		})),

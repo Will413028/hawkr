@@ -277,7 +277,7 @@
       "name": "hawkr.common.v1alpha1.StoreCardStatus",
       "tsName": "StoreCardStatus",
       "tsModule": "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {

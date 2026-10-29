@@ -7,6 +7,8 @@ import { SellerPageShell } from "@/components/shared/SellerPageShell";
 import Button from "@/components/ui/Button";
 import { AccountEmptyStateIcon } from "@/features/account/components/AccountEmptyIcon";
 import { useMemberCards } from "@/lib/hooks/useAccount";
+import { storeCardView } from "@/lib/seller/storeCardView";
+import { useStoreCardText } from "@/lib/seller/useStoreCardViews";
 
 function formatSpending(raw: string): string {
 	const n = Number(raw);
@@ -16,6 +18,7 @@ function formatSpending(raw: string): string {
 
 export default function WalletClient() {
 	const { cards, loading, error, hasMore, loadMore } = useMemberCards();
+	const storeCardText = useStoreCardText();
 	const [loadingMore, setLoadingMore] = React.useState(false);
 	const [loadError, setLoadError] = React.useState<string | null>(null);
 	const onLoadMore = async () => {
@@ -65,40 +68,48 @@ export default function WalletClient() {
 						</div>
 					) : (
 						<ul className="list-none m-0 p-0 flex flex-col gap-3">
-							{cards.map((card) => (
-								<li key={card.sellerId}>
-									<Link
-										href={`/account/wallet/${card.sellerId}?name=${encodeURIComponent(card.sellerName)}`}
-										className="flex items-center gap-3 p-4 bg-content1 dark:bg-white/4 border border-divider rounded-hkui-lg no-underline transition-colors hover:border-hkui-primary-200"
-									>
-										<span className="inline-flex items-center justify-center w-12 h-12 rounded-full overflow-hidden bg-default-100 shrink-0">
-											<Avatar
-												className="w-full h-full object-cover"
-												src={card.sellerLogo}
-												name={card.sellerName}
-												alt=""
-												entity="seller"
-												fallback="empty"
-											/>
-										</span>
-										<div className="flex flex-col gap-0.5 min-w-0 flex-1">
-											<div className="flex items-center gap-2 min-w-0">
-												<strong className="text-base text-foreground truncate">
-													{card.sellerName || "商家"}
-												</strong>
-												{card.isVip && (
-													<span className="shrink-0 text-xs font-bold px-2 py-0.5 rounded-full bg-warning-50 text-warning-700 dark:bg-[#f1cd70]/16 dark:text-[#f1cd70]">
-														VIP
-													</span>
-												)}
+							{cards.map((card) => {
+								const storeView = storeCardView(card.store, storeCardText);
+								return (
+									<li key={card.sellerId}>
+										<Link
+											href={`/account/wallet/${card.sellerId}?name=${encodeURIComponent(card.sellerName)}`}
+											className="flex items-center gap-3 p-4 bg-content1 dark:bg-white/4 border border-divider rounded-hkui-lg no-underline transition-colors hover:border-hkui-primary-200"
+										>
+											<span className="inline-flex items-center justify-center w-12 h-12 rounded-full overflow-hidden bg-default-100 shrink-0">
+												<Avatar
+													className="w-full h-full object-cover"
+													src={card.sellerLogo}
+													name={card.sellerName}
+													alt=""
+													entity="seller"
+													fallback="empty"
+												/>
+											</span>
+											<div className="flex flex-col gap-0.5 min-w-0 flex-1">
+												<div className="flex items-center gap-2 min-w-0">
+													<strong className="text-base text-foreground truncate">
+														{storeView?.name || card.sellerName || "商家"}
+													</strong>
+													{storeView?.labelText ? (
+														<small className="shrink-0 text-xs text-foreground-soft">
+															{storeView.labelText}
+														</small>
+													) : null}
+													{card.isVip && (
+														<span className="shrink-0 text-xs font-bold px-2 py-0.5 rounded-full bg-warning-50 text-warning-700 dark:bg-[#f1cd70]/16 dark:text-[#f1cd70]">
+															VIP
+														</span>
+													)}
+												</div>
+												<small className="text-xs text-foreground-soft">
+													累計消費 NT$ {formatSpending(card.totalSpending)}
+												</small>
 											</div>
-											<small className="text-xs text-foreground-soft">
-												累計消費 NT$ {formatSpending(card.totalSpending)}
-											</small>
-										</div>
-									</Link>
-								</li>
-							))}
+										</Link>
+									</li>
+								);
+							})}
 						</ul>
 					)}
 				</section>

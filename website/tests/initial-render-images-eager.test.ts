@@ -152,7 +152,10 @@ test("buyer list, cart, checkout, and order media never waits for scroll", () =>
 			"features/account/screens/favorites/FavoritesClient.tsx",
 			"src={sellerLogo}",
 		],
-		["features/account/screens/recent/RecentClient.tsx", "src={it.logoUrl}"],
+		[
+			"features/account/screens/recent/RecentClient.tsx",
+			"src={storeView.logoUrl}",
+		],
 		[
 			"features/cart/components/SellerGroupCard.tsx",
 			"src={group.sellerLogoUrl}",

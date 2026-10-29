@@ -87,6 +87,38 @@ func (t Text) CommonPolicyCategory(v string) (string, bool) {
 	return "", false
 }
 
+// CommonStoreCardClosedStore 是 common.StoreCard.closed_store 的文案。
+func (t Text) CommonStoreCardClosedStore() string {
+	if t.Locale() == EN {
+		return "Closed store"
+	}
+	return "已關閉的店家"
+}
+
+// CommonStoreCardStatus 是 common.StoreCardStatus 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) CommonStoreCardStatus(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "OPEN":
+			return "Open", true
+		case "PAUSED":
+			return "Temporarily closed", true
+		case "CLOSED":
+			return "Closed", true
+		}
+	}
+	switch v {
+	case "OPEN":
+		return "營業中", true
+	case "PAUSED":
+		return "暫停營業", true
+	case "CLOSED":
+		return "已關閉", true
+	}
+	return "", false
+}
+
 // CommonError 是 common.error 的文案。
 // 回傳的 Message.Locale 是實際使用的語系（缺字時是來源語系）；不認得的 code 回 (Message{}, false)，伺服器不顯示「未知」。
 func (t Text) CommonError(code string) (Message, bool) {

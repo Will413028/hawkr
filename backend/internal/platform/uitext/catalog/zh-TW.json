@@ -80,6 +80,22 @@
       "message": "未經許可販售",
       "description": "依法應有的登錄、許可或資格沒有完成就販售（第十一條第 2 項）。入口：檢舉人、平台判定與認定。"
     },
+    "common.StoreCard.closed_store": {
+      "message": "已關閉的店家",
+      "description": "店家卡片沒有名稱（個資清除後）時顯示的店名。"
+    },
+    "common.StoreCardStatus.STORE_CARD_STATUS_CLOSED": {
+      "message": "已關閉",
+      "description": "已關閉。"
+    },
+    "common.StoreCardStatus.STORE_CARD_STATUS_OPEN": {
+      "message": "營業中",
+      "description": "營業中：此刻可以公開曝光（營運中、沒有停權、身分認證與 PayUni 審核通過、店名與 logo 與所在地齊全），有公開的店面頁，\n也可以被追蹤。"
+    },
+    "common.StoreCardStatus.STORE_CARD_STATUS_PAUSED": {
+      "message": "暫停營業",
+      "description": "暫停：沒有關閉，但此刻不可公開曝光（停權、等待刪除、PayUni 被拒絕、身分認證改回草稿、缺店名或 logo 或所在地）。"
+    },
     "common.error.ABORTED": {
       "message": "資源衝突",
       "description": "Connect code ABORTED 的預設文字：伺服器沒有附 LocalizedMessage 時顯示。"

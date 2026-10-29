@@ -78,6 +78,12 @@ async function renderOverview(items: Favorite[]): Promise<string> {
 			useOrderStatusCounts: () => ({ counts: {} }),
 		},
 	});
+	// 常買賣家的店家卡片自己讀 React Query；這個測試不渲染它（卡片呈現另有單元測試）。
+	mock.module("@/lib/seller/useStoreCardViews", {
+		exports: {
+			useStoreCardViews: () => ({ views: new Map(), settled: false }),
+		},
+	});
 	// 措施與申覆入口自己讀 React Query；這個測試不渲染它（入口另有單元測試）。
 	mock.module("@/features/seller/measures/MeasuresAccountEntry", {
 		exports: { default: () => null },

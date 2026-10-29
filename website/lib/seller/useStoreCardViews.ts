@@ -1,8 +1,14 @@
 "use client";
 
+import { StoreCardStatus } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
+import {
+	commonStoreCardClosedStore,
+	commonStoreCardStatus,
+	commonUnknown,
+} from "@hawkr/ui-text/keys";
 import { useQuery } from "@tanstack/react-query";
-import { useTranslations } from "next-intl";
 import { useMemo } from "react";
+import { optionalText, useUiText } from "@/lib/i18n/ui-text";
 import { queryKeys } from "@/lib/query/keys";
 import { fetchStoreCards, normalizeStoreIds } from "./fetchStoreCards";
 import {
@@ -12,15 +18,16 @@ import {
 } from "./storeCardView";
 
 export function useStoreCardText(): StoreCardText {
-	const t = useTranslations("storeCard");
-	return useMemo(
-		() => ({
-			paused: t("paused"),
-			closed: t("closed"),
-			closedStore: t("closedStore"),
-		}),
-		[t],
-	);
+	const ut = useUiText();
+	return useMemo(() => {
+		const status = (v: StoreCardStatus) =>
+			optionalText(ut, commonStoreCardStatus(v)) ?? ut(commonUnknown());
+		return {
+			paused: status(StoreCardStatus.PAUSED),
+			closed: status(StoreCardStatus.CLOSED),
+			closedStore: ut(commonStoreCardClosedStore()),
+		};
+	}, [ut]);
 }
 
 /**

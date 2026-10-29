@@ -10,7 +10,8 @@ import { AccountEmptyStateIcon } from "@/features/account/components/AccountEmpt
 import { formatTaipeiDate } from "@/lib/date/taipei";
 import { useHistory } from "@/lib/hooks/useAccount";
 import { resolveCdnUrl } from "@/lib/media/cdn";
-import { sellerPath } from "@/lib/seo/urls";
+import { storeCardView } from "@/lib/seller/storeCardView";
+import { useStoreCardText } from "@/lib/seller/useStoreCardViews";
 
 function formatPriceRange(min?: string, max?: string): string {
 	const toNum = (v?: string) => {
@@ -49,6 +50,7 @@ function formatVisitedAt(raw?: string): string {
 
 export default function RecentClient() {
 	const { items, loading, error, clear, hasMore, loadMore } = useHistory();
+	const storeCardText = useStoreCardText();
 	const [loadingMore, setLoadingMore] = React.useState(false);
 	const [loadError, setLoadError] = React.useState<string | null>(null);
 	const onLoadMore = async () => {
@@ -116,10 +118,11 @@ export default function RecentClient() {
 						{visibleItems.map((it) => {
 							const rating = formatRating(it.rating);
 							const visited = formatVisitedAt(it.visitedAt);
-							const sellerInner = (
+							const storeView = storeCardView(it.store, storeCardText);
+							const sellerInner = storeView ? (
 								<>
 									<Avatar
-										src={it.logoUrl}
+										src={storeView.logoUrl}
 										alt=""
 										entity="seller"
 										loading="eager"
@@ -127,10 +130,13 @@ export default function RecentClient() {
 										fallback="empty"
 									/>
 									<em className="not-italic overflow-hidden text-ellipsis whitespace-nowrap">
-										{it.sellerName}
+										{storeView.name}
 									</em>
+									{storeView.labelText ? (
+										<small className="shrink-0">{storeView.labelText}</small>
+									) : null}
 								</>
-							);
+							) : null;
 							return (
 								<li
 									key={String(it.id)}
@@ -157,10 +163,10 @@ export default function RecentClient() {
 											<strong className="text-base leading-[1.3] line-clamp-2">
 												{it.productName || `商品 #${it.productId}`}
 											</strong>
-											{it.sellerName ? (
-												sellerPath(it.storeCode) ? (
+											{sellerInner ? (
+												storeView?.href ? (
 													<Link
-														href={sellerPath(it.storeCode)}
+														href={storeView.href}
 														className="relative z-10 pointer-events-auto inline-flex items-center gap-1.5 w-fit max-w-full text-xs text-foreground-soft no-underline min-w-0 hover:text-hkui-primary-600"
 													>
 														{sellerInner}

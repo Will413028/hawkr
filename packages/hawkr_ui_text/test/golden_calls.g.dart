@@ -6,6 +6,7 @@
 import 'package:connectrpc/connect.dart' show Code;
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pbenum.dart' as hawkr_buyer_v1alpha1_buyer;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart' as hawkr_common_v1alpha1_policy_category;
+import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as hawkr_common_v1alpha1_store_card;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart' as hawkr_seller_v1alpha1_seller;
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
@@ -126,6 +127,10 @@ const _enumNumber = <String, int>{
 	'SELLER_REQUIREMENT_STORE_NAME': 4,
 	'SELLER_REQUIREMENT_TOWN_CODE': 6,
 	'SELLER_REQUIREMENT_UNSPECIFIED': 0,
+	'STORE_CARD_STATUS_CLOSED': 3,
+	'STORE_CARD_STATUS_OPEN': 1,
+	'STORE_CARD_STATUS_PAUSED': 2,
+	'STORE_CARD_STATUS_UNSPECIFIED': 0,
 	'STORE_FIELD_ADDRESS': 1,
 	'STORE_FIELD_CONTACT_MOBILE': 3,
 	'STORE_FIELD_CONTACT_NAME': 2,
@@ -180,6 +185,10 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return buyerProfileGenderUnset(l);
     case 'common.PolicyCategory':
       return hawkr_common_v1alpha1_policy_category.PolicyCategory.valueOf(_n(value))!.uiText(l);
+    case 'common.StoreCard.closed_store':
+      return commonStoreCardClosedStore(l);
+    case 'common.StoreCardStatus':
+      return hawkr_common_v1alpha1_store_card.StoreCardStatus.valueOf(_n(value))!.uiText(l);
     case 'common.error':
       return commonErrorText(_codes[value]!, l);
     case 'common.unknown':

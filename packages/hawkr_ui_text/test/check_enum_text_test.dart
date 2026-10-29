@@ -630,7 +630,7 @@ String j(MeasureKind k) => k == $warn ? x.t : '';
 
     test('Dart 版 manifest 不含 hawkr.admin.*', () {
       expect(manifest.where((e) => e.name.startsWith('hawkr.admin.')), isEmpty);
-      expect(manifest.where((e) => e.inCatalog), hasLength(17));
+      expect(manifest.where((e) => e.inCatalog), hasLength(18));
     });
   });
 

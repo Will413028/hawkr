@@ -100,7 +100,7 @@ export default function ChatContextPanel({ sellerId }: { sellerId: string }) {
 						前往賣場
 					</Link>
 				) : seller.labelText ? (
-					<span className="chat-context__name">{seller.labelText}</span>
+					<span className="chat-context__label">{seller.labelText}</span>
 				) : null}
 			</div>
 			{products.length > 0 ? (

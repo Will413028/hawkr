@@ -476,7 +476,7 @@ export const getCachedRecommendedSellers = cache(async (limit = 8) => {
 					endpoint: "DiscoveryPublicService/SuggestRecommendedSellers",
 				},
 			),
-		["recommended-sellers", String(limit)],
+		["recommended-sellers", "v2", String(limit)],
 		{
 			tags: [PUBLIC_CACHE_TAGS.sellers],
 			revalidate: CACHE_TTL.DISCOVERY,

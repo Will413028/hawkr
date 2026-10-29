@@ -43,6 +43,10 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.BuyerProfileGenderUnset(), true
 	case "common.PolicyCategory":
 		return t.CommonPolicyCategory(goldenEnum(c.Value, "POLICY_CATEGORY_"))
+	case "common.StoreCard.closed_store":
+		return t.CommonStoreCardClosedStore(), true
+	case "common.StoreCardStatus":
+		return t.CommonStoreCardStatus(goldenEnum(c.Value, "STORE_CARD_STATUS_"))
 	case "common.error":
 		m, ok := t.CommonError(c.Value)
 		return m.Text, ok

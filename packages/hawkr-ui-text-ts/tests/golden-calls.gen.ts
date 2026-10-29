@@ -1,6 +1,6 @@
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 import { Code } from "@connectrpc/connect";
-import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonUnknown, sellerContentKind, sellerKYCField, sellerKYCFlowStatus, sellerKYCFlowStatusAction, sellerKYCFlowStatusBannerDescription, sellerKYCFlowStatusBannerTitle, sellerKYCFlowStatusGateHeading, sellerKYCFlowStatusGateMessage, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerPayUniState, sellerRevokeReason, sellerRiskGround, sellerSellerPayUniFixFieldsHeading, sellerSellerPayUniReasonHeading, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity } from "../src/keys.gen";
+import { buyerGender, buyerProfileGenderUnset, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, sellerContentKind, sellerKYCField, sellerKYCFlowStatus, sellerKYCFlowStatusAction, sellerKYCFlowStatusBannerDescription, sellerKYCFlowStatusBannerTitle, sellerKYCFlowStatusGateHeading, sellerKYCFlowStatusGateMessage, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerPayUniState, sellerRevokeReason, sellerRiskGround, sellerSellerPayUniFixFieldsHeading, sellerSellerPayUniReasonHeading, sellerSellerRequirement, sellerStoreField, sellerTerminationGround, sellerViolationSeverity } from "../src/keys.gen";
 import { sellerMeasureRequestStateWithKindStaff } from "../src/zh-tw.gen";
 import type { UiMessage } from "../src/message";
 
@@ -131,6 +131,10 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"SELLER_REQUIREMENT_STORE_NAME": 4,
 	"SELLER_REQUIREMENT_TOWN_CODE": 6,
 	"SELLER_REQUIREMENT_UNSPECIFIED": 0,
+	"STORE_CARD_STATUS_CLOSED": 3,
+	"STORE_CARD_STATUS_OPEN": 1,
+	"STORE_CARD_STATUS_PAUSED": 2,
+	"STORE_CARD_STATUS_UNSPECIFIED": 0,
 	"STORE_FIELD_ADDRESS": 1,
 	"STORE_FIELD_CONTACT_MOBILE": 3,
 	"STORE_FIELD_CONTACT_NAME": 2,
@@ -192,6 +196,12 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	}
 	case "common.PolicyCategory": {
 		return commonPolicyCategory(num(c.value));
+	}
+	case "common.StoreCard.closed_store": {
+		return commonStoreCardClosedStore();
+	}
+	case "common.StoreCardStatus": {
+		return commonStoreCardStatus(num(c.value));
 	}
 	case "common.error": {
 		return commonError(CODES[c.value ?? ""]);

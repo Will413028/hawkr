@@ -17,7 +17,7 @@ import {
 import { useOrderList, useOrderStatusCounts } from "@/lib/hooks/useOrders";
 import { imageUri } from "@/lib/media/image";
 import type { Order } from "@/lib/orders/types";
-import { sellerPath } from "@/lib/seo/urls";
+import { useStoreCardViews } from "@/lib/seller/useStoreCardViews";
 
 /**
  * Account home — buyer personalized overview.
@@ -153,11 +153,6 @@ function orderAmount(o: Order): number {
 
 interface RankedEntry {
 	id: string;
-	/**
-	 * 賣家店面 canonical 短碼；沒有就不連結（不回退 id — id 路徑多吃一次 308）。
-	 * 常買商品那份 ranking 沒有這個概念，所以是選填。
-	 */
-	storeCode?: string;
 	name: string;
 	count: number;
 	spend: number;
@@ -184,7 +179,6 @@ function rankSellers(orders: Order[]): RankedEntry[] {
 		} else {
 			map.set(id, {
 				id,
-				storeCode: o.storeCode,
 				name: o.sellerName || "賣家",
 				count: 1,
 				spend: orderAmount(o),
@@ -319,6 +313,9 @@ export default function AccountOverviewClient() {
 	const topSellers = React.useMemo(
 		() => rankSellers(periodOrders).slice(0, 3),
 		[periodOrders],
+	);
+	const { views: topSellerViews } = useStoreCardViews(
+		topSellers.map((s) => s.id),
 	);
 	const topProducts = React.useMemo(
 		() => rankProducts(periodOrders).slice(0, 3),
@@ -524,13 +521,19 @@ export default function AccountOverviewClient() {
 							) : (
 								<ol className="list-none m-0 p-0 flex flex-col gap-1.5">
 									{topSellers.map((s, idx) => {
-										// 賣家頁 canonical 網址走 store_code；訂單本來就帶著它，
-										// 連 storeId 只是多吃一次 308。取不到就不連結。
-										const href = sellerPath(s.storeCode);
+										// 連結與暫停營業、已關閉的標籤依 B11 由店家卡片決定；
+										// 卡片還沒回來或沒有卡片就不連結。
+										const view = topSellerViews.get(s.id);
+										const href = view?.href ?? "";
 										const body = (
 											<>
 												<strong className="text-sm font-semibold text-foreground overflow-hidden text-ellipsis whitespace-nowrap">
-													{s.name}
+													{view?.name ?? s.name}
+													{view?.labelText ? (
+														<small className="ml-2 font-normal text-foreground-soft">
+															{view.labelText}
+														</small>
+													) : null}
 												</strong>
 												<small className="text-[length:clamp(9px,calc(6px_+_2.5cqw),var(--text-xs,12px))] text-foreground-soft overflow-hidden text-ellipsis whitespace-nowrap">
 													{s.count} 筆 ・ {formatTwd(s.spend)}

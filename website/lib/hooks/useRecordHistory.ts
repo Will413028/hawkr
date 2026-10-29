@@ -8,8 +8,9 @@ import { useQueryIdentity } from "./useQueryIdentity";
 
 /**
  * Records a product visit into the logged-in buyer's browse history
- * (POST /app/buyers/me/browse-history). The anonymous `/products/{id}/view`
- * beacon only feeds aggregate counts — this is what populates the 瀏覽紀錄 page.
+ * (BuyerAppService.RecordVisit). The product-view beacon
+ * (SellerPublicService.RecordProductView) only feeds aggregate counts — this
+ * is what populates the 瀏覽紀錄 page.
  *
  * `enabled` mirrors the buyer-query gate (`hydrated && isLoggedIn`) so callers
  * can skip recording for guests. On success the history query is invalidated so
