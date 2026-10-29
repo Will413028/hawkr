@@ -15,7 +15,7 @@ import (
 
 // Text 把輸入轉成儲存的值：去掉前後空白，空字串是 nil（沒有值）。
 func Text(value string) *string {
-	value = strings.TrimSpace(value)
+	value = trimtext.Trim(value)
 	if value == "" {
 		return nil
 	}
@@ -24,7 +24,7 @@ func Text(value string) *string {
 
 // Required 去掉前後空白後必須是 1 到 limit 字；field 是模組輸入的欄位名，name 是錯誤訊息裡的名稱。
 func Required(value string, limit int, field, name string) (string, error) {
-	value = strings.TrimSpace(value)
+	value = trimtext.Trim(value)
 	if n := utf8.RuneCountInString(value); n == 0 || n > limit {
 		return "", apperr.InvalidInputOn([]string{field}, "%s必須是 1 到 %d 字", name, limit)
 	}
@@ -53,7 +53,7 @@ const NoteBodyMaxRunes = 2000
 
 // NoteBody 驗證內部註記的內容：去掉前後空白後 1 到 NoteBodyMaxRunes 字（措施的註記與案件的註記共用；field 是模組輸入的欄位名）。
 func NoteBody(body, field string) (string, error) {
-	trimmed := strings.TrimSpace(body)
+	trimmed := trimtext.Trim(body)
 	if n := utf8.RuneCountInString(trimmed); n == 0 || n > NoteBodyMaxRunes {
 		return "", apperr.InvalidInputOn([]string{field}, "%s", text.NoteBodyLength().Text)
 	}

@@ -237,7 +237,7 @@ func (s *Service) revoke(ctx context.Context, q *store.Queries, plan revokePlan,
 		return revoked, err
 	}
 	affected := []store.SellerMeasure{revoked}
-	if err := s.publishRevoked(ctx, revoked, reason, now); err != nil {
+	if err := s.publishRevoked(ctx, q, revoked, reason, now); err != nil {
 		return revoked, err
 	}
 	if len(plan.findings) > 0 {
@@ -281,7 +281,7 @@ func (s *Service) cascadeRevoke(ctx context.Context, q *store.Queries, measures 
 		return nil, err
 	}
 	for _, m := range cascaded {
-		if err := s.publishRevoked(ctx, m, reason, now); err != nil {
+		if err := s.publishRevoked(ctx, q, m, reason, now); err != nil {
 			return nil, err
 		}
 	}
@@ -333,8 +333,18 @@ func (s *Service) publishClosed(ctx context.Context, measures []store.SellerMeas
 	return nil
 }
 
-func (s *Service) publishRevoked(ctx context.Context, row store.SellerMeasure, reason model.RevokeReason, now time.Time) error {
-	return events.Publish(ctx, s.d.Events, model.MeasureRevoked{
+func (s *Service) publishRevoked(ctx context.Context, q *store.Queries, row store.SellerMeasure, reason model.RevokeReason, now time.Time) error {
+	event := model.MeasureRevoked{
 		EventID: uuid.NewV7(), OccurredAt: now, MeasureID: row.ID, StoreID: row.StoreID, AccountID: row.AccountID, Reason: reason,
-	})
+	}
+	if row.Kind == string(model.MeasureContentTakedown) {
+		contents, err := q.MeasureContents(ctx, []uuid.UUID{row.ID})
+		if err != nil {
+			return err
+		}
+		for _, c := range contents {
+			event.Contents = append(event.Contents, model.ContentRef{Kind: model.ContentKind(c.ContentKind), ID: c.ContentID})
+		}
+	}
+	return events.Publish(ctx, s.d.Events, event)
 }

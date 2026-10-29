@@ -14,6 +14,7 @@ schema `seller`（`db/schema.sql`，view 與函式在 `db/objects.sql`）：`sto
 
 - `seller.pub_exposable_stores(at timestamptz) RETURNS SETOF seller.pub_exposable_store (store_id bigint)`：`at` 這一刻可公開曝光的店家，曝光規則唯一的家。
 - `seller.pub_review_items(at timestamptz) RETURNS SETOF seller.pub_review_item (kind, item_id, 對象的鍵, store_id, store_name, start_at, due_at)`：`at` 這一刻的全部待辦（10 種），給 `reviewqueue`。守門：`TestPubReviewItemsIsTheUnionOfTheReviewFunctions`。
+- `seller.pub_content_takedowns() RETURNS SETOF seller.pub_content_takedown (measure_id, content_kind, content_id)`：此刻生效中的內容下架措施的對象，一列一個（措施，內容）；不收 `at`（下架建立即生效、沒有結束時間）。給 social 每日對帳核對自己的複本，social 的讀取不 join 它。守門：`TestPubContentTakedownsListsOnlyActiveTakedownTargets`。
 
 ## 模組內部結構
 

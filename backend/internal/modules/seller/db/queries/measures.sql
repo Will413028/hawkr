@@ -10,6 +10,11 @@ VALUES (
 )
 RETURNING *;
 
+-- name: InsertFindingModerationReports :exec
+-- 認定的來源 moderation 檢舉（不透明的外部參照，沒有 FK；與 InsertViolation 同一個 transaction）。
+INSERT INTO seller.finding_moderation_reports (violation_id, report_id)
+SELECT sqlc.arg(violation_id), unnest(sqlc.arg(report_ids)::uuid[]);
+
 -- name: InsertFindingReports :exec
 -- 認定的來源通報（與 InsertViolation 同一個 transaction；呼叫方已依 id 升序鎖住這些通報並驗證過）。
 INSERT INTO seller.finding_reports (violation_id, report_id)
@@ -76,7 +81,8 @@ LIMIT sqlc.arg(page_size);
 -- name: InsertMeasure :one
 -- 新增措施：目前值寫進 measures，同一個語句追加第 1 版的歷史快照（SQL:2011 系統版本表：目前值與歷史由同一個寫入路徑維持一致）。
 -- 依據與 current_revision 的外鍵延遲到 commit 才檢查（依據在同一個 transaction 稍後寫入）。starts_at 由呼叫方算（停權與立即生效的終止是 now，
--- 預告終止是 now 加 720 小時；CHECK 保證）。
+-- 預告終止是 now 加 720 小時；CHECK 保證）。同一個 (管理員, request_id) 已存在時 0 列（DO NOTHING，不丟 23505）：呼叫方已鎖住目標帳號的 stint 並查過
+-- request_id，所以只有目標不同帳號的並行請求會走到這裡，再讀既有那筆比對內容。
 WITH created AS (
     INSERT INTO seller.measures (
         id, account_id, store_id, kind, basis, risk_ground, lead_finding_id, review_by, statement_to_seller, starts_at, ends_at,
@@ -88,12 +94,33 @@ WITH created AS (
         sqlc.narg(termination_ground), sqlc.narg(source_measure_id), sqlc.narg(source_case_id), sqlc.narg(source_authority_order_id),
         1, sqlc.narg(request_id), sqlc.narg(request_hash), sqlc.arg(admin_id), sqlc.arg(now), sqlc.arg(now)
     )
+    ON CONFLICT (created_by_admin_id, request_id) WHERE request_id IS NOT NULL DO NOTHING
     RETURNING *
 ), history AS (
     INSERT INTO seller.measure_revisions (measure_id, revision, statement_to_seller, ends_at, admin_id, created_at)
     SELECT id, current_revision, statement_to_seller, ends_at, created_by_admin_id, created_at FROM created
 )
 SELECT * FROM created;
+
+-- name: InsertMeasureContents :exec
+-- 內容下架措施的對象（與 InsertMeasure 同一個 transaction；種類與 ID 是平行陣列，呼叫方已驗證形狀）。
+INSERT INTO seller.measure_contents (measure_id, content_kind, content_id)
+SELECT sqlc.arg(measure_id), (sqlc.arg(kinds)::text[])[i], (sqlc.arg(ids)::uuid[])[i]
+FROM generate_series(1, cardinality(sqlc.arg(ids)::uuid[])) AS i;
+
+-- name: MeasureContents :many
+-- 一批措施的內容下架對象，依措施、種類、ID 排序（種類以位元組順序，不依 collation）。
+SELECT measure_id, content_kind, content_id
+FROM seller.measure_contents
+WHERE measure_id = ANY(sqlc.arg(measure_ids)::uuid[])
+ORDER BY measure_id, content_kind COLLATE "C", content_id;
+
+-- name: LinkedMeasureExists :one
+-- 這個帳號是否已有以這筆措施為來源、仍生效的關聯終止（measures_linked_source 的檢查版；呼叫方已鎖住來源與目標帳號）。
+SELECT EXISTS (
+    SELECT 1 FROM seller.measures
+    WHERE source_measure_id = sqlc.arg(source_measure_id) AND account_id = sqlc.arg(account_id) AND status = 'ENFORCED'
+);
 
 -- name: InsertMeasureFinding :exec
 INSERT INTO seller.measure_findings (measure_id, violation_id)
@@ -328,7 +355,7 @@ SELECT m.*
 FROM seller.measures m
 WHERE m.account_id = sqlc.arg(account_id)
   AND (sqlc.narg(state)::text IS NULL
-    OR (sqlc.narg(state)::text = 'ISSUED' AND m.status = 'ENFORCED' AND m.kind = 'WARNING')
+    OR (sqlc.narg(state)::text = 'ISSUED' AND m.status = 'ENFORCED' AND m.kind IN ('WARNING', 'CONTENT_TAKEDOWN'))
     OR (sqlc.narg(state)::text = 'REVOKED' AND m.status = 'REVOKED')
     OR (sqlc.narg(state)::text = 'ACTIVE' AND m.id = ANY(sqlc.arg(active_ids)::uuid[]))
     OR (sqlc.narg(state)::text = 'SCHEDULED' AND m.id = ANY(sqlc.arg(scheduled_ids)::uuid[]))
@@ -369,7 +396,7 @@ WHERE (sqlc.narg(store_id)::bigint IS NULL OR m.store_id = sqlc.narg(store_id))
       AND (sqlc.narg(request_state)::text IS NULL OR sqlc.narg(request_state)::text =
         CASE WHEN r.state = 'PENDING' AND r.kind = 'REMEDIATION' AND m.id <> ALL(sqlc.arg(active_ids)::uuid[]) THEN 'CLOSED' ELSE r.state END)))
   AND (sqlc.narg(state)::text IS NULL
-    OR (sqlc.narg(state)::text = 'ISSUED' AND m.status = 'ENFORCED' AND m.kind = 'WARNING')
+    OR (sqlc.narg(state)::text = 'ISSUED' AND m.status = 'ENFORCED' AND m.kind IN ('WARNING', 'CONTENT_TAKEDOWN'))
     OR (sqlc.narg(state)::text = 'REVOKED' AND m.status = 'REVOKED')
     OR (sqlc.narg(state)::text = 'ACTIVE' AND m.id = ANY(sqlc.arg(active_ids)::uuid[]))
     OR (sqlc.narg(state)::text = 'SCHEDULED' AND m.id = ANY(sqlc.arg(scheduled_ids)::uuid[]))
@@ -406,7 +433,7 @@ WHERE (sqlc.narg(store_id)::bigint IS NULL OR m.store_id = sqlc.narg(store_id))
   AND (sqlc.narg(basis)::text IS NULL OR m.basis = sqlc.narg(basis))
   AND (sqlc.narg(request_kind)::text IS NULL OR q.kind = sqlc.narg(request_kind)::text)
   AND (sqlc.narg(state)::text IS NULL
-    OR (sqlc.narg(state)::text = 'ISSUED' AND m.status = 'ENFORCED' AND m.kind = 'WARNING')
+    OR (sqlc.narg(state)::text = 'ISSUED' AND m.status = 'ENFORCED' AND m.kind IN ('WARNING', 'CONTENT_TAKEDOWN'))
     OR (sqlc.narg(state)::text = 'REVOKED' AND m.status = 'REVOKED')
     OR (sqlc.narg(state)::text = 'ACTIVE' AND m.id = ANY(sqlc.arg(active_ids)::uuid[]))
     OR (sqlc.narg(state)::text = 'SCHEDULED' AND m.id = ANY(sqlc.arg(scheduled_ids)::uuid[]))
@@ -448,7 +475,7 @@ WHERE m.id IN (SELECT r.measure_id FROM seller.review_measure_review(sqlc.arg(no
       AND (sqlc.narg(request_state)::text IS NULL OR sqlc.narg(request_state)::text =
         CASE WHEN r.state = 'PENDING' AND r.kind = 'REMEDIATION' AND m.id <> ALL(sqlc.arg(active_ids)::uuid[]) THEN 'CLOSED' ELSE r.state END)))
   AND (sqlc.narg(state)::text IS NULL
-    OR (sqlc.narg(state)::text = 'ISSUED' AND m.status = 'ENFORCED' AND m.kind = 'WARNING')
+    OR (sqlc.narg(state)::text = 'ISSUED' AND m.status = 'ENFORCED' AND m.kind IN ('WARNING', 'CONTENT_TAKEDOWN'))
     OR (sqlc.narg(state)::text = 'REVOKED' AND m.status = 'REVOKED')
     OR (sqlc.narg(state)::text = 'ACTIVE' AND m.id = ANY(sqlc.arg(active_ids)::uuid[]))
     OR (sqlc.narg(state)::text = 'SCHEDULED' AND m.id = ANY(sqlc.arg(scheduled_ids)::uuid[]))

@@ -10,6 +10,12 @@ import (
 	"uuid"
 )
 
+type SellerPubContentTakedown struct {
+	MeasureID   uuid.UUID
+	ContentKind string
+	ContentID   uuid.UUID
+}
+
 type SellerPubExposableStore struct {
 	StoreID int64
 }

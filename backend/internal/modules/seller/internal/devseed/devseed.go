@@ -84,6 +84,7 @@ var clearChildrenSQL = []string{
 	`DELETE FROM seller.governance_notes WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1)) OR case_id IN (SELECT id FROM seller.cases WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.measure_findings WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.measure_revisions WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1))`,
+	`DELETE FROM seller.measure_contents WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.measures WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.finding_authority_orders WHERE violation_id IN (SELECT id FROM seller.violations WHERE store_id = ANY($1))`,
 	// 主管機關來函只要有一個對象碰到種子店家（或其帳號），整份來函連同全部對象一起刪：對象的位置必須連續（DB 的 prev_position 外鍵保證），不能只刪其中幾個。
@@ -95,6 +96,7 @@ var clearChildrenSQL = []string{
 	`DELETE FROM seller.authority_order_targets WHERE order_id IN (SELECT order_id FROM seller.authority_order_targets WHERE store_id = ANY($1) OR account_id IN (SELECT account_id FROM seller.stores WHERE store_id = ANY($1)))`,
 	`DELETE FROM seller.authority_orders WHERE id NOT IN (SELECT order_id FROM seller.authority_order_targets) AND cardinality($1::bigint[]) >= 0`,
 	`DELETE FROM seller.finding_reports WHERE violation_id IN (SELECT id FROM seller.violations WHERE store_id = ANY($1))`,
+	`DELETE FROM seller.finding_moderation_reports WHERE violation_id IN (SELECT id FROM seller.violations WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.violations WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.suspension_periods WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.store_blocks WHERE store_id = ANY($1)`,

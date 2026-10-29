@@ -26,6 +26,8 @@ func TestStateOfAtTheBoundaries(t *testing.T) {
 	}{
 		{"警告永遠是已發出", MeasureStatusEnforced, MeasureWarning, before, nil, StateIssued},
 		{"撤銷的警告是已撤銷", MeasureStatusRevoked, MeasureWarning, before, nil, StateRevoked},
+		{"內容下架未撤銷是已發出", MeasureStatusEnforced, MeasureContentTakedown, before, nil, StateIssued},
+		{"內容下架撤銷是已撤銷", MeasureStatusRevoked, MeasureContentTakedown, before, nil, StateRevoked},
 		{"沒有結束時間的停權生效中", MeasureStatusEnforced, MeasureSuspension, before, nil, StateActive},
 		{"建立時間恰是此刻就生效", MeasureStatusEnforced, MeasureSuspension, micro, nil, StateActive},
 		{"開始時間在此刻之後尚未生效", MeasureStatusEnforced, MeasureSuspension, after, nil, StateScheduled},
@@ -606,11 +608,11 @@ func TestActionUnavailableReasonsAgreeWithTheLegacyPredicatesOnEveryCell(t *test
 		kind   MeasureKind
 		state  MeasureState
 	}
-	// 只取 StateOf 推得出的組合：撤銷一定是 REVOKED，警告未撤銷一定是 ISSUED，停權與終止不會是 ISSUED。
+	// 只取 StateOf 推得出的組合：撤銷一定是 REVOKED，沒有限制效果的種類（警告、內容下架）未撤銷一定是 ISSUED，停權與終止不會是 ISSUED。
 	var cells []cell
 	for _, kind := range MeasureKindValues() {
 		cells = append(cells, cell{MeasureStatusRevoked, kind, StateRevoked})
-		if kind == MeasureWarning {
+		if !kind.Restrictive() {
 			cells = append(cells, cell{MeasureStatusEnforced, kind, StateIssued})
 			continue
 		}
@@ -618,7 +620,7 @@ func TestActionUnavailableReasonsAgreeWithTheLegacyPredicatesOnEveryCell(t *test
 			cells = append(cells, cell{MeasureStatusEnforced, kind, state})
 		}
 	}
-	if len(cells) != 10 {
+	if len(cells) != 12 {
 		t.Fatalf("cells=%d", len(cells))
 	}
 	requestSets := map[string][]MeasureRequest{
@@ -776,6 +778,7 @@ func TestActionUnavailableReasonsAreExactAndOrdered(t *testing.T) {
 	}
 	revoked := Measure{Kind: MeasureSuspension, Status: MeasureStatusRevoked, State: StateRevoked, Requests: appeal(RequestPending)}
 	warning := Measure{Kind: MeasureWarning, Status: MeasureStatusEnforced, State: StateIssued}
+	takedown := Measure{Kind: MeasureContentTakedown, Status: MeasureStatusEnforced, State: StateIssued, Basis: BasisViolation}
 	termination := func(state MeasureState) Measure {
 		return Measure{Kind: MeasureTermination, Status: MeasureStatusEnforced, State: state, Basis: BasisContract}
 	}
@@ -806,6 +809,12 @@ func TestActionUnavailableReasonsAreExactAndOrdered(t *testing.T) {
 			reasons{ActionReasonRevoked, ActionReasonKindHasNoEndTime, ActionReasonNotActive},
 			reasons{ActionReasonRevoked}},
 		{"警告", warning, nil, reasons{ActionReasonKindHasNoEndTime, ActionReasonNotActive}, reasons{ActionReasonKindHasNoEndTime, ActionReasonNotActive}, nil},
+		{"內容下架：沒有結束時間，可改理由與撤銷", takedown, nil, reasons{ActionReasonKindHasNoEndTime, ActionReasonNotActive}, reasons{ActionReasonKindHasNoEndTime, ActionReasonNotActive}, nil},
+		{"已撤銷的內容下架", Measure{Kind: MeasureContentTakedown, Status: MeasureStatusRevoked, State: StateRevoked, Basis: BasisViolation},
+			reasons{ActionReasonRevoked, ActionReasonNotActive},
+			reasons{ActionReasonRevoked, ActionReasonKindHasNoEndTime, ActionReasonNotActive},
+			reasons{ActionReasonRevoked, ActionReasonKindHasNoEndTime, ActionReasonNotActive},
+			reasons{ActionReasonRevoked}},
 		{"預定生效的終止", termination(StateScheduled), nil,
 			reasons{ActionReasonTerminationRecreate, ActionReasonNotActive}, reasons{ActionReasonTerminationRecreate, ActionReasonNotActive}, nil},
 		{"生效中的終止", termination(StateActive), nil, reasons{ActionReasonTerminationRecreate}, reasons{ActionReasonTerminationRecreate}, nil},
@@ -874,6 +883,72 @@ func TestActionUnavailableTextIsTheApprovedStaffSentences(t *testing.T) {
 		got := ActionUnavailableText(tc.reason, tc.action)
 		if got.Text != tc.want || got.Locale != uitext.ZhTW {
 			t.Errorf("%s/%s = %+v，期望 %q（zh-TW）", tc.reason, tc.action, got, tc.want)
+		}
+	}
+}
+
+func TestContentTakedownIsNotRestrictiveAndHasNoEndTime(t *testing.T) {
+	if MeasureContentTakedown.Restrictive() {
+		t.Error("內容下架不影響能力與曝光，不算 Restrictive")
+	}
+	if MeasureContentTakedown.HasEndTime() || MeasureWarning.HasEndTime() {
+		t.Error("內容下架與警告沒有結束時間")
+	}
+	if !MeasureSuspension.HasEndTime() || !MeasureTermination.HasEndTime() {
+		t.Error("停權與終止合作可以有結束時間")
+	}
+	if !slices.Contains(MeasureKindValues(), MeasureContentTakedown) {
+		t.Error("MeasureKindValues 要含 CONTENT_TAKEDOWN")
+	}
+}
+
+// 內容下架解除只走申覆：結束不可用（依據是違規認定），申覆可用；補正解除請求只限 RISK 依據，內容下架不會有。
+func TestContentTakedownIsReleasedOnlyThroughAppeal(t *testing.T) {
+	read := time.Date(2026, 10, 29, 12, 0, 0, 0, time.UTC)
+	m := Measure{Kind: MeasureContentTakedown, Status: MeasureStatusEnforced, State: StateIssued, Basis: BasisViolation, ReadAt: read}
+	if m.CanEnd() {
+		t.Error("內容下架不能被結束")
+	}
+	if got := m.EndUnavailableReasons(); !slices.Equal(got, []MeasureActionUnavailableReason{ActionReasonNotActive, ActionReasonViolationBasis}) {
+		t.Errorf("結束的原因 %v", got)
+	}
+	if got := m.AppealUnavailableReasons(); len(got) != 0 {
+		t.Errorf("未撤銷的內容下架可以申覆：%v", got)
+	}
+	if m.AppealDeadline() != nil {
+		t.Error("內容下架的申覆沒有期限")
+	}
+	if !m.CanRevoke() || !m.CanUpdateStatement() {
+		t.Error("內容下架可撤銷、可改給賣家的理由")
+	}
+}
+
+func TestValidateContentTargetsRules(t *testing.T) {
+	id := func(n byte) uuid.UUID { var u uuid.UUID; u[15] = n; return u }
+	tests := []struct {
+		name string
+		in   []ContentRef
+		ok   bool
+	}{
+		{"一則貼文", []ContentRef{{ContentPost, id(1)}}, true},
+		{"三種內容各一", []ContentRef{{ContentPost, id(1)}, {ContentComment, id(2)}, {ContentForumEntry, id(3)}}, true},
+		{"同一個 id 不同種類不算重複", []ContentRef{{ContentPost, id(1)}, {ContentComment, id(1)}}, true},
+		{"空", nil, false},
+		{"重複", []ContentRef{{ContentPost, id(1)}, {ContentPost, id(1)}}, false},
+		{"未知種類", []ContentRef{{"STORE", id(1)}}, false},
+		{"空 ID", []ContentRef{{ContentPost, uuid.Nil()}}, false},
+		{"超過上限", func() []ContentRef {
+			var out []ContentRef
+			for i := range MaxTakedownContents + 1 {
+				out = append(out, ContentRef{ContentPost, id(byte(i + 1))})
+			}
+			return out
+		}(), false},
+	}
+	for _, tt := range tests {
+		err := ValidateContentTargets("Takedown.Contents", tt.in)
+		if (err == nil) != tt.ok {
+			t.Errorf("%s：%v", tt.name, err)
 		}
 	}
 }

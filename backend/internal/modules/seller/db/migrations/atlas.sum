@@ -1,4 +1,4 @@
-h1:MeixsHh9/2c3rRtxvJ6hJEa69iXirn26wEg8gaTgUZM=
+h1:d8ylxtz0/nLGaZNtWc+Tu36Ma2f5tp/LTKYea4z9MtY=
 20261001160141_seller_core.sql h1:hVkQ8Wo6S5BLgzr4nFSGS/1EZpRX9mHqRwpxmIP3Yeg=
 20261002120004_seller_governance.sql h1:Dj/zGg4clK5U8YBsKn+TWnE5ZizigjU9/s7EXXHuc+g=
 20261002133159_seller_kyc.sql h1:QiN6KkqvCU/lwdw0B66YQniBEGnAhojvTYHQJ8lOqlc=
@@ -59,3 +59,5 @@ h1:MeixsHh9/2c3rRtxvJ6hJEa69iXirn26wEg8gaTgUZM=
 20261023130906_seller_store_blocks.sql h1:uv1H3Xv2XL5hdvWJLga2Y2Mz6tOVR3aSTW/6YGaIbRs=
 20261027164917_seller_drop_food_registrations_and_referrals.sql h1:kUoyqNUQdYz5pYg8qufErT6FnxZPfSksuq8pfKu/BRQ=
 20261029112024_seller_assessable_community_categories.sql h1:mNYv9Xi74bl0NzEEV9qOAnT5lKCkRlClPw/wDIwi1kU=
+20261029112449_seller_content_takedown.sql h1:HNF+ykOB1RahqKs02sHLl7qFr0oMleBMaaLaekqLm6M=
+20261029112501_seller_pub_content_takedowns.sql h1:LrOn0oiVdE4pXo5ABwqly6adEAxlXecitGhVn/vrffE=

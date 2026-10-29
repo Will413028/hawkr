@@ -150,6 +150,11 @@ type SellerFindingAuthorityOrder struct {
 	OrderID     uuid.UUID
 }
 
+type SellerFindingModerationReport struct {
+	ViolationID uuid.UUID
+	ReportID    uuid.UUID
+}
+
 type SellerFindingReport struct {
 	ViolationID uuid.UUID
 	ReportID    uuid.UUID
@@ -316,6 +321,12 @@ type SellerMeasure struct {
 	RevokedByAdminID       *int64
 	RevokedAt              *time.Time
 	SourceAuthorityOrderID *uuid.UUID
+}
+
+type SellerMeasureContent struct {
+	MeasureID   uuid.UUID
+	ContentKind string
+	ContentID   uuid.UUID
 }
 
 type SellerMeasureFinding struct {
