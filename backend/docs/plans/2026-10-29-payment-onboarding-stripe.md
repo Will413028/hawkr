@@ -138,20 +138,20 @@
   - A：SG（亞洲、英文介面、可示範本地幣；平台與 connected account 同國）。（建議，暫定）
   - B：JP——同為亞洲，但 KYC 欄位與文件以日文為主。
   - C：US 平台加跨境撥款——示範跨境，但離台灣情境更遠，且台灣能否當 connected account 未確認。
-- **D9 平台審核與金流商驗證的分工**（未決；擋住：4、6）
+- **D9 平台審核與金流商驗證的分工**（已決 2026-10-29，Will，選 A；擋住：4、6）
   - A：平台審核只管市集政策（店家資訊、經營項目、登記資料比對），身分與銀行帳號由金流商驗證。`PLATFORM_COLLECTED` 送給金流商的欄位清單：本人姓名、身分證號、出生日期、住址、電話、email；公司型另加公司名稱、統編、登記地址、負責人；銀行代碼與帳號；證件正反面；服務協議接受（時間、IP）。平台仍以身分證號、統編、銀行帳號計算防詐雜湊。（建議）
   - B：平台審核繼續核對身分證件（現行）——兩方各驗一次；`PROVIDER_HOSTED` 時平台沒有證件可審。
-- **D10 開通閘門**（未決；擋住：4）
+- **D10 開通閘門**（已決 2026-10-29，Will，選 A；擋住：4）
   - A：平台審核通過且 port 回報收款能力啟用（Stripe 的 `charges_enabled`；與 ADR `2026-09-18-seller-capability-authorization` 的 capability 加 requirements 同一模型）。（建議）
   - B：只看平台審核——店家可能在金流商未開通時曝光、無法收款。
-- **D11 同意種類 `PAYUNI_TERMS`**（未決；擋住：4、7）
+- **D11 同意種類 `PAYUNI_TERMS`**（已決 2026-10-29，Will，選 A；擋住：4、7）
   - A：改成 provider 中立的 `PAYMENT_PROVIDER_TERMS`，記錄 provider 與版本；已接受的 `PAYUNI_TERMS` 紀錄轉成 provider = PayUni；Stripe 的服務協議接受（`tos_acceptance`）由 adapter 送出。（建議）
   - B：每個 provider 一個同意種類——新增 provider 就要改 enum 與 CHECK。
 - **D12 `PROVIDER_HOSTED` 時的防詐訊號**（未決；擋住：6；需要的事實：步驟 1）
   - A：平台沒有身分證號，只用金流商提供的銀行帳號 `fingerprint` 做關聯標記；身分層級的防重複開通交給金流商。（建議，前提是步驟 1 確認 fingerprint 跨帳號一致）
   - B：`PROVIDER_HOSTED` 也要求平台另收身分證號計算雜湊——兩邊重複收 PII，違反 D7 選 A 的目的。
 
-拍板順序：D1–D5 已決；D9、D10、D11 現在可以拍；D8 以 A 暫定讓步驟 1 開工；D6、D7、D12 與 D8 的確認在步驟 1 之後交。
+拍板順序：D1–D5、D9–D11 已決；D8 以 A 暫定讓步驟 1 開工；D6、D7、D12 與 D8 的確認在步驟 1 之後交。
 
 ## 進度
 
