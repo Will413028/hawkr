@@ -1,0 +1,344 @@
+{
+  "_說明": "govulncheck 沒有忽略檔；scripts/govulncheck-gate.py 只擋『被呼叫到、且不在此清單』的漏洞，期限過了也失敗。修復期限規則見根目錄 AGENTS.md。刪除項目＝該漏洞已修。",
+  "entries": [
+    {
+      "id": "GO-2026-5676",
+      "modules": [
+        "gateway",
+        "pkg",
+        "services/ai-service",
+        "services/crm-service",
+        "services/im-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "severity": "MODERATE",
+      "deadline": "2027-01-28",
+      "reason": "基準（2026-10-30 首次掃描）：github.com/quic-go/quic-go 修在 v0.59.1，升級需 Will 核准依賴變更；嚴重度 MODERATE。"
+    },
+    {
+      "id": "GO-2026-6253",
+      "modules": [
+        ".",
+        "pkg"
+      ],
+      "severity": "HIGH",
+      "deadline": "2026-11-29",
+      "reason": "基準（2026-10-30 首次掃描）：github.com/moby/go-archive 修在 v0.3.0，升級需 Will 核准依賴變更；嚴重度 HIGH。"
+    },
+    {
+      "id": "GO-2026-6348",
+      "modules": [
+        "gateway",
+        "pkg",
+        "services/ai-service",
+        "services/crm-service",
+        "services/im-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "severity": "HIGH",
+      "deadline": "2026-11-29",
+      "reason": "基準（2026-10-30 首次掃描）：google.golang.org/grpc 修在 v1.83.1，升級需 Will 核准依賴變更；嚴重度 HIGH。"
+    },
+    {
+      "id": "GO-2026-6354",
+      "modules": [
+        ".",
+        "pkg"
+      ],
+      "severity": "UNKNOWN",
+      "deadline": "2026-11-29",
+      "reason": "基準（2026-10-30 首次掃描）：golang.org/x/crypto 修在 v0.56.0，升級需 Will 核准依賴變更；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
+    },
+    {
+      "id": "GO-2026-6355",
+      "modules": [
+        ".",
+        "pkg"
+      ],
+      "severity": "UNKNOWN",
+      "deadline": "2026-11-29",
+      "reason": "基準（2026-10-30 首次掃描）：golang.org/x/crypto 修在 v0.56.0，升級需 Will 核准依賴變更；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
+    },
+    {
+      "id": "GO-2026-6372",
+      "modules": [
+        ".",
+        "gateway",
+        "pkg",
+        "services/ai-service",
+        "services/crm-service",
+        "services/im-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "severity": "HIGH",
+      "deadline": "2026-11-29",
+      "reason": "基準（2026-10-30 首次掃描）：github.com/rabbitmq/amqp091-go 修在 v1.13.0，升級需 Will 核准依賴變更；嚴重度 HIGH。"
+    },
+    {
+      "id": "GO-2026-6491",
+      "modules": [
+        ".",
+        "gateway",
+        "pkg",
+        "services/ai-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "severity": "HIGH",
+      "deadline": "2026-11-29",
+      "reason": "基準（2026-10-30 首次掃描）：github.com/rabbitmq/amqp091-go 修在 v1.13.0，升級需 Will 核准依賴變更；嚴重度 HIGH。"
+    },
+    {
+      "id": "GO-2026-6492",
+      "modules": [
+        ".",
+        "gateway",
+        "pkg",
+        "services/ai-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "severity": "CRITICAL",
+      "deadline": "2026-11-06",
+      "reason": "基準（2026-10-30 首次掃描）：github.com/rabbitmq/amqp091-go 修在 v1.13.0，升級需 Will 核准依賴變更；嚴重度 CRITICAL。"
+    },
+    {
+      "id": "GO-2026-6494",
+      "modules": [
+        ".",
+        "gateway",
+        "pkg",
+        "services/ai-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "severity": "HIGH",
+      "deadline": "2026-11-29",
+      "reason": "基準（2026-10-30 首次掃描）：github.com/rabbitmq/amqp091-go 修在 v1.13.0，升級需 Will 核准依賴變更；嚴重度 HIGH。"
+    },
+    {
+      "id": "GO-2026-6496",
+      "modules": [
+        ".",
+        "gateway",
+        "pkg",
+        "services/ai-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "severity": "CRITICAL",
+      "deadline": "2026-11-06",
+      "reason": "基準（2026-10-30 首次掃描）：github.com/rabbitmq/amqp091-go 修在 v1.13.0，升級需 Will 核准依賴變更；嚴重度 CRITICAL。"
+    },
+    {
+      "id": "GO-2026-6498",
+      "modules": [
+        ".",
+        "gateway",
+        "pkg",
+        "services/ai-service",
+        "services/im-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "severity": "CRITICAL",
+      "deadline": "2026-11-06",
+      "reason": "基準（2026-10-30 首次掃描）：github.com/rabbitmq/amqp091-go 修在 v1.13.0，升級需 Will 核准依賴變更；嚴重度 CRITICAL。"
+    },
+    {
+      "id": "GO-2026-6500",
+      "modules": [
+        ".",
+        "gateway",
+        "pkg",
+        "services/ai-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "severity": "HIGH",
+      "deadline": "2026-11-29",
+      "reason": "基準（2026-10-30 首次掃描）：github.com/rabbitmq/amqp091-go 修在 v1.13.0，升級需 Will 核准依賴變更；嚴重度 HIGH。"
+    },
+    {
+      "id": "GO-2026-6502",
+      "modules": [
+        ".",
+        "gateway",
+        "pkg"
+      ],
+      "severity": "HIGH",
+      "deadline": "2026-11-29",
+      "reason": "基準（2026-10-30 首次掃描）：github.com/rabbitmq/amqp091-go 修在 v1.13.0，升級需 Will 核准依賴變更；嚴重度 HIGH。"
+    },
+    {
+      "id": "GO-2026-6503",
+      "modules": [
+        ".",
+        "gateway",
+        "pkg",
+        "services/ai-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "severity": "HIGH",
+      "deadline": "2026-11-29",
+      "reason": "基準（2026-10-30 首次掃描）：github.com/rabbitmq/amqp091-go 修在 v1.13.0，升級需 Will 核准依賴變更；嚴重度 HIGH。"
+    },
+    {
+      "id": "GO-2026-6505",
+      "modules": [
+        ".",
+        "gateway",
+        "pkg",
+        "services/ai-service",
+        "services/crm-service",
+        "services/im-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "severity": "LOW",
+      "deadline": "2027-01-28",
+      "reason": "基準（2026-10-30 首次掃描）：go.opentelemetry.io/otel/sdk 修在 v1.45.0，升級需 Will 核准依賴變更；嚴重度 LOW。"
+    },
+    {
+      "id": "GO-2026-6603",
+      "modules": [
+        "gateway",
+        "pkg",
+        "services/ai-service",
+        "services/crm-service",
+        "services/im-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "severity": "UNKNOWN",
+      "deadline": "2026-11-29",
+      "reason": "基準（2026-10-30 首次掃描）：golang.org/x/net 修在 v0.60.0，升級需 Will 核准依賴變更；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
+    },
+    {
+      "id": "GO-2026-6610",
+      "modules": [
+        "pkg",
+        "services/ai-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "severity": "UNKNOWN",
+      "deadline": "2026-11-29",
+      "reason": "基準（2026-10-30 首次掃描）：golang.org/x/net 修在 v0.60.0，升級需 Will 核准依賴變更；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
+    },
+    {
+      "id": "GO-2026-6611",
+      "modules": [
+        "gateway",
+        "pkg",
+        "services/ai-service",
+        "services/crm-service",
+        "services/im-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "severity": "UNKNOWN",
+      "deadline": "2026-11-29",
+      "reason": "基準（2026-10-30 首次掃描）：golang.org/x/net 修在 v0.60.0，升級需 Will 核准依賴變更；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
+    },
+    {
+      "id": "GO-2026-6612",
+      "modules": [
+        "gateway",
+        "pkg",
+        "services/ai-service",
+        "services/crm-service",
+        "services/im-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "severity": "UNKNOWN",
+      "deadline": "2026-11-29",
+      "reason": "基準（2026-10-30 首次掃描）：golang.org/x/net 修在 v0.60.0，升級需 Will 核准依賴變更；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
+    },
+    {
+      "id": "GO-2026-6617",
+      "modules": [
+        "gateway",
+        "pkg",
+        "services/ai-service",
+        "services/crm-service",
+        "services/im-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "severity": "UNKNOWN",
+      "deadline": "2026-11-29",
+      "reason": "基準（2026-10-30 首次掃描）：golang.org/x/net 修在 v0.60.0，升級需 Will 核准依賴變更；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
+    },
+    {
+      "id": "GO-2026-6700",
+      "modules": [
+        ".",
+        "gateway",
+        "pkg",
+        "services/ai-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "severity": "MODERATE",
+      "deadline": "2027-01-28",
+      "reason": "基準（2026-10-30 首次掃描）：github.com/rabbitmq/amqp091-go 修在 v1.14.0，升級需 Will 核准依賴變更；嚴重度 MODERATE。"
+    }
+  ]
+}

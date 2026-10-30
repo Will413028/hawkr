@@ -49,11 +49,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
+          persist-credentials: false
           fetch-depth: 0
       # Go 版本以 .go-version 為準（go-base image 也吃它），不用某個 module 的 go.mod。
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: backend/.go-version
           cache-dependency-path: backend/**/go.sum
@@ -143,10 +144,12 @@ jobs:
       # vet -tags integration 只編譯不執行，讓它們的編譯錯誤在這裡就現形。
       - name: 帶 tag 的測試檔要編譯得過
         if: always() && steps.mods.outputs.modules != ''
+        env:
+          MODULES: ${{ steps.mods.outputs.modules }}
         run: |
           set -uo pipefail
           exit_code=0
-          for m in ${{ steps.mods.outputs.modules }}; do
+          for m in $MODULES; do
             echo "=== $m (vet -tags integration) ==="
             (cd "$m" && go vet -tags integration ./...) || exit_code=1
           done
@@ -154,11 +157,13 @@ jobs:
 
       - name: go test（含未登記 skip 檢查）
         if: always() && steps.mods.outputs.modules != ''
+        env:
+          MODULES: ${{ steps.mods.outputs.modules }}
         run: |
           set -uo pipefail
           exit_code=0
           first=1
-          for m in ${{ steps.mods.outputs.modules }}; do
+          for m in $MODULES; do
             echo "=== $m ==="
             extra=""
             if [ "$first" = "1" ]; then extra="--reset"; first=0; fi

@@ -1,0 +1,1010 @@
+# OSV-Scanner 設定。CI：osv-scanner scan source --recursive --no-resolve --config osv-scanner.toml .
+# 下面是 2026-10-30 首次全 repo 掃描的已知漏洞基準：新的漏洞會讓 CI 失敗，這裡的項目到 ignoreUntil 之後也會失敗。
+# 期限依 CVSS 分數與根目錄 AGENTS.md 的規則從 2026-10-30 起算：critical(>=9.0) 7 天、high(7.0-8.9) 30 天、
+# medium(4.0-6.9) 90 天、low 沿用 90 天（規則是「下一次相關更新」，工具需要日期）、沒有分數的保守當 high。
+# 升級依賴要先經核准（根目錄 AGENTS.md），修好就從這裡刪掉該筆。同一個漏洞的 GO-／GHSA-／CVE- 編號各列一筆。
+
+[[IgnoredVulns]]
+id = "GHSA-259r-337f-4rfw"
+ignoreUntil = 2026-11-29
+reason = "基準：Go github.com/klauspost/compress@1.18.5（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-27gv-rfvv-22mv"
+ignoreUntil = 2026-11-29
+reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 7.0，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-2v4p-qf9q-27wj"
+ignoreUntil = 2026-11-29
+reason = "基準：Go google.golang.org/grpc@1.82.0, google.golang.org/grpc@1.83.0（CVSS 8.7，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-33mj-cw25-m34h"
+ignoreUntil = 2026-11-06
+reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 9.4，CRITICAL）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-465g-fh3v-9jw4"
+ignoreUntil = 2026-11-29
+reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.7，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-4v58-74mf-rjx3"
+ignoreUntil = 2026-11-29
+reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.9，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-4w3g-jfj2-cw2q"
+ignoreUntil = 2027-01-28
+reason = "基準：Go github.com/go-jose/go-jose/v4@4.1.4（CVSS 6.9，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-6c5v-hqjr-5xxp"
+ignoreUntil = 2026-11-29
+reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.9，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-8wmf-6v46-5gfg"
+ignoreUntil = 2027-01-28
+reason = "基準：Go go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc@1.40.0, go.opentelemetry.io/otel/exporters/otlp/otlptrace@1.40.0 等（CVSS 2.0，LOW）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-9jj7-4m8r-rfcm"
+ignoreUntil = 2026-11-06
+reason = "基準：Go github.com/jackc/pgx/v5@5.8.0（CVSS 9.8，CRITICAL）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-c5pq-fr2g-9jpf"
+ignoreUntil = 2026-11-06
+reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 9.5，CRITICAL）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-hfg8-hc9c-6c3h"
+ignoreUntil = 2026-11-29
+reason = "基準：Go github.com/moby/go-archive@0.2.0（CVSS 7.1，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-hrxh-6v49-42gf"
+ignoreUntil = 2026-11-29
+reason = "基準：Go google.golang.org/grpc@1.82.0（CVSS 8.8，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-j497-x9hr-x34x"
+ignoreUntil = 2026-11-06
+reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 9.1，CRITICAL）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-j88v-2chj-qfwx"
+ignoreUntil = 2027-01-28
+reason = "基準：Go github.com/jackc/pgx/v5@5.8.0（CVSS 2.3，LOW）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-mgcc-cww5-fp2q"
+ignoreUntil = 2026-11-29
+reason = "基準：Go github.com/go-jose/go-jose/v4@4.1.4（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-mjcv-p78q-w5fw"
+ignoreUntil = 2027-01-28
+reason = "基準：Go github.com/moby/sys/user@0.4.0（CVSS 5.5，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-qc2q-p7wx-3px3"
+ignoreUntil = 2027-01-28
+reason = "基準：Go google.golang.org/grpc@1.82.0, google.golang.org/grpc@1.83.0（CVSS 6.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-r9c8-gcjp-xfwh"
+ignoreUntil = 2026-11-29
+reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.9，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-rm6m-hrcw-jw33"
+ignoreUntil = 2026-11-29
+reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.2，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-vp52-pcj8-j9qc"
+ignoreUntil = 2026-11-29
+reason = "基準：Go google.golang.org/grpc@1.82.0, google.golang.org/grpc@1.83.0（CVSS 8.7，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-vvgj-x9jq-8cj9"
+ignoreUntil = 2027-01-28
+reason = "基準：Go github.com/quic-go/quic-go@0.59.0（CVSS 5.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-vvm8-gf78-28g4"
+ignoreUntil = 2027-01-28
+reason = "基準：Go github.com/go-jose/go-jose/v4@4.1.4（CVSS 6.9，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-w6r9-248c-frg8"
+ignoreUntil = 2027-01-28
+reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 6.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-xgrm-4fwx-7qm8"
+ignoreUntil = 2026-11-06
+reason = "基準：Go github.com/jackc/pgx/v5@5.8.0（CVSS 9.8，CRITICAL）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-xwwf-m8fg-p9q2"
+ignoreUntil = 2026-11-29
+reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.9，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-4771"
+ignoreUntil = 2026-11-06
+reason = "基準：Go github.com/jackc/pgx/v5@5.8.0（CVSS 9.8，CRITICAL）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-4772"
+ignoreUntil = 2026-11-06
+reason = "基準：Go github.com/jackc/pgx/v5@5.8.0（CVSS 9.8，CRITICAL）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-5004"
+ignoreUntil = 2027-01-28
+reason = "基準：Go github.com/jackc/pgx/v5@5.8.0（CVSS 2.3，LOW）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-5676"
+ignoreUntil = 2027-01-28
+reason = "基準：Go github.com/quic-go/quic-go@0.59.0（CVSS 5.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-5841"
+ignoreUntil = 2026-11-29
+reason = "基準：Go github.com/klauspost/compress@1.18.5（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-5932"
+ignoreUntil = 2026-11-29
+reason = "基準：Go golang.org/x/crypto@0.54.0, golang.org/x/crypto@0.55.0（無 CVSS 分數，UNSCORED）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6061"
+ignoreUntil = 2026-11-29
+reason = "基準：Go google.golang.org/grpc@1.82.0（CVSS 8.8，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6253"
+ignoreUntil = 2026-11-29
+reason = "基準：Go github.com/moby/go-archive@0.2.0（CVSS 7.1，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6303"
+ignoreUntil = 2026-11-29
+reason = "基準：Go golang.org/x/crypto@0.54.0（無 CVSS 分數，UNSCORED）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6348"
+ignoreUntil = 2026-11-29
+reason = "基準：Go google.golang.org/grpc@1.82.0, google.golang.org/grpc@1.83.0（CVSS 8.7，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6354"
+ignoreUntil = 2026-11-29
+reason = "基準：Go golang.org/x/crypto@0.54.0, golang.org/x/crypto@0.55.0（無 CVSS 分數，UNSCORED）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6355"
+ignoreUntil = 2026-11-29
+reason = "基準：Go golang.org/x/crypto@0.54.0, golang.org/x/crypto@0.55.0（無 CVSS 分數，UNSCORED）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6372"
+ignoreUntil = 2026-11-29
+reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.9，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6441"
+ignoreUntil = 2027-01-28
+reason = "基準：Go google.golang.org/grpc@1.82.0, google.golang.org/grpc@1.83.0（CVSS 6.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6443"
+ignoreUntil = 2026-11-29
+reason = "基準：Go google.golang.org/grpc@1.82.0, google.golang.org/grpc@1.83.0（CVSS 8.7，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6491"
+ignoreUntil = 2026-11-29
+reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 7.0，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6492"
+ignoreUntil = 2026-11-06
+reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 9.4，CRITICAL）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6493"
+ignoreUntil = 2026-11-29
+reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.7，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6494"
+ignoreUntil = 2026-11-29
+reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.9，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6496"
+ignoreUntil = 2026-11-06
+reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 9.5，CRITICAL）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6498"
+ignoreUntil = 2026-11-06
+reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 9.1，CRITICAL）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6500"
+ignoreUntil = 2026-11-29
+reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.9，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6502"
+ignoreUntil = 2026-11-29
+reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.2，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6503"
+ignoreUntil = 2026-11-29
+reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.9，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6505"
+ignoreUntil = 2027-01-28
+reason = "基準：Go go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc@1.40.0, go.opentelemetry.io/otel/exporters/otlp/otlptrace@1.40.0 等（CVSS 2.0，LOW）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6603"
+ignoreUntil = 2026-11-29
+reason = "基準：Go golang.org/x/net@0.57.0（無 CVSS 分數，UNSCORED）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6610"
+ignoreUntil = 2026-11-29
+reason = "基準：Go golang.org/x/net@0.57.0（無 CVSS 分數，UNSCORED）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6611"
+ignoreUntil = 2026-11-29
+reason = "基準：Go golang.org/x/net@0.57.0（無 CVSS 分數，UNSCORED）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6612"
+ignoreUntil = 2026-11-29
+reason = "基準：Go golang.org/x/net@0.57.0（無 CVSS 分數，UNSCORED）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6617"
+ignoreUntil = 2026-11-29
+reason = "基準：Go golang.org/x/net@0.57.0（無 CVSS 分數，UNSCORED）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6629"
+ignoreUntil = 2026-11-29
+reason = "基準：Go golang.org/x/text@0.40.0（無 CVSS 分數，UNSCORED）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6686"
+ignoreUntil = 2027-01-28
+reason = "基準：Go github.com/moby/sys/user@0.4.0（CVSS 5.5，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6700"
+ignoreUntil = 2027-01-28
+reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 6.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6860"
+ignoreUntil = 2026-11-29
+reason = "基準：Go golang.org/x/net@0.57.0（無 CVSS 分數，UNSCORED）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GO-2026-6866"
+ignoreUntil = 2026-11-29
+reason = "基準：Go golang.org/x/net@0.57.0（無 CVSS 分數，UNSCORED）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-3pjw-73gf-8qr5"
+ignoreUntil = 2027-01-28
+reason = "基準：Maven com.fasterxml.jackson.core:jackson-databind@2.16.1（CVSS 6.5，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-563q-j3cm-6jxm"
+ignoreUntil = 2027-01-28
+reason = "基準：Maven io.netty:netty-codec-http2@4.1.115.Final（CVSS 6.9，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-5gvw-p9qm-jgwh"
+ignoreUntil = 2027-01-28
+reason = "基準：Maven com.fasterxml.jackson.core:jackson-databind@2.16.1（CVSS 6.5，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-5jmj-h7xm-6q6v"
+ignoreUntil = 2027-01-28
+reason = "基準：Maven com.fasterxml.jackson.core:jackson-databind@2.16.1（CVSS 5.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-5x3r-wrvg-rp6q"
+ignoreUntil = 2027-01-28
+reason = "基準：Maven io.netty:netty-codec-http2@4.1.115.Final（CVSS 5.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-65r4-943x-97jj"
+ignoreUntil = 2026-11-29
+reason = "基準：Maven org.jsoup:jsoup@1.18.1（CVSS 8.7，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-93wv-jw9v-4972"
+ignoreUntil = 2026-11-29
+reason = "基準：Maven io.netty:netty-codec-http2@4.1.115.Final（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-98qh-xjc8-98pq"
+ignoreUntil = 2026-11-29
+reason = "基準：Maven org.postgresql:postgresql@42.7.2（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-c2gf-v879-257j"
+ignoreUntil = 2027-01-28
+reason = "基準：Maven io.netty:netty-codec-http2@4.1.115.Final（CVSS 5.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-c69g-56f8-xwqj"
+ignoreUntil = 2027-01-28
+reason = "基準：Maven io.netty:netty-codec-http2@4.1.115.Final（CVSS 6.9，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-cxp5-3px4-pw24"
+ignoreUntil = 2026-11-29
+reason = "基準：Maven com.fasterxml.jackson.core:jackson-databind@2.16.1（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-f6hv-jmp6-3vwv"
+ignoreUntil = 2026-11-29
+reason = "基準：Maven io.netty:netty-codec-http2@4.1.115.Final（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-gx83-3vf8-gh7j"
+ignoreUntil = 2027-01-28
+reason = "基準：Maven com.fasterxml.jackson.core:jackson-databind@2.16.1（CVSS 5.6，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-hgj6-7826-r7m5"
+ignoreUntil = 2027-01-28
+reason = "基準：Maven com.fasterxml.jackson.core:jackson-databind@2.16.1（CVSS 5.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-j3rv-43j4-c7qm"
+ignoreUntil = 2026-11-29
+reason = "基準：Maven com.fasterxml.jackson.core:jackson-databind@2.16.1（CVSS 8.1，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-mgvc-8q2h-5pgc"
+ignoreUntil = 2026-11-29
+reason = "基準：Maven org.springframework.boot:spring-boot-starter-actuator@3.2.1（CVSS 8.2，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-pmhh-3w7g-xqp8"
+ignoreUntil = 2027-01-28
+reason = "基準：Maven org.jsoup:jsoup@1.18.1（CVSS 4.7，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-prj3-ccx8-p6x4"
+ignoreUntil = 2026-11-29
+reason = "基準：Maven io.grpc:grpc-netty-shaded@1.71.0, io.netty:netty-codec-http2@4.1.115.Final（CVSS 8.2，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-q4xh-88c3-wmh7"
+ignoreUntil = 2026-11-29
+reason = "基準：Maven com.fasterxml.jackson.core:jackson-databind@2.16.1（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-rmj7-2vxq-3g9f"
+ignoreUntil = 2026-11-29
+reason = "基準：Maven com.fasterxml.jackson.core:jackson-databind@2.16.1（CVSS 8.1，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-vvgp-rfg2-7rr6"
+ignoreUntil = 2027-01-28
+reason = "基準：Maven com.fasterxml.jackson.core:jackson-databind@2.16.1（CVSS 5.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-w9fj-cfpg-grvv"
+ignoreUntil = 2026-11-29
+reason = "基準：Maven io.netty:netty-codec-http2@4.1.115.Final（CVSS 8.7，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-wjgm-6hv5-3cvf"
+ignoreUntil = 2027-01-28
+reason = "基準：Maven com.fasterxml.jackson.core:jackson-databind@2.16.1（CVSS 5.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-wv8q-qhhj-9h54"
+ignoreUntil = 2026-11-29
+reason = "基準：Maven com.fasterxml.jackson.core:jackson-databind@2.16.1（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-768j-98cg-p3fv"
+ignoreUntil = 2027-01-28
+reason = "基準：PyPI fonttools@4.56.0（CVSS 6.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-9v8h-qqgm-4m35"
+ignoreUntil = 2026-11-06
+reason = "基準：PyPI brotli@1.2.0（CVSS 9.2，CRITICAL）；升級待核准"
+
+[[IgnoredVulns]]
+id = "PYSEC-2026-1389"
+ignoreUntil = 2027-01-28
+reason = "基準：PyPI fonttools@4.56.0（CVSS 6.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "PYSEC-2026-4322"
+ignoreUntil = 2026-11-06
+reason = "基準：PyPI brotli@1.2.0（CVSS 9.2，CRITICAL）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-2j26-frm8-cmj9"
+ignoreUntil = 2027-01-28
+reason = "基準：RubyGems activesupport@7.2.2.2（CVSS 6.6，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-33mh-2634-fwr2"
+ignoreUntil = 2027-01-28
+reason = "基準：RubyGems faraday@1.10.4（CVSS 5.8，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-3m6g-2423-7cp3"
+ignoreUntil = 2026-11-29
+reason = "基準：RubyGems json@2.18.0（CVSS 8.3，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-47m2-wp7j-p9vc"
+ignoreUntil = 2026-11-29
+reason = "基準：RubyGems rubyzip@2.4.1（CVSS 8.7，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-48rx-c7pg-q66r"
+ignoreUntil = 2027-01-28
+reason = "基準：RubyGems excon@0.112.0（CVSS 6.5，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-6wx8-w4f5-wwcr"
+ignoreUntil = 2027-01-28
+reason = "基準：RubyGems concurrent-ruby@1.3.5（CVSS 2.1，LOW）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-89vf-4333-qx8v"
+ignoreUntil = 2027-01-28
+reason = "基準：RubyGems activesupport@7.2.2.2（CVSS 5.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-98m9-hrrm-r99r"
+ignoreUntil = 2026-11-29
+reason = "基準：RubyGems faraday@1.10.4（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-c32j-vqhx-rx3x"
+ignoreUntil = 2026-11-29
+reason = "基準：RubyGems jwt@2.10.2（CVSS 7.4，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-cg4j-q9v8-6v38"
+ignoreUntil = 2027-01-28
+reason = "基準：RubyGems activesupport@7.2.2.2（CVSS 6.9，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-h27x-rffw-24p4"
+ignoreUntil = 2026-11-29
+reason = "基準：RubyGems addressable@2.8.8（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-h8w8-99g7-qmvj"
+ignoreUntil = 2026-11-29
+reason = "基準：RubyGems concurrent-ruby@1.3.5（CVSS 8.2，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-wv3x-4vxv-whpp"
+ignoreUntil = 2027-01-28
+reason = "基準：RubyGems concurrent-ruby@1.3.5（CVSS 5.5，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-x2f5-4prf-w687"
+ignoreUntil = 2027-01-28
+reason = "基準：RubyGems json@2.18.0（CVSS 3.7，LOW）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-22jq-vg5j-6vgg"
+ignoreUntil = 2027-01-28
+reason = "基準：npm ip-address@10.2.0（CVSS 6.9，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-2464-fhr4-w9xw"
+ignoreUntil = 2026-11-06
+reason = "基準：npm next@16.3.6（CVSS 9.5，CRITICAL）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-27r3-jxmh-p828"
+ignoreUntil = 2026-11-29
+reason = "基準：npm body-parser@1.20.5, body-parser@2.3.0（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-2883-xcg3-v3hh"
+ignoreUntil = 2026-11-29
+reason = "基準：npm js-yaml@3.14.2（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-2gqq-gqf2-x968"
+ignoreUntil = 2027-01-28
+reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 3.7，LOW）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-2jfj-6hjv-fm6j"
+ignoreUntil = 2027-01-28
+reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 6.5，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-2m5v-pch6-74hx"
+ignoreUntil = 2026-11-29
+reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 7.4，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-2v37-7h3g-55p8"
+ignoreUntil = 2026-11-29
+reason = "基準：npm nanoid@3.3.16（CVSS 8.2，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-2vc4-c4r6-p6v6"
+ignoreUntil = 2026-11-29
+reason = "基準：npm @opennextjs/cloudflare@1.20.0（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-2vr4-cq9g-pvrc"
+ignoreUntil = 2027-01-28
+reason = "基準：npm ip-address@10.2.0（CVSS 6.9，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-333x-w4r6-6crp"
+ignoreUntil = 2027-01-28
+reason = "基準：npm fast-uri@3.1.8（CVSS 3.7，LOW）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-39w2-rjm5-chcv"
+ignoreUntil = 2027-01-28
+reason = "基準：npm next@16.3.6（CVSS 5.4，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-3jxr-9vmj-r5cp"
+ignoreUntil = 2026-11-29
+reason = "基準：npm brace-expansion@2.1.1（CVSS 7.7，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-3w37-wq28-93x7"
+ignoreUntil = 2027-01-28
+reason = "基準：npm next@16.3.6（CVSS 6.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-3wwx-pv8p-q78v"
+ignoreUntil = 2027-01-28
+reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 5.9，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-3xpg-4rpp-hhhm"
+ignoreUntil = 2027-01-28
+reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 5.9，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-4cwx-7wf7-3272"
+ignoreUntil = 2026-11-29
+reason = "基準：npm undici@7.28.0（CVSS 7.4，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-4jqv-mc3x-m676"
+ignoreUntil = 2027-01-28
+reason = "基準：npm next@16.3.6（CVSS 6.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-4mjr-xmp4-gh2g"
+ignoreUntil = 2027-01-28
+reason = "基準：npm qs@6.15.2（CVSS 6.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-4qv8-2p9j-2685"
+ignoreUntil = 2027-01-28
+reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 5.9，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-4w7w-5xrc-9h26"
+ignoreUntil = 2026-11-29
+reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 7.4，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-4w7w-66w2-5vf9"
+ignoreUntil = 2027-01-28
+reason = "基準：npm vite@8.0.3（CVSS 6.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-4xrf-jv44-h6hh"
+ignoreUntil = 2027-01-28
+reason = "基準：npm ip-address@10.2.0（CVSS 6.9，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-52cp-r559-cp3m"
+ignoreUntil = 2026-11-29
+reason = "基準：npm js-yaml@3.14.2（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-52f5-9888-hmc6"
+ignoreUntil = 2027-01-28
+reason = "基準：npm tmp@0.0.33, tmp@0.1.0（CVSS 2.5，LOW）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-55wc-3pg8-jfw6"
+ignoreUntil = 2027-01-28
+reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 5.9，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-587h-7wmj-h5pm"
+ignoreUntil = 2026-11-29
+reason = "基準：npm vite@8.0.3, vite@8.1.4（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-5p4m-2wfm-xmqj"
+ignoreUntil = 2026-11-29
+reason = "基準：npm js-yaml@3.14.2（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-673q-mjm6-r5xr"
+ignoreUntil = 2026-11-06
+reason = "基準：npm next@16.3.6（CVSS 9.5，CRITICAL）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-68fv-2mgg-jv7q"
+ignoreUntil = 2026-11-29
+reason = "基準：npm source-map-js@1.2.1（CVSS 8.7，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-698v-4r3x-3vcv"
+ignoreUntil = 2027-01-28
+reason = "基準：npm vite@8.0.3, vite@8.1.4（CVSS 6.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-6j4f-fj2g-mc7p"
+ignoreUntil = 2026-11-29
+reason = "基準：npm brace-expansion@2.1.1（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-6pq8-jhm2-2vcw"
+ignoreUntil = 2027-01-28
+reason = "基準：npm qs@6.15.2（CVSS 6.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-7pqw-9j4j-h8q3"
+ignoreUntil = 2026-11-29
+reason = "基準：npm extract-zip@2.0.1（CVSS 8.1，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-7w5x-hrqm-74c2"
+ignoreUntil = 2026-11-29
+reason = "基準：npm smol-toml@1.6.1（CVSS 8.2，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-82fw-gwwq-j7x9"
+ignoreUntil = 2027-01-28
+reason = "基準：npm @vitest/mocker@4.1.10, @vitest/mocker@4.1.8 等（CVSS 5.9，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-8436-99hf-9mmv"
+ignoreUntil = 2027-01-28
+reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 3.7，LOW）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-8xcm-r25x-g524"
+ignoreUntil = 2027-01-28
+reason = "基準：npm undici@7.28.0（CVSS 4.8，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-9fm3-97px-rjf6"
+ignoreUntil = 2027-01-28
+reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 5.9，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-9jrq-w75r-8gcw"
+ignoreUntil = 2027-01-28
+reason = "基準：npm vite@8.0.3, vite@8.1.4（CVSS 2.1，LOW）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-9wx9-5pv9-3349"
+ignoreUntil = 2027-01-28
+reason = "基準：npm seroval@1.6.8（CVSS 4.7，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-c475-qrg2-pj4r"
+ignoreUntil = 2026-11-29
+reason = "基準：npm basic-ftp@5.3.1（CVSS 8.2，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-cjq9-62q9-8jv4"
+ignoreUntil = 2026-11-29
+reason = "基準：npm next@16.3.6（CVSS 8.3，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-f2ph-cmg5-wxc8"
+ignoreUntil = 2026-11-06
+reason = "基準：npm @storybook/addon-mcp@10.6.0, @storybook/addon-vitest@10.6.0 等（CVSS 9.4，CRITICAL）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-f72v-6w45-q472"
+ignoreUntil = 2027-01-28
+reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 5.9，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-f86p-h4j2-7qgj"
+ignoreUntil = 2027-01-28
+reason = "基準：npm seroval@1.6.8（CVSS 5.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-f87g-xv8r-7p7x"
+ignoreUntil = 2027-01-28
+reason = "基準：npm next@16.3.6（CVSS 6.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-f88m-g3jw-g9cj"
+ignoreUntil = 2026-11-29
+reason = "基準：npm sharp@0.34.5（CVSS 7.0，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-fx2h-pf6j-xcff"
+ignoreUntil = 2027-01-28
+reason = "基準：npm vite@8.0.3（CVSS 6.9，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-fxqj-rqcc-2cmp"
+ignoreUntil = 2027-01-28
+reason = "基準：npm postcss@8.5.18（CVSS 6.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-g7r4-m6w7-qqqr"
+ignoreUntil = 2027-01-28
+reason = "基準：npm esbuild@0.28.0（CVSS 2.5，LOW）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-h3mg-xc3c-68pw"
+ignoreUntil = 2027-01-28
+reason = "基準：npm ip-address@10.2.0（CVSS 6.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-h67p-54hq-rp68"
+ignoreUntil = 2027-01-28
+reason = "基準：npm js-yaml@3.14.2（CVSS 5.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-h694-7cp9-m8p3"
+ignoreUntil = 2027-01-28
+reason = "基準：npm next@16.3.6（CVSS 6.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-j6r3-76f7-8jcv"
+ignoreUntil = 2027-01-28
+reason = "基準：npm ip-address@10.2.0（CVSS 6.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-jmr9-qjv8-65gv"
+ignoreUntil = 2026-11-29
+reason = "基準：npm extract-zip@2.0.1（CVSS 8.6，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-jqcg-44mw-7w3h"
+ignoreUntil = 2026-11-06
+reason = "基準：npm proxy-addr@2.0.7（CVSS 9.1，CRITICAL）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-jr45-8vmc-qm54"
+ignoreUntil = 2027-01-28
+reason = "基準：npm undici@7.28.0（CVSS 5.9，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-m8rv-5g2x-5cg5"
+ignoreUntil = 2027-01-28
+reason = "基準：npm undici@7.28.0（CVSS 4.2，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-mchm-gjx6-7h55"
+ignoreUntil = 2026-11-06
+reason = "基準：npm @sentry/nextjs@10.58.0, @sentry/nextjs@10.61.0（CVSS 9.1，CRITICAL）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-mcj8-r9mp-w47p"
+ignoreUntil = 2027-01-28
+reason = "基準：npm next@16.3.6（CVSS 6.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-mh99-v99m-4gvg"
+ignoreUntil = 2026-11-29
+reason = "基準：npm brace-expansion@2.1.1（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-mrhx-c7xc-m3w5"
+ignoreUntil = 2026-11-29
+reason = "基準：npm zod@3.25.76, zod@4.4.3（CVSS 8.2，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-mwp4-54f8-5fhr"
+ignoreUntil = 2026-11-29
+reason = "基準：npm ip-address@10.2.0（CVSS 7.7，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-p3m5-59mp-jv5r"
+ignoreUntil = 2026-11-29
+reason = "基準：npm next@16.3.6（CVSS 8.2，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-p63j-vcc4-9vmv"
+ignoreUntil = 2026-11-06
+reason = "基準：npm @vitest/browser@4.1.8（CVSS 9.4，CRITICAL）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-p9ff-h696-f583"
+ignoreUntil = 2026-11-29
+reason = "基準：npm vite@8.0.3（CVSS 8.2，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-ph9p-34f9-6g65"
+ignoreUntil = 2026-11-29
+reason = "基準：npm tmp@0.0.33, tmp@0.1.0（CVSS 7.7，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-pmjh-fq2x-6v4x"
+ignoreUntil = 2027-01-28
+reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 5.9，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-px85-f4q5-jh77"
+ignoreUntil = 2026-11-29
+reason = "基準：npm @storybook/addon-mcp@10.6.0, @storybook/addon-vitest@10.6.0 等（CVSS 8.7，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-q2hr-2g5m-vwhr"
+ignoreUntil = 2027-01-28
+reason = "基準：npm brace-expansion@2.1.1（CVSS 5.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-qhr7-859c-m2p7"
+ignoreUntil = 2026-11-29
+reason = "基準：npm brace-expansion@2.1.1（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-qrxm-fqhp-jwvm"
+ignoreUntil = 2026-11-29
+reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-qxg6-89mg-rqv8"
+ignoreUntil = 2027-01-28
+reason = "基準：npm @vitest/mocker@4.1.10, @vitest/mocker@4.1.8（CVSS 4.7，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-r4xh-jqrq-34v2"
+ignoreUntil = 2027-01-28
+reason = "基準：npm smol-toml@1.6.1（CVSS 5.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-r53p-7pc4-xj5r"
+ignoreUntil = 2027-01-28
+reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 3.7，LOW）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-r825-w8mm-5pxw"
+ignoreUntil = 2027-01-28
+reason = "基準：npm vite@8.0.3, vite@8.1.4（CVSS 6.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-rfgv-xxqx-mfg5"
+ignoreUntil = 2026-11-29
+reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-rgj7-g3m4-5g8c"
+ignoreUntil = 2026-11-29
+reason = "基準：npm sharp@0.34.5（CVSS 8.9，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-rgw5-rvv9-x895"
+ignoreUntil = 2026-11-29
+reason = "基準：npm brace-expansion@2.1.1（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-rpw4-54j3-4h4q"
+ignoreUntil = 2027-01-28
+reason = "基準：npm ip-address@10.2.0（CVSS 6.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-rq7h-c2jc-7f22"
+ignoreUntil = 2027-01-28
+reason = "基準：npm vite@8.0.3, vite@8.1.4（CVSS 6.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-rx4f-c7p8-82vq"
+ignoreUntil = 2027-01-28
+reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 5.9，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-rxp7-6hxx-x8q5"
+ignoreUntil = 2027-01-28
+reason = "基準：npm ip-address@10.2.0（CVSS 6.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-v2wj-q39q-566r"
+ignoreUntil = 2026-11-29
+reason = "基準：npm vite@8.0.3（CVSS 8.2，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-v3r7-h72x-cjcm"
+ignoreUntil = 2027-01-28
+reason = "基準：npm undici@7.28.0（CVSS 4.8，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-v422-hmwv-36x6"
+ignoreUntil = 2027-01-28
+reason = "基準：npm body-parser@1.20.5（CVSS 3.7，LOW）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-v6wh-96g9-6wx3"
+ignoreUntil = 2027-01-28
+reason = "基準：npm vite@8.0.3（CVSS 5.5，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-vc2v-76pw-4v95"
+ignoreUntil = 2026-11-29
+reason = "基準：npm compression@1.8.1（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-vp8m-p9jh-q5pm"
+ignoreUntil = 2026-11-29
+reason = "基準：npm undici@8.10.0（CVSS 7.4，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-w293-vg96-wgc3"
+ignoreUntil = 2026-11-29
+reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 7.4，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-w5hq-g745-h8pq"
+ignoreUntil = 2026-11-29
+reason = "基準：npm uuid@8.3.2（CVSS 7.5，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-w74x-v6f9-j3xg"
+ignoreUntil = 2027-01-28
+reason = "基準：npm fast-uri@3.1.8（CVSS 6.1，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-wjr9-j795-jxcr"
+ignoreUntil = 2027-01-28
+reason = "基準：npm fast-uri@3.1.8（CVSS 4.8，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-wq5f-xc86-pv6w"
+ignoreUntil = 2026-11-29
+reason = "基準：npm sharp@0.34.5（CVSS 8.9，HIGH）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-x5fp-wj9c-mxmx"
+ignoreUntil = 2027-01-28
+reason = "基準：npm qs@6.15.2（CVSS 6.3，MEDIUM）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-xhq7-xmqj-769h"
+ignoreUntil = 2027-01-28
+reason = "基準：npm fast-uri@3.1.8（CVSS 3.7，LOW）；升級待核准"
+
+[[IgnoredVulns]]
+id = "GHSA-xjj6-f33q-929c"
+ignoreUntil = 2026-11-29
+reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 7.5，HIGH）；升級待核准"

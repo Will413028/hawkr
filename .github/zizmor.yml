@@ -1,0 +1,14 @@
+# zizmor 設定。CI 用 --persona=auditor 跑（最嚴，不隱藏低信心的發現），
+# 所以這裡每一條停用都要寫理由；新的發現一律先修，不新增停用。
+rules:
+  # 本 repo 的 local action／reusable workflow 一律用 `./` 相對路徑，這是 GitHub 文件的標準寫法，
+  # 沒有 fork 或改名造成指到別處的風險，不為了語法偏好改 11 處。
+  self-repository:
+    disable: true
+  # 只是 job／workflow 沒寫 `name:` 的顯示名稱提醒，不影響安全。
+  anonymous-definition:
+    disable: true
+  # ios-lockfile-check 只有 workflow_dispatch 手動觸發，沒有並行競爭的風險（見該檔開頭說明）。
+  concurrency-limits:
+    ignore:
+      - ios-lockfile-check.yml

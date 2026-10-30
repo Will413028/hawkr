@@ -34,12 +34,14 @@ jobs:
       run:
         working-directory: packages/${{ matrix.package }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - name: 讀取 Flutter 的版本
         id: versions
         run: echo "flutter=$(jq -r .flutter .fvmrc)" >> "$GITHUB_OUTPUT"
       # 套件自己的 .fvmrc；要和兩支 App 的 Flutter 相容（App 以 path 依賴它）。
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ steps.versions.outputs.flutter }}
           channel: stable
@@ -59,4 +61,7 @@ jobs:
 
       - name: package test
         if: always()
-        run: ${{ matrix.package == 'hawkr_auth' && 'flutter test' || 'dart test' }}
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          if [ "$PACKAGE" = hawkr_auth ]; then flutter test; else dart test; fi

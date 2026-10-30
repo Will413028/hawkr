@@ -1,0 +1,41 @@
+# gitleaks 設定：沿用內建規則，只對「明確是誤報」的樣式放行。
+# 其他歷史命中記在 .gitleaks-baseline.json（只擋新增的外洩）；基準裡的每一筆都等人工確認後處理。
+title = "hawkr gitleaks"
+
+[extend]
+useDefault = true
+
+# 新增放行前先確認那一筆真的不是機敏資料，並寫明理由。
+[[allowlists]]
+description = "依賴與遷移的雜湊／摘要檔：內容是 checksum，不是金鑰"
+paths = [
+  '''(^|/)atlas\.sum$''',
+  '''(^|/)Podfile\.lock$''',
+]
+
+[[allowlists]]
+description = "buf 模組的 BSR 摘要（googleapis:<digest>），公開的模組版本 pin"
+paths = [
+  '''(^|/)buf(\.gen)?\.yaml$''',
+]
+
+[[allowlists]]
+description = "website-e2e 用的假 Clerk key（內容是 base64 的保留網域 example.org，沒有對應的 Clerk application；檔內有說明）"
+condition = "AND"
+paths = ['''^\.github/workflows/website-e2e\.yml$''']
+regexTarget = "line"
+regexes = ['''NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:''']
+
+[[allowlists]]
+description = "設計書的範例：Idempotency-Key 是請求標頭範例值，不是機敏資料"
+condition = "AND"
+paths = ['''^backend/docs/詳細設計書/56-ADM''']
+regexTarget = "line"
+regexes = ['''[Ii]dempotency-?[Kk]ey''']
+
+[[allowlists]]
+description = "設計書的文字說明 PEM 檔頭格式（BEGIN PRIVATE KEY），沒有金鑰本體"
+condition = "AND"
+paths = ['''^backend/docs/詳細設計書/05-支付服務''']
+regexTarget = "line"
+regexes = ['''PKCS#8|PKCS#1|BEGIN (RSA )?PRIVATE KEY''']

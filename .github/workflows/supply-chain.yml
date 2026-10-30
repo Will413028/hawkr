@@ -1,0 +1,138 @@
+name: supply chain
+
+# 供應鏈檢查：已知漏洞（govulncheck、OSV-Scanner）、外洩的機敏資料（gitleaks）、workflow 本身的安全（zizmor）。
+# 不設 path 條件：任何依賴、設定、歷史的變動都可能引入問題。每週一再跑一次（只在 main），
+# 因為新漏洞會在程式沒變的情況下出現。
+#
+# 工具版本與下載雜湊都釘死在本檔；升版時兩邊一起改，且版本要發佈滿兩週（見根目錄 AGENTS.md）。
+# 已知問題的基準（新的才擋）：
+#   - govulncheck：scripts/govulncheck-allowlist.json（每筆有理由與期限）
+#   - OSV-Scanner：osv-scanner.toml 的 IgnoredVulns（每筆有理由與 ignoreUntil）
+#   - gitleaks：.gitleaks.toml（誤報放行）與 .gitleaks-baseline.json（待人工確認的歷史命中）
+#   - zizmor：.github/zizmor.yml（每條停用有理由）
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: supply-chain-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  go-modules:
+    name: 列出 go.work 的 module
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      modules: ${{ steps.list.outputs.modules }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: backend/.go-version
+          cache: false
+      - id: list
+        working-directory: backend
+        run: echo "modules=$(go work edit -json | jq -c '[.Use[].DiskPath]')" >> "$GITHUB_OUTPUT"
+
+  govulncheck:
+    name: govulncheck（${{ matrix.module }}）
+    needs: go-modules
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ${{ fromJSON(needs.go-modules.outputs.modules) }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      # Go 版本以 backend/.go-version 為準，與 backend-go-checks 相同。
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: backend/.go-version
+          cache-dependency-path: backend/**/go.sum
+      - name: 安裝 govulncheck（go module 校驗碼由 go.sum 資料庫驗證）
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+      - name: govulncheck（只擋允許清單以外、被呼叫到的漏洞）
+        working-directory: backend
+        env:
+          MODULE: ${{ matrix.module }}
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/govulncheck.json"
+          (cd "$MODULE" && govulncheck -format json ./... > "$report")
+          python3 "$GITHUB_WORKSPACE/scripts/govulncheck-gate.py" --module "$MODULE" --report "$report"
+
+  osv-scanner:
+    name: OSV-Scanner（所有 lockfile 與 pom.xml）
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - name: 安裝 OSV-Scanner v2.7.0（驗證雜湊）
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/osv-scanner" https://github.com/google/osv-scanner/releases/download/v2.7.0/osv-scanner_linux_amd64
+          echo "160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b  $RUNNER_TEMP/osv-scanner" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/osv-scanner"
+      # --no-resolve：pom.xml 不做傳遞依賴解析。Java 模組之間互相依賴 io.github.will413028.hawkr:*
+      # （reactor 內部模組，不在 Maven Central），解析會對每個內部模組報 "not found"；
+      # 只看 pom.xml 直接寫出的依賴與屬性插值後的版本。Java 服務是待退場的舊服務。
+      - name: OSV-Scanner
+        run: |
+          "$RUNNER_TEMP/osv-scanner" scan source --recursive --no-resolve \
+            --config osv-scanner.toml --format table .
+
+  gitleaks:
+    name: gitleaks（完整歷史）
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: 安裝 gitleaks v8.30.1（驗證雜湊）
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/gitleaks.tar.gz" https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum -c -
+          mkdir "$RUNNER_TEMP/gitleaks-bin"
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP/gitleaks-bin" gitleaks
+      # --redact：輸出不含秘密本體；--baseline-path：基準內的歷史命中不算失敗。
+      - name: gitleaks
+        run: |
+          "$RUNNER_TEMP/gitleaks-bin/gitleaks" git --config .gitleaks.toml \
+            --baseline-path .gitleaks-baseline.json --redact --no-banner --verbose .
+
+  zizmor:
+    name: zizmor（workflow 安全）
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.13'
+      # 以 --require-hashes 安裝釘死的 wheel（hash 在 scripts/ci/zizmor-requirements.txt）。
+      - name: 安裝 zizmor 1.31.1
+        run: |
+          python3 -m pip install --require-hashes --only-binary :all: -r scripts/ci/zizmor-requirements.txt
+      - name: zizmor（auditor：不隱藏低信心的發現）
+        run: zizmor --no-progress --persona=auditor --min-severity=informational .

@@ -18,8 +18,10 @@ jobs:
     outputs:
       apps: ${{ steps.apps.outputs.apps }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: dorny/paths-filter@v3
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
         id: filter
         with:
           filters: |
@@ -59,17 +61,19 @@ jobs:
       run:
         working-directory: ${{ matrix.app }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - name: Read Flutter version from .fvmrc
         id: fvmrc
         run: echo "flutter_version=$(jq -r .flutter .fvmrc)" >> "$GITHUB_OUTPUT"
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ steps.fvmrc.outputs.flutter_version }}
           channel: stable
           cache: true
       - run: flutter pub get
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@651ff0d62c5c79bed6d53ec518387aae20e72c1a # v1.329.0
         with:
           ruby-version: '3.2'
           bundler-cache: true
@@ -80,8 +84,10 @@ jobs:
         run: bundle exec pod install --deployment
       - name: Suggest fix
         if: failure()
+        env:
+          APP: ${{ matrix.app }}
         run: |
-          echo "::error title=Lockfile Mismatch::${{ matrix.app }} 的 Podfile.lock / pubspec.lock 與 dependency 不一致"
-          echo "在 ${{ matrix.app }}/ 下執行後 commit 兩個 lock 檔："
+          echo "::error title=Lockfile Mismatch::${APP} 的 Podfile.lock / pubspec.lock 與 dependency 不一致"
+          echo "在 ${APP}/ 下執行後 commit 兩個 lock 檔："
           echo "  flutter pub get"
           echo "  cd ios && bundle install --quiet && bundle exec pod install --repo-update"

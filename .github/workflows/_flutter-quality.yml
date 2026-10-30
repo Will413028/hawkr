@@ -32,11 +32,13 @@ jobs:
       run:
         working-directory: ${{ inputs.app }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - name: Read Flutter version from .fvmrc
         id: fvmrc
         run: echo "flutter_version=$(jq -r .flutter .fvmrc)" >> "$GITHUB_OUTPUT"
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ steps.fvmrc.outputs.flutter_version }}
           channel: stable
@@ -65,13 +67,15 @@ jobs:
         id: enum_text
         continue-on-error: true
         working-directory: packages/hawkr_ui_text
+        env:
+          APP: ${{ inputs.app }}
         run: |
           flutter pub get
-          dart run tool/check_enum_text.dart ../../${{ inputs.app }}/lib
+          dart run tool/check_enum_text.dart "../../${APP}/lib"
       - name: Upload dead-code report
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ inputs.app }}-dead-code-report
           path: ${{ inputs.app }}/deadcode-report.txt
@@ -85,13 +89,19 @@ jobs:
           steps.custom_lint.outcome == 'failure' ||
           steps.hygiene.outcome == 'failure' ||
           steps.enum_text.outcome == 'failure'
+        env:
+          FORMAT: ${{ steps.format.outcome }}
+          ANALYZE: ${{ steps.analyze.outcome }}
+          CUSTOM_LINT: ${{ steps.custom_lint.outcome }}
+          HYGIENE: ${{ steps.hygiene.outcome }}
+          ENUM_TEXT: ${{ steps.enum_text.outcome }}
         run: |
           echo "One or more static checks failed:"
-          echo "  format:      ${{ steps.format.outcome }}"
-          echo "  analyze:     ${{ steps.analyze.outcome }}"
-          echo "  custom_lint: ${{ steps.custom_lint.outcome }}"
-          echo "  hygiene:     ${{ steps.hygiene.outcome }}"
-          echo "  enum_text:   ${{ steps.enum_text.outcome }}"
+          echo "  format:      $FORMAT"
+          echo "  analyze:     $ANALYZE"
+          echo "  custom_lint: $CUSTOM_LINT"
+          echo "  hygiene:     $HYGIENE"
+          echo "  enum_text:   $ENUM_TEXT"
           exit 1
 
   tests:
@@ -102,11 +112,13 @@ jobs:
       run:
         working-directory: ${{ inputs.app }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - name: Read Flutter version from .fvmrc
         id: fvmrc
         run: echo "flutter_version=$(jq -r .flutter .fvmrc)" >> "$GITHUB_OUTPUT"
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ steps.fvmrc.outputs.flutter_version }}
           channel: stable
@@ -135,13 +147,14 @@ jobs:
         env:
           APP: ${{ inputs.app }}
           BASE_REF: ${{ github.base_ref }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
           mkdir -p coverage
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
             git fetch --depth=1 origin "$BASE_REF"
           fi
-          if [[ "${{ github.event_name }}" == "pull_request" ]] &&
+          if [[ "$EVENT_NAME" == "pull_request" ]] &&
              git cat-file -e "origin/${BASE_REF}:${APP}/tool/coverage_baseline.json" 2>/dev/null; then
             git show "origin/${BASE_REF}:${APP}/tool/coverage_baseline.json" > coverage/base-baseline.json
           else
@@ -159,7 +172,7 @@ jobs:
       - name: Upload coverage evidence
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ inputs.app }}-coverage
           path: |
@@ -177,11 +190,13 @@ jobs:
       run:
         working-directory: ${{ inputs.app }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - name: Read Flutter version from .fvmrc
         id: fvmrc
         run: echo "flutter_version=$(jq -r .flutter .fvmrc)" >> "$GITHUB_OUTPUT"
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ steps.fvmrc.outputs.flutter_version }}
           channel: stable

@@ -39,7 +39,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
       # image tag 由 scripts/proto/Dockerfile 的內容雜湊算出（見 scripts/proto/image-tag.sh 檔頭）。
       - name: 讀取權威版本設定（SSOT = scripts/proto/Dockerfile）
@@ -58,9 +60,10 @@ jobs:
           echo ">>> image=$IMAGE module=$MODULE"
 
       - name: 準備 protoc image
+        env:
+          IMAGE: ${{ steps.cfg.outputs.image }}
         run: |
           set -euo pipefail
-          IMAGE="${{ steps.cfg.outputs.image }}"
           # 與 gen-go-proto.sh 同樣的 cache 判斷；hosted runner 每次都是乾淨的，實際上都會 build。
           if docker image inspect "$IMAGE" >/dev/null 2>&1; then
             echo ">>> $IMAGE 已存在，跳過 build"
@@ -71,12 +74,15 @@ jobs:
 
       # 唯讀掛載 + 容器內 /out + 容器內 diff：工作樹全程零寫入。
       - name: 重新生成 Go proto 並與 repo 對拍
+        env:
+          CFG_IMAGE: ${{ steps.cfg.outputs.image }}
+          CFG_MODULE: ${{ steps.cfg.outputs.module }}
         run: |
           set -euo pipefail
           docker run --rm \
             -v "$PWD:/work:ro" -w /work \
-            -e MODULE="${{ steps.cfg.outputs.module }}" \
-            "${{ steps.cfg.outputs.image }}" \
+            -e MODULE="$CFG_MODULE" \
+            "$CFG_IMAGE" \
             sh -c '
               set -eu
               mkdir -p /out

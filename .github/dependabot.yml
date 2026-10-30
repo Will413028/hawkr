@@ -1,0 +1,271 @@
+# 依賴更新：每週一次，新版本發佈滿 7 天（major 滿 30 天）才提 PR，minor／patch 合併成一個 PR。
+# 這是「版本通知」，不是授權：升級要附套件、版本、存在與發佈時間的核對並經核准（根目錄 AGENTS.md）。
+# gomod 的 module 與 backend/go.work 的 use 清單一一對應；新增 module 時同步加一段。
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directories:
+      - "/"
+      - "/.github/actions/pnpm-install"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      actions-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      npm-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "pub"
+    directory: "/buyer-app"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      pub-buyer-app-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "pub"
+    directory: "/seller-app"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      pub-seller-app-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "pub"
+    directory: "/packages/hawkr_api"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      pub-hawkr_api-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "pub"
+    directory: "/packages/hawkr_app_update"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      pub-hawkr_app_update-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "pub"
+    directory: "/packages/hawkr_auth"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      pub-hawkr_auth-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "pub"
+    directory: "/packages/hawkr_twaddr"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      pub-hawkr_twaddr-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "pub"
+    directory: "/packages/hawkr_ui_text"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      pub-hawkr_ui_text-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "gomod"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      gomod-monolith-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "gomod"
+    directory: "/backend/gateway"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      gomod-gateway-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "gomod"
+    directory: "/backend/monitoring/discord-webhook-gateway"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      gomod-monitoring-discord-webhook-gateway-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "gomod"
+    directory: "/backend/pkg"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      gomod-pkg-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "gomod"
+    directory: "/backend/services/ai-service"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      gomod-services-ai-service-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "gomod"
+    directory: "/backend/services/crm-service"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      gomod-services-crm-service-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "gomod"
+    directory: "/backend/services/im-service"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      gomod-services-im-service-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "gomod"
+    directory: "/backend/services/invoice-service"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      gomod-services-invoice-service-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "gomod"
+    directory: "/backend/services/notification-service"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      gomod-services-notification-service-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "gomod"
+    directory: "/backend/services/review-service"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      gomod-services-review-service-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "gomod"
+    directory: "/backend/services/seller-service"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      gomod-services-seller-service-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "gomod"
+    directory: "/backend/services/social-service"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      gomod-services-social-service-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "maven"
+    directory: "/backend/services/java"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      maven-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
