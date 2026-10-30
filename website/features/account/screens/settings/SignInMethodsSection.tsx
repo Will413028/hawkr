@@ -23,9 +23,9 @@ const PROVIDERS: readonly { provider: LoginProvider; name: string }[] = [
 ];
 
 /**
- * 設定頁「帳號安全」的「登入方式」：每家一列，已連結顯示「已連結」，未連結是導向單體
+ * 設定頁「帳號安全」卡片內的「登入方式」（無自己的外框，由 `SettingsPage` 的 `extra` 放進卡片）：每家一列，已連結顯示「已連結」，未連結是導向單體
  * `/api/auth/{provider}/start?link=1` 的連結（整頁導覽，不是 fetch）。連結失敗時單體回到這頁並帶
- * `?link_error=<代碼>`，顯示在列上方。
+ * `?link_error=<代碼>`，顯示在小標下方、列上方。
  */
 export default function SignInMethodsSection() {
 	const t = useTranslations("account.signInMethods");
@@ -52,10 +52,10 @@ export default function SignInMethodsSection() {
 	const linked = new Set(query.data ?? []);
 
 	return (
-		<section className="seller-card">
-			<header className="seller-card__head">
-				<h2>{t("title")}</h2>
-			</header>
+		<div className="mt-4 flex flex-col gap-2">
+			<h3 className="m-0 text-sm font-semibold text-hk-heading">
+				{t("title")}
+			</h3>
 			{errorText ? (
 				<p
 					className="my-[var(--hkui-space-3)] p-[var(--hkui-space-3)_var(--hkui-space-4)] rounded-[var(--hkui-radius-md)] bg-[var(--hkui-danger-50)] text-[var(--hkui-danger-700)] text-[length:var(--hkui-text-small)]"
@@ -93,6 +93,6 @@ export default function SignInMethodsSection() {
 					</li>
 				))}
 			</ul>
-		</section>
+		</div>
 	);
 }

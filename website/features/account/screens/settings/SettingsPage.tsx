@@ -14,9 +14,15 @@ export const metadata = { title: "設定" };
  * controls, the sign-in methods and the delete-account section are the only client islands on it.
  */
 
-const SECTIONS = [
+/** `extra` is an optional client island rendered inside the section's card, after its item list. */
+export const SECTIONS: readonly {
+	group: string;
+	items: readonly { label: string; href: string; desc: string }[];
+	extra?: React.ComponentType;
+}[] = [
 	{
 		group: "帳號安全",
+		extra: SignInMethodsSection,
 		items: [
 			{
 				label: "個人資料",
@@ -115,35 +121,33 @@ export default function Page() {
 						</ul>
 					</section>
 					{SECTIONS.map((section) => (
-						<React.Fragment key={section.group}>
-							<section className="seller-card">
-								<header className="seller-card__head">
-									<h2>{section.group}</h2>
-								</header>
-								<ul className="list-none m-0 p-0 flex flex-col gap-2">
-									{section.items.map((item) => (
-										<li key={`${item.href}:${item.label}`}>
-											<Link
-												href={item.href}
-												className="flex flex-col gap-0.5 p-3 px-4 bg-hk-surface-muted rounded-hk-md text-inherit no-underline transition-colors duration-200 ease-in-out hover:bg-hk-surface-panel"
-											>
-												<strong className="text-sm font-semibold text-hk-heading">
-													{item.label}
-												</strong>
-												<small className="text-xs text-foreground-soft">
-													{item.desc}
-												</small>
-											</Link>
-										</li>
-									))}
-								</ul>
-							</section>
-							{section.group === "帳號安全" ? (
+						<section key={section.group} className="seller-card">
+							<header className="seller-card__head">
+								<h2>{section.group}</h2>
+							</header>
+							<ul className="list-none m-0 p-0 flex flex-col gap-2">
+								{section.items.map((item) => (
+									<li key={`${item.href}:${item.label}`}>
+										<Link
+											href={item.href}
+											className="flex flex-col gap-0.5 p-3 px-4 bg-hk-surface-muted rounded-hk-md text-inherit no-underline transition-colors duration-200 ease-in-out hover:bg-hk-surface-panel"
+										>
+											<strong className="text-sm font-semibold text-hk-heading">
+												{item.label}
+											</strong>
+											<small className="text-xs text-foreground-soft">
+												{item.desc}
+											</small>
+										</Link>
+									</li>
+								))}
+							</ul>
+							{section.extra ? (
 								<React.Suspense fallback={null}>
-									<SignInMethodsSection />
+									<section.extra />
 								</React.Suspense>
 							) : null}
-						</React.Fragment>
+						</section>
 					))}
 					<DeleteAccountSection />
 				</div>
