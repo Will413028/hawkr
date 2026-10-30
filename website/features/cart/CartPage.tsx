@@ -98,7 +98,7 @@ export default async function CartPage() {
 								Keep shopping
 							</span>
 							<h2 className="m-0 mb-3.5 text-hk-heading cart-type-section-title">
-								挑完購物車，再看看這週剛上架的
+								挑完購物車，再看看熱銷商品
 							</h2>
 						</section>
 						<section
