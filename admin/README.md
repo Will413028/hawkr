@@ -39,7 +39,7 @@ Hawkr 的後台管理平台，用於管理商戶、會員、商品、訂單、Ba
 
 ### 認證
 
-- 後台網域由 **Cloudflare Access** 保護（Google 登入、email 白名單；ADR `backend/docs/adr/2026-09-27-identity-clerk.md` 文末修訂）。`/` 直接進入 `/admin`，layout 以 `IdentityAdminService.GetSession` 讀管理員資料；後端無法連線時顯示錯誤與重試。管理員身分只由單體驗證 Access JWT。
+- 後台網域由 **Cloudflare Access** 保護（Google 登入、email 白名單；ADR `backend/docs/adr/2026-10-30-identity-self-hosted-federated-login.md`「沿用與作廢」）。`/` 直接進入 `/admin`，layout 以 `IdentityAdminService.GetSession` 讀管理員資料；後端無法連線時顯示錯誤與重試。管理員身分只由單體驗證 Access JWT。
 - 瀏覽器只呼叫同源 `/api/*`。BFF 與代行專用 route 讀取 Access 加上的 `Cf-Access-Jwt-Assertion`，作為 `Authorization: Bearer` 送到單體；不照抄瀏覽器的 `Authorization` 或 cookie，也不在 BFF 判斷身分。
 - 登出先呼叫 `IdentityAdminService.SignOut` 撤銷進行中的代行；成功或回 `Unauthenticated`／`PermissionDenied` 時導向 `/api/admin/logout`，由 server 依 Access assertion 前往 Access logout，或在本機顯示重新產生 dev token 的指示。其他錯誤留在原頁並顯示「登出失敗」。
 - 這項撤銷保證只涵蓋後台按鈕登出。離職處置須從 Access 白名單移除、在 Zero Trust 撤銷該使用者的 Access sessions，並從後台 UI 撤銷該管理員進行中的代行；外部 Access 登出不會自動呼叫 `SignOut`。若撤銷步驟未完成，代行受 30 分鐘 hard TTL 與 15 分鐘閒置逾時限制。

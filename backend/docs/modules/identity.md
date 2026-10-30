@@ -1,13 +1,13 @@
 # identity 模組行為規格
 
-本文是單體 `identity` 模組行為的唯一來源。誰在使用系統：登入的帳號（每個帳號都是買家，賣家是另外申請的角色）與管理員、帳號的角色與狀態。顧客登入與 session 由 Clerk 處理，後台由 Cloudflare Access 保護；決策見 ADR `docs/adr/2026-09-27-identity-clerk.md`（含文末修訂）。代行的授權、工作階段、稽核與編排由 delegation 擁有。
+本文是單體 `identity` 模組行為的唯一來源。誰在使用系統：登入的帳號（每個帳號都是買家，賣家是另外申請的角色）與管理員、帳號的角色與狀態。顧客以 Google、LINE 聯合登入，OAuth 與 session 由本模組自己做，後台由 Cloudflare Access 保護；決策見 ADR `docs/adr/2026-10-30-identity-self-hosted-federated-login.md` 與 `docs/adr/2026-09-27-identity-opaque-sessions.md`。代行的授權、工作階段、稽核與編排由 delegation 擁有。
 
 ## 1. 認證
 
-- 顧客的登入、session 與帳號連結由 Clerk 處理；後台的登入與白名單由 Cloudflare Access 處理。
-- 模組依 token 的 issuer 選 verifier：顧客 Clerk token 只會認證成帳號；後台 Access JWT（或本機 dev admin token）只會認證成管理員。Access 驗 team domain 的 JWKS、application AUD tag、`iss`、`exp`、`nbf`。
-- 首次認證建立帳號或管理員。cookie、`Authorization` header 與 CSRF 在 `internal/httpapi`，不在本模組。
-- 停權、刪除與角色以本模組的資料為準，每個請求都讀（token 在 Clerk 撤銷之後的效期內仍驗得過）。停權的帳號照樣認證成功，結果帶停權時間（`Authenticated.SuspendedAt`），能做什麼由入口依動作的性質決定（`internal/httpapi` 的 `customerEffects`，A7-D18）；已刪除的帳號回 Unauthenticated。
+- 顧客的登入、session 與帳號連結由本模組處理（登入方式見 §7）；後台的登入與白名單由 Cloudflare Access 處理。憑證是 opaque session token：web 是 httpOnly 的 `__Host-hk_session` cookie，App 是 `Authorization: Bearer`，其他位置不收，兩者都有時以 Bearer 為準。
+- 模組依 token 的 issuer 選 verifier：後台 Access JWT（或本機 dev admin token，以 `iss` 精確比對）只會認證成管理員；其餘 token 一律當顧客的 opaque session，只認證成帳號。Access 驗 team domain 的 JWKS、application AUD tag、`iss`、`exp`、`nbf`。
+- 管理員在首次認證時建立；顧客的帳號在第一次登入時建立（§2）。cookie、`Authorization` header 與 CSRF 在 `internal/httpapi`，不在本模組。
+- 停權、刪除與角色以本模組的資料為準，每個請求都讀（session 列被刪除，下一個請求就失效）。停權的帳號照樣認證成功，結果帶停權時間（`Authenticated.SuspendedAt`），能做什麼由入口依動作的性質決定（`internal/httpapi` 的 `customerEffects`，A7-D18）；已刪除的帳號回 Unauthenticated。
 
 ### App 原生登入與 session 管理
 
@@ -17,9 +17,9 @@
 
 ## 2. 帳號建立
 
-- 同一個 Clerk 使用者同時的第一個請求只建一個帳號：`clerk_user_id` UNIQUE 加 `ON CONFLICT DO NOTHING`。
+- 同一個 (provider, subject) 並發的第一次登入只建一個帳號：`account_identities` 的主鍵 `(provider, subject)` 加同一個 transaction。沒有 email（LINE 使用者可以拒給）也照樣建帳。登入遇到已刪除帳號留下的墓碑身分時被拒絕，不再建帳號。
 - 建帳不授予任何業務角色。建帳的 transaction 內發布 `AccountCreated`，buyer 模組訂閱並在同一個 transaction 內建立買家（ADR `docs/adr/2026-09-30-account-created-provisions-buyer.md`）。
-- `email` 是建帳時 Clerk session 的 email claim，只給後台顯示與搜尋，不是識別，不隨 Clerk 端的變更同步。
+- `accounts.email` 是 provider 回報的已驗證 email，每次登入更新，作通知的寄件地址，也給後台顯示與搜尋；不是識別、不唯一，沒有已驗證 email 時保持原值。
 
 ## 3. 帳號角色
 
@@ -32,19 +32,19 @@
 
 ## 4. 停權、刪除與生命週期
 
-- 刪帳與排入刪除 Clerk 使用者的 job 在同一個 transaction。停權不排任何 Clerk job（不停用 Clerk 使用者）。停權冪等：已經停權時不寫第二筆。
+- 停權與刪帳在同一個 transaction 刪該帳號全部的 session。停權冪等：已經停權時不寫第二筆。
 - 停權紀錄（`account_suspensions`，A7-D9）：型別只有 `PERMANENT`（A7-D16，沒有 `ends_at`），理由類別是 `platform/policy.Category` 的值（`TestCodeValueChecksMatchTheGoTypes`），另有說明、不透明的來源參照（identity 不讀它）、停權時間、解除時間與解除原因。`SuspendAccount(SuspendInput)` 在同一個 transaction 寫紀錄、設 `suspended_at`；已經停權時回傳原本的紀錄（`created=false`），不改理由、不寫第二筆；`uidx_account_suspensions_active` 保證同一帳號未解除的紀錄最多一筆。紀錄與狀態任何一步失敗都整筆回滾（`TestFailedRecordWriteLeavesTheAccountNotSuspended`、`TestFailureAfterTheRecordRollsTheRecordBack`）。
 - `UnsuspendAccount(accountID, reason)`：reason 必填；同一個 transaction 清 `suspended_at`、在目前的紀錄記解除時間與原因；沒有停權時成功並回傳 `released=false`。解除留列不刪，之後可以再停權（新的一筆）。`CurrentSuspension(accountID)` 回傳目前未解除的紀錄，給 A7-2 的「讀自己的停權」。
 - 停權、解除入口只允許 `accountsuspension` 呼叫（`internal/arch` 的 `TestSuspensionEntriesAreOnlyCalledByAccountsuspension` 掃非測試程式）：「擁有商店的帳號不能停權」在那裡檢查，identity 是葉節點、不查店家。刪帳號時未解除的紀錄以 `release_reason = ACCOUNT_DELETED` 解除。手動解除（`UnsuspendAccount`）拒絕這個值，只有帳號刪除路徑能寫。
-- 受限登入（ADR `2026-10-29-account-suspension-and-moderation.md`）：停權不停用 Clerk 使用者，認證不因停權回錯誤。入口 `withSession` 依 `customerEffects` 的宣告（讀取、寫入、自助）處理：公開與受邀供應商的 service 以訪客執行，讀取與自助放行，寫入回 `PermissionDenied` 與 `ACCOUNT_SUSPENDED`，舊 gateway 的 REST 依 HTTP method；`GetSession` 回 `suspension.suspended_at`。守門：`TestSuspendedAccountIsAuthorizedByTheNatureOfTheAction`、`TestSuspendedAccountStillAuthenticatesAndCarriesTheSuspensionTime`、`TestSuspendedAccountHasRestrictedAccess`。
-- 刪帳號留下墓碑與 `clerk_user_id`，`account_identities` 的列也留作墓碑（保留 provider 與 subject，清掉 email），同一個登入身分不會再建一個帳號，以它登入回 `Unauthenticated`；`email` 清為 NULL（`accounts_deleted_check`）。刪帳同時發出 `AccountDeleted`。
+- 受限登入（ADR `2026-10-29-account-suspension-and-moderation.md`）：認證不因停權回錯誤。入口 `withSession` 依 `customerEffects` 的宣告（讀取、寫入、自助）處理：公開與受邀供應商的 service 以訪客執行，讀取與自助放行，寫入回 `PermissionDenied` 與 `ACCOUNT_SUSPENDED`，舊 gateway 的 REST 依 HTTP method；`GetSession` 回 `suspension.suspended_at`。守門：`TestSuspendedAccountIsAuthorizedByTheNatureOfTheAction`、`TestSuspendedAccountStillAuthenticatesAndCarriesTheSuspensionTime`、`TestSuspendedAccountHasRestrictedAccess`。
+- 刪帳號留下帳號墓碑，`account_identities` 的列也留作墓碑（保留 provider 與 subject，清掉 email），同一個登入身分不會再建一個帳號，以它登入回 `Unauthenticated`；`email` 清為 NULL（`accounts_deleted_check`）。刪帳同時發出 `AccountDeleted`。
 - 帳號的生命週期是 ACTIVE → PENDING_DELETION → DELETED（`Account.Lifecycle`；欄位 `deletion_pending_at`、`deleted_at`）。
   - `BeginDeletion` 只由 accountdeletion 在受理會等待未結訂單的申請時呼叫。
   - 等待刪除時仍可登入，但 `GrantRole` 回 FailedPrecondition。
   - `DeleteAccount` 清掉等待的狀態；`accounts_deletion_pending_check` 保證已刪除的帳號沒有等待狀態。
   - 狀態在 identity，流程在 accountdeletion（ADR `docs/adr/2026-09-30-account-deletion-module.md` 的修訂）。
 - 跨模組的刪帳流程（accountdeletion 刪帳並關閉買家）在自己的 transaction 內以 `LockAccount` 取同一把帳號列鎖，再讀角色或呼叫參與者。`DeleteAccount` 只由 accountdeletion 呼叫，其他入口不得直接刪帳號。
-- Clerk 停擺時新登入失敗，已登入的使用者在下一次換 token（最多約 60 秒）之後也失效。
+- Google 或 LINE 停擺時新登入失敗；已登入的使用者不受影響，session 只靠我方資料庫。
 
 ## 5. 管理員與管理員角色
 
@@ -68,55 +68,51 @@
 - 舊契約的 `account_type` bitmask（買家 1、賣家 2、管理員 4）只在 `internal/legacy/accounttype` 合成：存活的帳號一定有買家位元，有 `SELLER` 時加賣家位元；`X-Account-Type`、`X-Login-Role` 與 legacy `AccountService` 回傳的 `account_type` 都來自它。單體內只有角色。
 - legacy `AccountService.RemoveRole`（`internal/legacy/accountservice`，給還沒搬的服務）只移除 `SELLER`：`ROLE_BUYER` 與未指定的角色回 InvalidInput；`source_id` 為 0 表示沒有帶來源；移除不刪帳號，`account_fully_deleted` 恆為 false。
 
-## 7. Sign in with Apple 授權撤銷
+## 7. 登入方式與 provider 設定
 
-- App 原生登入後以 `LinkAppleCredential` 交出 identity token 與 authorization code。驗證 token（簽章、issuer、audience）後，把 `sub`、audience 與加密的 code 排入 job，請求內不呼叫 Apple。
-- job 換 refresh token。Apple 簽發的 ID token 與連結時的身分相同，才以 AAD（表、欄、帳號 ID）加密存入 `identity.apple_tokens`（每帳號一筆，重新連結取代）。身分不符或帳號已刪除，當場撤銷換得的 token。
-- 暫時性失敗（驗證 ID token 連不到公鑰、保存失敗）不撤銷，改排 `identity.save_apple_token` job 帶加密的 token 回應重試；最後一次仍失敗就記 error 並放棄，下一次原生登入再交。
-- 每種失敗都以 error 等級記 log（原因與帳號 ID，不含 code 與 token）。不呼叫 Clerk Backend API 核對 `sub`。
-- 所有刪除路徑都經 `DeleteAccount`；它在同一個 transaction 內取走 token、刪列並排入 `identity.revoke_apple_token`。沒有保存的 token 就沒有東西可撤銷，刪帳不受影響。
-- 撤銷 job 最多嘗試 10 次，第 10 次大約在四小時後；仍失敗的 job 留在 `discarded`，由人工處理。撤銷失敗不回滾刪帳：帳號在我方已刪除，對 Apple 的撤銷盡力而為。
-- 向 Apple 認證用的 client secret 是 ES256 簽的 JWT，用 `.p8` 私鑰動態簽出（有效 5 分鐘），不保存。
-- 部署的環境 Apple 設定必填（缺任何一個啟動失敗）；本機開發可不設，此時 `LinkAppleCredential` 回 unavailable。啟動時 `CheckAppleKeys` 檢查保存的密文與排隊中 job 參數的密文用到的金鑰都在 `IDENTITY_TOKEN_KEYS`。
-- web 登入的 Apple 使用者沒有保存的 token（授權碼在 Clerk），website 維持人工提示。
+- 只提供 Google 與 LINE；不提供 Sign in with Apple（Will 2026-10-30，ADR 自建登入）。Apple Pay 是付款，與登入無關。
+- web：單體提供 `GET /api/auth/{google,line}/start` 與 `/api/auth/{google,line}/callback`（純 HTTP，每家獨立路徑防 mix-up，經 website 的同源反代到達）。start 寫一列暫存的登入流程（`state`、PKCE verifier、`nonce`、預期 provider、返回網址，10 分鐘、單次使用）並設短效的 `__Host-hk_login` cookie；callback 比對該 cookie、暫存列與 `state`，Google 的授權回應缺 `iss` 一律拒絕，換 code 後驗 ID token（Google 以 JWKS；LINE 的 web ID token 以 channel secret 驗 HS256），成功時換發新 session 並設 `__Host-hk_session`（httpOnly、Secure、`SameSite=Lax`，Max-Age 等於絕對逾時 90 天），失敗回登入頁並附固定的錯誤代碼。返回網址只收 `/` 開頭且不是 `//` 的站內路徑。
+- App：原生 SDK 取得 ID token 後走 §1 的 `IssueAppLoginNonce`／`ExchangeIdToken`。
+- 設定（環境變數名稱；值不進版控）：`GOOGLE_WEB_CLIENT_ID` 與 `GOOGLE_WEB_CLIENT_SECRET`（Google 的 web OAuth client）、`LINE_CHANNEL_ID` 與 `LINE_CHANNEL_SECRET`（LINE Login channel）各自整組選填，只設一個是設定錯誤，沒設定的 provider 其 start 回 404；redirect URI 是 `PUBLIC_WEB_ORIGIN` 加 `/api/auth/{google,line}/callback`，要登記在各家的 console。`GOOGLE_APP_CLIENT_IDS` 是 App 原生登入的 Google ID token 的 `azp` 允許清單，空的時候 Google 的 App 登入不啟用。`GOOGLE_CLIENT_IDS` 只用於 vendor portal 的 step-up 驗證，與登入無關。後台：`CF_ACCESS_TEAM_DOMAIN`、`CF_ACCESS_ADMIN_AUD`。
+- 本機可以不設這些：顧客用 §8 的 dev session，後台用 dev admin token。要用真的 Google／LINE 登入驗收時，在啟動 `make serve` 的 shell 匯出上面的變數（Makefile 不讀檔），並在各家 console 登記 `http://localhost:3000/api/auth/{google,line}/callback`（`PUBLIC_WEB_ORIGIN` 的本機預設是 `http://localhost:3000`）。
 
 ## 8. 本機開發與測試登入（DevAuth）
 
-- 本機的 RSA 金鑰簽 dev token，使用者是 `dev_` 開頭的 ID，不連外部服務（`hawkr dev-token`）。顧客 token 為 Clerk 形狀，後台 token 為 Access 形狀。
-- serve 設了 `DEV_AUTH_KEY_FILE` 才接受；不能與正式 Clerk 或 Access 設定同時使用。
+- 顧客：dev 使用者以帳號 ID 識別，不建假的登入身分。`make dev-token args='-account <帳號 ID>'` 為既有的帳號在資料庫建一個 App 種類的 session 並印出 token（以 `Authorization: Bearer` 帶；帳號不存在是錯誤，不會默默建立）；不帶 `-account` 時建立一個沒有登入身分的新帳號（ID 印到 stderr）。
+- 後台：`make dev-token args='-admin -user dev_ops'` 以本機的 RSA 金鑰簽 24 小時的 Access 形狀 JWT（使用者是 `dev_` 開頭的 ID），第一個請求時建立管理員。`-account` 與 `-admin` 不能並用。
+- `DEV_AUTH_KEY_FILE`（`make dev-key` 產生）設了才接受後台的 dev token 與執行 `dev-token`、`dev-seed`；不能與 Cloudflare Access 設定同時使用，同時設定時 serve 拒絕啟動。
 
 ## 9. 資料
 
 schema `identity`（`db/schema.sql`）：
 
-- `accounts`：登入的 principal。`clerk_user_id` 是顧客的 Clerk application 的使用者 ID（UNIQUE，墓碑也保留）。主鍵目前是 IDENTITY（過渡期，對外可列舉）。
+- `accounts`：登入的 principal。主鍵目前是 IDENTITY（過渡期，對外可列舉）；`email` 是寄件地址，不是識別。
 - `account_roles`：`(account_id, role)`，role 只允許 `SELLER`。
 - `admins`：管理員，與帳號是不同的 principal；`access_subject` 是 Access JWT 的 `sub`（UNIQUE），`email` 是首次登入時的顯示快照。
 - `admin_roles`：`(admin_id, role)`，role 的 CHECK 只允許 `OWNER`。
 - `admin_role_events`：角色授予與撤銷的歷史，只追加；`admin_role_events_*_check` 限定 role、action、reason（1 到 1000 字且不能全是空白）與 source。
-- `apple_tokens`：保存的 Apple refresh token 密文，每帳號一筆。
 - `account_suspensions`：停權紀錄。
 - `account_identities`：provider 身分，`(provider, subject)` 為主鍵；帳號刪除時留作墓碑並清掉 email。
 - `sessions`：opaque session，只存 token 的 SHA-256。
 - `login_flows`：web 登入流程的單次暫存。
 - `app_login_nonces`：App 登入的單次 nonce。
-- `accounts.clerk_user_id` 過渡期可為 NULL（自建登入的帳號沒有），Clerk 退場時刪欄。
 - 代行資格與行為參數由 delegation 擁有。
 
-外部 provider 的 client 在 `internal/`：`clerk`（顧客 session token 的驗證、Backend API、dev token）、`oidc`（Google、Apple 的 ID token；Clerk 與 Access 的驗證也用它）、`apple`（token 的交換與撤銷）、`seal`（AES-GCM，加密排入 job 與保存的 Apple 憑證）。
+外部 provider 的 client 在 `internal/`：`oidc`（JWT 簽章與 claims 的驗證，Access 與 Google、LINE 的 ID token 共用）。web 登入的 OAuth client（authorization code ＋ PKCE）在 `internal/provider`。
 
 ## 10. 已知限制
 
 - 帳號與管理員的主鍵是 IDENTITY，對外可列舉；舊 Java 服務仍存成 `BIGINT`。代行 session 的過渡 ID 記在 delegation。
-- 帳號的 email 是建帳時的快照，在 Clerk 改了 email 不會同步；後台的清單以它顯示與搜尋。
+- 帳號的 email 只在登入時以 provider 回報的已驗證 email 更新（LINE 使用者可以拒給）；後台的清單以它顯示與搜尋。
+- Google 自動連結信任 `hd`：Workspace 管理員刪除使用者後，同一個地址的新 `sub` 會自動連到舊帳號（ADR 自建登入「已知限制」）。
 - 賣家 CRM 以手機找顧客（legacy 的 `GetAccountByPhone`）一律回「找不到」：帳號沒有手機。
 - 外部 Access 登出不會自動撤銷代行。
 - 代行資格與撤回時的工作階段撤銷由 delegation 管理（`docs/modules/delegation.md` §7）。
 
 ## 11. 模組內部結構
 
-- `internal/account`：帳號、角色、清單、首次認證建帳與 Clerk 使用者 job。`internal/admin`：管理員查詢。`internal/auth`：Authenticate 的路由（後台 JWT 以 iss 辨認，其餘當 session）、認證時建管理員、舊 Google step-up。`internal/session`：session 的建立、解析（逾時、續期、帳號狀態與角色）、撤銷，以及 web 登入流程與 App nonce 的單次使用。`internal/login`：以 provider 身分登入、建帳、Google 自動連結、手動連結。`internal/applerevoke`：Apple 憑證的連結、換 token、保存的 job 與刪帳時撤銷。
-- `internal/provider` 把 `clerk`、`apple`、`oidc`、`seal` 的 client 接成模組公開介面，並提供本機 dev token；`internal/store` 是 sqlc 查詢套件。
+- `internal/account`：帳號、角色、清單、登入時建帳。`internal/admin`：管理員查詢。`internal/auth`：Authenticate 的路由（後台 JWT 以 iss 辨認，其餘當 session）、認證時建管理員、舊 Google step-up。`internal/session`：session 的建立、解析（逾時、續期、帳號狀態與角色）、撤銷，以及 web 登入流程與 App nonce 的單次使用。`internal/login`：以 provider 身分登入、建帳、Google 自動連結、手動連結。
+- `internal/provider` 把 `oidc` 與 web 登入的 OAuth client 接成模組公開介面，並提供後台的 dev token；`internal/store` 是 sqlc 查詢套件。
 
 ## 12. 不變量的守門
 
@@ -127,7 +123,7 @@ schema `identity`（`db/schema.sql`）：
 - App 原生登入的 ID token：Google 驗 `iss`（兩種寫法）、`aud` 為 web client ID、`azp` 在允許清單、`nonce`；LINE 以 ES256 與 JWKS 驗；nonce 先比對 ID token、通過才單次消耗：`TestGoogleAppLoginVerifiesTheIDToken`、`TestLineAppLoginVerifiesTheES256IDTokenWithTheJWKS`（provider）、`TestRevokeSessionNeedsRecentAuthentication`（httpapi/identity）
 - Google 自動連結只在 `email_verified` 為真、email 網域是 `gmail.com` 或帶 `hd`、而且恰好一個存活帳號上有「符合自動連結資格的 Google 身分」（`auto_link_eligible`：Google、已驗證、gmail.com 或帶 `hd`）的 email 相符時發生；比對的是身分的 email，不是 `accounts.email`；LINE 從不自動連結，LINE 的已驗證 email 也不是目標：`TestAutoLinking`、`TestLineVerifiedEmailIsNotAnAutoLinkAnchor`、`TestAutoLinkIgnoresTombstones`、`TestConcurrentFirstLoginsShareOneAccount`、`TestLoginIsAtomic`
 - 登入流程的 `state` 與 App 的 nonce 單次使用，驗證失敗也已作廢，10 分鐘與 5 分鐘逾時；返回網址只收站內相對路徑：`TestLoginFlowIsSingleUse`、`TestLoginFlowRefusesUnsafeReturnPathsAndUnknownProviders`、`TestAppNonceIsSingleUseAndShortLived`
-- 新帳號不授予角色（買家由 buyer 訂閱 `AccountCreated` 建立）：`TestLoginCreatesAnAccountForEachProvider`。Clerk 時期的 `clerk_user_id` UNIQUE 在 Clerk 退場前保留
+- 新帳號不授予角色（買家由 buyer 訂閱 `AccountCreated` 建立）：`TestLoginCreatesAnAccountForEachProvider`
 - 刪帳留下墓碑（登入身分的列保留，同一個身分不會再建帳號）並發出 `AccountDeleted`，不排任何 job；停權不排 job，認證結果帶 `SuspendedAt`、不回錯誤：`TestSuspendedAccountStillAuthenticatesAndCarriesTheSuspensionTime`、`TestDeletionLeavesATombstoneAndKeepsTheLoginIdentity`；`accounts_deleted_check`
 - 停權紀錄與 `suspended_at` 同一個 transaction，未解除的紀錄最多一筆；停權、解除入口只由 `accountsuspension` 呼叫：`TestFailureAfterTheRecordRollsTheRecordBack`、`TestRepeatedSuspendKeepsTheFirstRecord`、arch 的 `TestSuspensionEntriesAreOnlyCalledByAccountsuspension`
 - 帳號生命週期 ACTIVE → PENDING_DELETION → DELETED；等待刪除時 `GrantRole` 回 FailedPrecondition：`TestDeletionPendingRefusesGrantRole`；`accounts_deletion_pending_check`
@@ -135,4 +131,4 @@ schema `identity`（`db/schema.sql`）：
 - 授予、撤銷管理員角色與寫 `admin_role_events` 在同一個 transaction；事件只追加；撤銷在同一個 transaction 內發出 `AdminRoleRevoked`，授予不發：`TestAdminRoleEventsAreAppendOnly`、`TestRevokePublishesAdminRoleRevokedInTheSameTransaction`
 - `AdminAllows` 在呼叫方的 transaction 內以 `FOR SHARE` 讀角色列，與撤銷互相等待：`TestAdminAllowsReadsRolesInsideTheCallersTransaction`
 - 每個請求都讀角色、不快取；零角色沒有任何權限：`TestOwnerPassesEveryCheckAndRevocationTakesEffectOnTheNextRequest`（httpapi/identity）
-- Apple 憑證只在 ID token 與連結時身分相同才保存；身分不符或帳號已刪除才當場撤銷，暫時性失敗不撤銷；刪帳在同一個 transaction 取走 token 並排入撤銷：`TestExchangeRevokesWhenTheCodeBelongsToSomeoneElse`（applerevoke）、`TestAppleTokenIsStoredReplacedAndRevokedOnDeletion`
+

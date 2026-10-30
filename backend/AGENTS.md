@@ -44,7 +44,7 @@ GOWORK=off go test -race ./...  # unit，含依賴方向檢查
 GOWORK=off go test -race -tags integration ./...  # integration，需要 Docker
 make lint-monolith
 make infra-up && make migrate && make serve  # 本機環境（:8080）；make worker 跑 River job
-make dev-token args='-user dev_account_2001'  # 本機登入；管理員用 args='-admin -user dev_ops'
+make dev-token args='-account 2001'  # 本機登入（顧客以帳號 ID 識別；不帶 -account 建立新帳號）；管理員用 args='-admin -user dev_ops'
 make dev-seed  # 重置測試資料（前提見 Makefile 註解）
 make sqlc  # 改 db/schema.sql、objects.sql、queries/ 後
 make jet  # 改 social 的 migration 或擁有者的 pub.sql 後
@@ -55,7 +55,7 @@ make uitext  # 改文案目錄、模組的 text/*.json 或 proto 註解後
 
 營運子命令：`go run ./cmd/hawkr` 不帶參數會列出全部（營運用的需要 `DATABASE_URL`）。搬模組時的工具（`make new-module`、`make new-characterization`、`scripts/characterize.sh`）見遷移計畫。
 
-`GOWORK=off` 確保單體不依賴 `go.work` 裡的舊服務 module。單體的本機設定集中在 `Makefile`；`backend/.env` 只放本機 Clerk development key，與 `CF_ACCESS_*` 互斥。舊服務的整套本機環境是 `./dev.sh`，還沒搬的路徑由單體轉給它的 gateway（:9900）；細節見 `docs/開發規範/單體開發規範.md` §3。
+`GOWORK=off` 確保單體不依賴 `go.work` 裡的舊服務 module。單體的本機設定集中在 `Makefile`；`DEV_AUTH_KEY_FILE`（本機 dev 金鑰）與 `CF_ACCESS_*` 互斥。舊服務的整套本機環境是 `./dev.sh`，還沒搬的路徑由單體轉給它的 gateway（:9900）；細節見 `docs/開發規範/單體開發規範.md` §3。
 
 ## 契約規則（單體與舊服務都適用）
 

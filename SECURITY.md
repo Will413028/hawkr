@@ -23,7 +23,7 @@
 ## 範圍
 
 - 在範圍內：本 repo 的程式碼與設定（`backend/`、`website/`、`admin/`、`buyer-app/`、`seller-app/`、`api/`、`packages/`、`.github/`）。
-- 不在範圍內：第三方服務本身（Clerk、Cloudflare、雲端供應商）的漏洞，請直接回報給該服務；以及需要實體取得設備或社交工程的攻擊。
+- 不在範圍內：第三方服務本身（Google、LINE、Cloudflare、雲端供應商）的漏洞，請直接回報給該服務；以及需要實體取得設備或社交工程的攻擊。
 
 ## 持續的自動檢查
 

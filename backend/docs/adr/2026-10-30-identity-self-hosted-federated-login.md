@@ -63,6 +63,12 @@ Clerk 時期的問題（A7-D19，Will 2026-10-30）：session 期限要付費方
 - 負面：OAuth 的安全細節（mix-up、login CSRF、重放、返回網址）由我們維護，靠步驟 2 的 integration 與 mutation 測試守。部署環境的第一方反代必須原樣傳 3xx 與多個 `Set-Cookie`（步驟 3 驗收）。只用 LINE 登入且拒給 email 的使用者收不到交易 email。
 - 兩支 App 在步驟 6 完成前登不進。
 
+## 已知限制（2026-10-31 補記）
+
+- Google Workspace 的管理員刪除一個使用者之後，同一個地址若再建立新帳號，Google 會給新的 `sub`。D4 對帶 `hd` 的 Google 身分以已驗證 email 自動連結既有帳號，所以新的 `sub` 會自動連到舊帳號，繼承舊帳號的資料與角色。這是信任 `hd`（組織替成員背書 email）的固有結果：我們分辨不出「同一個人」和「同地址的新使用者」。
+- 現況接受這個限制：系統未上線，帶 `hd` 的 Workspace 登入沒有實際使用者；`gmail.com` 的地址由 Google 保證屬於該帳號本人，不受影響。
+- 重新評估的觸發：開放給帶 `hd` 的 Workspace 使用者實際登入，或有使用者回報地址重新發放。屆時的選項：帶 `hd` 的身分不自動連結，只能登入後手動連結；或自動連結改要求使用者在舊帳號的有效 session 內確認。
+
 ## 重新評估的條件
 
 - 要上架 App Store：加回 Sign in with Apple（App Store 審核準則 4.8）。

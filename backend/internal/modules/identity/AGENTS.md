@@ -2,7 +2,7 @@
 
 ## 職責
 
-誰在使用系統：登入的帳號（每個帳號都是買家，賣家是另外申請的角色）與管理員、帳號的角色與狀態。顧客登入與 session 由 Clerk 處理，後台由 Cloudflare Access 保護（ADR `docs/adr/2026-09-27-identity-clerk.md` 含文末修訂）。代行的授權、工作階段、稽核與編排由 delegation 擁有。行為規格的唯一來源是 `docs/modules/identity.md`。
+誰在使用系統：登入的帳號（每個帳號都是買家，賣家是另外申請的角色）與管理員、帳號的角色與狀態。顧客以 Google、LINE 聯合登入，OAuth 流程與 session 由本模組自己做（憑證是存在 Postgres 的 opaque session：web 的 httpOnly `__Host-hk_session` cookie、App 的 Bearer），後台由 Cloudflare Access 保護（ADR `docs/adr/2026-10-30-identity-self-hosted-federated-login.md`、`docs/adr/2026-09-27-identity-opaque-sessions.md`）。代行的授權、工作階段、稽核與編排由 delegation 擁有。行為規格的唯一來源是 `docs/modules/identity.md`。
 
 ## 擁有的資料
 
@@ -31,10 +31,10 @@ schema `identity`（`db/schema.sql`，欄位說明見規格 §9）。讀取模�
 - 買家、賣家的 profile 與業務身分（`buyer_id`、`store_id`）：buyer、seller。identity 只知道帳號有沒有賣家角色，不依賴 buyer 或 seller，也不判斷帳號要不要當買家（買家由 buyer 訂閱 `AccountCreated` 建立）。
 - 舊契約的買家位元（`account_type`、`X-Login-Role`）：`internal/legacy/accounttype` 合成。
 - 代行的授權、工作階段、稽核與編排：delegation。
-- 顧客的登入、登出、session、帳號連結與登入防濫用：Clerk。後台的登入、白名單與 session：Cloudflare Access。cookie、`Authorization` header 與 CSRF：`internal/httpapi`。方法與路由的權限檢查：`internal/httpapi/adminauth`。
+- 後台的登入、白名單與 session：Cloudflare Access。cookie 的讀寫、web 登入的 start／callback 路由、`Authorization` header 與 CSRF：`internal/httpapi`。方法與路由的權限檢查：`internal/httpapi/adminauth`。
 - 視角：本模組不認識（ADR `docs/adr/2026-10-07-connect-without-perspective.md`，規格 §6）。
 - 推播的 device token：notification（過渡期是 notification-service）。
 
 ## 決策紀錄
 
-從 account-service 沿用的每個機制、當時的決定與理由，以及與 account-service 的差異在同目錄的 `CARRYOVER.md`；改動或移除沿用的機制前，先讀那一列。相關 ADR：`docs/adr/2026-09-27-identity-clerk.md`、`docs/adr/2026-10-04-admin-roles.md`、`docs/adr/2026-09-30-account-created-provisions-buyer.md`、`docs/adr/2026-09-30-account-deletion-module.md`。
+從 account-service 沿用的每個機制、當時的決定與理由，以及與 account-service 的差異在同目錄的 `CARRYOVER.md`；改動或移除沿用的機制前，先讀那一列。相關 ADR：`docs/adr/2026-10-30-identity-self-hosted-federated-login.md`、`docs/adr/2026-09-27-identity-opaque-sessions.md`、`docs/adr/2026-10-04-admin-roles.md`、`docs/adr/2026-09-30-account-created-provisions-buyer.md`、`docs/adr/2026-09-30-account-deletion-module.md`。

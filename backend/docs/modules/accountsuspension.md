@@ -21,7 +21,7 @@
 
 - 同樣在呼叫方的 transaction 內，先 `identity.LockAccount` 再 `identity.UnsuspendAccount`。reason 必填（`platform/auditreason`），空白回 InvalidInput。
 - 帳號沒有停權時成功、回傳 `released=false`、不發事件；解除時發 `Unsuspended{AccountID, SuspensionID, Category, ReleasedAt}`。
-- 解除只清資料庫的停權狀態並在紀錄記解除時間與原因。停權不停用 Clerk 使用者，所以解除後下一個請求就恢復。
+- 解除只清資料庫的停權狀態並在紀錄記解除時間與原因。停權不影響登入身分，所以解除後下一個請求就恢復。
 
 ## 4. 鎖與序列化
 

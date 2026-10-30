@@ -9,7 +9,7 @@
 | 沿用的機制 | 必要條件 | 今天是否成立 | 業界在同樣條件下的做法 | 決定 |
 |---|---|---|---|---|
 | TSID／serial／固定方案 ID | 多服務發號 | 不成立，Java BIGINT 仍成立 | row-identity ADR：實體 UUIDv7、關聯自然鍵 | buyer/address IDENTITY；membership UUIDv7；刪帳申請 UUIDv7 由 accountdeletion 擁有；restock 複合自然鍵；plan_code 與關聯複合鍵 |
-| stint 與建立衝突重讀 | 同一帳號關閉後可重新成為買家，需隔離歷史 | 不成立：建帳就是買家（W1），後台只刪賣家或整個帳號（W3），帳號活著 ⇔ 買家活著；刪除的帳號留墓碑，同一 Clerk 使用者不會再建帳號 | 一個聚合一列、以唯一約束保證 | 不再有重新建立：`UNIQUE (account_id)`，建帳事件內單純 INSERT（不授予角色，W5），衝突即錯誤回滾；刪掉登入時的衝突重讀與 CLOSED 重試。status 仍區分 ACTIVE／PENDING_DELETION／CLOSED（等待訂單與 PII 清理需要） |
+| stint 與建立衝突重讀 | 同一帳號關閉後可重新成為買家，需隔離歷史 | 不成立：建帳就是買家（W1），後台只刪賣家或整個帳號（W3），帳號活著 ⇔ 買家活著；刪除的帳號留墓碑，同一個登入身分不會再建帳號 | 一個聚合一列、以唯一約束保證 | 不再有重新建立：`UNIQUE (account_id)`，建帳事件內單純 INSERT（不授予角色，W5），衝突即錯誤回滾；刪掉登入時的衝突重讀與 CLOSED 重試。status 仍區分 ACTIVE／PENDING_DELETION／CLOSED（等待訂單與 PII 清理需要） |
 | account_id 寫入／PII | 一帳號只有一列 | 成立（W3：一個帳號一生一個買家），但 Java 與事件仍以 buyer_id 為業務鍵 | aggregate ID 定位 | 所有業務寫入與清理改用 buyer_id |
 | buyer_id 與 account_id 各自發號 | 買家是 buyer 這個 bounded context 的聚合 | 成立 | 每個 bounded context 擁有自己的 ID；對外看得到的業務 ID 不暴露登入用的 principal ID | 維持各自發號（Will 2026-10-01 W6）：buyer_id 會出現在賣家看得到的地方（粉絲、CRM、訂單），登入用的 account_id 不外流；本機 seed 刻意讓兩者不同（`buyer_id = account_id + 50000`），互換的缺陷才藏不住 |
 | 收藏 Redis set | 跨服務熱點快取 | 未有量測，單體同 DB | 索引直接查 | 移除，複合 PK 查 membership |
@@ -116,7 +116,7 @@ legacy-backlog 的 A3 段裡屬於 buyer 的項目（A3a 步驟 6 對照現行�
 
 | 項目 | 結論 | 依據 |
 |---|---|---|
-| buyer #91：個人資料的「行政區」「個人簡介」顯示儲存成功，但後端沒有欄位 | 仍成立，未修：後端照設計沒有這兩欄（`Profile` 只有暱稱、電話、性別、生日、城市、職業），buyer-app 的編輯頁仍顯示兩欄、儲存時丟棄並提示「已儲存」。已修：Will 2026-10-01 決定拿掉 buyer-app 的兩欄（profile 契約不擴充）；同類的信箱欄（profile 沒有 email，必填卻被丟棄）改成唯讀顯示 Clerk 的登入信箱 | `api/hawkr/buyer/v1alpha1/buyer.proto` 的 `Profile`；`buyer-app/lib/features/settings/presentation/profile_edit_screen.dart`（district 恆為空、sign 不送）；website 的個人資料頁沒有這兩欄 |
+| buyer #91：個人資料的「行政區」「個人簡介」顯示儲存成功，但後端沒有欄位 | 仍成立，未修：後端照設計沒有這兩欄（`Profile` 只有暱稱、電話、性別、生日、城市、職業），buyer-app 的編輯頁仍顯示兩欄、儲存時丟棄並提示「已儲存」。已修：Will 2026-10-01 決定拿掉 buyer-app 的兩欄（profile 契約不擴充）；同類的信箱欄（profile 沒有 email，必填卻被丟棄）改成唯讀顯示登入信箱（2026-10-01 當時由 Clerk 提供） | `api/hawkr/buyer/v1alpha1/buyer.proto` 的 `Profile`；`buyer-app/lib/features/settings/presentation/profile_edit_screen.dart`（district 恆為空、sign 不送）；website 的個人資料頁沒有這兩欄 |
 | #2345：仍用 `account_id` 的位置（buyer 範圍） | 已解決：業務表一律以 `buyer_id` 為鍵，`account_id` 只在 `buyers` 的對應欄（UNIQUE）與「由登入者找自己的買家」的查詢；legacy 事件裡的 `account_id`、`seller_id`、`merchant_id`、`follower_id` 是舊契約定義在帳號空間的欄位，照舊送 | `db/schema.sql`；`db/queries/buyers.sql`；golden `tests/contract/golden/event_payload_keys.json` 的 `identity_spaces`；`internal/httpapi/buyer/buyer_integration_test.go`（讓 buyer_id 與 account_id 不同值）、`internal/legacy/buyerserver/server_integration_test.go` 的 `ResolvePrincipals` |
 | buyer-app L52：封鎖名單頁永遠無法顯示姓名與頭像 | 仍成立，不屬於 buyer：封鎖名單是 social 的資料，`ListBlocks` 只回 `blocked_id`，而它的命名空間是混合的（現任 buyer_id 或 store_id，查無時退回 account_id），補顯示要先在 social 定下被封鎖者的身分，才能用 `buyer.BatchDisplay` 或 seller 補。隨 A7 social（seller-app L54 同一件事） | `services/social-service/db/schema/schema.sql` 的 `user_blocks`；`buyer-app/lib/features/moderation/data/block_model.dart` |
 

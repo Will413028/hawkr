@@ -117,8 +117,8 @@ ssh root@203.0.113.20 \
 ### Phase 6：驗證
 
 ```bash
-# 1. 簽一個買家的 token（本機的 dev 金鑰，不連 Clerk；seed 的帳號是 dev_account_<帳號 ID>）
-TOKEN=$(make -s dev-token args='-user dev_account_<帳號 ID>')
+# 1. 為買家建一個 dev session 並取 token（seed 的帳號 ID 見 backend/infra/seed-data/01-account.sql）
+TOKEN=$(make -s dev-token args='-account <帳號 ID>')
 
 # 2. 真打 dev URL（cert/key 配對正確時應拿到 merchantSession 含 PKCS#7 簽章）
 curl -X POST https://test-api.example.com/api/v1/app/payments/apple_pay/validate_merchant \

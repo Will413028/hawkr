@@ -6,6 +6,8 @@
 
 account-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模組完成的定義」）。對外 API（舊 gateway 的入口與 auth handler）的機制在下一節。代行的沿用盤點在 delegation 的 `CARRYOVER.md`。
 
+**歷史標記：** 本檔下面兩張盤點表與「與 account-service 的差異」中提到 Clerk 或 Apple 登入的列，記錄 2026-09-27 至 2026-10-30 的 Clerk 時期的判斷；Clerk 與 Apple 登入已隨 ADR `docs/adr/2026-10-30-identity-self-hosted-federated-login.md` 移除，那些列保留作決策歷史，不是現況。自建登入之後的盤點在緊接著的「自建登入的沿用盤點」。
+
 | 沿用的機制 | 必要條件 | 今天是否成立 | 業界在同樣條件下的做法 | 決定 |
 |---|---|---|---|---|
 | 每個 provider 各自使用 go-oidc 與遠端 JWKS；未知 kid 觸發抓取 | 多個 issuer 的簽章與 claims 各不相同 | claim policy 不同成立，重複 verifier 與無限抓取不成立 | [RFC 8725 §3](https://www.rfc-editor.org/rfc/rfc8725.html#section-3) 要求限制 alg 並驗證 issuer／audience；[jwx jwt](https://pkg.go.dev/github.com/lestrrat-go/jwx/v3/jwt) 以 key set 與 validator 組裝驗證；遠端快取另加未知 kid 限頻 | jwx/v3 v3.3.0；Clerk 固定 PEM，Access／Google／Apple 用 jwk.Cache，刷新最短一分鐘。RS256、精確 iss、exp／nbf 五秒 leeway、sub；Clerk 必填 authorized parties、可缺 azp、sts 只接受 active |
@@ -63,6 +65,15 @@ account-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 | 錯誤用 `go-pkg/errors` 與業務碼（1303–1310、9701、9702），衝突以 `AuthErrorDetail` 帶出 | 錯誤經 gRPC 回給 gateway | 不成立 | 模組回報錯誤的種類，傳輸層決定狀態碼與 `ErrorReason` | `platform/apperr`，使用者的文字在 `LocalizedMessage`。登入移到 Clerk，`SignIn` 與它的 oneof 隨之刪除，`PHONE_CODE_EXPIRED` 隨驗證碼移除；CodeMeta 裡 identity 的碼（OTP 的 1201–1207、1307–1309、9701、9702）與 `pkg/errors` 的 1303–1310 在四個 client 換成 Connect、account-service 刪除後沒有產生者也沒有消費端，連同 gateway 的 status 對照一起刪除（2026-09-27）。代行的碼（9260–9299）由 delegation 擁有；`AccountType` 在 CodeMeta 標上擁有者 identity，由 `TestBusinessCodesMatchCodeMeta`、`TestLegacyAccountTypeMatchesCodeMeta` 保證投影一致 |
 | 共用套件：zap（`pkg/logger`）、fx、`pkg/sms`、`pkg/crypto`、`pkg/phone`、`pkg/ratelimit` | 多個服務共用 | 不成立 | 標準庫與模組自己的程式 | slog；不用 fx；Clerk、Apple、Google 的 client 放在模組的 `internal/`；AES-GCM 用標準庫；identity 不用 `platform/phone`（手機驗證已刪除；它現在屬於 buyer 的聯絡電話正規化） |
 
+## 自建登入的沿用盤點（ADR `2026-10-30-identity-self-hosted-federated-login.md`）
+
+從 Clerk 改回自建登入時，session 與 `internal/oidc` 兩個機制重新判斷（問題是「從零設計會怎麼做」）。
+
+| 沿用的機制 | 必要條件 | 今天是否成立 | 業界在同樣條件下的做法 | 決定 |
+|---|---|---|---|---|
+| session：opaque token 存 Postgres，只存 SHA-256，撤銷即刪列（恢復 `2026-09-27-identity-opaque-sessions.md` 的 D1–D3；account-service 的 HS256 JWT、refresh 輪替、`revoked_tokens`、`auth_epoch`、Redis 不恢復） | 停權、刪帳、終止單一 session 要下一個請求就生效；web 的長效憑證不讓 JS 讀到；期限由我們決定 | 成立：帳號狀態與角色本來就每個請求讀 DB，多讀一列 session 沒有新增依賴；自簽 JWT 加 refresh 輪替是為了少查庫，這裡不成立 | [OWASP Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)：伺服器端 session、高熵隨機 id、不透明；web 用 httpOnly、Secure 的 cookie | 從零設計也是 opaque session：32 bytes CSPRNG、只存 SHA-256、`__Host-` httpOnly cookie（web）與 Bearer（App）、閒置與絕對逾時、登入一律換發。不做 session 快取，量測顯示 session 讀取是熱路徑瓶頸再加（ADR「重新評估的條件」）。沿用的只有決策與期限，實作是新的 |
+| `internal/oidc`：一個以 Config 帶 issuer、audience、演算法與金鑰來源的 verifier，Access 與 Google、LINE 的 ID token 共用 | 三家的簽章與 claims 不同：Access 與 Google 是遠端 JWKS 的 RS256，LINE 原生 SDK 是 ES256，LINE web 是以 channel secret 簽的 HS256 | 簽章與 claims 的差異成立；重複三份 verifier 與每家各寫一次未知 kid 刷新不成立 | [RFC 8725 §3](https://www.rfc-editor.org/rfc/rfc8725.html#section-3) 限制 alg、驗 issuer 與 audience；[OpenID Connect Core §3.1.3.7](https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation) 的 ID token 驗證（nonce、audience、期限） | 從零設計也是一個 policy 可設定的 verifier；與 Clerk 時期的差異：移除 Clerk 與 Apple 的 policy，LINE web 以 `HMACSecret` 驗 HS256，Google 授權回應另驗 `iss`（[RFC 9207](https://www.rfc-editor.org/rfc/rfc9207.html)），nonce 與 App 的 `azp` 允許清單由 `internal/provider` 在驗簽之後檢查 |
+
 ## 傳輸層的沿用盤點
 
 舊的對外入口是 gateway：全域中介層（`internal/infrastructure/di.go`）、認證（`internal/middleware/auth.go`）與 auth 的 handler（`internal/handler/auth*.go`）。新的入口是單體的 `internal/httpapi`（計畫步驟 3），還沒搬的 REST、SSE 與 WebSocket 由它轉給 gateway。
@@ -94,12 +105,12 @@ account-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 資料沒有搬移（系統從未上線），schema 是新的 baseline；決定的理由在上面兩張沿用盤點表。
 
 - 帳號與管理員的主鍵是 IDENTITY（原本是兩位年份加 8 碼亂數）。帳號與管理員的 ID 對外可列舉：舊 Java 服務仍存成 `BIGINT`，最後一個數字 ID 消費端改寫後以 migration 換成 uuid（ADR `2026-09-25-row-identity-by-data-kind.md`，遷移計畫階段 C）。
-- 登入、登出、session 與帳號連結由 Clerk 處理（ADR `2026-09-27-identity-clerk.md`）：沒有 JWT、refresh token、`revoked_tokens`、`auth_epoch`、`roles_epoch`、Redis，也沒有 OAuth 連結與 1304 的確認。帳號以 `clerk_user_id` 對應，第一個認證過的請求時建立。
+- 登入、登出、session 與帳號連結由本模組處理（ADR `2026-10-30-identity-self-hosted-federated-login.md`）：Google、LINE 聯合登入，憑證是 opaque session；沒有 JWT、refresh token、`revoked_tokens`、`auth_epoch`、`roles_epoch`、Redis，也沒有 1304 的確認。帳號以 `account_identities` 的 `(provider, subject)` 對應，第一次登入時建立。不提供 Sign in with Apple。
 - 角色只存現況（`account_roles`），沒有 bitmask 與授予的歷史；角色只有 `SELLER`（買家不是角色，帳號活著就是買家）。角色、停權與刪除每個請求都從 DB 讀。
 - 新帳號不驗證手機：帳號沒有手機、沒有驗證碼與簡訊（原本一定要驗證手機，簡訊經三竹）。
-- email 是建帳時 Clerk session 的 email claim，只給後台顯示與搜尋，不唯一、不同步。
-- 刪除帳號是一個 transaction：刪角色、清掉 email 只留墓碑（保留 `clerk_user_id`）、排入 job 刪除 Clerk 的使用者，發出 `AccountDeleted`（原本刪除時不刪連結，同一個 Google 身分每次登入都會建一個新帳號）。保存的 Apple refresh token 在同一個 transaction 內取走並排入撤銷。
-- 停權時不停用 Clerk 的使用者；認證帶停權時間。
+- email 是 provider 回報的已驗證 email，每次登入更新，作通知的寄件地址與後台的顯示與搜尋，不唯一、不是識別。
+- 刪除帳號是一個 transaction：刪角色、清掉 email 只留墓碑（登入身分的列保留 provider 與 subject）、刪該帳號全部 session，發出 `AccountDeleted`（原本刪除時不刪連結，同一個 Google 身分每次登入都會建一個新帳號）。
+- 停權刪該帳號全部 session；之後仍可登入，認證帶停權時間。
 - 管理員由 Cloudflare Access 的 Google 登入與 email 白名單開通；單體驗 Access JWT，以 `sub` 建管理員列；沒有密碼登入與 `create-admin`。
 - 賣家 CRM 以手機找顧客（legacy 的 `GetAccountByPhone`）一律回「找不到」；CRM 的手機查詢改查 buyer 自己維護的聯絡電話，A6 隨 crm 接上（A3 決定 10a）。
 - 拿掉：provider 的列出、綁定、解綁；`VerifyPhone`；登出全部裝置；持久化 active role；公開的手機檢查；管理員的密碼登入；後台帳號的 get、suspend、unsuspend、stats 端點（停權留在模組的公開 API）；App Review 的 demo 登入與手機 bypass；`auth_audit_log`；Better Auth 的 schema。
@@ -108,4 +119,4 @@ account-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 
 ## 特性測試
 
-不寫 D4 的特性測試（Will 2026-09-29，比照 content 的退役）：舊的一側 account-service 已刪除，無法以原設定啟動；對外行為也依 ADR `2026-09-27-identity-clerk.md` 刻意改變（登入交給 Clerk，沒有 JWT、refresh 與手機驗證），同一份情境在兩邊不會得到相同結果。行為改由兩份 integration 測試涵蓋：`identity_integration_test.go`（模組：建帳、停權、刪除、墓碑、Apple 憑證連結、保存與撤銷、管理員）與 `internal/httpapi/identity/identity_integration_test.go`（入口：Bearer 與 cookie 的邊界、跨來源寫入、audience 分流、錯誤分流），OAuth 的登入以本機金鑰簽的 token 代替真的 provider。
+不寫 D4 的特性測試（Will 2026-09-29，比照 content 的退役）：舊的一側 account-service 已刪除，無法以原設定啟動；對外行為也依 ADR `2026-10-30-identity-self-hosted-federated-login.md` 刻意改變（聯合登入與 opaque session，沒有 JWT、refresh 與手機驗證），同一份情境在兩邊不會得到相同結果。行為改由兩份 integration 測試涵蓋：`identity_integration_test.go`（模組：登入與建帳、帳號連結、session、停權、刪除、墓碑、管理員）與 `internal/httpapi/identity/identity_integration_test.go`（入口：Bearer 與 cookie 的邊界、跨來源寫入、audience 分流、錯誤分流），OAuth 的登入以假的 provider 端點與本機金鑰簽的 token 代替真的 provider。

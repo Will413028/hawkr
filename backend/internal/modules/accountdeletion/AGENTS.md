@@ -36,7 +36,7 @@ schema `accountdeletion`（`db/schema.sql`）：`deletion_requests`（流程狀�
 ## 不負責
 
 - buyer stint、PII 與收藏等清理：buyer 模組。
-- 帳號的 SELLER 角色與墓碑、Clerk 使用者刪除：identity 模組。
+- 帳號的 SELLER 角色、墓碑與登入 session 的刪除：identity 模組。
 - 訂單狀態的來源：ordering；過渡期由 `internal/legacy/orderservice` 投影 CodeMeta。
 - Connect、legacy consumer 與後台路由：各入口及 `cmd` 組裝。
 

@@ -25,10 +25,10 @@
   |---|---|---|---|
   | `<模組>PublicService` | `hawkr.<模組>.*` | 任何人 | 不需要登入；有帶有效的 token 時 ctx 裡有呼叫者 |
   | `<模組>AppService` | `hawkr.<模組>.*` | 登入的帳號（買家、賣家） | 沒有登入回 `UNAUTHENTICATED`，管理員回 `PERMISSION_DENIED` |
-  | `<模組>InviteeService` | `hawkr.<模組>.*` | 兌換了邀請的供應商（沒有帳號） | 不讀 Clerk 身分；憑證是 service 自己的 interceptor 驗證的 cookie，沒有或無效回 `UNAUTHENTICATED`（見下方 vendor portal 的 session） |
+  | `<模組>InviteeService` | `hawkr.<模組>.*` | 兌換了邀請的供應商（沒有帳號） | 不讀顧客身分；憑證是 service 自己的 interceptor 驗證的 cookie，沒有或無效回 `UNAUTHENTICATED`（見下方 vendor portal 的 session） |
   | `<模組>AdminService` | `hawkr.admin.<模組>.*` | 管理員 | 沒有登入回 `UNAUTHENTICATED`，帳號回 `PERMISSION_DENIED`；管理員的角色不允許該方法宣告的權限（`internal/httpapi/adminauth`，只有 `GetSession`、`SignOut` 豁免）也回 `PERMISSION_DENIED` |
 
-- 單體是對外的入口（遷移計畫 A2）：登入由 Clerk 處理，入口的中介層以 identity 驗證 Clerk 的 session token（四端都以 `Authorization: Bearer` 帶；沒有 Bearer 時讀 web 同源的 `__session` cookie，給瀏覽器直接導覽的下載用；query、`token` header 與其他 scheme 一律不讀），把呼叫者放進 ctx（`rpc.PrincipalFrom`）。決策見 ADR `2026-09-27-identity-clerk.md`。token 無效或帳號停權、刪除時以訪客繼續（cookie 由 Clerk 管理，單體不清），後台的使用者不是允許的帳號時回 `PERMISSION_DENIED`，問不到公鑰、資料庫或 Clerk 時回 `UNAVAILABLE`，不當成訪客。帳號與管理員的 ID 各自發號，呼叫者一定連同類型判斷。
+- 單體是對外的入口（遷移計畫 A2）：登入由 identity 處理（Google、LINE 聯合登入，憑證是 opaque session），入口的中介層以 identity 解析 session token（App 以 `Authorization: Bearer` 帶；web 是同源的 httpOnly cookie `__Host-hk_session`，瀏覽器直接導覽的下載也靠它；兩者都有時以 Bearer 為準，query、`token` header 與其他 scheme 一律不讀；cookie 請求的 CSRF 規則見 ADR D6），把呼叫者放進 ctx（`rpc.PrincipalFrom`）。決策見 ADR `2026-10-30-identity-self-hosted-federated-login.md`。token 無效、逾時或帳號已刪除時以訪客繼續，停權的帳號照樣認證、授權依動作性質（A7-D18），後台的使用者不是允許的帳號時回 `PERMISSION_DENIED`，問不到公鑰或資料庫時回 `UNAVAILABLE`，不當成訪客。帳號與管理員的 ID 各自發號，呼叫者一定連同類型判斷。
 - 角色與視角：每個帳號都是買家（帳號活著就是買家，ADR `2026-09-30-account-created-provisions-buyer`），買家不是角色；角色只有要另外申請的賣家（`Role.ROLE_SELLER`），每個請求從資料庫讀，變更下一個請求就生效。Connect 沒有視角（ADR `2026-10-07-connect-without-perspective`）：Connect 的服務名稱（`BuyerAppService`、`SellerAppService`）本身就表示以哪個身分呼叫（資源被兩種身分共用的模組，例如 social，用 `<模組>AppService`，身分由伺服器依資源歸屬推導，見 ADR `2026-10-07-connect-without-perspective` 文末修訂），client 不送 `X-Active-Role`，伺服器不讀它，`GetSession` 不回視角；「正在看哪個工作區」是 client 的 UI 狀態。只有賣家能做的事，由模組檢查帳號有沒有賣家角色（`Principal.HasRole`），不是授權的另有「視角」。`X-Active-Role`（`BUYER` 或 `SELLER`）只留在舊 REST、SSE、AI chat 與 chat ws-ticket 的送出端：舊 gateway 在同一條路由內以 `X-Login-Role` 選擇以買家或賣家身分動作，`internal/legacy/gatewayproxy` 從轉發的請求讀它、以 `internal/legacy/accounttype.OfLoginRole` 推導（`SELLER` 而且帳號有賣家角色時是賣家，其他情況是買家，管理員沒有）。最後一個讀 loginRole 的 gateway handler 或 IM 消費端退場時，header 與推導一起刪除。
 - service 以外更細的條件（例如只有賣家、只能改自己的資料）在模組裡判斷。
 - 賣家區的能力宣告（ADR `2026-09-29-seller-suspension-and-business-identity-in-monolith.md`；文末修訂：資源被買家與店家共用的模組，其 `AppService` 也可以宣告以店家身分動作時需要的賣家能力，由擁有資料的模組推導身分後再向 seller 檢查，宣告表各 service 一張，下面描述 `SellerAppService` 的做法；沿用 `2026-09-18-seller-capability-authorization.md` 的 D1「宣告＝掛載」）：`SellerAppService` 的每個方法在 `internal/httpapi/seller` 的宣告表（key 是生成的 procedure 常數）宣告需要的賣家能力（`seller.Cap*`），或明列豁免與理由。只掛在這個 service、位在 `rpc.NewInterceptor` 之內的 interceptor 依宣告呼叫 `seller.ActingStore`，把店家放進 ctx；handler 只從 ctx 取店家，不自己呼叫 `ActingStore`。豁免的方法不查店家，也不要求賣家角色（例如申請開店）。啟動時以 service descriptor 雙向對照宣告表，方法缺宣告或宣告指向不存在的方法，`NewHandler` 回錯誤。能力由 `seller.CapabilitiesOf` 推導：生命週期、停權與前置條件（物流建店要 KYC 流程核准），`GetMyStore.capabilities` 回報每個能力的 `{active, missing}`（`missing` 是 `SellerRequirement`），狀態 `PUBLIC_LISTING`（買家看得到店面）只出現在那裡，方法不能宣告它。停權的拒絕是 `permission_denied`，`ErrorInfo.reason` 是 `SELLER_SUSPENDED`；其他前置條件沒有滿足（等待刪除、KYC 未核准）是 `failed_precondition`，`ErrorInfo.reason` 是 `SELLER_REQUIREMENT_MISSING`，metadata 的 `missingRequirements` 是缺的條件（`SellerRequirement` 的值名，不加前綴，依列舉的數字由小到大以逗號連接，例如 `KYC_APPROVED,NOT_PENDING_DELETION`）。
@@ -50,7 +50,7 @@
 
   gateway 信任它們的前提是只有單體連得到 gateway。gateway 與舊服務不會部署（後端 CD 以遷移完成後的單一 image 為對象），這個前提只在本機與 CI 成立；「只有入口連得到 gateway、入口刪掉 client 帶的身分 header」仍列在 CD 的待辦，以防順序改變。
 
-- **vendor portal 的 session**（ADR `2026-10-03-vendor-portal-invite-scoped-access.md` 2026-10-04 兩次修訂）：供應商沒有帳號，憑 `VendorPortalPublicService.ExchangeInvite` 設定的 cookie 進入，不經 Clerk，也不是 ctx 裡的呼叫者（`rpc.PrincipalFrom`）（`rpc.Credential` 不變）。瀏覽器可以同時持有多張邀請的 cookie，每個以 cookie 認證的請求都指名要用哪一張。
+- **vendor portal 的 session**（ADR `2026-10-03-vendor-portal-invite-scoped-access.md` 2026-10-04 兩次修訂）：供應商沒有帳號，憑 `VendorPortalPublicService.ExchangeInvite` 設定的 cookie 進入，不經顧客登入，也不是 ctx 裡的呼叫者（`rpc.PrincipalFrom`）（`rpc.Credential` 不變）。瀏覽器可以同時持有多張邀請的 cookie，每個以 cookie 認證的請求都指名要用哪一張。
 
   | 項目 | 值 |
   |---|---|
@@ -169,8 +169,8 @@
   | （interceptor）沒有身分 | `unauthenticated` | `LocalizedMessage` |
   | （interceptor）身分不符 | `permission_denied` | `LocalizedMessage` |
 
-- 入口的中介層在 interceptor 之前擋下的請求（限流、認證時問不到資料庫或 Clerk、不是允許的後台帳號）由 connect-go 的 `ErrorWriter` 寫出 Connect 的錯誤（`rpc.RetryLater`、`rpc.UserError`），不帶 `ErrorInfo`。
-- client（四端相同）：`canceled` 不處理；方法可安全重送（`NO_SIDE_EFFECTS`、`IDEMPOTENT` 或帶 `request_id`）且錯誤可重試（`unavailable`、沒收到回應的傳輸失敗、帶 `RetryInfo` 的 `resource_exhausted`）才自動重試；`unauthenticated` 回到登入（token 的更新由 Clerk 的 SDK 處理，ADR `2026-09-27-identity-clerk.md`）；認得的 reason 走它的流程；有 `BadRequest` 就標在欄位；其他顯示 `LocalizedMessage`，沒有就顯示該 code 的預設文字。
+- 入口的中介層在 interceptor 之前擋下的請求（限流、認證時問不到資料庫、不是允許的後台帳號）由 connect-go 的 `ErrorWriter` 寫出 Connect 的錯誤（`rpc.RetryLater`、`rpc.UserError`），不帶 `ErrorInfo`。
+- client（四端相同）：`canceled` 不處理；方法可安全重送（`NO_SIDE_EFFECTS`、`IDEMPOTENT` 或帶 `request_id`）且錯誤可重試（`unavailable`、沒收到回應的傳輸失敗、帶 `RetryInfo` 的 `resource_exhausted`）才自動重試；`unauthenticated` 回到登入（session 由伺服器發放與撤銷，ADR `2026-10-30-identity-self-hosted-federated-login.md`）；認得的 reason 走它的流程；有 `BadRequest` 就標在欄位；其他顯示 `LocalizedMessage`，沒有就顯示該 code 的預設文字。
 
 ## 九、讀取與快取
 

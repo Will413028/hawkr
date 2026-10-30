@@ -1070,7 +1070,7 @@ invoice-service 的 seller template 一律 `store_id`／`identity_migrated=true`
 
 ### 12.2 退休 buyer stint 的收件匣歸宿
 
-一個帳號一生只有一個買家（`UNIQUE (account_id)`）；帳號刪除時同一個 transaction 關閉買家並清除關聯資料，刪除後的帳號留墓碑，同一個 Clerk 使用者不會再建帳號（`docs/modules/buyer.md` §2、`docs/modules/identity.md`）。使用者之後以新的帳號註冊，得到新的 `buyer_id`，是完全全新開始（含過去訂單／售後依據／評論在新身份下不可見）。本節是這條規則在通知領域的落地方式。
+一個帳號一生只有一個買家（`UNIQUE (account_id)`）；帳號刪除時同一個 transaction 關閉買家並清除關聯資料，刪除後的帳號留墓碑，同一個登入身分不會再建帳號（`docs/modules/buyer.md` §2、`docs/modules/identity.md`）。使用者之後以新的帳號註冊，得到新的 `buyer_id`，是完全全新開始（含過去訂單／售後依據／評論在新身份下不可見）。本節是這條規則在通知領域的落地方式。
 
 | 問題 | 本設計的答案 | 依據 |
 |---|---|---|

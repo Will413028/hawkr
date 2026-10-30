@@ -27,13 +27,13 @@ make worker              # River job 與 legacy 事件轉送；驗事件時必�
 ## 2. 取得身分
 
 ```bash
-TOKEN=$(make -s dev-token args='-user dev_account_2001')   # seed 的買家
-make -s dev-token args='-user dev_account_9'               # seed 的賣家
+TOKEN=$(make -s dev-token args='-account 2001')   # seed 的買家（為既有帳號建 App 種類的 session）
+make -s dev-token args='-account 9'               # seed 的賣家
 make -s dev-token args='-admin -user dev_ops'              # 後台
 ```
 
 - seed 帳號在 `infra/seed-data/01-account.sql`，帳號 ID 與 `buyer_id`、`store_id` 刻意不同（`buyer_id = account_id + 50000`）。驗身分時用這些帳號，兩個 ID 空間互換的缺陷才藏不住。
-- 需要全新帳號時用新的 `-user dev_<名稱>`：帳號在第一個請求時建立，不會動到其他測試資料。
+- 需要全新帳號時不帶 `-account`（`make -s dev-token`）：建立一個沒有登入身分的新帳號，ID 印到 stderr，不會動到其他測試資料。帳號 ID 不存在是錯誤，不會默默建立。
 - 驗證產生的資料用可辨識的前綴（店名、備註），驗完清掉；不要沿用前一輪留下的帳號或資料 ID。
 - token 是本機金鑰簽的，不要貼進 commit、issue 或 log。
 
