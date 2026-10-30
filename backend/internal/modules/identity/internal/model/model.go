@@ -350,3 +350,100 @@ type AccessConfig struct {
 
 // ErrRejected 表示 provider 拒絕請求，且重試不會成功。
 var ErrRejected = errors.New("identity：provider 拒絕，重試不會成功")
+
+// Provider 是聯合登入的 provider。值等於 account_identities.provider 與 login_flows.provider 的 CHECK
+// （TestCodeValueChecksMatchTheGoTypes）；沒有 UNKNOWN 或空字串這種值。
+type Provider string
+
+const (
+	ProviderGoogle Provider = "GOOGLE"
+	ProviderLine   Provider = "LINE"
+)
+
+// ProviderValues 回傳所有登入 provider。
+func ProviderValues() []Provider { return []Provider{ProviderGoogle, ProviderLine} }
+
+// Valid 回報 p 是不是已知的 provider。
+func (p Provider) Valid() bool { return slices.Contains(ProviderValues(), p) }
+
+// ClientKind 是 session 的 client 種類，決定閒置逾時。值等於 sessions.client 的 CHECK。
+type ClientKind string
+
+const (
+	ClientWeb ClientKind = "WEB"
+	ClientApp ClientKind = "APP"
+)
+
+// ClientKinds 回傳所有 client 種類。
+func ClientKinds() []ClientKind { return []ClientKind{ClientWeb, ClientApp} }
+
+// Valid 回報 c 是不是已知的 client 種類。
+func (c ClientKind) Valid() bool { return slices.Contains(ClientKinds(), c) }
+
+// ProviderIdentity 是 provider 驗證後回報的身分。Email 為空表示 provider 沒有給（LINE）；EmailVerified 只在 provider 保證
+// 這個 email 已驗證時為真。HostedDomain 是 Google 的 hd claim（Workspace 網域），沒有時是空字串。
+type ProviderIdentity struct {
+	Provider      Provider
+	Subject       string
+	Email         string
+	EmailVerified bool
+	HostedDomain  string
+	// Name 是姓名，只給新帳號的 AccountCreated；沒有時是空字串。
+	Name string
+}
+
+// LoginInput 是以 provider 身分登入的輸入。
+type LoginInput struct {
+	Identity ProviderIdentity
+	Client   ClientKind
+	// PreviousToken 是這個請求帶來的登入前 session token（沒有時是空字串）；登入換發新 session 時一併刪除它（防 session fixation）。
+	PreviousToken string
+}
+
+// LoginResult 是登入的結果。Token 是新 session 的原文 token，只在這裡出現一次。
+type LoginResult struct {
+	Token     string
+	SessionID uuid.UUID
+	AccountID int64
+	// Created 是這次登入建立了新帳號；Linked 是這次依規則自動連結到既有帳號。
+	Created bool
+	Linked  bool
+}
+
+// SessionInfo 是一個 session 的資料（沒有 token）。
+type SessionInfo struct {
+	ID                uuid.UUID
+	AccountID         int64
+	Client            ClientKind
+	CreatedAt         time.Time
+	LastUsedAt        time.Time
+	AbsoluteExpiresAt time.Time
+	// AuthTime 是最近一次以 provider 驗證的時間。
+	AuthTime time.Time
+}
+
+// LoginFlowInput 是 web 登入流程 start 的輸入。
+type LoginFlowInput struct {
+	Provider   Provider
+	ReturnPath string
+	// LinkAccountID 不是 nil 時，這是已登入帳號發起的手動連結。
+	LinkAccountID *int64
+}
+
+// LoginFlowStart 是 start 要交給 provider 與瀏覽器的值，都是原文且只回傳這一次：State、Nonce 與 CodeVerifier 進授權網址
+// （CodeVerifier 轉成 S256 challenge），Binding 設成登入前 cookie。
+type LoginFlowStart struct {
+	State        string
+	Nonce        string
+	CodeVerifier string
+	Binding      string
+}
+
+// LoginFlow 是 callback 取出的登入流程。
+type LoginFlow struct {
+	Provider      Provider
+	CodeVerifier  string
+	Nonce         string
+	ReturnPath    string
+	LinkAccountID *int64
+}

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -193,34 +194,55 @@ func newIdentity(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, c identityConfig, 
 	})
 }
 
-// runDevToken 以本機的金鑰（DEV_AUTH_KEY_FILE）簽一個 dev token 並印出：本機開發與特性測試的登入方法，不連 Clerk。
-// serve 設了同一個 DEV_AUTH_KEY_FILE 才接受它；帳號或管理員在第一個請求時建立。
+// runDevToken 印出本機開發與特性測試的登入 token，不連任何外部 provider：
 //
-//	hawkr dev-token [-admin] [-user dev_<名稱>]（效期 24 小時）
-func runDevToken(args []string, out io.Writer) error {
+//   - 顧客：在資料庫建一個 dev session（App 種類，帳號沒有時建立，同 serve 一樣建立買家）並印出原文 token；需要 DATABASE_URL，
+//     而且 requireDevEnvironment 成立（DEV_AUTH_KEY_FILE 指向本機的 dev 金鑰，沒有正式的 Access 設定）。session 的效期同正式 session。
+//
+//   - 後台（-admin）：以 DEV_AUTH_KEY_FILE 的金鑰簽 24 小時的 JWT，serve 設了同一個 DEV_AUTH_KEY_FILE 才接受它，管理員在第一個請求時建立。
+//
+//     hawkr dev-token [-admin] [-user dev_<名稱>]
+func runDevToken(ctx context.Context, args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("dev-token", flag.ContinueOnError)
 	admin := fs.Bool("admin", false, "簽後台的 token（否則是買家、賣家的）")
 	user := fs.String("user", "dev_buyer", "使用者的 ID，以 dev_ 開頭；本機 seed 的帳號是 dev_account_<帳號 ID>")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	path := os.Getenv("DEV_AUTH_KEY_FILE")
-	if path == "" {
-		return errors.New("沒有設定 DEV_AUTH_KEY_FILE（make dev-key 產生）")
+	e := config.NewEnv()
+	if err := requireDevEnvironment(e); err != nil {
+		return err
 	}
-	key, err := readDevKey(path)
-	if err != nil {
-		return fmt.Errorf("DEV_AUTH_KEY_FILE：%w", err)
+	if *admin {
+		key, err := readDevKey(e.StringOr("DEV_AUTH_KEY_FILE", ""))
+		if err != nil {
+			return fmt.Errorf("DEV_AUTH_KEY_FILE：%w", err)
+		}
+		dev, err := identity.NewDevAuth(key)
+		if err != nil {
+			return err
+		}
+		tok, err := dev.AdminToken(*user)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintln(out, tok)
+		return err
 	}
-	dev, err := identity.NewDevAuth(key)
+	dbc := dbConfig(e)
+	if err := e.Err(); err != nil {
+		return err
+	}
+	d, err := db.Open(ctx, dbc)
 	if err != nil {
 		return err
 	}
-	sign := dev.CustomerToken
-	if *admin {
-		sign = dev.AdminToken
-	}
-	tok, err := sign(*user)
+	defer d.Close()
+	log := newLogger()
+	bus := events.NewBus()
+	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
+	subscribeBuyerLifecycle(bus, buyers)
+	tok, err := identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log}).DevSession(ctx, *user)
 	if err != nil {
 		return err
 	}

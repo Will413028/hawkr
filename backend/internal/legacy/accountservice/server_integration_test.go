@@ -100,7 +100,7 @@ func setup(t *testing.T) *fixture {
 func (f *fixture) account(t *testing.T, roles ...identity.Role) int64 {
 	t.Helper()
 	ctx := context.Background()
-	tok, err := f.dev.CustomerToken("dev_" + uuid.NewV7().String())
+	tok, err := f.m.DevSession(ctx, "dev_"+uuid.NewV7().String())
 	if err != nil {
 		t.Fatal(err)
 	}

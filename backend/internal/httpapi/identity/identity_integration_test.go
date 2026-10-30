@@ -141,7 +141,7 @@ func headers(kv ...string) connect.ClientOption {
 
 func (f *fixture) customerToken(t *testing.T, user string) string {
 	t.Helper()
-	tok, err := f.dev.CustomerToken(user)
+	tok, err := f.m.DevSession(t.Context(), user)
 	if err != nil {
 		t.Fatal(err)
 	}

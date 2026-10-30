@@ -3,7 +3,7 @@
 //	serve        對外 HTTP API（入口：還沒搬的路徑轉給 gateway）
 //	worker       執行非同步 job（River）
 //	migrate      套用資料庫 migration（部署時在 serve、worker 之前執行）
-//	dev-token    本機開發用：以本機的金鑰簽一個 dev token，不連 Clerk（見 identity.go）
+//	dev-token    本機開發用：顧客在資料庫建 dev session、後台以本機的金鑰簽 JWT，不連外部 provider（見 identity.go）
 //	delegation-eligibility 開通或撤回管理員的代行資格
 //	admin-role   授予或撤銷管理員的角色（必填理由，寫入 identity.admin_role_events）
 //	social-recount 對全部可重算的社群計數跑重算與覆寫，印出漂移（手動全量重算）
@@ -96,7 +96,7 @@ func run(ctx context.Context, args []string) error {
 	case "migrate":
 		return runMigrate(ctx)
 	case "dev-token":
-		return runDevToken(args[1:], os.Stdout)
+		return runDevToken(ctx, args[1:], os.Stdout)
 	case "dev-seed":
 		return runDevSeed(ctx, args[1:], os.Stdout)
 	case "reannounce-exposures":

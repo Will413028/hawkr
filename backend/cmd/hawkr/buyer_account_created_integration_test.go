@@ -4,11 +4,8 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"io"
 	"log/slog"
-	"strings"
 	"testing"
 	"time"
 
@@ -20,15 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
 
-type accountCreatedClerk struct{}
-
-func (accountCreatedClerk) Issuer() string          { return "https://clerk.account-created.test" }
-func (accountCreatedClerk) OwnsUser(id string) bool { return strings.HasPrefix(id, "user_") }
-func (accountCreatedClerk) Verify(_ context.Context, _ string) (identity.ClerkIdentity, error) {
-	return identity.ClerkIdentity{Subject: "user_created", Name: "新買家"}, nil
-}
-func (accountCreatedClerk) DeleteUser(context.Context, string) error { return nil }
-
 func TestAccountCreationProvisionsBuyerInSameTransaction(t *testing.T) {
 	ctx := context.Background()
 	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(migrate.Module{Name: "identity", Dir: identity.Migrations()}, migrate.Module{Name: "buyer", Dir: buyer.Migrations()}))
@@ -39,12 +27,17 @@ func TestAccountCreationProvisionsBuyerInSameTransaction(t *testing.T) {
 	bus := events.NewBus()
 	clock := func() time.Time { return time.Date(2026, 9, 30, 0, 0, 0, 0, time.UTC) }
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	accounts := identity.New(identity.Deps{DB: d, Events: bus, Jobs: queue, Providers: identity.Providers{Customers: []identity.Clerk{accountCreatedClerk{}}}, Now: clock, Logger: logger})
+	accounts := identity.New(identity.Deps{DB: d, Events: bus, Jobs: queue, Now: clock, Logger: logger})
 	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: queue, Now: clock, Logger: logger})
 	subscribeBuyerLifecycle(bus, buyers)
-	claims, _ := json.Marshal(map[string]string{"iss": accountCreatedClerk{}.Issuer(), "sub": "user_created"})
-	token := "e30." + base64.RawURLEncoding.EncodeToString(claims) + ".sig"
-	authenticated, err := accounts.Authenticate(ctx, token)
+	login, err := accounts.Login(ctx, identity.LoginInput{
+		Identity: identity.ProviderIdentity{Provider: identity.ProviderGoogle, Subject: "google-created", Name: "新買家"},
+		Client:   identity.ClientApp,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	authenticated, err := accounts.Authenticate(ctx, login.Token)
 	if err != nil {
 		t.Fatal(err)
 	}

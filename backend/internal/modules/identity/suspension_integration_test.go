@@ -99,7 +99,7 @@ func TestUnsuspendClearsTheStateAndKeepsTheRecord(t *testing.T) {
 	if _, ok, err := f.m.CurrentSuspension(ctx, id); err != nil || ok {
 		t.Fatalf("解除後 CurrentSuspension = %v, %v", ok, err)
 	}
-	if _, err := f.m.Authenticate(ctx, token(customerIssuer, "user_1")); err != nil {
+	if _, err := f.authenticate(t, "user_1"); err != nil {
 		t.Fatalf("解除後帳號不能使用：%v", err)
 	}
 	if all, open := f.suspensionRows(t, id); all != 1 || open != 0 {

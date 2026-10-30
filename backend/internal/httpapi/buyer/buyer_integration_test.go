@@ -167,10 +167,6 @@ func setup(t *testing.T) *fixture {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	bus := events.NewBus()
 	id := identity.New(identity.Deps{DB: d, Events: bus, Jobs: queue, Providers: identity.Providers{Customers: []identity.Clerk{dev.Customers()}, Admin: dev.Admins()}, Now: time.Now, Logger: log})
-	buyerToken, err := dev.CustomerToken("dev_buyer_connect")
-	if err != nil {
-		t.Fatal(err)
-	}
 	adminToken, err := dev.AdminToken("dev_admin_connect")
 	if err != nil {
 		t.Fatal(err)
@@ -184,6 +180,10 @@ func setup(t *testing.T) *fixture {
 	}
 	m := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log})
 	events.Subscribe(bus, m.OnAccountCreated)
+	buyerToken, err := id.DevSession(ctx, "dev_buyer_connect")
+	if err != nil {
+		t.Fatal(err)
+	}
 	authenticated, err := id.Authenticate(ctx, buyerToken)
 	if err != nil {
 		t.Fatal(err)
@@ -281,7 +281,7 @@ func TestConnectAuthorization(t *testing.T) {
 	accountAsAdmin := adminconnect.NewBuyerAdminServiceClient(f.http, f.base, clientOptions(f.buyerToken)...)
 	_, err = accountAsAdmin.GetBuyerStats(ctx, connect.NewRequest(&adminpb.GetBuyerStatsRequest{}))
 	wantCode(t, err, connect.CodePermissionDenied, "")
-	bareToken, err := f.dev.CustomerToken("dev_no_buyer")
+	bareToken, err := f.id.DevSession(ctx, "dev_no_buyer")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -440,7 +440,7 @@ func TestConnectAddressOwnershipAndPaging(t *testing.T) {
 	if token != "" || len(map[string]bool{got[0]: true, got[1]: true, got[2]: true}) != 3 {
 		t.Fatalf("paging=%v token=%q", got, token)
 	}
-	otherToken, err := f.dev.CustomerToken("dev_other_buyer")
+	otherToken, err := f.id.DevSession(ctx, "dev_other_buyer")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -761,7 +761,7 @@ func TestFollowStoreRejectsAStoreThatIsNotPubliclyExposable(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	f.stores.current = f.seller
-	ownerToken, err := f.dev.CustomerToken("dev_unfinished_store_owner")
+	ownerToken, err := f.id.DevSession(ctx, "dev_unfinished_store_owner")
 	if err != nil {
 		t.Fatal(err)
 	}

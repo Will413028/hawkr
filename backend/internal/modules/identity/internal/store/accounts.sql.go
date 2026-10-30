@@ -60,6 +60,34 @@ func (q *Queries) DeleteAccount(ctx context.Context, arg DeleteAccountParams) (i
 	return result.RowsAffected(), nil
 }
 
+const findLiveAccountIDsByEmail = `-- name: FindLiveAccountIDsByEmail :many
+SELECT id FROM identity.accounts
+WHERE deleted_at IS NULL AND lower(email) = lower($1::text)
+ORDER BY id
+LIMIT 2
+`
+
+// 自動連結的候選：存活帳號裡，寄件地址（只由已驗證 email 寫入）等於 email 的帳號，最多回 2 筆，讓呼叫方分辨「唯一」與「不唯一」。
+func (q *Queries) FindLiveAccountIDsByEmail(ctx context.Context, email string) ([]int64, error) {
+	rows, err := q.db.Query(ctx, findLiveAccountIDsByEmail, email)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAccount = `-- name: GetAccount :one
 SELECT id, clerk_user_id, email, suspended_at, deleted_at, deletion_pending_at, created_at, updated_at FROM identity.accounts WHERE id = $1
 `
@@ -122,7 +150,7 @@ RETURNING id
 `
 
 type InsertAccountParams struct {
-	ClerkUserID string
+	ClerkUserID *string
 	Email       *string
 	Now         time.Time
 }
@@ -130,6 +158,25 @@ type InsertAccountParams struct {
 // 第一個認證過的請求時建立帳號。同一個 Clerk 使用者同時的第一個請求由 UNIQUE 收斂：沒有列回傳時呼叫方重讀。
 func (q *Queries) InsertAccount(ctx context.Context, arg InsertAccountParams) (int64, error) {
 	row := q.db.QueryRow(ctx, insertAccount, arg.ClerkUserID, arg.Email, arg.Now)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
+const insertFederatedAccount = `-- name: InsertFederatedAccount :one
+INSERT INTO identity.accounts (email, created_at, updated_at)
+VALUES ($1, $2, $2)
+RETURNING id
+`
+
+type InsertFederatedAccountParams struct {
+	Email *string
+	Now   time.Time
+}
+
+// 自建登入的新帳號：沒有 clerk_user_id。email 是 provider 回報的已驗證 email（沒有時 NULL）。
+func (q *Queries) InsertFederatedAccount(ctx context.Context, arg InsertFederatedAccountParams) (int64, error) {
+	row := q.db.QueryRow(ctx, insertFederatedAccount, arg.Email, arg.Now)
 	var id int64
 	err := row.Scan(&id)
 	return id, err
@@ -257,7 +304,7 @@ type ResolveAccountRow struct {
 }
 
 // 認證：Clerk 使用者對應的帳號、狀態與目前的角色（依字母排序）。含墓碑：刪除的帳號不得再建一個。
-func (q *Queries) ResolveAccount(ctx context.Context, clerkUserID string) (ResolveAccountRow, error) {
+func (q *Queries) ResolveAccount(ctx context.Context, clerkUserID *string) (ResolveAccountRow, error) {
 	row := q.db.QueryRow(ctx, resolveAccount, clerkUserID)
 	var i ResolveAccountRow
 	err := row.Scan(
@@ -303,6 +350,27 @@ type UnsuspendAccountParams struct {
 // 沒有停權時沒有列被更新（冪等）。
 func (q *Queries) UnsuspendAccount(ctx context.Context, arg UnsuspendAccountParams) (int64, error) {
 	result, err := q.db.Exec(ctx, unsuspendAccount, arg.Now, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateAccountEmail = `-- name: UpdateAccountEmail :execrows
+UPDATE identity.accounts
+SET email = $1, updated_at = $2::timestamptz
+WHERE id = $3 AND deleted_at IS NULL AND email IS DISTINCT FROM $1
+`
+
+type UpdateAccountEmailParams struct {
+	Email *string
+	Now   time.Time
+	ID    int64
+}
+
+// 登入時以已驗證 email 更新寄件地址（ADR 2026-10-30-identity-self-hosted-federated-login D4）；墓碑不更新。
+func (q *Queries) UpdateAccountEmail(ctx context.Context, arg UpdateAccountEmailParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateAccountEmail, arg.Email, arg.Now, arg.ID)
 	if err != nil {
 		return 0, err
 	}

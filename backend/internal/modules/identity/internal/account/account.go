@@ -196,7 +196,7 @@ func (m *Service) isDeleted(ctx context.Context, q *store.Queries, id int64) (bo
 	return a.DeletedAt != nil, nil
 }
 
-// SuspendAccount 永久停權帳號：同一個 transaction 寫停權紀錄與 accounts.suspended_at。不停用 Clerk 的使用者：停權者仍能登入，
+// SuspendAccount 永久停權帳號：同一個 transaction 寫停權紀錄與 accounts.suspended_at，並刪除該帳號全部的 session。停權者仍能重新登入，
 // 能做什麼由入口依動作的性質決定（A7-D17、A7-D18）。已經停權時不寫第二筆紀錄、不改理由，回傳原本的紀錄與 created=false。紀錄寫入失敗時
 // 整個 transaction 回滾，suspended_at 不變。
 func (m *Service) SuspendAccount(ctx context.Context, in model.SuspendInput) (rec model.AccountSuspension, created bool, err error) {
@@ -226,6 +226,9 @@ func (m *Service) SuspendAccount(ctx context.Context, in model.SuspendInput) (re
 		}
 		if _, err := q.SuspendAccount(ctx, store.SuspendAccountParams{ID: in.AccountID, Now: now}); err != nil {
 			return fmt.Errorf("identity：停權：%w", err)
+		}
+		if _, err := q.DeleteSessionsOfAccount(ctx, in.AccountID); err != nil {
+			return fmt.Errorf("identity：停權時刪除 session：%w", err)
 		}
 		rec, created = suspensionOf(inserted), true
 		return nil
@@ -344,8 +347,8 @@ func (m *Service) DeleteAccount(ctx context.Context, accountID int64) error {
 	})
 }
 
-// deleteAccount 在呼叫方的 transaction 內刪除已鎖定的帳號：解除未解除的停權紀錄（release_reason 為 ACCOUNT_DELETED），刪角色，帳號只留沒有個資的墓碑（保留 clerk_user_id，
-// 同一個 Clerk 使用者不會再建一個帳號），排入 job 刪除 Clerk 的使用者，並發出 AccountDeleted。帳號保存的 Sign in with Apple
+// deleteAccount 在呼叫方的 transaction 內刪除已鎖定的帳號：解除未解除的停權紀錄（release_reason 為 ACCOUNT_DELETED），刪角色、全部 session 與登入身分，帳號只留沒有個資的墓碑（保留 clerk_user_id，
+// 同一個 Clerk 使用者不會再建一個帳號），有 Clerk 使用者的排入 job 刪除它，並發出 AccountDeleted。帳號保存的 Sign in with Apple
 // refresh token 在同一個 transaction 內取走並排入撤銷的 job（Clerk 不會代為撤銷）；所有刪除路徑都經過這裡。
 func (m *Service) deleteAccount(ctx context.Context, q *store.Queries, a store.IdentityAccount) error {
 	now := m.d.Now()
@@ -361,8 +364,16 @@ func (m *Service) deleteAccount(ctx context.Context, q *store.Queries, a store.I
 	if _, err := q.DeleteAccount(ctx, store.DeleteAccountParams{ID: a.ID, Now: now}); err != nil {
 		return fmt.Errorf("identity：刪除帳號：%w", err)
 	}
-	if err := m.enqueueClerkUserJob(ctx, clerkUserActionDelete, a.ClerkUserID); err != nil {
-		return err
+	if _, err := q.DeleteSessionsOfAccount(ctx, a.ID); err != nil {
+		return fmt.Errorf("identity：刪除 session：%w", err)
+	}
+	if err := q.DeleteIdentitiesOfAccount(ctx, a.ID); err != nil {
+		return fmt.Errorf("identity：刪除登入身分：%w", err)
+	}
+	if a.ClerkUserID != nil {
+		if err := m.enqueueClerkUserJob(ctx, clerkUserActionDelete, *a.ClerkUserID); err != nil {
+			return err
+		}
 	}
 	if err := m.d.AppleRevoker.RevokeStored(ctx, a.ID); err != nil {
 		return err
@@ -396,7 +407,7 @@ func (m *Service) CreateForClerk(ctx context.Context, userID, email, name string
 	err = m.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := m.q(ctx)
 		var insertErr error
-		id, insertErr = q.InsertAccount(ctx, store.InsertAccountParams{ClerkUserID: userID, Email: nonEmpty(email), Now: m.d.Now()})
+		id, insertErr = q.InsertAccount(ctx, store.InsertAccountParams{ClerkUserID: &userID, Email: nonEmpty(email), Now: m.d.Now()})
 		if errors.Is(insertErr, pgx.ErrNoRows) {
 			return nil
 		}
@@ -417,3 +428,25 @@ func nonEmpty(s string) *string {
 }
 
 func (m *Service) q(ctx context.Context) *store.Queries { return store.New(m.d.DB.Conn(ctx)) }
+
+// EnsureDevAccount 回傳 dev 使用者（user 是 clerk_user_id 的位置，本機 seed 的帳號是 dev_account_<ID>）對應的帳號 ID，沒有時建立
+// （發出 AccountCreated）。只給本機 dev token 與測試；已刪除的帳號回 Unauthenticated。
+func (m *Service) EnsureDevAccount(ctx context.Context, user string) (int64, error) {
+	q := m.q(ctx)
+	for range 2 {
+		row, err := q.ResolveAccount(ctx, &user)
+		switch {
+		case err == nil:
+			if row.DeletedAt != nil {
+				return 0, apperr.Unauthenticated("dev 帳號 %s 已刪除", user)
+			}
+			return row.ID, nil
+		case !errors.Is(err, pgx.ErrNoRows):
+			return 0, fmt.Errorf("identity：讀取 dev 帳號：%w", err)
+		}
+		if _, _, err := m.CreateForClerk(ctx, user, user+"@dev.localhost", user); err != nil {
+			return 0, err
+		}
+	}
+	return 0, fmt.Errorf("identity：建立 dev 帳號 %s 後仍讀不到", user)
+}

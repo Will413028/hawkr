@@ -27,7 +27,7 @@ CREATE SCHEMA identity;
 -- 之後在 Clerk 改了 email 也不同步。
 CREATE TABLE identity.accounts (
     id            BIGINT       GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    clerk_user_id TEXT         NOT NULL,
+    clerk_user_id TEXT,
     email         TEXT,
     suspended_at  TIMESTAMPTZ,
     deleted_at    TIMESTAMPTZ,
@@ -41,6 +41,87 @@ CREATE TABLE identity.accounts (
 );
 
 CREATE UNIQUE INDEX uidx_accounts_clerk_user_id ON identity.accounts (clerk_user_id);
+
+-- 自建登入（ADR 2026-10-30-identity-self-hosted-federated-login）建立的帳號沒有 clerk_user_id：欄位在 Clerk 退場前是 NULL 可多筆
+-- 的過渡（UNIQUE 對 NULL 不衝突），由 account_identities 識別；Clerk 退場時整欄與索引一起刪除。
+
+-- 帳號連結的 provider 身分（D1、D4）：(provider, subject) 是識別，同一個身分只屬於一個帳號。登入時以 provider 回報的 subject 找帳號，
+-- 找不到才依規則自動連結或建帳；email 與 email_verified 是 provider 最近一次回報的值，只用於自動連結的比對與更新帳號的寄件地址，
+-- 不作識別或授權。LINE 沒有給 email 時兩者是 NULL 與 false。帳號刪除時刪除這些列（墓碑不留個資，accounts_deleted_check 同理）。
+CREATE TABLE identity.account_identities (
+    provider       TEXT         NOT NULL,
+    subject        TEXT         NOT NULL,
+    account_id     BIGINT       NOT NULL REFERENCES identity.accounts (id),
+    email          TEXT,
+    email_verified BOOLEAN      NOT NULL DEFAULT FALSE,
+    created_at     TIMESTAMPTZ  NOT NULL,
+    updated_at     TIMESTAMPTZ  NOT NULL,
+    PRIMARY KEY (provider, subject),
+    CONSTRAINT account_identities_provider_check CHECK (provider::text IN ('GOOGLE', 'LINE')),
+    CONSTRAINT account_identities_subject_check CHECK (char_length(subject) >= 1),
+    -- 已驗證一定有 email。
+    CONSTRAINT account_identities_email_check CHECK (email IS NULL OR char_length(email) >= 1),
+    CONSTRAINT account_identities_verified_check CHECK (NOT email_verified OR email IS NOT NULL)
+);
+
+CREATE INDEX idx_account_identities_account_id ON identity.account_identities (account_id);
+
+-- 登入 session（opaque-sessions ADR D1–D3、自建登入 ADR D1）：token 是 32 bytes 的 CSPRNG，只存 SHA-256；id 是對外的識別
+-- （列出、終止 session 用），不是憑證。閒置逾時由 last_used_at 加上 client 的期限算出（web 7 天、App 14 天，常數在 Go），
+-- 絕對逾時是 absolute_expires_at（建立後 90 天）；last_used_at 一天最多寫一次。auth_time 是最近一次以 provider 驗證的時間，
+-- 登入時等於 created_at，之後重新驗證時更新（終止 session 前要求 15 分鐘內驗證過）。停權、刪帳在同一個 transaction 刪該帳號全部的列。
+CREATE TABLE identity.sessions (
+    id                  UUID         PRIMARY KEY DEFAULT uuidv7(),
+    token_hash          BYTEA        NOT NULL,
+    account_id          BIGINT       NOT NULL REFERENCES identity.accounts (id),
+    client              TEXT         NOT NULL,
+    created_at          TIMESTAMPTZ  NOT NULL,
+    last_used_at        TIMESTAMPTZ  NOT NULL,
+    absolute_expires_at TIMESTAMPTZ  NOT NULL,
+    auth_time           TIMESTAMPTZ  NOT NULL,
+    CONSTRAINT sessions_client_check CHECK (client::text IN ('WEB', 'APP')),
+    CONSTRAINT sessions_token_hash_check CHECK (octet_length(token_hash) = 32),
+    CONSTRAINT sessions_times_check CHECK (last_used_at >= created_at AND absolute_expires_at > created_at AND auth_time >= created_at)
+);
+
+CREATE UNIQUE INDEX uidx_sessions_token_hash ON identity.sessions (token_hash);
+
+CREATE INDEX idx_sessions_account_id ON identity.sessions (account_id);
+
+-- web 登入流程的暫存狀態（自建登入 ADR D3）：start 寫一列，callback 以 state 取出並同時刪除（單次使用，驗證失敗也已作廢），
+-- 10 分鐘內有效。state 與登入前 cookie 只存 SHA-256；code_verifier 與 nonce 要在換 token 與驗 ID token 時原文使用，所以存原文，
+-- 列的壽命只有 10 分鐘。provider 是預期的 provider（callback 的路徑必須相同，防 mix-up）；return_path 只收 / 開頭且不是 // 或 /\
+-- 的相對路徑；link_account_id 不是 NULL 時這是已登入帳號發起的手動連結。
+CREATE TABLE identity.login_flows (
+    state_hash       BYTEA        PRIMARY KEY,
+    provider         TEXT         NOT NULL,
+    code_verifier    TEXT         NOT NULL,
+    nonce            TEXT         NOT NULL,
+    return_path      TEXT         NOT NULL,
+    binding_hash     BYTEA        NOT NULL,
+    link_account_id  BIGINT       REFERENCES identity.accounts (id),
+    created_at       TIMESTAMPTZ  NOT NULL,
+    expires_at       TIMESTAMPTZ  NOT NULL,
+    CONSTRAINT login_flows_provider_check CHECK (provider::text IN ('GOOGLE', 'LINE')),
+    CONSTRAINT login_flows_state_hash_check CHECK (octet_length(state_hash) = 32),
+    CONSTRAINT login_flows_binding_hash_check CHECK (octet_length(binding_hash) = 32),
+    CONSTRAINT login_flows_return_path_check CHECK (return_path LIKE '/%' AND return_path NOT LIKE '//%' AND return_path NOT LIKE '/\\%'),
+    CONSTRAINT login_flows_expires_check CHECK (expires_at > created_at)
+);
+
+CREATE INDEX idx_login_flows_expires_at ON identity.login_flows (expires_at);
+
+-- App 以原生 SDK 登入前向後端要的單次 nonce（自建登入 ADR D2）：ID token 的 nonce claim 必須等於它的原文，驗證時取出並刪除，
+-- 5 分鐘內有效。只存 SHA-256。
+CREATE TABLE identity.app_login_nonces (
+    nonce_hash  BYTEA        PRIMARY KEY,
+    created_at  TIMESTAMPTZ  NOT NULL,
+    expires_at  TIMESTAMPTZ  NOT NULL,
+    CONSTRAINT app_login_nonces_nonce_hash_check CHECK (octet_length(nonce_hash) = 32),
+    CONSTRAINT app_login_nonces_expires_check CHECK (expires_at > created_at)
+);
+
+CREATE INDEX idx_app_login_nonces_expires_at ON identity.app_login_nonces (expires_at);
 
 -- 帳號的停權紀錄（A7-D9：處分紀錄歸執行效果的模組）：停權的理由、來源與解除在同一處，與 accounts.suspended_at 在同一個 transaction 寫入，
 -- 入口只有 accountsuspension（internal/arch 的 TestSuspensionEntriesAreOnlyCalledByAccountsuspension）。解除留列不刪，之後可以再停權。

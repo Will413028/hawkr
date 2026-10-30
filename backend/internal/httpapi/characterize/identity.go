@@ -20,15 +20,11 @@ type Auth struct {
 	Tokens    map[Caller]string
 }
 
-// DevAuth 產生一把測試用的金鑰，回傳接受它的 identity 設定與每個呼叫者的 token（第一次請求時建立帳號與管理員）。管理員
-// 建立時沒有任何角色（ADR 2026-10-04-admin-roles）：直接打單體的測試要在第一次認證之後以 GrantAdminOwner 授予 OWNER。
+// DevAuth 產生一把測試用的金鑰，回傳接受它的 identity 設定與後台的 token（第一次請求時建立管理員）。顧客的 token 是資料庫裡的
+// session，identity 建好之後用 BuyerSession 建。管理員建立時沒有任何角色（ADR 2026-10-04-admin-roles）：直接打單體的測試要在第一次認證之後以 GrantAdminOwner 授予 OWNER。
 func DevAuth(t *testing.T) Auth {
 	t.Helper()
 	d, err := identity.NewDevAuth(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	buyer, err := d.CustomerToken("dev_characterize_buyer")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +34,7 @@ func DevAuth(t *testing.T) Auth {
 	}
 	return Auth{
 		Providers: identity.Providers{Customers: []identity.Clerk{d.Customers()}, Admin: d.Admins()},
-		Tokens:    map[Caller]string{Buyer: buyer, Admin: admin},
+		Tokens:    map[Caller]string{Admin: admin},
 	}
 }
 
@@ -104,4 +100,14 @@ func EnvTokens(t *testing.T) map[Caller]string {
 		}
 	}
 	return tokens
+}
+
+// BuyerSession 為 dev 買家在 m 建一個 session 並回傳 token（帳號沒有時建立）。
+func BuyerSession(t *testing.T, m *identity.Module) string {
+	t.Helper()
+	tok, err := m.DevSession(t.Context(), "dev_characterize_buyer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tok
 }

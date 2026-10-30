@@ -1,4 +1,4 @@
-h1:P3JkLVu9avHuFEX0U1+03NHjOSyFhz06afPMX/8H0js=
+h1:Vfnphezc7jhWY+RwCYj2fm3a0MmmK7X5lREttkcyCyE=
 20260926174906_identity_schema.sql h1:2NM4NjDq422PAHcqToCZHkZY3518aS25tMHbiI9WP20=
 20260926183055_identity_baseline.sql h1:pRO0oKuUx5kr/+hWoYqKk9QzQwMGUDH5OQvxSSAgDeU=
 20260926202602_delegation.sql h1:oOoQcZXPckFs+ZNcju98FsFlwCQKJo+itzZgmgNxPsQ=
@@ -14,3 +14,4 @@ h1:P3JkLVu9avHuFEX0U1+03NHjOSyFhz06afPMX/8H0js=
 20261008100026_apple_tokens.sql h1:GY6Xs65qiGjfsCEjKY2O0G7boi4/LM8dVqalyJ6DJUY=
 20261019143948_identity_trimmed_text_unicode_space.sql h1:IX4i5ejn02KGQlt/glx87IZerzw2M1QmWZr0GBjOOt4=
 20261029150426_account_suspensions.sql h1:PvJv0L3dZxPqV2FIFrJVlWxXL+UL0ZJoX4ur8GCqRg0=
+20261030124025_identity_sessions.sql h1:VVaKwCono47zEPVX4ji6blaxSCy54aJBymNacg8d+ns=

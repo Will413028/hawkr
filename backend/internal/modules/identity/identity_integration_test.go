@@ -5,9 +5,11 @@ package identity_test
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"regexp"
@@ -15,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -191,6 +194,7 @@ type fixture struct {
 	appleTokens *fakeAppleTokens
 	deleted     []AccountDeleted
 	createdMu   sync.Mutex
+	sessionSeq  atomic.Int64
 	created     []AccountCreated // 已 commit 與回滾的建帳事件都會記下；只在建帳成功時斷言
 }
 
@@ -245,14 +249,47 @@ func wantKind(t *testing.T, err error, want apperr.Kind) {
 
 func ptr[T any](v T) *T { return &v }
 
-// account 以第一次認證建立帳號。買家不是角色（W5）：建帳之後沒有任何角色。
+// account 直接寫入一個以 Clerk 使用者 user 識別的帳號（Clerk 退場前的舊欄位；email 取自 f.customers.users）。買家不是角色（W5）：
+// 建帳之後沒有任何角色。
 func (f *fixture) account(t *testing.T, user string) int64 {
 	t.Helper()
-	a, err := f.m.Authenticate(context.Background(), token(customerIssuer, user))
-	if err != nil || a.Principal.Kind != PrincipalAccount {
-		t.Fatalf("建立帳號 = %+v, %v", a, err)
+	var email *string
+	if e := f.customers.users[user].Email; e != "" {
+		email = &e
 	}
-	return a.Principal.ID
+	var id int64
+	if err := f.db.Pool().QueryRow(context.Background(),
+		`INSERT INTO identity.accounts (clerk_user_id, email, created_at, updated_at) VALUES ($1, $2, $3, $3) RETURNING id`,
+		user, email, f.now).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
+// sessionToken 為帳號直接寫入一個 App 種類的 session（時間取 f.now）並回傳 token，不經 Login。
+func (f *fixture) sessionToken(t *testing.T, accountID int64) string {
+	t.Helper()
+	tok := fmt.Sprintf("%043d", f.sessionSeq.Add(1))
+	hash := sha256.Sum256([]byte(tok))
+	if _, err := f.db.Pool().Exec(context.Background(),
+		`INSERT INTO identity.sessions (token_hash, account_id, client, created_at, last_used_at, absolute_expires_at, auth_time)
+		 VALUES ($1, $2, 'APP', $3, $3, $3 + interval '90 days', $3)`, hash[:], accountID, f.now); err != nil {
+		t.Fatal(err)
+	}
+	return tok
+}
+
+// authenticate 認證 Clerk 使用者 user 的帳號（沒有時建立）：為它寫一個 session 再認證，等於這個帳號帶著 session 打進來。
+func (f *fixture) authenticate(t *testing.T, user string) (Authenticated, error) {
+	t.Helper()
+	var id int64
+	err := f.db.Pool().QueryRow(context.Background(), `SELECT id FROM identity.accounts WHERE clerk_user_id = $1`, user).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		id = f.account(t, user)
+	} else if err != nil {
+		t.Fatal(err)
+	}
+	return f.m.Authenticate(context.Background(), f.sessionToken(t, id))
 }
 
 func (f *fixture) count(t *testing.T, query string, args ...any) int {
@@ -361,80 +398,21 @@ func (f *fixture) appleCalls() (exchanged []string, revoked []revokeCall) {
 	return slices.Clone(f.appleTokens.exchanged), slices.Clone(f.appleTokens.revoked)
 }
 
-func TestTheFirstAuthenticationCreatesAnAccountWithoutBusinessRoles(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	f.customers.users["user_1"] = ClerkIdentity{Email: "alice@example.com", Name: "Alice"}
-
-	a, err := f.m.Authenticate(ctx, token(customerIssuer, "user_1"))
-	if err != nil || len(a.Principal.Roles) != 0 {
-		t.Fatalf("第一次 = %+v, %v", a, err)
-	}
-	again, err := f.m.Authenticate(ctx, token(customerIssuer, "user_1"))
-	if err != nil || again.Principal.ID != a.Principal.ID {
-		t.Fatalf("第二次 = %+v, %v", again, err)
-	}
-	// 建帳事件只在第一次發出，帶 Clerk 上的姓名（買家模組以它建立 profile）。
-	if len(f.created) != 1 || f.created[0] != (AccountCreated{AccountID: a.Principal.ID, Name: "Alice"}) {
-		t.Fatalf("建帳事件 = %+v", f.created)
-	}
-	acc, err := f.m.Account(ctx, a.Principal.ID)
-	if err != nil || acc.Email != "alice@example.com" || len(acc.Roles) != 0 {
-		t.Fatalf("帳號 = %+v, %v", acc, err)
-	}
-	// 沒有 email 的使用者（LINE 沒有給）照樣建立。
-	b := f.account(t, "user_line")
-	if acc, _ := f.m.Account(ctx, b); acc.Email != "" {
-		t.Fatalf("沒有 email 的帳號 = %+v", acc)
-	}
-}
-
-func TestConcurrentFirstAuthenticationsShareAnAccount(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	f.customers.users["user_race"] = ClerkIdentity{Name: "Alice"}
-	const n = 8
-	var wg sync.WaitGroup
-	results := make([]Authenticated, n)
-	errs := make([]error, n)
-	for i := range n {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			results[i], errs[i] = f.m.Authenticate(context.Background(), token(customerIssuer, "user_race"))
-		}()
-	}
-	wg.Wait()
-	for i := range n {
-		if errs[i] != nil || results[i].Principal.ID != results[0].Principal.ID {
-			t.Fatalf("第 %d 個 = %+v, %v", i, results[i], errs[i])
-		}
-	}
-	if n := f.count(t, `SELECT count(*) FROM identity.accounts`); n != 1 {
-		t.Fatalf("建立了 %d 個帳號", n)
-	}
-}
-
 func TestAuthenticationErrors(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	for name, tok := range map[string]string{
 		"沒有 token":    "",
-		"不是 JWT":      "opaque",
-		"無效的 token":   token(customerIssuer, "bad"),
-		"不認得的 issuer": token("https://other.clerk.test", "user_1"),
+		"不是 session":  "opaque",
+		"長度對但不存在":     strings.Repeat("A", 43),
+		"顧客的舊 JWT":    token("https://customers.clerk.test", "user_1"),
 		"後台的無效 token": token(adminIssuer, "bad"),
 	} {
 		_, err := f.m.Authenticate(ctx, tok)
 		if apperr.KindOf(err) != apperr.KindUnauthenticated {
 			t.Errorf("%s：err = %v，預期 unauthenticated", name, err)
 		}
-	}
-	// 問不到公鑰：不是「沒有登入」（否則 client 會把使用者登出），也不建帳號。
-	if _, err := f.m.Authenticate(ctx, token(customerIssuer, "down")); err == nil || apperr.KindOf(err) == apperr.KindUnauthenticated {
-		t.Fatalf("問不到公鑰 = %v", err)
 	}
 	if n := f.count(t, `SELECT count(*) FROM identity.accounts`); n != 0 {
 		t.Fatalf("失敗時建了 %d 個帳號", n)
@@ -446,7 +424,7 @@ func TestSuspendedAccountStillAuthenticatesAndCarriesTheSuspensionTime(t *testin
 	f := setup(t)
 	ctx := context.Background()
 	id := f.account(t, "user_1")
-	if a, err := f.m.Authenticate(ctx, token(customerIssuer, "user_1")); err != nil || a.SuspendedAt != nil {
+	if a, err := f.authenticate(t, "user_1"); err != nil || a.SuspendedAt != nil {
 		t.Fatalf("未停權的帳號 = %+v, %v", a, err)
 	}
 	for range 2 { // 冪等：已經停權時不再寫第二筆
@@ -454,7 +432,7 @@ func TestSuspendedAccountStillAuthenticatesAndCarriesTheSuspensionTime(t *testin
 			t.Fatal(err)
 		}
 	}
-	a, err := f.m.Authenticate(ctx, token(customerIssuer, "user_1"))
+	a, err := f.authenticate(t, "user_1")
 	if err != nil || a.Principal.ID != id || a.Principal.Kind != PrincipalAccount || a.SuspendedAt == nil || !a.SuspendedAt.Equal(f.now) {
 		t.Fatalf("停權的帳號 = %+v, %v，預期認證成功並帶停權時間 %v", a, err, f.now)
 	}
@@ -464,7 +442,7 @@ func TestSuspendedAccountStillAuthenticatesAndCarriesTheSuspensionTime(t *testin
 	if _, released, err := f.m.UnsuspendAccount(ctx, id, "申覆成立"); err != nil || !released {
 		t.Fatalf("UnsuspendAccount = %v, %v", released, err)
 	}
-	if a, err := f.m.Authenticate(ctx, token(customerIssuer, "user_1")); err != nil || a.SuspendedAt != nil {
+	if a, err := f.authenticate(t, "user_1"); err != nil || a.SuspendedAt != nil {
 		t.Fatalf("解除後 = %+v, %v，預期停權時間清除", a, err)
 	}
 }
@@ -488,7 +466,7 @@ func TestDeletionLeavesATombstoneAndDeletesTheClerkUser(t *testing.T) {
 		t.Fatalf("墓碑 = %+v, %v", acc, err)
 	}
 	// 同一個 Clerk 使用者（Clerk 那邊還沒刪掉時）不會再建一個帳號。
-	_, err = f.m.Authenticate(ctx, token(customerIssuer, "user_1"))
+	_, err = f.authenticate(t, "user_1")
 	wantKind(t, err, apperr.KindUnauthenticated)
 	if n := f.count(t, `SELECT count(*) FROM identity.accounts`); n != 1 {
 		t.Fatalf("帳號數 = %d", n)
@@ -521,7 +499,7 @@ func TestRemoveRole(t *testing.T) {
 		t.Fatalf("柵欄沒擋下：角色 = %v", a.Roles)
 	}
 	// 角色的變更下一個請求就生效：每個請求都讀。
-	if got, err := f.m.Authenticate(ctx, token(customerIssuer, "user_1")); err != nil || !slices.Equal(got.Principal.Roles, []Role{RoleSeller}) {
+	if got, err := f.authenticate(t, "user_1"); err != nil || !slices.Equal(got.Principal.Roles, []Role{RoleSeller}) {
 		t.Fatalf("認證的角色 = %+v, %v", got, err)
 	}
 	// 移除最後一個角色不刪帳號（W5：帳號活著就是買家，刪帳由 accountdeletion 編排），重送也一樣。
@@ -530,7 +508,7 @@ func TestRemoveRole(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if got, err := f.m.Authenticate(ctx, token(customerIssuer, "user_1")); err != nil || len(got.Principal.Roles) != 0 {
+	if got, err := f.authenticate(t, "user_1"); err != nil || len(got.Principal.Roles) != 0 {
 		t.Fatalf("認證的角色 = %+v, %v", got, err)
 	}
 	if a, _ := f.m.Account(ctx, id); a.Deleted || len(a.Roles) != 0 || len(f.deleted) != 0 {
@@ -578,7 +556,7 @@ func TestAdminsAreCreatedForAccessSubjects(t *testing.T) {
 	if id != a.Principal.ID {
 		t.Fatalf("前提：兩邊都是第一筆（帳號 %d、管理員 %d）", id, a.Principal.ID)
 	}
-	if got, err := f.m.Authenticate(ctx, token(customerIssuer, "user_ops")); err != nil || got.Principal.Kind != PrincipalAccount {
+	if got, err := f.authenticate(t, "user_ops"); err != nil || got.Principal.Kind != PrincipalAccount {
 		t.Fatalf("顧客的 token = %+v, %v", got, err)
 	}
 	_, err = f.m.Admin(ctx, 999)
@@ -821,6 +799,9 @@ func TestCodeValueChecksMatchTheGoTypes(t *testing.T) {
 		{"account_roles_role_check", []string{string(RoleSeller)}},
 		{"account_suspensions_kind_check", []string{string(SuspensionPermanent)}},
 		{"account_suspensions_reason_category_check", categoryValues()},
+		{"account_identities_provider_check", providerValues()},
+		{"login_flows_provider_check", providerValues()},
+		{"sessions_client_check", clientValues()},
 		{"admin_roles_role_check", adminRoleValues()},
 		{"admin_role_events_role_check", adminRoleValues()},
 		{"admin_role_events_action_check", []string{string(AdminRoleActionGrant), string(AdminRoleActionRevoke)}},
@@ -850,6 +831,22 @@ func TestCodeValueChecksMatchTheGoTypes(t *testing.T) {
 func categoryValues() []string {
 	var out []string
 	for _, c := range policy.Values() {
+		out = append(out, string(c))
+	}
+	return out
+}
+
+func providerValues() []string {
+	var out []string
+	for _, p := range LoginProviders() {
+		out = append(out, string(p))
+	}
+	return out
+}
+
+func clientValues() []string {
+	var out []string
+	for _, c := range ClientKinds() {
 		out = append(out, string(c))
 	}
 	return out
@@ -969,7 +966,7 @@ func TestListAccountsByID(t *testing.T) {
 	}
 }
 
-// 本機開發的 dev token（DevAuth）走同一條認證：建帳、建管理員。
+// 本機開發的 dev 登入：顧客是資料庫裡的 dev session（建帳、建 session），後台是 DevAuth 簽的 JWT。
 func TestDevAuth(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -978,21 +975,29 @@ func TestDevAuth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.deps.Providers.Customers = append(f.deps.Providers.Customers, dev.Customers())
-	if len(f.deps.Providers.Customers) != 2 || f.deps.Providers.Customers[0].OwnsUser("dev_buyer") || !f.deps.Providers.Customers[1].OwnsUser("dev_buyer") {
-		t.Fatal("dev 使用者必須由第二個 Clerk application 擁有")
-	}
 	f.deps.Providers.Admin = dev.Admins()
 	f.m = New(f.deps)
 
-	buyer, _ := dev.CustomerToken("dev_buyer")
+	buyer, err := f.m.DevSession(ctx, "dev_buyer")
+	if err != nil {
+		t.Fatal(err)
+	}
 	a, err := f.m.Authenticate(ctx, buyer)
 	if err != nil || a.Principal.Kind != PrincipalAccount {
 		t.Fatalf("dev 的帳號 = %+v, %v", a, err)
 	}
+	if again, err := f.m.DevSession(ctx, "dev_buyer"); err != nil || again == buyer {
+		t.Fatalf("同一個 dev 使用者再建一個 session 要是新的 token：%v", err)
+	}
+	if n := f.count(t, `SELECT count(*) FROM identity.accounts`); n != 1 {
+		t.Fatalf("帳號數 = %d", n)
+	}
+	if _, err := f.m.DevSession(ctx, "alice"); err == nil {
+		t.Fatal("不是 dev_ 開頭的使用者要被拒絕")
+	}
 	admin, _ := dev.AdminToken("dev_ops")
-	if a, err := f.m.Authenticate(ctx, admin); err != nil || a.Principal.Kind != PrincipalAdmin {
-		t.Fatalf("dev 的管理員 = %+v, %v", a, err)
+	if adm, err := f.m.Authenticate(ctx, admin); err != nil || adm.Principal.Kind != PrincipalAdmin {
+		t.Fatalf("dev 的管理員 = %+v, %v", adm, err)
 	}
 	if err := f.m.DeleteAccount(ctx, a.Principal.ID); err != nil {
 		t.Fatal(err)
@@ -1025,7 +1030,7 @@ func TestDeletionPendingRefusesGrantRole(t *testing.T) {
 	if a, _ := f.m.Account(ctx, id); len(a.Roles) != 0 {
 		t.Fatalf("roles = %v", a.Roles)
 	}
-	if _, err := f.m.Authenticate(ctx, token(customerIssuer, "user_1")); err != nil {
+	if _, err := f.authenticate(t, "user_1"); err != nil {
 		t.Fatalf("pending account must still authenticate: %v", err)
 	}
 	if err := f.m.DeleteAccount(ctx, id); err != nil {

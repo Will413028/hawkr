@@ -12,13 +12,23 @@ import (
 
 type IdentityAccount struct {
 	ID                int64
-	ClerkUserID       string
+	ClerkUserID       *string
 	Email             *string
 	SuspendedAt       *time.Time
 	DeletedAt         *time.Time
 	DeletionPendingAt *time.Time
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+}
+
+type IdentityAccountIdentity struct {
+	Provider      string
+	Subject       string
+	AccountID     int64
+	Email         *string
+	EmailVerified bool
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 type IdentityAccountRole struct {
@@ -66,10 +76,39 @@ type IdentityAdminRoleEvent struct {
 	OccurredAt time.Time
 }
 
+type IdentityAppLoginNonce struct {
+	NonceHash []byte
+	CreatedAt time.Time
+	ExpiresAt time.Time
+}
+
 type IdentityAppleToken struct {
 	AccountID int64
 	ClientID  string
 	Token     []byte
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+type IdentityLoginFlow struct {
+	StateHash     []byte
+	Provider      string
+	CodeVerifier  string
+	Nonce         string
+	ReturnPath    string
+	BindingHash   []byte
+	LinkAccountID *int64
+	CreatedAt     time.Time
+	ExpiresAt     time.Time
+}
+
+type IdentitySession struct {
+	ID                uuid.UUID
+	TokenHash         []byte
+	AccountID         int64
+	Client            string
+	CreatedAt         time.Time
+	LastUsedAt        time.Time
+	AbsoluteExpiresAt time.Time
+	AuthTime          time.Time
 }

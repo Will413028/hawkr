@@ -1,14 +1,17 @@
-// Package identity 是 identity 模組的公開 API：認證（顧客 Clerk、後台 Cloudflare Access）、帳號與管理員、角色，帳號的停權與刪除。
+// Package identity 是 identity 模組的公開 API：認證（顧客的 opaque session、後台 Cloudflare Access）、聯合登入與 session、帳號與管理員、角色，帳號的停權與刪除。
 //
-// 職責、擁有的資料與不變量見同目錄的 AGENTS.md；身分驗證的決策見 ADR 2026-09-27-identity-clerk。
+// 職責、擁有的資料與不變量見同目錄的 AGENTS.md；身分驗證的決策見 ADR 2026-10-30-identity-self-hosted-federated-login。
 package identity
 
 import (
 	"context"
 	"embed"
+	"fmt"
 	"io/fs"
 	"log/slog"
+	"strings"
 	"time"
+	"uuid"
 
 	"github.com/riverqueue/river"
 
@@ -16,7 +19,9 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/identity/internal/admin"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity/internal/applerevoke"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity/internal/auth"
+	"github.com/Will413028/hawkr/backend/internal/modules/identity/internal/login"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/identity/internal/session"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -162,6 +167,48 @@ var ErrInvalidToken = model.ErrInvalidToken
 // ErrRejected 表示 provider 拒絕且重試不會成功。
 var ErrRejected = model.ErrRejected
 
+// Provider 是聯合登入的 provider（GOOGLE、LINE）。
+type Provider = model.Provider
+
+// ClientKind 是 session 的 client 種類（WEB、APP）。
+type ClientKind = model.ClientKind
+
+// ProviderIdentity 是 provider 驗證後回報的身分。
+type ProviderIdentity = model.ProviderIdentity
+
+// LoginInput 與 LoginResult 是以 provider 身分登入的輸入與結果。
+type (
+	LoginInput  = model.LoginInput
+	LoginResult = model.LoginResult
+)
+
+// SessionID 是 session 對外的識別（不是憑證）；SessionInfo 是一個 session 的資料。
+type (
+	SessionID   = uuid.UUID
+	SessionInfo = model.SessionInfo
+)
+
+// LoginFlowInput、LoginFlowStart 與 LoginFlow 是 web 登入流程的暫存狀態。
+type (
+	LoginFlowInput = model.LoginFlowInput
+	LoginFlowStart = model.LoginFlowStart
+	LoginFlow      = model.LoginFlow
+)
+
+const (
+	ProviderGoogle = model.ProviderGoogle
+	ProviderLine   = model.ProviderLine
+	ClientWeb      = model.ClientWeb
+	ClientApp      = model.ClientApp
+)
+
+// LoginProviders 與 ClientKinds 回傳所有登入 provider 與 client 種類。
+func LoginProviders() []Provider { return model.ProviderValues() }
+func ClientKinds() []ClientKind  { return model.ClientKinds() }
+
+// ValidReturnPath 回報 p 是不是可以安全轉址的返回網址（站內的相對路徑）。
+func ValidReturnPath(p string) bool { return session.ValidReturnPath(p) }
+
 // Roles 回傳所有帳號角色（只有另外申請的角色；每個帳號都是買家）。
 func Roles() []Role { return model.Roles() }
 
@@ -170,6 +217,8 @@ type Module struct {
 	account     *account.Service
 	admin       *admin.Service
 	auth        *auth.Service
+	session     *session.Service
+	login       *login.Service
 	applerevoke *applerevoke.Service
 }
 
@@ -183,11 +232,14 @@ func New(d Deps) *Module {
 		DB: d.DB, Events: d.Events, Jobs: d.Jobs, Customers: d.Providers.Customers, AppleRevoker: ar,
 		Now: d.Now, Logger: d.Logger,
 	})
+	sess := session.New(session.Deps{DB: d.DB, Now: d.Now, Logger: d.Logger})
 	return &Module{
 		account: a,
+		session: sess,
+		login:   login.New(login.Deps{DB: d.DB, Events: d.Events, Sessions: sess, Now: d.Now, Logger: d.Logger}),
 		admin:   admin.New(admin.Deps{DB: d.DB, Events: d.Events, Now: d.Now, Logger: d.Logger}),
 		auth: auth.New(auth.Deps{
-			DB: d.DB, Account: a, Customers: d.Providers.Customers, Admin: d.Providers.Admin,
+			DB: d.DB, Sessions: sess, Admin: d.Providers.Admin,
 			Google: d.Providers.Google, Now: d.Now, Logger: d.Logger,
 		}),
 		applerevoke: ar,
@@ -227,7 +279,7 @@ func (m *Module) LockAccount(ctx context.Context, id int64) error {
 	return m.account.LockAccount(ctx, id)
 }
 
-// SuspendAccount 永久停權帳號：停權紀錄與 suspended_at 在同一個 transaction 寫入，並排入 Clerk 停用 job。已停權時不寫第二筆紀錄，
+// SuspendAccount 永久停權帳號：停權紀錄、suspended_at 與刪除該帳號全部 session 在同一個 transaction。已停權時不寫第二筆紀錄，
 // 回傳原本的紀錄與 created=false。只由 accountsuspension 呼叫（internal/arch 的 TestSuspensionEntriesAreOnlyCalledByAccountsuspension）：
 // 擁有商店的帳號不能停權的檢查在那裡，這裡不查。類別不是政策分類回 InvalidInput，帳號不存在或已刪除回 NotFound。
 func (m *Module) SuspendAccount(ctx context.Context, in SuspendInput) (AccountSuspension, bool, error) {
@@ -245,7 +297,7 @@ func (m *Module) CurrentSuspension(ctx context.Context, accountID int64) (Accoun
 	return m.account.CurrentSuspension(ctx, accountID)
 }
 
-// DeleteAccount 刪除帳號、解除未解除的停權紀錄並排入 Clerk 刪除 job；已刪除時成功，從未存在時回 NotFound。
+// DeleteAccount 刪除帳號、解除未解除的停權紀錄，並在同一個 transaction 刪除全部 session 與登入身分（有 Clerk 使用者的另排 Clerk 刪除 job）；已刪除時成功，從未存在時回 NotFound。
 func (m *Module) DeleteAccount(ctx context.Context, accountID int64) error {
 	return m.account.DeleteAccount(ctx, accountID)
 }
@@ -283,10 +335,80 @@ func (m *Module) AdminAllows(ctx context.Context, adminID int64, perm adminperm.
 	return m.admin.AdminAllows(ctx, adminID, perm)
 }
 
-// Authenticate 依 issuer 驗證顧客 Clerk 或後台 Access/dev token。首次顧客認證建立帳號與買家角色；刪除或
-// 無效 token 回 KindUnauthenticated，停權回 KindPermissionDenied，provider 或資料庫故障回其他錯誤。
+// Authenticate 驗證顧客的 session token（Bearer 或 cookie 的值）或後台 Access/dev token：後台 token 以 iss 辨認，其餘一律當 session。
+// 無效、逾時的 token 與已刪除的帳號回 KindUnauthenticated；停權的帳號照樣認證成功，結果帶 SuspendedAt（A7-D18）；provider 或資料庫
+// 故障回其他錯誤。
 func (m *Module) Authenticate(ctx context.Context, token string) (Authenticated, error) {
 	return m.auth.Authenticate(ctx, token)
+}
+
+// Login 以 provider 驗證過的身分登入並換發新 session：已有身分就登入該帳號，Google 已驗證 email 符合條件時自動連結既有帳號，
+// 否則建帳。LoginResult.Token 是新 session 的原文 token，只回傳這一次；LoginInput.PreviousToken 在同一個 transaction 刪除。
+// 停權的帳號照樣登入。provider 或 client 不是已知的值、沒有 subject 回 InvalidInput。
+func (m *Module) Login(ctx context.Context, in LoginInput) (LoginResult, error) {
+	return m.login.Login(ctx, in)
+}
+
+// LinkIdentity 把 provider 身分連結到已登入的帳號；身分已屬於別的帳號回 AlreadyExists，帳號不存在回 NotFound。
+func (m *Module) LinkIdentity(ctx context.Context, accountID int64, id ProviderIdentity) error {
+	return m.login.Link(ctx, accountID, id)
+}
+
+// SignOut 刪除 token 對應的 session；token 無效或已不存在時成功。
+func (m *Module) SignOut(ctx context.Context, token string) error {
+	return m.session.SignOut(ctx, token)
+}
+
+// ListSessions 列出帳號的 session，新到舊。
+func (m *Module) ListSessions(ctx context.Context, accountID int64) ([]SessionInfo, error) {
+	return m.session.List(ctx, accountID)
+}
+
+// RevokeSession 刪除帳號自己的一個 session，不存在或屬於別的帳號回 NotFound。不檢查重新驗證：呼叫方依 SessionInfo.AuthTime 判斷。
+func (m *Module) RevokeSession(ctx context.Context, accountID int64, sessionID SessionID) error {
+	return m.session.Revoke(ctx, accountID, sessionID)
+}
+
+// MarkSessionAuthenticated 記下帳號的這個 session 剛重新以 provider 驗證過（更新 AuthTime）。
+func (m *Module) MarkSessionAuthenticated(ctx context.Context, accountID int64, sessionID SessionID) error {
+	return m.session.MarkAuthenticated(ctx, accountID, sessionID)
+}
+
+// BeginLoginFlow 寫 web 登入流程的暫存狀態（10 分鐘、單次使用），回傳 state、nonce、PKCE verifier 與登入前 cookie 的原文值。
+func (m *Module) BeginLoginFlow(ctx context.Context, in LoginFlowInput) (LoginFlowStart, error) {
+	return m.session.BeginLoginFlow(ctx, in)
+}
+
+// ConsumeLoginFlow 以 state 取出登入流程並同時刪除；重放、逾時、provider 與預期不同、登入前 cookie 不符都回 KindUnauthenticated，
+// 且那一列已作廢。不得在可能 rollback 的 transaction 內呼叫。
+func (m *Module) ConsumeLoginFlow(ctx context.Context, state, binding string, want Provider) (LoginFlow, error) {
+	return m.session.ConsumeLoginFlow(ctx, state, binding, want)
+}
+
+// IssueAppNonce 發 App 登入用的單次 nonce（5 分鐘）。
+func (m *Module) IssueAppNonce(ctx context.Context) (string, time.Time, error) {
+	return m.session.IssueAppNonce(ctx)
+}
+
+// ConsumeAppNonce 取出並刪除 nonce；重放、不存在或逾時回 KindUnauthenticated。
+func (m *Module) ConsumeAppNonce(ctx context.Context, nonce string) error {
+	return m.session.ConsumeAppNonce(ctx, nonce)
+}
+
+// DevSession 為 dev 使用者（以 dev_ 開頭）建一個 App 種類的 session 並回傳原文 token，使用者的帳號沒有時建立。只給本機 dev token 與測試。
+func (m *Module) DevSession(ctx context.Context, user string) (string, error) {
+	if !strings.HasPrefix(user, "dev_") {
+		return "", fmt.Errorf("identity：dev 使用者 %q 必須以 dev_ 開頭", user)
+	}
+	id, err := m.account.EnsureDevAccount(ctx, user)
+	if err != nil {
+		return "", err
+	}
+	issued, err := m.session.Create(ctx, id, ClientApp)
+	if err != nil {
+		return "", err
+	}
+	return issued.Token, nil
 }
 
 // VerifyGoogle 驗證 vendor portal step-up 的 Google ID token，不登入或寫入；單體入口的 VerifySession 呼叫它。token 的 nonce 必須等於

@@ -104,7 +104,7 @@ func setup(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	characterize.GrantAdminOwner(t, id, admin)
-	buyer, err := dev.CustomerToken("dev_buyer")
+	buyer, err := id.DevSession(t.Context(), "dev_buyer")
 	if err != nil {
 		t.Fatal(err)
 	}

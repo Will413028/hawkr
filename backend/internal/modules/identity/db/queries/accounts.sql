@@ -72,3 +72,22 @@ WHERE a.deleted_at IS NULL
        OR EXISTS (SELECT 1 FROM identity.account_roles r WHERE r.account_id = a.id AND r.role = sqlc.arg(role)::text))
   AND (sqlc.arg(pattern)::text = '' OR a.id = sqlc.arg(account_id)::bigint OR a.email ILIKE sqlc.arg(pattern)::text)
   AND (sqlc.arg(email)::text = '' OR lower(a.email) = sqlc.arg(email)::text);
+
+-- name: InsertFederatedAccount :one
+-- 自建登入的新帳號：沒有 clerk_user_id。email 是 provider 回報的已驗證 email（沒有時 NULL）。
+INSERT INTO identity.accounts (email, created_at, updated_at)
+VALUES (sqlc.narg(email), sqlc.arg(now), sqlc.arg(now))
+RETURNING id;
+
+-- name: UpdateAccountEmail :execrows
+-- 登入時以已驗證 email 更新寄件地址（ADR 2026-10-30-identity-self-hosted-federated-login D4）；墓碑不更新。
+UPDATE identity.accounts
+SET email = sqlc.arg(email), updated_at = sqlc.arg(now)::timestamptz
+WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND email IS DISTINCT FROM sqlc.arg(email);
+
+-- name: FindLiveAccountIDsByEmail :many
+-- 自動連結的候選：存活帳號裡，寄件地址（只由已驗證 email 寫入）等於 email 的帳號，最多回 2 筆，讓呼叫方分辨「唯一」與「不唯一」。
+SELECT id FROM identity.accounts
+WHERE deleted_at IS NULL AND lower(email) = lower(sqlc.arg(email)::text)
+ORDER BY id
+LIMIT 2;

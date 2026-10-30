@@ -310,10 +310,10 @@ dev-key:
 		openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out '$(DEV_AUTH_KEY_FILE)' 2>/dev/null && \
 		chmod 600 '$(DEV_AUTH_KEY_FILE)' && echo "產生 $(DEV_AUTH_KEY_FILE)"; }
 
-# 本機的登入：以 dev 金鑰簽一個 token 印出（24 小時，不連 Clerk），第一個請求時建立帳號或管理員。
+# 本機的登入：顧客在資料庫建一個 dev session 印出 token（帳號沒有時建立，需要 make migrate）；後台以 dev 金鑰簽 24 小時的 JWT，第一個請求時建立管理員。
 # 例：make dev-token args='-user dev_account_2001'（seed 的帳號）、make dev-token args='-admin -user dev_ops'
 dev-token: dev-key
-	@DEV_AUTH_KEY_FILE='$(DEV_AUTH_KEY_FILE)' GOWORK=off go run ./cmd/hawkr dev-token $(args)
+	@DEV_AUTH_KEY_FILE='$(DEV_AUTH_KEY_FILE)' DATABASE_URL='$(DATABASE_URL)' GOWORK=off go run ./cmd/hawkr dev-token $(args)
 
 # 本機的測試資料重置（唯一支援的路徑）：infra/seed-test-data.sh 先 dev-seed-check，再依序跑 01 帳號與買家 → dev-seed-stores → 04–06 → 全量重新公告。
 # 單獨寫 seller 的店家會讓 identity 與 Java 的 store_exposure 不一致，所以不提供單獨的目標給人用。要先 make migrate，

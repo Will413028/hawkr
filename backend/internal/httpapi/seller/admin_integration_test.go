@@ -173,7 +173,7 @@ func setupAdmin(t *testing.T) *adminFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	customerToken, err := dev.CustomerToken("dev_customer_connect")
+	customerToken, err := id.DevSession(ctx, "dev_customer_connect")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +211,7 @@ func setupAdmin(t *testing.T) *adminFixture {
 func (f *adminFixture) newSeller(t *testing.T, name string) (int64, seller.Store) {
 	t.Helper()
 	f.users++
-	token, err := f.dev.CustomerToken("dev_seller_" + strconv.Itoa(f.users))
+	token, err := f.id.DevSession(context.Background(), "dev_seller_"+strconv.Itoa(f.users))
 	if err != nil {
 		t.Fatal(err)
 	}
