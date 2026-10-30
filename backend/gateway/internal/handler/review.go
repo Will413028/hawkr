@@ -189,6 +189,37 @@ func toReviewStatsBlock(s *pb.ReviewStats) *ReviewStatsBlock {
 	}
 }
 
+// requireExposableProductStore 檢查商品所屬店家此刻可曝光（can_accept_orders），
+// 評論的父資源規則與 /public/sellers/{id}/reviews 相同。商品→店家走公開商品
+// 讀取（與公開 PDP 同一條 publication contract）；任何一步失敗都 fail closed。
+// 失敗時錯誤回應已寫入，呼叫端必須立刻 return。
+func (h *Holder) requireExposableProductStore(c *gin.Context, productID string) bool {
+	resp, err := h.Product.GetPublicProduct(c.Request.Context(), productID)
+	if err != nil {
+		pkglogger.Info(c.Request.Context(), "Failed to resolve review parent product", zap.Error(err))
+		response.GrpcErr(c, "product", err)
+		return false
+	}
+	if resp.Code != 0 {
+		response.GrpcResult(c, resp.Code, resp.Message, nil)
+		return false
+	}
+	storeID, perr := strconv.ParseInt(resp.GetData().GetSeller().GetStoreId(), 10, 64)
+	if perr != nil || storeID <= 0 {
+		response.NotFound(c, "product not found")
+		return false
+	}
+	meta, ok := h.storeMeta(c, storeID)
+	if !ok {
+		return false
+	}
+	if !meta.CanAcceptOrders {
+		response.NotFound(c, "product not found")
+		return false
+	}
+	return true
+}
+
 // @Summary      取得商品評論列表
 // @Description  取得指定商品的評論列表與統計資訊，無需登入
 // @Tags         評論 (Review)
@@ -201,12 +232,17 @@ func toReviewStatsBlock(s *pb.ReviewStats) *ReviewStatsBlock {
 // @Param        sort_by     query  string  false  "排序方式（latest / highest / lowest）"
 // @Success      200  {object}  object{code=int,message=string,data=object{records=[]handler.ReviewListItem,stats=handler.ReviewStatsBlock,total=string,page=string,pageSize=string}}
 // @Failure      400  {object}  object{code=int,message=string}
+// @Failure      404  {object}  object{code=int,message=string}  "商品不存在或其店家此刻不可曝光"
 // @Failure      503  {object}  object{code=int,message=string}
 // @Router /public/products/{id}/reviews [get]
 func (h *Holder) GetProductReviews(c *gin.Context) {
 	productID := c.Param("id")
 	if productID == "" {
 		response.BadRequest(c, "invalid product id")
+		return
+	}
+
+	if !h.requireExposableProductStore(c, productID) {
 		return
 	}
 
@@ -261,6 +297,7 @@ func (h *Holder) GetProductReviews(c *gin.Context) {
 // @Param        id  path  int  true  "評論 ID"
 // @Success      200  {object}  object{code=int,message=string,data=handler.ReviewDetail}
 // @Failure      400  {object}  object{code=int,message=string}
+// @Failure      404  {object}  object{code=int,message=string}  "評論所屬商品的店家此刻不可曝光"
 // @Failure      503  {object}  object{code=int,message=string}
 // @Router /app/reviews/{id} [get]
 func (h *Holder) GetReview(c *gin.Context) {
@@ -285,6 +322,11 @@ func (h *Holder) GetReview(c *gin.Context) {
 	// key 欄放裸 key、對應 url 欄由 Gateway 組），不再把 URL 值塞回 key 欄（49 §6.6 review／S2）。
 	if resp.Review == nil {
 		response.OK(c, nil)
+		return
+	}
+	// 父資源檢查：評論所屬商品的店家此刻不可曝光就回 404（評論本身不帶店家 id，
+	// 經商品取得）。失敗一律 fail closed，不回評論內容。
+	if !h.requireExposableProductStore(c, resp.Review.ProductId) {
 		return
 	}
 	response.OK(c, toReviewDetail(h.MediaBaseURL, resp.Review))

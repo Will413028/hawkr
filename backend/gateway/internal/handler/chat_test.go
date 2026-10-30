@@ -993,3 +993,47 @@ func TestChatHandlers_PageParamParsing(t *testing.T) {
 		}
 	})
 }
+
+// resolveChatTargetID 的 seller RPC 失敗一律 fail closed：不得打到 im-service。
+func TestSendChatMessage_SellerRPCFailure_FailsClosed(t *testing.T) {
+	okSeller := func(ctx context.Context, in *sellerpb.GetSellerRequest, opts ...grpc.CallOption) (*sellerpb.SellerResponse, error) {
+		return &sellerpb.SellerResponse{Data: &sellerpb.SellerInfo{StoreId: "100"}}, nil
+	}
+	cases := map[string]*mockSellerServiceClient{
+		"GetSeller RPC error": {GetSellerFn: func(ctx context.Context, in *sellerpb.GetSellerRequest, opts ...grpc.CallOption) (*sellerpb.SellerResponse, error) {
+			return nil, grpcstatus.Error(grpccodes.Unavailable, "down")
+		}},
+		"BatchGetSellerMeta RPC error": {GetSellerFn: okSeller, BatchGetSellerMetaFn: func(ctx context.Context, in *sellerpb.BatchGetSellerMetaRequest, opts ...grpc.CallOption) (*sellerpb.BatchGetSellerMetaResponse, error) {
+			return nil, grpcstatus.Error(grpccodes.Unavailable, "down")
+		}},
+		"BatchGetSellerMeta code != 0": {GetSellerFn: okSeller, BatchGetSellerMetaFn: func(ctx context.Context, in *sellerpb.BatchGetSellerMetaRequest, opts ...grpc.CallOption) (*sellerpb.BatchGetSellerMetaResponse, error) {
+			return &sellerpb.BatchGetSellerMetaResponse{Code: 5000}, nil
+		}},
+		"meta entry missing": {GetSellerFn: okSeller, BatchGetSellerMetaFn: func(ctx context.Context, in *sellerpb.BatchGetSellerMetaRequest, opts ...grpc.CallOption) (*sellerpb.BatchGetSellerMetaResponse, error) {
+			return &sellerpb.BatchGetSellerMetaResponse{Sellers: map[int64]*sellerpb.SellerMeta{}}, nil
+		}},
+	}
+	for name, sm := range cases {
+		t.Run(name, func(t *testing.T) {
+			h := &Holder{
+				IM: grpcclient.NewIMClientForTest(&mockIMServiceClient{
+					SendMessageFn: func(ctx context.Context, in *pb.SendMessageRequest, opts ...grpc.CallOption) (*pb.SendMessageResponse, error) {
+						t.Fatal("im-service must not be called when the target gate fails")
+						return nil, nil
+					},
+				}),
+				BuyerID: buyerGrandfatherResolverForTest(),
+				Seller:  grpcclient.NewSellerClientForTest(sm),
+			}
+			reqBody, _ := json.Marshal(map[string]interface{}{"toUserId": "100", "content": "hi"})
+			req, _ := http.NewRequest("POST", "/api/v1/app/chat/messages", bytes.NewReader(reqBody))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("X-Account-Id", "42")
+			w := httptest.NewRecorder()
+			setupChatRouter(h).ServeHTTP(w, req)
+			if w.Code == http.StatusOK && strings.Contains(w.Body.String(), `"code":0`) {
+				t.Fatalf("gate failure must not succeed: %s", w.Body.String())
+			}
+		})
+	}
+}

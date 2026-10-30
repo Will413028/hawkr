@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 
@@ -93,7 +94,8 @@ func (h *Holder) getPostShareURL(c *gin.Context, id string) {
 	// 分享網址對外一律用 store_code；解析不到時回錯誤，不退回 store_id。
 	sid, parseErr := strconv.ParseInt(sellerID, 10, 64)
 	if parseErr != nil {
-		response.NotFound(c, "seller store code not found")
+		// 非數字的 SellerId 是上游資料壞掉，不是客戶端找不到資源。
+		response.Err(c, http.StatusInternalServerError, 500, "invalid seller id from upstream")
 		return
 	}
 	sellerResp, sErr := h.Seller.GetSellerByStoreID(c.Request.Context(), sid)

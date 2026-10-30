@@ -18973,6 +18973,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: 評論所屬商品的店家此刻不可曝光
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '503':
           description: Service Unavailable
           content:
@@ -26839,6 +26845,12 @@ paths:
                     type: string
         '400':
           description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: 商品不存在或其店家此刻不可曝光
           content:
             application/json:
               schema:

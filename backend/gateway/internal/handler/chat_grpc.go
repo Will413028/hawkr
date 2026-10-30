@@ -6,10 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"time"
 
 	pb "github.com/Will413028/hawkr/go-pkg/proto/im"
+	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
 
@@ -235,7 +238,7 @@ func (h *Holder) serveChatWebSocketGRPC(ctx context.Context, clientConn *websock
 	}
 
 	errChan := make(chan error, 2)
-	go pipePublicWSToIM(client, stream, errChan)
+	go pipePublicWSToIM(client, stream, errChan, h.chatFrameTargetGate(ctx, loginRole))
 	go pipeIMToPublicWS(stream, client, errChan)
 
 	ticker := time.NewTicker(wsProxyPingPeriod)
@@ -252,7 +255,23 @@ func (h *Holder) serveChatWebSocketGRPC(ctx context.Context, clientConn *websock
 	}
 }
 
-func pipePublicWSToIM(src *wsProxyConn, dst pb.IMService_ChatStreamClient, errChan chan<- error) {
+// chatFrameTargetGate returns the WebSocket counterpart of the REST
+// SendChatMessage gate: a buyer frame addressed to `to` is allowed only when
+// resolveChatTargetID accepts it (existing, non-closed store that has had a
+// public card). Sellers pass through unchanged; any resolver failure denies
+// (fail closed). resolveChatTargetID writes its error to a gin context, so it
+// runs on a discarded one: the upgraded connection cannot carry an HTTP reply.
+func (h *Holder) chatFrameTargetGate(ctx context.Context, loginRole int32) func(to string) bool {
+	return func(to string) bool {
+		sc, _ := gin.CreateTestContext(httptest.NewRecorder())
+		sc.Request = (&http.Request{}).WithContext(ctx)
+		sc.Set("accountType", int(loginRole))
+		_, ok := h.resolveChatTargetID(sc, to)
+		return ok
+	}
+}
+
+func pipePublicWSToIM(src *wsProxyConn, dst pb.IMService_ChatStreamClient, errChan chan<- error, allowTarget func(to string) bool) {
 	for {
 		_, data, err := src.Conn.ReadMessage()
 		if err != nil {
@@ -264,6 +283,21 @@ func pipePublicWSToIM(src *wsProxyConn, dst pb.IMService_ChatStreamClient, errCh
 		if err != nil {
 			// Keep malformed public frames from tearing down the public WS, as the
 			// previous Gateway edge behavior did.
+			continue
+		}
+		if to := request.GetFrame().GetToUserId(); to != "" && !allowTarget(to) {
+			// Reject without forwarding; keep the connection open like other
+			// bad frames. Echo the frame's room so the client can correlate.
+			errFrame, _ := json.Marshal(&publicChatMessage{
+				Type:      "error",
+				RoomID:    request.GetFrame().GetRoomId(),
+				Content:   "seller not found",
+				Timestamp: time.Now().UnixMilli(),
+			})
+			if err := src.write(websocket.TextMessage, errFrame); err != nil {
+				errChan <- err
+				return
+			}
 			continue
 		}
 		if err := dst.Send(request); err != nil {

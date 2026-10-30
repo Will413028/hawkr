@@ -142,6 +142,20 @@ func TestGetShareURL_Post_StoreCodeUnresolved(t *testing.T) {
 	}
 }
 
+// 上游回非數字的 SellerId 是壞資料：回 500，不是 404，也不退回 store_id。
+func TestGetShareURL_Post_NonNumericUpstreamSellerID_Returns500(t *testing.T) {
+	socialMock := &mockSocialServiceClient{}
+	socialMock.GetPostDetailFn = func(ctx context.Context, in *socialpb.GetPostDetailRequest, opts ...grpc.CallOption) (*socialpb.PostDetailResponse, error) {
+		return &socialpb.PostDetailResponse{Data: &socialpb.PostDetailInfo{Id: "123", SellerId: "not-a-number", SellerName: "x"}}, nil
+	}
+	h := setupShareHolder(&mockSellerServiceClient{}, socialMock, nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/app/share_url?type=post&id=123", nil)
+	req.Header.Set("X-Account-Id", "9999")
+	w := httptest.NewRecorder()
+	setupShareRouter(h).ServeHTTP(w, req)
+	assertHTTPStatus(t, w, http.StatusInternalServerError)
+}
+
 func TestGetShareURL_Product(t *testing.T) {
 	productMock := &mockProductServiceClient{
 		GetPublicProductFn: func(ctx context.Context, in *productpb.GetPublicProductRequest, opts ...grpc.CallOption) (*productpb.GetProductResponse, error) {

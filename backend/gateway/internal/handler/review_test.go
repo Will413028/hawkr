@@ -9,10 +9,13 @@ import (
 	"testing"
 
 	grpcclient "github.com/Will413028/hawkr/gateway/internal/grpc"
+	productpb "github.com/Will413028/hawkr/go-pkg/proto/product"
 	pb "github.com/Will413028/hawkr/go-pkg/proto/review"
 	sellerpb "github.com/Will413028/hawkr/go-pkg/proto/seller"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // ==================== Mock ReviewServiceClient ====================
@@ -24,6 +27,7 @@ type reviewMockClient struct {
 	GetSellerOrderReviewsFn     func(ctx context.Context, in *pb.GetSellerOrderReviewsRequest, opts ...grpc.CallOption) (*pb.GetSellerOrderReviewsResponse, error)
 	GetSellerOrderReviewStatsFn func(ctx context.Context, in *pb.GetSellerOrderReviewStatsRequest, opts ...grpc.CallOption) (*pb.GetSellerOrderReviewStatsResponse, error)
 	ReplyReviewFn               func(ctx context.Context, in *pb.ReplyReviewRequest, opts ...grpc.CallOption) (*pb.ReviewResponse, error)
+	GetReviewFn                 func(ctx context.Context, in *pb.GetReviewRequest, opts ...grpc.CallOption) (*pb.ReviewResponse, error)
 }
 
 func (m *reviewMockClient) GetProductReviews(ctx context.Context, in *pb.GetProductReviewsRequest, opts ...grpc.CallOption) (*pb.ProductReviewsResponse, error) {
@@ -33,6 +37,9 @@ func (m *reviewMockClient) GetProductReviews(ctx context.Context, in *pb.GetProd
 	return nil, nil
 }
 func (m *reviewMockClient) GetReview(ctx context.Context, in *pb.GetReviewRequest, opts ...grpc.CallOption) (*pb.ReviewResponse, error) {
+	if m.GetReviewFn != nil {
+		return m.GetReviewFn(ctx, in, opts...)
+	}
 	return nil, nil
 }
 func (m *reviewMockClient) ReplyReview(ctx context.Context, in *pb.ReplyReviewRequest, opts ...grpc.CallOption) (*pb.ReviewResponse, error) {
@@ -74,8 +81,28 @@ func (m *reviewMockClient) ListStoreRatingStats(ctx context.Context, in *pb.List
 
 // ==================== Router Setup ====================
 
+// exposableStoreMocks 是評論父資源檢查的預設後端：任何商品都屬於可曝光的店 1001。
+// 既有測試只關心評論內容，沿用它；父資源檢查的測試自己給 Product／Seller。
+func exposableStoreMocks() (*mockProductServiceClient, *mockSellerServiceClient) {
+	return &mockProductServiceClient{
+		GetPublicProductFn: func(context.Context, *productpb.GetPublicProductRequest, ...grpc.CallOption) (*productpb.GetProductResponse, error) {
+			return &productpb.GetProductResponse{Data: &productpb.ProductDetail{Seller: &productpb.SellerInfo{StoreId: "1001"}}}, nil
+		},
+	}, &mockSellerServiceClient{
+		BatchGetSellerMetaFn: func(context.Context, *sellerpb.BatchGetSellerMetaRequest, ...grpc.CallOption) (*sellerpb.BatchGetSellerMetaResponse, error) {
+			return &sellerpb.BatchGetSellerMetaResponse{Sellers: map[int64]*sellerpb.SellerMeta{1001: {CanAcceptOrders: true}}}, nil
+		},
+	}
+}
+
 func setupReviewRouter(h *Holder) *gin.Engine {
+	if h.Product == nil && h.Seller == nil {
+		p, s := exposableStoreMocks()
+		h.Product = grpcclient.NewProductClientForTest(p)
+		h.Seller = grpcclient.NewSellerClientForTest(s)
+	}
 	r := gin.New()
+	r.GET("/api/v1/app/reviews/:id", h.GetReview)
 	v1 := r.Group("/api/v1")
 	pub := v1.Group("/public/products")
 	pub.Use(fakeOptionalAuth())
@@ -734,6 +761,145 @@ func TestMaskBuyerDisplayName(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			if got := maskBuyerDisplayName(c.input, c.deleted); got != c.want {
 				t.Errorf("maskBuyerDisplayName(%q, %v) = %q, want %q", c.input, c.deleted, got, c.want)
+			}
+		})
+	}
+}
+
+// ==================== 評論的父資源檢查（商品／評論 → 店家）====================
+
+type reviewGateCase struct {
+	name   string
+	seller func(context.Context, *sellerpb.BatchGetSellerMetaRequest, ...grpc.CallOption) (*sellerpb.BatchGetSellerMetaResponse, error)
+	want   int // HTTP status; resp.Code != 0 maps to a business-code envelope (HTTP 200, code != 0, no data)
+}
+
+func assertGateDenied(t *testing.T, w *httptest.ResponseRecorder, tc reviewGateCase) {
+	t.Helper()
+	assertHTTPStatus(t, w, tc.want)
+	if tc.want == http.StatusOK && !strings.Contains(w.Body.String(), `"code":5000`) {
+		t.Fatalf("want business-code error 5000, got %s", w.Body.String())
+	}
+}
+
+func reviewGateCases() []reviewGateCase {
+	meta := func(m map[int64]*sellerpb.SellerMeta, code int32) func(context.Context, *sellerpb.BatchGetSellerMetaRequest, ...grpc.CallOption) (*sellerpb.BatchGetSellerMetaResponse, error) {
+		return func(context.Context, *sellerpb.BatchGetSellerMetaRequest, ...grpc.CallOption) (*sellerpb.BatchGetSellerMetaResponse, error) {
+			return &sellerpb.BatchGetSellerMetaResponse{Code: code, Sellers: m}, nil
+		}
+	}
+	return []reviewGateCase{
+		{"can_accept_orders=false", meta(map[int64]*sellerpb.SellerMeta{1001: {CanAcceptOrders: false, HasPublicCard: true}}, 0), http.StatusNotFound},
+		{"meta RPC error", func(context.Context, *sellerpb.BatchGetSellerMetaRequest, ...grpc.CallOption) (*sellerpb.BatchGetSellerMetaResponse, error) {
+			return nil, status.Error(codes.Unavailable, "seller down")
+		}, http.StatusServiceUnavailable},
+		{"meta resp.Code != 0", meta(nil, 5000), http.StatusOK},
+		{"meta entry missing", meta(map[int64]*sellerpb.SellerMeta{}, 0), http.StatusNotFound},
+	}
+}
+
+func gateHolder(tc reviewGateCase, rv *reviewMockClient, productStore string) *Holder {
+	return &Holder{
+		Review: grpcclient.NewReviewClientForTest(rv),
+		Product: grpcclient.NewProductClientForTest(&mockProductServiceClient{
+			GetPublicProductFn: func(context.Context, *productpb.GetPublicProductRequest, ...grpc.CallOption) (*productpb.GetProductResponse, error) {
+				return &productpb.GetProductResponse{Data: &productpb.ProductDetail{Seller: &productpb.SellerInfo{StoreId: productStore}}}, nil
+			},
+		}),
+		Seller:  grpcclient.NewSellerClientForTest(&mockSellerServiceClient{BatchGetSellerMetaFn: tc.seller}),
+		BuyerID: noBuyerResolverForTest(),
+		Store:   noStoreResolverForTest(),
+	}
+}
+
+func TestGetProductReviews_ParentStoreGate_FailsClosed(t *testing.T) {
+	for _, tc := range reviewGateCases() {
+		t.Run(tc.name, func(t *testing.T) {
+			rv := &reviewMockClient{GetProductReviewsFn: func(context.Context, *pb.GetProductReviewsRequest, ...grpc.CallOption) (*pb.ProductReviewsResponse, error) {
+				t.Fatal("review-service must not be called when the parent store gate fails")
+				return nil, nil
+			}}
+			w := httptest.NewRecorder()
+			setupReviewRouter(gateHolder(tc, rv, "1001")).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/public/products/42/reviews", nil))
+			assertGateDenied(t, w, tc)
+			if strings.Contains(w.Body.String(), `"records"`) {
+				t.Fatalf("response leaks review data: %s", w.Body.String())
+			}
+		})
+	}
+}
+
+func TestGetProductReviews_ParentProductUnresolvable_FailsClosed(t *testing.T) {
+	for name, store := range map[string]string{"empty store id": "", "non-numeric store id": "abc"} {
+		t.Run(name, func(t *testing.T) {
+			rv := &reviewMockClient{GetProductReviewsFn: func(context.Context, *pb.GetProductReviewsRequest, ...grpc.CallOption) (*pb.ProductReviewsResponse, error) {
+				t.Fatal("review-service must not be called")
+				return nil, nil
+			}}
+			tc := reviewGateCases()[0]
+			w := httptest.NewRecorder()
+			setupReviewRouter(gateHolder(tc, rv, store)).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/public/products/42/reviews", nil))
+			assertHTTPStatus(t, w, http.StatusNotFound)
+		})
+	}
+}
+
+func TestGetReview_ParentStoreGate(t *testing.T) {
+	review := func(context.Context, *pb.GetReviewRequest, ...grpc.CallOption) (*pb.ReviewResponse, error) {
+		return &pb.ReviewResponse{Review: &pb.ReviewInfo{Id: "9", ProductId: "42", Content: "secret-content"}}, nil
+	}
+	for _, tc := range reviewGateCases() {
+		t.Run(tc.name, func(t *testing.T) {
+			rv := &reviewMockClient{GetReviewFn: review}
+			w := httptest.NewRecorder()
+			setupReviewRouter(gateHolder(tc, rv, "1001")).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/app/reviews/9", nil))
+			assertGateDenied(t, w, tc)
+			if strings.Contains(w.Body.String(), "secret-content") {
+				t.Fatalf("response leaks review content: %s", w.Body.String())
+			}
+		})
+	}
+	t.Run("exposable store passes", func(t *testing.T) {
+		tc := reviewGateCase{seller: func(context.Context, *sellerpb.BatchGetSellerMetaRequest, ...grpc.CallOption) (*sellerpb.BatchGetSellerMetaResponse, error) {
+			return &sellerpb.BatchGetSellerMetaResponse{Sellers: map[int64]*sellerpb.SellerMeta{1001: {CanAcceptOrders: true}}}, nil
+		}}
+		w := httptest.NewRecorder()
+		setupReviewRouter(gateHolder(tc, &reviewMockClient{GetReviewFn: review}, "1001")).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/app/reviews/9", nil))
+		assertHTTPStatus(t, w, http.StatusOK)
+		if !strings.Contains(w.Body.String(), "secret-content") {
+			t.Fatalf("expected review body: %s", w.Body.String())
+		}
+	})
+}
+
+func TestGetPublicSellerReviews_StoreMetaFailsClosed(t *testing.T) {
+	for _, tc := range reviewGateCases() {
+		t.Run(tc.name, func(t *testing.T) {
+			rv := &reviewMockClient{
+				GetSellerOrderReviewsFn: func(context.Context, *pb.GetSellerOrderReviewsRequest, ...grpc.CallOption) (*pb.GetSellerOrderReviewsResponse, error) {
+					t.Fatal("review-service must not be called")
+					return nil, nil
+				},
+				GetSellerOrderReviewStatsFn: func(context.Context, *pb.GetSellerOrderReviewStatsRequest, ...grpc.CallOption) (*pb.GetSellerOrderReviewStatsResponse, error) {
+					t.Fatal("review-service must not be called")
+					return nil, nil
+				},
+			}
+			h := gateHolder(tc, rv, "1001")
+			h.OrderReview = grpcclient.NewOrderReviewClientForTest(rv)
+			h.Seller = grpcclient.NewSellerClientForTest(&mockSellerServiceClient{
+				GetSellerFn: func(context.Context, *sellerpb.GetSellerRequest, ...grpc.CallOption) (*sellerpb.SellerResponse, error) {
+					return &sellerpb.SellerResponse{Data: &sellerpb.SellerInfo{StoreId: "1001"}}, nil
+				},
+				BatchGetSellerMetaFn: tc.seller,
+			})
+			r := gin.New()
+			r.GET("/s/:id/reviews", h.GetPublicSellerReviews)
+			r.GET("/s/:id/reviews/stats", h.GetPublicSellerReviewStats)
+			for _, p := range []string{"/s/1001/reviews", "/s/1001/reviews/stats"} {
+				w := httptest.NewRecorder()
+				r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, p, nil))
+				assertGateDenied(t, w, tc)
 			}
 		})
 	}

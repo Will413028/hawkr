@@ -12,6 +12,7 @@ import (
 
 	grpcclient "github.com/Will413028/hawkr/gateway/internal/grpc"
 	pb "github.com/Will413028/hawkr/go-pkg/proto/im"
+	sellerpb "github.com/Will413028/hawkr/go-pkg/proto/seller"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"google.golang.org/grpc"
@@ -193,5 +194,143 @@ func TestChatWebSocket_UsesGRPCPathAndPreservesPublicContractAndResolvedIdentity
 	}
 	if string(got["type"]) != `"pong"` {
 		t.Fatalf("public response type = %s, want pong", got["type"])
+	}
+}
+
+// startChatWS 起 fake IM + 閘道，回傳 client 與 IM 收到的 frame channel。
+func startChatWS(t *testing.T, seller *mockSellerServiceClient, accountType string, extra func(*Holder)) (*websocket.Conn, *gatewayChatStreamFakeIM) {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	lis := bufconn.Listen(1024 * 1024)
+	grpcSrv := grpc.NewServer()
+	fakeIM := &gatewayChatStreamFakeIM{opened: make(chan *pb.ChatStreamOpen, 1), frames: make(chan *pb.ChatStreamClientFrame, 8)}
+	pb.RegisterIMServiceServer(grpcSrv, fakeIM)
+	go func() { _ = grpcSrv.Serve(lis) }()
+	t.Cleanup(grpcSrv.Stop)
+	conn, err := grpc.NewClient("passthrough:///bufnet",
+		grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) { return lis.DialContext(ctx) }),
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatalf("grpc.NewClient: %v", err)
+	}
+	t.Cleanup(func() { conn.Close() })
+	h := &Holder{
+		IM:      grpcclient.NewIMClientForTest(pb.NewIMServiceClient(conn)),
+		BuyerID: buyerResolverForTest(87001),
+		Store:   storeResolverForTest(87002),
+	}
+	if seller != nil {
+		h.Seller = grpcclient.NewSellerClientForTest(seller)
+	}
+	if extra != nil {
+		extra(h)
+	}
+	r := gin.New()
+	r.GET("/ws", fakeJWTAuth(), h.ChatWebSocket)
+	gw := httptest.NewServer(r)
+	t.Cleanup(gw.Close)
+	header := http.Header{"X-Account-Id": []string{"87001"}, "X-Account-Type": []string{accountType}}
+	client, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(gw.URL, "http")+"/ws", header)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	t.Cleanup(func() { client.Close() })
+	select {
+	case <-fakeIM.opened:
+	case <-time.After(time.Second):
+		t.Fatal("no stream open")
+	}
+	return client, fakeIM
+}
+
+func sellerMocksForWS(meta func(context.Context, *sellerpb.BatchGetSellerMetaRequest, ...grpc.CallOption) (*sellerpb.BatchGetSellerMetaResponse, error)) *mockSellerServiceClient {
+	return &mockSellerServiceClient{
+		GetSellerFn: func(context.Context, *sellerpb.GetSellerRequest, ...grpc.CallOption) (*sellerpb.SellerResponse, error) {
+			return &sellerpb.SellerResponse{Data: &sellerpb.SellerInfo{StoreId: "100"}}, nil
+		},
+		BatchGetSellerMetaFn: meta,
+	}
+}
+
+// 買家 frame 的 to 必須通過與 REST 相同的 has_public_card 檢查；被拒的 frame
+// 回 error frame、不轉給 IM，連線保持開著（之後的 ping 照常轉發）。
+func TestChatWebSocket_BuyerFrameTargetGate_RejectsAndDoesNotForward(t *testing.T) {
+	cases := map[string]func(context.Context, *sellerpb.BatchGetSellerMetaRequest, ...grpc.CallOption) (*sellerpb.BatchGetSellerMetaResponse, error){
+		"never public": func(context.Context, *sellerpb.BatchGetSellerMetaRequest, ...grpc.CallOption) (*sellerpb.BatchGetSellerMetaResponse, error) {
+			return &sellerpb.BatchGetSellerMetaResponse{Sellers: map[int64]*sellerpb.SellerMeta{100: {HasPublicCard: false}}}, nil
+		},
+		"meta RPC error": func(context.Context, *sellerpb.BatchGetSellerMetaRequest, ...grpc.CallOption) (*sellerpb.BatchGetSellerMetaResponse, error) {
+			return nil, status.Error(codes.Unavailable, "down")
+		},
+		"meta code != 0": func(context.Context, *sellerpb.BatchGetSellerMetaRequest, ...grpc.CallOption) (*sellerpb.BatchGetSellerMetaResponse, error) {
+			return &sellerpb.BatchGetSellerMetaResponse{Code: 5000}, nil
+		},
+		"meta entry missing": func(context.Context, *sellerpb.BatchGetSellerMetaRequest, ...grpc.CallOption) (*sellerpb.BatchGetSellerMetaResponse, error) {
+			return &sellerpb.BatchGetSellerMetaResponse{Sellers: map[int64]*sellerpb.SellerMeta{}}, nil
+		},
+	}
+	for name, meta := range cases {
+		t.Run(name, func(t *testing.T) {
+			client, fakeIM := startChatWS(t, sellerMocksForWS(meta), "1", nil)
+			if err := client.WriteMessage(websocket.TextMessage, []byte(`{"type":"message","to":"100","content":"hi"}`)); err != nil {
+				t.Fatal(err)
+			}
+			_ = client.SetReadDeadline(time.Now().Add(time.Second))
+			_, raw, err := client.ReadMessage()
+			if err != nil {
+				t.Fatalf("expected error frame: %v", err)
+			}
+			var got map[string]any
+			_ = json.Unmarshal(raw, &got)
+			if got["type"] != "error" {
+				t.Fatalf("frame = %s, want type=error", raw)
+			}
+			// 連線仍可用，且 IM 收到的第一個 frame 是 ping，不是被拒的 message。
+			if err := client.WriteMessage(websocket.TextMessage, []byte(`{"type":"ping"}`)); err != nil {
+				t.Fatal(err)
+			}
+			select {
+			case f := <-fakeIM.frames:
+				if f.GetType() != "ping" {
+					t.Fatalf("IM received %+v, want only the later ping", f)
+				}
+			case <-time.After(time.Second):
+				t.Fatal("ping not forwarded after rejection")
+			}
+		})
+	}
+}
+
+func TestChatWebSocket_BuyerFrameTargetGate_AllowsPublicCardStore(t *testing.T) {
+	meta := func(context.Context, *sellerpb.BatchGetSellerMetaRequest, ...grpc.CallOption) (*sellerpb.BatchGetSellerMetaResponse, error) {
+		return &sellerpb.BatchGetSellerMetaResponse{Sellers: map[int64]*sellerpb.SellerMeta{100: {HasPublicCard: true}}}, nil
+	}
+	client, fakeIM := startChatWS(t, sellerMocksForWS(meta), "1", nil)
+	if err := client.WriteMessage(websocket.TextMessage, []byte(`{"type":"message","to":"100","content":"hi"}`)); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case f := <-fakeIM.frames:
+		if f.GetToUserId() != "100" {
+			t.Fatalf("IM frame = %+v, want to=100", f)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("allowed frame not forwarded")
+	}
+}
+
+// 賣家 frame 不經店家檢查（Seller client 未設定：被呼叫就 panic）。
+func TestChatWebSocket_SellerFrameTargetUnchanged(t *testing.T) {
+	client, fakeIM := startChatWS(t, nil, "2", nil)
+	if err := client.WriteMessage(websocket.TextMessage, []byte(`{"type":"message","to":"555","content":"hi"}`)); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case f := <-fakeIM.frames:
+		if f.GetToUserId() != "555" {
+			t.Fatalf("IM frame = %+v, want to=555", f)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("seller frame not forwarded")
 	}
 }
