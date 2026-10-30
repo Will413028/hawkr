@@ -1,30 +1,34 @@
 diff --git a/dist/esm/server/app-render/cache-signal.js b/dist/esm/server/app-render/cache-signal.js
-index 8d570750e90a9f2df882743ee75c5712f1d9a744..465fe7995042e71fb4edce33747214d60298c8e0 100644
+index 2913e6b4b2fec488aff250b2a900cab45f78cc3b..0ef836d58b6d1449b903442fcafa8d203707bfe6 100644
 --- a/dist/esm/server/app-render/cache-signal.js
-+++ b/dist/esm/server/app-render/cache-signal.js	
-@@ -165,7 +165,16 @@ function scheduleImmediateAndTimeoutWithCleanup(cb) {
-         clearPending = clearTimeout.bind(null, timeout);
-     });
-     clearPending = clearImmediate.bind(null, immediate);
--    return ()=>clearPending();
-+    return ()=>{
++++ b/dist/esm/server/app-render/cache-signal.js
+@@ -185,11 +185,20 @@ function scheduleImmediateAndTimeoutWithCleanup(callback, immediateTracker) {
+     return ()=>{
+         cancelled = true;
+         unsubscribe == null ? void 0 : unsubscribe();
 +        // workerd forbids touching I/O objects across requests: the module-loading
 +        // CacheSignal is an isolate-wide singleton, so a timer scheduled by another
 +        // request cannot be cleared here (IoContext error). A failed clear means the
 +        // timer already died with its request; both call sites reset or reschedule
 +        // pendingTimeoutCleanup right after, so ignoring is safe.
-+        try {
-+            clearPending();
-+        } catch {}
-+    };
+         if (immediate !== null) {
+-            clearImmediate(immediate);
++            try {
++                clearImmediate(immediate);
++            } catch {}
+         }
+         if (timeout !== null) {
+-            clearTimeout(timeout);
++            try {
++                clearTimeout(timeout);
++            } catch {}
+         }
+     };
  }
- 
- //# sourceMappingURL=cache-signal.js.map
-\ No newline at end of file
 diff --git a/dist/esm/server/node-environment-extensions/fast-set-immediate.external.js b/dist/esm/server/node-environment-extensions/fast-set-immediate.external.js
-index 7f1b7c9ad871f500c933618f5f9bbdf679cfceae..b9c27f8b60e4b28af723f46467e572d2818a3392 100644
+index e1cdf3183ff1881f42493cb3f6d205352d70a068..b885710d2f708c78a635e88b701514b93a163f38 100644
 --- a/dist/esm/server/node-environment-extensions/fast-set-immediate.external.js
-+++ b/dist/esm/server/node-environment-extensions/fast-set-immediate.external.js	
++++ b/dist/esm/server/node-environment-extensions/fast-set-immediate.external.js
 @@ -34,6 +34,17 @@ function install() {
          globalThis.setImmediate = nodeTimers.setImmediate = // Workaround for missing __promisify__ which is not a real property
          patchedSetImmediate;
@@ -43,7 +47,7 @@ index 7f1b7c9ad871f500c933618f5f9bbdf679cfceae..b9c27f8b60e4b28af723f46467e572d2
          const nodeTimersPromises = require('node:timers/promises');
          nodeTimersPromises.setImmediate = patchedSetImmediatePromise;
          process.nextTick = patchedNextTick;
-@@ -529,7 +540,16 @@ const patchedClearImmediate = (immediateObject)=>{
+@@ -590,7 +601,16 @@ const patchedClearImmediate = (immediateObject)=>{
          ;
          immediateObject[Symbol.dispose]();
      } else {
@@ -62,33 +66,37 @@ index 7f1b7c9ad871f500c933618f5f9bbdf679cfceae..b9c27f8b60e4b28af723f46467e572d2
  };
  //========================================================
 diff --git a/dist/server/app-render/cache-signal.js b/dist/server/app-render/cache-signal.js
-index 2c453189a38fe4b8b253b6a7a9ed9fb66f5a2f84..281b872346f7ca02687b747b7909140adf35fd55 100644
+index 2835812cbcd6dfcb5f490dfe198dbca9c8a571cf..181f0bf6b528c50631a8ab08602e21017b2a014e 100644
 --- a/dist/server/app-render/cache-signal.js
-+++ b/dist/server/app-render/cache-signal.js	
-@@ -175,7 +175,16 @@ function scheduleImmediateAndTimeoutWithCleanup(cb) {
-         clearPending = clearTimeout.bind(null, timeout);
-     });
-     clearPending = clearImmediate.bind(null, immediate);
--    return ()=>clearPending();
-+    return ()=>{
++++ b/dist/server/app-render/cache-signal.js
+@@ -195,11 +195,20 @@ function scheduleImmediateAndTimeoutWithCleanup(callback, immediateTracker) {
+     return ()=>{
+         cancelled = true;
+         unsubscribe == null ? void 0 : unsubscribe();
 +        // workerd forbids touching I/O objects across requests: the module-loading
 +        // CacheSignal is an isolate-wide singleton, so a timer scheduled by another
 +        // request cannot be cleared here (IoContext error). A failed clear means the
 +        // timer already died with its request; both call sites reset or reschedule
 +        // pendingTimeoutCleanup right after, so ignoring is safe.
-+        try {
-+            clearPending();
-+        } catch {}
-+    };
+         if (immediate !== null) {
+-            clearImmediate(immediate);
++            try {
++                clearImmediate(immediate);
++            } catch {}
+         }
+         if (timeout !== null) {
+-            clearTimeout(timeout);
++            try {
++                clearTimeout(timeout);
++            } catch {}
+         }
+     };
  }
- 
- //# sourceMappingURL=cache-signal.js.map
-\ No newline at end of file
 diff --git a/dist/server/node-environment-extensions/fast-set-immediate.external.js b/dist/server/node-environment-extensions/fast-set-immediate.external.js
-index eeaa0ae5f90b5037836954f50e671e073ef73718..5fa63338e850561336f2f90ee7b158b3aedc34fc 100644
+index 16ee3506512d04539bed8692eb8e3a731febe278..f267aac46b5cd194dbbf040b1f7d7f6a30f94032 100644
 --- a/dist/server/node-environment-extensions/fast-set-immediate.external.js
-+++ b/dist/server/node-environment-extensions/fast-set-immediate.external.js	
-@@ -60,6 +60,17 @@ function install() {
++++ b/dist/server/node-environment-extensions/fast-set-immediate.external.js
+@@ -68,6 +68,17 @@ function install() {
          globalThis.setImmediate = nodeTimers.setImmediate = // Workaround for missing __promisify__ which is not a real property
          patchedSetImmediate;
          globalThis.clearImmediate = nodeTimers.clearImmediate = patchedClearImmediate;
@@ -106,7 +114,7 @@ index eeaa0ae5f90b5037836954f50e671e073ef73718..5fa63338e850561336f2f90ee7b158b3
          const nodeTimersPromises = require('node:timers/promises');
          nodeTimersPromises.setImmediate = patchedSetImmediatePromise;
          process.nextTick = patchedNextTick;
-@@ -487,7 +498,16 @@ const patchedClearImmediate = (immediateObject)=>{
+@@ -544,7 +555,16 @@ const patchedClearImmediate = (immediateObject)=>{
          ;
          immediateObject[Symbol.dispose]();
      } else {

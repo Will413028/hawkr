@@ -134,8 +134,11 @@ manually. Re-check the relevant entry whenever a patched dependency is bumped
   matters in production: the pre-bundled `next-server/*.runtime.prod.js` copies
   carry their own CacheSignal, and only the global timer shim reaches them.
 - **Upstream**: not filed against vercel/next.js as of 2026-09-04; no known fix.
-- **Installed version**: `next 16.3.6`（根 lockfile；website 與 admin 同一個 next，patch 作用到兩者）。
-  patch 原本對 16.2.10 切出，之後每次 bump 都能乾淨套用。
+- **Installed version**: `next 16.4.1`（根 lockfile；website 與 admin 同一個 next，patch 作用到兩者）。
+  patch 原本對 16.2.10 切出，到 16.3.6 為止每次 bump 都能乾淨套用；16.4.1 上游改寫了
+  `scheduleImmediateAndTimeoutWithCleanup`（加了 `cancelled`／`unsubscribe`／`immediateTracker`），
+  cache-signal.js 的 hunk 因此重切成分別包住 `clearImmediate` 與 `clearTimeout` 的 try/catch，
+  fast-set-immediate.external.js 的兩個 hunk 原樣套用。跨 request 清理仍沒有上游修復。
 - **Redemption condition**: 一個 Next 版本的 `scheduleImmediateAndTimeoutWithCleanup`
   （或 OpenNext 的 timer shim）容許跨 request 的清理，且依本機檢查在 workerd 不再出現
   `Cannot perform I/O on behalf of a different request`。

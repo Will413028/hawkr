@@ -14,21 +14,10 @@ autoInstallPeers: false
 # 這裡刪了而 audit 仍報就失敗）。不要在這裡新增 osv-scanner.toml 沒有的 id。
 auditConfig:
   ignoreGhsas:
-    - GHSA-2464-fhr4-w9xw
     - GHSA-333x-w4r6-6crp
-    - GHSA-39w2-rjm5-chcv
-    - GHSA-3w37-wq28-93x7
-    - GHSA-4jqv-mc3x-m676
-    - GHSA-673q-mjm6-r5xr
     - GHSA-9wx9-5pv9-3349
     - GHSA-f86p-h4j2-7qgj
-    - GHSA-cjq9-62q9-8jv4
-    - GHSA-f87g-xv8r-7p7x
-    - GHSA-h694-7cp9-m8p3
-    - GHSA-mchm-gjx6-7h55
-    - GHSA-mcj8-r9mp-w47p
     - GHSA-mrhx-c7xc-m3w5
-    - GHSA-p3m5-59mp-jv5r
     - GHSA-w74x-v6f9-j3xg
     - GHSA-wjr9-j795-jxcr
     - GHSA-xhq7-xmqj-769h
@@ -45,7 +34,7 @@ catalog:
   "@types/node": ^26.0.0
   "@types/react": 19.2.18
   "@types/react-dom": 19.2.4
-  next: 16.3.6
+  next: 16.4.1
   next-intl: 4.13.0
   react: 19.2.8
   react-dom: 19.2.8
