@@ -155,3 +155,19 @@ manually. Re-check the relevant entry whenever a patched dependency is bumped
   未確認：步驟 3 在拿掉 patch 時能不能穩定重現（原始證據是線上 Sentry 事件，沒有本機重現紀錄）；
   缺的是一次拿掉 patch 的本機負載測試。若不能重現，退場依據只剩步驟 1 的原始碼檢查。
 - **Redemption action**: 升級 next → 共用步驟（`patchedDependencies` 的 `next` 與檔案）→ 上面的 1、3。
+
+---
+
+## `@storybook__nextjs-vite@10.6.2.patch` — LayoutRouterContext 缺 `parentRenderTree`
+
+- **File patched**: `dist/_browser-chunks/chunk-342N7CWU.js`（`AppRouterProvider` 提供的 `LayoutRouterContext` 值）
+- **What it does**: next 16.4 的 `useRouter` 改讀 `LayoutRouterContext.parentRenderTree.data.bfcacheId`
+  （16.3 讀 `parentCacheNode.bfcacheId`）。storybook 10.6.2 只提供 `parentCacheNode`，
+  所以任何 story 渲染到 `useRouter` 都丟 `Cannot read properties of undefined (reading 'data')`
+  （2026-10-30 CI `Storybook 互動測試` 204 個全失敗）。patch 補上 `parentRenderTree: { data: { bfcacheId: 0 } }`，
+  與上游修法（10.6.3 起）相同。
+- **Upstream**: 10.6.3（2026-10-20）起已修（已核對 10.6.3、10.6.4、10.6.5 的 dist 都有 `parentRenderTree`）；10.6.3 要到 2026-11-03 才滿兩週，依根目錄 AGENTS.md 此前不採用。
+- **Redemption condition**: `@storybook/nextjs-vite` 升到含 `parentRenderTree` 的版本（>= 10.6.3 且發佈滿兩週（2026-11-03 起））。
+- **How to check**: 升級後 `grep -rn parentRenderTree node_modules/@storybook/nextjs-vite/dist` 有結果。
+- **Redemption action**: 升級 → 共用步驟（`patchedDependencies` 的 `@storybook/nextjs-vite@10.6.2` 與檔案）→ 上面的 grep；
+  storybook 互動測試由 CI 驗證。

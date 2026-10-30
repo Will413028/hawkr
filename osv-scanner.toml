@@ -65,39 +65,14 @@ ignoreUntil = 2027-01-28
 reason = "基準：Go github.com/go-jose/go-jose/v4@4.1.4（CVSS 6.9，MEDIUM）；升級待核准"
 
 [[IgnoredVulns]]
-id = "GO-2026-5676"
-ignoreUntil = 2027-01-28
-reason = "基準：Go github.com/quic-go/quic-go@0.59.0（CVSS 5.3，MEDIUM）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GO-2026-5841"
-ignoreUntil = 2026-11-29
-reason = "基準：Go github.com/klauspost/compress@1.18.5（CVSS 7.5，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
 id = "GO-2026-5932"
 ignoreUntil = 2026-11-29
 reason = "基準：Go golang.org/x/crypto@0.54.0, golang.org/x/crypto@0.55.0（無 CVSS 分數，UNSCORED）；升級待核准"
 
 [[IgnoredVulns]]
-id = "GO-2026-6061"
-ignoreUntil = 2026-11-29
-reason = "基準：Go google.golang.org/grpc@1.82.0（CVSS 8.8，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GO-2026-6253"
-ignoreUntil = 2026-11-29
-reason = "基準：Go github.com/moby/go-archive@0.2.0（CVSS 7.1，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
 id = "GO-2026-6303"
 ignoreUntil = 2026-11-29
 reason = "基準：Go golang.org/x/crypto@0.54.0（無 CVSS 分數，UNSCORED）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GO-2026-6348"
-ignoreUntil = 2026-11-29
-reason = "基準：Go google.golang.org/grpc@1.82.0, google.golang.org/grpc@1.83.0（CVSS 8.7，HIGH）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GO-2026-6354"
@@ -108,21 +83,6 @@ reason = "基準：Go golang.org/x/crypto@0.54.0, golang.org/x/crypto@0.55.0（�
 id = "GO-2026-6355"
 ignoreUntil = 2026-11-29
 reason = "基準：Go golang.org/x/crypto@0.54.0, golang.org/x/crypto@0.55.0（無 CVSS 分數，UNSCORED）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GO-2026-6441"
-ignoreUntil = 2027-01-28
-reason = "基準：Go google.golang.org/grpc@1.82.0, google.golang.org/grpc@1.83.0（CVSS 6.3，MEDIUM）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GO-2026-6443"
-ignoreUntil = 2026-11-29
-reason = "基準：Go google.golang.org/grpc@1.82.0, google.golang.org/grpc@1.83.0（CVSS 8.7，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GO-2026-6505"
-ignoreUntil = 2027-01-28
-reason = "基準：Go go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc@1.40.0, go.opentelemetry.io/otel/exporters/otlp/otlptrace@1.40.0 等（CVSS 2.0，LOW）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GO-2026-6603"
@@ -153,11 +113,6 @@ reason = "基準：Go golang.org/x/net@0.57.0（無 CVSS 分數，UNSCORED）；
 id = "GO-2026-6629"
 ignoreUntil = 2026-11-29
 reason = "基準：Go golang.org/x/text@0.40.0（無 CVSS 分數，UNSCORED）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GO-2026-6686"
-ignoreUntil = 2027-01-28
-reason = "基準：Go github.com/moby/sys/user@0.4.0（CVSS 5.5，MEDIUM）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GO-2026-6860"
@@ -296,16 +251,6 @@ reason = "基準：PyPI fonttools@4.56.0（CVSS 6.3，MEDIUM）；升級待核�
 
 [[IgnoredVulns]]
 id = "GHSA-9v8h-qqgm-4m35"
-ignoreUntil = 2026-11-06
-reason = "基準：PyPI brotli@1.2.0（CVSS 9.2，CRITICAL）；升級待核准"
-
-[[IgnoredVulns]]
-id = "PYSEC-2026-1389"
-ignoreUntil = 2027-01-28
-reason = "基準：PyPI fonttools@4.56.0（CVSS 6.3，MEDIUM）；升級待核准"
-
-[[IgnoredVulns]]
-id = "PYSEC-2026-4322"
 ignoreUntil = 2026-11-06
 reason = "基準：PyPI brotli@1.2.0（CVSS 9.2，CRITICAL）；升級待核准"
 
@@ -565,11 +510,6 @@ ignoreUntil = 2026-11-29
 reason = "基準：npm basic-ftp@5.3.1（CVSS 8.2，HIGH）；升級待核准"
 
 [[IgnoredVulns]]
-id = "GHSA-f2ph-cmg5-wxc8"
-ignoreUntil = 2026-11-06
-reason = "基準：npm @storybook/addon-mcp@10.6.0, @storybook/addon-vitest@10.6.0 等（CVSS 9.4，CRITICAL）；升級待核准"
-
-[[IgnoredVulns]]
 id = "GHSA-f72v-6w45-q472"
 ignoreUntil = 2027-01-28
 reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 5.9，MEDIUM）；升級待核准"
@@ -645,11 +585,6 @@ ignoreUntil = 2026-11-29
 reason = "基準：npm ip-address@10.2.0（CVSS 7.7，HIGH）；升級待核准"
 
 [[IgnoredVulns]]
-id = "GHSA-p63j-vcc4-9vmv"
-ignoreUntil = 2026-11-06
-reason = "基準：npm @vitest/browser@4.1.8（CVSS 9.4，CRITICAL）；升級待核准"
-
-[[IgnoredVulns]]
 id = "GHSA-p9ff-h696-f583"
 ignoreUntil = 2026-11-29
 reason = "基準：npm vite@8.0.3（CVSS 8.2，HIGH）；升級待核准"
@@ -663,11 +598,6 @@ reason = "基準：npm tmp@0.0.33, tmp@0.1.0（CVSS 7.7，HIGH）；升級待核
 id = "GHSA-pmjh-fq2x-6v4x"
 ignoreUntil = 2027-01-28
 reason = "基準：npm undici@7.28.0, undici@7.29.0 等（CVSS 5.9，MEDIUM）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-px85-f4q5-jh77"
-ignoreUntil = 2026-11-29
-reason = "基準：npm @storybook/addon-mcp@10.6.0, @storybook/addon-vitest@10.6.0 等（CVSS 8.7，HIGH）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-q2hr-2g5m-vwhr"

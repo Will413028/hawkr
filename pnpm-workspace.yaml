@@ -42,7 +42,7 @@ catalog:
   typescript: 7.0.2
   typescript-compiler-api: npm:@typescript/typescript6@6.0.2
   use-intl: 4.13.0
-  vitest: ^4.1.8
+  vitest: 4.1.10
 
 # minimumReleaseAge (pnpm 11 default: 24h) needs a live round-trip to
 # registry.npmjs.org per lockfile entry to read its publish date. That
@@ -186,4 +186,5 @@ allowBuilds:
 patchedDependencies:
   '@editorjs/editorjs': patches/@editorjs__editorjs.patch
   '@opennextjs/cloudflare': patches/@opennextjs__cloudflare.patch
+  '@storybook/nextjs-vite@10.6.2': patches/@storybook__nextjs-vite@10.6.2.patch
   next: patches/next.patch
