@@ -17,6 +17,7 @@
 - LINE 驗章要分兩條路：web 用 HS256＋channel secret，App 用 ES256＋JWKS。同一個驗證器不能只看 discovery。web 那條也可以不驗 ID token 簽章，改成 token endpoint 走 TLS 直接拿 ID token（OIDC Core 3.1.3.7 允許）。
 - web 跟 App 要用**同一個 provider** 底下的 channel，`sub` 才會一致；(provider, sub) 當外部身分鍵。
 - email 可能拿不到。帳號模型不能假設 LINE 一定給 email。
+- 實測（2026-10-31，channel `Hawkr Login (dev)` 的 email 權限為 Applied，本機 `http://localhost:3000`）：同意畫面上 Email address 是可關的開關，其餘兩項標 Required。關掉 email 後按 Allow：callback 照常 302、登入成功（`identity.sessions` 新增一列），`identity.account_identities` 的 LINE 列 `email` 為 NULL、`email_verified=f`，沒有錯誤也沒有另建帳號。拒給 email 不是錯誤回應，只是 ID token 沒有 `email` claim；符合 D4（照樣建帳、email 留空）。
 
 ## b. Sign in with Apple（web）
 
