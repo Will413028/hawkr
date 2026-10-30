@@ -1331,131 +1331,6 @@ class Suspension extends $pb.GeneratedMessage {
   $0.Timestamp ensureSuspendedAt() => $_ensure(0);
 }
 
-class LinkAppleCredentialRequest extends $pb.GeneratedMessage {
-  factory LinkAppleCredentialRequest({
-    $core.String? idToken,
-    $core.String? authorizationCode,
-  }) {
-    final result = LinkAppleCredentialRequest._();
-    if (idToken != null) result.idToken = idToken;
-    if (authorizationCode != null) result.authorizationCode = authorizationCode;
-    return result;
-  }
-
-  LinkAppleCredentialRequest._();
-
-  factory LinkAppleCredentialRequest.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      LinkAppleCredentialRequest()..mergeFromBuffer(data, registry);
-  factory LinkAppleCredentialRequest.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      LinkAppleCredentialRequest()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'LinkAppleCredentialRequest',
-      package: const $pb.PackageName(
-          _omitMessageNames ? '' : 'hawkr.identity.v1alpha1'),
-      createEmptyInstance: LinkAppleCredentialRequest.$_createMessage)
-    ..aOS(1, _omitFieldNames ? '' : 'idToken')
-    ..aOS(2, _omitFieldNames ? '' : 'authorizationCode')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LinkAppleCredentialRequest clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LinkAppleCredentialRequest copyWith(
-          void Function(LinkAppleCredentialRequest) updates) =>
-      super.copyWith(
-              (message) => updates(message as LinkAppleCredentialRequest))
-          as LinkAppleCredentialRequest;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  @$core.Deprecated(
-      'Use LinkAppleCredentialRequest() / LinkAppleCredentialRequest.new instead')
-  static LinkAppleCredentialRequest create() => LinkAppleCredentialRequest._();
-  static $pb.GeneratedMessage $_createMessage() =>
-      LinkAppleCredentialRequest._();
-  @$core.override
-  LinkAppleCredentialRequest createEmptyInstance() =>
-      LinkAppleCredentialRequest._();
-  @$core.pragma('dart2js:noInline')
-  static LinkAppleCredentialRequest getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<LinkAppleCredentialRequest>(
-          LinkAppleCredentialRequest.$_createMessage);
-  static LinkAppleCredentialRequest? _defaultInstance;
-
-  /// Sign in with Apple 這次給的 identity token：驗證它的簽章與 audience；伺服器之後確認 Apple 換 token 簽發的 ID token 是同一個身分。
-  @$pb.TagNumber(1)
-  $core.String get idToken => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set idToken($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasIdToken() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearIdToken() => $_clearField(1);
-
-  /// 同一次給的 authorization code，伺服器在背景以它換 refresh token 保存。
-  @$pb.TagNumber(2)
-  $core.String get authorizationCode => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set authorizationCode($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasAuthorizationCode() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearAuthorizationCode() => $_clearField(2);
-}
-
-class LinkAppleCredentialResponse extends $pb.GeneratedMessage {
-  factory LinkAppleCredentialResponse() => LinkAppleCredentialResponse._();
-
-  LinkAppleCredentialResponse._();
-
-  factory LinkAppleCredentialResponse.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      LinkAppleCredentialResponse()..mergeFromBuffer(data, registry);
-  factory LinkAppleCredentialResponse.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      LinkAppleCredentialResponse()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'LinkAppleCredentialResponse',
-      package: const $pb.PackageName(
-          _omitMessageNames ? '' : 'hawkr.identity.v1alpha1'),
-      createEmptyInstance: LinkAppleCredentialResponse.$_createMessage)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LinkAppleCredentialResponse clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LinkAppleCredentialResponse copyWith(
-          void Function(LinkAppleCredentialResponse) updates) =>
-      super.copyWith(
-              (message) => updates(message as LinkAppleCredentialResponse))
-          as LinkAppleCredentialResponse;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  @$core.Deprecated(
-      'Use LinkAppleCredentialResponse() / LinkAppleCredentialResponse.new instead')
-  static LinkAppleCredentialResponse create() =>
-      LinkAppleCredentialResponse._();
-  static $pb.GeneratedMessage $_createMessage() =>
-      LinkAppleCredentialResponse._();
-  @$core.override
-  LinkAppleCredentialResponse createEmptyInstance() =>
-      LinkAppleCredentialResponse._();
-  @$core.pragma('dart2js:noInline')
-  static LinkAppleCredentialResponse getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<LinkAppleCredentialResponse>(
-          LinkAppleCredentialResponse.$_createMessage);
-  static LinkAppleCredentialResponse? _defaultInstance;
-}
-
 class DeleteAccountRequest extends $pb.GeneratedMessage {
   factory DeleteAccountRequest() => DeleteAccountRequest._();
 
@@ -1596,16 +1471,6 @@ class IdentityAppServiceApi {
       _client.invoke<GetSessionResponse>(ctx, 'IdentityAppService',
           'GetSession', request, GetSessionResponse());
 
-  /// LinkAppleCredential 交出 Sign in with Apple 的憑證（App Store 審核準則 5.1.1(v)）：App 每次以 Apple 原生登入成功後呼叫。
-  /// 伺服器驗證 identity token（簽章、issuer、audience），之後在背景以 authorization code 換成 refresh token；Apple 換 token
-  /// 簽發的 ID token 必須與這個 identity token 是同一個身分才加密保存（取代舊的），成功只表示已經排入。帳號最終刪除時
-  /// 伺服器自動撤銷保存的 token。可以安全重送。identity token 無效時回 invalid_argument；Apple 沒有設定（本機開發）時回
-  /// unavailable。
-  $async.Future<LinkAppleCredentialResponse> linkAppleCredential(
-          $pb.ClientContext? ctx, LinkAppleCredentialRequest request) =>
-      _client.invoke<LinkAppleCredentialResponse>(ctx, 'IdentityAppService',
-          'LinkAppleCredential', request, LinkAppleCredentialResponse());
-
   /// SignOut 撤銷目前的 session。web 的回應另以 Set-Cookie 清掉 `__Host-hk_session`。session 已經不存在時也成功。停權的帳號也能呼叫。
   $async.Future<SignOutResponse> signOut(
           $pb.ClientContext? ctx, SignOutRequest request) =>
@@ -1643,7 +1508,7 @@ class IdentityAppServiceApi {
 
   /// DeleteAccount 刪除呼叫者的帳號（App Store 審核準則 5.1.1(v)）。沒有未完成的訂單時立即刪除；有的話進入刪除流程，
   /// 最後一筆訂單完成後自動刪除，期間不能新增收藏與追蹤；流程中再呼叫回目前的狀態。帳號有店家時店家是
-  /// 參與者：同一個 transaction 關閉買家、店家並刪除帳號，店家有未結訂單時與買家一起等待到兩側都結清。保存的 Apple 授權由伺服器在最後刪除時撤銷，client 不需要任何前置步驟。
+  /// 參與者：同一個 transaction 關閉買家、店家並刪除帳號，店家有未結訂單時與買家一起等待到兩側都結清。client 不需要任何前置步驟。
   /// 刪除之後 token 不再有效，所以 client 不自動重送：沒收到回應時以 GetSession 確認，unauthenticated 表示已刪除。
   $async.Future<DeleteAccountResponse> deleteAccount(
           $pb.ClientContext? ctx, DeleteAccountRequest request) =>

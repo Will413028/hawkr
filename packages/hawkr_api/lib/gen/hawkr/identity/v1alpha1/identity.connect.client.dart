@@ -70,28 +70,6 @@ extension type IdentityAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// LinkAppleCredential 交出 Sign in with Apple 的憑證（App Store 審核準則 5.1.1(v)）：App 每次以 Apple 原生登入成功後呼叫。
-  /// 伺服器驗證 identity token（簽章、issuer、audience），之後在背景以 authorization code 換成 refresh token；Apple 換 token
-  /// 簽發的 ID token 必須與這個 identity token 是同一個身分才加密保存（取代舊的），成功只表示已經排入。帳號最終刪除時
-  /// 伺服器自動撤銷保存的 token。可以安全重送。identity token 無效時回 invalid_argument；Apple 沒有設定（本機開發）時回
-  /// unavailable。
-  Future<hawkridentityv1alpha1identity.LinkAppleCredentialResponse> linkAppleCredential(
-    hawkridentityv1alpha1identity.LinkAppleCredentialRequest input, {
-    connect.Headers? headers,
-    connect.AbortSignal? signal,
-    Function(connect.Headers)? onHeader,
-    Function(connect.Headers)? onTrailer,
-  }) {
-    return connect.Client(_transport).unary(
-      specs.IdentityAppService.linkAppleCredential,
-      input,
-      signal: signal,
-      headers: headers,
-      onHeader: onHeader,
-      onTrailer: onTrailer,
-    );
-  }
-
   /// SignOut 撤銷目前的 session。web 的回應另以 Set-Cookie 清掉 `__Host-hk_session`。session 已經不存在時也成功。停權的帳號也能呼叫。
   Future<hawkridentityv1alpha1identity.SignOutResponse> signOut(
     hawkridentityv1alpha1identity.SignOutRequest input, {
@@ -189,7 +167,7 @@ extension type IdentityAppServiceClient (connect.Transport _transport) {
 
   /// DeleteAccount 刪除呼叫者的帳號（App Store 審核準則 5.1.1(v)）。沒有未完成的訂單時立即刪除；有的話進入刪除流程，
   /// 最後一筆訂單完成後自動刪除，期間不能新增收藏與追蹤；流程中再呼叫回目前的狀態。帳號有店家時店家是
-  /// 參與者：同一個 transaction 關閉買家、店家並刪除帳號，店家有未結訂單時與買家一起等待到兩側都結清。保存的 Apple 授權由伺服器在最後刪除時撤銷，client 不需要任何前置步驟。
+  /// 參與者：同一個 transaction 關閉買家、店家並刪除帳號，店家有未結訂單時與買家一起等待到兩側都結清。client 不需要任何前置步驟。
   /// 刪除之後 token 不再有效，所以 client 不自動重送：沒收到回應時以 GetSession 確認，unauthenticated 表示已刪除。
   Future<hawkridentityv1alpha1identity.DeleteAccountResponse> deleteAccount(
     hawkridentityv1alpha1identity.DeleteAccountRequest input, {

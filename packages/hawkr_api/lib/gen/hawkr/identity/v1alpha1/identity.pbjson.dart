@@ -471,38 +471,6 @@ final $typed_data.Uint8List suspensionDescriptor = $convert.base64Decode(
     'CgpTdXNwZW5zaW9uEkIKDHN1c3BlbmRlZF9hdBgBIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW'
     '1lc3RhbXBCA+BBA1ILc3VzcGVuZGVkQXQ=');
 
-@$core.Deprecated('Use linkAppleCredentialRequestDescriptor instead')
-const LinkAppleCredentialRequest$json = {
-  '1': 'LinkAppleCredentialRequest',
-  '2': [
-    {'1': 'id_token', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'idToken'},
-    {
-      '1': 'authorization_code',
-      '3': 2,
-      '4': 1,
-      '5': 9,
-      '8': {},
-      '10': 'authorizationCode'
-    },
-  ],
-};
-
-/// Descriptor for `LinkAppleCredentialRequest`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List linkAppleCredentialRequestDescriptor =
-    $convert.base64Decode(
-        'ChpMaW5rQXBwbGVDcmVkZW50aWFsUmVxdWVzdBIeCghpZF90b2tlbhgBIAEoCUID4EECUgdpZF'
-        'Rva2VuEjIKEmF1dGhvcml6YXRpb25fY29kZRgCIAEoCUID4EECUhFhdXRob3JpemF0aW9uQ29k'
-        'ZQ==');
-
-@$core.Deprecated('Use linkAppleCredentialResponseDescriptor instead')
-const LinkAppleCredentialResponse$json = {
-  '1': 'LinkAppleCredentialResponse',
-};
-
-/// Descriptor for `LinkAppleCredentialResponse`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List linkAppleCredentialResponseDescriptor =
-    $convert.base64Decode('ChtMaW5rQXBwbGVDcmVkZW50aWFsUmVzcG9uc2U=');
-
 @$core.Deprecated('Use deleteAccountRequestDescriptor instead')
 const DeleteAccountRequest$json = {
   '1': 'DeleteAccountRequest',
@@ -594,12 +562,6 @@ const $core.Map<$core.String, $core.dynamic> IdentityAppServiceBase$json = {
       '4': {'34': 1},
     },
     {
-      '1': 'LinkAppleCredential',
-      '2': '.hawkr.identity.v1alpha1.LinkAppleCredentialRequest',
-      '3': '.hawkr.identity.v1alpha1.LinkAppleCredentialResponse',
-      '4': {'34': 2},
-    },
-    {
       '1': 'SignOut',
       '2': '.hawkr.identity.v1alpha1.SignOutRequest',
       '3': '.hawkr.identity.v1alpha1.SignOutResponse'
@@ -642,10 +604,6 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.identity.v1alpha1.Account': Account$json,
   '.hawkr.identity.v1alpha1.Suspension': Suspension$json,
   '.google.protobuf.Timestamp': $0.Timestamp$json,
-  '.hawkr.identity.v1alpha1.LinkAppleCredentialRequest':
-      LinkAppleCredentialRequest$json,
-  '.hawkr.identity.v1alpha1.LinkAppleCredentialResponse':
-      LinkAppleCredentialResponse$json,
   '.hawkr.identity.v1alpha1.SignOutRequest': SignOutRequest$json,
   '.hawkr.identity.v1alpha1.SignOutResponse': SignOutResponse$json,
   '.hawkr.identity.v1alpha1.LinkIdentityRequest': LinkIdentityRequest$json,
@@ -668,19 +626,16 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
 final $typed_data.Uint8List identityAppServiceDescriptor = $convert.base64Decode(
     'ChJJZGVudGl0eUFwcFNlcnZpY2USagoKR2V0U2Vzc2lvbhIqLmhhd2tyLmlkZW50aXR5LnYxYW'
     'xwaGExLkdldFNlc3Npb25SZXF1ZXN0GisuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuR2V0U2Vz'
-    'c2lvblJlc3BvbnNlIgOQAgEShQEKE0xpbmtBcHBsZUNyZWRlbnRpYWwSMy5oYXdrci5pZGVudG'
-    'l0eS52MWFscGhhMS5MaW5rQXBwbGVDcmVkZW50aWFsUmVxdWVzdBo0Lmhhd2tyLmlkZW50aXR5'
-    'LnYxYWxwaGExLkxpbmtBcHBsZUNyZWRlbnRpYWxSZXNwb25zZSIDkAICElwKB1NpZ25PdXQSJy'
-    '5oYXdrci5pZGVudGl0eS52MWFscGhhMS5TaWduT3V0UmVxdWVzdBooLmhhd2tyLmlkZW50aXR5'
-    'LnYxYWxwaGExLlNpZ25PdXRSZXNwb25zZRJrCgxMaW5rSWRlbnRpdHkSLC5oYXdrci5pZGVudG'
-    'l0eS52MWFscGhhMS5MaW5rSWRlbnRpdHlSZXF1ZXN0Gi0uaGF3a3IuaWRlbnRpdHkudjFhbHBo'
-    'YTEuTGlua0lkZW50aXR5UmVzcG9uc2UScAoMTGlzdFNlc3Npb25zEiwuaGF3a3IuaWRlbnRpdH'
-    'kudjFhbHBoYTEuTGlzdFNlc3Npb25zUmVxdWVzdBotLmhhd2tyLmlkZW50aXR5LnYxYWxwaGEx'
-    'Lkxpc3RTZXNzaW9uc1Jlc3BvbnNlIgOQAgESiAEKFExpc3RMaW5rZWRJZGVudGl0aWVzEjQuaG'
-    'F3a3IuaWRlbnRpdHkudjFhbHBoYTEuTGlzdExpbmtlZElkZW50aXRpZXNSZXF1ZXN0GjUuaGF3'
-    'a3IuaWRlbnRpdHkudjFhbHBoYTEuTGlzdExpbmtlZElkZW50aXRpZXNSZXNwb25zZSIDkAIBEm'
-    '4KDVJldm9rZVNlc3Npb24SLS5oYXdrci5pZGVudGl0eS52MWFscGhhMS5SZXZva2VTZXNzaW9u'
-    'UmVxdWVzdBouLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLlJldm9rZVNlc3Npb25SZXNwb25zZR'
-    'JuCg1EZWxldGVBY2NvdW50Ei0uaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuRGVsZXRlQWNjb3Vu'
-    'dFJlcXVlc3QaLi5oYXdrci5pZGVudGl0eS52MWFscGhhMS5EZWxldGVBY2NvdW50UmVzcG9uc2'
-    'U=');
+    'c2lvblJlc3BvbnNlIgOQAgESXAoHU2lnbk91dBInLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLl'
+    'NpZ25PdXRSZXF1ZXN0GiguaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuU2lnbk91dFJlc3BvbnNl'
+    'EmsKDExpbmtJZGVudGl0eRIsLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkxpbmtJZGVudGl0eV'
+    'JlcXVlc3QaLS5oYXdrci5pZGVudGl0eS52MWFscGhhMS5MaW5rSWRlbnRpdHlSZXNwb25zZRJw'
+    'CgxMaXN0U2Vzc2lvbnMSLC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5MaXN0U2Vzc2lvbnNSZX'
+    'F1ZXN0Gi0uaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTGlzdFNlc3Npb25zUmVzcG9uc2UiA5AC'
+    'ARKIAQoUTGlzdExpbmtlZElkZW50aXRpZXMSNC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5MaX'
+    'N0TGlua2VkSWRlbnRpdGllc1JlcXVlc3QaNS5oYXdrci5pZGVudGl0eS52MWFscGhhMS5MaXN0'
+    'TGlua2VkSWRlbnRpdGllc1Jlc3BvbnNlIgOQAgESbgoNUmV2b2tlU2Vzc2lvbhItLmhhd2tyLm'
+    'lkZW50aXR5LnYxYWxwaGExLlJldm9rZVNlc3Npb25SZXF1ZXN0Gi4uaGF3a3IuaWRlbnRpdHku'
+    'djFhbHBoYTEuUmV2b2tlU2Vzc2lvblJlc3BvbnNlEm4KDURlbGV0ZUFjY291bnQSLS5oYXdrci'
+    '5pZGVudGl0eS52MWFscGhhMS5EZWxldGVBY2NvdW50UmVxdWVzdBouLmhhd2tyLmlkZW50aXR5'
+    'LnYxYWxwaGExLkRlbGV0ZUFjY291bnRSZXNwb25zZQ==');

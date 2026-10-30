@@ -54,9 +54,6 @@ const (
 	// IdentityAppServiceGetSessionProcedure is the fully-qualified name of the IdentityAppService's
 	// GetSession RPC.
 	IdentityAppServiceGetSessionProcedure = "/hawkr.identity.v1alpha1.IdentityAppService/GetSession"
-	// IdentityAppServiceLinkAppleCredentialProcedure is the fully-qualified name of the
-	// IdentityAppService's LinkAppleCredential RPC.
-	IdentityAppServiceLinkAppleCredentialProcedure = "/hawkr.identity.v1alpha1.IdentityAppService/LinkAppleCredential"
 	// IdentityAppServiceSignOutProcedure is the fully-qualified name of the IdentityAppService's
 	// SignOut RPC.
 	IdentityAppServiceSignOutProcedure = "/hawkr.identity.v1alpha1.IdentityAppService/SignOut"
@@ -192,12 +189,6 @@ func (UnimplementedIdentityPublicServiceHandler) ExchangeIdToken(context.Context
 type IdentityAppServiceClient interface {
 	// GetSession 回傳目前登入的帳號；web 以它判斷是否仍在登入。
 	GetSession(context.Context, *connect.Request[v1alpha1.GetSessionRequest]) (*connect.Response[v1alpha1.GetSessionResponse], error)
-	// LinkAppleCredential 交出 Sign in with Apple 的憑證（App Store 審核準則 5.1.1(v)）：App 每次以 Apple 原生登入成功後呼叫。
-	// 伺服器驗證 identity token（簽章、issuer、audience），之後在背景以 authorization code 換成 refresh token；Apple 換 token
-	// 簽發的 ID token 必須與這個 identity token 是同一個身分才加密保存（取代舊的），成功只表示已經排入。帳號最終刪除時
-	// 伺服器自動撤銷保存的 token。可以安全重送。identity token 無效時回 invalid_argument；Apple 沒有設定（本機開發）時回
-	// unavailable。
-	LinkAppleCredential(context.Context, *connect.Request[v1alpha1.LinkAppleCredentialRequest]) (*connect.Response[v1alpha1.LinkAppleCredentialResponse], error)
 	// SignOut 撤銷目前的 session。web 的回應另以 Set-Cookie 清掉 `__Host-hk_session`。session 已經不存在時也成功。停權的帳號也能呼叫。
 	SignOut(context.Context, *connect.Request[v1alpha1.SignOutRequest]) (*connect.Response[v1alpha1.SignOutResponse], error)
 	// LinkIdentity 把 App 以原生 SDK 取得的 Google 或 LINE 身分連結到呼叫者的帳號（web 走 GET /api/auth/{provider}/start?link=1）。
@@ -215,7 +206,7 @@ type IdentityAppServiceClient interface {
 	RevokeSession(context.Context, *connect.Request[v1alpha1.RevokeSessionRequest]) (*connect.Response[v1alpha1.RevokeSessionResponse], error)
 	// DeleteAccount 刪除呼叫者的帳號（App Store 審核準則 5.1.1(v)）。沒有未完成的訂單時立即刪除；有的話進入刪除流程，
 	// 最後一筆訂單完成後自動刪除，期間不能新增收藏與追蹤；流程中再呼叫回目前的狀態。帳號有店家時店家是
-	// 參與者：同一個 transaction 關閉買家、店家並刪除帳號，店家有未結訂單時與買家一起等待到兩側都結清。保存的 Apple 授權由伺服器在最後刪除時撤銷，client 不需要任何前置步驟。
+	// 參與者：同一個 transaction 關閉買家、店家並刪除帳號，店家有未結訂單時與買家一起等待到兩側都結清。client 不需要任何前置步驟。
 	// 刪除之後 token 不再有效，所以 client 不自動重送：沒收到回應時以 GetSession 確認，unauthenticated 表示已刪除。
 	DeleteAccount(context.Context, *connect.Request[v1alpha1.DeleteAccountRequest]) (*connect.Response[v1alpha1.DeleteAccountResponse], error)
 }
@@ -236,13 +227,6 @@ func NewIdentityAppServiceClient(httpClient connect.HTTPClient, baseURL string, 
 			baseURL+IdentityAppServiceGetSessionProcedure,
 			connect.WithSchema(identityAppServiceMethods.ByName("GetSession")),
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		linkAppleCredential: connect.NewClient[v1alpha1.LinkAppleCredentialRequest, v1alpha1.LinkAppleCredentialResponse](
-			httpClient,
-			baseURL+IdentityAppServiceLinkAppleCredentialProcedure,
-			connect.WithSchema(identityAppServiceMethods.ByName("LinkAppleCredential")),
-			connect.WithIdempotency(connect.IdempotencyIdempotent),
 			connect.WithClientOptions(opts...),
 		),
 		signOut: connect.NewClient[v1alpha1.SignOutRequest, v1alpha1.SignOutResponse](
@@ -289,7 +273,6 @@ func NewIdentityAppServiceClient(httpClient connect.HTTPClient, baseURL string, 
 // identityAppServiceClient implements IdentityAppServiceClient.
 type identityAppServiceClient struct {
 	getSession           *connect.Client[v1alpha1.GetSessionRequest, v1alpha1.GetSessionResponse]
-	linkAppleCredential  *connect.Client[v1alpha1.LinkAppleCredentialRequest, v1alpha1.LinkAppleCredentialResponse]
 	signOut              *connect.Client[v1alpha1.SignOutRequest, v1alpha1.SignOutResponse]
 	linkIdentity         *connect.Client[v1alpha1.LinkIdentityRequest, v1alpha1.LinkIdentityResponse]
 	listSessions         *connect.Client[v1alpha1.ListSessionsRequest, v1alpha1.ListSessionsResponse]
@@ -301,11 +284,6 @@ type identityAppServiceClient struct {
 // GetSession calls hawkr.identity.v1alpha1.IdentityAppService.GetSession.
 func (c *identityAppServiceClient) GetSession(ctx context.Context, req *connect.Request[v1alpha1.GetSessionRequest]) (*connect.Response[v1alpha1.GetSessionResponse], error) {
 	return c.getSession.CallUnary(ctx, req)
-}
-
-// LinkAppleCredential calls hawkr.identity.v1alpha1.IdentityAppService.LinkAppleCredential.
-func (c *identityAppServiceClient) LinkAppleCredential(ctx context.Context, req *connect.Request[v1alpha1.LinkAppleCredentialRequest]) (*connect.Response[v1alpha1.LinkAppleCredentialResponse], error) {
-	return c.linkAppleCredential.CallUnary(ctx, req)
 }
 
 // SignOut calls hawkr.identity.v1alpha1.IdentityAppService.SignOut.
@@ -343,12 +321,6 @@ func (c *identityAppServiceClient) DeleteAccount(ctx context.Context, req *conne
 type IdentityAppServiceHandler interface {
 	// GetSession 回傳目前登入的帳號；web 以它判斷是否仍在登入。
 	GetSession(context.Context, *connect.Request[v1alpha1.GetSessionRequest]) (*connect.Response[v1alpha1.GetSessionResponse], error)
-	// LinkAppleCredential 交出 Sign in with Apple 的憑證（App Store 審核準則 5.1.1(v)）：App 每次以 Apple 原生登入成功後呼叫。
-	// 伺服器驗證 identity token（簽章、issuer、audience），之後在背景以 authorization code 換成 refresh token；Apple 換 token
-	// 簽發的 ID token 必須與這個 identity token 是同一個身分才加密保存（取代舊的），成功只表示已經排入。帳號最終刪除時
-	// 伺服器自動撤銷保存的 token。可以安全重送。identity token 無效時回 invalid_argument；Apple 沒有設定（本機開發）時回
-	// unavailable。
-	LinkAppleCredential(context.Context, *connect.Request[v1alpha1.LinkAppleCredentialRequest]) (*connect.Response[v1alpha1.LinkAppleCredentialResponse], error)
 	// SignOut 撤銷目前的 session。web 的回應另以 Set-Cookie 清掉 `__Host-hk_session`。session 已經不存在時也成功。停權的帳號也能呼叫。
 	SignOut(context.Context, *connect.Request[v1alpha1.SignOutRequest]) (*connect.Response[v1alpha1.SignOutResponse], error)
 	// LinkIdentity 把 App 以原生 SDK 取得的 Google 或 LINE 身分連結到呼叫者的帳號（web 走 GET /api/auth/{provider}/start?link=1）。
@@ -366,7 +338,7 @@ type IdentityAppServiceHandler interface {
 	RevokeSession(context.Context, *connect.Request[v1alpha1.RevokeSessionRequest]) (*connect.Response[v1alpha1.RevokeSessionResponse], error)
 	// DeleteAccount 刪除呼叫者的帳號（App Store 審核準則 5.1.1(v)）。沒有未完成的訂單時立即刪除；有的話進入刪除流程，
 	// 最後一筆訂單完成後自動刪除，期間不能新增收藏與追蹤；流程中再呼叫回目前的狀態。帳號有店家時店家是
-	// 參與者：同一個 transaction 關閉買家、店家並刪除帳號，店家有未結訂單時與買家一起等待到兩側都結清。保存的 Apple 授權由伺服器在最後刪除時撤銷，client 不需要任何前置步驟。
+	// 參與者：同一個 transaction 關閉買家、店家並刪除帳號，店家有未結訂單時與買家一起等待到兩側都結清。client 不需要任何前置步驟。
 	// 刪除之後 token 不再有效，所以 client 不自動重送：沒收到回應時以 GetSession 確認，unauthenticated 表示已刪除。
 	DeleteAccount(context.Context, *connect.Request[v1alpha1.DeleteAccountRequest]) (*connect.Response[v1alpha1.DeleteAccountResponse], error)
 }
@@ -383,13 +355,6 @@ func NewIdentityAppServiceHandler(svc IdentityAppServiceHandler, opts ...connect
 		svc.GetSession,
 		connect.WithSchema(identityAppServiceMethods.ByName("GetSession")),
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	identityAppServiceLinkAppleCredentialHandler := connect.NewUnaryHandler(
-		IdentityAppServiceLinkAppleCredentialProcedure,
-		svc.LinkAppleCredential,
-		connect.WithSchema(identityAppServiceMethods.ByName("LinkAppleCredential")),
-		connect.WithIdempotency(connect.IdempotencyIdempotent),
 		connect.WithHandlerOptions(opts...),
 	)
 	identityAppServiceSignOutHandler := connect.NewUnaryHandler(
@@ -434,8 +399,6 @@ func NewIdentityAppServiceHandler(svc IdentityAppServiceHandler, opts ...connect
 		switch r.URL.Path {
 		case IdentityAppServiceGetSessionProcedure:
 			identityAppServiceGetSessionHandler.ServeHTTP(w, r)
-		case IdentityAppServiceLinkAppleCredentialProcedure:
-			identityAppServiceLinkAppleCredentialHandler.ServeHTTP(w, r)
 		case IdentityAppServiceSignOutProcedure:
 			identityAppServiceSignOutHandler.ServeHTTP(w, r)
 		case IdentityAppServiceLinkIdentityProcedure:
@@ -459,10 +422,6 @@ type UnimplementedIdentityAppServiceHandler struct{}
 
 func (UnimplementedIdentityAppServiceHandler) GetSession(context.Context, *connect.Request[v1alpha1.GetSessionRequest]) (*connect.Response[v1alpha1.GetSessionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.identity.v1alpha1.IdentityAppService.GetSession is not implemented"))
-}
-
-func (UnimplementedIdentityAppServiceHandler) LinkAppleCredential(context.Context, *connect.Request[v1alpha1.LinkAppleCredentialRequest]) (*connect.Response[v1alpha1.LinkAppleCredentialResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.identity.v1alpha1.IdentityAppService.LinkAppleCredential is not implemented"))
 }
 
 func (UnimplementedIdentityAppServiceHandler) SignOut(context.Context, *connect.Request[v1alpha1.SignOutRequest]) (*connect.Response[v1alpha1.SignOutResponse], error) {

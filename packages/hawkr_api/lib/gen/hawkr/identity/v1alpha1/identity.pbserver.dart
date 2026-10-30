@@ -58,8 +58,6 @@ abstract class IdentityPublicServiceBase extends $pb.GeneratedService {
 abstract class IdentityAppServiceBase extends $pb.GeneratedService {
   $async.Future<$2.GetSessionResponse> getSession(
       $pb.ServerContext ctx, $2.GetSessionRequest request);
-  $async.Future<$2.LinkAppleCredentialResponse> linkAppleCredential(
-      $pb.ServerContext ctx, $2.LinkAppleCredentialRequest request);
   $async.Future<$2.SignOutResponse> signOut(
       $pb.ServerContext ctx, $2.SignOutRequest request);
   $async.Future<$2.LinkIdentityResponse> linkIdentity(
@@ -77,8 +75,6 @@ abstract class IdentityAppServiceBase extends $pb.GeneratedService {
     switch (methodName) {
       case 'GetSession':
         return $2.GetSessionRequest();
-      case 'LinkAppleCredential':
-        return $2.LinkAppleCredentialRequest();
       case 'SignOut':
         return $2.SignOutRequest();
       case 'LinkIdentity':
@@ -101,9 +97,6 @@ abstract class IdentityAppServiceBase extends $pb.GeneratedService {
     switch (methodName) {
       case 'GetSession':
         return getSession(ctx, request as $2.GetSessionRequest);
-      case 'LinkAppleCredential':
-        return linkAppleCredential(
-            ctx, request as $2.LinkAppleCredentialRequest);
       case 'SignOut':
         return signOut(ctx, request as $2.SignOutRequest);
       case 'LinkIdentity':

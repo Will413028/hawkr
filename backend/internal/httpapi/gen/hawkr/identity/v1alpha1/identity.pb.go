@@ -231,7 +231,7 @@ func (x DeleteAccountResponse_DeletionState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DeleteAccountResponse_DeletionState.Descriptor instead.
 func (DeleteAccountResponse_DeletionState) EnumDescriptor() ([]byte, []int) {
-	return file_hawkr_identity_v1alpha1_identity_proto_rawDescGZIP(), []int{23, 0}
+	return file_hawkr_identity_v1alpha1_identity_proto_rawDescGZIP(), []int{21, 0}
 }
 
 // Account 是登入的帳號。
@@ -1205,96 +1205,6 @@ func (x *Suspension) GetSuspendedAt() *timestamppb.Timestamp {
 	return nil
 }
 
-type LinkAppleCredentialRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Sign in with Apple 這次給的 identity token：驗證它的簽章與 audience；伺服器之後確認 Apple 換 token 簽發的 ID token 是同一個身分。
-	IdToken string `protobuf:"bytes,1,opt,name=id_token,json=idToken,proto3" json:"id_token,omitempty"`
-	// 同一次給的 authorization code，伺服器在背景以它換 refresh token 保存。
-	AuthorizationCode string `protobuf:"bytes,2,opt,name=authorization_code,json=authorizationCode,proto3" json:"authorization_code,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
-}
-
-func (x *LinkAppleCredentialRequest) Reset() {
-	*x = LinkAppleCredentialRequest{}
-	mi := &file_hawkr_identity_v1alpha1_identity_proto_msgTypes[20]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *LinkAppleCredentialRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*LinkAppleCredentialRequest) ProtoMessage() {}
-
-func (x *LinkAppleCredentialRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_identity_v1alpha1_identity_proto_msgTypes[20]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use LinkAppleCredentialRequest.ProtoReflect.Descriptor instead.
-func (*LinkAppleCredentialRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_identity_v1alpha1_identity_proto_rawDescGZIP(), []int{20}
-}
-
-func (x *LinkAppleCredentialRequest) GetIdToken() string {
-	if x != nil {
-		return x.IdToken
-	}
-	return ""
-}
-
-func (x *LinkAppleCredentialRequest) GetAuthorizationCode() string {
-	if x != nil {
-		return x.AuthorizationCode
-	}
-	return ""
-}
-
-type LinkAppleCredentialResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *LinkAppleCredentialResponse) Reset() {
-	*x = LinkAppleCredentialResponse{}
-	mi := &file_hawkr_identity_v1alpha1_identity_proto_msgTypes[21]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *LinkAppleCredentialResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*LinkAppleCredentialResponse) ProtoMessage() {}
-
-func (x *LinkAppleCredentialResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_identity_v1alpha1_identity_proto_msgTypes[21]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use LinkAppleCredentialResponse.ProtoReflect.Descriptor instead.
-func (*LinkAppleCredentialResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_identity_v1alpha1_identity_proto_rawDescGZIP(), []int{21}
-}
-
 type DeleteAccountRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -1303,7 +1213,7 @@ type DeleteAccountRequest struct {
 
 func (x *DeleteAccountRequest) Reset() {
 	*x = DeleteAccountRequest{}
-	mi := &file_hawkr_identity_v1alpha1_identity_proto_msgTypes[22]
+	mi := &file_hawkr_identity_v1alpha1_identity_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1315,7 +1225,7 @@ func (x *DeleteAccountRequest) String() string {
 func (*DeleteAccountRequest) ProtoMessage() {}
 
 func (x *DeleteAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_identity_v1alpha1_identity_proto_msgTypes[22]
+	mi := &file_hawkr_identity_v1alpha1_identity_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1328,7 +1238,7 @@ func (x *DeleteAccountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAccountRequest.ProtoReflect.Descriptor instead.
 func (*DeleteAccountRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_identity_v1alpha1_identity_proto_rawDescGZIP(), []int{22}
+	return file_hawkr_identity_v1alpha1_identity_proto_rawDescGZIP(), []int{20}
 }
 
 type DeleteAccountResponse struct {
@@ -1340,7 +1250,7 @@ type DeleteAccountResponse struct {
 
 func (x *DeleteAccountResponse) Reset() {
 	*x = DeleteAccountResponse{}
-	mi := &file_hawkr_identity_v1alpha1_identity_proto_msgTypes[23]
+	mi := &file_hawkr_identity_v1alpha1_identity_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1352,7 +1262,7 @@ func (x *DeleteAccountResponse) String() string {
 func (*DeleteAccountResponse) ProtoMessage() {}
 
 func (x *DeleteAccountResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_identity_v1alpha1_identity_proto_msgTypes[23]
+	mi := &file_hawkr_identity_v1alpha1_identity_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1365,7 +1275,7 @@ func (x *DeleteAccountResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAccountResponse.ProtoReflect.Descriptor instead.
 func (*DeleteAccountResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_identity_v1alpha1_identity_proto_rawDescGZIP(), []int{23}
+	return file_hawkr_identity_v1alpha1_identity_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *DeleteAccountResponse) GetState() DeleteAccountResponse_DeletionState {
@@ -1438,11 +1348,7 @@ const file_hawkr_identity_v1alpha1_identity_proto_rawDesc = "" +
 	"suspensionJ\x04\b\x01\x10\x02\"P\n" +
 	"\n" +
 	"Suspension\x12B\n" +
-	"\fsuspended_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\vsuspendedAt\"p\n" +
-	"\x1aLinkAppleCredentialRequest\x12\x1e\n" +
-	"\bid_token\x18\x01 \x01(\tB\x03\xe0A\x02R\aidToken\x122\n" +
-	"\x12authorization_code\x18\x02 \x01(\tB\x03\xe0A\x02R\x11authorizationCode\"\x1d\n" +
-	"\x1bLinkAppleCredentialResponse\"\x16\n" +
+	"\fsuspended_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\vsuspendedAt\"\x16\n" +
 	"\x14DeleteAccountRequest\"\xdb\x01\n" +
 	"\x15DeleteAccountResponse\x12R\n" +
 	"\x05state\x18\x01 \x01(\x0e2<.hawkr.identity.v1alpha1.DeleteAccountResponse.DeletionStateR\x05state\"n\n" +
@@ -1465,11 +1371,10 @@ const file_hawkr_identity_v1alpha1_identity_proto_rawDesc = "" +
 	"\x0fCLIENT_KIND_APP\x10\x022\x8c\x02\n" +
 	"\x15IdentityPublicService\x12}\n" +
 	"\x12IssueAppLoginNonce\x122.hawkr.identity.v1alpha1.IssueAppLoginNonceRequest\x1a3.hawkr.identity.v1alpha1.IssueAppLoginNonceResponse\x12t\n" +
-	"\x0fExchangeIdToken\x12/.hawkr.identity.v1alpha1.ExchangeIdTokenRequest\x1a0.hawkr.identity.v1alpha1.ExchangeIdTokenResponse2\xb0\a\n" +
+	"\x0fExchangeIdToken\x12/.hawkr.identity.v1alpha1.ExchangeIdTokenRequest\x1a0.hawkr.identity.v1alpha1.ExchangeIdTokenResponse2\xa8\x06\n" +
 	"\x12IdentityAppService\x12j\n" +
 	"\n" +
-	"GetSession\x12*.hawkr.identity.v1alpha1.GetSessionRequest\x1a+.hawkr.identity.v1alpha1.GetSessionResponse\"\x03\x90\x02\x01\x12\x85\x01\n" +
-	"\x13LinkAppleCredential\x123.hawkr.identity.v1alpha1.LinkAppleCredentialRequest\x1a4.hawkr.identity.v1alpha1.LinkAppleCredentialResponse\"\x03\x90\x02\x02\x12\\\n" +
+	"GetSession\x12*.hawkr.identity.v1alpha1.GetSessionRequest\x1a+.hawkr.identity.v1alpha1.GetSessionResponse\"\x03\x90\x02\x01\x12\\\n" +
 	"\aSignOut\x12'.hawkr.identity.v1alpha1.SignOutRequest\x1a(.hawkr.identity.v1alpha1.SignOutResponse\x12k\n" +
 	"\fLinkIdentity\x12,.hawkr.identity.v1alpha1.LinkIdentityRequest\x1a-.hawkr.identity.v1alpha1.LinkIdentityResponse\x12p\n" +
 	"\fListSessions\x12,.hawkr.identity.v1alpha1.ListSessionsRequest\x1a-.hawkr.identity.v1alpha1.ListSessionsResponse\"\x03\x90\x02\x01\x12\x88\x01\n" +
@@ -1491,7 +1396,7 @@ func file_hawkr_identity_v1alpha1_identity_proto_rawDescGZIP() []byte {
 }
 
 var file_hawkr_identity_v1alpha1_identity_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_hawkr_identity_v1alpha1_identity_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_hawkr_identity_v1alpha1_identity_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_hawkr_identity_v1alpha1_identity_proto_goTypes = []any{
 	(Role)(0),                                // 0: hawkr.identity.v1alpha1.Role
 	(LoginProvider)(0),                       // 1: hawkr.identity.v1alpha1.LoginProvider
@@ -1517,53 +1422,49 @@ var file_hawkr_identity_v1alpha1_identity_proto_goTypes = []any{
 	(*GetSessionRequest)(nil),                // 21: hawkr.identity.v1alpha1.GetSessionRequest
 	(*GetSessionResponse)(nil),               // 22: hawkr.identity.v1alpha1.GetSessionResponse
 	(*Suspension)(nil),                       // 23: hawkr.identity.v1alpha1.Suspension
-	(*LinkAppleCredentialRequest)(nil),       // 24: hawkr.identity.v1alpha1.LinkAppleCredentialRequest
-	(*LinkAppleCredentialResponse)(nil),      // 25: hawkr.identity.v1alpha1.LinkAppleCredentialResponse
-	(*DeleteAccountRequest)(nil),             // 26: hawkr.identity.v1alpha1.DeleteAccountRequest
-	(*DeleteAccountResponse)(nil),            // 27: hawkr.identity.v1alpha1.DeleteAccountResponse
-	(*timestamppb.Timestamp)(nil),            // 28: google.protobuf.Timestamp
-	(*durationpb.Duration)(nil),              // 29: google.protobuf.Duration
+	(*DeleteAccountRequest)(nil),             // 24: hawkr.identity.v1alpha1.DeleteAccountRequest
+	(*DeleteAccountResponse)(nil),            // 25: hawkr.identity.v1alpha1.DeleteAccountResponse
+	(*timestamppb.Timestamp)(nil),            // 26: google.protobuf.Timestamp
+	(*durationpb.Duration)(nil),              // 27: google.protobuf.Duration
 }
 var file_hawkr_identity_v1alpha1_identity_proto_depIdxs = []int32{
 	0,  // 0: hawkr.identity.v1alpha1.Account.roles:type_name -> hawkr.identity.v1alpha1.Role
-	28, // 1: hawkr.identity.v1alpha1.IssueAppLoginNonceResponse.expire_time:type_name -> google.protobuf.Timestamp
+	26, // 1: hawkr.identity.v1alpha1.IssueAppLoginNonceResponse.expire_time:type_name -> google.protobuf.Timestamp
 	1,  // 2: hawkr.identity.v1alpha1.ExchangeIdTokenRequest.provider:type_name -> hawkr.identity.v1alpha1.LoginProvider
-	28, // 3: hawkr.identity.v1alpha1.ExchangeIdTokenResponse.absolute_expire_time:type_name -> google.protobuf.Timestamp
-	29, // 4: hawkr.identity.v1alpha1.ExchangeIdTokenResponse.idle_timeout:type_name -> google.protobuf.Duration
+	26, // 3: hawkr.identity.v1alpha1.ExchangeIdTokenResponse.absolute_expire_time:type_name -> google.protobuf.Timestamp
+	27, // 4: hawkr.identity.v1alpha1.ExchangeIdTokenResponse.idle_timeout:type_name -> google.protobuf.Duration
 	1,  // 5: hawkr.identity.v1alpha1.LinkIdentityRequest.provider:type_name -> hawkr.identity.v1alpha1.LoginProvider
 	20, // 6: hawkr.identity.v1alpha1.ListSessionsResponse.sessions:type_name -> hawkr.identity.v1alpha1.LoginSession
 	17, // 7: hawkr.identity.v1alpha1.ListLinkedIdentitiesResponse.identities:type_name -> hawkr.identity.v1alpha1.LinkedIdentity
 	1,  // 8: hawkr.identity.v1alpha1.LinkedIdentity.provider:type_name -> hawkr.identity.v1alpha1.LoginProvider
-	28, // 9: hawkr.identity.v1alpha1.LinkedIdentity.link_time:type_name -> google.protobuf.Timestamp
+	26, // 9: hawkr.identity.v1alpha1.LinkedIdentity.link_time:type_name -> google.protobuf.Timestamp
 	2,  // 10: hawkr.identity.v1alpha1.LoginSession.client_kind:type_name -> hawkr.identity.v1alpha1.ClientKind
-	28, // 11: hawkr.identity.v1alpha1.LoginSession.create_time:type_name -> google.protobuf.Timestamp
-	28, // 12: hawkr.identity.v1alpha1.LoginSession.last_use_time:type_name -> google.protobuf.Timestamp
+	26, // 11: hawkr.identity.v1alpha1.LoginSession.create_time:type_name -> google.protobuf.Timestamp
+	26, // 12: hawkr.identity.v1alpha1.LoginSession.last_use_time:type_name -> google.protobuf.Timestamp
 	4,  // 13: hawkr.identity.v1alpha1.GetSessionResponse.account:type_name -> hawkr.identity.v1alpha1.Account
 	23, // 14: hawkr.identity.v1alpha1.GetSessionResponse.suspension:type_name -> hawkr.identity.v1alpha1.Suspension
-	28, // 15: hawkr.identity.v1alpha1.Suspension.suspended_at:type_name -> google.protobuf.Timestamp
+	26, // 15: hawkr.identity.v1alpha1.Suspension.suspended_at:type_name -> google.protobuf.Timestamp
 	3,  // 16: hawkr.identity.v1alpha1.DeleteAccountResponse.state:type_name -> hawkr.identity.v1alpha1.DeleteAccountResponse.DeletionState
 	5,  // 17: hawkr.identity.v1alpha1.IdentityPublicService.IssueAppLoginNonce:input_type -> hawkr.identity.v1alpha1.IssueAppLoginNonceRequest
 	7,  // 18: hawkr.identity.v1alpha1.IdentityPublicService.ExchangeIdToken:input_type -> hawkr.identity.v1alpha1.ExchangeIdTokenRequest
 	21, // 19: hawkr.identity.v1alpha1.IdentityAppService.GetSession:input_type -> hawkr.identity.v1alpha1.GetSessionRequest
-	24, // 20: hawkr.identity.v1alpha1.IdentityAppService.LinkAppleCredential:input_type -> hawkr.identity.v1alpha1.LinkAppleCredentialRequest
-	9,  // 21: hawkr.identity.v1alpha1.IdentityAppService.SignOut:input_type -> hawkr.identity.v1alpha1.SignOutRequest
-	11, // 22: hawkr.identity.v1alpha1.IdentityAppService.LinkIdentity:input_type -> hawkr.identity.v1alpha1.LinkIdentityRequest
-	13, // 23: hawkr.identity.v1alpha1.IdentityAppService.ListSessions:input_type -> hawkr.identity.v1alpha1.ListSessionsRequest
-	15, // 24: hawkr.identity.v1alpha1.IdentityAppService.ListLinkedIdentities:input_type -> hawkr.identity.v1alpha1.ListLinkedIdentitiesRequest
-	18, // 25: hawkr.identity.v1alpha1.IdentityAppService.RevokeSession:input_type -> hawkr.identity.v1alpha1.RevokeSessionRequest
-	26, // 26: hawkr.identity.v1alpha1.IdentityAppService.DeleteAccount:input_type -> hawkr.identity.v1alpha1.DeleteAccountRequest
-	6,  // 27: hawkr.identity.v1alpha1.IdentityPublicService.IssueAppLoginNonce:output_type -> hawkr.identity.v1alpha1.IssueAppLoginNonceResponse
-	8,  // 28: hawkr.identity.v1alpha1.IdentityPublicService.ExchangeIdToken:output_type -> hawkr.identity.v1alpha1.ExchangeIdTokenResponse
-	22, // 29: hawkr.identity.v1alpha1.IdentityAppService.GetSession:output_type -> hawkr.identity.v1alpha1.GetSessionResponse
-	25, // 30: hawkr.identity.v1alpha1.IdentityAppService.LinkAppleCredential:output_type -> hawkr.identity.v1alpha1.LinkAppleCredentialResponse
-	10, // 31: hawkr.identity.v1alpha1.IdentityAppService.SignOut:output_type -> hawkr.identity.v1alpha1.SignOutResponse
-	12, // 32: hawkr.identity.v1alpha1.IdentityAppService.LinkIdentity:output_type -> hawkr.identity.v1alpha1.LinkIdentityResponse
-	14, // 33: hawkr.identity.v1alpha1.IdentityAppService.ListSessions:output_type -> hawkr.identity.v1alpha1.ListSessionsResponse
-	16, // 34: hawkr.identity.v1alpha1.IdentityAppService.ListLinkedIdentities:output_type -> hawkr.identity.v1alpha1.ListLinkedIdentitiesResponse
-	19, // 35: hawkr.identity.v1alpha1.IdentityAppService.RevokeSession:output_type -> hawkr.identity.v1alpha1.RevokeSessionResponse
-	27, // 36: hawkr.identity.v1alpha1.IdentityAppService.DeleteAccount:output_type -> hawkr.identity.v1alpha1.DeleteAccountResponse
-	27, // [27:37] is the sub-list for method output_type
-	17, // [17:27] is the sub-list for method input_type
+	9,  // 20: hawkr.identity.v1alpha1.IdentityAppService.SignOut:input_type -> hawkr.identity.v1alpha1.SignOutRequest
+	11, // 21: hawkr.identity.v1alpha1.IdentityAppService.LinkIdentity:input_type -> hawkr.identity.v1alpha1.LinkIdentityRequest
+	13, // 22: hawkr.identity.v1alpha1.IdentityAppService.ListSessions:input_type -> hawkr.identity.v1alpha1.ListSessionsRequest
+	15, // 23: hawkr.identity.v1alpha1.IdentityAppService.ListLinkedIdentities:input_type -> hawkr.identity.v1alpha1.ListLinkedIdentitiesRequest
+	18, // 24: hawkr.identity.v1alpha1.IdentityAppService.RevokeSession:input_type -> hawkr.identity.v1alpha1.RevokeSessionRequest
+	24, // 25: hawkr.identity.v1alpha1.IdentityAppService.DeleteAccount:input_type -> hawkr.identity.v1alpha1.DeleteAccountRequest
+	6,  // 26: hawkr.identity.v1alpha1.IdentityPublicService.IssueAppLoginNonce:output_type -> hawkr.identity.v1alpha1.IssueAppLoginNonceResponse
+	8,  // 27: hawkr.identity.v1alpha1.IdentityPublicService.ExchangeIdToken:output_type -> hawkr.identity.v1alpha1.ExchangeIdTokenResponse
+	22, // 28: hawkr.identity.v1alpha1.IdentityAppService.GetSession:output_type -> hawkr.identity.v1alpha1.GetSessionResponse
+	10, // 29: hawkr.identity.v1alpha1.IdentityAppService.SignOut:output_type -> hawkr.identity.v1alpha1.SignOutResponse
+	12, // 30: hawkr.identity.v1alpha1.IdentityAppService.LinkIdentity:output_type -> hawkr.identity.v1alpha1.LinkIdentityResponse
+	14, // 31: hawkr.identity.v1alpha1.IdentityAppService.ListSessions:output_type -> hawkr.identity.v1alpha1.ListSessionsResponse
+	16, // 32: hawkr.identity.v1alpha1.IdentityAppService.ListLinkedIdentities:output_type -> hawkr.identity.v1alpha1.ListLinkedIdentitiesResponse
+	19, // 33: hawkr.identity.v1alpha1.IdentityAppService.RevokeSession:output_type -> hawkr.identity.v1alpha1.RevokeSessionResponse
+	25, // 34: hawkr.identity.v1alpha1.IdentityAppService.DeleteAccount:output_type -> hawkr.identity.v1alpha1.DeleteAccountResponse
+	26, // [26:35] is the sub-list for method output_type
+	17, // [17:26] is the sub-list for method input_type
 	17, // [17:17] is the sub-list for extension type_name
 	17, // [17:17] is the sub-list for extension extendee
 	0,  // [0:17] is the sub-list for field type_name
@@ -1580,7 +1481,7 @@ func file_hawkr_identity_v1alpha1_identity_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_identity_v1alpha1_identity_proto_rawDesc), len(file_hawkr_identity_v1alpha1_identity_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   24,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   2,
 		},
