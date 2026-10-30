@@ -166,7 +166,7 @@
 
 | 步驟 | 狀態 | 已跑的驗收 | 未跑的驗收與原因 | commit |
 |---|---|---|---|---|
-| 1a 前置驗證 | 進行中 | 官方文件查證（a、b、c、e）與 repo 代理程式閱讀（d 前半）、govulncheck 基線（f），見 `spikes.md` | 需要 OAuth client 的實測：LINE 拒給 email 的回應、Google iOS `aud`；部署環境的第一方反代與 OpenNext 對 3xx、多個 `Set-Cookie` 的處理（反代程式不在 repo）。Google 的 OAuth client 已建（2026-10-30），LINE 建立中 | |
+| 1a 前置驗證 | 進行中 | 官方文件查證（a、b、c、e）與 repo 代理程式閱讀（d 前半）、govulncheck 基線（f），見 `spikes.md` | 需要 OAuth client 的實測：LINE 拒給 email 的回應、Google iOS `aud`；部署環境的第一方反代與 OpenNext 對 3xx、多個 `Set-Cookie` 的處理（反代程式不在 repo）。開發用 OAuth client 已建（2026-10-30：GCP 專案 `hawkr` 的 web 與 buyer／seller iOS client；LINE provider `Hawkr` 的 channel `Hawkr Login (dev)`，callback 與 iOS bundle ID 已設，email 權限未申請——要上傳登入畫面截圖，等步驟 3 做出畫面再申請）。LINE 拒給 email 的實測要等 email 權限核准；Google iOS `aud` 要等步驟 6 的 App | |
 | 1b 新 ADR | 未開始 | | | |
 | 2 後端：session 與聯合登入 | 未開始 | | | |
 | 3 website 切換 | 未開始 | | | |
