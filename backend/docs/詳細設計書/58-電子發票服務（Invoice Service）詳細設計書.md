@@ -477,7 +477,7 @@ flowchart TD
 | **E3** | 數字欄位對外一律 string、時間一律 ISO 8601 UTC 帶 `Z`；金額以「元」的整數表示，禁浮點 | 全部 ID、金額、版本號對外皆為 string。⚠️ 事件宣告若把金額欄寫成 `"amount": "decimal"` 即與此牴觸，不得沿用那種形狀 | `docs/開發規範/Java 微服務開發規範.md` §2 |
 | **E4** | `invoice` 是 Gateway 代行路由的 **boot-time 禁字**（10 個之一：`shipment/fulfillment/payment/payout/grant/refund/invoice/bank/identity/certification`，子字串比對）；代行 storefront allow-list 也明文排除發票 | 任何 `delegatedHandle(..., "/sellers/:store_id/invoices", ...)` ⇒ Gateway 啟動 panic、部署即炸。ADM 發票端點只能走一般 `admin.GET("/invoices", ...)`。另一半義務：**「發票與稅籍」必須登記進 `hawkr-website/features/delegated-operations/nav-policy.ts` 的 `DELEGATED_HIDDEN_HREFS`**——那是排除清單、其餘一律渲染，漏登記不會編譯錯、不會測試紅 | `gateway/internal/router/seller_route_assert.go:66-79`；`gateway/internal/handler/admin_delegated_storefront.go:18-24` |
 | **E5** | 未登記於 `envelopeCodeToGRPC` 的業務碼一律塌縮成 HTTP 409；要帶結構化 data 必須進 `envelopeCodePreserveData` | 「查無發票」回 404、「AMEGO 上游不可用」回 503、「作廢失敗要帶 AMEGO 原始回覆」三者都需**逐碼登記**，而這兩張表不是 CodeMeta 生成的、最容易漏。不要擴充 `response/bizhttp.go` 的登錄表（那是代行專用且有機械測試守著） | `gateway/internal/grpc/envelope_guard_interceptor.go:27-49,56-60` |
-| **E6** | CodeMeta 是共享代碼值的 SSOT：先改 `.md` 再 `generate.sh`，生成檔禁手改（`static-gates.yml` 會重跑 `generate.sh --all` 再 `git diff --exit-code`）；禁止預先登記沒有 emitter 的碼 | 每個發票碼都要在同一波實作裡指得出 emitter 的 `檔案:行號`。三張 allowlist（`GO_LABEL_ENUMS`／`GO_REGISTRY_ENUMS`／`ADMIN_ENUMS`）打錯或漏名不會報錯、只會靜默少生成，且前兩者必須互斥。前端四份是人工 verbatim 拷貝，唯一防線 `check-copies.sh` 掛 pre-commit（前提是本機跑過 `lefthook install`，判準 `ls .git/hooks/pre-commit`） | `docs/代碼管理（CodeMeta）/README.md` |
+| **E6** | CodeMeta 是共享代碼值的 SSOT：先改 `.md` 再 `generate.sh`，生成檔禁手改（`backend-monolith.yml` 的 drift 步驟會重跑 `generate.sh --go --go-media --web --admin --flutter` 再檢查 `git status`；CodeMeta 已凍結，只服務未搬進單體的舊契約，見 [ADR：CodeMeta 凍結](../adr/2026-09-25-codemeta-retirement.md)）；禁止預先登記沒有 emitter 的碼 | 每個發票碼都要在同一波實作裡指得出 emitter 的 `檔案:行號`。三張 allowlist（`GO_LABEL_ENUMS`／`GO_REGISTRY_ENUMS`／`ADMIN_ENUMS`）打錯或漏名不會報錯、只會靜默少生成，且前兩者必須互斥。前端與 App 的生成物由 `generate.sh` 直寫進 monorepo，沒有手動複製，守門只有上述 CI drift 步驟 | `docs/代碼管理（CodeMeta）/README.md` |
 | **E7** | Proto 只改 `api/proto/*`；改完必跑 `scripts/gen-go-proto.sh`（只需 docker）＋ rsync 到 java-proto ＋ `mvn clean install`；CI 有 `proto-generated-diff.yml` 對拍 | 新增 `api/proto/invoice/invoice.proto`，五件套 `syntax`／`package hawkr.invoice`／`go_package`／`java_package`／`java_multiple_files`。**不要抄 `payment.proto` 的 `io.github.will413028.hawkr.payment.grpc`**，那是全 repo 唯一的歷史偏差 | `docs/開發規範/Proto 管理規範.md`；`api/proto/review/review.proto:1-8`（正確範本） |
 | **E8** | TSID 用於對外暴露的業務表，BIGSERIAL 用於內部表；Go 服務用 `pkg/tsid.NewGenerator`（無 Node ID Base 概念，不需申請） | 對外表 9 張（開票主體／賣家稅務資格／provider 憑證／買家發票偏好／發票文件／調整／更正請求／申訴／operation）→ TSID；內部表 8 張（品項行／折讓明細／申訴時間軸／入向 inbox／出向 outbox／provider 稽核／狀態歷程／ADM 稽核）→ BIGSERIAL；`invoice_business_day_mirror` 用自然鍵 `holiday_date`。合計 §5.1 的 **18 張** | `pkg/tsid/tsid.go` |
 | **E9** | Go 走 Atlas declarative：改 `db/schema/schema.sql` → `atlas migrate diff` → `atlas migrate hash`；禁止 SSH 手跑 DDL。部署自動涵蓋：有 `db/atlas.hcl` 就自動 migrate | migration 時間戳的順序是**跨分支的**：拿自己的最大值與**遠端已套用的最大值**比，不是與 repo 內的比——`added out of order` 會擋掉全部服務部署 | `docs/開發規範/PostgreSQL 設計規範與最佳實踐.md`；`.github/workflows/deploy-k8s.yml` |
@@ -2961,7 +2961,7 @@ CREATE INDEX "idx_invmu_operation" ON "invoice_manual_unlocks" ("operation_id", 
 | `provider_check_evidence` 是自由文字，**不得複製進 `invoice_admin_audit_logs` 的 before/after** | 那張表保存 5 年；查證說明常寫進第三方客服姓名／電話 ＝ 憑空造一個五年期的 PII 倉庫 |
 | 駁回（`REJECTED`）**不動 job 狀態** | job 留在 `CANCELLED_BY_ADMIN`，之後仍可重新發起 |
 
-**狀態值域不納管進 CodeMeta（定版）**：§C.2 的 30 個新增碼表逐名清單裡沒有本表，而登記一張新碼表會連動四個前端 repo 的 verbatim 拷貝。現況與 `invoice_status_history.actor_type`（§C.4 明列的邊界案例）同一格：值域由 `chk_invmu_status` 守、常數由 `internal/domain/manual_unlock.go` 承載。**改判條件寫死**：ADM 一旦需要中文標籤（`ManualUnlockInfo` 目前沒有 `statusLabel` 欄），就必須改判納管並補登記——那正是 §C.4 對 `InvoiceDocumentTimelineEvent` 用的同一條判準。
+**狀態值域不納管進 CodeMeta（定版）**：§C.2 的 30 個新增碼表逐名清單裡沒有本表，而登記一張新碼表會連動 `--web`／`--admin`／`--flutter` 的生成物。現況與 `invoice_status_history.actor_type`（§C.4 明列的邊界案例）同一格：值域由 `chk_invmu_status` 守、常數由 `internal/domain/manual_unlock.go` 承載。**改判條件寫死**：ADM 一旦需要中文標籤（`ManualUnlockInfo` 目前沒有 `statusLabel` 欄），就必須改判納管並補登記——那正是 §C.4 對 `InvoiceDocumentTimelineEvent` 用的同一條判準。
 
 ---
 
@@ -11140,7 +11140,7 @@ echo "  hawkr-amego"
 | 25 | `gateway/internal/handler/holder.go` ＋ `handler/di.go` | handler holder 欄位與注入參數 | 同上 | ✅（編譯） |
 | 26 | `gateway/internal/router/routes_invoice.go`（新檔） | §6.1 的路由全表 ＋ **3 條 PDF 二進位子路由**（不計入端點支數）。**不得經 `delegatedHandle`**（`invoice` 是代行路由的 boot-time 禁字） | boot 斷言 panic（**這是刻意的**） | ✅（boot） |
 | 27 | `pkg/mq/exchanges.go` ＋ `events.go` | §6.3.8 的常數。**queue 常數必須以 `Queue` 開頭且定義在 `exchanges.go`**——登記 gate 的抽取器是正則 `^\s*(Queue\w+)\s*=\s*"([^"]+)"` 且**只掃這一個檔** | 登記 gate 看不見它 | ✅ |
-| 28 | CodeMeta 四份 `.md` → `./generate.sh --all` | §6.3.10 條目 ＋ 錯誤碼 `9300~9399`。**不動 README 的 Value 分配表**（本領域不佔 Value 號段）。**生成檔一併 commit、嚴禁手改** | 手改的生成檔下次 generate 被覆蓋 ⇒ 執行期 crash | ✅ |
+| 28 | CodeMeta 四份 `.md` → `generate.sh --go --go-media --web --admin --flutter（CI 旗標組）` | §6.3.10 條目 ＋ 錯誤碼 `9300~9399`。**不動 README 的 Value 分配表**（本領域不佔 Value 號段）。**生成檔一併 commit、嚴禁手改** | 手改的生成檔下次 generate 被覆蓋 ⇒ 執行期 crash | ✅ |
 | 29 | 36 號 MQ Catalog | §6.3.11 的 A–E 五段 | catalog 與實況漂移 | ❌ |
 | 30 | `shared/events/events.json` | **刪除** `InvoiceIssuedEvent` 與 `BuyerInvoiceNotifyEvent` 兩個死宣告 | 兩套發票事件命名並存，且那份宣告的 exchange 錯（零 binding，訊息靜默消失）、欄位型別違反 §4 ⇒ 下一個人照它施工 | ❌ |
 | 31 | `docs/詳細設計書/00-總覽.md` ＋ `docs/_sidebar.md` | 新增第 58 列 | 文件索引缺口 | ❌ |
@@ -11795,7 +11795,7 @@ COMMIT;
 
 ## 附錄 C：CodeMeta 與碼表新增清單
 
-**碼值本體在 `docs/代碼管理（CodeMeta）/` 的四份 `.md`**（`業務狀態碼.md`／`業務類型碼.md`／`內部技術碼.md`／`錯誤碼.md`）。本附錄只給：新增了哪些 enum、每個值的 **emitter 在哪**、生成命令、三張 allowlist 怎麼動、四份前端拷貝怎麼同步。**值域全文一律回那四份 `.md` 的同名 `##` 區塊，本附錄不複製第二份。**
+**碼值本體在 `docs/代碼管理（CodeMeta）/` 的四份 `.md`**（`業務狀態碼.md`／`業務類型碼.md`／`內部技術碼.md`／`錯誤碼.md`）。本附錄只給：新增了哪些 enum、每個值的 **emitter 在哪**、生成命令、三張 allowlist 怎麼動、生成物怎麼直寫進 monorepo。**值域全文一律回那四份 `.md` 的同名 `##` 區塊，本附錄不複製第二份。**
 
 | 三個必須先分清楚的東西 | 是什麼 | 本案的量 |
 |---|---|---|
@@ -11812,12 +11812,12 @@ COMMIT;
 #    docs/代碼管理（CodeMeta）/{業務狀態碼,業務類型碼,內部技術碼,錯誤碼}.md
 #    docs/代碼管理（CodeMeta）/scripts/generate.sh   ← 三張 allowlist（§C.5）
 #    README.md 的 Value 分配表不需要改（本領域不佔 Value 號段，§C.3）
-# ② 生成 —— 一律 --all，不要逐旗標
-cd "docs/代碼管理（CodeMeta）/scripts" && ./generate.sh --all
-# ③ 四份前端 verbatim 拷貝 + 各自 fixture（§C.6）
+# ② 生成 —— 用 CI 的旗標組一次跑完
+cd "docs/代碼管理（CodeMeta）/scripts" && ./generate.sh --go --go-media --web --admin --flutter   # 與 CI drift 步驟相同；Java 另見 C.6
+# ③ 生成物直寫進 monorepo，與 .md 同一個 commit（§C.6），不需要複製
 ```
 
-**必須是 `--all` 不能是任何子集**：`static-gates.yml` 的 CodeMeta gate **會重跑 `generate.sh --all` 再對六個受管路徑 `git diff --exit-code`**；發票領域同時動到 `--go-registry` 與 `--flutter`，只跑子集 ⇒ 那兩個 target 的產物留舊 ⇒ CI 的 `--all` 重跑後 diff 非空 ⇒ 紅。
+**以 CI 的旗標組為準，不要逐旗標只跑一部分，也不必 `--all`**：drift 步驟會重跑 `generate.sh --go --go-media --web --admin --flutter` 再看 `git status`；發票領域同時動到 `--go` 與 `--flutter` 的產物，只跑子集 ⇒ 其餘 target 的產物留舊 ⇒ CI 重跑後有變更 ⇒ 紅。生成物與 `.md` 同一個 commit 提交。
 
 | 旗標 | 產出 | 發票領域是否變動 |
 |---|---|---|
@@ -11943,24 +11943,23 @@ comm -12 \
 ./generate.sh --all && (cd ../../.. && go build ./pkg/... && cd gateway && go build ./...)
 ```
 
-### C.6 前端四份 verbatim 拷貝與 fixture
+### C.6 前端生成物（直寫 monorepo，CI drift 檢查）
 
-`check-copies.sh` 是**唯一**擋得住「backend 生成了新 enum 而根本沒人來拷貝」這個方向的東西（四支前端 fixture gate 都擋不住——前端 repo 的 CI 看不到 backend）。它掛在 `lefthook.yml`，但 **`lefthook.yml` 只是宣告**：沒跑過 `lefthook install` 的機器上 `.git/hooks/pre-commit` 根本不存在，整份 `lefthook.yml`（含既有的 lint／proto-numeric／atlas-validate）都是惰性的。**判準是這個檔案在不在，不是「`lefthook.yml` 裡有沒有那個條目」**：`ls -l .git/hooks/pre-commit`。
+前端與 App 的 CodeMeta 檔**不是拷貝**：`generate.sh` 的 `--web`／`--admin`／`--flutter` 直接寫進同一個 monorepo 的目錄，沒有複製步驟，也沒有 fixture 同步測試。守門只有 `.github/workflows/backend-monolith.yml` 的「CodeMeta 生成物 drift」步驟：跑 `generate.sh --go --go-media --web --admin --flutter` 後，對受管路徑 `git status --porcelain` 非空即紅（受管路徑見該 workflow）。凍結範圍與替代做法見 [ADR：CodeMeta 凍結](../adr/2026-09-25-codemeta-retirement.md)。
 
-| 拷貝目標 | 來源旗標 | fixture gate 要改的常數 |
-|---|---|---|
-| `hawkr-website/lib/codemeta/generated.ts` | `--web` | `EXPECTED_OBJECT_COUNT` / `EXPECTED_ENTRY_COUNT` / `EXPECTED_DIGEST` |
-| `hawkr-admin/src/lib/codemeta/generated.ts` | **`--admin`** | 同上（ADM 側三個） |
-| `hawkr_seller` ／ `hawkr_buyer` 的 `lib/core/codemeta/code_meta.dart` | `--flutter` | `_expectedMemberCounts`（每 enum 一列）／`_expectedDigest` |
-
-**本案「不含 App」，但兩支 Flutter 拷貝仍然必須更新。** 理由是機械的：`--flutter` 與 `--web` 都沒有 allowlist、都是「前端可見: Yes 全量輸出」，而發票領域有 19 個 enum 標 Yes ⇒ 這 19 個**必然**同時出現在 `--flutter` 的輸出裡 ⇒ 兩支 App repo 的 `code_meta.dart` 與 backend 生成物當場不一致，`check-copies.sh` 在 commit 那一刻就擋。**App 的程式碼一行都不用改**（拷貝後在兩支 App repo 各跑一次 `flutter analyze lib/` 確認）。
-
-| 兩個格式陷阱 | 處置 |
+| 生成目標（monorepo 根目錄起算） | 來源旗標 |
 |---|---|
-| Flutter 拷貝必須補跑 `dart format` | `generate.sh` 的輸出不是 format-clean，而兩個 App repo 的 `dart format --set-exit-if-changed lib/` 會擋。format 只改換行不改語意，`check-copies.sh` 的比對已對折行免疫 |
-| 兩個 TS repo 都必須把生成檔排除在 formatter 之外 | 那兩行**已經存在**（`biome.json` 的 `!!lib/codemeta/generated.ts` 與 `!!src/lib/codemeta/generated.ts`），**不要在「順手整理 biome 設定」時刪掉**——少了它，biome 會重排生成檔，拷貝就再也不可能與 backend 逐位元相同，`check-copies.sh` 會永遠紅、形同沒有檢查 |
+| `website/lib/codemeta/generated.ts` | `--web` |
+| `admin/src/lib/codemeta/generated.ts` | **`--admin`**（走 `ADMIN_ENUMS` allowlist） |
+| `buyer-app/lib/core/codemeta/code_meta.dart`、`seller-app/lib/core/codemeta/code_meta.dart` | `--flutter` |
 
-**更新 fixture 常數的正確做法**：四支 gate 的失敗訊息都會**印出實際值** ⇒ 流程是「先拷貝、再跑測試、把實際值抄回常數」，不要試圖手算 digest。抄回之後要再跑一次確認轉綠，**而且要另外驗一次鑑別力**：故意改壞拷貝裡的一個 label，確認 gate 轉紅，再**用 `cp` 從自己的備份還原**（`git checkout <file>` 還原的是 HEAD，會把同檔未 commit 的修改一併抹掉）。`check-copies.sh` 對「repo 不在本機」是 **SKIP 不轉紅** ⇒ 發票的 CodeMeta PR **必須在四個 repo 都在本機的機器上**跑一次。
+**本案「不含 App」，但兩支 Flutter 生成物仍會變動。** `--flutter` 與 `--web` 都沒有 allowlist、都是「前端可見: Yes 全量輸出」，而發票領域有 19 個 enum 標 Yes ⇒ 這 19 個**必然**同時出現在 `--flutter` 的輸出裡。**App 的程式碼一行都不用改**，同一個 commit 帶上重新生成的 `code_meta.dart` 即可。
+
+| 格式陷阱 | 處置 |
+|---|---|
+| Flutter 生成檔檔頭是 `// dart format off` | `dart format` 不會重排，不需要另外補跑 |
+| TS 生成檔要留在 formatter 之外 | `biome.json` 的 `!!lib/codemeta/generated.ts` 與 `!!src/lib/codemeta/generated.ts` **不要在「順手整理 biome 設定」時刪掉**——少了它，biome 會重排生成檔，drift 檢查會永遠紅 |
+| `--all` 會帶出 Java 與 `bizcode.go` 的舊 drift | CI 只檢查上面那組旗標；本機只留本次的變動，最後用 CI 旗標重跑確認 `git status` 乾淨。Java 產生器不刪舊檔，刪掉的 enum 要手動 `git rm` 對應的 `.java` |
 
 ### C.7 每個值的 emitter（登記的前提）
 
@@ -12095,7 +12094,7 @@ CodeMetaValidator.requireValidValue(InvoiceCarrierSelectionMode.class, mode, "ca
 
 G1 只有 `generate_java_enum` 這個函式漏了（錯誤碼那一支的 Message 欄本來就有跳脫），而 enum 的 Description 是**自由書寫的中文散文**，比錯誤碼 Message 更容易出現引號。**G2 的形狀值得單獨記住：它只炸 Dart，backend 完全無感**——Java／TypeScript／Go 三邊都合法，CI 的 Java／Go 測試全綠，只有兩支 Flutter App 拿到一支語法錯誤的 `code_meta.dart`。修法只能在生成器這一層（碼值本身與 DB CHECK、provider 線上值逐字綁定，**改名就是改契約**）；加尾底線而非改字首，是為了讓「原本是哪個碼」一眼可讀。**修在生成器層 ＝ 之後所有領域都不會再踩**。
 
-**碼表寫進 CodeMeta 的 `.md` 而不另存材料分冊，是刻意的**：`static-gates` 的 CodeMeta 檢查對拍的是「`docs/代碼管理（CodeMeta）/*.md` ↔ 生成檔」與「四份前端拷貝」——**它不知道有分冊存在** ⇒ 分冊漂移時讀分冊的人會拿到錯的值域，而沒有任何東西會轉紅。代價是碼在還沒有 emitter 的時候就先登記在 SSOT 裡，但那是**延遲且可被發現的風險**（§C.7 逐個列著 emitter，#3534 已把「逐碼核對」列為必做項）。**跨檔引用一律用 enum 名 ＋ 檔名，不用小節號**——名字不會因為在檔案裡上下移動而失效。
+**碼表寫進 CodeMeta 的 `.md` 而不另存材料分冊，是刻意的**：CI 的 CodeMeta drift 檢查對拍的是「`docs/代碼管理（CodeMeta）/*.md` ↔ 生成檔」與直寫進 monorepo 的生成物（drift 檢查）——**它不知道有分冊存在** ⇒ 分冊漂移時讀分冊的人會拿到錯的值域，而沒有任何東西會轉紅。代價是碼在還沒有 emitter 的時候就先登記在 SSOT 裡，但那是**延遲且可被發現的風險**（§C.7 逐個列著 emitter，#3534 已把「逐碼核對」列為必做項）。**跨檔引用一律用 enum 名 ＋ 檔名，不用小節號**——名字不會因為在檔案裡上下移動而失效。
 
 ---
 
@@ -12108,7 +12107,7 @@ G1 只有 `generate_java_enum` 這個函式漏了（錯誤碼那一支的 Messag
 | 端點的 request/response DTO 逐欄定義、業務碼、限流 tier | §6.1 |
 | MQ 事件、通知模板 13 列、golden 契約 | §6.3 |
 | 三端 31 個畫面的版面、元件、四態、a11y | `58A-電子發票前端實作規格.md`（第一部分 Buyer `B01`–`B08`／第二部分 Seller `S01`–`S10`／第三部分 ADM `A01`–`A13`）。**畫面代號與畫面清冊的權威是 `58A`**，本附錄的「畫面」欄是引用；反過來**路由字串與消費檔案落點的權威是本附錄 §D.1** |
-| CodeMeta enum 的值域內容、三張 allowlist、四份拷貝與 fixture | 附錄 C |
+| CodeMeta enum 的值域內容、三張 allowlist、生成物 drift 檢查 | 附錄 C |
 | backend 的 22 處登記、k8s、監控 | §12.2（**該節完全不涵蓋前端 repo**） |
 
 | 代號 | 路徑 | 內容 |
@@ -12242,7 +12241,7 @@ A08 的建議卡「依建議建立措施」與右欄「建立措施」在同一�
 
 **ADM 一律不寫 `src/services/*.ts`**：`api.get/post/...` 直接在 `queryFn` 內呼叫（既有慣例）。上面兩個檔是**型別與格式化**不是 service 層，不違反這一條。
 
-**CodeMeta 是三個 repo 之間唯一真正的 SSOT，也是唯一有 gate 守著的一份**（其餘 wire 型別全靠自覺）。前端這一側要做的事、四份拷貝與 fixture 的更新順序見附錄 C；本附錄只補三條硬規則：
+**CodeMeta 是 backend、website、admin、兩支 App 之間的共享代碼 SSOT，生成物直寫進 monorepo，由 CI drift 檢查守著**（凍結狀態與新值的去處見 [ADR：CodeMeta 凍結](../adr/2026-09-25-codemeta-retirement.md)）。前端這一側要做的事見附錄 C；本附錄只補三條硬規則：
 
 | 硬規則 | 說明 |
 |---|---|
@@ -12404,7 +12403,7 @@ export const SUSPENSION_WHITELIST_PREFIXES = [
 | **V3** | 前端路由檔案是否真的存在（不是只有 fetch 字串）：WEB **9 條靜態**（＋`/account/invoices`）＋ **4 條動態**（B05 改為 `/account/invoices/[documentId]`、新增 `/seller-center/invoices/[documentId]`）＋ 3 個沒有自己 route 的元件；ADM 14 條 | 全部存在 | 有 fetch 字串但沒有頁 ⇒ V1 綠、使用者仍然到不了 |
 | **V4** | 八份清冊登記（§D.3） | 三個路由數字對得上本 PR 的量；`dynamic-route-catalog` 含 invoices ≥3；`sellerNav` 1；`nav-policy` 1；`suspensionWhitelist` **3**（＋其單元測試 ≥3）；`menu.ts` ≥1；`PrivacyPage` 的 AMEGO／光貿 ≥1；`resolve.ts` 的 `INVOICE_` ≥1；ADM `Sidebar.tsx` 第一列帶 `exact: true` | TypeScript 全綠、build 全綠、頁面打得開，但 E2E set-equality 紅（WEB）或「頁面存在但沒有人找得到」（ADM） |
 | **V5** | 通知落地：`ORDER_REF_TYPES` 仍含 `order`；13 列模板全部有 refType 或明確登記為「刻意沒有」 | 模板契約測試全綠 ＋ **變異測試轉紅** | 賣家點通知沒反應／導向不存在的訂單 |
-| **V6** | CodeMeta 四份拷貝一致 | 四份全綠，**不得有 SKIP** | 前端狀態欄空白（拿到舊碼表） |
+| **V6** | CodeMeta 生成物無 drift（`generate.sh --go --go-media --web --admin --flutter` 後 `git status` 乾淨） | 乾淨，無任何變更 | 前端狀態欄空白（拿到舊碼表） |
 
 | # | 五個會讓綠燈變假的陷阱 | 正解 |
 |---|---|---|
@@ -12412,7 +12411,7 @@ export const SUSPENSION_WHITELIST_PREFIXES = [
 | 2 | 只做陽性反證 | **陽性（必命中）＋ 陰性（必 MISS）兩件一起做**，且反證要用**與真檢查完全相同的呼叫形狀** |
 | 3 | repo 內的 `grep` 是 ripgrep wrapper | 遵守 gitignore、跳過隱藏檔 ⇒ 少命中。腳本一律用 `/usr/bin/grep`，且 **`-F`（固定字串）不可省**（路徑含 `/` 與 `_`，用預設正則會在某些引號組合下誤匹配） |
 | 4 | `go test` 少帶 `-tags=integration` | 模板契約測試第一行是 `//go:build integration`，不帶 tag 時該檔整個被排除、輸出是「ok … [no tests to run]」——**看起來全綠、實際一支都沒跑**。它用 testcontainers 起真 Postgres ⇒ 需要 Docker 在跑 |
-| 5 | `check-copies.sh` 對「repo 不在本機」是 SKIP 不轉紅 | 必須在四個 repo 都在本機的機器上跑一次 |
+| 5 | 只跑 `--go` 等子集旗標，漏掉 `--web`／`--admin`／`--flutter` 的生成物 | 一律用 CI 的完整旗標組（附錄 C.1），跑完 `git status` 乾淨再推 |
 
 **V1 有三處沒有鑑別力，各自靠另一條線索補**：① 端點 62——`/seller/invoices/jobs` 端點 33 也會命中 ⇒ 靠 V3 的 `ExternalIssuanceDialog.tsx` 存在性，或用 `/external_issuances` 片段（該片段同時涵蓋 62 與 `62R`，要區分則看 method）② 端點 63／64／65——`/invoice_complaints` 端點 13／14／15 也會命中，**三支全接或全不接是同一個 hits 數** ⇒ 靠 `/rejections`／`/withdrawals`／`/reopenings` 三個互不重疊尾段 ＋ V3 的 `InvoiceComplaintSection.tsx` 存在性 ③ 端點 66／67——`provider_accounts` 前綴端點 42–46 全都會命中，**六支全接或只接一支是同一個 hits 數** ⇒ 靠 `/reactivations`／`/revocations` 兩個互不重疊尾段 ＋ 兩支 dialog 檔案存在性。**第三處是最容易漏的**：兩支端點**不新增前端路由**（落在既有 `[storeId]` 頁內），所以 V3 的「ADM 14 條路由」對它們完全沒有鑑別力——只加路由字串而不加檔案存在性檢查，V1／V3 會在兩顆按鈕都不存在時**全綠**。
 
