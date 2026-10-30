@@ -20,7 +20,7 @@ function fixture(t) {
 	t.after(() => rmSync(root, { recursive: true, force: true }));
 	mkdirSync(join(root, "lib"));
 	writeFileSync(join(root, "lib/main_catalog.dart"), "void main() {}\n");
-	writeFileSync(join(root, ".fvmrc"), JSON.stringify({ flutter: "3.41.2" }));
+	writeFileSync(join(root, ".fvmrc"), JSON.stringify({ flutter: "3.47.7" }));
 	return root;
 }
 
@@ -80,7 +80,7 @@ test("CI Flutter override checks the pinned SDK and builds under a base path wit
 		env: {
 			...process.env,
 			UI_LIBRARY_FLUTTER_BIN: fakeFlutter(cwd),
-			SDK_TEST_VERSION: "3.41.2",
+			SDK_TEST_VERSION: "3.47.7",
 			SDK_TEST_LOG: log,
 		},
 	});
@@ -116,7 +116,7 @@ test("an incorrect CI Flutter version fails before invoking build", (t) => {
 					SDK_TEST_LOG: log,
 				},
 			}),
-		/does not match .fvmrc 3\.41\.2/,
+		/does not match .fvmrc 3\.47\.7/,
 	);
 	assert.equal(readFileSync(log, "utf8").trim().split("\n").length, 1);
 });

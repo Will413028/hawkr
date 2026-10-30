@@ -14,6 +14,9 @@ analyzer:
     - custom_lint
   errors:
     invalid_annotation_target: ignore
+    # custom_lint 仍是舊式 analyzer plugin；Dart 3.13 起對它發警告。
+    # 鎖定的 custom_lint 0.8.1 沒有新 plugin 系統的版本；升 custom_lint 時拿掉這行。
+    analysis_options_deprecated_plugins: ignore
     duplicate_ignore: ignore
 
 linter:

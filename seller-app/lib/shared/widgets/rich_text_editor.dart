@@ -595,7 +595,6 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
   void _onReorder(int oldIndex, int newIndex) {
     _saveState();
     setState(() {
-      if (newIndex > oldIndex) newIndex--;
       final block = _blocks.removeAt(oldIndex);
       _blocks.insert(newIndex, block);
       // 更新選中索引
@@ -1045,7 +1044,7 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
       scrollController: _scrollController,
       padding: EdgeInsets.fromLTRB(12.w, 16.h, 12.w, 16.h),
       itemCount: _blocks.length,
-      onReorder: _onReorder,
+      onReorderItem: _onReorder,
       proxyDecorator: (child, index, animation) {
         return Material(
           elevation: 4,

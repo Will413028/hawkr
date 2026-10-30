@@ -7,7 +7,7 @@ ThemeData 僅抽出為共用來源，沒有改變品牌色或元件預設值。
 
 ## 啟動與建置
 
-在 `hawkr_seller` 執行，使用 `.fvmrc` 鎖定的 Flutter 3.41.2：
+在 `hawkr_seller` 執行，使用 `.fvmrc` 鎖定的 Flutter 3.47.7：
 
 ```sh
 fvm flutter pub get

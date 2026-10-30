@@ -95,11 +95,11 @@ dependencies:
   # Clerk 的 OAuth（Google、LINE）在系統瀏覽器完成（iOS 的 ASWebAuthenticationSession）：Google 不允許在 App 內嵌的
   # WebView 登入。
   # 用於商品說明 rich text editor 的 inline hashtag chip 渲染
-  extended_text_field: ^16.0.2
+  extended_text_field: ^17.0.0
 
   vector_math: ^2.2.0
   firebase_analytics: ^12.4.2
-  flutter_quill: ^11.5.0
+  flutter_quill: ^11.6.0
 dev_dependencies:
   protobuf: 6.1.0
   flutter_native_splash: ^2.4.1

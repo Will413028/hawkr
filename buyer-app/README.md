@@ -95,7 +95,7 @@ lib/
 ## 技術架構
 
 ### 前端框架
-- **Flutter** 3.41.2（由 `.fvmrc` 固定）
+- **Flutter** 3.47.7（由 `.fvmrc` 固定）
 - **Dart** SDK ^3.8.0
 
 ### 架構模式
@@ -192,7 +192,7 @@ lib/
 ## 開發環境設置
 
 ### 前置需求
-- Flutter SDK 3.41.2（請使用 FVM）
+- Flutter SDK 3.47.7（請使用 FVM）
 - Dart SDK ^3.8.0
 - VS Code
 - Xcode (iOS 開發)

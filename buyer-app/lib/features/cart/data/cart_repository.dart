@@ -169,7 +169,6 @@ class CartRepository {
       final body = response.data;
       if (body == null) throw const ServerException('加入購物車失敗');
       _requireSuccess(body, '加入購物車失敗');
-      return getCartData(guestId: guestId);
     } on DioException catch (error) {
       final selfPurchaseMessage = _selfPurchaseMessageFromDio(error);
       if (selfPurchaseMessage != null) {
@@ -181,6 +180,7 @@ class CartRepository {
       }
       throw _transportException(error);
     }
+    return getCartData(guestId: guestId);
   }
 
   /// PUT /public/carts/items/{sku_id}/quantity.
@@ -196,10 +196,10 @@ class CartRepository {
       final body = response.data;
       if (body == null) throw const ServerException('更新數量失敗');
       _requireSuccess(body, '更新數量失敗');
-      return getCartData(guestId: guestId);
     } on DioException catch (error) {
       throw _transportException(error);
     }
+    return getCartData(guestId: guestId);
   }
 
   /// DELETE /public/carts/items/{sku_id}.

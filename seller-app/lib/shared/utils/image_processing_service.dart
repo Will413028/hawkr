@@ -89,13 +89,14 @@ class ImageProcessingService {
 
   /// 處理頭像圖片（從檔案）
   static Future<Uint8List?> processAvatarFromFile(File file) async {
+    final Uint8List bytes;
     try {
-      final bytes = await file.readAsBytes();
-      return processAvatar(bytes);
+      bytes = await file.readAsBytes();
     } catch (e, stackTrace) {
       HKLog.logE('[ImageProcessing] Failed to read avatar file', e, stackTrace);
       return null;
     }
+    return processAvatar(bytes);
   }
 
   /// 處理頭像圖片（從路徑）
@@ -162,14 +163,9 @@ class ImageProcessingService {
     int maxWidth = productMaxWidth,
     int maxHeight = productMaxHeight,
   }) async {
+    final Uint8List bytes;
     try {
-      final bytes = await file.readAsBytes();
-      return processProductImage(
-        bytes,
-        quality: quality,
-        maxWidth: maxWidth,
-        maxHeight: maxHeight,
-      );
+      bytes = await file.readAsBytes();
     } catch (e, stackTrace) {
       HKLog.logE(
         '[ImageProcessing] Failed to read product image file',
@@ -178,6 +174,12 @@ class ImageProcessingService {
       );
       return null;
     }
+    return processProductImage(
+      bytes,
+      quality: quality,
+      maxWidth: maxWidth,
+      maxHeight: maxHeight,
+    );
   }
 
   /// 處理商品圖片（從路徑）

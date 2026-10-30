@@ -53,6 +53,7 @@
   - session 讀取的快取（觸發：量測顯示 session 讀取是熱路徑瓶頸；opaque-sessions ADR 的重新評估條件）。
   - Sign in with Apple（觸發：App 要上架 App Store；見前提段）。
   - Swift 原生 App 的登入（觸發：Swift 版開工）。
+  - App 內連結登入方式（`LinkIdentity`；web 已有；觸發：App 要進入測試發佈，Will 2026-10-31）。
   - 部署環境的第一方反代確認 3xx、`Location` 與多個 `Set-Cookie` 原樣轉給瀏覽器（觸發：第一次部署 website；系統從未部署，步驟 3 時沒有對象可驗，本機代理已實測；Will 2026-10-31）。
 
 ## 步驟
@@ -119,11 +120,17 @@
   - 消費端：`rg -il clerk -g '*.md' . -g '!backend/docs/adr/**' -g '!backend/docs/plans/**' -g '!buyer-app/**' -g '!seller-app/**' -g '!packages/hawkr_auth/**'`（App 的文件在步驟 6 改）。
   - 驗收：上面那個 rg 只剩明確標為歷史的段落；`python3 scripts/check-agents-md.py`。
 
-- [ ] **6. 兩支 App**（被擋於：步驟 4、D2）
+- [ ] **6a. Flutter 升到 3.47.7**（被擋於：無）
+  - 範圍：所有 `.fvmrc`（兩支 App 與 `packages/` 各套件）從 3.41.2 升到 3.47.7（2026-10-08 stable，Dart 3.13.5；`flutter_line_sdk` 3.0.0 要 Flutter ≥3.44，Will 2026-10-31 選升級而非用 2.7.2），重解 `pubspec.lock`，修新版 analyzer／lint 的發現，文件裡寫死的版本一併改；不新增或升級其他依賴（`pub get` 被迫升級時停下回報）。
+  - 消費端：`find . -name .fvmrc -not -path '*/node_modules/*'`；`rg -l '3\.41\.2' -g '!*.lock'`；CI 經 `.fvmrc` 讀版本（`_flutter-quality.yml`、`api-contract.yml`、`dart-packages.yml`）。
+  - 驗收：每個 Flutter 專案 analyze、custom_lint、守門測試、`deadcode.sh`、build_runner 生成比對；完整測試與 coverage 交 CI，CI 全綠才開 6b。
+
+- [ ] **6b. 兩支 App 改原生登入**（被擋於：步驟 6a、D2）
   - 範圍：`packages/hawkr_auth` 改用原生 SDK（`google_sign_in`、LINE SDK；`sign_in_with_apple` 移除，依 D2）取得 ID token／授權碼，呼叫步驟 2 的 token 交換 RPC，session token 存 secure storage；`clerk_auth` 移除；兩支 App 與 `hawkr_auth` 的 README、ARCHITECTURE 一併改；兩支 App 的 session provider、interceptor、測試 fake 改寫；收到 `unauthenticated` 回登入頁。
   - 消費端：`rg -il clerk packages buyer-app seller-app`（盤點 56 檔）。
   - 驗收：實測 Google iOS client 的 ID token `aud`，結果補進 `spikes.md` 並對齊步驟 2 接受的 audience；兩支 App 的 analyze、custom_lint、改到的測試加以字串讀原始碼的守門測試、`bash scripts/deadcode.sh`、build_runner 生成比對（diff 有 `part` 宣告的檔時）；完整測試與 coverage ratchet 交給 CI（seller 依 CI 的 artifact 重算 baseline）。真機或模擬器登入：Will。mutation：interceptor 不帶 Bearer 要紅、token 存非 secure storage 的守門測試要紅。
   - 需要人做的事：Will 以模擬器或真機兩家各登入一次；iOS 拿掉 Sign in with Apple capability，加 LINE 的 URL scheme。
+  - 已定（Will 2026-10-31）：依賴 `google_sign_in` 7.2.0、`flutter_line_sdk` 3.0.0，移除 `clerk_auth`、`sign_in_with_apple`、`flutter_web_auth_2`；Google 的 nonce 只能經 `GoogleSignIn.instance.initialize(nonce:)` 帶，每次登入先取新 nonce 再重新 initialize（文件寫只呼叫一次，iOS 實作只覆寫設定；以測試守住順序，升 SDK 時重驗）；App 內連結登入方式（`LinkIdentity`）不在本步，見範圍的「延後」。兩支 App 沒有 `android/`，只做 iOS。
 
 - [ ] **7. 收尾**：完成定義逐項核對；獨立設計審查（design-review skill）；`rg -il clerk -g '!node_modules' -g '!gen/**' -g '!*.g.dart' -g '!pnpm-lock*' . -g '!backend/docs/adr/**' -g '!backend/docs/plans/**'` 沒有結果，盤點每列去向填完；延後項附觸發條件搬回主清單；需要人做的事列給 Will（刪除開發用 Clerk instance 是不可逆的對外動作，列給 Will 做）。
 
@@ -187,5 +194,6 @@
 | 3 website 切換 | 完成 | 主 session 重跑 website 的 lint、vitest、`test:unit`、`pnpm run build`（loopback API base）、`design:check --apps-root ..` 皆 exit 0；B1（`ListLinkedIdentities`）重跑 gofmt、vet（含 `-tags integration`）、`go test ./...`、`make lint-monolith` 0 issues、`buf lint`，`make sqlc` 以映像重生無 diff；mutation 實跑（transport 加回 Bearer、middleware 不認 cookie、代理拿掉 `redirect: "manual"`、連結 href 拿掉 `link=1`、`identity_already_linked` 對錯句、連結區移到別的 section、`ListLinkedIdentities` 的 effects 宣告與 account id）皆紅；三個單元各經獨立審查無 HIGH（MED：Apple→LINE 文案，Will 2026-10-31 同意；LOW：刪 Apple 撤銷指引，依不提供 Apple 接受）；`rg -il clerk website .github/workflows` 從 73 檔剩 3 檔（兩個斷言「沒有 Clerk」的測試、一處歷史註解）。Will 2026-10-31 同意：連結區版面、Apple→LINE 文案、登入錯誤分三句 | 部署環境反代對 3xx、多個 `Set-Cookie` 的處理移到範圍的「延後」（觸發：第一次部署）。已補：`ListLinkedIdentities` integration 在 CI 綠；e2e 與 Storybook 在 CI 綠（run 41094311718 之後 `ff1c5b9` 全綠；中途兩個修正：e2e 的 `__Host-` cookie 改由回應的 Set-Cookie 設，CDP `addCookies` 會被拒；繞過 `mockGateway` 的 spec 補 `GetSession` 的訪客 mock）；2026-10-31 本機真人驗收——Google 登入建帳、帳號設定連結 LINE、登出（`SignOut`，session 歸零）、LINE 登入落在同一帳號；LINE email 權限已 Applied，「拒給 email」實測見 `spikes.md` | `8dfeb8f`、`10bae63`、`bd34c2f`、`7bfa416`、`e507060`、`3fdff43`、`ff1c5b9` |
 | 4 後端刪除 Clerk | 完成 | 兩個單元各經 Sonnet 實作、主 session 重跑驗收、獨立審查：4a 刪 Clerk（`internal/clerk`、job `identity.clerk_user`、`accounts.clerk_user_id` 的 migration、`CLERK_*`、`clerk-env.sh`、Makefile、seed）；4b 刪 Apple 登入（`internal/apple`、`applerevoke`、`apple_tokens` 的 migration、`APPLE_*`、`IDENTITY_TOKEN_KEYS`／`Sealer`、identity 的 job worker、proto `LinkAppleCredential` 與三端生成、`hawkr_api` 與兩支 App 的交接呼叫；Apple Pay 未動）。主 session 重跑 gofmt、vet（含 `-tags integration`）、`go test ./...`、`make lint-monolith` 0 issues、`atlas migrate validate`、`buf lint`、`buf breaking`（v1alpha1 依 `ignore_unstable_packages` 不檢查）、兩支 App 的 analyze 與 deadcode、`hawkr_api` analyze；mutation 實跑（加回 `CLERK_*`／`APPLE_*` 讀取、拿掉 dev 金鑰與 Access 互斥、dev-token 對不存在帳號默默建立、seed 插入登入身分、`effects.go` 加回已刪 procedure）皆紅；審查 4a 2 個 LOW（過時註解，4b 修正）、4b 無缺陷。CI（`73d7453`）全綠，含 integration；首輪 `c7f4e35` 的 integration 7 個失敗皆為測試 fixture 沒跟上 dev 以帳號 ID 識別、seller-app coverage baseline 依 CI artifact 重算、instruction-lint 指向已改名的測試，`ac62f05`、`ea31a43`、`73d7453` 修正。決定：dev 使用者以帳號 ID 識別、不建假登入身分（`make dev-token args='-account <id>'`，Will 2026-10-31） | 盤點指令 `rg -il clerk backend -g '!docs/**'` 沒排除 `backend/docs`，實際用 `-g '!**/docs/**' -g '!*.md'`，殘留只剩既有 migration、`reserved` 歷史註解、斷言「沒有 Clerk／Apple 設定」的測試與舊 migration 的回歸測試；文件（含 `identity/AGENTS.md`、`CARRYOVER.md`、dev-token 用法、`.agents/skills/backend-e2e-verify/SKILL.md`）是步驟 5 | `2a2d7e5`、`69603ee`、`6767eef`、`11351de`、`b9c4e55`、`ac62f05`、`ea31a43`、`73d7453` |
 | 5 文件 | 完成 | Sonnet 改 28 檔，主 session 重跑：步驟 5 的 Clerk rg 只剩 4 檔（`hawkr_auth` 列寫明步驟 6、三份 CARRYOVER 的歷史標記），`dev-token` rg 全為現行用法，instruction-lint exit 0，second-brain `check-links.py`、`lint-rules.py` exit 0；抽查 cookie 名、provider 環境變數、`PUBLIC_WEB_ORIGIN` 預設、`dev-token` 用法與程式一致。ADR 自建登入補「已知限制」（Workspace 刪人後新 `sub` 自動連結） | 計畫寫的 `scripts/check-agents-md.py` 不存在，以 CI 的 instruction-lint 代替；`website/.env.example` 的 `NEXT_PUBLIC_APPLE_*`、`secrets/INDEX.md` 的 Apple 鍵與舊微服務文件的 Apple 引用不是本步範圍，留到收尾 | |
-| 6 兩支 App | 未開始 | | | |
+| 6a Flutter 升級 | 程式完成待 CI | 三輪 Sonnet；7 份 `.fvmrc` 升 3.47.7；連帶升級（Will 2026-10-31 逐項同意）：`hawkr_auth` 的 `test` 1.31.1、`hawkr_ui_text` 的 `intl` 0.20.3、seller-app 的 `flutter_quill` ^11.6.0、`extended_text_field` ^17.0.0；新 lint 的最小修正（cart、image processing 的 try 內 return 外移，`onReorder`→`onReorderItem`）。主 session 重跑：兩支 App analyze exit 0、`hawkr_auth`、`hawkr_ui_text` 測試 exit 0、seller `test/shared/widgets` 233 過；subagent 回報：五個套件 analyze／測試、兩支 App custom_lint、守門測試、`deadcode.sh`、build_runner 穩定、website `app-catalog-build` 皆過 | 兩支 App 以 `analysis_options_deprecated_plugins: ignore` 壓 custom_lint 舊式 plugin 的警告（觸發移除：升 custom_lint 到支援新 plugin 系統的版本）；Flutter 3.47 的 `pub get`／analyze 會自動往 `analysis_options.yaml` 加 `analyzer.exclude`，本地要還原；完整測試、coverage 待 CI | |
+| 6b 兩支 App | 未開始 | | | |
 | 7 收尾 | 未開始 | | | |

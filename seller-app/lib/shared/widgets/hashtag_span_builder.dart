@@ -48,11 +48,11 @@ class HashtagSpanBuilder extends SpecialTextSpanBuilder {
 class _HashtagSpecialText extends SpecialText {
   _HashtagSpecialText({
     TextStyle? textStyle,
-    SpecialTextGestureTapCallback? onTap,
+    super.onTap,
     required this.startIndex,
     required this.tagColor,
     required this.tagWeight,
-  }) : super(flag, '', textStyle, onTap: onTap);
+  }) : super(flag, '', textStyle);
 
   static const String flag = '#';
   final int startIndex;

@@ -9,7 +9,7 @@ Hawkr Seller 是 Hawkr 平台的商家端 Flutter App，提供商品管理、訂
 共用元件改動應在同一次 PR 更新正式 widget、catalog、API 文件與測試，Web 的 Storybook 在 build 時直接讀入 API 文件。文件與 catalog 的更新不代表已發布手機 App。
 
 **版本**: 1.0.1 (build_number 於打包時透過 git commit 數動態推導)
-**Flutter SDK**: 3.41.2（使用 FVM 管理；Dart 設定區間為 >=3.8.0 <4.0.0）
+**Flutter SDK**: 3.47.7（使用 FVM 管理；Dart 設定區間為 >=3.8.0 <4.0.0）
 **支援平台**: iOS / Web
 
 ## 快速開始
@@ -17,10 +17,10 @@ Hawkr Seller 是 Hawkr 平台的商家端 Flutter App，提供商品管理、訂
 ### 環境準備
 
 1. 本專案使用 FVM 進行 SDK 版本管理，請確保已安裝 `fvm`。
-2. 執行 `fvm install` 安裝 `.fvmrc` 指定的 Flutter 版本（目前 3.41.2），再 `fvm flutter pub get` 載入依賴套件。
+2. 執行 `fvm install` 安裝 `.fvmrc` 指定的 Flutter 版本（目前 3.47.7），再 `fvm flutter pub get` 載入依賴套件。
 
 > [!IMPORTANT]
-> **一律透過 `fvm flutter` 執行**，或設 `fvm global 3.41.2` 讓 `flutter` 指向 pin 的版本。
+> **一律透過 `fvm flutter` 執行**，或設 `fvm global 3.47.7` 讓 `flutter` 指向 pin 的版本。
 > 若系統另裝了全域 Flutter（例如 Homebrew cask），它會在 `PATH` 中蓋過 FVM，導致用「錯版本的 engine 去編譯本專案的 framework」。iOS build 會炸出一堆 **Flutter SDK 內部**錯誤（如 `Type 'ui.SemanticsHitTestBehavior' not found`、`PlatformDispatcher.lineHeightScaleFactorOverride` 不存在、`ImageFilter.bounds` not found）——這是**版本錯配**，不是你的 code 有問題。
 > 用 `which flutter` + `flutter --version` 確認解析到的是 FVM 版本（路徑含 `fvm/`、engine 與 framework 同版）。被全域 flutter 污染後，`fvm flutter clean` 可把 `ios/Flutter/Generated.xcconfig` 的 `FLUTTER_ROOT` 重生回 FVM。
 

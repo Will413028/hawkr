@@ -9,9 +9,9 @@ dependencies:
   connectrpc: 2.0.0
   hawkr_api:
     path: ../hawkr_api
-  # plural 呼叫 Intl.pluralLogic（ADR 2026-10-17-multi-locale-architecture D2）。釘 0.20.2：Flutter 3.41.2 的
-  # flutter_localizations 釘這一版，兩支 App 都解析到它，套件的測試就跑 App 實際用的版本。
-  intl: 0.20.2
+  # plural 呼叫 Intl.pluralLogic（ADR 2026-10-17-multi-locale-architecture D2）。釘 0.20.3：Flutter 3.47.7 的
+  # flutter_localizations 要求 ^0.20.3，兩支 App 都解析到它，套件的測試就跑 App 實際用的版本。
+  intl: 0.20.3
 
 dev_dependencies:
   # 守門工具 tool/check_enum_text.dart 用；版本與兩支 App 的 pubspec.lock 相同。
