@@ -1,5 +1,5 @@
 # gitleaks 設定：沿用內建規則，只對「明確是誤報」的樣式放行。
-# 其他歷史命中記在 .gitleaks-baseline.json（只擋新增的外洩）；基準裡的每一筆都等人工確認後處理。
+# .gitleaks-baseline.json 放待人工確認的歷史命中（只擋新增的外洩），目前為空。
 title = "hawkr gitleaks"
 
 [extend]
@@ -39,3 +39,9 @@ condition = "AND"
 paths = ['''^backend/docs/詳細設計書/05-支付服務''']
 regexTarget = "line"
 regexes = ['''PKCS#8|PKCS#1|BEGIN (RSA )?PRIVATE KEY''']
+
+[[allowlists]]
+description = "AMEGO 電子發票 API 文件的範例：廠商公開的測試帳號 AppKey（搭配測試統編 12345678），不是正式憑證"
+condition = "AND"
+paths = ['''^backend/docs/第三方整合/AMEGO 電子發票 API 總覽\.md$''']
+rules = ["generic-api-key"]
