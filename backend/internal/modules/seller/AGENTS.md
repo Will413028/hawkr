@@ -6,7 +6,7 @@
 
 ## 擁有的資料
 
-schema `seller`（`db/schema.sql`，view 與函式在 `db/objects.sql`）：`stores`、`store_closures`、`store_exposures`、`store_blocks`；`measures`、`measure_*`、`violations`、`suspension_periods`、`reports`、`report_*`、`cases`、`case_inquiries`、`governance_notes`、`evidence_accesses`；`kyc_*`、`payuni_*`；`prospects`、`prospect_*`；`product_view_events`、`product_views_daily`；媒體同步 `media_ref_sync` 與退場資產 `retired_assets`。讀取模型：無（規格 §1）。
+schema `seller`（`db/schema.sql`，view 與函式在 `db/objects.sql`）：`stores`、`store_closures`、`store_exposures`、`store_blocks`；`measures`、`measure_*`、`violations`、`suspension_periods`、`reports`、`report_*`、`cases`、`case_inquiries`、`governance_notes`、`evidence_accesses`；`kyc_*`、`account_identity_hashes`、`payuni_*`；`prospects`、`prospect_*`；`product_view_events`、`product_views_daily`；媒體同步 `media_ref_sync` 與退場資產 `retired_assets`。讀取模型：無（規格 §1）。
 
 ## 發布的讀取介面
 
@@ -38,6 +38,7 @@ schema `seller`（`db/schema.sql`，view 與函式在 `db/objects.sql`）：`sto
 - 寫入以版本樂觀鎖，拒絕都在 token 轉正之前。守門：`TestRejectedProfileUpdateDoesNotConsumeTheStagedToken`。規格：§3。
 - 通報只指向公開過的店，重複送出併成補充；佐證與證件先寫讀取紀錄才讀。守門：`TestEvidenceReadIsRecordedBeforeTheBytesAreRead`。規格：§7、§9。
 - KYC 個資只存密文，型別不帶明文，顯示全文先稽核。守門：`TestKYCNeverReturnsOrStoresPlaintext`。規格：§13。
+- 防詐身分雜湊（`account_identity_hashes`，只有 blind index）與 `kyc_identity_hashes` 同一個 transaction 寫入、不隨 184 天個資清理刪除，來源 stint 關店滿 5 年才刪；措施快照從它取；銀行帳號命中只列出、不能建立關聯終止。守門：`TestIdentityHashesOutliveThePIIPurgeAndFeedLaterSnapshots`、`TestBankAccountHitsAreListedButNeverTerminate`。規格：§13。
 - PayUni 外部呼叫不在 transaction 內，一店一個 sync job。守門：`TestSyncJobIsUniquePerStoreInRiver`。規格：§14。
 - 商家名單統編在未封存業者間唯一。守門：`TestTaxIDIsUniqueAmongLiveProspects`。規格：§15。
 - 瀏覽數以 `store_id` 與台北日計，請求路徑不呼叫商品服務。守門：`TestRollupBucketsByStoreAndTaipeiDayOfOccurrence`。規格：§16。

@@ -12,6 +12,73 @@ import (
 	"uuid"
 )
 
+const deleteExpiredAccountIdentityHashes = `-- name: DeleteExpiredAccountIdentityHashes :execrows
+DELETE FROM seller.account_identity_hashes a
+USING seller.store_closures c
+WHERE c.store_id = a.source_store_id AND c.reopened_at IS NULL
+  AND a.source_store_id = ANY($1::bigint[])
+  AND $2::timestamptz > c.closed_at + make_interval(hours => $3::int)
+`
+
+type DeleteExpiredAccountIdentityHashesParams struct {
+	StoreIds []int64
+	Now      time.Time
+	Hours    int32
+}
+
+// 刪掉這些來源 stint 過期的防詐保存 hash；時間條件在這裡再判斷一次（與 ExpiredIdentityHashStores 同一個式子），所以候選之後恢復營業或時間條件不成立的不會被刪。
+func (q *Queries) DeleteExpiredAccountIdentityHashes(ctx context.Context, arg DeleteExpiredAccountIdentityHashesParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteExpiredAccountIdentityHashes, arg.StoreIds, arg.Now, arg.Hours)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const expiredIdentityHashStores = `-- name: ExpiredIdentityHashStores :many
+SELECT DISTINCT a.source_store_id AS store_id
+FROM seller.account_identity_hashes a
+JOIN seller.store_closures c ON c.store_id = a.source_store_id AND c.reopened_at IS NULL
+WHERE $1::timestamptz > c.closed_at + make_interval(hours => $2::int)
+  AND ($3::bigint IS NULL OR a.source_store_id > $3::bigint)
+ORDER BY a.source_store_id
+LIMIT $4
+`
+
+type ExpiredIdentityHashStoresParams struct {
+	Now          time.Time
+	Hours        int32
+	AfterStoreID *int64
+	BatchLimit   int32
+}
+
+// 防詐保存的比對 hash（account_identity_hashes）過期的來源 stint：stint 目前這次關店（store_closures 沒有 reopened_at 的那一列）滿 hours（model.IdentityHashRetentionHours，
+// 5 年）。恢復營業的 stint 沒有目前這次關店，不算關閉。after_store_id 是 keyset。保存條件（StoreHolds）由呼叫方再問，被擋的略過。
+func (q *Queries) ExpiredIdentityHashStores(ctx context.Context, arg ExpiredIdentityHashStoresParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, expiredIdentityHashStores,
+		arg.Now,
+		arg.Hours,
+		arg.AfterStoreID,
+		arg.BatchLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var store_id int64
+		if err := rows.Scan(&store_id); err != nil {
+			return nil, err
+		}
+		items = append(items, store_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const purgeKYCApplications = `-- name: PurgeKYCApplications :many
 UPDATE seller.kyc_applications a
 SET real_name = NULL,
@@ -110,7 +177,8 @@ const purgeKYCIdentityHashes = `-- name: PurgeKYCIdentityHashes :exec
 DELETE FROM seller.kyc_identity_hashes WHERE application_id = ANY($1::uuid[])
 `
 
-// 清掉已清理的申請的比對 hash（blind index 與申請的個人欄位同時清除；措施的身分快照是措施擁有的，不在這裡）。
+// 清掉已清理的申請的比對 hash（blind index 與申請的個人欄位同時清除；措施的身分快照是措施擁有的，防詐保存的 account_identity_hashes 由
+// DeleteExpiredAccountIdentityHashes 在關店滿 5 年後刪，都不在這裡）。
 func (q *Queries) PurgeKYCIdentityHashes(ctx context.Context, applicationIds []uuid.UUID) error {
 	_, err := q.db.Exec(ctx, purgeKYCIdentityHashes, applicationIds)
 	return err

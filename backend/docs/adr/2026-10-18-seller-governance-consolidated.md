@@ -157,3 +157,7 @@
 - **`request_id` 流程改寫**：舊流程在同一個 use case 內「先插入、撞唯一鍵、再重讀」，撞鍵之後在同一個 transaction 繼續下 SQL，違反單體規則 3。改成先鎖目標帳號的全部 stint、再查 `(admin, request_id)` 重送、插入用 `ON CONFLICT DO NOTHING`；落空（只剩目標在不同帳號的並行請求）回 `InvalidInput` 並回滾。關聯終止的唯一鍵改成鎖住後先檢查，索引只是保底。
 - **對象不可變**：見第一項；`UpdateMeasure` 沒有對象欄位。
 - **social 以 D-sync 複本取代讀取時 join**：原設計是 social 的讀取 join `seller.pub_content_takedowns(at)`。改成 social 的同 transaction 訂閱者維護自己的 `content_takedowns`（建立插入、撤銷刪除、同則內容被多個措施下架時只刪該措施的列），旗標與讀取只看自己的表；`seller.pub_content_takedowns()` 不收 `at`，只給每日對帳核對。理由：social 的旗標與 `reevaluate_*` 是資料庫函式，不能參照 seller 的表，而 join 會讓每個公開讀取多一次跨 schema 探測；撤銷要立即生效（SD13）。與買家刪帳的 `inactive_authors` 同形，差別是可刪除。
+
+## 修訂：關聯帳號納入銀行帳號命中，只列出（2026-10-30，Will 2026-10-29 決定 D4；計畫 `plans/2026-10-29-payment-onboarding-stripe.md` 步驟 3）
+
+「終止合作」的關聯帳號（`LINKED_ACCOUNT`）一條原本只反查身分證號與統編。現在 `linked_accounts` 也列出銀行帳號相同的其他帳號，命中種類標成銀行帳號；這種命中只列出，不能當建立關聯終止的依據：該列的 `can_create_linked_termination` 是 false，`CreateMeasure` 的再驗證要求至少一種身分證號或統編的命中，伺服器不自動建立任何措施。理由：家人或配偶共用帳戶是常態，銀行帳號相同是線索不是同一個人的證據（`2026-10-19-seller-kyc-payuni-consolidated.md` 對送件阻擋的判斷相同）。快照的來源改為防詐保存的身分雜湊，見該 ADR 同日修訂。原決策段保留歷史。

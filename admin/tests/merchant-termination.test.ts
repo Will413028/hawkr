@@ -213,8 +213,9 @@ test("標籤文字照 proto 註解的標籤：終止合作、預定生效、契�
 			LinkedIdentity.NATIONAL_ID,
 			LinkedIdentity.UBN,
 			LinkedIdentity.RESPONSIBLE_PERSON_ID,
+			LinkedIdentity.BANK_ACCOUNT,
 		].map(linkedIdentityLabel),
-		["身分證號", "統編", "負責人身分證號"],
+		["身分證號", "統編", "負責人身分證號", "銀行帳號"],
 	);
 	assert.equal(terminationGroundLabel(TerminationGround.UNSPECIFIED), "未知");
 	assert.equal(linkedIdentityLabel(LinkedIdentity.UNSPECIFIED), "未知");

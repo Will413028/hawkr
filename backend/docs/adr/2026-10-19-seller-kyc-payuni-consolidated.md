@@ -150,3 +150,15 @@ KYC 認證與 PayUni 子商店從 seller-service 搬進 seller 模組。舊實�
 ## 修訂：pricebook 刪除（2026-10-28，ADR `2026-10-27-general-ecommerce-scope-cut` D1；計畫 `plans/2026-10-27-ecommerce-scope-cut.md` 步驟 6）
 
 `seller.deleted` 的消費者不再包含 pricebook（`pricebook.seller.deleted` queue 已從 topology 刪除）。
+
+## 修訂：防詐身分雜湊獨立保存 5 年，關聯帳號納入銀行帳號（2026-10-30，Will 2026-10-29 決定 D3、D4；計畫 `plans/2026-10-29-payment-onboarding-stripe.md` 步驟 3）
+
+脈絡：本檔「比對 hash 的保留」寫「KYC 列的 hash 隨 KYC 個資一起清理」，快照只能取到處分當下還沒清理的 hash，關店 184 天後才被處分的舊 stint 用過的身分是接受的缺口（W8）。Will 決定把防詐用的身分比對索引與 KYC 個資分開保存。原決策段保留歷史，下列取代它們的對應部分。
+
+- 保存（D3）：新表 `seller.account_identity_hashes`（來源 stint、欄位、金鑰 ID、hash、帳號、建立時間；沒有明文）與 `kyc_identity_hashes` 同一個 transaction、同一個呼叫點寫入；`kyc_identity_hashes` 仍是申請的 hash、照 184 天清理。新表不隨個資清理刪除，來源 stint 目前這次關店滿 5 年後由清理 job 刪（不看關閉原因；主管機關來函的保存與申覆的 legal hold 擋下的略過；恢復營業的 stint 不算關閉）。5 年是 Will 的產品決定，參考金流業「關係結束後 5 年」的紀錄保存慣例，法源未確認，上線前與條款一起核對。
+- 為什麼不是延長 `kyc_identity_hashes` 的保留：該表綁著申請的個資清理（本檔「比對 hash 與個資清理的衝突」否決「hash 留在 KYC 列、清理跳過」與「hash 永久保留」）；獨立一張只有 blind index 的表，保留理由（防詐）與期限自己一份，清理不必懂它。代價：多存一份 hash 5 年（沒有明文）；舊 HMAC 金鑰要留在金鑰環到這些列被刪，`CheckKYCKeys` 涵蓋新表。
+- 措施快照（`SnapshotMeasureIdentities`）改從新表取，涵蓋已清理的舊 stint；快照的生命週期不變（措施結束或撤銷就刪）。本檔「清理之後才發現的 21.3 事由，快照取不到舊 stint 已清理的 hash」的缺口縮到關店滿 5 年之後。
+- 草稿欄位被改掉時，新表同步修剪該 stint 已沒有任何申請持有的值：保存的是申請上存在過的身分，不是草稿裡打錯又改掉的值。
+- 關聯帳號的反查（本檔「身分比對」）納入銀行帳號（D4）：命中種類為銀行帳號，只列出，不能據以建立關聯終止、不自動建立任何措施（家人或配偶共用帳戶是常態，與本檔「銀行帳號命中只標記，不擋」同一個判斷）。反查的申請一側仍讀 `kyc_identity_hashes`，已清理的申請不命中；要涵蓋已清理的 stint 時另議。
+- 條款 21.3、賣家身分認證告知事項第 4 項與隱私政策的保存目的與期間要寫入這個 5 年的 blind index（草稿待 Will 核可，不在本次 commit）。
+- 系統未上線，migration 不回填既有申請。

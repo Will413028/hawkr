@@ -83,6 +83,23 @@ func TestTerminationTimeConstants(t *testing.T) {
 	if StoreRetention < 184*24*time.Hour {
 		t.Fatalf("保留期 %s 短於任何連續六個曆月的最大長度（184 天）", StoreRetention)
 	}
+	// 防詐保存期（D3）：5 年，不短於任何連續五個曆年（最長 1826 天），而且是 StoreRetention 之外的另一個常數。
+	if IdentityHashRetention != 1826*24*time.Hour || IdentityHashRetentionHours != 43824 {
+		t.Fatalf("防詐保存期 %s／%d", IdentityHashRetention, IdentityHashRetentionHours)
+	}
+}
+
+// 銀行帳號命中只列出，不能當關聯終止的依據；其他三種可以。
+func TestOnlyBankAccountHitsAreListOnly(t *testing.T) {
+	for _, id := range LinkedIdentityValues() {
+		if got, want := id.CountsAsGround(), id != LinkedBankAccount; got != want {
+			t.Errorf("%s：CountsAsGround=%v，期望 %v", id, got, want)
+		}
+	}
+	src := LinkedSource{Status: MeasureStatusEnforced, Kind: MeasureTermination, Ground: func() *TerminationGround { g := GroundFraud; return &g }(), AccountID: 1}
+	if CanCreateLinkedTermination(src, 2, false, false, TerminationTarget{LatestOfAccount: true}) {
+		t.Error("沒有可當依據的命中不能建立關聯終止")
+	}
 }
 
 func TestMeasureActionPredicates(t *testing.T) {
@@ -510,12 +527,12 @@ func TestLinkedTerminationAvailability(t *testing.T) {
 		if got := tc.source.BlockFor(2); got != tc.block && tc.name != "同一個帳號" {
 			t.Errorf("%s：BlockFor=%q，期望 %q", tc.name, got, tc.block)
 		}
-		if got := CanCreateLinkedTermination(tc.source, 2, tc.linked, tc.target); got != tc.allowed {
+		if got := CanCreateLinkedTermination(tc.source, 2, true, tc.linked, tc.target); got != tc.allowed {
 			t.Errorf("%s：Can=%v，期望 %v", tc.name, got, tc.allowed)
 		}
 	}
 	same := LinkedSource{Status: MeasureStatusEnforced, Kind: MeasureTermination, Ground: ground(GroundFraud), AccountID: 2}
-	if same.BlockFor(2) != LinkedSourceSameAccount || CanCreateLinkedTermination(same, 2, false, open) {
+	if same.BlockFor(2) != LinkedSourceSameAccount || CanCreateLinkedTermination(same, 2, true, false, open) {
 		t.Error("來源與目標同一個帳號")
 	}
 }

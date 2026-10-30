@@ -116,6 +116,7 @@ var clearChildrenSQL = []string{
 	`DELETE FROM seller.kyc_reviews WHERE application_id IN (SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.kyc_registration_checks WHERE application_id IN (SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.kyc_documents WHERE application_id IN (SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1))`,
+	`DELETE FROM seller.account_identity_hashes WHERE source_store_id = ANY($1)`,
 	`DELETE FROM seller.kyc_identity_hashes WHERE application_id IN (SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.kyc_applications WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.product_views_daily WHERE store_id = ANY($1)`,

@@ -219,6 +219,7 @@ const (
 	LinkedNationalID                 = model.LinkedNationalID
 	LinkedUBN                        = model.LinkedUBN
 	LinkedResponsiblePersonID        = model.LinkedResponsiblePersonID
+	LinkedBankAccount                = model.LinkedBankAccount
 	RiskTransaction                  = model.RiskTransaction
 	RiskFoodSafety                   = model.RiskFoodSafety
 	RiskFraud                        = model.RiskFraud
@@ -272,6 +273,8 @@ const (
 	StoreRetireAfter = model.StoreRetireAfter
 	// StoreRetention 是關店之後的第二段清理（註冊、身分與連線資料）：184 天（6 個月）。
 	StoreRetention = model.StoreRetention
+	// IdentityHashRetention 是防詐保存的身分 blind index 的保存期：來源 stint 關店後 5 年（Stripe 計畫 D3）。
+	IdentityHashRetention = model.IdentityHashRetention
 	// InquiryDefaultDue 是詢問沒有指定期限時，建立後的期限（3 天）。
 	InquiryDefaultDue = model.InquiryDefaultDue
 	// InquiryMinDue 與 InquiryMaxDue 是建立詢問時可以指定的期限範圍（距離建立）。

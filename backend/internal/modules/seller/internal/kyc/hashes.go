@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
@@ -29,6 +30,8 @@ func linkedIdentityOf(field string) (model.LinkedIdentity, bool) {
 		return model.LinkedResponsiblePersonID, true
 	case fieldTaxID:
 		return model.LinkedUBN, true
+	case fieldBank:
+		return model.LinkedBankAccount, true
 	}
 	return "", false
 }
@@ -88,8 +91,9 @@ func (p protector) hashInput(row store.SellerKycApplication, field string) (inpu
 	}
 }
 
-// writeHashes 把這個欄位金鑰環每一把金鑰算的 blind index 寫進 kyc_identity_hashes（已存在的略過）。
-func (p protector) writeHashes(ctx context.Context, q *store.Queries, row store.SellerKycApplication, field string) error {
+// writeHashes 把這個欄位金鑰環每一把金鑰算的 blind index 寫進 kyc_identity_hashes 與防詐保存的 account_identity_hashes（同一個 transaction、已存在的略過）：
+// 兩張表的寫入只有這一個呼叫點，所以不會只寫一邊。account_identity_hashes 不隨個資清理刪除（過期由清理 job 刪，ADR 的 2026-10-30 修訂）。
+func (p protector) writeHashes(ctx context.Context, q *store.Queries, row store.SellerKycApplication, field string, now time.Time) error {
 	input, ok, err := p.hashInput(row, field)
 	if err != nil || !ok {
 		return err
@@ -100,13 +104,18 @@ func (p protector) writeHashes(ctx context.Context, q *store.Queries, row store.
 		}); err != nil {
 			return err
 		}
+		if err := q.InsertAccountIdentityHash(ctx, store.InsertAccountIdentityHashParams{
+			StoreID: row.StoreID, Field: field, KeyID: h.KeyID, Hash: h.Sum, CreatedAt: now,
+		}); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 // syncHashes 在寫入申請的同一個 transaction 內讓 kyc_identity_hashes 與申請的識別欄位一致：跟寫入前的列（before，新建時是 nil）比，
 // 欄位的值有變（hash 不同）才刪掉重寫，沒動的欄位不解密也不寫。
-func (p protector) syncHashes(ctx context.Context, q *store.Queries, before *store.SellerKycApplication, after store.SellerKycApplication) error {
+func (p protector) syncHashes(ctx context.Context, q *store.Queries, before *store.SellerKycApplication, after store.SellerKycApplication, now time.Time) error {
 	for _, field := range hashFields {
 		if before != nil && sameStoredHash(*before, after, field) {
 			continue
@@ -114,7 +123,11 @@ func (p protector) syncHashes(ctx context.Context, q *store.Queries, before *sto
 		if err := q.DeleteKYCIdentityHashes(ctx, store.DeleteKYCIdentityHashesParams{ApplicationID: after.ApplicationID, Field: field}); err != nil {
 			return err
 		}
-		if err := p.writeHashes(ctx, q, after, field); err != nil {
+		// 防詐保存的列同步修剪：只刪這個 stint 已沒有任何申請持有的值，再寫入新值。
+		if err := q.PruneAccountIdentityHashes(ctx, store.PruneAccountIdentityHashesParams{StoreID: after.StoreID, Field: field}); err != nil {
+			return err
+		}
+		if err := p.writeHashes(ctx, q, after, field, now); err != nil {
 			return err
 		}
 	}
@@ -149,6 +162,7 @@ func (s *Service) rehashBatchFor(ctx context.Context, keyID string, after *uuid.
 	var count int
 	var last uuid.UUID
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		now := s.d.Now().UTC()
 		q := store.New(s.d.DB.Conn(ctx))
 		params := store.KYCApplicationsMissingHashKeyParams{KeyID: keyID, AfterID: after, BatchLimit: rehashBatch}
 		rows, err := q.KYCApplicationsMissingHashKey(ctx, params)
@@ -157,7 +171,7 @@ func (s *Service) rehashBatchFor(ctx context.Context, keyID string, after *uuid.
 		}
 		for _, row := range rows {
 			for _, field := range hashFields {
-				if err := s.p.writeHashes(ctx, q, row, field); err != nil {
+				if err := s.p.writeHashes(ctx, q, row, field, now); err != nil {
 					return fmt.Errorf("seller：補算申請 %s 的 %s 比對 hash：%w", row.ApplicationID, field, err)
 				}
 			}

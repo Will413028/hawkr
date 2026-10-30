@@ -193,6 +193,10 @@ const (
 	// StoreRetention 是關店後的第二段清理：關店後 184 天清註冊、身分與連線資料（店名、聯絡、地址、KYC、PayUni 的自由文字、食品登錄字號、同意紀錄的
 	// IP 與 User-Agent）。184 天是任何連續六個曆月的最大長度，所以不論關店日都不短於詐欺犯罪危害防制條例第 37 條第 1 項的「六個月」。時數只從這一個常數來。
 	StoreRetention = 4416 * time.Hour
+	// IdentityHashRetention 是防詐保存的身分 blind index（account_identity_hashes）的保存期：來源 stint 目前這次關店滿 5 年才刪（Stripe 計畫 D3，Will 2026-10-29；
+	// 參考金流業「關係結束後 5 年」的紀錄保存慣例，法源未確認，上線前與條款一起核對）。用固定時數：1826 天不短於任何連續五個曆年（最多含兩個閏日，1826 天）的長度，
+	// 與 StoreRetention 同一個做法。與 StoreRetention 是不同的常數：理由不同（個資清理對比防詐比對），一個改了另一個不必跟著改。時數只從這一個常數來。
+	IdentityHashRetention = 43824 * time.Hour
 )
 
 // 清理與申覆期間的整數時數，給清理查詢的 hours 參數（Go 的常數是唯一來源）。
@@ -200,6 +204,9 @@ const (
 	AppealWindowHours     = int32(AppealWindow / time.Hour)
 	StoreRetireAfterHours = int32(StoreRetireAfter / time.Hour)
 	StoreRetentionHours   = int32(StoreRetention / time.Hour)
+
+	// IdentityHashRetentionHours 是 IdentityHashRetention 的整數時數，給 ExpiredIdentityHashStores 與 DeleteExpiredAccountIdentityHashes 的 hours 參數。
+	IdentityHashRetentionHours = int32(IdentityHashRetention / time.Hour)
 )
 
 // RiskGround 是 RISK 措施的風險類型（條款第 17.1 條）與外部要求（第 17.5 條）。
@@ -481,14 +488,21 @@ const (
 	LinkedUBN LinkedIdentity = "UBN"
 	// LinkedResponsiblePersonID 企業負責人的身分證號相同。
 	LinkedResponsiblePersonID LinkedIdentity = "RESPONSIBLE_PERSON_ID"
+	// LinkedBankAccount 銀行帳號（連同銀行代碼）相同。只列出、不能據以建立關聯終止（Stripe 計畫 D4：家人或配偶共用帳戶是常態，與 ADR
+	// 2026-10-19-seller-kyc-payuni-consolidated「銀行帳號命中只標記，不擋」同一個判斷）。
+	LinkedBankAccount LinkedIdentity = "BANK_ACCOUNT"
 )
 
 // LinkedIdentityValues 回傳全部命中的身分類別，依同時命中多種時的取用順序。
 func LinkedIdentityValues() []LinkedIdentity {
-	return []LinkedIdentity{LinkedNationalID, LinkedUBN, LinkedResponsiblePersonID}
+	return []LinkedIdentity{LinkedNationalID, LinkedUBN, LinkedResponsiblePersonID, LinkedBankAccount}
 }
 
-// LinkedHit 是身分快照反查的一筆命中：別的帳號的 KYC 申請裡，有一種身分與措施的快照相同。
+// CountsAsGround 回報這種命中能不能當作建立關聯終止（LINKED_ACCOUNT）的依據：身分證號與統編可以，銀行帳號只列出。列出關聯帳號（linkedAccounts）與
+// 建立時的再驗證（CreateMeasure）都只問它，所以「只列出、不能建立」只有這一個判斷點。
+func (i LinkedIdentity) CountsAsGround() bool { return i != LinkedBankAccount }
+
+// LinkedHit 是身分快照反查的一筆命中：別的帳號的 KYC 申請裡，有一種身分（含銀行帳號）與措施的快照相同。
 type LinkedHit struct {
 	AccountID int64
 	Identity  LinkedIdentity
@@ -595,10 +609,11 @@ func (s LinkedSource) BlockFor(targetAccountID int64) LinkedSourceBlock {
 }
 
 // CanCreateLinkedTermination 判斷此刻能不能以 source 為來源對 targetAccountID 建立關聯終止：來源措施不擋、這個帳號還沒有以它為來源的生效中關聯終止
-// （alreadyLinked，唯一索引 measures_linked_source），而且目標店家不擋關聯帳號事由。身分快照命中是呼叫方列出帳號的前提（命中才會有這一列），不在這裡。
+// （alreadyLinked，唯一索引 measures_linked_source），目標店家不擋關聯帳號事由，而且至少有一種命中能當依據（groundHit：LinkedIdentity.CountsAsGround，只命中銀行帳號的
+// 帳號只列出）。身分快照命中是呼叫方列出帳號的前提（命中才會有這一列），不在這裡。
 // CreateMeasure 的前置條件逐項用同一組 BlockFor；alreadyLinked 在那裡由唯一索引回 AlreadyExists。
-func CanCreateLinkedTermination(source LinkedSource, targetAccountID int64, alreadyLinked bool, target TerminationTarget) bool {
-	return source.BlockFor(targetAccountID) == "" && !alreadyLinked && target.BlockFor(GroundLinkedAccount) == ""
+func CanCreateLinkedTermination(source LinkedSource, targetAccountID int64, groundHit, alreadyLinked bool, target TerminationTarget) bool {
+	return groundHit && source.BlockFor(targetAccountID) == "" && !alreadyLinked && target.BlockFor(GroundLinkedAccount) == ""
 }
 
 // RemediationUnavailableReason 是賣家此刻不能請求解除的原因。

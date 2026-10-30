@@ -163,7 +163,7 @@ func (s *Service) SaveDraft(ctx context.Context, in model.KYCDraftInput) (model.
 		if err != nil {
 			return err
 		}
-		if err := s.p.syncHashes(ctx, q, current, row); err != nil {
+		if err := s.p.syncHashes(ctx, q, current, row, now); err != nil {
 			return err
 		}
 		if current != nil && current.Status != row.Status {

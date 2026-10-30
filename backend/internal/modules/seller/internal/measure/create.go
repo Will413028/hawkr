@@ -643,7 +643,8 @@ func (s *Service) checkTermination(ctx context.Context, q *store.Queries, in mod
 	if err != nil {
 		return err
 	}
-	if len(hits) == 0 {
+	// 銀行帳號命中只列出，不能當依據（LinkedIdentity.CountsAsGround，與列表的 can_create_linked_termination 同一個判斷）。
+	if !slices.ContainsFunc(hits, func(h model.LinkedHit) bool { return h.Identity.CountsAsGround() }) {
 		return apperr.InvalidInputOn([]string{sourceField}, "這個帳號的身分和來源措施的身分快照沒有相同")
 	}
 	return nil

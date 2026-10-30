@@ -1,4 +1,4 @@
-h1:d8ylxtz0/nLGaZNtWc+Tu36Ma2f5tp/LTKYea4z9MtY=
+h1:VRI+rFHO3SVtLn0qApAG2UN7/olAYvYgSsWnq4EP08c=
 20261001160141_seller_core.sql h1:hVkQ8Wo6S5BLgzr4nFSGS/1EZpRX9mHqRwpxmIP3Yeg=
 20261002120004_seller_governance.sql h1:Dj/zGg4clK5U8YBsKn+TWnE5ZizigjU9/s7EXXHuc+g=
 20261002133159_seller_kyc.sql h1:QiN6KkqvCU/lwdw0B66YQniBEGnAhojvTYHQJ8lOqlc=
@@ -61,3 +61,4 @@ h1:d8ylxtz0/nLGaZNtWc+Tu36Ma2f5tp/LTKYea4z9MtY=
 20261029112024_seller_assessable_community_categories.sql h1:mNYv9Xi74bl0NzEEV9qOAnT5lKCkRlClPw/wDIwi1kU=
 20261029112449_seller_content_takedown.sql h1:HNF+ykOB1RahqKs02sHLl7qFr0oMleBMaaLaekqLm6M=
 20261029112501_seller_pub_content_takedowns.sql h1:LrOn0oiVdE4pXo5ABwqly6adEAxlXecitGhVn/vrffE=
+20261030090000_seller_account_identity_hashes.sql h1:O8GPikvLoQEd0TZBJmy5nlN/JvaoG3k1zJM/sHeJXxE=

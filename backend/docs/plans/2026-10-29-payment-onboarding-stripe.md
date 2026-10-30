@@ -161,7 +161,7 @@
 |---|---|---|---|---|
 | 1 Spike 與 CI 基線 | 未開始 | | | |
 | 2 B 階段需求 | 完成 | `git grep -c "2026-10-29-payment-onboarding-stripe" backend/docs/plans/2026-09-24-go-modular-monolith.md` = 5（B2、B3、B8、B9、B10 各一） | 無 | 見 git log |
-| 3 防詐雜湊與銀行帳號關聯 | 未開始 | | | |
+| 3 防詐雜湊與銀行帳號關聯 | 程式完成待驗收（法務告知文字待 Will 核可後才改 `website/docs/legal/` 並 `pnpm gen:legal`；integration 待 CI） | 已跑：`atlas migrate diff`（原生 postgres 18 暫存庫）= 已同步、`atlas migrate validate` 通過；本機 sqlc v1.31.1（同 gen-sqlc.sh 的映像版本）；`make connect`、TS `gen:api`、Dart `generate.sh`（admin proto 不在 Dart 生成物，無 diff）、`make uitext`（無 drift）；gofmt、`go vet`（含 `-tags integration`）、unit（seller、httpapi、arch、cmd）、`make lint-monolith` 0 issues（兩輪）、`GOWORK=off go mod tidy -diff` 無差異；admin `merchant-termination` 與 `merchant-create-termination-dialog` 測試 35 通過。 | 未跑：單體 integration（本機不跑，AGENTS.local 規則；Docker 也無回應）——新增 5 個測試（`account_identity_hashes_integration_test.go`）及其 mutation（快照改回 `kyc_identity_hashes`、清理不刪 5 年列、拿掉銀行帳號條件、`ReferencedKeyIDs` 拿掉新表）只編譯過、未執行；`TestPubContractsMatchMigrations`（需 testcontainers；本步驟沒改 `pub_*`）；與基線逐行比對的 CI job。決定：不回填（系統未上線，ADR 的 migration 不回填原則）；新表 `field` 與 `kyc_identity_hashes.field` 同一組值；銀行帳號命中不能建立關聯終止（`LinkedIdentity.CountsAsGround`），防詐列在草稿欄位改掉時同步修剪。 | 見 git log |
 | 4 payment port、中立契約與改名 | 未開始 | | | |
 | 5 Stripe 金流商代收 | 未開始 | | | |
 | 6 Stripe 平台自收與防詐訊號 | 未開始 | | | |

@@ -180,6 +180,7 @@ export const LINKED_IDENTITY_LABEL: Record<
 	[LinkedIdentity.NATIONAL_ID]: "身分證號",
 	[LinkedIdentity.UBN]: "統編",
 	[LinkedIdentity.RESPONSIBLE_PERSON_ID]: "負責人身分證號",
+	[LinkedIdentity.BANK_ACCOUNT]: "銀行帳號",
 };
 
 /** 命中的身分類別的顯示文字；UNSPECIFIED 或不認得的值是「未知」。 */

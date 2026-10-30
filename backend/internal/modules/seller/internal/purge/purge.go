@@ -6,6 +6,8 @@
 //   - 第二段（個資清理，purge）：已退場而且關店之後過了 model.StoreRetention（184 天，詐欺犯罪危害防制條例第 37 條第 1 項的六個月），註冊、身分與連線資料
 //     在同一個 transaction 內一併清掉：店名、聯絡與地址、KYC 申請的個人欄位與證件、登記資料查詢、PayUni 註冊與觀測的自由文字、
 //     同意紀錄的 IP 與 User-Agent。審核的事實、PayUni 的狀態碼與措施的身分快照（措施擁有，隨措施撤銷才刪）保留。
+//   - 防詐保存的過期刪除（第三項，不是清理的一段）：account_identity_hashes（身分的 blind index，沒有明文，D3）不隨第二段刪除；來源 stint 目前這次關店
+//     滿 model.IdentityHashRetention（5 年）後刪，被主管機關來函的保存或申覆的 legal hold 擋下的略過（StoreHolds）。
 //
 // 時間條件只有一支查詢（兩段清理是 RetireDueStores 的兩個 stage），保存條件只有 StoreHolds 一支：申覆的 legal hold 擋兩段清理（也讓
 // 恢復營業視為保留期還沒過），主管機關來函的保存擋兩段清理（不影響恢復營業）。每一批都是：時間條件選候選並鎖住（FOR UPDATE SKIP LOCKED）
@@ -54,11 +56,11 @@ type Service struct {
 // New 建立服務。
 func New(d Deps) *Service { return &Service{d: d} }
 
-// Run 依序跑第一段（退場）與第二段（個資清理），各自分批到沒有候選為止；回傳第二段清理了個資的店家數
+// Run 依序跑第一段（退場）、第二段（個資清理）與防詐保存的過期刪除，各自分批到沒有候選為止；回傳第二段清理了個資的店家數
 // （退場由 retired_at 看得到，不計入）。
 func (s *Service) Run(ctx context.Context) (int, error) {
 	purged := 0
-	for i, stage := range []func(context.Context, *int64) (int, int, *int64, error){s.retireBatch, s.purgeBatch} {
+	for i, stage := range []func(context.Context, *int64) (int, int, *int64, error){s.retireBatch, s.purgeBatch, s.expireIdentityHashBatch} {
 		var after *int64
 		for {
 			done, candidates, last, err := stage(ctx, after)
@@ -272,4 +274,46 @@ func (s *Service) purgeBatch(ctx context.Context, after *int64) (int, int, *int6
 		return err
 	})
 	return purgedCount, candidateCount, last, err
+}
+
+// expireIdentityHashBatch 刪掉一批來源 stint 已關店滿 model.IdentityHashRetention 的防詐保存 hash（account_identity_hashes）：先選候選 stint，再問 StoreHolds
+// （被保存擋下的略過，不刪），刪除的語句自己再判斷一次時間（stint 在候選之後恢復營業的不會被刪）。回傳這批刪了 hash 的 stint 數、候選數與最後一個候選的 store_id
+// （keyset；與兩段清理同一個形狀）。
+func (s *Service) expireIdentityHashBatch(ctx context.Context, after *int64) (int, int, *int64, error) {
+	var deleted, candidates int
+	var last *int64
+	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		q := store.New(s.d.DB.Conn(ctx))
+		now := s.d.Now().UTC()
+		ids, err := q.ExpiredIdentityHashStores(ctx, store.ExpiredIdentityHashStoresParams{
+			Now: now, Hours: model.IdentityHashRetentionHours, AfterStoreID: after, BatchLimit: batchSize,
+		})
+		if err != nil {
+			return err
+		}
+		candidates = len(ids)
+		if candidates == 0 {
+			return nil
+		}
+		last = &ids[candidates-1]
+		held, err := holds(ctx, q, ids, now)
+		if err != nil {
+			return err
+		}
+		var due []int64
+		for _, id := range ids {
+			if !held[id] {
+				due = append(due, id)
+			}
+		}
+		if len(due) == 0 {
+			return nil
+		}
+		if _, err := q.DeleteExpiredAccountIdentityHashes(ctx, store.DeleteExpiredAccountIdentityHashesParams{StoreIds: due, Now: now, Hours: model.IdentityHashRetentionHours}); err != nil {
+			return err
+		}
+		deleted = len(due)
+		return nil
+	})
+	return deleted, candidates, last, err
 }

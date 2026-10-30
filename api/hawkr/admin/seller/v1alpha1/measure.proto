@@ -221,6 +221,8 @@ enum LinkedIdentity {
   LINKED_IDENTITY_UBN = 2;
   // 企業負責人的身分證號相同。
   LINKED_IDENTITY_RESPONSIBLE_PERSON_ID = 3;
+  // 銀行帳號（連同銀行代碼）相同。只列出，不能據以建立關聯終止（can_create_linked_termination 為 false，除非同時命中上面的身分）。
+  LINKED_IDENTITY_BANK_ACCOUNT = 4;
 }
 
 // LinkedAccount 是措施詳情上「相同身分的其他帳號」的一列。
@@ -229,7 +231,7 @@ message LinkedAccount {
   // 這個帳號目前的店家；沒有目前的店家時是最近的一個 stint。
   string store_id = 2;
   string store_code = 3;
-  // 命中的身分類別；同時命中多種時依 NATIONAL_ID、UBN、RESPONSIBLE_PERSON_ID 的順序取第一種。
+  // 命中的身分類別；同時命中多種時依 NATIONAL_ID、UBN、RESPONSIBLE_PERSON_ID、BANK_ACCOUNT 的順序取第一種。
   LinkedIdentity matched_identity = 4;
   // 以本措施為來源、仍生效（未撤銷）的關聯終止；還沒有時是空字串（管理員可以用 CreateMeasure 建立）。
   string linked_measure_id = 5;

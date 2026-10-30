@@ -170,6 +170,8 @@ const (
 	LinkedIdentity_LINKED_IDENTITY_UBN LinkedIdentity = 2
 	// 企業負責人的身分證號相同。
 	LinkedIdentity_LINKED_IDENTITY_RESPONSIBLE_PERSON_ID LinkedIdentity = 3
+	// 銀行帳號（連同銀行代碼）相同。只列出，不能據以建立關聯終止（can_create_linked_termination 為 false，除非同時命中上面的身分）。
+	LinkedIdentity_LINKED_IDENTITY_BANK_ACCOUNT LinkedIdentity = 4
 )
 
 // Enum value maps for LinkedIdentity.
@@ -179,12 +181,14 @@ var (
 		1: "LINKED_IDENTITY_NATIONAL_ID",
 		2: "LINKED_IDENTITY_UBN",
 		3: "LINKED_IDENTITY_RESPONSIBLE_PERSON_ID",
+		4: "LINKED_IDENTITY_BANK_ACCOUNT",
 	}
 	LinkedIdentity_value = map[string]int32{
 		"LINKED_IDENTITY_UNSPECIFIED":           0,
 		"LINKED_IDENTITY_NATIONAL_ID":           1,
 		"LINKED_IDENTITY_UBN":                   2,
 		"LINKED_IDENTITY_RESPONSIBLE_PERSON_ID": 3,
+		"LINKED_IDENTITY_BANK_ACCOUNT":          4,
 	}
 )
 
@@ -1189,7 +1193,7 @@ type LinkedAccount struct {
 	// 這個帳號目前的店家；沒有目前的店家時是最近的一個 stint。
 	StoreId   string `protobuf:"bytes,2,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
 	StoreCode string `protobuf:"bytes,3,opt,name=store_code,json=storeCode,proto3" json:"store_code,omitempty"`
-	// 命中的身分類別；同時命中多種時依 NATIONAL_ID、UBN、RESPONSIBLE_PERSON_ID 的順序取第一種。
+	// 命中的身分類別；同時命中多種時依 NATIONAL_ID、UBN、RESPONSIBLE_PERSON_ID、BANK_ACCOUNT 的順序取第一種。
 	MatchedIdentity LinkedIdentity `protobuf:"varint,4,opt,name=matched_identity,json=matchedIdentity,proto3,enum=hawkr.admin.seller.v1alpha1.LinkedIdentity" json:"matched_identity,omitempty"`
 	// 以本措施為來源、仍生效（未撤銷）的關聯終止；還沒有時是空字串（管理員可以用 CreateMeasure 建立）。
 	LinkedMeasureId string `protobuf:"bytes,5,opt,name=linked_measure_id,json=linkedMeasureId,proto3" json:"linked_measure_id,omitempty"`
@@ -1492,12 +1496,13 @@ const file_hawkr_admin_seller_v1alpha1_measure_proto_rawDesc = "" +
 	"0MEASURE_ACTION_UNAVAILABLE_REASON_APPEAL_PENDING\x10\x06\x125\n" +
 	"1MEASURE_ACTION_UNAVAILABLE_REASON_VIOLATION_BASIS\x10\a\x129\n" +
 	"5MEASURE_ACTION_UNAVAILABLE_REASON_REMEDIATION_PENDING\x10\b\x12B\n" +
-	">MEASURE_ACTION_UNAVAILABLE_REASON_CONTENT_TAKEDOWN_REVOKE_ONLY\x10\t*\x96\x01\n" +
+	">MEASURE_ACTION_UNAVAILABLE_REASON_CONTENT_TAKEDOWN_REVOKE_ONLY\x10\t*\xb8\x01\n" +
 	"\x0eLinkedIdentity\x12\x1f\n" +
 	"\x1bLINKED_IDENTITY_UNSPECIFIED\x10\x00\x12\x1f\n" +
 	"\x1bLINKED_IDENTITY_NATIONAL_ID\x10\x01\x12\x17\n" +
 	"\x13LINKED_IDENTITY_UBN\x10\x02\x12)\n" +
-	"%LINKED_IDENTITY_RESPONSIBLE_PERSON_ID\x10\x03*\xe5\x01\n" +
+	"%LINKED_IDENTITY_RESPONSIBLE_PERSON_ID\x10\x03\x12 \n" +
+	"\x1cLINKED_IDENTITY_BANK_ACCOUNT\x10\x04*\xe5\x01\n" +
 	"\x1fTerminationViolationRequirement\x121\n" +
 	"-TERMINATION_VIOLATION_REQUIREMENT_UNSPECIFIED\x10\x00\x12.\n" +
 	"*TERMINATION_VIOLATION_REQUIREMENT_REQUIRED\x10\x01\x12.\n" +

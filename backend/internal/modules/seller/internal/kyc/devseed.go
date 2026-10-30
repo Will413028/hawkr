@@ -23,7 +23,7 @@ func (s *Service) SeedApproved(ctx context.Context, q *store.Queries, storeID in
 	if err != nil {
 		return store.SellerKycApplication{}, uuid.Nil(), err
 	}
-	if err := s.p.syncHashes(ctx, q, nil, draft); err != nil {
+	if err := s.p.syncHashes(ctx, q, nil, draft, now); err != nil {
 		return store.SellerKycApplication{}, uuid.Nil(), err
 	}
 	// 照正式流程的狀態轉移：草稿 → SUBMITTED（submission_seq 加一）→ APPROVED，用同一個 TransitionKYCApplication。

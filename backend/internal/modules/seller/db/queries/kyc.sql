@@ -239,16 +239,15 @@ JOIN seller.kyc_applications a ON a.application_id = d.application_id
 WHERE d.application_id = $1 AND a.status <> 'CANCELLED';
 
 -- name: SnapshotMeasureIdentities :exec
--- 停權措施建立時，複製被處分帳號全部 KYC 申請（跨 stint、含已取消的）的身分 blind index 到措施擁有的快照：每個識別欄位金鑰環裡每一把金鑰算的 hash 各一筆
--- （kyc_identity_hashes），之後換鑰也查得到；同一個 hash 只留一筆。身分證號與企業負責人身分證號同一種（ID_CARD）。
+-- 停權措施建立時，複製被處分帳號全部 stint 的身分 blind index 到措施擁有的快照：每個識別欄位金鑰環裡每一把金鑰算的 hash 各一筆，之後換鑰也查得到；
+-- 同一個 hash 只留一筆。來源是 account_identity_hashes（防詐保存，ADR 2026-10-19-seller-kyc-payuni-consolidated 的 2026-10-30 修訂），不是
+-- kyc_identity_hashes：後者隨 184 天的個資清理刪除，舊 stint 清理之後才建立的處分取不到它的身分。身分證號與企業負責人身分證號同一種（ID_CARD）。
 INSERT INTO seller.measure_identities (measure_id, kind, key_id, hash)
 SELECT sqlc.arg(measure_id)::uuid,
        CASE h.field WHEN 'TAX_ID' THEN 'TAX_ID' WHEN 'BANK_ACCOUNT' THEN 'BANK_ACCOUNT' ELSE 'ID_CARD' END,
        h.key_id, h.hash
-FROM seller.kyc_identity_hashes h
-JOIN seller.kyc_applications a ON a.application_id = h.application_id
-JOIN seller.stores st ON st.store_id = a.store_id
-WHERE st.account_id = sqlc.arg(account_id)
+FROM seller.account_identity_hashes h
+WHERE h.account_id = sqlc.arg(account_id)
 ON CONFLICT DO NOTHING;
 
 -- name: MeasureIdentityMatches :many
@@ -262,7 +261,8 @@ ORDER BY m.account_id, mi.kind;
 
 -- name: LinkedAccountHits :many
 -- 與這筆措施的身分快照相同的其他帳號（W9）：別的帳號的申請（跨 stint、含已取消的）裡，身分證號（本人與企業負責人）對快照的 ID_CARD、統一編號對
--- TAX_ID，銀行帳號不算。快照與申請都存金鑰環每一把金鑰算的 (key_id, hash)，以索引等值連接，不解密；個資清理過的申請沒有這些列，不命中。
+-- TAX_ID、銀行帳號對 BANK_ACCOUNT（Stripe 計畫 D4：銀行帳號命中只列出；能不能據以建立關聯終止由 model.LinkedIdentity.CountsAsGround 決定，不在這裡）。
+-- 快照與申請都存金鑰環每一把金鑰算的 (key_id, hash)，以索引等值連接，不解密；個資清理過的申請沒有這些列，不命中。
 -- account_id 不為 NULL 時只看那個帳號。
 SELECT DISTINCT st.account_id, h.field
 FROM seller.measure_identities mi
@@ -270,9 +270,7 @@ JOIN seller.kyc_identity_hashes h ON h.hash = mi.hash AND h.key_id = mi.key_id
 JOIN seller.kyc_applications a ON a.application_id = h.application_id
 JOIN seller.stores st ON st.store_id = a.store_id
 WHERE mi.measure_id = sqlc.arg(measure_id)
-  AND mi.kind IN ('ID_CARD', 'TAX_ID')
-  AND mi.kind = CASE h.field WHEN 'TAX_ID' THEN 'TAX_ID' ELSE 'ID_CARD' END
-  AND h.field <> 'BANK_ACCOUNT'
+  AND mi.kind = CASE h.field WHEN 'TAX_ID' THEN 'TAX_ID' WHEN 'BANK_ACCOUNT' THEN 'BANK_ACCOUNT' ELSE 'ID_CARD' END
   AND st.account_id <> sqlc.arg(except_account_id)
   AND (sqlc.narg(account_id)::bigint IS NULL OR st.account_id = sqlc.narg(account_id)::bigint)
 ORDER BY st.account_id, h.field;
@@ -286,6 +284,25 @@ DELETE FROM seller.kyc_identity_hashes WHERE application_id = $1 AND field = $2;
 INSERT INTO seller.kyc_identity_hashes (application_id, field, key_id, hash)
 VALUES ($1, $2, $3, $4)
 ON CONFLICT DO NOTHING;
+
+-- name: InsertAccountIdentityHash :exec
+-- 防詐保存的比對 hash（與 InsertKYCIdentityHash 在同一個 transaction、同一個呼叫點寫入）；帳號取自來源 stint；已存在的略過（補金鑰可重跑）。
+INSERT INTO seller.account_identity_hashes (source_store_id, field, key_id, hash, account_id, created_at)
+SELECT s.store_id, sqlc.arg(field)::text, sqlc.arg(key_id)::text, sqlc.arg(hash)::bytea, s.account_id, sqlc.arg(created_at)::timestamptz
+FROM seller.stores s
+WHERE s.store_id = sqlc.arg(store_id)
+ON CONFLICT DO NOTHING;
+
+-- name: PruneAccountIdentityHashes :exec
+-- 欄位被改掉之後，修剪這個 stint 這個欄位已經沒有任何申請持有的值（草稿裡改掉的值不是送出的事實，不保存）。在 DeleteKYCIdentityHashes 之後、寫入新值之前執行；
+-- 還有別的申請（同一個 stint 的已取消申請）持有同一個值的列不刪。只在 stint 還有未清理的申請時呼叫：清理之後申請不能再編輯，這張表的列由
+-- DeleteExpiredAccountIdentityHashes 刪。
+DELETE FROM seller.account_identity_hashes a
+WHERE a.source_store_id = sqlc.arg(store_id) AND a.field = sqlc.arg(field)::text
+  AND NOT EXISTS (
+    SELECT 1 FROM seller.kyc_identity_hashes h
+    JOIN seller.kyc_applications ap ON ap.application_id = h.application_id
+    WHERE ap.store_id = a.source_store_id AND h.field = a.field AND h.key_id = a.key_id AND h.hash = a.hash);
 
 -- name: KYCApplicationsMissingHashKey :many
 -- 還有識別欄位、但缺這把金鑰的比對 hash 的申請（個資清理過的沒有欄位，不在其中）：換鑰之後補算用，依 application_id 一批一批取（after_id 是上一批最後一筆），
@@ -331,7 +348,7 @@ WHERE store_id = ANY(sqlc.arg(store_ids)::bigint[]);
 
 -- name: ReferencedKeyIDs :many
 -- 資料庫裡被參照的每一把金鑰 ID（啟動檢查用）：ENCRYPTION 是密文開頭的金鑰 ID（1 byte 的長度、ID），HASH 是 blind index
--- 的金鑰 ID（申請的 hash、比對用的 hash 與處分的身分快照）。已清理（NULL）的欄位不參照任何金鑰。
+-- 的金鑰 ID（申請的 hash、比對用的 hash、防詐保存的 hash 與處分的身分快照）。已清理（NULL）的欄位不參照任何金鑰。
 SELECT 'ENCRYPTION'::text AS kind, convert_from(substring(c FROM 2 FOR get_byte(c, 0)), 'UTF8')::text AS key_id
 FROM (
     SELECT id_card_no_enc AS c FROM seller.kyc_applications
@@ -348,6 +365,7 @@ FROM (
     UNION SELECT tax_id_hash_key FROM seller.kyc_applications
     UNION SELECT bank_account_hash_key FROM seller.kyc_applications
     UNION SELECT key_id FROM seller.kyc_identity_hashes
+    UNION SELECT key_id FROM seller.account_identity_hashes
     UNION SELECT key_id FROM seller.measure_identities
 ) k
 WHERE k.key_id IS NOT NULL

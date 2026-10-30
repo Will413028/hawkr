@@ -11,6 +11,15 @@ import (
 	"uuid"
 )
 
+type SellerAccountIdentityHash struct {
+	SourceStoreID int64
+	Field         string
+	KeyID         string
+	Hash          []byte
+	AccountID     int64
+	CreatedAt     time.Time
+}
+
 type SellerAgreementAcceptance struct {
 	AcceptanceID       int64
 	StoreID            int64

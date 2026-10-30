@@ -385,6 +385,34 @@ func (q *Queries) DeleteKYCIdentityHashes(ctx context.Context, arg DeleteKYCIden
 	return err
 }
 
+const insertAccountIdentityHash = `-- name: InsertAccountIdentityHash :exec
+INSERT INTO seller.account_identity_hashes (source_store_id, field, key_id, hash, account_id, created_at)
+SELECT s.store_id, $1::text, $2::text, $3::bytea, s.account_id, $4::timestamptz
+FROM seller.stores s
+WHERE s.store_id = $5
+ON CONFLICT DO NOTHING
+`
+
+type InsertAccountIdentityHashParams struct {
+	Field     string
+	KeyID     string
+	Hash      []byte
+	CreatedAt time.Time
+	StoreID   int64
+}
+
+// 防詐保存的比對 hash（與 InsertKYCIdentityHash 在同一個 transaction、同一個呼叫點寫入）；帳號取自來源 stint；已存在的略過（補金鑰可重跑）。
+func (q *Queries) InsertAccountIdentityHash(ctx context.Context, arg InsertAccountIdentityHashParams) error {
+	_, err := q.db.Exec(ctx, insertAccountIdentityHash,
+		arg.Field,
+		arg.KeyID,
+		arg.Hash,
+		arg.CreatedAt,
+		arg.StoreID,
+	)
+	return err
+}
+
 const insertKYCApplication = `-- name: InsertKYCApplication :one
 INSERT INTO seller.kyc_applications (
     application_id, store_id, seller_type, real_name, birth_date,
@@ -1002,9 +1030,7 @@ JOIN seller.kyc_identity_hashes h ON h.hash = mi.hash AND h.key_id = mi.key_id
 JOIN seller.kyc_applications a ON a.application_id = h.application_id
 JOIN seller.stores st ON st.store_id = a.store_id
 WHERE mi.measure_id = $1
-  AND mi.kind IN ('ID_CARD', 'TAX_ID')
-  AND mi.kind = CASE h.field WHEN 'TAX_ID' THEN 'TAX_ID' ELSE 'ID_CARD' END
-  AND h.field <> 'BANK_ACCOUNT'
+  AND mi.kind = CASE h.field WHEN 'TAX_ID' THEN 'TAX_ID' WHEN 'BANK_ACCOUNT' THEN 'BANK_ACCOUNT' ELSE 'ID_CARD' END
   AND st.account_id <> $2
   AND ($3::bigint IS NULL OR st.account_id = $3::bigint)
 ORDER BY st.account_id, h.field
@@ -1022,7 +1048,8 @@ type LinkedAccountHitsRow struct {
 }
 
 // 與這筆措施的身分快照相同的其他帳號（W9）：別的帳號的申請（跨 stint、含已取消的）裡，身分證號（本人與企業負責人）對快照的 ID_CARD、統一編號對
-// TAX_ID，銀行帳號不算。快照與申請都存金鑰環每一把金鑰算的 (key_id, hash)，以索引等值連接，不解密；個資清理過的申請沒有這些列，不命中。
+// TAX_ID、銀行帳號對 BANK_ACCOUNT（Stripe 計畫 D4：銀行帳號命中只列出；能不能據以建立關聯終止由 model.LinkedIdentity.CountsAsGround 決定，不在這裡）。
+// 快照與申請都存金鑰環每一把金鑰算的 (key_id, hash)，以索引等值連接，不解密；個資清理過的申請沒有這些列，不命中。
 // account_id 不為 NULL 時只看那個帳號。
 func (q *Queries) LinkedAccountHits(ctx context.Context, arg LinkedAccountHitsParams) ([]LinkedAccountHitsRow, error) {
 	rows, err := q.db.Query(ctx, linkedAccountHits, arg.MeasureID, arg.ExceptAccountID, arg.AccountID)
@@ -1252,6 +1279,28 @@ func (q *Queries) MeasureIdentityMatches(ctx context.Context, arg MeasureIdentit
 	return items, nil
 }
 
+const pruneAccountIdentityHashes = `-- name: PruneAccountIdentityHashes :exec
+DELETE FROM seller.account_identity_hashes a
+WHERE a.source_store_id = $1 AND a.field = $2::text
+  AND NOT EXISTS (
+    SELECT 1 FROM seller.kyc_identity_hashes h
+    JOIN seller.kyc_applications ap ON ap.application_id = h.application_id
+    WHERE ap.store_id = a.source_store_id AND h.field = a.field AND h.key_id = a.key_id AND h.hash = a.hash)
+`
+
+type PruneAccountIdentityHashesParams struct {
+	StoreID int64
+	Field   string
+}
+
+// 欄位被改掉之後，修剪這個 stint 這個欄位已經沒有任何申請持有的值（草稿裡改掉的值不是送出的事實，不保存）。在 DeleteKYCIdentityHashes 之後、寫入新值之前執行；
+// 還有別的申請（同一個 stint 的已取消申請）持有同一個值的列不刪。只在 stint 還有未清理的申請時呼叫：清理之後申請不能再編輯，這張表的列由
+// DeleteExpiredAccountIdentityHashes 刪。
+func (q *Queries) PruneAccountIdentityHashes(ctx context.Context, arg PruneAccountIdentityHashesParams) error {
+	_, err := q.db.Exec(ctx, pruneAccountIdentityHashes, arg.StoreID, arg.Field)
+	return err
+}
+
 const referencedKeyIDs = `-- name: ReferencedKeyIDs :many
 SELECT 'ENCRYPTION'::text AS kind, convert_from(substring(c FROM 2 FOR get_byte(c, 0)), 'UTF8')::text AS key_id
 FROM (
@@ -1269,6 +1318,7 @@ FROM (
     UNION SELECT tax_id_hash_key FROM seller.kyc_applications
     UNION SELECT bank_account_hash_key FROM seller.kyc_applications
     UNION SELECT key_id FROM seller.kyc_identity_hashes
+    UNION SELECT key_id FROM seller.account_identity_hashes
     UNION SELECT key_id FROM seller.measure_identities
 ) k
 WHERE k.key_id IS NOT NULL
@@ -1281,7 +1331,7 @@ type ReferencedKeyIDsRow struct {
 }
 
 // 資料庫裡被參照的每一把金鑰 ID（啟動檢查用）：ENCRYPTION 是密文開頭的金鑰 ID（1 byte 的長度、ID），HASH 是 blind index
-// 的金鑰 ID（申請的 hash、比對用的 hash 與處分的身分快照）。已清理（NULL）的欄位不參照任何金鑰。
+// 的金鑰 ID（申請的 hash、比對用的 hash、防詐保存的 hash 與處分的身分快照）。已清理（NULL）的欄位不參照任何金鑰。
 func (q *Queries) ReferencedKeyIDs(ctx context.Context) ([]ReferencedKeyIDsRow, error) {
 	rows, err := q.db.Query(ctx, referencedKeyIDs)
 	if err != nil {
@@ -1363,10 +1413,8 @@ INSERT INTO seller.measure_identities (measure_id, kind, key_id, hash)
 SELECT $1::uuid,
        CASE h.field WHEN 'TAX_ID' THEN 'TAX_ID' WHEN 'BANK_ACCOUNT' THEN 'BANK_ACCOUNT' ELSE 'ID_CARD' END,
        h.key_id, h.hash
-FROM seller.kyc_identity_hashes h
-JOIN seller.kyc_applications a ON a.application_id = h.application_id
-JOIN seller.stores st ON st.store_id = a.store_id
-WHERE st.account_id = $2
+FROM seller.account_identity_hashes h
+WHERE h.account_id = $2
 ON CONFLICT DO NOTHING
 `
 
@@ -1375,8 +1423,9 @@ type SnapshotMeasureIdentitiesParams struct {
 	AccountID int64
 }
 
-// 停權措施建立時，複製被處分帳號全部 KYC 申請（跨 stint、含已取消的）的身分 blind index 到措施擁有的快照：每個識別欄位金鑰環裡每一把金鑰算的 hash 各一筆
-// （kyc_identity_hashes），之後換鑰也查得到；同一個 hash 只留一筆。身分證號與企業負責人身分證號同一種（ID_CARD）。
+// 停權措施建立時，複製被處分帳號全部 stint 的身分 blind index 到措施擁有的快照：每個識別欄位金鑰環裡每一把金鑰算的 hash 各一筆，之後換鑰也查得到；
+// 同一個 hash 只留一筆。來源是 account_identity_hashes（防詐保存，ADR 2026-10-19-seller-kyc-payuni-consolidated 的 2026-10-30 修訂），不是
+// kyc_identity_hashes：後者隨 184 天的個資清理刪除，舊 stint 清理之後才建立的處分取不到它的身分。身分證號與企業負責人身分證號同一種（ID_CARD）。
 func (q *Queries) SnapshotMeasureIdentities(ctx context.Context, arg SnapshotMeasureIdentitiesParams) error {
 	_, err := q.db.Exec(ctx, snapshotMeasureIdentities, arg.MeasureID, arg.AccountID)
 	return err

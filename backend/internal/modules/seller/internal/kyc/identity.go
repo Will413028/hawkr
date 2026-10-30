@@ -77,7 +77,7 @@ func (s *Service) match(ctx context.Context, q *store.Queries, row store.SellerK
 }
 
 // LinkedAccountHits 反查與一筆措施的身分快照相同的其他帳號（W9）：別的帳號的申請（跨 stint、含已取消的）裡，身分證號（本人與企業負責人）對快照的
-// ID_CARD、統一編號對 TAX_ID，銀行帳號不算。快照與申請都存金鑰環每一把金鑰算的 (key_id, hash)（kyc_identity_hashes、measure_identities），一支以索引等值連接的查詢
+// ID_CARD、統一編號對 TAX_ID、銀行帳號對 BANK_ACCOUNT（銀行帳號的命中只列出，是否能當依據由 LinkedIdentity.CountsAsGround 決定）。快照與申請都存金鑰環每一把金鑰算的 (key_id, hash)（kyc_identity_hashes、measure_identities），一支以索引等值連接的查詢
 // 找出命中的帳號，不解密任何申請；輪替之後兩邊總有共同的金鑰（舊金鑰的 hash 留著、新金鑰由 RehashIdentities 補算）。accountID 不為 nil 時只看那個帳號。
 // 個資清理過的申請沒有這些列，不命中。
 func (s *Service) LinkedAccountHits(ctx context.Context, q *store.Queries, measureID uuid.UUID, exceptAccountID int64, accountID *int64) ([]model.LinkedHit, error) {
