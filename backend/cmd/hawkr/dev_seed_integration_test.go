@@ -372,7 +372,7 @@ func TestDevSeedCheckRefusesRebuiltAccountsThatOwnOtherStores(t *testing.T) {
 	if err == nil {
 		t.Fatal("前提檢查應該失敗")
 	}
-	for _, want := range []string{"店家 " + strconv.FormatInt(other, 10), "帳號 3002", "重建本機資料庫", "dev_<名稱>"} {
+	for _, want := range []string{"店家 " + strconv.FormatInt(other, 10), "帳號 3002", "重建本機資料庫", "不帶 -account"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("錯誤訊息缺少 %q：%v", want, err)
 		}

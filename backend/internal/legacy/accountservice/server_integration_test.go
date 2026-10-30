@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -24,6 +25,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
@@ -54,6 +56,7 @@ func (s *fakeSuspender) Suspend(ctx context.Context, accountID int64, rec accoun
 type fixture struct {
 	suspender *fakeSuspender
 	m         *identity.Module
+	db        *db.DB
 	dev       *identity.DevAuth
 	client    accountconnect.AccountServiceClient
 	published []rabbitmq.PublishArgs
@@ -71,7 +74,7 @@ func setup(t *testing.T) *fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f := &fixture{dev: dev}
+	f := &fixture{dev: dev, db: d}
 	bus := events.NewBus()
 	events.Subscribe(bus, OnAccountDeleted(func(ctx context.Context, a rabbitmq.PublishArgs) error {
 		f.published = append(f.published, a)
@@ -108,6 +111,10 @@ func (f *fixture) account(t *testing.T, roles ...identity.Role) int64 {
 		t.Fatal(err)
 	}
 	id := a.Principal.ID
+	// dev 帳號沒有登入身分，所以沒有 email；legacy AccountInfo 要帶出 accounts.email，這裡直接寫入（provider 回報的 email 的位置）。
+	if _, err := f.db.Pool().Exec(ctx, `UPDATE identity.accounts SET email = $1 WHERE id = $2`, fmt.Sprintf("dev_%d@dev.localhost", id), id); err != nil {
+		t.Fatal(err)
+	}
 	for _, r := range roles {
 		if err := f.m.GrantRole(ctx, identity.GrantRoleInput{AccountID: id, Role: r, SourceID: nil}); err != nil {
 			t.Fatal(err)

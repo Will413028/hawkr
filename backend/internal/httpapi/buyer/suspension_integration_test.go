@@ -30,7 +30,7 @@ func (f *fixture) suspend(t *testing.T) {
 // 停權的帳號仍可登入（ADR identity-self-hosted-federated-login、A7-D18），所以要重新登入才看得到停權中的狀態。
 func (f *fixture) relogin(t *testing.T) {
 	t.Helper()
-	_, tok, err := f.id.DevNewSession(context.Background())
+	tok, err := f.id.DevSession(context.Background(), f.accountID)
 	if err != nil {
 		t.Fatal(err)
 	}

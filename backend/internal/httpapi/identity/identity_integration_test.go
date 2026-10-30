@@ -128,6 +128,11 @@ func (f *fixture) customerToken(t *testing.T, user string) string {
 		if id, err = f.m.DevNewAccount(t.Context()); err != nil {
 			t.Fatal(err)
 		}
+		// dev 帳號沒有登入身分，所以沒有 email；後台列表與 email 篩選讀 accounts.email（provider 回報的 email 的位置），這裡直接寫入，
+		// 讓測試以 user 名稱認得帳號。
+		if _, err := f.db.Pool().Exec(t.Context(), `UPDATE identity.accounts SET email = $1 WHERE id = $2`, user+"@dev.localhost", id); err != nil {
+			t.Fatal(err)
+		}
 		if f.accounts == nil {
 			f.accounts = map[string]int64{}
 		}
@@ -189,7 +194,7 @@ func TestGetSessionCreatesTheAccountAsABuyer(t *testing.T) {
 			t.Fatal(err)
 		}
 		p, err := f.buyers.Profile(ctx, accountID)
-		if err != nil || p.AccountID != accountID || p.DisplayName != tc.user {
+		if err != nil || p.AccountID != accountID || p.DisplayName != "dev" {
 			t.Fatalf("%s：買家 = %+v, %v", tc.user, p, err)
 		}
 	}
