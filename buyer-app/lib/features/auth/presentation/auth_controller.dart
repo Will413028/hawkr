@@ -1,6 +1,3 @@
-import 'dart:async';
-
-import 'package:hawkr_api/account.dart' show AppleHandOver;
 import 'package:hawkr_auth/clerk.dart';
 import 'package:hawkr_auth/oauth.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -35,16 +32,10 @@ class AuthController extends _$AuthController {
     try {
       await ref.read(sessionProvider.future);
       final clerk = await ref.read(clerkSessionProvider.future);
-      AppleCredentials? apple;
-      Future<bool> signInToClerk() async {
-        final result = await _signInToClerk(clerk, provider);
-        apple = result.apple;
-        return result.signedIn;
-      }
-
-      final signedIn = clerk.isSignedIn || await signInToClerk();
+      final signedIn =
+          clerk.isSignedIn || await _signInToClerk(clerk, provider);
       if (signedIn) {
-        await _completeSignIn(clerk, apple: apple);
+        await _completeSignIn(clerk);
       }
       state = const AsyncData(null);
       return signedIn;
@@ -56,20 +47,15 @@ class AuthController extends _$AuthController {
 
   // ─────────────────────── internals ───────────────────────
 
-  Future<({bool signedIn, AppleCredentials? apple})> _signInToClerk(
+  Future<bool> _signInToClerk(
     ClerkSession clerk,
     OAuthProvider provider,
   ) async {
     final picker = ref.read(oauthPickerProvider);
-    Future<({bool signedIn, AppleCredentials? apple})> inBrowser(
-      BrowserSignIn browser,
-    ) async => (
-      signedIn: await clerk.signInWithBrowser(
-        browser,
-        redirect: kOAuthRedirect,
-        authenticate: picker.authenticateInBrowser,
-      ),
-      apple: null,
+    Future<bool> inBrowser(BrowserSignIn browser) => clerk.signInWithBrowser(
+      browser,
+      redirect: kOAuthRedirect,
+      authenticate: picker.authenticateInBrowser,
     );
     switch (provider) {
       case OAuthProvider.google:
@@ -78,18 +64,14 @@ class AuthController extends _$AuthController {
         return inBrowser(BrowserSignIn.line);
       case OAuthProvider.apple:
         final credentials = await picker.pickApple();
-        if (credentials == null) return (signedIn: false, apple: null);
+        if (credentials == null) return false;
         await clerk.signInWithApple(credentials.identityToken);
-        return (signedIn: true, apple: credentials);
+        return true;
     }
   }
 
-  /// Clerk 登入之後：GetSession 取得帳號、寫入 session。剛以 Apple 登入時 [apple] 是 picker 給的憑證，帳號確定存在
-  /// 後交給伺服器保存（不等待、失敗不影響登入）。
-  Future<void> _completeSignIn(
-    ClerkSession clerk, {
-    AppleCredentials? apple,
-  }) async {
+  /// Clerk 登入之後：GetSession 取得帳號、寫入 session。
+  Future<void> _completeSignIn(ClerkSession clerk) async {
     ref.read(sessionProvider.notifier).cancelRestore();
     final String accountId;
     try {
@@ -108,31 +90,7 @@ class AuthController extends _$AuthController {
       }
       rethrow;
     }
-    if (apple != null) unawaited(_linkApple(apple));
     await _finishSignIn(accountId);
-  }
-
-  Future<void> _linkApple(AppleCredentials credentials) async {
-    try {
-      final handOver = await ref
-          .read(authRepositoryProvider)
-          .linkAppleCredential(
-            identityToken: credentials.identityToken,
-            authorizationCode: credentials.authorizationCode,
-          );
-      switch (handOver.result) {
-        case AppleHandOver.linked:
-          break;
-        case AppleHandOver.unavailable:
-          HKLog.logD(
-            '[AuthController] LinkAppleCredential unavailable: ${handOver.error}',
-          );
-        case AppleHandOver.failed:
-          HKLog.logE('[AuthController] LinkAppleCredential 失敗', handOver.error);
-      }
-    } catch (error, stack) {
-      HKLog.logE('[AuthController] LinkAppleCredential 失敗', error, stack);
-    }
   }
 
   Future<void> _finishSignIn(String accountId) async {

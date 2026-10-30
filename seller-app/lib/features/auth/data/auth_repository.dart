@@ -1,5 +1,3 @@
-import 'package:hawkr_api/account.dart'
-    show AppleHandOver, handOverAppleCredential;
 import 'package:hawkr_api/errors.dart'
     show DefaultErrorText, ErrorFacts, isSessionUnavailableCode, errorText;
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
@@ -39,18 +37,6 @@ class AuthRepository {
     }
     return response.account.id;
   }
-
-  /// 把剛才 Sign in with Apple 給的 [identityToken] 與 [authorizationCode] 交給伺服器保存，刪除帳號時由伺服器撤銷這個 App
-  /// 在使用者 Apple ID 上的授權（App Store 審核準則 5.1.1(v)）。authorization code 的有效期很短，取得後立即呼叫；帳號要已存在
-  /// （GetSession 之後）。不丟例外，結果見 [AppleHandOver]。
-  Future<({AppleHandOver result, Object? error})> linkAppleCredential({
-    required String identityToken,
-    required String authorizationCode,
-  }) => handOverAppleCredential(
-    _client,
-    identityToken: identityToken,
-    authorizationCode: authorizationCode,
-  );
 
   /// 刪除帳號（DeleteAccount）。失敗拋出原本的例外，由呼叫端依 [ErrorFacts] 分類：沒收到回應時帳號可能已刪除，
   /// 不能自動重送，要以 [accountExists] 確認。

@@ -4,47 +4,8 @@ library;
 import 'package:connectrpc/connect.dart';
 
 import 'errors.dart';
-import 'gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
 import 'gen/hawkr/identity/v1alpha1/identity.pb.dart';
 import 'submit.dart';
-
-/// [handOverAppleCredential] 的結果。
-enum AppleHandOver {
-  /// 伺服器已收下，換 token 與保存在背景執行。
-  linked,
-
-  /// 伺服器回 unavailable：Apple 沒有設定（本機開發），或 Apple 暫時不可用。不是錯誤，下一次原生登入會再交。
-  unavailable,
-
-  /// 其他失敗（網路、token 無效等）。不影響登入，下一次原生登入會再交。
-  failed,
-}
-
-/// Apple 原生登入成功、帳號建立之後，把 identity token 與 authorization code 交給伺服器（`LinkAppleCredential`）。
-/// 不丟例外：呼叫端依結果記 log，不能因此阻擋登入。
-Future<({AppleHandOver result, Object? error})> handOverAppleCredential(
-  IdentityAppServiceClient client, {
-  required String identityToken,
-  required String authorizationCode,
-}) async {
-  try {
-    await client.linkAppleCredential(
-      LinkAppleCredentialRequest(
-        idToken: identityToken,
-        authorizationCode: authorizationCode,
-      ),
-    );
-    return (result: AppleHandOver.linked, error: null);
-  } catch (error) {
-    final code = ConnectException.from(error).code;
-    return (
-      result: code == Code.unavailable
-          ? AppleHandOver.unavailable
-          : AppleHandOver.failed,
-      error: error,
-    );
-  }
-}
 
 /// `DeleteAccount` 的結果。顯示的文字由各 App 決定。
 sealed class AccountDeletionResult {

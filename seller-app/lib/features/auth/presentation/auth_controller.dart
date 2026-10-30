@@ -1,6 +1,3 @@
-import 'dart:async';
-
-import 'package:hawkr_api/account.dart' show AppleHandOver;
 import 'package:hawkr_auth/clerk.dart';
 import 'package:hawkr_auth/oauth.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -36,7 +33,6 @@ class AuthController extends _$AuthController {
   Future<bool> signInWith(OAuthProvider provider) async {
     final clerk = await ref.read(clerkSessionProvider.future);
     final picker = ref.read(oauthPickerProvider);
-    AppleCredentials? appleCredentials;
     final signedIn =
         clerk.isSignedIn ||
         switch (provider) {
@@ -50,10 +46,7 @@ class AuthController extends _$AuthController {
             picker,
             BrowserSignIn.line,
           ),
-          OAuthProvider.apple => await () async {
-            appleCredentials = await _withApple(clerk, picker);
-            return appleCredentials != null;
-          }(),
+          OAuthProvider.apple => await _withApple(clerk, picker),
         };
     if (!signedIn) return false;
 
@@ -73,8 +66,6 @@ class AuthController extends _$AuthController {
       }
       rethrow;
     }
-    final credentials = appleCredentials;
-    if (credentials != null) unawaited(_linkApple(credentials));
     await ref.read(sessionProvider.notifier).login(accountId: accountId);
     await ref.read(currentStoreProvider.future);
     return true;
@@ -90,36 +81,11 @@ class AuthController extends _$AuthController {
     authenticate: picker.authenticateInBrowser,
   );
 
-  Future<AppleCredentials?> _withApple(
-    ClerkSession clerk,
-    OAuthPicker picker,
-  ) async {
+  Future<bool> _withApple(ClerkSession clerk, OAuthPicker picker) async {
     final credentials = await picker.pickApple();
-    if (credentials == null) return null;
+    if (credentials == null) return false;
     await clerk.signInWithApple(credentials.identityToken);
-    return credentials;
-  }
-
-  /// 不阻擋登入：失敗不影響登入，下一次原生 Apple 登入會再送一次。
-  Future<void> _linkApple(AppleCredentials credentials) async {
-    try {
-      final handOver = await ref
-          .read(authRepositoryProvider)
-          .linkAppleCredential(
-            identityToken: credentials.identityToken,
-            authorizationCode: credentials.authorizationCode,
-          );
-      switch (handOver.result) {
-        case AppleHandOver.linked:
-          break;
-        case AppleHandOver.unavailable:
-          HKLog.logD('[AuthController] 伺服器暫時無法收下 Apple 憑證: ${handOver.error}');
-        case AppleHandOver.failed:
-          HKLog.logE('[AuthController] 交付 Apple 憑證失敗', handOver.error);
-      }
-    } catch (error, stack) {
-      HKLog.logE('[AuthController] 交付 Apple 憑證失敗', error, stack);
-    }
+    return true;
   }
 
   /// 登出：先註銷裝置、再登出 Clerk、最後清空本機（見 [Session.logout]）。

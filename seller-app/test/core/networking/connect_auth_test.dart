@@ -136,12 +136,7 @@ void main() {
       try {
         await c
             .read(identityClientProvider)
-            .linkAppleCredential(
-              LinkAppleCredentialRequest(
-                idToken: 'apple',
-                authorizationCode: 'c',
-              ),
-            );
+            .listSessions(ListSessionsRequest());
       } catch (e) {
         error = e;
       }
@@ -184,14 +179,7 @@ void main() {
         .getSession(GetSessionRequest());
     expect(response.account.id, 'acc-1');
     await expectLater(
-      c
-          .read(identityClientProvider)
-          .linkAppleCredential(
-            LinkAppleCredentialRequest(
-              idToken: 'apple',
-              authorizationCode: 'code',
-            ),
-          ),
+      c.read(identityClientProvider).listSessions(ListSessionsRequest()),
       throwsA(
         isA<ConnectException>().having(
           (e) => e.code,

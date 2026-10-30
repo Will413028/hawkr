@@ -47,24 +47,15 @@ void main() {
     mockSecureStorage({});
   });
 
-  ({
-    ProviderContainer c,
-    FakeClerkSession clerk,
-    List<String?> getSessions,
-    List<String> events,
-    List<LinkAppleCredentialRequest> links,
-  })
+  ({ProviderContainer c, FakeClerkSession clerk, List<String?> getSessions})
   harness({
     FakeClerkSession? clerkSession,
     _FakePicker? picker,
     _ProfileAdapter? adapter,
     FutureOr<GetSessionResponse> Function()? getSession,
-    FutureOr<LinkAppleCredentialResponse> Function()? link,
   }) {
     final clerk = clerkSession ?? FakeClerkSession();
     final getSessions = <String?>[];
-    final events = <String>[];
-    final links = <LinkAppleCredentialRequest>[];
     final container = ProviderContainer(
       overrides: [
         clerkSessionProvider.overrideWith((ref) async => clerk),
@@ -85,14 +76,8 @@ void main() {
             FakeTransportBuilder()
                 .unary(IdentityAppService.getSession, (req, ctx) {
                   getSessions.add(ctx.requestHeaders['authorization']);
-                  events.add('getSession');
                   return getSession?.call() ??
                       GetSessionResponse(account: Account(id: 'acc_01J8Z'));
-                })
-                .unary(IdentityAppService.linkAppleCredential, (req, _) {
-                  events.add('link');
-                  links.add(req);
-                  return link?.call() ?? LinkAppleCredentialResponse();
                 })
                 .build(interceptors: [sessionBootstrapInterceptor(ref)]),
           ),
@@ -103,13 +88,7 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
-    return (
-      c: container,
-      clerk: clerk,
-      getSessions: getSessions,
-      events: events,
-      links: links,
-    );
+    return (c: container, clerk: clerk, getSessions: getSessions);
   }
 
   Future<bool> signIn(ProviderContainer c, OAuthProvider provider) =>
@@ -145,74 +124,6 @@ void main() {
 
     expect(h.clerk.calls, ['apple apple-id-token']);
     expect(h.getSessions, ['Bearer live']);
-  });
-
-  test(
-    'Apple：GetSession 之後把 identity token 與 authorization code 交給伺服器，各一次',
-    () async {
-      final h = harness();
-
-      expect(await signIn(h.c, OAuthProvider.apple), isTrue);
-      await pumpEventQueue();
-
-      expect(h.events, ['getSession', 'link']);
-      expect(h.links.single.idToken, 'apple-id-token');
-      expect(h.links.single.authorizationCode, 'apple-code');
-    },
-  );
-
-  test('Apple：交付失敗只記錄，登入照常完成', () async {
-    final h = harness(
-      link: () => throw ConnectException(Code.unavailable, 'down'),
-    );
-
-    expect(await signIn(h.c, OAuthProvider.apple), isTrue);
-    await pumpEventQueue();
-
-    expect(h.links, hasLength(1));
-    expect(h.c.read(sessionProvider).value?.userId, 'acc_01J8Z');
-  });
-
-  test('Apple：伺服器未設定 Apple（unavailable）：不當成錯誤，登入照常完成', () async {
-    final h = harness(
-      link: () =>
-          throw ConnectException(Code.unavailable, 'apple not configured'),
-    );
-
-    expect(await signIn(h.c, OAuthProvider.apple), isTrue);
-    await pumpEventQueue();
-
-    expect(h.links, hasLength(1));
-    expect(h.c.read(sessionProvider).value?.userId, 'acc_01J8Z');
-  });
-
-  test('Apple：交付一直沒有回應也不擋登入', () async {
-    final never = Completer<LinkAppleCredentialResponse>();
-    final h = harness(link: () => never.future);
-
-    expect(await signIn(h.c, OAuthProvider.apple), isTrue);
-
-    expect(h.c.read(sessionProvider).value?.userId, 'acc_01J8Z');
-  });
-
-  test('Google 與 LINE 不交付 Apple 憑證', () async {
-    final google = harness();
-    await signIn(google.c, OAuthProvider.google);
-    final line = harness();
-    await signIn(line.c, OAuthProvider.line);
-    await pumpEventQueue();
-
-    expect(google.links, isEmpty);
-    expect(line.links, isEmpty);
-  });
-
-  test('還原既有的 Clerk session 不交付 Apple 憑證', () async {
-    final h = harness(clerkSession: FakeClerkSession(signedIn: true));
-
-    expect(await signIn(h.c, OAuthProvider.apple), isTrue);
-    await pumpEventQueue();
-
-    expect(h.links, isEmpty);
   });
 
   test('使用者取消：回 false，不呼叫 GetSession，沒有 session', () async {

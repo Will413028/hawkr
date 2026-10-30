@@ -1,4 +1,3 @@
-import 'package:hawkr_api/account.dart';
 import 'package:hawkr_api/images.dart';
 import 'package:hawkr_api/errors.dart';
 import 'package:hawkr_api/field_mask.dart';
@@ -50,17 +49,6 @@ class AuthRepository {
     }
     return res.account.id;
   }
-
-  /// 把剛才 Sign in with Apple 給的 [identityToken] 與 [authorizationCode] 交給伺服器保存，帳號最終刪除時由伺服器
-  /// 撤銷 Apple 的授權（App Store 審核準則 5.1.1(v)）。不丟例外，結果由呼叫端記 log。
-  Future<({AppleHandOver result, Object? error})> linkAppleCredential({
-    required String identityToken,
-    required String authorizationCode,
-  }) => handOverAppleCredential(
-    _identity,
-    identityToken: identityToken,
-    authorizationCode: authorizationCode,
-  );
 
   /// 刪除帳號（DeleteAccount）。失敗拋出原本的例外，由呼叫端依 [ErrorFacts] 分類：沒收到回應時帳號可能已刪除，
   /// 不能自動重送，要以 [accountExists] 確認。

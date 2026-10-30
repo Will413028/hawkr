@@ -62,7 +62,7 @@ final class AuthControllerProvider
   }
 }
 
-String _$authControllerHash() => r'3ce6d099b82a1a1611d96a176461a0193103712b';
+String _$authControllerHash() => r'd4afffa15417863d8ff92ff723a60254020bef9d';
 
 /// 唯一的登入入口：以 Clerk 登入（Google、LINE 經系統瀏覽器，Apple 用 Sign in with Apple），再以 GetSession
 /// 取得帳號（第一次登入的使用者由伺服器在這時建立），寫入 session。

@@ -2,9 +2,6 @@ import 'dart:io';
 
 import 'package:connectrpc/connect.dart';
 import 'package:hawkr_api/account.dart';
-import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
-import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.spec.dart';
-import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.pb.dart';
 import 'package:test/test.dart';
 
@@ -21,14 +18,6 @@ Future<AccountDeletionResult> _run(
   deleteAccount: delete,
   accountExists: exists ?? () async => throw StateError('不該確認'),
   defaults: _defaults,
-);
-
-IdentityAppServiceClient _client(
-  Future<LinkAppleCredentialResponse> Function(LinkAppleCredentialRequest) link,
-) => IdentityAppServiceClient(
-  FakeTransportBuilder()
-      .unary(IdentityAppService.linkAppleCredential, (req, _) => link(req))
-      .build(),
 );
 
 String _defaults(Code code) => '預設:${code.name}';
@@ -98,39 +87,6 @@ void main() {
         onError: (step, _) => steps.add(step),
       );
       expect(steps, ['DeleteAccount', 'GetSession']);
-    });
-  });
-
-  group('handOverAppleCredential', () {
-    test('帶 identity token 與 authorization code', () async {
-      LinkAppleCredentialRequest? sent;
-      final r = await handOverAppleCredential(
-        _client((req) async {
-          sent = req;
-          return LinkAppleCredentialResponse();
-        }),
-        identityToken: 'idt',
-        authorizationCode: 'code',
-      );
-      expect(r.result, AppleHandOver.linked);
-      expect(sent?.idToken, 'idt');
-      expect(sent?.authorizationCode, 'code');
-    });
-
-    test('unavailable 與其他失敗分開，且不丟例外', () async {
-      final unavailable = await handOverAppleCredential(
-        _client((_) async => throw ConnectException(Code.unavailable, 'x')),
-        identityToken: 'a',
-        authorizationCode: 'b',
-      );
-      expect(unavailable.result, AppleHandOver.unavailable);
-      final failed = await handOverAppleCredential(
-        _client((_) async => throw ConnectException(Code.invalidArgument, 'x')),
-        identityToken: 'a',
-        authorizationCode: 'b',
-      );
-      expect(failed.result, AppleHandOver.failed);
-      expect(failed.error, isA<ConnectException>());
     });
   });
 }
