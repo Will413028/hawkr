@@ -1,19 +1,18 @@
+import * as React from "react";
 import Link from "@/components/shared/Link";
 import { SellerPageShell } from "@/components/shared/SellerPageShell";
 import TextScaleControl from "@/components/shared/TextScaleControl";
 import ThemeToggle from "@/components/shared/ThemeToggle";
 import DeleteAccountSection from "./DeleteAccountSection";
+import SignInMethodsSection from "./SignInMethodsSection";
+import { DISPLAY_ROW } from "./settings-row";
 
 export const metadata = { title: "設定" };
 
 /**
- * 顯示 rows carry a control instead of a link, so they reuse the link row's
- * surface / radius / padding without the anchor. This page stays a Server
- * Component; the two controls and the delete-account section are the only
- * client islands on it.
+ * 顯示 rows（`DISPLAY_ROW`）carry a control instead of a link. This page stays a Server Component; the two
+ * controls, the sign-in methods and the delete-account section are the only client islands on it.
  */
-const DISPLAY_ROW =
-	"flex flex-wrap items-center justify-between gap-3 p-3 px-4 bg-hk-surface-muted rounded-hk-md";
 
 const SECTIONS = [
 	{
@@ -116,28 +115,35 @@ export default function Page() {
 						</ul>
 					</section>
 					{SECTIONS.map((section) => (
-						<section key={section.group} className="seller-card">
-							<header className="seller-card__head">
-								<h2>{section.group}</h2>
-							</header>
-							<ul className="list-none m-0 p-0 flex flex-col gap-2">
-								{section.items.map((item) => (
-									<li key={`${item.href}:${item.label}`}>
-										<Link
-											href={item.href}
-											className="flex flex-col gap-0.5 p-3 px-4 bg-hk-surface-muted rounded-hk-md text-inherit no-underline transition-colors duration-200 ease-in-out hover:bg-hk-surface-panel"
-										>
-											<strong className="text-sm font-semibold text-hk-heading">
-												{item.label}
-											</strong>
-											<small className="text-xs text-foreground-soft">
-												{item.desc}
-											</small>
-										</Link>
-									</li>
-								))}
-							</ul>
-						</section>
+						<React.Fragment key={section.group}>
+							<section className="seller-card">
+								<header className="seller-card__head">
+									<h2>{section.group}</h2>
+								</header>
+								<ul className="list-none m-0 p-0 flex flex-col gap-2">
+									{section.items.map((item) => (
+										<li key={`${item.href}:${item.label}`}>
+											<Link
+												href={item.href}
+												className="flex flex-col gap-0.5 p-3 px-4 bg-hk-surface-muted rounded-hk-md text-inherit no-underline transition-colors duration-200 ease-in-out hover:bg-hk-surface-panel"
+											>
+												<strong className="text-sm font-semibold text-hk-heading">
+													{item.label}
+												</strong>
+												<small className="text-xs text-foreground-soft">
+													{item.desc}
+												</small>
+											</Link>
+										</li>
+									))}
+								</ul>
+							</section>
+							{section.group === "帳號安全" ? (
+								<React.Suspense fallback={null}>
+									<SignInMethodsSection />
+								</React.Suspense>
+							) : null}
+						</React.Fragment>
 					))}
 					<DeleteAccountSection />
 				</div>

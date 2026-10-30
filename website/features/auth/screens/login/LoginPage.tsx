@@ -1,6 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import AuthBrandLoading from "@/components/shared/AuthBrandLoading";
@@ -14,7 +15,7 @@ import { trackLogin } from "@/lib/analytics/events";
 import type { LoginProvider } from "@/lib/api/auth";
 import { useAuth } from "@/lib/auth/context";
 import {
-	LOGIN_ERROR_CODES,
+	loginErrorKey,
 	oauthStartUrl,
 	parseLoginProvider,
 } from "@/lib/auth/oauth-start";
@@ -33,9 +34,6 @@ import { localizeHref } from "@/lib/intl/navigation";
 import { stripLocale } from "@/lib/intl/paths";
 import { useRoutedLocale } from "@/lib/intl/routed-locale";
 import { navigateDocument } from "@/lib/navigation/observability";
-
-/** 登入失敗時給使用者看的文字（既有文案，沿用）。 */
-const LOGIN_FAILED_MESSAGE = "登入失敗，請稍後再試";
 
 const OAUTH_BUTTON_CLASS = "hkui-login__oauth-btn h-[52px]!";
 
@@ -75,10 +73,11 @@ function LoginPageContent({
 	searchParams: NonNullable<ReturnType<typeof useSearchParams>>;
 	initialInAppBrowser: InAppBrowserInfo;
 }) {
-	// 單體的 callback 沒有完成登入時 302 回這頁並帶 `?error=<代碼>`（weblogin.go）；代碼只決定有沒有
-	// 錯誤，使用者看到的是同一句既有文案。
-	const errorCode = searchParams.get("error") || "";
-	const error = LOGIN_ERROR_CODES.has(errorCode) ? LOGIN_FAILED_MESSAGE : null;
+	// 單體的 callback 沒有完成登入時 302 回這頁並帶 `?error=<代碼>`（weblogin.go）；代碼對到三句之一
+	// （取消授權、服務暫時不能用、其他失敗），不認得的代碼不顯示。
+	const tError = useTranslations("auth.error");
+	const errorKey = loginErrorKey(searchParams.get("error"));
+	const error = errorKey ? tError(errorKey) : null;
 	const locale = useRoutedLocale();
 	// 單體 302 回來時帶 `?provider=`：剛從 Google 或 LINE 登入完成。
 	const returnedProvider = parseLoginProvider(searchParams.get("provider"));

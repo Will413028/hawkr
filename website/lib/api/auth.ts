@@ -17,6 +17,7 @@ import {
 	type Account,
 	DeleteAccountResponse_DeletionState,
 	IdentityAppService,
+	LoginProvider as ProtoLoginProvider,
 	Role,
 } from "@hawkr/api/gen/hawkr/identity/v1alpha1/identity_pb";
 import {
@@ -130,6 +131,20 @@ export async function logout(): Promise<void> {
 			.catch(() => {});
 		throw new LogoutRevokeFailedError("network");
 	}
+}
+
+/**
+ * 帳號已連結的登入方式（ListLinkedIdentities）。同一家可能有多個身分，這裡依 provider 去重；
+ * UNSPECIFIED 與不認得的 provider 忽略。
+ */
+export async function fetchLinkedProviders(): Promise<LoginProvider[]> {
+	const res = await identityApp().listLinkedIdentities({});
+	const linked = new Set<LoginProvider>();
+	for (const identity of res.identities) {
+		if (identity.provider === ProtoLoginProvider.GOOGLE) linked.add("google");
+		else if (identity.provider === ProtoLoginProvider.LINE) linked.add("line");
+	}
+	return [...linked];
 }
 
 /**

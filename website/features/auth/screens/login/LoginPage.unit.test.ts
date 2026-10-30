@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render as renderWithoutIntl,
+	screen,
+} from "@testing-library/react";
 import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -35,7 +40,11 @@ vi.mock("@/features/auth/components/login/WebViewBrowserGuide", () => ({
 	default: () => null,
 }));
 
+import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 import LoginPage from "./LoginPage";
+
+const render = (ui: React.ReactElement) =>
+	renderWithoutIntl(ui, { wrapper: IntlTestWrapper });
 
 function guest() {
 	mocks.auth = {
@@ -109,16 +118,16 @@ describe("LoginPage: the buttons hand the browser to the monolith's OAuth start"
 
 describe("LoginPage: ?error= from the monolith's failed callback", () => {
 	it.each([
-		"access_denied",
-		"invalid_flow",
-		"provider_error",
-		"login_failed",
-		"unavailable",
-		"login_required",
-	])("%s shows the existing login-failed text", (code) => {
+		["access_denied", "你取消了授權，請再試一次"],
+		["unavailable", "登入服務暫時無法使用，請稍後再試"],
+		["invalid_flow", "登入失敗，請稍後再試"],
+		["provider_error", "登入失敗，請稍後再試"],
+		["login_failed", "登入失敗，請稍後再試"],
+		["login_required", "登入失敗，請稍後再試"],
+	])("%s shows its sentence", (code, text) => {
 		mocks.search = `error=${code}`;
 		render(React.createElement(LoginPage));
-		expect(screen.getByRole("alert").textContent).toBe("登入失敗，請稍後再試");
+		expect(screen.getByRole("alert").textContent).toBe(text);
 	});
 
 	it("an unknown code shows nothing", () => {

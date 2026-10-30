@@ -10,7 +10,15 @@
 	},
 	"auth": {
 		"login": "登入",
-		"logout": "登出"
+		"logout": "登出",
+		"error": {
+			"accessDenied": "你取消了授權，請再試一次",
+			"unavailable": "登入服務暫時無法使用，請稍後再試",
+			"failed": "登入失敗，請稍後再試"
+		},
+		"linkError": {
+			"alreadyLinked": "這個登入帳號已連結到別的帳號"
+		}
 	},
 	"navigation": {},
 	"product": {},
@@ -20,6 +28,13 @@
 		"merchants": {
 			"localMerchants": "在地商家",
 			"weeklyPick": "本週推薦"
+		}
+	},
+	"account": {
+		"signInMethods": {
+			"title": "登入方式",
+			"linked": "已連結",
+			"link": "連結"
 		}
 	}
 }

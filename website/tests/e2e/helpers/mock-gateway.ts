@@ -68,6 +68,11 @@ export const GET_SESSION_URL = identityMethod(
 	"GetSession",
 );
 
+export const LIST_LINKED_IDENTITIES_URL = identityMethod(
+	"IdentityAppService",
+	"ListLinkedIdentities",
+);
+
 /** 這個 URL 是 session 的探測（GetSession）嗎。 */
 export function isGetSessionUrl(url: string): boolean {
 	return GET_SESSION_URL.test(url);
@@ -971,6 +976,13 @@ export async function setupGatewayMocks(
 
 	// 2c. 開店可用性（GetMyStoreOpening）：預設可以開店。
 	await mockStoreOpening(page, opts.storeOpeningUnavailabilities ?? []);
+
+	// 2d. 已連結的登入方式（ListLinkedIdentities，設定頁的「登入方式」）：預設只連結 Google。
+	await page.route(LIST_LINKED_IDENTITIES_URL, (route) => {
+		void fulfillConnect(route, {
+			identities: [{ provider: "LOGIN_PROVIDER_GOOGLE" }],
+		});
+	});
 
 	// 3. The signed-in account (GetSession), and the session cookie behind it.
 	if (opts.session === "identity") {

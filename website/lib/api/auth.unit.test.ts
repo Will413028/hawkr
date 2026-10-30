@@ -4,6 +4,7 @@ const rpc = vi.hoisted(() => ({
 	getSession: vi.fn(),
 	deleteAccount: vi.fn(),
 	signOut: vi.fn(),
+	listLinkedIdentities: vi.fn(),
 }));
 vi.mock("@connectrpc/connect", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@connectrpc/connect")>()),
@@ -17,10 +18,12 @@ vi.mock("@/lib/connect/transport", () => ({
 import { Code, ConnectError } from "@connectrpc/connect";
 import {
 	DeleteAccountResponse_DeletionState,
+	LoginProvider,
 	Role,
 } from "@hawkr/api/gen/hawkr/identity/v1alpha1/identity_pb";
 import {
 	deleteAccount,
+	fetchLinkedProviders,
 	fetchSession,
 	LogoutRevokeFailedError,
 	logout,
@@ -125,5 +128,30 @@ describe("deleteAccount", () => {
 		);
 		await expect(deleteAccount()).rejects.toBeTruthy();
 		expect(rpc.getSession).not.toHaveBeenCalled();
+	});
+});
+
+describe("ListLinkedIdentities → providers", () => {
+	beforeEach(() => rpc.listLinkedIdentities.mockReset());
+
+	it("two identities of one provider are one linked provider", async () => {
+		rpc.listLinkedIdentities.mockResolvedValue({
+			identities: [
+				{ provider: LoginProvider.GOOGLE },
+				{ provider: LoginProvider.GOOGLE },
+			],
+		});
+		expect(await fetchLinkedProviders()).toEqual(["google"]);
+	});
+
+	it("UNSPECIFIED and unknown providers are ignored", async () => {
+		rpc.listLinkedIdentities.mockResolvedValue({
+			identities: [
+				{ provider: LoginProvider.UNSPECIFIED },
+				{ provider: 99 },
+				{ provider: LoginProvider.LINE },
+			],
+		});
+		expect(await fetchLinkedProviders()).toEqual(["line"]);
 	});
 });

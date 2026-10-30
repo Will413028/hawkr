@@ -44,6 +44,8 @@ export const queryKeys = {
 		megaMenu: () => ["navbar", "mega-menu"] as const,
 	},
 	buyer: {
+		linkedProviders: (id: QueryIdentity) =>
+			["buyer", ...idPrefix(id), "linked-providers"] as const,
 		profile: (id: QueryIdentity) =>
 			["buyer", ...idPrefix(id), "profile"] as const,
 		addresses: (id: QueryIdentity) =>

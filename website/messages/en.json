@@ -10,7 +10,15 @@
 	},
 	"auth": {
 		"login": "Log in",
-		"logout": "Log out"
+		"logout": "Log out",
+		"error": {
+			"accessDenied": "You cancelled the authorization. Please try again.",
+			"unavailable": "Sign-in is temporarily unavailable. Please try again later.",
+			"failed": "Sign-in failed. Please try again later."
+		},
+		"linkError": {
+			"alreadyLinked": "This sign-in account is already linked to another account."
+		}
 	},
 	"navigation": {},
 	"product": {},
@@ -20,6 +28,13 @@
 		"merchants": {
 			"localMerchants": "Local shop",
 			"weeklyPick": "Featured this week"
+		}
+	},
+	"account": {
+		"signInMethods": {
+			"title": "Sign-in methods",
+			"linked": "Linked",
+			"link": "Link"
 		}
 	}
 }
