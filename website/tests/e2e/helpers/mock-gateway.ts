@@ -881,6 +881,17 @@ export function fulfillConnectError(
 	});
 }
 
+/**
+ * 訪客：GetSession 回 `unauthenticated`。不經 mockGateway 的 spec 用它；沒 mock 時請求落到打不通的
+ * API，是網路錯誤（SESSION_UNAVAILABLE），導覽列依設計顯示骨架而不是訪客的登入連結
+ * （lib/auth/auth-rail.ts）。
+ */
+export async function mockGuestSession(page: Page): Promise<void> {
+	await page.route(GET_SESSION_URL, (route) => {
+		void fulfillConnectError(route, "unauthenticated");
+	});
+}
+
 /** 以 Connect 的成功（JSON）回應。 */
 export function fulfillConnect(
 	route: Route,

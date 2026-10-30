@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mockGuestSession } from "./helpers/mock-gateway";
 import { installProviderMocks } from "./helpers/mock-gsi";
 
 /**
@@ -11,6 +12,7 @@ import { installProviderMocks } from "./helpers/mock-gsi";
 test.describe("locale routing", { tag: ["@ui"] }, () => {
 	test.beforeEach(async ({ page }) => {
 		await installProviderMocks(page);
+		await mockGuestSession(page);
 	});
 
 	test("zh-TW is the unprefixed URL: <html lang> follows the locale", async ({

@@ -7,6 +7,7 @@ import {
 	type Route,
 	test,
 } from "@playwright/test";
+import { mockGuestSession } from "./e2e/helpers/mock-gateway";
 
 const REPO_ROOT = process.cwd();
 const CHUNK_ROOT = path.join(REPO_ROOT, ".next/static/chunks");
@@ -122,6 +123,7 @@ async function installInteractionFixtures(
 		requests[key].push(route.request().url());
 	};
 
+	await mockGuestSession(page);
 	await page.route(/\/api\/v1\/public\/categories\/tree(?:\?|$)/, (route) => {
 		note("menuCategories", route);
 		return gatewayData(route, [{ id: "12", name: "葉菜類", children: [] }]);
