@@ -31,7 +31,7 @@
 - `UnsuspendAccount(accountID, reason)`：reason 必填；同一個 transaction 清 `suspended_at`、在目前的紀錄記解除時間與原因；沒有停權時成功並回傳 `released=false`。解除留列不刪，之後可以再停權（新的一筆）。`CurrentSuspension(accountID)` 回傳目前未解除的紀錄，給 A7-2 的「讀自己的停權」。
 - 停權、解除入口只允許 `accountsuspension` 呼叫（`internal/arch` 的 `TestSuspensionEntriesAreOnlyCalledByAccountsuspension` 掃非測試程式）：「擁有商店的帳號不能停權」在那裡檢查，identity 是葉節點、不查店家。刪帳號時未解除的紀錄以 `release_reason = ACCOUNT_DELETED` 解除。手動解除（`UnsuspendAccount`）拒絕這個值，只有帳號刪除路徑能寫。
 - 受限登入（ADR `2026-10-29-account-suspension-and-moderation.md`）：停權不停用 Clerk 使用者，認證不因停權回錯誤。入口 `withSession` 依 `customerEffects` 的宣告（讀取、寫入、自助）處理：公開與受邀供應商的 service 以訪客執行，讀取與自助放行，寫入回 `PermissionDenied` 與 `ACCOUNT_SUSPENDED`，舊 gateway 的 REST 依 HTTP method；`GetSession` 回 `suspension.suspended_at`。守門：`TestSuspendedAccountIsAuthorizedByTheNatureOfTheAction`、`TestSuspendedAccountStillAuthenticatesAndCarriesTheSuspensionTime`、`TestSuspendedAccountHasRestrictedAccess`。
-- 刪帳號留下墓碑與 `clerk_user_id`，同一個 Clerk 使用者不會再建一個帳號；`email` 清為 NULL（`accounts_deleted_check`）。刪帳同時發出 `AccountDeleted`。
+- 刪帳號留下墓碑與 `clerk_user_id`，`account_identities` 的列也留作墓碑（保留 provider 與 subject，清掉 email），同一個登入身分不會再建一個帳號，以它登入回 `Unauthenticated`；`email` 清為 NULL（`accounts_deleted_check`）。刪帳同時發出 `AccountDeleted`。
 - 帳號的生命週期是 ACTIVE → PENDING_DELETION → DELETED（`Account.Lifecycle`；欄位 `deletion_pending_at`、`deleted_at`）。
   - `BeginDeletion` 只由 accountdeletion 在受理會等待未結訂單的申請時呼叫。
   - 等待刪除時仍可登入，但 `GrantRole` 回 FailedPrecondition。

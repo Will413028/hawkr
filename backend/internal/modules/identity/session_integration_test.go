@@ -64,7 +64,7 @@ func (f *fixture) accountEmail(t *testing.T, id int64) string {
 	return acc.Email
 }
 
-// failOn 讓對 table 的 op（INSERT 或 DELETE）一律丟錯，用來逼一個 transaction 的後一句失敗。
+// failOn 讓對 table 的 op（INSERT、UPDATE 或 DELETE）一律丟錯，用來逼一個 transaction 的後一句失敗。
 func (f *fixture) failOn(t *testing.T, op, table string) {
 	t.Helper()
 	ctx := context.Background()
@@ -536,7 +536,7 @@ func TestSuspensionAndSessionDeletionAreAtomic(t *testing.T) {
 	f.authenticated(t, res.Token)
 }
 
-func TestDeletionEndsSessionsRemovesIdentitiesAndAllowsAFreshStart(t *testing.T) {
+func TestDeletionEndsSessionsAndLeavesIdentityTombstones(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
@@ -550,40 +550,66 @@ func TestDeletionEndsSessionsRemovesIdentitiesAndAllowsAFreshStart(t *testing.T)
 			t.Fatalf("刪帳後的 session = %v，預期失效", err)
 		}
 	}
-	for _, table := range []string{"sessions", "account_identities"} {
-		if n := f.count(t, `SELECT count(*) FROM identity.`+table+` WHERE account_id = $1`, res.AccountID); n != 0 {
-			t.Errorf("刪帳後 %s 還有 %d 列", table, n)
-		}
+	if n := f.count(t, `SELECT count(*) FROM identity.sessions WHERE account_id = $1`, res.AccountID); n != 0 {
+		t.Errorf("刪帳後 sessions 還有 %d 列", n)
+	}
+	if n := f.count(t, `SELECT count(*) FROM identity.account_identities WHERE provider = 'GOOGLE' AND subject = 'google-alice' AND account_id = $1 AND email IS NULL AND NOT email_verified`, res.AccountID); n != 1 {
+		t.Errorf("墓碑身分列 = %d，預期保留 provider 與 subject、清掉 email", n)
 	}
 	if acc, err := f.m.Account(ctx, res.AccountID); err != nil || !acc.Deleted || acc.Email != "" {
 		t.Fatalf("墓碑 = %+v, %v", acc, err)
 	}
-	// 身分已清掉：同一個 Google 身分再登入是全新的帳號，不會復活墓碑。
-	fresh := f.loginAs(t, googleAlice, ClientWeb)
-	if !fresh.Created || fresh.AccountID == res.AccountID {
-		t.Fatalf("刪帳後再登入 = %+v", fresh)
+	accounts := f.count(t, `SELECT count(*) FROM identity.accounts`)
+	for _, client := range []ClientKind{ClientWeb, ClientApp} {
+		_, err := f.m.Login(ctx, LoginInput{Identity: googleAlice.identity(), Client: client})
+		wantKind(t, err, apperr.KindUnauthenticated)
+	}
+	if n := f.count(t, `SELECT count(*) FROM identity.accounts`); n != accounts {
+		t.Fatalf("墓碑身分再登入後帳號數 %d -> %d，預期不建新帳號", accounts, n)
+	}
+	if n := f.count(t, `SELECT count(*) FROM identity.sessions`); n != 0 {
+		t.Fatalf("被拒的登入留下 %d 個 session", n)
 	}
 }
 
-// 刪帳的墓碑、刪 session 與刪身分是同一個 transaction（R4）：任何一句失敗，前面的都不留。
+// 已刪帳號的身分不能被連到另一個帳號：自動連結只看存活帳號，手動連結回 AlreadyExists 且不改資料。
+func TestDeletedAccountsIdentityCannotBeReusedOrLinked(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	gone := f.loginAs(t, lineBob, ClientWeb)
+	other := f.loginAs(t, googleAlice, ClientWeb)
+	if err := f.m.DeleteAccount(ctx, gone.AccountID); err != nil {
+		t.Fatal(err)
+	}
+	wantKind(t, f.m.LinkIdentity(ctx, other.AccountID, lineBob.identity()), apperr.KindAlreadyExists)
+	if n := f.count(t, `SELECT count(*) FROM identity.account_identities WHERE provider = 'LINE' AND subject = 'line-bob' AND account_id = $1`, gone.AccountID); n != 1 {
+		t.Fatalf("手動連結失敗後墓碑身分 = %d，預期仍屬於已刪帳號", n)
+	}
+	_, err := f.m.Login(ctx, LoginInput{Identity: lineBob.identity(), Client: ClientWeb})
+	wantKind(t, err, apperr.KindUnauthenticated)
+}
+
+// 刪帳的墓碑、刪 session 與清身分個資是同一個 transaction（R4）：任何一句失敗，前面的都不留。
 func TestDeletionIsAtomicAcrossSessionsAndIdentities(t *testing.T) {
-	for _, table := range []string{"sessions", "account_identities"} {
-		t.Run(table, func(t *testing.T) {
+	for _, c := range []struct{ op, table string }{{"DELETE", "sessions"}, {"UPDATE", "account_identities"}} {
+		t.Run(c.table, func(t *testing.T) {
 			t.Parallel()
 			f := setup(t)
 			ctx := context.Background()
 			res := f.loginAs(t, googleAlice, ClientWeb)
-			f.failOn(t, "DELETE", table)
+			f.failOn(t, c.op, c.table)
 			if err := f.m.DeleteAccount(ctx, res.AccountID); err == nil {
 				t.Fatal("刪除失敗時刪帳要失敗")
 			}
 			if acc, err := f.m.Account(ctx, res.AccountID); err != nil || acc.Deleted || acc.Email != "alice@gmail.com" {
 				t.Fatalf("帳號 = %+v, %v，預期沒有變成墓碑", acc, err)
 			}
-			for _, tbl := range []string{"sessions", "account_identities"} {
-				if n := f.count(t, `SELECT count(*) FROM identity.`+tbl+` WHERE account_id = $1`, res.AccountID); n != 1 {
-					t.Errorf("%s 剩 %d 列，預期 1", tbl, n)
-				}
+			if n := f.count(t, `SELECT count(*) FROM identity.sessions WHERE account_id = $1`, res.AccountID); n != 1 {
+				t.Errorf("sessions 剩 %d 列，預期 1", n)
+			}
+			if n := f.count(t, `SELECT count(*) FROM identity.account_identities WHERE account_id = $1 AND email = 'alice@gmail.com'`, res.AccountID); n != 1 {
+				t.Errorf("身分的 email 被清掉了（%d 列保留），預期整筆回滾", n)
 			}
 			f.authenticated(t, res.Token)
 		})

@@ -14,5 +14,8 @@ UPDATE identity.account_identities
 SET email = sqlc.narg(email), email_verified = sqlc.arg(email_verified), updated_at = sqlc.arg(now)::timestamptz
 WHERE provider = sqlc.arg(provider) AND subject = sqlc.arg(subject);
 
--- name: DeleteIdentitiesOfAccount :exec
-DELETE FROM identity.account_identities WHERE account_id = $1;
+-- name: ScrubIdentitiesOfAccount :exec
+-- 帳號刪除時身分列留作墓碑（保留 provider 與 subject，同一個登入身分不會再建一個帳號），清掉 email。
+UPDATE identity.account_identities
+SET email = NULL, email_verified = FALSE, updated_at = sqlc.arg(now)::timestamptz
+WHERE account_id = sqlc.arg(account_id);

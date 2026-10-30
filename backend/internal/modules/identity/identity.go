@@ -297,7 +297,7 @@ func (m *Module) CurrentSuspension(ctx context.Context, accountID int64) (Accoun
 	return m.account.CurrentSuspension(ctx, accountID)
 }
 
-// DeleteAccount 刪除帳號、解除未解除的停權紀錄，並在同一個 transaction 刪除全部 session 與登入身分（有 Clerk 使用者的另排 Clerk 刪除 job）；已刪除時成功，從未存在時回 NotFound。
+// DeleteAccount 刪除帳號、解除未解除的停權紀錄，並在同一個 transaction 刪除全部 session、清除登入身分的個資（身分列留作墓碑）（有 Clerk 使用者的另排 Clerk 刪除 job）；已刪除時成功，從未存在時回 NotFound。
 func (m *Module) DeleteAccount(ctx context.Context, accountID int64) error {
 	return m.account.DeleteAccount(ctx, accountID)
 }

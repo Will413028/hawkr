@@ -6,7 +6,7 @@
 
 ## 擁有的資料
 
-schema `identity`（`db/schema.sql`）：`accounts`（`clerk_user_id` UNIQUE，墓碑也保留）、`account_roles`、`account_suspensions`（停權紀錄）、`admins`（`access_subject` UNIQUE）、`admin_roles`、`admin_role_events`（只追加）、`apple_tokens`、`account_identities`（provider 身分，(provider, subject) 主鍵，帳號刪除時刪）、`sessions`（opaque session，只存 token 的 SHA-256）、`login_flows`（web 登入流程的單次暫存）、`app_login_nonces`（App 登入的單次 nonce）。`clerk_user_id` 過渡期可為 NULL（自建登入的帳號沒有），Clerk 退場時刪欄。帳號與管理員的主鍵過渡期是 IDENTITY，見 `CARRYOVER.md`。讀取模型：無。
+schema `identity`（`db/schema.sql`）：`accounts`（`clerk_user_id` UNIQUE，墓碑也保留）、`account_roles`、`account_suspensions`（停權紀錄）、`admins`（`access_subject` UNIQUE）、`admin_roles`、`admin_role_events`（只追加）、`apple_tokens`、`account_identities`（provider 身分，(provider, subject) 主鍵，帳號刪除時留作墓碑，清掉 email）、`sessions`（opaque session，只存 token 的 SHA-256）、`login_flows`（web 登入流程的單次暫存）、`app_login_nonces`（App 登入的單次 nonce）。`clerk_user_id` 過渡期可為 NULL（自建登入的帳號沒有），Clerk 退場時刪欄。帳號與管理員的主鍵過渡期是 IDENTITY，見 `CARRYOVER.md`。讀取模型：無。
 
 ## 發布的讀取介面
 

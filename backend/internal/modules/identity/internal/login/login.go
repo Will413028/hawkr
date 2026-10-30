@@ -89,7 +89,7 @@ func AutoLinkEligible(id model.ProviderIdentity) bool {
 }
 
 // Login 以 provider 驗證過的身分登入，換發新 session（舊的登入前 token 同一個 transaction 刪除）：
-//   - 已有這個身分：登入它的帳號；
+//   - 已有這個身分：登入它的帳號；帳號已刪除（身分是墓碑）回 KindUnauthenticated，不建新帳號；
 //   - 否則符合 AutoLinkEligible 且恰好一個存活帳號的寄件地址等於這個已驗證 email：連結到該帳號；
 //   - 否則建立新帳號（沒有 email 也照樣建）與身分，發出 AccountCreated。
 //
@@ -126,7 +126,9 @@ func (s *Service) login(ctx context.Context, in model.LoginInput) (model.LoginRe
 	existing, err := q.GetIdentity(ctx, store.GetIdentityParams{Provider: string(id.Provider), Subject: id.Subject})
 	switch {
 	case err == nil:
-		if _, err := q.LockLiveAccount(ctx, existing.AccountID); err != nil {
+		if _, err := q.LockLiveAccount(ctx, existing.AccountID); errors.Is(err, pgx.ErrNoRows) {
+			return res, apperr.Unauthenticated("這個登入身分的帳號已刪除")
+		} else if err != nil {
 			return res, fmt.Errorf("identity：鎖定身分的帳號：%w", err)
 		}
 		res.AccountID = existing.AccountID

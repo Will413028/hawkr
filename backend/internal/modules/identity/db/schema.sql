@@ -47,7 +47,7 @@ CREATE UNIQUE INDEX uidx_accounts_clerk_user_id ON identity.accounts (clerk_user
 
 -- 帳號連結的 provider 身分（D1、D4）：(provider, subject) 是識別，同一個身分只屬於一個帳號。登入時以 provider 回報的 subject 找帳號，
 -- 找不到才依規則自動連結或建帳；email 與 email_verified 是 provider 最近一次回報的值，只用於自動連結的比對與更新帳號的寄件地址，
--- 不作識別或授權。LINE 沒有給 email 時兩者是 NULL 與 false。帳號刪除時刪除這些列（墓碑不留個資，accounts_deleted_check 同理）。
+-- 不作識別或授權。LINE 沒有給 email 時兩者是 NULL 與 false。帳號刪除時這些列留作墓碑（保留 provider 與 subject，清掉 email 與 email_verified；同一個登入身分不會再建一個帳號），登入時遇到墓碑身分被拒。
 CREATE TABLE identity.account_identities (
     provider       TEXT         NOT NULL,
     subject        TEXT         NOT NULL,

@@ -367,8 +367,8 @@ func (m *Service) deleteAccount(ctx context.Context, q *store.Queries, a store.I
 	if _, err := q.DeleteSessionsOfAccount(ctx, a.ID); err != nil {
 		return fmt.Errorf("identity：刪除 session：%w", err)
 	}
-	if err := q.DeleteIdentitiesOfAccount(ctx, a.ID); err != nil {
-		return fmt.Errorf("identity：刪除登入身分：%w", err)
+	if err := q.ScrubIdentitiesOfAccount(ctx, store.ScrubIdentitiesOfAccountParams{AccountID: a.ID, Now: now}); err != nil {
+		return fmt.Errorf("identity：清除登入身分的個資：%w", err)
 	}
 	if a.ClerkUserID != nil {
 		if err := m.enqueueClerkUserJob(ctx, clerkUserActionDelete, *a.ClerkUserID); err != nil {

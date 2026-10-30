@@ -10,15 +10,6 @@ import (
 	"time"
 )
 
-const deleteIdentitiesOfAccount = `-- name: DeleteIdentitiesOfAccount :exec
-DELETE FROM identity.account_identities WHERE account_id = $1
-`
-
-func (q *Queries) DeleteIdentitiesOfAccount(ctx context.Context, accountID int64) error {
-	_, err := q.db.Exec(ctx, deleteIdentitiesOfAccount, accountID)
-	return err
-}
-
 const getIdentity = `-- name: GetIdentity :one
 SELECT provider, subject, account_id, email, email_verified, created_at, updated_at FROM identity.account_identities WHERE provider = $1 AND subject = $2
 `
@@ -72,6 +63,23 @@ func (q *Queries) InsertIdentity(ctx context.Context, arg InsertIdentityParams) 
 	var account_id int64
 	err := row.Scan(&account_id)
 	return account_id, err
+}
+
+const scrubIdentitiesOfAccount = `-- name: ScrubIdentitiesOfAccount :exec
+UPDATE identity.account_identities
+SET email = NULL, email_verified = FALSE, updated_at = $1::timestamptz
+WHERE account_id = $2
+`
+
+type ScrubIdentitiesOfAccountParams struct {
+	Now       time.Time
+	AccountID int64
+}
+
+// 帳號刪除時身分列留作墓碑（保留 provider 與 subject，同一個登入身分不會再建一個帳號），清掉 email。
+func (q *Queries) ScrubIdentitiesOfAccount(ctx context.Context, arg ScrubIdentitiesOfAccountParams) error {
+	_, err := q.db.Exec(ctx, scrubIdentitiesOfAccount, arg.Now, arg.AccountID)
+	return err
 }
 
 const updateIdentityClaims = `-- name: UpdateIdentityClaims :exec
