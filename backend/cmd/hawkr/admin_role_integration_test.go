@@ -45,9 +45,9 @@ func TestAdminRoleCLIRevokeEndsRunningDelegations(t *testing.T) {
 		target_seller_account_id, target_store_name, reason_code, reason_label, capabilities,
 		issued_at, expires_at, last_active_at, status, idempotency_key, create_request_id, create_correlation_id
 	) VALUES ('OPS-0000000000001', decode(repeat('11', 32), 'hex'), $1, 'ops', 1, 2, 'store',
-		'seller_request', 'seller request', ARRAY['products.read'],
+		'SELLER_REQUEST', 'seller request', ARRAY['products.read'],
 		date_trunc('second', now()), date_trunc('second', now()) + interval '30 minutes',
-		date_trunc('second', now()), 'active', 'cli-test', 'cli-test', 'cli-test')`, adminID)
+		date_trunc('second', now()), 'ACTIVE', 'cli-test', 'cli-test', 'cli-test')`, adminID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestAdminRoleCLIRevokeEndsRunningDelegations(t *testing.T) {
 	if err := d.Pool().QueryRow(ctx, `SELECT status, revoke_reason FROM delegation.delegated_operation_sessions WHERE actor_admin_id = $1`, adminID).Scan(&status, &reason); err != nil {
 		t.Fatal(err)
 	}
-	if status != "revoked" || reason != "admin_role_revoked" {
+	if status != "REVOKED" || reason != "admin_role_revoked" {
 		t.Fatalf("代行 = %s %s", status, reason)
 	}
 	rows, err := d.Pool().Query(ctx, `SELECT action, source, reason, os_user IS NOT NULL FROM identity.admin_role_events WHERE admin_id = $1 ORDER BY occurred_at, action`, adminID)

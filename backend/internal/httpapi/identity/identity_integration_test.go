@@ -381,9 +381,9 @@ func TestAdminSessionAccountListAndSignOut(t *testing.T) {
 		target_seller_account_id, target_store_name, reason_code, reason_label, capabilities,
 		issued_at, expires_at, last_active_at, status, idempotency_key, create_request_id, create_correlation_id
 	) VALUES ('OPS-0000000000001', decode(repeat('11', 32), 'hex'), $1, 'ops', 1, 2, 'store',
-		'seller_request', 'seller request', ARRAY['products.read'],
+		'SELLER_REQUEST', 'seller request', ARRAY['products.read'],
 		date_trunc('second', now()), date_trunc('second', now()) + interval '30 minutes',
-		date_trunc('second', now()), 'active', 'signout-test', 'signout-test', 'signout-test')`, adminID)
+		date_trunc('second', now()), 'ACTIVE', 'signout-test', 'signout-test', 'signout-test')`, adminID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -409,7 +409,7 @@ func TestAdminSessionAccountListAndSignOut(t *testing.T) {
 	if err := f.db.Pool().QueryRow(ctx, `SELECT status, revoke_reason FROM delegation.delegated_operation_sessions WHERE actor_admin_id = $1`, adminID).Scan(&status, &reason); err != nil {
 		t.Fatal(err)
 	}
-	if status != "revoked" || reason != "admin_logout" {
+	if status != "REVOKED" || reason != "admin_logout" {
 		t.Fatalf("登出後代行狀態 = %s, %s", status, reason)
 	}
 }

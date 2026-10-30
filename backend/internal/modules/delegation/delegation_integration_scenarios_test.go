@@ -360,7 +360,7 @@ func TestStartDelegationValidatesAndReevaluatesTheGrant(t *testing.T) {
 	f.grant(t, admin, testStore, model.CapabilityProductsRead)
 	invalid := map[string]func(*StartDelegationInput){
 		"沒有冪等鍵":    func(in *StartDelegationInput) { in.IdempotencyKey = "" },
-		"不認得的理由":   func(in *StartDelegationInput) { in.Reason = "SELLER_REQUEST" },
+		"不認得的理由":   func(in *StartDelegationInput) { in.Reason = "seller_request" },
 		"沒有案件編號":   func(in *StartDelegationInput) { in.CaseReference = nil },
 		"案件編號太短":   func(in *StartDelegationInput) { in.CaseReference = ptr("HK1") },
 		"沒有能力":     func(in *StartDelegationInput) { in.Capabilities = nil },
