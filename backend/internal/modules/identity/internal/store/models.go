@@ -22,13 +22,14 @@ type IdentityAccount struct {
 }
 
 type IdentityAccountIdentity struct {
-	Provider      string
-	Subject       string
-	AccountID     int64
-	Email         *string
-	EmailVerified bool
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	Provider         string
+	Subject          string
+	AccountID        int64
+	Email            *string
+	EmailVerified    bool
+	AutoLinkEligible bool
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 type IdentityAccountRole struct {

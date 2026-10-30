@@ -151,31 +151,58 @@ func TestLoginRejectsUnknownProviderAndClient(t *testing.T) {
 	}
 }
 
-// 自動連結只在 Google 回報 email 已驗證、而且是 gmail.com 或帶 hd 時，且恰好一個既有帳號的寄件地址相符。
+// 自動連結只在進來的 Google 身分已驗證、是 gmail.com 或帶 hd 時，且恰好一個存活帳號上有符合資格的 Google 身分，其 email 相符。
+// 目標用身分登入建立（existing）；accountOnly 是只有 accounts.email、沒有任何身分的帳號（Clerk 時期的帳號），永遠不是目標。
 func TestAutoLinking(t *testing.T) {
 	t.Parallel()
+	gmailTarget := who{provider: ProviderGoogle, subject: "g0", email: "shared@gmail.com", verified: true}
 	cases := []struct {
-		name     string
-		login    who
-		existing []string // 既有帳號的寄件地址
-		linked   bool
+		name        string
+		login       who
+		existing    []who
+		accountOnly []string
+		linked      bool
 	}{
-		{"Google 已驗證的 gmail 連結到既有帳號", who{provider: ProviderGoogle, subject: "g1", email: "shared@gmail.com", verified: true}, []string{"shared@gmail.com"}, true},
-		{"email 大小寫不分", who{provider: ProviderGoogle, subject: "g1", email: "Shared@Gmail.com", verified: true}, []string{"shared@gmail.com"}, true},
-		{"Google Workspace（有 hd）連結", who{provider: ProviderGoogle, subject: "g1", email: "a@corp.example", verified: true, hd: "corp.example"}, []string{"a@corp.example"}, true},
-		{"Google 未驗證不連結", who{provider: ProviderGoogle, subject: "g1", email: "shared@gmail.com"}, []string{"shared@gmail.com"}, false},
-		{"Google 非 gmail 且沒有 hd 不連結", who{provider: ProviderGoogle, subject: "g1", email: "a@corp.example", verified: true}, []string{"a@corp.example"}, false},
-		{"LINE 同 email 不連結", who{provider: ProviderLine, subject: "l1", email: "shared@gmail.com"}, []string{"shared@gmail.com"}, false},
-		{"LINE 就算標為已驗證也不連結", who{provider: ProviderLine, subject: "l1", email: "shared@gmail.com", verified: true}, []string{"shared@gmail.com"}, false},
-		{"兩個帳號有同一個寄件地址時不猜", who{provider: ProviderGoogle, subject: "g1", email: "shared@gmail.com", verified: true}, []string{"shared@gmail.com", "shared@gmail.com"}, false},
-		{"沒有符合的帳號就建新帳", who{provider: ProviderGoogle, subject: "g1", email: "shared@gmail.com", verified: true}, []string{"other@gmail.com"}, false},
+		{"Google 已驗證的 gmail 連結到既有的 Google 身分", who{provider: ProviderGoogle, subject: "g1", email: "shared@gmail.com", verified: true}, []who{gmailTarget}, nil, true},
+		{"email 大小寫不分", who{provider: ProviderGoogle, subject: "g1", email: "Shared@Gmail.com", verified: true}, []who{gmailTarget}, nil, true},
+		{"Google Workspace（有 hd）連結到同樣有 hd 的身分", who{provider: ProviderGoogle, subject: "g1", email: "a@corp.example", verified: true, hd: "corp.example"},
+			[]who{{provider: ProviderGoogle, subject: "g0", email: "a@corp.example", verified: true, hd: "corp.example"}}, nil, true},
+		{"目標不符資格（非 gmail 且沒有 hd）時不連結", who{provider: ProviderGoogle, subject: "g1", email: "a@corp.example", verified: true, hd: "corp.example"},
+			[]who{{provider: ProviderGoogle, subject: "g0", email: "a@corp.example", verified: true}}, nil, false},
+		{"目標的 email 未驗證時不連結", who{provider: ProviderGoogle, subject: "g1", email: "shared@gmail.com", verified: true},
+			[]who{{provider: ProviderGoogle, subject: "g0", email: "shared@gmail.com"}}, nil, false},
+		{"Google 未驗證不連結", who{provider: ProviderGoogle, subject: "g1", email: "shared@gmail.com"}, []who{gmailTarget}, nil, false},
+		{"Google 非 gmail 且沒有 hd 不連結", who{provider: ProviderGoogle, subject: "g1", email: "a@corp.example", verified: true},
+			[]who{{provider: ProviderGoogle, subject: "g0", email: "a@corp.example", verified: true, hd: "corp.example"}}, nil, false},
+		{"LINE 同 email 不連結", who{provider: ProviderLine, subject: "l1", email: "shared@gmail.com"}, []who{gmailTarget}, nil, false},
+		{"LINE 就算標為已驗證也不連結", who{provider: ProviderLine, subject: "l1", email: "shared@gmail.com", verified: true}, []who{gmailTarget}, nil, false},
+		{"目標是 LINE 的已驗證 email 時不連結", who{provider: ProviderGoogle, subject: "g1", email: "shared@gmail.com", verified: true},
+			[]who{{provider: ProviderLine, subject: "l0", email: "shared@gmail.com", verified: true}}, nil, false},
+		{"只有 accounts.email 的帳號不是目標", who{provider: ProviderGoogle, subject: "g1", email: "shared@gmail.com", verified: true}, nil, []string{"shared@gmail.com"}, false},
+		{"兩個帳號都有符合資格的相同 email 時不猜", who{provider: ProviderGoogle, subject: "g1", email: "shared@gmail.com", verified: true},
+			[]who{gmailTarget, {provider: ProviderGoogle, subject: "g0b", email: "shared@gmail.com", verified: true}}, nil, false},
+		{"沒有符合的帳號就建新帳", who{provider: ProviderGoogle, subject: "g1", email: "shared@gmail.com", verified: true},
+			[]who{{provider: ProviderGoogle, subject: "g0", email: "other@gmail.com", verified: true}}, nil, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 			f := setup(t)
 			var existing []int64
-			for i, email := range c.existing {
+			for i, w := range c.existing {
+				// 兩個目標要落在不同帳號：先用各自的 email 建帳，再用同一個 subject 登入把身分的 email 改成相符的值。
+				first := w
+				first.email = "setup-" + w.subject + "@gmail.com"
+				res := f.loginAs(t, first, ClientWeb)
+				if w.email != first.email {
+					f.loginAs(t, w, ClientWeb)
+				}
+				if !res.Created || res.Linked {
+					t.Fatalf("目標 %d 沒有建新帳：%+v", i, res)
+				}
+				existing = append(existing, res.AccountID)
+			}
+			for i, email := range c.accountOnly {
 				user := "user_" + string(rune('a'+i))
 				f.customers.users[user] = ClerkIdentity{Email: email}
 				existing = append(existing, f.account(t, user))
@@ -193,6 +220,11 @@ func TestAutoLinking(t *testing.T) {
 						t.Fatalf("不該連結卻登入了既有帳號 %d", id)
 					}
 				}
+				for _, id := range existing {
+					if n := f.count(t, `SELECT count(*) FROM identity.account_identities WHERE account_id = $1 AND subject = $2`, id, c.login.subject); n != 0 {
+						t.Fatalf("帳號 %d 多出了登入的身分", id)
+					}
+				}
 			}
 			// 連結之後同一個身分以後直接登入該帳號，不再比對 email。
 			if next := f.loginAs(t, c.login, ClientWeb); next.AccountID != res.AccountID || next.Created || next.Linked {
@@ -202,6 +234,35 @@ func TestAutoLinking(t *testing.T) {
 				t.Fatalf("身分列 %d 筆", n)
 			}
 		})
+	}
+}
+
+// LINE 以已驗證的 email X 建帳之後，Google（gmail、已驗證）以 X 登入建新帳：LINE 帳號不多出 Google 身分。
+func TestLineVerifiedEmailIsNotAnAutoLinkAnchor(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	line := f.loginAs(t, who{provider: ProviderLine, subject: "line-x", email: "x@gmail.com", verified: true}, ClientApp)
+	g := f.loginAs(t, who{provider: ProviderGoogle, subject: "google-x", email: "x@gmail.com", verified: true}, ClientWeb)
+	if !g.Created || g.Linked || g.AccountID == line.AccountID {
+		t.Fatalf("Google 登入 = %+v，預期建新帳而不是連到 LINE 帳號 %d", g, line.AccountID)
+	}
+	if n := f.count(t, `SELECT count(*) FROM identity.account_identities WHERE account_id = $1 AND provider = 'GOOGLE'`, line.AccountID); n != 0 {
+		t.Fatalf("LINE 帳號多出 %d 個 Google 身分", n)
+	}
+}
+
+// 已刪帳號的身分是墓碑（email 已清），不會成為自動連結的目標。
+func TestAutoLinkIgnoresTombstones(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	old := f.loginAs(t, googleAlice, ClientWeb)
+	if err := f.m.DeleteAccount(context.Background(), old.AccountID); err != nil {
+		t.Fatal(err)
+	}
+	other := googleAlice
+	other.subject = "google-alice-2"
+	if res := f.loginAs(t, other, ClientWeb); !res.Created || res.Linked || res.AccountID == old.AccountID {
+		t.Fatalf("登入 = %+v，預期建新帳而不是連到已刪帳號", res)
 	}
 }
 

@@ -60,34 +60,6 @@ func (q *Queries) DeleteAccount(ctx context.Context, arg DeleteAccountParams) (i
 	return result.RowsAffected(), nil
 }
 
-const findLiveAccountIDsByEmail = `-- name: FindLiveAccountIDsByEmail :many
-SELECT id FROM identity.accounts
-WHERE deleted_at IS NULL AND lower(email) = lower($1::text)
-ORDER BY id
-LIMIT 2
-`
-
-// 自動連結的候選：存活帳號裡，寄件地址（只由已驗證 email 寫入）等於 email 的帳號，最多回 2 筆，讓呼叫方分辨「唯一」與「不唯一」。
-func (q *Queries) FindLiveAccountIDsByEmail(ctx context.Context, email string) ([]int64, error) {
-	rows, err := q.db.Query(ctx, findLiveAccountIDsByEmail, email)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []int64{}
-	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getAccount = `-- name: GetAccount :one
 SELECT id, clerk_user_id, email, suspended_at, deleted_at, deletion_pending_at, created_at, updated_at FROM identity.accounts WHERE id = $1
 `

@@ -90,7 +90,7 @@ func AutoLinkEligible(id model.ProviderIdentity) bool {
 
 // Login 以 provider 驗證過的身分登入，換發新 session（舊的登入前 token 同一個 transaction 刪除）：
 //   - 已有這個身分：登入它的帳號；帳號已刪除（身分是墓碑）回 KindUnauthenticated，不建新帳號；
-//   - 否則符合 AutoLinkEligible 且恰好一個存活帳號的寄件地址等於這個已驗證 email：連結到該帳號；
+//   - 否則符合 AutoLinkEligible 且恰好一個存活帳號有符合資格的 Google 身分、其 email 等於這個已驗證 email：連結到該帳號；
 //   - 否則建立新帳號（沒有 email 也照樣建）與身分，發出 AccountCreated。
 //
 // 每次登入以已驗證 email 更新帳號的寄件地址與身分記錄的 email。停權的帳號照樣登入（A7-D18）。
@@ -133,7 +133,7 @@ func (s *Service) login(ctx context.Context, in model.LoginInput) (model.LoginRe
 		}
 		res.AccountID = existing.AccountID
 		if err := q.UpdateIdentityClaims(ctx, store.UpdateIdentityClaimsParams{
-			Provider: string(id.Provider), Subject: id.Subject, Email: nonEmpty(id.Email), EmailVerified: id.EmailVerified, Now: now,
+			Provider: string(id.Provider), Subject: id.Subject, Email: nonEmpty(id.Email), EmailVerified: id.EmailVerified, AutoLinkEligible: AutoLinkEligible(id), Now: now,
 		}); err != nil {
 			return res, fmt.Errorf("identity：更新身分：%w", err)
 		}
@@ -186,7 +186,7 @@ func (s *Service) linkTarget(ctx context.Context, q *store.Queries, id model.Pro
 	if !AutoLinkEligible(id) {
 		return 0, false, nil
 	}
-	ids, err := q.FindLiveAccountIDsByEmail(ctx, id.Email)
+	ids, err := q.FindAutoLinkAccountIDsByEmail(ctx, id.Email)
 	if err != nil {
 		return 0, false, fmt.Errorf("identity：以 email 找帳號：%w", err)
 	}
@@ -205,7 +205,7 @@ func (s *Service) linkTarget(ctx context.Context, q *store.Queries, id model.Pro
 func (s *Service) insertIdentity(ctx context.Context, q *store.Queries, accountID int64, id model.ProviderIdentity) error {
 	_, err := q.InsertIdentity(ctx, store.InsertIdentityParams{
 		Provider: string(id.Provider), Subject: id.Subject, AccountID: accountID, Email: nonEmpty(id.Email),
-		EmailVerified: id.EmailVerified, Now: s.d.Now(),
+		EmailVerified: id.EmailVerified, AutoLinkEligible: AutoLinkEligible(id), Now: s.d.Now(),
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return errRace
@@ -242,7 +242,7 @@ func (s *Service) Link(ctx context.Context, accountID int64, in model.ProviderId
 				return apperr.AlreadyExists("這個登入方式已連結到另一個帳號")
 			}
 			if err := q.UpdateIdentityClaims(ctx, store.UpdateIdentityClaimsParams{
-				Provider: string(id.Provider), Subject: id.Subject, Email: nonEmpty(id.Email), EmailVerified: id.EmailVerified, Now: now,
+				Provider: string(id.Provider), Subject: id.Subject, Email: nonEmpty(id.Email), EmailVerified: id.EmailVerified, AutoLinkEligible: AutoLinkEligible(id), Now: now,
 			}); err != nil {
 				return fmt.Errorf("identity：更新身分：%w", err)
 			}

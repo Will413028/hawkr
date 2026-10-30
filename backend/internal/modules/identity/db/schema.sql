@@ -47,13 +47,16 @@ CREATE UNIQUE INDEX uidx_accounts_clerk_user_id ON identity.accounts (clerk_user
 
 -- 帳號連結的 provider 身分（D1、D4）：(provider, subject) 是識別，同一個身分只屬於一個帳號。登入時以 provider 回報的 subject 找帳號，
 -- 找不到才依規則自動連結或建帳；email 與 email_verified 是 provider 最近一次回報的值，只用於自動連結的比對與更新帳號的寄件地址，
--- 不作識別或授權。LINE 沒有給 email 時兩者是 NULL 與 false。帳號刪除時這些列留作墓碑（保留 provider 與 subject，清掉 email 與 email_verified；同一個登入身分不會再建一個帳號），登入時遇到墓碑身分被拒。
+-- 不作識別或授權。auto_link_eligible 是這個身分最近一次登入（或建立）時是否符合自動連結資格（Google、email 已驗證、網域是 gmail.com 或帶 hd）：
+-- 自動連結只拿符合資格的身分的 email 當目標，因為目標的 email 也要和進來的 Google 身分一樣可信（nOAuth：不可信的 email 不能成為連結的錨點）；
+-- hd 不存，只存判斷的結果。LINE 沒有給 email 時兩者是 NULL 與 false。帳號刪除時這些列留作墓碑（保留 provider 與 subject，清掉 email 與 email_verified；同一個登入身分不會再建一個帳號），登入時遇到墓碑身分被拒。
 CREATE TABLE identity.account_identities (
     provider       TEXT         NOT NULL,
     subject        TEXT         NOT NULL,
     account_id     BIGINT       NOT NULL REFERENCES identity.accounts (id),
     email          TEXT,
     email_verified BOOLEAN      NOT NULL DEFAULT FALSE,
+    auto_link_eligible BOOLEAN  NOT NULL DEFAULT FALSE,
     created_at     TIMESTAMPTZ  NOT NULL,
     updated_at     TIMESTAMPTZ  NOT NULL,
     PRIMARY KEY (provider, subject),
@@ -61,7 +64,9 @@ CREATE TABLE identity.account_identities (
     CONSTRAINT account_identities_subject_check CHECK (char_length(subject) >= 1),
     -- 已驗證一定有 email。
     CONSTRAINT account_identities_email_check CHECK (email IS NULL OR char_length(email) >= 1),
-    CONSTRAINT account_identities_verified_check CHECK (NOT email_verified OR email IS NOT NULL)
+    CONSTRAINT account_identities_verified_check CHECK (NOT email_verified OR email IS NOT NULL),
+    -- 符合資格一定是 Google 且 email 已驗證。
+    CONSTRAINT account_identities_auto_link_check CHECK (NOT auto_link_eligible OR (provider = 'GOOGLE' AND email_verified))
 );
 
 CREATE INDEX idx_account_identities_account_id ON identity.account_identities (account_id);

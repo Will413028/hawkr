@@ -85,9 +85,3 @@ UPDATE identity.accounts
 SET email = sqlc.arg(email), updated_at = sqlc.arg(now)::timestamptz
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND email IS DISTINCT FROM sqlc.arg(email);
 
--- name: FindLiveAccountIDsByEmail :many
--- 自動連結的候選：存活帳號裡，寄件地址（只由已驗證 email 寫入）等於 email 的帳號，最多回 2 筆，讓呼叫方分辨「唯一」與「不唯一」。
-SELECT id FROM identity.accounts
-WHERE deleted_at IS NULL AND lower(email) = lower(sqlc.arg(email)::text)
-ORDER BY id
-LIMIT 2;

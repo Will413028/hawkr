@@ -10,8 +10,39 @@ import (
 	"time"
 )
 
+const findAutoLinkAccountIDsByEmail = `-- name: FindAutoLinkAccountIDsByEmail :many
+SELECT DISTINCT i.account_id FROM identity.account_identities i
+JOIN identity.accounts a ON a.id = i.account_id
+WHERE a.deleted_at IS NULL AND i.provider = 'GOOGLE' AND i.email_verified AND i.auto_link_eligible
+  AND lower(i.email) = lower($1::text)
+ORDER BY i.account_id
+LIMIT 2
+`
+
+// 自動連結的候選：存活帳號上符合自動連結資格的 Google 身分（email 已驗證、gmail.com 或帶 hd）裡，email 等於 email 的帳號，
+// 最多回 2 筆，讓呼叫方分辨「唯一」與「不唯一」。墓碑身分的 email 已清、帳號也已刪，不會被比對到；accounts.email 不參與。
+func (q *Queries) FindAutoLinkAccountIDsByEmail(ctx context.Context, email string) ([]int64, error) {
+	rows, err := q.db.Query(ctx, findAutoLinkAccountIDsByEmail, email)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var account_id int64
+		if err := rows.Scan(&account_id); err != nil {
+			return nil, err
+		}
+		items = append(items, account_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getIdentity = `-- name: GetIdentity :one
-SELECT provider, subject, account_id, email, email_verified, created_at, updated_at FROM identity.account_identities WHERE provider = $1 AND subject = $2
+SELECT provider, subject, account_id, email, email_verified, auto_link_eligible, created_at, updated_at FROM identity.account_identities WHERE provider = $1 AND subject = $2
 `
 
 type GetIdentityParams struct {
@@ -28,6 +59,7 @@ func (q *Queries) GetIdentity(ctx context.Context, arg GetIdentityParams) (Ident
 		&i.AccountID,
 		&i.Email,
 		&i.EmailVerified,
+		&i.AutoLinkEligible,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -35,19 +67,20 @@ func (q *Queries) GetIdentity(ctx context.Context, arg GetIdentityParams) (Ident
 }
 
 const insertIdentity = `-- name: InsertIdentity :one
-INSERT INTO identity.account_identities (provider, subject, account_id, email, email_verified, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $6)
+INSERT INTO identity.account_identities (provider, subject, account_id, email, email_verified, auto_link_eligible, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
 ON CONFLICT (provider, subject) DO NOTHING
 RETURNING account_id
 `
 
 type InsertIdentityParams struct {
-	Provider      string
-	Subject       string
-	AccountID     int64
-	Email         *string
-	EmailVerified bool
-	Now           time.Time
+	Provider         string
+	Subject          string
+	AccountID        int64
+	Email            *string
+	EmailVerified    bool
+	AutoLinkEligible bool
+	Now              time.Time
 }
 
 // 同一個 (provider, subject) 並發連結時只有一個成功：沒有列回傳表示它已存在，呼叫方放棄這個 transaction 重來。
@@ -58,6 +91,7 @@ func (q *Queries) InsertIdentity(ctx context.Context, arg InsertIdentityParams) 
 		arg.AccountID,
 		arg.Email,
 		arg.EmailVerified,
+		arg.AutoLinkEligible,
 		arg.Now,
 	)
 	var account_id int64
@@ -67,7 +101,7 @@ func (q *Queries) InsertIdentity(ctx context.Context, arg InsertIdentityParams) 
 
 const scrubIdentitiesOfAccount = `-- name: ScrubIdentitiesOfAccount :exec
 UPDATE identity.account_identities
-SET email = NULL, email_verified = FALSE, updated_at = $1::timestamptz
+SET email = NULL, email_verified = FALSE, auto_link_eligible = FALSE, updated_at = $1::timestamptz
 WHERE account_id = $2
 `
 
@@ -84,16 +118,17 @@ func (q *Queries) ScrubIdentitiesOfAccount(ctx context.Context, arg ScrubIdentit
 
 const updateIdentityClaims = `-- name: UpdateIdentityClaims :exec
 UPDATE identity.account_identities
-SET email = $1, email_verified = $2, updated_at = $3::timestamptz
-WHERE provider = $4 AND subject = $5
+SET email = $1, email_verified = $2, auto_link_eligible = $3, updated_at = $4::timestamptz
+WHERE provider = $5 AND subject = $6
 `
 
 type UpdateIdentityClaimsParams struct {
-	Email         *string
-	EmailVerified bool
-	Now           time.Time
-	Provider      string
-	Subject       string
+	Email            *string
+	EmailVerified    bool
+	AutoLinkEligible bool
+	Now              time.Time
+	Provider         string
+	Subject          string
 }
 
 // 每次登入以 provider 最近回報的 email 更新。
@@ -101,6 +136,7 @@ func (q *Queries) UpdateIdentityClaims(ctx context.Context, arg UpdateIdentityCl
 	_, err := q.db.Exec(ctx, updateIdentityClaims,
 		arg.Email,
 		arg.EmailVerified,
+		arg.AutoLinkEligible,
 		arg.Now,
 		arg.Provider,
 		arg.Subject,
