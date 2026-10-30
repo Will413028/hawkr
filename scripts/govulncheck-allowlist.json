@@ -89,7 +89,6 @@
       "severity": "UNKNOWN",
       "deadline": "2026-11-29",
       "modules": [
-        ".",
         "pkg"
       ],
       "reason": "基準（2026-10-30 首次掃描）：golang.org/x/crypto 修在 v0.56.0，升級需 Will 核准依賴變更；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
@@ -100,7 +99,6 @@
       "severity": "UNKNOWN",
       "deadline": "2026-11-29",
       "modules": [
-        ".",
         "pkg"
       ],
       "reason": "基準（2026-10-30 首次掃描）：golang.org/x/crypto 修在 v0.56.0，升級需 Will 核准依賴變更；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
