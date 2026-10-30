@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"go/format"
 	"os"
 	"os/exec"
@@ -250,6 +251,36 @@ func TestGeneratedAgentsLeavesTheAuditToFill(t *testing.T) {
 	}
 }
 
+// moduleAgentsSections 讀 .instruction-lint.toml 的 R2 設定（instruction-lint.json 是它的生成檔，
+// CI 比對兩者一致），回傳模組 AGENTS.md 的固定節。
+func moduleAgentsSections(t *testing.T) []string {
+	t.Helper()
+	b, err := os.ReadFile("instruction-lint.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg struct {
+		Rules struct {
+			R2 struct {
+				Shapes []struct {
+					Glob     string   `json:"glob"`
+					Sections []string `json:"sections"`
+				} `json:"shapes"`
+			} `json:"R2"`
+		} `json:"rules"`
+	}
+	if err := json.Unmarshal(b, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	for _, shape := range cfg.Rules.R2.Shapes {
+		if shape.Glob == "backend/internal/modules/*/AGENTS.md" {
+			return shape.Sections
+		}
+	}
+	t.Fatal("instruction-lint.json 沒有模組 AGENTS.md 的 R2 shape")
+	return nil
+}
+
 // 模組 AGENTS.md 只有 ADR 2026-10-31-agents-md-layering-consolidated 的固定七節，依序排列；
 // 行為規格與已知限制在 docs/modules/<模組>.md，不在每次都載入的指令檔。
 func TestGeneratedAgentsHasOnlyTheFixedSections(t *testing.T) {
@@ -264,7 +295,7 @@ func TestGeneratedAgentsHasOnlyTheFixedSections(t *testing.T) {
 			got = append(got, strings.TrimPrefix(line, "## "))
 		}
 	}
-	want := []string{"職責", "擁有的資料", "發布的讀取介面", "模組內部結構", "不變量", "不負責", "決策紀錄"}
+	want := moduleAgentsSections(t)
 	if strings.Join(got, "｜") != strings.Join(want, "｜") {
 		t.Errorf("AGENTS.md 的節是 %q，要是 %q", got, want)
 	}

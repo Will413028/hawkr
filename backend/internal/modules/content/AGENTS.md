@@ -1,6 +1,6 @@
 # content 模組
 
-<!-- 只放改這個模組前必須知道的規則，上限 6,000 bytes（scripts/check-agents-md.py）。行為規格與已知限制寫在 `docs/modules/content.md`，理由寫在 ADR，這裡只指過去。 -->
+<!-- 只放改這個模組前必須知道的規則，上限 6,000 bytes（根目錄 `.instruction-lint.toml`）。行為規格與已知限制寫在 `docs/modules/content.md`，理由寫在 ADR，這裡只指過去。 -->
 
 ## 職責
 

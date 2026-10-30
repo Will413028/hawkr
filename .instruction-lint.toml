@@ -1,0 +1,81 @@
+# AGENTS.md 的規則與上限（ADR backend/docs/adr/2026-10-31-agents-md-layering-consolidated.md）。
+# 本機 hook（.pre-commit-config.yaml）與 CI（.github/workflows/repo-hygiene.yml）跑同一份。
+# 模組 AGENTS.md 的七節同時是 backend/cmd/new-module/agents_sections.json 的來源，
+# 改了要重生：instruction-lint config --format json（CI 比對）。
+extends = ["preset:default"]
+
+[discover]
+globs = ["AGENTS.md", "**/AGENTS.md"]
+
+[rules.R1]
+level = "error"
+max_line_chars = 500
+excluded_blocks = [
+  { begin = "<!-- BEGIN:nextjs-agent-rules -->", end = "<!-- END:nextjs-agent-rules -->" },
+]
+
+[rules.R1.max_bytes]
+root = 12000
+subproject = 10000
+nested = 6000
+
+[rules.R2]
+level = "error"
+
+[[rules.R2.shapes]]
+glob = "backend/internal/modules/*/AGENTS.md"
+sections = ["職責", "擁有的資料", "發布的讀取介面", "模組內部結構", "不變量", "不負責", "決策紀錄"]
+mode = "exact"
+title = true
+
+[[rules.R2.shapes]]
+glob = "backend/internal/modules/*/internal/*/AGENTS.md"
+sections = ["不變量"]
+mode = "exact"
+title = true
+purpose = true
+bullets_only = ["不變量"]
+
+[rules.R3a]
+level = "error"
+
+[rules.R3b]
+level = "warn"
+base_dirs = ["backend", "website", "admin", "buyer-app", "seller-app", "packages/*", ".github/workflows"]
+source_roots = ["src"]
+resolve_extensions = [".ts", ".tsx"]
+ignore_negated_words = ["沒有", "尚無", "不存在", "已移除"]
+
+[rules.R3c]
+level = "warn"
+ignore_before = ['設計書\s*$']
+
+[[rules.R3c.specs]]
+glob = "backend/internal/modules/*/AGENTS.md"
+spec = "backend/docs/modules/{1}.md"
+
+[[rules.R3c.specs]]
+glob = "backend/internal/modules/*/internal/*/AGENTS.md"
+spec = "backend/docs/modules/{1}.md"
+
+[rules.R4]
+level = "error"
+
+[rules.R5]
+level = "error"
+
+[rules.R6]
+level = "warn"
+
+[rules.C1]
+level = "error"
+mode = "forbid"
+
+[allowlist]
+max_days = 90
+
+[[allowlist.entries]]
+rule = "R2"
+path = "backend/internal/modules/accountsuspension/AGENTS.md"
+reason = "多一節「鎖順序」，在七節固定形狀之外；歸位或移出由清理步驟決定"
+expires = 2027-01-29

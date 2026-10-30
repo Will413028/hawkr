@@ -55,7 +55,7 @@
 - **沿用也是決策**：搬遷或修改既有程式時，每個照搬的機制（ID 方案、extension、套件、共用 helper、舊的檢查邏輯）都先回答「從零設計會怎麼做」。答案不同就提出來決定，不默默在既有結構上修補，也不只記成待決。搬進單體的模組把結論寫進模組 `CARRYOVER.md` 的沿用盤點表（不放 `AGENTS.md`：它每次都載入，只放現行規則）（`backend/docs/plans/2026-09-24-go-modular-monolith.md`「模組完成的定義」）。
 - **UI 改動**：bug 修正、純粹跟隨 API 契約的調整可以直接做；版面、UX 文案與流程的改動要先取得同意。取得同意後仍要先重用既有元件與 pattern，樣式一律走 design token，沿用既有的密度與互動；真的沒有可重用的才新建，並先說明為什麼。
 - **使用者面文字**：買家與賣家介面是 zh-TW／en，admin 只有 zh-TW；語系的選擇、文字資源與伺服器文字見 ADR `backend/docs/adr/2026-10-17-multi-locale-architecture.md`，用語以 `backend/docs/開發規範/使用者面用語術語表.md` 為準。
-- **依賴與供應鏈**：已知漏洞的修復期限自發現日起算：critical 7 天、high 30 天、medium 90 天、low 在下一次相關更新時；暫不修的放進基準（`osv-scanner.toml` 的 `IgnoredVulns`、`scripts/govulncheck-allowlist.json`），每筆寫理由與期限，期限到了 CI 會失敗。agent 不自行新增或升級依賴：先列出套件名稱與版本，核對該版本存在、發佈滿兩週，經同意才改；`uses:` 一律釘完整 40 碼 SHA 並在行尾註明版本。
+- **依賴與供應鏈**：已知漏洞的修復期限自發現日起算：critical 7 天、high 30 天、medium 90 天、low 在下一次相關更新時；暫不修的放進基準（`osv-scanner.toml` 的 `IgnoredVulns`、`scripts/govulncheck-allowlist.json`），每筆寫理由與期限，期限到了 CI 會失敗。agent 不自行新增或升級依賴：先列出套件名稱與版本，核對該版本存在、發佈滿兩週，經同意才改；`uses:` 一律釘完整 40 碼 SHA 並在行尾註明版本。僅 instruction-lint（Will 自有的檢查工具）的 tag 免「發佈滿兩週」與逐版同意；其餘依賴（含 instruction-lint 自己的傳遞依賴與其 CI 引用的 Action）照原規則；引用仍須釘完整 SHA 並註明版本。
 - **Git**：只有 `main` 一條分支。commit 使用 Conventional Commits，例如 `feat(backend): …`，只提交本次範圍的檔案，不用 `git add -A`。push 依使用者授權。
 - **驗證**：完成前跑與 CI 相同的檢查並看結果；看 CI 時看每個 job 自己的結論，不只看 run 的整體狀態。沒有驗證到的部分明確說出來。
 

@@ -3,7 +3,8 @@ name: repo hygiene
 # 跨專案、秒級的靜態檢查，不設 path 條件：
 # - actionlint：workflow 檔本身（expression、steps.<id>、action 輸入）。shellcheck 整合關掉，
 #   只看 actionlint 自己的檢查。
-# - AGENTS.md 的大小與單行長度：每一層的上限在 scripts/check-agents-md.py（ADR 2026-10-31-agents-md-layering-consolidated）。
+# - AGENTS.md 的大小、形狀與重複：規則與上限在 .instruction-lint.toml（ADR 2026-10-31-agents-md-layering-consolidated）。
+#   工具的 hook 與 CI 引用必須釘同一個 SHA（check-pins）；new-module 讀的 JSON 要和設定一致。
 # - shell 變數緊接全形字元：`$var，` 會被 bash 吃成變數名（set -u 下直接中止），掃全 repo 的
 #   版控 shell 腳本，規則在 scripts/check-fullwidth-var-expansion.sh。
 
@@ -34,9 +35,14 @@ jobs:
       - name: shell 變數緊接全形字元
         if: always()
         run: bash scripts/check-fullwidth-var-expansion.sh
-      - name: AGENTS.md 大小與單行長度
+      - name: AGENTS.md 規則
         if: always()
-        run: python3 scripts/check-agents-md.py
-      - name: AGENTS.md 檢查的單元測試
+        uses: Will413028/instruction-lint@a89ccb131c9a1e0159c1ac0b25d21ccca55d45f3 # v0.2.0
+      - name: instruction-lint 引用的 SHA 一致
         if: always()
-        run: python3 -m unittest scripts/test_check_agents_md.py
+        run: pipx run --spec git+https://github.com/Will413028/instruction-lint@a89ccb131c9a1e0159c1ac0b25d21ccca55d45f3 instruction-lint check-pins # v0.2.0
+      - name: new-module 的 instruction-lint.json 與設定一致
+        if: always()
+        run: |
+          pipx run --spec git+https://github.com/Will413028/instruction-lint@a89ccb131c9a1e0159c1ac0b25d21ccca55d45f3 instruction-lint config --format json > "$RUNNER_TEMP/instruction-lint.json" # v0.2.0
+          diff -u backend/cmd/new-module/instruction-lint.json "$RUNNER_TEMP/instruction-lint.json"

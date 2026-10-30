@@ -4,6 +4,13 @@
 default_install_hook_types: [pre-commit, commit-msg, pre-push]
 
 repos:
+  # 規則與上限在 .instruction-lint.toml；掃全部追蹤的 AGENTS.md，所以不傳檔名。CI 同一份：.github/workflows/repo-hygiene.yml。
+  - repo: https://github.com/Will413028/instruction-lint
+    rev: a89ccb131c9a1e0159c1ac0b25d21ccca55d45f3 # v0.2.0
+    hooks:
+      - id: instruction-lint
+        pass_filenames: false
+        stages: [pre-commit]
   - repo: local
     hooks:
       - id: conventional-commit-message
@@ -11,15 +18,6 @@ repos:
         entry: python3 scripts/check-commit-msg.py
         language: system
         stages: [commit-msg]
-      # AGENTS.md 的大小與單行長度（ADR 2026-10-31-agents-md-layering-consolidated）；只在動到 AGENTS.md 時跑，掃全部追蹤的檔，毫秒級。
-      # CI 同一支腳本：.github/workflows/repo-hygiene.yml。
-      - id: check-agents-md
-        name: AGENTS.md 大小與單行長度
-        entry: python3 scripts/check-agents-md.py
-        language: system
-        files: (^|/)AGENTS\.md$
-        pass_filenames: false
-        stages: [pre-commit]
       # 只掃要推的範圍，離線且很快；沒裝 gitleaks 時只警告（CI 掃完整歷史）。
       - id: gitleaks-pre-push
         name: gitleaks（要推的 commit）
