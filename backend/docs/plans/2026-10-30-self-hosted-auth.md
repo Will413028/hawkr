@@ -24,6 +24,10 @@
   - Google 自動連結條件：`email_verified` 為真，且 email 是 `gmail.com` 或 token 帶 `hd`（nOAuth 教訓）。
   - 登入相關回應 `Cache-Control: no-store`；登入頁 `frame-ancestors 'none'`；start、callback、token 交換每 IP 限流（單體內的限流器）。
   - 不做（上線前過度設計）：獨立登入事件表（結構化 log 即可）、異常偵測與新裝置通知、session 綁裝置（DPoP、DBSC）。
+- provider 的事實（spike 結果，附件 `spikes.md`，2026-10-30 查官方文件；標「未確認」的仍待 1a 實測）：
+  - LINE：web 登入的 ID token 是 HS256（以 channel secret 驗），原生 SDK 的是 ES256（以 `https://api.line.me/oauth2/v2.1/certs` 驗），驗證器依來源分兩條；discovery 只列 ES256，不能只照 discovery。PKCE 只收 S256、支援 nonce。同一個 provider 底下的 channel `sub` 才相同：web 與 App 的 channel 必須在同一個 LINE provider，之後不能換。
+  - Apple：要 name／email 就必須 `form_post`；redirect URI 不能是 IP 或 `localhost`，本機驗收要一個真的 HTTPS 網域（tunnel）；discovery 沒宣告 PKCE、授權參數也沒有 `code_challenge`，所以 Apple 這條靠 `state` 與 `nonce`，不以 PKCE 當防線。伺服器通知是 Apple 簽的 JWT（以 `https://appleid.apple.com/auth/keys` 驗），事件是 `email-disabled`、`email-enabled`、`consent-revoked`、`account-deleted`。「web 登入要先有上架 App Store 的 App」出自官方設定頁，但是否要求「上架」而不只是存在的 App ID，未確認。
+  - Google：`http://localhost` 可當 redirect URI；身分鍵用 `sub`；三家只有 Google 在授權回應帶 `iss`（三份 discovery 實抓）。iOS client 的 ID token `aud` 是哪個 client ID，未確認。
 - 工具鏈（預設，可推翻）：OAuth 用 `golang.org/x/oauth2`，ID token 用既有的 `internal/oidc`；本機開發與 e2e 繼續用 dev token（`provider/dev.go`），改成簽發 dev session。
 
 **驗收基線：** 開工時以 `9b133ff` 為準：CI 6/6 綠（A7-1d″ 收尾時的紀錄，本計畫開工時重看一次各 job 結論）。本機基線在步驟 2 開工時跑 backend monolith 的 gofmt、vet、`go test ./...`、`-tags integration -p 2`、`make lint-monolith`，既有失敗記在進度表，不在本階段修。
@@ -86,7 +90,7 @@
     - start／callback 是純 HTTP 路由，不在 `rpc.CheckDeclarations` 的對照內：在 `internal/httpapi` 以測試列出全部 `/api/auth/*` 路由並斷言它們不經 `withSession` 的寫入路徑；`ratelimit.go` 為它們加每 IP 的限流；CORS 不放行（只走同源反代）。
     - 舊 gateway：`backend/internal/legacy/gatewayproxy` 照舊只轉單體解析出的 principal，不把 `__Host-hk_session` 或 Bearer 原樣轉出。
     - session 管理：`ListSessions`、`RevokeSession`（終止前要求 15 分鐘內重新以任一已連結的 provider 驗證過，依 ASVS）。
-    - Apple 伺服器通知的 endpoint：`consent-revoked` 刪該身分的 session 與 `apple_tokens`，`account-delete` 走既有刪帳流程。
+    - Apple 伺服器通知的 endpoint：驗 Apple 的 JWT；`consent-revoked` 刪該身分的 session 與 `apple_tokens`，`account-deleted` 走既有刪帳流程，`email-disabled`／`email-enabled` 更新該身分的 email 可寄送狀態。
     - 動作性質宣告表（`effects.go`）補新 procedure：登入與 token 交換是公開、`SignOut`、`LinkIdentity`、`ListSessions`、`RevokeSession` 是自助。
     - dev token 改成直接建 dev session（`make dev-token` 介面不變）。
   - 消費端：`rg -n 'withSession|rpc\.Session|SessionFrom|__session' backend/internal`；`rg -n 'GetSession' api website/lib buyer-app/lib seller-app/lib packages`；舊 gateway 轉送 `rg -n 'Authorization|Cookie' backend/internal/legacy/gatewayproxy`；Apple `rg -n 'LinkAppleCredential|applerevoke' api backend/internal website/lib buyer-app/lib seller-app/lib packages`。
@@ -96,7 +100,7 @@
   - 完成後的狀態：website 與兩支 App 登不進（Clerk 的 token 不再被接受），必須接著做步驟 3。
 
 - [ ] **3. website 切換**（被擋於：步驟 2）
-  - 範圍：移除 `@clerk/nextjs` 與 `clerkMiddleware`；登入頁的三個按鈕導向 `/api/auth/{provider}/start`，SSO callback 頁刪除；middleware 只看 `__Host-hk_session` 在不在做樂觀導向（不打 API），權威判斷是頁面與 client 呼叫 `GetSession`（收到 `unauthenticated` 導回登入）；`lib/auth/*` 改成以 `GetSession` 判斷登入、`SignOut` 登出；`lib/api`、`lib/connect`、SSE、AI chat、媒體上傳的 transport 不再帶 Bearer（同源 cookie）；`next.config.ts` 的 CSP 拿掉 Clerk 網域；`lib/config/env.ts`、`website-e2e.yml` 的 `CLERK_*` 刪除；e2e helper `clerk-session.ts` 換成 session cookie 的 mock；帳號設定加「連結 LINE／Apple／Google」（UI 改動，畫面先給 Will 看過）。
+  - 範圍：移除 `@clerk/nextjs` 與 `clerkMiddleware`；登入頁的三個按鈕導向 `/api/auth/{provider}/start`，SSO callback 頁刪除；middleware 只看 `__Host-hk_session` 在不在做樂觀導向（不打 API），權威判斷是頁面與 client 呼叫 `GetSession`（收到 `unauthenticated` 導回登入）；`lib/auth/*` 改成以 `GetSession` 判斷登入、`SignOut` 登出；`lib/api`、`lib/connect`、SSE、AI chat、媒體上傳的 transport 不再帶 Bearer（同源 cookie）；`next.config.ts` 的 CSP 拿掉 Clerk 網域；`lib/config/env.ts`、`website-e2e.yml` 的 `CLERK_*` 刪除；e2e helper `clerk-session.ts` 換成 session cookie 的 mock；本機代理 `website/app/api/connect/[...path]/route.ts:23` 與 `website/app/api/v1/[...path]/route.ts:282` 的 `fetch` 加 `redirect: "manual"`，3xx 與 `Location` 原樣交給瀏覽器（現在會自己跟隨，OAuth 的 302 到不了瀏覽器）；伺服器端身分改成轉送 session cookie：`website/features/seller-center/profile/actions.ts:21`（Clerk `auth()`）、`website/lib/api/client.ts:490`（Bearer），依 D6；帳號設定加「連結 LINE／Apple／Google」（UI 改動，畫面先給 Will 看過）。
   - 消費端：`rg -il clerk website .github/workflows`（盤點 72 檔）；Storybook `rg -n 'clerk' website/.storybook`。
   - 不能動：畫面版面與既有文案（連結區以外）；同源反代的路徑。
   - 驗收：website CI 等價的 lint、typecheck、`test:unit`（node:test 指令）、vitest、`pnpm run build`（帶 `API_BASE_URL=http://127.0.0.1:9/api/v1` 與同值 `NEXT_PUBLIC_API_BASE_URL`）、`design:check --apps-root ..`；e2e 與 Storybook 交給 CI（`website-e2e.yml`），回報為待 CI。真人登入：Will 在本機以三家各登入一次、登出、連結一次；Apple 依 spike b 的結論在本機或以 tunnel 的 HTTPS 網址驗，兩者都不行時 Apple 的真人登入列為待驗並寫進進度表。mutation：transport 又帶 Bearer 而 cookie 缺時要紅（未登入 e2e）、middleware 不認 cookie 要紅。
@@ -167,7 +171,7 @@
 
 | 步驟 | 狀態 | 已跑的驗收 | 未跑的驗收與原因 | commit |
 |---|---|---|---|---|
-| 1a 前置驗證 | 未開始 | | | |
+| 1a 前置驗證 | 進行中 | 官方文件查證（a、b、c、e）與 repo 代理程式閱讀（d 前半）、govulncheck 基線（f），見 `spikes.md` | 需要 OAuth client 的實測：LINE 拒給 email 的回應、Apple return URL 與「上架」要求、Google iOS `aud`；部署環境的第一方反代與 OpenNext 對 3xx、多個 `Set-Cookie` 的處理（反代程式不在 repo）。等 Will 跑完 OAuth 設定的 wizard | |
 | 1b 新 ADR | 未開始 | | | |
 | 2 後端：session 與聯合登入 | 未開始 | | | |
 | 3 website 切換 | 未開始 | | | |
