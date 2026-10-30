@@ -199,7 +199,7 @@ export type Account = Message<"hawkr.admin.identity.v1alpha1.Account"> & {
   id: string;
 
   /**
-   * 第一次登入時 Clerk 回報的已驗證 email；沒有時是空字串（例如 LINE 沒有給 email）。
+   * 最近一次登入時 provider 回報的已驗證 email（也是寄件地址）；沒有時是空字串（例如 LINE 沒有給 email）。
    *
    * @generated from field: string email = 2;
    */

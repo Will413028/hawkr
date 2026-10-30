@@ -371,7 +371,7 @@ func runWorker(ctx context.Context) error {
 		return err
 	}
 
-	// identity 的 job（停用、刪除 Clerk 的使用者，撤銷 Apple 的授權）在 worker 執行；排入在 serve，撤銷 Apple 的第二段
+	// identity 的 job（撤銷 Apple 的授權）在 worker 執行；排入在 serve，撤銷 Apple 的第二段
 	// 由 worker 自己排入。
 	jc, err := jobs.NewInsertOnly(d)
 	if err != nil {

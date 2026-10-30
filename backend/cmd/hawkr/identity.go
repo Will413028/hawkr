@@ -36,30 +36,22 @@ type identityConfig struct {
 // webClient 是 web 登入在一家 provider 的 OAuth client。
 type webClient struct{ id, secret string }
 
-// readIdentityConfig 讀 identity 的設定（ADR 2026-09-27-identity-clerk）。每組設定整組選填：沒有設定時那個功能回
+// readIdentityConfig 讀 identity 的設定（ADR 2026-10-30-identity-self-hosted-federated-login）。每組設定整組選填：沒有設定時那個功能回
 // unavailable 或無法登入；只設了一部分是設定錯誤。
 //
-//   - CLERK_PUBLISHABLE_KEY、CLERK_SECRET_KEY、CLERK_JWT_KEY：顧客的 Clerk application；CLERK_AUTHORIZED_PARTIES 是 web 的 origin
-//     （web 取得的 token 帶 azp）。
 //   - CF_ACCESS_TEAM_DOMAIN、CF_ACCESS_ADMIN_AUD：後台的 Access team domain 與 application AUD tag。
-//   - DEV_AUTH_KEY_FILE：本機開發的 dev token 的 RSA 私鑰（make dev-key 產生）；設定時另外接受它簽的 token，不能與
-//     正式環境的 Clerk（sk_live_）或 Cloudflare Access 同時設定。
+//   - DEV_AUTH_KEY_FILE：本機開發的 dev token 的 RSA 私鑰（make dev-key 產生）；設定時另外接受它簽的後台 token，不能與
+//     Cloudflare Access 同時設定。
 //   - GOOGLE_CLIENT_IDS：vendor portal step-up 的 Google ID token 驗證（VendorPortalInviteeService.VerifySession）。
 //   - GOOGLE_WEB_CLIENT_ID、GOOGLE_WEB_CLIENT_SECRET：web 登入（/api/auth/google/*）的 Google OAuth client（authorization code ＋ PKCE），與
 //     GOOGLE_CLIENT_IDS（vendor portal step-up 驗 ID token 的 aud）無關；兩個都設才啟用，只設一個是設定錯誤。LINE_CHANNEL_ID、
 //     LINE_CHANNEL_SECRET：web 登入（/api/auth/line/*）的 LINE Login channel，同樣整組選填；LINE 的 web ID token 以 channel secret 驗（HS256）。
 //     redirect URI 是 PUBLIC_WEB_ORIGIN 加 /api/auth/{google,line}/callback，要登記在各家的 console。
 //   - APPLE_CLIENT_IDS、APPLE_TEAM_ID、APPLE_KEY_ID、APPLE_PRIVATE_KEY、IDENTITY_TOKEN_KEYS：App 原生登入交來的 Apple 授權碼換成
-//     refresh token 加密保存（LinkAppleCredential），刪帳號時撤銷。設了顧客的 Clerk 又沒有 DEV_AUTH_KEY_FILE（部署的環境）時
-//     五個都必填；只設一部分是設定錯誤；本機開發（DEV_AUTH_KEY_FILE）可以全部不設，LinkAppleCredential 回 unavailable。
+//     refresh token 加密保存（LinkAppleCredential），刪帳號時撤銷。整組選填：只設一部分是設定錯誤；全部不設時 LinkAppleCredential 回 unavailable。
 func readIdentityConfig(ctx context.Context, e *config.Env) identityConfig {
 	var c identityConfig
-	customers := readClerk(e, "CLERK_PUBLISHABLE_KEY", "CLERK_SECRET_KEY", "CLERK_AUTHORIZED_PARTIES")
-	if customers != nil {
-		c.providers.Customers = append(c.providers.Customers, customers)
-	}
-	accessConfigured := anySet(e, "CF_ACCESS_TEAM_DOMAIN", "CF_ACCESS_ADMIN_AUD")
-	if accessConfigured {
+	if accessConfigured(e) {
 		admin, err := identity.NewAccess(identity.AccessConfig{TeamDomain: e.String("CF_ACCESS_TEAM_DOMAIN"), Audience: e.String("CF_ACCESS_ADMIN_AUD"), Context: ctx})
 		if err != nil {
 			e.Fail("CF_ACCESS_TEAM_DOMAIN／CF_ACCESS_ADMIN_AUD：%v", err)
@@ -68,8 +60,8 @@ func readIdentityConfig(ctx context.Context, e *config.Env) identityConfig {
 		}
 	}
 	if path := e.StringOr("DEV_AUTH_KEY_FILE", ""); path != "" {
-		if liveIdentityConfigured(e) {
-			e.Fail("DEV_AUTH_KEY_FILE 不能與正式 Clerk 或 Cloudflare Access 設定同時使用")
+		if accessConfigured(e) {
+			e.Fail("DEV_AUTH_KEY_FILE 不能與 Cloudflare Access 設定同時使用")
 		} else {
 			key, err := readDevKey(path)
 			if err != nil {
@@ -77,7 +69,6 @@ func readIdentityConfig(ctx context.Context, e *config.Env) identityConfig {
 			} else if dev, err := identity.NewDevAuth(key); err != nil {
 				e.Fail("DEV_AUTH_KEY_FILE：%v", err)
 			} else {
-				c.providers.Customers = append(c.providers.Customers, dev.Customers())
 				c.providers.Admin = dev.Admins()
 			}
 		}
@@ -102,16 +93,9 @@ func readIdentityConfig(ctx context.Context, e *config.Env) identityConfig {
 		}
 	}
 	c.googleAppClients = e.List("GOOGLE_APP_CLIENT_IDS")
-	appleKeys := []string{"APPLE_CLIENT_IDS", "APPLE_TEAM_ID", "APPLE_KEY_ID", "APPLE_PRIVATE_KEY", "IDENTITY_TOKEN_KEYS"}
-	switch {
-	case anySet(e, appleKeys...):
+	if appleKeys := []string{"APPLE_CLIENT_IDS", "APPLE_TEAM_ID", "APPLE_KEY_ID", "APPLE_PRIVATE_KEY", "IDENTITY_TOKEN_KEYS"}; anySet(e, appleKeys...) {
 		// 設了任何一個就全部必填：只設一部分不會悄悄停用 Apple。
 		c.providers.Apple, c.providers.AppleTokens, c.providers.Sealer = readApple(ctx, e)
-	case customers != nil && e.StringOr("DEV_AUTH_KEY_FILE", "") == "":
-		// 有顧客的 Clerk 又不是本機開發（沒有 DEV_AUTH_KEY_FILE）：Apple 必填。
-		for _, k := range appleKeys {
-			e.String(k)
-		}
 	}
 	return c
 }
@@ -148,35 +132,20 @@ func readApple(ctx context.Context, e *config.Env) (identity.IDTokenVerifier, id
 	return v, tokens, sealer
 }
 
-// readClerk 讀一個 Clerk application 的設定；所有 key 都沒有設定時是 nil。
-func readClerk(e *config.Env, publishable, secret, parties string) identity.Clerk {
-	if !anySet(e, publishable, secret, "CLERK_JWT_KEY") {
-		return nil
-	}
-	c, err := identity.NewClerk(identity.ClerkConfig{
-		PublishableKey: e.String(publishable), SecretKey: e.String(secret), JWTKey: e.String("CLERK_JWT_KEY"), AuthorizedParties: e.List(parties),
-	})
-	if err != nil {
-		e.Fail("%s：%v", publishable, err)
-		return nil
-	}
-	return c
-}
-
-// liveIdentityConfigured 是這個環境設定了正式的登入：Clerk 的 live key 或 Cloudflare Access。DEV_AUTH_KEY_FILE 不能與它同時使用。
-func liveIdentityConfigured(e *config.Env) bool {
-	return strings.HasPrefix(e.StringOr("CLERK_SECRET_KEY", ""), "sk_live_") || anySet(e, "CF_ACCESS_TEAM_DOMAIN", "CF_ACCESS_ADMIN_AUD")
+// accessConfigured 是這個環境設定了 Cloudflare Access（正式的後台登入）。DEV_AUTH_KEY_FILE 不能與它同時使用。
+func accessConfigured(e *config.Env) bool {
+	return anySet(e, "CF_ACCESS_TEAM_DOMAIN", "CF_ACCESS_ADMIN_AUD")
 }
 
 // requireDevEnvironment 是只給本機開發的子命令（dev-seed）的保護，前提與 dev-token、serve 接受 dev token 相同：DEV_AUTH_KEY_FILE 指向
-// 本機的 dev 金鑰（make dev-key 產生，正式環境沒有），而且沒有正式的 Clerk 或 Cloudflare Access 設定。
+// 本機的 dev 金鑰（make dev-key 產生，正式環境沒有），而且沒有 Cloudflare Access 設定。
 func requireDevEnvironment(e *config.Env) error {
 	path := e.StringOr("DEV_AUTH_KEY_FILE", "")
 	if path == "" {
 		return errors.New("這個子命令只給本機開發使用：沒有設定 DEV_AUTH_KEY_FILE（make dev-key 產生）")
 	}
-	if liveIdentityConfigured(e) {
-		return errors.New("這個子命令只給本機開發使用：DEV_AUTH_KEY_FILE 不能與正式 Clerk 或 Cloudflare Access 設定同時使用")
+	if accessConfigured(e) {
+		return errors.New("這個子命令只給本機開發使用：DEV_AUTH_KEY_FILE 不能與 Cloudflare Access 設定同時使用")
 	}
 	if _, err := readDevKey(path); err != nil {
 		return fmt.Errorf("DEV_AUTH_KEY_FILE：%w", err)

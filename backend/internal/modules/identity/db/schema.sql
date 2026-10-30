@@ -12,9 +12,9 @@ CREATE SCHEMA identity;
 -- 帳號：登入的 principal（`docs/modules/identity.md`）。買家、賣家是同一個帳號的角色（account_roles）；業務身分
 -- （buyer_id、store_id）屬於 buyer、seller 模組。
 --
--- 登入由 Clerk 處理（ADR 2026-09-27-identity-clerk）：clerk_user_id 是顧客的 Clerk application 的使用者 ID，
--- 第一個認證過的請求時建立帳號。刪除的帳號保留 clerk_user_id（Clerk 的使用者可能還沒刪掉，同一個 ID 不得再建一個
--- 帳號），其他個資清掉，只留墓碑，讓舊服務查得到「已刪除」。
+-- 登入由自建的聯合登入處理（ADR 2026-10-30-identity-self-hosted-federated-login）：帳號由 account_identities 的 provider 身分識別，
+-- 第一次以某個身分登入時建立。刪除的帳號保留登入身分的墓碑（account_identities，同一個身分不得再建一個帳號），其他個資清掉，
+-- 帳號只留墓碑，讓舊服務查得到「已刪除」。
 --
 -- id 過渡期是 IDENTITY：Java 服務仍把帳號 ID 存成 BIGINT，最後一個 Java 消費者改寫後以一個 migration
 -- 換成 uuid（ADR 2026-09-25-row-identity-by-data-kind 的過渡規則、遷移計畫階段 C）。
@@ -23,11 +23,9 @@ CREATE SCHEMA identity;
 -- 結束的時間（狀態由 identity 保存，流程由 accountdeletion 編排；ADR 2026-09-30-account-deletion-module 的修訂）。
 -- 等待刪除的帳號不能再授予角色；刪除時清掉。
 --
--- email 是建立帳號時 Clerk 回報的已驗證 email（LINE 可能沒有），只給後台的清單顯示與搜尋。它不是識別：不唯一，
--- 之後在 Clerk 改了 email 也不同步。
+-- email 是 provider 回報的已驗證 email（LINE 可能沒有），登入時更新，是寄件地址，也給後台的清單顯示與搜尋。它不是識別：不唯一。
 CREATE TABLE identity.accounts (
     id            BIGINT       GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    clerk_user_id TEXT,
     email         TEXT,
     suspended_at  TIMESTAMPTZ,
     deleted_at    TIMESTAMPTZ,
@@ -39,11 +37,6 @@ CREATE TABLE identity.accounts (
     -- 刪除的帳號不再是等待刪除。
     CONSTRAINT accounts_deletion_pending_check CHECK (deleted_at IS NULL OR deletion_pending_at IS NULL)
 );
-
-CREATE UNIQUE INDEX uidx_accounts_clerk_user_id ON identity.accounts (clerk_user_id);
-
--- 自建登入（ADR 2026-10-30-identity-self-hosted-federated-login）建立的帳號沒有 clerk_user_id：欄位在 Clerk 退場前是 NULL 可多筆
--- 的過渡（UNIQUE 對 NULL 不衝突），由 account_identities 識別；Clerk 退場時整欄與索引一起刪除。
 
 -- 帳號連結的 provider 身分（D1、D4）：(provider, subject) 是識別，同一個身分只屬於一個帳號。登入時以 provider 回報的 subject 找帳號，
 -- 找不到才依規則自動連結或建帳；email 與 email_verified 是 provider 最近一次回報的值，只用於自動連結的比對與更新帳號的寄件地址，

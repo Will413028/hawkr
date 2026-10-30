@@ -45,7 +45,7 @@ type Deps struct {
 	DB     *db.DB
 	Events *events.Bus
 	Jobs   jobs.Enqueuer
-	// Providers 是外部的 Clerk、Access、Google 與 Apple；沒有設定的欄位是 nil，對應的功能回 unavailable。
+	// Providers 是外部的 Access、Google 與 Apple；沒有設定的欄位是 nil，對應的功能回 unavailable。
 	Providers Providers
 	// Now 是目前時間；測試注入固定值。
 	Now    func() time.Time
@@ -61,14 +61,8 @@ type PrincipalKind = model.PrincipalKind
 // Principal 是帶類型與角色的登入者。
 type Principal = model.Principal
 
-// Authenticated 是驗證後的登入者及 Clerk token 的姓名。
+// Authenticated 是驗證後的登入者。
 type Authenticated = model.Authenticated
-
-// Clerk 是顧客 Clerk application 的 client。
-type Clerk = model.Clerk
-
-// ClerkIdentity 是已驗證的 Clerk session claims。
-type ClerkIdentity = model.ClerkIdentity
 
 // AdminIdentity 是驗證後的後台身分。
 type AdminIdentity = model.AdminIdentity
@@ -246,7 +240,7 @@ func New(d Deps) *Module {
 		AppleTokens: d.Providers.AppleTokens, Sealer: d.Providers.Sealer, Now: d.Now, Logger: d.Logger,
 	})
 	a := account.New(account.Deps{
-		DB: d.DB, Events: d.Events, Jobs: d.Jobs, Customers: d.Providers.Customers, AppleRevoker: ar,
+		DB: d.DB, Events: d.Events, AppleRevoker: ar,
 		Now: d.Now, Logger: d.Logger,
 	})
 	sess := session.New(session.Deps{DB: d.DB, Now: d.Now, Logger: d.Logger})
@@ -314,7 +308,7 @@ func (m *Module) CurrentSuspension(ctx context.Context, accountID int64) (Accoun
 	return m.account.CurrentSuspension(ctx, accountID)
 }
 
-// DeleteAccount 刪除帳號、解除未解除的停權紀錄，並在同一個 transaction 刪除全部 session、清除登入身分的個資（身分列留作墓碑）（有 Clerk 使用者的另排 Clerk 刪除 job）；已刪除時成功，從未存在時回 NotFound。
+// DeleteAccount 刪除帳號、解除未解除的停權紀錄，並在同一個 transaction 刪除全部 session、清除登入身分的個資（身分列留作墓碑）；已刪除時成功，從未存在時回 NotFound。
 func (m *Module) DeleteAccount(ctx context.Context, accountID int64) error {
 	return m.account.DeleteAccount(ctx, accountID)
 }
@@ -450,7 +444,6 @@ func (m *Module) CheckAppleKeys(ctx context.Context) error {
 
 // AddWorkers 登記本模組的 job worker。
 func (m *Module) AddWorkers(w *river.Workers) {
-	m.account.AddWorkers(w)
 	m.applerevoke.AddWorkers(w)
 }
 

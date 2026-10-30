@@ -9,8 +9,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
 )
 
-// 呼叫者的身分是 Clerk 形式的 session token（ADR 2026-09-27-identity-clerk）：特性測試不連 Clerk，一律用本機金鑰簽的
-// dev token（identity.NewDevClerk）。兩種 driver 都以 Authorization: Bearer 帶。REST driver 打單體的入口（/api/v1 由
+// 呼叫者的身分是 Bearer token：顧客是資料庫裡的 dev session（BuyerSession），後台是本機金鑰簽的 dev token（DevAuth）。兩種 driver 都以 Authorization: Bearer 帶。REST driver 打單體的入口（/api/v1 由
 // 單體轉給 gateway，身分 header 由單體設上），Connect driver 直接打單體。
 
 // Auth 是直接打單體的測試要裝進 identity 的 dev 驗證，與各呼叫者的 token。
@@ -33,7 +32,7 @@ func DevAuth(t *testing.T) Auth {
 		t.Fatal(err)
 	}
 	return Auth{
-		Providers: identity.Providers{Customers: []identity.Clerk{d.Customers()}, Admin: d.Admins()},
+		Providers: identity.Providers{Admin: d.Admins()},
 		Tokens:    map[Caller]string{Admin: admin},
 	}
 }

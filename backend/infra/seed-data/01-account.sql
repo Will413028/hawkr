@@ -15,8 +15,8 @@
 --
 -- 前置：單體的 migration 已套用（backend 的 make migrate）。帳號與買家的主鍵是 IDENTITY，固定的測試 ID 以
 -- OVERRIDING SYSTEM VALUE 寫入，最後把序號推到這些範圍之後，新註冊的帳號與買家不會撞到它們。
--- 本機登入不走 Clerk（ADR 2026-09-27-identity-clerk）：clerk_user_id 是 dev 使用者 dev_account_<ID>，以
--- make dev-token args='-user dev_account_2001' 之類的方式簽 token。
+-- 本機登入不走外部 provider：登入身分（account_identities）是 GOOGLE、subject 為 dev 使用者 dev_account_<ID>
+-- （Google 的 sub 是純數字，不會相撞），以 make dev-token args='-user dev_account_2001' 之類的方式建 dev session。
 -- 後台本機用 make dev-token args='-admin -user dev_ops'；Access 管理員以 JWT sub 對應 access_subject。
 -- 已經在本機登入過（由 dev token 建出帳號）的 DB 不保證與這裡一致：改用這份 seed 前先重建本機 DB。
 -- ============================================================================
@@ -37,14 +37,20 @@ DELETE FROM buyer.restock_subscriptions WHERE buyer_id IN (SELECT buyer_id FROM 
 DELETE FROM buyer.memberships WHERE buyer_id IN (SELECT buyer_id FROM seed_buyers);
 DELETE FROM buyer.buyers WHERE buyer_id IN (SELECT buyer_id FROM seed_buyers);
 DELETE FROM identity.account_roles WHERE account_id IN (SELECT id FROM seed_accounts);
+DELETE FROM identity.sessions WHERE account_id IN (SELECT id FROM seed_accounts);
+DELETE FROM identity.login_flows WHERE link_account_id IN (SELECT id FROM seed_accounts);
+DELETE FROM identity.account_identities WHERE account_id IN (SELECT id FROM seed_accounts);
 DELETE FROM identity.accounts WHERE id IN (SELECT id FROM seed_accounts);
 
-INSERT INTO identity.accounts (id, clerk_user_id, email) OVERRIDING SYSTEM VALUE VALUES
-  (9,    'dev_account_9',    'seller1@hawkr.test'),
-  (4,    'dev_account_4',    'seller2@hawkr.test'),
-  (2001, 'dev_account_2001', 'buyer1@hawkr.test'),
-  (2002, 'dev_account_2002', 'buyer2@hawkr.test'),
-  (3001, 'dev_account_3001', 'both1@hawkr.test');
+INSERT INTO identity.accounts (id, email) OVERRIDING SYSTEM VALUE VALUES
+  (9,    'seller1@hawkr.test'),
+  (4,    'seller2@hawkr.test'),
+  (2001, 'buyer1@hawkr.test'),
+  (2002, 'buyer2@hawkr.test'),
+  (3001, 'both1@hawkr.test');
+
+INSERT INTO identity.account_identities (provider, subject, account_id, created_at, updated_at)
+SELECT 'GOOGLE', 'dev_account_' || id, id, now(), now() FROM identity.accounts WHERE id IN (9, 4, 2001, 2002, 3001);
 
 INSERT INTO identity.admins (access_subject, email) VALUES ('dev_ops', 'dev_ops@dev.localhost')
 ON CONFLICT (access_subject) DO NOTHING;

@@ -65,7 +65,7 @@ func businessCode(err error) (int32, string, error) {
 }
 
 // accountInfo 是舊的 AccountInfo。刪除的帳號在舊的 account-service 查不到（404），這裡也一樣，所以 a 一定是存活的
-// 帳號：account_type 的買家位元由 accounttype 合成（帳號活著就是買家）。帳號不再有手機（ADR 2026-09-27-identity-clerk），
+// 帳號：account_type 的買家位元由 accounttype 合成（帳號活著就是買家）。帳號沒有手機，
 // phone 一律是空字串。
 func accountInfo(a identity.Account) *pb.AccountInfo {
 	status := "active"
@@ -107,7 +107,7 @@ func (s *Server) GetAccountInfoBatch(ctx context.Context, req *connect.Request[p
 	return connect.NewResponse(out), nil
 }
 
-// GetAccountByPhone 是舊的賣家 CRM 以手機找顧客：帳號不再有手機（ADR 2026-09-27-identity-clerk），一律回「找不到」，
+// GetAccountByPhone 是舊的賣家 CRM 以手機找顧客：帳號沒有手機，一律回「找不到」，
 // 與原本查無此手機相同。改用什麼資料找顧客隨 A3（seller、buyer）決定。
 func (s *Server) GetAccountByPhone(context.Context, *connect.Request[pb.GetAccountByPhoneRequest]) (*connect.Response[pb.AccountInfoResponse], error) {
 	return connect.NewResponse(&pb.AccountInfoResponse{Code: codeNotFound, Message: "這支手機沒有帳號"}), nil

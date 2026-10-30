@@ -2,7 +2,7 @@
 # 在本機起單體（入口）與 gateway，經入口跑一個模組的特性測試（internal/httpapi/<模組>/characterization 裡
 # build tag gateway 的測試；ADR 2026-09-24-go-modular-monolith D8、ADR 2026-09-26-external-contract-protobuf-connect
 # D4）。搬遷中的模組另外起它的舊服務，同一份情境以 REST 經入口與 gateway 打舊服務、以 Connect 打單體。呼叫者的身分
-# 是以 hawkr dev-token 簽的 token（本機的暫時金鑰，不連 Clerk）。
+# 是以 hawkr dev-token 簽的 token（本機的暫時金鑰，不連任何外部 provider）。
 #
 # 只用 docker-compose-infra.yml 的 Postgres 與 Redis（先 make infra-up）；舊服務與單體呼叫的 media-service 是
 # 測試自己聽的假服務（characterize.ServeFakeMedia）。服務以 env -i 啟動，不讀 .env、不繼承 shell 的環境變數，
@@ -112,7 +112,7 @@ GOWORK=off go build -o "${LOG_DIR}/hawkr" ./cmd/hawkr
 create_db "$MONOLITH_DB"
 MONOLITH_DB_URL=$(db_url "$MONOLITH_DB")
 (clean_env DATABASE_URL="$MONOLITH_DB_URL" "${LOG_DIR}/hawkr" migrate) >"${LOG_DIR}/monolith-migrate.log" 2>&1
-# 身分是本機的暫時金鑰簽的 dev token（不連 Clerk，ADR 2026-09-27-identity-clerk）；代行讀店家狀態在行程內
+# 身分是本機的暫時金鑰簽的 dev token（不連任何外部 provider）；代行讀店家狀態在行程內
 # 讀 seller 模組，不需要另外的服務位址。
 DEV_AUTH_KEY_FILE="${LOG_DIR}/dev-auth.pem"
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$DEV_AUTH_KEY_FILE" 2>/dev/null

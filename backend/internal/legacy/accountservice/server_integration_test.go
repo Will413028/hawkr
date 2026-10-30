@@ -80,7 +80,7 @@ func setup(t *testing.T) *fixture {
 	}))
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	f.m = identity.New(identity.Deps{
-		DB: d, Events: bus, Jobs: jc, Providers: identity.Providers{Customers: []identity.Clerk{dev.Customers()}},
+		DB: d, Events: bus, Jobs: jc, Providers: identity.Providers{},
 		Now: time.Now, Logger: log,
 	})
 	mux := http.NewServeMux()
@@ -159,7 +159,7 @@ func TestGetAccountInfo(t *testing.T) {
 		batch.Msg.GetData()[1].GetAccountType() != 1 {
 		t.Fatalf("batch = %v, %v", batch, err)
 	}
-	// 帳號不再有手機（ADR 2026-09-27-identity-clerk）：以手機找一律是「找不到」，與原本查無此手機相同。
+	// 帳號沒有手機：以手機找一律是「找不到」，與原本查無此手機相同。
 	byPhone, err := f.client.GetAccountByPhone(ctx, connect.NewRequest(&pb.GetAccountByPhoneRequest{Phone: "0900000000"}))
 	if err != nil || byPhone.Msg.GetCode() != codeNotFound || byPhone.Msg.GetData() != nil {
 		t.Fatalf("以手機找 = %v, %v", byPhone, err)

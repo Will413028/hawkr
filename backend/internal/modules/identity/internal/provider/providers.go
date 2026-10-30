@@ -2,13 +2,10 @@ package provider
 
 import (
 	"context"
-	"crypto/rsa"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/identity/internal/apple"
-	"github.com/Will413028/hawkr/backend/internal/modules/identity/internal/clerk"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity/internal/oidc"
 	"github.com/Will413028/hawkr/backend/internal/platform/seal"
@@ -16,68 +13,8 @@ import (
 
 // 以下是真正的 provider，給組裝點用；測試以假的實作取代 Providers 的欄位。
 
-// NewClerk 建立一個 Clerk application 的 client。
-func NewClerk(cfg model.ClerkConfig) (model.Clerk, error) {
-	c, err := clerk.New(clerk.Config{PublishableKey: cfg.PublishableKey, SecretKey: cfg.SecretKey, JWTKey: cfg.JWTKey, AuthorizedParties: cfg.AuthorizedParties})
-	if err != nil {
-		return nil, fmt.Errorf("identity：%w", err)
-	}
-	return clerkApp{c}, nil
-}
-
-// 本機開發的 token 的 issuer：顧客與後台各一個（hawkr dev-token）。
-const (
-	DevIssuer      = clerk.DevIssuer
-	DevAdminIssuer = "hawkr-dev-admin"
-)
-
-// NewDevClerk 建立本機開發用的顧客 application：接受 key 簽的 dev token（issuer 是 DevIssuer），
-// 使用者是 dev_ 開頭的 ID，不連 Clerk。只在設定明確指定時使用。
-func NewDevClerk(key *rsa.PublicKey, now func() time.Time) (model.Clerk, error) {
-	d, err := clerk.NewDev(key, now)
-	if err != nil {
-		return nil, fmt.Errorf("identity：%w", err)
-	}
-	return clerkApp{d}, nil
-}
-
-// SignDevToken 以本機的金鑰簽一個 dev token（hawkr dev-token 與測試用）。userID 要以 dev_ 開頭。
-func SignDevToken(key *rsa.PrivateKey, issuer, userID string, ttl time.Duration, now time.Time) (string, error) {
-	return clerk.SignDev(key, issuer, userID, ttl, now)
-}
-
-// clerkBackend 是 clerk.Client 與 clerk.Dev 共同的方法。
-type clerkBackend interface {
-	Issuer() string
-	OwnsUser(id string) bool
-	Verify(ctx context.Context, token string) (oidc.Claims, error)
-	DeleteUser(ctx context.Context, id string) error
-}
-
-// clerkApp 把 clerk 套件的錯誤換成本模組的（model.ErrInvalidToken、model.ErrRejected）。
-type clerkApp struct{ c clerkBackend }
-
-func (a clerkApp) Issuer() string          { return a.c.Issuer() }
-func (a clerkApp) OwnsUser(id string) bool { return a.c.OwnsUser(id) }
-
-func (a clerkApp) Verify(ctx context.Context, token string) (model.ClerkIdentity, error) {
-	c, err := a.c.Verify(ctx, token)
-	if errors.Is(err, clerk.ErrInvalid) {
-		return model.ClerkIdentity{}, errors.Join(err, model.ErrInvalidToken)
-	}
-	return model.ClerkIdentity{Subject: c.Subject, Email: c.Email, Name: c.Name}, err
-}
-
-func (a clerkApp) DeleteUser(ctx context.Context, id string) error {
-	return rejected(a.c.DeleteUser(ctx, id))
-}
-
-func rejected(err error) error {
-	if errors.Is(err, clerk.ErrRejected) {
-		return errors.Join(err, model.ErrRejected)
-	}
-	return err
-}
+// 本機開發的後台 token 的 issuer（hawkr dev-token -admin）。
+const DevAdminIssuer = "hawkr-dev-admin"
 
 // NewGoogleVerifier 驗證 Google 的 ID token。audiences 是接受的 OAuth client ID；給 vendor portal 的 step-up。
 func NewGoogleVerifier(audiences []string, lifetime ...context.Context) (model.IDTokenVerifier, error) {

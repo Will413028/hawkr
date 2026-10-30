@@ -198,7 +198,7 @@ func TestDevSeedRerunLeavesNoOrphanedViewRows(t *testing.T) {
 // newAccount 以固定 ID 建立帳號（identity.accounts 的主鍵是 IDENTITY）。
 func newAccount(t *testing.T, d *db.DB, id int64) {
 	t.Helper()
-	if _, err := d.Pool().Exec(context.Background(), `INSERT INTO identity.accounts (id, clerk_user_id) OVERRIDING SYSTEM VALUE VALUES ($1, $2)`, id, "dev_account_"+strconv.FormatInt(id, 10)); err != nil {
+	if _, err := d.Pool().Exec(context.Background(), `INSERT INTO identity.accounts (id) OVERRIDING SYSTEM VALUE VALUES ($1)`, id); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -706,7 +706,7 @@ func TestDevSeedKeepsPayUniIntentSeqMonotonic(t *testing.T) {
 	}
 }
 
-// dev-seed 只在本機開發的環境執行：沒有 DEV_AUTH_KEY_FILE，或同時設了正式的 Clerk、Cloudflare Access，都不寫任何資料。
+// dev-seed 只在本機開發的環境執行：沒有 DEV_AUTH_KEY_FILE，或同時設了 Cloudflare Access，都不寫任何資料。
 func TestDevSeedRefusesAnEnvironmentThatIsNotLocalDevelopment(t *testing.T) {
 	ctx := context.Background()
 	for name, setup := range map[string]func(t *testing.T){
@@ -718,7 +718,6 @@ func TestDevSeedRefusesAnEnvironmentThatIsNotLocalDevelopment(t *testing.T) {
 			}
 			t.Setenv("DEV_AUTH_KEY_FILE", path)
 		},
-		"正式的 Clerk":               func(t *testing.T) { t.Setenv("CLERK_SECRET_KEY", "sk_live_x") },
 		"Cloudflare Access":       func(t *testing.T) { t.Setenv("CF_ACCESS_TEAM_DOMAIN", "example.cloudflareaccess.com") },
 		"Cloudflare Access 的 AUD": func(t *testing.T) { t.Setenv("CF_ACCESS_ADMIN_AUD", "aud") },
 	} {

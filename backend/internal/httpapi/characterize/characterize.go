@@ -6,7 +6,7 @@
 //     這裡的分類。
 //   - REST driver 經單體的入口打舊服務（/api/v1 由單體轉給 gateway，REST 基底），Connect driver 打單體；錯誤各自
 //     以 RESTKind、ConnectKind 對應到同一組分類。
-//   - 身分一律是本機金鑰簽的 dev token（Clerk 形式），以 Bearer 帶（identity.go）：直接打單體的一份（build tag
+//   - 身分一律是本機金鑰簽的 dev token，以 Bearer 帶（identity.go）：直接打單體的一份（build tag
 //     integration，CI 跑）以 DevAuth 產生；經入口的一份（build tag gateway，scripts/characterize.sh 起服務後執行）讀
 //     腳本以 hawkr dev-token 簽的 token（EnvTokens）。
 //

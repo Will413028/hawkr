@@ -64,8 +64,8 @@ func AudienceOf(procedure string) (Audience, bool) {
 
 type principalKey struct{}
 
-// WithPrincipal 把認證過的呼叫者放進 ctx；只有入口的認證中介層呼叫：它以 identity 驗證 Clerk 的 session token（cookie 或
-// Bearer）後放進來（ADR 2026-09-27-identity-clerk）。
+// WithPrincipal 把認證過的呼叫者放進 ctx；只有入口的認證中介層呼叫：它以 identity 驗證 session token（cookie 或
+// Bearer）後放進來（ADR 2026-10-30-identity-self-hosted-federated-login）。
 func WithPrincipal(ctx context.Context, p identity.Principal) context.Context {
 	return context.WithValue(ctx, principalKey{}, p)
 }

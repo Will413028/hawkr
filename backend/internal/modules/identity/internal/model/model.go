@@ -66,27 +66,6 @@ type SessionRef struct {
 // ErrInvalidToken 表示 token 無效：簽章、issuer、audience 或期限不對。其他錯誤表示驗證時 provider 沒有回應。
 var ErrInvalidToken = errors.New("identity：token 無效")
 
-// Clerk 是顧客 Clerk application 的 client。
-type Clerk interface {
-	// Issuer 是這個 application 簽的 session token 的 issuer。
-	Issuer() string
-	// OwnsUser 回傳使用者的 ID 是不是這個 application 發的。
-	OwnsUser(id string) bool
-	// Verify 驗證 session token，回傳使用者的 subject 與建帳資料。token 無效時回傳包著 ErrInvalidToken 的錯誤；其他錯誤表示問不到公鑰。
-	Verify(ctx context.Context, token string) (ClerkIdentity, error)
-	// DeleteUser 刪除使用者。已經不存在時成功。
-	DeleteUser(ctx context.Context, id string) error
-}
-
-// ClerkIdentity 是驗證過的 Clerk session claims。
-type ClerkIdentity struct {
-	Subject string
-	// Email 是 session 的 email claim；沒有時是空字串（例如 LINE 沒有給 email）。
-	Email string
-	// Name 是姓名；沒有時是空字串。
-	Name string
-}
-
 // AdminIdentity 是已驗證的後台身分。email 只供顯示，識別以 subject 為準。
 type AdminIdentity struct {
 	Subject string
@@ -140,9 +119,8 @@ type Sealer interface {
 
 // Providers 是外部的 provider。沒有設定的欄位是 nil 或空的。
 type Providers struct {
-	// Customers 是顧客的 Clerk application；Admin 是後台的 Access 或本機 dev verifier。
-	Customers []Clerk
-	Admin     AdminVerifier
+	// Admin 是後台的 Access 或本機 dev verifier。
+	Admin AdminVerifier
 	// Google 驗證 vendor portal step-up 的 ID token（單體入口的 VerifySession）；nil 時回 unavailable。
 	Google IDTokenVerifier
 	// Apple、AppleTokens 與 Sealer 給 Sign in with Apple 的授權碼交換、保存與刪帳時撤銷（LinkAppleCredential）；
@@ -155,7 +133,7 @@ type Providers struct {
 // Account 是帳號。存活的帳號都是買家；刪除的帳號只留墓碑：沒有 email 與角色。
 type Account struct {
 	ID int64
-	// Email 是建立帳號時 Clerk 回報的已驗證 email；沒有時是空字串。只給後台顯示，不是識別。
+	// Email 是 provider 回報的已驗證 email（登入時更新）；沒有時是空字串。只給後台顯示，不是識別。
 	Email string
 	// Roles 是另外申請的角色，依字母排序。
 	Roles     []Role
@@ -328,15 +306,6 @@ type AccountCreated struct {
 type AccountDeleted struct {
 	AccountID int64
 	DeletedAt time.Time
-}
-
-// ClerkConfig 是一個 Clerk application 的設定。
-type ClerkConfig struct {
-	PublishableKey string
-	SecretKey      string
-	JWTKey         string
-	// AuthorizedParties 是 web 的 origin：web 取得的 token 帶 azp，必須是其中之一。
-	AuthorizedParties []string
 }
 
 // AppleConfig 是 Apple 開發者帳號的 Sign in with Apple 金鑰。

@@ -12,7 +12,6 @@ import (
 
 type IdentityAccount struct {
 	ID                int64
-	ClerkUserID       *string
 	Email             *string
 	SuspendedAt       *time.Time
 	DeletedAt         *time.Time

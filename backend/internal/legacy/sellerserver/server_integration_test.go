@@ -149,7 +149,7 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 	account := func() int64 {
 		var accountID int64
 		for range 3 { // account_id 與 store_id 不同值，互換 ID 的缺陷才藏不住
-			if err := d.Conn(ctx).QueryRow(ctx, "INSERT INTO identity.accounts (clerk_user_id) VALUES ($1) RETURNING id", uuid.NewV7().String()).Scan(&accountID); err != nil {
+			if err := d.Conn(ctx).QueryRow(ctx, "INSERT INTO identity.accounts DEFAULT VALUES RETURNING id").Scan(&accountID); err != nil {
 				t.Fatal(err)
 			}
 		}

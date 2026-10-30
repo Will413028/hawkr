@@ -9,9 +9,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/identity/internal/provider"
 )
 
-// ClerkConfig 是 Clerk application 的設定。
-type ClerkConfig = model.ClerkConfig
-
 // AccessConfig 是後台 Access JWT 驗證的設定。
 type AccessConfig = model.AccessConfig
 
@@ -21,10 +18,7 @@ type AppleConfig = model.AppleConfig
 // DevAuth 是本機的顧客與後台測試登入。
 type DevAuth = provider.DevAuth
 
-const (
-	DevIssuer      = provider.DevIssuer
-	DevAdminIssuer = provider.DevAdminIssuer
-)
+const DevAdminIssuer = provider.DevAdminIssuer
 
 // WebLogin 是一個 provider 的 web 登入（授權網址、換 code、驗 ID token）；WebLoginConfig 是它的設定。
 type (
@@ -44,19 +38,6 @@ type (
 
 // NewAppLogin 建立 Google 或 LINE 的 App 登入驗證；cfg.Provider 指定哪一家。
 func NewAppLogin(cfg AppLoginConfig) (*AppLogin, error) { return provider.NewAppLogin(cfg) }
-
-// NewClerk 建立 Clerk application 的 client。
-func NewClerk(cfg ClerkConfig) (Clerk, error) { return provider.NewClerk(cfg) }
-
-// NewDevClerk 建立接受 dev token 的顧客 application，不連 Clerk。
-func NewDevClerk(key *rsa.PublicKey, now func() time.Time) (Clerk, error) {
-	return provider.NewDevClerk(key, now)
-}
-
-// SignDevToken 以本機金鑰簽 dev token；userID 必須以 dev_ 開頭。
-func SignDevToken(key *rsa.PrivateKey, issuer, userID string, ttl time.Duration, now time.Time) (string, error) {
-	return provider.SignDevToken(key, issuer, userID, ttl, now)
-}
 
 // NewGoogleVerifier 建立 vendor portal step-up 的 Google ID token verifier。
 func NewGoogleVerifier(audiences []string, lifetime ...context.Context) (IDTokenVerifier, error) {

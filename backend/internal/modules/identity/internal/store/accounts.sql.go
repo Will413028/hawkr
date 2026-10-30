@@ -51,7 +51,7 @@ type DeleteAccountParams struct {
 	ID  int64
 }
 
-// 留下沒有個資的墓碑（accounts_deleted_check），clerk_user_id 保留。已經刪除時沒有列被更新（冪等）。
+// 留下沒有個資的墓碑（accounts_deleted_check）。已經刪除時沒有列被更新（冪等）。
 func (q *Queries) DeleteAccount(ctx context.Context, arg DeleteAccountParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteAccount, arg.Now, arg.ID)
 	if err != nil {
@@ -61,7 +61,7 @@ func (q *Queries) DeleteAccount(ctx context.Context, arg DeleteAccountParams) (i
 }
 
 const getAccount = `-- name: GetAccount :one
-SELECT id, clerk_user_id, email, suspended_at, deleted_at, deletion_pending_at, created_at, updated_at FROM identity.accounts WHERE id = $1
+SELECT id, email, suspended_at, deleted_at, deletion_pending_at, created_at, updated_at FROM identity.accounts WHERE id = $1
 `
 
 // 含已刪除的帳號（墓碑）：舊服務要查得到「已刪除」。
@@ -70,7 +70,6 @@ func (q *Queries) GetAccount(ctx context.Context, id int64) (IdentityAccount, er
 	var i IdentityAccount
 	err := row.Scan(
 		&i.ID,
-		&i.ClerkUserID,
 		&i.Email,
 		&i.SuspendedAt,
 		&i.DeletedAt,
@@ -82,7 +81,7 @@ func (q *Queries) GetAccount(ctx context.Context, id int64) (IdentityAccount, er
 }
 
 const getAccounts = `-- name: GetAccounts :many
-SELECT id, clerk_user_id, email, suspended_at, deleted_at, deletion_pending_at, created_at, updated_at FROM identity.accounts WHERE id = ANY($1::bigint[]) ORDER BY id
+SELECT id, email, suspended_at, deleted_at, deletion_pending_at, created_at, updated_at FROM identity.accounts WHERE id = ANY($1::bigint[]) ORDER BY id
 `
 
 func (q *Queries) GetAccounts(ctx context.Context, ids []int64) ([]IdentityAccount, error) {
@@ -96,7 +95,6 @@ func (q *Queries) GetAccounts(ctx context.Context, ids []int64) ([]IdentityAccou
 		var i IdentityAccount
 		if err := rows.Scan(
 			&i.ID,
-			&i.ClerkUserID,
 			&i.Email,
 			&i.SuspendedAt,
 			&i.DeletedAt,
@@ -114,27 +112,6 @@ func (q *Queries) GetAccounts(ctx context.Context, ids []int64) ([]IdentityAccou
 	return items, nil
 }
 
-const insertAccount = `-- name: InsertAccount :one
-INSERT INTO identity.accounts (clerk_user_id, email, created_at, updated_at)
-VALUES ($1, $2, $3, $3)
-ON CONFLICT (clerk_user_id) DO NOTHING
-RETURNING id
-`
-
-type InsertAccountParams struct {
-	ClerkUserID *string
-	Email       *string
-	Now         time.Time
-}
-
-// 第一個認證過的請求時建立帳號。同一個 Clerk 使用者同時的第一個請求由 UNIQUE 收斂：沒有列回傳時呼叫方重讀。
-func (q *Queries) InsertAccount(ctx context.Context, arg InsertAccountParams) (int64, error) {
-	row := q.db.QueryRow(ctx, insertAccount, arg.ClerkUserID, arg.Email, arg.Now)
-	var id int64
-	err := row.Scan(&id)
-	return id, err
-}
-
 const insertFederatedAccount = `-- name: InsertFederatedAccount :one
 INSERT INTO identity.accounts (email, created_at, updated_at)
 VALUES ($1, $2, $2)
@@ -146,7 +123,7 @@ type InsertFederatedAccountParams struct {
 	Now   time.Time
 }
 
-// 自建登入的新帳號：沒有 clerk_user_id。email 是 provider 回報的已驗證 email（沒有時 NULL）。
+// 聯合登入的新帳號。email 是 provider 回報的已驗證 email（沒有時 NULL）。
 func (q *Queries) InsertFederatedAccount(ctx context.Context, arg InsertFederatedAccountParams) (int64, error) {
 	row := q.db.QueryRow(ctx, insertFederatedAccount, arg.Email, arg.Now)
 	var id int64
@@ -155,7 +132,7 @@ func (q *Queries) InsertFederatedAccount(ctx context.Context, arg InsertFederate
 }
 
 const listAccounts = `-- name: ListAccounts :many
-SELECT a.id, a.clerk_user_id, a.email, a.suspended_at, a.deleted_at, a.deletion_pending_at, a.created_at, a.updated_at FROM identity.accounts a
+SELECT a.id, a.email, a.suspended_at, a.deleted_at, a.deletion_pending_at, a.created_at, a.updated_at FROM identity.accounts a
 WHERE a.deleted_at IS NULL
   AND ($1::text = ''
        OR EXISTS (SELECT 1 FROM identity.account_roles r WHERE r.account_id = a.id AND r.role = $1::text))
@@ -202,7 +179,6 @@ func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]I
 		var i IdentityAccount
 		if err := rows.Scan(
 			&i.ID,
-			&i.ClerkUserID,
 			&i.Email,
 			&i.SuspendedAt,
 			&i.DeletedAt,
@@ -221,7 +197,7 @@ func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]I
 }
 
 const lockLiveAccount = `-- name: LockLiveAccount :one
-SELECT id, clerk_user_id, email, suspended_at, deleted_at, deletion_pending_at, created_at, updated_at FROM identity.accounts WHERE id = $1 AND deleted_at IS NULL FOR UPDATE
+SELECT id, email, suspended_at, deleted_at, deletion_pending_at, created_at, updated_at FROM identity.accounts WHERE id = $1 AND deleted_at IS NULL FOR UPDATE
 `
 
 // 鎖住存活的帳號，讓同一個帳號的角色變更、停權與刪除依序執行。
@@ -230,7 +206,6 @@ func (q *Queries) LockLiveAccount(ctx context.Context, id int64) (IdentityAccoun
 	var i IdentityAccount
 	err := row.Scan(
 		&i.ID,
-		&i.ClerkUserID,
 		&i.Email,
 		&i.SuspendedAt,
 		&i.DeletedAt,
@@ -259,33 +234,6 @@ func (q *Queries) MarkDeletionPending(ctx context.Context, arg MarkDeletionPendi
 		return 0, err
 	}
 	return result.RowsAffected(), nil
-}
-
-const resolveAccount = `-- name: ResolveAccount :one
-SELECT a.id, a.suspended_at, a.deleted_at,
-       ARRAY(SELECT r.role FROM identity.account_roles r WHERE r.account_id = a.id ORDER BY r.role)::text[] AS roles
-FROM identity.accounts a
-WHERE a.clerk_user_id = $1
-`
-
-type ResolveAccountRow struct {
-	ID          int64
-	SuspendedAt *time.Time
-	DeletedAt   *time.Time
-	Roles       []string
-}
-
-// 認證：Clerk 使用者對應的帳號、狀態與目前的角色（依字母排序）。含墓碑：刪除的帳號不得再建一個。
-func (q *Queries) ResolveAccount(ctx context.Context, clerkUserID *string) (ResolveAccountRow, error) {
-	row := q.db.QueryRow(ctx, resolveAccount, clerkUserID)
-	var i ResolveAccountRow
-	err := row.Scan(
-		&i.ID,
-		&i.SuspendedAt,
-		&i.DeletedAt,
-		&i.Roles,
-	)
-	return i, err
 }
 
 const suspendAccount = `-- name: SuspendAccount :execrows

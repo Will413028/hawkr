@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"testing"
 	"time"
-	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/gcis"
 
@@ -95,7 +94,7 @@ func TestLoggedInProductViewSucceedsWithoutProductServiceAndIsRolledUpLater(t *t
 	var ids []int64
 	for range 5 {
 		var id int64
-		if err := d.Conn(ctx).QueryRow(ctx, "INSERT INTO identity.accounts (clerk_user_id) VALUES ($1) RETURNING id", uuid.NewV7().String()).Scan(&id); err != nil {
+		if err := d.Conn(ctx).QueryRow(ctx, "INSERT INTO identity.accounts DEFAULT VALUES RETURNING id").Scan(&id); err != nil {
 			t.Fatal(err)
 		}
 		ids = append(ids, id)

@@ -1,17 +1,3 @@
--- name: InsertAccount :one
--- 第一個認證過的請求時建立帳號。同一個 Clerk 使用者同時的第一個請求由 UNIQUE 收斂：沒有列回傳時呼叫方重讀。
-INSERT INTO identity.accounts (clerk_user_id, email, created_at, updated_at)
-VALUES (sqlc.arg(clerk_user_id), sqlc.narg(email), sqlc.arg(now), sqlc.arg(now))
-ON CONFLICT (clerk_user_id) DO NOTHING
-RETURNING id;
-
--- name: ResolveAccount :one
--- 認證：Clerk 使用者對應的帳號、狀態與目前的角色（依字母排序）。含墓碑：刪除的帳號不得再建一個。
-SELECT a.id, a.suspended_at, a.deleted_at,
-       ARRAY(SELECT r.role FROM identity.account_roles r WHERE r.account_id = a.id ORDER BY r.role)::text[] AS roles
-FROM identity.accounts a
-WHERE a.clerk_user_id = $1;
-
 -- name: GetAccount :one
 -- 含已刪除的帳號（墓碑）：舊服務要查得到「已刪除」。
 SELECT * FROM identity.accounts WHERE id = $1;
@@ -36,7 +22,7 @@ SET suspended_at = NULL, updated_at = sqlc.arg(now)::timestamptz
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND suspended_at IS NOT NULL;
 
 -- name: DeleteAccount :execrows
--- 留下沒有個資的墓碑（accounts_deleted_check），clerk_user_id 保留。已經刪除時沒有列被更新（冪等）。
+-- 留下沒有個資的墓碑（accounts_deleted_check）。已經刪除時沒有列被更新（冪等）。
 UPDATE identity.accounts
 SET deleted_at = sqlc.arg(now)::timestamptz, email = NULL, suspended_at = NULL, deletion_pending_at = NULL,
     updated_at = sqlc.arg(now)::timestamptz
@@ -74,7 +60,7 @@ WHERE a.deleted_at IS NULL
   AND (sqlc.arg(email)::text = '' OR lower(a.email) = sqlc.arg(email)::text);
 
 -- name: InsertFederatedAccount :one
--- 自建登入的新帳號：沒有 clerk_user_id。email 是 provider 回報的已驗證 email（沒有時 NULL）。
+-- 聯合登入的新帳號。email 是 provider 回報的已驗證 email（沒有時 NULL）。
 INSERT INTO identity.accounts (email, created_at, updated_at)
 VALUES (sqlc.narg(email), sqlc.arg(now), sqlc.arg(now))
 RETURNING id;

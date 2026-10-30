@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"testing"
 	"time"
-	"uuid"
 
 	"connectrpc.com/connect"
 
@@ -38,7 +37,7 @@ func TestEveryLegacyBuyerRPCReadsTheModule(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	b := buyer.New(buyer.Deps{DB: db, Events: bus, Jobs: queue, Now: time.Now, Logger: log})
 	var accountID int64
-	if err := db.Pool().QueryRow(ctx, "INSERT INTO identity.accounts (clerk_user_id) VALUES ($1) RETURNING id", uuid.NewV7().String()).Scan(&accountID); err != nil {
+	if err := db.Pool().QueryRow(ctx, "INSERT INTO identity.accounts DEFAULT VALUES RETURNING id").Scan(&accountID); err != nil {
 		t.Fatal(err)
 	}
 	if err := b.OnAccountCreated(ctx, identity.AccountCreated{AccountID: accountID, Name: "買家甲"}); err != nil {

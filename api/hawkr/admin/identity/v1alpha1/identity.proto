@@ -86,7 +86,7 @@ message GetAccountResponse {
 // Account 是帳號。
 message Account {
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
-  // 第一次登入時 Clerk 回報的已驗證 email；沒有時是空字串（例如 LINE 沒有給 email）。
+  // 最近一次登入時 provider 回報的已驗證 email（也是寄件地址）；沒有時是空字串（例如 LINE 沒有給 email）。
   string email = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 3 是刪掉的 phone（新帳號不驗證手機）。
   reserved 3;

@@ -15,7 +15,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-	"uuid"
 
 	"github.com/riverqueue/river"
 
@@ -254,7 +253,7 @@ func (f *fixture) account(t *testing.T) int64 {
 	ctx := context.Background()
 	var id int64
 	for range 3 {
-		must(t, f.db.Conn(ctx).QueryRow(ctx, "INSERT INTO identity.accounts (clerk_user_id) VALUES ($1) RETURNING id", uuid.NewV7().String()).Scan(&id))
+		must(t, f.db.Conn(ctx).QueryRow(ctx, "INSERT INTO identity.accounts DEFAULT VALUES RETURNING id").Scan(&id))
 	}
 	return id
 }

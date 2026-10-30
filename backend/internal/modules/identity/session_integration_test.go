@@ -152,7 +152,7 @@ func TestLoginRejectsUnknownProviderAndClient(t *testing.T) {
 }
 
 // 自動連結只在進來的 Google 身分已驗證、是 gmail.com 或帶 hd 時，且恰好一個存活帳號上有符合資格的 Google 身分，其 email 相符。
-// 目標用身分登入建立（existing）；accountOnly 是只有 accounts.email、沒有任何身分的帳號（Clerk 時期的帳號），永遠不是目標。
+// 目標用身分登入建立（existing）；accountOnly 是 accounts.email 有值、但登入身分沒有已驗證 email 的帳號，永遠不是目標。
 func TestAutoLinking(t *testing.T) {
 	t.Parallel()
 	gmailTarget := who{provider: ProviderGoogle, subject: "g0", email: "shared@gmail.com", verified: true}
@@ -204,7 +204,7 @@ func TestAutoLinking(t *testing.T) {
 			}
 			for i, email := range c.accountOnly {
 				user := "user_" + string(rune('a'+i))
-				f.customers.users[user] = ClerkIdentity{Email: email}
+				f.emails[user] = email
 				existing = append(existing, f.account(t, user))
 			}
 			res := f.loginAs(t, c.login, ClientWeb)

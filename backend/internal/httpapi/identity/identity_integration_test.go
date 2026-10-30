@@ -85,7 +85,7 @@ type options struct {
 	legacy http.Handler
 }
 
-// setup 起 identity 與單體的入口，身分用本機金鑰簽的 dev token（與 Clerk 的 session token 同一條認證）。
+// setup 起 identity 與單體的入口，後台的身分用本機金鑰簽的 dev token，顧客的身分是 dev session。
 func setup(t *testing.T, o options) *fixture {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
@@ -101,7 +101,7 @@ func setup(t *testing.T, o options) *fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	providers := identity.Providers{Customers: []identity.Clerk{dev.Customers()}, Admin: dev.Admins()}
+	providers := identity.Providers{Admin: dev.Admins()}
 	if o.access != nil {
 		providers.Admin = o.access
 	}

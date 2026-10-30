@@ -492,12 +492,12 @@ func TestListPublicStoresReadsOnlyStoresWithAnAnnouncedExposure(t *testing.T) {
 	f := setup(t)
 	_, a := f.exposable(t)
 	must(t, func() error {
-		_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO identity.accounts (clerk_user_id) SELECT 'filler-' || g FROM generate_series(1, 250) g`)
+		_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO identity.accounts (email) SELECT 'filler-' || g || '@example.test' FROM generate_series(1, 250) g`)
 		return err
 	}())
 	_, err := f.db.Conn(ctx).Exec(ctx, `
 		INSERT INTO seller.stores (store_code, account_id, store_name, created_at, updated_at)
-		SELECT 3000000000 + row_number() OVER (ORDER BY id), id, 'filler', $1, $1 FROM identity.accounts WHERE clerk_user_id LIKE 'filler-%'`, f.now)
+		SELECT 3000000000 + row_number() OVER (ORDER BY id), id, 'filler', $1, $1 FROM identity.accounts WHERE email LIKE 'filler-%'`, f.now)
 	must(t, err)
 	_, b := f.exposable(t)
 	first := f.listPublic(t, 1, nil)

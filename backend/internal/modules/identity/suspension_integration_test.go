@@ -4,7 +4,6 @@ package identity_test
 
 import (
 	"context"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -207,8 +206,8 @@ func TestDeletingASuspendedAccountReleasesItsRecord(t *testing.T) {
 	}
 	_, _, err := f.m.SuspendAccount(ctx, SuspendInput{AccountID: id, Category: policy.Spam})
 	wantKind(t, err, apperr.KindNotFound)
-	if !slices.Equal(f.jobKinds(t), []string{"identity.clerk_user"}) {
-		t.Fatalf("job = %v", f.jobKinds(t))
+	if kinds := f.jobKinds(t); len(kinds) != 0 {
+		t.Fatalf("job = %v", kinds)
 	}
 }
 

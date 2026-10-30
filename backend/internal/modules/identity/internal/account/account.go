@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/auditreason"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 )
@@ -347,9 +346,9 @@ func (m *Service) DeleteAccount(ctx context.Context, accountID int64) error {
 	})
 }
 
-// deleteAccount 在呼叫方的 transaction 內刪除已鎖定的帳號：解除未解除的停權紀錄（release_reason 為 ACCOUNT_DELETED），刪角色、全部 session 與登入身分，帳號只留沒有個資的墓碑（保留 clerk_user_id，
-// 同一個 Clerk 使用者不會再建一個帳號），有 Clerk 使用者的排入 job 刪除它，並發出 AccountDeleted。帳號保存的 Sign in with Apple
-// refresh token 在同一個 transaction 內取走並排入撤銷的 job（Clerk 不會代為撤銷）；所有刪除路徑都經過這裡。
+// deleteAccount 在呼叫方的 transaction 內刪除已鎖定的帳號：解除未解除的停權紀錄（release_reason 為 ACCOUNT_DELETED），刪角色、全部 session 與登入身分，帳號只留沒有個資的墓碑（登入身分留作墓碑，
+// 同一個登入身分不會再建一個帳號），並發出 AccountDeleted。帳號保存的 Sign in with Apple
+// refresh token 在同一個 transaction 內取走並排入撤銷的 job；所有刪除路徑都經過這裡。
 func (m *Service) deleteAccount(ctx context.Context, q *store.Queries, a store.IdentityAccount) error {
 	now := m.d.Now()
 	if a.SuspendedAt != nil {
@@ -370,11 +369,6 @@ func (m *Service) deleteAccount(ctx context.Context, q *store.Queries, a store.I
 	if err := q.ScrubIdentitiesOfAccount(ctx, store.ScrubIdentitiesOfAccountParams{AccountID: a.ID, Now: now}); err != nil {
 		return fmt.Errorf("identity：清除登入身分的個資：%w", err)
 	}
-	if a.ClerkUserID != nil {
-		if err := m.enqueueClerkUserJob(ctx, clerkUserActionDelete, *a.ClerkUserID); err != nil {
-			return err
-		}
-	}
 	if err := m.d.AppleRevoker.RevokeStored(ctx, a.ID); err != nil {
 		return err
 	}
@@ -383,10 +377,8 @@ func (m *Service) deleteAccount(ctx context.Context, q *store.Queries, a store.I
 }
 
 type Deps struct {
-	DB        *db.DB
-	Events    *events.Bus
-	Jobs      jobs.Enqueuer
-	Customers []model.Clerk
+	DB     *db.DB
+	Events *events.Bus
 	// AppleRevoker 在刪除帳號的 transaction 內排入撤銷保存的 Apple token；必填。
 	AppleRevoker AppleRevoker
 	Now          func() time.Time
@@ -402,51 +394,51 @@ type Service struct{ d Deps }
 
 func New(d Deps) *Service { return &Service{d: d} }
 
-// CreateForClerk 建立首次登入的帳號；並發建立時回傳 created=false。
-func (m *Service) CreateForClerk(ctx context.Context, userID, email, name string) (id int64, created bool, err error) {
-	err = m.d.DB.InTx(ctx, func(ctx context.Context) error {
-		q := m.q(ctx)
-		var insertErr error
-		id, insertErr = q.InsertAccount(ctx, store.InsertAccountParams{ClerkUserID: &userID, Email: nonEmpty(email), Now: m.d.Now()})
-		if errors.Is(insertErr, pgx.ErrNoRows) {
-			return nil
-		}
-		if insertErr != nil {
-			return fmt.Errorf("identity：建立帳號：%w", insertErr)
-		}
-		created = true
-		return events.Publish(ctx, m.d.Events, model.AccountCreated{AccountID: id, Name: name})
-	})
-	return
-}
-
-func nonEmpty(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
-
 func (m *Service) q(ctx context.Context) *store.Queries { return store.New(m.d.DB.Conn(ctx)) }
 
-// EnsureDevAccount 回傳 dev 使用者（user 是 clerk_user_id 的位置，本機 seed 的帳號是 dev_account_<ID>）對應的帳號 ID，沒有時建立
-// （發出 AccountCreated）。只給本機 dev token 與測試；已刪除的帳號回 Unauthenticated。
+// errDevRace 表示並發的呼叫先寫入了同一個 dev 身分；建帳的 transaction 回滾後重讀。
+var errDevRace = errors.New("identity：dev 身分被並發寫入")
+
+// EnsureDevAccount 回傳 dev 使用者（本機 seed 的帳號是 dev_account_<ID>）對應的帳號 ID，沒有時建立
+// （發出 AccountCreated）。dev 使用者以 account_identities 的一列識別，provider 用 GOOGLE、subject 是 dev_ 開頭的使用者 ID
+// （Google 的 sub 是純數字，不會相撞）。只給本機 dev token 與測試；已刪除的帳號回 Unauthenticated。
 func (m *Service) EnsureDevAccount(ctx context.Context, user string) (int64, error) {
-	q := m.q(ctx)
 	for range 2 {
-		row, err := q.ResolveAccount(ctx, &user)
+		ident, err := m.q(ctx).GetIdentity(ctx, store.GetIdentityParams{Provider: string(model.ProviderGoogle), Subject: user})
 		switch {
 		case err == nil:
-			if row.DeletedAt != nil {
+			acct, err := m.q(ctx).GetAccount(ctx, ident.AccountID)
+			if err != nil {
+				return 0, fmt.Errorf("identity：讀取 dev 帳號：%w", err)
+			}
+			if acct.DeletedAt != nil {
 				return 0, apperr.Unauthenticated("dev 帳號 %s 已刪除", user)
 			}
-			return row.ID, nil
+			return acct.ID, nil
 		case !errors.Is(err, pgx.ErrNoRows):
-			return 0, fmt.Errorf("identity：讀取 dev 帳號：%w", err)
+			return 0, fmt.Errorf("identity：讀取 dev 身分：%w", err)
 		}
-		if _, _, err := m.CreateForClerk(ctx, user, user+"@dev.localhost", user); err != nil {
+		if err := m.createDevAccount(ctx, user); err != nil && !errors.Is(err, errDevRace) {
 			return 0, err
 		}
 	}
 	return 0, fmt.Errorf("identity：建立 dev 帳號 %s 後仍讀不到", user)
+}
+
+func (m *Service) createDevAccount(ctx context.Context, user string) error {
+	return m.d.DB.InTx(ctx, func(ctx context.Context) error {
+		q := m.q(ctx)
+		now := m.d.Now()
+		email := user + "@dev.localhost"
+		id, err := q.InsertFederatedAccount(ctx, store.InsertFederatedAccountParams{Email: &email, Now: now})
+		if err != nil {
+			return fmt.Errorf("identity：建立 dev 帳號：%w", err)
+		}
+		if _, err := q.InsertIdentity(ctx, store.InsertIdentityParams{Provider: string(model.ProviderGoogle), Subject: user, AccountID: id, Now: now}); errors.Is(err, pgx.ErrNoRows) {
+			return errDevRace
+		} else if err != nil {
+			return fmt.Errorf("identity：寫入 dev 身分：%w", err)
+		}
+		return events.Publish(ctx, m.d.Events, model.AccountCreated{AccountID: id, Name: user})
+	})
 }

@@ -1,4 +1,4 @@
-h1:ukRdQU/VY/xe5h3BFKiNXn+843qbDXVlahZ7iL8LR5Y=
+h1:V2geqccYfFF814OgiwrmbKd7pccCbIAZxb3YOa7jWUA=
 20260926174906_identity_schema.sql h1:2NM4NjDq422PAHcqToCZHkZY3518aS25tMHbiI9WP20=
 20260926183055_identity_baseline.sql h1:pRO0oKuUx5kr/+hWoYqKk9QzQwMGUDH5OQvxSSAgDeU=
 20260926202602_delegation.sql h1:oOoQcZXPckFs+ZNcju98FsFlwCQKJo+itzZgmgNxPsQ=
@@ -16,3 +16,4 @@ h1:ukRdQU/VY/xe5h3BFKiNXn+843qbDXVlahZ7iL8LR5Y=
 20261029150426_account_suspensions.sql h1:PvJv0L3dZxPqV2FIFrJVlWxXL+UL0ZJoX4ur8GCqRg0=
 20261030124025_identity_sessions.sql h1:VVaKwCono47zEPVX4ji6blaxSCy54aJBymNacg8d+ns=
 20261030130552_identity_auto_link_eligible.sql h1:V4gLQg6N1DoVUCsVPx3lmlaKVs50+FOk6sW4Tror2wM=
+20261030171858_drop_clerk_user_id.sql h1:GDsAWWExcjZurhQjn0VbM4Eh8IuvLv0uk7XVJWfT3LE=

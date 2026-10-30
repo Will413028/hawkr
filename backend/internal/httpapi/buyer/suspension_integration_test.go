@@ -39,17 +39,7 @@ func (f *fixture) relogin(t *testing.T) {
 	f.identity = identityconnect.NewIdentityAppServiceClient(f.http, f.base, clientOptions(tok)...)
 }
 
-func (f *fixture) clerkJobs(t *testing.T) int {
-	t.Helper()
-	var n int
-	if err := f.db.Pool().QueryRow(context.Background(), `SELECT count(*) FROM river.river_job WHERE kind = 'identity.clerk_user'`).Scan(&n); err != nil {
-		t.Fatal(err)
-	}
-	return n
-}
-
-// 停權的帳號仍能登入：GetSession 成功並顯示停權中，讀取成功，公開方法成功，寫入回 ACCOUNT_SUSPENDED；停權不排 Clerk 的 job；
-// 解除之後恢復。
+// 停權的帳號仍能登入：GetSession 成功並顯示停權中，讀取成功，公開方法成功，寫入回 ACCOUNT_SUSPENDED；解除之後恢復。
 func TestSuspendedAccountHasRestrictedAccess(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -79,9 +69,6 @@ func TestSuspendedAccountHasRestrictedAccess(t *testing.T) {
 	wantCode(t, err, connect.CodePermissionDenied, "ACCOUNT_SUSPENDED")
 	_, err = f.app.CreateAddress(ctx, connect.NewRequest(&pb.CreateAddressRequest{Address: address("王小明收件人")}))
 	wantCode(t, err, connect.CodePermissionDenied, "ACCOUNT_SUSPENDED")
-	if n := f.clerkJobs(t); n != 0 {
-		t.Fatalf("停權排了 %d 個 Clerk job", n)
-	}
 
 	if _, _, err := f.id.UnsuspendAccount(ctx, f.accountID, "申覆成立"); err != nil {
 		t.Fatal(err)

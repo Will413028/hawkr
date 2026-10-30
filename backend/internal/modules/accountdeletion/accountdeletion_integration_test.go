@@ -169,7 +169,7 @@ func (f *fixture) accountWithoutBuyer(t *testing.T) int64 {
 	t.Helper()
 	ctx := context.Background()
 	var id int64
-	if err := f.db.Conn(ctx).QueryRow(ctx, "INSERT INTO identity.accounts (clerk_user_id) VALUES ($1) RETURNING id", uuid.NewV7().String()).Scan(&id); err != nil {
+	if err := f.db.Conn(ctx).QueryRow(ctx, "INSERT INTO identity.accounts DEFAULT VALUES RETURNING id").Scan(&id); err != nil {
 		t.Fatal(err)
 	}
 	return id

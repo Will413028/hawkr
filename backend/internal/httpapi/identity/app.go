@@ -1,5 +1,5 @@
 // Package identity 是 identity 模組的 Connect handler：登入的帳號（IdentityAppService）與後台
-// （IdentityAdminService）。登入、登出由 Clerk 處理，認證在入口的中介層（ADR 2026-09-27-identity-clerk）。
+// （IdentityAdminService）。登入、登出由自建的聯合登入處理，認證在入口的中介層（ADR 2026-10-30-identity-self-hosted-federated-login）。
 package identity
 
 import (

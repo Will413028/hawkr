@@ -100,12 +100,12 @@ func TestDevAdminUsesAccessClaims(t *testing.T) {
 	if err != nil || got != (model.AdminIdentity{Subject: "dev_ops", Email: "dev_ops@dev.localhost"}) {
 		t.Fatalf("dev admin = %+v, %v", got, err)
 	}
-	clerkShaped, err := SignDevToken(dev.key, DevAdminIssuer, "dev_ops", time.Hour, time.Now())
+	noAudience, err := signDevToken(dev.key, DevAdminIssuer, "dev_ops", time.Hour, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := dev.Admins().Verify(context.Background(), clerkShaped); !errors.Is(err, model.ErrInvalidToken) {
-		t.Fatalf("Clerk-shaped admin token = %v", err)
+	if _, err := dev.Admins().Verify(context.Background(), noAudience); !errors.Is(err, model.ErrInvalidToken) {
+		t.Fatalf("沒有 audience 的 admin token = %v", err)
 	}
 }
 

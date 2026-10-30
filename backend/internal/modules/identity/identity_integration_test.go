@@ -40,19 +40,10 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// token 是測試的 session token：沒有簽章，只有 Authenticate 選 application 時讀的 iss 與 fakeClerk 讀的 sub。
+// token 是測試的後台 token：沒有簽章，只有 Authenticate 選 application 時讀的 iss 與 fakeAdmin 讀的 sub。
 func token(issuer, sub string) string {
 	b, _ := json.Marshal(map[string]string{"iss": issuer, "sub": sub})
 	return "e30." + base64.RawURLEncoding.EncodeToString(b) + ".sig"
-}
-
-// fakeClerk 是一個 Clerk application：token 的 sub 是 bad 時無效、down 時問不到公鑰；使用者查表，沒有登記的使用者
-// 回傳沒有 email 的資料。
-type fakeClerk struct {
-	issuer  string
-	mu      sync.Mutex
-	users   map[string]ClerkIdentity
-	deleted []string
 }
 
 type fakeAdmin struct {
@@ -78,39 +69,6 @@ func (a *fakeAdmin) Verify(_ context.Context, tok string) (AdminIdentity, error)
 	}
 	u.Subject = claims.Sub
 	return u, nil
-}
-
-func (c *fakeClerk) Issuer() string          { return c.issuer }
-func (c *fakeClerk) OwnsUser(id string) bool { return strings.HasPrefix(id, "user_") }
-
-func (c *fakeClerk) Verify(_ context.Context, tok string) (ClerkIdentity, error) {
-	var claims struct{ Iss, Sub string }
-	parts := strings.Split(tok, ".")
-	if len(parts) != 3 {
-		return ClerkIdentity{}, ErrInvalidToken
-	}
-	raw, _ := base64.RawURLEncoding.DecodeString(parts[1])
-	if json.Unmarshal(raw, &claims) != nil || claims.Iss != c.issuer {
-		return ClerkIdentity{}, ErrInvalidToken
-	}
-	switch claims.Sub {
-	case "bad":
-		return ClerkIdentity{}, errors.Join(errors.New("簽章不符"), ErrInvalidToken)
-	case "down":
-		return ClerkIdentity{}, errors.New("抓不到 JWKS")
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	u := c.users[claims.Sub]
-	u.Subject = claims.Sub
-	return u, nil
-}
-
-func (c *fakeClerk) DeleteUser(_ context.Context, id string) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.deleted = append(c.deleted, id)
-	return nil
 }
 
 // fakeVerifier 以 token 查表回傳 Apple 的身分；"bad" 是無效的 token，"down" 表示 Apple 沒有回應。
@@ -178,17 +136,14 @@ func (fakeSealer) Open(c, aad []byte) ([]byte, error) {
 // Has：fakeSealer 認得金鑰 "k1"（fakeSealer 的密文不帶金鑰 ID，啟動檢查只看資料庫參照的 ID）。
 func (fakeSealer) Has(id string) bool { return id == "k1" }
 
-const (
-	customerIssuer = "https://customers.clerk.test"
-	adminIssuer    = "https://team.cloudflareaccess.test"
-)
+const adminIssuer = "https://team.cloudflareaccess.test"
 
 type fixture struct {
 	m           *Module
 	deps        Deps
 	db          *db.DB
 	now         time.Time
-	customers   *fakeClerk
+	emails      map[string]string // f.account 建帳時用的 email，鍵是使用者（登入身分的 subject）
 	admins      *fakeAdmin
 	apple       *fakeVerifier
 	appleTokens *fakeAppleTokens
@@ -209,7 +164,7 @@ func setup(t *testing.T) *fixture {
 	f := &fixture{
 		db:          d,
 		now:         time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC),
-		customers:   &fakeClerk{issuer: customerIssuer, users: map[string]ClerkIdentity{}},
+		emails:      map[string]string{},
 		admins:      &fakeAdmin{issuer: adminIssuer, users: map[string]AdminIdentity{}},
 		apple:       &fakeVerifier{ids: map[string]Identity{}},
 		appleTokens: &fakeAppleTokens{},
@@ -230,7 +185,7 @@ func setup(t *testing.T) *fixture {
 		Events: bus,
 		Jobs:   jc,
 		Providers: Providers{
-			Customers: []Clerk{f.customers}, Admin: f.admins,
+			Admin: f.admins,
 			Apple: f.apple, AppleTokens: f.appleTokens, Sealer: fakeSealer{},
 		},
 		Now:    func() time.Time { return f.now },
@@ -257,18 +212,22 @@ func wantReason(t *testing.T, err error, want apperr.Reason) {
 
 func ptr[T any](v T) *T { return &v }
 
-// account 直接寫入一個以 Clerk 使用者 user 識別的帳號（Clerk 退場前的舊欄位；email 取自 f.customers.users）。買家不是角色（W5）：
+// account 直接寫入一個帳號與它的登入身分（GOOGLE，subject 是 user；email 取自 f.emails）。買家不是角色（W5）：
 // 建帳之後沒有任何角色。
 func (f *fixture) account(t *testing.T, user string) int64 {
 	t.Helper()
 	var email *string
-	if e := f.customers.users[user].Email; e != "" {
+	if e := f.emails[user]; e != "" {
 		email = &e
 	}
 	var id int64
 	if err := f.db.Pool().QueryRow(context.Background(),
-		`INSERT INTO identity.accounts (clerk_user_id, email, created_at, updated_at) VALUES ($1, $2, $3, $3) RETURNING id`,
-		user, email, f.now).Scan(&id); err != nil {
+		`INSERT INTO identity.accounts (email, created_at, updated_at) VALUES ($1, $2, $2) RETURNING id`, email, f.now).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.Pool().Exec(context.Background(),
+		`INSERT INTO identity.account_identities (provider, subject, account_id, created_at, updated_at) VALUES ('GOOGLE', $1, $2, $3, $3)`,
+		user, id, f.now); err != nil {
 		t.Fatal(err)
 	}
 	return id
@@ -287,11 +246,11 @@ func (f *fixture) sessionToken(t *testing.T, accountID int64) string {
 	return tok
 }
 
-// authenticate 認證 Clerk 使用者 user 的帳號（沒有時建立）：為它寫一個 session 再認證，等於這個帳號帶著 session 打進來。
+// authenticate 認證登入身分 user 的帳號（沒有時建立）：為它寫一個 session 再認證，等於這個帳號帶著 session 打進來。
 func (f *fixture) authenticate(t *testing.T, user string) (Authenticated, error) {
 	t.Helper()
 	var id int64
-	err := f.db.Pool().QueryRow(context.Background(), `SELECT id FROM identity.accounts WHERE clerk_user_id = $1`, user).Scan(&id)
+	err := f.db.Pool().QueryRow(context.Background(), `SELECT account_id FROM identity.account_identities WHERE provider = 'GOOGLE' AND subject = $1`, user).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		id = f.account(t, user)
 	} else if err != nil {
@@ -340,11 +299,6 @@ func lastJobArgs[T any](t *testing.T, f *fixture, kind string) T {
 		t.Fatal(err)
 	}
 	return args
-}
-
-type clerkJobArgs struct {
-	Action      string `json:"action"`
-	ClerkUserID string `json:"clerk_user_id"`
 }
 
 type exchangeAppleCodeJobArgs struct {
@@ -411,11 +365,11 @@ func TestAuthenticationErrors(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	for name, tok := range map[string]string{
-		"沒有 token":    "",
-		"不是 session":  "opaque",
-		"長度對但不存在":     strings.Repeat("A", 43),
-		"顧客的舊 JWT":    token("https://customers.clerk.test", "user_1"),
-		"後台的無效 token": token(adminIssuer, "bad"),
+		"沒有 token":      "",
+		"不是 session":    "opaque",
+		"長度對但不存在":       strings.Repeat("A", 43),
+		"JWT 形式的 token": token("https://customers.example.test", "user_1"),
+		"後台的無效 token":   token(adminIssuer, "bad"),
 	} {
 		_, err := f.m.Authenticate(ctx, tok)
 		if apperr.KindOf(err) != apperr.KindUnauthenticated {
@@ -445,7 +399,7 @@ func TestSuspendedAccountStillAuthenticatesAndCarriesTheSuspensionTime(t *testin
 		t.Fatalf("停權的帳號 = %+v, %v，預期認證成功並帶停權時間 %v", a, err, f.now)
 	}
 	if kinds := f.jobKinds(t); len(kinds) != 0 {
-		t.Fatalf("停權排了 job：%v，停權不停用 Clerk 的使用者", kinds)
+		t.Fatalf("停權排了 job：%v，停權不排任何 job", kinds)
 	}
 	if _, released, err := f.m.UnsuspendAccount(ctx, id, "申覆成立"); err != nil || !released {
 		t.Fatalf("UnsuspendAccount = %v, %v", released, err)
@@ -455,11 +409,11 @@ func TestSuspendedAccountStillAuthenticatesAndCarriesTheSuspensionTime(t *testin
 	}
 }
 
-func TestDeletionLeavesATombstoneAndDeletesTheClerkUser(t *testing.T) {
+func TestDeletionLeavesATombstoneAndKeepsTheLoginIdentity(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	f.customers.users["user_1"] = ClerkIdentity{Email: "alice@example.com"}
+	f.emails["user_1"] = "alice@example.com"
 	id := f.account(t, "user_1")
 	for range 2 { // 冪等
 		if err := f.m.DeleteAccount(ctx, id); err != nil {
@@ -473,15 +427,17 @@ func TestDeletionLeavesATombstoneAndDeletesTheClerkUser(t *testing.T) {
 	if err != nil || !acc.Deleted || acc.Email != "" || len(acc.Roles) != 0 {
 		t.Fatalf("墓碑 = %+v, %v", acc, err)
 	}
-	// 同一個 Clerk 使用者（Clerk 那邊還沒刪掉時）不會再建一個帳號。
+	// 同一個登入身分不會再建一個帳號：身分列留作墓碑。
 	_, err = f.authenticate(t, "user_1")
 	wantKind(t, err, apperr.KindUnauthenticated)
 	if n := f.count(t, `SELECT count(*) FROM identity.accounts`); n != 1 {
 		t.Fatalf("帳號數 = %d", n)
 	}
-	args := lastJobArgs[clerkJobArgs](t, f, "identity.clerk_user")
-	if args != (clerkJobArgs{Action: "delete", ClerkUserID: "user_1"}) {
-		t.Fatalf("刪除 Clerk 的 job = %+v", args)
+	if n := f.count(t, `SELECT count(*) FROM identity.account_identities WHERE provider = 'GOOGLE' AND subject = 'user_1' AND account_id = $1`, id); n != 1 {
+		t.Fatalf("登入身分的墓碑 = %d 列", n)
+	}
+	if kinds := f.jobKinds(t); len(kinds) != 0 {
+		t.Fatalf("刪除排了 job：%v", kinds)
 	}
 	wantKind(t, f.m.DeleteAccount(ctx, 999), apperr.KindNotFound)
 }
@@ -875,7 +831,7 @@ func TestListAccounts(t *testing.T) {
 	var ids []int64
 	for i, email := range []string{"a_1@example.com", "b@example.com", "c@example.com"} {
 		user := "user_" + strconv.Itoa(i)
-		f.customers.users[user] = ClerkIdentity{Email: email}
+		f.emails[user] = email
 		ids = append(ids, f.account(t, user))
 		f.now = f.now.Add(time.Minute)
 	}
@@ -920,7 +876,7 @@ func TestListAccountsByExactEmail(t *testing.T) {
 	var ids []int64
 	for i, email := range []string{"Shop@Example.com", "myshop@example.com", "x_y@example.com", "xzy@example.com"} {
 		user := "user_" + strconv.Itoa(i)
-		f.customers.users[user] = ClerkIdentity{Email: email}
+		f.emails[user] = email
 		ids = append(ids, f.account(t, user))
 		f.now = f.now.Add(time.Minute)
 	}
@@ -961,7 +917,7 @@ func TestListAccountsByID(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	f.customers.users["user_1"] = ClerkIdentity{Email: "x@example.com"}
+	f.emails["user_1"] = "x@example.com"
 	id := f.account(t, "user_1")
 	q := strconv.FormatInt(id, 10)
 	page, err := f.m.ListAccounts(ctx, ListAccountsInput{Filter: AccountFilter{Query: " " + q + " "}, After: nil, Size: 0})
@@ -1010,9 +966,10 @@ func TestDevAuth(t *testing.T) {
 	if err := f.m.DeleteAccount(ctx, a.Principal.ID); err != nil {
 		t.Fatal(err)
 	}
-	args := lastJobArgs[clerkJobArgs](t, f, "identity.clerk_user")
-	if args != (clerkJobArgs{Action: "delete", ClerkUserID: "dev_buyer"}) {
-		t.Fatalf("dev 使用者的 job = %+v", args)
+	_, err = f.m.DevSession(ctx, "dev_buyer")
+	wantKind(t, err, apperr.KindUnauthenticated)
+	if n := f.count(t, `SELECT count(*) FROM identity.accounts`); n != 1 {
+		t.Fatalf("已刪除的 dev 使用者又建了帳號：帳號數 = %d", n)
 	}
 }
 
