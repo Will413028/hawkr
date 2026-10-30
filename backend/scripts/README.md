@@ -77,8 +77,7 @@ DB_PASSWORD=<本機 postgres 密碼> ./scripts/init-databases.sh local
 | 命令 | 說明 |
 |------|------|
 | `make db-init` | 建立所有資料庫（`make db-init-local` 為同一目標；內部呼叫 `./scripts/init-databases.sh local`） |
-| `make atlas-validate-all` | 離線驗證所有 Go 服務的 migration 目錄完整性（`atlas.sum` 與檔案對得上），不需連 DB |
-| `make atlas-validate-staged` | 同上，只驗有 staged `db/` 變更的服務（pre-commit 用） |
+| `make atlas-validate-all` | 離線驗證所有單體模組與舊服務的 migration 目錄完整性（CI：backend-db-proto-checks）（`atlas.sum` 與檔案對得上），不需連 DB |
 
 ## 環境說明
 

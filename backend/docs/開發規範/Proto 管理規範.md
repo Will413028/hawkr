@@ -142,4 +142,4 @@ Proto 的 `string` 要求僅適用於 **gRPC 介面與對外 API**。後端內�
 
 - 既有違規以 `scripts/proto/numeric-allowlist.txt` grandfather；遷移欄位到 `string` 後**刪除對應行**，gate 即保證不回潮。
 - §6.2 例外：`code`（int32）自動豁免；其餘例外請加入 allowlist 並註明原因。
-- 本地手動執行：`make proto-lint-numeric`（目前沒有接進 CI）。
+- 本地手動執行：`make proto-lint-numeric`；CI 在 `backend-db-proto-checks.yml` 跑同一條指令。

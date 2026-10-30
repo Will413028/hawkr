@@ -1,5 +1,5 @@
 .PHONY: build-all test-all vet-all lint-all lint-monolith lint-staged vet-tags-staged lint-fix-all deadcode proto-gen proto-lint proto-lint-numeric \
-	db-init db-init-local atlas-validate-all atlas-validate-staged \
+	db-init db-init-local atlas-validate-all \
 	infra-up infra-down migrate serve worker dev-key dev-token dev-seed dev-seed-check dev-seed-stores reannounce-exposures sqlc jet connect uitext new-module new-characterization
 
 GO_SERVICES := \
@@ -159,36 +159,19 @@ lint-fix-all:
 	done
 	@echo "=== All services fixed ==="
 
-# Validate Atlas migration directory integrity for every Go service (atlas.sum
-# checksums match the actual migration files). Local-only, no DB connection needed.
+# Validate Atlas migration directory integrity for every migration directory
+# (atlas.sum checksums match the actual migration files): monolith modules and
+# legacy services. Local-only, no DB connection needed. CI runs the same loop in
+# .github/workflows/backend-db-proto-checks.yml.
 # Catches: a migration .sql file added/edited without re-running `atlas migrate hash`
-# to update atlas.sum — this passes `go build`/`go test` silently but fails
-# `atlas migrate apply`'s directory integrity check at deploy time (see
-# deploy-k8s.yml's migrate job). Added after this exact gap escaped code review once
-# (notification-service, 2026-07-18) and was only caught by a whole-branch review, not CI.
+# — passes `go build`/`go test` silently but fails when `hawkr migrate` applies it.
 atlas-validate-all:
-	@for svc in $(ATLAS_SERVICES); do \
-		if [ -f "$$svc/db/atlas.hcl" ]; then \
-			echo "=== Validating $$svc migrations ==="; \
-			(cd $$svc/db && atlas migrate validate --dir "file://migrations") || exit 1; \
-		fi; \
+	@for hcl in internal/modules/*/db/atlas.hcl $(addsuffix /db/atlas.hcl,$(ATLAS_SERVICES)); do \
+		dir=$$(dirname $$hcl); \
+		echo "=== Validating $$dir migrations ==="; \
+		(cd $$dir && atlas migrate validate --dir "file://migrations") || exit 1; \
 	done
 	@echo "=== All Atlas migration directories valid ==="
-
-# Validate Atlas migration directory integrity ONLY for services with staged migration/schema files
-atlas-validate-staged:
-	@STAGED_SVCS=$$(git diff --name-only --cached --diff-filter=ACMR | grep -E '^services/[^/]+/db/' | cut -d/ -f1-2 | sort -u); \
-	if [ -z "$$STAGED_SVCS" ]; then \
-		echo "=== No staged DB migrations to validate ==="; \
-	else \
-		for svc in $$STAGED_SVCS; do \
-			if [ -f "$$svc/db/atlas.hcl" ]; then \
-				echo "=== Validating $$svc migrations ==="; \
-				(cd $$svc/db && atlas migrate validate --dir "file://migrations") || exit 1; \
-			fi; \
-		done; \
-		echo "=== All staged Atlas migration directories valid ==="; \
-	fi
 
 # Report unreachable functions across all Go services (call-graph dead code).
 # golangci-lint 的 unused 只做 package 層級；deadcode 做跨 package call-graph 分析。

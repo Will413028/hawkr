@@ -86,13 +86,18 @@ hawkr.buyer.SubscriptionItem.subscribed_at
 hawkr.buyer.SubscriptionListResponse.total
 hawkr.buyer.VisitListResponse.total
 hawkr.buyer.VisitOperationResponse.affected
-hawkr.content.BannerItem.display_order
 hawkr.order.GetSellerOrderStatusCountsResponse.aftersales_count
 hawkr.order.GetSellerOrderStatusCountsResponse.completed_count
 hawkr.order.GetSellerOrderStatusCountsResponse.in_progress_count
 hawkr.order.GetSellerOrderStatusCountsResponse.pending_shipment_count
 hawkr.order.SellerRevenue.order_count
 hawkr.order.SellerRevenue.total_revenue
+# §6.2 #3 exception — ListStoreOrderStats is an internal-only service-to-service RPC
+# (discovery 的店家排序取數)；計數欄位是小整數（天數上限 90 內的店家訂單數），不經任何 HTTP 回應，
+# 也不是 ID，沒有 2^53 精度問題。NOT Track-1 backlog。
+hawkr.order.StoreOrderStats.distinct_buyers
+hawkr.order.StoreOrderStats.qualifying_orders
+hawkr.order.StoreOrderStats.seller_cancelled_orders
 hawkr.review.OrderReviewInfo.rating
 hawkr.review.ProductReviewsResponse.page
 hawkr.review.ProductReviewsResponse.page_size

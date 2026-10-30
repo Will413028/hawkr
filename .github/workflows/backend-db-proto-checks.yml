@@ -1,0 +1,95 @@
+name: backend db proto checks
+
+# 刪除 backend lefthook 時沒有對應 CI 的兩項檢查：
+#   (1) Atlas migration 目錄完整性：每個 migration 目錄的 atlas.sum 要和 .sql 檔一致。
+#       改了或新增 .sql 卻沒重跑 `atlas migrate hash`，go build／go test 都不會發現，
+#       要到 `hawkr migrate` 套用時才失敗。涵蓋單體模組（internal/modules/*/db）與
+#       還沒退場的舊服務（services/*/db）。不連資料庫。
+#   (2) protonumericlint：舊 proto 樹（backend/api/proto，Proto 管理規範 §6）對外暴露的欄位
+#       不得是 int64／int32／double；既有違規由 backend/scripts/proto/numeric-allowlist.txt
+#       grandfather，清單裡已不違規的行也會失敗（棘輪）。
+#       對外 API 的 proto 在根目錄 api/，由 api-contract.yml 的 buf lint／breaking 守，與這條無關。
+# 不跑 `atlas migrate lint`：它要連 dev database，進階的破壞性變更分析也屬 Atlas 付費功能；
+# Makefile 與文件從來沒有用過它，沒有要補的對應。
+#
+# Atlas CLI 版本與下載雜湊釘死在本檔；升版時兩邊一起改，且版本要發佈滿兩週（見根目錄 AGENTS.md）。
+
+on:
+  pull_request:
+    paths: &db_proto_paths
+      - 'backend/internal/modules/*/db/**'
+      - 'backend/services/*/db/**'
+      - 'backend/api/proto/**'
+      - 'backend/scripts/proto/numeric-allowlist.txt'
+      - 'backend/pkg/cmd/protonumericlint/**'
+      - 'backend/go.work'
+      - 'backend/.go-version'
+      - 'api/.buf-version'
+      - '.github/workflows/backend-db-proto-checks.yml'
+  push:
+    branches: [main]
+    paths: *db_proto_paths
+  workflow_dispatch:
+
+concurrency:
+  group: backend-db-proto-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  atlas-validate:
+    name: Atlas migration 目錄完整性
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - name: 安裝 Atlas v1.3.3（驗證雜湊）
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/atlas" https://release.ariga.io/atlas/atlas-linux-amd64-v1.3.3
+          echo "a41ea66b5aaad1e363fd829613a6725c3934378792d0be5591269c041c112b96  $RUNNER_TEMP/atlas" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/atlas"
+      # 每個有 atlas.hcl 的 db 目錄都驗；找不到任何目錄也算失敗，避免路徑改了之後變成空轉。
+      - name: atlas migrate validate
+        working-directory: backend
+        env:
+          ATLAS_NO_UPDATE_NOTIFIER: '1'
+        run: |
+          set -euo pipefail
+          count=0
+          for hcl in internal/modules/*/db/atlas.hcl services/*/db/atlas.hcl; do
+            dir=$(dirname "$hcl")
+            echo "=== $dir ==="
+            (cd "$dir" && "$RUNNER_TEMP/atlas" migrate validate --dir file://migrations)
+            count=$((count + 1))
+          done
+          echo "validated $count migration directories"
+          test "$count" -gt 0
+
+  proto-numeric:
+    name: protonumericlint（舊 proto 樹）
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - name: 讀取 buf 的版本
+        id: buf
+        run: echo "version=$(cat api/.buf-version)" >> "$GITHUB_OUTPUT"
+      - uses: bufbuild/buf-action@85aebf73123b5c15fd5528aaecbf9129cddf7fa7 # v1.6.0
+        with:
+          version: ${{ steps.buf.outputs.version }}
+          setup_only: true
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: backend/.go-version
+          cache-dependency-path: backend/**/go.sum
+      # 與 Makefile 的 proto-lint-numeric 同一條指令；pkg/cmd/protonumericlint 屬 go.work 的 go-pkg module。
+      - name: protonumericlint
+        working-directory: backend
+        run: make proto-lint-numeric
