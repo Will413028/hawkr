@@ -6,7 +6,7 @@ export const SELLER_AGREEMENTS = {
 		url: "/seller-terms",
 	},
 	KYC_PRIVACY_NOTICE: {
-		version: "2026-10-25",
+		version: "2026-10-30",
 		url: "/privacy#seller-kyc-notice",
 	},
 	PAYUNI_TERMS: {

@@ -20,7 +20,7 @@ export default function PrivacyPage() {
 			solidCards
 			title="隱私政策"
 			enTitle="Privacy Policy"
-			lastUpdated="2026-10-25"
+			lastUpdated="2026-10-30"
 			description="本站是作品集的示範專案，不收集、不處理真實的個人資料，本頁只用來展示隱私政策的版面。"
 			sections={[
 				{

@@ -9,7 +9,7 @@ var CurrentAgreements = map[AgreementKind]Agreement{
 		URL:     "/seller-terms",
 	},
 	"KYC_PRIVACY_NOTICE": {
-		Version: "2026-10-25",
+		Version: "2026-10-30",
 		URL:     "/privacy#seller-kyc-notice",
 	},
 	"PAYUNI_TERMS": {
