@@ -828,3 +828,44 @@ func TestSessionTokensComeOnlyFromLogin(t *testing.T) {
 		}
 	}
 }
+
+func TestListLinkedIdentitiesReturnsOnlyTheAccountsOwn(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	a := f.loginAs(t, googleAlice, ClientWeb)
+	b := f.loginAs(t, lineBob, ClientWeb)
+	f.now = f.now.Add(time.Minute)
+	if err := f.m.LinkIdentity(ctx, a.AccountID, who{provider: ProviderLine, subject: "line-alice"}.identity()); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := f.m.ListLinkedIdentities(ctx, a.AccountID)
+	if err != nil || len(got) != 2 || got[0].Provider != ProviderGoogle || got[1].Provider != ProviderLine || !got[1].LinkedAt.After(got[0].LinkedAt) {
+		t.Fatalf("alice = %+v, %v，預期 Google 與 LINE 各一筆，連結時間舊到新", got, err)
+	}
+	// 別帳號的身分不回。
+	other, err := f.m.ListLinkedIdentities(ctx, b.AccountID)
+	if err != nil || len(other) != 1 || other[0].Provider != ProviderLine {
+		t.Fatalf("bob = %+v, %v，預期只有自己的 LINE", other, err)
+	}
+	none, err := f.m.ListLinkedIdentities(ctx, 9999)
+	if err != nil || len(none) != 0 {
+		t.Fatalf("不存在的帳號 = %+v, %v，預期空", none, err)
+	}
+}
+
+// schema 沒有 (account_id, provider) 唯一約束：同一帳號連兩個 Google 身分時兩筆都回。
+func TestListLinkedIdentitiesReturnsTwoIdentitiesOfTheSameProvider(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	a := f.loginAs(t, googleAlice, ClientWeb)
+	if err := f.m.LinkIdentity(ctx, a.AccountID, who{provider: ProviderGoogle, subject: "google-alice-2", email: "alice2@example.com"}.identity()); err != nil {
+		t.Fatal(err)
+	}
+	got, err := f.m.ListLinkedIdentities(ctx, a.AccountID)
+	if err != nil || len(got) != 2 || got[0].Provider != ProviderGoogle || got[1].Provider != ProviderGoogle {
+		t.Fatalf("alice = %+v, %v，預期兩筆 Google", got, err)
+	}
+}

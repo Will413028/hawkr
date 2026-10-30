@@ -432,6 +432,12 @@ type SessionInfo struct {
 	AuthTime time.Time
 }
 
+// LinkedIdentity 是帳號已連結的一個登入身分（沒有 subject 與 email）。同一 provider 可能有多筆。
+type LinkedIdentity struct {
+	Provider Provider
+	LinkedAt time.Time
+}
+
 // LoginFlowInput 是 web 登入流程 start 的輸入。
 type LoginFlowInput struct {
 	Provider   Provider

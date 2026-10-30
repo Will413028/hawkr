@@ -24,7 +24,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/identity/v1alpha1/identity.proto.
  */
 export const file_hawkr_identity_v1alpha1_identity: GenFile = /*@__PURE__*/
-  fileDesc("CiZoYXdrci9pZGVudGl0eS92MWFscGhhMS9pZGVudGl0eS5wcm90bxIXaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEieQoHQWNjb3VudBIPCgJpZBgBIAEoCUID4EEIEjEKBXJvbGVzGAIgAygOMh0uaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuUm9sZUID4EEDSgQIAxAESgQIBBAFSgQIBRAGUgthY3RpdmVfcm9sZVILcGVyc3BlY3RpdmUiGwoZSXNzdWVBcHBMb2dpbk5vbmNlUmVxdWVzdCJmChpJc3N1ZUFwcExvZ2luTm9uY2VSZXNwb25zZRISCgVub25jZRgBIAEoCUID4EEDEjQKC2V4cGlyZV90aW1lGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDIoIBChZFeGNoYW5nZUlkVG9rZW5SZXF1ZXN0Ej0KCHByb3ZpZGVyGAEgASgOMiYuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTG9naW5Qcm92aWRlckID4EECEhUKCGlkX3Rva2VuGAIgASgJQgPgQQISEgoFbm9uY2UYAyABKAlCA+BBAiKqAQoXRXhjaGFuZ2VJZFRva2VuUmVzcG9uc2USGgoNc2Vzc2lvbl90b2tlbhgBIAEoCUID4EEDEj0KFGFic29sdXRlX2V4cGlyZV90aW1lGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEjQKDGlkbGVfdGltZW91dBgDIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkID4EEDIhAKDlNpZ25PdXRSZXF1ZXN0IhEKD1NpZ25PdXRSZXNwb25zZSJ/ChNMaW5rSWRlbnRpdHlSZXF1ZXN0Ej0KCHByb3ZpZGVyGAEgASgOMiYuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTG9naW5Qcm92aWRlckID4EECEhUKCGlkX3Rva2VuGAIgASgJQgPgQQISEgoFbm9uY2UYAyABKAlCA+BBAiIWChRMaW5rSWRlbnRpdHlSZXNwb25zZSI8ChNMaXN0U2Vzc2lvbnNSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJImgKFExpc3RTZXNzaW9uc1Jlc3BvbnNlEjcKCHNlc3Npb25zGAEgAygLMiUuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTG9naW5TZXNzaW9uEhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSIvChRSZXZva2VTZXNzaW9uUmVxdWVzdBIXCgpzZXNzaW9uX2lkGAEgASgJQgPgQQIiFwoVUmV2b2tlU2Vzc2lvblJlc3BvbnNlIuIBCgxMb2dpblNlc3Npb24SDwoCaWQYASABKAlCA+BBCBI9CgtjbGllbnRfa2luZBgCIAEoDjIjLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkNsaWVudEtpbmRCA+BBAxI0CgtjcmVhdGVfdGltZRgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxI2Cg1sYXN0X3VzZV90aW1lGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEhQKB2N1cnJlbnQYBSABKAhCA+BBAyITChFHZXRTZXNzaW9uUmVxdWVzdCKLAQoSR2V0U2Vzc2lvblJlc3BvbnNlEjEKB2FjY291bnQYAiABKAsyIC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5BY2NvdW50EjwKCnN1c3BlbnNpb24YAyABKAsyIy5oYXdrci5pZGVudGl0eS52MWFscGhhMS5TdXNwZW5zaW9uQgPgQQNKBAgBEAIiQwoKU3VzcGVuc2lvbhI1CgxzdXNwZW5kZWRfYXQYASABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMiVAoaTGlua0FwcGxlQ3JlZGVudGlhbFJlcXVlc3QSFQoIaWRfdG9rZW4YASABKAlCA+BBAhIfChJhdXRob3JpemF0aW9uX2NvZGUYAiABKAlCA+BBAiIdChtMaW5rQXBwbGVDcmVkZW50aWFsUmVzcG9uc2UiFgoURGVsZXRlQWNjb3VudFJlcXVlc3Qi1AEKFURlbGV0ZUFjY291bnRSZXNwb25zZRJLCgVzdGF0ZRgBIAEoDjI8Lmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkRlbGV0ZUFjY291bnRSZXNwb25zZS5EZWxldGlvblN0YXRlIm4KDURlbGV0aW9uU3RhdGUSHgoaREVMRVRJT05fU1RBVEVfVU5TUEVDSUZJRUQQABIaChZERUxFVElPTl9TVEFURV9ERUxFVEVEEAESIQodREVMRVRJT05fU1RBVEVfUEVORElOR19PUkRFUlMQAio/CgRSb2xlEhQKEFJPTEVfVU5TUEVDSUZJRUQQABIPCgtST0xFX1NFTExFUhACIgQIARABKgpST0xFX0JVWUVSKmMKDUxvZ2luUHJvdmlkZXISHgoaTE9HSU5fUFJPVklERVJfVU5TUEVDSUZJRUQQABIZChVMT0dJTl9QUk9WSURFUl9HT09HTEUQARIXChNMT0dJTl9QUk9WSURFUl9MSU5FEAIqUwoKQ2xpZW50S2luZBIbChdDTElFTlRfS0lORF9VTlNQRUNJRklFRBAAEhMKD0NMSUVOVF9LSU5EX1dFQhABEhMKD0NMSUVOVF9LSU5EX0FQUBACMowCChVJZGVudGl0eVB1YmxpY1NlcnZpY2USfQoSSXNzdWVBcHBMb2dpbk5vbmNlEjIuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuSXNzdWVBcHBMb2dpbk5vbmNlUmVxdWVzdBozLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLklzc3VlQXBwTG9naW5Ob25jZVJlc3BvbnNlEnQKD0V4Y2hhbmdlSWRUb2tlbhIvLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkV4Y2hhbmdlSWRUb2tlblJlcXVlc3QaMC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5FeGNoYW5nZUlkVG9rZW5SZXNwb25zZTKlBgoSSWRlbnRpdHlBcHBTZXJ2aWNlEmoKCkdldFNlc3Npb24SKi5oYXdrci5pZGVudGl0eS52MWFscGhhMS5HZXRTZXNzaW9uUmVxdWVzdBorLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkdldFNlc3Npb25SZXNwb25zZSIDkAIBEoUBChNMaW5rQXBwbGVDcmVkZW50aWFsEjMuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTGlua0FwcGxlQ3JlZGVudGlhbFJlcXVlc3QaNC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5MaW5rQXBwbGVDcmVkZW50aWFsUmVzcG9uc2UiA5ACAhJcCgdTaWduT3V0EicuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuU2lnbk91dFJlcXVlc3QaKC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5TaWduT3V0UmVzcG9uc2USawoMTGlua0lkZW50aXR5EiwuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTGlua0lkZW50aXR5UmVxdWVzdBotLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkxpbmtJZGVudGl0eVJlc3BvbnNlEnAKDExpc3RTZXNzaW9ucxIsLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkxpc3RTZXNzaW9uc1JlcXVlc3QaLS5oYXdrci5pZGVudGl0eS52MWFscGhhMS5MaXN0U2Vzc2lvbnNSZXNwb25zZSIDkAIBEm4KDVJldm9rZVNlc3Npb24SLS5oYXdrci5pZGVudGl0eS52MWFscGhhMS5SZXZva2VTZXNzaW9uUmVxdWVzdBouLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLlJldm9rZVNlc3Npb25SZXNwb25zZRJuCg1EZWxldGVBY2NvdW50Ei0uaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuRGVsZXRlQWNjb3VudFJlcXVlc3QaLi5oYXdrci5pZGVudGl0eS52MWFscGhhMS5EZWxldGVBY2NvdW50UmVzcG9uc2ViBnByb3RvMw", [file_google_api_field_behavior, file_google_protobuf_duration, file_google_protobuf_timestamp]);
+  fileDesc("CiZoYXdrci9pZGVudGl0eS92MWFscGhhMS9pZGVudGl0eS5wcm90bxIXaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEieQoHQWNjb3VudBIPCgJpZBgBIAEoCUID4EEIEjEKBXJvbGVzGAIgAygOMh0uaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuUm9sZUID4EEDSgQIAxAESgQIBBAFSgQIBRAGUgthY3RpdmVfcm9sZVILcGVyc3BlY3RpdmUiGwoZSXNzdWVBcHBMb2dpbk5vbmNlUmVxdWVzdCJmChpJc3N1ZUFwcExvZ2luTm9uY2VSZXNwb25zZRISCgVub25jZRgBIAEoCUID4EEDEjQKC2V4cGlyZV90aW1lGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDIoIBChZFeGNoYW5nZUlkVG9rZW5SZXF1ZXN0Ej0KCHByb3ZpZGVyGAEgASgOMiYuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTG9naW5Qcm92aWRlckID4EECEhUKCGlkX3Rva2VuGAIgASgJQgPgQQISEgoFbm9uY2UYAyABKAlCA+BBAiKqAQoXRXhjaGFuZ2VJZFRva2VuUmVzcG9uc2USGgoNc2Vzc2lvbl90b2tlbhgBIAEoCUID4EEDEj0KFGFic29sdXRlX2V4cGlyZV90aW1lGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEjQKDGlkbGVfdGltZW91dBgDIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkID4EEDIhAKDlNpZ25PdXRSZXF1ZXN0IhEKD1NpZ25PdXRSZXNwb25zZSJ/ChNMaW5rSWRlbnRpdHlSZXF1ZXN0Ej0KCHByb3ZpZGVyGAEgASgOMiYuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTG9naW5Qcm92aWRlckID4EECEhUKCGlkX3Rva2VuGAIgASgJQgPgQQISEgoFbm9uY2UYAyABKAlCA+BBAiIWChRMaW5rSWRlbnRpdHlSZXNwb25zZSI8ChNMaXN0U2Vzc2lvbnNSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJImgKFExpc3RTZXNzaW9uc1Jlc3BvbnNlEjcKCHNlc3Npb25zGAEgAygLMiUuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTG9naW5TZXNzaW9uEhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSIdChtMaXN0TGlua2VkSWRlbnRpdGllc1JlcXVlc3QiWwocTGlzdExpbmtlZElkZW50aXRpZXNSZXNwb25zZRI7CgppZGVudGl0aWVzGAEgAygLMicuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTGlua2VkSWRlbnRpdHkigwEKDkxpbmtlZElkZW50aXR5Ej0KCHByb3ZpZGVyGAEgASgOMiYuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTG9naW5Qcm92aWRlckID4EEDEjIKCWxpbmtfdGltZRgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAyIvChRSZXZva2VTZXNzaW9uUmVxdWVzdBIXCgpzZXNzaW9uX2lkGAEgASgJQgPgQQIiFwoVUmV2b2tlU2Vzc2lvblJlc3BvbnNlIuIBCgxMb2dpblNlc3Npb24SDwoCaWQYASABKAlCA+BBCBI9CgtjbGllbnRfa2luZBgCIAEoDjIjLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkNsaWVudEtpbmRCA+BBAxI0CgtjcmVhdGVfdGltZRgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxI2Cg1sYXN0X3VzZV90aW1lGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEhQKB2N1cnJlbnQYBSABKAhCA+BBAyITChFHZXRTZXNzaW9uUmVxdWVzdCKLAQoSR2V0U2Vzc2lvblJlc3BvbnNlEjEKB2FjY291bnQYAiABKAsyIC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5BY2NvdW50EjwKCnN1c3BlbnNpb24YAyABKAsyIy5oYXdrci5pZGVudGl0eS52MWFscGhhMS5TdXNwZW5zaW9uQgPgQQNKBAgBEAIiQwoKU3VzcGVuc2lvbhI1CgxzdXNwZW5kZWRfYXQYASABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMiVAoaTGlua0FwcGxlQ3JlZGVudGlhbFJlcXVlc3QSFQoIaWRfdG9rZW4YASABKAlCA+BBAhIfChJhdXRob3JpemF0aW9uX2NvZGUYAiABKAlCA+BBAiIdChtMaW5rQXBwbGVDcmVkZW50aWFsUmVzcG9uc2UiFgoURGVsZXRlQWNjb3VudFJlcXVlc3Qi1AEKFURlbGV0ZUFjY291bnRSZXNwb25zZRJLCgVzdGF0ZRgBIAEoDjI8Lmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkRlbGV0ZUFjY291bnRSZXNwb25zZS5EZWxldGlvblN0YXRlIm4KDURlbGV0aW9uU3RhdGUSHgoaREVMRVRJT05fU1RBVEVfVU5TUEVDSUZJRUQQABIaChZERUxFVElPTl9TVEFURV9ERUxFVEVEEAESIQodREVMRVRJT05fU1RBVEVfUEVORElOR19PUkRFUlMQAio/CgRSb2xlEhQKEFJPTEVfVU5TUEVDSUZJRUQQABIPCgtST0xFX1NFTExFUhACIgQIARABKgpST0xFX0JVWUVSKmMKDUxvZ2luUHJvdmlkZXISHgoaTE9HSU5fUFJPVklERVJfVU5TUEVDSUZJRUQQABIZChVMT0dJTl9QUk9WSURFUl9HT09HTEUQARIXChNMT0dJTl9QUk9WSURFUl9MSU5FEAIqUwoKQ2xpZW50S2luZBIbChdDTElFTlRfS0lORF9VTlNQRUNJRklFRBAAEhMKD0NMSUVOVF9LSU5EX1dFQhABEhMKD0NMSUVOVF9LSU5EX0FQUBACMowCChVJZGVudGl0eVB1YmxpY1NlcnZpY2USfQoSSXNzdWVBcHBMb2dpbk5vbmNlEjIuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuSXNzdWVBcHBMb2dpbk5vbmNlUmVxdWVzdBozLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLklzc3VlQXBwTG9naW5Ob25jZVJlc3BvbnNlEnQKD0V4Y2hhbmdlSWRUb2tlbhIvLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkV4Y2hhbmdlSWRUb2tlblJlcXVlc3QaMC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5FeGNoYW5nZUlkVG9rZW5SZXNwb25zZTKwBwoSSWRlbnRpdHlBcHBTZXJ2aWNlEmoKCkdldFNlc3Npb24SKi5oYXdrci5pZGVudGl0eS52MWFscGhhMS5HZXRTZXNzaW9uUmVxdWVzdBorLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkdldFNlc3Npb25SZXNwb25zZSIDkAIBEoUBChNMaW5rQXBwbGVDcmVkZW50aWFsEjMuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTGlua0FwcGxlQ3JlZGVudGlhbFJlcXVlc3QaNC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5MaW5rQXBwbGVDcmVkZW50aWFsUmVzcG9uc2UiA5ACAhJcCgdTaWduT3V0EicuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuU2lnbk91dFJlcXVlc3QaKC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5TaWduT3V0UmVzcG9uc2USawoMTGlua0lkZW50aXR5EiwuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTGlua0lkZW50aXR5UmVxdWVzdBotLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkxpbmtJZGVudGl0eVJlc3BvbnNlEnAKDExpc3RTZXNzaW9ucxIsLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkxpc3RTZXNzaW9uc1JlcXVlc3QaLS5oYXdrci5pZGVudGl0eS52MWFscGhhMS5MaXN0U2Vzc2lvbnNSZXNwb25zZSIDkAIBEogBChRMaXN0TGlua2VkSWRlbnRpdGllcxI0Lmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkxpc3RMaW5rZWRJZGVudGl0aWVzUmVxdWVzdBo1Lmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkxpc3RMaW5rZWRJZGVudGl0aWVzUmVzcG9uc2UiA5ACARJuCg1SZXZva2VTZXNzaW9uEi0uaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuUmV2b2tlU2Vzc2lvblJlcXVlc3QaLi5oYXdrci5pZGVudGl0eS52MWFscGhhMS5SZXZva2VTZXNzaW9uUmVzcG9uc2USbgoNRGVsZXRlQWNjb3VudBItLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkRlbGV0ZUFjY291bnRSZXF1ZXN0Gi4uaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuRGVsZXRlQWNjb3VudFJlc3BvbnNlYgZwcm90bzM", [file_google_api_field_behavior, file_google_protobuf_duration, file_google_protobuf_timestamp]);
 
 /**
  * Account 是登入的帳號。
@@ -268,6 +268,62 @@ export const ListSessionsResponseSchema: GenMessage<ListSessionsResponse> = /*@_
   messageDesc(file_hawkr_identity_v1alpha1_identity, 10);
 
 /**
+ * @generated from message hawkr.identity.v1alpha1.ListLinkedIdentitiesRequest
+ */
+export type ListLinkedIdentitiesRequest = Message<"hawkr.identity.v1alpha1.ListLinkedIdentitiesRequest"> & {
+};
+
+/**
+ * Describes the message hawkr.identity.v1alpha1.ListLinkedIdentitiesRequest.
+ * Use `create(ListLinkedIdentitiesRequestSchema)` to create a new message.
+ */
+export const ListLinkedIdentitiesRequestSchema: GenMessage<ListLinkedIdentitiesRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 11);
+
+/**
+ * @generated from message hawkr.identity.v1alpha1.ListLinkedIdentitiesResponse
+ */
+export type ListLinkedIdentitiesResponse = Message<"hawkr.identity.v1alpha1.ListLinkedIdentitiesResponse"> & {
+  /**
+   * 連結時間舊到新；不分頁。
+   *
+   * @generated from field: repeated hawkr.identity.v1alpha1.LinkedIdentity identities = 1;
+   */
+  identities: LinkedIdentity[];
+};
+
+/**
+ * Describes the message hawkr.identity.v1alpha1.ListLinkedIdentitiesResponse.
+ * Use `create(ListLinkedIdentitiesResponseSchema)` to create a new message.
+ */
+export const ListLinkedIdentitiesResponseSchema: GenMessage<ListLinkedIdentitiesResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 12);
+
+/**
+ * LinkedIdentity 是帳號已連結的一個登入身分。
+ *
+ * @generated from message hawkr.identity.v1alpha1.LinkedIdentity
+ */
+export type LinkedIdentity = Message<"hawkr.identity.v1alpha1.LinkedIdentity"> & {
+  /**
+   * @generated from field: hawkr.identity.v1alpha1.LoginProvider provider = 1;
+   */
+  provider: LoginProvider;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp link_time = 2;
+   */
+  linkTime?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message hawkr.identity.v1alpha1.LinkedIdentity.
+ * Use `create(LinkedIdentitySchema)` to create a new message.
+ */
+export const LinkedIdentitySchema: GenMessage<LinkedIdentity> = /*@__PURE__*/
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 13);
+
+/**
  * @generated from message hawkr.identity.v1alpha1.RevokeSessionRequest
  */
 export type RevokeSessionRequest = Message<"hawkr.identity.v1alpha1.RevokeSessionRequest"> & {
@@ -282,7 +338,7 @@ export type RevokeSessionRequest = Message<"hawkr.identity.v1alpha1.RevokeSessio
  * Use `create(RevokeSessionRequestSchema)` to create a new message.
  */
 export const RevokeSessionRequestSchema: GenMessage<RevokeSessionRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_identity_v1alpha1_identity, 11);
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 14);
 
 /**
  * @generated from message hawkr.identity.v1alpha1.RevokeSessionResponse
@@ -295,7 +351,7 @@ export type RevokeSessionResponse = Message<"hawkr.identity.v1alpha1.RevokeSessi
  * Use `create(RevokeSessionResponseSchema)` to create a new message.
  */
 export const RevokeSessionResponseSchema: GenMessage<RevokeSessionResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_identity_v1alpha1_identity, 12);
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 15);
 
 /**
  * LoginSession 是帳號的一個登入中的 session。id 不是憑證：token 不會出現在任何回應（除了建立它的那一次）。
@@ -338,7 +394,7 @@ export type LoginSession = Message<"hawkr.identity.v1alpha1.LoginSession"> & {
  * Use `create(LoginSessionSchema)` to create a new message.
  */
 export const LoginSessionSchema: GenMessage<LoginSession> = /*@__PURE__*/
-  messageDesc(file_hawkr_identity_v1alpha1_identity, 13);
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 16);
 
 /**
  * @generated from message hawkr.identity.v1alpha1.GetSessionRequest
@@ -351,7 +407,7 @@ export type GetSessionRequest = Message<"hawkr.identity.v1alpha1.GetSessionReque
  * Use `create(GetSessionRequestSchema)` to create a new message.
  */
 export const GetSessionRequestSchema: GenMessage<GetSessionRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_identity_v1alpha1_identity, 14);
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 17);
 
 /**
  * @generated from message hawkr.identity.v1alpha1.GetSessionResponse
@@ -376,7 +432,7 @@ export type GetSessionResponse = Message<"hawkr.identity.v1alpha1.GetSessionResp
  * Use `create(GetSessionResponseSchema)` to create a new message.
  */
 export const GetSessionResponseSchema: GenMessage<GetSessionResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_identity_v1alpha1_identity, 15);
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 18);
 
 /**
  * Suspension 是帳號的停權狀態。
@@ -397,7 +453,7 @@ export type Suspension = Message<"hawkr.identity.v1alpha1.Suspension"> & {
  * Use `create(SuspensionSchema)` to create a new message.
  */
 export const SuspensionSchema: GenMessage<Suspension> = /*@__PURE__*/
-  messageDesc(file_hawkr_identity_v1alpha1_identity, 16);
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 19);
 
 /**
  * @generated from message hawkr.identity.v1alpha1.LinkAppleCredentialRequest
@@ -423,7 +479,7 @@ export type LinkAppleCredentialRequest = Message<"hawkr.identity.v1alpha1.LinkAp
  * Use `create(LinkAppleCredentialRequestSchema)` to create a new message.
  */
 export const LinkAppleCredentialRequestSchema: GenMessage<LinkAppleCredentialRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_identity_v1alpha1_identity, 17);
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 20);
 
 /**
  * @generated from message hawkr.identity.v1alpha1.LinkAppleCredentialResponse
@@ -436,7 +492,7 @@ export type LinkAppleCredentialResponse = Message<"hawkr.identity.v1alpha1.LinkA
  * Use `create(LinkAppleCredentialResponseSchema)` to create a new message.
  */
 export const LinkAppleCredentialResponseSchema: GenMessage<LinkAppleCredentialResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_identity_v1alpha1_identity, 18);
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 21);
 
 /**
  * @generated from message hawkr.identity.v1alpha1.DeleteAccountRequest
@@ -449,7 +505,7 @@ export type DeleteAccountRequest = Message<"hawkr.identity.v1alpha1.DeleteAccoun
  * Use `create(DeleteAccountRequestSchema)` to create a new message.
  */
 export const DeleteAccountRequestSchema: GenMessage<DeleteAccountRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_identity_v1alpha1_identity, 19);
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 22);
 
 /**
  * @generated from message hawkr.identity.v1alpha1.DeleteAccountResponse
@@ -466,7 +522,7 @@ export type DeleteAccountResponse = Message<"hawkr.identity.v1alpha1.DeleteAccou
  * Use `create(DeleteAccountResponseSchema)` to create a new message.
  */
 export const DeleteAccountResponseSchema: GenMessage<DeleteAccountResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_identity_v1alpha1_identity, 20);
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 23);
 
 /**
  * DeletionState 是申請之後帳號的狀態。
@@ -498,7 +554,7 @@ export enum DeleteAccountResponse_DeletionState {
  * Describes the enum hawkr.identity.v1alpha1.DeleteAccountResponse.DeletionState.
  */
 export const DeleteAccountResponse_DeletionStateSchema: GenEnum<DeleteAccountResponse_DeletionState> = /*@__PURE__*/
-  enumDesc(file_hawkr_identity_v1alpha1_identity, 20, 0);
+  enumDesc(file_hawkr_identity_v1alpha1_identity, 23, 0);
 
 /**
  * Role 是帳號另外申請的角色。買家不是角色：每個帳號都是買家。
@@ -674,6 +730,17 @@ export const IdentityAppService: GenService<{
     methodKind: "unary";
     input: typeof ListSessionsRequestSchema;
     output: typeof ListSessionsResponseSchema;
+  },
+  /**
+   * ListLinkedIdentities 列出呼叫者的帳號已連結的登入身分。同一 provider 可能有多筆；client 依 provider 判斷是否已連結。
+   * 不回 provider 的使用者識別與 email。停權的帳號也能呼叫。
+   *
+   * @generated from rpc hawkr.identity.v1alpha1.IdentityAppService.ListLinkedIdentities
+   */
+  listLinkedIdentities: {
+    methodKind: "unary";
+    input: typeof ListLinkedIdentitiesRequestSchema;
+    output: typeof ListLinkedIdentitiesResponseSchema;
   },
   /**
    * RevokeSession 終止呼叫者自己的一個 session（包含目前這個）。目前的 session 必須在 15 分鐘內以 provider 驗證過

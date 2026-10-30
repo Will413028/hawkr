@@ -261,3 +261,16 @@ func (s *Service) Link(ctx context.Context, accountID int64, in model.ProviderId
 		return nil
 	})
 }
+
+// ListLinked 回傳帳號已連結的登入身分，連結時間舊到新；不含 subject 與 email。同一 provider 可有多筆。
+func (s *Service) ListLinked(ctx context.Context, accountID int64) ([]model.LinkedIdentity, error) {
+	rows, err := s.q(ctx).ListIdentitiesOfAccount(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("identity：列出已連結的身分：%w", err)
+	}
+	out := make([]model.LinkedIdentity, len(rows))
+	for i, r := range rows {
+		out[i] = model.LinkedIdentity{Provider: model.Provider(r.Provider), LinkedAt: r.CreatedAt}
+	}
+	return out, nil
+}

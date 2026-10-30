@@ -12,7 +12,7 @@
 ### App 原生登入與 session 管理
 
 - App 以原生 SDK 取得 ID token：`IssueAppLoginNonce` 發單次、5 分鐘的 nonce，`ExchangeIdToken` 驗 ID token 後登入並發 App 種類的 session（閒置 14 天、絕對 90 天）。ID token 的 `nonce` 必須等於請求的 nonce，驗證通過才消耗它（無效的 token 不作廢別人的 nonce）；Google：`iss` 為 `https://accounts.google.com` 或 `accounts.google.com`、`aud` 為 web client ID（`GOOGLE_WEB_CLIENT_ID`）、`azp` 在 `GOOGLE_APP_CLIENT_IDS`；LINE：ES256、以 `https://api.line.me/oauth2/v2.1/certs` 驗、`aud` 為 channel ID。ADR D2 的「SDK 帶不了 nonce 時改短效 token 加單次使用紀錄」尚未採用（步驟 6 實測後定）。
-- `SignOut` 刪目前的 session（web 另清 cookie）；`LinkIdentity`（App 帶 ID token 與 nonce，web 走 `GET /api/auth/{provider}/start?link=1`）連結 provider 身分，身分已屬於別的帳號（含墓碑）回 `ALREADY_EXISTS` 與 `IDENTITY_ALREADY_LINKED`；`ListSessions` 列有效的 session 並標出目前這個；`RevokeSession` 要求目前的 session 在 `ReauthWindow`（15 分鐘）內以 provider 驗證過，否則回 `FAILED_PRECONDITION` 與 `REAUTHENTICATION_REQUIRED`，重新驗證就是再走一次登入（登入換發新 session，`auth_time` 是登入時間）。四者停權的帳號都能呼叫（自助／讀取，A7-D18）。
+- `SignOut` 刪目前的 session（web 另清 cookie）；`LinkIdentity`（App 帶 ID token 與 nonce，web 走 `GET /api/auth/{provider}/start?link=1`）連結 provider 身分，身分已屬於別的帳號（含墓碑）回 `ALREADY_EXISTS` 與 `IDENTITY_ALREADY_LINKED`；`ListSessions` 列有效的 session 並標出目前這個；`ListLinkedIdentities` 列呼叫者帳號已連結的登入身分（只有 provider 與連結時間，不回 subject 與 email；同一 provider 可能有多筆，不分頁）；`RevokeSession` 要求目前的 session 在 `ReauthWindow`（15 分鐘）內以 provider 驗證過，否則回 `FAILED_PRECONDITION` 與 `REAUTHENTICATION_REQUIRED`，重新驗證就是再走一次登入（登入換發新 session，`auth_time` 是登入時間）。五者停權的帳號都能呼叫（自助／讀取，A7-D18）。
 - web 的連結：start 把已登入的帳號寫進暫存列，callback 要通過登入前 cookie、`state`，而且現在登入的帳號等於發起的帳號才連結，不換發 session；失敗回返回網址並附 `link_error`。
 
 ## 2. 帳號建立

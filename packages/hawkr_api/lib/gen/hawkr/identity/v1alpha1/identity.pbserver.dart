@@ -66,6 +66,8 @@ abstract class IdentityAppServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $2.LinkIdentityRequest request);
   $async.Future<$2.ListSessionsResponse> listSessions(
       $pb.ServerContext ctx, $2.ListSessionsRequest request);
+  $async.Future<$2.ListLinkedIdentitiesResponse> listLinkedIdentities(
+      $pb.ServerContext ctx, $2.ListLinkedIdentitiesRequest request);
   $async.Future<$2.RevokeSessionResponse> revokeSession(
       $pb.ServerContext ctx, $2.RevokeSessionRequest request);
   $async.Future<$2.DeleteAccountResponse> deleteAccount(
@@ -83,6 +85,8 @@ abstract class IdentityAppServiceBase extends $pb.GeneratedService {
         return $2.LinkIdentityRequest();
       case 'ListSessions':
         return $2.ListSessionsRequest();
+      case 'ListLinkedIdentities':
+        return $2.ListLinkedIdentitiesRequest();
       case 'RevokeSession':
         return $2.RevokeSessionRequest();
       case 'DeleteAccount':
@@ -106,6 +110,9 @@ abstract class IdentityAppServiceBase extends $pb.GeneratedService {
         return linkIdentity(ctx, request as $2.LinkIdentityRequest);
       case 'ListSessions':
         return listSessions(ctx, request as $2.ListSessionsRequest);
+      case 'ListLinkedIdentities':
+        return listLinkedIdentities(
+            ctx, request as $2.ListLinkedIdentitiesRequest);
       case 'RevokeSession':
         return revokeSession(ctx, request as $2.RevokeSessionRequest);
       case 'DeleteAccount':

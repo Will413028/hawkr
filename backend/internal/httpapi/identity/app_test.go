@@ -30,6 +30,7 @@ type appModule struct {
 	sessions []identity.SessionInfo
 	revoked  []uuid.UUID
 	listErr  error
+	linked   map[int64][]identity.LinkedIdentity
 }
 
 func newAppModule() *appModule { return &appModule{nonces: map[string]bool{"nonce-1": true}} }
@@ -68,6 +69,10 @@ func (m *appModule) ListSessions(_ context.Context, accountID int64) ([]identity
 		}
 	}
 	return out, m.listErr
+}
+
+func (m *appModule) ListLinkedIdentities(_ context.Context, accountID int64) ([]identity.LinkedIdentity, error) {
+	return m.linked[accountID], m.listErr
 }
 
 func (m *appModule) RevokeSession(_ context.Context, accountID int64, id identity.SessionID) error {
@@ -330,6 +335,10 @@ func TestHandlersRefuseARequestWithoutASession(t *testing.T) {
 			_, err := e.app.ListSessions(withPrincipalOnly, connect.NewRequest(&pb.ListSessionsRequest{}))
 			return err
 		},
+		"ListLinkedIdentities": func() error {
+			_, err := e.app.ListLinkedIdentities(withPrincipalOnly, connect.NewRequest(&pb.ListLinkedIdentitiesRequest{}))
+			return err
+		},
 		"RevokeSession": func() error {
 			_, err := e.app.RevokeSession(withPrincipalOnly, connect.NewRequest(&pb.RevokeSessionRequest{}))
 			return err
@@ -537,5 +546,46 @@ func TestEnumsMatchTheContract(t *testing.T) {
 	}
 	if m := rpc.EnumMismatches[pb.ClientKind](identity.ClientKinds()); len(m) != 0 {
 		t.Error(m)
+	}
+}
+
+func TestListLinkedIdentitiesReturnsOnlyTheCallersOwn(t *testing.T) {
+	t.Parallel()
+	e := newAppEnv(t)
+	t1, t2, t3 := appNow.Add(-48*time.Hour), appNow.Add(-24*time.Hour), appNow.Add(-time.Hour)
+	e.m.linked = map[int64][]identity.LinkedIdentity{
+		42: {{Provider: identity.ProviderGoogle, LinkedAt: t1}, {Provider: identity.ProviderLine, LinkedAt: t2}, {Provider: identity.ProviderGoogle, LinkedAt: t3}},
+		43: {{Provider: identity.ProviderLine, LinkedAt: t1}},
+	}
+	resp, err := e.app.ListLinkedIdentities(callerContext(t, 42, uuid.New(), rpc.CredentialBearer), connect.NewRequest(&pb.ListLinkedIdentitiesRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := resp.Msg.GetIdentities()
+	want := []struct {
+		p pb.LoginProvider
+		t time.Time
+	}{{pb.LoginProvider_LOGIN_PROVIDER_GOOGLE, t1}, {pb.LoginProvider_LOGIN_PROVIDER_LINE, t2}, {pb.LoginProvider_LOGIN_PROVIDER_GOOGLE, t3}}
+	if len(got) != len(want) {
+		t.Fatalf("identities = %v，預期呼叫者自己的 3 筆（同一 provider 可多筆）", got)
+	}
+	for i, w := range want {
+		if got[i].GetProvider() != w.p || !got[i].GetLinkTime().AsTime().Equal(w.t) {
+			t.Errorf("identities[%d] = %v，預期 %v %v", i, got[i], w.p, w.t)
+		}
+	}
+	none, err := e.app.ListLinkedIdentities(callerContext(t, 99, uuid.New(), rpc.CredentialBearer), connect.NewRequest(&pb.ListLinkedIdentitiesRequest{}))
+	if err != nil || len(none.Msg.GetIdentities()) != 0 {
+		t.Errorf("沒有連結的帳號：%v %v", none, err)
+	}
+}
+
+func TestListLinkedIdentitiesRefusesAnUnknownProvider(t *testing.T) {
+	t.Parallel()
+	e := newAppEnv(t)
+	e.m.linked = map[int64][]identity.LinkedIdentity{42: {{Provider: "FACEBOOK", LinkedAt: appNow}}}
+	_, err := e.app.ListLinkedIdentities(callerContext(t, 42, uuid.New(), rpc.CredentialBearer), connect.NewRequest(&pb.ListLinkedIdentitiesRequest{}))
+	if err == nil || apperr.KindOf(err) != apperr.KindInternal {
+		t.Fatalf("不認得的 provider 要回內部錯誤，err = %v", err)
 	}
 }

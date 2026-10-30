@@ -99,6 +99,39 @@ func (q *Queries) InsertIdentity(ctx context.Context, arg InsertIdentityParams) 
 	return account_id, err
 }
 
+const listIdentitiesOfAccount = `-- name: ListIdentitiesOfAccount :many
+SELECT provider, created_at FROM identity.account_identities
+WHERE account_id = $1
+ORDER BY created_at, provider, subject
+`
+
+type ListIdentitiesOfAccountRow struct {
+	Provider  string
+	CreatedAt time.Time
+}
+
+// 帳號已連結的登入身分，只取 provider 與連結時間（不取 subject、email）。同一 provider 可有多列（schema 沒有 (account_id, provider) 唯一約束）。
+// 墓碑身分屬於已刪除的帳號，呼叫者是存活帳號，不會列到；account_id 條件是唯一的範圍限制。
+func (q *Queries) ListIdentitiesOfAccount(ctx context.Context, accountID int64) ([]ListIdentitiesOfAccountRow, error) {
+	rows, err := q.db.Query(ctx, listIdentitiesOfAccount, accountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListIdentitiesOfAccountRow{}
+	for rows.Next() {
+		var i ListIdentitiesOfAccountRow
+		if err := rows.Scan(&i.Provider, &i.CreatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const scrubIdentitiesOfAccount = `-- name: ScrubIdentitiesOfAccount :exec
 UPDATE identity.account_identities
 SET email = NULL, email_verified = FALSE, auto_link_eligible = FALSE, updated_at = $1::timestamptz

@@ -184,9 +184,10 @@ type (
 
 // SessionID 是 session 對外的識別（不是憑證）；SessionInfo 是一個 session 的資料；SessionRef 是認證用的 session 的識別。
 type (
-	SessionID   = uuid.UUID
-	SessionInfo = model.SessionInfo
-	SessionRef  = model.SessionRef
+	SessionID      = uuid.UUID
+	SessionInfo    = model.SessionInfo
+	LinkedIdentity = model.LinkedIdentity
+	SessionRef     = model.SessionRef
 )
 
 // LoginFlowInput、LoginFlowStart 與 LoginFlow 是 web 登入流程的暫存狀態。
@@ -368,6 +369,11 @@ func (m *Module) Login(ctx context.Context, in LoginInput) (LoginResult, error) 
 // LinkIdentity 把 provider 身分連結到已登入的帳號；身分已屬於別的帳號回 AlreadyExists，帳號不存在回 NotFound。
 func (m *Module) LinkIdentity(ctx context.Context, accountID int64, id ProviderIdentity) error {
 	return m.login.Link(ctx, accountID, id)
+}
+
+// ListLinkedIdentities 列出帳號已連結的登入身分（provider 與連結時間，連結時間舊到新）；同一 provider 可能有多筆，沒有連結回空。
+func (m *Module) ListLinkedIdentities(ctx context.Context, accountID int64) ([]LinkedIdentity, error) {
+	return m.login.ListLinked(ctx, accountID)
 }
 
 // SignOut 刪除 token 對應的 session；token 無效或已不存在時成功。

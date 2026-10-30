@@ -281,6 +281,67 @@ final $typed_data.Uint8List listSessionsResponseDescriptor = $convert.base64Deco
     'R5LnYxYWxwaGExLkxvZ2luU2Vzc2lvblIIc2Vzc2lvbnMSJgoPbmV4dF9wYWdlX3Rva2VuGAIg'
     'ASgJUg1uZXh0UGFnZVRva2Vu');
 
+@$core.Deprecated('Use listLinkedIdentitiesRequestDescriptor instead')
+const ListLinkedIdentitiesRequest$json = {
+  '1': 'ListLinkedIdentitiesRequest',
+};
+
+/// Descriptor for `ListLinkedIdentitiesRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listLinkedIdentitiesRequestDescriptor =
+    $convert.base64Decode('ChtMaXN0TGlua2VkSWRlbnRpdGllc1JlcXVlc3Q=');
+
+@$core.Deprecated('Use listLinkedIdentitiesResponseDescriptor instead')
+const ListLinkedIdentitiesResponse$json = {
+  '1': 'ListLinkedIdentitiesResponse',
+  '2': [
+    {
+      '1': 'identities',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.identity.v1alpha1.LinkedIdentity',
+      '10': 'identities'
+    },
+  ],
+};
+
+/// Descriptor for `ListLinkedIdentitiesResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listLinkedIdentitiesResponseDescriptor =
+    $convert.base64Decode(
+        'ChxMaXN0TGlua2VkSWRlbnRpdGllc1Jlc3BvbnNlEkcKCmlkZW50aXRpZXMYASADKAsyJy5oYX'
+        'drci5pZGVudGl0eS52MWFscGhhMS5MaW5rZWRJZGVudGl0eVIKaWRlbnRpdGllcw==');
+
+@$core.Deprecated('Use linkedIdentityDescriptor instead')
+const LinkedIdentity$json = {
+  '1': 'LinkedIdentity',
+  '2': [
+    {
+      '1': 'provider',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.identity.v1alpha1.LoginProvider',
+      '8': {},
+      '10': 'provider'
+    },
+    {
+      '1': 'link_time',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '8': {},
+      '10': 'linkTime'
+    },
+  ],
+};
+
+/// Descriptor for `LinkedIdentity`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List linkedIdentityDescriptor = $convert.base64Decode(
+    'Cg5MaW5rZWRJZGVudGl0eRJHCghwcm92aWRlchgBIAEoDjImLmhhd2tyLmlkZW50aXR5LnYxYW'
+    'xwaGExLkxvZ2luUHJvdmlkZXJCA+BBA1IIcHJvdmlkZXISPAoJbGlua190aW1lGAIgASgLMhou'
+    'Z29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUghsaW5rVGltZQ==');
+
 @$core.Deprecated('Use revokeSessionRequestDescriptor instead')
 const RevokeSessionRequest$json = {
   '1': 'RevokeSessionRequest',
@@ -555,6 +616,12 @@ const $core.Map<$core.String, $core.dynamic> IdentityAppServiceBase$json = {
       '4': {'34': 1},
     },
     {
+      '1': 'ListLinkedIdentities',
+      '2': '.hawkr.identity.v1alpha1.ListLinkedIdentitiesRequest',
+      '3': '.hawkr.identity.v1alpha1.ListLinkedIdentitiesResponse',
+      '4': {'34': 1},
+    },
+    {
       '1': 'RevokeSession',
       '2': '.hawkr.identity.v1alpha1.RevokeSessionRequest',
       '3': '.hawkr.identity.v1alpha1.RevokeSessionResponse'
@@ -586,6 +653,11 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.identity.v1alpha1.ListSessionsRequest': ListSessionsRequest$json,
   '.hawkr.identity.v1alpha1.ListSessionsResponse': ListSessionsResponse$json,
   '.hawkr.identity.v1alpha1.LoginSession': LoginSession$json,
+  '.hawkr.identity.v1alpha1.ListLinkedIdentitiesRequest':
+      ListLinkedIdentitiesRequest$json,
+  '.hawkr.identity.v1alpha1.ListLinkedIdentitiesResponse':
+      ListLinkedIdentitiesResponse$json,
+  '.hawkr.identity.v1alpha1.LinkedIdentity': LinkedIdentity$json,
   '.hawkr.identity.v1alpha1.RevokeSessionRequest': RevokeSessionRequest$json,
   '.hawkr.identity.v1alpha1.RevokeSessionResponse': RevokeSessionResponse$json,
   '.hawkr.identity.v1alpha1.DeleteAccountRequest': DeleteAccountRequest$json,
@@ -604,8 +676,11 @@ final $typed_data.Uint8List identityAppServiceDescriptor = $convert.base64Decode
     'l0eS52MWFscGhhMS5MaW5rSWRlbnRpdHlSZXF1ZXN0Gi0uaGF3a3IuaWRlbnRpdHkudjFhbHBo'
     'YTEuTGlua0lkZW50aXR5UmVzcG9uc2UScAoMTGlzdFNlc3Npb25zEiwuaGF3a3IuaWRlbnRpdH'
     'kudjFhbHBoYTEuTGlzdFNlc3Npb25zUmVxdWVzdBotLmhhd2tyLmlkZW50aXR5LnYxYWxwaGEx'
-    'Lkxpc3RTZXNzaW9uc1Jlc3BvbnNlIgOQAgESbgoNUmV2b2tlU2Vzc2lvbhItLmhhd2tyLmlkZW'
-    '50aXR5LnYxYWxwaGExLlJldm9rZVNlc3Npb25SZXF1ZXN0Gi4uaGF3a3IuaWRlbnRpdHkudjFh'
-    'bHBoYTEuUmV2b2tlU2Vzc2lvblJlc3BvbnNlEm4KDURlbGV0ZUFjY291bnQSLS5oYXdrci5pZG'
-    'VudGl0eS52MWFscGhhMS5EZWxldGVBY2NvdW50UmVxdWVzdBouLmhhd2tyLmlkZW50aXR5LnYx'
-    'YWxwaGExLkRlbGV0ZUFjY291bnRSZXNwb25zZQ==');
+    'Lkxpc3RTZXNzaW9uc1Jlc3BvbnNlIgOQAgESiAEKFExpc3RMaW5rZWRJZGVudGl0aWVzEjQuaG'
+    'F3a3IuaWRlbnRpdHkudjFhbHBoYTEuTGlzdExpbmtlZElkZW50aXRpZXNSZXF1ZXN0GjUuaGF3'
+    'a3IuaWRlbnRpdHkudjFhbHBoYTEuTGlzdExpbmtlZElkZW50aXRpZXNSZXNwb25zZSIDkAIBEm'
+    '4KDVJldm9rZVNlc3Npb24SLS5oYXdrci5pZGVudGl0eS52MWFscGhhMS5SZXZva2VTZXNzaW9u'
+    'UmVxdWVzdBouLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLlJldm9rZVNlc3Npb25SZXNwb25zZR'
+    'JuCg1EZWxldGVBY2NvdW50Ei0uaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuRGVsZXRlQWNjb3Vu'
+    'dFJlcXVlc3QaLi5oYXdrci5pZGVudGl0eS52MWFscGhhMS5EZWxldGVBY2NvdW50UmVzcG9uc2'
+    'U=');

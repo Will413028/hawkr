@@ -29,3 +29,10 @@ WHERE a.deleted_at IS NULL AND i.provider = 'GOOGLE' AND i.email_verified AND i.
   AND lower(i.email) = lower(sqlc.arg(email)::text)
 ORDER BY i.account_id
 LIMIT 2;
+
+-- name: ListIdentitiesOfAccount :many
+-- 帳號已連結的登入身分，只取 provider 與連結時間（不取 subject、email）。同一 provider 可有多列（schema 沒有 (account_id, provider) 唯一約束）。
+-- 墓碑身分屬於已刪除的帳號，呼叫者是存活帳號，不會列到；account_id 條件是唯一的範圍限制。
+SELECT provider, created_at FROM identity.account_identities
+WHERE account_id = $1
+ORDER BY created_at, provider, subject;

@@ -5,6 +5,7 @@ package identity
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"time"
 	"uuid"
@@ -26,6 +27,7 @@ type appIdentity interface {
 	LinkAppleCredential(ctx context.Context, in identity.LinkAppleCredentialInput) error
 	LinkIdentity(ctx context.Context, accountID int64, id identity.ProviderIdentity) error
 	ListSessions(ctx context.Context, accountID int64) ([]identity.SessionInfo, error)
+	ListLinkedIdentities(ctx context.Context, accountID int64) ([]identity.LinkedIdentity, error)
 	RevokeSession(ctx context.Context, accountID int64, sessionID identity.SessionID) error
 }
 
@@ -186,6 +188,27 @@ func (h *App) ListSessions(ctx context.Context, req *connect.Request[pb.ListSess
 			LastUseTime: timestamppb.New(s.LastUsedAt), Current: s.ID == cur.ID,
 		})
 		last = s
+	}
+	return connect.NewResponse(out), nil
+}
+
+// ListLinkedIdentities 列出呼叫者的帳號已連結的登入身分（連結時間舊到新）；只回 provider 與連結時間。
+func (h *App) ListLinkedIdentities(ctx context.Context, _ *connect.Request[pb.ListLinkedIdentitiesRequest]) (*connect.Response[pb.ListLinkedIdentitiesResponse], error) {
+	p, _, err := caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	all, err := h.m.ListLinkedIdentities(ctx, p.ID)
+	if err != nil {
+		return nil, err
+	}
+	out := &pb.ListLinkedIdentitiesResponse{}
+	for _, li := range all {
+		provider := rpc.EnumToProto[pb.LoginProvider](li.Provider)
+		if provider == pb.LoginProvider_LOGIN_PROVIDER_UNSPECIFIED {
+			return nil, fmt.Errorf("httpapi/identity：帳號 %d 有不認得的登入方式 %q", p.ID, li.Provider)
+		}
+		out.Identities = append(out.Identities, &pb.LinkedIdentity{Provider: provider, LinkTime: timestamppb.New(li.LinkedAt)})
 	}
 	return connect.NewResponse(out), nil
 }

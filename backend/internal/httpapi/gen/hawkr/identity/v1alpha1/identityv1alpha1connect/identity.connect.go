@@ -66,6 +66,9 @@ const (
 	// IdentityAppServiceListSessionsProcedure is the fully-qualified name of the IdentityAppService's
 	// ListSessions RPC.
 	IdentityAppServiceListSessionsProcedure = "/hawkr.identity.v1alpha1.IdentityAppService/ListSessions"
+	// IdentityAppServiceListLinkedIdentitiesProcedure is the fully-qualified name of the
+	// IdentityAppService's ListLinkedIdentities RPC.
+	IdentityAppServiceListLinkedIdentitiesProcedure = "/hawkr.identity.v1alpha1.IdentityAppService/ListLinkedIdentities"
 	// IdentityAppServiceRevokeSessionProcedure is the fully-qualified name of the IdentityAppService's
 	// RevokeSession RPC.
 	IdentityAppServiceRevokeSessionProcedure = "/hawkr.identity.v1alpha1.IdentityAppService/RevokeSession"
@@ -203,6 +206,9 @@ type IdentityAppServiceClient interface {
 	LinkIdentity(context.Context, *connect.Request[v1alpha1.LinkIdentityRequest]) (*connect.Response[v1alpha1.LinkIdentityResponse], error)
 	// ListSessions 列出呼叫者的有效 session（新到舊），標出目前這一個。停權的帳號也能呼叫。
 	ListSessions(context.Context, *connect.Request[v1alpha1.ListSessionsRequest]) (*connect.Response[v1alpha1.ListSessionsResponse], error)
+	// ListLinkedIdentities 列出呼叫者的帳號已連結的登入身分。同一 provider 可能有多筆；client 依 provider 判斷是否已連結。
+	// 不回 provider 的使用者識別與 email。停權的帳號也能呼叫。
+	ListLinkedIdentities(context.Context, *connect.Request[v1alpha1.ListLinkedIdentitiesRequest]) (*connect.Response[v1alpha1.ListLinkedIdentitiesResponse], error)
 	// RevokeSession 終止呼叫者自己的一個 session（包含目前這個）。目前的 session 必須在 15 分鐘內以 provider 驗證過
 	// （重新走一次登入），否則回 failed_precondition 與 ErrorReason REAUTHENTICATION_REQUIRED，client 引導重新登入後再送。
 	// 沒有這個 session 或屬於別的帳號回 not_found。停權的帳號也能呼叫。
@@ -258,6 +264,13 @@ func NewIdentityAppServiceClient(httpClient connect.HTTPClient, baseURL string, 
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
+		listLinkedIdentities: connect.NewClient[v1alpha1.ListLinkedIdentitiesRequest, v1alpha1.ListLinkedIdentitiesResponse](
+			httpClient,
+			baseURL+IdentityAppServiceListLinkedIdentitiesProcedure,
+			connect.WithSchema(identityAppServiceMethods.ByName("ListLinkedIdentities")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
 		revokeSession: connect.NewClient[v1alpha1.RevokeSessionRequest, v1alpha1.RevokeSessionResponse](
 			httpClient,
 			baseURL+IdentityAppServiceRevokeSessionProcedure,
@@ -275,13 +288,14 @@ func NewIdentityAppServiceClient(httpClient connect.HTTPClient, baseURL string, 
 
 // identityAppServiceClient implements IdentityAppServiceClient.
 type identityAppServiceClient struct {
-	getSession          *connect.Client[v1alpha1.GetSessionRequest, v1alpha1.GetSessionResponse]
-	linkAppleCredential *connect.Client[v1alpha1.LinkAppleCredentialRequest, v1alpha1.LinkAppleCredentialResponse]
-	signOut             *connect.Client[v1alpha1.SignOutRequest, v1alpha1.SignOutResponse]
-	linkIdentity        *connect.Client[v1alpha1.LinkIdentityRequest, v1alpha1.LinkIdentityResponse]
-	listSessions        *connect.Client[v1alpha1.ListSessionsRequest, v1alpha1.ListSessionsResponse]
-	revokeSession       *connect.Client[v1alpha1.RevokeSessionRequest, v1alpha1.RevokeSessionResponse]
-	deleteAccount       *connect.Client[v1alpha1.DeleteAccountRequest, v1alpha1.DeleteAccountResponse]
+	getSession           *connect.Client[v1alpha1.GetSessionRequest, v1alpha1.GetSessionResponse]
+	linkAppleCredential  *connect.Client[v1alpha1.LinkAppleCredentialRequest, v1alpha1.LinkAppleCredentialResponse]
+	signOut              *connect.Client[v1alpha1.SignOutRequest, v1alpha1.SignOutResponse]
+	linkIdentity         *connect.Client[v1alpha1.LinkIdentityRequest, v1alpha1.LinkIdentityResponse]
+	listSessions         *connect.Client[v1alpha1.ListSessionsRequest, v1alpha1.ListSessionsResponse]
+	listLinkedIdentities *connect.Client[v1alpha1.ListLinkedIdentitiesRequest, v1alpha1.ListLinkedIdentitiesResponse]
+	revokeSession        *connect.Client[v1alpha1.RevokeSessionRequest, v1alpha1.RevokeSessionResponse]
+	deleteAccount        *connect.Client[v1alpha1.DeleteAccountRequest, v1alpha1.DeleteAccountResponse]
 }
 
 // GetSession calls hawkr.identity.v1alpha1.IdentityAppService.GetSession.
@@ -307,6 +321,11 @@ func (c *identityAppServiceClient) LinkIdentity(ctx context.Context, req *connec
 // ListSessions calls hawkr.identity.v1alpha1.IdentityAppService.ListSessions.
 func (c *identityAppServiceClient) ListSessions(ctx context.Context, req *connect.Request[v1alpha1.ListSessionsRequest]) (*connect.Response[v1alpha1.ListSessionsResponse], error) {
 	return c.listSessions.CallUnary(ctx, req)
+}
+
+// ListLinkedIdentities calls hawkr.identity.v1alpha1.IdentityAppService.ListLinkedIdentities.
+func (c *identityAppServiceClient) ListLinkedIdentities(ctx context.Context, req *connect.Request[v1alpha1.ListLinkedIdentitiesRequest]) (*connect.Response[v1alpha1.ListLinkedIdentitiesResponse], error) {
+	return c.listLinkedIdentities.CallUnary(ctx, req)
 }
 
 // RevokeSession calls hawkr.identity.v1alpha1.IdentityAppService.RevokeSession.
@@ -338,6 +357,9 @@ type IdentityAppServiceHandler interface {
 	LinkIdentity(context.Context, *connect.Request[v1alpha1.LinkIdentityRequest]) (*connect.Response[v1alpha1.LinkIdentityResponse], error)
 	// ListSessions 列出呼叫者的有效 session（新到舊），標出目前這一個。停權的帳號也能呼叫。
 	ListSessions(context.Context, *connect.Request[v1alpha1.ListSessionsRequest]) (*connect.Response[v1alpha1.ListSessionsResponse], error)
+	// ListLinkedIdentities 列出呼叫者的帳號已連結的登入身分。同一 provider 可能有多筆；client 依 provider 判斷是否已連結。
+	// 不回 provider 的使用者識別與 email。停權的帳號也能呼叫。
+	ListLinkedIdentities(context.Context, *connect.Request[v1alpha1.ListLinkedIdentitiesRequest]) (*connect.Response[v1alpha1.ListLinkedIdentitiesResponse], error)
 	// RevokeSession 終止呼叫者自己的一個 session（包含目前這個）。目前的 session 必須在 15 分鐘內以 provider 驗證過
 	// （重新走一次登入），否則回 failed_precondition 與 ErrorReason REAUTHENTICATION_REQUIRED，client 引導重新登入後再送。
 	// 沒有這個 session 或屬於別的帳號回 not_found。停權的帳號也能呼叫。
@@ -389,6 +411,13 @@ func NewIdentityAppServiceHandler(svc IdentityAppServiceHandler, opts ...connect
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
+	identityAppServiceListLinkedIdentitiesHandler := connect.NewUnaryHandler(
+		IdentityAppServiceListLinkedIdentitiesProcedure,
+		svc.ListLinkedIdentities,
+		connect.WithSchema(identityAppServiceMethods.ByName("ListLinkedIdentities")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
 	identityAppServiceRevokeSessionHandler := connect.NewUnaryHandler(
 		IdentityAppServiceRevokeSessionProcedure,
 		svc.RevokeSession,
@@ -413,6 +442,8 @@ func NewIdentityAppServiceHandler(svc IdentityAppServiceHandler, opts ...connect
 			identityAppServiceLinkIdentityHandler.ServeHTTP(w, r)
 		case IdentityAppServiceListSessionsProcedure:
 			identityAppServiceListSessionsHandler.ServeHTTP(w, r)
+		case IdentityAppServiceListLinkedIdentitiesProcedure:
+			identityAppServiceListLinkedIdentitiesHandler.ServeHTTP(w, r)
 		case IdentityAppServiceRevokeSessionProcedure:
 			identityAppServiceRevokeSessionHandler.ServeHTTP(w, r)
 		case IdentityAppServiceDeleteAccountProcedure:
@@ -444,6 +475,10 @@ func (UnimplementedIdentityAppServiceHandler) LinkIdentity(context.Context, *con
 
 func (UnimplementedIdentityAppServiceHandler) ListSessions(context.Context, *connect.Request[v1alpha1.ListSessionsRequest]) (*connect.Response[v1alpha1.ListSessionsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.identity.v1alpha1.IdentityAppService.ListSessions is not implemented"))
+}
+
+func (UnimplementedIdentityAppServiceHandler) ListLinkedIdentities(context.Context, *connect.Request[v1alpha1.ListLinkedIdentitiesRequest]) (*connect.Response[v1alpha1.ListLinkedIdentitiesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.identity.v1alpha1.IdentityAppService.ListLinkedIdentities is not implemented"))
 }
 
 func (UnimplementedIdentityAppServiceHandler) RevokeSession(context.Context, *connect.Request[v1alpha1.RevokeSessionRequest]) (*connect.Response[v1alpha1.RevokeSessionResponse], error) {

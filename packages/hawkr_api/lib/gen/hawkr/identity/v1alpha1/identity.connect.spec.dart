@@ -86,6 +86,16 @@ abstract final class IdentityAppService {
     idempotency: connect.Idempotency.noSideEffects,
   );
 
+  /// ListLinkedIdentities 列出呼叫者的帳號已連結的登入身分。同一 provider 可能有多筆；client 依 provider 判斷是否已連結。
+  /// 不回 provider 的使用者識別與 email。停權的帳號也能呼叫。
+  static const listLinkedIdentities = connect.Spec(
+    '/$name/ListLinkedIdentities',
+    connect.StreamType.unary,
+    hawkridentityv1alpha1identity.ListLinkedIdentitiesRequest.new,
+    hawkridentityv1alpha1identity.ListLinkedIdentitiesResponse.new,
+    idempotency: connect.Idempotency.noSideEffects,
+  );
+
   /// RevokeSession 終止呼叫者自己的一個 session（包含目前這個）。目前的 session 必須在 15 分鐘內以 provider 驗證過
   /// （重新走一次登入），否則回 failed_precondition 與 ErrorReason REAUTHENTICATION_REQUIRED，client 引導重新登入後再送。
   /// 沒有這個 session 或屬於別的帳號回 not_found。停權的帳號也能呼叫。

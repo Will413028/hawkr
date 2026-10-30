@@ -748,6 +748,189 @@ class ListSessionsResponse extends $pb.GeneratedMessage {
   void clearNextPageToken() => $_clearField(2);
 }
 
+class ListLinkedIdentitiesRequest extends $pb.GeneratedMessage {
+  factory ListLinkedIdentitiesRequest() => ListLinkedIdentitiesRequest._();
+
+  ListLinkedIdentitiesRequest._();
+
+  factory ListLinkedIdentitiesRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListLinkedIdentitiesRequest()..mergeFromBuffer(data, registry);
+  factory ListLinkedIdentitiesRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListLinkedIdentitiesRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListLinkedIdentitiesRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.identity.v1alpha1'),
+      createEmptyInstance: ListLinkedIdentitiesRequest.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListLinkedIdentitiesRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListLinkedIdentitiesRequest copyWith(
+          void Function(ListLinkedIdentitiesRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as ListLinkedIdentitiesRequest))
+          as ListLinkedIdentitiesRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListLinkedIdentitiesRequest() / ListLinkedIdentitiesRequest.new instead')
+  static ListLinkedIdentitiesRequest create() =>
+      ListLinkedIdentitiesRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      ListLinkedIdentitiesRequest._();
+  @$core.override
+  ListLinkedIdentitiesRequest createEmptyInstance() =>
+      ListLinkedIdentitiesRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ListLinkedIdentitiesRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListLinkedIdentitiesRequest>(
+          ListLinkedIdentitiesRequest.$_createMessage);
+  static ListLinkedIdentitiesRequest? _defaultInstance;
+}
+
+class ListLinkedIdentitiesResponse extends $pb.GeneratedMessage {
+  factory ListLinkedIdentitiesResponse({
+    $core.Iterable<LinkedIdentity>? identities,
+  }) {
+    final result = ListLinkedIdentitiesResponse._();
+    if (identities != null) result.identities.addAll(identities);
+    return result;
+  }
+
+  ListLinkedIdentitiesResponse._();
+
+  factory ListLinkedIdentitiesResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListLinkedIdentitiesResponse()..mergeFromBuffer(data, registry);
+  factory ListLinkedIdentitiesResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListLinkedIdentitiesResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListLinkedIdentitiesResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.identity.v1alpha1'),
+      createEmptyInstance: ListLinkedIdentitiesResponse.$_createMessage)
+    ..pPM<LinkedIdentity>(1, _omitFieldNames ? '' : 'identities',
+        subBuilder: LinkedIdentity.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListLinkedIdentitiesResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListLinkedIdentitiesResponse copyWith(
+          void Function(ListLinkedIdentitiesResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as ListLinkedIdentitiesResponse))
+          as ListLinkedIdentitiesResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListLinkedIdentitiesResponse() / ListLinkedIdentitiesResponse.new instead')
+  static ListLinkedIdentitiesResponse create() =>
+      ListLinkedIdentitiesResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      ListLinkedIdentitiesResponse._();
+  @$core.override
+  ListLinkedIdentitiesResponse createEmptyInstance() =>
+      ListLinkedIdentitiesResponse._();
+  @$core.pragma('dart2js:noInline')
+  static ListLinkedIdentitiesResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListLinkedIdentitiesResponse>(
+          ListLinkedIdentitiesResponse.$_createMessage);
+  static ListLinkedIdentitiesResponse? _defaultInstance;
+
+  /// 連結時間舊到新；不分頁。
+  @$pb.TagNumber(1)
+  $pb.PbList<LinkedIdentity> get identities => $_getList(0);
+}
+
+/// LinkedIdentity 是帳號已連結的一個登入身分。
+class LinkedIdentity extends $pb.GeneratedMessage {
+  factory LinkedIdentity({
+    LoginProvider? provider,
+    $0.Timestamp? linkTime,
+  }) {
+    final result = LinkedIdentity._();
+    if (provider != null) result.provider = provider;
+    if (linkTime != null) result.linkTime = linkTime;
+    return result;
+  }
+
+  LinkedIdentity._();
+
+  factory LinkedIdentity.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      LinkedIdentity()..mergeFromBuffer(data, registry);
+  factory LinkedIdentity.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      LinkedIdentity()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LinkedIdentity',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.identity.v1alpha1'),
+      createEmptyInstance: LinkedIdentity.$_createMessage)
+    ..aE<LoginProvider>(1, _omitFieldNames ? '' : 'provider',
+        enumValues: LoginProvider.values)
+    ..aOM<$0.Timestamp>(2, _omitFieldNames ? '' : 'linkTime',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LinkedIdentity clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LinkedIdentity copyWith(void Function(LinkedIdentity) updates) =>
+      super.copyWith((message) => updates(message as LinkedIdentity))
+          as LinkedIdentity;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use LinkedIdentity() / LinkedIdentity.new instead')
+  static LinkedIdentity create() => LinkedIdentity._();
+  static $pb.GeneratedMessage $_createMessage() => LinkedIdentity._();
+  @$core.override
+  LinkedIdentity createEmptyInstance() => LinkedIdentity._();
+  @$core.pragma('dart2js:noInline')
+  static LinkedIdentity getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<LinkedIdentity>(
+          LinkedIdentity.$_createMessage);
+  static LinkedIdentity? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  LoginProvider get provider => $_getN(0);
+  @$pb.TagNumber(1)
+  set provider(LoginProvider value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasProvider() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearProvider() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $0.Timestamp get linkTime => $_getN(1);
+  @$pb.TagNumber(2)
+  set linkTime($0.Timestamp value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasLinkTime() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearLinkTime() => $_clearField(2);
+  @$pb.TagNumber(2)
+  $0.Timestamp ensureLinkTime() => $_ensure(1);
+}
+
 class RevokeSessionRequest extends $pb.GeneratedMessage {
   factory RevokeSessionRequest({
     $core.String? sessionId,
@@ -1442,6 +1625,13 @@ class IdentityAppServiceApi {
           $pb.ClientContext? ctx, ListSessionsRequest request) =>
       _client.invoke<ListSessionsResponse>(ctx, 'IdentityAppService',
           'ListSessions', request, ListSessionsResponse());
+
+  /// ListLinkedIdentities 列出呼叫者的帳號已連結的登入身分。同一 provider 可能有多筆；client 依 provider 判斷是否已連結。
+  /// 不回 provider 的使用者識別與 email。停權的帳號也能呼叫。
+  $async.Future<ListLinkedIdentitiesResponse> listLinkedIdentities(
+          $pb.ClientContext? ctx, ListLinkedIdentitiesRequest request) =>
+      _client.invoke<ListLinkedIdentitiesResponse>(ctx, 'IdentityAppService',
+          'ListLinkedIdentities', request, ListLinkedIdentitiesResponse());
 
   /// RevokeSession 終止呼叫者自己的一個 session（包含目前這個）。目前的 session 必須在 15 分鐘內以 provider 驗證過
   /// （重新走一次登入），否則回 failed_precondition 與 ErrorReason REAUTHENTICATION_REQUIRED，client 引導重新登入後再送。
