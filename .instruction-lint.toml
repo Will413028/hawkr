@@ -78,4 +78,4 @@ max_days = 90
 rule = "R2"
 path = "backend/internal/modules/accountsuspension/AGENTS.md"
 reason = "多一節「鎖順序」，在七節固定形狀之外；歸位或移出由清理步驟決定"
-expires = 2027-01-29
+expires = 2027-01-27
