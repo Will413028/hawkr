@@ -64,7 +64,7 @@ Connect 草稿 §四 把 ADR-08 的「扁平成對 `xxxKey`＋`xxxUrl`、在 gat
 - **核心取捨是 host 與路徑形狀放在伺服器還是 client。** ADR-01 已經把轉換語法收回 gateway；本檔把剩下的 host 與路徑也收回伺服器，client 只保留它唯一該決定的事：這個畫面要哪個 preset。代價是每張圖多一段文字、回應隨部署設定而不同。
 - **選樣板（B）而不是原圖加參數（C）**：
   - gateway 的 preset 本來就在路徑上（`/i/{preset}/`），B 不必改 gateway；C 要改路由與快取鍵。
-  - C 讓原圖成為預設的 URL，而伺服器端目前沒有剝除 EXIF（含 GPS）的步驟，暴露面變大。
+  - C 讓原圖成為預設的 URL，而原圖直出儲存的位元組，暴露面比 preset 大（寫入 `public/` 時已剝除 EXIF，見 49 號設計書 §8.1，2026-10-31）。
   - C 的論點「樣板本身不是可用的 URL，忘了替換就破圖」，由 D3 的單一 helper 與測試擋住。
   - C 另外提議開放有上限的寬度階梯，讓 web 恢復 srcset。這是 image gateway 的決定（修訂 ADR-01、影響 Cloudflare Images 的計費），與 API 怎麼表示圖片無關，另案處理。
 - **不回 key**：現在沒有讀取端（content 的圖都是單張，沿用靠 `update_mask`）。依「不做沒有讀取端的功能」，等需要時再加不透明的識別欄位。
@@ -84,7 +84,7 @@ Connect 草稿 §四 把 ADR-08 的「扁平成對 `xxxKey`＋`xxxUrl`、在 gat
   - 〈API 設計規範（Connect）〉§四、〈多媒體與圖片 URL 規範〉§2、§4、49 號設計書 §6；content 模組 `CARRYOVER.md` 傳輸層沿用盤點的圖片列。
   - D8 特性測試的圖片比對：REST driver 回 key、Connect driver 回樣板，在 driver 內正規化成同一種值。
   - media ADR 的 ADR-08 標 `superseded by 2026-09-25-api-image-uri-template.md`。
-- **不在本檔，另列待辦**：website 的 `next/image` loader 忽略寬度、一律回 `original`，90 處 `AppImage` 有 61 處沒傳 preset 而下載原圖；原圖沒有剝除 EXIF。
+- **不在本檔，另列待辦**：website 的 `next/image` loader 忽略寬度、一律回 `original`，90 處 `AppImage` 有 61 處沒傳 preset 而下載原圖。
 - **重新評估的條件**：圖片服務需要每個尺寸各自簽章或短效 token；web 需要 srcset 而 preset 的固定寬度不夠；出現 monorepo 以外的 client。
 - 試點不通過、回到 OpenAPI 時，同樣形狀的 JSON schema 照樣適用。
 

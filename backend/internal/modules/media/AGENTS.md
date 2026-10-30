@@ -33,7 +33,7 @@
 
 - 業務列、asset ID 欄位與每個 ref 的同步 job、版本與退場表：由擁有媒體的模組（buyer、seller、content）各自擁有，各用自己的 schema。
 - 機敏下載的授權與存取紀錄：擁有者的端點負責（路徑與傳輸規則見〈API 設計規範（Connect）〉「檔案回應」）。
-- 儲存層與圖片讀取出口：Java media-service 與 49 號設計書。
+- 儲存層與圖片讀取出口：Java media-service 與 49 號設計書。寫入 `public/` 的圖片剝除 EXIF（含 GPS）等 metadata 也在儲存層（Java `ImageMetadataStripper`，49 號設計書 §8.1）；B1 把儲存搬進 Go 時，這個不變量與它的測試要一併搬。
 
 ## 決策紀錄
 

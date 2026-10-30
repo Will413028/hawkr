@@ -490,6 +490,7 @@ Worker **必須檢查轉換輸出的長度**，長度為 0 一律視同失敗、
 ### 8.1 安全與授權
 - R2 bucket 零公開存取：無 r2.dev、無 custom domain 直綁——唯一公開讀取面是 Worker，且 key 前綴白名單（僅 `public/`）fail-closed。
 - 機敏檔（`secure/`）維持 AES-256-GCM 服務端加密＋代理下載，Worker 物理上讀得到密文但路徑規則直接 404。
+- 公開圖片寫入時剝除 metadata：寫進 `public/` 的圖片（JPEG、PNG、WebP、GIF），位元組在 `R2StorageService.copyObject`／`uploadStream` 先過 `ImageMetadataStripper`，丟掉 EXIF（含 GPS）、XMP、IPTC、縮圖、註解與文字區塊，只保留顯示方向（EXIF Orientation，重寫成只含這一欄的最小 EXIF）。原因：`/i/original/*` 直出儲存的位元組，不剝除就是把拍攝位置公開。做法是白名單逐段搬運，不重新編碼、無畫質損失；結構壞掉的圖片拒絕寫入（不退回原檔）。`secure/`（密文）與非圖片不處理。
 - R2 API Token 權限最小化：media-service／product-import-service 用 Object Read & Write 限定 bucket token；遷移工具用獨立臨時 token，遷移後作廢；憑證一律 k8s secret／`.env`（gitignored），**禁止如現行 OSS AK/SK 寫死於 application.yml fallback**（本案一併移除該明文，舊 OSS key 於 OSS 退役時作廢）。
 - 上傳驗證補強（隨本案實作，堵盤點缺口）：CreateUploadSession 增 MIME 白名單（image/jpeg,png,webp,gif＋pdf 限機敏/標籤場景）＋fileSize 上限宣告驗證（一般 10MB，與前端一致）；**強制點=finalize 時 HEAD 回查 R2 實際 size/Content-Type，超限或與宣告不符即 reject＋刪除 tmp 物件**；`getFileExtension` 消毒（拒含 `/`、`..`）。註：SigV4 presigned PUT 無法表達 size 範圍條件（`content-length-range` 為 S3 POST policy 專屬）——size 上限不依賴 presign 條件，一律由 finalize 回查兜底；presigned PUT 僅綁 Content-Type。
 

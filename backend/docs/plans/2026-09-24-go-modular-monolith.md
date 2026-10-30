@@ -258,6 +258,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
 
 - [ ] **B1 media**
   - media 改成不認識業務（ADR `2026-10-03-media-references-owner-side.md`，Will 2026-10-03）：只存資產與生命週期（暫存→確認→刪除），引用只在擁有者的表；刪除是擁有者經 outbox 送出的明確指令，GC 只清過期沒確認的暫存檔；機敏下載由擁有者授權後向 media 要短效的簽章網址；拿掉 `asset_reference` 與 media 端的 `(ref_type, ref_id)`。B1 之前的做法（每個 ref 只有一個同步 job 寫引用、只精準解除退場的圖）在 B1 時換成確認／刪除的介面。
+  - B1 搬儲存時要帶走的不變量：寫入 `public/` 的圖片剝除 metadata、只留方向（Java `ImageMetadataStripper`，49 號設計書 §8.1；2026-10-31）。
   - 延後項（`2026-10-27-ecommerce-scope-cut`「延後」，2026-10-29）：CodeMeta `AssetReferenceType` 的食譜值（content 的食譜已刪）還被 Java media-service 使用，也鏡像在 Go 的 `media/ref_type.go`、`pkg/media/ref_type.go` 與 `media/finalize_args.go`。觸發：B1 把 media 改成不認識業務（拿掉 `(ref_type, ref_id)`）時，連同 CodeMeta 值與生成物一起刪。
 - [ ] **B2 payment**：物流財務與責任判定先留在 Java，B10 再處理。
   - `createRefund` 依 D5 修正。

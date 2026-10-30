@@ -9,6 +9,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
@@ -174,6 +175,13 @@ public class R2StorageService extends AbstractStorageService {
             return;
         }
         try {
+            if (isPublicKey(objectKey)) {
+                byte[] data = inputStream.readAllBytes();
+                byte[] stripped = stripOrReject(data);
+                putPublicBytes(objectKey, stripped != null ? stripped : data, contentType, null, null);
+                log.info("r2.upload.success", "檔案上傳成功", "object_key", objectKey);
+                return;
+            }
             PutObjectRequest request = PutObjectRequest.builder()
                 .bucket(bucketName)
                 .key(objectKey)
@@ -182,6 +190,8 @@ public class R2StorageService extends AbstractStorageService {
                 .build();
             s3Client.putObject(request, RequestBody.fromInputStream(inputStream, size));
             log.info("r2.upload.success", "檔案上傳成功", "object_key", objectKey);
+        } catch (MediaServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("r2.upload.failed", "檔案上傳失敗", e);
             throw MediaServiceException.internal("檔案上傳失敗", e);
@@ -235,6 +245,9 @@ public class R2StorageService extends AbstractStorageService {
             return;
         }
         try {
+            if (isPublicKey(destinationKey) && copyPublicImageWithoutMetadata(sourceKey, destinationKey)) {
+                return;
+            }
             s3Client.copyObject(CopyObjectRequest.builder()
                 .sourceBucket(bucketName)
                 .sourceKey(sourceKey)
@@ -246,6 +259,8 @@ public class R2StorageService extends AbstractStorageService {
         } catch (NoSuchKeyException e) {
             log.warn("r2.copy.not_found", "來源物件不存在", "source", sourceKey);
             throw MediaServiceException.notFound("來源檔案不存在: " + sourceKey);
+        } catch (MediaServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("r2.copy.failed", "R2 物件複製失敗", e);
             throw MediaServiceException.internal("R2 物件複製失敗", e);
@@ -277,6 +292,53 @@ public class R2StorageService extends AbstractStorageService {
         } catch (Exception e) {
             log.error("r2.head.failed", "HEAD 物件失敗", e);
             throw MediaServiceException.internal("HEAD 物件失敗", e);
+        }
+    }
+
+    // ---- 公開圖片 metadata 剝除 ----
+    // 不變量：寫進 public/ 的圖片位元組不含 EXIF（GPS）、XMP、IPTC 等 metadata，只保留顯示方向。
+    // 公開出口（image gateway 的 original）原樣直出儲存的位元組，所以在寫入這一刻處理，
+    // 之後的下載、後台與備份就不必各自再處理。所有寫入 public/ 的路徑（轉正的 copy、後端直傳）都經過這裡。
+
+    private boolean isPublicKey(String key) {
+        return publicPrefix != null && key != null && key.startsWith(publicPrefix + "/");
+    }
+
+    /** 來源是可辨認的圖片時，讀出、剝除、以剝除後的位元組寫入目的地並回傳 true；不是圖片回傳 false（呼叫端走一般複製）。 */
+    private boolean copyPublicImageWithoutMetadata(String sourceKey, String destinationKey) {
+        ResponseBytes<GetObjectResponse> src = s3Client.getObjectAsBytes(GetObjectRequest.builder()
+            .bucket(bucketName)
+            .key(sourceKey)
+            .build());
+        GetObjectResponse meta = src.response();
+        byte[] stripped = stripOrReject(src.asByteArrayUnsafe());
+        if (stripped == null) {
+            return false;
+        }
+        putPublicBytes(destinationKey, stripped, meta.contentType(), meta.contentDisposition(), meta.cacheControl());
+        log.info("r2.copy.success", "R2 物件複製成功（已剝除圖片 metadata）",
+            "path", sourceKey + " → " + destinationKey);
+        return true;
+    }
+
+    private void putPublicBytes(String key, byte[] data, String contentType, String contentDisposition, String cacheControl) {
+        byte[] body = data;
+        s3Client.putObject(PutObjectRequest.builder()
+            .bucket(bucketName)
+            .key(key)
+            .contentType(contentType)
+            .contentDisposition(contentDisposition)
+            .cacheControl(cacheControl)
+            .contentLength((long) body.length)
+            .build(), RequestBody.fromBytes(body));
+    }
+
+    private static byte[] stripOrReject(byte[] data) {
+        try {
+            return ImageMetadataStripper.strip(data);
+        } catch (IllegalArgumentException e) {
+            log.warn("r2.strip.rejected", "圖片結構無法解析，拒絕寫入公開路徑", "reason", e.getMessage());
+            throw MediaServiceException.invalidArgument("圖片檔案損毀或格式不正確，無法使用");
         }
     }
 }

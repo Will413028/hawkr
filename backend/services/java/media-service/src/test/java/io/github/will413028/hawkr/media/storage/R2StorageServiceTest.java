@@ -30,6 +30,9 @@ import java.net.URL;
 import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.never;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -91,7 +94,7 @@ class R2StorageServiceTest {
         S3Client timeoutClient = S3Client.builder()
             .endpointOverride(URI.create("http://127.0.0.1:" + server.getAddress().getPort()))
             .credentialsProvider(StaticCredentialsProvider.create(
-                AwsBasicCredentials.create("test-access", "test-secret")))
+                AwsBasicCredentials.create("test-access", "test-gpsMarker")))
             .region(software.amazon.awssdk.regions.Region.of("auto"))
             .overrideConfiguration(ClientOverrideConfiguration.builder()
                 .apiCallAttemptTimeout(Duration.ofMillis(100))
@@ -135,6 +138,108 @@ class R2StorageServiceTest {
         assertEquals("tmp/20260216/a.jpg", captor.getValue().sourceKey());
         assertEquals(BUCKET, captor.getValue().destinationBucket());
         assertEquals("public/product/1/20260216/a.jpg", captor.getValue().destinationKey());
+    }
+
+    private static final byte[] JPEG_WITH_GPS = jpegWithGps();
+
+    private static byte[] jpegWithGps() {
+        byte[] gpsMarker = "GPS-25.0330N-121.5654E".getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
+        int len = 2 + 6 + gpsMarker.length;
+        java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
+        o.writeBytes(new byte[] {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE1, (byte) (len >> 8), (byte) len});
+        o.writeBytes("Exif\0\0".getBytes(java.nio.charset.StandardCharsets.ISO_8859_1));
+        o.writeBytes(gpsMarker);
+        o.writeBytes(new byte[] {(byte) 0xFF, (byte) 0xDA, 0, 4, 0, 0, 1, 2, 3, (byte) 0xFF, (byte) 0xD9});
+        return o.toByteArray();
+    }
+
+    private static boolean hasGps(byte[] d) {
+        return new String(d, java.nio.charset.StandardCharsets.ISO_8859_1).contains("GPS-25");
+    }
+
+    @Test
+    @DisplayName("copyObject 到 public/：圖片以剝除 metadata 後的位元組寫入，且不走伺服器端複製")
+    void copyToPublicStripsMetadata() {
+        ReflectionTestUtils.setField(service, "publicPrefix", "public");
+        when(s3Client.getObjectAsBytes(any(software.amazon.awssdk.services.s3.model.GetObjectRequest.class)))
+            .thenReturn(software.amazon.awssdk.core.ResponseBytes.fromByteArray(
+                software.amazon.awssdk.services.s3.model.GetObjectResponse.builder().contentType("image/jpeg").build(),
+                JPEG_WITH_GPS));
+
+        service.copyObject("tmp/20260216/a.jpg", "public/product/1/20260216/a.jpg");
+
+        ArgumentCaptor<PutObjectRequest> req = ArgumentCaptor.forClass(PutObjectRequest.class);
+        ArgumentCaptor<RequestBody> body = ArgumentCaptor.forClass(RequestBody.class);
+        verify(s3Client).putObject(req.capture(), body.capture());
+        verify(s3Client, never()).copyObject(any(CopyObjectRequest.class));
+        assertEquals("public/product/1/20260216/a.jpg", req.getValue().key());
+        assertEquals("image/jpeg", req.getValue().contentType());
+        byte[] stored = readAll(body.getValue());
+        assertFalse(hasGps(stored));
+    }
+
+    @Test
+    @DisplayName("copyObject 到 public/：結構壞掉的圖片拒絕，不寫入也不退回原檔複製")
+    void copyToPublicRejectsCorruptImage() {
+        ReflectionTestUtils.setField(service, "publicPrefix", "public");
+        byte[] corrupt = java.util.Arrays.copyOf(JPEG_WITH_GPS, 12);
+        when(s3Client.getObjectAsBytes(any(software.amazon.awssdk.services.s3.model.GetObjectRequest.class)))
+            .thenReturn(software.amazon.awssdk.core.ResponseBytes.fromByteArray(
+                software.amazon.awssdk.services.s3.model.GetObjectResponse.builder().contentType("image/jpeg").build(),
+                corrupt));
+
+        assertThrows(MediaServiceException.class,
+            () -> service.copyObject("tmp/20260216/a.jpg", "public/product/1/20260216/a.jpg"));
+        verify(s3Client, never()).copyObject(any(CopyObjectRequest.class));
+        verify(s3Client, never()).putObject(any(PutObjectRequest.class), any(RequestBody.class));
+    }
+
+    @Test
+    @DisplayName("copyObject 到 public/：不是圖片的物件照舊伺服器端複製")
+    void copyToPublicNonImageUsesServerSideCopy() {
+        ReflectionTestUtils.setField(service, "publicPrefix", "public");
+        when(s3Client.getObjectAsBytes(any(software.amazon.awssdk.services.s3.model.GetObjectRequest.class)))
+            .thenReturn(software.amazon.awssdk.core.ResponseBytes.fromByteArray(
+                software.amazon.awssdk.services.s3.model.GetObjectResponse.builder().build(),
+                "%PDF-1.7".getBytes(java.nio.charset.StandardCharsets.ISO_8859_1)));
+
+        service.copyObject("tmp/20260216/a.pdf", "public/shipping/1/20260216/a.pdf");
+
+        verify(s3Client).copyObject(any(CopyObjectRequest.class));
+    }
+
+    @Test
+    @DisplayName("uploadStream 到 public/：圖片剝除 metadata 後上傳")
+    void uploadToPublicStripsMetadata() {
+        ReflectionTestUtils.setField(service, "publicPrefix", "public");
+
+        service.uploadStream("public/shipping/20260216/u/a.jpg",
+            new ByteArrayInputStream(JPEG_WITH_GPS), "image/jpeg", JPEG_WITH_GPS.length);
+
+        ArgumentCaptor<RequestBody> body = ArgumentCaptor.forClass(RequestBody.class);
+        verify(s3Client).putObject(any(PutObjectRequest.class), body.capture());
+        assertFalse(hasGps(readAll(body.getValue())));
+    }
+
+    @Test
+    @DisplayName("uploadStream 到 tmp/：不處理，位元組原樣（轉正時才剝除）")
+    void uploadToTmpIsUntouched() {
+        ReflectionTestUtils.setField(service, "publicPrefix", "public");
+
+        service.uploadStream("tmp/20260216/a.jpg",
+            new ByteArrayInputStream(JPEG_WITH_GPS), "image/jpeg", JPEG_WITH_GPS.length);
+
+        ArgumentCaptor<RequestBody> body = ArgumentCaptor.forClass(RequestBody.class);
+        verify(s3Client).putObject(any(PutObjectRequest.class), body.capture());
+        assertTrue(hasGps(readAll(body.getValue())));
+    }
+
+    private static byte[] readAll(RequestBody body) {
+        try (java.io.InputStream in = body.contentStreamProvider().newStream()) {
+            return in.readAllBytes();
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
     }
 
     @Test
