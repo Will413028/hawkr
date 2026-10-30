@@ -6,8 +6,8 @@
     ".freezed.dart",
     ".mocks.dart"
   ],
-  "coveredLines": 21374,
-  "instrumentedLines": 44746,
+  "coveredLines": 21354,
+  "instrumentedLines": 44728,
   "instrumentedFiles": [
     "lib/app.dart",
     "lib/config/firebase_config.dart",
