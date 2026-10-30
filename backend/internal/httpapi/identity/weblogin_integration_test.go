@@ -579,7 +579,7 @@ func TestWebLoginRefusesAReplayedCallback(t *testing.T) {
 	start := b.get("/api/auth/google/start")
 	loc := start.Header.Get("Location")
 	u, _ := url.Parse(loc)
-	q := url.Values{"state": {u.Query().Get("state")}, "code": {f.idp[identity.ProviderGoogle].authorize(loc, nil)}}
+	q := url.Values{"state": {u.Query().Get("state")}, "code": {f.idp[identity.ProviderGoogle].authorize(loc, nil)}, "iss": {"https://accounts.google.com"}}
 	binding := b.cookies[httpidentity.LoginCookie]
 	first := b.get("/api/auth/google/callback?" + q.Encode())
 	if setCookie(first, rpc.SessionCookie) == nil {
@@ -736,8 +736,10 @@ func TestGatewayReceivesNoSessionCredential(t *testing.T) {
 
 // D6：以 session cookie 認證的寫入要 same-origin（或沒有 Sec-Fetch-Site 時 Origin 是 web 的 origin），Bearer 不檢查。
 // 拒絕發生在 handler 之前（403，body 帶 cross-origin 說明）；放行的請求會進到 handler，回應不是這個 403。
-// mutation：拿掉 server.go 的 withCookieCSRF 一行，cookie＋cross-site 的案例變成放行；讓 withCookieCSRF 也檢查 Bearer，
-// Bearer＋cross-site 的案例變成 403；把「兩者都沒有」改成放行，「cookie 兩者都沒有」的案例變成放行。
+// 瀏覽器的跨站寫入不論憑證都先被既有的 http.CrossOriginProtection 擋下（App 不送 Sec-Fetch-Site），所以 Bearer＋cross-site 也是 403，
+// 由那一層而不是 D6 層擋；D6 層不檢查 Bearer 由「Bearer 不送 Sec-Fetch-Site／Origin」與「Bearer 與 cookie 同時、兩者都沒有」放行證明。
+// mutation：拿掉 server.go 的 withCookieCSRF 一行，「cookie 兩者都沒有」的案例變成放行；讓 withCookieCSRF 也檢查 Bearer，
+// 兩個 Bearer 放行的案例變成 403；把「兩者都沒有」改成放行，「cookie 兩者都沒有」的案例變成放行。
 func TestCookieAuthenticatedWritesRequireSameOrigin(t *testing.T) {
 	t.Parallel()
 	f := setupWeb(t)
@@ -776,8 +778,10 @@ func TestCookieAuthenticatedWritesRequireSameOrigin(t *testing.T) {
 		{"cookie Origin 不符", []string{cookie, session, "Origin", "https://evil.example"}, true},
 		{"cookie same-origin", []string{cookie, session, "Sec-Fetch-Site", "same-origin"}, false},
 		{"cookie 沒有 Sec-Fetch-Site、Origin 是 web", []string{cookie, session, "Origin", webOrigin}, false},
-		{"Bearer 跨站", []string{"Authorization", "Bearer " + tok, "Sec-Fetch-Site", "cross-site"}, false},
-		{"Bearer 與 cookie 同時、跨站", []string{"Authorization", "Bearer " + tok, cookie, session, "Sec-Fetch-Site", "cross-site"}, false},
+		{"Bearer 跨站（既有層擋）", []string{"Authorization", "Bearer " + tok, "Sec-Fetch-Site", "cross-site"}, true},
+		{"Bearer 與 cookie 同時、跨站（既有層擋）", []string{"Authorization", "Bearer " + tok, cookie, session, "Sec-Fetch-Site", "cross-site"}, true},
+		{"Bearer 不送 Sec-Fetch-Site 與 Origin", []string{"Authorization", "Bearer " + tok}, false},
+		{"Bearer 與 cookie 同時、兩者都沒有", []string{"Authorization", "Bearer " + tok, cookie, session}, false},
 	}
 	for _, c := range cases {
 		code, body := post(c.header...)

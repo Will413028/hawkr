@@ -281,7 +281,7 @@ func (f *fixture) sessionToken(t *testing.T, accountID int64) string {
 	hash := sha256.Sum256([]byte(tok))
 	if _, err := f.db.Pool().Exec(context.Background(),
 		`INSERT INTO identity.sessions (token_hash, account_id, client, created_at, last_used_at, absolute_expires_at, auth_time)
-		 VALUES ($1, $2, 'APP', $3, $3, $3 + interval '90 days', $3)`, hash[:], accountID, f.now); err != nil {
+		 VALUES ($1, $2, 'APP', $3, $3, $3::timestamptz + interval '90 days', $3)`, hash[:], accountID, f.now); err != nil {
 		t.Fatal(err)
 	}
 	return tok

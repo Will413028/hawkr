@@ -6,7 +6,7 @@
 
 ## 擁有的資料
 
-schema `identity`（`db/schema.sql`）：`accounts`（`clerk_user_id` UNIQUE，墓碑也保留）、`account_roles`、`account_suspensions`（停權紀錄）、`admins`（`access_subject` UNIQUE）、`admin_roles`、`admin_role_events`（只追加）、`apple_tokens`、`account_identities`（provider 身分，(provider, subject) 主鍵，帳號刪除時留作墓碑，清掉 email）、`sessions`（opaque session，只存 token 的 SHA-256）、`login_flows`（web 登入流程的單次暫存）、`app_login_nonces`（App 登入的單次 nonce）。`clerk_user_id` 過渡期可為 NULL（自建登入的帳號沒有），Clerk 退場時刪欄。帳號與管理員的主鍵過渡期是 IDENTITY，見 `CARRYOVER.md`。讀取模型：無。
+schema `identity`，資料表與欄位的說明在 `docs/modules/identity.md` §9。`clerk_user_id` 過渡期可為 NULL（自建登入的帳號沒有），Clerk 退場時刪欄；帳號與管理員的主鍵過渡期是 IDENTITY，見 `CARRYOVER.md`。讀取模型：無。
 
 ## 發布的讀取介面
 
@@ -16,27 +16,27 @@ schema `identity`（`db/schema.sql`）：`accounts`（`clerk_user_id` UNIQUE，�
 
 - 根套件組裝 `Module`，保留公開型別別名、事件、錯誤、provider 建構函式與轉呼叫方法。根套件不得 import `store`。
 - 根套件的 `Deps` 是組裝 API；`internal/model` 定義公開型別、事件與 provider 介面；各子領域宣告最小 `Deps`。
-- `internal/account`：帳號、角色、清單、首次認證建帳與 Clerk 使用者 job。`internal/admin`：管理員查詢。`internal/auth`：Authenticate 的路由（後台 JWT 以 iss 辨認，其餘當 session）、認證時建管理員、舊 Google step-up。`internal/session`：session 的建立、解析（逾時、續期、帳號狀態與角色）、撤銷，以及 web 登入流程與 App nonce 的單次使用。`internal/login`：以 provider 身分登入、建帳、Google 自動連結、手動連結。`internal/applerevoke`：Apple 憑證的連結、換 token、保存的 job 與刪帳時撤銷。
-- `internal/provider` 把 `clerk`、`apple`、`oidc`、`seal` 的 client 接成模組公開介面，並提供本機 dev token；`internal/store` 是 sqlc 查詢套件。
+- 子領域套件（`internal/account`、`admin`、`auth`、`session`、`login`、`applerevoke`）與 `internal/provider`、`internal/store` 的分工在 `docs/modules/identity.md` §11。
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。
 
 ## 不變量
 
-- 後台 Access/dev admin token（JWT，以 `iss` 精確比對）只認證成管理員；其餘 token 一律當顧客的 opaque session，只認證成帳號。守門：`TestAuthenticationErrors`、`TestServicesAreSeparatedByAudience`（httpapi/identity）。規格：`docs/modules/identity.md` §1。
-- session 只存 token 的 SHA-256；閒置逾時 web 7 天、App 14 天，絕對逾時 90 天，`last_used_at` 一天最多寫一次；登入一律換發新 token。停權與刪帳在同一個 transaction 刪該帳號全部 session。守門：`TestSessionIdleAndAbsoluteExpiry`、`TestSessionRenewalWritesAtMostOncePerDay`、`TestSuspensionAndSessionDeletionAreAtomic`、`TestDeletionIsAtomicAcrossSessionsAndIdentities`、`TestLoginIssuesAFreshSessionAndRevokesThePreviousOne`。
-- App 原生登入的 ID token：Google 驗 `iss`（兩種寫法）、`aud` 為 web client ID、`azp` 在允許清單、`nonce`；LINE 以 ES256 與 JWKS 驗；nonce 先比對 ID token、通過才單次消耗。`RevokeSession` 的重新驗證期限是 `ReauthWindow`。守門：`TestGoogleAppLoginVerifiesTheIDToken`、`TestLineAppLoginVerifiesTheES256IDTokenWithTheJWKS`（provider）、`TestRevokeSessionNeedsRecentAuthentication`（httpapi/identity）。規格：`docs/modules/identity.md` §1。
-- Google 自動連結只在 `email_verified` 為真、email 網域是 `gmail.com` 或帶 `hd`、而且恰好一個存活帳號上有「符合自動連結資格的 Google 身分」（`auto_link_eligible`：Google、已驗證、gmail.com 或帶 `hd`）的 email 相符時發生；比對的是身分的 email，不是 `accounts.email`；LINE 從不自動連結，LINE 的已驗證 email 也不是目標。同一個 (provider, subject) 並發的首次登入只建一個帳號。守門：`TestAutoLinking`、`TestLineVerifiedEmailIsNotAnAutoLinkAnchor`、`TestAutoLinkIgnoresTombstones`、`TestConcurrentFirstLoginsShareOneAccount`、`TestLoginIsAtomic`。
-- 登入流程的 `state` 與 App 的 nonce 單次使用，驗證失敗也已作廢，10 分鐘與 5 分鐘逾時；返回網址只收站內相對路徑。守門：`TestLoginFlowIsSingleUse`、`TestLoginFlowRefusesUnsafeReturnPathsAndUnknownProviders`、`TestAppNonceIsSingleUseAndShortLived`。
-- 新帳號不授予角色（買家由 buyer 訂閱 `AccountCreated` 建立）。守門：`TestLoginCreatesAnAccountForEachProvider`。Clerk 時期的 `clerk_user_id` UNIQUE 在 Clerk 退場前保留。規格：§2。
-- 刪帳與（有 Clerk 使用者時）排入刪除它的 job 在同一個 transaction，刪帳留下墓碑並發出 `AccountDeleted`；停權不排 Clerk job，認證結果帶 `SuspendedAt`、不回錯誤。守門：`TestSuspendedAccountStillAuthenticatesAndCarriesTheSuspensionTime`、`TestDeletionLeavesATombstoneAndDeletesTheClerkUser`；`accounts_deleted_check`。規格：§4。
-- 停權紀錄與 `suspended_at` 同一個 transaction，未解除的紀錄最多一筆；停權、解除入口只由 `accountsuspension` 呼叫。守門：`TestFailureAfterTheRecordRollsTheRecordBack`、`TestRepeatedSuspendKeepsTheFirstRecord`、arch 的 `TestSuspensionEntriesAreOnlyCalledByAccountsuspension`。規格：§4。
-- 帳號生命週期 ACTIVE → PENDING_DELETION → DELETED；等待刪除時 `GrantRole` 回 FailedPrecondition。守門：`TestDeletionPendingRefusesGrantRole`；`accounts_deletion_pending_check`。規格：§4。
+- 後台 Access/dev admin token（JWT，以 `iss` 精確比對）只認證成管理員；其餘 token 一律當顧客的 opaque session，只認證成帳號。規格：`docs/modules/identity.md` §1。
+- session 只存 token 的 SHA-256；閒置逾時 web 7 天、App 14 天，絕對逾時 90 天，`last_used_at` 一天最多寫一次；登入一律換發新 token。停權與刪帳在同一個 transaction 刪該帳號全部 session。
+- App 原生登入的 ID token：Google 驗 `iss`（兩種寫法）、`aud` 為 web client ID、`azp` 在允許清單、`nonce`；LINE 以 ES256 與 JWKS 驗；nonce 先比對 ID token、通過才單次消耗。`RevokeSession` 的重新驗證期限是 `ReauthWindow`。規格：`docs/modules/identity.md` §1。
+- Google 自動連結只在 `email_verified` 為真、email 網域是 `gmail.com` 或帶 `hd`、而且恰好一個存活帳號上有「符合自動連結資格的 Google 身分」（`auto_link_eligible`：Google、已驗證、gmail.com 或帶 `hd`）的 email 相符時發生；比對的是身分的 email，不是 `accounts.email`；LINE 從不自動連結，LINE 的已驗證 email 也不是目標。同一個 (provider, subject) 並發的首次登入只建一個帳號。
+- 登入流程的 `state` 與 App 的 nonce 單次使用，驗證失敗也已作廢，10 分鐘與 5 分鐘逾時；返回網址只收站內相對路徑。
+- 新帳號不授予角色（買家由 buyer 訂閱 `AccountCreated` 建立）。Clerk 時期的 `clerk_user_id` UNIQUE 在 Clerk 退場前保留。規格：§2。
+- 刪帳與（有 Clerk 使用者時）排入刪除它的 job 在同一個 transaction，刪帳留下墓碑並發出 `AccountDeleted`；停權不排 Clerk job，認證結果帶 `SuspendedAt`、不回錯誤。規格：§4。
+- 停權紀錄與 `suspended_at` 同一個 transaction，未解除的紀錄最多一筆；停權、解除入口只由 `accountsuspension` 呼叫。規格：§4。
+- 帳號生命週期 ACTIVE → PENDING_DELETION → DELETED；等待刪除時 `GrantRole` 回 FailedPrecondition。規格：§4。
 - 授予、移除角色與刪帳都先鎖帳號列；`DeleteAccount` 只由 accountdeletion 呼叫。守門：無（只有規格）。規格：§3、§4。
-- 不是角色的值（例如 `BUYER`）授予或移除回 InvalidInput。守門：`TestRemoveRole`；`account_roles_role_check`。規格：§3。
-- 授予、撤銷管理員角色與寫 `admin_role_events` 在同一個 transaction；事件只追加；撤銷在同一個 transaction 內發出 `AdminRoleRevoked`，授予不發。守門：`TestAdminRoleEventsAreAppendOnly`、`TestRevokePublishesAdminRoleRevokedInTheSameTransaction`。規格：§5。
-- `AdminAllows` 在呼叫方的 transaction 內以 `FOR SHARE` 讀角色列，與撤銷互相等待。守門：`TestAdminAllowsReadsRolesInsideTheCallersTransaction`。規格：§5。
-- 每個請求都讀角色、不快取；零角色沒有任何權限。守門：`TestOwnerPassesEveryCheckAndRevocationTakesEffectOnTheNextRequest`（httpapi/identity）。規格：§5。
-- Apple 憑證只在 ID token 與連結時身分相同才保存；身分不符或帳號已刪除才當場撤銷，暫時性失敗不撤銷；刪帳在同一個 transaction 取走 token 並排入撤銷。守門：`TestExchangeRevokesWhenTheCodeBelongsToSomeoneElse`（applerevoke）、`TestAppleTokenIsStoredReplacedAndRevokedOnDeletion`。規格：§7。
+- 不是角色的值（例如 `BUYER`）授予或移除回 InvalidInput。規格：§3。
+- 授予、撤銷管理員角色與寫 `admin_role_events` 在同一個 transaction；事件只追加；撤銷在同一個 transaction 內發出 `AdminRoleRevoked`，授予不發。規格：§5。
+- `AdminAllows` 在呼叫方的 transaction 內以 `FOR SHARE` 讀角色列，與撤銷互相等待。規格：§5。
+- 每個請求都讀角色、不快取；零角色沒有任何權限。規格：§5。
+- Apple 憑證只在 ID token 與連結時身分相同才保存；身分不符或帳號已刪除才當場撤銷，暫時性失敗不撤銷；刪帳在同一個 transaction 取走 token 並排入撤銷。規格：§7。
+- 每條不變量的守門測試與約束列在 `docs/modules/identity.md` §12。
 
 ## 不負責
 
