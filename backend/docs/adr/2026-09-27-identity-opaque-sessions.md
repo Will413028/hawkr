@@ -2,7 +2,7 @@
 
 | 項目 | 值 |
 |---|---|
-| 狀態 | 部分被取代：D1、D2、D4、D5 由 `2026-09-27-identity-clerk.md` 取代，D3 只留「停權、角色、刪帳以 identity 的資料為準」 |
+| 狀態 | D1、D2、D3 恢復有效（2026-10-30，Will，`2026-10-30-identity-self-hosted-federated-login.md`）；D4、D5 作廢（手機 OTP 與三竹簡訊隨 `2026-09-27-identity-clerk.md` 移除，未恢復） |
 | 日期 | 2026-09-27 |
 | 影響範圍 | 單體的 identity 模組與 `internal/httpapi` 的認證；四個 client 的登入與憑證處理；設計書 17、51 |
 | 上層決策 | `2026-09-24-go-modular-monolith.md` D1、D5；`2026-09-26-external-contract-protobuf-connect.md` D6（入口在 A2 移到單體） |

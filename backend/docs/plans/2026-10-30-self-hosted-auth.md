@@ -58,7 +58,7 @@
 
 步驟 1a、1b 完成前不開步驟 2。步驟 2、3、4 必須連著做：步驟 2 合進 main 後 website 就登不進，到步驟 3 完成為止。
 
-- [ ] **1a. 前置驗證**（被擋於：無）
+- [x] **1a. 前置驗證**（被擋於：無）
   - 範圍：
     - spike（產出事實，不是產品程式）：
       - a. LINE Login v2.1：ID token 的簽章（web channel 是否 HS256＋channel secret、原生 SDK 是否 ES256＋JWKS）、`nonce`、email 要申請的權限與沒給 email 時的行為、`sub` 在同一 provider 底下跨 channel 是否相同。
@@ -73,7 +73,7 @@
   - 停止條件：LINE 的事實讓「帳號只在 Google 的 email 已驗證時自動連結」或「web 用 redirect 流程」做不到時，停下帶事實回報 Will。
   - 需要人做的事：Will 登入 Google Cloud Console 與 LINE Developers（建立開發用 OAuth client 由 agent 操作瀏覽器完成，secret 直接存進本機 `secrets/`，不經對話）。
 
-- [ ] **1b. 新 ADR**（被擋於：步驟 1a、D2–D6）
+- [x] **1b. 新 ADR**（被擋於：步驟 1a、D2–D6）
   - 範圍：
     - 方法簡報（前提題、業界基準、REAL／SELF-IMPOSED 約束帳），fresh subagent 批判後交 Will 拍板 D2–D6。
     - 寫新 ADR（decision-log skill）取代 `2026-09-27-identity-clerk.md`：寫明它的各修訂哪些沿用（後台 Access、受限登入、email 當通知寄件地址改為登入時取得），哪些作廢（D1–D8 的 Clerk 部分、job `identity.clerk_user`、2026-10-08 的 Apple 授權撤銷修訂：不再提供 Apple 登入）；`2026-09-27-identity-opaque-sessions.md` 的狀態改成依 D1 的結論恢復。兩份舊 ADR 只改狀態列並加取代註記。
@@ -83,10 +83,10 @@
 
 - [ ] **2. 後端：session 與聯合登入**（被擋於：步驟 1b）
   - 範圍：
-    - schema（identity 模組，Atlas migration）：`sessions`（token 雜湊、account、client kind、建立、最後使用、絕對到期）、`account_identities`（provider、`sub`、UNIQUE(provider, sub)、email、`email_verified`）、web 登入流程的暫存狀態（依 D3）。
+    - schema（identity 模組，Atlas migration）：`sessions`（token 雜湊、account、client kind、建立、最後使用、絕對到期）、`account_identities`（provider、`sub`、UNIQUE(provider, sub)、email、`email_verified`）、web 登入流程的暫存狀態（D3：單次使用的一列）、App 換 session 用的單次 nonce（D2）。
     - identity 公開 API：解析 session（一併讀帳號狀態與角色）、以 provider 的身分登入或建帳（自動連結只在 Google 且 `email_verified` 為真時，比對既有帳號的已驗證 email）、手動連結（已登入，provider 的 `sub` 已屬別的帳號時回錯誤）、登出（刪列）；停權、刪帳刪掉該帳號全部 session（同一個 transaction）。
     - 入口：web 的 `GET /api/auth/{provider}/start`、`GET|POST /api/auth/{provider}/callback`（純 HTTP handler，不走 Connect；依 D3），callback 設 `__Host-hk_session` 後 302 回 website；App 的 token 交換 RPC（原生 SDK 給的 ID token／授權碼換 session，依 D2）；`SignOut`、`LinkIdentity` RPC。
-    - `rpc/session.go`：Bearer 或 `__Host-hk_session`，其他位置不收；`__session` 刪除。CSRF：只對以 cookie 認證的請求檢查——非 GET／HEAD 的請求 `Origin` 必須是 website 的 origin，缺 `Origin` 拒絕；以 Bearer 認證的請求（App、admin BFF 轉的 Access JWT）不帶 ambient credential，不檢查。
+    - `rpc/session.go`：Bearer 或 `__Host-hk_session`，其他位置不收；`__session` 刪除。CSRF（D6）：只對以 cookie 認證的請求檢查——非 GET／HEAD 的請求 `Sec-Fetch-Site` 必須是 `same-origin`，瀏覽器沒送時 `Origin` 必須是 website 的 origin，兩者都沒有就拒絕；cookie 請求只有宣告 `NO_SIDE_EFFECTS` 的 procedure 能走 GET；以 Bearer 認證的請求（App、admin BFF 轉的 Access JWT）不帶 ambient credential，不檢查。
     - start／callback 是純 HTTP 路由，不在 `rpc.CheckDeclarations` 的對照內：在 `internal/httpapi` 以測試列出全部 `/api/auth/*` 路由並斷言它們不經 `withSession` 的寫入路徑；`ratelimit.go` 為它們加每 IP 的限流；CORS 不放行（只走同源反代）。
     - 舊 gateway：`backend/internal/legacy/gatewayproxy` 照舊只轉單體解析出的 principal，不把 `__Host-hk_session` 或 Bearer 原樣轉出。
     - session 管理：`ListSessions`、`RevokeSession`（終止前要求 15 分鐘內重新以任一已連結的 provider 驗證過，依 ASVS）。
@@ -94,7 +94,7 @@
     - dev token 改成直接建 dev session（`make dev-token` 介面不變）。
   - 消費端：`rg -n 'withSession|rpc\.Session|SessionFrom|__session' backend/internal`；`rg -n 'GetSession' api website/lib buyer-app/lib seller-app/lib packages`；舊 gateway 轉送 `rg -n 'Authorization|Cookie' backend/internal/legacy/gatewayproxy`。
   - 不能動：`effects.go` 的語意與 `withSession` 是唯一執行點；account ID；`GetSession` 的回應形狀（A7-1d″ 的巢狀 message）。
-  - 驗收：backend monolith CI 等價（gofmt、vet、test、`-tags integration -p 2`、`make lint-monolith` 0 issues、`GOWORK=off go mod tidy` 無 diff、`buf lint`；`buf breaking` 照 `api-contract.yml` 現行設定跑，契約有破壞性變更時照上線前規則在 commit 訊息寫明）。integration 測試：兩家各一條登入建帳、Google 已驗證 email 自動連結、Google 未驗證與 LINE 相同 email 不連結而建新帳、手動連結衝突、停權後 session 讀到停權狀態且寫入回 `ACCOUNT_SUSPENDED`、刪帳後 session 失效、閒置與絕對逾時、`state`／`nonce`／PKCE 不符拒絕、cookie 請求 `Sec-Fetch-Site` 為 cross-site 或 `Origin` 不符時拒絕、Bearer 請求放行、重放 `state` 被拒、返回網址 `//evil` 與絕對網址被拒、登出用 GET 被拒、Google 非 gmail 且無 `hd` 不自動連結、mix-up（以 A 家的 code 打 B 家的 callback）被拒、未重新驗證時 `RevokeSession` 被拒、登入回應帶 `no-store`、`/api/auth/*` 超過限流回 429。mutation：拿掉 CSRF 檢查要紅、`state` 改成可重用要紅、返回網址不檢查要紅、自動連結拿掉 `hd`／gmail 條件要紅、拿掉預期 provider 比對要紅、自動連結條件拿掉 `email_verified` 要紅、自動連結放行 LINE 要紅、停權不刪 session 且解析不讀狀態要紅、不檢查 `state` 要紅、token 從 query 也收要紅、登入不換發新 session 要紅。
+  - 驗收：backend monolith CI 等價（gofmt、vet、test、`-tags integration -p 2`、`make lint-monolith` 0 issues、`GOWORK=off go mod tidy` 無 diff、`buf lint`；`buf breaking` 照 `api-contract.yml` 現行設定跑，契約有破壞性變更時照上線前規則在 commit 訊息寫明）。integration 測試：兩家各一條登入建帳、Google 已驗證 email 自動連結、Google 未驗證與 LINE 相同 email 不連結而建新帳、手動連結衝突、停權後 session 讀到停權狀態且寫入回 `ACCOUNT_SUSPENDED`、刪帳後 session 失效、閒置與絕對逾時、`state`／`nonce`／PKCE 不符拒絕、cookie 請求 `Sec-Fetch-Site` 為 cross-site 或 `Origin` 不符時拒絕、Bearer 請求放行、重放 `state` 被拒、返回網址 `//evil` 與絕對網址被拒、登出用 GET 被拒、Google 非 gmail 且無 `hd` 不自動連結、mix-up（以 A 家的 code 打 B 家的 callback）被拒、未重新驗證時 `RevokeSession` 被拒、登入回應帶 `no-store`、`/api/auth/*` 超過限流回 429。mutation：拿掉 CSRF 檢查要紅、callback 不比對登入前 cookie 要紅（login CSRF）、App 交換不比對 nonce 要紅、cookie 請求的寫入 procedure 改走 GET 被放行要紅、`state` 改成可重用要紅、返回網址不檢查要紅、自動連結拿掉 `hd`／gmail 條件要紅、拿掉預期 provider 比對要紅、自動連結條件拿掉 `email_verified` 要紅、自動連結放行 LINE 要紅、停權不刪 session 且解析不讀狀態要紅、不檢查 `state` 要紅、token 從 query 也收要紅、登入不換發新 session 要紅。
   - 停止條件：步驟 1 的 spike 結論與本步驟寫法不同時，先改計畫再做。
   - 完成後的狀態：website 與兩支 App 登不進（Clerk 的 token 不再被接受），必須接著做步驟 3。
 
@@ -134,31 +134,31 @@
   - B：照字面恢復 D4、D5——要重新引入三竹與手機驗證，與 A7-D19 的登入方式矛盾。
   - 結論：A。恢復 D1、D2、D3 全文，D4、D5 維持作廢；ADR：步驟 1b 的新 ADR。
 
-- **D2 App 怎麼取得 provider 的身分**（狀態：未決；擋住步驟：2、6；需要的事實：spike a）
+- **D2 App 怎麼取得 provider 的身分**（狀態：已決 2026-10-30，Will；擋住步驟：2、6；需要的事實：spike a）
   - A：原生 SDK（Google Sign-In、LINE SDK）在裝置上取得 ID token，App 呼叫 token 交換 RPC 換 session——業界最常見（Firebase、Supabase 的原生登入都這樣），體驗最好；後端要接受各 provider 給原生 client 的 audience（建議）。
   - B：系統瀏覽器走與 web 相同的 authorization code＋PKCE 流程，callback 以 App 的 universal link 帶回一次性 code 再換 session（[RFC 8252](https://www.rfc-editor.org/rfc/rfc8252)）——後端只有一條流程；但 Google、LINE 原生 SDK 的帳號選擇體驗較好（LINE 可直接跳 LINE App 授權）。
-  - 結論：（待 Will）
+  - 結論：A。後端先發單次 nonce；Google 帶不了 nonce 時改用短效 token＋單次使用紀錄（步驟 6 實測）；Google `aud`＝web client ID 加 `azp` 允許清單。ADR：`2026-10-30-identity-self-hosted-federated-login.md` D2。
 
-- **D3 web 的登入流程放在哪一層**（狀態：未決；擋住步驟：2、3；需要的事實：spike d）
+- **D3 web 的登入流程放在哪一層**（狀態：已決 2026-10-30，Will；擋住步驟：2、3；需要的事實：spike d）
   - A：單體負責 start 與 callback（純 HTTP handler，經同源反代），流程暫存狀態放在短效（10 分鐘）的簽章 cookie 或 identity 的一列，callback 直接設 session cookie——憑證只由後端處理，website 沒有 secret（建議）。
   - B：website 的 route handler 做 OAuth，再以 ID token 呼叫單體換 session——website 要持有兩家的 client secret，Workers 上要多管一份 secret。
-  - 結論：（待 Will）
+  - 結論：A，暫存放 identity 的一列（簽章 cookie 做不到單次使用，否決）；另設短效 `__Host-` 登入前 cookie 防 login CSRF。ADR：`2026-10-30-identity-self-hosted-federated-login.md` D3。
 
-- **D4 LINE 沒有可用 email 時**（狀態：未決；擋住步驟：2；需要的事實：spike a）
+- **D4 LINE 沒有可用 email 時**（狀態：已決 2026-10-30，Will；擋住步驟：2；需要的事實：spike a）
   - 背景：通知以 email 寄送（clerk ADR 2026-10-05 修訂）；LINE 要申請權限、使用者可以不同意。
   - A：照樣建帳，email 留空，通知以 App 推播或站內為主，需要寄信時在帳號設定補填並驗證（建議；不擋登入）。
   - B：沒有 email 就要求使用者當場填寫並驗證——要做 email 驗證流程，與「沒有 email 驗證碼」的範圍衝突。
-  - 結論：（待 Will）
+  - 結論：A，沿用 `2026-10-05-notification-module.md` 決策 8；寄件地址改為每次登入以已驗證 email 更新（取代 Clerk webhook）。ADR：`2026-10-30-identity-self-hosted-federated-login.md` D4。
 
 - **D5 Apple 授權碼與 `LinkAppleCredential` 的去向**（狀態：作廢 2026-10-30，Will 決定不提供 Apple 登入；Apple 的程式在步驟 4 刪除）
 
-- **D6 Next.js 伺服器端呼叫單體的寫入**（狀態：未決；擋住步驟：2、3；需要的事實：spike d）
+- **D6 Next.js 伺服器端呼叫單體的寫入**（狀態：已決 2026-10-30，Will；擋住步驟：2、3；需要的事實：spike d）
   - 背景：伺服器端發出的請求沒有瀏覽器的 `Sec-Fetch-Site`／`Origin`，CSRF 檢查會擋下寫入。
   - A：伺服器端只做讀取（GET 與 Connect 的唯讀 procedure），寫入一律由瀏覽器直接經同源反代送出——CSRF 檢查不需例外（建議）。
   - B：server action 轉送瀏覽器原本的 `Origin`／`Sec-Fetch-Site` 與 cookie——單體要信任 Worker 轉來的 header，多一個要守的信任邊界。
-  - 結論：（待 Will）
+  - 結論：A；cookie 請求只有 `NO_SIDE_EFFECTS` 的 procedure 能走 GET。ADR：`2026-10-30-identity-self-hosted-federated-login.md` D6。
 
-拍板順序：D1 已決、D5 作廢；D2、D3、D4、D6 等步驟 1a 的 spike 之後一起交，附方法簡報與 subagent 批判。
+拍板：D1 已決、D5 作廢；D2、D3、D4、D6 於 2026-10-30 依方法簡報（fresh subagent 批判後修正）由 Will 一次拍板，全採建議。
 
 ## 進度
 
@@ -167,7 +167,7 @@
 | 步驟 | 狀態 | 已跑的驗收 | 未跑的驗收與原因 | commit |
 |---|---|---|---|---|
 | 1a 前置驗證 | 完成 | 官方文件查證（a、c、e）與 repo 代理程式閱讀（d 前半）、govulncheck 基線（f），見 `spikes.md`；開發用 OAuth client 已建（GCP 專案 `hawkr` 的 web 與 buyer／seller iOS client；LINE provider `Hawkr` 的 channel `Hawkr Login (dev)`，callback 與 iOS bundle ID 已設）；b 取消（不提供 Apple） | 移到後續步驟的實測：LINE 拒給 email 的回應（email 權限要附登入畫面截圖，步驟 3 做出畫面後申請，驗收併入步驟 3）；Google iOS `aud`（步驟 6）；部署環境反代對 3xx、多個 `Set-Cookie` 的處理（反代程式不在 repo，步驟 3 的部署驗收） | `5cfb680`、`584ead2` |
-| 1b 新 ADR | 未開始 | | | |
+| 1b 新 ADR | 完成 | 方法簡報經 fresh subagent 批判（8 項全數處理）後 Will 拍板 D2–D4、D6；ADR `2026-10-30-identity-self-hosted-federated-login.md` 寫成，clerk ADR 標 superseded、opaque-sessions ADR 狀態改為 D1–D3 恢復；A7-D17 已修訂 | ADR gate 的獨立草稿未另跑（決策已經過方法簡報與 fresh 批判） | （本 commit） |
 | 2 後端：session 與聯合登入 | 未開始 | | | |
 | 3 website 切換 | 未開始 | | | |
 | 4 後端刪除 Clerk | 未開始 | | | |

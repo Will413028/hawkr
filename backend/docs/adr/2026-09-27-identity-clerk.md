@@ -2,7 +2,7 @@
 
 | 項目 | 值 |
 |---|---|
-| 狀態 | accepted |
+| 狀態 | superseded by `2026-10-30-identity-self-hosted-federated-login.md`（2026-10-30，Will；沿用與作廢見新 ADR） |
 | 日期 | 2026-09-27 |
 | 修訂 | 2026-09-27：D1、D2 後台改用 Cloudflare Access（Will，見文末〈修訂：後台改用 Cloudflare Access〉）；2026-10-05：email 以 webhook 同步、作為通知的寄件地址（Will，見文末〈修訂：email 作為通知的寄件地址〉）；2026-10-08：Apple 授權的撤銷改回伺服器保存 refresh token、刪帳時撤銷（Will，見文末〈修訂：Apple 授權由伺服器保存並在刪帳時撤銷〉）；2026-10-29：停權不再停用 Clerk 使用者（Will，見文末〈修訂：受限登入〉） |
 | 影響範圍 | 單體的 identity 模組與 `internal/httpapi` 的認證；四個 client 的登入；設計書 17、51 |
