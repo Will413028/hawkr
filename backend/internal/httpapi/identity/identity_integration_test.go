@@ -237,12 +237,12 @@ func TestGetSessionCreatesTheAccountAsABuyer(t *testing.T) {
 	}
 }
 
-func TestConnectRequiresBearerAndCrossOriginWriteIsDenied(t *testing.T) {
+func TestConnectIgnoresTheOldSessionCookieAndCrossOriginWriteIsDenied(t *testing.T) {
 	t.Parallel()
 	f := setup(t, options{apple: true})
 	ctx := context.Background()
 	tok := f.customerToken(t, "dev_web")
-	web := f.app(headers("Cookie", rpc.SessionCookie+"="+tok))
+	web := f.app(headers("Cookie", "__session="+tok))
 	_, err := web.GetSession(ctx, connect.NewRequest(&pb.GetSessionRequest{}))
 	wantCode(t, err, connect.CodeUnauthenticated)
 	withBearer := f.app(headers("Authorization", "Bearer "+tok))

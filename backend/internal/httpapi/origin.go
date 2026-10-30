@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+
+	httpidentity "github.com/Will413028/hawkr/backend/internal/httpapi/identity"
 )
 
 // 瀏覽器跨來源的呼叫只在入口處理一次；轉給 gateway 的 REST 也在這裡決定，gateway 不再回 CORS。web 在各環境都經
@@ -33,6 +35,11 @@ func withCORS(allowed []string, next http.Handler) http.Handler {
 	allowHeaders := strings.Join(corsAllowHeaders, ", ")
 	exposeHeaders := strings.Join(corsExposeHeaders, ", ")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// web 登入入口（/api/auth/*）只走同源反代，不放行跨來源：不回 CORS 的 header，preflight 也交給路由（405）。
+		if strings.HasPrefix(r.URL.Path, httpidentity.AuthPathPrefix) {
+			next.ServeHTTP(w, r)
+			return
+		}
 		origin := r.Header.Get("Origin")
 		ok := origin != "" && slices.Contains(allowed, origin)
 		h := w.Header()

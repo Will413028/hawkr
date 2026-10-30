@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	httpidentity "github.com/Will413028/hawkr/backend/internal/httpapi/identity"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
@@ -25,7 +27,12 @@ import (
 // identityConfig 是 identity 模組的外部 provider。
 type identityConfig struct {
 	providers identity.Providers
+	// webLogin 是 web 聯合登入已設定的 provider 的 client（Google、LINE）；沒設定的 provider，/api/auth/{provider}/start 回 404。
+	webLogin map[identity.Provider]webClient
 }
+
+// webClient 是 web 登入在一家 provider 的 OAuth client。
+type webClient struct{ id, secret string }
 
 // readIdentityConfig 讀 identity 的設定（ADR 2026-09-27-identity-clerk）。每組設定整組選填：沒有設定時那個功能回
 // unavailable 或無法登入；只設了一部分是設定錯誤。
@@ -36,6 +43,10 @@ type identityConfig struct {
 //   - DEV_AUTH_KEY_FILE：本機開發的 dev token 的 RSA 私鑰（make dev-key 產生）；設定時另外接受它簽的 token，不能與
 //     正式環境的 Clerk（sk_live_）或 Cloudflare Access 同時設定。
 //   - GOOGLE_CLIENT_IDS：vendor portal step-up 的 Google ID token 驗證（VendorPortalInviteeService.VerifySession）。
+//   - GOOGLE_WEB_CLIENT_ID、GOOGLE_WEB_CLIENT_SECRET：web 登入（/api/auth/google/*）的 Google OAuth client（authorization code ＋ PKCE），與
+//     GOOGLE_CLIENT_IDS（vendor portal step-up 驗 ID token 的 aud）無關；兩個都設才啟用，只設一個是設定錯誤。LINE_CHANNEL_ID、
+//     LINE_CHANNEL_SECRET：web 登入（/api/auth/line/*）的 LINE Login channel，同樣整組選填；LINE 的 web ID token 以 channel secret 驗（HS256）。
+//     redirect URI 是 PUBLIC_WEB_ORIGIN 加 /api/auth/{google,line}/callback，要登記在各家的 console。
 //   - APPLE_CLIENT_IDS、APPLE_TEAM_ID、APPLE_KEY_ID、APPLE_PRIVATE_KEY、IDENTITY_TOKEN_KEYS：App 原生登入交來的 Apple 授權碼換成
 //     refresh token 加密保存（LinkAppleCredential），刪帳號時撤銷。設了顧客的 Clerk 又沒有 DEV_AUTH_KEY_FILE（部署的環境）時
 //     五個都必填；只設一部分是設定錯誤；本機開發（DEV_AUTH_KEY_FILE）可以全部不設，LinkAppleCredential 回 unavailable。
@@ -75,6 +86,18 @@ func readIdentityConfig(ctx context.Context, e *config.Env) identityConfig {
 			e.Fail("GOOGLE_CLIENT_IDS：%v", err)
 		}
 		c.providers.Google = v
+	}
+	c.webLogin = map[identity.Provider]webClient{}
+	for _, w := range []struct {
+		provider         identity.Provider
+		idKey, secretKey string
+	}{
+		{identity.ProviderGoogle, "GOOGLE_WEB_CLIENT_ID", "GOOGLE_WEB_CLIENT_SECRET"},
+		{identity.ProviderLine, "LINE_CHANNEL_ID", "LINE_CHANNEL_SECRET"},
+	} {
+		if anySet(e, w.idKey, w.secretKey) {
+			c.webLogin[w.provider] = webClient{id: e.String(w.idKey), secret: e.String(w.secretKey)}
+		}
 	}
 	appleKeys := []string{"APPLE_CLIENT_IDS", "APPLE_TEAM_ID", "APPLE_KEY_ID", "APPLE_PRIVATE_KEY", "IDENTITY_TOKEN_KEYS"}
 	switch {
@@ -248,4 +271,26 @@ func runDevToken(ctx context.Context, args []string, out io.Writer) error {
 	}
 	_, err = fmt.Fprintln(out, tok)
 	return err
+}
+
+// newWebLogin 建立 web 聯合登入的路由（ADR 2026-10-30-identity-self-hosted-federated-login D3）。redirect URI 是 web 的網域加各家獨立的 callback 路徑。
+// session cookie 沒有設 Max-Age（瀏覽器的 session cookie），伺服器端的閒置與絕對逾時照 session 的規則。
+func newWebLogin(ctx context.Context, id *identity.Module, web rpc.WebOrigin, c identityConfig, log *slog.Logger) (*httpidentity.WebLogin, error) {
+	var providers []httpidentity.WebProvider
+	for _, p := range identity.LoginProviders() {
+		client, ok := c.webLogin[p]
+		if !ok {
+			continue
+		}
+		redirect, err := web.URL(httpidentity.AuthPathPrefix + httpidentity.PathOf(p) + "/callback")
+		if err != nil {
+			return nil, err
+		}
+		w, err := identity.NewWebLogin(identity.WebLoginConfig{Provider: p, ClientID: client.id, ClientSecret: client.secret, RedirectURL: redirect, Context: ctx})
+		if err != nil {
+			return nil, err
+		}
+		providers = append(providers, w)
+	}
+	return httpidentity.NewWebLogin(httpidentity.WebLoginDeps{Module: id, Providers: providers, Logger: log})
 }

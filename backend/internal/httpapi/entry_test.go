@@ -93,8 +93,7 @@ func TestSessionMiddleware(t *testing.T) {
 	h := entryWithAuth(t, caller)
 	withCookie := func(token string) *http.Request {
 		r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/app/buyers/me", nil)
-		r.AddCookie(&http.Cookie{Name: "__session", Value: token})
-		r.Header.Set("Sec-Fetch-Mode", "navigate")
+		r.AddCookie(&http.Cookie{Name: rpc.SessionCookie, Value: token})
 		return r
 	}
 	withBearer := func(token string) *http.Request {
@@ -122,21 +121,21 @@ func TestSessionMiddleware(t *testing.T) {
 		t.Fatalf("Bearer 應該優先：%q", rec.Body)
 	}
 
-	// 無效的 token：以訪客繼續；cookie 由 Clerk 管理，單體不清。
+	// 無效的 token：以訪客繼續，不改 cookie。
 	for _, r := range []*http.Request{withCookie("dead"), withBearer("dead")} {
 		if rec := do(h, r); !strings.Contains(rec.Body.String(), "ok=false") || rec.Header().Get("Set-Cookie") != "" {
 			t.Fatalf("無效的 token = %q，Set-Cookie %q", rec.Body, rec.Header().Get("Set-Cookie"))
 		}
 	}
 
-	// #2511：憑證只從 Clerk 的 cookie 與 Authorization: Bearer 讀，query、token header、其他 scheme、舊的 cookie 都不讀。
+	// #2511：憑證只從 session cookie 與 Authorization: Bearer 讀，query、token header、其他 scheme、舊的 cookie 都不讀。
 	for _, r := range []*http.Request{
 		httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/app/buyers/me?token=good", nil),
 		func() *http.Request {
 			r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/app/buyers/me", nil)
 			r.Header.Set("token", "good")
 			r.Header.Set("Authorization", "good")
-			r.AddCookie(&http.Cookie{Name: "__Host-hk_session", Value: "good"})
+			r.AddCookie(&http.Cookie{Name: "__session", Value: "good"})
 			return r
 		}(),
 	} {

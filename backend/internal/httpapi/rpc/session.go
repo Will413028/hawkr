@@ -10,26 +10,46 @@ import (
 	"time"
 )
 
-// SessionCookie 是 Clerk 在 web 設的 session cookie 的名稱（ADR 2026-09-27-identity-clerk D3）：同源的請求（web 經
-// 第一方反代打單體）自動帶上，值是 Clerk 的 session token。cookie 由 Clerk 的 SDK 寫入與更新（只在分頁有焦點時），
-// 單體只讀不寫。web 的請求以 Bearer 為主，cookie 給帶不了 header 的瀏覽器導覽下載與子資源（例如發票 PDF 與圖片）。
-const SessionCookie = "__session"
+// SessionCookie 是 web 的 session cookie 的名稱（ADR 2026-10-30-identity-self-hosted-federated-login D1）：單體在登入的 callback 設定，值是
+// opaque session token。`__Host-` 前綴要求 Secure、Path=/、沒有 Domain，cookie 因此只落在 web 的 host（web 經第一方同源反代打單體）。
+const SessionCookie = "__Host-hk_session"
 
-// Credential 回傳請求帶的 session token：四端都以 Authorization: Bearer 帶，沒有時僅在 GET REST 瀏覽器導覽或 no-cors 子資源讀 Clerk 的 cookie。兩者都有時
-// 以 Bearer 為準。其他位置（query、token header、Bearer 以外的 scheme）一律不讀（#2511）。
-func Credential(r *http.Request) string {
-	h := r.Header
-	if scheme, v, ok := strings.Cut(h.Get("Authorization"), " "); ok && strings.EqualFold(scheme, "Bearer") {
-		return strings.TrimSpace(v)
+// CredentialSource 是請求的憑證從哪裡來；CSRF 的檢查只針對 ambient 的 cookie（ADR 同上 D6），Bearer 要呼叫方自己帶，不檢查。
+type CredentialSource int
+
+const (
+	// CredentialNone 是請求沒有帶憑證。
+	CredentialNone CredentialSource = iota
+	// CredentialBearer 是 Authorization: Bearer。
+	CredentialBearer
+	// CredentialCookie 是 SessionCookie。
+	CredentialCookie
+)
+
+// Credential 回傳請求帶的 session token 與它的來源：只收 `Authorization: Bearer` 與 cookie SessionCookie（ADR 同上 D1），兩者都有時
+// 以 Bearer 為準。其他位置（query、token header、Bearer 以外的 scheme）一律不讀（#2511）。cookie 重複出現（同名兩個）視為沒有：
+// 無法判斷哪一個是我們設的。
+func Credential(r *http.Request) (string, CredentialSource) {
+	if scheme, v, ok := strings.Cut(r.Header.Get("Authorization"), " "); ok && strings.EqualFold(scheme, "Bearer") {
+		if token := strings.TrimSpace(v); token != "" {
+			return token, CredentialBearer
+		}
+		return "", CredentialNone
 	}
-	mode := h.Get("Sec-Fetch-Mode")
-	if r.Method != http.MethodGet || (mode != "navigate" && mode != "no-cors") || !strings.HasPrefix(r.URL.Path, "/api/v1/") {
-		return ""
+	var token string
+	for _, ck := range r.Cookies() {
+		if ck.Name != SessionCookie {
+			continue
+		}
+		if token != "" {
+			return "", CredentialNone
+		}
+		token = ck.Value
 	}
-	if ck, err := r.Cookie(SessionCookie); err == nil {
-		return ck.Value
+	if token == "" {
+		return "", CredentialNone
 	}
-	return ""
+	return token, CredentialCookie
 }
 
 type subjectKey struct{}

@@ -15,7 +15,7 @@ import (
 )
 
 // 單體的 Connect 以限流的身分（subject，見 subject.go）分級計數，每個 instance 各自計數：這是粗略的防護，全站的
-// 限流在後端 CD 設在 CDN（模組 CARRYOVER.md 的傳輸層盤點）。登入與它的防濫用由 Clerk 負責（ADR 2026-09-27-identity-clerk）。
+// 限流在後端 CD 設在 CDN（模組 CARRYOVER.md 的傳輸層盤點）。web 登入入口（/api/auth/*）另有每 IP 的級別（tierAuth）。
 // 轉給 gateway 的 REST 由 gateway 自己限流。級別與額度沿用 gateway 的 classifyTier（每 60 秒）。
 
 const rateWindow = time.Minute
@@ -203,6 +203,26 @@ func withFileRateLimit(l *rateLimiter, next http.Handler) http.Handler {
 		subject := rpc.SubjectFrom(r.Context())
 		if ok, wait := l.allow(tier.name+"|"+subject, tier.limit(subject)); !ok {
 			w.Header().Set("Cache-Control", "private, no-store")
+			w.Header().Set("Retry-After", strconv.Itoa(int(wait/time.Second)+1))
+			http.Error(w, "too many requests", http.StatusTooManyRequests)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// tierAuth 是 web 登入入口（/api/auth/*：start、callback）的額度，以連線端 IP 計數，不分登入與否、也不信 origin-auth 的身分：登入的請求
+// 是瀏覽器導覽，不經 SSR。一次登入是 start 加 callback 兩個請求，每個來源每分鐘 30 個請求（約 15 次登入）：共用位址（公司、校園的 NAT）的
+// 人也在額度內，掃描器與灌 login_flows 的程式則被擋。業界沒有固定的數字，這是保守的預設，要調整先看 429 的比例。
+var tierAuth = rateTier{name: "auth", visitor: 30}
+
+// withAuthRateLimit 為 web 登入入口計數：每個連線端 IP（IPv6 以 /64 聚合，同 visitorSubject）一個計數器，start 與 callback 共用；超過額度回
+// 429 加 Retry-After；回應不可快取。
+func withAuthRateLimit(l *rateLimiter, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		subject := visitorSubject(rpc.ClientIPFrom(r.Context()))
+		if ok, wait := l.allow(tierAuth.name+"|"+subject, tierAuth.limit(subject)); !ok {
+			w.Header().Set("Cache-Control", "no-store")
 			w.Header().Set("Retry-After", strconv.Itoa(int(wait/time.Second)+1))
 			http.Error(w, "too many requests", http.StatusTooManyRequests)
 			return

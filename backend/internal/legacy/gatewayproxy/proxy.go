@@ -267,6 +267,7 @@ func New(gatewayURL string, callerOf CallerOf, vendors VendorSessionOf, buyers B
 			pr.SetXForwarded()
 			c, _ := pr.In.Context().Value(resolvedCallerKey{}).(Caller)
 			ok := c.Principal.ID > 0
+			StripSessionCredentials(pr.Out.Header)
 			SetIdentity(pr.Out.Header, c, ok)
 			info, valid := pr.In.Context().Value(vendorSessionKey{}).(agent.SessionInfo)
 			SetVendorSession(pr.Out.Header, info, valid)
@@ -285,6 +286,35 @@ func New(gatewayURL string, callerOf CallerOf, vendors VendorSessionOf, buyers B
 		},
 	}
 	return &forwarder{proxy: proxy, callerOf: callerOf, vendors: vendors, buyers: buyers, sellers: sellers, log: log}, nil
+}
+
+// SessionCookie 是單體 session cookie 的名稱，必須等於 rpc.SessionCookie（legacy 不依賴 httpapi，httpapi 的 TestGatewayProxyStripsTheSessionCookieName 守住兩者相同）。
+const SessionCookie = "__Host-hk_session"
+
+// StripSessionCredentials 刪掉 h 裡單體的 session 憑證：Authorization 整個刪除，Cookie 只移除 session cookie（SessionCookie），其他 cookie
+// 原樣保留。gateway 只信單體解析出的身分 header（SetIdentity），不收原始憑證（ADR 2026-10-30-identity-self-hosted-federated-login D1）。
+func StripSessionCredentials(h http.Header) {
+	h.Del("Authorization")
+	lines := h.Values("Cookie")
+	if len(lines) == 0 {
+		return
+	}
+	h.Del("Cookie")
+	for _, line := range lines {
+		var kept []string
+		for part := range strings.SplitSeq(line, ";") {
+			name, _, _ := strings.Cut(strings.TrimSpace(part), "=")
+			if strings.TrimSpace(name) == SessionCookie {
+				continue
+			}
+			if strings.TrimSpace(part) != "" {
+				kept = append(kept, strings.TrimSpace(part))
+			}
+		}
+		if len(kept) > 0 {
+			h.Add("Cookie", strings.Join(kept, "; "))
+		}
+	}
 }
 
 // SetIdentity 刪掉 h 裡 client 帶來的身分 header，登入時（ok）再依入口認證過的呼叫者與解析的業務身分設上（#1859）。

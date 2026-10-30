@@ -208,6 +208,10 @@ func runServe(ctx context.Context) error {
 	events.Subscribe(bus, delegationservice.OnDelegationOperationCompleted(enqueueLegacy))
 	subscribeBuyerEvents(bus, jc)
 	id := newIdentity(d, bus, jc, idc, log)
+	webLogin, err := newWebLogin(verifierCtx, id, web, idc, log)
+	if err != nil {
+		return err
+	}
 	// 保存的 Apple token 用到的金鑰都要在 IDENTITY_TOKEN_KEYS 裡，缺了就不啟動。
 	if err := id.CheckAppleKeys(ctx); err != nil {
 		return err
@@ -264,6 +268,7 @@ func runServe(ctx context.Context) error {
 			Logger: log,
 		}),
 		Identity:        id,
+		WebLogin:        webLogin,
 		Buyer:           buyerModule,
 		Seller:          sellerModule,
 		Agent:           agentModule,

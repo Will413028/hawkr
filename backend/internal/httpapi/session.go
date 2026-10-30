@@ -15,26 +15,26 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// Authenticator 驗證 Clerk 的 session token；identity.Module 滿足它。
+// Authenticator 驗證 session token；identity.Module 滿足它。
 type Authenticator interface {
 	Authenticate(ctx context.Context, token string) (identity.Authenticated, error)
 }
 
-// withSession 驗證請求帶的 session token（ADR 2026-09-27-identity-clerk），把呼叫者放進 ctx（rpc.WithPrincipal）。
+// withSession 驗證請求帶的 session token（ADR 2026-10-30-identity-self-hosted-federated-login D1），把呼叫者放進 ctx（rpc.WithPrincipal）。
 //
 //   - 沒有帶 token：以訪客繼續；需要登入的 service 由 interceptor 回 unauthenticated。
-//   - token 無效、過期，或帳號已刪除：以訪客繼續。cookie 由 Clerk 的 SDK 管理，單體只讀不寫。
+//   - token 無效、過期，或帳號已刪除：以訪客繼續。
 //   - 後台的使用者不是允許的帳號：回 permission_denied，不以訪客繼續（否則後台只看到 unauthenticated，一直回到登入）。
 //   - 帳號停權：照樣登入，能做什麼依動作的性質（customerEffects，A7-D18），這裡是唯一的執行點。公開與受邀供應商的 service 以訪客執行
 //     （ctx 沒有 principal）；其他顧客 service 的讀取與自助放行，ctx 另帶停權時間（rpc.SuspensionFrom），寫入回 permission_denied 與
 //     ACCOUNT_SUSPENDED；不是 Connect 的路徑（轉給 gateway 的 REST）只放行不要求換協定的 GET、HEAD（WebSocket 升級有副作用，視為寫入），其餘回 403。
-//   - 問不到公鑰、資料庫或 Clerk：回 503，不以訪客繼續：「問不到」不等於「沒有登入」，否則 client 會把使用者登出。
+//   - 問不到公鑰或資料庫：回 503，不以訪客繼續：「問不到」不等於「沒有登入」，否則 client 會把使用者登出。
 //
 // 業務身分（buyer_id、store_id）不在這裡解析：只有需要它的地方——buyer 的 Connect handler 與轉給 gateway 的請求——
 // 才查，其他請求（例如賣家的 Connect 方法、GetSession）不受 buyer 查詢失敗影響。
 func withSession(auth Authenticator, log *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := rpc.Credential(r)
+		token, _ := rpc.Credential(r)
 		if token == "" {
 			next.ServeHTTP(w, r)
 			return

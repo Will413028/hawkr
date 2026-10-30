@@ -68,7 +68,9 @@ type Deps struct {
 	// ReviewQueue 是後台待辦（ReviewQueueAdminService）；時鐘用 Now。
 	ReviewQueue *reviewqueue.Module
 	Identity    *identity.Module
-	Seller      *seller.Module
+	// WebLogin 是 web 的聯合登入入口（/api/auth/{provider}/start 與 callback，經同源反代）；nil 時不掛。
+	WebLogin *httpidentity.WebLogin
+	Seller   *seller.Module
 	// Social 給後台建立內容下架措施前核對內容歸屬（SellerGovernanceAdminService.CreateMeasure）。
 	Social *social.Module
 	// Agent 是 vendor portal 的邀請與 session（VendorPortalPublicService、VendorPortalInviteeService）；Google 的 step-up 經 Identity。
@@ -227,6 +229,11 @@ func assemble(deps Deps, services []service, files ...fileRoute) (http.Handler, 
 			return nil, err
 		}
 		mux.Handle(f.pattern, withFileRateLimit(limiter, h))
+	}
+	if deps.WebLogin != nil {
+		for _, route := range deps.WebLogin.Routes() {
+			mux.Handle(route.Pattern, withAuthRateLimit(limiter, route.Handler))
+		}
 	}
 	if deps.Legacy != nil {
 		// 管理員的請求要有 legacy.gateway.forward 才轉發（ADR 2026-10-04-admin-roles）；其他呼叫者原樣放行。
