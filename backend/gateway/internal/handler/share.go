@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/Will413028/hawkr/gateway/internal/response"
 	"github.com/Will413028/hawkr/go-pkg/mediaurl"
@@ -39,7 +38,7 @@ type ShareURLData struct {
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Param        type  query  string  true  "資源類型（post, product, seller）"
+// @Param        type  query  string  true  "資源類型（post, product）"
 // @Param        id    query  string  true  "資源 ID"
 // @Success      200  {object}  object{code=int,data=ShareURLData}
 // @Failure      400  {object}  object{code=int,message=string}
@@ -60,10 +59,8 @@ func (h *Holder) GetShareURL(c *gin.Context) {
 		h.getPostShareURL(c, resourceID)
 	case "product":
 		h.getProductShareURL(c, resourceID)
-	case "seller":
-		h.getSellerShareURL(c, resourceID)
 	default:
-		response.BadRequest(c, "invalid type: must be post, product, or seller")
+		response.BadRequest(c, "invalid type: must be post or product")
 	}
 }
 
@@ -93,15 +90,26 @@ func (h *Holder) getPostShareURL(c *gin.Context, id string) {
 	// p.SellerId 是 string TSID（§6 Track 1 B5）；GetPostList sellerID 與分享 URL 皆用 string。
 	sellerID := p.SellerId
 
-	// 分享網址對外一律用 store_code（2026-07-23 起）；resolve 失敗（seller-
-	// service 暫時不可達等）時退回原始 store_id——分享連結仍可用（會被網站
-	// canonical redirect 導到 store_code 版），不因為這一步失敗就整支請求 503。
-	urlID := sellerID
-	if sid, sidErr := strconv.ParseInt(sellerID, 10, 64); sidErr == nil {
-		if sellerResp, sErr := h.Seller.GetSellerByStoreID(c.Request.Context(), sid); sErr == nil && sellerResp.Code == 0 && sellerResp.Data != nil && sellerResp.Data.StoreCode != "" {
-			urlID = sellerResp.Data.StoreCode
-		}
+	// 分享網址對外一律用 store_code；解析不到時回錯誤，不退回 store_id。
+	sid, parseErr := strconv.ParseInt(sellerID, 10, 64)
+	if parseErr != nil {
+		response.NotFound(c, "seller store code not found")
+		return
 	}
+	sellerResp, sErr := h.Seller.GetSellerByStoreID(c.Request.Context(), sid)
+	if sErr != nil {
+		response.GrpcErr(c, "seller", sErr)
+		return
+	}
+	if sellerResp.Code != 0 {
+		response.GrpcResult(c, sellerResp.Code, sellerResp.Message, nil)
+		return
+	}
+	if sellerResp.Data == nil || sellerResp.Data.StoreCode == "" {
+		response.NotFound(c, "seller store code not found")
+		return
+	}
+	urlID := sellerResp.Data.StoreCode
 
 	// 找出貼文在賣家列表中的位置，推算網站頁碼。
 	// GetPostList 的順序需與網站一致（預期皆為 created_at DESC）。
@@ -154,56 +162,6 @@ func (h *Holder) getProductShareURL(c *gin.Context, id string) {
 		Title:       title,
 		Description: description,
 		ImageURL:    mediaurl.BuildURL(h.MediaBaseURL, p.ImageKey), // 49 §6.6：分享圖走 /i/original（S6），Gateway 由 objectKey 組
-	})
-}
-
-func (h *Holder) getSellerShareURL(c *gin.Context, id string) {
-	sellerID, err := strconv.ParseInt(id, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "invalid seller id")
-		return
-	}
-
-	resp, err := h.Seller.GetSellerByStoreID(c.Request.Context(), sellerID)
-	if err != nil {
-		response.GrpcErr(c, "seller", err)
-		return
-	}
-	if resp.Code != 0 {
-		response.GrpcResult(c, resp.Code, resp.Message, nil)
-		return
-	}
-
-	s := resp.Data
-	title := s.Name
-
-	var parts []string
-	if s.City != "" || s.District != "" {
-		parts = append(parts, s.City+s.District)
-	}
-	parts = append(parts, fmt.Sprintf("%.1f 評分", s.Rating))
-	description := strings.Join(parts, " | ")
-
-	// s.LogoKey / s.CoverKey 為 objectKey（49 §6.6）；OG 預覽需完整 URL，由 Gateway 組。
-	var imageURL string
-	if s.LogoKey != "" {
-		imageURL = mediaurl.BuildURL(h.MediaBaseURL, s.LogoKey)
-	} else if s.CoverKey != "" {
-		imageURL = mediaurl.BuildURL(h.MediaBaseURL, s.CoverKey)
-	}
-
-	// s.StoreCode 理論上不應為空，但缺值時退回賣家自身 id，避免產生
-	// 結尾為 /sellers/ 的殘缺網址（對稱 getPostShareURL 的同款防呆）。
-	urlID := s.StoreCode
-	if urlID == "" {
-		urlID = strconv.FormatInt(sellerID, 10)
-	}
-
-	response.OK(c, ShareURLData{
-		URL:         fmt.Sprintf("%s/sellers/%s", websiteBaseURL, urlID),
-		Title:       title,
-		Description: description,
-		ImageURL:    imageURL,
 	})
 }
 

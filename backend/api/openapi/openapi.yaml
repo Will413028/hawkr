@@ -24047,7 +24047,7 @@ paths:
       parameters:
       - name: type
         in: query
-        description: 資源類型（post, product, seller）
+        description: 資源類型（post, product）
         required: true
         schema:
           type: string

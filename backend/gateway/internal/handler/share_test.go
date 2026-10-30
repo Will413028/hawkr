@@ -102,36 +102,43 @@ func TestGetShareURL_Post(t *testing.T) {
 	}
 }
 
-func TestGetShareURL_Post_SellerResolveFailsFallsBackToStoreID(t *testing.T) {
-	socialMock := &mockSocialServiceClient{
-		GetPostListFn: func(ctx context.Context, in *socialpb.GetPostListRequest, opts ...grpc.CallOption) (*socialpb.PostListResponse, error) {
-			return &socialpb.PostListResponse{Code: 0, Data: nil}, nil
-		},
-	}
-	socialMock.GetPostDetailFn = func(ctx context.Context, in *socialpb.GetPostDetailRequest, opts ...grpc.CallOption) (*socialpb.PostDetailResponse, error) {
-		return &socialpb.PostDetailResponse{
-			Data: &socialpb.PostDetailInfo{Id: "123", SellerId: "1001", SellerName: "黑貓測試家"},
-		}, nil
-	}
-	sellerMock := &mockSellerServiceClient{
-		GetSellerFn: func(ctx context.Context, in *sellerpb.GetSellerRequest, opts ...grpc.CallOption) (*sellerpb.SellerResponse, error) {
+func TestGetShareURL_Post_StoreCodeUnresolved(t *testing.T) {
+	tests := []struct {
+		name       string
+		fn         func(ctx context.Context, in *sellerpb.GetSellerRequest, opts ...grpc.CallOption) (*sellerpb.SellerResponse, error)
+		wantStatus int
+	}{
+		{"seller-service unavailable", func(ctx context.Context, in *sellerpb.GetSellerRequest, opts ...grpc.CallOption) (*sellerpb.SellerResponse, error) {
 			return nil, fmt.Errorf("seller-service unavailable")
-		},
+		}, http.StatusServiceUnavailable},
+		{"seller not found", func(ctx context.Context, in *sellerpb.GetSellerRequest, opts ...grpc.CallOption) (*sellerpb.SellerResponse, error) {
+			return nil, grpcstatus.Error(grpccodes.NotFound, "seller not found")
+		}, http.StatusNotFound},
+		{"empty store code", func(ctx context.Context, in *sellerpb.GetSellerRequest, opts ...grpc.CallOption) (*sellerpb.SellerResponse, error) {
+			return &sellerpb.SellerResponse{Code: 0, Data: &sellerpb.SellerInfo{}}, nil
+		}, http.StatusNotFound},
 	}
-	h := setupShareHolder(sellerMock, socialMock, nil)
-	router := setupShareRouter(h)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			socialMock := &mockSocialServiceClient{}
+			socialMock.GetPostDetailFn = func(ctx context.Context, in *socialpb.GetPostDetailRequest, opts ...grpc.CallOption) (*socialpb.PostDetailResponse, error) {
+				return &socialpb.PostDetailResponse{
+					Data: &socialpb.PostDetailInfo{Id: "123", SellerId: "1001", SellerName: "黑貓測試家"},
+				}, nil
+			}
+			h := setupShareHolder(&mockSellerServiceClient{GetSellerFn: tt.fn}, socialMock, nil)
+			router := setupShareRouter(h)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/app/share_url?type=post&id=123", nil)
-	req.Header.Set("X-Account-Id", "9999")
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/app/share_url?type=post&id=123", nil)
+			req.Header.Set("X-Account-Id", "9999")
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
 
-	assertHTTPStatus(t, w, http.StatusOK)
-	body := parseJSON(t, w.Body)
-	data := body["data"].(map[string]interface{})
-	wantURL := "http://localhost:3000/sellers/1001/posts?page=1#post-123"
-	if data["url"] != wantURL {
-		t.Errorf("url = %q, want %q (falls back to raw store_id, share must not hard-fail)", data["url"], wantURL)
+			assertHTTPStatus(t, w, tt.wantStatus)
+			if body := parseJSON(t, w.Body); body["data"] != nil {
+				t.Errorf("data = %v, want none (no store_id fallback URL)", body["data"])
+			}
+		})
 	}
 }
 
@@ -177,81 +184,6 @@ func TestGetShareURL_Product(t *testing.T) {
 	}
 	if data["imageUrl"] != "https://test-media.example.com/apple.jpg" {
 		t.Errorf("imageUrl = %q, want %q", data["imageUrl"], "https://test-media.example.com/apple.jpg")
-	}
-}
-
-func TestGetShareURL_Seller(t *testing.T) {
-	sellerMock := &mockSellerServiceClient{
-		GetSellerFn: func(ctx context.Context, in *sellerpb.GetSellerRequest, opts ...grpc.CallOption) (*sellerpb.SellerResponse, error) {
-			return &sellerpb.SellerResponse{
-				Code: 0,
-				Data: &sellerpb.SellerInfo{
-					AccountId: 2619961976,
-					StoreCode: "2601001000",
-					Name:      "黑貓測試家",
-					LogoKey:   "https://test-media.example.com/logo.jpg",
-					City:      "台北市",
-					District:  "中正區",
-					Rating:    4.8,
-				},
-			}, nil
-		},
-	}
-	h := setupShareHolder(sellerMock, nil, nil)
-	router := setupShareRouter(h)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/app/share_url?type=seller&id=2619961976", nil)
-	req.Header.Set("X-Account-Id", "9999")
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	assertHTTPStatus(t, w, http.StatusOK)
-	body := parseJSON(t, w.Body)
-	assertCode(t, body, 0)
-
-	data := body["data"].(map[string]interface{})
-	if data["url"] != "http://localhost:3000/sellers/2601001000" {
-		t.Errorf("url = %q, want %q", data["url"], "http://localhost:3000/sellers/2601001000")
-	}
-	if data["title"] != "黑貓測試家" {
-		t.Errorf("title = %q, want %q", data["title"], "黑貓測試家")
-	}
-	if data["description"] != "台北市中正區 | 4.8 評分" {
-		t.Errorf("description = %q, want %q", data["description"], "台北市中正區 | 4.8 評分")
-	}
-	if data["imageUrl"] != "https://test-media.example.com/logo.jpg" {
-		t.Errorf("imageUrl = %q, want %q", data["imageUrl"], "https://test-media.example.com/logo.jpg")
-	}
-}
-
-func TestGetShareURL_Seller_UsesStoreIdNotAccountId(t *testing.T) {
-	var captured *sellerpb.GetSellerRequest
-	sellerMock := &mockSellerServiceClient{
-		GetSellerFn: func(ctx context.Context, in *sellerpb.GetSellerRequest, opts ...grpc.CallOption) (*sellerpb.SellerResponse, error) {
-			captured = in
-			return &sellerpb.SellerResponse{
-				Code: 0,
-				Data: &sellerpb.SellerInfo{Name: "黑貓測試家"},
-			}, nil
-		},
-	}
-	h := setupShareHolder(sellerMock, nil, nil)
-	router := setupShareRouter(h)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/app/share_url?type=seller&id=7001", nil)
-	req.Header.Set("X-Account-Id", "9999")
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	assertHTTPStatus(t, w, http.StatusOK)
-	if captured == nil {
-		t.Fatal("GetSeller not called")
-	}
-	if captured.StoreId != 7001 {
-		t.Errorf("StoreId = %d, want 7001", captured.StoreId)
-	}
-	if captured.AccountId != 0 {
-		t.Errorf("AccountId = %d, want 0 (must query by StoreId, not AccountId — regression: backend-payuni#1736)", captured.AccountId)
 	}
 }
 
