@@ -126,7 +126,7 @@
 		"tailwindcss": "^4.3.0",
 		"tsx": "^4.22.3",
 		"typescript-compiler-api": "catalog:",
-		"vite": "8.0.3",
+		"vite": "8.1.6",
 		"vitest": "catalog:",
 		"webpack": "^5.107.2",
 		"wrangler": "4.125.0"
