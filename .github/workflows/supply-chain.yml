@@ -43,7 +43,7 @@ jobs:
           cache: false
       - id: list
         working-directory: backend
-        run: echo "modules=$(go work edit -json | jq -c '[.Use[].DiskPath]')" >> "$GITHUB_OUTPUT"
+        run: echo "modules=$(go work edit -json | jq -c '[.Use[].DiskPath | ltrimstr("./")]')" >> "$GITHUB_OUTPUT"
 
   govulncheck:
     name: govulncheck（${{ matrix.module }}）
@@ -69,6 +69,10 @@ jobs:
         working-directory: backend
         env:
           MODULE: ${{ matrix.module }}
+          # GOWORK=off：各服務的 Dockerfile 與單體都這樣建置，上線的是各 module 自己 go.mod 解析出的版本；
+          # go.work 會把依賴抬到整個 workspace 的最高版，掃出來的漏洞會比實際上線的少。
+          # 允許清單的產生也必須用同一個模式（見 scripts/govulncheck-allowlist.json 的說明）。
+          GOWORK: 'off'
         run: |
           set -euo pipefail
           report="$RUNNER_TEMP/govulncheck.json"

@@ -1,7 +1,9 @@
 name: workspace CI
 
 # pnpm workspace 層級的檢查（整個 workspace 只有一棵依賴樹，不屬於哪個 app）：
-# `pnpm audit --prod` 與 scripts/check-dependency-overrides.ts，由根 package.json 的 check:deps 一次跑完。
+# `pnpm audit --prod`（已審查的基準在 pnpm-workspace.yaml 的 auditConfig.ignoreGhsas，必須是 osv-scanner.toml 的
+# npm 基準的子集，期限由 OSV-Scanner 執行）、scripts/check-audit-ignores.ts 與 scripts/check-dependency-overrides.ts，
+# 由根 package.json 的 check:deps 一次跑完。
 # 每週一次的 schedule 讓新公告的漏洞不必等到有人改依賴才被發現。
 
 on:

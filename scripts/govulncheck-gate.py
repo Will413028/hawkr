@@ -9,6 +9,8 @@ govulncheck 本身沒有忽略檔，所以這裡讀 `govulncheck -format json ./
   - 只 import 到套件或只 require 到 module（沒有呼叫）→ 列出但不失敗，govulncheck 預設也是這樣
   - 清單項目這次沒有出現 → 提醒可以刪（不失敗）
 
+模式：必須在 GOWORK=off 下產生報告（與上線的建置相同）；清單也用同一模式產生。
+
 用法：
   govulncheck-gate.py --module <路徑，與 go.work 內相同> --report <govulncheck json 檔> [--today YYYY-MM-DD]
 """
@@ -58,6 +60,7 @@ def main() -> int:
     ap.add_argument("--today", default=datetime.date.today().isoformat())
     args = ap.parse_args()
 
+    args.module = args.module.removeprefix("./")  # go.work 的 DiskPath 帶 "./"，清單裡不帶
     messages = load_messages(args.report)
     if not any("progress" in m and "Checking" in m["progress"].get("message", "") for m in messages) and not any(
         "config" in m for m in messages

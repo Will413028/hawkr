@@ -4,6 +4,6 @@
 	"type": "module",
 	"packageManager": "pnpm@12.15.0",
 	"scripts": {
-		"check:deps": "pnpm audit --prod && node scripts/check-dependency-overrides.ts"
+		"check:deps": "node scripts/check-audit-ignores.ts && pnpm audit --prod && node scripts/check-dependency-overrides.ts"
 	}
 }

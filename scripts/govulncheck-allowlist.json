@@ -1,8 +1,26 @@
 {
-  "_說明": "govulncheck 沒有忽略檔；scripts/govulncheck-gate.py 只擋『被呼叫到、且不在此清單』的漏洞，期限過了也失敗。修復期限規則見根目錄 AGENTS.md。刪除項目＝該漏洞已修。",
+  "_說明": "govulncheck 沒有忽略檔；scripts/govulncheck-gate.py 只擋『被呼叫到、且不在此清單』的漏洞，期限過了也失敗。修復期限規則見根目錄 AGENTS.md。刪除項目＝該漏洞已修。 清單以 GOWORK=off 掃描產生（與 CI、Dockerfile 相同）；標準函式庫的項目取自 CI（backend/.go-version 的 toolchain），修法是升 toolchain。每筆的 package 是有漏洞的 Go module，嚴重度查不到的依規則保守當 high（30 天）。",
   "entries": [
     {
+      "id": "GO-2026-5004",
+      "package": "github.com/jackc/pgx/v5",
+      "severity": "LOW",
+      "deadline": "2027-01-28",
+      "modules": [
+        "pkg",
+        "services/im-service",
+        "services/invoice-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "reason": "基準：github.com/jackc/pgx/v5 修在 v5.9.2，升級待核准；嚴重度 LOW。"
+    },
+    {
       "id": "GO-2026-5676",
+      "package": "github.com/quic-go/quic-go",
+      "severity": "MODERATE",
+      "deadline": "2027-01-28",
       "modules": [
         "gateway",
         "pkg",
@@ -15,22 +33,42 @@
         "services/seller-service",
         "services/social-service"
       ],
-      "severity": "MODERATE",
-      "deadline": "2027-01-28",
       "reason": "基準（2026-10-30 首次掃描）：github.com/quic-go/quic-go 修在 v0.59.1，升級需 Will 核准依賴變更；嚴重度 MODERATE。"
     },
     {
+      "id": "GO-2026-6061",
+      "package": "google.golang.org/grpc",
+      "severity": "HIGH",
+      "deadline": "2026-11-29",
+      "modules": [
+        "gateway",
+        "pkg",
+        "services/crm-service",
+        "services/im-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "reason": "基準：google.golang.org/grpc 修在 v1.82.1，升級待核准；嚴重度 HIGH。"
+    },
+    {
       "id": "GO-2026-6253",
+      "package": "github.com/moby/go-archive",
+      "severity": "HIGH",
+      "deadline": "2026-11-29",
       "modules": [
         ".",
         "pkg"
       ],
-      "severity": "HIGH",
-      "deadline": "2026-11-29",
       "reason": "基準（2026-10-30 首次掃描）：github.com/moby/go-archive 修在 v0.3.0，升級需 Will 核准依賴變更；嚴重度 HIGH。"
     },
     {
       "id": "GO-2026-6348",
+      "package": "google.golang.org/grpc",
+      "severity": "HIGH",
+      "deadline": "2026-11-29",
       "modules": [
         "gateway",
         "pkg",
@@ -43,32 +81,35 @@
         "services/seller-service",
         "services/social-service"
       ],
-      "severity": "HIGH",
-      "deadline": "2026-11-29",
       "reason": "基準（2026-10-30 首次掃描）：google.golang.org/grpc 修在 v1.83.1，升級需 Will 核准依賴變更；嚴重度 HIGH。"
     },
     {
       "id": "GO-2026-6354",
+      "package": "golang.org/x/crypto",
+      "severity": "UNKNOWN",
+      "deadline": "2026-11-29",
       "modules": [
         ".",
         "pkg"
       ],
-      "severity": "UNKNOWN",
-      "deadline": "2026-11-29",
       "reason": "基準（2026-10-30 首次掃描）：golang.org/x/crypto 修在 v0.56.0，升級需 Will 核准依賴變更；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
     },
     {
       "id": "GO-2026-6355",
+      "package": "golang.org/x/crypto",
+      "severity": "UNKNOWN",
+      "deadline": "2026-11-29",
       "modules": [
         ".",
         "pkg"
       ],
-      "severity": "UNKNOWN",
-      "deadline": "2026-11-29",
       "reason": "基準（2026-10-30 首次掃描）：golang.org/x/crypto 修在 v0.56.0，升級需 Will 核准依賴變更；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
     },
     {
       "id": "GO-2026-6372",
+      "package": "github.com/rabbitmq/amqp091-go",
+      "severity": "HIGH",
+      "deadline": "2026-11-29",
       "modules": [
         ".",
         "gateway",
@@ -82,12 +123,13 @@
         "services/seller-service",
         "services/social-service"
       ],
-      "severity": "HIGH",
-      "deadline": "2026-11-29",
       "reason": "基準（2026-10-30 首次掃描）：github.com/rabbitmq/amqp091-go 修在 v1.13.0，升級需 Will 核准依賴變更；嚴重度 HIGH。"
     },
     {
       "id": "GO-2026-6491",
+      "package": "github.com/rabbitmq/amqp091-go",
+      "severity": "HIGH",
+      "deadline": "2026-11-29",
       "modules": [
         ".",
         "gateway",
@@ -99,12 +141,13 @@
         "services/seller-service",
         "services/social-service"
       ],
-      "severity": "HIGH",
-      "deadline": "2026-11-29",
       "reason": "基準（2026-10-30 首次掃描）：github.com/rabbitmq/amqp091-go 修在 v1.13.0，升級需 Will 核准依賴變更；嚴重度 HIGH。"
     },
     {
       "id": "GO-2026-6492",
+      "package": "github.com/rabbitmq/amqp091-go",
+      "severity": "CRITICAL",
+      "deadline": "2026-11-06",
       "modules": [
         ".",
         "gateway",
@@ -116,12 +159,13 @@
         "services/seller-service",
         "services/social-service"
       ],
-      "severity": "CRITICAL",
-      "deadline": "2026-11-06",
       "reason": "基準（2026-10-30 首次掃描）：github.com/rabbitmq/amqp091-go 修在 v1.13.0，升級需 Will 核准依賴變更；嚴重度 CRITICAL。"
     },
     {
       "id": "GO-2026-6494",
+      "package": "github.com/rabbitmq/amqp091-go",
+      "severity": "HIGH",
+      "deadline": "2026-11-29",
       "modules": [
         ".",
         "gateway",
@@ -133,12 +177,13 @@
         "services/seller-service",
         "services/social-service"
       ],
-      "severity": "HIGH",
-      "deadline": "2026-11-29",
       "reason": "基準（2026-10-30 首次掃描）：github.com/rabbitmq/amqp091-go 修在 v1.13.0，升級需 Will 核准依賴變更；嚴重度 HIGH。"
     },
     {
       "id": "GO-2026-6496",
+      "package": "github.com/rabbitmq/amqp091-go",
+      "severity": "CRITICAL",
+      "deadline": "2026-11-06",
       "modules": [
         ".",
         "gateway",
@@ -150,12 +195,13 @@
         "services/seller-service",
         "services/social-service"
       ],
-      "severity": "CRITICAL",
-      "deadline": "2026-11-06",
       "reason": "基準（2026-10-30 首次掃描）：github.com/rabbitmq/amqp091-go 修在 v1.13.0，升級需 Will 核准依賴變更；嚴重度 CRITICAL。"
     },
     {
       "id": "GO-2026-6498",
+      "package": "github.com/rabbitmq/amqp091-go",
+      "severity": "CRITICAL",
+      "deadline": "2026-11-06",
       "modules": [
         ".",
         "gateway",
@@ -168,12 +214,13 @@
         "services/seller-service",
         "services/social-service"
       ],
-      "severity": "CRITICAL",
-      "deadline": "2026-11-06",
       "reason": "基準（2026-10-30 首次掃描）：github.com/rabbitmq/amqp091-go 修在 v1.13.0，升級需 Will 核准依賴變更；嚴重度 CRITICAL。"
     },
     {
       "id": "GO-2026-6500",
+      "package": "github.com/rabbitmq/amqp091-go",
+      "severity": "HIGH",
+      "deadline": "2026-11-29",
       "modules": [
         ".",
         "gateway",
@@ -185,23 +232,25 @@
         "services/seller-service",
         "services/social-service"
       ],
-      "severity": "HIGH",
-      "deadline": "2026-11-29",
       "reason": "基準（2026-10-30 首次掃描）：github.com/rabbitmq/amqp091-go 修在 v1.13.0，升級需 Will 核准依賴變更；嚴重度 HIGH。"
     },
     {
       "id": "GO-2026-6502",
+      "package": "github.com/rabbitmq/amqp091-go",
+      "severity": "HIGH",
+      "deadline": "2026-11-29",
       "modules": [
         ".",
         "gateway",
         "pkg"
       ],
-      "severity": "HIGH",
-      "deadline": "2026-11-29",
       "reason": "基準（2026-10-30 首次掃描）：github.com/rabbitmq/amqp091-go 修在 v1.13.0，升級需 Will 核准依賴變更；嚴重度 HIGH。"
     },
     {
       "id": "GO-2026-6503",
+      "package": "github.com/rabbitmq/amqp091-go",
+      "severity": "HIGH",
+      "deadline": "2026-11-29",
       "modules": [
         ".",
         "gateway",
@@ -213,12 +262,13 @@
         "services/seller-service",
         "services/social-service"
       ],
-      "severity": "HIGH",
-      "deadline": "2026-11-29",
       "reason": "基準（2026-10-30 首次掃描）：github.com/rabbitmq/amqp091-go 修在 v1.13.0，升級需 Will 核准依賴變更；嚴重度 HIGH。"
     },
     {
       "id": "GO-2026-6505",
+      "package": "go.opentelemetry.io/otel/exporters/otlp/otlptrace",
+      "severity": "LOW",
+      "deadline": "2027-01-28",
       "modules": [
         ".",
         "gateway",
@@ -232,14 +282,37 @@
         "services/seller-service",
         "services/social-service"
       ],
-      "severity": "LOW",
-      "deadline": "2027-01-28",
       "reason": "基準（2026-10-30 首次掃描）：go.opentelemetry.io/otel/sdk 修在 v1.45.0，升級需 Will 核准依賴變更；嚴重度 LOW。"
     },
     {
-      "id": "GO-2026-6603",
+      "id": "GO-2026-6599",
+      "package": "stdlib",
+      "severity": "UNKNOWN",
+      "deadline": "2026-11-29",
       "modules": [
+        "gateway"
+      ],
+      "reason": "基準：Go 標準函式庫，修在 go1.27.2；修法是升 backend/.go-version 的 toolchain，升級待核准；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
+    },
+    {
+      "id": "GO-2026-6600",
+      "package": "stdlib",
+      "severity": "UNKNOWN",
+      "deadline": "2026-11-29",
+      "modules": [
+        "gateway"
+      ],
+      "reason": "基準：Go 標準函式庫，修在 go1.27.2；修法是升 backend/.go-version 的 toolchain，升級待核准；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
+    },
+    {
+      "id": "GO-2026-6603",
+      "package": "golang.org/x/net",
+      "severity": "UNKNOWN",
+      "deadline": "2026-11-29",
+      "modules": [
+        ".",
         "gateway",
+        "monitoring/discord-webhook-gateway",
         "pkg",
         "services/ai-service",
         "services/crm-service",
@@ -250,13 +323,16 @@
         "services/seller-service",
         "services/social-service"
       ],
-      "severity": "UNKNOWN",
-      "deadline": "2026-11-29",
       "reason": "基準（2026-10-30 首次掃描）：golang.org/x/net 修在 v0.60.0，升級需 Will 核准依賴變更；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
     },
     {
-      "id": "GO-2026-6610",
+      "id": "GO-2026-6605",
+      "package": "stdlib",
+      "severity": "UNKNOWN",
+      "deadline": "2026-11-29",
       "modules": [
+        ".",
+        "monitoring/discord-webhook-gateway",
         "pkg",
         "services/ai-service",
         "services/invoice-service",
@@ -265,14 +341,87 @@
         "services/seller-service",
         "services/social-service"
       ],
+      "reason": "基準：Go 標準函式庫，修在 go1.27.2；修法是升 backend/.go-version 的 toolchain，升級待核准；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
+    },
+    {
+      "id": "GO-2026-6607",
+      "package": "stdlib",
       "severity": "UNKNOWN",
       "deadline": "2026-11-29",
+      "modules": [
+        ".",
+        "gateway",
+        "monitoring/discord-webhook-gateway",
+        "pkg",
+        "services/ai-service",
+        "services/crm-service",
+        "services/im-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "reason": "基準：Go 標準函式庫，修在 go1.27.2；修法是升 backend/.go-version 的 toolchain，升級待核准；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
+    },
+    {
+      "id": "GO-2026-6608",
+      "package": "stdlib",
+      "severity": "UNKNOWN",
+      "deadline": "2026-11-29",
+      "modules": [
+        ".",
+        "gateway",
+        "monitoring/discord-webhook-gateway",
+        "pkg",
+        "services/ai-service",
+        "services/crm-service",
+        "services/im-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "reason": "基準：Go 標準函式庫，修在 go1.27.2；修法是升 backend/.go-version 的 toolchain，升級待核准；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
+    },
+    {
+      "id": "GO-2026-6609",
+      "package": "stdlib",
+      "severity": "UNKNOWN",
+      "deadline": "2026-11-29",
+      "modules": [
+        "gateway"
+      ],
+      "reason": "基準：Go 標準函式庫，修在 go1.27.2；修法是升 backend/.go-version 的 toolchain，升級待核准；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
+    },
+    {
+      "id": "GO-2026-6610",
+      "package": "golang.org/x/net",
+      "severity": "UNKNOWN",
+      "deadline": "2026-11-29",
+      "modules": [
+        ".",
+        "monitoring/discord-webhook-gateway",
+        "pkg",
+        "services/ai-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
       "reason": "基準（2026-10-30 首次掃描）：golang.org/x/net 修在 v0.60.0，升級需 Will 核准依賴變更；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
     },
     {
       "id": "GO-2026-6611",
+      "package": "golang.org/x/net",
+      "severity": "UNKNOWN",
+      "deadline": "2026-11-29",
       "modules": [
+        ".",
         "gateway",
+        "monitoring/discord-webhook-gateway",
         "pkg",
         "services/ai-service",
         "services/crm-service",
@@ -283,14 +432,17 @@
         "services/seller-service",
         "services/social-service"
       ],
-      "severity": "UNKNOWN",
-      "deadline": "2026-11-29",
       "reason": "基準（2026-10-30 首次掃描）：golang.org/x/net 修在 v0.60.0，升級需 Will 核准依賴變更；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
     },
     {
       "id": "GO-2026-6612",
+      "package": "golang.org/x/net",
+      "severity": "UNKNOWN",
+      "deadline": "2026-11-29",
       "modules": [
+        ".",
         "gateway",
+        "monitoring/discord-webhook-gateway",
         "pkg",
         "services/ai-service",
         "services/crm-service",
@@ -301,14 +453,38 @@
         "services/seller-service",
         "services/social-service"
       ],
+      "reason": "基準（2026-10-30 首次掃描）：golang.org/x/net 修在 v0.60.0，升級需 Will 核准依賴變更；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
+    },
+    {
+      "id": "GO-2026-6613",
+      "package": "stdlib",
       "severity": "UNKNOWN",
       "deadline": "2026-11-29",
-      "reason": "基準（2026-10-30 首次掃描）：golang.org/x/net 修在 v0.60.0，升級需 Will 核准依賴變更；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
+      "modules": [
+        ".",
+        "gateway",
+        "monitoring/discord-webhook-gateway",
+        "pkg",
+        "services/ai-service",
+        "services/crm-service",
+        "services/im-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "reason": "基準：Go 標準函式庫，修在 go1.27.2；修法是升 backend/.go-version 的 toolchain，升級待核准；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
     },
     {
       "id": "GO-2026-6617",
+      "package": "golang.org/x/net",
+      "severity": "UNKNOWN",
+      "deadline": "2026-11-29",
       "modules": [
+        ".",
         "gateway",
+        "monitoring/discord-webhook-gateway",
         "pkg",
         "services/ai-service",
         "services/crm-service",
@@ -319,12 +495,31 @@
         "services/seller-service",
         "services/social-service"
       ],
-      "severity": "UNKNOWN",
-      "deadline": "2026-11-29",
       "reason": "基準（2026-10-30 首次掃描）：golang.org/x/net 修在 v0.60.0，升級需 Will 核准依賴變更；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
     },
     {
+      "id": "GO-2026-6629",
+      "package": "golang.org/x/text",
+      "severity": "UNKNOWN",
+      "deadline": "2026-11-29",
+      "modules": [
+        "pkg",
+        "services/ai-service",
+        "services/crm-service",
+        "services/im-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "reason": "基準：golang.org/x/text 修在 v0.41.0，升級待核准；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
+    },
+    {
       "id": "GO-2026-6700",
+      "package": "github.com/rabbitmq/amqp091-go",
+      "severity": "MODERATE",
+      "deadline": "2027-01-28",
       "modules": [
         ".",
         "gateway",
@@ -336,9 +531,28 @@
         "services/seller-service",
         "services/social-service"
       ],
-      "severity": "MODERATE",
-      "deadline": "2027-01-28",
       "reason": "基準（2026-10-30 首次掃描）：github.com/rabbitmq/amqp091-go 修在 v1.14.0，升級需 Will 核准依賴變更；嚴重度 MODERATE。"
+    },
+    {
+      "id": "GO-2026-6809",
+      "package": "stdlib",
+      "severity": "UNKNOWN",
+      "deadline": "2026-11-29",
+      "modules": [
+        ".",
+        "gateway",
+        "monitoring/discord-webhook-gateway",
+        "pkg",
+        "services/ai-service",
+        "services/crm-service",
+        "services/im-service",
+        "services/invoice-service",
+        "services/notification-service",
+        "services/review-service",
+        "services/seller-service",
+        "services/social-service"
+      ],
+      "reason": "基準：Go 標準函式庫，修在 go1.27.3；修法是升 backend/.go-version 的 toolchain，升級待核准；嚴重度 UNKNOWN（查不到，依規則保守當 high）。"
     }
   ]
 }
