@@ -1,6 +1,6 @@
 # social/internal/comment
 
-留言與回覆。上層規則見模組根 `AGENTS.md`；行為規格唯一來源是 `docs/modules/social.md`。
+留言與回覆。
 
 ## 不變量
 

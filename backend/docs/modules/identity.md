@@ -120,7 +120,7 @@ schema `identity`（`db/schema.sql`）：
 
 ## 12. 不變量的守門
 
-`internal/modules/identity/AGENTS.md` 的每條不變量與守門測試或約束的對照（開頭為該不變量的第一句）。
+`internal/modules/identity/internal/<子領域>/AGENTS.md` 的不變量與守門測試或約束的對照（開頭為該不變量的第一句）；子領域檔是各條守門的現行來源，本節是跨子領域的總表。
 
 - 後台 Access/dev admin token（JWT，以 `iss` 精確比對）只認證成管理員；其餘 token 一律當顧客的 opaque session，只認證成帳號：`TestAuthenticationErrors`、`TestServicesAreSeparatedByAudience`（httpapi/identity）
 - session 只存 token 的 SHA-256；閒置逾時 web 7 天、App 14 天，絕對逾時 90 天，`last_used_at` 一天最多寫一次；登入一律換發新 token：`TestSessionIdleAndAbsoluteExpiry`、`TestSessionRenewalWritesAtMostOncePerDay`、`TestSuspensionAndSessionDeletionAreAtomic`、`TestDeletionIsAtomicAcrossSessionsAndIdentities`、`TestLoginIssuesAFreshSessionAndRevokesThePreviousOne`

@@ -1,6 +1,6 @@
 # social/internal/stats
 
-計數的維護與每日對帳。上層規則見模組根 `AGENTS.md`；行為規格唯一來源是 `docs/modules/social.md`。
+計數的維護與每日對帳。
 
 ## 不變量
 

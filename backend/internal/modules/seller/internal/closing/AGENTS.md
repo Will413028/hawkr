@@ -1,6 +1,6 @@
 # seller/internal/closing
 
-關店與恢復營業。上層規則見模組根 `AGENTS.md`；行為規格唯一來源是 `docs/modules/seller.md`。
+關店與恢復營業。
 
 ## 不變量
 

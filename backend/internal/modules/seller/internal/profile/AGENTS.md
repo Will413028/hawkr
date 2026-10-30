@@ -1,6 +1,6 @@
 # seller/internal/profile
 
-店家 profile 的寫入。上層規則見模組根 `AGENTS.md`；行為規格唯一來源是 `docs/modules/seller.md`。
+店家 profile 的寫入。
 
 ## 不變量
 

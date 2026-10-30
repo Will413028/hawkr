@@ -1,6 +1,6 @@
 # social/internal/actor
 
-推導互動者與店家封鎖檢查。上層規則見模組根 `AGENTS.md`；行為規格唯一來源是 `docs/modules/social.md`。
+推導互動者與店家封鎖檢查。
 
 ## 不變量
 

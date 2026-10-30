@@ -1,6 +1,6 @@
 # social/internal/visibility
 
-「公開可讀」與「可見」的唯一定義。上層規則見模組根 `AGENTS.md`；行為規格唯一來源是 `docs/modules/social.md`。
+「公開可讀」與「可見」的唯一定義。
 
 ## 不變量
 

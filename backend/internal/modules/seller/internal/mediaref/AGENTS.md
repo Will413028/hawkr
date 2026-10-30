@@ -1,6 +1,6 @@
 # seller/internal/mediaref
 
-店家圖片的 media 引用同步。上層規則見模組根 `AGENTS.md`；行為規格唯一來源是 `docs/modules/seller.md`。
+店家圖片的 media 引用同步。
 
 ## 不變量
 

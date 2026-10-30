@@ -6,7 +6,7 @@
 
 ## 擁有的資料
 
-schema `identity`，資料表與欄位的說明在 `docs/modules/identity.md` §9。`clerk_user_id` 過渡期可為 NULL（自建登入的帳號沒有），Clerk 退場時刪欄；帳號與管理員的主鍵過渡期是 IDENTITY，見 `CARRYOVER.md`。讀取模型：無。
+schema `identity`（`db/schema.sql`，欄位說明見規格 §9）。讀取模型：無。
 
 ## 發布的讀取介面
 
@@ -16,14 +16,14 @@ schema `identity`，資料表與欄位的說明在 `docs/modules/identity.md` §
 
 - 根套件組裝 `Module`，保留公開型別別名、事件、錯誤、provider 建構函式與轉呼叫方法。根套件不得 import `store`。
 - 根套件的 `Deps` 是組裝 API；`internal/model` 定義公開型別、事件與 provider 介面；各子領域宣告最小 `Deps`。
-- 子領域套件（`internal/account`、`admin`、`auth`、`session`、`login`、`applerevoke`）與 `internal/provider`、`internal/store` 的分工在 `docs/modules/identity.md` §11。
+- 子領域套件與 `internal/provider`、`internal/store` 的分工在 `docs/modules/identity.md` §11。
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。
 
 ## 不變量
 
 - 後台 Access/dev admin token（JWT，以 `iss` 精確比對）只認證成管理員；其餘 token 一律當顧客的 opaque session，只認證成帳號。規格：`docs/modules/identity.md` §1。
-- 每條不變量的守門測試與約束列在 `docs/modules/identity.md` §12。
-- 子領域的不變量在 `internal/<子領域>/AGENTS.md`（碰該目錄時才載入）：account、admin、applerevoke、login、oidc、session。單一子領域的規則放那裡，跨子領域的才放這裡。
+- 子領域的守門測試與約束在 `internal/<子領域>/AGENTS.md`；`docs/modules/identity.md` §12 是同一份的對照表。
+- 單一子領域的不變量在 `internal/<子領域>/AGENTS.md`（碰該目錄時才載入）；跨子領域的才放這裡。
 
 ## 不負責
 

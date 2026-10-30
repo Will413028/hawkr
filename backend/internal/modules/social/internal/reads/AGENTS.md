@@ -1,6 +1,6 @@
 # social/internal/reads
 
-帶可見性規則的讀取與 keyset 分頁。上層規則見模組根 `AGENTS.md`；行為規格唯一來源是 `docs/modules/social.md`。
+帶可見性規則的讀取與 keyset 分頁。
 
 ## 不變量
 

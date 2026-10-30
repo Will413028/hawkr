@@ -1,6 +1,6 @@
 # social/internal/hashtag
 
-hashtag 與熱門標籤。上層規則見模組根 `AGENTS.md`；行為規格唯一來源是 `docs/modules/social.md`。
+hashtag 與熱門標籤。
 
 ## 不變量
 

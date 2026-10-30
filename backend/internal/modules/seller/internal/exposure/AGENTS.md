@@ -1,6 +1,6 @@
 # seller/internal/exposure
 
-店家可曝光狀態的計算與公告。上層規則見模組根 `AGENTS.md`；行為規格唯一來源是 `docs/modules/seller.md`。
+店家可曝光狀態的計算與公告。
 
 ## 不變量
 

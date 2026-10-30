@@ -1,6 +1,6 @@
 # seller/internal/purge
 
-關店後的兩段清理。上層規則見模組根 `AGENTS.md`；行為規格唯一來源是 `docs/modules/seller.md`。
+關店後的兩段清理。
 
 ## 不變量
 

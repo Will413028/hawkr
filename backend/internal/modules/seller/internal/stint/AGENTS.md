@@ -1,6 +1,6 @@
 # seller/internal/stint
 
-stint（一個帳號的一段店家身分）的狀態推導。上層規則見模組根 `AGENTS.md`；行為規格唯一來源是 `docs/modules/seller.md`。
+stint（一個帳號的一段店家身分）的狀態推導。
 
 ## 不變量
 

@@ -1,6 +1,6 @@
 # seller/internal/payuni
 
-PayUni 的外部呼叫與同步 job。上層規則見模組根 `AGENTS.md`；行為規格唯一來源是 `docs/modules/seller.md`。
+PayUni 的外部呼叫與同步 job。
 
 ## 不變量
 
