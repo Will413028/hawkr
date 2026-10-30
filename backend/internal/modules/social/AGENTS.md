@@ -21,20 +21,11 @@ schema `social`（`db/schema.sql`）：貼文與 hashtag、留言與讚、討論
 
 ## 不變量
 
-- 公開可讀 = 店家可曝光、貼文已發布且沒有被內容下架、旗標 `counted` 為真；規則只在 `visibility`，公開表只經它的入口取得。守門：`TestPublicTablesAreOnlyReachedThroughVisibility`、`TestRawSQLEscapesOnlyAppearInGeneratedPubWrappers`、`TestEveryQueryIsRegistered`。規格：`docs/modules/social.md` §4。
-- 個人封鎖是依觀看者的獨立條件，不併進 `counted`、不影響計數；匿名語句沒有封鎖子句。守門：`TestAnonymousReadsCarryNoBlockClause`、`TestViewerReadsCarryTheBlockPredicates`、`TestBlocksDoNotChangeCounts`。規格：§5。
-- 買家身分的寫入一律經 `actor.Resolver` 的 `ForWrite`／`ForAuthor`／`ForBuyerWrite` 檢查店家封鎖；`Deps.StoreBlocks` 缺了 `New` 就 panic。守門：`TestNewSocialWiresStoreBlocks`（`cmd/hawkr`）、`TestBuyerBlockingAStoreHidesItsContentAndStopsWrites`。規格：§5。
-- 計數只由 trigger 與 `reevaluate_*` 維護，「是否計入」只有那一份定義；stats 有 `CHECK (>= 0)`。守門：`TestStatsMatchTheDatasetAfterRandomWrites`、`TestConcurrentReevaluatesDoNotCountTwice`、`TestReevaluateHasNoDeadlocksAndEndsConsistent`、`TestStatsRejectNegativeCounts`。規格：§6。
-- 每日對帳先修旗標再覆寫計數，且不蓋掉並行的加減。守門：`TestReconcileRepairsFlagsBeforeCounts`、`TestRecountDoesNotOverwriteConcurrentLikes`。規格：§6。
 - 買家刪帳的事實有複本，由訂閱者在同一個 transaction 同步寫並重新求值。守門：`TestBuyerDeletionRequestUncountsTheContentInTheSameTransaction`、`TestDirectCloseStillHidesUncountsAndPurges`。規格：§7。
 - 內容下架的事實有複本 `content_takedowns`，由 seller 措施事件的同 transaction 訂閱者維護，每日對帳雙向核對 `seller.pub_content_takedowns()`；建立時訂閱者核對內容存在、未刪除、作者是措施的店家（`TakedownContentError`）。守門：`TestTakedownRejectsContentThatIsNotTheMeasureStoresOwn`、`TestReconcileAddsTheTakedownsTheSubscriberMissed`。規格：§4、§6。
 - 跨模組鎖順序見 `backend/AGENTS.md` 單體規則 4（social 在 seller 之後）；本模組內：內容列 → 貼文 stats → 父項 stats，各依 ID 由小到大。守門：`TestMarkAuthorInactiveLocksStatsInTheSameOrderAsTheTriggers`、`TestEditLocksTheBuyerBeforeTheContentRow`。規格：§6、§7。
-- 隱藏與還原先鎖目標內容列。守門：`TestDirectHideRowRacingADeleteCountsOnce`。規格：§8。
-- 回覆的 partial index 述詞是旗標。守門：`TestReplyIndexesAreOnTheCountedFlag`。規格：§4。
-- keyset 游標是單一列比較，沒有布林開關。守門：`TestKeysetQueriesCompareOneRowAndHaveNoBooleanSwitch`、`TestKeysetSQLCQueriesHaveNoBooleanCursorSwitch`。規格：§4。
 - 使用者面的句子都在 `internal/text`，`apperr.*` 不帶字串字面值。守門：`TestSocialApperrCallsCarryNoSentenceLiterals`（`internal/arch`）。規格：§3。
-- 隱藏、還原、警告的理由先 `trimtext.Trim`。守門：DB 的 `trimtext.Check` CHECK、`TestTrimmedTextChecksUseTheCanonicalPattern`（`cmd/hawkr`）。規格：§8。
-- 熱門標籤的窗口最長 30 天。守門：`TestTrendingHashtagsWindowIsCappedAtThirtyDays`。規格：§2。
+- 子領域的不變量在 `internal/<子領域>/AGENTS.md`（碰該目錄時才載入）：actor、comment、hashtag、reads、sanction、stats、visibility。單一子領域的規則放那裡，跨子領域的才放這裡。
 
 ## 不負責
 

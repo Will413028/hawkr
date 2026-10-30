@@ -116,6 +116,8 @@
 
 - **D5 兄弟子專案共用的規則**（狀態：已決 2026-10-28，Will；步驟 3 之後追加）：先讓規則不需要存在（CI 強制、刪掉描述不存在流程的、留一行指向各自文件），不寫兄弟互指；真正共用又無法強制的才以 `@路徑` 引用一份中立檔。ADR：`docs/adr/2026-10-28-agents-md-layering.md` 文末修訂。
 
+- **D6 模組 AGENTS.md 逐條成長**（狀態：已決 2026-10-31，Will）：選 F＋B。F：單一子領域的不變量搬進 `internal/<子領域>/AGENTS.md`，模組根只留跨子領域的規則與一行指向；B：`check-agents-md` 進 pre-commit。依據：identity 6,003 → 8,662 bytes（5 個 commit）、social 6,416、seller 6,335／6,436，上限擋得住爆量擋不住逐條累積。已知限制：Claude Code 在 Read 子目錄檔案時載入（只 Edit／Write 未確認）、Codex 只在工作目錄位於子領域內時載入。ADR：`docs/adr/2026-10-31-agents-md-layering-consolidated.md`（原 ADR 修訂已滿 3 段，整合取代）。
+
 ## 進度
 
 狀態值：未開始／進行中／程式完成待驗收／完成。
@@ -129,3 +131,4 @@
 | 5 seller 開工前的確認 | 完成 | `git status --short backend/internal/modules/seller/` 無輸出（2026-10-29）；`seller/AGENTS.md` 168,619 bytes，各節：職責 27,235、擁有的資料 5,677、發布的讀取介面 2,169、模組內部結構 2,998、不變量 112,395（80 條）、已知限制 11,433、讀取模型 326、不負責 4,578、決策紀錄 194、特性測試 611 | 無 | 無（只量測） |
 | 6 seller 模組 | 完成 | 6a 不變量、6b 已知限制、6c 其餘節、6d 設計書收編（18、28 刪除；19、32、44、46 只留仍運作服務的部分並標檔頭；48 改指向）。本機：`python3 scripts/check-agents-md.py` exit 0，EXCEPTIONS 為空（D4 的後備沒用上，ADR 文末修訂）；unittest 8 項 OK；`GOWORK=off go test ./cmd/hawkr/ ./internal/arch/ ./cmd/new-module/` ok；seller AGENTS.md 5,925 bytes、七節同模板；引用的 §N 與守門測試／函式逐一 `rg` 0 缺；程式檔 diff 只有註解（過濾非註解行 0 行） | proto 註解改動的生成比對要 docker，待 CI；整合測試未跑（只改文件）；seller-service 與 Java 舊 migration 註解仍指向已刪的 32 §13，隨 seller-service 刪除處理 | 見 git log |
 | 7 收尾 | 完成 | 完成定義逐項核對；獨立審查（新 subagent，比對 base `9b40593`）：內容遺失 0、理由遺失 0、5 項 MED/LOW（待辦數 12→10、重複句、32 舊節引用 8 處、§23 缺觸發、漏一條 `RecordProductView` 規則）已修 | 無；repo-hygiene run 40744254630（commit 1c0b246）success。同一 commit 的 seller-app、website e2e、backend monolith、migration inventory 失敗在 9b40593 已存在，與本計畫無關 | 見 git log |
+| 8 子領域 AGENTS.md（D6） | 完成 | 見本 commit 內文：seller、identity、social 的對照與大小；`python3 scripts/check-agents-md.py` exit 0；unittest OK；`pre-commit run check-agents-md --all-files` 通過，mutation（kyc 檔加長到 7,046 bytes）失敗；`go test ./cmd/new-module/ ./cmd/hawkr/ ./internal/arch/` ok | 守門測試名稱逐一確認 `func` 仍存在；整合測試（需 Docker）未跑 | 見 git log |

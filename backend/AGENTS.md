@@ -73,5 +73,6 @@ make uitext  # 改文案目錄、模組的 text/*.json 或 proto 註解後
 ## 文件
 
 - 模組規格：`docs/modules/`；設計書：`docs/詳細設計書/`；工程規範：`docs/開發規範/`；ADR：`docs/adr/`（格式見 `docs/adr/README.md`）；計畫：`docs/plans/`。
+- 模組 `AGENTS.md` 固定七節；模組成長時，單一子領域的不變量放進 `internal/<子領域>/AGENTS.md`（選用，上限同樣 6,000 bytes），模組根只留跨子領域的規則與一行指向（ADR `docs/adr/2026-10-31-agents-md-layering-consolidated.md`）。
 - `docs/開發規範/` 裡只適用舊服務或已不適用的規範，檔頭有「適用範圍」標註與退場時間。
 - 舊註解與文件裡的「`CLAUDE.md` §N」指已移除的公司時期指令檔；仍有效的規則已併入本檔。

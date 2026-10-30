@@ -2,7 +2,7 @@
 
 | 項目 | 值 |
 |---|---|
-| 狀態 | accepted |
+| 狀態 | superseded by `2026-10-31-agents-md-layering-consolidated.md`（修訂已滿 3 段，整合並加上子領域檔案；本檔保留脈絡、方案與歷史） |
 | 日期 | 2026-10-28（Will 決定） |
 | 影響範圍 | repo 內所有 `AGENTS.md`、`cmd/new-module` 的模板、`docs/開發規範/設計文件治理規範.md` 的文件 taxonomy、單體 ADR `2026-09-24-go-modular-monolith.md` 對模組 `AGENTS.md` 的定義 |
 | 執行計畫 | `docs/plans/2026-10-28-agents-md-layering.md` |

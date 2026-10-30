@@ -250,7 +250,7 @@ func TestGeneratedAgentsLeavesTheAuditToFill(t *testing.T) {
 	}
 }
 
-// 模組 AGENTS.md 只有 ADR 2026-10-28-agents-md-layering 的固定七節，依序排列；
+// 模組 AGENTS.md 只有 ADR 2026-10-31-agents-md-layering-consolidated 的固定七節，依序排列；
 // 行為規格與已知限制在 docs/modules/<模組>.md，不在每次都載入的指令檔。
 func TestGeneratedAgentsHasOnlyTheFixedSections(t *testing.T) {
 	b, err := os.ReadFile(filepath.Join(scaffold(t, ""), "internal", "modules", "payment", "AGENTS.md"))
@@ -270,6 +270,14 @@ func TestGeneratedAgentsHasOnlyTheFixedSections(t *testing.T) {
 	}
 	if !strings.Contains(agents, "`docs/modules/payment.md`") {
 		t.Error("AGENTS.md 要指向模組規格 docs/modules/payment.md")
+	}
+	// 子領域的 AGENTS.md 是選用的（同一份 ADR 的決策 4）：模板說明規則，但骨架不產生它。
+	if !strings.Contains(agents, "`internal/<子領域>/AGENTS.md`（選用") {
+		t.Error("不變量節的註解要說明子領域 AGENTS.md 的規則")
+	}
+	nested, err := filepath.Glob(filepath.Join(scaffold(t, ""), "internal", "modules", "payment", "internal", "*", "AGENTS.md"))
+	if err != nil || len(nested) != 0 {
+		t.Errorf("骨架不該產生子領域的 AGENTS.md：%v %v", nested, err)
 	}
 }
 

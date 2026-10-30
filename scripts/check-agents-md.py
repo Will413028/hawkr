@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""檢查每個 AGENTS.md 的大小與單行長度（ADR backend/docs/adr/2026-10-28-agents-md-layering.md）。
+"""檢查每個 AGENTS.md 的大小與單行長度（ADR backend/docs/adr/2026-10-31-agents-md-layering-consolidated.md）。
 
 AGENTS.md 是 coding agent 的指令檔，碰到那個目錄就整份載入，所以每一層都有上限：
 

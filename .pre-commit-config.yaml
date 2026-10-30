@@ -1,7 +1,7 @@
 # repo 管理的本機 git hook。clone 之後執行一次：pre-commit install
-# 既有 clone 要重跑一次，才會裝上 commit-msg 與 pre-push 的 hook type。
+# 既有 clone 要重跑一次，才會裝上 pre-commit、commit-msg 與 pre-push 的 hook type。
 # CI 用同一支腳本檢查推上來的 commit（.github/workflows/commit-messages.yml）。
-default_install_hook_types: [commit-msg, pre-push]
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
 
 repos:
   - repo: local
@@ -11,6 +11,15 @@ repos:
         entry: python3 scripts/check-commit-msg.py
         language: system
         stages: [commit-msg]
+      # AGENTS.md 的大小與單行長度（ADR 2026-10-31-agents-md-layering-consolidated）；只在動到 AGENTS.md 時跑，掃全部追蹤的檔，毫秒級。
+      # CI 同一支腳本：.github/workflows/repo-hygiene.yml。
+      - id: check-agents-md
+        name: AGENTS.md 大小與單行長度
+        entry: python3 scripts/check-agents-md.py
+        language: system
+        files: (^|/)AGENTS\.md$
+        pass_filenames: false
+        stages: [pre-commit]
       # 只掃要推的範圍，離線且很快；沒裝 gitleaks 時只警告（CI 掃完整歷史）。
       - id: gitleaks-pre-push
         name: gitleaks（要推的 commit）
