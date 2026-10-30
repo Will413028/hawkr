@@ -67,7 +67,6 @@ func SetupRoutes(r *gin.Engine, h *handler.Holder) {
 
 	registerPostRoutes(public, app, h)
 	registerModerationRoutes(app, admin, h)
-	registerGovernanceRoutes(public, app, h)
 	registerInvoiceRoutes(app, admin, h) // 58 號電子發票（置於 governance 之後）
 	registerSearchRoutes(public, h)
 	registerSellerRoutes(public, app, h)

@@ -320,15 +320,22 @@ type PublicSellerReviewStatsResponse struct {
 // @Description  取得指定賣家收到的買家評論（匿名可存取）
 // @Tags         商家 (Seller)
 // @Produce      json
-// @Param        id    path   string  true   "賣家帳號 ID（store_id 或 store_code）"
+// @Param        id    path   string  true   "店家 ID（store_id）"
 // @Param        page       query  string  false  "頁碼（預設 1）"
 // @Param        page_size  query  string  false  "每頁筆數（預設 20）"
 // @Success      200  {object}  object{code=int,data=object{records=[]PublicSellerReviewItem,total=string,page=string,pageSize=string}}
 // @Failure      400  {object}  object{code=int,message=string}
+// @Failure      404  {object}  object{code=int,message=string}  "店家不存在或此刻不可曝光"
 // @Router       /public/sellers/{id}/reviews [get]
 func (h *Holder) GetPublicSellerReviews(c *gin.Context) {
 	storeID, ok := h.resolveStorefrontSellerID(c, c.Param("id"))
 	if !ok {
+		return
+	}
+	if meta, ok := h.storeMeta(c, storeID); !ok {
+		return
+	} else if !meta.CanAcceptOrders {
+		response.NotFound(c, "seller not found")
 		return
 	}
 
@@ -385,13 +392,20 @@ func (h *Holder) GetPublicSellerReviews(c *gin.Context) {
 // @Description  取得指定賣家的評論統計（總數、平均評分、星級分布）
 // @Tags         商家 (Seller)
 // @Produce      json
-// @Param        id  path  string  true  "賣家帳號 ID（store_id 或 store_code）"
+// @Param        id  path  string  true  "店家 ID（store_id）"
 // @Success      200  {object}  object{code=int,data=PublicSellerReviewStatsResponse}
 // @Failure      400  {object}  object{code=int,message=string}
+// @Failure      404  {object}  object{code=int,message=string}  "店家不存在或此刻不可曝光"
 // @Router       /public/sellers/{id}/reviews/stats [get]
 func (h *Holder) GetPublicSellerReviewStats(c *gin.Context) {
 	storeID, ok := h.resolveStorefrontSellerID(c, c.Param("id"))
 	if !ok {
+		return
+	}
+	if meta, ok := h.storeMeta(c, storeID); !ok {
+		return
+	} else if !meta.CanAcceptOrders {
+		response.NotFound(c, "seller not found")
 		return
 	}
 

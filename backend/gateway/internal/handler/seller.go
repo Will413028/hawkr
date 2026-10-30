@@ -117,7 +117,7 @@ type SellerStats struct {
 // @Tags         商家 (Seller)
 // @Accept       json
 // @Produce      json
-// @Param        id   path      int  true  "店家 ID（store_id 或 store_code）"
+// @Param        id   path      int  true  "店家 ID（store_id）"
 // @Success      200  {object}  handler.SellerResponse{data=handler.PublicSellerInfo}
 // @Failure      400  {object}  handler.SellerResponse
 // @Failure      503  {object}  handler.SellerResponse
@@ -160,15 +160,13 @@ func (h *Holder) GetSellerInfo(c *gin.Context) {
 	response.OK(c, toPublicSellerInfoDTO(resp.Data, h.MediaBaseURL))
 }
 
-// resolveStorefrontSellerID resolves a public storefront path id — which may
-// be either the seller's store_id (PK surrogate, pre-2026-07-23 links) or
-// store_code (the short display code storefront URLs use going forward) —
-// into the real store_id every downstream service call (stats/products/
-// reviews) is keyed by. Reuses the existing GetSeller RPC purely as a
-// resolver — it's already store_code-aware via the query fix backing
-// GetPublicSellerProfileByStoreID, so no new RPC is needed. On
-// failure the error response has already been written; callers must return
-// immediately when ok is false.
+// resolveStorefrontSellerID validates a public storefront path id as a
+// store_id (the PK surrogate every downstream service call is keyed by) and
+// confirms the store exists and is not closed. store_code is not accepted:
+// the seller RPC looks stores up by store_id only, so callers resolve a
+// store_code through SellerPublicService.GetStore first. On failure the error
+// response has already been written; callers must return immediately when ok
+// is false.
 func (h *Holder) resolveStorefrontSellerID(c *gin.Context, idParam string) (storeID int64, ok bool) {
 	rawID, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil || rawID <= 0 {
@@ -185,12 +183,28 @@ func (h *Holder) resolveStorefrontSellerID(c *gin.Context, idParam string) (stor
 		response.GrpcResult(c, resp.Code, resp.Message, nil)
 		return 0, false
 	}
-	storeID, err = strconv.ParseInt(resp.Data.StoreId, 10, 64)
+	return rawID, true
+}
+
+// storeMeta reads the store's exposure flags. On failure the error response
+// has already been written; callers must return immediately when ok is false.
+func (h *Holder) storeMeta(c *gin.Context, storeID int64) (meta *pb.SellerMeta, ok bool) {
+	resp, err := h.Seller.BatchGetSellerMeta(c.Request.Context(), []int64{storeID})
 	if err != nil {
-		response.BadRequest(c, "invalid seller id")
-		return 0, false
+		pkglogger.Info(c.Request.Context(), "Failed to read seller meta", zap.Error(err))
+		response.GrpcErr(c, "seller", err)
+		return nil, false
 	}
-	return storeID, true
+	if resp.Code != 0 {
+		response.GrpcResult(c, resp.Code, resp.Message, nil)
+		return nil, false
+	}
+	meta = resp.Sellers[storeID]
+	if meta == nil {
+		response.NotFound(c, "seller not found")
+		return nil, false
+	}
+	return meta, true
 }
 
 // GetSellerStats returns merchant statistics
@@ -199,7 +213,7 @@ func (h *Holder) resolveStorefrontSellerID(c *gin.Context, idParam string) (stor
 // @Tags         商家 (Seller)
 // @Accept       json
 // @Produce      json
-// @Param        id   path      int  true  "店家 ID（store_id 或 store_code）"
+// @Param        id   path      int  true  "店家 ID（store_id）"
 // @Success      200  {object}  handler.SellerResponse{data=handler.SellerStats}
 // @Failure      400  {object}  handler.SellerResponse
 // @Router /public/sellers/{id}/stats [get]
@@ -238,7 +252,7 @@ func (h *Holder) GetSellerStats(c *gin.Context) {
 // @Tags         商家 (Seller)
 // @Accept       json
 // @Produce      json
-// @Param        id           path   string  true   "店家 ID（store_id 或 store_code）"
+// @Param        id           path   string  true   "店家 ID（store_id）"
 // @Param        category_id  query  string  false  "分類 ID"
 // @Param        keyword      query  string  false  "搜尋關鍵字"
 // @Param        page         query  string  false  "頁碼（預設為 1）"

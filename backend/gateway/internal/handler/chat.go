@@ -129,23 +129,27 @@ func (c *wsProxyConn) write(messageType int, data []byte) error {
 	return c.Conn.WriteMessage(messageType, data)
 }
 
-// resolveChatTargetID normalizes a client-supplied chat counterpart id before
+// resolveChatTargetID validates a client-supplied chat counterpart id before
 // it's used to build/query a conversation room. When the current user is a
-// buyer, the target is a seller — and per resolveStorefrontSellerID
-// (2026-07-23 storefront URL migration), a seller-facing id from the client
-// may be either the real store_id or the public store_code storefront pages
-// use; both must resolve to the same real store_id here too. Without this,
-// a conversation gets keyed on a value that never matches any seller row —
-// the room silently carries a dead surrogate, and every downstream read
-// (profile enrichment, history lookup) comes back empty with no error ever
-// surfaced. Sellers messaging a buyer are passed through unchanged — buyer_id
-// has no equivalent public short-code form in this codebase.
+// buyer, the target is a store: toUserId must be an existing, non-closed
+// store_id whose public store card exists (it has been exposable at least
+// once), so a conversation list can never reveal the name of a store that was
+// never public. Suspended stores that were once public stay reachable.
+// Sellers messaging a buyer are passed through unchanged.
 func (h *Holder) resolveChatTargetID(c *gin.Context, targetID string) (string, bool) {
 	if parseAccountType(c) == 2 {
 		return targetID, true
 	}
 	storeID, ok := h.resolveStorefrontSellerID(c, targetID)
 	if !ok {
+		return "", false
+	}
+	meta, ok := h.storeMeta(c, storeID)
+	if !ok {
+		return "", false
+	}
+	if !meta.HasPublicCard {
+		response.NotFound(c, "seller not found")
 		return "", false
 	}
 	return strconv.FormatInt(storeID, 10), true
@@ -159,11 +163,11 @@ func (h *Holder) resolveChatTargetID(c *gin.Context, targetID string) (string, b
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Param        request  body  object{toUserId=string,type=string,content=string,extra=object}  true  "發送訊息請求（type: text|image，image 時 content 為 staged token）。買家傳訊給賣家時 toUserId 可為 store_id 或 store_code，後端統一解析成 store_id 再建立對話。"
+// @Param        request  body  object{toUserId=string,type=string,content=string,extra=object}  true  "發送訊息請求（type: text|image，image 時 content 為 staged token）。買家傳訊給賣家時 toUserId 為 store_id，且該店必須曾經公開過。"
 // @Success      200  {object}  object{code=int,message=string,data=object{delivered=bool,messageId=int64,seqId=int64,timestamp=string,content=string}}
 // @Failure      400  {object}  object{code=int,message=string}  "圖片處理失敗（staged token 無效）或 toUserId 格式無效"
 // @Failure      401  {object}  object{code=int,message=string}
-// @Failure      404  {object}  object{code=int,message=string}  "toUserId 對應的賣家不存在"
+// @Failure      404  {object}  object{code=int,message=string}  "toUserId 對應的賣家不存在或從未公開過"
 // @Failure      502  {object}  object{code=int,message=string}
 // @Router /app/chat/messages [post]
 func (h *Holder) SendChatMessage(c *gin.Context) {

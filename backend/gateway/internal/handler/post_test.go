@@ -298,32 +298,6 @@ func TestGetSellerPosts_BuyerRoleResolvesCurrentBuyerID(t *testing.T) {
 	}
 }
 
-// TestGetSellerPosts_ResolvesStoreCode proves /public/sellers/:id/posts
-// resolves a store_code path id (2026-07-23 storefront URLs) to the real
-// store_id before querying social-service, matching the same
-// resolveStorefrontSellerID pattern already used by GetSellerProducts and
-// the public reviews endpoints. Without the resolver, the raw store_code
-// is sent straight through as SellerId, cms_post.seller_id never matches
-// it (that column holds store_id), and the seller's posts silently vanish.
-func TestGetSellerPosts_ResolvesStoreCode(t *testing.T) {
-	var captured *socialpb.GetPostListRequest
-	mc := &mockSocialServiceClient{
-		GetPostListFn: func(ctx context.Context, in *socialpb.GetPostListRequest, opts ...grpc.CallOption) (*socialpb.PostListResponse, error) {
-			captured = in
-			return &socialpb.PostListResponse{Data: []*socialpb.PostListItem{}, Total: 0, Page: 1, PageSize: 20}, nil
-		},
-	}
-	h := newPostHolder(mc)
-	h.BuyerID = mustNotResolveBuyer(t)
-	h.Seller = sellerClientResolvingStoreIDForTest("857045288972403572")
-	r := setupPostRouter(h)
-	w := doPostReq(r, "GET", "/api/v1/public/sellers/2605576172/posts", "", "", nil)
-	assertHTTPStatus(t, w, http.StatusOK)
-	if captured == nil || captured.SellerId != "857045288972403572" {
-		t.Errorf("captured.SellerId = %v, want %q (resolved store_id, not the raw store_code path value)", captured, "857045288972403572")
-	}
-}
-
 // ==================== GetPostDetail (Deviation 2: REST single-post is_liked) ====================
 
 func TestGetPostDetail_Anonymous_NoPersonalization(t *testing.T) {

@@ -298,32 +298,66 @@ func TestSendChatMessage_Success_ReturnsSeqId(t *testing.T) {
 	}
 }
 
-// 買家傳訊給賣家時 toUserId 若是公開商家頁 id，可能是 store_code（2026-07-23
-// 起商家頁 URL 改用 store_code）而非 store_id。輸入值與解析後的 store_id 刻意用
-// 不同數字（同值斷言零鑑別力），驗證 gateway 真的把解析後的值送給 im-service，
-// 不是原樣透傳 store_code 讓 room_id 存進錯誤的代理鍵。
-func TestSendChatMessage_ResolvesStoreCodeToStoreID(t *testing.T) {
-	const storeCode = "2677764963"
-	const realStoreID = "7489859548420286732"
+// 買家傳訊的對象必須曾經公開過（has_public_card）；從沒公開過的店回 404，
+// 且不得呼叫 im-service，否則對話列表會洩漏沒公開過的店名。
+func TestSendChatMessage_NeverPublicStore_Returns404(t *testing.T) {
 	mock := &mockIMServiceClient{
 		SendMessageFn: func(ctx context.Context, in *pb.SendMessageRequest, opts ...grpc.CallOption) (*pb.SendMessageResponse, error) {
-			if in.ToUserId != realStoreID {
-				t.Errorf("ToUserId = %s, want %s (resolved store_id, not the store_code %s the client sent)", in.ToUserId, realStoreID, storeCode)
-			}
+			t.Fatal("im-service must not be called for a store that was never public")
+			return nil, nil
+		},
+	}
+	h := &Holder{
+		IM:      grpcclient.NewIMClientForTest(mock),
+		BuyerID: buyerGrandfatherResolverForTest(),
+		Seller: grpcclient.NewSellerClientForTest(&mockSellerServiceClient{
+			GetSellerFn: func(ctx context.Context, in *sellerpb.GetSellerRequest, opts ...grpc.CallOption) (*sellerpb.SellerResponse, error) {
+				return &sellerpb.SellerResponse{Data: &sellerpb.SellerInfo{StoreId: "100"}}, nil
+			},
+			BatchGetSellerMetaFn: func(ctx context.Context, in *sellerpb.BatchGetSellerMetaRequest, opts ...grpc.CallOption) (*sellerpb.BatchGetSellerMetaResponse, error) {
+				return &sellerpb.BatchGetSellerMetaResponse{Sellers: map[int64]*sellerpb.SellerMeta{
+					100: {CanAcceptOrders: false, HasPublicCard: false},
+				}}, nil
+			},
+		}),
+	}
+
+	reqBody, _ := json.Marshal(map[string]interface{}{"toUserId": "100", "content": "hi"})
+	r := setupChatRouter(h)
+	req, _ := http.NewRequest("POST", "/api/v1/app/chat/messages", bytes.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Account-Id", "42")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assertHTTPStatus(t, w, http.StatusNotFound)
+}
+
+// 暫停中（此刻不可曝光）但曾經公開過的店，買家仍可聯絡（售後）。
+func TestSendChatMessage_SuspendedButOncePublicStore_Succeeds(t *testing.T) {
+	var sent *pb.SendMessageRequest
+	mock := &mockIMServiceClient{
+		SendMessageFn: func(ctx context.Context, in *pb.SendMessageRequest, opts ...grpc.CallOption) (*pb.SendMessageResponse, error) {
+			sent = in
 			return &pb.SendMessageResponse{Code: 0, Delivered: true, Timestamp: "1700000000"}, nil
 		},
 	}
 	h := &Holder{
 		IM:      grpcclient.NewIMClientForTest(mock),
 		BuyerID: buyerGrandfatherResolverForTest(),
-		Seller:  sellerClientResolvingStoreIDForTest(realStoreID),
+		Seller: grpcclient.NewSellerClientForTest(&mockSellerServiceClient{
+			GetSellerFn: func(ctx context.Context, in *sellerpb.GetSellerRequest, opts ...grpc.CallOption) (*sellerpb.SellerResponse, error) {
+				return &sellerpb.SellerResponse{Data: &sellerpb.SellerInfo{StoreId: "100"}}, nil
+			},
+			BatchGetSellerMetaFn: func(ctx context.Context, in *sellerpb.BatchGetSellerMetaRequest, opts ...grpc.CallOption) (*sellerpb.BatchGetSellerMetaResponse, error) {
+				return &sellerpb.BatchGetSellerMetaResponse{Sellers: map[int64]*sellerpb.SellerMeta{
+					100: {CanAcceptOrders: false, HasPublicCard: true},
+				}}, nil
+			},
+		}),
 	}
 
-	reqBody, _ := json.Marshal(map[string]interface{}{
-		"toUserId": storeCode,
-		"content":  "hi",
-	})
-
+	reqBody, _ := json.Marshal(map[string]interface{}{"toUserId": "100", "content": "hi"})
 	r := setupChatRouter(h)
 	req, _ := http.NewRequest("POST", "/api/v1/app/chat/messages", bytes.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
@@ -332,8 +366,9 @@ func TestSendChatMessage_ResolvesStoreCodeToStoreID(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assertHTTPStatus(t, w, http.StatusOK)
-	body := parseJSON(t, w.Body)
-	assertCode(t, body, 0)
+	if sent == nil || sent.ToUserId != "100" {
+		t.Errorf("im-service request = %v, want ToUserId 100", sent)
+	}
 }
 
 // 賣家不存在（seller 模組回 NotFound）時必須直接回錯，不能讓 room_id 存進

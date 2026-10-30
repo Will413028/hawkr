@@ -59,7 +59,7 @@ func (h *Holder) GetLatestPosts(c *gin.Context) {
 // @Tags         貼文 (Post)
 // @Accept       json
 // @Produce      json
-// @Param        id         path   string  true   "店家 ID（store_id 或 store_code）"
+// @Param        id         path   string  true   "店家 ID（store_id）"
 // @Param        page       query  int  false  "頁碼"      default(1)
 // @Param        page_size  query  int  false  "每頁筆數"  default(20)
 // @Success      200  {object}  object{code=int,data=object{records=[]PostListItemData,total=string,page=string,pageSize=string}}

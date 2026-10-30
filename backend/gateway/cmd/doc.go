@@ -110,9 +110,6 @@
 // @tag.name 開發工具 (Dev)
 // @tag.description 開發環境工具
 //
-// @tag.name 商家治理 (Governance)
-// @tag.description B-169 商家違規檢舉、食安通報、申訴流程
-//
 // @tag.name 健康檢查 (Health)
 // @tag.description 系統健康檢查端點
 package main

@@ -28,38 +28,6 @@ func setupStorefrontResolveProbe(h *Holder) *gin.Engine {
 	return r
 }
 
-func TestResolveStorefrontSellerID_ResolvesStoreCode(t *testing.T) {
-	var captured *sellerpb.GetSellerRequest
-	sellerMock := &mockSellerServiceClient{
-		GetSellerFn: func(ctx context.Context, in *sellerpb.GetSellerRequest, opts ...grpc.CallOption) (*sellerpb.SellerResponse, error) {
-			captured = in
-			return &sellerpb.SellerResponse{
-				Code: 0,
-				Data: &sellerpb.SellerInfo{StoreId: "1234567890123456789", StoreCode: "2600123456"},
-			}, nil
-		},
-	}
-	h := &Holder{Seller: grpcclient.NewSellerClientForTest(sellerMock)}
-	router := setupStorefrontResolveProbe(h)
-
-	req := httptest.NewRequest(http.MethodGet, "/probe/2600123456", nil)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	assertHTTPStatus(t, w, http.StatusOK)
-	body := parseJSON(t, w.Body)
-	data := body["data"].(map[string]interface{})
-	if data["storeId"] != "1234567890123456789" {
-		t.Errorf("storeId = %v, want 1234567890123456789 (resolved store_id, not the raw store_code path value)", data["storeId"])
-	}
-	if captured == nil {
-		t.Fatal("GetSeller not called")
-	}
-	if captured.StoreId != 2600123456 {
-		t.Errorf("GetSeller called with StoreId = %d, want 2600123456 (raw path value passed through unmodified)", captured.StoreId)
-	}
-}
-
 func TestResolveStorefrontSellerID_PassesThroughLegacyStoreID(t *testing.T) {
 	sellerMock := &mockSellerServiceClient{
 		GetSellerFn: func(ctx context.Context, in *sellerpb.GetSellerRequest, opts ...grpc.CallOption) (*sellerpb.SellerResponse, error) {

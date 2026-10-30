@@ -380,6 +380,7 @@ type mockSellerServiceClient struct {
 	GetSellerFn                      func(ctx context.Context, in *sellerpb.GetSellerRequest, opts ...grpc.CallOption) (*sellerpb.SellerResponse, error)
 	GetSellerStatsFn                 func(ctx context.Context, in *sellerpb.GetSellerStatsRequest, opts ...grpc.CallOption) (*sellerpb.SellerStatsResponse, error)
 	RecordStoreVisitFn               func(ctx context.Context, in *sellerpb.RecordStoreVisitRequest, opts ...grpc.CallOption) (*sellerpb.RecordStoreVisitResponse, error)
+	BatchGetSellerMetaFn             func(ctx context.Context, in *sellerpb.BatchGetSellerMetaRequest, opts ...grpc.CallOption) (*sellerpb.BatchGetSellerMetaResponse, error)
 	GetSellerBatchFn                 func(ctx context.Context, in *sellerpb.GetSellerBatchRequest, opts ...grpc.CallOption) (*sellerpb.SellerBatchResponse, error)
 	GetRecommendedSellersFn          func(ctx context.Context, in *sellerpb.GetRecommendedSellersRequest, opts ...grpc.CallOption) (*sellerpb.GetRecommendedSellersResponse, error)
 	GetCertificationApplicationFn    func(ctx context.Context, in *sellerpb.GetCertificationApplicationRequest, opts ...grpc.CallOption) (*sellerpb.CertificationApplicationResponse, error)
@@ -549,7 +550,14 @@ func (m *mockSellerServiceClient) ListCertificationsForAdmin(ctx context.Context
 	return nil, nil
 }
 func (m *mockSellerServiceClient) BatchGetSellerMeta(ctx context.Context, in *sellerpb.BatchGetSellerMetaRequest, opts ...grpc.CallOption) (*sellerpb.BatchGetSellerMetaResponse, error) {
-	return nil, nil
+	if m.BatchGetSellerMetaFn != nil {
+		return m.BatchGetSellerMetaFn(ctx, in, opts...)
+	}
+	sellers := make(map[int64]*sellerpb.SellerMeta, len(in.StoreIds))
+	for _, id := range in.StoreIds {
+		sellers[id] = &sellerpb.SellerMeta{CanAcceptOrders: true, HasPublicCard: true}
+	}
+	return &sellerpb.BatchGetSellerMetaResponse{Sellers: sellers}, nil
 }
 func (m *mockSellerServiceClient) CompleteOnboarding(ctx context.Context, in *sellerpb.CompleteOnboardingRequest, opts ...grpc.CallOption) (*sellerpb.SellerResponse, error) {
 	return nil, nil

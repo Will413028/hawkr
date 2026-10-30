@@ -62,8 +62,6 @@ tags:
   description: 收藏：商品收藏
 - name: Forum
   description: 討論區：商家討論區
-- name: Governance
-  description: 商家治理：B-169 商家違規檢舉、食安通報、申訴流程
 - name: Hashtag
 - name: Health
   description: 健康檢查：系統健康檢查端點
@@ -12371,7 +12369,7 @@ paths:
       - BearerAuth: []
       - CookieAuth: []
       requestBody:
-        description: '發送訊息請求（type: text|image，image 時 content 為 staged token）。買家傳訊給賣家時 toUserId 可為 store_id 或 store_code，後端統一解析成 store_id 再建立對話。'
+        description: '發送訊息請求（type: text|image，image 時 content 為 staged token）。買家傳訊給賣家時 toUserId 為 store_id，且該店必須曾經公開過。'
         required: true
         content:
           application/json:
@@ -12431,7 +12429,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '404':
-          description: toUserId 對應的賣家不存在
+          description: toUserId 對應的賣家不存在或從未公開過
           content:
             application/json:
               schema:
@@ -25479,128 +25477,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/violation_reports:
-    post:
-      operationId: submitViolationReport
-      summary: 提交商家違規檢舉
-      description: 買家或賣家對特定商家提交違規檢舉（食安、假認證、誤導、刷單等）。回應含 duplicate 旗標，重複 24h 內同 reporter+target 會以 code=4090 回。
-      tags:
-      - Governance
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      requestBody:
-        description: 檢舉內容
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SubmitViolationReportRequest'
-        x-originalParamName: body
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    type: object
-                    properties:
-                      duplicate:
-                        type: boolean
-                      reportId:
-                        type: string
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '409':
-          description: duplicate report (4090)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '503':
-          description: Service Unavailable
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/violation_reports/me:
-    get:
-      operationId: listMyViolationReports
-      summary: 我提交的檢舉列表
-      description: 回傳當前登入者提交的違規檢舉，含 status / admin_resolution_summary 處理進度。
-      tags:
-      - Governance
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: limit
-        in: query
-        description: 每頁筆數
-        schema:
-          type: integer
-          default: 20
-      - name: offset
-        in: query
-        description: 偏移量
-        schema:
-          type: integer
-          default: 0
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    type: object
-                    properties:
-                      records:
-                        type: array
-                        items: {}
-                  message:
-                    type: string
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '503':
-          description: Service Unavailable
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/health:
     get:
       operationId: healthSelf
@@ -26068,62 +25944,6 @@ paths:
                     type: string
         '404':
           description: 找不到該分類
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/public/food_safety_reports:
-    post:
-      operationId: submitFoodSafetyReport
-      summary: 食安緊急通報（公開無登入）
-      description: '公開食安通報入口，無需登入。reporter_phone 必填用於回追，severity 後端自動設 critical，4h 內 admin 必須 ack。本入口另有路由專屬雙層限流（10 分鐘 5 次、1 小時 10 次），超出回 429；額度算在限流身分上（一般訪客即其來源 IP，SSR／CI 等共用出口另有獨立身分軸）。本入口不接受佐證附件（匿名端 deny-by-default，issue #1527）；需附佐證圖請登入改走 POST /app/violation_reports（category=food_safety）。'
-      tags:
-      - Governance
-      requestBody:
-        description: 食安通報內容
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SubmitFoodSafetyReportRequest'
-        x-originalParamName: body
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    type: object
-                    properties:
-                      ackEstimatedAt:
-                        type: string
-                      reportId:
-                        type: string
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '429':
-          description: rate limit exceeded（10 分鐘 5 次 或 1 小時 10 次）
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '503':
-          description: Service Unavailable
           content:
             application/json:
               schema:
@@ -27325,7 +27145,7 @@ paths:
       parameters:
       - name: id
         in: path
-        description: 店家 ID（store_id 或 store_code）
+        description: 店家 ID（store_id）
         required: true
         schema:
           type: integer
@@ -27436,7 +27256,7 @@ paths:
       parameters:
       - name: id
         in: path
-        description: 店家 ID（store_id 或 store_code）
+        description: 店家 ID（store_id）
         required: true
         schema:
           type: string
@@ -27503,7 +27323,7 @@ paths:
       parameters:
       - name: id
         in: path
-        description: 店家 ID（store_id 或 store_code）
+        description: 店家 ID（store_id）
         required: true
         schema:
           type: string
@@ -27578,7 +27398,7 @@ paths:
       parameters:
       - name: id
         in: path
-        description: 賣家帳號 ID（store_id 或 store_code）
+        description: 店家 ID（store_id）
         required: true
         schema:
           type: string
@@ -27627,6 +27447,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: 店家不存在或此刻不可曝光
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/public/sellers/{id}/reviews/stats:
     get:
       operationId: getPublicSellerReviewStats
@@ -27637,7 +27463,7 @@ paths:
       parameters:
       - name: id
         in: path
-        description: 賣家帳號 ID（store_id 或 store_code）
+        description: 店家 ID（store_id）
         required: true
         schema:
           type: string
@@ -27665,6 +27491,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: 店家不存在或此刻不可曝光
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/public/sellers/{id}/stats:
     get:
       operationId: getSellerStats
@@ -27675,7 +27507,7 @@ paths:
       parameters:
       - name: id
         in: path
-        description: 店家 ID（store_id 或 store_code）
+        description: 店家 ID（store_id）
         required: true
         schema:
           type: integer
@@ -27699,60 +27531,6 @@ paths:
                     $ref: '#/components/schemas/SellerStats'
         '400':
           description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/public/sellers/{id}/violations/public:
-    get:
-      operationId: getPublicSellerViolations
-      summary: 公開賣家違規記錄
-      description: 公開查詢指定賣家過去 90 天 high+ severity 違規記錄（D8 cache）。買家在賣家頁可見，無需登入。
-      tags:
-      - Governance
-      parameters:
-      - name: id
-        in: path
-        description: 賣家 ID
-        required: true
-        schema:
-          type: integer
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    type: object
-                    properties:
-                      records:
-                        type: array
-                        items: {}
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '503':
-          description: Service Unavailable
           content:
             application/json:
               schema:
@@ -38535,26 +38313,6 @@ components:
         appealState:
           type: string
           description: APPEALED=10
-    SubmitFoodSafetyReportRequest:
-      type: object
-      required:
-      - description
-      - reporterPhone
-      properties:
-        description:
-          type: string
-        reporterEmail:
-          type: string
-        reporterName:
-          type: string
-        reporterPhone:
-          type: string
-        targetOrderNo:
-          type: string
-        targetProductId:
-          type: string
-        targetSellerId:
-          type: string
     SubmitOrderItemReviewRequest:
       type: object
       required:
@@ -38632,32 +38390,6 @@ components:
             🔴 false／缺席 ⇒ 後端回 **9325**（HTTP 409），且一筆都不寫。它與端點 22 是
             兩條路：這裡是「送審時一併簽」，端點 22 是補簽（S04）。
         expectedVersion:
-          type: string
-    SubmitViolationReportRequest:
-      type: object
-      required:
-      - category
-      - description
-      - severity
-      - targetSellerId
-      properties:
-        category:
-          type: string
-        description:
-          type: string
-        evidenceAssetIds:
-          type: array
-          items:
-            type: string
-        severity:
-          type: string
-        targetOrderNo:
-          type: string
-        targetPostId:
-          type: string
-        targetProductId:
-          type: string
-        targetSellerId:
           type: string
     SuccessResponse:
       type: object

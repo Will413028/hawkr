@@ -88,6 +88,13 @@ func (c *SellerClient) GetSellerBatch(ctx context.Context, storeIDs []int64) (*p
 	})
 }
 
+// BatchGetSellerMeta 讀店家此刻的可曝光與曾公開過的旗標（公開評價的父資源檢查、買家聊天對象檢查）。
+func (c *SellerClient) BatchGetSellerMeta(ctx context.Context, storeIDs []int64) (*pb.BatchGetSellerMetaResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	return c.client.BatchGetSellerMeta(ctx, &pb.BatchGetSellerMetaRequest{StoreIds: storeIDs})
+}
+
 // ==================== Delete ====================
 
 // ==================== Store Visitors ====================

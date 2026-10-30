@@ -18,11 +18,12 @@ import (
 // ==================== Mock ReviewServiceClient ====================
 
 type reviewMockClient struct {
-	GetProductReviewsFn     func(ctx context.Context, in *pb.GetProductReviewsRequest, opts ...grpc.CallOption) (*pb.ProductReviewsResponse, error)
-	SubmitOrderReviewFn     func(ctx context.Context, in *pb.SubmitOrderReviewRequest, opts ...grpc.CallOption) (*pb.SubmitOrderReviewResponse, error)
-	ListMyOrderReviewsFn    func(ctx context.Context, in *pb.ListMyOrderReviewsRequest, opts ...grpc.CallOption) (*pb.ListMyOrderReviewsResponse, error)
-	GetSellerOrderReviewsFn func(ctx context.Context, in *pb.GetSellerOrderReviewsRequest, opts ...grpc.CallOption) (*pb.GetSellerOrderReviewsResponse, error)
-	ReplyReviewFn           func(ctx context.Context, in *pb.ReplyReviewRequest, opts ...grpc.CallOption) (*pb.ReviewResponse, error)
+	GetProductReviewsFn         func(ctx context.Context, in *pb.GetProductReviewsRequest, opts ...grpc.CallOption) (*pb.ProductReviewsResponse, error)
+	SubmitOrderReviewFn         func(ctx context.Context, in *pb.SubmitOrderReviewRequest, opts ...grpc.CallOption) (*pb.SubmitOrderReviewResponse, error)
+	ListMyOrderReviewsFn        func(ctx context.Context, in *pb.ListMyOrderReviewsRequest, opts ...grpc.CallOption) (*pb.ListMyOrderReviewsResponse, error)
+	GetSellerOrderReviewsFn     func(ctx context.Context, in *pb.GetSellerOrderReviewsRequest, opts ...grpc.CallOption) (*pb.GetSellerOrderReviewsResponse, error)
+	GetSellerOrderReviewStatsFn func(ctx context.Context, in *pb.GetSellerOrderReviewStatsRequest, opts ...grpc.CallOption) (*pb.GetSellerOrderReviewStatsResponse, error)
+	ReplyReviewFn               func(ctx context.Context, in *pb.ReplyReviewRequest, opts ...grpc.CallOption) (*pb.ReviewResponse, error)
 }
 
 func (m *reviewMockClient) GetProductReviews(ctx context.Context, in *pb.GetProductReviewsRequest, opts ...grpc.CallOption) (*pb.ProductReviewsResponse, error) {
@@ -59,6 +60,9 @@ func (m *reviewMockClient) GetSellerOrderReviews(ctx context.Context, in *pb.Get
 	return nil, nil
 }
 func (m *reviewMockClient) GetSellerOrderReviewStats(ctx context.Context, in *pb.GetSellerOrderReviewStatsRequest, opts ...grpc.CallOption) (*pb.GetSellerOrderReviewStatsResponse, error) {
+	if m.GetSellerOrderReviewStatsFn != nil {
+		return m.GetSellerOrderReviewStatsFn(ctx, in, opts...)
+	}
 	return nil, nil
 }
 func (m *reviewMockClient) HideReview(ctx context.Context, in *pb.HideReviewRequest, opts ...grpc.CallOption) (*pb.HideReviewResponse, error) {
@@ -455,6 +459,47 @@ func TestMaskUsername(t *testing.T) {
 		if got != c.want {
 			t.Errorf("maskUsername(%q) = %q, want %q", c.input, got, c.want)
 		}
+	}
+}
+
+// 評價的父資源檢查：店家此刻不可曝光（can_accept_orders=false）時回 404，
+// 且不得讀 review-service。
+func TestGetPublicSellerReviews_NonExposableStore_Returns404(t *testing.T) {
+	sellerMock := &mockSellerServiceClient{
+		GetSellerFn: func(ctx context.Context, in *sellerpb.GetSellerRequest, opts ...grpc.CallOption) (*sellerpb.SellerResponse, error) {
+			return &sellerpb.SellerResponse{Data: &sellerpb.SellerInfo{StoreId: "2683382637"}}, nil
+		},
+		BatchGetSellerMetaFn: func(ctx context.Context, in *sellerpb.BatchGetSellerMetaRequest, opts ...grpc.CallOption) (*sellerpb.BatchGetSellerMetaResponse, error) {
+			return &sellerpb.BatchGetSellerMetaResponse{Sellers: map[int64]*sellerpb.SellerMeta{
+				2683382637: {CanAcceptOrders: false, HasPublicCard: true},
+			}}, nil
+		},
+	}
+	reviewMock := &reviewMockClient{
+		GetSellerOrderReviewsFn: func(ctx context.Context, in *pb.GetSellerOrderReviewsRequest, opts ...grpc.CallOption) (*pb.GetSellerOrderReviewsResponse, error) {
+			t.Fatal("review-service must not be read for a non-exposable store")
+			return nil, nil
+		},
+		GetSellerOrderReviewStatsFn: func(ctx context.Context, in *pb.GetSellerOrderReviewStatsRequest, opts ...grpc.CallOption) (*pb.GetSellerOrderReviewStatsResponse, error) {
+			t.Fatal("review-service must not be read for a non-exposable store")
+			return nil, nil
+		},
+	}
+	h := &Holder{
+		Seller:      grpcclient.NewSellerClientForTest(sellerMock),
+		OrderReview: grpcclient.NewOrderReviewClientForTest(reviewMock),
+	}
+	r := gin.New()
+	r.GET("/api/v1/public/sellers/:id/reviews", h.GetPublicSellerReviews)
+	r.GET("/api/v1/public/sellers/:id/reviews/stats", h.GetPublicSellerReviewStats)
+
+	for _, path := range []string{
+		"/api/v1/public/sellers/2683382637/reviews",
+		"/api/v1/public/sellers/2683382637/reviews/stats",
+	} {
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+		assertHTTPStatus(t, w, http.StatusNotFound)
 	}
 }
 
