@@ -128,7 +128,7 @@ schema `identity`（`db/schema.sql`）：
 - Google 自動連結只在 `email_verified` 為真、email 網域是 `gmail.com` 或帶 `hd`、而且恰好一個存活帳號上有「符合自動連結資格的 Google 身分」（`auto_link_eligible`：Google、已驗證、gmail.com 或帶 `hd`）的 email 相符時發生；比對的是身分的 email，不是 `accounts.email`；LINE 從不自動連結，LINE 的已驗證 email 也不是目標：`TestAutoLinking`、`TestLineVerifiedEmailIsNotAnAutoLinkAnchor`、`TestAutoLinkIgnoresTombstones`、`TestConcurrentFirstLoginsShareOneAccount`、`TestLoginIsAtomic`
 - 登入流程的 `state` 與 App 的 nonce 單次使用，驗證失敗也已作廢，10 分鐘與 5 分鐘逾時；返回網址只收站內相對路徑：`TestLoginFlowIsSingleUse`、`TestLoginFlowRefusesUnsafeReturnPathsAndUnknownProviders`、`TestAppNonceIsSingleUseAndShortLived`
 - 新帳號不授予角色（買家由 buyer 訂閱 `AccountCreated` 建立）：`TestLoginCreatesAnAccountForEachProvider`。Clerk 時期的 `clerk_user_id` UNIQUE 在 Clerk 退場前保留
-- 刪帳與（有 Clerk 使用者時）排入刪除它的 job 在同一個 transaction，刪帳留下墓碑並發出 `AccountDeleted`；停權不排 Clerk job，認證結果帶 `SuspendedAt`、不回錯誤：`TestSuspendedAccountStillAuthenticatesAndCarriesTheSuspensionTime`、`TestDeletionLeavesATombstoneAndDeletesTheClerkUser`；`accounts_deleted_check`
+- 刪帳留下墓碑（登入身分的列保留，同一個身分不會再建帳號）並發出 `AccountDeleted`，不排任何 job；停權不排 job，認證結果帶 `SuspendedAt`、不回錯誤：`TestSuspendedAccountStillAuthenticatesAndCarriesTheSuspensionTime`、`TestDeletionLeavesATombstoneAndKeepsTheLoginIdentity`；`accounts_deleted_check`
 - 停權紀錄與 `suspended_at` 同一個 transaction，未解除的紀錄最多一筆；停權、解除入口只由 `accountsuspension` 呼叫：`TestFailureAfterTheRecordRollsTheRecordBack`、`TestRepeatedSuspendKeepsTheFirstRecord`、arch 的 `TestSuspensionEntriesAreOnlyCalledByAccountsuspension`
 - 帳號生命週期 ACTIVE → PENDING_DELETION → DELETED；等待刪除時 `GrantRole` 回 FailedPrecondition：`TestDeletionPendingRefusesGrantRole`；`accounts_deletion_pending_check`
 - 不是角色的值（例如 `BUYER`）授予或移除回 InvalidInput：`TestRemoveRole`；`account_roles_role_check`
