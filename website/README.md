@@ -123,8 +123,6 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_WEB_ORIGIN` | 這份部署的站台 origin（canonical、sitemap、CSRF 同源檢查與「這是不是正式網域」的判斷都取自它）。只能是 origin（無路徑、query、帳密）。dev 留空用 `http://localhost:3000`；**prod 必填** | 否 |
 | `NEXT_PUBLIC_ADM_ORIGIN` | ADM 的 origin（代行工作區「返回 ADM」）。dev 留空用 `http://localhost:3001`；**prod 必填** | 否 |
 | `MEDIA_UPLOAD_ORIGINS` | 預簽名上傳（`PUT`）的目的地 origin，逗號分隔的 `https://` origin，host 可帶一個 `*.` 開頭（虛擬主機式 bucket）。只用於 build 時產生 CSP `connect-src`；沒設就不在 CSP 內（上傳會被瀏覽器擋下） | 否 |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk 顧客 application 的 publishable key（登入；CSP 也由它推得 Clerk 的 Frontend API） | 是 |
-| `CLERK_SECRET_KEY` | Clerk 顧客 application 的 secret key（middleware 驗 session token） | 是 |
 | `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Google Identity Services 前端 client id（廠商入口的二次驗證 GIS 按鈕） | 廠商入口需要 |
 | `NEXT_PUBLIC_FIREBASE_*` | Firebase Web SDK 設定，**僅供 phone OTP 註冊綁手機，不參與 OAuth** | 手機註冊需要 |
 | `NEXT_PUBLIC_MEDIA_BASE_URL` | 圖片／媒體 gateway 來源（R2 + Cloudflare Worker），也是 app 唯一認得的自家媒體主機。**留空 = 沒有媒體 origin**，object key 不會組出任何網址，圖片就是不顯示（不會退到別的主機） | **要在本機跑 E2E 或 `pnpm build` 就必填**（dev 值 `https://test-media.example.com`；見下方第 8 節） |
@@ -133,7 +131,7 @@ cp .env.example .env.local
 | `ORIGIN_AUTH_SECRET` | backend#2264 限流身分簽章金鑰。server 端每次打 gateway 時附上 `X-HK-Origin-Auth`，讓 gateway 知道這次呼叫該算在哪個訪客（或算成 SSR）頭上，而不是把全站流量算在 Worker 的單一出口位址上。Worker binding **確實不存在時**才是不簽章；candidate upload 的 secrets file 是 additive，僅省略 GitHub secret 會繼承既有 binding，不會自動切成 unsigned。目前沒有部署環境，此項沒有現行操作。CI 用的是另一把 `ORIGIN_AUTH_CI_SECRET`（只在 GitHub Actions step 上，不進 Worker） | 否（binding 不存在時只是粒度退化） |
 | `REVALIDATE_SECRET` | 後端服務 POST `/api/revalidate` 時帶的 `x-revalidate-secret`；producer 只送 `product:<id>` / `seller:<id>` 等 entity tag，web 邊界自動展開為對應的 aggregate tags。失效強度由 tag 形狀決定：entity tag 立即過期（寫入者下一次讀取即為新內容），aggregate 列表維持 stale-while-revalidate 以保留重生去重與後端故障時的 stale 兜底 | server 端 ISR busting 需要 |
 
-> 認證已**不再使用 Better Auth / 獨立 DB**。舊版的 `BETTER_AUTH_*`、`BFF_SESSION_*`、`DB_*`、`NEXT_PUBLIC_AUTH_DRIVER` 已移除，無需設定。登入走 GIS / Apple OAuth + 後端 gateway session。
+> 認證已**不再使用 Better Auth / 獨立 DB**。舊版的 `BETTER_AUTH_*`、`BFF_SESSION_*`、`DB_*`、`NEXT_PUBLIC_AUTH_DRIVER` 已移除，無需設定。顧客登入走單體的 Google / LINE OAuth 與 HttpOnly 的 session cookie（見下方「顧客登入」）。
 
 最小本機設定可從這份開始：
 
@@ -143,10 +141,6 @@ NEXT_PUBLIC_FLAVOR=dev
 # 通常不需覆寫（flavor 會推導），需指向自架後端時才設
 API_BASE_URL=
 NEXT_PUBLIC_API_BASE_URL=
-
-# 登入（Clerk 顧客 application）
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
-CLERK_SECRET_KEY=
 
 # 廠商入口的 Google 二次驗證
 NEXT_PUBLIC_GOOGLE_CLIENT_ID=
@@ -166,7 +160,7 @@ REVALIDATE_SECRET=
 ### 4. Firebase 與 OAuth 設定
 
 - **Firebase**：僅用於 phone OTP（手機註冊綁定）。Firebase Console → Project Settings → Web app config 取值；Authentication → Sign-in method 啟用 Phone，Authorized domains 加入 `localhost` 與正式網域；開發時可設 test phone numbers 節省簡訊額度。
-- **顧客登入（Google、Apple、LINE）**：由 Clerk 處理（ADR `backend/docs/adr/2026-09-27-identity-clerk.md`）。三個 provider 在 Clerk dashboard 的 SSO connections 設定，登入畫面是自己的（`features/auth`），OAuth 回到 `/login/sso-callback`。
+- **顧客登入（Google、LINE）**：由單體處理（ADR `backend/docs/adr/2026-10-30-identity-self-hosted-federated-login.md`），website 沒有 secret 也沒有登入用的環境變數。登入頁（`features/auth`）把瀏覽器整頁導向 `/api/auth/{provider}/start?return_to=…`（經同源反代到單體），單體完成 OAuth 後設 HttpOnly 的 `__Host-hk_session` cookie 並 302 回登入頁；失敗時 302 回 `/login?error=<代碼>`。OAuth client 與 redirect URI 在單體的設定與各 provider 的 console，不在這裡。登入與否由 `GetSession` 判斷（`lib/auth/context.tsx`），登出是 `SignOut`；middleware 只看 cookie 在不在（樂觀導向，不打 API）。伺服器端（RSC、server action）只讀取：把訪客的 cookie 轉送給單體的 GET，寫入一律由瀏覽器送出（`lib/auth/session-cookie.server.ts`）。
 - **廠商入口的 Google 二次驗證**：GCP Console → APIs & Services → Credentials → OAuth 2.0 Client ID（Web application），把本機與正式網域加入 Authorized JavaScript origins。
 
 ### 5. Next.js 配置 (`next.config.ts`)
@@ -223,7 +217,7 @@ CI 在跑 E2E 之前，會由 workflow **自己覆寫一份 `.env.local`**，把
 # 1) .env.local 必須有 media gateway 來源（否則不會組出任何圖片網址）
 echo 'NEXT_PUBLIC_MEDIA_BASE_URL=https://test-media.example.com' >> .env.local
 
-# 2) Clerk 的 key（顧客的 development instance）。沒有 key 時 middleware 對每個請求都丟錯。
+# 2) 登入不需要任何 key：e2e 的已登入 spec 設 `__Host-hk_session` cookie 並 mock GetSession（tests/e2e/helpers/session-cookie.ts）。
 #    Google client id 由 playwright.config.ts 以假值帶入（廠商入口的 GIS 由 E2E mock 掉）。
 
 # 3) 用系統 Chrome 跑（本機沒有 CI 那顆 chrome-headless-shell）
@@ -236,7 +230,6 @@ PW_CHANNEL=chrome pnpm exec playwright test tests/e2e/site-stability.spec.ts --p
 | 前置 | 沒設會怎樣（症狀） |
 |------|--------------------|
 | `NEXT_PUBLIC_MEDIA_BASE_URL=https://test-media.example.com` | 沒有媒體 origin → `buildImageUrl` 不組網址 → 圖片全部缺席。`site-stability.spec.ts` 斷言頁面的圖片都載得到，於是**乾淨的樹也必紅** |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` | middleware（`clerkMiddleware`）對每個請求丟 missing key 的錯誤，整站 500 |
 | `PW_CHANNEL=chrome` | 找不到瀏覽器。CI 裝的是 `--only-shell`（chrome-headless-shell），本機通常沒有；本機到 Playwright CDN 實質不通，硬抓會卡很久 |
 | port 3000 淨空 | `playwright.config.ts` 本機是 `reuseExistingServer: true`——3000 上若是別的東西，Playwright 會直接拿它當受測站，測到的不是這份 code |
 | 連得到本機單體（`localhost:8080`） | `@live` 標籤那批打真後端。要跳過改用 `pnpm test:e2e:hermetic` |

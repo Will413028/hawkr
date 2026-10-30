@@ -51,7 +51,7 @@ int64 snowflake (precision-safe). `value` is numeric NT$.
 | Event | Trigger (file) | Key params | Timing / dedup |
 |---|---|---|---|
 | `page_view` | `lib/analytics/NavigationEvents.tsx` | `page_path`, `page_location`, `page_referrer`, `page_title` | once per normalized pathname/search change; auth hydration and role switches do not retrigger it |
-| `login` | `lib/api/auth.ts` (`completeSignIn`, after the Clerk OAuth redirect) | `method` (google/apple/line) | fresh login only — **not** session refresh |
+| `login` | `lib/api/auth.ts` (`LoginPage` effect: the monolith redirects back to `/login?provider=…` after the OAuth flow) | `method` (google/line) | fresh login only — **not** session refresh |
 | `view_item_list` | `features/market/components/MarketProductsList.tsx` | `items[]`, `item_list_id/name` | **client-only**, fires only the newly-appended slice on grow; resets on filter change |
 | `select_item` | `features/market/components/MarketProductCard.tsx` | `items[1]`, `item_list_name` | on card click, before navigation |
 | `view_item` | `app/[locale]/(public)/products/[id]/page.tsx` → `ViewItemTracker` | `items[1]`, `value` | once on mount (server-built item) |
@@ -98,7 +98,7 @@ int64 snowflake (precision-safe). `value` is numeric NT$.
 - Stable Hawkr account identifiers are not sent as GA4 `user_id`.
 - user property `role` = active role (buyer/seller), updates on role switch and
   resets to `anonymous` on logout.
-- user property `login_method` = google/apple/line, set in `trackLogin`.
+- user property `login_method` = google/line, set in `trackLogin`.
 
 ## Consent and advertising use
 

@@ -30,7 +30,7 @@
 
 等待目的地資料時，完成回呼必須核對當前意圖 ID 與原頁 URL。登入完成或新的程式導覽已接管時，晚到的舊資料不能再觸發 `router.push/replace`。等待中再次點擊同一連結，可建立新的意圖；QueryClient 共用仍在進行的請求，舊回呼不能清除新一次等待狀態。
 
-`useCompleteLogin` 使用同步 ref 防止同一輪 provider 回呼重複完成。它先沿用 `redirectForRole` 套用角色和目的地政策，再以 `navigateDocument` 清除舊復原狀態並離頁。商品目的地與 query/hash 保留；不符合角色的受保護路徑仍使用既有角色預設頁。若文件導覽被拒絕或同步拋錯，登入的 leaving 狀態會解除，讓原有錯誤處理及重試繼續。
+單體完成 OAuth 後 302 回登入頁（`/login?role=…&redirect=…&provider=…`），`LoginPage` 的離頁 effect 讀到 `GetSession` 解出的帳號，使用同步 ref 防止同一輪重複離頁。它先沿用 `redirectForRole` 套用角色和目的地政策，再以 `navigateDocument` 清除舊復原狀態並離頁。商品目的地與 query/hash 保留；不符合角色的受保護路徑仍使用既有角色預設頁。若文件導覽被拒絕或同步拋錯，登入的 leaving 狀態會解除，讓原有錯誤處理及重試繼續。
 
 ## 來源 API
 
@@ -53,7 +53,7 @@ import {
 | `cancelNavigationIntent(id?)` | 指定 ID 時只取消該筆；不帶參數時取消目前意圖。 |
 | `navigateDocument(target, { componentId?, actionId?, replace?, reason?, recoveryOf? }?)` | 驗證同來源目的地、清除舊復原並記錄 hard handoff，再呼叫文件導覽。無效目的地回傳 `false`；已發起回傳 `true`，不等於目的地成功載入。同步文件導覽錯誤仍拋給呼叫端。 |
 
-正式期限與取消條件由 [`recovery-state.ts`](../lib/navigation/recovery-state.ts) 管理；意圖、完成與跨文件關聯在 [`observability.ts`](../lib/navigation/observability.ts)，已開始的導覽由 [`navigation-watchdog.ts`](../lib/loading/navigation-watchdog.ts) 接手。登入使用 [`useCompleteLogin.ts`](../lib/auth/useCompleteLogin.ts)。來源仍是行為與 API 的最終依據。
+正式期限與取消條件由 [`recovery-state.ts`](../lib/navigation/recovery-state.ts) 管理；意圖、完成與跨文件關聯在 [`observability.ts`](../lib/navigation/observability.ts)，已開始的導覽由 [`navigation-watchdog.ts`](../lib/loading/navigation-watchdog.ts) 接手。登入使用 [`LoginPage.tsx`](../features/auth/screens/login/LoginPage.tsx)。來源仍是行為與 API 的最終依據。
 
 ## Stories 與驗證狀態
 
@@ -71,7 +71,7 @@ import {
 
 | 證據層級 | 狀態 |
 | --- | --- |
-| 本機 React 整合單元測試 | `pnpm test lib/auth/useCompleteLogin.unit.test.ts components/shared/Link.navigation.unit.test.ts`：2 檔、15 項通過。涵蓋登入重入、角色／目的地保留、取消、replace、延遲回呼及重複點擊。 |
+| 本機 React 整合單元測試 | `pnpm test features/auth/screens/login/LoginPage.unit.test.ts components/shared/Link.navigation.unit.test.ts`：2 檔、29 項通過。涵蓋登入頁導向單體的 OAuth start、provider 回來後的離頁與目的地保留、重複點擊，以及連結導覽的取消、replace、延遲回呼。 |
 | 完整單元測試 | `pnpm test`：220 檔、2022 項全數通過；包含 storage key 分類、共用 Link 與手機底部導覽。 |
 | core Node 測試 | observability、watchdog、route contract 三套最新合計 66 項通過。登入角色／redirect、樣式 ownership 與賣家通知 contract 另 17 項通過。 |
 | MCP `test-run` | 最後完整一輪 146 項全數通過，包含 3 個新預覽。前一輪商品描述 story 的可見性等待失敗，限定重跑與完整重跑均通過，未修改商品描述程式。 |
