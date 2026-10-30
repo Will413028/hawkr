@@ -103,7 +103,7 @@
   - 消費端：`rg -il clerk website .github/workflows`（盤點 72 檔）；Storybook `rg -n 'clerk' website/.storybook`。
   - 不能動：畫面版面與既有文案（連結區以外）；同源反代的路徑。
   - 驗收：website CI 等價的 lint、typecheck、`test:unit`（node:test 指令）、vitest、`pnpm run build`（帶 `API_BASE_URL=http://127.0.0.1:9/api/v1` 與同值 `NEXT_PUBLIC_API_BASE_URL`）、`design:check --apps-root ..`；e2e 與 Storybook 交給 CI（`website-e2e.yml`），回報為待 CI。真人登入：Will 在本機以兩家各登入一次、登出、連結一次。mutation：transport 又帶 Bearer 而 cookie 缺時要紅（未登入 e2e）、middleware 不認 cookie 要紅。
-  - 需要人做的事：Will 的真人登入驗收；連結區的畫面同意。
+  - 需要人做的事：Will 的真人登入驗收；連結區的畫面同意；畫面完成後 Will 以登入畫面截圖申請 LINE email 權限，核准後實測「拒給 email」並把結果補進 `spikes.md`；部署環境的第一方反代確認 3xx 與多個 `Set-Cookie` 原樣轉給瀏覽器。
   - 完成後的狀態：web 可登入；兩支 App 仍登不進。
 
 - [ ] **4. 後端刪除 Clerk**（被擋於：步驟 3）
@@ -121,7 +121,7 @@
 - [ ] **6. 兩支 App**（被擋於：步驟 4、D2）
   - 範圍：`packages/hawkr_auth` 改用原生 SDK（`google_sign_in`、LINE SDK；`sign_in_with_apple` 移除，依 D2）取得 ID token／授權碼，呼叫步驟 2 的 token 交換 RPC，session token 存 secure storage；`clerk_auth` 移除；兩支 App 與 `hawkr_auth` 的 README、ARCHITECTURE 一併改；兩支 App 的 session provider、interceptor、測試 fake 改寫；收到 `unauthenticated` 回登入頁。
   - 消費端：`rg -il clerk packages buyer-app seller-app`（盤點 56 檔）。
-  - 驗收：兩支 App 的 analyze、custom_lint、改到的測試加以字串讀原始碼的守門測試、`bash scripts/deadcode.sh`、build_runner 生成比對（diff 有 `part` 宣告的檔時）；完整測試與 coverage ratchet 交給 CI（seller 依 CI 的 artifact 重算 baseline）。真機或模擬器登入：Will。mutation：interceptor 不帶 Bearer 要紅、token 存非 secure storage 的守門測試要紅。
+  - 驗收：實測 Google iOS client 的 ID token `aud`，結果補進 `spikes.md` 並對齊步驟 2 接受的 audience；兩支 App 的 analyze、custom_lint、改到的測試加以字串讀原始碼的守門測試、`bash scripts/deadcode.sh`、build_runner 生成比對（diff 有 `part` 宣告的檔時）；完整測試與 coverage ratchet 交給 CI（seller 依 CI 的 artifact 重算 baseline）。真機或模擬器登入：Will。mutation：interceptor 不帶 Bearer 要紅、token 存非 secure storage 的守門測試要紅。
   - 需要人做的事：Will 以模擬器或真機兩家各登入一次；iOS 拿掉 Sign in with Apple capability，加 LINE 的 URL scheme。
 
 - [ ] **7. 收尾**：完成定義逐項核對；獨立設計審查（design-review skill）；`rg -il clerk -g '!node_modules' -g '!gen/**' -g '!*.g.dart' -g '!pnpm-lock*' . -g '!backend/docs/adr/**' -g '!backend/docs/plans/**'` 沒有結果，盤點每列去向填完；延後項附觸發條件搬回主清單；需要人做的事列給 Will（刪除開發用 Clerk instance 是不可逆的對外動作，列給 Will 做）。
@@ -166,7 +166,7 @@
 
 | 步驟 | 狀態 | 已跑的驗收 | 未跑的驗收與原因 | commit |
 |---|---|---|---|---|
-| 1a 前置驗證 | 進行中 | 官方文件查證（a、b、c、e）與 repo 代理程式閱讀（d 前半）、govulncheck 基線（f），見 `spikes.md` | 需要 OAuth client 的實測：LINE 拒給 email 的回應、Google iOS `aud`；部署環境的第一方反代與 OpenNext 對 3xx、多個 `Set-Cookie` 的處理（反代程式不在 repo）。開發用 OAuth client 已建（2026-10-30：GCP 專案 `hawkr` 的 web 與 buyer／seller iOS client；LINE provider `Hawkr` 的 channel `Hawkr Login (dev)`，callback 與 iOS bundle ID 已設，email 權限未申請——要上傳登入畫面截圖，等步驟 3 做出畫面再申請）。LINE 拒給 email 的實測要等 email 權限核准；Google iOS `aud` 要等步驟 6 的 App | |
+| 1a 前置驗證 | 完成 | 官方文件查證（a、c、e）與 repo 代理程式閱讀（d 前半）、govulncheck 基線（f），見 `spikes.md`；開發用 OAuth client 已建（GCP 專案 `hawkr` 的 web 與 buyer／seller iOS client；LINE provider `Hawkr` 的 channel `Hawkr Login (dev)`，callback 與 iOS bundle ID 已設）；b 取消（不提供 Apple） | 移到後續步驟的實測：LINE 拒給 email 的回應（email 權限要附登入畫面截圖，步驟 3 做出畫面後申請，驗收併入步驟 3）；Google iOS `aud`（步驟 6）；部署環境反代對 3xx、多個 `Set-Cookie` 的處理（反代程式不在 repo，步驟 3 的部署驗收） | `5cfb680`、`584ead2` |
 | 1b 新 ADR | 未開始 | | | |
 | 2 後端：session 與聯合登入 | 未開始 | | | |
 | 3 website 切換 | 未開始 | | | |
