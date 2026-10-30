@@ -249,24 +249,3 @@ func (q *Queries) ResolveSession(ctx context.Context, tokenHash []byte) (Resolve
 	)
 	return i, err
 }
-
-const setSessionAuthTime = `-- name: SetSessionAuthTime :execrows
-UPDATE identity.sessions
-SET auth_time = $1::timestamptz
-WHERE id = $2 AND account_id = $3 AND auth_time < $1::timestamptz
-`
-
-type SetSessionAuthTimeParams struct {
-	Now       time.Time
-	ID        uuid.UUID
-	AccountID int64
-}
-
-// 重新以 provider 驗證之後記下時間；只往後改。
-func (q *Queries) SetSessionAuthTime(ctx context.Context, arg SetSessionAuthTimeParams) (int64, error) {
-	result, err := q.db.Exec(ctx, setSessionAuthTime, arg.Now, arg.ID, arg.AccountID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}

@@ -385,11 +385,6 @@ func (m *Module) RevokeSession(ctx context.Context, accountID int64, sessionID S
 	return m.session.Revoke(ctx, accountID, sessionID)
 }
 
-// MarkSessionAuthenticated 記下帳號的這個 session 剛重新以 provider 驗證過（更新 AuthTime）。
-func (m *Module) MarkSessionAuthenticated(ctx context.Context, accountID int64, sessionID SessionID) error {
-	return m.session.MarkAuthenticated(ctx, accountID, sessionID)
-}
-
 // BeginLoginFlow 寫 web 登入流程的暫存狀態（10 分鐘、單次使用），回傳 state、nonce、PKCE verifier 與登入前 cookie 的原文值。
 func (m *Module) BeginLoginFlow(ctx context.Context, in LoginFlowInput) (LoginFlowStart, error) {
 	return m.session.BeginLoginFlow(ctx, in)

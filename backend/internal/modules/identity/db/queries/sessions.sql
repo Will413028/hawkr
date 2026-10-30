@@ -47,9 +47,3 @@ ORDER BY created_at DESC, id DESC;
 SELECT id, account_id, client, created_at, last_used_at, absolute_expires_at, auth_time
 FROM identity.sessions
 WHERE id = $1 AND account_id = $2;
-
--- name: SetSessionAuthTime :execrows
--- 重新以 provider 驗證之後記下時間；只往後改。
-UPDATE identity.sessions
-SET auth_time = sqlc.arg(now)::timestamptz
-WHERE id = sqlc.arg(id) AND account_id = sqlc.arg(account_id) AND auth_time < sqlc.arg(now)::timestamptz;

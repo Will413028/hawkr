@@ -452,19 +452,10 @@ func TestSessionsCanBeListedAndRevokedOnlyByTheirOwner(t *testing.T) {
 	if !list[1].AuthTime.Equal(list[1].CreatedAt) || !list[1].AbsoluteExpiresAt.Equal(list[1].CreatedAt.Add(90*24*time.Hour)) {
 		t.Fatalf("auth_time／絕對到期 = %+v", list[1])
 	}
-	// 別人的 session 不能終止，也不能標記重新驗證。
+	// 別人的 session 不能終止。
 	wantKind(t, f.m.RevokeSession(ctx, a1.AccountID, b.SessionID), apperr.KindNotFound)
-	wantKind(t, f.m.MarkSessionAuthenticated(ctx, a1.AccountID, b.SessionID), apperr.KindNotFound)
 	f.authenticated(t, b.Token)
 
-	f.now = f.now.Add(10 * time.Minute)
-	if err := f.m.MarkSessionAuthenticated(ctx, a1.AccountID, a1.SessionID); err != nil {
-		t.Fatal(err)
-	}
-	list, _ = f.m.ListSessions(ctx, a1.AccountID)
-	if !list[1].AuthTime.Equal(f.now) {
-		t.Fatalf("重新驗證後 auth_time = %v，預期 %v", list[1].AuthTime, f.now)
-	}
 	if err := f.m.RevokeSession(ctx, a1.AccountID, a1.SessionID); err != nil {
 		t.Fatal(err)
 	}

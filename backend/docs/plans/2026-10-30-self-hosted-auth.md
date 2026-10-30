@@ -160,6 +160,18 @@
 
 拍板：D1 已決、D5 作廢；D2、D3、D4、D6 於 2026-10-30 依方法簡報（fresh subagent 批判後修正）由 Will 一次拍板，全採建議。
 
+- **步驟 2 的實作決定**（2026-10-30，主 session 依 SSOT 裁決）
+  - `accounts.clerk_user_id` 過渡期改 nullable，步驟 4 刪除。
+  - 自動連結的目標只限符合資格的 Google identity（`auto_link_eligible`）。
+  - 刪帳保留登入身分墓碑。
+  - CSRF 疊加在既有 CrossOriginProtection 上。
+  - session cookie Max-Age 90 天。
+  - LINE web token 沒有 `email_verified`，不寫寄件地址；步驟 3 實測 email 權限時重看。
+  - Google 授權回應缺 `iss` 一律拒絕。
+  - 重新驗證＝重新登入。
+  - 延後：Workspace 刪除使用者後，同地址的新 `sub` 會自動連到舊帳號（信任 `hd` 的固有限制），步驟 5 寫進 ADR。
+  - 延後：過期的 session、flow、nonce 只機會式清除，上線前加排程清除 job。
+
 ## 進度
 
 狀態值：未開始／進行中／程式完成待驗收／完成。
@@ -168,7 +180,7 @@
 |---|---|---|---|---|
 | 1a 前置驗證 | 完成 | 官方文件查證（a、c、e）與 repo 代理程式閱讀（d 前半）、govulncheck 基線（f），見 `spikes.md`；開發用 OAuth client 已建（GCP 專案 `hawkr` 的 web 與 buyer／seller iOS client；LINE provider `Hawkr` 的 channel `Hawkr Login (dev)`，callback 與 iOS bundle ID 已設）；b 取消（不提供 Apple） | 移到後續步驟的實測：LINE 拒給 email 的回應（email 權限要附登入畫面截圖，步驟 3 做出畫面後申請，驗收併入步驟 3）；Google iOS `aud`（步驟 6）；部署環境反代對 3xx、多個 `Set-Cookie` 的處理（反代程式不在 repo，步驟 3 的部署驗收） | `5cfb680`、`584ead2` |
 | 1b 新 ADR | 完成 | 方法簡報經 fresh subagent 批判（8 項全數處理）後 Will 拍板 D2–D4、D6；ADR `2026-10-30-identity-self-hosted-federated-login.md` 寫成，clerk ADR 標 superseded、opaque-sessions ADR 狀態改為 D1–D3 恢復；A7-D17 已修訂 | ADR gate 的獨立草稿未另跑（決策已經過方法簡報與 fresh 批判） | （本 commit） |
-| 2 後端：session 與聯合登入 | 未開始 | | | |
+| 2 後端：session 與聯合登入 | 程式完成待驗收 | 本機 gofmt、vet（含 `-tags integration`）、`go test ./...`、`make lint-monolith` 0 issues、`go mod tidy` 無 diff、`atlas migrate validate`、`buf lint`、`buf breaking` 無破壞、TS／Dart 生成與 `@hawkr/api` lint／test、`hawkr_api` analyze、uitext 套件測試；unit 層 mutation 實跑（自動連結資格、返回網址、CSRF、login-CSRF cookie、mix-up、query token、gateway 刪憑證、Google 缺 iss、App nonce、azp、RevokeSession auth_time 等）；三個單元各經獨立審查，MED 全數修正（LINE email 預先劫持、Google 缺 iss） | integration 測試與其 mutation 由 CI 跑（Will 2026-10-30：本機只跑快速的）；本機 Docker 引擎回 500，atlas／sqlc 以本機替代工具執行，生成物由 CI 的 drift 檢查覆核；dev-token 端對端未跑（要 DB） | 57ab243、766485d、e7a74f7、67e9cff、5dde1b5、a734ada、3ce869c、（本 commit） |
 | 3 website 切換 | 未開始 | | | |
 | 4 後端刪除 Clerk | 未開始 | | | |
 | 5 文件 | 未開始 | | | |

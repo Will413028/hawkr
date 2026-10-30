@@ -194,20 +194,3 @@ func (s *Service) Revoke(ctx context.Context, accountID int64, id uuid.UUID) err
 	}
 	return nil
 }
-
-// MarkAuthenticated 記下帳號的這個 session 剛重新以 provider 驗證過；不存在或屬於別的帳號回 NotFound。
-func (s *Service) MarkAuthenticated(ctx context.Context, accountID int64, id uuid.UUID) error {
-	q := s.q(ctx)
-	n, err := q.SetSessionAuthTime(ctx, store.SetSessionAuthTimeParams{ID: id, AccountID: accountID, Now: s.d.Now()})
-	if err != nil {
-		return fmt.Errorf("identity：記錄重新驗證：%w", err)
-	}
-	if n == 0 {
-		if _, err := q.GetSessionOfAccount(ctx, store.GetSessionOfAccountParams{ID: id, AccountID: accountID}); errors.Is(err, pgx.ErrNoRows) {
-			return apperr.NotFound("session 不存在")
-		} else if err != nil {
-			return fmt.Errorf("identity：讀取 session：%w", err)
-		}
-	}
-	return nil
-}
