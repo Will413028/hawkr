@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 	"time"
 
@@ -83,7 +84,7 @@ func TestVerifyReturnsTheClaims(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Claims{Subject: "sub-1", Email: "a@example.com", EmailVerified: true, Audience: "seller-ios", Name: "王小明", IssuedAt: now.Add(-time.Minute)}
+	want := Claims{Subject: "sub-1", Email: "a@example.com", EmailVerified: true, Audience: "seller-ios", Name: "王小明", HostedDomain: "example.com", IssuedAt: now.Add(-time.Minute)}
 	if c != want {
 		t.Fatalf("= %+v", c)
 	}
@@ -160,5 +161,74 @@ func TestUnreachableKeysAreNotAnInvalidToken(t *testing.T) {
 	_, err := v.Verify(context.Background(), is.sign(t, nil))
 	if err == nil || errors.Is(err, ErrInvalid) {
 		t.Fatalf("抓不到公鑰時 err = %v，預期不是 ErrInvalid", err)
+	}
+}
+
+func hmacToken(t *testing.T, secret []byte, alg jose.SignatureAlgorithm, claims map[string]any) string {
+	t.Helper()
+	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: alg, Key: secret}, (&jose.SignerOptions{}).WithType("JWT"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := map[string]any{
+		"iss": "https://access.line.me", "sub": "U1", "aud": "channel-1",
+		"iat": now.Add(-time.Minute).Unix(), "exp": now.Add(time.Hour).Unix(),
+	}
+	for k, v := range claims {
+		base[k] = v
+	}
+	raw, err := jwt.Signed(signer).Claims(base).Serialize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
+}
+
+func lineVerifier(t *testing.T, secret []byte) *Verifier {
+	t.Helper()
+	v, err := New(Config{Issuers: []string{"https://access.line.me"}, HMACSecret: secret, Audiences: []string{"channel-1"}, Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return v
+}
+
+func TestHMACVerifierAcceptsOnlyHS256SignedByTheSecret(t *testing.T) {
+	secret := []byte("channel-secret-0123456789abcdef0")
+	v := lineVerifier(t, secret)
+	c, err := v.Verify(context.Background(), hmacToken(t, secret, jose.HS256, map[string]any{"nonce": "n", "name": "小明"}))
+	if err != nil || c.Subject != "U1" || c.Audience != "channel-1" || c.Nonce != "n" || c.Name != "小明" {
+		t.Fatalf("= %+v, %v", c, err)
+	}
+	other := newIssuer(t)
+	cases := map[string]string{
+		"別的 secret":   hmacToken(t, []byte("another-secret-0123456789abcdef01"), jose.HS256, nil),
+		"HS384":       hmacToken(t, append(slices.Clone(secret), secret...), jose.HS384, nil),
+		"RS256":       other.sign(t, map[string]any{"iss": "https://access.line.me", "aud": "channel-1"}),
+		"issuer 不對":   hmacToken(t, secret, jose.HS256, map[string]any{"iss": "https://evil.example"}),
+		"audience 不對": hmacToken(t, secret, jose.HS256, map[string]any{"aud": "channel-2"}),
+		"過期":          hmacToken(t, secret, jose.HS256, map[string]any{"exp": now.Add(-time.Minute).Unix()}),
+	}
+	for name, tok := range cases {
+		if _, err := v.Verify(context.Background(), tok); !errors.Is(err, ErrInvalid) {
+			t.Errorf("%s：err = %v，預期 ErrInvalid", name, err)
+		}
+	}
+}
+
+func TestRSAVerifierRejectsHS256Tokens(t *testing.T) {
+	is := newIssuer(t)
+	v := is.verifier(t)
+	if _, err := v.Verify(context.Background(), hmacToken(t, []byte("channel-secret-0123456789abcdef0"), jose.HS256, map[string]any{"iss": GoogleIssuer, "aud": "buyer-web"})); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("RS256 的 verifier 收了 HS256：%v", err)
+	}
+}
+
+func TestHMACConfigNeedsAudiencesAndNoPublicKey(t *testing.T) {
+	if _, err := New(Config{Issuers: []string{"https://access.line.me"}, HMACSecret: []byte("s")}); err == nil {
+		t.Fatal("沒有 audience 也能建立")
+	}
+	if _, err := New(Config{Issuers: []string{"https://access.line.me"}, HMACSecret: []byte("s"), Audiences: []string{"a"}, JWKSURL: "https://jwks.test/keys"}); err == nil {
+		t.Fatal("HMAC 與 JWKS 同時設定也能建立")
 	}
 }

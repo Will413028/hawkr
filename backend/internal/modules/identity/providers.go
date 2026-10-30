@@ -26,6 +26,16 @@ const (
 	DevAdminIssuer = provider.DevAdminIssuer
 )
 
+// WebLogin 是一個 provider 的 web 登入（授權網址、換 code、驗 ID token）；WebLoginConfig 是它的設定。
+type (
+	WebLogin       = provider.WebLogin
+	WebLoginConfig = provider.WebLoginConfig
+	WebEndpoints   = provider.WebEndpoints
+)
+
+// NewWebLogin 建立 Google 或 LINE 的 web 登入；cfg.Provider 指定哪一家。
+func NewWebLogin(cfg WebLoginConfig) (*WebLogin, error) { return provider.NewWebLogin(cfg) }
+
 // NewClerk 建立 Clerk application 的 client。
 func NewClerk(cfg ClerkConfig) (Clerk, error) { return provider.NewClerk(cfg) }
 

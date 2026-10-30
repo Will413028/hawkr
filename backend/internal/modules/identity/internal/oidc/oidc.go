@@ -41,11 +41,13 @@ type Config struct {
 	JWKSURL      string
 	PublicKey    *rsa.PublicKey
 	PublicKeyPEM string
-	Audiences    []string
-	Validators   []jwt.Validator
-	HTTPClient   *http.Client
-	Now          func() time.Time
-	Context      context.Context
+	// HMACSecret 驗 HS256 的 token（LINE web 登入的 ID token 以 channel secret 簽）；設了就只收 HS256。
+	HMACSecret []byte
+	Audiences  []string
+	Validators []jwt.Validator
+	HTTPClient *http.Client
+	Now        func() time.Time
+	Context    context.Context
 }
 
 // Claims 是驗證過的 token 內容。
@@ -57,6 +59,8 @@ type Claims struct {
 	Audience string
 	// Name 是使用者的姓名（Google 的 name）；Apple 的 token 沒有。
 	Name string
+	// HostedDomain 是 Google 的 hd claim（Workspace 網域），沒有時是空字串。
+	HostedDomain string
 	// Nonce 是 token 的 nonce claim，沒有時是空字串。
 	Nonce string
 	// IssuedAt 是 token 的 iat，沒有時是零值。
@@ -67,6 +71,7 @@ type Claims struct {
 type Verifier struct {
 	cfg         Config
 	key         any
+	hmac        []byte
 	cache       *jwk.Cache
 	mu          sync.Mutex
 	lastRefresh time.Time
@@ -76,13 +81,20 @@ type Verifier struct {
 
 // New 建立 Verifier；遠端公鑰在第一次驗證時載入。
 func New(cfg Config) (*Verifier, error) {
-	if len(cfg.Issuers) == 0 || slices.Contains(cfg.Issuers, "") || (cfg.JWKSURL == "" && cfg.PublicKey == nil && cfg.PublicKeyPEM == "") || (cfg.JWKSURL != "" && len(cfg.Audiences) == 0) {
+	if len(cfg.Issuers) == 0 || slices.Contains(cfg.Issuers, "") || (cfg.JWKSURL == "" && cfg.PublicKey == nil && cfg.PublicKeyPEM == "" && len(cfg.HMACSecret) == 0) || ((cfg.JWKSURL != "" || len(cfg.HMACSecret) > 0) && len(cfg.Audiences) == 0) {
 		return nil, errors.New("oidc：issuer、公鑰與 audience 都要設定")
+	}
+	if len(cfg.HMACSecret) > 0 && (cfg.JWKSURL != "" || cfg.PublicKey != nil || cfg.PublicKeyPEM != "") {
+		return nil, errors.New("oidc：HMAC 密鑰不能與公鑰同時設定")
 	}
 	if cfg.Now == nil {
 		cfg.Now = time.Now //nolint:forbidigo // assigns the clock dependency without calling it
 	}
 	v := &Verifier{cfg: cfg}
+	if len(cfg.HMACSecret) > 0 {
+		v.hmac = slices.Clone(cfg.HMACSecret)
+		return v, nil
+	}
 	if cfg.PublicKey != nil {
 		v.key = cfg.PublicKey
 		return v, nil
@@ -200,11 +212,17 @@ func (v *Verifier) Verify(ctx context.Context, raw string) (Claims, error) {
 		Algorithm string `json:"alg"`
 		KeyID     string `json:"kid"`
 	}
-	if err := json.Unmarshal(encoded, &h); err != nil || h.Algorithm != "RS256" {
+	wantAlg := "RS256"
+	if v.hmac != nil {
+		wantAlg = "HS256"
+	}
+	if err := json.Unmarshal(encoded, &h); err != nil || h.Algorithm != wantAlg {
 		return Claims{}, ErrInvalid
 	}
 	options := []jwt.ParseOption{jwt.WithValidate(true), jwt.WithRequiredClaim(jwt.ExpirationKey), jwt.WithRequiredClaim(jwt.SubjectKey), jwt.WithClock(jwt.ClockFunc(v.cfg.Now)), jwt.WithAcceptableSkew(claimLeeway)}
-	if v.key == nil {
+	if v.hmac != nil {
+		options = append(options, jwt.WithKey(jwa.HS256(), v.hmac))
+	} else if v.key == nil {
 		if h.KeyID == "" {
 			return Claims{}, ErrInvalid
 		}
@@ -290,6 +308,12 @@ func (v *Verifier) Verify(ctx context.Context, raw string) (Claims, error) {
 			return Claims{}, apperr.WithCause(ErrInvalid, err)
 		}
 	}
+	var hostedDomain string
+	if tok.Has("hd") {
+		if err := tok.Get("hd", &hostedDomain); err != nil {
+			return Claims{}, apperr.WithCause(ErrInvalid, err)
+		}
+	}
 	var nonce string
 	if tok.Has("nonce") {
 		if err := tok.Get("nonce", &nonce); err != nil {
@@ -299,5 +323,5 @@ func (v *Verifier) Verify(ctx context.Context, raw string) (Claims, error) {
 	issuedAt, _ := tok.IssuedAt()
 	var verified any
 	_ = tok.Get("email_verified", &verified)
-	return Claims{Subject: sub, Email: email, EmailVerified: verified == true || verified == "true", Audience: audience, Name: name, Nonce: nonce, IssuedAt: issuedAt}, nil
+	return Claims{Subject: sub, Email: email, EmailVerified: verified == true || verified == "true", Audience: audience, Name: name, HostedDomain: hostedDomain, Nonce: nonce, IssuedAt: issuedAt}, nil
 }

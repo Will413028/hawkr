@@ -76,7 +76,7 @@ func nonEmpty(s string) *string {
 }
 
 // AutoLinkEligible 回報 id 是不是可以用 email 自動連結到既有帳號（D4）：只有 Google、email 已驗證，而且 email 的網域是 gmail.com
-// 或帶 hd。LINE 沒有這個資格：它不保證 email 屬於本人。
+// 或帶 hd；帶 hd 時 email 的網域必須等於 hd，不等就不符資格。LINE 沒有這個資格：它不保證 email 屬於本人。
 func AutoLinkEligible(id model.ProviderIdentity) bool {
 	if id.Provider != model.ProviderGoogle || !id.EmailVerified || id.Email == "" {
 		return false
@@ -85,7 +85,11 @@ func AutoLinkEligible(id model.ProviderIdentity) bool {
 	if at < 0 {
 		return false
 	}
-	return strings.EqualFold(id.Email[at+1:], gmailDomain) || id.HostedDomain != ""
+	domain := id.Email[at+1:]
+	if id.HostedDomain != "" {
+		return strings.EqualFold(domain, id.HostedDomain)
+	}
+	return strings.EqualFold(domain, gmailDomain)
 }
 
 // Login 以 provider 驗證過的身分登入，換發新 session（舊的登入前 token 同一個 transaction 刪除）：
