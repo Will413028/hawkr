@@ -4,7 +4,11 @@ import {
 	discoverAppPageRoutes,
 	discoverPermanentRedirects,
 } from "./helpers/app-route-inventory";
-import { fulfillConnect, GET_SESSION_URL } from "./helpers/mock-gateway";
+import {
+	fulfillConnectError,
+	GET_SESSION_URL,
+	isGetSessionUrl,
+} from "./helpers/mock-gateway";
 import { installProviderMocks } from "./helpers/mock-gsi";
 import { assertNoResidualLoading } from "./helpers/page-stability";
 
@@ -32,8 +36,6 @@ const EXPECTED_PUBLIC_STATIC_ROUTES = [
 	"/feed",
 	"/hawkr-agent-rfq-demo",
 	"/login",
-	// Clerk 社群登入的回呼頁：登入流程中的訪客落在這裡，必須匿名可達。
-	"/login/sso-callback",
 	"/market/products",
 	"/payment/return",
 	"/privacy",
@@ -94,12 +96,27 @@ function attachRuntimeMonitors(page: Page, baseURL: string): string[] {
 		issues.push(`pageerror: ${error.stack || error.message}`);
 	});
 	page.on("console", (message) => {
-		if (message.type() === "error") {
-			issues.push(`console.error: ${message.text()}`);
+		if (message.type() !== "error") return;
+		// The browser logs a failed fetch's status as a console error; the guest
+		// session probe's 401 is the answer "no session", not a broken page.
+		if (
+			message.text().includes("status of 401") &&
+			isGetSessionUrl(message.location().url)
+		) {
+			return;
 		}
+		issues.push(`console.error: ${message.text()}`);
 	});
 	page.on("response", (response) => {
 		if (response.status() < 400) return;
+		// A guest's GetSession probe answers 401 `unauthenticated` (guest, not broken).
+		if (
+			response.status() === 401 &&
+			response.request().method() === "GET" &&
+			isGetSessionUrl(response.url())
+		) {
+			return;
+		}
 		try {
 			if (new URL(response.url()).origin !== appOrigin) return;
 		} catch {
@@ -139,16 +156,15 @@ async function prepareGuestPage(page: Page): Promise<GuestPageState> {
 	await page.addInitScript((loaderKey) => {
 		sessionStorage.setItem(loaderKey, "1");
 	}, LOADER_KEY);
-	// A guest never asks GetSession (Clerk holds no session). Should a page ask
-	// anyway, answer with no account rather than a 401: this suite treats every
-	// same-origin >=400 response as a page-health failure.
+	// The session cookie is HttpOnly, so every page load asks GetSession; a guest
+	// gets `unauthenticated`. The monitors above exempt exactly this probe.
 	await page.route(GET_SESSION_URL, (route) => {
 		if (route.request().method() !== "GET") {
 			void route.fallback();
 			return;
 		}
 		state.sessionProbeHits += 1;
-		void fulfillConnect(route, {});
+		void fulfillConnectError(route, "unauthenticated");
 	});
 	return state;
 }
@@ -344,7 +360,7 @@ test.describe("canonical public static route browser health", {
 
 	test("public static inventory stays explicit and complete", () => {
 		expect(PUBLIC_STATIC_ROUTES).toEqual([...EXPECTED_PUBLIC_STATIC_ROUTES]);
-		expect(PUBLIC_STATIC_ROUTES).toHaveLength(23);
+		expect(PUBLIC_STATIC_ROUTES).toHaveLength(22);
 	});
 
 	// EVERY route here is `@live`, including the ones that render nothing but

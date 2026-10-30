@@ -5,7 +5,6 @@ import { buildContentSecurityPolicy } from "../lib/security/csp";
 const connectSrc = buildContentSecurityPolicy({
 	appConnectOrigins: [],
 	uploadOrigins: [],
-	clerkFrontendApi: "",
 })
 	.split("; ")
 	.find((entry) => entry.startsWith("connect-src "));

@@ -56,6 +56,8 @@ describe("RoleZoneGuard 的 account zone：登入即可，不看工作區", () =
 			configurable: true,
 			value: {
 				...window.location,
+				pathname: "/account/orders",
+				search: "?tab=open",
 				replace: mocks.replace,
 				reload: mocks.reload,
 			},
@@ -79,7 +81,7 @@ describe("RoleZoneGuard 的 account zone：登入即可，不看工作區", () =
 		expect(mocks.reload).not.toHaveBeenCalled();
 	});
 
-	it("有 Clerk session 但單體不認（沒有登入的帳號）：走既有的 fallback，不放行", () => {
+	it("有 session cookie 但單體不認（unauthenticated，頁面上沒有出現過登入的帳號）：導向登入頁並帶回原本的網址，不放行", () => {
 		mocks.auth = {
 			activeRole: null,
 			hasSeller: false,
@@ -90,8 +92,59 @@ describe("RoleZoneGuard 的 account zone：登入即可，不看工作區", () =
 		};
 		renderZone("account");
 		expect(screen.queryByText("zone content")).toBeNull();
-		expect(mocks.replace).toHaveBeenCalledWith("/");
+		expect(mocks.replace).toHaveBeenCalledWith(
+			"/login?redirect=%2Faccount%2Forders%3Ftab%3Dopen",
+		);
 		expect(mocks.switchRole).not.toHaveBeenCalled();
+	});
+
+	it("工作區 zone 的登入頁帶著工作區與語系前綴", () => {
+		Object.defineProperty(window, "location", {
+			configurable: true,
+			value: {
+				...window.location,
+				pathname: "/en/seller-center/orders",
+				search: "",
+				replace: mocks.replace,
+				reload: mocks.reload,
+			},
+		});
+		mocks.auth = {
+			activeRole: null,
+			hasSeller: false,
+			hydrated: true,
+			sessionSettled: true,
+			isLoggedIn: false,
+			switchRole: mocks.switchRole,
+		};
+		renderZone("seller");
+		expect(mocks.replace).toHaveBeenCalledWith(
+			"/en/login?role=seller&redirect=%2Fen%2Fseller-center%2Forders",
+		);
+	});
+
+	it("頁面上登入過、session 中途結束：走既有的 fallback 回首頁，不導向登入", () => {
+		signedIn({ activeRole: "buyer", hasSeller: false });
+		const view = renderZone("account");
+		expect(screen.getByText("zone content")).toBeTruthy();
+		mocks.auth = {
+			activeRole: null,
+			hasSeller: false,
+			hydrated: true,
+			sessionSettled: true,
+			isLoggedIn: false,
+			switchRole: mocks.switchRole,
+		};
+		view.rerender(
+			React.createElement(RoleZoneGuard, {
+				required: "account",
+				children: React.createElement("p", null, "zone content"),
+			}),
+		);
+		expect(mocks.replace).toHaveBeenCalledWith("/");
+		expect(mocks.replace).not.toHaveBeenCalledWith(
+			expect.stringContaining("/login"),
+		);
 	});
 
 	it("對照：seller zone 仍要求賣家角色，沒有就導回", () => {

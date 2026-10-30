@@ -30,7 +30,6 @@ const SHARE_IMAGE_PATH = "/opengraph-image";
 const INHERITING = [
 	"/search?q=test",
 	"/login",
-	"/login/sso-callback",
 	"/cart",
 	"/payment/return",
 	"/seller/onboarding",

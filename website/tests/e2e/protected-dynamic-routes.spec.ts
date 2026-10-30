@@ -1547,7 +1547,7 @@ test.describe("authenticated protected dynamic route smoke", {
 			(entry) =>
 				entry.access !== "public" &&
 				entry.access !== "delegated" &&
-				// 帳號層級的頁面（`account`）不在這份清單：e2e 的 mock 無法建立 Clerk 工作階段
+				// 帳號層級的頁面（`account`）不在這份清單：e2e 的 mock 沒有建立這類帳號的工作階段
 				// （見 helpers/mock-gateway.ts），登入後的畫面由 SellerMeasureRequestPage 的元件測試承接，
 				// 訪客導頁由 site-links 斷言。
 				entry.access !== "account" &&

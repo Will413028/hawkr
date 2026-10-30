@@ -44,10 +44,6 @@ beforeEach(() => {
 			dispatchedEvents.push(evt);
 		},
 		localStorage: fakeLocalStorage,
-		Clerk: {
-			loaded: true,
-			session: { getToken: async () => "clerk-session-token" },
-		},
 	};
 	(globalThis as Record<string, unknown>).localStorage = fakeLocalStorage;
 });
@@ -114,6 +110,8 @@ test("authed POST carries X-Active-Role from stored role and no CSRF header", as
 	const h = new Headers(c.init.headers);
 	// The monolith's CSRF check reads Sec-Fetch-Site / Origin, not a custom header.
 	assert.equal(h.get("X-Requested-With"), null);
+	// The credential is the HttpOnly session cookie the browser attaches itself.
+	assert.equal(h.get("Authorization"), null);
 	assert.equal(h.get("X-Active-Role"), "SELLER");
 	assert.equal(
 		(c.init as RequestInit & { credentials: string }).credentials,
@@ -148,7 +146,11 @@ test("authed GET on 401 throws UnauthorizedError and emits AUTH_EXPIRED_EVENT", 
 		},
 	);
 	assert.equal(dispatchedEvents.length, 1, "should emit exactly one event");
-	assert.equal(calls.length, 2, "refreshes the token and retries once");
+	assert.equal(
+		calls.length,
+		1,
+		"a 401 is the answer: no token refresh, no retry",
+	);
 	assert.equal((dispatchedEvents[0] as CustomEvent).type, AUTH_EXPIRED_EVENT);
 });
 

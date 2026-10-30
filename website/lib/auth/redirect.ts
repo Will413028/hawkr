@@ -56,16 +56,23 @@ export function safeRedirectPath(value: string | null | undefined) {
 
 /**
  * Builds a `/login` URL, dropping empty params. Single formatter so every
- * entry point (navbar, SSO callback failures, re-login) round-trips `role` /
+ * entry point (navbar, provider return, re-login) round-trips `role` /
  * `redirect` / `error` exactly the way middleware.ts and LoginPage read them.
  */
 export function loginPath(
-	params: { role?: RoleSlot; error?: string; redirect?: string } = {},
+	params: {
+		role?: RoleSlot;
+		error?: string;
+		redirect?: string;
+		/** 剛用哪一家登入完成回到這頁（單體 302 回來的網址帶著它，登入頁據此記 `login` 事件）。 */
+		provider?: string;
+	} = {},
 ) {
 	const qs = new URLSearchParams();
 	if (params.role) qs.set("role", params.role);
 	if (params.error) qs.set("error", params.error);
 	if (params.redirect) qs.set("redirect", params.redirect);
+	if (params.provider) qs.set("provider", params.provider);
 	const s = qs.toString();
 	return s ? `/login?${s}` : "/login";
 }

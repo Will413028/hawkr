@@ -102,15 +102,11 @@ function mountOverview() {
 beforeEach(() => {
 	vi.clearAllMocks();
 	sellerSelf.current = { capabilities: active(HEALTHY) };
-	Object.assign(window, {
-		Clerk: { loaded: true, session: { getToken: async () => "test-token" } },
-	});
 });
 
 afterEach(() => {
 	cleanup();
 	for (const client of clients.splice(0)) client.clear();
-	delete (window as Window & { Clerk?: unknown }).Clerk;
 });
 
 describe("useSellerInvoiceOverview retry ownership", () => {

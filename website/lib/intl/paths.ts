@@ -20,7 +20,7 @@ import {
  * 每一項都有理由，新增前先確認它真的不屬於 `app/[locale]`。
  *
  * 子樹（底下真的有整片路由，連同子路徑一起放行）：
- *   /api                 route handlers（含第一方反代 /api/connect、/api/v1）
+ *   /api                 route handlers（含第一方反代 /api/connect、/api/v1、/api/auth）
  *   /adm                 代行工作區：staff 介面，只有 zh-TW，有自己的根 layout（app/(delegated)）
  *   /.well-known         平台驗證檔（next.config 的 rewrite 轉到 /api/apple-pay/…）
  *

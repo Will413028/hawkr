@@ -5,7 +5,7 @@ import {
 } from "@hawkr/api/gen/hawkr/agent/v1alpha1/agent_pb";
 import { vendorPortalTransport } from "./transport";
 
-/** 供應商入口、以 secret 為憑證的兩個方法（Preview、Exchange）；不經 Clerk（見 vendorPortalTransport）。 */
+/** 供應商入口、以 secret 為憑證的兩個方法（Preview、Exchange）；憑證是邀請範圍的 cookie（見 vendorPortalTransport）。 */
 export function vendorPortalClient() {
 	return createClient(VendorPortalPublicService, vendorPortalTransport());
 }

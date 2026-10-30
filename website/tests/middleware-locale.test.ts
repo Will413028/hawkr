@@ -8,15 +8,15 @@ import { __resetSellerStoreCodeMemoForTest } from "../lib/seller/canonical-redir
 import { siteMiddleware } from "../middleware";
 
 /**
- * Locale routing as the middleware composes it (ADR 2026-10-17 D1): Clerk is outermost, the
- * site's own decisions run on the locale-free pathname, and whatever passes is next-intl's
+ * Locale routing as the middleware composes it (ADR 2026-10-17 D1): the
+ * site's own decisions (the session cookie's presence) run on the locale-free pathname, and whatever passes is next-intl's
  * response. The test process runs the dev flavor, which routes every supported locale, so `/en`
  * is a locale here; the prod behaviour of the same code (`/en` is not a locale) is the unit
  * tests of lib/intl and the built-server smoke.
  */
 
-const signedOut = async () => ({ userId: null });
-const signedIn = async () => ({ userId: "user_1" });
+// 登入與否只看 session cookie 在不在（middleware.ts；值不驗，權威是 GetSession）。
+const SIGNED_IN = { cookie: "__Host-hk_session=opaque" };
 
 function request(path: string, headers: Record<string, string> = {}) {
 	// A request with no Host header is an unidentifiable client and middleware
@@ -68,7 +68,7 @@ test("an unprefixed page is zh-TW: next-intl rewrites it to /zh-TW/… without r
 		["/products/123", "/zh-TW/products/123"],
 		["/login", "/zh-TW/login"],
 	] as const) {
-		const response = await siteMiddleware(request(path), signedOut);
+		const response = await siteMiddleware(request(path));
 		assert.equal(response.status, 200, path);
 		assert.equal(location(response), null, path);
 		assert.equal(rewrittenTo(response), internal, path);
@@ -77,7 +77,7 @@ test("an unprefixed page is zh-TW: next-intl rewrites it to /zh-TW/… without r
 
 test("a prefixed page is served as is; the locale comes from the URL", async () => {
 	for (const path of ["/en", "/en/about", "/en/products/123", "/en/login"]) {
-		const response = await siteMiddleware(request(path), signedOut);
+		const response = await siteMiddleware(request(path));
 		assert.equal(response.status, 200, path);
 		assert.equal(location(response), null, path);
 		assert.equal(rewrittenTo(response), null, path);
@@ -91,7 +91,7 @@ test("an explicit /zh-TW prefix is redirected to the unprefixed URL, before any 
 		// not turned into a login redirect carrying a /zh-TW return path
 		["/zh-TW/account/orders", "/account/orders"],
 	] as const) {
-		const response = await siteMiddleware(request(path), signedOut);
+		const response = await siteMiddleware(request(path));
 		assert.ok(
 			[307, 308].includes(response.status),
 			`${path} ${response.status}`,
@@ -105,20 +105,17 @@ test("a metadata image route keeps its /zh-TW prefix: Next writes it into the HT
 		"/zh-TW/sellers/9/apple-icon-v673w8",
 		"/zh-TW/sellers/9/apple-icon-v673w8?x=1",
 	]) {
-		const response = await siteMiddleware(request(path), signedOut);
+		const response = await siteMiddleware(request(path));
 		assert.equal(response.status, 200, path);
 		assert.equal(location(response), null, path);
 		assert.equal(rewrittenTo(response), null, path);
 	}
 	// ...while a page under the same explicit prefix is still redirected
-	const page = await siteMiddleware(request("/zh-TW/sellers/9"), signedOut);
+	const page = await siteMiddleware(request("/zh-TW/sellers/9"));
 	assert.ok([307, 308].includes(page.status));
 	// and a page whose dynamic segment happens to be called icon is not an image route: it
 	// is redirected to its canonical URL, where the login guard applies
-	const order = await siteMiddleware(
-		request("/zh-TW/account/orders/icon"),
-		signedOut,
-	);
+	const order = await siteMiddleware(request("/zh-TW/account/orders/icon"));
 	assert.ok([307, 308].includes(order.status));
 	assert.equal(location(order)?.pathname, "/account/orders/icon");
 });
@@ -127,7 +124,6 @@ test("the browser's language never routes: Accept-Language: en on / stays zh-TW,
 	for (const path of ["/", "/en", "/about"]) {
 		const response = await siteMiddleware(
 			request(path, { "accept-language": "en-US,en;q=0.9" }),
-			signedOut,
 		);
 		assert.equal(location(response), null, path);
 		assert.equal(
@@ -137,15 +133,11 @@ test("the browser's language never routes: Accept-Language: en on / stays zh-TW,
 		);
 		assert.equal(response.headers.get("link"), null, `${path} link`);
 	}
-	const home = await siteMiddleware(
-		request("/", { "accept-language": "en" }),
-		signedOut,
-	);
+	const home = await siteMiddleware(request("/", { "accept-language": "en" }));
 	assert.equal(rewrittenTo(home), "/zh-TW");
 	// and a stale NEXT_LOCALE cookie from an older deployment does not route either
 	const withCookie = await siteMiddleware(
 		request("/", { cookie: "NEXT_LOCALE=en" }),
-		signedOut,
 	);
 	assert.equal(rewrittenTo(withCookie), "/zh-TW");
 });
@@ -156,7 +148,7 @@ test("a guest on a protected page is sent to the login of the SAME locale, and c
 		["/en/checkout", "buyer"],
 		["/en/seller-center/orders", "seller"],
 	] as const) {
-		const to = location(await siteMiddleware(request(path), signedOut));
+		const to = location(await siteMiddleware(request(path)));
 		assert.ok(to, path);
 		assert.equal(to.pathname, "/en/login", path);
 		assert.equal(to.searchParams.get("role"), role, path);
@@ -164,7 +156,7 @@ test("a guest on a protected page is sent to the login of the SAME locale, and c
 	}
 	// the unprefixed (zh-TW) flow is unchanged
 	const zh = location(
-		await siteMiddleware(request("/account/orders?tab=open"), signedOut),
+		await siteMiddleware(request("/account/orders?tab=open")),
 	);
 	assert.equal(zh?.pathname, "/login");
 	assert.equal(zh?.searchParams.get("redirect"), "/account/orders?tab=open");
@@ -175,7 +167,7 @@ test("a guest on a protected page is sent to the login of the SAME locale, and c
 		"/en/seller-center/dashboard",
 	]) {
 		assert.equal(
-			location(await siteMiddleware(request(path), signedIn)),
+			location(await siteMiddleware(request(path, SIGNED_IN))),
 			null,
 			path,
 		);
@@ -197,7 +189,7 @@ test("staff and infrastructure paths never reach next-intl: no rewrite, no redir
 		"/opengraph-image",
 		"/apple-app-site-association",
 	]) {
-		const response = await siteMiddleware(request(path), signedOut);
+		const response = await siteMiddleware(request(path));
 		assert.equal(response.status, 200, path);
 		assert.equal(location(response), null, path);
 		assert.equal(rewrittenTo(response), null, path);
@@ -210,7 +202,7 @@ test("a subpath of a single non-localized path is an ordinary unknown path: next
 		"/apple-icon/products/1",
 		"/store-map/return/x",
 	]) {
-		const response = await siteMiddleware(request(path), signedOut);
+		const response = await siteMiddleware(request(path));
 		assert.equal(rewrittenTo(response), `/zh-TW${path}`, path);
 	}
 });
@@ -222,7 +214,7 @@ test("an alternate spelling of a path is judged as next-intl routes it: no way a
 		["/%65n/account/orders", "/en/login"],
 		["//en/account/orders", "/en/login"],
 	] as const) {
-		const response = await siteMiddleware(request(path), signedOut);
+		const response = await siteMiddleware(request(path));
 		const to = location(response);
 		assert.ok(to, path);
 		assert.equal(to.pathname, login, path);
@@ -235,12 +227,12 @@ test("an alternate spelling of a path is judged as next-intl routes it: no way a
 	}
 	// the infrastructure paths stay out of next-intl in either spelling
 	for (const path of ["/%61pi/health", "//api/health", "/%61dm/enter"]) {
-		const response = await siteMiddleware(request(path), signedOut);
+		const response = await siteMiddleware(request(path));
 		assert.equal(response.status, 200, path);
 		assert.equal(rewrittenTo(response), null, path);
 	}
 	// a path that cannot be decoded is left to Next, which answers 400
-	const broken = await siteMiddleware(request("/%E0%A4%A"), signedOut);
+	const broken = await siteMiddleware(request("/%E0%A4%A"));
 	assert.equal(rewrittenTo(broken), null);
 	assert.equal(location(broken), null);
 });
@@ -252,7 +244,7 @@ test("a prefix spelled in another case is not a way around anything: next-intl m
 		// two hops: to the canonical-case prefix, then (default locale) to the unprefixed URL, then the guard
 		["/ZH-tw/account/orders", "/zh-TW/account/orders"],
 	] as const) {
-		const response = await siteMiddleware(request(path), signedOut);
+		const response = await siteMiddleware(request(path));
 		assert.ok(
 			[307, 308].includes(response.status),
 			`${path} ${response.status}`,
@@ -260,20 +252,17 @@ test("a prefix spelled in another case is not a way around anything: next-intl m
 		assert.equal(location(response)?.pathname, to, path);
 	}
 	// a locale that is not at the front is just a path segment (and, being unknown, a 404 page)
-	const nested = await siteMiddleware(request("/en/en/account"), signedOut);
+	const nested = await siteMiddleware(request("/en/en/account"));
 	assert.equal(location(nested)?.pathname, "/en/login");
 });
 
 test("a root-level path that is no file is rewritten to its /zh-TW twin, which has no route: a plain 404, never the [locale] route", async () => {
 	for (const path of ["/favicon.ico", "/foo.json", "/ads.txt"]) {
-		const response = await siteMiddleware(request(path), signedOut);
+		const response = await siteMiddleware(request(path));
 		assert.equal(rewrittenTo(response), `/zh-TW${path}`, path);
 	}
 	// and an asset-looking tail does not take a guarded page out of the guard
-	const guarded = await siteMiddleware(
-		request("/account/orders/HK-1.png"),
-		signedOut,
-	);
+	const guarded = await siteMiddleware(request("/account/orders/HK-1.png"));
 	assert.equal(location(guarded)?.pathname, "/login");
 });
 
@@ -283,7 +272,7 @@ test("a malformed storefront id is a 404 in every locale, answered by the middle
 		"/en/sellers/abc",
 		"/en/sellers/0/posts",
 	]) {
-		const response = await siteMiddleware(request(path), signedOut);
+		const response = await siteMiddleware(request(path));
 		assert.equal(response.status, 404, path);
 		assert.equal(rewrittenTo(response), "/_not-found", path);
 	}
@@ -310,7 +299,7 @@ test("a store_id storefront URL is 308'd to its store_code and keeps the locale 
 		],
 	] as const) {
 		__resetSellerStoreCodeMemoForTest();
-		const response = await siteMiddleware(request(path), signedOut);
+		const response = await siteMiddleware(request(path));
 		assert.equal(response.status, 308, path);
 		const target = location(response);
 		assert.equal(target?.pathname, to, path);
@@ -325,7 +314,7 @@ test("the agent-gate cleanup keeps the locale prefix", async () => {
 		["/account/messages?requestId=abc&utm=1", "/account/messages?utm=1"],
 		["/en/account/messages?requestId=abc&utm=1", "/en/account/messages?utm=1"],
 	] as const) {
-		const response = await siteMiddleware(request(path), signedIn);
+		const response = await siteMiddleware(request(path, SIGNED_IN));
 		assert.equal(response.status, 307, path);
 		const target = location(response);
 		assert.equal(`${target?.pathname}${target?.search}`, to, path);
@@ -338,7 +327,7 @@ test("a locale one surface has published and another has not is a 404 on the sec
 	__setFlavorForTest("prod");
 	__setEnvForTest(null);
 	__setPublishedLocalesForTest({ buyer: ["zh-TW", "en"], seller: ["zh-TW"] });
-	const buyer = await siteMiddleware(request("/en/faq"), signedOut);
+	const buyer = await siteMiddleware(request("/en/faq"));
 	assert.equal(buyer.status, 200);
 	assert.equal(rewrittenTo(buyer), null);
 	for (const path of [
@@ -346,12 +335,12 @@ test("a locale one surface has published and another has not is a 404 on the sec
 		"/en/seller/pricing",
 		"/en/seller-center/orders",
 	]) {
-		const response = await siteMiddleware(request(path), signedOut);
+		const response = await siteMiddleware(request(path));
 		assert.equal(response.status, 404, path);
 		assert.equal(rewrittenTo(response), "/_not-found", path);
 	}
 	// zh-TW is unaffected on the seller surface
-	const zh = await siteMiddleware(request("/seller/pricing"), signedOut);
+	const zh = await siteMiddleware(request("/seller/pricing"));
 	assert.equal(zh.status, 200);
 });
 
@@ -371,7 +360,7 @@ test("a non-default locale's UGC page answers X-Robots-Tag: noindex on an indexa
 		"/%65n/products/1",
 		"//en/products/1",
 	]) {
-		const response = await siteMiddleware(request(path), signedOut);
+		const response = await siteMiddleware(request(path));
 		assert.equal(response.headers.get("x-robots-tag"), "noindex", path);
 	}
 	for (const path of [
@@ -382,7 +371,7 @@ test("a non-default locale's UGC page answers X-Robots-Tag: noindex on an indexa
 		"/en",
 		"/en/market/products",
 	]) {
-		const response = await siteMiddleware(request(path), signedOut);
+		const response = await siteMiddleware(request(path));
 		assert.equal(response.headers.get("x-robots-tag"), null, path);
 	}
 });

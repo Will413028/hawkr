@@ -6,7 +6,7 @@ import { installProviderMocks } from "./helpers/mock-gsi";
  *
  * 這份 spec 跑在 dev flavor 的建置上（本機與 CI 的 E2E 都是），dev flavor 路由全部支援的語系，
  * 所以 `/en` 在這裡存在；prod flavor 只路由已發佈的語系（`/en` 回 404），那一半由 `lib/intl` 的單元測試
- * 鎖住。登入狀態是 Clerk 的，這裡造不出 session，所以受保護頁只測「被導到哪裡」。
+ * 鎖住。這份 spec 不登入（不設 session cookie），所以受保護頁只測「被導到哪裡」。
  */
 test.describe("locale routing", { tag: ["@ui"] }, () => {
 	test.beforeEach(async ({ page }) => {

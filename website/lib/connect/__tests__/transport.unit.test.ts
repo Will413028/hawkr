@@ -228,36 +228,12 @@ describe("optionalAuthTransport", () => {
 		fetchMock.mockReset();
 	});
 
-	it("登入時帶 Bearer 與 cookie，POST 寫入", async () => {
-		vi.stubGlobal("Clerk", {
-			loaded: true,
-			session: { getToken: vi.fn().mockResolvedValue("clerk-session-token") },
-		});
+	it("帶同源 session cookie，POST 寫入，不帶 Authorization（憑證是 HttpOnly cookie）", async () => {
 		await send();
+		expect(fetchMock).toHaveBeenCalledTimes(1);
 		const [, init] = fetchMock.mock.calls[0];
 		expect(init?.method).toBe("POST");
 		expect(init?.credentials).toBe("include");
-		expect(new Headers(init?.headers).get("Authorization")).toBe(
-			"Bearer clerk-session-token",
-		);
-	});
-
-	it("沒登入（Clerk 已載入、沒有 session）匿名送出，不丟錯", async () => {
-		vi.stubGlobal("Clerk", { loaded: true, session: null });
-		await send();
-		expect(fetchMock).toHaveBeenCalledTimes(1);
-		const [, init] = fetchMock.mock.calls[0];
-		expect(new Headers(init?.headers).has("Authorization")).toBe(false);
-	});
-
-	it("Clerk 取 token 失敗時仍匿名送出", async () => {
-		vi.stubGlobal("Clerk", {
-			loaded: true,
-			session: { getToken: vi.fn().mockRejectedValue(new Error("offline")) },
-		});
-		await send();
-		expect(fetchMock).toHaveBeenCalledTimes(1);
-		const [, init] = fetchMock.mock.calls[0];
 		expect(new Headers(init?.headers).has("Authorization")).toBe(false);
 	});
 });
@@ -421,10 +397,6 @@ describe("authedTransport", () => {
 		vi.stubGlobal("fetch", fetchMock);
 		// 瀏覽器：vitest 的 node 環境沒有 window 與 localStorage。
 		vi.stubGlobal("window", globalThis);
-		vi.stubGlobal("Clerk", {
-			loaded: true,
-			session: { getToken: vi.fn().mockResolvedValue("clerk-session-token") },
-		});
 		vi.stubGlobal("localStorage", {
 			getItem: (k: string) => storage.get(k) ?? null,
 			setItem: (k: string, v: string) => void storage.set(k, v),
@@ -465,51 +437,35 @@ describe("authedTransport", () => {
 		expect(new Headers(init?.headers).has("X-Active-Role")).toBe(false);
 	});
 
-	it("以 Authorization: Bearer 帶 Clerk 此刻有效的 session token", async () => {
+	it("憑證是同源的 session cookie：credentials include，不帶 Authorization", async () => {
 		await createClient(
 			IdentityAppService,
 			authedTransport({ locale: "zh-TW" }),
 		).getSession({});
 		const [, init] = fetchMock.mock.calls[0];
-		expect(new Headers(init?.headers).get("Authorization")).toBe(
-			"Bearer clerk-session-token",
-		);
+		expect(init?.credentials).toBe("include");
+		expect(new Headers(init?.headers).has("Authorization")).toBe(false);
 	});
 
-	it("Clerk 暫時取不到 token 時不發請求", async () => {
-		const source = vi
-			.fn()
-			.mockResolvedValueOnce(null)
-			.mockRejectedValueOnce(new Error("clerk_offline"));
-		vi.stubGlobal("Clerk", { loaded: true, session: { getToken: source } });
-		const client = createClient(
+	it("寫入（POST）也只靠 cookie，不帶 Authorization", async () => {
+		await createClient(
 			IdentityAppService,
 			authedTransport({ locale: "zh-TW" }),
-		);
-		await expect(client.getSession({})).rejects.toMatchObject({
-			code: Code.Unavailable,
-		});
-		await expect(client.getSession({})).rejects.toMatchObject({
-			code: Code.Unavailable,
-		});
-		expect(fetchMock).not.toHaveBeenCalled();
+		).signOut({});
+		const [, init] = fetchMock.mock.calls[0];
+		expect(init?.method).toBe("POST");
+		expect(init?.credentials).toBe("include");
+		expect(new Headers(init?.headers).has("Authorization")).toBe(false);
 	});
 
-	it.each([
-		false,
-		true,
-	])("revoked Clerk session reaches server 401 (refresh=%s)", async (refresh) => {
-		const source = vi.fn().mockRejectedValue({ status: 401 });
-		if (refresh) source.mockResolvedValueOnce("stale");
-		vi.stubGlobal("Clerk", { loaded: true, session: { getToken: source } });
-		const authorization: (string | null)[] = [];
-		fetchMock.mockImplementation(async (_url, init) => {
-			authorization.push(new Headers(init?.headers).get("Authorization"));
-			return new Response('{"code":"unauthenticated","message":"expired"}', {
-				status: 401,
-				headers: { "content-type": "application/json" },
-			});
-		});
+	it("伺服器回 401 就是答案：一次請求、不重送，呼叫端收到 unauthenticated", async () => {
+		fetchMock.mockImplementation(
+			async () =>
+				new Response('{"code":"unauthenticated","message":"expired"}', {
+					status: 401,
+					headers: { "content-type": "application/json" },
+				}),
+		);
 		await expect(
 			createClient(
 				IdentityAppService,
@@ -521,48 +477,7 @@ describe("authedTransport", () => {
 				},
 			),
 		).rejects.toMatchObject({ code: Code.Unauthenticated });
-		expect(authorization).toEqual(refresh ? ["Bearer stale", null] : [null]);
-	});
-	it("unavailable Clerk refresh remains Code.Unavailable", async () => {
-		const source = vi.fn(async (options?: { skipCache?: boolean }) => {
-			if (options?.skipCache) throw new Error("offline");
-			return "stale";
-		});
-		vi.stubGlobal("Clerk", { loaded: true, session: { getToken: source } });
-		fetchMock.mockImplementation(
-			async () => new Response("{}", { status: 401 }),
-		);
-		await expect(
-			createClient(
-				IdentityAppService,
-				authedTransport({ locale: "zh-TW" }),
-			).getSession({}),
-		).rejects.toMatchObject({ code: Code.Unavailable });
-	});
-
-	it("401 時重新取得 Clerk token 並且只重試一次", async () => {
-		const source = vi
-			.fn()
-			.mockResolvedValueOnce("old")
-			.mockResolvedValueOnce("new");
-		vi.stubGlobal("Clerk", { loaded: true, session: { getToken: source } });
-		fetchMock
-			.mockResolvedValueOnce(new Response("{}", { status: 401 }))
-			.mockResolvedValueOnce(
-				new Response("{}", {
-					status: 200,
-					headers: { "content-type": "application/json" },
-				}),
-			);
-		await createClient(
-			IdentityAppService,
-			authedTransport({ locale: "zh-TW" }),
-		).getSession({});
-		expect(fetchMock).toHaveBeenCalledTimes(2);
-		expect(source).toHaveBeenNthCalledWith(2, { skipCache: true });
-		expect(
-			new Headers(fetchMock.mock.calls[0][1]?.headers).get("Authorization"),
-		).toBe("Bearer new");
+		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
 
 	it("代行工作區內直接拒絕，不發請求", async () => {
@@ -640,7 +555,7 @@ describe("vendorPortalTransport", () => {
 		fetchMock.mockReset();
 	});
 
-	it("POST、帶 cookie、不帶 Clerk 的憑證與 X-Active-Role，secret 在訊息裡不在 URL", async () => {
+	it("POST、帶 cookie、不帶 Authorization 與 X-Active-Role，secret 在訊息裡不在 URL", async () => {
 		fetchMock.mockResolvedValue(
 			new Response(JSON.stringify({ rfqRecipientId: "42" }), {
 				status: 200,
@@ -728,7 +643,7 @@ describe("vendorPortalTransport", () => {
 		expect(fetchMock).toHaveBeenCalledTimes(2);
 	});
 
-	it("GetSession（NO_SIDE_EFFECTS）以 GET 呼叫：收件人在 query，帶 cookie、不帶 Clerk 憑證，不在 body", async () => {
+	it("GetSession（NO_SIDE_EFFECTS）以 GET 呼叫：收件人在 query，帶 cookie、不帶 Authorization，不在 body", async () => {
 		fetchMock.mockResolvedValue(
 			new Response(JSON.stringify({ googleNonce: "n1" }), {
 				status: 200,
@@ -815,10 +730,6 @@ describe("Accept-Language（ADR 2026-10-17 D1：UI 語系由 client transport �
 				}),
 		);
 		vi.stubGlobal("fetch", fetchMock);
-		vi.stubGlobal("Clerk", {
-			loaded: true,
-			session: { getToken: vi.fn().mockResolvedValue("clerk-session-token") },
-		});
 		setActiveLocale("zh-TW");
 	});
 	afterEach(() => {

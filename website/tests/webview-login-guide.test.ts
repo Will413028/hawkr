@@ -100,13 +100,12 @@ test("login sends Google to the external-browser guide in embedded browsers whil
 	);
 	assert.match(page, /open=\{showBrowserGuide\}/);
 	assert.match(page, /<WebViewBrowserGuide/);
-	assert.match(page, /provider="apple"/);
 	assert.match(page, /provider="line"/);
 	assert.ok(
-		page.indexOf('{appleLoginAction("page")}') <
+		page.indexOf('{lineLoginAction("page")}') <
 			page.indexOf("{showBrowserGuide && ("),
 	);
-	assert.match(page, /appleAction=/);
+	assert.match(page, /alternativeAction=/);
 	assert.match(
 		button,
 		/data-webview-guide-trigger=\{guided \? provider : undefined\}/,

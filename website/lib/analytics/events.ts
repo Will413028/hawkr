@@ -170,7 +170,7 @@ export function trackPurchase(order: Order): void {
 	track("purchase", { ...buildPurchaseParams(order) });
 }
 
-export function trackLogin(method: "google" | "apple" | "line"): void {
+export function trackLogin(method: "google" | "line"): void {
 	setUserProperties({ login_method: method });
 	track("login", { method });
 }

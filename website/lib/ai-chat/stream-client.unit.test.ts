@@ -45,9 +45,7 @@ describe("streamAiChat", () => {
 					aguiFrame({ type: "RUN_FINISHED", threadId: "t1", runId: "r1" }),
 				]),
 			);
-		vi.stubGlobal("window", {
-			Clerk: { loaded: true, session: { getToken: async () => "test-token" } },
-		});
+		vi.stubGlobal("window", {});
 		vi.stubGlobal("localStorage", {
 			getItem: vi.fn(() => "buyer"),
 		});
@@ -66,6 +64,8 @@ describe("streamAiChat", () => {
 		const headers = new Headers(fetchMock.mock.calls[0][1].headers);
 		expect(headers.get("X-Active-Role")).toBe("BUYER");
 		expect(headers.has("X-Requested-With")).toBe(false);
+		// The credential is the HttpOnly session cookie the browser attaches.
+		expect(headers.has("Authorization")).toBe(false);
 		expect(fetchMock.mock.calls[0][1].credentials).toBe("include");
 	});
 
@@ -81,7 +81,6 @@ describe("streamAiChat", () => {
 		}
 		vi.stubGlobal("window", {
 			dispatchEvent,
-			Clerk: { loaded: true, session: { getToken: async () => "test-token" } },
 		});
 		vi.stubGlobal("CustomEvent", TestCustomEvent);
 		vi.stubGlobal(
@@ -797,17 +796,9 @@ describe("streamAiChat", () => {
 	});
 });
 
-it.each([
-	false,
-	true,
-])("revoked Clerk session uses stream HTTP 401 (refresh=%s)", async (refresh) => {
-	const source = vi.fn().mockRejectedValue({ status: 401 });
-	if (refresh) source.mockResolvedValueOnce("stale");
+it("a 401 on the stream POST is final: one request, no Authorization, one expiry event", async () => {
 	const dispatchEvent = vi.fn();
-	vi.stubGlobal("window", {
-		dispatchEvent,
-		Clerk: { loaded: true, session: { getToken: source } },
-	});
+	vi.stubGlobal("window", { dispatchEvent });
 	const authorization: (string | null)[] = [];
 	vi.stubGlobal(
 		"fetch",
@@ -827,6 +818,6 @@ it.each([
 			},
 		),
 	).rejects.toMatchObject({ name: "AiStreamHttpError", status: 401 });
-	expect(authorization).toEqual(refresh ? ["Bearer stale", null] : [null]);
+	expect(authorization).toEqual([null]);
 	expect(dispatchEvent).toHaveBeenCalledOnce();
 });

@@ -1,6 +1,5 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
 import { errorText } from "@hawkr/api/connect/errors";
 import { DeleteAccountResponse_DeletionState } from "@hawkr/api/gen/hawkr/identity/v1alpha1/identity_pb";
 import * as React from "react";
@@ -19,20 +18,13 @@ type Outcome =
 const STORE_CLOSURE_NOTICE =
 	"你的商店也會一起關閉，商店與商品不再公開，賣家身分會移除。有未結訂單時，帳號與商店會在訂單結清後才刪除，期間商店不能自行關閉或換店。";
 
-const APPLE_REVOKE_GUIDANCE =
-	"刪除後請到 Apple ID 設定的「使用 Apple 登入」移除 Hawkr 的授權。";
-
 /**
  * 設定頁的「刪除帳號」。沒有未完成的訂單時立即刪除並登出；有的話進入刪除流程，最後一筆訂單完成後
  * 自動刪除。
  */
 export default function DeleteAccountSection() {
 	const { signOut, hasSeller } = useAuth();
-	const { user } = useUser();
 	const defaults = useDefaultErrorText();
-	const hasAppleAccount =
-		user?.externalAccounts.some((account) => account.provider === "apple") ??
-		false;
 	const [open, setOpen] = React.useState(false);
 	const [busy, setBusy] = React.useState(false);
 	const [outcome, setOutcome] = React.useState<Outcome>({ kind: "idle" });
@@ -57,7 +49,7 @@ export default function DeleteAccountSection() {
 				setOutcome({ kind: "error", message: "刪除帳號失敗，請稍後再試" });
 				return;
 			}
-			// 已刪除：token 不再有效，結束 Clerk 的 session 後整頁回首頁。
+			// 已刪除：session 不再有效，登出（清掉本機狀態）後整頁回首頁。
 			try {
 				await signOut();
 			} finally {
@@ -127,11 +119,6 @@ export default function DeleteAccountSection() {
 				{hasSeller ? (
 					<p className="mt-2 text-sm text-[var(--hkui-default-700)]">
 						{STORE_CLOSURE_NOTICE}
-					</p>
-				) : null}
-				{hasAppleAccount ? (
-					<p className="mt-2 text-sm text-[var(--hkui-default-700)]">
-						{APPLE_REVOKE_GUIDANCE}
 					</p>
 				) : null}
 				{outcome.kind === "error" ? (

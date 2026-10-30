@@ -163,7 +163,7 @@ test("auth login owner preserves the exact unlayered semantic CSS", () => {
 	const authLogin = source(AUTH_LOGIN);
 
 	// Reviewed update: the phone-verification, account-link and GSI-overlay
-	// rules were removed with those screens (Clerk sign-in); the login panel,
+	// rules were removed with those screens (OAuth redirect sign-in); the login panel,
 	// OAuth buttons, role tabs and cascade are intact.
 	assert.equal(
 		semanticDigest(authLogin),

@@ -1,4 +1,3 @@
-import { withClerkAuthorization } from "../auth/clerk-token";
 import { apiClient } from "./client";
 
 export interface MarketplaceProduct {
@@ -118,10 +117,10 @@ export interface FetchProductsOptions {
 	sellerStoreIds?: Array<string | number>;
 	/** When true, asks backend to keep only products the buyer has
 	 * favourited (heart icon). Backend returns 400 if user isn't logged
-	 * in; fetcher sends the Clerk token as Bearer for the viewer-aware filter. */
+	 * in; fetcher sends the session cookie for the viewer-aware filter. */
 	followedProductOnly?: boolean;
 	/** When true, asks backend to keep only products belonging to the
-	 * buyer's followed sellers (subscriptions). Same Bearer auth
+	 * buyer's followed sellers (subscriptions). Same cookie auth
 	 * as `followedProductOnly`. */
 	followedSellerOnly?: boolean;
 	/** Forwarded from the TanStack queryFn so a rapid market-filter change
@@ -172,7 +171,7 @@ export async function fetchProducts(
 	if (options?.followedSellerOnly) {
 		params.set("followed_seller_only", "true");
 	}
-	// Viewer-aware filters require the buyer's Clerk token on the public route.
+	// Viewer-aware filters require the buyer's session cookie on the public route.
 	// Non-viewer branches also go through apiClient for consistency (same
 	// credentials policy; server-side calls use env.serverApiBase automatically).
 	// apiClient re-serialises a plain object back to URLSearchParams.
@@ -180,11 +179,8 @@ export async function fetchProducts(
 	const needsAuth = options?.followedProductOnly || options?.followedSellerOnly;
 	if (needsAuth) {
 		try {
-			const headers = new Headers();
-			await withClerkAuthorization(headers, {}, options?.signal);
 			const envelope = await apiClient.public.get<LooseJson>("/products", {
 				query,
-				headers,
 				credentials: "include",
 				signal: options?.signal,
 				visitorIp: options?.visitorIp,

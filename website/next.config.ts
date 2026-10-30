@@ -9,7 +9,6 @@ import { allRoutableLocales, defaultLocale } from "./lib/intl/locales";
 import { isNonLocalizedPath } from "./lib/intl/paths";
 import {
 	buildContentSecurityPolicy,
-	clerkFrontendApiOrigin,
 	originOf,
 	parseUploadOrigins,
 	withWebSocketSiblings,
@@ -58,9 +57,6 @@ const UPLOAD_ORIGINS = parseUploadOrigins(process.env.MEDIA_UPLOAD_ORIGINS);
 const CONTENT_SECURITY_POLICY = buildContentSecurityPolicy({
 	appConnectOrigins: APP_CONNECT_ORIGINS,
 	uploadOrigins: UPLOAD_ORIGINS,
-	clerkFrontendApi: clerkFrontendApiOrigin(
-		process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
-	),
 });
 
 /**

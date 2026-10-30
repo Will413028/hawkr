@@ -17,11 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
 	deleteAccount: vi.fn(),
 	signOut: vi.fn(async () => {}),
-	externalAccounts: [] as { provider: string }[],
 	hasSeller: false,
-}));
-vi.mock("@clerk/nextjs", () => ({
-	useUser: () => ({ user: { externalAccounts: mocks.externalAccounts } }),
 }));
 vi.mock("@/lib/api/auth", () => ({ deleteAccount: mocks.deleteAccount }));
 vi.mock("@/lib/auth/context", () => ({
@@ -82,7 +78,6 @@ function openDialog() {
 beforeEach(() => {
 	mocks.deleteAccount.mockReset();
 	mocks.signOut.mockClear();
-	mocks.externalAccounts = [];
 	mocks.hasSeller = false;
 	assign.mockReset();
 	vi.stubGlobal("location", { ...window.location, assign });
@@ -190,20 +185,7 @@ describe("DeleteAccountSection", () => {
 		expect(openDialog().textContent).not.toContain("商店也會一起關閉");
 	});
 
-	it("an account with an Apple external account is told to revoke the authorization", () => {
-		mocks.externalAccounts = [{ provider: "google" }, { provider: "apple" }];
-		const dialog = openDialog();
-		expect(dialog.textContent).toContain(
-			"刪除後請到 Apple ID 設定的「使用 Apple 登入」移除 Hawkr 的授權。",
-		);
-	});
-
-	it("accounts without an Apple external account see no Apple guidance", () => {
-		mocks.externalAccounts = [{ provider: "google" }];
-		const dialog = openDialog();
-		expect(dialog.textContent).not.toContain("Apple");
-		cleanup();
-		mocks.externalAccounts = [];
+	it("shows no Apple authorization guidance: Apple sign-in is not offered", () => {
 		expect(openDialog().textContent).not.toContain("Apple");
 	});
 });

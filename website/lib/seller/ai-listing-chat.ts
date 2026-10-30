@@ -17,7 +17,7 @@
  * Both request and response now use camelCase. ai-service struct tags and
  * Gateway proxy updated in coordinated rollout (backend-payuni PR).
  *
- * Auth: streamAiChat sends the Clerk session token (lib/auth/clerk-token.ts).
+ * Auth: streamAiChat sends the same-origin session cookie (`__Host-hk_session`).
  */
 
 import { streamAiChat } from "@/lib/ai-chat/stream-client";

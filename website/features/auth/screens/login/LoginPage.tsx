@@ -10,24 +10,32 @@ import OAuthLoginButton from "@/features/auth/components/login/OAuthLoginButton"
 import WebViewBrowserGuide, {
 	type WebViewBrowserGuideVariant,
 } from "@/features/auth/components/login/WebViewBrowserGuide";
+import { trackLogin } from "@/lib/analytics/events";
 import type { LoginProvider } from "@/lib/api/auth";
 import { useAuth } from "@/lib/auth/context";
+import {
+	LOGIN_ERROR_CODES,
+	oauthStartUrl,
+	parseLoginProvider,
+} from "@/lib/auth/oauth-start";
 import { resolvePostLoginTarget } from "@/lib/auth/post-login-redirect";
-import { redirectForRole, safeRedirectPath } from "@/lib/auth/redirect";
-import { LOGIN_FAILED_MESSAGE } from "@/lib/auth/sso-callback";
-import { useOAuthSignIn } from "@/lib/auth/useOAuthSignIn";
+import {
+	loginPath,
+	redirectForRole,
+	safeRedirectPath,
+} from "@/lib/auth/redirect";
 import {
 	detectInAppBrowser,
 	EMPTY_IN_APP_BROWSER_INFO,
 	type InAppBrowserInfo,
 } from "@/lib/browser/in-app-browser";
+import { localizeHref } from "@/lib/intl/navigation";
 import { stripLocale } from "@/lib/intl/paths";
+import { useRoutedLocale } from "@/lib/intl/routed-locale";
 import { navigateDocument } from "@/lib/navigation/observability";
 
-/** `?error=` 的值：SSO callback 沒有完成登入時帶回來（SsoCallbackPage）。 */
-const ERROR_LABELS: Record<string, string> = {
-	failed: LOGIN_FAILED_MESSAGE,
-};
+/** 登入失敗時給使用者看的文字（既有文案，沿用）。 */
+const LOGIN_FAILED_MESSAGE = "登入失敗，請稍後再試";
 
 const OAUTH_BUTTON_CLASS = "hkui-login__oauth-btn h-[52px]!";
 
@@ -67,18 +75,16 @@ function LoginPageContent({
 	searchParams: NonNullable<ReturnType<typeof useSearchParams>>;
 	initialInAppBrowser: InAppBrowserInfo;
 }) {
+	// 單體的 callback 沒有完成登入時 302 回這頁並帶 `?error=<代碼>`（weblogin.go）；代碼只決定有沒有
+	// 錯誤，使用者看到的是同一句既有文案。
 	const errorCode = searchParams.get("error") || "";
-	const [error, setError] = React.useState<string | null>(
-		errorCode ? (ERROR_LABELS[errorCode] ?? null) : null,
-	);
-	// True from the click until the browser leaves for the provider (or the
-	// start fails) — the form can't flash idle or accept a second provider.
+	const error = LOGIN_ERROR_CODES.has(errorCode) ? LOGIN_FAILED_MESSAGE : null;
+	const locale = useRoutedLocale();
+	// 單體 302 回來時帶 `?provider=`：剛從 Google 或 LINE 登入完成。
+	const returnedProvider = parseLoginProvider(searchParams.get("provider"));
+	// True from the click until the browser leaves for the start URL — the form
+	// can't flash idle or accept a second provider.
 	const [signingIn, setSigningIn] = React.useState(false);
-	const onLoginError = React.useCallback((message: string) => {
-		setSigningIn(false);
-		setError(message);
-	}, []);
-	const startOAuth = useOAuthSignIn(onLoginError);
 	// Back from the provider's page restores this page from the bfcache with the
 	// overlay still up; the flow it covered is no longer running.
 	React.useEffect(() => {
@@ -122,11 +128,11 @@ function LoginPageContent({
 	const requiresBrowserGuide = inAppBrowser.isInApp;
 	const showBrowserGuide = requiresBrowserGuide && browserGuideOpen;
 
-	// middleware.ts never bounces /login (hawkr-website#259): a Clerk
-	// session the monolith refuses (suspended/deleted account) would otherwise
+	// middleware.ts never bounces /login (hawkr-website#259): a session cookie
+	// the monolith refuses (suspended/deleted account) would otherwise
 	// loop the visitor away from this form. The AUTHORITATIVE check happens here
 	// — once the signed-in account resolves to a real identity, leave
-	// immediately. Hard nav (not router.replace): matches useCompleteLogin's
+	// immediately. Hard nav (not router.replace): matches the provider-return redirect's
 	// own reasoning, and an already-logged-in visitor landing here has nothing
 	// to lose from a full reload.
 	const { identity, isLoggedIn, hydrated, activeRole, switchRole } = useAuth();
@@ -141,11 +147,13 @@ function LoginPageContent({
 		: redirectAfter;
 	React.useEffect(() => {
 		// Once a provider flow is in progress, the browser is about to leave for
-		// the provider; SsoCallbackPage owns the navigation after sign-in.
+		// the provider.
 		if (signingIn || awayNavigationRef.current) return;
 		if (!hydrated || !isLoggedIn || !identity) return;
 		awayNavigationRef.current = true;
 		setRedirectingAway(true);
+		// 從 provider 回來（單體 302 到這頁）才是剛登入；已經登入的人直接打開這頁不算。
+		if (returnedProvider) trackLogin(returnedProvider);
 		const requestedRole =
 			roleHint === "buyer" || roleHint === "seller" ? roleHint : activeRole;
 		const target = resolvePostLoginTarget({
@@ -178,29 +186,42 @@ function LoginPageContent({
 		awayTarget,
 		roleHint,
 		switchRole,
+		returnedProvider,
 	]);
 
 	const signInWith = React.useCallback(
 		(provider: LoginProvider) => {
 			if (signingIn) return;
+			// 單體登入成功後 302 回這頁（帶著工作區、目的地與登入方式），上面的 effect 讀到帳號就離開。
+			const returnTo = localizeHref(
+				loginPath({ role: selectedRole, redirect: redirectAfter, provider }),
+				locale,
+			);
 			setSigningIn(true);
-			void startOAuth(provider, selectedRole, redirectAfter);
+			if (
+				!navigateDocument(oauthStartUrl(provider, returnTo), {
+					componentId: "login",
+					actionId: `oauth_start_${provider}`,
+				})
+			) {
+				setSigningIn(false);
+			}
 		},
-		[signingIn, startOAuth, selectedRole, redirectAfter],
+		[signingIn, selectedRole, redirectAfter, locale],
 	);
 
-	const subtitle = "用 Google 或 Apple 繼續，第一次使用會自動為你建立帳號。";
-	const appleLoginAction = (placement: "page" | "sheet") => (
+	const subtitle = "用 Google 或 LINE 繼續，第一次使用會自動為你建立帳號。";
+	const lineLoginAction = (placement: "page" | "sheet") => (
 		<OAuthLoginButton
 			key={placement}
-			provider="apple"
+			provider="line"
 			className={
 				placement === "sheet"
 					? "hkui-login__oauth-btn h-auto! min-h-[52px] whitespace-normal! px-[12px]! py-[12px] text-center leading-5"
 					: OAUTH_BUTTON_CLASS
 			}
-			label={placement === "sheet" ? "使用 Apple 登入" : undefined}
-			onClick={() => signInWith("apple")}
+			label={placement === "sheet" ? "使用 LINE 登入" : undefined}
+			onClick={() => signInWith("line")}
 		/>
 	);
 
@@ -289,12 +310,7 @@ function LoginPageContent({
 						requiresBrowserGuide ? openBrowserGuide : () => signInWith("google")
 					}
 				/>
-				{appleLoginAction("page")}
-				<OAuthLoginButton
-					provider="line"
-					className={OAUTH_BUTTON_CLASS}
-					onClick={() => signInWith("line")}
-				/>
+				{lineLoginAction("page")}
 				{showBrowserGuide && (
 					<WebViewBrowserGuide
 						browser={inAppBrowser}
@@ -302,8 +318,8 @@ function LoginPageContent({
 						variant={guideVariant}
 						open={showBrowserGuide}
 						onClose={closeBrowserGuide}
-						appleAction={
-							guideVariant === "sheet" ? appleLoginAction("sheet") : undefined
+						alternativeAction={
+							guideVariant === "sheet" ? lineLoginAction("sheet") : undefined
 						}
 					/>
 				)}
@@ -318,7 +334,9 @@ function LoginPageContent({
 				<Link href="/privacy">隱私政策</Link>。
 			</p>
 			{/* Fixed fullscreen overlay while the browser leaves for the provider. */}
-			{(signingIn || redirectingAway) && <AuthBrandLoading />}
+			{(signingIn || redirectingAway || (returnedProvider && !hydrated)) && (
+				<AuthBrandLoading />
+			)}
 		</LoginShell>
 	);
 }

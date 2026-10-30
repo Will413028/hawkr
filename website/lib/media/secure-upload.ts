@@ -11,8 +11,8 @@
  *      → { stagedToken }
  *
  * Differs from the public flow (`lib/media/upload.ts`):
- *   - The PUT goes directly to the gateway with the Clerk session token
- *     (lib/auth/clerk-token.ts), NOT a presigned OSS URL — the gateway
+ *   - The PUT goes directly to the gateway with the same-origin session cookie
+ *     (`__Host-hk_session`), NOT a presigned OSS URL — the gateway
  *     server-side encrypts before persisting.
  *   - There's no "complete" call — the secure PUT itself returns the
  *     stagedToken in its response body.
@@ -25,7 +25,6 @@
  */
 
 import { authedFetch } from "@/lib/api/client";
-import { clerkSessionToken } from "@/lib/auth/clerk-token";
 import { env } from "@/lib/config/env";
 
 interface CreateSecureSessionOutput {
@@ -93,55 +92,46 @@ export async function uploadSecureDocument(
 }
 
 /**
- * PUT raw bytes directly to the gateway with the Clerk session token (XHR for
- * upload progress, which fetch cannot report).
+ * PUT raw bytes directly to the gateway with the same-origin session cookie
+ * (XHR for upload progress, which fetch cannot report).
  */
 async function putSecure(
 	gatewayPath: string,
 	file: File,
 	onProgress?: (ratio: number) => void,
 ): Promise<string> {
-	const token = await clerkSessionToken();
-	const send = (credential: string | null, retried: boolean): Promise<string> =>
-		new Promise((resolve, reject) => {
-			const xhr = new XMLHttpRequest();
-			xhr.open("PUT", `${env.apiBaseUrl}${gatewayPath}`);
-			xhr.withCredentials = true;
-			xhr.setRequestHeader("Content-Type", file.type);
-			if (credential)
-				xhr.setRequestHeader("Authorization", `Bearer ${credential}`);
-			xhr.upload.onprogress = (e) => {
-				if (!onProgress || !e.lengthComputable) return;
-				onProgress(e.loaded / e.total);
-			};
-			xhr.onload = () => {
-				if (xhr.status >= 200 && xhr.status < 300) {
-					try {
-						const body = JSON.parse(xhr.responseText) as {
-							data?: SecurePutOutput;
-						};
-						const token = body.data?.stagedToken;
-						if (!token) {
-							reject(new Error("安全上傳完成但未取得 stagedToken"));
-							return;
-						}
-						resolve(token);
-					} catch {
-						reject(new Error("安全上傳回應解析失敗"));
+	return new Promise((resolve, reject) => {
+		const xhr = new XMLHttpRequest();
+		xhr.open("PUT", `${env.apiBaseUrl}${gatewayPath}`);
+		xhr.withCredentials = true;
+		xhr.setRequestHeader("Content-Type", file.type);
+		xhr.upload.onprogress = (e) => {
+			if (!onProgress || !e.lengthComputable) return;
+			onProgress(e.loaded / e.total);
+		};
+		xhr.onload = () => {
+			if (xhr.status >= 200 && xhr.status < 300) {
+				try {
+					const body = JSON.parse(xhr.responseText) as {
+						data?: SecurePutOutput;
+					};
+					const token = body.data?.stagedToken;
+					if (!token) {
+						reject(new Error("安全上傳完成但未取得 stagedToken"));
+						return;
 					}
-				} else if (xhr.status === 401 && !retried) {
-					clerkSessionToken({ skipCache: true })
-						.then((fresh) => send(fresh, true))
-						.then(resolve, reject);
-				} else {
-					reject(new Error(`安全上傳失敗（HTTP ${xhr.status}）`));
+					resolve(token);
+				} catch {
+					reject(new Error("安全上傳回應解析失敗"));
 				}
-			};
-			xhr.onerror = () => reject(new Error("安全上傳失敗（網路錯誤）"));
-			xhr.onabort = () => reject(new Error("安全上傳已取消"));
-			xhr.send(file);
-		});
-	return send(token, false);
+			} else {
+				reject(new Error(`安全上傳失敗（HTTP ${xhr.status}）`));
+			}
+		};
+		xhr.onerror = () => reject(new Error("安全上傳失敗（網路錯誤）"));
+		xhr.onabort = () => reject(new Error("安全上傳已取消"));
+		xhr.send(file);
+	});
 }
 
 function formatBytes(n: number): string {

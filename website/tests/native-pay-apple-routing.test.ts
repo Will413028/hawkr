@@ -39,7 +39,6 @@ function installBrowserGlobals({
 	const windowStub: Record<string, unknown> = {
 		ApplePaySession,
 		PaymentRequest,
-		Clerk: { loaded: true, session: { getToken: async () => "test-token" } },
 		location: { hostname: "web-dev.example.com" },
 		dispatchEvent() {},
 		localStorage: fakeLocalStorage,

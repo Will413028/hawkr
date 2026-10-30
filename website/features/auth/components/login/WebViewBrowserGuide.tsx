@@ -22,7 +22,8 @@ interface WebViewBrowserGuideProps {
 	browser: InAppBrowserInfo;
 	role: LoginRoleHint;
 	variant: WebViewBrowserGuideVariant;
-	appleAction?: React.ReactNode;
+	/** 內建瀏覽器用不了 Google 時，改用的另一種登入方式（sheet 版放按鈕）。 */
+	alternativeAction?: React.ReactNode;
 	open?: boolean;
 	onClose?: () => void;
 }
@@ -166,7 +167,7 @@ function guideCopy(
 	return {
 		title: `用 ${targetBrowser} 完成 Google 登入`,
 		description: browser.isInApp
-			? `${source} 的內建瀏覽器不支援 Google 登入，也可直接改用 Apple 登入。`
+			? `${source} 的內建瀏覽器不支援 Google 登入，也可直接改用 LINE 登入。`
 			: "Google 登入目前無法在此瀏覽器啟動，請改用其他瀏覽器開啟本頁。",
 		instruction: `點${nativeMenuGuide.cornerLabel}「${nativeMenuGuide.menuSymbol}」，再選「${nativeMenuGuide.actionLabel}」。`,
 	};
@@ -176,7 +177,7 @@ export default function WebViewBrowserGuide({
 	browser,
 	role,
 	variant,
-	appleAction,
+	alternativeAction,
 	open = true,
 	onClose,
 }: WebViewBrowserGuideProps) {
@@ -385,7 +386,7 @@ export default function WebViewBrowserGuide({
 								</h2>
 								<p className="m-0 text-[length:var(--hkui-text-small)] leading-6 text-hk-cream/78">
 									{browser.appName ?? "目前的 App"} 內建瀏覽器不支援 Google
-									登入，可使用 Chrome 或 Apple 繼續。
+									登入，可使用 Chrome 或 LINE 繼續。
 								</p>
 							</div>
 						</section>
@@ -396,7 +397,7 @@ export default function WebViewBrowserGuide({
 							aria-label="外部瀏覽器開啟操作區"
 						>
 							<div className="grid w-full">{actions}</div>
-							{appleAction}
+							{alternativeAction}
 							<span className="sr-only" role="status" aria-live="polite">
 								{feedback}
 							</span>

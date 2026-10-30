@@ -46,7 +46,6 @@ beforeEach(() => {
 	(globalThis as Record<string, unknown>).window = {
 		dispatchEvent() {},
 		localStorage: fakeLocalStorage,
-		Clerk: { loaded: true, session: { getToken: async () => "test-token" } },
 	};
 	(globalThis as Record<string, unknown>).localStorage = fakeLocalStorage;
 });

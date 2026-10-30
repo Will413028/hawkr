@@ -1,6 +1,5 @@
 "use client";
 
-import { useClerk, useAuth as useClerkAuth } from "@clerk/nextjs";
 import type { ConnectError } from "@connectrpc/connect";
 import { userMessage } from "@hawkr/api/connect/errors";
 import * as Sentry from "@sentry/nextjs";
@@ -43,9 +42,8 @@ function withinVoluntaryLogout() {
 	return Date.now() - lastVoluntaryLogoutAt <= VOLUNTARY_LOGOUT_WINDOW_MS;
 }
 
-function endClerkSession(clerk: ReturnType<typeof useClerk>): Promise<void> {
-	return clerk.signOut(() => undefined);
-}
+/** 目前登入的帳號在 React Query 的快取 key（見 AuthProvider）。 */
+const SESSION_KEY = ["session"] as const;
 
 function templatePath(path: string | undefined): string {
 	if (!path) return "unknown";
@@ -87,24 +85,15 @@ function resolveActiveRole(identity: Identity | null): RoleSlot | null {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const router = useObservedRouter("auth_context");
 	const queryClient = useQueryClient();
-	const clerk = useClerk();
-	const {
-		isLoaded: clerkLoaded,
-		isSignedIn: clerkSignedIn,
-		userId: clerkUserId,
-	} = useClerkAuth();
-	const sessionKey = React.useMemo(
-		() => ["session", clerkUserId] as const,
-		[clerkUserId],
-	);
+	// 憑證是 HttpOnly cookie，JS 讀不到：登入與否只能問單體（GetSession）。快取裡 undefined 是「還沒問到」，
+	// null 是「問過了，沒有登入」。登入、換帳號都是整頁導覽，所以整份快取只有一個 key。
 	const sessionQuery = useQuery<Identity | null>({
-		queryKey: sessionKey,
+		queryKey: SESSION_KEY,
 		queryFn: skipToken,
 		enabled: false,
 		staleTime: Number.POSITIVE_INFINITY,
 	});
-	const identity =
-		clerkLoaded && clerkSignedIn ? (sessionQuery.data ?? null) : null;
+	const identity = sessionQuery.data ?? null;
 	const [active, setActive] = React.useState<RoleSlot | null>(null);
 	const [gateExpired, setGateExpired] = React.useState(false);
 	const [probeUnavailable, setProbeUnavailable] = React.useState(false);
@@ -112,12 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const previousAccountId = React.useRef<string | undefined>(undefined);
 	const profileStartedFor = React.useRef<string | null>(null);
 	const endingSession = React.useRef(false);
-	const sessionSettled =
-		clerkLoaded &&
-		(!clerkSignedIn ||
-			!clerkUserId ||
-			sessionQuery.data !== undefined ||
-			probeGaveUp);
+	const sessionSettled = sessionQuery.data !== undefined || probeGaveUp;
 	const hydrated = gateExpired || sessionSettled || probeUnavailable;
 
 	const teardownPrivateCache = React.useCallback(
@@ -137,15 +121,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				const text = userMessage(error, defaultErrorText);
 				if (text) toast.error(text);
 			}
-			queryClient.setQueryData(sessionKey, null);
+			queryClient.setQueryData(SESSION_KEY, null);
 			setProbeUnavailable(false);
 			setProbeGaveUp(true);
-			rejection = endClerkSession(clerk).catch(() => {
+			// 單體拒絕這個帳號（刪除或停權）：盡力撤銷 session 並清掉 cookie；失敗不影響本機已經當成訪客。
+			rejection = apiLogout().catch(() => {
 				rejection = undefined;
 			});
 			return rejection;
 		};
-	}, [clerk, defaultErrorText, queryClient, sessionKey]);
+	}, [defaultErrorText, queryClient]);
 
 	React.useEffect(() => {
 		const gate = setTimeout(() => setGateExpired(true), HYDRATION_GATE_MS);
@@ -153,15 +138,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	}, []);
 
 	React.useEffect(() => {
-		if (!clerkLoaded) return;
-		queryClient.removeQueries({
-			queryKey: ["session"],
-			predicate: (query) => !clerkSignedIn || query.queryKey[1] !== clerkUserId,
-		});
-	}, [clerkLoaded, clerkSignedIn, clerkUserId, queryClient]);
-
-	React.useEffect(() => {
-		if (!clerkLoaded || !clerkSignedIn || !clerkUserId) return;
 		setProbeUnavailable(false);
 		setProbeGaveUp(false);
 		return resolveSession(fetchSession, {
@@ -170,25 +146,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				void rejectSession(error);
 			},
 			onGaveUp: () => setProbeGaveUp(true),
+			// null = unauthenticated：訪客。
 			onResolved: (result) => {
 				setProbeUnavailable(false);
-				queryClient.setQueryData(sessionKey, result);
-				if (result === null) void rejectSession();
+				queryClient.setQueryData(SESSION_KEY, result);
 			},
 		});
-	}, [
-		clerkLoaded,
-		clerkSignedIn,
-		clerkUserId,
-		queryClient,
-		sessionKey,
-		rejectSession,
-	]);
+	}, [queryClient, rejectSession]);
 
 	React.useEffect(() => {
-		if (!clerkLoaded || (clerkSignedIn && sessionQuery.data === undefined)) {
-			return;
-		}
+		if (sessionQuery.data === undefined) return;
 		const nextAccountId = identity?.accountId;
 		const previous = previousAccountId.current;
 		syncLocalPrivateState(nextAccountId ?? null);
@@ -205,29 +172,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		) {
 			commitDocumentNavigation("/", true);
 		}
-	}, [
-		clerkLoaded,
-		clerkSignedIn,
-		sessionQuery.data,
-		identity,
-		teardownPrivateCache,
-	]);
+	}, [sessionQuery.data, identity, teardownPrivateCache]);
 
 	React.useEffect(() => {
-		if (!clerkLoaded || !clerkSignedIn || !clerkUserId || !identity) return;
+		if (!identity) {
+			profileStartedFor.current = null;
+			return;
+		}
 		if (
 			effectiveActiveRole(identity) !== "buyer" ||
 			identity.nickname ||
-			profileStartedFor.current === clerkUserId
+			profileStartedFor.current === identity.accountId
 		) {
 			return;
 		}
-		profileStartedFor.current = clerkUserId;
+		profileStartedFor.current = identity.accountId;
 		let canceled = false;
 		void fetchProfile({ suppressAuthExpired: true })
 			.then((profile) => {
 				if (canceled) return;
-				queryClient.setQueryData<Identity | null>(sessionKey, (current) =>
+				queryClient.setQueryData<Identity | null>(SESSION_KEY, (current) =>
 					current?.accountId === identity.accountId
 						? {
 								...current,
@@ -241,25 +205,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		return () => {
 			canceled = true;
 		};
-	}, [
-		clerkLoaded,
-		clerkSignedIn,
-		clerkUserId,
-		identity,
-		queryClient,
-		sessionKey,
-	]);
-
-	React.useEffect(() => {
-		if (!clerkSignedIn) profileStartedFor.current = null;
-	}, [clerkSignedIn]);
+	}, [identity, queryClient]);
 
 	React.useEffect(() => {
 		const onExpired = async (event: Event) => {
 			if (endingSession.current) return;
 			endingSession.current = true;
 			try {
-				await endClerkSession(clerk);
 				const detail = (event as CustomEvent<{ path?: string }>).detail;
 				if (!withinVoluntaryLogout()) {
 					Sentry.captureMessage("involuntary logout", {
@@ -268,7 +220,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 						tags: { trigger_path: templatePath(detail?.path) },
 					});
 				}
-				queryClient.removeQueries({ queryKey: ["session"] });
+				// 單體說 unauthenticated：session 已經不在（過期、撤銷、帳號停權或刪除），沒有東西要結束。
+				queryClient.setQueryData(SESSION_KEY, null);
 				setActive(null);
 				await teardownPrivateCache();
 				if (stripLocale(window.location.pathname) !== "/") {
@@ -283,7 +236,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		const listener = (event: Event) => void onExpired(event);
 		window.addEventListener(AUTH_EXPIRED_EVENT, listener);
 		return () => window.removeEventListener(AUTH_EXPIRED_EVENT, listener);
-	}, [clerk, queryClient, teardownPrivateCache]);
+	}, [queryClient, teardownPrivateCache]);
 
 	React.useEffect(() => {
 		const onStorage = (event: StorageEvent) => {
@@ -296,23 +249,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 	const commitIdentity = React.useCallback(
 		(next: Identity) => {
-			if (!clerkUserId) return;
-			queryClient.setQueryData(sessionKey, next);
+			queryClient.setQueryData(SESSION_KEY, next);
 			setActive(resolveActiveRole(next));
 		},
-		[clerkUserId, queryClient, sessionKey],
+		[queryClient],
 	);
 
 	const switchRole = React.useCallback(
 		(next: RoleSlot): boolean => {
 			const account =
-				queryClient.getQueryData<Identity | null>(sessionKey) ?? identity;
+				queryClient.getQueryData<Identity | null>(SESSION_KEY) ?? identity;
 			if (!account || !canUsePerspective(account, next)) return false;
 			setStoredActiveRole(next);
 			setActive(next);
 			return true;
 		},
-		[identity, queryClient, sessionKey],
+		[identity, queryClient],
 	);
 
 	const startSellerOnboarding = React.useCallback(
@@ -330,7 +282,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const signOut = React.useCallback(async () => {
 		markVoluntaryLogout();
 		try {
-			await apiLogout(() => endClerkSession(clerk));
+			await apiLogout();
 		} catch (error) {
 			toast.error(
 				error instanceof LogoutRevokeFailedError && error.reason === "network"
@@ -339,10 +291,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			);
 			throw error;
 		}
-		queryClient.removeQueries({ queryKey: ["session"] });
+		queryClient.setQueryData(SESSION_KEY, null);
 		setActive(null);
 		await teardownPrivateCache();
-	}, [clerk, queryClient, teardownPrivateCache]);
+	}, [queryClient, teardownPrivateCache]);
 
 	const value = React.useMemo<AuthContextValue>(
 		() => ({

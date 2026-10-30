@@ -1,22 +1,23 @@
 import type { Page, Route } from "@playwright/test";
 import { ACTIVE_ROLE_STORAGE_KEY } from "../../../lib/auth/active-role";
-import { signInWithClerk } from "./clerk-session";
+import { signInWithSessionCookie } from "./session-cookie";
 
 /**
  * Server mocks for the e2e.
  *
  * Every server call is intercepted so tests run without a real backend. The
  * signed-in account comes from the monolith's identity Connect API
- * (hawkr.identity.v1alpha1, ADR 2026-09-27-identity-clerk); the
+ * (hawkr.identity.v1alpha1, ADR 2026-10-30-identity-self-hosted-federated-login); the
  * not-yet-migrated REST stays under `/api/v1`. `API` is a `**`-prefixed glob
  * so it matches whether the browser base is the dev same-origin proxy
  * (`/api/v1`) or an absolute origin.
  *
- * The sign-in state itself is Clerk's: the browser only asks GetSession while
- * Clerk's SDK holds a session, and the middleware only lets a guarded path
- * through with a Clerk session. `session: "identity"` therefore also signs the
- * browser in hermetically (helpers/clerk-session.ts: a locally signed session
- * JWT for the middleware plus a stub `window.Clerk`).
+ * The credential is the HttpOnly `__Host-hk_session` cookie: the middleware only lets a
+ * guarded path through when it is present, and the browser asks GetSession on every
+ * load (it cannot see the cookie). `session: "identity"` therefore sets the cookie
+ * (helpers/session-cookie.ts) and answers GetSession with the account; every other
+ * mode sets no cookie and answers GetSession `unauthenticated`, like the monolith does
+ * for a visitor with no (or a revoked) session.
  */
 const API = "**/api/v1";
 
@@ -893,9 +894,9 @@ export interface GatewayMockOptions {
 	/** Account GetSession answers with. */
 	identity?: MockIdentity;
 	/**
-	 * GetSession's answer. Default (omitted) and "identity" answer with
-	 * `identity`; "guest" answers unauthenticated (the monolith refuses the
-	 * session, e.g. a suspended account).
+	 * GetSession's answer. "identity" sets the session cookie and answers with
+	 * `identity`; default (omitted) and "guest" set no cookie and answer
+	 * unauthenticated (a visitor, or a session the monolith refuses).
 	 */
 	session?: "identity" | "guest";
 	/**
@@ -971,12 +972,12 @@ export async function setupGatewayMocks(
 	// 2c. 開店可用性（GetMyStoreOpening）：預設可以開店。
 	await mockStoreOpening(page, opts.storeOpeningUnavailabilities ?? []);
 
-	// 3. The signed-in account (GetSession), and the Clerk session behind it.
+	// 3. The signed-in account (GetSession), and the session cookie behind it.
 	if (opts.session === "identity") {
-		await signInWithClerk(page, identity.accountId);
+		await signInWithSessionCookie(page, identity.accountId);
 	}
 	await page.route(GET_SESSION_URL, (route) => {
-		if (opts.session === "guest") {
+		if (opts.session !== "identity") {
 			void fulfillConnectError(route, "unauthenticated");
 			return;
 		}

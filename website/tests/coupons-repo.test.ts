@@ -34,7 +34,6 @@ beforeEach(() => {
 	globals.window = {
 		dispatchEvent() {},
 		localStorage: fakeLocalStorage,
-		Clerk: { loaded: true, session: { getToken: async () => "test-token" } },
 	};
 	globals.localStorage = fakeLocalStorage;
 	globalThis.fetch = async (

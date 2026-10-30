@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { NextRequest } from "next/server";
+import { GET as authGET } from "../app/api/auth/[...path]/route";
 import { POST as connectPOST } from "../app/api/connect/[...path]/route";
 import { GET, POST } from "../app/api/v1/[...path]/route";
 import {
 	apiProxyTarget,
+	authProxyTarget,
 	connectProxyTarget,
 	isLocalApiProxyEnabled,
 } from "../lib/api/local-proxy";
@@ -389,8 +391,8 @@ test("API proxy handler preserves its HTTP contract", async (t) => {
 });
 
 test("Connect proxy forwards the credentials and every Set-Cookie", async () => {
-	// 登入的憑證是 Clerk 的 session token（Authorization: Bearer，或同源的 `__session` cookie）：本機代理要
-	// 原樣轉給單體；回應的多個 Set-Cookie 逐筆傳回（new Headers 會把它們併成一個）。
+	// 登入的憑證是同源的 `__Host-hk_session` cookie：本機代理要原樣轉給單體；回應的多個 Set-Cookie 逐筆傳回
+	// （new Headers 會把它們併成一個）。
 	const originalFetch = globalThis.fetch;
 	const originalNodeEnv = process.env.NODE_ENV;
 	const originalProxyFlag = process.env.PLAYWRIGHT_E2E_API_PROXY;
@@ -405,8 +407,7 @@ test("Connect proxy forwards the credentials and every Set-Cookie", async () => 
 				"https://monolith.example/hawkr.identity.v1alpha1.IdentityAppService/GetSession",
 			);
 			const forwarded = new Headers(init?.headers);
-			assert.equal(forwarded.get("authorization"), "Bearer session-token");
-			assert.equal(forwarded.get("cookie"), "__session=session-token");
+			assert.equal(forwarded.get("cookie"), "__Host-hk_session=session-token");
 			const headers = new Headers({ "content-type": "application/json" });
 			headers.append("set-cookie", "a=1; Path=/; HttpOnly");
 			headers.append("set-cookie", "b=2; Path=/; HttpOnly; SameSite=Lax");
@@ -420,8 +421,7 @@ test("Connect proxy forwards the credentials and every Set-Cookie", async () => 
 					method: "POST",
 					headers: {
 						"content-type": "application/json",
-						authorization: "Bearer session-token",
-						cookie: "__session=session-token",
+						cookie: "__Host-hk_session=session-token",
 					},
 					body: "{}",
 				},
@@ -445,4 +445,133 @@ test("Connect proxy forwards the credentials and every Set-Cookie", async () => 
 		if (originalApiBase === undefined) delete process.env.API_BASE_URL;
 		else process.env.API_BASE_URL = originalApiBase;
 	}
+});
+
+/** 本機代理的環境：NODE_ENV=production 加上 Playwright 的開關，與單體的位址。 */
+async function withLocalProxy(run: () => Promise<void>): Promise<void> {
+	const originalFetch = globalThis.fetch;
+	const originalNodeEnv = process.env.NODE_ENV;
+	const originalProxyFlag = process.env.PLAYWRIGHT_E2E_API_PROXY;
+	const originalApiBase = process.env.API_BASE_URL;
+	process.env.NODE_ENV = "production";
+	process.env.PLAYWRIGHT_E2E_API_PROXY = "1";
+	process.env.API_BASE_URL = "https://monolith.example/api/v1";
+	try {
+		await run();
+	} finally {
+		globalThis.fetch = originalFetch;
+		if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+		else process.env.NODE_ENV = originalNodeEnv;
+		if (originalProxyFlag === undefined) {
+			delete process.env.PLAYWRIGHT_E2E_API_PROXY;
+		} else {
+			process.env.PLAYWRIGHT_E2E_API_PROXY = originalProxyFlag;
+		}
+		if (originalApiBase === undefined) delete process.env.API_BASE_URL;
+		else process.env.API_BASE_URL = originalApiBase;
+	}
+}
+
+/** 單體發起登入的 302：Location 與兩個 Set-Cookie。 */
+function loginRedirect(): Response {
+	const headers = new Headers({
+		location: "https://accounts.google.com/o/oauth2/v2/auth?x=1",
+	});
+	headers.append("set-cookie", "__Host-hk_login=a; Path=/; Secure; HttpOnly");
+	headers.append("set-cookie", "__Host-hk_session=b; Path=/; Secure; HttpOnly");
+	return new Response(null, { status: 302, headers });
+}
+
+function assertRedirectPassedThrough(response: Response): void {
+	assert.equal(response.status, 302);
+	assert.equal(
+		response.headers.get("location"),
+		"https://accounts.google.com/o/oauth2/v2/auth?x=1",
+	);
+	assert.deepEqual(response.headers.getSetCookie(), [
+		"__Host-hk_login=a; Path=/; Secure; HttpOnly",
+		"__Host-hk_session=b; Path=/; Secure; HttpOnly",
+	]);
+}
+
+test("auth proxy hands the monolith's 302 and every Set-Cookie to the browser unchanged", async () => {
+	assert.equal(
+		authProxyTarget(
+			"http://localhost:3213/api/auth/google/start?return_to=%2Flogin",
+			"https://monolith.example/api/v1",
+		),
+		"https://monolith.example/api/auth/google/start?return_to=%2Flogin",
+	);
+	await withLocalProxy(async () => {
+		let seenInit: RequestInit | undefined;
+		globalThis.fetch = (async (input, init) => {
+			assert.equal(
+				String(input),
+				"https://monolith.example/api/auth/google/start?return_to=%2Flogin",
+			);
+			seenInit = init;
+			return loginRedirect();
+		}) as typeof fetch;
+
+		const response = await authGET(
+			new NextRequest(
+				"http://localhost:3213/api/auth/google/start?return_to=%2Flogin",
+				{ headers: { cookie: "__Host-hk_login=prev" } },
+			),
+		);
+
+		assert.equal(seenInit?.redirect, "manual", "the proxy must not follow it");
+		assert.equal(
+			new Headers(seenInit?.headers).get("cookie"),
+			"__Host-hk_login=prev",
+		);
+		assertRedirectPassedThrough(response);
+	});
+});
+
+test("auth proxy is closed outside local development and Playwright", async () => {
+	const originalNodeEnv = process.env.NODE_ENV;
+	process.env.NODE_ENV = "production";
+	try {
+		const response = await authGET(
+			new NextRequest("https://www.example.com/api/auth/google/start"),
+		);
+		assert.equal(response.status, 404);
+	} finally {
+		if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+		else process.env.NODE_ENV = originalNodeEnv;
+	}
+});
+
+test("Connect proxy does not follow a 3xx either", async () => {
+	await withLocalProxy(async () => {
+		let seenInit: RequestInit | undefined;
+		globalThis.fetch = (async (_input, init) => {
+			seenInit = init;
+			return loginRedirect();
+		}) as typeof fetch;
+		const response = await connectPOST(
+			new NextRequest(
+				"http://localhost:3213/api/connect/hawkr.identity.v1alpha1.IdentityAppService/SignOut",
+				{ method: "POST", body: "{}" },
+			),
+		);
+		assert.equal(seenInit?.redirect, "manual");
+		assertRedirectPassedThrough(response);
+	});
+});
+
+test("REST proxy does not follow a 3xx: the 302, Location and every Set-Cookie reach the browser", async () => {
+	await withLocalProxy(async () => {
+		let seenInit: RequestInit | undefined;
+		globalThis.fetch = (async (_input, init) => {
+			seenInit = init;
+			return loginRedirect();
+		}) as typeof fetch;
+		const response = await GET(
+			new NextRequest("http://localhost:3213/api/v1/app/anything"),
+		);
+		assert.equal(seenInit?.redirect, "manual");
+		assertRedirectPassedThrough(response);
+	});
 });

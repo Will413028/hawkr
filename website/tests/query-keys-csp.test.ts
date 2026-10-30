@@ -30,7 +30,6 @@ test("CSP allowlist covers deployed Cloudflare RUM and Apple Pay fonts", () => {
 	const policy = buildContentSecurityPolicy({
 		appConnectOrigins: ["https://api.example.org"],
 		uploadOrigins: [],
-		clerkFrontendApi: "",
 	});
 	const sources = (name: string) =>
 		(

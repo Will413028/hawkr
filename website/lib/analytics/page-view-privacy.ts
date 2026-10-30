@@ -102,7 +102,6 @@ const STATIC_ANALYTICS_ROUTES = new Set([
 	"/faq",
 	"/feed",
 	"/login",
-	"/login/sso-callback",
 	"/market/products",
 	"/payment/return",
 	"/privacy",

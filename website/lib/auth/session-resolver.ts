@@ -1,5 +1,5 @@
 /**
- * Account resolution race (GetSession while Clerk holds a session), decoupled
+ * Account resolution race (GetSession on every load), decoupled
  * from React so it's unit testable without a DOM rendering harness (see
  * __tests__).
  */
@@ -16,11 +16,11 @@ export const SESSION_RETRY_BACKOFF_MS = [1500, 3000, 6000] as const;
 // Backstop for a slow answer. A *guest* is never gated — their 登入 link is
 // live from first paint, because resolveAuthRailMode() renders the clickable
 // guest rail while `authReady` is false (auth-rail.ts). The sign-in state comes
-// from Clerk's SDK, which has to load first, and GetSession can then run up to
+// from GetSession alone (the session cookie is HttpOnly), which can run up to
 // apiTimeoutMs (15-30s) on a slow/cold backend. Un-gate after a human-scale
 // wait so neither can strand the UI: onResolved/onUnavailable still apply the
 // real answer whenever it lands — this only bounds how long the UI can look
-// stuck. lib/auth/context.tsx starts this gate on mount, before Clerk loads.
+// stuck. lib/auth/context.tsx starts this gate on mount, before GetSession answers.
 export const HYDRATION_GATE_MS = 2500;
 
 export interface ResolveSessionCallbacks {
@@ -42,7 +42,7 @@ export interface ResolveSessionCallbacks {
 }
 
 /**
- * Resolve the signed-in account (call only while Clerk holds a session);
+ * Resolve the signed-in account (GetSession; a visitor with no session resolves null);
  * returns a cancel function (effect cleanup).
  */
 export function resolveSession(

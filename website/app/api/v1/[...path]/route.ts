@@ -283,6 +283,8 @@ async function proxy(req: NextRequest): Promise<NextResponse> {
 			method: req.method,
 			headers,
 			body,
+			// 不跟隨上游的 3xx：連同 Location 與 Set-Cookie 原樣交給瀏覽器（fetch 預設會自己跟隨）。
+			redirect: "manual",
 			signal: req.signal,
 		});
 	} catch {

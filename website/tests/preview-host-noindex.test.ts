@@ -6,8 +6,7 @@ import { __setFlavorForTest } from "../lib/config/flavor";
 import { isCanonicalHost } from "../lib/seo/canonical-host";
 import { compiledMatcher } from "./helpers/middleware-matcher";
 
-/** Clerk 沒有 session 的請求（middleware 的 Clerk 包裝交給 Clerk，這裡只測網站自己的判斷）。 */
-const signedOut = async () => ({ userId: null });
+/** 登入與否只看 session cookie 在不在（middleware.ts）。 */
 
 const PROD_ORIGIN = "https://example.com";
 const PREVIEW_HOST = "hawkr-website-prod.example.workers.dev";
@@ -81,7 +80,6 @@ async function xRobotsTagFor(host: string): Promise<string | null> {
 		const { siteMiddleware } = await import("../middleware");
 		const response = await siteMiddleware(
 			new NextRequest(`https://${host}/`, { headers: { host } }),
-			signedOut,
 		);
 		return response.headers.get("x-robots-tag");
 	} finally {
@@ -205,7 +203,6 @@ async function middlewareFor(
 		__resetSellerStoreCodeMemoForTest();
 		return await siteMiddleware(
 			new NextRequest(`https://${host}${pathname}`, { headers: { host } }),
-			signedOut,
 		);
 	} finally {
 		globalThis.fetch = realFetch;
@@ -234,7 +231,6 @@ test("the login bounce still fires for a guarded path on the canonical host", as
 		const host = new URL(PROD_ORIGIN).host;
 		const response = await siteMiddleware(
 			new NextRequest(`https://${host}/account/orders`, { headers: { host } }),
-			signedOut,
 		);
 		assert.equal(response.status, 307);
 		const location = new URL(response.headers.get("location") as string);
@@ -248,14 +244,15 @@ test("the login bounce still fires for a guarded path on the canonical host", as
 	}
 });
 
-test("a Clerk session passes a guarded path through", async () => {
+test("a session cookie passes a guarded path through", async () => {
 	applyLaunchedProdEnv();
 	try {
 		const { siteMiddleware } = await import("../middleware");
 		const host = new URL(PROD_ORIGIN).host;
 		const response = await siteMiddleware(
-			new NextRequest(`https://${host}/account/orders`, { headers: { host } }),
-			async () => ({ userId: "user_1" }),
+			new NextRequest(`https://${host}/account/orders`, {
+				headers: { host, cookie: "__Host-hk_session=opaque" },
+			}),
 		);
 		assert.equal(response.headers.get("location"), null);
 		assert.equal(response.status, 200);
@@ -274,7 +271,6 @@ test("hidden Agent restore ids are removed before the login bounce", async () =>
 				`https://${host}/account/messages?requestId=req-secret-1&utm_source=internal&requestId=req-secret-2`,
 				{ headers: { host } },
 			),
-			signedOut,
 		);
 
 		assert.equal(response.status, 307);
@@ -286,7 +282,6 @@ test("hidden Agent restore ids are removed before the login bounce", async () =>
 
 		const loginResponse = await siteMiddleware(
 			new NextRequest(cleanLocation, { headers: { host } }),
-			signedOut,
 		);
 		assert.equal(loginResponse.status, 307);
 		const loginLocation = new URL(

@@ -3,8 +3,8 @@
 /**
  * Realtime notification stream hook — subscribes to
  * `/app/notifications/stream` and surfaces typed payloads (new inbox item
- * + unread-count deltas) to the caller. Authed mode rides the Clerk session
- * token + `X-Active-Role` selection — same auth wiring as
+ * + unread-count deltas) to the caller. Authed mode rides the session cookie
+ * + `X-Active-Role` selection — same auth wiring as
  * `apiClient.authed.*` (lib/sse/client.ts).
  *
  * Design book §3 (notification event schema) / §10 (lifecycle) / §10

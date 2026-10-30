@@ -14,6 +14,7 @@ interface Seen {
 	target: string;
 	method: string;
 	headers: Headers;
+	credentials: RequestCredentials | undefined;
 }
 
 let seen: Seen[];
@@ -31,6 +32,7 @@ function serve(
 			target,
 			method: (init?.method ?? "GET").toUpperCase(),
 			headers: new Headers(init?.headers),
+			credentials: init?.credentials,
 		});
 		return handler(target);
 	}) as typeof fetch;
@@ -42,10 +44,6 @@ beforeEach(() => {
 	__setFlavorForTest("prod");
 	getEnv();
 	(globalThis as Record<string, unknown>).window = globalThis;
-	(globalThis as Record<string, unknown>).Clerk = {
-		loaded: true,
-		session: { getToken: async () => "clerk-session-token" },
-	};
 	(globalThis as Record<string, unknown>).localStorage = {
 		getItem: () => null,
 		setItem: () => {},
@@ -58,59 +56,7 @@ afterEach(() => {
 	__setEnvForTest(null);
 	__setFlavorForTest(null);
 	delete (globalThis as Record<string, unknown>).window;
-	delete (globalThis as Record<string, unknown>).Clerk;
 	delete (globalThis as Record<string, unknown>).localStorage;
-});
-
-test("completeSignIn reads GetSession and GetMyStore with the Clerk token", async () => {
-	serve((target) =>
-		target.endsWith("/GetSession")
-			? connectOk(sessionJson("5", { seller: true }))
-			: connectOk({ store: { id: "s1", onboardingCompleted: true } }),
-	);
-	const { completeSignIn } = await import("../lib/api/auth");
-	const account = await completeSignIn("google");
-	assert.deepEqual(
-		seen.map((r) => r.target),
-		["IdentityAppService/GetSession", "SellerAppService/GetMyStore"],
-	);
-	assert.equal(seen[0]?.method, "GET");
-	assert.equal(seen[1]?.method, "GET");
-	assert.equal(
-		seen[0]?.headers.get("Authorization"),
-		"Bearer clerk-session-token",
-	);
-	assert.equal(
-		seen[1]?.headers.get("Authorization"),
-		"Bearer clerk-session-token",
-	);
-	assert.equal(account.accountId, "5");
-	assert.equal(account.isSeller, true);
-	assert.equal("perspective" in account, false);
-	assert.equal(account.needsOnboarding, false);
-});
-
-test("buyer-only sign-in does not request seller onboarding", async () => {
-	serve(() => connectOk(sessionJson("8")));
-	const { completeSignIn } = await import("../lib/api/auth");
-	const account = await completeSignIn("line");
-	assert.deepEqual(
-		seen.map((r) => r.target),
-		["IdentityAppService/GetSession"],
-	);
-	assert.equal(account.needsOnboarding, true);
-});
-
-test("seller sign-in reports the seller role and onboarding state", async () => {
-	serve((target) =>
-		target.endsWith("/GetSession")
-			? connectOk(sessionJson("9", { seller: true }))
-			: connectOk({ store: { id: "s9", onboardingCompleted: false } }),
-	);
-	const { completeSignIn } = await import("../lib/api/auth");
-	const account = await completeSignIn("apple");
-	assert.equal(account.isSeller, true);
-	assert.equal(account.needsOnboarding, true);
 });
 
 test("fetchSession returns the account from GetSession", async () => {
@@ -121,6 +67,9 @@ test("fetchSession returns the account from GetSession", async () => {
 	assert.equal(identity.accountId, "7");
 	assert.equal(seen[0]?.target, "IdentityAppService/GetSession");
 	assert.equal(seen[0]?.method, "GET");
+	// 憑證是同源的 HttpOnly session cookie，由瀏覽器附上；程式不碰 Authorization。
+	assert.equal(seen[0]?.headers.get("Authorization"), null);
+	assert.equal(seen[0]?.credentials, "include");
 });
 
 test("backend outage and a dead network remain retryable", async () => {
@@ -133,17 +82,6 @@ test("backend outage and a dead network remain retryable", async () => {
 	assert.equal(await fetchSession(), SESSION_UNAVAILABLE);
 });
 
-test("unavailable Clerk token prevents the GetSession request", async () => {
-	(globalThis as Record<string, unknown>).Clerk = {
-		loaded: true,
-		session: { getToken: async () => null },
-	};
-	serve(() => connectOk(sessionJson("7")));
-	const { fetchSession, SESSION_UNAVAILABLE } = await import("../lib/api/auth");
-	assert.equal(await fetchSession(), SESSION_UNAVAILABLE);
-	assert.equal(seen.length, 0);
-});
-
 test("backend unauthenticated resolves guest; permission denied remains distinct", async () => {
 	const { fetchSession } = await import("../lib/api/auth");
 	serve(() => connectError(Code.Unauthenticated));
@@ -151,15 +89,6 @@ test("backend unauthenticated resolves guest; permission denied remains distinct
 	serve(() => connectError(Code.PermissionDenied));
 	await assert.rejects(fetchSession(), (error: unknown) => {
 		assert.equal((error as { code?: Code }).code, Code.PermissionDenied);
-		return true;
-	});
-});
-
-test("completeSignIn preserves the backend rejection code", async () => {
-	serve(() => connectError(Code.Unauthenticated));
-	const { completeSignIn } = await import("../lib/api/auth");
-	await assert.rejects(completeSignIn("google"), (error: unknown) => {
-		assert.equal((error as { code?: Code }).code, Code.Unauthenticated);
 		return true;
 	});
 });

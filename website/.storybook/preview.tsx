@@ -8,6 +8,7 @@ import "../styles/components/product-modal.css";
 import "../styles/components/ui-kit.css";
 import "../styles/components/input-field-fx.css";
 import "./preview.css";
+import "./guest-session";
 
 const preview: Preview = {
 	tags: ["autodocs", "ai-generated"],

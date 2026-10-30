@@ -5,9 +5,9 @@
  *   apiClient.public(path, opts)  → ${base}/public/* (anonymous)
  *   apiClient.authed(path, opts)  → ${base}/app/*    (signed in)
  *
- * Authed requests in the browser carry the Clerk session token as
- * `Authorization: Bearer` (lib/auth/clerk-token.ts, ADR
- * 2026-09-27-identity-clerk). Credentials default by mode: authed → "include",
+ * Authed requests in the browser carry the same-origin session cookie
+ * (`__Host-hk_session`, HttpOnly; ADR 2026-10-30-identity-self-hosted-federated-login)
+ * and no `Authorization` header. Credentials default by mode: authed → "include",
  * public → "omit" (an anonymous read must not carry cookies — it would fragment
  * shared/CDN caches). A caller may override via opts.credentials.
  * CSRF: the entry point checks Sec-Fetch-Site / Origin (the monolith's
@@ -21,10 +21,6 @@
  */
 
 import { getStoredActiveRole, roleToHeader } from "../auth/active-role";
-import {
-	AuthUnavailableError,
-	withClerkAuthorization,
-} from "../auth/clerk-token";
 import { getEnv } from "../config/env";
 import {
 	DelegatedRuntimeTransportError,
@@ -108,6 +104,12 @@ export interface RequestOptions extends RequestInit {
 	onUnauthorized?: () => void | Promise<void>;
 	/** Suppress the AUTH_EXPIRED_EVENT emit on 401 (still throws UnauthorizedError). Used by background reads that must not sign the user out. */
 	suppressAuthExpired?: boolean;
+	/**
+	 * Server side only: the visitor's session cookie to forward on an authed GET/HEAD
+	 * (`sessionCookieHeader()` in lib/auth/session-cookie.server.ts). Ignored in the
+	 * browser (which sends the HttpOnly cookie itself) and on writes (D6).
+	 */
+	cookie?: string;
 	/**
 	 * Next.js Data Cache directives, applied server-side only (the browser path is
 	 * always no-store). Lets a cacheable public read opt into ISR / tag revalidation.
@@ -485,36 +487,27 @@ async function dispatch<T>(
 		data: null as unknown as T,
 		message,
 	});
-	try {
-		if (mode === "authed")
-			await withClerkAuthorization(headers, {}, init.signal);
-	} catch (error) {
-		if (canSoftFail) return soft(503, (error as Error)?.message);
-		throw error;
+	// Server side (SSR / server action) there is no browser to send the cookie:
+	// the caller hands over the visitor's session cookie (`opts.cookie`, from
+	// lib/auth/session-cookie.server.ts) and it goes to the monolith for reads
+	// only (D6 of ADR 2026-10-30-identity-self-hosted-federated-login: a
+	// server-originated request carries no Sec-Fetch-Site / Origin, so the
+	// monolith's CSRF check rejects a cookie-authenticated write; writes go from
+	// the browser).
+	if (
+		mode === "authed" &&
+		!isBrowser &&
+		opts.cookie &&
+		(method === "GET" || method === "HEAD")
+	) {
+		headers.set("Cookie", opts.cookie);
 	}
-	let refreshed = false;
 	let res: Response;
 	for (let attempt = 0; ; attempt++) {
 		try {
 			res = await fetch(url, init);
-			if (
-				mode === "authed" &&
-				isBrowser &&
-				res.status === 401 &&
-				!refreshed &&
-				headers.has("Authorization")
-			) {
-				refreshed = true;
-				await withClerkAuthorization(headers, { skipCache: true }, init.signal);
-				res = await fetch(url, init);
-			}
 		} catch (networkErr) {
-			if (
-				!(networkErr instanceof AuthUnavailableError) &&
-				canRetry &&
-				!init.signal?.aborted &&
-				attempt < MAX_RETRIES
-			) {
+			if (canRetry && !init.signal?.aborted && attempt < MAX_RETRIES) {
 				continue;
 			}
 			// Timeout / connection refused / DNS — a hung or unreachable upstream.

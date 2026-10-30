@@ -231,7 +231,6 @@ describe("middleware storefront handling", () => {
 	function get(path: string) {
 		return siteMiddleware(
 			new NextRequest(new URL(`https://web-dev.example.com${path}`)),
-			async () => ({ userId: null }),
 		);
 	}
 

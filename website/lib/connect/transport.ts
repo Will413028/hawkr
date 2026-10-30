@@ -15,10 +15,6 @@ import {
 	DelegatedRuntimeTransportError,
 	isDelegatedRuntime,
 } from "@/lib/api/delegated-runtime";
-import {
-	AuthUnavailableError,
-	withClerkAuthorization,
-} from "@/lib/auth/clerk-token";
 import { getEnv } from "@/lib/config/env";
 import { activeLocale } from "@/lib/intl/active-locale";
 import type { AppLocale } from "@/lib/intl/locales";
@@ -26,9 +22,9 @@ import type { AppLocale } from "@/lib/intl/locales";
 // 對外 API（Protobuf＋Connect）的 transport，三種（前兩種與 lib/api/client.ts 的兩種模式相同）：
 // - publicTransport：公開讀取。不帶 cookie、server 端簽 origin-auth（backend#2264）；瀏覽器的 HTTP 快取以
 //   條件請求重新驗證（公開讀取是 `public, no-cache` 加 ETag）。
-// - authedTransport：帶 Clerk 的 session token（ADR 2026-09-27-identity-clerk，lib/auth/clerk-token.ts）。
+// - authedTransport：帶同源的 session cookie（`__Host-hk_session`，HttpOnly，ADR 2026-10-30-identity-self-hosted-federated-login；不帶 Authorization）。
 //   瀏覽器不快取、不帶 X-Active-Role（Connect 不讀工作區，只有舊 REST 帶它）、*AppService 回 unauthenticated 時發 AUTH_EXPIRED_EVENT、代行工作區內直接拋錯。
-// - vendorPortalTransport：供應商入口，邀請範圍的 cookie 憑證，不經 Clerk（見該函式的說明）。
+// - vendorPortalTransport：供應商入口，邀請範圍的 cookie 憑證，與顧客的 session cookie 無關（見該函式的說明）。
 // 三者都有逾時、5xx 上報 Sentry 與錯誤模型 D7 的重試。入口在單體：CSRF 看 Sec-Fetch-Site／Origin，不需要
 // X-Requested-With（〈API 設計規範（Connect）〉§二）。
 // 三者也都送單一值的 `Accept-Language`（UI 語系，見 acceptLanguageInterceptor）。
@@ -80,6 +76,12 @@ function originOf(url: string): string | undefined {
 }
 
 export interface TransportOptions {
+	/**
+	 * 伺服器端（RSC、server action）代訪客讀取時要轉送的 session cookie（`lib/auth/session-cookie.server.ts`
+	 * 的 `sessionCookieHeader()`）。只有 authedTransport 用，也只在 GET 送出：伺服器發出的請求沒有瀏覽器的
+	 * Sec-Fetch-Site／Origin，單體對 cookie 認證的寫入會拒絕，寫入由瀏覽器送（D6）。瀏覽器端不用。
+	 */
+	cookie?: string;
 	/**
 	 * 這些呼叫代表的 UI 語系，送成 `Accept-Language`。瀏覽器端不用傳：取自 `AppProviders` 依路由的語系設的目前語系
 	 * （`lib/intl/active-locale.ts`；不讀 `<html lang>`，那個會被瀏覽器的翻譯改掉）。server 端（SSR、ISR）沒有
@@ -135,8 +137,8 @@ export function publicTransport(opts: PublicTransportOptions = {}): Transport {
 
 /**
  * 登入與否都能呼叫的寫入型 beacon（例如 SellerPublicService.RecordProductView：登入者不計數，由伺服器判斷，
- * client 不判斷登入狀態）。有 Clerk session 時帶同 authedTransport 的 Bearer 與 cookie；沒登入、Clerk 還沒載入完
- * 或取不到 token 都照常匿名送出，不丟錯、不發 AUTH_EXPIRED_EVENT、不導向登入。
+ * client 不判斷登入狀態）。帶同 authedTransport 的同源 session cookie；沒登入就是沒有 cookie，照常匿名送出，
+ * 不丟錯、不發 AUTH_EXPIRED_EVENT、不導向登入。
  * 只給寫入用：讀取（GET）仍走 publicTransport，才能共用快取。server 端沒有 session，等同匿名。
  */
 export function optionalAuthTransport(
@@ -161,25 +163,13 @@ function optionalAuthFetch(
 	visitorIp: string | undefined,
 ): typeof fetch {
 	if (!isBrowser) return publicFetch(false, visitorIp);
-	return async (input, init) => {
-		const headers = new Headers(init?.headers);
-		try {
-			await withClerkAuthorization(headers, {}, init?.signal);
-		} catch {
-			// 取不到 token 就匿名送出；beacon 不該因登入狀態失敗。
-			headers.delete("Authorization");
-		}
-		return fetch(input, {
-			...init,
-			headers,
-			credentials: "include",
-			cache: "no-store",
-		});
-	};
+	return (input, init) =>
+		fetch(input, { ...init, credentials: "include", cache: "no-store" });
 }
 
 /**
- * 帶登入憑證的 transport：*AppService 的方法。瀏覽器端以 `Authorization: Bearer` 帶 Clerk 的 session token。
+ * 帶登入憑證的 transport：*AppService 的方法。憑證是同源的 `__Host-hk_session` cookie（HttpOnly，JS 讀不到），
+ * 由瀏覽器隨請求送出；不帶 `Authorization`。
  *
  * 讀取（NO_SIDE_EFFECTS）照〈API 設計規範（Connect）〉§三、§九以 GET 呼叫：GET 不受 CSRF 檢查、可以安全
  * 重試。伺服器對 AppService 回 `private, no-store`，瀏覽器端再以 `cache: "no-store"` 保證不從 HTTP 快取
@@ -192,7 +182,7 @@ export function authedTransport(opts: TransportOptions = {}): Transport {
 			baseUrl: connectBaseUrl(isBrowser),
 			useHttpGet: true,
 			defaultTimeoutMs: getEnv().apiTimeoutMs,
-			fetch: authedFetch(isBrowser),
+			fetch: authedFetch(isBrowser, opts.cookie),
 			interceptors: [
 				languageInterceptor(opts),
 				reportInterceptor(sentryCapture("authed")),
@@ -207,11 +197,10 @@ export function authedTransport(opts: TransportOptions = {}): Transport {
 /**
  * 供應商入口（VendorPortalPublicService、VendorPortalInviteeService）的 transport，兩個 service 共用。
  * 獨立存在，因為它們的憑證是邀請範圍的 session cookie（`__Host-hk_vp_<rfq_recipient_id>`，ExchangeInvite
- * 以 Set-Cookie 發、HttpOnly，JS 讀不到），與 Clerk 無關：
+ * 以 Set-Cookie 發、HttpOnly，JS 讀不到），與顧客的 session cookie 無關：
  * - publicTransport 以 `credentials: "omit"` 送出，Set-Cookie 落不了地、cookie 也送不出去；
- * - authedTransport 會帶 Clerk 的 Bearer，並在 unauthenticated 時發 AUTH_EXPIRED_EVENT，
- *   把供應商的 session 失效誤報成買家登入過期。
- * 所以這裡 `credentials: "include"`（同源走 /api/connect，cookie 隨請求送出）、不碰 Clerk，瀏覽器不快取。
+ * - authedTransport 會在 unauthenticated 時發 AUTH_EXPIRED_EVENT，把供應商的 session 失效誤報成買家登入過期。
+ * 所以這裡 `credentials: "include"`（同源走 /api/connect，cookie 隨請求送出）、不發 AUTH_EXPIRED_EVENT，瀏覽器不快取。
  * 供應商憑證的規則只定義在這裡：沒有標 NO_SIDE_EFFECTS 的方法（PreviewInvite、ExchangeInvite、
  * VerifySession）一律 POST，憑證在訊息裡不進 URL；NO_SIDE_EFFECTS 的讀取（GetSession）以 GET 呼叫
  * （API 設計規範（Connect）§三），收件人 ID 在 query。
@@ -299,38 +288,26 @@ function delegatedGuard(inner: Transport): Transport {
 	};
 }
 
-function authedFetch(isBrowser: boolean): typeof fetch {
+function authedFetch(isBrowser: boolean, cookie?: string): typeof fetch {
 	return async (input, init) => {
 		const headers = new Headers(init?.headers);
-		const authorize = async (skipCache = false) => {
-			try {
-				await withClerkAuthorization(headers, { skipCache });
-			} catch (error) {
-				if (error instanceof AuthUnavailableError) {
-					throw new ConnectError(error.message, Code.Unavailable);
-				}
-				throw error;
-			}
-		};
-		if (isBrowser) await authorize();
-		const request: RequestInit = {
+		const method = init?.method ?? "GET";
+		// 伺服器端沒有瀏覽器替它送 cookie：只讀取（GET）轉送呼叫端交來的 session cookie（見 TransportOptions.cookie）。
+		if (!isBrowser && cookie && (method === "GET" || method === "HEAD")) {
+			headers.set("Cookie", cookie);
+		}
+		return fetch(input, {
 			...init,
 			headers,
 			credentials: "include",
 			...(isBrowser ? { cache: "no-store" as const } : {}),
-		};
-		let response = await fetch(input, request);
-		if (isBrowser && response.status === 401 && headers.has("Authorization")) {
-			await authorize(true);
-			response = await fetch(input, request);
-		}
-		return response;
+		});
 	};
 }
 
 /**
  * 呼叫方以 contextValues 設成 true 時，unauthenticated 不發 AUTH_EXPIRED_EVENT：讀取登入帳號的呼叫
- * （fetchSession、completeSignIn）自己決定怎麼處理「沒有登入」。
+ * （fetchSession）自己決定怎麼處理「沒有登入」。
  */
 export const SUPPRESS_AUTH_EXPIRED = createContextKey(false, {
 	description: "suppress AUTH_EXPIRED_EVENT",
@@ -371,7 +348,7 @@ export function sellerSuspendedInterceptor(
 }
 
 /**
- * *AppService 回 unauthenticated 表示登入已經不在（Clerk 的 session 失效，或帳號已停權、刪除），廣播
+ * *AppService 回 unauthenticated 表示登入已經不在（session 過期或被撤銷，或帳號已停權、刪除），廣播
  * AUTH_EXPIRED_EVENT，由 auth context 清掉登入狀態（同 lib/api/client.ts 的 401）。公開 service 不需要登入，
  * 它的 unauthenticated 與登入無關，不廣播。
  */

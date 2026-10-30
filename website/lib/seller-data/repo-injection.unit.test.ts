@@ -41,7 +41,6 @@ function stubBrowserFetch(envelope: unknown = { code: 0, data: null }) {
 	});
 	vi.stubGlobal("window", {
 		location: { pathname: "/seller-center" },
-		Clerk: { loaded: true, session: { getToken: async () => "test-token" } },
 	});
 	vi.stubGlobal("fetch", fetchSpy);
 	return { fetchSpy, urls };

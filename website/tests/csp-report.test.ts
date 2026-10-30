@@ -6,7 +6,6 @@ import { fileURLToPath } from "node:url";
 import {
 	buildContentSecurityPolicy,
 	type ContentSecurityPolicyInput,
-	clerkFrontendApiOrigin,
 	parseUploadOrigins,
 	withWebSocketSiblings,
 } from "../lib/security/csp";
@@ -14,14 +13,12 @@ import {
 const testDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = dirname(testDir);
 
-const CLERK_API = "https://clerk.example.org";
 const APP_ORIGINS = ["https://api.example.org", "wss://api.example.org"];
 
 function policy(overrides: Partial<ContentSecurityPolicyInput> = {}): string {
 	return buildContentSecurityPolicy({
 		appConnectOrigins: APP_ORIGINS,
 		uploadOrigins: [],
-		clerkFrontendApi: CLERK_API,
 		...overrides,
 	});
 }
@@ -98,7 +95,6 @@ test("every directive is well formed, with and without optional origins", () => 
 		policy({
 			appConnectOrigins: [],
 			uploadOrigins: [],
-			clerkFrontendApi: "",
 		}),
 		policy({ uploadOrigins: ["https://*.uploads.example.org"] }),
 	]) {
@@ -176,33 +172,12 @@ test("frame-src lists the Apple Pay sheet iframe host", () => {
 	);
 });
 
-// Clerk 的 SDK 從它的 Frontend API 載入、登入也打它；bot protection（Turnstile）是 script 加 iframe。
-// 少了任何一條，enforce 下登入按鈕按了沒有反應。
-test("CSP allows Clerk's Frontend API and its bot protection", () => {
+// 登入改由單體發起、整頁導向 provider（302），瀏覽器不再載入第三方登入 SDK、也不開 bot protection 的 iframe：
+// CSP 不該為登入留任何 Clerk 或 challenges.cloudflare.com 的來源。
+test("CSP carries no Clerk or Clerk bot-protection origin", () => {
 	const value = policy();
-	assert.ok(directive(value, "script-src").includes(CLERK_API));
-	assert.ok(
-		directive(value, "script-src").includes(
-			"https://challenges.cloudflare.com",
-		),
-	);
-	assert.ok(directive(value, "connect-src").includes(CLERK_API));
-	assert.ok(
-		directive(value, "frame-src").includes("https://challenges.cloudflare.com"),
-	);
-	// Clerk's host comes from the publishable key; no key, no Clerk origin.
-	assert.equal(clerkFrontendApiOrigin(undefined), "");
-	assert.equal(
-		clerkFrontendApiOrigin(
-			`pk_test_${Buffer.from("clerk.example.org$").toString("base64")}`,
-		),
-		CLERK_API,
-	);
-	assert.ok(
-		!directive(policy({ clerkFrontendApi: "" }), "connect-src").includes(
-			CLERK_API,
-		),
-	);
+	assert.doesNotMatch(value, /clerk/i);
+	assert.doesNotMatch(value, /challenges\.cloudflare\.com/);
 });
 
 test("enforced CSP carries the required hardening directives", () => {

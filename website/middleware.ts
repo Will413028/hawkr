@@ -1,8 +1,8 @@
-import { clerkMiddleware } from "@clerk/nextjs/server";
 import { type NextRequest, NextResponse } from "next/server";
 import createIntlMiddleware from "next-intl/middleware";
 import { routing } from "@/i18n/routing";
 import { requiredAccessForPath, workspaceOfPath } from "@/lib/auth/redirect";
+import { SESSION_COOKIE_NAME } from "@/lib/auth/session-cookie";
 import { getEnv } from "@/lib/config/env";
 import { type AppLocale, defaultLocale } from "@/lib/intl/locales";
 import {
@@ -60,9 +60,6 @@ function withHostIndexability(
 	return response;
 }
 
-/** The part of Clerk's `auth()` the site's routing reads. */
-export type SiteAuth = () => Promise<{ userId: string | null }>;
-
 /**
  * A non-default locale's UGC page is kept out of the index (lib/seo/indexability.ts
  * `isLocaleNoindex`; ADR 2026-10-17 D1 "SEO"). Same mechanism and the same gate as
@@ -83,31 +80,24 @@ function withLocaleIndexability(
 }
 
 /**
- * Clerk's middleware runs first on every matched request: it verifies the
- * session token (locally, against the instance's public key) and, for a
- * document request whose token has expired, refreshes it through Clerk's
- * handshake redirect. `auth()` reads that result.
+ * Everything the site decides per request, on the locale-free pathname. What it
+ * lets through goes to next-intl, whose rewrite/redirect is the return value.
+ * Every redirect the site decides keeps the locale prefix.
  *
- * The site's decisions below run inside it, on the locale-free pathname. What
- * they let through goes to next-intl, whose rewrite/redirect is the handler's
- * return value (Clerk's documented composition: return the second middleware
- * from the handler; next-intl's "composing other middlewares" does the same
- * the other way round). Every redirect the site decides keeps the locale prefix.
+ * Who the visitor is: only whether the `__Host-hk_session` cookie is present. That
+ * is an optimistic check (a cookie the monolith has since revoked still passes),
+ * made without calling the API so the middleware stays free of a network hop; the
+ * authoritative answer is the page's and the client's GetSession, which sends an
+ * `unauthenticated` visitor back to the login page.
  */
-export const middleware = clerkMiddleware(
-	(auth, request) => siteMiddleware(request, auth),
-	// Clerk 的「不連網驗證」：給了實例公鑰就在本機驗 session JWT。@clerk/nextjs 不會自己讀
-	// `CLERK_JWT_KEY`，要明確傳進來。部署沒設這個變數 → undefined → 照舊向 Clerk 取 JWKS；
-	// e2e 由 playwright.config.ts 設成一把本機產生的公鑰（tests/e2e/helpers/clerk-session.ts）。
-	{ jwtKey: process.env.CLERK_JWT_KEY || undefined },
-);
-
-/** Everything the site decides per request, given Clerk's verdict. */
 export async function siteMiddleware(
 	request: NextRequest,
-	auth: SiteAuth,
 ): Promise<NextResponse> {
-	return withHostIndexability(request, await route(request, auth));
+	return withHostIndexability(request, await route(request));
+}
+
+export function middleware(request: NextRequest): Promise<NextResponse> {
+	return siteMiddleware(request);
 }
 
 /** What every "let it through" decision returns once locales exist: next-intl's rewrite. */
@@ -134,10 +124,7 @@ function notFoundResponse(request: NextRequest): NextResponse {
 	return NextResponse.rewrite(notFoundUrl, { status: 404 });
 }
 
-async function route(
-	request: NextRequest,
-	auth: SiteAuth,
-): Promise<NextResponse> {
+async function route(request: NextRequest): Promise<NextResponse> {
 	// next-intl routes on the decoded, slash-collapsed path (`/%65n/…` and `//en/…`
 	// reach the `/en/…` page), so every decision below reads that same string; an
 	// undecodable path is left to Next, which answers 400.
@@ -227,7 +214,7 @@ async function route(
 	}
 
 	// /login is never bounced for signed-in visitors (hawkr-website#259): a
-	// Clerk session the monolith refuses (suspended or deleted account) would
+	// session cookie the monolith refuses (suspended or deleted account) would
 	// loop them away from the login screen. The authoritative check is the
 	// client-side GetSession; LoginPage itself redirects away once it confirms a
 	// live account (see useAuth().isLoggedIn there).
@@ -235,9 +222,11 @@ async function route(
 
 	const access = requiredAccessForPath(pathname);
 	if (!access) return pass(request, pathname, locale);
-	// Signed in to Clerk is enough to enter; the account behind the session (and
-	// its roles) is checked by the monolith on every call and by RoleZoneGuard.
-	if ((await auth()).userId) return pass(request, pathname, locale);
+	// A session cookie is enough to enter; the account behind it (and its roles)
+	// is checked by the monolith on every call and by RoleZoneGuard.
+	if (request.cookies.get(SESSION_COOKIE_NAME)?.value) {
+		return pass(request, pathname, locale);
+	}
 
 	const loginUrl = request.nextUrl.clone();
 	// The login page of the locale the visitor is in, and the way back is the URL

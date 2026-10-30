@@ -107,9 +107,7 @@ const okEnvelope = () =>
 // navigation serves stale data until a hard reload (the 下架→編輯 stale-status bug).
 test("browser-side requests opt out of the HTTP cache (no-store)", async () => {
 	respond = okEnvelope;
-	(globalThis as { window?: unknown }).window = {
-		Clerk: { loaded: true, session: { getToken: async () => "test-token" } },
-	};
+	(globalThis as { window?: unknown }).window = {};
 	const { apiClient } = await import("../lib/api/client");
 	await apiClient.authed.get("/products/1");
 	assert.equal(
@@ -130,9 +128,7 @@ test("server-side requests do not force no-store (Data Cache intact)", async () 
 
 test("an explicit cache option overrides the browser default", async () => {
 	respond = okEnvelope;
-	(globalThis as { window?: unknown }).window = {
-		Clerk: { loaded: true, session: { getToken: async () => "test-token" } },
-	};
+	(globalThis as { window?: unknown }).window = {};
 	const { apiClient } = await import("../lib/api/client");
 	await apiClient.authed.get("/products/1", { cache: "force-cache" });
 	assert.equal(lastInit?.cache, "force-cache");
@@ -174,4 +170,39 @@ test("401 still throws UnauthorizedError by default (throwOnHttpError unset)", a
 			e instanceof UnauthorizedError &&
 			e.cloudflareRayId === "a1feaf706bfbd6a9",
 	);
+});
+
+// D6 (ADR 2026-10-30-identity-self-hosted-federated-login): a server-originated request has no
+// Sec-Fetch-Site / Origin, so the monolith refuses a cookie-authenticated write. The caller hands the
+// visitor's session cookie over and it is forwarded on reads only.
+test("server side: an authed GET forwards the cookie the caller handed over, and never a Bearer", async () => {
+	respond = okEnvelope;
+	const { apiClient } = await import("../lib/api/client");
+	await apiClient.authed.get("/products/1", {
+		cookie: "__Host-hk_session=opaque",
+	});
+	const headers = new Headers(lastInit?.headers);
+	assert.equal(headers.get("Cookie"), "__Host-hk_session=opaque");
+	assert.equal(headers.get("Authorization"), null);
+});
+
+test("server side: an authed write does not get the cookie", async () => {
+	respond = okEnvelope;
+	const { apiClient } = await import("../lib/api/client");
+	await apiClient.authed.post("/products/1", {
+		json: {},
+		cookie: "__Host-hk_session=opaque",
+	});
+	assert.equal(new Headers(lastInit?.headers).get("Cookie"), null);
+});
+
+test("server side: without a handed-over cookie, or on a public read, no Cookie is sent", async () => {
+	respond = okEnvelope;
+	const { apiClient } = await import("../lib/api/client");
+	await apiClient.authed.get("/products/1");
+	assert.equal(new Headers(lastInit?.headers).get("Cookie"), null);
+	await apiClient.public.get("/products/1", {
+		cookie: "__Host-hk_session=opaque",
+	});
+	assert.equal(new Headers(lastInit?.headers).get("Cookie"), null);
 });

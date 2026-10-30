@@ -96,7 +96,8 @@ test("profile save expires both public seller cache identities", () => {
 	assert.match(profileEditor, /revalidateOwnSellerProfile\(\{/);
 	assert.match(profileEditor, /accountId: serverStore\.id/);
 	assert.match(profileEditor, /storeCode: serverStore\.storeCode/);
-	assert.match(action, /\(await auth\(\)\)\.userId/);
+	assert.match(action, /\(await hasLiveSession\(\)\)/);
+	assert.doesNotMatch(action, /clerk/i);
 	assert.match(action, /revalidateTag\(sellerTag\(id\), \{ expire: 0 \}\)/);
 });
 

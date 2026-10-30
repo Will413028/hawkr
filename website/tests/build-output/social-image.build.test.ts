@@ -25,11 +25,7 @@ function page(file: string): string {
 }
 
 /** Prerendered pages that declare no `openGraph` of their own, so they inherit the root layout's. */
-const INHERITING = [
-	"zh-TW/cart.html",
-	"zh-TW/account/addresses.html",
-	"zh-TW/login/sso-callback.html",
-];
+const INHERITING = ["zh-TW/cart.html", "zh-TW/account/addresses.html"];
 
 /** A prerendered page that declares its own `openGraph` and names the card through `socialImages()`. */
 const DECLARING = ["zh-TW/about.html", "zh-TW/faq.html"];

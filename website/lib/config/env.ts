@@ -11,8 +11,8 @@
  * be added here, never sprinkled inline.
  *
  * Public values (gateway host, OAuth client ids) are baked into the client
- * bundle at `next build` time via `NEXT_PUBLIC_*` env vars. Sign-in is Clerk's
- * (`@clerk/nextjs` reads its own keys, ADR 2026-09-27-identity-clerk).
+ * bundle at `next build` time via `NEXT_PUBLIC_*` env vars. Sign-in has no key here:
+ * the monolith runs the OAuth flow and sets the session cookie (ADR 2026-10-30-identity-self-hosted-federated-login).
  */
 
 import { currentFlavor, type Flavor } from "./flavor";
@@ -209,8 +209,8 @@ function readApiBase(flavor: Flavor): string {
 	// browser only ever talks to its own origin and the `app/api/v1/[...path]`
 	// route proxies to the gateway server-side — a same-origin topology that
 	// MIRRORS prod (prod serves the API first-party under the web host to dodge
-	// content blockers). Same-origin means Clerk's session cookie is sent to the
-	// API host too (the middleware reads it) and CORS / cookie-domain /
+	// content blockers). Same-origin means the session cookie (`__Host-hk_session`) is sent to the
+	// API host too (the cookie has no Domain, so it can only go same-origin) and CORS / cookie-domain /
 	// VPN / blocker / self-signed-cert friction all disappear. Opt into raw
 	// cross-origin (rarely needed — prod isn't cross-origin) by setting
 	// NEXT_PUBLIC_API_BASE_URL to the absolute gateway URL. Deployed builds always

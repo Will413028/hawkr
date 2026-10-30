@@ -18,8 +18,6 @@
  *   Google Pay                       pay.google.com
  *   Apple Pay                        applepay.cdn-apple.com,
  *                                    smp-paymentservices.apple.com
- *   Clerk (sign-in)                  its Frontend API (from the publishable key),
- *                                    challenges.cloudflare.com (bot protection)
  *   Cloudflare Web Analytics / RUM   static.cloudflareinsights.com,
  *                                    cloudflareinsights.com
  *   Backend gateway + chat WS        API base env (https + wss)
@@ -42,22 +40,6 @@ export function originOf(value: string | undefined): string {
 	} catch {
 		return "";
 	}
-}
-
-/**
- * Clerk's Frontend API origin — clerk-js loads from it and talks to it. The
- * publishable key encodes the host: `pk_<env>_<base64("<host>$")>`. Empty
- * when no key is configured.
- */
-export function clerkFrontendApiOrigin(
-	publishableKey: string | undefined,
-): string {
-	const encoded = publishableKey?.split("_")[2];
-	if (!encoded) return "";
-	const host = Buffer.from(encoded, "base64")
-		.toString("utf8")
-		.replace(/\$$/, "");
-	return /^[a-z0-9.-]+$/i.test(host) ? `https://${host}` : "";
 }
 
 /**
@@ -112,11 +94,7 @@ export interface ContentSecurityPolicyInput {
 	appConnectOrigins: readonly string[];
 	/** Presigned-upload destinations (`parseUploadOrigins`). */
 	uploadOrigins: readonly string[];
-	/** `clerkFrontendApiOrigin(...)`; empty when Clerk is not configured. */
-	clerkFrontendApi: string;
 }
-
-const CLERK_BOT_PROTECTION = "https://challenges.cloudflare.com";
 
 function sources(...parts: ReadonlyArray<string | readonly string[]>): string {
 	return parts.flat().filter(Boolean).join(" ");
@@ -146,7 +124,6 @@ function sources(...parts: ReadonlyArray<string | readonly string[]>): string {
 export function buildContentSecurityPolicy(
 	input: ContentSecurityPolicyInput,
 ): string {
-	const { clerkFrontendApi } = input;
 	return [
 		"default-src 'self'",
 		"base-uri 'self'",
@@ -156,8 +133,6 @@ export function buildContentSecurityPolicy(
 		sources(
 			"script-src 'self' 'unsafe-inline' 'report-sample'",
 			"https://www.googletagmanager.com https://www.gstatic.com https://www.google.com https://apis.google.com https://accounts.google.com https://pay.google.com https://applepay.cdn-apple.com https://static.cloudflareinsights.com",
-			clerkFrontendApi,
-			CLERK_BOT_PROTECTION,
 		),
 		"style-src 'self' 'unsafe-inline' https://accounts.google.com",
 		"style-src-elem 'self' 'unsafe-inline' https://accounts.google.com",
@@ -168,12 +143,8 @@ export function buildContentSecurityPolicy(
 			input.appConnectOrigins,
 			input.uploadOrigins,
 			"https://www.googletagmanager.com https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://stats.g.doubleclick.net https://*.googleapis.com https://google.com https://www.google.com https://*.gstatic.com https://accounts.google.com https://pay.google.com https://smp-paymentservices.apple.com https://static.cloudflareinsights.com https://cloudflareinsights.com",
-			clerkFrontendApi,
 		),
-		sources(
-			"frame-src 'self' https://accounts.google.com https://apis.google.com https://pay.google.com https://applepay.cdn-apple.com",
-			CLERK_BOT_PROTECTION,
-		),
+		"frame-src 'self' https://accounts.google.com https://apis.google.com https://pay.google.com https://applepay.cdn-apple.com",
 		"worker-src 'self' blob:",
 		"manifest-src 'self'",
 		// Collects violations at app/api/csp-report/route.ts → Sentry.

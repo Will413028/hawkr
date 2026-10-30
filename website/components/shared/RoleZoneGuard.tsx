@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth/context";
 import {
 	ACCESS_CLASSES,
 	defaultPathForRole,
+	loginPath,
 	type RequiredAccess,
 } from "@/lib/auth/redirect";
 import { getActiveRole, type RoleSlot } from "@/lib/auth/storage";
@@ -16,6 +17,7 @@ import {
 	hydrationServerSnapshot,
 	useHydrationSafeClientRender,
 } from "@/lib/hooks/useHydrationSafeClientRender";
+import { splitLocale } from "@/lib/intl/paths";
 import { INITIAL_LOADER_REACT_FALLBACK_MS } from "@/lib/loading/initial-loader-watchdog";
 import { commitDocumentNavigation } from "@/lib/navigation/document-location";
 
@@ -26,7 +28,11 @@ import { commitDocumentNavigation } from "@/lib/navigation/document-location";
  * boundary; if it doesn't match `required`, the user is sent back to the
  * default page for their active workspace. An `account` zone only needs a
  * signed-in account: it never compares, switches or reloads the workspace.
- * Signed-out visitors are redirected by middleware, not here.
+ * Visitors with no session cookie are redirected by middleware (which only
+ * checks that the cookie is present). A visitor whose cookie the monolith
+ * refuses (GetSession: unauthenticated) gets past it, so this guard sends them
+ * to the login page, the way middleware does — unless the page had a signed-in
+ * account earlier (the session ended mid-visit; AuthProvider takes them home).
  *
  * A hard entry remains behind InitialPageLoader until this guard publishes
  * its ready marker. Soft navigation normally arrives with AuthProvider
@@ -141,6 +147,8 @@ function RoleZoneGuardInner({
 		switchRole,
 	} = useAuth();
 	const [ready, setReady] = React.useState(false);
+	const everLoggedIn = React.useRef(false);
+	if (isLoggedIn) everLoggedIn.current = true;
 	const [terminalTimeout, setTerminalTimeout] = React.useState(false);
 	const hydrationSafeClientRender = useHydrationSafeClientRender();
 	const { workspace, owns } = ACCESS_CLASSES[required];
@@ -164,7 +172,7 @@ function RoleZoneGuardInner({
 	});
 
 	React.useEffect(() => {
-		// AuthProvider hydrates identity (Clerk's session, then fetchSession) on
+		// AuthProvider hydrates identity (GetSession) on
 		// mount. Until that resolves, activeRole is null — bailing out before
 		// `hydrated` would redirect the user home on every page refresh even when
 		// they hold a valid session.
@@ -233,7 +241,21 @@ function RoleZoneGuardInner({
 			return;
 		}
 
-		// No matching role on the account (or no session). Don't push to /login —
+		// A cookie the monolith refuses (and no account earlier on this page):
+		// the login page of this locale, coming back to the URL they asked for.
+		if (!isLoggedIn && !everLoggedIn.current) {
+			const { prefix } = splitLocale(window.location.pathname);
+			commitDocumentNavigation(
+				`${prefix}${loginPath({
+					...(workspace ? { role: workspace } : {}),
+					redirect: `${window.location.pathname}${window.location.search}`,
+				})}`,
+				true,
+			);
+			return;
+		}
+
+		// No matching role on the account (or the session ended mid-visit). Don't push to /login —
 		// that would dump the user onto a page with no navigation. Keep a resolved
 		// seller inside the seller workspace; buyers and guests return home.
 		// Hard nav (not router.replace): a stale-chunk skeleton hang here is the
@@ -250,6 +272,7 @@ function RoleZoneGuardInner({
 		workspace,
 		ready,
 		switchRole,
+		isLoggedIn,
 	]);
 
 	// Latest-value box for the watchdog below: the timeout fires on a fixed

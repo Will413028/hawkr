@@ -1,16 +1,11 @@
 import path from "node:path";
 import pkg from "@next/env";
 import { defineConfig, devices } from "@playwright/test";
-import { ensureClerkSigningKey } from "./tests/e2e/helpers/clerk-session";
 
 // Load .env.local so any required secrets are available in the test process.
 // This mirrors the environment the Next.js dev server runs in.
 const { loadEnvConfig } = pkg;
 loadEnvConfig(process.cwd());
-
-// 已登入的 spec 用本機簽的 Clerk session（tests/e2e/helpers/clerk-session.ts）：公鑰以 CLERK_JWT_KEY 交給
-// webServer（middleware 不連 Clerk 就能驗），私鑰留在測試程序。必須在 webServer 啟動前設好。
-ensureClerkSigningKey();
 
 // CI runs many refs concurrently on the same self-hosted runner pool (the
 // web-deploy-${{ github.ref }} concurrency group only serializes same-ref

@@ -4,7 +4,7 @@
  * Built on `fetch + ReadableStream` rather than the native EventSource
  * because:
  *   - EventSource cannot set custom headers, but the authed notification
- *     stream needs `X-Active-Role` + the Clerk session token, and
+ *     stream needs `X-Active-Role` + the session cookie, and
  *     reconnect needs `Last-Event-ID` set explicitly (the cached id may
  *     come from a previous in-memory state, not the browser's own).
  *   - We want fine-grained control over reconnect timing, heartbeat
@@ -34,7 +34,6 @@
 
 import { AUTH_EXPIRED_EVENT, apiClient } from "@/lib/api/client";
 import { getStoredActiveRole, roleToHeader } from "@/lib/auth/active-role";
-import { withClerkAuthorization } from "@/lib/auth/clerk-token";
 
 export type SseConnectionStatus =
 	| "idle"
@@ -168,14 +167,6 @@ export class SseClient {
 		if (this.mode === "authed") {
 			const role = roleToHeader(getStoredActiveRole());
 			if (role) headers.set("X-Active-Role", role);
-			try {
-				await withClerkAuthorization(headers);
-			} catch {
-				this.scheduleReconnect();
-				return;
-			}
-			// close() may have run while the token was fetched.
-			if (this.closed || controller.signal.aborted) return;
 		}
 
 		const url = apiClient.buildUrl(this.mode, this.path);
@@ -190,15 +181,6 @@ export class SseClient {
 		};
 		try {
 			response = await fetch(url, request);
-			if (
-				this.mode === "authed" &&
-				response.status === 401 &&
-				headers.has("Authorization")
-			) {
-				await withClerkAuthorization(headers, { skipCache: true });
-				if (this.closed || controller.signal.aborted) return;
-				response = await fetch(url, request);
-			}
 		} catch (err) {
 			// AbortError from `close()` is terminal (closed flag set), but
 			// AbortError from the heartbeat watchdog should fall through to

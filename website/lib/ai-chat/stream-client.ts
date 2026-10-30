@@ -17,7 +17,6 @@
 import { AUTH_EXPIRED_EVENT, apiClient } from "@/lib/api/client";
 import { parseJsonSafe } from "@/lib/api/json";
 import { getStoredActiveRole, roleToHeader } from "@/lib/auth/active-role";
-import { withClerkAuthorization } from "@/lib/auth/clerk-token";
 import {
 	type AgUiEventHandlers,
 	createAgUiEventDispatcher,
@@ -88,7 +87,6 @@ export async function streamAiChat(
 	});
 	const activeRole = roleToHeader(getStoredActiveRole());
 	if (activeRole) headers.set("X-Active-Role", activeRole);
-	await withClerkAuthorization(headers);
 	const init: RequestInit = {
 		method: "POST",
 		headers,
@@ -97,11 +95,7 @@ export async function streamAiChat(
 		signal: req.signal,
 		cache: "no-store",
 	};
-	let res = await fetch(url, init);
-	if (res.status === 401 && headers.has("Authorization")) {
-		await withClerkAuthorization(headers, { skipCache: true });
-		res = await fetch(url, init);
-	}
+	const res = await fetch(url, init);
 
 	if (!res.ok || !res.body) {
 		const text = await res.text().catch(() => "");

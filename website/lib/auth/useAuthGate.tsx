@@ -14,8 +14,8 @@ type GatedAction = (auth: AuthGateSnapshot) => void;
 /**
  * Defer auth-gated click actions until the sign-in state has resolved.
  *
- * Account identity lives in a Clerk-user-keyed query, so every full page
- * load starts as a guest until Clerk's SDK loads and GetSession returns. A handler
+ * Account identity lives in the session query, so every full page
+ * load starts as a guest until GetSession returns. A handler
  * that branches on `isLoggedIn` directly would open the login modal for an
  * actually-logged-in user who taps during that window (common on mobile —
  * the gated buttons sit right under the thumb on first paint).

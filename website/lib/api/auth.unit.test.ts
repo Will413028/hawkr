@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const rpc = vi.hoisted(() => ({
 	getSession: vi.fn(),
 	deleteAccount: vi.fn(),
+	signOut: vi.fn(),
 }));
-const store = vi.hoisted(() => ({ fetchMyStore: vi.fn() }));
 vi.mock("@connectrpc/connect", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@connectrpc/connect")>()),
 	createClient: () => rpc,
@@ -13,18 +13,18 @@ vi.mock("@/lib/connect/transport", () => ({
 	authedTransport: () => ({}),
 	SUPPRESS_AUTH_EXPIRED: { id: Symbol("suppress"), defaultValue: false },
 }));
-vi.mock("@clerk/nextjs/errors", () => ({
-	isClerkAPIResponseError: () => false,
-}));
-vi.mock("@/lib/analytics/events", () => ({ trackLogin: vi.fn() }));
-vi.mock("../seller/repo", () => ({ fetchMyStore: store.fetchMyStore }));
 
 import { Code, ConnectError } from "@connectrpc/connect";
 import {
 	DeleteAccountResponse_DeletionState,
 	Role,
 } from "@hawkr/api/gen/hawkr/identity/v1alpha1/identity_pb";
-import { completeSignIn, deleteAccount, fetchSession } from "./auth";
+import {
+	deleteAccount,
+	fetchSession,
+	LogoutRevokeFailedError,
+	logout,
+} from "./auth";
 
 // 契約（identity.proto）：每個帳號都是買家，roles 只列另外申請的 ROLE_SELLER；工作區是 client 的狀態，GetSession 不回。
 describe("GetSession → Identity", () => {
@@ -43,58 +43,29 @@ describe("GetSession → Identity", () => {
 	});
 });
 
-describe("completeSignIn: 開店是否完成由 GetMyStore 判斷", () => {
+describe("logout: SignOut RPC", () => {
 	beforeEach(() => {
-		rpc.getSession.mockReset();
-		store.fetchMyStore.mockReset();
+		rpc.signOut.mockReset();
 	});
 
-	it("沒有賣家角色：需要開店，不查店家", async () => {
-		rpc.getSession.mockResolvedValue({ account: { id: "7", roles: [] } });
-		expect(await completeSignIn(null)).toMatchObject({ needsOnboarding: true });
-		expect(store.fetchMyStore).not.toHaveBeenCalled();
+	it("calls SignOut once", async () => {
+		rpc.signOut.mockResolvedValue({});
+		await logout();
+		expect(rpc.signOut).toHaveBeenCalledOnce();
 	});
 
-	it("店家完成新手引導：不需要開店", async () => {
-		rpc.getSession.mockResolvedValue({
-			account: { id: "8", roles: [Role.SELLER] },
-		});
-		store.fetchMyStore.mockResolvedValue({
-			store: { id: "1", onboardingCompleted: true },
-		});
-		expect(await completeSignIn(null)).toMatchObject({
-			needsOnboarding: false,
-		});
+	it("an answer from the server that refuses is a server failure", async () => {
+		rpc.signOut.mockRejectedValue(new ConnectError("no", Code.Internal));
+		const error = await logout().catch((e: unknown) => e);
+		expect(error).toBeInstanceOf(LogoutRevokeFailedError);
+		expect((error as LogoutRevokeFailedError).reason).toBe("server");
 	});
 
-	it("店家還沒完成新手引導：需要開店", async () => {
-		rpc.getSession.mockResolvedValue({
-			account: { id: "8", roles: [Role.SELLER] },
-		});
-		store.fetchMyStore.mockResolvedValue({
-			store: { id: "1", onboardingCompleted: false },
-		});
-		expect(await completeSignIn(null)).toMatchObject({ needsOnboarding: true });
-	});
-
-	it("GetMyStore 回 not_found：需要開店", async () => {
-		rpc.getSession.mockResolvedValue({
-			account: { id: "8", roles: [Role.SELLER] },
-		});
-		store.fetchMyStore.mockRejectedValue(
-			new ConnectError("no store", Code.NotFound),
-		);
-		expect(await completeSignIn(null)).toMatchObject({ needsOnboarding: true });
-	});
-
-	it("暫時失敗是「不知道」，不當成已完成也不當成沒店家", async () => {
-		rpc.getSession.mockResolvedValue({
-			account: { id: "8", roles: [Role.SELLER] },
-		});
-		store.fetchMyStore.mockRejectedValue(
-			new ConnectError("down", Code.Unavailable),
-		);
-		expect((await completeSignIn(null)).needsOnboarding).toBeUndefined();
+	it("no answer is a network failure", async () => {
+		rpc.signOut.mockRejectedValue(new ConnectError("down", Code.Unavailable));
+		const error = await logout().catch((e: unknown) => e);
+		expect(error).toBeInstanceOf(LogoutRevokeFailedError);
+		expect((error as LogoutRevokeFailedError).reason).toBe("network");
 	});
 });
 
