@@ -12,21 +12,38 @@ import { SESSION_COOKIE_NAME } from "../../../lib/auth/session-cookie";
  * verified. Guest specs set no cookie and the mock answers GetSession `unauthenticated`.
  */
 
-/** Make `page` a signed-in browser. Call before the first navigation. */
+/**
+ * Make `page` a signed-in browser. Call before the first navigation.
+ *
+ * The cookie is set by a Set-Cookie response header on a route-fulfilled same-origin page, not by
+ * `addCookies`: Chromium's CDP `Storage.setCookies` rejects `__Host-` cookies whose origin is http
+ * ("Invalid cookie fields"), while a response header from http://localhost is accepted.
+ */
 export async function signInWithSessionCookie(
 	page: Page,
 	accountId: string,
 ): Promise<void> {
-	await page.context().addCookies([
-		{
-			name: SESSION_COOKIE_NAME,
-			value: `e2e-session-${accountId}`,
-			// `__Host-` requires Secure, Path=/ and no Domain attribute; Chromium accepts
-			// Secure cookies on http://localhost, which is where the suite's server runs.
-			url: `http://localhost:${process.env.PLAYWRIGHT_PORT || "3000"}`,
-			secure: true,
-			httpOnly: true,
-			sameSite: "Lax",
-		},
-	]);
+	const origin = `http://localhost:${process.env.PLAYWRIGHT_PORT || "3000"}`;
+	const url = `${origin}/__e2e/session`;
+	await page.route(url, (route) =>
+		route.fulfill({
+			status: 200,
+			contentType: "text/html",
+			headers: {
+				"set-cookie": `${SESSION_COOKIE_NAME}=e2e-session-${accountId}; Path=/; Secure; HttpOnly; SameSite=Lax`,
+			},
+			body: "<!doctype html><title>e2e session</title>",
+		}),
+	);
+	try {
+		await page.goto(url);
+	} finally {
+		await page.unroute(url);
+	}
+	const cookies = await page.context().cookies(origin);
+	if (!cookies.some((c) => c.name === SESSION_COOKIE_NAME)) {
+		throw new Error(
+			`signInWithSessionCookie: ${SESSION_COOKIE_NAME} was not stored after the Set-Cookie response from ${url}`,
+		);
+	}
 }
