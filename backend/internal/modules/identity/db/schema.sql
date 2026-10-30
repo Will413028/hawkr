@@ -164,17 +164,6 @@ CREATE TABLE identity.account_roles (
     CONSTRAINT account_roles_role_check CHECK (role::text IN ('SELLER'))
 );
 
--- 帳號的 Sign in with Apple refresh token（App 原生登入時交出 authorization code，背景換得）：刪除帳號的最後一步
--- 撤銷它（App Store 審核準則 5.1.1(v)）。token 是 AES-GCM 的密文，每個帳號最多一筆，重新連結時取代；撤銷的 job 排入時刪列。
-CREATE TABLE identity.apple_tokens (
-    account_id BIGINT       PRIMARY KEY REFERENCES identity.accounts (id),
-    client_id  TEXT         NOT NULL,
-    token      BYTEA        NOT NULL,
-    created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    CONSTRAINT apple_tokens_client_id_check CHECK (client_id <> '')
-);
-
 -- 管理員：與帳號是不同的 principal，由 Cloudflare Access 的白名單開通。access_subject 是 Access JWT 的 sub；
 -- 第一次認證時建立。id 的過渡規則同
 -- accounts（Java 以 BIGINT 記錄操作的管理員）。

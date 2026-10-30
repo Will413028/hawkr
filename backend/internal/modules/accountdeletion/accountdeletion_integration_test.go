@@ -34,33 +34,13 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// testQueue 記下排入的 job 的 kind。
-type testQueue struct {
-	mu    sync.Mutex
-	kinds []string
-}
+// testQueue 吞掉排入的 job：這些測試不執行 job。
+type testQueue struct{}
 
-func (q *testQueue) Enqueue(_ context.Context, args river.JobArgs, _ *river.InsertOpts) error {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	q.kinds = append(q.kinds, args.Kind())
-	return nil
-}
+func (*testQueue) Enqueue(context.Context, river.JobArgs, *river.InsertOpts) error { return nil }
 
-func (q *testQueue) EnqueueReport(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) (bool, error) {
-	return true, q.Enqueue(ctx, args, opts)
-}
-
-func (q *testQueue) count(kind string) int {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	n := 0
-	for _, k := range q.kinds {
-		if k == kind {
-			n++
-		}
-	}
-	return n
+func (*testQueue) EnqueueReport(context.Context, river.JobArgs, *river.InsertOpts) (bool, error) {
+	return true, nil
 }
 
 // noProducts 是商品 port 的替身：這裡的測試不彙總瀏覽事件。
@@ -140,7 +120,7 @@ func setupWith(t *testing.T, extra ...migrate.Module) *fixture {
 	bus := events.NewBus()
 	queue := &testQueue{}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	id := identity.New(identity.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log})
+	id := identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
 	b := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log})
 	kycKeys, kycMAC := sealtest.Keys(t)
 	orders := &testOrders{}
@@ -985,89 +965,4 @@ func TestStoreReplacedAfterTheOrdersCheckWritesNothing(t *testing.T) {
 // ReadSecure 實作 media.Media；這些測試不讀機敏資產。
 func (testMedia) ReadSecure(context.Context, string, media.Ref) (media.SecureAsset, error) {
 	return media.SecureAsset{}, errors.New("not used")
-}
-
-const revokeAppleJob = "identity.revoke_apple_token"
-
-// giveAppleToken 放一筆帳號保存的 Apple refresh token（密文內容在這裡不重要）。
-func (f *fixture) giveAppleToken(t *testing.T, accountID int64) {
-	t.Helper()
-	if _, err := f.db.Conn(context.Background()).Exec(context.Background(),
-		"INSERT INTO identity.apple_tokens (account_id, client_id, token) VALUES ($1, 'io.github.will413028.hawkr.buyer', '\\x01')", accountID); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func (f *fixture) hasAppleToken(t *testing.T, accountID int64) bool {
-	t.Helper()
-	var n int
-	if err := f.db.Conn(context.Background()).QueryRow(context.Background(), "SELECT count(*) FROM identity.apple_tokens WHERE account_id=$1", accountID).Scan(&n); err != nil {
-		t.Fatal(err)
-	}
-	return n == 1
-}
-
-// 每一條最終刪除的路徑（本人立即刪除、管理員刪除、未結訂單完成後的最終刪除）都在刪帳號的 transaction 內排入撤銷並刪掉
-// 保存的 token；受理等待（PENDING_ORDERS）時還沒有刪帳號，不撤銷。
-func TestEveryFinalDeletionPathRevokesAppleToken(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	t.Run("本人立即刪除", func(t *testing.T) {
-		f := setup(t)
-		id, _ := f.account(t)
-		f.giveAppleToken(t, id)
-		if state, err := f.module.Request(ctx, RequestInput{AccountID: id, Requester: AccountOwner}); err != nil || state != Completed {
-			t.Fatalf("state=%s err=%v", state, err)
-		}
-		if f.queue.count(revokeAppleJob) != 1 || f.hasAppleToken(t, id) {
-			t.Fatalf("撤銷 job %d 個，token 還在 %v", f.queue.count(revokeAppleJob), f.hasAppleToken(t, id))
-		}
-	})
-	t.Run("管理員刪除", func(t *testing.T) {
-		f := setup(t)
-		id, _ := f.account(t)
-		f.giveAppleToken(t, id)
-		if state, err := f.module.Request(ctx, adminRequest(id)); err != nil || state != Completed {
-			t.Fatalf("state=%s err=%v", state, err)
-		}
-		if f.queue.count(revokeAppleJob) != 1 || f.hasAppleToken(t, id) {
-			t.Fatalf("撤銷 job %d 個，token 還在 %v", f.queue.count(revokeAppleJob), f.hasAppleToken(t, id))
-		}
-	})
-	t.Run("未結訂單完成後的最終刪除", func(t *testing.T) {
-		f := setup(t)
-		id, _ := f.account(t)
-		f.giveAppleToken(t, id)
-		f.orders.open = true
-		if state, err := f.module.Request(ctx, RequestInput{AccountID: id, Requester: AccountOwner}); err != nil || state != PendingOrders {
-			t.Fatalf("state=%s err=%v", state, err)
-		}
-		if state, err := f.module.CompletePending(ctx, id); err != nil || state != PendingOrders {
-			t.Fatalf("仍有未結訂單：state=%s err=%v", state, err)
-		}
-		if f.queue.count(revokeAppleJob) != 0 || !f.hasAppleToken(t, id) {
-			t.Fatalf("等待期間不該撤銷：job %d 個，token 還在 %v", f.queue.count(revokeAppleJob), f.hasAppleToken(t, id))
-		}
-		f.orders.open = false
-		if state, err := f.module.CompletePending(ctx, id); err != nil || state != Completed {
-			t.Fatalf("state=%s err=%v", state, err)
-		}
-		if f.queue.count(revokeAppleJob) != 1 || f.hasAppleToken(t, id) {
-			t.Fatalf("撤銷 job %d 個，token 還在 %v", f.queue.count(revokeAppleJob), f.hasAppleToken(t, id))
-		}
-	})
-	t.Run("被拒絕的刪除（有 SELLER 沒有店家）不撤銷", func(t *testing.T) {
-		f := setup(t)
-		id, _ := f.account(t)
-		f.giveAppleToken(t, id)
-		if err := f.identity.GrantRole(ctx, identity.GrantRoleInput{AccountID: id, Role: identity.RoleSeller}); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := f.module.Request(ctx, RequestInput{AccountID: id, Requester: AccountOwner}); apperr.KindOf(err) != apperr.KindInternal {
-			t.Fatalf("err=%v", err)
-		}
-		if f.queue.count(revokeAppleJob) != 0 || !f.hasAppleToken(t, id) {
-			t.Fatalf("被拒絕的刪除不該撤銷：job %d 個，token 還在 %v", f.queue.count(revokeAppleJob), f.hasAppleToken(t, id))
-		}
-	})
 }

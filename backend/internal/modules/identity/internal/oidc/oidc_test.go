@@ -88,7 +88,7 @@ func TestVerifyReturnsTheClaims(t *testing.T) {
 	if c != want {
 		t.Fatalf("= %+v", c)
 	}
-	// Apple 的 email_verified 可能是字串。
+	// email_verified 可能是字串。
 	c, err = v.Verify(context.Background(), is.sign(t, map[string]any{"email_verified": "true"}))
 	if err != nil || !c.EmailVerified {
 		t.Fatalf("= %+v, %v", c, err)

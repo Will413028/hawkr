@@ -137,7 +137,7 @@ func setupAdmin(t *testing.T) *adminFixture {
 	}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	bus := events.NewBus()
-	id := identity.New(identity.Deps{DB: d, Events: bus, Jobs: queue, Providers: identity.Providers{Admin: dev.Admins()}, Now: time.Now, Logger: log})
+	id := identity.New(identity.Deps{DB: d, Events: bus, Providers: identity.Providers{Admin: dev.Admins()}, Now: time.Now, Logger: log})
 	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log})
 	// 與正式組裝相同：買家在建帳的 transaction 內由 AccountCreated 建立。
 	events.Subscribe(bus, buyers.OnAccountCreated)

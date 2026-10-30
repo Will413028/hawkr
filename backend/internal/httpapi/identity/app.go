@@ -24,7 +24,6 @@ import (
 
 type appIdentity interface {
 	Account(ctx context.Context, id int64) (identity.Account, error)
-	LinkAppleCredential(ctx context.Context, in identity.LinkAppleCredentialInput) error
 	LinkIdentity(ctx context.Context, accountID int64, id identity.ProviderIdentity) error
 	ListSessions(ctx context.Context, accountID int64) ([]identity.SessionInfo, error)
 	ListLinkedIdentities(ctx context.Context, accountID int64) ([]identity.LinkedIdentity, error)
@@ -84,18 +83,6 @@ func (h *App) GetSession(ctx context.Context, _ *connect.Request[pb.GetSessionRe
 		resp.Suspension = &pb.Suspension{SuspendedAt: timestamppb.New(at)}
 	}
 	return connect.NewResponse(resp), nil
-}
-
-// LinkAppleCredential 接收原生 Apple 登入的憑證；換 token 與保存在背景執行。
-func (h *App) LinkAppleCredential(ctx context.Context, req *connect.Request[pb.LinkAppleCredentialRequest]) (*connect.Response[pb.LinkAppleCredentialResponse], error) {
-	p, ok := rpc.PrincipalFrom(ctx)
-	if !ok {
-		return nil, errors.New("httpapi/identity：登入後的請求沒有呼叫者，interceptor 沒有掛上")
-	}
-	if err := h.m.LinkAppleCredential(ctx, identity.LinkAppleCredentialInput{AccountID: p.ID, IDToken: req.Msg.GetIdToken(), AuthorizationCode: req.Msg.GetAuthorizationCode()}); err != nil {
-		return nil, err
-	}
-	return connect.NewResponse(&pb.LinkAppleCredentialResponse{}), nil
 }
 
 // caller 回傳登入的帳號與它這次請求所用的 session；interceptor 保證登入的帳號有，沒有是組裝錯誤。

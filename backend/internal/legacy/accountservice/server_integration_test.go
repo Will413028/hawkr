@@ -79,7 +79,7 @@ func setup(t *testing.T) *fixture {
 	}))
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	f.m = identity.New(identity.Deps{
-		DB: d, Events: bus, Jobs: jc, Providers: identity.Providers{},
+		DB: d, Events: bus, Providers: identity.Providers{},
 		Now: time.Now, Logger: log,
 	})
 	mux := http.NewServeMux()

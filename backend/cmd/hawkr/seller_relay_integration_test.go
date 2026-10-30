@@ -41,7 +41,7 @@ func newSellerRelayFixture(t *testing.T) *sellerRelayFixture {
 	now := time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC)
 	clock := func() time.Time { return now }
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	accounts := identity.New(identity.Deps{DB: d, Events: bus, Jobs: queue, Now: clock, Logger: logger})
+	accounts := identity.New(identity.Deps{DB: d, Events: bus, Now: clock, Logger: logger})
 	kycKeys, kycMAC := sealtest.Keys(t)
 	sellers := seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: queue, Identity: accounts, Media: noMedia{}, Orders: noOrders{}, ProductStores: &productStoresStub{}, Registry: noRegistry{},

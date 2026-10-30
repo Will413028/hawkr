@@ -50,27 +50,6 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// fakeApple 驗證 Apple 的 identity token（"good" 有效）並記下換 token 的呼叫。
-type fakeApple struct{}
-
-func (fakeApple) Verify(_ context.Context, tok string) (identity.Identity, error) {
-	if tok != "good" {
-		return identity.Identity{}, errors.Join(errors.New("簽章不符"), identity.ErrInvalidToken)
-	}
-	return identity.Identity{Subject: "apple-1", Audience: "io.github.will413028.hawkr.buyer"}, nil
-}
-
-func (fakeApple) Exchange(context.Context, string, string) (identity.AppleGrant, error) {
-	return identity.AppleGrant{RefreshToken: "rt"}, nil
-}
-func (fakeApple) Revoke(context.Context, string, string) error { return nil }
-
-type plainSealer struct{}
-
-func (plainSealer) Seal(p, _ []byte) ([]byte, error) { return p, nil }
-func (plainSealer) Open(c, _ []byte) ([]byte, error) { return c, nil }
-func (plainSealer) Has(string) bool                  { return true }
-
 type fixture struct {
 	url    string
 	m      *identity.Module
@@ -83,7 +62,6 @@ type fixture struct {
 }
 
 type options struct {
-	apple  bool
 	access identity.AdminVerifier
 	// legacy 是轉給舊 gateway 的 handler；nil 時不掛。
 	legacy http.Handler
@@ -109,13 +87,10 @@ func setup(t *testing.T, o options) *fixture {
 	if o.access != nil {
 		providers.Admin = o.access
 	}
-	if o.apple {
-		providers.Apple, providers.AppleTokens, providers.Sealer = fakeApple{}, fakeApple{}, plainSealer{}
-	}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	bus := events.NewBus()
 	m := identity.New(identity.Deps{
-		DB: d, Events: bus, Jobs: jc, Providers: providers,
+		DB: d, Events: bus, Providers: providers,
 		Now: time.Now, Logger: log,
 	})
 	// 與正式組裝相同：buyer 在建帳的 transaction 內建立買家並授予 BUYER（cmd/hawkr 的 subscribeBuyerLifecycle）。
@@ -256,7 +231,7 @@ func TestGetSessionCreatesTheAccountAsABuyer(t *testing.T) {
 
 func TestConnectIgnoresTheOldSessionCookieAndCrossOriginWriteIsDenied(t *testing.T) {
 	t.Parallel()
-	f := setup(t, options{apple: true})
+	f := setup(t, options{})
 	ctx := context.Background()
 	tok := f.customerToken(t, "dev_web")
 	web := f.app(headers("Cookie", "__session="+tok))
@@ -267,10 +242,10 @@ func TestConnectIgnoresTheOldSessionCookieAndCrossOriginWriteIsDenied(t *testing
 		t.Fatalf("Bearer 的 GetSession = %v, %v", s, err)
 	}
 	crossSite := f.app(headers("Authorization", "Bearer "+tok, "Sec-Fetch-Site", "cross-site", "Origin", "https://evil.example"))
-	_, err = crossSite.LinkAppleCredential(ctx, connect.NewRequest(&pb.LinkAppleCredentialRequest{IdToken: "good", AuthorizationCode: "c"}))
+	_, err = crossSite.SignOut(ctx, connect.NewRequest(&pb.SignOutRequest{}))
 	wantCode(t, err, connect.CodePermissionDenied) // CSRF（http.CrossOriginProtection）回 403
 	sameOrigin := f.app(headers("Authorization", "Bearer "+tok, "Sec-Fetch-Site", "same-origin"))
-	if _, err := sameOrigin.LinkAppleCredential(ctx, connect.NewRequest(&pb.LinkAppleCredentialRequest{IdToken: "good", AuthorizationCode: "c"})); err != nil {
+	if _, err := sameOrigin.SignOut(ctx, connect.NewRequest(&pb.SignOutRequest{})); err != nil {
 		t.Fatalf("同源的寫入 = %v", err)
 	}
 }
@@ -429,25 +404,6 @@ func TestAdminSessionAccountListAndSignOut(t *testing.T) {
 	if status != "REVOKED" || reason != "admin_logout" {
 		t.Fatalf("登出後代行狀態 = %s, %s", status, reason)
 	}
-}
-
-func TestLinkAppleCredential(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	f := setup(t, options{})
-	client := f.app(headers("Authorization", "Bearer "+f.customerToken(t, "dev_buyer")))
-	_, err := client.LinkAppleCredential(ctx, connect.NewRequest(&pb.LinkAppleCredentialRequest{IdToken: "good", AuthorizationCode: "c"}))
-	wantCode(t, err, connect.CodeUnavailable)
-
-	f = setup(t, options{apple: true})
-	client = f.app(headers("Authorization", "Bearer "+f.customerToken(t, "dev_buyer")))
-	if _, err := client.LinkAppleCredential(ctx, connect.NewRequest(&pb.LinkAppleCredentialRequest{IdToken: "good", AuthorizationCode: "c"})); err != nil {
-		t.Fatal(err)
-	}
-	_, err = client.LinkAppleCredential(ctx, connect.NewRequest(&pb.LinkAppleCredentialRequest{IdToken: "good"}))
-	wantCode(t, err, connect.CodeInvalidArgument)
-	_, err = client.LinkAppleCredential(ctx, connect.NewRequest(&pb.LinkAppleCredentialRequest{IdToken: "expired", AuthorizationCode: "c"}))
-	wantCode(t, err, connect.CodeInvalidArgument)
 }
 
 func TestEnumsMatchTheModule(t *testing.T) {

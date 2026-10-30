@@ -11,7 +11,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"strings"
 	"time"
 
 	httpidentity "github.com/Will413028/hawkr/backend/internal/httpapi/identity"
@@ -21,7 +20,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
 // identityConfig 是 identity 模組的外部 provider。
@@ -47,8 +45,6 @@ type webClient struct{ id, secret string }
 //     GOOGLE_CLIENT_IDS（vendor portal step-up 驗 ID token 的 aud）無關；兩個都設才啟用，只設一個是設定錯誤。LINE_CHANNEL_ID、
 //     LINE_CHANNEL_SECRET：web 登入（/api/auth/line/*）的 LINE Login channel，同樣整組選填；LINE 的 web ID token 以 channel secret 驗（HS256）。
 //     redirect URI 是 PUBLIC_WEB_ORIGIN 加 /api/auth/{google,line}/callback，要登記在各家的 console。
-//   - APPLE_CLIENT_IDS、APPLE_TEAM_ID、APPLE_KEY_ID、APPLE_PRIVATE_KEY、IDENTITY_TOKEN_KEYS：App 原生登入交來的 Apple 授權碼換成
-//     refresh token 加密保存（LinkAppleCredential），刪帳號時撤銷。整組選填：只設一部分是設定錯誤；全部不設時 LinkAppleCredential 回 unavailable。
 func readIdentityConfig(ctx context.Context, e *config.Env) identityConfig {
 	var c identityConfig
 	if accessConfigured(e) {
@@ -93,43 +89,7 @@ func readIdentityConfig(ctx context.Context, e *config.Env) identityConfig {
 		}
 	}
 	c.googleAppClients = e.List("GOOGLE_APP_CLIENT_IDS")
-	if appleKeys := []string{"APPLE_CLIENT_IDS", "APPLE_TEAM_ID", "APPLE_KEY_ID", "APPLE_PRIVATE_KEY", "IDENTITY_TOKEN_KEYS"}; anySet(e, appleKeys...) {
-		// 設了任何一個就全部必填：只設一部分不會悄悄停用 Apple。
-		c.providers.Apple, c.providers.AppleTokens, c.providers.Sealer = readApple(ctx, e)
-	}
 	return c
-}
-
-// readApple 讀 Sign in with Apple 的設定（全部必填）：ID token 驗證、authorization code 的交換與撤銷、保存 token 的加密。
-func readApple(ctx context.Context, e *config.Env) (identity.IDTokenVerifier, identity.AppleTokens, identity.Sealer) {
-	v, err := identity.NewAppleVerifier(e.List("APPLE_CLIENT_IDS"), ctx)
-	if err != nil {
-		e.Fail("APPLE_CLIENT_IDS：%v", err)
-	}
-	cfg := identity.AppleConfig{
-		TeamID:        e.String("APPLE_TEAM_ID"),
-		KeyID:         e.String("APPLE_KEY_ID"),
-		PrivateKeyPEM: e.String("APPLE_PRIVATE_KEY"),
-		RedirectURIs:  map[string]string{},
-	}
-	for _, kv := range e.List("APPLE_REDIRECT_URIS") {
-		clientID, uri, ok := strings.Cut(kv, "=")
-		if !ok {
-			e.Fail("APPLE_REDIRECT_URIS 的格式是 client_id=redirect_uri，以逗號分隔")
-			continue
-		}
-		cfg.RedirectURIs[clientID] = uri
-	}
-	keys := e.String("IDENTITY_TOKEN_KEYS")
-	tokens, err := identity.NewAppleTokens(cfg)
-	if err != nil {
-		e.Fail("APPLE_PRIVATE_KEY：%v", err)
-	}
-	sealer, err := identity.NewSealer(keys)
-	if err != nil {
-		e.Fail("IDENTITY_TOKEN_KEYS：%v", err)
-	}
-	return v, tokens, sealer
 }
 
 // accessConfigured 是這個環境設定了 Cloudflare Access（正式的後台登入）。DEV_AUTH_KEY_FILE 不能與它同時使用。
@@ -182,9 +142,9 @@ func readDevKey(path string) (*rsa.PrivateKey, error) {
 }
 
 // newIdentity 建立 identity 模組。
-func newIdentity(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, c identityConfig, log *slog.Logger) *identity.Module {
+func newIdentity(d *db.DB, bus *events.Bus, c identityConfig, log *slog.Logger) *identity.Module {
 	return identity.New(identity.Deps{
-		DB: d, Events: bus, Jobs: jc, Providers: c.providers,
+		DB: d, Events: bus, Providers: c.providers,
 		Now: time.Now, Logger: log,
 	})
 }

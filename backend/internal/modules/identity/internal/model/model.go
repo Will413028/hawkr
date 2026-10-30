@@ -78,43 +78,19 @@ type AdminVerifier interface {
 	Verify(ctx context.Context, token string) (AdminIdentity, error)
 }
 
-// Identity 是驗證過的 Google 或 Apple ID token 的內容。
+// Identity 是驗證過的 Google ID token 的內容。
 type Identity struct {
 	Subject       string
 	Email         string
 	EmailVerified bool
-	// Audience 是 token 簽給哪個 client（aud）：Apple 以它換 token 與撤銷。
-	Audience string
 	// Nonce 是 token 的 nonce claim，沒有時是空字串；IssuedAt 是 iat，沒有時是零值。
 	Nonce    string
 	IssuedAt time.Time
 }
 
-// IDTokenVerifier 驗證 Google 或 Apple 的 ID token。token 無效時回傳包著 ErrInvalidToken 的錯誤。
+// IDTokenVerifier 驗證 Google 的 ID token。token 無效時回傳包著 ErrInvalidToken 的錯誤。
 type IDTokenVerifier interface {
 	Verify(ctx context.Context, idToken string) (Identity, error)
-}
-
-// AppleTokens 以 Sign in with Apple 的 authorization code 換 refresh token，並撤銷它。clientID 是 ID token 的 audience。
-type AppleTokens interface {
-	// Exchange 回傳 refresh token 與 Apple 同一次簽發的 ID token。
-	Exchange(ctx context.Context, clientID, authorizationCode string) (AppleGrant, error)
-	Revoke(ctx context.Context, clientID, refreshToken string) error
-}
-
-// AppleGrant 是 authorization code 換得的 token。
-type AppleGrant struct {
-	RefreshToken string
-	IDToken      string
-}
-
-// Sealer 加密排入 job 與保存的第三方憑證（Apple 的 authorization code 與 refresh token）。aad 是密文認證的脈絡（用途與帳號），
-// 解密時必須給同一份，密文搬到別的列、欄或帳號就解不開。密文自帶金鑰 ID，換金鑰之後舊的密文仍解得開。
-type Sealer interface {
-	Seal(plaintext, aad []byte) ([]byte, error)
-	Open(ciphertext, aad []byte) ([]byte, error)
-	// Has 回報金鑰環有沒有這個金鑰 ID。
-	Has(keyID string) bool
 }
 
 // Providers 是外部的 provider。沒有設定的欄位是 nil 或空的。
@@ -123,11 +99,6 @@ type Providers struct {
 	Admin AdminVerifier
 	// Google 驗證 vendor portal step-up 的 ID token（單體入口的 VerifySession）；nil 時回 unavailable。
 	Google IDTokenVerifier
-	// Apple、AppleTokens 與 Sealer 給 Sign in with Apple 的授權碼交換、保存與刪帳時撤銷（LinkAppleCredential）；
-	// 任一個是 nil 時 LinkAppleCredential 回 unavailable，刪帳照常（沒有保存的 token 就沒有東西可撤銷）。
-	Apple       IDTokenVerifier
-	AppleTokens AppleTokens
-	Sealer      Sealer
 }
 
 // Account 是帳號。存活的帳號都是買家；刪除的帳號只留墓碑：沒有 email 與角色。
@@ -288,13 +259,6 @@ type ListAccountsInput struct {
 	Size   int32
 }
 
-// LinkAppleCredentialInput 是交出 Apple 憑證的輸入。
-type LinkAppleCredentialInput struct {
-	AccountID         int64
-	IDToken           string
-	AuthorizationCode string
-}
-
 // AccountCreated 在建帳的 transaction 內發出，訂閱者以相同 transaction 建立業務身分。
 type AccountCreated struct {
 	AccountID int64
@@ -306,15 +270,6 @@ type AccountCreated struct {
 type AccountDeleted struct {
 	AccountID int64
 	DeletedAt time.Time
-}
-
-// AppleConfig 是 Apple 開發者帳號的 Sign in with Apple 金鑰。
-type AppleConfig struct {
-	TeamID        string
-	KeyID         string
-	PrivateKeyPEM string
-	// RedirectURIs 是 web 的 Services ID 授權時用的 redirect URI（換 token 時要帶同一個）。
-	RedirectURIs map[string]string
 }
 
 // AccessConfig 設定後台 Access application 的 JWT 驗證。

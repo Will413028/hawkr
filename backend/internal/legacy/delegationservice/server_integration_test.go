@@ -121,9 +121,8 @@ func setup(t *testing.T) *fixture {
 	}))
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	f.identity = identity.New(identity.Deps{
-		DB: d, Events: bus, Jobs: jc,
-		Providers: identity.Providers{Admin: dev.Admins()},
-		Now:       time.Now, Logger: log,
+		DB: d, Events: bus, Providers: identity.Providers{Admin: dev.Admins()},
+		Now: time.Now, Logger: log,
 	})
 	f.m = delegation.New(delegation.Deps{
 		DB: d, Events: bus, Identity: f.identity, Seller: f.stores,

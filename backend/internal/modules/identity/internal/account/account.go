@@ -347,8 +347,7 @@ func (m *Service) DeleteAccount(ctx context.Context, accountID int64) error {
 }
 
 // deleteAccount 在呼叫方的 transaction 內刪除已鎖定的帳號：解除未解除的停權紀錄（release_reason 為 ACCOUNT_DELETED），刪角色、全部 session 與登入身分，帳號只留沒有個資的墓碑（登入身分留作墓碑，
-// 同一個登入身分不會再建一個帳號），並發出 AccountDeleted。帳號保存的 Sign in with Apple
-// refresh token 在同一個 transaction 內取走並排入撤銷的 job；所有刪除路徑都經過這裡。
+// 同一個登入身分不會再建一個帳號），並發出 AccountDeleted；所有刪除路徑都經過這裡。
 func (m *Service) deleteAccount(ctx context.Context, q *store.Queries, a store.IdentityAccount) error {
 	now := m.d.Now()
 	if a.SuspendedAt != nil {
@@ -369,9 +368,6 @@ func (m *Service) deleteAccount(ctx context.Context, q *store.Queries, a store.I
 	if err := q.ScrubIdentitiesOfAccount(ctx, store.ScrubIdentitiesOfAccountParams{AccountID: a.ID, Now: now}); err != nil {
 		return fmt.Errorf("identity：清除登入身分的個資：%w", err)
 	}
-	if err := m.d.AppleRevoker.RevokeStored(ctx, a.ID); err != nil {
-		return err
-	}
 	m.d.Logger.InfoContext(ctx, "identity：刪除帳號", "account_id", a.ID)
 	return events.Publish(ctx, m.d.Events, model.AccountDeleted{AccountID: a.ID, DeletedAt: now})
 }
@@ -379,15 +375,8 @@ func (m *Service) deleteAccount(ctx context.Context, q *store.Queries, a store.I
 type Deps struct {
 	DB     *db.DB
 	Events *events.Bus
-	// AppleRevoker 在刪除帳號的 transaction 內排入撤銷保存的 Apple token；必填。
-	AppleRevoker AppleRevoker
-	Now          func() time.Time
-	Logger       *slog.Logger
-}
-
-// AppleRevoker 取走帳號保存的 Apple refresh token 並排入撤銷；沒有保存時什麼都不做。
-type AppleRevoker interface {
-	RevokeStored(ctx context.Context, accountID int64) error
+	Now    func() time.Time
+	Logger *slog.Logger
 }
 
 type Service struct{ d Deps }

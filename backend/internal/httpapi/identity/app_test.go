@@ -90,10 +90,6 @@ func (m *appModule) Account(context.Context, int64) (identity.Account, error) {
 	return identity.Account{}, nil
 }
 
-func (m *appModule) LinkAppleCredential(context.Context, identity.LinkAppleCredentialInput) error {
-	return nil
-}
-
 // appVerifier 驗證 ID token：只有 "good-token" 有效，nonce 必須等於 wantNonce。
 type appVerifier struct {
 	p        identity.Provider

@@ -15,7 +15,6 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/identity/internal/account"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity/internal/admin"
-	"github.com/Will413028/hawkr/backend/internal/modules/identity/internal/applerevoke"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity/internal/auth"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity/internal/login"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity/internal/model"
@@ -23,7 +22,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
 //go:embed db/migrations/*.sql db/migrations/atlas.sum
@@ -42,8 +40,7 @@ func Migrations() fs.FS {
 type Deps struct {
 	DB     *db.DB
 	Events *events.Bus
-	Jobs   jobs.Enqueuer
-	// Providers 是外部的 Access、Google 與 Apple；沒有設定的欄位是 nil，對應的功能回 unavailable。
+	// Providers 是外部的 Access 與 Google；沒有設定的欄位是 nil，對應的功能回 unavailable。
 	Providers Providers
 	// Now 是目前時間；測試注入固定值。
 	Now    func() time.Time
@@ -68,22 +65,13 @@ type AdminIdentity = model.AdminIdentity
 // AdminVerifier 驗證後台 Access 或 dev token。
 type AdminVerifier = model.AdminVerifier
 
-// Identity 是驗證過的 Google 或 Apple ID token 資料。
+// Identity 是驗證過的 Google ID token 資料。
 type Identity = model.Identity
 
-// IDTokenVerifier 驗證 Google 或 Apple 的 ID token。
+// IDTokenVerifier 驗證 Google 的 ID token。
 type IDTokenVerifier = model.IDTokenVerifier
 
-// AppleTokens 交換並撤銷 Sign in with Apple token。
-type AppleTokens = model.AppleTokens
-
-// AppleGrant 是 authorization code 換得的 token。
-type AppleGrant = model.AppleGrant
-
-// Sealer 加密排入 job 的第三方憑證。
-type Sealer = model.Sealer
-
-// Providers 是模組的外部身分與 Apple provider。
+// Providers 是模組的外部身分 provider。
 type Providers = model.Providers
 
 // Account 是帳號，已刪除時只保留墓碑。
@@ -136,9 +124,6 @@ type GrantRoleInput = model.GrantRoleInput
 
 // ListAccountsInput 是帳號清單的篩選與分頁輸入。
 type ListAccountsInput = model.ListAccountsInput
-
-// LinkAppleCredentialInput 是交出 Apple 憑證的輸入。
-type LinkAppleCredentialInput = model.LinkAppleCredentialInput
 
 const (
 	RoleSeller               = model.RoleSeller
@@ -223,22 +208,17 @@ func Roles() []Role { return model.Roles() }
 
 // Module 是 identity 模組。
 type Module struct {
-	account     *account.Service
-	admin       *admin.Service
-	auth        *auth.Service
-	session     *session.Service
-	login       *login.Service
-	applerevoke *applerevoke.Service
+	account *account.Service
+	admin   *admin.Service
+	auth    *auth.Service
+	session *session.Service
+	login   *login.Service
 }
 
 // New 建立模組。
 func New(d Deps) *Module {
-	ar := applerevoke.New(applerevoke.Deps{
-		DB: d.DB, Jobs: d.Jobs, Apple: d.Providers.Apple,
-		AppleTokens: d.Providers.AppleTokens, Sealer: d.Providers.Sealer, Now: d.Now, Logger: d.Logger,
-	})
 	a := account.New(account.Deps{
-		DB: d.DB, Events: d.Events, AppleRevoker: ar,
+		DB: d.DB, Events: d.Events,
 		Now: d.Now, Logger: d.Logger,
 	})
 	sess := session.New(session.Deps{DB: d.DB, Now: d.Now, Logger: d.Logger})
@@ -251,7 +231,6 @@ func New(d Deps) *Module {
 			DB: d.DB, Sessions: sess, Admin: d.Providers.Admin,
 			Google: d.Providers.Google, Now: d.Now, Logger: d.Logger,
 		}),
-		applerevoke: ar,
 	}
 }
 
@@ -437,24 +416,6 @@ func (m *Module) DevNewSession(ctx context.Context) (int64, string, error) {
 // 以 email 授權的呼叫方必須自己檢查。無效 token、nonce 不符與 token 太舊回 KindUnauthenticated；未設定 provider 或讀不到公鑰回 KindUnavailable。
 func (m *Module) VerifyGoogle(ctx context.Context, idToken, wantNonce string) (Identity, error) {
 	return m.auth.VerifyGoogle(ctx, idToken, wantNonce)
-}
-
-// LinkAppleCredential 接收 App 原生登入 Apple 後交來的憑證（App Store 5.1.1(v)）：驗證 identity token，把它的 sub、
-// audience 與加密的 authorization code 排入 job；job 換 refresh token，Apple 同一次簽發的 ID token 與連結時驗證的身分相同
-// 才加密保存。帳號最終刪除時在同一個 transaction 內排入撤銷（單體 ADR D5：外部呼叫在 transaction 外）。
-func (m *Module) LinkAppleCredential(ctx context.Context, in LinkAppleCredentialInput) error {
-	return m.applerevoke.LinkAppleCredential(ctx, in)
-}
-
-// CheckAppleKeys 是啟動檢查：保存的 Apple token 密文用到的每一把金鑰都要在 IDENTITY_TOKEN_KEYS 的金鑰環裡（serve 與
-// worker 啟動時呼叫）；沒有設定 Apple 時略過。
-func (m *Module) CheckAppleKeys(ctx context.Context) error {
-	return m.applerevoke.CheckKeys(ctx)
-}
-
-// AddWorkers 登記本模組的 job worker。
-func (m *Module) AddWorkers(w *river.Workers) {
-	m.applerevoke.AddWorkers(w)
 }
 
 // PeriodicJobs 回傳本模組的排程 job；目前沒有。

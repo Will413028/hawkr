@@ -166,7 +166,7 @@ func setup(t *testing.T) *fixture {
 	}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	bus := events.NewBus()
-	id := identity.New(identity.Deps{DB: d, Events: bus, Jobs: queue, Providers: identity.Providers{Admin: dev.Admins()}, Now: time.Now, Logger: log})
+	id := identity.New(identity.Deps{DB: d, Events: bus, Providers: identity.Providers{Admin: dev.Admins()}, Now: time.Now, Logger: log})
 	adminToken, err := dev.AdminToken("dev_admin_connect")
 	if err != nil {
 		t.Fatal(err)

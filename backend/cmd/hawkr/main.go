@@ -207,17 +207,13 @@ func runServe(ctx context.Context) error {
 	events.Subscribe(bus, accountservice.OnAccountDeleted(enqueueLegacy))
 	events.Subscribe(bus, delegationservice.OnDelegationOperationCompleted(enqueueLegacy))
 	subscribeBuyerEvents(bus, jc)
-	id := newIdentity(d, bus, jc, idc, log)
+	id := newIdentity(d, bus, idc, log)
 	webLogin, err := newWebLogin(verifierCtx, id, web, idc, log)
 	if err != nil {
 		return err
 	}
 	appLogin, err := newAppLogin(verifierCtx, id, idc)
 	if err != nil {
-		return err
-	}
-	// 保存的 Apple token 用到的金鑰都要在 IDENTITY_TOKEN_KEYS 裡，缺了就不啟動。
-	if err := id.CheckAppleKeys(ctx); err != nil {
 		return err
 	}
 	buyerModule := buyer.New(buyer.Deps{
@@ -371,19 +367,13 @@ func runWorker(ctx context.Context) error {
 		return err
 	}
 
-	// identity 的 job（撤銷 Apple 的授權）在 worker 執行；排入在 serve，撤銷 Apple 的第二段
-	// 由 worker 自己排入。
 	jc, err := jobs.NewInsertOnly(d)
 	if err != nil {
 		return err
 	}
 	bus := events.NewBus()
 	subscribeBuyerEvents(bus, jc)
-	id := newIdentity(d, bus, jc, idc, log)
-	// 保存的 Apple token 用到的金鑰都要在 IDENTITY_TOKEN_KEYS 裡，缺了就不啟動。
-	if err := id.CheckAppleKeys(ctx); err != nil {
-		return err
-	}
+	id := newIdentity(d, bus, idc, log)
 	med, err := mediaservice.New(mediaCfg)
 	if err != nil {
 		return err
@@ -426,7 +416,6 @@ func runWorker(ctx context.Context) error {
 	contentModule := content.New(content.Deps{DB: d, Media: med, Jobs: jc, NewID: uuid.NewV7, Now: time.Now, Logger: log})
 	workers := river.NewWorkers()
 	river.AddWorker(workers, revalidate.NewWorker(rv, log))
-	id.AddWorkers(workers)
 	contentModule.AddWorkers(workers)
 	buyerModule.AddWorkers(workers)
 	sellerModule.AddWorkers(workers)

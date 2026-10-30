@@ -101,7 +101,7 @@ func EnvTokens(t *testing.T) map[Caller]string {
 	return tokens
 }
 
-// BuyerSession 為 dev 買家在 m 建一個 session 並回傳 token（帳號沒有時建立）。
+// BuyerSession 每次為 m 建一個新的 dev 買家帳號與它的 session，回傳 token。
 func BuyerSession(t *testing.T, m *identity.Module) string {
 	t.Helper()
 	_, tok, err := m.DevNewSession(t.Context())

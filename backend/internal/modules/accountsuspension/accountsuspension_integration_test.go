@@ -89,7 +89,7 @@ func setup(t *testing.T) *fixture {
 	bus := events.NewBus()
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	q := testQueue{}
-	id := identity.New(identity.Deps{DB: d, Events: bus, Jobs: q, Now: time.Now, Logger: log})
+	id := identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
 	b := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: q, Now: time.Now, Logger: log})
 	kycKeys, kycMAC := sealtest.Keys(t)
 	sl := seller.New(seller.Deps{KYCKeys: kycKeys, KYCMAC: kycMAC, DB: d, Events: bus, Jobs: q, Identity: id, Media: testMedia{}, Orders: noOrders{}, ProductStores: noProducts{}, Registry: noRegistry{}, Now: time.Now, Logger: log})

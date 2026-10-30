@@ -26,8 +26,6 @@ const (
 	GoogleIssuer         = "https://accounts.google.com"
 	GoogleIssuerNoScheme = "accounts.google.com"
 	GoogleJWKS           = "https://www.googleapis.com/oauth2/v3/certs"
-	AppleIssuer          = "https://appleid.apple.com"
-	AppleJWKS            = "https://appleid.apple.com/auth/keys"
 	LineJWKS             = "https://api.line.me/oauth2/v2.1/certs"
 	fetchTimeout         = 5 * time.Second
 	minRefreshInterval   = time.Minute
@@ -62,7 +60,7 @@ type Claims struct {
 	EmailVerified bool
 	// Audience 是 token 的 aud 裡被接受的那一個。
 	Audience string
-	// Name 是使用者的姓名（Google 的 name）；Apple 的 token 沒有。
+	// Name 是使用者的姓名（Google 的 name）；沒有時是空字串。
 	Name string
 	// HostedDomain 是 Google 的 hd claim（Workspace 網域），沒有時是空字串。
 	HostedDomain string

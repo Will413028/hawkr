@@ -59,7 +59,7 @@ func TestClerkEnvironmentIsNotRead(t *testing.T) {
 			if c.providers.Admin == nil {
 				t.Error("DEV_AUTH_KEY_FILE 的後台 dev 登入被 CLERK_ 的設定關掉")
 			}
-			if c.providers.Apple != nil || c.providers.Google != nil || len(c.webLogin) != 0 || len(c.googleAppClients) != 0 {
+			if c.providers.Google != nil || len(c.webLogin) != 0 || len(c.googleAppClients) != 0 {
 				t.Errorf("CLERK_ 的設定啟用了其他登入：%+v", c)
 			}
 		})
@@ -92,14 +92,39 @@ func TestDevAuthKeyFileExcludesAccess(t *testing.T) {
 	}
 }
 
-func TestAppleConfigIsAllOrNothing(t *testing.T) {
-	env := config.FromMap(map[string]string{})
-	if c := readIdentityConfig(context.Background(), env); c.providers.Apple != nil || env.Err() != nil {
-		t.Fatalf("沒有設定（本機開發）：%v %v", c.providers.Apple, env.Err())
+// 不提供 Sign in with Apple（計畫 2026-10-30-self-hosted-auth 前提段）：設定表裡沒有 APPLE_ 與 IDENTITY_TOKEN_KEYS 的鍵，設了也不啟用
+// 任何東西、不算設定錯誤（舊的 .env 還留著也能啟動），更不影響 DEV_AUTH_KEY_FILE。
+func TestAppleEnvironmentIsNotRead(t *testing.T) {
+	keyFile := writeDevKey(t)
+	appleEnv := map[string]string{ //nolint:gosec // G101：假的設定值，不是憑證
+		"APPLE_CLIENT_IDS":    "com.example.buyer",
+		"APPLE_TEAM_ID":       "TEAM",
+		"APPLE_KEY_ID":        "KEY",
+		"APPLE_PRIVATE_KEY":   "not a pem",
+		"APPLE_REDIRECT_URIS": "web=https://example.com/cb",
+		"IDENTITY_TOKEN_KEYS": "k1:not-base64",
 	}
-	env = config.FromMap(map[string]string{"APPLE_TEAM_ID": "TEAM"})
-	readIdentityConfig(context.Background(), env)
-	if env.Err() == nil {
-		t.Fatal("只設一部分 Apple 設定必須失敗，不能悄悄停用")
+	cases := map[string]map[string]string{"全部": appleEnv}
+	for k, v := range appleEnv {
+		cases["只有 "+k] = map[string]string{k: v}
+	}
+	for name, apple := range cases {
+		t.Run(name, func(t *testing.T) {
+			m := map[string]string{"DEV_AUTH_KEY_FILE": keyFile}
+			for k, v := range apple {
+				m[k] = v
+			}
+			env := config.FromMap(m)
+			c := readIdentityConfig(context.Background(), env)
+			if err := env.Err(); err != nil {
+				t.Fatalf("APPLE_ 的環境變數不該影響設定：%v", err)
+			}
+			if c.providers.Admin == nil {
+				t.Error("DEV_AUTH_KEY_FILE 的後台 dev 登入被 APPLE_ 的設定關掉")
+			}
+			if c.providers.Google != nil || len(c.webLogin) != 0 || len(c.googleAppClients) != 0 {
+				t.Errorf("APPLE_ 的設定啟用了其他登入：%+v", c)
+			}
+		})
 	}
 }

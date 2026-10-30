@@ -36,7 +36,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
@@ -143,15 +142,11 @@ func TestVendorPortalFromInviteToTheGateway(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(migrate.Module{Name: "identity", Dir: identity.Migrations()}, migrate.Module{Name: "agent", Dir: agent.Migrations()}))
-	jc, err := jobs.NewInsertOnly(d)
-	if err != nil {
-		t.Fatal(err)
-	}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	now := func() time.Time { return clock }
 	agents := agent.New(agent.Deps{DB: d, Prospects: prospects{email: "vendor@example.com"}, Now: now})
 	id := identity.New(identity.Deps{
-		DB: d, Events: events.NewBus(), Jobs: jc, Now: now, Logger: log,
+		DB: d, Events: events.NewBus(), Now: now, Logger: log,
 		Providers: identity.Providers{Google: googleDouble{}},
 	})
 	inviteA, err := agents.EnsureInvite(ctx, agent.EnsureInviteInput{ProspectID: 7, RfqRecipientID: 42, ExpiresAt: clock.Add(24 * time.Hour)})

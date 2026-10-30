@@ -225,7 +225,7 @@ func TestGETOnAWriteProcedureNeverReachesTheHandler(t *testing.T) {
 		"cookie": func(r *http.Request) { r.AddCookie(&http.Cookie{Name: rpc.SessionCookie, Value: "good"}) },
 		"Bearer": func(r *http.Request) { r.Header.Set("Authorization", "Bearer good") },
 	}
-	for _, procedure := range []string{"DeleteAccount", "LinkAppleCredential", "SignOut", "LinkIdentity", "RevokeSession"} {
+	for _, procedure := range []string{"DeleteAccount", "SignOut", "LinkIdentity", "RevokeSession"} {
 		for name, credential := range credentials {
 			r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path+procedure+"?connect=v1&encoding=json&message=%7B%7D", nil)
 			credential(r)

@@ -252,7 +252,7 @@ func setupWeb(t *testing.T) *webFixture {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	bus := events.NewBus()
 	clock := &testClock{t: time.Now()}
-	m := identity.New(identity.Deps{DB: d, Events: bus, Jobs: jc, Providers: identity.Providers{Admin: dev.Admins()}, Now: clock.Now, Logger: log})
+	m := identity.New(identity.Deps{DB: d, Events: bus, Providers: identity.Providers{Admin: dev.Admins()}, Now: clock.Now, Logger: log})
 	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: jc, Now: time.Now, Logger: log})
 	events.Subscribe(bus, buyers.OnAccountCreated)
 	del := delegation.New(delegation.Deps{DB: d, Identity: m, Events: bus, Seller: &seller.Module{}, Now: time.Now, Logger: log})
@@ -748,7 +748,7 @@ func TestCookieAuthenticatedWritesRequireSameOrigin(t *testing.T) {
 	tok := setCookie(cb, rpc.SessionCookie).Value
 	post := func(header ...string) (int, string) {
 		t.Helper()
-		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, f.url+identityv1alpha1connect.IdentityAppServiceLinkAppleCredentialProcedure, strings.NewReader("{}"))
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, f.url+identityv1alpha1connect.IdentityAppServiceRevokeSessionProcedure, strings.NewReader("{}"))
 		if err != nil {
 			t.Fatal(err)
 		}

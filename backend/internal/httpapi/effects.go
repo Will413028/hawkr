@@ -56,7 +56,6 @@ var customerEffects = map[string]Effect{
 
 	// IdentityAppService
 	"/hawkr.identity.v1alpha1.IdentityAppService/GetSession":           EffectRead,
-	"/hawkr.identity.v1alpha1.IdentityAppService/LinkAppleCredential":  EffectWrite,
 	"/hawkr.identity.v1alpha1.IdentityAppService/DeleteAccount":        EffectSelfService,
 	"/hawkr.identity.v1alpha1.IdentityAppService/SignOut":              EffectSelfService,
 	"/hawkr.identity.v1alpha1.IdentityAppService/LinkIdentity":         EffectSelfService,

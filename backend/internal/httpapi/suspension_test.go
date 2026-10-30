@@ -111,7 +111,6 @@ func reasonOf(t *testing.T, body []byte) (code, reason string) {
 const (
 	procGetSession      = "/hawkr.identity.v1alpha1.IdentityAppService/GetSession"
 	procDeleteAccount   = "/hawkr.identity.v1alpha1.IdentityAppService/DeleteAccount"
-	procLinkApple       = "/hawkr.identity.v1alpha1.IdentityAppService/LinkAppleCredential"
 	procGetProfile      = "/hawkr.buyer.v1alpha1.BuyerAppService/GetProfile"
 	procAddFavorite     = "/hawkr.buyer.v1alpha1.BuyerAppService/AddFavorite"
 	procSubmitFoodSafe  = "/hawkr.seller.v1alpha1.SellerReportPublicService/SubmitFoodSafetyReport"
@@ -129,7 +128,7 @@ func TestSuspendedAccountIsAuthorizedByTheNatureOfTheAction(t *testing.T) {
 			t.Fatalf("%s：%d %+v，預期放行、帶 principal 與停權時間", proc, rec.Code, s)
 		}
 	}
-	for _, proc := range []string{procAddFavorite, procLinkApple} {
+	for _, proc := range []string{procAddFavorite} {
 		rec, s := callAs(t, h, "suspended", http.MethodPost, proc)
 		code, reason := reasonOf(t, rec.Body.Bytes())
 		if rec.Code != http.StatusForbidden || code != "permission_denied" || reason != "ACCOUNT_SUSPENDED" || s.Called {
@@ -152,7 +151,7 @@ func TestSuspendedAccountIsAuthorizedByTheNatureOfTheAction(t *testing.T) {
 // 沒有停權的帳號不受影響：寫入照樣到 handler，ctx 沒有停權時間。
 func TestNonSuspendedAccountIsNotRestricted(t *testing.T) {
 	h := suspendedEntry()
-	for _, proc := range []string{procGetSession, procAddFavorite, procLinkApple, procDeleteAccount} {
+	for _, proc := range []string{procGetSession, procAddFavorite, procDeleteAccount} {
 		rec, s := callAs(t, h, "good", http.MethodPost, proc)
 		if rec.Code != http.StatusOK || !s.Principal || s.Suspended {
 			t.Fatalf("%s：%d %+v", proc, rec.Code, s)

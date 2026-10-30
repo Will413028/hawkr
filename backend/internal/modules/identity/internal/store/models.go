@@ -82,14 +82,6 @@ type IdentityAppLoginNonce struct {
 	ExpiresAt time.Time
 }
 
-type IdentityAppleToken struct {
-	AccountID int64
-	ClientID  string
-	Token     []byte
-	CreatedAt time.Time
-	UpdatedAt time.Time
-}
-
 type IdentityLoginFlow struct {
 	StateHash     []byte
 	Provider      string

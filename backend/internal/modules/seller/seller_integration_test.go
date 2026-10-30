@@ -195,7 +195,7 @@ func setup(t *testing.T) *fixture {
 	))
 	f := &fixture{db: d, bus: events.NewBus(), jobs: &queue{}, media: newImages(), payuni: &fakePayUni{t: t}, orders: &storeOrders{}, products: &fakeProductStores{}, registry: &fakeRegistry{t: t}, now: time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	f.identity = identity.New(identity.Deps{DB: d, Events: f.bus, Jobs: f.jobs, Now: func() time.Time { return f.now }, Logger: log})
+	f.identity = identity.New(identity.Deps{DB: d, Events: f.bus, Now: func() time.Time { return f.now }, Logger: log})
 	f.module = f.newModule(t, f.payuni, f.jobs)
 	return f
 }

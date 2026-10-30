@@ -3,7 +3,6 @@
 package identity_test
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -22,7 +21,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/riverqueue/river"
 
 	. "github.com/Will413028/hawkr/backend/internal/modules/identity"
 
@@ -30,7 +28,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
@@ -71,103 +68,30 @@ func (a *fakeAdmin) Verify(_ context.Context, tok string) (AdminIdentity, error)
 	return u, nil
 }
 
-// fakeVerifier 以 token 查表回傳 Apple 的身分；"bad" 是無效的 token，"down" 表示 Apple 沒有回應。
-type fakeVerifier struct{ ids map[string]Identity }
-
-func (v *fakeVerifier) Verify(_ context.Context, tok string) (Identity, error) {
-	switch tok {
-	case "bad":
-		return Identity{}, errors.Join(errors.New("簽章不符"), ErrInvalidToken)
-	case "down":
-		return Identity{}, errors.New("抓不到 JWKS")
-	}
-	id, ok := v.ids[tok]
-	if !ok {
-		return Identity{}, ErrInvalidToken
-	}
-	return id, nil
-}
-
-type revokeCall struct{ clientID, token string }
-
-// fakeAppleTokens 以 code 換出 "rt-"+code；code 是 "fail" 時 Apple 拒絕（過期或已用過）；revokeErr 是撤銷的結果。
-type fakeAppleTokens struct {
-	mu        sync.Mutex
-	exchanged []string
-	revoked   []revokeCall
-	revokeErr error
-}
-
-func (a *fakeAppleTokens) Exchange(_ context.Context, _, code string) (AppleGrant, error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.exchanged = append(a.exchanged, code)
-	if code == "fail" {
-		return AppleGrant{}, errors.Join(errors.New("invalid_grant"), ErrRejected)
-	}
-	return AppleGrant{RefreshToken: "rt-" + code, IDToken: "id-" + code}, nil
-}
-
-func (a *fakeAppleTokens) Revoke(_ context.Context, clientID, tok string) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if a.revokeErr != nil {
-		return a.revokeErr
-	}
-	a.revoked = append(a.revoked, revokeCall{clientID, tok})
-	return nil
-}
-
-// fakeSealer 可逆地「加密」：前面加上標記，讓測試看得出排入 job 的不是明文。
-type fakeSealer struct{}
-
-func (fakeSealer) Seal(p, aad []byte) ([]byte, error) {
-	return append([]byte("sealed:"+string(aad)+":"), p...), nil
-}
-
-func (fakeSealer) Open(c, aad []byte) ([]byte, error) {
-	prefix := []byte("sealed:" + string(aad) + ":")
-	if !bytes.HasPrefix(c, prefix) {
-		return nil, errors.New("不是密文或脈絡不符")
-	}
-	return bytes.TrimPrefix(c, prefix), nil
-}
-
-// Has：fakeSealer 認得金鑰 "k1"（fakeSealer 的密文不帶金鑰 ID，啟動檢查只看資料庫參照的 ID）。
-func (fakeSealer) Has(id string) bool { return id == "k1" }
-
 const adminIssuer = "https://team.cloudflareaccess.test"
 
 type fixture struct {
-	m           *Module
-	deps        Deps
-	db          *db.DB
-	now         time.Time
-	emails      map[string]string // f.account 建帳時用的 email，鍵是使用者（登入身分的 subject）
-	admins      *fakeAdmin
-	apple       *fakeVerifier
-	appleTokens *fakeAppleTokens
-	deleted     []AccountDeleted
-	createdMu   sync.Mutex
-	sessionSeq  atomic.Int64
-	created     []AccountCreated // 已 commit 與回滾的建帳事件都會記下；只在建帳成功時斷言
+	m          *Module
+	deps       Deps
+	db         *db.DB
+	now        time.Time
+	emails     map[string]string // f.account 建帳時用的 email，鍵是使用者（登入身分的 subject）
+	admins     *fakeAdmin
+	deleted    []AccountDeleted
+	createdMu  sync.Mutex
+	sessionSeq atomic.Int64
+	created    []AccountCreated // 已 commit 與回滾的建帳事件都會記下；只在建帳成功時斷言
 }
 
 // setup 起一個只套用了本模組 migration 的空 database：integration 測試只跑在自己的 schema 上。
 func setup(t *testing.T) *fixture {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(migrate.Module{Name: "identity", Dir: Migrations()}))
-	jc, err := jobs.NewInsertOnly(d)
-	if err != nil {
-		t.Fatal(err)
-	}
 	f := &fixture{
-		db:          d,
-		now:         time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC),
-		emails:      map[string]string{},
-		admins:      &fakeAdmin{issuer: adminIssuer, users: map[string]AdminIdentity{}},
-		apple:       &fakeVerifier{ids: map[string]Identity{}},
-		appleTokens: &fakeAppleTokens{},
+		db:     d,
+		now:    time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC),
+		emails: map[string]string{},
+		admins: &fakeAdmin{issuer: adminIssuer, users: map[string]AdminIdentity{}},
 	}
 	bus := events.NewBus()
 	events.Subscribe(bus, func(_ context.Context, e AccountDeleted) error {
@@ -183,10 +107,8 @@ func setup(t *testing.T) *fixture {
 	f.deps = Deps{
 		DB:     d,
 		Events: bus,
-		Jobs:   jc,
 		Providers: Providers{
 			Admin: f.admins,
-			Apple: f.apple, AppleTokens: f.appleTokens, Sealer: fakeSealer{},
 		},
 		Now:    func() time.Time { return f.now },
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -284,80 +206,6 @@ func (f *fixture) jobKinds(t *testing.T) []string {
 		out = append(out, k)
 	}
 	return out
-}
-
-// lastJobArgs 讀最新一個 kind 的 job 的參數。
-func lastJobArgs[T any](t *testing.T, f *fixture, kind string) T {
-	t.Helper()
-	var raw []byte
-	if err := f.db.Pool().QueryRow(context.Background(),
-		`SELECT args FROM river.river_job WHERE kind = $1 ORDER BY id DESC LIMIT 1`, kind).Scan(&raw); err != nil {
-		t.Fatalf("沒有排入 %s：%v", kind, err)
-	}
-	var args T
-	if err := json.Unmarshal(raw, &args); err != nil {
-		t.Fatal(err)
-	}
-	return args
-}
-
-type exchangeAppleCodeJobArgs struct {
-	AccountID int64  `json:"account_id"`
-	ClientID  string `json:"client_id"`
-	Subject   string `json:"subject"`
-	Code      []byte `json:"code"`
-}
-
-type revokeAppleTokenJobArgs struct {
-	AccountID int64  `json:"account_id"`
-	ClientID  string `json:"client_id"`
-	Token     []byte `json:"token"`
-}
-
-// runWorkers 起真的 River worker，直到 ctx 結束；done 在每輪輪詢到條件成立時回 true。
-func (f *fixture) runWorkers(t *testing.T, done func() bool) {
-	t.Helper()
-	workers := river.NewWorkers()
-	f.m.AddWorkers(workers)
-	c, err := jobs.NewWorker(f.db, workers, map[string]int{river.QueueDefault: 2}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	stopped := make(chan error, 1)
-	go func() { stopped <- c.Run(ctx) }()
-	defer func() {
-		cancel()
-		if err := <-stopped; err != nil {
-			t.Errorf("worker 停止：%v", err)
-		}
-	}()
-	deadline := time.Now().Add(30 * time.Second)
-	for !done() {
-		if time.Now().After(deadline) {
-			t.Fatal("job 沒有在時限內完成")
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-}
-
-func (f *fixture) storedAppleToken(t *testing.T, id int64) (clientID string, token []byte, ok bool) {
-	t.Helper()
-	err := f.db.Pool().QueryRow(context.Background(),
-		`SELECT client_id, token FROM identity.apple_tokens WHERE account_id = $1`, id).Scan(&clientID, &token)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return "", nil, false
-	}
-	if err != nil {
-		t.Fatal(err)
-	}
-	return clientID, token, true
-}
-
-func (f *fixture) appleCalls() (exchanged []string, revoked []revokeCall) {
-	f.appleTokens.mu.Lock()
-	defer f.appleTokens.mu.Unlock()
-	return slices.Clone(f.appleTokens.exchanged), slices.Clone(f.appleTokens.revoked)
 }
 
 func TestAuthenticationErrors(t *testing.T) {
@@ -525,231 +373,6 @@ func TestAdminsAreCreatedForAccessSubjects(t *testing.T) {
 	}
 	_, err = f.m.Admin(ctx, 999)
 	wantKind(t, err, apperr.KindNotFound)
-}
-
-// sealedToken 是 fakeSealer 對帳號保存的 token 的密文（內容與 AAD 都看得出來）。
-func sealedToken(accountID int64, plain string) string {
-	return "sealed:identity.apple_tokens|token|" + strconv.FormatInt(accountID, 10) + ":" + plain
-}
-
-func TestLinkAppleCredentialVerifiesTheIDToken(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	id := f.account(t, "user_1")
-	f.apple.ids["a1"] = Identity{Subject: "apple-1", Audience: "io.github.will413028.hawkr.buyer"}
-	link := func(tok, code string) error {
-		return f.m.LinkAppleCredential(ctx, LinkAppleCredentialInput{AccountID: id, IDToken: tok, AuthorizationCode: code})
-	}
-
-	wantKind(t, link("bad", "code-1"), apperr.KindInvalidInput)
-	wantKind(t, link("a1", ""), apperr.KindInvalidInput)
-	wantKind(t, link("down", "code-1"), apperr.KindUnavailable)
-	var queued int
-	if err := f.db.Pool().QueryRow(ctx, `SELECT count(*) FROM river.river_job WHERE kind = 'identity.exchange_apple_code'`).Scan(&queued); err != nil || queued != 0 {
-		t.Fatalf("被拒絕的請求排入了 %d 個 job（%v）", queued, err)
-	}
-
-	if err := link("a1", "code-1"); err != nil {
-		t.Fatal(err)
-	}
-	if exchanged, _ := f.appleCalls(); len(exchanged) != 0 {
-		t.Fatal("請求內不該呼叫 Apple")
-	}
-	args := lastJobArgs[exchangeAppleCodeJobArgs](t, f, "identity.exchange_apple_code")
-	wantCode := "sealed:identity.exchange_apple_code|code|" + strconv.FormatInt(id, 10) + ":code-1"
-	if args.AccountID != id || args.ClientID != "io.github.will413028.hawkr.buyer" || args.Subject != "apple-1" || string(args.Code) != wantCode {
-		t.Fatalf("job 的參數 = %+v", args)
-	}
-	f.deps.Providers.AppleTokens = nil
-	f.m = New(f.deps)
-	wantKind(t, link("a1", "code-1"), apperr.KindUnavailable)
-}
-
-// 連結、換 token、保存（加密、取代舊的）、最終刪除時撤銷並刪列的完整流程。
-func TestAppleTokenIsStoredReplacedAndRevokedOnDeletion(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	id := f.account(t, "user_1")
-	f.apple.ids["a1"] = Identity{Subject: "apple-1", Audience: "io.github.will413028.hawkr.buyer"}
-	f.apple.ids["id-code-1"] = f.apple.ids["a1"]
-	f.apple.ids["id-code-2"] = f.apple.ids["a1"]
-	link := func(code string) {
-		t.Helper()
-		if err := f.m.LinkAppleCredential(ctx, LinkAppleCredentialInput{AccountID: id, IDToken: "a1", AuthorizationCode: code}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	storedIs := func(want string) func() bool {
-		return func() bool {
-			_, tok, ok := f.storedAppleToken(t, id)
-			return ok && string(tok) == want
-		}
-	}
-
-	link("code-1")
-	f.runWorkers(t, storedIs(sealedToken(id, "rt-code-1")))
-	if cid, _, _ := f.storedAppleToken(t, id); cid != "io.github.will413028.hawkr.buyer" {
-		t.Fatalf("client_id = %q", cid)
-	}
-	link("code-2") // 重新連結取代
-	f.runWorkers(t, storedIs(sealedToken(id, "rt-code-2")))
-	var rows int
-	if err := f.db.Pool().QueryRow(ctx, `SELECT count(*) FROM identity.apple_tokens`).Scan(&rows); err != nil || rows != 1 {
-		t.Fatalf("保存了 %d 筆（%v）", rows, err)
-	}
-	if _, revoked := f.appleCalls(); len(revoked) != 0 {
-		t.Fatalf("刪除之前不該撤銷：%+v", revoked)
-	}
-
-	// 刪除帳號：同一個 transaction 內刪列並排入撤銷；transaction 回滾時兩者都不發生。
-	rollback := errors.New("rollback")
-	err := f.db.InTx(ctx, func(ctx context.Context) error {
-		if err := f.m.DeleteAccount(ctx, id); err != nil {
-			return err
-		}
-		return rollback
-	})
-	if !errors.Is(err, rollback) {
-		t.Fatal(err)
-	}
-	if _, _, ok := f.storedAppleToken(t, id); !ok {
-		t.Fatal("回滾之後 token 應該還在")
-	}
-	if err := f.db.Pool().QueryRow(ctx, `SELECT count(*) FROM river.river_job WHERE kind = 'identity.revoke_apple_token'`).Scan(&rows); err != nil || rows != 0 {
-		t.Fatalf("回滾之後排入了 %d 個撤銷 job（%v）", rows, err)
-	}
-	if err := f.m.DeleteAccount(ctx, id); err != nil {
-		t.Fatal(err)
-	}
-	if _, _, ok := f.storedAppleToken(t, id); ok {
-		t.Fatal("刪除之後不該留著 token")
-	}
-	queued := lastJobArgs[revokeAppleTokenJobArgs](t, f, "identity.revoke_apple_token")
-	if queued.AccountID != id || queued.ClientID != "io.github.will413028.hawkr.buyer" || string(queued.Token) != sealedToken(id, "rt-code-2") {
-		t.Fatalf("撤銷 job = %+v", queued)
-	}
-	f.runWorkers(t, func() bool { _, r := f.appleCalls(); return len(r) == 1 })
-	if _, r := f.appleCalls(); r[0] != (revokeCall{"io.github.will413028.hawkr.buyer", "rt-code-2"}) {
-		t.Fatalf("撤銷 = %+v", r)
-	}
-	// 再刪一次（冪等）不會再撤銷。
-	if err := f.m.DeleteAccount(ctx, id); err != nil {
-		t.Fatal(err)
-	}
-	if err := f.db.Pool().QueryRow(ctx, `SELECT count(*) FROM river.river_job WHERE kind = 'identity.revoke_apple_token'`).Scan(&rows); err != nil || rows != 1 {
-		t.Fatalf("撤銷 job 共 %d 個（%v）", rows, err)
-	}
-}
-
-// A 的 identity token 搭配 B 的 code：Apple 換 token 簽發的是 B 的 ID token，不保存，換得的 token 當場撤銷。
-func TestExchangeWithSomeoneElsesCodeIsNotStored(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	id := f.account(t, "user_1")
-	f.apple.ids["a1"] = Identity{Subject: "apple-A", Audience: "io.github.will413028.hawkr.buyer"}
-	f.apple.ids["id-code-B"] = Identity{Subject: "apple-B", Audience: "io.github.will413028.hawkr.buyer"}
-	if err := f.m.LinkAppleCredential(ctx, LinkAppleCredentialInput{AccountID: id, IDToken: "a1", AuthorizationCode: "code-B"}); err != nil {
-		t.Fatal(err)
-	}
-	f.runWorkers(t, func() bool { _, r := f.appleCalls(); return len(r) == 1 })
-	if _, _, ok := f.storedAppleToken(t, id); ok {
-		t.Fatal("別人的授權不該存在這個帳號上")
-	}
-	if _, r := f.appleCalls(); r[0] != (revokeCall{"io.github.will413028.hawkr.buyer", "rt-code-B"}) {
-		t.Fatalf("撤銷 = %+v", r)
-	}
-}
-
-func TestDeletingAnAccountWithoutAppleCredentialEnqueuesNoRevocation(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	id := f.account(t, "user_1")
-	if err := f.m.DeleteAccount(ctx, id); err != nil {
-		t.Fatal(err)
-	}
-	var n int
-	if err := f.db.Pool().QueryRow(ctx, `SELECT count(*) FROM river.river_job WHERE kind = 'identity.revoke_apple_token'`).Scan(&n); err != nil || n != 0 {
-		t.Fatalf("撤銷 job %d 個（%v）", n, err)
-	}
-}
-
-// 換 token 的 job 執行時帳號已經刪除：不保存，換得的 token 當場撤銷。
-func TestExchangeAfterDeletionRevokesInsteadOfStoring(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	id := f.account(t, "user_1")
-	f.apple.ids["a1"] = Identity{Subject: "apple-1", Audience: "io.github.will413028.hawkr.buyer"}
-	f.apple.ids["id-code-1"] = f.apple.ids["a1"]
-	if err := f.m.LinkAppleCredential(ctx, LinkAppleCredentialInput{AccountID: id, IDToken: "a1", AuthorizationCode: "code-1"}); err != nil {
-		t.Fatal(err)
-	}
-	if err := f.m.DeleteAccount(ctx, id); err != nil {
-		t.Fatal(err)
-	}
-	f.runWorkers(t, func() bool { _, r := f.appleCalls(); return len(r) == 1 })
-	if _, _, ok := f.storedAppleToken(t, id); ok {
-		t.Fatal("已刪除的帳號不該保存 token")
-	}
-}
-
-func TestCheckAppleKeysRequiresEveryReferencedKey(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	id := f.account(t, "user_1")
-	if err := f.m.CheckAppleKeys(ctx); err != nil {
-		t.Fatalf("沒有保存的 token：%v", err)
-	}
-	insert := func(keyID string) {
-		t.Helper()
-		// 密文開頭：1 byte 的金鑰 ID 長度、金鑰 ID。
-		if _, err := f.db.Pool().Exec(ctx, `INSERT INTO identity.apple_tokens (account_id, client_id, token) VALUES ($1, 'c', $2)
-			ON CONFLICT (account_id) DO UPDATE SET token = EXCLUDED.token`, id, append([]byte{byte(len(keyID))}, keyID+"rest"...)); err != nil {
-			t.Fatal(err)
-		}
-	}
-	insert("k1")
-	if err := f.m.CheckAppleKeys(ctx); err != nil {
-		t.Fatalf("金鑰在金鑰環裡：%v", err)
-	}
-	insert("old")
-	if err := f.m.CheckAppleKeys(ctx); err == nil || !strings.Contains(err.Error(), "old") {
-		t.Fatalf("金鑰被拿掉要擋下：%v", err)
-	}
-	insert("k1")
-
-	// 排隊或重試中的 job 參數裡的密文也要檢查；完成的 job 不管。
-	job := func(kind, field, keyID, state string) {
-		t.Helper()
-		sealed := append([]byte{byte(len(keyID))}, keyID+"rest"...)
-		args, _ := json.Marshal(map[string]any{field: sealed})
-		if _, err := f.db.Pool().Exec(ctx, `INSERT INTO river.river_job (kind, args, state, max_attempts, finalized_at) VALUES ($1, $2, $3::text::river.river_job_state, 5, CASE WHEN $3::text = 'completed' THEN now() END)`, kind, args, state); err != nil {
-			t.Fatal(err)
-		}
-	}
-	job("identity.revoke_apple_token", "token", "k1", "available")
-	job("identity.exchange_apple_code", "code", "k1", "retryable")
-	job("identity.save_apple_token", "grant", "k1", "scheduled")
-	job("identity.revoke_apple_token", "token", "gone", "completed")
-	if err := f.m.CheckAppleKeys(ctx); err != nil {
-		t.Fatalf("job 參數的金鑰都在，或 job 已完成：%v", err)
-	}
-	for _, c := range []struct{ kind, field string }{
-		{"identity.exchange_apple_code", "code"}, {"identity.save_apple_token", "grant"}, {"identity.revoke_apple_token", "token"},
-	} {
-		job(c.kind, c.field, "retired-"+c.field, "retryable")
-		if err := f.m.CheckAppleKeys(ctx); err == nil || !strings.Contains(err.Error(), "retired-"+c.field) {
-			t.Fatalf("%s 的 job 參數用到被拿掉的金鑰要擋下：%v", c.kind, err)
-		}
-		if _, err := f.db.Pool().Exec(ctx, `DELETE FROM river.river_job WHERE args->>$1 IS NOT NULL AND kind = $2 AND state = 'retryable' AND convert_from(substring(decode(args->>$1,'base64') FROM 2 FOR get_byte(decode(args->>$1,'base64'),0)),'UTF8') = $3`, c.field, c.kind, "retired-"+c.field); err != nil {
-			t.Fatal(err)
-		}
-	}
 }
 
 func TestCodeValueChecksMatchTheGoTypes(t *testing.T) {

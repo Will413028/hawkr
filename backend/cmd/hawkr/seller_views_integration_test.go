@@ -80,7 +80,7 @@ func TestLoggedInProductViewSucceedsWithoutProductServiceAndIsRolledUpLater(t *t
 	now := time.Date(2026, 10, 7, 12, 0, 0, 0, twtime.Taipei) // 週三
 	clock := func() time.Time { return now }
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	accounts := identity.New(identity.Deps{DB: d, Events: bus, Jobs: queue, Now: clock, Logger: logger})
+	accounts := identity.New(identity.Deps{DB: d, Events: bus, Now: clock, Logger: logger})
 	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: queue, Now: clock, Logger: logger})
 	kycKeys, kycMAC := sealtest.Keys(t)
 	products := &productStoresStub{err: errors.New("product service down")}

@@ -27,7 +27,7 @@ func TestAccountCreationProvisionsBuyerInSameTransaction(t *testing.T) {
 	bus := events.NewBus()
 	clock := func() time.Time { return time.Date(2026, 9, 30, 0, 0, 0, 0, time.UTC) }
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	accounts := identity.New(identity.Deps{DB: d, Events: bus, Jobs: queue, Now: clock, Logger: logger})
+	accounts := identity.New(identity.Deps{DB: d, Events: bus, Now: clock, Logger: logger})
 	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: queue, Now: clock, Logger: logger})
 	subscribeBuyerLifecycle(bus, buyers)
 	login, err := accounts.Login(ctx, identity.LoginInput{

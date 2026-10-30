@@ -12,10 +12,7 @@ import (
 // AccessConfig 是後台 Access JWT 驗證的設定。
 type AccessConfig = model.AccessConfig
 
-// AppleConfig 是 Sign in with Apple 金鑰設定。
-type AppleConfig = model.AppleConfig
-
-// DevAuth 是本機的顧客與後台測試登入。
+// DevAuth 是本機開發與測試的後台登入；顧客的 dev 登入是資料庫裡的 dev session，不經過這裡。
 type DevAuth = provider.DevAuth
 
 const DevAdminIssuer = provider.DevAdminIssuer
@@ -43,17 +40,6 @@ func NewAppLogin(cfg AppLoginConfig) (*AppLogin, error) { return provider.NewApp
 func NewGoogleVerifier(audiences []string, lifetime ...context.Context) (IDTokenVerifier, error) {
 	return provider.NewGoogleVerifier(audiences, lifetime...)
 }
-
-// NewAppleVerifier 建立 Sign in with Apple ID token verifier。
-func NewAppleVerifier(audiences []string, lifetime ...context.Context) (IDTokenVerifier, error) {
-	return provider.NewAppleVerifier(audiences, lifetime...)
-}
-
-// NewAppleTokens 建立 authorization code 交換與撤銷的 client。
-func NewAppleTokens(cfg AppleConfig) (AppleTokens, error) { return provider.NewAppleTokens(cfg) }
-
-// NewSealer 建立 job 憑證的 AES-256-GCM 加密器。
-func NewSealer(keys string) (Sealer, error) { return provider.NewSealer(keys) }
 
 // NewAccess 建立後台 Access JWT verifier。
 func NewAccess(cfg AccessConfig) (AdminVerifier, error) { return provider.NewAccess(cfg) }

@@ -137,7 +137,7 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 	now := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	bus := events.NewBus()
-	id := identity.New(identity.Deps{DB: d, Events: bus, Jobs: noJobs{}, Now: func() time.Time { return now }, Logger: log})
+	id := identity.New(identity.Deps{DB: d, Events: bus, Now: func() time.Time { return now }, Logger: log})
 	fake := media.NewFake()
 	fake.Key = func(refType, token string) string { return refType + "/" + token }
 	keys, mac := sealtest.Keys(t)

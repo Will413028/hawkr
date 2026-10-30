@@ -448,11 +448,6 @@ func TestSuspendedAccountsCanStillManageTheirSessions(t *testing.T) {
 	}
 	_, err = f.getSession(t, bearer(other))
 	wantCode(t, err, connect.CodeUnauthenticated)
-	_, err = c.LinkAppleCredential(t.Context(), connect.NewRequest(&pb.LinkAppleCredentialRequest{IdToken: "x", AuthorizationCode: "y"}))
-	wantCode(t, err, connect.CodePermissionDenied)
-	if got := reasonOf(err); got != "ACCOUNT_SUSPENDED" {
-		t.Fatalf("寫入的 reason = %q", got)
-	}
 	if _, err := c.SignOut(t.Context(), connect.NewRequest(&pb.SignOutRequest{})); err != nil {
 		t.Fatalf("停權者 SignOut = %v", err)
 	}

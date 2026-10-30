@@ -24,7 +24,6 @@ import (
 	"{{.Module}}/internal/modules/seller"
 	"{{.Module}}/internal/modules/social"
 	"{{.Module}}/internal/platform/events"
-	"{{.Module}}/internal/platform/jobs"
 	"{{.Module}}/internal/platform/migrate"
 	"{{.Module}}/internal/platform/testdb"
 )
@@ -42,14 +41,10 @@ func monolith(t *testing.T) *connectDriver {
 		migrate.Module{Name: "delegation", Dir: delegation.Migrations()},
 		migrate.Module{Name: "{{.Name}}", Dir: {{.Name}}.Migrations()},
 	))
-	jc, err := jobs.NewInsertOnly(d)
-	if err != nil {
-		t.Fatal(err)
-	}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	auth := ch.DevAuth(t)
 	id := identity.New(identity.Deps{
-		DB: d, Events: events.NewBus(), Jobs: jc, Providers: auth.Providers,
+		DB: d, Events: events.NewBus(), Providers: auth.Providers,
 		Now: time.Now, Logger: log,
 	})
 	del := delegation.New(delegation.Deps{DB: d, Identity: id, Seller: seller.NewReader(d, time.Now), Now: time.Now, Logger: log})

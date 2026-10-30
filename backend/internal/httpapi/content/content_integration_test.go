@@ -96,7 +96,7 @@ func setup(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	id := identity.New(identity.Deps{
-		DB: d, Events: events.NewBus(), Jobs: jc, Now: time.Now, Logger: log,
+		DB: d, Events: events.NewBus(), Now: time.Now, Logger: log,
 		Providers: identity.Providers{Admin: dev.Admins()},
 	})
 	admin, err := dev.AdminToken("dev_ops")
