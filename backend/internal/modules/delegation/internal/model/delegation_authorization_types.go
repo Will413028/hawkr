@@ -10,9 +10,9 @@ import (
 type AuthorizationSource string
 
 const (
-	AuthorizationContract       AuthorizationSource = "contract"
-	AuthorizationTicket         AuthorizationSource = "ticket"
-	AuthorizationPlatformPolicy AuthorizationSource = "platform_policy"
+	AuthorizationContract       AuthorizationSource = "CONTRACT"
+	AuthorizationTicket         AuthorizationSource = "TICKET"
+	AuthorizationPlatformPolicy AuthorizationSource = "PLATFORM_POLICY"
 )
 
 func (s AuthorizationSource) Valid() bool {

@@ -98,7 +98,7 @@ func toChange(m authorizationChange, effectiveUntil *string) (delegation.Delegat
 	in := delegation.DelegationAuthorizationChange{
 		AdminID:         adminID,
 		StoreID:         storeID,
-		Source:          delegation.AuthorizationSource(m.GetSource()),
+		Source:          fromWire[delegation.AuthorizationSource](m.GetSource()),
 		SourceReference: m.GetSourceReference(),
 		Capabilities:    toCapabilities(m.GetGrantedCapabilities()),
 		OperationReason: m.GetOperationReason(),
@@ -223,7 +223,7 @@ func (s *Server) ListDelegationAuthorizationHistory(ctx context.Context, req *co
 			CreatedAt:            formatTime(e.CreatedAt),
 		}
 		if e.Source != nil {
-			src := string(*e.Source)
+			src := toWire(*e.Source)
 			r.Source = &src
 		}
 		out.Records = append(out.Records, r)
@@ -236,7 +236,7 @@ func toAuthorization(a delegation.DelegationAuthorization) *pb.DelegationAuthori
 	return &pb.DelegationAuthorization{
 		Id:                         a.ID.String(),
 		TargetStoreId:              formatID(a.StoreID),
-		Source:                     string(a.Source),
+		Source:                     toWire(a.Source),
 		SourceReference:            a.SourceReference,
 		GrantedCapabilities:        capabilityStrings(a.Capabilities),
 		EffectiveFrom:              formatTime(a.EffectiveFrom),

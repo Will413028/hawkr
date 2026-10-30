@@ -117,7 +117,7 @@ func (s *Server) Preflight(ctx context.Context, req *connect.Request[pb.Prefligh
 	}
 	for _, o := range res.ReasonOptions {
 		data.ReasonOptions = append(data.ReasonOptions, &pb.ReasonOption{
-			Code: string(o.Code), Label: o.Label, CaseReferenceRequired: o.CaseReferenceRequired,
+			Code: toWire(o.Code), Label: o.Label, CaseReferenceRequired: o.CaseReferenceRequired,
 		})
 	}
 	return connect.NewResponse(&pb.PreflightResponse{Message: success, Data: data}), nil
@@ -137,7 +137,7 @@ func (s *Server) CreateSession(ctx context.Context, req *connect.Request[pb.Crea
 		AdminID:          adminID,
 		AdminDisplayName: m.GetActorDisplayName(),
 		StoreID:          storeID,
-		Reason:           delegation.DelegationReason(m.GetReasonCode()),
+		Reason:           fromWire[delegation.DelegationReason](m.GetReasonCode()),
 		// proto3 optional：沒有帶是 null（合法），空字串是帶了一個不合法的值。
 		CaseReference:  m.CaseReference,
 		Capabilities:   toCapabilities(m.GetRequestedCapabilities()),
@@ -201,7 +201,7 @@ func (s *Server) RevokeSession(ctx context.Context, req *connect.Request[pb.Revo
 		return connect.NewResponse(&pb.RevokeSessionResponse{Code: code, Message: msg}), err
 	}
 	return connect.NewResponse(&pb.RevokeSessionResponse{Message: success, Data: &pb.RevokeSessionData{
-		SessionId: formatID(sess.ID), Status: string(delegation.DelegationRevoked), Revision: int64(sess.Revision),
+		SessionId: formatID(sess.ID), Status: toWire(delegation.DelegationRevoked), Revision: int64(sess.Revision),
 		RevokedAt: formatTimePtr(sess.RevokedAt),
 	}}), nil
 }
@@ -320,7 +320,7 @@ func toActor(a delegation.DelegationActor) *pb.DelegationActor {
 }
 
 func toReason(s delegation.DelegationSession) *pb.DelegationReason {
-	return &pb.DelegationReason{Code: string(s.Reason), Label: s.ReasonLabel, CaseReferenceRequired: s.Reason.CaseReferenceRequired()}
+	return &pb.DelegationReason{Code: toWire(s.Reason), Label: s.ReasonLabel, CaseReferenceRequired: s.Reason.CaseReferenceRequired()}
 }
 
 // toSummary 是 create、current 與兌換共用的投影。不含任何 credential 或 token；連續兩次讀取必須逐位元相同（前端以
@@ -336,7 +336,7 @@ func toSummary(s delegation.DelegationSession) *pb.OperationSessionSummary {
 		Capabilities:  capabilityStrings(s.Capabilities),
 		IssuedAt:      formatTime(s.IssuedAt),
 		ExpiresAt:     formatTime(s.ExpiresAt),
-		Status:        string(s.Status),
+		Status:        toWire(s.Status),
 		Revision:      int64(s.Revision),
 	}
 }

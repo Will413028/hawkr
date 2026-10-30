@@ -134,7 +134,7 @@ func (q *Queries) CountDelegationAuditLogs(ctx context.Context, arg CountDelegat
 
 const delegationAuditSummary = `-- name: DelegationAuditSummary :one
 SELECT count(*) FILTER (WHERE result = 'SUCCEEDED')                         AS succeeded_count,
-       count(*) FILTER (WHERE risk_level = 'high' AND result = 'SUCCEEDED') AS high_risk_count,
+       count(*) FILTER (WHERE risk_level = 'HIGH' AND result = 'SUCCEEDED') AS high_risk_count,
        count(*) FILTER (WHERE result = 'PENDING')                           AS pending_count,
        count(*) FILTER (WHERE notified_at IS NOT NULL)                      AS notified_count,
        count(*) FILTER (WHERE lower(action) LIKE ANY ($1::text[])) AS fulfillment_count,

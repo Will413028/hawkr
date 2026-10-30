@@ -64,10 +64,10 @@ func TestRevokingTheRoleEndsRunningDelegationsInTheSameTransaction(t *testing.T)
 		Scan(&status, &reason, &by); err != nil {
 		t.Fatal(err)
 	}
-	if status != "revoked" || reason != RevokeReasonAdminRoleRevoked || by != nil {
+	if status != "REVOKED" || reason != RevokeReasonAdminRoleRevoked || by != nil {
 		t.Fatalf("被撤銷角色的管理員的代行 = %s %s %v，預期 revoked_by_admin_id 為 NULL（系統撤銷沒有操作者）", status, reason, by)
 	}
-	if err := f.db.Pool().QueryRow(ctx, `SELECT status FROM delegation.delegated_operation_sessions WHERE id = $1`, theirs.Session.ID).Scan(&status); err != nil || status != "active" {
+	if err := f.db.Pool().QueryRow(ctx, `SELECT status FROM delegation.delegated_operation_sessions WHERE id = $1`, theirs.Session.ID).Scan(&status); err != nil || status != "ACTIVE" {
 		t.Fatalf("其他管理員的代行 = %s, %v", status, err)
 	}
 	_, err := f.m.StartDelegation(ctx, startInput(admin, testStore, "ik-3"))
@@ -89,7 +89,7 @@ func TestRoleRevocationAndDelegationRevocationRollBackTogether(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 	var status string
-	if err := f.db.Pool().QueryRow(ctx, `SELECT status FROM delegation.delegated_operation_sessions WHERE id = $1`, s.Session.ID).Scan(&status); err != nil || status != "active" {
+	if err := f.db.Pool().QueryRow(ctx, `SELECT status FROM delegation.delegated_operation_sessions WHERE id = $1`, s.Session.ID).Scan(&status); err != nil || status != "ACTIVE" {
 		t.Fatalf("回滾後的代行 = %s, %v", status, err)
 	}
 	if n := f.count(t, `SELECT count(*) FROM identity.admin_roles WHERE admin_id = $1`, admin); n != 1 {

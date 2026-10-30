@@ -27,7 +27,7 @@ TTL、閒置、handoff、分頁與保留天數是 `internal/model` 的常數，�
 
 ## 3. 工作階段
 
-- 狀態只儲存 `active`、`revoked`。hard 到期（1800 秒）與閒置到期（900 秒）在讀取時推導，所有「進行中」查詢都含兩個到期述詞。
+- 狀態只儲存 `ACTIVE`、`REVOKED`（儲存的代碼一律 UPPER_SNAKE；舊 gRPC 與事件對外仍是小寫，由 legacy delegationservice 轉換）。hard 到期（1800 秒）與閒置到期（900 秒）在讀取時推導，所有「進行中」查詢都含兩個到期述詞。
 - 結束代行把 `ended_at` 設為現在、`expires_at` 取 `LEAST(expires_at, 現在)`（不早於 `issued_at` 加一秒），`revision` 加一；對已終止的 session 重放是冪等。
 - `revision` 只在結束與撤銷時增加；輪詢、活動延長與代行讀寫不改它。session 列永不硬刪，只有 `admin_eligibilities` 會 `DELETE`。
 - 輪詢（`ResolveDelegation` 的 activity 為假）不延長閒置期限；代行資源的反查（activity 為真）才會延長。

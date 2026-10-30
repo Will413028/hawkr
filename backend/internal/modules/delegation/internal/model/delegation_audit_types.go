@@ -41,9 +41,9 @@ const (
 type RiskLevel string
 
 const (
-	RiskLow    RiskLevel = "low"
-	RiskMedium RiskLevel = "medium"
-	RiskHigh   RiskLevel = "high"
+	RiskLow    RiskLevel = "LOW"
+	RiskMedium RiskLevel = "MEDIUM"
+	RiskHigh   RiskLevel = "HIGH"
 )
 
 type auditActionRule struct {
@@ -129,18 +129,18 @@ const (
 type AuditOrigin string
 
 const (
-	AuditInteractive AuditOrigin = "interactive"
-	AuditScheduled   AuditOrigin = "scheduled"
+	AuditInteractive AuditOrigin = "INTERACTIVE"
+	AuditScheduled   AuditOrigin = "SCHEDULED"
 )
 
 // AuditResourceType 是稽核對象的種類。
 type AuditResourceType string
 
 const (
-	ResourceStorefront AuditResourceType = "storefront"
-	ResourceProduct    AuditResourceType = "product"
-	ResourcePost       AuditResourceType = "post"
-	ResourceOrder      AuditResourceType = "order"
+	ResourceStorefront AuditResourceType = "STOREFRONT"
+	ResourceProduct    AuditResourceType = "PRODUCT"
+	ResourcePost       AuditResourceType = "POST"
+	ResourceOrder      AuditResourceType = "ORDER"
 )
 
 func (t AuditResourceType) Valid() bool {

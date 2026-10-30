@@ -66,9 +66,9 @@ func (c Capability) Valid() bool { return slices.Contains(Capabilities(), c) }
 type DelegationReason string
 
 const (
-	ReasonSellerRequest       DelegationReason = "seller_request"
-	ReasonPlatformMaintenance DelegationReason = "platform_maintenance"
-	ReasonContentGovernance   DelegationReason = "content_governance"
+	ReasonSellerRequest       DelegationReason = "SELLER_REQUEST"
+	ReasonPlatformMaintenance DelegationReason = "PLATFORM_MAINTENANCE"
+	ReasonContentGovernance   DelegationReason = "CONTENT_GOVERNANCE"
 )
 
 // DelegationReasonOption 是 preflight 給建立畫面的理由選項。
@@ -118,9 +118,9 @@ func AnyCaseReferenceRequired() bool {
 type DelegationStatus string
 
 const (
-	DelegationActive  DelegationStatus = "active"
-	DelegationExpired DelegationStatus = "expired"
-	DelegationRevoked DelegationStatus = "revoked"
+	DelegationActive  DelegationStatus = "ACTIVE"
+	DelegationExpired DelegationStatus = "EXPIRED"
+	DelegationRevoked DelegationStatus = "REVOKED"
 )
 
 // 撤銷的理由裡由系統寫入的固定值（設計書 56 §12.4 ①、docs/modules/delegation.md §3）：稽核以這一欄機械地區分撤銷的來源，不是自由文字。

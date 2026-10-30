@@ -1,7 +1,7 @@
 -- 代行的 session 的 canonical 查詢。時間一律由模組傳入（now、idle_since = now − 閒置逾時），
 -- 不用 DB 的 now()：測試注入時鐘，也讓同一個請求的判定都用同一個時刻。
 --
--- 「進行中」的述詞有四項：status = 'active'、ended_at IS NULL、now < expires_at、last_active_at > idle_since。
+-- 「進行中」的述詞有四項：status = 'ACTIVE'、ended_at IS NULL、now < expires_at、last_active_at > idle_since。
 -- DB 的 status 沒有 expired（到期在讀取時推導），少了後兩項，一個已經 hard 或閒置到期、但還沒被收斂的列會被
 -- 當成進行中：衝突探測把它報成 9268／9269，兌換照樣交出 credential，撤回授權的確認框多數它一次。
 
@@ -22,7 +22,7 @@ INSERT INTO delegation.delegated_operation_sessions (
     sqlc.arg(actor_admin_id), sqlc.arg(actor_display_name), sqlc.arg(target_store_id),
     sqlc.arg(target_seller_account_id), sqlc.arg(target_store_name),
     sqlc.arg(reason_code), sqlc.arg(reason_label), sqlc.narg(case_reference), sqlc.arg(capabilities)::text[],
-    sqlc.arg(issued_at)::timestamptz, sqlc.arg(expires_at)::timestamptz, sqlc.arg(issued_at)::timestamptz, 'active',
+    sqlc.arg(issued_at)::timestamptz, sqlc.arg(expires_at)::timestamptz, sqlc.arg(issued_at)::timestamptz, 'ACTIVE',
     sqlc.arg(idempotency_key), sqlc.arg(request_id), sqlc.arg(correlation_id),
     sqlc.narg(user_agent), sqlc.arg(now)::timestamptz, sqlc.arg(now)::timestamptz
 )
@@ -47,7 +47,7 @@ SELECT * FROM delegation.delegated_operation_sessions WHERE credential_hash = $1
 -- expired、revoked；條件要含閒置與 hard 到期，否則下一個請求會把已經逾時的 session 救回來。
 UPDATE delegation.delegated_operation_sessions
 SET last_active_at = CASE
-        WHEN status = 'active' AND ended_at IS NULL
+        WHEN status = 'ACTIVE' AND ended_at IS NULL
              AND sqlc.arg(now)::timestamptz < expires_at
              AND last_active_at > sqlc.arg(idle_since)::timestamptz
         THEN date_trunc('second', sqlc.arg(now)::timestamptz)
@@ -60,14 +60,14 @@ RETURNING *;
 -- preflight 的衝突探測。管理員與店家拆成兩句（OR 會讓兩個 partial unique index 都用不上）。
 SELECT * FROM delegation.delegated_operation_sessions
 WHERE actor_admin_id = sqlc.arg(actor_admin_id)
-  AND status = 'active' AND ended_at IS NULL
+  AND status = 'ACTIVE' AND ended_at IS NULL
   AND sqlc.arg(now)::timestamptz < expires_at
   AND last_active_at > sqlc.arg(idle_since)::timestamptz;
 
 -- name: GetActiveDelegationSessionOfStore :one
 SELECT * FROM delegation.delegated_operation_sessions
 WHERE target_store_id = sqlc.arg(target_store_id)
-  AND status = 'active' AND ended_at IS NULL
+  AND status = 'ACTIVE' AND ended_at IS NULL
   AND sqlc.arg(now)::timestamptz < expires_at
   AND last_active_at > sqlc.arg(idle_since)::timestamptz;
 
@@ -75,20 +75,20 @@ WHERE target_store_id = sqlc.arg(target_store_id)
 -- 建立時沒有寫入的判斷：述詞與 uidx_delegated_operation_sessions_active_actor 相同。
 SELECT EXISTS (
     SELECT 1 FROM delegation.delegated_operation_sessions
-    WHERE actor_admin_id = $1 AND status = 'active' AND ended_at IS NULL
+    WHERE actor_admin_id = $1 AND status = 'ACTIVE' AND ended_at IS NULL
 ) AS taken;
 
 -- name: DelegationStoreSlotTaken :one
 SELECT EXISTS (
     SELECT 1 FROM delegation.delegated_operation_sessions
-    WHERE target_store_id = $1 AND status = 'active' AND ended_at IS NULL
+    WHERE target_store_id = $1 AND status = 'ACTIVE' AND ended_at IS NULL
 ) AS taken;
 
 -- name: CountActiveDelegationSessionsOfStore :one
 -- 撤回授權的確認框要顯示的「將被中止的 session 數」；述詞與連帶撤銷那句相同。
 SELECT count(*) FROM delegation.delegated_operation_sessions
 WHERE target_store_id = sqlc.arg(target_store_id)
-  AND status = 'active' AND ended_at IS NULL
+  AND status = 'ACTIVE' AND ended_at IS NULL
   AND sqlc.arg(now)::timestamptz < expires_at
   AND last_active_at > sqlc.arg(idle_since)::timestamptz;
 
@@ -97,7 +97,7 @@ WHERE target_store_id = sqlc.arg(target_store_id)
 -- 的列。兩個到期述詞都要寫：少了閒置那一個，被閒置踢出的管理員重建時會撞 9268／9269。
 UPDATE delegation.delegated_operation_sessions
 SET ended_at = sqlc.arg(now)::timestamptz, updated_at = sqlc.arg(now)::timestamptz
-WHERE status = 'active' AND ended_at IS NULL
+WHERE status = 'ACTIVE' AND ended_at IS NULL
   AND (expires_at <= sqlc.arg(now)::timestamptz OR last_active_at <= sqlc.arg(idle_since)::timestamptz)
   AND (actor_admin_id = sqlc.arg(actor_admin_id) OR target_store_id = sqlc.arg(target_store_id));
 
@@ -109,7 +109,7 @@ SET ended_at = sqlc.arg(now)::timestamptz,
                           LEAST(expires_at, date_trunc('second', sqlc.arg(now)::timestamptz))),
     revision = revision + 1,
     updated_at = sqlc.arg(now)::timestamptz
-WHERE id = sqlc.arg(id) AND status = 'active' AND ended_at IS NULL;
+WHERE id = sqlc.arg(id) AND status = 'ACTIVE' AND ended_at IS NULL;
 
 -- name: RedeemDelegationHandoff :one
 -- handoff 兌換：單句 CAS，七個述詞（code 自己的兩個、尚未核發 credential、session 被終止的兩個、到期的兩個）。沒有列一律是
@@ -120,7 +120,7 @@ SET handoff_code_hash = NULL, credential_hash = sqlc.arg(credential_hash)
 WHERE handoff_code_hash = sqlc.arg(handoff_code_hash)
   AND handoff_expires_at > sqlc.arg(now)::timestamptz
   AND credential_hash IS NULL
-  AND status = 'active' AND ended_at IS NULL
+  AND status = 'ACTIVE' AND ended_at IS NULL
   AND sqlc.arg(now)::timestamptz < expires_at
   AND last_active_at > sqlc.arg(idle_since)::timestamptz
 RETURNING *;
@@ -139,7 +139,7 @@ RETURNING *;
 -- 已經到期的取 expires_at，否則摘要的時長會隨查詢時刻長大。only_active 用於撤回授權與管理員登出，
 -- 只撤銷仍符合四項進行中述詞的列；治理的單筆撤銷不設此限制。
 UPDATE delegation.delegated_operation_sessions
-SET status = 'revoked',
+SET status = 'REVOKED',
     revoked_at = date_trunc('second', sqlc.arg(now)::timestamptz),
     ended_at = COALESCE(ended_at, LEAST(expires_at, date_trunc('second', sqlc.arg(now)::timestamptz))),
     revoke_reason = sqlc.arg(revoke_reason)::text,
@@ -148,7 +148,7 @@ SET status = 'revoked',
     updated_at = sqlc.arg(now)::timestamptz
 WHERE id = sqlc.arg(id) AND revoked_at IS NULL
   AND (NOT sqlc.arg(only_active)::boolean OR (
-    status = 'active' AND ended_at IS NULL
+    status = 'ACTIVE' AND ended_at IS NULL
     AND sqlc.arg(now)::timestamptz < expires_at
     AND last_active_at > sqlc.arg(idle_since)::timestamptz
   ))
@@ -157,7 +157,7 @@ RETURNING *;
 -- name: RevokeActiveDelegationsOfActor :many
 -- revoked_by_admin_id 可為 NULL：系統因角色變動而撤銷時沒有操作者，不填被撤銷者自己。
 UPDATE delegation.delegated_operation_sessions
-SET status = 'revoked',
+SET status = 'REVOKED',
     revoked_at = date_trunc('second', sqlc.arg(now)::timestamptz),
     ended_at = LEAST(expires_at, date_trunc('second', sqlc.arg(now)::timestamptz)),
     revoke_reason = sqlc.arg(revoke_reason)::text,
@@ -165,14 +165,14 @@ SET status = 'revoked',
     revision = revision + 1,
     updated_at = sqlc.arg(now)::timestamptz
 WHERE actor_admin_id = sqlc.arg(actor_admin_id)
-  AND status = 'active' AND ended_at IS NULL
+  AND status = 'ACTIVE' AND ended_at IS NULL
   AND sqlc.arg(now)::timestamptz < expires_at
   AND last_active_at > sqlc.arg(idle_since)::timestamptz
 RETURNING id;
 
 -- name: RevokeActiveDelegationsOfStore :many
 UPDATE delegation.delegated_operation_sessions
-SET status = 'revoked',
+SET status = 'REVOKED',
     revoked_at = date_trunc('second', sqlc.arg(now)::timestamptz),
     ended_at = LEAST(expires_at, date_trunc('second', sqlc.arg(now)::timestamptz)),
     revoke_reason = sqlc.arg(revoke_reason)::text,
@@ -180,7 +180,7 @@ SET status = 'revoked',
     revision = revision + 1,
     updated_at = sqlc.arg(now)::timestamptz
 WHERE target_store_id = sqlc.arg(target_store_id)
-  AND status = 'active' AND ended_at IS NULL
+  AND status = 'ACTIVE' AND ended_at IS NULL
   AND sqlc.arg(now)::timestamptz < expires_at
   AND last_active_at > sqlc.arg(idle_since)::timestamptz
 RETURNING id;

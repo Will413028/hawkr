@@ -75,7 +75,7 @@ func TestReasons(t *testing.T) {
 		}
 	}
 	// 不認得的理由沒有標籤（不會被當成標籤存起來），而且要案件編號（fail closed）。
-	if r := DelegationReason("SELLER_REQUEST"); r.Label() != "" || !r.CaseReferenceRequired() {
+	if r := DelegationReason("seller_request"); r.Label() != "" || !r.CaseReferenceRequired() {
 		t.Fatal("不認得的理由")
 	}
 	if !AnyCaseReferenceRequired() {

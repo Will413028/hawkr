@@ -34,7 +34,7 @@ CREATE TABLE delegation.admin_eligibilities (
 -- 無關（ADR 2026-09-25-row-identity-by-data-kind D1）。credential_hash 與 handoff_code_hash 只存 SHA-256；
 -- Create 時 credential_hash 為 NULL，Redeem 以單句 CAS 清空 handoff_code_hash 並寫入 credential_hash。
 --
--- status 只有 active、revoked：到期（hard 或閒置）在讀取時推導，不落庫。expires_at 只在主動結束時縮短，
+-- status 只有 ACTIVE、REVOKED：到期（hard 或閒置）在讀取時推導，不落庫。expires_at 只在主動結束時縮短，
 -- 不延長。last_active_at 只由代行資源的 credential 反查順延（閒置逾時）；刻意不建索引，讓那句 UPDATE
 -- 維持 HOT update。revision 只在主動結束與撤銷時加一（樂觀鎖，前端以它對帳）。
 -- 秒精度：前端的時間格式最多三位小數，結束時把 expires_at 壓到 now 之後，截秒後可能等於 issued_at，
@@ -69,9 +69,9 @@ CREATE TABLE delegation.delegated_operation_sessions (
     create_user_agent        TEXT,
     created_at               TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at               TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    CONSTRAINT delegated_operation_sessions_status_check CHECK (status::text IN ('active', 'revoked')),
+    CONSTRAINT delegated_operation_sessions_status_check CHECK (status::text IN ('ACTIVE', 'REVOKED')),
     CONSTRAINT delegated_operation_sessions_reason_code_check CHECK (
-        reason_code::text IN ('seller_request', 'platform_maintenance', 'content_governance')
+        reason_code::text IN ('SELLER_REQUEST', 'PLATFORM_MAINTENANCE', 'CONTENT_GOVERNANCE')
     ),
     CONSTRAINT delegated_operation_sessions_lifetime_check CHECK (
         expires_at > issued_at AND expires_at <= issued_at + INTERVAL '1800 seconds'
@@ -85,7 +85,7 @@ CREATE TABLE delegation.delegated_operation_sessions (
         last_active_at >= issued_at AND last_active_at <= expires_at
     ),
     CONSTRAINT delegated_operation_sessions_revision_check CHECK (revision >= 0),
-    CONSTRAINT delegated_operation_sessions_revoked_check CHECK ((status = 'revoked') = (revoked_at IS NOT NULL)),
+    CONSTRAINT delegated_operation_sessions_revoked_check CHECK ((status = 'REVOKED') = (revoked_at IS NOT NULL)),
     -- 撤銷的理由是產品規則（1–200 字）：沒有理由的撤銷紀錄沒有價值。
     CONSTRAINT delegated_operation_sessions_revoke_reason_check CHECK (
         revoke_reason IS NULL OR char_length(revoke_reason) BETWEEN 1 AND 200
@@ -133,9 +133,9 @@ CREATE UNIQUE INDEX uidx_delegated_operation_sessions_display_code
 -- 一位管理員同時只代行一家店；一家店同時只被一位管理員代行。到期但還沒結束的列也佔著：partial index 的述詞
 -- 不能用 now()，建立新的 session 前在同一個 transaction 內先結束它們。
 CREATE UNIQUE INDEX uidx_delegated_operation_sessions_active_actor
-    ON delegation.delegated_operation_sessions (actor_admin_id) WHERE status = 'active' AND ended_at IS NULL;
+    ON delegation.delegated_operation_sessions (actor_admin_id) WHERE status = 'ACTIVE' AND ended_at IS NULL;
 CREATE UNIQUE INDEX uidx_delegated_operation_sessions_active_store
-    ON delegation.delegated_operation_sessions (target_store_id) WHERE status = 'active' AND ended_at IS NULL;
+    ON delegation.delegated_operation_sessions (target_store_id) WHERE status = 'ACTIVE' AND ended_at IS NULL;
 CREATE INDEX idx_delegated_operation_sessions_actor_created_at
     ON delegation.delegated_operation_sessions (actor_admin_id, created_at DESC);
 CREATE INDEX idx_delegated_operation_sessions_store_created_at
@@ -163,10 +163,10 @@ CREATE TABLE delegation.seller_delegation_authorizations (
     created_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     CONSTRAINT seller_delegation_authorizations_source_check CHECK (
-        source::text IN ('contract', 'ticket', 'platform_policy')
+        source::text IN ('CONTRACT', 'TICKET', 'PLATFORM_POLICY')
     ),
     CONSTRAINT seller_delegation_authorizations_global_check CHECK (
-        target_store_id IS NOT NULL OR source = 'platform_policy'
+        target_store_id IS NOT NULL OR source = 'PLATFORM_POLICY'
     ),
     -- 授權的依據編號是產品規則：4–200 字、至少一個數字（是編號，不是說明）。
     CONSTRAINT seller_delegation_authorizations_source_reference_check CHECK (
@@ -258,11 +258,11 @@ CREATE TABLE delegation.admin_operation_audit_logs (
     CONSTRAINT admin_operation_audit_logs_notified_check CHECK (
         notified_at IS NULL OR (notify_seller AND result = 'SUCCEEDED')
     ),
-    CONSTRAINT admin_operation_audit_logs_risk_level_check CHECK (risk_level::text IN ('low', 'medium', 'high')),
+    CONSTRAINT admin_operation_audit_logs_risk_level_check CHECK (risk_level::text IN ('LOW', 'MEDIUM', 'HIGH')),
     CONSTRAINT admin_operation_audit_logs_resource_type_check CHECK (
-        resource_type::text IN ('storefront', 'product', 'post', 'order')
+        resource_type::text IN ('STOREFRONT', 'PRODUCT', 'POST', 'ORDER')
     ),
-    CONSTRAINT admin_operation_audit_logs_origin_check CHECK (origin::text IN ('interactive', 'scheduled')),
+    CONSTRAINT admin_operation_audit_logs_origin_check CHECK (origin::text IN ('INTERACTIVE', 'SCHEDULED')),
     -- 操作理由是產品規則（1–100 字）。
     CONSTRAINT admin_operation_audit_logs_reason_check CHECK (
         operation_reason IS NULL OR char_length(operation_reason) BETWEEN 1 AND 100

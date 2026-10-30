@@ -90,7 +90,7 @@ WHERE (sqlc.narg(session_id)::bigint IS NULL OR session_id = sqlc.narg(session_i
 -- 計數以子字串比對 action、刻意不夾 result：一列 PENDING 的履約 intent 就已經證明封鎖被打穿；也不能改成列舉
 -- 已登錄的動作（要偵測的東西按定義不在清單裡）。
 SELECT count(*) FILTER (WHERE result = 'SUCCEEDED')                         AS succeeded_count,
-       count(*) FILTER (WHERE risk_level = 'high' AND result = 'SUCCEEDED') AS high_risk_count,
+       count(*) FILTER (WHERE risk_level = 'HIGH' AND result = 'SUCCEEDED') AS high_risk_count,
        count(*) FILTER (WHERE result = 'PENDING')                           AS pending_count,
        count(*) FILTER (WHERE notified_at IS NOT NULL)                      AS notified_count,
        count(*) FILTER (WHERE lower(action) LIKE ANY (sqlc.arg(fulfillment_patterns)::text[])) AS fulfillment_count,

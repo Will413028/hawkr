@@ -335,7 +335,7 @@ func TestPreflightDenials(t *testing.T) {
 	const store3, store4 = testStore + 2, testStore + 3
 	if _, err := f.db.Pool().Exec(ctx, `INSERT INTO delegation.seller_delegation_authorizations
 		(id, target_store_id, source, source_reference, granted_capabilities, effective_from, approved_by_admin_id, approved_at)
-		VALUES ($1, NULL, 'platform_policy', 'POLICY-2026-1', '{posts.read}', $2, $3, $2)`, uuid.NewV7(), f.now, admin); err != nil {
+		VALUES ($1, NULL, 'PLATFORM_POLICY', 'POLICY-2026-1', '{posts.read}', $2, $3, $2)`, uuid.NewV7(), f.now, admin); err != nil {
 		t.Fatal(err)
 	}
 	if p := preflight(other, store3); !p.Allowed || !slices.Equal(p.Capabilities, []Capability{model.CapabilityPostsRead}) {
@@ -528,7 +528,7 @@ func TestRedeemHandoffRefusesAnExpiredSession(t *testing.T) {
 	wantDenial(t, err, DenialHandoffInvalid)
 	// 只有四個述詞的版本會兌換成功：到期的兩個述詞不可省略的證明。
 	if n := f.count(t, `WITH r AS (UPDATE delegation.delegated_operation_sessions SET handoff_code_hash = NULL
-		WHERE handoff_code_hash = $1 AND handoff_expires_at > $2 AND status = 'active' AND ended_at IS NULL RETURNING id)
+		WHERE handoff_code_hash = $1 AND handoff_expires_at > $2 AND status = 'ACTIVE' AND ended_at IS NULL RETURNING id)
 		SELECT count(*) FROM r`, tokenHash(s.HandoffCode), f.now); n != 1 {
 		t.Fatalf("四述詞版本 %d 列", n)
 	}
@@ -654,7 +654,7 @@ func TestDisablingAdminEligibilityRevokesSessionsAtomically(t *testing.T) {
 	_, err := f.db.Pool().Exec(ctx, `
 		CREATE FUNCTION delegation.reject_revoke() RETURNS trigger LANGUAGE plpgsql AS $$
 		BEGIN
-			IF NEW.status = 'revoked' THEN RAISE EXCEPTION 'reject revoke'; END IF;
+			IF NEW.status = 'REVOKED' THEN RAISE EXCEPTION 'reject revoke'; END IF;
 			RETURN NEW;
 		END $$`)
 	if err != nil {
@@ -1042,7 +1042,7 @@ func TestAuditLogsAndSummary(t *testing.T) {
 			(id, session_id, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name,
 			 origin, capability, action, resource_type, result, request_id, correlation_id, risk_level, notify_seller,
 			 created_at, confirmed_at, biz_code)
-			VALUES ($1, $2, $3, 'x', $4, 0, 'x', 'interactive', 'orders.read', $5, 'order', $6, 'r', 'c', 'high', false,
+			VALUES ($1, $2, $3, 'x', $4, 0, 'x', 'INTERACTIVE', 'orders.read', $5, 'ORDER', $6, 'r', 'c', 'HIGH', false,
 			        $7, CASE WHEN $6 = 'PENDING' THEN NULL ELSE $7::timestamptz END, CASE WHEN $6 = 'FAILED' THEN 9280 END)`,
 			uuid.NewV7(), s.Session.ID, admin, testStore, action, result, f.now)
 		return err
@@ -1394,7 +1394,7 @@ func TestStatusFilterIsATotalPartition(t *testing.T) {
 	// 生效時間在未來的列（維運 SQL 仍可能建）：兩分法不能漏掉它。
 	if _, err := f.db.Pool().Exec(ctx, `INSERT INTO delegation.seller_delegation_authorizations
 		(id, target_store_id, source, source_reference, granted_capabilities, effective_from, approved_by_admin_id, approved_at)
-		VALUES ($1, $2, 'ticket', 'TICKET-2026-1', '{posts.read}', $3, $4, $3)`, uuid.NewV7(), testStore+3, f.now.Add(24*time.Hour), admin); err != nil {
+		VALUES ($1, $2, 'TICKET', 'TICKET-2026-1', '{posts.read}', $3, $4, $3)`, uuid.NewV7(), testStore+3, f.now.Add(24*time.Hour), admin); err != nil {
 		t.Fatal(err)
 	}
 	f.now = until

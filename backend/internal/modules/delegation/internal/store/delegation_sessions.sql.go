@@ -13,7 +13,7 @@ import (
 const countActiveDelegationSessionsOfStore = `-- name: CountActiveDelegationSessionsOfStore :one
 SELECT count(*) FROM delegation.delegated_operation_sessions
 WHERE target_store_id = $1
-  AND status = 'active' AND ended_at IS NULL
+  AND status = 'ACTIVE' AND ended_at IS NULL
   AND $2::timestamptz < expires_at
   AND last_active_at > $3::timestamptz
 `
@@ -66,7 +66,7 @@ func (q *Queries) CountDelegationSessions(ctx context.Context, arg CountDelegati
 const delegationActorSlotTaken = `-- name: DelegationActorSlotTaken :one
 SELECT EXISTS (
     SELECT 1 FROM delegation.delegated_operation_sessions
-    WHERE actor_admin_id = $1 AND status = 'active' AND ended_at IS NULL
+    WHERE actor_admin_id = $1 AND status = 'ACTIVE' AND ended_at IS NULL
 ) AS taken
 `
 
@@ -81,7 +81,7 @@ func (q *Queries) DelegationActorSlotTaken(ctx context.Context, actorAdminID int
 const delegationStoreSlotTaken = `-- name: DelegationStoreSlotTaken :one
 SELECT EXISTS (
     SELECT 1 FROM delegation.delegated_operation_sessions
-    WHERE target_store_id = $1 AND status = 'active' AND ended_at IS NULL
+    WHERE target_store_id = $1 AND status = 'ACTIVE' AND ended_at IS NULL
 ) AS taken
 `
 
@@ -99,7 +99,7 @@ SET ended_at = $1::timestamptz,
                           LEAST(expires_at, date_trunc('second', $1::timestamptz))),
     revision = revision + 1,
     updated_at = $1::timestamptz
-WHERE id = $2 AND status = 'active' AND ended_at IS NULL
+WHERE id = $2 AND status = 'ACTIVE' AND ended_at IS NULL
 `
 
 type EndDelegationSessionParams struct {
@@ -119,7 +119,7 @@ func (q *Queries) EndDelegationSession(ctx context.Context, arg EndDelegationSes
 const endStaleDelegationSessions = `-- name: EndStaleDelegationSessions :execrows
 UPDATE delegation.delegated_operation_sessions
 SET ended_at = $1::timestamptz, updated_at = $1::timestamptz
-WHERE status = 'active' AND ended_at IS NULL
+WHERE status = 'ACTIVE' AND ended_at IS NULL
   AND (expires_at <= $1::timestamptz OR last_active_at <= $2::timestamptz)
   AND (actor_admin_id = $3 OR target_store_id = $4)
 `
@@ -149,7 +149,7 @@ func (q *Queries) EndStaleDelegationSessions(ctx context.Context, arg EndStaleDe
 const getActiveDelegationSessionOfActor = `-- name: GetActiveDelegationSessionOfActor :one
 SELECT id, display_code, credential_hash, handoff_code_hash, handoff_expires_at, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name, reason_code, reason_label, case_reference, capabilities, issued_at, expires_at, last_active_at, ended_at, revoked_at, revoked_by_admin_id, revoke_reason, status, revision, idempotency_key, create_request_id, create_correlation_id, create_user_agent, created_at, updated_at FROM delegation.delegated_operation_sessions
 WHERE actor_admin_id = $1
-  AND status = 'active' AND ended_at IS NULL
+  AND status = 'ACTIVE' AND ended_at IS NULL
   AND $2::timestamptz < expires_at
   AND last_active_at > $3::timestamptz
 `
@@ -201,7 +201,7 @@ func (q *Queries) GetActiveDelegationSessionOfActor(ctx context.Context, arg Get
 const getActiveDelegationSessionOfStore = `-- name: GetActiveDelegationSessionOfStore :one
 SELECT id, display_code, credential_hash, handoff_code_hash, handoff_expires_at, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name, reason_code, reason_label, case_reference, capabilities, issued_at, expires_at, last_active_at, ended_at, revoked_at, revoked_by_admin_id, revoke_reason, status, revision, idempotency_key, create_request_id, create_correlation_id, create_user_agent, created_at, updated_at FROM delegation.delegated_operation_sessions
 WHERE target_store_id = $1
-  AND status = 'active' AND ended_at IS NULL
+  AND status = 'ACTIVE' AND ended_at IS NULL
   AND $2::timestamptz < expires_at
   AND last_active_at > $3::timestamptz
 `
@@ -395,7 +395,7 @@ INSERT INTO delegation.delegated_operation_sessions (
     $4, $5, $6,
     $7, $8,
     $9, $10, $11, $12::text[],
-    $13::timestamptz, $14::timestamptz, $13::timestamptz, 'active',
+    $13::timestamptz, $14::timestamptz, $13::timestamptz, 'ACTIVE',
     $15, $16, $17,
     $18, $19::timestamptz, $19::timestamptz
 )
@@ -428,7 +428,7 @@ type InsertDelegationSessionParams struct {
 // 代行的 session 的 canonical 查詢。時間一律由模組傳入（now、idle_since = now − 閒置逾時），
 // 不用 DB 的 now()：測試注入時鐘，也讓同一個請求的判定都用同一個時刻。
 //
-// 「進行中」的述詞有四項：status = 'active'、ended_at IS NULL、now < expires_at、last_active_at > idle_since。
+// 「進行中」的述詞有四項：status = 'ACTIVE'、ended_at IS NULL、now < expires_at、last_active_at > idle_since。
 // DB 的 status 沒有 expired（到期在讀取時推導），少了後兩項，一個已經 hard 或閒置到期、但還沒被收斂的列會被
 // 當成進行中：衝突探測把它報成 9268／9269，兌換照樣交出 credential，撤回授權的確認框多數它一次。
 // 建立 session 並簽發 handoff code（同一句）。last_active_at 等於 issued_at。ON CONFLICT DO NOTHING 涵蓋每一個
@@ -579,7 +579,7 @@ SET handoff_code_hash = NULL, credential_hash = $1
 WHERE handoff_code_hash = $2
   AND handoff_expires_at > $3::timestamptz
   AND credential_hash IS NULL
-  AND status = 'active' AND ended_at IS NULL
+  AND status = 'ACTIVE' AND ended_at IS NULL
   AND $3::timestamptz < expires_at
   AND last_active_at > $4::timestamptz
 RETURNING id, display_code, credential_hash, handoff_code_hash, handoff_expires_at, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name, reason_code, reason_label, case_reference, capabilities, issued_at, expires_at, last_active_at, ended_at, revoked_at, revoked_by_admin_id, revoke_reason, status, revision, idempotency_key, create_request_id, create_correlation_id, create_user_agent, created_at, updated_at
@@ -691,7 +691,7 @@ func (q *Queries) ReissueDelegationHandoff(ctx context.Context, arg ReissueDeleg
 
 const revokeActiveDelegationsOfActor = `-- name: RevokeActiveDelegationsOfActor :many
 UPDATE delegation.delegated_operation_sessions
-SET status = 'revoked',
+SET status = 'REVOKED',
     revoked_at = date_trunc('second', $1::timestamptz),
     ended_at = LEAST(expires_at, date_trunc('second', $1::timestamptz)),
     revoke_reason = $2::text,
@@ -699,7 +699,7 @@ SET status = 'revoked',
     revision = revision + 1,
     updated_at = $1::timestamptz
 WHERE actor_admin_id = $4
-  AND status = 'active' AND ended_at IS NULL
+  AND status = 'ACTIVE' AND ended_at IS NULL
   AND $1::timestamptz < expires_at
   AND last_active_at > $5::timestamptz
 RETURNING id
@@ -742,7 +742,7 @@ func (q *Queries) RevokeActiveDelegationsOfActor(ctx context.Context, arg Revoke
 
 const revokeActiveDelegationsOfStore = `-- name: RevokeActiveDelegationsOfStore :many
 UPDATE delegation.delegated_operation_sessions
-SET status = 'revoked',
+SET status = 'REVOKED',
     revoked_at = date_trunc('second', $1::timestamptz),
     ended_at = LEAST(expires_at, date_trunc('second', $1::timestamptz)),
     revoke_reason = $2::text,
@@ -750,7 +750,7 @@ SET status = 'revoked',
     revision = revision + 1,
     updated_at = $1::timestamptz
 WHERE target_store_id = $4
-  AND status = 'active' AND ended_at IS NULL
+  AND status = 'ACTIVE' AND ended_at IS NULL
   AND $1::timestamptz < expires_at
   AND last_active_at > $5::timestamptz
 RETURNING id
@@ -792,7 +792,7 @@ func (q *Queries) RevokeActiveDelegationsOfStore(ctx context.Context, arg Revoke
 
 const revokeDelegationSession = `-- name: RevokeDelegationSession :one
 UPDATE delegation.delegated_operation_sessions
-SET status = 'revoked',
+SET status = 'REVOKED',
     revoked_at = date_trunc('second', $1::timestamptz),
     ended_at = COALESCE(ended_at, LEAST(expires_at, date_trunc('second', $1::timestamptz))),
     revoke_reason = $2::text,
@@ -801,7 +801,7 @@ SET status = 'revoked',
     updated_at = $1::timestamptz
 WHERE id = $4 AND revoked_at IS NULL
   AND (NOT $5::boolean OR (
-    status = 'active' AND ended_at IS NULL
+    status = 'ACTIVE' AND ended_at IS NULL
     AND $1::timestamptz < expires_at
     AND last_active_at > $6::timestamptz
   ))
@@ -868,7 +868,7 @@ func (q *Queries) RevokeDelegationSession(ctx context.Context, arg RevokeDelegat
 const touchDelegationSession = `-- name: TouchDelegationSession :one
 UPDATE delegation.delegated_operation_sessions
 SET last_active_at = CASE
-        WHEN status = 'active' AND ended_at IS NULL
+        WHEN status = 'ACTIVE' AND ended_at IS NULL
              AND $1::timestamptz < expires_at
              AND last_active_at > $2::timestamptz
         THEN date_trunc('second', $1::timestamptz)

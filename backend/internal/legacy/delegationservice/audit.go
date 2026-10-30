@@ -22,7 +22,7 @@ func toIntentInput(m *pb.RecordAuditIntentRequest) (delegation.AuditIntentInput,
 		SessionID:             sessionID,
 		Capability:            delegation.Capability(m.GetCapability()),
 		Action:                delegation.AuditAction(m.GetAction()),
-		ResourceType:          delegation.AuditResourceType(m.GetResourceType()),
+		ResourceType:          fromWire[delegation.AuditResourceType](m.GetResourceType()),
 		ResourceID:            m.GetResourceId(),
 		ResourceName:          m.GetResourceName(),
 		OperationReason:       m.GetOperationReason(),
@@ -33,7 +33,7 @@ func toIntentInput(m *pb.RecordAuditIntentRequest) (delegation.AuditIntentInput,
 		UserAgent:             m.GetUserAgent(),
 		PayloadHash:           m.GetPayloadHash(),
 		NotifySeller:          m.GetNotifySeller(),
-		Origin:                delegation.AuditOrigin(m.GetOrigin()),
+		Origin:                fromWire[delegation.AuditOrigin](m.GetOrigin()),
 	}
 	if raw := m.GetBeforeSnapshotJson(); raw != "" {
 		in.BeforeSnapshot = json.RawMessage(raw)
@@ -171,7 +171,7 @@ func (s *Server) ConfirmAuditResultBatch(ctx context.Context, req *connect.Reque
 // auditFilter 解析兩支稽核清單共用的篩選與分頁；失敗時回傳給操作者的訊息。
 func auditFilter(action, resourceType, result, from, to, page, pageSize string) (delegation.AuditLogFilter, delegation.DelegationPaging, string) {
 	f := delegation.AuditLogFilter{
-		Action: delegation.AuditAction(action), ResourceType: delegation.AuditResourceType(resourceType), Result: delegation.AuditResult(result),
+		Action: delegation.AuditAction(action), ResourceType: fromWire[delegation.AuditResourceType](resourceType), Result: delegation.AuditResult(result),
 	}
 	var p delegation.DelegationPaging
 	var ok bool
@@ -259,7 +259,7 @@ func (s *Server) GetSessionSummary(ctx context.Context, req *connect.Request[pb.
 		IssuedAt:                  formatTime(sess.IssuedAt),
 		EndedAt:                   optionalTime(sess.EndedAt),
 		DurationSeconds:           strconv.FormatInt(int64(sum.Duration.Seconds()), 10),
-		Status:                    string(sess.Status),
+		Status:                    toWire(sess.Status),
 		OperationCount:            strconv.FormatInt(sum.OperationCount, 10),
 		RiskOperationCount:        strconv.FormatInt(sum.RiskOperationCount, 10),
 		PendingAuditCount:         strconv.FormatInt(sum.PendingAuditCount, 10),
@@ -323,7 +323,7 @@ func (s *Server) ListSessions(ctx context.Context, req *connect.Request[pb.ListS
 			IssuedAt:                  formatTime(sess.IssuedAt),
 			ExpiresAt:                 formatTime(sess.ExpiresAt),
 			EndedAt:                   optionalTime(sess.EndedAt),
-			Status:                    string(sess.Status),
+			Status:                    toWire(sess.Status),
 			RevokedAt:                 optionalTime(sess.RevokedAt),
 			RevokedByAdminId:          optionalID(sess.RevokedByAdminID),
 			RevokedByAdminDisplayName: sess.RevokedByDisplayName,
@@ -344,15 +344,15 @@ func toAuditEntries(logs []delegation.AuditLog) []*pb.AuditLogEntry {
 			ConfirmedAt:   optionalTime(l.ConfirmedAt),
 			Action:        string(l.Action),
 			ActionLabel:   l.Action.Label(),
-			RiskLevel:     string(l.RiskLevel),
+			RiskLevel:     toWire(l.RiskLevel),
 			Capability:    string(l.Capability),
-			ResourceType:  string(l.ResourceType),
+			ResourceType:  toWire(l.ResourceType),
 			Result:        string(l.Result),
 			CaseReference: l.CaseReference,
 			CorrelationId: l.CorrelationID,
 			RequestId:     l.RequestID,
 			NotifiedAt:    optionalTime(l.NotifiedAt),
-			Origin:        string(l.Origin),
+			Origin:        toWire(l.Origin),
 			Actor:         toActor(l.Actor),
 			Target:        toTarget(l.Target),
 		}

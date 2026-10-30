@@ -48,7 +48,7 @@ func TestDisplayCodeIsRandomAndMatchesTheContract(t *testing.T) {
 func TestDelegationStatusFollowsTheOrderedRules(t *testing.T) {
 	issued := time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC)
 	s := store.DelegationDelegatedOperationSession{
-		Status: "active", IssuedAt: issued, ExpiresAt: issued.Add(30 * time.Minute), LastActiveAt: issued,
+		Status: "ACTIVE", IssuedAt: issued, ExpiresAt: issued.Add(30 * time.Minute), LastActiveAt: issued,
 	}
 	cases := []struct {
 		name string
@@ -60,7 +60,7 @@ func TestDelegationStatusFollowsTheOrderedRules(t *testing.T) {
 		{"閒置逾時的前一刻", issued.Add(model.DelegationIdleTimeout - time.Second), nil, model.DelegationActive},
 		{"閒置逾時", issued.Add(model.DelegationIdleTimeout), nil, model.DelegationExpired},
 		{"hard 到期", issued.Add(30 * time.Minute), func(s *store.DelegationDelegatedOperationSession) { s.LastActiveAt = issued.Add(29 * time.Minute) }, model.DelegationExpired},
-		{"撤銷優先於到期", issued.Add(time.Hour), func(s *store.DelegationDelegatedOperationSession) { s.Status = "revoked" }, model.DelegationRevoked},
+		{"撤銷優先於到期", issued.Add(time.Hour), func(s *store.DelegationDelegatedOperationSession) { s.Status = "REVOKED" }, model.DelegationRevoked},
 	}
 	for _, c := range cases {
 		row := s

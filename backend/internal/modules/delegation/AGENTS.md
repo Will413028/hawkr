@@ -23,7 +23,7 @@ schema `delegation`（`db/schema.sql`）五張表：`admin_eligibilities`（代�
 
 - credential 與 handoff code 只以 SHA-256 存，handoff 以一條 CAS 兌換一次，兩者不進 log。守門：`TestHandoffAndOperationCredentialsUseIndependentRandomTokens`、`TestStartDelegationReplay`。規格：`docs/modules/delegation.md` §3。
 - 管理員同時只代行一家、店家同時只被一位管理員代行。守門：DB 約束 `uidx_delegated_operation_sessions_active_actor`、`uidx_delegated_operation_sessions_active_store`。規格：§3。
-- 狀態只儲存 active、revoked，到期在讀取時推導；輪詢不延長閒置期限。守門：`TestDelegationStatusFollowsTheOrderedRules`、`TestIdleTimeout`。規格：§3。
+- 狀態只儲存 ACTIVE、REVOKED（儲存的代碼一律 UPPER_SNAKE，ADR 2026-09-25-codemeta-retirement D3；舊 gRPC 與事件仍傳小寫，轉換在 `internal/legacy/delegationservice/wire.go`；守門：`TestStoredCodesInChecksAreUpperSnake`），到期在讀取時推導；輪詢不延長閒置期限。守門：`TestDelegationStatusFollowsTheOrderedRules`、`TestIdleTimeout`。規格：§3。
 - 能力是封閉的九項，拒絕履約、退款與金流。守門：`TestCapabilitiesAreTheClosedNine`、DB CHECK `delegated_operation_sessions_capabilities_check`。規格：§3。
 - 店家層級授權列一旦存在，即遮蔽全域列。守門：`TestPreflightDenials`。規格：§4。
 - 授權寫入與治理歷史同 transaction；撤回同時撤銷該店進行中的工作階段。守門：`TestAuthorizationAndItsHistoryCommitTogether`、`TestRevokingTheAuthorizationEndsRunningSessions`。規格：§4。
