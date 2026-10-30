@@ -942,23 +942,25 @@ func TestDevAuth(t *testing.T) {
 	f.deps.Providers.Admin = dev.Admins()
 	f.m = New(f.deps)
 
-	buyer, err := f.m.DevSession(ctx, "dev_buyer")
+	id, buyer, err := f.m.DevNewSession(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	a, err := f.m.Authenticate(ctx, buyer)
-	if err != nil || a.Principal.Kind != PrincipalAccount {
+	if err != nil || a.Principal.Kind != PrincipalAccount || a.Principal.ID != id {
 		t.Fatalf("dev 的帳號 = %+v, %v", a, err)
 	}
-	if again, err := f.m.DevSession(ctx, "dev_buyer"); err != nil || again == buyer {
-		t.Fatalf("同一個 dev 使用者再建一個 session 要是新的 token：%v", err)
+	if again, err := f.m.DevSession(ctx, id); err != nil || again == buyer {
+		t.Fatalf("同一個 dev 帳號再建一個 session 要是新的 token：%v", err)
 	}
 	if n := f.count(t, `SELECT count(*) FROM identity.accounts`); n != 1 {
 		t.Fatalf("帳號數 = %d", n)
 	}
-	if _, err := f.m.DevSession(ctx, "alice"); err == nil {
-		t.Fatal("不是 dev_ 開頭的使用者要被拒絕")
+	if n := f.count(t, `SELECT count(*) FROM identity.account_identities`); n != 0 {
+		t.Fatalf("dev 帳號不該有登入身分：%d 列", n)
 	}
+	_, err = f.m.DevSession(ctx, id+1000)
+	wantKind(t, err, apperr.KindNotFound)
 	admin, _ := dev.AdminToken("dev_ops")
 	if adm, err := f.m.Authenticate(ctx, admin); err != nil || adm.Principal.Kind != PrincipalAdmin {
 		t.Fatalf("dev 的管理員 = %+v, %v", adm, err)
@@ -966,7 +968,7 @@ func TestDevAuth(t *testing.T) {
 	if err := f.m.DeleteAccount(ctx, a.Principal.ID); err != nil {
 		t.Fatal(err)
 	}
-	_, err = f.m.DevSession(ctx, "dev_buyer")
+	_, err = f.m.DevSession(ctx, id)
 	wantKind(t, err, apperr.KindUnauthenticated)
 	if n := f.count(t, `SELECT count(*) FROM identity.accounts`); n != 1 {
 		t.Fatalf("已刪除的 dev 使用者又建了帳號：帳號數 = %d", n)

@@ -289,8 +289,9 @@ dev-key:
 		openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out '$(DEV_AUTH_KEY_FILE)' 2>/dev/null && \
 		chmod 600 '$(DEV_AUTH_KEY_FILE)' && echo "產生 $(DEV_AUTH_KEY_FILE)"; }
 
-# 本機的登入：顧客在資料庫建一個 dev session 印出 token（帳號沒有時建立，需要 make migrate）；後台以 dev 金鑰簽 24 小時的 JWT，第一個請求時建立管理員。
-# 例：make dev-token args='-user dev_account_2001'（seed 的帳號）、make dev-token args='-admin -user dev_ops'
+# 本機的登入：顧客以帳號 ID 識別，在資料庫為該帳號建一個 dev session 印出 token（帳號不存在時失敗；不帶 -account 時建立一個沒有登入身分的新帳號，
+# ID 印到 stderr；需要 make migrate）；後台以 dev 金鑰簽 24 小時的 JWT，第一個請求時建立管理員。
+# 例：make dev-token args='-account 2001'（seed 的帳號）、make dev-token（新帳號）、make dev-token args='-admin -user dev_ops'
 dev-token: dev-key
 	@DEV_AUTH_KEY_FILE='$(DEV_AUTH_KEY_FILE)' DATABASE_URL='$(DATABASE_URL)' GOWORK=off go run ./cmd/hawkr dev-token $(args)
 

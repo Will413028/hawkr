@@ -354,7 +354,7 @@ func check(ctx context.Context, conn db.DBTX, stores []Store, rebuilt []AccountR
 	var sections []string
 	if len(conflicts) > 0 {
 		sections = append(sections, "下列店家屬於 01-account.sql 會重建的帳號，或佔用種子的 store_code；重建帳號會讓未關閉的店家失去 SELLER 角色。\n"+strings.Join(conflicts, "\n")+"\n"+
-			"請重建本機資料庫（01 的前提：改用這份 seed 前先重建本機 DB）；手動測試改用全新的 dev_<名稱> 帳號（.agents/skills/backend-e2e-verify/SKILL.md §2），不要用種子的帳號區間")
+			"請重建本機資料庫（01 的前提：改用這份 seed 前先重建本機 DB）；手動測試改用 make dev-token 不帶 -account 建立的新帳號（.agents/skills/backend-e2e-verify/SKILL.md §2），不要用種子的帳號區間")
 	}
 	if len(states) > 0 {
 		sections = append(sections, "種子店家有還在進行的生命週期狀態；它們有下游消費者（事件、停權期間、刪帳流程），種子不繞過它們去還原。\n"+strings.Join(states, "\n")+"\n"+

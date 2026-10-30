@@ -191,24 +191,25 @@ func newIdentity(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, c identityConfig, 
 
 // runDevToken 印出本機開發與特性測試的登入 token，不連任何外部 provider：
 //
-//   - 顧客：在資料庫建一個 dev session（App 種類，帳號沒有時建立，同 serve 一樣建立買家）並印出原文 token；需要 DATABASE_URL，
-//     而且 requireDevEnvironment 成立（DEV_AUTH_KEY_FILE 指向本機的 dev 金鑰，沒有正式的 Access 設定）。session 的效期同正式 session。
+//   - 顧客：在資料庫為既有的帳號建一個 dev session（App 種類）並印出原文 token；dev 使用者以帳號 ID 識別，不建任何登入身分。
+//     帳號不存在時回錯誤（非 0 結束），不帶 -account 時建立一個新帳號（同 serve 一樣建立買家），ID 印到 stderr、token 印到 stdout。
+//     需要 DATABASE_URL，而且 requireDevEnvironment 成立（DEV_AUTH_KEY_FILE 指向本機的 dev 金鑰，沒有正式的 Access 設定）。
+//     session 的效期同正式 session。
 //
 //   - 後台（-admin）：以 DEV_AUTH_KEY_FILE 的金鑰簽 24 小時的 JWT，serve 設了同一個 DEV_AUTH_KEY_FILE 才接受它，管理員在第一個請求時建立。
 //
-//     hawkr dev-token [-admin] [-user dev_<名稱>]
-func runDevToken(ctx context.Context, args []string, out io.Writer) error {
-	fs := flag.NewFlagSet("dev-token", flag.ContinueOnError)
-	admin := fs.Bool("admin", false, "簽後台的 token（否則是買家、賣家的）")
-	user := fs.String("user", "dev_buyer", "使用者的 ID，以 dev_ 開頭；本機 seed 的帳號是 dev_account_<帳號 ID>")
-	if err := fs.Parse(args); err != nil {
+//     hawkr dev-token [-account <帳號 ID>]
+//     hawkr dev-token -admin [-user dev_<名稱>]
+func runDevToken(ctx context.Context, args []string, out, errOut io.Writer) error {
+	opts, err := parseDevTokenArgs(args)
+	if err != nil {
 		return err
 	}
 	e := config.NewEnv()
 	if err := requireDevEnvironment(e); err != nil {
 		return err
 	}
-	if *admin {
+	if opts.admin {
 		key, err := readDevKey(e.StringOr("DEV_AUTH_KEY_FILE", ""))
 		if err != nil {
 			return fmt.Errorf("DEV_AUTH_KEY_FILE：%w", err)
@@ -217,7 +218,7 @@ func runDevToken(ctx context.Context, args []string, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		tok, err := dev.AdminToken(*user)
+		tok, err := dev.AdminToken(opts.user)
 		if err != nil {
 			return err
 		}
@@ -237,9 +238,58 @@ func runDevToken(ctx context.Context, args []string, out io.Writer) error {
 	bus := events.NewBus()
 	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
 	subscribeBuyerLifecycle(bus, buyers)
-	tok, err := identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log}).DevSession(ctx, *user)
+	return issueCustomerToken(ctx, identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log}), opts.account, out, errOut)
+}
+
+type devTokenOptions struct {
+	admin   bool
+	user    string // 後台的 dev 使用者，以 dev_ 開頭
+	account int64  // 0 是建立新帳號
+}
+
+func parseDevTokenArgs(args []string) (devTokenOptions, error) {
+	fs := flag.NewFlagSet("dev-token", flag.ContinueOnError)
+	admin := fs.Bool("admin", false, "簽後台的 token（否則是顧客的）")
+	user := fs.String("user", "dev_buyer", "後台使用者的 ID，以 dev_ 開頭；只用於 -admin")
+	account := fs.Int64("account", 0, "顧客：為這個帳號 ID 建 dev session；不帶時建立新帳號")
+	if err := fs.Parse(args); err != nil {
+		return devTokenOptions{}, err
+	}
+	set := map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
+	switch {
+	case *admin && set["account"]:
+		return devTokenOptions{}, errors.New("-account 只用於顧客，不能與 -admin 一起用")
+	case !*admin && set["user"]:
+		return devTokenOptions{}, errors.New("顧客以帳號 ID 識別：用 -account <帳號 ID>；-user 只用於 -admin")
+	case set["account"] && *account <= 0:
+		return devTokenOptions{}, fmt.Errorf("-account 要是正的帳號 ID，收到 %d", *account)
+	}
+	return devTokenOptions{admin: *admin, user: *user, account: *account}, nil
+}
+
+// devSessions 是 issueCustomerToken 用到的 identity 能力。
+type devSessions interface {
+	DevSession(ctx context.Context, accountID int64) (string, error)
+	DevNewAccount(ctx context.Context) (int64, error)
+}
+
+// issueCustomerToken 為 accountID 的帳號建 dev session 並把 token 印到 out；accountID 是 0 時先建立新帳號並把 ID 印到 errOut。
+// 帳號不存在是錯誤，不會默默建立。
+func issueCustomerToken(ctx context.Context, m devSessions, accountID int64, out, errOut io.Writer) error {
+	if accountID == 0 {
+		id, err := m.DevNewAccount(ctx)
+		if err != nil {
+			return err
+		}
+		accountID = id
+		if _, err := fmt.Fprintf(errOut, "帳號 ID：%d\n", accountID); err != nil {
+			return err
+		}
+	}
+	tok, err := m.DevSession(ctx, accountID)
 	if err != nil {
-		return err
+		return fmt.Errorf("帳號 %d：%w", accountID, err)
 	}
 	_, err = fmt.Fprintln(out, tok)
 	return err

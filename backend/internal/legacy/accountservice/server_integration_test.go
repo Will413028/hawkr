@@ -14,7 +14,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"uuid"
 
 	"connectrpc.com/connect"
 
@@ -100,7 +99,7 @@ func setup(t *testing.T) *fixture {
 func (f *fixture) account(t *testing.T, roles ...identity.Role) int64 {
 	t.Helper()
 	ctx := context.Background()
-	tok, err := f.m.DevSession(ctx, "dev_"+uuid.NewV7().String())
+	_, tok, err := f.m.DevNewSession(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

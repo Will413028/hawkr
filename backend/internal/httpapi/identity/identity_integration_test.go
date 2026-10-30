@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"slices"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -76,6 +77,9 @@ type fixture struct {
 	db     *db.DB
 	dev    *identity.DevAuth
 	buyers *buyer.Module
+
+	mu       sync.Mutex
+	accounts map[string]int64 // customerToken 的名稱 → 帳號 ID：同一個名稱是同一個帳號
 }
 
 type options struct {
@@ -141,7 +145,20 @@ func headers(kv ...string) connect.ClientOption {
 
 func (f *fixture) customerToken(t *testing.T, user string) string {
 	t.Helper()
-	tok, err := f.m.DevSession(t.Context(), user)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	id, ok := f.accounts[user]
+	if !ok {
+		var err error
+		if id, err = f.m.DevNewAccount(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if f.accounts == nil {
+			f.accounts = map[string]int64{}
+		}
+		f.accounts[user] = id
+	}
+	tok, err := f.m.DevSession(t.Context(), id)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -6,10 +6,8 @@ package identity
 import (
 	"context"
 	"embed"
-	"fmt"
 	"io/fs"
 	"log/slog"
-	"strings"
 	"time"
 	"uuid"
 
@@ -406,20 +404,32 @@ func (m *Module) ConsumeAppNonce(ctx context.Context, nonce string) error {
 	return m.session.ConsumeAppNonce(ctx, nonce)
 }
 
-// DevSession 為 dev 使用者（以 dev_ 開頭）建一個 App 種類的 session 並回傳原文 token，使用者的帳號沒有時建立。只給本機 dev token 與測試。
-func (m *Module) DevSession(ctx context.Context, user string) (string, error) {
-	if !strings.HasPrefix(user, "dev_") {
-		return "", fmt.Errorf("identity：dev 使用者 %q 必須以 dev_ 開頭", user)
-	}
-	id, err := m.account.EnsureDevAccount(ctx, user)
-	if err != nil {
+// DevSession 為既有的帳號建一個 App 種類的 session 並回傳原文 token；帳號不存在回 NotFound，已刪除回 Unauthenticated。
+// dev 使用者以帳號 ID 識別，不經過任何登入身分。只給本機 dev token 與測試。
+func (m *Module) DevSession(ctx context.Context, accountID int64) (string, error) {
+	if err := m.account.RequireDevAccount(ctx, accountID); err != nil {
 		return "", err
 	}
-	issued, err := m.session.Create(ctx, id, ClientApp)
+	issued, err := m.session.Create(ctx, accountID, ClientApp)
 	if err != nil {
 		return "", err
 	}
 	return issued.Token, nil
+}
+
+// DevNewAccount 建立一個沒有任何登入身分的帳號（同 serve 一樣建立買家）並回傳 ID。只給本機 dev token 與測試。
+func (m *Module) DevNewAccount(ctx context.Context) (int64, error) {
+	return m.account.CreateDevAccount(ctx)
+}
+
+// DevNewSession 建一個新的 dev 帳號與它的 session，回傳帳號 ID 與原文 token。只給測試。
+func (m *Module) DevNewSession(ctx context.Context) (int64, string, error) {
+	id, err := m.DevNewAccount(ctx)
+	if err != nil {
+		return 0, "", err
+	}
+	tok, err := m.DevSession(ctx, id)
+	return id, tok, err
 }
 
 // VerifyGoogle 驗證 vendor portal step-up 的 Google ID token，不登入或寫入；單體入口的 VerifySession 呼叫它。token 的 nonce 必須等於

@@ -180,7 +180,7 @@ func setup(t *testing.T) *fixture {
 	}
 	m := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log})
 	events.Subscribe(bus, m.OnAccountCreated)
-	buyerToken, err := id.DevSession(ctx, "dev_buyer_connect")
+	_, buyerToken, err := id.DevNewSession(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +281,7 @@ func TestConnectAuthorization(t *testing.T) {
 	accountAsAdmin := adminconnect.NewBuyerAdminServiceClient(f.http, f.base, clientOptions(f.buyerToken)...)
 	_, err = accountAsAdmin.GetBuyerStats(ctx, connect.NewRequest(&adminpb.GetBuyerStatsRequest{}))
 	wantCode(t, err, connect.CodePermissionDenied, "")
-	bareToken, err := f.id.DevSession(ctx, "dev_no_buyer")
+	_, bareToken, err := f.id.DevNewSession(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -440,7 +440,7 @@ func TestConnectAddressOwnershipAndPaging(t *testing.T) {
 	if token != "" || len(map[string]bool{got[0]: true, got[1]: true, got[2]: true}) != 3 {
 		t.Fatalf("paging=%v token=%q", got, token)
 	}
-	otherToken, err := f.id.DevSession(ctx, "dev_other_buyer")
+	_, otherToken, err := f.id.DevNewSession(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -761,7 +761,7 @@ func TestFollowStoreRejectsAStoreThatIsNotPubliclyExposable(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	f.stores.current = f.seller
-	ownerToken, err := f.id.DevSession(ctx, "dev_unfinished_store_owner")
+	_, ownerToken, err := f.id.DevNewSession(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

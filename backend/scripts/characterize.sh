@@ -132,7 +132,7 @@ start_bg monolith \
 dev_token() {
   (clean_env DEV_AUTH_KEY_FILE="$DEV_AUTH_KEY_FILE" "${LOG_DIR}/hawkr" dev-token "$@")
 }
-BUYER_TOKEN=$(dev_token -user dev_characterize_buyer)
+BUYER_TOKEN=$(dev_token)
 ADMIN_TOKEN=$(dev_token -admin -user dev_characterize_admin)
 
 # 管理員第一次認證時建立、而且沒有任何角色（ADR 2026-10-04-admin-roles）：GetSession 不需要權限，用它建立管理員，再以 CLI 授予 OWNER。

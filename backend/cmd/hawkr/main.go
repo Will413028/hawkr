@@ -96,7 +96,7 @@ func run(ctx context.Context, args []string) error {
 	case "migrate":
 		return runMigrate(ctx)
 	case "dev-token":
-		return runDevToken(ctx, args[1:], os.Stdout)
+		return runDevToken(ctx, args[1:], os.Stdout, os.Stderr)
 	case "dev-seed":
 		return runDevSeed(ctx, args[1:], os.Stdout)
 	case "reannounce-exposures":

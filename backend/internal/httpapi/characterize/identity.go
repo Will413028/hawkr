@@ -104,7 +104,7 @@ func EnvTokens(t *testing.T) map[Caller]string {
 // BuyerSession 為 dev 買家在 m 建一個 session 並回傳 token（帳號沒有時建立）。
 func BuyerSession(t *testing.T, m *identity.Module) string {
 	t.Helper()
-	tok, err := m.DevSession(t.Context(), "dev_characterize_buyer")
+	_, tok, err := m.DevNewSession(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}

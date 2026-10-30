@@ -127,11 +127,11 @@ func setup(t *testing.T) *fixture {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	bus := events.NewBus()
 	id := identity.New(identity.Deps{DB: d, Events: bus, Jobs: queue, Providers: identity.Providers{Admin: dev.Admins()}, Now: time.Now, Logger: log})
-	sellerToken, err := id.DevSession(ctx, "dev_seller_connect")
+	_, sellerToken, err := id.DevNewSession(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	otherToken, err := id.DevSession(ctx, "dev_other_connect")
+	_, otherToken, err := id.DevNewSession(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

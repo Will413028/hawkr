@@ -15,7 +15,7 @@ import (
 )
 
 // DevAuth 是本機開發與測試的後台登入：一把 RSA 金鑰，與接受它簽的 dev token 的後台 application，管理員在第一個請求時建立。
-// 顧客的 dev 登入是資料庫裡的 dev session（identity.Module.DevSession），不經過這裡。
+// 顧客的 dev 登入是資料庫裡的 dev session（identity.Module.DevSession，以帳號 ID），不經過這裡。
 type DevAuth struct {
 	key    *rsa.PrivateKey
 	admins model.AdminVerifier

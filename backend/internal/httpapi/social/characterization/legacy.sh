@@ -5,7 +5,7 @@
 # social-service 呼叫 account-service、buyer-service、seller-service 的 gRPC 時連單體的 legacy listener
 # （127.0.0.1:${LEGACY_PORT}）；product-service 不起（情境不帶 product_id）；RabbitMQ 連不上時 social-service 自己停用事件
 # 發布（internal/mq/di.go），所以不用起 MQ。賣家需要店家：套用 infra/seed-data/01-account.sql（帳號 9、4 是賣家，2001、2002
-# 是買家）再跑 hawkr dev-seed，token 以 hawkr dev-token 簽 dev_account_<帳號 ID>。
+# 是買家）再跑 hawkr dev-seed，token 以 hawkr dev-token -account <帳號 ID> 簽。
 
 legacy_start() {
   local social_port=19918
@@ -20,9 +20,9 @@ legacy_start() {
     PRODUCT_SERVICE_ADDR=127.0.0.1:1 ORDER_SERVICE_ADDR=127.0.0.1:1 CRM_SERVICE_ADDR=127.0.0.1:1 REVIEW_SERVICE_ADDR=127.0.0.1:1 \
     CORS_ALLOWED_ORIGINS=http://localhost:3000 \
     "${LOG_DIR}/hawkr" dev-seed) >"${LOG_DIR}/seed-stores.log" 2>&1
-  CHARACTERIZE_SELLER_TOKEN=$(dev_token -user dev_account_9)
-  CHARACTERIZE_SELLER2_TOKEN=$(dev_token -user dev_account_4)
-  CHARACTERIZE_BUYER2_TOKEN=$(dev_token -user dev_account_2002)
+  CHARACTERIZE_SELLER_TOKEN=$(dev_token -account 9)
+  CHARACTERIZE_SELLER2_TOKEN=$(dev_token -account 4)
+  CHARACTERIZE_BUYER2_TOKEN=$(dev_token -account 2002)
   export CHARACTERIZE_SELLER_TOKEN CHARACTERIZE_SELLER2_TOKEN CHARACTERIZE_BUYER2_TOKEN
 
   create_db social_characterization

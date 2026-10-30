@@ -65,3 +65,18 @@ func TestDevSeedRebuiltAccountsMatchTheAccountSeed(t *testing.T) {
 		t.Errorf("01-account.sql 刪除重建的帳號 %v 與 devSeedRebuiltAccounts %v 不一致：%s", got, want, where)
 	}
 }
+
+// dev 使用者以帳號 ID 識別，seed 不建任何假的登入身分（account_identities）；重置段落仍刪它，真人連結過的 seed 帳號才能重置。
+func TestAccountSeedCreatesNoLoginIdentities(t *testing.T) {
+	b, err := os.ReadFile("../../infra/seed-data/01-account.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql := string(b)
+	if regexp.MustCompile(`(?i)INSERT\s+INTO\s+identity\.account_identities`).MatchString(sql) {
+		t.Error("01-account.sql 不該插入 identity.account_identities")
+	}
+	if !strings.Contains(sql, "DELETE FROM identity.account_identities WHERE account_id IN (SELECT id FROM seed_accounts)") {
+		t.Error("01-account.sql 的重置段落要刪 seed 帳號的 account_identities")
+	}
+}

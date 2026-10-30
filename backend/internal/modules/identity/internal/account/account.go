@@ -396,49 +396,31 @@ func New(d Deps) *Service { return &Service{d: d} }
 
 func (m *Service) q(ctx context.Context) *store.Queries { return store.New(m.d.DB.Conn(ctx)) }
 
-// errDevRace 表示並發的呼叫先寫入了同一個 dev 身分；建帳的 transaction 回滾後重讀。
-var errDevRace = errors.New("identity：dev 身分被並發寫入")
-
-// EnsureDevAccount 回傳 dev 使用者（本機 seed 的帳號是 dev_account_<ID>）對應的帳號 ID，沒有時建立
-// （發出 AccountCreated）。dev 使用者以 account_identities 的一列識別，provider 用 GOOGLE、subject 是 dev_ 開頭的使用者 ID
-// （Google 的 sub 是純數字，不會相撞）。只給本機 dev token 與測試；已刪除的帳號回 Unauthenticated。
-func (m *Service) EnsureDevAccount(ctx context.Context, user string) (int64, error) {
-	for range 2 {
-		ident, err := m.q(ctx).GetIdentity(ctx, store.GetIdentityParams{Provider: string(model.ProviderGoogle), Subject: user})
-		switch {
-		case err == nil:
-			acct, err := m.q(ctx).GetAccount(ctx, ident.AccountID)
-			if err != nil {
-				return 0, fmt.Errorf("identity：讀取 dev 帳號：%w", err)
-			}
-			if acct.DeletedAt != nil {
-				return 0, apperr.Unauthenticated("dev 帳號 %s 已刪除", user)
-			}
-			return acct.ID, nil
-		case !errors.Is(err, pgx.ErrNoRows):
-			return 0, fmt.Errorf("identity：讀取 dev 身分：%w", err)
-		}
-		if err := m.createDevAccount(ctx, user); err != nil && !errors.Is(err, errDevRace) {
-			return 0, err
-		}
-	}
-	return 0, fmt.Errorf("identity：建立 dev 帳號 %s 後仍讀不到", user)
-}
-
-func (m *Service) createDevAccount(ctx context.Context, user string) error {
-	return m.d.DB.InTx(ctx, func(ctx context.Context) error {
-		q := m.q(ctx)
-		now := m.d.Now()
-		email := user + "@dev.localhost"
-		id, err := q.InsertFederatedAccount(ctx, store.InsertFederatedAccountParams{Email: &email, Now: now})
+// CreateDevAccount 建立一個沒有任何登入身分的帳號（發出 AccountCreated）並回傳 ID。dev 使用者以帳號 ID 識別，不建假的 account_identities。
+// 只給本機 dev token 與測試。
+func (m *Service) CreateDevAccount(ctx context.Context) (int64, error) {
+	var id int64
+	err := m.d.DB.InTx(ctx, func(ctx context.Context) error {
+		var err error
+		id, err = m.q(ctx).InsertFederatedAccount(ctx, store.InsertFederatedAccountParams{Now: m.d.Now()})
 		if err != nil {
 			return fmt.Errorf("identity：建立 dev 帳號：%w", err)
 		}
-		if _, err := q.InsertIdentity(ctx, store.InsertIdentityParams{Provider: string(model.ProviderGoogle), Subject: user, AccountID: id, Now: now}); errors.Is(err, pgx.ErrNoRows) {
-			return errDevRace
-		} else if err != nil {
-			return fmt.Errorf("identity：寫入 dev 身分：%w", err)
-		}
-		return events.Publish(ctx, m.d.Events, model.AccountCreated{AccountID: id, Name: user})
+		return events.Publish(ctx, m.d.Events, model.AccountCreated{AccountID: id, Name: "dev"})
 	})
+	return id, err
+}
+
+// RequireDevAccount 確認帳號存在且未刪除；不存在回 NotFound，已刪除回 Unauthenticated。只給本機 dev token 與測試。
+func (m *Service) RequireDevAccount(ctx context.Context, accountID int64) error {
+	acct, err := m.q(ctx).GetAccount(ctx, accountID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return apperr.NotFound("帳號 %d 不存在", accountID)
+	} else if err != nil {
+		return fmt.Errorf("identity：讀取 dev 帳號：%w", err)
+	}
+	if acct.DeletedAt != nil {
+		return apperr.Unauthenticated("dev 帳號 %d 已刪除", accountID)
+	}
+	return nil
 }
