@@ -79,7 +79,7 @@ func closeError(what string, e *amqp.Error) error {
 	if e == nil {
 		return fmt.Errorf("%s closed", what)
 	}
-	return fmt.Errorf("%s: %w", what, *e)
+	return fmt.Errorf("%s: %w", what, e)
 }
 
 func isNotFound(err error) bool {

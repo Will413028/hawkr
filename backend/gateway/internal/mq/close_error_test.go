@@ -7,7 +7,7 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-// TestConnCloseError 釘住 connCloseError 的 nil 處置與「包值不包指標」。
+// TestConnCloseError 釘住 connCloseError 的 nil 處置與「包指標」。
 // 理由與 pkg/mq 的同名測試相同：原位置在 runOnce 的 select 裡，要真的連上
 // broker 才走得到，內聯的話這兩件事沒有任何觀測點。
 func TestConnCloseError(t *testing.T) {
@@ -21,19 +21,19 @@ func TestConnCloseError(t *testing.T) {
 		if got, want := err.Error(), "amqp connection closed"; got != want {
 			t.Errorf("message = %q, want %q", got, want)
 		}
-		var target amqp.Error
+		var target *amqp.Error
 		if errors.As(err, &target) {
 			t.Error("沒有 amqp 原因時不該解得出 amqp.Error")
 		}
 	})
 
-	t.Run("非 nil：解得出值型別的 amqp.Error", func(t *testing.T) {
+	t.Run("非 nil：解得出 *amqp.Error", func(t *testing.T) {
 		e := &amqp.Error{Code: amqp.ConnectionForced, Reason: "CONNECTION_FORCED - broker forced connection closure"}
 		err := connCloseError(e)
 
-		var target amqp.Error
+		var target *amqp.Error
 		if !errors.As(err, &target) {
-			t.Fatal("應該解得出 amqp.Error（值型別）——包指標的話這裡會失敗")
+			t.Fatal("應該解得出 *amqp.Error——包值的話這裡會失敗")
 		}
 		if target.Code != amqp.ConnectionForced {
 			t.Errorf("Code = %d, want %d", target.Code, amqp.ConnectionForced)

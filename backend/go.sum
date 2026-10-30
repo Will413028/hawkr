@@ -116,8 +116,8 @@ github.com/pganalyze/pg_query_go/v6 v6.2.5/go.mod h1:JZoURQupTV7G8lS6OzKakgvp+xp
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 h1:o4JXh1EVt9k/+g42oCprj/FisM4qX9L3sZB3upGN2ZU=
 github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55/go.mod h1:OmDBASR4679mdNQnz2pUhc2G8CO2JrUAVFDRBDP/hJE=
-github.com/rabbitmq/amqp091-go v1.10.0 h1:STpn5XsHlHGcecLmMFCtg7mqq0RnD+zFr4uzukfVhBw=
-github.com/rabbitmq/amqp091-go v1.10.0/go.mod h1:Hy4jKW5kQART1u+JkDTF9YYOQUHXqMuhrgxOEeS7G4o=
+github.com/rabbitmq/amqp091-go v1.14.0 h1:RSaT7aOKt/OrkVUyswPDW29lnRz9psuGmfZFBmLqLek=
+github.com/rabbitmq/amqp091-go v1.14.0/go.mod h1:Hy4jKW5kQART1u+JkDTF9YYOQUHXqMuhrgxOEeS7G4o=
 github.com/riverqueue/river v0.47.0 h1:j8HOEyiOE8gRRhVS2wllKams372TH1WWiH6xCakXHqc=
 github.com/riverqueue/river v0.47.0/go.mod h1:Wgmwx475ZBd8lQnNrJgyG2DWH7BfyNiSAtv0rC9bJBQ=
 github.com/riverqueue/river/riverdriver v0.47.0 h1:qU8VkjdMl9plqeRg57SxsDUM/i/eECaSYejZ7HynC60=

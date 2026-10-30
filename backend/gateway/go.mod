@@ -11,7 +11,7 @@ require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
 	github.com/quasilyte/go-ruleguard/dsl v0.3.23
-	github.com/rabbitmq/amqp091-go v1.10.0
+	github.com/rabbitmq/amqp091-go v1.14.0
 	github.com/redis/go-redis/v9 v9.18.0
 	github.com/sony/gobreaker/v2 v2.4.0
 	github.com/stretchr/testify v1.11.1

@@ -4,7 +4,7 @@ go 1.27.1
 
 require (
 	github.com/Will413028/hawkr/go-pkg v0.0.0
-	github.com/jackc/pgx/v5 v5.8.0
+	github.com/jackc/pgx/v5 v5.9.2
 	github.com/redis/go-redis/v9 v9.18.0
 	go.opentelemetry.io/otel v1.44.0
 	go.opentelemetry.io/otel/sdk/metric v1.44.0
@@ -51,7 +51,7 @@ require (
 	github.com/prometheus/procfs v0.20.1 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.59.0 // indirect
-	github.com/rabbitmq/amqp091-go v1.10.0 // indirect
+	github.com/rabbitmq/amqp091-go v1.14.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.1 // indirect
 	go.mongodb.org/mongo-driver/v2 v2.5.0 // indirect

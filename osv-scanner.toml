@@ -10,29 +10,9 @@ ignoreUntil = 2026-11-29
 reason = "基準：Go github.com/klauspost/compress@1.18.5（CVSS 7.5，HIGH）；升級待核准"
 
 [[IgnoredVulns]]
-id = "GHSA-27gv-rfvv-22mv"
-ignoreUntil = 2026-11-29
-reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 7.0，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
 id = "GHSA-2v4p-qf9q-27wj"
 ignoreUntil = 2026-11-29
 reason = "基準：Go google.golang.org/grpc@1.82.0, google.golang.org/grpc@1.83.0（CVSS 8.7，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-33mj-cw25-m34h"
-ignoreUntil = 2026-11-06
-reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 9.4，CRITICAL）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-465g-fh3v-9jw4"
-ignoreUntil = 2026-11-29
-reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.7，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-4v58-74mf-rjx3"
-ignoreUntil = 2026-11-29
-reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.9，HIGH）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-4w3g-jfj2-cw2q"
@@ -40,24 +20,9 @@ ignoreUntil = 2027-01-28
 reason = "基準：Go github.com/go-jose/go-jose/v4@4.1.4（CVSS 6.9，MEDIUM）；升級待核准"
 
 [[IgnoredVulns]]
-id = "GHSA-6c5v-hqjr-5xxp"
-ignoreUntil = 2026-11-29
-reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.9，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
 id = "GHSA-8wmf-6v46-5gfg"
 ignoreUntil = 2027-01-28
 reason = "基準：Go go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc@1.40.0, go.opentelemetry.io/otel/exporters/otlp/otlptrace@1.40.0 等（CVSS 2.0，LOW）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-9jj7-4m8r-rfcm"
-ignoreUntil = 2026-11-06
-reason = "基準：Go github.com/jackc/pgx/v5@5.8.0（CVSS 9.8，CRITICAL）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-c5pq-fr2g-9jpf"
-ignoreUntil = 2026-11-06
-reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 9.5，CRITICAL）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-hfg8-hc9c-6c3h"
@@ -68,16 +33,6 @@ reason = "基準：Go github.com/moby/go-archive@0.2.0（CVSS 7.1，HIGH）；�
 id = "GHSA-hrxh-6v49-42gf"
 ignoreUntil = 2026-11-29
 reason = "基準：Go google.golang.org/grpc@1.82.0（CVSS 8.8，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-j497-x9hr-x34x"
-ignoreUntil = 2026-11-06
-reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 9.1，CRITICAL）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-j88v-2chj-qfwx"
-ignoreUntil = 2027-01-28
-reason = "基準：Go github.com/jackc/pgx/v5@5.8.0（CVSS 2.3，LOW）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GHSA-mgcc-cww5-fp2q"
@@ -95,16 +50,6 @@ ignoreUntil = 2027-01-28
 reason = "基準：Go google.golang.org/grpc@1.82.0, google.golang.org/grpc@1.83.0（CVSS 6.3，MEDIUM）；升級待核准"
 
 [[IgnoredVulns]]
-id = "GHSA-r9c8-gcjp-xfwh"
-ignoreUntil = 2026-11-29
-reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.9，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-rm6m-hrcw-jw33"
-ignoreUntil = 2026-11-29
-reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.2，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
 id = "GHSA-vp52-pcj8-j9qc"
 ignoreUntil = 2026-11-29
 reason = "基準：Go google.golang.org/grpc@1.82.0, google.golang.org/grpc@1.83.0（CVSS 8.7，HIGH）；升級待核准"
@@ -118,36 +63,6 @@ reason = "基準：Go github.com/quic-go/quic-go@0.59.0（CVSS 5.3，MEDIUM）�
 id = "GHSA-vvm8-gf78-28g4"
 ignoreUntil = 2027-01-28
 reason = "基準：Go github.com/go-jose/go-jose/v4@4.1.4（CVSS 6.9，MEDIUM）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-w6r9-248c-frg8"
-ignoreUntil = 2027-01-28
-reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 6.3，MEDIUM）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-xgrm-4fwx-7qm8"
-ignoreUntil = 2026-11-06
-reason = "基準：Go github.com/jackc/pgx/v5@5.8.0（CVSS 9.8，CRITICAL）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GHSA-xwwf-m8fg-p9q2"
-ignoreUntil = 2026-11-29
-reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.9，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GO-2026-4771"
-ignoreUntil = 2026-11-06
-reason = "基準：Go github.com/jackc/pgx/v5@5.8.0（CVSS 9.8，CRITICAL）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GO-2026-4772"
-ignoreUntil = 2026-11-06
-reason = "基準：Go github.com/jackc/pgx/v5@5.8.0（CVSS 9.8，CRITICAL）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GO-2026-5004"
-ignoreUntil = 2027-01-28
-reason = "基準：Go github.com/jackc/pgx/v5@5.8.0（CVSS 2.3，LOW）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GO-2026-5676"
@@ -195,11 +110,6 @@ ignoreUntil = 2026-11-29
 reason = "基準：Go golang.org/x/crypto@0.54.0, golang.org/x/crypto@0.55.0（無 CVSS 分數，UNSCORED）；升級待核准"
 
 [[IgnoredVulns]]
-id = "GO-2026-6372"
-ignoreUntil = 2026-11-29
-reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.9，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
 id = "GO-2026-6441"
 ignoreUntil = 2027-01-28
 reason = "基準：Go google.golang.org/grpc@1.82.0, google.golang.org/grpc@1.83.0（CVSS 6.3，MEDIUM）；升級待核准"
@@ -208,51 +118,6 @@ reason = "基準：Go google.golang.org/grpc@1.82.0, google.golang.org/grpc@1.83
 id = "GO-2026-6443"
 ignoreUntil = 2026-11-29
 reason = "基準：Go google.golang.org/grpc@1.82.0, google.golang.org/grpc@1.83.0（CVSS 8.7，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GO-2026-6491"
-ignoreUntil = 2026-11-29
-reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 7.0，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GO-2026-6492"
-ignoreUntil = 2026-11-06
-reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 9.4，CRITICAL）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GO-2026-6493"
-ignoreUntil = 2026-11-29
-reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.7，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GO-2026-6494"
-ignoreUntil = 2026-11-29
-reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.9，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GO-2026-6496"
-ignoreUntil = 2026-11-06
-reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 9.5，CRITICAL）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GO-2026-6498"
-ignoreUntil = 2026-11-06
-reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 9.1，CRITICAL）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GO-2026-6500"
-ignoreUntil = 2026-11-29
-reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.9，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GO-2026-6502"
-ignoreUntil = 2026-11-29
-reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.2，HIGH）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GO-2026-6503"
-ignoreUntil = 2026-11-29
-reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 8.9，HIGH）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GO-2026-6505"
@@ -293,11 +158,6 @@ reason = "基準：Go golang.org/x/text@0.40.0（無 CVSS 分數，UNSCORED）�
 id = "GO-2026-6686"
 ignoreUntil = 2027-01-28
 reason = "基準：Go github.com/moby/sys/user@0.4.0（CVSS 5.5，MEDIUM）；升級待核准"
-
-[[IgnoredVulns]]
-id = "GO-2026-6700"
-ignoreUntil = 2027-01-28
-reason = "基準：Go github.com/rabbitmq/amqp091-go@1.10.0（CVSS 6.3，MEDIUM）；升級待核准"
 
 [[IgnoredVulns]]
 id = "GO-2026-6860"

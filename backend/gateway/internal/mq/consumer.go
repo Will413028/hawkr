@@ -103,18 +103,19 @@ func (c *Consumer) Run(ctx context.Context) {
 //
 //  1. nil 判斷。原本只判 channel 是否關閉，NotifyClose 送 nil 時會把一個 nil
 //     *amqp.Error 包進 error 介面——之後任何人呼叫它的 Error() 都會 panic
-//     （value receiver + nil 指標）。pkg/mq/resilient.go 的同款迴圈本來就有
+//     （nil 指標解參考）。pkg/mq/resilient.go 的同款迴圈本來就有
 //     這個判斷，這裡補齊。
-//  2. 包**值**不包指標。理由與 pkg/mq/resilient.go 的 closeError 相同（見該處
-//     完整說明）：value receiver 的 error 包成指標會讓 errors.Is/As 的慣用寫法
-//     失效，go1.27 起的 go vet 也會報。
+//  2. 包**指標**。amqp091-go v1.13 起 Error() 是 pointer receiver，只有 *amqp.Error
+//     實作 error：包指標才能讓 errors.As(err, &target)（target 為 *amqp.Error）
+//     與 errors.Is(err, e) 成立，也是 go vet 接受的唯一形狀。
+//     （v1.10 時是 value receiver，當時包值；升級時一併改成指標。）
 //
 // 抽成函式的理由同上：原位置在 runOnce 的 select 裡，要真的連上 broker 才走得到。
 func connCloseError(e *amqp.Error) error {
 	if e == nil {
 		return fmt.Errorf("amqp connection closed")
 	}
-	return fmt.Errorf("amqp connection error: %w", *e)
+	return fmt.Errorf("amqp connection error: %w", e)
 }
 
 // runOnce performs a single connect-consume-disconnect cycle。
