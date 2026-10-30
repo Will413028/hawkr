@@ -19,7 +19,7 @@ import (
 func setupStorefrontResolveProbe(h *Holder) *gin.Engine {
 	r := gin.New()
 	r.GET("/probe/:id", func(c *gin.Context) {
-		id, ok := h.resolveStorefrontSellerID(c, c.Param("id"))
+		id, ok := h.requireStore(c, c.Param("id"), gateExists)
 		if !ok {
 			return
 		}

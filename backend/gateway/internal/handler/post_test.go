@@ -72,7 +72,7 @@ func newPostHolder(mc *mockSocialServiceClient) *Holder {
 }
 
 // sellerClientResolvingStoreIDForTest wires a Seller client whose
-// GetSellerByStoreID (used by resolveStorefrontSellerID) always
+// GetSellerByStoreID (used by requireStore) always
 // resolves to storeID, regardless of the id it was called with — enough to
 // exercise handlers that resolve a storefront path id (store_id or
 // store_code) before querying a downstream service keyed by store_id.

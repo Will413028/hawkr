@@ -160,53 +160,6 @@ func (h *Holder) GetSellerInfo(c *gin.Context) {
 	response.OK(c, toPublicSellerInfoDTO(resp.Data, h.MediaBaseURL))
 }
 
-// resolveStorefrontSellerID validates a public storefront path id as a
-// store_id (the PK surrogate every downstream service call is keyed by) and
-// confirms the store exists and is not closed. store_code is not accepted:
-// the seller RPC looks stores up by store_id only, so callers resolve a
-// store_code through SellerPublicService.GetStore first. On failure the error
-// response has already been written; callers must return immediately when ok
-// is false.
-func (h *Holder) resolveStorefrontSellerID(c *gin.Context, idParam string) (storeID int64, ok bool) {
-	rawID, err := strconv.ParseInt(idParam, 10, 64)
-	if err != nil || rawID <= 0 {
-		response.BadRequest(c, "invalid seller id")
-		return 0, false
-	}
-	resp, err := h.Seller.GetSellerByStoreID(c.Request.Context(), rawID)
-	if err != nil {
-		pkglogger.Info(c.Request.Context(), "Failed to resolve seller id", zap.Error(err))
-		response.GrpcErr(c, "seller", err)
-		return 0, false
-	}
-	if resp.Code != 0 || resp.Data == nil {
-		response.GrpcResult(c, resp.Code, resp.Message, nil)
-		return 0, false
-	}
-	return rawID, true
-}
-
-// storeMeta reads the store's exposure flags. On failure the error response
-// has already been written; callers must return immediately when ok is false.
-func (h *Holder) storeMeta(c *gin.Context, storeID int64) (meta *pb.SellerMeta, ok bool) {
-	resp, err := h.Seller.BatchGetSellerMeta(c.Request.Context(), []int64{storeID})
-	if err != nil {
-		pkglogger.Info(c.Request.Context(), "Failed to read seller meta", zap.Error(err))
-		response.GrpcErr(c, "seller", err)
-		return nil, false
-	}
-	if resp.Code != 0 {
-		response.GrpcResult(c, resp.Code, resp.Message, nil)
-		return nil, false
-	}
-	meta = resp.Sellers[storeID]
-	if meta == nil {
-		response.NotFound(c, "seller not found")
-		return nil, false
-	}
-	return meta, true
-}
-
 // GetSellerStats returns merchant statistics
 // @Summary      取得商家統計資料
 // @Description  取得商家的商品數、訂單數、銷售額等統計資料
@@ -262,7 +215,7 @@ func (h *Holder) GetSellerStats(c *gin.Context) {
 // @Failure      404  {object}  object{code=int,message=string}
 // @Router       /public/sellers/{id}/products [get]
 func (h *Holder) GetSellerProducts(c *gin.Context) {
-	storeID, ok := h.resolveStorefrontSellerID(c, c.Param("id"))
+	storeID, ok := h.requireStore(c, c.Param("id"), gateExists)
 	if !ok {
 		return
 	}

@@ -6,13 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"strconv"
+	"sync"
 	"time"
 
 	pb "github.com/Will413028/hawkr/go-pkg/proto/im"
-	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
 
@@ -255,19 +253,47 @@ func (h *Holder) serveChatWebSocketGRPC(ctx context.Context, clientConn *websock
 	}
 }
 
+// chatGateCacheMax bounds the per-connection decision cache; once full, new
+// targets are simply re-checked on every frame (no eviction).
+const chatGateCacheMax = 256
+
 // chatFrameTargetGate returns the WebSocket counterpart of the REST
 // SendChatMessage gate: a buyer frame addressed to `to` is allowed only when
-// resolveChatTargetID accepts it (existing, non-closed store that has had a
-// public card). Sellers pass through unchanged; any resolver failure denies
-// (fail closed). resolveChatTargetID writes its error to a gin context, so it
-// runs on a discarded one: the upgraded connection cannot carry an HTTP reply.
+// checkStoreGate(gateCard) accepts it (existing, non-closed store that has had
+// a public card). Sellers pass through unchanged; any failure denies (fail
+// closed). Definitive decisions (allow, or a store that is not found / has no
+// card) are cached per connection and target so a busy conversation does not
+// re-RPC per frame; invalid ids and upstream errors are never cached. The
+// cache is bounded by chatGateCacheMax. Trade-off: a store that is closed
+// after the first allowed frame stays reachable until the connection ends.
 func (h *Holder) chatFrameTargetGate(ctx context.Context, loginRole int32) func(to string) bool {
+	if loginRole == 2 {
+		return func(string) bool { return true }
+	}
+	var mu sync.Mutex
+	decided := make(map[int64]bool)
 	return func(to string) bool {
-		sc, _ := gin.CreateTestContext(httptest.NewRecorder())
-		sc.Request = (&http.Request{}).WithContext(ctx)
-		sc.Set("accountType", int(loginRole))
-		_, ok := h.resolveChatTargetID(sc, to)
-		return ok
+		storeID, err := strconv.ParseInt(to, 10, 64)
+		if err != nil || storeID <= 0 {
+			return false
+		}
+		mu.Lock()
+		allowed, hit := decided[storeID]
+		mu.Unlock()
+		if hit {
+			return allowed
+		}
+		gerr := h.checkStoreGate(ctx, storeID, gateCard)
+		if gerr != nil && gerr.kind != gateNotFound {
+			return false
+		}
+		allowed = gerr == nil
+		mu.Lock()
+		if len(decided) < chatGateCacheMax {
+			decided[storeID] = allowed
+		}
+		mu.Unlock()
+		return allowed
 	}
 }
 

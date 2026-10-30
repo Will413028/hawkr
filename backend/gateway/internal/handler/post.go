@@ -67,7 +67,7 @@ func (h *Holder) GetLatestPosts(c *gin.Context) {
 // @Failure      503  {object}  object{code=int,message=string}
 // @Router       /public/sellers/{id}/posts [get]
 func (h *Holder) GetSellerPosts(c *gin.Context) {
-	storeID, ok := h.resolveStorefrontSellerID(c, c.Param("id"))
+	storeID, ok := h.requireStore(c, c.Param("id"), gateExists)
 	if !ok {
 		return
 	}

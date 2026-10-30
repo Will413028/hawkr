@@ -328,14 +328,8 @@ type PublicSellerReviewStatsResponse struct {
 // @Failure      404  {object}  object{code=int,message=string}  "店家不存在或此刻不可曝光"
 // @Router       /public/sellers/{id}/reviews [get]
 func (h *Holder) GetPublicSellerReviews(c *gin.Context) {
-	storeID, ok := h.resolveStorefrontSellerID(c, c.Param("id"))
+	storeID, ok := h.requireStore(c, c.Param("id"), gateExposable)
 	if !ok {
-		return
-	}
-	if meta, ok := h.storeMeta(c, storeID); !ok {
-		return
-	} else if !meta.CanAcceptOrders {
-		response.NotFound(c, "seller not found")
 		return
 	}
 
@@ -398,14 +392,8 @@ func (h *Holder) GetPublicSellerReviews(c *gin.Context) {
 // @Failure      404  {object}  object{code=int,message=string}  "店家不存在或此刻不可曝光"
 // @Router       /public/sellers/{id}/reviews/stats [get]
 func (h *Holder) GetPublicSellerReviewStats(c *gin.Context) {
-	storeID, ok := h.resolveStorefrontSellerID(c, c.Param("id"))
+	storeID, ok := h.requireStore(c, c.Param("id"), gateExposable)
 	if !ok {
-		return
-	}
-	if meta, ok := h.storeMeta(c, storeID); !ok {
-		return
-	} else if !meta.CanAcceptOrders {
-		response.NotFound(c, "seller not found")
 		return
 	}
 

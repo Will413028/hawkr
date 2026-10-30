@@ -140,16 +140,8 @@ func (h *Holder) resolveChatTargetID(c *gin.Context, targetID string) (string, b
 	if parseAccountType(c) == 2 {
 		return targetID, true
 	}
-	storeID, ok := h.resolveStorefrontSellerID(c, targetID)
+	storeID, ok := h.requireStore(c, targetID, gateCard)
 	if !ok {
-		return "", false
-	}
-	meta, ok := h.storeMeta(c, storeID)
-	if !ok {
-		return "", false
-	}
-	if !meta.HasPublicCard {
-		response.NotFound(c, "seller not found")
 		return "", false
 	}
 	return strconv.FormatInt(storeID, 10), true

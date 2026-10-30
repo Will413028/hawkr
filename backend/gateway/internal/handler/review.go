@@ -209,12 +209,8 @@ func (h *Holder) requireExposableProductStore(c *gin.Context, productID string) 
 		response.NotFound(c, "product not found")
 		return false
 	}
-	meta, ok := h.storeMeta(c, storeID)
-	if !ok {
-		return false
-	}
-	if !meta.CanAcceptOrders {
-		response.NotFound(c, "product not found")
+	if gerr := h.checkStoreGate(c.Request.Context(), storeID, gateExposable); gerr != nil {
+		writeStoreGateError(c, gerr, "product not found")
 		return false
 	}
 	return true

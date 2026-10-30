@@ -373,7 +373,7 @@ func TestSendChatMessage_SuspendedButOncePublicStore_Succeeds(t *testing.T) {
 
 // 賣家不存在（seller 模組回 NotFound）時必須直接回錯，不能讓 room_id 存進
 // 一個查無資料的代理鍵——那樣訊息「送出成功」但對話列表永遠空白，使用者拿不到
-// 任何錯誤訊號。狀態碼比照 resolveStorefrontSellerID 既有慣例（見
+// 任何錯誤訊號。狀態碼比照 requireStore 既有慣例（見
 // TestResolveStorefrontSellerID_NotFound）。
 func TestSendChatMessage_UnknownSeller_Returns404(t *testing.T) {
 	mock := &mockIMServiceClient{
