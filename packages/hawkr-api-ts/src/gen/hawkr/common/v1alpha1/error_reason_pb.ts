@@ -9,7 +9,7 @@ import { enumDesc, fileDesc } from "@bufbuild/protobuf/codegenv2";
  * Describes the file hawkr/common/v1alpha1/error_reason.proto.
  */
 export const file_hawkr_common_v1alpha1_error_reason: GenFile = /*@__PURE__*/
-  fileDesc("CihoYXdrci9jb21tb24vdjFhbHBoYTEvZXJyb3JfcmVhc29uLnByb3RvEhVoYXdrci5jb21tb24udjFhbHBoYTEq5AIKC0Vycm9yUmVhc29uEhwKGEVSUk9SX1JFQVNPTl9VTlNQRUNJRklFRBAAEhQKEFZFUlNJT05fQ09ORkxJQ1QQARIUChBTRUxMRVJfU1VTUEVOREVEEAMSGAoUUFJPU1BFQ1RfTUFUQ0hfRk9VTkQQBBIYChRQUk9TUEVDVF9UQVhfSURfSEVMRBAKEhYKEkFHUkVFTUVOVF9PVVREQVRFRBAGEh4KGlNFTExFUl9SRVFVSVJFTUVOVF9NSVNTSU5HEAcSGwoXU1RPUkVfT1BFTklOR19TVVNQRU5ERUQQCBIcChhTVE9SRV9PUEVOSU5HX1RFUk1JTkFURUQQCRIVChFBQ0NPVU5UX0hBU19TVE9SRRALEhUKEUFDQ09VTlRfU1VTUEVOREVEEAwiBAgCEAIiBAgFEAUqElBIT05FX0NPREVfRVhQSVJFRCoWQUNDT1VOVF9IQVNfT1BFTl9TVE9SRWIGcHJvdG8z");
+  fileDesc("CihoYXdrci9jb21tb24vdjFhbHBoYTEvZXJyb3JfcmVhc29uLnByb3RvEhVoYXdrci5jb21tb24udjFhbHBoYTEqoAMKC0Vycm9yUmVhc29uEhwKGEVSUk9SX1JFQVNPTl9VTlNQRUNJRklFRBAAEhQKEFZFUlNJT05fQ09ORkxJQ1QQARIUChBTRUxMRVJfU1VTUEVOREVEEAMSGAoUUFJPU1BFQ1RfTUFUQ0hfRk9VTkQQBBIYChRQUk9TUEVDVF9UQVhfSURfSEVMRBAKEhYKEkFHUkVFTUVOVF9PVVREQVRFRBAGEh4KGlNFTExFUl9SRVFVSVJFTUVOVF9NSVNTSU5HEAcSGwoXU1RPUkVfT1BFTklOR19TVVNQRU5ERUQQCBIcChhTVE9SRV9PUEVOSU5HX1RFUk1JTkFURUQQCRIVChFBQ0NPVU5UX0hBU19TVE9SRRALEhUKEUFDQ09VTlRfU1VTUEVOREVEEAwSGwoXSURFTlRJVFlfQUxSRUFEWV9MSU5LRUQQDRIdChlSRUFVVEhFTlRJQ0FUSU9OX1JFUVVJUkVEEA4iBAgCEAIiBAgFEAUqElBIT05FX0NPREVfRVhQSVJFRCoWQUNDT1VOVF9IQVNfT1BFTl9TVE9SRWIGcHJvdG8z");
 
 /**
  * ErrorReason 是錯誤 details 裡 google.rpc.ErrorInfo.reason 可以用的值，domain 是 hawkr
@@ -115,6 +115,24 @@ export enum ErrorReason {
    * @generated from enum value: ACCOUNT_SUSPENDED = 12;
    */
   ACCOUNT_SUSPENDED = 12,
+
+  /**
+   * 要連結的登入方式（Google、LINE 的身分）已經連結到另一個帳號，包含已刪除帳號留下的身分（搭配 already_exists）；什麼都沒有改。
+   * client 顯示 LocalizedMessage，請使用者改用那個帳號登入，或換一個登入方式。
+   * IdentityAppService.LinkIdentity（web 的連結走 /api/auth，不在 Connect）。
+   *
+   * @generated from enum value: IDENTITY_ALREADY_LINKED = 13;
+   */
+  IDENTITY_ALREADY_LINKED = 13,
+
+  /**
+   * 這個操作要求最近重新驗證過，而目前的 session 沒有（搭配 failed_precondition）：IdentityAppService.RevokeSession 要求目前的 session
+   * 在 15 分鐘內以 provider 驗證過。client 引導使用者重新走一次登入（web 的 /api/auth/{provider}/start、App 的 ExchangeIdToken，
+   * 登入會換發新 session），再重送。
+   *
+   * @generated from enum value: REAUTHENTICATION_REQUIRED = 14;
+   */
+  REAUTHENTICATION_REQUIRED = 14,
 }
 
 /**

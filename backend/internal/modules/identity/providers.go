@@ -36,6 +36,15 @@ type (
 // NewWebLogin 建立 Google 或 LINE 的 web 登入；cfg.Provider 指定哪一家。
 func NewWebLogin(cfg WebLoginConfig) (*WebLogin, error) { return provider.NewWebLogin(cfg) }
 
+// AppLogin 驗證一個 provider 的原生 SDK 簽發給 App 的 ID token；AppLoginConfig 是它的設定。
+type (
+	AppLogin       = provider.AppLogin
+	AppLoginConfig = provider.AppLoginConfig
+)
+
+// NewAppLogin 建立 Google 或 LINE 的 App 登入驗證；cfg.Provider 指定哪一家。
+func NewAppLogin(cfg AppLoginConfig) (*AppLogin, error) { return provider.NewAppLogin(cfg) }
+
 // NewClerk 建立 Clerk application 的 client。
 func NewClerk(cfg ClerkConfig) (Clerk, error) { return provider.NewClerk(cfg) }
 

@@ -33,6 +33,52 @@ class Role extends $pb.ProtobufEnum {
   const Role._(super.value, super.name);
 }
 
+/// LoginProvider 是聯合登入的 provider。值名去掉前綴等於資料庫與 identity 模組的 provider 值。
+class LoginProvider extends $pb.ProtobufEnum {
+  static const LoginProvider LOGIN_PROVIDER_UNSPECIFIED =
+      LoginProvider._(0, _omitEnumNames ? '' : 'LOGIN_PROVIDER_UNSPECIFIED');
+  static const LoginProvider LOGIN_PROVIDER_GOOGLE =
+      LoginProvider._(1, _omitEnumNames ? '' : 'LOGIN_PROVIDER_GOOGLE');
+  static const LoginProvider LOGIN_PROVIDER_LINE =
+      LoginProvider._(2, _omitEnumNames ? '' : 'LOGIN_PROVIDER_LINE');
+
+  static const $core.List<LoginProvider> values = <LoginProvider>[
+    LOGIN_PROVIDER_UNSPECIFIED,
+    LOGIN_PROVIDER_GOOGLE,
+    LOGIN_PROVIDER_LINE,
+  ];
+
+  static final $core.List<LoginProvider?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static LoginProvider? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const LoginProvider._(super.value, super.name);
+}
+
+/// ClientKind 是 session 的 client 種類，決定閒置逾時（web 7 天、App 14 天）。
+class ClientKind extends $pb.ProtobufEnum {
+  static const ClientKind CLIENT_KIND_UNSPECIFIED =
+      ClientKind._(0, _omitEnumNames ? '' : 'CLIENT_KIND_UNSPECIFIED');
+  static const ClientKind CLIENT_KIND_WEB =
+      ClientKind._(1, _omitEnumNames ? '' : 'CLIENT_KIND_WEB');
+  static const ClientKind CLIENT_KIND_APP =
+      ClientKind._(2, _omitEnumNames ? '' : 'CLIENT_KIND_APP');
+
+  static const $core.List<ClientKind> values = <ClientKind>[
+    CLIENT_KIND_UNSPECIFIED,
+    CLIENT_KIND_WEB,
+    CLIENT_KIND_APP,
+  ];
+
+  static final $core.List<ClientKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static ClientKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ClientKind._(super.value, super.name);
+}
+
 /// DeletionState 是申請之後帳號的狀態。
 class DeleteAccountResponse_DeletionState extends $pb.ProtobufEnum {
   static const DeleteAccountResponse_DeletionState DELETION_STATE_UNSPECIFIED =

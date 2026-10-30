@@ -3,6 +3,7 @@ package oidc
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
@@ -27,6 +28,7 @@ const (
 	GoogleJWKS           = "https://www.googleapis.com/oauth2/v3/certs"
 	AppleIssuer          = "https://appleid.apple.com"
 	AppleJWKS            = "https://appleid.apple.com/auth/keys"
+	LineJWKS             = "https://api.line.me/oauth2/v2.1/certs"
 	fetchTimeout         = 5 * time.Second
 	minRefreshInterval   = time.Minute
 	claimLeeway          = 5 * time.Second
@@ -41,6 +43,9 @@ type Config struct {
 	JWKSURL      string
 	PublicKey    *rsa.PublicKey
 	PublicKeyPEM string
+	// Algorithm 是遠端公鑰（JWKSURL）簽章的演算法：RS256（預設）或 ES256（LINE 原生 SDK 的 ID token，spikes.md §a）。
+	// 只收這一種；HMACSecret 與固定的 RSA 公鑰另有自己的演算法，不能設它。
+	Algorithm string
 	// HMACSecret 驗 HS256 的 token（LINE web 登入的 ID token 以 channel secret 簽）；設了就只收 HS256。
 	HMACSecret []byte
 	Audiences  []string
@@ -61,6 +66,8 @@ type Claims struct {
 	Name string
 	// HostedDomain 是 Google 的 hd claim（Workspace 網域），沒有時是空字串。
 	HostedDomain string
+	// AuthorizedParty 是 token 的 azp claim（Google 原生登入：取得 token 的 client），沒有時是空字串。
+	AuthorizedParty string
 	// Nonce 是 token 的 nonce claim，沒有時是空字串。
 	Nonce string
 	// IssuedAt 是 token 的 iat，沒有時是零值。
@@ -86,6 +93,15 @@ func New(cfg Config) (*Verifier, error) {
 	}
 	if len(cfg.HMACSecret) > 0 && (cfg.JWKSURL != "" || cfg.PublicKey != nil || cfg.PublicKeyPEM != "") {
 		return nil, errors.New("oidc：HMAC 密鑰不能與公鑰同時設定")
+	}
+	switch cfg.Algorithm {
+	case "", "RS256":
+	case "ES256":
+		if cfg.JWKSURL == "" || cfg.PublicKey != nil || cfg.PublicKeyPEM != "" || len(cfg.HMACSecret) > 0 {
+			return nil, errors.New("oidc：ES256 只能搭配遠端 JWKS")
+		}
+	default:
+		return nil, fmt.Errorf("oidc：不支援的演算法 %q", cfg.Algorithm)
 	}
 	if cfg.Now == nil {
 		cfg.Now = time.Now //nolint:forbidigo // assigns the clock dependency without calling it
@@ -213,8 +229,11 @@ func (v *Verifier) Verify(ctx context.Context, raw string) (Claims, error) {
 		KeyID     string `json:"kid"`
 	}
 	wantAlg := "RS256"
-	if v.hmac != nil {
+	switch {
+	case v.hmac != nil:
 		wantAlg = "HS256"
+	case v.cfg.Algorithm == "ES256":
+		wantAlg = "ES256"
 	}
 	if err := json.Unmarshal(encoded, &h); err != nil || h.Algorithm != wantAlg {
 		return Claims{}, ErrInvalid
@@ -237,21 +256,32 @@ func (v *Verifier) Verify(ctx context.Context, raw string) (Claims, error) {
 		if !ok {
 			return Claims{}, ErrInvalid
 		}
-		if alg, has := key.Algorithm(); has && alg != jwa.RS256() {
+		keyAlg := jwa.RS256()
+		if wantAlg == "ES256" {
+			keyAlg = jwa.ES256()
+		}
+		if alg, has := key.Algorithm(); has && alg != keyAlg {
 			return Claims{}, ErrInvalid
 		}
 		if usage, has := key.KeyUsage(); has && usage != "sig" {
 			return Claims{}, ErrInvalid
 		}
-		var public rsa.PublicKey
-		if err := jwk.Export(key, &public); err != nil {
-			return Claims{}, ErrInvalid
+		if wantAlg == "ES256" {
+			var public ecdsa.PublicKey
+			if err := jwk.Export(key, &public); err != nil {
+				return Claims{}, ErrInvalid
+			}
+		} else {
+			var public rsa.PublicKey
+			if err := jwk.Export(key, &public); err != nil {
+				return Claims{}, ErrInvalid
+			}
 		}
 		selected, err := key.Clone()
 		if err != nil {
 			return Claims{}, ErrInvalid
 		}
-		if err := selected.Set(jwk.AlgorithmKey, jwa.RS256()); err != nil {
+		if err := selected.Set(jwk.AlgorithmKey, keyAlg); err != nil {
 			return Claims{}, ErrInvalid
 		}
 		set := jwk.NewSet()
@@ -314,6 +344,12 @@ func (v *Verifier) Verify(ctx context.Context, raw string) (Claims, error) {
 			return Claims{}, apperr.WithCause(ErrInvalid, err)
 		}
 	}
+	var authorizedParty string
+	if tok.Has("azp") {
+		if err := tok.Get("azp", &authorizedParty); err != nil {
+			return Claims{}, apperr.WithCause(ErrInvalid, err)
+		}
+	}
 	var nonce string
 	if tok.Has("nonce") {
 		if err := tok.Get("nonce", &nonce); err != nil {
@@ -323,5 +359,5 @@ func (v *Verifier) Verify(ctx context.Context, raw string) (Claims, error) {
 	issuedAt, _ := tok.IssuedAt()
 	var verified any
 	_ = tok.Get("email_verified", &verified)
-	return Claims{Subject: sub, Email: email, EmailVerified: verified == true || verified == "true", Audience: audience, Name: name, HostedDomain: hostedDomain, Nonce: nonce, IssuedAt: issuedAt}, nil
+	return Claims{Subject: sub, Email: email, EmailVerified: verified == true || verified == "true", Audience: audience, Name: name, HostedDomain: hostedDomain, AuthorizedParty: authorizedParty, Nonce: nonce, IssuedAt: issuedAt}, nil
 }

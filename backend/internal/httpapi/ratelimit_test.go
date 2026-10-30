@@ -12,6 +12,7 @@ import (
 
 	"connectrpc.com/connect"
 
+	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
@@ -201,5 +202,21 @@ func TestAllowAllCountsEveryWindowOrNone(t *testing.T) {
 	}
 	if ok, _ := l.allowAll(short); ok {
 		t.Fatal("短窗第 4 次要被拒絕")
+	}
+}
+
+// App 原生登入的兩個公開 procedure 共用同一個每 IP 的額度（不是公開的一般額度）。
+func TestAppLoginProceduresShareTheirOwnTier(t *testing.T) {
+	t.Parallel()
+	for _, procedure := range []string{
+		identityconnect.IdentityPublicServiceIssueAppLoginNonceProcedure,
+		identityconnect.IdentityPublicServiceExchangeIdTokenProcedure,
+	} {
+		if got := tiersOf(procedure); !slices.Equal(got, []rateTier{tierAppLogin}) {
+			t.Errorf("%s 的級別 = %v，預期 tierAppLogin", procedure, got)
+		}
+	}
+	if tierAppLogin.name == tierPublic.name || tierAppLogin.name == tierAuth.name {
+		t.Error("tierAppLogin 要有自己的計數器名稱")
 	}
 }

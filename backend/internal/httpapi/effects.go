@@ -58,6 +58,14 @@ var customerEffects = map[string]Effect{
 	"/hawkr.identity.v1alpha1.IdentityAppService/GetSession":          EffectRead,
 	"/hawkr.identity.v1alpha1.IdentityAppService/LinkAppleCredential": EffectWrite,
 	"/hawkr.identity.v1alpha1.IdentityAppService/DeleteAccount":       EffectSelfService,
+	"/hawkr.identity.v1alpha1.IdentityAppService/SignOut":             EffectSelfService,
+	"/hawkr.identity.v1alpha1.IdentityAppService/LinkIdentity":        EffectSelfService,
+	"/hawkr.identity.v1alpha1.IdentityAppService/ListSessions":        EffectRead,
+	"/hawkr.identity.v1alpha1.IdentityAppService/RevokeSession":       EffectSelfService,
+
+	// IdentityPublicService
+	"/hawkr.identity.v1alpha1.IdentityPublicService/IssueAppLoginNonce": EffectWrite,
+	"/hawkr.identity.v1alpha1.IdentityPublicService/ExchangeIdToken":    EffectWrite,
 
 	// DiscoveryPublicService
 	"/hawkr.discovery.v1alpha1.DiscoveryPublicService/SuggestRecommendedSellers": EffectRead,

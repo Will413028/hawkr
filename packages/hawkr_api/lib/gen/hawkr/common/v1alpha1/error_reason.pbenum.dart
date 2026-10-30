@@ -83,6 +83,18 @@ class ErrorReason extends $pb.ProtobufEnum {
   static const ErrorReason ACCOUNT_SUSPENDED =
       ErrorReason._(12, _omitEnumNames ? '' : 'ACCOUNT_SUSPENDED');
 
+  /// 要連結的登入方式（Google、LINE 的身分）已經連結到另一個帳號，包含已刪除帳號留下的身分（搭配 already_exists）；什麼都沒有改。
+  /// client 顯示 LocalizedMessage，請使用者改用那個帳號登入，或換一個登入方式。
+  /// IdentityAppService.LinkIdentity（web 的連結走 /api/auth，不在 Connect）。
+  static const ErrorReason IDENTITY_ALREADY_LINKED =
+      ErrorReason._(13, _omitEnumNames ? '' : 'IDENTITY_ALREADY_LINKED');
+
+  /// 這個操作要求最近重新驗證過，而目前的 session 沒有（搭配 failed_precondition）：IdentityAppService.RevokeSession 要求目前的 session
+  /// 在 15 分鐘內以 provider 驗證過。client 引導使用者重新走一次登入（web 的 /api/auth/{provider}/start、App 的 ExchangeIdToken，
+  /// 登入會換發新 session），再重送。
+  static const ErrorReason REAUTHENTICATION_REQUIRED =
+      ErrorReason._(14, _omitEnumNames ? '' : 'REAUTHENTICATION_REQUIRED');
+
   static const $core.List<ErrorReason> values = <ErrorReason>[
     ERROR_REASON_UNSPECIFIED,
     VERSION_CONFLICT,
@@ -95,10 +107,12 @@ class ErrorReason extends $pb.ProtobufEnum {
     STORE_OPENING_TERMINATED,
     ACCOUNT_HAS_STORE,
     ACCOUNT_SUSPENDED,
+    IDENTITY_ALREADY_LINKED,
+    REAUTHENTICATION_REQUIRED,
   ];
 
   static final $core.List<ErrorReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 12);
+      $pb.ProtobufEnum.$_initByValueList(values, 14);
   static ErrorReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

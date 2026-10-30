@@ -247,6 +247,14 @@ func wantKind(t *testing.T, err error, want apperr.Kind) {
 	}
 }
 
+func wantReason(t *testing.T, err error, want apperr.Reason) {
+	t.Helper()
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || ae.Reason != want {
+		t.Fatalf("err = %v，預期原因 %s", err, want)
+	}
+}
+
 func ptr[T any](v T) *T { return &v }
 
 // account 直接寫入一個以 Clerk 使用者 user 識別的帳號（Clerk 退場前的舊欄位；email 取自 f.customers.users）。買家不是角色（W5）：

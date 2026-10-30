@@ -178,7 +178,7 @@ func (s *Service) login(ctx context.Context, in model.LoginInput) (model.LoginRe
 	if err != nil {
 		return res, err
 	}
-	res.Token, res.SessionID = issued.Token, issued.ID
+	res.Token, res.SessionID, res.AbsoluteExpiresAt = issued.Token, issued.ID, issued.AbsoluteExpiresAt
 	if res.Created {
 		s.d.Logger.InfoContext(ctx, "identity：登入建立帳號", "account_id", res.AccountID, "provider", id.Provider)
 	}
@@ -243,7 +243,7 @@ func (s *Service) Link(ctx context.Context, accountID int64, in model.ProviderId
 				return fmt.Errorf("identity：讀取身分：%w", err)
 			}
 			if existing.AccountID != accountID {
-				return apperr.AlreadyExists("這個登入方式已連結到另一個帳號")
+				return apperr.AlreadyExists("這個登入方式已連結到另一個帳號").WithReason(apperr.ReasonIdentityAlreadyLinked)
 			}
 			if err := q.UpdateIdentityClaims(ctx, store.UpdateIdentityClaimsParams{
 				Provider: string(id.Provider), Subject: id.Subject, Email: nonEmpty(id.Email), EmailVerified: id.EmailVerified, AutoLinkEligible: AutoLinkEligible(id), Now: now,

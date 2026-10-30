@@ -288,8 +288,22 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.identity.v1alpha1.ClientKind",
+      "tsName": "ClientKind",
+      "tsModule": "@hawkr/api/gen/hawkr/identity/v1alpha1/identity_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.identity.v1alpha1.DeleteAccountResponse.DeletionState",
       "tsName": "DeleteAccountResponse_DeletionState",
+      "tsModule": "@hawkr/api/gen/hawkr/identity/v1alpha1/identity_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.identity.v1alpha1.LoginProvider",
+      "tsName": "LoginProvider",
       "tsModule": "@hawkr/api/gen/hawkr/identity/v1alpha1/identity_pb",
       "inCatalog": false,
       "serverOwned": false

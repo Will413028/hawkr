@@ -8,6 +8,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"uuid"
+
+	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 )
 
 // SessionCookie 是 web 的 session cookie 的名稱（ADR 2026-10-30-identity-self-hosted-federated-login D1）：單體在登入的 callback 設定，值是
@@ -30,14 +33,19 @@ const (
 // 以 Bearer 為準。其他位置（query、token header、Bearer 以外的 scheme）一律不讀（#2511）。cookie 重複出現（同名兩個）視為沒有：
 // 無法判斷哪一個是我們設的。
 func Credential(r *http.Request) (string, CredentialSource) {
-	if scheme, v, ok := strings.Cut(r.Header.Get("Authorization"), " "); ok && strings.EqualFold(scheme, "Bearer") {
+	return CredentialFromHeader(r.Header)
+}
+
+// CredentialFromHeader 是 Credential 對 header 的版本，給只拿得到 header 的 Connect handler（req.Header()）用，規則完全相同。
+func CredentialFromHeader(h http.Header) (string, CredentialSource) {
+	if scheme, v, ok := strings.Cut(h.Get("Authorization"), " "); ok && strings.EqualFold(scheme, "Bearer") {
 		if token := strings.TrimSpace(v); token != "" {
 			return token, CredentialBearer
 		}
 		return "", CredentialNone
 	}
 	var token string
-	for _, ck := range r.Cookies() {
+	for _, ck := range (&http.Request{Header: h}).Cookies() {
 		if ck.Name != SessionCookie {
 			continue
 		}
@@ -50,6 +58,26 @@ func Credential(r *http.Request) (string, CredentialSource) {
 		return "", CredentialNone
 	}
 	return token, CredentialCookie
+}
+
+// Session 是請求所用的 session（不是憑證）：ID 與 client 種類，以及憑證從哪裡來（決定登出要不要清 cookie）。
+type Session struct {
+	ID     uuid.UUID
+	Client identity.ClientKind
+	Source CredentialSource
+}
+
+type sessionKey struct{}
+
+// WithSession 把請求所用的 session 放進 ctx；只有入口的認證中介層（withSession）呼叫，管理員的請求沒有。
+func WithSession(ctx context.Context, s Session) context.Context {
+	return context.WithValue(ctx, sessionKey{}, s)
+}
+
+// SessionFrom 回傳請求所用的 session；以訪客執行或管理員的請求 ok 是 false。
+func SessionFrom(ctx context.Context) (Session, bool) {
+	s, ok := ctx.Value(sessionKey{}).(Session)
+	return s, ok
 }
 
 type subjectKey struct{}

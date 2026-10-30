@@ -4,6 +4,8 @@ package identity_test
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -54,6 +56,8 @@ const (
 	lineSecret    = "line-channel-secret-0123456789ab"
 	googleClient  = "google-web-client"
 	lineChannelID = "line-channel"
+	// googleAppClient 是 App 原生登入的 Google ID token 的 azp 允許清單裡的 client。
+	googleAppClient = "android-client"
 )
 
 // grant 是假 provider 在授權步驟記下的東西：code 綁定 nonce、PKCE challenge 與 redirect URI，token 端點照真的 provider 驗證。
@@ -68,6 +72,7 @@ type fakeIdP struct {
 	srv      *httptest.Server
 	provider identity.Provider
 	key      *rsa.PrivateKey
+	ecKey    *ecdsa.PrivateKey
 	mu       sync.Mutex
 	codes    map[string]grant
 	n        int
@@ -79,11 +84,18 @@ func newFakeIdP(t *testing.T, p identity.Provider) *fakeIdP {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f := &fakeIdP{t: t, provider: p, key: key, codes: map[string]grant{}}
+	ecKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := &fakeIdP{t: t, provider: p, key: key, ecKey: ecKey, codes: map[string]grant{}}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /token", f.token)
 	mux.HandleFunc("GET /jwks", func(w http.ResponseWriter, _ *http.Request) {
 		_ = json.NewEncoder(w).Encode(jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{Key: &key.PublicKey, KeyID: "k1", Algorithm: "RS256", Use: "sig"}}})
+	})
+	mux.HandleFunc("GET /jwks-ec", func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{Key: &ecKey.PublicKey, KeyID: "e1", Algorithm: "ES256", Use: "sig"}}})
 	})
 	f.srv = httptest.NewServer(mux)
 	t.Cleanup(f.srv.Close)
@@ -194,7 +206,26 @@ func (f *fakeIdP) sign(claims map[string]any) string {
 	return raw
 }
 
+// testClock 是 identity 模組與入口共用的時鐘：測試把它往後撥，驗證逾時與重新驗證的期限。
+type testClock struct {
+	mu sync.Mutex
+	t  time.Time
+}
+
+func (c *testClock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.t
+}
+
+func (c *testClock) Advance(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.t = c.t.Add(d)
+}
+
 type webFixture struct {
+	clock  *testClock
 	url    string
 	db     *db.DB
 	m      *identity.Module
@@ -220,13 +251,15 @@ func setupWeb(t *testing.T) *webFixture {
 	}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	bus := events.NewBus()
-	m := identity.New(identity.Deps{DB: d, Events: bus, Jobs: jc, Providers: identity.Providers{Admin: dev.Admins()}, Now: time.Now, Logger: log})
+	clock := &testClock{t: time.Now()}
+	m := identity.New(identity.Deps{DB: d, Events: bus, Jobs: jc, Providers: identity.Providers{Admin: dev.Admins()}, Now: clock.Now, Logger: log})
 	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: jc, Now: time.Now, Logger: log})
 	events.Subscribe(bus, buyers.OnAccountCreated)
 	del := delegation.New(delegation.Deps{DB: d, Identity: m, Events: bus, Seller: &seller.Module{}, Now: time.Now, Logger: log})
 
-	f := &webFixture{db: d, m: m, idp: map[identity.Provider]*fakeIdP{}, gwSeen: make(chan http.Header, 8)}
+	f := &webFixture{clock: clock, db: d, m: m, idp: map[identity.Provider]*fakeIdP{}, gwSeen: make(chan http.Header, 8)}
 	var providers []httpidentity.WebProvider
+	var appVerifiers []httpidentity.AppVerifier
 	for _, p := range []identity.Provider{identity.ProviderGoogle, identity.ProviderLine} {
 		idp := newFakeIdP(t, p)
 		f.idp[p] = idp
@@ -240,6 +273,21 @@ func setupWeb(t *testing.T) *webFixture {
 			t.Fatal(err)
 		}
 		providers = append(providers, w)
+		app := identity.AppLoginConfig{Provider: p, ClientID: idp.clientID(), JWKSURL: idp.srv.URL + "/jwks", HTTPClient: idp.srv.Client()}
+		if p == identity.ProviderGoogle {
+			app.AuthorizedParties = []string{googleAppClient}
+		} else {
+			app.JWKSURL = idp.srv.URL + "/jwks-ec"
+		}
+		av, err := identity.NewAppLogin(app)
+		if err != nil {
+			t.Fatal(err)
+		}
+		appVerifiers = append(appVerifiers, av)
+	}
+	appLogin, err := httpidentity.NewAppLogin(m, appVerifiers...)
+	if err != nil {
+		t.Fatal(err)
 	}
 	webLogin, err := httpidentity.NewWebLogin(httpidentity.WebLoginDeps{Module: m, Providers: providers, Logger: log})
 	if err != nil {
@@ -258,7 +306,7 @@ func setupWeb(t *testing.T) *webFixture {
 		t.Fatal(err)
 	}
 	h, err := httpapi.NewHandler(httpapi.Deps{
-		Social: &social.Module{}, Legacy: proxy, LegacyPrefixes: gatewayproxy.Prefixes, Ready: d.Ping, Identity: m, WebLogin: webLogin,
+		Social: &social.Module{}, Legacy: proxy, LegacyPrefixes: gatewayproxy.Prefixes, Ready: d.Ping, Identity: m, WebLogin: webLogin, AppLogin: appLogin, Now: clock.Now,
 		Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t),
 		DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, Agent: &agent.Module{}, ReviewQueue: &reviewqueue.Module{},
 		Delegation: del, Origins: []string{webOrigin}, ClientIP: httpapi.ClientIP{Header: "X-Test-Client-IP"}, Logger: log,
@@ -481,6 +529,7 @@ func TestWebLoginRefusesBrokenFlows(t *testing.T) {
 		"過期的 ID token":                  {opts: loginOpts{claims: map[string]any{"exp": time.Now().Add(-time.Hour).Unix()}}, want: httpidentity.ErrorInvalidFlow},
 		"PKCE 的 verifier 對不上":           {opts: loginOpts{}, challenge: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", want: httpidentity.ErrorInvalidFlow},
 		"code 不是 provider 發的":           {opts: loginOpts{callback: func(q url.Values) { q.Set("code", "code-that-was-never-issued") }}, want: httpidentity.ErrorInvalidFlow},
+		"Google 的授權回應缺 iss":             {opts: loginOpts{callback: func(q url.Values) { q.Del("iss") }}, want: httpidentity.ErrorInvalidFlow},
 		"授權回應的 iss 不符":                  {opts: loginOpts{callback: func(q url.Values) { q.Set("iss", "https://evil.example") }}, want: httpidentity.ErrorInvalidFlow},
 		"使用者拒絕授權":                       {opts: loginOpts{callback: func(q url.Values) { q.Del("code"); q.Set("error", "access_denied") }}, want: httpidentity.ErrorAccessDenied},
 		"沒有登入前 cookie":                  {opts: loginOpts{}, cookie: func(b *browser) { delete(b.cookies, httpidentity.LoginCookie) }, want: httpidentity.ErrorInvalidFlow},

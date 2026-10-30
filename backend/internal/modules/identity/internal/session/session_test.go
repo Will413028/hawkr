@@ -52,3 +52,27 @@ func TestIdleDependsOnTheClient(t *testing.T) {
 		t.Fatalf("web %v、App %v", Idle(model.ClientWeb), Idle(model.ClientApp))
 	}
 }
+
+func TestExpiredFollowsTheIdleAndAbsoluteLimits(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 10, 30, 12, 0, 0, 0, time.UTC)
+	created := now.Add(-100 * 24 * time.Hour)
+	for name, tc := range map[string]struct {
+		client   model.ClientKind
+		lastUsed time.Time
+		absolute time.Time
+		want     bool
+	}{
+		"web 閒置未滿 7 天":  {model.ClientWeb, now.Add(WebIdle - time.Second).Add(-WebIdle), now.Add(time.Hour), false},
+		"web 閒置剛好 7 天":  {model.ClientWeb, now.Add(-WebIdle), now.Add(time.Hour), true},
+		"App 閒置 8 天仍有效": {model.ClientApp, now.Add(-8 * 24 * time.Hour), now.Add(time.Hour), false},
+		"App 閒置剛好 14 天": {model.ClientApp, now.Add(-AppIdle), now.Add(time.Hour), true},
+		"絕對期限前一秒":       {model.ClientApp, now, now.Add(time.Second), false},
+		"絕對期限剛好到":       {model.ClientApp, now, now, true},
+		"絕對期限已過但剛使用過":   {model.ClientWeb, now, created.Add(Absolute), true},
+	} {
+		if got := Expired(tc.client, tc.lastUsed, tc.absolute, now); got != tc.want {
+			t.Errorf("%s：Expired = %v，預期 %v", name, got, tc.want)
+		}
+	}
+}

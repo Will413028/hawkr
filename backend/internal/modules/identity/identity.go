@@ -182,10 +182,11 @@ type (
 	LoginResult = model.LoginResult
 )
 
-// SessionID 是 session 對外的識別（不是憑證）；SessionInfo 是一個 session 的資料。
+// SessionID 是 session 對外的識別（不是憑證）；SessionInfo 是一個 session 的資料；SessionRef 是認證用的 session 的識別。
 type (
 	SessionID   = uuid.UUID
 	SessionInfo = model.SessionInfo
+	SessionRef  = model.SessionRef
 )
 
 // LoginFlowInput、LoginFlowStart 與 LoginFlow 是 web 登入流程的暫存狀態。
@@ -205,6 +206,21 @@ const (
 // LoginProviders 與 ClientKinds 回傳所有登入 provider 與 client 種類。
 func LoginProviders() []Provider { return model.ProviderValues() }
 func ClientKinds() []ClientKind  { return model.ClientKinds() }
+
+// WebSessionCookieMaxAge 是 web 的 session cookie 的 Max-Age：等於 session 的絕對逾時（ADR 2026-10-30-identity-self-hosted-federated-login D1），
+// 閒置逾時由伺服器判斷。
+const WebSessionCookieMaxAge = session.Absolute
+
+// ReauthWindow 是終止 session 要求的重新驗證期限：目前的 session 最近一次以 provider 驗證不得早於這麼久之前。
+const ReauthWindow = session.ReauthWindow
+
+// SessionIdleTimeout 回傳 client 種類的閒置逾時：距離最後使用這麼久，session 就失效。
+func SessionIdleTimeout(c ClientKind) time.Duration { return session.Idle(c) }
+
+// SessionExpired 回報 s 在 now 是不是已經失效（絕對逾時，或閒置超過 client 的期限）；失效但還沒被清掉的列 ListSessions 仍會回傳。
+func SessionExpired(s SessionInfo, now time.Time) bool {
+	return session.Expired(s.Client, s.LastUsedAt, s.AbsoluteExpiresAt, now)
+}
 
 // ValidReturnPath 回報 p 是不是可以安全轉址的返回網址（站內的相對路徑）。
 func ValidReturnPath(p string) bool { return session.ValidReturnPath(p) }

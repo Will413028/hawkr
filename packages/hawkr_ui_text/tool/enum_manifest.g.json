@@ -50,8 +50,22 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.identity.v1alpha1.ClientKind",
+      "dartClass": "ClientKind",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.identity.v1alpha1.DeleteAccountResponse.DeletionState",
       "dartClass": "DeleteAccountResponse_DeletionState",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.identity.v1alpha1.LoginProvider",
+      "dartClass": "LoginProvider",
       "dartLibrary": "package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.pbenum.dart",
       "inCatalog": false,
       "serverOwned": false

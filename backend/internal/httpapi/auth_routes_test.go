@@ -30,6 +30,10 @@ func (authModule) ConsumeLoginFlow(context.Context, string, string, identity.Pro
 	return identity.LoginFlow{}, apperr.Unauthenticated("失效")
 }
 
+func (authModule) LinkIdentity(context.Context, int64, identity.ProviderIdentity) error {
+	return apperr.Unauthenticated("失效")
+}
+
 func (authModule) Login(context.Context, identity.LoginInput) (identity.LoginResult, error) {
 	return identity.LoginResult{}, apperr.Unauthenticated("失效")
 }
@@ -38,6 +42,7 @@ type authProvider struct{ p identity.Provider }
 
 func (a authProvider) Provider() identity.Provider { return a.p }
 func (authProvider) CheckIssuer(string) bool       { return true }
+func (authProvider) RequiresIssuer() bool          { return false }
 func (a authProvider) AuthURL(string, string, string) string {
 	return "https://" + strings.ToLower(string(a.p)) + ".test/auth"
 }
@@ -207,19 +212,26 @@ func TestGatewayProxyStripsTheSameCookieTheMonolithSets(t *testing.T) {
 	}
 }
 
-// cookie 認證的請求只有宣告 NO_SIDE_EFFECTS 的 procedure 能走 GET（ADR 2026-10-30-identity-self-hosted-federated-login D6）：這條由 connect-go 執行
-// （沒有宣告的 procedure 收到 GET 回 405，handler 不會被呼叫），effects 與 proto 宣告的一致由 TestEffectDeclarationsAgreeWithTheIdempotencyLevels 守。
-func TestCookieGETOnAWriteProcedureNeverReachesTheHandler(t *testing.T) {
+// 只有宣告 NO_SIDE_EFFECTS 的 procedure 能走 GET，不論憑證在 cookie 或 Bearer（ADR 2026-10-30-identity-self-hosted-federated-login D6、D7）：這條由
+// connect-go 執行（沒有宣告的 procedure 收到 GET 回 405，handler 不會被呼叫），effects 與 proto 宣告的一致由
+// TestEffectDeclarationsAgreeWithTheIdempotencyLevels 守。登出、連結、終止 session 用 GET 被拒。
+func TestGETOnAWriteProcedureNeverReachesTheHandler(t *testing.T) {
 	t.Parallel()
-	path, handler := identityconnect.NewIdentityAppServiceHandler(httpidentity.NewApp(nil, nil))
+	path, handler := identityconnect.NewIdentityAppServiceHandler(httpidentity.NewApp(nil, nil, nil, time.Now))
 	inner := http.NewServeMux()
 	mount(inner, path, handler)
 	h := withSession(fakeAuth{}, slog.New(slog.DiscardHandler), inner)
-	for _, procedure := range []string{"DeleteAccount", "LinkAppleCredential"} {
-		r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path+procedure+"?connect=v1&encoding=json&message=%7B%7D", nil)
-		r.AddCookie(&http.Cookie{Name: rpc.SessionCookie, Value: "good"})
-		if rec := do(h, r); rec.Code != http.StatusMethodNotAllowed {
-			t.Errorf("GET %s = %d，預期 405", procedure, rec.Code)
+	credentials := map[string]func(*http.Request){
+		"cookie": func(r *http.Request) { r.AddCookie(&http.Cookie{Name: rpc.SessionCookie, Value: "good"}) },
+		"Bearer": func(r *http.Request) { r.Header.Set("Authorization", "Bearer good") },
+	}
+	for _, procedure := range []string{"DeleteAccount", "LinkAppleCredential", "SignOut", "LinkIdentity", "RevokeSession"} {
+		for name, credential := range credentials {
+			r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path+procedure+"?connect=v1&encoding=json&message=%7B%7D", nil)
+			credential(r)
+			if rec := do(h, r); rec.Code != http.StatusMethodNotAllowed {
+				t.Errorf("GET %s（%s）= %d，預期 405", procedure, name, rec.Code)
+			}
 		}
 	}
 }

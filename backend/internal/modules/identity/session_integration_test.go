@@ -300,6 +300,7 @@ func TestLinkIdentityConflict(t *testing.T) {
 	// 把 Bob 的 LINE 身分連到 Alice：已屬於 Bob 的帳號，回錯誤，什麼都不改。
 	err := f.m.LinkIdentity(ctx, a.AccountID, lineBob.identity())
 	wantKind(t, err, apperr.KindAlreadyExists)
+	wantReason(t, err, apperr.ReasonIdentityAlreadyLinked)
 	var owner int64
 	if err := f.db.Pool().QueryRow(ctx, `SELECT account_id FROM identity.account_identities WHERE provider = 'LINE' AND subject = 'line-bob'`).Scan(&owner); err != nil || owner != b.AccountID {
 		t.Fatalf("身分的擁有者 = %d, %v，預期仍是 %d", owner, err, b.AccountID)
@@ -391,6 +392,26 @@ func TestLoginIssuesAFreshSessionAndRevokesThePreviousOne(t *testing.T) {
 	f.authenticated(t, res.Token)
 	if n := f.count(t, `SELECT count(*) FROM identity.sessions`); n != 1 {
 		t.Fatalf("session 數 = %d", n)
+	}
+}
+
+// Authenticate 回傳請求所用的 session（ID 與 client 種類），給 SignOut、ListSessions、RevokeSession 認出「目前這個」；Login 回傳絕對到期時間。
+func TestAuthenticateNamesTheSessionItResolved(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	web := f.loginAs(t, googleAlice, ClientWeb)
+	app := f.loginAs(t, googleAlice, ClientApp)
+	for name, res := range map[string]LoginResult{"web": web, "App": app} {
+		a := f.authenticated(t, res.Token)
+		if a.Session == nil || a.Session.ID != res.SessionID {
+			t.Errorf("%s：Session = %+v，預期 %s", name, a.Session, res.SessionID)
+		}
+		if want := f.now.Add(WebSessionCookieMaxAge); !res.AbsoluteExpiresAt.Equal(want) {
+			t.Errorf("%s：AbsoluteExpiresAt = %v，預期 %v", name, res.AbsoluteExpiresAt, want)
+		}
+	}
+	if a := f.authenticated(t, app.Token); a.Session.Client != ClientApp {
+		t.Errorf("Session.Client = %q", a.Session.Client)
 	}
 }
 
@@ -643,11 +664,13 @@ func TestDeletedAccountsIdentityCannotBeReusedOrLinked(t *testing.T) {
 	if err := f.m.DeleteAccount(ctx, gone.AccountID); err != nil {
 		t.Fatal(err)
 	}
-	wantKind(t, f.m.LinkIdentity(ctx, other.AccountID, lineBob.identity()), apperr.KindAlreadyExists)
+	err := f.m.LinkIdentity(ctx, other.AccountID, lineBob.identity())
+	wantKind(t, err, apperr.KindAlreadyExists)
+	wantReason(t, err, apperr.ReasonIdentityAlreadyLinked)
 	if n := f.count(t, `SELECT count(*) FROM identity.account_identities WHERE provider = 'LINE' AND subject = 'line-bob' AND account_id = $1`, gone.AccountID); n != 1 {
 		t.Fatalf("手動連結失敗後墓碑身分 = %d，預期仍屬於已刪帳號", n)
 	}
-	_, err := f.m.Login(ctx, LoginInput{Identity: lineBob.identity(), Client: ClientWeb})
+	_, err = f.m.Login(ctx, LoginInput{Identity: lineBob.identity(), Client: ClientWeb})
 	wantKind(t, err, apperr.KindUnauthenticated)
 }
 

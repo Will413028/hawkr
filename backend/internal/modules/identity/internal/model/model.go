@@ -53,6 +53,14 @@ type Authenticated struct {
 	Principal Principal
 	// SuspendedAt 是帳號被停權的時間；沒有停權時是 nil。管理員不使用它。
 	SuspendedAt *time.Time
+	// Session 是認證用的 session；管理員（Access、dev JWT）沒有。
+	Session *SessionRef
+}
+
+// SessionRef 是請求所用的 session 的識別（不是憑證）。
+type SessionRef struct {
+	ID     uuid.UUID
+	Client ClientKind
 }
 
 // ErrInvalidToken 表示 token 無效：簽章、issuer、audience 或期限不對。其他錯誤表示驗證時 provider 沒有回應。
@@ -404,7 +412,9 @@ type LoginInput struct {
 type LoginResult struct {
 	Token     string
 	SessionID uuid.UUID
-	AccountID int64
+	// AbsoluteExpiresAt 是新 session 的絕對到期時間。
+	AbsoluteExpiresAt time.Time
+	AccountID         int64
 	// Created 是這次登入建立了新帳號；Linked 是這次依規則自動連結到既有帳號。
 	Created bool
 	Linked  bool

@@ -17,6 +17,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 
 	"connectrpc.com/connect"
 
@@ -36,6 +37,11 @@ func (fakeAuth) Authenticate(_ context.Context, token string) (identity.Authenti
 	switch token {
 	case "good":
 		return identity.Authenticated{Principal: identity.Principal{Kind: identity.PrincipalAccount, ID: 7, Roles: []identity.Role{identity.RoleSeller}}}, nil
+	case "session":
+		return identity.Authenticated{
+			Principal: identity.Principal{Kind: identity.PrincipalAccount, ID: 9},
+			Session:   &identity.SessionRef{ID: entrySessionID, Client: identity.ClientApp},
+		}, nil
 	case "new":
 		return identity.Authenticated{Principal: identity.Principal{Kind: identity.PrincipalAccount, ID: 8}}, nil
 	case "admin":
@@ -48,6 +54,35 @@ func (fakeAuth) Authenticate(_ context.Context, token string) (identity.Authenti
 		return identity.Authenticated{}, errors.New("db down")
 	}
 	return identity.Authenticated{}, apperr.Unauthenticated("登入已失效")
+}
+
+var entrySessionID = uuid.MustParse("01930000-0000-7000-8000-000000000001")
+
+// 認證用的 session 與憑證的來源放進 ctx，給 SignOut、ListSessions、RevokeSession 用；沒有 session 的呼叫者（管理員）ctx 沒有。
+func TestSessionMiddlewarePutsTheSessionAndItsCredentialSourceInContext(t *testing.T) {
+	t.Parallel()
+	var got rpc.Session
+	var ok bool
+	probe := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { got, ok = rpc.SessionFrom(r.Context()) })
+	h := withSession(fakeAuth{}, slog.New(slog.DiscardHandler), probe)
+	for name, tc := range map[string]struct {
+		credential func(*http.Request)
+		want       bool
+		source     rpc.CredentialSource
+	}{
+		"Bearer": {func(r *http.Request) { r.Header.Set("Authorization", "Bearer session") }, true, rpc.CredentialBearer},
+		"cookie": {func(r *http.Request) { r.AddCookie(&http.Cookie{Name: rpc.SessionCookie, Value: "session"}) }, true, rpc.CredentialCookie},
+		"管理員":    {func(r *http.Request) { r.Header.Set("Authorization", "Bearer admin") }, false, 0},
+		"訪客":     {func(*http.Request) {}, false, 0},
+	} {
+		got, ok = rpc.Session{}, false
+		r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/x", nil)
+		tc.credential(r)
+		h.ServeHTTP(httptest.NewRecorder(), r)
+		if ok != tc.want || ok && (got.ID != entrySessionID || got.Client != identity.ClientApp || got.Source != tc.source) {
+			t.Errorf("%s：session = %+v ok=%v", name, got, ok)
+		}
+	}
 }
 
 // caller 回報 ctx 裡的呼叫者與限流身分，給中介層的測試看。

@@ -9,6 +9,7 @@ import (
 	"connectrpc.com/connect"
 
 	agentconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/agent/v1alpha1/agentv1alpha1connect"
+	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
@@ -39,6 +40,11 @@ var (
 	tierProductView = rateTier{name: "product-view", visitor: 120, ssr: 2400, ci: 60}
 )
 
+// tierAppLogin 是 App 原生登入的兩個公開 procedure（IssueAppLoginNonce、ExchangeIdToken）的額度，兩者共用同一個計數器，以來源 IP 計數（沒有登入的
+// 請求；帶有效 session 重新驗證的以帳號計）。一次登入是兩個請求，每分鐘 30 個（約 15 次登入），與 web 的 tierAuth 同一個保守的預設，擋灌 nonce 與
+// 猜 ID token 的程式；共用位址的人也在額度內。SSR 與 CI 的身分沒有加倍：App 的請求不經它們。
+var tierAppLogin = rateTier{name: "app-login", visitor: 30}
+
 // vendor portal 的邀請 secret 是匿名來源猜得到的憑證：預覽與兌換共用同一個級別（同一個 name，每個來源一個計數器，不是各 20 次），
 // 每個來源 5 分鐘 20 次；Google 驗證更窄，每個來源 10 分鐘 10 次。SSR 與 CI 的身分沒有加倍：它們代表很多人，更不能共用額度。
 var (
@@ -63,6 +69,8 @@ var procedureTiers = map[string][]rateTier{
 	agentconnect.VendorPortalPublicServicePreviewInviteProcedure:           {tierVendorPortalInvite},
 	agentconnect.VendorPortalPublicServiceExchangeInviteProcedure:          {tierVendorPortalInvite},
 	agentconnect.VendorPortalInviteeServiceVerifySessionProcedure:          {tierVendorPortalVerify},
+	identityconnect.IdentityPublicServiceIssueAppLoginNonceProcedure:       {tierAppLogin},
+	identityconnect.IdentityPublicServiceExchangeIdTokenProcedure:          {tierAppLogin},
 }
 
 // tiersOf 決定 Connect procedure 的級別：procedureTiers 列出的用自己的級別，其餘依 service 的使用者類別。

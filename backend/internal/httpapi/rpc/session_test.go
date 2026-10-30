@@ -160,3 +160,25 @@ func TestExcessVendorPortalCookies(t *testing.T) {
 		t.Fatal("不確定的結果")
 	}
 }
+
+func TestCredentialFromHeaderFollowsTheSameRulesAsCredential(t *testing.T) {
+	t.Parallel()
+	cases := map[string]http.Header{
+		"bearer":         {"Authorization": {"Bearer tok"}},
+		"cookie":         {"Cookie": {SessionCookie + "=tok"}},
+		"兩者都有，Bearer 優先": {"Authorization": {"Bearer a"}, "Cookie": {SessionCookie + "=b"}},
+		"空 Bearer":       {"Authorization": {"Bearer "}, "Cookie": {SessionCookie + "=b"}},
+		"同名 cookie 兩個":   {"Cookie": {SessionCookie + "=a; " + SessionCookie + "=b"}},
+		"其他 scheme":      {"Authorization": {"Basic abc"}},
+		"舊的 cookie 名稱":   {"Cookie": {"__session=tok"}},
+		"沒有":             {},
+	}
+	for name, h := range cases {
+		r := &http.Request{Header: h}
+		wantToken, wantSource := Credential(r)
+		gotToken, gotSource := CredentialFromHeader(h)
+		if gotToken != wantToken || gotSource != wantSource {
+			t.Errorf("%s：CredentialFromHeader = %q, %v；Credential = %q, %v", name, gotToken, gotSource, wantToken, wantSource)
+		}
+	}
+}

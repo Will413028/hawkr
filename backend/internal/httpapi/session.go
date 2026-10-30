@@ -34,7 +34,7 @@ type Authenticator interface {
 // 才查，其他請求（例如賣家的 Connect 方法、GetSession）不受 buyer 查詢失敗影響。
 func withSession(auth Authenticator, log *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token, _ := rpc.Credential(r)
+		token, source := rpc.Credential(r)
 		if token == "" {
 			next.ServeHTTP(w, r)
 			return
@@ -58,6 +58,9 @@ func withSession(auth Authenticator, log *slog.Logger, next http.Handler) http.H
 			return
 		}
 		ctx := rpc.WithPrincipal(r.Context(), a.Principal)
+		if a.Session != nil {
+			ctx = rpc.WithSession(ctx, rpc.Session{ID: a.Session.ID, Client: a.Session.Client, Source: source})
+		}
 		if a.SuspendedAt != nil {
 			switch suspendedAccess(r) {
 			case accessGuest:

@@ -29,6 +29,8 @@ type identityConfig struct {
 	providers identity.Providers
 	// webLogin 是 web 聯合登入已設定的 provider 的 client（Google、LINE）；沒設定的 provider，/api/auth/{provider}/start 回 404。
 	webLogin map[identity.Provider]webClient
+	// googleAppClients 是 App 原生登入的 Google ID token 的 azp 允許清單（Android、iOS 的 client ID）；空的時候 Google 的 App 登入不啟用。
+	googleAppClients []string
 }
 
 // webClient 是 web 登入在一家 provider 的 OAuth client。
@@ -99,6 +101,7 @@ func readIdentityConfig(ctx context.Context, e *config.Env) identityConfig {
 			c.webLogin[w.provider] = webClient{id: e.String(w.idKey), secret: e.String(w.secretKey)}
 		}
 	}
+	c.googleAppClients = e.List("GOOGLE_APP_CLIENT_IDS")
 	appleKeys := []string{"APPLE_CLIENT_IDS", "APPLE_TEAM_ID", "APPLE_KEY_ID", "APPLE_PRIVATE_KEY", "IDENTITY_TOKEN_KEYS"}
 	switch {
 	case anySet(e, appleKeys...):
@@ -273,10 +276,8 @@ func runDevToken(ctx context.Context, args []string, out io.Writer) error {
 	return err
 }
 
-const sessionCookieMaxAge = 90 * 24 * time.Hour
-
 // newWebLogin 建立 web 聯合登入的路由（ADR 2026-10-30-identity-self-hosted-federated-login D3）。redirect URI 是 web 的網域加各家獨立的 callback 路徑。
-// session cookie 的 Max-Age 是 sessionCookieMaxAge（等於絕對逾時，ADR D1）；閒置逾時由伺服器判斷。
+// session cookie 的 Max-Age 是 identity.WebSessionCookieMaxAge（等於絕對逾時，ADR D1）；閒置逾時由伺服器判斷。
 func newWebLogin(ctx context.Context, id *identity.Module, web rpc.WebOrigin, c identityConfig, log *slog.Logger) (*httpidentity.WebLogin, error) {
 	var providers []httpidentity.WebProvider
 	for _, p := range identity.LoginProviders() {
@@ -294,5 +295,31 @@ func newWebLogin(ctx context.Context, id *identity.Module, web rpc.WebOrigin, c 
 		}
 		providers = append(providers, w)
 	}
-	return httpidentity.NewWebLogin(httpidentity.WebLoginDeps{Module: id, Providers: providers, SessionMaxAge: sessionCookieMaxAge, Logger: log})
+	return httpidentity.NewWebLogin(httpidentity.WebLoginDeps{Module: id, Providers: providers, SessionMaxAge: identity.WebSessionCookieMaxAge, Logger: log})
+}
+
+// newAppLogin 建立 App 原生登入的 ID token 驗證（ADR 2026-10-30-identity-self-hosted-federated-login D2）：web 登入已設定的 provider 才有，
+// Google 另需 azp 允許清單。
+func newAppLogin(ctx context.Context, id *identity.Module, c identityConfig) (*httpidentity.AppLogin, error) {
+	var verifiers []httpidentity.AppVerifier
+	for _, p := range identity.LoginProviders() {
+		client, ok := c.webLogin[p]
+		if !ok || p == identity.ProviderGoogle && len(c.googleAppClients) == 0 {
+			continue
+		}
+		v, err := identity.NewAppLogin(identity.AppLoginConfig{Provider: p, ClientID: client.id, AuthorizedParties: appParties(p, c), Context: ctx})
+		if err != nil {
+			return nil, err
+		}
+		verifiers = append(verifiers, v)
+	}
+	return httpidentity.NewAppLogin(id, verifiers...)
+}
+
+// appParties 是 provider 的 App ID token 的 azp 允許清單：只有 Google 有。
+func appParties(p identity.Provider, c identityConfig) []string {
+	if p == identity.ProviderGoogle {
+		return c.googleAppClients
+	}
+	return nil
 }

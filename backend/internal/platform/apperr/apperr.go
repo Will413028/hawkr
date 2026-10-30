@@ -126,6 +126,12 @@ var ReasonAccountHasStore = newReason("ACCOUNT_HAS_STORE")
 // ReasonAccountSuspended 表示帳號停權中，這個操作是寫入，不在停權時仍可做的範圍；搭配 PermissionDenied。只由入口依動作的性質判斷。
 var ReasonAccountSuspended = newReason("ACCOUNT_SUSPENDED")
 
+// ReasonIdentityAlreadyLinked 表示要連結的登入方式（provider 的身分）已經連結到另一個帳號，包含已刪除帳號留下的身分；搭配 AlreadyExists。
+var ReasonIdentityAlreadyLinked = newReason("IDENTITY_ALREADY_LINKED")
+
+// ReasonReauthenticationRequired 表示這個操作要求最近重新驗證過，目前的 session 沒有；搭配 FailedPrecondition。
+var ReasonReauthenticationRequired = newReason("REAUTHENTICATION_REQUIRED")
+
 // FieldViolation 是一個輸入欄位的錯誤。Field 是模組輸入的欄位名（Go 的欄位名，巢狀以 . 連接、
 // 索引寫成 [n]），例如 Title、Action.Target、Ingredients[2].Name；對應到請求的路徑是傳輸層的事
 // （ADR 2026-09-25-api-error-model D4）。Message 給使用者看。

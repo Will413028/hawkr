@@ -67,8 +67,8 @@ func TestInvalidInputFieldsKeepsPerFieldMessages(t *testing.T) {
 }
 
 func TestReasonsListsEveryDeclaredReason(t *testing.T) {
-	want := []Reason{ReasonVersionConflict, ReasonSellerSuspended, ReasonProspectMatchFound, ReasonProspectTaxIDHeld, ReasonAgreementOutdated, ReasonSellerRequirementMissing, ReasonStoreOpeningSuspended, ReasonStoreOpeningTerminated, ReasonAccountHasStore, ReasonAccountSuspended}
-	if got := Reasons(); !slices.Equal(got, want) || len(got) != 10 || got[0].String() != "VERSION_CONFLICT" || got[1].String() != "SELLER_SUSPENDED" || got[2].String() != "PROSPECT_MATCH_FOUND" || got[3].String() != "PROSPECT_TAX_ID_HELD" || got[4].String() != "AGREEMENT_OUTDATED" || got[5].String() != "SELLER_REQUIREMENT_MISSING" || got[6].String() != "STORE_OPENING_SUSPENDED" || got[7].String() != "STORE_OPENING_TERMINATED" || got[8].String() != "ACCOUNT_HAS_STORE" || got[9].String() != "ACCOUNT_SUSPENDED" {
+	want := []Reason{ReasonVersionConflict, ReasonSellerSuspended, ReasonProspectMatchFound, ReasonProspectTaxIDHeld, ReasonAgreementOutdated, ReasonSellerRequirementMissing, ReasonStoreOpeningSuspended, ReasonStoreOpeningTerminated, ReasonAccountHasStore, ReasonAccountSuspended, ReasonIdentityAlreadyLinked, ReasonReauthenticationRequired}
+	if got := Reasons(); !slices.Equal(got, want) || len(got) != 12 || got[0].String() != "VERSION_CONFLICT" || got[1].String() != "SELLER_SUSPENDED" || got[2].String() != "PROSPECT_MATCH_FOUND" || got[3].String() != "PROSPECT_TAX_ID_HELD" || got[4].String() != "AGREEMENT_OUTDATED" || got[5].String() != "SELLER_REQUIREMENT_MISSING" || got[6].String() != "STORE_OPENING_SUSPENDED" || got[7].String() != "STORE_OPENING_TERMINATED" || got[8].String() != "ACCOUNT_HAS_STORE" || got[9].String() != "ACCOUNT_SUSPENDED" || got[10].String() != "IDENTITY_ALREADY_LINKED" || got[11].String() != "REAUTHENTICATION_REQUIRED" {
 		t.Fatalf("Reasons() = %v", got)
 	}
 	if (VersionConflict("x").Reason) != ReasonVersionConflict || (NotFound("x").Reason != Reason{}) || (InvalidInput("x").Reason != Reason{}) || len(InvalidInput("x").Metadata) != 0 {

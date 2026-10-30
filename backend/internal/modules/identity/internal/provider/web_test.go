@@ -252,6 +252,13 @@ func TestLineExchangeVerifiesTheHS256IDTokenWithTheChannelSecret(t *testing.T) {
 	}
 }
 
+func TestOnlyGoogleRequiresTheIssuerParameter(t *testing.T) {
+	f := newFakeProvider(t)
+	if !f.web(model.ProviderGoogle).RequiresIssuer() || f.web(model.ProviderLine).RequiresIssuer() {
+		t.Error("只有 Google 的授權回應一定帶 iss")
+	}
+}
+
 func TestCheckIssuerIsPerProvider(t *testing.T) {
 	f := newFakeProvider(t)
 	g, l := f.web(model.ProviderGoogle), f.web(model.ProviderLine)

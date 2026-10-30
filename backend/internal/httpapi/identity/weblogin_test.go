@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -33,6 +34,13 @@ type fakeModule struct {
 	consumed   int
 	beginErr   error
 	consumeErr error
+	links      []linkCall
+	linkErr    error
+}
+
+type linkCall struct {
+	accountID int64
+	identity  identity.ProviderIdentity
 }
 
 func newFakeModule() *fakeModule {
@@ -76,17 +84,20 @@ func (m *fakeModule) Login(_ context.Context, in identity.LoginInput) (identity.
 }
 
 type fakeProvider struct {
-	p         identity.Provider
-	issuer    string
-	identity  identity.ProviderIdentity
-	err       error
-	exchanges []exchange
+	p      identity.Provider
+	issuer string
+	// requiresIssuer 是這家的授權回應一定帶 iss（Google）。
+	requiresIssuer bool
+	identity       identity.ProviderIdentity
+	err            error
+	exchanges      []exchange
 }
 
 type exchange struct{ code, verifier, nonce string }
 
 func (f *fakeProvider) Provider() identity.Provider { return f.p }
 func (f *fakeProvider) CheckIssuer(iss string) bool { return iss == f.issuer }
+func (f *fakeProvider) RequiresIssuer() bool        { return f.requiresIssuer }
 func (f *fakeProvider) AuthURL(state, nonce, verifier string) string {
 	return "https://" + strings.ToLower(string(f.p)) + ".test/auth?" + url.Values{"state": {state}, "nonce": {nonce}, "verifier": {verifier}}.Encode()
 }
@@ -107,7 +118,7 @@ func newEnv(t *testing.T, maxAge time.Duration, providers ...identity.Provider) 
 	t.Helper()
 	e := &env{
 		m:      newFakeModule(),
-		google: &fakeProvider{p: identity.ProviderGoogle, issuer: "https://accounts.google.com", identity: identity.ProviderIdentity{Provider: identity.ProviderGoogle, Subject: "g-1", Email: "a@gmail.com", EmailVerified: true}},
+		google: &fakeProvider{p: identity.ProviderGoogle, issuer: "https://accounts.google.com", requiresIssuer: true, identity: identity.ProviderIdentity{Provider: identity.ProviderGoogle, Subject: "g-1", Email: "a@gmail.com", EmailVerified: true}},
 		line:   &fakeProvider{p: identity.ProviderLine, issuer: "https://access.line.me", identity: identity.ProviderIdentity{Provider: identity.ProviderLine, Subject: "l-1"}},
 		routes: map[string]http.Handler{},
 	}
@@ -155,6 +166,11 @@ func cookieOf(rec *httptest.ResponseRecorder, name string) *http.Cookie {
 	return nil
 }
 
+func (m *fakeModule) LinkIdentity(_ context.Context, accountID int64, id identity.ProviderIdentity) error {
+	m.links = append(m.links, linkCall{accountID, id})
+	return m.linkErr
+}
+
 func location(t *testing.T, rec *httptest.ResponseRecorder) *url.URL {
 	t.Helper()
 	if rec.Code != http.StatusFound {
@@ -194,7 +210,16 @@ func (e *env) startFlow(t *testing.T, provider, returnTo string) (state string, 
 	return u.Query().Get("state"), binding
 }
 
+// callbackURL 組 callback 的請求；Google 的授權回應一定帶 iss，q 沒有時補上正確的。
 func callbackURL(provider string, q url.Values) string {
+	if provider == "google" && !q.Has("iss") {
+		q = maps.Clone(q)
+		q.Set("iss", "https://accounts.google.com")
+	}
+	return rawCallbackURL(provider, q)
+}
+
+func rawCallbackURL(provider string, q url.Values) string {
 	return "GET /api/auth/" + provider + "/callback?" + q.Encode()
 }
 
@@ -413,25 +438,29 @@ func TestCallbackRefusesAFlowStartedForAnotherProvider(t *testing.T) {
 	wantError(t, e.do(t, callbackURL("google", q), func(r *http.Request) { r.AddCookie(binding) }), ErrorInvalidFlow)
 }
 
-func TestCallbackChecksTheIssuerWhenTheProviderSendsOne(t *testing.T) {
+func TestCallbackChecksTheIssuer(t *testing.T) {
 	t.Parallel()
 	for name, tc := range map[string]struct {
-		iss  []string
-		want string
+		provider string
+		iss      []string
+		want     string
 	}{
-		"沒有 iss":    {nil, ""},
-		"正確的 iss":   {[]string{"https://accounts.google.com"}, ""},
-		"別家的 iss":   {[]string{"https://access.line.me"}, ErrorInvalidFlow},
-		"空的 iss":    {[]string{""}, ErrorInvalidFlow},
-		"沒有 scheme": {[]string{"accounts.google.com"}, ErrorInvalidFlow},
+		"Google 沒有 iss":    {"google", nil, ErrorInvalidFlow},
+		"Google 正確的 iss":   {"google", []string{"https://accounts.google.com"}, ""},
+		"Google 別家的 iss":   {"google", []string{"https://access.line.me"}, ErrorInvalidFlow},
+		"Google 空的 iss":    {"google", []string{""}, ErrorInvalidFlow},
+		"Google 沒有 scheme": {"google", []string{"accounts.google.com"}, ErrorInvalidFlow},
+		"LINE 沒有 iss":      {"line", nil, ""},
+		"LINE 正確的 iss":     {"line", []string{"https://access.line.me"}, ""},
+		"LINE 別家的 iss":     {"line", []string{"https://accounts.google.com"}, ErrorInvalidFlow},
 	} {
-		e := newEnv(t, 0, identity.ProviderGoogle)
-		state, binding := e.startFlow(t, "google", "")
+		e := newEnv(t, 0, identity.ProviderGoogle, identity.ProviderLine)
+		state, binding := e.startFlow(t, tc.provider, "")
 		q := url.Values{"state": {state}, "code": {"c"}}
 		if tc.iss != nil {
 			q["iss"] = tc.iss
 		}
-		rec := e.do(t, callbackURL("google", q), func(r *http.Request) { r.AddCookie(binding) })
+		rec := e.do(t, rawCallbackURL(tc.provider, q), func(r *http.Request) { r.AddCookie(binding) })
 		if tc.want == "" {
 			if cookieOf(rec, rpc.SessionCookie) == nil {
 				t.Errorf("%s：被拒絕", name)
@@ -439,7 +468,7 @@ func TestCallbackChecksTheIssuerWhenTheProviderSendsOne(t *testing.T) {
 			continue
 		}
 		wantError(t, rec, tc.want)
-		if len(e.google.exchanges) != 0 || len(e.m.logins) != 0 {
+		if len(e.google.exchanges) != 0 || len(e.line.exchanges) != 0 || len(e.m.logins) != 0 {
 			t.Errorf("%s：iss 不符還是換了 token", name)
 		}
 	}
@@ -464,21 +493,15 @@ func TestCallbackProviderErrorsVoidTheFlow(t *testing.T) {
 	}
 }
 
-func TestCallbackRefusesMissingParametersAndLinkFlows(t *testing.T) {
+func TestCallbackRefusesMissingParameters(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t, 0, identity.ProviderGoogle)
 	state, binding := e.startFlow(t, "google", "")
 	wantError(t, e.do(t, callbackURL("google", url.Values{"state": {state}}), func(r *http.Request) { r.AddCookie(binding) }), ErrorInvalidFlow)
 	wantError(t, e.do(t, callbackURL("google", url.Values{"code": {"c"}}), func(r *http.Request) { r.AddCookie(binding) }), ErrorInvalidFlow)
 
-	state, binding = e.startFlow(t, "google", "")
-	account := int64(9)
-	f := e.m.flows[state]
-	f.flow.LinkAccountID = &account
-	e.m.flows[state] = f
-	wantError(t, e.do(t, callbackURL("google", url.Values{"state": {state}, "code": {"c"}}), func(r *http.Request) { r.AddCookie(binding) }), ErrorInvalidFlow)
 	if len(e.google.exchanges) != 0 || len(e.m.logins) != 0 {
-		t.Fatal("缺參數或連結流程還是換了 token")
+		t.Fatal("缺參數還是換了 token")
 	}
 }
 
@@ -557,5 +580,181 @@ func TestEachProviderSignsInThroughItsOwnRoutes(t *testing.T) {
 	}
 	if len(e.m.logins) != 1 || e.m.logins[0].Identity.Provider != identity.ProviderLine {
 		t.Fatalf("Login = %+v", e.m.logins)
+	}
+}
+
+// asAccount 讓請求帶著 withSession 解析好的登入帳號。
+func asAccount(id int64) func(*http.Request) {
+	return func(r *http.Request) {
+		*r = *r.WithContext(rpc.WithPrincipal(r.Context(), identity.Principal{Kind: identity.PrincipalAccount, ID: id}))
+	}
+}
+
+func TestStartWithLinkRecordsTheSignedInAccount(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t, 0, identity.ProviderGoogle, identity.ProviderLine)
+	rec := e.do(t, "GET /api/auth/google/start?link=1&return_to=/account/settings", asAccount(42))
+	u := location(t, rec)
+	if u.Host != "google.test" || cookieOf(rec, LoginCookie) == nil {
+		t.Fatalf("連結的 start 沒有轉去 provider：%s", u)
+	}
+	got := e.m.flows[u.Query().Get("state")].flow.LinkAccountID
+	if got == nil || *got != 42 {
+		t.Fatalf("暫存列的連結帳號 = %v，預期 42", got)
+	}
+}
+
+func TestStartWithLinkNeedsASignedInAccount(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		target string
+		mut    func(*http.Request)
+		want   string
+	}{
+		"沒有登入": {"GET /api/auth/google/start?link=1", nil, ErrorLoginRequired},
+		"管理員": {"GET /api/auth/google/start?link=1", func(r *http.Request) {
+			*r = *r.WithContext(rpc.WithPrincipal(r.Context(), identity.Principal{Kind: identity.PrincipalAdmin, ID: 1}))
+		}, ErrorLoginRequired},
+		"link 不是 1": {"GET /api/auth/google/start?link=0", asAccount(42), ErrorInvalidFlow},
+		"link 是空字串": {"GET /api/auth/google/start?link=", asAccount(42), ErrorInvalidFlow},
+		"link=true": {"GET /api/auth/google/start?link=true", asAccount(42), ErrorInvalidFlow},
+	} {
+		e := newEnv(t, 0, identity.ProviderGoogle)
+		rec := e.do(t, tc.target, tc.mut)
+		wantError(t, rec, tc.want)
+		if len(e.m.flows) != 0 || cookieOf(rec, LoginCookie) != nil {
+			t.Errorf("%s：被拒絕的連結還是寫了暫存列或設了登入前 cookie", name)
+		}
+	}
+}
+
+func startLink(t *testing.T, e *env, account int64) (state string, binding *http.Cookie) {
+	t.Helper()
+	rec := e.do(t, "GET /api/auth/google/start?link=1&return_to="+url.QueryEscape("/account/settings?tab=login"), asAccount(account))
+	return location(t, rec).Query().Get("state"), cookieOf(rec, LoginCookie)
+}
+
+func TestLinkCallbackLinksToTheAccountThatStartedItWithoutANewSession(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t, 0, identity.ProviderGoogle)
+	state, binding := startLink(t, e, 42)
+	rec := e.do(t, callbackURL("google", url.Values{"state": {state}, "code": {"c"}}), func(r *http.Request) {
+		r.AddCookie(binding)
+		asAccount(42)(r)
+	})
+	if u := location(t, rec); u.String() != "/account/settings?tab=login" {
+		t.Fatalf("Location = %s，成功的連結回到原本的返回網址", u)
+	}
+	if len(e.m.links) != 1 || e.m.links[0].accountID != 42 || e.m.links[0].identity.Subject != "g-1" {
+		t.Fatalf("links = %+v", e.m.links)
+	}
+	if len(e.m.logins) != 0 || cookieOf(rec, rpc.SessionCookie) != nil {
+		t.Fatal("連結不能登入或換發 session")
+	}
+}
+
+func TestLinkCallbackRefusesWhenTheSignedInAccountChanged(t *testing.T) {
+	t.Parallel()
+	for name, mut := range map[string]func(*http.Request){
+		"已登出":  nil,
+		"換了帳號": asAccount(43),
+		"換成管理員": func(r *http.Request) {
+			*r = *r.WithContext(rpc.WithPrincipal(r.Context(), identity.Principal{Kind: identity.PrincipalAdmin, ID: 42}))
+		},
+	} {
+		e := newEnv(t, 0, identity.ProviderGoogle)
+		state, binding := startLink(t, e, 42)
+		rec := e.do(t, callbackURL("google", url.Values{"state": {state}, "code": {"c"}}), func(r *http.Request) {
+			r.AddCookie(binding)
+			if mut != nil {
+				mut(r)
+			}
+		})
+		if u := location(t, rec); u.Path != "/account/settings" || u.Query().Get(LinkErrorParam) != ErrorInvalidFlow {
+			t.Errorf("%s：Location = %s", name, u)
+		}
+		if len(e.m.links) != 0 || len(e.google.exchanges) != 0 || len(e.m.logins) != 0 {
+			t.Errorf("%s：不該連結、換 token 或登入", name)
+		}
+	}
+}
+
+func TestLinkCallbackReportsConflictsOnTheReturnPath(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		err  error
+		want string
+	}{
+		"身分已連結到別的帳號": {apperr.AlreadyExists("x").WithReason(apperr.ReasonIdentityAlreadyLinked), LinkErrorAlreadyLinked},
+		"帳號不存在":      {apperr.NotFound("x"), ErrorLoginFailed},
+		"資料庫故障":      {errors.New("db down"), ErrorUnavailable},
+	} {
+		e := newEnv(t, 0, identity.ProviderGoogle)
+		e.m.linkErr = tc.err
+		state, binding := startLink(t, e, 42)
+		rec := e.do(t, callbackURL("google", url.Values{"state": {state}, "code": {"c"}}), func(r *http.Request) {
+			r.AddCookie(binding)
+			asAccount(42)(r)
+		})
+		u := location(t, rec)
+		if u.Path != "/account/settings" || u.Query().Get("tab") != "login" || u.Query().Get(LinkErrorParam) != tc.want {
+			t.Errorf("%s：Location = %s，預期 /account/settings?tab=login&link_error=%s", name, u, tc.want)
+		}
+		if len(e.m.logins) != 0 || cookieOf(rec, rpc.SessionCookie) != nil {
+			t.Errorf("%s：連結失敗不能登入", name)
+		}
+	}
+}
+
+func TestLinkCallbackStillNeedsTheFlowChecks(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		noCookie bool
+		query    func(url.Values)
+		want     string
+	}{
+		"沒有登入前 cookie":  {noCookie: true, want: ErrorInvalidFlow},
+		"Google 沒有 iss": {query: func(q url.Values) { q.Del("iss") }, want: ErrorInvalidFlow},
+		"沒有 code":       {query: func(q url.Values) { q.Del("code") }, want: ErrorInvalidFlow},
+		"使用者拒絕授權":       {query: func(q url.Values) { q.Del("code"); q.Set("error", "access_denied") }, want: ErrorAccessDenied},
+	} {
+		e := newEnv(t, 0, identity.ProviderGoogle)
+		state, binding := startLink(t, e, 42)
+		q := url.Values{"state": {state}, "code": {"c"}, "iss": {"https://accounts.google.com"}}
+		if tc.query != nil {
+			tc.query(q)
+		}
+		rec := e.do(t, rawCallbackURL("google", q), func(r *http.Request) {
+			if !tc.noCookie {
+				r.AddCookie(binding)
+			}
+			asAccount(42)(r)
+		})
+		u := location(t, rec)
+		if tc.noCookie && (u.Path != "/login" || u.Query().Get("error") != tc.want) {
+			t.Errorf("%s：Location = %s，流程不成立時回登入頁", name, u)
+		}
+		if !tc.noCookie && (u.Path != "/account/settings" || u.Query().Get(LinkErrorParam) != tc.want) {
+			t.Errorf("%s：Location = %s", name, u)
+		}
+		if len(e.m.links) != 0 || len(e.google.exchanges) != 0 {
+			t.Errorf("%s：不該換 token 或連結", name)
+		}
+	}
+}
+
+func TestRedirectLinkErrorKeepsTheReturnPathsQueryAndFragment(t *testing.T) {
+	t.Parallel()
+	for returnPath, want := range map[string]string{
+		"/account":           "/account?link_error=identity_already_linked",
+		"/account?tab=login": "/account?tab=login&link_error=identity_already_linked",
+		"/account#sessions":  "/account?link_error=identity_already_linked#sessions",
+		"/a?x=1&y=2#top":     "/a?x=1&y=2&link_error=identity_already_linked#top",
+	} {
+		rec := httptest.NewRecorder()
+		redirectLinkError(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/x", nil), returnPath, LinkErrorAlreadyLinked)
+		if got := rec.Header().Get("Location"); got != want {
+			t.Errorf("%q → %q，預期 %q", returnPath, got, want)
+		}
 	}
 }

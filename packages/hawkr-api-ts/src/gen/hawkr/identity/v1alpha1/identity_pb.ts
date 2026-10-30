@@ -4,9 +4,10 @@
 
 // identity 模組給前台的 API：登入的帳號與它的角色（行為規格在 backend/docs/modules/identity.md）。後台的 API 在 hawkr.admin.identity.v1alpha1。
 //
-// 登入、登出與 session 由 Clerk 處理（ADR 2026-09-27-identity-clerk）：每個請求以 Authorization: Bearer 帶 Clerk SDK
-// 取得的 session token（web 在每次請求前取，App 同樣）；沒有 Bearer 時讀 web 同源的 Clerk `__session` cookie，給瀏覽器
-// 直接導覽的下載用。token 的效期很短，由 SDK 自動換新；收到 unauthenticated 就回到登入。帳號在第一個認證過的請求時建立。
+// 登入、登出與 session 由 identity 模組自己管（ADR 2026-10-30-identity-self-hosted-federated-login）：session 是不透明的 token，
+// 以 Authorization: Bearer 帶（App），或在 web 以 `__Host-hk_session` cookie 帶（web 的登入走 /api/auth/{provider}/start，不在這個 API）。
+// App 以原生 SDK 取得 Google 或 LINE 的 ID token，經 IdentityPublicService 換成 session。收到 unauthenticated 就回到登入。
+// 以 cookie 認證的請求，只有標 NO_SIDE_EFFECTS 的方法能用 GET，其他方法必須是同源的 POST（D6）。
 //
 // 每個帳號都是買家（帳號活著就是買家，ADR 2026-09-30-account-created-provisions-buyer）；角色只有要另外申請的賣家。
 // 買家或賣家「正在看哪個工作區」是 client 的 UI 狀態，Connect 不讀：服務名稱（BuyerAppService、SellerAppService）本身就表示
@@ -15,15 +16,15 @@
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_google_api_field_behavior } from "../../../google/api/field_behavior_pb";
-import type { Timestamp } from "@bufbuild/protobuf/wkt";
-import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { Duration, Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_duration, file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file hawkr/identity/v1alpha1/identity.proto.
  */
 export const file_hawkr_identity_v1alpha1_identity: GenFile = /*@__PURE__*/
-  fileDesc("CiZoYXdrci9pZGVudGl0eS92MWFscGhhMS9pZGVudGl0eS5wcm90bxIXaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEieQoHQWNjb3VudBIPCgJpZBgBIAEoCUID4EEIEjEKBXJvbGVzGAIgAygOMh0uaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuUm9sZUID4EEDSgQIAxAESgQIBBAFSgQIBRAGUgthY3RpdmVfcm9sZVILcGVyc3BlY3RpdmUiEwoRR2V0U2Vzc2lvblJlcXVlc3QiiwEKEkdldFNlc3Npb25SZXNwb25zZRIxCgdhY2NvdW50GAIgASgLMiAuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuQWNjb3VudBI8CgpzdXNwZW5zaW9uGAMgASgLMiMuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuU3VzcGVuc2lvbkID4EEDSgQIARACIkMKClN1c3BlbnNpb24SNQoMc3VzcGVuZGVkX2F0GAEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDIlQKGkxpbmtBcHBsZUNyZWRlbnRpYWxSZXF1ZXN0EhUKCGlkX3Rva2VuGAEgASgJQgPgQQISHwoSYXV0aG9yaXphdGlvbl9jb2RlGAIgASgJQgPgQQIiHQobTGlua0FwcGxlQ3JlZGVudGlhbFJlc3BvbnNlIhYKFERlbGV0ZUFjY291bnRSZXF1ZXN0ItQBChVEZWxldGVBY2NvdW50UmVzcG9uc2USSwoFc3RhdGUYASABKA4yPC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5EZWxldGVBY2NvdW50UmVzcG9uc2UuRGVsZXRpb25TdGF0ZSJuCg1EZWxldGlvblN0YXRlEh4KGkRFTEVUSU9OX1NUQVRFX1VOU1BFQ0lGSUVEEAASGgoWREVMRVRJT05fU1RBVEVfREVMRVRFRBABEiEKHURFTEVUSU9OX1NUQVRFX1BFTkRJTkdfT1JERVJTEAIqPwoEUm9sZRIUChBST0xFX1VOU1BFQ0lGSUVEEAASDwoLUk9MRV9TRUxMRVIQAiIECAEQASoKUk9MRV9CVVlFUjL4AgoSSWRlbnRpdHlBcHBTZXJ2aWNlEmoKCkdldFNlc3Npb24SKi5oYXdrci5pZGVudGl0eS52MWFscGhhMS5HZXRTZXNzaW9uUmVxdWVzdBorLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkdldFNlc3Npb25SZXNwb25zZSIDkAIBEoUBChNMaW5rQXBwbGVDcmVkZW50aWFsEjMuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTGlua0FwcGxlQ3JlZGVudGlhbFJlcXVlc3QaNC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5MaW5rQXBwbGVDcmVkZW50aWFsUmVzcG9uc2UiA5ACAhJuCg1EZWxldGVBY2NvdW50Ei0uaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuRGVsZXRlQWNjb3VudFJlcXVlc3QaLi5oYXdrci5pZGVudGl0eS52MWFscGhhMS5EZWxldGVBY2NvdW50UmVzcG9uc2ViBnByb3RvMw", [file_google_api_field_behavior, file_google_protobuf_timestamp]);
+  fileDesc("CiZoYXdrci9pZGVudGl0eS92MWFscGhhMS9pZGVudGl0eS5wcm90bxIXaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEieQoHQWNjb3VudBIPCgJpZBgBIAEoCUID4EEIEjEKBXJvbGVzGAIgAygOMh0uaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuUm9sZUID4EEDSgQIAxAESgQIBBAFSgQIBRAGUgthY3RpdmVfcm9sZVILcGVyc3BlY3RpdmUiGwoZSXNzdWVBcHBMb2dpbk5vbmNlUmVxdWVzdCJmChpJc3N1ZUFwcExvZ2luTm9uY2VSZXNwb25zZRISCgVub25jZRgBIAEoCUID4EEDEjQKC2V4cGlyZV90aW1lGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDIoIBChZFeGNoYW5nZUlkVG9rZW5SZXF1ZXN0Ej0KCHByb3ZpZGVyGAEgASgOMiYuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTG9naW5Qcm92aWRlckID4EECEhUKCGlkX3Rva2VuGAIgASgJQgPgQQISEgoFbm9uY2UYAyABKAlCA+BBAiKqAQoXRXhjaGFuZ2VJZFRva2VuUmVzcG9uc2USGgoNc2Vzc2lvbl90b2tlbhgBIAEoCUID4EEDEj0KFGFic29sdXRlX2V4cGlyZV90aW1lGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEjQKDGlkbGVfdGltZW91dBgDIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkID4EEDIhAKDlNpZ25PdXRSZXF1ZXN0IhEKD1NpZ25PdXRSZXNwb25zZSJ/ChNMaW5rSWRlbnRpdHlSZXF1ZXN0Ej0KCHByb3ZpZGVyGAEgASgOMiYuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTG9naW5Qcm92aWRlckID4EECEhUKCGlkX3Rva2VuGAIgASgJQgPgQQISEgoFbm9uY2UYAyABKAlCA+BBAiIWChRMaW5rSWRlbnRpdHlSZXNwb25zZSI8ChNMaXN0U2Vzc2lvbnNSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJImgKFExpc3RTZXNzaW9uc1Jlc3BvbnNlEjcKCHNlc3Npb25zGAEgAygLMiUuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTG9naW5TZXNzaW9uEhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSIvChRSZXZva2VTZXNzaW9uUmVxdWVzdBIXCgpzZXNzaW9uX2lkGAEgASgJQgPgQQIiFwoVUmV2b2tlU2Vzc2lvblJlc3BvbnNlIuIBCgxMb2dpblNlc3Npb24SDwoCaWQYASABKAlCA+BBCBI9CgtjbGllbnRfa2luZBgCIAEoDjIjLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkNsaWVudEtpbmRCA+BBAxI0CgtjcmVhdGVfdGltZRgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxI2Cg1sYXN0X3VzZV90aW1lGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEhQKB2N1cnJlbnQYBSABKAhCA+BBAyITChFHZXRTZXNzaW9uUmVxdWVzdCKLAQoSR2V0U2Vzc2lvblJlc3BvbnNlEjEKB2FjY291bnQYAiABKAsyIC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5BY2NvdW50EjwKCnN1c3BlbnNpb24YAyABKAsyIy5oYXdrci5pZGVudGl0eS52MWFscGhhMS5TdXNwZW5zaW9uQgPgQQNKBAgBEAIiQwoKU3VzcGVuc2lvbhI1CgxzdXNwZW5kZWRfYXQYASABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMiVAoaTGlua0FwcGxlQ3JlZGVudGlhbFJlcXVlc3QSFQoIaWRfdG9rZW4YASABKAlCA+BBAhIfChJhdXRob3JpemF0aW9uX2NvZGUYAiABKAlCA+BBAiIdChtMaW5rQXBwbGVDcmVkZW50aWFsUmVzcG9uc2UiFgoURGVsZXRlQWNjb3VudFJlcXVlc3Qi1AEKFURlbGV0ZUFjY291bnRSZXNwb25zZRJLCgVzdGF0ZRgBIAEoDjI8Lmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkRlbGV0ZUFjY291bnRSZXNwb25zZS5EZWxldGlvblN0YXRlIm4KDURlbGV0aW9uU3RhdGUSHgoaREVMRVRJT05fU1RBVEVfVU5TUEVDSUZJRUQQABIaChZERUxFVElPTl9TVEFURV9ERUxFVEVEEAESIQodREVMRVRJT05fU1RBVEVfUEVORElOR19PUkRFUlMQAio/CgRSb2xlEhQKEFJPTEVfVU5TUEVDSUZJRUQQABIPCgtST0xFX1NFTExFUhACIgQIARABKgpST0xFX0JVWUVSKmMKDUxvZ2luUHJvdmlkZXISHgoaTE9HSU5fUFJPVklERVJfVU5TUEVDSUZJRUQQABIZChVMT0dJTl9QUk9WSURFUl9HT09HTEUQARIXChNMT0dJTl9QUk9WSURFUl9MSU5FEAIqUwoKQ2xpZW50S2luZBIbChdDTElFTlRfS0lORF9VTlNQRUNJRklFRBAAEhMKD0NMSUVOVF9LSU5EX1dFQhABEhMKD0NMSUVOVF9LSU5EX0FQUBACMowCChVJZGVudGl0eVB1YmxpY1NlcnZpY2USfQoSSXNzdWVBcHBMb2dpbk5vbmNlEjIuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuSXNzdWVBcHBMb2dpbk5vbmNlUmVxdWVzdBozLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLklzc3VlQXBwTG9naW5Ob25jZVJlc3BvbnNlEnQKD0V4Y2hhbmdlSWRUb2tlbhIvLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkV4Y2hhbmdlSWRUb2tlblJlcXVlc3QaMC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5FeGNoYW5nZUlkVG9rZW5SZXNwb25zZTKlBgoSSWRlbnRpdHlBcHBTZXJ2aWNlEmoKCkdldFNlc3Npb24SKi5oYXdrci5pZGVudGl0eS52MWFscGhhMS5HZXRTZXNzaW9uUmVxdWVzdBorLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkdldFNlc3Npb25SZXNwb25zZSIDkAIBEoUBChNMaW5rQXBwbGVDcmVkZW50aWFsEjMuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTGlua0FwcGxlQ3JlZGVudGlhbFJlcXVlc3QaNC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5MaW5rQXBwbGVDcmVkZW50aWFsUmVzcG9uc2UiA5ACAhJcCgdTaWduT3V0EicuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuU2lnbk91dFJlcXVlc3QaKC5oYXdrci5pZGVudGl0eS52MWFscGhhMS5TaWduT3V0UmVzcG9uc2USawoMTGlua0lkZW50aXR5EiwuaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuTGlua0lkZW50aXR5UmVxdWVzdBotLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkxpbmtJZGVudGl0eVJlc3BvbnNlEnAKDExpc3RTZXNzaW9ucxIsLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLkxpc3RTZXNzaW9uc1JlcXVlc3QaLS5oYXdrci5pZGVudGl0eS52MWFscGhhMS5MaXN0U2Vzc2lvbnNSZXNwb25zZSIDkAIBEm4KDVJldm9rZVNlc3Npb24SLS5oYXdrci5pZGVudGl0eS52MWFscGhhMS5SZXZva2VTZXNzaW9uUmVxdWVzdBouLmhhd2tyLmlkZW50aXR5LnYxYWxwaGExLlJldm9rZVNlc3Npb25SZXNwb25zZRJuCg1EZWxldGVBY2NvdW50Ei0uaGF3a3IuaWRlbnRpdHkudjFhbHBoYTEuRGVsZXRlQWNjb3VudFJlcXVlc3QaLi5oYXdrci5pZGVudGl0eS52MWFscGhhMS5EZWxldGVBY2NvdW50UmVzcG9uc2ViBnByb3RvMw", [file_google_api_field_behavior, file_google_protobuf_duration, file_google_protobuf_timestamp]);
 
 /**
  * Account 是登入的帳號。
@@ -52,6 +53,294 @@ export const AccountSchema: GenMessage<Account> = /*@__PURE__*/
   messageDesc(file_hawkr_identity_v1alpha1_identity, 0);
 
 /**
+ * @generated from message hawkr.identity.v1alpha1.IssueAppLoginNonceRequest
+ */
+export type IssueAppLoginNonceRequest = Message<"hawkr.identity.v1alpha1.IssueAppLoginNonceRequest"> & {
+};
+
+/**
+ * Describes the message hawkr.identity.v1alpha1.IssueAppLoginNonceRequest.
+ * Use `create(IssueAppLoginNonceRequestSchema)` to create a new message.
+ */
+export const IssueAppLoginNonceRequestSchema: GenMessage<IssueAppLoginNonceRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 1);
+
+/**
+ * @generated from message hawkr.identity.v1alpha1.IssueAppLoginNonceResponse
+ */
+export type IssueAppLoginNonceResponse = Message<"hawkr.identity.v1alpha1.IssueAppLoginNonceResponse"> & {
+  /**
+   * 單次使用的 nonce：不透明的字串，client 不解析。
+   *
+   * @generated from field: string nonce = 1;
+   */
+  nonce: string;
+
+  /**
+   * nonce 的到期時間（發出後 5 分鐘）。
+   *
+   * @generated from field: google.protobuf.Timestamp expire_time = 2;
+   */
+  expireTime?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message hawkr.identity.v1alpha1.IssueAppLoginNonceResponse.
+ * Use `create(IssueAppLoginNonceResponseSchema)` to create a new message.
+ */
+export const IssueAppLoginNonceResponseSchema: GenMessage<IssueAppLoginNonceResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 2);
+
+/**
+ * @generated from message hawkr.identity.v1alpha1.ExchangeIdTokenRequest
+ */
+export type ExchangeIdTokenRequest = Message<"hawkr.identity.v1alpha1.ExchangeIdTokenRequest"> & {
+  /**
+   * @generated from field: hawkr.identity.v1alpha1.LoginProvider provider = 1;
+   */
+  provider: LoginProvider;
+
+  /**
+   * 原生 SDK 簽發的 ID token。
+   *
+   * @generated from field: string id_token = 2;
+   */
+  idToken: string;
+
+  /**
+   * IssueAppLoginNonce 發的 nonce，必須等於 ID token 的 nonce claim。
+   *
+   * @generated from field: string nonce = 3;
+   */
+  nonce: string;
+};
+
+/**
+ * Describes the message hawkr.identity.v1alpha1.ExchangeIdTokenRequest.
+ * Use `create(ExchangeIdTokenRequestSchema)` to create a new message.
+ */
+export const ExchangeIdTokenRequestSchema: GenMessage<ExchangeIdTokenRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 3);
+
+/**
+ * @generated from message hawkr.identity.v1alpha1.ExchangeIdTokenResponse
+ */
+export type ExchangeIdTokenResponse = Message<"hawkr.identity.v1alpha1.ExchangeIdTokenResponse"> & {
+  /**
+   * 新 session 的 token，只在這裡出現一次：client 保存在安全儲存，之後以 Authorization: Bearer 帶。
+   *
+   * @generated from field: string session_token = 1;
+   */
+  sessionToken: string;
+
+  /**
+   * session 的絕對到期時間（建立後 90 天），到期一定要重新登入。
+   *
+   * @generated from field: google.protobuf.Timestamp absolute_expire_time = 2;
+   */
+  absoluteExpireTime?: Timestamp | undefined;
+
+  /**
+   * 閒置逾時（App 14 天）：這麼久沒有請求 session 就失效；使用中的 session 每天最多續期一次。
+   *
+   * @generated from field: google.protobuf.Duration idle_timeout = 3;
+   */
+  idleTimeout?: Duration | undefined;
+};
+
+/**
+ * Describes the message hawkr.identity.v1alpha1.ExchangeIdTokenResponse.
+ * Use `create(ExchangeIdTokenResponseSchema)` to create a new message.
+ */
+export const ExchangeIdTokenResponseSchema: GenMessage<ExchangeIdTokenResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 4);
+
+/**
+ * @generated from message hawkr.identity.v1alpha1.SignOutRequest
+ */
+export type SignOutRequest = Message<"hawkr.identity.v1alpha1.SignOutRequest"> & {
+};
+
+/**
+ * Describes the message hawkr.identity.v1alpha1.SignOutRequest.
+ * Use `create(SignOutRequestSchema)` to create a new message.
+ */
+export const SignOutRequestSchema: GenMessage<SignOutRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 5);
+
+/**
+ * @generated from message hawkr.identity.v1alpha1.SignOutResponse
+ */
+export type SignOutResponse = Message<"hawkr.identity.v1alpha1.SignOutResponse"> & {
+};
+
+/**
+ * Describes the message hawkr.identity.v1alpha1.SignOutResponse.
+ * Use `create(SignOutResponseSchema)` to create a new message.
+ */
+export const SignOutResponseSchema: GenMessage<SignOutResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 6);
+
+/**
+ * @generated from message hawkr.identity.v1alpha1.LinkIdentityRequest
+ */
+export type LinkIdentityRequest = Message<"hawkr.identity.v1alpha1.LinkIdentityRequest"> & {
+  /**
+   * @generated from field: hawkr.identity.v1alpha1.LoginProvider provider = 1;
+   */
+  provider: LoginProvider;
+
+  /**
+   * @generated from field: string id_token = 2;
+   */
+  idToken: string;
+
+  /**
+   * @generated from field: string nonce = 3;
+   */
+  nonce: string;
+};
+
+/**
+ * Describes the message hawkr.identity.v1alpha1.LinkIdentityRequest.
+ * Use `create(LinkIdentityRequestSchema)` to create a new message.
+ */
+export const LinkIdentityRequestSchema: GenMessage<LinkIdentityRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 7);
+
+/**
+ * @generated from message hawkr.identity.v1alpha1.LinkIdentityResponse
+ */
+export type LinkIdentityResponse = Message<"hawkr.identity.v1alpha1.LinkIdentityResponse"> & {
+};
+
+/**
+ * Describes the message hawkr.identity.v1alpha1.LinkIdentityResponse.
+ * Use `create(LinkIdentityResponseSchema)` to create a new message.
+ */
+export const LinkIdentityResponseSchema: GenMessage<LinkIdentityResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 8);
+
+/**
+ * @generated from message hawkr.identity.v1alpha1.ListSessionsRequest
+ */
+export type ListSessionsRequest = Message<"hawkr.identity.v1alpha1.ListSessionsRequest"> & {
+  /**
+   * 預設 20，上限 100。
+   *
+   * @generated from field: int32 page_size = 1;
+   */
+  pageSize: number;
+
+  /**
+   * @generated from field: string page_token = 2;
+   */
+  pageToken: string;
+};
+
+/**
+ * Describes the message hawkr.identity.v1alpha1.ListSessionsRequest.
+ * Use `create(ListSessionsRequestSchema)` to create a new message.
+ */
+export const ListSessionsRequestSchema: GenMessage<ListSessionsRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 9);
+
+/**
+ * @generated from message hawkr.identity.v1alpha1.ListSessionsResponse
+ */
+export type ListSessionsResponse = Message<"hawkr.identity.v1alpha1.ListSessionsResponse"> & {
+  /**
+   * @generated from field: repeated hawkr.identity.v1alpha1.LoginSession sessions = 1;
+   */
+  sessions: LoginSession[];
+
+  /**
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
+};
+
+/**
+ * Describes the message hawkr.identity.v1alpha1.ListSessionsResponse.
+ * Use `create(ListSessionsResponseSchema)` to create a new message.
+ */
+export const ListSessionsResponseSchema: GenMessage<ListSessionsResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 10);
+
+/**
+ * @generated from message hawkr.identity.v1alpha1.RevokeSessionRequest
+ */
+export type RevokeSessionRequest = Message<"hawkr.identity.v1alpha1.RevokeSessionRequest"> & {
+  /**
+   * @generated from field: string session_id = 1;
+   */
+  sessionId: string;
+};
+
+/**
+ * Describes the message hawkr.identity.v1alpha1.RevokeSessionRequest.
+ * Use `create(RevokeSessionRequestSchema)` to create a new message.
+ */
+export const RevokeSessionRequestSchema: GenMessage<RevokeSessionRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 11);
+
+/**
+ * @generated from message hawkr.identity.v1alpha1.RevokeSessionResponse
+ */
+export type RevokeSessionResponse = Message<"hawkr.identity.v1alpha1.RevokeSessionResponse"> & {
+};
+
+/**
+ * Describes the message hawkr.identity.v1alpha1.RevokeSessionResponse.
+ * Use `create(RevokeSessionResponseSchema)` to create a new message.
+ */
+export const RevokeSessionResponseSchema: GenMessage<RevokeSessionResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 12);
+
+/**
+ * LoginSession 是帳號的一個登入中的 session。id 不是憑證：token 不會出現在任何回應（除了建立它的那一次）。
+ *
+ * @generated from message hawkr.identity.v1alpha1.LoginSession
+ */
+export type LoginSession = Message<"hawkr.identity.v1alpha1.LoginSession"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: hawkr.identity.v1alpha1.ClientKind client_kind = 2;
+   */
+  clientKind: ClientKind;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp create_time = 3;
+   */
+  createTime?: Timestamp | undefined;
+
+  /**
+   * 最後一次使用的時間；使用中的 session 每天最多更新一次。
+   *
+   * @generated from field: google.protobuf.Timestamp last_use_time = 4;
+   */
+  lastUseTime?: Timestamp | undefined;
+
+  /**
+   * 這是不是送出這個請求的 session。
+   *
+   * @generated from field: bool current = 5;
+   */
+  current: boolean;
+};
+
+/**
+ * Describes the message hawkr.identity.v1alpha1.LoginSession.
+ * Use `create(LoginSessionSchema)` to create a new message.
+ */
+export const LoginSessionSchema: GenMessage<LoginSession> = /*@__PURE__*/
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 13);
+
+/**
  * @generated from message hawkr.identity.v1alpha1.GetSessionRequest
  */
 export type GetSessionRequest = Message<"hawkr.identity.v1alpha1.GetSessionRequest"> & {
@@ -62,7 +351,7 @@ export type GetSessionRequest = Message<"hawkr.identity.v1alpha1.GetSessionReque
  * Use `create(GetSessionRequestSchema)` to create a new message.
  */
 export const GetSessionRequestSchema: GenMessage<GetSessionRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_identity_v1alpha1_identity, 1);
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 14);
 
 /**
  * @generated from message hawkr.identity.v1alpha1.GetSessionResponse
@@ -87,7 +376,7 @@ export type GetSessionResponse = Message<"hawkr.identity.v1alpha1.GetSessionResp
  * Use `create(GetSessionResponseSchema)` to create a new message.
  */
 export const GetSessionResponseSchema: GenMessage<GetSessionResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_identity_v1alpha1_identity, 2);
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 15);
 
 /**
  * Suspension 是帳號的停權狀態。
@@ -108,7 +397,7 @@ export type Suspension = Message<"hawkr.identity.v1alpha1.Suspension"> & {
  * Use `create(SuspensionSchema)` to create a new message.
  */
 export const SuspensionSchema: GenMessage<Suspension> = /*@__PURE__*/
-  messageDesc(file_hawkr_identity_v1alpha1_identity, 3);
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 16);
 
 /**
  * @generated from message hawkr.identity.v1alpha1.LinkAppleCredentialRequest
@@ -134,7 +423,7 @@ export type LinkAppleCredentialRequest = Message<"hawkr.identity.v1alpha1.LinkAp
  * Use `create(LinkAppleCredentialRequestSchema)` to create a new message.
  */
 export const LinkAppleCredentialRequestSchema: GenMessage<LinkAppleCredentialRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_identity_v1alpha1_identity, 4);
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 17);
 
 /**
  * @generated from message hawkr.identity.v1alpha1.LinkAppleCredentialResponse
@@ -147,7 +436,7 @@ export type LinkAppleCredentialResponse = Message<"hawkr.identity.v1alpha1.LinkA
  * Use `create(LinkAppleCredentialResponseSchema)` to create a new message.
  */
 export const LinkAppleCredentialResponseSchema: GenMessage<LinkAppleCredentialResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_identity_v1alpha1_identity, 5);
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 18);
 
 /**
  * @generated from message hawkr.identity.v1alpha1.DeleteAccountRequest
@@ -160,7 +449,7 @@ export type DeleteAccountRequest = Message<"hawkr.identity.v1alpha1.DeleteAccoun
  * Use `create(DeleteAccountRequestSchema)` to create a new message.
  */
 export const DeleteAccountRequestSchema: GenMessage<DeleteAccountRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_identity_v1alpha1_identity, 6);
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 19);
 
 /**
  * @generated from message hawkr.identity.v1alpha1.DeleteAccountResponse
@@ -177,7 +466,7 @@ export type DeleteAccountResponse = Message<"hawkr.identity.v1alpha1.DeleteAccou
  * Use `create(DeleteAccountResponseSchema)` to create a new message.
  */
 export const DeleteAccountResponseSchema: GenMessage<DeleteAccountResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_identity_v1alpha1_identity, 7);
+  messageDesc(file_hawkr_identity_v1alpha1_identity, 20);
 
 /**
  * DeletionState 是申請之後帳號的狀態。
@@ -209,7 +498,7 @@ export enum DeleteAccountResponse_DeletionState {
  * Describes the enum hawkr.identity.v1alpha1.DeleteAccountResponse.DeletionState.
  */
 export const DeleteAccountResponse_DeletionStateSchema: GenEnum<DeleteAccountResponse_DeletionState> = /*@__PURE__*/
-  enumDesc(file_hawkr_identity_v1alpha1_identity, 7, 0);
+  enumDesc(file_hawkr_identity_v1alpha1_identity, 20, 0);
 
 /**
  * Role 是帳號另外申請的角色。買家不是角色：每個帳號都是買家。
@@ -233,6 +522,96 @@ export enum Role {
  */
 export const RoleSchema: GenEnum<Role> = /*@__PURE__*/
   enumDesc(file_hawkr_identity_v1alpha1_identity, 0);
+
+/**
+ * LoginProvider 是聯合登入的 provider。值名去掉前綴等於資料庫與 identity 模組的 provider 值。
+ *
+ * @generated from enum hawkr.identity.v1alpha1.LoginProvider
+ */
+export enum LoginProvider {
+  /**
+   * @generated from enum value: LOGIN_PROVIDER_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: LOGIN_PROVIDER_GOOGLE = 1;
+   */
+  GOOGLE = 1,
+
+  /**
+   * @generated from enum value: LOGIN_PROVIDER_LINE = 2;
+   */
+  LINE = 2,
+}
+
+/**
+ * Describes the enum hawkr.identity.v1alpha1.LoginProvider.
+ */
+export const LoginProviderSchema: GenEnum<LoginProvider> = /*@__PURE__*/
+  enumDesc(file_hawkr_identity_v1alpha1_identity, 1);
+
+/**
+ * ClientKind 是 session 的 client 種類，決定閒置逾時（web 7 天、App 14 天）。
+ *
+ * @generated from enum hawkr.identity.v1alpha1.ClientKind
+ */
+export enum ClientKind {
+  /**
+   * @generated from enum value: CLIENT_KIND_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: CLIENT_KIND_WEB = 1;
+   */
+  WEB = 1,
+
+  /**
+   * @generated from enum value: CLIENT_KIND_APP = 2;
+   */
+  APP = 2,
+}
+
+/**
+ * Describes the enum hawkr.identity.v1alpha1.ClientKind.
+ */
+export const ClientKindSchema: GenEnum<ClientKind> = /*@__PURE__*/
+  enumDesc(file_hawkr_identity_v1alpha1_identity, 2);
+
+/**
+ * IdentityPublicService 是登入之前的方法：App 把原生 SDK 取得的 ID token 換成 session。兩個方法都是 POST，回應一律不可快取。
+ * 每個來源 IP 有額度，超過回 resource_exhausted（帶 RetryInfo）。
+ *
+ * @generated from service hawkr.identity.v1alpha1.IdentityPublicService
+ */
+export const IdentityPublicService: GenService<{
+  /**
+   * IssueAppLoginNonce 發一個單次使用、5 分鐘內有效的 nonce：App 把它交給原生 SDK（Google 的 nonce、LINE 的 nonce），
+   * SDK 簽發的 ID token 的 nonce claim 必須等於它，再交給 ExchangeIdToken 或 LinkIdentity。
+   *
+   * @generated from rpc hawkr.identity.v1alpha1.IdentityPublicService.IssueAppLoginNonce
+   */
+  issueAppLoginNonce: {
+    methodKind: "unary";
+    input: typeof IssueAppLoginNonceRequestSchema;
+    output: typeof IssueAppLoginNonceResponseSchema;
+  },
+  /**
+   * ExchangeIdToken 以原生 SDK 取得的 ID token 登入並換發 session（App 種類，閒置 14 天、絕對 90 天）：驗證簽章、issuer、audience、
+   * nonce（必須是 IssueAppLoginNonce 發的、尚未用過）；Google 另外要求 azp 在允許的 App client 清單。已有這個身分就登入它的帳號，
+   * 否則依規則自動連結或建立帳號（ADR 同上 D4）。請求已帶 Authorization: Bearer 的舊 session 時一併撤銷。
+   * ID token 或 nonce 無效回 unauthenticated；身分屬於已刪除的帳號也回 unauthenticated；這個 provider 沒有設定回 unavailable。
+   *
+   * @generated from rpc hawkr.identity.v1alpha1.IdentityPublicService.ExchangeIdToken
+   */
+  exchangeIdToken: {
+    methodKind: "unary";
+    input: typeof ExchangeIdTokenRequestSchema;
+    output: typeof ExchangeIdTokenResponseSchema;
+  },
+}> = /*@__PURE__*/
+  serviceDesc(file_hawkr_identity_v1alpha1_identity, 0);
 
 /**
  * IdentityAppService 是登入的買家、賣家的方法。
@@ -265,6 +644,50 @@ export const IdentityAppService: GenService<{
     output: typeof LinkAppleCredentialResponseSchema;
   },
   /**
+   * SignOut 撤銷目前的 session。web 的回應另以 Set-Cookie 清掉 `__Host-hk_session`。session 已經不存在時也成功。停權的帳號也能呼叫。
+   *
+   * @generated from rpc hawkr.identity.v1alpha1.IdentityAppService.SignOut
+   */
+  signOut: {
+    methodKind: "unary";
+    input: typeof SignOutRequestSchema;
+    output: typeof SignOutResponseSchema;
+  },
+  /**
+   * LinkIdentity 把 App 以原生 SDK 取得的 Google 或 LINE 身分連結到呼叫者的帳號（web 走 GET /api/auth/{provider}/start?link=1）。
+   * ID token 與 nonce 的驗證同 IdentityPublicService.ExchangeIdToken，不換發 session。這個身分已連結到別的帳號（含已刪除帳號
+   * 留下的身分）回 already_exists 與 ErrorReason IDENTITY_ALREADY_LINKED，什麼都不改；已連結到呼叫者自己時成功。
+   *
+   * @generated from rpc hawkr.identity.v1alpha1.IdentityAppService.LinkIdentity
+   */
+  linkIdentity: {
+    methodKind: "unary";
+    input: typeof LinkIdentityRequestSchema;
+    output: typeof LinkIdentityResponseSchema;
+  },
+  /**
+   * ListSessions 列出呼叫者的有效 session（新到舊），標出目前這一個。停權的帳號也能呼叫。
+   *
+   * @generated from rpc hawkr.identity.v1alpha1.IdentityAppService.ListSessions
+   */
+  listSessions: {
+    methodKind: "unary";
+    input: typeof ListSessionsRequestSchema;
+    output: typeof ListSessionsResponseSchema;
+  },
+  /**
+   * RevokeSession 終止呼叫者自己的一個 session（包含目前這個）。目前的 session 必須在 15 分鐘內以 provider 驗證過
+   * （重新走一次登入），否則回 failed_precondition 與 ErrorReason REAUTHENTICATION_REQUIRED，client 引導重新登入後再送。
+   * 沒有這個 session 或屬於別的帳號回 not_found。停權的帳號也能呼叫。
+   *
+   * @generated from rpc hawkr.identity.v1alpha1.IdentityAppService.RevokeSession
+   */
+  revokeSession: {
+    methodKind: "unary";
+    input: typeof RevokeSessionRequestSchema;
+    output: typeof RevokeSessionResponseSchema;
+  },
+  /**
    * DeleteAccount 刪除呼叫者的帳號（App Store 審核準則 5.1.1(v)）。沒有未完成的訂單時立即刪除；有的話進入刪除流程，
    * 最後一筆訂單完成後自動刪除，期間不能新增收藏與追蹤；流程中再呼叫回目前的狀態。帳號有店家時店家是
    * 參與者：同一個 transaction 關閉買家、店家並刪除帳號，店家有未結訂單時與買家一起等待到兩側都結清。保存的 Apple 授權由伺服器在最後刪除時撤銷，client 不需要任何前置步驟。
@@ -278,5 +701,5 @@ export const IdentityAppService: GenService<{
     output: typeof DeleteAccountResponseSchema;
   },
 }> = /*@__PURE__*/
-  serviceDesc(file_hawkr_identity_v1alpha1_identity, 0);
+  serviceDesc(file_hawkr_identity_v1alpha1_identity, 1);
 

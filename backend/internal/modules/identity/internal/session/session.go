@@ -28,6 +28,9 @@ const (
 	AppIdle = 14 * 24 * time.Hour
 	// Absolute 是絕對逾時：無論多常使用，建立後超過就失效。
 	Absolute = 90 * 24 * time.Hour
+	// ReauthWindow 是終止 session 這類敏感操作要求的重新驗證期限：目前的 session 最近一次以 provider 驗證不得早於這麼久之前
+	// （計畫 2026-10-30-self-hosted-auth 步驟 2「session 管理」，ASVS）。
+	ReauthWindow = 15 * time.Minute
 	// RenewEvery 是 last_used_at 最多寫入一次的間隔。
 	RenewEvery = 24 * time.Hour
 	// FlowTTL 是 web 登入流程暫存列的壽命；AppNonceTTL 是 App 的 nonce 壽命。
@@ -79,8 +82,9 @@ func Hash(secret string) []byte {
 
 // Issued 是剛建立的 session：Token 是原文，只在這裡出現一次。
 type Issued struct {
-	Token string
-	ID    uuid.UUID
+	Token             string
+	ID                uuid.UUID
+	AbsoluteExpiresAt time.Time
 }
 
 // Create 為帳號建立新 session，並順手清掉這個帳號已逾時的 session。client 必須是已知的種類。登入建立 session 時由呼叫方包進同一個 transaction。
@@ -99,13 +103,19 @@ func (s *Service) Create(ctx context.Context, accountID int64, client model.Clie
 	}); err != nil {
 		return Issued{}, fmt.Errorf("identity：清除逾時的 session：%w", err)
 	}
+	absolute := now.Add(Absolute)
 	id, err := q.InsertSession(ctx, store.InsertSessionParams{
-		TokenHash: Hash(token), AccountID: accountID, Client: string(client), Now: now, AbsoluteExpiresAt: now.Add(Absolute),
+		TokenHash: Hash(token), AccountID: accountID, Client: string(client), Now: now, AbsoluteExpiresAt: absolute,
 	})
 	if err != nil {
 		return Issued{}, fmt.Errorf("identity：建立 session：%w", err)
 	}
-	return Issued{Token: token, ID: id}, nil
+	return Issued{Token: token, ID: id, AbsoluteExpiresAt: absolute}, nil
+}
+
+// Expired 回報 session 在 now 是不是已經失效：絕對逾時，或距離最後使用超過 client 的閒置逾時。
+func Expired(client model.ClientKind, lastUsedAt, absoluteExpiresAt, now time.Time) bool {
+	return !now.Before(absoluteExpiresAt) || !now.Before(lastUsedAt.Add(Idle(client)))
 }
 
 // Resolve 解析 token：雜湊查列，檢查閒置與絕對逾時，續期（一天最多寫一次 last_used_at），並讀出帳號的停權狀態與角色。
@@ -124,7 +134,7 @@ func (s *Service) Resolve(ctx context.Context, token string) (model.Authenticate
 		return model.Authenticated{}, fmt.Errorf("identity：讀取 session：%w", err)
 	}
 	now := s.d.Now()
-	if row.DeletedAt != nil || !now.Before(row.AbsoluteExpiresAt) || !now.Before(row.LastUsedAt.Add(Idle(model.ClientKind(row.Client)))) {
+	if row.DeletedAt != nil || Expired(model.ClientKind(row.Client), row.LastUsedAt, row.AbsoluteExpiresAt, now) {
 		if _, err := q.DeleteSessionByTokenHash(ctx, hash); err != nil {
 			s.d.Logger.WarnContext(ctx, "identity：刪除逾時的 session 失敗", "error", err)
 		}
@@ -142,6 +152,7 @@ func (s *Service) Resolve(ctx context.Context, token string) (model.Authenticate
 	return model.Authenticated{
 		Principal:   model.Principal{Kind: model.PrincipalAccount, ID: row.AccountID, Roles: roles},
 		SuspendedAt: row.SuspendedAt,
+		Session:     &model.SessionRef{ID: row.ID, Client: model.ClientKind(row.Client)},
 	}, nil
 }
 

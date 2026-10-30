@@ -70,6 +70,9 @@ type Deps struct {
 	Identity    *identity.Module
 	// WebLogin 是 web 的聯合登入入口（/api/auth/{provider}/start 與 callback，經同源反代）；nil 時不掛。
 	WebLogin *httpidentity.WebLogin
+	// AppLogin 驗證 App 原生登入的 ID token（IdentityPublicService.ExchangeIdToken、IdentityAppService.LinkIdentity）；nil 時等於沒有設定任何
+	// provider，這兩個方法回 unavailable。
+	AppLogin *httpidentity.AppLogin
 	Seller   *seller.Module
 	// Social 給後台建立內容下架措施前核對內容歸屬（SellerGovernanceAdminService.CreateMeasure）。
 	Social *social.Module
@@ -271,7 +274,18 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	}
 	add(buyerconnect.NewBuyerAppServiceHandler(buyerApp, opts...))
 	add(adminbuyerconnect.NewBuyerAdminServiceHandler(httpbuyer.NewAdmin(deps.Buyer), opts...))
-	add(identityconnect.NewIdentityAppServiceHandler(httpidentity.NewApp(deps.Identity, deps.Deletion), opts...))
+	appLogin := deps.AppLogin
+	if appLogin == nil {
+		if appLogin, err = httpidentity.NewAppLogin(deps.Identity); err != nil {
+			return nil, err
+		}
+	}
+	now := deps.Now
+	if now == nil {
+		now = time.Now
+	}
+	add(identityconnect.NewIdentityPublicServiceHandler(httpidentity.NewPublic(appLogin), opts...))
+	add(identityconnect.NewIdentityAppServiceHandler(httpidentity.NewApp(deps.Identity, deps.Deletion, appLogin, now), opts...))
 	add(adminidentityconnect.NewIdentityAdminServiceHandler(httpidentity.NewAdmin(deps.Identity, deps.Delegation, deps.Deletion), opts...))
 	// 賣家區每個方法的能力宣告由這支 interceptor 執行，只掛在 SellerAppService、在 rpc.NewInterceptor 之內；宣告與 service
 	// 的方法對不上時不能啟動。

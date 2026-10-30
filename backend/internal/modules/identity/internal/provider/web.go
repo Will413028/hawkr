@@ -116,6 +116,10 @@ func (w *WebLogin) CheckIssuer(iss string) bool {
 	return subtle.ConstantTimeCompare([]byte(iss), []byte(w.issuer)) == 1
 }
 
+// RequiresIssuer 回報這家 provider 的授權回應一定帶 iss：Google 的 discovery 宣告 authorization_response_iss_parameter_supported，
+// LINE 沒有（計畫 2026-10-30-self-hosted-auth 附件 spikes.md §a、§c；RFC 9207 §2.4）。
+func (w *WebLogin) RequiresIssuer() bool { return w.provider == model.ProviderGoogle }
+
 // Exchange 以 authorization code（帶 PKCE verifier）換 token，驗證 ID token（簽章、iss、aud、exp，nonce 必須等於 wantNonce），
 // 回傳 provider 的身分。ID token 無效、nonce 不符回含 model.ErrInvalidToken 的錯誤；provider 拒絕這個 code（4xx）回含 model.ErrRejected 的錯誤；
 // 其他（連不上、5xx）是沒有分類的錯誤。access／refresh token 不外流。

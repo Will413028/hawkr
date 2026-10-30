@@ -16,8 +16,8 @@ import (
 )
 
 // web 的聯合登入入口（ADR 2026-10-30-identity-self-hosted-federated-login D3）：純 HTTP 的 start 與 callback，每家 provider 各一組路徑
-// （防 mix-up），經 web 的同源反代到達單體。不走 Connect，也不經動作性質宣告：兩條路由都只收 GET，不改變既有帳號的狀態，
-// 登入本身是新建 session 與（首次登入時）帳號。
+// （防 mix-up），經 web 的同源反代到達單體。不走 Connect，也不經動作性質宣告：兩條路由都只收 GET。start 只寫一列暫存狀態；callback
+// 登入（新建 session 與首次登入時的帳號），或在 start 帶 link=1 時把 provider 身分連結到發起的已登入帳號，不換發 session。
 
 const (
 	// AuthPathPrefix 是所有 web 登入路由的前綴。
@@ -41,6 +41,15 @@ const (
 	ErrorProvider     = "provider_error"
 	ErrorLoginFailed  = "login_failed"
 	ErrorUnavailable  = "unavailable"
+	// ErrorLoginRequired 是要求連結（link=1）卻沒有登入。
+	ErrorLoginRequired = "login_required"
+)
+
+// 手動連結失敗時，附在返回網址上的 link_error 代碼（成功時返回網址不變）：固定值。
+const (
+	LinkErrorParam = "link_error"
+	// LinkErrorAlreadyLinked 是這個 provider 身分已經連結到另一個帳號（含已刪除帳號留下的）。
+	LinkErrorAlreadyLinked = "identity_already_linked"
 )
 
 // webLoginModule 是 web 登入需要的 identity 方法；*identity.Module 滿足它。
@@ -48,6 +57,7 @@ type webLoginModule interface {
 	BeginLoginFlow(ctx context.Context, in identity.LoginFlowInput) (identity.LoginFlowStart, error)
 	ConsumeLoginFlow(ctx context.Context, state, binding string, want identity.Provider) (identity.LoginFlow, error)
 	Login(ctx context.Context, in identity.LoginInput) (identity.LoginResult, error)
+	LinkIdentity(ctx context.Context, accountID int64, id identity.ProviderIdentity) error
 }
 
 // WebProvider 是一家 provider 的 web 登入；*identity.WebLogin 滿足它。
@@ -55,6 +65,8 @@ type WebProvider interface {
 	Provider() identity.Provider
 	AuthURL(state, nonce, verifier string) string
 	CheckIssuer(iss string) bool
+	// RequiresIssuer 回報這家 provider 的授權回應一定帶 iss（RFC 9207 §2.4：宣告了就必須帶，沒帶要拒絕）。
+	RequiresIssuer() bool
 	Exchange(ctx context.Context, code, verifier, wantNonce string) (identity.ProviderIdentity, error)
 }
 
@@ -142,7 +154,22 @@ func (w *WebLogin) start(rw http.ResponseWriter, r *http.Request, p WebProvider)
 	if !identity.ValidReturnPath(returnTo) {
 		returnTo = "/"
 	}
-	flow, err := w.d.Module.BeginLoginFlow(r.Context(), identity.LoginFlowInput{Provider: p.Provider(), ReturnPath: returnTo})
+	input := identity.LoginFlowInput{Provider: p.Provider(), ReturnPath: returnTo}
+	if r.URL.Query().Has("link") {
+		// 手動連結：只有已登入的帳號能發起，帳號寫進暫存列；實際連結在 callback，要通過登入前 cookie 與 state。這個 GET 只寫一列暫存狀態，
+		// 不改任何帳號資料，跨站導覽過來也無法完成連結（攻擊者拿不到暫存列的 state 與瀏覽器裡的登入前 cookie）。
+		caller, ok := rpc.PrincipalFrom(r.Context())
+		switch {
+		case r.URL.Query().Get("link") != "1":
+			redirectToLogin(rw, r, ErrorInvalidFlow)
+			return
+		case !ok || caller.Kind != identity.PrincipalAccount:
+			redirectToLogin(rw, r, ErrorLoginRequired)
+			return
+		}
+		input.LinkAccountID = &caller.ID
+	}
+	flow, err := w.d.Module.BeginLoginFlow(r.Context(), input)
 	if err != nil {
 		w.d.Logger.ErrorContext(r.Context(), "httpapi：建立登入流程失敗", "provider", p.Provider(), "error", err)
 		redirectToLogin(rw, r, ErrorUnavailable)
@@ -169,6 +196,14 @@ func (w *WebLogin) callback(rw http.ResponseWriter, r *http.Request, p WebProvid
 		binding = c.Value
 	}
 	flow, err := w.d.Module.ConsumeLoginFlow(ctx, state, binding, p.Provider())
+	// fail 結束這次 callback：手動連結的流程（流程成立且帶連結帳號）回到返回網址並附 link_error，其餘回到登入頁並附 error。
+	fail := func(code string) {
+		if err == nil && flow.LinkAccountID != nil {
+			redirectLinkError(rw, r, flow.ReturnPath, code)
+			return
+		}
+		redirectToLogin(rw, r, code)
+	}
 	if providerError := q.Get("error"); providerError != "" {
 		// 使用者在 provider 拒絕授權或 provider 出錯：流程已作廢（上面的 consume），不看 flow 是否成立。
 		code := ErrorProvider
@@ -176,33 +211,35 @@ func (w *WebLogin) callback(rw http.ResponseWriter, r *http.Request, p WebProvid
 			code = ErrorAccessDenied
 		}
 		log.InfoContext(ctx, "httpapi：provider 回報登入失敗", "error", providerError)
-		redirectToLogin(rw, r, code)
+		fail(code)
 		return
 	}
 	if err != nil {
 		if apperr.KindOf(err) == apperr.KindUnauthenticated {
-			redirectToLogin(rw, r, ErrorInvalidFlow)
+			fail(ErrorInvalidFlow)
 			return
 		}
 		log.ErrorContext(ctx, "httpapi：取出登入流程失敗", "error", err)
-		redirectToLogin(rw, r, ErrorUnavailable)
+		fail(ErrorUnavailable)
 		return
 	}
-	// 手動連結的入口不在這裡；帶連結帳號的流程不由這個 callback 處理。
+	// 手動連結：發起的帳號必須還是現在登入的帳號（登出或換了帳號就不連結）。
 	if flow.LinkAccountID != nil {
-		log.WarnContext(ctx, "httpapi：登入流程帶了連結帳號，這個 callback 不處理")
-		redirectToLogin(rw, r, ErrorInvalidFlow)
-		return
+		if caller, ok := rpc.PrincipalFrom(ctx); !ok || caller.Kind != identity.PrincipalAccount || caller.ID != *flow.LinkAccountID {
+			log.WarnContext(ctx, "httpapi：連結流程的帳號不是現在登入的帳號")
+			fail(ErrorInvalidFlow)
+			return
+		}
 	}
-	// RFC 9207：provider 回應帶 iss 時必須是這家的 issuer。
-	if q.Has("iss") && !p.CheckIssuer(q.Get("iss")) {
-		log.WarnContext(ctx, "httpapi：授權回應的 iss 不是這家 provider")
-		redirectToLogin(rw, r, ErrorInvalidFlow)
+	// RFC 9207 §2.4：宣告帶 iss 的 provider 沒帶就拒絕；帶了必須是這家的 issuer。
+	if q.Has("iss") && !p.CheckIssuer(q.Get("iss")) || !q.Has("iss") && p.RequiresIssuer() {
+		log.WarnContext(ctx, "httpapi：授權回應的 iss 缺少或不是這家 provider")
+		fail(ErrorInvalidFlow)
 		return
 	}
 	code := q.Get("code")
 	if code == "" {
-		redirectToLogin(rw, r, ErrorInvalidFlow)
+		fail(ErrorInvalidFlow)
 		return
 	}
 	id, err := p.Exchange(ctx, code, flow.CodeVerifier, flow.Nonce)
@@ -210,11 +247,15 @@ func (w *WebLogin) callback(rw http.ResponseWriter, r *http.Request, p WebProvid
 		switch {
 		case errors.Is(err, identity.ErrInvalidToken), errors.Is(err, identity.ErrRejected):
 			log.WarnContext(ctx, "httpapi：provider 的 code 或 ID token 無效", "error", err)
-			redirectToLogin(rw, r, ErrorInvalidFlow)
+			fail(ErrorInvalidFlow)
 		default:
 			log.ErrorContext(ctx, "httpapi：向 provider 換 token 失敗", "error", err)
-			redirectToLogin(rw, r, ErrorUnavailable)
+			fail(ErrorUnavailable)
 		}
+		return
+	}
+	if flow.LinkAccountID != nil {
+		w.link(ctx, rw, r, log, *flow.LinkAccountID, id, flow.ReturnPath)
 		return
 	}
 	// 請求若帶著舊的 session cookie，登入換發新 session 時一併刪除它（session fixation）。
@@ -237,6 +278,24 @@ func (w *WebLogin) callback(rw http.ResponseWriter, r *http.Request, p WebProvid
 	http.Redirect(rw, r, flow.ReturnPath, http.StatusFound)
 }
 
+// link 把 provider 驗證過的身分連結到發起流程的帳號，不換發 session；成功回到返回網址，失敗附 link_error。
+func (w *WebLogin) link(ctx context.Context, rw http.ResponseWriter, r *http.Request, log *slog.Logger, accountID int64, id identity.ProviderIdentity, returnPath string) {
+	err := w.d.Module.LinkIdentity(ctx, accountID, id)
+	switch {
+	case err == nil:
+		http.Redirect(rw, r, returnPath, http.StatusFound)
+	case apperr.KindOf(err) == apperr.KindAlreadyExists:
+		log.InfoContext(ctx, "httpapi：這個身分已連結到另一個帳號")
+		redirectLinkError(rw, r, returnPath, LinkErrorAlreadyLinked)
+	case apperr.KindOf(err) == apperr.KindNotFound, apperr.KindOf(err) == apperr.KindInvalidInput:
+		log.WarnContext(ctx, "httpapi：這個身分不能連結", "error", err)
+		redirectLinkError(rw, r, returnPath, ErrorLoginFailed)
+	default:
+		log.ErrorContext(ctx, "httpapi：連結失敗", "error", err)
+		redirectLinkError(rw, r, returnPath, ErrorUnavailable)
+	}
+}
+
 func (w *WebLogin) sessionCookie(token string) *http.Cookie {
 	c := &http.Cookie{
 		Name: rpc.SessionCookie, Value: token, Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode,
@@ -253,4 +312,18 @@ func expiredCookie(name string) *http.Cookie {
 
 func redirectToLogin(rw http.ResponseWriter, r *http.Request, code string) {
 	http.Redirect(rw, r, loginPagePath+"?"+url.Values{"error": {code}}.Encode(), http.StatusFound)
+}
+
+// redirectLinkError 回到返回網址（站內相對路徑，建立流程時已驗證），查詢參數附上 link_error；網址原有的查詢與 fragment 保留。
+func redirectLinkError(rw http.ResponseWriter, r *http.Request, returnPath, code string) {
+	base, fragment, hasFragment := strings.Cut(returnPath, "#")
+	separator := "?"
+	if strings.Contains(base, "?") {
+		separator = "&"
+	}
+	location := base + separator + url.Values{LinkErrorParam: {code}}.Encode()
+	if hasFragment {
+		location += "#" + fragment
+	}
+	http.Redirect(rw, r, location, http.StatusFound) //nolint:gosec // returnPath 是建立流程時已經 ValidReturnPath 驗證的站內相對路徑，存在暫存列；附加的只有編碼過的固定代碼
 }

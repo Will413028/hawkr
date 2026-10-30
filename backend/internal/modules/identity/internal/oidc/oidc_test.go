@@ -232,3 +232,24 @@ func TestHMACConfigNeedsAudiencesAndNoPublicKey(t *testing.T) {
 		t.Fatal("HMAC 與 JWKS 同時設定也能建立")
 	}
 }
+
+func TestAlgorithmConfig(t *testing.T) {
+	t.Parallel()
+	base := Config{Issuers: []string{"https://access.line.me"}, Audiences: []string{"channel-1"}}
+	for name, tc := range map[string]struct {
+		mutate func(*Config)
+		ok     bool
+	}{
+		"ES256 搭配 JWKS": {func(c *Config) { c.JWKSURL = "https://keys.example/certs"; c.Algorithm = "ES256" }, true},
+		"RS256 搭配 JWKS": {func(c *Config) { c.JWKSURL = "https://keys.example/certs"; c.Algorithm = "RS256" }, true},
+		"ES256 沒有 JWKS": {func(c *Config) { c.PublicKeyPEM = "x"; c.Algorithm = "ES256" }, false},
+		"ES256 搭配 HMAC": {func(c *Config) { c.HMACSecret = []byte("0123456789abcdef0123456789abcdef"); c.Algorithm = "ES256" }, false},
+		"不支援的演算法":       {func(c *Config) { c.JWKSURL = "https://keys.example/certs"; c.Algorithm = "none" }, false},
+	} {
+		c := base
+		tc.mutate(&c)
+		if _, err := New(c); (err == nil) != tc.ok {
+			t.Errorf("%s：err = %v", name, err)
+		}
+	}
+}

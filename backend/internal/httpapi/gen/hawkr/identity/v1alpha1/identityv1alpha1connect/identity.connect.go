@@ -4,9 +4,10 @@
 
 // identity 模組給前台的 API：登入的帳號與它的角色（行為規格在 backend/docs/modules/identity.md）。後台的 API 在 hawkr.admin.identity.v1alpha1。
 //
-// 登入、登出與 session 由 Clerk 處理（ADR 2026-09-27-identity-clerk）：每個請求以 Authorization: Bearer 帶 Clerk SDK
-// 取得的 session token（web 在每次請求前取，App 同樣）；沒有 Bearer 時讀 web 同源的 Clerk `__session` cookie，給瀏覽器
-// 直接導覽的下載用。token 的效期很短，由 SDK 自動換新；收到 unauthenticated 就回到登入。帳號在第一個認證過的請求時建立。
+// 登入、登出與 session 由 identity 模組自己管（ADR 2026-10-30-identity-self-hosted-federated-login）：session 是不透明的 token，
+// 以 Authorization: Bearer 帶（App），或在 web 以 `__Host-hk_session` cookie 帶（web 的登入走 /api/auth/{provider}/start，不在這個 API）。
+// App 以原生 SDK 取得 Google 或 LINE 的 ID token，經 IdentityPublicService 換成 session。收到 unauthenticated 就回到登入。
+// 以 cookie 認證的請求，只有標 NO_SIDE_EFFECTS 的方法能用 GET，其他方法必須是同源的 POST（D6）。
 //
 // 每個帳號都是買家（帳號活著就是買家，ADR 2026-09-30-account-created-provisions-buyer）；角色只有要另外申請的賣家。
 // 買家或賣家「正在看哪個工作區」是 client 的 UI 狀態，Connect 不讀：服務名稱（BuyerAppService、SellerAppService）本身就表示
@@ -30,6 +31,8 @@ import (
 const _ = connect.IsAtLeastVersion1_13_0
 
 const (
+	// IdentityPublicServiceName is the fully-qualified name of the IdentityPublicService service.
+	IdentityPublicServiceName = "hawkr.identity.v1alpha1.IdentityPublicService"
 	// IdentityAppServiceName is the fully-qualified name of the IdentityAppService service.
 	IdentityAppServiceName = "hawkr.identity.v1alpha1.IdentityAppService"
 )
@@ -42,16 +45,145 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
+	// IdentityPublicServiceIssueAppLoginNonceProcedure is the fully-qualified name of the
+	// IdentityPublicService's IssueAppLoginNonce RPC.
+	IdentityPublicServiceIssueAppLoginNonceProcedure = "/hawkr.identity.v1alpha1.IdentityPublicService/IssueAppLoginNonce"
+	// IdentityPublicServiceExchangeIdTokenProcedure is the fully-qualified name of the
+	// IdentityPublicService's ExchangeIdToken RPC.
+	IdentityPublicServiceExchangeIdTokenProcedure = "/hawkr.identity.v1alpha1.IdentityPublicService/ExchangeIdToken"
 	// IdentityAppServiceGetSessionProcedure is the fully-qualified name of the IdentityAppService's
 	// GetSession RPC.
 	IdentityAppServiceGetSessionProcedure = "/hawkr.identity.v1alpha1.IdentityAppService/GetSession"
 	// IdentityAppServiceLinkAppleCredentialProcedure is the fully-qualified name of the
 	// IdentityAppService's LinkAppleCredential RPC.
 	IdentityAppServiceLinkAppleCredentialProcedure = "/hawkr.identity.v1alpha1.IdentityAppService/LinkAppleCredential"
+	// IdentityAppServiceSignOutProcedure is the fully-qualified name of the IdentityAppService's
+	// SignOut RPC.
+	IdentityAppServiceSignOutProcedure = "/hawkr.identity.v1alpha1.IdentityAppService/SignOut"
+	// IdentityAppServiceLinkIdentityProcedure is the fully-qualified name of the IdentityAppService's
+	// LinkIdentity RPC.
+	IdentityAppServiceLinkIdentityProcedure = "/hawkr.identity.v1alpha1.IdentityAppService/LinkIdentity"
+	// IdentityAppServiceListSessionsProcedure is the fully-qualified name of the IdentityAppService's
+	// ListSessions RPC.
+	IdentityAppServiceListSessionsProcedure = "/hawkr.identity.v1alpha1.IdentityAppService/ListSessions"
+	// IdentityAppServiceRevokeSessionProcedure is the fully-qualified name of the IdentityAppService's
+	// RevokeSession RPC.
+	IdentityAppServiceRevokeSessionProcedure = "/hawkr.identity.v1alpha1.IdentityAppService/RevokeSession"
 	// IdentityAppServiceDeleteAccountProcedure is the fully-qualified name of the IdentityAppService's
 	// DeleteAccount RPC.
 	IdentityAppServiceDeleteAccountProcedure = "/hawkr.identity.v1alpha1.IdentityAppService/DeleteAccount"
 )
+
+// IdentityPublicServiceClient is a client for the hawkr.identity.v1alpha1.IdentityPublicService
+// service.
+type IdentityPublicServiceClient interface {
+	// IssueAppLoginNonce 發一個單次使用、5 分鐘內有效的 nonce：App 把它交給原生 SDK（Google 的 nonce、LINE 的 nonce），
+	// SDK 簽發的 ID token 的 nonce claim 必須等於它，再交給 ExchangeIdToken 或 LinkIdentity。
+	IssueAppLoginNonce(context.Context, *connect.Request[v1alpha1.IssueAppLoginNonceRequest]) (*connect.Response[v1alpha1.IssueAppLoginNonceResponse], error)
+	// ExchangeIdToken 以原生 SDK 取得的 ID token 登入並換發 session（App 種類，閒置 14 天、絕對 90 天）：驗證簽章、issuer、audience、
+	// nonce（必須是 IssueAppLoginNonce 發的、尚未用過）；Google 另外要求 azp 在允許的 App client 清單。已有這個身分就登入它的帳號，
+	// 否則依規則自動連結或建立帳號（ADR 同上 D4）。請求已帶 Authorization: Bearer 的舊 session 時一併撤銷。
+	// ID token 或 nonce 無效回 unauthenticated；身分屬於已刪除的帳號也回 unauthenticated；這個 provider 沒有設定回 unavailable。
+	ExchangeIdToken(context.Context, *connect.Request[v1alpha1.ExchangeIdTokenRequest]) (*connect.Response[v1alpha1.ExchangeIdTokenResponse], error)
+}
+
+// NewIdentityPublicServiceClient constructs a client for the
+// hawkr.identity.v1alpha1.IdentityPublicService service. By default, it uses the Connect protocol
+// with the binary Protobuf Codec, asks for gzipped responses, and sends uncompressed requests. To
+// use the gRPC or gRPC-Web protocols, supply the connect.WithGRPC() or connect.WithGRPCWeb()
+// options.
+//
+// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
+// http://api.acme.com or https://acme.com/grpc).
+func NewIdentityPublicServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) IdentityPublicServiceClient {
+	baseURL = strings.TrimRight(baseURL, "/")
+	identityPublicServiceMethods := v1alpha1.File_hawkr_identity_v1alpha1_identity_proto.Services().ByName("IdentityPublicService").Methods()
+	return &identityPublicServiceClient{
+		issueAppLoginNonce: connect.NewClient[v1alpha1.IssueAppLoginNonceRequest, v1alpha1.IssueAppLoginNonceResponse](
+			httpClient,
+			baseURL+IdentityPublicServiceIssueAppLoginNonceProcedure,
+			connect.WithSchema(identityPublicServiceMethods.ByName("IssueAppLoginNonce")),
+			connect.WithClientOptions(opts...),
+		),
+		exchangeIdToken: connect.NewClient[v1alpha1.ExchangeIdTokenRequest, v1alpha1.ExchangeIdTokenResponse](
+			httpClient,
+			baseURL+IdentityPublicServiceExchangeIdTokenProcedure,
+			connect.WithSchema(identityPublicServiceMethods.ByName("ExchangeIdToken")),
+			connect.WithClientOptions(opts...),
+		),
+	}
+}
+
+// identityPublicServiceClient implements IdentityPublicServiceClient.
+type identityPublicServiceClient struct {
+	issueAppLoginNonce *connect.Client[v1alpha1.IssueAppLoginNonceRequest, v1alpha1.IssueAppLoginNonceResponse]
+	exchangeIdToken    *connect.Client[v1alpha1.ExchangeIdTokenRequest, v1alpha1.ExchangeIdTokenResponse]
+}
+
+// IssueAppLoginNonce calls hawkr.identity.v1alpha1.IdentityPublicService.IssueAppLoginNonce.
+func (c *identityPublicServiceClient) IssueAppLoginNonce(ctx context.Context, req *connect.Request[v1alpha1.IssueAppLoginNonceRequest]) (*connect.Response[v1alpha1.IssueAppLoginNonceResponse], error) {
+	return c.issueAppLoginNonce.CallUnary(ctx, req)
+}
+
+// ExchangeIdToken calls hawkr.identity.v1alpha1.IdentityPublicService.ExchangeIdToken.
+func (c *identityPublicServiceClient) ExchangeIdToken(ctx context.Context, req *connect.Request[v1alpha1.ExchangeIdTokenRequest]) (*connect.Response[v1alpha1.ExchangeIdTokenResponse], error) {
+	return c.exchangeIdToken.CallUnary(ctx, req)
+}
+
+// IdentityPublicServiceHandler is an implementation of the
+// hawkr.identity.v1alpha1.IdentityPublicService service.
+type IdentityPublicServiceHandler interface {
+	// IssueAppLoginNonce 發一個單次使用、5 分鐘內有效的 nonce：App 把它交給原生 SDK（Google 的 nonce、LINE 的 nonce），
+	// SDK 簽發的 ID token 的 nonce claim 必須等於它，再交給 ExchangeIdToken 或 LinkIdentity。
+	IssueAppLoginNonce(context.Context, *connect.Request[v1alpha1.IssueAppLoginNonceRequest]) (*connect.Response[v1alpha1.IssueAppLoginNonceResponse], error)
+	// ExchangeIdToken 以原生 SDK 取得的 ID token 登入並換發 session（App 種類，閒置 14 天、絕對 90 天）：驗證簽章、issuer、audience、
+	// nonce（必須是 IssueAppLoginNonce 發的、尚未用過）；Google 另外要求 azp 在允許的 App client 清單。已有這個身分就登入它的帳號，
+	// 否則依規則自動連結或建立帳號（ADR 同上 D4）。請求已帶 Authorization: Bearer 的舊 session 時一併撤銷。
+	// ID token 或 nonce 無效回 unauthenticated；身分屬於已刪除的帳號也回 unauthenticated；這個 provider 沒有設定回 unavailable。
+	ExchangeIdToken(context.Context, *connect.Request[v1alpha1.ExchangeIdTokenRequest]) (*connect.Response[v1alpha1.ExchangeIdTokenResponse], error)
+}
+
+// NewIdentityPublicServiceHandler builds an HTTP handler from the service implementation. It
+// returns the path on which to mount the handler and the handler itself.
+//
+// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
+// and JSON codecs. They also support gzip compression.
+func NewIdentityPublicServiceHandler(svc IdentityPublicServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	identityPublicServiceMethods := v1alpha1.File_hawkr_identity_v1alpha1_identity_proto.Services().ByName("IdentityPublicService").Methods()
+	identityPublicServiceIssueAppLoginNonceHandler := connect.NewUnaryHandler(
+		IdentityPublicServiceIssueAppLoginNonceProcedure,
+		svc.IssueAppLoginNonce,
+		connect.WithSchema(identityPublicServiceMethods.ByName("IssueAppLoginNonce")),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityPublicServiceExchangeIdTokenHandler := connect.NewUnaryHandler(
+		IdentityPublicServiceExchangeIdTokenProcedure,
+		svc.ExchangeIdToken,
+		connect.WithSchema(identityPublicServiceMethods.ByName("ExchangeIdToken")),
+		connect.WithHandlerOptions(opts...),
+	)
+	return "/hawkr.identity.v1alpha1.IdentityPublicService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case IdentityPublicServiceIssueAppLoginNonceProcedure:
+			identityPublicServiceIssueAppLoginNonceHandler.ServeHTTP(w, r)
+		case IdentityPublicServiceExchangeIdTokenProcedure:
+			identityPublicServiceExchangeIdTokenHandler.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+}
+
+// UnimplementedIdentityPublicServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedIdentityPublicServiceHandler struct{}
+
+func (UnimplementedIdentityPublicServiceHandler) IssueAppLoginNonce(context.Context, *connect.Request[v1alpha1.IssueAppLoginNonceRequest]) (*connect.Response[v1alpha1.IssueAppLoginNonceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.identity.v1alpha1.IdentityPublicService.IssueAppLoginNonce is not implemented"))
+}
+
+func (UnimplementedIdentityPublicServiceHandler) ExchangeIdToken(context.Context, *connect.Request[v1alpha1.ExchangeIdTokenRequest]) (*connect.Response[v1alpha1.ExchangeIdTokenResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.identity.v1alpha1.IdentityPublicService.ExchangeIdToken is not implemented"))
+}
 
 // IdentityAppServiceClient is a client for the hawkr.identity.v1alpha1.IdentityAppService service.
 type IdentityAppServiceClient interface {
@@ -63,6 +195,18 @@ type IdentityAppServiceClient interface {
 	// 伺服器自動撤銷保存的 token。可以安全重送。identity token 無效時回 invalid_argument；Apple 沒有設定（本機開發）時回
 	// unavailable。
 	LinkAppleCredential(context.Context, *connect.Request[v1alpha1.LinkAppleCredentialRequest]) (*connect.Response[v1alpha1.LinkAppleCredentialResponse], error)
+	// SignOut 撤銷目前的 session。web 的回應另以 Set-Cookie 清掉 `__Host-hk_session`。session 已經不存在時也成功。停權的帳號也能呼叫。
+	SignOut(context.Context, *connect.Request[v1alpha1.SignOutRequest]) (*connect.Response[v1alpha1.SignOutResponse], error)
+	// LinkIdentity 把 App 以原生 SDK 取得的 Google 或 LINE 身分連結到呼叫者的帳號（web 走 GET /api/auth/{provider}/start?link=1）。
+	// ID token 與 nonce 的驗證同 IdentityPublicService.ExchangeIdToken，不換發 session。這個身分已連結到別的帳號（含已刪除帳號
+	// 留下的身分）回 already_exists 與 ErrorReason IDENTITY_ALREADY_LINKED，什麼都不改；已連結到呼叫者自己時成功。
+	LinkIdentity(context.Context, *connect.Request[v1alpha1.LinkIdentityRequest]) (*connect.Response[v1alpha1.LinkIdentityResponse], error)
+	// ListSessions 列出呼叫者的有效 session（新到舊），標出目前這一個。停權的帳號也能呼叫。
+	ListSessions(context.Context, *connect.Request[v1alpha1.ListSessionsRequest]) (*connect.Response[v1alpha1.ListSessionsResponse], error)
+	// RevokeSession 終止呼叫者自己的一個 session（包含目前這個）。目前的 session 必須在 15 分鐘內以 provider 驗證過
+	// （重新走一次登入），否則回 failed_precondition 與 ErrorReason REAUTHENTICATION_REQUIRED，client 引導重新登入後再送。
+	// 沒有這個 session 或屬於別的帳號回 not_found。停權的帳號也能呼叫。
+	RevokeSession(context.Context, *connect.Request[v1alpha1.RevokeSessionRequest]) (*connect.Response[v1alpha1.RevokeSessionResponse], error)
 	// DeleteAccount 刪除呼叫者的帳號（App Store 審核準則 5.1.1(v)）。沒有未完成的訂單時立即刪除；有的話進入刪除流程，
 	// 最後一筆訂單完成後自動刪除，期間不能新增收藏與追蹤；流程中再呼叫回目前的狀態。帳號有店家時店家是
 	// 參與者：同一個 transaction 關閉買家、店家並刪除帳號，店家有未結訂單時與買家一起等待到兩側都結清。保存的 Apple 授權由伺服器在最後刪除時撤銷，client 不需要任何前置步驟。
@@ -95,6 +239,31 @@ func NewIdentityAppServiceClient(httpClient connect.HTTPClient, baseURL string, 
 			connect.WithIdempotency(connect.IdempotencyIdempotent),
 			connect.WithClientOptions(opts...),
 		),
+		signOut: connect.NewClient[v1alpha1.SignOutRequest, v1alpha1.SignOutResponse](
+			httpClient,
+			baseURL+IdentityAppServiceSignOutProcedure,
+			connect.WithSchema(identityAppServiceMethods.ByName("SignOut")),
+			connect.WithClientOptions(opts...),
+		),
+		linkIdentity: connect.NewClient[v1alpha1.LinkIdentityRequest, v1alpha1.LinkIdentityResponse](
+			httpClient,
+			baseURL+IdentityAppServiceLinkIdentityProcedure,
+			connect.WithSchema(identityAppServiceMethods.ByName("LinkIdentity")),
+			connect.WithClientOptions(opts...),
+		),
+		listSessions: connect.NewClient[v1alpha1.ListSessionsRequest, v1alpha1.ListSessionsResponse](
+			httpClient,
+			baseURL+IdentityAppServiceListSessionsProcedure,
+			connect.WithSchema(identityAppServiceMethods.ByName("ListSessions")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		revokeSession: connect.NewClient[v1alpha1.RevokeSessionRequest, v1alpha1.RevokeSessionResponse](
+			httpClient,
+			baseURL+IdentityAppServiceRevokeSessionProcedure,
+			connect.WithSchema(identityAppServiceMethods.ByName("RevokeSession")),
+			connect.WithClientOptions(opts...),
+		),
 		deleteAccount: connect.NewClient[v1alpha1.DeleteAccountRequest, v1alpha1.DeleteAccountResponse](
 			httpClient,
 			baseURL+IdentityAppServiceDeleteAccountProcedure,
@@ -108,6 +277,10 @@ func NewIdentityAppServiceClient(httpClient connect.HTTPClient, baseURL string, 
 type identityAppServiceClient struct {
 	getSession          *connect.Client[v1alpha1.GetSessionRequest, v1alpha1.GetSessionResponse]
 	linkAppleCredential *connect.Client[v1alpha1.LinkAppleCredentialRequest, v1alpha1.LinkAppleCredentialResponse]
+	signOut             *connect.Client[v1alpha1.SignOutRequest, v1alpha1.SignOutResponse]
+	linkIdentity        *connect.Client[v1alpha1.LinkIdentityRequest, v1alpha1.LinkIdentityResponse]
+	listSessions        *connect.Client[v1alpha1.ListSessionsRequest, v1alpha1.ListSessionsResponse]
+	revokeSession       *connect.Client[v1alpha1.RevokeSessionRequest, v1alpha1.RevokeSessionResponse]
 	deleteAccount       *connect.Client[v1alpha1.DeleteAccountRequest, v1alpha1.DeleteAccountResponse]
 }
 
@@ -119,6 +292,26 @@ func (c *identityAppServiceClient) GetSession(ctx context.Context, req *connect.
 // LinkAppleCredential calls hawkr.identity.v1alpha1.IdentityAppService.LinkAppleCredential.
 func (c *identityAppServiceClient) LinkAppleCredential(ctx context.Context, req *connect.Request[v1alpha1.LinkAppleCredentialRequest]) (*connect.Response[v1alpha1.LinkAppleCredentialResponse], error) {
 	return c.linkAppleCredential.CallUnary(ctx, req)
+}
+
+// SignOut calls hawkr.identity.v1alpha1.IdentityAppService.SignOut.
+func (c *identityAppServiceClient) SignOut(ctx context.Context, req *connect.Request[v1alpha1.SignOutRequest]) (*connect.Response[v1alpha1.SignOutResponse], error) {
+	return c.signOut.CallUnary(ctx, req)
+}
+
+// LinkIdentity calls hawkr.identity.v1alpha1.IdentityAppService.LinkIdentity.
+func (c *identityAppServiceClient) LinkIdentity(ctx context.Context, req *connect.Request[v1alpha1.LinkIdentityRequest]) (*connect.Response[v1alpha1.LinkIdentityResponse], error) {
+	return c.linkIdentity.CallUnary(ctx, req)
+}
+
+// ListSessions calls hawkr.identity.v1alpha1.IdentityAppService.ListSessions.
+func (c *identityAppServiceClient) ListSessions(ctx context.Context, req *connect.Request[v1alpha1.ListSessionsRequest]) (*connect.Response[v1alpha1.ListSessionsResponse], error) {
+	return c.listSessions.CallUnary(ctx, req)
+}
+
+// RevokeSession calls hawkr.identity.v1alpha1.IdentityAppService.RevokeSession.
+func (c *identityAppServiceClient) RevokeSession(ctx context.Context, req *connect.Request[v1alpha1.RevokeSessionRequest]) (*connect.Response[v1alpha1.RevokeSessionResponse], error) {
+	return c.revokeSession.CallUnary(ctx, req)
 }
 
 // DeleteAccount calls hawkr.identity.v1alpha1.IdentityAppService.DeleteAccount.
@@ -137,6 +330,18 @@ type IdentityAppServiceHandler interface {
 	// 伺服器自動撤銷保存的 token。可以安全重送。identity token 無效時回 invalid_argument；Apple 沒有設定（本機開發）時回
 	// unavailable。
 	LinkAppleCredential(context.Context, *connect.Request[v1alpha1.LinkAppleCredentialRequest]) (*connect.Response[v1alpha1.LinkAppleCredentialResponse], error)
+	// SignOut 撤銷目前的 session。web 的回應另以 Set-Cookie 清掉 `__Host-hk_session`。session 已經不存在時也成功。停權的帳號也能呼叫。
+	SignOut(context.Context, *connect.Request[v1alpha1.SignOutRequest]) (*connect.Response[v1alpha1.SignOutResponse], error)
+	// LinkIdentity 把 App 以原生 SDK 取得的 Google 或 LINE 身分連結到呼叫者的帳號（web 走 GET /api/auth/{provider}/start?link=1）。
+	// ID token 與 nonce 的驗證同 IdentityPublicService.ExchangeIdToken，不換發 session。這個身分已連結到別的帳號（含已刪除帳號
+	// 留下的身分）回 already_exists 與 ErrorReason IDENTITY_ALREADY_LINKED，什麼都不改；已連結到呼叫者自己時成功。
+	LinkIdentity(context.Context, *connect.Request[v1alpha1.LinkIdentityRequest]) (*connect.Response[v1alpha1.LinkIdentityResponse], error)
+	// ListSessions 列出呼叫者的有效 session（新到舊），標出目前這一個。停權的帳號也能呼叫。
+	ListSessions(context.Context, *connect.Request[v1alpha1.ListSessionsRequest]) (*connect.Response[v1alpha1.ListSessionsResponse], error)
+	// RevokeSession 終止呼叫者自己的一個 session（包含目前這個）。目前的 session 必須在 15 分鐘內以 provider 驗證過
+	// （重新走一次登入），否則回 failed_precondition 與 ErrorReason REAUTHENTICATION_REQUIRED，client 引導重新登入後再送。
+	// 沒有這個 session 或屬於別的帳號回 not_found。停權的帳號也能呼叫。
+	RevokeSession(context.Context, *connect.Request[v1alpha1.RevokeSessionRequest]) (*connect.Response[v1alpha1.RevokeSessionResponse], error)
 	// DeleteAccount 刪除呼叫者的帳號（App Store 審核準則 5.1.1(v)）。沒有未完成的訂單時立即刪除；有的話進入刪除流程，
 	// 最後一筆訂單完成後自動刪除，期間不能新增收藏與追蹤；流程中再呼叫回目前的狀態。帳號有店家時店家是
 	// 參與者：同一個 transaction 關閉買家、店家並刪除帳號，店家有未結訂單時與買家一起等待到兩側都結清。保存的 Apple 授權由伺服器在最後刪除時撤銷，client 不需要任何前置步驟。
@@ -165,6 +370,31 @@ func NewIdentityAppServiceHandler(svc IdentityAppServiceHandler, opts ...connect
 		connect.WithIdempotency(connect.IdempotencyIdempotent),
 		connect.WithHandlerOptions(opts...),
 	)
+	identityAppServiceSignOutHandler := connect.NewUnaryHandler(
+		IdentityAppServiceSignOutProcedure,
+		svc.SignOut,
+		connect.WithSchema(identityAppServiceMethods.ByName("SignOut")),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityAppServiceLinkIdentityHandler := connect.NewUnaryHandler(
+		IdentityAppServiceLinkIdentityProcedure,
+		svc.LinkIdentity,
+		connect.WithSchema(identityAppServiceMethods.ByName("LinkIdentity")),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityAppServiceListSessionsHandler := connect.NewUnaryHandler(
+		IdentityAppServiceListSessionsProcedure,
+		svc.ListSessions,
+		connect.WithSchema(identityAppServiceMethods.ByName("ListSessions")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityAppServiceRevokeSessionHandler := connect.NewUnaryHandler(
+		IdentityAppServiceRevokeSessionProcedure,
+		svc.RevokeSession,
+		connect.WithSchema(identityAppServiceMethods.ByName("RevokeSession")),
+		connect.WithHandlerOptions(opts...),
+	)
 	identityAppServiceDeleteAccountHandler := connect.NewUnaryHandler(
 		IdentityAppServiceDeleteAccountProcedure,
 		svc.DeleteAccount,
@@ -177,6 +407,14 @@ func NewIdentityAppServiceHandler(svc IdentityAppServiceHandler, opts ...connect
 			identityAppServiceGetSessionHandler.ServeHTTP(w, r)
 		case IdentityAppServiceLinkAppleCredentialProcedure:
 			identityAppServiceLinkAppleCredentialHandler.ServeHTTP(w, r)
+		case IdentityAppServiceSignOutProcedure:
+			identityAppServiceSignOutHandler.ServeHTTP(w, r)
+		case IdentityAppServiceLinkIdentityProcedure:
+			identityAppServiceLinkIdentityHandler.ServeHTTP(w, r)
+		case IdentityAppServiceListSessionsProcedure:
+			identityAppServiceListSessionsHandler.ServeHTTP(w, r)
+		case IdentityAppServiceRevokeSessionProcedure:
+			identityAppServiceRevokeSessionHandler.ServeHTTP(w, r)
 		case IdentityAppServiceDeleteAccountProcedure:
 			identityAppServiceDeleteAccountHandler.ServeHTTP(w, r)
 		default:
@@ -194,6 +432,22 @@ func (UnimplementedIdentityAppServiceHandler) GetSession(context.Context, *conne
 
 func (UnimplementedIdentityAppServiceHandler) LinkAppleCredential(context.Context, *connect.Request[v1alpha1.LinkAppleCredentialRequest]) (*connect.Response[v1alpha1.LinkAppleCredentialResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.identity.v1alpha1.IdentityAppService.LinkAppleCredential is not implemented"))
+}
+
+func (UnimplementedIdentityAppServiceHandler) SignOut(context.Context, *connect.Request[v1alpha1.SignOutRequest]) (*connect.Response[v1alpha1.SignOutResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.identity.v1alpha1.IdentityAppService.SignOut is not implemented"))
+}
+
+func (UnimplementedIdentityAppServiceHandler) LinkIdentity(context.Context, *connect.Request[v1alpha1.LinkIdentityRequest]) (*connect.Response[v1alpha1.LinkIdentityResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.identity.v1alpha1.IdentityAppService.LinkIdentity is not implemented"))
+}
+
+func (UnimplementedIdentityAppServiceHandler) ListSessions(context.Context, *connect.Request[v1alpha1.ListSessionsRequest]) (*connect.Response[v1alpha1.ListSessionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.identity.v1alpha1.IdentityAppService.ListSessions is not implemented"))
+}
+
+func (UnimplementedIdentityAppServiceHandler) RevokeSession(context.Context, *connect.Request[v1alpha1.RevokeSessionRequest]) (*connect.Response[v1alpha1.RevokeSessionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.identity.v1alpha1.IdentityAppService.RevokeSession is not implemented"))
 }
 
 func (UnimplementedIdentityAppServiceHandler) DeleteAccount(context.Context, *connect.Request[v1alpha1.DeleteAccountRequest]) (*connect.Response[v1alpha1.DeleteAccountResponse], error) {
