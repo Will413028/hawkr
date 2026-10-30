@@ -75,6 +75,13 @@ minimumReleaseAgeExclude:
 #      used to wave the check through: overshoot somebody unlisted and it turns
 #      red; list somebody we no longer overshoot and it turns red too.
 overrides:
+  # 發佈未滿兩週的間接依賴：@sentry/nextjs 10.75.2 宣告 @sentry/webpack-plugin ^5.3.0，
+  # 5.4.1（2026-10-06）改依賴 @sentry/bundler-plugins ^10.76.0，解析到 10.78.0
+  # （2026-10-28）與其 @sentry/core 10.78.0，違反「依賴發佈滿兩週」。5.3.0（2026-05-12）
+  # 只依賴 @sentry/bundler-plugin-core 5.3.0（本來就在樹上），且在 nextjs 宣告範圍內。
+  # 無安全 advisory，純為滿足發佈年齡規則。
+  # REMOVE-WHEN: requesters-demand >=5.4.1
+  "@sentry/webpack-plugin": 5.3.0
   # GHSA-r28c-9q8g-f849 + GHSA-fxqj-rqcc-2cmp: attacker-controlled
   # sourceMappingURL reads arbitrary .map files when `from` is unset. The
   # second advisory is the incomplete-fix follow-up; patched >=8.5.23.
