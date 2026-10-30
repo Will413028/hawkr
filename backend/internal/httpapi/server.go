@@ -245,6 +245,7 @@ func assemble(deps Deps, services []service, files ...fileRoute) (http.Handler, 
 	var h http.Handler = mux
 	h = withSubject(deps.OriginAuth, deps.ClientIP, deps.Now, h)
 	h = withSession(deps.Identity, deps.Logger, h)
+	h = withCookieCSRF(cookieCSRFOrigins(deps.WebOrigin, deps.Origins), h)
 	h = csrf.Handler(h)
 	h = withCORS(deps.Origins, h)
 	return withTracing(deps.Tracer, h), nil

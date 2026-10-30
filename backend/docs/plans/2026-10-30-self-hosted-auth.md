@@ -85,7 +85,7 @@
   - 範圍：
     - schema（identity 模組，Atlas migration）：`sessions`（token 雜湊、account、client kind、建立、最後使用、絕對到期）、`account_identities`（provider、`sub`、UNIQUE(provider, sub)、email、`email_verified`）、web 登入流程的暫存狀態（D3：單次使用的一列）、App 換 session 用的單次 nonce（D2）。
     - identity 公開 API：解析 session（一併讀帳號狀態與角色）、以 provider 的身分登入或建帳（自動連結只在 Google 且 `email_verified` 為真時，比對既有帳號的已驗證 email）、手動連結（已登入，provider 的 `sub` 已屬別的帳號時回錯誤）、登出（刪列）；停權、刪帳刪掉該帳號全部 session（同一個 transaction）。
-    - 入口：web 的 `GET /api/auth/{provider}/start`、`GET|POST /api/auth/{provider}/callback`（純 HTTP handler，不走 Connect；依 D3），callback 設 `__Host-hk_session` 後 302 回 website；App 的 token 交換 RPC（原生 SDK 給的 ID token／授權碼換 session，依 D2）；`SignOut`、`LinkIdentity` RPC。
+    - 入口：web 的 `GET /api/auth/{provider}/start`、`GET /api/auth/{provider}/callback`（純 HTTP handler，不走 Connect；依 D3），callback 設 `__Host-hk_session` 後 302 回 website；App 的 token 交換 RPC（原生 SDK 給的 ID token／授權碼換 session，依 D2）；`SignOut`、`LinkIdentity` RPC。
     - `rpc/session.go`：Bearer 或 `__Host-hk_session`，其他位置不收；`__session` 刪除。CSRF（D6）：只對以 cookie 認證的請求檢查——非 GET／HEAD 的請求 `Sec-Fetch-Site` 必須是 `same-origin`，瀏覽器沒送時 `Origin` 必須是 website 的 origin，兩者都沒有就拒絕；cookie 請求只有宣告 `NO_SIDE_EFFECTS` 的 procedure 能走 GET；以 Bearer 認證的請求（App、admin BFF 轉的 Access JWT）不帶 ambient credential，不檢查。
     - start／callback 是純 HTTP 路由，不在 `rpc.CheckDeclarations` 的對照內：在 `internal/httpapi` 以測試列出全部 `/api/auth/*` 路由並斷言它們不經 `withSession` 的寫入路徑；`ratelimit.go` 為它們加每 IP 的限流；CORS 不放行（只走同源反代）。
     - 舊 gateway：`backend/internal/legacy/gatewayproxy` 照舊只轉單體解析出的 principal，不把 `__Host-hk_session` 或 Bearer 原樣轉出。

@@ -333,10 +333,10 @@ func TestCallbackSignsInAndRedirectsToTheStoredReturnPath(t *testing.T) {
 
 func TestSessionCookieMaxAgeFollowsTheConfiguration(t *testing.T) {
 	t.Parallel()
-	e := newEnv(t, 7*24*time.Hour, identity.ProviderGoogle)
+	e := newEnv(t, 90*24*time.Hour, identity.ProviderGoogle)
 	state, binding := e.startFlow(t, "google", "")
 	rec := e.do(t, callbackURL("google", url.Values{"state": {state}, "code": {"c"}}), func(r *http.Request) { r.AddCookie(binding) })
-	if c := cookieOf(rec, rpc.SessionCookie); c == nil || c.MaxAge != 7*24*3600 {
+	if c := cookieOf(rec, rpc.SessionCookie); c == nil || c.MaxAge != 90*24*3600 || c.Name != "__Host-hk_session" || c.Path != "/" || c.Domain != "" || !c.Secure || !c.HttpOnly || c.SameSite != http.SameSiteLaxMode {
 		t.Fatalf("cookie = %+v", c)
 	}
 }

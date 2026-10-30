@@ -273,8 +273,10 @@ func runDevToken(ctx context.Context, args []string, out io.Writer) error {
 	return err
 }
 
+const sessionCookieMaxAge = 90 * 24 * time.Hour
+
 // newWebLogin 建立 web 聯合登入的路由（ADR 2026-10-30-identity-self-hosted-federated-login D3）。redirect URI 是 web 的網域加各家獨立的 callback 路徑。
-// session cookie 沒有設 Max-Age（瀏覽器的 session cookie），伺服器端的閒置與絕對逾時照 session 的規則。
+// session cookie 的 Max-Age 是 sessionCookieMaxAge（等於絕對逾時，ADR D1）；閒置逾時由伺服器判斷。
 func newWebLogin(ctx context.Context, id *identity.Module, web rpc.WebOrigin, c identityConfig, log *slog.Logger) (*httpidentity.WebLogin, error) {
 	var providers []httpidentity.WebProvider
 	for _, p := range identity.LoginProviders() {
@@ -292,5 +294,5 @@ func newWebLogin(ctx context.Context, id *identity.Module, web rpc.WebOrigin, c 
 		}
 		providers = append(providers, w)
 	}
-	return httpidentity.NewWebLogin(httpidentity.WebLoginDeps{Module: id, Providers: providers, Logger: log})
+	return httpidentity.NewWebLogin(httpidentity.WebLoginDeps{Module: id, Providers: providers, SessionMaxAge: sessionCookieMaxAge, Logger: log})
 }

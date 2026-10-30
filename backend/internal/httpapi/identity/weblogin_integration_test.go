@@ -684,3 +684,57 @@ func TestGatewayReceivesNoSessionCredential(t *testing.T) {
 		}
 	}
 }
+
+// D6：以 session cookie 認證的寫入要 same-origin（或沒有 Sec-Fetch-Site 時 Origin 是 web 的 origin），Bearer 不檢查。
+// 拒絕發生在 handler 之前（403，body 帶 cross-origin 說明）；放行的請求會進到 handler，回應不是這個 403。
+// mutation：拿掉 server.go 的 withCookieCSRF 一行，cookie＋cross-site 的案例變成放行；讓 withCookieCSRF 也檢查 Bearer，
+// Bearer＋cross-site 的案例變成 403；把「兩者都沒有」改成放行，「cookie 兩者都沒有」的案例變成放行。
+func TestCookieAuthenticatedWritesRequireSameOrigin(t *testing.T) {
+	t.Parallel()
+	f := setupWeb(t)
+	b := f.browser(t, "192.0.2.70")
+	_, cb := b.login(identity.ProviderGoogle, loginOpts{})
+	tok := setCookie(cb, rpc.SessionCookie).Value
+	post := func(header ...string) (int, string) {
+		t.Helper()
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, f.url+identityv1alpha1connect.IdentityAppServiceLinkAppleCredentialProcedure, strings.NewReader("{}"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Test-Client-IP", "192.0.2.70")
+		for i := 0; i+1 < len(header); i += 2 {
+			req.Header.Set(header[i], header[i+1])
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		body, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, string(body)
+	}
+	cookie := "Cookie"
+	session := rpc.SessionCookie + "=" + tok
+	cases := []struct {
+		name     string
+		header   []string
+		rejected bool
+	}{
+		{"cookie 跨站", []string{cookie, session, "Sec-Fetch-Site", "cross-site"}, true},
+		{"cookie same-site", []string{cookie, session, "Sec-Fetch-Site", "same-site"}, true},
+		{"cookie 兩者都沒有", []string{cookie, session}, true},
+		{"cookie Origin 不符", []string{cookie, session, "Origin", "https://evil.example"}, true},
+		{"cookie same-origin", []string{cookie, session, "Sec-Fetch-Site", "same-origin"}, false},
+		{"cookie 沒有 Sec-Fetch-Site、Origin 是 web", []string{cookie, session, "Origin", webOrigin}, false},
+		{"Bearer 跨站", []string{"Authorization", "Bearer " + tok, "Sec-Fetch-Site", "cross-site"}, false},
+		{"Bearer 與 cookie 同時、跨站", []string{"Authorization", "Bearer " + tok, cookie, session, "Sec-Fetch-Site", "cross-site"}, false},
+	}
+	for _, c := range cases {
+		code, body := post(c.header...)
+		got := code == http.StatusForbidden && strings.Contains(body, "cross-origin")
+		if got != c.rejected {
+			t.Errorf("%s：status %d body %q，rejected = %v，預期 %v", c.name, code, body, got, c.rejected)
+		}
+	}
+}

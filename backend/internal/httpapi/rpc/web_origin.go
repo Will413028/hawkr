@@ -24,6 +24,9 @@ func NewWebOrigin(origin string) (WebOrigin, error) {
 // IsZero 回報是不是沒有設定網域的零值。
 func (w WebOrigin) IsZero() bool { return w.origin == "" }
 
+// Origin 回傳網站的 origin（scheme 與 host），零值回空字串。
+func (w WebOrigin) Origin() string { return w.origin }
+
 // URL 回傳 ref 的絕對網址：以 / 開頭的站內路徑（不含 //）接在網域後面，有 host 的 http:// 或 https:// 網址原樣回傳；
 // 其他形式（相對路徑、//host、其他 scheme）回錯誤，不讓不是絕對的網址流出去。
 func (w WebOrigin) URL(ref string) (string, error) {
