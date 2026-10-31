@@ -6,7 +6,7 @@ default_install_hook_types: [pre-commit, commit-msg, pre-push]
 repos:
   # 規則與上限在 .instruction-lint.toml；掃全部追蹤的 AGENTS.md，所以不傳檔名。CI 同一份：.github/workflows/repo-hygiene.yml。
   - repo: https://github.com/Will413028/instruction-lint
-    rev: a89ccb131c9a1e0159c1ac0b25d21ccca55d45f3 # v0.2.0
+    rev: a0078a45712c941f83a9516d0306c2a1706d0b3b # v0.3.0
     hooks:
       - id: instruction-lint
         pass_filenames: false

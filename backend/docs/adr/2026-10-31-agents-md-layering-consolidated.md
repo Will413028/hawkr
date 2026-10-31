@@ -29,7 +29,7 @@
 
 ## 決策
 
-1. **三層與上限**（沿用，2026-10-28）：根目錄 12,000 bytes；子專案（repo 第一層目錄）10,000；模組、`packages/*` 與更深的目錄 6,000；單行 500 字元。根目錄放專案地圖、跨專案契約、共通規則；子專案放指令、技術慣例、特有的坑；模組放固定七節（職責、擁有的資料、發布的讀取介面、模組內部結構、不變量、不負責、決策紀錄），`cmd/new-module` 的模板與 `TestGeneratedAgentsHasOnlyTheFixedSections` 守住。大小由 instruction-lint 依 `.instruction-lint.toml` 檢查，例外（allowlist）有理由與期限（2026-10-29 起為空）。
+1. **三層與上限**（沿用，2026-10-28）：根目錄 12,000 bytes；子專案（repo 第一層目錄）10,000；模組、`packages/*` 與更深的目錄 6,000；單行 500 字元。根目錄放專案地圖、跨專案契約、共通規則；子專案放指令、技術慣例、特有的坑；模組放固定七節（職責、擁有的資料、發布的讀取介面、模組內部結構、不變量、不負責、決策紀錄），`cmd/new-module` 的模板與 instruction-lint 的 R2 shape 守住。大小由 instruction-lint 依 `.instruction-lint.toml` 檢查，例外（allowlist）有理由與期限（2026-10-29 起為空）。
 2. **模組行為規格**在 `docs/modules/<模組>.md`，是唯一來源；舊設計書依 `docs/開發規範/設計文件治理規範.md` §7：新規格完整涵蓋且描述的系統已停運就刪，否則標為該服務的現行規格、搬進單體時刪（沿用，2026-10-28）。
 3. **兄弟共用的規則**（沿用，2026-10-28）：能機械檢查的交給 CI 或測試；描述不存在的流程的刪除；內容已在文件裡的，指令檔只留「做 X 前先讀 Y」；不指向兄弟目錄的指令檔（不會被載入）。真正共用、無法檢查、又不屬於根目錄的規則才放一份中立檔、以 `@路徑` 引用，且要把引入的 bytes 算進上限；目前這類規則是 0 條，不建機制。
 4. **子領域檔案（F，2026-10-31）**：模組內某個子領域（`internal/<子領域>/`）有只涉及它的不變量時，放在 `backend/internal/modules/<模組>/internal/<子領域>/AGENTS.md`，一個子領域一份、選用、上限同樣 6,000。固定形狀：標題、一行目的、指向 `docs/modules/<模組>.md` 的指標，然後是不變量，每條一句規則加守門測試與規格位置。模組根的 `AGENTS.md` 仍是固定七節；它的「不變量」只列跨子領域的規則加一行指向那些檔案，「擁有的資料」指向 `db/schema.sql` 並依子領域分組、不逐表列。搬移只搬不改：每一條的意思不變，搬的對照記在 commit 內文。行為規格仍以 `docs/modules/<模組>.md` 為唯一來源。第一次套用：seller、identity、social。
@@ -65,6 +65,6 @@
 
 ## 修訂：檢查改由 instruction-lint 執行（2026-10-31，Will 決定）
 
-脈絡：檢查腳本 `scripts/check-agents-md.py` 只服務這個 repo，同類檢查在其他 repo 各寫一份。改用共用工具 instruction-lint（Will 自有，釘 v0.2.0），規則與上限集中在根目錄 `.instruction-lint.toml`。
+脈絡：檢查腳本 `scripts/check-agents-md.py` 只服務這個 repo，同類檢查在其他 repo 各寫一份。改用共用工具 instruction-lint（Will 自有，釘 v0.3.0），規則與上限集中在根目錄 `.instruction-lint.toml`。
 
-決策：決策 1 與 5 的檢查器改為 instruction-lint；三層上限、單行 500 字元、七節、hook 觸發條件與 CI 步驟的數值和範圍不變。例外清單改為設定檔的 `allowlist`，每筆有理由與到期日（最長 90 天）。模組七節的來源改為設定檔的 R2 shape，`cmd/new-module/instruction-lint.json` 由它生成（`instruction-lint config --format json`），`TestGeneratedAgentsHasOnlyTheFixedSections` 讀這個檔，CI 比對生成檔與設定一致。原決策段保留歷史。
+決策：決策 1 與 5 的檢查器改為 instruction-lint；三層上限、單行 500 字元、七節、hook 觸發條件與 CI 步驟的數值和範圍不變。例外清單改為設定檔的 `allowlist`，每筆有理由與到期日（最長 90 天）。模組七節的唯一來源是設定檔的 R2 shape；CI 用 new-module 產生一個模組再交給檢查器驗，不另存生成檔。原決策段保留歷史。

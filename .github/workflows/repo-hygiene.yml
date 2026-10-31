@@ -4,7 +4,8 @@ name: repo hygiene
 # - actionlint：workflow 檔本身（expression、steps.<id>、action 輸入）。shellcheck 整合關掉，
 #   只看 actionlint 自己的檢查。
 # - AGENTS.md 的大小、形狀與重複：規則與上限在 .instruction-lint.toml（ADR 2026-10-31-agents-md-layering-consolidated）。
-#   工具的 hook 與 CI 引用必須釘同一個 SHA（check-pins）；new-module 讀的 JSON 要和設定一致。
+#   工具的 hook 與 CI 引用必須釘同一個 SHA（check-pins）；每週一的排程讓例外清單的到期警告不靠 commit 也會出現。
+#   new-module 產生的模組 AGENTS.md 也交給檢查器驗。
 # - shell 變數緊接全形字元：`$var，` 會被 bash 吃成變數名（set -u 下直接中止），掃全 repo 的
 #   版控 shell 腳本，規則在 scripts/check-fullwidth-var-expansion.sh。
 
@@ -12,6 +13,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  schedule:
+    - cron: '17 3 * * 1'
   workflow_dispatch:
 
 concurrency:
@@ -25,7 +28,7 @@ jobs:
   check:
     name: workflow 與 shell 靜態檢查
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -37,12 +40,22 @@ jobs:
         run: bash scripts/check-fullwidth-var-expansion.sh
       - name: AGENTS.md 規則
         if: always()
-        uses: Will413028/instruction-lint@a89ccb131c9a1e0159c1ac0b25d21ccca55d45f3 # v0.2.0
+        uses: Will413028/instruction-lint@a0078a45712c941f83a9516d0306c2a1706d0b3b # v0.3.0
       - name: instruction-lint 引用的 SHA 一致
         if: always()
-        run: pipx run --spec git+https://github.com/Will413028/instruction-lint@a89ccb131c9a1e0159c1ac0b25d21ccca55d45f3 instruction-lint check-pins # v0.2.0
-      - name: new-module 的 instruction-lint.json 與設定一致
+        run: pipx run --spec git+https://github.com/Will413028/instruction-lint@a0078a45712c941f83a9516d0306c2a1706d0b3b instruction-lint check-pins # v0.3.0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        if: always()
+        with:
+          go-version-file: backend/.go-version
+          cache-dependency-path: backend/**/go.sum
+      # 模組 AGENTS.md 的七節只有 .instruction-lint.toml 的 R2 shape 一個來源：用真的產生器產生一個
+      # 不可能和真模組撞名的探針模組（先寫進依賴表，產生器只認依賴表裡的名稱），讓檢查器驗它。
+      - name: new-module 產生的 AGENTS.md 符合規則
         if: always()
         run: |
-          pipx run --spec git+https://github.com/Will413028/instruction-lint@a89ccb131c9a1e0159c1ac0b25d21ccca55d45f3 instruction-lint config --format json > "$RUNNER_TEMP/instruction-lint.json" # v0.2.0
-          diff -u backend/cmd/new-module/instruction-lint.json "$RUNNER_TEMP/instruction-lint.json"
+          set -euo pipefail
+          sed -i 's/^var Dependencies = map\[string\]\[\]string{$/&\n\t"zzlintprobe": {},/' backend/internal/arch/modules.go
+          (cd backend && GOWORK=off go run ./cmd/new-module module zzlintprobe)
+          git add -N backend/internal/modules/zzlintprobe/AGENTS.md
+          pipx run --spec git+https://github.com/Will413028/instruction-lint@a0078a45712c941f83a9516d0306c2a1706d0b3b instruction-lint # v0.3.0
