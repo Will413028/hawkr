@@ -57,7 +57,7 @@ function hostnameOf(host: string): string {
 const VERCEL_DEPLOYMENT_HOST_SUFFIX = ".vercel.app";
 
 /** True for any `*.vercel.app` hostname (lower-cased, port already stripped). */
-function isVercelDeploymentHost(hostname: string): boolean {
+export function isVercelDeploymentHost(hostname: string): boolean {
 	return hostname.endsWith(VERCEL_DEPLOYMENT_HOST_SUFFIX);
 }
 
