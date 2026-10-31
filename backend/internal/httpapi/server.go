@@ -89,8 +89,8 @@ type Deps struct {
 	Images rpc.Images
 	// WebOrigin 把站內路徑組成對外的絕對網址（PUBLIC_WEB_ORIGIN），必填：入駐文件的網址靠它，零值啟動就失敗。
 	WebOrigin rpc.WebOrigin
-	// Origins 是自己的 web 與後台的 origin：CORS 允許它們帶 cookie 呼叫，CSRF 信任它們。web 在各環境都經第一方同源
-	// 反代打單體，只有選擇跨來源的開發模式用得到。
+	// Origins 是自己的 web 與後台的 origin：CSRF 信任它們，gateway 的 WebSocket 比對 Origin 也用它。web 在各環境都經
+	// 第一方同源反代打單體，單體不回 CORS 的 header，不支援瀏覽器跨來源呼叫。
 	Origins []string
 	// OriginAuth 驗證網頁 SSR 與 CI 自己簽出的限流身分；ClientIP 決定訪客的 IP。
 	OriginAuth OriginAuth
@@ -197,7 +197,7 @@ func fileRoutes(deps Deps) []fileRoute {
 	}}
 }
 
-// assemble 把 service 掛上入口的中介層：tracing、CORS、CSRF、session、限流的身分，以及 Connect 的限流、快取規則
+// assemble 把 service 掛上入口的中介層：tracing、CSRF、session、限流的身分，以及 Connect 的限流、快取規則
 // 與 interceptor 之前的錯誤 log。測試以它掛上假的 service，驗證中介層本身的性質（例如串流不被緩衝），不必依賴
 // 某個正式的 service。
 func assemble(deps Deps, services []service, files ...fileRoute) (http.Handler, error) {
@@ -250,7 +250,6 @@ func assemble(deps Deps, services []service, files ...fileRoute) (http.Handler, 
 	h = withSession(deps.Identity, deps.Logger, h)
 	h = withCookieCSRF(cookieCSRFOrigins(deps.WebOrigin, deps.Origins), h)
 	h = csrf.Handler(h)
-	h = withCORS(deps.Origins, h)
 	return withTracing(deps.Tracer, h), nil
 }
 

@@ -134,31 +134,6 @@ func TestAuthRoutesAreGetOnlyAndOutsideTheEffectDeclarations(t *testing.T) {
 	}
 }
 
-func TestAuthRoutesAreNotCORSAllowed(t *testing.T) {
-	t.Parallel()
-	h := authEntry(t, func() time.Time { return entryNow })
-	control := authRequest(t, http.MethodGet, "/healthz", "192.0.2.1")
-	control.Header.Set("Origin", testOrigin)
-	if rec := do(h, control); rec.Header().Get("Access-Control-Allow-Origin") != testOrigin {
-		t.Fatal("對照組：允許的 origin 在其他路徑要得到 CORS header")
-	}
-	for _, path := range []string{"/api/auth/google/start", "/api/auth/line/callback?state=x&code=y"} {
-		get := authRequest(t, http.MethodGet, path, "192.0.2.1")
-		get.Header.Set("Origin", testOrigin)
-		rec := do(h, get)
-		if rec.Header().Get("Access-Control-Allow-Origin") != "" || rec.Header().Get("Access-Control-Allow-Credentials") != "" {
-			t.Errorf("GET %s 回了 CORS header：%v", path, rec.Header())
-		}
-		pre := authRequest(t, http.MethodOptions, path, "192.0.2.1")
-		pre.Header.Set("Origin", testOrigin)
-		pre.Header.Set("Access-Control-Request-Method", "GET")
-		rec = do(h, pre)
-		if rec.Code == http.StatusNoContent || rec.Header().Get("Access-Control-Allow-Origin") != "" || rec.Header().Get("Access-Control-Allow-Methods") != "" {
-			t.Errorf("preflight %s = %d %v", path, rec.Code, rec.Header())
-		}
-	}
-}
-
 // /api/auth/* 每個連線端 IP 一分鐘 30 個請求（start 與 callback 共用一個計數器）；超過回 429 加 Retry-After，不可快取；另一個 IP 與下一個時間窗不受影響。
 func TestAuthRoutesAreRateLimitedPerClientIP(t *testing.T) {
 	t.Parallel()

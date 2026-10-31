@@ -15,7 +15,7 @@ import (
 //
 // 為什麼是普通的 HTTP GET，不是 Connect：回應是圖片本身（瀏覽器的 <img> 與下載直接顯示），Connect 的 unary 只能回訊息、要自己
 // 包 bytes 欄位（base64 膨脹約三分之一，也進不了瀏覽器的圖片快取與串流）。API 設計規範（Connect）§「檔案回應」規則：
-// 不經 Connect 的二進位回應放在 /api/files/<使用者類別>/ 底下，與 Connect 同一條入口中介鏈（tracing、CORS、CSRF、
+// 不經 Connect 的二進位回應放在 /api/files/<使用者類別>/ 底下，與 Connect 同一條入口中介鏈（tracing、CSRF、
 // withSession、限流），授權由擁有的 handler 做，機敏檔案 no-store，以業務資源定址、不以 asset ID。驗證與後台的 Connect 方法相同
 // （Authorization: Bearer 的 Access JWT 或本機的 dev token），授權是這條路由自己的規則：管理員，而且持有這筆申請未到期的授權
 // （顯示全文建立，RevealKYCSensitive）。

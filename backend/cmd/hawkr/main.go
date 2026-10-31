@@ -142,7 +142,7 @@ func runServe(ctx context.Context) error {
 	crmAddr := e.String("CRM_SERVICE_ADDR")
 	// 店家評價統計（店面頁、推薦排行）：review 還在舊服務（遷移計畫 A6）。
 	reviewAddr := e.String("REVIEW_SERVICE_ADDR")
-	// 直接呼叫單體的 web 的 origin（CORS 與 CSRF；後台經自己的 BFF 呼叫，不在這裡）；限流的身分（origin-auth 的金鑰、
+	// 直接呼叫單體的 web 的 origin（CSRF 與 gateway 的 WebSocket 比對；後台經自己的 BFF 呼叫，不在這裡）；限流的身分（origin-auth 的金鑰、
 	// CDN 帶的 client IP header）。
 	origins := e.List("CORS_ALLOWED_ORIGINS")
 	originAuth := httpapi.OriginAuth{

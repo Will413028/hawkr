@@ -234,28 +234,29 @@ func TestSessionMiddleware(t *testing.T) {
 	}
 }
 
-func TestCORS(t *testing.T) {
+func TestCrossOriginPreflightGetsNoCORSHeaders(t *testing.T) {
 	h := entry(t, caller)
-	preflight := func(origin string) *httptest.ResponseRecorder {
-		r := httptest.NewRequestWithContext(t.Context(), http.MethodOptions, "/hawkr.identity.v1alpha1.IdentityAppService/GetSession", nil)
-		r.Header.Set("Origin", origin)
-		r.Header.Set("Access-Control-Request-Method", "POST")
-		r.Header.Set("Access-Control-Request-Headers", "content-type,connect-protocol-version")
-		return do(h, r)
-	}
-	rec := preflight(testOrigin)
-	if rec.Code != http.StatusNoContent || rec.Header().Get("Access-Control-Allow-Origin") != testOrigin ||
-		rec.Header().Get("Access-Control-Allow-Credentials") != "true" ||
-		!strings.Contains(rec.Header().Get("Access-Control-Allow-Headers"), "Connect-Protocol-Version") {
-		t.Fatalf("允許的 origin 的 preflight = %d %v", rec.Code, rec.Header())
-	}
-	if rec := preflight("https://evil.example"); rec.Code != http.StatusNoContent || rec.Header().Get("Access-Control-Allow-Origin") != "" {
-		t.Fatalf("其他 origin 的 preflight = %d %v", rec.Code, rec.Header())
-	}
-	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/public/products", nil)
-	r.Header.Set("Origin", testOrigin)
-	if rec := do(h, r); rec.Header().Get("Access-Control-Allow-Origin") != testOrigin || rec.Header().Get("Vary") != "Origin" {
-		t.Fatalf("跨來源的 GET = %v", rec.Header())
+	for _, path := range []string{"/hawkr.identity.v1alpha1.IdentityAppService/GetSession", "/api/v1/public/products"} {
+		for _, origin := range []string{testOrigin, "https://evil.example"} {
+			pre := httptest.NewRequestWithContext(t.Context(), http.MethodOptions, path, nil)
+			pre.Header.Set("Origin", origin)
+			pre.Header.Set("Access-Control-Request-Method", "POST")
+			pre.Header.Set("Access-Control-Request-Headers", "content-type,connect-protocol-version")
+			rec := do(h, pre)
+			for k := range rec.Header() {
+				if strings.HasPrefix(k, "Access-Control-") {
+					t.Errorf("preflight %s from %s 回了 %s：%v", path, origin, k, rec.Header())
+				}
+			}
+			get := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil)
+			get.Header.Set("Origin", origin)
+			rec = do(h, get)
+			for k := range rec.Header() {
+				if strings.HasPrefix(k, "Access-Control-") {
+					t.Errorf("GET %s from %s 回了 %s：%v", path, origin, k, rec.Header())
+				}
+			}
+		}
 	}
 }
 
@@ -386,7 +387,7 @@ func TestFileRoutesAreRateLimitedAndNeverFallThroughToTheLegacyGateway(t *testin
 	}
 }
 
-// 轉給 gateway 的 WebSocket 與 SSE 經過入口的整條中介層（tracing、CORS、CSRF、session）之後仍然可以 upgrade、逐筆送出。
+// 轉給 gateway 的 WebSocket 與 SSE 經過入口的整條中介層（tracing、CSRF、session）之後仍然可以 upgrade、逐筆送出。
 func TestLegacyStreamsSurviveTheMiddlewareChain(t *testing.T) {
 	legacy := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
