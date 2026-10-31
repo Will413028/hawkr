@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_buyer/config/flavor.dart';
+import 'package:hawkr_buyer/core/networking/connect_provider.dart';
 import 'package:hawkr_buyer/core/networking/dio_provider.dart';
 import 'package:hawkr_buyer/core/session/session_model.dart';
 import 'package:hawkr_buyer/core/session/session_provider.dart';
@@ -97,6 +99,9 @@ void main() {
           final container = ProviderContainer(
             overrides: [
               dioProvider.overrideWithValue(dio),
+              connectAuthTransportProvider.overrideWith(
+                (_) => FakeTransportBuilder().build(),
+              ),
               sellerRepositoryProvider.overrideWithValue(
                 fakeSellerRepository(),
               ),
