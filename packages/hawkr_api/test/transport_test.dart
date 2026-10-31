@@ -317,30 +317,33 @@ void main() {
       expect(invalid, 1);
     });
 
-    test('取不到 token（例如 Keychain 讀取失敗）：不送出，以 unavailable 結束，原本的例外在 cause', () async {
-      var invalid = 0;
-      final h = harness(
-        token: () async => throw const SocketException('offline'),
-        onInvalid: () => invalid++,
-      );
+    test(
+      '取不到 token（例如 Keychain 讀取失敗）：不送出，以 unavailable 結束，原本的例外在 cause',
+      () async {
+        var invalid = 0;
+        final h = harness(
+          token: () async => throw const SocketException('offline'),
+          onInvalid: () => invalid++,
+        );
 
-      await expectLater(
-        h.client.checkAppVersion(
-          CheckAppVersionRequest(clientVersion: '1.0.0'),
-        ),
-        throwsA(
-          isA<ConnectException>()
-              .having((e) => e.code, 'code', Code.unavailable)
-              .having(
-                (e) => (e.cause as LocalAuthFailure).cause,
-                'cause',
-                isA<SocketException>(),
-              ),
-        ),
-      );
-      expect(h.seen, isEmpty);
-      expect(invalid, 0);
-    });
+        await expectLater(
+          h.client.checkAppVersion(
+            CheckAppVersionRequest(clientVersion: '1.0.0'),
+          ),
+          throwsA(
+            isA<ConnectException>()
+                .having((e) => e.code, 'code', Code.unavailable)
+                .having(
+                  (e) => (e.cause as LocalAuthFailure).cause,
+                  'cause',
+                  isA<SocketException>(),
+                ),
+          ),
+        );
+        expect(h.seen, isEmpty);
+        expect(invalid, 0);
+      },
+    );
 
     test('其他錯誤與 session 無關，不登出', () async {
       var invalid = 0;
