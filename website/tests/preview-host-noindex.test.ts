@@ -9,7 +9,7 @@ import { compiledMatcher } from "./helpers/middleware-matcher";
 /** 登入與否只看 session cookie 在不在（middleware.ts）。 */
 
 const PROD_ORIGIN = "https://example.com";
-const PREVIEW_HOST = "hawkr-website-prod.example.workers.dev";
+const PREVIEW_HOST = "hawkr-git-main-example.vercel.app";
 
 /**
  * Put the process into the ONE configuration this feature exists for: a
@@ -49,7 +49,7 @@ test("canonical hosts are the deployment's own origin, its www sibling, and loop
 test("preview and look-alike hosts are not canonical", () => {
 	for (const host of [
 		PREVIEW_HOST,
-		"hawkr-website-dev.example.workers.dev",
+		"hawkr-abc123-example.vercel.app",
 		// Suffix/prefix look-alikes: a substring match would wrongly admit these.
 		"evil-example.com",
 		"example.com.attacker.example",
@@ -65,6 +65,26 @@ test("preview and look-alike hosts are not canonical", () => {
 	// A request with no Host header at all is an unidentifiable client, not a
 	// licence to index.
 	assert.equal(isCanonicalHost(null, PROD_ORIGIN), false);
+});
+
+test("any *.vercel.app host is non-canonical, even when it is the configured web origin", () => {
+	const vercelOrigin = "https://hawkr.vercel.app";
+	for (const host of [
+		"hawkr.vercel.app",
+		"www.hawkr.vercel.app",
+		PREVIEW_HOST,
+	]) {
+		assert.equal(
+			isCanonicalHost(host, vercelOrigin),
+			false,
+			`${host} must not be indexable`,
+		);
+	}
+	// The rule is a suffix match on a label boundary, not a substring match.
+	assert.equal(
+		isCanonicalHost("vercel.app.example.com", "https://vercel.app.example.com"),
+		true,
+	);
 });
 
 /**

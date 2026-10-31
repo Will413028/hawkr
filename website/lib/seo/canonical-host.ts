@@ -1,21 +1,20 @@
 /**
  * Which hosts this deployment is willing to be indexed under (#355).
  *
- * A Cloudflare Worker answers on more hosts than the one it was built for: the
- * platform always keeps a `*.workers.dev` subdomain alive, and CI depends on it
- * — `deploy.yml`'s post-deploy `cf-smoke` targets that address precisely because
- * it bypasses the zone's routes and hits the worker that was just published. So
- * the preview host cannot be switched off; it can only be told apart.
+ * Vercel keeps a `*.vercel.app` address alive for every deployment (preview
+ * and production alike), so the platform host cannot be switched off; it can
+ * only be told apart. Every `*.vercel.app` host is therefore non-canonical,
+ * even when it is the host `NEXT_PUBLIC_WEB_ORIGIN` names: indexing is for the
+ * custom domain.
  *
- * Telling it apart has to happen per request, and neither of the two places that
- * already emit indexability signals can do that:
+ * Telling hosts apart has to happen per request, and neither of the two places
+ * that already emit indexability signals can do that:
  *
  *   - `app/robots.ts` builds from `env.seoIndexable` alone, a build-time value
- *     identical for every host the worker answers on. Reading `headers()` there
- *     would make robots.txt a dynamic route.
- *   - `next.config.ts`'s `headers()` can carry a `has: host` condition, but
- *     OpenNext does not honour it (measured in `bb54880e`), so a host-gated rule
- *     there is silently inert.
+ *     identical for every host the deployment answers on. Reading `headers()`
+ *     there would make robots.txt a dynamic route.
+ *   - `next.config.ts`'s `headers()` is static for the build; a `has: host`
+ *     condition there would have to enumerate preview hosts it cannot know.
  *
  * Middleware is the remaining layer that sees the real `Host`, which is why the
  * de-indexing decision for non-canonical hosts lives there and imports this.
@@ -55,11 +54,18 @@ function hostnameOf(host: string): string {
 	return colon === -1 ? trimmed : trimmed.slice(0, colon);
 }
 
+const VERCEL_DEPLOYMENT_HOST_SUFFIX = ".vercel.app";
+
+/** True for any `*.vercel.app` hostname (lower-cased, port already stripped). */
+function isVercelDeploymentHost(hostname: string): boolean {
+	return hostname.endsWith(VERCEL_DEPLOYMENT_HOST_SUFFIX);
+}
+
 /**
  * True when `host` is a hostname this deployment publishes under, i.e. one whose
  * pages may be indexed. `webOrigin` is the deployment's own origin
- * (`env.webOrigin`); the `www.` sibling is included because the zone answers it
- * and a redirect there should not read as a de-indexed host.
+ * (`env.webOrigin`); the `www.` sibling is included because the custom domain
+ * answers it and a redirect there should not read as a de-indexed host.
  *
  * A missing/blank `Host` is NOT canonical: every real browser and crawler sends
  * one, so its absence is an unidentifiable client and the safe answer is to
@@ -72,6 +78,7 @@ export function isCanonicalHost(
 	if (!host) return false;
 	const hostname = hostnameOf(host);
 	if (!hostname) return false;
+	if (isVercelDeploymentHost(hostname)) return false;
 	if (isLoopbackHost(hostname)) return true;
 
 	let canonical: string;
