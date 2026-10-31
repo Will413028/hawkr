@@ -190,19 +190,16 @@ test("rejects event-id aliases that disagree", () => {
 });
 
 test("expires an entity on write instead of opening a stale window", () => {
-	// `{expire: 0}` writes the tag row with expire=now, which OpenNext reads as
-	// "every entry generated before this bust is a miss". `"max"` writes
-	// expire=now+1y and only marks the entry stale — the next reader gets the
-	// pre-mutation copy, and for a single record that reader is usually the
+	// `{expire: 0}` makes every entry generated before the bust a miss. `"max"`
+	// only marks the entry stale — the next reader gets the pre-mutation copy, and for a single record that reader is usually the
 	// seller who just saved.
 	assert.deepEqual(IMMEDIATE_PROFILE, { expire: 0 });
 	assert.equal(DEFERRED_PROFILE, "max");
 });
 
 test("expires entity tags immediately and leaves aggregates stale-servable", () => {
-	// The split is the whole point: a hard expiry on the lists would bypass
-	// OpenNext's regeneration dedupe (it only runs on the STALE path) and drop
-	// stale-if-error, and one edit expands into three list tags — the #338
+	// The split is the whole point: a hard expiry on the lists would make every
+	// concurrent reader render inline and drop stale-if-error, and one edit expands into three list tags — the #338
 	// amplification. Their readers are not the writer.
 	for (const tag of [
 		"product:1",

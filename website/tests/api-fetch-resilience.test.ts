@@ -161,14 +161,11 @@ test("401 still throws UnauthorizedError by default (throwOnHttpError unset)", a
 	respond = () =>
 		new Response(JSON.stringify({ code: 401 }), {
 			status: 401,
-			headers: { "cf-ray": "a1feaf706bfbd6a9-TPE" },
 		});
 	const { apiClient, UnauthorizedError } = await import("../lib/api/client");
 	await assert.rejects(
 		() => apiClient.authed.get("/products/1"),
-		(e: unknown) =>
-			e instanceof UnauthorizedError &&
-			e.cloudflareRayId === "a1feaf706bfbd6a9",
+		(e: unknown) => e instanceof UnauthorizedError,
 	);
 });
 

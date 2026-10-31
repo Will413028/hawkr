@@ -26,7 +26,7 @@ test("private query keys tolerate missing identity during auth hydration", () =>
 	]);
 });
 
-test("CSP allowlist covers deployed Cloudflare RUM and Apple Pay fonts", () => {
+test("CSP allowlist covers Apple Pay fonts and the API origins", () => {
 	const policy = buildContentSecurityPolicy({
 		appConnectOrigins: ["https://api.example.org"],
 		uploadOrigins: [],
@@ -37,9 +37,9 @@ test("CSP allowlist covers deployed Cloudflare RUM and Apple Pay fonts", () => {
 		).split(" ");
 
 	assert.ok(
-		sources("script-src").includes("https://static.cloudflareinsights.com"),
+		!policy.includes("cloudflareinsights"),
+		"Cloudflare Web Analytics is not part of the Vercel deployment",
 	);
-	assert.ok(sources("connect-src").includes("https://cloudflareinsights.com"));
 	assert.ok(sources("font-src").includes("https://applepay.cdn-apple.com"));
 	assert.ok(sources("connect-src").includes("https://api.example.org"));
 	assert.ok(sources("style-src").includes("https://accounts.google.com"));

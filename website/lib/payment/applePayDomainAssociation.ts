@@ -1,10 +1,8 @@
 // Apple Pay merchant domain-association blobs, served verbatim at
 // /.well-known/apple-developer-merchantid-domain-association per environment.
 // These are PUBLIC verification files (also fetchable from the live endpoint),
-// committed as static data rather than a runtime secret: the ~5.6 kB value
-// exceeds the Cloudflare Worker text-binding limit (5.1 kB), so it cannot ride
-// as a `wrangler secret` like REVALIDATE_SECRET. Source of truth lives here for
-// both VM and Worker; no env var / GitHub secret needed.
+// committed as static data rather than a runtime secret. Source of truth lives
+// here; no env var / GitHub secret needed.
 import type { Flavor } from "@/lib/config/flavor";
 
 export const APPLE_PAY_DOMAIN_ASSOCIATION: Record<Flavor, string> = {

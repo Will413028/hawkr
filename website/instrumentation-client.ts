@@ -108,19 +108,15 @@ if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
 			/window\.webkit\.messageHandlers/,
 			/this\.config\.endpoints\.byUrl/,
 		],
-		// 先丟棄 *.workers.dev 預覽網域的事件（CI cf-smoke 自產噪音：該網域結構上
-		// 沒有 first-party API proxy，/api/v1/* 必 404 且屬設計行為），再對真正要
-		// 上報的事件補後端 trace tag 與去識別化。正式網域一律不受影響——那裡的同類
-		// 錯誤才是真缺陷。詳見 lib/sentry/client-before-send.ts。
+		// 補後端 trace tag 並去識別化，詳見 lib/sentry/client-before-send.ts。
 		beforeSend: (event, hint) => clientBeforeSend(event, hint),
 	});
 }
 
-// Deploy-skew self-heal. Cloudflare Workers Assets replaces every static asset on
-// each deploy and keeps no previous version, so a tab still holding an earlier
-// build 404s on its now-deleted `/_next/static/*` chunks — and on a soft
+// Deploy-skew self-heal. A tab still holding an earlier build can 404 on
+// `/_next/static/*` chunks the current deployment no longer serves — and on a soft
 // navigation this hangs forever on the loading skeleton (the "refresh sometimes
-// fixes it" bug). Next's deploymentId only self-heals the RSC/document layer;
+// fixes it" bug). Next's deployment-id check only self-heals the RSC/document layer;
 // these listeners cover the raw chunk 404s that slip through, reloading once to
 // pull the current build. Both a <script>/<link> resource error and a dynamic
 // import() rejection are handled; neither calls preventDefault, so Sentry still

@@ -48,7 +48,7 @@ export async function loadMarketProductsSection({
 
 		// Cache only the canonical anonymous first page. Filter values come from
 		// the URL and are intentionally fetched directly so arbitrary queries do
-		// not create an unbounded OpenNext/R2 key space. Use the shared 100-item
+		// not create an unbounded cache key space. Use the shared 100-item
 		// pool already consumed by Home, then slice the
 		// visible grid; this keeps all three surfaces on one cache key.
 		const productJson = await (isCanonicalNavbarLanding

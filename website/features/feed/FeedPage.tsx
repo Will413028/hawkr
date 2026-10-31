@@ -38,8 +38,7 @@ function buildStories(posts: PostListItem[]): StoryItem[] {
  * per-request dynamic server render.
  */
 export default async function FeedPage() {
-	// Keep this canonical seed off the OpenNext incremental cache boundary via a
-	// bounded deadline: an intermittent foreground gateway read can otherwise
+	// Bound this canonical seed with a deadline: an intermittent foreground gateway read can otherwise
 	// hold a Flight body open after its 200 headers. A failed seed is explicitly
 	// distinguished from a valid empty feed so the client query retries instead
 	// of persisting a false empty state.

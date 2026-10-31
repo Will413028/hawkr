@@ -113,7 +113,6 @@ const SKIP_DIRS = new Set([
 	"node_modules",
 	".next",
 	".git",
-	".open-next",
 	"dist",
 	"coverage",
 	"playwright-report",

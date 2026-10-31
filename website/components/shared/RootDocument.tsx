@@ -102,14 +102,6 @@ export default function RootDocument({
 				    into the body stream without adding them to the body fiber, so
 				    hydration can see SCRIPT where it expects InitialPageLoader.
 				    These scripts still block parsing before visual body content. */}
-				{/* OpenNext keepNames compatibility shim; must precede theme code. */}
-				<script
-					id="hk-name-shim"
-					// biome-ignore lint/security/noDangerouslySetInnerHtml: trusted shim
-					dangerouslySetInnerHTML={{
-						__html: "self.__name||(self.__name=function(t){return t});",
-					}}
-				/>
 				<script
 					id="hk-theme-boot"
 					// biome-ignore lint/security/noDangerouslySetInnerHtml: trusted boot script
@@ -150,7 +142,7 @@ export default function RootDocument({
 				/>
 				{/* Keep the client context inside the document body. A client
 					    provider above <html> can be detached from the replayed route
-					    subtree during a Cloudflare/Next SSR POST, leaving shared Link
+					    subtree during a Next SSR POST, leaving shared Link
 					    consumers without their ViewTransitions context. */}
 				<ViewTransitions>
 					<ProductQuickViewPendingBridge />

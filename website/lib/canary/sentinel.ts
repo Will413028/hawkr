@@ -1,13 +1,10 @@
 /**
  * Cross-PoP freshness canary — the measured object.
  *
- * `open-next.config.ts` keeps the regional incremental cache at `short-lived`
- * (a hard-coded 60s ceiling) with a comment that refuses to relax it until a
- * canary proves on-demand invalidation actually reaches every PoP under load.
- * This module is that canary's target: a tiny `unstable_cache` entry that goes
- * through the exact same incremental-cache + tag-cache path as every product /
- * seller / discovery fetcher (lib/api/cached.ts), but carries no upstream call,
- * so what it measures is the cache layer itself rather than backend latency.
+ * A tiny `unstable_cache` entry that goes through the exact same
+ * incremental-cache + tag-cache path as every product / seller / discovery
+ * fetcher (lib/api/cached.ts), but carries no upstream call, so what it
+ * measures is the cache layer itself rather than backend latency.
  *
  * The served payload stamps the moment the entry was regenerated. A prober
  * anywhere on the internet can therefore answer "has the PoP serving me picked

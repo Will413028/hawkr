@@ -17,22 +17,16 @@ import {
  *   POST /sentinel  → purge the canary tag (x-revalidate-secret, same secret as
  *                     POST /api/revalidate)
  *
- * The writer/prober is `cloudflare/canary` (Cron Trigger); `cloudflare/canary/
- * probe.mjs` runs the same read loop from anywhere else. The purge deliberately
- * does NOT go through /api/revalidate: that route expands entity tags into the
- * aggregate tags real pages use, and the canary must never touch a visitor-
- * facing cache entry.
+ * The purge deliberately does NOT go through /api/revalidate: that route
+ * expands entity tags into the aggregate tags real pages use, and the canary
+ * must never touch a visitor-facing cache entry.
  *
  * The route is dynamic on purpose. Only the `unstable_cache` entry below is
  * cached — that is the object under study — while the response itself stays
  * per-request so `servedAt`/`ageMs` are always true.
  */
 const readSentinelEntry = unstable_cache(
-	async () =>
-		buildSentinelEntry(
-			Date.now(),
-			process.env.OPEN_NEXT_BUILD_ID ?? process.env.DEPLOYMENT_ID,
-		),
+	async () => buildSentinelEntry(Date.now(), process.env.VERCEL_DEPLOYMENT_ID),
 	CANARY_CACHE_KEY,
 	{ tags: [CANARY_TAG], revalidate: CANARY_TTL_SECONDS },
 );

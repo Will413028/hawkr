@@ -26,7 +26,7 @@ type E2ePublicGetCacheEntry = {
 // The full Playwright suite shares one rate-limited test gateway. Repeated
 // anonymous reference-data reads across fresh browser contexts can otherwise
 // exhaust that gateway even with a single Playwright worker. This cache exists
-// only in the explicitly opted-in, loopback-only E2E proxy; deployed Workers
+// only in the explicitly opted-in, loopback-only E2E proxy; deployed environments
 // never set PLAYWRIGHT_E2E_API_PROXY and therefore never use it.
 const E2E_PUBLIC_GET_CACHE_TTL_MS = 15 * 60 * 1000;
 const E2E_PUBLIC_GET_CACHE_MAX_ENTRIES = 256;

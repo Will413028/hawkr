@@ -79,7 +79,6 @@ test("stale-chunk recovery keeps its reload guard and quiet UI handoff wired", a
 	// and create misleading "preloaded but not used" browser warnings.
 	assert.doesNotMatch(layout, /from "next\/script"/);
 	assert.doesNotMatch(layout, /strategy="beforeInteractive"/);
-	assert.match(layout, /<script[\s\S]*id="hk-name-shim"/);
 	assert.match(loader, /isStaleChunkReload/);
 	assert.match(loader, /STALE_CHUNK_RELOAD_PENDING_CLASS/);
 	assert.match(styles, /\.hk-stale-chunk-reload \.initial-loader/);

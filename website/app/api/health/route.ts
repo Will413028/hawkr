@@ -1,5 +1,5 @@
 /**
- * Liveness probe: "this Worker version is up and serving traffic."
+ * Liveness probe: "this deployment is up and serving traffic."
  *
  * That sentence is the whole contract, and the endpoint is deliberately built
  * so it cannot answer anything wider. It reads process env and the clock — no
@@ -12,11 +12,10 @@
  *
  * `buildId` is what makes the response worth more than a bare 200: it is the
  * same deploy namespace the version-promotion workflow and the canary use
- * (OPEN_NEXT_BUILD_ID, set to `deploymentId` by the build — see next.config.ts),
- * so a monitor polling this endpoint can tell "up" from "up, and already on the
- * version I just shipped". Unset locally, where Next falls back to its own
- * build id and this env var never exists — hence the explicit "unknown" rather
- * than an omitted field, so the shape never varies.
+ * (VERCEL_DEPLOYMENT_ID, set by the platform), so a monitor polling this
+ * endpoint can tell "up" from "up, and already on the version I just shipped".
+ * Unset locally, where this env var never exists — hence the explicit
+ * "unknown" rather than an omitted field, so the shape never varies.
  *
  * `no-store` is load-bearing. A cached health response describes the past and
  * could let a dead deployment appear healthy after it stopped serving traffic.
@@ -30,10 +29,7 @@ export function GET() {
 			code: 0,
 			message: "success",
 			data: {
-				buildId:
-					process.env.OPEN_NEXT_BUILD_ID ??
-					process.env.DEPLOYMENT_ID ??
-					"unknown",
+				buildId: process.env.VERCEL_DEPLOYMENT_ID ?? "unknown",
 				servedAt: new Date().toISOString(),
 			},
 		},

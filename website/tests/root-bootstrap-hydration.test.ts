@@ -17,7 +17,6 @@ test("root bootstrap scripts are the first React-owned body nodes", async () => 
 	assert.ok(bodyIndex >= 0);
 	assert.ok(providerIndex > bodyIndex);
 	for (const id of [
-		"hk-name-shim",
 		"hk-theme-boot",
 		"hk-initial-loader-watchdog",
 		"hk-stale-chunk-reload-boot",

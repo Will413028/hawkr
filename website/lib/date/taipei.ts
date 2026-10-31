@@ -2,7 +2,7 @@
  * 台北日期格式化（輸出與 runtime 時區 / locale / ICU 版本全脫鉤）。
  *
  * 為什麼不用 `toLocaleDateString("zh-TW")`（hawkr-website#374）：
- *   1. **hydration mismatch**：server render 的頁面在 Cloudflare Workers runtime
+ *   1. **hydration mismatch**：server render 的頁面在 server runtime
  *      一律 UTC、client 端跟著瀏覽器時區，同一個 instant 在 16:00Z 之後就會產出
  *      差一天的文字 → React #418（量大到把 Sentry ingest 打成 429）。
  *      `toLocaleDateString` 的輸出還受 runtime ICU 版本影響，是第二條 mismatch

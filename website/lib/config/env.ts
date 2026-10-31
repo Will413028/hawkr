@@ -71,7 +71,7 @@ export interface EnvConfig {
 	 * (dev/stage leave it unset; prod sets it → events fire). Baked at build. */
 	gaId: string;
 	/**
-	 * Base origin of the media / image-gateway (R2 + Cloudflare Worker), from
+	 * Base origin of the media / image-gateway (R2 + image-gateway Worker), from
 	 * `NEXT_PUBLIC_MEDIA_BASE_URL`. It is the only media host the app recognises
 	 * as its own. **Empty string = no media origin configured**: `buildImageUrl`
 	 * builds no URL for a bare object key (the image is simply absent) and never

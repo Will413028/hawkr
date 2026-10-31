@@ -87,15 +87,13 @@ test("gate open allows all but /api and points at the sitemap", () => {
 
 test("a closed gate also de-indexes over HTTP, where robots.txt can be overridden", async () => {
 	// robots.txt is not enough on its own: a body is merged per user-agent group
-	// (RFC 9309), and Cloudflare's zone-level Managed robots.txt prepends its own
-	// `User-Agent: *` group whose `Allow: /` cancels ours — measured on web-dev,
-	// which serves allow-all while this gate is closed. The header is outside
-	// that merge. Both must be driven by env.seoIndexable and nothing else.
+	// (RFC 9309), and an intermediary's robots.txt can prepend its own `User-Agent: *`
+	// group whose `Allow: /` cancels ours. The header is outside that merge. Both must be driven by env.seoIndexable and nothing else.
 	//
 	// Reach, measured (hawkr-website#367 item 4): this covers every response
 	// Next produces, NOT literally every response. `/_next/static/*` and files
-	// shipped in `public/` are answered by Cloudflare's asset layer before the
-	// Worker runs, so no `headers()` rule can decorate them — next.config.ts's
+	// shipped in `public/` are answered by the platform's asset layer before any
+	// function runs, so no `headers()` rule can decorate them — next.config.ts's
 	// "also covers non-HTML responses" is true of Next's own non-HTML responses
 	// only. Harmless (a JS chunk or an image is not indexable content, and every
 	// HTML entry point that links them is covered), but not a guarantee.

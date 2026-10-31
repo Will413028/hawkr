@@ -36,7 +36,6 @@ test("tags API request context from a captured ApiClientError", () => {
 	err.apiMethod = "POST";
 	err.apiMode = "authed";
 	err.apiRole = "2";
-	err.cloudflareRayId = "a1feaf706bfbd6a9";
 	const event = tagBackendTrace({} as { tags?: Record<string, unknown> }, {
 		originalException: err,
 	});
@@ -46,7 +45,6 @@ test("tags API request context from a captured ApiClientError", () => {
 		api_method: "POST",
 		api_mode: "authed",
 		api_role: "2",
-		cloudflare_ray_id: "a1feaf706bfbd6a9",
 		http_status: "503",
 	});
 });

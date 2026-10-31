@@ -51,7 +51,7 @@ const HEADER_NAME = "X-HK-Origin-Auth";
  * Two keys, not one, and the split is deliberate (gateway §5.2 reasoning):
  * whoever holds the CI key would otherwise be able to sign `p=visitor` carrying
  * any victim's IP and lock that person out of login — while metering as a
- * success, so no alert fires. A GitHub Actions secret and a Cloudflare Worker
+ * success, so no alert fires. A GitHub Actions secret and a Vercel runtime
  * secret have very different exposure, so they are different keys.
  *
  * Presence of `ORIGIN_AUTH_CI_SECRET` is therefore also the signal that this
@@ -69,7 +69,7 @@ function resolveSigner(): { secret: string; ci: boolean } | null {
 	return null;
 }
 
-// `crypto.subtle` rather than `node:crypto`: it exists on workerd, in Node and
+// `crypto.subtle` rather than `node:crypto`: it exists in Node and
 // in the browser, so this module carries no platform-only import that a bundler
 // would have to resolve for a graph it is never executed in.
 const keyCache = new Map<string, Promise<CryptoKey>>();

@@ -54,13 +54,6 @@ export default defineConfig({
 	webServer: {
 		// Always build with the gate open (NEXT_PUBLIC_* are baked at build), then
 		// serve. Locally reuse a server you already started; in CI build fresh.
-		//
-		// 曾經是 `node .next/standalone/server.js`（理由：`next start` 不支援
-		// `output: standalone`）。那個前提已經消失——`output: "standalone"` 於
-		// 2026-07-02 隨「拔除 VM 部署路徑，收斂到 Cloudflare Workers」(ae9c3fd2)
-		// 一併刪除，`pnpm build` 不再產出 `.next/standalone/`，於是這行從那天起
-		// 必定 `Cannot find module …/.next/standalone/server.js`，整個 SEO 套件
-		// 連 server 都起不來。沒人發現，是因為 CI 從來沒呼叫過 `test:seo`。
 		command: "pnpm build:seo && pnpm start",
 		url: "http://localhost:3000",
 		reuseExistingServer: !process.env.CI,

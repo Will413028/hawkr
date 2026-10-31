@@ -16,8 +16,7 @@ import { getEnv } from "@/lib/config/env";
  * 擋掉，要嘛被迫放行「Referer 缺席」而使檢查形同虛設。
  *
  * ⚠️ **不得用 `new URL(request.url).origin` 判自身 origin**（本 repo 唯一的既有樣本
- * `app/api/public/seller-leads/route.ts` 就是這樣寫的）：這支 BFF 跑在 Cloudflare
- * Workers 上，`request.url` 的 host 未必等於使用者看到的那個 origin。權威來源是
+ * `app/api/public/seller-leads/route.ts` 就是這樣寫的）：這支 BFF 在平台反代後面，`request.url` 的 host 未必等於使用者看到的那個 origin。權威來源是
  * `getEnv().webOrigin`（取自 `NEXT_PUBLIC_WEB_ORIGIN`，prod 必填）。
  */
 

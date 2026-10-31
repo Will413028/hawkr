@@ -24,27 +24,21 @@ export type RevalidateParseResult =
  * knows which record changed; it cannot know which cache entries embed it, so
  * it must not be the one choosing how hard they expire.
  *
- * `{expire: 0}` makes the adapter write the tag row with `expire = now`, and
- * OpenNext's `hasBeenRevalidated` (`expire <= now && expire > lastModified`)
- * then reports every entry generated before the bust as a miss — the next
- * reader renders fresh content. `"max"` instead writes `expire = now + 1y` and
- * only opens a stale window: the next reader is still handed the pre-mutation
- * HTML while the refresh runs behind it.
+ * `{expire: 0}` expires the tag at once: every entry generated before the bust
+ * is a miss, so the next reader renders fresh content. `"max"` instead opens a
+ * stale window: the next reader is still handed the pre-mutation HTML while the
+ * refresh runs behind it.
  *
  * Entity tags key the single-record views a writer looks at straight after
  * saving. Serving those stale shows someone their own edit as if it never
  * happened, which reads as a failed save — so they expire immediately.
  *
  * Aggregate tags key the catalogue, home, market and feed. Expiring those on
- * the spot costs far more than it buys. OpenNext only routes a regeneration
- * through its deduplicating queue on the STALE path (`revalidateIfRequired`
- * returns early unless the response was STALE), so a hard expiry has every
- * concurrent reader render inline instead of one render serving all of them —
- * and because `expandAggregateTags` turns a single edit into `products:list` +
+ * the spot costs far more than it buys: a hard expiry makes every concurrent
+ * reader render inline instead of one regeneration serving all of them, and
+ * because `expandAggregateTags` turns a single edit into `products:list` +
  * `posts:list` + `sellers:list`, one price change would do that across the
- * whole catalogue at once. That is the amplification that pushed the prod
- * Workers past their memory ceiling and blanked the site (#338). Deferring
- * also keeps the stale-if-error fallback that serves the last good page while
+ * whole catalogue at once. Deferring also keeps the stale-if-error fallback that serves the last good page while
  * the backend is degraded. The readers of an aggregate are not the writer, and
  * one request's lag is invisible to them.
  */

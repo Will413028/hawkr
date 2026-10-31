@@ -18,8 +18,6 @@
  *   Google Pay                       pay.google.com
  *   Apple Pay                        applepay.cdn-apple.com,
  *                                    smp-paymentservices.apple.com
- *   Cloudflare Web Analytics / RUM   static.cloudflareinsights.com,
- *                                    cloudflareinsights.com
  *   Backend gateway + chat WS        API base env (https + wss)
  *   Media (image-gateway)            NEXT_PUBLIC_MEDIA_BASE_URL
  *   Sentry ingest                    NEXT_PUBLIC_SENTRY_DSN host
@@ -132,7 +130,7 @@ export function buildContentSecurityPolicy(
 		"form-action 'self' https:",
 		sources(
 			"script-src 'self' 'unsafe-inline' 'report-sample'",
-			"https://www.googletagmanager.com https://www.gstatic.com https://www.google.com https://apis.google.com https://accounts.google.com https://pay.google.com https://applepay.cdn-apple.com https://static.cloudflareinsights.com",
+			"https://www.googletagmanager.com https://www.gstatic.com https://www.google.com https://apis.google.com https://accounts.google.com https://pay.google.com https://applepay.cdn-apple.com",
 		),
 		"style-src 'self' 'unsafe-inline' https://accounts.google.com",
 		"style-src-elem 'self' 'unsafe-inline' https://accounts.google.com",
@@ -142,7 +140,7 @@ export function buildContentSecurityPolicy(
 			"connect-src 'self'",
 			input.appConnectOrigins,
 			input.uploadOrigins,
-			"https://www.googletagmanager.com https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://stats.g.doubleclick.net https://*.googleapis.com https://google.com https://www.google.com https://*.gstatic.com https://accounts.google.com https://pay.google.com https://smp-paymentservices.apple.com https://static.cloudflareinsights.com https://cloudflareinsights.com",
+			"https://www.googletagmanager.com https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://stats.g.doubleclick.net https://*.googleapis.com https://google.com https://www.google.com https://*.gstatic.com https://accounts.google.com https://pay.google.com https://smp-paymentservices.apple.com",
 		),
 		"frame-src 'self' https://accounts.google.com https://apis.google.com https://pay.google.com https://applepay.cdn-apple.com",
 		"worker-src 'self' blob:",

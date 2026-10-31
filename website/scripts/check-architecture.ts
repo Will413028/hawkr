@@ -49,8 +49,7 @@ const codeFiles = walk(
 	(path) =>
 		/\.(ts|tsx|mjs|js)$/.test(path) &&
 		!path.startsWith("node_modules/") &&
-		!path.startsWith(".next/") &&
-		!path.startsWith(".open-next/"),
+		!path.startsWith(".next/"),
 );
 
 const allowedLibRootFiles = new Set(["README.md"]);
@@ -128,16 +127,6 @@ for (const path of codeFiles) {
 	) {
 		fail(
 			`${path} writes global scroll styles directly. Use acquireBodyScrollLock() so overlapping overlays cannot strand the page.`,
-		);
-	}
-	if (
-		path !== "scripts/check-architecture.ts" &&
-		path !== "open-next.config.ts" &&
-		!path.startsWith("tests/") &&
-		/\brevalidatePath\s*\(/.test(text)
-	) {
-		fail(
-			`${path} calls revalidatePath(), but OpenNext filters implicit path tags with softTagFilter. Use explicit cache tags or remove that filter first.`,
 		);
 	}
 }

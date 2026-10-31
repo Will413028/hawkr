@@ -26,7 +26,7 @@ import {
  * How hard a tag expires follows its shape, not the caller (see
  * `revalidationProfileFor`): entity tags expire on the spot so the writer's own
  * next read shows their change, while the aggregate lists stay
- * stale-while-revalidate to keep OpenNext's regeneration dedupe and the
+ * stale-while-revalidate to keep regeneration deduplicated and the
  * stale-if-error fallback.
  *
  * Two bounds stay honest even for the immediate half: the tag lookup is cached

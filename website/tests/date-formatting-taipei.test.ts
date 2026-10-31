@@ -10,7 +10,7 @@ import type { DateLike } from "../lib/date/taipei";
  *
  * root cause 與 #374 同一條：`toLocaleDateString` / `toLocaleTimeString` /
  * `Date.prototype.toLocaleString` 的輸出同時吃 **runtime 時區** 與 **runtime ICU 版本**。
- * 站台 server 端跑在 Cloudflare Workers（UTC）、client 端跑在使用者的瀏覽器（多為
+ * 站台 server 端跑在 UTC、client 端跑在使用者的瀏覽器（多為
  * UTC+8），同一個 instant 在 16:00Z 之後就會產出差一天的文字：
  *   - 有 SSR 的畫面 → hydration mismatch（React #418，#374 當時把 Sentry ingest 打成 429）
  *   - 純 server 算完才下傳的畫面 → 沒有 mismatch，但**所有**使用者看到 UTC 日期，

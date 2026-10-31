@@ -33,9 +33,6 @@ export function tagBackendTrace<T extends TaggableEvent>(
 			if (ex.apiMethod) event.tags.api_method = ex.apiMethod;
 			if (ex.apiMode) event.tags.api_mode = ex.apiMode;
 			if (ex.apiRole) event.tags.api_role = ex.apiRole;
-			if (ex.cloudflareRayId) {
-				event.tags.cloudflare_ray_id = ex.cloudflareRayId;
-			}
 			event.tags.http_status = String(ex.status);
 		}
 	}

@@ -53,7 +53,6 @@ export class ApiClientError extends Error {
 	public apiEndpoint?: string;
 	public apiMode?: Mode;
 	public apiRole?: string;
-	public cloudflareRayId?: string;
 	/** 機器可讀業務錯誤碼（procurement 的 {code,reason,message} 契約）；
 	 * 沒有帶這個欄位的回應一律是 ""，與 Gateway 端 `reason := ""` 的
 	 * 無-detail fallback 對齊，不是猜測值。 */
@@ -79,21 +78,6 @@ export class UnauthorizedError extends ApiClientError {
 		super(message, 401);
 		this.name = "UnauthorizedError";
 	}
-}
-
-function attachResponseCorrelation<T extends ApiClientError>(
-	error: T,
-	response: Response,
-): T {
-	// `CF-Ray` is returned as `<id>-<colo>` while the Workers trace attribute
-	// `cloudflare.ray_id` contains the ID only. Store the normalized ID so a
-	// Sentry issue can be cross-queried against the exported Worker log/trace
-	// even where Cloudflare cannot propagate its native trace ID externally.
-	const rayId = response.headers.get("cf-ray")?.split("-", 1)[0]?.trim();
-	if (rayId && /^[0-9a-f]{16,32}$/i.test(rayId)) {
-		error.cloudflareRayId = rayId;
-	}
-	return error;
 }
 
 export interface RequestOptions extends RequestInit {
@@ -159,10 +143,8 @@ type Mode = "public" | "authed";
 // B-199: a transient backend blip (gateway answers 5xx — e.g. 503 when Redis is
 // momentarily down/failing over) should be absorbed, not surfaced as a failure.
 // Retry once, only for idempotent GETs — a mutation must never be replayed.
-// No backoff delay: a real setTimeout() scheduled inside a streaming
-// Suspense hole can fire after Cloudflare Workers has torn down this request's
-// IoContext, throwing "Cannot perform I/O on behalf of a different request."
-// Retrying immediately avoids the timer entirely.
+// No backoff delay: the retry is immediate, so no timer is scheduled inside a
+// streaming Suspense hole.
 const MAX_RETRIES = 1;
 const API_FAILURE_DEDUP_MS = 30_000;
 const recentApiFailures = new Map<string, number>();
@@ -355,7 +337,7 @@ function abortable<T>(
 // request aborts on whichever fires first. A caller signal (React Query aborts
 // on unmount / query-key change) carries no deadline; without composing it the
 // timeout would be dropped and a hung fetch could stay pending forever.
-// AbortSignal.any is native on workerd and every browser target; with no caller
+// AbortSignal.any is native on Node and every browser target; with no caller
 // signal the timeout signal is used directly.
 function composeSignals(
 	caller: AbortSignal | null | undefined,
@@ -408,7 +390,7 @@ async function dispatch<T>(
 	const endpoint = endpointPath(url);
 	const activeRole =
 		mode === "authed" ? roleToHeader(getStoredActiveRole()) : undefined;
-	// Logs are exported from Workers Observability to Sentry. Keep query strings
+	// Keep query strings
 	// out of the record: search/customer filters can contain user-provided text,
 	// while the normalized endpoint still provides the operational signal.
 	if (getEnv().enableApiLogging)
@@ -546,15 +528,12 @@ async function dispatch<T>(
 
 	if (canSoftFail && (res.status === 404 || res.status >= 500)) {
 		if (res.status >= 500) {
-			const error = attachResponseCorrelation(
-				new ApiClientError(
-					parsed?.message || parsed?.msg || `HTTP ${res.status}`,
-					res.status,
-					parsed?.code,
-					parsed,
-					parsed?.reason,
-				),
-				res,
+			const error = new ApiClientError(
+				parsed?.message || parsed?.msg || `HTTP ${res.status}`,
+				res.status,
+				parsed?.code,
+				parsed,
+				parsed?.reason,
 			);
 			reportApiFailure(error, { method, endpoint, mode, role: activeRole });
 		}
@@ -587,9 +566,8 @@ async function dispatch<T>(
 		// they treat "no session" as a normal outcome. Falls through to normal
 		// envelope handling.
 		if (opts.throwOnHttpError !== false) {
-			throw attachResponseCorrelation(
-				new UnauthorizedError(parsed?.message || parsed?.msg || "Unauthorized"),
-				res,
+			throw new UnauthorizedError(
+				parsed?.message || parsed?.msg || "Unauthorized",
 			);
 		}
 	}
@@ -600,15 +578,12 @@ async function dispatch<T>(
 		if (mode === "authed" && parsed?.code === SELLER_SUSPENDED_CODE) {
 			emitSellerSuspended({ path, message: parsed?.message || parsed?.msg });
 		}
-		const error = attachResponseCorrelation(
-			new ApiClientError(
-				parsed?.message || parsed?.msg || `HTTP ${res.status}`,
-				res.status,
-				parsed?.code,
-				parsed,
-				parsed?.reason,
-			),
-			res,
+		const error = new ApiClientError(
+			parsed?.message || parsed?.msg || `HTTP ${res.status}`,
+			res.status,
+			parsed?.code,
+			parsed,
+			parsed?.reason,
 		);
 		reportApiFailure(error, { method, endpoint, mode, role: activeRole });
 		throw error;
@@ -626,15 +601,12 @@ async function dispatch<T>(
 		if (mode === "authed" && parsed.code === SELLER_SUSPENDED_CODE) {
 			emitSellerSuspended({ path, message: parsed.message || parsed.msg });
 		}
-		throw attachResponseCorrelation(
-			new ApiClientError(
-				parsed.message || parsed.msg || `code ${parsed.code}`,
-				res.status,
-				parsed.code,
-				parsed,
-				parsed.reason,
-			),
-			res,
+		throw new ApiClientError(
+			parsed.message || parsed.msg || `code ${parsed.code}`,
+			res.status,
+			parsed.code,
+			parsed,
+			parsed.reason,
 		);
 	}
 
@@ -644,14 +616,11 @@ async function dispatch<T>(
 	// (softFail and normal reads keep the lenient `{ code: 0, data: undefined }`
 	// fallback below so a legitimately empty body stays non-fatal for them.)
 	if (canSoftFailNotFound && parsed === null) {
-		throw attachResponseCorrelation(
-			new ApiClientError(
-				`empty or unparseable body (HTTP ${res.status})`,
-				res.status,
-				undefined,
-				null,
-			),
-			res,
+		throw new ApiClientError(
+			`empty or unparseable body (HTTP ${res.status})`,
+			res.status,
+			undefined,
+			null,
 		);
 	}
 
