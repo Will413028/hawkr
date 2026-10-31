@@ -5,6 +5,7 @@
 | 狀態 | accepted |
 | 日期 | 2026-10-30 |
 | 決定者 | Will（A7-D19；D1–D6 依方法簡報與 fresh subagent 批判拍板，2026-10-30） |
+| 修訂 | 2026-10-31：D2 的 Google nonce 處理定案（見文末〈修訂：Google 原生登入的 nonce〉） |
 | 影響範圍 | identity 模組、`internal/httpapi` 的認證與 CSRF；website 的登入與 transport；`packages/hawkr_auth` 與兩支 App |
 | 上層決策 | `2026-09-24-go-modular-monolith.md` D1、D5；`2026-09-26-external-contract-protobuf-connect.md` D6 |
 
@@ -84,3 +85,12 @@ Clerk 時期的問題（A7-D19，Will 2026-10-30）：session 期限要付費方
 - 決定來源：`docs/plans/2026-10-18-a7-social.md` A7-D17、A7-D18、A7-D19
 - 被取代：`2026-09-27-identity-clerk.md`；部分恢復：`2026-09-27-identity-opaque-sessions.md`
 - 通知的 email：`2026-10-05-notification-module.md` 決策 8
+
+## 修訂：Google 原生登入的 nonce（2026-10-31）
+
+D2 寫「Google 的 SDK 帶不了 nonce 時，改以短效 token＋雜湊紀錄防重放（步驟 6 實測後定）」。實測結果：SDK 帶得了 nonce，備案不採用。決策表不改，結果如下。
+
+- `hawkr_auth` 每次登入先取後端的單次 nonce，再重新呼叫 `GoogleSignIn.instance.initialize(nonce:)`，然後 `authenticate`；ID token 的 `nonce` 與後端紀錄相符才交換（`packages/hawkr_auth/lib/auth_session.dart`）。
+- 與 `google_sign_in` 文件不同（文件寫只呼叫一次 `initialize`）。證據：iOS 外掛的實作只覆寫設定；2026-10-31 在 iOS 模擬器（iPhone 17／iOS 26.0）實測 buyer 與 seller 的 Google 登入，nonce 比對通過（計畫附件 `spikes.md` g）。未在實體裝置驗證。Android 不適用，兩支 App 沒有 `android/` 目錄。
+- 重新驗證的觸發：`google_sign_in` 升級，或加入 Android 支援。
+- 理由與盤點在 `internal/modules/identity/CARRYOVER.md` 的「自建登入的沿用盤點」。

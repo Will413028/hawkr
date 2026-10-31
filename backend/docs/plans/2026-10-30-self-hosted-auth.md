@@ -132,7 +132,7 @@
   - 需要人做的事：Will 以模擬器或真機兩家各登入一次；iOS 拿掉 Sign in with Apple capability，加 LINE 的 URL scheme。
   - 已定（Will 2026-10-31）：依賴 `google_sign_in` 7.2.0、`flutter_line_sdk` 3.0.0，移除 `clerk_auth`、`sign_in_with_apple`、`flutter_web_auth_2`；Google 的 nonce 只能經 `GoogleSignIn.instance.initialize(nonce:)` 帶，每次登入先取新 nonce 再重新 initialize（文件寫只呼叫一次，iOS 實作只覆寫設定；以測試守住順序，升 SDK 時重驗）；App 內連結登入方式（`LinkIdentity`）不在本步，見範圍的「延後」。兩支 App 沒有 `android/`，只做 iOS。
 
-- [ ] **7. 收尾**：完成定義逐項核對；獨立設計審查（design-review skill）；`rg -il clerk -g '!node_modules' -g '!gen/**' -g '!*.g.dart' -g '!pnpm-lock*' . -g '!backend/docs/adr/**' -g '!backend/docs/plans/**'` 沒有結果，盤點每列去向填完；延後項附觸發條件搬回主清單；需要人做的事列給 Will（刪除開發用 Clerk instance 是不可逆的對外動作，列給 Will 做）。
+- [ ] **7. 收尾**：完成定義逐項核對；獨立設計審查（design-review skill）；`rg -il clerk -g '!node_modules' -g '!gen/**' -g '!*.g.dart' -g '!pnpm-lock*' . -g '!backend/docs/adr/**' -g '!backend/docs/plans/**'` 只剩 `clerk-inventory.md` 收尾段列出的類別，盤點每列去向填完；延後項附觸發條件搬回主清單；需要人做的事列給 Will（刪除開發用 Clerk instance 是不可逆的對外動作，列給 Will 做）。
 
 ## 決定
 

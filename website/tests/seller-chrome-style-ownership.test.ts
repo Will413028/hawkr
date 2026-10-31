@@ -125,8 +125,8 @@ test("seller and auth owner CSS preserve the exact reviewed semantic AST", () =>
 	const profile = source(SELLER_PROFILE);
 	const share = source(SELLER_SHARE_CARD);
 
-	// Phone verification, account link and the GSI overlay left with Clerk
-	// sign-in; tests/auth-login-style-ownership.test.ts carries the inventory.
+	// The auth-login CSS has no phone verification, account link or GSI
+	// overlay rules; tests/auth-login-style-ownership.test.ts carries the inventory.
 	assert.equal(
 		semanticDigest(authLogin),
 		"4470ca3983d9da7899e7c2a01ddd4237c7781037cc5208cb29dc3a3ff5af796b",
@@ -239,8 +239,6 @@ test("seller and auth owner CSS preserve the exact reviewed semantic AST", () =>
 	// 同步進入重組基線；auth-login / seller-profile / seller-share-card AST 未變。
 	// 2026-09-19 seller-profile 的店家簡介可展開：新增的 10 條規則落在原本
 	// __desc 的位置，owner 順序與 ui-kit／auth-login／share-card 皆未變。
-	// auth-login 移除手機驗證、帳號連結與 GSI 覆蓋層的規則（改用 Clerk 登入）；
-	// ui-kit／seller-profile／share-card 與 owner 順序未變。
 	// 2026-10-27 ui-kit 刪除 LOCATION PICKER MODAL 整段（產地地圖）；其餘 owner 與順序未變。
 	assert.equal(
 		digest(reconstructed),

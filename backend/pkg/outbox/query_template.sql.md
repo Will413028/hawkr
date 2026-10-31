@@ -46,8 +46,7 @@ WHERE id = $1;
 -- Persist last_error here too — a table that only writes last_error on
 -- non-terminal retries (via UpdateAttempt) and drops it on the terminal
 -- transition loses exactly the error message an operator needs when the row
--- finally lands on 'failed'. See the account-service apple_revoke_outbox fix
--- this template is drawn from.
+-- finally lands on 'failed'.
 UPDATE <table>
 SET status = 'failed',
     last_error = $2,
@@ -93,12 +92,12 @@ without the alias, even though plain Postgres resolves them fine unaliased.
    effect, and `outbox.Hooks[T]` for audit/metric side effects, then
    `outbox.New[T](repo, process, cfg, hooks)`.
 4. Scheduler: `outbox.NewScheduler(interval, worker.RunOnce, onPanic, onError)`,
-   wired into `fx.Lifecycle` the same way as account-service's
-   `internal/applerevoke/scheduler.go`.
+   wired into `fx.Lifecycle` the same way as invoice-service's
+   `internal/worker/di.go`.
 5. Monitoring: `outbox.NewMetrics("<name>")` as an `fx.Provide`'d singleton
    shared between the Worker's `Hooks.OnTerminalFailed` and a second
    `Scheduler` that calls `Metrics.Refresh` + `outbox.CleanupDone` — see
-   `services/account-service/internal/applerevoke/monitoring.go`.
+   `services/invoice-service/internal/worker/di.go`.
 
 ## Sizing Config
 
@@ -106,6 +105,6 @@ without the alias, even though plain Postgres resolves them fine unaliased.
 + any downstream RPC timeouts) — see
 `docs/開發規範/多副本排程搶佔規範.md §三`. `MaxAttempts`/`BaseBackoff`/
 `MaxBackoff`/`FetchBatch` are workload judgment calls, not derived from a
-formula; account-service's apple_revoke_outbox uses `MaxAttempts=5`,
+formula; a low-volume outbox can start with `MaxAttempts=5`,
 `BaseBackoff=1min`, `MaxBackoff=1hr`, `FetchBatch=50` as a reasonable
 starting point for a low-volume, non-latency-sensitive outbox.
