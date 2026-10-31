@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
+	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -93,4 +94,47 @@ func (noDashboardOrders) SalesStats(context.Context, int64, []httpseller.SalesWi
 
 func (noDashboardOrders) StatusCounts(context.Context, int64) (httpseller.OrderStatusCounts, error) {
 	return httpseller.OrderStatusCounts{}, errors.New("not used")
+}
+
+func TestServeAcceptsUnencryptedHTTP2(t *testing.T) {
+	ln, err := new(net.ListenConfig).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(r.Proto)) })
+	go func() { done <- serve(ctx, ln, h) }()
+
+	tr := &http.Transport{Protocols: new(http.Protocols)}
+	tr.Protocols.SetUnencryptedHTTP2(true)
+	defer tr.CloseIdleConnections()
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://"+ln.Addr().String()+"/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := (&http.Client{Transport: tr}).Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := resp.Body.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if resp.ProtoMajor != 2 || string(body) != "HTTP/2.0" {
+		t.Fatalf("proto = %s，server 看到 %q，預期 HTTP/2", resp.Proto, body)
+	}
+
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("serve 回傳 %v，預期 nil", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("ctx 結束後 serve 沒有停止")
+	}
 }

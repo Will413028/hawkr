@@ -306,10 +306,7 @@ func runServe(ctx context.Context) error {
 	legacyMux.Handle(buyerconnect.NewBuyerServiceHandler(buyerserver.New(buyerModule)))
 	legacyMux.Handle(sellerconnect.NewSellerServiceHandler(sellerserver.New(sellerModule, legacySellerRatings{reviews}, buyerModule, agentModule, log)))
 	legacyMux.Handle(accountconnect.NewDelegationServiceHandler(delegationservice.New(del, log)))
-	legacy := &http.Server{Handler: legacyMux, ReadHeaderTimeout: 10 * time.Second, Protocols: new(http.Protocols)}
-	legacy.Protocols.SetHTTP1(true)
-	legacy.Protocols.SetUnencryptedHTTP2(true)
-	return serveAll(ctx, listening{ln, &http.Server{Handler: h, ReadHeaderTimeout: 10 * time.Second}}, listening{legacyLn, legacy})
+	return serveAll(ctx, listening{ln, newServer(h)}, listening{legacyLn, newServer(legacyMux)})
 }
 
 // workerConcurrency 是 default queue 同時執行的 job 上限。
@@ -482,7 +479,16 @@ func runMigrate(ctx context.Context) error {
 
 // serve 在 ctx 結束前持續服務；ctx 結束後停止接新連線，並等進行中的請求收尾。
 func serve(ctx context.Context, ln net.Listener, h http.Handler) error {
-	return serveAll(ctx, listening{ln, &http.Server{Handler: h, ReadHeaderTimeout: 10 * time.Second}})
+	return serveAll(ctx, listening{ln, newServer(h)})
+}
+
+// newServer 建出公開 HTTP listener 用的 server，除 HTTP/1.1 外也收未加密的 HTTP/2（h2c）：App 的 Connect client
+// 只說 HTTP/2，開發時直連 http://；部署時 TLS 在反向代理終止，這裡只收內部流量。
+func newServer(h http.Handler) *http.Server {
+	srv := &http.Server{Handler: h, ReadHeaderTimeout: 10 * time.Second, Protocols: new(http.Protocols)}
+	srv.Protocols.SetHTTP1(true)
+	srv.Protocols.SetUnencryptedHTTP2(true)
+	return srv
 }
 
 // listening 是一個在 listener 上服務的 server。
