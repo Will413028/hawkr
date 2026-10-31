@@ -18,6 +18,7 @@
 - 扣掉 gateway，有 16 支服務互相呼叫成一個環（15 組雙向呼叫）。一個業務動作被拆到多個資料庫，靠 outbox、saga、補償 worker、去重表拼湊一致性，而這些機制本身已有多處缺口（見 `flows.md`）。
 - 不可動的約束：
   - 部署目標維持 k8s ＋ Cloudflare。
+    > 2026-11-01 修訂：此約束來自公司時期，已不成立。單體部署在 OCI 東京 `oci-a1`，website 在 Vercel（`2026-11-01-website-hosting-vercel.md`）。
   - 不得連到舊公司的任何端點，prod 與 dev 都算（D9）。
 
 ## D1 單一 Go module、單一 binary 的 modular monolith
