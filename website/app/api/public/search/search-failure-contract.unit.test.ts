@@ -10,7 +10,7 @@ vi.mock("@/lib/api", () => ({ fetchProducts: mocks.category }));
 
 function request(path: string, query = "q=芒果&page_size=6") {
 	return new Request(`https://hawkr.test/api/public/search/${path}?${query}`, {
-		headers: { "cf-connecting-ip": "203.0.113.8" },
+		headers: { "x-real-ip": "203.0.113.8" },
 	});
 }
 beforeEach(() => {

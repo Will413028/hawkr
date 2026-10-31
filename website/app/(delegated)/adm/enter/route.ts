@@ -8,6 +8,7 @@ import {
 	DELEGATION_HANDOFF_INVALID_CODE,
 	readDelegatedSessionSummary,
 } from "@/features/delegated-operations/state/session";
+import { getVisitorIp } from "@/lib/http/visitor-ip";
 import {
 	callDelegatedUpstream,
 	DelegatedUpstreamUnavailableError,
@@ -59,9 +60,9 @@ export async function GET(request: Request): Promise<Response> {
 			method: "POST",
 			path: "/admin/delegated-operations/handoff/redeem",
 			timeout: "session",
-			// Cloudflare 邊緣寫的、client 設不了。不帶就會簽成 p="ssr"，整個 ADM 的
+			// Vercel 邊緣寫的、client 設不了。不帶就會簽成 p="ssr"，整個 ADM 的
 			// 代行流量共用一個限流桶（限流主體＝per-admin-IP）。
-			visitorIp: request.headers.get("cf-connecting-ip"),
+			visitorIp: getVisitorIp(request),
 			json: { handoffCode: code },
 		});
 	} catch (error) {

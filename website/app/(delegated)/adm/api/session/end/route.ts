@@ -4,6 +4,7 @@ import {
 	isDelegatedEndProven,
 	serializeDelegatedCookie,
 } from "@/features/delegated-operations/server/session";
+import { getVisitorIp } from "@/lib/http/visitor-ip";
 import {
 	assertDelegatedBrowserRequest,
 	DelegatedRequestRejectedError,
@@ -83,7 +84,7 @@ export async function POST(request: Request): Promise<Response> {
 			path: "/admin/delegated-operations/current",
 			timeout: "session",
 			credential,
-			visitorIp: request.headers.get("cf-connecting-ip"),
+			visitorIp: getVisitorIp(request),
 		});
 		if (current.ok) {
 			const actualStoreId = targetStoreIdOf(current.data);
@@ -100,7 +101,7 @@ export async function POST(request: Request): Promise<Response> {
 			path: "/admin/delegated-operations/current",
 			timeout: "session",
 			credential,
-			visitorIp: request.headers.get("cf-connecting-ip"),
+			visitorIp: getVisitorIp(request),
 		});
 		const proven = isDelegatedEndProven(ended.status, {
 			code: ended.code,

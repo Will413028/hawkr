@@ -28,7 +28,7 @@ function sellerLeadRequest(
 	requestSequence += 1;
 	const headers = new Headers({
 		"content-type": options.contentType ?? "application/json;charset=UTF-8",
-		"cf-connecting-ip": options.ip ?? `203.0.113.${requestSequence}`,
+		"x-real-ip": options.ip ?? `203.0.113.${requestSequence}`,
 		...options.extraHeaders,
 	});
 	if (options.origin !== null) {

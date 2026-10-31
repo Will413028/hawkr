@@ -2,6 +2,7 @@ import {
 	getDelegatedCookieName,
 	isSafeOperationCredential,
 } from "@/features/delegated-operations/server/session";
+import { getVisitorIp } from "@/lib/http/visitor-ip";
 import {
 	assertDelegatedBrowserRequest,
 	DelegatedRequestRejectedError,
@@ -205,9 +206,9 @@ export async function forwardDelegated(
 				timeout: spec.timeout,
 				credential,
 				idempotencyKey,
-				// Cloudflare 邊緣寫的、client 設不了。不帶就會簽成 p="ssr"，整個 ADM
+				// Vercel 邊緣寫的、client 設不了。不帶就會簽成 p="ssr"，整個 ADM
 				// 的代行流量共用一個限流桶（限流主體＝per-admin-IP）。
-				visitorIp: request.headers.get("cf-connecting-ip"),
+				visitorIp: getVisitorIp(request),
 				json,
 			}),
 		);

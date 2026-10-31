@@ -1,3 +1,4 @@
+import { getVisitorIp } from "@/lib/http/visitor-ip";
 import { fetchSuggestions } from "@/lib/search/repo";
 
 /**
@@ -14,11 +15,10 @@ export async function GET(request: Request) {
 	// that visitor rather than to the site's shared SSR subject (backend#2264).
 	let suggestions: Awaited<ReturnType<typeof fetchSuggestions>>;
 	try {
-		suggestions = await fetchSuggestions(
-			q,
-			request.headers.get("cf-connecting-ip"),
-			{ strict: true, signal: request.signal },
-		);
+		suggestions = await fetchSuggestions(q, getVisitorIp(request), {
+			strict: true,
+			signal: request.signal,
+		});
 	} catch {
 		return Response.json(
 			{ error: "搜尋建議暫時無法載入" },

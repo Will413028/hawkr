@@ -1,4 +1,5 @@
 import { fetchProducts } from "@/lib/api";
+import { getVisitorIp } from "@/lib/http/visitor-ip";
 import type { ProductRecord } from "@/lib/market/listFilters";
 import { type SearchProductHit, searchProducts } from "@/lib/search/repo";
 
@@ -57,7 +58,7 @@ export async function GET(request: Request) {
 	const sortOrder = params.get("sort_order") || undefined;
 	// Both upstream reads below are made on one visitor's behalf, so they are
 	// charged to that visitor rather than to the shared SSR subject (backend#2264).
-	const visitorIp = request.headers.get("cf-connecting-ip");
+	const visitorIp = getVisitorIp(request);
 
 	let result: Awaited<ReturnType<typeof searchProducts>>;
 	try {

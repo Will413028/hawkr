@@ -4,6 +4,7 @@ import { routing } from "@/i18n/routing";
 import { requiredAccessForPath, workspaceOfPath } from "@/lib/auth/redirect";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/session-cookie";
 import { getEnv } from "@/lib/config/env";
+import { getVisitorIp } from "@/lib/http/visitor-ip";
 import { type AppLocale, defaultLocale } from "@/lib/intl/locales";
 import {
 	isLocaleRoutableFor,
@@ -23,11 +24,6 @@ import {
 } from "@/lib/seo/canonical-host";
 import { isLocaleNoindex } from "@/lib/seo/indexability";
 
-// OpenNext / workerd 不支援 Next 16 的 Node-runtime proxy（proxy.ts），故沿用
-// hawkr-admin 做法改用 edge middleware。全 edge-safe（無 Node-only API）。
-// 追蹤：待 opennextjs-cloudflare 補上 proxy.ts 支援後再遷移
-// https://github.com/cloudflare/workers-sdk/issues/13755
-
 /**
  * 語系路由（ADR 2026-10-17 D1，設定與理由在 i18n/routing.ts）：zh-TW 在 `/…`，其他語系在 `/<locale>/…`。
  * next-intl 把無前綴的網址改寫成 `/zh-TW/…`（交給 `app/[locale]`）、把明寫的 `/zh-TW/…` 導向無前綴網址。
@@ -36,9 +32,8 @@ const handleI18nRouting = createIntlMiddleware(routing);
 
 /**
  * De-index every response this deployment serves under a host it does not
- * publish under (#355) — in practice the `*.workers.dev` preview address, which
- * CI's post-deploy smoke needs alive and which therefore cannot simply be
- * turned off. Full reasoning, and why neither `app/robots.ts` nor
+ * publish under (#355) — in practice the `*.vercel.app` address Vercel keeps alive
+ * for every deployment, which therefore cannot simply be turned off. Full reasoning, and why neither `app/robots.ts` nor
  * `next.config.ts` can make this decision, is in lib/seo/canonical-host.ts.
  *
  * Gated on `seoIndexable` because that is the exact complement of
@@ -64,7 +59,7 @@ function withHostIndexability(
  * A non-default locale's UGC page is kept out of the index (lib/seo/indexability.ts
  * `isLocaleNoindex`; ADR 2026-10-17 D1 "SEO"). Same mechanism and the same gate as
  * `withHostIndexability`: a header set here reaches the final response even when
- * OpenNext serves the HTML from its cache, and a non-indexable build already carries
+ * the HTML comes from the ISR cache, and a non-indexable build already carries
  * a (stronger) one from next.config.ts.
  */
 function withLocaleIndexability(
@@ -179,18 +174,16 @@ async function route(request: NextRequest): Promise<NextResponse> {
 	// nothing at all for a crawler), and a `notFound()` renders the 404 body but
 	// still answers 200. See lib/seller/canonical-redirect.ts.
 	//
-	// Neither response carries Set-Cookie, which matters: a Set-Cookie makes
-	// Cloudflare's Workers Cache skip the entry, so a cookie here would knock the
-	// whole storefront subtree out of the edge HTML cache.
+	// Neither response carries Set-Cookie, which matters: a Set-Cookie keeps
+	// a CDN from caching the entry, so a cookie here would knock the whole
+	// storefront subtree out of the edge HTML cache.
 	if (pathname.startsWith("/sellers/")) {
 		// Middleware is one of only two places on this site that can see who the
 		// visitor is (a cached RSC render cannot — `headers()` throws inside
 		// `unstable_cache`), so it is where the storefront lookup gets attributed to
 		// the person it is made for rather than to the site's shared SSR quota
-		// (backend#2264). `cf-connecting-ip` is written by Cloudflare's edge before
-		// this Worker runs and is not something a client can set: Cloudflare rejects
-		// an inbound request that carries it.
-		const visitorIp = request.headers.get("cf-connecting-ip");
+		// (backend#2264). See `getVisitorIp` for why the address is trustworthy.
+		const visitorIp = getVisitorIp(request);
 		const outcome = await resolveSellerRequest(pathname, (id) =>
 			lookupSeller(id, visitorIp),
 		);
@@ -268,8 +261,8 @@ async function route(request: NextRequest): Promise<NextResponse> {
  *                 redirected to the login page and the caller would parse an
  *                 HTML 200 as JSON.
  *   `_next/`      build output and RSC payloads. `_next/static` is answered by
- *                 Cloudflare's asset layer before the worker runs at all
- *                 (measured — see next.config.ts's NOINDEX_HEADERS comment), so
+ *                 the platform's static asset layer before any function runs
+ *                 (see next.config.ts's NOINDEX_HEADERS comment), so
  *                 matching it would be a no-op on the platform anyway.
  *   `public/`     its top-level directories, and the four generated root files
  *                 (`robots.txt`, `sitemap.xml`, `manifest.webmanifest`,

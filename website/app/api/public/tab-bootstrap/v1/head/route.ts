@@ -1,5 +1,6 @@
 import { getCachedStrictProductsPage } from "@/lib/api/cached";
 import { fetchPublicPostsTyped } from "@/lib/api/posts";
+import { getVisitorIp } from "@/lib/http/visitor-ip";
 
 // Reads the request URL (tab/page) and returns a browser no-store payload, so
 // the handler is per-request; the market branch's data still comes from a
@@ -23,7 +24,7 @@ function readRequest(url: string): { tab: HeadTab; page: number } | null {
  *
  * The browser response is never shared or persisted. Market retains its strict
  * Cache-Components page. Feed intentionally uses a bounded direct gateway read:
- * an intermittent OpenNext/R2 read stall must never hold a tab-refresh response
+ * an intermittent gateway read stall must never hold a tab-refresh response
  * (or its parent Flight) open. Each browser query keeps its visible snapshot
  * when this endpoint returns 503 and applies a retry cooldown.
  */
@@ -51,7 +52,7 @@ export async function GET(request: Request) {
 						// visitor, so it is charged to them (backend#2264). The market
 						// branch below is a shared cache entry and stays on the SSR
 						// subject — a per-visitor value must never reach a cache key.
-						visitorIp: request.headers.get("cf-connecting-ip"),
+						visitorIp: getVisitorIp(request),
 					})
 				: await getCachedStrictProductsPage(input.page, 24);
 		return Response.json(

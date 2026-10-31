@@ -36,7 +36,7 @@ export interface DelegatedUpstreamRequest {
 	credential?: string | null;
 	idempotencyKey?: string | null;
 	/**
-	 * 管理員的真實位址（`cf-connecting-ip`，Cloudflare 邊緣寫的、client 設不了）。
+	 * 管理員的真實位址（`x-real-ip`，Vercel 邊緣寫的、client 設不了）。
 	 * 不帶會讓簽章的 `p` 變成 `ssr`，整個 ADM 的代行流量共用一個限流桶。
 	 */
 	visitorIp?: string | null;

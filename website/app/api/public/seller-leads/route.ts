@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { getVisitorIp } from "@/lib/http/visitor-ip";
 
 const GOOGLE_FORM_URL =
 	"https://docs.google.com/forms/d/e/1FAIpQLSefqVw5BrXD70RksYvw25ks0x4jD-JEb0zUenKk5JYQxlu3ow/formResponse";
@@ -147,10 +148,7 @@ function isSameOrigin(request: Request): boolean {
 }
 
 function clientRateLimitKey(request: Request): string {
-	// Cloudflare overwrites this header before the Worker sees the request. Do
-	// not fall back to x-forwarded-for, which an untrusted direct caller can
-	// supply as an arbitrary string.
-	return request.headers.get("cf-connecting-ip")?.trim() || "unknown-client";
+	return getVisitorIp(request) ?? "unknown-client";
 }
 
 function consumeRateLimit(request: Request, now = Date.now()) {
