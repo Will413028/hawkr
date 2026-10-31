@@ -157,11 +157,6 @@ class _AuthOAuthPillButtonState extends State<AuthOAuthPillButton>
         AppColors.brandPrimaryStrong,
         AppColors.brandPrimaryStrong,
       ),
-      OAuthProvider.apple => (
-        AppColors.neutralInk,
-        AppColors.neutralCream,
-        AppColors.brandSecondary,
-      ),
       OAuthProvider.line => (
         AppColors.lineBrand,
         AppColors.neutralWhite,
@@ -345,11 +340,6 @@ class _ButtonContents extends StatelessWidget {
   Widget build(BuildContext context) {
     final providerIcon = switch (provider) {
       OAuthProvider.google => Icon(
-        AppIcons.login,
-        size: HkControl.icon,
-        color: foreground,
-      ),
-      OAuthProvider.apple => Icon(
         AppIcons.login,
         size: HkControl.icon,
         color: foreground,

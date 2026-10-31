@@ -4,7 +4,7 @@ import 'package:hawkr_seller/features/seller/data/current_store.dart';
 import 'package:hawkr_seller/config/flavor.dart';
 import 'package:hawkr_seller/core/router/redirect_logic.dart';
 import 'package:hawkr_seller/core/router/session_listenable.dart';
-import 'package:hawkr_seller/core/session/clerk_session_provider.dart';
+import 'package:hawkr_seller/core/session/auth_session_provider.dart';
 import 'package:hawkr_seller/features/auth/data/auth_repository.dart';
 import 'package:hawkr_seller/core/session/post_login_side_effects.dart';
 import 'package:hawkr_seller/core/session/session_provider.dart';
@@ -18,7 +18,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../support/fake_clerk_session.dart';
+import '../../support/fake_auth_session.dart';
 import 'support/auth_test_fakes.dart';
 import 'support/login_harness.dart';
 
@@ -68,15 +68,15 @@ void main() {
 
   Future<void> coldStart(
     WidgetTester tester, {
-    required bool clerkSignedIn,
+    required bool authSignedIn,
     bool needsOnboarding = false,
   }) async {
-    final clerk = FakeClerkSession(signedIn: clerkSignedIn);
+    final auth = FakeAuthSession(signedIn: authSignedIn);
     final account = FakeAuthRepository();
     when(() => account.currentAccountId()).thenAnswer((_) async => 'acc-1');
     final container = ProviderContainer(
       overrides: [
-        clerkSessionProvider.overrideWith((ref) async => clerk),
+        authSessionProvider.overrideWith((ref) async => auth),
         authRepositoryProvider.overrideWithValue(account),
         ...myStoreOverrides(needsOnboarding: needsOnboarding),
         postLoginSideEffectsProvider.overrideWith(SyncSellerOnRestore.new),
@@ -101,23 +101,23 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('Clerk 登入中、有帳號 → 開啟就是登入狀態，進主畫面', (tester) async {
-    await coldStart(tester, clerkSignedIn: true);
+  testWidgets('session token 登入中、有帳號 → 開啟就是登入狀態，進主畫面', (tester) async {
+    await coldStart(tester, authSignedIn: true);
 
     expect(find.text('HOME'), findsOneWidget);
     expect(find.byType(WelcomeScreen), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Clerk 沒有登入 → 到登入頁', (tester) async {
-    await coldStart(tester, clerkSignedIn: false);
+  testWidgets('session token 沒有登入 → 到登入頁', (tester) async {
+    await coldStart(tester, authSignedIn: false);
 
     expect(find.text('AUTH'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Clerk 登入中、有帳號、還沒建店 → 到 onboarding', (tester) async {
-    await coldStart(tester, clerkSignedIn: true, needsOnboarding: true);
+  testWidgets('session token 登入中、有帳號、還沒建店 → 到 onboarding', (tester) async {
+    await coldStart(tester, authSignedIn: true, needsOnboarding: true);
 
     expect(find.text('ONBOARD'), findsOneWidget);
     expect(tester.takeException(), isNull);

@@ -54,7 +54,7 @@ final class AuthControllerProvider
   AuthController create() => AuthController();
 }
 
-String _$authControllerHash() => r'59b9fa58ef9103e0548705002a47d066d2da1ded';
+String _$authControllerHash() => r'612b9c2f5a7eea22e90836e77beb8839e218a2f7';
 
 /// 登入。
 ///

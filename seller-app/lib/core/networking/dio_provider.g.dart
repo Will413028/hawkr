@@ -14,7 +14,7 @@ part of 'dio_provider.dart';
 /// 而非直接使用 `DioManager.instance.dio`。
 ///
 /// Interceptor 順序：
-/// 1. Auth interceptor — 注入 Clerk 的 session token（[sessionTokenInterceptor]）
+/// 1. Auth interceptor — 注入 identity 的 session token（[sessionTokenInterceptor]）
 /// 2. Logging interceptor — 統一日誌輸出
 /// 3. Unauthorized interceptor — 401 登出
 /// 4. Suspension interceptor — 9240 全域偵測（46 §7.2）
@@ -28,7 +28,7 @@ final dioProvider = DioProvider._();
 /// 而非直接使用 `DioManager.instance.dio`。
 ///
 /// Interceptor 順序：
-/// 1. Auth interceptor — 注入 Clerk 的 session token（[sessionTokenInterceptor]）
+/// 1. Auth interceptor — 注入 identity 的 session token（[sessionTokenInterceptor]）
 /// 2. Logging interceptor — 統一日誌輸出
 /// 3. Unauthorized interceptor — 401 登出
 /// 4. Suspension interceptor — 9240 全域偵測（46 §7.2）
@@ -41,7 +41,7 @@ final class DioProvider extends $FunctionalProvider<Dio, Dio, Dio>
   /// 而非直接使用 `DioManager.instance.dio`。
   ///
   /// Interceptor 順序：
-  /// 1. Auth interceptor — 注入 Clerk 的 session token（[sessionTokenInterceptor]）
+  /// 1. Auth interceptor — 注入 identity 的 session token（[sessionTokenInterceptor]）
   /// 2. Logging interceptor — 統一日誌輸出
   /// 3. Unauthorized interceptor — 401 登出
   /// 4. Suspension interceptor — 9240 全域偵測（46 §7.2）
@@ -78,4 +78,4 @@ final class DioProvider extends $FunctionalProvider<Dio, Dio, Dio>
   }
 }
 
-String _$dioHash() => r'd48e07dbcc7ebf757bb1d04b0bf379d88880270a';
+String _$dioHash() => r'8123f87a1a05a956ab8ff52dcaf507423d62d916';

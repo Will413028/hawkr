@@ -3,12 +3,11 @@ import 'dart:convert';
 import 'dart:async';
 
 import 'package:hawkr_seller/core/networking/dio_provider.dart';
-import 'package:hawkr_seller/core/session/clerk_session_provider.dart';
+import 'package:hawkr_seller/core/session/auth_session_provider.dart';
 import 'package:hawkr_seller/core/session/post_login_side_effects.dart';
 import 'package:hawkr_seller/features/auth/data/auth_repository.dart';
 import 'package:hawkr_seller/features/seller/data/current_store.dart';
 import 'package:hawkr_seller/features/seller/data/my_store_repository.dart';
-import 'package:hawkr_auth/oauth.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,12 +15,12 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../support/fake_clerk_session.dart';
+import '../../../support/fake_auth_session.dart';
 import '../../../support/fake_my_store.dart';
 import '../../../support/my_store_fixtures.dart';
 
-/// 建立已 override 四個 seam（picker、repository、Dio、Clerk）+ no-op 副作用的測試 container。[clerk] 沒有給時
-/// 是一個登出的 [FakeClerkSession]。
+/// 建立已 override 三個 seam（repository、Dio、session token）+ no-op 副作用的測試 container。[auth] 沒有給時
+/// 是一個登出的 [FakeAuthSession]。
 ///
 /// 登入後的 `GetMyStore` 由假的 Connect 伺服器回答：[needsOnboarding] 為 true
 /// 時回 not_found（沒有店家），否則回已建店的賣家（storeId [kSellerId]）；
@@ -30,18 +29,16 @@ import '../../../support/my_store_fixtures.dart';
 /// caller 負責先呼叫 [resetLoginStorage]（或在 setUp 中）以確保
 /// SharedPreferences mock 乾淨。container 自動於測試結束 dispose。
 ProviderContainer makeLoginContainer({
-  required OAuthPicker picker,
   required AuthRepository repo,
-  FakeClerkSession? clerk,
+  FakeAuthSession? auth,
   bool needsOnboarding = false,
   bool meFails = false,
   Future<void>? meGate,
 }) {
-  final fakeClerk = clerk ?? FakeClerkSession();
+  final fakeAuth = auth ?? FakeAuthSession();
   final container = ProviderContainer(
     overrides: [
-      clerkSessionProvider.overrideWith((ref) async => fakeClerk),
-      oauthPickerProvider.overrideWithValue(picker),
+      authSessionProvider.overrideWith((ref) async => fakeAuth),
       authRepositoryProvider.overrideWithValue(repo),
       ...myStoreOverrides(
         needsOnboarding: needsOnboarding,

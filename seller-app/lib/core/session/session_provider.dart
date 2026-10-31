@@ -12,7 +12,7 @@ import 'store_refresh_signal.dart';
 import '../../shared/utils/hk_log.dart';
 import '../networking/dio_provider.dart';
 import '../storage/auth_storage.dart';
-import 'clerk_session_provider.dart';
+import 'auth_session_provider.dart';
 import 'post_login_side_effects.dart';
 import 'session_model.dart';
 
@@ -22,14 +22,14 @@ part 'session_provider.g.dart';
 
 /// Session 狀態管理 Provider（@Riverpod codegen）
 ///
-/// 登入由 Clerk 的 session 與 GetSession 決定。
+/// 登入由保存的 session token 與 GetSession 決定。
 ///
 /// 用法：
 /// ```dart
 /// // 讀取 session
 /// final session = ref.watch(sessionProvider);
 ///
-/// // 寫入 session（Clerk 登入、GetSession 之後）
+/// // 寫入 session（登入、GetSession 之後）
 /// await ref.read(sessionProvider.notifier).login(accountId: 'acc-1');
 /// ```
 @Riverpod(keepAlive: true)
@@ -46,15 +46,15 @@ class Session extends _$Session {
   set restoreError(String? message) =>
       ref.read(sessionRestoreErrorProvider.notifier).setMessage(message);
 
-  /// App 啟動時以 Clerk session 呼叫 GetSession，取得目前的帳號。
+  /// App 啟動時以保存的 session token 呼叫 GetSession，取得目前的帳號。
   Future<void> initialize() async {
     final generation = _restore.cancel();
     if (!e2eAuthEnabled) {
       try {
-        final clerk = await ref.read(clerkSessionProvider.future);
-        if (!clerk.isSignedIn) return;
+        final authSession = await ref.read(authSessionProvider.future);
+        if (!authSession.isSignedIn) return;
       } catch (error) {
-        HKLog.logE('[SessionNotifier] Clerk 無法啟動，以訪客開始: $error');
+        HKLog.logE('[SessionNotifier] 登入狀態無法讀取，以訪客開始: $error');
         return;
       }
     }
@@ -114,7 +114,7 @@ class Session extends _$Session {
     );
   }
 
-  /// 登入 — Clerk 登入、GetSession 取得帳號之後寫入 session。店家（`GetMyStore`）由 `currentStoreProvider` 隨帳號讀取
+  /// 登入 — session token 已保存、GetSession 取得帳號之後寫入 session。店家（`GetMyStore`）由 `currentStoreProvider` 隨帳號讀取
   /// （46 號設計書「賣家能力權限層」§7.2：登入當下就知道店家、onboarding、停權與能力，不等撞 9240）；登入流程等它讀完。
   /// 在那之前 `needsOnboarding` 是 null，router 不導頁；讀取失敗而沒有快照時，router 顯示重試。
   Future<void> login({required String accountId}) async {
@@ -138,7 +138,7 @@ class Session extends _$Session {
     ref.read(storeRefreshSignalProvider.notifier).request();
   }
 
-  /// 登出 — 登出 Clerk（撤銷 session），清空所有 session 資料
+  /// 登出 — 在伺服器撤銷 session（`SignOut`）、清除保存的 token，清空所有 session 資料
   ///
   /// 可重入保護（[_loggingOut]）：登出流程自己會發 API 請求——
   /// [PushNotificationManager.onUserLoggedOut] 的 removeDevice 走中央
@@ -146,7 +146,7 @@ class Session extends _$Session {
   /// 就會 `logout → removeDevice → 401 → logout` 自我循環。removeDevice 已標記
   /// 401 不登出，這裡再擋一層。
   ///
-  /// 順序：先註銷裝置（請求帶 Clerk 的 token），再登出 Clerk，最後清本機。
+  /// 順序：先註銷裝置（請求帶 session token），再撤銷伺服器端 session 並清除 token，最後清本機。
   Future<void> logout() async {
     cancelRestore();
     if (_loggingOut) return;
@@ -155,7 +155,7 @@ class Session extends _$Session {
       await PushNotificationManager.instance.onUserLoggedOut(
         hasCredential: state.isLoggedIn,
       );
-      await _signOutOfClerk();
+      await _signOut();
 
       state = const SessionModel();
 
@@ -171,13 +171,22 @@ class Session extends _$Session {
     }
   }
 
-  /// 登出 Clerk（撤銷 session、清除保存的狀態）。失敗只記 log，本機照樣登出。
-  Future<void> _signOutOfClerk() async {
+  /// 撤銷伺服器端的 session（`SignOut`；session 已失效時也只記 log），再清除保存的 token 並登出 Google、LINE
+  /// 的 SDK。失敗只記 log，本機照樣登出。
+  Future<void> _signOut() async {
     if (e2eAuthEnabled) return;
     try {
-      await (await ref.read(clerkSessionProvider.future)).signOut();
+      final authSession = await ref.read(authSessionProvider.future);
+      if (authSession.isSignedIn) {
+        try {
+          await ref.read(authRepositoryProvider).signOut();
+        } catch (e) {
+          HKLog.logW('[SessionNotifier] server sign-out failed: $e');
+        }
+      }
+      await authSession.clear();
     } catch (e) {
-      HKLog.logW('[SessionNotifier] Clerk sign-out failed: $e');
+      HKLog.logW('[SessionNotifier] sign-out failed: $e');
     }
   }
 

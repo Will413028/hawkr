@@ -281,11 +281,6 @@ class AuthScreen extends HookConsumerWidget {
           ),
           const SizedBox(height: HkSpace.md),
           AuthEntranceItem(
-            stage: AuthEntranceStage.apple,
-            child: button(OAuthProvider.apple),
-          ),
-          const SizedBox(height: HkSpace.md),
-          AuthEntranceItem(
             stage: AuthEntranceStage.line,
             child: button(OAuthProvider.line),
           ),

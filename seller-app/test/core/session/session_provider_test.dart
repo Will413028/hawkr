@@ -3,9 +3,10 @@ import 'dart:convert';
 
 import 'package:hawkr_seller/config/flavor.dart';
 import 'package:hawkr_seller/core/networking/dio_provider.dart';
-import 'package:hawkr_seller/core/session/clerk_session_provider.dart';
+import 'package:hawkr_seller/core/session/auth_session_provider.dart';
 import 'package:hawkr_seller/core/session/post_login_side_effects.dart';
 import 'package:hawkr_seller/core/session/session_provider.dart';
+import 'package:hawkr_seller/features/auth/data/auth_repository.dart';
 import 'package:hawkr_seller/features/chat/data/chat_repository.dart';
 import 'package:hawkr_seller/features/notification/data/push/device_registrar.dart';
 import 'package:hawkr_seller/features/seller/data/current_store.dart';
@@ -21,7 +22,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../support/fake_clerk_session.dart';
+import '../../support/fake_auth_session.dart';
 import '../../support/fake_my_store.dart';
 import '../../support/my_store_fixtures.dart';
 
@@ -65,7 +66,8 @@ void main() {
 
     ProviderContainer containerWith(
       _CountingChatRepository chat, {
-      FakeClerkSession? clerk,
+      FakeAuthSession? auth,
+      List<String>? events,
     }) {
       final dio = Dio(BaseOptions(baseUrl: 'https://example.test'))
         ..httpClientAdapter = _OkAdapter();
@@ -79,8 +81,11 @@ void main() {
           postLoginSideEffectsProvider.overrideWithValue(
             const NoopPostLoginSideEffects(),
           ),
-          clerkSessionProvider.overrideWith(
-            (ref) async => clerk ?? FakeClerkSession(signedIn: true),
+          authSessionProvider.overrideWith(
+            (ref) async => auth ?? FakeAuthSession(signedIn: true),
+          ),
+          authRepositoryProvider.overrideWithValue(
+            _SignOutRecorder(events ?? <String>[]),
           ),
         ],
       );
@@ -146,7 +151,7 @@ void main() {
       expect(gateway.removeCalls, isEmpty);
     });
 
-    test('登入中登出：先送出裝置註銷一次，再登出 Clerk（對照組，確保上一條不是空測）', () async {
+    test('登入中登出：先送出裝置註銷一次，再登出 session token（對照組，確保上一條不是空測）', () async {
       final events = <String>[];
       final gateway = _RecordingDeviceGateway(events);
       PushNotificationManager.instance.seedLifecycleStateForTest(
@@ -162,7 +167,8 @@ void main() {
       );
       final container = containerWith(
         _CountingChatRepository(),
-        clerk: FakeClerkSession(signedIn: true, calls: events),
+        auth: FakeAuthSession(signedIn: true, calls: events),
+        events: events,
       );
       final notifier = container.read(sessionProvider.notifier);
       await notifier.login(accountId: 'acc-1');
@@ -170,18 +176,18 @@ void main() {
       await notifier.logout();
 
       expect(gateway.removeCalls, ['fcm-token']);
-      expect(events, ['removeDevice', 'signOut']);
+      expect(events, ['removeDevice', 'serverSignOut', 'clear']);
     });
 
-    test('登出時登出 Clerk，再清除本機', () async {
-      final clerk = FakeClerkSession(signedIn: true);
-      final container = containerWith(_CountingChatRepository(), clerk: clerk);
+    test('登出時登出 session token，再清除本機', () async {
+      final auth = FakeAuthSession(signedIn: true);
+      final container = containerWith(_CountingChatRepository(), auth: auth);
       final notifier = container.read(sessionProvider.notifier);
 
       await notifier.login(accountId: 'acc-1');
       await notifier.logout();
 
-      expect(clerk.calls, ['signOut']);
+      expect(auth.calls, ['clear']);
       expect(container.read(sessionProvider).isLoggedIn, isFalse);
     });
 
@@ -291,6 +297,16 @@ void main() {
 }
 
 /// 記錄裝置註銷是否真的送到 gateway 的假實作。
+/// 只記錄伺服器端的 `SignOut`。
+class _SignOutRecorder extends Fake implements AuthRepository {
+  _SignOutRecorder(this.events);
+
+  final List<String> events;
+
+  @override
+  Future<void> signOut() async => events.add('serverSignOut');
+}
+
 class _RecordingDeviceGateway implements DeviceRegistrationGateway {
   _RecordingDeviceGateway([List<String>? events]) : _events = events ?? [];
 

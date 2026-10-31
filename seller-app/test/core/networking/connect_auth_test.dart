@@ -14,12 +14,12 @@ import 'package:hawkr_api/transport.dart';
 import 'package:hawkr_seller/config/flavor.dart';
 import 'package:hawkr_seller/core/networking/app_version_headers.dart';
 import 'package:hawkr_seller/core/networking/connect_provider.dart';
-import 'package:hawkr_seller/core/session/clerk_session_provider.dart';
+import 'package:hawkr_seller/core/session/auth_session_provider.dart';
 import 'package:hawkr_seller/core/session/session_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../support/fake_clerk_session.dart';
+import '../../support/fake_auth_session.dart';
 
 class _FakeSession extends Session {
   _FakeSession({this.loggedIn = true});
@@ -40,8 +40,8 @@ class _FakeSession extends Session {
   void onSellerSuspendedSignal() => suspendedSignals++;
 }
 
-class _PendingTokenClerk extends FakeClerkSession {
-  _PendingTokenClerk() : super(signedIn: true);
+class _PendingTokenAuth extends FakeAuthSession {
+  _PendingTokenAuth() : super(signedIn: true);
   final pending = Completer<String?>();
   final requested = Completer<void>();
 
@@ -57,16 +57,16 @@ final _bootstrapInterceptor = Provider<Interceptor>(
   sessionBootstrapInterceptor,
 );
 
-/// Clerk 的 session token（`live`）接上 Connect 的身分。假的伺服器只接受 [valid]；每次送出記下
+/// session token（`live`）接上 Connect 的身分。假的伺服器只接受 [valid]；每次送出記下
 /// authorization 與 X-Active-Role。
 Future<({List<String?> auth, List<String?> roles, _FakeSession session})>
 _call({required String valid}) async {
   final session = _FakeSession();
-  final clerk = FakeClerkSession(signedIn: true);
+  final authSession = FakeAuthSession(signedIn: true);
   final container = ProviderContainer(
     overrides: [
       sessionProvider.overrideWith(() => session),
-      clerkSessionProvider.overrideWith((ref) async => clerk),
+      authSessionProvider.overrideWith((ref) async => authSession),
     ],
   );
   addTearDown(container.dispose);
@@ -105,8 +105,8 @@ void main() {
       final c = ProviderContainer(
         overrides: [
           sessionProvider.overrideWith(() => session),
-          clerkSessionProvider.overrideWith(
-            (ref) async => FakeClerkSession(signedIn: true),
+          authSessionProvider.overrideWith(
+            (ref) async => FakeAuthSession(signedIn: true),
           ),
           connectHttpClientProvider.overrideWithValue((request) async {
             final info =
@@ -156,8 +156,8 @@ void main() {
     final c = ProviderContainer(
       overrides: [
         sessionProvider.overrideWith(() => _FakeSession(loggedIn: false)),
-        clerkSessionProvider.overrideWith(
-          (ref) async => FakeClerkSession(signedIn: true),
+        authSessionProvider.overrideWith(
+          (ref) async => FakeAuthSession(signedIn: true),
         ),
         connectHttpClientProvider.overrideWithValue((request) async {
           seen.add(request.header['authorization']);
@@ -193,11 +193,11 @@ void main() {
 
   test('GetSession 沒有 Bearer 時不送出、不把 401 當成帳號拒絕', () async {
     final session = _FakeSession();
-    final clerk = FakeClerkSession();
+    final auth = FakeAuthSession();
     final c = ProviderContainer(
       overrides: [
         sessionProvider.overrideWith(() => session),
-        clerkSessionProvider.overrideWith((ref) async => clerk),
+        authSessionProvider.overrideWith((ref) async => auth),
       ],
     );
     addTearDown(c.dispose);
@@ -220,7 +220,7 @@ void main() {
       ),
     );
     expect(calls, 0);
-    expect(clerk.calls, isEmpty);
+    expect(auth.calls, isEmpty);
     expect(session.logouts, 0);
   });
 
@@ -230,11 +230,11 @@ void main() {
 
   test('取 token 期間登出，不帶先前帳號的 Bearer', () async {
     final session = _FakeSession();
-    final clerk = _PendingTokenClerk();
+    final auth = _PendingTokenAuth();
     final c = ProviderContainer(
       overrides: [
         sessionProvider.overrideWith(() => session),
-        clerkSessionProvider.overrideWith((ref) async => clerk),
+        authSessionProvider.overrideWith((ref) async => auth),
       ],
     );
     addTearDown(c.dispose);
@@ -243,18 +243,18 @@ void main() {
       (ref) => currentSessionToken(ref),
     );
     final token = c.read(tokenProvider.future);
-    await clerk.requested.future;
+    await auth.requested.future;
     session.clear();
-    clerk.pending.complete('old-account');
+    auth.pending.complete('old-account');
     expect(await token, isNull);
   });
 
-  test('Clerk 存在但尚未恢復：只有 GetSession 帶 token', () async {
+  test('session token 存在但尚未恢復：只有 GetSession 帶 token', () async {
     final c = ProviderContainer(
       overrides: [
         sessionProvider.overrideWith(() => _FakeSession(loggedIn: false)),
-        clerkSessionProvider.overrideWith(
-          (ref) async => FakeClerkSession(signedIn: true),
+        authSessionProvider.overrideWith(
+          (ref) async => FakeAuthSession(signedIn: true),
         ),
       ],
     );
@@ -291,18 +291,15 @@ void main() {
     expect(await c.read(tokenProvider.future), isNull);
   });
 
-  test(
-    '帶 Clerk 的 session token、不帶 X-Active-Role（Connect 不讀視角），成功時不登出',
-    () async {
-      final r = await _call(valid: 'live');
+  test('帶 session token、不帶 X-Active-Role（Connect 不讀視角），成功時不登出', () async {
+    final r = await _call(valid: 'live');
 
-      expect(r.auth, ['Bearer live']);
-      expect(r.roles, [null]);
-      expect(appConnectHeaders().containsKey(kActiveRoleHeader), isFalse);
-      expect(appVersionHeaders()[kActiveRoleHeader], 'SELLER');
-      expect(r.session.logouts, 0);
-    },
-  );
+    expect(r.auth, ['Bearer live']);
+    expect(r.roles, [null]);
+    expect(appConnectHeaders().containsKey(kActiveRoleHeader), isFalse);
+    expect(appVersionHeaders()[kActiveRoleHeader], 'SELLER');
+    expect(r.session.logouts, 0);
+  });
 
   test('unauthenticated：直接登出，不重送', () async {
     final r = await _call(valid: 'other');

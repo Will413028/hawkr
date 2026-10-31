@@ -1,11 +1,10 @@
-import 'package:hawkr_auth/clerk.dart';
 import 'dart:io';
 
 import 'package:hawkr_buyer/config/flavor.dart';
 import 'package:hawkr_buyer/core/networking/app_version_headers.dart';
 import 'package:hawkr_buyer/core/networking/auth_interceptor.dart';
 import 'package:hawkr_buyer/core/networking/dio_provider.dart';
-import 'package:hawkr_buyer/core/session/clerk_session_provider.dart';
+import 'package:hawkr_buyer/core/session/auth_session_provider.dart';
 import 'package:hawkr_buyer/core/session/force_logout_provider.dart';
 import 'package:hawkr_buyer/core/session/session_model.dart';
 import 'package:hawkr_buyer/core/session/session_provider.dart';
@@ -14,7 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../../support/fake_clerk_session.dart';
+import '../../support/fake_auth_session.dart';
 
 const _session = SessionModel(userId: 'acc_01J', nickname: 'n');
 
@@ -27,7 +26,7 @@ class _FakeSession extends Session {
   Future<SessionModel?> build() async => initial;
 }
 
-/// Dio 的身分：帶 Clerk 的 session token；取不到 token 時不送出；401 就強制登出，不重送。
+/// Dio 的身分：帶 session token；取不到 token 時不送出；401 就強制登出，不重送。
 void main() {
   setUpAll(() async {
     if (!F.isInitialized) F.init(Flavor.dev);
@@ -45,15 +44,15 @@ void main() {
   Future<({Dio dio, ProviderContainer c, List<RequestOptions> sent})> harness(
     SessionModel? session, {
     required int status,
-    FakeClerkSession? clerk,
-    Object? clerkStartError,
+    FakeAuthSession? auth,
+    Object? authStartError,
   }) async {
-    final fake = clerk ?? FakeClerkSession(signedIn: session != null);
+    final fake = auth ?? FakeAuthSession(signedIn: session != null);
     final container = ProviderContainer(
       overrides: [
         sessionProvider.overrideWith(() => _FakeSession(session)),
-        clerkSessionProvider.overrideWith((ref) async {
-          if (clerkStartError != null) throw clerkStartError;
+        authSessionProvider.overrideWith((ref) async {
+          if (authStartError != null) throw authStartError;
           return fake;
         }),
       ],
@@ -66,7 +65,7 @@ void main() {
     return (dio: dio, c: container, sent: sent);
   }
 
-  test('帶 Clerk 的 session token 與版本 header，不送 X-Active-Role', () async {
+  test('帶 session token 與版本 header，不送 X-Active-Role', () async {
     final h = await harness(_session, status: HttpStatus.ok);
 
     await h.dio.get<dynamic>('/app/buyers/me');
@@ -102,32 +101,11 @@ void main() {
     expect(h.c.read(forceLogoutProvider), isFalse);
   });
 
-  test('Clerk refused 不送 REST，也會強制登出', () async {
+  test('取不到 token（連不上 session token）：不送出，以連線錯誤結束，不登出', () async {
     final h = await harness(
       _session,
       status: HttpStatus.ok,
-      clerk: FakeClerkSession(signedIn: true)
-        ..tokenError = const SessionTokenRefused('revoked'),
-    );
-    await expectLater(
-      h.dio.get<dynamic>('/app/buyers/me'),
-      throwsA(
-        isA<DioException>().having(
-          (e) => e.type,
-          'type',
-          DioExceptionType.cancel,
-        ),
-      ),
-    );
-    expect(h.sent, isEmpty);
-    expect(h.c.read(forceLogoutProvider), isTrue);
-  });
-
-  test('取不到 token（連不上 Clerk）：不送出，以連線錯誤結束，不登出', () async {
-    final h = await harness(
-      _session,
-      status: HttpStatus.ok,
-      clerk: FakeClerkSession(signedIn: true)
+      auth: FakeAuthSession(signedIn: true)
         ..tokenError = const SocketException('offline'),
     );
 
@@ -146,11 +124,11 @@ void main() {
     expect(h.c.read(forceLogoutProvider), isFalse);
   });
 
-  test('Clerk 無法啟動：當成訪客，照常送出、不帶 token', () async {
+  test('session token 無法啟動：當成訪客，照常送出、不帶 token', () async {
     final h = await harness(
       null,
       status: HttpStatus.ok,
-      clerkStartError: StateError('keychain'),
+      authStartError: StateError('keychain'),
     );
 
     await h.dio.get<dynamic>('/public/products');

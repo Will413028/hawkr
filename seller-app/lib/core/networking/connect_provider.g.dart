@@ -147,12 +147,12 @@ final class ContentClientProvider
 
 String _$contentClientHash() => r'02a325cac6180f94d43b9770aba7203355e6ed50';
 
-/// 登入的帳號（GetSession）與刪帳前撤銷 Apple 的授權。登入與登出由 Clerk 處理（`clerkSessionProvider`）。
+/// 登入的帳號（GetSession）。登入（`IdentityPublicService`）與 session token 的保存見 `authSessionProvider`。
 
 @ProviderFor(identityClient)
 final identityClientProvider = IdentityClientProvider._();
 
-/// 登入的帳號（GetSession）與刪帳前撤銷 Apple 的授權。登入與登出由 Clerk 處理（`clerkSessionProvider`）。
+/// 登入的帳號（GetSession）。登入（`IdentityPublicService`）與 session token 的保存見 `authSessionProvider`。
 
 final class IdentityClientProvider
     extends
@@ -162,7 +162,7 @@ final class IdentityClientProvider
           IdentityAppServiceClient
         >
     with $Provider<IdentityAppServiceClient> {
-  /// 登入的帳號（GetSession）與刪帳前撤銷 Apple 的授權。登入與登出由 Clerk 處理（`clerkSessionProvider`）。
+  /// 登入的帳號（GetSession）。登入（`IdentityPublicService`）與 session token 的保存見 `authSessionProvider`。
   IdentityClientProvider._()
     : super(
         from: null,
@@ -352,19 +352,19 @@ final class SessionIdentityClientProvider
 String _$sessionIdentityClientHash() =>
     r'fe12a260e10877ee7a238127ea604118a2282126';
 
-/// 登入後的 service 的 transport：一般呼叫的 interceptor 加上身分（帶 Clerk 的 session token；
+/// 登入後的 service 的 transport：一般呼叫的 interceptor 加上身分（帶 identity 的 session token；
 /// unauthenticated 時登出）。
 
 @ProviderFor(connectAuthTransport)
 final connectAuthTransportProvider = ConnectAuthTransportProvider._();
 
-/// 登入後的 service 的 transport：一般呼叫的 interceptor 加上身分（帶 Clerk 的 session token；
+/// 登入後的 service 的 transport：一般呼叫的 interceptor 加上身分（帶 identity 的 session token；
 /// unauthenticated 時登出）。
 
 final class ConnectAuthTransportProvider
     extends $FunctionalProvider<Transport, Transport, Transport>
     with $Provider<Transport> {
-  /// 登入後的 service 的 transport：一般呼叫的 interceptor 加上身分（帶 Clerk 的 session token；
+  /// 登入後的 service 的 transport：一般呼叫的 interceptor 加上身分（帶 identity 的 session token；
   /// unauthenticated 時登出）。
   ConnectAuthTransportProvider._()
     : super(

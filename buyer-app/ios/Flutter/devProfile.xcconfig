@@ -5,3 +5,5 @@ ASSET_PREFIX=dev
 BUNDLE_NAME=Hawkr Dev
 BUNDLE_DISPLAY_NAME=Hawkr Dev
 GOOGLESERVICE_INFO_PLIST=${PROJECT_DIR}/Runner/config/dev/GoogleService-Info.plist
+// Google 登入的 reversed client ID（GOOGLE_REVERSED_CLIENT_ID），不進版控；範本見 config/Auth.example.xcconfig
+#include? "../Runner/config/dev/Auth.xcconfig"

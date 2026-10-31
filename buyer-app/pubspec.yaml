@@ -82,8 +82,6 @@ dependencies:
   webview_flutter: ^4.13.1
   pay: ^3.0.0
   flutter_screenutil: ^5.9.3
-  # Clerk 的 OAuth（Google、LINE）在系統瀏覽器完成（iOS 的 ASWebAuthenticationSession）：Google 不允許在 App 內嵌的
-  # WebView 登入。
   sensors_plus: ^6.1.1
   firebase_analytics: ^12.4.2
   flutter_client_sse: ^2.0.3

@@ -53,7 +53,7 @@ lib/
 │   └── theme/                     # AppColors
 │
 ├── features/                      # 功能模組 (Feature-First)
-│   ├── auth/                      # 登入（Clerk：Google、Apple、LINE）
+│   ├── auth/                      # 登入（原生 SDK：Google、LINE；session token 在 Keychain）
 │   │   ├── data/                  # auth_repository, auth_model, user_model
 │   │   └── presentation/         # auth_controller, auth_screen, ...
 │   ├── dashboard/                 # 首頁 (presentation only)

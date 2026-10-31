@@ -1,4 +1,3 @@
-import 'package:hawkr_auth/clerk.dart' show isSessionTokenRefused;
 import 'dart:async';
 import 'dart:convert';
 
@@ -10,7 +9,7 @@ import '../../config/flavor.dart';
 import '../../shared/utils/secret_redaction.dart';
 import 'app_version_headers.dart';
 import '../exceptions/seller_suspension_codes.dart';
-import '../session/clerk_session_provider.dart';
+import '../session/auth_session_provider.dart';
 import '../session/session_provider.dart';
 import '../../shared/utils/hk_log.dart';
 
@@ -29,7 +28,7 @@ const String kSkipAuthInterceptorExtra = 'skipAuthInterceptor';
 /// 而非直接使用 `DioManager.instance.dio`。
 ///
 /// Interceptor 順序：
-/// 1. Auth interceptor — 注入 Clerk 的 session token（[sessionTokenInterceptor]）
+/// 1. Auth interceptor — 注入 identity 的 session token（[sessionTokenInterceptor]）
 /// 2. Logging interceptor — 統一日誌輸出
 /// 3. Unauthorized interceptor — 401 登出
 /// 4. Suspension interceptor — 9240 全域偵測（46 §7.2）
@@ -48,16 +47,7 @@ Dio dio(Ref ref) {
   dio.addSentry();
 
   // ─── 1. Auth Interceptor ───
-  dio.interceptors.add(
-    sessionTokenInterceptor(
-      () => currentSessionToken(ref),
-      onSessionInvalid: () {
-        if (ref.read(sessionProvider).isLoggedIn) {
-          unawaited(ref.read(sessionProvider.notifier).logout());
-        }
-      },
-    ),
-  );
+  dio.interceptors.add(sessionTokenInterceptor(() => currentSessionToken(ref)));
 
   // ─── 2. Logging Interceptor ───
   dio.interceptors.add(
@@ -171,8 +161,8 @@ Dio dio(Ref ref) {
 
   // ─── 3. Unauthorized Interceptor ───────────────────────────────────────────
   //
-  // token 由 Clerk 的 SDK 換新（ADR 2026-09-27-identity-clerk）：401 代表 Clerk 的
-  // session 已結束，直接登出，由 router redirect 回到登入頁。
+  // token 是 Keychain 裡的 opaque token（ADR 2026-10-30-identity-self-hosted-federated-login），不換新：401 代表
+  // session 已結束（過期或被撤銷），登出時清除 token，由 router redirect 回到登入頁。
 
   bool shouldLogout(int? status, RequestOptions options) =>
       status == 401 && options.extra[kSkipAuthInterceptorExtra] != true;
@@ -224,26 +214,18 @@ Dio dio(Ref ref) {
   return dio;
 }
 
-/// 每個請求帶 [sessionToken] 給的 token（`Authorization: Bearer`，沒有時不帶）。取不到 token（連不上 Clerk）
-/// 時不送出，以連線錯誤結束。
-Interceptor sessionTokenInterceptor(
-  Future<String?> Function() sessionToken, {
-  void Function()? onSessionInvalid,
-}) {
+/// 每個請求帶 [sessionToken] 給的 token（`Authorization: Bearer`，沒有時不帶）。讀不到 token 時不送出，以連線錯誤結束。
+Interceptor sessionTokenInterceptor(Future<String?> Function() sessionToken) {
   return InterceptorsWrapper(
     onRequest: (options, handler) async {
       final String? token;
       try {
         token = await sessionToken();
       } catch (e) {
-        final refused = isSessionTokenRefused(e);
-        if (refused) onSessionInvalid?.call();
         return handler.reject(
           DioException(
             requestOptions: options,
-            type: refused
-                ? DioExceptionType.cancel
-                : DioExceptionType.connectionError,
+            type: DioExceptionType.connectionError,
             error: e,
             message: 'session token unavailable',
           ),

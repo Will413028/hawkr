@@ -12,7 +12,7 @@ import 'package:sentry_flutter/sentry_flutter.dart' show Sentry;
 
 import '../../config/flavor.dart';
 import '../../shared/utils/hk_log.dart';
-import '../session/clerk_session_provider.dart';
+import '../session/auth_session_provider.dart';
 import '../session/force_logout_provider.dart';
 import '../session/session_provider.dart';
 import 'app_version_headers.dart';
@@ -71,7 +71,7 @@ SellerPublicServiceClient sellerPublicOptionalAuthClient(Ref ref) =>
 DiscoveryPublicServiceClient discoveryPublicClient(Ref ref) =>
     DiscoveryPublicServiceClient(ref.watch(connectTransportProvider));
 
-/// 登入的帳號（GetSession）。登入與登出由 Clerk 處理（`clerkSessionProvider`）。
+/// 登入的帳號（GetSession）。登入（`IdentityPublicService`）與 session token 的保存見 `authSessionProvider`。
 @Riverpod(keepAlive: true)
 IdentityAppServiceClient identityClient(Ref ref) => IdentityAppServiceClient(
   apiTransport(
@@ -90,10 +90,9 @@ List<Interceptor> connectInterceptors({Interceptor? auth}) => appInterceptors(
   log: kDebugMode || F.appFlavor.enableApiLogging ? HKLog.logD : null,
 );
 
-/// 以 Clerk 的 session token 提供身分；session 失效時強制登出（同 Dio 的 `AuthInterceptor`）。
+/// 以 identity 的 session token 提供身分；session 失效時強制登出（同 Dio 的 `AuthInterceptor`）。
 Interceptor sessionAuthInterceptor(Ref ref) => authInterceptor(
   sessionToken: () => currentSessionToken(ref),
-  isTokenRefused: auth.isSessionTokenRefused,
   onSessionInvalid: () {
     // 訪客（從未登入、沒有 session）不彈「登入已過期」（同 AuthInterceptor）。
     if (ref.read(sessionProvider).value == null) return;
@@ -119,8 +118,10 @@ Interceptor optionalSessionInterceptor(Ref ref) {
 }
 
 Interceptor sessionBootstrapInterceptor(Ref ref) => authInterceptor(
-  sessionToken: () => auth.currentSessionToken(ref),
-  isTokenRefused: auth.isSessionTokenRefused,
+  sessionToken: () => auth.currentSessionToken(
+    ref,
+    session: ref.read(authSessionProvider.future),
+  ),
   onSessionInvalid: () {},
 );
 

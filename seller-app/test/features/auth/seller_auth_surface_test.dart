@@ -67,7 +67,7 @@ void main() {
             size: size,
             scale: scale,
             platform: TargetPlatform.iOS,
-            providers: const ['google', 'apple', 'line'],
+            providers: const ['google', 'line'],
             safeArea: size.width == 390 && scale == 1.4
                 ? const EdgeInsets.only(top: 44, bottom: 34)
                 : EdgeInsets.zero,
@@ -129,7 +129,7 @@ void main() {
       }
 
       expect(
-        find.byKey(const ValueKey('auth-oauth-apple-button')),
+        find.byKey(const ValueKey('auth-oauth-line-button')),
         caseData.platform == TargetPlatform.iOS ? findsOneWidget : findsNothing,
       );
 
@@ -162,7 +162,7 @@ void main() {
 
     for (final key in const [
       ValueKey('auth-oauth-google-button'),
-      ValueKey('auth-oauth-apple-button'),
+      ValueKey('auth-oauth-line-button'),
       ValueKey('auth-footer-legal'),
     ]) {
       final target = find.byKey(key);

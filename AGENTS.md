@@ -17,7 +17,7 @@
 | `api/` | 對外 API 的 Protobuf 契約（Connect） | `.github/workflows/api-contract.yml` |
 | `packages/hawkr-api-ts/` | `api/` 的 TypeScript 生成物（`src/gen`）與 Connect 執行期（錯誤分類 `connect/errors`、重試 `connect/retry`、表單送出分類 `connect/submit`）與手寫的 `proto/date`（`google.type.Date` 與 `YYYY-MM-DD`）、`proto/field-mask`（依 descriptor 檢查路徑的 update_mask）、`text/server-text`（Go `TrimSpace` 與以 rune 計長的伺服器文字規則），套件名 `@hawkr/api`，website 與 admin 共用 | `.github/workflows/api-contract.yml` |
 | `packages/hawkr_api/` | `api/` 的 Dart 生成物，兩支 App 共用 | `.github/workflows/api-contract.yml` |
-| `packages/hawkr_auth/` | 兩支 App 共用的登入接線；現況仍是 Clerk session 與原生 OAuth（依賴 `clerk_auth`），改為原生 SDK 換 identity 的 session 是計畫 `backend/docs/plans/2026-10-30-self-hosted-auth.md` 的步驟 6 | `.github/workflows/dart-packages.yml` |
+| `packages/hawkr_auth/` | Google、LINE 原生登入（`google_sign_in`、`flutter_line_sdk`；沒有 Apple 登入）換 identity 的 opaque session token，token 存 Keychain（`flutter_secure_storage`）；換發的 RPC 由 App 實作 `IdentityGateway`，套件不依賴 `hawkr_api`。兩支 App 共用 | `.github/workflows/dart-packages.yml` |
 | `packages/hawkr_app_update/` | App 版本門檻的檢查邏輯，兩支 App 共用；行為規格在 `docs/spec.md` | `.github/workflows/dart-packages.yml` |
 | `packages/hawkr_twaddr/` | 內政部 8 碼鄉鎮市區代碼表與查詢；資料檔 `lib/src/twaddr_data.g.dart` 由 `backend/internal/platform/twaddr` 的 CSV 生成，不得手改，查詢是手寫的。兩支 App 共用 | `.github/workflows/dart-packages.yml`、`.github/workflows/twaddr-generated-diff.yml` |
 | `packages/hawkr-icons-ts/` | Material Symbols（Apache-2.0）的 SVG 圖形與繪製元件 `MaterialSymbol`，套件名 `@hawkr/icons`；`src/material-symbols.gen.ts` 由 `tools/gen.ts` 依手寫的 `src/names.ts` 從 `@material-symbols/svg-400` 生成，不得手改，drift 由套件自己的測試守。website 與 admin 共用 | `.github/workflows/ts-packages.yml` |

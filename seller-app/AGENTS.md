@@ -20,7 +20,7 @@ lib/
 ├── main.dart                      # 啟動點 (Flavor 初始化 + Firebase 設定)
 ├── core/                          # 基礎設施 (Networking, Router, Session, Theme)
 ├── features/                      # 功能模組 (Feature-First)
-│   ├── auth/                      # 登入（Clerk：Google、Apple、LINE）
+│   ├── auth/                      # 登入（原生 SDK：Google、LINE）
 │   ├── product/                   # 商品 CRUD、規格標籤、圖片編輯
 │   ├── order/                     # 訂單管理、各狀態頁面
 │   ├── seller/                    # 賣家認證、PAYUNi、錢包、個人檔案

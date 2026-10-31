@@ -11,7 +11,7 @@ import 'package:sentry_flutter/sentry_flutter.dart' show Sentry;
 
 import '../../config/flavor.dart';
 import '../../shared/utils/hk_log.dart';
-import '../session/clerk_session_provider.dart';
+import '../session/auth_session_provider.dart';
 import '../session/session_provider.dart';
 import 'app_version_headers.dart';
 
@@ -37,7 +37,7 @@ Transport connectTransport(Ref ref) => apiTransport(
 ContentPublicServiceClient contentClient(Ref ref) =>
     ContentPublicServiceClient(ref.watch(connectTransportProvider));
 
-/// 登入的帳號（GetSession）與刪帳前撤銷 Apple 的授權。登入與登出由 Clerk 處理（`clerkSessionProvider`）。
+/// 登入的帳號（GetSession）。登入（`IdentityPublicService`）與 session token 的保存見 `authSessionProvider`。
 @Riverpod(keepAlive: true)
 IdentityAppServiceClient identityClient(Ref ref) =>
     IdentityAppServiceClient(ref.watch(connectAuthTransportProvider));
@@ -64,7 +64,7 @@ IdentityAppServiceClient sessionIdentityClient(Ref ref) =>
       ),
     );
 
-/// 登入後的 service 的 transport：一般呼叫的 interceptor 加上身分（帶 Clerk 的 session token；
+/// 登入後的 service 的 transport：一般呼叫的 interceptor 加上身分（帶 identity 的 session token；
 /// unauthenticated 時登出）。
 @Riverpod(keepAlive: true)
 Transport connectAuthTransport(Ref ref) => apiTransport(
@@ -91,10 +91,9 @@ List<Interceptor> connectInterceptors({
   log: kDebugMode || F.appFlavor.enableApiLogging ? HKLog.logD : null,
 );
 
-/// 以 Clerk 的 session token 提供身分；session 失效時登出。
+/// 以 identity 的 session token 提供身分；session 失效時登出。
 Interceptor sessionAuthInterceptor(Ref ref) => authInterceptor(
   sessionToken: () => currentSessionToken(ref),
-  isTokenRefused: auth.isSessionTokenRefused,
   onSessionInvalid: () {
     if (!ref.read(sessionProvider).isLoggedIn) return;
     unawaited(ref.read(sessionProvider.notifier).logout());
@@ -102,8 +101,10 @@ Interceptor sessionAuthInterceptor(Ref ref) => authInterceptor(
 );
 
 Interceptor sessionBootstrapInterceptor(Ref ref) => authInterceptor(
-  sessionToken: () => auth.currentSessionToken(ref),
-  isTokenRefused: auth.isSessionTokenRefused,
+  sessionToken: () => auth.currentSessionToken(
+    ref,
+    session: ref.read(authSessionProvider.future),
+  ),
   onSessionInvalid: () {},
 );
 

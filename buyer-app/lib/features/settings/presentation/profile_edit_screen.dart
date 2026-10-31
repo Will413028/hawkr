@@ -20,7 +20,6 @@ import '../../../config/image_config.dart';
 import '../../../core/exceptions/app_exception.dart';
 import '../../../core/extensions/url_extensions.dart';
 import '../../../core/l10n/ui_locale.dart';
-import '../../../core/session/clerk_session_provider.dart';
 import '../../../core/session/session_provider.dart';
 import '../../../shared/utils/hk_log.dart';
 import '../../../shared/widgets/app_date_picker.dart';
@@ -40,7 +39,7 @@ import 'widgets/profile_edit_widgets.dart';
 /// Profile edit screen
 /// - Responsive account/contact and optional-profile sections
 /// - Editable: username, mobile, gender, birth, city, job, avatar
-/// - Readonly: login email from Clerk, hidden when unavailable
+/// - 登入信箱不顯示：identity 不把 email 給 App
 class ProfileEditScreen extends ConsumerStatefulWidget {
   const ProfileEditScreen({super.key});
 
@@ -56,7 +55,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   // Display fields
   String header = '';
   String userName = '';
-  String email = '';
   String mobile = '';
   String city = '';
   String job = '';
@@ -67,7 +65,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
   // Inputs
   final TextEditingController _userNameCtrl = TextEditingController();
-  final TextEditingController _emailCtrl = TextEditingController();
   final TextEditingController _mobileCtrl = TextEditingController();
   final TextEditingController _cityCtrl = TextEditingController();
   final TextEditingController _jobCtrl = TextEditingController();
@@ -97,7 +94,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   @override
   void dispose() {
     _userNameCtrl.dispose();
-    _emailCtrl.dispose();
     _mobileCtrl.dispose();
     _cityCtrl.dispose();
     _jobCtrl.dispose();
@@ -120,19 +116,12 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       }
     } catch (_) {}
 
-    String? loginEmail;
-    try {
-      loginEmail = (await ref.read(clerkSessionProvider.future)).email;
-    } catch (e, st) {
-      HKLog.logE('[ProfileEdit] 讀取登入信箱失敗', e, st);
-    }
     if (!mounted) return;
     setState(() {
       _profile = profile;
       _loaded = true;
       header = profile?.avatarUrl ?? '';
       userName = profile?.displayName ?? sessionNickname;
-      email = loginEmail ?? '';
       mobile = profile?.phone ?? '';
       city = profile?.city ?? '';
       job = profile?.job ?? '';
@@ -150,7 +139,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   // 寫進 buyers.display_name。空的欄位顯示為空才是對的。
   void _syncControllers() {
     _userNameCtrl.text = userName;
-    _emailCtrl.text = email;
     _mobileCtrl.text = mobile;
     _cityCtrl.text = city;
     _jobCtrl.text = job;
@@ -475,15 +463,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                                       ? '請輸入用戶名稱'
                                       : null,
                                 ),
-                                if (email.isNotEmpty)
-                                  ProfileTextField(
-                                    label: '登入信箱',
-                                    controller: _emailCtrl,
-                                    icon: HkIconName.document,
-                                    helperText: '登入信箱目前無法在此變更',
-                                    readOnly: true,
-                                    enabled: !_busy,
-                                  ),
                                 ProfileTextField(
                                   label: '手機號碼',
                                   controller: _mobileCtrl,

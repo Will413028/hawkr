@@ -1,0 +1,8 @@
+// Google 登入的 URL scheme（Info.plist 的 CFBundleURLTypes 讀 GOOGLE_REVERSED_CLIENT_ID）。
+// 複製成 ios/Runner/config/<flavor>/Auth.xcconfig（dev、stage、prod 各一份，已被 .gitignore 排除）並填值。
+//
+// 值是 Google iOS OAuth client ID 的 reversed 寫法：
+//   client ID   123456789012-abcdefg.apps.googleusercontent.com
+//   reversed    com.googleusercontent.apps.123456789012-abcdefg
+// iOS client ID 本身放 config/dart-defines.json 的 GOOGLE_IOS_CLIENT_ID，兩者必須是同一個 client。
+GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.<iOS client 的數字與雜湊>

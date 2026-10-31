@@ -39,7 +39,7 @@ void main() {
     (tester) async {
       final semantics = tester.ensureSemantics();
       var googleTaps = 0;
-      var appleTaps = 0;
+      var lineTaps = 0;
 
       await pumpPill(
         tester,
@@ -58,18 +58,18 @@ void main() {
               ),
               const SizedBox(height: HkSpace.lg),
               AuthOAuthPillButton(
-                provider: OAuthProvider.apple,
-                text: '透過Apple繼續',
+                provider: OAuthProvider.line,
+                text: '透過LINE繼續',
                 isLoading: false,
                 isDisabled: false,
-                onTap: () => appleTaps += 1,
+                onTap: () => lineTaps += 1,
               ),
             ],
           ),
         ),
       );
 
-      for (final provider in const ['google', 'apple']) {
+      for (final provider in const ['google', 'line']) {
         final button = find.byKey(ValueKey('auth-oauth-$provider-button'));
         final icon = find.byKey(ValueKey('auth-oauth-$provider-icon'));
         final providerGlyph = find.byKey(
@@ -118,9 +118,9 @@ void main() {
       }
 
       await tester.tap(find.byKey(const ValueKey('auth-oauth-google-button')));
-      await tester.tap(find.byKey(const ValueKey('auth-oauth-apple-button')));
+      await tester.tap(find.byKey(const ValueKey('auth-oauth-line-button')));
       expect(googleTaps, 1);
-      expect(appleTaps, 1);
+      expect(lineTaps, 1);
       expect(tester.takeException(), isNull);
       semantics.dispose();
       await tester.pumpWidget(const SizedBox.shrink());

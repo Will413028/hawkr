@@ -18,7 +18,7 @@ void main() {
     (tester) async {
       final semantics = tester.ensureSemantics();
       var googleTaps = 0;
-      var appleTaps = 0;
+      var lineTaps = 0;
 
       await pumpProductionLayoutTestApp(
         tester,
@@ -39,11 +39,11 @@ void main() {
                 ),
                 const SizedBox(height: 16),
                 AuthOAuthPillButton(
-                  provider: OAuthProvider.apple,
-                  text: '透過Apple繼續',
+                  provider: OAuthProvider.line,
+                  text: '透過LINE繼續',
                   isLoading: false,
                   isDisabled: false,
-                  onTap: () => appleTaps += 1,
+                  onTap: () => lineTaps += 1,
                   scale: 1,
                 ),
               ],
@@ -52,7 +52,7 @@ void main() {
         ),
       );
 
-      for (final provider in const ['google', 'apple']) {
+      for (final provider in const ['google', 'line']) {
         final button = find.byKey(ValueKey('auth-oauth-$provider-button'));
         final icon = find.byKey(ValueKey('auth-oauth-$provider-icon'));
         final providerGlyph = find.byKey(
@@ -116,16 +116,16 @@ void main() {
         );
 
         final data = tester.getSemantics(button).getSemanticsData();
-        expect(data.label, provider == 'google' ? '透過Google繼續' : '透過Apple繼續');
+        expect(data.label, provider == 'google' ? '透過Google繼續' : '透過LINE繼續');
         expect(data.flagsCollection.isButton, isTrue);
         expect(data.flagsCollection.isEnabled, Tristate.isTrue);
         expect(data.hasAction(SemanticsAction.tap), isTrue);
       }
 
       await tester.tap(find.byKey(const ValueKey('auth-oauth-google-button')));
-      await tester.tap(find.byKey(const ValueKey('auth-oauth-apple-button')));
+      await tester.tap(find.byKey(const ValueKey('auth-oauth-line-button')));
       expect(googleTaps, 1);
-      expect(appleTaps, 1);
+      expect(lineTaps, 1);
       expect(tester.takeException(), isNull);
 
       semantics.dispose();
@@ -203,7 +203,7 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 840));
 
-      for (final provider in const ['google', 'apple']) {
+      for (final provider in const ['google', 'line']) {
         final button = find.byKey(ValueKey('auth-oauth-$provider-button'));
         final icon = find.byKey(ValueKey('auth-oauth-$provider-icon'));
         final label = find.byKey(ValueKey('auth-oauth-$provider-label'));
@@ -264,7 +264,7 @@ void main() {
             size: size,
             scale: scale,
             platform: TargetPlatform.iOS,
-            providers: const ['google', 'apple'],
+            providers: const ['google', 'line'],
             safeArea: size.width == 390 && scale == 1.4
                 ? const EdgeInsets.only(top: 44, bottom: 34)
                 : EdgeInsets.zero,
@@ -328,7 +328,7 @@ void main() {
       }
 
       expect(
-        find.byKey(const ValueKey('auth-oauth-apple-button')),
+        find.byKey(const ValueKey('auth-oauth-line-button')),
         caseData.platform == TargetPlatform.iOS ? findsOneWidget : findsNothing,
       );
       expect(
@@ -336,7 +336,7 @@ void main() {
         findsNothing,
       );
       expect(
-        find.byKey(const ValueKey('auth-oauth-apple-tap-hint')),
+        find.byKey(const ValueKey('auth-oauth-line-tap-hint')),
         findsNothing,
       );
       expect(tester.takeException(), isNull);

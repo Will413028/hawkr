@@ -2,14 +2,9 @@
 FLUTTER = $(shell which fvm > /dev/null 2>&1 && echo "fvm flutter" || echo "flutter")
 DART = $(shell which fvm > /dev/null 2>&1 && echo "fvm dart" || echo "dart")
 
-# Clerk 顧客 application 的 publishable key（例如 `make dev-debug CLERK_PUBLISHABLE_KEY=pk_test_...`，或先
-# export）。不寫進版控；沒有帶時只能停在登入頁，登入時顯示「登入服務尚未設定」。
-CLERK_PUBLISHABLE_KEY ?=
-CLERK_DEFINE = --dart-define=CLERK_PUBLISHABLE_KEY=$(CLERK_PUBLISHABLE_KEY) $(DEFINES_FLAG)
-
 # 外部服務設定（Firebase、Sentry、API 主機）：複製 config/dart-defines.example.json 成
 # config/dart-defines.json 並填值（不進版控）。檔案不存在時不帶，Firebase 與 Sentry 停用，
-# dev 連本機單體。
+# dev 連本機單體。登入用的 GOOGLE_IOS_CLIENT_ID、GOOGLE_WEB_CLIENT_ID、LINE_CHANNEL_ID 也在這個檔案；沒填時登入顯示「登入服務尚未設定」。
 DEFINES_FILE ?= config/dart-defines.json
 # GATEWAY_HOST 也可以直接帶：`make stage-debug GATEWAY_HOST=https://api.example.test`。
 GATEWAY_HOST ?=
@@ -24,15 +19,15 @@ DEFINES_FLAG = $(if $(wildcard $(DEFINES_FILE)),--dart-define-from-file=$(DEFINE
 
 dev-debug:
 	@echo "Running dev environment (Debug)..."
-	$(FLUTTER) run --flavor dev -t lib/main.dart --dart-define=FLUTTER_FLAVOR=dev $(CLERK_DEFINE)
+	$(FLUTTER) run --flavor dev -t lib/main.dart --dart-define=FLUTTER_FLAVOR=dev $(DEFINES_FLAG)
 
 dev-profile:
 	@echo "Running dev environment (Profile)..."
-	$(FLUTTER) run --flavor dev -t lib/main.dart --dart-define=FLUTTER_FLAVOR=dev $(CLERK_DEFINE) --profile
+	$(FLUTTER) run --flavor dev -t lib/main.dart --dart-define=FLUTTER_FLAVOR=dev $(DEFINES_FLAG) --profile
 
 dev-release:
 	@echo "Running dev environment (Release)..."
-	$(FLUTTER) run --flavor dev -t lib/main.dart --dart-define=FLUTTER_FLAVOR=dev $(CLERK_DEFINE) --release
+	$(FLUTTER) run --flavor dev -t lib/main.dart --dart-define=FLUTTER_FLAVOR=dev $(DEFINES_FLAG) --release
 
 # ============================================================
 # 預發布環境 (stage)
@@ -40,15 +35,15 @@ dev-release:
 
 stage-debug: require-gateway
 	@echo "Running stage environment (Debug)..."
-	$(FLUTTER) run --flavor stage -t lib/main.dart --dart-define=FLUTTER_FLAVOR=stage $(CLERK_DEFINE)
+	$(FLUTTER) run --flavor stage -t lib/main.dart --dart-define=FLUTTER_FLAVOR=stage $(DEFINES_FLAG)
 
 stage-profile: require-gateway
 	@echo "Running stage environment (Profile)..."
-	$(FLUTTER) run --flavor stage -t lib/main.dart --dart-define=FLUTTER_FLAVOR=stage $(CLERK_DEFINE) --profile
+	$(FLUTTER) run --flavor stage -t lib/main.dart --dart-define=FLUTTER_FLAVOR=stage $(DEFINES_FLAG) --profile
 
 stage-release: require-gateway
 	@echo "Running stage environment (Release)..."
-	$(FLUTTER) run --flavor stage -t lib/main.dart --dart-define=FLUTTER_FLAVOR=stage $(CLERK_DEFINE) --release
+	$(FLUTTER) run --flavor stage -t lib/main.dart --dart-define=FLUTTER_FLAVOR=stage $(DEFINES_FLAG) --release
 
 # ============================================================
 # 生產環境 (prod)
@@ -56,15 +51,15 @@ stage-release: require-gateway
 
 prod-debug: require-gateway
 	@echo "Running prod environment (Debug)..."
-	$(FLUTTER) run --flavor prod -t lib/main.dart --dart-define=FLUTTER_FLAVOR=prod $(CLERK_DEFINE)
+	$(FLUTTER) run --flavor prod -t lib/main.dart --dart-define=FLUTTER_FLAVOR=prod $(DEFINES_FLAG)
 
 prod-profile: require-gateway
 	@echo "Running prod environment (Profile)..."
-	$(FLUTTER) run --flavor prod -t lib/main.dart --dart-define=FLUTTER_FLAVOR=prod $(CLERK_DEFINE) --profile
+	$(FLUTTER) run --flavor prod -t lib/main.dart --dart-define=FLUTTER_FLAVOR=prod $(DEFINES_FLAG) --profile
 
 prod-release: require-gateway
 	@echo "Running prod environment (Release)..."
-	$(FLUTTER) run --flavor prod -t lib/main.dart --dart-define=FLUTTER_FLAVOR=prod $(CLERK_DEFINE) --release
+	$(FLUTTER) run --flavor prod -t lib/main.dart --dart-define=FLUTTER_FLAVOR=prod $(DEFINES_FLAG) --release
 
 # ============================================================
 # iOS 構建命令
@@ -72,27 +67,27 @@ prod-release: require-gateway
 
 build-ios-dev:
 	@echo "Building iOS (dev)..."
-	$(FLUTTER) build ios --flavor dev -t lib/main.dart --dart-define=FLUTTER_FLAVOR=dev $(CLERK_DEFINE) --release
+	$(FLUTTER) build ios --flavor dev -t lib/main.dart --dart-define=FLUTTER_FLAVOR=dev $(DEFINES_FLAG) --release
 
 build-ios-stage: require-gateway
 	@echo "Building iOS (stage)..."
-	$(FLUTTER) build ios --flavor stage -t lib/main.dart --dart-define=FLUTTER_FLAVOR=stage $(CLERK_DEFINE) --release
+	$(FLUTTER) build ios --flavor stage -t lib/main.dart --dart-define=FLUTTER_FLAVOR=stage $(DEFINES_FLAG) --release
 
 build-ios-prod: require-gateway
 	@echo "Building iOS (prod)..."
-	$(FLUTTER) build ios --flavor prod -t lib/main.dart --dart-define=FLUTTER_FLAVOR=prod $(CLERK_DEFINE) --release
+	$(FLUTTER) build ios --flavor prod -t lib/main.dart --dart-define=FLUTTER_FLAVOR=prod $(DEFINES_FLAG) --release
 
 build-ios-ipa-dev:
 	@echo "Building iOS IPA (dev)..."
-	$(FLUTTER) build ipa --flavor dev -t lib/main.dart --dart-define=FLUTTER_FLAVOR=dev $(CLERK_DEFINE)
+	$(FLUTTER) build ipa --flavor dev -t lib/main.dart --dart-define=FLUTTER_FLAVOR=dev $(DEFINES_FLAG)
 
 build-ios-ipa-stage: require-gateway
 	@echo "Building iOS IPA (stage)..."
-	$(FLUTTER) build ipa --flavor stage -t lib/main.dart --dart-define=FLUTTER_FLAVOR=stage $(CLERK_DEFINE)
+	$(FLUTTER) build ipa --flavor stage -t lib/main.dart --dart-define=FLUTTER_FLAVOR=stage $(DEFINES_FLAG)
 
 build-ios-ipa-prod: require-gateway
 	@echo "Building iOS IPA (prod)..."
-	$(FLUTTER) build ipa --flavor prod -t lib/main.dart --dart-define=FLUTTER_FLAVOR=prod $(CLERK_DEFINE)
+	$(FLUTTER) build ipa --flavor prod -t lib/main.dart --dart-define=FLUTTER_FLAVOR=prod $(DEFINES_FLAG)
 
 # stage 與 prod 必須有 GATEWAY_HOST（API 主機是必要設定，沒有預設值）；缺少時拒絕建置。
 # 檔案裡只看 GATEWAY_HOST 一行是否有非空值。

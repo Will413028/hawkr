@@ -16,7 +16,7 @@ import 'core/analytics/analytics_providers.dart';
 import 'core/layout/app_text_size.dart';
 import 'core/networking/app_version_headers.dart';
 import 'core/observability/sentry_scrub.dart';
-import 'core/session/clerk_session_provider.dart';
+import 'core/session/auth_session_provider.dart';
 import 'package:hawkr_auth/logging.dart';
 import 'features/app_update/application/force_update_provider.dart';
 import 'features/notification/data/push/background_handler.dart';
@@ -83,8 +83,8 @@ Future<void> _requestNotificationPermissionAndToken() async {
 
 Future<Widget> _bootstrapApplication() async {
   // ============ E2E auth inject（debug build only）============
-  // `--dart-define=E2E_AUTH_TOKEN=<token>` 以固定的 Bearer 取代 Clerk 的 session token（見
-  // clerk_session_provider.dart），GetSession 讀取對應的帳號。release build 不讀它。
+  // `--dart-define=E2E_AUTH_TOKEN=<token>` 以固定的 Bearer 取代 identity 的 session token（見
+  // auth_session_provider.dart），GetSession 讀取對應的帳號。release build 不讀它。
   if (kDebugMode && _e2eModeSeller) {
     PushNotificationManager.e2eDisabled = true;
   }

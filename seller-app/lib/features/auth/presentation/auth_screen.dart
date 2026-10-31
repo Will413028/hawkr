@@ -53,7 +53,7 @@ class AuthScreen extends HookConsumerWidget {
       }
     }
 
-    /// 以 Clerk 登入；session 與 onboarding 狀態由 [AuthController.signInWith] 寫好，這裡只負責導頁。
+    /// 以 Google、LINE 登入；session 與 onboarding 狀態由 [AuthController.signInWith] 寫好，這裡只負責導頁。
     Future<void> handleSignIn(OAuthProvider provider) async {
       if (loadingProvider.value != null) return;
       loadingProvider.value = provider;

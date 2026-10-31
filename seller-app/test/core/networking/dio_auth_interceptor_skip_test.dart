@@ -1,10 +1,9 @@
-import 'package:hawkr_auth/clerk.dart';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:hawkr_seller/config/flavor.dart';
 import 'package:hawkr_seller/core/networking/dio_provider.dart';
-import 'package:hawkr_seller/core/session/clerk_session_provider.dart';
+import 'package:hawkr_seller/core/session/auth_session_provider.dart';
 import 'package:hawkr_seller/core/session/post_login_side_effects.dart';
 import 'package:hawkr_seller/core/session/session_provider.dart';
 import 'package:hawkr_seller/features/chat/data/chat_repository.dart';
@@ -16,9 +15,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../support/fake_clerk_session.dart';
+import '../../support/fake_auth_session.dart';
 
-/// 401 代表 Clerk 的 session 已結束：直接登出，不重送。
+/// 401 代表 session token 的 session 已結束：直接登出，不重送。
 ///
 /// 登出流程自己會發請求（裝置註銷），那個請求可能 401——若照常登出，logout
 /// 又會再發一次同樣的請求。帶 [kSkipAuthInterceptorExtra] 的請求必須在**兩個**
@@ -52,17 +51,17 @@ void main() {
   });
 
   /// 回傳已登入的 container：401 一旦被攔截器接手就登出 → `isLoggedIn`
-  /// 變成 false、Clerk 登出，成為可觀測訊號。
-  Future<(ProviderContainer, Dio, _Unauthorized401Adapter, FakeClerkSession)>
+  /// 變成 false、session token 登出，成為可觀測訊號。
+  Future<(ProviderContainer, Dio, _Unauthorized401Adapter, FakeAuthSession)>
   buildContainer() async {
-    final clerk = FakeClerkSession(signedIn: true, tokenValue: 'session-token');
+    final auth = FakeAuthSession(signedIn: true, tokenValue: 'session-token');
     final container = ProviderContainer(
       overrides: [
         chatRepositoryProvider.overrideWithValue(_NoopChatRepository()),
         postLoginSideEffectsProvider.overrideWithValue(
           const NoopPostLoginSideEffects(),
         ),
-        clerkSessionProvider.overrideWith((ref) async => clerk),
+        authSessionProvider.overrideWith((ref) async => auth),
       ],
     );
     addTearDown(container.dispose);
@@ -73,7 +72,7 @@ void main() {
       accountId: 'acc-1',
       isLoggedIn: true,
     );
-    return (container, dio, adapter, clerk);
+    return (container, dio, adapter, auth);
   }
 
   test('onResponse 分支：帶旗標的 401 不登出', () async {
@@ -147,8 +146,8 @@ void main() {
     expect(users.toSet(), allowed);
   });
 
-  test('沒帶旗標的 401（onResponse）：直接登出並登出 Clerk，不重送', () async {
-    final (container, dio, adapter, clerk) = await buildContainer();
+  test('沒帶旗標的 401（onResponse）：直接登出並登出 session token，不重送', () async {
+    final (container, dio, adapter, auth) = await buildContainer();
 
     await dio.get<dynamic>(
       '/api/v1/app/chat/unread',
@@ -157,7 +156,7 @@ void main() {
 
     expect(adapter.calls, 1);
     expect(container.read(sessionProvider).isLoggedIn, isFalse);
-    expect(clerk.calls, ['signOut']);
+    expect(auth.calls, ['clear']);
   });
 
   test('沒帶旗標的 401（onError）：直接登出，不重送', () async {
@@ -172,28 +171,9 @@ void main() {
     expect(container.read(sessionProvider).isLoggedIn, isFalse);
   });
 
-  test('Clerk refused 不送 REST，也會登出', () async {
-    final (container, dio, adapter, clerk) = await buildContainer();
-    clerk.tokenError = const SessionTokenRefused('revoked');
-    await expectLater(
-      dio.get<dynamic>('/app/chat/unread'),
-      throwsA(
-        isA<DioException>().having(
-          (e) => e.type,
-          'type',
-          DioExceptionType.cancel,
-        ),
-      ),
-    );
-    await Future<void>.delayed(const Duration(milliseconds: 50));
-    expect(adapter.lastHeaders, isNull);
-    expect(clerk.isSignedIn, isFalse);
-    expect(container.read(sessionProvider).isLoggedIn, isFalse);
-  });
-
-  test('取不到 token（連不上 Clerk）：不送出，以連線錯誤結束，不登出', () async {
-    final (container, dio, adapter, clerk) = await buildContainer();
-    clerk.tokenError = const SocketException('offline');
+  test('取不到 token（連不上 session token）：不送出，以連線錯誤結束，不登出', () async {
+    final (container, dio, adapter, auth) = await buildContainer();
+    auth.tokenError = const SocketException('offline');
 
     await expectLater(
       dio.get<dynamic>('/api/v1/app/chat/unread'),
@@ -210,7 +190,7 @@ void main() {
     expect(container.read(sessionProvider).isLoggedIn, isTrue);
   });
 
-  test('每個請求帶 X-Active-Role: SELLER 與 Clerk 的 session token', () async {
+  test('每個請求帶 X-Active-Role: SELLER 與 session token', () async {
     final (_, dio, adapter, _) = await buildContainer();
 
     await dio.get<dynamic>(

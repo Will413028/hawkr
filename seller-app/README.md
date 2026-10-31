@@ -54,12 +54,31 @@ Hawkr Seller 是 Hawkr 平台的商家端 Flutter App，提供商品管理、訂
 > [!NOTE]
 > 原生層僅有 `dev`、`stage`、`prod` 三種 flavor。`feDev` 環境需要藉由 `dev` 原生外殼並在 Dart 層注入參數來啟動。
 
-Clerk 顧客 application 的 publishable key 以 `--dart-define=CLERK_PUBLISHABLE_KEY=pk_...` 帶入（`make` 的目標用
-`CLERK_PUBLISHABLE_KEY=...` 變數），不寫進程式碼；沒有帶時登入顯示「登入服務尚未設定」。
+### 登入設定（Google、LINE）
+App 以原生 SDK 登入（`packages/hawkr_auth`）：SDK 取得 ID token，再經 `IdentityPublicService`（`IssueAppLoginNonce`、`ExchangeIdToken`）
+換成 identity 的 session token，存在 Keychain。只提供 Google 與 LINE，沒有 Sign in with Apple。值與後端必須對齊：
+
+| 設定 | 放哪裡 | 對應 |
+|------|--------|------|
+| `GOOGLE_IOS_CLIENT_ID` | `config/dart-defines.json` | Google Cloud 的 iOS OAuth client（bundle ID 要等於這個 flavor 的 `PRODUCT_BUNDLE_IDENTIFIER`）；ID token 的 `azp`，後端 `GOOGLE_APP_CLIENT_IDS` 要包含它 |
+| `GOOGLE_WEB_CLIENT_ID` | `config/dart-defines.json` | Google Cloud 的 web OAuth client；傳給 SDK 的 `serverClientId`，ID token 的 `aud`，要等於後端 `GOOGLE_WEB_CLIENT_ID` |
+| `LINE_CHANNEL_ID` | `config/dart-defines.json` | LINE Login channel 的 Channel ID（與後端、web 同一個 channel）；ID token 的 `aud` |
+| `GOOGLE_REVERSED_CLIENT_ID` | `ios/Runner/config/{dev,stage,prod}/Auth.xcconfig（`feDev` 用 `dev` 的）`（不進版控，範本 `config/Auth.example.xcconfig`） | iOS client ID 的 reversed 寫法，Info.plist 的 Google URL scheme 讀它 |
+
+任一欄位沒填時，點對應的登入按鈕顯示「登入服務尚未設定」。LINE 的 URL scheme（`line3rdp.$(PRODUCT_BUNDLE_IDENTIFIER)`）與
+`LSApplicationQueriesSchemes` 的 `lineauth2` 已在 `Info.plist`。
+
+需要人在各主控台做的事：
+1. Google Cloud Console（與後端同一個專案）：為每個 flavor 的 bundle ID 建一個 iOS OAuth client，取得 client ID 填 `GOOGLE_IOS_CLIENT_ID`，
+   reversed 寫法填 `Auth.xcconfig`；web client 已存在（後端用的那個），client ID 填 `GOOGLE_WEB_CLIENT_ID`；確認 OAuth 同意畫面包含 `openid`、`email`、`profile`。
+2. LINE Developers Console：Login channel 的「App types」勾選 iOS，填入每個 flavor 的 bundle ID（`io.github.will413028.hawkr.*`）；
+   申請 OpenID Connect 與 Email address 權限；Channel ID 填 `LINE_CHANNEL_ID`。
+3. Xcode：目標的 Signing & Capabilities 已不需要 Sign in with Apple（`entitlements` 已移除該項）；Apple Developer 帳號那邊的 App ID 設定不用動。
+4. 驗證 ID token（真機或模擬器，各登入一次）：Google 的 token 要 `aud` = web client、`azp` = iOS client；LINE 的 `aud` = channel ID。
 
 ```bash
 # 測試環境 (dev)
-fvm flutter run --flavor dev --dart-define=FLUTTER_FLAVOR=dev --dart-define=CLERK_PUBLISHABLE_KEY=pk_test_...
+fvm flutter run --flavor dev --dart-define=FLUTTER_FLAVOR=dev --dart-define-from-file=config/dart-defines.json
 
 # 前端開發環境 (feDev)
 fvm flutter run --flavor dev --dart-define=FLUTTER_FLAVOR=feDev
@@ -122,10 +141,10 @@ lib/
 
 ### 認證流程
 
-1. 以 Clerk 登入（顧客 application）：Google、LINE 經系統瀏覽器，Apple 用 Sign in with Apple；Clerk 的登入狀態存在 Keychain
+1. 原生 SDK 登入（Google、LINE；沒有 Sign in with Apple）：先 `IdentityPublicService/IssueAppLoginNonce` 取單次 nonce，SDK 把 nonce 寫進 ID token，再 `ExchangeIdToken` 換成 identity 的 opaque session token，存在 Keychain
 2. 登入後呼叫 `IdentityAppService/GetSession`（Connect）取得帳號，第一次登入時伺服器建立帳號
-3. 每次請求以 Clerk 的 session token 帶 `Authorization: Bearer <token>`（SDK 自動換新），另帶 `X-Active-Role: SELLER`
-4. Apple 原生登入且 GetSession 成功之後，背景呼叫 `LinkAppleCredential` 把憑證交給伺服器（失敗不影響登入）；刪除帳號時由伺服器撤銷 App 的授權，App 端不需要額外步驟
+3. 每次請求以 session token 帶 `Authorization: Bearer <token>`（不換新，閒置 14 天或絕對 90 天到期），另帶 `X-Active-Role: SELLER`
+4. 收到 `unauthenticated`（401）就登出：清除 token，回登入頁；使用者登出時先呼叫 `IdentityAppService/SignOut` 在伺服器撤銷 session
 
 ### 圖片與媒體
 
@@ -142,7 +161,7 @@ lib/
 | 畫面 | 檔案 | 說明 |
 | --- | --- | --- |
 | 歡迎頁 | `welcome_screen.dart` | App 入口，自動登入檢查 |
-| 登入/註冊 | `auth_screen.dart` | Google、Apple、LINE 登入按鈕，背景農場插畫 |
+| 登入/註冊 | `auth_screen.dart` | Google、LINE 登入按鈕，背景農場插畫 |
 
 ### 主導航
 
@@ -241,7 +260,7 @@ lib/
 | HTTP Client | `dio_manager.dart` | Dio 實例管理 (攔截器、token 注入) |
 | 認證儲存 | `auth_storage.dart` | JWT / Session 持久化 |
 | Session | `session_store.dart` | 當前登入狀態 (userId, merchantId, token) |
-| 登入 | `clerk_session_provider.dart`、`oauth_picker.dart` | Clerk 的登入狀態與 session token、系統瀏覽器與 Sign in with Apple |
+| 登入 | `auth_session_provider.dart`、`packages/hawkr_auth` | session token（Keychain）與 Google、LINE 原生登入 |
 | 聊天 | `chat_service.dart` | WebSocket 即時聊天 |
 | 訂單 | `order_service.dart` | 訂單 CRUD、搶單、狀態更新 |
 | 商品上傳 | `product_upload_service.dart` | 商品建立/更新流程封裝 |
@@ -273,7 +292,7 @@ lib/
 | --- | --- |
 | HTTP | `http`, `dio` |
 | Firebase | `firebase_core`, `firebase_auth`, `firebase_messaging` |
-| 登入 | `hawkr_api`（`clerk_auth`）, `flutter_web_auth_2`, `sign_in_with_apple` |
+| 登入 | `hawkr_auth`（`google_sign_in`, `flutter_line_sdk`, `flutter_secure_storage`） |
 | Google | `google_generative_ai` |
 | 媒體 | `image_picker`, `flutter_image_compress`, `photo_manager`, `video_player`, `cached_network_image` |
 | UI | `flutter_svg`, `rive`, `liquid_glass_easy`, `font_awesome_flutter` |

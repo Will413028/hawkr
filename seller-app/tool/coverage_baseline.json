@@ -43,7 +43,7 @@
     "lib/core/router/route_payload.dart",
     "lib/core/router/session_listenable.dart",
     "lib/core/router/tab_refresh_provider.dart",
-    "lib/core/session/clerk_session_provider.dart",
+    "lib/core/session/auth_session_provider.dart",
     "lib/core/session/my_store.dart",
     "lib/core/session/post_login_side_effects.dart",
     "lib/core/session/session_model.dart",

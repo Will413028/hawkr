@@ -34,6 +34,27 @@
 					<string>hawkrbuyer</string>
 				</array>
 			</dict>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
+				<key>CFBundleURLName</key>
+				<string>google-sign-in</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<!-- Google iOS OAuth client 的 reversed client ID，來自 ios/Runner/config/{flavor}/Auth.xcconfig -->
+					<string>$(GOOGLE_REVERSED_CLIENT_ID)</string>
+				</array>
+			</dict>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
+				<key>CFBundleURLName</key>
+				<string>line-login</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>line3rdp.$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+				</array>
+			</dict>
 		</array>
 		<key>CFBundleVersion</key>
 		<string>$(FLUTTER_BUILD_NUMBER)</string>
@@ -41,6 +62,7 @@
 		<false/>
 		<key>LSApplicationQueriesSchemes</key>
 		<array>
+			<string>lineauth2</string>
 			<string>googlechromes</string>
 		</array>
 		<key>LSRequiresIPhoneOS</key>

@@ -10,14 +10,14 @@ part of 'session_provider.dart';
 // ignore_for_file: type=lint, type=warning
 /// Session 狀態管理 Provider（@Riverpod codegen）
 ///
-/// 登入由 Clerk 的 session 與 GetSession 決定。
+/// 登入由保存的 session token 與 GetSession 決定。
 ///
 /// 用法：
 /// ```dart
 /// // 讀取 session
 /// final session = ref.watch(sessionProvider);
 ///
-/// // 寫入 session（Clerk 登入、GetSession 之後）
+/// // 寫入 session（登入、GetSession 之後）
 /// await ref.read(sessionProvider.notifier).login(accountId: 'acc-1');
 /// ```
 
@@ -26,27 +26,27 @@ final sessionProvider = SessionProvider._();
 
 /// Session 狀態管理 Provider（@Riverpod codegen）
 ///
-/// 登入由 Clerk 的 session 與 GetSession 決定。
+/// 登入由保存的 session token 與 GetSession 決定。
 ///
 /// 用法：
 /// ```dart
 /// // 讀取 session
 /// final session = ref.watch(sessionProvider);
 ///
-/// // 寫入 session（Clerk 登入、GetSession 之後）
+/// // 寫入 session（登入、GetSession 之後）
 /// await ref.read(sessionProvider.notifier).login(accountId: 'acc-1');
 /// ```
 final class SessionProvider extends $NotifierProvider<Session, SessionModel> {
   /// Session 狀態管理 Provider（@Riverpod codegen）
   ///
-  /// 登入由 Clerk 的 session 與 GetSession 決定。
+  /// 登入由保存的 session token 與 GetSession 決定。
   ///
   /// 用法：
   /// ```dart
   /// // 讀取 session
   /// final session = ref.watch(sessionProvider);
   ///
-  /// // 寫入 session（Clerk 登入、GetSession 之後）
+  /// // 寫入 session（登入、GetSession 之後）
   /// await ref.read(sessionProvider.notifier).login(accountId: 'acc-1');
   /// ```
   SessionProvider._()
@@ -76,18 +76,18 @@ final class SessionProvider extends $NotifierProvider<Session, SessionModel> {
   }
 }
 
-String _$sessionHash() => r'b4cc8864dfbdceb207fdb4e4a09ac51b7ff34ced';
+String _$sessionHash() => r'5f857c98b40f858ccb8dac624b4dc1a2cd71d6c8';
 
 /// Session 狀態管理 Provider（@Riverpod codegen）
 ///
-/// 登入由 Clerk 的 session 與 GetSession 決定。
+/// 登入由保存的 session token 與 GetSession 決定。
 ///
 /// 用法：
 /// ```dart
 /// // 讀取 session
 /// final session = ref.watch(sessionProvider);
 ///
-/// // 寫入 session（Clerk 登入、GetSession 之後）
+/// // 寫入 session（登入、GetSession 之後）
 /// await ref.read(sessionProvider.notifier).login(accountId: 'acc-1');
 /// ```
 

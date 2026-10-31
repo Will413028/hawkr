@@ -12,17 +12,17 @@ import '../../features/order/data/receipt_photo_repository.dart';
 import '../../shared/utils/hk_log.dart';
 import '../exceptions/app_exception.dart';
 import 'force_logout_provider.dart';
-import 'clerk_session_provider.dart';
+import 'auth_session_provider.dart';
 import 'session_model.dart';
 
 part 'session_provider.g.dart';
 
-/// 是否登入。登入是否仍然有效由伺服器判斷：Clerk 的 session 結束時請求收到 401／unauthenticated，走強制登出。
+/// 是否登入。登入是否仍然有效由伺服器判斷：session 失效（過期或被撤銷）時請求收到 401／unauthenticated，走強制登出。
 bool hasUsableSession(SessionModel? session) {
   return session != null && session.userId.isNotEmpty;
 }
 
-/// 登入的帳號由 Clerk 的 session 與 GetSession 決定。
+/// 登入的帳號由保存的 session token 與 GetSession 決定。
 @Riverpod(keepAlive: true)
 class Session extends _$Session {
   final _restore = RestoreScheduler();
@@ -32,10 +32,10 @@ class Session extends _$Session {
     ref.onDispose(_restore.cancel);
     if (!e2eAuthEnabled) {
       try {
-        final clerk = await ref.watch(clerkSessionProvider.future);
-        if (!clerk.isSignedIn) return null;
+        final authSession = await ref.watch(authSessionProvider.future);
+        if (!authSession.isSignedIn) return null;
       } catch (e, st) {
-        HKLog.logE('[Session] Clerk 無法啟動，以訪客開始', e, st);
+        HKLog.logE('[Session] 登入狀態無法讀取，以訪客開始', e, st);
         return null;
       }
     }
@@ -45,13 +45,7 @@ class Session extends _$Session {
     } catch (error, stack) {
       if (!ref.mounted || !_restore.isCurrent(generation)) return null;
       if (error is UnauthorizedException || error is SuspendedException) {
-        if (!e2eAuthEnabled) {
-          try {
-            await (await ref.read(clerkSessionProvider.future)).signOut();
-          } catch (signOutError, stack) {
-            HKLog.logE('[Session] Clerk 登出失敗', signOutError, stack);
-          }
-        }
+        if (!e2eAuthEnabled) await _clearAuthSession();
         if (error is SuspendedException) {
           ref
               .read(forceLogoutProvider.notifier)
@@ -111,7 +105,7 @@ class Session extends _$Session {
     state = AsyncData(await _restoredSession(accountId));
   }
 
-  /// 登入完成（Clerk 已登入、GetSession 取得帳號）之後寫入。
+  /// 登入完成（session token 已保存、GetSession 取得帳號）之後寫入。
   Future<void> login({required String userId, String? nickname}) async {
     cancelRestore();
     state = AsyncData(await _prepareSession(userId, nickname: nickname));
@@ -174,20 +168,37 @@ class Session extends _$Session {
     state = AsyncData(current.copyWith(nickname: nickname));
   }
 
-  /// 登出：先註銷裝置（請求由中央 Dio 帶 Clerk 的 token，要在登出 Clerk 之前送出），再登出 Clerk（撤銷 session、
-  /// 清除保存的狀態），最後清除本機的帳號與快取。
+  /// 登出：先註銷裝置（請求由中央 Dio 帶 session token，要在清除 token 之前送出），再在伺服器撤銷 session
+  /// （`SignOut`），清除保存的 token，最後清除本機的帳號與快取。
   Future<void> logout() async {
     cancelRestore();
     await PushNotificationManager.instance.onUserLoggedOut();
     if (!e2eAuthEnabled) {
-      try {
-        await (await ref.read(clerkSessionProvider.future)).signOut();
-      } catch (e, st) {
-        HKLog.logE('[Session] Clerk 登出失敗', e, st);
-      }
+      await _revokeServerSession();
+      await _clearAuthSession();
     }
     state = const AsyncData(null);
     await _invalidateUserScopedCaches();
+  }
+
+  /// 在伺服器撤銷這個 session。失敗（含 session 已經失效）只記 log，本機照樣登出。
+  Future<void> _revokeServerSession() async {
+    try {
+      final authSession = await ref.read(authSessionProvider.future);
+      if (!authSession.isSignedIn) return;
+      await ref.read(authRepositoryProvider).signOut();
+    } catch (e, st) {
+      HKLog.logW('[Session] 伺服器端登出失敗', e, st);
+    }
+  }
+
+  /// 清除保存的 session token 並登出 Google、LINE 的 SDK。
+  Future<void> _clearAuthSession() async {
+    try {
+      await (await ref.read(authSessionProvider.future)).clear();
+    } catch (e, st) {
+      HKLog.logE('[Session] 清除登入狀態失敗', e, st);
+    }
   }
 
   /// 切換帳號時必須丟棄的 user-scoped 快取（keepAlive provider + 無帳號 scope

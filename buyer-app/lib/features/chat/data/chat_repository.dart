@@ -11,7 +11,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../config/flavor.dart';
 import '../../../core/networking/app_version_headers.dart';
-import '../../../core/session/clerk_session_provider.dart';
+import '../../../core/session/auth_session_provider.dart';
 import '../../../core/session/session_provider.dart';
 import '../../../shared/utils/hk_log.dart';
 import 'chat_model.dart';
@@ -44,21 +44,32 @@ class PresenceEvent {
 }
 
 class ChatRepository with WidgetsBindingObserver {
-  ChatRepository._(this._sessionToken, this._accountId) {
+  ChatRepository._(this._sessionToken, this._accountId, {Dio? dio})
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
+              validateStatus: (_) => true,
+              headers: {...AppVersionHeaders.headers},
+            ),
+          ) {
     WidgetsBinding.instance.addObserver(this);
   }
 
-  /// 目前的 session token（Clerk）；訪客回 null。
+  /// 測試用：注入 [dio] 以檢查送出的 header。
+  @visibleForTesting
+  ChatRepository.withDio({
+    required Future<String?> Function() sessionToken,
+    required String? Function() accountId,
+    required Dio dio,
+  }) : this._(sessionToken, accountId, dio: dio);
+
+  /// 目前的 session token；訪客回 null。
   final Future<String?> Function() _sessionToken;
   final String? Function() _accountId;
 
   // X-App-* 三欄供 Gateway access log 統計版本佔比（`packages/hawkr_app_update/docs/spec.md`）。
-  final Dio _dio = Dio(
-    BaseOptions(
-      validateStatus: (_) => true,
-      headers: {...AppVersionHeaders.headers},
-    ),
-  );
+  final Dio _dio;
 
   // ============================================================
   // 訊息去重 (Deduplication via roomId + seqId)

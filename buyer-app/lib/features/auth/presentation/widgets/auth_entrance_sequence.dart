@@ -3,16 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/hk_tokens.dart';
 
 /// Stages in the login screen's single, coordinated entrance timeline.
-enum AuthEntranceStage {
-  wordmark,
-  moon,
-  panel,
-  headline,
-  google,
-  apple,
-  line,
-  footer,
-}
+enum AuthEntranceStage { wordmark, moon, panel, headline, google, line, footer }
 
 /// Owns the one controller used by every entrance stage on the auth screen.
 ///
@@ -165,11 +156,6 @@ _AuthEntranceSpec _specFor(AuthEntranceStage stage) => switch (stage) {
   AuthEntranceStage.google => const _AuthEntranceSpec(
     start: 0.44,
     end: 0.84,
-    translateY: 12,
-  ),
-  AuthEntranceStage.apple => const _AuthEntranceSpec(
-    start: 0.52,
-    end: 0.92,
     translateY: 12,
   ),
   AuthEntranceStage.line => const _AuthEntranceSpec(

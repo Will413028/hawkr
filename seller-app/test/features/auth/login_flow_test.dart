@@ -25,7 +25,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../support/fake_clerk_session.dart';
+import '../../support/fake_auth_session.dart';
 import 'support/auth_test_fakes.dart';
 import 'support/login_harness.dart';
 import '../../support/default_error_text.dart';
@@ -47,14 +47,6 @@ FakeAuthRepository accountRepo() {
   when(() => repo.currentAccountId()).thenAnswer((_) async => 'acc-1');
   return repo;
 }
-
-/// 系統瀏覽器導回 App 的網址。
-final oauthCallback = Uri.parse('hawkrseller://oauth-callback');
-
-const appleCredentials = AppleCredentials(
-  identityToken: 'a-tok',
-  authorizationCode: 'a-code',
-);
 
 /// 伺服器的 LocalizedMessage：使用者看到的句子（Status.message 是開發者訊息，不顯示）。
 ErrorDetail _localized(String message) => ErrorDetail(
@@ -259,23 +251,17 @@ void main() {
   }
 
   test(
-    '#1 Google 成功（已 onboard）：系統瀏覽器登入 Clerk → GetSession → 寫 session + redirect dashboard',
+    '#1 Google 成功（已 onboard）：原生登入 session token → GetSession → 寫 session + redirect dashboard',
     () async {
-      final picker = FakeOAuthPicker(browserCallback: oauthCallback);
-      final clerk = FakeClerkSession();
-      final container = makeLoginContainer(
-        picker: picker,
-        repo: accountRepo(),
-        clerk: clerk,
-      );
+      final auth = FakeAuthSession();
+      final container = makeLoginContainer(repo: accountRepo(), auth: auth);
 
       final signedIn = await container
           .read(authControllerProvider.notifier)
           .signInWith(OAuthProvider.google);
 
       expect(signedIn, isTrue);
-      expect(clerk.calls, ['browser google']);
-      expect(picker.browserSchemes, ['hawkrseller']);
+      expect(auth.calls, ['signIn google']);
       final session = container.read(sessionProvider);
       expect(session.isLoggedIn, isTrue);
       expect(session.accountId, 'acc-1');
@@ -288,19 +274,15 @@ void main() {
     },
   );
 
-  test('#1b LINE：同樣經系統瀏覽器', () async {
-    final clerk = FakeClerkSession();
-    final container = makeLoginContainer(
-      picker: FakeOAuthPicker(browserCallback: oauthCallback),
-      repo: accountRepo(),
-      clerk: clerk,
-    );
+  test('#1b LINE：同樣經原生登入', () async {
+    final auth = FakeAuthSession();
+    final container = makeLoginContainer(repo: accountRepo(), auth: auth);
 
     await container
         .read(authControllerProvider.notifier)
         .signInWith(OAuthProvider.line);
 
-    expect(clerk.calls, ['browser line']);
+    expect(auth.calls, ['signIn line']);
     expect(container.read(sessionProvider).isLoggedIn, isTrue);
   });
 
@@ -308,7 +290,6 @@ void main() {
     '#2 Google 新賣家：登入時 GetMyStore 回 not_found（沒有店家） → redirect onboard',
     () async {
       final container = makeLoginContainer(
-        picker: FakeOAuthPicker(browserCallback: oauthCallback),
         repo: accountRepo(),
         needsOnboarding: true,
       );
@@ -327,7 +308,6 @@ void main() {
   test('#2b 新賣家：GetMyStore 回答前停在登入頁（不閃 dashboard），回答後才導 onboard', () async {
     final gate = Completer<void>();
     final container = makeLoginContainer(
-      picker: FakeOAuthPicker(browserCallback: oauthCallback),
       repo: accountRepo(),
       needsOnboarding: true,
       meGate: gate.future,
@@ -362,11 +342,7 @@ void main() {
   });
 
   test('#2c GetMyStore 失敗且沒有快照：不當成已 onboard，導去重試頁（fail-closed）', () async {
-    final container = makeLoginContainer(
-      picker: FakeOAuthPicker(browserCallback: oauthCallback),
-      repo: accountRepo(),
-      meFails: true,
-    );
+    final container = makeLoginContainer(repo: accountRepo(), meFails: true);
 
     await container
         .read(authControllerProvider.notifier)
@@ -385,43 +361,24 @@ void main() {
   });
 
   test(
-    '#3 Apple 成功：以 identity token 登入 Clerk → 寫 session + redirect dashboard',
+    '#6 使用者取消 Google 或 LINE 的畫面 → false、不呼叫 GetSession、不寫 session',
     () async {
-      final clerk = FakeClerkSession();
+      final repo = accountRepo();
       final container = makeLoginContainer(
-        picker: FakeOAuthPicker(apple: appleCredentials),
-        repo: accountRepo(),
-        clerk: clerk,
+        repo: repo,
+        auth: FakeAuthSession()..signInResult = false, // 取消
       );
+      final controller = container.read(authControllerProvider.notifier);
 
-      final signedIn = await container
-          .read(authControllerProvider.notifier)
-          .signInWith(OAuthProvider.apple);
+      expect(await controller.signInWith(OAuthProvider.google), isFalse);
+      expect(await controller.signInWith(OAuthProvider.line), isFalse);
 
-      expect(signedIn, isTrue);
-      expect(clerk.calls, ['apple a-tok']);
-      final session = container.read(sessionProvider);
-      expect(session.isLoggedIn, isTrue);
-      expect(redirectFrom(container, AuthRoutes.auth), MainRoutes.dashboard);
+      expect(container.read(sessionProvider).isLoggedIn, isFalse);
+      verifyNever(() => repo.currentAccountId());
     },
   );
 
-  test('#6 使用者取消瀏覽器或 Apple 的畫面 → false、不呼叫 GetSession、不寫 session', () async {
-    final repo = accountRepo();
-    final container = makeLoginContainer(
-      picker: FakeOAuthPicker(), // null = 取消
-      repo: repo,
-    );
-    final controller = container.read(authControllerProvider.notifier);
-
-    expect(await controller.signInWith(OAuthProvider.google), isFalse);
-    expect(await controller.signInWith(OAuthProvider.apple), isFalse);
-
-    expect(container.read(sessionProvider).isLoggedIn, isFalse);
-    verifyNever(() => repo.currentAccountId());
-  });
-
-  test('#7 GetSession 暫時失敗 → 保留 Clerk、冒泡、不寫 session', () async {
+  test('#7 GetSession 暫時失敗 → 保留 session token、冒泡、不寫 session', () async {
     final repo = FakeAuthRepository();
     when(() => repo.currentAccountId()).thenThrow(
       AuthRequestException.from(
@@ -429,12 +386,8 @@ void main() {
         defaults: zhDefaultErrorText,
       ),
     );
-    final clerk = FakeClerkSession();
-    final container = makeLoginContainer(
-      picker: FakeOAuthPicker(browserCallback: oauthCallback),
-      repo: repo,
-      clerk: clerk,
-    );
+    final auth = FakeAuthSession();
+    final container = makeLoginContainer(repo: repo, auth: auth);
 
     await expectLater(
       container
@@ -442,26 +395,22 @@ void main() {
           .signInWith(OAuthProvider.google),
       throwsException,
     );
-    expect(clerk.calls, ['browser google']);
+    expect(auth.calls, ['signIn google']);
     expect(container.read(sessionProvider).isLoggedIn, isFalse);
   });
 
-  test('GetSession 回應缺少帳號時保留 Clerk', () async {
+  test('GetSession 回應缺少帳號時保留 session token', () async {
     final repo = FakeAuthRepository();
     when(
       () => repo.currentAccountId(),
     ).thenThrow(const MalformedAuthResponse('missing account'));
-    final clerk = FakeClerkSession();
-    final c = makeLoginContainer(
-      picker: FakeOAuthPicker(browserCallback: oauthCallback),
-      repo: repo,
-      clerk: clerk,
-    );
+    final auth = FakeAuthSession();
+    final c = makeLoginContainer(repo: repo, auth: auth);
     await expectLater(
       c.read(authControllerProvider.notifier).signInWith(OAuthProvider.google),
       throwsA(isA<MalformedAuthResponse>()),
     );
-    expect(clerk.isSignedIn, isTrue);
+    expect(auth.isSignedIn, isTrue);
   });
 
   test('暫時故障後再次登入重試 GetSession，不重新開啟 OAuth', () async {
@@ -472,12 +421,8 @@ void main() {
         defaults: zhDefaultErrorText,
       ),
     );
-    final clerk = FakeClerkSession();
-    final c = makeLoginContainer(
-      picker: FakeOAuthPicker(browserCallback: oauthCallback),
-      repo: repo,
-      clerk: clerk,
-    );
+    final auth = FakeAuthSession();
+    final c = makeLoginContainer(repo: repo, auth: auth);
     await expectLater(
       c.read(authControllerProvider.notifier).signInWith(OAuthProvider.google),
       throwsA(isA<AuthRequestException>()),
@@ -489,11 +434,11 @@ void main() {
           .signInWith(OAuthProvider.google),
       isTrue,
     );
-    expect(clerk.calls, ['browser google']);
+    expect(auth.calls, ['signIn google']);
   });
 
   for (final code in [Code.unauthenticated, Code.permissionDenied]) {
-    test('GetSession 明確拒絕憑證時結束 Clerk session', () async {
+    test('GetSession 明確拒絕憑證時結束 session token session', () async {
       final repo = FakeAuthRepository();
       when(() => repo.currentAccountId()).thenThrow(
         AuthRequestException.from(
@@ -501,12 +446,8 @@ void main() {
           defaults: zhDefaultErrorText,
         ),
       );
-      final clerk = FakeClerkSession();
-      final container = makeLoginContainer(
-        picker: FakeOAuthPicker(browserCallback: oauthCallback),
-        repo: repo,
-        clerk: clerk,
-      );
+      final auth = FakeAuthSession();
+      final container = makeLoginContainer(repo: repo, auth: auth);
 
       await expectLater(
         container
@@ -514,7 +455,7 @@ void main() {
             .signInWith(OAuthProvider.google),
         throwsA(isA<AuthRequestException>()),
       );
-      expect(clerk.calls, ['browser google', 'signOut']);
+      expect(auth.calls, ['signIn google', 'clear']);
       expect(container.read(sessionProvider).isLoggedIn, isFalse);
     });
   }
@@ -532,7 +473,7 @@ void main() {
     Code.aborted,
     Code.invalidArgument,
   ]) {
-    test('$code 是暫時失敗，不拒絕 Clerk', () {
+    test('$code 是暫時失敗，不拒絕 session token', () {
       expect(
         AuthRequestException.from(
           ConnectException(code, 'retry'),
@@ -552,19 +493,15 @@ void main() {
       ),
     ),
   ]) {
-    test('冷啟動非拒絕失敗保留 Clerk：$error', () async {
+    test('冷啟動非拒絕失敗保留 session token：$error', () async {
       final repo = FakeAuthRepository();
       when(() => repo.currentAccountId()).thenThrow(error);
-      final clerk = FakeClerkSession(signedIn: true);
-      final c = makeLoginContainer(
-        picker: FakeOAuthPicker(),
-        repo: repo,
-        clerk: clerk,
-      );
+      final auth = FakeAuthSession(signedIn: true);
+      final c = makeLoginContainer(repo: repo, auth: auth);
       await c.read(sessionProvider.notifier).initialize();
       expect(c.read(sessionProvider).isLoggedIn, isFalse);
-      expect(clerk.isSignedIn, isTrue);
-      expect(clerk.calls, isEmpty);
+      expect(auth.isSignedIn, isTrue);
+      expect(auth.calls, isEmpty);
     });
   }
 
@@ -585,7 +522,7 @@ void main() {
     expect(prefs.getString('auth_cache_owner'), 'B');
   });
 
-  test('背景重試停權會結束 Clerk 並發布伺服器文字', () async {
+  test('背景重試停權會結束 session token 並發布伺服器文字', () async {
     final repo = FakeAuthRepository();
     var calls = 0;
     when(() => repo.currentAccountId()).thenAnswer((_) async {
@@ -598,16 +535,12 @@ void main() {
         defaults: zhDefaultErrorText,
       );
     });
-    final clerk = FakeClerkSession(signedIn: true);
-    final c = makeLoginContainer(
-      picker: FakeOAuthPicker(),
-      repo: repo,
-      clerk: clerk,
-    );
+    final auth = FakeAuthSession(signedIn: true);
+    final c = makeLoginContainer(repo: repo, auth: auth);
     await c.read(sessionProvider.notifier).initialize();
-    expect(clerk.isSignedIn, isTrue);
+    expect(auth.isSignedIn, isTrue);
     await Future<void>.delayed(const Duration(milliseconds: 1600));
-    expect(clerk.isSignedIn, isFalse);
+    expect(auth.isSignedIn, isFalse);
     expect(c.read(sessionRestoreErrorProvider), '帳號已停權');
     expect(calls, 2);
   });
@@ -626,19 +559,15 @@ void main() {
       }
       return 'acc-1';
     });
-    final clerk = FakeClerkSession(signedIn: true);
-    final c = makeLoginContainer(
-      picker: FakeOAuthPicker(),
-      repo: repo,
-      clerk: clerk,
-    );
+    final auth = FakeAuthSession(signedIn: true);
+    final c = makeLoginContainer(repo: repo, auth: auth);
     await c.read(sessionProvider.notifier).initialize();
     expect(c.read(sessionProvider).isLoggedIn, isFalse);
     expect(calls, 1);
     await Future<void>.delayed(const Duration(milliseconds: 1600));
     expect(c.read(sessionProvider).isLoggedIn, isTrue);
     expect(calls, 2);
-    expect(clerk.calls, isEmpty);
+    expect(auth.calls, isEmpty);
     expect(await _cachedEditHistory(), '[]');
   });
 
@@ -654,12 +583,8 @@ void main() {
         defaults: zhDefaultErrorText,
       );
     });
-    final clerk = FakeClerkSession(signedIn: true);
-    final c = makeLoginContainer(
-      picker: FakeOAuthPicker(),
-      repo: repo,
-      clerk: clerk,
-    );
+    final auth = FakeAuthSession(signedIn: true);
+    final c = makeLoginContainer(repo: repo, auth: auth);
     await c.read(sessionProvider.notifier).initialize();
     expect(c.read(sessionProvider).isLoggedIn, isFalse);
     expect(calls, 1);
@@ -671,33 +596,25 @@ void main() {
     expect(calls, 4);
     await tester.pump(const Duration(minutes: 1));
     expect(calls, 4);
-    expect(clerk.calls, isEmpty);
+    expect(auth.calls, isEmpty);
     await c.read(sessionProvider.notifier).login(accountId: 'acc-1');
     expect(await _cachedEditHistory(), '[]');
     c.dispose();
   });
 
   test(
-    '#8 登入後模擬 restart → initialize 從 Clerk 與 GetSession 恢復 session',
+    '#8 登入後模擬 restart → initialize 從 session token 與 GetSession 恢復 session',
     () async {
-      final clerk = FakeClerkSession();
-      final c1 = makeLoginContainer(
-        picker: FakeOAuthPicker(browserCallback: oauthCallback),
-        repo: accountRepo(),
-        clerk: clerk,
-      );
+      final auth = FakeAuthSession();
+      final c1 = makeLoginContainer(repo: accountRepo(), auth: auth);
       await c1
           .read(authControllerProvider.notifier)
           .signInWith(OAuthProvider.google);
       expect(c1.read(sessionProvider).isLoggedIn, isTrue);
       c1.dispose();
 
-      // 第二個 container（模擬 app 重啟，沿用同一份 mock 持久層與 Clerk 保存的登入）
-      final c2 = makeLoginContainer(
-        picker: FakeOAuthPicker(),
-        repo: accountRepo(),
-        clerk: clerk,
-      );
+      // 第二個 container（模擬 app 重啟，沿用同一份 mock 持久層與 session token 保存的登入）
+      final c2 = makeLoginContainer(repo: accountRepo(), auth: auth);
       await c2.read(sessionProvider.notifier).initialize();
 
       final restored = c2.read(sessionProvider);
@@ -713,43 +630,31 @@ void main() {
     },
   );
 
-  test('#9 restart 時 Clerk 的 session 已結束 → 不恢復，清掉保存的帳號', () async {
-    final clerk = FakeClerkSession();
-    final c1 = makeLoginContainer(
-      picker: FakeOAuthPicker(browserCallback: oauthCallback),
-      repo: accountRepo(),
-      clerk: clerk,
-    );
+  test('#9 restart 時 session token 的 session 已結束 → 不恢復，清掉保存的帳號', () async {
+    final auth = FakeAuthSession();
+    final c1 = makeLoginContainer(repo: accountRepo(), auth: auth);
     await c1
         .read(authControllerProvider.notifier)
         .signInWith(OAuthProvider.google);
     c1.dispose();
-    clerk.signedIn = false;
+    auth.signedIn = false;
 
-    final c2 = makeLoginContainer(
-      picker: FakeOAuthPicker(),
-      repo: FakeAuthRepository(),
-      clerk: clerk,
-    );
+    final c2 = makeLoginContainer(repo: FakeAuthRepository(), auth: auth);
     await c2.read(sessionProvider.notifier).initialize();
 
     expect(c2.read(sessionProvider).isLoggedIn, isFalse);
   });
 
-  test('#10 登出 → 登出 Clerk、清 session、redirect 回 /auth', () async {
-    final clerk = FakeClerkSession();
-    final container = makeLoginContainer(
-      picker: FakeOAuthPicker(browserCallback: oauthCallback),
-      repo: accountRepo(),
-      clerk: clerk,
-    );
+  test('#10 登出 → 登出 session token、清 session、redirect 回 /auth', () async {
+    final auth = FakeAuthSession();
+    final container = makeLoginContainer(repo: accountRepo(), auth: auth);
     final controller = container.read(authControllerProvider.notifier);
     await controller.signInWith(OAuthProvider.google);
     expect(container.read(sessionProvider).isLoggedIn, isTrue);
 
     await controller.logout();
 
-    expect(clerk.calls, ['browser google', 'signOut']);
+    expect(auth.calls, ['signIn google', 'clear']);
     final session = container.read(sessionProvider);
     expect(session.isLoggedIn, isFalse);
     expect(redirectFrom(container, MainRoutes.dashboard), AuthRoutes.auth);

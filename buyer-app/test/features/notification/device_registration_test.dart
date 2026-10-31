@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:hawkr_buyer/config/flavor.dart';
 import 'package:hawkr_buyer/core/networking/dio_provider.dart';
-import 'package:hawkr_buyer/core/session/clerk_session_provider.dart';
+import 'package:hawkr_buyer/core/session/auth_session_provider.dart';
 import 'package:hawkr_buyer/core/session/force_logout_provider.dart';
 import 'package:hawkr_buyer/core/session/session_provider.dart';
 import 'package:hawkr_buyer/features/auth/data/auth_repository.dart';
@@ -13,7 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../support/fake_clerk_session.dart';
+import '../../support/fake_auth_session.dart';
 import '../../support/firebase_core_mock.dart';
 import '../../support/secure_storage_mock.dart';
 
@@ -24,7 +24,7 @@ class _AccountRepository extends Fake implements AuthRepository {
   Future<String> currentAccountId() async => 'acc_01J8Z';
 }
 
-/// 裝置註冊走中央 Dio：憑證只由 auth interceptor 從 Clerk 帶上，manager 不持有 session token。
+/// 裝置註冊走中央 Dio：憑證只由 auth interceptor 從 session token 帶上，manager 不持有 session token。
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -41,16 +41,16 @@ void main() {
     addTearDown(manager.seedLifecycleStateForTest);
   });
 
-  /// 以登入中的 Clerk 與 GetSession 還原 session；裝置註冊的請求回 [deviceStatus]。
+  /// 以登入中的 session token 與 GetSession 還原 session；裝置註冊的請求回 [deviceStatus]。
   Future<
-    ({ProviderContainer c, List<RequestOptions> sent, FakeClerkSession clerk})
+    ({ProviderContainer c, List<RequestOptions> sent, FakeAuthSession auth})
   >
   restore({int deviceStatus = HttpStatus.ok}) async {
     mockSecureStorage({});
-    final clerk = FakeClerkSession(signedIn: true);
+    final auth = FakeAuthSession(signedIn: true);
     final container = ProviderContainer(
       overrides: [
-        clerkSessionProvider.overrideWith((ref) async => clerk),
+        authSessionProvider.overrideWith((ref) async => auth),
         authRepositoryProvider.overrideWith((ref) => _AccountRepository()),
       ],
     );
@@ -62,7 +62,7 @@ void main() {
     );
     manager.injectContainer(container);
     await container.read(sessionProvider.future);
-    return (c: container, sent: sent, clerk: clerk);
+    return (c: container, sent: sent, auth: auth);
   }
 
   test('冷啟動恢復 session → 以恢復的 session 憑證註冊裝置', () async {
@@ -90,26 +90,29 @@ void main() {
       addTearDown(() => PushNotificationManager.e2eDisabled = false);
     });
 
-    test('先以登入中的 Clerk token 註銷，再登出 Clerk、清除 session；第二次登出不再送', () async {
-      final h = await restore();
-      manager.seedLifecycleStateForTest(
-        fcmToken: 'fcm-1',
-        isUserLoggedIn: true,
-      );
+    test(
+      '先以登入中的 session token token 註銷，再登出 session token、清除 session；第二次登出不再送',
+      () async {
+        final h = await restore();
+        manager.seedLifecycleStateForTest(
+          fcmToken: 'fcm-1',
+          isUserLoggedIn: true,
+        );
 
-      await h.c.read(sessionProvider.notifier).logout();
+        await h.c.read(sessionProvider.notifier).logout();
 
-      final remove = h.sent.single;
-      expect(remove.method, 'DELETE');
-      expect(remove.uri.path, _devicesPath);
-      expect(remove.headers['Authorization'], 'Bearer live');
-      expect(remove.data, {'token': 'fcm-1'});
-      expect(h.clerk.calls, ['signOut']);
-      expect(h.c.read(sessionProvider).value, isNull);
+        final remove = h.sent.single;
+        expect(remove.method, 'DELETE');
+        expect(remove.uri.path, _devicesPath);
+        expect(remove.headers['Authorization'], 'Bearer live');
+        expect(remove.data, {'token': 'fcm-1'});
+        expect(h.auth.calls, ['clear']);
+        expect(h.c.read(sessionProvider).value, isNull);
 
-      await h.c.read(sessionProvider.notifier).logout();
-      expect(h.sent, hasLength(1));
-    });
+        await h.c.read(sessionProvider.notifier).logout();
+        expect(h.sent, hasLength(1));
+      },
+    );
 
     test('強制登出（session 已失效，註銷收到 401）→ 照樣清除，不再觸發強制登出', () async {
       final h = await restore(deviceStatus: HttpStatus.unauthorized);

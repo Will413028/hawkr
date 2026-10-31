@@ -1,15 +1,10 @@
-import 'package:hawkr_auth/clerk.dart';
-import 'package:hawkr_api/testing.dart';
-import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
-import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.spec.dart';
 import 'package:hawkr_seller/features/seller/data/current_store.dart';
-import 'package:hawkr_seller/core/networking/connect_provider.dart';
 import 'package:hawkr_api/gen/google/rpc/error_details.pb.dart';
 import 'package:hawkr_api/transport.dart'
     show Code, ConnectException, ErrorDetail;
 import 'package:hawkr_seller/core/storage/auth_storage.dart';
 import 'package:hawkr_seller/config/flavor.dart';
-import 'package:hawkr_seller/core/session/clerk_session_provider.dart';
+import 'package:hawkr_seller/core/session/auth_session_provider.dart';
 import 'package:hawkr_seller/core/session/post_login_side_effects.dart';
 import 'package:hawkr_seller/core/session/session_provider.dart';
 import 'package:hawkr_seller/features/auth/data/auth_repository.dart';
@@ -21,12 +16,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../support/fake_clerk_session.dart';
+import '../../support/fake_auth_session.dart';
 import 'support/auth_test_fakes.dart';
 import 'support/login_harness.dart';
 import '../../support/default_error_text.dart';
 
-/// 冷啟動自動登入：Clerk 登入中時以 GetSession 恢復帳號。
+/// 冷啟動自動登入：session token 登入中時以 GetSession 恢復帳號。
 /// 導頁見 welcome_screen_auto_login_test.dart。
 /// 伺服器的 LocalizedMessage：使用者看到的句子（Status.message 是開發者訊息，不顯示）。
 ErrorDetail _localized(String message) => ErrorDetail(
@@ -50,10 +45,10 @@ void main() {
   setUp(resetLoginStorage);
 
   ProviderContainer makeContainer(
-    FakeClerkSession clerk, {
+    FakeAuthSession auth, {
     bool needsOnboarding = false,
     Future<String> Function()? accountAnswer,
-    bool clerkFails = false,
+    bool authFails = false,
   }) {
     final account = FakeAuthRepository();
     when(() => account.currentAccountId()).thenAnswer(
@@ -61,9 +56,9 @@ void main() {
     );
     final container = ProviderContainer(
       overrides: [
-        clerkSessionProvider.overrideWith((ref) async {
-          if (clerkFails) throw StateError("keychain");
-          return clerk;
+        authSessionProvider.overrideWith((ref) async {
+          if (authFails) throw StateError("keychain");
+          return auth;
         }),
         authRepositoryProvider.overrideWithValue(account),
         ...myStoreOverrides(needsOnboarding: needsOnboarding),
@@ -77,44 +72,14 @@ void main() {
   Future<AutoLoginResult> check(ProviderContainer container) =>
       container.read(autoLoginControllerProvider.notifier).check();
 
-  test('冷啟動 token 換發遭拒時登出 Clerk，不送 GetSession', () async {
-    final clerk = FakeClerkSession(signedIn: true)
-      ..tokenError = const SessionTokenRefused('revoked');
-    var requests = 0;
-    final c = ProviderContainer(
-      overrides: [
-        clerkSessionProvider.overrideWith((ref) async => clerk),
-        sessionIdentityClientProvider.overrideWith(
-          (ref) => IdentityAppServiceClient(
-            FakeTransportBuilder()
-                .unary(IdentityAppService.getSession, (req, ctx) {
-                  requests++;
-                  throw StateError('must not send');
-                })
-                .build(interceptors: [sessionBootstrapInterceptor(ref)]),
-          ),
-        ),
-        ...myStoreOverrides(),
-        postLoginSideEffectsProvider.overrideWithValue(
-          const NoopPostLoginSideEffects(),
-        ),
-      ],
-    );
-    addTearDown(c.dispose);
-    expect(await check(c), isA<AutoLoginSignedOut>());
-    expect(clerk.isSignedIn, isFalse);
-    expect(clerk.calls, ['signOut']);
-    expect(requests, 0);
-  });
-
-  test('Clerk 啟動失敗不重試 GetSession、不登出、不清快取', () async {
+  test('session token 啟動失敗不重試 GetSession、不登出、不清快取', () async {
     await AuthStorage.restoreAccount('acc-1');
     await _saveCachedEditHistory();
     var calls = 0;
-    final clerk = FakeClerkSession(signedIn: true);
+    final auth = FakeAuthSession(signedIn: true);
     final c = makeContainer(
-      clerk,
-      clerkFails: true,
+      auth,
+      authFails: true,
       accountAnswer: () async {
         calls++;
         throw AuthRequestException.from(
@@ -126,27 +91,27 @@ void main() {
     expect(await check(c), isA<AutoLoginSignedOut>());
     await Future<void>.delayed(const Duration(milliseconds: 1600));
     expect(calls, 0);
-    expect(clerk.calls, isEmpty);
+    expect(auth.calls, isEmpty);
     expect(await _cachedEditHistory(), '[]');
   });
 
-  test('GetSession 暫時失敗時保留 Clerk session', () async {
-    final clerk = FakeClerkSession(signedIn: true);
+  test('GetSession 暫時失敗時保留 session token session', () async {
+    final auth = FakeAuthSession(signedIn: true);
     final container = makeContainer(
-      clerk,
+      auth,
       accountAnswer: () async => throw StateError('offline'),
     );
 
     expect(await check(container), isA<AutoLoginSignedOut>());
     expect(container.read(sessionProvider).isLoggedIn, isFalse);
-    expect(clerk.calls, isEmpty);
+    expect(auth.calls, isEmpty);
   });
 
   for (final code in [Code.unauthenticated, Code.permissionDenied]) {
-    test('冷啟動 $code 結束 Clerk，停權保留訊息', () async {
-      final clerk = FakeClerkSession(signedIn: true);
+    test('冷啟動 $code 結束 session token，停權保留訊息', () async {
+      final auth = FakeAuthSession(signedIn: true);
       final container = makeContainer(
-        clerk,
+        auth,
         accountAnswer: () async => throw AuthRequestException.from(
           ConnectException(
             code,
@@ -157,7 +122,7 @@ void main() {
         ),
       );
       expect(await check(container), isA<AutoLoginSignedOut>());
-      expect(clerk.isSignedIn, isFalse);
+      expect(auth.isSignedIn, isFalse);
       if (code == Code.permissionDenied) {
         expect(container.read(sessionRestoreErrorProvider), '帳號已停權');
       }
@@ -167,31 +132,31 @@ void main() {
   test('同帳號冷啟動保留快取，換帳號清除快取', () async {
     await AuthStorage.restoreAccount('acc-1');
     await _saveCachedEditHistory();
-    final c = makeContainer(FakeClerkSession(signedIn: true));
+    final c = makeContainer(FakeAuthSession(signedIn: true));
     await check(c);
     expect(await _cachedEditHistory(), '[]');
     await AuthStorage.restoreAccount('other');
     expect(await _cachedEditHistory(), isNull);
   });
 
-  test('Clerk 的 session 已經結束 → 不呼叫 GetSession', () async {
-    final container = makeContainer(FakeClerkSession());
+  test('session token 的 session 已經結束 → 不呼叫 GetSession', () async {
+    final container = makeContainer(FakeAuthSession());
 
     expect(await check(container), isA<AutoLoginSignedOut>());
     expect(container.read(sessionProvider).isLoggedIn, isFalse);
   });
 
-  test('Clerk 登入中但沒有本機帳號 → GetSession 恢復帳號', () async {
-    final clerk = FakeClerkSession(signedIn: true);
-    final container = makeContainer(clerk);
+  test('session token 登入中但沒有本機帳號 → GetSession 恢復帳號', () async {
+    final auth = FakeAuthSession(signedIn: true);
+    final container = makeContainer(auth);
 
     expect(await check(container), isA<AutoLoginSignedIn>());
     expect(container.read(sessionProvider).accountId, 'acc-1');
-    expect(clerk.calls, isEmpty);
+    expect(auth.calls, isEmpty);
   });
 
-  test('Clerk 登入中、有帳號 → 恢復 session，已建店時不需要 onboarding', () async {
-    final container = makeContainer(FakeClerkSession(signedIn: true));
+  test('session token 登入中、有帳號 → 恢復 session，已建店時不需要 onboarding', () async {
+    final container = makeContainer(FakeAuthSession(signedIn: true));
 
     final result = await check(container);
 
@@ -209,9 +174,9 @@ void main() {
     expect(container.read(sellerStoreIdProvider), kSellerId.toString());
   });
 
-  test('Clerk 登入中、有帳號、還沒有 sellers row → 需要 onboarding', () async {
+  test('session token 登入中、有帳號、還沒有 sellers row → 需要 onboarding', () async {
     final container = makeContainer(
-      FakeClerkSession(signedIn: true),
+      FakeAuthSession(signedIn: true),
       needsOnboarding: true,
     );
 

@@ -8,15 +8,15 @@ part of 'session_provider.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// 登入的帳號由 Clerk 的 session 與 GetSession 決定。
+/// 登入的帳號由保存的 session token 與 GetSession 決定。
 
 @ProviderFor(Session)
 final sessionProvider = SessionProvider._();
 
-/// 登入的帳號由 Clerk 的 session 與 GetSession 決定。
+/// 登入的帳號由保存的 session token 與 GetSession 決定。
 final class SessionProvider
     extends $AsyncNotifierProvider<Session, SessionModel?> {
-  /// 登入的帳號由 Clerk 的 session 與 GetSession 決定。
+  /// 登入的帳號由保存的 session token 與 GetSession 決定。
   SessionProvider._()
     : super(
         from: null,
@@ -36,9 +36,9 @@ final class SessionProvider
   Session create() => Session();
 }
 
-String _$sessionHash() => r'0bfb308fdeaa659d83820703c84abbaa6c1d6092';
+String _$sessionHash() => r'22f12f07db34fb3e66d540e2eec50a44d0decf91';
 
-/// 登入的帳號由 Clerk 的 session 與 GetSession 決定。
+/// 登入的帳號由保存的 session token 與 GetSession 決定。
 
 abstract class _$Session extends $AsyncNotifier<SessionModel?> {
   FutureOr<SessionModel?> build();

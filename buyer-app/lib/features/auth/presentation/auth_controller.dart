@@ -1,8 +1,7 @@
-import 'package:hawkr_auth/clerk.dart';
 import 'package:hawkr_auth/oauth.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../core/session/clerk_session_provider.dart';
+import '../../../core/session/auth_session_provider.dart';
 import '../../../core/session/session_provider.dart';
 import '../../../core/exceptions/app_exception.dart';
 import '../../../shared/utils/hk_log.dart';
@@ -13,7 +12,7 @@ export 'package:hawkr_auth/oauth.dart';
 
 part 'auth_controller.g.dart';
 
-/// 唯一的登入入口：以 Clerk 登入（Google、LINE 經系統瀏覽器，Apple 用 Sign in with Apple），再以 GetSession
+/// 唯一的登入入口：以 Google、LINE 的原生 SDK 登入並換到 identity 的 session token，再以 GetSession
 /// 取得帳號（第一次登入的使用者由伺服器在這時建立），寫入 session。
 ///
 /// keepAlive：登入流程含原生 picker / 畫面切換的多個 await，期間 watch 此
@@ -25,17 +24,17 @@ class AuthController extends _$AuthController {
   @override
   AsyncValue<void> build() => const AsyncData(null);
 
-  /// 以 [provider] 登入。使用者在瀏覽器或 Apple 的畫面取消時回 false；其他錯誤一律 throw（`toString()` 是給
-  /// 使用者看的文字）；暫時錯誤保留 Clerk session，冷啟動可再呼叫 GetSession。
+  /// 以 [provider] 登入。使用者在 Google／LINE 的畫面取消時回 false；其他錯誤一律 throw（`toString()` 是給
+  /// 使用者看的文字）；暫時錯誤保留已換到的 session token，冷啟動可再呼叫 GetSession。
   Future<bool> signInWith(OAuthProvider provider) async {
     state = const AsyncLoading();
     try {
       await ref.read(sessionProvider.future);
-      final clerk = await ref.read(clerkSessionProvider.future);
+      final authSession = await ref.read(authSessionProvider.future);
       final signedIn =
-          clerk.isSignedIn || await _signInToClerk(clerk, provider);
+          authSession.isSignedIn || await authSession.signIn(provider);
       if (signedIn) {
-        await _completeSignIn(clerk);
+        await _completeSignIn(authSession);
       }
       state = const AsyncData(null);
       return signedIn;
@@ -47,31 +46,8 @@ class AuthController extends _$AuthController {
 
   // ─────────────────────── internals ───────────────────────
 
-  Future<bool> _signInToClerk(
-    ClerkSession clerk,
-    OAuthProvider provider,
-  ) async {
-    final picker = ref.read(oauthPickerProvider);
-    Future<bool> inBrowser(BrowserSignIn browser) => clerk.signInWithBrowser(
-      browser,
-      redirect: kOAuthRedirect,
-      authenticate: picker.authenticateInBrowser,
-    );
-    switch (provider) {
-      case OAuthProvider.google:
-        return inBrowser(BrowserSignIn.google);
-      case OAuthProvider.line:
-        return inBrowser(BrowserSignIn.line);
-      case OAuthProvider.apple:
-        final credentials = await picker.pickApple();
-        if (credentials == null) return false;
-        await clerk.signInWithApple(credentials.identityToken);
-        return true;
-    }
-  }
-
-  /// Clerk 登入之後：GetSession 取得帳號、寫入 session。
-  Future<void> _completeSignIn(ClerkSession clerk) async {
+  /// 登入之後：GetSession 取得帳號、寫入 session。
+  Future<void> _completeSignIn(AuthSession authSession) async {
     ref.read(sessionProvider.notifier).cancelRestore();
     final String accountId;
     try {
@@ -79,9 +55,9 @@ class AuthController extends _$AuthController {
     } catch (error) {
       if (error is UnauthorizedException || error is SuspendedException) {
         try {
-          await clerk.signOut();
-        } catch (signOutError, stack) {
-          HKLog.logE('[AuthController] Clerk 登出失敗', signOutError, stack);
+          await authSession.clear();
+        } catch (clearError, stack) {
+          HKLog.logE('[AuthController] 清除登入狀態失敗', clearError, stack);
         }
       } else {
         ref

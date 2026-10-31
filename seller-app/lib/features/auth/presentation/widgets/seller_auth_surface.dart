@@ -5,7 +5,9 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/hk_tokens.dart';
 import '../../../../shared/widgets/animated_orbs_background.dart';
+
 import 'package:hawkr_auth/oauth.dart';
+
 import 'auth_action_glass_panel.dart';
 import 'auth_entrance_sequence.dart';
 import 'auth_moon_hero.dart';
@@ -171,11 +173,6 @@ class SellerAuthSurface extends StatelessWidget {
                   AuthEntranceItem(
                     stage: AuthEntranceStage.google,
                     child: _button(OAuthProvider.google),
-                  ),
-                  const SizedBox(height: HkSpace.md),
-                  AuthEntranceItem(
-                    stage: AuthEntranceStage.apple,
-                    child: _button(OAuthProvider.apple),
                   ),
                   const SizedBox(height: HkSpace.md),
                   AuthEntranceItem(

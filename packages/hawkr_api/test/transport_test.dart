@@ -317,7 +317,7 @@ void main() {
       expect(invalid, 1);
     });
 
-    test('取不到 token（連不上 Clerk）：不送出，以 unavailable 結束，原本的例外在 cause', () async {
+    test('取不到 token（例如 Keychain 讀取失敗）：不送出，以 unavailable 結束，原本的例外在 cause', () async {
       var invalid = 0;
       final h = harness(
         token: () async => throw const SocketException('offline'),

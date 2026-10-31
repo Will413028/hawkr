@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 mixin _$SessionModel {
 
 /// 帳號 ID（identity 的 opaque 字串，不解析成數字）
- String? get accountId;/// 是否已登入：Clerk 登入中，而且有帳號 ID（見 `Session`）。憑證是 Clerk 的 session token，不在這裡。
+ String? get accountId;/// 是否已登入：有 session token，而且有帳號 ID（見 `Session`）。憑證是 identity 的 session token，不在這裡。
  bool get isLoggedIn;
 /// Create a copy of SessionModel
 /// with the given fields replaced by the non-null parameter values.
@@ -210,7 +210,7 @@ class _SessionModel implements SessionModel {
 
 /// 帳號 ID（identity 的 opaque 字串，不解析成數字）
 @override final  String? accountId;
-/// 是否已登入：Clerk 登入中，而且有帳號 ID（見 `Session`）。憑證是 Clerk 的 session token，不在這裡。
+/// 是否已登入：有 session token，而且有帳號 ID（見 `Session`）。憑證是 identity 的 session token，不在這裡。
 @override@JsonKey() final  bool isLoggedIn;
 
 /// Create a copy of SessionModel

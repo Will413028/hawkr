@@ -8,6 +8,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/hk_tokens.dart';
 import '../../../../shared/icons/app_icons.dart';
 import '../../../../shared/widgets/hk_button_label.dart';
+
 import 'package:hawkr_auth/oauth.dart';
 
 /// Full-width, high-contrast OAuth action for the moonlit auth panel.
@@ -155,11 +156,6 @@ class _AuthOAuthPillButtonState extends State<AuthOAuthPillButton>
         AppColors.neutralCream,
         AppColors.brandPrimaryStrong,
         AppColors.brandPrimaryStrong,
-      ),
-      OAuthProvider.apple => (
-        AppColors.neutralInk,
-        AppColors.neutralCream,
-        AppColors.brandSecondary,
       ),
       OAuthProvider.line => (
         AppColors.lineBrand,
@@ -343,7 +339,7 @@ class _ButtonContents extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final providerIcon = switch (provider) {
-      OAuthProvider.google || OAuthProvider.apple => Icon(
+      OAuthProvider.google => Icon(
         AppIcons.login,
         size: HkControl.icon,
         color: foreground,

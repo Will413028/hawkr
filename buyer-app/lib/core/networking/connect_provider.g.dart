@@ -401,12 +401,12 @@ final class DiscoveryPublicClientProvider
 String _$discoveryPublicClientHash() =>
     r'0fb25558c420b2cab6c2080e1e82a1276329ec40';
 
-/// 登入的帳號（GetSession）。登入與登出由 Clerk 處理（`clerkSessionProvider`）。
+/// 登入的帳號（GetSession）。登入（`IdentityPublicService`）與 session token 的保存見 `authSessionProvider`。
 
 @ProviderFor(identityClient)
 final identityClientProvider = IdentityClientProvider._();
 
-/// 登入的帳號（GetSession）。登入與登出由 Clerk 處理（`clerkSessionProvider`）。
+/// 登入的帳號（GetSession）。登入（`IdentityPublicService`）與 session token 的保存見 `authSessionProvider`。
 
 final class IdentityClientProvider
     extends
@@ -416,7 +416,7 @@ final class IdentityClientProvider
           IdentityAppServiceClient
         >
     with $Provider<IdentityAppServiceClient> {
-  /// 登入的帳號（GetSession）。登入與登出由 Clerk 處理（`clerkSessionProvider`）。
+  /// 登入的帳號（GetSession）。登入（`IdentityPublicService`）與 session token 的保存見 `authSessionProvider`。
   IdentityClientProvider._()
     : super(
         from: null,

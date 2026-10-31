@@ -10,8 +10,8 @@ import '../../../core/networking/connect_provider.dart';
 
 part 'auth_repository.g.dart';
 
-/// 登入的帳號、交付 Apple 憑證與刪除帳號：identity 的 `IdentityAppService`（Connect）。登入與登出由 Clerk
-/// 處理（`clerkSessionProvider`）。
+/// 登入的帳號、登出與刪除帳號：identity 的 `IdentityAppService`（Connect）。登入（換發 session token）見
+/// `identity_gateway.dart`，token 的保存見 `authSessionProvider`。
 ///
 /// [currentAccountId] 失敗一律拋 [AuthRequestException]（給使用者看的文字在 `message`），回應不符
 /// 契約時拋 [MalformedAuthResponse]；[deleteAccount] 與 [accountExists] 拋出原本的例外，由刪除流程自己分類。
@@ -27,7 +27,7 @@ class AuthRepository {
   final IdentityAppServiceClient _sessionClient;
   final DefaultErrorText _defaults;
 
-  /// 目前登入的帳號 ID（GetSession）。Clerk 登入之後呼叫：第一次登入的使用者，伺服器在這時建立帳號。
+  /// 目前登入的帳號 ID（GetSession）。登入之後呼叫：第一次登入的使用者，伺服器在這時建立帳號。
   Future<String> currentAccountId() async {
     final response = await _call(
       () => _sessionClient.getSession(GetSessionRequest()),
@@ -36,6 +36,11 @@ class AuthRepository {
       throw const MalformedAuthResponse('GetSession: missing account id');
     }
     return response.account.id;
+  }
+
+  /// 登出（SignOut）：在伺服器撤銷目前的 session。session 已經不存在時也成功。
+  Future<void> signOut() async {
+    await _call(() => _sessionClient.signOut(SignOutRequest()));
   }
 
   /// 刪除帳號（DeleteAccount）。失敗拋出原本的例外，由呼叫端依 [ErrorFacts] 分類：沒收到回應時帳號可能已刪除，

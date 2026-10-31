@@ -1,8 +1,7 @@
-import 'package:hawkr_auth/clerk.dart' show isSessionTokenRefused;
 import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../session/clerk_session_provider.dart';
+import '../session/auth_session_provider.dart';
 import '../session/force_logout_provider.dart';
 import '../session/session_provider.dart';
 
@@ -12,9 +11,9 @@ part 'auth_interceptor.g.dart';
 AuthInterceptor authInterceptor(Ref ref) =>
     AuthInterceptor(() => currentSessionToken(ref), ref);
 
-/// 登入後的身分：每個請求帶 Clerk 的 session token（`Authorization: Bearer`，訪客不帶）。token 由 Clerk 的 SDK
-/// 換新（ADR `2026-09-27-identity-clerk.md`）；取不到 token（連不上 Clerk）時不送出，以連線錯誤結束。收到 401
-/// 就強制登出，回到登入。
+/// 登入後的身分：每個請求帶 identity 的 session token（`Authorization: Bearer`，訪客不帶）。token 是 Keychain 裡的
+/// opaque token（ADR `2026-10-30-identity-self-hosted-federated-login.md`），不換新；讀不到 token 時不送出，以連線錯誤結束。
+/// 收到 401 就強制登出（登出時清除 token），回到登入。
 class AuthInterceptor extends Interceptor {
   AuthInterceptor(this._sessionToken, this._ref);
 
@@ -30,14 +29,10 @@ class AuthInterceptor extends Interceptor {
     try {
       token = await _sessionToken();
     } catch (e) {
-      final refused = isSessionTokenRefused(e);
-      if (refused) _triggerForceLogout();
       handler.reject(
         DioException(
           requestOptions: options,
-          type: refused
-              ? DioExceptionType.cancel
-              : DioExceptionType.connectionError,
+          type: DioExceptionType.connectionError,
           error: e,
           message: 'session token unavailable',
         ),

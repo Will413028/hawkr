@@ -11,7 +11,7 @@ abstract class SessionModel with _$SessionModel {
     /// 帳號 ID（identity 的 opaque 字串，不解析成數字）
     String? accountId,
 
-    /// 是否已登入：Clerk 登入中，而且有帳號 ID（見 `Session`）。憑證是 Clerk 的 session token，不在這裡。
+    /// 是否已登入：有 session token，而且有帳號 ID（見 `Session`）。憑證是 identity 的 session token，不在這裡。
     @Default(false) bool isLoggedIn,
   }) = _SessionModel;
 }

@@ -268,7 +268,7 @@
 | 路由／頁面 | 功能目的 | 新版內容 Layout | 必備情境與 Icon |
 |---|---|---|---|
 | `/welcome` `WelcomeScreen` | 在 session bootstrap 完成前提供品牌載入，依登入／onboarding／停權狀態導向 | 全螢幕 warm cream；中央品牌 mark 動態；下方小型進度訊息；不顯示牛牛歡迎頁 | slow bootstrap、offline cached session、redirect loop guard；只用 Logo，不用功能 icon |
-| `/auth` `AuthScreen` | Google／Apple／LINE 登入（Clerk）、隱藏 demo review login | 上半品牌月亮／農地 hero；下半單一玻璃登入 card；OAuth 按鈕保留外部品牌 Logo；條款與版本固定底部 | 取消、provider error、買家帳號誤入、demo entry；一般 action 用 Material icon |
+| `/auth` `AuthScreen` | Google／LINE 登入（原生 SDK）、隱藏 demo review login | 上半品牌月亮／農地 hero；下半單一玻璃登入 card；OAuth 按鈕保留外部品牌 Logo；條款與版本固定底部 | 取消、provider error、買家帳號誤入、demo entry；一般 action 用 Material icon |
 | `/onboard` `SellerInformationScreen` | 建立／補齊店舖名稱、聯絡與地址，完成 seller 基本資料 | 三段式：品牌身份、聯絡方式、營運地址；頂部 progress；底部固定 CTA；「稍後設定」必須說明影響 | 新／既有 seller、資料預填、地址不完整、同步部分失敗、skip、重登續填；store/user/phone/location 語意圖示 |
 
 ### 8.2 總覽主頁（1 路由）

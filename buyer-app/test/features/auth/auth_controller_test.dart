@@ -6,7 +6,7 @@ import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pb.dart' as buyer;
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.pb.dart';
 import 'package:hawkr_api/testing.dart';
-import 'package:hawkr_auth/clerk.dart';
+import 'package:hawkr_auth/hawkr_auth.dart' show SignInFailed;
 import 'package:hawkr_buyer/features/order/data/receipt_photo_local_service.dart';
 import 'package:hawkr_buyer/features/notification/data/push/background_handler.dart';
 import 'package:hawkr_api/gen/google/rpc/error_details.pb.dart';
@@ -17,7 +17,7 @@ import 'package:hawkr_buyer/core/storage/auth_storage.dart';
 import 'package:hawkr_buyer/core/exceptions/app_exception.dart';
 import 'package:hawkr_buyer/core/networking/connect_provider.dart';
 import 'package:hawkr_buyer/core/networking/dio_provider.dart';
-import 'package:hawkr_buyer/core/session/clerk_session_provider.dart';
+import 'package:hawkr_buyer/core/session/auth_session_provider.dart';
 import 'package:hawkr_buyer/features/auth/presentation/auth_controller.dart';
 import 'package:hawkr_buyer/features/notification/data/push/manager.dart';
 import 'package:dio/dio.dart';
@@ -27,11 +27,11 @@ import 'package:hawkr_buyer/shared/utils/hk_log.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../support/fake_clerk_session.dart';
+import '../../support/fake_auth_session.dart';
 import '../../support/firebase_core_mock.dart';
 import '../../support/secure_storage_mock.dart';
 
-/// 登入：以 Clerk 登入，再以 GetSession 取得帳號寫入 session。
+/// 登入：原生 SDK 登入換到 session token，再以 GetSession 取得帳號寫入 session。
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -47,19 +47,17 @@ void main() {
     mockSecureStorage({});
   });
 
-  ({ProviderContainer c, FakeClerkSession clerk, List<String?> getSessions})
+  ({ProviderContainer c, FakeAuthSession auth, List<String?> getSessions})
   harness({
-    FakeClerkSession? clerkSession,
-    _FakePicker? picker,
+    FakeAuthSession? authSession,
     _ProfileAdapter? adapter,
     FutureOr<GetSessionResponse> Function()? getSession,
   }) {
-    final clerk = clerkSession ?? FakeClerkSession();
+    final auth = authSession ?? FakeAuthSession();
     final getSessions = <String?>[];
     final container = ProviderContainer(
       overrides: [
-        clerkSessionProvider.overrideWith((ref) async => clerk),
-        oauthPickerProvider.overrideWithValue(picker ?? _FakePicker()),
+        authSessionProvider.overrideWith((ref) async => auth),
         connectAuthTransportProvider.overrideWith(
           (ref) => FakeTransportBuilder()
               .unary(
@@ -70,7 +68,7 @@ void main() {
               )
               .build(),
         ),
-        // GetSession 經過真的身分 interceptor：驗證登入之後的請求帶 Clerk 的 token。
+        // GetSession 經過真的身分 interceptor：驗證登入之後的請求帶 session token。
         identityClientProvider.overrideWith(
           (ref) => IdentityAppServiceClient(
             FakeTransportBuilder()
@@ -88,55 +86,44 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
-    return (c: container, clerk: clerk, getSessions: getSessions);
+    return (c: container, auth: auth, getSessions: getSessions);
   }
 
   Future<bool> signIn(ProviderContainer c, OAuthProvider provider) =>
       c.read(authControllerProvider.notifier).signInWith(provider);
 
-  test('Google：在系統瀏覽器登入 Clerk，GetSession 帶 Clerk 的 token，寫入帳號與暱稱', () async {
-    final picker = _FakePicker();
-    final h = harness(picker: picker);
+  test('Google：原生登入換到 session token，GetSession 帶這個 token，寫入帳號與暱稱', () async {
+    final h = harness();
 
     expect(await signIn(h.c, OAuthProvider.google), isTrue);
 
-    expect(h.clerk.calls, ['browser google']);
-    expect(picker.browserSchemes, ['hawkrbuyer']);
+    expect(h.auth.calls, ['signIn google']);
     expect(h.getSessions, ['Bearer live']);
     final session = h.c.read(sessionProvider).value;
     expect(session?.userId, 'acc_01J8Z');
     expect(session?.nickname, 'Cora');
   });
 
-  test('LINE：同樣經系統瀏覽器', () async {
+  test('LINE：同樣經原生登入', () async {
     final h = harness();
 
     expect(await signIn(h.c, OAuthProvider.line), isTrue);
 
-    expect(h.clerk.calls, ['browser line']);
+    expect(h.auth.calls, ['signIn line']);
     expect(h.c.read(sessionProvider).value?.userId, 'acc_01J8Z');
   });
 
-  test('Apple：以 Sign in with Apple 的 identity token 登入 Clerk', () async {
-    final h = harness();
-
-    expect(await signIn(h.c, OAuthProvider.apple), isTrue);
-
-    expect(h.clerk.calls, ['apple apple-id-token']);
-    expect(h.getSessions, ['Bearer live']);
-  });
-
   test('使用者取消：回 false，不呼叫 GetSession，沒有 session', () async {
-    final h = harness(picker: _FakePicker(cancel: true));
+    final h = harness(authSession: FakeAuthSession()..signInResult = false);
 
     expect(await signIn(h.c, OAuthProvider.google), isFalse);
-    expect(await signIn(h.c, OAuthProvider.apple), isFalse);
+    expect(await signIn(h.c, OAuthProvider.line), isFalse);
 
     expect(h.getSessions, isEmpty);
     expect(h.c.read(sessionProvider).value, isNull);
   });
 
-  test('GetSession 停權錯誤：結束 Clerk session、往外丟，不寫入帳號', () async {
+  test('GetSession 停權錯誤：清除 session token、往外丟，不寫入帳號', () async {
     final h = harness(
       getSession: () => throw ConnectException(
         Code.permissionDenied,
@@ -160,12 +147,12 @@ void main() {
       ),
     );
 
-    expect(h.clerk.calls, ['browser google', 'signOut']);
-    expect(h.clerk.isSignedIn, isFalse);
+    expect(h.auth.calls, ['signIn google', 'clear']);
+    expect(h.auth.isSignedIn, isFalse);
     expect(h.c.read(sessionProvider).value, isNull);
   });
 
-  test('暫時失敗保留 Clerk，再次登入直接重試 GetSession', () async {
+  test('暫時失敗保留 session token，再次登入直接重試 GetSession', () async {
     var fail = true;
     final h = harness(
       getSession: () {
@@ -177,10 +164,10 @@ void main() {
       signIn(h.c, OAuthProvider.google),
       throwsA(isA<NetworkException>()),
     );
-    expect(h.clerk.isSignedIn, isTrue);
+    expect(h.auth.isSignedIn, isTrue);
     fail = false;
     expect(await signIn(h.c, OAuthProvider.google), isTrue);
-    expect(h.clerk.calls, ['browser google']);
+    expect(h.auth.calls, ['signIn google']);
     expect(h.c.read(sessionProvider).value?.userId, 'recovered');
   });
 
@@ -215,14 +202,33 @@ void main() {
     expect(calls, 2);
   });
 
-  test('冷啟動 token 換發遭拒時登出 Clerk，不送 GetSession', () async {
-    final clerk = FakeClerkSession(signedIn: true)
-      ..tokenError = const SessionTokenRefused('revoked');
-    final h = harness(clerkSession: clerk);
+  test('冷啟動 GetSession 回 unauthenticated：清除 token，沒有 session', () async {
+    final auth = FakeAuthSession(signedIn: true);
+    final h = harness(
+      authSession: auth,
+      getSession: () => throw ConnectException(Code.unauthenticated, 'revoked'),
+    );
     expect(await h.c.read(sessionProvider.future), isNull);
-    expect(clerk.isSignedIn, isFalse);
-    expect(clerk.calls, ['signOut']);
+    expect(auth.isSignedIn, isFalse);
+    expect(auth.calls, ['clear']);
+  });
+
+  test('原生登入失敗：SignInFailed 往外丟（文字給使用者看），不呼叫 GetSession', () async {
+    final auth = FakeAuthSession()
+      ..signInError = const SignInFailed('登入失敗，請稍後再試');
+    final h = harness(authSession: auth);
+    await expectLater(
+      signIn(h.c, OAuthProvider.google),
+      throwsA(
+        isA<SignInFailed>().having(
+          (e) => e.toString(),
+          'message',
+          '登入失敗，請稍後再試',
+        ),
+      ),
+    );
     expect(h.getSessions, isEmpty);
+    expect(h.c.read(sessionProvider).value, isNull);
   });
 
   for (final method in ['read', 'write']) {
@@ -254,7 +260,7 @@ void main() {
           await photos.write('order-1', 'photo');
           final prefs = await SharedPreferences.getInstance();
           await prefs.setStringList(fcmProcessedIdsKey, ['push-1']);
-          final h = harness(clerkSession: FakeClerkSession(signedIn: restore));
+          final h = harness(authSession: FakeAuthSession(signedIn: restore));
           if (restore) {
             expect(
               (await h.c.read(sessionProvider.future))?.userId,
@@ -281,7 +287,7 @@ void main() {
     await prefs.setStringList(fcmProcessedIdsKey, ['push-1']);
     var calls = 0;
     final h = harness(
-      clerkSession: FakeClerkSession(signedIn: true),
+      authSession: FakeAuthSession(signedIn: true),
       getSession: () {
         if (++calls == 1) throw ConnectException(Code.unavailable, 'offline');
         return GetSessionResponse(account: Account(id: 'acc_01J8Z'));
@@ -322,7 +328,7 @@ void main() {
     expect(calls, 4);
     expect(await AuthStorage.existingGuestCartId(), guest);
     final adapter = _ProfileAdapter();
-    final second = harness(clerkSession: first.clerk, adapter: adapter);
+    final second = harness(authSession: first.auth, adapter: adapter);
     expect((await second.c.read(sessionProvider.future))?.userId, 'acc_01J8Z');
     await _until(() async => await AuthStorage.existingGuestCartId() == null);
     expect(adapter.merges, [guest]);
@@ -336,7 +342,7 @@ void main() {
     final adapter = _ProfileAdapter();
     var calls = 0;
     final h = harness(
-      clerkSession: FakeClerkSession(signedIn: true),
+      authSession: FakeAuthSession(signedIn: true),
       adapter: adapter,
       getSession: () {
         if (++calls == 1) throw ConnectException(Code.unavailable, 'offline');
@@ -356,14 +362,14 @@ void main() {
     expect(adapter.merges, [guest]);
   });
 
-  test('GetSession 缺少帳號時保留 Clerk', () async {
+  test('GetSession 缺少帳號時保留 session token', () async {
     final h = harness(getSession: () => GetSessionResponse());
     await expectLater(signIn(h.c, OAuthProvider.google), throwsException);
-    expect(h.clerk.isSignedIn, isTrue);
-    expect(h.clerk.calls, ['browser google']);
+    expect(h.auth.isSignedIn, isTrue);
+    expect(h.auth.calls, ['signIn google']);
   });
 
-  test('GetSession 明確拒絕憑證時結束 Clerk session', () async {
+  test('GetSession 明確拒絕憑證時清除 session token', () async {
     final h = harness(
       getSession: () => throw ConnectException(Code.unauthenticated, 'invalid'),
     );
@@ -373,30 +379,9 @@ void main() {
       throwsA(isA<UnauthorizedException>()),
     );
 
-    expect(h.clerk.calls, ['browser google', 'signOut']);
+    expect(h.auth.calls, ['signIn google', 'clear']);
     expect(h.c.read(sessionProvider).value, isNull);
   });
-}
-
-class _FakePicker implements OAuthPicker {
-  _FakePicker({this.cancel = false});
-
-  final bool cancel;
-  final browserSchemes = <String>[];
-
-  @override
-  Future<Uri?> authenticateInBrowser(Uri url, String callbackScheme) async {
-    browserSchemes.add(callbackScheme);
-    return cancel ? null : Uri.parse('$callbackScheme://oauth-callback');
-  }
-
-  @override
-  Future<AppleCredentials?> pickApple() async => cancel
-      ? null
-      : const AppleCredentials(
-          identityToken: 'apple-id-token',
-          authorizationCode: 'apple-code',
-        );
 }
 
 /// 登入後的 REST（合併購物車、`GET /app/buyers/me`）：一律回同一個 body，不連網路。

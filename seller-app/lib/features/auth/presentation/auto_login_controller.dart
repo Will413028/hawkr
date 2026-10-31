@@ -23,7 +23,7 @@ class AutoLoginSignedIn extends AutoLoginResult {
   final bool needsOnboarding;
 }
 
-/// 冷啟動自動登入：Clerk 登入中時以 GetSession 恢復帳號。
+/// 冷啟動自動登入：有保存的 session token 時以 GetSession 恢復帳號。
 ///
 /// 登入是否仍然有效由伺服器判斷：失效時請求收到 401，由中央 Dio 登出（見 `dio_provider.dart`）。
 ///

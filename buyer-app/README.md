@@ -116,8 +116,8 @@ lib/
 | `firebase_core` | Firebase 核心 |
 | `firebase_messaging` | 推播通知 |
 | `firebase_auth` | Firebase 認證 |
-| `flutter_web_auth_2` | Clerk 的 OAuth（Google、LINE）在系統瀏覽器完成 |
-| `sign_in_with_apple` | Sign in with Apple |
+| `google_sign_in` | Google 原生登入（`packages/hawkr_auth`） |
+| `flutter_line_sdk` | LINE 原生登入（`packages/hawkr_auth`） |
 | `flutter_svg` | SVG 圖片 |
 | `image_picker` | 圖片選擇 |
 
@@ -134,7 +134,7 @@ lib/
 ### 主要 API 端點
 
 #### 認證
-- 登入與登出由 Clerk 處理（Google、LINE 經系統瀏覽器，Apple 用 Sign in with Apple），請求以 Clerk 的 session token 帶 `Authorization: Bearer`
+- 登入：Google、LINE 的原生 SDK 取得 ID token，`IdentityPublicService/ExchangeIdToken`（先 `IssueAppLoginNonce`）換成 session token，存 Keychain；請求以它帶 `Authorization: Bearer`；`IdentityAppService/SignOut` 登出
 - `IdentityAppService/GetSession`（Connect）- 登入後取得帳號（第一次登入時建立）
 
 #### 會員
@@ -210,9 +210,9 @@ flutter pub get
 # 產生程式碼 (Riverpod / Freezed / JSON)
 dart run build_runner build --delete-conflicting-outputs
 
-# 運行 (dev 環境)；Clerk 顧客 application 的 publishable key 以 dart-define 帶入，不寫進程式碼，
-# 沒有帶時只能以訪客使用
-flutter run --flavor dev --dart-define=CLERK_PUBLISHABLE_KEY=pk_test_...
+# 運行 (dev 環境)；登入用的 client ID 經 dart-define-from-file 提供（見下方「登入設定」），
+# 沒有提供時只能以訪客使用
+flutter run --flavor dev --dart-define-from-file=config/dart-defines.json
 
 # 運行 (stage 環境)；API 主機沒有預設值，經 dart-define-from-file 提供
 flutter run --flavor stage --dart-define-from-file=config/dart-defines.json
@@ -235,11 +235,33 @@ flutter run --flavor prod --dart-define-from-file=config/dart-defines.json
 - `PUBLIC_SITE_ORIGIN`：網頁公開網址，伺服器沒給分享連結時用來組分享連結；沒有提供時不開分享面板。
 - `HELP_CENTER_LINE_ID`、`HELP_CENTER_LINE_URL`：幫助中心的客服 LINE 官方帳號；沒有提供時不顯示 LINE 入口。
 
+### 登入設定（Google、LINE）
+App 以原生 SDK 登入（`packages/hawkr_auth`）：SDK 取得 ID token，再經 `IdentityPublicService`（`IssueAppLoginNonce`、`ExchangeIdToken`）
+換成 identity 的 session token，存在 Keychain。只提供 Google 與 LINE，沒有 Sign in with Apple。值與後端必須對齊：
+
+| 設定 | 放哪裡 | 對應 |
+|------|--------|------|
+| `GOOGLE_IOS_CLIENT_ID` | `config/dart-defines.json` | Google Cloud 的 iOS OAuth client（bundle ID 要等於這個 flavor 的 `PRODUCT_BUNDLE_IDENTIFIER`）；ID token 的 `azp`，後端 `GOOGLE_APP_CLIENT_IDS` 要包含它 |
+| `GOOGLE_WEB_CLIENT_ID` | `config/dart-defines.json` | Google Cloud 的 web OAuth client；傳給 SDK 的 `serverClientId`，ID token 的 `aud`，要等於後端 `GOOGLE_WEB_CLIENT_ID` |
+| `LINE_CHANNEL_ID` | `config/dart-defines.json` | LINE Login channel 的 Channel ID（與後端、web 同一個 channel）；ID token 的 `aud` |
+| `GOOGLE_REVERSED_CLIENT_ID` | `ios/Runner/config/{dev,stage,prod}/Auth.xcconfig`（不進版控，範本 `config/Auth.example.xcconfig`） | iOS client ID 的 reversed 寫法，Info.plist 的 Google URL scheme 讀它 |
+
+任一欄位沒填時，點對應的登入按鈕顯示「登入服務尚未設定」。LINE 的 URL scheme（`line3rdp.$(PRODUCT_BUNDLE_IDENTIFIER)`）與
+`LSApplicationQueriesSchemes` 的 `lineauth2` 已在 `Info.plist`。
+
+需要人在各主控台做的事：
+1. Google Cloud Console（與後端同一個專案）：為每個 flavor 的 bundle ID 建一個 iOS OAuth client，取得 client ID 填 `GOOGLE_IOS_CLIENT_ID`，
+   reversed 寫法填 `Auth.xcconfig`；web client 已存在（後端用的那個），client ID 填 `GOOGLE_WEB_CLIENT_ID`；確認 OAuth 同意畫面包含 `openid`、`email`、`profile`。
+2. LINE Developers Console：Login channel 的「App types」勾選 iOS，填入每個 flavor 的 bundle ID（`io.github.will413028.hawkr.*`）；
+   申請 OpenID Connect 與 Email address 權限；Channel ID 填 `LINE_CHANNEL_ID`。
+3. Xcode：目標的 Signing & Capabilities 已不需要 Sign in with Apple（`entitlements` 已移除該項）；Apple Developer 帳號那邊的 App ID 設定不用動。
+4. 驗證 ID token（真機或模擬器，各登入一次）：Google 的 token 要 `aud` = web client、`azp` = iOS client；LINE 的 `aud` = channel ID。
+
 ## 建置發布
 
 ```bash
-# iOS IPA（publishable key 用正式的 Clerk instance）
-flutter build ios --release --flavor prod --dart-define=CLERK_PUBLISHABLE_KEY=pk_live_...
+# iOS IPA（config/dart-defines.json 與 Auth.xcconfig 用正式的 client ID）
+flutter build ios --release --flavor prod --dart-define-from-file=config/dart-defines.json
 ```
 
 ## 更新紀錄

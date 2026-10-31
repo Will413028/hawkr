@@ -37,7 +37,7 @@ class AuthRepository {
 
   // ─────────────────── 帳號（IdentityAppService） ───────────────────
 
-  /// 目前登入的帳號 ID（GetSession）。Clerk 登入之後呼叫：第一次登入的使用者，伺服器在這時建立帳號。
+  /// 目前登入的帳號 ID（GetSession）。登入之後呼叫：第一次登入的使用者，伺服器在這時建立帳號。
   /// 錯誤轉成 [AppException]：文字取自伺服器的 LocalizedMessage（例如停權）。
   Future<String> currentAccountId() async {
     final res = await _call(
@@ -48,6 +48,11 @@ class AuthRepository {
       throw const MalformedAuthResponse('GetSession without account id');
     }
     return res.account.id;
+  }
+
+  /// 登出（SignOut）：在伺服器撤銷目前的 session。session 已經不存在時也成功。
+  Future<void> signOut() async {
+    await _call('signOut', () => _identity.signOut(identity.SignOutRequest()));
   }
 
   /// 刪除帳號（DeleteAccount）。失敗拋出原本的例外，由呼叫端依 [ErrorFacts] 分類：沒收到回應時帳號可能已刪除，

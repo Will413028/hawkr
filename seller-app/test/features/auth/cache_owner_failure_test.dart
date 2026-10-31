@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../support/fake_clerk_session.dart';
+import '../../support/fake_auth_session.dart';
 import 'support/auth_test_fakes.dart';
 import 'support/login_harness.dart';
 
@@ -59,9 +59,8 @@ void main() {
           final repo = FakeAuthRepository();
           when(() => repo.currentAccountId()).thenAnswer((_) async => 'acc-1');
           final c = makeLoginContainer(
-            picker: FakeOAuthPicker(),
             repo: repo,
-            clerk: FakeClerkSession(signedIn: restore),
+            auth: FakeAuthSession(signedIn: restore),
           );
           final session = c.read(sessionProvider.notifier);
           if (restore) {

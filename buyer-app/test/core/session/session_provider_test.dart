@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:hawkr_buyer/core/exceptions/app_exception.dart';
 import 'package:hawkr_buyer/core/session/force_logout_provider.dart';
-import 'package:hawkr_buyer/core/session/clerk_session_provider.dart';
+import 'package:hawkr_buyer/core/session/auth_session_provider.dart';
 import 'package:hawkr_buyer/core/session/session_provider.dart';
 import 'package:hawkr_buyer/features/auth/data/auth_repository.dart';
 import 'package:hawkr_buyer/features/notification/data/push/manager.dart';
@@ -12,7 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../support/fake_clerk_session.dart';
+import '../../support/fake_auth_session.dart';
 import '../../support/firebase_core_mock.dart';
 import '../../support/secure_storage_mock.dart';
 
@@ -23,6 +23,10 @@ class _AccountRepository extends Fake implements AuthRepository {
   final Future<BuyerProfile?> Function()? profileAnswer;
 
   final Future<String> Function() answer;
+  var signOuts = 0;
+
+  @override
+  Future<void> signOut() async => signOuts++;
 
   @override
   Future<String> currentAccountId() => answer();
@@ -43,8 +47,10 @@ void main() {
     mockSecureStorage({});
   });
 
+  _AccountRepository? lastRepository;
+
   ProviderContainer containerWith(
-    Future<FakeClerkSession> Function() clerk,
+    Future<FakeAuthSession> Function() auth,
     Future<String> Function() account, {
     BuyerProfile? profile = const BuyerProfile(
       id: '1',
@@ -61,9 +67,13 @@ void main() {
   }) {
     final container = ProviderContainer(
       overrides: [
-        clerkSessionProvider.overrideWith((ref) => clerk()),
+        authSessionProvider.overrideWith((ref) => auth()),
         authRepositoryProvider.overrideWith(
-          (ref) => _AccountRepository(account, profile, profileAnswer),
+          (ref) => lastRepository = _AccountRepository(
+            account,
+            profile,
+            profileAnswer,
+          ),
         ),
       ],
     );
@@ -71,10 +81,10 @@ void main() {
     return container;
   }
 
-  test('冷啟動：Clerk 登入中，以 GetSession 取得帳號', () async {
+  test('冷啟動：session token 登入中，以 GetSession 取得帳號', () async {
     var calls = 0;
     final c = containerWith(
-      () async => FakeClerkSession(signedIn: true),
+      () async => FakeAuthSession(signedIn: true),
       () async {
         calls++;
         return 'acc_01J8Z';
@@ -93,7 +103,7 @@ void main() {
   test('GetSession 完成即恢復，個人資料在背景完成', () async {
     final profile = Completer<BuyerProfile?>();
     final c = containerWith(
-      () async => FakeClerkSession(signedIn: true),
+      () async => FakeAuthSession(signedIn: true),
       () async => 'acc-1',
       profileAnswer: () => profile.future,
     );
@@ -124,8 +134,8 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(fcmProcessedIdsKey, ['message-1']);
     var calls = 0;
-    final clerk = FakeClerkSession(signedIn: true);
-    final c = containerWith(() async => clerk, () async {
+    final auth = FakeAuthSession(signedIn: true);
+    final c = containerWith(() async => auth, () async {
       if (++calls < 2) throw const NetworkException();
       return 'recovered';
     });
@@ -134,7 +144,7 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 1600));
     expect(c.read(sessionProvider).value?.userId, 'recovered');
     expect(calls, 2);
-    expect(clerk.calls, isEmpty);
+    expect(auth.calls, isEmpty);
     expect(await photos.read('order-1'), 'cached-photo');
     expect(prefs.getStringList(fcmProcessedIdsKey), ['message-1']);
   });
@@ -143,7 +153,7 @@ void main() {
     final answer = Completer<String>();
     var calls = 0;
     final c = containerWith(
-      () async => FakeClerkSession(signedIn: true),
+      () async => FakeAuthSession(signedIn: true),
       () async {
         if (++calls == 1) throw const NetworkException();
         return answer.future;
@@ -159,10 +169,7 @@ void main() {
   });
 
   test('已排程停權提醒不被後續 401 清空', () {
-    final c = containerWith(
-      () async => FakeClerkSession(),
-      () async => 'acc-1',
-    );
+    final c = containerWith(() async => FakeAuthSession(), () async => 'acc-1');
     final force = c.read(forceLogoutProvider.notifier);
     force.trigger(message: '帳號已停權');
     force.trigger();
@@ -174,7 +181,7 @@ void main() {
 
   test('冷啟動個人資料尚未知時暱稱是 null', () async {
     final c = containerWith(
-      () async => FakeClerkSession(signedIn: true),
+      () async => FakeAuthSession(signedIn: true),
       () async => 'acc-1',
       profile: null,
     );
@@ -183,9 +190,9 @@ void main() {
     expect(session?.nickname, isNull);
   });
 
-  test('冷啟動：Clerk 沒有 session，不呼叫 GetSession', () async {
+  test('冷啟動：session token 沒有 session，不呼叫 GetSession', () async {
     var calls = 0;
-    final c = containerWith(() async => FakeClerkSession(), () async {
+    final c = containerWith(() async => FakeAuthSession(), () async {
       calls++;
       return 'acc_01J8Z';
     });
@@ -194,16 +201,16 @@ void main() {
     expect(calls, 0);
   });
 
-  test('冷啟動：GetSession 暫時失敗，保留 Clerk session', () async {
-    final clerk = FakeClerkSession(signedIn: true);
+  test('冷啟動：GetSession 暫時失敗，保留 session token session', () async {
+    final auth = FakeAuthSession(signedIn: true);
     final c = containerWith(
-      () async => clerk,
+      () async => auth,
       () async => throw StateError('backend unavailable'),
     );
 
     expect(await c.read(sessionProvider.future), isNull);
     expect(c.read(sessionProvider).hasError, isFalse);
-    expect(clerk.calls, isEmpty);
+    expect(auth.calls, isEmpty);
   });
 
   for (final error in [
@@ -211,10 +218,10 @@ void main() {
     const SuspendedException('帳號已停權'),
   ]) {
     test('冷啟動拒絕憑證：$error', () async {
-      final clerk = FakeClerkSession(signedIn: true);
-      final c = containerWith(() async => clerk, () async => throw error);
+      final auth = FakeAuthSession(signedIn: true);
+      final c = containerWith(() async => auth, () async => throw error);
       expect(await c.read(sessionProvider.future), isNull);
-      expect(clerk.isSignedIn, isFalse);
+      expect(auth.isSignedIn, isFalse);
       expect(c.read(sessionProvider).hasError, isFalse);
       if (error is SuspendedException) {
         expect(c.read(forceLogoutProvider.notifier).message, '帳號已停權');
@@ -226,7 +233,7 @@ void main() {
   test('暫時故障後可重新取得帳號', () async {
     var failed = true;
     final c = containerWith(
-      () async => FakeClerkSession(signedIn: true),
+      () async => FakeAuthSession(signedIn: true),
       () async {
         if (failed) throw const NetworkException();
         return 'recovered';
@@ -242,16 +249,16 @@ void main() {
     const MalformedAuthResponse('missing account'),
     const ServerException('unknown error'),
   ]) {
-    test('非拒絕失敗保留 Clerk：$error', () async {
-      final clerk = FakeClerkSession(signedIn: true);
-      final c = containerWith(() async => clerk, () async => throw error);
+    test('非拒絕失敗保留 session token：$error', () async {
+      final auth = FakeAuthSession(signedIn: true);
+      final c = containerWith(() async => auth, () async => throw error);
       expect(await c.read(sessionProvider.future), isNull);
-      expect(clerk.isSignedIn, isTrue);
-      expect(clerk.calls, isEmpty);
+      expect(auth.isSignedIn, isTrue);
+      expect(auth.calls, isEmpty);
     });
   }
 
-  test('冷啟動：Clerk 無法啟動，以訪客開始', () async {
+  test('冷啟動：session token 無法啟動，以訪客開始', () async {
     final c = containerWith(
       () async => throw StateError('keychain'),
       () async => 'acc_01J8Z',
@@ -260,20 +267,21 @@ void main() {
     expect(await c.read(sessionProvider.future), isNull);
   });
 
-  test('登出：結束 Clerk session 並清除記憶體帳號', () async {
-    final clerk = FakeClerkSession(signedIn: true);
-    final c = containerWith(() async => clerk, () async => 'acc_01J8Z');
+  test('登出：伺服器撤銷 session、清除 token 並清除記憶體帳號', () async {
+    final auth = FakeAuthSession(signedIn: true);
+    final c = containerWith(() async => auth, () async => 'acc_01J8Z');
     await c.read(sessionProvider.future);
 
     await c.read(sessionProvider.notifier).logout();
 
-    expect(clerk.calls, ['signOut']);
+    expect(lastRepository?.signOuts, 1);
+    expect(auth.calls, ['clear']);
     expect(c.read(sessionProvider).value, isNull);
   });
 
   test('登入後更新暱稱只改目前 session', () async {
     final c = containerWith(
-      () async => FakeClerkSession(),
+      () async => FakeAuthSession(),
       () async => 'acc_01J8Z',
     );
     await c.read(sessionProvider.future);

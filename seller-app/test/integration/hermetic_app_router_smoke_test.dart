@@ -18,7 +18,7 @@ import 'package:hawkr_seller/config/flavor.dart';
 import 'package:hawkr_seller/core/networking/connect_provider.dart';
 import 'package:hawkr_seller/core/networking/dio_provider.dart';
 import 'package:hawkr_seller/core/router/app_router.dart';
-import 'package:hawkr_seller/core/session/clerk_session_provider.dart';
+import 'package:hawkr_seller/core/session/auth_session_provider.dart';
 import 'package:hawkr_seller/core/session/post_login_side_effects.dart';
 import 'package:hawkr_seller/core/session/session_provider.dart';
 import 'package:hawkr_seller/features/auth/presentation/auth_screen.dart';
@@ -33,7 +33,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../support/fake_clerk_session.dart';
+import '../support/fake_auth_session.dart';
 import '../support/my_store_fixtures.dart';
 import '../support/default_error_text.dart';
 
@@ -189,7 +189,7 @@ void main() {
         'seller_id': 42,
         'seller_name': 'Hermetic Seller',
       });
-      final harness = _SellerAppHarness(clerkSignedIn: true);
+      final harness = _SellerAppHarness(authSignedIn: true);
       tester.view.padding = const FakeViewPadding(top: 62, bottom: 34);
       tester.view.viewPadding = const FakeViewPadding(top: 62, bottom: 34);
       addTearDown(tester.view.resetPadding);
@@ -210,7 +210,7 @@ void main() {
         harness.router.routeInformationProvider.value.uri.path,
         MainRoutes.dashboard,
       );
-      // 冷啟動恢復：Clerk 登入中 → GetSession（Connect，獨立的 session client）取回帳號，再讀 GetMyStore。
+      // 冷啟動恢復：session token 登入中 → GetSession（Connect，獨立的 session client）取回帳號，再讀 GetMyStore。
       expect(harness.connectCalls, [
         IdentityAppService.getSession.procedure,
         SellerAppService.getMyStore.procedure,
@@ -238,15 +238,15 @@ void main() {
 }
 
 class _SellerAppHarness {
-  _SellerAppHarness({bool clerkSignedIn = false})
+  _SellerAppHarness({bool authSignedIn = false})
     : connectCalls = [],
       adapter = _HermeticSellerAdapter(),
       dio = Dio(BaseOptions(baseUrl: 'https://hermetic.invalid')) {
     dio.httpClientAdapter = adapter;
-    final clerk = FakeClerkSession(signedIn: clerkSignedIn);
+    final auth = FakeAuthSession(signedIn: authSignedIn);
     container = ProviderContainer(
       overrides: [
-        clerkSessionProvider.overrideWith((ref) async => clerk),
+        authSessionProvider.overrideWith((ref) async => auth),
         dioProvider.overrideWithValue(dio),
         // Connect 只開放 GetSession 與 GetMyStore；其他 procedure 沒註冊就直接失敗。
         myStoreRepositoryProvider.overrideWithValue(

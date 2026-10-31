@@ -14,7 +14,6 @@ import 'package:hawkr_ui_text/hawkr_ui_text.dart' show UiLocale;
 import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_buyer/config/flavor.dart';
 import 'package:hawkr_buyer/core/l10n/ui_locale.dart';
-import 'package:hawkr_buyer/core/session/clerk_session_provider.dart';
 import 'package:hawkr_buyer/core/session/session_model.dart';
 import 'package:hawkr_buyer/core/session/session_provider.dart';
 import 'package:hawkr_buyer/core/theme/app_theme.dart';
@@ -29,7 +28,6 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../../support/fake_clerk_session.dart';
 import '../../support/firebase_core_mock.dart';
 import '../../support/secure_storage_mock.dart';
 import '../../support/default_error_text.dart';
@@ -40,7 +38,7 @@ class _ActiveSession extends Session {
       const SessionModel(userId: 'account-3001', nickname: 'Iris');
 }
 
-/// 登入信箱來自 Clerk（身分），不是個人資料：只顯示、不必填、不送出。
+/// 登入信箱不是個人資料：identity 目前沒有把它給 App，所以不顯示；儲存時不送出。
 void main() {
   if (!F.isInitialized) F.init(Flavor.dev);
 
@@ -49,7 +47,6 @@ void main() {
 
   Future<List<buyer.UpdateProfileRequest>> pumpScreen(
     WidgetTester tester, {
-    required String? email,
     FutureOr<DeleteAccountResponse> Function()? deleteAccount,
     FutureOr<GetSessionResponse> Function()? getSession,
     Gender? gender,
@@ -100,9 +97,6 @@ void main() {
         authRepositoryProvider.overrideWith((_) => repository),
         sessionProvider.overrideWith(_ActiveSession.new),
         if (locale != null) uiLocaleProvider.overrideWithValue(locale),
-        clerkSessionProvider.overrideWith(
-          (_) async => FakeClerkSession(signedIn: true, email: email),
-        ),
       ],
     );
     addTearDown(container.dispose);
@@ -146,28 +140,8 @@ void main() {
     }
   }
 
-  testWidgets('登入信箱顯示 Clerk 的 email、唯讀，沒有輸入也能儲存且不送出', (tester) async {
-    final updates = await pumpScreen(tester, email: 'buyer@example.com');
-
-    final field = tester.widget<TextField>(
-      find.descendant(
-        of: find.byKey(const ValueKey('profile-field-登入信箱')),
-        matching: find.byType(TextField),
-      ),
-    );
-    expect(field.controller!.text, 'buyer@example.com');
-    expect(field.readOnly, isTrue);
-
-    await save(tester);
-
-    expect(updates, hasLength(1));
-    expect(updates.single.updateMask.paths, isNot(contains('email')));
-    expect(find.text('home'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 5));
-  });
-
-  testWidgets('Clerk 沒有 email 時不顯示信箱欄，照樣可以儲存', (tester) async {
-    final updates = await pumpScreen(tester, email: null);
+  testWidgets('identity 沒有把登入信箱給 App：不顯示信箱欄，照樣可以儲存', (tester) async {
+    final updates = await pumpScreen(tester);
 
     expect(find.byKey(const ValueKey('profile-field-登入信箱')), findsNothing);
 
@@ -204,11 +178,7 @@ void main() {
 
     testWidgets('讀到女性就顯示「女性」，不改直接儲存仍送 FEMALE', (tester) async {
       tallView(tester);
-      final updates = await pumpScreen(
-        tester,
-        email: null,
-        gender: Gender.GENDER_FEMALE,
-      );
+      final updates = await pumpScreen(tester, gender: Gender.GENDER_FEMALE);
       await showGender(tester);
       expect(genderSurfaceText('女性'), findsOneWidget);
 
@@ -221,11 +191,7 @@ void main() {
 
     testWidgets('選「尚未設定」後儲存：gender 在 mask 裡而且沒有設值', (tester) async {
       tallView(tester);
-      final updates = await pumpScreen(
-        tester,
-        email: null,
-        gender: Gender.GENDER_FEMALE,
-      );
+      final updates = await pumpScreen(tester, gender: Gender.GENDER_FEMALE);
       await openGender(tester);
       await tester.tap(find.byKey(const ValueKey('app-dropdown-item-0')));
       await tester.pump(const Duration(milliseconds: 100));
@@ -242,7 +208,7 @@ void main() {
       tallView(tester);
       final semantics = tester.ensureSemantics();
       try {
-        await pumpScreen(tester, email: null);
+        await pumpScreen(tester);
         await showGender(tester);
         expect(genderSurfaceText('尚未設定'), findsOneWidget);
 
@@ -270,7 +236,6 @@ void main() {
       tallView(tester);
       await pumpScreen(
         tester,
-        email: null,
         gender: Gender.GENDER_FEMALE,
         locale: UiLocale.en,
       );
@@ -289,14 +254,14 @@ void main() {
 
     testWidgets('伺服器回 UNSPECIFIED（或不認得的值）時呈現同沒有填', (tester) async {
       tallView(tester);
-      await pumpScreen(tester, email: null, gender: Gender.GENDER_UNSPECIFIED);
+      await pumpScreen(tester, gender: Gender.GENDER_UNSPECIFIED);
       await showGender(tester);
       expect(genderSurfaceText('尚未設定'), findsOneWidget);
       expect(find.text('未知'), findsNothing);
     });
 
     testWidgets('頂部沒有「會員等級」那一行', (tester) async {
-      await pumpScreen(tester, email: null);
+      await pumpScreen(tester);
       expect(find.text('未設定'), findsNothing);
       expect(find.text('一般會員'), findsNothing);
     });
@@ -306,7 +271,6 @@ void main() {
     testWidgets('讀到完整的生日，不改直接儲存仍送同一天', (tester) async {
       final updates = await pumpScreen(
         tester,
-        email: null,
         birthDate: Date(year: 1990, month: 5, day: 20),
       );
       await save(tester);
@@ -318,7 +282,6 @@ void main() {
     testWidgets('年月日有缺的生日視為沒有，儲存時不送日期值', (tester) async {
       final updates = await pumpScreen(
         tester,
-        email: null,
         birthDate: Date(year: 0, month: 5, day: 20),
       );
       await save(tester);
@@ -362,7 +325,7 @@ void main() {
     }
 
     testWidgets('入口在所有表單欄位之後，對話框說明刪除的後果', (tester) async {
-      await pumpScreen(tester, email: null);
+      await pumpScreen(tester);
 
       await showSection(tester);
 
@@ -387,7 +350,7 @@ void main() {
     });
 
     testWidgets('取消：不呼叫 DeleteAccount', (tester) async {
-      await pumpScreen(tester, email: null);
+      await pumpScreen(tester);
       await showSection(tester);
       await tester.tap(find.byKey(const ValueKey('profile-delete-account')));
       await settle(tester);
@@ -402,7 +365,6 @@ void main() {
     testWidgets('DELETED：登出並回首頁', (tester) async {
       await pumpScreen(
         tester,
-        email: null,
         deleteAccount: () => DeleteAccountResponse(
           state: DeleteAccountResponse_DeletionState.DELETION_STATE_DELETED,
         ),
@@ -418,7 +380,6 @@ void main() {
     testWidgets('PENDING_ORDERS：顯示處理中並維持登入', (tester) async {
       await pumpScreen(
         tester,
-        email: null,
         deleteAccount: () => DeleteAccountResponse(
           state:
               DeleteAccountResponse_DeletionState.DELETION_STATE_PENDING_ORDERS,
@@ -437,7 +398,6 @@ void main() {
     testWidgets('其他錯誤：顯示失敗訊息並維持登入', (tester) async {
       await pumpScreen(
         tester,
-        email: null,
         deleteAccount: () => throw ConnectException(Code.internal, 'boom'),
       );
 
@@ -456,7 +416,6 @@ void main() {
     testWidgets('沒有回應且 GetSession unauthenticated：視為已刪除而登出', (tester) async {
       await pumpScreen(
         tester,
-        email: null,
         deleteAccount: () =>
             throw ConnectException.from(const SocketException('offline')),
         getSession: () =>
@@ -473,7 +432,6 @@ void main() {
     testWidgets('沒有回應但 GetSession 有回應：帳號尚未刪除', (tester) async {
       await pumpScreen(
         tester,
-        email: null,
         deleteAccount: () =>
             throw ConnectException.from(const SocketException('offline')),
       );

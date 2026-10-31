@@ -8,7 +8,7 @@ part of 'auto_login_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// 冷啟動自動登入：Clerk 登入中時以 GetSession 恢復帳號。
+/// 冷啟動自動登入：有保存的 session token 時以 GetSession 恢復帳號。
 ///
 /// 登入是否仍然有效由伺服器判斷：失效時請求收到 401，由中央 Dio 登出（見 `dio_provider.dart`）。
 ///
@@ -19,7 +19,7 @@ part of 'auto_login_controller.dart';
 @ProviderFor(AutoLoginController)
 final autoLoginControllerProvider = AutoLoginControllerProvider._();
 
-/// 冷啟動自動登入：Clerk 登入中時以 GetSession 恢復帳號。
+/// 冷啟動自動登入：有保存的 session token 時以 GetSession 恢復帳號。
 ///
 /// 登入是否仍然有效由伺服器判斷：失效時請求收到 401，由中央 Dio 登出（見 `dio_provider.dart`）。
 ///
@@ -28,7 +28,7 @@ final autoLoginControllerProvider = AutoLoginControllerProvider._();
 /// GoRouter 的 redirect 照樣會導頁。
 final class AutoLoginControllerProvider
     extends $NotifierProvider<AutoLoginController, void> {
-  /// 冷啟動自動登入：Clerk 登入中時以 GetSession 恢復帳號。
+  /// 冷啟動自動登入：有保存的 session token 時以 GetSession 恢復帳號。
   ///
   /// 登入是否仍然有效由伺服器判斷：失效時請求收到 401，由中央 Dio 登出（見 `dio_provider.dart`）。
   ///
@@ -65,7 +65,7 @@ final class AutoLoginControllerProvider
 String _$autoLoginControllerHash() =>
     r'0bc59244034ed45b78c050fd61756ffcc63467d5';
 
-/// 冷啟動自動登入：Clerk 登入中時以 GetSession 恢復帳號。
+/// 冷啟動自動登入：有保存的 session token 時以 GetSession 恢復帳號。
 ///
 /// 登入是否仍然有效由伺服器判斷：失效時請求收到 401，由中央 Dio 登出（見 `dio_provider.dart`）。
 ///

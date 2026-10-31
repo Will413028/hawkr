@@ -92,8 +92,6 @@ dependencies:
   flutter_screenutil: ^5.9.3
   palette_generator_plus: ^1.0.0
   sensors_plus: ^6.1.1
-  # Clerk 的 OAuth（Google、LINE）在系統瀏覽器完成（iOS 的 ASWebAuthenticationSession）：Google 不允許在 App 內嵌的
-  # WebView 登入。
   # 用於商品說明 rich text editor 的 inline hashtag chip 渲染
   extended_text_field: ^17.0.0
 

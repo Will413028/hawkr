@@ -8,7 +8,7 @@ part of 'auth_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// 唯一的登入入口：以 Clerk 登入（Google、LINE 經系統瀏覽器，Apple 用 Sign in with Apple），再以 GetSession
+/// 唯一的登入入口：以 Google、LINE 的原生 SDK 登入並換到 identity 的 session token，再以 GetSession
 /// 取得帳號（第一次登入的使用者由伺服器在這時建立），寫入 session。
 ///
 /// keepAlive：登入流程含原生 picker / 畫面切換的多個 await，期間 watch 此
@@ -19,7 +19,7 @@ part of 'auth_controller.dart';
 @ProviderFor(AuthController)
 final authControllerProvider = AuthControllerProvider._();
 
-/// 唯一的登入入口：以 Clerk 登入（Google、LINE 經系統瀏覽器，Apple 用 Sign in with Apple），再以 GetSession
+/// 唯一的登入入口：以 Google、LINE 的原生 SDK 登入並換到 identity 的 session token，再以 GetSession
 /// 取得帳號（第一次登入的使用者由伺服器在這時建立），寫入 session。
 ///
 /// keepAlive：登入流程含原生 picker / 畫面切換的多個 await，期間 watch 此
@@ -28,7 +28,7 @@ final authControllerProvider = AuthControllerProvider._();
 /// ref.read 直接中斷。keepAlive 讓 controller 在整段非同步流程存活。
 final class AuthControllerProvider
     extends $NotifierProvider<AuthController, AsyncValue<void>> {
-  /// 唯一的登入入口：以 Clerk 登入（Google、LINE 經系統瀏覽器，Apple 用 Sign in with Apple），再以 GetSession
+  /// 唯一的登入入口：以 Google、LINE 的原生 SDK 登入並換到 identity 的 session token，再以 GetSession
   /// 取得帳號（第一次登入的使用者由伺服器在這時建立），寫入 session。
   ///
   /// keepAlive：登入流程含原生 picker / 畫面切換的多個 await，期間 watch 此
@@ -62,9 +62,9 @@ final class AuthControllerProvider
   }
 }
 
-String _$authControllerHash() => r'd4afffa15417863d8ff92ff723a60254020bef9d';
+String _$authControllerHash() => r'c9c8509fb547ed373b0c819c682a3b324dab8309';
 
-/// 唯一的登入入口：以 Clerk 登入（Google、LINE 經系統瀏覽器，Apple 用 Sign in with Apple），再以 GetSession
+/// 唯一的登入入口：以 Google、LINE 的原生 SDK 登入並換到 identity 的 session token，再以 GetSession
 /// 取得帳號（第一次登入的使用者由伺服器在這時建立），寫入 session。
 ///
 /// keepAlive：登入流程含原生 picker / 畫面切換的多個 await，期間 watch 此
