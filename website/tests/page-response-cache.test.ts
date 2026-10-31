@@ -220,7 +220,11 @@ test("the no-store rule still covers every SEO-private prefix", async () => {
 
 test("no page header rule opts out of the two cache policies", async () => {
 	const rules = await loadRules();
-	const cacheRules = rules.filter((rule) => cacheControlOf(rule) !== undefined);
+	const cacheRules = rules.filter(
+		(rule) =>
+			cacheControlOf(rule) !== undefined &&
+			!rule.source.startsWith("/_next/static"),
+	);
 
 	// The three public rules, the no-store rule, and one more no-store rule per
 	// routed non-default locale (prod routes none, so there it is exactly four).
@@ -343,4 +347,13 @@ test("Permissions-Policy allows geolocation only for same-origin pages", async (
 		permissionsPolicy?.value,
 		"camera=(), microphone=(), geolocation=(self)",
 	);
+});
+
+test("fingerprinted build assets are immutable in the browser", async () => {
+	const rules = await loadRules();
+	const rule = rules.find((candidate) =>
+		candidate.source.startsWith("/_next/static"),
+	);
+	assert.ok(rule, "a /_next/static rule must exist");
+	assert.equal(cacheControlOf(rule), "public, max-age=31536000, immutable");
 });

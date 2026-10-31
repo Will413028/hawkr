@@ -47,6 +47,7 @@ docs/                       # 技術文件（directory-architecture.md、design-
 - **寫新頁面**：放在 `app/[locale]/`；RSC 從 `params.locale`（`localeFromParam`）讀語系、文字用 `uiTextFor(locale)`，不用 `getTranslations()`／`getLocale()`（會把 ISR 的頁變動態）。
 - **不本地化的路徑**：不屬於 `app/[locale]` 又沒有副檔名的 route 要加進 `lib/intl/paths.ts` 的 `NON_LOCALIZED_PREFIXES`／`NON_LOCALIZED_EXACT`，否則被改寫成 `/zh-TW/…` 而 404；`public/` 新增頂層目錄要同步 middleware 的 matcher（`tests/middleware-matcher.test.ts`）；`next.config.ts` 的路徑規則照 `withLocalizedRedirects`、`privateRouteSource` 寫。
 - **API 語系**：server 端（SSR、ISR）呼叫要明確傳 `locale`，沒傳就丟錯；瀏覽器端取自 `lib/intl/active-locale.ts`，不讀 `<html lang>`（瀏覽器翻譯會改寫它）。
+- **部署與訪客 IP**：部署在 Vercel（區域 `hnd1`，設定在 `vercel.json`）。訪客 IP 只經 `lib/http/visitor-ip.ts` 的 `getVisitorIp(request)` 讀（`x-real-ip`，Vercel 覆寫、client 偽造不了）；不讀其他 client 位址 header（Vercel 不管的 header 會原樣透傳，client 偽造得了）。
 - **導覽層**：站內路徑在程式裡不含語系，**不要在呼叫點手拼 `/en`**。出口：連結 `components/shared/Link`（保留 `next/link` 行為的用 `lib/intl/native-link`）；router `useRouter()`（`lib/intl/use-router.ts`）；server 導向 `redirect({ href, locale })`；整頁導覽 `commitDocumentNavigation()`；其他站內目標過 `useLocalizedHref()`／`localizeHref()`；讀路徑用 `lib/intl/navigation.ts` 的 `usePathname()`；依網址判斷頁面類型先 `stripLocale`。`tests/navigation-layer.test.ts` 擋繞過出口的寫法；元件測試的 mock 寫法見 `docs/i18n-routing.md`。
 
 共通規則（UI 改動的授權、Git、不留技術債）見根目錄的 `AGENTS.md`。

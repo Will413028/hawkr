@@ -24,7 +24,6 @@ const withBundleAnalyzer = bundleAnalyzer({
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 const isAnalyzeBuild = process.env.ANALYZE === "true";
 const HAWKR_AGENT_ENABLED = getEnv().hawkrAgentEnabled;
-const DEPLOYMENT_ID = process.env.DEPLOYMENT_ID;
 
 const MEDIA_ORIGIN = originOf(getEnv().mediaBaseUrl);
 const IMAGE_REMOTE_PATTERNS: NonNullable<
@@ -105,23 +104,15 @@ const IS_E2E_HARNESS = Boolean(process.env.PLAYWRIGHT_PORT);
  * `app/robots.ts`.
  *
  * It is a header rather than only a robots.txt line because a robots.txt body
- * is merged per user-agent group (RFC 9309): Cloudflare's zone-level Managed
- * robots.txt prepends its own `User-Agent: *` group, and an equally specific
- * `Allow: /` in it cancels the `Disallow: /` this app serves — measured on
- * web-dev, whose robots.txt reads as allow-all despite the gate being closed.
- * A response header sits outside that merge, which is the reason it exists.
+ * is merged per user-agent group (RFC 9309): a robots.txt prepended by an
+ * intermediary with an equally specific `Allow: /` cancels the `Disallow: /`
+ * this app serves. A response header sits outside that merge.
  *
- * SCOPE (hawkr-website#367 item 4) — an earlier version of this comment
- * added "and unlike `<meta robots>` it also covers non-HTML responses". That
- * over-claims: `headers()` only decorates responses Next itself produces, and
- * `/_next/static/*` and `public/` are answered by the platform's asset layer
- * BEFORE the worker runs. Measured on web-dev (gate closed), same deployment,
- * one sweep: the HTML document carries `x-robots-tag: noindex, nofollow`;
- * `/brand/logo-mark.svg` and `/_next/static/chunks/*.js` carry no such header
- * at all. So the reach is "every Next-rendered response, HTML or not", not
- * "every response on the origin". Harmless in practice — a JS chunk and an SVG
- * are not indexable content — but the sentence read as a guarantee that static
- * assets were covered, and they are not.
+ * Scope: `headers()` only decorates responses Next itself produces. Files under
+ * `public/` and `/_next/static/*` are answered by the platform's asset layer
+ * before any function runs, so they carry no such header. A JS chunk or an SVG
+ * is not indexable content, so the reach is "every Next-rendered response, HTML
+ * or not", not "every response on the origin".
  */
 const NOINDEX_HEADERS = getEnv().seoIndexable
 	? []
@@ -164,13 +155,13 @@ const SECURITY_HEADERS = [
 /**
  * A document or RSC payload can contain build-specific chunk references.
  * Letting a browser or an intermediary retain those responses across a
- * Cloudflare Worker deployment can pair old HTML/RSC with a new asset set,
- * leaving hydration stuck on a loading shell. OpenNext's incremental/data
- * caches remain enabled; this only prevents response-level caches from
- * retaining version-coupled page payloads.
+ * deployment can pair old HTML/RSC with a new asset set, leaving hydration
+ * stuck on a loading shell. The server-side ISR and data caches remain
+ * enabled; this only prevents response-level caches from retaining
+ * version-coupled page payloads.
  *
  * `no-cache`（不是 `no-store`）就足以擋住上面那個 skew：它禁止任何快取在未向
- * origin 重新驗證前重用回應，瀏覽器與中介每次都會回到 Worker 拿當前版本。
+ * origin 重新驗證前重用回應，瀏覽器與中介每次都會回到 origin 拿當前版本。
  * `no-store` 多做的一件事是禁止瀏覽器把頁面放進 back/forward cache ——
  * 實測（2026-09-04，Chrome preload_check）整站因此零 bfcache，按上一頁必須整份
  * 文件重新載入、重跑 hydration。bfcache 還原的是記憶體裡「已經跑起來」的頁面，
@@ -275,7 +266,7 @@ function withLocalizedRedirects(
 // payloads, and the complement below. This keeps the no-cache policy a default
 // even when `Accept` is absent or carries a non-document media type; a fourth
 // rule then tightens private routes to no-store. Fingerprinted assets retain
-// their separate immutable policy in `public/_headers`.
+// their separate immutable policy in the `/_next/static/*` rule.
 const REQUEST_SHAPES_WITHOUT_A_DOCUMENT_RULE = [
 	{ type: "header" as const, key: "accept", value: ".*text/html.*" },
 	{ type: "header" as const, key: "rsc", value: "1" },
@@ -291,48 +282,6 @@ const nextConfig: NextConfig = {
 	],
 	turbopack: { root: workspaceRoot },
 	outputFileTracingRoot: workspaceRoot,
-	// Cold-start bundle: Sentry's SDK was being compiled into FIVE near-identical
-	// ~950 KB Turbopack chunks (RSC layer, SSR layer, instrumentation entry,
-	// route-handler layer, _global-error) inside the ~23 MB handler.mjs that the
-	// Worker lazily imports *inside* its fetch handler — i.e. on the request's
-	// critical path. Turbopack keeps a separate module graph per server layer, so
-	// the duplication is structural, not a chunking-config knob. Marking the
-	// package external takes it out of those graphs entirely; OpenNext's esbuild
-	// then bundles exactly one copy.
-	//
-	// This is also why package.json carries `@sentry/vercel-edge` even though no
-	// code here imports it. Once the SDK is external, esbuild resolves
-	// `@sentry/nextjs` through its edge entry, which re-exports that package —
-	// and Next's output tracing never copied it in, because nothing in the Node
-	// graph reaches it. It is unreachable at runtime on workerd, but it has to
-	// RESOLVE, and it has to resolve to the real thing: OpenNext's
-	// optional-dependency stub throws on evaluation, which kills the entire
-	// instrumentation hook and silently disables server-side Sentry while the
-	// build stays green and pages still return 200. Verified in workerd via
-	// `wrangler dev --local`, never inferred from a green build.
-	serverExternalPackages: ["@sentry/nextjs"],
-	// Version-skew marking — and, read the limits below, only partial recovery.
-	// Cloudflare Workers replaces every static asset on each deploy and retains no
-	// previous version, so a client still holding an earlier build's HTML/RSC 404s
-	// on its now-deleted chunks (the turbopack runtime chunk included) and
-	// hydration stalls forever at the loading skeleton — the "refresh sometimes
-	// fixes it" bug. Stamping each deploy with its unique CI deployment id makes
-	// Next emit `?dpl=` on assets plus `data-dpl-id` on <html>, and reload the tab
-	// when it detects a mismatch.
-	//
-	// The reload can recover an already-hydrated tab because React is running. It
-	// cannot recover a first load whose runtime chunk never arrived, so candidate
-	// and canonical traffic are verified by the version-promotion workflow before
-	// the release is accepted.
-	//
-	// It also namespaces the OpenNext R2 cache key per deploy (OPEN_NEXT_BUILD_ID =
-	// deploymentId — see .open-next/server-functions/default/index.mjs), including
-	// reruns of the same commit or build-time env changes. That namespacing is what
-	// proves the stale `/` above came from the previous Worker version rather than
-	// a stale cache entry: the new version cannot read the old namespace.
-	// Only set in CI (deploy.yml); unset locally → undefined → Next's own
-	// build id, unchanged dev/local behaviour.
-	deploymentId: DEPLOYMENT_ID,
 	// Hide the bottom-left Next.js dev-tools indicator (the "Rendering…" pill +
 	// the route URL tooltip it shows while prefetching a hovered <Link>). Dev-only
 	// surface; never rendered in prod. Removes the URL preview on all pages.
@@ -388,25 +337,6 @@ const nextConfig: NextConfig = {
 				missing: REQUEST_SHAPES_WITHOUT_A_DOCUMENT_RULE,
 				headers: PAGE_RESPONSE_CACHE_HEADERS,
 			},
-			// Next 16.3 static Flight payloads can omit the build id and rely on
-			// this response header for navigation version checks. OpenNext's cache
-			// interceptor bypasses NextServer, so a valid cached RSC response can
-			// otherwise look like a different deployment and force a document reload
-			// on every tab tap. OpenNext applies these headers after interception.
-			// Use the serving build's id, never the request's x-deployment-id: an
-			// actually stale client must still reload. Local builds without an id
-			// retain Next's normal build-id handling.
-			...(DEPLOYMENT_ID
-				? [
-						{
-							source: "/(.*)",
-							has: [{ type: "header" as const, key: "rsc", value: "1" }],
-							headers: [
-								{ key: "x-nextjs-deployment-id", value: DEPLOYMENT_ID },
-							],
-						},
-					]
-				: []),
 			// 私有路由收緊為 no-store。放在三條公開規則之後：同一個 header key
 			// 後匹配者勝（與檔尾 Referrer-Policy 那條依賴的是同一個規則）。
 			{
@@ -419,6 +349,19 @@ const nextConfig: NextConfig = {
 				headers: PRIVATE_RESPONSE_CACHE_HEADERS,
 			})),
 			{ source: "/(.*)", headers: SECURITY_HEADERS },
+			// Build assets are fingerprinted, so a new deploy always produces a new
+			// URL and these can stay immutable in the browser. This must come after
+			// the catch-all no-cache rules above: without it `/_next/static/*` is
+			// answered with their `no-cache` (measured with `next start`).
+			{
+				source: "/_next/static/:path*",
+				headers: [
+					{
+						key: "Cache-Control",
+						value: "public, max-age=31536000, immutable",
+					},
+				],
+			},
 			// `/adm/enter?code=…` 的查詢字串本身就是一把單次憑證（§8.1.6）。route
 			// handler 已經在它的 303 上寫了 `Referrer-Policy: no-referrer`，但
 			// `headers()` 的規則會覆蓋 handler 設的同名 header —— 實測 runtime 回的是

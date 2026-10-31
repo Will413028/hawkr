@@ -11,7 +11,7 @@
 		"start:standalone": "node .next/standalone/server.js",
 		"test": "vitest run --project unit",
 		"test:watch": "vitest --project unit",
-		"lint": "tsc --noEmit && biome check --max-diagnostics=200 app components features lib scripts tests middleware.ts next.config.ts open-next.config.ts postcss.config.mjs && tsx scripts/check-transport.ts && tsx scripts/check-no-emoji.ts && tsx scripts/check-theme-tokens.ts && tsx scripts/check-jsx-cjk-linebreak.ts && pnpm --filter @hawkr/ui-text check-enum-text ../../website",
+		"lint": "tsc --noEmit && biome check --max-diagnostics=200 app components features lib scripts tests middleware.ts next.config.ts postcss.config.mjs && tsx scripts/check-transport.ts && tsx scripts/check-no-emoji.ts && tsx scripts/check-theme-tokens.ts && tsx scripts/check-jsx-cjk-linebreak.ts && pnpm --filter @hawkr/ui-text check-enum-text ../../website",
 		"architecture:check": "tsx scripts/check-architecture.ts",
 		"gen:legal": "tsx scripts/generate-legal.ts",
 		"gen:placeholders": "tsx scripts/gen-placeholders.ts",
@@ -32,8 +32,6 @@
 		"test:seo": "playwright test --config=playwright.seo.config.ts",
 		"lhci:desktop": "lhci autorun --config=lighthouserc.desktop.cjs",
 		"lhci:mobile": "lhci autorun --config=lighthouserc.mobile.cjs",
-		"preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-		"cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
 		"storybook": "storybook dev --host 127.0.0.1 --port 6006 --no-open --disable-telemetry",
 		"storybook:build": "storybook build --output-dir output/storybook --disable-telemetry",
 		"storybook:test": "vitest run --config vitest.storybook.config.ts",
@@ -104,7 +102,6 @@
 		"@lhci/cli": "^0.15.1",
 		"@next/bundle-analyzer": "^16.3.6",
 		"@next/env": "^16.3.6",
-		"@opennextjs/cloudflare": "1.20.6",
 		"@playwright/test": "~1.59.1",
 		"@storybook/addon-a11y": "10.6.2",
 		"@storybook/addon-docs": "10.6.2",
@@ -127,7 +124,6 @@
 		"typescript-compiler-api": "catalog:",
 		"vite": "8.0.3",
 		"vitest": "catalog:",
-		"webpack": "^5.107.2",
-		"wrangler": "4.125.0"
+		"webpack": "^5.107.2"
 	}
 }

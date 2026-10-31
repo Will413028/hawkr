@@ -39,8 +39,8 @@ test("public/ holds no root-level file the matcher would send through the middle
 		.filter((entry) => entry.isFile())
 		.map((entry) => entry.name)
 		.sort();
-	// `_headers` is read by Cloudflare and never requested; the association file is in NON_LOCALIZED_EXACT.
-	assert.deepEqual(rootFiles, ["_headers", "apple-app-site-association"]);
+	// The association file is in NON_LOCALIZED_EXACT.
+	assert.deepEqual(rootFiles, ["apple-app-site-association"]);
 });
 
 test("the matcher is linear: a long path costs nothing", () => {

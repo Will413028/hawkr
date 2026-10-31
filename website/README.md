@@ -167,11 +167,11 @@ REVALIDATE_SECRET=
 
 重點：
 
-- ~~`output: "standalone"`~~：已隨遷移 Cloudflare Workers 移除（commit `45084b4a`）；產物由 OpenNext 產出，不再是 Node standalone。
+- 不設 `output: "standalone"`：Vercel 自己打包 Next 產物。
 - ~~`cacheComponents: true`~~ / ~~`cacheLife`~~：**已於 #338 全數移除**（commit `6015754f`「關閉 cacheComponents 全站回傳統純 ISR」）。根因是 Cache Components 的 static-shell resume 在 workerd 會爆 128MB → prod 白畫面 + OOM。
   - **現行快取模型＝傳統 ISR**：各路由用 `export const revalidate = <秒>`（例：`app/[locale]/(public)/page.tsx` 首頁 60 秒）；資料層新鮮度在 `lib/api/cached.ts`（`unstable_cache` per fetcher，帶 tag ＋ revalidate TTL 安全網）。
   - `POST /api/revalidate`（帶 `REVALIDATE_SECRET`）以 tag 提前 bust，tag 名見 `app/api/revalidate/route.ts`。
-  - ⚠️ **不要重新加回 `cacheComponents` / `experimental.dynamicIO` / `ppr`**；`'use cache'` 那套 cacheLife profile 已不適用。邊緣/持久層設定改在 `open-next.config.ts`。
+  - ⚠️ **不要重新加回 `cacheComponents` / `experimental.dynamicIO` / `ppr`**；`'use cache'` 那套 cacheLife profile 已不適用。
 - `images`：custom loader → Alibaba OSS image service（`lib/media/ossImageLoader.ts`），用 OSS 的 resize/quality/WebP pipeline 取代 Next 內建 optimizer（已移除舊的 `unoptimized: true`）。`qualities` 需先列出才能當 prop 用。
 - `turbopack.root`：明確指定專案根目錄。
 - `devIndicators: false`：隱藏左下角 dev-tools 指示器（dev-only）。
@@ -188,15 +188,17 @@ async redirects() {
 }
 ```
 
-### 6. 部署設定（Cloudflare Workers / OpenNext）
+### 6. 部署設定（Vercel）
 
-目前沒有部署環境：公司時期的 dev / production Worker 環境（`env.*`）、secrets 清單、observability 目的地、
-附屬 Worker 與部署 workflow 已刪除。部署設定等選定 demo 部署目標時重寫。
+目前沒有部署環境：website 部署在 Vercel（function 區域 `hnd1`，見 ADR `backend/docs/adr/2026-11-01-website-hosting-vercel.md`），
+但還沒有 production 部署；預覽部署由 Will 建立。
 
-- **執行環境**：Cloudflare Workers（`@opennextjs/cloudflare` 轉譯 Next 產物）。
-- **配置檔**：`wrangler.jsonc` 只留頂層設定（bindings / R2 / Durable Objects，本機 preview 與 `pnpm cf-typegen` 用）＋ `open-next.config.ts`（incrementalCache / tagCache / queue / cachePurge）。
-- **環境變數**：`NEXT_PUBLIC_*`（含 `NEXT_PUBLIC_FLAVOR`、API base、Google/Apple/Firebase）在 **build 階段**寫入 browser bundle；server-only 值（`REVALIDATE_SECRET` 等）本機放 `.dev.vars`（見 `.dev.vars.example`），不落 repo 明文。
-- **本機開發**：`pnpm dev` 即可；要在本機驗 Workers runtime 行為才需 OpenNext 本地模擬，一般開發不需要容器。
+- **執行環境**：Vercel（Next 原生建置，Node.js function，Fluid compute）。`vercel.json` 只放 function 區域 `["hnd1"]`；專案設定（root directory `website`、環境變數）在 Vercel 專案裡。
+- **上傳範圍**：根目錄 `.vercelignore` 排除 website 用不到的目錄，規則以 `/` 錨定（`/api`、`/brand` 不錨定會連 `website/lib/api` 一起排除）。CLI 部署用 `--archive=tgz`（逐檔上傳會撞 Hobby 的上傳次數上限）。
+- **快取**：Vercel 的 ISR 快取與 `revalidateTag`（`POST /api/revalidate`）；沒有自管的快取層。
+- **網域**：`*.vercel.app` 一律 noindex（`lib/seo/canonical-host.ts`）。
+- **環境變數**：`NEXT_PUBLIC_*`（含 `NEXT_PUBLIC_FLAVOR`、API base、Google/Apple/Firebase）在 **build 階段**寫入 browser bundle；server-only 值（`REVALIDATE_SECRET` 等，名稱見 `.env.example`）設在 Vercel 專案的環境變數，本機放 `.env.local`，不落 repo 明文。
+- **本機開發**：`pnpm dev`；要驗產物用 `pnpm build && pnpm start`（build 要帶 loopback 的 API base，見 `AGENTS.md`）。
 
 ### 7. 工具配置
 

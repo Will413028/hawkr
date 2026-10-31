@@ -1,0 +1,9 @@
+/backend
+/buyer-app
+/seller-app
+/admin
+/api
+/brand
+/packages/hawkr_*
+node_modules
+.next

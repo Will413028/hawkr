@@ -10,7 +10,7 @@
 | 目錄 | 內容 | 與 CI 相同的檢查 |
 |---|---|---|
 | `backend/` | Go 後端，正在從 `backend/services/` 的微服務遷移成 modular monolith | `.github/workflows/backend-*.yml` |
-| `website/` | Next.js 買家與賣家網頁（Cloudflare Workers） | `.github/workflows/website-ci.yml` |
+| `website/` | Next.js 買家與賣家網頁（Vercel，function 區域 `hnd1`） | `.github/workflows/website-ci.yml` |
 | `admin/` | Next.js 營運後台 | `.github/workflows/admin-ci.yml` |
 | `buyer-app/` | Flutter 買家 App | `.github/workflows/buyer-ci.yml` |
 | `seller-app/` | Flutter 賣家 App | `.github/workflows/seller-ci.yml` |

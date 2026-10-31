@@ -80,11 +80,8 @@ seller-login-white.png
 
 certificates
 
-# OpenNext / Cloudflare Workers
-.open-next/
-.wrangler/
-.dev.vars
-cloudflare-env.d.ts
+# Vercel
+.vercel
 docs/threads-promotion-plan.md
 .gitignore
 .gitignore
