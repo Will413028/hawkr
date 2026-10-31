@@ -18,6 +18,10 @@ analyzer:
     # 鎖定的 custom_lint 0.8.1 沒有新 plugin 系統的版本；升 custom_lint 時拿掉這行。
     analysis_options_deprecated_plugins: ignore
     duplicate_ignore: ignore
+  exclude:
+    - build/**
+    - ios/**
+    - web/**
 
 linter:
   # The lint rules applied to this project can be customized in the

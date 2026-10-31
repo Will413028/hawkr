@@ -1,6 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'chat_model.freezed.dart';
+
 // NOTE: No 'chat_model.g.dart' part — fromJson is hand-written, not codegen.
 
 @freezed
