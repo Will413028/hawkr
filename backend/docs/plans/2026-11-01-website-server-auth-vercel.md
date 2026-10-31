@@ -61,7 +61,7 @@
   - 驗收：完成定義的檢查；`pnpm install --frozen-lockfile` 成功；rg 清單只剩上面註明的無關命中；`rg -n "cf-connecting-ip" website` 無命中；mutation：讓 `getVisitorIp` 改讀 `cf-connecting-ip`，seller-leads 限流測試要失敗；預覽網域 noindex 測試在移除規則時失敗。
   - 停止條件：某個 Cloudflare 機制在 Vercel 沒有對應而且影響行為 → 回報。
   - 完成後的狀態：Apple Pay 關聯檔路由保留（與平台無關）；本機 `pnpm preview` 消失，改 `pnpm build && pnpm start`。
-- [ ] **3. 開 cacheComponents ＋ DAL，身分由伺服器初值決定**（被擋於：步驟 2、D1、D2）
+- [ ] **3. 開 cacheComponents ＋ DAL，身分由伺服器初值決定**（被擋於：步驟 2；單體公開可達後補完步驟 1 的反代、RTT、tag 失效三項）
   - 範圍：`cacheComponents: true`；`lib/api/cached.ts` 的 `unstable_cache` 遷到 `'use cache'`＋`cacheTag`＋`cacheLife`（Next 16 的基準；`unstable_cache` 在 Cache Components 下是舊 API）。它的 `singleFlight`（同 key 併發只打一次後端）先回答「從零設計會不會需要」：`'use cache'` 本身會併發去重時刪除，否則保留並在 commit 寫理由；新增 `lib/auth/dal.ts` 的 `verifySession()`（`react` `cache()` 包，讀 cookie → GetSession，回 `signedIn | guest | unavailable`）；根 layout 把 session promise 包在 Suspense 交給 `AuthProvider`，client 以 `use()` 讀；刪除 client 的初次探測與 `HYDRATION_GATE_MS`；受保護區 layout 以 DAL 導向，`RoleZoneGuard` 改伺服器端；刪 `website/README.md` 的「不要加回 cacheComponents」與零 PARTIALLY_STATIC gate（`rg -ln "PARTIALLY_STATIC" website/tests website/open-next.config.ts website/next.config.ts` 列出的檔，例如 `tests/seller-preview-ssr-production.test.ts`），改成 `tests/build-output/` 下的新測試：讀 build 產出的 prerender manifest，斷言受保護頁與含頁首的頁是 PARTIALLY_STATIC。
   - 消費端：`rg -ln "useAuth\(|hydrated|sessionSettled|sessionUnavailable|unstable_cache|cachedFetch" website --glob '*.ts*'`。
   - 不能動：不變量表全部；登入與登出流程的 URL 與 cookie。
@@ -107,7 +107,7 @@
 
 | 步驟 | 狀態 | 已跑的驗收 | 未跑的驗收與原因 | commit |
 |---|---|---|---|---|
-| 1 spike | 未開始 | | | |
+| 1 spike | 進行中 | 上傳方式、純 ISR 建置、cacheComponents 改寫量（34／405 頁）、IP header 防偽、區域與記憶體設定（spikes.md） | 反代 3xx／Set-Cookie、RTT、tag 失效：單體尚未公開部署 | |
 | 2 平台遷移 | 未開始 | | | |
 | 3 cacheComponents ＋ DAL | 未開始 | | | |
 | 4 client 四態 | 未開始 | | | |
