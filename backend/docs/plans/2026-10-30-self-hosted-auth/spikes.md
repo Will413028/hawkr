@@ -89,3 +89,20 @@
 | `github.com/moby/go-archive` | v0.2.0 | v0.3.0 |
 
 對設計的影響：不在本計畫修（依賴升級交給供應鏈掃描的 Pending）；`x/crypto` 在步驟 2 開工前升到修正版，因為登入流程會用到。
+
+## g. App 原生登入實測（2026-10-31，iOS 模擬器 iPhone 17／iOS 26.0，dev flavor，`cfbe20b` 加 h2c `324e46b`）
+
+單體以 `GOOGLE_APP_CLIENT_IDS`（buyer、seller 的 iOS client）啟動；App 經 `IssueAppLoginNonce` 取 nonce 後走原生 SDK，`ExchangeIdToken` 換 session，`GetSession` 帶 Bearer。
+
+| App | 動作 | 結果（單體 log／DB） |
+|---|---|---|
+| buyer | Google（Gmail 帳號，與 web 測試的帳號不同） | `ExchangeIdToken` ok，建帳號 2；登入身分有 email |
+| buyer | 登出 | `SignOut` ok，帳號 2 的 session 歸零 |
+| buyer | LINE（與 web 步驟 3 同一個 LINE 使用者） | 落在既有帳號 1，不建帳；這次同意了 email，身分補上 email |
+| seller | Google（同 buyer 的 Gmail） | 落在帳號 2；沒有賣家角色，導到「建立店舖」 |
+| seller | 後端刪 session 後重開 | `GetSession` 回 `unauthenticated`，App 清 token 回登入頁 |
+| seller | LINE | 落在帳號 1 |
+
+- Google iOS client 的 ID token：單體只接受 `aud`＝web client 且 `azp` 在 `GOOGLE_APP_CLIENT_IDS` 的 token，四次交換都通過，所以 `aud` 是 web client、`azp` 是 iOS client（由驗證規則推得，未解開 token 檢視）。
+- Google 的 nonce 每次登入重新 `initialize` 後帶得進 ID token（交換時 nonce 比對通過）。
+- 首次實測發現 App 的 Connect（HTTP/2）打不到本機單體：`:8080` 原本只開 HTTP/1.1，`324e46b` 讓主 listener 也收 h2c。
