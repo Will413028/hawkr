@@ -337,6 +337,35 @@ function assertApiConfigured(
 	}
 }
 
+/**
+ * The production flavor serves the API first-party: the browser calls the web origin and the host
+ * proxies to the backend (rewrites in next.config.ts). `NEXT_PUBLIC_API_BASE_URL` is inlined at
+ * build time and `lib/connect/transport.ts` uses it as-is, so an absolute value on another origin
+ * would send browser Connect calls (and the cookie-less requests that follow) to that host
+ * instead. A relative base is same-origin by definition.
+ */
+function assertApiSameOrigin(
+	flavor: Flavor,
+	apiBaseUrl: string,
+	webOrigin: string,
+): void {
+	if (flavor !== "prod" || typeof window !== "undefined") return;
+	if (!/^[a-z][a-z0-9+.-]*:/i.test(apiBaseUrl)) return;
+	let apiOrigin: string;
+	try {
+		apiOrigin = new URL(apiBaseUrl).origin;
+	} catch {
+		throw new Error(
+			`NEXT_PUBLIC_API_BASE_URL must be a valid URL (got "${apiBaseUrl}")`,
+		);
+	}
+	if (apiOrigin !== webOrigin) {
+		throw new Error(
+			`NEXT_PUBLIC_API_BASE_URL (${apiOrigin}) must be same-origin with NEXT_PUBLIC_WEB_ORIGIN (${webOrigin}) for the production flavor: the browser reaches the API through the web origin`,
+		);
+	}
+}
+
 function buildEnvConfig(flavor: Flavor): EnvConfig {
 	const apiBaseUrl = readApiBase(flavor);
 	const gatewayHost = readGatewayHost(flavor);
@@ -345,6 +374,13 @@ function buildEnvConfig(flavor: Flavor): EnvConfig {
 		gatewayHost ? `${gatewayHost}/api/v1` : "",
 	).replace(/\/$/, "");
 	assertApiConfigured(flavor, apiBaseUrl, serverApiBase);
+	const webOrigin = readOriginEnv(
+		"NEXT_PUBLIC_WEB_ORIGIN",
+		process.env.NEXT_PUBLIC_WEB_ORIGIN,
+		flavor,
+		DEV_WEB_ORIGIN,
+	);
+	assertApiSameOrigin(flavor, apiBaseUrl, webOrigin);
 	return {
 		flavor,
 		displayName: DISPLAY_NAME[flavor],
@@ -352,12 +388,7 @@ function buildEnvConfig(flavor: Flavor): EnvConfig {
 		apiBaseUrl,
 		publicApi: `${apiBaseUrl}/public`,
 		appApi: `${apiBaseUrl}/app`,
-		webOrigin: readOriginEnv(
-			"NEXT_PUBLIC_WEB_ORIGIN",
-			process.env.NEXT_PUBLIC_WEB_ORIGIN,
-			flavor,
-			DEV_WEB_ORIGIN,
-		),
+		webOrigin,
 		admOrigin: readOriginEnv(
 			"NEXT_PUBLIC_ADM_ORIGIN",
 			process.env.NEXT_PUBLIC_ADM_ORIGIN,

@@ -4,6 +4,9 @@ import { afterEach, beforeEach, test } from "node:test";
 import { __setEnvForTest } from "../lib/config/env";
 import { __setFlavorForTest } from "../lib/config/flavor";
 
+// The prod flavor requires the browser API base on the web origin; a relative base is.
+process.env.NEXT_PUBLIC_API_BASE_URL = "/api/v1";
+
 // Reproduces the React #419 read-hang: an upstream that sends response headers
 // (so fetch() resolves) but then stalls mid-body forever. The transport's
 // AbortSignal.timeout must fire and a softFail GET must degrade to a null-data

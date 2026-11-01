@@ -3,6 +3,9 @@ import test from "node:test";
 import { __setEnvForTest, getEnv } from "../lib/config/env";
 import { __setFlavorForTest } from "../lib/config/flavor";
 
+// The prod flavor requires the browser API base on the web origin; a relative base is.
+process.env.NEXT_PUBLIC_API_BASE_URL = "/api/v1";
+
 /**
  * next.config.ts decides its path rules ONCE, in its module body, from the routed locales of the
  * flavor it is loaded under. Each case gets its own module instance (a distinct import specifier)

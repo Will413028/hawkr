@@ -6,6 +6,9 @@ import { __setFlavorForTest } from "../lib/config/flavor";
 import { isCanonicalHost } from "../lib/seo/canonical-host";
 import { compiledMatcher } from "./helpers/middleware-matcher";
 
+// The prod flavor requires the browser API base on the web origin; a relative base is.
+process.env.NEXT_PUBLIC_API_BASE_URL = "/api/v1";
+
 /** 登入與否只看 session cookie 在不在（middleware.ts）。 */
 
 const PROD_ORIGIN = "https://example.com";

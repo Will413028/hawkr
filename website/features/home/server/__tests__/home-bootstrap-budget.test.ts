@@ -248,7 +248,13 @@ describe("home bootstrap budget sizing", () => {
 	 */
 	const PROD_VISITOR_WAIT_CEILING_MS = 4_500;
 
+	beforeEach(() => {
+		// The prod flavor requires a browser API base on the web origin; a relative one is.
+		vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "/api/v1");
+	});
+
 	afterEach(() => {
+		vi.unstubAllEnvs();
 		__setFlavorForTest(null);
 		__setEnvForTest(null);
 	});

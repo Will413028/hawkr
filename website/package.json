@@ -28,7 +28,7 @@
 		"test:e2e:contract": "playwright test --grep @contract",
 		"test:e2e:ui": "playwright test --ui",
 		"test:reliability": "playwright test tests/e2e/reliability.spec.ts",
-		"build:seo": "NEXT_PUBLIC_FLAVOR=prod NEXT_PUBLIC_SEO_INDEXABLE=true NEXT_PUBLIC_HAWKR_AGENT_ENABLED=false NEXT_PUBLIC_WEB_ORIGIN=https://example.com NEXT_PUBLIC_ADM_ORIGIN=https://admin.example.com NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:9/api/v1 API_BASE_URL=http://127.0.0.1:9/api/v1 next build",
+		"build:seo": "NEXT_PUBLIC_FLAVOR=prod NEXT_PUBLIC_SEO_INDEXABLE=true NEXT_PUBLIC_HAWKR_AGENT_ENABLED=false NEXT_PUBLIC_WEB_ORIGIN=https://example.com NEXT_PUBLIC_ADM_ORIGIN=https://admin.example.com NEXT_PUBLIC_API_BASE_URL=https://example.com/api/v1 API_BASE_URL=http://127.0.0.1:9/api/v1 next build",
 		"test:seo": "playwright test --config=playwright.seo.config.ts",
 		"lhci:desktop": "lhci autorun --config=lighthouserc.desktop.cjs",
 		"lhci:mobile": "lhci autorun --config=lighthouserc.mobile.cjs",

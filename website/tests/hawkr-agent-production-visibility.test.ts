@@ -7,6 +7,9 @@ import { unstable_getResponseFromNextConfig } from "next/dist/experimental/testi
 import { __setEnvForTest, resolveHawkrAgentEnabled } from "../lib/config/env";
 import { __setFlavorForTest } from "../lib/config/flavor";
 
+// The prod flavor requires the browser API base on the web origin; a relative base is.
+process.env.NEXT_PUBLIC_API_BASE_URL = "/api/v1";
+
 const root = fileURLToPath(new URL("..", import.meta.url));
 
 function read(relativePath: string): string {

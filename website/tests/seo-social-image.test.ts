@@ -14,6 +14,9 @@ import {
 	socialImages,
 } from "../lib/seo/metadata";
 
+// The prod flavor requires the browser API base on the web origin; a relative base is.
+process.env.NEXT_PUBLIC_API_BASE_URL = "/api/v1";
+
 // The prod flavor requires its own web origin (NEXT_PUBLIC_WEB_ORIGIN); these cases describe a deployment at this one.
 process.env.NEXT_PUBLIC_WEB_ORIGIN = "https://example.com";
 

@@ -4,6 +4,7 @@ import bundleAnalyzer from "@next/bundle-analyzer";
 import { withSentryConfig } from "@sentry/nextjs/config";
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
+import { apiProxyRewrites } from "./lib/api/local-proxy";
 import { getEnv } from "./lib/config/env";
 import { allRoutableLocales, defaultLocale } from "./lib/intl/locales";
 import { isNonLocalizedPath } from "./lib/intl/paths";
@@ -375,17 +376,22 @@ const nextConfig: NextConfig = {
 	},
 
 	async rewrites() {
-		return [
-			{
-				source:
-					"/.well-known/apple-developer-merchantid-domain-association.txt",
-				destination: "/api/apple-pay/domain-association",
-			},
-			{
-				source: "/.well-known/apple-developer-merchantid-domain-association",
-				destination: "/api/apple-pay/domain-association",
-			},
-		];
+		return {
+			// 部署環境的同源反代；本機反代的 build 為空（lib/api/local-proxy.ts）。
+			beforeFiles: apiProxyRewrites(),
+			afterFiles: [
+				{
+					source:
+						"/.well-known/apple-developer-merchantid-domain-association.txt",
+					destination: "/api/apple-pay/domain-association",
+				},
+				{
+					source: "/.well-known/apple-developer-merchantid-domain-association",
+					destination: "/api/apple-pay/domain-association",
+				},
+			],
+			fallback: [],
+		};
 	},
 
 	/**

@@ -4,7 +4,11 @@ import { afterEach, test } from "node:test";
 import { __setEnvForTest, getEnv } from "../lib/config/env";
 import { __setFlavorForTest } from "../lib/config/flavor";
 
-const NAMES = ["NEXT_PUBLIC_WEB_ORIGIN", "NEXT_PUBLIC_ADM_ORIGIN"] as const;
+const NAMES = [
+	"NEXT_PUBLIC_WEB_ORIGIN",
+	"NEXT_PUBLIC_ADM_ORIGIN",
+	"NEXT_PUBLIC_API_BASE_URL",
+] as const;
 const saved = new Map(NAMES.map((name) => [name, process.env[name]]));
 
 function resolve(
@@ -33,6 +37,7 @@ afterEach(() => {
 const PROD_ORIGINS = {
 	NEXT_PUBLIC_WEB_ORIGIN: "https://www.example.org",
 	NEXT_PUBLIC_ADM_ORIGIN: "https://admin.example.org",
+	NEXT_PUBLIC_API_BASE_URL: "https://www.example.org/api/v1",
 };
 
 test("prod takes its web and admin origins from env", () => {
@@ -41,16 +46,61 @@ test("prod takes its web and admin origins from env", () => {
 	assert.equal(env.admOrigin, "https://admin.example.org");
 });
 
+test("prod accepts a same-origin or relative NEXT_PUBLIC_API_BASE_URL", () => {
+	assert.equal(
+		resolve("prod", PROD_ORIGINS).apiBaseUrl,
+		"https://www.example.org/api/v1",
+	);
+	assert.equal(
+		resolve("prod", { ...PROD_ORIGINS, NEXT_PUBLIC_API_BASE_URL: "/api/v1" })
+			.apiBaseUrl,
+		"/api/v1",
+	);
+});
+
+test("prod rejects a NEXT_PUBLIC_API_BASE_URL on another origin", () => {
+	for (const bad of [
+		"http://127.0.0.1:9/api/v1",
+		"https://api.example.org/api/v1",
+		"http://www.example.org/api/v1",
+		"https://www.example.org:8443/api/v1",
+	]) {
+		assert.throws(
+			() => resolve("prod", { ...PROD_ORIGINS, NEXT_PUBLIC_API_BASE_URL: bad }),
+			/NEXT_PUBLIC_API_BASE_URL .* must be same-origin with NEXT_PUBLIC_WEB_ORIGIN/,
+			bad,
+		);
+	}
+});
+
+test("dev keeps allowing a cross-origin NEXT_PUBLIC_API_BASE_URL", () => {
+	assert.equal(
+		resolve("dev", {
+			NEXT_PUBLIC_WEB_ORIGIN: "http://localhost:3000",
+			NEXT_PUBLIC_API_BASE_URL: "http://127.0.0.1:9/api/v1",
+		}).apiBaseUrl,
+		"http://127.0.0.1:9/api/v1",
+	);
+});
+
 test("prod has no default web origin", () => {
 	assert.throws(
-		() => resolve("prod", { NEXT_PUBLIC_ADM_ORIGIN: "https://a.example.org" }),
+		() =>
+			resolve("prod", {
+				NEXT_PUBLIC_ADM_ORIGIN: "https://a.example.org",
+				NEXT_PUBLIC_API_BASE_URL: "/api/v1",
+			}),
 		/NEXT_PUBLIC_WEB_ORIGIN is required for the production flavor/,
 	);
 });
 
 test("prod has no default admin origin", () => {
 	assert.throws(
-		() => resolve("prod", { NEXT_PUBLIC_WEB_ORIGIN: "https://w.example.org" }),
+		() =>
+			resolve("prod", {
+				NEXT_PUBLIC_WEB_ORIGIN: "https://w.example.org",
+				NEXT_PUBLIC_API_BASE_URL: "/api/v1",
+			}),
 		/NEXT_PUBLIC_ADM_ORIGIN is required for the production flavor/,
 	);
 });

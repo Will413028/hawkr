@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { __setEnvForTest, getEnv } from "@/lib/config/env";
 import { __setFlavorForTest } from "@/lib/config/flavor";
 
@@ -13,12 +13,15 @@ function resolveMediaBase(
 	} else {
 		process.env.NEXT_PUBLIC_MEDIA_BASE_URL = value;
 	}
+	// The prod flavor requires a browser API base on the web origin; a relative one is.
+	vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "/api/v1");
 	__setFlavorForTest(flavor);
 	__setEnvForTest(null);
 	return getEnv().mediaBaseUrl;
 }
 
 afterEach(() => {
+	vi.unstubAllEnvs();
 	if (originalMediaBase === undefined) {
 		delete process.env.NEXT_PUBLIC_MEDIA_BASE_URL;
 	} else {

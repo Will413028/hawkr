@@ -7,6 +7,9 @@ import { __setPublishedLocalesForTest } from "../lib/intl/locales";
 import { __resetSellerStoreCodeMemoForTest } from "../lib/seller/canonical-redirect";
 import { siteMiddleware } from "../middleware";
 
+// The prod flavor requires the browser API base on the web origin; a relative base is.
+process.env.NEXT_PUBLIC_API_BASE_URL = "/api/v1";
+
 /**
  * Locale routing as the middleware composes it (ADR 2026-10-17 D1): the
  * site's own decisions (the session cookie's presence) run on the locale-free pathname, and whatever passes is next-intl's

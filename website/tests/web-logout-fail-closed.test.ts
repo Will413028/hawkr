@@ -5,6 +5,9 @@ import { __setEnvForTest, getEnv } from "../lib/config/env";
 import { __setFlavorForTest } from "../lib/config/flavor";
 import { connectError, connectOk, procedureOf } from "./mocks/connect-response";
 
+// The prod flavor requires the browser API base on the web origin; this file's base is http://127.0.0.1:9.
+process.env.NEXT_PUBLIC_WEB_ORIGIN = "http://127.0.0.1:9";
+
 interface Seen {
 	procedure: string;
 	method: string;

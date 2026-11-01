@@ -119,7 +119,7 @@ cp .env.example .env.local
 |------|------|--------------|
 | `NEXT_PUBLIC_FLAVOR` | 環境選擇器 `dev` / `prod`；推導其餘設定 | 否（預設 `dev`） |
 | `API_BASE_URL` | Server 端呼叫後端的 API base URL（絕對網址，含 `/api/v1`）。dev 留空則用本機單體；**prod 必填** | 否 |
-| `NEXT_PUBLIC_API_BASE_URL` | Browser 端 API base URL；`next build` 時寫入 bundle。dev 留空則走同源 proxy；**prod 必填** | 否 |
+| `NEXT_PUBLIC_API_BASE_URL` | Browser 端 API base URL；`next build` 時寫入 bundle。dev 留空則走同源 proxy；**prod 必填，且須與 `NEXT_PUBLIC_WEB_ORIGIN` 同源**（跨來源值讓 build／啟動失敗）。部署環境的 `next build` 以 `API_BASE_URL` 的 origin 為單體位址，把 `/api/{connect,auth,v1}/*` 轉過去（`next.config.ts` 的 `rewrites().beforeFiles`）；`next dev` 與 `PLAYWRIGHT_E2E_API_PROXY=1` 的 build 不啟用，走 `app/api` 的 route handler | 否 |
 | `NEXT_PUBLIC_WEB_ORIGIN` | 這份部署的站台 origin（canonical、sitemap、CSRF 同源檢查與「這是不是正式網域」的判斷都取自它）。只能是 origin（無路徑、query、帳密）。dev 留空用 `http://localhost:3000`；**prod 必填** | 否 |
 | `NEXT_PUBLIC_ADM_ORIGIN` | ADM 的 origin（代行工作區「返回 ADM」）。dev 留空用 `http://localhost:3001`；**prod 必填** | 否 |
 | `MEDIA_UPLOAD_ORIGINS` | 預簽名上傳（`PUT`）的目的地 origin，逗號分隔的 `https://` origin，host 可帶一個 `*.` 開頭（虛擬主機式 bucket）。只用於 build 時產生 CSP `connect-src`；沒設就不在 CSP 內（上傳會被瀏覽器擋下） | 否 |

@@ -13,6 +13,9 @@ import { __setFlavorForTest } from "../lib/config/flavor";
 import { finalizeSellerOnboarding } from "../lib/seller/onboarding";
 import type { ApplyStoreInput } from "../lib/seller/repo";
 
+// The prod flavor requires the browser API base on the web origin; a relative base is.
+process.env.NEXT_PUBLIC_API_BASE_URL = "/api/v1";
+
 const ONBOARDING_INPUT: ApplyStoreInput = {
 	storeName: "測試商店",
 	contactPhone: "0912345678",

@@ -3,6 +3,9 @@ import { afterEach, beforeEach, test } from "node:test";
 import { __setEnvForTest } from "../lib/config/env";
 import { __setFlavorForTest } from "../lib/config/flavor";
 
+// The prod flavor requires the browser API base on the web origin; a relative base is.
+process.env.NEXT_PUBLIC_API_BASE_URL = "/api/v1";
+
 // Exercises the prerender-safe transport gaps added to dispatch():
 //   - softFail GET resolves 5xx / 404 / network-timeout to a {code,data:null} envelope
 //   - softFail never softens a mutation (POST still throws)

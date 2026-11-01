@@ -30,49 +30,115 @@ export function isLocalApiProxyEnabled(
 	}
 }
 
+interface UpstreamParts {
+	origin: string;
+	apiPath: string;
+	rootPath: string;
+}
+
+/** 單體入口的組成：origin，加上 `API_BASE_URL` 去掉結尾斜線的路徑（`/api/v1`）與去掉 `/api/v1` 的入口根路徑。 */
+function upstreamParts(apiBaseUrl: string): UpstreamParts {
+	const base = new URL(apiBaseUrl);
+	const apiPath = base.pathname.replace(/\/+$/, "");
+	return {
+		origin: base.origin,
+		apiPath,
+		rootPath: apiPath.replace(/\/api\/v1$/, ""),
+	};
+}
+
+/**
+ * 同源反代的路徑對照，只在這裡定義：瀏覽器打的前綴（`source`）對到單體上的路徑前綴（`upstream`）。
+ * route handler 的上游網址（`*ProxyTarget`）與 `next.config.ts` 的 rewrites（`apiProxyRewrites`）都由此推出。
+ * Connect 不在 /api/v1 底下（lib/connect/transport.ts 的 FIRST_PARTY_CONNECT_PATH），登入流程在單體根目錄的
+ * `/api/auth/*`（lib/auth/oauth-start.ts）。
+ */
+const PROXY_ROUTES = {
+	connect: {
+		source: "/api/connect",
+		upstream: (p: UpstreamParts) => p.rootPath,
+	},
+	auth: { source: "/api/auth", upstream: () => "/api/auth" },
+	api: { source: "/api/v1", upstream: (p: UpstreamParts) => p.apiPath },
+} as const;
+
+function proxyTarget(
+	route: (typeof PROXY_ROUTES)[keyof typeof PROXY_ROUTES],
+	requestUrl: string,
+	apiBaseUrl: string,
+): string {
+	const incoming = new URL(requestUrl);
+	const parts = upstreamParts(apiBaseUrl);
+	const suffix = incoming.pathname.slice(route.source.length);
+	const upstream = new URL(`${route.upstream(parts)}${suffix}`, parts.origin);
+	upstream.search = incoming.search;
+	return upstream.toString();
+}
+
 export function apiProxyTarget(
 	requestUrl: string,
 	apiBaseUrl = process.env.API_BASE_URL || DEV_GATEWAY_BASE,
 ): string {
-	const incoming = new URL(requestUrl);
-	const base = new URL(apiBaseUrl);
-	const suffix = incoming.pathname.replace(/^\/api\/v1(?=\/|$)/, "");
-	const basePath = base.pathname.replace(/\/+$/, "");
-	const upstream = new URL(`${basePath}${suffix}`, base.origin);
-	upstream.search = incoming.search;
-	return upstream.toString();
+	return proxyTarget(PROXY_ROUTES.api, requestUrl, apiBaseUrl);
 }
 
-/**
- * Connect 第一方路徑的上游網址：`/api/connect/{service}/{method}` → 入口根目錄的 `/{service}/{method}`
- * （Connect 不在 /api/v1 底下；lib/connect/transport.ts 的 FIRST_PARTY_CONNECT_PATH）。
- */
+/** `/api/connect/{service}/{method}` → 入口根目錄的 `/{service}/{method}`。 */
 export function connectProxyTarget(
 	requestUrl: string,
 	apiBaseUrl = process.env.API_BASE_URL || DEV_GATEWAY_BASE,
 ): string {
-	const incoming = new URL(requestUrl);
-	const base = new URL(apiBaseUrl);
-	const suffix = incoming.pathname.replace(/^\/api\/connect(?=\/|$)/, "");
-	const basePath = base.pathname.replace(/\/+$/, "").replace(/\/api\/v1$/, "");
-	const upstream = new URL(`${basePath}${suffix}`, base.origin);
-	upstream.search = incoming.search;
-	return upstream.toString();
+	return proxyTarget(PROXY_ROUTES.connect, requestUrl, apiBaseUrl);
 }
 
-/**
- * 單體發起登入的上游網址：`/api/auth/{provider}/start`、`/callback` 原路徑（登入流程在單體的根目錄
- * `/api/auth/*`，不在 /api/v1 底下；lib/auth/oauth-start.ts）。
- */
+/** `/api/auth/{provider}/start`、`/callback` 原路徑。 */
 export function authProxyTarget(
 	requestUrl: string,
 	apiBaseUrl = process.env.API_BASE_URL || DEV_GATEWAY_BASE,
 ): string {
-	const incoming = new URL(requestUrl);
-	const base = new URL(apiBaseUrl);
-	const upstream = new URL(incoming.pathname, base.origin);
-	upstream.search = incoming.search;
-	return upstream.toString();
+	return proxyTarget(PROXY_ROUTES.auth, requestUrl, apiBaseUrl);
+}
+
+/**
+ * 本機的 route handler 是不是這個 build 的反代：與 `isLocalApiProxyEnabled` 同一條規則的 build 期版本
+ * （`next dev`，或帶 `PLAYWRIGHT_E2E_API_PROXY=1` 的 e2e build；後者執行期再限 loopback）。
+ * 是的話 rewrites 不啟用，請求進 `app/api/{connect,auth,v1}`。
+ */
+export function isLocalApiProxyBuild(
+	env: Pick<
+		ApiProxyEnvironment,
+		"NODE_ENV" | "PLAYWRIGHT_E2E_API_PROXY"
+	> = process.env,
+): boolean {
+	return env.NODE_ENV === "development" || env.PLAYWRIGHT_E2E_API_PROXY === "1";
+}
+
+/**
+ * 部署環境的同源反代：`rewrites().beforeFiles` 把 `/api/{connect,auth,v1}/*` 轉給單體，單體位址由
+ * `API_BASE_URL` 推得。本機反代的 build（`isLocalApiProxyBuild`）回空陣列。啟用時 `API_BASE_URL`
+ * 必須是絕對的 http(s) 網址，否則丟錯讓 build 失敗。
+ */
+export function apiProxyRewrites(
+	env: ApiProxyEnvironment = process.env,
+): { source: string; destination: string }[] {
+	if (isLocalApiProxyBuild(env)) return [];
+	const raw = env.API_BASE_URL?.trim();
+	let parts: UpstreamParts;
+	try {
+		if (!raw) throw new Error("unset");
+		const base = new URL(raw);
+		if (base.protocol !== "https:" && base.protocol !== "http:") {
+			throw new Error("not http(s)");
+		}
+		parts = upstreamParts(raw);
+	} catch {
+		throw new Error(
+			`API_BASE_URL must be an absolute http(s) URL (e.g. https://api.<your-domain>/api/v1) for the /api rewrites (got "${raw ?? ""}")`,
+		);
+	}
+	return Object.values(PROXY_ROUTES).map((route) => ({
+		source: `${route.source}/:path*`,
+		destination: `${parts.origin}${route.upstream(parts)}/:path*`,
+	}));
 }
 
 /**

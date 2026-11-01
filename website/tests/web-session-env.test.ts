@@ -4,6 +4,9 @@ import { __setEnvForTest, getEnv } from "../lib/config/env";
 import { __setFlavorForTest } from "../lib/config/flavor";
 import { withApiBase, withoutApiBasePins } from "./helpers/default-api-base";
 
+// The prod flavor requires the browser API base on the web origin; the prod API base below is this one.
+process.env.NEXT_PUBLIC_WEB_ORIGIN = "https://api.example.com";
+
 // dev/prod connection parity: both env hit the gateway directly (no dev-only
 // same-origin proxy). The browser path is apiBaseUrl in every flavor; if anyone
 // reintroduces a dev proxy divergence, this fails.

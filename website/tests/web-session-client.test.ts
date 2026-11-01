@@ -4,6 +4,9 @@ import { __setEnvForTest, getEnv } from "../lib/config/env";
 import { __setFlavorForTest } from "../lib/config/flavor";
 import { withApiBase } from "./helpers/default-api-base";
 
+// The prod flavor requires the browser API base on the web origin; this file's base is https://api.example.com.
+process.env.NEXT_PUBLIC_WEB_ORIGIN = "https://api.example.com";
+
 let calls: Array<{ url: string; init: RequestInit }> = [];
 const realFetch = globalThis.fetch;
 let dispatchedEvents: Event[] = [];
