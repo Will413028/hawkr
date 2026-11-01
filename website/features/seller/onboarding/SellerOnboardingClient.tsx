@@ -306,7 +306,7 @@ export default function SellerOnboardingClient() {
 			return;
 		}
 		// role=seller 讓登入頁預選賣家分頁 —— 重新登入後 switchRole("seller")
-		// 才會生效、直接落地賣家中心（否則雙角色帳號預設買家，RoleZoneGuard
+		// 才會生效、直接落地賣家中心（否則雙角色帳號預設買家，WorkspaceAlign
 		// 會把人從 /seller-center 踢回首頁）。
 		// 整頁重載（replace，不留歷史）到登入頁：登出後若 session 期間上了新
 		// 部署，soft 導航會去要已刪除的舊 chunk 卡骨架（同其他登出入口）。

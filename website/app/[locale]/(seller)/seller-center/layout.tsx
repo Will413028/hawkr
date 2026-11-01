@@ -1,5 +1,5 @@
 import "@/styles/features/seller-center.css";
-import RoleZoneGuard from "@/components/shared/RoleZoneGuard";
+import ZoneGate from "@/components/shared/ZoneGate";
 import { SellerCenterShell } from "@/features/seller-center";
 import { noindexMetadata } from "@/lib/seo/metadata";
 
@@ -11,8 +11,8 @@ export default function SellerCenterLayout({
 	children: React.ReactNode;
 }) {
 	return (
-		<RoleZoneGuard required="seller">
+		<ZoneGate required="seller">
 			<SellerCenterShell>{children}</SellerCenterShell>
-		</RoleZoneGuard>
+		</ZoneGate>
 	);
 }

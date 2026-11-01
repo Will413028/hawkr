@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import RoleZoneGuard from "@/components/shared/RoleZoneGuard";
+import ZoneGate from "@/components/shared/ZoneGate";
 
 export default function CheckoutLayout({ children }: { children: ReactNode }) {
-	return <RoleZoneGuard required="buyer">{children}</RoleZoneGuard>;
+	return <ZoneGate required="buyer">{children}</ZoneGate>;
 }

@@ -97,3 +97,30 @@ test("the session cookie is checked for presence only: the API is never called",
 		globalThis.fetch = realFetch;
 	}
 });
+
+// 受保護區的 layout 讀不到 pathname 與 query：middleware 把要求的 URL 放進 request header，
+// DAL 判定「cookie 在但單體拒絕」時用它組登入頁的 `redirect`。
+function forwardedReturnPath(response: Response): string | null {
+	return response.headers.get("x-middleware-request-x-hk-return-path");
+}
+
+test("a signed-in visitor on a guarded path forwards the requested URL as a request header", async () => {
+	const path = "/account/orders/a%25b?tab=open%25";
+	const response = await siteMiddleware(request(path, SIGNED_IN));
+	assert.equal(forwardedReturnPath(response), path);
+});
+
+test("a client-sent return-path header is overwritten, not trusted", async () => {
+	const response = await siteMiddleware(
+		request("/account", {
+			...SIGNED_IN,
+			"x-hk-return-path": "//evil.example/steal",
+		}),
+	);
+	assert.equal(forwardedReturnPath(response), "/account");
+});
+
+test("a public path forwards no return path", async () => {
+	const response = await siteMiddleware(request("/about", SIGNED_IN));
+	assert.equal(forwardedReturnPath(response), null);
+});

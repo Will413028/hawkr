@@ -122,8 +122,8 @@ function startApiStub(sellerId: string, seenRequests: string[]): Server {
  * `/seller-center/*` is gated twice on the client before any route child — and
  * therefore before `StorefrontPreviewBoundary` — can mount:
  *
- *  1. `RoleZoneGuard` (components/shared/RoleZoneGuard.tsx:266) renders `null`
- *     until the session probe settles with the seller role.
+ *  1. `WorkspaceAlign` (components/shared/WorkspaceAlign.tsx) renders the workspace
+ *     skeleton until the stored workspace is the seller one.
  *  2. `SellerCenterShell` (features/seller-center/components/SellerCenterShell.tsx)
  *     redirects to `/seller/onboarding` whenever `useSellerIdentity()` reports
  *     `setupIncomplete`, and that flag is true for any `GetMyStore` response
@@ -385,11 +385,12 @@ test("production Next serves all four seller preview routes and the read-only gu
 
 	// Document-level reachability + route-tree check. Deliberately NOT a claim
 	// that these routes are server-rendered — they are not, and should not be.
-	// `/seller-center/*` sits behind `RoleZoneGuard`
-	// (components/shared/RoleZoneGuard.tsx:266), a client-only gate that renders
-	// `null` during SSR so the seller workspace never emits its contents for an
-	// anonymous document request. That is the correct design, so "SSR renders
-	// the preview" is not a property this app has and not one this test asserts.
+	// `/seller-center/*` sits behind `ZoneGate` and `WorkspaceAlign`
+	// (components/shared/WorkspaceAlign.tsx): the stored workspace is browser-only
+	// state, so the document the server renders carries the workspace skeleton and
+	// the seller workspace never emits its contents for a document request. That is
+	// the correct design, so "SSR renders the preview" is not a property this app
+	// has and not one this test asserts.
 	//
 	// Concretely: strip every <script> from these responses and the remaining
 	// DOM is just the initial-loader shell — no 買家視角預覽, no seller-tab-frame,
@@ -397,10 +398,8 @@ test("production Next serves all four seller preview routes and the read-only gu
 	// serialised RSC flight payload, which is all this loop claims: the
 	// production runtime answered, and it produced this route's layout tree.
 	//
-	// This is not a Cache Components postponement — next.config.ts does not
-	// enable `cacheComponents` (an earlier comment here blamed it, and cost a
-	// later reader a full investigation). The read-only guarantee that actually
-	// matters is asserted against a live browser below.
+	// The read-only guarantee that actually matters is asserted against a live
+	// browser below.
 	for (const { suffix } of ROUTES) {
 		const pathname = `/seller-center/preview/${sellerId}${suffix}`;
 		const response = await fetch(`${origin}${pathname}`, {

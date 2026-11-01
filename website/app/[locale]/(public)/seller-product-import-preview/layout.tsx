@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import RoleZoneGuard from "@/components/shared/RoleZoneGuard";
+import ZoneGate from "@/components/shared/ZoneGate";
 import { noindexMetadata } from "@/lib/seo/metadata";
 import "@/styles/features/market.css";
 import "@/styles/features/market-products-list.css";
@@ -17,5 +17,5 @@ export default function SellerProductImportPreviewLayout({
 }: {
 	children: ReactNode;
 }) {
-	return <RoleZoneGuard required="seller">{children}</RoleZoneGuard>;
+	return <ZoneGate required="seller">{children}</ZoneGate>;
 }

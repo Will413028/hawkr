@@ -1,7 +1,8 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import createIntlMiddleware from "next-intl/middleware";
 import { routing } from "@/i18n/routing";
 import { requiredAccessForPath, workspaceOfPath } from "@/lib/auth/redirect";
+import { RETURN_PATH_HEADER } from "@/lib/auth/return-path";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/session-cookie";
 import { getEnv } from "@/lib/config/env";
 import { getVisitorIp } from "@/lib/http/visitor-ip";
@@ -180,7 +181,7 @@ async function route(request: NextRequest): Promise<NextResponse> {
 	if (pathname.startsWith("/sellers/")) {
 		// Middleware is one of only two places on this site that can see who the
 		// visitor is (a cached RSC render cannot — `headers()` throws inside
-		// `unstable_cache`), so it is where the storefront lookup gets attributed to
+		// `use cache`), so it is where the storefront lookup gets attributed to
 		// the person it is made for rather than to the site's shared SSR quota
 		// (backend#2264). See `getVisitorIp` for why the address is trustworthy.
 		const visitorIp = getVisitorIp(request);
@@ -216,9 +217,15 @@ async function route(request: NextRequest): Promise<NextResponse> {
 	const access = requiredAccessForPath(pathname);
 	if (!access) return pass(request, pathname, locale);
 	// A session cookie is enough to enter; the account behind it (and its roles)
-	// is checked by the monolith on every call and by RoleZoneGuard.
+	// is checked by the monolith on every call and by the zone layouts (ZoneGate, lib/auth/zone.ts).
+	// The zone layouts have no pathname or query of their own, so the requested URL rides along as a
+	// request header (overwriting anything the client sent under that name) for the login redirect they
+	// issue when the monolith refuses the cookie.
+	const returnPath = `${request.nextUrl.pathname.replace(/^\/{2,}/, "/")}${request.nextUrl.search}`;
 	if (request.cookies.get(SESSION_COOKIE_NAME)?.value) {
-		return pass(request, pathname, locale);
+		const headers = new Headers(request.headers);
+		headers.set(RETURN_PATH_HEADER, returnPath);
+		return pass(new NextRequest(request, { headers }), pathname, locale);
 	}
 
 	const loginUrl = request.nextUrl.clone();
@@ -231,10 +238,7 @@ async function route(request: NextRequest): Promise<NextResponse> {
 	// An account page belongs to no workspace: the login page keeps its default tab.
 	const role = workspaceOfPath(pathname);
 	if (role) loginUrl.searchParams.set("role", role);
-	loginUrl.searchParams.set(
-		"redirect",
-		`${request.nextUrl.pathname.replace(/^\/{2,}/, "/")}${request.nextUrl.search}`,
-	);
+	loginUrl.searchParams.set("redirect", returnPath);
 	return NextResponse.redirect(loginUrl);
 }
 

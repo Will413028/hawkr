@@ -8,11 +8,11 @@ import type { Theme } from "./_helpers";
  * Computed-style gate for the seller SellerHeader Tailwind migration (子刀 5).
  *
  * The seller header only renders on /seller-center/* (RoleAwareNavbar branches
- * on pathname) and its content layout is guarded by RoleZoneGuard required=
+ * on pathname) and its content layout is guarded by ZoneGate/WorkspaceAlign required=
  * "seller", so — unlike the buyer navbar gate — there is no guest route that
  * shows it. This gate fakes a logged-in seller: it route-mocks the gateway
  * (setupGatewayMocks with a seller-bit identity + session probe) and pins the
- * stored active-role to "seller" so RoleZoneGuard passes. SellerCenterShell
+ * stored active-role to "seller" so WorkspaceAlign passes. SellerCenterShell
  * then mounts `.seller-shell`, which is what activates the route-scoped
  * `body .page-wrapper:has(.seller-shell) .seller-header__inner` surface
  * overrides in seller-center.css — the values this gate must preserve.
@@ -114,7 +114,7 @@ async function gotoSellerHeader(
 		waitUntil: "domcontentloaded",
 	});
 	await page.locator(".seller-header").first().waitFor({ state: "attached" });
-	// `.seller-shell` only mounts once RoleZoneGuard resolves the seller role —
+	// `.seller-shell` only mounts once WorkspaceAlign resolves the seller role —
 	// it is the `:has()` anchor for the pill surface overrides, so the read must
 	// wait for it or it captures the un-overridden navigation-shell surface.
 	await page.locator(".seller-shell").first().waitFor({ state: "attached" });

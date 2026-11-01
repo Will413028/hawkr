@@ -1,4 +1,4 @@
-import RoleZoneGuard from "@/components/shared/RoleZoneGuard";
+import ZoneGate from "@/components/shared/ZoneGate";
 import AccountShell from "@/features/account/components/AccountShell";
 import { noindexMetadata } from "@/lib/seo/metadata";
 
@@ -10,8 +10,8 @@ export default function AccountLayout({
 	children: React.ReactNode;
 }) {
 	return (
-		<RoleZoneGuard required="buyer">
+		<ZoneGate required="buyer">
 			<AccountShell>{children}</AccountShell>
-		</RoleZoneGuard>
+		</ZoneGate>
 	);
 }

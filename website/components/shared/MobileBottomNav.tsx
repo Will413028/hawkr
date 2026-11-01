@@ -114,7 +114,7 @@ export default function MobileBottomNav() {
 	// explicit login destination; calling the
 	// tab 「設定」 before an account exists made the action's outcome ambiguous.
 	// 依 activeRole 決定目的地：/account 是 buyer 專區、/seller-center 是
-	// seller 專區，RoleZoneGuard 對不上角色會直接 replace("/") —— 賣家身分
+	// seller 專區，ZoneGate／WorkspaceAlign 對不上角色會直接導回首頁 —— 賣家身分
 	// 點 /account 的「設定」會看起來像「馬上跳回首頁」。桌面 Navbar 已依
 	// 角色分流（商店設定 → /seller-center/me），這裡對齊同一規則。
 	const items = React.useMemo(() => {

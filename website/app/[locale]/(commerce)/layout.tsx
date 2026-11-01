@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { noindexMetadata } from "@/lib/seo/metadata";
 
 // Transactional surfaces (cart / checkout / payment) must never be indexed.
-// checkout has its own nested layout (RoleZoneGuard); this group layout only
+// checkout has its own nested layout (ZoneGate); this group layout only
 // contributes the noindex metadata that all of them inherit.
 export const metadata = noindexMetadata();
 

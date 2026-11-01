@@ -17,8 +17,8 @@ import { useObservedRouter } from "@/lib/navigation/use-observed-router";
  * Keys off the active-role UI state (`activeRole === "seller"`), NOT the
  * account's role SET (`hasSeller`). A both-role account viewing as a buyer
  * (activeRole "buyer", the default) must NOT be locked here: it would
- * ping-pong against `RoleZoneGuard required="seller"` on /seller-center
- * (which bounces non-seller views back to "/") and loop forever. Switching
+ * ping-pong against `WorkspaceAlign` on /seller-center (which bounces
+ * non-seller views back to the default page) and loop forever. Switching
  * workspace is a client-side activeRole toggle, no re-login.
  *
  * Skips /seller-center itself (already there).
@@ -65,7 +65,7 @@ export default function SellerWorkspaceLock() {
 	React.useEffect(() => {
 		if (!hydrated) return;
 		if (!isLoggedIn || activeRole !== "seller") return;
-		// Freshness check, same reason as RoleZoneGuard's: a buyer-zone deep link
+		// Freshness check, same reason as WorkspaceAlign's: a buyer-zone deep link
 		// can have just auto-switched the workspace via switchRole(), which writes
 		// localStorage synchronously but commits the context state a beat later.
 		// Trusting the stale in-memory "seller" here would hijack that navigation
