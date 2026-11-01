@@ -40,10 +40,10 @@ jobs:
         run: bash scripts/check-fullwidth-var-expansion.sh
       - name: AGENTS.md 規則
         if: always()
-        uses: Will413028/instruction-lint@a0078a45712c941f83a9516d0306c2a1706d0b3b # v0.3.0
+        uses: Will413028/instruction-lint@e645a1682f5ff623d3db6855beee630ce13064cf # v0.3.1
       - name: instruction-lint 引用的 SHA 一致
         if: always()
-        run: pipx run --spec git+https://github.com/Will413028/instruction-lint@a0078a45712c941f83a9516d0306c2a1706d0b3b instruction-lint check-pins # v0.3.0
+        run: pipx run --spec git+https://github.com/Will413028/instruction-lint@e645a1682f5ff623d3db6855beee630ce13064cf instruction-lint check-pins # v0.3.1
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         if: always()
         with:
@@ -58,4 +58,4 @@ jobs:
           sed -i 's/^var Dependencies = map\[string\]\[\]string{$/&\n\t"zzlintprobe": {},/' backend/internal/arch/modules.go
           (cd backend && GOWORK=off go run ./cmd/new-module module zzlintprobe)
           git add -N backend/internal/modules/zzlintprobe/AGENTS.md
-          pipx run --spec git+https://github.com/Will413028/instruction-lint@a0078a45712c941f83a9516d0306c2a1706d0b3b instruction-lint # v0.3.0
+          pipx run --spec git+https://github.com/Will413028/instruction-lint@e645a1682f5ff623d3db6855beee630ce13064cf instruction-lint # v0.3.1
