@@ -100,8 +100,9 @@ D2 寫「Google 的 SDK 帶不了 nonce 時，改以短效 token＋雜湊紀錄�
 website 從 Cloudflare Workers（OpenNext）搬到 Vercel（函式區域 `hnd1`，見 `2026-11-01-website-hosting-vercel.md`）並開 Cache Components 後，web 端讀登入狀態的機制改了。D1（憑證）、D3（OAuth 由單體做，website 不持 secret）、D6（Next.js 伺服器端只讀）不變；上方方案表中「Workers 多持兩家 secret」是當時平台的否決理由，保留原文。下列取代原先 website 端「client 自己問單體」的做法，以現行程式為準。
 
 - **唯一來源**：website 伺服器端的 DAL `verifySession()`（`website/lib/auth/dal.ts`）。它讀 `__Host-hk_session`，把訪客的 cookie 轉送給單體的 GetSession（GET，唯讀），回 `signedIn | guest | unavailable`；同一請求只讀一次。HttpOnly 的 cookie JS 讀不到，client 不再自己決定是否登入。
-- **只有確定的答案才是訪客**：沒有 cookie、401、單體拒絕帳號的 403 是 `guest`；網路錯誤、逾時、5xx 是 `unavailable`，不是登出，不清除任何登入狀態。client 在 `unavailable` 時以退避重問，並在 `online`、`visibilitychange` 時再問；拿到確定的答案後以 `router.refresh()` 讓伺服器重算，不直接寫入 client 狀態。
+- **只有確定的答案才是訪客**：沒有 cookie、401 是 `guest`；顧客的 session 解析不回 403（只有後台帳號會），所以 403 也歸 `unavailable`；網路錯誤、逾時、5xx 是 `unavailable`，不是登出，不清除任何登入狀態。client 在 `unavailable` 時以退避重問，並在 `online`、`visibilitychange` 時再問；拿到確定的答案後以 `router.refresh()` 讓伺服器重算，不直接寫入 client 狀態。
 - **client 狀態**：根 layout 不 await 該 promise，交給 `AuthProvider`（`website/lib/auth/context.tsx`）；Provider 不 suspend，答案到之前是 `unknown`（頁首顯示固定尺寸的中性骨架），所以靜態外殼與 404 狀態碼不受影響（取捨見 hosting ADR 的同日修訂）。
-- **受保護區**（`/account`、`/checkout`、`/seller-center` 等）：server layout 的 `ZoneGate` 依 DAL 導向；`website/middleware.ts` 只看 cookie 在不在做樂觀導向，被單體撤銷的 cookie 仍會通過 middleware，由 `ZoneGate` 擋下。已移除 client 端的導向守衛。
-- **狀態改變之後**（登出、任何 401、單體拒絕 session、登入成功換帳號）：client 呼叫 `router.refresh()`，讓根 layout 交來新的 promise，最新的 promise 的答案勝出；其他分頁經 BroadcastChannel `hk-auth-session` 得知後同樣 refresh。
+- **受保護區**（`/account`、`/checkout`、`/seller-center` 等）：server layout 的 `ZoneGate` 依 DAL 導向，並把這次請求驗過的身分交給區內的 `ZoneIdentityProvider`，區內元件與查詢第一次 render 就有身分；`website/middleware.ts` 只看 cookie 在不在做樂觀導向，被單體撤銷的 cookie 仍會通過 middleware，由 `ZoneGate` 擋下。已移除 client 端的導向守衛。
+- **身分改變之後**（登出、已登入頁面收到 401、session 失效、開店完成取得賣家角色）：client 清本機私有資料後整頁導向，伺服器只會讀到改變後的 cookie；其他分頁經 BroadcastChannel `hk-auth-session` 得知帳號不同或失去身分時重新載入，訪客分頁得知登入時 `router.refresh()`。同一帳號的資料更新（暱稱、頭像）以 `router.refresh()` 重取。
+- **顯示資料**：GetSession 帶 `display_name` 與 `avatar`，由單體 httpapi 從 buyer 模組組裝，client 不另外取 profile。
 - **反代需求不變**：website 經同源反代把 `/api/auth/*`、`/api/connect/*`、`/api/v1/*` 轉給單體，需原樣傳 3xx 與多個 `Set-Cookie`；部署平台換成 Vercel 後的驗證由 hosting ADR 的步驟負責。
