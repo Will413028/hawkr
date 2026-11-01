@@ -15,8 +15,10 @@ autoInstallPeers: false
 auditConfig:
   ignoreGhsas:
     - GHSA-333x-w4r6-6crp
+    - GHSA-3g3m-2fjr-6pw4
     - GHSA-9wx9-5pv9-3349
     - GHSA-f86p-h4j2-7qgj
+    - GHSA-g3hv-75wg-m249
     - GHSA-mrhx-c7xc-m3w5
     - GHSA-w74x-v6f9-j3xg
     - GHSA-wjr9-j795-jxcr
