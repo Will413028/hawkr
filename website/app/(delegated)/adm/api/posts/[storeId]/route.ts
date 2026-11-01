@@ -14,8 +14,6 @@ type RouteContext = { params: Promise<{ storeId: string }> };
 /** Gateway `ListDelegatedPosts` 實際讀取的三個 key（沒有 `keyword`）。 */
 const LIST_QUERY = ["page", "page_size", "status"] as const;
 
-export const dynamic = "force-dynamic";
-
 export async function GET(
 	request: Request,
 	context: RouteContext,

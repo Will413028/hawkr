@@ -14,8 +14,6 @@ import { forwardDelegated, mediaSessionSegment } from "../../../../_forward";
 
 type RouteContext = { params: Promise<{ sessionId: string }> };
 
-export const dynamic = "force-dynamic";
-
 export async function POST(
 	request: Request,
 	context: RouteContext,

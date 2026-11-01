@@ -10,9 +10,6 @@ interface Props {
 	params: Promise<{ locale: string; id: string }>;
 }
 
-// Seller-profile freshness tier (on-demand ISR; long-tail seller routes resolve
-// on first visit).
-export const revalidate = 1800;
 export const generateStaticParams = sellerStaticParams;
 
 export default async function Page(props: Props) {

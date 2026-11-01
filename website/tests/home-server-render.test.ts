@@ -31,9 +31,10 @@ test("home page is a server component that renders the snapshot into HTML", asyn
 	assert.match(source, /buildHomeSnapshot\(bootstrap\)/);
 	assert.match(source, /<HomePage snapshot=\{snapshot\} \/>/);
 
-	// Traditional ISR: prerender the HTML, regenerate on the live-commerce window,
-	// and keep the client route-cache tree for instant BFCache revisits.
-	assert.match(source, /export const revalidate = 60/);
+	// Cache Components: the live-commerce window is the `cacheLife` of the cached
+	// reads the page awaits (a segment `revalidate` is rejected), and the client
+	// route-cache tree is kept for instant BFCache revisits.
+	assert.doesNotMatch(source, /export const revalidate\b/);
 	assert.match(source, /export const unstable_dynamicStaleTime = 300/);
 
 	// ItemList JSON-LD for the products the HTML lists (same contract as

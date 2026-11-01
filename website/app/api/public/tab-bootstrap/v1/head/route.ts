@@ -1,11 +1,7 @@
+import { connection } from "next/server";
 import { getCachedStrictProductsPage } from "@/lib/api/cached";
 import { fetchPublicPostsTyped } from "@/lib/api/posts";
 import { getVisitorIp } from "@/lib/http/visitor-ip";
-
-// Reads the request URL (tab/page) and returns a browser no-store payload, so
-// the handler is per-request; the market branch's data still comes from a
-// shared `unstable_cache` entry.
-export const dynamic = "force-dynamic";
 
 type HeadTab = "feed" | "market";
 const FEED_REFRESH_DEADLINE_MS = 3_000;
@@ -29,6 +25,7 @@ function readRequest(url: string): { tab: HeadTab; page: number } | null {
  * when this endpoint returns 503 and applies a retry cooldown.
  */
 export async function GET(request: Request) {
+	await connection();
 	const input = readRequest(request.url);
 	if (!input) {
 		return Response.json(

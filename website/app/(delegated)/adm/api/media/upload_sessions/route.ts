@@ -21,8 +21,6 @@ import { forwardDelegated } from "../../_forward";
  * **一律算活動** —— 換一批商品圖正是最容易停留超過一個閒置窗口的動作。
  */
 
-export const dynamic = "force-dynamic";
-
 export async function POST(request: Request): Promise<Response> {
 	return forwardDelegated(request, {
 		method: "POST",

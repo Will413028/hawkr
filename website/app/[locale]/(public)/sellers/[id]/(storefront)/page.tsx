@@ -21,12 +21,6 @@ interface Props {
 	params: Promise<{ locale: string; id: string }>;
 }
 
-// Seller-profile freshness tier. The route is pure ISR — only the first product
-// page is server-rendered (SEO body); later pages are fetched client-side, so
-// the server reads no request-time input. Product data comes from the shared
-// `unstable_cache` layer; `revalidate` is the TTL safety net.
-export const revalidate = 1800;
-
 export const generateStaticParams = sellerStaticParams;
 
 export default async function Page({ params }: Props) {

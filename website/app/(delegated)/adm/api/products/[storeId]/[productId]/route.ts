@@ -12,8 +12,6 @@ import { forwardDelegated, numericSegment } from "../../../_forward";
 
 type RouteContext = { params: Promise<{ storeId: string; productId: string }> };
 
-export const dynamic = "force-dynamic";
-
 export async function GET(
 	request: Request,
 	context: RouteContext,

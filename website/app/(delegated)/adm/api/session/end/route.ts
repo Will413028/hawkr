@@ -35,8 +35,6 @@ import {
  * 讓瀏覽器丟掉一把可能還活著的憑證。
  */
 
-export const dynamic = "force-dynamic";
-
 interface EndRequestBody {
 	/** 工作區當前路由的 storeId；與工作階段快照的 target 不符即 409。 */
 	storeId?: unknown;

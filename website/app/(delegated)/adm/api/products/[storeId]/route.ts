@@ -15,8 +15,6 @@ type RouteContext = { params: Promise<{ storeId: string }> };
 /** Gateway `ListDelegatedProducts` 實際讀取的四個 key，多一個少一個都不對。 */
 const LIST_QUERY = ["page", "page_size", "keyword", "status"] as const;
 
-export const dynamic = "force-dynamic";
-
 export async function GET(
 	request: Request,
 	context: RouteContext,

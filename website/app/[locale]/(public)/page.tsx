@@ -24,11 +24,6 @@ import { productUrl } from "@/lib/seo/urls";
 // immediately without blocking on another RSC flight.
 export const unstable_dynamicStaleTime = 300;
 
-// Regenerate the prerendered home HTML at most once a minute — the same
-// live-commerce window the underlying product/marketplace cache entries use.
-// A write-side POST /api/revalidate still busts sooner via cache tags.
-export const revalidate = 60;
-
 // 描述只有中文（術語表沒有英文描述，英文發佈前由發佈門檻補上）；標題是這個語系的預設標題。
 const HOME_DESCRIPTION =
 	"Hawkr 是在地小農與職人的線上市集，當季蔬果、海鮮、肉品由產地直送到你家餐桌。我們以商家認證與交易保障建立信任，讓你看見每樣食材背後的產地故事與用心，遇見每一天最新鮮的味道，安心採買、輕鬆下單，把產地到餐桌的距離拉得更近，也讓飲食回到對土地與生產者的理解與信任。";

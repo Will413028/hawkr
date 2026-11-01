@@ -1,10 +1,9 @@
-import { revalidateTag, unstable_cache } from "next/cache";
-import { type NextRequest, NextResponse } from "next/server";
+import { cacheLife, cacheTag, revalidateTag } from "next/cache";
+import { connection, type NextRequest, NextResponse } from "next/server";
 import { isRevalidationSecretAuthorized } from "@/lib/api/revalidate-request";
 import {
 	buildSentinelBody,
 	buildSentinelEntry,
-	CANARY_CACHE_KEY,
 	CANARY_TAG,
 	CANARY_TTL_SECONDS,
 	SENTINEL_RESPONSE_HEADERS,
@@ -21,19 +20,22 @@ import {
  * expands entity tags into the aggregate tags real pages use, and the canary
  * must never touch a visitor-facing cache entry.
  *
- * The route is dynamic on purpose. Only the `unstable_cache` entry below is
+ * The route is dynamic on purpose. Only the `'use cache'` entry below is
  * cached — that is the object under study — while the response itself stays
  * per-request so `servedAt`/`ageMs` are always true.
  */
-const readSentinelEntry = unstable_cache(
-	async () => buildSentinelEntry(Date.now(), process.env.VERCEL_DEPLOYMENT_ID),
-	CANARY_CACHE_KEY,
-	{ tags: [CANARY_TAG], revalidate: CANARY_TTL_SECONDS },
-);
-
-export const dynamic = "force-dynamic";
+async function readSentinelEntry() {
+	"use cache";
+	cacheTag(CANARY_TAG);
+	cacheLife({
+		revalidate: CANARY_TTL_SECONDS,
+		expire: CANARY_TTL_SECONDS * 2,
+	});
+	return buildSentinelEntry(Date.now(), process.env.VERCEL_DEPLOYMENT_ID);
+}
 
 export async function GET() {
+	await connection();
 	const entry = await readSentinelEntry();
 	return NextResponse.json(buildSentinelBody(entry, Date.now()), {
 		headers: SENTINEL_RESPONSE_HEADERS,

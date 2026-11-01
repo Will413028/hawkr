@@ -27,8 +27,6 @@ import {
  * ⚠️ **不得把 gateway 的 `message` 顯示出來**（message 不透傳，§4.4.4）。
  */
 
-export const dynamic = "force-dynamic";
-
 /** `dhof_` ＋ 43 字 base64url ＝ 48 字（§8.1.6）。 */
 const HANDOFF_CODE_PATTERN = /^dhof_[A-Za-z0-9_-]{43}$/;
 

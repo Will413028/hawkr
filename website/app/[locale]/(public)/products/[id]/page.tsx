@@ -6,6 +6,7 @@ import { ProductDetailPage } from "@/features/product";
 import type { GA4Item } from "@/lib/analytics/types";
 import { getCachedProduct } from "@/lib/api/cached";
 import { prerenderSafe } from "@/lib/api/prerender";
+import { SENTINEL_ENTITY_ID } from "@/lib/api/static-params";
 import { buildImageUrl } from "@/lib/media/cdn";
 import { breadcrumbSchema, productSchema } from "@/lib/seo/jsonld";
 import {
@@ -20,13 +21,8 @@ interface Props {
 	params: Promise<{ locale: string; id: string }>;
 }
 
-// On-demand ISR：不在 build 期列舉真實商品（後端對任一商品的 5xx 不會炸 build），
-// 全部首訪生成、快取 revalidate 秒數後背景刷新，並由 POST /api/revalidate 帶
-// productTag 即時失效。傳統模式 dynamicParams 預設 true，空陣列即「零預建、全 on-demand」。
-export const revalidate = 60;
-
 export function generateStaticParams() {
-	return [];
+	return [{ id: SENTINEL_ENTITY_ID }];
 }
 
 // 商品 id 是純數字 TSID；掃描器打的垃圾路徑（如 /products/styles.css.map）

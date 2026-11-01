@@ -1,3 +1,5 @@
+import { connection } from "next/server";
+
 /**
  * Liveness probe: "this deployment is up and serving traffic."
  *
@@ -19,11 +21,12 @@
  *
  * `no-store` is load-bearing. A cached health response describes the past and
  * could let a dead deployment appear healthy after it stopped serving traffic.
+ *
+ * `connection()` keeps the handler out of the build-time prerender, so every
+ * request reads the clock itself.
  */
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
-export function GET() {
+export async function GET() {
+	await connection();
 	return Response.json(
 		{
 			code: 0,

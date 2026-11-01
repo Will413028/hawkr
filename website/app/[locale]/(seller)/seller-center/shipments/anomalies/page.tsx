@@ -8,9 +8,6 @@ import { localeFromParam } from "@/lib/seo/metadata";
  * Keep this route as a redirect so old bookmarks / banner links still land on
  * the right place.
  */
-// Alias with no renderable page — render per request so redirect()'s
-// request-scoped (Sentry) instrumentation is never pulled into a static build.
-export const dynamic = "force-dynamic";
 
 // Same as /seller-center: the redirect resolves on the client because the
 // document has already started streaming, so this route really does serve a

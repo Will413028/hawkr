@@ -18,8 +18,6 @@ import { forwardDelegated } from "../../_forward";
  * 正是在結束之後才顯示的。
  */
 
-export const dynamic = "force-dynamic";
-
 export async function GET(request: Request): Promise<Response> {
 	return forwardDelegated(request, {
 		method: "GET",

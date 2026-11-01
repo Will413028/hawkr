@@ -15,8 +15,6 @@ import { forwardDelegated } from "../../_forward";
  * `storeId` query 會讓這支端點直接死（Gateway 不收，F17）。
  */
 
-export const dynamic = "force-dynamic";
-
 export async function GET(request: Request): Promise<Response> {
 	return forwardDelegated(request, {
 		method: "GET",

@@ -1,7 +1,7 @@
 /**
  * Cross-PoP freshness canary — the measured object.
  *
- * A tiny `unstable_cache` entry that goes through the exact same
+ * A tiny `use cache` entry that goes through the exact same
  * incremental-cache + tag-cache path as every product / seller / discovery
  * fetcher (lib/api/cached.ts), but carries no upstream call, so what it
  * measures is the cache layer itself rather than backend latency.
@@ -22,9 +22,6 @@ export const CANARY_TAG = "canary:freshness";
 
 /** Public path of the sentinel route (`app/(canary)/sentinel/route.ts`). */
 export const CANARY_PATH = "/sentinel";
-
-/** `unstable_cache` key parts — one shared entry, no per-request variance. */
-export const CANARY_CACHE_KEY = ["canary", "sentinel"];
 
 /**
  * TTL safety net only. Freshness here is meant to be driven by the tag purge,

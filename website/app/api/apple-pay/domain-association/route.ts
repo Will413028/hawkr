@@ -2,13 +2,6 @@ import { NextResponse } from "next/server";
 import { env } from "@/lib/config/env";
 import { APPLE_PAY_DOMAIN_ASSOCIATION } from "@/lib/payment/applePayDomainAssociation";
 
-// The domain-association blob is a PUBLIC, per-environment static value
-// (committed in applePayDomainAssociation.ts). It does NOT come from process.env —
-// it ships in the bundle, picked by build-time flavor. Keep this per-request so
-// the flavor-selected blob is served fresh; Apple re-fetches it when verifying
-// the merchant domain.
-export const dynamic = "force-dynamic";
-
 export async function GET() {
 	const content = APPLE_PAY_DOMAIN_ASSOCIATION[env.flavor];
 	if (!content) {

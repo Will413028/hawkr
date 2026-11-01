@@ -6,14 +6,6 @@ import { localeFromParam, pageMetadata } from "@/lib/seo/metadata";
 // refreshes in the background on activation).
 export const unstable_dynamicStaleTime = 300;
 
-// ISR (#338): the server renders the canonical no-filter first page (SEO body +
-// ItemList JSON-LD) with no request-time input; all filter / sort / tab params
-// are read on the client (MarketProductsListClient), so the route no longer
-// server-renders per request. Product data comes from the shared `unstable_cache`
-// layer; `revalidate` is the static-shell TTL safety net, aligned with the
-// product list data window.
-export const revalidate = 60;
-
 export const generateMetadata = pageMetadata({
 	title: { absolute: "Hawkr 市集 — 生鮮蔬果產地直送" },
 	description:

@@ -6,13 +6,6 @@ import { pageMetadata } from "@/lib/seo/metadata";
 // refreshes in the background on activation).
 export const unstable_dynamicStaleTime = 300;
 
-// ISR (#338): the server renders the canonical unscoped feed only; `?seller` /
-// `?hashtag` / `?topic` / `?post` are read on the client (FeedParamController)
-// so the route no longer server-renders per request. Post data comes from the
-// bounded public transport; `revalidate` is the static-shell TTL safety net,
-// aligned with the feed data window.
-export const revalidate = 60;
-
 export const generateMetadata = pageMetadata({
 	title: { absolute: "Hawkr 動態 — 食材故事與店家貼文" },
 	description:

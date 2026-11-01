@@ -18,8 +18,6 @@ interface Props {
 	params: Promise<{ locale: string; id: string }>;
 }
 
-export const revalidate = 300;
-
 function cardTitle(name?: string): string {
 	return name?.trim()
 		? `${name.trim()} 的商家名片 | Hawkr`

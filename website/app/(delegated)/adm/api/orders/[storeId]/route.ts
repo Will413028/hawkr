@@ -33,8 +33,6 @@ const LIST_QUERY = [
 	"date_to",
 ] as const;
 
-export const dynamic = "force-dynamic";
-
 export async function GET(
 	request: Request,
 	context: RouteContext,

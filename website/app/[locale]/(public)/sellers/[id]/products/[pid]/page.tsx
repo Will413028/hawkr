@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ProductDetailPage } from "@/features/product";
 import { getCachedProduct } from "@/lib/api/cached";
 import { prerenderSafe } from "@/lib/api/prerender";
+import { SENTINEL_ENTITY_ID } from "@/lib/api/static-params";
 import { buildImageUrl } from "@/lib/media/cdn";
 import {
 	localeFromParam,
@@ -15,13 +16,8 @@ interface Props {
 	params: Promise<{ locale: string; id: string; pid: string }>;
 }
 
-// On-demand ISR (traditional model): no build-time enumeration of live seller
-// products; every id resolves on first visit and refreshes on the revalidate
-// window / productTag bust.
-export const revalidate = 60;
-
 export function generateStaticParams() {
-	return [];
+	return [{ id: SENTINEL_ENTITY_ID, pid: SENTINEL_ENTITY_ID }];
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

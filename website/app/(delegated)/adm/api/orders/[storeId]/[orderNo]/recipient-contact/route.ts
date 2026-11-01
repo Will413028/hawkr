@@ -21,8 +21,6 @@ type RouteContext = { params: Promise<{ storeId: string; orderNo: string }> };
 
 const REVEAL_QUERY = ["operation_reason"] as const;
 
-export const dynamic = "force-dynamic";
-
 export async function GET(
 	request: Request,
 	context: RouteContext,

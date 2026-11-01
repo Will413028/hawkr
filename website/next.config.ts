@@ -290,12 +290,12 @@ const nextConfig: NextConfig = {
 	// 根 layout 有兩個（app/[locale] 與 app/(delegated)），沒有單一 layout 組得出全站的 404，
 	// 所以找不到任何路由時用 app/global-not-found.tsx（整份文件自己組，見該檔的說明）。
 	experimental: { globalNotFound: true },
-	// Traditional ISR/SSG model (#338): static-by-default + on-demand
-	// revalidation. Cache Components / PPR is deliberately OFF — its per-request
-	// static-shell resume was the prod white-screen + OOM root cause. Data-layer
-	// freshness now lives in lib/api/cached.ts (unstable_cache per fetcher, with
-	// tags + a revalidate TTL safety net); revalidateTag (POST /api/revalidate)
-	// busts those entries early on backend price/stock/publish mutations.
+	// Cache Components: dynamic by default with a prerendered static shell.
+	// Data-layer freshness lives in lib/api/cached.ts (a `'use cache'` function per
+	// fetcher, with tags + a cacheLife TTL safety net); revalidateTag
+	// (POST /api/revalidate) busts those entries early on backend
+	// price/stock/publish mutations.
+	cacheComponents: true,
 	images: {
 		// Custom loader → Alibaba OSS image service. We use OSS's own
 		// image-processing pipeline (resize/quality/WebP) instead of Next's
