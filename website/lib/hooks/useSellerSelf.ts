@@ -30,7 +30,7 @@ interface UseSellerSelfResult {
  * `useInvalidateSellerSelf`) so every consumer refetches.
  */
 export function useSellerSelf(): UseSellerSelfResult {
-	const { isLoggedIn, hasSeller } = useAuth();
+	const { isLoggedIn, hasSeller, status } = useAuth();
 	const scope = useSellerDataScope();
 	const query = useQuery({
 		queryKey: scope.keys.storefront(),
@@ -49,7 +49,7 @@ export function useSellerSelf(): UseSellerSelfResult {
 	});
 	return {
 		data: query.data ?? null,
-		loading: query.isLoading,
+		loading: query.isLoading || status === "unknown",
 		error: query.error,
 		refresh: async () => {
 			await query.refetch();
