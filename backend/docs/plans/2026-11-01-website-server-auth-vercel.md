@@ -67,14 +67,15 @@
   - 不能動：本機開發的 route handler 行為；3xx 與多個 `Set-Cookie` 原樣傳遞。
   - 驗收：完成定義；新測試：prod flavor 以跨來源 `NEXT_PUBLIC_API_BASE_URL` 載入設定要失敗；build 出的 routes manifest 含三條 beforeFiles rewrite；mutation：拿掉同源檢查、拿掉任一條 rewrite，對應測試要失敗。
 - [ ] **3. 開 cacheComponents ＋ DAL，身分由伺服器初值決定**（被擋於：步驟 2b；tag 失效與正式連線的 RTT 在第一次正式部署時量）
-  - 範圍：`cacheComponents: true`；`lib/api/cached.ts` 的 `unstable_cache` 遷到 `'use cache'`＋`cacheTag`＋`cacheLife`（Next 16 的基準；`unstable_cache` 在 Cache Components 下是舊 API）。它的 `singleFlight`（同 key 併發只打一次後端）先回答「從零設計會不會需要」：`'use cache'` 本身會併發去重時刪除，否則保留並在 commit 寫理由；新增 `lib/auth/dal.ts` 的 `verifySession()`（`react` `cache()` 包，讀 cookie → GetSession，回 `signedIn | guest | unavailable`）；根 layout 把 session promise 包在 Suspense 交給 `AuthProvider`，client 以 `use()` 讀；刪除 client 的初次探測與 `HYDRATION_GATE_MS`；受保護區 layout 以 DAL 導向，`RoleZoneGuard` 改伺服器端；刪 `website/README.md` 的「不要加回 cacheComponents」與零 PARTIALLY_STATIC gate（`rg -ln "PARTIALLY_STATIC" website/tests website/open-next.config.ts website/next.config.ts` 列出的檔，例如 `tests/seller-preview-ssr-production.test.ts`），改成 `tests/build-output/` 下的新測試：讀 build 產出的 prerender manifest，斷言受保護頁與含頁首的頁是 PARTIALLY_STATIC。
+  - 範圍：`cacheComponents: true`；`lib/api/cached.ts` 的 `unstable_cache` 遷到 `'use cache'`＋`cacheTag`＋`cacheLife`（Next 16 的基準；`unstable_cache` 在 Cache Components 下是舊 API）。它的 `singleFlight`（同 key 併發只打一次後端）先回答「從零設計會不會需要」：`'use cache'` 本身會併發去重時刪除，否則保留並在 commit 寫理由；新增 `lib/auth/dal.ts` 的 `verifySession()`（`react` `cache()` 包，讀 cookie → GetSession，回 `signedIn | guest | unavailable`）；根 layout 不 await，把 session promise 交給 `AuthProvider`；Provider 不 suspend，promise 結果出來前 context 是 `unknown`，`{children}` 不在任何根層 Suspense 內（D5）；`AuthProvider` 的狀態改 `unknown | guest | signedIn | unavailable`，刪 `hydrated`／`sessionSettled`／`sessionUnavailable` 旗標，消費端改讀狀態；`unknown` 時頁首顯示 D3 的固定尺寸中性骨架；刪除 client 的初次探測與 `HYDRATION_GATE_MS`；受保護區 layout 以 DAL 導向，`RoleZoneGuard` 改伺服器端；刪 `website/README.md` 的「不要加回 cacheComponents」與零 PARTIALLY_STATIC gate（`rg -ln "PARTIALLY_STATIC" website/tests website/open-next.config.ts website/next.config.ts` 列出的檔，例如 `tests/seller-preview-ssr-production.test.ts`），改成 `tests/build-output/` 下的新測試：讀 build 產出的 prerender manifest，斷言受保護頁與含頁首的頁是 PARTIALLY_STATIC。
   - 消費端：`rg -ln "useAuth\(|hydrated|sessionSettled|sessionUnavailable|unstable_cache|cachedFetch" website --glob '*.ts*'`。
   - 不能動：不變量表全部；登入與登出流程的 URL 與 cookie。
   - 驗收：完成定義；mutation：DAL 對 401 回 `unavailable` 時，「401 轉訪客」測試要失敗；把 GetSession 移進 `'use cache'` 時 build 要失敗（Next 會擋讀 cookie）；把 gate 加回時「首屏無檢查中」測試要失敗。#338 回歸（預覽部署，Will 觸發）：首頁、PDP、`/account` 各以 `curl` 請求 20 次，全部 200 且 HTML 含頁首的固定標記（`data-testid` 由步驟 3 指定）；Vercel Observability 中這些 function 的最大記憶體低於步驟 1 記下的上限的 50%。
   - 停止條件：某頁讀 cookie 又必須整頁快取，無法拆成動態洞 → 回報。
   - 需要人做的事：觸發預覽部署。
-- [ ] **4. client 四態**（被擋於：步驟 3、D3）
-  - 範圍：`AuthProvider` 的狀態改 `unknown | guest | signedIn | unavailable`（`unknown` 只存在於 Suspense fallback）；刪 `hydrated`／`sessionSettled`／`sessionUnavailable` 旗標，消費端改讀狀態。狀態轉移（D4）：
+- [ ] **4. client 四態的事件轉移**（被擋於：步驟 3、D4）
+  - 四態本身、旗標刪除與 D3 骨架已依 D5（2026-11-01）併入步驟 3；本步只做事件後的轉移。
+  - 範圍：狀態轉移（D4）：
 
     | 事件 | 轉到 | 機制 |
     |---|---|---|
@@ -96,13 +97,19 @@
 - **D2 受保護區（`/account`、`/seller-center` 等）的角色檢查**（狀態：已決 2026-11-01，Will，選 A；擋住步驟 3）
   - A：layout 呼叫 DAL，不符 `redirect()`；middleware 只保留「有沒有 cookie」的樂觀導向；刪 `RoleZoneGuard`（Next 官方 DAL 模式）。（建議，採用）
   - B：保留 client `RoleZoneGuard`——角色在 client 判斷，與本計畫目標相反。
-- **D3 `unknown`（Suspense fallback）時頁首顯示什麼**（狀態：已決 2026-11-01，Will，選 A；擋住步驟 4；UI 改動需同意）
+- **D3 `unknown`（promise 結果出來前）時頁首顯示什麼**（狀態：已決 2026-11-01，Will，選 A；擋住步驟 3（依 D5）；UI 改動需同意）
   - A：固定尺寸的中性骨架（不顯示登入鈕、也不顯示頭像），避免位移與閃爍。（建議，採用）
   - B：先顯示訪客樣式——登入者會看到「登入」閃一下再變頭像。
 
 - **D4 事件之後 client 的登入狀態怎麼更新**（狀態：已決 2026-11-01，Will，選 A；擋住步驟 4）
   - A：伺服器是唯一來源，登出、跨分頁訊號、401 之後 `router.refresh()` 重取初值；client 只在 refresh 完成前暫時顯示目標態（步驟 4 的轉移表）。（建議，採用）
   - B：client 自己維護狀態並直接改——快，但伺服器初值與 client 狀態成為兩個來源，會再分歧。
+
+- **D5 children 是否在身分的 Suspense 內**（狀態：已決 2026-11-01，Will，選 A；擋住步驟 3；步驟 3 實作時發現）
+  - 事實：照 D1 字面把 `AuthProvider` 連 `{children}` 包進一個根 Suspense，`notFound()` 回 200 加 noindex，靜態外殼只剩 fallback（`next start`＋curl 實測）；讀身分的檔案 91 個（`useAuth`／`useOptionalAuth`，含 `Link` 與約 50 個 hook）。
+  - A：Provider 不 suspend，結果出來前 context 為 `unknown`，children 在 Suspense 外；四態與 D3 骨架從步驟 4 提前到步驟 3。（建議，採用）
+  - B：頁首、頁尾等外框元件各自包 Suspense，children 內的元件 `unknown` 時先用訪客外觀——等於 D3 的 B，且要逐頁加邊界。
+  - C：接受 200 與只有 fallback 的外殼——放寬 SEO 驗收，PPR 的效益大幅縮小。
 
 拍板順序：D1–D4 現在可一起拍；若步驟 1 的事實推翻前提，重交 D1／D2。
 
