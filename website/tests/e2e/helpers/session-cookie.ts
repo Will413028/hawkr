@@ -1,15 +1,19 @@
 import type { Page } from "@playwright/test";
 import { SESSION_COOKIE_NAME } from "../../../lib/auth/session-cookie";
+import {
+	encodeSessionValue,
+	type SessionIdentity,
+} from "./fake-session-upstream";
 
 /**
  * Hermetic sign-in for the e2e (ADR 2026-10-30-identity-self-hosted-federated-login).
  *
  * The credential is the HttpOnly `__Host-hk_session` cookie, and the site reads it in exactly two
  * places: middleware.ts only checks that the cookie is PRESENT (an optimistic gate that never
- * calls the API), and the browser asks GetSession for who the account is — which the suite
- * intercepts (helpers/mock-gateway.ts). So signing in here is: set the cookie the middleware wants,
- * and let the mock answer GetSession with the account. The value is opaque to both and never
- * verified. Guest specs set no cookie and the mock answers GetSession `unauthenticated`.
+ * calls the API), and the server asks GetSession for who the account is (lib/auth/dal.ts) — which the
+ * e2e webServer answers from helpers/fake-session-upstream.ts, decoding the account out of this very
+ * cookie. So signing in here is: set the cookie that carries the identity. Guest specs set no cookie, so
+ * the server answers guest without asking anyone.
  */
 
 /**
@@ -21,7 +25,7 @@ import { SESSION_COOKIE_NAME } from "../../../lib/auth/session-cookie";
  */
 export async function signInWithSessionCookie(
 	page: Page,
-	accountId: string,
+	identity: SessionIdentity,
 ): Promise<void> {
 	const origin = `http://localhost:${process.env.PLAYWRIGHT_PORT || "3000"}`;
 	const url = `${origin}/__e2e/session`;
@@ -30,7 +34,7 @@ export async function signInWithSessionCookie(
 			status: 200,
 			contentType: "text/html",
 			headers: {
-				"set-cookie": `${SESSION_COOKIE_NAME}=e2e-session-${accountId}; Path=/; Secure; HttpOnly; SameSite=Lax`,
+				"set-cookie": `${SESSION_COOKIE_NAME}=${encodeSessionValue(identity)}; Path=/; Secure; HttpOnly; SameSite=Lax`,
 			},
 			body: "<!doctype html><title>e2e session</title>",
 		}),

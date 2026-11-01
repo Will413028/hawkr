@@ -14,6 +14,9 @@ loadEnvConfig(process.cwd());
 // PLAYWRIGHT_PORT per run (run id + attempt) and exports it before this
 // config loads; local dev has no such env var and stays on 3000.
 const PORT = process.env.PLAYWRIGHT_PORT || "3000";
+// The site reads the session on the server, so the monolith's GetSession needs a real upstream
+// (tests/e2e/helpers/fake-session-upstream.ts); it follows PORT so concurrent runs do not collide.
+const SESSION_UPSTREAM_PORT = String(Number(PORT) + 1000);
 
 export default defineConfig({
 	testDir: "./tests",
@@ -91,66 +94,75 @@ export default defineConfig({
 			},
 		},
 	],
-	webServer: {
-		// In CI, test against a PRODUCTION build: `next dev` compiles routes
-		// on-demand, so the first navigation to a cold route (e.g. "/", "/login")
-		// can blow the 15s navigationTimeout on a loaded runner — the source of
-		// the flaky page.goto timeouts. `next build` precompiles every route, so
-		// `next start` serves instantly and deterministically.
-		//
-		// The CI job already runs `pnpm run build` as a separate "cacheComponents
-		// gate" step (.github/workflows/deploy.yml) BEFORE the E2E step, so we only
-		// `pnpm start` here — reusing that artifact. Folding the build into the
-		// webServer command would (a) build twice and (b) bury a build failure
-		// inside Playwright's webServer boot instead of failing at the gate step.
-		// Locally keep the dev server for fast iteration.
-		// `next dev` on an explicit PORT (`pnpm dev` is the same command on the
-		// default port 3000) so the local server matches `url` below.
-		command: process.env.CI ? "pnpm start" : "pnpm exec next dev",
-		url: `http://localhost:${PORT}`,
-		reuseExistingServer: !process.env.CI,
-		// E2E browser base must be SAME-ORIGIN with this server so the browser
-		// exercises the first-party API paths (/api/connect, /api/v1) the way a
-		// deployment does. SSR inherits the branch-correct gateway
-		// loaded from .env.local: main exercises the formal API, while dev/local
-		// defaults to the test API.
-		// (CI's pnpm-start build bakes the matching PORT-scoped value via
-		// .env.local in deploy.yml — NEXT_PUBLIC_* is inlined at build time, so
-		// setting it here only affects local `next dev`, not the CI prebuilt run.)
-		env: {
-			PORT,
-			NEXT_PUBLIC_API_BASE_URL: `http://localhost:${PORT}/api/v1`,
-			API_BASE_URL: process.env.API_BASE_URL ?? "http://127.0.0.1:9/api/v1",
-			PLAYWRIGHT_E2E_API_PROXY: "1",
-			// dev-only 浮動工具（角色切換器 / React Query Devtools）在本機 `next dev`
-			// 下會 render，production build 不會 —— 於是本機量到的 DOM 與 CI 不是同
-			// 一份。實測（web#425）：兩顆都是右下角 viewport-fixed，整個蓋在手機底部
-			// 導覽列第 5 格上，mobile project 的點擊被攔截、3/3 紅，而 CI 上同一支
-			// mobile 測試一直是綠的。關掉它們，本機測的才是 CI 會測到的那份 DOM。
-			//
-			// 只對本機 `next dev` 生效，這是對的：CI 的 `pnpm start` 服務的是先前
-			// build 好的產物，NEXT_PUBLIC_* 在 build 期就被字面替換掉了（同上面
-			// NEXT_PUBLIC_API_BASE_URL 那段註解），而那份產物本來就是 production，
-			// 兩顆都不存在。
-			NEXT_PUBLIC_DEV_OVERLAYS: "off",
-			// 廠商入口二次驗證（GIS）的 Google client id：測試一律用這個假值，**不吃 .env.local**。
-			//
-			// 🔴 不設的話行為會隨環境漂：有 .env.local 的機器上 GSI 元件會渲染，
-			// 乾淨的 worktree（或 CI 的某些 job）上元件會走「尚未設定」分支而整個不畫
-			// 按鈕——同一支測試在兩台機器上測到的是不同的畫面。真正的 Google 網路請求
-			// 由 tests/e2e/helpers/mock-gsi.ts 的 window.google stub 擋掉，所以這裡
-			// 放假值是安全的。
-			NEXT_PUBLIC_GOOGLE_CLIENT_ID:
-				"e2e-dummy-client-id.apps.googleusercontent.com",
-			// RFQ specs exercise the enabled cohort explicitly. Production/default
-			// remains fail-safe OFF in capabilities.ts; the browser fixture turns on
-			// only the two Web presentation gates. The tests exercise price
-			// preview and immutable confirmation; formal publication remains a
-			// separate, visibly disabled capability in the UI.
-			WEB_PROCUREMENT_RFQ_PRICE_RANGE_V1: "true",
-			WEB_PROCUREMENT_RFQ_APPROVAL_V1: "true",
+	webServer: [
+		{
+			command: "pnpm exec tsx tests/e2e/helpers/fake-session-upstream.main.ts",
+			url: `http://127.0.0.1:${SESSION_UPSTREAM_PORT}/healthz`,
+			reuseExistingServer: !process.env.CI,
+			env: { FAKE_SESSION_UPSTREAM_PORT: SESSION_UPSTREAM_PORT },
+			timeout: 30_000,
 		},
-		// `next start` boot only — the build already ran at the gate step.
-		timeout: 120_000,
-	},
+		{
+			// In CI, test against a PRODUCTION build: `next dev` compiles routes
+			// on-demand, so the first navigation to a cold route (e.g. "/", "/login")
+			// can blow the 15s navigationTimeout on a loaded runner — the source of
+			// the flaky page.goto timeouts. `next build` precompiles every route, so
+			// `next start` serves instantly and deterministically.
+			//
+			// The CI job already runs `pnpm run build` as a separate "cacheComponents
+			// gate" step (.github/workflows/deploy.yml) BEFORE the E2E step, so we only
+			// `pnpm start` here — reusing that artifact. Folding the build into the
+			// webServer command would (a) build twice and (b) bury a build failure
+			// inside Playwright's webServer boot instead of failing at the gate step.
+			// Locally keep the dev server for fast iteration.
+			// `next dev` on an explicit PORT (`pnpm dev` is the same command on the
+			// default port 3000) so the local server matches `url` below.
+			command: process.env.CI ? "pnpm start" : "pnpm exec next dev",
+			url: `http://localhost:${PORT}`,
+			reuseExistingServer: !process.env.CI,
+			// E2E browser base must be SAME-ORIGIN with this server so the browser
+			// exercises the first-party API paths (/api/connect, /api/v1) the way a
+			// deployment does. SSR inherits the branch-correct gateway
+			// loaded from .env.local: main exercises the formal API, while dev/local
+			// defaults to the test API.
+			// (CI's pnpm-start build bakes the matching PORT-scoped value via
+			// .env.local in deploy.yml — NEXT_PUBLIC_* is inlined at build time, so
+			// setting it here only affects local `next dev`, not the CI prebuilt run.)
+			env: {
+				PORT,
+				NEXT_PUBLIC_API_BASE_URL: `http://localhost:${PORT}/api/v1`,
+				API_BASE_URL: `http://127.0.0.1:${SESSION_UPSTREAM_PORT}/api/v1`,
+				PLAYWRIGHT_E2E_API_PROXY: "1",
+				// dev-only 浮動工具（角色切換器 / React Query Devtools）在本機 `next dev`
+				// 下會 render，production build 不會 —— 於是本機量到的 DOM 與 CI 不是同
+				// 一份。實測（web#425）：兩顆都是右下角 viewport-fixed，整個蓋在手機底部
+				// 導覽列第 5 格上，mobile project 的點擊被攔截、3/3 紅，而 CI 上同一支
+				// mobile 測試一直是綠的。關掉它們，本機測的才是 CI 會測到的那份 DOM。
+				//
+				// 只對本機 `next dev` 生效，這是對的：CI 的 `pnpm start` 服務的是先前
+				// build 好的產物，NEXT_PUBLIC_* 在 build 期就被字面替換掉了（同上面
+				// NEXT_PUBLIC_API_BASE_URL 那段註解），而那份產物本來就是 production，
+				// 兩顆都不存在。
+				NEXT_PUBLIC_DEV_OVERLAYS: "off",
+				// 廠商入口二次驗證（GIS）的 Google client id：測試一律用這個假值，**不吃 .env.local**。
+				//
+				// 🔴 不設的話行為會隨環境漂：有 .env.local 的機器上 GSI 元件會渲染，
+				// 乾淨的 worktree（或 CI 的某些 job）上元件會走「尚未設定」分支而整個不畫
+				// 按鈕——同一支測試在兩台機器上測到的是不同的畫面。真正的 Google 網路請求
+				// 由 tests/e2e/helpers/mock-gsi.ts 的 window.google stub 擋掉，所以這裡
+				// 放假值是安全的。
+				NEXT_PUBLIC_GOOGLE_CLIENT_ID:
+					"e2e-dummy-client-id.apps.googleusercontent.com",
+				// RFQ specs exercise the enabled cohort explicitly. Production/default
+				// remains fail-safe OFF in capabilities.ts; the browser fixture turns on
+				// only the two Web presentation gates. The tests exercise price
+				// preview and immutable confirmation; formal publication remains a
+				// separate, visibly disabled capability in the UI.
+				WEB_PROCUREMENT_RFQ_PRICE_RANGE_V1: "true",
+				WEB_PROCUREMENT_RFQ_APPROVAL_V1: "true",
+			},
+			// `next start` boot only — the build already ran at the gate step.
+			timeout: 120_000,
+		},
+	],
 });

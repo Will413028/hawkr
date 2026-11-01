@@ -13,11 +13,12 @@ import { signInWithSessionCookie } from "./session-cookie";
  * (`/api/v1`) or an absolute origin.
  *
  * The credential is the HttpOnly `__Host-hk_session` cookie: the middleware only lets a
- * guarded path through when it is present, and the browser asks GetSession on every
- * load (it cannot see the cookie). `session: "identity"` therefore sets the cookie
- * (helpers/session-cookie.ts) and answers GetSession with the account; every other
- * mode sets no cookie and answers GetSession `unauthenticated`, like the monolith does
- * for a visitor with no (or a revoked) session.
+ * guarded path through when it is present, and the server asks GetSession on every
+ * request (it is the only reader of the cookie). `session: "identity"` therefore sets a cookie
+ * that carries the account (helpers/session-cookie.ts), which the e2e webServer's fake upstream
+ * (helpers/fake-session-upstream.ts) turns into the GetSession answer; every other mode sets no
+ * cookie, so the server treats the visitor as a guest. `page.route` cannot answer GetSession:
+ * the browser never calls it.
  */
 const API = "**/api/v1";
 
@@ -76,19 +77,6 @@ export const LIST_LINKED_IDENTITIES_URL = identityMethod(
 /** 這個 URL 是 session 的探測（GetSession）嗎。 */
 export function isGetSessionUrl(url: string): boolean {
 	return GET_SESSION_URL.test(url);
-}
-
-/**
- * proto3 JSON 的 GetSessionResponse（identity.proto）。工作區是 client 的狀態，回應不帶；Connect 也不送 X-Active-Role。
- */
-export function sessionJson(identity: MockIdentity) {
-	const isSeller = identity.roles.includes("seller");
-	return {
-		account: {
-			id: identity.accountId,
-			roles: isSeller ? ["ROLE_SELLER"] : [],
-		},
-	};
 }
 
 /**
@@ -910,9 +898,8 @@ export interface GatewayMockOptions {
 	/** Account GetSession answers with. */
 	identity?: MockIdentity;
 	/**
-	 * GetSession's answer. "identity" sets the session cookie and answers with
-	 * `identity`; default (omitted) and "guest" set no cookie and answer
-	 * unauthenticated (a visitor, or a session the monolith refuses).
+	 * "identity" sets a session cookie carrying `identity`, which the fake upstream answers GetSession
+	 * with; default (omitted) and "guest" set no cookie (a visitor).
 	 */
 	session?: "identity" | "guest";
 	/**
@@ -995,17 +982,10 @@ export async function setupGatewayMocks(
 		});
 	});
 
-	// 3. The signed-in account (GetSession), and the session cookie behind it.
+	// 3. The signed-in account: the session cookie carries it to the server's GetSession.
 	if (opts.session === "identity") {
-		await signInWithSessionCookie(page, identity.accountId);
+		await signInWithSessionCookie(page, identity);
 	}
-	await page.route(GET_SESSION_URL, (route) => {
-		if (opts.session !== "identity") {
-			void fulfillConnectError(route, "unauthenticated");
-			return;
-		}
-		void fulfillConnect(route, sessionJson(identity));
-	});
 
 	return state;
 }
