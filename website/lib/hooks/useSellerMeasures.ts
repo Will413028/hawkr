@@ -4,7 +4,7 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { type DefaultErrorText, errorText } from "@hawkr/api/connect/errors";
 import { MeasureState } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth/context";
 import { useDefaultErrorText } from "@/lib/i18n/ui-text";
 import { queryKeys } from "@/lib/query/keys";
@@ -57,7 +57,10 @@ export function useSellerMeasures(
 		enabled,
 		placeholderData: [] as SellerMeasure[],
 	});
-	const records = enabled ? (query.data ?? []) : [];
+	const records = useMemo(
+		() => (enabled && query.data) || [],
+		[enabled, query.data],
+	);
 
 	return {
 		records,

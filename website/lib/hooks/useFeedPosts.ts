@@ -474,7 +474,10 @@ export function useFeedPosts({
 		queryKey,
 	]);
 
-	const pages = query.data?.pages ?? [];
+	const pages = React.useMemo(
+		() => query.data?.pages ?? [],
+		[query.data?.pages],
+	);
 	const posts = React.useMemo(() => dedupePosts(pages), [pages]);
 	const lastPage = pages.at(-1);
 	const page = lastPage?.page ?? seedPage;

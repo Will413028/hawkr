@@ -51,7 +51,10 @@ export function useMyAfterSales(): UseMyAfterSalesResult {
 		enabled,
 		placeholderData: [] as AfterSaleCase[],
 	});
-	const records = enabled ? (query.data ?? []) : [];
+	const records = React.useMemo(
+		() => (enabled && query.data) || [],
+		[enabled, query.data],
+	);
 	const lookup = React.useMemo(() => buildBuyerLookup(records), [records]);
 
 	return {

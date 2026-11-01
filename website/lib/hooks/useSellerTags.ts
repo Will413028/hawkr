@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { useAuth } from "@/lib/auth/context";
 import { queryKeys } from "@/lib/query/keys";
 import { type CustomerTag, fetchSellerTags } from "@/lib/seller/repo";
@@ -23,5 +24,5 @@ export function useSellerTags(): CustomerTag[] {
 		enabled: isLoggedIn && activeRole === "seller",
 		staleTime: 60_000,
 	});
-	return query.data ?? [];
+	return useMemo(() => query.data ?? [], [query.data]);
 }

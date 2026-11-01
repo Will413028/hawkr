@@ -1,6 +1,7 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { useAuth } from "@/lib/auth/context";
 import {
 	type CartAvailableCoupon,
@@ -72,12 +73,17 @@ export function useCartCoupons({
 		enabled,
 		// keepPreviousData: orderAmount/seller change (debounced) as the buyer
 		// edits quantities — keep the prior coupon list visible instead of
-		// flashing empty. First-load fallback handled by `?? []` below.
+		// flashing empty. First-load fallback handled by the empty fallback below.
 		placeholderData: keepPreviousData,
 	});
 
+	const coupons = useMemo(
+		() => (enabled && query.data) || [],
+		[enabled, query.data],
+	);
+
 	return {
-		coupons: enabled ? (query.data ?? []) : [],
+		coupons,
 		loading: query.isLoading,
 		error: query.error instanceof Error ? query.error.message : null,
 		refresh: async () => {

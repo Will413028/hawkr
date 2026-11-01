@@ -108,8 +108,13 @@ export function useConversations({
 		return unsub;
 	}, [shouldFetch, subscribeToSocket, queryClient, queryKey]);
 
+	const items = React.useMemo(
+		() => (shouldFetch && query.data) || [],
+		[shouldFetch, query.data],
+	);
+
 	return {
-		items: shouldFetch ? (query.data ?? []) : [],
+		items,
 		loading:
 			status === "unknown" ||
 			query.isLoading ||
@@ -207,7 +212,10 @@ export function useChatThread(
 			return sortTimeline(messages);
 		},
 	});
-	const messages = threadQuery.data ?? [];
+	const messages = React.useMemo(
+		() => threadQuery.data ?? [],
+		[threadQuery.data],
+	);
 
 	// Mark read when the thread is opened. Independent of history loading: a
 	// failed history fetch must not leave the unread badge stuck, and the

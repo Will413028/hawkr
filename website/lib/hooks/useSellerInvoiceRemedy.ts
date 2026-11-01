@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+
 /**
  * 賣家面發票的 **停權放行類** 查詢（58A §B-2.2 (4)(c)）。
  *
@@ -122,8 +124,13 @@ export function useOrderExternalIssuances(
 		enabled,
 	});
 
+	const records = useMemo(
+		() => (enabled && query.data?.records) || [],
+		[enabled, query.data?.records],
+	);
+
 	return {
-		records: enabled ? (query.data?.records ?? []) : [],
+		records,
 		loading: enabled && query.isLoading,
 		error: query.error,
 		refresh: async () => {

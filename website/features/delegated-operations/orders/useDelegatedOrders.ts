@@ -178,8 +178,13 @@ export function useDelegatedOrderStatusTotals(
 		placeholderData: keepPreviousData,
 	});
 
+	const totals = React.useMemo(
+		() => (enabled && query.data) || {},
+		[enabled, query.data],
+	);
+
 	return {
-		totals: enabled ? (query.data ?? {}) : {},
+		totals,
 		loading: query.isLoading,
 	};
 }

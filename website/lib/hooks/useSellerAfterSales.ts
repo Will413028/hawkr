@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { useAuth } from "@/lib/auth/context";
 import { queryKeys } from "@/lib/query/keys";
 import {
@@ -51,11 +52,15 @@ export function useSellerAfterSales(): UseSellerAfterSalesResult {
 		// mount fetch — the seller case table would stay empty for up to 30s.
 		placeholderData: [] as AfterSaleCase[],
 	});
-	const records = enabled ? (query.data ?? []) : [];
+	const records = useMemo(
+		() => (enabled && query.data) || [],
+		[enabled, query.data],
+	);
+	const lookup = useMemo(() => buildAfterSaleLookup(records), [records]);
 
 	return {
 		records,
-		lookup: buildAfterSaleLookup(records),
+		lookup,
 		loading: query.isLoading || query.isPlaceholderData,
 		error: query.error instanceof Error ? query.error.message : null,
 		refresh: async () => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { useAuth } from "@/lib/auth/context";
 import { queryKeys } from "@/lib/query/keys";
 import {
@@ -46,12 +47,15 @@ export function useSellerShipmentAnomalies(
 	// when filter inputs actually change (matches useSellerAfterSales).
 	const paramsKey = JSON.stringify(params);
 	const enabled = isLoggedIn && activeRole === "seller";
-	const emptyResult = {
-		records: [] as ShipmentAnomalyItem[],
-		total: 0,
-		page: params.page ?? 1,
-		pageSize: params.pageSize ?? 100,
-	};
+	const emptyResult = useMemo(
+		() => ({
+			records: [] as ShipmentAnomalyItem[],
+			total: 0,
+			page: params.page ?? 1,
+			pageSize: params.pageSize ?? 100,
+		}),
+		[params.page, params.pageSize],
+	);
 	const query = useQuery({
 		queryKey: queryKeys.seller.shipmentAnomalies(identity, {
 			paramsKey,
@@ -71,13 +75,14 @@ export function useSellerShipmentAnomalies(
 	});
 	const result = enabled ? (query.data ?? emptyResult) : emptyResult;
 	const records = result.records;
+	const lookup = useMemo(() => buildShipmentAnomalyLookup(records), [records]);
 
 	return {
 		records,
 		total: result.total,
 		page: result.page,
 		pageSize: result.pageSize,
-		lookup: buildShipmentAnomalyLookup(records),
+		lookup,
 		loading: query.isLoading,
 		error: query.error instanceof Error ? query.error.message : null,
 		refresh: async () => {
@@ -98,13 +103,11 @@ interface UseSellerShipmentAnomalyStatsResult {
 export function useSellerShipmentAnomalyStats(): UseSellerShipmentAnomalyStatsResult {
 	const { activeRole, isLoggedIn } = useAuth();
 	const identity = useQueryIdentity();
-	const emptyStats: ShipmentAnomalyStats = {
-		total: 0,
-		high: 0,
-		medium: 0,
-		low: 0,
-	};
 	const enabled = isLoggedIn && activeRole === "seller";
+	const emptyStats = useMemo(
+		(): ShipmentAnomalyStats => ({ total: 0, high: 0, medium: 0, low: 0 }),
+		[],
+	);
 	const query = useQuery({
 		queryKey: queryKeys.seller.shipmentAnomalyStats(identity),
 		queryFn: fetchSellerShipmentAnomalyStats,

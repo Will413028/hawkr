@@ -76,8 +76,12 @@ export function useMyReviews(): UseMyReviewsResult {
 			return loaded < lastPage.total ? lastPage.page + 1 : undefined;
 		},
 	});
-	const pages = query.data?.pages ?? [];
-	const rawReviews = isLoggedIn ? pages.flatMap((p) => p.records) : [];
+	const pages = query.data?.pages;
+	const rawReviews = useMemo(
+		(): MyReview[] =>
+			isLoggedIn ? (pages?.flatMap((p) => p.records) ?? []) : [],
+		[isLoggedIn, pages],
+	);
 	const snapshotOrderNos = useMemo(
 		() =>
 			Array.from(
@@ -119,7 +123,7 @@ export function useMyReviews(): UseMyReviewsResult {
 		loading: query.isLoading,
 		loadingMore: query.isFetchingNextPage,
 		error: query.error instanceof Error ? query.error.message : null,
-		total: pages[0]?.total ?? 0,
+		total: pages?.[0]?.total ?? 0,
 		hasMore: Boolean(query.hasNextPage),
 		loadMore: async () => {
 			if (!query.isFetchingNextPage && query.hasNextPage) {

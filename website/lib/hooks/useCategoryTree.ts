@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import {
 	type CategoryNode,
 	fetchCategoryTree,
@@ -28,8 +29,9 @@ export function useCategoryTree(
 		enabled: options.enabled ?? true,
 		staleTime: 60 * 60 * 1000,
 	});
+	const tree = useMemo(() => query.data ?? [], [query.data]);
 	return {
-		tree: query.data ?? [],
+		tree,
 		loading: query.isPending,
 		error: query.error ? "分類暫時無法載入，請稍後再試。" : null,
 		refresh: async () => {

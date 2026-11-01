@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { useAuth } from "@/lib/auth/context";
 import {
 	createInvoiceProfile,
@@ -135,7 +136,10 @@ export function useInvoiceProfiles(): UseInvoiceProfilesResult {
 		onSettled: invalidate,
 	});
 
-	const profiles = isLoggedIn ? (profilesQuery.data ?? []) : [];
+	const profiles = useMemo(
+		() => (isLoggedIn && profilesQuery.data) || [],
+		[isLoggedIn, profilesQuery.data],
+	);
 
 	return {
 		profiles,

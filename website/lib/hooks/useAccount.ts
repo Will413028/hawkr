@@ -12,6 +12,7 @@ import {
 	useQuery,
 	useQueryClient,
 } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { useAuth } from "@/lib/auth/context";
 import {
 	type CouponItem,
@@ -112,9 +113,18 @@ export function useCoupons() {
 		},
 	});
 
+	const my = useMemo(
+		() => (enabled && query.data?.my) || [],
+		[enabled, query.data?.my],
+	);
+	const available = useMemo(
+		() => (enabled && query.data?.available) || [],
+		[enabled, query.data?.available],
+	);
+
 	return {
-		my: enabled ? (query.data?.my ?? []) : [],
-		available: enabled ? (query.data?.available ?? []) : [],
+		my,
+		available,
 		loading: query.isLoading,
 		error: errorMessage(query.error, "載入優惠券失敗"),
 		refresh: async () => {
@@ -170,10 +180,13 @@ export function useFavorites(options: { enabled?: boolean } = {}) {
 	const remove = (productId: number | string) =>
 		removeMutation.mutateAsync(productId);
 
+	const items = useMemo(
+		() => (enabled && query.data?.pages.flatMap((page) => page.items)) || [],
+		[enabled, query.data],
+	);
+
 	return {
-		items: enabled
-			? (query.data?.pages.flatMap((page) => page.items) ?? [])
-			: [],
+		items,
 		hasMore: enabled && Boolean(query.hasNextPage),
 		...cursorListControls(query),
 		error: errorMessage(query.error ?? removeMutation.error, "更新收藏失敗"),
@@ -225,10 +238,13 @@ export function useFollowing(options: { enabled?: boolean } = {}) {
 	const unfollow = (id: number | string) =>
 		unfollowMutation.mutateAsync({ id });
 
+	const items = useMemo(
+		() => (enabled && query.data?.pages.flatMap((page) => page.items)) || [],
+		[enabled, query.data],
+	);
+
 	return {
-		items: enabled
-			? (query.data?.pages.flatMap((page) => page.items) ?? [])
-			: [],
+		items,
 		hasMore: enabled && Boolean(query.hasNextPage),
 		...cursorListControls(query),
 		error: errorMessage(query.error ?? unfollowMutation.error, "更新追蹤失敗"),
@@ -277,10 +293,13 @@ export function useHistory() {
 
 	const clear = () => clearMutation.mutateAsync();
 
+	const items = useMemo(
+		() => (enabled && query.data?.pages.flatMap((page) => page.items)) || [],
+		[enabled, query.data],
+	);
+
 	return {
-		items: enabled
-			? (query.data?.pages.flatMap((page) => page.items) ?? [])
-			: [],
+		items,
 		hasMore: enabled && Boolean(query.hasNextPage),
 		...cursorListControls(query),
 		error: errorMessage(query.error, "載入瀏覽紀錄失敗"),
@@ -302,10 +321,13 @@ export function useMemberCards() {
 		getNextPageParam: (last) => last.nextPageToken || undefined,
 	});
 
+	const cards = useMemo(
+		() => (enabled && query.data?.pages.flatMap((page) => page.records)) || [],
+		[enabled, query.data],
+	);
+
 	return {
-		cards: enabled
-			? (query.data?.pages.flatMap((page) => page.records) ?? [])
-			: [],
+		cards,
 		hasMore: enabled && Boolean(query.hasNextPage),
 		...cursorListControls(query),
 		error: errorMessage(query.error, "載入會員卡失敗"),

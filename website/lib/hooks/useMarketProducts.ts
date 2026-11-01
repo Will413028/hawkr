@@ -584,7 +584,12 @@ export function useMarketProducts({
 		queryKey,
 	]);
 
-	const pages = restorePending ? restoredData.pages : (query.data?.pages ?? []);
+	const queryPages = query.data?.pages;
+	const pages = React.useMemo(
+		() =>
+			restorePending && restoredData ? restoredData.pages : (queryPages ?? []),
+		[restorePending, restoredData, queryPages],
+	);
 	const products = React.useMemo(() => dedupeProducts(pages), [pages]);
 	const lastPage = pages.at(-1);
 	const page = lastPage?.page ?? seedPage;

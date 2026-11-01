@@ -650,7 +650,10 @@ export function useCommentReplies(commentId: number | string | undefined) {
 			return r.records;
 		},
 	});
-	const items = repliesQuery.data ?? [];
+	const items = React.useMemo(
+		() => repliesQuery.data ?? [],
+		[repliesQuery.data],
+	);
 	const refetchReplies = repliesQuery.refetch;
 
 	const load = React.useCallback(async () => {

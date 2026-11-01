@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { useAuth } from "@/lib/auth/context";
 import {
 	createStorePickup,
@@ -61,7 +62,10 @@ export function useStorePickups(): UseStorePickupsResult {
 		onSuccess: invalidatePickups,
 	});
 
-	const pickups = isLoggedIn ? (pickupsQuery.data ?? []) : [];
+	const pickups = useMemo(
+		() => (isLoggedIn && pickupsQuery.data) || [],
+		[isLoggedIn, pickupsQuery.data],
+	);
 	const mutationError =
 		createMutation.error ?? updateMutation.error ?? removeMutation.error;
 	const error =

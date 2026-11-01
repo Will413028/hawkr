@@ -62,8 +62,6 @@ interface UseCartResult {
 	}>;
 }
 
-const NO_ITEMS: CartItem[] = [];
-
 /**
  * Cart hook — backend authoritative, member-only.
  *
@@ -108,7 +106,10 @@ export function useCart(): UseCartResult {
 		refetchOnWindowFocus: "always",
 		refetchOnReconnect: "always",
 	});
-	const items = isLoggedIn ? (cartQuery.data ?? NO_ITEMS) : NO_ITEMS;
+	const items = React.useMemo(
+		() => (isLoggedIn && cartQuery.data) || [],
+		[isLoggedIn, cartQuery.data],
+	);
 	const loading = cartQuery.isLoading;
 	const refreshing = cartQuery.isFetching;
 	const currentError =

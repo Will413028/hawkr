@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import {
 	type Address,
 	type AddressInput,
@@ -157,7 +158,10 @@ export function useAddresses(): UseAddressesResult {
 		onSettled: invalidateAddresses,
 	});
 
-	const addresses = isLoggedIn ? (addressesQuery.data ?? []) : [];
+	const addresses = useMemo(
+		() => (isLoggedIn && addressesQuery.data) || [],
+		[isLoggedIn, addressesQuery.data],
+	);
 	const mutationError =
 		createMutation.error ??
 		updateMutation.error ??

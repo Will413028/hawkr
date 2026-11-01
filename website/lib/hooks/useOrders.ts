@@ -5,6 +5,7 @@ import {
 	useInfiniteQuery,
 	useQuery,
 } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { fetchMyAfterSales } from "@/lib/after-sales/buyer-repo";
 import { useAuth } from "@/lib/auth/context";
 import { AfterSaleCaseStatus } from "@/lib/codemeta/enums";
@@ -91,16 +92,20 @@ export function useOrderList(
 			return loaded < lastPage.total ? lastPage.page + 1 : undefined;
 		},
 	});
-	const pages = query.data?.pages ?? [];
-	const orders = pages.flatMap((page) => page.records);
-	const lastPage = pages.at(-1);
+	const pages = query.data?.pages;
+	const orders = useMemo(
+		() => pages?.flatMap((page) => page.records) ?? [],
+		[pages],
+	);
+	const noOrders = useMemo((): Order[] => [], []);
+	const lastPage = pages?.at(-1);
 	const page = lastPage?.page ?? 1;
 	const pageSize = lastPage?.pageSize ?? 20;
 	const total = lastPage?.total ?? 0;
 	const error = query.error instanceof Error ? query.error.message : null;
 
 	return {
-		orders: isLoggedIn ? orders : [],
+		orders: isLoggedIn ? orders : noOrders,
 		loading: query.isLoading,
 		refreshing: query.isFetching && !query.isFetchingNextPage,
 		loadingMore: query.isFetchingNextPage,
@@ -179,8 +184,13 @@ export function useAllSellerOrders(
 		enabled,
 	});
 
+	const orders = useMemo(
+		() => (enabled && query.data) || [],
+		[enabled, query.data],
+	);
+
 	return {
-		orders: enabled ? (query.data ?? []) : [],
+		orders,
 		loading: query.isLoading,
 		refreshing: query.isFetching,
 		error: query.error instanceof Error ? query.error.message : null,
@@ -308,8 +318,13 @@ export function useOrderStatusCounts(
 		placeholderData: {} as Record<string, number>,
 	});
 
+	const counts = useMemo(
+		() => (enabled && query.data) || {},
+		[enabled, query.data],
+	);
+
 	return {
-		counts: enabled ? (query.data ?? {}) : {},
+		counts,
 		error: query.error instanceof Error ? query.error.message : null,
 		loading: query.isLoading,
 		refresh: async () => {

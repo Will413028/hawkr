@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { useAuth } from "@/lib/auth/context";
 import { queryKeys } from "@/lib/query/keys";
 import {
@@ -34,8 +35,9 @@ export function useShippingOnboardings(): UseShippingOnboardingsResult {
 		queryFn: fetchShippingOnboardings,
 		enabled,
 	});
+	const rows = useMemo(() => query.data ?? [], [query.data]);
 	return {
-		rows: query.data ?? [],
+		rows,
 		loaded: enabled && query.isSuccess,
 		loading: query.isLoading || query.isFetching,
 		error: query.error instanceof Error ? query.error.message : null,
