@@ -1,13 +1,10 @@
 "use client";
 
-import { Code, ConnectError } from "@connectrpc/connect";
-import { userMessage } from "@hawkr/api/connect/errors";
-import { LocalizedMessageSchema } from "@hawkr/api/gen/google/rpc/error_details_pb";
 import * as Sentry from "@sentry/nextjs";
-import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "@/lib/feedback/toast";
-import { useDefaultErrorText } from "@/lib/i18n/ui-text";
 import { stripLocale } from "@/lib/intl/paths";
 import { commitDocumentNavigation } from "@/lib/navigation/document-location";
 import { useObservedRouter } from "@/lib/navigation/use-observed-router";
@@ -18,7 +15,6 @@ import {
 	SESSION_UNAVAILABLE,
 } from "../api/auth";
 import { AUTH_EXPIRED_EVENT } from "../api/client";
-import { fetchProfile } from "../profile/repo";
 import {
 	canUsePerspective,
 	effectiveActiveRole,
@@ -28,9 +24,9 @@ import {
 } from "./active-role";
 import {
 	openSessionChannel,
+	peerAction,
 	reduceStorageEvent,
 	type SessionChannel,
-	shouldRefreshForPeer,
 } from "./cross-tab-sync";
 import { syncLocalPrivateState } from "./local-private-state";
 import {
@@ -53,9 +49,6 @@ function withinVoluntaryLogout() {
 	return Date.now() - lastVoluntaryLogoutAt <= VOLUNTARY_LOGOUT_WINDOW_MS;
 }
 
-/** 目前登入的帳號在 React Query 的快取 key（見 AuthProvider）。 */
-const SESSION_KEY = ["session"] as const;
-
 function templatePath(path: string | undefined): string {
 	if (!path) return "unknown";
 	return (path.split("?")[0] ?? "")
@@ -76,11 +69,15 @@ interface AuthContextValue {
 	 * `identity` 為 null 但不能當成訪客。
 	 */
 	status: AuthStatus;
-	commitIdentity: (identity: Identity) => void;
-	switchRole: (next: RoleSlot) => boolean;
+	/** `confirmed`：剛由伺服器確認的身分（開店完成後的 GetSession），用它判斷能不能切，不看載入頁面時的身分。 */
+	switchRole: (next: RoleSlot, confirmed?: Identity) => boolean;
 	startSellerOnboarding: (redirect?: string) => void;
-	signOut: () => Promise<void>;
-	rejectSession: (error?: ConnectError) => Promise<void>;
+	/**
+	 * 撤銷 session、清本機私有資料，再整頁導向 `to`（預設首頁；`replace` 不留歷史）。身分改變的事件都以
+	 * 換文件收尾，所以進行中的舊答案不會讓舊身分回來。同時的呼叫合併成一次；撤銷失敗時 reject（已跳 toast），
+	 * 什麼都不改，可以再呼叫。
+	 */
+	signOut: (to?: string, replace?: boolean) => Promise<void>;
 }
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
@@ -96,22 +93,15 @@ function resolveActiveRole(identity: Identity | null): RoleSlot | null {
 	return active;
 }
 
-/** 伺服器的 GetSession 答案（DAL）換成 React Query 快取的初值：`undefined` 是「沒有答案」（暫時不可用）。 */
-function identityFromSession(
-	session: SessionState,
-): Identity | null | undefined {
-	if (session.status === "signedIn") return session.identity;
-	if (session.status === "guest") return null;
-	return undefined;
-}
-
 /**
  * 登入狀態的唯一來源是伺服器：根 layout 不 await `verifySession()`，把 promise 交給這裡。
  * Provider 不 suspend：promise 在 effect 內接收，結果出來前 `status` 是 `unknown`，所以 `{children}`
  * 留在靜態外殼內，server HTML 與第一次 client render 一致（都是 `unknown`）。
- * 憑證是 HttpOnly cookie，JS 讀不到，所以 client 不再自己問單體。事件（登出、其他分頁的訊號、401）
- * 之後 `router.refresh()` 讓根 layout 交來新的 promise，最新的 promise 的答案覆蓋快取裡的同一個 key；
- * refresh 完成前 client 只顯示事件的目標態（登出與 401 是 `guest`）。暫時不可用的答案不覆蓋任何身分。
+ * 憑證是 HttpOnly cookie，JS 讀不到，所以 client 不再自己問單體；顯示用的暱稱與頭像也在同一個答案裡。
+ * client 不持有自己的身分：改變身分的事件（登出、401、結束 session、完成開店）都整頁導向新文件，
+ * 新文件的一次 server render 讀事件之後的 cookie；舊文件卸載會中止進行中的請求。
+ * 其餘 `router.refresh()` 的答案由最新的 promise 取代舊答案（同帳號或訪客變登入）。
+ * 暫時不可用的答案不取代已有的答案。
  */
 export function AuthProvider({
 	session,
@@ -130,43 +120,35 @@ export function AuthProvider({
 	const [serverSession, setServerSession] = React.useState<SessionState | null>(
 		null,
 	);
+	const leaving = React.useRef(false);
 	React.useEffect(() => {
 		let live = true;
-		session.then(
-			(next) => {
-				if (live) setServerSession(next);
-			},
-			() => {
-				if (live) setServerSession({ status: "unavailable" });
-			},
-		);
+		const adopt = (next: SessionState) => {
+			if (!live || leaving.current) return;
+			setServerSession((current) =>
+				next.status === "unavailable" && current ? current : next,
+			);
+		};
+		session.then(adopt, () => adopt({ status: "unavailable" }));
 		return () => {
 			live = false;
 		};
 	}, [session]);
-	// 快取裡 undefined 是「沒有答案」，null 是「確定沒有登入」。登入、換帳號都是整頁導覽，所以整份快取只有一個 key。
-	const sessionQuery = useQuery<Identity | null>({
-		queryKey: SESSION_KEY,
-		queryFn: skipToken,
-		enabled: false,
-		staleTime: Number.POSITIVE_INFINITY,
-	});
-	const identity = sessionQuery.data ?? null;
+	const identity: Identity | null =
+		serverSession?.status === "signedIn" ? serverSession.identity : null;
+	const latestIdentity = React.useRef(identity);
+	latestIdentity.current = identity;
 	// 工作區：只有 localStorage 知道賣家上次停在哪個工作區，effect 之後才讀它；之前用伺服器答案的預設值。
 	const [storedActive, setActive] = React.useState<RoleSlot | null>(null);
 	const active = identity
 		? (storedActive ?? effectiveActiveRole(identity, null))
 		: null;
-	const status: AuthStatus =
-		sessionQuery.data !== undefined
-			? sessionQuery.data
-				? "signedIn"
-				: "guest"
-			: serverSession?.status === "unavailable"
-				? "unavailable"
-				: "unknown";
+	const status: AuthStatus = serverSession?.status ?? "unknown";
 	const previousAccountId = React.useRef<string | undefined>(undefined);
-	const profileStartedFor = React.useRef<string | null>(null);
+	const statusRef = React.useRef(status);
+	statusRef.current = status;
+	const signingOut = React.useRef<Promise<void> | undefined>(undefined);
+	const tAuth = useTranslations("auth");
 	const endingSession = React.useRef(false);
 
 	const teardownPrivateCache = React.useCallback(
@@ -174,38 +156,30 @@ export function AuthProvider({
 		[queryClient],
 	);
 
-	const defaultErrorText = useDefaultErrorText();
-	const defaultErrorTextRef = React.useRef(defaultErrorText);
-	defaultErrorTextRef.current = defaultErrorText;
-	const rejection = React.useRef<Promise<void> | undefined>(undefined);
-	const rejectionNotified = React.useRef(false);
-	const rejectSession = React.useCallback(
-		(error?: ConnectError): Promise<void> => {
-			if (rejection.current) return rejection.current;
-			markVoluntaryLogout();
-			if (error && !rejectionNotified.current) {
-				rejectionNotified.current = true;
-				const text = userMessage(error, defaultErrorTextRef.current);
-				if (text) toast.error(text);
+	const leaveDocument = React.useCallback(
+		async (to: string | null, replace: boolean, onCancelled?: () => void) => {
+			// 換文件前的空檔：舊答案不能再改這個文件的身分。
+			leaving.current = true;
+			// beforeunload 的提示被使用者取消時文件留下來，要讓這個文件繼續接收伺服器的答案。
+			const onBeforeUnload = (event: BeforeUnloadEvent) => {
+				if (!event.defaultPrevented) return;
+				setTimeout(() => {
+					leaving.current = false;
+					onCancelled?.();
+				}, 0);
+			};
+			window.addEventListener("beforeunload", onBeforeUnload, { once: true });
+			try {
+				await teardownPrivateCache();
+			} catch {
+				// 清不掉也要換文件：留著舊文件才是風險。
 			}
-			// 單體拒絕這個帳號（刪除或停權）：盡力撤銷 session 並清掉 cookie；撤銷成功才寫入訪客並廣播，
-			// 失敗時 session 仍有效，不能讓其他分頁依一個還有效的 cookie 重新整理。
-			rejection.current = apiLogout().then(
-				() => {
-					queryClient.setQueryData(SESSION_KEY, null);
-					refreshFromServer();
-				},
-				() => {
-					rejection.current = undefined;
-				},
-			);
-			return rejection.current;
+			if (to === null) window.location.reload();
+			else commitDocumentNavigation(to, replace);
 		},
-		[queryClient, refreshFromServer],
+		[teardownPrivateCache],
 	);
 
-	const rejectSessionRef = React.useRef(rejectSession);
-	rejectSessionRef.current = rejectSession;
 	React.useEffect(() => {
 		if (status !== "unavailable") return;
 		let cancelled = false;
@@ -218,19 +192,12 @@ export function AuthProvider({
 				let result: Awaited<ReturnType<typeof fetchSession>>;
 				try {
 					result = await fetchSession();
-				} catch (error) {
-					if (cancelled) return false;
-					const denied = ConnectError.from(error);
-					if (denied.code === Code.PermissionDenied) {
-						void rejectSessionRef.current(denied);
-						return false;
-					}
+				} catch {
 					result = SESSION_UNAVAILABLE;
 				}
 				if (cancelled) return false;
-				if (result === SESSION_UNAVAILABLE) return true;
-				refreshFromServer();
-				return false;
+				if (result !== SESSION_UNAVAILABLE) refreshFromServer();
+				return true;
 			} finally {
 				inFlight = false;
 			}
@@ -257,44 +224,8 @@ export function AuthProvider({
 		};
 	}, [status, refreshFromServer]);
 
-	const refusal =
-		serverSession?.status === "guest" ? serverSession.refusal : undefined;
 	React.useEffect(() => {
-		if (!serverSession) return;
-		const answer = identityFromSession(serverSession);
-		if (answer === undefined) return;
-		queryClient.setQueryData<Identity | null>(SESSION_KEY, (current) =>
-			answer && current?.accountId === answer.accountId
-				? {
-						...answer,
-						nickname: answer.nickname ?? current.nickname,
-						avatarKey: answer.avatarKey ?? current.avatarKey,
-					}
-				: answer,
-		);
-	}, [serverSession, queryClient]);
-	React.useEffect(() => {
-		if (!refusal) return;
-		// 單體拒絕這個帳號（刪除或停權）：伺服器端唯讀，由這裡撤銷 session、清 cookie 並顯示原因。
-		void rejectSession(
-			new ConnectError(
-				refusal.message ?? "session refused",
-				Code.PermissionDenied,
-				undefined,
-				refusal.message
-					? [
-							{
-								desc: LocalizedMessageSchema,
-								value: { message: refusal.message },
-							},
-						]
-					: undefined,
-			),
-		);
-	}, [refusal, rejectSession]);
-
-	React.useEffect(() => {
-		if (sessionQuery.data === undefined) return;
+		if (status !== "signedIn" && status !== "guest") return;
 		const nextAccountId = identity?.accountId;
 		const previous = previousAccountId.current;
 		syncLocalPrivateState(nextAccountId ?? null);
@@ -306,45 +237,11 @@ export function AuthProvider({
 		if (
 			previous !== undefined &&
 			nextAccountId === undefined &&
-			!withinVoluntaryLogout() &&
 			stripLocale(window.location.pathname) !== "/"
 		) {
 			commitDocumentNavigation("/", true);
 		}
-	}, [sessionQuery.data, identity, teardownPrivateCache]);
-
-	React.useEffect(() => {
-		if (!identity) {
-			profileStartedFor.current = null;
-			return;
-		}
-		if (
-			effectiveActiveRole(identity) !== "buyer" ||
-			identity.nickname ||
-			profileStartedFor.current === identity.accountId
-		) {
-			return;
-		}
-		profileStartedFor.current = identity.accountId;
-		let canceled = false;
-		void fetchProfile({ suppressAuthExpired: true })
-			.then((profile) => {
-				if (canceled) return;
-				queryClient.setQueryData<Identity | null>(SESSION_KEY, (current) =>
-					current?.accountId === identity.accountId
-						? {
-								...current,
-								nickname: profile.nickname,
-								avatarKey: profile.avatarKey,
-							}
-						: current,
-				);
-			})
-			.catch(() => {});
-		return () => {
-			canceled = true;
-		};
-	}, [identity, queryClient]);
+	}, [status, identity, teardownPrivateCache]);
 
 	React.useEffect(() => {
 		const onExpired = async (event: Event) => {
@@ -359,14 +256,10 @@ export function AuthProvider({
 						tags: { trigger_path: templatePath(detail?.path) },
 					});
 				}
-				// 單體說 unauthenticated：session 已經不在（過期、撤銷、帳號停權或刪除），沒有東西要結束。
-				queryClient.setQueryData(SESSION_KEY, null);
-				setActive(null);
-				await teardownPrivateCache();
-				refreshFromServer();
-				if (stripLocale(window.location.pathname) !== "/") {
-					commitDocumentNavigation("/", true);
-				}
+				// 單體說 unauthenticated：session 已經不在（過期、撤銷、帳號停權或刪除）。不是 signedIn 的文件
+				// 沒有身分可清，換文件只會循環。
+				if (statusRef.current !== "signedIn") return;
+				await leaveDocument("/", true);
 			} catch {
 				return;
 			} finally {
@@ -376,7 +269,7 @@ export function AuthProvider({
 		const listener = (event: Event) => void onExpired(event);
 		window.addEventListener(AUTH_EXPIRED_EVENT, listener);
 		return () => window.removeEventListener(AUTH_EXPIRED_EVENT, listener);
-	}, [queryClient, teardownPrivateCache, refreshFromServer]);
+	}, [leaveDocument]);
 
 	const peerView = React.useRef({ status, accountId: identity?.accountId });
 	peerView.current = { status, accountId: identity?.accountId };
@@ -384,9 +277,10 @@ export function AuthProvider({
 	const announcedAccount = React.useRef<string | null | undefined>(undefined);
 	React.useEffect(() => {
 		const channel = openSessionChannel((announcement) => {
-			if (shouldRefreshForPeer(announcement, peerView.current)) {
-				refreshFromServer();
-			}
+			const action = peerAction(announcement, peerView.current);
+			if (action === "refresh") refreshFromServer();
+			// 這個分頁已登入而別的分頁換了帳號或登出：整頁重載，不讓舊身分留在畫面上。
+			if (action === "reload") void leaveDocument(null, true);
 		});
 		channelRef.current = channel;
 		return () => {
@@ -394,7 +288,7 @@ export function AuthProvider({
 			channelRef.current = null;
 			announcedAccount.current = undefined;
 		};
-	}, [refreshFromServer]);
+	}, [refreshFromServer, leaveDocument]);
 	const announceableAccount =
 		status === "signedIn" || status === "guest"
 			? (identity?.accountId ?? null)
@@ -415,25 +309,26 @@ export function AuthProvider({
 		return () => window.removeEventListener("storage", onStorage);
 	}, [identity]);
 
-	const commitIdentity = React.useCallback(
-		(next: Identity) => {
-			queryClient.setQueryData(SESSION_KEY, next);
-			setActive(resolveActiveRole(next));
-			refreshFromServer();
-		},
-		[queryClient, refreshFromServer],
-	);
+	// 從 bfcache 還原的已登入頁面沒有重新問伺服器，可能還帶著登出前的身分；訪客頁沒有身分要清，留給 bfcache。
+	React.useEffect(() => {
+		const onPageShow = (event: PageTransitionEvent) => {
+			if (event.persisted && statusRef.current === "signedIn") {
+				window.location.reload();
+			}
+		};
+		window.addEventListener("pageshow", onPageShow);
+		return () => window.removeEventListener("pageshow", onPageShow);
+	}, []);
 
 	const switchRole = React.useCallback(
-		(next: RoleSlot): boolean => {
-			const account =
-				queryClient.getQueryData<Identity | null>(SESSION_KEY) ?? identity;
+		(next: RoleSlot, confirmed?: Identity): boolean => {
+			const account = confirmed ?? latestIdentity.current;
 			if (!account || !canUsePerspective(account, next)) return false;
 			setStoredActiveRole(next);
 			setActive(next);
 			return true;
 		},
-		[identity, queryClient],
+		[],
 	);
 
 	const startSellerOnboarding = React.useCallback(
@@ -448,23 +343,33 @@ export function AuthProvider({
 		[router],
 	);
 
-	const signOut = React.useCallback(async () => {
-		markVoluntaryLogout();
-		try {
-			await apiLogout();
-		} catch (error) {
-			toast.error(
-				error instanceof LogoutRevokeFailedError && error.reason === "network"
-					? "登出失敗，請確認網路後再試一次"
-					: "登出失敗，請再試一次",
+	const signOut = React.useCallback(
+		(to = "/", replace = false): Promise<void> => {
+			if (signingOut.current) return signingOut.current;
+			markVoluntaryLogout();
+			const run = apiLogout().then(
+				() =>
+					leaveDocument(to, replace, () => {
+						// 工作階段已撤銷、文件被留下：放行下一次登出，並請伺服器重答（訪客）。
+						signingOut.current = undefined;
+						refreshFromServer();
+					}),
+				(error: unknown) => {
+					signingOut.current = undefined;
+					toast.error(
+						error instanceof LogoutRevokeFailedError &&
+							error.reason === "network"
+							? tAuth("logoutFailedNetwork")
+							: tAuth("logoutFailed"),
+					);
+					throw error;
+				},
 			);
-			throw error;
-		}
-		queryClient.setQueryData(SESSION_KEY, null);
-		setActive(null);
-		await teardownPrivateCache();
-		refreshFromServer();
-	}, [queryClient, teardownPrivateCache, refreshFromServer]);
+			signingOut.current = run;
+			return run;
+		},
+		[leaveDocument, refreshFromServer, tAuth],
+	);
 
 	const value = React.useMemo<AuthContextValue>(
 		() => ({
@@ -473,22 +378,11 @@ export function AuthProvider({
 			hasSeller: !!identity && identity.isSeller,
 			activeRole: active,
 			status,
-			commitIdentity,
 			switchRole,
 			startSellerOnboarding,
 			signOut,
-			rejectSession,
 		}),
-		[
-			identity,
-			active,
-			status,
-			commitIdentity,
-			switchRole,
-			startSellerOnboarding,
-			signOut,
-			rejectSession,
-		],
+		[identity, active, status, switchRole, startSellerOnboarding, signOut],
 	);
 
 	return (

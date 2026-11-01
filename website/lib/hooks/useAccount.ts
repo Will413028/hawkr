@@ -23,9 +23,11 @@ import {
 import { fetchFavorites, removeFavorite } from "@/lib/favorites/repo";
 import { fetchFollowing, setSellerFollow } from "@/lib/follow/repo";
 import { fetchMemberCards } from "@/lib/member-cards/repo";
+import { useObservedRouter } from "@/lib/navigation/use-observed-router";
 import {
 	fetchProfile,
 	type ProfileEdit,
+	updateBuyerAvatar,
 	updateProfile,
 } from "@/lib/profile/repo";
 import { queryKeys } from "@/lib/query/keys";
@@ -314,27 +316,36 @@ export function useMemberCards() {
 
 /**
  * `enabled` lets a caller that doesn't always need the buyer profile skip the
- * `/app/buyers/me` request entirely — mirrors the active-role gate in
- * `lib/api/auth.ts` (background nickname/avatar backfill only runs when
- * `activeRole === "buyer"`, since a seller-only account 403s that endpoint).
+ * `/app/buyers/me` request entirely (a seller-only account 403s that endpoint).
  * Defaults to `true` so existing callers are unaffected.
+ *
+ * The header's nickname and avatar come from the server's session answer, so every
+ * successful profile change (`save`, `updateAvatar`) asks the server again via
+ * `router.refresh()`.
  */
 export function useProfile(options: { enabled?: boolean } = {}) {
 	const { identity, enabled: scopeEnabled } = useBuyerQueryScope();
 	const enabled = scopeEnabled && (options.enabled ?? true);
 	const queryClient = useQueryClient();
+	const router = useObservedRouter("profile_refresh");
 	const queryKey = queryKeys.buyer.profile(identity);
 	const query = useQuery({
 		queryKey,
 		enabled,
 		queryFn: () => fetchProfile(),
 	});
+	const syncHeader = () => router.refresh();
 	const saveMutation = useMutation({
 		mutationFn: (body: ProfileEdit) => updateProfile(body, query.data ?? {}),
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey });
+			syncHeader();
 		},
 	});
+	const updateAvatar = async (stagedToken: string) => {
+		await updateBuyerAvatar(stagedToken, query.data ?? {});
+		syncHeader();
+	};
 
 	return {
 		profile: enabled ? (query.data ?? null) : null,
@@ -347,5 +358,6 @@ export function useProfile(options: { enabled?: boolean } = {}) {
 		save: async (body: ProfileEdit) => {
 			await saveMutation.mutateAsync(body);
 		},
+		updateAvatar,
 	};
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import AppDownloadCTA from "@/components/shared/AppDownloadCTA";
 import Avatar from "@/components/shared/Avatar";
@@ -38,7 +39,6 @@ import { loginPath } from "@/lib/auth/redirect";
 import { getActiveRole, type RoleSlot } from "@/lib/auth/storage";
 import { navItems } from "@/lib/content/data";
 import { usePathname } from "@/lib/intl/navigation";
-import { commitDocumentNavigation } from "@/lib/navigation/document-location";
 import {
 	cancelMainNavPointerIntent,
 	prefetchMainNavOnIntent,
@@ -247,8 +247,8 @@ function BuyerMenu({ onSignOut }: { onSignOut: SignOutAction }) {
 		}
 	}, [onSignOut]);
 
-	// TODO(B-189): profile endpoint — buyerName not on Identity; use nickname fallback.
-	const displayName = identity?.nickname || "會員";
+	const tCommon = useTranslations("common");
+	const displayName = identity?.nickname || tCommon("memberFallback");
 	const avatar = identity?.avatarKey;
 
 	return (
@@ -393,8 +393,6 @@ export default function Navbar({ megaMenuDynamicLinks }: NavbarProps = {}) {
 			// 讓畫面看起來像登出了，實際上 cookie 還在，下次冷載入又是登入狀態。
 			return false;
 		}
-		// 整頁重載回首頁，避免 session 期間上了新部署後 soft 導航去要舊 chunk 卡骨架。
-		commitDocumentNavigation("/");
 		return true;
 	};
 

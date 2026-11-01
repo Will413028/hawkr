@@ -4,7 +4,6 @@ import * as React from "react";
 import BrandLogoLoader from "@/components/shared/BrandLogoLoader";
 import Button from "@/components/ui/Button";
 import { useAuth } from "@/lib/auth/context";
-import { commitDocumentNavigation } from "@/lib/navigation/document-location";
 import { cn } from "@/lib/utils/cn";
 
 export type SignOutAction = () => Promise<boolean>;
@@ -154,7 +153,6 @@ export function SellerHeaderLoader({
 			signOutPendingRef.current = false;
 			setIsSigningOut(false);
 		}
-		commitDocumentNavigation("/");
 	}, [signOut]);
 
 	if (state.status === "ready" && !isSigningOut) {

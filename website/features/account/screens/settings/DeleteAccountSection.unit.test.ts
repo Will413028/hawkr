@@ -97,15 +97,26 @@ describe("DeleteAccountSection", () => {
 		expect(mocks.deleteAccount).not.toHaveBeenCalled();
 	});
 
-	it("a deleted account signs out and leaves", async () => {
+	it("a deleted account signs out, and the sign-out owns the navigation", async () => {
 		mocks.deleteAccount.mockResolvedValue(
 			DeleteAccountResponse_DeletionState.DELETED,
 		);
 		openDialog();
 		fireEvent.click(screen.getByRole("button", { name: "確認刪除" }));
 
+		await waitFor(() => expect(mocks.signOut).toHaveBeenCalledOnce());
+		expect(assign).not.toHaveBeenCalled();
+	});
+
+	it("a deleted account still leaves for the home page when the revoke fails", async () => {
+		mocks.deleteAccount.mockResolvedValue(
+			DeleteAccountResponse_DeletionState.DELETED,
+		);
+		mocks.signOut.mockRejectedValueOnce(new Error("offline"));
+		openDialog();
+		fireEvent.click(screen.getByRole("button", { name: "確認刪除" }));
+
 		await waitFor(() => expect(assign).toHaveBeenCalledWith("/"));
-		expect(mocks.signOut).toHaveBeenCalledOnce();
 	});
 
 	it("unfinished orders start the deletion flow and keep the session", async () => {

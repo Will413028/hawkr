@@ -11,11 +11,11 @@ import { ImageCropDialog } from "@/components/ui/ImageCropDialog";
 import { useProfile } from "@/lib/hooks/useAccount";
 import { useUiText } from "@/lib/i18n/ui-text";
 import { uploadImageFile } from "@/lib/media/upload";
-import { updateBuyerAvatar } from "@/lib/profile/repo";
 import { genderFromValue, genderOptions } from "./genderOptions";
 
 export default function ProfileClient() {
-	const { profile, loading, saving, error, refresh, save } = useProfile();
+	const { profile, loading, saving, error, refresh, save, updateAvatar } =
+		useProfile();
 	const [nickname, setNickname] = React.useState("");
 	const ut = useUiText();
 	const options = React.useMemo(() => genderOptions(ut), [ut]);
@@ -53,7 +53,7 @@ export default function ProfileClient() {
 			// Finalize via the dedicated endpoint so we store a permanent
 			// objectKey, not the temporary upload preview URL.
 			const asset = await uploadImageFile(file);
-			await updateBuyerAvatar(asset.stagedToken, profile ?? {});
+			await updateAvatar(asset.stagedToken);
 			await refresh();
 			setHint("頭像已更新");
 		} catch (err) {

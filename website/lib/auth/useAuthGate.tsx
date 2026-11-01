@@ -14,8 +14,8 @@ type GatedAction = (auth: AuthGateSnapshot) => void;
 /**
  * Defer auth-gated click actions until the sign-in state has resolved.
  *
- * Account identity lives in the session query, so every full page
- * load starts as a guest until GetSession returns. A handler
+ * The sign-in state is the server's answer, which reaches the client after
+ * hydration, so every full page load is `unknown` until it arrives. A handler
  * that branches on `isLoggedIn` directly would open the login modal for an
  * actually-logged-in user who taps during that window (common on mobile —
  * the gated buttons sit right under the thumb on first paint).

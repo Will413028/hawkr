@@ -21,7 +21,6 @@ import { useSellerProducts } from "@/lib/hooks/useSellerProducts";
 import { useInvalidateSellerSelf } from "@/lib/hooks/useSellerSelf";
 import { useSellerWorkspaceRealtime } from "@/lib/hooks/useSellerWorkspaceRealtime";
 import { usePathname } from "@/lib/intl/navigation";
-import { commitDocumentNavigation } from "@/lib/navigation/document-location";
 import { useObservedRouter } from "@/lib/navigation/use-observed-router";
 import { useNotificationUnread } from "@/lib/notifications/unread-context";
 import { hasCapability } from "@/lib/seller/store";
@@ -194,12 +193,7 @@ export default function SellerCenterShell({
 		} catch {
 			// 撤銷失敗＝session 仍有效（signOut 已跳 toast），留在賣家工作區。
 			setSigningOut(false);
-			return;
 		}
-		// 用整頁重載（非 soft router.push）落回首頁：若 session 期間剛好上了新
-		// 部署，這個分頁仍握著舊 chunk manifest，soft 導航會去要已被刪除的舊
-		// chunk 而卡在首頁 skeleton；整頁載入會抓當前 build（同 login 的手法）。
-		commitDocumentNavigation("/");
 	};
 
 	// seller-self 首抓未回前，onboarding 狀態未知。Hard entry 仍由

@@ -91,7 +91,15 @@ async function renderOverview(items: Favorite[]): Promise<string> {
 	const { default: AccountOverviewClient } = await import(
 		`@/features/account/screens/overview/AccountOverviewClient?t=${Math.random()}`
 	);
-	return renderToStaticMarkup(React.createElement(AccountOverviewClient));
+	const { NextIntlClientProvider } = await import("next-intl");
+	const { defaultLocale, messagesFor } = await import("@/lib/intl/config");
+	return renderToStaticMarkup(
+		React.createElement(NextIntlClientProvider, {
+			locale: defaultLocale,
+			messages: messagesFor(defaultLocale),
+			children: React.createElement(AccountOverviewClient),
+		}),
+	);
 }
 
 test("有收藏且載得到：照常畫卡片，不出現空狀態", async () => {

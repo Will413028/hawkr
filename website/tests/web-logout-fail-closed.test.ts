@@ -80,3 +80,23 @@ test("network failure keeps sign-out unsuccessful", async () => {
 		return true;
 	});
 });
+
+test("a sign-out the monolith answers unauthenticated is a success and broadcasts no expiry", async () => {
+	serve(() => connectError(Code.Unauthenticated, "no session"));
+	const { AUTH_EXPIRED_EVENT } = await import("../lib/api/client");
+	const expired: Event[] = [];
+	(
+		globalThis as unknown as { dispatchEvent: (e: Event) => boolean }
+	).dispatchEvent = (event) => {
+		if (event.type === AUTH_EXPIRED_EVENT) expired.push(event);
+		return true;
+	};
+	try {
+		const { logout } = await import("../lib/api/auth");
+		await logout();
+		assert.equal(seen.length, 1);
+		assert.deepEqual(expired, []);
+	} finally {
+		delete (globalThis as Record<string, unknown>).dispatchEvent;
+	}
+});

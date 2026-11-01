@@ -15,6 +15,7 @@ package hawkr.identity.v1alpha1;
 import "google/api/field_behavior.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
+import "hawkr/common/v1alpha1/image.proto";
 
 // IdentityPublicService 是登入之前的方法：App 把原生 SDK 取得的 ID token 換成 session。兩個方法都是 POST，回應一律不可快取。
 // 每個來源 IP 有額度，超過回 resource_exhausted（帶 RetryInfo）。
@@ -191,6 +192,11 @@ message GetSessionResponse {
   // 帳號被停權時的狀態；沒有停權時不設。停權的帳號仍能登入、讀取與刪除帳號，寫入回 permission_denied 與
   // hawkr.common.v1alpha1.ErrorReason.ACCOUNT_SUSPENDED。
   Suspension suspension = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 買家的顯示名稱（頁首與帳號選單用），與 BuyerAppService 的 Profile.display_name 同一份。讀取買家資料失敗時不設；
+  // 登入狀態不受影響，client 不可把沒有這個欄位當成未登入。
+  string display_name = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 買家的頭像，與 Profile.avatar 同一份。沒有頭像、或讀取買家資料失敗時不設。
+  hawkr.common.v1alpha1.Image avatar = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Suspension 是帳號的停權狀態。

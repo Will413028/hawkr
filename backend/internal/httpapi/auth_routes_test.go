@@ -192,7 +192,7 @@ func TestGatewayProxyStripsTheSameCookieTheMonolithSets(t *testing.T) {
 // TestEffectDeclarationsAgreeWithTheIdempotencyLevels 守。登出、連結、終止 session 用 GET 被拒。
 func TestGETOnAWriteProcedureNeverReachesTheHandler(t *testing.T) {
 	t.Parallel()
-	path, handler := identityconnect.NewIdentityAppServiceHandler(httpidentity.NewApp(nil, nil, nil, time.Now))
+	path, handler := identityconnect.NewIdentityAppServiceHandler(httpidentity.NewApp(nil, nil, nil, time.Now, nil, rpc.Images{}, nil))
 	inner := http.NewServeMux()
 	mount(inner, path, handler)
 	h := withSession(fakeAuth{}, slog.New(slog.DiscardHandler), inner)

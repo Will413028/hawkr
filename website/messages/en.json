@@ -2,7 +2,8 @@
 	"common": {
 		"error": "Something went wrong. Please try again later.",
 		"success": "Done",
-		"loading": "Processing…"
+		"loading": "Processing…",
+		"memberFallback": "Member"
 	},
 	"validation": {
 		"required": "This field is required",
@@ -10,6 +11,8 @@
 	},
 	"auth": {
 		"login": "Log in",
+		"logoutFailed": "Could not log out. Please try again.",
+		"logoutFailedNetwork": "Could not log out. Check your connection and try again.",
 		"logout": "Log out",
 		"error": {
 			"accessDenied": "You cancelled the authorization. Please try again.",

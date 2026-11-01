@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
 import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -24,22 +25,23 @@ vi.mock("../../api/auth", () => ({
 		reason = "server";
 	},
 }));
+const buyerRpc = vi.hoisted(() => ({ getProfile: vi.fn(async () => ({})) }));
+vi.mock("../../connect/buyer", () => ({ buyerAppClient: () => buyerRpc }));
 vi.mock("@/lib/navigation/use-observed-router", () => ({
 	useObservedRouter: () => router,
 }));
 vi.mock("@sentry/nextjs", () => ({ captureMessage: vi.fn() }));
+const toasts = vi.hoisted(() => ({ error: vi.fn() }));
+vi.mock("@/lib/feedback/toast", () => ({ toast: toasts }));
+const nav = vi.hoisted(() => ({ commit: vi.fn(), reload: vi.fn() }));
+vi.mock("@/lib/navigation/document-location", () => ({
+	commitDocumentNavigation: nav.commit,
+}));
 
-import { Code, ConnectError } from "@connectrpc/connect";
-import { LocalizedMessageSchema } from "@hawkr/api/gen/google/rpc/error_details_pb";
-import { NextIntlClientProvider } from "next-intl";
-import { toast } from "@/lib/feedback/toast";
-import { defaultErrorTextFor } from "@/lib/i18n/ui-text";
-import { messagesFor } from "@/lib/intl/config";
-import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
-
-vi.mock("@/lib/feedback/toast", () => ({ toast: { error: vi.fn() } }));
-
+import { LogoutRevokeFailedError } from "@/lib/api/auth";
 import { AUTH_EXPIRED_EVENT } from "@/lib/api/client";
+import { messagesFor } from "@/lib/intl/config";
+import { ACTIVE_ROLE_STORAGE_KEY } from "../active-role";
 import { AuthProvider, useAuth } from "../context";
 import { SESSION_RETRY_BACKOFF_MS, type SessionState } from "../session-state";
 
@@ -95,6 +97,7 @@ function deferred<T>() {
 async function render(
 	session: SessionState | Promise<SessionState>,
 	client = new QueryClient(),
+	locale: "zh-TW" | "en" = "zh-TW",
 ) {
 	const rendered: Array<ReturnType<typeof useAuth>> = [];
 	let sessionPromise = Promise.resolve(session);
@@ -102,14 +105,14 @@ async function render(
 		React.createElement(
 			QueryClientProvider,
 			{ client },
-			React.createElement(
-				IntlTestWrapper,
-				null,
-				React.createElement(AuthProvider, {
+			React.createElement(NextIntlClientProvider, {
+				locale,
+				messages: messagesFor(locale),
+				children: React.createElement(AuthProvider, {
 					session: sessionPromise,
 					children,
 				}),
-			),
+			}),
 		);
 	let hook!: ReturnType<typeof renderHook<ReturnType<typeof useAuth>, unknown>>;
 	await act(async () => {
@@ -154,12 +157,16 @@ beforeEach(() => {
 		clear: () => storage.clear(),
 	});
 	router.refresh.mockReset();
+	nav.commit.mockReset();
+	nav.reload.mockReset();
+	vi.stubGlobal("location", { pathname: "/account", reload: nav.reload });
 	FakeBroadcastChannel.open.clear();
 	FakeBroadcastChannel.sent = [];
 	vi.stubGlobal("BroadcastChannel", FakeBroadcastChannel);
 	api.logout.mockReset();
 	api.logout.mockResolvedValue(undefined);
 	api.fetchSession.mockReset();
+	buyerRpc.getProfile.mockClear();
 });
 
 afterEach(() => {
@@ -209,28 +216,6 @@ describe("AuthProvider on the server's session answer", () => {
 		expect(api.logout).not.toHaveBeenCalled();
 	});
 
-	it("revokes the session of a suspended account and displays the server denial", async () => {
-		const { result } = await render({
-			status: "guest",
-			refusal: { message: "帳號已停權，請聯絡客服" },
-		});
-		await waitFor(() => expect(api.logout).toHaveBeenCalled());
-		expect(toast.error).toHaveBeenCalledWith("帳號已停權，請聯絡客服");
-		expect(result.current.isLoggedIn).toBe(false);
-	});
-
-	it("without a message the toast is the code's catalog text, never a developer message", async () => {
-		vi.mocked(toast.error).mockClear();
-		await render({ status: "guest", refusal: { message: null } });
-		await waitFor(() => expect(api.logout).toHaveBeenCalled());
-		expect(toast.error).toHaveBeenCalledWith(
-			defaultErrorTextFor("zh-TW")(Code.PermissionDenied),
-		);
-		expect(toast.error).not.toHaveBeenCalledWith(
-			expect.stringContaining("session refused"),
-		);
-	});
-
 	it("a guest has no session to end", async () => {
 		const { result } = await render(guest);
 		await waitFor(() => expect(result.current.status).toBe("guest"));
@@ -247,15 +232,90 @@ describe("AuthProvider on the server's session answer", () => {
 		expect(api.logout).not.toHaveBeenCalled();
 	});
 
-	it("a 401 broadcast from any call turns the page into a guest without calling SignOut", async () => {
+	it("a 401 from any call leaves the document for the home page without calling SignOut or asking the server softly", async () => {
 		const { result } = await render(signedIn);
 		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
 		await act(async () => {
 			window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
 		});
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(false));
-		expect(result.current.status).toBe("guest");
+		await waitFor(() => expect(nav.commit).toHaveBeenCalledWith("/", true));
 		expect(api.logout).not.toHaveBeenCalled();
+		expect(router.refresh).not.toHaveBeenCalled();
+	});
+
+	it("a 401 on the home page still replaces the document: a soft refresh there could be overtaken by an older answer", async () => {
+		vi.stubGlobal("location", { pathname: "/", reload: nav.reload });
+		const { result } = await render(signedIn);
+		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await act(async () => {
+			window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+		});
+		await waitFor(() => expect(nav.commit).toHaveBeenCalledWith("/", true));
+	});
+
+	it.each([
+		["guest", guest],
+		["unavailable", unavailable],
+		["unknown", new Promise<SessionState>(() => {})],
+	])("a 401 while the state is %s has no identity to clear and never replaces the document, on the home page or elsewhere", async (_name, state) => {
+		for (const pathname of ["/", "/account"]) {
+			vi.stubGlobal("location", { pathname, reload: nav.reload });
+			const { result, unmount } = await render(state);
+			await flushMacrotasks();
+			expect(result.current.isLoggedIn).toBe(false);
+			await act(async () => {
+				window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+			});
+			await flushMacrotasks();
+			expect(nav.commit).not.toHaveBeenCalled();
+			unmount();
+		}
+	});
+
+	it("signOut of a session that is already gone replaces the document without a failure toast", async () => {
+		api.logout.mockResolvedValueOnce(undefined);
+		const { result } = await render(signedIn);
+		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await act(async () => {
+			await result.current.signOut();
+		});
+		expect(toasts.error).not.toHaveBeenCalled();
+		expect(nav.commit).toHaveBeenCalledExactlyOnceWith("/", false);
+	});
+
+	it("toasts the English text resource in the English locale", async () => {
+		api.logout.mockRejectedValueOnce(
+			Object.assign(new LogoutRevokeFailedError("network"), {
+				reason: "network",
+			}),
+		);
+		const { result } = await render(signedIn, new QueryClient(), "en");
+		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await act(async () => {
+			await result.current.signOut().catch(() => {});
+		});
+		expect(toasts.error).toHaveBeenCalledWith(
+			"Could not log out. Check your connection and try again.",
+		);
+	});
+
+	it.each([
+		[
+			"offline",
+			Object.assign(new LogoutRevokeFailedError("network"), {
+				reason: "network",
+			}),
+			"登出失敗，請確認網路後再試一次",
+		],
+		["refused", new LogoutRevokeFailedError("server"), "登出失敗，請再試一次"],
+	])("a failed SignOut (%s) toasts the text resource", async (_name, error, text) => {
+		api.logout.mockRejectedValueOnce(error);
+		const { result } = await render(signedIn);
+		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await act(async () => {
+			await result.current.signOut().catch(() => {});
+		});
+		expect(toasts.error).toHaveBeenCalledWith(text);
 	});
 
 	it("an unavailable answer is not a guest and never ends the session", async () => {
@@ -265,18 +325,30 @@ describe("AuthProvider on the server's session answer", () => {
 		expect(api.logout).not.toHaveBeenCalled();
 	});
 
-	it("signOut calls the SignOut RPC and then the page is a guest", async () => {
+	it("signOut revokes the session and then replaces the document, writing no client identity", async () => {
 		const { result } = await render(signedIn);
 		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
 		await act(async () => {
 			await result.current.signOut();
 		});
 		expect(api.logout).toHaveBeenCalledTimes(1);
-		expect(result.current.isLoggedIn).toBe(false);
-		expect(result.current.status).toBe("guest");
+		expect(nav.commit).toHaveBeenCalledExactlyOnceWith("/", false);
+		expect(router.refresh).not.toHaveBeenCalled();
 	});
 
-	it("a failed SignOut keeps the account: the session was not ended", async () => {
+	it("signOut goes where the caller says, and replaces history when asked", async () => {
+		const { result } = await render(signedIn);
+		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await act(async () => {
+			await result.current.signOut("/login?role=seller", true);
+		});
+		expect(nav.commit).toHaveBeenCalledExactlyOnceWith(
+			"/login?role=seller",
+			true,
+		);
+	});
+
+	it("a failed SignOut keeps the account and the document: the session was not ended", async () => {
 		api.logout.mockRejectedValueOnce(new Error("offline"));
 		const { result } = await render(signedIn);
 		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
@@ -284,38 +356,59 @@ describe("AuthProvider on the server's session answer", () => {
 			await result.current.signOut().catch(() => {});
 		});
 		expect(result.current.identity?.accountId).toBe("7");
+		expect(nav.commit).not.toHaveBeenCalled();
+	});
+
+	it("a server answer read before the sign-out and delivered after it cannot bring an identity back", async () => {
+		const { result, adopt } = await render(signedIn);
+		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await act(async () => {
+			await result.current.signOut();
+		});
+		expect(nav.commit).toHaveBeenCalledExactlyOnceWith("/", false);
+		FakeBroadcastChannel.sent = [];
+		await adopt({
+			status: "signedIn",
+			identity: { accountId: "9", isSeller: false },
+		});
+		expect(result.current.identity?.accountId).toBe("7");
+		expect(FakeBroadcastChannel.sent).toEqual([]);
+		expect(nav.commit).toHaveBeenCalledTimes(1);
 	});
 });
 
-it("retries a failed rejection sign-out, coalesces concurrent calls and toasts once", async () => {
-	vi.mocked(toast.error).mockClear();
+it("signOut replaces the document only after the session was really ended, retries after a failure and coalesces concurrent calls", async () => {
 	const { result } = await render(signedIn);
 	await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
-	const denied = new ConnectError("suspended", Code.PermissionDenied);
 	api.logout.mockRejectedValueOnce(new Error("offline"));
 	await act(async () => {
-		await Promise.all([
-			result.current.rejectSession(denied),
-			result.current.rejectSession(denied),
+		const results = await Promise.allSettled([
+			result.current.signOut("/login", true),
+			result.current.signOut("/login", true),
 		]);
+		expect(results.map((r) => r.status)).toEqual(["rejected", "rejected"]);
 	});
 	expect(api.logout).toHaveBeenCalledTimes(1);
+	expect(nav.commit).not.toHaveBeenCalled();
 	await act(async () => {
-		await result.current.rejectSession(denied);
+		await result.current.signOut("/login", true);
 	});
 	expect(api.logout).toHaveBeenCalledTimes(2);
-	expect(toast.error).toHaveBeenCalledTimes(1);
+	expect(nav.commit).toHaveBeenCalledExactlyOnceWith("/login", true);
+	expect(router.refresh).not.toHaveBeenCalled();
 });
 
-it("the session cache has no fetcher: a refetch cannot replace identity", async () => {
+it("identity comes only from the server: no client profile fetch, and the React Query cache cannot replace it", async () => {
 	const client = new QueryClient();
 	const { result } = await render(signedIn, client);
 	await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
-	await act(async () => {
-		await client.refetchQueries({ queryKey: ["session"] });
+	act(() => {
+		client.setQueryData(["session"], { accountId: "99", isSeller: true });
 	});
+	await flushMacrotasks();
 	expect(result.current.identity).toEqual(buyer);
-	expect(api.logout).not.toHaveBeenCalled();
+	expect(result.current.identity?.nickname).toBeUndefined();
+	expect(buyerRpc.getProfile).not.toHaveBeenCalled();
 });
 
 describe("AuthProvider retries an unavailable session", () => {
@@ -379,6 +472,19 @@ describe("AuthProvider retries an unavailable session", () => {
 		expect(api.logout).not.toHaveBeenCalled();
 	});
 
+	it("keeps backing off while the server still answers unavailable after a successful probe", async () => {
+		vi.useFakeTimers();
+		api.fetchSession.mockResolvedValue(buyer);
+		const { result } = await render(unavailable);
+		await advance(SESSION_RETRY_BACKOFF_MS[0]);
+		expect(api.fetchSession).toHaveBeenCalledTimes(1);
+		expect(router.refresh).toHaveBeenCalledTimes(1);
+		expect(result.current.status).toBe("unavailable");
+		await advance(SESSION_RETRY_BACKOFF_MS[1]);
+		expect(api.fetchSession).toHaveBeenCalledTimes(2);
+		expect(router.refresh).toHaveBeenCalledTimes(2);
+	});
+
 	it("does not ask again when the server's first answer was definitive", async () => {
 		vi.useFakeTimers();
 		await render(guest);
@@ -387,42 +493,13 @@ describe("AuthProvider retries an unavailable session", () => {
 	});
 });
 
-describe("AuthProvider adopts the server's newest answer after an event", () => {
-	it("after sign-out the header shows no avatar: guest now, the server's refresh is requested and its guest answer is adopted", async () => {
+describe("AuthProvider adopts the server's newest answer", () => {
+	it("a refreshed promise from the server replaces the older answer", async () => {
 		const { result, adopt } = await render(signedIn);
 		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
-		expect(router.refresh).not.toHaveBeenCalled();
-		await act(async () => {
-			await result.current.signOut();
-		});
-		expect(result.current.status).toBe("guest");
-		expect(router.refresh).toHaveBeenCalledTimes(1);
-		vi.useRealTimers();
 		await adopt(guest);
 		expect(result.current.status).toBe("guest");
 		expect(result.current.identity).toBeNull();
-	});
-
-	it("a failed SignOut does not refresh", async () => {
-		api.logout.mockRejectedValueOnce(new Error("offline"));
-		const { result } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
-		await act(async () => {
-			await result.current.signOut().catch(() => {});
-		});
-		expect(router.refresh).not.toHaveBeenCalled();
-	});
-
-	it("the server value wins over the transient target state", async () => {
-		const { result, adopt } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
-		await act(async () => {
-			window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
-		});
-		await waitFor(() => expect(result.current.status).toBe("guest"));
-		await adopt({ status: "signedIn", identity: { ...buyer, isSeller: true } });
-		await waitFor(() => expect(result.current.status).toBe("signedIn"));
-		expect(result.current.hasSeller).toBe(true);
 	});
 
 	it("a newer promise wins over a late older one", async () => {
@@ -455,163 +532,80 @@ describe("AuthProvider adopts the server's newest answer after an event", () => 
 		expect(result.current.identity?.accountId).toBe("7");
 	});
 
-	it("a refresh to the same account keeps the profile nickname the client backfilled", async () => {
-		const client = new QueryClient();
-		const { result, adopt } = await render(signedIn, client);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
-		act(() => {
-			client.setQueryData(["session"], { ...buyer, nickname: "Mei" });
-		});
+	it("display name and avatar are the server's newest answer, never merged with an older one", async () => {
+		const withProfile: SessionState = {
+			status: "signedIn",
+			identity: {
+				...buyer,
+				nickname: "Mei",
+				avatarKey: "https://m/i/avatar/a",
+			},
+		};
+		const { result, adopt } = await render(withProfile);
+		await waitFor(() => expect(result.current.identity?.nickname).toBe("Mei"));
+		expect(result.current.identity?.avatarKey).toBe("https://m/i/avatar/a");
 		await adopt(signedIn);
-		expect(result.current.identity?.nickname).toBe("Mei");
+		expect(result.current.identity).toEqual(buyer);
+		await adopt({
+			status: "signedIn",
+			identity: { ...buyer, nickname: "Mei2" },
+		});
+		expect(result.current.identity?.nickname).toBe("Mei2");
+		expect(buyerRpc.getProfile).not.toHaveBeenCalled();
 	});
 
-	it("a 401 from any call is guest now and asks the server again", async () => {
-		const { result } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
-		await act(async () => {
-			window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
-		});
-		await waitFor(() => expect(result.current.status).toBe("guest"));
-		expect(router.refresh).toHaveBeenCalledTimes(1);
-	});
-
-	it("a rejection by the server refreshes only after the session was really ended", async () => {
-		const { result } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
-		const denied = new ConnectError("suspended", Code.PermissionDenied);
-		api.logout.mockRejectedValueOnce(new Error("offline"));
-		await act(async () => {
-			await result.current.rejectSession(denied);
-		});
-		expect(router.refresh).not.toHaveBeenCalled();
-		await act(async () => {
-			await result.current.rejectSession(denied);
-		});
-		expect(router.refresh).toHaveBeenCalledTimes(1);
-	});
-
-	it("a rejection announces the guest only after the session was really ended, so a peer refreshing meanwhile still sees the old cookie", async () => {
+	it("a rejection announces nothing before the session was really ended: the new document announces the guest", async () => {
 		const { result } = await render(signedIn);
 		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
 		const revoke = deferred<void>();
 		api.logout.mockReturnValueOnce(revoke.promise);
 		let pending!: Promise<void>;
 		act(() => {
-			pending = result.current.rejectSession(
-				new ConnectError("suspended", Code.PermissionDenied),
-			);
+			pending = result.current.signOut("/login", true);
 		});
 		await flushMacrotasks();
 		expect(FakeBroadcastChannel.sent).toEqual([{ accountId: "7" }]);
-		expect(result.current.status).toBe("signedIn");
+		expect(nav.commit).not.toHaveBeenCalled();
 		await act(async () => {
 			revoke.resolve();
 			await pending;
 		});
-		await flushMacrotasks();
-		expect(FakeBroadcastChannel.sent).toEqual([
-			{ accountId: "7" },
-			{ accountId: null },
-		]);
-		expect(result.current.status).toBe("guest");
-	});
-
-	it("two tabs: the peer hears the guest announcement only after this tab's cookie is gone", async () => {
-		const { result } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
-		const revoke = deferred<void>();
-		api.logout.mockReturnValueOnce(revoke.promise);
-		let pending!: Promise<void>;
-		act(() => {
-			pending = result.current.rejectSession(
-				new ConnectError("suspended", Code.PermissionDenied),
-			);
-		});
-		await flushMacrotasks();
-		const heard: unknown[] = [];
-		const peer = new FakeBroadcastChannel("hk-auth-session");
-		peer.onmessage = (event) => heard.push(event.data);
-		expect(heard).toEqual([]);
-		await act(async () => {
-			revoke.resolve();
-			await pending;
-		});
-		await flushMacrotasks();
-		expect(heard).toEqual([{ accountId: null }]);
-		peer.close();
-	});
-
-	it("commitIdentity writes the target state and asks the server once", async () => {
-		const { result } = await render(guest);
-		await waitFor(() => expect(result.current.status).toBe("guest"));
-		act(() => result.current.commitIdentity({ ...buyer, accountId: "9" }));
-		expect(result.current.identity?.accountId).toBe("9");
-		expect(router.refresh).toHaveBeenCalledTimes(1);
-	});
-
-	it("a locale switch does not re-arm the rejection: one logout and one toast", async () => {
-		vi.mocked(toast.error).mockClear();
-		let locale: "zh-TW" | "en" = "zh-TW";
-		const client = new QueryClient();
-		const wrapper = ({ children }: { children: React.ReactNode }) =>
-			React.createElement(
-				QueryClientProvider,
-				{ client },
-				React.createElement(NextIntlClientProvider, {
-					locale,
-					messages: messagesFor(locale),
-					children: React.createElement(AuthProvider, {
-						session: Promise.resolve(signedIn),
-						children,
-					}),
-				}),
-			);
-		let hook!: ReturnType<
-			typeof renderHook<ReturnType<typeof useAuth>, unknown>
-		>;
-		await act(async () => {
-			hook = renderHook(() => useAuth(), { wrapper });
-		});
-		await waitFor(() => expect(hook.result.current.isLoggedIn).toBe(true));
-		const denied = new ConnectError("suspended", Code.PermissionDenied);
-		await act(async () => {
-			await hook.result.current.rejectSession(denied);
-		});
-		locale = "en";
-		await act(async () => {
-			hook.rerender();
-		});
-		await act(async () => {
-			await hook.result.current.rejectSession(denied);
-		});
-		expect(api.logout).toHaveBeenCalledTimes(1);
-		expect(toast.error).toHaveBeenCalledTimes(1);
+		expect(nav.commit).toHaveBeenCalledExactlyOnceWith("/login", true);
+		expect(FakeBroadcastChannel.sent).toEqual([{ accountId: "7" }]);
 	});
 });
 
 describe("AuthProvider across tabs", () => {
-	it("another tab signing out refreshes this tab from the server without writing client state", async () => {
+	it("a signed-in tab reloads the document when another tab signed out", async () => {
 		const { result } = await render(signedIn);
 		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
 		act(() => peerAnnounces({ accountId: null }));
-		expect(router.refresh).toHaveBeenCalledTimes(1);
-		expect(result.current.status).toBe("signedIn");
-		expect(result.current.identity?.accountId).toBe("7");
+		await waitFor(() => expect(nav.reload).toHaveBeenCalledTimes(1));
+		expect(router.refresh).not.toHaveBeenCalled();
 	});
 
-	it("another tab signing in refreshes a guest tab", async () => {
+	it("a signed-in tab reloads the document when another tab signed in as a different account", async () => {
+		const { result } = await render(signedIn);
+		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		act(() => peerAnnounces({ accountId: "8" }));
+		await waitFor(() => expect(nav.reload).toHaveBeenCalledTimes(1));
+		expect(router.refresh).not.toHaveBeenCalled();
+	});
+
+	it("a guest tab only asks the server again when another tab signed in, never reloads", async () => {
 		const { result } = await render(guest);
 		await waitFor(() => expect(result.current.status).toBe("guest"));
 		act(() => peerAnnounces({ accountId: "7" }));
 		expect(router.refresh).toHaveBeenCalledTimes(1);
+		expect(nav.reload).not.toHaveBeenCalled();
 	});
 
-	it("a peer that agrees, a malformed message and a first answer still on its way do not refresh", async () => {
+	it("a peer that agrees, a malformed message and a first answer still on its way do nothing", async () => {
 		const pending = deferred<SessionState>();
 		const { result } = await render(pending.promise);
 		act(() => peerAnnounces({ accountId: "7" }));
 		expect(router.refresh).not.toHaveBeenCalled();
+		expect(nav.reload).not.toHaveBeenCalled();
 		await act(async () => {
 			pending.resolve(signedIn);
 		});
@@ -620,24 +614,126 @@ describe("AuthProvider across tabs", () => {
 		act(() => peerAnnounces({ accountId: 7 }));
 		act(() => peerAnnounces("7"));
 		expect(router.refresh).not.toHaveBeenCalled();
+		expect(nav.reload).not.toHaveBeenCalled();
 	});
 
-	it("announces the account it sees, once per change, including its own sign-out", async () => {
+	it("announces the account it sees once, and the guest only from the next document", async () => {
 		const { result } = await render(signedIn);
 		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
 		expect(FakeBroadcastChannel.sent).toEqual([{ accountId: "7" }]);
 		await act(async () => {
 			await result.current.signOut();
 		});
-		expect(FakeBroadcastChannel.sent).toEqual([
-			{ accountId: "7" },
-			{ accountId: null },
-		]);
+		expect(FakeBroadcastChannel.sent).toEqual([{ accountId: "7" }]);
 	});
 
 	it("does not announce while unknown or unavailable", async () => {
 		await render(unavailable);
 		expect(FakeBroadcastChannel.sent).toEqual([]);
+	});
+
+	it("reloads a page restored from the back-forward cache, not a normal page show", async () => {
+		const { result } = await render(signedIn);
+		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		act(() => {
+			window.dispatchEvent(
+				new PageTransitionEvent("pageshow", { persisted: false }),
+			);
+		});
+		expect(nav.reload).not.toHaveBeenCalled();
+		act(() => {
+			window.dispatchEvent(
+				new PageTransitionEvent("pageshow", { persisted: true }),
+			);
+		});
+		expect(nav.reload).toHaveBeenCalledTimes(1);
+	});
+
+	it("leaves a restored guest page alone: it holds no identity to clear and keeps the back-forward cache", async () => {
+		const { result } = await render(guest);
+		await waitFor(() => expect(result.current.status).toBe("guest"));
+		act(() => {
+			window.dispatchEvent(
+				new PageTransitionEvent("pageshow", { persisted: true }),
+			);
+		});
+		expect(nav.reload).not.toHaveBeenCalled();
+	});
+
+	it("takes answers again after the user cancels the beforeunload prompt of a document change", async () => {
+		const { result, adopt } = await render(signedIn);
+		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		const guard = (event: BeforeUnloadEvent) => event.preventDefault();
+		window.addEventListener("beforeunload", guard);
+		try {
+			await act(async () => {
+				await result.current.signOut();
+			});
+			act(() => {
+				window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
+			});
+			await flushMacrotasks();
+			await adopt(guest);
+			expect(result.current.status).toBe("guest");
+		} finally {
+			window.removeEventListener("beforeunload", guard);
+		}
+	});
+
+	it("after a cancelled leave the revoked session is not kept: the server is asked again and signOut runs again", async () => {
+		const { result } = await render(signedIn);
+		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		const guard = (event: BeforeUnloadEvent) => event.preventDefault();
+		window.addEventListener("beforeunload", guard);
+		try {
+			await act(async () => {
+				await result.current.signOut();
+			});
+			expect(router.refresh).not.toHaveBeenCalled();
+			act(() => {
+				window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
+			});
+			await flushMacrotasks();
+			expect(router.refresh).toHaveBeenCalledTimes(1);
+			await act(async () => {
+				await result.current.signOut();
+			});
+			expect(api.logout).toHaveBeenCalledTimes(2);
+		} finally {
+			window.removeEventListener("beforeunload", guard);
+		}
+	});
+
+	it("keeps ignoring answers when the document change goes ahead without a prompt", async () => {
+		const { result, adopt } = await render(signedIn);
+		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await act(async () => {
+			await result.current.signOut();
+		});
+		act(() => {
+			window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
+		});
+		await flushMacrotasks();
+		await adopt(guest);
+		expect(result.current.status).toBe("signedIn");
+	});
+});
+
+describe("switchRole with an identity the server just confirmed", () => {
+	it("uses the confirmed identity, not the one the page loaded with, so a new seller reaches the seller workspace", async () => {
+		const { result } = await render(signedIn);
+		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		expect(result.current.switchRole("seller")).toBe(false);
+		let switched = false;
+		act(() => {
+			switched = result.current.switchRole("seller", {
+				accountId: "7",
+				isSeller: true,
+			});
+		});
+		expect(switched).toBe(true);
+		expect(result.current.activeRole).toBe("seller");
+		expect(storage.get(ACTIVE_ROLE_STORAGE_KEY)).toBe("seller");
 	});
 });
 

@@ -16,6 +16,7 @@ import {
 import {
 	type Account,
 	DeleteAccountResponse_DeletionState,
+	type GetSessionResponse,
 	IdentityAppService,
 	LoginProvider as ProtoLoginProvider,
 	Role,
@@ -26,6 +27,7 @@ import {
 	type TransportOptions,
 } from "@/lib/connect/transport";
 import type { Identity } from "../auth/storage";
+import { imageUri } from "../media/image";
 
 /**
  * fetchSession could not determine the identity because the backend was
@@ -43,10 +45,12 @@ function identityApp(options?: TransportOptions) {
 	return createClient(IdentityAppService, authedTransport(options));
 }
 
-function toIdentity(account: Account): Identity {
+function toIdentity(account: Account, res: GetSessionResponse): Identity {
 	return {
 		accountId: account.id,
 		isSeller: account.roles.includes(Role.SELLER),
+		nickname: res.displayName || undefined,
+		avatarKey: imageUri(res.avatar, "avatar"),
 	};
 }
 
@@ -61,32 +65,30 @@ export interface FetchSessionOptions extends TransportOptions {
 }
 
 /**
- * GetSession resolves the signed-in account: 401 returns null, 403 throws the
- * server rejection, and every other failure returns SESSION_UNAVAILABLE.
+ * GetSession resolves the signed-in account with its display name and avatar: 401
+ * returns null, and every other failure (403 included) returns SESSION_UNAVAILABLE.
  * 伺服器端呼叫要傳 `cookie` 與 `locale`（見 `lib/auth/dal.ts`）；瀏覽器端兩者都不傳。
  */
 export async function fetchSession(
 	options: FetchSessionOptions = {},
 ): Promise<SessionResult> {
 	const { signal, ...transportOptions } = options;
-	let account: Account | undefined;
+	let res: GetSessionResponse;
 	try {
-		const res = await identityApp(transportOptions).getSession(
+		res = await identityApp(transportOptions).getSession(
 			{},
 			{ contextValues: suppressAuthExpired(), signal },
 		);
-		account = res.account;
 	} catch (e) {
 		// 代行工作區的護欄拋的不是 ConnectError：同樣是「答不出來」。
 		const err = ConnectError.from(e);
 		if (err.code === Code.Unauthenticated) return null;
-		if (err.code === Code.PermissionDenied) throw err;
 		return SESSION_UNAVAILABLE;
 	}
-	if (!account?.id) {
+	if (!res.account?.id) {
 		return SESSION_UNAVAILABLE;
 	}
-	return toIdentity(account);
+	return toIdentity(res.account, res);
 }
 
 /**
@@ -102,7 +104,10 @@ export async function fetchSession(
  */
 export class LogoutRevokeFailedError extends Error {
 	public reason: "server" | "network";
-	constructor(reason: "server" | "network", message = "登出失敗") {
+	constructor(
+		reason: "server" | "network",
+		message = `logout revoke failed (${reason})`,
+	) {
 		super(message);
 		this.name = "LogoutRevokeFailedError";
 		this.reason = reason;
@@ -112,14 +117,17 @@ export class LogoutRevokeFailedError extends Error {
 /**
  * 登出：呼叫 SignOut RPC，單體撤銷目前的 session，並以 Set-Cookie 清掉 `__Host-hk_session`。session 已經
  * 不存在時伺服器也回成功。成功後由 AuthProvider 清除帳號與私有快取。
+ * 單體說 unauthenticated 表示 session 已經失效（過期、帳號已刪除），等於已登出：視為成功，也不廣播
+ * AUTH_EXPIRED_EVENT（呼叫端正在處理這次登出）。
  *
  * 單體有回應（任何 ConnectError）是 "server"；沒收到回應（離線、逾時）是 "network"，兩者都沒有結束 session。
  */
 export async function logout(): Promise<void> {
 	try {
-		await identityApp().signOut({});
+		await identityApp().signOut({}, { contextValues: suppressAuthExpired() });
 	} catch (error) {
 		const err = ConnectError.from(error);
+		if (err.code === Code.Unauthenticated) return;
 		if (!NO_RESPONSE_CODES.has(err.code)) {
 			throw new LogoutRevokeFailedError("server");
 		}

@@ -19,6 +19,7 @@ import 'package:protobuf/well_known_types/google/protobuf/duration.pb.dart'
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart'
     as $0;
 
+import '../../common/v1alpha1/image.pb.dart' as $2;
 import 'identity.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -1196,10 +1197,14 @@ class GetSessionResponse extends $pb.GeneratedMessage {
   factory GetSessionResponse({
     Account? account,
     Suspension? suspension,
+    $core.String? displayName,
+    $2.Image? avatar,
   }) {
     final result = GetSessionResponse._();
     if (account != null) result.account = account;
     if (suspension != null) result.suspension = suspension;
+    if (displayName != null) result.displayName = displayName;
+    if (avatar != null) result.avatar = avatar;
     return result;
   }
 
@@ -1221,6 +1226,9 @@ class GetSessionResponse extends $pb.GeneratedMessage {
         subBuilder: Account.$_createMessage)
     ..aOM<Suspension>(3, _omitFieldNames ? '' : 'suspension',
         subBuilder: Suspension.$_createMessage)
+    ..aOS(4, _omitFieldNames ? '' : 'displayName')
+    ..aOM<$2.Image>(5, _omitFieldNames ? '' : 'avatar',
+        subBuilder: $2.Image.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1268,6 +1276,29 @@ class GetSessionResponse extends $pb.GeneratedMessage {
   void clearSuspension() => $_clearField(3);
   @$pb.TagNumber(3)
   Suspension ensureSuspension() => $_ensure(1);
+
+  /// 買家的顯示名稱（頁首與帳號選單用），與 BuyerAppService 的 Profile.display_name 同一份。讀取買家資料失敗時不設；
+  /// 登入狀態不受影響，client 不可把沒有這個欄位當成未登入。
+  @$pb.TagNumber(4)
+  $core.String get displayName => $_getSZ(2);
+  @$pb.TagNumber(4)
+  set displayName($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(4)
+  $core.bool hasDisplayName() => $_has(2);
+  @$pb.TagNumber(4)
+  void clearDisplayName() => $_clearField(4);
+
+  /// 買家的頭像，與 Profile.avatar 同一份。沒有頭像、或讀取買家資料失敗時不設。
+  @$pb.TagNumber(5)
+  $2.Image get avatar => $_getN(3);
+  @$pb.TagNumber(5)
+  set avatar($2.Image value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasAvatar() => $_has(3);
+  @$pb.TagNumber(5)
+  void clearAvatar() => $_clearField(5);
+  @$pb.TagNumber(5)
+  $2.Image ensureAvatar() => $_ensure(3);
 }
 
 /// Suspension 是帳號的停權狀態。

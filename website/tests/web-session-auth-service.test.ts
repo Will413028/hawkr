@@ -85,15 +85,12 @@ test("backend outage and a dead network remain retryable", async () => {
 	assert.equal(await fetchSession(), SESSION_UNAVAILABLE);
 });
 
-test("backend unauthenticated resolves guest; permission denied remains distinct", async () => {
-	const { fetchSession } = await import("../lib/api/auth");
+test("backend unauthenticated resolves guest; permission denied is unavailable, never a guest", async () => {
+	const { fetchSession, SESSION_UNAVAILABLE } = await import("../lib/api/auth");
 	serve(() => connectError(Code.Unauthenticated));
 	assert.equal(await fetchSession(), null);
 	serve(() => connectError(Code.PermissionDenied));
-	await assert.rejects(fetchSession(), (error: unknown) => {
-		assert.equal((error as { code?: Code }).code, Code.PermissionDenied);
-		return true;
-	});
+	assert.equal(await fetchSession(), SESSION_UNAVAILABLE);
 });
 
 for (const code of [

@@ -18,6 +18,7 @@
 package identityv1alpha1
 
 import (
+	v1alpha1 "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -1110,7 +1111,12 @@ type GetSessionResponse struct {
 	Account *Account               `protobuf:"bytes,2,opt,name=account,proto3" json:"account,omitempty"`
 	// 帳號被停權時的狀態；沒有停權時不設。停權的帳號仍能登入、讀取與刪除帳號，寫入回 permission_denied 與
 	// hawkr.common.v1alpha1.ErrorReason.ACCOUNT_SUSPENDED。
-	Suspension    *Suspension `protobuf:"bytes,3,opt,name=suspension,proto3" json:"suspension,omitempty"`
+	Suspension *Suspension `protobuf:"bytes,3,opt,name=suspension,proto3" json:"suspension,omitempty"`
+	// 買家的顯示名稱（頁首與帳號選單用），與 BuyerAppService 的 Profile.display_name 同一份。讀取買家資料失敗時不設；
+	// 登入狀態不受影響，client 不可把沒有這個欄位當成未登入。
+	DisplayName string `protobuf:"bytes,4,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	// 買家的頭像，與 Profile.avatar 同一份。沒有頭像、或讀取買家資料失敗時不設。
+	Avatar        *v1alpha1.Image `protobuf:"bytes,5,opt,name=avatar,proto3" json:"avatar,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1155,6 +1161,20 @@ func (x *GetSessionResponse) GetAccount() *Account {
 func (x *GetSessionResponse) GetSuspension() *Suspension {
 	if x != nil {
 		return x.Suspension
+	}
+	return nil
+}
+
+func (x *GetSessionResponse) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *GetSessionResponse) GetAvatar() *v1alpha1.Image {
+	if x != nil {
+		return x.Avatar
 	}
 	return nil
 }
@@ -1289,7 +1309,7 @@ var File_hawkr_identity_v1alpha1_identity_proto protoreflect.FileDescriptor
 
 const file_hawkr_identity_v1alpha1_identity_proto_rawDesc = "" +
 	"\n" +
-	"&hawkr/identity/v1alpha1/identity.proto\x12\x17hawkr.identity.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x84\x01\n" +
+	"&hawkr/identity/v1alpha1/identity.proto\x12\x17hawkr.identity.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!hawkr/common/v1alpha1/image.proto\"\x84\x01\n" +
 	"\aAccount\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x128\n" +
 	"\x05roles\x18\x02 \x03(\x0e2\x1d.hawkr.identity.v1alpha1.RoleB\x03\xe0A\x03R\x05rolesJ\x04\b\x03\x10\x04J\x04\b\x04\x10\x05J\x04\b\x05\x10\x06R\vactive_roleR\vperspective\"\x1b\n" +
@@ -1340,12 +1360,14 @@ const file_hawkr_identity_v1alpha1_identity_proto_rawDesc = "" +
 	"createTime\x12C\n" +
 	"\rlast_use_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\vlastUseTime\x12\x1d\n" +
 	"\acurrent\x18\x05 \x01(\bB\x03\xe0A\x03R\acurrent\"\x13\n" +
-	"\x11GetSessionRequest\"\xa0\x01\n" +
+	"\x11GetSessionRequest\"\x83\x02\n" +
 	"\x12GetSessionResponse\x12:\n" +
 	"\aaccount\x18\x02 \x01(\v2 .hawkr.identity.v1alpha1.AccountR\aaccount\x12H\n" +
 	"\n" +
 	"suspension\x18\x03 \x01(\v2#.hawkr.identity.v1alpha1.SuspensionB\x03\xe0A\x03R\n" +
-	"suspensionJ\x04\b\x01\x10\x02\"P\n" +
+	"suspension\x12&\n" +
+	"\fdisplay_name\x18\x04 \x01(\tB\x03\xe0A\x03R\vdisplayName\x129\n" +
+	"\x06avatar\x18\x05 \x01(\v2\x1c.hawkr.common.v1alpha1.ImageB\x03\xe0A\x03R\x06avatarJ\x04\b\x01\x10\x02\"P\n" +
 	"\n" +
 	"Suspension\x12B\n" +
 	"\fsuspended_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\vsuspendedAt\"\x16\n" +
@@ -1426,6 +1448,7 @@ var file_hawkr_identity_v1alpha1_identity_proto_goTypes = []any{
 	(*DeleteAccountResponse)(nil),            // 25: hawkr.identity.v1alpha1.DeleteAccountResponse
 	(*timestamppb.Timestamp)(nil),            // 26: google.protobuf.Timestamp
 	(*durationpb.Duration)(nil),              // 27: google.protobuf.Duration
+	(*v1alpha1.Image)(nil),                   // 28: hawkr.common.v1alpha1.Image
 }
 var file_hawkr_identity_v1alpha1_identity_proto_depIdxs = []int32{
 	0,  // 0: hawkr.identity.v1alpha1.Account.roles:type_name -> hawkr.identity.v1alpha1.Role
@@ -1443,31 +1466,32 @@ var file_hawkr_identity_v1alpha1_identity_proto_depIdxs = []int32{
 	26, // 12: hawkr.identity.v1alpha1.LoginSession.last_use_time:type_name -> google.protobuf.Timestamp
 	4,  // 13: hawkr.identity.v1alpha1.GetSessionResponse.account:type_name -> hawkr.identity.v1alpha1.Account
 	23, // 14: hawkr.identity.v1alpha1.GetSessionResponse.suspension:type_name -> hawkr.identity.v1alpha1.Suspension
-	26, // 15: hawkr.identity.v1alpha1.Suspension.suspended_at:type_name -> google.protobuf.Timestamp
-	3,  // 16: hawkr.identity.v1alpha1.DeleteAccountResponse.state:type_name -> hawkr.identity.v1alpha1.DeleteAccountResponse.DeletionState
-	5,  // 17: hawkr.identity.v1alpha1.IdentityPublicService.IssueAppLoginNonce:input_type -> hawkr.identity.v1alpha1.IssueAppLoginNonceRequest
-	7,  // 18: hawkr.identity.v1alpha1.IdentityPublicService.ExchangeIdToken:input_type -> hawkr.identity.v1alpha1.ExchangeIdTokenRequest
-	21, // 19: hawkr.identity.v1alpha1.IdentityAppService.GetSession:input_type -> hawkr.identity.v1alpha1.GetSessionRequest
-	9,  // 20: hawkr.identity.v1alpha1.IdentityAppService.SignOut:input_type -> hawkr.identity.v1alpha1.SignOutRequest
-	11, // 21: hawkr.identity.v1alpha1.IdentityAppService.LinkIdentity:input_type -> hawkr.identity.v1alpha1.LinkIdentityRequest
-	13, // 22: hawkr.identity.v1alpha1.IdentityAppService.ListSessions:input_type -> hawkr.identity.v1alpha1.ListSessionsRequest
-	15, // 23: hawkr.identity.v1alpha1.IdentityAppService.ListLinkedIdentities:input_type -> hawkr.identity.v1alpha1.ListLinkedIdentitiesRequest
-	18, // 24: hawkr.identity.v1alpha1.IdentityAppService.RevokeSession:input_type -> hawkr.identity.v1alpha1.RevokeSessionRequest
-	24, // 25: hawkr.identity.v1alpha1.IdentityAppService.DeleteAccount:input_type -> hawkr.identity.v1alpha1.DeleteAccountRequest
-	6,  // 26: hawkr.identity.v1alpha1.IdentityPublicService.IssueAppLoginNonce:output_type -> hawkr.identity.v1alpha1.IssueAppLoginNonceResponse
-	8,  // 27: hawkr.identity.v1alpha1.IdentityPublicService.ExchangeIdToken:output_type -> hawkr.identity.v1alpha1.ExchangeIdTokenResponse
-	22, // 28: hawkr.identity.v1alpha1.IdentityAppService.GetSession:output_type -> hawkr.identity.v1alpha1.GetSessionResponse
-	10, // 29: hawkr.identity.v1alpha1.IdentityAppService.SignOut:output_type -> hawkr.identity.v1alpha1.SignOutResponse
-	12, // 30: hawkr.identity.v1alpha1.IdentityAppService.LinkIdentity:output_type -> hawkr.identity.v1alpha1.LinkIdentityResponse
-	14, // 31: hawkr.identity.v1alpha1.IdentityAppService.ListSessions:output_type -> hawkr.identity.v1alpha1.ListSessionsResponse
-	16, // 32: hawkr.identity.v1alpha1.IdentityAppService.ListLinkedIdentities:output_type -> hawkr.identity.v1alpha1.ListLinkedIdentitiesResponse
-	19, // 33: hawkr.identity.v1alpha1.IdentityAppService.RevokeSession:output_type -> hawkr.identity.v1alpha1.RevokeSessionResponse
-	25, // 34: hawkr.identity.v1alpha1.IdentityAppService.DeleteAccount:output_type -> hawkr.identity.v1alpha1.DeleteAccountResponse
-	26, // [26:35] is the sub-list for method output_type
-	17, // [17:26] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	28, // 15: hawkr.identity.v1alpha1.GetSessionResponse.avatar:type_name -> hawkr.common.v1alpha1.Image
+	26, // 16: hawkr.identity.v1alpha1.Suspension.suspended_at:type_name -> google.protobuf.Timestamp
+	3,  // 17: hawkr.identity.v1alpha1.DeleteAccountResponse.state:type_name -> hawkr.identity.v1alpha1.DeleteAccountResponse.DeletionState
+	5,  // 18: hawkr.identity.v1alpha1.IdentityPublicService.IssueAppLoginNonce:input_type -> hawkr.identity.v1alpha1.IssueAppLoginNonceRequest
+	7,  // 19: hawkr.identity.v1alpha1.IdentityPublicService.ExchangeIdToken:input_type -> hawkr.identity.v1alpha1.ExchangeIdTokenRequest
+	21, // 20: hawkr.identity.v1alpha1.IdentityAppService.GetSession:input_type -> hawkr.identity.v1alpha1.GetSessionRequest
+	9,  // 21: hawkr.identity.v1alpha1.IdentityAppService.SignOut:input_type -> hawkr.identity.v1alpha1.SignOutRequest
+	11, // 22: hawkr.identity.v1alpha1.IdentityAppService.LinkIdentity:input_type -> hawkr.identity.v1alpha1.LinkIdentityRequest
+	13, // 23: hawkr.identity.v1alpha1.IdentityAppService.ListSessions:input_type -> hawkr.identity.v1alpha1.ListSessionsRequest
+	15, // 24: hawkr.identity.v1alpha1.IdentityAppService.ListLinkedIdentities:input_type -> hawkr.identity.v1alpha1.ListLinkedIdentitiesRequest
+	18, // 25: hawkr.identity.v1alpha1.IdentityAppService.RevokeSession:input_type -> hawkr.identity.v1alpha1.RevokeSessionRequest
+	24, // 26: hawkr.identity.v1alpha1.IdentityAppService.DeleteAccount:input_type -> hawkr.identity.v1alpha1.DeleteAccountRequest
+	6,  // 27: hawkr.identity.v1alpha1.IdentityPublicService.IssueAppLoginNonce:output_type -> hawkr.identity.v1alpha1.IssueAppLoginNonceResponse
+	8,  // 28: hawkr.identity.v1alpha1.IdentityPublicService.ExchangeIdToken:output_type -> hawkr.identity.v1alpha1.ExchangeIdTokenResponse
+	22, // 29: hawkr.identity.v1alpha1.IdentityAppService.GetSession:output_type -> hawkr.identity.v1alpha1.GetSessionResponse
+	10, // 30: hawkr.identity.v1alpha1.IdentityAppService.SignOut:output_type -> hawkr.identity.v1alpha1.SignOutResponse
+	12, // 31: hawkr.identity.v1alpha1.IdentityAppService.LinkIdentity:output_type -> hawkr.identity.v1alpha1.LinkIdentityResponse
+	14, // 32: hawkr.identity.v1alpha1.IdentityAppService.ListSessions:output_type -> hawkr.identity.v1alpha1.ListSessionsResponse
+	16, // 33: hawkr.identity.v1alpha1.IdentityAppService.ListLinkedIdentities:output_type -> hawkr.identity.v1alpha1.ListLinkedIdentitiesResponse
+	19, // 34: hawkr.identity.v1alpha1.IdentityAppService.RevokeSession:output_type -> hawkr.identity.v1alpha1.RevokeSessionResponse
+	25, // 35: hawkr.identity.v1alpha1.IdentityAppService.DeleteAccount:output_type -> hawkr.identity.v1alpha1.DeleteAccountResponse
+	27, // [27:36] is the sub-list for method output_type
+	18, // [18:27] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_identity_v1alpha1_identity_proto_init() }

@@ -10,9 +10,13 @@ vi.mock("@connectrpc/connect", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@connectrpc/connect")>()),
 	createClient: () => rpc,
 }));
+const SUPPRESS_KEY = vi.hoisted(() => ({
+	id: Symbol("suppress"),
+	defaultValue: false,
+}));
 vi.mock("@/lib/connect/transport", () => ({
 	authedTransport: () => ({}),
-	SUPPRESS_AUTH_EXPIRED: { id: Symbol("suppress"), defaultValue: false },
+	SUPPRESS_AUTH_EXPIRED: SUPPRESS_KEY,
 }));
 
 import { Code, ConnectError } from "@connectrpc/connect";
@@ -62,6 +66,17 @@ describe("logout: SignOut RPC", () => {
 		const error = await logout().catch((e: unknown) => e);
 		expect(error).toBeInstanceOf(LogoutRevokeFailedError);
 		expect((error as LogoutRevokeFailedError).reason).toBe("server");
+	});
+
+	it("unauthenticated means the session is already gone: success, without an expiry broadcast", async () => {
+		rpc.signOut.mockRejectedValue(
+			new ConnectError("gone", Code.Unauthenticated),
+		);
+		await expect(logout()).resolves.toBeUndefined();
+		const options = rpc.signOut.mock.calls[0]?.[1] as {
+			contextValues: { get: (key: unknown) => unknown };
+		};
+		expect(options.contextValues.get(SUPPRESS_KEY)).toBe(true);
 	});
 
 	it("no answer is a network failure", async () => {

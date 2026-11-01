@@ -20,6 +20,8 @@ import 'package:protobuf/well_known_types/google/protobuf/duration.pbjson.dart'
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pbjson.dart'
     as $0;
 
+import '../../common/v1alpha1/image.pbjson.dart' as $2;
+
 @$core.Deprecated('Use roleDescriptor instead')
 const Role$json = {
   '1': 'Role',
@@ -438,6 +440,16 @@ const GetSessionResponse$json = {
       '8': {},
       '10': 'suspension'
     },
+    {'1': 'display_name', '3': 4, '4': 1, '5': 9, '8': {}, '10': 'displayName'},
+    {
+      '1': 'avatar',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.common.v1alpha1.Image',
+      '8': {},
+      '10': 'avatar'
+    },
   ],
   '9': [
     {'1': 1, '2': 2},
@@ -448,7 +460,9 @@ const GetSessionResponse$json = {
 final $typed_data.Uint8List getSessionResponseDescriptor = $convert.base64Decode(
     'ChJHZXRTZXNzaW9uUmVzcG9uc2USOgoHYWNjb3VudBgCIAEoCzIgLmhhd2tyLmlkZW50aXR5Ln'
     'YxYWxwaGExLkFjY291bnRSB2FjY291bnQSSAoKc3VzcGVuc2lvbhgDIAEoCzIjLmhhd2tyLmlk'
-    'ZW50aXR5LnYxYWxwaGExLlN1c3BlbnNpb25CA+BBA1IKc3VzcGVuc2lvbkoECAEQAg==');
+    'ZW50aXR5LnYxYWxwaGExLlN1c3BlbnNpb25CA+BBA1IKc3VzcGVuc2lvbhImCgxkaXNwbGF5X2'
+    '5hbWUYBCABKAlCA+BBA1ILZGlzcGxheU5hbWUSOQoGYXZhdGFyGAUgASgLMhwuaGF3a3IuY29t'
+    'bW9uLnYxYWxwaGExLkltYWdlQgPgQQNSBmF2YXRhckoECAEQAg==');
 
 @$core.Deprecated('Use suspensionDescriptor instead')
 const Suspension$json = {
@@ -604,6 +618,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.identity.v1alpha1.Account': Account$json,
   '.hawkr.identity.v1alpha1.Suspension': Suspension$json,
   '.google.protobuf.Timestamp': $0.Timestamp$json,
+  '.hawkr.common.v1alpha1.Image': $2.Image$json,
   '.hawkr.identity.v1alpha1.SignOutRequest': SignOutRequest$json,
   '.hawkr.identity.v1alpha1.SignOutResponse': SignOutResponse$json,
   '.hawkr.identity.v1alpha1.LinkIdentityRequest': LinkIdentityRequest$json,

@@ -1,8 +1,10 @@
 package identity
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"testing"
@@ -13,6 +15,7 @@ import (
 
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
+	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
@@ -117,6 +120,21 @@ type appEnv struct {
 	public *Public
 	app    *App
 	now    time.Time
+
+	profiles *fakeProfiles
+	logs     *bytes.Buffer
+}
+
+// fakeProfiles 是買家模組的公開讀取：回 profile，或回 err。
+type fakeProfiles struct {
+	profile buyer.Profile
+	err     error
+	calls   []int64
+}
+
+func (f *fakeProfiles) Profile(_ context.Context, accountID int64) (buyer.Profile, error) {
+	f.calls = append(f.calls, accountID)
+	return f.profile, f.err
 }
 
 func newAppEnv(t *testing.T) *appEnv {
@@ -128,7 +146,13 @@ func newAppEnv(t *testing.T) *appEnv {
 		t.Fatal(err)
 	}
 	e.public = NewPublic(login)
-	e.app = NewApp(e.m, nil, login, func() time.Time { return e.now })
+	images, err := rpc.NewImages("https://media.example.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.profiles = &fakeProfiles{}
+	e.logs = &bytes.Buffer{}
+	e.app = NewApp(e.m, nil, login, func() time.Time { return e.now }, e.profiles, images, slog.New(slog.NewTextHandler(e.logs, nil)))
 	return e
 }
 
@@ -583,5 +607,70 @@ func TestListLinkedIdentitiesRefusesAnUnknownProvider(t *testing.T) {
 	_, err := e.app.ListLinkedIdentities(callerContext(t, 42, uuid.New(), rpc.CredentialBearer), connect.NewRequest(&pb.ListLinkedIdentitiesRequest{}))
 	if err == nil || apperr.KindOf(err) != apperr.KindInternal {
 		t.Fatalf("不認得的 provider 要回內部錯誤，err = %v", err)
+	}
+}
+
+func TestGetSessionComposesTheBuyersDisplayData(t *testing.T) {
+	t.Parallel()
+	e := newAppEnv(t)
+	avatar := "avatars/a1.png"
+	e.profiles.profile = buyer.Profile{DisplayName: "小鷹", Avatar: &avatar}
+	resp, err := e.app.GetSession(callerContext(t, 42, uuid.New(), rpc.CredentialCookie), connect.NewRequest(&pb.GetSessionRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := resp.Msg.GetDisplayName(); got != "小鷹" {
+		t.Fatalf("display_name = %q", got)
+	}
+	if got := resp.Msg.GetAvatar().GetUriTemplate(); got != "https://media.example.test/i/{preset}/avatars/a1.png" {
+		t.Fatalf("avatar = %q", got)
+	}
+	if len(e.profiles.calls) != 1 || e.profiles.calls[0] != 42 {
+		t.Fatalf("profile reads = %v", e.profiles.calls)
+	}
+}
+
+func TestGetSessionLeavesTheAvatarUnsetWithoutOne(t *testing.T) {
+	t.Parallel()
+	e := newAppEnv(t)
+	e.profiles.profile = buyer.Profile{DisplayName: "小鷹"}
+	resp, err := e.app.GetSession(callerContext(t, 42, uuid.New(), rpc.CredentialCookie), connect.NewRequest(&pb.GetSessionRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Msg.GetDisplayName() != "小鷹" || resp.Msg.Avatar != nil {
+		t.Fatalf("display_name = %q, avatar = %v", resp.Msg.GetDisplayName(), resp.Msg.Avatar)
+	}
+}
+
+func TestGetSessionSucceedsWithoutDisplayDataWhenTheBuyerReadFails(t *testing.T) {
+	t.Parallel()
+	e := newAppEnv(t)
+	e.profiles.err = apperr.Unavailable("buyer down")
+	resp, err := e.app.GetSession(callerContext(t, 42, uuid.New(), rpc.CredentialCookie), connect.NewRequest(&pb.GetSessionRequest{}))
+	if err != nil {
+		t.Fatalf("GetSession failed with the buyer read: %v", err)
+	}
+	if resp.Msg.GetAccount().GetId() == "" || resp.Msg.DisplayName != "" || resp.Msg.Avatar != nil {
+		t.Fatalf("resp = %v", resp.Msg)
+	}
+	if !strings.Contains(e.logs.String(), "level=ERROR") {
+		t.Fatalf("buyer read failure not logged: %q", e.logs.String())
+	}
+}
+
+func TestGetSessionTreatsAClosedBuyerRecordAsExpected(t *testing.T) {
+	t.Parallel()
+	e := newAppEnv(t)
+	e.profiles.err = apperr.NotFound("buyer closed")
+	resp, err := e.app.GetSession(callerContext(t, 42, uuid.New(), rpc.CredentialCookie), connect.NewRequest(&pb.GetSessionRequest{}))
+	if err != nil {
+		t.Fatalf("GetSession failed with the closed buyer record: %v", err)
+	}
+	if resp.Msg.GetAccount().GetId() == "" || resp.Msg.DisplayName != "" || resp.Msg.Avatar != nil {
+		t.Fatalf("resp = %v", resp.Msg)
+	}
+	if strings.Contains(e.logs.String(), "level=ERROR") {
+		t.Fatalf("closed buyer record logged as an error: %q", e.logs.String())
 	}
 }

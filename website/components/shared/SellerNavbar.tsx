@@ -25,7 +25,6 @@ import { useSellerIdentity } from "@/components/shared/useSellerIdentity";
 import Button from "@/components/ui/Button";
 import { useAuth } from "@/lib/auth/context";
 import { usePathname } from "@/lib/intl/navigation";
-import { commitDocumentNavigation } from "@/lib/navigation/document-location";
 import { isStandaloneFlowPath } from "@/lib/navigation/standalone-flow";
 import { cn } from "@/lib/utils/cn";
 
@@ -333,8 +332,6 @@ function SellerAccountMenu({ setupIncomplete }: { setupIncomplete: boolean }) {
 			setIsSigningOut(false);
 		}
 		setOpen(false);
-		// 整頁重載回首頁，避免部署後 soft 導航去要舊 chunk 卡骨架。
-		commitDocumentNavigation("/");
 	}, [signOut]);
 
 	return (

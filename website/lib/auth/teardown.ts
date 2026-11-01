@@ -25,7 +25,7 @@ function isIdentityBoundQuery(query: {
  *
  *   - First identity landing (guest/none → account): there is no previous
  *     viewer whose private cache could leak. `accountIdRef` starts `undefined`,
- *     so the first session query result of a cold-loaded logged-in session
+ *     so the server's first answer for a cold-loaded logged-in session
  *     hits this case. Firing here needlessly `cancelQueries()` +
  *     `removeQueries()` the in-flight PUBLIC `home.snapshot` query while its
  *     observer stays mounted, which never repopulates → the content skeleton
@@ -33,8 +33,8 @@ function isIdentityBoundQuery(query: {
  *     undefined` compares equal, so no teardown, which is exactly why the bug
  *     only ever reproduced for logged-in users.
  *   - Same-account backfill (account → same account): a cold-load buyer session
- *     updates twice for one account (the session probe, then
- *     the /buyers/me nickname/avatar backfill). Tearing down on that second,
+ *     gets a second answer for one account (a refreshed server answer
+ *     after a profile change). Tearing down on that second,
  *     same-account event flushed every just-mounted query back to loading — the
  *     "flash back to skeleton" half of hawkr-website#259.
  */

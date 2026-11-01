@@ -30,7 +30,9 @@ const mocks = vi.hoisted(() => ({
 	hasSeller: false,
 	hasMeasures: false,
 	fetchSession: vi.fn(),
-	rejectSession: vi.fn(async () => {}),
+	signOut: vi.fn(async (_to?: string, _replace?: boolean) => {}),
+	switchRole: vi.fn(() => true),
+	navigate: vi.fn(),
 	SESSION_UNAVAILABLE: Symbol("unavailable"),
 	apply: vi.fn(async (_input: unknown) => ({ etag: "e1" })),
 	complete: vi.fn(async (_etag: string) => {}),
@@ -70,8 +72,12 @@ vi.mock("@/lib/auth/context", () => ({
 		status: mocks.authStatus,
 		isLoggedIn: mocks.loggedIn,
 		hasSeller: mocks.hasSeller,
-		rejectSession: mocks.rejectSession,
+		signOut: mocks.signOut,
+		switchRole: mocks.switchRole,
 	}),
+}));
+vi.mock("@/lib/navigation/document-location", () => ({
+	commitDocumentNavigation: mocks.navigate,
 }));
 vi.mock("@/lib/navigation/use-observed-router", () => ({
 	useObservedRouter: () => mocks.router,
@@ -256,19 +262,13 @@ describe("建立賣場按鈕：店名、鄉鎮市區、路名門牌都有才能�
 });
 
 for (const code of [
-	Code.PermissionDenied,
 	Code.Internal,
 	Code.InvalidArgument,
 	"signed-out",
 ] as const) {
 	it(`handles post-submit session refresh result ${code}`, async () => {
 		if (code === "signed-out") mocks.fetchSession.mockResolvedValue(null);
-		else if (code === Code.Internal || code === Code.InvalidArgument)
-			mocks.fetchSession.mockResolvedValue(mocks.SESSION_UNAVAILABLE);
-		else
-			mocks.fetchSession.mockRejectedValue(
-				new ConnectError("refresh failed", code),
-			);
+		else mocks.fetchSession.mockResolvedValue(mocks.SESSION_UNAVAILABLE);
 		const { container } = render(React.createElement(SellerOnboardingClient));
 		fireEvent.change(screen.getByLabelText("商家名稱"), {
 			target: { value: "新商家" },
@@ -288,18 +288,14 @@ for (const code of [
 		fireEvent.submit(form);
 		if (code === Code.Internal || code === Code.InvalidArgument) {
 			await waitFor(() => expect(screen.getByText("賣場已建立")).toBeTruthy());
-			expect(mocks.rejectSession).not.toHaveBeenCalled();
+			expect(mocks.signOut).not.toHaveBeenCalled();
 		} else {
-			await waitFor(() => expect(mocks.router.replace).toHaveBeenCalledOnce());
-			expect(mocks.rejectSession).toHaveBeenCalledOnce();
-			if (code === "signed-out")
-				expect(mocks.rejectSession).toHaveBeenCalledWith(undefined);
-			else
-				expect(mocks.rejectSession).toHaveBeenCalledWith(
-					code === Code.PermissionDenied
-						? expect.objectContaining({ code, rawMessage: "refresh failed" })
-						: undefined,
-				);
+			await waitFor(() => expect(mocks.signOut).toHaveBeenCalledOnce());
+			expect(mocks.signOut).toHaveBeenCalledWith(
+				"/login?role=seller&redirect=%2Fseller-center%2Fdashboard",
+				true,
+			);
+			expect(mocks.router.replace).not.toHaveBeenCalled();
 			expect(screen.queryByText("賣場已建立")).toBeNull();
 		}
 		expect(mocks.apply).toHaveBeenCalledOnce();
@@ -763,5 +759,68 @@ describe("開店入口只在登入狀態確定是訪客時導去登入", () => {
 				"/login?role=seller&redirect=%2Fseller%2Fonboarding",
 			),
 		);
+	});
+});
+
+describe("建立後的身分切換與重新登入都由 auth context 換文件", () => {
+	afterEach(() => {
+		mocks.signOut.mockReset();
+		mocks.signOut.mockResolvedValue(undefined);
+		mocks.switchRole.mockClear();
+		mocks.navigate.mockClear();
+	});
+
+	async function reachDoneStep() {
+		mocks.fetchSession.mockResolvedValue(mocks.SESSION_UNAVAILABLE);
+		const { container } = render(React.createElement(SellerOnboardingClient));
+		fillStore();
+		await acceptTerms();
+		submitForm(container);
+		await waitFor(() => expect(screen.getByText("賣場已建立")).toBeTruthy());
+	}
+
+	it("拿到賣家身分：切到賣家工作區再整頁取代導向，不寫任何 client 身分", async () => {
+		mocks.fetchSession.mockResolvedValue({ accountId: "7", isSeller: true });
+		const { container } = render(React.createElement(SellerOnboardingClient));
+		fillStore();
+		await acceptTerms();
+		submitForm(container);
+		await waitFor(() => expect(mocks.navigate).toHaveBeenCalledOnce());
+		expect(mocks.switchRole).toHaveBeenCalledWith("seller", {
+			accountId: "7",
+			isSeller: true,
+		});
+		expect(mocks.navigate).toHaveBeenCalledWith(
+			"/seller-center/dashboard",
+			true,
+		);
+	});
+
+	it("重新登入：signOut 帶登入頁網址並取代歷史，頁面自己不導航", async () => {
+		await reachDoneStep();
+		fireEvent.click(screen.getByText("重新登入，進入賣家中心"));
+		await waitFor(() => expect(mocks.signOut).toHaveBeenCalledOnce());
+		expect(mocks.signOut).toHaveBeenCalledWith(
+			"/login?role=seller&redirect=%2Fseller-center%2Fdashboard",
+			true,
+		);
+		expect(mocks.navigate).not.toHaveBeenCalled();
+	});
+
+	it("重新登入撤銷失敗：不導航，按鈕恢復可重試", async () => {
+		await reachDoneStep();
+		mocks.signOut.mockRejectedValueOnce(new Error("offline"));
+		fireEvent.click(screen.getByText("重新登入，進入賣家中心"));
+		await waitFor(() => expect(mocks.signOut).toHaveBeenCalledOnce());
+		await waitFor(() =>
+			expect(
+				(
+					screen
+						.getByText("重新登入，進入賣家中心")
+						.closest("button") as HTMLButtonElement
+				).disabled,
+			).toBe(false),
+		);
+		expect(mocks.navigate).not.toHaveBeenCalled();
 	});
 });

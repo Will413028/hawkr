@@ -15,23 +15,23 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'identity.pb.dart' as $2;
+import 'identity.pb.dart' as $3;
 import 'identity.pbjson.dart';
 
 export 'identity.pb.dart';
 
 abstract class IdentityPublicServiceBase extends $pb.GeneratedService {
-  $async.Future<$2.IssueAppLoginNonceResponse> issueAppLoginNonce(
-      $pb.ServerContext ctx, $2.IssueAppLoginNonceRequest request);
-  $async.Future<$2.ExchangeIdTokenResponse> exchangeIdToken(
-      $pb.ServerContext ctx, $2.ExchangeIdTokenRequest request);
+  $async.Future<$3.IssueAppLoginNonceResponse> issueAppLoginNonce(
+      $pb.ServerContext ctx, $3.IssueAppLoginNonceRequest request);
+  $async.Future<$3.ExchangeIdTokenResponse> exchangeIdToken(
+      $pb.ServerContext ctx, $3.ExchangeIdTokenRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
       case 'IssueAppLoginNonce':
-        return $2.IssueAppLoginNonceRequest();
+        return $3.IssueAppLoginNonceRequest();
       case 'ExchangeIdToken':
-        return $2.ExchangeIdTokenRequest();
+        return $3.ExchangeIdTokenRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -41,9 +41,9 @@ abstract class IdentityPublicServiceBase extends $pb.GeneratedService {
       $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
       case 'IssueAppLoginNonce':
-        return issueAppLoginNonce(ctx, request as $2.IssueAppLoginNonceRequest);
+        return issueAppLoginNonce(ctx, request as $3.IssueAppLoginNonceRequest);
       case 'ExchangeIdToken':
-        return exchangeIdToken(ctx, request as $2.ExchangeIdTokenRequest);
+        return exchangeIdToken(ctx, request as $3.ExchangeIdTokenRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -56,37 +56,37 @@ abstract class IdentityPublicServiceBase extends $pb.GeneratedService {
 }
 
 abstract class IdentityAppServiceBase extends $pb.GeneratedService {
-  $async.Future<$2.GetSessionResponse> getSession(
-      $pb.ServerContext ctx, $2.GetSessionRequest request);
-  $async.Future<$2.SignOutResponse> signOut(
-      $pb.ServerContext ctx, $2.SignOutRequest request);
-  $async.Future<$2.LinkIdentityResponse> linkIdentity(
-      $pb.ServerContext ctx, $2.LinkIdentityRequest request);
-  $async.Future<$2.ListSessionsResponse> listSessions(
-      $pb.ServerContext ctx, $2.ListSessionsRequest request);
-  $async.Future<$2.ListLinkedIdentitiesResponse> listLinkedIdentities(
-      $pb.ServerContext ctx, $2.ListLinkedIdentitiesRequest request);
-  $async.Future<$2.RevokeSessionResponse> revokeSession(
-      $pb.ServerContext ctx, $2.RevokeSessionRequest request);
-  $async.Future<$2.DeleteAccountResponse> deleteAccount(
-      $pb.ServerContext ctx, $2.DeleteAccountRequest request);
+  $async.Future<$3.GetSessionResponse> getSession(
+      $pb.ServerContext ctx, $3.GetSessionRequest request);
+  $async.Future<$3.SignOutResponse> signOut(
+      $pb.ServerContext ctx, $3.SignOutRequest request);
+  $async.Future<$3.LinkIdentityResponse> linkIdentity(
+      $pb.ServerContext ctx, $3.LinkIdentityRequest request);
+  $async.Future<$3.ListSessionsResponse> listSessions(
+      $pb.ServerContext ctx, $3.ListSessionsRequest request);
+  $async.Future<$3.ListLinkedIdentitiesResponse> listLinkedIdentities(
+      $pb.ServerContext ctx, $3.ListLinkedIdentitiesRequest request);
+  $async.Future<$3.RevokeSessionResponse> revokeSession(
+      $pb.ServerContext ctx, $3.RevokeSessionRequest request);
+  $async.Future<$3.DeleteAccountResponse> deleteAccount(
+      $pb.ServerContext ctx, $3.DeleteAccountRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
       case 'GetSession':
-        return $2.GetSessionRequest();
+        return $3.GetSessionRequest();
       case 'SignOut':
-        return $2.SignOutRequest();
+        return $3.SignOutRequest();
       case 'LinkIdentity':
-        return $2.LinkIdentityRequest();
+        return $3.LinkIdentityRequest();
       case 'ListSessions':
-        return $2.ListSessionsRequest();
+        return $3.ListSessionsRequest();
       case 'ListLinkedIdentities':
-        return $2.ListLinkedIdentitiesRequest();
+        return $3.ListLinkedIdentitiesRequest();
       case 'RevokeSession':
-        return $2.RevokeSessionRequest();
+        return $3.RevokeSessionRequest();
       case 'DeleteAccount':
-        return $2.DeleteAccountRequest();
+        return $3.DeleteAccountRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -96,20 +96,20 @@ abstract class IdentityAppServiceBase extends $pb.GeneratedService {
       $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
       case 'GetSession':
-        return getSession(ctx, request as $2.GetSessionRequest);
+        return getSession(ctx, request as $3.GetSessionRequest);
       case 'SignOut':
-        return signOut(ctx, request as $2.SignOutRequest);
+        return signOut(ctx, request as $3.SignOutRequest);
       case 'LinkIdentity':
-        return linkIdentity(ctx, request as $2.LinkIdentityRequest);
+        return linkIdentity(ctx, request as $3.LinkIdentityRequest);
       case 'ListSessions':
-        return listSessions(ctx, request as $2.ListSessionsRequest);
+        return listSessions(ctx, request as $3.ListSessionsRequest);
       case 'ListLinkedIdentities':
         return listLinkedIdentities(
-            ctx, request as $2.ListLinkedIdentitiesRequest);
+            ctx, request as $3.ListLinkedIdentitiesRequest);
       case 'RevokeSession':
-        return revokeSession(ctx, request as $2.RevokeSessionRequest);
+        return revokeSession(ctx, request as $3.RevokeSessionRequest);
       case 'DeleteAccount':
-        return deleteAccount(ctx, request as $2.DeleteAccountRequest);
+        return deleteAccount(ctx, request as $3.DeleteAccountRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import AppImage from "@/components/shared/AppImage";
@@ -254,8 +255,8 @@ function PeriodSwitcher({ period, onChange }: QuickRangeProps) {
 
 export default function AccountOverviewClient() {
 	const { identity } = useAuth();
-	// TODO(B-189): profile endpoint — buyerName not on Identity; use nickname fallback.
-	const displayName = identity?.nickname || "會員";
+	const tCommon = useTranslations("common");
+	const displayName = identity?.nickname || tCommon("memberFallback");
 
 	const orders = useOrderList();
 	const coupons = useCoupons();

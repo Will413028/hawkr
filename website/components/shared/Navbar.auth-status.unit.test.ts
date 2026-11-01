@@ -2,15 +2,24 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AuthStatus } from "@/lib/auth/session-state";
+import { type AppLocale, messagesFor } from "@/lib/intl/config";
 
 const auth = vi.hoisted(() => ({
 	value: {
 		status: "unknown" as AuthStatus,
 		isLoggedIn: false,
 		activeRole: null as "buyer" | "seller" | null,
+		identity: null as {
+			accountId: string;
+			isSeller: boolean;
+			nickname?: string;
+			avatarKey?: string;
+		} | null,
+		hasSeller: false,
 		signOut: vi.fn(),
 	},
 }));
@@ -37,16 +46,23 @@ import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 import Navbar from "./Navbar";
 import { ViewTransitions } from "./view-transitions";
 
-function renderNavbar() {
+function renderNavbar(locale?: AppLocale) {
+	const tree = React.createElement(
+		ViewTransitions,
+		null,
+		React.createElement(Navbar),
+	);
 	return render(
 		React.createElement(
 			QueryClientProvider,
 			{ client: new QueryClient() },
-			React.createElement(
-				IntlTestWrapper,
-				null,
-				React.createElement(ViewTransitions, null, React.createElement(Navbar)),
-			),
+			locale
+				? React.createElement(NextIntlClientProvider, {
+						locale,
+						messages: messagesFor(locale),
+						children: tree,
+					})
+				: React.createElement(IntlTestWrapper, null, tree),
 		),
 	);
 }
@@ -57,6 +73,8 @@ afterEach(() => {
 		status: "unknown",
 		isLoggedIn: false,
 		activeRole: null,
+		identity: null,
+		hasSeller: false,
 		signOut: vi.fn(),
 	};
 });
@@ -85,5 +103,36 @@ describe("Navbar right rail by auth status", () => {
 		renderNavbar();
 		expect(screen.getByText("登入")).toBeTruthy();
 		expect(document.querySelectorAll(".animate-pulse").length).toBe(0);
+	});
+
+	it("signedIn shows the display name the server gave in the account menu", () => {
+		auth.value = {
+			...auth.value,
+			status: "signedIn",
+			isLoggedIn: true,
+			activeRole: "buyer",
+			identity: { accountId: "7", isSeller: false, nickname: "小鷹" },
+		};
+		renderNavbar();
+		expect(
+			screen.getByTestId("account-menu-trigger").getAttribute("aria-label"),
+		).toBe("小鷹 的選單");
+	});
+
+	it.each([
+		[undefined, "會員"],
+		["en" as const, "Member"],
+	])("a signed-in account without a nickname gets the %s text resource, not a hard-coded word", (locale, word) => {
+		auth.value = {
+			...auth.value,
+			status: "signedIn",
+			isLoggedIn: true,
+			activeRole: "buyer",
+			identity: { accountId: "7", isSeller: false },
+		};
+		renderNavbar(locale);
+		expect(screen.getByTestId("account-menu-trigger").textContent).toContain(
+			word,
+		);
 	});
 });

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"time"
 	"uuid"
@@ -17,6 +18,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
+	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/pagination"
@@ -30,19 +32,31 @@ type appIdentity interface {
 	RevokeSession(ctx context.Context, accountID int64, sessionID identity.SessionID) error
 }
 
+// buyerProfiles 是頁首顯示資料的來源：買家模組的公開讀取。
+type buyerProfiles interface {
+	Profile(ctx context.Context, accountID int64) (buyer.Profile, error)
+}
+
 // App 實作 IdentityAppService。授權（登入的帳號）由 rpc 的 interceptor 依 service 名稱檢查。
 type App struct {
 	m        appIdentity
 	deletion *accountdeletion.Module
 	login    *AppLogin
 	now      func() time.Time
+	profiles buyerProfiles
+	images   rpc.Images
+	log      *slog.Logger
 }
 
 var _ identityv1alpha1connect.IdentityAppServiceHandler = (*App)(nil)
 
-// NewApp 建立登入後的 handler。login 驗證 LinkIdentity 的 ID token；now 判斷 RevokeSession 的重新驗證期限。
-func NewApp(m appIdentity, deletion *accountdeletion.Module, login *AppLogin, now func() time.Time) *App {
-	return &App{m: m, deletion: deletion, login: login, now: now}
+// NewApp 建立登入後的 handler。login 驗證 LinkIdentity 的 ID token；now 判斷 RevokeSession 的重新驗證期限；
+// profiles 與 images 組出 GetSession 的顯示資料；log 記錄讀取買家資料的失敗（nil 時丟棄）。
+func NewApp(m appIdentity, deletion *accountdeletion.Module, login *AppLogin, now func() time.Time, profiles buyerProfiles, images rpc.Images, log *slog.Logger) *App {
+	if log == nil {
+		log = slog.New(slog.DiscardHandler)
+	}
+	return &App{m: m, deletion: deletion, login: login, now: now, profiles: profiles, images: images, log: log}
 }
 
 // 列表的每頁筆數：一個帳號的有效 session 通常只有幾個。
@@ -69,6 +83,7 @@ func (h *App) DeleteAccount(ctx context.Context, _ *connect.Request[pb.DeleteAcc
 }
 
 // GetSession 回傳登入的帳號；買家身分在建帳交易內建立。帳號停權時另帶停權狀態（入口認證時讀的，A7-D17）。
+// 顯示名稱與頭像取自買家資料；讀取失敗只記 log、不設這兩個欄位，登入狀態不受影響。
 func (h *App) GetSession(ctx context.Context, _ *connect.Request[pb.GetSessionRequest]) (*connect.Response[pb.GetSessionResponse], error) {
 	p, ok := rpc.PrincipalFrom(ctx)
 	if !ok {
@@ -81,6 +96,17 @@ func (h *App) GetSession(ctx context.Context, _ *connect.Request[pb.GetSessionRe
 	resp := &pb.GetSessionResponse{Account: account(a)}
 	if at, suspended := rpc.SuspensionFrom(ctx); suspended {
 		resp.Suspension = &pb.Suspension{SuspendedAt: timestamppb.New(at)}
+	}
+	if profile, err := h.profiles.Profile(ctx, p.ID); err != nil {
+		// 買家紀錄已關閉（帳號刪除中）是預期狀態：不帶顯示資料，不是錯誤。
+		if apperr.KindOf(err) != apperr.KindNotFound {
+			h.log.ErrorContext(ctx, "GetSession 讀取買家資料失敗，回應不帶顯示資料", "account_id", p.ID, "error", err)
+		}
+	} else {
+		resp.DisplayName = profile.DisplayName
+		if profile.Avatar != nil {
+			resp.Avatar = h.images.Image(*profile.Avatar)
+		}
 	}
 	return connect.NewResponse(resp), nil
 }

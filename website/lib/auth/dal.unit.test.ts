@@ -15,11 +15,10 @@ vi.mock("@/lib/connect/transport", () => ({
 }));
 
 import { Code, ConnectError } from "@connectrpc/connect";
-import { LocalizedMessageSchema } from "@hawkr/api/gen/google/rpc/error_details_pb";
 import { Role } from "@hawkr/api/gen/hawkr/identity/v1alpha1/identity_pb";
 import { SESSION_COOKIE_NAME } from "./session-cookie";
 
-const { classifySession, verifySession } = await import("./dal");
+const { verifySession } = await import("./dal");
 
 function withCookie(value: string | null) {
 	store.cookies.mockResolvedValue({
@@ -65,6 +64,7 @@ describe("verifySession", () => {
 	});
 
 	it.each([
+		["403", new ConnectError("refused", Code.PermissionDenied)],
 		["5xx", new ConnectError("boom", Code.Internal)],
 		["network", new ConnectError("down", Code.Unavailable)],
 		["timeout", new ConnectError("slow", Code.DeadlineExceeded)],
@@ -74,6 +74,42 @@ describe("verifySession", () => {
 		withCookie("opaque");
 		rpc.getSession.mockRejectedValue(failure);
 		expect(await verifySession()).toEqual({ status: "unavailable" });
+	});
+
+	it("the display name and avatar of the answer are on the signedIn identity", async () => {
+		withCookie("opaque");
+		rpc.getSession.mockResolvedValue({
+			account: { id: "7", roles: [] },
+			displayName: "小鷹",
+			avatar: { uriTemplate: "https://media.test/i/{preset}/avatars/a1.png" },
+		});
+		expect(await verifySession()).toEqual({
+			status: "signedIn",
+			identity: {
+				accountId: "7",
+				isSeller: false,
+				nickname: "小鷹",
+				avatarKey: "https://media.test/i/avatar/avatars/a1.png",
+			},
+		});
+	});
+
+	it("an answer without display data is signedIn with no nickname or avatar", async () => {
+		withCookie("opaque");
+		rpc.getSession.mockResolvedValue({
+			account: { id: "7", roles: [] },
+			displayName: "",
+		});
+		const state = await verifySession();
+		expect(state).toEqual({
+			status: "signedIn",
+			identity: {
+				accountId: "7",
+				isSeller: false,
+				nickname: undefined,
+				avatarKey: undefined,
+			},
+		});
 	});
 
 	it("an answer without an account is unavailable", async () => {
@@ -103,31 +139,5 @@ describe("verifySession", () => {
 		});
 		store.cookies.mockRejectedValue(signal);
 		await expect(verifySession()).rejects.toBe(signal);
-	});
-});
-
-describe("classifySession", () => {
-	it("403 is a guest that carries the monolith's refusal message", async () => {
-		const state = await classifySession(() =>
-			Promise.reject(
-				new ConnectError("suspended", Code.PermissionDenied, undefined, [
-					{
-						desc: LocalizedMessageSchema,
-						value: { locale: "zh-TW", message: "帳號已停權" },
-					},
-				]),
-			),
-		);
-		expect(state).toEqual({
-			status: "guest",
-			refusal: { message: "帳號已停權" },
-		});
-	});
-
-	it("403 without a LocalizedMessage carries a null message", async () => {
-		const state = await classifySession(() =>
-			Promise.reject(new ConnectError("no", Code.PermissionDenied)),
-		);
-		expect(state).toEqual({ status: "guest", refusal: { message: null } });
 	});
 });

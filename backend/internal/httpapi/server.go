@@ -284,7 +284,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 		now = time.Now
 	}
 	add(identityconnect.NewIdentityPublicServiceHandler(httpidentity.NewPublic(appLogin), opts...))
-	add(identityconnect.NewIdentityAppServiceHandler(httpidentity.NewApp(deps.Identity, deps.Deletion, appLogin, now), opts...))
+	add(identityconnect.NewIdentityAppServiceHandler(httpidentity.NewApp(deps.Identity, deps.Deletion, appLogin, now, deps.Buyer, deps.Images, deps.Logger), opts...))
 	add(adminidentityconnect.NewIdentityAdminServiceHandler(httpidentity.NewAdmin(deps.Identity, deps.Delegation, deps.Deletion), opts...))
 	// 賣家區每個方法的能力宣告由這支 interceptor 執行，只掛在 SellerAppService、在 rpc.NewInterceptor 之內；宣告與 service
 	// 的方法對不上時不能啟動。

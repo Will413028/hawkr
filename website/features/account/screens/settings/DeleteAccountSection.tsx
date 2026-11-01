@@ -52,7 +52,7 @@ export default function DeleteAccountSection() {
 			// 已刪除：session 不再有效，登出（清掉本機狀態）後整頁回首頁。
 			try {
 				await signOut();
-			} finally {
+			} catch {
 				commitDocumentNavigation("/");
 			}
 		} catch (e) {

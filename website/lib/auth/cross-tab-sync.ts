@@ -32,17 +32,21 @@ export function parseSessionAnnouncement(
 	return null;
 }
 
+export type PeerAction = "ignore" | "refresh" | "reload";
+
 /**
- * 其他分頁宣告的帳號和這個分頁看到的不同，才需要向伺服器重取。訊號只是「去重問」，不帶身分資料：
- * `unknown` 的初值還在路上、本來就會得到答案；`unavailable` 沒有可比的帳號，任何訊號都值得重問。
+ * 其他分頁宣告的帳號和這個分頁看到的不同時怎麼辦。訊號只是「去重問」，不帶身分資料：
+ * `unknown` 的初值還在路上、本來就會得到答案，忽略；`unavailable` 沒有可比的帳號，任何訊號都值得重問。
+ * 這個分頁已登入而帳號換了或登出是隱私情形，整頁重載；訪客分頁看到別人登入只是過時，soft 重問即可。
  */
-export function shouldRefreshForPeer(
+export function peerAction(
 	announcement: SessionAnnouncement,
 	current: { status: AuthStatus; accountId: string | undefined },
-): boolean {
-	if (current.status === "unknown") return false;
-	if (current.status === "unavailable") return true;
-	return announcement.accountId !== (current.accountId ?? null);
+): PeerAction {
+	if (current.status === "unknown") return "ignore";
+	if (current.status === "unavailable") return "refresh";
+	if (announcement.accountId === (current.accountId ?? null)) return "ignore";
+	return current.status === "signedIn" ? "reload" : "refresh";
 }
 
 export interface SessionChannel {

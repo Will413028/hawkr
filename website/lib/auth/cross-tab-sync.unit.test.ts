@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-	parseSessionAnnouncement,
-	shouldRefreshForPeer,
-} from "./cross-tab-sync";
+import { parseSessionAnnouncement, peerAction } from "./cross-tab-sync";
 
 describe("parseSessionAnnouncement", () => {
 	it.each([
@@ -25,58 +22,49 @@ describe("parseSessionAnnouncement", () => {
 	});
 });
 
-describe("shouldRefreshForPeer", () => {
-	it("refreshes when the peer sees a different account or a guest", () => {
+describe("peerAction", () => {
+	it("reloads a signed-in tab when the peer sees another account or a guest", () => {
 		expect(
-			shouldRefreshForPeer(
-				{ accountId: null },
-				{ status: "signedIn", accountId: "7" },
-			),
-		).toBe(true);
+			peerAction({ accountId: null }, { status: "signedIn", accountId: "7" }),
+		).toBe("reload");
 		expect(
-			shouldRefreshForPeer(
-				{ accountId: "7" },
-				{ status: "guest", accountId: undefined },
-			),
-		).toBe(true);
+			peerAction({ accountId: "8" }, { status: "signedIn", accountId: "7" }),
+		).toBe("reload");
+	});
+
+	it("only asks again when a guest tab hears about a sign-in", () => {
 		expect(
-			shouldRefreshForPeer(
-				{ accountId: "8" },
-				{ status: "signedIn", accountId: "7" },
-			),
-		).toBe(true);
+			peerAction({ accountId: "7" }, { status: "guest", accountId: undefined }),
+		).toBe("refresh");
 	});
 
 	it("does nothing when both tabs already agree", () => {
 		expect(
-			shouldRefreshForPeer(
-				{ accountId: "7" },
-				{ status: "signedIn", accountId: "7" },
-			),
-		).toBe(false);
+			peerAction({ accountId: "7" }, { status: "signedIn", accountId: "7" }),
+		).toBe("ignore");
 		expect(
-			shouldRefreshForPeer(
+			peerAction(
 				{ accountId: null },
 				{ status: "guest", accountId: undefined },
 			),
-		).toBe(false);
+		).toBe("ignore");
 	});
 
 	it("ignores signals while the first server answer is still on its way", () => {
 		expect(
-			shouldRefreshForPeer(
+			peerAction(
 				{ accountId: "7" },
 				{ status: "unknown", accountId: undefined },
 			),
-		).toBe(false);
+		).toBe("ignore");
 	});
 
 	it("re-asks while the server could not answer", () => {
 		expect(
-			shouldRefreshForPeer(
+			peerAction(
 				{ accountId: null },
 				{ status: "unavailable", accountId: undefined },
 			),
-		).toBe(true);
+		).toBe("refresh");
 	});
 });

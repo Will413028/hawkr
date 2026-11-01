@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import Avatar from "@/components/shared/Avatar";
 import Link from "@/components/shared/Link";
@@ -11,7 +12,6 @@ import {
 } from "@/features/account/menu";
 import { useAuth } from "@/lib/auth/context";
 import { usePathname } from "@/lib/intl/navigation";
-import { commitDocumentNavigation } from "@/lib/navigation/document-location";
 
 /**
  * Persistent left-rail navigation for `/account/*` pages.
@@ -31,8 +31,8 @@ export default function AccountSidebar() {
 	const { identity, signOut } = useAuth();
 	const [signingOut, setSigningOut] = React.useState(false);
 
-	// TODO(B-189): profile endpoint — buyerName not on Identity; use nickname fallback.
-	const displayName = identity?.nickname || "會員";
+	const tCommon = useTranslations("common");
+	const displayName = identity?.nickname || tCommon("memberFallback");
 	const avatar = identity?.avatarKey;
 
 	const handleSignOut = async () => {
@@ -43,10 +43,7 @@ export default function AccountSidebar() {
 		} catch {
 			// 撤銷失敗＝session 仍有效（signOut 已跳 toast），維持登入畫面。
 			setSigningOut(false);
-			return;
 		}
-		// 整頁重載回首頁，避免部署後 soft 導航去要舊 chunk 卡骨架。
-		commitDocumentNavigation("/");
 	};
 
 	const baseItemClass =

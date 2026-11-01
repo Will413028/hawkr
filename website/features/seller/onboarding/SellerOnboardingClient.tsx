@@ -83,15 +83,7 @@ function OnboardingMark() {
 export default function SellerOnboardingClient() {
 	const router = useObservedRouter("seller_onboarding");
 	const searchParams = useSearchParams();
-	const {
-		status,
-		isLoggedIn,
-		hasSeller,
-		commitIdentity,
-		switchRole,
-		signOut,
-		rejectSession,
-	} = useAuth();
+	const { status, isLoggedIn, hasSeller, switchRole, signOut } = useAuth();
 	const hasMeasures = useHasMeasures();
 
 	const [step, setStep] = React.useState<Step>("store");
@@ -223,23 +215,17 @@ export default function SellerOnboardingClient() {
 		);
 		// ApplyStore 改了 DB 的角色集 —— 重新解析一次；拿得到新角色就直接切進
 		// 工作區，拿不到就停在完成頁請使用者重新登入。
-		let denied: ConnectError | undefined;
-		let id: Awaited<ReturnType<typeof fetchSession>> = null;
-		try {
-			id = await fetchSession();
-		} catch (error) {
-			denied = ConnectError.from(error);
-		}
+		const id = await fetchSession();
 		if (id === null) {
-			await rejectSession(denied);
-			router.replace(loginPath({ role: "seller", redirect }));
+			await signOut(loginPath({ role: "seller", redirect }), true).catch(
+				() => {},
+			);
 			return;
 		}
 		// SESSION_UNAVAILABLE（後端短暫不可用，B-199）視同「確認不了新角色」，
 		// 一樣走完成頁的重新登入路徑。
 		if (id !== SESSION_UNAVAILABLE && id?.isSeller) {
-			commitIdentity(id);
-			switchRole("seller");
+			switchRole("seller", id);
 			// Hard replace is intentional: SellerHeader may still have the old
 			// `needsOnboarding=true` / 404 result cached for 30 seconds. Keeping
 			// that QueryClient across a soft route would send the completed seller
@@ -298,20 +284,16 @@ export default function SellerOnboardingClient() {
 		setPendingAction("relogin");
 		setSubmitting(true);
 		try {
-			await signOut();
+			// role=seller 讓登入頁預選賣家分頁 —— 重新登入後 switchRole("seller")
+			// 才會生效、直接落地賣家中心（否則雙角色帳號預設買家，WorkspaceAlign
+			// 會把人從 /seller-center 踢回首頁）。
+			await signOut(loginPath({ role: "seller", redirect }), true);
 		} catch {
 			// 撤銷失敗＝session 仍有效（signOut 已跳 toast）。導去登入頁只會拿同一
 			// 個仍生效的 session 直接彈回來，等於什麼都沒換——留在原地讓人重試。
 			setSubmitting(false);
 			setPendingAction(null);
-			return;
 		}
-		// role=seller 讓登入頁預選賣家分頁 —— 重新登入後 switchRole("seller")
-		// 才會生效、直接落地賣家中心（否則雙角色帳號預設買家，WorkspaceAlign
-		// 會把人從 /seller-center 踢回首頁）。
-		// 整頁重載（replace，不留歷史）到登入頁：登出後若 session 期間上了新
-		// 部署，soft 導航會去要已刪除的舊 chunk 卡骨架（同其他登出入口）。
-		commitDocumentNavigation(loginPath({ role: "seller", redirect }), true);
 	};
 
 	// Existing sellers must wait for the admission lookup to resolve before the
