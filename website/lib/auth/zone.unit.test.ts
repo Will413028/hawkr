@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RequiredAccess } from "./redirect";
+import { defaultPathForRole } from "./redirect";
 import type { SessionState } from "./session-state";
 import { decideZone } from "./zone";
 
@@ -91,5 +92,22 @@ describe("decideZone: who may open a protected zone", () => {
 			href: "/login?role=buyer",
 			locale: "zh-TW",
 		});
+	});
+});
+
+describe("decideZone: the fallback of an account without the zone's role", () => {
+	it("is the default page of the account's workspace, the old roleZoneFallbackPath target", () => {
+		const decision = decideZone("seller", buyer, "/seller-center");
+		expect(decision).toEqual({
+			kind: "redirect",
+			href: defaultPathForRole("buyer"),
+			locale: "zh-TW",
+		});
+	});
+
+	it("a guest never takes the fallback: it goes to login", () => {
+		const decision = decideZone("seller", guest, "/seller-center");
+		expect(decision).toMatchObject({ kind: "redirect" });
+		expect((decision as { href: string }).href).toMatch(/^\/login\?/);
 	});
 });

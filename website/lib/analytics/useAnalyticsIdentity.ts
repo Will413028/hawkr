@@ -14,7 +14,7 @@ export function useAnalyticsIdentity(): void {
 	const { identity, activeRole, status } = useAuth();
 
 	useEffect(() => {
-		if (status === "unknown") return;
+		if (status === "unknown" || status === "unavailable") return;
 		setUserProperties(roleProperty(identity ? activeRole : null));
 	}, [identity, activeRole, status]);
 }

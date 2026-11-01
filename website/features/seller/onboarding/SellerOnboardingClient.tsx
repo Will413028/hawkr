@@ -133,7 +133,8 @@ export default function SellerOnboardingClient() {
 	// 一半的帳號（拿到角色、店家沒建）GetMyStore 會回 not_found，dashboard
 	// 整頁壞掉；只有店家真的存在且 onboarding 完成才導走，否則留在精靈補完。
 	React.useEffect(() => {
-		if (status === "unknown" || step !== "store") return;
+		if (status === "unknown" || status === "unavailable") return;
+		if (step !== "store") return;
 		if (!isLoggedIn) {
 			router.replace(
 				loginPath({ role: "seller", redirect: "/seller/onboarding" }),

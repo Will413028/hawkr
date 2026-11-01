@@ -45,6 +45,9 @@ function unlatchAutoSwitch() {
  * re-arms once a zone admits normally. If the switch was already tried and the workspace still does not
  * match, the account goes to the default page of its current workspace.
  *
+ * Nothing here acts until the session is `signedIn`: while it is `unknown` or `unavailable` there is no
+ * identity to switch with, and navigating then would send a valid account to a default page.
+ *
  * The stored workspace is browser-only state, so nothing here reads it before hydration: the skeleton is
  * what the server renders and what the first client pass hydrates.
  */
@@ -57,7 +60,7 @@ export default function WorkspaceAlign({
 	workspace: RoleSlot;
 	children: React.ReactNode;
 }) {
-	const { activeRole, switchRole } = useAuth();
+	const { activeRole, status, switchRole } = useAuth();
 	const hydrationSafeClientRender = useHydrationSafeClientRender();
 	const [ready, setReady] = React.useState(false);
 	const roleMatches =
@@ -66,6 +69,7 @@ export default function WorkspaceAlign({
 
 	React.useEffect(() => {
 		if (!hydrationSafeClientRender) return;
+		if (status !== "signedIn") return;
 		if (roleMatches) {
 			setReady(true);
 			unlatchAutoSwitch();
@@ -85,6 +89,7 @@ export default function WorkspaceAlign({
 		roleMatches,
 		ready,
 		activeRole,
+		status,
 		switchRole,
 		workspace,
 	]);

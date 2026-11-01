@@ -25,6 +25,8 @@ import {
 } from "@/tests/support/server-unavailability";
 
 const mocks = vi.hoisted(() => ({
+	authStatus: "signedIn",
+	loggedIn: true,
 	hasSeller: false,
 	hasMeasures: false,
 	fetchSession: vi.fn(),
@@ -65,8 +67,8 @@ vi.mock("@/lib/api/auth", () => ({
 }));
 vi.mock("@/lib/auth/context", () => ({
 	useAuth: () => ({
-		status: "signedIn",
-		isLoggedIn: true,
+		status: mocks.authStatus,
+		isLoggedIn: mocks.loggedIn,
 		hasSeller: mocks.hasSeller,
 		rejectSession: mocks.rejectSession,
 	}),
@@ -734,5 +736,32 @@ describe("措施紀錄提示卡", () => {
 		submitForm(container);
 		await waitFor(() => expect(screen.getByText("賣場已建立")).toBeTruthy());
 		expect(screen.queryByRole("link", { name: MEASURES_LINK })).toBeNull();
+	});
+});
+
+describe("開店入口只在登入狀態確定是訪客時導去登入", () => {
+	afterEach(() => {
+		mocks.authStatus = "signedIn";
+		mocks.loggedIn = true;
+		mocks.router.replace.mockClear();
+	});
+
+	it.each(["unknown", "unavailable"])("%s：不導向登入", async (status) => {
+		mocks.authStatus = status;
+		mocks.loggedIn = false;
+		render(React.createElement(SellerOnboardingClient));
+		await Promise.resolve();
+		expect(mocks.router.replace).not.toHaveBeenCalled();
+	});
+
+	it("guest：導去登入", async () => {
+		mocks.authStatus = "guest";
+		mocks.loggedIn = false;
+		render(React.createElement(SellerOnboardingClient));
+		await waitFor(() =>
+			expect(mocks.router.replace).toHaveBeenCalledWith(
+				"/login?role=seller&redirect=%2Fseller%2Fonboarding",
+			),
+		);
 	});
 });

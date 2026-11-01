@@ -7,10 +7,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
 	logout: vi.fn(async () => {}),
+	fetchSession: vi.fn(),
+	UNAVAILABLE: Symbol("session-unavailable"),
 }));
 
 vi.mock("../../api/auth", () => ({
 	logout: api.logout,
+	fetchSession: api.fetchSession,
+	SESSION_UNAVAILABLE: api.UNAVAILABLE,
 	LogoutRevokeFailedError: class extends Error {
 		reason = "server";
 	},
@@ -30,7 +34,7 @@ vi.mock("@/lib/feedback/toast", () => ({ toast: { error: vi.fn() } }));
 
 import { AUTH_EXPIRED_EVENT } from "@/lib/api/client";
 import { AuthProvider, useAuth } from "../context";
-import type { SessionState } from "../session-state";
+import { SESSION_RETRY_BACKOFF_MS, type SessionState } from "../session-state";
 
 const buyer = { accountId: "7", isSeller: false };
 
@@ -88,6 +92,7 @@ beforeEach(() => {
 	});
 	api.logout.mockReset();
 	api.logout.mockResolvedValue(undefined);
+	api.fetchSession.mockReset();
 });
 
 afterEach(() => {
@@ -244,4 +249,65 @@ it("the session cache has no fetcher: a refetch cannot replace identity", async 
 	});
 	expect(result.current.identity).toEqual(buyer);
 	expect(api.logout).not.toHaveBeenCalled();
+});
+
+describe("AuthProvider retries an unavailable session", () => {
+	async function advance(ms: number) {
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(ms);
+		});
+	}
+
+	it("re-asks GetSession on the backoff schedule and becomes signedIn when it answers", async () => {
+		vi.useFakeTimers();
+		api.fetchSession
+			.mockResolvedValueOnce(api.UNAVAILABLE)
+			.mockResolvedValueOnce(buyer);
+		const { result } = await render(unavailable);
+		expect(result.current.status).toBe("unavailable");
+		await advance(SESSION_RETRY_BACKOFF_MS[0] - 1);
+		expect(api.fetchSession).not.toHaveBeenCalled();
+		await advance(1);
+		expect(api.fetchSession).toHaveBeenCalledTimes(1);
+		expect(result.current.status).toBe("unavailable");
+		await advance(SESSION_RETRY_BACKOFF_MS[1]);
+		expect(api.fetchSession).toHaveBeenCalledTimes(2);
+		await advance(1);
+		expect(result.current.status).toBe("signedIn");
+		expect(result.current.identity?.accountId).toBe("7");
+		await advance(SESSION_RETRY_BACKOFF_MS[2] * 2);
+		expect(api.fetchSession).toHaveBeenCalledTimes(2);
+	});
+
+	it("a 401 answer on retry is a guest", async () => {
+		vi.useFakeTimers();
+		api.fetchSession.mockResolvedValueOnce(null);
+		const { result } = await render(unavailable);
+		await advance(SESSION_RETRY_BACKOFF_MS[0]);
+		await advance(1);
+		expect(result.current.status).toBe("guest");
+	});
+
+	it("stays unavailable, never a guest, after the schedule runs out", async () => {
+		vi.useFakeTimers();
+		api.fetchSession.mockResolvedValue(api.UNAVAILABLE);
+		const { result } = await render(unavailable);
+		for (const delay of SESSION_RETRY_BACKOFF_MS) await advance(delay);
+		expect(api.fetchSession).toHaveBeenCalledTimes(
+			SESSION_RETRY_BACKOFF_MS.length,
+		);
+		await advance(60_000);
+		expect(api.fetchSession).toHaveBeenCalledTimes(
+			SESSION_RETRY_BACKOFF_MS.length,
+		);
+		expect(result.current.status).toBe("unavailable");
+		expect(api.logout).not.toHaveBeenCalled();
+	});
+
+	it("does not ask again when the server's first answer was definitive", async () => {
+		vi.useFakeTimers();
+		await render(guest);
+		await advance(60_000);
+		expect(api.fetchSession).not.toHaveBeenCalled();
+	});
 });

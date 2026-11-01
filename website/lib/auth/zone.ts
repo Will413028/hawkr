@@ -1,7 +1,9 @@
 import { type AppLocale, defaultLocale } from "@/lib/intl/locales";
 import { splitLocale } from "@/lib/intl/paths";
+import { effectiveActiveRole } from "./active-role";
 import {
 	ACCESS_CLASSES,
+	defaultPathForRole,
 	loginPath,
 	type RequiredAccess,
 	safeRedirectPath,
@@ -19,7 +21,7 @@ export type ZoneDecision =
  * 狀態（`lib/auth/active-role.ts`），不在這裡判斷。授權的唯一執行點仍是單體（`withSession`），這裡只決定導向。
  *
  * - 訪客（沒有 cookie，或 cookie 被單體拒絕）：登入頁，帶工作區與回來的網址，與 middleware 的導向同一個 URL。
- * - 登入了但沒有這區要的角色（非賣家進賣家區）：該語系的首頁。
+ * - 登入了但沒有這區要的角色（非賣家進賣家區）：帳號目前工作區的預設頁（`defaultPathForRole`，舊 `roleZoneFallbackPath` 的伺服器端對應）。
  *
  * 導向目標是不含語系前綴的 `href` 與 `locale`，由 `@/lib/intl/navigation` 的 `redirect` 加前綴。
  * - 單體暫時答不出來：不導向（不是登出），由呼叫端顯示「暫時無法確認」。
@@ -50,5 +52,10 @@ export function decideZone(
 		isLoggedIn: true,
 		hasSeller: session.identity.isSeller,
 	});
-	return allowed ? { kind: "allow" } : { kind: "redirect", href: "/", locale };
+	if (allowed) return { kind: "allow" };
+	return {
+		kind: "redirect",
+		href: defaultPathForRole(effectiveActiveRole(session.identity, null)),
+		locale,
+	};
 }

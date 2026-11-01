@@ -20,3 +20,6 @@ export interface SessionRefusal {
 
 /** `AuthProvider` 對外的狀態：伺服器的答案還沒到之前是 `unknown`，之後與 `SessionState` 同值。 */
 export type AuthStatus = "unknown" | SessionState["status"];
+
+/** `unavailable` 之後瀏覽器端重問 GetSession 的間隔（毫秒）；一直答不出來就停在 `unavailable`，不當成登出。 */
+export const SESSION_RETRY_BACKOFF_MS = [1500, 3000, 6000] as const;

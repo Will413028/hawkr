@@ -23,13 +23,15 @@ type GatedAction = (auth: AuthGateSnapshot) => void;
  * `authGate(action)` absorbs the race: before hydration it parks the
  * action and flips `authWaiting` (callers render `<AuthGateWaitModal>`);
  * once the session is known it replays the action — or calls `onGuest`
- * (open the login modal) if the visitor really is logged out.
+ * (open the login modal) if the visitor really is logged out. `unavailable` is
+ * not an answer: the action stays parked until the session resolves.
  */
 export function useAuthGate(onGuest: () => void): {
 	authGate: (action: GatedAction) => void;
 	authWaiting: boolean;
 } {
 	const { isLoggedIn, status, activeRole } = useAuth();
+	const decided = status === "signedIn" || status === "guest";
 	const [pending, setPending] = React.useState<GatedAction | null>(null);
 	// Latest-callback ref: callers pass inline closures, and renders can
 	// happen between the click and hydration completing.
@@ -37,15 +39,15 @@ export function useAuthGate(onGuest: () => void): {
 	onGuestRef.current = onGuest;
 
 	React.useEffect(() => {
-		if (status === "unknown" || !pending) return;
+		if (!decided || !pending) return;
 		setPending(null);
 		if (isLoggedIn) pending({ activeRole });
 		else onGuestRef.current();
-	}, [status, isLoggedIn, activeRole, pending]);
+	}, [decided, isLoggedIn, activeRole, pending]);
 
 	const authGate = React.useCallback(
 		(action: GatedAction) => {
-			if (status === "unknown") {
+			if (!decided) {
 				setPending(() => action);
 				return;
 			}
@@ -55,7 +57,7 @@ export function useAuthGate(onGuest: () => void): {
 			}
 			action({ activeRole });
 		},
-		[status, isLoggedIn, activeRole],
+		[decided, isLoggedIn, activeRole],
 	);
 
 	return { authGate, authWaiting: pending !== null };

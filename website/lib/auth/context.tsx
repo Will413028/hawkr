@@ -11,7 +11,12 @@ import { useDefaultErrorText } from "@/lib/i18n/ui-text";
 import { stripLocale } from "@/lib/intl/paths";
 import { commitDocumentNavigation } from "@/lib/navigation/document-location";
 import { useObservedRouter } from "@/lib/navigation/use-observed-router";
-import { logout as apiLogout, LogoutRevokeFailedError } from "../api/auth";
+import {
+	logout as apiLogout,
+	fetchSession,
+	LogoutRevokeFailedError,
+	SESSION_UNAVAILABLE,
+} from "../api/auth";
 import { AUTH_EXPIRED_EVENT } from "../api/client";
 import { fetchProfile } from "../profile/repo";
 import {
@@ -23,7 +28,11 @@ import {
 } from "./active-role";
 import { reduceStorageEvent } from "./cross-tab-sync";
 import { syncLocalPrivateState } from "./local-private-state";
-import type { AuthStatus, SessionState } from "./session-state";
+import {
+	type AuthStatus,
+	SESSION_RETRY_BACKOFF_MS,
+	type SessionState,
+} from "./session-state";
 import type { Identity } from "./storage";
 import {
 	shouldTeardownPrivateCache,
@@ -173,6 +182,44 @@ export function AuthProvider({
 			return rejection;
 		};
 	}, [defaultErrorText, queryClient]);
+
+	const rejectSessionRef = React.useRef(rejectSession);
+	rejectSessionRef.current = rejectSession;
+	React.useEffect(() => {
+		if (status !== "unavailable") return;
+		let cancelled = false;
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const schedule = (attempt: number) => {
+			const delay = SESSION_RETRY_BACKOFF_MS[attempt];
+			if (delay === undefined) return;
+			timer = setTimeout(async () => {
+				let result: Awaited<ReturnType<typeof fetchSession>>;
+				try {
+					result = await fetchSession();
+				} catch (error) {
+					if (cancelled) return;
+					const denied = ConnectError.from(error);
+					if (denied.code === Code.PermissionDenied) {
+						void rejectSessionRef.current(denied);
+						return;
+					}
+					result = SESSION_UNAVAILABLE;
+				}
+				if (cancelled) return;
+				if (result === SESSION_UNAVAILABLE) {
+					schedule(attempt + 1);
+					return;
+				}
+				if (queryClient.getQueryData(SESSION_KEY) !== undefined) return;
+				queryClient.setQueryData(SESSION_KEY, result);
+			}, delay);
+		};
+		schedule(0);
+		return () => {
+			cancelled = true;
+			if (timer) clearTimeout(timer);
+		};
+	}, [status, queryClient]);
 
 	const refusal =
 		initialSession?.status === "guest" ? initialSession.refusal : undefined;
