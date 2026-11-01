@@ -482,7 +482,7 @@ test("production Next serves all four seller preview routes and the read-only gu
 		);
 		await waitAttachedOrExplain(
 			page,
-			'[data-auth-hydrated="true"]',
+			'[data-auth-status]:not([data-auth-status="unknown"])',
 			runtimeIssues,
 			pathname,
 		);

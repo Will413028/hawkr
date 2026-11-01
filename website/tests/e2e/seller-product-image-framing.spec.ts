@@ -103,7 +103,9 @@ test.describe("seller product image framing", { tag: ["@ui"] }, () => {
 		await page.goto("/seller-center/products/new", {
 			waitUntil: "domcontentloaded",
 		});
-		await expect(page.locator('[data-auth-hydrated="true"]')).toBeAttached();
+		await expect(
+			page.locator('[data-auth-status]:not([data-auth-status="unknown"])'),
+		).toBeAttached();
 		await expect(page.getByRole("heading", { name: "新增商品" })).toBeVisible();
 	});
 

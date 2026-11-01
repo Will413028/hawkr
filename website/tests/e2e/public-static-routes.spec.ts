@@ -287,14 +287,14 @@ async function assertPublicStaticRoute(
 
 	try {
 		await expect(
-			page.locator('[data-auth-hydrated="true"]'),
-			`${route} never hydrated its guest shell`,
+			page.locator('[data-auth-status]:not([data-auth-status="unknown"])'),
+			`${route} never resolved its guest session status`,
 		).toBeAttached({ timeout: 15_000 });
 	} catch (error) {
 		const markerValues = await page
-			.locator("[data-auth-hydrated]")
+			.locator("[data-auth-status]")
 			.evaluateAll((nodes) =>
-				nodes.map((node) => node.getAttribute("data-auth-hydrated")),
+				nodes.map((node) => node.getAttribute("data-auth-status")),
 			);
 		throw new Error(
 			`${route} guest hydration diagnosis: session mock hits=${guestState.sessionProbeHits}, marker values=${JSON.stringify(markerValues)}, runtime issues=${JSON.stringify(runtimeIssues)}\n${error instanceof Error ? error.message : String(error)}`,

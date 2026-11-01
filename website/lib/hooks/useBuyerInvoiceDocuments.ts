@@ -25,8 +25,8 @@ export interface UseBuyerInvoiceDocumentsResult {
 /**
  * 買家發票中心的列表（58A §B09，端點 68）。
  *
- * `enabled` 三段與 `useInvoiceDocument` 一致：`hydrated` 之前 auth 還沒從 storage
- * 還原，此時發請求會帶著空身分打出去、拿回 401，然後在畫面上留下一個假的錯誤態。
+ * `enabled` 要求 `isLoggedIn`：`status` 為 `unknown` 時 auth 還沒有伺服器的答案，
+ * 此時發請求會帶著空身分打出去、拿回 401，然後在畫面上留下一個假的錯誤態。
  *
  * `options.enabled` 給呼叫端做**輸入驗證**用：日期格式不合法時整支不發，因為端點 68
  * 對壞掉的 `date_from` 回 400，而使用者每打一個字都會觸發一次。

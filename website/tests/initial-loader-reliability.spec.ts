@@ -48,7 +48,9 @@ test(
 			// Visual readiness is deliberately NOT permission for analytics/toast
 			// code to imperatively mutate the still-unhydrated document.
 			await expect(page.locator("html")).toHaveClass(/initial-loader-active/);
-			await expect(page.locator('[data-auth-hydrated="true"]')).toHaveCount(0);
+			await expect(
+				page.locator('[data-auth-status]:not([data-auth-status="unknown"])'),
+			).toHaveCount(0);
 			if (testInfo.project.name === "mobile") {
 				await expect(page.locator("html")).toHaveAttribute(
 					"data-theme",
@@ -58,7 +60,9 @@ test(
 
 			released = true;
 			await Promise.all(stalledScripts.map((route) => route.continue()));
-			await expect(page.locator('[data-auth-hydrated="true"]')).toBeAttached();
+			await expect(
+				page.locator('[data-auth-status]:not([data-auth-status="unknown"])'),
+			).toBeAttached();
 			await expect(page.locator(".initial-loader")).toHaveCount(0);
 			await expect(page.locator("html")).not.toHaveClass(
 				/initial-loader-active/,

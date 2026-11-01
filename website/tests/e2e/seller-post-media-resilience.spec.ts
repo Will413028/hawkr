@@ -107,7 +107,9 @@ async function prepareSellerPosts(
 	}, LOADER_KEY);
 
 	await page.goto("/seller-center/posts", { waitUntil: "domcontentloaded" });
-	await expect(page.locator('[data-auth-hydrated="true"]')).toBeAttached();
+	await expect(
+		page.locator('[data-auth-status]:not([data-auth-status="unknown"])'),
+	).toBeAttached();
 	await expect(
 		page.getByRole("heading", { name: "動態管理", exact: true }),
 	).toBeVisible();

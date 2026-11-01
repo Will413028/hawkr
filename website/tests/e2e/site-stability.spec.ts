@@ -786,7 +786,9 @@ test.describe("long-page stability after ready", {
 			await expect(page.locator(".initial-loader")).toBeHidden({
 				timeout: 12_000,
 			});
-			await expect(page.locator('[data-auth-hydrated="true"]')).toBeAttached({
+			await expect(
+				page.locator('[data-auth-status]:not([data-auth-status="unknown"])'),
+			).toBeAttached({
 				timeout: 12_000,
 			});
 			// Scoped to the visible route tree: while React streams a route the
@@ -1058,7 +1060,9 @@ test.describe("soft-navigation stability", { tag: ["@ui", "@live"] }, () => {
 		await expect(page.locator(".initial-loader")).toBeHidden({
 			timeout: 12_000,
 		});
-		await expect(page.locator('[data-auth-hydrated="true"]')).toBeAttached({
+		await expect(
+			page.locator('[data-auth-status]:not([data-auth-status="unknown"])'),
+		).toBeAttached({
 			timeout: 12_000,
 		});
 		await assertInitialLoaderHandoff(page, "/about");
@@ -1168,7 +1172,9 @@ test.describe("soft-navigation stability", { tag: ["@ui", "@live"] }, () => {
 		await expect(page.locator(".initial-loader")).toBeHidden({
 			timeout: 12_000,
 		});
-		await expect(page.locator('[data-auth-hydrated="true"]')).toBeAttached({
+		await expect(
+			page.locator('[data-auth-status]:not([data-auth-status="unknown"])'),
+		).toBeAttached({
 			timeout: 12_000,
 		});
 		await assertInitialLoaderHandoff(page, sourceRoute);

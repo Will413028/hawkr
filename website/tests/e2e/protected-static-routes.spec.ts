@@ -274,8 +274,8 @@ async function assertProtectedRoute(
 	).toBeLessThan(400);
 
 	await expect(
-		page.locator('[data-auth-hydrated="true"]'),
-		`${route} never hydrated its authenticated shell`,
+		page.locator('[data-auth-status]:not([data-auth-status="unknown"])'),
+		`${route} never resolved its authenticated session status`,
 	).toBeAttached({ timeout: 15_000 });
 
 	const expected = EXPECTED_FINAL_ROUTE[route] ?? { pathname: route };

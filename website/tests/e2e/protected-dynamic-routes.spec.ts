@@ -1501,8 +1501,8 @@ async function runDynamicRouteSmoke(
 	).toBeLessThan(400);
 
 	await expect(
-		page.locator('[data-auth-hydrated="true"]'),
-		`${routeCase.url} never hydrated its authenticated shell`,
+		page.locator('[data-auth-status]:not([data-auth-status="unknown"])'),
+		`${routeCase.url} never resolved its authenticated session status`,
 	).toBeAttached({ timeout: 15_000 });
 	await expect
 		.poll(() => new URL(page.url()).pathname, {
