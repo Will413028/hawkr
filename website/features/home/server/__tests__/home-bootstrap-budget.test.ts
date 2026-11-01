@@ -26,8 +26,10 @@ const mocks = vi.hoisted(() => ({
 // The aggregates under test are the cache bodies; run them inline so the test
 // exercises the route's own budget logic rather than Next's cache machinery.
 vi.mock("next/cache", () => ({
-	unstable_cache: <T>(fn: T) => fn,
+	cacheTag: () => undefined,
+	cacheLife: () => undefined,
 }));
+vi.mock("next/server", () => ({ connection: async () => undefined }));
 
 vi.mock("@/lib/api", () => ({
 	fetchHotProducts: mocks.fetchHotProducts,
@@ -44,12 +46,9 @@ vi.mock("@/lib/api/posts", () => ({
 }));
 
 vi.mock("@/lib/api/cached", () => ({
-	CACHE_TTL: { COMMERCE_LIVE: 300, DISCOVERY: 900 },
-	timedFetch: <T>(_label: string, fn: () => Promise<T>) => fn(),
-	// Pass-through: coalescing is about how many upstream reads one key opens, and
-	// these cases assert budget/degradation for a single read. The real helper has
-	// its own coverage in lib/api/cached-single-flight.unit.test.ts.
-	coalesceRead: <T>(_key: string[], run: () => Promise<T>) => run(),
+	applyCacheTier: () => undefined,
+	fillFetch: <T>(_label: string, fn: () => Promise<T>) => fn(),
+	settled: <T>(value: T) => value,
 	getCachedHotProducts: mocks.getCachedHotProducts,
 	getCachedProductsFirstPage: mocks.getCachedProductsFirstPage,
 	getCachedPublicPosts: mocks.getCachedPublicPosts,

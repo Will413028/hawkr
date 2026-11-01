@@ -230,7 +230,7 @@ export async function fetchSeller(id: string, strict = false) {
 	//  - client (default): softFail — 404 / 5xx / timeout all resolve to null so a
 	//    transient backend never crashes the calling component (e.g. chat context).
 	//  - cache (strict, via getCachedSeller): softFailNotFound — a real 404 stays a
-	//    cacheable null, but a 5xx / network error THROWS so the unstable_cache entry
+	//    cacheable null, but a 5xx / network error THROWS so the use cache entry
 	//    keeps its prior stale value instead of caching an outage-time null.
 	//    prerenderSafe still guards the render layer at build as defense-in-depth.
 	// The seller entity is still untyped (Phase c openapi codegen will type it); the
@@ -334,7 +334,7 @@ export async function fetchSellerReviews(id: string, page = 1, strict = false) {
 }
 
 // strict (via getCachedSellerReviewStats): 5xx throws so the shared
-// unstable_cache entry keeps stale; 404 stays a cacheable null. That wrapper is
+// use cache entry keeps stale; 404 stays a cacheable null. That wrapper is
 // the sole server caller and owns the cache window (seller:<id> tag + SELLER_PROFILE
 // TTL), so there is no inner next:{revalidate} here — a nested SWR layer would
 // re-cache stale stats for an extra cycle. Client callers (default) soften all —

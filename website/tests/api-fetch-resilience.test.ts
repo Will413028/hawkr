@@ -39,7 +39,7 @@ test("fetchSeller still returns null on 404", async () => {
 });
 
 // getCachedSeller reads through fetchSeller(id, true): a 5xx must THROW so the
-// unstable_cache entry keeps its prior stale seller rather than caching an
+// use cache entry keeps its prior stale seller rather than caching an
 // outage-time null; a real 404 stays a cacheable null.
 test("fetchSeller(strict) THROWS on 5xx (cache must not swallow an outage)", async () => {
 	respond = () => new Response("bad gateway", { status: 502 });

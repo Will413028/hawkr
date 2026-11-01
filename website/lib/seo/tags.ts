@@ -1,6 +1,6 @@
 /**
  * Cache-tag string builders — the single source of truth for the tags emitted
- * by the `unstable_cache` entity wrappers (lib/api/cached.ts) AND consumed by the
+ * by the `use cache` entity wrappers (lib/api/cached.ts) AND consumed by the
  * on-demand invalidation route (app/api/revalidate) + the Java write-side that
  * calls it. Keep these in sync with the documented webhook contract.
  */

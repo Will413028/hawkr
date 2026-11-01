@@ -3,7 +3,7 @@
  * deleting it makes any fetcher's upstream 5xx (e.g. SELLER_NOT_FOUND / 9233)
  * fail the whole export. #339 D3 misclassified this as dead code — do not delete.
  *
- * Prerender-safe error handler for `unstable_cache` data fetches called during
+ * Prerender-safe error handler for `use cache` data fetches called during
  * render. Replaces the scattered
  *   .catch(err => { if (process.env.NODE_ENV === "production") throw err; return fallback })
  * pattern, which re-threw during `next build` (NODE_ENV is "production" in BOTH

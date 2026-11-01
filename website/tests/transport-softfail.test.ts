@@ -91,7 +91,7 @@ test("softFail GET still throws on a real 4xx client error (400)", async () => {
 });
 
 // softFailNotFound: the cache-backing variant. A real 404 is a cacheable null,
-// but a 5xx / network error / unparseable body must THROW so an unstable_cache
+// but a 5xx / network error / unparseable body must THROW so an use cache
 // wrapper keeps its prior stale entry instead of caching an outage-time null.
 test("softFailNotFound GET on 404 → {code:404,data:null}", async () => {
 	respond = () => new Response("not found", { status: 404 });

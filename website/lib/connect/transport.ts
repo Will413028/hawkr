@@ -405,7 +405,7 @@ function publicFetch(isBrowser: boolean, visitorIp?: string): typeof fetch {
 			// 公開讀取不帶 cookie：共用快取不會因 cookie 分裂，也不外洩 session。
 			credentials: "omit",
 			// 不強制 no-store：伺服器回 `public, no-cache` 加弱 ETag，瀏覽器每次都帶 If-None-Match 重新驗證，
-			// 沒變時拿到 304（API 設計規範（Connect）§九）；server 端的快取由呼叫方的 unstable_cache 負責。
+			// 沒變時拿到 304（API 設計規範（Connect）§九）；server 端的快取由呼叫方的 use cache 負責。
 		});
 	};
 }

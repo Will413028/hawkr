@@ -14,7 +14,7 @@ import SearchClient from "./SearchClient";
 
 /**
  * `/search` (noindex, ISR). The server renders only the query-less landing —
- * its two editorial rails are fetched through the shared `unstable_cache`
+ * its two editorial rails are fetched through the shared `use cache`
  * layer (no request-time input) so the route stays statically renderable. The
  * query-driven surface (search box, hashtag rail, results) is owned by
  * `SearchClient`, which reads `?q` / `?sort` on the client and fetches results

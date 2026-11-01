@@ -44,7 +44,7 @@ test("dynamic columns reuse the mega menu href conventions", () => {
 		src,
 		/return `\/feed\?hashtag=\$\{encodeURIComponent\(tag\)\}`;/,
 	);
-	// Read on the server through the shared unstable_cache layer, so the browser
+	// Read on the server through the shared use cache layer, so the browser
 	// issues no request at all (tests/e2e/footer-columns-server-rendered.spec.ts).
 	assert.match(src, /getCachedCategoryTree/);
 	assert.match(src, /getCachedTrendingPostTags/);

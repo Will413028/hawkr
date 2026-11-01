@@ -58,17 +58,22 @@ const mainTabPagePaths = [
 	"../app/[locale]/(public)/search/page.tsx",
 ].map((pathname) => new URL(pathname, import.meta.url));
 
-// Every reader in lib/api/cached.ts is declared `export const <name> = cache(`:
-// the React.cache wrapper that coalesces same-key reads inside one request sits
-// outside the unstable_cache scope, so the declaration is a const, not a
-// function. Slice a reader's body from its declaration to the next one — the
-// tag/TTL invariants below are what these tests protect; the declaration shape
-// is only how they are located.
+// Every reader's cache scope in lib/api/cached.ts is a `'use cache'` function named
+// `read<Name>` (or the exported `getCached<Name>` itself for a wrapper-less one):
+// the public `getCached<Name>` only fills argument defaults and unwraps the
+// build-time failure marker. Slice a scope's body from its declaration to the next
+// declaration — the tag/TTL invariants below are what these tests protect; the
+// declaration shape is only how they are located.
 const readerBody = (source: string, name: string) => {
-	const start = source.indexOf(`export const ${name} = cache(`);
-	assert.notEqual(start, -1, `missing ${name}`);
-	const next = source.indexOf("\nexport const ", start + 1);
-	return source.slice(start, next === -1 ? undefined : next);
+	const scope = `read${name.replace(/^getCached/, "")}`;
+	const start = source.indexOf(`async function ${scope}(`);
+	assert.notEqual(start, -1, `missing ${scope} for ${name}`);
+	const next = source
+		.slice(start + 1)
+		.search(/\n(?:export )?(?:async )?function /);
+	const body = source.slice(start, next === -1 ? undefined : start + 1 + next);
+	assert.match(body, /"use cache";/, `${scope} is not a 'use cache' scope`);
+	return body;
 };
 
 // A landing read tags the data domains it embeds — never the page it renders on
@@ -76,21 +81,21 @@ const readerBody = (source: string, name: string) => {
 test("public landing reads tag exactly the domains they embed", async () => {
 	const source = await readFile(cachedPath, "utf8");
 
-	// The literal contents of the fetcher's `tags: [...]` array (bracket-matched,
-	// so nested arrays or later options never leak in).
+	// The literal arguments of the scope's `cacheTag(...)` call (paren-matched,
+	// so nested calls or later statements never leak in).
 	const tagsArrayOf = (name: string) => {
 		const body = readerBody(source, name);
-		const open = body.indexOf("tags: [");
-		assert.notEqual(open, -1, `${name}: no tags array`);
-		const start = open + "tags: [".length;
+		const open = body.indexOf("cacheTag(");
+		assert.notEqual(open, -1, `${name}: no cacheTag call`);
+		const start = open + "cacheTag(".length;
 		let depth = 1;
 		let cursor = start;
 		while (cursor < body.length && depth > 0) {
-			if (body[cursor] === "[") depth += 1;
-			else if (body[cursor] === "]") depth -= 1;
+			if (body[cursor] === "(") depth += 1;
+			else if (body[cursor] === ")") depth -= 1;
 			cursor += 1;
 		}
-		assert.equal(depth, 0, `${name}: unbalanced tags array`);
+		assert.equal(depth, 0, `${name}: unbalanced cacheTag call`);
 		return body.slice(start, cursor - 1);
 	};
 	const TAG_REF = /PUBLIC_CACHE_TAGS\.(\w+)/g;
@@ -165,12 +170,16 @@ test("home bootstrap is versioned, anonymous and browser no-store", async () => 
 	// that budget into an answer nobody is still listening for.
 	assert.match(home, /homeSnapshotDeadlineMs\(\)/);
 	assert.doesNotMatch(home, /DEADLINE_MS\s*=\s*\d/);
-	assert.match(route, /export const dynamic = "force-dynamic"/);
 	assert.match(
 		route,
 		/export \{ GET \} from "@\/features\/home\/server\/home-tab-bootstrap-route"/,
 	);
-	assert.doesNotMatch(route, /unstable_cache|fetchHotProducts|function GET/);
+	assert.doesNotMatch(route, /use cache|fetchHotProducts|function GET/);
+	// Request-time by construction: the handler opts out of the build prerender.
+	assert.match(
+		handler,
+		/export async function GET\(\) \{\s*await connection\(\);/,
+	);
 	assert.match(handler, /^import "server-only";/);
 	assert.match(handler, /schemaVersion: "home\.v2"/);
 	assert.match(handler, /fetchHotProducts\(8, \{ strict: true \}\)/);
@@ -183,13 +192,11 @@ test("home bootstrap is versioned, anonymous and browser no-store", async () => 
 		/fetchPublicPostsTyped\(\{ page: 1, pageSize: 8, strict: true \}\)/,
 	);
 	// Live aggregate keeps the live-commerce revalidate window (the shared
-	// CACHE_TTL model, now an unstable_cache option rather than a cacheLife profile).
-	assert.match(handler, /revalidate: CACHE_TTL\.COMMERCE_LIVE/);
-	const liveStart = handler.indexOf(
-		"getCachedHomeLiveBootstrap = unstable_cache",
-	);
+	// CACHE_TTL model, applied to the `'use cache'` scope with `applyCacheTier`).
+	assert.match(handler, /applyCacheTier\("COMMERCE_LIVE"\)/);
+	const liveStart = handler.indexOf("async function readHomeLiveBootstrap(");
 	const discoveryStart = handler.indexOf(
-		"getCachedHomeDiscoveryBootstrap = unstable_cache",
+		"async function readHomeDiscoveryBootstrap(",
 	);
 	const fallbackStart = handler.indexOf("async function fallbackLiveBootstrap");
 	assert.ok(liveStart >= 0 && discoveryStart > liveStart);
@@ -220,7 +227,7 @@ test("canonical freshness keeps Feed direct and bounded while Market stays share
 	assert.match(route, /"cache-control": "private, no-store"/);
 	for (const name of ["getCachedStrictProductsPage"]) {
 		const body = readerBody(cached, name);
-		assert.match(body, /revalidate: CACHE_TTL\.COMMERCE_LIVE/);
+		assert.match(body, /applyCacheTier\("COMMERCE_LIVE"\)/);
 		assert.match(body, /strict: true/);
 	}
 });
@@ -232,13 +239,13 @@ test("seller storefront product cards use live commerce cache windows", async ()
 		"getCachedSellerStorefrontProducts",
 	]) {
 		const body = readerBody(source, name);
-		assert.match(body, /revalidate: CACHE_TTL\.COMMERCE_LIVE/);
+		assert.match(body, /applyCacheTier\("COMMERCE_LIVE"\)/);
 		// products:list (busted by the revalidate parser for ANY product mutation)
 		// + seller:<id> replace the result-derived per-product tags that
-		// unstable_cache cannot attach dynamically.
+		// a cache scope cannot attach dynamically.
 		assert.match(body, /PUBLIC_CACHE_TAGS\.products/);
 		assert.match(body, /sellerTag\(id\)/);
-		assert.doesNotMatch(body, /revalidate: CACHE_TTL\.SELLER_PROFILE/);
+		assert.doesNotMatch(body, /applyCacheTier\("SELLER_PROFILE"\)/);
 	}
 });
 

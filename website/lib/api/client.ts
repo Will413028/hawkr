@@ -109,7 +109,7 @@ export interface RequestOptions extends RequestInit {
 	 */
 	softFail?: boolean;
 	/**
-	 * Narrower sibling of `softFail` for reads that back an `unstable_cache` entry:
+	 * Narrower sibling of `softFail` for reads that back a `use cache` entry:
 	 * ONLY a genuine 404 (the resource is absent) resolves to a `{ code, data: null }`
 	 * envelope — a legal, cacheable "not found". A 5xx / network error / unreadable
 	 * or unparseable body still THROWS so the cache layer keeps its prior stale entry
@@ -127,7 +127,7 @@ export interface RequestOptions extends RequestInit {
 	 * meters the call as SSR.
 	 *
 	 * NEVER derive it from a header the browser controls, and never let it reach an
-	 * `unstable_cache` key — a per-visitor cache key would split the cache per
+	 * `use cache` key — a per-visitor cache key would split the cache per
 	 * visitor, which is the fan-out this issue exists to remove.
 	 */
 	visitorIp?: string | null;
@@ -459,7 +459,7 @@ async function dispatch<T>(
 	// into a silent null (it must surface so the caller can react / not double-send).
 	const canSoftFail = opts.softFail === true && method === "GET";
 	// Cache-layer variant: a genuine 404 is a cacheable null, but a 5xx / network
-	// error / unreadable body MUST throw so an unstable_cache wrapper keeps its
+	// error / unreadable body MUST throw so a use cache wrapper keeps its
 	// prior stale entry rather than caching an outage-time null. GET only; the
 	// broader softFail wins if both are set.
 	const canSoftFailNotFound =
@@ -542,7 +542,7 @@ async function dispatch<T>(
 
 	// Cache-layer 404-only soften: a real not-found is a cacheable null. A 5xx is
 	// intentionally NOT caught here — it falls through to the throw sites below so
-	// the caller's unstable_cache keeps its prior stale entry.
+	// the caller's use cache keeps its prior stale entry.
 	if (canSoftFailNotFound && res.status === 404) {
 		return soft(404, parsed?.message || parsed?.msg);
 	}

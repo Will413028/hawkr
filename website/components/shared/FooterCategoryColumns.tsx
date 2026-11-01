@@ -19,7 +19,7 @@ import {
  *
  * Both lists arrive with the server render. They are identical for every
  * visitor and change rarely, so they are read through the shared
- * `unstable_cache` layer: one tagged entry serves every page and every user,
+ * `use cache` layer: one tagged entry serves every page and every user,
  * and the browser makes no request at all.
  *
  * This used to be a client island that waited for an IntersectionObserver, so

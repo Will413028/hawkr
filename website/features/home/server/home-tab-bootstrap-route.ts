@@ -1,17 +1,18 @@
 import "server-only";
 
-import { unstable_cache } from "next/cache";
+import { cacheTag } from "next/cache";
+import { connection } from "next/server";
 import type { MarketplaceProduct } from "@/lib/api";
 import { fetchCategoryTree, fetchHotProducts, fetchProducts } from "@/lib/api";
 import {
-	CACHE_TTL,
-	coalesceRead,
+	applyCacheTier,
+	fillFetch,
 	getCachedCategoryTree,
 	getCachedHotProducts,
 	getCachedProductsFirstPage,
 	getCachedPublicPosts,
 	getCachedRecommendedSellers,
-	timedFetch,
+	settled,
 } from "@/lib/api/cached";
 import type { Paginated, PostListItem } from "@/lib/api/openapi-types";
 import { fetchPublicPostsTyped } from "@/lib/api/posts";
@@ -119,74 +120,75 @@ function orDegraded<T>(
 
 // This aggregate is the sole cache owner for the live wave. Calling raw, strict
 // anonymous fetchers avoids nested SWR windows re-caching stale price/stock data
-// for an additional cycle. The `unstable_cache` entry is shared across sessions
-// and tag-invalidated by POST /api/revalidate; the CACHE_TTL.COMMERCE_LIVE
-// revalidate is the TTL safety net for a missed invalidation, not the freshness
-// path.
-const getCachedHomeLiveBootstrap = unstable_cache(
-	(): Promise<HomeLiveBootstrap> =>
-		// Timed as one unit: the raw fetchers below deliberately bypass the
-		// per-domain cached wrappers (where slow-miss timing normally lives), so
-		// without this the home live fan-out could stall past a client loader
-		// timeout and emit no slow-cache-miss beacon / cache-health signal.
-		timedFetch(
-			"home-live-bootstrap",
-			async () => {
-				const [hotProducts, products] = await Promise.all([
-					fetchHotProducts(8, { strict: true }),
-					fetchProducts("", 1, 100, undefined, undefined, { strict: true }),
-				]);
-				return { hotProducts, products };
-			},
-			{
-				key: ["home-live-bootstrap"],
-				endpoint: "/public/products?sort=SALES, /public/products",
-			},
-		),
-	["home-live-bootstrap", "v2"],
-	{
-		tags: [PUBLIC_CACHE_TAGS.products],
-		revalidate: CACHE_TTL.COMMERCE_LIVE,
-	},
-);
+// for an additional cycle. The `'use cache'` entry is shared across sessions
+// and tag-invalidated by POST /api/revalidate; the COMMERCE_LIVE tier is the
+// TTL safety net for a missed invalidation, not the freshness path.
+async function readHomeLiveBootstrap() {
+	"use cache";
+	cacheTag(PUBLIC_CACHE_TAGS.products);
+	applyCacheTier("COMMERCE_LIVE");
+	// Timed as one unit: the raw fetchers below deliberately bypass the
+	// per-domain cached wrappers (where slow-miss timing normally lives), so
+	// without this the home live fan-out could stall past a client loader
+	// timeout and emit no slow-cache-miss beacon / cache-health signal.
+	return fillFetch(
+		"home-live-bootstrap",
+		async () => {
+			const [hotProducts, products] = await Promise.all([
+				fetchHotProducts(8, { strict: true }),
+				fetchProducts("", 1, 100, undefined, undefined, { strict: true }),
+			]);
+			return { hotProducts, products };
+		},
+		{
+			key: ["home-live-bootstrap"],
+			endpoint: "/public/products?sort=SALES, /public/products",
+		},
+	);
+}
 
-const getCachedHomeDiscoveryBootstrap = unstable_cache(
-	(): Promise<HomeDiscoveryBootstrap> =>
-		timedFetch(
-			"home-discovery-bootstrap",
-			async () => {
-				const [recommendedSellers, posts, categoryTree] = await Promise.all([
-					fetchRecommendedStores(24, { locale: defaultLocale }),
-					fetchPublicPostsTyped({ page: 1, pageSize: 8, strict: true }),
-					fetchCategoryTree(true),
-				]);
-				return {
-					recommendedSellers,
-					posts,
-					// Rolled up here, not in the browser: the shelves need only the
-					// lv1 → descendant-id index, never the ~200KB tree itself.
-					categoryGroups: categoryGroupsFromTree(categoryTree),
-				};
-			},
-			{
-				key: ["home-discovery-bootstrap"],
-				endpoint:
-					"DiscoveryPublicService/SuggestRecommendedSellers, /public/posts, /public/categories/tree",
-			},
-		),
-	["home-discovery-bootstrap", "v2"],
-	{
-		// A post write busts this entry through the posts tag; CACHE_TTL.DISCOVERY
-		// is only the safety net for a missed invalidation, as it is for sellers
-		// and the category tree.
-		tags: [
-			PUBLIC_CACHE_TAGS.sellers,
-			PUBLIC_CACHE_TAGS.posts,
-			PUBLIC_CACHE_TAGS.categories,
-		],
-		revalidate: CACHE_TTL.DISCOVERY,
-	},
-);
+async function readHomeDiscoveryBootstrap() {
+	"use cache";
+	// A post write busts this entry through the posts tag; the DISCOVERY tier
+	// is only the safety net for a missed invalidation, as it is for sellers
+	// and the category tree.
+	cacheTag(
+		PUBLIC_CACHE_TAGS.sellers,
+		PUBLIC_CACHE_TAGS.posts,
+		PUBLIC_CACHE_TAGS.categories,
+	);
+	applyCacheTier("DISCOVERY");
+	return fillFetch(
+		"home-discovery-bootstrap",
+		async () => {
+			const [recommendedSellers, posts, categoryTree] = await Promise.all([
+				fetchRecommendedStores(24, { locale: defaultLocale }),
+				fetchPublicPostsTyped({ page: 1, pageSize: 8, strict: true }),
+				fetchCategoryTree(true),
+			]);
+			return {
+				recommendedSellers,
+				posts,
+				// Rolled up here, not in the browser: the shelves need only the
+				// lv1 → descendant-id index, never the ~200KB tree itself.
+				categoryGroups: categoryGroupsFromTree(categoryTree),
+			};
+		},
+		{
+			key: ["home-discovery-bootstrap"],
+			endpoint:
+				"DiscoveryPublicService/SuggestRecommendedSellers, /public/posts, /public/categories/tree",
+		},
+	);
+}
+
+async function getCachedHomeLiveBootstrap(): Promise<HomeLiveBootstrap> {
+	return settled(await readHomeLiveBootstrap());
+}
+
+async function getCachedHomeDiscoveryBootstrap(): Promise<HomeDiscoveryBootstrap> {
+	return settled(await readHomeDiscoveryBootstrap());
+}
 
 /**
  * Second source for the live wave: the per-domain cache entries.
@@ -259,11 +261,12 @@ async function fallbackDiscoveryBootstrap(
  *
  * The response itself remains browser no-store. Each public domain read is
  * split into one live and one discovery aggregate cached through
- * `unstable_cache` (shared across sessions, tag-invalidated). The split
+ * `'use cache'` (shared across sessions, tag-invalidated). The split
  * preserves commerce freshness while reducing the hot path from five R2 reads
  * to two.
  */
 export async function GET() {
+	await connection();
 	// One budget for the whole request, shared by both attempts. The primary and
 	// the cache fallback are consecutive tries at the same data, so the fallback
 	// inherits what the primary left rather than opening a second allowance —
@@ -271,30 +274,15 @@ export async function GET() {
 	const budget = homeBootstrapBudget();
 	const deadlineAt = Date.now() + budget.totalMs;
 	const intact = <T>(value: T): Degradable<T> => ({ value, degraded: [] });
-	// `coalesceRead` (backend#2264): `unstable_cache` does not coalesce concurrent
-	// cold reads of the same key, so two visitors arriving on the home tab in one
-	// isolate each opened their own gateway fan-out. Keyed on the same names the
-	// cache entries use.
 	const [live, discovery] = await Promise.all([
-		withDeadline(
-			coalesceRead(["home-live-bootstrap"], getCachedHomeLiveBootstrap),
-			budget.totalMs,
-			"live",
-		)
+		withDeadline(getCachedHomeLiveBootstrap(), budget.totalMs, "live")
 			.then(intact)
 			.catch(() =>
 				fallbackLiveBootstrap(
 					remainingBudgetMs(deadlineAt, budget.fallbackFloorMs),
 				),
 			),
-		withDeadline(
-			coalesceRead(
-				["home-discovery-bootstrap"],
-				getCachedHomeDiscoveryBootstrap,
-			),
-			budget.totalMs,
-			"discovery",
-		)
+		withDeadline(getCachedHomeDiscoveryBootstrap(), budget.totalMs, "discovery")
 			.then(intact)
 			.catch(() =>
 				fallbackDiscoveryBootstrap(

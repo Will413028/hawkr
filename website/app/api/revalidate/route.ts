@@ -13,7 +13,7 @@ import {
  * tags (e.g. ["product:123"], ["seller:456"]). The parser derives the domain
  * tags of the aggregates that embed that entity at this trusted boundary, so a
  * producer cannot accidentally invalidate only the entity page. Each
- * unstable_cache entry's `revalidate` window is the TTL safety net for when this
+ * use cache entry's `revalidate` window is the TTL safety net for when this
  * hasn't fired. Tag strings come from lib/seo/tags.ts.
  *
  *   POST /api/revalidate

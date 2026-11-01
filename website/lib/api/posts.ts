@@ -72,7 +72,7 @@ export async function fetchPublicPostsTyped({
 	try {
 		// No explicit cache directive: the browser path is always no-store
 		// (lib/api/client.ts); on the server, getCachedPublicPosts wraps this in
-		// an unstable_cache entry that owns caching + tag invalidation at its
+		// an use cache entry that owns caching + tag invalidation at its
 		// layer, so the inner fetch stays directive-free.
 		const { data } = await apiClient.public.get<Paginated<PostListItem>>(path, {
 			query,
