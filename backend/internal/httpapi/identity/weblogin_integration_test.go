@@ -306,7 +306,7 @@ func setupWeb(t *testing.T) *webFixture {
 		t.Fatal(err)
 	}
 	h, err := httpapi.NewHandler(httpapi.Deps{
-		Social: &social.Module{}, Legacy: proxy, LegacyPrefixes: gatewayproxy.Prefixes, Ready: d.Ping, Identity: m, WebLogin: webLogin, AppLogin: appLogin, Now: clock.Now,
+		Buyer: buyers, Social: &social.Module{}, Legacy: proxy, LegacyPrefixes: gatewayproxy.Prefixes, Ready: d.Ping, Identity: m, WebLogin: webLogin, AppLogin: appLogin, Now: clock.Now,
 		Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t),
 		DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, Agent: &agent.Module{}, ReviewQueue: &reviewqueue.Module{},
 		Delegation: del, Origins: []string{webOrigin}, ClientIP: httpapi.ClientIP{Header: "X-Test-Client-IP"}, Logger: log,

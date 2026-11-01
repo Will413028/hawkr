@@ -28,6 +28,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/gatewayproxy"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/agent"
+	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
@@ -176,7 +177,7 @@ func TestVendorPortalFromInviteToTheGateway(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := httpapi.NewHandler(httpapi.Deps{Social: &social.Module{},
+	h, err := httpapi.NewHandler(httpapi.Deps{Buyer: &buyer.Module{}, Social: &social.Module{},
 		Ready: d.Ping, Identity: id, Agent: agents, Deletion: &accountdeletion.Module{}, Seller: &seller.Module{},
 		Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{},
 		Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: &seller.Module{}, Now: now, Logger: log}),

@@ -173,10 +173,15 @@ async function openDashboardTasks(page: Page): Promise<Locator> {
 	const card = page.locator(".seller-onboarding-progress");
 	await expect(card).toBeVisible();
 	const body = card.locator(".seller-onboarding-progress__body");
-	if (!(await body.isVisible())) {
-		await card.getByRole("button", { name: "展開任務", exact: true }).click();
-	}
-	await expect(body).toBeVisible();
+	// 卡片在 seller-self、KYC 等資料回來前就渲染，且先是展開的；「公開前必須」全部滿足的帳號在資料
+	// 回來後才預設收合。所以只點一次會被這個轉變抵消：重試到展開狀態穩定為止。
+	const toggle = card.locator(".seller-onboarding-progress__toggle");
+	await expect(async () => {
+		if ((await toggle.getAttribute("aria-expanded")) !== "true") {
+			await toggle.click();
+		}
+		await expect(body).toBeVisible({ timeout: 1_000 });
+	}).toPass({ timeout: 15_000 });
 	return card;
 }
 

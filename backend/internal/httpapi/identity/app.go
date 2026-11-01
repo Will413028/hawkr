@@ -48,15 +48,21 @@ type App struct {
 	log      *slog.Logger
 }
 
+// ErrProfilesRequired 是 NewApp 收到 nil 的買家資料來源時的錯誤。
+var ErrProfilesRequired = errors.New("httpapi/identity：GetSession 需要買家資料來源")
+
 var _ identityv1alpha1connect.IdentityAppServiceHandler = (*App)(nil)
 
 // NewApp 建立登入後的 handler。login 驗證 LinkIdentity 的 ID token；now 判斷 RevokeSession 的重新驗證期限；
-// profiles 與 images 組出 GetSession 的顯示資料；log 記錄讀取買家資料的失敗（nil 時丟棄）。
-func NewApp(m appIdentity, deletion *accountdeletion.Module, login *AppLogin, now func() time.Time, profiles buyerProfiles, images rpc.Images, log *slog.Logger) *App {
+// profiles 與 images 組出 GetSession 的顯示資料（profiles 必填，nil 回錯誤）；log 記錄讀取買家資料的失敗（nil 時丟棄）。
+func NewApp(m appIdentity, deletion *accountdeletion.Module, login *AppLogin, now func() time.Time, profiles buyerProfiles, images rpc.Images, log *slog.Logger) (*App, error) {
+	if profiles == nil {
+		return nil, ErrProfilesRequired
+	}
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
-	return &App{m: m, deletion: deletion, login: login, now: now, profiles: profiles, images: images, log: log}
+	return &App{m: m, deletion: deletion, login: login, now: now, profiles: profiles, images: images, log: log}, nil
 }
 
 // 列表的每頁筆數：一個帳號的有效 session 通常只有幾個。

@@ -152,7 +152,9 @@ func newAppEnv(t *testing.T) *appEnv {
 	}
 	e.profiles = &fakeProfiles{}
 	e.logs = &bytes.Buffer{}
-	e.app = NewApp(e.m, nil, login, func() time.Time { return e.now }, e.profiles, images, slog.New(slog.NewTextHandler(e.logs, nil)))
+	if e.app, err = NewApp(e.m, nil, login, func() time.Time { return e.now }, e.profiles, images, slog.New(slog.NewTextHandler(e.logs, nil))); err != nil {
+		t.Fatal(err)
+	}
 	return e
 }
 
@@ -293,6 +295,12 @@ func TestIssueAppLoginNonce(t *testing.T) {
 	resp, err := e.public.IssueAppLoginNonce(t.Context(), connect.NewRequest(&pb.IssueAppLoginNonceRequest{}))
 	if err != nil || resp.Msg.GetNonce() != "nonce-1" || !resp.Msg.GetExpireTime().AsTime().Equal(appNow.Add(5*time.Minute)) {
 		t.Fatalf("resp = %v, err = %v", resp, err)
+	}
+}
+
+func TestNewAppRejectsNilProfiles(t *testing.T) {
+	if _, err := NewApp(nil, nil, nil, time.Now, nil, rpc.Images{}, nil); !errors.Is(err, ErrProfilesRequired) {
+		t.Fatalf("NewApp 收下了 nil 的買家資料來源：%v", err)
 	}
 }
 

@@ -145,6 +145,9 @@ func NewHandler(deps Deps) (http.Handler, error) {
 	if deps.Social == nil {
 		return nil, fmt.Errorf("httpapi：SellerGovernanceAdminService 需要 Social")
 	}
+	if deps.Buyer == nil {
+		return nil, fmt.Errorf("httpapi：BuyerAppService 與 IdentityAppService.GetSession 需要 Buyer")
+	}
 	if deps.Now == nil {
 		deps.Now = time.Now
 	}
@@ -284,7 +287,11 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 		now = time.Now
 	}
 	add(identityconnect.NewIdentityPublicServiceHandler(httpidentity.NewPublic(appLogin), opts...))
-	add(identityconnect.NewIdentityAppServiceHandler(httpidentity.NewApp(deps.Identity, deps.Deletion, appLogin, now, deps.Buyer, deps.Images, deps.Logger), opts...))
+	identityApp, err := httpidentity.NewApp(deps.Identity, deps.Deletion, appLogin, now, deps.Buyer, deps.Images, deps.Logger)
+	if err != nil {
+		return nil, err
+	}
+	add(identityconnect.NewIdentityAppServiceHandler(identityApp, opts...))
 	add(adminidentityconnect.NewIdentityAdminServiceHandler(httpidentity.NewAdmin(deps.Identity, deps.Delegation, deps.Deletion), opts...))
 	// 賣家區每個方法的能力宣告由這支 interceptor 執行，只掛在 SellerAppService、在 rpc.NewInterceptor 之內；宣告與 service
 	// 的方法對不上時不能啟動。

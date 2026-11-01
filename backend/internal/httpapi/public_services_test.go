@@ -19,7 +19,9 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/agent"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	discoverymod "github.com/Will413028/hawkr/backend/internal/modules/discovery"
+	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/modules/social"
 )
 
 type publicModule struct{}
@@ -192,5 +194,17 @@ func TestNewHandlerRequiresReviewQueue(t *testing.T) {
 	}
 	if _, err := NewHandler(deps); err == nil || !strings.Contains(err.Error(), "ReviewQueue") {
 		t.Fatalf("沒有 ReviewQueue：err=%v", err)
+	}
+}
+
+// GetSession 的顯示資料與買家區都讀 Buyer：漏接時啟動就失敗，不是 GetSession 第一次被呼叫時 nil pointer panic。
+func TestNewHandlerRequiresBuyer(t *testing.T) {
+	deps := Deps{
+		Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{},
+		Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: struct{ httpseller.DashboardOrders }{}, Discovery: &discoverymod.Module{}, Agent: &agent.Module{},
+		ReviewQueue: &reviewqueue.Module{}, Social: &social.Module{},
+	}
+	if _, err := NewHandler(deps); err == nil || !strings.Contains(err.Error(), "Buyer") {
+		t.Fatalf("沒有 Buyer：err=%v", err)
 	}
 }

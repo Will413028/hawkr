@@ -14,6 +14,7 @@ import (
 	httpidentity "github.com/Will413028/hawkr/backend/internal/httpapi/identity"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/legacy/gatewayproxy"
+	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
@@ -192,7 +193,11 @@ func TestGatewayProxyStripsTheSameCookieTheMonolithSets(t *testing.T) {
 // TestEffectDeclarationsAgreeWithTheIdempotencyLevels 守。登出、連結、終止 session 用 GET 被拒。
 func TestGETOnAWriteProcedureNeverReachesTheHandler(t *testing.T) {
 	t.Parallel()
-	path, handler := identityconnect.NewIdentityAppServiceHandler(httpidentity.NewApp(nil, nil, nil, time.Now, nil, rpc.Images{}, nil))
+	app, err := httpidentity.NewApp(nil, nil, nil, time.Now, &buyer.Module{}, rpc.Images{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path, handler := identityconnect.NewIdentityAppServiceHandler(app)
 	inner := http.NewServeMux()
 	mount(inner, path, handler)
 	h := withSession(fakeAuth{}, slog.New(slog.DiscardHandler), inner)
