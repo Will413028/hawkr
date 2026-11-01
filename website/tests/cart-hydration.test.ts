@@ -24,5 +24,5 @@ test("cart keeps browser-only state out of the first client render", async () =>
 	);
 	assert.match(cartClient, /await useCartUiStore\.persist\.rehydrate\(\)/);
 	assert.match(cartClient, /setSaved\(getSavedItems\(\)\)/);
-	assert.match(cartClient, /if \(!mounted \|\| !authHydrated\)/);
+	assert.match(cartClient, /if \(!mounted \|\| authStatus === "unknown"\)/);
 });

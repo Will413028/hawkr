@@ -12,7 +12,7 @@ import { useQueryIdentity } from "./useQueryIdentity";
  * (SellerPublicService.RecordProductView) only feeds aggregate counts — this
  * is what populates the 瀏覽紀錄 page.
  *
- * `enabled` mirrors the buyer-query gate (`hydrated && isLoggedIn`) so callers
+ * `enabled` mirrors the buyer-query gate (`isLoggedIn`) so callers
  * can skip recording for guests. On success the history query is invalidated so
  * an already-mounted 瀏覽紀錄 page reflects the new visit.
  */
@@ -20,7 +20,7 @@ export function useRecordHistory(): {
 	enabled: boolean;
 	record: (productId: string) => void;
 } {
-	const { hydrated, activeRole, isLoggedIn } = useAuth();
+	const { activeRole, isLoggedIn } = useAuth();
 	const identity = useQueryIdentity();
 	const queryClient = useQueryClient();
 	const mutation = useMutation({
@@ -33,5 +33,5 @@ export function useRecordHistory(): {
 			});
 		},
 	});
-	return { enabled: hydrated && isLoggedIn, record: mutation.mutate };
+	return { enabled: isLoggedIn, record: mutation.mutate };
 }

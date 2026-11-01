@@ -42,7 +42,7 @@ export default function RoleAwareFooter({
 	categoryColumns: React.ReactNode;
 }) {
 	const pathname = usePathname() ?? "";
-	const { activeRole, hydrated } = useAuth();
+	const { activeRole, status } = useAuth();
 	const [mounted, setMounted] = React.useState(false);
 	// Pathname and active role are both browser state. Wait for both so a seller
 	// opening a public/legal page never flashes the buyer footer first.
@@ -59,7 +59,7 @@ export default function RoleAwareFooter({
 			</footer>
 		);
 	}
-	if (!mounted || !hydrated || !pathname) {
+	if (!mounted || status === "unknown" || !pathname) {
 		return (
 			<div
 				className={`${FOOTER_RESERVE} w-full bg-[var(--brand-text-black)]`}

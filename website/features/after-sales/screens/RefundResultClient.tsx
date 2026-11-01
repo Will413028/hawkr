@@ -139,17 +139,17 @@ function Inner({ orderNo }: { orderNo: string }) {
 	const params = useSearchParams();
 	const hint = params?.get("status") ?? "";
 
-	const { hydrated } = useAuth();
+	const { status } = useAuth();
 	const identity = useQueryIdentity();
 	const query = useQuery({
 		queryKey: queryKeys.buyer.refundResolve(identity, orderNo),
 		queryFn: () => resolveForOrder(orderNo),
-		enabled: hydrated && Boolean(orderNo),
+		enabled: status !== "unknown" && Boolean(orderNo),
 	});
 	const resolved = query.data ?? null;
 	// Stay in the loading shell until auth hydrates and the first resolve
 	// settles, so we never flash a resolved outcome on an unauthenticated read.
-	const loading = !hydrated || query.isLoading;
+	const loading = status === "unknown" || query.isLoading;
 	const [copied, setCopied] = React.useState(false);
 
 	const copyOrderNo = async () => {

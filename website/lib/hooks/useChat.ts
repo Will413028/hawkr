@@ -86,11 +86,11 @@ export function useConversations({
 	 */
 	subscribeToSocket?: boolean;
 } = {}) {
-	const { hydrated, isLoggedIn } = useAuth();
+	const { status, isLoggedIn } = useAuth();
 	const queryIdentity = useQueryIdentity();
 	const queryClient = useQueryClient();
 	const queryKey = queryKeys.chat.conversations(queryIdentity);
-	const shouldFetch = hydrated && isLoggedIn;
+	const shouldFetch = isLoggedIn;
 	const query = useQuery({
 		queryKey,
 		enabled: shouldFetch,
@@ -111,7 +111,7 @@ export function useConversations({
 	return {
 		items: shouldFetch ? (query.data ?? []) : [],
 		loading:
-			!hydrated ||
+			status === "unknown" ||
 			query.isLoading ||
 			(query.isFetching && query.isPlaceholderData),
 		error: friendlyChatErrorOrNull(query.error, "載入會話失敗"),
@@ -155,7 +155,7 @@ export function useChatThread(
 ): UseChatThreadResult {
 	const pathname = usePathname() || "";
 	const localRole = chatWorkspaceRole(pathname);
-	const { activeRole, hydrated, isLoggedIn } = useAuth();
+	const { activeRole, isLoggedIn } = useAuth();
 	const queryIdentity = useQueryIdentity();
 	const { refresh: refreshChatUnread } = useChatUnread();
 	const queryClient = useQueryClient();
@@ -192,7 +192,7 @@ export function useChatThread(
 		queryKey: threadKey,
 		// Gate on hydration + login so the history fetch never fires under the
 		// `anon` identity slot pre-hydration (would cache a spurious 401).
-		enabled: Boolean(targetId) && hydrated && isLoggedIn,
+		enabled: Boolean(targetId) && isLoggedIn,
 		placeholderData: [] as ChatMessage[],
 		queryFn: async () => {
 			if (!targetId) return [];

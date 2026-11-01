@@ -11,10 +11,10 @@ import { setUserProperties } from "./gtag";
  * privacy notice's anonymous-statistics boundary.
  */
 export function useAnalyticsIdentity(): void {
-	const { identity, activeRole, hydrated } = useAuth();
+	const { identity, activeRole, status } = useAuth();
 
 	useEffect(() => {
-		if (!hydrated) return;
+		if (status === "unknown") return;
 		setUserProperties(roleProperty(identity ? activeRole : null));
-	}, [identity, activeRole, hydrated]);
+	}, [identity, activeRole, status]);
 }

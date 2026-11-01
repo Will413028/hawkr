@@ -30,14 +30,14 @@ interface UseStorePickupsResult {
  * Returns empty when the user isn't authed (the endpoint is auth-only).
  */
 export function useStorePickups(): UseStorePickupsResult {
-	const { hydrated, isLoggedIn } = useAuth();
+	const { isLoggedIn } = useAuth();
 	const identity = useQueryIdentity();
 	const queryClient = useQueryClient();
 
 	const pickupsQuery = useQuery({
 		queryKey: queryKeys.checkout.storePickups(identity),
 		queryFn: fetchStorePickups,
-		enabled: hydrated && isLoggedIn,
+		enabled: isLoggedIn,
 		placeholderData: [] as StorePickup[],
 	});
 
@@ -61,7 +61,7 @@ export function useStorePickups(): UseStorePickupsResult {
 		onSuccess: invalidatePickups,
 	});
 
-	const pickups = hydrated && isLoggedIn ? (pickupsQuery.data ?? []) : [];
+	const pickups = isLoggedIn ? (pickupsQuery.data ?? []) : [];
 	const mutationError =
 		createMutation.error ?? updateMutation.error ?? removeMutation.error;
 	const error =

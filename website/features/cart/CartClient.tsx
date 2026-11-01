@@ -86,7 +86,7 @@ function sameSelection(
 }
 
 export default function CartClient() {
-	const { isLoggedIn, hydrated: authHydrated } = useAuth();
+	const { isLoggedIn, status: authStatus } = useAuth();
 	const cart = useCart();
 	const { views: storeViews } = useStoreCardViews(
 		cart.itemsBySeller.map((group) => group.sellerStoreId),
@@ -970,7 +970,7 @@ export default function CartClient() {
 
 	// While auth is still hydrating from cookie/storage, hold the loader so we
 	// don't briefly render either the logged-in cart or the guest gate.
-	if (!mounted || !authHydrated) {
+	if (!mounted || authStatus === "unknown") {
 		return (
 			<section className="flex flex-col gap-7 mb-8">
 				<div

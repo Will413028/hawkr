@@ -24,7 +24,11 @@ const followRepo = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/follow/repo", () => followRepo);
 vi.mock("@/lib/auth/context", () => ({
-	useAuth: () => ({ hydrated: true, isLoggedIn: true, activeRole: "buyer" }),
+	useAuth: () => ({
+		status: "signedIn",
+		isLoggedIn: true,
+		activeRole: "buyer",
+	}),
 }));
 vi.mock("./useQueryIdentity", () => ({
 	useQueryIdentity: () => ({ accountId: "42", activeRole: "buyer" }),

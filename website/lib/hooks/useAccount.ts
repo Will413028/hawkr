@@ -39,12 +39,12 @@ import { favoriteIdKey } from "./useFavoriteIds";
 import { useQueryIdentity } from "./useQueryIdentity";
 
 function useBuyerQueryScope() {
-	const { hydrated, activeRole, isLoggedIn } = useAuth();
+	const { activeRole, isLoggedIn } = useAuth();
 	const identity = useQueryIdentity();
 	return {
 		identity,
 		activeRole,
-		enabled: hydrated && isLoggedIn,
+		enabled: isLoggedIn,
 		scope: { activeRole: activeRole ?? "" },
 	};
 }

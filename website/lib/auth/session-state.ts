@@ -17,3 +17,6 @@ export interface SessionRefusal {
 	/** 單體附的使用者面訊息；沒有時由 client 用該 code 的預設文字。 */
 	message: string | null;
 }
+
+/** `AuthProvider` 對外的狀態：伺服器的答案還沒到之前是 `unknown`，之後與 `SessionState` 同值。 */
+export type AuthStatus = "unknown" | SessionState["status"];

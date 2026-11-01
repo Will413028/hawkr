@@ -239,7 +239,7 @@ export default function CertificationsClient() {
 	const searchParams = useSearchParams();
 	const invalidateSelf = useInvalidateSellerSelf();
 	const setMyKyc = useSetMyKyc();
-	const { sessionSettled } = useAuth();
+	const { status: authStatus } = useAuth();
 	const { data: seller, loading: sellerLoading } = useSellerSelf();
 	const { application, loading: kycLoading, error: kycLoadError } = useMyKyc();
 	const [hydrated, setHydrated] = React.useState(false);
@@ -313,7 +313,7 @@ export default function CertificationsClient() {
 
 	// Initial load — hydrate the form once from the application (resume) and the store
 	React.useEffect(() => {
-		if (!sessionSettled) return;
+		if (authStatus === "unknown") return;
 		if (sellerLoading || kycLoading) return;
 		if (hydrated) return;
 		const defaults = storeDefaults(seller);
@@ -337,7 +337,7 @@ export default function CertificationsClient() {
 		}
 		setHydrated(true);
 	}, [
-		sessionSettled,
+		authStatus,
 		sellerLoading,
 		kycLoading,
 		hydrated,

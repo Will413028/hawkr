@@ -33,13 +33,13 @@ export default function SignInMethodsSection() {
 	const tAuthError = useTranslations("auth.error");
 	const tLinkError = useTranslations("auth.linkError");
 	const locale = useRoutedLocale();
-	const { hydrated, isLoggedIn } = useAuth();
+	const { isLoggedIn } = useAuth();
 	const identity = useQueryIdentity();
 	const searchParams = useSearchParams();
 	const query = useQuery({
 		queryKey: queryKeys.buyer.linkedProviders(identity),
 		queryFn: fetchLinkedProviders,
-		enabled: hydrated && isLoggedIn,
+		enabled: isLoggedIn,
 	});
 
 	const linkError = linkErrorKey(searchParams?.get("link_error"));

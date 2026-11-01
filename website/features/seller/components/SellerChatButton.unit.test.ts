@@ -8,7 +8,6 @@ const harness = vi.hoisted(() => ({
 	activeRole: "buyer" as "buyer" | "seller" | null,
 	authGateCall: vi.fn(),
 	hasSeller: true,
-	hydrated: true,
 	isLoggedIn: true,
 	openChat: vi.fn(),
 	openLoginRequired: vi.fn(),
@@ -33,7 +32,6 @@ vi.mock("@/lib/auth/context", () => ({
 	useAuth: () => ({
 		activeRole: harness.activeRole,
 		hasSeller: harness.hasSeller,
-		hydrated: harness.hydrated,
 		isLoggedIn: harness.isLoggedIn,
 	}),
 }));
@@ -70,7 +68,6 @@ describe("SellerChatButton self-store guard", () => {
 	beforeEach(() => {
 		harness.activeRole = "buyer";
 		harness.hasSeller = true;
-		harness.hydrated = true;
 		harness.isLoggedIn = true;
 		harness.sellerSelf.data = {
 			store: { id: "9223372036854775807", storeCode: "2601234567" },

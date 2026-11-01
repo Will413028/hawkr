@@ -240,15 +240,13 @@ export function useOrderStatusCounts(
 	options: OrderQueryOptions = {},
 ): UseOrderStatusCountsResult {
 	const { buyerId, view } = options;
-	const { hydrated, isLoggedIn } = useAuth();
+	const { isLoggedIn } = useAuth();
 	const identity = useQueryIdentity();
 	const scope = useSellerDataScope();
 	// 代行沒有 `/orders/status_counts` 對應端點（§6.1.10 只有列表與明細），所以在
 	// 代行 scope 下這支恆不啟用；總覽的數字改由列表的 `total` 自繪。
 	const enabled =
-		hydrated &&
-		isLoggedIn &&
-		(view === "seller" ? scope.mode === "seller" : true);
+		isLoggedIn && (view === "seller" ? scope.mode === "seller" : true);
 
 	// Callers pass a module-scope constant for `statusCsvList` (see
 	// `COUNT_KEYS` in OrdersClient) so the array identity stays stable
@@ -332,7 +330,7 @@ export function useOrder(
 	opts?: { view?: "seller" },
 ): UseOrderResult {
 	const view = opts?.view;
-	const { hydrated, isLoggedIn } = useAuth();
+	const { isLoggedIn } = useAuth();
 	const identity = useQueryIdentity();
 	const scope = useSellerDataScope();
 	const seller = view === "seller";
@@ -348,9 +346,7 @@ export function useOrder(
 		// `anon` slot just caches a 401.
 		enabled:
 			Boolean(orderNo) &&
-			(seller
-				? scope.canRead("orders", hydrated && isLoggedIn)
-				: hydrated && isLoggedIn),
+			(seller ? scope.canRead("orders", isLoggedIn) : isLoggedIn),
 	});
 
 	return {

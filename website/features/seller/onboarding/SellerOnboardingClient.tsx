@@ -84,7 +84,7 @@ export default function SellerOnboardingClient() {
 	const router = useObservedRouter("seller_onboarding");
 	const searchParams = useSearchParams();
 	const {
-		hydrated,
+		status,
 		isLoggedIn,
 		hasSeller,
 		commitIdentity,
@@ -133,7 +133,7 @@ export default function SellerOnboardingClient() {
 	// 一半的帳號（拿到角色、店家沒建）GetMyStore 會回 not_found，dashboard
 	// 整頁壞掉；只有店家真的存在且 onboarding 完成才導走，否則留在精靈補完。
 	React.useEffect(() => {
-		if (!hydrated || step !== "store") return;
+		if (status === "unknown" || step !== "store") return;
 		if (!isLoggedIn) {
 			router.replace(
 				loginPath({ role: "seller", redirect: "/seller/onboarding" }),
@@ -173,10 +173,10 @@ export default function SellerOnboardingClient() {
 		return () => {
 			cancelled = true;
 		};
-	}, [hydrated, step, isLoggedIn, hasSeller, redirect, router]);
+	}, [status, step, isLoggedIn, hasSeller, redirect, router]);
 
 	React.useEffect(() => {
-		if (!hydrated || !isLoggedIn || step !== "store") return;
+		if (!isLoggedIn || step !== "store") return;
 		// 有賣家角色時等店家查詢有結果；帳號有店家就不查（送出走更新流程）。
 		if (hasSeller && sellerLookupState !== "ready") return;
 		if (storeExists) return;
@@ -193,7 +193,7 @@ export default function SellerOnboardingClient() {
 		return () => {
 			cancelled = true;
 		};
-	}, [hydrated, isLoggedIn, step, hasSeller, sellerLookupState, storeExists]);
+	}, [isLoggedIn, step, hasSeller, sellerLookupState, storeExists]);
 
 	const finishSellerApplication = async () => {
 		await finalizeSellerOnboarding(
@@ -317,7 +317,7 @@ export default function SellerOnboardingClient() {
 	// form can mutate anything. This closes the slow-network window where a user
 	// could submit while we still did not know whether a completed store existed.
 	const sellerStatusReady =
-		hydrated && isLoggedIn && (!hasSeller || sellerLookupState === "ready");
+		isLoggedIn && (!hasSeller || sellerLookupState === "ready");
 	const willApplyStore = !storeExists;
 	// 伺服器說不能開店時擋送出並顯示第一個原因；已有店家走更新，不經 ApplyStore，不受影響。
 	const openingReady = willApplyStore && opening.status === "ready";

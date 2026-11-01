@@ -2,32 +2,36 @@ import { describe, expect, it } from "vitest";
 import { type AuthRailInput, resolveAuthRailMode } from "../auth-rail";
 
 const base: AuthRailInput = {
-	authReady: false,
+	status: "unknown",
 	isLoggedIn: false,
 	activeRole: null,
-	sessionUnavailable: false,
 };
 
 describe("resolveAuthRailMode", () => {
-	it("before hydration → guest rail (登入 clickable, the bug)", () => {
-		expect(resolveAuthRailMode({ ...base, authReady: false })).toBe("guest");
+	it("unknown (the server's answer has not arrived) → skeleton, neither a 登入 button nor an avatar", () => {
+		expect(resolveAuthRailMode({ ...base, status: "unknown" })).toBe(
+			"skeleton",
+		);
 	});
 
-	it("stale cookie: probe says logged-out → guest", () => {
+	it("an unknown status outranks a stale identity", () => {
 		expect(
 			resolveAuthRailMode({
 				...base,
-				authReady: true,
-				isLoggedIn: false,
+				isLoggedIn: true,
+				activeRole: "buyer",
 			}),
-		).toBe("guest");
+		).toBe("skeleton");
+	});
+
+	it("settled guest → guest rail", () => {
+		expect(resolveAuthRailMode({ ...base, status: "guest" })).toBe("guest");
 	});
 
 	it("settled buyer session → buyer rail", () => {
 		expect(
 			resolveAuthRailMode({
-				...base,
-				authReady: true,
+				status: "signedIn",
 				isLoggedIn: true,
 				activeRole: "buyer",
 			}),
@@ -37,8 +41,7 @@ describe("resolveAuthRailMode", () => {
 	it("settled seller session → seller rail", () => {
 		expect(
 			resolveAuthRailMode({
-				...base,
-				authReady: true,
+				status: "signedIn",
 				isLoggedIn: true,
 				activeRole: "seller",
 			}),
@@ -48,32 +51,25 @@ describe("resolveAuthRailMode", () => {
 	it("logged-in but role unresolved → seller rail (preserves prior !isBuyer branch)", () => {
 		expect(
 			resolveAuthRailMode({
-				...base,
-				authReady: true,
+				status: "signedIn",
 				isLoggedIn: true,
 				activeRole: null,
 			}),
 		).toBe("seller");
 	});
 
-	it("settled but unavailable (B-199 blip) → hold skeleton, never claim guest", () => {
-		expect(
-			resolveAuthRailMode({
-				...base,
-				authReady: true,
-				sessionUnavailable: true,
-			}),
-		).toBe("skeleton");
+	it("unavailable (B-199 blip) → hold skeleton, never claim guest", () => {
+		expect(resolveAuthRailMode({ ...base, status: "unavailable" })).toBe(
+			"skeleton",
+		);
 	});
 
-	it("an unavailable probe outranks a logged-in identity from before it", () => {
+	it("an unavailable answer outranks a logged-in identity from before it", () => {
 		expect(
 			resolveAuthRailMode({
-				...base,
-				authReady: true,
+				status: "unavailable",
 				isLoggedIn: true,
 				activeRole: "buyer",
-				sessionUnavailable: true,
 			}),
 		).toBe("skeleton");
 	});

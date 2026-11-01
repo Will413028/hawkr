@@ -17,7 +17,7 @@ vi.mock("@/lib/auth/context", () => ({
 	useAuth: () => ({
 		isLoggedIn: true,
 		activeRole: "seller",
-		hydrated: true,
+		status: "signedIn",
 	}),
 }));
 vi.mock("@/lib/auth/redirect", async (importActual) => {

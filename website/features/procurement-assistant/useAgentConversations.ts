@@ -30,11 +30,11 @@ const EMPTY_PAGE: AgentConversationPage = {
  * 側欄不長出 agent 區段，不當錯誤呈現。
  */
 export function useAgentConversations(enabled = true) {
-	const { hydrated, isLoggedIn } = useAuth();
+	const { status, isLoggedIn } = useAuth();
 	const queryIdentity = useQueryIdentity();
 	const queryClient = useQueryClient();
 	const queryKey = queryKeys.assistant.conversations(queryIdentity);
-	const shouldFetch = enabled && hydrated && isLoggedIn;
+	const shouldFetch = enabled && isLoggedIn;
 	const query = useQuery({
 		queryKey,
 		enabled: shouldFetch,
@@ -91,7 +91,7 @@ export function useAgentConversations(enabled = true) {
 		/** 後端還有更多沒抓下來——側欄用它讓「找不到對話」的文案誠實。 */
 		hasMore: page.hasMore,
 		loading:
-			!hydrated ||
+			status === "unknown" ||
 			query.isLoading ||
 			(query.isFetching && query.isPlaceholderData),
 		async rename(conversationId: string, title: string) {

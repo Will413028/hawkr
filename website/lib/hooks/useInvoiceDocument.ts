@@ -32,13 +32,13 @@ export interface UseInvoiceDocumentResult {
 export function useInvoiceDocument(
 	documentId: string,
 ): UseInvoiceDocumentResult {
-	const { hydrated, isLoggedIn } = useAuth();
+	const { isLoggedIn } = useAuth();
 	const identity = useQueryIdentity();
 
 	const documentQuery = useQuery({
 		queryKey: queryKeys.buyer.invoiceDocument(identity, documentId),
 		queryFn: () => fetchInvoiceDocument(documentId),
-		enabled: hydrated && isLoggedIn && documentId.length > 0,
+		enabled: isLoggedIn && documentId.length > 0,
 		meta: {
 			isExpectedError: (error: unknown) =>
 				invoiceBizCode(error) === INVOICE_BIZ_CODE.DOCUMENT_NOT_FOUND,

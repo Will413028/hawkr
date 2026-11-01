@@ -51,7 +51,7 @@ function isNotApplicable(error: unknown): boolean {
  *      QueryClient 預設把它關掉了（`lib/query/client.ts`），不寫就沒有這個行為。
  */
 export function useOrderInvoice(orderNo: string): UseOrderInvoiceResult {
-	const { hydrated, isLoggedIn } = useAuth();
+	const { isLoggedIn } = useAuth();
 	const identity = useQueryIdentity();
 	const queryClient = useQueryClient();
 	const queryKey = queryKeys.buyer.orderInvoice(identity, orderNo);
@@ -59,7 +59,7 @@ export function useOrderInvoice(orderNo: string): UseOrderInvoiceResult {
 	const invoiceQuery = useQuery({
 		queryKey,
 		queryFn: () => fetchOrderInvoice(orderNo),
-		enabled: hydrated && isLoggedIn && orderNo.length > 0,
+		enabled: isLoggedIn && orderNo.length > 0,
 		refetchOnWindowFocus: true,
 		// 9301 是「這筆訂單沒有發票」——零元訂單天天都有，上報它等於把正常狀態
 		// 灌進 Sentry。
@@ -67,7 +67,7 @@ export function useOrderInvoice(orderNo: string): UseOrderInvoiceResult {
 	});
 
 	React.useEffect(() => {
-		if (!hydrated || !isLoggedIn || !orderNo) return;
+		if (!isLoggedIn || !orderNo) return;
 		const onNotification = (event: Event) => {
 			const detail = (event as CustomEvent<NotificationNewEventDetail>).detail;
 			const item = detail?.item;
@@ -80,7 +80,7 @@ export function useOrderInvoice(orderNo: string): UseOrderInvoiceResult {
 		return () => {
 			window.removeEventListener(NOTIFICATION_NEW_EVENT, onNotification);
 		};
-	}, [hydrated, isLoggedIn, orderNo, queryClient, queryKey]);
+	}, [isLoggedIn, orderNo, queryClient, queryKey]);
 
 	const error = invoiceQuery.error;
 	const notFound = error != null && isNotApplicable(error);

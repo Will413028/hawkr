@@ -42,7 +42,7 @@ export function useInvoiceComplaint(
 	orderNo: string,
 	complaintId: string,
 ): UseInvoiceComplaintResult {
-	const { hydrated, isLoggedIn } = useAuth();
+	const { isLoggedIn } = useAuth();
 	const identity = useQueryIdentity();
 	const queryClient = useQueryClient();
 	const queryKey = queryKeys.buyer.orderInvoiceComplaint(
@@ -51,8 +51,7 @@ export function useInvoiceComplaint(
 		complaintId,
 	);
 
-	const enabled =
-		hydrated && isLoggedIn && orderNo.length > 0 && complaintId.length > 0;
+	const enabled = isLoggedIn && orderNo.length > 0 && complaintId.length > 0;
 
 	const complaintQuery = useQuery({
 		queryKey,

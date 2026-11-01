@@ -78,8 +78,8 @@ export default function RootDocument({
 	locale: AppLocale;
 	children: React.ReactNode;
 }) {
-	// Not awaited: the promise goes to AuthProvider, which reads it with `use()`
-	// inside the <Suspense> below, so the shell does not wait on GetSession.
+	// Not awaited: AuthProvider takes the promise without suspending (status
+	// `unknown` until it settles), so the shell and {children} stay static.
 	const session = verifySession();
 	return (
 		<html
@@ -182,68 +182,60 @@ export default function RootDocument({
 					</svg>
 
 					<AppProviders locale={locale} messages={messagesFor(locale)}>
-						<Suspense
-							fallback={
-								<div
-									className="root-nav-layout-reservation"
-									aria-hidden="true"
-								/>
-							}
-						>
-							<AuthProvider session={session}>
-								<Analytics />
-								<NotificationUnreadProvider>
-									<ChatUnreadProvider>
-										<NotificationToastProvider>
-											<UIProvider>
-												<Suspense fallback={null}>
-													<SellerWorkspaceLock />
-												</Suspense>
-												<div className="page-wrapper">
-													{/* Keep the root navbar free of server-side async work. The
+						<AuthProvider session={session}>
+							<Analytics />
+							<NotificationUnreadProvider>
+								<ChatUnreadProvider>
+									<NotificationToastProvider>
+										<UIProvider>
+											<Suspense fallback={null}>
+												<SellerWorkspaceLock />
+											</Suspense>
+											<div className="page-wrapper">
+												{/* Keep the root navbar free of server-side async work. The
 												    client usePathname() sits behind a persistent Suspense
 												    boundary, but unlike the old cookies()/gateway boundary
 												    this one completes in the static shell and cannot be
 												    stranded when /cart finishes streaming. */}
-													<Suspense
-														fallback={
-															<div
-																className="root-nav-layout-reservation"
-																aria-hidden="true"
-															/>
-														}
-													>
-														<RoleAwareNavbar />
-													</Suspense>
-													<main className="page-content">
-														{/* Keep route children outside a root Suspense boundary so
+												<Suspense
+													fallback={
+														<div
+															className="root-nav-layout-reservation"
+															aria-hidden="true"
+														/>
+													}
+												>
+													<RoleAwareNavbar />
+												</Suspense>
+												<main className="page-content">
+													{/* Keep route children outside a root Suspense boundary so
 											    notFound() can set the document HTTP status. The controller
 											    remains isolated because it owns no route content. */}
-														<Suspense fallback={null}>
-															<PageTransition controllerOnly />
-															<MainTabPending />
-														</Suspense>
-														<div className="page-transition">{children}</div>
-													</main>
 													<Suspense fallback={null}>
-														<MobileBottomNav />
+														<PageTransition controllerOnly />
+														<MainTabPending />
 													</Suspense>
-													<Suspense fallback={null}>
-														<RoleAwareFooter
-															categoryColumns={<FooterCategoryColumns />}
-														/>
-													</Suspense>
-												</div>
-												{/* 掛載條件走共用開關而非各自寫 NODE_ENV：本機 E2E 要能把
+													<div className="page-transition">{children}</div>
+												</main>
+												<Suspense fallback={null}>
+													<MobileBottomNav />
+												</Suspense>
+												<Suspense fallback={null}>
+													<RoleAwareFooter
+														categoryColumns={<FooterCategoryColumns />}
+													/>
+												</Suspense>
+											</div>
+											{/* 掛載條件走共用開關而非各自寫 NODE_ENV：本機 E2E 要能把
 											    所有 dev-only 浮動工具一次關掉，量到與 CI 相同的
 											    DOM（web#425）。 */}
-												{DEV_OVERLAYS_ENABLED && (
-													<Suspense fallback={null}>
-														<DevRoleSwitcherSlot />
-													</Suspense>
-												)}
-												<CartSnackbar />
-												{/* App-wide in-place chat: any 發訊息 / 聯絡買家 /
+											{DEV_OVERLAYS_ENABLED && (
+												<Suspense fallback={null}>
+													<DevRoleSwitcherSlot />
+												</Suspense>
+											)}
+											<CartSnackbar />
+											{/* App-wide in-place chat: any 發訊息 / 聯絡買家 /
 												    聊天 button opens this drawer via the chat-drawer
 												    store. Lives under AuthProvider so the embedded
 												    ThreadClient has session + query context.
@@ -252,19 +244,18 @@ export default function RootDocument({
 												    needs the same <Suspense> boundary as the other
 												    usePathname()-reading chrome above, or it blocks the
 												    static shell during streaming. */}
-												<Suspense fallback={null}>
-													<ChatDrawer />
-												</Suspense>
-												{/* Effects-only, renders null, reads no request-time
+											<Suspense fallback={null}>
+												<ChatDrawer />
+											</Suspense>
+											{/* Effects-only, renders null, reads no request-time
 												    data at render — safe to mount bare (no Suspense
 												    dynamic boundary needed). */}
-												<NotificationToastBridge />
-											</UIProvider>
-										</NotificationToastProvider>
-									</ChatUnreadProvider>
-								</NotificationUnreadProvider>
-							</AuthProvider>
-						</Suspense>
+											<NotificationToastBridge />
+										</UIProvider>
+									</NotificationToastProvider>
+								</ChatUnreadProvider>
+							</NotificationUnreadProvider>
+						</AuthProvider>
 					</AppProviders>
 				</ViewTransitions>
 			</body>

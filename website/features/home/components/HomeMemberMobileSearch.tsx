@@ -9,9 +9,9 @@ import { useAuth } from "@/lib/auth/context";
  * same horizontal bounds as the category bar directly below it.
  */
 export default function HomeMemberMobileSearch() {
-	const { hydrated, isLoggedIn } = useAuth();
+	const { isLoggedIn } = useAuth();
 
-	if (!hydrated || !isLoggedIn) return null;
+	if (!isLoggedIn) return null;
 
 	return (
 		<section

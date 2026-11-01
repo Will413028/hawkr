@@ -38,7 +38,7 @@ const AssistantEntryLink = React.forwardRef<
 	},
 	ref,
 ) {
-	const { isLoggedIn, sessionSettled } = useAuth();
+	const { isLoggedIn, status } = useAuth();
 	if (!HAWKR_AGENT_ENABLED) return null;
 
 	const normalizedQuery = query.trim();
@@ -48,7 +48,7 @@ const AssistantEntryLink = React.forwardRef<
 	// keep the intended deep link instead of falsely bouncing a signed-in buyer
 	// to login.
 	// 每個登入的帳號都是買家，所以只看有沒有登入。
-	const requiresBuyerLogin = sessionSettled && !isLoggedIn;
+	const requiresBuyerLogin = status !== "unknown" && !isLoggedIn;
 	const href = requiresBuyerLogin
 		? loginPath({ role: "buyer", redirect: ASSISTANT_PROCUREMENT_PATH })
 		: ASSISTANT_PROCUREMENT_PATH;

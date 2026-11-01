@@ -29,7 +29,7 @@ export function useAuthGate(onGuest: () => void): {
 	authGate: (action: GatedAction) => void;
 	authWaiting: boolean;
 } {
-	const { isLoggedIn, hydrated, activeRole } = useAuth();
+	const { isLoggedIn, status, activeRole } = useAuth();
 	const [pending, setPending] = React.useState<GatedAction | null>(null);
 	// Latest-callback ref: callers pass inline closures, and renders can
 	// happen between the click and hydration completing.
@@ -37,15 +37,15 @@ export function useAuthGate(onGuest: () => void): {
 	onGuestRef.current = onGuest;
 
 	React.useEffect(() => {
-		if (!hydrated || !pending) return;
+		if (status === "unknown" || !pending) return;
 		setPending(null);
 		if (isLoggedIn) pending({ activeRole });
 		else onGuestRef.current();
-	}, [hydrated, isLoggedIn, activeRole, pending]);
+	}, [status, isLoggedIn, activeRole, pending]);
 
 	const authGate = React.useCallback(
 		(action: GatedAction) => {
-			if (!hydrated) {
+			if (status === "unknown") {
 				setPending(() => action);
 				return;
 			}
@@ -55,7 +55,7 @@ export function useAuthGate(onGuest: () => void): {
 			}
 			action({ activeRole });
 		},
-		[hydrated, isLoggedIn, activeRole],
+		[status, isLoggedIn, activeRole],
 	);
 
 	return { authGate, authWaiting: pending !== null };

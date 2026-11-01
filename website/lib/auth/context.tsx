@@ -23,7 +23,7 @@ import {
 } from "./active-role";
 import { reduceStorageEvent } from "./cross-tab-sync";
 import { syncLocalPrivateState } from "./local-private-state";
-import type { SessionState } from "./session-state";
+import type { AuthStatus, SessionState } from "./session-state";
 import type { Identity } from "./storage";
 import {
 	shouldTeardownPrivateCache,
@@ -56,12 +56,12 @@ interface AuthContextValue {
 	/** 帳號有 ROLE_SELLER。每個登入的帳號都是買家，所以沒有 hasBuyer：看 isLoggedIn。 */
 	hasSeller: boolean;
 	activeRole: RoleSlot | null;
-	/** 伺服器已經把登入狀態帶進第一個畫面，恆為 true；等 client 狀態整併後移除。 */
-	hydrated: boolean;
-	/** 單體暫時答不出來（B-199）：不是登出，`identity` 為 null 但不能當成訪客。 */
-	sessionUnavailable: boolean;
-	/** 同 `hydrated`，恆為 true。 */
-	sessionSettled: boolean;
+	/**
+	 * 伺服器的答案還沒到之前是 `unknown`（靜態外殼與第一次 client render 都是它），之後是
+	 * `guest | signedIn | unavailable`。`unavailable` 是單體暫時答不出來（B-199）：不是登出，
+	 * `identity` 為 null 但不能當成訪客。
+	 */
+	status: AuthStatus;
 	commitIdentity: (identity: Identity) => void;
 	switchRole: (next: RoleSlot) => boolean;
 	startSellerOnboarding: (redirect?: string) => void;
@@ -92,8 +92,9 @@ function identityFromSession(
 }
 
 /**
- * 登入狀態的唯一來源是伺服器：根 layout 不 await `verifySession()`，把 promise 交給這裡，
- * 在 `<Suspense>` 內以 `use()` 讀（shell 仍可靜態，身分在同一個 response 串流）。
+ * 登入狀態的唯一來源是伺服器：根 layout 不 await `verifySession()`，把 promise 交給這裡。
+ * Provider 不 suspend：promise 在 effect 內接收，結果出來前 `status` 是 `unknown`，所以 `{children}`
+ * 留在靜態外殼內，server HTML 與第一次 client render 一致（都是 `unknown`）。
  * 憑證是 HttpOnly cookie，JS 讀不到，所以 client 不再自己問單體；事件（登入、登出、換帳號）
  * 之後才更新 React Query 快取裡的同一個 key。
  */
@@ -106,25 +107,46 @@ export function AuthProvider({
 }) {
 	const router = useObservedRouter("auth_context");
 	const queryClient = useQueryClient();
-	const initialSession = React.use(session);
+	const [initialSession, setInitialSession] =
+		React.useState<SessionState | null>(null);
+	React.useEffect(() => {
+		let live = true;
+		session.then(
+			(next) => {
+				if (live) setInitialSession(next);
+			},
+			() => {
+				if (live) setInitialSession({ status: "unavailable" });
+			},
+		);
+		return () => {
+			live = false;
+		};
+	}, [session]);
 	// 快取裡 undefined 是「沒有答案」，null 是「確定沒有登入」。登入、換帳號都是整頁導覽，所以整份快取只有一個 key。
 	const sessionQuery = useQuery<Identity | null>({
 		queryKey: SESSION_KEY,
 		queryFn: skipToken,
 		enabled: false,
 		staleTime: Number.POSITIVE_INFINITY,
-		initialData: identityFromSession(initialSession),
 	});
 	const identity = sessionQuery.data ?? null;
-	// 第一次渲染的工作區必須與伺服器一致：只有 localStorage 知道賣家上次停在哪個工作區，effect 之後才讀它。
-	const [active, setActive] = React.useState<RoleSlot | null>(() =>
-		identity ? effectiveActiveRole(identity, null) : null,
-	);
+	// 工作區：只有 localStorage 知道賣家上次停在哪個工作區，effect 之後才讀它；之前用伺服器答案的預設值。
+	const [storedActive, setActive] = React.useState<RoleSlot | null>(null);
+	const active = identity
+		? (storedActive ?? effectiveActiveRole(identity, null))
+		: null;
+	const status: AuthStatus =
+		sessionQuery.data !== undefined
+			? sessionQuery.data
+				? "signedIn"
+				: "guest"
+			: initialSession?.status === "unavailable"
+				? "unavailable"
+				: "unknown";
 	const previousAccountId = React.useRef<string | undefined>(undefined);
 	const profileStartedFor = React.useRef<string | null>(null);
 	const endingSession = React.useRef(false);
-	const sessionUnavailable =
-		initialSession.status === "unavailable" && sessionQuery.data === undefined;
 
 	const teardownPrivateCache = React.useCallback(
 		() => teardownPrivateCacheOp(queryClient),
@@ -153,7 +175,14 @@ export function AuthProvider({
 	}, [defaultErrorText, queryClient]);
 
 	const refusal =
-		initialSession.status === "guest" ? initialSession.refusal : undefined;
+		initialSession?.status === "guest" ? initialSession.refusal : undefined;
+	React.useEffect(() => {
+		if (!initialSession) return;
+		const answer = identityFromSession(initialSession);
+		if (answer === undefined) return;
+		if (queryClient.getQueryData(SESSION_KEY) !== undefined) return;
+		queryClient.setQueryData(SESSION_KEY, answer);
+	}, [initialSession, queryClient]);
 	React.useEffect(() => {
 		if (!refusal) return;
 		// 單體拒絕這個帳號（刪除或停權）：伺服器端唯讀，由這裡撤銷 session、清 cookie 並顯示原因。
@@ -322,9 +351,7 @@ export function AuthProvider({
 			isLoggedIn: !!identity,
 			hasSeller: !!identity && identity.isSeller,
 			activeRole: active,
-			hydrated: true,
-			sessionUnavailable,
-			sessionSettled: true,
+			status,
 			commitIdentity,
 			switchRole,
 			startSellerOnboarding,
@@ -334,7 +361,7 @@ export function AuthProvider({
 		[
 			identity,
 			active,
-			sessionUnavailable,
+			status,
 			commitIdentity,
 			switchRole,
 			startSellerOnboarding,
@@ -345,7 +372,11 @@ export function AuthProvider({
 
 	return (
 		<AuthContext.Provider value={value}>
-			<span data-auth-hydrated="true" style={{ display: "none" }} />
+			<span
+				data-auth-status={status}
+				data-auth-hydrated={status === "unknown" ? undefined : "true"}
+				style={{ display: "none" }}
+			/>
 			{children}
 		</AuthContext.Provider>
 	);

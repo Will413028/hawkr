@@ -50,7 +50,7 @@ interface UseInvoiceProfilesResult {
  * 再 invalidate 才是唯一不會說謊的做法。
  */
 export function useInvoiceProfiles(): UseInvoiceProfilesResult {
-	const { hydrated, isLoggedIn } = useAuth();
+	const { isLoggedIn } = useAuth();
 	const identity = useQueryIdentity();
 	const queryClient = useQueryClient();
 	const queryKey = queryKeys.buyer.invoiceProfiles(identity);
@@ -58,7 +58,7 @@ export function useInvoiceProfiles(): UseInvoiceProfilesResult {
 	const profilesQuery = useQuery({
 		queryKey,
 		queryFn: async () => (await fetchInvoiceProfiles()).records,
-		enabled: hydrated && isLoggedIn,
+		enabled: isLoggedIn,
 	});
 
 	const invalidate = async () => {
@@ -135,7 +135,7 @@ export function useInvoiceProfiles(): UseInvoiceProfilesResult {
 		onSettled: invalidate,
 	});
 
-	const profiles = hydrated && isLoggedIn ? (profilesQuery.data ?? []) : [];
+	const profiles = isLoggedIn ? (profilesQuery.data ?? []) : [];
 
 	return {
 		profiles,

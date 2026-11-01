@@ -46,7 +46,7 @@ export default function RoleAwareNavbar({
 	megaMenuDynamicLinks,
 }: RoleAwareNavbarProps = {}) {
 	const pathname = usePathname() ?? "";
-	const { activeRole, hydrated, isLoggedIn } = useAuth();
+	const { activeRole, status, isLoggedIn } = useAuth();
 	const [mounted, setMounted] = React.useState(false);
 	React.useEffect(() => {
 		setMounted(true);
@@ -60,7 +60,7 @@ export default function RoleAwareNavbar({
 	React.useEffect(() => {
 		if (pathname) recordPathname(pathname);
 	}, [pathname]);
-	const authReady = mounted && hydrated;
+	const authReady = status !== "unknown";
 	// Never substitute browser state during render. A prerendered Suspense boundary
 	// may temporarily expose a null pathname on both the server and the first
 	// client pass; reading window.location here would turn that into different

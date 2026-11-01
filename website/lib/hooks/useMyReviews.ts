@@ -63,14 +63,14 @@ function mergeOrderSnapshots(
 
 /** Reviews the logged-in buyer has written (GET /app/me/reviews, paged). */
 export function useMyReviews(): UseMyReviewsResult {
-	const { hydrated, isLoggedIn } = useAuth();
+	const { isLoggedIn } = useAuth();
 	const identity = useQueryIdentity();
 	const query = useInfiniteQuery({
 		queryKey: queryKeys.buyer.myReviews(identity),
 		queryFn: ({ pageParam }) =>
 			fetchMyReviews({ page: pageParam, pageSize: 20 }),
 		initialPageParam: 1,
-		enabled: hydrated && isLoggedIn,
+		enabled: isLoggedIn,
 		getNextPageParam: (lastPage) => {
 			const loaded = lastPage.page * lastPage.pageSize;
 			return loaded < lastPage.total ? lastPage.page + 1 : undefined;
@@ -94,9 +94,9 @@ export function useMyReviews(): UseMyReviewsResult {
 					scope: "review-snapshot",
 				}),
 				queryFn: () => fetchOrder(orderNo),
-				enabled: hydrated && isLoggedIn,
+				enabled: isLoggedIn,
 			})),
-		[hydrated, identity, isLoggedIn, snapshotOrderNos],
+		[identity, isLoggedIn, snapshotOrderNos],
 	);
 	const snapshotResults = useQueries({ queries: snapshotQueries });
 	const snapshots = useMemo(

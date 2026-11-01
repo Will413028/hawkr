@@ -50,10 +50,10 @@ export function useCartCoupons({
 	storeId: string | null;
 	orderAmount: number;
 }): UseCartCouponsResult {
-	const { hydrated, isLoggedIn } = useAuth();
+	const { isLoggedIn } = useAuth();
 	const identity = useQueryIdentity();
 
-	const enabled = hydrated && isLoggedIn && Boolean(storeId) && orderAmount > 0;
+	const enabled = isLoggedIn && Boolean(storeId) && orderAmount > 0;
 
 	const query = useQuery({
 		queryKey: queryKeys.buyer.availableCoupons(identity, {

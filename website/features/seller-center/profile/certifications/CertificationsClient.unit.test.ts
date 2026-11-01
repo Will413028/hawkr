@@ -72,7 +72,7 @@ vi.mock("next/navigation", async (importOriginal) => ({
 	useSearchParams: () => ({ get: () => mocks.type }),
 }));
 vi.mock("@/lib/auth/context", () => ({
-	useAuth: () => ({ sessionSettled: true }),
+	useAuth: () => ({ status: "signedIn" }),
 }));
 vi.mock("@/lib/hooks/useSellerSelf", async () => {
 	const react = await import("react");

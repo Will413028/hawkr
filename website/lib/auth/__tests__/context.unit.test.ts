@@ -39,7 +39,10 @@ const guest: SessionState = { status: "guest" };
 const unavailable: SessionState = { status: "unavailable" };
 
 /** Every context value the consumer rendered, in order: the first one is the first screen. */
-async function render(session: SessionState, client = new QueryClient()) {
+async function render(
+	session: SessionState | Promise<SessionState>,
+	client = new QueryClient(),
+) {
 	const rendered: Array<ReturnType<typeof useAuth>> = [];
 	const sessionPromise = Promise.resolve(session);
 	const wrapper = ({ children }: { children: React.ReactNode }) =>
@@ -49,18 +52,13 @@ async function render(session: SessionState, client = new QueryClient()) {
 			React.createElement(
 				IntlTestWrapper,
 				null,
-				React.createElement(
-					React.Suspense,
-					{ fallback: null },
-					React.createElement(AuthProvider, {
-						session: sessionPromise,
-						children,
-					}),
-				),
+				React.createElement(AuthProvider, {
+					session: sessionPromise,
+					children,
+				}),
 			),
 		);
 	let hook!: ReturnType<typeof renderHook<ReturnType<typeof useAuth>, unknown>>;
-	// The provider suspends on the session promise: let React retry once it is settled.
 	await act(async () => {
 		hook = renderHook(
 			() => {
@@ -100,28 +98,43 @@ afterEach(() => {
 });
 
 describe("AuthProvider on the server's session answer", () => {
-	it("the first screen has no checking state: identity and settled flags are final on the first render", async () => {
+	it("the first screen has no checking state: it is `unknown`, never a guess, and then the server's answer", async () => {
 		const { result, rendered } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
-		const first = rendered[0];
-		expect(first?.hydrated).toBe(true);
-		expect(first?.sessionSettled).toBe(true);
-		expect(first?.sessionUnavailable).toBe(false);
-		expect(first?.identity).toEqual(buyer);
-		for (const value of rendered) {
-			expect(value.hydrated).toBe(true);
-			expect(value.sessionSettled).toBe(true);
-		}
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
+		expect(rendered[0]?.status).toBe("unknown");
+		expect(rendered[0]?.isLoggedIn).toBe(false);
+		expect(rendered[0]?.identity).toBeNull();
+		const statuses = rendered.map((value) => value.status);
+		expect(statuses).not.toContain("guest");
+		expect(statuses.at(-1)).toBe("signedIn");
+		expect(result.current.identity).toEqual(buyer);
 	});
 
-	it("a guest's first screen is also final", async () => {
-		const { rendered } = await render(guest);
-		await waitFor(() => expect(rendered.length).toBeGreaterThan(0));
-		for (const value of rendered) {
-			expect(value.hydrated).toBe(true);
-			expect(value.sessionSettled).toBe(true);
-			expect(value.isLoggedIn).toBe(false);
-		}
+	it("stays `unknown` until the session promise settles, without suspending", async () => {
+		let settle!: (state: SessionState) => void;
+		const pending = new Promise<SessionState>((resolve) => {
+			settle = resolve;
+		});
+		const { result } = await render(pending);
+		expect(result.current.status).toBe("unknown");
+		expect(result.current.isLoggedIn).toBe(false);
+		await act(async () => {
+			settle(guest);
+		});
+		await waitFor(() => expect(result.current.status).toBe("guest"));
+	});
+
+	it("a guest resolves from `unknown` to `guest`", async () => {
+		const { result, rendered } = await render(guest);
+		await waitFor(() => expect(result.current.status).toBe("guest"));
+		expect(rendered[0]?.status).toBe("unknown");
+		expect(result.current.isLoggedIn).toBe(false);
+	});
+
+	it("a rejected session promise is `unavailable`, not a guest", async () => {
+		const { result } = await render(Promise.reject(new Error("stream failed")));
+		await waitFor(() => expect(result.current.status).toBe("unavailable"));
+		expect(api.logout).not.toHaveBeenCalled();
 	});
 
 	it("revokes the session of a suspended account and displays the server denial", async () => {
@@ -148,7 +161,7 @@ describe("AuthProvider on the server's session answer", () => {
 
 	it("a guest has no session to end", async () => {
 		const { result } = await render(guest);
-		await waitFor(() => expect(result.current.sessionSettled).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("guest"));
 		expect(result.current.isLoggedIn).toBe(false);
 		expect(result.current.identity).toBeNull();
 		expect(api.logout).not.toHaveBeenCalled();
@@ -169,15 +182,14 @@ describe("AuthProvider on the server's session answer", () => {
 			window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
 		});
 		await waitFor(() => expect(result.current.isLoggedIn).toBe(false));
-		expect(result.current.sessionSettled).toBe(true);
+		expect(result.current.status).toBe("guest");
 		expect(api.logout).not.toHaveBeenCalled();
 	});
 
 	it("an unavailable answer is not a guest and never ends the session", async () => {
 		const { result } = await render(unavailable);
-		await waitFor(() => expect(result.current.sessionSettled).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("unavailable"));
 		expect(result.current.isLoggedIn).toBe(false);
-		expect(result.current.sessionUnavailable).toBe(true);
 		expect(api.logout).not.toHaveBeenCalled();
 	});
 
@@ -189,7 +201,7 @@ describe("AuthProvider on the server's session answer", () => {
 		});
 		expect(api.logout).toHaveBeenCalledTimes(1);
 		expect(result.current.isLoggedIn).toBe(false);
-		expect(result.current.sessionSettled).toBe(true);
+		expect(result.current.status).toBe("guest");
 	});
 
 	it("a failed SignOut keeps the account: the session was not ended", async () => {

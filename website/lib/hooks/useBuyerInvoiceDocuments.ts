@@ -35,9 +35,9 @@ export function useBuyerInvoiceDocuments(
 	params: BuyerInvoiceDocumentsQuery,
 	options?: { enabled?: boolean },
 ): UseBuyerInvoiceDocumentsResult {
-	const { hydrated, isLoggedIn } = useAuth();
+	const { isLoggedIn } = useAuth();
 	const identity = useQueryIdentity();
-	const enabled = hydrated && isLoggedIn && options?.enabled !== false;
+	const enabled = isLoggedIn && options?.enabled !== false;
 
 	const query = useQuery({
 		queryKey: queryKeys.buyer.invoiceDocuments(

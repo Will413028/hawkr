@@ -11,9 +11,9 @@ import { sellerGuideChapters } from "@/lib/content/seller-guide-data";
  * `lib/content/seller-guide-data.ts`.
  */
 export default function SellerGuidePage() {
-	const { activeRole, hydrated } = useAuth();
+	const { activeRole, status } = useAuth();
 	const frameWidthClass =
-		hydrated && activeRole === "seller"
+		status !== "unknown" && activeRole === "seller"
 			? "w-[calc(100%_-_88px)]"
 			: "w-[calc(100%_-_48px)]";
 

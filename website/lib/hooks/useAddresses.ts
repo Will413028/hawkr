@@ -41,14 +41,14 @@ function applyDefault(addresses: Address[], id: string | number): Address[] {
 }
 
 export function useAddresses(): UseAddressesResult {
-	const { hydrated, isLoggedIn } = useAuth();
+	const { isLoggedIn } = useAuth();
 	const identity = useQueryIdentity();
 	const queryClient = useQueryClient();
 	const queryKey = queryKeys.buyer.addresses(identity);
 	const addressesQuery = useQuery({
 		queryKey,
 		queryFn: fetchAddresses,
-		enabled: hydrated && isLoggedIn,
+		enabled: isLoggedIn,
 		placeholderData: [] as Address[],
 	});
 
@@ -157,7 +157,7 @@ export function useAddresses(): UseAddressesResult {
 		onSettled: invalidateAddresses,
 	});
 
-	const addresses = hydrated && isLoggedIn ? (addressesQuery.data ?? []) : [];
+	const addresses = isLoggedIn ? (addressesQuery.data ?? []) : [];
 	const mutationError =
 		createMutation.error ??
 		updateMutation.error ??

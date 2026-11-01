@@ -24,8 +24,8 @@ import { useQueryIdentity } from "./useQueryIdentity";
  * 身分：切換工作區一律整頁重載，不會雙讀。
  */
 function useMeasuresEnabled(): boolean {
-	const { hydrated, isLoggedIn } = useAuth();
-	return hydrated && isLoggedIn;
+	const { isLoggedIn } = useAuth();
+	return isLoggedIn;
 }
 
 interface UseSellerMeasuresResult {

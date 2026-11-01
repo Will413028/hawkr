@@ -20,12 +20,12 @@ export function useNotificationPreferences(role: RoleSlot): {
 	loading: boolean;
 	error: string | null;
 } {
-	const { hydrated, isLoggedIn } = useAuth();
+	const { isLoggedIn } = useAuth();
 	const identity = useQueryIdentity();
 	const query = useQuery({
 		queryKey: queryKeys.notifications.preferences(identity, role),
 		queryFn: () => fetchNotificationPreferences({ role }),
-		enabled: hydrated && isLoggedIn,
+		enabled: isLoggedIn,
 	});
 	return {
 		prefs: query.data ?? null,

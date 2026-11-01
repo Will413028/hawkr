@@ -345,23 +345,11 @@ interface NavbarProps {
 export default function Navbar({ megaMenuDynamicLinks }: NavbarProps = {}) {
 	const pathname = usePathname() ?? "";
 	const router = useObservedRouter("navbar");
-	const { isLoggedIn, activeRole, hydrated, sessionUnavailable, signOut } =
-		useAuth();
-	const [mounted, setMounted] = React.useState(false);
-	React.useEffect(() => {
-		setMounted(true);
-	}, []);
-	const authReady = mounted && hydrated;
-	// Single decision point for the right-rail auth affordance. Pre-hydration it
-	// renders the clickable 登入 link rather than a skeleton — the client-only
-	// `bootRole` below must never gate it, which was the "login button does
-	// nothing" race.
-	const railMode = resolveAuthRailMode({
-		authReady,
-		isLoggedIn,
-		activeRole,
-		sessionUnavailable,
-	});
+	const { isLoggedIn, activeRole, status, signOut } = useAuth();
+	// Single decision point for the right-rail auth affordance. `unknown` (the
+	// server's answer has not arrived) and `unavailable` hold the neutral skeleton;
+	// the client-only `bootRole` below only shapes it and never gates the rail.
+	const railMode = resolveAuthRailMode({ status, isLoggedIn, activeRole });
 	// Pre-hydration role HINT from localStorage (set on login/role switch), used
 	// ONLY to shape the skeleton (buyer shows 訊息+通知 placeholders, others just
 	// the avatar). Read in an effect so SSR + first client render agree (both
@@ -478,16 +466,13 @@ export default function Navbar({ megaMenuDynamicLinks }: NavbarProps = {}) {
 					    looking: the guest rail is already the widest thing on a
 					    small laptop, and the setting is a returning reader's
 					    preference. Signed-out visitors reach it from the footer. */}
-					{/* `authReady &&` is the same hydration guard the rest of this rail
-					    uses: `isLoggedIn` is false until the session resolves, so
-					    gating on it bare is safe but reading it through authReady
-					    keeps every auth-dependent branch in this file on one rule. */}
+
 					{/* Hidden on phones: six 44px actions plus the brand do not fit a
 					    393px viewport, and the nav clips its own overflow, so the
 					    rightmost control (the account menu) becomes unreachable with no
 					    scroll to recover it. Text scale stays one tap away in the footer
 					    and in the settings page 顯示 section. */}
-					{authReady && isLoggedIn && (
+					{isLoggedIn && (
 						<TextScaleToggle className="size-11 [@media(max-width:840px)]:hidden" />
 					)}
 

@@ -70,7 +70,7 @@ export default function FeedStories({
 	hideTabsOnMobile = false,
 	reserveRegion = false,
 }: FeedStoriesProps) {
-	const { hydrated, activeRole, isLoggedIn } = useAuth();
+	const { status, activeRole, isLoggedIn } = useAuth();
 	const isBuyer = activeRole === "buyer";
 	const [nearbyItems, setNearbyItems] = React.useState<StoryItem[] | null>(
 		null,
@@ -89,7 +89,7 @@ export default function FeedStories({
 	const openLoginRequired = useLoginRequiredOverlay(loginPayload);
 
 	const ensureBuyerSession = (): boolean => {
-		if (!hydrated) {
+		if (status === "unknown") {
 			setEmptyMessage("正在確認登入狀態...");
 			return false;
 		}

@@ -50,7 +50,7 @@ function guest() {
 	mocks.auth = {
 		identity: null,
 		isLoggedIn: false,
-		hydrated: true,
+		status: "guest",
 		activeRole: null,
 		switchRole: mocks.switchRole,
 	};
@@ -143,7 +143,7 @@ describe("LoginPage: back from the provider (the monolith's 302 lands here)", ()
 		mocks.auth = {
 			identity: { accountId: "7", isSeller: false },
 			isLoggedIn: true,
-			hydrated: true,
+			status: "signedIn",
 			activeRole: "buyer",
 			switchRole: mocks.switchRole,
 		};
@@ -161,7 +161,7 @@ describe("LoginPage: back from the provider (the monolith's 302 lands here)", ()
 		mocks.auth = {
 			identity: { accountId: "7", isSeller: false },
 			isLoggedIn: true,
-			hydrated: true,
+			status: "signedIn",
 			activeRole: "buyer",
 			switchRole: mocks.switchRole,
 		};
@@ -175,7 +175,7 @@ describe("LoginPage: back from the provider (the monolith's 302 lands here)", ()
 		mocks.auth = {
 			identity: null,
 			isLoggedIn: false,
-			hydrated: false,
+			status: "unknown",
 			activeRole: null,
 			switchRole: mocks.switchRole,
 		};

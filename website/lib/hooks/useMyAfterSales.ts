@@ -39,9 +39,9 @@ function buildBuyerLookup(
  * the order-detail after-sale summary block. Scoped to the logged-in buyer.
  */
 export function useMyAfterSales(): UseMyAfterSalesResult {
-	const { hydrated, isLoggedIn } = useAuth();
+	const { isLoggedIn } = useAuth();
 	const identity = useQueryIdentity();
-	const enabled = hydrated && isLoggedIn;
+	const enabled = isLoggedIn;
 	const query = useQuery({
 		queryKey: queryKeys.buyer.afterSales(identity, { pageSize: 100 }),
 		queryFn: async () => {

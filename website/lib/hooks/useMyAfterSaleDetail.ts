@@ -36,7 +36,7 @@ interface UseMyAfterSaleDetailResult {
 export function useMyAfterSaleDetail(
 	caseNo: string,
 ): UseMyAfterSaleDetailResult {
-	const { hydrated, isLoggedIn } = useAuth();
+	const { isLoggedIn } = useAuth();
 	const identity = useQueryIdentity();
 	const query = useQuery({
 		queryKey: queryKeys.buyer.afterSale(identity, caseNo),
@@ -52,7 +52,7 @@ export function useMyAfterSaleDetail(
 			}
 			return { detail, arbitration };
 		},
-		enabled: Boolean(caseNo) && hydrated && isLoggedIn,
+		enabled: Boolean(caseNo) && isLoggedIn,
 		staleTime: 30_000,
 	});
 	return {

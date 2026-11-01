@@ -65,7 +65,7 @@ vi.mock("@/lib/api/auth", () => ({
 }));
 vi.mock("@/lib/auth/context", () => ({
 	useAuth: () => ({
-		hydrated: true,
+		status: "signedIn",
 		isLoggedIn: true,
 		hasSeller: mocks.hasSeller,
 		rejectSession: mocks.rejectSession,
