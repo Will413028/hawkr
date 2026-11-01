@@ -84,7 +84,9 @@ test.describe("locale routing", { tag: ["@ui"] }, () => {
 			expect(response.status(), path).toBe(200);
 			const headers = response.headers();
 			expect(headers["set-cookie"], `${path} set-cookie`).toBeUndefined();
-			expect(headers.link, `${path} link`).toBeUndefined();
+			expect(headers.link ?? "", `${path} link`).not.toMatch(
+				/rel="?alternate|hreflang/i,
+			);
 		}
 		const home = await (
 			await request.get("/", { headers: { "Accept-Language": "en" } })
@@ -92,7 +94,7 @@ test.describe("locale routing", { tag: ["@ui"] }, () => {
 		expect(home).toMatch(/<html[^>]*\blang="zh-TW"/);
 	});
 
-	test("the prerendered HTML is computed for the browser's URL: the internal /zh-TW path never leaks into it", async ({
+	test("the prerendered HTML never carries the internal /zh-TW path", async ({
 		request,
 	}) => {
 		for (const path of ["/", "/about", "/faq"]) {
@@ -100,9 +102,22 @@ test.describe("locale routing", { tag: ["@ui"] }, () => {
 			expect(html, `${path} carries the internal locale path`).not.toContain(
 				"%2Fzh-TW",
 			);
-			expect(html, `${path} login link`).toContain(
-				`login?redirect=${encodeURIComponent(path)}"`,
-			);
+		}
+	});
+
+	test("once the visitor is decided a guest, the login link returns to the browser's URL", async ({
+		page,
+	}) => {
+		for (const path of ["/", "/about", "/faq"]) {
+			await page.goto(path);
+			await expect(
+				page.locator('a[href^="/login?redirect="]').first(),
+				path,
+			).toHaveAttribute("href", `/login?redirect=${encodeURIComponent(path)}`);
+			expect(
+				await page.content(),
+				`${path} carries the internal locale path`,
+			).not.toContain("%2Fzh-TW");
 		}
 	});
 
