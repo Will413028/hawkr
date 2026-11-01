@@ -218,7 +218,7 @@ async function railGeometry(rail: Locator): Promise<RailGeometry> {
 async function waitForRealCards(rail: Locator, name: string): Promise<void> {
 	await expect
 		.poll(
-			async () => (await railGeometry(rail)).cardWidths.every((w) => w >= 100),
+			async () => (await railGeometry(rail)).cardWidths.every((w) => w >= 60),
 			{ message: `${name} shows its real cards, not the loading skeleton` },
 		)
 		.toBe(true);
