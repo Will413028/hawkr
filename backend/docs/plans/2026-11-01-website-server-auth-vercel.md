@@ -73,7 +73,7 @@
   - 驗收：完成定義；mutation：DAL 對 401 回 `unavailable` 時，「401 轉訪客」測試要失敗；把 GetSession 移進 `'use cache'` 時 build 要失敗（Next 會擋讀 cookie）；把 gate 加回時「首屏無檢查中」測試要失敗。#338 回歸（預覽部署，Will 觸發）：首頁、PDP、`/account` 各以 `curl` 請求 20 次，全部 200 且 HTML 含頁首的固定標記（`data-testid` 由步驟 3 指定）；Vercel Observability 中這些 function 的最大記憶體低於步驟 1 記下的上限的 50%。
   - 停止條件：某頁讀 cookie 又必須整頁快取，無法拆成動態洞 → 回報。
   - 需要人做的事：觸發預覽部署。
-- [ ] **4. client 四態的事件轉移**（被擋於：步驟 3、D4）
+- [x] **4. client 四態的事件轉移**（被擋於：步驟 3、D4）
   - 四態本身、旗標刪除與 D3 骨架已依 D5（2026-11-01）併入步驟 3；本步只做事件後的轉移。
   - 範圍：狀態轉移（D4）：
 
@@ -122,7 +122,8 @@
 | 1 spike | 完成（LINE 真人登入、tag 失效未測，Will 2026-11-01 決定收掉實測環境） | 上傳方式、純 ISR 建置、cacheComponents 改寫量（34／405 頁）、IP header 防偽、區域與記憶體設定（spikes.md） | 反代 3xx／Set-Cookie、RTT、tag 失效：單體尚未公開部署 | |
 | 2 平台遷移 | 完成 | lint、vitest 2755、node:test 2111、build＋build-output 7；mutation：IP 改讀 cf-connecting-ip、拿掉 vercel.app noindex、拿掉 Sentry 預覽過濾 皆失敗；獨立審查 2 項已處理；CI 全綠（website CI、website e2e、workspace CI、supply chain） | Vercel 上的 headers 實效（待步驟 3 預覽部署）；Skew Protection 待第一次部署前開 | `1ae6959`..`f0184b2`、`2b1a695` |
 | 2b API 反代與同源設定 | 完成 | lint、vitest 2755、node:test 2119、build＋build-output 11（routes manifest 三條 beforeFiles）；mutation：拿掉同源檢查、拿掉任一條 rewrite 皆失敗；獨立審查 3 項已處理（build:seo 改相對 `/api/v1`、同源檢查擋 `//host`）；CI 全綠（website CI、website e2e、supply chain、repo hygiene、ui-text guard、commit messages） | Vercel 上的實效（待步驟 3 預覽部署） | `0ec1d71`、`8a36adf` |
-| 3 cacheComponents＋DAL＋四態 | 程式完成待驗收 | lint、vitest 2781、node:test 2126、build＋build-output 18（全部 PARTIALLY_STATIC、頁首在靜態外殼、notFound 回 404）；mutation：DAL 401→unavailable、加回 gate（改為首屏猜 guest）、`verifySession` 進 `'use cache'`（build 失敗）、根層把 children 包回 Suspense、`unknown` 畫訪客頁首、拿掉 WorkspaceAlign 等待、拿掉 unavailable 重試 皆失敗；獨立審查 5 項已處理；CI 全綠（website CI、website e2e、supply chain、repo hygiene、ui-text guard、commit messages）；#338 預覽部署（上游不可達）：`/` 20×200、`/account`（假 cookie）20×200，皆含 `site-header`；Vercel Observability（Preview、近 12 小時、86 次呼叫，含 spike 的預覽部署）function 記憶體 Average 267 MB／P75 270 MB／P95 272 MB，上限 2.05 GB，P95 低於門檻 1 GB | 商品頁 200（擋於商品模組搬進單體，PDP 讀舊 gateway `/api/v1/public/products/{id}`；上游不可達時 `/products/1` 20×404）；function 記憶體的最大值（Hobby 的 Observability 只給 Average／P75／P95，不給 max） | `f8729d7`..`65a4fb9` |
+| 3 cacheComponents＋DAL＋四態 | 程式完成待驗收 | lint、vitest 2781、node:test 2126、build＋build-output 18（全部 PARTIALLY_STATIC、頁首在靜態外殼、notFound 回 404）；mutation：DAL 401→unavailable、加回 gate（改為首屏猜 guest）、`verifySession` 進 `'use cache'`（build 失敗）、根層把 children 包回 Suspense、`unknown` 畫訪客頁首、拿掉 WorkspaceAlign 等待、拿掉 unavailable 重試 皆失敗；獨立審查 5 項已處理；CI 全綠（website CI、website e2e、supply chain、repo hygiene、ui-text guard、commit messages）；#338 預覽部署（上游不可達）：`/` 20×200、`/account`（假 cookie）20×200，皆含 `site-header`；Vercel Observability（Preview、近 12 小時、86 次呼叫，含 spike 的預覽部署）function 記憶體 Average 267 MB／P75 270 MB／P95 272 MB，上限 2.05 GB，P95 低於門檻 1 GB | 商品頁 200（擋於商品模組搬進單體，PDP 讀舊 gateway `/api/v1/public/products/{id}`；上游不可達時 `/products/1` 20×404）；function 記憶體的最大值（Hobby 的 Observability 只給 Average／P75／P95，不給 max） | `2f9a87a`..`65a4fb9` |
+| 4 事件轉移 | 完成 | lint、vitest 2816、node:test、build＋build-output 18；`rg -nw` 四個舊名稱零命中；mutation：網路錯誤或 unavailable 映成 guest、拿掉登出／401／跨分頁後的 refresh、拿掉舊 promise 防護、拿掉 online／visibility 重試、伺服器值不覆寫快取、`rejectSession` 舊順序、`commitIdentity` 不 refresh、語系切換重置旗標 皆失敗；獨立審查 1 中 4 低：3 項修、暱稱頭像合併保留（GetSession 回應只有 id 與 roles，`identity.proto:81-90`）、401 前多一次 refresh 不修；CI 全綠（website CI、website e2e、supply chain、repo hygiene、ui-text guard、commit messages） | 無 | `3da7a18`、`7f0e691`、`b61a1d4` |
 | 3 cacheComponents ＋ DAL | 未開始 | | | |
 | 4 client 四態 | 未開始 | | | |
 | 5 收尾 | 未開始 | | | |
