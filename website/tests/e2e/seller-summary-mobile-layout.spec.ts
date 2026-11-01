@@ -215,6 +215,15 @@ async function railGeometry(rail: Locator): Promise<RailGeometry> {
 	});
 }
 
+async function waitForRealCards(rail: Locator, name: string): Promise<void> {
+	await expect
+		.poll(
+			async () => (await railGeometry(rail)).cardWidths.every((w) => w >= 100),
+			{ message: `${name} shows its real cards, not the loading skeleton` },
+		)
+		.toBe(true);
+}
+
 function expectEqualCards(geometry: RailGeometry, expectedWidth: number): void {
 	expect(geometry.cardWidths.length).toBeGreaterThan(0);
 	expect(
@@ -335,6 +344,7 @@ test.describe("賣家中心手機摘要卡滑軌", { tag: ["@ui"] }, () => {
 				await expect(rail.locator(":scope > *"), surface.name).toHaveCount(
 					surface.count,
 				);
+				await waitForRealCards(rail, surface.name);
 				if (
 					surface.path === "/seller-center/inventory" &&
 					viewport.width <= 540
@@ -367,6 +377,10 @@ test.describe("賣家中心手機摘要卡滑軌", { tag: ["@ui"] }, () => {
 			await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 			const rail = page.locator(surface.selector);
 			await expect(rail, surface.name).toBeVisible();
+			await expect(rail.locator(":scope > *"), surface.name).toHaveCount(
+				surface.count,
+			);
+			await waitForRealCards(rail, surface.name);
 			const geometry = await railGeometry(rail);
 			if (surface.compactOnPhone) {
 				expectCompactPhoneCards(geometry);
