@@ -26,7 +26,12 @@ import {
 	type RoleSlot,
 	setStoredActiveRole,
 } from "./active-role";
-import { reduceStorageEvent } from "./cross-tab-sync";
+import {
+	openSessionChannel,
+	reduceStorageEvent,
+	type SessionChannel,
+	shouldRefreshForPeer,
+} from "./cross-tab-sync";
 import { syncLocalPrivateState } from "./local-private-state";
 import {
 	type AuthStatus,
@@ -104,8 +109,9 @@ function identityFromSession(
  * 登入狀態的唯一來源是伺服器：根 layout 不 await `verifySession()`，把 promise 交給這裡。
  * Provider 不 suspend：promise 在 effect 內接收，結果出來前 `status` 是 `unknown`，所以 `{children}`
  * 留在靜態外殼內，server HTML 與第一次 client render 一致（都是 `unknown`）。
- * 憑證是 HttpOnly cookie，JS 讀不到，所以 client 不再自己問單體；事件（登入、登出、換帳號）
- * 之後才更新 React Query 快取裡的同一個 key。
+ * 憑證是 HttpOnly cookie，JS 讀不到，所以 client 不再自己問單體。事件（登出、其他分頁的訊號、401）
+ * 之後 `router.refresh()` 讓根 layout 交來新的 promise，最新的 promise 的答案覆蓋快取裡的同一個 key；
+ * refresh 完成前 client 只顯示事件的目標態（登出與 401 是 `guest`）。暫時不可用的答案不覆蓋任何身分。
  */
 export function AuthProvider({
 	session,
@@ -116,16 +122,22 @@ export function AuthProvider({
 }) {
 	const router = useObservedRouter("auth_context");
 	const queryClient = useQueryClient();
-	const [initialSession, setInitialSession] =
-		React.useState<SessionState | null>(null);
+	const routerRef = React.useRef(router);
+	routerRef.current = router;
+	const refreshFromServer = React.useCallback(() => {
+		routerRef.current.refresh();
+	}, []);
+	const [serverSession, setServerSession] = React.useState<SessionState | null>(
+		null,
+	);
 	React.useEffect(() => {
 		let live = true;
 		session.then(
 			(next) => {
-				if (live) setInitialSession(next);
+				if (live) setServerSession(next);
 			},
 			() => {
-				if (live) setInitialSession({ status: "unavailable" });
+				if (live) setServerSession({ status: "unavailable" });
 			},
 		);
 		return () => {
@@ -150,7 +162,7 @@ export function AuthProvider({
 			? sessionQuery.data
 				? "signedIn"
 				: "guest"
-			: initialSession?.status === "unavailable"
+			: serverSession?.status === "unavailable"
 				? "unavailable"
 				: "unknown";
 	const previousAccountId = React.useRef<string | undefined>(undefined);
@@ -176,60 +188,83 @@ export function AuthProvider({
 			}
 			queryClient.setQueryData(SESSION_KEY, null);
 			// 單體拒絕這個帳號（刪除或停權）：盡力撤銷 session 並清掉 cookie；失敗不影響本機已經當成訪客。
-			rejection = apiLogout().catch(() => {
+			rejection = apiLogout().then(refreshFromServer, () => {
 				rejection = undefined;
 			});
 			return rejection;
 		};
-	}, [defaultErrorText, queryClient]);
+	}, [defaultErrorText, queryClient, refreshFromServer]);
 
 	const rejectSessionRef = React.useRef(rejectSession);
 	rejectSessionRef.current = rejectSession;
 	React.useEffect(() => {
 		if (status !== "unavailable") return;
 		let cancelled = false;
+		let inFlight = false;
 		let timer: ReturnType<typeof setTimeout> | undefined;
-		const schedule = (attempt: number) => {
-			const delay = SESSION_RETRY_BACKOFF_MS[attempt];
-			if (delay === undefined) return;
-			timer = setTimeout(async () => {
+		const ask = async (): Promise<boolean> => {
+			if (inFlight) return true;
+			inFlight = true;
+			try {
 				let result: Awaited<ReturnType<typeof fetchSession>>;
 				try {
 					result = await fetchSession();
 				} catch (error) {
-					if (cancelled) return;
+					if (cancelled) return false;
 					const denied = ConnectError.from(error);
 					if (denied.code === Code.PermissionDenied) {
 						void rejectSessionRef.current(denied);
-						return;
+						return false;
 					}
 					result = SESSION_UNAVAILABLE;
 				}
-				if (cancelled) return;
-				if (result === SESSION_UNAVAILABLE) {
-					schedule(attempt + 1);
-					return;
-				}
-				if (queryClient.getQueryData(SESSION_KEY) !== undefined) return;
+				if (cancelled) return false;
+				if (result === SESSION_UNAVAILABLE) return true;
+				if (queryClient.getQueryData(SESSION_KEY) !== undefined) return false;
 				queryClient.setQueryData(SESSION_KEY, result);
+				return false;
+			} finally {
+				inFlight = false;
+			}
+		};
+		const schedule = (attempt: number) => {
+			const delay = SESSION_RETRY_BACKOFF_MS[attempt];
+			if (delay === undefined) return;
+			timer = setTimeout(async () => {
+				if (await ask()) schedule(attempt + 1);
 			}, delay);
 		};
+		const onOnline = () => void ask();
+		const onVisibility = () => {
+			if (document.visibilityState === "visible") void ask();
+		};
+		window.addEventListener("online", onOnline);
+		document.addEventListener("visibilitychange", onVisibility);
 		schedule(0);
 		return () => {
 			cancelled = true;
 			if (timer) clearTimeout(timer);
+			window.removeEventListener("online", onOnline);
+			document.removeEventListener("visibilitychange", onVisibility);
 		};
 	}, [status, queryClient]);
 
 	const refusal =
-		initialSession?.status === "guest" ? initialSession.refusal : undefined;
+		serverSession?.status === "guest" ? serverSession.refusal : undefined;
 	React.useEffect(() => {
-		if (!initialSession) return;
-		const answer = identityFromSession(initialSession);
+		if (!serverSession) return;
+		const answer = identityFromSession(serverSession);
 		if (answer === undefined) return;
-		if (queryClient.getQueryData(SESSION_KEY) !== undefined) return;
-		queryClient.setQueryData(SESSION_KEY, answer);
-	}, [initialSession, queryClient]);
+		queryClient.setQueryData<Identity | null>(SESSION_KEY, (current) =>
+			answer && current?.accountId === answer.accountId
+				? {
+						...answer,
+						nickname: answer.nickname ?? current.nickname,
+						avatarKey: answer.avatarKey ?? current.avatarKey,
+					}
+				: answer,
+		);
+	}, [serverSession, queryClient]);
 	React.useEffect(() => {
 		if (!refusal) return;
 		// 單體拒絕這個帳號（刪除或停權）：伺服器端唯讀，由這裡撤銷 session、清 cookie 並顯示原因。
@@ -320,6 +355,7 @@ export function AuthProvider({
 				queryClient.setQueryData(SESSION_KEY, null);
 				setActive(null);
 				await teardownPrivateCache();
+				refreshFromServer();
 				if (stripLocale(window.location.pathname) !== "/") {
 					commitDocumentNavigation("/", true);
 				}
@@ -332,7 +368,35 @@ export function AuthProvider({
 		const listener = (event: Event) => void onExpired(event);
 		window.addEventListener(AUTH_EXPIRED_EVENT, listener);
 		return () => window.removeEventListener(AUTH_EXPIRED_EVENT, listener);
-	}, [queryClient, teardownPrivateCache]);
+	}, [queryClient, teardownPrivateCache, refreshFromServer]);
+
+	const peerView = React.useRef({ status, accountId: identity?.accountId });
+	peerView.current = { status, accountId: identity?.accountId };
+	const channelRef = React.useRef<SessionChannel | null>(null);
+	const announcedAccount = React.useRef<string | null | undefined>(undefined);
+	React.useEffect(() => {
+		const channel = openSessionChannel((announcement) => {
+			if (shouldRefreshForPeer(announcement, peerView.current)) {
+				refreshFromServer();
+			}
+		});
+		channelRef.current = channel;
+		return () => {
+			channel?.close();
+			channelRef.current = null;
+			announcedAccount.current = undefined;
+		};
+	}, [refreshFromServer]);
+	const announceableAccount =
+		status === "signedIn" || status === "guest"
+			? (identity?.accountId ?? null)
+			: undefined;
+	React.useEffect(() => {
+		if (announceableAccount === undefined) return;
+		if (announcedAccount.current === announceableAccount) return;
+		announcedAccount.current = announceableAccount;
+		channelRef.current?.announce(announceableAccount);
+	}, [announceableAccount]);
 
 	React.useEffect(() => {
 		const onStorage = (event: StorageEvent) => {
@@ -390,7 +454,8 @@ export function AuthProvider({
 		queryClient.setQueryData(SESSION_KEY, null);
 		setActive(null);
 		await teardownPrivateCache();
-	}, [queryClient, teardownPrivateCache]);
+		refreshFromServer();
+	}, [queryClient, teardownPrivateCache, refreshFromServer]);
 
 	const value = React.useMemo<AuthContextValue>(
 		() => ({
@@ -419,11 +484,7 @@ export function AuthProvider({
 
 	return (
 		<AuthContext.Provider value={value}>
-			<span
-				data-auth-status={status}
-				data-auth-hydrated={status === "unknown" ? undefined : "true"}
-				style={{ display: "none" }}
-			/>
+			<span data-auth-status={status} style={{ display: "none" }} />
 			{children}
 		</AuthContext.Provider>
 	);
