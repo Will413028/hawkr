@@ -4,7 +4,7 @@
  *
  * The gateway meters every per-IP quota against a "subject" — who a request is
  * charged to — rather than the peer address it happens to arrive from. That
- * distinction only matters for OUR OWN server-side callers: this Worker's SSR,
+ * distinction only matters for OUR OWN server-side callers: this app's SSR,
  * its `/api/public/*` route handlers and the CI runner each present ONE address
  * on behalf of an unbounded number of people, so without an attestation every
  * visitor of the site shares a single quota bucket. That is the defect #2264
@@ -56,7 +56,7 @@ const HEADER_NAME = "X-HK-Origin-Auth";
  *
  * Presence of `ORIGIN_AUTH_CI_SECRET` is therefore also the signal that this
  * process IS a CI runner: it is only ever set on a GitHub Actions runner (the
- * deployed Worker never receives it), the gateway only accepts `p=ci` under it,
+ * deployed function never receives it), the gateway only accepts `p=ci` under it,
  * and a runner has no real visitors whose IP would mean anything.
  */
 function resolveSigner(): { secret: string; ci: boolean } | null {

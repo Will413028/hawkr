@@ -35,7 +35,7 @@
 
 目前公開頁已先取得 JSON 再輸出文字，沒有等待圖片下載。首頁的必要 bootstrap 失敗語意保護 ISR 的最後有效快取；市集共用商品請求已有去重。不要為了套用通用範例而移除這些契約。
 
-本次沒有啟用新的 HTML 串流或 PPR。專案使用 Next.js 16.3.4 與 OpenNext 的既有 ISR 路徑；已檢查的 Next 靜態產生路徑會收集完整 HTML stream。`next dev` 中看到 Suspense 分段輸出，不能直接當作部署後會提早送出 HTML 的證據。未來拆分伺服器區塊時，須另驗證正式建置、快取命中及失效重建時的實際回應。
+專案在 Vercel 上開啟 `cacheComponents`（PPR）：靜態外殼在建置時產生，動態洞（登入狀態等）以 Suspense 串流，`pnpm test:build-output` 檢查每頁的預渲染模式與外殼內容。`next dev` 中看到 Suspense 分段輸出，不能直接當作部署後會提早送出 HTML 的證據。未來拆分伺服器區塊時，須另驗證正式建置、快取命中及失效重建時的實際回應。
 
 ## 驗證方式
 

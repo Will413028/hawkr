@@ -5,7 +5,7 @@
 | 狀態 | accepted |
 | 日期 | 2026-10-30 |
 | 決定者 | Will（A7-D19；D1–D6 依方法簡報與 fresh subagent 批判拍板，2026-10-30） |
-| 修訂 | 2026-10-31：D2 的 Google nonce 處理定案（見文末〈修訂：Google 原生登入的 nonce〉） |
+| 修訂 | 2026-10-31：D2 的 Google nonce 處理定案（見文末〈修訂：Google 原生登入的 nonce〉）；2026-11-01：web 端登入狀態改由伺服器決定、website 改部署在 Vercel（見文末〈修訂：web 登入狀態由伺服器決定〉） |
 | 影響範圍 | identity 模組、`internal/httpapi` 的認證與 CSRF；website 的登入與 transport；`packages/hawkr_auth` 與兩支 App |
 | 上層決策 | `2026-09-24-go-modular-monolith.md` D1、D5；`2026-09-26-external-contract-protobuf-connect.md` D6 |
 
@@ -94,3 +94,14 @@ D2 寫「Google 的 SDK 帶不了 nonce 時，改以短效 token＋雜湊紀錄�
 - 與 `google_sign_in` 文件不同（文件寫只呼叫一次 `initialize`）。證據：iOS 外掛的實作只覆寫設定；2026-10-31 在 iOS 模擬器（iPhone 17／iOS 26.0）實測 buyer 與 seller 的 Google 登入，nonce 比對通過（計畫附件 `spikes.md` g）。未在實體裝置驗證。Android 不適用，兩支 App 沒有 `android/` 目錄。
 - 重新驗證的觸發：`google_sign_in` 升級，或加入 Android 支援。
 - 理由與盤點在 `internal/modules/identity/CARRYOVER.md` 的「自建登入的沿用盤點」。
+
+## 修訂：web 登入狀態由伺服器決定（2026-11-01）
+
+website 從 Cloudflare Workers（OpenNext）搬到 Vercel（函式區域 `hnd1`，見 `2026-11-01-website-hosting-vercel.md`）並開 Cache Components 後，web 端讀登入狀態的機制改了。D1（憑證）、D3（OAuth 由單體做，website 不持 secret）、D6（Next.js 伺服器端只讀）不變；上方方案表中「Workers 多持兩家 secret」是當時平台的否決理由，保留原文。下列取代原先 website 端「client 自己問單體」的做法，以現行程式為準。
+
+- **唯一來源**：website 伺服器端的 DAL `verifySession()`（`website/lib/auth/dal.ts`）。它讀 `__Host-hk_session`，把訪客的 cookie 轉送給單體的 GetSession（GET，唯讀），回 `signedIn | guest | unavailable`；同一請求只讀一次。HttpOnly 的 cookie JS 讀不到，client 不再自己決定是否登入。
+- **只有確定的答案才是訪客**：沒有 cookie、401、單體拒絕帳號的 403 是 `guest`；網路錯誤、逾時、5xx 是 `unavailable`，不是登出，不清除任何登入狀態。client 在 `unavailable` 時以退避重問，並在 `online`、`visibilitychange` 時再問；拿到確定的答案後以 `router.refresh()` 讓伺服器重算，不直接寫入 client 狀態。
+- **client 狀態**：根 layout 不 await 該 promise，交給 `AuthProvider`（`website/lib/auth/context.tsx`）；Provider 不 suspend，答案到之前是 `unknown`（頁首顯示固定尺寸的中性骨架），所以靜態外殼與 404 狀態碼不受影響（取捨見 hosting ADR 的同日修訂）。
+- **受保護區**（`/account`、`/checkout`、`/seller-center` 等）：server layout 的 `ZoneGate` 依 DAL 導向；`website/middleware.ts` 只看 cookie 在不在做樂觀導向，被單體撤銷的 cookie 仍會通過 middleware，由 `ZoneGate` 擋下。已移除 client 端的導向守衛。
+- **狀態改變之後**（登出、任何 401、單體拒絕 session、登入成功換帳號）：client 呼叫 `router.refresh()`，讓根 layout 交來新的 promise，最新的 promise 的答案勝出；其他分頁經 BroadcastChannel `hk-auth-session` 得知後同樣 refresh。
+- **反代需求不變**：website 經同源反代把 `/api/auth/*`、`/api/connect/*`、`/api/v1/*` 轉給單體，需原樣傳 3xx 與多個 `Set-Cookie`；部署平台換成 Vercel 後的驗證由 hosting ADR 的步驟負責。

@@ -4,7 +4,7 @@
 - **啟動開發伺服器**: `pnpm dev`
 - **正式環境編譯**: `pnpm build`
 - **Lint 與類型檢查**: `pnpm lint`（tsc、biome check 與架構／transport／dark mode 等檢查腳本）
-- **測試**: `pnpm test`（Vitest）、`pnpm test:unit`（`tests/*.test.ts`，node:test）；E2E 用 `pnpm test:e2e`。單元測試不得連到真的主機（`tests/setup/hermetic.mjs` 擋非 loopback 連線；沒有 handler 的 msw 請求會失敗）；啟動子程序時用 `hermeticEnv()`（`tests/helpers/hermetic-env.ts`，`tests/hermetic-guard.test.ts` 檢查）。`pnpm run test:build-output` 檢查 `pnpm build` 預先渲染的 HTML。本機跑 `pnpm build` 要把兩個 API base 設成 loopback。
+- **測試**: `pnpm test`（Vitest）、`pnpm test:unit`（`tests/*.test.ts`，node:test）；E2E 用 `pnpm test:e2e`。單元測試不得連到真的主機（`tests/setup/hermetic.mjs` 擋非 loopback 連線；沒有 handler 的 msw 請求會失敗）；啟動子程序時用 `hermeticEnv()`（`tests/helpers/hermetic-env.ts`，`tests/hermetic-guard.test.ts` 檢查）。`pnpm run test:build-output`（`tests/build-output/`：靜態外殼、404 狀態碼、各頁的預渲染模式等，CI 會跑）檢查 `pnpm build` 的產物；改動根 layout 在 `<Suspense>` 之外的元件後必跑 `pnpm build`。本機跑 `pnpm build` 要把兩個 API base 設成 loopback。
 - **共用文案目錄**: 在共用套件 `@hawkr/ui-text`（`packages/hawkr-ui-text-ts`），import 自 `@hawkr/ui-text/keys` 與 `@hawkr/ui-text/format`。元件用 `useUiText()`、RSC 與測試用 `uiTextFor(locale)`（`lib/i18n/ui-text.ts`，不用 `getTranslations()`，否則 ISR 的頁會變動態）；回傳字串的純函式第一個參數收 `ut: UiText`。目錄的名詞對 UNSPECIFIED 與不認得的值回 undefined，要文字用 `optionalText(ut, m)`，要「未知」用 `commonUnknown()`；錯誤文字用 `@hawkr/api/connect/errors` 的 `errorText`。enum 文字規則見根目錄 `AGENTS.md`，由 `pnpm lint` 的 `check-enum-text` 擋。
 - **佔位圖**: `pnpm gen:placeholders` 依 `scripts/gen-placeholders.ts` 的表與 `design-system/cross-platform-tokens.json` 的 `brand.*` 重新產生 `public/placeholders/*.svg`；`tests/placeholders.test.ts` 比對檔案、並檢查原始碼引用的本機素材路徑都存在
 - **自動格式化**: `pnpm format`
@@ -51,6 +51,14 @@ docs/                       # 技術文件（directory-architecture.md、design-
 - **導覽層**：站內路徑在程式裡不含語系，**不要在呼叫點手拼 `/en`**。出口：連結 `components/shared/Link`（保留 `next/link` 行為的用 `lib/intl/native-link`）；router `useRouter()`（`lib/intl/use-router.ts`）；server 導向 `redirect({ href, locale })`；整頁導覽 `commitDocumentNavigation()`；其他站內目標過 `useLocalizedHref()`／`localizeHref()`；讀路徑用 `lib/intl/navigation.ts` 的 `usePathname()`；依網址判斷頁面類型先 `stripLocale`。`tests/navigation-layer.test.ts` 擋繞過出口的寫法；元件測試的 mock 寫法見 `docs/i18n-routing.md`。
 
 共通規則（UI 改動的授權、Git、不留技術債）見根目錄的 `AGENTS.md`。
+
+## 登入狀態
+伺服器決定登入狀態；機制與 ADR 見 `README.md`「顧客登入」。
+- **唯一來源**：`lib/auth/dal.ts` 的 `verifySession()`。根 layout 不 await，promise 交給 `lib/auth/context.tsx` 的 `AuthProvider`，Provider 不 suspend。不在 `'use cache'` 內呼叫。
+- **四態**（`lib/auth/session-state.ts`）：`unknown | guest | signedIn | unavailable`。只有確定的答案才是 `guest`；網路錯誤、逾時、5xx 是 `unavailable`，**不是登出**，不清除登入狀態。`unavailable` 的探測拿到答案時只 `router.refresh()`，不寫 client 狀態。
+- **受保護區**：server layout 用 `components/shared/ZoneGate.tsx`（`lib/auth/zone.ts`）導向；`middleware.ts` 只看 cookie 在不在。client 不做導向守衛。
+- **狀態改變後**（登出、401、`rejectSession`、`commitIdentity`）呼叫 `router.refresh()`，最新的 promise 勝出；跨分頁用 `lib/auth/cross-tab-sync.ts`。
+- **E2E** 等登入狀態解析用 `data-auth-status`。
 
 ## UI 元件工作流程
 

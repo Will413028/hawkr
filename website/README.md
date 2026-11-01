@@ -28,7 +28,7 @@ pnpm dev
 | 指令 | 說明 |
 |------|------|
 | `pnpm dev` | 啟動開發伺服器（Turbopack，含自動重載） |
-| `pnpm build` | 編譯正式環境 standalone build |
+| `pnpm build` | 編譯正式環境產物（Vercel 自己打包，不設 standalone） |
 | `pnpm start` | 啟動正式環境伺服器 |
 | `pnpm lint` | `tsc --noEmit` 型別檢查 + Biome lint（針對 app/components/features/lib/scripts/tests/...） |
 | `pnpm format` | Biome 自動格式化整個專案 |
@@ -36,6 +36,7 @@ pnpm dev
 | `pnpm dark-mode:check` | 跑 `scripts/check-dark-mode.ts` 檢查 dark mode 樣式 |
 | `pnpm knip` | 偵測未使用的檔案 / export / 依賴 |
 | `pnpm test:unit` | Node test runner 跑 `tests/*.test.ts` 單元測試 |
+| `pnpm test:build-output` | 讀 `pnpm build` 的產物（`tests/build-output/`：靜態外殼、404 狀態碼、各頁預渲染模式等），CI 的 website-ci 會跑 |
 | `pnpm test:e2e` | 執行 Playwright E2E 測試 |
 | `pnpm test:e2e:ui` | 以 UI 模式執行 E2E 測試 |
 | `pnpm build:seo` | 以 prod flavor + indexable 旗標 build（SEO 驗證用） |
@@ -76,7 +77,7 @@ features/                   # 產品功能模組與 route-facing screens
 lib/                        # infrastructure 層
 ├── config/                 # env.ts / flavor.ts — flavor 驅動的設定來源
 ├── api/                    # API client
-├── auth/                   # GIS 登入、active-role、phone OTP、redirect
+├── auth/                   # 伺服器端登入狀態（dal、zone）、AuthProvider、跨分頁同步、active-role、GIS、redirect
 ├── seo/                    # jsonld / metadata / urls / indexability / tags
 ├── media/                  # OSS image loader 等
 ├── content/  services/  theme/  utils/  ...
@@ -128,7 +129,7 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_MEDIA_BASE_URL` | 圖片／媒體 gateway 來源（R2 + Cloudflare Worker），也是 app 唯一認得的自家媒體主機。**留空 = 沒有媒體 origin**，object key 不會組出任何網址，圖片就是不顯示（不會退到別的主機） | **要在本機跑 E2E 或 `pnpm build` 就必填**（dev 值 `https://test-media.example.com`；見下方第 8 節） |
 | `NEXT_PUBLIC_LINE_URL` | 客服 LINE 連結（聯絡頁的 LINE 項目）；須為 `https://` 網址。**留空 = 不顯示任何 LINE 入口**（不會退到預設帳號） | 否 |
 | `APPLE_PAY_DOMAIN_ASSOCIATION` | Apple Pay 網域驗證檔內容（單行）；由 `/.well-known/apple-developer-merchantid-domain-association(.txt)` 提供，未設回 404 | 否 |
-| `ORIGIN_AUTH_SECRET` | backend#2264 限流身分簽章金鑰。server 端每次打 gateway 時附上 `X-HK-Origin-Auth`，讓 gateway 知道這次呼叫該算在哪個訪客（或算成 SSR）頭上，而不是把全站流量算在 Worker 的單一出口位址上。Worker binding **確實不存在時**才是不簽章；candidate upload 的 secrets file 是 additive，僅省略 GitHub secret 會繼承既有 binding，不會自動切成 unsigned。目前沒有部署環境，此項沒有現行操作。CI 用的是另一把 `ORIGIN_AUTH_CI_SECRET`（只在 GitHub Actions step 上，不進 Worker） | 否（binding 不存在時只是粒度退化） |
+| `ORIGIN_AUTH_SECRET` | backend#2264 限流身分簽章金鑰。server 端每次打 gateway 時附上 `X-HK-Origin-Auth`，讓 gateway 知道這次呼叫該算在哪個訪客（或算成 SSR）頭上，而不是把全站流量算在 website server 的單一出口位址上。環境變數沒設時不簽章。目前沒有部署環境，此項沒有現行操作。CI 用的是另一把 `ORIGIN_AUTH_CI_SECRET`（只在 GitHub Actions step 上，不進部署環境） | 否（沒設時只是粒度退化） |
 | `REVALIDATE_SECRET` | 後端服務 POST `/api/revalidate` 時帶的 `x-revalidate-secret`；producer 只送 `product:<id>` / `seller:<id>` 等 entity tag，web 邊界自動展開為對應的 aggregate tags。失效強度由 tag 形狀決定：entity tag 立即過期（寫入者下一次讀取即為新內容），aggregate 列表維持 stale-while-revalidate 以保留重生去重與後端故障時的 stale 兜底 | server 端 ISR busting 需要 |
 
 > 認證已**不再使用 Better Auth / 獨立 DB**。舊版的 `BETTER_AUTH_*`、`BFF_SESSION_*`、`DB_*`、`NEXT_PUBLIC_AUTH_DRIVER` 已移除，無需設定。顧客登入走單體的 Google / LINE OAuth 與 HttpOnly 的 session cookie（見下方「顧客登入」）。
@@ -160,7 +161,7 @@ REVALIDATE_SECRET=
 ### 4. Firebase 與 OAuth 設定
 
 - **Firebase**：僅用於 phone OTP（手機註冊綁定）。Firebase Console → Project Settings → Web app config 取值；Authentication → Sign-in method 啟用 Phone，Authorized domains 加入 `localhost` 與正式網域；開發時可設 test phone numbers 節省簡訊額度。
-- **顧客登入（Google、LINE）**：由單體處理（ADR `backend/docs/adr/2026-10-30-identity-self-hosted-federated-login.md`），website 沒有 secret 也沒有登入用的環境變數。登入頁（`features/auth`）把瀏覽器整頁導向 `/api/auth/{provider}/start?return_to=…`（經同源反代到單體），單體完成 OAuth 後設 HttpOnly 的 `__Host-hk_session` cookie 並 302 回登入頁；失敗時 302 回 `/login?error=<代碼>`。OAuth client 與 redirect URI 在單體的設定與各 provider 的 console，不在這裡。登入與否由伺服器端 DAL 的 `GetSession` 判斷（`lib/auth/dal.ts`，結果交給 `lib/auth/context.tsx` 的 `AuthProvider`），登出是 `SignOut`；middleware 只看 cookie 在不在（樂觀導向，不打 API）。伺服器端（RSC、server action）只讀取：把訪客的 cookie 轉送給單體的 GET，寫入一律由瀏覽器送出（`lib/auth/session-cookie.server.ts`）。
+- **顧客登入（Google、LINE）**：由單體處理（ADR `backend/docs/adr/2026-10-30-identity-self-hosted-federated-login.md`），website 沒有 secret 也沒有登入用的環境變數。登入頁（`features/auth`）把瀏覽器整頁導向 `/api/auth/{provider}/start?return_to=…`（經同源反代到單體），單體完成 OAuth 後設 HttpOnly 的 `__Host-hk_session` cookie 並 302 回登入頁；失敗時 302 回 `/login?error=<代碼>`。OAuth client 與 redirect URI 在單體的設定與各 provider 的 console，不在這裡。登入與否由伺服器端 DAL 的 `GetSession` 判斷（`lib/auth/dal.ts`，結果交給 `lib/auth/context.tsx` 的 `AuthProvider`；狀態是 `unknown | guest | signedIn | unavailable`，`unavailable` 是單體暫時答不出來，不是登出，client 以退避與 `online`、`visibilitychange` 探測，拿到確定的答案後 `router.refresh()` 讓伺服器重算），登出是 `SignOut`；登出、401 等事件後 client 呼叫 `router.refresh()` 重取狀態，多個分頁以 BroadcastChannel `hk-auth-session` 同步；受保護區由 server layout 的 `ZoneGate` 導向；middleware 只看 cookie 在不在（樂觀導向，不打 API）。伺服器端（RSC、server action）只讀取：把訪客的 cookie 轉送給單體的 GET，寫入一律由瀏覽器送出（`lib/auth/session-cookie.server.ts`）。
 - **廠商入口的 Google 二次驗證**：GCP Console → APIs & Services → Credentials → OAuth 2.0 Client ID（Web application），把本機與正式網域加入 Authorized JavaScript origins。
 
 ### 5. Next.js 配置 (`next.config.ts`)

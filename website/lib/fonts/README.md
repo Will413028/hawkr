@@ -112,7 +112,7 @@ The backup is recoverable and should not be restored into a running dev server.
 
 ### Regenerate and verify
 
-Generation is an explicit maintenance step. Normal Next/OpenNext builds use
+Generation is an explicit maintenance step. Normal Next builds use
 the checked-in artifacts and need neither Python nor network access.
 Use an isolated Python environment with the exact versions in
 `scripts/fonts/requirements.txt`; the generator refuses version drift.
