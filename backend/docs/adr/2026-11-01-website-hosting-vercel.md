@@ -64,6 +64,23 @@
 - 計畫：平台遷移（行為不變）→ 開 cacheComponents ＋ DAL ＋ 伺服器初值 → client 四態模型（`unknown | guest | signedIn | unavailable`）。
 - 單體在 `oci-a1` 的容器資源上限與部署方式，在第一次部署前決定。
 
+## 修訂：身分不以根層 Suspense 包住頁面（2026-11-01，Will 決定）
+
+脈絡：決定 3 原本寫成「根 layout 把 session promise 包在 Suspense 交給 `AuthProvider`」。照這樣實作後，`{children}` 也落在那個 Suspense 裡：`notFound()` 回 200（狀態碼在靜態外殼送出時就定了；SEO 要求 404，屬外部約束），靜態外殼只剩 fallback，各頁的 prerender 錯誤也被它遮住（`next start`＋curl 實測）。讀身分的消費端有 91 個檔案，這是現有程式碼，系統未上線，不構成約束。
+
+考慮過的方案：
+- A：`AuthProvider` 收未 await 的 promise，自己不 suspend；結果出來前狀態是 `unknown`，頁首顯示固定尺寸的中性骨架；`{children}` 不在任何根層 Suspense 內，只有真正需要執行期資料的區塊各自包 Suspense（Next.js docs：Authentication、`use`）。（採用）
+- B：頁首、頁尾等外框元件各自包 Suspense，children 內的元件在身分未定時先用訪客外觀——登入者會看到「登入」閃一下，且要逐頁加邊界。
+- C：保留單一根 Suspense——要接受 404 變 200、外殼沒有內容，PPR 的效益大幅縮小。
+
+決策：採 A。四態 `unknown | guest | signedIn | unavailable` 與骨架因此從原計畫的 client 四態步驟提前到開 cacheComponents 的同一步；原決策段保留歷史。
+
+理由：選 A 而非 C，是因為 C 讓 404 與靜態外殼這兩個開 Cache Components 的主要收益同時消失；選 A 而非 B，是因為 B 的訪客外觀後備就是已否決的「先顯示訪客樣式」，而且邊界散在每一頁。代價是每個消費端都要能處理 `unknown`，以及那些 prerender 會讀執行期資料的頁面要各自加 Suspense。
+
+守門：website `tests/build-output/` 的 not-found-status 與 static-shell（把 children 包回根 Suspense 時失敗）。
+
+撤銷條件：Next 能在串流開始後仍改 HTTP 狀態碼，或 Suspense fallback 之下的錯誤能在 build 時浮出 → 重評 C 的代價。
+
 ## 相關
 
 - `2026-09-24-go-modular-monolith.md`（修訂「部署目標」）

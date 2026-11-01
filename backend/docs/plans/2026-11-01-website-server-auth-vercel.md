@@ -110,6 +110,7 @@
   - A：Provider 不 suspend，結果出來前 context 為 `unknown`，children 在 Suspense 外；四態與 D3 骨架從步驟 4 提前到步驟 3。（建議，採用）
   - B：頁首、頁尾等外框元件各自包 Suspense，children 內的元件 `unknown` 時先用訪客外觀——等於 D3 的 B，且要逐頁加邊界。
   - C：接受 200 與只有 fallback 的外殼——放寬 SEO 驗收，PPR 的效益大幅縮小。
+  - ADR：`backend/docs/adr/2026-11-01-website-hosting-vercel.md` 的「修訂：身分不以根層 Suspense 包住頁面」。
 
 拍板順序：D1–D4 現在可一起拍；若步驟 1 的事實推翻前提，重交 D1／D2。
 
