@@ -61,7 +61,7 @@
   - 驗收：完成定義的檢查；`pnpm install --frozen-lockfile` 成功；rg 清單只剩上面註明的無關命中；`rg -n "cf-connecting-ip" website` 無命中；mutation：讓 `getVisitorIp` 改讀 `cf-connecting-ip`，seller-leads 限流測試要失敗；預覽網域 noindex 測試在移除規則時失敗。
   - 停止條件：某個 Cloudflare 機制在 Vercel 沒有對應而且影響行為 → 回報。
   - 完成後的狀態：Apple Pay 關聯檔路由保留（與平台無關）；本機 `pnpm preview` 消失，改 `pnpm build && pnpm start`。
-- [ ] **2b. 部署環境的 API 反代與同源設定**（被擋於：無；必須在步驟 3 之前）
+- [x] **2b. 部署環境的 API 反代與同源設定**（被擋於：無；必須在步驟 3 之前）
   - 範圍：`next.config.ts` 的 `rewrites().beforeFiles` 依單體位址（新增必填的 server 端設定，名稱沿用 `API_BASE_URL` 推得的 host，不另立變數）把 `/api/connect/:path*` 轉到單體根目錄、`/api/auth/:path*` 與 `/api/v1/:path*` 原路徑轉送，只在非本機開發時啟用（本機仍走 route handler）；`lib/config/env.ts` 在 prod flavor 拒絕與 `NEXT_PUBLIC_WEB_ORIGIN` 不同源的 `NEXT_PUBLIC_API_BASE_URL`（spikes.md f）。
   - 消費端：`rg -n "isLocalApiProxyEnabled|connectBaseUrl|apiBaseUrl|NEXT_PUBLIC_API_BASE_URL" website`；`website/tests/` 的 env 與 proxy 測試；CI build 的 env（`.github/workflows/website-*.yml`、`package.json` 的 `build:seo`）。
   - 不能動：本機開發的 route handler 行為；3xx 與多個 `Set-Cookie` 原樣傳遞。
@@ -114,7 +114,7 @@
 |---|---|---|---|---|
 | 1 spike | 完成（LINE 真人登入、tag 失效未測，Will 2026-11-01 決定收掉實測環境） | 上傳方式、純 ISR 建置、cacheComponents 改寫量（34／405 頁）、IP header 防偽、區域與記憶體設定（spikes.md） | 反代 3xx／Set-Cookie、RTT、tag 失效：單體尚未公開部署 | |
 | 2 平台遷移 | 完成 | lint、vitest 2755、node:test 2111、build＋build-output 7；mutation：IP 改讀 cf-connecting-ip、拿掉 vercel.app noindex、拿掉 Sentry 預覽過濾 皆失敗；獨立審查 2 項已處理；CI 全綠（website CI、website e2e、workspace CI、supply chain） | Vercel 上的 headers 實效（待步驟 3 預覽部署）；Skew Protection 待第一次部署前開 | `1ae6959`..`f0184b2`、`2b1a695` |
-| 2b API 反代與同源設定 | 未開始 | | | |
+| 2b API 反代與同源設定 | 完成 | lint、vitest 2755、node:test 2119、build＋build-output 11（routes manifest 三條 beforeFiles）；mutation：拿掉同源檢查、拿掉任一條 rewrite 皆失敗；獨立審查 3 項已處理（build:seo 改相對 `/api/v1`、同源檢查擋 `//host`）；CI 全綠（website CI、website e2e、supply chain、repo hygiene、ui-text guard、commit messages） | Vercel 上的實效（待步驟 3 預覽部署） | `0ec1d71`、`8a36adf` |
 | 3 cacheComponents ＋ DAL | 未開始 | | | |
 | 4 client 四態 | 未開始 | | | |
 | 5 收尾 | 未開始 | | | |
