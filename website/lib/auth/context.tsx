@@ -229,8 +229,7 @@ export function AuthProvider({
 				}
 				if (cancelled) return false;
 				if (result === SESSION_UNAVAILABLE) return true;
-				if (queryClient.getQueryData(SESSION_KEY) !== undefined) return false;
-				queryClient.setQueryData(SESSION_KEY, result);
+				refreshFromServer();
 				return false;
 			} finally {
 				inFlight = false;
@@ -256,7 +255,7 @@ export function AuthProvider({
 			window.removeEventListener("online", onOnline);
 			document.removeEventListener("visibilitychange", onVisibility);
 		};
-	}, [status, queryClient]);
+	}, [status, refreshFromServer]);
 
 	const refusal =
 		serverSession?.status === "guest" ? serverSession.refusal : undefined;

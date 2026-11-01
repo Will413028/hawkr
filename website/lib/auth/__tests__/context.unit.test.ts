@@ -325,12 +325,12 @@ describe("AuthProvider retries an unavailable session", () => {
 		});
 	}
 
-	it("re-asks GetSession on the backoff schedule and becomes signedIn when it answers", async () => {
+	it("re-asks GetSession on the backoff schedule and, once it answers, asks the server for the new value instead of writing the cache", async () => {
 		vi.useFakeTimers();
 		api.fetchSession
 			.mockResolvedValueOnce(api.UNAVAILABLE)
 			.mockResolvedValueOnce(buyer);
-		const { result } = await render(unavailable);
+		const { result, adopt } = await render(unavailable);
 		expect(result.current.status).toBe("unavailable");
 		await advance(SESSION_RETRY_BACKOFF_MS[0] - 1);
 		expect(api.fetchSession).not.toHaveBeenCalled();
@@ -340,18 +340,26 @@ describe("AuthProvider retries an unavailable session", () => {
 		await advance(SESSION_RETRY_BACKOFF_MS[1]);
 		expect(api.fetchSession).toHaveBeenCalledTimes(2);
 		await advance(1);
+		expect(router.refresh).toHaveBeenCalledTimes(1);
+		expect(result.current.status).toBe("unavailable");
+		expect(result.current.identity).toBeNull();
+		vi.useRealTimers();
+		await adopt(signedIn);
 		expect(result.current.status).toBe("signedIn");
 		expect(result.current.identity?.accountId).toBe("7");
-		await advance(SESSION_RETRY_BACKOFF_MS[2] * 2);
 		expect(api.fetchSession).toHaveBeenCalledTimes(2);
 	});
 
-	it("a 401 answer on retry is a guest", async () => {
+	it("a 401 answer on retry asks the server and becomes a guest only through its answer", async () => {
 		vi.useFakeTimers();
 		api.fetchSession.mockResolvedValueOnce(null);
-		const { result } = await render(unavailable);
+		const { result, adopt } = await render(unavailable);
 		await advance(SESSION_RETRY_BACKOFF_MS[0]);
 		await advance(1);
+		expect(router.refresh).toHaveBeenCalledTimes(1);
+		expect(result.current.status).toBe("unavailable");
+		vi.useRealTimers();
+		await adopt(guest);
 		expect(result.current.status).toBe("guest");
 	});
 
@@ -389,6 +397,7 @@ describe("AuthProvider adopts the server's newest answer after an event", () => 
 		});
 		expect(result.current.status).toBe("guest");
 		expect(router.refresh).toHaveBeenCalledTimes(1);
+		vi.useRealTimers();
 		await adopt(guest);
 		expect(result.current.status).toBe("guest");
 		expect(result.current.identity).toBeNull();
@@ -636,13 +645,17 @@ describe("AuthProvider retries an unavailable session on reconnect and return", 
 	it("asks again when the browser comes back online, before the backoff elapses", async () => {
 		vi.useFakeTimers();
 		api.fetchSession.mockResolvedValueOnce(buyer);
-		const { result } = await render(unavailable);
+		const { result, adopt } = await render(unavailable);
 		expect(api.fetchSession).not.toHaveBeenCalled();
 		await act(async () => {
 			window.dispatchEvent(new Event("online"));
 			await vi.advanceTimersByTimeAsync(0);
 		});
 		expect(api.fetchSession).toHaveBeenCalledTimes(1);
+		expect(router.refresh).toHaveBeenCalledTimes(1);
+		expect(result.current.status).toBe("unavailable");
+		vi.useRealTimers();
+		await adopt(signedIn);
 		expect(result.current.status).toBe("signedIn");
 	});
 
@@ -668,7 +681,7 @@ describe("AuthProvider retries an unavailable session on reconnect and return", 
 	it("still asks after the backoff schedule ran out, a 401 is a guest and any other failure stays unavailable", async () => {
 		vi.useFakeTimers();
 		api.fetchSession.mockResolvedValue(api.UNAVAILABLE);
-		const { result } = await render(unavailable);
+		const { result, adopt } = await render(unavailable);
 		for (const delay of SESSION_RETRY_BACKOFF_MS) {
 			await act(async () => {
 				await vi.advanceTimersByTimeAsync(delay);
@@ -680,11 +693,15 @@ describe("AuthProvider retries an unavailable session on reconnect and return", 
 			await vi.advanceTimersByTimeAsync(0);
 		});
 		expect(result.current.status).toBe("unavailable");
+		expect(router.refresh).not.toHaveBeenCalled();
 		api.fetchSession.mockResolvedValueOnce(null);
 		await act(async () => {
 			window.dispatchEvent(new Event("online"));
 			await vi.advanceTimersByTimeAsync(0);
 		});
+		expect(router.refresh).toHaveBeenCalledTimes(1);
+		vi.useRealTimers();
+		await adopt(guest);
 		expect(result.current.status).toBe("guest");
 	});
 
