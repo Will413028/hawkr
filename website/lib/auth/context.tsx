@@ -1,7 +1,8 @@
 "use client";
 
-import type { ConnectError } from "@connectrpc/connect";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { userMessage } from "@hawkr/api/connect/errors";
+import { LocalizedMessageSchema } from "@hawkr/api/gen/google/rpc/error_details_pb";
 import * as Sentry from "@sentry/nextjs";
 import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as React from "react";
@@ -10,11 +11,7 @@ import { useDefaultErrorText } from "@/lib/i18n/ui-text";
 import { stripLocale } from "@/lib/intl/paths";
 import { commitDocumentNavigation } from "@/lib/navigation/document-location";
 import { useObservedRouter } from "@/lib/navigation/use-observed-router";
-import {
-	logout as apiLogout,
-	fetchSession,
-	LogoutRevokeFailedError,
-} from "../api/auth";
+import { logout as apiLogout, LogoutRevokeFailedError } from "../api/auth";
 import { AUTH_EXPIRED_EVENT } from "../api/client";
 import { fetchProfile } from "../profile/repo";
 import {
@@ -26,7 +23,7 @@ import {
 } from "./active-role";
 import { reduceStorageEvent } from "./cross-tab-sync";
 import { syncLocalPrivateState } from "./local-private-state";
-import { HYDRATION_GATE_MS, resolveSession } from "./session-resolver";
+import type { SessionState } from "./session-state";
 import type { Identity } from "./storage";
 import {
 	shouldTeardownPrivateCache,
@@ -59,8 +56,11 @@ interface AuthContextValue {
 	/** 帳號有 ROLE_SELLER。每個登入的帳號都是買家，所以沒有 hasBuyer：看 isLoggedIn。 */
 	hasSeller: boolean;
 	activeRole: RoleSlot | null;
+	/** 伺服器已經把登入狀態帶進第一個畫面，恆為 true；等 client 狀態整併後移除。 */
 	hydrated: boolean;
+	/** 單體暫時答不出來（B-199）：不是登出，`identity` 為 null 但不能當成訪客。 */
 	sessionUnavailable: boolean;
+	/** 同 `hydrated`，恆為 true。 */
 	sessionSettled: boolean;
 	commitIdentity: (identity: Identity) => void;
 	switchRole: (next: RoleSlot) => boolean;
@@ -82,27 +82,49 @@ function resolveActiveRole(identity: Identity | null): RoleSlot | null {
 	return active;
 }
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+/** 伺服器的 GetSession 答案（DAL）換成 React Query 快取的初值：`undefined` 是「沒有答案」（暫時不可用）。 */
+function identityFromSession(
+	session: SessionState,
+): Identity | null | undefined {
+	if (session.status === "signedIn") return session.identity;
+	if (session.status === "guest") return null;
+	return undefined;
+}
+
+/**
+ * 登入狀態的唯一來源是伺服器：根 layout 不 await `verifySession()`，把 promise 交給這裡，
+ * 在 `<Suspense>` 內以 `use()` 讀（shell 仍可靜態，身分在同一個 response 串流）。
+ * 憑證是 HttpOnly cookie，JS 讀不到，所以 client 不再自己問單體；事件（登入、登出、換帳號）
+ * 之後才更新 React Query 快取裡的同一個 key。
+ */
+export function AuthProvider({
+	session,
+	children,
+}: {
+	session: Promise<SessionState>;
+	children: React.ReactNode;
+}) {
 	const router = useObservedRouter("auth_context");
 	const queryClient = useQueryClient();
-	// 憑證是 HttpOnly cookie，JS 讀不到：登入與否只能問單體（GetSession）。快取裡 undefined 是「還沒問到」，
-	// null 是「問過了，沒有登入」。登入、換帳號都是整頁導覽，所以整份快取只有一個 key。
+	const initialSession = React.use(session);
+	// 快取裡 undefined 是「沒有答案」，null 是「確定沒有登入」。登入、換帳號都是整頁導覽，所以整份快取只有一個 key。
 	const sessionQuery = useQuery<Identity | null>({
 		queryKey: SESSION_KEY,
 		queryFn: skipToken,
 		enabled: false,
 		staleTime: Number.POSITIVE_INFINITY,
+		initialData: identityFromSession(initialSession),
 	});
 	const identity = sessionQuery.data ?? null;
-	const [active, setActive] = React.useState<RoleSlot | null>(null);
-	const [gateExpired, setGateExpired] = React.useState(false);
-	const [probeUnavailable, setProbeUnavailable] = React.useState(false);
-	const [probeGaveUp, setProbeGaveUp] = React.useState(false);
+	// 第一次渲染的工作區必須與伺服器一致：只有 localStorage 知道賣家上次停在哪個工作區，effect 之後才讀它。
+	const [active, setActive] = React.useState<RoleSlot | null>(() =>
+		identity ? effectiveActiveRole(identity, null) : null,
+	);
 	const previousAccountId = React.useRef<string | undefined>(undefined);
 	const profileStartedFor = React.useRef<string | null>(null);
 	const endingSession = React.useRef(false);
-	const sessionSettled = sessionQuery.data !== undefined || probeGaveUp;
-	const hydrated = gateExpired || sessionSettled || probeUnavailable;
+	const sessionUnavailable =
+		initialSession.status === "unavailable" && sessionQuery.data === undefined;
 
 	const teardownPrivateCache = React.useCallback(
 		() => teardownPrivateCacheOp(queryClient),
@@ -122,8 +144,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				if (text) toast.error(text);
 			}
 			queryClient.setQueryData(SESSION_KEY, null);
-			setProbeUnavailable(false);
-			setProbeGaveUp(true);
 			// 單體拒絕這個帳號（刪除或停權）：盡力撤銷 session 並清掉 cookie；失敗不影響本機已經當成訪客。
 			rejection = apiLogout().catch(() => {
 				rejection = undefined;
@@ -132,27 +152,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		};
 	}, [defaultErrorText, queryClient]);
 
+	const refusal =
+		initialSession.status === "guest" ? initialSession.refusal : undefined;
 	React.useEffect(() => {
-		const gate = setTimeout(() => setGateExpired(true), HYDRATION_GATE_MS);
-		return () => clearTimeout(gate);
-	}, []);
-
-	React.useEffect(() => {
-		setProbeUnavailable(false);
-		setProbeGaveUp(false);
-		return resolveSession(fetchSession, {
-			onUnavailable: () => setProbeUnavailable(true),
-			onDenied: (error) => {
-				void rejectSession(error);
-			},
-			onGaveUp: () => setProbeGaveUp(true),
-			// null = unauthenticated：訪客。
-			onResolved: (result) => {
-				setProbeUnavailable(false);
-				queryClient.setQueryData(SESSION_KEY, result);
-			},
-		});
-	}, [queryClient, rejectSession]);
+		if (!refusal) return;
+		// 單體拒絕這個帳號（刪除或停權）：伺服器端唯讀，由這裡撤銷 session、清 cookie 並顯示原因。
+		void rejectSession(
+			new ConnectError(
+				refusal.message ?? "session refused",
+				Code.PermissionDenied,
+				undefined,
+				refusal.message
+					? [
+							{
+								desc: LocalizedMessageSchema,
+								value: { message: refusal.message },
+							},
+						]
+					: undefined,
+			),
+		);
+	}, [refusal, rejectSession]);
 
 	React.useEffect(() => {
 		if (sessionQuery.data === undefined) return;
@@ -302,9 +322,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			isLoggedIn: !!identity,
 			hasSeller: !!identity && identity.isSeller,
 			activeRole: active,
-			hydrated,
-			sessionUnavailable: probeUnavailable && !identity,
-			sessionSettled,
+			hydrated: true,
+			sessionUnavailable,
+			sessionSettled: true,
 			commitIdentity,
 			switchRole,
 			startSellerOnboarding,
@@ -314,9 +334,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		[
 			identity,
 			active,
-			hydrated,
-			probeUnavailable,
-			sessionSettled,
+			sessionUnavailable,
 			commitIdentity,
 			switchRole,
 			startSellerOnboarding,
@@ -327,7 +345,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 	return (
 		<AuthContext.Provider value={value}>
-			<span data-auth-hydrated={hydrated} style={{ display: "none" }} />
+			<span data-auth-hydrated="true" style={{ display: "none" }} />
 			{children}
 		</AuthContext.Provider>
 	);

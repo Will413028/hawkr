@@ -86,6 +86,7 @@ export default function AutoHideNavShell({
 			{/* biome-ignore lint/a11y/noStaticElementInteractions: hover-only wrapper keeps the shared navbar visible while pointer users traverse mega-menu content. */}
 			<div
 				ref={wrapperRef}
+				data-testid="site-header"
 				className="auto-nav sticky top-0 z-[200] pt-[var(--floating-nav-top-gap)] will-change-transform [transform:translate3d(0,0,0)] [--anv-hide:-120%] max-[768px]:[--anv-hide:-100%] data-[hidden=true]:[transform:translate3d(0,var(--anv-hide),0)] data-[hidden=true]:pointer-events-none [transition:transform_var(--hkui-dur-slow)_var(--hkui-ease)] max-[768px]:[transition:transform_var(--hkui-dur-base)_var(--hkui-ease)] motion-reduce:[transition:none]"
 				data-hidden={hidden ? "true" : "false"}
 				// Off-screen chrome must leave the tab order too. `pointer-events`

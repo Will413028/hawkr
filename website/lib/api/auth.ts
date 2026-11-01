@@ -23,6 +23,7 @@ import {
 import {
 	authedTransport,
 	SUPPRESS_AUTH_EXPIRED,
+	type TransportOptions,
 } from "@/lib/connect/transport";
 import type { Identity } from "../auth/storage";
 
@@ -38,8 +39,8 @@ export type SessionResult = Identity | null | typeof SESSION_UNAVAILABLE;
 /** 登入方式：單體 `/api/auth/{provider}/start` 的 provider 段。 */
 export type LoginProvider = "google" | "line";
 
-function identityApp() {
-	return createClient(IdentityAppService, authedTransport());
+function identityApp(options?: TransportOptions) {
+	return createClient(IdentityAppService, authedTransport(options));
 }
 
 function toIdentity(account: Account): Identity {
@@ -54,16 +55,25 @@ function suppressAuthExpired() {
 	return createContextValues().set(SUPPRESS_AUTH_EXPIRED, true);
 }
 
+export interface FetchSessionOptions extends TransportOptions {
+	/** 取消這次讀取（伺服器端用 `AbortSignal.timeout`，連 body 一起計）。 */
+	signal?: AbortSignal;
+}
+
 /**
  * GetSession resolves the signed-in account: 401 returns null, 403 throws the
  * server rejection, and every other failure returns SESSION_UNAVAILABLE.
+ * 伺服器端呼叫要傳 `cookie` 與 `locale`（見 `lib/auth/dal.ts`）；瀏覽器端兩者都不傳。
  */
-export async function fetchSession(): Promise<SessionResult> {
+export async function fetchSession(
+	options: FetchSessionOptions = {},
+): Promise<SessionResult> {
+	const { signal, ...transportOptions } = options;
 	let account: Account | undefined;
 	try {
-		const res = await identityApp().getSession(
+		const res = await identityApp(transportOptions).getSession(
 			{},
-			{ contextValues: suppressAuthExpired() },
+			{ contextValues: suppressAuthExpired(), signal },
 		);
 		account = res.account;
 	} catch (e) {

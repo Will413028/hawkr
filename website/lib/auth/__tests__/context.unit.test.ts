@@ -6,14 +6,10 @@ import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
-	SESSION_UNAVAILABLE: Symbol("session-unavailable"),
-	fetchSession: vi.fn(),
 	logout: vi.fn(async () => {}),
 }));
 
 vi.mock("../../api/auth", () => ({
-	SESSION_UNAVAILABLE: api.SESSION_UNAVAILABLE,
-	fetchSession: api.fetchSession,
 	logout: api.logout,
 	LogoutRevokeFailedError: class extends Error {
 		reason = "server";
@@ -34,11 +30,18 @@ vi.mock("@/lib/feedback/toast", () => ({ toast: { error: vi.fn() } }));
 
 import { AUTH_EXPIRED_EVENT } from "@/lib/api/client";
 import { AuthProvider, useAuth } from "../context";
-import { SESSION_RETRY_BACKOFF_MS } from "../session-resolver";
+import type { SessionState } from "../session-state";
 
 const buyer = { accountId: "7", isSeller: false };
 
-function render(client = new QueryClient()) {
+const signedIn: SessionState = { status: "signedIn", identity: buyer };
+const guest: SessionState = { status: "guest" };
+const unavailable: SessionState = { status: "unavailable" };
+
+/** Every context value the consumer rendered, in order: the first one is the first screen. */
+async function render(session: SessionState, client = new QueryClient()) {
+	const rendered: Array<ReturnType<typeof useAuth>> = [];
+	const sessionPromise = Promise.resolve(session);
 	const wrapper = ({ children }: { children: React.ReactNode }) =>
 		React.createElement(
 			QueryClientProvider,
@@ -46,10 +49,29 @@ function render(client = new QueryClient()) {
 			React.createElement(
 				IntlTestWrapper,
 				null,
-				React.createElement(AuthProvider, null, children),
+				React.createElement(
+					React.Suspense,
+					{ fallback: null },
+					React.createElement(AuthProvider, {
+						session: sessionPromise,
+						children,
+					}),
+				),
 			),
 		);
-	return renderHook(() => useAuth(), { wrapper });
+	let hook!: ReturnType<typeof renderHook<ReturnType<typeof useAuth>, unknown>>;
+	// The provider suspends on the session promise: let React retry once it is settled.
+	await act(async () => {
+		hook = renderHook(
+			() => {
+				const value = useAuth();
+				rendered.push(value);
+				return value;
+			},
+			{ wrapper },
+		);
+	});
+	return { ...hook, rendered };
 }
 
 const storage = new Map<string, string>();
@@ -68,7 +90,6 @@ beforeEach(() => {
 	});
 	api.logout.mockReset();
 	api.logout.mockResolvedValue(undefined);
-	api.fetchSession.mockReset();
 });
 
 afterEach(() => {
@@ -78,60 +99,63 @@ afterEach(() => {
 	storage.clear();
 });
 
-describe("AuthProvider on the GetSession answer", () => {
+describe("AuthProvider on the server's session answer", () => {
+	it("the first screen has no checking state: identity and settled flags are final on the first render", async () => {
+		const { result, rendered } = await render(signedIn);
+		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		const first = rendered[0];
+		expect(first?.hydrated).toBe(true);
+		expect(first?.sessionSettled).toBe(true);
+		expect(first?.sessionUnavailable).toBe(false);
+		expect(first?.identity).toEqual(buyer);
+		for (const value of rendered) {
+			expect(value.hydrated).toBe(true);
+			expect(value.sessionSettled).toBe(true);
+		}
+	});
+
+	it("a guest's first screen is also final", async () => {
+		const { rendered } = await render(guest);
+		await waitFor(() => expect(rendered.length).toBeGreaterThan(0));
+		for (const value of rendered) {
+			expect(value.hydrated).toBe(true);
+			expect(value.sessionSettled).toBe(true);
+			expect(value.isLoggedIn).toBe(false);
+		}
+	});
+
 	it("revokes the session of a suspended account and displays the server denial", async () => {
-		api.fetchSession.mockRejectedValue(
-			new ConnectError("account suspended", Code.PermissionDenied, undefined, [
-				{
-					desc: LocalizedMessageSchema,
-					value: { locale: "zh-TW", message: "帳號已停權，請聯絡客服" },
-				},
-			]),
-		);
-		const { result } = render();
+		const { result } = await render({
+			status: "guest",
+			refusal: { message: "帳號已停權，請聯絡客服" },
+		});
 		await waitFor(() => expect(api.logout).toHaveBeenCalled());
 		expect(toast.error).toHaveBeenCalledWith("帳號已停權，請聯絡客服");
 		expect(result.current.isLoggedIn).toBe(false);
 	});
 
-	it("without a LocalizedMessage the toast is the code's catalog text, never the developer message", async () => {
+	it("without a message the toast is the code's catalog text, never a developer message", async () => {
 		vi.mocked(toast.error).mockClear();
-		api.fetchSession.mockRejectedValue(
-			new ConnectError("DEV-ONLY detail", Code.PermissionDenied),
-		);
-		render();
+		await render({ status: "guest", refusal: { message: null } });
 		await waitFor(() => expect(api.logout).toHaveBeenCalled());
 		expect(toast.error).toHaveBeenCalledWith(
 			defaultErrorTextFor("zh-TW")(Code.PermissionDenied),
 		);
 		expect(toast.error).not.toHaveBeenCalledWith(
-			expect.stringContaining("DEV-ONLY"),
+			expect.stringContaining("session refused"),
 		);
 	});
 
-	it("the cookie is HttpOnly, so every load asks GetSession; unauthenticated settles as a guest", async () => {
-		api.fetchSession.mockResolvedValue(null);
-		const { result } = render();
+	it("a guest has no session to end", async () => {
+		const { result } = await render(guest);
 		await waitFor(() => expect(result.current.sessionSettled).toBe(true));
-		expect(api.fetchSession).toHaveBeenCalledTimes(1);
 		expect(result.current.isLoggedIn).toBe(false);
 		expect(result.current.identity).toBeNull();
-		// a guest has no session to end
 		expect(api.logout).not.toHaveBeenCalled();
 	});
 
-	it("is not settled before the GetSession answer arrives", async () => {
-		api.fetchSession.mockReturnValue(new Promise(() => {}));
-		const { result } = render();
-		await act(async () => {});
-		expect(api.fetchSession).toHaveBeenCalledTimes(1);
-		expect(result.current.sessionSettled).toBe(false);
-		expect(result.current.isLoggedIn).toBe(false);
-	});
-
-	it("resolves the account through GetSession", async () => {
-		api.fetchSession.mockResolvedValue(buyer);
-		const { result } = render();
+	it("resolves the account the server gave", async () => {
+		const { result } = await render(signedIn);
 		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
 		expect(result.current.identity?.accountId).toBe("7");
 		await waitFor(() => expect(result.current.activeRole).toBe("buyer"));
@@ -139,8 +163,7 @@ describe("AuthProvider on the GetSession answer", () => {
 	});
 
 	it("a 401 broadcast from any call turns the page into a guest without calling SignOut", async () => {
-		api.fetchSession.mockResolvedValue(buyer);
-		const { result } = render();
+		const { result } = await render(signedIn);
 		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
 		await act(async () => {
 			window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
@@ -150,28 +173,16 @@ describe("AuthProvider on the GetSession answer", () => {
 		expect(api.logout).not.toHaveBeenCalled();
 	});
 
-	it("an outage that outlasts the backoff never ends the session", async () => {
-		vi.useFakeTimers({ shouldAdvanceTime: true });
-		api.fetchSession.mockResolvedValue(api.SESSION_UNAVAILABLE);
-		const { result } = render();
-		for (const delay of SESSION_RETRY_BACKOFF_MS) {
-			await act(async () => {
-				await vi.advanceTimersByTimeAsync(delay);
-			});
-		}
-		await waitFor(() =>
-			expect(api.fetchSession).toHaveBeenCalledTimes(
-				SESSION_RETRY_BACKOFF_MS.length + 1,
-			),
-		);
+	it("an unavailable answer is not a guest and never ends the session", async () => {
+		const { result } = await render(unavailable);
 		await waitFor(() => expect(result.current.sessionSettled).toBe(true));
 		expect(result.current.isLoggedIn).toBe(false);
+		expect(result.current.sessionUnavailable).toBe(true);
 		expect(api.logout).not.toHaveBeenCalled();
 	});
 
 	it("signOut calls the SignOut RPC and then the page is a guest", async () => {
-		api.fetchSession.mockResolvedValue(buyer);
-		const { result } = render();
+		const { result } = await render(signedIn);
 		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
 		await act(async () => {
 			await result.current.signOut();
@@ -182,9 +193,8 @@ describe("AuthProvider on the GetSession answer", () => {
 	});
 
 	it("a failed SignOut keeps the account: the session was not ended", async () => {
-		api.fetchSession.mockResolvedValue(buyer);
 		api.logout.mockRejectedValueOnce(new Error("offline"));
-		const { result } = render();
+		const { result } = await render(signedIn);
 		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
 		await act(async () => {
 			await result.current.signOut().catch(() => {});
@@ -195,8 +205,7 @@ describe("AuthProvider on the GetSession answer", () => {
 
 it("retries a failed rejection sign-out, coalesces concurrent calls and toasts once", async () => {
 	vi.mocked(toast.error).mockClear();
-	api.fetchSession.mockResolvedValue(buyer);
-	const { result } = render();
+	const { result } = await render(signedIn);
 	await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
 	const denied = new ConnectError("suspended", Code.PermissionDenied);
 	api.logout.mockRejectedValueOnce(new Error("offline"));
@@ -214,21 +223,13 @@ it("retries a failed rejection sign-out, coalesces concurrent calls and toasts o
 	expect(toast.error).toHaveBeenCalledTimes(1);
 });
 
-it("session cache refetch cannot replace identity with a transient result", async () => {
-	api.fetchSession.mockResolvedValue(buyer);
+it("the session cache has no fetcher: a refetch cannot replace identity", async () => {
 	const client = new QueryClient();
-	const { result } = render(client);
+	const { result } = await render(signedIn, client);
 	await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
-	api.fetchSession.mockResolvedValue(api.SESSION_UNAVAILABLE);
 	await act(async () => {
 		await client.refetchQueries({ queryKey: ["session"] });
-		const query = client.getQueryCache().find({ queryKey: ["session"] });
-		if (!query) throw new Error("session query missing");
-		await query
-			.fetch({ ...query.options, retry: false })
-			.catch(() => undefined);
 	});
-	expect(api.fetchSession).toHaveBeenCalledOnce();
 	expect(result.current.identity).toEqual(buyer);
 	expect(api.logout).not.toHaveBeenCalled();
 });

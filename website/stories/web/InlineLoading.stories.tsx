@@ -28,9 +28,12 @@ import ProductReviewsSection from "@/features/product/components/ProductReviewsS
 import ProductReviewsSkeleton from "@/features/product/components/ProductReviewsSkeleton";
 import ProductSellerIntro from "@/features/product/components/ProductSellerIntro";
 import { AuthProvider } from "@/lib/auth/context";
+import type { SessionState } from "@/lib/auth/session-state";
 import { queryKeys } from "@/lib/query/keys";
 import "@/styles/features/cart.css";
 import "@/styles/components/sheet.css";
+
+const GUEST_SESSION = Promise.resolve<SessionState>({ status: "guest" });
 
 const IMAGE =
 	"data:image/svg+xml," +
@@ -159,7 +162,7 @@ function SearchPreview({ loading }: { loading: boolean }) {
 	return (
 		<QueryClientProvider client={client}>
 			<ViewTransitions>
-				<AuthProvider>
+				<AuthProvider session={GUEST_SESSION}>
 					<HomeCompactSearchExperience
 						open
 						query="預覽"
@@ -289,7 +292,7 @@ function AgentEntryPreview() {
 	return (
 		<QueryClientProvider client={client}>
 			<ViewTransitions>
-				<AuthProvider>
+				<AuthProvider session={GUEST_SESSION}>
 					<div className="mx-auto grid max-w-[720px] gap-6">
 						<div data-agent-entry-loading>
 							<AssistantEntrySkeleton query={query} />
