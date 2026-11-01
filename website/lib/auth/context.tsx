@@ -175,25 +175,34 @@ export function AuthProvider({
 	);
 
 	const defaultErrorText = useDefaultErrorText();
-	const rejectSession = React.useMemo(() => {
-		let rejection: Promise<void> | undefined;
-		let notified = false;
-		return (error?: ConnectError): Promise<void> => {
-			if (rejection) return rejection;
+	const defaultErrorTextRef = React.useRef(defaultErrorText);
+	defaultErrorTextRef.current = defaultErrorText;
+	const rejection = React.useRef<Promise<void> | undefined>(undefined);
+	const rejectionNotified = React.useRef(false);
+	const rejectSession = React.useCallback(
+		(error?: ConnectError): Promise<void> => {
+			if (rejection.current) return rejection.current;
 			markVoluntaryLogout();
-			if (error && !notified) {
-				notified = true;
-				const text = userMessage(error, defaultErrorText);
+			if (error && !rejectionNotified.current) {
+				rejectionNotified.current = true;
+				const text = userMessage(error, defaultErrorTextRef.current);
 				if (text) toast.error(text);
 			}
-			queryClient.setQueryData(SESSION_KEY, null);
-			// 單體拒絕這個帳號（刪除或停權）：盡力撤銷 session 並清掉 cookie；失敗不影響本機已經當成訪客。
-			rejection = apiLogout().then(refreshFromServer, () => {
-				rejection = undefined;
-			});
-			return rejection;
-		};
-	}, [defaultErrorText, queryClient, refreshFromServer]);
+			// 單體拒絕這個帳號（刪除或停權）：盡力撤銷 session 並清掉 cookie；撤銷成功才寫入訪客並廣播，
+			// 失敗時 session 仍有效，不能讓其他分頁依一個還有效的 cookie 重新整理。
+			rejection.current = apiLogout().then(
+				() => {
+					queryClient.setQueryData(SESSION_KEY, null);
+					refreshFromServer();
+				},
+				() => {
+					rejection.current = undefined;
+				},
+			);
+			return rejection.current;
+		},
+		[queryClient, refreshFromServer],
+	);
 
 	const rejectSessionRef = React.useRef(rejectSession);
 	rejectSessionRef.current = rejectSession;
@@ -411,8 +420,9 @@ export function AuthProvider({
 		(next: Identity) => {
 			queryClient.setQueryData(SESSION_KEY, next);
 			setActive(resolveActiveRole(next));
+			refreshFromServer();
 		},
-		[queryClient],
+		[queryClient, refreshFromServer],
 	);
 
 	const switchRole = React.useCallback(

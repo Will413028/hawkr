@@ -86,7 +86,7 @@
     | 網路錯誤或 5xx | `unavailable` | 不登出，保留身分，可重試 |
   - 消費端：同步驟 3 的 rg，加 `lib/auth/{cross-tab-sync,teardown,useAuthGate}.ts*`。
   - 不能動：B-199 語意。
-  - 驗收：完成定義；`rg -n "hydrated|sessionSettled|sessionUnavailable|HYDRATION_GATE_MS" website` 無命中；mutation：把網路錯誤映射成 `guest`，「暫時不可用不登出」測試要失敗；拿掉登出後的 `router.refresh()`，「登出後頁首不顯示頭像」測試要失敗；e2e 待 CI。
+  - 驗收：完成定義；`rg -nw "sessionSettled|sessionUnavailable|HYDRATION_GATE_MS|data-auth-hydrated" website` 與 `rg -n "\.hydrated\b" website/lib/auth website/components` 都無命中；mutation：把網路錯誤映射成 `guest`，「暫時不可用不登出」測試要失敗；拿掉登出後的 `router.refresh()`，「登出後頁首不顯示頭像」測試要失敗；e2e 待 CI。
 - [ ] **5. 收尾**：完成定義逐項核對；design-review；步驟 3 的 build-output 測試已接 CI；延後項附觸發條件搬回主清單；更新根 `AGENTS.md` 地圖（website 改 Vercel）、`website/AGENTS.md`、`website/README.md`、identity ADR 的 web 段落。需要人做的事：預覽部署驗證、第一次正式部署的決定。驗收：上述 rg 與 CI 連結。
 
 ## 決定

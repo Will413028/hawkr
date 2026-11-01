@@ -31,8 +31,10 @@ vi.mock("@sentry/nextjs", () => ({ captureMessage: vi.fn() }));
 
 import { Code, ConnectError } from "@connectrpc/connect";
 import { LocalizedMessageSchema } from "@hawkr/api/gen/google/rpc/error_details_pb";
+import { NextIntlClientProvider } from "next-intl";
 import { toast } from "@/lib/feedback/toast";
 import { defaultErrorTextFor } from "@/lib/i18n/ui-text";
+import { messagesFor } from "@/lib/intl/config";
 import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 
 vi.mock("@/lib/feedback/toast", () => ({ toast: { error: vi.fn() } }));
@@ -478,6 +480,104 @@ describe("AuthProvider adopts the server's newest answer after an event", () => 
 			await result.current.rejectSession(denied);
 		});
 		expect(router.refresh).toHaveBeenCalledTimes(1);
+	});
+
+	it("a rejection announces the guest only after the session was really ended, so a peer refreshing meanwhile still sees the old cookie", async () => {
+		const { result } = await render(signedIn);
+		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		const revoke = deferred<void>();
+		api.logout.mockReturnValueOnce(revoke.promise);
+		let pending!: Promise<void>;
+		act(() => {
+			pending = result.current.rejectSession(
+				new ConnectError("suspended", Code.PermissionDenied),
+			);
+		});
+		await flushMacrotasks();
+		expect(FakeBroadcastChannel.sent).toEqual([{ accountId: "7" }]);
+		expect(result.current.status).toBe("signedIn");
+		await act(async () => {
+			revoke.resolve();
+			await pending;
+		});
+		await flushMacrotasks();
+		expect(FakeBroadcastChannel.sent).toEqual([
+			{ accountId: "7" },
+			{ accountId: null },
+		]);
+		expect(result.current.status).toBe("guest");
+	});
+
+	it("two tabs: the peer hears the guest announcement only after this tab's cookie is gone", async () => {
+		const { result } = await render(signedIn);
+		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		const revoke = deferred<void>();
+		api.logout.mockReturnValueOnce(revoke.promise);
+		let pending!: Promise<void>;
+		act(() => {
+			pending = result.current.rejectSession(
+				new ConnectError("suspended", Code.PermissionDenied),
+			);
+		});
+		await flushMacrotasks();
+		const heard: unknown[] = [];
+		const peer = new FakeBroadcastChannel("hk-auth-session");
+		peer.onmessage = (event) => heard.push(event.data);
+		expect(heard).toEqual([]);
+		await act(async () => {
+			revoke.resolve();
+			await pending;
+		});
+		await flushMacrotasks();
+		expect(heard).toEqual([{ accountId: null }]);
+		peer.close();
+	});
+
+	it("commitIdentity writes the target state and asks the server once", async () => {
+		const { result } = await render(guest);
+		await waitFor(() => expect(result.current.status).toBe("guest"));
+		act(() => result.current.commitIdentity({ ...buyer, accountId: "9" }));
+		expect(result.current.identity?.accountId).toBe("9");
+		expect(router.refresh).toHaveBeenCalledTimes(1);
+	});
+
+	it("a locale switch does not re-arm the rejection: one logout and one toast", async () => {
+		vi.mocked(toast.error).mockClear();
+		let locale: "zh-TW" | "en" = "zh-TW";
+		const client = new QueryClient();
+		const wrapper = ({ children }: { children: React.ReactNode }) =>
+			React.createElement(
+				QueryClientProvider,
+				{ client },
+				React.createElement(NextIntlClientProvider, {
+					locale,
+					messages: messagesFor(locale),
+					children: React.createElement(AuthProvider, {
+						session: Promise.resolve(signedIn),
+						children,
+					}),
+				}),
+			);
+		let hook!: ReturnType<
+			typeof renderHook<ReturnType<typeof useAuth>, unknown>
+		>;
+		await act(async () => {
+			hook = renderHook(() => useAuth(), { wrapper });
+		});
+		await waitFor(() => expect(hook.result.current.isLoggedIn).toBe(true));
+		const denied = new ConnectError("suspended", Code.PermissionDenied);
+		await act(async () => {
+			await hook.result.current.rejectSession(denied);
+		});
+		locale = "en";
+		await act(async () => {
+			hook.rerender();
+		});
+		await act(async () => {
+			await hook.result.current.rejectSession(denied);
+		});
+		expect(api.logout).toHaveBeenCalledTimes(1);
+		expect(toast.error).toHaveBeenCalledTimes(1);
 	});
 });
 
