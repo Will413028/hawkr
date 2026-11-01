@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import SearchPage from "@/features/search/SearchPage";
 import { noindexMetadata } from "@/lib/seo/metadata";
 
@@ -12,5 +13,9 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-	return <SearchPage />;
+	return (
+		<Suspense fallback={null}>
+			<SearchPage />
+		</Suspense>
+	);
 }

@@ -16,13 +16,15 @@ interface Props {
  */
 export default function InterceptedProductModalPage({ params }: Props) {
 	return (
-		<ProductModal>
-			<Suspense
-				fallback={<RouteLoadingSkeleton page variant="product-detail" />}
-			>
-				<InterceptedProductModalContent params={params} />
-			</Suspense>
-		</ProductModal>
+		<Suspense fallback={null}>
+			<ProductModal>
+				<Suspense
+					fallback={<RouteLoadingSkeleton page variant="product-detail" />}
+				>
+					<InterceptedProductModalContent params={params} />
+				</Suspense>
+			</ProductModal>
+		</Suspense>
 	);
 }
 

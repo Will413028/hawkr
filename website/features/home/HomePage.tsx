@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { Suspense } from "react";
 import ErrorState from "@/components/shared/ErrorState";
 import HomeCompactCategoryNav from "@/features/home/components/HomeCompactCategoryNav";
 import HomeCompactMarketStage from "@/features/home/components/HomeCompactMarketStage";
@@ -189,7 +190,7 @@ interface HomePageProps {
 
 export default function HomePage({ snapshot }: HomePageProps) {
 	// The server built `snapshot` and renders this whole tree into the initial
-	// HTML (cacheComponents is off — traditional ISR), so product / seller / post
+	// HTML, so product / seller / post
 	// cards are crawlable rather than fetched client-side into an empty shell.
 	// HomeContent seeds `snapshot` as react-query initialData: first paint uses
 	// it directly, and the browser query only reconciles price/stock afterwards.
@@ -202,7 +203,9 @@ export default function HomePage({ snapshot }: HomePageProps) {
 			<h1 className="sr-only">Hawkr — 在地小農與職人的生鮮市集</h1>
 
 			<HomeMemberMobileSearch />
-			<HomeContent initialSnapshot={snapshot} />
+			<Suspense fallback={null}>
+				<HomeContent initialSnapshot={snapshot} />
+			</Suspense>
 		</main>
 	);
 }

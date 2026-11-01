@@ -8,6 +8,10 @@ export const metadata = { title: "退款結果" };
  * the WEB_BROWSER client; native apps get a `hawkrbuyer://` deep link
  * instead. See `fetchRefundPage` / design doc 09 §5.4.2.
  */
+export function generateStaticParams() {
+	return [{ orderNo: "0" }];
+}
+
 export default async function Page({
 	params,
 }: {

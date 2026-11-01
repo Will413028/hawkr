@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { HAWKR_AGENT_ENABLED } from "@/features/procurement-assistant/availability";
 import BuyerOfferDemo from "@/features/procurement-rfq-demo/BuyerOfferDemo";
 
@@ -16,13 +17,25 @@ export const metadata = {
  * 下面那段「缺少 request_id」，因此清冊對它發的匿名 hard-load `@live` 測試
  * 驗到的是那段 fallback——這是刻意接受的涵蓋範圍，不是遺漏。
  */
-export default async function Page({
+export default function Page({
 	searchParams,
 }: {
 	searchParams: Promise<{ request_id?: string }>;
 }) {
 	if (!HAWKR_AGENT_ENABLED) notFound();
 
+	return (
+		<Suspense fallback={null}>
+			<RfqDemoContent searchParams={searchParams} />
+		</Suspense>
+	);
+}
+
+async function RfqDemoContent({
+	searchParams,
+}: {
+	searchParams: Promise<{ request_id?: string }>;
+}) {
 	const { request_id: requestId } = await searchParams;
 	if (!requestId) {
 		return (

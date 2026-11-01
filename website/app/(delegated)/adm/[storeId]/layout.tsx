@@ -1,4 +1,7 @@
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
+import DelegatedRuntimeBoundary from "@/features/delegated-operations/components/DelegatedRuntimeBoundary";
+import { getEnv } from "@/lib/config/env";
 
 /**
  * 代行工作區的 storeId 守門，也是這整棵子樹**唯一的 server 端驗證點**。
@@ -29,5 +32,15 @@ export default async function DelegatedStoreLayout({
 }) {
 	const { storeId } = await params;
 	if (!/^\d{1,19}$/.test(storeId)) notFound();
-	return <>{children}</>;
+	return (
+		<Suspense fallback={null}>
+			<DelegatedRuntimeBoundary admOrigin={getEnv().admOrigin}>
+				{children}
+			</DelegatedRuntimeBoundary>
+		</Suspense>
+	);
+}
+
+export function generateStaticParams() {
+	return [{ storeId: "1" }];
 }

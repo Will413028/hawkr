@@ -38,7 +38,8 @@ test("homepage data cannot reopen a server-streaming blank state", async () => {
 	assert.doesNotMatch(source, /from "next\/server"/);
 	assert.doesNotMatch(source, /from "@\/lib\/api\/cached"/);
 	assert.doesNotMatch(source, /await connection\(/);
-	assert.doesNotMatch(source, /<Suspense/);
+	assert.match(source, /<Suspense fallback=\{null\}>\s*<HomeContent\b/);
+	assert.equal(source.match(/<Suspense/g)?.length, 1);
 	assert.doesNotMatch(source, /getCachedSellerStats/);
 	assert.doesNotMatch(source, /getCachedSeller\b/);
 	assert.doesNotMatch(source, /mappedSellers\.map\(async/);

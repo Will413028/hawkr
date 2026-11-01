@@ -5,6 +5,7 @@ import SellerCardPage, {
 	type SellerCardSeller,
 } from "@/features/sellers/card/SellerCardPage";
 import { getCachedSeller } from "@/lib/api/cached";
+import { sellerStaticParams } from "@/lib/api/static-params";
 import { sellerSchema } from "@/lib/seo/jsonld";
 import {
 	localeFromParam,
@@ -17,6 +18,8 @@ import "@/styles/features/seller-card-page.css";
 interface Props {
 	params: Promise<{ locale: string; id: string }>;
 }
+
+export const generateStaticParams = sellerStaticParams;
 
 function cardTitle(name?: string): string {
 	return name?.trim()

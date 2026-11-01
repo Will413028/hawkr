@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import FeedPage from "@/features/feed/FeedPage";
 import { pageMetadata } from "@/lib/seo/metadata";
 
@@ -17,7 +18,9 @@ export default function Page() {
 	return (
 		<>
 			<h1 className="sr-only">Hawkr 動態</h1>
-			<FeedPage />
+			<Suspense fallback={null}>
+				<FeedPage />
+			</Suspense>
 		</>
 	);
 }

@@ -217,7 +217,8 @@ test("home keeps the initial loader as the only pending surface", async () => {
 	assert.doesNotMatch(homeSource, /HomeShelfSkeleton/);
 	assert.doesNotMatch(homeSource, /from "next\/server"/);
 	assert.doesNotMatch(homeSource, /await connection\(/);
-	assert.doesNotMatch(homeSource, /<Suspense/);
+	assert.match(homeSource, /<Suspense fallback=\{null\}>\s*<HomeContent\b/);
+	assert.equal(homeSource.match(/<Suspense/g)?.length, 1);
 	assert.doesNotMatch(homeSource, /RouteLoadingSkeleton/);
 });
 

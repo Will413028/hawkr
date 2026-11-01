@@ -42,7 +42,8 @@ test("the intercepted product opens one persistent modal shell while content str
 	assert.ok(modalStart >= 0 && suspenseStart > modalStart);
 	assert.ok(modalEnd > suspenseStart && contentStart > modalEnd);
 	assert.ok(paramsAwait > contentStart);
-	assert.doesNotMatch(source, /fallback=\{null\}/);
+	assert.equal(source.match(/fallback=\{null\}/g)?.length, 1);
+	assert.ok(source.indexOf("fallback={null}") < modalStart);
 });
 
 test("seller and reviews stream behind independent keyed fallbacks", async () => {

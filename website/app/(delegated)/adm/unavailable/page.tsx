@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { getEnv } from "@/lib/config/env";
 
 /**
@@ -22,7 +23,19 @@ const COPY: Record<string, { title: string; body: string }> = {
 	},
 };
 
-export default async function DelegatedUnavailablePage({
+export default function DelegatedUnavailablePage({
+	searchParams,
+}: {
+	searchParams: Promise<{ reason?: string }>;
+}) {
+	return (
+		<Suspense fallback={null}>
+			<DelegatedUnavailableContent searchParams={searchParams} />
+		</Suspense>
+	);
+}
+
+async function DelegatedUnavailableContent({
 	searchParams,
 }: {
 	searchParams: Promise<{ reason?: string }>;

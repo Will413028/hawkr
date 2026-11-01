@@ -1,7 +1,5 @@
 import "@/styles/features/seller-center.css";
 import "@/styles/features/delegated-operations.css";
-import DelegatedRuntimeBoundary from "@/features/delegated-operations/components/DelegatedRuntimeBoundary";
-import { getEnv } from "@/lib/config/env";
 import { noindexMetadata } from "@/lib/seo/metadata";
 
 /**
@@ -23,9 +21,5 @@ export default function DelegatedWorkspaceLayout({
 }: {
 	children: React.ReactNode;
 }) {
-	return (
-		<DelegatedRuntimeBoundary admOrigin={getEnv().admOrigin}>
-			{children}
-		</DelegatedRuntimeBoundary>
-	);
+	return <>{children}</>;
 }

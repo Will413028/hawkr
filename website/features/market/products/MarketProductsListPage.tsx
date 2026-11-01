@@ -10,6 +10,7 @@
  * client-side — no per-request dynamic server render.
  */
 
+import { Suspense } from "react";
 import JsonLd from "@/components/seo/JsonLd";
 import { recommendedStoriesFromStores } from "@/features/feed/recommendedStories";
 import { loadMarketProductsSection } from "@/features/market/components/MarketProductsSection";
@@ -72,14 +73,16 @@ export default async function MarketProductsListPage({
 	return (
 		<main className="market-page market-public-page w-[min(1440px,calc(100%_-_48px))] mx-auto pt-[var(--page-start-gap,_6px)] pb-[60px]! max-[768px]:w-[min(100%_-_28px,680px)]">
 			{productUrls.length > 0 && <JsonLd data={itemListSchema(productUrls)} />}
-			<MarketProductsListClient
-				categoryList={categoryList}
-				sellerStories={sellerStories}
-				trendingHashtags={trendingHashtagList}
-				pageSize={INITIAL_PAGE_SIZE}
-				defaultProducts={initialProducts}
-				defaultInitialDone={initialDone}
-			/>
+			<Suspense fallback={null}>
+				<MarketProductsListClient
+					categoryList={categoryList}
+					sellerStories={sellerStories}
+					trendingHashtags={trendingHashtagList}
+					pageSize={INITIAL_PAGE_SIZE}
+					defaultProducts={initialProducts}
+					defaultInitialDone={initialDone}
+				/>
+			</Suspense>
 		</main>
 	);
 }
