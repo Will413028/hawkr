@@ -10,19 +10,17 @@ export type AuthRailMode = "skeleton" | "guest" | "buyer" | "seller";
 export interface AuthRailInput {
 	/** The server's session answer; `unknown` until it arrives. */
 	status: AuthStatus;
-	isLoggedIn: boolean;
 	activeRole: "buyer" | "seller" | null;
 }
 
 export function resolveAuthRailMode({
 	status,
-	isLoggedIn,
 	activeRole,
 }: AuthRailInput): AuthRailMode {
 	// Neither `unknown` nor `unavailable` (B-199) is a claim that the visitor is a
 	// guest or a member: hold the neutral skeleton instead of a sign-in button or
 	// an avatar.
 	if (status === "unknown" || status === "unavailable") return "skeleton";
-	if (!isLoggedIn) return "guest";
+	if (status === "guest") return "guest";
 	return activeRole === "buyer" ? "buyer" : "seller";
 }

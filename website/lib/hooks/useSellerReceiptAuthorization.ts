@@ -8,7 +8,6 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/lib/auth/context";
 import { isInvoiceBizCode } from "@/lib/invoices/errorCopy";
 import {
 	confirmSellerReceiptAuthorization,
@@ -36,9 +35,8 @@ export interface UseSellerReceiptAuthorizationResult {
  * 的 gate，與後端對已建檔但未核定的賣家給的答案一致。
  */
 export function useSellerReceiptAuthorization(): UseSellerReceiptAuthorizationResult {
-	const { isLoggedIn, activeRole } = useAuth();
 	const identity = useQueryIdentity();
-	const enabled = isLoggedIn && activeRole === "seller";
+	const enabled = identity.activeRole === "seller";
 
 	const query = useQuery({
 		queryKey: queryKeys.seller.invoiceReceiptAuth(identity),

@@ -44,6 +44,7 @@ import { messagesFor } from "@/lib/intl/config";
 import { ACTIVE_ROLE_STORAGE_KEY } from "../active-role";
 import { AuthProvider, useAuth } from "../context";
 import { SESSION_RETRY_BACKOFF_MS, type SessionState } from "../session-state";
+import { ZoneIdentityProvider } from "../zone-context";
 
 const buyer = { accountId: "7", isSeller: false };
 
@@ -98,6 +99,7 @@ async function render(
 	session: SessionState | Promise<SessionState>,
 	client = new QueryClient(),
 	locale: "zh-TW" | "en" = "zh-TW",
+	zone = false,
 ) {
 	const rendered: Array<ReturnType<typeof useAuth>> = [];
 	let sessionPromise = Promise.resolve(session);
@@ -110,7 +112,13 @@ async function render(
 				messages: messagesFor(locale),
 				children: React.createElement(AuthProvider, {
 					session: sessionPromise,
-					children,
+					children: zone
+						? React.createElement(ZoneIdentityProvider, {
+								identity: buyer,
+								workspace: "buyer",
+								children,
+							})
+						: children,
 				}),
 			}),
 		);
@@ -181,7 +189,7 @@ describe("AuthProvider on the server's session answer", () => {
 		const { result, rendered } = await render(signedIn);
 		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		expect(rendered[0]?.status).toBe("unknown");
-		expect(rendered[0]?.isLoggedIn).toBe(false);
+		expect(rendered[0]?.status).not.toBe("signedIn");
 		expect(rendered[0]?.identity).toBeNull();
 		const statuses = rendered.map((value) => value.status);
 		expect(statuses).not.toContain("guest");
@@ -196,7 +204,7 @@ describe("AuthProvider on the server's session answer", () => {
 		});
 		const { result } = await render(pending);
 		expect(result.current.status).toBe("unknown");
-		expect(result.current.isLoggedIn).toBe(false);
+		expect(result.current.status).not.toBe("signedIn");
 		await act(async () => {
 			settle(guest);
 		});
@@ -207,7 +215,7 @@ describe("AuthProvider on the server's session answer", () => {
 		const { result, rendered } = await render(guest);
 		await waitFor(() => expect(result.current.status).toBe("guest"));
 		expect(rendered[0]?.status).toBe("unknown");
-		expect(result.current.isLoggedIn).toBe(false);
+		expect(result.current.status).not.toBe("signedIn");
 	});
 
 	it("a rejected session promise is `unavailable`, not a guest", async () => {
@@ -219,14 +227,14 @@ describe("AuthProvider on the server's session answer", () => {
 	it("a guest has no session to end", async () => {
 		const { result } = await render(guest);
 		await waitFor(() => expect(result.current.status).toBe("guest"));
-		expect(result.current.isLoggedIn).toBe(false);
+		expect(result.current.status).not.toBe("signedIn");
 		expect(result.current.identity).toBeNull();
 		expect(api.logout).not.toHaveBeenCalled();
 	});
 
 	it("resolves the account the server gave", async () => {
 		const { result } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		expect(result.current.identity?.accountId).toBe("7");
 		await waitFor(() => expect(result.current.activeRole).toBe("buyer"));
 		expect(api.logout).not.toHaveBeenCalled();
@@ -234,7 +242,7 @@ describe("AuthProvider on the server's session answer", () => {
 
 	it("a 401 from any call leaves the document for the home page without calling SignOut or asking the server softly", async () => {
 		const { result } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		await act(async () => {
 			window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
 		});
@@ -246,7 +254,7 @@ describe("AuthProvider on the server's session answer", () => {
 	it("a 401 on the home page still replaces the document: a soft refresh there could be overtaken by an older answer", async () => {
 		vi.stubGlobal("location", { pathname: "/", reload: nav.reload });
 		const { result } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		await act(async () => {
 			window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
 		});
@@ -262,7 +270,7 @@ describe("AuthProvider on the server's session answer", () => {
 			vi.stubGlobal("location", { pathname, reload: nav.reload });
 			const { result, unmount } = await render(state);
 			await flushMacrotasks();
-			expect(result.current.isLoggedIn).toBe(false);
+			expect(result.current.status).not.toBe("signedIn");
 			await act(async () => {
 				window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
 			});
@@ -272,10 +280,45 @@ describe("AuthProvider on the server's session answer", () => {
 		}
 	});
 
+	it("a 401 inside a protected zone replaces the document even while the root answer is still `unavailable`", async () => {
+		const { result } = await render(
+			unavailable,
+			new QueryClient(),
+			"zh-TW",
+			true,
+		);
+		await flushMacrotasks();
+		expect(result.current.status).toBe("unavailable");
+		await act(async () => {
+			window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+		});
+		await waitFor(() => expect(nav.commit).toHaveBeenCalledWith("/", true));
+	});
+
+	it("a 401 after the protected zone unmounts is a guest page again and does not navigate", async () => {
+		const { result, unmount } = await render(
+			unavailable,
+			new QueryClient(),
+			"zh-TW",
+			true,
+		);
+		await flushMacrotasks();
+		expect(result.current.status).toBe("unavailable");
+		unmount();
+		const guestPage = await render(guest);
+		await flushMacrotasks();
+		await act(async () => {
+			window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+		});
+		await flushMacrotasks();
+		expect(nav.commit).not.toHaveBeenCalled();
+		guestPage.unmount();
+	});
+
 	it("signOut of a session that is already gone replaces the document without a failure toast", async () => {
 		api.logout.mockResolvedValueOnce(undefined);
 		const { result } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		await act(async () => {
 			await result.current.signOut();
 		});
@@ -290,7 +333,7 @@ describe("AuthProvider on the server's session answer", () => {
 			}),
 		);
 		const { result } = await render(signedIn, new QueryClient(), "en");
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		await act(async () => {
 			await result.current.signOut().catch(() => {});
 		});
@@ -311,7 +354,7 @@ describe("AuthProvider on the server's session answer", () => {
 	])("a failed SignOut (%s) toasts the text resource", async (_name, error, text) => {
 		api.logout.mockRejectedValueOnce(error);
 		const { result } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		await act(async () => {
 			await result.current.signOut().catch(() => {});
 		});
@@ -321,13 +364,13 @@ describe("AuthProvider on the server's session answer", () => {
 	it("an unavailable answer is not a guest and never ends the session", async () => {
 		const { result } = await render(unavailable);
 		await waitFor(() => expect(result.current.status).toBe("unavailable"));
-		expect(result.current.isLoggedIn).toBe(false);
+		expect(result.current.status).not.toBe("signedIn");
 		expect(api.logout).not.toHaveBeenCalled();
 	});
 
 	it("signOut revokes the session and then replaces the document, writing no client identity", async () => {
 		const { result } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		await act(async () => {
 			await result.current.signOut();
 		});
@@ -338,7 +381,7 @@ describe("AuthProvider on the server's session answer", () => {
 
 	it("signOut goes where the caller says, and replaces history when asked", async () => {
 		const { result } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		await act(async () => {
 			await result.current.signOut("/login?role=seller", true);
 		});
@@ -351,7 +394,7 @@ describe("AuthProvider on the server's session answer", () => {
 	it("a failed SignOut keeps the account and the document: the session was not ended", async () => {
 		api.logout.mockRejectedValueOnce(new Error("offline"));
 		const { result } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		await act(async () => {
 			await result.current.signOut().catch(() => {});
 		});
@@ -361,7 +404,7 @@ describe("AuthProvider on the server's session answer", () => {
 
 	it("a server answer read before the sign-out and delivered after it cannot bring an identity back", async () => {
 		const { result, adopt } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		await act(async () => {
 			await result.current.signOut();
 		});
@@ -379,7 +422,7 @@ describe("AuthProvider on the server's session answer", () => {
 
 it("signOut replaces the document only after the session was really ended, retries after a failure and coalesces concurrent calls", async () => {
 	const { result } = await render(signedIn);
-	await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+	await waitFor(() => expect(result.current.status).toBe("signedIn"));
 	api.logout.mockRejectedValueOnce(new Error("offline"));
 	await act(async () => {
 		const results = await Promise.allSettled([
@@ -401,7 +444,7 @@ it("signOut replaces the document only after the session was really ended, retri
 it("identity comes only from the server: no client profile fetch, and the React Query cache cannot replace it", async () => {
 	const client = new QueryClient();
 	const { result } = await render(signedIn, client);
-	await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+	await waitFor(() => expect(result.current.status).toBe("signedIn"));
 	act(() => {
 		client.setQueryData(["session"], { accountId: "99", isSeller: true });
 	});
@@ -496,7 +539,7 @@ describe("AuthProvider retries an unavailable session", () => {
 describe("AuthProvider adopts the server's newest answer", () => {
 	it("a refreshed promise from the server replaces the older answer", async () => {
 		const { result, adopt } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		await adopt(guest);
 		expect(result.current.status).toBe("guest");
 		expect(result.current.identity).toBeNull();
@@ -517,7 +560,7 @@ describe("AuthProvider adopts the server's newest answer", () => {
 
 	it("a refresh that answers unavailable keeps the identity instead of signing out", async () => {
 		const { result, adopt } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		await adopt(unavailable);
 		expect(result.current.status).toBe("signedIn");
 		expect(result.current.identity?.accountId).toBe("7");
@@ -526,7 +569,7 @@ describe("AuthProvider adopts the server's newest answer", () => {
 
 	it("a refresh that rejects keeps the identity too", async () => {
 		const { result, adopt } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		await adopt(Promise.reject(new Error("stream failed")));
 		expect(result.current.status).toBe("signedIn");
 		expect(result.current.identity?.accountId).toBe("7");
@@ -556,7 +599,7 @@ describe("AuthProvider adopts the server's newest answer", () => {
 
 	it("a rejection announces nothing before the session was really ended: the new document announces the guest", async () => {
 		const { result } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		const revoke = deferred<void>();
 		api.logout.mockReturnValueOnce(revoke.promise);
 		let pending!: Promise<void>;
@@ -578,7 +621,7 @@ describe("AuthProvider adopts the server's newest answer", () => {
 describe("AuthProvider across tabs", () => {
 	it("a signed-in tab reloads the document when another tab signed out", async () => {
 		const { result } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		act(() => peerAnnounces({ accountId: null }));
 		await waitFor(() => expect(nav.reload).toHaveBeenCalledTimes(1));
 		expect(router.refresh).not.toHaveBeenCalled();
@@ -586,7 +629,7 @@ describe("AuthProvider across tabs", () => {
 
 	it("a signed-in tab reloads the document when another tab signed in as a different account", async () => {
 		const { result } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		act(() => peerAnnounces({ accountId: "8" }));
 		await waitFor(() => expect(nav.reload).toHaveBeenCalledTimes(1));
 		expect(router.refresh).not.toHaveBeenCalled();
@@ -609,7 +652,7 @@ describe("AuthProvider across tabs", () => {
 		await act(async () => {
 			pending.resolve(signedIn);
 		});
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		act(() => peerAnnounces({ accountId: "7" }));
 		act(() => peerAnnounces({ accountId: 7 }));
 		act(() => peerAnnounces("7"));
@@ -619,7 +662,7 @@ describe("AuthProvider across tabs", () => {
 
 	it("announces the account it sees once, and the guest only from the next document", async () => {
 		const { result } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		expect(FakeBroadcastChannel.sent).toEqual([{ accountId: "7" }]);
 		await act(async () => {
 			await result.current.signOut();
@@ -634,7 +677,7 @@ describe("AuthProvider across tabs", () => {
 
 	it("reloads a page restored from the back-forward cache, not a normal page show", async () => {
 		const { result } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		act(() => {
 			window.dispatchEvent(
 				new PageTransitionEvent("pageshow", { persisted: false }),
@@ -662,7 +705,7 @@ describe("AuthProvider across tabs", () => {
 
 	it("takes answers again after the user cancels the beforeunload prompt of a document change", async () => {
 		const { result, adopt } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		const guard = (event: BeforeUnloadEvent) => event.preventDefault();
 		window.addEventListener("beforeunload", guard);
 		try {
@@ -682,7 +725,7 @@ describe("AuthProvider across tabs", () => {
 
 	it("after a cancelled leave the revoked session is not kept: the server is asked again and signOut runs again", async () => {
 		const { result } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		const guard = (event: BeforeUnloadEvent) => event.preventDefault();
 		window.addEventListener("beforeunload", guard);
 		try {
@@ -706,7 +749,7 @@ describe("AuthProvider across tabs", () => {
 
 	it("keeps ignoring answers when the document change goes ahead without a prompt", async () => {
 		const { result, adopt } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		await act(async () => {
 			await result.current.signOut();
 		});
@@ -722,7 +765,7 @@ describe("AuthProvider across tabs", () => {
 describe("switchRole with an identity the server just confirmed", () => {
 	it("uses the confirmed identity, not the one the page loaded with, so a new seller reaches the seller workspace", async () => {
 		const { result } = await render(signedIn);
-		await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+		await waitFor(() => expect(result.current.status).toBe("signedIn"));
 		expect(result.current.switchRole("seller")).toBe(false);
 		let switched = false;
 		act(() => {

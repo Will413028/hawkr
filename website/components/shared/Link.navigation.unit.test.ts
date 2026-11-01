@@ -37,7 +37,7 @@ vi.mock("next/navigation", async (importOriginal) => ({
 vi.mock("@/lib/auth/context", () => ({
 	useOptionalAuth: () => ({
 		activeRole: mocks.activeRole,
-		isLoggedIn: true,
+		status: "signedIn",
 		hasSeller: true,
 		identity: { accountId: "navigation-test" },
 		switchRole: mocks.switchRole,

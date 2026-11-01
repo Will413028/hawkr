@@ -83,7 +83,8 @@ function OnboardingMark() {
 export default function SellerOnboardingClient() {
 	const router = useObservedRouter("seller_onboarding");
 	const searchParams = useSearchParams();
-	const { status, isLoggedIn, hasSeller, switchRole, signOut } = useAuth();
+	const { status, hasSeller, switchRole, signOut } = useAuth();
+	const signedIn = status === "signedIn";
 	const hasMeasures = useHasMeasures();
 
 	const [step, setStep] = React.useState<Step>("store");
@@ -127,7 +128,7 @@ export default function SellerOnboardingClient() {
 	React.useEffect(() => {
 		if (status === "unknown" || status === "unavailable") return;
 		if (step !== "store") return;
-		if (!isLoggedIn) {
+		if (!signedIn) {
 			router.replace(
 				loginPath({ role: "seller", redirect: "/seller/onboarding" }),
 			);
@@ -166,10 +167,10 @@ export default function SellerOnboardingClient() {
 		return () => {
 			cancelled = true;
 		};
-	}, [status, step, isLoggedIn, hasSeller, redirect, router]);
+	}, [status, step, signedIn, hasSeller, redirect, router]);
 
 	React.useEffect(() => {
-		if (!isLoggedIn || step !== "store") return;
+		if (!signedIn || step !== "store") return;
 		// 有賣家角色時等店家查詢有結果；帳號有店家就不查（送出走更新流程）。
 		if (hasSeller && sellerLookupState !== "ready") return;
 		if (storeExists) return;
@@ -186,7 +187,7 @@ export default function SellerOnboardingClient() {
 		return () => {
 			cancelled = true;
 		};
-	}, [isLoggedIn, step, hasSeller, sellerLookupState, storeExists]);
+	}, [signedIn, step, hasSeller, sellerLookupState, storeExists]);
 
 	const finishSellerApplication = async () => {
 		await finalizeSellerOnboarding(
@@ -300,7 +301,7 @@ export default function SellerOnboardingClient() {
 	// form can mutate anything. This closes the slow-network window where a user
 	// could submit while we still did not know whether a completed store existed.
 	const sellerStatusReady =
-		isLoggedIn && (!hasSeller || sellerLookupState === "ready");
+		signedIn && (!hasSeller || sellerLookupState === "ready");
 	const willApplyStore = !storeExists;
 	// 伺服器說不能開店時擋送出並顯示第一個原因；已有店家走更新，不經 ApplyStore，不受影響。
 	const openingReady = willApplyStore && opening.status === "ready";

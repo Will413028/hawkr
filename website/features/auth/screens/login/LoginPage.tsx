@@ -134,7 +134,7 @@ function LoginPageContent({
 	// immediately. Hard nav (not router.replace): matches the provider-return redirect's
 	// own reasoning, and an already-logged-in visitor landing here has nothing
 	// to lose from a full reload.
-	const { identity, isLoggedIn, status, activeRole, switchRole } = useAuth();
+	const { identity, status, activeRole, switchRole } = useAuth();
 	const [redirectingAway, setRedirectingAway] = React.useState(false);
 	const awayNavigationRef = React.useRef(false);
 	// Guard a self-referential `?redirect=/login`: middleware used to be the
@@ -148,7 +148,7 @@ function LoginPageContent({
 		// Once a provider flow is in progress, the browser is about to leave for
 		// the provider.
 		if (signingIn || awayNavigationRef.current) return;
-		if (!isLoggedIn || !identity) return;
+		if (status !== "signedIn") return;
 		awayNavigationRef.current = true;
 		setRedirectingAway(true);
 		// 從 provider 回來（單體 302 到這頁）才是剛登入；已經登入的人直接打開這頁不算。
@@ -178,7 +178,7 @@ function LoginPageContent({
 		}
 	}, [
 		signingIn,
-		isLoggedIn,
+		status,
 		identity,
 		activeRole,
 		awayTarget,

@@ -484,7 +484,7 @@ function CommentItem({
 	comment,
 	postId,
 	canModerate,
-	isLoggedIn,
+	signedIn,
 	composerAvatar,
 	onLike,
 	onRemove,
@@ -492,7 +492,7 @@ function CommentItem({
 	comment: Comment;
 	postId: number | string;
 	canModerate: boolean;
-	isLoggedIn: boolean;
+	signedIn: boolean;
 	composerAvatar: ComposerAvatar;
 	onLike: (id: number | string) => Promise<void>;
 	onRemove: (id: number | string) => Promise<void>;
@@ -744,7 +744,7 @@ function CommentItem({
 						<span className="sr-only">按讚</span>
 						<span>{comment.likeCount ?? 0}</span>
 					</Button>
-					{isLoggedIn && !editing && (
+					{signedIn && !editing && (
 						<button
 							type="button"
 							className="bg-transparent border-0 text-[var(--hkui-foreground-soft)] text-[length:var(--hkui-text-tiny)] cursor-pointer py-[2px] px-[6px] rounded-[var(--hkui-radius-sm)] hover:text-[var(--hkui-primary)] hover:bg-[var(--hkui-content2)]"
@@ -842,7 +842,8 @@ export default function PostComments({
 	canModerate = false,
 	active = true,
 }: PostCommentsProps) {
-	const { isLoggedIn, identity } = useAuth();
+	const { status, identity } = useAuth();
+	const signedIn = status === "signedIn";
 	const sellerIdentity = useSellerIdentity();
 	const list = usePostComments(postId, { active });
 	const [draft, setDraft] = React.useState("");
@@ -939,7 +940,7 @@ export default function PostComments({
 				</strong>
 			</header>
 
-			{isLoggedIn && (
+			{signedIn && (
 				<form
 					className="flex gap-[var(--hkui-space-3)] items-start mb-[var(--hkui-space-4)]"
 					onSubmit={handleSend}
@@ -1008,7 +1009,7 @@ export default function PostComments({
 							comment={c}
 							postId={postId}
 							canModerate={canModerate}
-							isLoggedIn={isLoggedIn}
+							signedIn={signedIn}
 							composerAvatar={composerAvatar}
 							onLike={list.like}
 							onRemove={list.remove}

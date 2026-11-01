@@ -2,7 +2,8 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { useAuth } from "@/lib/auth/context";
+import { accountQueryFn, accountQueryPending } from "@/lib/auth/account-query";
+import { useAccountStatus } from "@/lib/auth/use-account-status";
 import {
 	type CartAvailableCoupon,
 	fetchAvailableCoupons,
@@ -51,25 +52,28 @@ export function useCartCoupons({
 	storeId: string | null;
 	orderAmount: number;
 }): UseCartCouponsResult {
-	const { isLoggedIn } = useAuth();
+	const status = useAccountStatus();
 	const identity = useQueryIdentity();
 
-	const enabled = isLoggedIn && Boolean(storeId) && orderAmount > 0;
+	const enabled = Boolean(storeId) && orderAmount > 0;
 
 	const query = useQuery({
 		queryKey: queryKeys.buyer.availableCoupons(identity, {
 			storeId: storeId ?? "",
 			orderAmount,
 		}),
-		queryFn: async ({ signal }) => {
-			await delay(300, signal);
-			const { records } = await fetchAvailableCoupons({
-				storeId: storeId ?? undefined,
-				orderAmount,
-				pageSize: 50,
-			});
-			return records;
-		},
+		queryFn: accountQueryFn(
+			status,
+			async ({ signal }: { signal?: AbortSignal }) => {
+				await delay(300, signal);
+				const { records } = await fetchAvailableCoupons({
+					storeId: storeId ?? undefined,
+					orderAmount,
+					pageSize: 50,
+				});
+				return records;
+			},
+		),
 		enabled,
 		// keepPreviousData: orderAmount/seller change (debounced) as the buyer
 		// edits quantities — keep the prior coupon list visible instead of
@@ -78,13 +82,13 @@ export function useCartCoupons({
 	});
 
 	const coupons = useMemo(
-		() => (enabled && query.data) || [],
-		[enabled, query.data],
+		() => (status === "signedIn" && enabled && query.data) || [],
+		[status, enabled, query.data],
 	);
 
 	return {
 		coupons,
-		loading: query.isLoading,
+		loading: accountQueryPending(status, query.isLoading),
 		error: query.error instanceof Error ? query.error.message : null,
 		refresh: async () => {
 			await query.refetch();

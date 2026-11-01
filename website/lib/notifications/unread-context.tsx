@@ -72,7 +72,8 @@ export function NotificationUnreadProvider({
 }: {
 	children: React.ReactNode;
 }) {
-	const { activeRole, isLoggedIn } = useAuth();
+	const { activeRole, status } = useAuth();
+	const signedIn = status === "signedIn";
 	const identity = useQueryIdentity();
 	const queryClient = useQueryClient();
 	const resetSignal = `${identity.accountId ?? "anon"}:${activeRole ?? "none"}`;
@@ -100,7 +101,7 @@ export function NotificationUnreadProvider({
 		[identity.accountId, queryClient],
 	);
 	const streamEnabled =
-		isLoggedIn && identity.accountId !== null && activeRole !== null;
+		signedIn && identity.accountId !== null && activeRole !== null;
 	const { unread, handlers, recover } = useUnreadCount({
 		enabled: streamEnabled,
 		accountId: identity.accountId ?? undefined,
@@ -153,7 +154,7 @@ export function NotificationUnreadProvider({
 	}, [resetSignal, recover, streamStatus]);
 
 	React.useEffect(() => {
-		if (!isLoggedIn) return;
+		if (!signedIn) return;
 		const handleNewNotification = () => {
 			// notification.new is emitted after the row commits. Refetch only active
 			// list variants; inactive roles stay stale until their next mount.
@@ -162,7 +163,7 @@ export function NotificationUnreadProvider({
 		window.addEventListener(NOTIFICATION_NEW_EVENT, handleNewNotification);
 		return () =>
 			window.removeEventListener(NOTIFICATION_NEW_EVENT, handleNewNotification);
-	}, [invalidateActiveLists, isLoggedIn]);
+	}, [invalidateActiveLists, signedIn]);
 
 	return (
 		<NotificationUnreadContext.Provider value={unread}>

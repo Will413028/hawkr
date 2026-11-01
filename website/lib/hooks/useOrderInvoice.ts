@@ -2,7 +2,8 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as React from "react";
-import { useAuth } from "@/lib/auth/context";
+import { accountQueryFn, accountQueryPending } from "@/lib/auth/account-query";
+import { useAccountStatus } from "@/lib/auth/use-account-status";
 import {
 	fetchOrderInvoice,
 	INVOICE_BIZ_CODE,
@@ -51,15 +52,15 @@ function isNotApplicable(error: unknown): boolean {
  *      QueryClient 預設把它關掉了（`lib/query/client.ts`），不寫就沒有這個行為。
  */
 export function useOrderInvoice(orderNo: string): UseOrderInvoiceResult {
-	const { isLoggedIn } = useAuth();
+	const status = useAccountStatus();
 	const identity = useQueryIdentity();
 	const queryClient = useQueryClient();
 	const queryKey = queryKeys.buyer.orderInvoice(identity, orderNo);
 
 	const invoiceQuery = useQuery({
 		queryKey,
-		queryFn: () => fetchOrderInvoice(orderNo),
-		enabled: isLoggedIn && orderNo.length > 0,
+		queryFn: accountQueryFn(status, () => fetchOrderInvoice(orderNo)),
+		enabled: orderNo.length > 0,
 		refetchOnWindowFocus: true,
 		// 9301 是「這筆訂單沒有發票」——零元訂單天天都有，上報它等於把正常狀態
 		// 灌進 Sentry。
@@ -67,7 +68,7 @@ export function useOrderInvoice(orderNo: string): UseOrderInvoiceResult {
 	});
 
 	React.useEffect(() => {
-		if (!isLoggedIn || !orderNo) return;
+		if (status !== "signedIn" || !orderNo) return;
 		const onNotification = (event: Event) => {
 			const detail = (event as CustomEvent<NotificationNewEventDetail>).detail;
 			const item = detail?.item;
@@ -80,14 +81,14 @@ export function useOrderInvoice(orderNo: string): UseOrderInvoiceResult {
 		return () => {
 			window.removeEventListener(NOTIFICATION_NEW_EVENT, onNotification);
 		};
-	}, [isLoggedIn, orderNo, queryClient, queryKey]);
+	}, [status, orderNo, queryClient, queryKey]);
 
 	const error = invoiceQuery.error;
 	const notFound = error != null && isNotApplicable(error);
 
 	return {
 		invoice: invoiceQuery.data ?? null,
-		loading: invoiceQuery.isLoading,
+		loading: accountQueryPending(status, invoiceQuery.isLoading),
 		notFound,
 		error:
 			error instanceof Error && !notFound

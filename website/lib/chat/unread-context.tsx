@@ -31,10 +31,10 @@ export function ChatUnreadProvider({
 }: {
 	children: React.ReactNode;
 }) {
-	const { activeRole, isLoggedIn } = useAuth();
+	const { activeRole, status } = useAuth();
 	const value = useChatUnreadStream({
 		fetcher: fetchUnreadChatCount,
-		enabled: isLoggedIn,
+		enabled: status === "signedIn",
 		resetSignal: activeRole,
 		activeRole,
 	});

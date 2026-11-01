@@ -23,6 +23,7 @@ import ThemeToggle from "@/components/shared/ThemeToggle";
 import { useDisclosureMenu } from "@/components/shared/useDisclosureMenu";
 import { useSellerIdentity } from "@/components/shared/useSellerIdentity";
 import Button from "@/components/ui/Button";
+import { resolveAuthRailMode } from "@/lib/auth/auth-rail";
 import { useAuth } from "@/lib/auth/context";
 import { usePathname } from "@/lib/intl/navigation";
 import { isStandaloneFlowPath } from "@/lib/navigation/standalone-flow";
@@ -472,11 +473,14 @@ export function SellerHeader() {
 	const navLockHintId = `${React.useId()}-seller-nav-lock`;
 	// 賣場建立未完成：工作區連結鎖定（dim、不可點），CTA 變成「繼續建立賣場」
 	// 把人導去 /seller/onboarding —— 引導優先於死按鈕。
-	const { hasSeller } = useAuth();
+	const { hasSeller, status, activeRole } = useAuth();
+	const authPending =
+		resolveAuthRailMode({ status, activeRole }) === "skeleton";
 	const { setupIncomplete: profileSetupIncomplete } = useSellerIdentity();
 	// buyer -> seller 升級在綁定完成前本來就沒有 seller-self 可查；不能把
 	// `self=null` 當成已完成，否則 onboarding header 會洩出可點的工作區入口。
-	const setupIncomplete = !hasSeller || profileSetupIncomplete;
+	const setupIncomplete =
+		!authPending && (!hasSeller || profileSetupIncomplete);
 
 	const isActive = (href: string) =>
 		pathname === href || pathname.startsWith(`${href}/`);
@@ -499,33 +503,42 @@ export function SellerHeader() {
 				</Link>
 
 				<div className={SELLER_NAV}>
-					{sellerNavItems.map((item) =>
-						setupIncomplete ? (
-							<button
-								key={item.href}
-								type="button"
-								className={SELLER_NAV_ITEM_LOCKED}
-								aria-disabled="true"
-								aria-describedby={navLockHintId}
-								onClick={(event) => event.preventDefault()}
-							>
-								{item.label}
-							</button>
-						) : (
-							<Link
-								key={item.href}
-								href={item.href}
-								className={cn(
-									SELLER_NAV_ITEM,
-									isActive(item.href)
-										? `is-active ${SELLER_NAV_ITEM_ACTIVE}`
-										: SELLER_NAV_ITEM_DEFAULT,
-								)}
-							>
-								{item.label}
-							</Link>
-						),
-					)}
+					{authPending
+						? sellerNavItems.map((item) => (
+								<span
+									key={item.href}
+									data-testid="seller-header-skeleton"
+									className="h-6 w-16 animate-pulse rounded-full bg-default-200/70"
+									aria-hidden="true"
+								/>
+							))
+						: sellerNavItems.map((item) =>
+								setupIncomplete ? (
+									<button
+										key={item.href}
+										type="button"
+										className={SELLER_NAV_ITEM_LOCKED}
+										aria-disabled="true"
+										aria-describedby={navLockHintId}
+										onClick={(event) => event.preventDefault()}
+									>
+										{item.label}
+									</button>
+								) : (
+									<Link
+										key={item.href}
+										href={item.href}
+										className={cn(
+											SELLER_NAV_ITEM,
+											isActive(item.href)
+												? `is-active ${SELLER_NAV_ITEM_ACTIVE}`
+												: SELLER_NAV_ITEM_DEFAULT,
+										)}
+									>
+										{item.label}
+									</Link>
+								),
+							)}
 					{setupIncomplete && (
 						<span id={navLockHintId} className="sr-only">
 							{SETUP_LOCK_HINT}
@@ -534,7 +547,7 @@ export function SellerHeader() {
 				</div>
 
 				<div className={SELLER_ACTIONS}>
-					{setupIncomplete ? (
+					{authPending ? null : setupIncomplete ? (
 						<Link
 							href="/seller/onboarding"
 							className={SELLER_SETUP_CTA}
@@ -582,7 +595,15 @@ export function SellerHeader() {
 							</NotificationBell>
 						</>
 					)}
-					<SellerAccountMenu setupIncomplete={setupIncomplete} />
+					{authPending ? (
+						<span
+							data-testid="seller-header-skeleton"
+							className="size-11 animate-pulse rounded-full bg-default-200/70"
+							aria-hidden="true"
+						/>
+					) : (
+						<SellerAccountMenu setupIncomplete={setupIncomplete} />
+					)}
 				</div>
 			</div>
 		</nav>

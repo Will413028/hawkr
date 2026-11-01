@@ -26,7 +26,6 @@ import { useMemo } from "react";
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/lib/auth/context";
 import { isInvoiceBizCode } from "@/lib/invoices/errorCopy";
 import {
 	fetchSellerInvoiceComplaint,
@@ -73,9 +72,8 @@ export interface UseSellerTaxProfileResult {
 
 /** 端點 17（S02 唯一資料源）。停權賣家必須查得到——見檔頭。 */
 export function useSellerTaxProfile(): UseSellerTaxProfileResult {
-	const { isLoggedIn, activeRole } = useAuth();
 	const identity = useQueryIdentity();
-	const enabled = isLoggedIn && activeRole === "seller";
+	const enabled = identity.activeRole === "seller";
 
 	const query = useQuery({
 		queryKey: queryKeys.seller.invoiceTaxProfile(identity),
@@ -114,9 +112,8 @@ export interface UseOrderExternalIssuancesResult {
 export function useOrderExternalIssuances(
 	orderNo: string,
 ): UseOrderExternalIssuancesResult {
-	const { isLoggedIn, activeRole } = useAuth();
 	const identity = useQueryIdentity();
-	const enabled = isLoggedIn && activeRole === "seller" && orderNo !== "";
+	const enabled = identity.activeRole === "seller" && orderNo !== "";
 
 	const query = useQuery({
 		queryKey: queryKeys.seller.orderExternalIssuances(identity, orderNo),
@@ -346,9 +343,8 @@ export function useSellerInvoiceComplaints(params: {
 	page?: number;
 	pageSize?: number;
 }): UseSellerInvoiceComplaintsResult {
-	const { isLoggedIn, activeRole } = useAuth();
 	const identity = useQueryIdentity();
-	const enabled = isLoggedIn && activeRole === "seller";
+	const enabled = identity.activeRole === "seller";
 
 	const query = useQuery({
 		queryKey: queryKeys.seller.invoiceComplaints(
@@ -380,9 +376,8 @@ export interface UseSellerInvoiceComplaintResult {
 export function useSellerInvoiceComplaint(
 	complaintId: string,
 ): UseSellerInvoiceComplaintResult {
-	const { isLoggedIn, activeRole } = useAuth();
 	const identity = useQueryIdentity();
-	const enabled = isLoggedIn && activeRole === "seller" && complaintId !== "";
+	const enabled = identity.activeRole === "seller" && complaintId !== "";
 
 	const query = useQuery({
 		queryKey: queryKeys.seller.invoiceComplaint(identity, complaintId),

@@ -11,14 +11,14 @@ interface AccessClass {
 	/** The workspace the class belongs to; `null` means any workspace. */
 	workspace: RoleSlot | null;
 	/** Whether the signed-in account may open pages of this class. */
-	owns: (account: { isLoggedIn: boolean; hasSeller: boolean }) => boolean;
+	owns: (account: { signedIn: boolean; hasSeller: boolean }) => boolean;
 }
 
 // 每個登入的帳號都是買家；賣家區要有 ROLE_SELLER；`account` 登入即可、不分工作區。
 export const ACCESS_CLASSES: Record<RequiredAccess, AccessClass> = {
-	buyer: { workspace: "buyer", owns: ({ isLoggedIn }) => isLoggedIn },
+	buyer: { workspace: "buyer", owns: ({ signedIn }) => signedIn },
 	seller: { workspace: "seller", owns: ({ hasSeller }) => hasSeller },
-	account: { workspace: null, owns: ({ isLoggedIn }) => isLoggedIn },
+	account: { workspace: null, owns: ({ signedIn }) => signedIn },
 };
 
 const ACCESS_RULES: ReadonlyArray<{

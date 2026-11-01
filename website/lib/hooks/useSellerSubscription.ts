@@ -32,11 +32,11 @@ export interface SellerSubscriptionState {
 export function useSellerSubscription(
 	sellerId: string | number,
 ): SellerSubscriptionState {
-	const { isLoggedIn, activeRole } = useAuth();
+	const { activeRole } = useAuth();
 	const identity = useQueryIdentity();
 	const queryClient = useQueryClient();
 	const isBuyer = activeRole === "buyer";
-	const enabled = isLoggedIn && isBuyer && sellerId != null && sellerId !== "";
+	const enabled = isBuyer && sellerId != null && sellerId !== "";
 	const queryKey = React.useMemo(
 		() => queryKeys.buyer.subscription(identity, sellerId),
 		[identity, sellerId],

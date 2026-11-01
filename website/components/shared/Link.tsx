@@ -175,7 +175,7 @@ export default function Link(props: LinkProps) {
 	const routedLocale = useRoutedLocale();
 	const auth = useOptionalAuth();
 	const activeRole = auth?.activeRole ?? null;
-	const isLoggedIn = auth?.isLoggedIn ?? false;
+	const signedIn = auth?.status === "signedIn";
 	const hasSeller = auth?.hasSeller ?? false;
 	const identity = React.useMemo(
 		() => ({
@@ -194,7 +194,7 @@ export default function Link(props: LinkProps) {
 	const targetRole = protectedRoleForTarget(target);
 	const ownsTargetRole =
 		targetRole === "buyer"
-			? isLoggedIn
+			? signedIn
 			: targetRole === "seller"
 				? hasSeller
 				: false;

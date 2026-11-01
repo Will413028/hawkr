@@ -6,7 +6,6 @@ import {
 	useQueryClient,
 } from "@tanstack/react-query";
 import { useCallback } from "react";
-import { useAuth } from "@/lib/auth/context";
 import { queryKeys } from "@/lib/query/keys";
 import {
 	fetchSellerCustomers,
@@ -52,12 +51,11 @@ interface UseSellerCustomersResult {
 export function useSellerCustomers(
 	params?: UseSellerCustomersParams,
 ): UseSellerCustomersResult {
-	const { isLoggedIn, activeRole } = useAuth();
 	const identity = useQueryIdentity();
 	const query = useQuery({
 		queryKey: queryKeys.seller.customers(identity, params),
 		queryFn: () => fetchSellerCustomers(params ?? {}),
-		enabled: isLoggedIn && activeRole === "seller",
+		enabled: identity.activeRole === "seller",
 		staleTime: 30_000,
 		refetchOnWindowFocus: false,
 		placeholderData: keepPreviousData,

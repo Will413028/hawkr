@@ -21,7 +21,10 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/api/auth", () => ({ deleteAccount: mocks.deleteAccount }));
 vi.mock("@/lib/auth/context", () => ({
-	useAuth: () => ({ signOut: mocks.signOut, hasSeller: mocks.hasSeller }),
+	useAuth: () => ({ signOut: mocks.signOut }),
+}));
+vi.mock("@/lib/auth/zone-identity", () => ({
+	useZoneIdentity: () => ({ accountId: "7", isSeller: mocks.hasSeller }),
 }));
 vi.mock("@/components/ui/Button", () => ({
 	default: ({

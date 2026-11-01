@@ -20,7 +20,6 @@
 
 import { SellerCapability } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/lib/auth/context";
 import {
 	fetchSellerInvoiceDocument,
 	fetchSellerInvoiceJob,
@@ -62,11 +61,10 @@ function invoiceManageBlocked(self: MyStore | null): boolean {
 
 /** 端點 16（S01 唯一資料源）。 */
 export function useSellerInvoiceOverview(): UseSellerInvoiceOverviewResult {
-	const { isLoggedIn, activeRole } = useAuth();
 	const { data: self } = useSellerSelf();
 	const blocked = invoiceManageBlocked(self);
 	const identity = useQueryIdentity();
-	const enabled = isLoggedIn && activeRole === "seller" && !blocked;
+	const enabled = identity.activeRole === "seller" && !blocked;
 
 	const query = useQuery({
 		queryKey: queryKeys.seller.invoiceOverview(identity),
@@ -104,15 +102,11 @@ export function useSellerInvoiceDocuments(
 	params: SellerInvoiceDocumentsQuery,
 	options?: { enabled?: boolean },
 ): UseSellerInvoiceDocumentsResult {
-	const { isLoggedIn, activeRole } = useAuth();
 	const { data: self } = useSellerSelf();
 	const blocked = invoiceManageBlocked(self);
 	const identity = useQueryIdentity();
 	const enabled =
-		isLoggedIn &&
-		activeRole === "seller" &&
-		!blocked &&
-		options?.enabled !== false;
+		identity.activeRole === "seller" && !blocked && options?.enabled !== false;
 
 	const query = useQuery({
 		queryKey: queryKeys.seller.invoiceDocuments(
@@ -142,12 +136,11 @@ export interface UseSellerInvoiceDocumentResult extends BlockedQueryBase {
 export function useSellerInvoiceDocument(
 	documentId: string,
 ): UseSellerInvoiceDocumentResult {
-	const { isLoggedIn, activeRole } = useAuth();
 	const { data: self } = useSellerSelf();
 	const blocked = invoiceManageBlocked(self);
 	const identity = useQueryIdentity();
 	const enabled =
-		isLoggedIn && activeRole === "seller" && !blocked && documentId !== "";
+		identity.activeRole === "seller" && !blocked && documentId !== "";
 
 	const query = useQuery({
 		queryKey: queryKeys.seller.invoiceDocument(identity, documentId),
@@ -184,15 +177,11 @@ export function useSellerReceivedInvoices(
 	params: SellerReceivedInvoicesQuery,
 	options?: { enabled?: boolean },
 ): UseSellerReceivedInvoicesResult {
-	const { isLoggedIn, activeRole } = useAuth();
 	const { data: self } = useSellerSelf();
 	const blocked = invoiceManageBlocked(self);
 	const identity = useQueryIdentity();
 	const enabled =
-		isLoggedIn &&
-		activeRole === "seller" &&
-		!blocked &&
-		options?.enabled !== false;
+		identity.activeRole === "seller" && !blocked && options?.enabled !== false;
 
 	const query = useQuery({
 		queryKey: queryKeys.seller.invoiceReceivedDocuments(
@@ -225,12 +214,10 @@ export interface UseSellerInvoiceJobResult extends BlockedQueryBase {
  * 62R，`CapInvoiceTaxRemedy`），不是這一頁（58A §S08 權限列）。
  */
 export function useSellerInvoiceJob(jobId: string): UseSellerInvoiceJobResult {
-	const { isLoggedIn, activeRole } = useAuth();
 	const { data: self } = useSellerSelf();
 	const blocked = invoiceManageBlocked(self);
 	const identity = useQueryIdentity();
-	const enabled =
-		isLoggedIn && activeRole === "seller" && !blocked && jobId !== "";
+	const enabled = identity.activeRole === "seller" && !blocked && jobId !== "";
 
 	const query = useQuery({
 		queryKey: queryKeys.seller.invoiceJob(identity, jobId),

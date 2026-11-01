@@ -5,7 +5,9 @@ import { type DefaultErrorText, errorText } from "@hawkr/api/connect/errors";
 import { MeasureState } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
-import { useAuth } from "@/lib/auth/context";
+import { accountQueryFn, accountQueryPending } from "@/lib/auth/account-query";
+import type { AuthStatus } from "@/lib/auth/session-state";
+import { useAccountStatus } from "@/lib/auth/use-account-status";
 import { useDefaultErrorText } from "@/lib/i18n/ui-text";
 import { queryKeys } from "@/lib/query/keys";
 import {
@@ -23,9 +25,8 @@ import { useQueryIdentity } from "./useQueryIdentity";
  * 措施與申覆以帳號為範圍，伺服器只要求登入（店家全關、停權的帳號一樣讀得到），所以不看 active role。key 仍帶
  * 身分：切換工作區一律整頁重載，不會雙讀。
  */
-function useMeasuresEnabled(): boolean {
-	const { isLoggedIn } = useAuth();
-	return isLoggedIn;
+function useMeasuresStatus(): AuthStatus {
+	return useAccountStatus();
 }
 
 interface UseSellerMeasuresResult {
@@ -50,21 +51,19 @@ export function useSellerMeasures(
 ): UseSellerMeasuresResult {
 	const defaults = useDefaultErrorText();
 	const identity = useQueryIdentity();
-	const enabled = useMeasuresEnabled();
+	const status = useMeasuresStatus();
 	const query = useQuery({
 		queryKey: queryKeys.seller.measureList(identity, { state }),
-		queryFn: () => fetchMyMeasures(state),
-		enabled,
-		placeholderData: [] as SellerMeasure[],
+		queryFn: accountQueryFn(status, () => fetchMyMeasures(state)),
 	});
 	const records = useMemo(
-		() => (enabled && query.data) || [],
-		[enabled, query.data],
+		() => (status === "signedIn" && query.data) || [],
+		[status, query.data],
 	);
 
 	return {
 		records,
-		loading: query.isLoading || query.isPlaceholderData,
+		loading: accountQueryPending(status, query.isLoading),
 		error: failureText(query.error, defaults),
 		refresh: async () => {
 			await query.refetch();
@@ -77,11 +76,10 @@ export function useSellerMeasures(
  */
 export function useHasMeasures(): boolean {
 	const identity = useQueryIdentity();
-	const enabled = useMeasuresEnabled();
+	const status = useMeasuresStatus();
 	const query = useQuery({
 		queryKey: queryKeys.seller.measureExists(identity),
-		queryFn: () => fetchHasMeasures(),
-		enabled,
+		queryFn: accountQueryFn(status, () => fetchHasMeasures()),
 	});
 	return query.data === true;
 }
@@ -104,14 +102,13 @@ export function useSellerMeasure(measureId: string): UseSellerMeasureResult {
 	const defaults = useDefaultErrorText();
 	const queryClient = useQueryClient();
 	const identity = useQueryIdentity();
-	const enabled = useMeasuresEnabled();
+	const status = useMeasuresStatus();
 	const listKey = queryKeys.seller.measureList(identity, {
 		state: MeasureState.UNSPECIFIED,
 	});
 	const query = useQuery({
 		queryKey: queryKeys.seller.measure(identity, measureId),
-		queryFn: () => fetchMyMeasure(measureId),
-		enabled,
+		queryFn: accountQueryFn(status, () => fetchMyMeasure(measureId)),
 		initialData: () =>
 			queryClient
 				.getQueryData<SellerMeasure[]>(listKey)

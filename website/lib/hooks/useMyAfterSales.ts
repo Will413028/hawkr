@@ -4,7 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import * as React from "react";
 import { fetchMyAfterSales } from "@/lib/after-sales/buyer-repo";
 import type { AfterSaleCase } from "@/lib/after-sales/types";
-import { useAuth } from "@/lib/auth/context";
+import { accountQueryFn, accountQueryPending } from "@/lib/auth/account-query";
+import { useAccountStatus } from "@/lib/auth/use-account-status";
 import { queryKeys } from "@/lib/query/keys";
 import { useQueryIdentity } from "./useQueryIdentity";
 
@@ -39,28 +40,25 @@ function buildBuyerLookup(
  * the order-detail after-sale summary block. Scoped to the logged-in buyer.
  */
 export function useMyAfterSales(): UseMyAfterSalesResult {
-	const { isLoggedIn } = useAuth();
+	const status = useAccountStatus();
 	const identity = useQueryIdentity();
-	const enabled = isLoggedIn;
 	const query = useQuery({
 		queryKey: queryKeys.buyer.afterSales(identity, { pageSize: 100 }),
-		queryFn: async () => {
+		queryFn: accountQueryFn(status, async () => {
 			const { records: list } = await fetchMyAfterSales({ pageSize: 100 });
 			return list;
-		},
-		enabled,
-		placeholderData: [] as AfterSaleCase[],
+		}),
 	});
 	const records = React.useMemo(
-		() => (enabled && query.data) || [],
-		[enabled, query.data],
+		() => (status === "signedIn" && query.data) || [],
+		[status, query.data],
 	);
 	const lookup = React.useMemo(() => buildBuyerLookup(records), [records]);
 
 	return {
 		records,
 		lookup,
-		loading: query.isLoading,
+		loading: accountQueryPending(status, query.isPending),
 		error: query.error instanceof Error ? query.error.message : null,
 		refresh: async () => {
 			await query.refetch();

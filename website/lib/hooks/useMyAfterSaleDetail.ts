@@ -11,7 +11,8 @@ import type {
 	AfterSaleArbitration,
 	AfterSaleDetail,
 } from "@/lib/after-sales/types";
-import { useAuth } from "@/lib/auth/context";
+import { accountQueryFn, accountQueryPending } from "@/lib/auth/account-query";
+import { useAccountStatus } from "@/lib/auth/use-account-status";
 import { queryKeys } from "@/lib/query/keys";
 import { useQueryIdentity } from "./useQueryIdentity";
 
@@ -36,11 +37,11 @@ interface UseMyAfterSaleDetailResult {
 export function useMyAfterSaleDetail(
 	caseNo: string,
 ): UseMyAfterSaleDetailResult {
-	const { isLoggedIn } = useAuth();
+	const status = useAccountStatus();
 	const identity = useQueryIdentity();
 	const query = useQuery({
 		queryKey: queryKeys.buyer.afterSale(identity, caseNo),
-		queryFn: async (): Promise<AfterSaleDetailData> => {
+		queryFn: accountQueryFn(status, async (): Promise<AfterSaleDetailData> => {
 			const detail = await fetchMyAfterSaleDetail(caseNo);
 			let arbitration: AfterSaleArbitration | null = null;
 			if (afterSaleIsAppealLocked(detail.appealState)) {
@@ -51,15 +52,15 @@ export function useMyAfterSaleDetail(
 				}
 			}
 			return { detail, arbitration };
-		},
-		enabled: Boolean(caseNo) && isLoggedIn,
+		}),
+		enabled: Boolean(caseNo),
 		staleTime: 30_000,
 	});
 	return {
 		// `data` (not `error || !data`): a failed background refetch keeps the
 		// last-good detail rather than blanking the page.
 		data: query.data ?? null,
-		loading: query.isLoading,
+		loading: accountQueryPending(status, query.isLoading),
 		error: query.error instanceof Error ? query.error.message : null,
 	};
 }

@@ -7,7 +7,9 @@ import {
 } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { fetchMyAfterSales } from "@/lib/after-sales/buyer-repo";
-import { useAuth } from "@/lib/auth/context";
+import { accountQueryFn, accountQueryPending } from "@/lib/auth/account-query";
+import type { AuthStatus } from "@/lib/auth/session-state";
+import { useAccountStatus } from "@/lib/auth/use-account-status";
 import { AfterSaleCaseStatus } from "@/lib/codemeta/enums";
 import {
 	denormalizeStatus,
@@ -17,7 +19,10 @@ import {
 } from "@/lib/orders/repo";
 import type { Order } from "@/lib/orders/types";
 import { queryKeys } from "@/lib/query/keys";
-import { useSellerDataScope } from "@/lib/seller-data/scope";
+import {
+	type SellerDataScope,
+	useSellerDataScope,
+} from "@/lib/seller-data/scope";
 import { useQueryIdentity } from "./useQueryIdentity";
 
 /**
@@ -46,6 +51,31 @@ interface OrderQueryOptions {
 	view?: "seller";
 }
 
+interface OrderPageContext {
+	pageParam: number;
+	signal?: AbortSignal;
+}
+
+/** 買家路徑經 `accountQueryFn`；賣家路徑（含代行）由 `scope.canRead` 決定，沒有買家登入狀態可等。 */
+function ordersQueryFn<TFn extends (...args: never[]) => unknown>(
+	seller: boolean,
+	authStatus: AuthStatus,
+	fn: TFn,
+) {
+	return seller ? fn : accountQueryFn(authStatus, fn);
+}
+
+function ordersLoading(
+	seller: boolean,
+	scope: SellerDataScope,
+	authStatus: AuthStatus,
+	queryIsLoading: boolean,
+): boolean {
+	return seller && scope.mode === "delegated"
+		? queryIsLoading
+		: accountQueryPending(authStatus, queryIsLoading);
+}
+
 /**
  * Paged orders hook. `status` flips refetch from page 1. The backend scopes
  * data by the JWT session identity sealed in the BFF cookie.
@@ -55,7 +85,7 @@ export function useOrderList(
 	options: OrderQueryOptions = {},
 ): UseOrderListResult {
 	const { buyerId, view } = options;
-	const { isLoggedIn } = useAuth();
+	const authStatus = useAccountStatus();
 	const identity = useQueryIdentity();
 	const scope = useSellerDataScope();
 	const seller = view === "seller";
@@ -64,26 +94,32 @@ export function useOrderList(
 		queryKey: seller
 			? scope.keys.orders(queryParams)
 			: queryKeys.buyer.orders(identity, queryParams),
-		queryFn: ({ pageParam, signal }) =>
-			seller
-				? scope.repos.orders.fetchOrders({
-						status,
-						page: pageParam,
-						pageSize: 20,
-						buyerId,
-						view,
-						signal,
-					})
-				: fetchOrders({
-						status,
-						page: pageParam,
-						pageSize: 20,
-						buyerId,
-						view,
-						signal,
-					}),
+		queryFn: ordersQueryFn(
+			seller,
+			authStatus,
+			({ pageParam, signal }: OrderPageContext) =>
+				seller
+					? scope.repos.orders.fetchOrders({
+							status,
+							page: pageParam,
+							pageSize: 20,
+							buyerId,
+							view,
+							signal,
+						})
+					: fetchOrders({
+							status,
+							page: pageParam,
+							pageSize: 20,
+							buyerId,
+							view,
+							signal,
+						}),
+		),
 		initialPageParam: 1,
-		enabled: seller ? scope.canRead("orders", isLoggedIn) : isLoggedIn,
+		enabled: seller
+			? scope.canRead("orders", identity.activeRole !== null)
+			: undefined,
 		// Keep the previous status tab's orders on screen while the next tab
 		// loads, instead of flashing an empty list.
 		placeholderData: keepPreviousData,
@@ -105,8 +141,8 @@ export function useOrderList(
 	const error = query.error instanceof Error ? query.error.message : null;
 
 	return {
-		orders: isLoggedIn ? orders : noOrders,
-		loading: query.isLoading,
+		orders: authStatus === "signedIn" || seller ? orders : noOrders,
+		loading: ordersLoading(seller, scope, authStatus, query.isLoading),
 		refreshing: query.isFetching && !query.isFetchingNextPage,
 		loadingMore: query.isFetchingNextPage,
 		error,
@@ -148,50 +184,55 @@ export function useAllSellerOrders(
 	options: { view?: "seller"; enabled?: boolean } = {},
 ): UseAllOrdersResult {
 	const { view, enabled: enabledOverride } = options;
-	const { isLoggedIn } = useAuth();
+	const authStatus = useAccountStatus();
 	const identity = useQueryIdentity();
 	const scope = useSellerDataScope();
 	const seller = view === "seller";
 	const enabled =
-		(seller ? scope.canRead("orders", isLoggedIn) : isLoggedIn) &&
+		(seller ? scope.canRead("orders", identity.activeRole !== null) : true) &&
 		(enabledOverride ?? true);
 	const query = useQuery({
 		queryKey: seller
 			? scope.keys.orders({ view, scope: "all" })
 			: queryKeys.buyer.orders(identity, { type: "all", view }),
-		queryFn: async ({ signal }) => {
-			const pageSize = 100;
-			const all: Order[] = [];
-			let page = 1;
-			// Hard page cap so a misbehaving backend pagination contract can't
-			// spin this into an unbounded fetch loop.
-			for (let guard = 0; guard < 100; guard += 1) {
-				const res = seller
-					? await scope.repos.orders.fetchOrders({
-							page,
-							pageSize,
-							view,
-							signal,
-						})
-					: await fetchOrders({ page, pageSize, view, signal });
-				all.push(...res.records);
-				const loaded = res.page * res.pageSize;
-				if (res.records.length === 0 || loaded >= res.total) break;
-				page += 1;
-			}
-			return all;
-		},
+		queryFn: ordersQueryFn(
+			seller,
+			authStatus,
+			async ({ signal }: { signal?: AbortSignal }) => {
+				const pageSize = 100;
+				const all: Order[] = [];
+				let page = 1;
+				// Hard page cap so a misbehaving backend pagination contract can't
+				// spin this into an unbounded fetch loop.
+				for (let guard = 0; guard < 100; guard += 1) {
+					const res = seller
+						? await scope.repos.orders.fetchOrders({
+								page,
+								pageSize,
+								view,
+								signal,
+							})
+						: await fetchOrders({ page, pageSize, view, signal });
+					all.push(...res.records);
+					const loaded = res.page * res.pageSize;
+					if (res.records.length === 0 || loaded >= res.total) break;
+					page += 1;
+				}
+				return all;
+			},
+		),
 		enabled,
 	});
 
 	const orders = useMemo(
-		() => (enabled && query.data) || [],
-		[enabled, query.data],
+		() =>
+			(enabled && (seller || authStatus === "signedIn") && query.data) || [],
+		[enabled, seller, authStatus, query.data],
 	);
 
 	return {
 		orders,
-		loading: query.isLoading,
+		loading: ordersLoading(seller, scope, authStatus, query.isLoading),
 		refreshing: query.isFetching,
 		error: query.error instanceof Error ? query.error.message : null,
 		refresh: async () => {
@@ -250,13 +291,15 @@ export function useOrderStatusCounts(
 	options: OrderQueryOptions = {},
 ): UseOrderStatusCountsResult {
 	const { buyerId, view } = options;
-	const { isLoggedIn } = useAuth();
+	const authStatus = useAccountStatus();
 	const identity = useQueryIdentity();
 	const scope = useSellerDataScope();
 	// 代行沒有 `/orders/status_counts` 對應端點（§6.1.10 只有列表與明細），所以在
 	// 代行 scope 下這支恆不啟用；總覽的數字改由列表的 `total` 自繪。
 	const enabled =
-		isLoggedIn && (view === "seller" ? scope.mode === "seller" : true);
+		view === "seller"
+			? scope.mode === "seller" && identity.activeRole !== null
+			: true;
 
 	// Callers pass a module-scope constant for `statusCsvList` (see
 	// `COUNT_KEYS` in OrdersClient) so the array identity stays stable
@@ -274,59 +317,71 @@ export function useOrderStatusCounts(
 						statusCsvList,
 						buyerId,
 					}),
-		queryFn: async ({ signal }) => {
-			// One rollup call for every real OrderStatus bucket, plus (only when a
-			// caller actually asks for it) one after-sale count. The after-sale
-			// fetch soft-degrades to 0 so a flaky /app/after_sales can't blank the
-			// whole order-count panel; the rollup itself is the primary signal and
-			// its failure surfaces through query.error.
-			const needsAfterSale = statusCsvList.some((csv) =>
-				csv.split(",").some((token) => token.trim() === AFTER_SALE_KEY),
-			);
-			const [rollup, afterSaleTotal] = await Promise.all([
-				fetchOrderStatusCounts({ signal }),
-				needsAfterSale
-					? fetchMyAfterSales({
-							pageSize: 1,
-							status: AFTER_SALE_IN_PROGRESS_CSV,
-						})
-							.then((r) => r.total)
-							.catch(() => 0)
-					: Promise.resolve(0),
-			]);
-			const entries = statusCsvList.map((csv) => {
-				// "" = 全部 → the rollup's grand total.
-				if (!csv) return [csv, rollup.total] as const;
-				// after_sale is a pseudo-status the rollup doesn't track.
-				if (csv.split(",").some((token) => token.trim() === AFTER_SALE_KEY)) {
-					return [csv, afterSaleTotal] as const;
-				}
-				// `denormalizeStatus` turns semantic names AND already-numeric CSVs
-				// into a numeric-code CSV (reusing repo.ts's single name↔code
-				// table); sum every raw OrderStatus bucket this tab spans.
-				const sum = denormalizeStatus(csv)
-					.split(",")
-					.reduce(
-						(acc, code) => acc + (rollup.countsByStatus[code.trim()] ?? 0),
-						0,
-					);
-				return [csv, sum] as const;
-			});
-			return Object.fromEntries(entries);
-		},
+		queryFn: ordersQueryFn(
+			view === "seller",
+			authStatus,
+			async ({ signal }: { signal?: AbortSignal }) => {
+				// One rollup call for every real OrderStatus bucket, plus (only when a
+				// caller actually asks for it) one after-sale count. The after-sale
+				// fetch soft-degrades to 0 so a flaky /app/after_sales can't blank the
+				// whole order-count panel; the rollup itself is the primary signal and
+				// its failure surfaces through query.error.
+				const needsAfterSale = statusCsvList.some((csv) =>
+					csv.split(",").some((token) => token.trim() === AFTER_SALE_KEY),
+				);
+				const [rollup, afterSaleTotal] = await Promise.all([
+					fetchOrderStatusCounts({ signal }),
+					needsAfterSale
+						? fetchMyAfterSales({
+								pageSize: 1,
+								status: AFTER_SALE_IN_PROGRESS_CSV,
+							})
+								.then((r) => r.total)
+								.catch(() => 0)
+						: Promise.resolve(0),
+				]);
+				const entries = statusCsvList.map((csv) => {
+					// "" = 全部 → the rollup's grand total.
+					if (!csv) return [csv, rollup.total] as const;
+					// after_sale is a pseudo-status the rollup doesn't track.
+					if (csv.split(",").some((token) => token.trim() === AFTER_SALE_KEY)) {
+						return [csv, afterSaleTotal] as const;
+					}
+					// `denormalizeStatus` turns semantic names AND already-numeric CSVs
+					// into a numeric-code CSV (reusing repo.ts's single name↔code
+					// table); sum every raw OrderStatus bucket this tab spans.
+					const sum = denormalizeStatus(csv)
+						.split(",")
+						.reduce(
+							(acc, code) => acc + (rollup.countsByStatus[code.trim()] ?? 0),
+							0,
+						);
+					return [csv, sum] as const;
+				});
+				return Object.fromEntries(entries);
+			},
+		),
 		enabled,
-		placeholderData: {} as Record<string, number>,
 	});
 
 	const counts = useMemo(
-		() => (enabled && query.data) || {},
-		[enabled, query.data],
+		() =>
+			(enabled &&
+				(view === "seller" || authStatus === "signedIn") &&
+				query.data) ||
+			{},
+		[enabled, view, authStatus, query.data],
 	);
 
 	return {
 		counts,
 		error: query.error instanceof Error ? query.error.message : null,
-		loading: query.isLoading,
+		loading: ordersLoading(
+			view === "seller",
+			scope,
+			authStatus,
+			query.isLoading,
+		),
 		refresh: async () => {
 			await query.refetch();
 		},
@@ -345,7 +400,7 @@ export function useOrder(
 	opts?: { view?: "seller" },
 ): UseOrderResult {
 	const view = opts?.view;
-	const { isLoggedIn } = useAuth();
+	const authStatus = useAccountStatus();
 	const identity = useQueryIdentity();
 	const scope = useSellerDataScope();
 	const seller = view === "seller";
@@ -353,20 +408,19 @@ export function useOrder(
 		queryKey: seller
 			? scope.keys.order(orderNo ?? "", { view })
 			: queryKeys.buyer.order(identity, orderNo ?? ""),
-		queryFn: () =>
+		queryFn: ordersQueryFn(seller, authStatus, () =>
 			seller
 				? scope.repos.orders.fetchOrder(orderNo ?? "", { view: "seller" })
 				: fetchOrder(orderNo ?? ""),
-		// Gate on hydration + login: an order detail fetch under the pre-hydration
-		// `anon` slot just caches a 401.
+		),
 		enabled:
 			Boolean(orderNo) &&
-			(seller ? scope.canRead("orders", isLoggedIn) : isLoggedIn),
+			(seller ? scope.canRead("orders", identity.activeRole !== null) : true),
 	});
 
 	return {
 		order: query.data ?? null,
-		loading: query.isLoading,
+		loading: ordersLoading(seller, scope, authStatus, query.isLoading),
 		error: query.error instanceof Error ? query.error.message : null,
 		refresh: async () => {
 			await query.refetch();

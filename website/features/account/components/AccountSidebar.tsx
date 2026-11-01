@@ -11,6 +11,7 @@ import {
 	isAccountMenuActive,
 } from "@/features/account/menu";
 import { useAuth } from "@/lib/auth/context";
+import { useZoneIdentity } from "@/lib/auth/zone-identity";
 import { usePathname } from "@/lib/intl/navigation";
 
 /**
@@ -28,12 +29,13 @@ import { usePathname } from "@/lib/intl/navigation";
  */
 export default function AccountSidebar() {
 	const pathname = usePathname() ?? "";
-	const { identity, signOut } = useAuth();
+	const { signOut } = useAuth();
+	const identity = useZoneIdentity();
 	const [signingOut, setSigningOut] = React.useState(false);
 
 	const tCommon = useTranslations("common");
-	const displayName = identity?.nickname || tCommon("memberFallback");
-	const avatar = identity?.avatarKey;
+	const displayName = identity.nickname || tCommon("memberFallback");
+	const avatar = identity.avatarKey;
 
 	const handleSignOut = async () => {
 		if (signingOut) return;

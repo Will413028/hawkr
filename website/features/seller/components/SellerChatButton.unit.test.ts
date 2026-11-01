@@ -8,7 +8,7 @@ const harness = vi.hoisted(() => ({
 	activeRole: "buyer" as "buyer" | "seller" | null,
 	authGateCall: vi.fn(),
 	hasSeller: true,
-	isLoggedIn: true,
+	signedIn: true,
 	openChat: vi.fn(),
 	openLoginRequired: vi.fn(),
 	prewarmChatDrawerThread: vi.fn(),
@@ -32,7 +32,7 @@ vi.mock("@/lib/auth/context", () => ({
 	useAuth: () => ({
 		activeRole: harness.activeRole,
 		hasSeller: harness.hasSeller,
-		isLoggedIn: harness.isLoggedIn,
+		status: harness.signedIn ? "signedIn" : "guest",
 	}),
 }));
 vi.mock("@/lib/auth/useAuthGate", () => ({
@@ -41,7 +41,7 @@ vi.mock("@/lib/auth/useAuthGate", () => ({
 			action: (snapshot: { activeRole: "buyer" | "seller" | null }) => void,
 		) => {
 			harness.authGateCall();
-			if (!harness.isLoggedIn) {
+			if (!harness.signedIn) {
 				onGuest();
 				return;
 			}
@@ -68,7 +68,7 @@ describe("SellerChatButton self-store guard", () => {
 	beforeEach(() => {
 		harness.activeRole = "buyer";
 		harness.hasSeller = true;
-		harness.isLoggedIn = true;
+		harness.signedIn = true;
 		harness.sellerSelf.data = {
 			store: { id: "9223372036854775807", storeCode: "2601234567" },
 		};
@@ -191,7 +191,7 @@ describe("SellerChatButton self-store guard", () => {
 
 	it("does not prewarm before click for guests or a seller-role workspace", () => {
 		vi.useFakeTimers();
-		harness.isLoggedIn = false;
+		harness.signedIn = false;
 		harness.activeRole = null;
 		harness.hasSeller = false;
 		const view = render(
@@ -210,7 +210,7 @@ describe("SellerChatButton self-store guard", () => {
 		expect(harness.openLoginRequired).toHaveBeenCalledTimes(1);
 		expect(harness.prewarmChatDrawerThread).not.toHaveBeenCalled();
 
-		harness.isLoggedIn = true;
+		harness.signedIn = true;
 		harness.activeRole = "seller";
 		harness.hasSeller = true;
 		view.rerender(

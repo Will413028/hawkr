@@ -45,9 +45,9 @@ export interface UseSelfIssueAttestationResult {
  * 整頁渲染成紅字，而重試一百次也不會變。
  */
 export function useSelfIssueAttestation(): UseSelfIssueAttestationResult {
-	const { isLoggedIn, activeRole } = useAuth();
+	const { activeRole } = useAuth();
 	const identity = useQueryIdentity();
-	const enabled = isLoggedIn && activeRole === "seller";
+	const enabled = activeRole === "seller";
 
 	const query = useQuery({
 		queryKey: queryKeys.seller.invoiceAttestation(identity),

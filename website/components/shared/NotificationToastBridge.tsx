@@ -58,18 +58,19 @@ function isMessagesArea(rawPathname: string): boolean {
 }
 
 export default function NotificationToastBridge() {
-	const { activeRole, isLoggedIn, identity } = useAuth();
+	const { activeRole, status, identity } = useAuth();
+	const signedIn = status === "signedIn";
 	const { count, loading } = useNotificationUnread();
 	const { show } = useNotificationToast();
 
 	const myId = identity?.accountId != null ? String(identity.accountId) : "";
-	const workspaceKey = isLoggedIn
+	const workspaceKey = signedIn
 		? `${myId || "unknown"}:${activeRole ?? "none"}`
 		: "guest";
 
 	/* ── New chat messages (immediate, via socket) ─────────────── */
 	React.useEffect(() => {
-		if (!isLoggedIn) return;
+		if (!signedIn) return;
 		const sock = getChatSocket();
 		sock.connect(); // idempotent; the singleton is never auto-disconnected
 		const seen = new Set<string>();
@@ -110,7 +111,7 @@ export default function NotificationToastBridge() {
 			});
 		});
 		return unsub;
-	}, [isLoggedIn, myId, show]);
+	}, [signedIn, myId, show]);
 
 	/* ── New orders / notifications (via unread-count increase) ─── */
 	const primedRef = React.useRef(false);
@@ -144,7 +145,7 @@ export default function NotificationToastBridge() {
 	 * `highWaterMarkRef` so the same row never double-toasts.
 	 */
 	React.useEffect(() => {
-		if (!isLoggedIn) return;
+		if (!signedIn) return;
 		const onNotificationNew = (e: Event) => {
 			const detail = (e as CustomEvent<NotificationNewEventDetail>).detail;
 			const item = detail?.item;
@@ -182,11 +183,11 @@ export default function NotificationToastBridge() {
 		window.addEventListener(NOTIFICATION_NEW_EVENT, onNotificationNew);
 		return () =>
 			window.removeEventListener(NOTIFICATION_NEW_EVENT, onNotificationNew);
-	}, [activeRole, isLoggedIn, show]);
+	}, [activeRole, signedIn, show]);
 
 	React.useEffect(() => {
 		void workspaceKey;
-		if (!isLoggedIn) return;
+		if (!signedIn) return;
 		let cancelled = false;
 		const wasLoading = prevLoadingRef.current;
 		prevLoadingRef.current = loading;
@@ -286,7 +287,7 @@ export default function NotificationToastBridge() {
 		return () => {
 			cancelled = true;
 		};
-	}, [activeRole, count, isLoggedIn, loading, show, workspaceKey]);
+	}, [activeRole, count, signedIn, loading, show, workspaceKey]);
 
 	return null;
 }

@@ -19,7 +19,7 @@ vi.mock("@/lib/connect/seller-public", () => ({
 	}),
 }));
 vi.mock("@/lib/hooks/useRecordHistory", () => ({
-	useRecordHistory: () => ({ enabled: false, record: vi.fn() }),
+	useRecordHistory: () => ({ canRecord: false, record: vi.fn() }),
 }));
 
 import { ProductViewTracker } from "./ProductViewTracker";

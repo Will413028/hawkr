@@ -1,7 +1,6 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/lib/auth/context";
 import { queryKeys } from "@/lib/query/keys";
 import {
 	fetchSellerCustomerLookup,
@@ -13,7 +12,6 @@ export function useSellerCustomerLookup(
 	buyerId: string | number | undefined,
 	options: { enabled?: boolean } = {},
 ): SellerCustomerLookup | null {
-	const { isLoggedIn, activeRole } = useAuth();
 	const identity = useQueryIdentity();
 	const id = String(buyerId ?? "");
 	const query = useQuery({
@@ -21,8 +19,7 @@ export function useSellerCustomerLookup(
 		queryFn: ({ signal }) => fetchSellerCustomerLookup(id, { signal }),
 		enabled:
 			Boolean(id) &&
-			isLoggedIn &&
-			activeRole === "seller" &&
+			identity.activeRole === "seller" &&
 			(options.enabled ?? true),
 		staleTime: 5 * 60_000,
 		retry: 1,

@@ -2,7 +2,6 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { useAuth } from "@/lib/auth/context";
 import { queryKeys } from "@/lib/query/keys";
 import {
 	buildShipmentAnomalyLookup,
@@ -41,12 +40,11 @@ interface UseSellerShipmentAnomaliesResult {
 export function useSellerShipmentAnomalies(
 	params: FetchShipmentAnomaliesParams = {},
 ): UseSellerShipmentAnomaliesResult {
-	const { activeRole, isLoggedIn } = useAuth();
 	const identity = useQueryIdentity();
 	// Stable params snapshot — JSON-stringify so the hook only refetches
 	// when filter inputs actually change (matches useSellerAfterSales).
 	const paramsKey = JSON.stringify(params);
-	const enabled = isLoggedIn && activeRole === "seller";
+	const enabled = identity.activeRole === "seller";
 	const emptyResult = useMemo(
 		() => ({
 			records: [] as ShipmentAnomalyItem[],
@@ -101,9 +99,8 @@ interface UseSellerShipmentAnomalyStatsResult {
 /** Lightweight stats-only hook — used by the dashboard banner so the
  *  homepage doesn't need to fetch the full list just to know the count. */
 export function useSellerShipmentAnomalyStats(): UseSellerShipmentAnomalyStatsResult {
-	const { activeRole, isLoggedIn } = useAuth();
 	const identity = useQueryIdentity();
-	const enabled = isLoggedIn && activeRole === "seller";
+	const enabled = identity.activeRole === "seller";
 	const emptyStats = useMemo(
 		(): ShipmentAnomalyStats => ({ total: 0, high: 0, medium: 0, low: 0 }),
 		[],

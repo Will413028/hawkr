@@ -159,7 +159,7 @@ test("navbar only offers the toggle to signed-in readers", async () => {
 	// the footer and the settings page instead.
 	assert.match(
 		navbar,
-		/isLoggedIn && \(\s*<TextScaleToggle className="size-11 \[@media\(max-width:840px\)\]:hidden" \/>/,
+		/status === "signedIn" && \(\s*<TextScaleToggle className="size-11 \[@media\(max-width:840px\)\]:hidden" \/>/,
 	);
 	// Directly after the theme toggle, per the approved placement.
 	const themeIndex = navbar.indexOf('<ThemeToggle className="size-11" />');

@@ -36,7 +36,7 @@ vi.mock("next/navigation", async (importOriginal) => ({
 // auth mock 慣例（見 useProcurementSession.*.unit.test.ts），不為此拉起真 provider。
 vi.mock("@/lib/auth/context", () => ({
 	useAuth: () => ({
-		isLoggedIn: true,
+		status: "signedIn",
 		activeRole: "buyer",
 		identity: { accountId: "1001", nickname: "測試買家" },
 	}),

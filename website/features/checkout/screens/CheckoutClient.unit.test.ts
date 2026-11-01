@@ -8,11 +8,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const auth = vi.hoisted(() => ({
 	value: {
 		identity: null as { accountId: string; isSeller: boolean } | null,
-		isLoggedIn: false,
+		status: "unknown",
 		activeRole: null as string | null,
 	},
 }));
 vi.mock("@/lib/auth/context", () => ({ useAuth: () => auth.value }));
+vi.mock("@/lib/auth/zone-identity", () => ({
+	useZoneIdentity: () => ({ accountId: "7", isSeller: false }),
+}));
 vi.mock("@/lib/navigation/use-observed-router", () => ({
 	useObservedRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
@@ -28,11 +31,11 @@ vi.mock("@/lib/payment/useNativePayAvailability", () => ({
 	}),
 }));
 
-import CheckoutClient from "./CheckoutClient";
+import CheckoutClient, { transientReducer } from "./CheckoutClient";
 
 afterEach(cleanup);
 
-describe("CheckoutClient while the session is not signed in", () => {
+describe("CheckoutClient before the root auth state has an answer", () => {
 	it("settles instead of re-rendering itself forever", async () => {
 		let commits = 0;
 		const client = new QueryClient();
@@ -53,11 +56,36 @@ describe("CheckoutClient while the session is not signed in", () => {
 				),
 			),
 		);
-		await screen.findByText("請先登入。");
+		await screen.findByText("正在讀取結帳資料…");
 		await new Promise((done) => setTimeout(done, 100));
 		const settled = commits;
 		await new Promise((done) => setTimeout(done, 100));
 		expect(commits).toBe(settled);
 		expect(settled).toBeLessThan(10);
+	});
+});
+
+describe("transientReducer SET", () => {
+	it("returns the same state when the patch changes no field", () => {
+		const state = transientReducer(undefined as never, { type: "NEW_ATTEMPT" });
+		expect(
+			transientReducer(state, { type: "SET", patch: { submitting: false } }),
+		).toBe(state);
+		expect(
+			transientReducer(state, {
+				type: "SET",
+				patch: { preview: null, previewNonce: 0 },
+			}),
+		).toBe(state);
+	});
+
+	it("returns a new state when any field changes", () => {
+		const state = transientReducer(undefined as never, { type: "NEW_ATTEMPT" });
+		const next = transientReducer(state, {
+			type: "SET",
+			patch: { submitting: true },
+		});
+		expect(next).not.toBe(state);
+		expect(next.submitting).toBe(true);
 	});
 });

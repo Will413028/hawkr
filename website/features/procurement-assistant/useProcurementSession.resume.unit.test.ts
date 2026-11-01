@@ -34,7 +34,7 @@ const { postMock, getMock, toastErrorMock } = vi.hoisted(() => ({
 
 vi.mock("@/lib/auth/context", () => ({
 	useAuth: () => ({
-		isLoggedIn: true,
+		status: "signedIn",
 		activeRole: "buyer",
 		identity: { accountId: "1001" },
 	}),

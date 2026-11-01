@@ -7,7 +7,8 @@ import { SellerPageShell } from "@/components/shared/SellerPageShell";
 import Button from "@/components/ui/Button";
 import { AccountEmptyStateIcon } from "@/features/account/components/AccountEmptyIcon";
 import OrderQuickActionDrawer from "@/features/account/screens/orders/OrderQuickActionDrawer";
-import { useAuth } from "@/lib/auth/context";
+import { accountQueryFn, accountQueryPending } from "@/lib/auth/account-query";
+import { useAccountStatus } from "@/lib/auth/use-account-status";
 import { formatTaipeiDate } from "@/lib/date/taipei";
 import { useOrder } from "@/lib/hooks/useOrders";
 import { useQueryIdentity } from "@/lib/hooks/useQueryIdentity";
@@ -36,23 +37,24 @@ export default function MemberCardDetailClient({
 	sellerId: string;
 	sellerName?: string;
 }) {
-	const { isLoggedIn } = useAuth();
+	const status = useAccountStatus();
 	const identity = useQueryIdentity();
 
 	const query = useInfiniteQuery({
 		queryKey: queryKeys.buyer.memberCardRecords(identity, sellerId, {
 			size: 50,
 		}),
-		queryFn: ({ pageParam }) =>
+		queryFn: accountQueryFn(status, ({ pageParam }: { pageParam: string }) =>
 			fetchSpendingRecords({ sellerId, size: 50, pageToken: pageParam }),
+		),
 		initialPageParam: "",
 		getNextPageParam: (page) => page.nextPageToken || undefined,
-		enabled: isLoggedIn && Boolean(sellerId),
+		enabled: Boolean(sellerId),
 	});
 	const records = query.data?.pages.flatMap((page) => page.records) ?? [];
 	const totalSpending = query.data?.pages[0]?.totalSpending ?? "0";
 	const totalRefund = query.data?.pages[0]?.totalRefund ?? "0";
-	const loading = query.isLoading;
+	const loading = accountQueryPending(status, query.isLoading);
 	const error = query.error instanceof Error ? query.error.message : null;
 
 	// Spending rows are slim (orderSn only), so clicking one opens the shared

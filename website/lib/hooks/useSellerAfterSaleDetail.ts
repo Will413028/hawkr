@@ -11,7 +11,6 @@ import type {
 	AfterSaleArbitration,
 	AfterSaleDetail,
 } from "@/lib/after-sales/types";
-import { useAuth } from "@/lib/auth/context";
 import { queryKeys } from "@/lib/query/keys";
 import { useQueryIdentity } from "./useQueryIdentity";
 
@@ -37,7 +36,6 @@ export function useSellerAfterSaleDetail(
 	caseNo: string,
 	options?: { enabled?: boolean },
 ): UseSellerAfterSaleDetailResult {
-	const { isLoggedIn, activeRole } = useAuth();
 	const identity = useQueryIdentity();
 	const query = useQuery({
 		queryKey: queryKeys.seller.afterSale(identity, caseNo),
@@ -55,8 +53,7 @@ export function useSellerAfterSaleDetail(
 		},
 		enabled:
 			Boolean(caseNo) &&
-			isLoggedIn &&
-			activeRole === "seller" &&
+			identity.activeRole === "seller" &&
 			(options?.enabled ?? true),
 		staleTime: 30_000,
 	});

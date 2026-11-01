@@ -9,7 +9,7 @@ import { queryKeys } from "@/lib/query/keys";
 import type { SellerMeasure } from "@/lib/seller/measures";
 
 const mocks = vi.hoisted(() => ({
-	auth: { status: "signedIn", isLoggedIn: true, hasSeller: false },
+	auth: { status: "signedIn", hasSeller: false },
 	fetchMyMeasures: vi.fn(),
 	fetchHasMeasures: vi.fn(),
 	fetchMyMeasure: vi.fn(),
@@ -57,7 +57,6 @@ beforeEach(() => {
 		defaultOptions: { queries: { retry: false, gcTime: Infinity } },
 	});
 	mocks.auth.status = "signedIn";
-	mocks.auth.isLoggedIn = true;
 	mocks.fetchMyMeasures.mockReset().mockResolvedValue([measure()]);
 	mocks.fetchHasMeasures.mockReset().mockResolvedValue(true);
 	mocks.fetchMyMeasure.mockReset().mockResolvedValue(measure());
@@ -77,8 +76,8 @@ describe("措施查詢的啟用條件", () => {
 	});
 
 	it.each([
-		["答案未到（unknown）", { status: "unknown", isLoggedIn: false }],
-		["未登入", { status: "guest", isLoggedIn: false }],
+		["答案未到（unknown）", { status: "unknown" }],
+		["未登入", { status: "guest" }],
 	])("%s 不讀取", async (_name, state) => {
 		Object.assign(mocks.auth, state);
 		const list = renderHook(() => useSellerMeasures(), { wrapper });

@@ -55,14 +55,17 @@ describe("requireZone", () => {
 			identity: { accountId: "8", isSeller: true },
 		});
 		requestAt("/seller-center/dashboard");
-		expect(await requireZone("seller")).toBe("allow");
+		expect(await requireZone("seller")).toEqual({
+			kind: "allow",
+			identity: { accountId: "8", isSeller: true },
+		});
 		expect(mocks.redirect).not.toHaveBeenCalled();
 	});
 
 	it("reports an unavailable session without redirecting", async () => {
 		mocks.verifySession.mockResolvedValue({ status: "unavailable" });
 		requestAt("/account");
-		expect(await requireZone("buyer")).toBe("unavailable");
+		expect(await requireZone("buyer")).toEqual({ kind: "unavailable" });
 		expect(mocks.redirect).not.toHaveBeenCalled();
 	});
 });

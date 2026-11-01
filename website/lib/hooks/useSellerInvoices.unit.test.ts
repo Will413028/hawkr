@@ -23,7 +23,7 @@ vi.mock("@/lib/config/env", () => ({
 }));
 vi.mock("@/lib/auth/context", () => ({
 	useAuth: () => ({
-		isLoggedIn: true,
+		status: "signedIn",
 		activeRole: "seller",
 		identity: { accountId: "seller-test" },
 	}),

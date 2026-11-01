@@ -2,7 +2,6 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { useAuth } from "@/lib/auth/context";
 import { queryKeys } from "@/lib/query/keys";
 import { type CustomerTag, fetchSellerTags } from "@/lib/seller/repo";
 import { useQueryIdentity } from "./useQueryIdentity";
@@ -16,12 +15,11 @@ import { useQueryIdentity } from "./useQueryIdentity";
  * an empty pool so the rest of the page keeps working.
  */
 export function useSellerTags(): CustomerTag[] {
-	const { isLoggedIn, activeRole } = useAuth();
 	const identity = useQueryIdentity();
 	const query = useQuery({
 		queryKey: queryKeys.seller.tags(identity),
 		queryFn: fetchSellerTags,
-		enabled: isLoggedIn && activeRole === "seller",
+		enabled: identity.activeRole === "seller",
 		staleTime: 60_000,
 	});
 	return useMemo(() => query.data ?? [], [query.data]);

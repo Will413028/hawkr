@@ -1,7 +1,8 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/lib/auth/context";
+import { accountQueryFn, accountQueryPending } from "@/lib/auth/account-query";
+import { useAccountStatus } from "@/lib/auth/use-account-status";
 import {
 	fetchInvoiceDocument,
 	INVOICE_BIZ_CODE,
@@ -32,13 +33,13 @@ export interface UseInvoiceDocumentResult {
 export function useInvoiceDocument(
 	documentId: string,
 ): UseInvoiceDocumentResult {
-	const { isLoggedIn } = useAuth();
+	const status = useAccountStatus();
 	const identity = useQueryIdentity();
 
 	const documentQuery = useQuery({
 		queryKey: queryKeys.buyer.invoiceDocument(identity, documentId),
-		queryFn: () => fetchInvoiceDocument(documentId),
-		enabled: isLoggedIn && documentId.length > 0,
+		queryFn: accountQueryFn(status, () => fetchInvoiceDocument(documentId)),
+		enabled: documentId.length > 0,
 		meta: {
 			isExpectedError: (error: unknown) =>
 				invoiceBizCode(error) === INVOICE_BIZ_CODE.DOCUMENT_NOT_FOUND,
@@ -47,7 +48,7 @@ export function useInvoiceDocument(
 
 	return {
 		detail: documentQuery.data ?? null,
-		loading: documentQuery.isLoading,
+		loading: accountQueryPending(status, documentQuery.isLoading),
 		error:
 			documentQuery.error instanceof Error
 				? "這份文件可能已被移除，或連結不正確。"

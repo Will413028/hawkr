@@ -1,10 +1,10 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/lib/auth/context";
 import type { ProductListResult } from "@/lib/products/seller-repo";
 import { queryKeys } from "@/lib/query/keys";
 import { useSellerDataScope } from "@/lib/seller-data/scope";
+import { useQueryIdentity } from "./useQueryIdentity";
 
 interface UseSellerProductsResult {
 	data: ProductListResult | null;
@@ -31,13 +31,13 @@ export function useSellerProducts(
 	params?: { page?: number; pageSize?: number; status?: number | string },
 	options?: { enabled?: boolean },
 ): UseSellerProductsResult {
-	const { isLoggedIn, activeRole } = useAuth();
+	const identity = useQueryIdentity();
 	const scope = useSellerDataScope();
 	const query = useQuery({
 		queryKey: scope.keys.products(params),
 		queryFn: () => scope.repos.products.fetchSellerProducts(params ?? {}),
 		enabled:
-			scope.canRead("products", isLoggedIn && activeRole === "seller") &&
+			scope.canRead("products", identity.activeRole === "seller") &&
 			(options?.enabled ?? true),
 		staleTime: 30_000,
 		refetchOnWindowFocus: true,

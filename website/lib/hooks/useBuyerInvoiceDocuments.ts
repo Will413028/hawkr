@@ -1,7 +1,8 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/lib/auth/context";
+import { accountQueryFn, accountQueryPending } from "@/lib/auth/account-query";
+import { useAccountStatus } from "@/lib/auth/use-account-status";
 import {
 	type BuyerInvoiceDocumentsQuery,
 	listBuyerInvoiceDocuments,
@@ -25,7 +26,7 @@ export interface UseBuyerInvoiceDocumentsResult {
 /**
  * 買家發票中心的列表（58A §B09，端點 68）。
  *
- * `enabled` 要求 `isLoggedIn`：`status` 為 `unknown` 時 auth 還沒有伺服器的答案，
+ * 查詢只在 `status` 為 `signedIn` 時送（`accountQueryFn`）：`unknown` 時 auth 還沒有伺服器的答案，
  * 此時發請求會帶著空身分打出去、拿回 401，然後在畫面上留下一個假的錯誤態。
  *
  * `options.enabled` 給呼叫端做**輸入驗證**用：日期格式不合法時整支不發，因為端點 68
@@ -35,22 +36,22 @@ export function useBuyerInvoiceDocuments(
 	params: BuyerInvoiceDocumentsQuery,
 	options?: { enabled?: boolean },
 ): UseBuyerInvoiceDocumentsResult {
-	const { isLoggedIn } = useAuth();
+	const status = useAccountStatus();
 	const identity = useQueryIdentity();
-	const enabled = isLoggedIn && options?.enabled !== false;
+	const enabled = options?.enabled !== false;
 
 	const query = useQuery({
 		queryKey: queryKeys.buyer.invoiceDocuments(
 			identity,
 			params as Record<string, unknown>,
 		),
-		queryFn: () => listBuyerInvoiceDocuments(params),
+		queryFn: accountQueryFn(status, () => listBuyerInvoiceDocuments(params)),
 		enabled,
 	});
 
 	return {
-		page: enabled ? (query.data ?? null) : null,
-		loading: enabled && query.isLoading,
+		page: status === "signedIn" && enabled ? (query.data ?? null) : null,
+		loading: accountQueryPending(status, enabled && query.isLoading),
 		error: query.error,
 		refresh: async () => {
 			await query.refetch();

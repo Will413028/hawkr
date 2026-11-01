@@ -39,6 +39,7 @@ import {
 	shouldTeardownPrivateCache,
 	teardownPrivateCache as teardownPrivateCacheOp,
 } from "./teardown";
+import { ZoneMountRegistryContext } from "./zone-context";
 
 const VOLUNTARY_LOGOUT_WINDOW_MS = 15_000;
 let lastVoluntaryLogoutAt = 0;
@@ -57,18 +58,20 @@ function templatePath(path: string | undefined): string {
 		.join("/");
 }
 
-interface AuthContextValue {
-	identity: Identity | null;
-	isLoggedIn: boolean;
-	/** 帳號有 ROLE_SELLER。每個登入的帳號都是買家，所以沒有 hasBuyer：看 isLoggedIn。 */
+type AuthIdentityState =
+	| { status: "signedIn"; identity: Identity }
+	| { status: Exclude<AuthStatus, "signedIn">; identity: null };
+
+/**
+ * `status` 是 `unknown`（伺服器的答案還沒到：靜態外殼與第一次 client render 都是它）、
+ * `guest | signedIn | unavailable`。`unavailable` 是單體暫時答不出來（B-199）：不是登出，
+ * `identity` 為 null 但不能當成訪客。沒有「是否登入」的布林：`unknown` 與 `guest` 都會讓它是 false，
+ * 把還沒回答當成訪客；要分支就明寫 `status`。
+ */
+type AuthContextValue = AuthIdentityState & {
+	/** 帳號有 ROLE_SELLER。每個登入的帳號都是買家，所以沒有 hasBuyer：看 `status === "signedIn"`。 */
 	hasSeller: boolean;
 	activeRole: RoleSlot | null;
-	/**
-	 * 伺服器的答案還沒到之前是 `unknown`（靜態外殼與第一次 client render 都是它），之後是
-	 * `guest | signedIn | unavailable`。`unavailable` 是單體暫時答不出來（B-199）：不是登出，
-	 * `identity` 為 null 但不能當成訪客。
-	 */
-	status: AuthStatus;
 	/** `confirmed`：剛由伺服器確認的身分（開店完成後的 GetSession），用它判斷能不能切，不看載入頁面時的身分。 */
 	switchRole: (next: RoleSlot, confirmed?: Identity) => boolean;
 	startSellerOnboarding: (redirect?: string) => void;
@@ -78,7 +81,7 @@ interface AuthContextValue {
 	 * 什麼都不改，可以再呼叫。
 	 */
 	signOut: (to?: string, replace?: boolean) => Promise<void>;
-}
+};
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
 
@@ -144,9 +147,20 @@ export function AuthProvider({
 		? (storedActive ?? effectiveActiveRole(identity, null))
 		: null;
 	const status: AuthStatus = serverSession?.status ?? "unknown";
+	const identityState = React.useMemo<AuthIdentityState>(
+		() =>
+			serverSession?.status === "signedIn"
+				? { status: "signedIn", identity: serverSession.identity }
+				: {
+						status: serverSession?.status ?? "unknown",
+						identity: null,
+					},
+		[serverSession],
+	);
 	const previousAccountId = React.useRef<string | undefined>(undefined);
 	const statusRef = React.useRef(status);
 	statusRef.current = status;
+	const mountedZones = React.useRef(0);
 	const signingOut = React.useRef<Promise<void> | undefined>(undefined);
 	const tAuth = useTranslations("auth");
 	const endingSession = React.useRef(false);
@@ -256,9 +270,11 @@ export function AuthProvider({
 						tags: { trigger_path: templatePath(detail?.path) },
 					});
 				}
-				// 單體說 unauthenticated：session 已經不在（過期、撤銷、帳號停權或刪除）。不是 signedIn 的文件
-				// 沒有身分可清，換文件只會循環。
-				if (statusRef.current !== "signedIn") return;
+				// 單體說 unauthenticated：session 已經不在（過期、撤銷、帳號停權或刪除）。文件上沒有身分可清
+				// （根層不是 signedIn，也沒有掛著由伺服器確認身分的受保護區）就不換文件，否則只會循環。
+				if (statusRef.current !== "signedIn" && mountedZones.current === 0) {
+					return;
+				}
 				await leaveDocument("/", true);
 			} catch {
 				return;
@@ -373,23 +389,30 @@ export function AuthProvider({
 
 	const value = React.useMemo<AuthContextValue>(
 		() => ({
-			identity,
-			isLoggedIn: !!identity,
+			...identityState,
 			hasSeller: !!identity && identity.isSeller,
 			activeRole: active,
-			status,
 			switchRole,
 			startSellerOnboarding,
 			signOut,
 		}),
-		[identity, active, status, switchRole, startSellerOnboarding, signOut],
+		[
+			identityState,
+			identity,
+			active,
+			switchRole,
+			startSellerOnboarding,
+			signOut,
+		],
 	);
 
 	return (
-		<AuthContext.Provider value={value}>
-			<span data-auth-status={status} style={{ display: "none" }} />
-			{children}
-		</AuthContext.Provider>
+		<ZoneMountRegistryContext.Provider value={mountedZones}>
+			<AuthContext.Provider value={value}>
+				<span data-auth-status={status} style={{ display: "none" }} />
+				{children}
+			</AuthContext.Provider>
+		</ZoneMountRegistryContext.Provider>
 	);
 }
 

@@ -2,7 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { useAuth } from "@/lib/auth/context";
+import { accountQueryFn, accountQueryPending } from "@/lib/auth/account-query";
+import { useAccountStatus } from "@/lib/auth/use-account-status";
 import {
 	createInvoiceProfile,
 	deleteInvoiceProfile,
@@ -51,15 +52,17 @@ interface UseInvoiceProfilesResult {
  * 再 invalidate 才是唯一不會說謊的做法。
  */
 export function useInvoiceProfiles(): UseInvoiceProfilesResult {
-	const { isLoggedIn } = useAuth();
+	const status = useAccountStatus();
 	const identity = useQueryIdentity();
 	const queryClient = useQueryClient();
 	const queryKey = queryKeys.buyer.invoiceProfiles(identity);
 
 	const profilesQuery = useQuery({
 		queryKey,
-		queryFn: async () => (await fetchInvoiceProfiles()).records,
-		enabled: isLoggedIn,
+		queryFn: accountQueryFn(
+			status,
+			async () => (await fetchInvoiceProfiles()).records,
+		),
 	});
 
 	const invalidate = async () => {
@@ -137,14 +140,14 @@ export function useInvoiceProfiles(): UseInvoiceProfilesResult {
 	});
 
 	const profiles = useMemo(
-		() => (isLoggedIn && profilesQuery.data) || [],
-		[isLoggedIn, profilesQuery.data],
+		() => (status === "signedIn" && profilesQuery.data) || [],
+		[status, profilesQuery.data],
 	);
 
 	return {
 		profiles,
 		defaultProfile: profiles.find((profile) => profile.isDefault) ?? null,
-		loading: profilesQuery.isLoading,
+		loading: accountQueryPending(status, profilesQuery.isPending),
 		error:
 			profilesQuery.error instanceof Error ? profilesQuery.error.message : null,
 		refresh: async () => {

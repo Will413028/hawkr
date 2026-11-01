@@ -3,7 +3,6 @@ import { type AuthRailInput, resolveAuthRailMode } from "../auth-rail";
 
 const base: AuthRailInput = {
 	status: "unknown",
-	isLoggedIn: false,
 	activeRole: null,
 };
 
@@ -18,7 +17,6 @@ describe("resolveAuthRailMode", () => {
 		expect(
 			resolveAuthRailMode({
 				...base,
-				isLoggedIn: true,
 				activeRole: "buyer",
 			}),
 		).toBe("skeleton");
@@ -32,7 +30,6 @@ describe("resolveAuthRailMode", () => {
 		expect(
 			resolveAuthRailMode({
 				status: "signedIn",
-				isLoggedIn: true,
 				activeRole: "buyer",
 			}),
 		).toBe("buyer");
@@ -42,7 +39,6 @@ describe("resolveAuthRailMode", () => {
 		expect(
 			resolveAuthRailMode({
 				status: "signedIn",
-				isLoggedIn: true,
 				activeRole: "seller",
 			}),
 		).toBe("seller");
@@ -52,7 +48,6 @@ describe("resolveAuthRailMode", () => {
 		expect(
 			resolveAuthRailMode({
 				status: "signedIn",
-				isLoggedIn: true,
 				activeRole: null,
 			}),
 		).toBe("seller");
@@ -68,7 +63,6 @@ describe("resolveAuthRailMode", () => {
 		expect(
 			resolveAuthRailMode({
 				status: "unavailable",
-				isLoggedIn: true,
 				activeRole: "buyer",
 			}),
 		).toBe("skeleton");

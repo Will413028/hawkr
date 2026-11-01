@@ -170,7 +170,7 @@ export interface SellerDataScope {
 	 * 布林值，scope 一個字都沒改。
 	 *
 	 * 代行路徑忽略 `sellerGate`，改由工作階段的 capability 決定：代行的瀏覽器在 www
-	 * 上沒有登入態，沿用 `isLoggedIn && activeRole === "seller"` 會**恆為 false**，
+	 * 上沒有登入態，沿用 `activeRole === "seller"` 會**恆為 false**，
 	 * 整個工作區一個查詢都不會發，而畫面只會顯示空清單、不報任何錯。
 	 */
 	canRead(area: SellerDataArea, sellerGate: boolean): boolean;

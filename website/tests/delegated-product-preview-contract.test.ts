@@ -201,9 +201,9 @@ test("預覽真的渲染得出來，且畫面上沒有通往買家公開面的�
 		defaultExport: ({ alt, src }: { alt?: string; src?: string }) =>
 			React.createElement("img", { alt: alt ?? "", src: String(src ?? "") }),
 	});
-	// 購買盒讀登入態。代行的瀏覽器在 www 上**沒有**登入態，所以 false 是這條路徑上
+	// 購買盒讀登入態。代行的瀏覽器在 www 上**沒有**登入態，所以 guest 是這條路徑上
 	// 的真實值 —— 這不是為了讓測試過而調的參數。
-	const anonymousAuth = { isLoggedIn: false, user: null, loading: false };
+	const anonymousAuth = { status: "guest", identity: null, activeRole: null };
 	mock.module("@/lib/auth/context", {
 		namedExports: {
 			AuthProvider: ({ children }: { children: React.ReactNode }) => children,

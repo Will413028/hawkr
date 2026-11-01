@@ -7,6 +7,7 @@ import Button from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { deleteAccount } from "@/lib/api/auth";
 import { useAuth } from "@/lib/auth/context";
+import { useZoneIdentity } from "@/lib/auth/zone-identity";
 import { useDefaultErrorText } from "@/lib/i18n/ui-text";
 import { commitDocumentNavigation } from "@/lib/navigation/document-location";
 
@@ -23,7 +24,8 @@ const STORE_CLOSURE_NOTICE =
  * 自動刪除。
  */
 export default function DeleteAccountSection() {
-	const { signOut, hasSeller } = useAuth();
+	const { signOut } = useAuth();
+	const { isSeller: hasSeller } = useZoneIdentity();
 	const defaults = useDefaultErrorText();
 	const [open, setOpen] = React.useState(false);
 	const [busy, setBusy] = React.useState(false);

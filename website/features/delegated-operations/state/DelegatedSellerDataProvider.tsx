@@ -23,7 +23,7 @@ import { type DelegatedIdentity, delegatedIdentityOf } from "./session";
  * - **快取鍵** → `queryKeys.delegated.*`（工作階段身分，不是登入身分）。沿用
  *   `QueryIdentity` 時代行的 `accountId`／`activeRole` 恆為 `null` ⇒ 先後代行 A 店與
  *   B 店會共用同一個快取槽，第二家直接看到第一家的資料
- * - **啟用條件** → capability。沿用 `isLoggedIn && activeRole === "seller"` 在代行下
+ * - **啟用條件** → capability。沿用 `activeRole === "seller"` 在代行下
  *   恆為 false ⇒ 一個查詢都不會發，畫面只顯示空清單、不報任何錯
  *
  * 寫入另外多一道 `confirmMutation`：代行的每一筆寫入都必須帶修改原因／目前版本／

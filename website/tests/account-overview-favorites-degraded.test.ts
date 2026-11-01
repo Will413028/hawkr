@@ -28,10 +28,9 @@ const EMPTY_STATE = "還沒有收藏商品";
 
 async function renderOverview(items: Favorite[]): Promise<string> {
 	mock.reset();
-	mock.module("@/lib/auth/context", {
+	mock.module("@/lib/auth/zone-identity", {
 		exports: {
-			useAuth: () => ({ identity: { nickname: "阿明" } }),
-			useOptionalAuth: () => null,
+			useZoneIdentity: () => ({ accountId: "7", nickname: "阿明" }),
 		},
 	});
 	mock.module("@/components/shared/AppImage", {

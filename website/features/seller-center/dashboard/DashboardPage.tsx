@@ -10,7 +10,7 @@ import {
 	SellerMobileDisclosureList,
 } from "@/features/seller-center/components/SellerMobileDisclosureList";
 import { formatDeadline } from "@/features/seller-center/orders/orderDisplay";
-import { useAuth } from "@/lib/auth/context";
+import { useZoneIdentity } from "@/lib/auth/zone-identity";
 import {
 	OrderStatus,
 	ProductStatus,
@@ -62,7 +62,7 @@ const SELLER_ORDERS_COMPLETED_HREF = "/seller-center/orders?tab=completed";
 const SELLER_ORDERS_AFTERSALE_HREF = "/seller-center/orders?tab=aftersale";
 
 export default function DashboardPage() {
-	const { identity } = useAuth();
+	const identity = useZoneIdentity();
 	// `view: "seller"` is required — `/app/orders` defaults to the BUYER view,
 	// so without it a seller account gets its (empty) buyer orders and the
 	// "待處理訂單" block is always empty. See SellerOrdersPage.
@@ -100,7 +100,7 @@ export default function DashboardPage() {
 	const { records: anomalyRecords, loading: anomalyRecordsLoading } =
 		useSellerShipmentAnomalies({ pageSize: 3 });
 
-	const greeting = self?.store?.storeName || identity?.nickname || "賣家";
+	const greeting = self?.store?.storeName || identity.nickname || "賣家";
 	const todayLabel = formatToday();
 
 	const stats = buildStats(dash);

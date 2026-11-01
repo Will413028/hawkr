@@ -3,7 +3,9 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as React from "react";
 import { ApiClientError } from "@/lib/api/client";
+import { accountQueryFn } from "@/lib/auth/account-query";
 import { useAuth } from "@/lib/auth/context";
+import { useAccountStatus } from "@/lib/auth/use-account-status";
 import { resolveChatViewerId } from "@/lib/chat/chatIdentity";
 import {
 	fetchChatHistory,
@@ -86,16 +88,15 @@ export function useConversations({
 	 */
 	subscribeToSocket?: boolean;
 } = {}) {
-	const { status, isLoggedIn } = useAuth();
+	const status = useAccountStatus();
 	const queryIdentity = useQueryIdentity();
 	const queryClient = useQueryClient();
 	const queryKey = queryKeys.chat.conversations(queryIdentity);
-	const shouldFetch = isLoggedIn;
+	const shouldFetch = status === "signedIn";
 	const query = useQuery({
 		queryKey,
-		enabled: shouldFetch,
 		placeholderData: [] as Conversation[],
-		queryFn: () => fetchConversations({ pageSize: 50 }),
+		queryFn: accountQueryFn(status, () => fetchConversations({ pageSize: 50 })),
 	});
 
 	// Soft refresh on inbound message
@@ -160,7 +161,8 @@ export function useChatThread(
 ): UseChatThreadResult {
 	const pathname = usePathname() || "";
 	const localRole = chatWorkspaceRole(pathname);
-	const { activeRole, isLoggedIn } = useAuth();
+	const { activeRole } = useAuth();
+	const status = useAccountStatus();
 	const queryIdentity = useQueryIdentity();
 	const { refresh: refreshChatUnread } = useChatUnread();
 	const queryClient = useQueryClient();
@@ -195,11 +197,9 @@ export function useChatThread(
 	);
 	const threadQuery = useQuery({
 		queryKey: threadKey,
-		// Gate on hydration + login so the history fetch never fires under the
-		// `anon` identity slot pre-hydration (would cache a spurious 401).
-		enabled: Boolean(targetId) && isLoggedIn,
+		enabled: Boolean(targetId),
 		placeholderData: [] as ChatMessage[],
-		queryFn: async () => {
+		queryFn: accountQueryFn(status, async () => {
 			if (!targetId) return [];
 			const messages = await fetchChatHistory({ targetId, pageSize: 50 }).catch(
 				(error) => {
@@ -210,7 +210,7 @@ export function useChatThread(
 				},
 			);
 			return sortTimeline(messages);
-		},
+		}),
 	});
 	const messages = React.useMemo(
 		() => threadQuery.data ?? [],

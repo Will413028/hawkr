@@ -50,7 +50,10 @@ test("all user-facing Agent entries consume the same top-level gate", () => {
 	}
 	assert.match(messagesLayout, /useAgentConversations\(HAWKR_AGENT_ENABLED\)/);
 	assert.match(messagesLayout, /assistantEntry=\{\s*HAWKR_AGENT_ENABLED/);
-	assert.match(conversations, /const shouldFetch = enabled && isLoggedIn/);
+	assert.match(
+		conversations,
+		/const shouldFetch = enabled && status === "signedIn"/,
+	);
 });
 
 test("search keeps Agent beside the form on wide screens and stacked when narrow", () => {

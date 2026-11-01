@@ -15,7 +15,7 @@ import { isStandaloneFlowPath } from "@/lib/navigation/standalone-flow";
  */
 export default function RoleSwitcher() {
 	const pathname = usePathname() ?? "";
-	const { activeRole, isLoggedIn, signOut } = useAuth();
+	const { activeRole, status, signOut } = useAuth();
 	const [open, setOpen] = React.useState(false);
 	const rootRef = React.useRef<HTMLDivElement>(null);
 	const fabRef = React.useRef<HTMLButtonElement>(null);
@@ -87,14 +87,16 @@ export default function RoleSwitcher() {
 						DEV · 目前角色
 					</div>
 					<div className="role-switcher__hint px-3 py-2">
-						{isLoggedIn
+						{status === "signedIn"
 							? `已登入 · 活動角色：${activeRole ?? "未設定"}`
-							: "未登入 (訪客)"}
+							: status === "guest"
+								? "未登入 (訪客)"
+								: "登入狀態確認中"}
 					</div>
 					{/* Role is driven by the signed-in account + the stored
 					    workspace. Use switchRole() from the navbar role switcher UI
 					    instead of a dev override. */}
-					{isLoggedIn && (
+					{status === "signedIn" && (
 						<button
 							type="button"
 							className="role-switcher__option mt-1 border-t border-[var(--hkui-divider)] text-[var(--hkui-danger)]"

@@ -3,9 +3,11 @@
 import * as React from "react";
 import AddToCartButton from "@/components/shared/AddToCartButton";
 import AppIcon from "@/components/shared/AppIcon";
+import AuthGateWaitModal from "@/components/shared/AuthGateWaitModal";
 import { emitCartToast } from "@/components/shared/CartSnackbar";
 import Button from "@/components/ui/Button";
 import { useAuth } from "@/lib/auth/context";
+import { useAuthGate } from "@/lib/auth/useAuthGate";
 import { addToCart, CartError, type CartInput } from "@/lib/cart";
 import { formatUnitLabel } from "@/lib/codemeta/enums";
 import { usePathname } from "@/lib/intl/navigation";
@@ -102,7 +104,7 @@ export default function ProductPurchaseBox({
 	previewMode = false,
 }: ProductPurchaseBoxProps) {
 	const router = useObservedRouter("product_purchase_box");
-	const { isLoggedIn } = useAuth();
+	const { status } = useAuth();
 	const [selectedSkuId, setSelectedSkuId] = React.useState(skus[0]?.id ?? "");
 	const [quantity, setQuantity] = React.useState(1);
 	const loginPayload = React.useMemo(
@@ -114,6 +116,7 @@ export default function ProductPurchaseBox({
 		[],
 	);
 	const openLoginRequired = useLoginRequiredOverlay(loginPayload);
+	const { authGate, authWaiting } = useAuthGate(openLoginRequired);
 
 	// Re-sync selection if the parent swaps the SKU list (e.g. variant
 	// switch on the same PDP). Keeps the controlled selection valid.
@@ -171,14 +174,14 @@ export default function ProductPurchaseBox({
 	// (`GET /app/products/{id}/restock_subscriptions`) — for now keep it simple.
 	// ⚠️ `previewMode` 在這裡是**必要**條件，不是保險。預覽路徑（匯入精靈、代行工作區）
 	// 傳進來的 `productId` 不是買家端認得的商品，而這一發是 `/app/*` 的買家端請求。
-	// 今天它不會送出，只是因為那兩個預覽面恰好都沒有 www 登入態（`isLoggedIn` 為
-	// false）—— 那是巧合不是保證：管理員本人若剛好也在同一個瀏覽器登入過 www，這一發
+	// 今天它不會送出，只是因為那兩個預覽面恰好都沒有 www 登入態（`status` 不是
+	// `signedIn`）—— 那是巧合不是保證：管理員本人若剛好也在同一個瀏覽器登入過 www，這一發
 	// 就會用他自己的買家身分打出去。按鈕全部 disabled 卻仍發請求，正是 previewMode
 	// 要防的形狀。
 	React.useEffect(() => {
 		if (
 			previewMode ||
-			!isLoggedIn ||
+			status !== "signedIn" ||
 			!purchaseAvailability.canSubscribeRestock ||
 			initialRestockSubscribed
 		)
@@ -200,18 +203,19 @@ export default function ProductPurchaseBox({
 		};
 	}, [
 		previewMode,
-		isLoggedIn,
+		status,
 		purchaseAvailability.canSubscribeRestock,
 		productId,
 		initialRestockSubscribed,
 	]);
 
-	const handleRestockNotify = async () => {
+	const handleRestockNotify = () => {
 		if (restockPendingRef.current) return;
-		if (!isLoggedIn) {
-			openLoginRequired();
-			return;
-		}
+		authGate(() => void runRestockNotify());
+	};
+
+	const runRestockNotify = async () => {
+		if (restockPendingRef.current) return;
 		restockPendingRef.current = true;
 		const next = !restockOn;
 		setRestockPending(true);
@@ -265,15 +269,16 @@ export default function ProductPurchaseBox({
 		quantity,
 	};
 
-	const handleBuyNow = async () => {
+	const handleBuyNow = () => {
 		if (buyingNow) return;
-		// Guests can't check out — prompt login up front instead of letting the
-		// cart API fail with the raw backend "guest_id is required" error. The
-		// 401 catch below stays as a fallback for stale/expired sessions.
-		if (!isLoggedIn) {
-			openLoginRequired();
-			return;
-		}
+		// Guests can't check out — `authGate` prompts login up front instead of
+		// letting the cart API fail with the raw backend "guest_id is required"
+		// error, and parks the click until the server's answer arrives. The 401
+		// catch below stays as a fallback for stale/expired sessions.
+		authGate(() => void runBuyNow());
+	};
+
+	const runBuyNow = async () => {
 		setBuyingNow(true);
 		try {
 			// Await backend so the cart page sees the new SKU on mount.
@@ -300,6 +305,7 @@ export default function ProductPurchaseBox({
 
 	return (
 		<div className="flex flex-col gap-[22px]">
+			<AuthGateWaitModal open={authWaiting} />
 			<div className="bg-[#f3ead7] rounded-[18px] pt-[22px] px-6 pb-[18px] dark:bg-[#f1cd70]/10 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] max-sm:flex max-sm:flex-col max-sm:gap-1">
 				<div className="flex items-baseline flex-wrap gap-x-3.5 gap-y-2.5">
 					<span className="text-lg font-semibold text-hk-ink-600 tracking-[0.5px] dark:text-[#ffeec0]">

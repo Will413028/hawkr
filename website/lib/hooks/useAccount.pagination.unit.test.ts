@@ -26,7 +26,6 @@ vi.mock("@/lib/follow/repo", () => followRepo);
 vi.mock("@/lib/auth/context", () => ({
 	useAuth: () => ({
 		status: "signedIn",
-		isLoggedIn: true,
 		activeRole: "buyer",
 	}),
 }));

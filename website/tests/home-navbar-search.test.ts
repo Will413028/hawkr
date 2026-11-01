@@ -56,8 +56,8 @@ test("home keeps member search in the desktop navbar and moves only its mobile c
 		/<HomeMemberMobileSearch\b[^>]*\/>\s*<Suspense fallback=\{null\}>\s*<HomeContent\b(?=[^>]*\binitialSnapshot=\{snapshot\})[^>]*\/>/,
 	);
 	assert.equal(homeSource.match(/<Suspense/g)?.length, 1);
-	assert.match(memberSearchSource, /const \{ isLoggedIn \} = useAuth\(\)/);
-	assert.match(memberSearchSource, /if \(!isLoggedIn\) return null/);
+	assert.match(memberSearchSource, /const \{ status \} = useAuth\(\)/);
+	assert.match(memberSearchSource, /if \(status !== "signedIn"\) return null/);
 	assert.match(memberSearchSource, /data-home-member-search/);
 	assert.match(
 		memberSearchSource,

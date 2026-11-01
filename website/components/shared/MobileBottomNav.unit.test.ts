@@ -25,7 +25,7 @@ vi.mock("@/lib/navigation/use-observed-router", () => ({
 	useObservedRouter: () => ({ push: mocks.push, prefetch: vi.fn() }),
 }));
 vi.mock("@/lib/auth/context", () => ({
-	useAuth: () => ({ isLoggedIn: false, activeRole: "buyer" }),
+	useAuth: () => ({ status: "guest", activeRole: "buyer" }),
 }));
 vi.mock("@/lib/hooks/useAutoHideNav", () => ({
 	useAutoHideNav: () => ({ hidden: false }),

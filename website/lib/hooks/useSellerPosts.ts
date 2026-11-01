@@ -1,9 +1,9 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/lib/auth/context";
 import { storeIdOf } from "@/lib/seller/store";
 import { useSellerDataScope } from "@/lib/seller-data/scope";
+import { useQueryIdentity } from "./useQueryIdentity";
 import { useSellerSelf } from "./useSellerSelf";
 
 interface UseSellerPostsResult {
@@ -21,7 +21,7 @@ interface UseSellerPostsResult {
 export function useSellerPosts(options?: {
 	enabled?: boolean;
 }): UseSellerPostsResult {
-	const { isLoggedIn, activeRole } = useAuth();
+	const identity = useQueryIdentity();
 	const scope = useSellerDataScope();
 	const { data: seller, loading: sellerLoading } = useSellerSelf();
 	const sellerId = scope.ownerStoreId ?? storeIdOf(seller);
@@ -30,7 +30,7 @@ export function useSellerPosts(options?: {
 		queryFn: () =>
 			scope.repos.posts.fetchSellerPosts(sellerId, { pageSize: 50 }),
 		enabled:
-			scope.canRead("posts", isLoggedIn && activeRole === "seller") &&
+			scope.canRead("posts", identity.activeRole === "seller") &&
 			Boolean(sellerId) &&
 			(options?.enabled ?? true),
 		staleTime: 30_000,

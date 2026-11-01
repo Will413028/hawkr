@@ -5,6 +5,7 @@ import type {
 	KYCFlow,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { accountQueryPending } from "@/lib/auth/account-query";
 import { useAuth } from "@/lib/auth/context";
 import { queryKeys } from "@/lib/query/keys";
 import { fetchMyKyc } from "@/lib/seller/kyc";
@@ -30,7 +31,7 @@ interface UseSellerSelfResult {
  * `useInvalidateSellerSelf`) so every consumer refetches.
  */
 export function useSellerSelf(): UseSellerSelfResult {
-	const { isLoggedIn, hasSeller, status } = useAuth();
+	const { hasSeller, status } = useAuth();
 	const scope = useSellerDataScope();
 	const query = useQuery({
 		queryKey: scope.keys.storefront(),
@@ -41,7 +42,7 @@ export function useSellerSelf(): UseSellerSelfResult {
 		// 代行下這條由 scope 換成 capability，且工作區的 chrome 不掛這支 hook：側欄
 		// 每頁都渲染，讓它讀店面等於每次換頁都多落一列 STOREFRONT_READ 稽核（§6.5.3
 		// 那四個 READ action 的用途是「有人試圖跨店讀取」的安全訊號，會被灌成噪音）。
-		enabled: scope.canRead("storefront", isLoggedIn && hasSeller),
+		enabled: scope.canRead("storefront", hasSeller),
 		staleTime: 30_000,
 		// 還沒開店（not_found）是預期狀態，不是故障：沒有這個 meta，每個還沒開店的
 		// 帳號都會往 Sentry 灌一筆噪音。
@@ -49,7 +50,10 @@ export function useSellerSelf(): UseSellerSelfResult {
 	});
 	return {
 		data: query.data ?? null,
-		loading: query.isLoading || status === "unknown",
+		loading:
+			scope.mode === "delegated"
+				? query.isLoading
+				: accountQueryPending(status, query.isLoading),
 		error: query.error,
 		refresh: async () => {
 			await query.refetch();
@@ -86,18 +90,14 @@ function useMyKycQuery<T>(
 	select: (app: KYCApplication | null) => T,
 	enabledOption: boolean | undefined,
 ) {
-	const { isLoggedIn, hasSeller } = useAuth();
+	const { hasSeller } = useAuth();
 	const scope = useSellerDataScope();
 	const identity = useQueryIdentity();
 	return useQuery({
 		queryKey: queryKeys.seller.kyc(identity),
 		queryFn: () => fetchMyKyc(),
 		select,
-		enabled:
-			scope.mode === "seller" &&
-			isLoggedIn &&
-			hasSeller &&
-			(enabledOption ?? true),
+		enabled: scope.mode === "seller" && hasSeller && (enabledOption ?? true),
 		staleTime: 30_000,
 		// PayUni 的審核結果由伺服器的背景程序與 PayUni 通知更新，沒有賣家端的刷新動作：回到分頁時重新讀一次。
 		refetchOnWindowFocus: true,

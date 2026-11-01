@@ -16,7 +16,7 @@ type GatedAction = (auth: AuthGateSnapshot) => void;
  *
  * The sign-in state is the server's answer, which reaches the client after
  * hydration, so every full page load is `unknown` until it arrives. A handler
- * that branches on `isLoggedIn` directly would open the login modal for an
+ * that branches on a signed-in boolean directly would open the login modal for an
  * actually-logged-in user who taps during that window (common on mobile —
  * the gated buttons sit right under the thumb on first paint).
  *
@@ -30,7 +30,8 @@ export function useAuthGate(onGuest: () => void): {
 	authGate: (action: GatedAction) => void;
 	authWaiting: boolean;
 } {
-	const { isLoggedIn, status, activeRole } = useAuth();
+	const { status, activeRole } = useAuth();
+	const signedIn = status === "signedIn";
 	const decided = status === "signedIn" || status === "guest";
 	const [pending, setPending] = React.useState<GatedAction | null>(null);
 	// Latest-callback ref: callers pass inline closures, and renders can
@@ -41,9 +42,9 @@ export function useAuthGate(onGuest: () => void): {
 	React.useEffect(() => {
 		if (!decided || !pending) return;
 		setPending(null);
-		if (isLoggedIn) pending({ activeRole });
+		if (signedIn) pending({ activeRole });
 		else onGuestRef.current();
-	}, [decided, isLoggedIn, activeRole, pending]);
+	}, [decided, signedIn, activeRole, pending]);
 
 	const authGate = React.useCallback(
 		(action: GatedAction) => {
@@ -51,13 +52,13 @@ export function useAuthGate(onGuest: () => void): {
 				setPending(() => action);
 				return;
 			}
-			if (!isLoggedIn) {
+			if (!signedIn) {
 				onGuestRef.current();
 				return;
 			}
 			action({ activeRole });
 		},
-		[decided, isLoggedIn, activeRole],
+		[decided, signedIn, activeRole],
 	);
 
 	return { authGate, authWaiting: pending !== null };

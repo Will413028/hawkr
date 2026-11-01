@@ -2,7 +2,8 @@
 
 import { useInfiniteQuery, useQueries } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { useAuth } from "@/lib/auth/context";
+import { accountQueryFn, accountQueryPending } from "@/lib/auth/account-query";
+import { useAccountStatus } from "@/lib/auth/use-account-status";
 import { fetchOrder } from "@/lib/orders/repo";
 import type { Order } from "@/lib/orders/types";
 import { queryKeys } from "@/lib/query/keys";
@@ -63,14 +64,14 @@ function mergeOrderSnapshots(
 
 /** Reviews the logged-in buyer has written (GET /app/me/reviews, paged). */
 export function useMyReviews(): UseMyReviewsResult {
-	const { isLoggedIn } = useAuth();
+	const status = useAccountStatus();
 	const identity = useQueryIdentity();
 	const query = useInfiniteQuery({
 		queryKey: queryKeys.buyer.myReviews(identity),
-		queryFn: ({ pageParam }) =>
+		queryFn: accountQueryFn(status, ({ pageParam }: { pageParam: number }) =>
 			fetchMyReviews({ page: pageParam, pageSize: 20 }),
+		),
 		initialPageParam: 1,
-		enabled: isLoggedIn,
 		getNextPageParam: (lastPage) => {
 			const loaded = lastPage.page * lastPage.pageSize;
 			return loaded < lastPage.total ? lastPage.page + 1 : undefined;
@@ -79,8 +80,8 @@ export function useMyReviews(): UseMyReviewsResult {
 	const pages = query.data?.pages;
 	const rawReviews = useMemo(
 		(): MyReview[] =>
-			isLoggedIn ? (pages?.flatMap((p) => p.records) ?? []) : [],
-		[isLoggedIn, pages],
+			status === "signedIn" ? (pages?.flatMap((p) => p.records) ?? []) : [],
+		[status, pages],
 	);
 	const snapshotOrderNos = useMemo(
 		() =>
@@ -98,9 +99,8 @@ export function useMyReviews(): UseMyReviewsResult {
 					scope: "review-snapshot",
 				}),
 				queryFn: () => fetchOrder(orderNo),
-				enabled: isLoggedIn,
 			})),
-		[identity, isLoggedIn, snapshotOrderNos],
+		[identity, snapshotOrderNos],
 	);
 	const snapshotResults = useQueries({ queries: snapshotQueries });
 	const snapshots = useMemo(
@@ -120,7 +120,7 @@ export function useMyReviews(): UseMyReviewsResult {
 	);
 	return {
 		reviews,
-		loading: query.isLoading,
+		loading: accountQueryPending(status, query.isLoading),
 		loadingMore: query.isFetchingNextPage,
 		error: query.error instanceof Error ? query.error.message : null,
 		total: pages?.[0]?.total ?? 0,

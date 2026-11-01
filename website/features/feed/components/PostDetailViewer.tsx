@@ -128,7 +128,7 @@ function PostPage({
 	// gate resolves to a guest.
 	const intentRef = React.useRef<"like" | "comment">("like");
 	const openLoginRequired = useAppUiStore((state) => state.openLoginRequired);
-	const { isLoggedIn } = useAuth();
+	const { status } = useAuth();
 	const { authGate, authWaiting } = useAuthGate(() => {
 		const copy =
 			intentRef.current === "like"
@@ -310,7 +310,7 @@ function PostPage({
 		// authed client broadcasts as AUTH_EXPIRED_EVENT — that force-redirects
 		// them off the page (lib/auth/context.tsx). Anonymous shares aren't
 		// counted, so skip the API call entirely instead of hardening the 401 path.
-		if (isLoggedIn) {
+		if (status === "signedIn") {
 			sharePost(post.id);
 		}
 		if (typeof navigator !== "undefined" && navigator.share) {

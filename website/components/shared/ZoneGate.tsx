@@ -4,6 +4,7 @@ import WorkspaceAlign from "@/components/shared/WorkspaceAlign";
 import ZoneUnavailable from "@/components/shared/ZoneUnavailable";
 import { ACCESS_CLASSES, type RequiredAccess } from "@/lib/auth/redirect";
 import { requireZone } from "@/lib/auth/require-zone";
+import { ZoneIdentityProvider } from "@/lib/auth/zone-context";
 
 /**
  * Wraps an access-scoped zone (`/account/*` and `/checkout/*` for buyers, `/seller-center/*` for sellers,
@@ -40,21 +41,24 @@ async function ZoneGateInner({
 	required: RequiredAccess;
 	children: React.ReactNode;
 }) {
-	if ((await requireZone(required)) === "unavailable") {
+	const zone = await requireZone(required);
+	if (zone.kind === "unavailable") {
 		return <ZoneUnavailable required={required} />;
 	}
 	const { workspace } = ACCESS_CLASSES[required];
 	if (workspace) {
 		return (
-			<WorkspaceAlign required={required} workspace={workspace}>
-				{children}
-			</WorkspaceAlign>
+			<ZoneIdentityProvider identity={zone.identity} workspace={workspace}>
+				<WorkspaceAlign required={required} workspace={workspace}>
+					{children}
+				</WorkspaceAlign>
+			</ZoneIdentityProvider>
 		);
 	}
 	return (
-		<>
+		<ZoneIdentityProvider identity={zone.identity} workspace={workspace}>
 			<span data-hk-role-zone-ready={required} hidden />
 			{children}
-		</>
+		</ZoneIdentityProvider>
 	);
 }

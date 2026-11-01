@@ -2,7 +2,8 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as React from "react";
-import { useAuth } from "@/lib/auth/context";
+import { accountQueryFn, accountQueryPending } from "@/lib/auth/account-query";
+import { useAccountStatus } from "@/lib/auth/use-account-status";
 import {
 	fetchInvoiceComplaint,
 	INVOICE_BIZ_CODE,
@@ -42,7 +43,7 @@ export function useInvoiceComplaint(
 	orderNo: string,
 	complaintId: string,
 ): UseInvoiceComplaintResult {
-	const { isLoggedIn } = useAuth();
+	const status = useAccountStatus();
 	const identity = useQueryIdentity();
 	const queryClient = useQueryClient();
 	const queryKey = queryKeys.buyer.orderInvoiceComplaint(
@@ -51,11 +52,13 @@ export function useInvoiceComplaint(
 		complaintId,
 	);
 
-	const enabled = isLoggedIn && orderNo.length > 0 && complaintId.length > 0;
+	const enabled = orderNo.length > 0 && complaintId.length > 0;
 
 	const complaintQuery = useQuery({
 		queryKey,
-		queryFn: () => fetchInvoiceComplaint(orderNo, complaintId),
+		queryFn: accountQueryFn(status, () =>
+			fetchInvoiceComplaint(orderNo, complaintId),
+		),
 		enabled,
 		refetchOnWindowFocus: true,
 		meta: {
@@ -65,7 +68,7 @@ export function useInvoiceComplaint(
 	});
 
 	React.useEffect(() => {
-		if (!enabled) return;
+		if (!enabled || status !== "signedIn") return;
 		const onNotification = (event: Event) => {
 			const detail = (event as CustomEvent<NotificationNewEventDetail>).detail;
 			const item = detail?.item;
@@ -78,7 +81,7 @@ export function useInvoiceComplaint(
 		return () => {
 			window.removeEventListener(NOTIFICATION_NEW_EVENT, onNotification);
 		};
-	}, [enabled, orderNo, queryClient, queryKey]);
+	}, [enabled, status, orderNo, queryClient, queryKey]);
 
 	const error = complaintQuery.error;
 	const notFound =
@@ -87,7 +90,7 @@ export function useInvoiceComplaint(
 
 	return {
 		complaint: complaintQuery.data ?? null,
-		loading: complaintQuery.isLoading,
+		loading: accountQueryPending(status, complaintQuery.isLoading),
 		notFound,
 		error:
 			error instanceof Error && !notFound

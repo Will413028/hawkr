@@ -13,7 +13,10 @@ import {
 	useQueryClient,
 } from "@tanstack/react-query";
 import { useMemo } from "react";
+import { accountQueryFn, accountQueryPending } from "@/lib/auth/account-query";
 import { useAuth } from "@/lib/auth/context";
+import type { AuthStatus } from "@/lib/auth/session-state";
+import { useAccountStatus } from "@/lib/auth/use-account-status";
 import {
 	type CouponItem,
 	claimCoupon,
@@ -42,12 +45,13 @@ import { favoriteIdKey } from "./useFavoriteIds";
 import { useQueryIdentity } from "./useQueryIdentity";
 
 function useBuyerQueryScope() {
-	const { activeRole, isLoggedIn } = useAuth();
+	const { activeRole } = useAuth();
+	const status = useAccountStatus();
 	const identity = useQueryIdentity();
 	return {
 		identity,
 		activeRole,
-		enabled: isLoggedIn,
+		status,
 		scope: { activeRole: activeRole ?? "" },
 	};
 }
@@ -58,6 +62,7 @@ function useBuyerQueryScope() {
  * request the same page twice.
  */
 function cursorListControls(
+	status: AuthStatus,
 	query: Pick<
 		UseInfiniteQueryResult,
 		| "hasNextPage"
@@ -72,7 +77,7 @@ function cursorListControls(
 			if (!query.hasNextPage || query.isFetchingNextPage) return;
 			await query.fetchNextPage({ cancelRefetch: false });
 		},
-		loading: query.isLoading,
+		loading: accountQueryPending(status, query.isLoading),
 		refresh: async () => {
 			await query.refetch();
 		},
@@ -89,14 +94,13 @@ interface CouponState {
 const EMPTY_COUPONS: CouponState = { my: [], available: [] };
 
 export function useCoupons() {
-	const { identity, enabled, scope } = useBuyerQueryScope();
+	const { identity, status, scope } = useBuyerQueryScope();
+	const signedIn = status === "signedIn";
 	const queryClient = useQueryClient();
 	const queryKey = queryKeys.buyer.coupons(identity, scope);
 	const query = useQuery({
 		queryKey,
-		enabled,
-		placeholderData: EMPTY_COUPONS,
-		queryFn: async (): Promise<CouponState> => {
+		queryFn: accountQueryFn(status, async (): Promise<CouponState> => {
 			const [my, available] = await Promise.all([
 				fetchMyCoupons({ pageSize: 50 }),
 				fetchAvailableCoupons({ pageSize: 50 })
@@ -104,7 +108,7 @@ export function useCoupons() {
 					.catch(() => []),
 			]);
 			return { my, available };
-		},
+		}),
 	});
 	const claimMutation = useMutation({
 		mutationFn: (id: number | string) => claimCoupon(id),
@@ -114,18 +118,18 @@ export function useCoupons() {
 	});
 
 	const my = useMemo(
-		() => (enabled && query.data?.my) || [],
-		[enabled, query.data?.my],
+		() => (signedIn && query.data?.my) || [],
+		[signedIn, query.data?.my],
 	);
 	const available = useMemo(
-		() => (enabled && query.data?.available) || [],
-		[enabled, query.data?.available],
+		() => (signedIn && query.data?.available) || [],
+		[signedIn, query.data?.available],
 	);
 
 	return {
 		my,
 		available,
-		loading: query.isLoading,
+		loading: accountQueryPending(status, query.isPending),
 		error: errorMessage(query.error, "載入優惠券失敗"),
 		refresh: async () => {
 			await query.refetch();
@@ -139,16 +143,18 @@ export function useCoupons() {
 /* ===== Favorites ===== */
 
 export function useFavorites(options: { enabled?: boolean } = {}) {
-	const { identity, enabled: scopeEnabled, scope } = useBuyerQueryScope();
-	const enabled = scopeEnabled && (options.enabled ?? true);
+	const { identity, status, scope } = useBuyerQueryScope();
+	const signedIn = status === "signedIn";
+	const enabled = options.enabled ?? true;
 	const queryClient = useQueryClient();
 	const queryKey = queryKeys.buyer.favorites(identity, scope);
 	const query = useInfiniteQuery({
 		queryKey,
 		enabled,
 		initialPageParam: "",
-		queryFn: ({ pageParam }) =>
+		queryFn: accountQueryFn(status, ({ pageParam }: { pageParam: string }) =>
 			fetchFavorites({ pageSize: 50, pageToken: pageParam }),
+		),
 		getNextPageParam: (last) => last.nextPageToken || undefined,
 	});
 	const removeMutation = useMutation({
@@ -181,14 +187,14 @@ export function useFavorites(options: { enabled?: boolean } = {}) {
 		removeMutation.mutateAsync(productId);
 
 	const items = useMemo(
-		() => (enabled && query.data?.pages.flatMap((page) => page.items)) || [],
-		[enabled, query.data],
+		() => (signedIn && query.data?.pages.flatMap((page) => page.items)) || [],
+		[signedIn, query.data],
 	);
 
 	return {
 		items,
-		hasMore: enabled && Boolean(query.hasNextPage),
-		...cursorListControls(query),
+		hasMore: signedIn && Boolean(query.hasNextPage),
+		...cursorListControls(status, query),
 		error: errorMessage(query.error ?? removeMutation.error, "更新收藏失敗"),
 		remove,
 	};
@@ -197,16 +203,18 @@ export function useFavorites(options: { enabled?: boolean } = {}) {
 /* ===== Follow ===== */
 
 export function useFollowing(options: { enabled?: boolean } = {}) {
-	const { identity, enabled: scopeEnabled, scope } = useBuyerQueryScope();
-	const enabled = scopeEnabled && (options.enabled ?? true);
+	const { identity, status, scope } = useBuyerQueryScope();
+	const signedIn = status === "signedIn";
+	const enabled = options.enabled ?? true;
 	const queryClient = useQueryClient();
 	const queryKey = queryKeys.buyer.following(identity, scope);
 	const query = useInfiniteQuery({
 		queryKey,
 		enabled,
 		initialPageParam: "",
-		queryFn: ({ pageParam }) =>
+		queryFn: accountQueryFn(status, ({ pageParam }: { pageParam: string }) =>
 			fetchFollowing({ size: 50, pageToken: pageParam }),
+		),
 		getNextPageParam: (last) => last.nextPageToken || undefined,
 	});
 	const unfollowMutation = useMutation({
@@ -239,14 +247,14 @@ export function useFollowing(options: { enabled?: boolean } = {}) {
 		unfollowMutation.mutateAsync({ id });
 
 	const items = useMemo(
-		() => (enabled && query.data?.pages.flatMap((page) => page.items)) || [],
-		[enabled, query.data],
+		() => (signedIn && query.data?.pages.flatMap((page) => page.items)) || [],
+		[signedIn, query.data],
 	);
 
 	return {
 		items,
-		hasMore: enabled && Boolean(query.hasNextPage),
-		...cursorListControls(query),
+		hasMore: signedIn && Boolean(query.hasNextPage),
+		...cursorListControls(status, query),
 		error: errorMessage(query.error ?? unfollowMutation.error, "更新追蹤失敗"),
 		unfollow,
 	};
@@ -255,15 +263,16 @@ export function useFollowing(options: { enabled?: boolean } = {}) {
 /* ===== History ===== */
 
 export function useHistory() {
-	const { identity, enabled, scope } = useBuyerQueryScope();
+	const { identity, status, scope } = useBuyerQueryScope();
+	const signedIn = status === "signedIn";
 	const queryClient = useQueryClient();
 	const queryKey = queryKeys.buyer.history(identity, scope);
 	const query = useInfiniteQuery({
 		queryKey,
-		enabled,
 		initialPageParam: "",
-		queryFn: ({ pageParam }) =>
+		queryFn: accountQueryFn(status, ({ pageParam }: { pageParam: string }) =>
 			fetchHistory({ size: 50, pageToken: pageParam }),
+		),
 		getNextPageParam: (last) => last.nextPageToken || undefined,
 	});
 	const clearMutation = useMutation({
@@ -294,14 +303,14 @@ export function useHistory() {
 	const clear = () => clearMutation.mutateAsync();
 
 	const items = useMemo(
-		() => (enabled && query.data?.pages.flatMap((page) => page.items)) || [],
-		[enabled, query.data],
+		() => (signedIn && query.data?.pages.flatMap((page) => page.items)) || [],
+		[signedIn, query.data],
 	);
 
 	return {
 		items,
-		hasMore: enabled && Boolean(query.hasNextPage),
-		...cursorListControls(query),
+		hasMore: signedIn && Boolean(query.hasNextPage),
+		...cursorListControls(status, query),
 		error: errorMessage(query.error, "載入瀏覽紀錄失敗"),
 		clear,
 	};
@@ -310,26 +319,27 @@ export function useHistory() {
 /* ===== Member cards (會員卡) ===== */
 
 export function useMemberCards() {
-	const { identity, enabled, scope } = useBuyerQueryScope();
+	const { identity, status, scope } = useBuyerQueryScope();
+	const signedIn = status === "signedIn";
 	const queryKey = queryKeys.buyer.memberCards(identity, scope);
 	const query = useInfiniteQuery({
 		queryKey,
-		enabled,
 		initialPageParam: "",
-		queryFn: ({ pageParam }) =>
+		queryFn: accountQueryFn(status, ({ pageParam }: { pageParam: string }) =>
 			fetchMemberCards({ size: 50, pageToken: pageParam }),
+		),
 		getNextPageParam: (last) => last.nextPageToken || undefined,
 	});
 
 	const cards = useMemo(
-		() => (enabled && query.data?.pages.flatMap((page) => page.records)) || [],
-		[enabled, query.data],
+		() => (signedIn && query.data?.pages.flatMap((page) => page.records)) || [],
+		[signedIn, query.data],
 	);
 
 	return {
 		cards,
-		hasMore: enabled && Boolean(query.hasNextPage),
-		...cursorListControls(query),
+		hasMore: signedIn && Boolean(query.hasNextPage),
+		...cursorListControls(status, query),
 		error: errorMessage(query.error, "載入會員卡失敗"),
 	};
 }
@@ -346,15 +356,16 @@ export function useMemberCards() {
  * `router.refresh()`.
  */
 export function useProfile(options: { enabled?: boolean } = {}) {
-	const { identity, enabled: scopeEnabled } = useBuyerQueryScope();
-	const enabled = scopeEnabled && (options.enabled ?? true);
+	const { identity, status } = useBuyerQueryScope();
+	const signedIn = status === "signedIn";
+	const enabled = options.enabled ?? true;
 	const queryClient = useQueryClient();
 	const router = useObservedRouter("profile_refresh");
 	const queryKey = queryKeys.buyer.profile(identity);
 	const query = useQuery({
 		queryKey,
 		enabled,
-		queryFn: () => fetchProfile(),
+		queryFn: accountQueryFn(status, () => fetchProfile()),
 	});
 	const syncHeader = () => router.refresh();
 	const saveMutation = useMutation({
@@ -370,8 +381,8 @@ export function useProfile(options: { enabled?: boolean } = {}) {
 	};
 
 	return {
-		profile: enabled ? (query.data ?? null) : null,
-		loading: query.isLoading,
+		profile: signedIn ? (query.data ?? null) : null,
+		loading: accountQueryPending(status, query.isLoading),
 		saving: saveMutation.isPending,
 		error: errorMessage(query.error ?? saveMutation.error, "載入個人資料失敗"),
 		refresh: async () => {

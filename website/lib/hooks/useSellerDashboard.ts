@@ -1,7 +1,6 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/lib/auth/context";
 import { queryKeys } from "@/lib/query/keys";
 import {
 	fetchSellerDashboard,
@@ -29,10 +28,9 @@ interface UseSellerDashboardResult {
 export function useSellerDashboard(options?: {
 	enabled?: boolean;
 }): UseSellerDashboardResult {
-	const { isLoggedIn, activeRole } = useAuth();
 	const identity = useQueryIdentity();
 	const enabled =
-		isLoggedIn && activeRole === "seller" && (options?.enabled ?? true);
+		identity.activeRole === "seller" && (options?.enabled ?? true);
 	const query = useQuery({
 		queryKey: queryKeys.seller.dashboard(identity),
 		queryFn: () => fetchSellerDashboard(),

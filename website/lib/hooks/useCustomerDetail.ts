@@ -2,7 +2,6 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
-import { useAuth } from "@/lib/auth/context";
 import { fetchOrders } from "@/lib/orders/repo";
 import type { Order } from "@/lib/orders/types";
 import { queryKeys } from "@/lib/query/keys";
@@ -38,7 +37,6 @@ export function useCustomerDetail(
 	buyerId: string | number,
 	options?: { enabled?: boolean },
 ): UseCustomerDetailResult {
-	const { isLoggedIn, activeRole } = useAuth();
 	const identity = useQueryIdentity();
 	const query = useQuery({
 		queryKey: queryKeys.seller.customer(identity, buyerId),
@@ -55,8 +53,7 @@ export function useCustomerDetail(
 		},
 		enabled:
 			Boolean(buyerId) &&
-			isLoggedIn &&
-			activeRole === "seller" &&
+			identity.activeRole === "seller" &&
 			(options?.enabled ?? true),
 		staleTime: 30_000,
 	});

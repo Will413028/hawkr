@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const auth = vi.hoisted(() => ({
 	status: "unknown" as string,
-	isLoggedIn: false,
 	activeRole: null as "buyer" | "seller" | null,
 }));
 
@@ -15,7 +14,6 @@ import { useAuthGate } from "../useAuthGate";
 
 beforeEach(() => {
 	auth.status = "unknown";
-	auth.isLoggedIn = false;
 	auth.activeRole = null;
 });
 afterEach(cleanup);
@@ -42,7 +40,6 @@ describe("useAuthGate", () => {
 		const { result, rerender } = renderHook(() => useAuthGate(onGuest));
 		act(() => result.current.authGate(action));
 		auth.status = "signedIn";
-		auth.isLoggedIn = true;
 		auth.activeRole = "buyer";
 		rerender();
 		expect(action).toHaveBeenCalledWith({ activeRole: "buyer" });

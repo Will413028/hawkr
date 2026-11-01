@@ -113,7 +113,7 @@ const sellerProducts: CartItem[] = [
 
 function guestSellerPreview() {
 	// Only the identity hook is stubbed; SellerGroupCard, query setup and
-	// selection helpers stay real. isLoggedIn=false disables shipping queries.
+	// selection helpers stay real. signedIn=false disables shipping queries.
 	const identity = mocked(useQueryIdentity);
 	identity.mockReturnValue({ accountId: null, activeRole: null });
 	return () => identity.mockRestore();
@@ -186,7 +186,7 @@ function SellerSelectionPreview() {
 							isLocked={
 								activeSeller !== null && activeSeller !== seller.sellerStoreId
 							}
-							isLoggedIn={false}
+							signedIn={false}
 							selected={selected}
 							preferredMethod={ShippingMethod.TAQBIN}
 							editingQty={drafts}

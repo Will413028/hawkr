@@ -14,7 +14,6 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/lib/auth/context";
 import { isInvoiceBizCode } from "@/lib/invoices/errorCopy";
 import {
 	activateSellerProviderAccount,
@@ -47,9 +46,8 @@ export interface UseSellerProviderAccountResult {
 
 /** 端點 23（S03 唯一資料源）。 */
 export function useSellerProviderAccount(): UseSellerProviderAccountResult {
-	const { isLoggedIn, activeRole } = useAuth();
 	const identity = useQueryIdentity();
-	const enabled = isLoggedIn && activeRole === "seller";
+	const enabled = identity.activeRole === "seller";
 
 	const query = useQuery({
 		queryKey: queryKeys.seller.invoiceProviderAccount(identity),

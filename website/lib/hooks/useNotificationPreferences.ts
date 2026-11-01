@@ -2,8 +2,9 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
+import { accountQueryFn, accountQueryPending } from "@/lib/auth/account-query";
 import type { RoleSlot } from "@/lib/auth/active-role";
-import { useAuth } from "@/lib/auth/context";
+import { useAccountStatus } from "@/lib/auth/use-account-status";
 import { fetchNotificationPreferences } from "@/lib/notifications/repo";
 import type { NotificationPreferenceItem } from "@/lib/notifications/types";
 import { queryKeys } from "@/lib/query/keys";
@@ -20,16 +21,17 @@ export function useNotificationPreferences(role: RoleSlot): {
 	loading: boolean;
 	error: string | null;
 } {
-	const { isLoggedIn } = useAuth();
+	const status = useAccountStatus();
 	const identity = useQueryIdentity();
 	const query = useQuery({
 		queryKey: queryKeys.notifications.preferences(identity, role),
-		queryFn: () => fetchNotificationPreferences({ role }),
-		enabled: isLoggedIn,
+		queryFn: accountQueryFn(status, () =>
+			fetchNotificationPreferences({ role }),
+		),
 	});
 	return {
 		prefs: query.data ?? null,
-		loading: query.isLoading,
+		loading: accountQueryPending(status, query.isPending),
 		error: query.error instanceof Error ? query.error.message : null,
 	};
 }

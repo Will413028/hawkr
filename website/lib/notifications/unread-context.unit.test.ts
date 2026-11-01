@@ -40,7 +40,7 @@ vi.mock("@/lib/sse/lastEventIdCache", () => ({
 }));
 vi.mock("@tanstack/react-query", () => ({ useQueryClient: () => ({}) }));
 vi.mock("@/lib/auth/context", () => ({
-	useAuth: () => ({ activeRole: "seller", isLoggedIn: true }),
+	useAuth: () => ({ activeRole: "seller", status: "signedIn" }),
 }));
 vi.mock("@/lib/hooks/useQueryIdentity", () => {
 	const identity = { accountId: "acc-1", activeRole: "seller" };

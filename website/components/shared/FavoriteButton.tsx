@@ -51,7 +51,7 @@ export default function FavoriteButton({
 	className,
 	size = 16,
 }: FavoriteButtonProps) {
-	const { isLoggedIn } = useAuth();
+	const { status } = useAuth();
 	const favFlag = useIsFavorited(productId);
 	const setFavorited = useSetFavorited();
 	const [active, setActive] = React.useState(initialFavorited);
@@ -102,7 +102,11 @@ export default function FavoriteButton({
 
 		if (authWaiting || inFlightRef.current) return;
 		const now = Date.now();
-		if (isLoggedIn && now - lastClickAtRef.current < CLICK_THROTTLE_MS) return;
+		if (
+			status === "signedIn" &&
+			now - lastClickAtRef.current < CLICK_THROTTLE_MS
+		)
+			return;
 		lastClickAtRef.current = now;
 
 		authGate(() => void performToggle());

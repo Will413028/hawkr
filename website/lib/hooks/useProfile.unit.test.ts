@@ -18,7 +18,6 @@ vi.mock("@/lib/navigation/use-observed-router", () => ({
 vi.mock("@/lib/auth/context", () => ({
 	useAuth: () => ({
 		status: "signedIn",
-		isLoggedIn: true,
 		activeRole: "buyer",
 	}),
 }));

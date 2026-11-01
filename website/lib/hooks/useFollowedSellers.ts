@@ -31,14 +31,14 @@ export function useFollowedSellers(
 	enabled: boolean,
 	sellerIds: Array<string | number>,
 ): FollowedSellersState {
-	const { isLoggedIn, activeRole, status } = useAuth();
+	const { activeRole, status } = useAuth();
 	const identity = useQueryIdentity();
 	// Keyed by content, not by array identity: callers derive `sellerIds` from
 	// their posts on every render, and a new `ids` would re-run `combine` and
 	// hand back a new `ids` Set, re-running everything downstream of it.
 	const idsKey = [...new Set(sellerIds.map(String).filter(Boolean))].join(",");
 	const ids = React.useMemo(() => (idsKey ? idsKey.split(",") : []), [idsKey]);
-	const shouldFetch = enabled && isLoggedIn && activeRole === "buyer";
+	const shouldFetch = enabled && activeRole === "buyer";
 	const scope = `${identity.accountId}:${identity.activeRole}`;
 	const combine = React.useCallback(
 		(results: Array<QueryObserverResult<boolean>>): FollowedSellersState => {
@@ -78,7 +78,7 @@ let legacyFlagsSwept = false;
 export function useIsFollowedSeller(
 	sellerId: string | number,
 ): boolean | undefined {
-	const { isLoggedIn, activeRole } = useAuth();
+	const { activeRole } = useAuth();
 	const identity = useQueryIdentity();
 	const id = String(sellerId);
 	React.useEffect(() => {
@@ -96,7 +96,7 @@ export function useIsFollowedSeller(
 		queryKey: queryKeys.buyer.subscription(identity, id),
 		queryFn: () =>
 			checkVisibleFollows(`${identity.accountId}:${identity.activeRole}`, id),
-		enabled: isLoggedIn && activeRole === "buyer" && id !== "",
+		enabled: activeRole === "buyer" && id !== "",
 		staleTime: Number.POSITIVE_INFINITY,
 	});
 	return query.isSuccess ? query.data : undefined;

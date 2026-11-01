@@ -55,7 +55,7 @@ const PUBLIC_ALLOWLIST = [
 export default function SellerWorkspaceLock() {
 	const router = useObservedRouter("seller_workspace_lock");
 	const pathname = usePathname() ?? "";
-	const { isLoggedIn, activeRole, status } = useAuth();
+	const { activeRole, status } = useAuth();
 	// The redirect is otherwise completely silent: the page simply becomes a
 	// different page. This component renders nothing visible (it is a sibling
 	// guard, not a wrapper), so the announcement is the one thing it CAN add —
@@ -64,7 +64,7 @@ export default function SellerWorkspaceLock() {
 
 	React.useEffect(() => {
 		if (status === "unknown") return;
-		if (!isLoggedIn || activeRole !== "seller") return;
+		if (status !== "signedIn" || activeRole !== "seller") return;
 		// Freshness check, same reason as WorkspaceAlign's: a buyer-zone deep link
 		// can have just auto-switched the workspace via switchRole(), which writes
 		// localStorage synchronously but commits the context state a beat later.
@@ -87,7 +87,7 @@ export default function SellerWorkspaceLock() {
 			return;
 		setRedirecting(true);
 		router.replace("/seller-center/dashboard");
-	}, [status, isLoggedIn, activeRole, pathname, router]);
+	}, [status, activeRole, pathname, router]);
 
 	// Clear once the destination has committed, so a later lock announces again.
 	React.useEffect(() => {

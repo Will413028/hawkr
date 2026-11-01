@@ -2,7 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { useAuth } from "@/lib/auth/context";
+import { accountQueryFn, accountQueryPending } from "@/lib/auth/account-query";
+import { useAccountStatus } from "@/lib/auth/use-account-status";
 import {
 	createStorePickup,
 	deleteStorePickup,
@@ -31,15 +32,13 @@ interface UseStorePickupsResult {
  * Returns empty when the user isn't authed (the endpoint is auth-only).
  */
 export function useStorePickups(): UseStorePickupsResult {
-	const { isLoggedIn } = useAuth();
+	const status = useAccountStatus();
 	const identity = useQueryIdentity();
 	const queryClient = useQueryClient();
 
 	const pickupsQuery = useQuery({
 		queryKey: queryKeys.checkout.storePickups(identity),
-		queryFn: fetchStorePickups,
-		enabled: isLoggedIn,
-		placeholderData: [] as StorePickup[],
+		queryFn: accountQueryFn(status, fetchStorePickups),
 	});
 
 	const invalidatePickups = async () => {
@@ -63,8 +62,8 @@ export function useStorePickups(): UseStorePickupsResult {
 	});
 
 	const pickups = useMemo(
-		() => (isLoggedIn && pickupsQuery.data) || [],
-		[isLoggedIn, pickupsQuery.data],
+		() => (status === "signedIn" && pickupsQuery.data) || [],
+		[status, pickupsQuery.data],
 	);
 	const mutationError =
 		createMutation.error ?? updateMutation.error ?? removeMutation.error;
@@ -78,7 +77,7 @@ export function useStorePickups(): UseStorePickupsResult {
 	return {
 		pickups,
 		defaultPickup: pickups.find((p) => p.isDefault) ?? pickups[0] ?? null,
-		loading: pickupsQuery.isLoading,
+		loading: accountQueryPending(status, pickupsQuery.isPending),
 		error,
 		refresh: async () => {
 			await pickupsQuery.refetch();

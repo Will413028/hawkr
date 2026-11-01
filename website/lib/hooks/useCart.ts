@@ -2,7 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as React from "react";
-import { useAuth } from "@/lib/auth/context";
+import { accountQueryFn, accountQueryPending } from "@/lib/auth/account-query";
+import { useAccountStatus } from "@/lib/auth/use-account-status";
 import {
 	addToCart,
 	CART_UPDATED_EVENT,
@@ -82,7 +83,7 @@ interface UseCartResult {
  * 不額外做 push 機制(已知 trade-off,業界電商標準做法)。
  */
 export function useCart(): UseCartResult {
-	const { isLoggedIn } = useAuth();
+	const status = useAccountStatus();
 	const identity = useQueryIdentity();
 	const queryClient = useQueryClient();
 	const cartKey = queryKeys.checkout.cart(identity);
@@ -95,9 +96,7 @@ export function useCart(): UseCartResult {
 	const [banner, setBanner] = React.useState<CartBanner | null>(null);
 	const cartQuery = useQuery({
 		queryKey: cartKey,
-		queryFn: loadCart,
-		enabled: isLoggedIn,
-		placeholderData: [] as CartItem[],
+		queryFn: accountQueryFn(status, loadCart),
 		// Transactional state is never a discovery snapshot. Keep cached rows on
 		// screen, but reconcile whenever this tab mounts/foregrounds/reconnects so
 		// another browser tab or device cannot leave the checkout entry stale.
@@ -107,10 +106,10 @@ export function useCart(): UseCartResult {
 		refetchOnReconnect: "always",
 	});
 	const items = React.useMemo(
-		() => (isLoggedIn && cartQuery.data) || [],
-		[isLoggedIn, cartQuery.data],
+		() => (status === "signedIn" && cartQuery.data) || [],
+		[status, cartQuery.data],
 	);
-	const loading = cartQuery.isLoading;
+	const loading = accountQueryPending(status, cartQuery.isPending);
 	const refreshing = cartQuery.isFetching;
 	const currentError =
 		error ??

@@ -11,8 +11,8 @@ test("guest mobile navbar exposes the login icon instead of settings", async () 
 	const source = await readFile(mobileBottomNavPath, "utf8");
 
 	assert.match(source, /login: "login"/);
-	assert.match(source, /label:\s*isLoggedIn\s*\?\s*"設定"\s*:\s*"登入"/);
-	assert.match(source, /icon:\s*\(isLoggedIn\s*\?\s*"user"\s*:\s*"login"\)/);
+	assert.match(source, /label:\s*signedIn\s*\?\s*"設定"\s*:\s*"登入"/);
+	assert.match(source, /icon:\s*\(signedIn\s*\?\s*"user"\s*:\s*"login"\)/);
 	assert.match(source, /: "\/login\?role=buyer"/);
 });
 

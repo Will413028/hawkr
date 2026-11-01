@@ -45,6 +45,6 @@ test("guest account navigation keeps the hard auth boundary", async () => {
 
 	assert.match(
 		mobile,
-		/hardNavigation=\{!isLoggedIn && item\.icon === "login"\}/,
+		/hardNavigation=\{!signedIn && item\.icon === "login"\}/,
 	);
 });

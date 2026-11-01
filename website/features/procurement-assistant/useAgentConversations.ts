@@ -2,7 +2,8 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
-import { useAuth } from "@/lib/auth/context";
+import { accountQueryFn } from "@/lib/auth/account-query";
+import { useAccountStatus } from "@/lib/auth/use-account-status";
 import { toast } from "@/lib/feedback/toast";
 import { useQueryIdentity } from "@/lib/hooks/useQueryIdentity";
 import { queryKeys } from "@/lib/query/keys";
@@ -30,16 +31,18 @@ const EMPTY_PAGE: AgentConversationPage = {
  * 側欄不長出 agent 區段，不當錯誤呈現。
  */
 export function useAgentConversations(enabled = true) {
-	const { status, isLoggedIn } = useAuth();
+	const status = useAccountStatus();
 	const queryIdentity = useQueryIdentity();
 	const queryClient = useQueryClient();
 	const queryKey = queryKeys.assistant.conversations(queryIdentity);
-	const shouldFetch = enabled && isLoggedIn;
+	const shouldFetch = enabled && status === "signedIn";
 	const query = useQuery({
 		queryKey,
-		enabled: shouldFetch,
+		enabled,
 		placeholderData: EMPTY_PAGE,
-		queryFn: () => fetchAgentConversations({ pageSize: 50 }),
+		queryFn: accountQueryFn(status, () =>
+			fetchAgentConversations({ pageSize: 50 }),
+		),
 	});
 	const page = shouldFetch ? (query.data ?? EMPTY_PAGE) : EMPTY_PAGE;
 

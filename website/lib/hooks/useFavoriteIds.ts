@@ -2,7 +2,8 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as React from "react";
-import { useAuth } from "@/lib/auth/context";
+import { accountQueryFn } from "@/lib/auth/account-query";
+import { useAccountStatus } from "@/lib/auth/use-account-status";
 import { createMembershipBatcher } from "@/lib/connect/batch-membership";
 import { batchCheckFavoriteProductIds } from "@/lib/favorites/repo";
 import { type QueryIdentity, queryKeys } from "@/lib/query/keys";
@@ -25,14 +26,15 @@ export function favoriteIdKey(
 export function useIsFavorited(
 	productId: string | number,
 ): boolean | undefined {
-	const { isLoggedIn } = useAuth();
+	const status = useAccountStatus();
 	const identity = useQueryIdentity();
 	const id = String(productId);
 	const query = useQuery({
 		queryKey: favoriteIdKey(identity, id),
-		queryFn: () =>
+		queryFn: accountQueryFn(status, () =>
 			checkVisibleFavorites(`${identity.accountId}:${identity.activeRole}`, id),
-		enabled: isLoggedIn && id !== "",
+		),
+		enabled: id !== "",
 		staleTime: Number.POSITIVE_INFINITY,
 	});
 	return query.isSuccess ? query.data : undefined;

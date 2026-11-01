@@ -64,7 +64,8 @@ export default function MobileBottomNav() {
 	const mainTabPending =
 		pendingTab?.sourcePathname === pathname ? pendingTab : null;
 	const router = useObservedRouter("mobile_bottom_nav");
-	const { isLoggedIn, activeRole } = useAuth();
+	const { status, activeRole } = useAuth();
+	const signedIn = status === "signedIn";
 	const reduceMotion = usePrefersReducedMotion();
 	const [mounted, setMounted] = React.useState(false);
 
@@ -119,16 +120,17 @@ export default function MobileBottomNav() {
 	// 角色分流（商店設定 → /seller-center/me），這裡對齊同一規則。
 	const items = React.useMemo(() => {
 		const meItem = {
-			label: isLoggedIn ? "設定" : "登入",
-			href: isLoggedIn
+			pending: status === "unknown",
+			label: signedIn ? "設定" : "登入",
+			href: signedIn
 				? activeRole === "seller"
 					? "/seller-center/me"
 					: "/account"
 				: "/login?role=buyer",
-			icon: (isLoggedIn ? "user" : "login") as MobileNavIconName,
+			icon: (signedIn ? "user" : "login") as MobileNavIconName,
 		};
-		return [...baseItems, meItem];
-	}, [isLoggedIn, activeRole]);
+		return [...baseItems.map((item) => ({ ...item, pending: false })), meItem];
+	}, [status, signedIn, activeRole]);
 
 	const activeIndex = React.useMemo(() => {
 		if (!pathname) return 0;
@@ -497,86 +499,94 @@ export default function MobileBottomNav() {
 				/>
 			) : null}
 
-			{items.map((item, index) => (
-				<Link
-					ref={(el) => {
-						itemEls.current[index] = el;
-					}}
-					href={item.href}
-					// The four public tabs share a cross-navbar single-flight
-					// coordinator below. Account/login intentionally stay on the
-					// shared Link's role-aware path, and guest login keeps the
-					// authentication hard-navigation boundary.
-					prefetch={index < baseItems.length ? false : undefined}
-					hardNavigation={!isLoggedIn && item.icon === "login"}
-					aria-current={index === activeIndex ? "page" : undefined}
-					className={cn(
-						// `text-hk-*!` is important on purpose: the unlayered
-						// `[data-theme="dark"] body a { color: --color-ink-200 }` rule in
-						// styles/foundation/01-tokens-theme.css has higher specificity
-						// (0,1,2) than the plain utility (0,1,0) and otherwise repaints
-						// dark-mode link text. See memory tailwind-layer-vs-unlayered-css.
-						"relative z-10 grid place-items-center gap-[3px] min-h-12 rounded-[16px] text-[0.6875rem] font-extrabold no-underline touch-manipulation",
-						index === highlightIndex
-							? "text-[#101010]! dark:text-[#f5f5f5]!"
-							: "text-hk-muted!",
-					)}
-					key={item.label}
-					onFocus={(event) => {
-						if (
-							index < baseItems.length &&
-							event.currentTarget.matches(":focus-visible")
-						) {
-							prefetchMainTab(item.href, "focus");
-						}
-					}}
-					onPointerEnter={(event) => {
-						// Touch gets the stronger pointer-down signal below. Starting a
-						// hover timer from synthetic touch pointer-enter would duplicate it.
-						if (index < baseItems.length && event.pointerType !== "touch") {
-							prefetchMainTab(item.href, "pointer");
-						}
-					}}
-					onPointerLeave={() => {
-						if (index < baseItems.length) {
-							cancelMainNavPointerIntent(item.href);
-						}
-					}}
-					onPointerDown={(event) => {
-						if (index < baseItems.length && event.pointerType === "touch") {
-							prefetchMainTab(item.href, "touch");
-						}
-					}}
-					onClick={(event) => {
-						// Modified clicks belong to the browser's new-tab/window action;
-						// they cannot commit a route in this document to clear the pill.
-						if (
-							event.defaultPrevented ||
-							event.button !== 0 ||
-							event.ctrlKey ||
-							event.metaKey ||
-							event.shiftKey ||
-							event.altKey ||
-							(event.currentTarget.target &&
-								event.currentTarget.target !== "_self")
-						)
-							return;
-						if (index < baseItems.length) {
-							cancelMainNavPointerIntent(item.href);
-						}
-						// Plain tap: let <Link> navigate, but move the pill at once.
-						selectPendingTarget(index);
-					}}
-				>
+			{items.map((item, index) =>
+				item.pending ? (
 					<span
-						className="grid place-items-center size-[30px] overflow-hidden leading-[0] [&_svg]:block [&_svg]:size-[30px]"
+						key={item.label}
 						aria-hidden="true"
+						className="relative z-10 min-h-12"
+					/>
+				) : (
+					<Link
+						ref={(el) => {
+							itemEls.current[index] = el;
+						}}
+						href={item.href}
+						// The four public tabs share a cross-navbar single-flight
+						// coordinator below. Account/login intentionally stay on the
+						// shared Link's role-aware path, and guest login keeps the
+						// authentication hard-navigation boundary.
+						prefetch={index < baseItems.length ? false : undefined}
+						hardNavigation={!signedIn && item.icon === "login"}
+						aria-current={index === activeIndex ? "page" : undefined}
+						className={cn(
+							// `text-hk-*!` is important on purpose: the unlayered
+							// `[data-theme="dark"] body a { color: --color-ink-200 }` rule in
+							// styles/foundation/01-tokens-theme.css has higher specificity
+							// (0,1,2) than the plain utility (0,1,0) and otherwise repaints
+							// dark-mode link text. See memory tailwind-layer-vs-unlayered-css.
+							"relative z-10 grid place-items-center gap-[3px] min-h-12 rounded-[16px] text-[0.6875rem] font-extrabold no-underline touch-manipulation",
+							index === highlightIndex
+								? "text-[#101010]! dark:text-[#f5f5f5]!"
+								: "text-hk-muted!",
+						)}
+						key={item.label}
+						onFocus={(event) => {
+							if (
+								index < baseItems.length &&
+								event.currentTarget.matches(":focus-visible")
+							) {
+								prefetchMainTab(item.href, "focus");
+							}
+						}}
+						onPointerEnter={(event) => {
+							// Touch gets the stronger pointer-down signal below. Starting a
+							// hover timer from synthetic touch pointer-enter would duplicate it.
+							if (index < baseItems.length && event.pointerType !== "touch") {
+								prefetchMainTab(item.href, "pointer");
+							}
+						}}
+						onPointerLeave={() => {
+							if (index < baseItems.length) {
+								cancelMainNavPointerIntent(item.href);
+							}
+						}}
+						onPointerDown={(event) => {
+							if (index < baseItems.length && event.pointerType === "touch") {
+								prefetchMainTab(item.href, "touch");
+							}
+						}}
+						onClick={(event) => {
+							// Modified clicks belong to the browser's new-tab/window action;
+							// they cannot commit a route in this document to clear the pill.
+							if (
+								event.defaultPrevented ||
+								event.button !== 0 ||
+								event.ctrlKey ||
+								event.metaKey ||
+								event.shiftKey ||
+								event.altKey ||
+								(event.currentTarget.target &&
+									event.currentTarget.target !== "_self")
+							)
+								return;
+							if (index < baseItems.length) {
+								cancelMainNavPointerIntent(item.href);
+							}
+							// Plain tap: let <Link> navigate, but move the pill at once.
+							selectPendingTarget(index);
+						}}
 					>
-						<AppIcon name={MOBILE_NAV_GLYPH[item.icon]} size={30} />
-					</span>
-					<span>{item.label}</span>
-				</Link>
-			))}
+						<span
+							className="grid place-items-center size-[30px] overflow-hidden leading-[0] [&_svg]:block [&_svg]:size-[30px]"
+							aria-hidden="true"
+						>
+							<AppIcon name={MOBILE_NAV_GLYPH[item.icon]} size={30} />
+						</span>
+						<span>{item.label}</span>
+					</Link>
+				),
+			)}
 			{/* The optimistic pill is the only feedback a pending tab switch had.
 			    Announce it too, so a screen-reader user knows the tap registered
 			    before the route commits. */}

@@ -7,8 +7,9 @@ import {
 	useQueryClient,
 } from "@tanstack/react-query";
 import * as React from "react";
+import { accountQueryFn, accountQueryPending } from "../auth/account-query";
 import type { RoleSlot } from "../auth/active-role";
-import { useAuth } from "../auth/context";
+import { useAccountStatus } from "../auth/use-account-status";
 import { invalidateNotificationLists } from "../notifications/cache";
 import {
 	deleteNotifications,
@@ -114,7 +115,7 @@ export function useNotificationList(
 	const pageSize = options.pageSize ?? 20;
 	const filterCategory = options.category;
 	const role = options.role;
-	const { isLoggedIn } = useAuth();
+	const status = useAccountStatus();
 	const identity = useQueryIdentity();
 	const {
 		decrement: decrementUnread,
@@ -130,15 +131,17 @@ export function useNotificationList(
 	const listKey = notificationListQueryKey(identity, listOptions);
 	const listQuery = useInfiniteQuery({
 		queryKey: listKey,
-		queryFn: ({ pageParam }) =>
-			fetchNotificationListPage(listOptions, pageParam),
+		queryFn: accountQueryFn(
+			status,
+			({ pageParam }: { pageParam: string | null }) =>
+				fetchNotificationListPage(listOptions, pageParam),
+		),
 		initialPageParam: null as string | null,
 		getNextPageParam: nextNotificationListPage,
 		// A category change keeps the complete previous list in place until the
 		// replacement query resolves instead of clearing the workspace to a
 		// loading surface.
 		placeholderData: (previousData) => previousData,
-		enabled: isLoggedIn,
 	});
 	const updatePages = React.useCallback(
 		(updater: (item: NotificationItem) => NotificationItem | null) => {
@@ -230,8 +233,9 @@ export function useNotificationList(
 	});
 
 	const items = React.useMemo(
-		() => (isLoggedIn ? flattenNotificationPages(listQuery.data) : []),
-		[isLoggedIn, listQuery.data],
+		() =>
+			status === "signedIn" ? flattenNotificationPages(listQuery.data) : [],
+		[status, listQuery.data],
 	);
 
 	// Thin wrappers: the optimistic + rollback work lives in the mutation
@@ -273,7 +277,7 @@ export function useNotificationList(
 
 	return {
 		items,
-		loading: listQuery.isLoading,
+		loading: accountQueryPending(status, listQuery.isLoading),
 		loadingMore: listQuery.isFetchingNextPage,
 		hasMore: Boolean(listQuery.hasNextPage),
 		error: error instanceof Error ? error.message : null,

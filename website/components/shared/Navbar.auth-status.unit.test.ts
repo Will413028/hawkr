@@ -11,7 +11,6 @@ import { type AppLocale, messagesFor } from "@/lib/intl/config";
 const auth = vi.hoisted(() => ({
 	value: {
 		status: "unknown" as AuthStatus,
-		isLoggedIn: false,
 		activeRole: null as "buyer" | "seller" | null,
 		identity: null as {
 			accountId: string;
@@ -71,7 +70,6 @@ afterEach(() => {
 	cleanup();
 	auth.value = {
 		status: "unknown",
-		isLoggedIn: false,
 		activeRole: null,
 		identity: null,
 		hasSeller: false,
@@ -109,7 +107,6 @@ describe("Navbar right rail by auth status", () => {
 		auth.value = {
 			...auth.value,
 			status: "signedIn",
-			isLoggedIn: true,
 			activeRole: "buyer",
 			identity: { accountId: "7", isSeller: false, nickname: "小鷹" },
 		};
@@ -126,7 +123,6 @@ describe("Navbar right rail by auth status", () => {
 		auth.value = {
 			...auth.value,
 			status: "signedIn",
-			isLoggedIn: true,
 			activeRole: "buyer",
 			identity: { accountId: "7", isSeller: false },
 		};

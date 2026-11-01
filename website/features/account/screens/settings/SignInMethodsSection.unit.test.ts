@@ -28,7 +28,6 @@ vi.mock("@/lib/api/auth", () => ({
 vi.mock("@/lib/auth/context", () => ({
 	useAuth: () => ({
 		status: "signedIn",
-		isLoggedIn: true,
 		identity: { accountId: "7", isSeller: false },
 		activeRole: "buyer",
 	}),

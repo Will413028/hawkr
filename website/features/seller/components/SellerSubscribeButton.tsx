@@ -31,7 +31,7 @@ export default function SellerSubscribeButton({
 	activeLabel = "已訂閱",
 	previewMode = false,
 }: SellerSubscribeButtonProps) {
-	const { isLoggedIn } = useAuth();
+	const { status } = useAuth();
 	const setFollowed = useSetFollowedSeller();
 	const { active, toggle, pending } = useSellerSubscription(sellerId);
 	const [notice, setNotice] = React.useState<string | null>(null);
@@ -77,7 +77,10 @@ export default function SellerSubscribeButton({
 	const handleClick = () => {
 		if (previewMode) return;
 		const now = Date.now();
-		if (isLoggedIn && now - lastClickAtRef.current < CLICK_THROTTLE_MS) {
+		if (
+			status === "signedIn" &&
+			now - lastClickAtRef.current < CLICK_THROTTLE_MS
+		) {
 			return;
 		}
 		lastClickAtRef.current = now;

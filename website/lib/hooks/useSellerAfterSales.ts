@@ -2,7 +2,6 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { useAuth } from "@/lib/auth/context";
 import { queryKeys } from "@/lib/query/keys";
 import {
 	type AfterSaleCase,
@@ -37,9 +36,8 @@ interface UseSellerAfterSalesResult {
  * delivered order out of the generic 配送中 bucket.
  */
 export function useSellerAfterSales(): UseSellerAfterSalesResult {
-	const { activeRole, isLoggedIn } = useAuth();
 	const identity = useQueryIdentity();
-	const enabled = isLoggedIn && activeRole === "seller";
+	const enabled = identity.activeRole === "seller";
 	const query = useQuery({
 		queryKey: queryKeys.seller.afterSales(identity, { pageSize: 100 }),
 		queryFn: async () => {

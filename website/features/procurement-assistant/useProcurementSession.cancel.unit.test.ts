@@ -28,7 +28,7 @@ const { postMock, getMock, streamProcurementTurnMock, toastErrorMock } =
 
 vi.mock("@/lib/auth/context", () => ({
 	useAuth: () => ({
-		isLoggedIn: true,
+		status: "signedIn",
 		activeRole: "buyer",
 		identity: { accountId: "1001" },
 	}),

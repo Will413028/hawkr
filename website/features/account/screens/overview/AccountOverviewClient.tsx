@@ -6,7 +6,7 @@ import AppIcon from "@/components/shared/AppIcon";
 import AppImage from "@/components/shared/AppImage";
 import Link from "@/components/shared/Link";
 import MeasuresAccountEntry from "@/features/seller/measures/MeasuresAccountEntry";
-import { useAuth } from "@/lib/auth/context";
+import { useZoneIdentity } from "@/lib/auth/zone-identity";
 import { formatTaipeiMonthDay as formatShortDate } from "@/lib/date/taipei";
 import { displayableFavorites } from "@/lib/favorites/visible";
 import {
@@ -254,9 +254,9 @@ function PeriodSwitcher({ period, onChange }: QuickRangeProps) {
 }
 
 export default function AccountOverviewClient() {
-	const { identity } = useAuth();
+	const identity = useZoneIdentity();
 	const tCommon = useTranslations("common");
-	const displayName = identity?.nickname || tCommon("memberFallback");
+	const displayName = identity.nickname || tCommon("memberFallback");
 
 	const orders = useOrderList();
 	const coupons = useCoupons();

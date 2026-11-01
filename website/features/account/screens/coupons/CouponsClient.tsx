@@ -6,7 +6,8 @@ import Avatar from "@/components/shared/Avatar";
 import Link from "@/components/shared/Link";
 import { SellerPageShell } from "@/components/shared/SellerPageShell";
 import { AccountEmptyStateIcon } from "@/features/account/components/AccountEmptyIcon";
-import { useAuth } from "@/lib/auth/context";
+import { accountQueryFn, accountQueryPending } from "@/lib/auth/account-query";
+import { useAccountStatus } from "@/lib/auth/use-account-status";
 import {
 	type CouponItem,
 	fetchMyCoupons,
@@ -61,7 +62,7 @@ function couponVisual(c: CouponItem): CouponKindVisual {
 }
 
 export default function CouponsClient() {
-	const { isLoggedIn } = useAuth();
+	const status = useAccountStatus();
 	const identity = useQueryIdentity();
 	const [tab, setTab] = React.useState("unused");
 
@@ -70,15 +71,16 @@ export default function CouponsClient() {
 	// page lands, instead of flashing the loading text.
 	const query = useQuery({
 		queryKey: queryKeys.buyer.coupons(identity, { status: tab, pageSize: 50 }),
-		queryFn: () => fetchMyCoupons({ status: tab, pageSize: 50 }),
-		enabled: isLoggedIn,
+		queryFn: accountQueryFn(status, () =>
+			fetchMyCoupons({ status: tab, pageSize: 50 }),
+		),
 		placeholderData: keepPreviousData,
 	});
 	const list: Array<MyCouponItem | CouponItem> = query.data ?? [];
 	const { views: storeViews } = useStoreCardViews(
 		list.flatMap((c) => (c.applicableStoreId ? [c.applicableStoreId] : [])),
 	);
-	const loading = query.isLoading;
+	const loading = accountQueryPending(status, query.isLoading);
 	const error = query.error instanceof Error ? query.error.message : null;
 
 	return (

@@ -46,7 +46,7 @@ export default function RoleAwareNavbar({
 	megaMenuDynamicLinks,
 }: RoleAwareNavbarProps = {}) {
 	const pathname = usePathname() ?? "";
-	const { activeRole, status, isLoggedIn } = useAuth();
+	const { activeRole, status } = useAuth();
 	const [mounted, setMounted] = React.useState(false);
 	React.useEffect(() => {
 		setMounted(true);
@@ -97,7 +97,7 @@ export default function RoleAwareNavbar({
 	// 接著才被目的頁的正確列取代——使用者看到的是「怪列先出現再換掉」。未登入
 	// 訪客（一般登入/註冊）不受影響，照常顯示。這條在 mount 之後才成立，所以
 	// 收掉的是**已經畫出來的** 84px bar：保留高度，別讓登入卡跳一下。
-	if (isAuthRoute && authReady && isLoggedIn) return reservation;
+	if (isAuthRoute && authReady && status === "signedIn") return reservation;
 	// The seller header reads client-owned identity. Keep SSR and the first client
 	// render deterministic; after mount, its loader preserves the same geometry
 	// while fetching the seller-only implementation.

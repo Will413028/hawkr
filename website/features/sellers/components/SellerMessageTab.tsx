@@ -40,7 +40,8 @@ export default function SellerMessageTab({
 	sellerId,
 	initialData,
 }: SellerMessageTabProps) {
-	const { isLoggedIn } = useAuth();
+	const { status } = useAuth();
+	const signedIn = status === "signedIn";
 	const forum = useSellerForum(sellerId, initialData);
 	const [draft, setDraft] = React.useState("");
 	const [submitting, setSubmitting] = React.useState(false);
@@ -134,7 +135,7 @@ export default function SellerMessageTab({
 
 	return (
 		<section className="flex flex-col gap-5">
-			{isLoggedIn ? (
+			{signedIn ? (
 				<form
 					className="flex flex-col gap-[10px] p-4 rounded-[var(--radius-lg)] bg-[var(--surface-card,#fffefa)] border border-[var(--surface-border,rgb(var(--color-ink-800-rgb)/0.1))] dark:bg-[rgba(255,255,255,0.04)] dark:border-[rgba(245,222,165,0.14)]"
 					onSubmit={handleSubmit}
@@ -176,7 +177,7 @@ export default function SellerMessageTab({
 						{replyingTo ? "回覆" : "送出"}
 					</Button>
 				</form>
-			) : (
+			) : status === "unknown" ? null : (
 				<div className="flex items-center justify-between gap-3 p-[14px_18px] rounded-[14px] bg-[var(--surface-card,rgb(var(--color-ink-800-rgb)/0.04))] dark:bg-[rgba(255,255,255,0.04)] text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.72)] text-[0.9375rem]">
 					<span>登入後可以留言給這個賣家</span>
 					<Link
@@ -272,7 +273,7 @@ export default function SellerMessageTab({
 												{expanded ? "▲ 收合回覆" : `${replyCount} 則回覆 ▼`}
 											</Button>
 										) : null}
-										{isLoggedIn ? (
+										{signedIn ? (
 											<button
 												type="button"
 												className="p-[4px_8px] mx-[-8px] border-0 bg-transparent text-[var(--ink-soft,var(--color-ink-500))] dark:text-[rgb(var(--color-ink-100-rgb)/0.6)] text-[0.8125rem] font-semibold cursor-pointer rounded-[var(--radius-xs)] transition-[background,color] duration-[120ms] hover:not-disabled:bg-[rgb(var(--color-ink-800-rgb)/0.08)] dark:hover:not-disabled:bg-[rgba(245,222,165,0.08)] hover:text-[var(--ink-body)] dark:hover:text-[var(--hk-text-strong,#f5e9c3)] disabled:opacity-60 disabled:cursor-not-allowed"

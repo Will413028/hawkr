@@ -11,7 +11,8 @@ import {
 	setDefaultAddress,
 	updateAddress,
 } from "@/lib/addresses/repo";
-import { useAuth } from "@/lib/auth/context";
+import { accountQueryFn, accountQueryPending } from "@/lib/auth/account-query";
+import { useAccountStatus } from "@/lib/auth/use-account-status";
 import { queryKeys } from "@/lib/query/keys";
 import { useQueryIdentity } from "./useQueryIdentity";
 
@@ -42,15 +43,13 @@ function applyDefault(addresses: Address[], id: string | number): Address[] {
 }
 
 export function useAddresses(): UseAddressesResult {
-	const { isLoggedIn } = useAuth();
+	const status = useAccountStatus();
 	const identity = useQueryIdentity();
 	const queryClient = useQueryClient();
 	const queryKey = queryKeys.buyer.addresses(identity);
 	const addressesQuery = useQuery({
 		queryKey,
-		queryFn: fetchAddresses,
-		enabled: isLoggedIn,
-		placeholderData: [] as Address[],
+		queryFn: accountQueryFn(status, fetchAddresses),
 	});
 
 	const invalidateAddresses = async () => {
@@ -159,8 +158,8 @@ export function useAddresses(): UseAddressesResult {
 	});
 
 	const addresses = useMemo(
-		() => (isLoggedIn && addressesQuery.data) || [],
-		[isLoggedIn, addressesQuery.data],
+		() => (status === "signedIn" && addressesQuery.data) || [],
+		[status, addressesQuery.data],
 	);
 	const mutationError =
 		createMutation.error ??
@@ -177,7 +176,7 @@ export function useAddresses(): UseAddressesResult {
 	return {
 		addresses,
 		defaultAddress: addresses.find((a) => a.isDefault) ?? null,
-		loading: addressesQuery.isLoading,
+		loading: accountQueryPending(status, addressesQuery.isPending),
 		error,
 		refresh: async () => {
 			await addressesQuery.refetch();

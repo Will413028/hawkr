@@ -42,7 +42,7 @@ export default function SellerChatButton({
 	const chatHref = `/account/messages/${encodeURIComponent(sellerId)}`;
 	const openChat = useChatDrawerStore((state) => state.openChat);
 	const openLoginRequired = useAppUiStore((state) => state.openLoginRequired);
-	const { activeRole, hasSeller, isLoggedIn } = useAuth();
+	const { activeRole, hasSeller, status } = useAuth();
 	const {
 		data: sellerSelf,
 		error: sellerSelfError,
@@ -65,7 +65,7 @@ export default function SellerChatButton({
 	};
 	const canPrewarmChat =
 		!previewMode &&
-		isLoggedIn &&
+		status === "signedIn" &&
 		decideSellerChatAction({
 			activeRole,
 			targetSellerId: sellerId,

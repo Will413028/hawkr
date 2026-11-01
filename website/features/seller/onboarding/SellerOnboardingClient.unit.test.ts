@@ -69,8 +69,7 @@ vi.mock("@/lib/api/auth", () => ({
 }));
 vi.mock("@/lib/auth/context", () => ({
 	useAuth: () => ({
-		status: mocks.authStatus,
-		isLoggedIn: mocks.loggedIn,
+		status: mocks.loggedIn ? "signedIn" : mocks.authStatus,
 		hasSeller: mocks.hasSeller,
 		signOut: mocks.signOut,
 		switchRole: mocks.switchRole,

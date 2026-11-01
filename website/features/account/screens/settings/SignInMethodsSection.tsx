@@ -5,8 +5,9 @@ import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { buttonClasses } from "@/components/ui/Button";
 import { fetchLinkedProviders, type LoginProvider } from "@/lib/api/auth";
-import { useAuth } from "@/lib/auth/context";
+import { accountQueryFn } from "@/lib/auth/account-query";
 import { linkErrorKey, linkStartUrl } from "@/lib/auth/oauth-start";
+import { useAccountStatus } from "@/lib/auth/use-account-status";
 import { useQueryIdentity } from "@/lib/hooks/useQueryIdentity";
 import { localizeHref } from "@/lib/intl/navigation";
 import { useRoutedLocale } from "@/lib/intl/routed-locale";
@@ -33,13 +34,12 @@ export default function SignInMethodsSection() {
 	const tAuthError = useTranslations("auth.error");
 	const tLinkError = useTranslations("auth.linkError");
 	const locale = useRoutedLocale();
-	const { isLoggedIn } = useAuth();
+	const status = useAccountStatus();
 	const identity = useQueryIdentity();
 	const searchParams = useSearchParams();
 	const query = useQuery({
 		queryKey: queryKeys.buyer.linkedProviders(identity),
-		queryFn: fetchLinkedProviders,
-		enabled: isLoggedIn,
+		queryFn: accountQueryFn(status, fetchLinkedProviders),
 	});
 
 	const linkError = linkErrorKey(searchParams?.get("link_error"));

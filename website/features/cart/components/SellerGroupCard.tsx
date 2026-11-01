@@ -30,7 +30,7 @@ interface Props {
 	storeView?: StoreCardView;
 	groupKey: string;
 	isLocked: boolean;
-	isLoggedIn: boolean;
+	signedIn: boolean;
 	selected: Record<string, boolean>;
 	preferredMethod: string;
 	editingQty: Record<string, string>;
@@ -61,7 +61,7 @@ export function SellerGroupCard({
 	storeView,
 	groupKey,
 	isLocked,
-	isLoggedIn,
+	signedIn,
 	selected,
 	preferredMethod,
 	editingQty,
@@ -112,7 +112,7 @@ export function SellerGroupCard({
 	);
 	const shippingState = useShippingOptions(
 		checkoutItems,
-		isLoggedIn && checkoutItems.length > 0 && !isLocked,
+		signedIn && checkoutItems.length > 0 && !isLocked,
 	);
 	const options = shippingState.options ?? [];
 	const method: AvailableShippingOption | undefined = React.useMemo(

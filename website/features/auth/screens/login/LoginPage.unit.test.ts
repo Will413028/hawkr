@@ -49,7 +49,6 @@ const render = (ui: React.ReactElement) =>
 function guest() {
 	mocks.auth = {
 		identity: null,
-		isLoggedIn: false,
 		status: "guest",
 		activeRole: null,
 		switchRole: mocks.switchRole,
@@ -142,7 +141,6 @@ describe("LoginPage: back from the provider (the monolith's 302 lands here)", ()
 		mocks.search = "role=buyer&redirect=%2Faccount%2Forders&provider=line";
 		mocks.auth = {
 			identity: { accountId: "7", isSeller: false },
-			isLoggedIn: true,
 			status: "signedIn",
 			activeRole: "buyer",
 			switchRole: mocks.switchRole,
@@ -160,7 +158,6 @@ describe("LoginPage: back from the provider (the monolith's 302 lands here)", ()
 		mocks.search = "role=buyer&redirect=%2Faccount%2Forders";
 		mocks.auth = {
 			identity: { accountId: "7", isSeller: false },
-			isLoggedIn: true,
 			status: "signedIn",
 			activeRole: "buyer",
 			switchRole: mocks.switchRole,
@@ -174,7 +171,6 @@ describe("LoginPage: back from the provider (the monolith's 302 lands here)", ()
 		mocks.search = "provider=google";
 		mocks.auth = {
 			identity: null,
-			isLoggedIn: false,
 			status: "unknown",
 			activeRole: null,
 			switchRole: mocks.switchRole,

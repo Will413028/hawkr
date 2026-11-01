@@ -2,7 +2,6 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { useAuth } from "@/lib/auth/context";
 import { queryKeys } from "@/lib/query/keys";
 import {
 	fetchShippingOnboardings,
@@ -27,9 +26,8 @@ interface UseShippingOnboardingsResult {
  * per-SKU editors all read from one cached query.
  */
 export function useShippingOnboardings(): UseShippingOnboardingsResult {
-	const { activeRole, isLoggedIn } = useAuth();
 	const identity = useQueryIdentity();
-	const enabled = isLoggedIn && activeRole === "seller";
+	const enabled = identity.activeRole === "seller";
 	const query = useQuery({
 		queryKey: queryKeys.seller.shippingOnboardings(identity),
 		queryFn: fetchShippingOnboardings,

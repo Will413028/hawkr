@@ -345,11 +345,11 @@ interface NavbarProps {
 export default function Navbar({ megaMenuDynamicLinks }: NavbarProps = {}) {
 	const pathname = usePathname() ?? "";
 	const router = useObservedRouter("navbar");
-	const { isLoggedIn, activeRole, status, signOut } = useAuth();
+	const { activeRole, status, signOut } = useAuth();
 	// Single decision point for the right-rail auth affordance. `unknown` (the
 	// server's answer has not arrived) and `unavailable` hold the neutral skeleton;
 	// the client-only `bootRole` below only shapes it and never gates the rail.
-	const railMode = resolveAuthRailMode({ status, isLoggedIn, activeRole });
+	const railMode = resolveAuthRailMode({ status, activeRole });
 	// Pre-hydration role HINT from localStorage (set on login/role switch), used
 	// ONLY to shape the skeleton (buyer shows 訊息+通知 placeholders, others just
 	// the avatar). Read in an effect so SSR + first client render agree (both
@@ -470,7 +470,7 @@ export default function Navbar({ megaMenuDynamicLinks }: NavbarProps = {}) {
 					    rightmost control (the account menu) becomes unreachable with no
 					    scroll to recover it. Text scale stays one tap away in the footer
 					    and in the settings page 顯示 section. */}
-					{isLoggedIn && (
+					{status === "signedIn" && (
 						<TextScaleToggle className="size-11 [@media(max-width:840px)]:hidden" />
 					)}
 

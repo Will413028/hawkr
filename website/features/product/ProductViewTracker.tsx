@@ -5,7 +5,7 @@ import { sellerBeaconClient } from "@/lib/connect/seller-public";
 import { useRecordHistory } from "@/lib/hooks/useRecordHistory";
 
 export function ProductViewTracker({ productId }: { productId: string }) {
-	const { enabled, record } = useRecordHistory();
+	const { canRecord, record } = useRecordHistory();
 	const recordedFor = useRef<string | null>(null);
 
 	useEffect(() => {
@@ -19,11 +19,11 @@ export function ProductViewTracker({ productId }: { productId: string }) {
 		// history (the beacon above only feeds aggregate counts). The mutation
 		// handles the request + history-cache invalidation; we just gate on the
 		// buyer scope and fire once per product mount — guests keep just the beacon.
-		if (!enabled) return;
+		if (!canRecord) return;
 		if (recordedFor.current === productId) return;
 		recordedFor.current = productId;
 		record(productId);
-	}, [productId, enabled, record]);
+	}, [productId, canRecord, record]);
 
 	return null;
 }

@@ -6,6 +6,7 @@ import AppIcon from "@/components/shared/AppIcon";
 import AppImage from "@/components/shared/AppImage";
 import { emitCartToast } from "@/components/shared/CartSnackbar";
 import Link from "@/components/shared/Link";
+import ZoneUnavailable from "@/components/shared/ZoneUnavailable";
 import Button from "@/components/ui/Button";
 import {
 	cartSellerKeyOf,
@@ -86,7 +87,8 @@ function sameSelection(
 }
 
 export default function CartClient() {
-	const { isLoggedIn, status: authStatus } = useAuth();
+	const { status: authStatus } = useAuth();
+	const signedIn = authStatus === "signedIn";
 	const cart = useCart();
 	const { views: storeViews } = useStoreCardViews(
 		cart.itemsBySeller.map((group) => group.sellerStoreId),
@@ -292,7 +294,7 @@ export default function CartClient() {
 	);
 	const shippingState = useShippingOptions(
 		checkoutItems,
-		isLoggedIn && checkoutItems.length > 0,
+		signedIn && checkoutItems.length > 0,
 		shippingRefreshNonce,
 	);
 	const shippingOptions: AvailableShippingOption[] = React.useMemo(
@@ -800,7 +802,7 @@ export default function CartClient() {
 
 	/* ───── Stale revalidate before checkout ───── */
 
-	const checkoutHref = isLoggedIn ? "/checkout" : "/login?redirect=/checkout";
+	const checkoutHref = signedIn ? "/checkout" : "/login?redirect=/checkout";
 	// 🔴 未知配送方式一律 fail-closed。舊寫法三元的最後一支是
 	// `: true` —— 語意等於「沒見過的配送方式就不用選收件地址也不用選門市」，
 	// 於是 3005 商家自送可以直接進結帳。
@@ -822,7 +824,7 @@ export default function CartClient() {
 				? "請選擇收件地址"
 				: "此配送方式尚未開放，請改選其他配送方式";
 	const canCheckout =
-		isLoggedIn &&
+		signedIn &&
 		selectedPurchasableItems.length > 0 &&
 		!selectionBusy &&
 		selectedShipping != null &&
@@ -987,7 +989,11 @@ export default function CartClient() {
 		);
 	}
 
-	if (!isLoggedIn) {
+	if (authStatus === "unavailable") {
+		return <ZoneUnavailable required="buyer" />;
+	}
+
+	if (!signedIn) {
 		return (
 			<section className="flex flex-col gap-7 mb-8">
 				<div className="flex flex-col gap-3 rounded-[28px] border border-hk-border-soft bg-hk-surface-card p-9 shadow-hk-card">
@@ -1129,7 +1135,7 @@ export default function CartClient() {
 											storeView={storeViews.get(group.sellerStoreId)}
 											groupKey={groupKey}
 											isLocked={isLocked}
-											isLoggedIn={isLoggedIn}
+											signedIn={signedIn}
 											selectionBusy={selectionBusy}
 											selected={selected}
 											preferredMethod={shippingMethod}
@@ -1238,7 +1244,7 @@ export default function CartClient() {
 								</p>
 							) : null}
 							{shippingOptions.length === 0 ? (
-								selectedItems.length === 0 && isLoggedIn ? (
+								selectedItems.length === 0 && signedIn ? (
 									<div
 										className="flex flex-col items-center gap-2.5"
 										role="note"
@@ -1249,7 +1255,7 @@ export default function CartClient() {
 									</div>
 								) : (
 									<p className="cart-page__summary-foot">
-										{!isLoggedIn
+										{!signedIn
 											? "登入後可查看可用運送方式"
 											: selectedPurchasableItems.some(
 														(it) => it.productId == null,
@@ -1289,7 +1295,7 @@ export default function CartClient() {
 							<h3 className="m-0 mb-2.5 cart-type-subtitle text-hk-heading">
 								優惠券
 							</h3>
-							{!isLoggedIn ? (
+							{!signedIn ? (
 								<p className="cart-page__summary-foot">
 									<Link href="/login?redirect=/cart" hardNavigation>
 										登入
@@ -1404,7 +1410,7 @@ export default function CartClient() {
 							aria-disabled={!canCheckout}
 							onClick={handleCheckoutClick}
 						>
-							{isLoggedIn
+							{signedIn
 								? selectedPurchasableItems.length === 0
 									? "請先選取可購買商品"
 									: selectionBusy

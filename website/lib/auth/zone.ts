@@ -49,7 +49,7 @@ export function decideZone(
 		};
 	}
 	const allowed = owns({
-		isLoggedIn: true,
+		signedIn: true,
 		hasSeller: session.identity.isSeller,
 	});
 	if (allowed) return { kind: "allow" };

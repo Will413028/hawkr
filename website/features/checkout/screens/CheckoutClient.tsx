@@ -20,7 +20,7 @@ import {
 	trackBeginCheckout,
 } from "@/lib/analytics/events";
 import { setPendingPurchase } from "@/lib/analytics/purchase-store";
-import { useAuth } from "@/lib/auth/context";
+import { useZoneIdentity } from "@/lib/auth/zone-identity";
 import type { CartItem } from "@/lib/cart";
 import {
 	CHECKOUT_DRAFT_STORAGE_KEY,
@@ -149,15 +149,21 @@ type CheckoutTransientEvent =
 	// previewNonce functional setter — 改 dedicated event 避免 stale closure
 	| { type: "INCREMENT_PREVIEW_NONCE" };
 
-function transientReducer(
+export function transientReducer(
 	state: CheckoutSessionTransient,
 	evt: CheckoutTransientEvent,
 ): CheckoutSessionTransient {
 	switch (evt.type) {
 		case "NEW_ATTEMPT":
 			return INITIAL_TRANSIENT;
-		case "SET":
-			return { ...state, ...evt.patch };
+		case "SET": {
+			const keys = Object.keys(evt.patch) as Array<
+				keyof CheckoutSessionTransient
+			>;
+			return keys.every((key) => Object.is(state[key], evt.patch[key]))
+				? state
+				: { ...state, ...evt.patch };
+		}
 		case "RESET_ERROR":
 			return { ...state, error: INITIAL_CHECKOUT_ERROR };
 		case "FAIL":
@@ -272,7 +278,7 @@ function cartItemsToCheckoutItems(items: CartItem[]): CheckoutItemInput[] {
 
 export default function CheckoutClient() {
 	const router = useObservedRouter("checkout");
-	const { isLoggedIn } = useAuth();
+	useZoneIdentity();
 	const cart = useCart();
 	const queryClient = useQueryClient();
 	const queryIdentity = useQueryIdentity();
@@ -505,7 +511,6 @@ export default function CheckoutClient() {
 		// cancelled 守衛攔下後,UI 會永卡「計算中」。新增 early-return 條件
 		// 時也必須沿用此 invariant。
 		if (
-			!isLoggedIn ||
 			!draft ||
 			selectedItems.length === 0 ||
 			hasInvalidCartItems ||
@@ -584,7 +589,6 @@ export default function CheckoutClient() {
 		draft,
 		hasInvalidCartItems,
 		hasRequiredRecipient,
-		isLoggedIn,
 		isStorePickup,
 		needsAddress,
 		previewToken,
@@ -608,21 +612,6 @@ export default function CheckoutClient() {
 			coupon: draft.coupon?.title,
 		});
 	}, [draft?.shipping.method, preview?.totalPayAmount, selectedItems, draft]);
-
-	if (!isLoggedIn) {
-		return (
-			<section className="min-h-[calc(100vh-280px)] flex flex-col items-center justify-center gap-4 text-center px-4">
-				<p>請先登入。</p>
-				<Link
-					href="/login?redirect=/checkout"
-					hardNavigation
-					className="hk-cta-primary inline-flex items-center justify-center min-h-[48px] px-[22px] rounded-[var(--radius-pill)] border border-hk-primary bg-hk-primary text-hk-inverse font-bold no-underline transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-hk-card"
-				>
-					登入
-				</Link>
-			</section>
-		);
-	}
 
 	if (!draftLoaded || (cart.loading && cart.items.length === 0)) {
 		return (
