@@ -160,7 +160,7 @@ REVALIDATE_SECRET=
 ### 4. Firebase 與 OAuth 設定
 
 - **Firebase**：僅用於 phone OTP（手機註冊綁定）。Firebase Console → Project Settings → Web app config 取值；Authentication → Sign-in method 啟用 Phone，Authorized domains 加入 `localhost` 與正式網域；開發時可設 test phone numbers 節省簡訊額度。
-- **顧客登入（Google、LINE）**：由單體處理（ADR `backend/docs/adr/2026-10-30-identity-self-hosted-federated-login.md`），website 沒有 secret 也沒有登入用的環境變數。登入頁（`features/auth`）把瀏覽器整頁導向 `/api/auth/{provider}/start?return_to=…`（經同源反代到單體），單體完成 OAuth 後設 HttpOnly 的 `__Host-hk_session` cookie 並 302 回登入頁；失敗時 302 回 `/login?error=<代碼>`。OAuth client 與 redirect URI 在單體的設定與各 provider 的 console，不在這裡。登入與否由 `GetSession` 判斷（`lib/auth/context.tsx`），登出是 `SignOut`；middleware 只看 cookie 在不在（樂觀導向，不打 API）。伺服器端（RSC、server action）只讀取：把訪客的 cookie 轉送給單體的 GET，寫入一律由瀏覽器送出（`lib/auth/session-cookie.server.ts`）。
+- **顧客登入（Google、LINE）**：由單體處理（ADR `backend/docs/adr/2026-10-30-identity-self-hosted-federated-login.md`），website 沒有 secret 也沒有登入用的環境變數。登入頁（`features/auth`）把瀏覽器整頁導向 `/api/auth/{provider}/start?return_to=…`（經同源反代到單體），單體完成 OAuth 後設 HttpOnly 的 `__Host-hk_session` cookie 並 302 回登入頁；失敗時 302 回 `/login?error=<代碼>`。OAuth client 與 redirect URI 在單體的設定與各 provider 的 console，不在這裡。登入與否由伺服器端 DAL 的 `GetSession` 判斷（`lib/auth/dal.ts`，結果交給 `lib/auth/context.tsx` 的 `AuthProvider`），登出是 `SignOut`；middleware 只看 cookie 在不在（樂觀導向，不打 API）。伺服器端（RSC、server action）只讀取：把訪客的 cookie 轉送給單體的 GET，寫入一律由瀏覽器送出（`lib/auth/session-cookie.server.ts`）。
 - **廠商入口的 Google 二次驗證**：GCP Console → APIs & Services → Credentials → OAuth 2.0 Client ID（Web application），把本機與正式網域加入 Authorized JavaScript origins。
 
 ### 5. Next.js 配置 (`next.config.ts`)
@@ -168,10 +168,11 @@ REVALIDATE_SECRET=
 重點：
 
 - 不設 `output: "standalone"`：Vercel 自己打包 Next 產物。
-- ~~`cacheComponents: true`~~ / ~~`cacheLife`~~：**已於 #338 全數移除**（commit `6015754f`「關閉 cacheComponents 全站回傳統純 ISR」）。根因是 Cache Components 的 static-shell resume 在 workerd 會爆 128MB → prod 白畫面 + OOM。
-  - **現行快取模型＝傳統 ISR**：各路由用 `export const revalidate = <秒>`（例：`app/[locale]/(public)/page.tsx` 首頁 60 秒）；資料層新鮮度在 `lib/api/cached.ts`（`unstable_cache` per fetcher，帶 tag ＋ revalidate TTL 安全網）。
+- `cacheComponents: true`：預設動態、靜態 shell 預渲染（PPR），動態部分以 `<Suspense>` 洞在每個請求串流。route segment config（`dynamic`、`revalidate`、`runtime`）一律不能用；`generateStaticParams` 至少回一筆（沒有真實資料可預渲染時回 sentinel，見 `lib/api/static-params.ts`）。
+  - **快取模型**：資料層在 `lib/api/cached.ts`，每個讀取是一個 `'use cache'` 函式，用 `cacheTag` 帶 tag、`applyCacheTier`（`cacheLife`）帶 TTL 安全網；`'use cache'` 本身會合併同一個 key 的併發讀取（同請求與跨請求），不另做 in-flight 去重。`'use cache'` 內不得讀 cookie 或 header，也不得放因人而異的讀取。
   - `POST /api/revalidate`（帶 `REVALIDATE_SECRET`）以 tag 提前 bust，tag 名見 `app/api/revalidate/route.ts`。
-  - ⚠️ **不要重新加回 `cacheComponents` / `experimental.dynamicIO` / `ppr`**；`'use cache'` 那套 cacheLife profile 已不適用。
+  - **登入狀態由伺服器決定**：根 layout 不 await `verifySession()`（`lib/auth/dal.ts`），把 promise 交給 `AuthProvider`，在 `<Suspense>` 內以 `use()` 讀；受保護區（`/account`、`/checkout`、`/seller-center`、`/seller-product-import-preview`、`/seller/measures`）的 layout 用 `ZoneGate` 依 DAL 導向，middleware 只做「cookie 在不在」的樂觀導向。
+  - 改動根 layout 且在 `<Suspense>` 之外的元件後，`pnpm build` 是必跑項：該位置的 dynamic read 只有 build 的 prerender 階段會擋。`pnpm test:build-output` 讀 prerender manifest，斷言含頁首的頁與受保護頁是 `PARTIALLY_STATIC`。
 - `images`：custom loader → Alibaba OSS image service（`lib/media/ossImageLoader.ts`），用 OSS 的 resize/quality/WebP pipeline 取代 Next 內建 optimizer（已移除舊的 `unoptimized: true`）。`qualities` 需先列出才能當 prop 用。
 - `turbopack.root`：明確指定專案根目錄。
 - `devIndicators: false`：隱藏左下角 dev-tools 指示器（dev-only）。
