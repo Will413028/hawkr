@@ -87,10 +87,10 @@
   - 消費端：同步驟 3 的 rg，加 `lib/auth/{cross-tab-sync,teardown,useAuthGate}.ts*`。
   - 不能動：B-199 語意。
   - 驗收：完成定義；`rg -nw "sessionSettled|sessionUnavailable|HYDRATION_GATE_MS|data-auth-hydrated" website` 與 `rg -n "\.hydrated\b" website/lib/auth website/components` 都無命中；mutation：把網路錯誤映射成 `guest`，「暫時不可用不登出」測試要失敗；拿掉登出後的 `router.refresh()`，「登出後頁首不顯示頭像」測試要失敗；e2e 待 CI。
-- [ ] **5a. 身分顯示資料由伺服器一次給，刪掉 client 補抓與碰不到的拒絕路徑**（被擋於：D6、D7；必須在步驟 5 之前）
+- [x] **5a. 身分顯示資料由伺服器一次給，刪掉 client 補抓與碰不到的拒絕路徑**（被擋於：D6、D7；必須在步驟 5 之前）
   - 範圍：
     - 契約：`GetSessionResponse`（`api/hawkr/identity/v1alpha1/identity.proto`）加 `display_name` 與 `avatar`（`hawkr.common.v1alpha1.Image`，OUTPUT_ONLY，沒有頭像時不設），組裝在單體 `backend/internal/httpapi/identity/app.go`，經 buyer 模組的公開 API 讀 profile；identity 模組不依賴 buyer。buyer 讀取失敗時記 log、不設這兩個欄位，`GetSession` 照常回應（登入狀態的正確性優先於顯示資料，`session.go` 已規定 GetSession 不受 buyer 查詢失敗影響）。重新生成 Go、`@hawkr/api`、`packages/hawkr_api`。
-    - website：DAL 把顯示資料放進 `signedIn` 的 identity；刪 `context.tsx` 的 `fetchProfile` 合併（約 :316-345）與快取回填舊暱稱頭像（約 :266-272）；React Query 不再存身分：identity 直接來自伺服器的 promise，`commitIdentity`、`switchRole`、登出、過期的寫入改為事件後 `router.refresh()` 期間的目標態（D4）；刪 `SESSION_KEY`。改 profile 成功後 `router.refresh()`。`Navbar.tsx:251` 寫死的「會員」改用文案資源。
+    - website：DAL 把顯示資料放進 `signedIn` 的 identity；刪 `context.tsx` 的 `fetchProfile` 合併（約 :316-345）與快取回填舊暱稱頭像（約 :266-272）；React Query 不再存身分：identity 直接來自伺服器的 promise，`commitIdentity`、`switchRole`、登出、過期的寫入改為事件後 `router.refresh()` 期間的目標態（D4）；刪 `SESSION_KEY`。改 profile 成功後 `router.refresh()`。`Navbar`、`AccountSidebar`、`AccountOverviewClient` 寫死的「會員」改用文案資源（D8）。改變身分的事件依 D4 修訂整頁導向。
     - 拒絕路徑（D7）：刪 DAL 的 403 → `guest`＋`refusal` 分類、`SessionRefusal` 型別、`context.tsx` 的 refusal toast；403 依「只有確定的答案才是訪客」歸 `unavailable`。`rejectSession` 若只為 403 存在一併刪除，否則寫明剩下的觸發來源。
   - 消費端：`rg -n "GetSessionResponse|getSession\(|fetchSession|fetchProfile|SESSION_KEY|refusal|rejectSession|nickname|avatarKey" website/lib website/components website/features backend/internal/httpapi packages/hawkr_api/lib buyer-app/lib seller-app/lib`；App 目前不讀新欄位（接線遷移中，見 identity ADR），生成碼更新即可。
   - 不能動：D4 的「伺服器是唯一來源」、`unavailable` 不登出、`data-auth-status`、靜態外殼與 404 的 build-output 測試。
@@ -113,6 +113,7 @@
 - **D4 事件之後 client 的登入狀態怎麼更新**（狀態：已決 2026-11-01，Will，選 A；擋住步驟 4）
   - A：伺服器是唯一來源，登出、跨分頁訊號、401 之後 `router.refresh()` 重取初值；client 只在 refresh 完成前暫時顯示目標態（步驟 4 的轉移表）。（建議，採用）
   - B：client 自己維護狀態並直接改——快，但伺服器初值與 client 狀態成為兩個來源，會再分歧。
+  - 修訂（2026-11-01，Will，選 B-strict；步驟 5a 的 review F1／F3）：「refresh 完成前暫時顯示目標態」被推翻——client 分不出答案是事件前或後發出的，舊答案會蓋回舊身分。改為：改變身分的事件（登出、401、session 失效、取得角色（開店完成）；`switchRole` 只切換視角，不算）先 teardown 再整頁導向；刪暫時目標態與 `commitIdentity`；跨分頁只在本分頁已登入且收到的帳號不同或失去身分時 reload，訪客轉登入照舊 `router.refresh()`；`pageshow` 的 bfcache 還原時 reload。`router.refresh()` 只用於同一帳號的資料更新（profile、頭像）與 `unavailable` 恢復。選項 A（epoch cookie 比對新舊）與 C（Server Action 寫 cookie，違反 identity ADR D6 的寫入路徑且不解跨分頁）否決。
 
 - **D5 children 是否在身分的 Suspense 內**（狀態：已決 2026-11-01，Will，選 A；擋住步驟 3；步驟 3 實作時發現）
   - 事實：照 D1 字面把 `AuthProvider` 連 `{children}` 包進一個根 Suspense，`notFound()` 回 200 加 noindex，靜態外殼只剩 fallback（`next start`＋curl 實測）；讀身分的檔案 91 個（`useAuth`／`useOptionalAuth`，含 `Link` 與約 50 個 hook）。
@@ -125,6 +126,7 @@
   - A：維持 client 另外 `fetchProfile` 並合併進快取——身分兩個來源、頭像晚到、改 profile 後頭像不更新。
   - B：website 伺服器端平行呼叫 GetSession 與 GetProfile——不改契約，但兩支 App 要各自再組。
   - C：單體 httpapi 組裝，session 讀取一次帶顯示資料（Next.js DAL／DTO、Auth.js session 帶 name/image；`backend/AGENTS.md` httpapi 做畫面需要的讀取組裝）。（建議，採用；實作形式為擴充 `GetSessionResponse`，不另開 RPC，避免第二次讀 session）
+- **D8 頁首後備稱呼「會員」的文字來源**（狀態：已決 2026-11-01，Will；擋住步驟 5a）：`Navbar`、`AccountSidebar`、`AccountOverviewClient` 寫死的「會員」改為文案資源（zh-TW「會員」、en「Member」）。
 - **D7 website 的 session 拒絕（403）路徑**（狀態：已決 2026-11-01，Will，選刪除；擋住步驟 5a）
   - 事實：單體只在後台帳號不被允許時回 403（`backend/internal/httpapi/session.go:27`）；顧客的 session 解析沒有 PermissionDenied（rg 零命中，讀程式推論）；刪除的帳號是訪客、停權回 200 加 `suspension`。所以顧客碰不到這條路徑，原先「DAL 固定 defaultLocale」的語系問題隨之消失。
   - 選項：帶請求語系修文字（修一條碰不到的路徑）；刪除。（建議刪除，採用）
@@ -142,5 +144,5 @@
 | 2b API 反代與同源設定 | 完成 | lint、vitest 2755、node:test 2119、build＋build-output 11（routes manifest 三條 beforeFiles）；mutation：拿掉同源檢查、拿掉任一條 rewrite 皆失敗；獨立審查 3 項已處理（build:seo 改相對 `/api/v1`、同源檢查擋 `//host`）；CI 全綠（website CI、website e2e、supply chain、repo hygiene、ui-text guard、commit messages） | Vercel 上的實效（待步驟 3 預覽部署） | `0ec1d71`、`8a36adf` |
 | 3 cacheComponents＋DAL＋四態 | 完成（商品頁 200 延後到商品模組搬進單體，Will 2026-11-01） | lint、vitest 2781、node:test 2126、build＋build-output 18（全部 PARTIALLY_STATIC、頁首在靜態外殼、notFound 回 404）；mutation：DAL 401→unavailable、加回 gate（改為首屏猜 guest）、`verifySession` 進 `'use cache'`（build 失敗）、根層把 children 包回 Suspense、`unknown` 畫訪客頁首、拿掉 WorkspaceAlign 等待、拿掉 unavailable 重試 皆失敗；獨立審查 5 項已處理；CI 全綠（website CI、website e2e、supply chain、repo hygiene、ui-text guard、commit messages）；#338 預覽部署（上游不可達）：`/` 20×200、`/account`（假 cookie）20×200，皆含 `site-header`；Vercel Observability（Preview、近 12 小時、86 次呼叫，含 spike 的預覽部署）function 記憶體 Average 267 MB／P75 270 MB／P95 272 MB，上限 2.05 GB，P95 低於門檻 1 GB | 商品頁 200（擋於商品模組搬進單體，PDP 讀舊 gateway `/api/v1/public/products/{id}`；上游不可達時 `/products/1` 20×404）；function 記憶體的最大值（Hobby 的 Observability 只給 Average／P75／P95，不給 max） | `2f9a87a`..`65a4fb9` |
 | 4 事件轉移 | 完成 | lint、vitest 2816、node:test、build＋build-output 18；`rg -nw` 四個舊名稱零命中；mutation：網路錯誤或 unavailable 映成 guest、拿掉登出／401／跨分頁後的 refresh、拿掉舊 promise 防護、拿掉 online／visibility 重試、伺服器值不覆寫快取、`rejectSession` 舊順序、`commitIdentity` 不 refresh、語系切換重置旗標 皆失敗；獨立審查 1 中 4 低：3 項修、暱稱頭像合併保留（GetSession 回應只有 id 與 roles，`identity.proto:81-90`）、401 前多一次 refresh 不修；CI 全綠（website CI、website e2e、supply chain、repo hygiene、ui-text guard、commit messages） | 無 | `3da7a18`、`7f0e691`、`b61a1d4` |
-| 5a 身分顯示資料與拒絕路徑 | 未開始 | | | |
+| 5a 身分顯示資料與拒絕路徑 | 程式完成待驗收（待 CI） | backend gofmt、vet（含 integration tag）、`go test -race`、lint-monolith 0、tidy 無 diff；buf lint／breaking；website lint、vitest 2838、node:test 2127、build＋build-output 18；`hawkr_api` dart analyze、兩支 App flutter analyze；mutation：單體不組 profile、加回 client `fetchProfile`、403 歸 guest、soft refresh 取代整頁導向、拿掉 `leaving` 守衛、跨分頁 reload 改 refresh、拿掉 `pageshow`、401 只在 signedIn 導向、`switchRole` 不用確認的身分、取消離開後不清登出 皆失敗；三輪 code review（F1–F5、R1–R4、R3-1）與一輪 design-review（9 項：改 7、駁回 2）全部處理，D4 修訂（B-strict）與 D8 由 Will 決定 | integration、e2e：待 CI | `b2e62a0` |
 | 5 收尾 | 進行中 | 舊名稱 rg 零命中；build-output 在 CI（`website-ci.yml` 的 `test:build-output`）；design-review 5 項：改 1（`unavailable` 探測改為 `router.refresh()`、不寫快取，`be09b36`；mutation 拿掉 refresh 4 測試失敗）、記 1（身分仍存在 React Query 快取：探測修正後只由伺服器值寫入，保留；`SESSION_KEY` 出現在 `context.tsx` 以外的檔案時再評估）、駁回 1（auth-expired 多一次 refresh＝步驟 4 的 F5）、交 Will 2（暱稱頭像經 `fetchProfile` 對比擴充 `GetSession`；DAL 固定 `defaultLocale`）；文件與 identity ADR 修訂 `ee10f28` | 交 Will 的 2 項待決；延後項搬主清單；需要人做的事 | `8a8ef9d`、`be09b36`、`ee10f28` |
