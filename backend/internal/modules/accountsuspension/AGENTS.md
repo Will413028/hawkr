@@ -16,12 +16,9 @@
 
 只有根套件：`Suspend`、`Unsuspend`、輸入 `Record`，事件 `Suspended`、`Unsuspended`（`events.go`）。依賴 identity、seller；依賴表的唯一來源是 `internal/arch/modules.go`。
 
-## 鎖順序
-
-identity 帳號列 → buyer → seller，與 `accountdeletion`、seller 開店相同。本模組只用到第一個和最後一個：先 `identity.LockAccount`，再讀 `seller.CurrentStore`（不鎖店家列），之後才寫 identity。不得先讀店家再鎖帳號。守門：`TestSuspendAndAccountDeletionRunConcurrentlyWithoutDeadlock`。
-
 ## 不變量
 
+- 鎖順序：全域順序見 `backend/AGENTS.md` 單體規則 4；本模組只用到帳號列與店家：先 `identity.LockAccount`，再讀 `seller.CurrentStore`（不鎖店家列），之後才寫 identity；不得先讀店家再鎖帳號。守門：`TestSuspendAndAccountDeletionRunConcurrentlyWithoutDeadlock`。
 - 擁有店家的帳號回 `FailedPrecondition` 與 `ACCOUNT_HAS_STORE`，什麼都不寫、不發事件。只有這裡檢查，identity 不查店家。守門：`TestSuspendRefusesAnAccountThatHasAStore`。
 - 與開店序列化：停權和開店都先鎖帳號列，結果不是「有店且被停權」。守門：`TestSuspendWaitsForAnOpeningStoreAndThenSeesIt`、`TestOpeningWaitsForASuspensionAndThenIsRefused`、`TestConcurrentSuspendAndOpenNeverLeaveASuspendedStore`。
 - 在呼叫方的 transaction 內執行，事件在同一個 transaction，呼叫方回滾則紀錄、狀態與事件都回滾。守門：`TestSuspendAndUnsuspendRunInTheCallersTransaction`。
