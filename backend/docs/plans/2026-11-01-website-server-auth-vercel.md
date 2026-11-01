@@ -54,7 +54,7 @@
   - 停止條件（加）：偽造的 IP 能被伺服器讀到 → 回報，步驟 2 的 IP 讀取點重新設計。
   - 停止條件：`cacheComponents` 需要改寫超過約一半頁面，或反代丟失 `Set-Cookie` → 回報，重拍 D1／D2。
   - 需要人做的事：建立 Vercel 專案、授權 GitHub 連結、觸發預覽部署（部署需授權）。
-- [ ] **2. 平台遷移，行為不變**（被擋於：步驟 1，且其中「訪客 IP 無法偽造」已實測成立）
+- [x] **2. 平台遷移，行為不變**（被擋於：步驟 1，且其中「訪客 IP 無法偽造」已實測成立）
   - 範圍：刪 `open-next.config.ts`、`wrangler.jsonc`、`public/_headers`（併入 `next.config.ts` headers）、`@opennextjs/cloudflare` 依賴與 `preview`、`cf-typegen` script、`lint` script 裡寫死的 `open-next.config.ts` 路徑、`tests/open-next-*`；根目錄 `pnpm-workspace.yaml` 的 patchedDependencies 條目與 `patches/@opennextjs__cloudflare.patch`、`osv-scanner.toml` 對應的 IgnoredVulns 條目（供應鏈基準，刪除寫進 commit 訊息）。訪客 IP：新增唯一讀取點 `getVisitorIp(request)`，不變量表列的 9 個呼叫點與直接塞 `cf-connecting-ip` 的 seller-leads、search 測試全部改用它。`lib/seo/canonical-host.ts` 與 middleware 的 workers.dev 規則改成 Vercel 預覽網域（`*.vercel.app` 一律 noindex）。快取：刪 OpenNext 的 R2 incremental cache、DO queue、tag cache 綁定；`app/api/revalidate` 已用 `next/cache` 的 `revalidateTag`，不動。CSP、Sentry trace tag 去掉 Cloudflare 專屬項；新增 `vercel.json`（`regions: ["hnd1"]`）。
   - 消費端：`rg -l -i "opennext|open-next|wrangler|cloudflare|workers\.dev|cf-connecting|getCloudflareContext|DurableObject" --glob '!*.md' --glob '!node_modules' .`（整個 repo），每檔標去向；已知無關：`packages/hawkr-ui-text-ts/tools/check-enum-text.ts` 的 `.wrangler` 排除項、`backend/workers/image-gateway`（另一支 Worker，不在範圍）、`lib/media/cdn.ts` 的 OSS loader。另：`.github/workflows/website-*.yml`；根 `AGENTS.md` 地圖、`website/AGENTS.md`、`website/README.md`。
   - 不能動：渲染模型（仍純 ISR，`cacheComponents` 關）；路由與回應內容。
@@ -108,7 +108,7 @@
 | 步驟 | 狀態 | 已跑的驗收 | 未跑的驗收與原因 | commit |
 |---|---|---|---|---|
 | 1 spike | 進行中 | 上傳方式、純 ISR 建置、cacheComponents 改寫量（34／405 頁）、IP header 防偽、區域與記憶體設定（spikes.md） | 反代 3xx／Set-Cookie、RTT、tag 失效：單體尚未公開部署 | |
-| 2 平台遷移 | 未開始 | | | |
+| 2 平台遷移 | 完成 | lint、vitest 2755、node:test 2111、build＋build-output 7；mutation：IP 改讀 cf-connecting-ip、拿掉 vercel.app noindex、拿掉 Sentry 預覽過濾 皆失敗；獨立審查 2 項已處理；CI 全綠（website CI、website e2e、workspace CI、supply chain） | Vercel 上的 headers 實效（待步驟 3 預覽部署）；Skew Protection 待第一次部署前開 | `1ae6959`..`f0184b2`、`2b1a695` |
 | 3 cacheComponents ＋ DAL | 未開始 | | | |
 | 4 client 四態 | 未開始 | | | |
 | 5 收尾 | 未開始 | | | |
