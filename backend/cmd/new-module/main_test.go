@@ -250,7 +250,7 @@ func TestGeneratedAgentsLeavesTheAuditToFill(t *testing.T) {
 	}
 }
 
-// 模組 AGENTS.md 指向模組規格，並說明子領域 AGENTS.md 的規則；節的形狀由 instruction-lint 的 R2 檢查（repo-hygiene）。
+// 模組 AGENTS.md 指向模組規格，並說明子領域 AGENTS.md 的規則；節的形狀由 agentfile-lint 的 R2 檢查（repo-hygiene）。
 func TestGeneratedAgentsPointsToTheSpec(t *testing.T) {
 	b, err := os.ReadFile(filepath.Join(scaffold(t, ""), "internal", "modules", "payment", "AGENTS.md"))
 	if err != nil {
