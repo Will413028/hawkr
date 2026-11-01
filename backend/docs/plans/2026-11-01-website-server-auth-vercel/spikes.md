@@ -52,3 +52,13 @@ vercel deploy --yes --archive=tgz -b NEXT_PUBLIC_FLAVOR=prod -b NEXT_PUBLIC_WEB_
 ## 未做（擋於單體部署到 `oci-a1`）
 
 - 反代 `/api/auth/*` 的 3xx 與多個 `Set-Cookie`、Connect 串流、`hnd1`→`oci-a1` 的 RTT、`revalidateTag` 的 tag 失效：都需要公開可達的單體。步驟 3 開工前補做；步驟 2（行為不變的平台遷移）不依賴它們。
+
+## f. 單體公開後的反代與登入（2026-11-01，量測）
+
+部署：`oci-a1` 上 `~/hawkr-spike`（單體 `serve`＋Postgres 18 容器，1 CPU／1.5GiB 與 0.5 CPU／512MiB；舊服務位址填佔位值 `127.0.0.1:9`），經 Tailscale Funnel `https://oci-a1.tail357fef.ts.net:10000` 對外；website 預覽固定別名 `https://hawkr-spike.vercel.app`（OAuth dev client 已登記該 callback）。
+
+- **計畫前提錯誤**：`app/api/{connect,auth,v1}/[...path]` 的 route handler 只在本機開發啟用（`isLocalApiProxyEnabled`），部署環境回 404；原本靠 Cloudflare 的路由把 `/api/*` 轉給單體。Vercel 上要用 `next.config.ts` 的 `rewrites().beforeFiles` 把 `/api/connect/:path*`（到單體根目錄）、`/api/auth/:path*`、`/api/v1/:path*` 轉到單體。spike 分支 `spike/vercel-proxy` 以 `SPIKE_API_ORIGIN` 驗證。
+- 經 Vercel rewrite：`GetSession` 無 cookie 回單體的 `401 unauthenticated`；`/api/auth/google/start` 回 `302` 到 Google 並帶 `Set-Cookie: __Host-hk_login=…; HttpOnly; Secure; SameSite=Lax`。真人 Google 登入：單體記 `identity：登入建立帳號 account_id=1`，瀏覽器帶 cookie 呼叫 GetSession 回 `200 {"account":{"id":"1"}}`。重導向、多個 Set-Cookie 經 rewrite 原樣傳遞，成立。
+- **第二個設定錯誤**：`NEXT_PUBLIC_API_BASE_URL` 在 build 時寫死；設成跨來源的值（spike 第一次是 `http://127.0.0.1:9/api/v1`）時，瀏覽器的 Connect 直接打那個 host（`lib/connect/transport.ts` `connectBaseUrl`），登入後頁面仍顯示未登入。改成同源 `https://hawkr-spike.vercel.app/api/v1` 後瀏覽器打 `/api/connect/…`，頁首正常顯示登入狀態。部署環境的值必須同源，prod 設定應拒絕跨來源值。
+- RTT（Vercel `hnd1` function → Funnel → `oci-a1`，10 次 `/healthz`）：`[1540,347,235,253,194,185,174,187,158,136]` ms。Funnel 經 Tailscale 中繼，只能當上限；正式連線方式定案後重量。
+- LINE 真人登入、`revalidateTag` 失效：未測。
