@@ -96,6 +96,18 @@
   - 不能動：D4 的「伺服器是唯一來源」、`unavailable` 不登出、`data-auth-status`、靜態外殼與 404 的 build-output 測試。
   - 驗收：完成定義；backend `GOWORK=off go test -race ./...`、`make lint-monolith`、`go vet -tags integration`（integration 待 CI）；buf lint／breaking 照 CI；mutation：GetSession 不組 profile → website 頁首測試與單體 handler 測試失敗；buyer 讀取回錯 → GetSession 仍成功的測試失敗則代表實作錯；加回 client `fetchProfile` 合併 → 「身分只來自伺服器」測試失敗；DAL 把 403 歸 `guest` → 測試失敗；`rg -n "SESSION_KEY|refusal|fetchProfile" website/lib/auth` 零命中。
   - 停止條件：buyer 模組沒有可用的公開讀取 API、要新增模組依賴表條目，或 App 的生成碼需要手改 → 回報。
+- [ ] **5b. 登入狀態的三態型別與受保護區的伺服器身分**（被擋於：D9、D10、D11；必須在步驟 5 之前）
+  - 範圍：
+    - 受保護區：新增 `useZoneIdentity()`，在 `ZoneGate` 既有的 Suspense 內以 `use()` 讀根層同一個 `verifySession()` promise（經 context 傳下，`cache()` 不多打後端），回傳型別上非 null 的身分；在 zone 外呼叫即丟錯。zone 內讀身分的元件改用它，不再等 `unknown`。`activeRole` 仍由 client 從 localStorage 算（伺服器 HTML 與第一次 render 必須一致），不進伺服器初值。
+    - 公開頁：刪除 `useAuth` 的 `isLoggedIn`；消費端改以 `status` 聯合型別分支，`unknown` 一律中性等待（D10，與 D3 頁首骨架一致），不顯示訪客外觀。實作時以 tsc 列出全部使用處，逐項記入進度列。
+    - 帳號查詢：公開頁的帳號相關查詢統一用一個 `skipToken` helper（TanStack Query v5），消費端以 `isPending` 判斷未就緒；受保護區的查詢不再以登入狀態擋。
+    - 刪除步驟 5a 後的個別修補（`useSellerSelf` 的 `|| status === "unknown"`），保留其回歸測試。
+    - D11：`CheckoutClient` reducer 的 `SET` 在 patch 不改變任何欄位時回傳原 state。
+    - 守門：source 檢查禁止重新加入 `isLoggedIn` 與公開頁直接以 `enabled:` 擋帳號查詢。
+  - 消費端：`rg -l "useAuth\(|useOptionalAuth\(" website/app website/components website/features website/lib`；`rg -n "enabled:" website/lib/hooks website/features`。
+  - 不能動：靜態外殼、404 狀態碼與 prerender 模式（build-output 測試）；D4 修訂的整頁導向；`unavailable` 不登出；`data-auth-status`。
+  - 驗收：完成定義；mutation：`useZoneIdentity` 改回等根層 → zone 內「第一次 render 即有身分」測試失敗；公開頁元件在 `unknown` 顯示訪客外觀 → 對應測試失敗；`skipToken` helper 在 `unknown` 回 `isPending=false` → 測試失敗；reducer 無變化時回新物件 → 測試失敗；`rg -nw "isLoggedIn" website/app website/components website/features website/lib` 零命中；build-output 18 全過；e2e 待 CI。
+  - 停止條件：`use()` 讀 promise 讓靜態外殼或 404 測試失敗；某個公開頁元件的中性等待需要新版面而不只是隱藏或骨架 → 回報。
 - [ ] **5. 收尾**：完成定義逐項核對；design-review；步驟 3 的 build-output 測試已接 CI；延後項附觸發條件搬回主清單；更新根 `AGENTS.md` 地圖（website 改 Vercel）、`website/AGENTS.md`、`website/README.md`、identity ADR 的 web 段落。需要人做的事：預覽部署驗證、第一次正式部署的決定。驗收：上述 rg 與 CI 連結。
 
 ## 決定
@@ -130,6 +142,13 @@
 - **D7 website 的 session 拒絕（403）路徑**（狀態：已決 2026-11-01，Will，選刪除；擋住步驟 5a）
   - 事實：單體只在後台帳號不被允許時回 403（`backend/internal/httpapi/session.go:27`）；顧客的 session 解析沒有 PermissionDenied（rg 零命中，讀程式推論）；刪除的帳號是訪客、停權回 200 加 `suspension`。所以顧客碰不到這條路徑，原先「DAL 固定 defaultLocale」的語系問題隨之消失。
   - 選項：帶請求語系修文字（修一條碰不到的路徑）；刪除。（建議刪除，採用）
+- **D9 「伺服器還沒回答」與「訪客」的區分**（狀態：已決 2026-11-02，Will，選 D；擋住步驟 5b；5a 的 CI 修正發現同類 bug）
+  - A：逐處補 `|| status === "unknown"`——其餘約 70 處隱患留著。
+  - B：只刪 `isLoggedIn` 改用 `status`——受保護頁仍要等待。
+  - C：受保護區另包 provider 或以 props 傳身分——與根層的登出、跨分頁同步衝突，或要改 50 多個檔。
+  - D：受保護區 `useZoneIdentity()`（`use()` 讀同一個 promise）＋公開頁三態型別＋`skipToken` helper（Clerk `isLoaded`、Auth.js `status`、TanStack v5 `skipToken`／`isPending`）。（建議，採用）
+- **D10 公開頁元件在 `unknown` 時的畫面**（狀態：已決 2026-11-02，Will；擋住步驟 5b；UI 改動）：預設中性等待（隱藏或骨架），與 D3 頁首一致，不先顯示訪客外觀。
+- **D11 checkout reducer 無變化時回傳原 state**（狀態：已決 2026-11-02，Will；擋住步驟 5b）：結構上避免不穩定相依造成 render 迴圈。
 
 拍板順序：D1–D4 現在可一起拍；若步驟 1 的事實推翻前提，重交 D1／D2。
 
@@ -145,4 +164,5 @@
 | 3 cacheComponents＋DAL＋四態 | 完成（商品頁 200 延後到商品模組搬進單體，Will 2026-11-01） | lint、vitest 2781、node:test 2126、build＋build-output 18（全部 PARTIALLY_STATIC、頁首在靜態外殼、notFound 回 404）；mutation：DAL 401→unavailable、加回 gate（改為首屏猜 guest）、`verifySession` 進 `'use cache'`（build 失敗）、根層把 children 包回 Suspense、`unknown` 畫訪客頁首、拿掉 WorkspaceAlign 等待、拿掉 unavailable 重試 皆失敗；獨立審查 5 項已處理；CI 全綠（website CI、website e2e、supply chain、repo hygiene、ui-text guard、commit messages）；#338 預覽部署（上游不可達）：`/` 20×200、`/account`（假 cookie）20×200，皆含 `site-header`；Vercel Observability（Preview、近 12 小時、86 次呼叫，含 spike 的預覽部署）function 記憶體 Average 267 MB／P75 270 MB／P95 272 MB，上限 2.05 GB，P95 低於門檻 1 GB | 商品頁 200（擋於商品模組搬進單體，PDP 讀舊 gateway `/api/v1/public/products/{id}`；上游不可達時 `/products/1` 20×404）；function 記憶體的最大值（Hobby 的 Observability 只給 Average／P75／P95，不給 max） | `2f9a87a`..`65a4fb9` |
 | 4 事件轉移 | 完成 | lint、vitest 2816、node:test、build＋build-output 18；`rg -nw` 四個舊名稱零命中；mutation：網路錯誤或 unavailable 映成 guest、拿掉登出／401／跨分頁後的 refresh、拿掉舊 promise 防護、拿掉 online／visibility 重試、伺服器值不覆寫快取、`rejectSession` 舊順序、`commitIdentity` 不 refresh、語系切換重置旗標 皆失敗；獨立審查 1 中 4 低：3 項修、暱稱頭像合併保留（GetSession 回應只有 id 與 roles，`identity.proto:81-90`）、401 前多一次 refresh 不修；CI 全綠（website CI、website e2e、supply chain、repo hygiene、ui-text guard、commit messages） | 無 | `3da7a18`、`7f0e691`、`b61a1d4` |
 | 5a 身分顯示資料與拒絕路徑 | 完成 | backend gofmt、vet（含 integration tag）、`go test -race`、lint-monolith 0、tidy 無 diff；buf lint／breaking；website lint、vitest 2838、node:test 2127、build＋build-output 18；`hawkr_api` dart analyze、兩支 App flutter analyze；mutation：單體不組 profile、加回 client `fetchProfile`、403 歸 guest、soft refresh 取代整頁導向、拿掉 `leaving` 守衛、跨分頁 reload 改 refresh、拿掉 `pageshow`、401 只在 signedIn 導向、`switchRole` 不用確認的身分、取消離開後不清登出 皆失敗；三輪 code review（F1–F5、R1–R4、R3-1）與一輪 design-review（9 項：改 7、駁回 2）全部處理，D4 修訂（B-strict）與 D8 由 Will 決定；CI 修正：integration 的 buyer 依賴改必填、`useCart` 等 hook 未登入時每次 render 回新空值造成 checkout render 迴圈（改為各 hook `useMemo`，加 `hook-stable-empty-contract` 守門）、`useSellerSelf` 在 `unknown` 回報未載入造成賣家中心卸載重掛；CI 全綠（`038478a`，29 個 job 含 website e2e 8 份與 Storybook） | 無 | `4f9615f`、`b2dcbb0`、`c84faa6`、`04d281b`、`038478a` |
+| 5b 三態型別與受保護區身分 | 未開始 | | | |
 | 5 收尾 | 進行中 | 舊名稱 rg 零命中；build-output 在 CI（`website-ci.yml` 的 `test:build-output`）；design-review 5 項：改 1（`unavailable` 探測改為 `router.refresh()`、不寫快取，`be09b36`；mutation 拿掉 refresh 4 測試失敗）、記 1（身分仍存在 React Query 快取：探測修正後只由伺服器值寫入，保留；`SESSION_KEY` 出現在 `context.tsx` 以外的檔案時再評估）、駁回 1（auth-expired 多一次 refresh＝步驟 4 的 F5）、交 Will 2（暱稱頭像經 `fetchProfile` 對比擴充 `GetSession`；DAL 固定 `defaultLocale`）；文件與 identity ADR 修訂 `ee10f28` | 交 Will 的 2 項待決；延後項搬主清單；需要人做的事 | `8a8ef9d`、`be09b36`、`ee10f28` |
