@@ -189,6 +189,7 @@ export function useNotificationUnread(): UnreadCountState {
 	return {
 		count: 0,
 		loading: false,
+		baselineReady: false,
 		refresh: async () => {},
 		setCount: () => {},
 		decrement: () => {},

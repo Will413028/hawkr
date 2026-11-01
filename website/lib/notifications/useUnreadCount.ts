@@ -33,6 +33,8 @@ import type {
 export interface UnreadCountState {
 	count: number;
 	loading: boolean;
+	/** The count is the server's answer for the current account and workspace. Unlike a loading edge, it cannot be skipped by batched renders. */
+	baselineReady: boolean;
 	refresh: () => Promise<void>;
 	setCount: (next: number) => void;
 	decrement: (by?: number) => void;
@@ -75,6 +77,13 @@ export function useUnreadCount({
 }: UseUnreadCountOptions): UnreadCountStream {
 	const [count, setCountState] = React.useState(0);
 	const [loading, setLoading] = React.useState(false);
+	const [settledSignal, setSettledSignal] = React.useState<unknown>(null);
+	const resetSignalRef = React.useRef(resetSignal);
+	resetSignalRef.current = resetSignal;
+	const settle = React.useCallback(() => {
+		setLoading(false);
+		setSettledSignal(resetSignalRef.current);
+	}, []);
 	const requestGenerationRef = React.useRef(
 		createNotificationRequestGeneration(),
 	);
@@ -84,6 +93,7 @@ export function useUnreadCount({
 		if (!enabled) {
 			setCountState(0);
 			setLoading(false);
+			setSettledSignal(null);
 			return;
 		}
 		setLoading(true);
@@ -104,10 +114,10 @@ export function useUnreadCount({
 			}
 		} finally {
 			if (requestGenerationRef.current.isCurrent(generation)) {
-				setLoading(false);
+				settle();
 			}
 		}
-	}, [enabled, role]);
+	}, [enabled, role, settle]);
 	const inboxRecoveryPendingRef = React.useRef(false);
 	const scheduleInboxRecovery = React.useCallback(() => {
 		// Replayed batches can contain several ambiguous count/item events. One
@@ -124,6 +134,7 @@ export function useUnreadCount({
 	React.useEffect(() => {
 		void resetSignal;
 		setCountState(0);
+		setSettledSignal(null);
 		void load();
 		return () => {
 			// Permanently obsolete the previous account/workspace response. A boolean
@@ -157,7 +168,7 @@ export function useUnreadCount({
 			}
 
 			requestGenerationRef.current.invalidate();
-			setLoading(false);
+			settle();
 			setCountState(Math.max(0, payload.unreadCount));
 			if (typeof window === "undefined") return;
 			const detail: NotificationNewEventDetail = {
@@ -166,7 +177,13 @@ export function useUnreadCount({
 			};
 			window.dispatchEvent(new CustomEvent(NOTIFICATION_NEW_EVENT, { detail }));
 		},
-		[accountId, onOtherWorkspaceNotification, role, scheduleInboxRecovery],
+		[
+			accountId,
+			onOtherWorkspaceNotification,
+			role,
+			scheduleInboxRecovery,
+			settle,
+		],
 	);
 
 	const handleUnreadChanged = React.useCallback(
@@ -178,29 +195,38 @@ export function useUnreadCount({
 				return;
 			}
 			requestGenerationRef.current.invalidate();
-			setLoading(false);
+			settle();
 			setCountState(Math.max(0, payload.unreadCount));
 		},
-		[role, scheduleInboxRecovery],
+		[role, scheduleInboxRecovery, settle],
 	);
 
-	const setCount = React.useCallback((next: number) => {
-		requestGenerationRef.current.invalidate();
-		setLoading(false);
-		setCountState(Math.max(0, next));
-	}, []);
+	const setCount = React.useCallback(
+		(next: number) => {
+			requestGenerationRef.current.invalidate();
+			settle();
+			setCountState(Math.max(0, next));
+		},
+		[settle],
+	);
 
-	const decrement = React.useCallback((by = 1) => {
-		requestGenerationRef.current.invalidate();
-		setLoading(false);
-		setCountState((prev) => Math.max(0, prev - by));
-	}, []);
+	const decrement = React.useCallback(
+		(by = 1) => {
+			requestGenerationRef.current.invalidate();
+			settle();
+			setCountState((prev) => Math.max(0, prev - by));
+		},
+		[settle],
+	);
 
-	const increment = React.useCallback((by = 1) => {
-		requestGenerationRef.current.invalidate();
-		setLoading(false);
-		setCountState((prev) => prev + by);
-	}, []);
+	const increment = React.useCallback(
+		(by = 1) => {
+			requestGenerationRef.current.invalidate();
+			settle();
+			setCountState((prev) => prev + by);
+		},
+		[settle],
+	);
 
 	const handlers = React.useMemo(
 		() => ({ onNew: handleNew, onUnreadChanged: handleUnreadChanged }),
@@ -211,12 +237,22 @@ export function useUnreadCount({
 		() => ({
 			count,
 			loading,
+			baselineReady: settledSignal === resetSignal,
 			refresh: load,
 			setCount,
 			decrement,
 			increment,
 		}),
-		[count, loading, load, setCount, decrement, increment],
+		[
+			count,
+			loading,
+			settledSignal,
+			resetSignal,
+			load,
+			setCount,
+			decrement,
+			increment,
+		],
 	);
 
 	return {

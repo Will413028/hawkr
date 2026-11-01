@@ -60,7 +60,7 @@ function isMessagesArea(rawPathname: string): boolean {
 export default function NotificationToastBridge() {
 	const { activeRole, status, identity } = useAuth();
 	const signedIn = status === "signedIn";
-	const { count, loading } = useNotificationUnread();
+	const { count, loading, baselineReady } = useNotificationUnread();
 	const { show } = useNotificationToast();
 
 	const myId = identity?.accountId != null ? String(identity.accountId) : "";
@@ -116,7 +116,6 @@ export default function NotificationToastBridge() {
 	/* ── New orders / notifications (via unread-count increase) ─── */
 	const primedRef = React.useRef(false);
 	const prevCountRef = React.useRef(0);
-	const prevLoadingRef = React.useRef(false);
 	// High-water mark: the largest notification id already accounted for
 	// (toasted, or known to exist before we started watching). Anything
 	// with id <= this is never "new" — same cursor concept as the SSE
@@ -125,13 +124,15 @@ export default function NotificationToastBridge() {
 	// count arithmetic guessing which rows changed.
 	const highWaterMarkRef = React.useRef<bigint>(BigInt(0));
 
+	const workspaceKeyRef = React.useRef(workspaceKey);
+	workspaceKeyRef.current = workspaceKey;
+
 	React.useEffect(() => {
 		void workspaceKey;
 		// Buyer and seller have independent inboxes. A role/account change starts
 		// a fresh baseline instead of reusing the previous inbox's high-water mark.
 		primedRef.current = false;
 		prevCountRef.current = 0;
-		prevLoadingRef.current = false;
 		highWaterMarkRef.current = BigInt(0);
 	}, [workspaceKey]);
 
@@ -189,23 +190,23 @@ export default function NotificationToastBridge() {
 		void workspaceKey;
 		if (!signedIn) return;
 		let cancelled = false;
-		const wasLoading = prevLoadingRef.current;
-		prevLoadingRef.current = loading;
-		// Establish the real baseline only after the FIRST fetch settles
-		// (loading true→false). The count is 0 before that first load, so
+		// Establish the real baseline only once the count is the server's answer
+		// for this workspace (`baselineReady`). The count is 0 before that, so
 		// priming earlier would treat the initial 0→N load as N new toasts —
-		// that's the "dumps everything on login" bug.
+		// that's the "dumps everything on login" bug. A level, not a loading
+		// edge: batched renders can skip the transient loading=true state.
 		if (!primedRef.current) {
-			if (wasLoading && !loading) {
+			if (baselineReady) {
 				primedRef.current = true;
 				prevCountRef.current = count;
 				// Mark everything that already exists (read or unread) as
 				// pre-dating this session, regardless of backlog size — the
 				// single newest row's id is the cutoff, no need to page
 				// through the whole unread list.
+				const requestedFor = workspaceKey;
 				void fetchNotifications({ pageSize: 1 })
 					.then((res) => {
-						if (cancelled) return;
+						if (workspaceKeyRef.current !== requestedFor) return;
 						const latest = res.records[0];
 						if (!latest) return;
 						const latestId = idToBigInt(latest.id);
@@ -287,7 +288,7 @@ export default function NotificationToastBridge() {
 		return () => {
 			cancelled = true;
 		};
-	}, [activeRole, count, signedIn, loading, show, workspaceKey]);
+	}, [activeRole, baselineReady, count, signedIn, loading, show, workspaceKey]);
 
 	return null;
 }
