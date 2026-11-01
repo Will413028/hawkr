@@ -350,16 +350,15 @@ function assertApiSameOrigin(
 	webOrigin: string,
 ): void {
 	if (flavor !== "prod" || typeof window !== "undefined") return;
-	if (!/^[a-z][a-z0-9+.-]*:/i.test(apiBaseUrl)) return;
 	let apiOrigin: string;
 	try {
-		apiOrigin = new URL(apiBaseUrl).origin;
+		apiOrigin = new URL(apiBaseUrl, webOrigin).origin;
 	} catch {
 		throw new Error(
 			`NEXT_PUBLIC_API_BASE_URL must be a valid URL (got "${apiBaseUrl}")`,
 		);
 	}
-	if (apiOrigin !== webOrigin) {
+	if (apiOrigin !== new URL(webOrigin).origin) {
 		throw new Error(
 			`NEXT_PUBLIC_API_BASE_URL (${apiOrigin}) must be same-origin with NEXT_PUBLIC_WEB_ORIGIN (${webOrigin}) for the production flavor: the browser reaches the API through the web origin`,
 		);

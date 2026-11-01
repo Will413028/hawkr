@@ -3,7 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 /**
  * SEO invariant suite — runs the spec's "上線 QA Gate" against a build with the
  * indexability launch-gate OPEN (NEXT_PUBLIC_FLAVOR=prod + SEO_INDEXABLE=true),
- * API base pinned to an unreachable loopback address (a spec run without env can
+ * public API base same-origin (/api/v1) and API_BASE_URL pinned to an unreachable loopback address (a spec run without env can
  * never leave the machine; pages render their empty state) while canonicals resolve to the prod origin (env.webOrigin). Kept in
  * a SEPARATE config + testDir so the gate-closed main e2e run never touches it.
  */

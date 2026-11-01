@@ -64,6 +64,8 @@ test("prod rejects a NEXT_PUBLIC_API_BASE_URL on another origin", () => {
 		"https://api.example.org/api/v1",
 		"http://www.example.org/api/v1",
 		"https://www.example.org:8443/api/v1",
+		"//evil.example/api/v1",
+		"/\\evil.example/api/v1",
 	]) {
 		assert.throws(
 			() => resolve("prod", { ...PROD_ORIGINS, NEXT_PUBLIC_API_BASE_URL: bad }),
