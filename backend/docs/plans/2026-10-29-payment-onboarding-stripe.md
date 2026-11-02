@@ -59,6 +59,7 @@
 - 做：payment port 的開通部分；Stripe Connect adapter（測試模式）的兩種開通；開通閘門改看 port 的能力狀態；同意種類改成 provider 中立；防詐身分雜湊的獨立保存；銀行帳號列入關聯帳號；刪除單體的 PayUni 與 `internal/legacy` 的 PayUni 接縫；B 階段需求。
 - 不做：Java 與 Go 舊服務的 PayUni（B 階段搬時刪，避免改兩次）；台灣金流商 adapter（沒有合約與測試帳號）；代理收付的法律意見。
 - 延後：
+  - live mode 的銀行帳號 fingerprint 範圍核對（D12 的前提；觸發：上線前）。
   - 台灣金流商 adapter（觸發：決定在台灣上線；先確認法規與合約）。
   - 撥款模型與手續費（代理商費反推、ADR `payuni-channel-fee-bearer`）重審（觸發：B2、B10 開工）。
   - 裝置與聯絡方式重疊、風險評分等防人頭措施（觸發：上線前）。
@@ -128,10 +129,10 @@
 - **D3 防詐身分雜湊的保存**（已決 2026-10-29，Will；擋住：3）：與 KYC 個資分開保存 5 年（來源 stint 關閉起算）；明文仍 184 天清。法源未確認，見前提。
 - **D4 共用銀行帳號**（已決 2026-10-29，Will；擋住：3）：列入關聯帳號，只標記、不自動終止。
 - **D5 本計畫的範圍**（已決 2026-10-29，Will）：只做單體的收款開通；付款、退款、撥款、物流寫成 B2、B3、B8–B10 的需求。
-- **D6 單體的 PayUni adapter**（未決；擋住：4、8；需要的事實：步驟 1）
+- **D6 單體的 PayUni adapter**（已決 2026-11-02，Will，選 A；擋住：4、8；步驟 1 確認 Custom 在測試模式可用）
   - A：刪除（git 可找回）。必要條件不成立：沒有測試帳號，無法驗證；`PLATFORM_COLLECTED` 由 Stripe Custom 示範。（建議，前提是步驟 1 確認 Custom 可用）
   - B：保留在 port 後面當第二個 adapter，只有 fake 測試——保留台灣上線的起點，但無法對真實服務驗證，會隨 port 演進而失真。步驟 8 改走 B 分支。
-- **D7 Stripe 的預設開通模式**（未決；擋住：4–6；需要的事實：步驟 1）
+- **D7 Stripe 的預設開通模式**（已決 2026-11-02，Will，選 A；`PLATFORM_COLLECTED` 以 US 的 Custom 帳號示範：SG 卡在 `proof_of_liveness`，TW 只能開 transfers；擋住：4–6）
   - A：預設 `PROVIDER_HOSTED`（Stripe 託管或內嵌 onboarding，Stripe 收證件與銀行帳號），`PLATFORM_COLLECTED` 用 Custom 示範。平台持有的 PII 最少。（建議）
   - B：預設 `PLATFORM_COLLECTED`——沿用現行 KYC 畫面最多，但平台持有最多 PII。
 - **D8 Stripe 測試平台帳號的國別**（已決 2026-11-02，Will，選 C：測試帳號建成 US，沿用不改；擋住：5）
@@ -147,11 +148,11 @@
 - **D11 同意種類 `PAYUNI_TERMS`**（已決 2026-10-29，Will，選 A；擋住：4、7）
   - A：改成 provider 中立的 `PAYMENT_PROVIDER_TERMS`，記錄 provider 與版本；已接受的 `PAYUNI_TERMS` 紀錄轉成 provider = PayUni；Stripe 的服務協議接受（`tos_acceptance`）由 adapter 送出。（建議）
   - B：每個 provider 一個同意種類——新增 provider 就要改 enum 與 CHECK。
-- **D12 `PROVIDER_HOSTED` 時的防詐訊號**（未決；擋住：6；需要的事實：步驟 1）
+- **D12 `PROVIDER_HOSTED` 時的防詐訊號**（已決 2026-11-02，Will，選 A；步驟 1 在測試模式確認 fingerprint 跨帳號一致，live mode 的範圍上線前核對；擋住：6）
   - A：平台沒有身分證號，只用金流商提供的銀行帳號 `fingerprint` 做關聯標記；身分層級的防重複開通交給金流商。（建議，前提是步驟 1 確認 fingerprint 跨帳號一致）
   - B：`PROVIDER_HOSTED` 也要求平台另收身分證號計算雜湊——兩邊重複收 PII，違反 D7 選 A 的目的。
 
-拍板順序：D1–D5、D8–D11 已決；D6、D7、D12 在步驟 1 之後交。
+拍板順序：D1–D12 全部已決（2026-11-02）。
 
 ## 進度
 
