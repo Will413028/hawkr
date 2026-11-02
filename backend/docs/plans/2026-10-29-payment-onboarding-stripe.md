@@ -1,6 +1,6 @@
 # 賣家收款開通改走 payment port，作品集接 Stripe Connect
 
-**Goal：** 單體的賣家收款開通（子帳戶建立、KYC 轉送、狀態同步、開通閘門、同意書）只經 provider 中立的 payment port；作品集的 adapter 是 Stripe Connect 測試模式，支援金流商代收（`PROVIDER_HOSTED`）與平台自收（`PLATFORM_COLLECTED`）；防詐身分雜湊與 KYC 個資分開保存；共用銀行帳號列入關聯帳號。單體與 `api/hawkr` 不再有 PayUni（允許清單見步驟 8）；付款、退款、撥款與物流的換供應商寫在單體計畫 B2、B3、B8–B10。驗收見步驟 9 與「完成定義」。
+**Goal：** 單體的賣家收款開通（外部帳戶建立、開通連結或內嵌元件、狀態同步、開通閘門、同意書）只經 provider 中立的 payment port；作品集的 adapter 是 Stripe Connect 測試模式（Accounts v2），示範兩種收件方式：Stripe 收件（託管頁面，預設）與平台收件（Stripe 內嵌元件）。平台不再保存身分證號、銀行帳號與證件（D22），防詐改用銀行帳號 fingerprint；共用銀行帳號列入關聯帳號。單體與 `api/hawkr` 不再有 PayUni（允許清單見步驟 8）；付款、退款、撥款與物流的換供應商寫在單體計畫 B2、B3、B8–B10（收款模式依 D20）。驗收見步驟 9 與「完成定義」。
 
 **上層：** 主清單見本機個人脈絡檔；單體遷移的全域約束見 `backend/docs/plans/2026-09-24-go-modular-monolith.md`。
 
@@ -9,12 +9,13 @@
 ## 完成定義
 
 - 單體與 `api/hawkr` 的 `git grep -n -i payuni` 只剩步驟 8 允許清單裡的列。
-- 開通只經 port；開通閘門依 D10；Stripe 兩種開通模式在測試模式各完成一次，記錄在進度表。
+- 開通只經 port；開通閘門依 D10、D20；Stripe 收件與平台收件在測試模式各完成一次，記錄在進度表。
+- 平台不存身分證號、銀行帳號與證件（D22）：KYC 申請的表與 request 沒有這些欄位，有 integration 測試與 mutation。
 - 防詐身分雜湊與 KYC 個資分開保存（D3），銀行帳號列入關聯帳號（D4），有 integration 測試與 mutation。
 - `payuni-inventory.md` 每列有「去向」（`check_inventory.py` 通過）。
 - 改到的契約、表、文案與條款的所有消費端在同一個步驟內跟上；三端生成物無 drift。
 - CI：與 `baseline-ci.md` 比對，新增失敗的 job 或 step 為 0。
-- D1–D12 的結論寫進 ADR；`docs/modules/seller.md` 與 ADR 2026-10-19、2026-10-18 依修訂流程更新。
+- D1–D22 與 E1 的結論寫進 ADR；`docs/modules/seller.md` 與 ADR 2026-10-19、2026-10-18、2026-09-18 依修訂流程更新。
 
 ## 前提（開工時核對過，2026-10-29）
 
@@ -22,11 +23,11 @@
 - 目標是作品集為主、保留在台灣上線的可能（Will 2026-10-29）。
 - 不簽 PayUni 代理商合約，沒有 PayUni 測試帳號（Will 2026-10-29）。單體的 PayUni 程式無法對真實 sandbox 驗證。
 - Stripe 不接受台灣的平台帳號；Connect 跨境撥款只開放平台在 US、UK、EEA、CA、CH；Stripe 沒有台灣的超商代碼、ATM、LINE Pay、街口（`psp-compare.md` §1，官方文件，2026-10-29；已確認）。Stripe adapter 只示範機制，不示範台灣上線情境。
-- Stripe Custom 帳號（`controller.requirement_collection = application`）在測試模式可以 API 送 KYC，可實作 `PLATFORM_COLLECTED`（推論；未確認，步驟 1 查證）。
+- 平台收件的帳戶（`requirement_collection = application`）在 US 測試平台可以只靠 API 完成並啟用（步驟 1 實測，v1；已確認）。新整合用 Accounts v2，平台收件也能用內嵌元件（https://docs.stripe.com/connect/accounts-v2、https://docs.stripe.com/connect/onboarding；2026-11-02 核對）；v2 的 recipient 帳戶在 US 測試平台的實測在步驟 5（未確認）。
 - 平台自己收款再轉給賣家可能落入《電子支付機構管理條例》的代理收付（第 3、5 條；第三方轉載，未在全國法規資料庫核對；未確認）。只影響真實上線，不擋本計畫。
 - D3 的 5 年保存期是 Will 的產品決定（參考金流業「關係結束後 5 年」的紀錄保存慣例），法源未確認；上線前與條款一起核對。
 - PayUni 在單體只有收款開通（盤點 G1–G3、G10），加上 `internal/legacy` 對 Java 舊服務的接縫；買家付款、退款、撥款、webhook、對帳與物流在 Java 舊服務（G4–G9），由 B2、B3、B8–B10 搬（`payuni-inventory.md`；已確認）。
-- 過渡期：步驟 6 之後新開通的店家只有 Stripe 帳號；`internal/legacy/sellerserver` 回給 Java 的 `payuni_mer_id` 變成空值，Java 以 PayUni 下單的本機端到端不通，B2 完成後恢復（Will 2026-10-29 接受）。
+- 過渡期：步驟 8 之後新開通的店家只有 Stripe 帳號；`internal/legacy/sellerserver` 回給 Java 的 `payuni_mer_id` 變成空值，Java 以 PayUni 下單的本機端到端不通，B2 完成後恢復（Will 2026-10-29 接受）。
 
 **驗收基線：** commit `1c0b246` 的 CI：失敗的是 seller-app CI（unit and widget tests）、website e2e（Storybook 的 `product-certification.css` import 與 Playwright 1、2、3、5）、backend monolith（golangci-lint 在未改的檔）、backend migration inventory（16 列缺 disposition）；其餘通過。步驟 1 把每個失敗 job 的失敗 step 與錯誤行存成 `baseline-ci.md`（`gh run view <id> --log-failed`）。這四項不在本階段修；golangci-lint 與 migration inventory 是本階段會改到的 job，驗收以「錯誤行與基線逐行比對，新增為 0」判定，不看 job 的整體結論。
 
@@ -34,9 +35,9 @@
 
 | 不變量 | 依賴它的機制 |
 |---|---|
-| 店家能否曝光、收單由開通閘門推導 | view `seller.store_requirement_flags.kyc_approved`（KYC 核准且 PayUni `outcome = 'APPROVED'`）、`model.CapabilitiesOf`、`seller.pub_exposable_*`、discovery 與 `store_card.proto` 的「營業中」、`cmd/hawkr/dev_seed.go` 的種子店家 |
-| 外部呼叫不在 transaction 內，一店一個 sync job，先追加觀測再套用 | `seller/internal/payuni` 的 River job（唯一鍵）、`payuni_registrations.intent_seq/synced_seq`、`payuni_observations`、`TestSyncJobIsUniquePerStoreInRiver` |
-| 外部事件先寫 inbox 再處理 | `backend/AGENTS.md` 單體規則 5；現行 PayUni webhook 的入口 |
+| 店家能否曝光、收單由開通閘門推導 | view `seller.store_requirement_flags.kyc_approved`（現行：KYC 核准且 PayUni `outcome = 'APPROVED'`；步驟 4 起：平台核准且 `payment_accounts.transfers_active`）、`model.CapabilitiesOf`、`seller.pub_exposable_*`、discovery 與 `store_card.proto` 的「營業中」、`cmd/hawkr/dev_seed.go` 的種子店家 |
+| 外部呼叫不在 transaction 內，一店一個 sync job | 現行：`seller/internal/payuni` 的 River job（唯一鍵）、`TestSyncJobIsUniquePerStoreInRiver`；步驟 4 起：`seller/internal/payment` 的同步 job（唯一鍵 `store_id`） |
+| 外部事件先寫 inbox 再處理 | `backend/AGENTS.md` 單體規則 5；單體目前沒有 webhook inbox（PayUni webhook 由舊服務收），步驟 4 新建 `seller.payment_provider_events` |
 | KYC 個資只存密文，身分比對只用 HMAC blind index | `seller/internal/kyc`、`kyc_identity_hashes`、`measure_identities`、`CheckKYCKeys`、`TestKYCNeverReturnsOrStoresPlaintext` |
 | 關店兩段清理（30 天、184 天） | `seller/internal/purge`、`model.StoreRetireAfter`、`model.StoreRetention`、`payuni_registrations_purged_check` |
 | 入駐同意的現行版本只有一個來源 | `internal/model/agreement_gen.go` 的 `CurrentAgreements`（`website/scripts/generate-legal.ts` 從 `website/docs/legal/` 產生）、`agreement_acceptances_kind_check`、已接受的紀錄、同意種類 `PAYUNI_TERMS`（proto enum、DB CHECK、manifest） |
@@ -52,7 +53,7 @@
 |---|---|---|---|
 | 檔案 | 約 160（seller 101、測試 31），另有 `internal/legacy/{sellerrelay,sellerconsumer,sellerserver}` | Java 421、seller-service 151、gateway 40 | `payuni-inventory.md`「計數」；`git -c core.quotepath=off grep -IlP -i "(?<!backend-)pay_?uni"` |
 | client | website 107、admin 19、seller-app 89、buyer-app 28、packages 25（含舊服務的呼叫） | | 同上 |
-| 對外契約 | `admin/seller/v1alpha1/seller.proto` 的 4 支 PayUni RPC、`review_queue.proto` 1 個 kind、同意種類 `PAYUNI_TERMS`、`store_card.proto`、`discovery.proto` 的說明 | `order.proto`、舊 `seller.proto` | `git grep -n -i payuni -- api/hawkr` |
+| 對外契約 | `seller/v1alpha1/seller.proto` 的 `KYCFlowStatus` 與 PayUni 欄位（56 筆）、`admin/seller/v1alpha1/seller.proto` 的 4 支 PayUni RPC、`review_queue.proto` 1 個 kind、同意種類 `PAYUNI_TERMS`、`store_card.proto`、`discovery.proto` 的說明 | `order.proto`、舊 `seller.proto` | `git grep -n -i payuni -- api/hawkr` |
 
 ## 範圍
 
@@ -85,74 +86,92 @@
   - 不能動：KYC 明文只存密文；`CheckKYCKeys`（新表的金鑰 ID 納入啟動檢查）；處分快照保留到措施撤銷；已套用的 migration。
   - 驗收：單體 integration：舊 stint 已過 184 天清理、之後才建立的停權措施，快照含舊 stint 的身分（mutation：快照改回從 `kyc_identity_hashes` 取，測試要失敗）；來源 stint 關閉滿 5 年的列被刪（mutation：清理不刪，測試要失敗）；銀行帳號命中出現在關聯帳號且不自動建立終止（mutation：拿掉銀行帳號條件，測試要失敗）；`CheckKYCKeys` 的測試含新表；`atlas migrate validate`；`TestPubContractsMatchMigrations`；`make lint-monolith` 與基線比對新增為 0；admin 改到的測試。
 
-- [ ] **4. payment port、provider 中立的資料與契約，以及所有消費端的改名**（被擋於：步驟 1，D6、D7、D9、D10、D11；**4、5、7 必須連著做**）
-  - 範圍：
-    - port：在 seller 模組定義（建立子帳戶、送 KYC 或取得開通連結、讀狀態與缺的條件、解析 webhook、能力描述含 `onboarding_mode`），以 in-memory fake adapter 做測試。
-    - 資料：新 migration 把 `payuni_registrations`、`payuni_observations` 改成 provider 中立（provider、外部帳戶 ID、狀態、缺的條件、觀測），重建 view `seller.store_requirement_flags`（閘門依 D10）與依賴它的 view；`make sqlc`、`atlas.sum`。
-    - 行為：sync job、`intent_seq/synced_seq` 與「先追加觀測再套用」改成走 port。
-    - 契約：admin 的 `GetPayUniRegistration`、`RebindPayUni`、`ListPayUniObservations`、`RefreshPayUniStatus` 改名為 provider 中立；`REVIEW_QUEUE_ITEM_KIND_PAYUNI_BIND_RETRY` 改名；`PayUniRemedy` 泛化；`PAYUNI_TERMS` 依 D11（新 migration 改 `agreement_acceptances_kind_check` 並轉換已接受的紀錄）；`store_card.proto`、`discovery.proto` 的說明改寫；三端重新生成。
-    - 其他消費端同一步跟上：`adminperm.go` 的 `seller.payuni_*` 與 `adminauth.go` 宣告表；`internal/arch/modules.go`；`cmd/hawkr` 的 `readPayUni` 與 `PAYUNI_*` 設定、`docker-compose-local.yml`；`internal/platform/codemeta/code_meta.go` 的 PayUni 審核狀態（CodeMeta 凍結，只刪單體用不到的；照本機脈絡檔的 CodeMeta 規則跑 `generate.sh`）；`internal/legacy/sellerrelay` 的 `merchant.verification.*` 事件、`sellerconsumer`（Java 的審核通知）、`sellerserver` 的 `payuni_mer_id`（改回 port 的外部帳戶 ID，PayUni 帳戶不存在時回空值）；client 的機械改名（RPC、enum、權限字串、文案 key），讓四個 client 編得過、測試通過；共用文案目錄 `make uitext`。
-    - 本機種子：`cmd/hawkr/dev_seed.go` 以 fake provider 寫入「收款能力啟用」，讓種子店家仍能曝光；`dev_seed_integration_test.go` 跟上。
-  - 消費端：`git grep -n -i "payuni" -- backend/internal backend/cmd api/hawkr admin/src website seller-app/lib buyer-app/lib packages docker-compose-local.yml ':!**/gen/**'`；`git grep -n -E "seller\.payuni_|PAYUNI_TERMS|PAYUNI_BIND_RETRY|PayUniRemedy" -- .`。
-  - 不能動：同一店家同時只有一個外部呼叫 job；外部呼叫不在 transaction 內；KYC 個資只存密文；已套用的 migration。
-  - 驗收：單體 unit 與 integration（fake adapter）；mutation：閘門拿掉 provider 能力條件，曝光測試要失敗；`buf lint`（`buf breaking` 預期失敗，未上線，commit 訊息列出 breaking 項）；三端生成物 drift；uitext 與法務生成物 drift；啟動檢查（`go run ./cmd/hawkr serve` 在本機以 fake provider 起得來）；`make dev-seed` 後種子店家可曝光；四個 client 改到的測試與 CI 等價檢查；`make lint-monolith` 與 golangci-lint、migration inventory 和基線比對新增為 0。
-  - 完成後的狀態：只有 fake adapter；與步驟 5、7 連著做。
+> 2026-11-02 改寫：原步驟 4（PayUni 改名成中立）、5、6、8 的切法被 D13–D20 與 D2、D7、D9、D10、D11、D17、D19 的修訂取代。原切法會把 PayUni 的資料與狀態機搬進中立契約（開工時的設計審查 8 項照搬都出自這裡）。新的切法是從零建中立的收款帳戶，PayUni 與平台自建的 KYC 個資管線在同一波刪除。步驟 4–8 在同一個分支 `payment-onboarding` 完成，全部完成才進 `main`；分支內每個子步驟一個或多個 commit，每段 CI 綠（D21）。
 
-- [ ] **5. Stripe adapter：金流商代收（`PROVIDER_HOSTED`）**（被擋於：步驟 4，D7、D8）
-  - 範圍：`internal/platform/stripe`（只做開通需要的 API）；建立 connected account（冪等鍵取自 store_id 與 stint）、帳號連結；`account.updated` webhook：單體 httpapi 的入口驗簽後先寫 inbox（單體規則 5），以 event id 去重，處理時以 API 重新讀取帳號的目前狀態（不信任 payload 的順序）；入口不經身分驗證（簽章就是驗證），在 `internal/httpapi` 的豁免清單登記；website 同源反代與本機以 `stripe listen` 轉送；狀態輪詢補漏；`requirements` 對應 port 的缺的條件；設定由環境變數提供，缺金鑰時開通 API 回 `failed_precondition`，serve 照常啟動。
+- [ ] **4. 中立的收款帳戶：port、資料、閘門、fake adapter、新契約**（被擋於：D13、D16、D19、D20、D21；**4–8 必須連著做**）
+  - 範圍：
+    - port（seller 模組 `internal/payment`）：`EnsureAccount`（冪等鍵 `store_id`；先在本地寫「建立中」的列，再在 transaction 外呼叫）、`CreateOnboardingSession`（託管連結或內嵌元件的 session，依 D2 的兩軸）、`FetchAccount`（帳戶快照：capability 狀態、requirements 原始 JSON、`disabled_reason`）、`ParseEvent`（驗簽並取出 event id 與帳戶 ID）。能力描述宣告 `requirement_collection`（`provider`／`platform`）與 `onboarding_surface`（`hosted`／`embedded`）。不做 `SubmitKYC`。in-memory fake adapter 供測試與本機。
+    - 資料：新表 `seller.payment_accounts`（`store_id` 主鍵、provider、外部帳戶 ID（建立中可為空）、`requirement_collection`、狀態快取（D13 的 6 值）、`transfers_active`、`payouts_active`、requirements 原始 JSON、`disabled_reason`、`fetched_at`），一店一列、關店再開沿用（D19）；不存個資，不隨 184 天 KYC 清理刪除，隨店家列的最終清理刪除（`seller/internal/purge` 跟上，取代 `payuni_registrations_purged_check`）；新表 `seller.payment_provider_events`（provider、event id 唯一、收到時間、處理時間、帳戶 ID）作為 webhook inbox（單體規則 5）。不從 `payuni_*` 改名。
+    - 同步：一店一個 River job（唯一鍵 `store_id`）：`FetchAccount` 在 transaction 外，結果在 transaction 內整列覆寫快取；inbox 的事件與管理員「重新整理狀態」都只排這個 job；輪詢補漏是 River periodic job（每 15 分鐘），只排 `ACTION_REQUIRED`、`ONBOARDING`、`UNDER_REVIEW` 的帳戶。沒有觀測歷史表、沒有事件時間排序（重讀即最新）。
+    - 時點（D16）：平台審核核准的同一個 transaction 排入 `EnsureAccount` job；建立失敗由 River 退避重試，用完進審核待辦的新種類 `PAYMENT_ACCOUNT_CREATE_FAILED`（管理員只能「重試建立」）。
+    - 閘門（D10 修訂、D20）：view `seller.store_requirement_flags` 改成平台核准且 `payment_accounts.transfers_active`；依賴它的 view 重建；`model.CapabilitiesOf` 跟上。
+    - 契約（新增，不改名）：seller 的「收款帳戶」讀取與開通 session RPC；admin 的「讀帳戶」「重新整理狀態」「重試建立」RPC；`PaymentAccountStatus` enum（D13）；審核待辦 kind `PAYMENT_ACCOUNT_CREATE_FAILED`。PayUni 的舊 RPC 與 enum 留到步驟 8 刪（分支內並存，不進 `main`）。`make connect`、TS 與 Dart 生成、`make uitext`。
+    - 本機種子：`cmd/hawkr/dev_seed.go` 以 fake provider 寫 `transfers_active = true` 的帳戶，種子店家仍可曝光。
+  - 消費端：本步驟只新增；閘門的消費端 `git grep -n -E "store_requirement_flags|kyc_approved|CapabilitiesOf|pub_exposable" -- backend api/hawkr admin/src website packages ':!**/gen/**'`（含 `exposure_rule_dataset_integration_test.go` 等以 PayUni 條件建資料的測試）。`kyc_approved` 在閘門改寫後不再只代表 KYC，改名為 `onboarding_complete`（view、admin proto、生成物同步）。
+  - 不能動：已套用的 migration；外部呼叫不在 transaction 內；一店一個 sync job；PayUni 的舊路徑在本步驟仍可編譯（步驟 8 才刪）。
+  - 驗收：`atlas migrate validate`、`make sqlc` 無 drift、`TestPubContractsMatchMigrations`；unit 與 `go vet -tags integration`；integration（CI）：核准後排入 `EnsureAccount`，重複核准不建第二個帳戶（mutation：拿掉 `store_id` 冪等鍵，測試要失敗）；同一店兩個同步請求只有一個 job（mutation：拿掉唯一鍵，測試要失敗）；曝光測試 `TestExposure*`（以 `rg -n "func Test.*Expos" backend/internal/modules/seller` 定位）在 `transfers_active = false` 時不可曝光（mutation：閘門拿掉 `transfers_active`，測試要失敗）；同一 event id 第二次寫 inbox 不排 job（mutation：拿掉唯一約束，測試要失敗）；輪詢只排三種狀態的帳戶（mutation：條件拿掉 `ENABLED` 的排除，測試要失敗）。`buf lint`；三端生成物與 uitext 無 drift；`make dev-seed` 後種子店家可曝光；`make lint-monolith`、migration inventory 與基線比對新增為 0。
+  - 完成後的狀態：只有 fake adapter；新舊契約在分支內並存。
+
+- [ ] **5. Stripe adapter（Accounts v2）與 webhook 入口**（被擋於：步驟 4，D7、D8、E1）
+  - 範圍：`internal/platform/stripe`，只做開通需要的 API，用 Accounts v2（`/v2/core/accounts`，configuration `recipient`，capability `stripe_transfers`），D8 的 US 測試帳號。`EnsureAccount` 以 `Idempotency-Key = store_id`（v2 期限 30 天）；本地「建立中」的列已有外部 ID 時不再建立。`CreateOnboardingSession`：Stripe 收件用 Account Link（託管），平台收件（D2 修訂）用 Account Session（內嵌元件）。`ParseEvent`：thin events（`v2.core.account[...].updated`）驗簽，handler 只寫 inbox 並排同步 job。入口是 `internal/httpapi` 的 `POST /webhooks/stripe`，不經身分驗證（簽章就是驗證），掛在 Connect 與 session 中介層之外（開工時以 `rg -n "Handle\(" backend/internal/httpapi/*.go` 找到路由組裝處並在驗收列出）；Stripe 直接打單體，不經 website 反代；本機以 `stripe listen --forward-to localhost:8080/webhooks/stripe` 轉送。缺金鑰時開通 RPC 回 `failed_precondition`，serve 照常啟動。Stripe 的 `requirements` 對應 D13（對應表見 D13）。限流與 429 退避在 adapter 內，不上提到 port。
+  - 實測（orchestrator 在本機跑，結果補進 `spike/README.md`）：v2 建帳戶與冪等重放；thin event 的實際型別名與簽章；Stripe 收件時平台能否讀到外部銀行帳號的 `fingerprint`（D12，讀不到就停下回報）；平台改店名後是否需要同步給 Stripe（D17：不同步，只確認 Stripe 端不擋）。
   - 消費端：步驟 4 的 port；`git grep -n -i "webhook" -- backend/internal/httpapi website/next.config.* website/src/middleware*`。
   - 不能動：步驟 4 的不變量。
-  - 驗收：adapter 的 contract 測試以步驟 1 錄下、遮罩過的回應重放（CI 不打網路）；webhook mutation：簽章錯誤要拒絕、同一 event id 第二次不再處理；本機手動開通的通過判定：測試帳號完成 onboarding 後，port 狀態為啟用、`charges_enabled = true`、該店家在 discovery 可曝光，三項的輸出貼進進度表（orchestrator 在本機跑）。
-  - 需要人做的事：無（用步驟 1 的金鑰）。
+  - 驗收：contract 測試以實測錄下、遮罩過的回應重放（CI 不打網路）；webhook mutation：簽章錯誤要拒絕、同一 event id 第二次不再排 job；本機手動開通（client 畫面在步驟 7，本步驟用 `make dev-token` 加 `buf curl` 呼叫 seller 的開通 session RPC 取得 Account Link，在瀏覽器走完）：`payment_accounts.transfers_active = true`、狀態 `ENABLED`、該店家在 discovery 可曝光，三項輸出貼進進度表。內嵌元件需要網頁，平台收件模式的手動開通移到步驟 7 的驗收。
+  - 停止條件：v2 的 recipient 帳戶在 US 測試平台建不起來，或 fingerprint 讀不到，停下回報。
 
-- [ ] **6. Stripe adapter：平台自收（`PLATFORM_COLLECTED`）與 `PROVIDER_HOSTED` 的防詐訊號**（被擋於：步驟 5，D7、D9、D12；步驟 1 確認 Custom 可用）
-  - 範圍：依 D9 的欄位清單把平台收的 KYC 對應到 Stripe 的 `individual`、`company`、`external_account`、`tos_acceptance`；證件以 Files API 上傳；平台審核核准後才送（ADR 2026-10-19「核准與綁定」的時點）。條款（`website/docs/legal/` 的 KYC 告知）加「證件與銀行帳號提供給金流商」。依 D12 為 `PROVIDER_HOSTED` 的店家寫入銀行帳號 fingerprint 到步驟 3 的表（種類另列），關聯帳號比對涵蓋它。
-  - 驗收：contract 測試（重放）；mutation：缺必填欄位時 port 回報缺的條件且不送出；送出的欄位集合等於 D9 的清單（測試比對 request 欄位，多一個就失敗）；fingerprint 命中出現在關聯帳號（mutation：不寫 fingerprint，測試要失敗）；本機以 Custom 測試帳號完成一次開通，判定同步驟 5。
-  - 停止條件：步驟 1 查出測試模式不支援 Custom 時，本步驟改依 D7 的結論處理。
+- [ ] **6. 防詐訊號改用 fingerprint**（被擋於：步驟 5，D12）
+  - 範圍：同步 job 讀到外部銀行帳號的 `fingerprint` 時，以 HMAC 寫入步驟 3 的 `account_identity_hashes`（新 field `BANK_FINGERPRINT`，來源是 provider；不存明文 fingerprint）；`LinkedAccountHits` 涵蓋它。本步驟只加 fingerprint 這條訊號；平台收的身分證號、銀行帳號與證件（D22）在步驟 7 的畫面不再送出之後，於步驟 8 與 proto 欄位、client 一起刪（避免中間 CI 編譯失敗）。
+  - 消費端：`git grep -n -E "account_identity_hashes|LinkedAccountHits|SnapshotMeasureIdentities" -- backend/internal backend/cmd api/hawkr admin/src`。
+  - 不能動：防詐雜湊只存 HMAC；處分快照保留到措施撤銷；已套用的 migration。
+  - 驗收：integration：兩店綁同一 fingerprint 出現在關聯帳號且不自動終止（mutation：不寫 fingerprint，測試要失敗）；`atlas migrate validate`；與基線比對新增為 0。
 
-- [ ] **7. client 的流程與畫面**（被擋於：步驟 4、5；步驟 6 的平台自收畫面待步驟 6）
-  - 範圍：website 與 seller-app 的開通流程（`PROVIDER_HOSTED` 導到 Stripe 連結並處理回跳與重新取得連結；`PLATFORM_COLLECTED` 沿用現行表單）、收款狀態頁、admin 的帳戶與觀測畫面；provider 中立的文案；條款與同意書。版面與流程的改動先給 Will 看（根目錄 UI 改動規則）。
-  - 驗收：各 client 改到的測試與 CI 等價檢查（Flutter 兩段驗證、website `test:unit`、admin `pnpm test`）；e2e 與 Storybook 只在 CI 跑，與基線比對。
-  - 需要人做的事：Will 同意開通流程的畫面改動。
+- [ ] **7. client 的流程與畫面**（被擋於：步驟 4、5；Will 同意畫面）
+  - 範圍：website 與 seller-app：平台審核表單只留市集資料（D9、D22）；核准後的收款帳戶區（D15：平台審核與收款帳戶兩區）；Stripe 收件導到 Account Link 並處理回跳與重新取得連結（seller-app 開外部瀏覽器，託管頁面不支援 WebView）；平台收件的內嵌元件（website）；admin 的帳戶畫面（狀態、缺的條件、重新整理、重試建立）。provider 中立文案；條款（`website/docs/legal/`）改成「身分與銀行帳號由金流商收集」並重新生成。
+  - 驗收：各 client 改到的測試與 CI 等價檢查（Flutter 兩段驗證、website `test:unit`、admin `pnpm test`）；e2e 與 Storybook 只在 CI 跑，與基線比對；本機以 website 內嵌元件完成一次平台收件的開通，判定同步驟 5。
+  - 需要人做的事：Will 先看兩區狀態頁、平台審核表單刪減後的版面、admin 帳戶畫面的草案。
 
-- [ ] **8. 刪除單體的 PayUni**（被擋於：步驟 4–7，D6）
-  - 範圍（D6 選 A）：刪除 `internal/platform/payuni`、`seller/internal/payuni`、PayUni 的 config 與單體文件；`backend/docs/第三方整合/` 的 PayUni 文件檔頭改標「Java 舊服務的現行規格，B 階段刪除」；建立附件 `check_inventory.py`（盤點每列的「去向」不得為空或 TBD），並填完 `payuni-inventory.md` 的去向。D6 選 B 時：本步驟改成把 PayUni adapter 接到 port 後面（只有 fake 測試），允許清單加上 adapter 的目錄。
-  - 允許清單：`internal/legacy/**` 中 Java 契約生成的欄位名（例：`payuni_mer_id` 的 proto 欄位，B2 刪）、`backend/docs/plans/**`、指向 B 階段的文件；其餘單體與 `api/hawkr` 0 筆。
-  - 驗收：`git grep -n -i payuni -- backend/internal backend/cmd api/hawkr` 的結果逐筆屬於允許清單；`python3 <附件>/check_inventory.py` 通過，mutation：把一列的去向改回 TBD，腳本要失敗；單體 build、unit、integration；`make sqlc`、`atlas migrate validate`；與基線比對新增為 0。
+- [ ] **8. 刪除 PayUni、舊契約與 KYC 個資管線的程式**（被擋於：步驟 4–7，D6、D22）
+  - 範圍：D22 的 KYC 個資管線：刪身分證號、銀行帳號、證件的 proto 欄位、request 驗證、密文欄位與證件檔參照（新 migration）、`kyc_identity_hashes` 的 `ID_CARD_NO`、`REP_ID_CARD_NO`、`BANK_ACCOUNT` 種類、client 的對應欄位；`account_identity_hashes` 已有的列保留到 5 年清理；`CheckKYCKeys` 只檢查仍在用的金鑰；清理程式（`seller/internal/purge`）跟上。統編是市集登記資料（D9），仍由平台收並計算雜湊。PayUni：刪 `internal/platform/payuni`、`seller/internal/payuni`、`payuni_*` 表（新 migration drop）、`CheckNameUnlocked`／`IdentityLocked`（D17）、admin 的 4 支 PayUni RPC、`PAYUNI_BIND_RETRY`、`PayUniRemedy`、`KYCFlowStatus` 的 PayUni 值與 `BINDING`／`BIND_FAILED`／`FORWARDED`／`UNDER_REVIEW`／`PENDING_INFO`（D15）、`PAYUNI_TERMS`（D11：CHECK 改掉、不轉換舊紀錄）、`seller.payuni_*` 權限、`modules.go` 的 `platform/payuni`、`cmd/hawkr` 的 `readPayUni` 與 `PAYUNI_*`、`internal/legacy/sellerrelay` 的 `merchant.verification.*` 與 `sellerconsumer` 的 PayUni 審核通知（D18）、`sellerserver` 的 `payuni_mer_id` 回空值（Stripe 的 `acct_` 不是 PayUni 商店代號；B2 以 port 的外部帳戶 ID 取代這個接縫）；CodeMeta 照本機脈絡檔規則；client 刪掉舊 RPC 與 enum 的使用；CARRYOVER 聯絡欄位長度一列改成平台自己的上限並結案；`backend/docs/第三方整合/` 的 PayUni 文件檔頭改標「Java 舊服務的現行規格，B 階段刪除」；建立附件 `check_inventory.py` 並填完 `payuni-inventory.md` 的去向。
+  - 消費端：附件 `step4-inventory.md` 的 A、B、C、E 類（以 `git grep -l -i payuni -- backend/internal backend/cmd api/hawkr admin/src website seller-app/lib packages ':!**/gen/**'` 重跑）；D 類（買家付款、訂單、物流、Java 推播 `PAYUNI_STATUS`、物流的 `PayUniSubmitStatus`）留給 B 階段。
+  - 允許清單：`internal/legacy/**` 中 Java 契約生成的欄位名（B2 刪）、`backend/docs/plans/**`、指向 B 階段的文件、`backend/docs/第三方整合/` 的 PayUni 文件、buyer 與 content 模組 `CARRYOVER.md` 指向 B 階段的列、D 類檔；其餘單體與 `api/hawkr` 0 筆。
+  - 驗收：`git grep -n -i payuni -- backend/internal backend/cmd api/hawkr` 逐筆屬於允許清單；`check_inventory.py` 通過，mutation：一列去向改回 TBD，腳本要失敗；`buf lint`、`buf breaking`（`v1alpha1` 由 `api/buf.yaml` 的 `ignore_unstable_packages` 略過，預期通過）；KYC 申請的表與 request 沒有身分證號、銀行帳號欄位（`TestKYCNeverReturnsOrStoresPlaintext` 改寫成「沒有這些欄位」，mutation：加回一個欄位，測試要失敗）；單體 build、unit、integration（CI）；`make sqlc`、`atlas migrate validate`；三端生成物無 drift；與基線比對新增為 0。之後開 `payment-onboarding` → `main` 的 PR。
 
-- [ ] **9. 收尾**：完成定義逐項核對；獨立設計審查（design-review skill）；`check_inventory.py` 留在附件（一次性）；延後項附觸發條件搬回主清單；ADR（D1–D12）寫進 `backend/docs/adr/`；需要人做的事列給 Will。驗收：完成定義每項附證據；CI 與 `baseline-ci.md` 比對新增為 0。
+- [ ] **9. 收尾**：完成定義逐項核對；獨立設計審查（design-review skill）；`check_inventory.py` 留在附件（一次性）；延後項附觸發條件搬回主清單；A8 的需求清單加「賣家收款開通結果的通知」（D18）；ADR（D1–D22）寫進 `backend/docs/adr/`，ADR 2026-10-19、2026-10-18、2026-09-18 依修訂流程更新；需要人做的事列給 Will。驗收：完成定義每項附證據；CI 與 `baseline-ci.md` 比對新增為 0。
 
 ## 決定
 
 - **D1 作品集的金流 adapter**（已決 2026-10-29，Will；擋住：全部）：Stripe Connect 測試模式。不簽 PayUni（測試帳號要簽約）；作品集要展示國際標準。
-- **D2 開通模式**（已決 2026-10-29，Will；擋住：4–7）：port 支援 `PROVIDER_HOSTED` 與 `PLATFORM_COLLECTED`。
+- **D2 開通模式**（已決 2026-10-29，Will；擋住：4–7）：port 支援 `PROVIDER_HOSTED` 與 `PLATFORM_COLLECTED`。（2026-11-02 修訂，Will，E2：「誰收件」與「用什麼介面」是兩軸；Stripe 收件用託管頁面為預設，平台收件改用 Stripe 內嵌元件，不再自建 KYC 表單，見 D22）
 - **D3 防詐身分雜湊的保存**（已決 2026-10-29，Will；擋住：3）：與 KYC 個資分開保存 5 年（來源 stint 關閉起算）；明文仍 184 天清。法源未確認，見前提。
 - **D4 共用銀行帳號**（已決 2026-10-29，Will；擋住：3）：列入關聯帳號，只標記、不自動終止。
 - **D5 本計畫的範圍**（已決 2026-10-29，Will）：只做單體的收款開通；付款、退款、撥款、物流寫成 B2、B3、B8–B10 的需求。
 - **D6 單體的 PayUni adapter**（已決 2026-11-02，Will，選 A；擋住：4、8；步驟 1 確認 Custom 在測試模式可用）
   - A：刪除（git 可找回）。必要條件不成立：沒有測試帳號，無法驗證；`PLATFORM_COLLECTED` 由 Stripe Custom 示範。（建議，前提是步驟 1 確認 Custom 可用）
   - B：保留在 port 後面當第二個 adapter，只有 fake 測試——保留台灣上線的起點，但無法對真實服務驗證，會隨 port 演進而失真。步驟 8 改走 B 分支。
-- **D7 Stripe 的預設開通模式**（已決 2026-11-02，Will，選 A；`PLATFORM_COLLECTED` 以 US 的 Custom 帳號示範：SG 卡在 `proof_of_liveness`，TW 只能開 transfers；擋住：4–6）
+- **D7 Stripe 的預設開通模式**（已決 2026-11-02，Will，選 A；`PLATFORM_COLLECTED` 以 US 的 Custom 帳號示範：SG 卡在 `proof_of_liveness`，TW 只能開 transfers；擋住：4–6）（2026-11-02 修訂，Will：平台收件的示範改用 Accounts v2 加內嵌元件，見 D2、E1）
   - A：預設 `PROVIDER_HOSTED`（Stripe 託管或內嵌 onboarding，Stripe 收證件與銀行帳號），`PLATFORM_COLLECTED` 用 Custom 示範。平台持有的 PII 最少。（建議）
   - B：預設 `PLATFORM_COLLECTED`——沿用現行 KYC 畫面最多，但平台持有最多 PII。
 - **D8 Stripe 測試平台帳號的國別**（已決 2026-11-02，Will，選 C：測試帳號建成 US，沿用不改；擋住：5）
   - A：SG（亞洲、英文介面、可示範本地幣；平台與 connected account 同國）。（建議，暫定）
   - B：JP——同為亞洲，但 KYC 欄位與文件以日文為主。
   - C：US 平台加跨境撥款——示範跨境，但離台灣情境更遠，且台灣能否當 connected account 未確認。
-- **D9 平台審核與金流商驗證的分工**（已決 2026-10-29，Will，選 A；擋住：4、6）
+- **D9 平台審核與金流商驗證的分工**（已決 2026-10-29，Will，選 A；擋住：4、6）（2026-11-02 修訂，Will：送給金流商的欄位清單作廢，平台不收身分與銀行資料，見 D22；平台審核只管市集政策與統編）
   - A：平台審核只管市集政策（店家資訊、經營項目、登記資料比對），身分與銀行帳號由金流商驗證。`PLATFORM_COLLECTED` 送給金流商的欄位清單：本人姓名、身分證號、出生日期、住址、電話、email；公司型另加公司名稱、統編、登記地址、負責人；銀行代碼與帳號；證件正反面；服務協議接受（時間、IP）。平台仍以身分證號、統編、銀行帳號計算防詐雜湊。（建議）
   - B：平台審核繼續核對身分證件（現行）——兩方各驗一次；`PROVIDER_HOSTED` 時平台沒有證件可審。
-- **D10 開通閘門**（已決 2026-10-29，Will，選 A；擋住：4）
+- **D10 開通閘門**（已決 2026-10-29，Will，選 A；擋住：4）（2026-11-02 修訂，Will：能力改看 `stripe_transfers`，見 D20；選項 A 正文的 `charges_enabled` 作廢）
   - A：平台審核通過且 port 回報收款能力啟用（Stripe 的 `charges_enabled`；與 ADR `2026-09-18-seller-capability-authorization` 的 capability 加 requirements 同一模型）。（建議）
   - B：只看平台審核——店家可能在金流商未開通時曝光、無法收款。
-- **D11 同意種類 `PAYUNI_TERMS`**（已決 2026-10-29，Will，選 A；擋住：4、7）
+- **D11 同意種類 `PAYUNI_TERMS`**（已決 2026-10-29，Will，選 A；擋住：4、7）（2026-11-02 修訂，Will：不轉換已接受的 `PAYUNI_TERMS` 紀錄（未上線，只有本機種子）；託管與內嵌流程由 Stripe 頁面收服務協議，adapter 不送 `tos_acceptance`；不新增 `PAYMENT_PROVIDER_TERMS`，只刪 `PAYUNI_TERMS`，入駐只記平台自己的條款；平台代收同意的需要在接台灣金流商時再加）
   - A：改成 provider 中立的 `PAYMENT_PROVIDER_TERMS`，記錄 provider 與版本；已接受的 `PAYUNI_TERMS` 紀錄轉成 provider = PayUni；Stripe 的服務協議接受（`tos_acceptance`）由 adapter 送出。（建議）
   - B：每個 provider 一個同意種類——新增 provider 就要改 enum 與 CHECK。
-- **D12 `PROVIDER_HOSTED` 時的防詐訊號**（已決 2026-11-02，Will，選 A；步驟 1 在測試模式確認 fingerprint 跨帳號一致，live mode 的範圍上線前核對；擋住：6）
+- **D12 `PROVIDER_HOSTED` 時的防詐訊號**（已決 2026-11-02，Will，選 A；步驟 1 在測試模式確認 fingerprint 跨帳號一致，live mode 的範圍上線前核對；擋住：6）（2026-11-02 修訂，Will：D22 之後兩種收件方式都只用 fingerprint；Stripe 收件時平台讀不讀得到 fingerprint 由步驟 5 實測）
   - A：平台沒有身分證號，只用金流商提供的銀行帳號 `fingerprint` 做關聯標記；身分層級的防重複開通交給金流商。（建議，前提是步驟 1 確認 fingerprint 跨帳號一致）
   - B：`PROVIDER_HOSTED` 也要求平台另收身分證號計算雜湊——兩邊重複收 PII，違反 D7 選 A 的目的。
 
-拍板順序：D1–D12 全部已決（2026-11-02）。
+- **D13 收款帳戶的狀態模型**（已決 2026-11-02，Will，選 A；擋住：4）：中立狀態從帳戶快照推導，不自創語意：`NOT_CREATED`（本地無外部 ID）、`ONBOARDING`（尚未送出資料）、`UNDER_REVIEW`（已送出、`stripe_transfers` 非 active、無待補條件）、`ACTION_REQUIRED`（`currently_due` 或 `past_due` 非空）、`ENABLED`（`stripe_transfers` active）、`DISABLED`（`disabled_reason` 屬拒絕或平台暫停）。另存 `transfers_active`、`payouts_active`、requirements 原始 JSON、`disabled_reason`。B（只存原始 JSON，client 自己判讀）未採。業界：Stripe capability 加 requirements（https://docs.stripe.com/connect/accounts-v2）。
+- **D14 管理員重新綁定**（已決 2026-11-02，Will，選 A；擋住：4、8）：刪除 `RebindPayUni`、`PAYUNI_BIND_RETRY`、`PayUniRemedy`；缺件由賣家經新的開通連結補。保留「重新整理狀態」；建立失敗用完重試才進審核待辦 `PAYMENT_ACCOUNT_CREATE_FAILED`。
+- **D15 賣家端狀態**（已決 2026-11-02，Will，選 A；擋住：7、8）：拆成平台審核（NOT_STARTED、DRAFT、SUBMITTED、REJECTED、APPROVED）與收款帳戶（D13）兩條。
+- **D16 何時建立外部帳戶**（已決 2026-11-02，Will，選 A；擋住：4）：平台審核核准後才建立並產生開通連結或 session。
+- **D17 店名與身分欄位鎖**（已決 2026-11-02，Will，選 A；擋住：8）：刪除；店名是平台自己的欄位，不同步給 Stripe（Stripe 收件時平台在建立 Account Link 後不能寫入身分資料，https://docs.stripe.com/connect/hosted-onboarding）。
+- **D18 舊事件**（已決 2026-11-02，Will，選 A；擋住：8）：停發 `merchant.verification.*`、刪 `sellerconsumer` 的 PayUni 審核通知；開通結果通知寫進 A8 的需求，A8 完成時恢復。
+- **D19 關店再開**（已決 2026-11-02，Will，選 A；擋住：4、5）：一店一個外部帳戶，關店再開沿用；冪等鍵 `store_id`（v2 期限 30 天，https://docs.stripe.com/api-v2-overview#idempotency），先寫本地「建立中」的列。
+- **D20 收款模式與閘門的能力**（已決 2026-11-02，Will；擋住：4；限定 B2）：市集用 destination charges（平台收款再轉給賣家），閘門看 `stripe_transfers`（D10 修訂）。Etsy、Shopify 同型是推論，未核出處；台灣上線前核對代理收付法規（前提段）。
+- **D21 分支**（已決 2026-11-02，Will）：步驟 4–8 在 `payment-onboarding` 分支完成才進 `main`，不在 `main` 留新舊契約並存或 shim。
+- **D22 平台自建 KYC 個資管線**（已決 2026-11-02，Will；擋住：6–8）：退場並在本波刪除。平台不再收身分證號、銀行帳號與證件；統編是市集登記資料，仍由平台收並算雜湊（2026-11-02 Will 確認）；防詐改用 fingerprint（D12）。觸發重建：決定接台灣金流商。
+- **E1 Stripe API 版本**（已決 2026-11-02，Will）：Accounts v2（https://docs.stripe.com/connect/accounts-v2）；只有台灣只收轉帳的帳號需要 v1，D8 用 US 碰不到。webhook 用 thin events，收到後一律重讀帳戶（https://docs.stripe.com/webhooks）。
+
+拍板順序：D1–D22、E1 全部已決（2026-11-02）。
 
 ## 進度
 
@@ -163,9 +182,9 @@
 | 1 Spike 與 CI 基線 | 完成 | `baseline-ci.md`：四個失敗 run 的失敗 step 與錯誤行（`27bc439`）。`spike/README.md` Q1–Q8 各有答案、官方 URL 與遮罩後輸出；`spike/` grep `sk_|whsec_|rk_` 為 0；測試帳號全刪（`GET /v1/accounts` 0 筆）。結論：Custom（`requirement_collection=application`）在 US 與 TW（recipient、只開 transfers）可只靠 API 完成並啟用；SG 卡在 `proof_of_liveness`（無 API 參數）；TW 不能開 `card_payments`；同一測試銀行帳號在兩個 connected account 的 `fingerprint` 相同。前置：Will 在 Dashboard 確認 ongoing seller compliance（2026-11-02）。 | 文件上的重試期、冪等 key 期限、事件不保證順序未在本次重抓文件核對；webhook 重試未實測（接收端一律回 2xx）；live mode 的 fingerprint 範圍未查（D12 拍板前核對）；託管 onboarding 未以瀏覽器走完（步驟 5 的本機手動驗收做）。 | `d690766`、`d601aa0`、`27bc439` |
 | 2 B 階段需求 | 完成 | `git grep -c "2026-10-29-payment-onboarding-stripe" backend/docs/plans/2026-09-24-go-modular-monolith.md` = 5（B2、B3、B8、B9、B10 各一） | 無 | 見 git log |
 | 3 防詐雜湊與銀行帳號關聯 | 完成 | 本機：`atlas migrate diff` 已同步、`atlas migrate validate`、sqlc、`make connect`、TS 與 Dart 生成、`make uitext` 無 drift；gofmt、`go vet`（含 `-tags integration`）、unit（seller、httpapi、arch、cmd）、`make lint-monolith` 0 issues、`GOWORK=off go mod tidy -diff` 無差異；admin `merchant-termination` 與 `merchant-create-termination-dialog` 35 個測試通過。法務告知：`seller-kyc-notice.md` 第 6 點加防詐比對碼保存說明並 `gen:legal`（`612a5b3`）。CI：backend monolith run 41318569031（`b2dcbb0`，含 `ab3eb7d`）兩個 job 綠，integration 的 seller 套件 ok。mutation 在 CI 診斷 run 41366066358 各自執行：未改 6 個測試全過；快照改回 `kyc_identity_hashes`、5 年清理不刪、拿掉銀行帳號條件、`CheckKYCKeys` 拿掉新表，四個對應測試各自失敗。 | `TestPubContractsMatchMigrations` 本步驟沒改 `pub_*`，隨 CI 的 integration 一起跑過。決定：不回填（系統未上線）；新表 `field` 與 `kyc_identity_hashes.field` 同一組值；銀行帳號命中不能建立關聯終止（`LinkedIdentity.CountsAsGround`），防詐列在草稿欄位改掉時同步修剪。 | `ab3eb7d`、`612a5b3` |
-| 4 payment port、中立契約與改名 | 未開始 | | | |
-| 5 Stripe 金流商代收 | 未開始 | | | |
-| 6 Stripe 平台自收與防詐訊號 | 未開始 | | | |
+| 4 中立收款帳戶與新契約 | 未開始 | | | |
+| 5 Stripe adapter 與 webhook | 未開始 | | | |
+| 6 fingerprint 與 KYC 資料退場 | 未開始 | | | |
 | 7 client 流程與畫面 | 未開始 | | | |
-| 8 刪除單體 PayUni | 未開始 | | | |
+| 8 刪 PayUni、舊契約、KYC 管線 | 未開始 | | | |
 | 9 收尾 | 未開始 | | | |
