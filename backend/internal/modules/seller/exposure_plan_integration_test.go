@@ -23,10 +23,10 @@ func (f *fixture) makeSeededStoresExposable(t *testing.T) {
 			`UPDATE seller.stores SET logo_key = 'logo/' || store_id, logo_asset_id = 'asset-' || store_id, town_code = '63000010'
 				WHERE store_code > 2900000000`,
 			`INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, real_name, english_name, bank_name, bank_code,
-					bank_account_enc, bank_account_hash, bank_account_hash_key, id_card_no_enc, id_card_hash, id_card_hash_key,
+					bank_account_enc, bank_account_hash, bank_account_hash_key, payout_contact_email, id_card_no_enc, id_card_hash, id_card_hash_key,
 					submitted_at, submission_seq, decided_at, created_at, updated_at)
 				SELECT md5('kyc' || store_id)::uuid, store_id, 'APPROVED', 'INDIVIDUAL', 'x', 'x', 'x', '004',
-				       '\x01', sha256(('b' || store_id)::bytea), 'k', '\x01', sha256(('i' || store_id)::bytea), 'k', $1, 1, $1, $1, $1
+				       '\x01', sha256(('b' || store_id)::bytea), 'k', 'seller@example.com', '\x01', sha256(('i' || store_id)::bytea), 'k', $1, 1, $1, $1, $1
 				FROM seller.stores WHERE store_code > 2900000000`,
 			`INSERT INTO seller.payuni_registrations (store_id, mer_id, application_id, bind_status, bound_at, outcome, status_observed_at,
 					created_at, updated_at)

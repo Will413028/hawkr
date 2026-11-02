@@ -1,4 +1,4 @@
-h1:7/+Br+6iUodlszqDPR6Q5GFX19DCbfMrf6TKu/LWAk0=
+h1:LPowxwP12UpMmUpjLF2nPkqw9SaZ/fYqwfWAak8tBbE=
 20261001160141_seller_core.sql h1:hVkQ8Wo6S5BLgzr4nFSGS/1EZpRX9mHqRwpxmIP3Yeg=
 20261002120004_seller_governance.sql h1:Dj/zGg4clK5U8YBsKn+TWnE5ZizigjU9/s7EXXHuc+g=
 20261002133159_seller_kyc.sql h1:QiN6KkqvCU/lwdw0B66YQniBEGnAhojvTYHQJ8lOqlc=
@@ -67,3 +67,4 @@ h1:7/+Br+6iUodlszqDPR6Q5GFX19DCbfMrf6TKu/LWAk0=
 20261102170735_payment_status_v2.sql h1:rdn9zICSrPxwwlR5TTWPnbLIlxdo+poy05/iXkLIi9c=
 20261102174635_payment_create_idempotency_key.sql h1:zkS9XmDdOgk+c5Nt/Zqm+xauhPKABusd++Y+BmT3YDg=
 20261102232910_payout_contact_email.sql h1:nS512A2FyGYUwUwt+0nNepoty6u80F8kTuYN3FPuKEo=
+20261102234040_payout_contact_email_required.sql h1:1j3jIP6qz7tLdb2eHhBzK/XojU0YMsCA//1AhCqW0qk=

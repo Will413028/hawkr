@@ -915,7 +915,7 @@ CREATE INDEX measure_identities_hash ON seller.measure_identities (hash);
 -- 個資：id_card_no、rep_id_card_no（企業負責人）與 bank_account 是 AES-256-GCM 的密文（platform/seal，AAD 是申請 ID
 -- 加欄位名），real_name 與 birth_date 明文（後台以姓名模糊搜尋，ADR 2026-07-20）。每個識別欄位另有一個 blind index
 -- （HMAC，輸入帶欄位標籤；*_hash_key 是算出它的金鑰 ID），給處分的身分快照用。送給 PayUni 的聯絡資料（聯絡人、聯絡手機、
--- 客服信箱）是店家的欄位（stores），不在申請上。收款聯絡信箱（payout_contact_email）是申請上的欄位：賣家送出時確認，核准時複製到 payment_accounts.contact_email；草稿可以空，送出時必填（kyc_applications 的必填檢查在服務層，不在 complete_check）。公司地址以內政部的鄉鎮市區代碼表示（同 stores）。
+-- 客服信箱）是店家的欄位（stores），不在申請上。收款聯絡信箱（payout_contact_email）是申請上的欄位：賣家送出時確認，核准時複製到 payment_accounts.contact_email；草稿可以空，送出之後必填由 kyc_applications_complete_check 表達。公司地址以內政部的鄉鎮市區代碼表示（同 stores）。
 -- version 是樂觀鎖（etag 的來源）：所有寫入者必帶讀到的版本。
 -- 個資清理：店家關閉滿保留期後 purge 套件清掉全部個人欄位（密文、blind index、姓名、生日、證件資訊、聯絡方式、公司與
 -- 地址），記下 pii_purged_at；審核的事實（狀態、時間、審核紀錄）與不具名的欄位（seller_type、product_type）保留。kyc_applications_purged_check 列出被清掉的欄位：清理過的列這些一定是 NULL。處分的身分快照不在這裡
@@ -1012,7 +1012,7 @@ CREATE TABLE seller.kyc_applications (
         status NOT IN ('SUBMITTED', 'APPROVED', 'REJECTED') OR (
             submitted_at IS NOT NULL AND (pii_purged_at IS NOT NULL OR (
                 real_name IS NOT NULL AND english_name IS NOT NULL AND bank_name IS NOT NULL AND
-                bank_code IS NOT NULL AND bank_account_enc IS NOT NULL AND
+                bank_code IS NOT NULL AND bank_account_enc IS NOT NULL AND payout_contact_email IS NOT NULL AND
                 ((seller_type = 'INDIVIDUAL' AND id_card_no_enc IS NOT NULL) OR
                  (seller_type = 'COMPANY' AND company_name IS NOT NULL AND tax_id IS NOT NULL AND rep_id_card_no_enc IS NOT NULL))
             ))

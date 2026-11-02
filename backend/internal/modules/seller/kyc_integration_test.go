@@ -676,6 +676,7 @@ func TestKYCSchemaConstraints(t *testing.T) {
 	f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
 	for name, query := range map[string]string{
 		"submitted without required fields":  "UPDATE seller.kyc_applications SET status='SUBMITTED', submitted_at=now(), submission_seq=1, real_name=NULL",
+		"submitted without a payout email":   "UPDATE seller.kyc_applications SET status='SUBMITTED', submitted_at=now(), submission_seq=1, payout_contact_email=NULL",
 		"submitted without a submission seq": "UPDATE seller.kyc_applications SET status='SUBMITTED', submitted_at=now()",
 		"a negative submission seq":          "UPDATE seller.kyc_applications SET submission_seq=-1",
 		"individual with company fields":     "UPDATE seller.kyc_applications SET company_name='x'",
