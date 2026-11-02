@@ -45,9 +45,9 @@ for mode, dash in [("platform", "none"), ("provider", "express")]:
     s, t = v2("POST", "/v2/core/accounts", dict(b, display_name="x"), k); save(f"create_{mode}_idem_conflict", s, t)
     s, t = retrieve(aid); save(f"retrieve_{mode}_new", s, t)
     s, t = v2("POST", "/v2/core/account_links", {"account": aid, "use_case": {"type": "account_onboarding", "account_onboarding": {
-        "return_url": "https://example.com/r", "refresh_url": "https://example.com/f"}}})
+        "return_url": "https://accessible.stripe.com/r", "refresh_url": "https://accessible.stripe.com/f"}}})
     save(f"account_link_{mode}", s, t)
-    s, o, _ = sp.call("POST", "/v1/account_sessions", {"account": aid, "components": {"account_onboarding": {"enabled": True}}})
+    s, o, _ = sp.call("POST", "/v1/account_sessions", {"account": aid, "components": {"account_onboarding": {"enabled": True}}}, headers={"Stripe-Version": "2026-09-30.endive"})
     save(f"account_session_{mode}", s, json.dumps(o))
 
 s, t = v2("GET", "/v2/core/accounts/acct_doesnotexist000"); save("retrieve_not_found", s, t)
@@ -59,7 +59,7 @@ s, t = v2("POST", f"/v2/core/accounts/{aid}", {"identity": {"individual": {
     "address": {"line1": "address_full_match", "city": "San Francisco", "state": "CA", "postal_code": "94111", "country": "us"},
     "id_numbers": [{"type": "us_ssn_last_4", "value": "0000"}]},
     "attestations": {"terms_of_service": {"account": {"date": "2026-11-02T00:00:00Z", "ip": "8.8.8.8"}}}},
-    "defaults": {"profile": {"business_url": "https://example.com"}}, "include": INC})
+    "defaults": {"profile": {"business_url": "https://accessible.stripe.com"}}, "include": INC})
 save("update_platform_identity", s, t)
 s, o, _ = sp.call("POST", f"/v1/accounts/{aid}/external_accounts", {"external_account": {
     "object": "bank_account", "country": "US", "currency": "usd", "routing_number": "110000000", "account_number": "000123456789"}})

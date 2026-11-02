@@ -210,7 +210,7 @@ func TestAccountSessionIsFormEncodedAndReturnsTheClientSecret(t *testing.T) {
 	if r.Body != "account=acct_1&components%5Baccount_onboarding%5D%5Benabled%5D=true" {
 		t.Errorf("本文 %q", r.Body)
 	}
-	if sess.ClientSecret != "<CLIENT-SECRET-MASKED>" || sess.ExpiresAt == nil || sess.ExpiresAt.Unix() != 1793636969 {
+	if sess.ClientSecret != "<CLIENT-SECRET-MASKED>" || sess.ExpiresAt == nil || sess.ExpiresAt.Unix() != 1793661693 {
 		t.Errorf("session %+v", sess)
 	}
 }

@@ -1,16 +1,22 @@
 {
-  "status": 400,
+  "status": 200,
   "body": {
-    "error": {
-      "code": "invalid_fields",
-      "message": "Some fields in the request were invalid: 'account: Cannot create a v2 account link for acct_1UXO50EWUjgLkPE9 with recipient config capabilities other than stripe_balance.stripe_transfers requested in testmode. Please switch to an account created in a sandbox to test.'",
-      "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/logs/req_<MASKED:e904>",
-      "invalid_fields": [
-        {
-          "field": "account",
-          "message": "Cannot create a v2 account link for acct_1UXO50EWUjgLkPE9 with recipient config capabilities other than stripe_balance.stripe_transfers requested in testmode. Please switch to an account created in a sandbox to test."
-        }
-      ]
-    }
+    "object": "v2.core.account_link",
+    "account": "acct_1UXUVmInXFm90qMK",
+    "created": "2026-11-02T23:19:40.000Z",
+    "expires_at": "2026-11-02T23:24:40.000Z",
+    "url": "<MASKED>",
+    "use_case": {
+      "account_onboarding": {
+        "collection_options": {
+          "fields": "currently_due",
+          "future_requirements": "omit"
+        },
+        "refresh_url": "https://accessible.stripe.com/f",
+        "return_url": "https://accessible.stripe.com/r"
+      },
+      "type": "account_onboarding"
+    },
+    "livemode": false
   }
 }

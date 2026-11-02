@@ -1,12 +1,188 @@
 {
-  "status": 400,
+  "status": 200,
   "body": {
-    "error": {
-      "code": "url_invalid",
-      "message": "Invalid URL.",
-      "user_message": "Invalid URL.",
-      "param": "defaults.profile.business_url",
-      "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/logs/req_<MASKED:ac71>"
-    }
+    "id": "acct_1UXUVeEfy6as5ms7",
+    "object": "v2.core.account",
+    "applied_configurations": [
+      "recipient"
+    ],
+    "closed": false,
+    "configuration": {
+      "customer": null,
+      "merchant": null,
+      "recipient": {
+        "applied": true,
+        "capabilities": {
+          "bank_accounts": {
+            "local": null,
+            "wire": null
+          },
+          "cards": null,
+          "crypto_wallets": null,
+          "stripe_balance": {
+            "payouts": {
+              "status": "restricted",
+              "status_details": [
+                {
+                  "code": "requirements_past_due",
+                  "resolution": "provide_info"
+                }
+              ]
+            },
+            "stripe_transfers": {
+              "status": "active",
+              "status_details": []
+            }
+          }
+        },
+        "default_outbound_destination": null
+      }
+    },
+    "contact_email": "<EMAIL-MASKED>",
+    "contact_phone": null,
+    "created": "2026-11-02T23:19:29.000Z",
+    "dashboard": "none",
+    "identity": {
+      "attestations": {
+        "directorship_declaration": null,
+        "ownership_declaration": null,
+        "persons_provided": {
+          "directors": null,
+          "executives": null,
+          "owners": null,
+          "ownership_exemption_reason": null
+        },
+        "representative_declaration": null,
+        "terms_of_service": {
+          "account": {
+            "date": "2026-11-02T00:00:00.000Z",
+            "ip": "<MASKED>",
+            "user_agent": null
+          }
+        }
+      },
+      "business_details": {
+        "additional_addresses": [],
+        "address": null,
+        "annual_revenue": null,
+        "documents": null,
+        "estimated_worker_count": null,
+        "id_numbers": [],
+        "monthly_estimated_revenue": null,
+        "phone": null,
+        "registered_name": null,
+        "registration_date": null,
+        "script_addresses": null,
+        "script_names": null,
+        "structure": null
+      },
+      "country": "US",
+      "entity_type": "individual",
+      "individual": {
+        "id": "person_test_61VgsTHb4lagc3yiBA6VgsT1Q9SQjxjXyFbkJOI5gBsO",
+        "object": "v2.core.account_person",
+        "account": "acct_1UXUVeEfy6as5ms7",
+        "additional_addresses": [],
+        "additional_names": null,
+        "additional_terms_of_service": null,
+        "address": {
+          "city": "<MASKED>",
+          "country": "US",
+          "line1": "<MASKED>",
+          "line2": null,
+          "postal_code": "<MASKED>",
+          "state": "<MASKED>",
+          "town": null
+        },
+        "created": "2026-11-02T23:19:43.000Z",
+        "date_of_birth": {
+          "day": 1,
+          "month": 1,
+          "year": 1990
+        },
+        "documents": null,
+        "email": "<MASKED>",
+        "given_name": "Jenny",
+        "id_numbers": [
+          {
+            "type": "us_ssn_last_4"
+          }
+        ],
+        "legal_gender": null,
+        "metadata": {},
+        "nationalities": [],
+        "phone": "<MASKED>",
+        "political_exposure": null,
+        "relationship": {
+          "authorizer": null,
+          "director": null,
+          "executive": null,
+          "legal_guardian": null,
+          "owner": null,
+          "percent_ownership": null,
+          "representative": true,
+          "title": null
+        },
+        "script_addresses": null,
+        "script_names": null,
+        "surname": "Rosen",
+        "updated": "2026-11-02T23:19:43.000Z"
+      }
+    },
+    "defaults": {
+      "currency": "usd",
+      "locales": [],
+      "payout_methods": null,
+      "profile": {
+        "business_url": "https://accessible.stripe.com",
+        "doing_business_as": null,
+        "product_description": null
+      },
+      "responsibilities": {
+        "fees_collector": "application",
+        "losses_collector": "application",
+        "requirements_collector": "application"
+      },
+      "timezone": null
+    },
+    "display_name": "Spike Store",
+    "future_requirements": null,
+    "metadata": {},
+    "requirements": {
+      "entries": [
+        {
+          "awaiting_action_from": "user",
+          "description": "external_account",
+          "errors": [],
+          "impact": {
+            "restricts_capabilities": [
+              {
+                "capability": "stripe_balance.payouts",
+                "configuration": "recipient",
+                "deadline": {
+                  "status": "past_due"
+                }
+              }
+            ]
+          },
+          "minimum_deadline": {
+            "status": "past_due"
+          },
+          "reference": null,
+          "requested_reasons": [
+            {
+              "code": "routine_onboarding"
+            }
+          ]
+        }
+      ],
+      "summary": {
+        "minimum_deadline": {
+          "status": "past_due",
+          "time": null
+        }
+      }
+    },
+    "livemode": false
   }
 }

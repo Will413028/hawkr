@@ -1,7 +1,7 @@
 {
   "status": 200,
   "body": {
-    "id": "acct_1UXO4tEWUj72IISg",
+    "id": "acct_1UXUVeEfy6as5ms7",
     "object": "v2.core.account",
     "applied_configurations": [
       "recipient"
@@ -45,7 +45,7 @@
     },
     "contact_email": "<EMAIL-MASKED>",
     "contact_phone": null,
-    "created": "2026-11-02T16:27:26.000Z",
+    "created": "2026-11-02T23:19:29.000Z",
     "dashboard": "none",
     "identity": {
       "attestations": {

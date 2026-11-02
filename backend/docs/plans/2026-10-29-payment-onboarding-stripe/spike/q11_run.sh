@@ -2,7 +2,7 @@
 # usage: q11_run.sh  -> outputs/fixtures/*.json (each scrubbed)
 set -e
 cd "$(dirname "$0")"
-set -a; . /Users/will/second-brain/secrets/personal/hawkr/hawkr-stripe-test.env; set +a
+set -a; . /Users/will/second-brain/secrets/personal/hawkr/hawkr-stripe-sandbox.env; set +a
 RAW=$(mktemp -d)
 /opt/homebrew/bin/python3 -u q11_record.py "$RAW" 2>&1 | /opt/homebrew/bin/python3 scrub.py | tee outputs/q11_record.txt
 mkdir -p outputs/fixtures

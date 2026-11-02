@@ -2,7 +2,7 @@
   "status": 200,
   "body": {
     "object": "account_session",
-    "account": "acct_1UXO50EWUjgLkPE9",
+    "account": "acct_1UXUVmInXFm90qMK",
     "client_secret": "<CLIENT-SECRET-MASKED>",
     "components": {
       "account_management": {
@@ -175,7 +175,7 @@
         "features": {}
       }
     },
-    "expires_at": 1793636976,
+    "expires_at": 1793661700,
     "livemode": false,
     "read_only": false
   }
