@@ -1,4 +1,4 @@
-# 依賴更新：每週一次，新版本發佈滿 7 天（major 滿 30 天）才提 PR，minor／patch 合併成一個 PR。
+# 依賴更新：每週一次，新版本發佈滿 7 天（major 滿 30 天；github-actions 不支援分 major，一律 7 天）才提 PR，minor／patch 合併成一個 PR。
 # 這是「版本通知」，不是授權：升級要附套件、版本、存在與發佈時間的核對並經核准（根目錄 AGENTS.md）。
 # gomod 的 module 與 backend/go.work 的 use 清單一一對應；新增 module 時同步加一段。
 version: 2
@@ -12,7 +12,6 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
-      semver-major-days: 30
     groups:
       actions-minor-patch:
         update-types:
