@@ -39,7 +39,7 @@ func kycDraft(accountID int64, idCard, bank string) KYCDraftInput {
 	return KYCDraftInput{
 		AccountID: accountID, SellerType: individual(), RealName: ptr("王小明"), BirthDate: ptr("1990-05-06"), IDCardNo: ptr(idCard),
 		EnglishName: ptr("Wang Farm"), BankName: ptr("臺灣銀行"), BankCode: ptr("004"), BankAccount: ptr(bank),
-		ProductType: ptr("蔬果"),
+		ProductType: ptr("蔬果"), PayoutContactEmail: ptr("seller@example.com"),
 		IDCardFront: &KYCDocumentRef{StagedToken: "front"}, IDCardBack: &KYCDocumentRef{StagedToken: "back"}, BankBook: &KYCDocumentRef{StagedToken: "book"},
 	}
 }
@@ -912,6 +912,9 @@ func TestKYCInputValidation(t *testing.T) {
 		"english name unicode":   {EnglishName: ptr("範例小農")},
 		"english name too long":  {EnglishName: ptr(strings.Repeat("a", 51))},
 		"bad website":            {WebsiteURL: ptr("ftp://x")},
+		"payout email no at":     {PayoutContactEmail: ptr("seller.example.com")},
+		"payout email no dot":    {PayoutContactEmail: ptr("seller@localhost")},
+		"payout email too long":  {PayoutContactEmail: ptr(strings.Repeat("a", 250) + "@b.co")},
 		"unknown seller type":    {SellerType: ptr(KYCSellerType("GOV"))},
 		"company field on indiv": {CompanyName: ptr("x")},
 	} {
@@ -1306,7 +1309,7 @@ func TestKYCMissingFieldsFollowTheSubmissionRule(t *testing.T) {
 	ctx := context.Background()
 	accountID, _ := f.open(t)
 	empty := f.savedDraft(t, KYCDraftInput{AccountID: accountID, SellerType: individual()})
-	wantIndividual := []string{"real_name", "english_name", "bank_name", "bank_code", "bank_account", "id_card_front", "id_card_back", "bank_book", "individual.id_card_no"}
+	wantIndividual := []string{"real_name", "english_name", "bank_name", "bank_code", "bank_account", "id_card_front", "id_card_back", "bank_book", "individual.id_card_no", "payout_contact_email"}
 	if !slices.Equal(empty.MissingFields, wantIndividual) {
 		t.Fatalf("個人賣家缺：%v", empty.MissingFields)
 	}

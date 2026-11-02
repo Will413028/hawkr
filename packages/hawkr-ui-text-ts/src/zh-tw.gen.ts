@@ -72,6 +72,7 @@ const DEFAULT: Readonly<Partial<Record<UiTextKey, Formatter>>> = {
 	"seller.KYCField.KYC_FIELD_BUSINESS_REP_ID_CARD_NO": () => "負責人身分證字號",
 	"seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS": () => "補充文件",
 	"seller.KYCField.KYC_FIELD_BUSINESS_COMPANY_ADDRESS": () => "公司地址",
+	"seller.KYCField.KYC_FIELD_PAYOUT_CONTACT_EMAIL": () => "收款聯絡信箱",
 	"seller.KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED": () => "待認證",
 	"seller.KYCFlowStatus.KYC_FLOW_STATUS_DRAFT": () => "填寫中",
 	"seller.KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED": () => "平台審核中",

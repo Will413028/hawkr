@@ -26,7 +26,7 @@ var kycFields = map[string]string{
 	"IDCardIssueDate": "id_card_issue_date", "IDCardIssueType": "id_card_issue_type",
 	"IDCardIssueLocation": "id_card_issue_location", "EnglishName": "english_name", "BankName": "bank_name",
 	"BankCode": "bank_code", "BankAccount": "bank_account", "ProductType": "product_type",
-	"WebsiteURL":  "website_url",
+	"WebsiteURL": "website_url", "PayoutContactEmail": "payout_contact_email",
 	"CompanyName": "business.company_name",
 	"TaxID":       "business.tax_id", "CompanyRegisterDate": "business.company_register_date", "CompanyTownCode": "business.company_address.town_code",
 	"CompanyAddressDetail": "business.company_address.address_detail", "CompanyPhone": "business.company_phone",
@@ -156,6 +156,7 @@ func kycDraftInput(app *pb.KYCApplication, mask *fieldmaskpb.FieldMask, create b
 	text("bank_account", &in.BankAccount, app.GetBankAccount())
 	text("product_type", &in.ProductType, app.GetProductType())
 	text("website_url", &in.WebsiteURL, app.GetWebsiteUrl())
+	text("payout_contact_email", &in.PayoutContactEmail, app.GetPayoutContactEmail())
 	single("id_card_front", &in.IDCardFront, app.GetIdCardFront())
 	single("id_card_back", &in.IDCardBack, app.GetIdCardBack())
 	single("bank_book", &in.BankBook, app.GetBankBook())
@@ -249,8 +250,8 @@ func toKYC(ctx context.Context, a model.KYCApplication) *pb.KYCApplication {
 		IdCardIssueDate: toDate(a.IDCardIssueDate), IdCardIssueType: deref(a.IDCardIssueType), IdCardIssueLocation: deref(a.IDCardIssueLocation),
 		EnglishName: deref(a.EnglishName), BankName: deref(a.BankName), BankCode: deref(a.BankCode), BankAccountMasked: deref(a.BankAccountMasked),
 		ProductType: deref(a.ProductType),
-		WebsiteUrl:  deref(a.WebsiteURL),
-		CreateTime:  timestamppb.New(a.CreatedAt), UpdateTime: timestamppb.New(a.UpdatedAt),
+		WebsiteUrl:  deref(a.WebsiteURL), PayoutContactEmail: deref(a.PayoutContactEmail),
+		CreateTime: timestamppb.New(a.CreatedAt), UpdateTime: timestamppb.New(a.UpdatedAt),
 	}
 	switch a.SellerType {
 	case model.KYCIndividual:

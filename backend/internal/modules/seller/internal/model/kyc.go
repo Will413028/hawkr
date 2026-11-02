@@ -248,7 +248,7 @@ type KYCApplication struct {
 	BankName, BankCode                                    *string
 	BankAccountMasked                                     *string
 	ProductType                                           *string
-	WebsiteURL                                            *string
+	WebsiteURL, PayoutContactEmail                        *string
 	CompanyName, TaxID                                    *string
 	CompanyRegisterDate                                   *string
 	CompanyTownCode, CompanyAddressDetail, CompanyPhone   *string
@@ -423,7 +423,7 @@ type KYCDraftInput struct {
 	IDCardIssueDate, IDCardIssueType, IDCardIssueLocation *string
 	EnglishName                                           *string
 	BankName, BankCode, BankAccount, ProductType          *string
-	WebsiteURL                                            *string
+	WebsiteURL, PayoutContactEmail                        *string
 	CompanyName, TaxID, CompanyRegisterDate               *string
 	CompanyTownCode, CompanyAddressDetail, CompanyPhone   *string
 	RepIDCardNo                                           *string
@@ -681,7 +681,7 @@ func KYCFieldNames() []string {
 		"id_card_front", "id_card_back", "bank_book", "individual.id_card_no",
 		"business.company_name", "business.tax_id", "business.company_register_date",
 		"business.company_address", "business.company_phone", "business.rep_id_card_no",
-		"business.company_documents",
+		"business.company_documents", "payout_contact_email",
 	}
 }
 

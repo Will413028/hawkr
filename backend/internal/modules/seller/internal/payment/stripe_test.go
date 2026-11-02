@@ -95,14 +95,26 @@ func TestStripeEnsureAccountUsesTheDashboardOfTheStoredCollection(t *testing.T) 
 			_ = json.NewDecoder(r.Body).Decode(&got)
 			_, _ = w.Write([]byte(`{"id":"acct_1"}`))
 		}))
-		id, err := p.EnsureAccount(context.Background(), EnsureInput{StoreID: 5, IdempotencyKey: "k", Collection: stored})
-		if err != nil || id != "acct_1" || got["dashboard"] != dash {
-			t.Errorf("列 %s：id=%q err=%v dashboard=%v", stored, id, err, got["dashboard"])
+		id, err := p.EnsureAccount(context.Background(), EnsureInput{StoreID: 5, IdempotencyKey: "k", ContactEmail: "seller@example.com", Collection: stored})
+		if err != nil || id != "acct_1" || got["dashboard"] != dash || got["contact_email"] != "seller@example.com" {
+			t.Errorf("列 %s：id=%q err=%v dashboard=%v contact_email=%v", stored, id, err, got["dashboard"], got["contact_email"])
 		}
 	}
 	p := stripeProvider(t, model.CollectionProvider, http.NotFoundHandler())
 	if _, err := p.EnsureAccount(context.Background(), EnsureInput{IdempotencyKey: "k"}); !errors.Is(err, ErrPermanent) {
 		t.Errorf("空的收件方式：%v，預期 ErrPermanent", err)
+	}
+}
+
+// 沒有聯絡信箱時不呼叫 Stripe：有收款設定的帳戶沒有信箱一定被拒，重試也不會成功。
+func TestStripeEnsureAccountWithoutContactEmailIsPermanentAndSendsNothing(t *testing.T) {
+	called := false
+	p := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		called = true
+		_, _ = w.Write([]byte(`{"id":"acct_1"}`))
+	}))
+	if _, err := p.EnsureAccount(context.Background(), EnsureInput{StoreID: 5, IdempotencyKey: "k", Collection: model.CollectionProvider}); !errors.Is(err, ErrPermanent) || called {
+		t.Errorf("err=%v called=%v，預期 ErrPermanent 且沒有送出請求", err, called)
 	}
 }
 
@@ -114,7 +126,7 @@ func TestStripeEnsureAccountSendsTheGivenKeyOnEveryAttempt(t *testing.T) {
 		_, _ = w.Write([]byte(`{"id":"acct_1"}`))
 	}))
 	for range 2 {
-		if _, err := p.EnsureAccount(context.Background(), EnsureInput{StoreID: 5, IdempotencyKey: "6f1c0a52-0000-4000-8000-000000000001", Collection: model.CollectionProvider}); err != nil {
+		if _, err := p.EnsureAccount(context.Background(), EnsureInput{StoreID: 5, IdempotencyKey: "6f1c0a52-0000-4000-8000-000000000001", ContactEmail: "seller@example.com", Collection: model.CollectionProvider}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -125,7 +137,7 @@ func TestStripeEnsureAccountSendsTheGivenKeyOnEveryAttempt(t *testing.T) {
 
 func TestStripeEnsureAccountClassifiesErrors(t *testing.T) {
 	create := func(h http.HandlerFunc) error {
-		_, err := stripeProvider(t, model.CollectionProvider, h).EnsureAccount(context.Background(), EnsureInput{StoreID: 5, IdempotencyKey: "5", Collection: model.CollectionProvider})
+		_, err := stripeProvider(t, model.CollectionProvider, h).EnsureAccount(context.Background(), EnsureInput{StoreID: 5, IdempotencyKey: "5", ContactEmail: "seller@example.com", Collection: model.CollectionProvider})
 		return err
 	}
 	if err := create(fixtureResponder(t, "create_provider_idem_conflict")); !errors.Is(err, ErrPermanent) {
@@ -149,7 +161,7 @@ func TestStripeEnsureAccountClassifiesErrors(t *testing.T) {
 	srv.Close()
 	c, _ := stripe.New(stripe.Config{BaseURL: url, SecretKey: "k", WebhookSecret: "w"})
 	p, _ := NewStripe(c, model.CollectionProvider)
-	if _, err := p.EnsureAccount(context.Background(), EnsureInput{IdempotencyKey: "5", Collection: model.CollectionProvider}); err == nil || errors.Is(err, ErrPermanent) {
+	if _, err := p.EnsureAccount(context.Background(), EnsureInput{IdempotencyKey: "5", ContactEmail: "seller@example.com", Collection: model.CollectionProvider}); err == nil || errors.Is(err, ErrPermanent) {
 		t.Errorf("傳輸錯誤：%v，預期一般錯誤", err)
 	}
 	if _, err := p.EnsureAccount(context.Background(), EnsureInput{}); !errors.Is(err, ErrPermanent) {

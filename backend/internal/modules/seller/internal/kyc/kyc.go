@@ -574,6 +574,7 @@ var requirements = []requirement{
 	{"business.company_name", "請填寫公司名稱", func(r store.SellerKycApplication, _ map[string]bool) bool { return r.CompanyName == nil }},
 	{"business.tax_id", "請填寫統一編號", func(r store.SellerKycApplication, _ map[string]bool) bool { return r.TaxID == nil }},
 	{"business.rep_id_card_no", "請填寫負責人身分證字號", func(r store.SellerKycApplication, _ map[string]bool) bool { return r.RepIDCardNoEnc == nil }},
+	{"payout_contact_email", "請填寫收款聯絡信箱", func(r store.SellerKycApplication, _ map[string]bool) bool { return r.PayoutContactEmail == nil }},
 }
 
 // missingFields 回傳還缺的欄位路徑（依 requirements 的順序）。

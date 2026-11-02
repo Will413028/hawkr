@@ -20,7 +20,7 @@ SET status = $1,
     fetched_at = $6,
     updated_at = $7
 WHERE store_id = $8 AND external_account_id IS NOT NULL
-RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at
+RETURNING store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at
 `
 
 type ApplyPaymentSnapshotParams struct {
@@ -51,6 +51,7 @@ func (q *Queries) ApplyPaymentSnapshot(ctx context.Context, arg ApplyPaymentSnap
 		&i.StoreID,
 		&i.Provider,
 		&i.ExternalAccountID,
+		&i.ContactEmail,
 		&i.RequirementCollection,
 		&i.Status,
 		&i.TransfersActive,
@@ -88,23 +89,25 @@ func (q *Queries) ClearPaymentAccountCreateFailed(ctx context.Context, arg Clear
 }
 
 const insertPaymentAccount = `-- name: InsertPaymentAccount :execrows
-INSERT INTO seller.payment_accounts (store_id, provider, requirement_collection, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $4)
+INSERT INTO seller.payment_accounts (store_id, provider, contact_email, requirement_collection, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $5)
 ON CONFLICT (store_id) DO NOTHING
 `
 
 type InsertPaymentAccountParams struct {
 	StoreID               int64
 	Provider              string
+	ContactEmail          string
 	RequirementCollection string
 	Now                   time.Time
 }
 
-// 核准時寫「建立中」的列（沒有外部 ID）；一店一列，關店再開沿用既有的列，所以已有列時不寫。
+// 核准時寫「建立中」的列（沒有外部 ID），contact_email 是申請上的收款聯絡信箱；一店一列，關店再開沿用既有的列（含它的信箱），所以已有列時不寫。
 func (q *Queries) InsertPaymentAccount(ctx context.Context, arg InsertPaymentAccountParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertPaymentAccount,
 		arg.StoreID,
 		arg.Provider,
+		arg.ContactEmail,
 		arg.RequirementCollection,
 		arg.Now,
 	)
@@ -142,7 +145,7 @@ func (q *Queries) InsertPaymentProviderEvent(ctx context.Context, arg InsertPaym
 }
 
 const lockPaymentAccount = `-- name: LockPaymentAccount :one
-SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at
+SELECT store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at
 FROM seller.payment_accounts
 WHERE store_id = $1
 FOR UPDATE
@@ -156,6 +159,7 @@ func (q *Queries) LockPaymentAccount(ctx context.Context, storeID int64) (Seller
 		&i.StoreID,
 		&i.Provider,
 		&i.ExternalAccountID,
+		&i.ContactEmail,
 		&i.RequirementCollection,
 		&i.Status,
 		&i.TransfersActive,
@@ -221,7 +225,7 @@ func (q *Queries) MarkPaymentEventsProcessed(ctx context.Context, arg MarkPaymen
 }
 
 const paymentAccountByExternal = `-- name: PaymentAccountByExternal :one
-SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at
+SELECT store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at
 FROM seller.payment_accounts
 WHERE provider = $1 AND external_account_id = $2
 `
@@ -238,6 +242,7 @@ func (q *Queries) PaymentAccountByExternal(ctx context.Context, arg PaymentAccou
 		&i.StoreID,
 		&i.Provider,
 		&i.ExternalAccountID,
+		&i.ContactEmail,
 		&i.RequirementCollection,
 		&i.Status,
 		&i.TransfersActive,
@@ -254,7 +259,7 @@ func (q *Queries) PaymentAccountByExternal(ctx context.Context, arg PaymentAccou
 }
 
 const paymentAccountByStore = `-- name: PaymentAccountByStore :one
-SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at
+SELECT store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at
 FROM seller.payment_accounts
 WHERE store_id = $1
 `
@@ -266,6 +271,7 @@ func (q *Queries) PaymentAccountByStore(ctx context.Context, storeID int64) (Sel
 		&i.StoreID,
 		&i.Provider,
 		&i.ExternalAccountID,
+		&i.ContactEmail,
 		&i.RequirementCollection,
 		&i.Status,
 		&i.TransfersActive,
@@ -282,7 +288,7 @@ func (q *Queries) PaymentAccountByStore(ctx context.Context, storeID int64) (Sel
 }
 
 const paymentAccountsByStores = `-- name: PaymentAccountsByStores :many
-SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at
+SELECT store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at
 FROM seller.payment_accounts
 WHERE store_id = ANY($1::bigint[])
 `
@@ -301,6 +307,7 @@ func (q *Queries) PaymentAccountsByStores(ctx context.Context, storeIds []int64)
 			&i.StoreID,
 			&i.Provider,
 			&i.ExternalAccountID,
+			&i.ContactEmail,
 			&i.RequirementCollection,
 			&i.Status,
 			&i.TransfersActive,
@@ -397,7 +404,7 @@ SET external_account_id = $1,
     create_failed_at = NULL,
     updated_at = $2
 WHERE store_id = $3 AND external_account_id IS NULL
-RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at
+RETURNING store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, create_idempotency_key, created_at, updated_at
 `
 
 type SetPaymentAccountExternalParams struct {
@@ -414,6 +421,7 @@ func (q *Queries) SetPaymentAccountExternal(ctx context.Context, arg SetPaymentA
 		&i.StoreID,
 		&i.Provider,
 		&i.ExternalAccountID,
+		&i.ContactEmail,
 		&i.RequirementCollection,
 		&i.Status,
 		&i.TransfersActive,

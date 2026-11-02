@@ -545,6 +545,7 @@ const (
 	KYCField_KYC_FIELD_BUSINESS_REP_ID_CARD_NO        KYCField = 26
 	KYCField_KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS     KYCField = 27
 	KYCField_KYC_FIELD_BUSINESS_COMPANY_ADDRESS       KYCField = 28
+	KYCField_KYC_FIELD_PAYOUT_CONTACT_EMAIL           KYCField = 29
 )
 
 // Enum value maps for KYCField.
@@ -573,6 +574,7 @@ var (
 		26: "KYC_FIELD_BUSINESS_REP_ID_CARD_NO",
 		27: "KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS",
 		28: "KYC_FIELD_BUSINESS_COMPANY_ADDRESS",
+		29: "KYC_FIELD_PAYOUT_CONTACT_EMAIL",
 	}
 	KYCField_value = map[string]int32{
 		"KYC_FIELD_UNSPECIFIED":                    0,
@@ -598,6 +600,7 @@ var (
 		"KYC_FIELD_BUSINESS_REP_ID_CARD_NO":        26,
 		"KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS":     27,
 		"KYC_FIELD_BUSINESS_COMPANY_ADDRESS":       28,
+		"KYC_FIELD_PAYOUT_CONTACT_EMAIL":           29,
 	}
 )
 
@@ -4509,14 +4512,16 @@ type KYCApplication struct {
 	EnglishName         string     `protobuf:"bytes,9,opt,name=english_name,json=englishName,proto3" json:"english_name,omitempty"`
 	BankName            string     `protobuf:"bytes,10,opt,name=bank_name,json=bankName,proto3" json:"bank_name,omitempty"`
 	// 3 碼銀行代碼，或 3 碼加 4 碼分行代碼。
-	BankCode          string       `protobuf:"bytes,11,opt,name=bank_code,json=bankCode,proto3" json:"bank_code,omitempty"`
-	BankAccount       string       `protobuf:"bytes,12,opt,name=bank_account,json=bankAccount,proto3" json:"bank_account,omitempty"`
-	BankAccountMasked string       `protobuf:"bytes,13,opt,name=bank_account_masked,json=bankAccountMasked,proto3" json:"bank_account_masked,omitempty"`
-	ProductType       string       `protobuf:"bytes,14,opt,name=product_type,json=productType,proto3" json:"product_type,omitempty"`
-	WebsiteUrl        string       `protobuf:"bytes,16,opt,name=website_url,json=websiteUrl,proto3" json:"website_url,omitempty"`
-	IdCardFront       *KYCDocument `protobuf:"bytes,19,opt,name=id_card_front,json=idCardFront,proto3" json:"id_card_front,omitempty"`
-	IdCardBack        *KYCDocument `protobuf:"bytes,20,opt,name=id_card_back,json=idCardBack,proto3" json:"id_card_back,omitempty"`
-	BankBook          *KYCDocument `protobuf:"bytes,21,opt,name=bank_book,json=bankBook,proto3" json:"bank_book,omitempty"`
+	BankCode          string `protobuf:"bytes,11,opt,name=bank_code,json=bankCode,proto3" json:"bank_code,omitempty"`
+	BankAccount       string `protobuf:"bytes,12,opt,name=bank_account,json=bankAccount,proto3" json:"bank_account,omitempty"`
+	BankAccountMasked string `protobuf:"bytes,13,opt,name=bank_account_masked,json=bankAccountMasked,proto3" json:"bank_account_masked,omitempty"`
+	ProductType       string `protobuf:"bytes,14,opt,name=product_type,json=productType,proto3" json:"product_type,omitempty"`
+	WebsiteUrl        string `protobuf:"bytes,16,opt,name=website_url,json=websiteUrl,proto3" json:"website_url,omitempty"`
+	// 收款聯絡信箱：核准後建立收款帳戶時交給金流商的聯絡信箱。草稿可以空，送出時必填；伺服器去掉前後空白並轉小寫，至多 254 字。
+	PayoutContactEmail string       `protobuf:"bytes,33,opt,name=payout_contact_email,json=payoutContactEmail,proto3" json:"payout_contact_email,omitempty"`
+	IdCardFront        *KYCDocument `protobuf:"bytes,19,opt,name=id_card_front,json=idCardFront,proto3" json:"id_card_front,omitempty"`
+	IdCardBack         *KYCDocument `protobuf:"bytes,20,opt,name=id_card_back,json=idCardBack,proto3" json:"id_card_back,omitempty"`
+	BankBook           *KYCDocument `protobuf:"bytes,21,opt,name=bank_book,json=bankBook,proto3" json:"bank_book,omitempty"`
 	// Types that are valid to be assigned to Subject:
 	//
 	//	*KYCApplication_Individual
@@ -4674,6 +4679,13 @@ func (x *KYCApplication) GetProductType() string {
 func (x *KYCApplication) GetWebsiteUrl() string {
 	if x != nil {
 		return x.WebsiteUrl
+	}
+	return ""
+}
+
+func (x *KYCApplication) GetPayoutContactEmail() string {
+	if x != nil {
+		return x.PayoutContactEmail
 	}
 	return ""
 }
@@ -7545,7 +7557,7 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x15rep_id_card_no_masked\x18\t \x01(\tB\x03\xe0A\x03R\x11repIdCardNoMasked\x12O\n" +
 	"\x11company_documents\x18\n" +
 	" \x03(\v2\".hawkr.seller.v1alpha1.KYCDocumentR\x10companyDocuments\x12M\n" +
-	"\x0fcompany_address\x18\v \x01(\v2$.hawkr.common.v1alpha1.PostalAddressR\x0ecompanyAddressJ\x04\b\x01\x10\x02J\x04\b\x05\x10\x06J\x04\b\x06\x10\aR\fcompany_typeR\x11company_town_codeR\x16company_address_detail\"\x98\r\n" +
+	"\x0fcompany_address\x18\v \x01(\v2$.hawkr.common.v1alpha1.PostalAddressR\x0ecompanyAddressJ\x04\b\x01\x10\x02J\x04\b\x05\x10\x06J\x04\b\x06\x10\aR\fcompany_typeR\x11company_town_codeR\x16company_address_detail\"\xca\r\n" +
 	"\x0eKYCApplication\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12=\n" +
 	"\x06status\x18\x02 \x01(\x0e2 .hawkr.seller.v1alpha1.KYCStatusB\x03\xe0A\x03R\x06status\x12\x12\n" +
@@ -7564,7 +7576,8 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x13bank_account_masked\x18\r \x01(\tB\x03\xe0A\x03R\x11bankAccountMasked\x12!\n" +
 	"\fproduct_type\x18\x0e \x01(\tR\vproductType\x12\x1f\n" +
 	"\vwebsite_url\x18\x10 \x01(\tR\n" +
-	"websiteUrl\x12F\n" +
+	"websiteUrl\x120\n" +
+	"\x14payout_contact_email\x18! \x01(\tR\x12payoutContactEmail\x12F\n" +
 	"\rid_card_front\x18\x13 \x01(\v2\".hawkr.seller.v1alpha1.KYCDocumentR\vidCardFront\x12D\n" +
 	"\fid_card_back\x18\x14 \x01(\v2\".hawkr.seller.v1alpha1.KYCDocumentR\n" +
 	"idCardBack\x12?\n" +
@@ -7837,7 +7850,7 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x14KYC_STATUS_SUBMITTED\x10\x02\x12\x17\n" +
 	"\x13KYC_STATUS_APPROVED\x10\x03\x12\x17\n" +
 	"\x13KYC_STATUS_REJECTED\x10\x04\x12\x18\n" +
-	"\x14KYC_STATUS_CANCELLED\x10\x05*\xcc\a\n" +
+	"\x14KYC_STATUS_CANCELLED\x10\x05*\xf0\a\n" +
 	"\bKYCField\x12\x19\n" +
 	"\x15KYC_FIELD_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13KYC_FIELD_REAL_NAME\x10\x01\x12\x18\n" +
@@ -7862,7 +7875,8 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	" KYC_FIELD_BUSINESS_COMPANY_PHONE\x10\x19\x12%\n" +
 	"!KYC_FIELD_BUSINESS_REP_ID_CARD_NO\x10\x1a\x12(\n" +
 	"$KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS\x10\x1b\x12&\n" +
-	"\"KYC_FIELD_BUSINESS_COMPANY_ADDRESS\x10\x1c\"\x04\b\v\x10\v\"\x04\b\r\x10\r\"\x04\b\x0e\x10\x0e\"\x04\b\x13\x10\x13\"\x04\b\x17\x10\x17\"\x04\b\x18\x10\x18*\x17KYC_FIELD_FOOD_BUSINESS*\x17KYC_FIELD_CONTACT_EMAIL*\x17KYC_FIELD_CONTACT_PHONE*\x1fKYC_FIELD_BUSINESS_COMPANY_TYPE*$KYC_FIELD_BUSINESS_COMPANY_TOWN_CODE*)KYC_FIELD_BUSINESS_COMPANY_ADDRESS_DETAIL*\xd8\x01\n" +
+	"\"KYC_FIELD_BUSINESS_COMPANY_ADDRESS\x10\x1c\x12\"\n" +
+	"\x1eKYC_FIELD_PAYOUT_CONTACT_EMAIL\x10\x1d\"\x04\b\v\x10\v\"\x04\b\r\x10\r\"\x04\b\x0e\x10\x0e\"\x04\b\x13\x10\x13\"\x04\b\x17\x10\x17\"\x04\b\x18\x10\x18*\x17KYC_FIELD_FOOD_BUSINESS*\x17KYC_FIELD_CONTACT_EMAIL*\x17KYC_FIELD_CONTACT_PHONE*\x1fKYC_FIELD_BUSINESS_COMPANY_TYPE*$KYC_FIELD_BUSINESS_COMPANY_TOWN_CODE*)KYC_FIELD_BUSINESS_COMPANY_ADDRESS_DETAIL*\xd8\x01\n" +
 	"\fKYCIssueCode\x12\x1e\n" +
 	"\x1aKYC_ISSUE_CODE_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19KYC_ISSUE_CODE_UNREADABLE\x10\x01\x12\x1b\n" +

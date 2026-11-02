@@ -3503,6 +3503,7 @@ class KYCApplication extends $pb.GeneratedMessage {
     $1.Timestamp? updateTime,
     $core.Iterable<StoreField>? missingStoreFields,
     $core.Iterable<KYCIssue>? outstandingIssues,
+    $core.String? payoutContactEmail,
   }) {
     final result = KYCApplication._();
     if (id != null) result.id = id;
@@ -3537,6 +3538,8 @@ class KYCApplication extends $pb.GeneratedMessage {
       result.missingStoreFields.addAll(missingStoreFields);
     if (outstandingIssues != null)
       result.outstandingIssues.addAll(outstandingIssues);
+    if (payoutContactEmail != null)
+      result.payoutContactEmail = payoutContactEmail;
     return result;
   }
 
@@ -3613,6 +3616,7 @@ class KYCApplication extends $pb.GeneratedMessage {
         defaultEnumValue: StoreField.STORE_FIELD_UNSPECIFIED)
     ..pPM<KYCIssue>(32, _omitFieldNames ? '' : 'outstandingIssues',
         subBuilder: KYCIssue.$_createMessage)
+    ..aOS(33, _omitFieldNames ? '' : 'payoutContactEmail')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3923,6 +3927,16 @@ class KYCApplication extends $pb.GeneratedMessage {
   /// 重新送出、核准或取消之後是空的。client 以它標出要補的欄位與文件，不必自己推導退回是否仍然有效。
   @$pb.TagNumber(32)
   $pb.PbList<KYCIssue> get outstandingIssues => $_getList(28);
+
+  /// 收款聯絡信箱：核准後建立收款帳戶時交給金流商的聯絡信箱。草稿可以空，送出時必填；伺服器去掉前後空白並轉小寫，至多 254 字。
+  @$pb.TagNumber(33)
+  $core.String get payoutContactEmail => $_getSZ(29);
+  @$pb.TagNumber(33)
+  set payoutContactEmail($core.String value) => $_setString(29, value);
+  @$pb.TagNumber(33)
+  $core.bool hasPayoutContactEmail() => $_has(29);
+  @$pb.TagNumber(33)
+  void clearPayoutContactEmail() => $_clearField(33);
 }
 
 class SaveKYCDraftRequest extends $pb.GeneratedMessage {

@@ -140,8 +140,8 @@ const profileSnapshotSQL = `SELECT s.store_id, ` + profileExpr + ` FROM seller.s
 const (
 	lockApplicationsSQL = `SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1) ORDER BY store_id, application_id FOR UPDATE`
 	// 種子店家的收款帳戶：fake provider 的外部帳戶，轉帳能力已啟用（開通閘門看 transfers_active），店家仍可曝光。
-	insertPaymentAccountSQL = `INSERT INTO seller.payment_accounts (store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, fetched_at, created_at, updated_at)
-		VALUES ($1, 'fake', 'fake_acct_seed_' || $1::bigint::text, 'PROVIDER', 'ENABLED', true, true, '{}', $2, $2, $2)`
+	insertPaymentAccountSQL = `INSERT INTO seller.payment_accounts (store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, payouts_active, requirements, fetched_at, created_at, updated_at)
+		VALUES ($1, 'fake', 'fake_acct_seed_' || $1::bigint::text, 'seed-' || $1::bigint::text || '@example.com', 'PROVIDER', 'ENABLED', true, true, '{}', $2, $2, $2)`
 	lockRegistrationsSQL = `SELECT store_id, intent_seq FROM seller.payuni_registrations WHERE store_id = ANY($1) ORDER BY store_id FOR UPDATE`
 	setIntentSeqSQL      = `UPDATE seller.payuni_registrations SET intent_seq = $2 WHERE store_id = $1 RETURNING intent_seq`
 )

@@ -99,7 +99,7 @@ func TestCreateAccountSendsTheSpikeBodyForBothDashboards(t *testing.T) {
 	for dash, fx := range map[Dashboard]string{DashboardExpress: "create_provider", DashboardNone: "create_platform"} {
 		s := &stub{resp: replay(loadFixture(t, fx))}
 		c := newTestClient(t, s)
-		id, err := c.CreateAccount(context.Background(), "42", dash)
+		id, err := c.CreateAccount(context.Background(), "42", dash, "seller@example.com")
 		if err != nil || !strings.HasPrefix(id, "acct_") {
 			t.Fatalf("%s：id=%q err=%v", dash, id, err)
 		}
@@ -112,7 +112,8 @@ func TestCreateAccountSendsTheSpikeBodyForBothDashboards(t *testing.T) {
 			"identity": {"country": "us", "entity_type": "individual"},
 			"configuration": {"recipient": {"capabilities": {"stripe_balance": {"stripe_transfers": {"requested": true}}}}},
 			"defaults": {"responsibilities": {"fees_collector": "application", "losses_collector": "application"}},
-			"dashboard": "`+string(dash)+`"}`)
+			"dashboard": "`+string(dash)+`",
+			"contact_email": "seller@example.com"}`)
 		if !jsonEqual(got, want) {
 			t.Errorf("%s：本文 %s", dash, r.Body)
 		}
@@ -127,7 +128,7 @@ func jsonEqual(a, b any) bool {
 
 func TestIdempotencyConflictIsAnAPIErrorThatIsPermanent(t *testing.T) {
 	s := &stub{resp: replay(loadFixture(t, "create_provider_idem_conflict"))}
-	_, err := newTestClient(t, s).CreateAccount(context.Background(), "42", DashboardExpress)
+	_, err := newTestClient(t, s).CreateAccount(context.Background(), "42", DashboardExpress, "seller@example.com")
 	var api *APIError
 	if !errors.As(err, &api) || api.Status != 409 || api.Code != "idempotency_error" || !api.Permanent() {
 		t.Fatalf("err=%v", err)
@@ -215,11 +216,9 @@ func TestAccountSessionIsFormEncodedAndReturnsTheClientSecret(t *testing.T) {
 	}
 }
 
-// 合成的回應（sandbox 尚未錄製）：請求形狀是這個測試要守的。
+// 回應是 sandbox 錄下的 account_link_platform；請求形狀是這個測試要守的。
 func TestAccountLinkRequestHasNoConfigurationsField(t *testing.T) {
-	s := &stub{resp: func(int) (int, string, http.Header) {
-		return 200, `{"object":"v2.core.account_link","url":"https://connect.stripe.com/x","expires_at":"2026-11-04T01:02:03Z"}`, nil
-	}}
+	s := &stub{resp: replay(loadFixture(t, "account_link_platform"))}
 	link, err := newTestClient(t, s).CreateAccountLink(context.Background(), "acct_1", "https://app.test/return", "https://app.test/refresh")
 	if err != nil {
 		t.Fatal(err)
@@ -232,7 +231,7 @@ func TestAccountLinkRequestHasNoConfigurationsField(t *testing.T) {
 	if !jsonEqual(decode(t, r.Body), want) || strings.Contains(r.Body, "configurations") {
 		t.Errorf("本文 %s", r.Body)
 	}
-	if link.URL != "https://connect.stripe.com/x" || link.ExpiresAt == nil || !link.ExpiresAt.Equal(time.Date(2026, 11, 4, 1, 2, 3, 0, time.UTC)) {
+	if link.URL != "<MASKED>" || link.ExpiresAt == nil || !link.ExpiresAt.Equal(time.Date(2026, 11, 2, 23, 24, 33, 0, time.UTC)) {
 		t.Errorf("link %+v", link)
 	}
 }
@@ -241,7 +240,7 @@ func TestResponsesMissingRequiredFieldsAreErrorsNotValues(t *testing.T) {
 	s := &stub{resp: func(int) (int, string, http.Header) { return 200, `{}`, nil }}
 	c := newTestClient(t, s)
 	ctx := context.Background()
-	if id, err := c.CreateAccount(ctx, "1", DashboardNone); err == nil || id != "" {
+	if id, err := c.CreateAccount(ctx, "1", DashboardNone, "seller@example.com"); err == nil || id != "" {
 		t.Errorf("CreateAccount id=%q err=%v", id, err)
 	}
 	if l, err := c.CreateAccountLink(ctx, "a", "r", "f"); err == nil || l.URL != "" {
@@ -266,7 +265,7 @@ func TestRateLimitIsRetriedInsideTheClientWithBackoffThenSucceeds(t *testing.T) 
 	c := newTestClient(t, s, func(cfg *Config) {
 		cfg.Wait = func(_ context.Context, d time.Duration) error { waits = append(waits, d); return nil }
 	})
-	id, err := c.CreateAccount(context.Background(), "7", DashboardExpress)
+	id, err := c.CreateAccount(context.Background(), "7", DashboardExpress, "seller@example.com")
 	if err != nil || id != "acct_9" {
 		t.Fatalf("id=%q err=%v", id, err)
 	}

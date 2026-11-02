@@ -89,10 +89,11 @@ type Snapshot struct {
 }
 
 // EnsureInput 是建立外部帳戶的輸入。IdempotencyKey 是「建立中」的列寫入時產生並保存的隨機 UUID：同一家店的每次重試都用它，得到同一個帳戶；
-// 兩個資料庫共用同一個 provider 帳號時不會撞鍵。Collection 是帳戶列保存的收件方式（D2），不是行程設定。
+// 兩個資料庫共用同一個 provider 帳號時不會撞鍵。Collection 是帳戶列保存的收件方式（D2），不是行程設定。ContactEmail 是帳戶列保存的聯絡信箱（D23），金流商要求有收款設定的帳戶必須有。
 type EnsureInput struct {
 	StoreID        int64
 	IdempotencyKey string
+	ContactEmail   string
 	Collection     model.RequirementCollection
 }
 

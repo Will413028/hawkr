@@ -224,6 +224,8 @@ func (t Text) SellerKYCField(v string) (string, bool) {
 		return "補充文件", true
 	case "BUSINESS_COMPANY_ADDRESS":
 		return "公司地址", true
+	case "PAYOUT_CONTACT_EMAIL":
+		return "收款聯絡信箱", true
 	}
 	return "", false
 }

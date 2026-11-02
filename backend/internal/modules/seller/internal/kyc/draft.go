@@ -144,6 +144,9 @@ func (p protector) mergeDraft(base store.SellerKycApplication, in model.KYCDraft
 			return setNormalized(&next.WebsiteUrl, in.WebsiteURL, "WebsiteURL", "網站網址格式不正確", model.NormalizeWebsiteURL)
 		},
 		func() error {
+			return setNormalized(&next.PayoutContactEmail, in.PayoutContactEmail, "PayoutContactEmail", "收款聯絡信箱格式不正確", model.NormalizeEmail)
+		},
+		func() error {
 			return setText(&next.CompanyName, in.CompanyName, 200, "CompanyName", "公司名稱不可超過 200 字")
 		},
 		func() error {

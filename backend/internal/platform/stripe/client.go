@@ -230,14 +230,16 @@ const (
 )
 
 // CreateAccount 建立 v2 recipient 帳戶（US、individual、轉帳能力），以 idempotencyKey 冪等；回傳帳戶 ID。
-func (c *Client) CreateAccount(ctx context.Context, idempotencyKey string, dashboard Dashboard) (string, error) {
+// contactEmail 必填：有 recipient 設定的帳戶沒有它時 Stripe 回 400。
+func (c *Client) CreateAccount(ctx context.Context, idempotencyKey string, dashboard Dashboard, contactEmail string) (string, error) {
 	body := map[string]any{
 		"identity": map[string]any{"country": "us", "entity_type": "individual"},
 		"configuration": map[string]any{"recipient": map[string]any{"capabilities": map[string]any{
 			"stripe_balance": map[string]any{"stripe_transfers": map[string]any{"requested": true}},
 		}}},
-		"defaults":  map[string]any{"responsibilities": map[string]any{"fees_collector": "application", "losses_collector": "application"}},
-		"dashboard": string(dashboard),
+		"defaults":      map[string]any{"responsibilities": map[string]any{"fees_collector": "application", "losses_collector": "application"}},
+		"dashboard":     string(dashboard),
+		"contact_email": contactEmail,
 	}
 	var out struct {
 		ID string `json:"id"`

@@ -48,7 +48,7 @@ func (r *fakeRegistry) Lookup(context.Context, string) (gcis.Registration, bool,
 
 var draftPaths = []string{
 	"individual.id_card_no", "real_name", "birth_date", "english_name", "bank_name", "bank_code", "bank_account",
-	"product_type", "id_card_front", "id_card_back", "bank_book",
+	"product_type", "payout_contact_email", "id_card_front", "id_card_back", "bank_book",
 }
 
 // completeDraft 是一份完整、合法的個人賣家草稿請求。
@@ -56,7 +56,7 @@ func completeDraft(idNo string) *pb.SaveKYCDraftRequest {
 	return &pb.SaveKYCDraftRequest{
 		Application: &pb.KYCApplication{
 			Subject:  &pb.KYCApplication_Individual{Individual: &pb.IndividualKYC{IdCardNo: idNo}},
-			RealName: "王小明", BirthDate: &date.Date{Year: 1990, Month: 5, Day: 6}, EnglishName: "Wang Farm", BankName: "臺灣銀行", BankCode: "004", BankAccount: "012345678901", ProductType: "蔬果",
+			RealName: "王小明", BirthDate: &date.Date{Year: 1990, Month: 5, Day: 6}, EnglishName: "Wang Farm", BankName: "臺灣銀行", BankCode: "004", BankAccount: "012345678901", ProductType: "蔬果", PayoutContactEmail: "seller@example.com",
 			IdCardFront: &pb.KYCDocument{StagedToken: "front"}, IdCardBack: &pb.KYCDocument{StagedToken: "back"}, BankBook: &pb.KYCDocument{StagedToken: "book"},
 		},
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: draftPaths},
@@ -742,7 +742,7 @@ func TestSubmitKYCReportsEveryMissingItemAsAFieldViolation(t *testing.T) {
 	})
 	_, err := f.app.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: individual.GetEtag(), AcceptedAgreements: kycAgreementsPB()}))
 	wantCode(t, err, connect.CodeInvalidArgument, "")
-	want := []string{"bank_account", "bank_code", "bank_name", "bank_book", "english_name", "id_card_back", "id_card_front", "individual.id_card_no", "real_name"}
+	want := []string{"bank_account", "bank_code", "bank_name", "bank_book", "english_name", "id_card_back", "id_card_front", "individual.id_card_no", "payout_contact_email", "real_name"}
 	slices.Sort(want)
 	wantStore := []string{"store.contact_mobile", "store.contact_name", "store.support_email"}
 	if got := badRequestFields(t, err); !slices.Equal(got, want) {
@@ -764,11 +764,11 @@ func TestSubmitKYCReportsEveryMissingItemAsAFieldViolation(t *testing.T) {
 		Application: &pb.KYCApplication{
 			Etag: individual.GetEtag(), Subject: &pb.KYCApplication_Individual{Individual: &pb.IndividualKYC{IdCardNo: testID}},
 			RealName: "王小明", BirthDate: &date.Date{Year: 1990, Month: 5, Day: 6}, EnglishName: "Wang Farm", BankName: "臺灣銀行", BankCode: "004",
-			BankAccount: "012345678901", IdCardFront: &pb.KYCDocument{StagedToken: "front"}, IdCardBack: &pb.KYCDocument{StagedToken: "back"},
+			BankAccount: "012345678901", PayoutContactEmail: "seller@example.com", IdCardFront: &pb.KYCDocument{StagedToken: "front"}, IdCardBack: &pb.KYCDocument{StagedToken: "back"},
 			BankBook: &pb.KYCDocument{StagedToken: "book"},
 		},
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{
-			"individual.id_card_no", "real_name", "birth_date", "english_name", "bank_name", "bank_code", "bank_account", "id_card_front", "id_card_back", "bank_book",
+			"individual.id_card_no", "real_name", "birth_date", "english_name", "bank_name", "bank_code", "bank_account", "payout_contact_email", "id_card_front", "id_card_back", "bank_book",
 		}},
 	})
 	_, err = f.app.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: full.GetEtag(), AcceptedAgreements: kycAgreementsPB()}))

@@ -81,6 +81,7 @@
       "KYC_FIELD_ID_CARD_ISSUE_LOCATION": "發證地點",
       "KYC_FIELD_ID_CARD_ISSUE_TYPE": "發證類型",
       "KYC_FIELD_INDIVIDUAL_ID_CARD_NO": "身分證字號",
+      "KYC_FIELD_PAYOUT_CONTACT_EMAIL": "收款聯絡信箱",
       "KYC_FIELD_PRODUCT_TYPE": "主要商品類型",
       "KYC_FIELD_REAL_NAME": "真實姓名",
       "KYC_FIELD_WEBSITE_URL": "官方網站"

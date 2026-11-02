@@ -22,9 +22,9 @@ WHERE store_id = $1
 FOR UPDATE;
 
 -- name: InsertPaymentAccount :execrows
--- 核准時寫「建立中」的列（沒有外部 ID）；一店一列，關店再開沿用既有的列，所以已有列時不寫。
-INSERT INTO seller.payment_accounts (store_id, provider, requirement_collection, created_at, updated_at)
-VALUES (sqlc.arg(store_id), sqlc.arg(provider), sqlc.arg(requirement_collection), sqlc.arg(now), sqlc.arg(now))
+-- 核准時寫「建立中」的列（沒有外部 ID），contact_email 是申請上的收款聯絡信箱；一店一列，關店再開沿用既有的列（含它的信箱），所以已有列時不寫。
+INSERT INTO seller.payment_accounts (store_id, provider, contact_email, requirement_collection, created_at, updated_at)
+VALUES (sqlc.arg(store_id), sqlc.arg(provider), sqlc.arg(contact_email), sqlc.arg(requirement_collection), sqlc.arg(now), sqlc.arg(now))
 ON CONFLICT (store_id) DO NOTHING;
 
 -- name: SetPaymentAccountExternal :one

@@ -103,6 +103,10 @@ const Map<KYCField, _FieldMeta> _kycFields = {
     control: 'productType',
   ),
   KYCField.KYC_FIELD_WEBSITE_URL: (step: KycStep.other, control: 'websiteUrl'),
+  KYCField.KYC_FIELD_PAYOUT_CONTACT_EMAIL: (
+    step: KycStep.other,
+    control: 'payoutContactEmail',
+  ),
   KYCField.KYC_FIELD_ID_CARD_FRONT: (
     step: KycStep.idUpload,
     control: 'idCardFront',

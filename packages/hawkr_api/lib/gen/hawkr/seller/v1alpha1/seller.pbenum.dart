@@ -434,6 +434,8 @@ class KYCField extends $pb.ProtobufEnum {
       27, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS');
   static const KYCField KYC_FIELD_BUSINESS_COMPANY_ADDRESS = KYCField._(
       28, _omitEnumNames ? '' : 'KYC_FIELD_BUSINESS_COMPANY_ADDRESS');
+  static const KYCField KYC_FIELD_PAYOUT_CONTACT_EMAIL =
+      KYCField._(29, _omitEnumNames ? '' : 'KYC_FIELD_PAYOUT_CONTACT_EMAIL');
 
   static const $core.List<KYCField> values = <KYCField>[
     KYC_FIELD_UNSPECIFIED,
@@ -459,10 +461,11 @@ class KYCField extends $pb.ProtobufEnum {
     KYC_FIELD_BUSINESS_REP_ID_CARD_NO,
     KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS,
     KYC_FIELD_BUSINESS_COMPANY_ADDRESS,
+    KYC_FIELD_PAYOUT_CONTACT_EMAIL,
   ];
 
   static final $core.List<KYCField?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 28);
+      $pb.ProtobufEnum.$_initByValueList(values, 29);
   static KYCField? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

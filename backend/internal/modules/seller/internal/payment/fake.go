@@ -29,18 +29,19 @@ type Fake struct {
 	// OnFetch 在 FetchAccount 進行中（讀取之前）執行一次，測試用來製造「讀取期間又收到事件」的交錯。
 	OnFetch func()
 
-	mu         sync.Mutex
-	caps       Capabilities
-	next       int
-	byKey      map[string]string
-	accounts   map[string]Snapshot
-	ensureErrs []error
-	fetchErrs  []error
-	ensures    int
-	ensureKeys []string
-	fetches    int
-	sessions   int
-	violations []string
+	mu           sync.Mutex
+	caps         Capabilities
+	next         int
+	byKey        map[string]string
+	accounts     map[string]Snapshot
+	ensureErrs   []error
+	fetchErrs    []error
+	ensures      int
+	ensureKeys   []string
+	ensureEmails []string
+	fetches      int
+	sessions     int
+	violations   []string
 }
 
 // NewFake 建立 Fake：預設是 provider 收件、託管介面。
@@ -86,6 +87,13 @@ func (f *Fake) Calls() (ensures, fetches, sessions int) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.ensures, f.fetches, f.sessions
+}
+
+// EnsureEmails 回傳每次 EnsureAccount 收到的聯絡信箱（依呼叫順序，失敗的呼叫也算）。
+func (f *Fake) EnsureEmails() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.ensureEmails...)
 }
 
 // EnsureKeys 回傳每次 EnsureAccount 收到的冪等鍵（依呼叫順序，失敗的呼叫也算）。
@@ -145,6 +153,7 @@ func (f *Fake) EnsureAccount(ctx context.Context, in EnsureInput) (string, error
 	f.check(ctx, "EnsureAccount")
 	f.ensures++
 	f.ensureKeys = append(f.ensureKeys, in.IdempotencyKey)
+	f.ensureEmails = append(f.ensureEmails, in.ContactEmail)
 	if err := pop(&f.ensureErrs); err != nil {
 		return "", err
 	}

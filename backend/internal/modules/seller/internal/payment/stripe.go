@@ -58,7 +58,10 @@ func (s *Stripe) EnsureAccount(ctx context.Context, in EnsureInput) (string, err
 	default:
 		return "", fmt.Errorf("%w：不支援的收件方式 %q", ErrPermanent, in.Collection)
 	}
-	id, err := s.client.CreateAccount(ctx, in.IdempotencyKey, dashboard)
+	if in.ContactEmail == "" {
+		return "", fmt.Errorf("%w：缺少聯絡信箱", ErrPermanent)
+	}
+	id, err := s.client.CreateAccount(ctx, in.IdempotencyKey, dashboard, in.ContactEmail)
 	return id, classify(err)
 }
 

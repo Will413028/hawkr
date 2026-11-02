@@ -58,13 +58,17 @@ func New(d Deps) *Service {
 func (s *Service) Configured() bool { return s.d.Provider != nil }
 
 // RequestAccount 在平台審核核准的 transaction 內寫「建立中」的帳戶列（已有列時沿用，關店再開不建第二個帳戶）並排入以 store_id 為唯一鍵的建立 job
-// （D16、D19）；列寫入時由資料庫產生建立用的冪等鍵 UUID。呼叫方已鎖住店家與申請列。這裡不呼叫 provider（規則 5）。沒有設定 provider 時什麼都不做。
-func (s *Service) RequestAccount(ctx context.Context, q *store.Queries, storeID int64, now time.Time) error {
+// （D16、D19）；列寫入時由資料庫產生建立用的冪等鍵 UUID。contactEmail 是申請上的收款聯絡信箱（D23），複製到列上供建立外部帳戶使用；沒有時
+// 回 failed_precondition（送出前的申請沒有這個欄位），核准整筆不寫入。呼叫方已鎖住店家與申請列。這裡不呼叫 provider（規則 5）。沒有設定 provider 時什麼都不做。
+func (s *Service) RequestAccount(ctx context.Context, q *store.Queries, storeID int64, contactEmail *string, now time.Time) error {
 	if s.d.Provider == nil {
 		return nil
 	}
+	if contactEmail == nil {
+		return apperr.FailedPrecondition("申請缺少收款聯絡信箱，請退回申請要求賣家補填")
+	}
 	_, err := q.InsertPaymentAccount(ctx, store.InsertPaymentAccountParams{
-		StoreID: storeID, Provider: s.d.Provider.Name(), RequirementCollection: string(s.d.Provider.Capabilities().RequirementCollection), Now: now,
+		StoreID: storeID, Provider: s.d.Provider.Name(), ContactEmail: *contactEmail, RequirementCollection: string(s.d.Provider.Capabilities().RequirementCollection), Now: now,
 	})
 	if err != nil {
 		return err
@@ -138,7 +142,7 @@ func (s *Service) Ensure(ctx context.Context, storeID int64, final bool) error {
 	}
 	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
 	defer cancel()
-	externalID, callErr := p.EnsureAccount(callCtx, EnsureInput{StoreID: storeID, IdempotencyKey: row.CreateIdempotencyKey.String(), Collection: model.RequirementCollection(row.RequirementCollection)})
+	externalID, callErr := p.EnsureAccount(callCtx, EnsureInput{StoreID: storeID, IdempotencyKey: row.CreateIdempotencyKey.String(), ContactEmail: row.ContactEmail, Collection: model.RequirementCollection(row.RequirementCollection)})
 	permanent := errors.Is(callErr, ErrPermanent)
 	if callErr != nil && !permanent && !final {
 		return callErr

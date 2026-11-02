@@ -613,6 +613,7 @@ enum KYCField {
   KYC_FIELD_BUSINESS_REP_ID_CARD_NO = 26;
   KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS = 27;
   KYC_FIELD_BUSINESS_COMPANY_ADDRESS = 28;
+  KYC_FIELD_PAYOUT_CONTACT_EMAIL = 29;
 }
 
 // KYCIssueCode 是退回時一個問題的原因類別：封閉集合，client 可以依它分支；具體的說明在 KYCIssue.message。
@@ -848,6 +849,8 @@ message KYCApplication {
   string bank_account_masked = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
   string product_type = 14;
   string website_url = 16;
+  // 收款聯絡信箱：核准後建立收款帳戶時交給金流商的聯絡信箱。草稿可以空，送出時必填；伺服器去掉前後空白並轉小寫，至多 254 字。
+  string payout_contact_email = 33;
   KYCDocument id_card_front = 19;
   KYCDocument id_card_back = 20;
   KYCDocument bank_book = 21;

@@ -479,6 +479,10 @@ export const KYC_FIELDS: Record<
 		control: "productType",
 	},
 	[KYCField.KYC_FIELD_WEBSITE_URL]: { section: "other", control: "websiteUrl" },
+	[KYCField.KYC_FIELD_PAYOUT_CONTACT_EMAIL]: {
+		section: "other",
+		control: "payoutContactEmail",
+	},
 	[KYCField.KYC_FIELD_ID_CARD_FRONT]: {
 		section: "identity",
 		control: "idCardFront",

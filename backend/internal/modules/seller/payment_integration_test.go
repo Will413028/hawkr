@@ -101,6 +101,33 @@ func (f *fixture) paymentEvent(id, external string) (http.Header, []byte) {
 	return h, []byte(external)
 }
 
+// 申請上的收款聯絡信箱（D23）存的是正規化後的值，核准時複製到帳戶列，建立 job 從列上讀出來交給 provider；之後申請的草稿再怎麼改，列上的值不變。
+// mutation：核准不複製信箱（寫入固定值或申請以外的來源）→ 列上的信箱與 provider 收到的信箱都不是申請上的值，失敗。
+func TestApprovalCopiesThePayoutContactEmailToTheAccountRowAndTheCreateCallSendsIt(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	accountID, s := f.open(t)
+	in := kycDraft(accountID, idA, bankAcct)
+	in.PayoutContactEmail = ptr("  Pay.Out@Example.COM ")
+	d := f.savedDraft(t, in)
+	if d.PayoutContactEmail == nil || *d.PayoutContactEmail != "pay.out@example.com" {
+		t.Fatalf("草稿的信箱=%v，預期去空白並轉小寫", d.PayoutContactEmail)
+	}
+	sub, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
+	must(t, err)
+	must(t, approve(f, sub))
+	var stored string
+	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT contact_email FROM seller.payment_accounts WHERE store_id = $1", s.StoreID).Scan(&stored))
+	if stored != "pay.out@example.com" {
+		t.Fatalf("列上的信箱=%q", stored)
+	}
+	f.ensureAccount(t, s.StoreID)
+	if got := f.payment.EnsureEmails(); !slices.Equal(got, []string{"pay.out@example.com"}) {
+		t.Fatalf("provider 收到的信箱=%v", got)
+	}
+}
+
 // 核准的 transaction 內寫「建立中」的列並排入建立 job，外部呼叫不在核准裡；建立 job 重送（外部帳戶已建立但本地沒記到）時，provider 以列上保存的
 // UUID 為冪等鍵回同一個帳戶，不會有第二個；不同店家的鍵不同（兩個資料庫共用同一個 provider 帳號時不撞鍵）。
 // mutation：Ensure 每次呼叫產生新的冪等鍵、不用列上保存的 → 重送建出第二個帳戶，且送出的鍵不等於列上的值，失敗。
@@ -350,8 +377,8 @@ func TestSweepQueuesSyncForOpenAndLiftableStatusesOnly(t *testing.T) {
 		}
 		enabled := st == PaymentEnabled
 		_, err := f.db.Conn(ctx).Exec(ctx, fmt.Sprintf(`INSERT INTO seller.payment_accounts
-			(store_id, provider, external_account_id, requirement_collection, status, transfers_active, created_at, updated_at)
-			VALUES ($1, 'fake', %s, 'PROVIDER', $2, $3, $4, $4)`, external), s.StoreID, string(st), enabled, f.now.Add(-time.Hour))
+			(store_id, provider, external_account_id, contact_email, requirement_collection, status, transfers_active, created_at, updated_at)
+			VALUES ($1, 'fake', %s, 'seller@example.com', 'PROVIDER', $2, $3, $4, $4)`, external), s.StoreID, string(st), enabled, f.now.Add(-time.Hour))
 		must(t, err)
 	}
 	// byStatus 的 DISABLED 沒有原因碼（可被輪詢）；再加三個 DISABLED：可解除的原因碼被輪詢，rejected、unsupported 開頭的終局原因碼不輪詢。
@@ -360,8 +387,8 @@ func TestSweepQueuesSyncForOpenAndLiftableStatusesOnly(t *testing.T) {
 		_, s := f.open(t)
 		disabledWith[reason] = s.StoreID
 		_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO seller.payment_accounts
-			(store_id, provider, external_account_id, requirement_collection, status, status_reason, created_at, updated_at)
-			VALUES ($1, 'fake', $2, 'PROVIDER', 'DISABLED', $3, $4, $4)`, s.StoreID, fmt.Sprintf("acct_%d", s.StoreID), reason, f.now.Add(-time.Hour))
+			(store_id, provider, external_account_id, contact_email, requirement_collection, status, status_reason, created_at, updated_at)
+			VALUES ($1, 'fake', $2, 'seller@example.com', 'PROVIDER', 'DISABLED', $3, $4, $4)`, s.StoreID, fmt.Sprintf("acct_%d", s.StoreID), reason, f.now.Add(-time.Hour))
 		must(t, err)
 	}
 	synced, ensured, err := f.module.SweepPaymentAccounts(ctx)

@@ -484,7 +484,7 @@ func TestListStoresPagesOverConnectAndGetStoreCarriesTheKYCSummary(t *testing.T)
 	draft, err := f.module.SaveKYCDraft(ctx, seller.KYCDraftInput{
 		AccountID: accountID, SellerType: ptr(seller.KYCIndividual), RealName: ptr("王小明"), BirthDate: ptr("1990-05-06"), IDCardNo: ptr("A123456789"),
 		EnglishName: ptr("Wang Farm"), BankName: ptr("臺灣銀行"), BankCode: ptr("004"), BankAccount: ptr("012345678901"),
-		ProductType: ptr("蔬果"),
+		ProductType: ptr("蔬果"), PayoutContactEmail: ptr("seller@example.com"),
 		IDCardFront: &seller.KYCDocumentRef{StagedToken: "front"}, IDCardBack: &seller.KYCDocumentRef{StagedToken: "back"}, BankBook: &seller.KYCDocumentRef{StagedToken: "book"},
 	})
 	if err != nil {
@@ -905,7 +905,7 @@ func (f *adminFixture) submitKYC(t *testing.T, storeID int64, idCard, bank strin
 	draft, err := f.module.SaveKYCDraft(ctx, seller.KYCDraftInput{
 		AccountID: accountID, SellerType: ptr(seller.KYCIndividual), RealName: ptr("王小明"), BirthDate: ptr("1990-05-06"), IDCardNo: ptr(idCard),
 		EnglishName: ptr("Wang Farm"), BankName: ptr("臺灣銀行"), BankCode: ptr("004"), BankAccount: ptr(bank),
-		ProductType: ptr("蔬果"),
+		ProductType: ptr("蔬果"), PayoutContactEmail: ptr("seller@example.com"),
 		IDCardFront: &seller.KYCDocumentRef{StagedToken: "front"}, IDCardBack: &seller.KYCDocumentRef{StagedToken: "back"}, BankBook: &seller.KYCDocumentRef{StagedToken: "book"},
 	})
 	if err != nil {
