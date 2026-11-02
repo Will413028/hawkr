@@ -1,0 +1,142 @@
+--- stripe-collected express country=US caps=['card_payments', 'transfers'] tos=None (HTTP 200)
+{
+  "id": "acct_1UX9BmEr9ocI8mJA",
+  "type": "none",
+  "country": "US",
+  "controller": {
+    "fees": {
+      "payer": "application"
+    },
+    "is_controller": true,
+    "losses": {
+      "payments": "application"
+    },
+    "requirement_collection": "stripe",
+    "stripe_dashboard": {
+      "type": "express"
+    },
+    "type": "application"
+  },
+  "capabilities": {
+    "card_payments": "inactive",
+    "transfers": "inactive"
+  },
+  "charges_enabled": false,
+  "payouts_enabled": false
+}
+--- stripe-collected express country=SG caps=['card_payments', 'transfers'] tos=None (HTTP 200)
+{
+  "id": "acct_1UX9BoIiqq986Pq0",
+  "type": "none",
+  "country": "SG",
+  "controller": {
+    "fees": {
+      "payer": "application"
+    },
+    "is_controller": true,
+    "losses": {
+      "payments": "application"
+    },
+    "requirement_collection": "stripe",
+    "stripe_dashboard": {
+      "type": "express"
+    },
+    "type": "application"
+  },
+  "capabilities": {
+    "card_payments": "inactive",
+    "transfers": "inactive"
+  },
+  "charges_enabled": false,
+  "payouts_enabled": false
+}
+--- stripe-collected express country=JP caps=['card_payments', 'transfers'] tos=None (HTTP 200)
+{
+  "id": "acct_1UX9BrRI8kwURw97",
+  "type": "none",
+  "country": "JP",
+  "controller": {
+    "fees": {
+      "payer": "application"
+    },
+    "is_controller": true,
+    "losses": {
+      "payments": "application"
+    },
+    "requirement_collection": "stripe",
+    "stripe_dashboard": {
+      "type": "express"
+    },
+    "type": "application"
+  },
+  "capabilities": {
+    "card_payments": "inactive",
+    "transfers": "inactive"
+  },
+  "charges_enabled": false,
+  "payouts_enabled": false
+}
+--- stripe-collected express country=TW caps=['card_payments', 'transfers'] tos=None (HTTP 400)
+{
+  "error": {
+    "message": "You cannot request the `card_payments` capability for accounts in TW. For a list of countries that support `card_payments`, see https://stripe.com/global. To create an account in TW, see https://stripe.com/docs/connect/cross-border-payouts.",
+    "param": "requested_capabilities",
+    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:6d40>",
+    "type": "invalid_request_error"
+  }
+}
+--- stripe-collected express country=TW caps=['transfers'] tos={'service_agreement': 'recipient'} (HTTP 200)
+{
+  "id": "acct_1UX9BvEtam2dPxDJ",
+  "type": "none",
+  "country": "TW",
+  "controller": {
+    "fees": {
+      "payer": "application"
+    },
+    "is_controller": true,
+    "losses": {
+      "payments": "application"
+    },
+    "requirement_collection": "stripe",
+    "stripe_dashboard": {
+      "type": "express"
+    },
+    "type": "application"
+  },
+  "capabilities": {
+    "transfers": "inactive"
+  },
+  "charges_enabled": false,
+  "payouts_enabled": false
+}
+--- stripe-collected express country=SG caps=['transfers'] tos={'service_agreement': 'recipient'} (HTTP 200)
+{
+  "id": "acct_1UX9BxIplDJsepBS",
+  "type": "none",
+  "country": "SG",
+  "controller": {
+    "fees": {
+      "payer": "application"
+    },
+    "is_controller": true,
+    "losses": {
+      "payments": "application"
+    },
+    "requirement_collection": "stripe",
+    "stripe_dashboard": {
+      "type": "express"
+    },
+    "type": "application"
+  },
+  "capabilities": {
+    "transfers": "inactive"
+  },
+  "charges_enabled": false,
+  "payouts_enabled": false
+}
+deleted acct_1UX9BmEr9ocI8mJA 200 True
+deleted acct_1UX9BoIiqq986Pq0 200 True
+deleted acct_1UX9BrRI8kwURw97 200 True
+deleted acct_1UX9BvEtam2dPxDJ 200 True
+deleted acct_1UX9BxIplDJsepBS 200 True

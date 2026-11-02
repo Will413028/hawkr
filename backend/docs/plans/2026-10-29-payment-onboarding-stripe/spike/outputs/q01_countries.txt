@@ -1,0 +1,89 @@
+--- controller/application country=US full agreement (HTTP 400)
+{
+  "error": {
+    "message": "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile.",
+    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:51e6>",
+    "type": "invalid_request_error"
+  }
+}
+--- controller/application country=TW full agreement (HTTP 400)
+{
+  "error": {
+    "message": "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile.",
+    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:c93e>",
+    "type": "invalid_request_error"
+  }
+}
+--- controller/application country=SG full agreement (HTTP 400)
+{
+  "error": {
+    "message": "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile.",
+    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:328f>",
+    "type": "invalid_request_error"
+  }
+}
+--- controller/application country=JP full agreement (HTTP 400)
+{
+  "error": {
+    "message": "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile.",
+    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:2929>",
+    "type": "invalid_request_error"
+  }
+}
+--- legacy type=custom country=TW (HTTP 400)
+{
+  "error": {
+    "message": "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile.",
+    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:af2a>",
+    "type": "invalid_request_error"
+  }
+}
+--- legacy type=custom country=SG (HTTP 400)
+{
+  "error": {
+    "message": "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile.",
+    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:ea10>",
+    "type": "invalid_request_error"
+  }
+}
+--- legacy type=custom country=JP (HTTP 400)
+{
+  "error": {
+    "message": "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile.",
+    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:76b2>",
+    "type": "invalid_request_error"
+  }
+}
+--- controller/application country=TW tos_acceptance.service_agreement=recipient (transfers only) (HTTP 400)
+{
+  "error": {
+    "message": "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile.",
+    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:f52d>",
+    "type": "invalid_request_error"
+  }
+}
+--- controller/application country=SG tos_acceptance.service_agreement=recipient (transfers only) (HTTP 400)
+{
+  "error": {
+    "message": "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile.",
+    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:f6fa>",
+    "type": "invalid_request_error"
+  }
+}
+--- controller/application country=JP tos_acceptance.service_agreement=recipient (transfers only) (HTTP 400)
+{
+  "error": {
+    "message": "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile.",
+    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:264f>",
+    "type": "invalid_request_error"
+  }
+}
+--- Express-like controller country=TW requirement_collection=stripe (HTTP 400)
+{
+  "error": {
+    "message": "When `stripe_dashboard[type]=express`, your platform must collect fees and be liable for negative balances or refunds and chargebacks.",
+    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:dca2>",
+    "type": "invalid_request_error"
+  }
+}
+--- created ids (for cleanup): 

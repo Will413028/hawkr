@@ -1,0 +1,18 @@
+--- v2 core account country=us (HTTP 400)
+{
+  "error": {
+    "code": "account_creation_requirement_collection_unacknowledged",
+    "doc_url": "https://dashboard.stripe.com/settings/connect/platform-profile",
+    "message": "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile.",
+    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/logs/req_<MASKED:6500>"
+  }
+}
+--- v2 core account country=tw (HTTP 400)
+{
+  "error": {
+    "code": "account_creation_requirement_collection_unacknowledged",
+    "doc_url": "https://dashboard.stripe.com/settings/connect/platform-profile",
+    "message": "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile.",
+    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/logs/req_<MASKED:95f8>"
+  }
+}
