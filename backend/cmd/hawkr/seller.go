@@ -19,6 +19,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/payuni"
 	"github.com/Will413028/hawkr/backend/internal/platform/seal"
+	"github.com/Will413028/hawkr/backend/internal/platform/stripe"
 )
 
 // kycKeys 是 KYC 個資的金鑰：加密金鑰環與比對用的 HMAC 金鑰環。
@@ -109,7 +110,9 @@ func readPayUni(e *config.Env, log *slog.Logger) *payuniSetup {
 }
 
 // readPayment 讀收款開通的 provider：PAYMENT_PROVIDER 為空表示沒有設定（核准不建立收款帳戶，開通相關的方法回 failed_precondition），
-// fake 是記憶體內的 provider（所有帳戶都回轉帳能力已啟用，只給本機開發），其他值讓啟動失敗。
+// fake 是記憶體內的 provider（所有帳戶都回轉帳能力已啟用，只給本機開發），stripe 是 Stripe Connect（Accounts v2）；其他值讓啟動失敗。
+// stripe 讀 STRIPE_SECRET_KEY（沒有設定時等於沒有 provider，serve 照常啟動）、STRIPE_WEBHOOK_SECRET（有金鑰卻沒有它，啟動失敗）與
+// STRIPE_REQUIREMENT_COLLECTION（provider 是 Stripe 收件、託管頁面，預設；platform 是平台收件、內嵌元件；其他值啟動失敗）。
 func readPayment(e *config.Env, log *slog.Logger) seller.PaymentProvider {
 	switch name := e.StringOr("PAYMENT_PROVIDER", ""); name {
 	case "":
@@ -119,10 +122,46 @@ func readPayment(e *config.Env, log *slog.Logger) seller.PaymentProvider {
 		fake := seller.NewPaymentFake()
 		fake.AutoActive = true
 		return fake
+	case "stripe":
+		return readStripe(e, log)
 	default:
-		e.Fail("PAYMENT_PROVIDER：不認得的值 %q（可用：fake）", name)
+		e.Fail("PAYMENT_PROVIDER：不認得的值 %q（可用：fake、stripe）", name)
 		return nil
 	}
+}
+
+func readStripe(e *config.Env, log *slog.Logger) seller.PaymentProvider {
+	var collection seller.RequirementCollection
+	switch v := e.StringOr("STRIPE_REQUIREMENT_COLLECTION", "provider"); v {
+	case "provider":
+		collection = seller.CollectionProvider
+	case "platform":
+		collection = seller.CollectionPlatform
+	default:
+		e.Fail("STRIPE_REQUIREMENT_COLLECTION：不認得的值 %q（可用：provider、platform）", v)
+		return nil
+	}
+	key := e.StringOr("STRIPE_SECRET_KEY", "")
+	if key == "" {
+		log.Warn("PAYMENT_PROVIDER=stripe 但沒有 STRIPE_SECRET_KEY：核准後不會建立收款帳戶，店家不會通過開通閘門")
+		return nil
+	}
+	whsecret := e.StringOr("STRIPE_WEBHOOK_SECRET", "")
+	if whsecret == "" {
+		e.Fail("STRIPE_WEBHOOK_SECRET：設了 STRIPE_SECRET_KEY 就必填")
+		return nil
+	}
+	client, err := stripe.New(stripe.Config{SecretKey: key, WebhookSecret: whsecret})
+	if err != nil {
+		e.Fail("Stripe：%v", err)
+		return nil
+	}
+	provider, err := seller.NewStripePayment(client, collection)
+	if err != nil {
+		e.Fail("Stripe：%v", err)
+		return nil
+	}
+	return provider
 }
 
 // readGCIS 讀統一編號查詢（經濟部商業司的公開資料，不是舊公司的服務）的設定：GCIS_BASE_URL（預設是公開資料平台

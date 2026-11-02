@@ -31,7 +31,7 @@ func TestStatusOfFollowsTheDecisionTable(t *testing.T) {
 		wantReason string
 		wantWarn   bool
 	}{
-		"active":         {Snapshot{Transfers: CapabilityActive, TransfersActive: true}, model.PaymentEnabled, "", false},
+		"active":         {Snapshot{Transfers: CapabilityActive}, model.PaymentEnabled, "", false},
 		"active 忽略殘留的細節": {Snapshot{Transfers: CapabilityActive, Details: details(platform("x"))}, model.PaymentEnabled, "", false},
 		"新帳戶：restricted 加 seller_action":     {Snapshot{Transfers: CapabilityRestricted, Details: details(seller("routine_onboarding"))}, model.PaymentActionRequired, "routine_onboarding", false},
 		"pending 但有 seller_action":           {Snapshot{Transfers: CapabilityPending, Details: details(seller("verification_failed"))}, model.PaymentActionRequired, "verification_failed", false},

@@ -7,6 +7,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/payment"
+	"github.com/Will413028/hawkr/backend/internal/platform/stripe"
 )
 
 // 收款開通（Stripe 計畫；port 與快取在 internal/payment）。賣家的方法以店家為身分（呼叫方先從能力檢查取得店家）；管理員的方法由呼叫方
@@ -98,8 +99,23 @@ var ErrPaymentPermanent = payment.ErrPermanent
 // ErrPaymentInvalidEvent 標示事件的簽章或格式不合。
 var ErrPaymentInvalidEvent = payment.ErrInvalidEvent
 
+// ErrPaymentIgnoredEvent 標示驗過簽章但不處理的事件。
+var ErrPaymentIgnoredEvent = payment.ErrIgnoredEvent
+
+// PaymentFakeIgnoredEventHeader 讓 PaymentFake 把事件當成不處理的事件。
+const PaymentFakeIgnoredEventHeader = payment.FakeIgnoredEventHeader
+
 // PaymentFakeEventHeader 是 PaymentFake 的事件 ID header。
 const PaymentFakeEventHeader = payment.FakeEventHeader
+
+// NewStripePayment 建立 Stripe 的收款 provider（Accounts v2）；collection 是 CollectionProvider（託管頁面）或 CollectionPlatform（內嵌元件）。
+func NewStripePayment(client *stripe.Client, collection RequirementCollection) (PaymentProvider, error) {
+	p, err := payment.NewStripe(client, collection)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
 
 // NewPaymentFake 建立 PaymentFake。
 func NewPaymentFake() *PaymentFake { return payment.NewFake() }

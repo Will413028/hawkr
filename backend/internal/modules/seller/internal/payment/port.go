@@ -69,14 +69,13 @@ type StatusDetail struct {
 }
 
 // Snapshot 是外部帳戶某一刻的狀態，由 adapter 從 provider 的回應整理成中立的欄位。Transfers 與 Details 是轉帳能力（開通閘門）的狀態與
-// 它的限制細節；TransfersActive 與 PayoutsActive 是轉帳、撥款能力已啟用；Requirements 是 provider 回報的待補條件原始 JSON（物件），原樣
+// 它的限制細節；PayoutsActive 是撥款能力已啟用；Requirements 是 provider 回報的待補條件原始 JSON（物件），原樣
 // 保存給後台看。
 type Snapshot struct {
-	Transfers       CapabilityState
-	Details         []StatusDetail
-	TransfersActive bool
-	PayoutsActive   bool
-	Requirements    json.RawMessage
+	Transfers     CapabilityState
+	Details       []StatusDetail
+	PayoutsActive bool
+	Requirements  json.RawMessage
 }
 
 // EnsureInput 是建立外部帳戶的輸入。IdempotencyKey 是 store_id 的十進位文字：同一家店重送建立得到同一個帳戶。
@@ -98,7 +97,7 @@ type Event struct {
 	ExternalAccountID string
 }
 
-// Provider 是收款開通的 port。真正的實作（Stripe）在後續的 adapter，測試與本機用 Fake。傳輸錯誤（連線、逾時、5xx、429）回一般錯誤，
+// Provider 是收款開通的 port。真正的實作是 Stripe（stripe.go），測試與本機用 Fake。傳輸錯誤（連線、逾時、5xx、429）回一般錯誤，
 // job 重試；provider 以業務理由拒絕、重試也不會成功時包 ErrPermanent。實作不得把傳輸錯誤轉成業務結果。每個呼叫都有 deadline。
 type Provider interface {
 	// Name 是 provider 的代碼（小寫英數與底線），存在帳戶列的 provider 欄。
@@ -110,7 +109,7 @@ type Provider interface {
 	CreateOnboardingSession(ctx context.Context, in SessionInput) (model.OnboardingSession, error)
 	// FetchAccount 讀外部帳戶目前的狀態。
 	FetchAccount(ctx context.Context, externalID string) (Snapshot, error)
-	// ParseEvent 驗簽並取出事件 ID 與外部帳戶 ID；簽章不符回 ErrInvalidEvent。
+	// ParseEvent 驗簽並取出事件 ID 與外部帳戶 ID；簽章不符或格式不合回 ErrInvalidEvent，驗過簽章但不是本平台要處理的事件回 ErrIgnoredEvent。
 	ParseEvent(header http.Header, body []byte) (Event, error)
 }
 
@@ -119,6 +118,8 @@ var (
 	ErrPermanent = errors.New("payment: permanent failure")
 	// ErrInvalidEvent 標示事件的簽章或格式不合，不處理。
 	ErrInvalidEvent = errors.New("payment: invalid event")
+	// ErrIgnoredEvent 標示驗過簽章、但不是要處理的事件：回應 2xx，不寫 inbox、不排 job。
+	ErrIgnoredEvent = errors.New("payment: ignored event")
 )
 
 // maxReasonLen 是 status_reason 的字數上限（payment_accounts_status_reason_check）。

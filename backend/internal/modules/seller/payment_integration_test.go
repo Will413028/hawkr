@@ -23,7 +23,7 @@ const (
 )
 
 var (
-	enabledSnapshot = PaymentSnapshot{Transfers: PaymentCapabilityActive, TransfersActive: true, PayoutsActive: true}
+	enabledSnapshot = PaymentSnapshot{Transfers: PaymentCapabilityActive, PayoutsActive: true}
 	// needsSellerSnapshot 是賣家要補資料（新帳戶的樣子）；rejectedSnapshot 是被金流商拒絕。
 	needsSellerSnapshot = PaymentSnapshot{Transfers: PaymentCapabilityRestricted, Details: []PaymentStatusDetail{{Resolution: PaymentResolutionSellerAction, Reason: "routine_onboarding"}}}
 	rejectedSnapshot    = PaymentSnapshot{Transfers: PaymentCapabilityRejected, Details: []PaymentStatusDetail{{Resolution: PaymentResolutionPlatformAction, Reason: "rejected.fraud"}}}
@@ -268,6 +268,26 @@ func TestDuplicateProviderEventIsRecordedOnceAndQueuesNoSecondSync(t *testing.T)
 	err := f.module.ReceivePaymentEvent(ctx, http.Header{}, []byte(external))
 	if apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("簽章不合的事件 err=%v", err)
+	}
+}
+
+// 驗過簽章但不處理的事件（例如連線帳戶的 v1 事件、v2.core.account_person.*）：回 nil，不寫 inbox、不排 job。
+// mutation：ReceiveEvent 把 ErrIgnoredEvent 當成 ErrInvalidEvent → 回 InvalidInput，失敗。
+func TestIgnoredProviderEventWritesNoInboxRowAndQueuesNoSync(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	_, s := f.approvedStore(t)
+	external := f.ensureAccount(t, s.StoreID)
+	before := len(f.jobs.queuedStoreIDs(t, kindPaymentSync))
+	h, body := f.paymentEvent("evt_ignored", external)
+	h.Set(PaymentFakeIgnoredEventHeader, "1")
+	must(t, f.module.ReceivePaymentEvent(ctx, h, body))
+	if got := len(f.jobs.queuedStoreIDs(t, kindPaymentSync)) - before; got != 0 {
+		t.Fatalf("不處理的事件排了 %d 個同步 job", got)
+	}
+	if n := f.count(t, "SELECT count(*) FROM seller.payment_provider_events WHERE event_id = 'evt_ignored'"); n != 0 {
+		t.Fatalf("不處理的事件寫了 inbox：%d", n)
 	}
 }
 

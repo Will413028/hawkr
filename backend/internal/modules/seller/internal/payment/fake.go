@@ -19,6 +19,9 @@ const FakeName = "fake"
 // FakeEventHeader 是 Fake 的事件載體：header 帶事件 ID，body 是外部帳戶 ID（沒有簽章）。
 const FakeEventHeader = "X-Fake-Event-Id"
 
+// FakeIgnoredEventHeader 讓 Fake 的 ParseEvent 把事件當成不處理的事件（回 ErrIgnoredEvent）。
+const FakeIgnoredEventHeader = "X-Fake-Event-Ignored"
+
 // Fake 是記憶體內的 provider：測試與本機用。每個呼叫都檢查不在 DB transaction 內、有 deadline（規則 5），違規記在 Violations。
 // AutoActive 為真時，每個外部帳戶（含不認得的 ID，例如種子資料的帳戶）都回轉帳能力已啟用的快照，本機不需要真的 provider 就能走完開通。
 type Fake struct {
@@ -182,7 +185,7 @@ func (f *Fake) FetchAccount(ctx context.Context, externalID string) (Snapshot, e
 		return Snapshot{}, err
 	}
 	if f.AutoActive {
-		return Snapshot{Transfers: CapabilityActive, TransfersActive: true, PayoutsActive: true, Requirements: json.RawMessage(`{}`)}, nil
+		return Snapshot{Transfers: CapabilityActive, PayoutsActive: true, Requirements: json.RawMessage(`{}`)}, nil
 	}
 	s, ok := f.accounts[externalID]
 	if !ok {
@@ -193,6 +196,9 @@ func (f *Fake) FetchAccount(ctx context.Context, externalID string) (Snapshot, e
 
 // ParseEvent 實作 Provider：沒有簽章，header 帶事件 ID，body 是外部帳戶 ID。
 func (f *Fake) ParseEvent(header http.Header, body []byte) (Event, error) {
+	if header.Get(FakeIgnoredEventHeader) != "" {
+		return Event{}, ErrIgnoredEvent
+	}
 	id, account := strings.TrimSpace(header.Get(FakeEventHeader)), strings.TrimSpace(string(body))
 	if id == "" || account == "" {
 		return Event{}, errors.Join(ErrInvalidEvent, errors.New("缺少事件 ID 或外部帳戶"))

@@ -201,7 +201,7 @@ func fileRoutes(deps Deps) []fileRoute {
 }
 
 // assemble 把 service 掛上入口的中介層：tracing、CSRF、session、限流的身分，以及 Connect 的限流、快取規則
-// 與 interceptor 之前的錯誤 log。測試以它掛上假的 service，驗證中介層本身的性質（例如串流不被緩衝），不必依賴
+// 與 interceptor 之前的錯誤 log。Stripe webhook（簽章就是驗證）在 CSRF、session 與限流的身分之外，只經 tracing。測試以它掛上假的 service，驗證中介層本身的性質（例如串流不被緩衝），不必依賴
 // 某個正式的 service。
 func assemble(deps Deps, services []service, files ...fileRoute) (http.Handler, error) {
 	if deps.Now == nil {
@@ -253,7 +253,18 @@ func assemble(deps Deps, services []service, files ...fileRoute) (http.Handler, 
 	h = withSession(deps.Identity, deps.Logger, h)
 	h = withCookieCSRF(cookieCSRFOrigins(deps.WebOrigin, deps.Origins), h)
 	h = csrf.Handler(h)
+	if deps.Seller != nil {
+		h = withPaymentWebhook(deps.Seller, deps.Logger, h)
+	}
 	return withTracing(deps.Tracer, h), nil
+}
+
+// withPaymentWebhook 在 next（CSRF、session、限流身分都在裡面）之外掛上 Stripe webhook：簽章就是驗證，沒有 cookie、Origin 與 Bearer。
+func withPaymentWebhook(events httpseller.PaymentEvents, log *slog.Logger, next http.Handler) http.Handler {
+	root := http.NewServeMux()
+	root.Handle(httpseller.PaymentWebhookRoute, httpseller.NewPaymentWebhook(events, log))
+	root.Handle("/", next)
+	return root
 }
 
 type service struct {
