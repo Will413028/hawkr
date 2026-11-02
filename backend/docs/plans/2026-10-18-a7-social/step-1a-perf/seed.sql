@@ -33,6 +33,10 @@ INSERT INTO seller.payuni_registrations (application_id, store_id, mer_id, creat
 SELECT application_id, store_id, 'HAWK' || store_id, now() - interval '789 days', now(), 'BOUND', now() - interval '788 days', 'APPROVED', now() - interval '788 days'
 FROM seller.kyc_applications;
 
+INSERT INTO seller.payment_accounts (store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, created_at, updated_at)
+SELECT store_id, 'fake', 'acct_' || store_id, 'PROVIDER', 'ENABLED', true, true, now() - interval '788 days', now()
+FROM seller.kyc_applications;
+
 INSERT INTO seller.measures (id, account_id, store_id, basis, kind, status, risk_ground, review_by, created_at, starts_at, created_by_admin_id, current_revision, statement_to_seller, updated_at)
 SELECT gen_random_uuid(), account_id, store_id, 'RISK', 'SUSPENSION', 'ENFORCED', 'FRAUD', now() + interval '30 days',
        now() - interval '10 days', now() - interval '10 days', 1, 1, '測試停權', now()
