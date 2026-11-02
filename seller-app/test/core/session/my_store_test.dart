@@ -155,7 +155,9 @@ void main() {
             ),
             CapabilityStatus(
               capability: SellerCapability.SELLER_CAPABILITY_SHIPPING_SETUP,
-              missing: [SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE],
+              missing: [
+                SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
+              ],
             ),
           ],
         ),

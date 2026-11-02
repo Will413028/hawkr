@@ -569,7 +569,9 @@ void main() {
           capabilities: [
             CapabilityStatus(
               capability: SellerCapability.SELLER_CAPABILITY_MARKETING,
-              missing: [SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE],
+              missing: [
+                SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
+              ],
             ),
           ],
         ),

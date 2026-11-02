@@ -207,7 +207,9 @@ final class MyStore {
     if (missing.contains(SellerRequirement.SELLER_REQUIREMENT_NOT_SUSPENDED)) {
       return ShippingGate.suspended;
     }
-    if (missing.contains(SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE) &&
+    if (missing.contains(
+          SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
+        ) &&
         !missing.contains(SellerRequirement.SELLER_REQUIREMENT_STORE_ACTIVE)) {
       return ShippingGate.certification;
     }
@@ -220,7 +222,9 @@ final class MyStore {
       SellerCapability.SELLER_CAPABILITY_PUBLIC_LISTING,
     );
     return missing != null &&
-        !missing.contains(SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE);
+        !missing.contains(
+          SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
+        );
   }
 
   /// 商店介紹；沒有填時是 null。
