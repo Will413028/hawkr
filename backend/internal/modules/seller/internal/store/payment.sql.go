@@ -91,7 +91,10 @@ func (q *Queries) ClearPaymentAccountCreateFailed(ctx context.Context, arg Clear
 const insertPaymentAccount = `-- name: InsertPaymentAccount :execrows
 INSERT INTO seller.payment_accounts (store_id, provider, contact_email, requirement_collection, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $5)
-ON CONFLICT (store_id) DO NOTHING
+ON CONFLICT (store_id) DO UPDATE
+SET contact_email = EXCLUDED.contact_email,
+    updated_at = EXCLUDED.updated_at
+WHERE seller.payment_accounts.external_account_id IS NULL
 `
 
 type InsertPaymentAccountParams struct {
@@ -102,7 +105,7 @@ type InsertPaymentAccountParams struct {
 	Now                   time.Time
 }
 
-// 核准時寫「建立中」的列（沒有外部 ID），contact_email 是申請上的收款聯絡信箱；一店一列，關店再開沿用既有的列（含它的信箱），所以已有列時不寫。
+// 核准時寫「建立中」的列（沒有外部 ID），contact_email 是申請上的收款聯絡信箱；一店一列，關店再開沿用既有的列；已有列且還沒有外部 ID 時（建立失敗或 job 還沒跑）以這次申請的信箱覆寫，建立才會用最新的信箱；已有外部 ID 的列保留原信箱（建立之後改信箱由 D23 延後處理）。
 func (q *Queries) InsertPaymentAccount(ctx context.Context, arg InsertPaymentAccountParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertPaymentAccount,
 		arg.StoreID,

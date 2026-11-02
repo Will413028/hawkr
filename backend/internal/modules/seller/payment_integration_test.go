@@ -128,6 +128,51 @@ func TestApprovalCopiesThePayoutContactEmailToTheAccountRowAndTheCreateCallSends
 	}
 }
 
+// reapprove 模擬同一家店再一次核准：舊的申請已取消（唯一索引只允許一筆沒取消的申請），賣家用新信箱送出新申請並核准。
+func (f *fixture) reapprove(t *testing.T, accountID int64, email string) {
+	t.Helper()
+	ctx := context.Background()
+	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.kyc_applications SET status = 'CANCELLED', decided_at = NULL WHERE account_id = $1", accountID)
+	must(t, err)
+	in := kycDraft(accountID, idA, bankAcct)
+	in.PayoutContactEmail = ptr(email)
+	d := f.savedDraft(t, in)
+	sub, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
+	must(t, err)
+	must(t, approve(f, sub))
+}
+
+func (f *fixture) accountEmail(t *testing.T, storeID int64) string {
+	t.Helper()
+	ctx := context.Background()
+	var email string
+	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT contact_email FROM seller.payment_accounts WHERE store_id = $1", storeID).Scan(&email))
+	return email
+}
+
+// 再次核准時帳戶列已存在：還沒有外部帳戶（建立失敗或 job 沒跑）的列改用新申請的信箱，建立才會送最新的；已經有外部帳戶的列保留原信箱（D23 延後改信箱）。
+// mutation：InsertPaymentAccount 改回 ON CONFLICT DO NOTHING → 第一段的信箱仍是舊的，失敗；拿掉 WHERE external_account_id IS NULL → 第二段的信箱被覆寫，失敗。
+func TestReapprovalReplacesTheContactEmailOnlyWhileTheExternalAccountDoesNotExist(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	accountID, s := f.approvedWith(t, idA, bankAcct)
+	if got := f.accountEmail(t, s.StoreID); got != "seller@example.com" {
+		t.Fatalf("第一次核准的信箱=%q", got)
+	}
+	f.reapprove(t, accountID, "New.Owner@Example.com")
+	if got := f.accountEmail(t, s.StoreID); got != "new.owner@example.com" {
+		t.Fatalf("沒有外部帳戶時再次核准的信箱=%q，預期換成新申請的", got)
+	}
+	f.ensureAccount(t, s.StoreID)
+	if got := f.payment.EnsureEmails(); !slices.Equal(got, []string{"new.owner@example.com"}) {
+		t.Fatalf("provider 收到的信箱=%v", got)
+	}
+	f.reapprove(t, accountID, "third@example.com")
+	if got := f.accountEmail(t, s.StoreID); got != "new.owner@example.com" {
+		t.Fatalf("已有外部帳戶的列信箱=%q，預期保留原值", got)
+	}
+}
+
 // 核准的 transaction 內寫「建立中」的列並排入建立 job，外部呼叫不在核准裡；建立 job 重送（外部帳戶已建立但本地沒記到）時，provider 以列上保存的
 // UUID 為冪等鍵回同一個帳戶，不會有第二個；不同店家的鍵不同（兩個資料庫共用同一個 provider 帳號時不撞鍵）。
 // mutation：Ensure 每次呼叫產生新的冪等鍵、不用列上保存的 → 重送建出第二個帳戶，且送出的鍵不等於列上的值，失敗。

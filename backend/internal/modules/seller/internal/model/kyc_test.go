@@ -1,6 +1,7 @@
 package model
 
 import (
+	"strings"
 	"testing"
 	"time"
 	"uuid"
@@ -74,10 +75,16 @@ func TestNormalizeEmailAndMobile(t *testing.T) {
 	if got, ok := NormalizeEmail(" Owner@Example.COM "); !ok || got != "owner@example.com" {
 		t.Errorf("email = %q, %v", got, ok)
 	}
-	for _, raw := range []string{"", "user@localhost", "no-at.example.com", "Name <a@b.co>"} {
+	for _, raw := range []string{"", "user@localhost", "no-at.example.com", "Name <a@b.co>", `"a@b"@c.com`, `"a b"@c.co`, "a@b@c.com"} {
 		if _, ok := NormalizeEmail(raw); ok {
 			t.Errorf("NormalizeEmail(%q) 應該被拒絕", raw)
 		}
+	}
+	if _, ok := NormalizeEmail(strings.Repeat("a", 250) + "@b.co"); ok {
+		t.Errorf("超過 254 字的信箱應該被拒絕")
+	}
+	if got, ok := NormalizeEmail(`"ab"@C.com`); !ok || got != "ab@c.com" {
+		t.Errorf("quoted without @ = %q, %v", got, ok)
 	}
 	if got, ok := NormalizeMobile("+886 912-345-678"); !ok || got != "0912345678" {
 		t.Errorf("mobile = %q, %v", got, ok)

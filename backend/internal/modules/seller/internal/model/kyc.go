@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 	"uuid"
 
@@ -655,15 +656,19 @@ func NormalizeMobile(raw string) (string, bool) {
 	return p, mobileRe.MatchString(p)
 }
 
-// NormalizeEmail 去掉前後空白、轉小寫，要求有網域且網域有點（user@localhost 不算）。
+// NormalizeEmail 去掉前後空白、轉小寫，要求恰好一個 @、兩側非空、沒有空白、至多 254 字，且網域有點（user@localhost 不算）。
+// 這些條件與資料庫的信箱 CHECK（payout_contact_email、contact_email、support_email）一致；mail.ParseAddress 接受的帶引號本地
+// 部分（"a@b"@c.com）會多出一個 @，所以要在解析之後再檢查一次。
 func NormalizeEmail(raw string) (string, bool) {
 	addr, err := mail.ParseAddress(strings.TrimSpace(raw))
 	if err != nil || addr.Name != "" {
 		return "", false
 	}
 	email := strings.ToLower(addr.Address)
-	at := strings.LastIndex(email, "@")
-	ok := at > 0 && strings.Contains(email[at+1:], ".") && len(email) <= 254 && !strings.ContainsAny(email, " \t")
+	at := strings.Index(email, "@")
+	ok := at > 0 && at < len(email)-1 && strings.Count(email, "@") == 1 &&
+		strings.Contains(email[at+1:], ".") && len(email) <= 254 &&
+		strings.IndexFunc(email, unicode.IsSpace) < 0
 	return email, ok
 }
 

@@ -1634,7 +1634,7 @@ CREATE INDEX store_blocks_buyer ON seller.store_blocks (buyer_id, store_id);
 -- status 是中立的五個狀態，由轉帳能力的狀態與 status_details 推導；transfers_active 與 payouts_active 是外部帳戶的能力是否啟用（開通閘門看 transfers_active，
 -- ENABLED 等於 transfers_active）。requirements 是快照的原始內容，status_reason 是導出目前狀態的金流商原因碼（只給後台）。create_failed_at 是建立重試用完的時刻
 -- （只有還沒有外部 ID 的列才有；後台待辦 review_payment_account_create_failed 的開始時間，重試建立時清空）。
--- contact_email 是核准時從 KYC 申請的 payout_contact_email 複製來的聯絡信箱，建立外部帳戶時送給金流商；列隨店家個資清理一起刪除，所以不另設清除欄位。
+-- contact_email 是核准時從 KYC 申請的 payout_contact_email 複製來的聯絡信箱，建立外部帳戶時送給金流商；外部帳戶建立前每次核准以新申請的信箱覆寫，建立後保留原值（改信箱 D23 延後）；列隨店家個資清理一起刪除，所以不另設清除欄位。
 -- create_idempotency_key 是寫入「建立中」的列時產生的隨機 UUID（v4），建立外部帳戶的每次重試都用它當冪等鍵（Stripe 建議每個邏輯請求用隨機 UUID；
 -- 不用 store_id，兩個資料庫共用同一個 Stripe 帳號時才不會撞到別人的帳戶）。
 CREATE TABLE seller.payment_accounts (

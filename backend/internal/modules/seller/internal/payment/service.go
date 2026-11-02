@@ -57,7 +57,7 @@ func New(d Deps) *Service {
 // Configured 回傳是否設定了 provider。
 func (s *Service) Configured() bool { return s.d.Provider != nil }
 
-// RequestAccount 在平台審核核准的 transaction 內寫「建立中」的帳戶列（已有列時沿用，關店再開不建第二個帳戶）並排入以 store_id 為唯一鍵的建立 job
+// RequestAccount 在平台審核核准的 transaction 內寫「建立中」的帳戶列（已有列時沿用，關店再開不建第二個帳戶；還沒有外部 ID 的列改用這次申請的信箱）並排入以 store_id 為唯一鍵的建立 job
 // （D16、D19）；列寫入時由資料庫產生建立用的冪等鍵 UUID。contactEmail 是申請上的收款聯絡信箱（D23），複製到列上供建立外部帳戶使用；沒有時
 // 回 failed_precondition（送出前的申請沒有這個欄位），核准整筆不寫入。呼叫方已鎖住店家與申請列。這裡不呼叫 provider（規則 5）。沒有設定 provider 時什麼都不做。
 func (s *Service) RequestAccount(ctx context.Context, q *store.Queries, storeID int64, contactEmail *string, now time.Time) error {
