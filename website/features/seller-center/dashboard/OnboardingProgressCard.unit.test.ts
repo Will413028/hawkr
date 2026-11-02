@@ -85,7 +85,9 @@ function renderCard(
 			create(CapabilityStatusSchema, {
 				capability: SellerCapability.SHIPPING_SETUP,
 				active: !missing.includes(R.ONBOARDING_COMPLETE),
-				missing: missing.includes(R.ONBOARDING_COMPLETE) ? [R.ONBOARDING_COMPLETE] : [],
+				missing: missing.includes(R.ONBOARDING_COMPLETE)
+					? [R.ONBOARDING_COMPLETE]
+					: [],
 			}),
 		],
 	});
@@ -141,7 +143,10 @@ describe("OnboardingProgressCard", () => {
 	});
 
 	it("selecting a required step shows its status and action", () => {
-		renderCard([R.ONBOARDING_COMPLETE], KYCFlowStatus.KYC_FLOW_STATUS_PENDING_INFO);
+		renderCard(
+			[R.ONBOARDING_COMPLETE],
+			KYCFlowStatus.KYC_FLOW_STATUS_PENDING_INFO,
+		);
 		expand();
 
 		fireEvent.click(screen.getByRole("button", { name: /^商家認證，/ }));

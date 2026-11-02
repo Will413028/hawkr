@@ -90,7 +90,8 @@ export function shippingGateOf(my: MyStore | null | undefined): ShippingGate {
 	}
 	if (missing.includes(SellerRequirement.NOT_SUSPENDED)) return "suspended";
 	if (missing.includes(SellerRequirement.STORE_ACTIVE)) return "unknown";
-	if (missing.includes(SellerRequirement.ONBOARDING_COMPLETE)) return "certification";
+	if (missing.includes(SellerRequirement.ONBOARDING_COMPLETE))
+		return "certification";
 	return "unknown";
 }
 
@@ -101,7 +102,8 @@ export function shippingGateOf(my: MyStore | null | undefined): ShippingGate {
 export function isStoreCertified(my: MyStore | null | undefined): boolean {
 	const missing = missingRequirements(my);
 	return (
-		missing !== undefined && !missing.includes(SellerRequirement.ONBOARDING_COMPLETE)
+		missing !== undefined &&
+		!missing.includes(SellerRequirement.ONBOARDING_COMPLETE)
 	);
 }
 

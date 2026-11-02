@@ -22,7 +22,9 @@ function shippingStatus(
 ) {
 	const missing =
 		extra.shippingMissing ??
-		(publicMissing.includes(R.ONBOARDING_COMPLETE) ? [R.ONBOARDING_COMPLETE] : []);
+		(publicMissing.includes(R.ONBOARDING_COMPLETE)
+			? [R.ONBOARDING_COMPLETE]
+			: []);
 	return create(CapabilityStatusSchema, {
 		capability: SellerCapability.SHIPPING_SETUP,
 		active: missing.length === 0,
@@ -99,7 +101,9 @@ describe("公開前必須 follows the PUBLIC_LISTING missing requirements", () =
 
 	it("ONBOARDING_COMPLETE keeps the cert task open and shows the flow status as its text", () => {
 		const cert = task(
-			build([R.ONBOARDING_COMPLETE], { flowStatus: F.KYC_FLOW_STATUS_UNDER_REVIEW }),
+			build([R.ONBOARDING_COMPLETE], {
+				flowStatus: F.KYC_FLOW_STATUS_UNDER_REVIEW,
+			}),
 			"cert",
 		);
 		expect(cert.completed).toBe(false);
@@ -116,7 +120,9 @@ describe("公開前必須 follows the PUBLIC_LISTING missing requirements", () =
 		// 伺服器說還缺 ONBOARDING_COMPLETE：就算流程狀態是 APPROVED，這一列也還沒完成。
 		expect(
 			task(
-				build([R.ONBOARDING_COMPLETE], { flowStatus: F.KYC_FLOW_STATUS_APPROVED }),
+				build([R.ONBOARDING_COMPLETE], {
+					flowStatus: F.KYC_FLOW_STATUS_APPROVED,
+				}),
 				"cert",
 			).completed,
 		).toBe(false);
@@ -183,13 +189,17 @@ describe("建議完成", () => {
 		expect(task(build([]), "shipping").locked).toBe(false);
 		expect(
 			task(
-				build([R.ONBOARDING_COMPLETE], { flowStatus: F.KYC_FLOW_STATUS_APPROVED }),
+				build([R.ONBOARDING_COMPLETE], {
+					flowStatus: F.KYC_FLOW_STATUS_APPROVED,
+				}),
 				"shipping",
 			).locked,
 		).toBe(true);
 		expect(
 			task(
-				build([R.ONBOARDING_COMPLETE], { flowStatus: F.KYC_FLOW_STATUS_FORWARDED }),
+				build([R.ONBOARDING_COMPLETE], {
+					flowStatus: F.KYC_FLOW_STATUS_FORWARDED,
+				}),
 				"shipping",
 			).locked,
 		).toBe(true);
@@ -198,7 +208,8 @@ describe("建議完成", () => {
 	it("shipping is gated by SHIPPING_SETUP, not by the PUBLIC_LISTING list", () => {
 		// PUBLIC_LISTING 說缺 ONBOARDING_COMPLETE，但 SHIPPING_SETUP 啟用：不鎖。
 		expect(
-			task(build([R.ONBOARDING_COMPLETE], { shippingMissing: [] }), "shipping").locked,
+			task(build([R.ONBOARDING_COMPLETE], { shippingMissing: [] }), "shipping")
+				.locked,
 		).toBe(false);
 		// 認證已核准（PUBLIC_LISTING 不缺 KYC），但 SHIPPING_SETUP 缺 NOT_SUSPENDED：鎖，不說需要認證。
 		const suspended = task(
