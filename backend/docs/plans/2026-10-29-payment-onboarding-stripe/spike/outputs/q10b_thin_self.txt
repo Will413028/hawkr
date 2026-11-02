@@ -1,0 +1,106 @@
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+create 200
+update 200
+{"recv": "00:17:15", "event": "evt_test_65VglsQmm0HAhNjsRzs16VPLMGQgSQnNXMGX8s36Kr25Jo", "type": "v2.core.account[defaults].updated", "created": "2026-11-02T16:17:14.762Z", "api_version": null, "request_id": null, "account": null, "livemode": false, "pending_webhooks": null, "verify": true, "why": "ok", "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "top_keys": ["created", "id", "livemode", "object", "reason", "related_object", "type"], "related_object": {"id": "acct_1UXNv4EWUjvNrNki", "type": "v2.core.account", "url": "<MASKED>"}, "context": null, "sig_header_parts": ["t", "v1"]}
+{"recv": "00:17:15", "event": "evt_test_65VglsR8lTZWWXyZ0zs16VPLMGQgSQnNXMGX8s36Kr2WIK", "type": "v2.core.account[identity].updated", "created": "2026-11-02T16:17:14.496854323Z", "api_version": null, "request_id": null, "account": null, "livemode": false, "pending_webhooks": null, "verify": true, "why": "ok", "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "top_keys": ["created", "id", "livemode", "object", "reason", "related_object", "type"], "related_object": {"id": "acct_1UXNv4EWUjvNrNki", "type": "v2.core.account", "url": "<MASKED>"}, "context": null, "sig_header_parts": ["t", "v1"]}
+{"recv": "00:17:17", "event": "evt_test_65VglsT1Y8MhBxBFezs16VPLMGQgSQnNXMGX8s36Kr2SEq", "type": "v2.core.account.created", "created": "2026-11-02T16:17:16.824Z", "api_version": null, "request_id": null, "account": null, "livemode": false, "pending_webhooks": null, "verify": true, "why": "ok", "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "top_keys": ["created", "id", "livemode", "object", "reason", "related_object", "type"], "related_object": {"id": "acct_1UXNv4EWUjvNrNki", "type": "v2.core.account", "url": "<MASKED>"}, "context": null, "sig_header_parts": ["t", "v1"]}
+{"recv": "00:17:18", "event": "evt_test_65VglsUiw3PCeYYPCzs16VPLMGQgSQnNXMGX8s36Kr2DiC", "type": "v2.core.account[configuration.recipient].updated", "created": "2026-11-02T16:17:16.794564911Z", "api_version": null, "request_id": null, "account": null, "livemode": false, "pending_webhooks": null, "verify": true, "why": "ok", "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "top_keys": ["created", "id", "livemode", "object", "reason", "related_object", "type"], "related_object": {"id": "acct_1UXNv4EWUjvNrNki", "type": "v2.core.account", "url": "<MASKED>"}, "context": null, "sig_header_parts": ["t", "v1"]}
+{"recv": "00:17:18", "event": "evt_test_65VglsUzOPORkYAB6wR16VglsQQWSQ1T3Xjkuif4U6aKu0", "type": "v1.capability.updated", "created": "2026-11-02T16:17:17.968Z", "api_version": null, "request_id": null, "account": null, "livemode": false, "pending_webhooks": null, "verify": true, "why": "ok", "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "top_keys": ["context", "created", "id", "livemode", "object", "reason", "related_object", "type"], "related_object": {"id": "transfers", "type": "capability", "url": "<MASKED>"}, "context": "acct_1UXNv4EWUjvNrNki", "sig_header_parts": ["t", "v1"]}
+{"recv": "00:17:19", "event": "evt_test_65VglsVxwl35Ou3mrzs16VPLMGQgSQnNXMGX8s36Kr24Ge", "type": "v2.core.account[configuration.recipient].capability_status_updated", "created": "2026-11-02T16:17:17.837464109Z", "api_version": null, "request_id": null, "account": null, "livemode": false, "pending_webhooks": null, "verify": true, "why": "ok", "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "top_keys": ["created", "id", "livemode", "object", "related_object", "type"], "related_object": {"id": "acct_1UXNv4EWUjvNrNki", "type": "v2.core.account", "url": "<MASKED>"}, "context": null, "sig_header_parts": ["t", "v1"]}
+{"recv": "00:17:19", "event": "evt_test_65VglsVFf8JMCZciUzs16VPLMGQgSQnNXMGX8s36Kr2Jxg", "type": "v2.core.account[configuration.recipient].capability_status_updated", "created": "2026-11-02T16:17:17.838031348Z", "api_version": null, "request_id": null, "account": null, "livemode": false, "pending_webhooks": null, "verify": true, "why": "ok", "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "top_keys": ["created", "id", "livemode", "object", "related_object", "type"], "related_object": {"id": "acct_1UXNv4EWUjvNrNki", "type": "v2.core.account", "url": "<MASKED>"}, "context": null, "sig_header_parts": ["t", "v1"]}
+{"recv": "00:17:23", "event": "evt_test_65VglsZfQnr6bbqjFTT16VPLMGQgSQnNXMGX8s36Kr2CbI", "type": "v2.core.account_person.created", "created": "2026-11-02T16:17:22.468302394Z", "api_version": null, "request_id": null, "account": null, "livemode": false, "pending_webhooks": null, "verify": true, "why": "ok", "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "top_keys": ["created", "id", "livemode", "object", "reason", "related_object", "type"], "related_object": {"id": "person_test_61VglsYOv8eO1VYTkA6VglsQQWSQ1T3XjciYpGCumX1E", "type": "v2.core.account_person", "url": "<MASKED>"}, "context": null, "sig_header_parts": ["t", "v1"]}
+{"recv": "00:17:23", "event": "evt_test_65VglsZMUxhwDiOZk1g16VglsQQWSQ1T3Xjkuif4U6aDZY", "type": "v1.person.created", "created": "2026-11-02T16:17:23.290Z", "api_version": null, "request_id": null, "account": null, "livemode": false, "pending_webhooks": null, "verify": true, "why": "ok", "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "top_keys": ["context", "created", "id", "livemode", "object", "reason", "related_object", "type"], "related_object": {"id": "person_<MASKED:fc47>", "type": "person", "url": "<MASKED>"}, "context": "acct_1UXNv4EWUjvNrNki", "sig_header_parts": ["t", "v1"]}
+{"recv": "00:17:24", "event": "evt_test_65VglsZWkyU8FtxMPzs16VPLMGQgSQnNXMGX8s36Kr2UXg", "type": "v2.core.account[identity].updated", "created": "2026-11-02T16:17:22.482642703Z", "api_version": null, "request_id": null, "account": null, "livemode": false, "pending_webhooks": null, "verify": true, "why": "ok", "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "top_keys": ["created", "id", "livemode", "object", "reason", "related_object", "type"], "related_object": {"id": "acct_1UXNv4EWUjvNrNki", "type": "v2.core.account", "url": "<MASKED>"}, "context": null, "sig_header_parts": ["t", "v1"]}
+{"recv": "00:17:24", "event": "evt_test_65VglsaW8pK5qlmYAzs16VglsQQWSQ1T3Xjkuif4U6aIJU", "type": "v1.account.updated", "created": "2026-11-02T16:17:23.290Z", "api_version": null, "request_id": null, "account": null, "livemode": false, "pending_webhooks": null, "verify": true, "why": "ok", "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "top_keys": ["context", "created", "id", "livemode", "object", "reason", "related_object", "type"], "related_object": {"id": "acct_1UXNv4EWUjvNrNki", "type": "account", "url": "<MASKED>"}, "context": "acct_1UXNv4EWUjvNrNki", "sig_header_parts": ["t", "v1"]}
+{"recv": "00:17:24", "event": "evt_test_65VglsaoV9q2Qvw1Szs16VPLMGQgSQnNXMGX8s36Kr2AAi", "type": "v2.core.account[configuration.recipient].capability_status_updated", "created": "2026-11-02T16:17:23.170832918Z", "api_version": null, "request_id": null, "account": null, "livemode": false, "pending_webhooks": null, "verify": true, "why": "ok", "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "top_keys": ["created", "id", "livemode", "object", "related_object", "type"], "related_object": {"id": "acct_1UXNv4EWUjvNrNki", "type": "v2.core.account", "url": "<MASKED>"}, "context": null, "sig_header_parts": ["t", "v1"]}
+{"recv": "00:17:24", "event": "evt_test_65VglsauaNk6lAif9zs16VPLMGQgSQnNXMGX8s36Kr21Ds", "type": "v2.core.account[configuration.recipient].capability_status_updated", "created": "2026-11-02T16:17:23.170469638Z", "api_version": null, "request_id": null, "account": null, "livemode": false, "pending_webhooks": null, "verify": true, "why": "ok", "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "top_keys": ["created", "id", "livemode", "object", "related_object", "type"], "related_object": {"id": "acct_1UXNv4EWUjvNrNki", "type": "v2.core.account", "url": "<MASKED>"}, "context": null, "sig_header_parts": ["t", "v1"]}
+{"recv": "00:17:34", "event": "evt_test_65VglskYKdoJpCEQMzs16VPLMGQgSQnNXMGX8s36Kr2PMu", "type": "v2.core.account[configuration.recipient].capability_status_updated", "created": "2026-11-02T16:17:33.557191973Z", "api_version": null, "request_id": null, "account": null, "livemode": false, "pending_webhooks": null, "verify": true, "why": "ok", "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "top_keys": ["created", "id", "livemode", "object", "related_object", "type"], "related_object": {"id": "acct_1UXNv4EWUjvNrNki", "type": "v2.core.account", "url": "<MASKED>"}, "context": null, "sig_header_parts": ["t", "v1"]}
+{"recv": "00:17:34", "event": "evt_test_65VglskJFicrvEXb1zs16VPLMGQgSQnNXMGX8s36Kr2Jgu", "type": "v2.core.account[configuration.recipient].capability_status_updated", "created": "2026-11-02T16:17:33.557769775Z", "api_version": null, "request_id": null, "account": null, "livemode": false, "pending_webhooks": null, "verify": true, "why": "ok", "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "top_keys": ["created", "id", "livemode", "object", "related_object", "type"], "related_object": {"id": "acct_1UXNv4EWUjvNrNki", "type": "v2.core.account", "url": "<MASKED>"}, "context": null, "sig_header_parts": ["t", "v1"]}
+--- retrieve v2.core.account[defaults].updated (HTTP 200)
+{
+  "object": "v2.core.event",
+  "type": "v2.core.account[defaults].updated",
+  "related_object": {
+    "id": "acct_1UXNv4EWUjvNrNki",
+    "type": "v2.core.account",
+    "url": "<MASKED>"
+  },
+  "data": {},
+  "changes": {
+    "before": {
+      "defaults": null
+    },
+    "after": {
+      "defaults": {
+        "currency": "usd",
+        "locales": [],
+        "profile": {
+          "business_url": null,
+          "doing_business_as": null,
+          "product_description": null
+        },
+        "responsibilities": {
+          "fees_collector": "application",
+          "losses_collector": "application",
+          "requirements_collector": "application"
+        },
+        "timezone": null
+      }
+    }
+  },
+  "context": null,
+  "reason": {
+    "request": {
+      "id": "req_<MASKED:8a33>",
+      "idempotency_key": "<MASKED>"
+    },
+    "type": "request"
+  }
+}
+--- retrieve v2.core.account[identity].updated (HTTP 200)
+{
+  "object": "v2.core.event",
+  "type": "v2.core.account[identity].updated",
+  "related_object": {
+    "id": "acct_1UXNv4EWUjvNrNki",
+    "type": "v2.core.account",
+    "url": "<MASKED>"
+  },
+  "data": {},
+  "changes": {
+    "before": {
+      "identity": null
+    },
+    "after": {
+      "identity": {
+        "attestations": {
+          "directorship_declaration": null,
+          "ownership_declaration": null,
+          "persons_provided": {
+            "directors": null,
+            "executives": null,
+            "owners": null,
+            "ownership_exemption_reason": null
+          },
+          "representative_declaration": null,
+          "terms_of_service": {
+            "account": null
+          }
+        },
+        "business_details": null,
+        "country": "US",
+        "entity_type": "individual",
+        "individual": null
+      }
+    }
+  },
+  "context": null,
+  "reason": {
+    "request": {
+      "id": "req_<MASKED:8a33>",
+      "idempotency_key": "<MASKED>"
+    },
+    "type": "request"
+  }
+}
+delete 200

@@ -60,6 +60,30 @@ Answer [measured]: `POST https://files.stripe.com/v1/files` multipart, `purpose=
 Docs: https://docs.stripe.com/api/files/create , https://docs.stripe.com/connect/handling-api-verification#upload-a-verification-document
 Output: `outputs/q08_files.txt`.
 
+## Q9 Accounts v2 recipient, both collection modes (step 5, measured 2026-11-03)
+
+`Stripe-Version: 2026-04-22.preview`, US, `identity.entity_type=individual`, `configuration.recipient.capabilities.stripe_balance.stripe_transfers.requested=true`, `defaults.responsibilities.fees_collector=losses_collector=application`.
+
+- Collection mode is chosen by `dashboard`: `none` gives `defaults.responsibilities.requirements_collector=application`; `express` gives `stripe` (https://docs.stripe.com/connect/accounts-v2/connected-account-configuration). `fees_collector`/`losses_collector=stripe` is rejected for a recipient-only account (`invalid_fields`: "can only be application").
+- Idempotency: same `Idempotency-Key` and body returns 200 with the same account id; same key with a different body returns 409 `idempotency_error`.
+- Bank fingerprint: an external bank account attached via `POST /v1/accounts/{id}/external_accounts` is listed with `fingerprint` under the platform key in both modes; same tag as Q6 (fingerprint stable). Not measured: a bank entered by the seller inside Stripe-hosted onboarding (step 5 manual run).
+- Rename: `POST /v2/core/accounts/{id}` with `display_name` returns 200 in both modes (D17: Stripe does not block; we do not sync).
+- `POST /v2/core/account_links` (`use_case.type=account_onboarding`, `configurations=[recipient]`) returns a URL in both modes; `POST /v1/account_sessions` with `account_onboarding` returns a client secret in both modes.
+- Cleanup: `POST /v2/core/accounts/{id}/close` returns 400 `configs_must_match_to_close` without a body naming the configurations; `DELETE /v1/accounts/{id}` deletes test accounts.
+
+Output: `outputs/q09_v2_recipient.txt`.
+
+## Q10 Thin events for v2 accounts (step 5, measured 2026-11-03)
+
+`stripe listen --all-thin` forwarding to `webhook_receiver.py`.
+
+- v2 account events are delivered to the platform's own destination (`context` null): `v2.core.account.created`, `v2.core.account[defaults].updated`, `v2.core.account[identity].updated`, `v2.core.account[configuration.recipient].updated`, `v2.core.account[configuration.recipient].capability_status_updated`, `v2.core.account_person.created`. `related_object = {id: acct_…, type: v2.core.account}`. Payload top-level keys: `context, created, id, livemode, object, reason, related_object, type`.
+- With `--events-from @accounts` the connected account's v1 events arrive thin as `v1.account.updated`, `v1.capability.updated`, `v1.person.created` with `context = acct_…`; retrieving one with `GET /v2/core/events/{id}` without `Stripe-Context` returns 404. The adapter subscribes only to the platform's `v2.core.account*` events.
+- `GET /v2/core/events/{id}` returns `changes.before/after` (not needed: the sync job re-reads the account).
+- Signature: `Stripe-Signature: t=…,v1=…`, HMAC-SHA256 of `{t}.{raw body}`; altered body and a timestamp 1000 s off both fail verification.
+
+Output: `outputs/q10_thin.txt` (`@accounts`), `outputs/q10b_thin_self.txt` (platform).
+
 ## Cleanup
 All connected accounts were deleted with `DELETE /v1/accounts/{id}` (`cleanup.py`, `outputs/cleanup_final.txt`: 0 remaining). Webhook listener and receiver were stopped by `q05_webhook.sh`.
 
