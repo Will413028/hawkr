@@ -138,9 +138,18 @@ func TestIdempotencyConflictIsAnAPIErrorThatIsPermanent(t *testing.T) {
 }
 
 func TestAPIErrorPermanence(t *testing.T) {
-	for status, want := range map[int]bool{400: true, 401: true, 404: true, 409: true, 408: false, 429: false, 500: false, 503: false} {
+	for status, want := range map[int]bool{400: true, 401: true, 404: true, 408: false, 429: false, 500: false, 503: false} {
 		if got := (&APIError{Status: status}).Permanent(); got != want {
 			t.Errorf("%d：%v，want %v", status, got, want)
+		}
+	}
+}
+
+// 409 只有冪等鍵搭配不同參數（idempotency_error）是永久的；同一把鍵的另一個請求還在執行（https://docs.stripe.com/error-low-level）要重試。
+func TestOnlyAnIdempotencyMismatchConflictIsPermanent(t *testing.T) {
+	for code, want := range map[string]bool{"idempotency_error": true, "idempotency_key_in_use": false, "": false} {
+		if got := (&APIError{Status: 409, Code: code}).Permanent(); got != want {
+			t.Errorf("409 %q：%v，want %v", code, got, want)
 		}
 	}
 }
@@ -156,7 +165,7 @@ func TestRetrieveAccountSendsIncludesAndKeepsOnlyTheOnboardingFields(t *testing.
 		t.Errorf("請求 %+v", r)
 	}
 	wantDetails := []StatusDetail{{Code: "requirements_past_due", Resolution: "provide_info"}}
-	if !a.Transfers.Present || a.Transfers.Status != "restricted" || !jsonEqual(a.Transfers.Details, wantDetails) || !a.Payouts.Present || a.Payouts.Status != "restricted" {
+	if a.Transfers.Status != "restricted" || !jsonEqual(a.Transfers.Details, wantDetails) || a.Payouts.Status != "restricted" {
 		t.Errorf("能力 %+v / %+v", a.Transfers, a.Payouts)
 	}
 	req := decode(t, string(a.Requirements))
@@ -165,13 +174,17 @@ func TestRetrieveAccountSendsIncludesAndKeepsOnlyTheOnboardingFields(t *testing.
 	}
 }
 
-func TestRetrieveAccountWithoutRecipientConfigurationHasNoCapabilities(t *testing.T) {
-	s := &stub{resp: func(int) (int, string, http.Header) {
-		return 200, `{"id":"acct_1","object":"v2.core.account","configuration":{"recipient":null}}`, nil
-	}}
-	a, err := newTestClient(t, s).RetrieveAccount(context.Background(), "acct_1")
-	if err != nil || a.Transfers.Present || a.Payouts.Present || a.Requirements != nil {
-		t.Fatalf("a=%+v err=%v", a, err)
+func TestRetrieveAccountWithoutTheTransfersCapabilityIsAMalformedResponse(t *testing.T) {
+	for name, body := range map[string]string{
+		"recipient 是 null":    `{"id":"acct_1","object":"v2.core.account","configuration":{"recipient":null}}`,
+		"沒有 stripe_transfers": `{"id":"acct_1","configuration":{"recipient":{"capabilities":{"stripe_balance":{"payouts":{"status":"active"}}}}}}`,
+	} {
+		s := &stub{resp: func(int) (int, string, http.Header) { return 200, body, nil }}
+		a, err := newTestClient(t, s).RetrieveAccount(context.Background(), "acct_1")
+		var api *APIError
+		if err == nil || errors.As(err, &api) || a.ID != "" {
+			t.Errorf("%s：a=%+v err=%v，預期一般錯誤", name, a, err)
+		}
 	}
 }
 
@@ -191,7 +204,7 @@ func TestAccountSessionIsFormEncodedAndReturnsTheClientSecret(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := s.requests()[0]
-	if r.Method != "POST" || r.URI != "/v1/account_sessions" || r.ContentType != "application/x-www-form-urlencoded" || r.Version != APIVersion {
+	if r.Method != "POST" || r.URI != "/v1/account_sessions" || r.ContentType != "application/x-www-form-urlencoded" || r.Version != APIVersionV1 {
 		t.Errorf("請求 %+v", r)
 	}
 	if r.Body != "account=acct_1&components%5Baccount_onboarding%5D%5Benabled%5D=true" {

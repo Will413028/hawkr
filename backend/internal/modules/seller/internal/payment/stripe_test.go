@@ -1,7 +1,6 @@
 package payment
 
 import (
-	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -9,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -85,27 +83,60 @@ func TestStripeCapabilitiesFollowTheCollectionMode(t *testing.T) {
 	}
 }
 
-func TestStripeEnsureAccountUsesTheDashboardOfTheCollectionMode(t *testing.T) {
-	for mode, dash := range map[model.RequirementCollection]string{model.CollectionProvider: "express", model.CollectionPlatform: "none"} {
+// 收件方式取自帳戶列（EnsureInput.Collection），不是行程設定：adapter 設定成相反的值，建立的 dashboard 仍跟著列走。
+func TestStripeEnsureAccountUsesTheDashboardOfTheStoredCollection(t *testing.T) {
+	for stored, dash := range map[model.RequirementCollection]string{model.CollectionProvider: "express", model.CollectionPlatform: "none"} {
+		configured := model.CollectionProvider
+		if stored == model.CollectionProvider {
+			configured = model.CollectionPlatform
+		}
 		var got map[string]any
-		p := stripeProvider(t, mode, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := stripeProvider(t, configured, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			_ = json.NewDecoder(r.Body).Decode(&got)
 			_, _ = w.Write([]byte(`{"id":"acct_1"}`))
 		}))
-		id, err := p.EnsureAccount(context.Background(), EnsureInput{StoreID: 5, IdempotencyKey: "5"})
+		id, err := p.EnsureAccount(context.Background(), EnsureInput{StoreID: 5, IdempotencyKey: "k", Collection: stored})
 		if err != nil || id != "acct_1" || got["dashboard"] != dash {
-			t.Errorf("%s：id=%q err=%v dashboard=%v", mode, id, err, got["dashboard"])
+			t.Errorf("列 %s：id=%q err=%v dashboard=%v", stored, id, err, got["dashboard"])
 		}
+	}
+	p := stripeProvider(t, model.CollectionProvider, http.NotFoundHandler())
+	if _, err := p.EnsureAccount(context.Background(), EnsureInput{IdempotencyKey: "k"}); !errors.Is(err, ErrPermanent) {
+		t.Errorf("空的收件方式：%v，預期 ErrPermanent", err)
+	}
+}
+
+// 重試沿用同一把鍵：adapter 原樣把 EnsureInput 的鍵送成 Idempotency-Key。
+func TestStripeEnsureAccountSendsTheGivenKeyOnEveryAttempt(t *testing.T) {
+	var keys []string
+	p := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		keys = append(keys, r.Header.Get("Idempotency-Key"))
+		_, _ = w.Write([]byte(`{"id":"acct_1"}`))
+	}))
+	for range 2 {
+		if _, err := p.EnsureAccount(context.Background(), EnsureInput{StoreID: 5, IdempotencyKey: "6f1c0a52-0000-4000-8000-000000000001", Collection: model.CollectionProvider}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if fmt.Sprint(keys) != "[6f1c0a52-0000-4000-8000-000000000001 6f1c0a52-0000-4000-8000-000000000001]" {
+		t.Errorf("Idempotency-Key %v", keys)
 	}
 }
 
 func TestStripeEnsureAccountClassifiesErrors(t *testing.T) {
 	create := func(h http.HandlerFunc) error {
-		_, err := stripeProvider(t, model.CollectionProvider, h).EnsureAccount(context.Background(), EnsureInput{StoreID: 5, IdempotencyKey: "5"})
+		_, err := stripeProvider(t, model.CollectionProvider, h).EnsureAccount(context.Background(), EnsureInput{StoreID: 5, IdempotencyKey: "5", Collection: model.CollectionProvider})
 		return err
 	}
 	if err := create(fixtureResponder(t, "create_provider_idem_conflict")); !errors.Is(err, ErrPermanent) {
 		t.Errorf("409 idempotency_error：%v，預期 ErrPermanent", err)
+	}
+	inProgress := func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"error":{"code":"idempotency_key_in_use","message":"A request with this key is still being processed."}}`))
+	}
+	if err := create(inProgress); err == nil || errors.Is(err, ErrPermanent) {
+		t.Errorf("409 同一把鍵的請求還在執行：%v，預期一般錯誤（重試）", err)
 	}
 	for _, status := range []int{500, 502, 429} {
 		err := create(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(status) })
@@ -118,7 +149,7 @@ func TestStripeEnsureAccountClassifiesErrors(t *testing.T) {
 	srv.Close()
 	c, _ := stripe.New(stripe.Config{BaseURL: url, SecretKey: "k", WebhookSecret: "w"})
 	p, _ := NewStripe(c, model.CollectionProvider)
-	if _, err := p.EnsureAccount(context.Background(), EnsureInput{IdempotencyKey: "5"}); err == nil || errors.Is(err, ErrPermanent) {
+	if _, err := p.EnsureAccount(context.Background(), EnsureInput{IdempotencyKey: "5", Collection: model.CollectionProvider}); err == nil || errors.Is(err, ErrPermanent) {
 		t.Errorf("傳輸錯誤：%v，預期一般錯誤", err)
 	}
 	if _, err := p.EnsureAccount(context.Background(), EnsureInput{}); !errors.Is(err, ErrPermanent) {
@@ -133,7 +164,7 @@ func TestStripeFetchNewAccountFixtureIsActionRequired(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		status, reason := StatusOf(slog.New(slog.DiscardHandler), snap)
+		status, reason, _ := StatusOf(snap)
 		if status != model.PaymentActionRequired || reason != "requirements_past_due" {
 			t.Errorf("%s：%s %q", fx, status, reason)
 		}
@@ -211,23 +242,23 @@ func TestStripeFetchMapsCapabilityStatesAndResolutions(t *testing.T) {
 		if snap.Transfers != tc.wantState || fmt.Sprint(res) != fmt.Sprint(tc.wantRes) || snap.PayoutsActive != tc.wantPayout {
 			t.Errorf("%s：快照 %+v", name, snap)
 		}
-		if got, _ := StatusOf(slog.New(slog.DiscardHandler), snap); got != tc.wantStatus {
+		if got, _, _ := StatusOf(snap); got != tc.wantStatus {
 			t.Errorf("%s：狀態 %s，want %s", name, got, tc.wantStatus)
 		}
 	}
 }
 
-func TestStripeFetchWithoutCapabilitiesOrRequirementsIsUnknownNotActive(t *testing.T) {
-	p := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`{"id":"acct_1","configuration":{"recipient":null},"requirements":null}`))
-	}))
-	snap, err := p.FetchAccount(context.Background(), "acct_1")
-	if err != nil || snap.Transfers != CapabilityUnknown || snap.PayoutsActive || string(snap.Requirements) != `{}` {
-		t.Fatalf("snap=%+v err=%v", snap, err)
-	}
-	var buf bytes.Buffer
-	if got, _ := StatusOf(slog.New(slog.NewTextHandler(&buf, nil)), snap); got != model.PaymentUnderReview || buf.Len() == 0 {
-		t.Errorf("狀態 %s，警示 log %q", got, buf.String())
+// 沒有轉帳能力的回應是格式錯誤：回一般錯誤（重試），不產生快照，不能被存成審核中。
+func TestStripeFetchWithoutTheTransfersCapabilityIsARetryableError(t *testing.T) {
+	for name, body := range map[string]string{
+		"沒有 recipient 設定":     `{"id":"acct_1","configuration":{"recipient":null},"requirements":null}`,
+		"沒有 stripe_transfers": `{"id":"acct_1","configuration":{"recipient":{"capabilities":{"stripe_balance":{"payouts":{"status":"active"}}}}},"requirements":{}}`,
+	} {
+		p := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(body)) }))
+		snap, err := p.FetchAccount(context.Background(), "acct_1")
+		if err == nil || errors.Is(err, ErrPermanent) || snap.Transfers != "" {
+			t.Errorf("%s：snap=%+v err=%v，預期一般錯誤", name, snap, err)
+		}
 	}
 }
 
@@ -243,19 +274,25 @@ func TestStripeOnboardingSessionByCollectionMode(t *testing.T) {
 	})
 	in := SessionInput{ExternalAccountID: "acct_1", ReturnURL: "https://a.test/r", RefreshURL: "https://a.test/f"}
 
-	hosted, err := stripeProvider(t, model.CollectionProvider, handler).CreateOnboardingSession(context.Background(), in)
+	// 介面取自帳戶列的收件方式；adapter 設定成相反的值，結果仍跟著列走。
+	in.Collection = model.CollectionProvider
+	hosted, err := stripeProvider(t, model.CollectionPlatform, handler).CreateOnboardingSession(context.Background(), in)
 	if err != nil || hosted.Surface != model.SurfaceHosted || hosted.URL != "https://connect.stripe.com/x" || hosted.ClientSecret != "" || hosted.ExpiresAt == nil {
 		t.Errorf("託管 %+v err=%v", hosted, err)
 	}
-	embedded, err := stripeProvider(t, model.CollectionPlatform, handler).CreateOnboardingSession(context.Background(), in)
+	in.Collection = model.CollectionPlatform
+	embedded, err := stripeProvider(t, model.CollectionProvider, handler).CreateOnboardingSession(context.Background(), in)
 	if err != nil || embedded.Surface != model.SurfaceEmbedded || embedded.ClientSecret == "" || embedded.URL != "" || embedded.ExpiresAt == nil {
 		t.Errorf("內嵌 %+v err=%v", embedded, err)
 	}
 	if fmt.Sprint(paths) != "[/v2/core/account_links /v1/account_sessions]" {
 		t.Errorf("呼叫的路徑 %v", paths)
 	}
-	if _, err := stripeProvider(t, model.CollectionProvider, handler).CreateOnboardingSession(context.Background(), SessionInput{}); !errors.Is(err, ErrPermanent) {
+	if _, err := stripeProvider(t, model.CollectionProvider, handler).CreateOnboardingSession(context.Background(), SessionInput{Collection: model.CollectionProvider}); !errors.Is(err, ErrPermanent) {
 		t.Errorf("沒有帳戶 ID：%v", err)
+	}
+	if _, err := stripeProvider(t, model.CollectionProvider, handler).CreateOnboardingSession(context.Background(), SessionInput{ExternalAccountID: "acct_1"}); !errors.Is(err, ErrPermanent) {
+		t.Errorf("空的收件方式：%v", err)
 	}
 }
 

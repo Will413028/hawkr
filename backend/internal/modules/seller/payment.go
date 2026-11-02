@@ -2,7 +2,6 @@ package seller
 
 import (
 	"context"
-	"log/slog"
 	"net/http"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
@@ -122,11 +121,6 @@ func NewPaymentFake() *PaymentFake { return payment.NewFake() }
 
 // PaymentAccountStatusValues 回傳全部收款帳戶狀態。
 func PaymentAccountStatusValues() []PaymentAccountStatus { return model.PaymentAccountStatusValues() }
-
-// PaymentStatusOf 由快照推導收款帳戶的狀態與要存的原因碼。
-func PaymentStatusOf(log *slog.Logger, s PaymentSnapshot) (PaymentAccountStatus, string) {
-	return payment.StatusOf(log, s)
-}
 
 // PaymentAccountOf 讀店家的收款帳戶；店家還沒有回 NotFound。
 func (m *Module) PaymentAccountOf(ctx context.Context, storeID int64) (PaymentAccount, error) {

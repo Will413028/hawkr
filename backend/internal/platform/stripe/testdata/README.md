@@ -8,3 +8,7 @@ mode on `2026-04-22`-era behavior and masked (`<MASKED>` values). Re-record in a
 The Account Link success response is synthetic (`client_test.go`, `TestAccountLinkRequestHasNoConfigurationsField`): the
 sandbox recording does not exist yet. Re-record in sandbox. The recorded `account_link_*.json` fixtures are 400 responses from
 plain test mode and are not used.
+
+`account_session_platform` is a v1 response. v1 calls send the GA version of the same release (`APIVersionV1`,
+`2026-09-30.endive`); the preview version is for v2 calls only. This is verified only when the fixture is re-recorded in the
+sandbox on that version (the recorded copy predates it).

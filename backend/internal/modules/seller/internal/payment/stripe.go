@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"slices"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/stripe"
@@ -16,7 +15,8 @@ import (
 const StripeName = "stripe"
 
 // Stripe 是 Provider 的 Stripe 實作（Accounts v2）。收件方式決定 dashboard 與開通介面：provider 收件用 express 加託管的 Account Link，平台收件
-// 用 none 加內嵌的 Account Session（計畫 D2、D7，spike Q9）。
+// 用 none 加內嵌的 Account Session（計畫 D2、D7，spike Q9）。每次呼叫的收件方式取自帳戶列保存的值（EnsureInput、SessionInput 的 Collection），
+// 行程設定的 collection 只決定新列寫入的值（Capabilities）。
 type Stripe struct {
 	client     *stripe.Client
 	collection model.RequirementCollection
@@ -49,9 +49,14 @@ func (s *Stripe) EnsureAccount(ctx context.Context, in EnsureInput) (string, err
 	if in.IdempotencyKey == "" {
 		return "", fmt.Errorf("%w：缺少冪等鍵", ErrPermanent)
 	}
-	dashboard := stripe.DashboardExpress
-	if s.collection == model.CollectionPlatform {
+	var dashboard stripe.Dashboard
+	switch in.Collection {
+	case model.CollectionProvider:
+		dashboard = stripe.DashboardExpress
+	case model.CollectionPlatform:
 		dashboard = stripe.DashboardNone
+	default:
+		return "", fmt.Errorf("%w：不支援的收件方式 %q", ErrPermanent, in.Collection)
 	}
 	id, err := s.client.CreateAccount(ctx, in.IdempotencyKey, dashboard)
 	return id, classify(err)
@@ -62,18 +67,21 @@ func (s *Stripe) CreateOnboardingSession(ctx context.Context, in SessionInput) (
 	if in.ExternalAccountID == "" {
 		return model.OnboardingSession{}, fmt.Errorf("%w：缺少外部帳戶 ID", ErrPermanent)
 	}
-	if s.collection == model.CollectionPlatform {
+	switch in.Collection {
+	case model.CollectionPlatform:
 		sess, err := s.client.CreateAccountSession(ctx, in.ExternalAccountID)
 		if err != nil {
 			return model.OnboardingSession{}, classify(err)
 		}
 		return model.OnboardingSession{Surface: model.SurfaceEmbedded, ClientSecret: sess.ClientSecret, ExpiresAt: sess.ExpiresAt}, nil
+	case model.CollectionProvider:
+		link, err := s.client.CreateAccountLink(ctx, in.ExternalAccountID, in.ReturnURL, in.RefreshURL)
+		if err != nil {
+			return model.OnboardingSession{}, classify(err)
+		}
+		return model.OnboardingSession{Surface: model.SurfaceHosted, URL: link.URL, ExpiresAt: link.ExpiresAt}, nil
 	}
-	link, err := s.client.CreateAccountLink(ctx, in.ExternalAccountID, in.ReturnURL, in.RefreshURL)
-	if err != nil {
-		return model.OnboardingSession{}, classify(err)
-	}
-	return model.OnboardingSession{Surface: model.SurfaceHosted, URL: link.URL, ExpiresAt: link.ExpiresAt}, nil
+	return model.OnboardingSession{}, fmt.Errorf("%w：不支援的收件方式 %q", ErrPermanent, in.Collection)
 }
 
 // FetchAccount 實作 Provider：只取轉帳能力（狀態與細節）、撥款能力是否 active 與 requirements 原始 JSON，其餘欄位丟棄。
@@ -119,7 +127,7 @@ func classify(err error) error {
 }
 
 func capabilityState(c stripe.Capability) CapabilityState {
-	if s := CapabilityState(c.Status); slices.Contains([]CapabilityState{CapabilityActive, CapabilityPending, CapabilityRestricted, CapabilityRejected, CapabilityUnsupported}, s) {
+	if s := CapabilityState(c.Status); s.Valid() {
 		return s
 	}
 	return CapabilityUnknown

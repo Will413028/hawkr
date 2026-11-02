@@ -51,7 +51,10 @@ func (s *Service) Sync(ctx context.Context, storeID int64) (again bool, err erro
 			return nil
 		}
 		now := s.d.Now().UTC()
-		status, reasonCode := StatusOf(s.d.Logger, snap)
+		status, reasonCode, note := StatusOf(snap)
+		if note != NoteNone {
+			s.d.Logger.WarnContext(ctx, "seller：收款帳戶的快照不認得或不完整，視為審核中", "store_id", storeID, "external_account_id", external, "note", string(note), "transfers", string(snap.Transfers), "details", len(snap.Details))
+		}
 		raw := snap.Requirements
 		if len(raw) == 0 || !json.Valid(raw) {
 			raw = json.RawMessage(`{}`)
@@ -154,7 +157,7 @@ func (s *Service) CreateOnboardingSession(ctx context.Context, storeID int64, re
 	}
 	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
 	defer cancel()
-	session, err := s.d.Provider.CreateOnboardingSession(callCtx, SessionInput{ExternalAccountID: *acct.ExternalAccountID, ReturnURL: returnURL, RefreshURL: refreshURL})
+	session, err := s.d.Provider.CreateOnboardingSession(callCtx, SessionInput{ExternalAccountID: *acct.ExternalAccountID, Collection: acct.RequirementCollection, ReturnURL: returnURL, RefreshURL: refreshURL})
 	if errors.Is(err, ErrPermanent) {
 		return model.OnboardingSession{}, apperr.FailedPrecondition("目前無法開通收款帳戶")
 	}

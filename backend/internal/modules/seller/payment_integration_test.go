@@ -101,9 +101,9 @@ func (f *fixture) paymentEvent(id, external string) (http.Header, []byte) {
 	return h, []byte(external)
 }
 
-// 核准的 transaction 內寫「建立中」的列並排入建立 job，外部呼叫不在核准裡；建立 job 重送（外部帳戶已建立但本地沒記到）時，provider 以 store_id
-// 為冪等鍵回同一個帳戶，不會有第二個。
-// mutation：EnsureInput.IdempotencyKey 不用 store_id → 重送建出第二個帳戶，帳戶數不是 1，失敗。
+// 核准的 transaction 內寫「建立中」的列並排入建立 job，外部呼叫不在核准裡；建立 job 重送（外部帳戶已建立但本地沒記到）時，provider 以列上保存的
+// UUID 為冪等鍵回同一個帳戶，不會有第二個；不同店家的鍵不同（兩個資料庫共用同一個 provider 帳號時不撞鍵）。
+// mutation：Ensure 每次呼叫產生新的冪等鍵、不用列上保存的 → 重送建出第二個帳戶，且送出的鍵不等於列上的值，失敗。
 func TestApprovalQueuesOneAccountCreationAndAReplayedCreateKeepsOneExternalAccount(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -131,7 +131,13 @@ func TestApprovalQueuesOneAccountCreationAndAReplayedCreateKeepsOneExternalAccou
 	// 模擬 provider 已建立、本地沒記到：把列退回「建立中」再跑一次，provider 以同一個冪等鍵回同一個帳戶。
 	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.payment_accounts SET external_account_id = NULL, status = 'NOT_CREATED' WHERE store_id = $1", s.StoreID)
 	must(t, err)
-	if second := f.ensureAccount(t, s.StoreID); second != first {
+	second := f.ensureAccount(t, s.StoreID)
+	var stored string
+	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT create_idempotency_key::text FROM seller.payment_accounts WHERE store_id = $1", s.StoreID).Scan(&stored))
+	if keys := f.payment.EnsureKeys(); len(keys) != 2 || keys[0] != stored || keys[1] != stored || len(stored) != 36 || stored[14] != '4' {
+		t.Fatalf("兩次建立送出的冪等鍵=%v，列上保存的 v4 UUID=%q", keys, stored)
+	}
+	if second != first {
 		t.Fatalf("重送建出另一個帳戶：%s 與 %s", first, second)
 	}
 	if n := f.payment.Accounts(); n != 1 {
@@ -326,9 +332,11 @@ func TestAnEventArrivingWhileTheAccountIsBeingReadMakesTheSyncRunAgain(t *testin
 	}
 }
 
-// 輪詢補漏只排 UNDER_REVIEW、ACTION_REQUIRED 的帳戶的同步；已啟用、被停用與還沒建立的帳戶不排同步，閒置的「建立中」補排建立。
-// mutation：PollablePaymentAccountStoreIDs 的條件改成排除 'DISABLED' 而不是列出兩個狀態 → ENABLED 的帳戶也被排，失敗。
-func TestSweepQueuesSyncOnlyForTheTwoOpenStatuses(t *testing.T) {
+// 輪詢補漏排 UNDER_REVIEW、ACTION_REQUIRED 的帳戶，以及 DISABLED 但原因碼不是終局（rejected*、unsupported*）的帳戶（Stripe 可以解除 restricted，掉了 webhook 時只有輪詢補得到）；
+// 已啟用、終局的 DISABLED 與還沒建立的帳戶不排同步，閒置的「建立中」補排建立。
+// mutation 1：PollablePaymentAccountStoreIDs 的條件改成排除 'DISABLED' 而不是列出狀態 → ENABLED 的帳戶也被排，失敗。
+// mutation 2：拿掉 DISABLED 的子句 → 可解除的 DISABLED 帳戶沒被排，失敗。
+func TestSweepQueuesSyncForOpenAndLiftableStatusesOnly(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
@@ -346,13 +354,23 @@ func TestSweepQueuesSyncOnlyForTheTwoOpenStatuses(t *testing.T) {
 			VALUES ($1, 'fake', %s, 'PROVIDER', $2, $3, $4, $4)`, external), s.StoreID, string(st), enabled, f.now.Add(-time.Hour))
 		must(t, err)
 	}
+	// byStatus 的 DISABLED 沒有原因碼（可被輪詢）；再加三個 DISABLED：可解除的原因碼被輪詢，rejected、unsupported 開頭的終局原因碼不輪詢。
+	disabledWith := map[string]int64{}
+	for _, reason := range []string{"risk_under_review", "rejected_fraud", "unsupported_country"} {
+		_, s := f.open(t)
+		disabledWith[reason] = s.StoreID
+		_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO seller.payment_accounts
+			(store_id, provider, external_account_id, requirement_collection, status, status_reason, created_at, updated_at)
+			VALUES ($1, 'fake', $2, 'PROVIDER', 'DISABLED', $3, $4, $4)`, s.StoreID, fmt.Sprintf("acct_%d", s.StoreID), reason, f.now.Add(-time.Hour))
+		must(t, err)
+	}
 	synced, ensured, err := f.module.SweepPaymentAccounts(ctx)
 	must(t, err)
-	want := []int64{byStatus[PaymentUnderReview], byStatus[PaymentActionRequired]}
+	want := []int64{byStatus[PaymentUnderReview], byStatus[PaymentActionRequired], byStatus[PaymentDisabled], disabledWith["risk_under_review"]}
 	got := f.jobs.queuedStoreIDs(t, kindPaymentSync)
 	slices.Sort(want)
 	slices.Sort(got)
-	if !slices.Equal(got, want) || synced != 2 {
+	if !slices.Equal(got, want) || synced != 4 {
 		t.Fatalf("輪詢排入的店家=%v（回報 %d），應該是 %v", got, synced, want)
 	}
 	if ensured != 1 || !slices.Equal(f.jobs.queuedStoreIDs(t, kindPaymentEnsure), []int64{byStatus[PaymentNotCreated]}) {
@@ -392,6 +410,20 @@ func TestSweepQueuesSyncForAnOldUnprocessedEventOnAnEnabledAccount(t *testing.T)
 	}
 }
 
+// 每家店的「建立中」列寫入時各自產生一個 UUID 冪等鍵：兩家店的鍵不同，各自得到自己的外部帳戶。
+// mutation：create_idempotency_key 的預設值改成常數 → 兩家店共用一把鍵，外部帳戶只有一個，失敗。
+func TestEachStoreGetsItsOwnCreateIdempotencyKey(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	_, a := f.approvedStore(t)
+	_, b := f.approvedStore(t)
+	ea, eb := f.ensureAccount(t, a.StoreID), f.ensureAccount(t, b.StoreID)
+	keys := f.payment.EnsureKeys()
+	if len(keys) != 2 || keys[0] == keys[1] || ea == eb {
+		t.Fatalf("keys=%v accounts=%s %s", keys, ea, eb)
+	}
+}
+
 // 建立重試用完（最後一次嘗試）或 provider 永久拒絕：記下建立失敗的時刻並進後台待辦 PAYMENT_ACCOUNT_CREATE_FAILED，期限 24 小時；中途的暫時性失敗
 // 只回傳錯誤、不記失敗。管理員重試建立清空失敗並重新排入，待辦消失；不是建立失敗的狀態不能重試。
 // mutation：Ensure 在最後一次嘗試仍只回傳錯誤、不記 create_failed_at → 待辦沒有這一列，失敗。
@@ -412,6 +444,9 @@ func TestCreateFailureAfterTheLastAttemptQueuesAReviewItemAndRetryClearsIt(t *te
 		t.Fatalf("待辦=%v", rows)
 	}
 	must(t, f.module.EnsurePaymentAccount(ctx, s.StoreID, true))
+	if keys := f.payment.EnsureKeys(); len(keys) != 2 || keys[0] == "" || keys[0] != keys[1] {
+		t.Fatalf("重試沒有沿用同一把冪等鍵：%v", keys)
+	}
 	a := f.paymentAccount(t, s.StoreID)
 	if a.CreateFailedAt == nil || !a.CreateFailedAt.Equal(f.now) || a.ExternalAccountID != nil || a.Status != PaymentNotCreated {
 		t.Fatalf("最後一次嘗試後=%+v", a)

@@ -402,6 +402,7 @@ type SellerPaymentAccount struct {
 	StatusReason          *string
 	FetchedAt             *time.Time
 	CreateFailedAt        *time.Time
+	CreateIdempotencyKey  uuid.UUID
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
 }

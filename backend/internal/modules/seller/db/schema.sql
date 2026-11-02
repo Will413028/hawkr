@@ -1629,6 +1629,8 @@ CREATE INDEX store_blocks_buyer ON seller.store_blocks (buyer_id, store_id);
 -- status 是中立的五個狀態，由轉帳能力的狀態與 status_details 推導；transfers_active 與 payouts_active 是外部帳戶的能力是否啟用（開通閘門看 transfers_active，
 -- ENABLED 等於 transfers_active）。requirements 是快照的原始內容，status_reason 是導出目前狀態的金流商原因碼（只給後台）。create_failed_at 是建立重試用完的時刻
 -- （只有還沒有外部 ID 的列才有；後台待辦 review_payment_account_create_failed 的開始時間，重試建立時清空）。
+-- create_idempotency_key 是寫入「建立中」的列時產生的隨機 UUID（v4），建立外部帳戶的每次重試都用它當冪等鍵（Stripe 建議每個邏輯請求用隨機 UUID；
+-- 不用 store_id，兩個資料庫共用同一個 Stripe 帳號時才不會撞到別人的帳戶）。
 CREATE TABLE seller.payment_accounts (
     store_id               BIGINT      PRIMARY KEY REFERENCES seller.stores (store_id),
     provider               TEXT        NOT NULL,
@@ -1641,6 +1643,7 @@ CREATE TABLE seller.payment_accounts (
     status_reason          TEXT,
     fetched_at             TIMESTAMPTZ,
     create_failed_at       TIMESTAMPTZ,
+    create_idempotency_key UUID        NOT NULL DEFAULT gen_random_uuid(),
     created_at             TIMESTAMPTZ NOT NULL,
     updated_at             TIMESTAMPTZ NOT NULL,
     CONSTRAINT payment_accounts_provider_check CHECK (provider ~ '^[a-z][a-z0-9_]{0,39}$'),
@@ -1655,7 +1658,7 @@ CREATE TABLE seller.payment_accounts (
     CONSTRAINT payment_accounts_create_failed_check CHECK (create_failed_at IS NULL OR external_account_id IS NULL)
 );
 CREATE UNIQUE INDEX payment_accounts_external ON seller.payment_accounts (provider, external_account_id) WHERE external_account_id IS NOT NULL;
-CREATE INDEX payment_accounts_poll ON seller.payment_accounts (fetched_at NULLS FIRST, store_id) WHERE status IN ('UNDER_REVIEW', 'ACTION_REQUIRED');
+CREATE INDEX payment_accounts_poll ON seller.payment_accounts (fetched_at NULLS FIRST, store_id) WHERE status IN ('UNDER_REVIEW', 'ACTION_REQUIRED', 'DISABLED');
 
 -- 收款開通的 webhook inbox（單體規則 5）：金流商的事件先寫這裡再處理。(provider, event_id) 唯一，重送的事件不再排 job。
 -- processed_at 是同步 job 讀過外部帳戶、涵蓋這個事件之後記下的時間；外部帳戶 ID 對不到本地帳戶的事件只留紀錄。

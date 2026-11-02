@@ -37,6 +37,7 @@ type Fake struct {
 	ensureErrs []error
 	fetchErrs  []error
 	ensures    int
+	ensureKeys []string
 	fetches    int
 	sessions   int
 	violations []string
@@ -85,6 +86,13 @@ func (f *Fake) Calls() (ensures, fetches, sessions int) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.ensures, f.fetches, f.sessions
+}
+
+// EnsureKeys 回傳每次 EnsureAccount 收到的冪等鍵（依呼叫順序，失敗的呼叫也算）。
+func (f *Fake) EnsureKeys() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.ensureKeys...)
 }
 
 // Violations 回傳違反呼叫規則的紀錄（在 transaction 內、沒有 deadline）。
@@ -136,6 +144,7 @@ func (f *Fake) EnsureAccount(ctx context.Context, in EnsureInput) (string, error
 	defer f.mu.Unlock()
 	f.check(ctx, "EnsureAccount")
 	f.ensures++
+	f.ensureKeys = append(f.ensureKeys, in.IdempotencyKey)
 	if err := pop(&f.ensureErrs); err != nil {
 		return "", err
 	}

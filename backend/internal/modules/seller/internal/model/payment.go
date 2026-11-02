@@ -27,11 +27,6 @@ func PaymentAccountStatusValues() []PaymentAccountStatus {
 	return []PaymentAccountStatus{PaymentNotCreated, PaymentUnderReview, PaymentActionRequired, PaymentEnabled, PaymentDisabled}
 }
 
-// Pollable 回傳此狀態的帳戶是否要由輪詢補漏（與 PollablePaymentAccountStoreIDs 的條件相同）。
-func (s PaymentAccountStatus) Pollable() bool {
-	return s == PaymentUnderReview || s == PaymentActionRequired
-}
-
 // RequirementCollection 是誰向賣家收身分與銀行資料（port 的能力描述，也存在帳戶列上）。
 type RequirementCollection string
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -59,7 +58,7 @@ func New(d Deps) *Service {
 func (s *Service) Configured() bool { return s.d.Provider != nil }
 
 // RequestAccount 在平台審核核准的 transaction 內寫「建立中」的帳戶列（已有列時沿用，關店再開不建第二個帳戶）並排入以 store_id 為唯一鍵的建立 job
-// （D16、D19）。呼叫方已鎖住店家與申請列。這裡不呼叫 provider（規則 5）。沒有設定 provider 時什麼都不做。
+// （D16、D19）；列寫入時由資料庫產生建立用的冪等鍵 UUID。呼叫方已鎖住店家與申請列。這裡不呼叫 provider（規則 5）。沒有設定 provider 時什麼都不做。
 func (s *Service) RequestAccount(ctx context.Context, q *store.Queries, storeID int64, now time.Time) error {
 	if s.d.Provider == nil {
 		return nil
@@ -105,7 +104,7 @@ func (s *Service) Account(ctx context.Context, storeID int64) (model.PaymentAcco
 	return ToModel(row), nil
 }
 
-// Ensure 是建立 job 的內容：先讀本地列（transaction 內短讀），在 transaction 外呼叫 provider 建立外部帳戶（冪等鍵是 store_id），再於
+// Ensure 是建立 job 的內容：先讀本地列（transaction 內短讀），在 transaction 外呼叫 provider 建立外部帳戶（冪等鍵是列上保存的 UUID），再於
 // transaction 內填上外部 ID 並排入同步 job。已經有外部 ID、已進入失敗、店家已關閉時什麼都不做。暫時性的失敗回傳錯誤由 River 退避重試；
 // final 為 true（最後一次嘗試）或失敗是永久的時，記下建立失敗的時刻（進後台待辦 PAYMENT_ACCOUNT_CREATE_FAILED）並結束。
 func (s *Service) Ensure(ctx context.Context, storeID int64, final bool) error {
@@ -139,7 +138,7 @@ func (s *Service) Ensure(ctx context.Context, storeID int64, final bool) error {
 	}
 	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
 	defer cancel()
-	externalID, callErr := p.EnsureAccount(callCtx, EnsureInput{StoreID: storeID, IdempotencyKey: strconv.FormatInt(storeID, 10)})
+	externalID, callErr := p.EnsureAccount(callCtx, EnsureInput{StoreID: storeID, IdempotencyKey: row.CreateIdempotencyKey.String(), Collection: model.RequirementCollection(row.RequirementCollection)})
 	permanent := errors.Is(callErr, ErrPermanent)
 	if callErr != nil && !permanent && !final {
 		return callErr

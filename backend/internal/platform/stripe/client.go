@@ -4,6 +4,7 @@ package stripe
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -16,8 +17,12 @@ import (
 	"time"
 )
 
-// APIVersion 是釘住的 Stripe API 版本（計畫 E1 2026-11-03 修訂）。
+// APIVersion 是 v2 呼叫釘住的 Stripe API 版本（計畫 E1 2026-11-03 修訂）。
 const APIVersion = "2026-09-30.preview"
+
+// APIVersionV1 是 v1 呼叫（Account Session）用的版本：同一個 release 的 GA 版（2026-09-30.endive，
+// https://docs.stripe.com/changelog/endive/2026-09-30/rejected-accounts-v2-capabilities）；preview 版本只給 v2 呼叫。
+const APIVersionV1 = "2026-09-30.endive"
 
 // DefaultBaseURL 是 Stripe API 的位址。
 const DefaultBaseURL = "https://api.stripe.com"
@@ -111,8 +116,12 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("stripe：HTTP %d %s：%s", e.Status, e.Code, e.Message)
 }
 
-// Permanent 回傳重試也不會成功：4xx 而且不是逾時（408）與限流（429）。
+// Permanent 回傳重試也不會成功：4xx 而且不是逾時（408）與限流（429）。409 只有 code 為 idempotency_error（冪等鍵搭配了不同的參數）才是永久的；
+// 其他 409 是同一把鍵的另一個請求還在執行，等一下用同一把鍵重送即可（https://docs.stripe.com/error-low-level 的 Content errors）。
 func (e *APIError) Permanent() bool {
+	if e.Status == http.StatusConflict {
+		return e.Code == "idempotency_error"
+	}
 	return e.Status >= 400 && e.Status < 500 && e.Status != http.StatusRequestTimeout && e.Status != http.StatusTooManyRequests
 }
 
@@ -133,6 +142,8 @@ type request struct {
 	body        []byte
 	contentType string
 	idempotency string
+	// version 是 Stripe-Version；空值用 APIVersion（v2）。
+	version string
 }
 
 func (c *Client) do(ctx context.Context, r request) ([]byte, error) {
@@ -148,7 +159,7 @@ func (c *Client) do(ctx context.Context, r request) ([]byte, error) {
 			return nil, fmt.Errorf("stripe：組請求失敗：%w", err)
 		}
 		req.SetBasicAuth(c.key, "")
-		req.Header.Set("Stripe-Version", APIVersion)
+		req.Header.Set("Stripe-Version", cmp.Or(r.version, APIVersion))
 		if r.contentType != "" {
 			req.Header.Set("Content-Type", r.contentType)
 		}
@@ -276,7 +287,7 @@ type AccountSession struct {
 // CreateAccountSession 產生 v1 Account Session（內嵌的 account_onboarding 元件）。
 func (c *Client) CreateAccountSession(ctx context.Context, accountID string) (AccountSession, error) {
 	form := url.Values{"account": {accountID}, "components[account_onboarding][enabled]": {"true"}}
-	data, err := c.do(ctx, request{method: http.MethodPost, path: "/v1/account_sessions", body: []byte(form.Encode()), contentType: "application/x-www-form-urlencoded"})
+	data, err := c.do(ctx, request{method: http.MethodPost, path: "/v1/account_sessions", body: []byte(form.Encode()), contentType: "application/x-www-form-urlencoded", version: APIVersionV1})
 	if err != nil {
 		return AccountSession{}, err
 	}
@@ -304,9 +315,8 @@ type StatusDetail struct {
 	Resolution string `json:"resolution"`
 }
 
-// Capability 是能力的狀態與細節；Present 為 false 表示回應裡沒有這個能力。
+// Capability 是能力的狀態與細節。
 type Capability struct {
-	Present bool
 	Status  string
 	Details []StatusDetail
 }
@@ -328,7 +338,7 @@ func (w *capabilityWire) capability() Capability {
 	if w == nil {
 		return Capability{}
 	}
-	return Capability{Present: true, Status: w.Status, Details: w.StatusDetails}
+	return Capability{Status: w.Status, Details: w.StatusDetails}
 }
 
 // RetrieveAccount 讀 v2 帳戶，include recipient 設定與 requirements。
@@ -354,10 +364,15 @@ func (c *Client) RetrieveAccount(ctx context.Context, accountID string) (Account
 	if out.ID == "" {
 		return Account{}, errors.New("stripe：讀取帳戶的回應沒有 id")
 	}
-	a := Account{ID: out.ID, Requirements: out.Requirements}
-	if r := out.Configuration.Recipient; r != nil {
-		a.Transfers = r.Capabilities.StripeBalance.StripeTransfers.capability()
-		a.Payouts = r.Capabilities.StripeBalance.Payouts.capability()
+	r := out.Configuration.Recipient
+	if r == nil || r.Capabilities.StripeBalance.StripeTransfers == nil {
+		// 沒有轉帳能力的回應是格式錯誤，不是一個狀態；回一般錯誤讓呼叫方重試，不能當成「審核中」存下來。
+		return Account{}, fmt.Errorf("stripe：帳戶 %s 的回應沒有 stripe_transfers 能力", out.ID)
 	}
-	return a, nil
+	return Account{
+		ID:           out.ID,
+		Transfers:    r.Capabilities.StripeBalance.StripeTransfers.capability(),
+		Payouts:      r.Capabilities.StripeBalance.Payouts.capability(),
+		Requirements: out.Requirements,
+	}, nil
 }

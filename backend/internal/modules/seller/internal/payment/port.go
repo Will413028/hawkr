@@ -13,7 +13,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log/slog"
 	"net/http"
 	"slices"
 	"unicode/utf8"
@@ -45,6 +44,17 @@ const (
 	// CapabilityUnknown provider 回了不認得的狀態。
 	CapabilityUnknown CapabilityState = "unknown"
 )
+
+// Valid 回傳 s 是否是 provider 已知的五個狀態之一（CapabilityUnknown 與空值都不是）。adapter 與 StatusOf 共用這一份清單。
+func (s CapabilityState) Valid() bool {
+	switch s {
+	case CapabilityActive, CapabilityPending, CapabilityRestricted, CapabilityRejected, CapabilityUnsupported:
+		return true
+	case CapabilityUnknown:
+		return false
+	}
+	return false
+}
 
 // Resolution 是狀態細節要由誰行動才能解開。
 type Resolution string
@@ -78,15 +88,18 @@ type Snapshot struct {
 	Requirements  json.RawMessage
 }
 
-// EnsureInput 是建立外部帳戶的輸入。IdempotencyKey 是 store_id 的十進位文字：同一家店重送建立得到同一個帳戶。
+// EnsureInput 是建立外部帳戶的輸入。IdempotencyKey 是「建立中」的列寫入時產生並保存的隨機 UUID：同一家店的每次重試都用它，得到同一個帳戶；
+// 兩個資料庫共用同一個 provider 帳號時不會撞鍵。Collection 是帳戶列保存的收件方式（D2），不是行程設定。
 type EnsureInput struct {
 	StoreID        int64
 	IdempotencyKey string
+	Collection     model.RequirementCollection
 }
 
-// SessionInput 是開通 session 的輸入；ReturnURL 是賣家完成或離開後回到的頁面，RefreshURL 是連結過期時重新取得的頁面。
+// SessionInput 是開通 session 的輸入；Collection 是帳戶列保存的收件方式（D2），介面由它決定；ReturnURL 是賣家完成或離開後回到的頁面，RefreshURL 是連結過期時重新取得的頁面。
 type SessionInput struct {
 	ExternalAccountID string
+	Collection        model.RequirementCollection
 	ReturnURL         string
 	RefreshURL        string
 }
@@ -103,7 +116,7 @@ type Provider interface {
 	// Name 是 provider 的代碼（小寫英數與底線），存在帳戶列的 provider 欄。
 	Name() string
 	Capabilities() Capabilities
-	// EnsureAccount 建立外部帳戶，以 IdempotencyKey 冪等。回傳外部帳戶 ID。
+	// EnsureAccount 建立外部帳戶，以 IdempotencyKey 冪等，收件方式取 in.Collection。回傳外部帳戶 ID。
 	EnsureAccount(ctx context.Context, in EnsureInput) (externalID string, err error)
 	// CreateOnboardingSession 產生開通的連結或內嵌元件的 session。
 	CreateOnboardingSession(ctx context.Context, in SessionInput) (model.OnboardingSession, error)
@@ -125,43 +138,59 @@ var (
 // maxReasonLen 是 status_reason 的字數上限（payment_accounts_status_reason_check）。
 const maxReasonLen = 200
 
-// StatusOf 由快照推導中立的狀態與要存的原因碼（Stripe 計畫 D13）。順序：轉帳能力已啟用 → ENABLED；被拒絕或不支援 → DISABLED；
+// StatusNote 標示 StatusOf 遇到不認得或不完整的快照：狀態仍會推導（視為審核中），呼叫方要記警示（帶店家與外部帳戶 ID）。
+type StatusNote string
+
+// StatusOf 的註記。
+const (
+	// NoteNone 快照完整，沒有要記的事。
+	NoteNone StatusNote = ""
+	// NoteUnknownResolution 細節有不認得的行動方。
+	NoteUnknownResolution StatusNote = "unknown_resolution"
+	// NoteRestrictedWithoutDetail 轉帳能力被限制但沒有可判讀的細節。
+	NoteRestrictedWithoutDetail StatusNote = "restricted_without_detail"
+	// NoteUnknownState 轉帳能力的狀態不認得。
+	NoteUnknownState StatusNote = "unknown_state"
+)
+
+// StatusOf 由快照推導中立的狀態、要存的原因碼與註記（Stripe 計畫 D13）。純函式，不記 log。順序：轉帳能力已啟用 → ENABLED；被拒絕或不支援 → DISABLED；
 // 任何一筆細節要賣家行動（含 pending）→ ACTION_REQUIRED；pending → UNDER_REVIEW；restricted 而且有細節要平台處理或沒有解法 → DISABLED；
-// 其餘（不認得的狀態、restricted 但沒有可判讀的細節）→ UNDER_REVIEW 並記警示。細節有多筆時取最嚴重的：賣家能行動的優先，其次是 DISABLED。
+// 其餘（不認得的狀態、restricted 但沒有可判讀的細節）→ UNDER_REVIEW 並帶註記，由呼叫方記警示。細節有多筆時取最嚴重的：賣家能行動的優先，其次是 DISABLED。
 // 原因碼是導出狀態的那一筆細節的 Reason（rejected、unsupported 沒有細節時用狀態名）；ENABLED 與沒有原因碼時是空字串。
-func StatusOf(log *slog.Logger, s Snapshot) (model.PaymentAccountStatus, string) {
+func StatusOf(s Snapshot) (model.PaymentAccountStatus, string, StatusNote) {
 	state := s.Transfers
-	if !slices.Contains([]CapabilityState{CapabilityActive, CapabilityPending, CapabilityRestricted, CapabilityRejected, CapabilityUnsupported}, state) {
+	if !state.Valid() {
 		state = CapabilityUnknown
 	}
 	sellerDetail, sellerCanAct := firstDetail(s.Details, ResolutionSellerAction)
+	note := NoteNone
 	switch state {
 	case CapabilityActive:
-		return model.PaymentEnabled, ""
+		return model.PaymentEnabled, "", NoteNone
 	case CapabilityRejected, CapabilityUnsupported:
-		return model.PaymentDisabled, clipReason(cmp.Or(firstReason(s.Details), string(state)))
+		return model.PaymentDisabled, clipReason(cmp.Or(firstReason(s.Details), string(state))), NoteNone
 	case CapabilityPending:
 		if sellerCanAct {
-			return model.PaymentActionRequired, clipReason(sellerDetail.Reason)
+			return model.PaymentActionRequired, clipReason(sellerDetail.Reason), NoteNone
 		}
 		if _, ok := firstDetail(s.Details, ResolutionUnknown); ok {
-			log.Warn("seller：收款帳戶的狀態細節有不認得的行動方", "transfers", s.Transfers)
+			note = NoteUnknownResolution
 		}
 	case CapabilityRestricted:
 		if sellerCanAct {
-			return model.PaymentActionRequired, clipReason(sellerDetail.Reason)
+			return model.PaymentActionRequired, clipReason(sellerDetail.Reason), NoteNone
 		}
 		if d, ok := firstDetail(s.Details, ResolutionPlatformAction, ResolutionNone); ok {
-			return model.PaymentDisabled, clipReason(d.Reason)
+			return model.PaymentDisabled, clipReason(d.Reason), NoteNone
 		}
-		log.Warn("seller：收款帳戶被限制但沒有可判讀的細節，視為審核中", "transfers", s.Transfers, "details", len(s.Details))
+		note = NoteRestrictedWithoutDetail
 	case CapabilityUnknown:
 		if sellerCanAct {
-			return model.PaymentActionRequired, clipReason(sellerDetail.Reason)
+			return model.PaymentActionRequired, clipReason(sellerDetail.Reason), NoteNone
 		}
-		log.Warn("seller：收款帳戶的轉帳能力狀態不認得，視為審核中", "transfers", s.Transfers)
+		note = NoteUnknownState
 	}
-	return model.PaymentUnderReview, clipReason(firstReason(s.Details))
+	return model.PaymentUnderReview, clipReason(firstReason(s.Details)), note
 }
 
 // firstDetail 回傳第一筆行動方在 want 之內的細節。
