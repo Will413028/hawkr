@@ -103,7 +103,7 @@ dev_dependencies:
   # test/support/firebase_core_mock.dart 直接用到 FirebasePlatform／
   # FirebaseAppPlatform（firebase_core 本身不 export），原本只是
   # firebase_core 的傳遞依賴，補成顯式宣告以消除 depend_on_referenced_packages。
-  firebase_core_platform_interface: ^7.0.1
+  firebase_core_platform_interface: ^8.1.1
 
   # 死碼/未用依賴掃描（類 Knip），用法見 scripts/deadcode.sh
   dependency_validator: ^5.0.2
