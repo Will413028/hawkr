@@ -1,0 +1,21 @@
+t+0s charges=False payouts=False caps={'card_payments': 'pending', 'transfers': 'active'} pending=['individual.address.city', 'individual.address.line1', 'individual.address.postal_code', 'individual.address.state', 'individual.id_number', 'individual.verification.document'] due=[] dis=requirements.pending_verification
+t+10s charges=False payouts=False caps={'card_payments': 'pending', 'transfers': 'active'} pending=['individual.address.city', 'individual.address.line1', 'individual.address.postal_code', 'individual.address.state', 'individual.id_number', 'individual.verification.document'] due=[] dis=requirements.pending_verification
+t+20s charges=False payouts=False caps={'card_payments': 'pending', 'transfers': 'active'} pending=['individual.address.city', 'individual.address.line1', 'individual.address.postal_code', 'individual.address.state', 'individual.id_number', 'individual.verification.document'] due=[] dis=requirements.pending_verification
+t+30s charges=False payouts=False caps={'card_payments': 'pending', 'transfers': 'active'} pending=['individual.address.city', 'individual.address.line1', 'individual.address.postal_code', 'individual.address.state', 'individual.id_number', 'individual.verification.document'] due=[] dis=requirements.pending_verification
+t+40s charges=False payouts=False caps={'card_payments': 'pending', 'transfers': 'active'} pending=['individual.address.city', 'individual.address.line1', 'individual.address.postal_code', 'individual.address.state', 'individual.id_number', 'individual.verification.document'] due=[] dis=requirements.pending_verification
+t+50s charges=True payouts=True caps={'card_payments': 'active', 'transfers': 'active'} pending=[] due=[] dis=None
+--- final (HTTP 200)
+{
+  "charges_enabled": true,
+  "payouts_enabled": true,
+  "details_submitted": true,
+  "requirements": {
+    "currently_due": [],
+    "eventually_due": [],
+    "past_due": [],
+    "pending_verification": [],
+    "errors": [],
+    "disabled_reason": null,
+    "current_deadline": null
+  }
+}

@@ -15,7 +15,8 @@ def tag(v):
 # secrets: never keep any part
 SECRET = re.compile(r"\b(?:sk|rk|pk)" r"_(?:test|live)_[A-Za-z0-9_]+|\bwh" r"sec_[A-Za-z0-9_]+")
 # ids: keep only acct_ and evt_
-ID = re.compile(r"\b(?!acct_|evt_)(ba|btok|file|person|tok|req|link|acctsess|cs|pi|ch|txn|po|tr|fa|ipi|src|pm|cus|seti|si|ca|ek)_(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{8,}")
+ID = re.compile(r"\b(?!acct_|evt_|file_identity)(ba|btok|file|person|tok|req|link|acctsess|cs|pi|ch|txn|po|tr|fa|ipi|src|pm|cus|seti|si|ca|ek)_[A-Za-z0-9]{8,}")
+UUID = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b")
 CSID = re.compile(r"\b(?:client_secret|ccs)_[A-Za-z0-9_]+")
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 URLTOK = re.compile(r"(https://connect\.stripe\.com/[A-Za-z0-9_/.-]*?)/[A-Za-z0-9_-]{8,}")
@@ -37,6 +38,7 @@ def sub_id(m):
 def scrub(s):
     s = SECRET.sub("<SECRET-MASKED>", s)
     s = ID.sub(sub_id, s)
+    s = UUID.sub("<UUID-MASKED>", s)
     s = CSID.sub("<CLIENT-SECRET-MASKED>", s)
     s = EMAIL.sub("<EMAIL-MASKED>", s)
     s = URLTOK.sub(r"\1/<TOKEN-MASKED>", s)

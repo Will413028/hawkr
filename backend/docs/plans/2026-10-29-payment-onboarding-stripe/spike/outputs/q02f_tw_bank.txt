@@ -1,0 +1,2 @@
+bank SCBLTWTP/0001234567 + individual + tos -> 200 accepted
+t+8s charges=True payouts=True caps={'transfers': 'active'} due=[] pend=[] dis=None

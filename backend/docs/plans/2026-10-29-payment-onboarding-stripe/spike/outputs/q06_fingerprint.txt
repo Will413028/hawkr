@@ -1,0 +1,7 @@
+acct_1UX9QGEy4r1Ivrle bank fingerprint(masked, stable tag)= fp_11e7 | keys: ['bank_name', 'default_for_currency', 'fingerprint', 'last4', 'status'] status= new
+acct_1UX9QIIPILUvbKct bank fingerprint(masked, stable tag)= fp_11e7 | keys: ['bank_name', 'default_for_currency', 'fingerprint', 'last4', 'status'] status= new
+fingerprint equal across two accounts, same bank: True
+different account number fingerprint tag= fp_7787 equal to first: False
+attach same bank again to same account: 200 None
+token path fingerprint equal to first: True status 200
+fingerprint visible with platform key on retrieve of account object external_accounts list:  True

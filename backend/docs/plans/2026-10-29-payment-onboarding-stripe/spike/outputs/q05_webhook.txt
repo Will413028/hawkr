@@ -1,0 +1,57 @@
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+account acct_1UX9WeIxwhEE6GHo
+--- 6 deliveries after create + 5 rapid updates
+{"recv": "08:55:06", "event": "evt_1UX9WgIxwhEE6GHoj8AfuQAg", "type": "capability.updated", "created": 1793580906, "request_id": "req_<MASKED:0706>", "livemode": false, "verify": true, "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "sig_header_parts": ["t", "v0", "v1"], "api_version": "2026-08-26.dahlia"}
+{"recv": "08:55:08", "event": "evt_1UX9WhIxwhEE6GHomItlEC1b", "type": "account.updated", "created": 1793580907, "request_id": "req_<MASKED:1ca8>", "livemode": false, "verify": true, "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "sig_header_parts": ["t", "v0", "v1"], "api_version": "2026-08-26.dahlia"}
+{"recv": "08:55:09", "event": "evt_1UX9WjIxwhEE6GHo1N7ZhETv", "type": "account.updated", "created": 1793580908, "request_id": "req_<MASKED:1ca1>", "livemode": false, "verify": true, "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "sig_header_parts": ["t", "v0", "v1"], "api_version": "2026-08-26.dahlia"}
+{"recv": "08:55:10", "event": "evt_1UX9WkIxwhEE6GHodiqLfutm", "type": "account.updated", "created": 1793580910, "request_id": "req_<MASKED:c961>", "livemode": false, "verify": true, "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "sig_header_parts": ["t", "v0", "v1"], "api_version": "2026-08-26.dahlia"}
+{"recv": "08:55:11", "event": "evt_1UX9WlIxwhEE6GHoi8iWKIbt", "type": "account.updated", "created": 1793580911, "request_id": "req_<MASKED:1cb2>", "livemode": false, "verify": true, "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "sig_header_parts": ["t", "v0", "v1"], "api_version": "2026-08-26.dahlia"}
+{"recv": "08:55:12", "event": "evt_1UX9WmIxwhEE6GHog8w77N5p", "type": "account.updated", "created": 1793580912, "request_id": "req_<MASKED:47ef>", "livemode": false, "verify": true, "altered_body_verify": false, "altered_why": "signature mismatch", "stale_ts_verify": false, "stale_why": "timestamp outside tolerance", "sig_header_parts": ["t", "v0", "v1"], "api_version": "2026-08-26.dahlia"}
+account.updated count: 5 | all verified OK: True | every altered body rejected: True | every stale-timestamp rejected: True
+order of delivery equals order of event.created: True | created values: [0, 1, 2, 4, 5, 6]
+Events API (Stripe-Account header) HTTP 200 ids newest-first equal reverse of delivery order: True
+--- stripe events resend (no endpoint flag) rc= 0 
+delay_days": 2,
+            "interval": "daily"
+          },
+          "statement_descriptor": null
+        },
+        "sepa_debit_payments": {}
+      },
+      "tos_acceptance": {
+        "date": null,
+        "ip": null,
+        "user_agent": null
+      },
+      "type": "none"
+    },
+    "previous_attributes": {
+      "metadata": {
+        "seq": "3"
+      }
+    }
+  },
+  "livemode": false,
+  "pending_webhooks": 2,
+  "request": {
+    "id": "req_<MASKED:47ef>",
+    "idempotency_key": "<MASKED>"
+  },
+  "type": "account.updated"
+}
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+▸ Running in New business · live (acct_1UFxOuEWUjfmqMFC)
+
+deliveries after resend: 1 [('same event id as original', 'account.updated', 'sig verified')]
+--- listen log (secret masked by scrub):
+
+2026-11-02 08:55:09  <--  [200] POST http://127.0.0.1:4242/hook [evt_1UX9WjIxwhEE6GHo1N7ZhETv]
+2026-11-02 08:55:10   --> connect account.updated [evt_1UX9WkIxwhEE6GHodiqLfutm]
+2026-11-02 08:55:10  <--  [200] POST http://127.0.0.1:4242/hook [evt_1UX9WkIxwhEE6GHodiqLfutm]
+2026-11-02 08:55:11   --> connect account.updated [evt_1UX9WlIxwhEE6GHoi8iWKIbt]
+2026-11-02 08:55:11  <--  [200] POST http://127.0.0.1:4242/hook [evt_1UX9WlIxwhEE6GHoi8iWKIbt]
+2026-11-02 08:55:12   --> connect account.updated [evt_1UX9WmIxwhEE6GHog8w77N5p]
+2026-11-02 08:55:12  <--  [200] POST http://127.0.0.1:4242/hook [evt_1UX9WmIxwhEE6GHog8w77N5p]
+2026-11-02 08:55:21   --> connect account.updated [evt_1UX9WmIxwhEE6GHog8w77N5p]
+2026-11-02 08:55:21  <--  [200] POST http://127.0.0.1:4242/hook [evt_1UX9WmIxwhEE6GHog8w77N5p]
+

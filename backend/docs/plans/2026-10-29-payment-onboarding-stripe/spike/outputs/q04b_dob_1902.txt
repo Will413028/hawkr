@@ -1,0 +1,36 @@
+=== failed document t+6s: charges=False payouts=False caps={'card_payments': 'pending', 'transfers': 'active'}
+  {'currently_due': [], 'past_due': [], 'pending_verification': ['individual.address.city', 'individual.address.line1', 'individual.address.postal_code', 'individual.address.state', 'individual.id_number', 'individual.verification.document'], 'disabled_reason': 'requirements.pending_verification', 'current_deadline': None}
+  errors: []
+=== failed document t+12s: charges=False payouts=False caps={'card_payments': 'pending', 'transfers': 'active'}
+  {'currently_due': [], 'past_due': [], 'pending_verification': ['individual.address.city', 'individual.address.line1', 'individual.address.postal_code', 'individual.address.state', 'individual.id_number', 'individual.verification.document'], 'disabled_reason': 'requirements.pending_verification', 'current_deadline': None}
+  errors: []
+=== failed document t+18s: charges=False payouts=False caps={'card_payments': 'pending', 'transfers': 'active'}
+  {'currently_due': [], 'past_due': [], 'pending_verification': ['individual.address.city', 'individual.address.line1', 'individual.address.postal_code', 'individual.address.state', 'individual.id_number', 'individual.verification.document'], 'disabled_reason': 'requirements.pending_verification', 'current_deadline': None}
+  errors: []
+=== failed document t+24s: charges=False payouts=False caps={'card_payments': 'pending', 'transfers': 'active'}
+  {'currently_due': [], 'past_due': [], 'pending_verification': ['individual.address.city', 'individual.address.line1', 'individual.address.postal_code', 'individual.address.state', 'individual.id_number', 'individual.verification.document'], 'disabled_reason': 'requirements.pending_verification', 'current_deadline': None}
+  errors: []
+=== failed document t+30s: charges=False payouts=False caps={'card_payments': 'pending', 'transfers': 'active'}
+  {'currently_due': [], 'past_due': [], 'pending_verification': ['individual.address.city', 'individual.address.line1', 'individual.address.postal_code', 'individual.address.state', 'individual.id_number', 'individual.verification.document'], 'disabled_reason': 'requirements.pending_verification', 'current_deadline': None}
+  errors: []
+=== failed document t+36s: charges=False payouts=False caps={'card_payments': 'pending', 'transfers': 'active'}
+  {'currently_due': [], 'past_due': [], 'pending_verification': ['individual.address.city', 'individual.address.line1', 'individual.address.postal_code', 'individual.address.state', 'individual.id_number', 'individual.verification.document'], 'disabled_reason': 'requirements.pending_verification', 'current_deadline': None}
+  errors: []
+=== failed document t+42s: charges=False payouts=False caps={'card_payments': 'pending', 'transfers': 'active'}
+  {'currently_due': [], 'past_due': [], 'pending_verification': ['individual.address.city', 'individual.address.line1', 'individual.address.postal_code', 'individual.address.state', 'individual.id_number', 'individual.verification.document'], 'disabled_reason': 'requirements.pending_verification', 'current_deadline': None}
+  errors: []
+=== failed document t+48s: charges=False payouts=False caps={'card_payments': 'pending', 'transfers': 'active'}
+  {'currently_due': [], 'past_due': [], 'pending_verification': ['individual.address.city', 'individual.address.line1', 'individual.address.postal_code', 'individual.address.state', 'individual.id_number', 'individual.verification.document'], 'disabled_reason': 'requirements.pending_verification', 'current_deadline': None}
+  errors: []
+=== failed document t+54s: charges=False payouts=False caps={'card_payments': 'pending', 'transfers': 'active'}
+  {'currently_due': [], 'past_due': [], 'pending_verification': ['individual.address.city', 'individual.address.line1', 'individual.address.postal_code', 'individual.address.state', 'individual.id_number', 'individual.verification.document'], 'disabled_reason': 'requirements.pending_verification', 'current_deadline': None}
+  errors: []
+=== failed document t+60s: charges=False payouts=False caps={'card_payments': 'pending', 'transfers': 'active'}
+  {'currently_due': [], 'past_due': [], 'pending_verification': ['individual.address.city', 'individual.address.line1', 'individual.address.postal_code', 'individual.address.state', 'individual.id_number', 'individual.verification.document'], 'disabled_reason': 'requirements.pending_verification', 'current_deadline': None}
+  errors: []
+--- errors detail (full) (HTTP 200)
+[]
+resubmit good doc: 200
+=== after good doc t+6s: charges=True payouts=True caps={'card_payments': 'active', 'transfers': 'active'}
+  {'currently_due': [], 'past_due': [], 'pending_verification': [], 'disabled_reason': None, 'current_deadline': None}
+  errors: []

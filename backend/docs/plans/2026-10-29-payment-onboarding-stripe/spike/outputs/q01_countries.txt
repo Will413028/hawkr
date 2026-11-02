@@ -1,89 +1,275 @@
---- controller/application country=US full agreement (HTTP 400)
+--- controller/application country=US full agreement (HTTP 200)
 {
-  "error": {
-    "message": "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile.",
-    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:51e6>",
-    "type": "invalid_request_error"
+  "id": "acct_1UX9GuInEkt61Pry",
+  "type": "none",
+  "country": "US",
+  "default_currency": "usd",
+  "controller": {
+    "fees": {
+      "payer": "application"
+    },
+    "is_controller": true,
+    "losses": {
+      "payments": "application"
+    },
+    "requirement_collection": "application",
+    "stripe_dashboard": {
+      "type": "none"
+    },
+    "type": "application"
+  },
+  "capabilities": {
+    "card_payments": "inactive",
+    "transfers": "inactive"
+  },
+  "business_type": "individual",
+  "tos_acceptance": {
+    "date": null,
+    "ip": null,
+    "user_agent": null
   }
 }
 --- controller/application country=TW full agreement (HTTP 400)
 {
   "error": {
-    "message": "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile.",
-    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:c93e>",
+    "message": "You cannot request the `card_payments` capability for accounts in TW. For a list of countries that support `card_payments`, see https://stripe.com/global. To create an account in TW, see https://stripe.com/docs/connect/cross-border-payouts.",
+    "param": "requested_capabilities",
+    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:5f01>",
     "type": "invalid_request_error"
   }
 }
---- controller/application country=SG full agreement (HTTP 400)
+--- controller/application country=SG full agreement (HTTP 200)
 {
-  "error": {
-    "message": "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile.",
-    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:328f>",
-    "type": "invalid_request_error"
+  "id": "acct_1UX9GxIjMl443zR9",
+  "type": "none",
+  "country": "SG",
+  "default_currency": "sgd",
+  "controller": {
+    "fees": {
+      "payer": "application"
+    },
+    "is_controller": true,
+    "losses": {
+      "payments": "application"
+    },
+    "requirement_collection": "application",
+    "stripe_dashboard": {
+      "type": "none"
+    },
+    "type": "application"
+  },
+  "capabilities": {
+    "card_payments": "inactive",
+    "transfers": "inactive"
+  },
+  "business_type": "individual",
+  "tos_acceptance": {
+    "date": null,
+    "ip": null,
+    "user_agent": null
   }
 }
---- controller/application country=JP full agreement (HTTP 400)
+--- controller/application country=JP full agreement (HTTP 200)
 {
-  "error": {
-    "message": "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile.",
-    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:2929>",
-    "type": "invalid_request_error"
+  "id": "acct_1UX9GzI603lZqhnB",
+  "type": "none",
+  "country": "JP",
+  "default_currency": "jpy",
+  "controller": {
+    "fees": {
+      "payer": "application"
+    },
+    "is_controller": true,
+    "losses": {
+      "payments": "application"
+    },
+    "requirement_collection": "application",
+    "stripe_dashboard": {
+      "type": "none"
+    },
+    "type": "application"
+  },
+  "capabilities": {
+    "card_payments": "inactive",
+    "transfers": "inactive"
+  },
+  "business_type": "individual",
+  "tos_acceptance": {
+    "date": null,
+    "ip": null,
+    "user_agent": null
   }
 }
 --- legacy type=custom country=TW (HTTP 400)
 {
   "error": {
-    "message": "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile.",
-    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:af2a>",
+    "message": "You cannot request the `card_payments` capability for accounts in TW. For a list of countries that support `card_payments`, see https://stripe.com/global. To create an account in TW, see https://stripe.com/docs/connect/cross-border-payouts.",
+    "param": "requested_capabilities",
+    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:cd2d>",
     "type": "invalid_request_error"
   }
 }
---- legacy type=custom country=SG (HTTP 400)
+--- legacy type=custom country=SG (HTTP 200)
 {
-  "error": {
-    "message": "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile.",
-    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:ea10>",
-    "type": "invalid_request_error"
+  "id": "acct_1UX9H2ILTaqxa7qT",
+  "type": "custom",
+  "country": "SG",
+  "default_currency": "sgd",
+  "controller": {
+    "fees": {
+      "payer": "application_custom"
+    },
+    "is_controller": true,
+    "losses": {
+      "payments": "application"
+    },
+    "requirement_collection": "application",
+    "stripe_dashboard": {
+      "type": "none"
+    },
+    "type": "application"
+  },
+  "capabilities": {
+    "card_payments": "inactive",
+    "transfers": "inactive"
+  },
+  "business_type": "individual",
+  "tos_acceptance": {
+    "date": null,
+    "ip": null,
+    "user_agent": null
   }
 }
---- legacy type=custom country=JP (HTTP 400)
+--- legacy type=custom country=JP (HTTP 200)
 {
-  "error": {
-    "message": "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile.",
-    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:76b2>",
-    "type": "invalid_request_error"
+  "id": "acct_1UX9H4I9k3OkXTFn",
+  "type": "custom",
+  "country": "JP",
+  "default_currency": "jpy",
+  "controller": {
+    "fees": {
+      "payer": "application_custom"
+    },
+    "is_controller": true,
+    "losses": {
+      "payments": "application"
+    },
+    "requirement_collection": "application",
+    "stripe_dashboard": {
+      "type": "none"
+    },
+    "type": "application"
+  },
+  "capabilities": {
+    "card_payments": "inactive",
+    "transfers": "inactive"
+  },
+  "business_type": "individual",
+  "tos_acceptance": {
+    "date": null,
+    "ip": null,
+    "user_agent": null
   }
 }
---- controller/application country=TW tos_acceptance.service_agreement=recipient (transfers only) (HTTP 400)
+--- controller/application country=TW tos_acceptance.service_agreement=recipient (transfers only) (HTTP 200)
 {
-  "error": {
-    "message": "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile.",
-    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:f52d>",
-    "type": "invalid_request_error"
+  "id": "acct_1UX9H7I3oDPtiets",
+  "type": "none",
+  "country": "TW",
+  "default_currency": "twd",
+  "controller": {
+    "fees": {
+      "payer": "application"
+    },
+    "is_controller": true,
+    "losses": {
+      "payments": "application"
+    },
+    "requirement_collection": "application",
+    "stripe_dashboard": {
+      "type": "none"
+    },
+    "type": "application"
+  },
+  "capabilities": {
+    "transfers": "inactive"
+  },
+  "business_type": "individual",
+  "tos_acceptance": {
+    "date": null,
+    "ip": null,
+    "service_agreement": "recipient",
+    "user_agent": null
   }
 }
---- controller/application country=SG tos_acceptance.service_agreement=recipient (transfers only) (HTTP 400)
+--- controller/application country=SG tos_acceptance.service_agreement=recipient (transfers only) (HTTP 200)
 {
-  "error": {
-    "message": "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile.",
-    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:f6fa>",
-    "type": "invalid_request_error"
+  "id": "acct_1UX9H9EcnBshnNLE",
+  "type": "none",
+  "country": "SG",
+  "default_currency": "sgd",
+  "controller": {
+    "fees": {
+      "payer": "application"
+    },
+    "is_controller": true,
+    "losses": {
+      "payments": "application"
+    },
+    "requirement_collection": "application",
+    "stripe_dashboard": {
+      "type": "none"
+    },
+    "type": "application"
+  },
+  "capabilities": {
+    "transfers": "inactive"
+  },
+  "business_type": "individual",
+  "tos_acceptance": {
+    "date": null,
+    "ip": null,
+    "service_agreement": "recipient",
+    "user_agent": null
   }
 }
---- controller/application country=JP tos_acceptance.service_agreement=recipient (transfers only) (HTTP 400)
+--- controller/application country=JP tos_acceptance.service_agreement=recipient (transfers only) (HTTP 200)
 {
-  "error": {
-    "message": "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile.",
-    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:264f>",
-    "type": "invalid_request_error"
+  "id": "acct_1UX9HBI5JsSutgsz",
+  "type": "none",
+  "country": "JP",
+  "default_currency": "jpy",
+  "controller": {
+    "fees": {
+      "payer": "application"
+    },
+    "is_controller": true,
+    "losses": {
+      "payments": "application"
+    },
+    "requirement_collection": "application",
+    "stripe_dashboard": {
+      "type": "none"
+    },
+    "type": "application"
+  },
+  "capabilities": {
+    "transfers": "inactive"
+  },
+  "business_type": "individual",
+  "tos_acceptance": {
+    "date": null,
+    "ip": null,
+    "service_agreement": "recipient",
+    "user_agent": null
   }
 }
 --- Express-like controller country=TW requirement_collection=stripe (HTTP 400)
 {
   "error": {
     "message": "When `stripe_dashboard[type]=express`, your platform must collect fees and be liable for negative balances or refunds and chargebacks.",
-    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:dca2>",
+    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:986c>",
     "type": "invalid_request_error"
   }
 }
---- created ids (for cleanup): 
+--- created ids (for cleanup): acct_1UX9GuInEkt61Pry acct_1UX9GxIjMl443zR9 acct_1UX9GzI603lZqhnB acct_1UX9H2ILTaqxa7qT acct_1UX9H4I9k3OkXTFn acct_1UX9H7I3oDPtiets acct_1UX9H9EcnBshnNLE acct_1UX9HBI5JsSutgsz

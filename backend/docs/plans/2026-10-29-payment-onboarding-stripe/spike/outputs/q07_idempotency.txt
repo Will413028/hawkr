@@ -1,0 +1,189 @@
+first : 200 acct_1UX9LFRFFRiHAAAi Idempotent-Replayed= None
+second: 200 acct_1UX9LFRFFRiHAAAi Idempotent-Replayed= true
+same account id: True
+--- same key, different params (HTTP 400)
+{
+  "error": {
+    "message": "Keys for idempotent requests can only be used with the same parameters they were first used with. Try using a key other than '<UUID-MASKED>' if you meant to execute a different request.",
+    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:c7b7>",
+    "type": "idempotency_error"
+  }
+}
+headers on error: Idempotent-Replayed= None | Idempotency-Key header echoed: True
+different key, same params: 200 new account: True
+--- same key on a different endpoint (HTTP 200)
+{
+  "id": "acct_1UX9LFRFFRiHAAAi",
+  "object": "account",
+  "business_profile": {
+    "annual_revenue": null,
+    "estimated_worker_count": null,
+    "mcc": null,
+    "minority_owned_business_designation": null,
+    "name": "<MASKED>",
+    "product_description": null,
+    "specified_commercial_transactions_act_url": null,
+    "support_address": null,
+    "support_email": null,
+    "support_phone": null,
+    "support_url": null,
+    "url": null
+  },
+  "business_type": "individual",
+  "capabilities": {
+    "transfers": "inactive"
+  },
+  "charges_enabled": false,
+  "company": {
+    "address": {
+      "city": null,
+      "country": "US",
+      "line1": null,
+      "line2": null,
+      "postal_code": null,
+      "state": null
+    },
+    "directors_provided": true,
+    "executives_provided": true,
+    "name": null,
+    "owners_provided": true,
+    "tax_id_provided": false,
+    "verification": {
+      "document": {
+        "back": null,
+        "details": null,
+        "details_code": null,
+        "front": null
+      }
+    }
+  },
+  "controller": {
+    "fees": {
+      "payer": "application"
+    },
+    "is_controller": true,
+    "losses": {
+      "payments": "application"
+    },
+    "requirement_collection": "application",
+    "stripe_dashboard": {
+      "type": "none"
+    },
+    "type": "application"
+  },
+  "country": "US",
+  "created": 1793580198,
+  "default_currency": "usd",
+  "details_submitted": false,
+  "email": null,
+  "external_accounts": {
+    "object": "list",
+    "data": [],
+    "has_more": false,
+    "total_count": 0,
+    "url": "<MASKED>"
+  },
+  "future_requirements": {
+    "alternatives": [],
+    "current_deadline": null,
+    "currently_due": [],
+    "disabled_reason": null,
+    "errors": [],
+    "eventually_due": [],
+    "past_due": [],
+    "pending_verification": []
+  },
+  "metadata": {},
+  "payouts_enabled": false,
+  "requirements": {
+    "alternatives": [],
+    "current_deadline": null,
+    "currently_due": [
+      "business_profile.url",
+      "external_account",
+      "individual.first_name",
+      "individual.last_name",
+      "tos_acceptance.date",
+      "tos_acceptance.ip"
+    ],
+    "disabled_reason": "requirements.past_due",
+    "errors": [],
+    "eventually_due": [
+      "business_profile.url",
+      "external_account",
+      "individual.dob.day",
+      "individual.dob.month",
+      "individual.dob.year",
+      "individual.first_name",
+      "individual.last_name",
+      "individual.ssn_last_4",
+      "tos_acceptance.date",
+      "tos_acceptance.ip"
+    ],
+    "past_due": [
+      "business_profile.url",
+      "external_account",
+      "individual.first_name",
+      "individual.last_name",
+      "tos_acceptance.date",
+      "tos_acceptance.ip"
+    ],
+    "pending_verification": []
+  },
+  "settings": {
+    "bacs_debit_payments": {
+      "display_name": "Stripe",
+      "service_user_number": "449900"
+    },
+    "branding": {
+      "icon": null,
+      "logo": null,
+      "primary_color": null,
+      "secondary_color": null
+    },
+    "card_issuing": {
+      "tos_acceptance": {
+        "date": null,
+        "ip": null
+      }
+    },
+    "card_payments": {
+      "decline_on": {
+        "avs_failure": false,
+        "cvc_failure": false
+      },
+      "statement_descriptor_prefix": null,
+      "statement_descriptor_prefix_kana": null,
+      "statement_descriptor_prefix_kanji": null
+    },
+    "dashboard": {
+      "display_name": "x",
+      "timezone": "Etc/UTC"
+    },
+    "invoices": {
+      "default_account_tax_ids": null,
+      "hosted_payment_method_save": "offer"
+    },
+    "payments": {
+      "statement_descriptor": null,
+      "statement_descriptor_kana": null,
+      "statement_descriptor_kanji": null
+    },
+    "payouts": {
+      "debit_negative_balances": false,
+      "schedule": {
+        "delay_days": 2,
+        "interval": "daily"
+      },
+      "statement_descriptor": null
+    },
+    "sepa_debit_payments": {}
+  },
+  "tos_acceptance": {
+    "date": null,
+    "ip": null,
+    "user_agent": null
+  },
+  "type": "none"
+}
+400 replay: 400 400 Idempotent-Replayed= None

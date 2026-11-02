@@ -1,0 +1,12 @@
+purpose=identity_document: HTTP 200 type=png size=187 purpose_echo=identity_document expires_at=None keys=['created', 'expires_at', 'filename', 'id', 'links', 'object', 'purpose', 'size', 'title', 'type', 'url']
+purpose=additional_verification: HTTP 200 type=png size=187 purpose_echo=additional_verification expires_at=None keys=['created', 'expires_at', 'filename', 'id', 'links', 'object', 'purpose', 'size', 'title', 'type', 'url']
+purpose=account_requirement: HTTP 200 type=png size=187 purpose_echo=account_requirement expires_at=None keys=['created', 'expires_at', 'filename', 'id', 'links', 'object', 'purpose', 'size', 'title', 'type', 'url']
+purpose=dispute_evidence: HTTP 200 type=png size=187 purpose_echo=dispute_evidence expires_at=1816908536 keys=['created', 'expires_at', 'filename', 'id', 'links', 'object', 'purpose', 'size', 'title', 'type', 'url']
+purpose=bogus_purpose: HTTP 400 Invalid purpose: must be one of account_requirement, additional_verification, business_icon, business_logo, customer_signature, dispute_evidence, identity_document, issuing_regulatory_reporting, pci_document, platform_terms_of_service, tax_document_user_upload, terminal_android_apk, terminal_reader_splashscreen, terminal_wifi_certificate, or terminal_wifi_private_key
+attach identity_document file to individual.verification.document.front: 200 None
+individual.verification.document in response -> keys: ['back', 'details', 'details_code', 'front']
+persons: 1 verification.document keys: ['back', 'details', 'details_code', 'front']
+attach dispute_evidence file as ID document: 400 That file was not uploaded with the correct purpose parameter. Try uploading a new file with a valid purpose: `identity_document`, `document_provider_identity_document`.
+retrieve file: 200 {'purpose': 'identity_document', 'type': 'png', 'size': 187, 'title': None}
+file_link for identity_document: 400 You can't create a file link for this file. Upload a new file with a purpose that supports file links.
+text/plain upload: 400 We don't currently support file type: text/plain. Try uploading a file with one of the following mimetypes: application/pdf, image/jpeg, image/png

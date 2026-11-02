@@ -1,0 +1,78 @@
+created acct_1UX9LbI0BiLko3SN 200
+--- [SG] requirements after create (HTTP 200)
+{
+  "currently_due": [
+    "business_profile.mcc",
+    "business_profile.url",
+    "external_account",
+    "individual.address.line1",
+    "individual.address.postal_code",
+    "individual.dob.day",
+    "individual.dob.month",
+    "individual.dob.year",
+    "individual.email",
+    "individual.first_name",
+    "individual.full_name_aliases",
+    "individual.id_number",
+    "individual.last_name",
+    "individual.nationality",
+    "individual.phone",
+    "tos_acceptance.date",
+    "tos_acceptance.ip"
+  ]
+}
+--- [SG] after submit (HTTP 200)
+{
+  "charges_enabled": true,
+  "payouts_enabled": false,
+  "details_submitted": true,
+  "requirements": {
+    "currently_due": [
+      "individual.verification.proof_of_liveness"
+    ],
+    "eventually_due": [
+      "individual.verification.proof_of_liveness"
+    ],
+    "past_due": [
+      "individual.verification.proof_of_liveness"
+    ],
+    "pending_verification": [
+      "individual.address.line1",
+      "individual.address.postal_code",
+      "individual.verification.additional_document"
+    ],
+    "errors": [],
+    "disabled_reason": "requirements.past_due",
+    "current_deadline": 1796172223
+  }
+}
+t+10s charges=True payouts=False caps={'card_payments': 'active', 'transfers': 'active'} cd=['individual.verification.proof_of_liveness'] pend=['individual.address.line1', 'individual.address.postal_code', 'individual.verification.additional_document'] err=[]
+t+20s charges=True payouts=False caps={'card_payments': 'active', 'transfers': 'active'} cd=['individual.verification.proof_of_liveness'] pend=['individual.address.line1', 'individual.address.postal_code', 'individual.verification.additional_document'] err=[]
+t+30s charges=True payouts=False caps={'card_payments': 'active', 'transfers': 'active'} cd=['individual.verification.proof_of_liveness'] pend=['individual.address.line1', 'individual.address.postal_code', 'individual.verification.additional_document'] err=[]
+t+40s charges=True payouts=False caps={'card_payments': 'active', 'transfers': 'active'} cd=['individual.verification.proof_of_liveness'] pend=['individual.address.line1', 'individual.address.postal_code', 'individual.verification.additional_document'] err=[]
+t+50s charges=True payouts=False caps={'card_payments': 'active', 'transfers': 'active'} cd=['individual.verification.proof_of_liveness'] pend=['individual.address.line1', 'individual.address.postal_code', 'individual.verification.additional_document'] err=[]
+t+60s charges=True payouts=False caps={'card_payments': 'active', 'transfers': 'active'} cd=['individual.verification.proof_of_liveness'] pend=['individual.address.line1', 'individual.address.postal_code', 'individual.verification.additional_document'] err=[]
+t+70s charges=True payouts=False caps={'card_payments': 'active', 'transfers': 'active'} cd=['individual.verification.proof_of_liveness'] pend=['individual.address.line1', 'individual.address.postal_code', 'individual.verification.additional_document'] err=[]
+t+80s charges=True payouts=False caps={'card_payments': 'active', 'transfers': 'active'} cd=['individual.verification.proof_of_liveness'] pend=[] err=[]
+t+90s charges=True payouts=False caps={'card_payments': 'active', 'transfers': 'active'} cd=['individual.verification.proof_of_liveness'] pend=[] err=[]
+--- [SG] final (HTTP 200)
+{
+  "charges_enabled": true,
+  "payouts_enabled": false,
+  "details_submitted": true,
+  "requirements": {
+    "currently_due": [
+      "individual.verification.proof_of_liveness"
+    ],
+    "eventually_due": [
+      "individual.verification.proof_of_liveness"
+    ],
+    "past_due": [
+      "individual.verification.proof_of_liveness"
+    ],
+    "pending_verification": [],
+    "errors": [],
+    "disabled_reason": "requirements.past_due",
+    "current_deadline": 1796172223
+  }
+}

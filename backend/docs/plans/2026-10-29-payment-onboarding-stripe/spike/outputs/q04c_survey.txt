@@ -1,0 +1,44 @@
+acct_1UX9bKEw75QV5EYl TW collect=application charges=True payouts=True caps={'transfers': 'active'}
+    due=[] past_due=0 pending=[] errors=[] disabled_reason=None
+acct_1UX9arIsJtd4M3rb TW collect=application charges=False payouts=False caps={'transfers': 'inactive'}
+    due=['external_account', 'individual.address.city', 'individual.address.line1', 'individual.address.postal_code']...(+6) past_due=10 pending=[] errors=[] disabled_reason=requirements.past_due
+acct_1UX9a0IEilw7t8db TW collect=application charges=True payouts=False caps={'transfers': 'active'}
+    due=['external_account'] past_due=1 pending=[] errors=[] disabled_reason=requirements.past_due
+acct_1UX9YuRLHIpnbGMr US collect=application charges=False payouts=False caps={'card_payments': 'inactive', 'transfers': 'active'}
+    due=['individual.address.city', 'individual.address.line1', 'individual.address.postal_code', 'individual.address.state']...(+2) past_due=4 pending=[] errors=[('invalid_address_city_state_postal_code', 'individual.address.city'), ('invalid_street_address', 'individual.address.line1'), ('invalid_address_city_state_postal_code', 'individual.address.postal_code'), ('invalid_address_city_state_postal_code', 'individual.address.state'), ('verification_failed_tax_id_match', 'individual.id_number'), ('verification_failed_keyed_identity', 'individual.verification.document')] disabled_reason=listed
+acct_1UX9XHIUARGkzoxf US collect=application charges=True payouts=True caps={'card_payments': 'active', 'transfers': 'active'}
+    due=[] past_due=0 pending=[] errors=[] disabled_reason=None
+acct_1UX9UbEyfPtMOXUA US collect=application charges=False payouts=False caps={'transfers': 'inactive'}
+    due=['business_profile.url', 'external_account', 'individual.first_name', 'individual.last_name']...(+2) past_due=6 pending=[] errors=[] disabled_reason=requirements.past_due
+acct_1UX9UUIonm3AoOR4 US collect=application charges=True payouts=True caps={'card_payments': 'active', 'transfers': 'active'}
+    due=[] past_due=0 pending=[] errors=[] disabled_reason=None
+acct_1UX9U5RQ2HrsXws7 US collect=application charges=False payouts=False caps={'transfers': 'inactive'}
+    due=['business_profile.url', 'external_account', 'individual.first_name', 'individual.last_name']...(+2) past_due=6 pending=[] errors=[] disabled_reason=requirements.past_due
+acct_1UX9TyROpEUwQ46F US collect=application charges=False payouts=False caps={'card_payments': 'inactive', 'transfers': 'inactive'}
+    due=['business_profile.mcc', 'business_profile.url', 'external_account', 'individual.address.city']...(+14) past_due=18 pending=[] errors=[] disabled_reason=requirements.past_due
+acct_1UX9QeIxffiA5JEQ US collect=application charges=False payouts=False caps={'transfers': 'inactive'}
+    due=['business_profile.url', 'external_account', 'individual.first_name', 'individual.last_name']...(+2) past_due=6 pending=[] errors=[] disabled_reason=requirements.past_due
+acct_1UX9QMIP2RP9T3hD US collect=application charges=False payouts=False caps={'transfers': 'inactive'}
+    due=['business_profile.url', 'individual.first_name', 'individual.last_name', 'tos_acceptance.date']...(+1) past_due=5 pending=[] errors=[] disabled_reason=requirements.past_due
+acct_1UX9QIIPILUvbKct US collect=application charges=False payouts=False caps={'transfers': 'inactive'}
+    due=['business_profile.url', 'individual.first_name', 'individual.last_name', 'tos_acceptance.date']...(+1) past_due=5 pending=[] errors=[] disabled_reason=requirements.past_due
+acct_1UX9QGEy4r1Ivrle US collect=application charges=False payouts=False caps={'transfers': 'inactive'}
+    due=['business_profile.url', 'individual.first_name', 'individual.last_name', 'tos_acceptance.date']...(+1) past_due=5 pending=[] errors=[] disabled_reason=requirements.past_due
+acct_1UX9QGExIDrIssNn US collect=application charges=False payouts=False caps={'card_payments': 'inactive', 'transfers': 'inactive'}
+    due=['business_profile.mcc', 'business_profile.url', 'external_account', 'individual.address.city']...(+14) past_due=18 pending=[] errors=[] disabled_reason=requirements.past_due
+acct_1UX9OFEzHtAgdnQA US collect=application charges=False payouts=False caps={'card_payments': 'inactive', 'transfers': 'inactive'}
+    due=['business_profile.mcc', 'business_profile.url', 'external_account', 'individual.address.city']...(+14) past_due=18 pending=[] errors=[] disabled_reason=requirements.past_due
+acct_1UX9NxIOeYAZ7v0O US collect=application charges=False payouts=False caps={'card_payments': 'inactive', 'transfers': 'inactive'}
+    due=['business_profile.mcc', 'business_profile.url', 'external_account', 'individual.address.city']...(+14) past_due=18 pending=[] errors=[] disabled_reason=requirements.past_due
+acct_1UX9NsISKP6TkB4c US collect=stripe charges=False payouts=False caps={'card_payments': 'inactive', 'transfers': 'inactive'}
+    due=['business_profile.mcc', 'business_profile.url', 'business_type', 'external_account']...(+9) past_due=13 pending=[] errors=[] disabled_reason=requirements.past_due
+acct_1UX9LbI0BiLko3SN SG collect=application charges=True payouts=False caps={'card_payments': 'active', 'transfers': 'active'}
+    due=['individual.verification.proof_of_liveness'] past_due=1 pending=[] errors=[] disabled_reason=requirements.past_due
+acct_1UX9LIET1Msd7b8k US collect=application charges=False payouts=False caps={'transfers': 'inactive'}
+    due=['business_profile.url', 'external_account', 'individual.first_name', 'individual.last_name']...(+2) past_due=6 pending=[] errors=[] disabled_reason=requirements.past_due
+acct_1UX9LFRFFRiHAAAi US collect=application charges=False payouts=False caps={'transfers': 'inactive'}
+    due=['business_profile.url', 'external_account', 'individual.first_name', 'individual.last_name']...(+2) past_due=6 pending=[] errors=[] disabled_reason=requirements.past_due
+acct_1UX9JBIRgM5rqhus SG collect=application charges=False payouts=False caps={'card_payments': 'inactive', 'transfers': 'inactive'}
+    due=['business_profile.mcc', 'business_profile.url', 'external_account', 'individual.address.line1']...(+13) past_due=17 pending=[] errors=[] disabled_reason=requirements.past_due
+acct_1UX9HeEpcQyWfRTc US collect=application charges=True payouts=True caps={'card_payments': 'active', 'transfers': 'active'}
+    due=[] past_due=0 pending=[] errors=[] disabled_reason=None

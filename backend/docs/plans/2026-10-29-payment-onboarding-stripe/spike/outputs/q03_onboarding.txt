@@ -1,0 +1,123 @@
+--- express (requirement_collection=stripe) create (HTTP 200)
+{
+  "id": "acct_1UX9NsISKP6TkB4c",
+  "type": "none",
+  "controller": {
+    "fees": {
+      "payer": "application"
+    },
+    "is_controller": true,
+    "losses": {
+      "payments": "application"
+    },
+    "requirement_collection": "stripe",
+    "stripe_dashboard": {
+      "type": "express"
+    },
+    "type": "application"
+  },
+  "charges_enabled": false,
+  "payouts_enabled": false,
+  "details_submitted": false
+}
+--- express state right after create (HTTP 200)
+{
+  "charges_enabled": false,
+  "payouts_enabled": false,
+  "details_submitted": false,
+  "requirements": {
+    "currently_due": [
+      "business_profile.mcc",
+      "business_profile.url",
+      "business_type",
+      "external_account",
+      "representative.dob.day",
+      "representative.dob.month",
+      "representative.dob.year",
+      "representative.email",
+      "representative.first_name",
+      "representative.last_name",
+      "settings.payments.statement_descriptor",
+      "tos_acceptance.date",
+      "tos_acceptance.ip"
+    ],
+    "eventually_due": [
+      "business_profile.mcc",
+      "business_profile.url",
+      "business_type",
+      "external_account",
+      "representative.dob.day",
+      "representative.dob.month",
+      "representative.dob.year",
+      "representative.email",
+      "representative.first_name",
+      "representative.last_name",
+      "settings.payments.statement_descriptor",
+      "tos_acceptance.date",
+      "tos_acceptance.ip"
+    ],
+    "past_due": [
+      "business_profile.mcc",
+      "business_profile.url",
+      "business_type",
+      "external_account",
+      "representative.dob.day",
+      "representative.dob.month",
+      "representative.dob.year",
+      "representative.email",
+      "representative.first_name",
+      "representative.last_name",
+      "settings.payments.statement_descriptor",
+      "tos_acceptance.date",
+      "tos_acceptance.ip"
+    ],
+    "pending_verification": [],
+    "errors": [],
+    "disabled_reason": "requirements.past_due",
+    "current_deadline": null
+  }
+}
+--- account_onboarding, express HTTP 200
+{'object': 'account_link', 'created': 1793580363, 'expires_at': 1793580663, 'url': '<url>'} | expires_in_s = 300
+url host/path shape: https://connect.stripe.com/setup/e/<TOKEN-MASKED>/Gh9
+--- account_onboarding, express, future_requirements=include HTTP 200
+{'object': 'account_link', 'created': 1793580364, 'expires_at': 1793580664, 'url': '<url>'} | expires_in_s = 301
+url host/path shape: https://connect.stripe.com/setup/e/<TOKEN-MASKED>/Ptj
+--- account_update, express (docs: Custom only) HTTP 400
+{'error': {'message': 'You cannot create `account_update` type Account Links for this account. Valid types for this account are ["account_onboarding"].', 'param': 'type', 'request_log_url': 'https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:4577>', 'type': 'invalid_request_error'}} | expires_in_s = None
+--- account_update, express (docs: Custom only) (HTTP 400)
+{
+  "error": {
+    "message": "You cannot create `account_update` type Account Links for this account. Valid types for this account are [\"account_onboarding\"].",
+    "param": "type",
+    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:4577>",
+    "type": "invalid_request_error"
+  }
+}
+--- account_onboarding without return_url HTTP 400
+{'error': {'code': 'parameter_missing', 'doc_url': 'https://stripe.com/docs/error-codes/parameter-missing', 'message': 'Missing required param: return_url.', 'param': 'return_url', 'request_log_url': 'https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:ee53>', 'type': 'invalid_request_error'}} | expires_in_s = None
+--- account_onboarding without return_url (HTTP 400)
+{
+  "error": {
+    "code": "parameter_missing",
+    "doc_url": "https://stripe.com/docs/error-codes/parameter-missing",
+    "message": "Missing required param: return_url.",
+    "param": "return_url",
+    "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/workbench/logs?object=req_<MASKED:ee53>",
+    "type": "invalid_request_error"
+  }
+}
+--- account_onboarding with http (non-https) return_url HTTP 200
+{'object': 'account_link', 'created': 1793580365, 'expires_at': 1793580665, 'url': '<url>'} | expires_in_s = 302
+url host/path shape: https://connect.stripe.com/setup/e/<TOKEN-MASKED>/fih
+--- account_onboarding on application-collected account HTTP 200
+{'object': 'account_link', 'created': 1793580368, 'expires_at': 1793580668, 'url': '<url>'} | expires_in_s = 305
+url host/path shape: https://connect.stripe.com/setup/c/<TOKEN-MASKED>/iML
+--- account_update on application-collected account HTTP 200
+{'object': 'account_link', 'created': 1793580368, 'expires_at': 1793580668, 'url': '<url>'} | expires_in_s = 305
+url host/path shape: https://connect.stripe.com/setup/c/<TOKEN-MASKED>/QkV
+--- account_session on express: HTTP 200 keys=['account', 'client_secret', 'components', 'expires_at', 'livemode', 'object', 'read_only'] expires_in_s=125 components=['account_management', 'account_onboarding', 'balance_report', 'balances', 'disputes_list', 'documents', 'financial_account', 'financial_account_transactions', 'instant_payouts_promotion', 'issuing_card', 'issuing_cards_list', 'notification_banner', 'payment_details', 'payment_disputes', 'payment_method_settings', 'payments', 'payout_details', 'payout_reconciliation_report', 'payouts', 'payouts_list', 'reporting_chart', 'tax_registrations', 'tax_settings', 'terminal_hardware_orders', 'terminal_hardware_shop']
+--- account_session on application-collected: HTTP 200 keys=['account', 'client_secret', 'components', 'expires_at', 'livemode', 'object', 'read_only'] expires_in_s=126 components=['account_management', 'account_onboarding', 'balance_report', 'balances', 'disputes_list', 'documents', 'financial_account', 'financial_account_transactions', 'instant_payouts_promotion', 'issuing_card', 'issuing_cards_list', 'notification_banner', 'payment_details', 'payment_disputes', 'payment_method_settings', 'payments', 'payout_details', 'payout_reconciliation_report', 'payouts', 'payouts_list', 'reporting_chart', 'tax_registrations', 'tax_settings', 'terminal_hardware_orders', 'terminal_hardware_shop']
+--- account_session account_management+notification_banner: 200 ok
+state acct_1UX9NsISKP6TkB4c requirements.past_due
+state acct_1UX9NxIOeYAZ7v0O requirements.past_due
