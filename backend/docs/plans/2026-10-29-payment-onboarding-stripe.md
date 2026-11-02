@@ -67,7 +67,7 @@
 
 ## 步驟
 
-- [ ] **1. Spike：Stripe 測試模式的事實，與 CI 基線**（被擋於：需要人做的事）
+- [x] **1. Spike：Stripe 測試模式的事實，與 CI 基線**（被擋於：需要人做的事）
   - 範圍：orchestrator 先把基線 CI 的失敗存成附件 `baseline-ci.md`。之後在 Stripe 測試帳號（US，見 D8）上以附件 `spike/` 的腳本確認並記錄：connected account 可用國別（台灣可否）；Custom（`requirement_collection = application`）能否在測試模式以 API 送 KYC 並啟用；託管與內嵌 onboarding 的帳號連結與回跳；`requirements`（`currently_due`、`errors`）與 `charges_enabled`、`payouts_enabled` 的對應；`account.updated` webhook 的簽章驗證、event id、重送與亂序；外部銀行帳號 `fingerprint` 是否跨 connected account 一致；建立帳號的冪等鍵；證件以 Files API 上傳的用途值。每項附官方文件 URL 與實測輸出；輸出存檔前以 `spike/scrub.py` 遮掉金鑰、`acct_` 與 `evt_` 以外的識別碼與個資。
   - 消費端：無（spike）。
   - 驗收：`spike/README.md` 每個問題有答案、官方出處與遮罩後的實測輸出；`baseline-ci.md` 列出四個失敗 run 的失敗 step 與錯誤行。
@@ -159,7 +159,7 @@
 
 | 步驟 | 狀態 | 已跑的驗收 | 未跑的驗收與原因 | commit |
 |---|---|---|---|---|
-| 1 Spike 與 CI 基線 | 未開始 | | | |
+| 1 Spike 與 CI 基線 | 完成 | `baseline-ci.md`：四個失敗 run 的失敗 step 與錯誤行（`27bc439`）。`spike/README.md` Q1–Q8 各有答案、官方 URL 與遮罩後輸出；`spike/` grep `sk_|whsec_|rk_` 為 0；測試帳號全刪（`GET /v1/accounts` 0 筆）。結論：Custom（`requirement_collection=application`）在 US 與 TW（recipient、只開 transfers）可只靠 API 完成並啟用；SG 卡在 `proof_of_liveness`（無 API 參數）；TW 不能開 `card_payments`；同一測試銀行帳號在兩個 connected account 的 `fingerprint` 相同。前置：Will 在 Dashboard 確認 ongoing seller compliance（2026-11-02）。 | 文件上的重試期、冪等 key 期限、事件不保證順序未在本次重抓文件核對；webhook 重試未實測（接收端一律回 2xx）；live mode 的 fingerprint 範圍未查（D12 拍板前核對）；託管 onboarding 未以瀏覽器走完（步驟 5 的本機手動驗收做）。 | `d690766`、`d601aa0`、`27bc439` |
 | 2 B 階段需求 | 完成 | `git grep -c "2026-10-29-payment-onboarding-stripe" backend/docs/plans/2026-09-24-go-modular-monolith.md` = 5（B2、B3、B8、B9、B10 各一） | 無 | 見 git log |
 | 3 防詐雜湊與銀行帳號關聯 | 完成 | 本機：`atlas migrate diff` 已同步、`atlas migrate validate`、sqlc、`make connect`、TS 與 Dart 生成、`make uitext` 無 drift；gofmt、`go vet`（含 `-tags integration`）、unit（seller、httpapi、arch、cmd）、`make lint-monolith` 0 issues、`GOWORK=off go mod tidy -diff` 無差異；admin `merchant-termination` 與 `merchant-create-termination-dialog` 35 個測試通過。法務告知：`seller-kyc-notice.md` 第 6 點加防詐比對碼保存說明並 `gen:legal`（`612a5b3`）。CI：backend monolith run 41318569031（`b2dcbb0`，含 `ab3eb7d`）兩個 job 綠，integration 的 seller 套件 ok。mutation 在 CI 診斷 run 41366066358 各自執行：未改 6 個測試全過；快照改回 `kyc_identity_hashes`、5 年清理不刪、拿掉銀行帳號條件、`CheckKYCKeys` 拿掉新表，四個對應測試各自失敗。 | `TestPubContractsMatchMigrations` 本步驟沒改 `pub_*`，隨 CI 的 integration 一起跑過。決定：不回填（系統未上線）；新表 `field` 與 `kyc_identity_hashes.field` 同一組值；銀行帳號命中不能建立關聯終止（`LinkedIdentity.CountsAsGround`），防詐列在草稿欄位改掉時同步修剪。 | `ab3eb7d`、`612a5b3` |
 | 4 payment port、中立契約與改名 | 未開始 | | | |
