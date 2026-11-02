@@ -14,7 +14,7 @@ name: supply chain
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, dev]
   schedule:
     - cron: '17 3 * * 1'
   workflow_dispatch:

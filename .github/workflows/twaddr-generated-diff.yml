@@ -15,7 +15,7 @@ on:
       - 'packages/hawkr_twaddr/**'
       - '.github/workflows/twaddr-generated-diff.yml'
   push:
-    branches: [main]
+    branches: [main, dev]
     paths: *twaddr_paths
   workflow_dispatch:
 

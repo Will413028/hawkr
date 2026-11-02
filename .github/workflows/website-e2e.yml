@@ -34,7 +34,7 @@ on:
       - '.github/actions/pnpm-install/**'
       - '.github/workflows/website-e2e.yml'
   push:
-    branches: [main]
+    branches: [main, dev]
     paths:
       - 'website/**'
       - 'api/**'

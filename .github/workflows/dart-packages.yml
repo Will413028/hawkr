@@ -10,7 +10,7 @@ on:
       - 'packages/hawkr_*/**'
       - '.github/workflows/dart-packages.yml'
   push:
-    branches: [main]
+    branches: [main, dev]
     paths: *package_paths
   workflow_dispatch:
 

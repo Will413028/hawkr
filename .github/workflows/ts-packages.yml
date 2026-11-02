@@ -23,7 +23,7 @@ on:
       - '.github/actions/pnpm-install/**'
       - '.github/workflows/ts-packages.yml'
   push:
-    branches: [main]
+    branches: [main, dev]
     paths: *package_paths
   workflow_dispatch:
 

@@ -24,7 +24,7 @@ on:
       - '.github/actions/pnpm-install/**'
       - '.github/workflows/api-contract.yml'
   push:
-    branches: [main]
+    branches: [main, dev]
     paths: *api_paths
   workflow_dispatch:
 
@@ -75,7 +75,7 @@ jobs:
       - name: buf breaking
         if: always()
         env:
-          # 比對的基準：PR 是 base，push 是推上來之前的 main。
+          # 比對的基準：PR 是 base，push 是同一分支推上來之前的 commit。
           BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         run: |
           # 基準還沒有 api/（第一次加入契約）時沒有東西可比。

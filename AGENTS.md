@@ -56,6 +56,6 @@
 - **UI 改動**：bug 修正、純粹跟隨 API 契約的調整可以直接做；版面、UX 文案與流程的改動要先取得同意。取得同意後仍要先重用既有元件與 pattern，樣式一律走 design token，沿用既有的密度與互動；真的沒有可重用的才新建，並先說明為什麼。
 - **使用者面文字**：買家與賣家介面是 zh-TW／en，admin 只有 zh-TW；語系的選擇、文字資源與伺服器文字見 ADR `backend/docs/adr/2026-10-17-multi-locale-architecture.md`，用語以 `backend/docs/開發規範/使用者面用語術語表.md` 為準。
 - **依賴與供應鏈**：已知漏洞的修復期限自發現日起算：critical 7 天、high 30 天、medium 90 天、low 在下一次相關更新時；暫不修的放進基準（`osv-scanner.toml` 的 `IgnoredVulns`、`scripts/govulncheck-allowlist.json`），每筆寫理由與期限，期限到了 CI 會失敗。agent 不自行新增或升級依賴：先列出套件名稱與版本，核對該版本存在、發佈滿兩週，經同意才改；`uses:` 一律釘完整 40 碼 SHA 並在行尾註明版本。僅 agentfile-lint（Will 自有的檢查工具）的 tag 免「發佈滿兩週」與逐版同意；其餘依賴（含 agentfile-lint 自己的傳遞依賴與其 CI 引用的 Action）照原規則；引用仍須釘完整 SHA 並註明版本。
-- **Git**：只有 `main` 一條分支。commit 使用 Conventional Commits，例如 `feat(backend): …`，只提交本次範圍的檔案，不用 `git add -A`。push 依使用者授權。
+- **Git**：分支模型（branch model）是日常工作推 `dev`；`main` 只經 `dev`→`main` 的 PR 以 merge commit 合併，不直接推（ruleset 擋）。commit 使用 Conventional Commits，例如 `feat(backend): …`，只提交本次範圍的檔案，不用 `git add -A`。push 依使用者授權。
 - **驗證**：完成前跑與 CI 相同的檢查並看結果；看 CI 時看每個 job 自己的結論，不只看 run 的整體狀態。沒有驗證到的部分明確說出來。
 

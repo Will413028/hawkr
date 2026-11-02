@@ -16,7 +16,7 @@ on:
       - 'backend/internal/modules/seller/internal/model/agreement_gen.go'
       - '.github/workflows/legal-generated-diff.yml'
   push:
-    branches: [main]
+    branches: [main, dev]
     paths: *legal_paths
   workflow_dispatch:
 
