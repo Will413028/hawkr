@@ -387,3 +387,39 @@ func TestPurgeIsNotCappedAtOneBatch(t *testing.T) {
 		t.Fatalf("沒清的=%d（應該只剩關閉 10 天的 3 間）", left)
 	}
 }
+
+// 關店滿保留期的最終清理一併刪掉店家的收款帳戶列與那個外部帳戶的 webhook inbox；別的店家的帳戶與事件不動。
+// mutation：purge.go 拿掉 PurgePaymentAccounts（或 PurgePaymentProviderEvents）的呼叫 → 帳戶列（或事件）還在，失敗。
+func TestPurgeDeletesThePaymentAccountAndItsEventsOfThePurgedStoreOnly(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	gone, goneStore := f.approvedStore(t)
+	_, keptStore := f.approvedStore(t)
+	for _, s := range []Store{goneStore, keptStore} {
+		external := f.ensureAccount(t, s.StoreID)
+		f.setPayment(t, s.StoreID, enabledSnapshot)
+		h, body := f.paymentEvent(fmt.Sprintf("evt_%d", s.StoreID), external)
+		must(t, f.module.ReceivePaymentEvent(ctx, h, body))
+	}
+	_, err := f.module.CloseCurrent(ctx, gone)
+	must(t, err)
+	f.now = f.now.Add(StoreRetention + time.Second)
+	n, err := f.module.PurgePII(ctx)
+	must(t, err)
+	if n != 1 {
+		t.Fatalf("purged=%d", n)
+	}
+	if c := f.count(t, fmt.Sprintf("SELECT count(*) FROM seller.payment_accounts WHERE store_id = %d", goneStore.StoreID)); c != 0 {
+		t.Fatalf("清理之後帳戶列還在：%d", c)
+	}
+	if c := f.count(t, fmt.Sprintf("SELECT count(*) FROM seller.payment_provider_events WHERE event_id = 'evt_%d'", goneStore.StoreID)); c != 0 {
+		t.Fatalf("清理之後 inbox 事件還在：%d", c)
+	}
+	if c := f.count(t, fmt.Sprintf("SELECT count(*) FROM seller.payment_accounts WHERE store_id = %d", keptStore.StoreID)); c != 1 {
+		t.Fatalf("別的店家的帳戶列被刪：%d", c)
+	}
+	if c := f.count(t, fmt.Sprintf("SELECT count(*) FROM seller.payment_provider_events WHERE event_id = 'evt_%d'", keptStore.StoreID)); c != 1 {
+		t.Fatalf("別的店家的事件被刪：%d", c)
+	}
+}

@@ -28,6 +28,8 @@ const (
 	maxAttempts = 8
 	// sweepBatch 是掃描一次排入的上限。
 	sweepBatch = 100
+	// eventGrace 是 inbox 事件多久還沒處理之後由掃描補排同步（正常情況下同步 job 很快就涵蓋它）。
+	eventGrace = time.Minute
 	// createIdle 是建立列閒置多久之後由掃描補排建立 job（保底，平常 job 一定存在）。
 	createIdle = 10 * time.Minute
 )

@@ -86,11 +86,18 @@ SELECT EXISTS (
 ) AS pending;
 
 -- name: PollablePaymentAccountStoreIDs :many
--- 輪詢補漏：只有 ONBOARDING、UNDER_REVIEW、ACTION_REQUIRED 的帳戶，依 store_id 分批。
-SELECT store_id
-FROM seller.payment_accounts
-WHERE status IN ('ONBOARDING', 'UNDER_REVIEW', 'ACTION_REQUIRED') AND store_id > sqlc.arg(after_store_id)
-ORDER BY store_id
+-- 輪詢補漏：ONBOARDING、UNDER_REVIEW、ACTION_REQUIRED 的帳戶，加上任何狀態中 inbox 有 event_before 之前收到卻還沒處理的事件的帳戶
+-- （事件在同步寫入快照之後、job 標記完成之前到達時，排入被執行中的 job 合併掉，inbox 是唯一不會漏的來源），依 store_id 分批。
+SELECT a.store_id
+FROM seller.payment_accounts a
+WHERE (a.status IN ('ONBOARDING', 'UNDER_REVIEW', 'ACTION_REQUIRED')
+       OR EXISTS (
+           SELECT 1 FROM seller.payment_provider_events e
+           WHERE e.provider = a.provider AND e.external_account_id = a.external_account_id
+             AND e.processed_at IS NULL AND e.received_at < sqlc.arg(event_before)
+       ))
+  AND a.store_id > sqlc.arg(after_store_id)
+ORDER BY a.store_id
 LIMIT sqlc.arg(batch);
 
 -- name: StalePaymentAccountCreateStoreIDs :many

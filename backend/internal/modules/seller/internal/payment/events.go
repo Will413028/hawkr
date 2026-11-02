@@ -12,7 +12,9 @@ import (
 )
 
 func (s *Service) pollable(ctx context.Context, after int64) ([]int64, error) {
-	return store.New(s.d.DB.Conn(ctx)).PollablePaymentAccountStoreIDs(ctx, store.PollablePaymentAccountStoreIDsParams{AfterStoreID: after, Batch: sweepBatch})
+	return store.New(s.d.DB.Conn(ctx)).PollablePaymentAccountStoreIDs(ctx, store.PollablePaymentAccountStoreIDsParams{
+		EventBefore: s.d.Now().UTC().Add(-eventGrace), AfterStoreID: after, Batch: sweepBatch,
+	})
 }
 
 func (s *Service) stale(ctx context.Context, after int64) ([]int64, error) {

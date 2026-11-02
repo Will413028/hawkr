@@ -335,6 +335,38 @@ func TestSweepQueuesSyncOnlyForTheThreeOpenStatuses(t *testing.T) {
 	}
 }
 
+// 輪詢補漏也看 inbox：任何狀態（包含 ENABLED）的帳戶，有超過 1 分鐘還沒處理的事件就排同步；剛到的事件與已處理的事件不排。
+// mutation：PollablePaymentAccountStoreIDs 拿掉 payment_provider_events 的 EXISTS 子句 → ENABLED 帳戶的舊事件沒有同步，失敗。
+func TestSweepQueuesSyncForAnOldUnprocessedEventOnAnEnabledAccount(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	_, old := f.approvedStore(t)
+	_, fresh := f.approvedStore(t)
+	_, done := f.approvedStore(t)
+	externals := map[int64]string{}
+	for _, s := range []Store{old, fresh, done} {
+		externals[s.StoreID] = f.ensureAccount(t, s.StoreID)
+		f.setPayment(t, s.StoreID, enabledSnapshot)
+	}
+	h, body := f.paymentEvent("evt_done", externals[done.StoreID])
+	must(t, f.module.ReceivePaymentEvent(ctx, h, body))
+	_, err := f.module.SyncPaymentAccount(ctx, done.StoreID)
+	must(t, err)
+	h, body = f.paymentEvent("evt_old", externals[old.StoreID])
+	must(t, f.module.ReceivePaymentEvent(ctx, h, body))
+	f.now = f.now.Add(2 * time.Minute)
+	h, body = f.paymentEvent("evt_fresh", externals[fresh.StoreID])
+	must(t, f.module.ReceivePaymentEvent(ctx, h, body))
+	before := len(f.jobs.queuedStoreIDs(t, kindPaymentSync))
+	synced, _, err := f.module.SweepPaymentAccounts(ctx)
+	must(t, err)
+	got := f.jobs.queuedStoreIDs(t, kindPaymentSync)[before:]
+	if !slices.Equal(got, []int64{old.StoreID}) || synced != 1 {
+		t.Fatalf("輪詢排入的店家=%v（回報 %d），應該只有舊事件的 %d", got, synced, old.StoreID)
+	}
+}
+
 // 建立重試用完（最後一次嘗試）或 provider 永久拒絕：記下建立失敗的時刻並進後台待辦 PAYMENT_ACCOUNT_CREATE_FAILED，期限 24 小時；中途的暫時性失敗
 // 只回傳錯誤、不記失敗。管理員重試建立清空失敗並重新排入，待辦消失；不是建立失敗的狀態不能重試。
 // mutation：Ensure 在最後一次嘗試仍只回傳錯誤、不記 create_failed_at → 待辦沒有這一列，失敗。

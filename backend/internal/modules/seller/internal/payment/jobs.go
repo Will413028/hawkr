@@ -145,7 +145,7 @@ func (s *Service) PeriodicJobs() []*river.PeriodicJob {
 	)}
 }
 
-// Sweep 排入輪詢補漏的同步（只有 ONBOARDING、UNDER_REVIEW、ACTION_REQUIRED 的帳戶）與閒置建立列的建立 job，各自分批、各批一個 transaction。
+// Sweep 排入輪詢補漏的同步（ONBOARDING、UNDER_REVIEW、ACTION_REQUIRED 的帳戶，以及任何狀態中 inbox 有超過 eventGrace 還沒處理的事件的帳戶）與閒置建立列的建立 job，各自分批、各批一個 transaction。
 // 回傳排入同步與建立的帳戶數（唯一鍵合併掉的也算）。沒有設定 provider 時什麼都不做。
 func (s *Service) Sweep(ctx context.Context) (synced, ensured int, err error) {
 	if s.d.Provider == nil {

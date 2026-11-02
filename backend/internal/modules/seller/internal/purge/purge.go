@@ -270,7 +270,14 @@ func (s *Service) purgeBatch(ctx context.Context, after *int64) (int, int, *int6
 		if _, err := q.PurgeAgreementSources(ctx, store.PurgeAgreementSourcesParams{StoreIds: purged, Now: &now}); err != nil {
 			return err
 		}
-		_, err = q.PurgePayUniObservations(ctx, purged)
+		if _, err := q.PurgePayUniObservations(ctx, purged); err != nil {
+			return err
+		}
+		// 收款帳戶的快照帶外部帳戶 ID 與 requirements；webhook inbox 以外部帳戶 ID 為鍵，先刪 inbox 再刪帳戶列。
+		if _, err := q.PurgePaymentProviderEvents(ctx, purged); err != nil {
+			return err
+		}
+		_, err = q.PurgePaymentAccounts(ctx, purged)
 		return err
 	})
 	return purgedCount, candidateCount, last, err

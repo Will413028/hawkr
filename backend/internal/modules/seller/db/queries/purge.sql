@@ -169,3 +169,16 @@ UPDATE seller.payuni_observations o
 SET reason = NULL
 FROM seller.stores s
 WHERE o.store_id = ANY(sqlc.arg(store_ids)::bigint[]) AND s.store_id = o.store_id AND s.pii_purged_at IS NOT NULL AND o.reason IS NOT NULL;
+
+-- name: PurgePaymentProviderEvents :execrows
+-- 刪掉這些店家的收款帳戶的 webhook inbox 列（inbox 以外部帳戶 ID 為鍵，不帶 store_id，所以經由帳戶列找；要在 PurgePaymentAccounts 之前）。只作用於店家列已清理的店家。
+DELETE FROM seller.payment_provider_events e
+USING seller.payment_accounts a, seller.stores s
+WHERE a.store_id = ANY(sqlc.arg(store_ids)::bigint[]) AND s.store_id = a.store_id AND s.pii_purged_at IS NOT NULL
+  AND e.provider = a.provider AND e.external_account_id = a.external_account_id;
+
+-- name: PurgePaymentAccounts :execrows
+-- 刪掉這些店家的收款帳戶列（外部帳戶 ID、requirements、disabled_reason）。只作用於店家列已清理的店家：保留期限的判斷只有 PurgeStores 一處。
+DELETE FROM seller.payment_accounts a
+USING seller.stores s
+WHERE a.store_id = ANY(sqlc.arg(store_ids)::bigint[]) AND s.store_id = a.store_id AND s.pii_purged_at IS NOT NULL;
