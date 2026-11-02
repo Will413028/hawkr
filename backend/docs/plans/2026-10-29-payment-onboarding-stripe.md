@@ -68,11 +68,11 @@
 ## 步驟
 
 - [ ] **1. Spike：Stripe 測試模式的事實，與 CI 基線**（被擋於：需要人做的事）
-  - 範圍：orchestrator 先把基線 CI 的失敗存成附件 `baseline-ci.md`。之後在 Stripe 測試帳號（暫定國別 SG，見 D8，可推翻）上以附件 `spike/` 的腳本確認並記錄：connected account 可用國別（台灣可否）；Custom（`requirement_collection = application`）能否在測試模式以 API 送 KYC 並啟用；託管與內嵌 onboarding 的帳號連結與回跳；`requirements`（`currently_due`、`errors`）與 `charges_enabled`、`payouts_enabled` 的對應；`account.updated` webhook 的簽章驗證、event id、重送與亂序；外部銀行帳號 `fingerprint` 是否跨 connected account 一致；建立帳號的冪等鍵；證件以 Files API 上傳的用途值。每項附官方文件 URL 與實測輸出；輸出存檔前以 `spike/scrub.py` 遮掉金鑰、`acct_` 與 `evt_` 以外的識別碼與個資。
+  - 範圍：orchestrator 先把基線 CI 的失敗存成附件 `baseline-ci.md`。之後在 Stripe 測試帳號（US，見 D8）上以附件 `spike/` 的腳本確認並記錄：connected account 可用國別（台灣可否）；Custom（`requirement_collection = application`）能否在測試模式以 API 送 KYC 並啟用；託管與內嵌 onboarding 的帳號連結與回跳；`requirements`（`currently_due`、`errors`）與 `charges_enabled`、`payouts_enabled` 的對應；`account.updated` webhook 的簽章驗證、event id、重送與亂序；外部銀行帳號 `fingerprint` 是否跨 connected account 一致；建立帳號的冪等鍵；證件以 Files API 上傳的用途值。每項附官方文件 URL 與實測輸出；輸出存檔前以 `spike/scrub.py` 遮掉金鑰、`acct_` 與 `evt_` 以外的識別碼與個資。
   - 消費端：無（spike）。
   - 驗收：`spike/README.md` 每個問題有答案、官方出處與遮罩後的實測輸出；`baseline-ci.md` 列出四個失敗 run 的失敗 step 與錯誤行。
-  - 停止條件：SG 帳號無法建立 Custom 或 connected account 時，換 D8 的其他國別重試一次，仍不行就停下回報給 D7、D8。
-  - 需要人做的事：Will 建立 Stripe 測試帳號（國別 SG），把測試金鑰與 webhook signing secret 存在本機 `secrets/` 並回覆 done；不貼出金鑰。
+  - 停止條件：US 平台無法建立 Custom 或 connected account 時，停下回報給 D7、D8。
+  - 需要人做的事：Will 建立 Stripe 測試帳號，把測試金鑰存在本機 `secrets/`（2026-11-02 完成，國別 US）；webhook signing secret 由本機 `stripe listen --api-key` 產生。
 
 - [x] **2. B 階段需求**（被擋於：無；可與步驟 1 並行）
   - 範圍：在單體計畫加需求並指向本計畫：B2（付款經 payment port、Stripe；`internal/legacy/sellerserver` 的 `payuni_mer_id` 由 port 的外部帳戶 ID 取代）、B3（物流改綠界，PayUni 物流退場）、B8–B10（退款、撥款、對帳經 port；撥款模型與手續費重審）。
@@ -134,7 +134,7 @@
 - **D7 Stripe 的預設開通模式**（未決；擋住：4–6；需要的事實：步驟 1）
   - A：預設 `PROVIDER_HOSTED`（Stripe 託管或內嵌 onboarding，Stripe 收證件與銀行帳號），`PLATFORM_COLLECTED` 用 Custom 示範。平台持有的 PII 最少。（建議）
   - B：預設 `PLATFORM_COLLECTED`——沿用現行 KYC 畫面最多，但平台持有最多 PII。
-- **D8 Stripe 測試平台帳號的國別**（未決；步驟 1 以 A 暫定開工，查證後確認；擋住：5）
+- **D8 Stripe 測試平台帳號的國別**（已決 2026-11-02，Will，選 C：測試帳號建成 US，沿用不改；擋住：5）
   - A：SG（亞洲、英文介面、可示範本地幣；平台與 connected account 同國）。（建議，暫定）
   - B：JP——同為亞洲，但 KYC 欄位與文件以日文為主。
   - C：US 平台加跨境撥款——示範跨境，但離台灣情境更遠，且台灣能否當 connected account 未確認。
@@ -151,7 +151,7 @@
   - A：平台沒有身分證號，只用金流商提供的銀行帳號 `fingerprint` 做關聯標記；身分層級的防重複開通交給金流商。（建議，前提是步驟 1 確認 fingerprint 跨帳號一致）
   - B：`PROVIDER_HOSTED` 也要求平台另收身分證號計算雜湊——兩邊重複收 PII，違反 D7 選 A 的目的。
 
-拍板順序：D1–D5、D9–D11 已決；D8 以 A 暫定讓步驟 1 開工；D6、D7、D12 與 D8 的確認在步驟 1 之後交。
+拍板順序：D1–D5、D8–D11 已決；D6、D7、D12 在步驟 1 之後交。
 
 ## 進度
 
