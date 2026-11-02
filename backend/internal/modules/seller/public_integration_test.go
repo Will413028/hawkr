@@ -187,7 +187,7 @@ func TestStoreCardsReturnEveryEverExposedStoreWithItsStatus(t *testing.T) {
 	f.now = f.now.Add(time.Hour)
 	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "8"}
 	must(t, f.module.PollPayUni(ctx, rejected.StoreID, PayUniSourceRefresh))
-	f.setPayment(t, rejected.StoreID, PaymentSnapshot{DetailsSubmitted: true, DisabledReason: "rejected.other"})
+	f.setPayment(t, rejected.StoreID, rejectedSnapshot)
 	for name, c := range map[string]struct {
 		store  Store
 		status CardStatus
@@ -380,7 +380,7 @@ func TestAnOpenCardIsExactlyAnExposableStore(t *testing.T) {
 	f.now = f.now.Add(time.Hour)
 	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "8"}
 	must(t, f.module.PollPayUni(ctx, rejected.StoreID, PayUniSourceRefresh))
-	f.setPayment(t, rejected.StoreID, PaymentSnapshot{DetailsSubmitted: true, DisabledReason: "rejected.other"})
+	f.setPayment(t, rejected.StoreID, rejectedSnapshot)
 	if got := f.card(t, rejected.StoreID); got.Status != CardPaused || got.Name == nil {
 		t.Fatalf("PayUni 被拒絕的店 card=%+v, want PAUSED", got)
 	}
@@ -715,7 +715,7 @@ func TestStoreCardsAndStoresWithExposureAgreeOnTheSameStores(t *testing.T) {
 	f.now = f.now.Add(time.Hour)
 	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "8"}
 	must(t, f.module.PollPayUni(ctx, rejected.StoreID, PayUniSourceRefresh))
-	f.setPayment(t, rejected.StoreID, PaymentSnapshot{DetailsSubmitted: true, DisabledReason: "rejected.other"})
+	f.setPayment(t, rejected.StoreID, rejectedSnapshot)
 	ids := slices.Concat(visible, hidden, []int64{rejected.StoreID})
 	exposures, err := f.module.StoresWithExposure(ctx, ids)
 	must(t, err)

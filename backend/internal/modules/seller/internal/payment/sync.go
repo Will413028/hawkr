@@ -51,18 +51,18 @@ func (s *Service) Sync(ctx context.Context, storeID int64) (again bool, err erro
 			return nil
 		}
 		now := s.d.Now().UTC()
-		status := StatusOf(snap)
+		status, reasonCode := StatusOf(s.d.Logger, snap)
 		raw := snap.Requirements
 		if len(raw) == 0 || !json.Valid(raw) {
 			raw = json.RawMessage(`{}`)
 		}
 		var reason *string
-		if snap.DisabledReason != "" {
-			reason = &snap.DisabledReason
+		if reasonCode != "" {
+			reason = &reasonCode
 		}
 		if _, err := q.ApplyPaymentSnapshot(ctx, store.ApplyPaymentSnapshotParams{
 			StoreID: storeID, Status: string(status), TransfersActive: status == model.PaymentEnabled, PayoutsActive: snap.PayoutsActive && status == model.PaymentEnabled,
-			Requirements: raw, DisabledReason: reason, FetchedAt: &startedAt, Now: now,
+			Requirements: raw, StatusReason: reason, FetchedAt: &startedAt, Now: now,
 		}); err != nil {
 			return err
 		}

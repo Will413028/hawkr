@@ -98,7 +98,7 @@ func TestPublishedAtStartsWhenTheStoreFirstBecomesExposable(t *testing.T) {
 	f.now = f.now.Add(10 * 24 * time.Hour)
 	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "8"}
 	must(t, f.module.PollPayUni(ctx, s.StoreID, PayUniSourceRefresh))
-	f.setPayment(t, s.StoreID, PaymentSnapshot{DetailsSubmitted: true, DisabledReason: "rejected.other"})
+	f.setPayment(t, s.StoreID, rejectedSnapshot)
 	f.now = f.now.Add(24 * time.Hour)
 	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "1"}
 	must(t, f.module.PollPayUni(ctx, s.StoreID, PayUniSourceRefresh))

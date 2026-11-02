@@ -1,33 +1,65 @@
 package payment
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 )
 
-// 狀態的推導順序：被拒絕或暫停 → 轉帳能力啟用 → 還沒送出資料 → 有待補的條件 → 審核中（Stripe 計畫 D13）。
-func TestStatusOfFollowsTheDocumentedPrecedence(t *testing.T) {
+func details(ds ...StatusDetail) []StatusDetail { return ds }
+
+func seller(reason string) StatusDetail {
+	return StatusDetail{Resolution: ResolutionSellerAction, Reason: reason}
+}
+
+func platform(reason string) StatusDetail {
+	return StatusDetail{Resolution: ResolutionPlatformAction, Reason: reason}
+}
+
+// StatusOf 逐列對應 D13 修訂的對應表；原因碼是導出狀態的那一筆細節的原因碼。
+func TestStatusOfFollowsTheDecisionTable(t *testing.T) {
 	for name, tc := range map[string]struct {
-		snap Snapshot
-		want model.PaymentAccountStatus
+		snap       Snapshot
+		want       model.PaymentAccountStatus
+		wantReason string
+		wantWarn   bool
 	}{
-		"剛建立":                {Snapshot{RequirementsDue: true}, model.PaymentOnboarding},
-		"還沒送出資料，有待補":         {Snapshot{RequirementsDue: true, DetailsSubmitted: false}, model.PaymentOnboarding},
-		"已送出，有待補":            {Snapshot{DetailsSubmitted: true, RequirementsDue: true}, model.PaymentActionRequired},
-		"已送出，沒有待補，能力未啟用":     {Snapshot{DetailsSubmitted: true}, model.PaymentUnderReview},
-		"轉帳能力啟用":             {Snapshot{DetailsSubmitted: true, TransfersActive: true}, model.PaymentEnabled},
-		"啟用但又有新的待補條件":        {Snapshot{DetailsSubmitted: true, TransfersActive: true, RequirementsDue: true}, model.PaymentEnabled},
-		"被拒絕，能力仍標示啟用":        {Snapshot{DetailsSubmitted: true, TransfersActive: true, DisabledReason: "rejected.fraud"}, model.PaymentDisabled},
-		"被暫停，還沒送出資料":         {Snapshot{DisabledReason: "platform_paused"}, model.PaymentDisabled},
-		"只有撥款能力，轉帳能力未啟用，已送出": {Snapshot{DetailsSubmitted: true, PayoutsActive: true}, model.PaymentUnderReview},
+		"active":         {Snapshot{Transfers: CapabilityActive, TransfersActive: true}, model.PaymentEnabled, "", false},
+		"active 忽略殘留的細節": {Snapshot{Transfers: CapabilityActive, Details: details(platform("x"))}, model.PaymentEnabled, "", false},
+		"新帳戶：restricted 加 seller_action":     {Snapshot{Transfers: CapabilityRestricted, Details: details(seller("routine_onboarding"))}, model.PaymentActionRequired, "routine_onboarding", false},
+		"pending 但有 seller_action":           {Snapshot{Transfers: CapabilityPending, Details: details(seller("verification_failed"))}, model.PaymentActionRequired, "verification_failed", false},
+		"pending 沒有細節":                       {Snapshot{Transfers: CapabilityPending}, model.PaymentUnderReview, "", false},
+		"pending 只有平台行動的細節":                  {Snapshot{Transfers: CapabilityPending, Details: details(platform("in_review"))}, model.PaymentUnderReview, "in_review", false},
+		"rejected":                           {Snapshot{Transfers: CapabilityRejected, Details: details(platform("rejected_fraud"))}, model.PaymentDisabled, "rejected_fraud", false},
+		"rejected 沒有細節，原因碼用狀態名":              {Snapshot{Transfers: CapabilityRejected}, model.PaymentDisabled, "rejected", false},
+		"unsupported":                        {Snapshot{Transfers: CapabilityUnsupported}, model.PaymentDisabled, "unsupported", false},
+		"restricted 加 platform_action":       {Snapshot{Transfers: CapabilityRestricted, Details: details(platform("contact_stripe_reason"))}, model.PaymentDisabled, "contact_stripe_reason", false},
+		"restricted 加 none":                  {Snapshot{Transfers: CapabilityRestricted, Details: details(StatusDetail{Resolution: ResolutionNone, Reason: "no_fix"})}, model.PaymentDisabled, "no_fix", false},
+		"restricted 但沒有細節":                   {Snapshot{Transfers: CapabilityRestricted}, model.PaymentUnderReview, "", true},
+		"restricted 只有不認得的行動方":               {Snapshot{Transfers: CapabilityRestricted, Details: details(StatusDetail{Resolution: ResolutionUnknown, Reason: "new_kind"})}, model.PaymentUnderReview, "new_kind", true},
+		"未知的轉帳能力狀態":                          {Snapshot{Transfers: CapabilityUnknown}, model.PaymentUnderReview, "", true},
+		"空的轉帳能力狀態":                           {Snapshot{}, model.PaymentUnderReview, "", true},
+		"pending 有不認得的行動方":                   {Snapshot{Transfers: CapabilityPending, Details: details(StatusDetail{Resolution: ResolutionUnknown})}, model.PaymentUnderReview, "", true},
+		"多筆：賣家能行動的優先於平台處理的":                  {Snapshot{Transfers: CapabilityRestricted, Details: details(platform("p"), seller("s"))}, model.PaymentActionRequired, "s", false},
+		"多筆：平台處理的優先於不認得的":                    {Snapshot{Transfers: CapabilityRestricted, Details: details(StatusDetail{Resolution: ResolutionUnknown, Reason: "u"}, platform("p"))}, model.PaymentDisabled, "p", false},
+		"多筆：多個賣家行動取第一筆的原因碼":                  {Snapshot{Transfers: CapabilityRestricted, Details: details(seller("a"), seller("b"))}, model.PaymentActionRequired, "a", false},
+		"原因碼超過上限時截斷":                         {Snapshot{Transfers: CapabilityRestricted, Details: details(platform(strings.Repeat("字", 250)))}, model.PaymentDisabled, strings.Repeat("字", maxReasonLen), false},
+		"轉帳能力 active 與撥款能力無關：撥款受限也是 ENABLED": {Snapshot{Transfers: CapabilityActive, PayoutsActive: false}, model.PaymentEnabled, "", false},
 	} {
-		if got := StatusOf(tc.snap); got != tc.want {
-			t.Errorf("%s：%s，want %s", name, got, tc.want)
+		var buf bytes.Buffer
+		got, reason := StatusOf(slog.New(slog.NewTextHandler(&buf, nil)), tc.snap)
+		if got != tc.want || reason != tc.wantReason {
+			t.Errorf("%s：%s %q，want %s %q", name, got, reason, tc.want, tc.wantReason)
+		}
+		if warned := strings.Contains(buf.String(), "level=WARN"); warned != tc.wantWarn {
+			t.Errorf("%s：警示 log=%v，want %v", name, warned, tc.wantWarn)
 		}
 	}
 }
@@ -36,9 +68,10 @@ func TestStatusOfFollowsTheDocumentedPrecedence(t *testing.T) {
 func TestEveryStatusButNotCreatedIsReachableFromASnapshot(t *testing.T) {
 	reached := map[model.PaymentAccountStatus]bool{}
 	for _, s := range []Snapshot{
-		{}, {DetailsSubmitted: true}, {DetailsSubmitted: true, RequirementsDue: true}, {TransfersActive: true}, {DisabledReason: "x"},
+		{}, {Transfers: CapabilityActive}, {Transfers: CapabilityRestricted, Details: details(seller("x"))}, {Transfers: CapabilityRejected},
 	} {
-		reached[StatusOf(s)] = true
+		st, _ := StatusOf(slog.New(slog.DiscardHandler), s)
+		reached[st] = true
 	}
 	for _, st := range model.PaymentAccountStatusValues() {
 		if st != model.PaymentNotCreated && !reached[st] {
@@ -50,9 +83,9 @@ func TestEveryStatusButNotCreatedIsReachableFromASnapshot(t *testing.T) {
 	}
 }
 
-func TestOnlyTheThreeOpenStatusesArePollable(t *testing.T) {
+func TestOnlyTheTwoOpenStatusesArePollable(t *testing.T) {
 	for _, st := range model.PaymentAccountStatusValues() {
-		want := st == model.PaymentOnboarding || st == model.PaymentUnderReview || st == model.PaymentActionRequired
+		want := st == model.PaymentUnderReview || st == model.PaymentActionRequired
 		if st.Pollable() != want {
 			t.Errorf("%s：Pollable=%v", st, st.Pollable())
 		}

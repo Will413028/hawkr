@@ -983,23 +983,21 @@ func (KYCResubmitUnavailableReason) EnumDescriptor() ([]byte, []int) {
 	return file_hawkr_seller_v1alpha1_seller_proto_rawDescGZIP(), []int{12}
 }
 
-// PaymentAccountStatus 是收款帳戶的中立狀態，由金流商的帳戶快照推導（不是金流商自己的狀態名）。
+// PaymentAccountStatus 是收款帳戶的中立狀態，由金流商的轉帳能力推導（不是金流商自己的狀態名）。
 type PaymentAccountStatus int32
 
 const (
 	PaymentAccountStatus_PAYMENT_ACCOUNT_STATUS_UNSPECIFIED PaymentAccountStatus = 0
 	// 平台已核准，外部帳戶還在建立（背景程序處理，失敗時進後台待辦）。
 	PaymentAccountStatus_PAYMENT_ACCOUNT_STATUS_NOT_CREATED PaymentAccountStatus = 1
-	// 外部帳戶已建立，賣家還沒送出開通資料。
-	PaymentAccountStatus_PAYMENT_ACCOUNT_STATUS_ONBOARDING PaymentAccountStatus = 2
-	// 資料已送出，轉帳能力還沒啟用，沒有待補的條件。
-	PaymentAccountStatus_PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW PaymentAccountStatus = 3
-	// 有待補或逾期的條件，賣家要重新取得開通 session 補件。
-	PaymentAccountStatus_PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED PaymentAccountStatus = 4
+	// 轉帳能力還沒啟用，等金流商審核，賣家沒有要做的事。
+	PaymentAccountStatus_PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW PaymentAccountStatus = 2
+	// 賣家要補資料（包含新帳戶尚未開通）：重新取得開通 session 完成。
+	PaymentAccountStatus_PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED PaymentAccountStatus = 3
 	// 轉帳能力已啟用；平台審核同時核准時，店家通過開通閘門（SELLER_REQUIREMENT_ONBOARDING_COMPLETE）。
-	PaymentAccountStatus_PAYMENT_ACCOUNT_STATUS_ENABLED PaymentAccountStatus = 5
-	// 被金流商拒絕或暫停。
-	PaymentAccountStatus_PAYMENT_ACCOUNT_STATUS_DISABLED PaymentAccountStatus = 6
+	PaymentAccountStatus_PAYMENT_ACCOUNT_STATUS_ENABLED PaymentAccountStatus = 4
+	// 被金流商拒絕、不支援或限制，賣家補件解不開，要由平台或金流商處理。
+	PaymentAccountStatus_PAYMENT_ACCOUNT_STATUS_DISABLED PaymentAccountStatus = 5
 )
 
 // Enum value maps for PaymentAccountStatus.
@@ -1007,20 +1005,18 @@ var (
 	PaymentAccountStatus_name = map[int32]string{
 		0: "PAYMENT_ACCOUNT_STATUS_UNSPECIFIED",
 		1: "PAYMENT_ACCOUNT_STATUS_NOT_CREATED",
-		2: "PAYMENT_ACCOUNT_STATUS_ONBOARDING",
-		3: "PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW",
-		4: "PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED",
-		5: "PAYMENT_ACCOUNT_STATUS_ENABLED",
-		6: "PAYMENT_ACCOUNT_STATUS_DISABLED",
+		2: "PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW",
+		3: "PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED",
+		4: "PAYMENT_ACCOUNT_STATUS_ENABLED",
+		5: "PAYMENT_ACCOUNT_STATUS_DISABLED",
 	}
 	PaymentAccountStatus_value = map[string]int32{
 		"PAYMENT_ACCOUNT_STATUS_UNSPECIFIED":     0,
 		"PAYMENT_ACCOUNT_STATUS_NOT_CREATED":     1,
-		"PAYMENT_ACCOUNT_STATUS_ONBOARDING":      2,
-		"PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW":    3,
-		"PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": 4,
-		"PAYMENT_ACCOUNT_STATUS_ENABLED":         5,
-		"PAYMENT_ACCOUNT_STATUS_DISABLED":        6,
+		"PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW":    2,
+		"PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": 3,
+		"PAYMENT_ACCOUNT_STATUS_ENABLED":         4,
+		"PAYMENT_ACCOUNT_STATUS_DISABLED":        5,
 	}
 )
 
@@ -7914,15 +7910,14 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"6KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_CONTACT_SUPPORT\x10\x06\x126\n" +
 	"2KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_RETRY_LATER\x10\a\x125\n" +
 	"1KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_TERMINATED\x10\b\x123\n" +
-	"/KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_APPROVED\x10\t*\xab\x02\n" +
+	"/KYC_RESUBMIT_UNAVAILABLE_REASON_PAYUNI_APPROVED\x10\t*\x84\x02\n" +
 	"\x14PaymentAccountStatus\x12&\n" +
 	"\"PAYMENT_ACCOUNT_STATUS_UNSPECIFIED\x10\x00\x12&\n" +
-	"\"PAYMENT_ACCOUNT_STATUS_NOT_CREATED\x10\x01\x12%\n" +
-	"!PAYMENT_ACCOUNT_STATUS_ONBOARDING\x10\x02\x12'\n" +
-	"#PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW\x10\x03\x12*\n" +
-	"&PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED\x10\x04\x12\"\n" +
-	"\x1ePAYMENT_ACCOUNT_STATUS_ENABLED\x10\x05\x12#\n" +
-	"\x1fPAYMENT_ACCOUNT_STATUS_DISABLED\x10\x06*\x89\x01\n" +
+	"\"PAYMENT_ACCOUNT_STATUS_NOT_CREATED\x10\x01\x12'\n" +
+	"#PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW\x10\x02\x12*\n" +
+	"&PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED\x10\x03\x12\"\n" +
+	"\x1ePAYMENT_ACCOUNT_STATUS_ENABLED\x10\x04\x12#\n" +
+	"\x1fPAYMENT_ACCOUNT_STATUS_DISABLED\x10\x05*\x89\x01\n" +
 	"\x15RequirementCollection\x12&\n" +
 	"\"REQUIREMENT_COLLECTION_UNSPECIFIED\x10\x00\x12#\n" +
 	"\x1fREQUIREMENT_COLLECTION_PROVIDER\x10\x01\x12#\n" +

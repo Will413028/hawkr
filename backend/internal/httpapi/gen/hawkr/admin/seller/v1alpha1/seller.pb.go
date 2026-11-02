@@ -4217,8 +4217,8 @@ type PaymentAccount struct {
 	PayoutsActive         bool                            `protobuf:"varint,7,opt,name=payouts_active,json=payoutsActive,proto3" json:"payouts_active,omitempty"`
 	// 金流商回報的待補條件原始內容（物件）。
 	Requirements *structpb.Struct `protobuf:"bytes,8,opt,name=requirements,proto3" json:"requirements,omitempty"`
-	// 被拒絕或暫停的原因（金流商的原文）；沒有時是空字串。
-	DisabledReason string `protobuf:"bytes,9,opt,name=disabled_reason,json=disabledReason,proto3" json:"disabled_reason,omitempty"`
+	// 導出目前狀態的金流商原因碼（只給後台）；沒有時是空字串。
+	StatusReason string `protobuf:"bytes,9,opt,name=status_reason,json=statusReason,proto3" json:"status_reason,omitempty"`
 	// 最近一次向金流商讀取帳戶的時間；還沒讀過時不設。
 	FetchTime *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=fetch_time,json=fetchTime,proto3" json:"fetch_time,omitempty"`
 	// 建立重試用完的時間；只有還沒有外部帳戶而且建立失敗的帳戶才有。
@@ -4315,9 +4315,9 @@ func (x *PaymentAccount) GetRequirements() *structpb.Struct {
 	return nil
 }
 
-func (x *PaymentAccount) GetDisabledReason() string {
+func (x *PaymentAccount) GetStatusReason() string {
 	if x != nil {
-		return x.DisabledReason
+		return x.StatusReason
 	}
 	return ""
 }
@@ -5042,7 +5042,7 @@ const file_hawkr_admin_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"<\n" +
 	"\x1aRefreshPayUniStatusRequest\x12\x1e\n" +
 	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x02R\astoreId\"\x1d\n" +
-	"\x1bRefreshPayUniStatusResponse\"\xd8\x05\n" +
+	"\x1bRefreshPayUniStatusResponse\"\xd4\x05\n" +
 	"\x0ePaymentAccount\x12\x19\n" +
 	"\bstore_id\x18\x01 \x01(\tR\astoreId\x12\x1a\n" +
 	"\bprovider\x18\x02 \x01(\tR\bprovider\x12.\n" +
@@ -5051,8 +5051,8 @@ const file_hawkr_admin_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x16requirement_collection\x18\x05 \x01(\x0e2,.hawkr.seller.v1alpha1.RequirementCollectionR\x15requirementCollection\x12)\n" +
 	"\x10transfers_active\x18\x06 \x01(\bR\x0ftransfersActive\x12%\n" +
 	"\x0epayouts_active\x18\a \x01(\bR\rpayoutsActive\x12;\n" +
-	"\frequirements\x18\b \x01(\v2\x17.google.protobuf.StructR\frequirements\x12'\n" +
-	"\x0fdisabled_reason\x18\t \x01(\tR\x0edisabledReason\x129\n" +
+	"\frequirements\x18\b \x01(\v2\x17.google.protobuf.StructR\frequirements\x12#\n" +
+	"\rstatus_reason\x18\t \x01(\tR\fstatusReason\x129\n" +
 	"\n" +
 	"fetch_time\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\tfetchTime\x12H\n" +

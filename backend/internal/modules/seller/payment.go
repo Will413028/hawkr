@@ -2,6 +2,7 @@ package seller
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
@@ -19,6 +20,33 @@ type PaymentFake = payment.Fake
 
 // PaymentSnapshot 是外部帳戶某一刻的狀態。
 type PaymentSnapshot = payment.Snapshot
+
+// PaymentCapabilityState 是轉帳能力的中立狀態。
+type PaymentCapabilityState = payment.CapabilityState
+
+// 轉帳能力的狀態。
+const (
+	PaymentCapabilityActive      = payment.CapabilityActive
+	PaymentCapabilityPending     = payment.CapabilityPending
+	PaymentCapabilityRestricted  = payment.CapabilityRestricted
+	PaymentCapabilityRejected    = payment.CapabilityRejected
+	PaymentCapabilityUnsupported = payment.CapabilityUnsupported
+	PaymentCapabilityUnknown     = payment.CapabilityUnknown
+)
+
+// PaymentResolution 是狀態細節要由誰行動才能解開。
+type PaymentResolution = payment.Resolution
+
+// 狀態細節的行動方。
+const (
+	PaymentResolutionSellerAction   = payment.ResolutionSellerAction
+	PaymentResolutionPlatformAction = payment.ResolutionPlatformAction
+	PaymentResolutionNone           = payment.ResolutionNone
+	PaymentResolutionUnknown        = payment.ResolutionUnknown
+)
+
+// PaymentStatusDetail 是轉帳能力某個限制的行動方與 provider 的原因碼。
+type PaymentStatusDetail = payment.StatusDetail
 
 // PaymentCapabilities 是 provider 的能力描述（誰收件、用什麼介面）。
 type PaymentCapabilities = payment.Capabilities
@@ -50,7 +78,6 @@ type OnboardingSession = model.OnboardingSession
 // 收款帳戶的狀態。
 const (
 	PaymentNotCreated     = model.PaymentNotCreated
-	PaymentOnboarding     = model.PaymentOnboarding
 	PaymentUnderReview    = model.PaymentUnderReview
 	PaymentActionRequired = model.PaymentActionRequired
 	PaymentEnabled        = model.PaymentEnabled
@@ -80,8 +107,10 @@ func NewPaymentFake() *PaymentFake { return payment.NewFake() }
 // PaymentAccountStatusValues 回傳全部收款帳戶狀態。
 func PaymentAccountStatusValues() []PaymentAccountStatus { return model.PaymentAccountStatusValues() }
 
-// PaymentStatusOf 由快照推導收款帳戶的狀態。
-func PaymentStatusOf(s PaymentSnapshot) PaymentAccountStatus { return payment.StatusOf(s) }
+// PaymentStatusOf 由快照推導收款帳戶的狀態與要存的原因碼。
+func PaymentStatusOf(log *slog.Logger, s PaymentSnapshot) (PaymentAccountStatus, string) {
+	return payment.StatusOf(log, s)
+}
 
 // PaymentAccountOf 讀店家的收款帳戶；店家還沒有回 NotFound。
 func (m *Module) PaymentAccountOf(ctx context.Context, storeID int64) (PaymentAccount, error) {

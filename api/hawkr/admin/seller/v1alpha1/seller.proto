@@ -823,8 +823,8 @@ message PaymentAccount {
   bool payouts_active = 7;
   // 金流商回報的待補條件原始內容（物件）。
   google.protobuf.Struct requirements = 8;
-  // 被拒絕或暫停的原因（金流商的原文）；沒有時是空字串。
-  string disabled_reason = 9;
+  // 導出目前狀態的金流商原因碼（只給後台）；沒有時是空字串。
+  string status_reason = 9;
   // 最近一次向金流商讀取帳戶的時間；還沒讀過時不設。
   google.protobuf.Timestamp fetch_time = 10;
   // 建立重試用完的時間；只有還沒有外部帳戶而且建立失敗的帳戶才有。

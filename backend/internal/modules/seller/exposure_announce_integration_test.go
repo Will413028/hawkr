@@ -81,7 +81,7 @@ func TestExposureFlipsAreAnnouncedByEveryKindOfWrite(t *testing.T) {
 	f.now = f.now.Add(time.Hour)
 	f.payuni.status = pu.MerchantStatus{MerStatus: "1", MemberStatus: "8"}
 	must(t, f.module.PollPayUni(ctx, s.StoreID, PayUniSourceRefresh))
-	f.setPayment(t, s.StoreID, PaymentSnapshot{DetailsSubmitted: true, DisabledReason: "rejected.other"})
+	f.setPayment(t, s.StoreID, rejectedSnapshot)
 	f.wantAnnouncements(t, announcements, n, s.StoreID, false)
 	n = len(announcements.all())
 	f.now = f.now.Add(time.Hour)

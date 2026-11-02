@@ -178,7 +178,7 @@ WHERE a.store_id = ANY(sqlc.arg(store_ids)::bigint[]) AND s.store_id = a.store_i
   AND e.provider = a.provider AND e.external_account_id = a.external_account_id;
 
 -- name: PurgePaymentAccounts :execrows
--- 刪掉這些店家的收款帳戶列（外部帳戶 ID、requirements、disabled_reason）。只作用於店家列已清理的店家：保留期限的判斷只有 PurgeStores 一處。
+-- 刪掉這些店家的收款帳戶列（外部帳戶 ID、requirements、status_reason）。只作用於店家列已清理的店家：保留期限的判斷只有 PurgeStores 一處。
 DELETE FROM seller.payment_accounts a
 USING seller.stores s
 WHERE a.store_id = ANY(sqlc.arg(store_ids)::bigint[]) AND s.store_id = a.store_id AND s.pii_purged_at IS NOT NULL;

@@ -70,11 +70,11 @@ func TestPaymentAccountCapabilityChangesInvalidateTheStorePage(t *testing.T) {
 		t.Fatalf("轉帳能力啟用沒有排入快取失效：%d → %d", before, got)
 	}
 	before = f.revalidations(s)
-	f.setPayment(t, s.StoreID, PaymentSnapshot{TransfersActive: true, PayoutsActive: true, DetailsSubmitted: true})
+	f.setPayment(t, s.StoreID, enabledSnapshot)
 	if got := f.revalidations(s); got != before {
 		t.Fatalf("能力沒有變的同步排入了快取失效：%d → %d", before, got)
 	}
-	f.setPayment(t, s.StoreID, PaymentSnapshot{DetailsSubmitted: true, DisabledReason: "rejected.other"})
+	f.setPayment(t, s.StoreID, rejectedSnapshot)
 	if got := f.revalidations(s); got != before+1 {
 		t.Fatalf("轉帳能力停用沒有排入快取失效：%d → %d", before, got)
 	}

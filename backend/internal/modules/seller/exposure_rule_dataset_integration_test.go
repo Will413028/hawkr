@@ -124,7 +124,7 @@ func TestExposureRuleAgreesBetweenSQLAndGoOnADataset(t *testing.T) {
 	payment(id, "status = 'NOT_CREATED', external_account_id = NULL, transfers_active = false, payouts_active = false, fetched_at = NULL")
 	add("收款帳戶還沒有建立", id, []Requirement{RequirementOnboardingComplete}, nil)
 
-	for _, st := range []string{"ONBOARDING", "UNDER_REVIEW", "ACTION_REQUIRED", "DISABLED"} {
+	for _, st := range []string{"UNDER_REVIEW", "ACTION_REQUIRED", "DISABLED"} {
 		_, id = exposable()
 		payment(id, "status = '"+st+"', transfers_active = false, payouts_active = false")
 		add("收款帳戶 "+st, id, []Requirement{RequirementOnboardingComplete}, nil)

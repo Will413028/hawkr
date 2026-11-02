@@ -12,26 +12,24 @@ type PaymentAccountStatus string
 const (
 	// PaymentNotCreated 本地有列、還沒有外部帳戶。
 	PaymentNotCreated PaymentAccountStatus = "NOT_CREATED"
-	// PaymentOnboarding 外部帳戶已建立、賣家還沒送出資料。
-	PaymentOnboarding PaymentAccountStatus = "ONBOARDING"
-	// PaymentUnderReview 資料已送出、轉帳能力還沒啟用、沒有待補的條件。
+	// PaymentUnderReview 轉帳能力還沒啟用，等金流商處理，賣家沒有要做的事。
 	PaymentUnderReview PaymentAccountStatus = "UNDER_REVIEW"
-	// PaymentActionRequired 有待補或逾期的條件。
+	// PaymentActionRequired 賣家要補資料或完成開通（含新建立的帳戶）。
 	PaymentActionRequired PaymentAccountStatus = "ACTION_REQUIRED"
 	// PaymentEnabled 轉帳能力已啟用。
 	PaymentEnabled PaymentAccountStatus = "ENABLED"
-	// PaymentDisabled 被金流商拒絕或暫停。
+	// PaymentDisabled 被金流商拒絕、不支援或限制，賣家補件解不開。
 	PaymentDisabled PaymentAccountStatus = "DISABLED"
 )
 
 // PaymentAccountStatusValues 回傳全部狀態，與 payment_accounts_status_check 相同。
 func PaymentAccountStatusValues() []PaymentAccountStatus {
-	return []PaymentAccountStatus{PaymentNotCreated, PaymentOnboarding, PaymentUnderReview, PaymentActionRequired, PaymentEnabled, PaymentDisabled}
+	return []PaymentAccountStatus{PaymentNotCreated, PaymentUnderReview, PaymentActionRequired, PaymentEnabled, PaymentDisabled}
 }
 
 // Pollable 回傳此狀態的帳戶是否要由輪詢補漏（與 PollablePaymentAccountStoreIDs 的條件相同）。
 func (s PaymentAccountStatus) Pollable() bool {
-	return s == PaymentOnboarding || s == PaymentUnderReview || s == PaymentActionRequired
+	return s == PaymentUnderReview || s == PaymentActionRequired
 }
 
 // RequirementCollection 是誰向賣家收身分與銀行資料（port 的能力描述，也存在帳戶列上）。
@@ -71,9 +69,10 @@ type PaymentAccount struct {
 	TransfersActive       bool
 	PayoutsActive         bool
 	// Requirements 是金流商回報的待補條件原始 JSON（物件）。
-	Requirements   json.RawMessage
-	DisabledReason *string
-	FetchedAt      *time.Time
+	Requirements json.RawMessage
+	// StatusReason 是導出目前狀態的金流商原因碼（只給後台）。
+	StatusReason *string
+	FetchedAt    *time.Time
 	// CreateFailedAt 是建立重試用完的時刻；只有還沒有外部帳戶的列才有。
 	CreateFailedAt *time.Time
 	CreatedAt      time.Time

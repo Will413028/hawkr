@@ -228,7 +228,7 @@ USING seller.stores s
 WHERE a.store_id = ANY($1::bigint[]) AND s.store_id = a.store_id AND s.pii_purged_at IS NOT NULL
 `
 
-// 刪掉這些店家的收款帳戶列（外部帳戶 ID、requirements、disabled_reason）。只作用於店家列已清理的店家：保留期限的判斷只有 PurgeStores 一處。
+// 刪掉這些店家的收款帳戶列（外部帳戶 ID、requirements、status_reason）。只作用於店家列已清理的店家：保留期限的判斷只有 PurgeStores 一處。
 func (q *Queries) PurgePaymentAccounts(ctx context.Context, storeIds []int64) (int64, error) {
 	result, err := q.db.Exec(ctx, purgePaymentAccounts, storeIds)
 	if err != nil {

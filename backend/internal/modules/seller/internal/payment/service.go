@@ -85,7 +85,7 @@ func ToModel(r store.SellerPaymentAccount) model.PaymentAccount {
 	return model.PaymentAccount{
 		StoreID: r.StoreID, Provider: r.Provider, ExternalAccountID: r.ExternalAccountID,
 		RequirementCollection: model.RequirementCollection(r.RequirementCollection), Status: model.PaymentAccountStatus(r.Status),
-		TransfersActive: r.TransfersActive, PayoutsActive: r.PayoutsActive, Requirements: r.Requirements, DisabledReason: r.DisabledReason,
+		TransfersActive: r.TransfersActive, PayoutsActive: r.PayoutsActive, Requirements: r.Requirements, StatusReason: r.StatusReason,
 		FetchedAt: r.FetchedAt, CreateFailedAt: r.CreateFailedAt, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 	}
 }

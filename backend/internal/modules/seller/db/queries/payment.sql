@@ -28,10 +28,10 @@ VALUES (sqlc.arg(store_id), sqlc.arg(provider), sqlc.arg(requirement_collection)
 ON CONFLICT (store_id) DO NOTHING;
 
 -- name: SetPaymentAccountExternal :one
--- 外部帳戶建立後填上外部 ID，狀態從 NOT_CREATED 進 ONBOARDING；只在還沒有外部 ID 時寫（重送安全）。
+-- 外部帳戶建立後填上外部 ID，狀態從 NOT_CREATED 進 ACTION_REQUIRED（新帳戶要賣家補資料，同步 job 重讀後覆寫）；只在還沒有外部 ID 時寫（重送安全）。
 UPDATE seller.payment_accounts
 SET external_account_id = sqlc.arg(external_account_id),
-    status = 'ONBOARDING',
+    status = 'ACTION_REQUIRED',
     create_failed_at = NULL,
     updated_at = sqlc.arg(now)
 WHERE store_id = sqlc.arg(store_id) AND external_account_id IS NULL
@@ -58,7 +58,7 @@ SET status = sqlc.arg(status),
     transfers_active = sqlc.arg(transfers_active),
     payouts_active = sqlc.arg(payouts_active),
     requirements = sqlc.arg(requirements),
-    disabled_reason = sqlc.narg(disabled_reason),
+    status_reason = sqlc.narg(status_reason),
     fetched_at = sqlc.arg(fetched_at),
     updated_at = sqlc.arg(now)
 WHERE store_id = sqlc.arg(store_id) AND external_account_id IS NOT NULL
@@ -86,11 +86,11 @@ SELECT EXISTS (
 ) AS pending;
 
 -- name: PollablePaymentAccountStoreIDs :many
--- 輪詢補漏：ONBOARDING、UNDER_REVIEW、ACTION_REQUIRED 的帳戶，加上任何狀態中 inbox 有 event_before 之前收到卻還沒處理的事件的帳戶
+-- 輪詢補漏：UNDER_REVIEW、ACTION_REQUIRED 的帳戶，加上任何狀態中 inbox 有 event_before 之前收到卻還沒處理的事件的帳戶
 -- （事件在同步寫入快照之後、job 標記完成之前到達時，排入被執行中的 job 合併掉，inbox 是唯一不會漏的來源），依 store_id 分批。
 SELECT a.store_id
 FROM seller.payment_accounts a
-WHERE (a.status IN ('ONBOARDING', 'UNDER_REVIEW', 'ACTION_REQUIRED')
+WHERE (a.status IN ('UNDER_REVIEW', 'ACTION_REQUIRED')
        OR EXISTS (
            SELECT 1 FROM seller.payment_provider_events e
            WHERE e.provider = a.provider AND e.external_account_id = a.external_account_id

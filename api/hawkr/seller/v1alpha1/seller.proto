@@ -885,21 +885,19 @@ message SaveKYCDraftResponse {
   KYCApplication application = 1;
 }
 
-// PaymentAccountStatus 是收款帳戶的中立狀態，由金流商的帳戶快照推導（不是金流商自己的狀態名）。
+// PaymentAccountStatus 是收款帳戶的中立狀態，由金流商的轉帳能力推導（不是金流商自己的狀態名）。
 enum PaymentAccountStatus {
   PAYMENT_ACCOUNT_STATUS_UNSPECIFIED = 0;
   // 平台已核准，外部帳戶還在建立（背景程序處理，失敗時進後台待辦）。
   PAYMENT_ACCOUNT_STATUS_NOT_CREATED = 1;
-  // 外部帳戶已建立，賣家還沒送出開通資料。
-  PAYMENT_ACCOUNT_STATUS_ONBOARDING = 2;
-  // 資料已送出，轉帳能力還沒啟用，沒有待補的條件。
-  PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW = 3;
-  // 有待補或逾期的條件，賣家要重新取得開通 session 補件。
-  PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED = 4;
+  // 轉帳能力還沒啟用，等金流商審核，賣家沒有要做的事。
+  PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW = 2;
+  // 賣家要補資料（包含新帳戶尚未開通）：重新取得開通 session 完成。
+  PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED = 3;
   // 轉帳能力已啟用；平台審核同時核准時，店家通過開通閘門（SELLER_REQUIREMENT_ONBOARDING_COMPLETE）。
-  PAYMENT_ACCOUNT_STATUS_ENABLED = 5;
-  // 被金流商拒絕或暫停。
-  PAYMENT_ACCOUNT_STATUS_DISABLED = 6;
+  PAYMENT_ACCOUNT_STATUS_ENABLED = 4;
+  // 被金流商拒絕、不支援或限制，賣家補件解不開，要由平台或金流商處理。
+  PAYMENT_ACCOUNT_STATUS_DISABLED = 5;
 }
 
 // RequirementCollection 是誰向賣家收身分與銀行資料。

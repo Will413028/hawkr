@@ -399,7 +399,7 @@ type SellerPaymentAccount struct {
 	TransfersActive       bool
 	PayoutsActive         bool
 	Requirements          []byte
-	DisabledReason        *string
+	StatusReason          *string
 	FetchedAt             *time.Time
 	CreateFailedAt        *time.Time
 	CreatedAt             time.Time

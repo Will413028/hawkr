@@ -9,10 +9,14 @@
 package payment
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
+	"slices"
+	"unicode/utf8"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 )
@@ -23,19 +27,56 @@ type Capabilities struct {
 	OnboardingSurface     model.OnboardingSurface
 }
 
-// Snapshot 是外部帳戶某一刻的狀態，由 adapter 從 provider 的回應整理成中立的欄位。Requirements 是 provider 回報的待補條件原始 JSON
-// （物件），原樣保存給後台看。
+// CapabilityState 是轉帳能力的中立狀態，由 adapter 從 provider 的回應對應而來；不認得的值對應成 CapabilityUnknown（空值同）。
+type CapabilityState string
+
+// 轉帳能力的狀態。
+const (
+	// CapabilityActive 能力已啟用。
+	CapabilityActive CapabilityState = "active"
+	// CapabilityPending 資料已收齊或在處理，能力還沒啟用。
+	CapabilityPending CapabilityState = "pending"
+	// CapabilityRestricted 能力被限制，原因與誰能解除在 Details。
+	CapabilityRestricted CapabilityState = "restricted"
+	// CapabilityRejected 被 provider 拒絕，不會再啟用。
+	CapabilityRejected CapabilityState = "rejected"
+	// CapabilityUnsupported 這個帳戶不能使用此能力。
+	CapabilityUnsupported CapabilityState = "unsupported"
+	// CapabilityUnknown provider 回了不認得的狀態。
+	CapabilityUnknown CapabilityState = "unknown"
+)
+
+// Resolution 是狀態細節要由誰行動才能解開。
+type Resolution string
+
+// 狀態細節的行動方。
+const (
+	// ResolutionSellerAction 賣家補資料或完成開通。
+	ResolutionSellerAction Resolution = "seller_action"
+	// ResolutionPlatformAction 平台或 provider 處理，賣家補件解不開。
+	ResolutionPlatformAction Resolution = "platform_action"
+	// ResolutionNone 沒有可行的解法。
+	ResolutionNone Resolution = "none"
+	// ResolutionUnknown provider 回了不認得的行動方。
+	ResolutionUnknown Resolution = "unknown"
+)
+
+// StatusDetail 是轉帳能力某個限制的行動方與 provider 的原因碼。
+type StatusDetail struct {
+	Resolution Resolution
+	// Reason 是 provider 的原因碼，原樣保存。
+	Reason string
+}
+
+// Snapshot 是外部帳戶某一刻的狀態，由 adapter 從 provider 的回應整理成中立的欄位。Transfers 與 Details 是轉帳能力（開通閘門）的狀態與
+// 它的限制細節；TransfersActive 與 PayoutsActive 是轉帳、撥款能力已啟用；Requirements 是 provider 回報的待補條件原始 JSON（物件），原樣
+// 保存給後台看。
 type Snapshot struct {
-	// TransfersActive 是轉帳能力（開通閘門）已啟用；PayoutsActive 是撥款能力已啟用。
+	Transfers       CapabilityState
+	Details         []StatusDetail
 	TransfersActive bool
 	PayoutsActive   bool
-	// DetailsSubmitted 是賣家已送出開通資料。
-	DetailsSubmitted bool
-	// RequirementsDue 是有待補或逾期的條件（currently_due 或 past_due 非空）。
-	RequirementsDue bool
-	// DisabledReason 非空表示帳戶被 provider 拒絕或暫停（adapter 只在這兩類原因時設值）。
-	DisabledReason string
-	Requirements   json.RawMessage
+	Requirements    json.RawMessage
 }
 
 // EnsureInput 是建立外部帳戶的輸入。IdempotencyKey 是 store_id 的十進位文字：同一家店重送建立得到同一個帳戶。
@@ -80,19 +121,71 @@ var (
 	ErrInvalidEvent = errors.New("payment: invalid event")
 )
 
-// StatusOf 由快照推導中立的狀態（Stripe 計畫 D13）。順序：被拒絕或暫停 → 轉帳能力已啟用 → 還沒送出資料 → 有待補的條件 → 審核中。
-// 只有已啟用的狀態的 transfers_active 為真（帳戶被暫停時，能力即使仍標示啟用也不算）。
-func StatusOf(s Snapshot) model.PaymentAccountStatus {
-	switch {
-	case s.DisabledReason != "":
-		return model.PaymentDisabled
-	case s.TransfersActive:
-		return model.PaymentEnabled
-	case !s.DetailsSubmitted:
-		return model.PaymentOnboarding
-	case s.RequirementsDue:
-		return model.PaymentActionRequired
-	default:
-		return model.PaymentUnderReview
+// maxReasonLen 是 status_reason 的字數上限（payment_accounts_status_reason_check）。
+const maxReasonLen = 200
+
+// StatusOf 由快照推導中立的狀態與要存的原因碼（Stripe 計畫 D13）。順序：轉帳能力已啟用 → ENABLED；被拒絕或不支援 → DISABLED；
+// 任何一筆細節要賣家行動（含 pending）→ ACTION_REQUIRED；pending → UNDER_REVIEW；restricted 而且有細節要平台處理或沒有解法 → DISABLED；
+// 其餘（不認得的狀態、restricted 但沒有可判讀的細節）→ UNDER_REVIEW 並記警示。細節有多筆時取最嚴重的：賣家能行動的優先，其次是 DISABLED。
+// 原因碼是導出狀態的那一筆細節的 Reason（rejected、unsupported 沒有細節時用狀態名）；ENABLED 與沒有原因碼時是空字串。
+func StatusOf(log *slog.Logger, s Snapshot) (model.PaymentAccountStatus, string) {
+	state := s.Transfers
+	if !slices.Contains([]CapabilityState{CapabilityActive, CapabilityPending, CapabilityRestricted, CapabilityRejected, CapabilityUnsupported}, state) {
+		state = CapabilityUnknown
 	}
+	sellerDetail, sellerCanAct := firstDetail(s.Details, ResolutionSellerAction)
+	switch state {
+	case CapabilityActive:
+		return model.PaymentEnabled, ""
+	case CapabilityRejected, CapabilityUnsupported:
+		return model.PaymentDisabled, clipReason(cmp.Or(firstReason(s.Details), string(state)))
+	case CapabilityPending:
+		if sellerCanAct {
+			return model.PaymentActionRequired, clipReason(sellerDetail.Reason)
+		}
+		if _, ok := firstDetail(s.Details, ResolutionUnknown); ok {
+			log.Warn("seller：收款帳戶的狀態細節有不認得的行動方", "transfers", s.Transfers)
+		}
+	case CapabilityRestricted:
+		if sellerCanAct {
+			return model.PaymentActionRequired, clipReason(sellerDetail.Reason)
+		}
+		if d, ok := firstDetail(s.Details, ResolutionPlatformAction, ResolutionNone); ok {
+			return model.PaymentDisabled, clipReason(d.Reason)
+		}
+		log.Warn("seller：收款帳戶被限制但沒有可判讀的細節，視為審核中", "transfers", s.Transfers, "details", len(s.Details))
+	case CapabilityUnknown:
+		if sellerCanAct {
+			return model.PaymentActionRequired, clipReason(sellerDetail.Reason)
+		}
+		log.Warn("seller：收款帳戶的轉帳能力狀態不認得，視為審核中", "transfers", s.Transfers)
+	}
+	return model.PaymentUnderReview, clipReason(firstReason(s.Details))
+}
+
+// firstDetail 回傳第一筆行動方在 want 之內的細節。
+func firstDetail(details []StatusDetail, want ...Resolution) (StatusDetail, bool) {
+	for _, d := range details {
+		if slices.Contains(want, d.Resolution) {
+			return d, true
+		}
+	}
+	return StatusDetail{}, false
+}
+
+// firstReason 回傳第一筆有原因碼的細節的原因碼，沒有時是空字串。
+func firstReason(details []StatusDetail) string {
+	for _, d := range details {
+		if d.Reason != "" {
+			return d.Reason
+		}
+	}
+	return ""
+}
+
+func clipReason(r string) string {
+	if utf8.RuneCountInString(r) <= maxReasonLen {
+		return r
+	}
+	return string([]rune(r)[:maxReasonLen])
 }

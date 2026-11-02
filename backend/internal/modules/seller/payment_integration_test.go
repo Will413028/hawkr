@@ -22,7 +22,12 @@ const (
 	kindPaymentSync   = "seller.payment_sync"
 )
 
-var enabledSnapshot = PaymentSnapshot{TransfersActive: true, PayoutsActive: true, DetailsSubmitted: true}
+var (
+	enabledSnapshot = PaymentSnapshot{Transfers: PaymentCapabilityActive, TransfersActive: true, PayoutsActive: true}
+	// needsSellerSnapshot 是賣家要補資料（新帳戶的樣子）；rejectedSnapshot 是被金流商拒絕。
+	needsSellerSnapshot = PaymentSnapshot{Transfers: PaymentCapabilityRestricted, Details: []PaymentStatusDetail{{Resolution: PaymentResolutionSellerAction, Reason: "routine_onboarding"}}}
+	rejectedSnapshot    = PaymentSnapshot{Transfers: PaymentCapabilityRejected, Details: []PaymentStatusDetail{{Resolution: PaymentResolutionPlatformAction, Reason: "rejected.fraud"}}}
+)
 
 // queuedStoreIDs 是 fake queue 裡某個種類的 job 排入過的店家（依排入順序，不去重）。
 func (q *queue) queuedStoreIDs(t *testing.T, kind string) []int64 {
@@ -115,7 +120,7 @@ func TestApprovalQueuesOneAccountCreationAndAReplayedCreateKeepsOneExternalAccou
 		t.Fatalf("建立中的列=%+v", a)
 	}
 	first := f.ensureAccount(t, s.StoreID)
-	if got := f.paymentAccount(t, s.StoreID); got.Status != PaymentOnboarding {
+	if got := f.paymentAccount(t, s.StoreID); got.Status != PaymentActionRequired {
 		t.Fatalf("建立後的狀態=%s", got.Status)
 	}
 	if got := f.jobs.queuedStoreIDs(t, kindPaymentSync); !slices.Equal(got, []int64{s.StoreID}) {
@@ -193,9 +198,9 @@ func TestExposureRequiresTheTransfersCapabilityOfThePaymentAccount(t *testing.T)
 	f.logoed(t, accountID, s)
 	for _, snap := range []PaymentSnapshot{
 		{},
-		{DetailsSubmitted: true},
-		{DetailsSubmitted: true, RequirementsDue: true},
-		{TransfersActive: true, DetailsSubmitted: true, DisabledReason: "rejected.fraud"},
+		{Transfers: PaymentCapabilityPending},
+		needsSellerSnapshot,
+		rejectedSnapshot,
 	} {
 		f.setPayment(t, s.StoreID, snap)
 		if got := f.exposed(t, s.StoreID); len(got) != 0 {
@@ -214,7 +219,7 @@ func TestExposureRequiresTheTransfersCapabilityOfThePaymentAccount(t *testing.T)
 	if a := f.paymentAccount(t, s.StoreID); a.Status != PaymentEnabled || !a.TransfersActive || !a.PayoutsActive {
 		t.Fatalf("帳戶=%+v", a)
 	}
-	f.setPayment(t, s.StoreID, PaymentSnapshot{DetailsSubmitted: true, RequirementsDue: true})
+	f.setPayment(t, s.StoreID, needsSellerSnapshot)
 	if got := f.exposed(t, s.StoreID); len(got) != 0 {
 		t.Fatalf("轉帳能力又失效後仍可曝光：%v", got)
 	}
@@ -301,9 +306,9 @@ func TestAnEventArrivingWhileTheAccountIsBeingReadMakesTheSyncRunAgain(t *testin
 	}
 }
 
-// 輪詢補漏只排 ONBOARDING、UNDER_REVIEW、ACTION_REQUIRED 的帳戶的同步；已啟用、被停用與還沒建立的帳戶不排同步，閒置的「建立中」補排建立。
-// mutation：PollablePaymentAccountStoreIDs 的條件改成排除 'DISABLED' 而不是列出三個狀態 → ENABLED 的帳戶也被排，失敗。
-func TestSweepQueuesSyncOnlyForTheThreeOpenStatuses(t *testing.T) {
+// 輪詢補漏只排 UNDER_REVIEW、ACTION_REQUIRED 的帳戶的同步；已啟用、被停用與還沒建立的帳戶不排同步，閒置的「建立中」補排建立。
+// mutation：PollablePaymentAccountStoreIDs 的條件改成排除 'DISABLED' 而不是列出兩個狀態 → ENABLED 的帳戶也被排，失敗。
+func TestSweepQueuesSyncOnlyForTheTwoOpenStatuses(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
@@ -323,11 +328,11 @@ func TestSweepQueuesSyncOnlyForTheThreeOpenStatuses(t *testing.T) {
 	}
 	synced, ensured, err := f.module.SweepPaymentAccounts(ctx)
 	must(t, err)
-	want := []int64{byStatus[PaymentOnboarding], byStatus[PaymentUnderReview], byStatus[PaymentActionRequired]}
+	want := []int64{byStatus[PaymentUnderReview], byStatus[PaymentActionRequired]}
 	got := f.jobs.queuedStoreIDs(t, kindPaymentSync)
 	slices.Sort(want)
 	slices.Sort(got)
-	if !slices.Equal(got, want) || synced != 3 {
+	if !slices.Equal(got, want) || synced != 2 {
 		t.Fatalf("輪詢排入的店家=%v（回報 %d），應該是 %v", got, synced, want)
 	}
 	if ensured != 1 || !slices.Equal(f.jobs.queuedStoreIDs(t, kindPaymentEnsure), []int64{byStatus[PaymentNotCreated]}) {
@@ -449,10 +454,10 @@ func TestOnboardingSessionNeedsAnExternalAccountThatIsNotDisabled(t *testing.T) 
 	if session.Surface != SurfaceHosted || session.URL == "" || session.ClientSecret != "" {
 		t.Fatalf("session=%+v", session)
 	}
-	f.payment.Set(external, PaymentSnapshot{DetailsSubmitted: true, DisabledReason: "rejected.fraud"})
+	f.payment.Set(external, rejectedSnapshot)
 	_, err = f.module.SyncPaymentAccount(ctx, s.StoreID)
 	must(t, err)
-	if a := f.paymentAccount(t, s.StoreID); a.Status != PaymentDisabled || a.DisabledReason == nil || *a.DisabledReason != "rejected.fraud" {
+	if a := f.paymentAccount(t, s.StoreID); a.Status != PaymentDisabled || a.StatusReason == nil || *a.StatusReason != "rejected.fraud" {
 		t.Fatalf("帳戶=%+v", a)
 	}
 	if _, err := f.module.CreatePaymentOnboardingSession(ctx, s.StoreID, "https://web.example.test/ok", "https://web.example.test/again"); apperr.KindOf(err) != apperr.KindFailedPrecondition {

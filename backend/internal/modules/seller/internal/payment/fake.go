@@ -142,7 +142,11 @@ func (f *Fake) EnsureAccount(ctx context.Context, in EnsureInput) (string, error
 	f.next++
 	id := fmt.Sprintf("fake_acct_%d", f.next)
 	f.byKey[in.IdempotencyKey] = id
-	f.accounts[id] = Snapshot{Requirements: json.RawMessage(`{}`)}
+	f.accounts[id] = Snapshot{
+		Transfers:    CapabilityRestricted,
+		Details:      []StatusDetail{{Resolution: ResolutionSellerAction, Reason: "routine_onboarding"}},
+		Requirements: json.RawMessage(`{}`),
+	}
 	return id, nil
 }
 
@@ -178,7 +182,7 @@ func (f *Fake) FetchAccount(ctx context.Context, externalID string) (Snapshot, e
 		return Snapshot{}, err
 	}
 	if f.AutoActive {
-		return Snapshot{TransfersActive: true, PayoutsActive: true, DetailsSubmitted: true, Requirements: json.RawMessage(`{}`)}, nil
+		return Snapshot{Transfers: CapabilityActive, TransfersActive: true, PayoutsActive: true, Requirements: json.RawMessage(`{}`)}, nil
 	}
 	s, ok := f.accounts[externalID]
 	if !ok {

@@ -164,7 +164,7 @@ func TestAdminPaymentAccountHandlersMapTheAccountAndPassTheStore(t *testing.T) {
 	failed := time.Date(2026, 11, 2, 1, 0, 0, 0, time.UTC)
 	m := &paymentAdminModule{account: model.PaymentAccount{
 		StoreID: 11, Provider: "stripe", ExternalAccountID: &ext, Status: model.PaymentDisabled, RequirementCollection: model.CollectionProvider,
-		DisabledReason: &reason, CreateFailedAt: &failed, CreatedAt: failed, UpdatedAt: failed,
+		StatusReason: &reason, CreateFailedAt: &failed, CreatedAt: failed, UpdatedAt: failed,
 	}}
 	h := NewAdmin(m, rpc.Images{})
 	got, err := h.GetPaymentAccount(adminCtx(1), connect.NewRequest(&adminpb.GetPaymentAccountRequest{StoreId: "11"}))
@@ -173,7 +173,7 @@ func TestAdminPaymentAccountHandlersMapTheAccountAndPassTheStore(t *testing.T) {
 	}
 	a := got.Msg.GetAccount()
 	if a.GetStoreId() != "11" || a.GetProvider() != "stripe" || a.GetExternalAccountId() != "acct_1" || a.GetStatus() != pb.PaymentAccountStatus_PAYMENT_ACCOUNT_STATUS_DISABLED ||
-		a.GetDisabledReason() != reason || a.GetCreateFailedTime() == nil || a.GetFetchTime() != nil {
+		a.GetStatusReason() != reason || a.GetCreateFailedTime() == nil || a.GetFetchTime() != nil {
 		t.Fatalf("account=%v", a)
 	}
 	if _, err := h.RefreshPaymentAccount(adminCtx(1), connect.NewRequest(&adminpb.RefreshPaymentAccountRequest{StoreId: "11"})); err != nil || m.refreshed != 11 {

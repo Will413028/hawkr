@@ -103,7 +103,7 @@ func toAdminPaymentAccount(a model.PaymentAccount) *adminpb.PaymentAccount {
 		Status:                rpc.EnumToProto[pb.PaymentAccountStatus](a.Status),
 		RequirementCollection: rpc.EnumToProto[pb.RequirementCollection](a.RequirementCollection),
 		TransfersActive:       a.TransfersActive, PayoutsActive: a.PayoutsActive, Requirements: toPaymentRequirements(a.Requirements),
-		DisabledReason: deref(a.DisabledReason), FetchTime: optTimestamp(a.FetchedAt), CreateFailedTime: optTimestamp(a.CreateFailedAt),
+		StatusReason: deref(a.StatusReason), FetchTime: optTimestamp(a.FetchedAt), CreateFailedTime: optTimestamp(a.CreateFailedAt),
 		CreateTime: timestamppb.New(a.CreatedAt), UpdateTime: timestamppb.New(a.UpdatedAt),
 	}
 	return out

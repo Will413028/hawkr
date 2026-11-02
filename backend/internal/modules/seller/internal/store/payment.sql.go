@@ -16,11 +16,11 @@ SET status = $1,
     transfers_active = $2,
     payouts_active = $3,
     requirements = $4,
-    disabled_reason = $5,
+    status_reason = $5,
     fetched_at = $6,
     updated_at = $7
 WHERE store_id = $8 AND external_account_id IS NOT NULL
-RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, disabled_reason, fetched_at, create_failed_at, created_at, updated_at
+RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, created_at, updated_at
 `
 
 type ApplyPaymentSnapshotParams struct {
@@ -28,7 +28,7 @@ type ApplyPaymentSnapshotParams struct {
 	TransfersActive bool
 	PayoutsActive   bool
 	Requirements    []byte
-	DisabledReason  *string
+	StatusReason    *string
 	FetchedAt       *time.Time
 	Now             time.Time
 	StoreID         int64
@@ -41,7 +41,7 @@ func (q *Queries) ApplyPaymentSnapshot(ctx context.Context, arg ApplyPaymentSnap
 		arg.TransfersActive,
 		arg.PayoutsActive,
 		arg.Requirements,
-		arg.DisabledReason,
+		arg.StatusReason,
 		arg.FetchedAt,
 		arg.Now,
 		arg.StoreID,
@@ -56,7 +56,7 @@ func (q *Queries) ApplyPaymentSnapshot(ctx context.Context, arg ApplyPaymentSnap
 		&i.TransfersActive,
 		&i.PayoutsActive,
 		&i.Requirements,
-		&i.DisabledReason,
+		&i.StatusReason,
 		&i.FetchedAt,
 		&i.CreateFailedAt,
 		&i.CreatedAt,
@@ -141,7 +141,7 @@ func (q *Queries) InsertPaymentProviderEvent(ctx context.Context, arg InsertPaym
 }
 
 const lockPaymentAccount = `-- name: LockPaymentAccount :one
-SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, disabled_reason, fetched_at, create_failed_at, created_at, updated_at
+SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, created_at, updated_at
 FROM seller.payment_accounts
 WHERE store_id = $1
 FOR UPDATE
@@ -160,7 +160,7 @@ func (q *Queries) LockPaymentAccount(ctx context.Context, storeID int64) (Seller
 		&i.TransfersActive,
 		&i.PayoutsActive,
 		&i.Requirements,
-		&i.DisabledReason,
+		&i.StatusReason,
 		&i.FetchedAt,
 		&i.CreateFailedAt,
 		&i.CreatedAt,
@@ -219,7 +219,7 @@ func (q *Queries) MarkPaymentEventsProcessed(ctx context.Context, arg MarkPaymen
 }
 
 const paymentAccountByExternal = `-- name: PaymentAccountByExternal :one
-SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, disabled_reason, fetched_at, create_failed_at, created_at, updated_at
+SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, created_at, updated_at
 FROM seller.payment_accounts
 WHERE provider = $1 AND external_account_id = $2
 `
@@ -241,7 +241,7 @@ func (q *Queries) PaymentAccountByExternal(ctx context.Context, arg PaymentAccou
 		&i.TransfersActive,
 		&i.PayoutsActive,
 		&i.Requirements,
-		&i.DisabledReason,
+		&i.StatusReason,
 		&i.FetchedAt,
 		&i.CreateFailedAt,
 		&i.CreatedAt,
@@ -251,7 +251,7 @@ func (q *Queries) PaymentAccountByExternal(ctx context.Context, arg PaymentAccou
 }
 
 const paymentAccountByStore = `-- name: PaymentAccountByStore :one
-SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, disabled_reason, fetched_at, create_failed_at, created_at, updated_at
+SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, created_at, updated_at
 FROM seller.payment_accounts
 WHERE store_id = $1
 `
@@ -268,7 +268,7 @@ func (q *Queries) PaymentAccountByStore(ctx context.Context, storeID int64) (Sel
 		&i.TransfersActive,
 		&i.PayoutsActive,
 		&i.Requirements,
-		&i.DisabledReason,
+		&i.StatusReason,
 		&i.FetchedAt,
 		&i.CreateFailedAt,
 		&i.CreatedAt,
@@ -278,7 +278,7 @@ func (q *Queries) PaymentAccountByStore(ctx context.Context, storeID int64) (Sel
 }
 
 const paymentAccountsByStores = `-- name: PaymentAccountsByStores :many
-SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, disabled_reason, fetched_at, create_failed_at, created_at, updated_at
+SELECT store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, created_at, updated_at
 FROM seller.payment_accounts
 WHERE store_id = ANY($1::bigint[])
 `
@@ -302,7 +302,7 @@ func (q *Queries) PaymentAccountsByStores(ctx context.Context, storeIds []int64)
 			&i.TransfersActive,
 			&i.PayoutsActive,
 			&i.Requirements,
-			&i.DisabledReason,
+			&i.StatusReason,
 			&i.FetchedAt,
 			&i.CreateFailedAt,
 			&i.CreatedAt,
@@ -342,7 +342,7 @@ func (q *Queries) PaymentEventsPending(ctx context.Context, arg PaymentEventsPen
 const pollablePaymentAccountStoreIDs = `-- name: PollablePaymentAccountStoreIDs :many
 SELECT a.store_id
 FROM seller.payment_accounts a
-WHERE (a.status IN ('ONBOARDING', 'UNDER_REVIEW', 'ACTION_REQUIRED')
+WHERE (a.status IN ('UNDER_REVIEW', 'ACTION_REQUIRED')
        OR EXISTS (
            SELECT 1 FROM seller.payment_provider_events e
            WHERE e.provider = a.provider AND e.external_account_id = a.external_account_id
@@ -359,7 +359,7 @@ type PollablePaymentAccountStoreIDsParams struct {
 	Batch        int32
 }
 
-// 輪詢補漏：ONBOARDING、UNDER_REVIEW、ACTION_REQUIRED 的帳戶，加上任何狀態中 inbox 有 event_before 之前收到卻還沒處理的事件的帳戶
+// 輪詢補漏：UNDER_REVIEW、ACTION_REQUIRED 的帳戶，加上任何狀態中 inbox 有 event_before 之前收到卻還沒處理的事件的帳戶
 // （事件在同步寫入快照之後、job 標記完成之前到達時，排入被執行中的 job 合併掉，inbox 是唯一不會漏的來源），依 store_id 分批。
 func (q *Queries) PollablePaymentAccountStoreIDs(ctx context.Context, arg PollablePaymentAccountStoreIDsParams) ([]int64, error) {
 	rows, err := q.db.Query(ctx, pollablePaymentAccountStoreIDs, arg.EventBefore, arg.AfterStoreID, arg.Batch)
@@ -384,11 +384,11 @@ func (q *Queries) PollablePaymentAccountStoreIDs(ctx context.Context, arg Pollab
 const setPaymentAccountExternal = `-- name: SetPaymentAccountExternal :one
 UPDATE seller.payment_accounts
 SET external_account_id = $1,
-    status = 'ONBOARDING',
+    status = 'ACTION_REQUIRED',
     create_failed_at = NULL,
     updated_at = $2
 WHERE store_id = $3 AND external_account_id IS NULL
-RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, disabled_reason, fetched_at, create_failed_at, created_at, updated_at
+RETURNING store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, requirements, status_reason, fetched_at, create_failed_at, created_at, updated_at
 `
 
 type SetPaymentAccountExternalParams struct {
@@ -397,7 +397,7 @@ type SetPaymentAccountExternalParams struct {
 	StoreID           int64
 }
 
-// 外部帳戶建立後填上外部 ID，狀態從 NOT_CREATED 進 ONBOARDING；只在還沒有外部 ID 時寫（重送安全）。
+// 外部帳戶建立後填上外部 ID，狀態從 NOT_CREATED 進 ACTION_REQUIRED（新帳戶要賣家補資料，同步 job 重讀後覆寫）；只在還沒有外部 ID 時寫（重送安全）。
 func (q *Queries) SetPaymentAccountExternal(ctx context.Context, arg SetPaymentAccountExternalParams) (SellerPaymentAccount, error) {
 	row := q.db.QueryRow(ctx, setPaymentAccountExternal, arg.ExternalAccountID, arg.Now, arg.StoreID)
 	var i SellerPaymentAccount
@@ -410,7 +410,7 @@ func (q *Queries) SetPaymentAccountExternal(ctx context.Context, arg SetPaymentA
 		&i.TransfersActive,
 		&i.PayoutsActive,
 		&i.Requirements,
-		&i.DisabledReason,
+		&i.StatusReason,
 		&i.FetchedAt,
 		&i.CreateFailedAt,
 		&i.CreatedAt,
