@@ -21,7 +21,7 @@ on:
       - '.github/actions/pnpm-install/**'
       - '.github/workflows/admin-ci.yml'
   push:
-    branches: [main]
+    branches: [main, dev]
     paths:
       - 'admin/**'
       - 'api/**'

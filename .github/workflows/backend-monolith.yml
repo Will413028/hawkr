@@ -34,7 +34,7 @@ on:
       - 'api/**'
       - '.github/workflows/backend-monolith.yml'
   push:
-    branches: [main]
+    branches: [main, dev]
     paths: *monolith_paths
   workflow_dispatch:
 

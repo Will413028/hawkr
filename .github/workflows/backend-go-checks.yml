@@ -3,7 +3,7 @@ name: backend Go checks
 # gofmt / go vet -tags integration / go test（含未登記 skip 檢查）/ go mod tidy。
 # 由 backend/.github/workflows/go-checks.yml 搬來，差異：
 #   - runner 改 ubuntu-latest，開 setup-go cache
-#   - push 到 main 也跑：base 取 github.event.before，取不到就全模組
+#   - push 到 main、dev 也跑：base 取 github.event.before，取不到就全模組
 #
 # ⚠️ step 順序是硬性要求：gofmt（唯讀）→ 找模組 / vet / test（唯讀）→ go mod tidy
 # （會改工作樹，必須最後）。失敗用 accumulator + if: always() 讓每項都跑完，
@@ -28,7 +28,7 @@ on:
       - '!backend/go.mod'
       - '!backend/go.sum'
   push:
-    branches: [main]
+    branches: [main, dev]
     paths: *go_paths
   workflow_dispatch:
 

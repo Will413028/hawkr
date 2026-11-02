@@ -16,7 +16,7 @@ on:
       - 'backend/scripts/gen-sqlc.sh'
       - '.github/workflows/backend-sqlc-generated-diff.yml'
   push:
-    branches: [main]
+    branches: [main, dev]
     paths: *sqlc_paths
   workflow_dispatch:
 

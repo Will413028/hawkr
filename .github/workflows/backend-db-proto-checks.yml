@@ -27,7 +27,7 @@ on:
       - 'api/.buf-version'
       - '.github/workflows/backend-db-proto-checks.yml'
   push:
-    branches: [main]
+    branches: [main, dev]
     paths: *db_proto_paths
   workflow_dispatch:
 

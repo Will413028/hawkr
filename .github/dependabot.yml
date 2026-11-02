@@ -4,6 +4,7 @@
 version: 2
 updates:
   - package-ecosystem: "github-actions"
+    target-branch: "dev"
     directories:
       - "/"
       - "/.github/actions/pnpm-install"
@@ -18,6 +19,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "npm"
+    target-branch: "dev"
     directory: "/"
     schedule:
       interval: "weekly"
@@ -30,6 +32,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "pub"
+    target-branch: "dev"
     directory: "/buyer-app"
     schedule:
       interval: "weekly"
@@ -42,6 +45,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "pub"
+    target-branch: "dev"
     directory: "/seller-app"
     schedule:
       interval: "weekly"
@@ -54,6 +58,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "pub"
+    target-branch: "dev"
     directory: "/packages/hawkr_api"
     schedule:
       interval: "weekly"
@@ -66,6 +71,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "pub"
+    target-branch: "dev"
     directory: "/packages/hawkr_app_update"
     schedule:
       interval: "weekly"
@@ -78,6 +84,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "pub"
+    target-branch: "dev"
     directory: "/packages/hawkr_auth"
     schedule:
       interval: "weekly"
@@ -90,6 +97,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "pub"
+    target-branch: "dev"
     directory: "/packages/hawkr_twaddr"
     schedule:
       interval: "weekly"
@@ -102,6 +110,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "pub"
+    target-branch: "dev"
     directory: "/packages/hawkr_ui_text"
     schedule:
       interval: "weekly"
@@ -114,6 +123,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "gomod"
+    target-branch: "dev"
     directory: "/backend"
     schedule:
       interval: "weekly"
@@ -126,6 +136,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "gomod"
+    target-branch: "dev"
     directory: "/backend/gateway"
     schedule:
       interval: "weekly"
@@ -138,6 +149,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "gomod"
+    target-branch: "dev"
     directory: "/backend/monitoring/discord-webhook-gateway"
     schedule:
       interval: "weekly"
@@ -150,6 +162,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "gomod"
+    target-branch: "dev"
     directory: "/backend/pkg"
     schedule:
       interval: "weekly"
@@ -162,6 +175,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "gomod"
+    target-branch: "dev"
     directory: "/backend/services/ai-service"
     schedule:
       interval: "weekly"
@@ -174,6 +188,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "gomod"
+    target-branch: "dev"
     directory: "/backend/services/crm-service"
     schedule:
       interval: "weekly"
@@ -186,6 +201,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "gomod"
+    target-branch: "dev"
     directory: "/backend/services/im-service"
     schedule:
       interval: "weekly"
@@ -198,6 +214,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "gomod"
+    target-branch: "dev"
     directory: "/backend/services/invoice-service"
     schedule:
       interval: "weekly"
@@ -210,6 +227,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "gomod"
+    target-branch: "dev"
     directory: "/backend/services/notification-service"
     schedule:
       interval: "weekly"
@@ -222,6 +240,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "gomod"
+    target-branch: "dev"
     directory: "/backend/services/review-service"
     schedule:
       interval: "weekly"
@@ -234,6 +253,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "gomod"
+    target-branch: "dev"
     directory: "/backend/services/seller-service"
     schedule:
       interval: "weekly"
@@ -246,6 +266,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "gomod"
+    target-branch: "dev"
     directory: "/backend/services/social-service"
     schedule:
       interval: "weekly"
@@ -258,6 +279,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "maven"
+    target-branch: "dev"
     directory: "/backend/services/java"
     schedule:
       interval: "weekly"
