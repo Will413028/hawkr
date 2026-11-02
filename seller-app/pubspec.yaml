@@ -91,7 +91,7 @@ dependencies:
   path: ^1.9.1
   flutter_screenutil: ^5.9.3
   palette_generator_plus: ^1.0.0
-  sensors_plus: ^6.1.1
+  sensors_plus: ^7.1.1
   # 用於商品說明 rich text editor 的 inline hashtag chip 渲染
   extended_text_field: ^17.0.0
 
