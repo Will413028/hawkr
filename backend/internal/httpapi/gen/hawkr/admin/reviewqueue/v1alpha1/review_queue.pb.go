@@ -53,6 +53,8 @@ const (
 	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION ReviewQueueItemKind = 11
 	// 重試用完的 PayUni 綁定失敗，等管理員重新綁定（subject 是 kyc_application）。
 	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_PAYUNI_BIND_RETRY ReviewQueueItemKind = 12
+	// 建立重試用完的收款帳戶，等管理員重試建立（subject 是 payment_account）。
+	ReviewQueueItemKind_REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED ReviewQueueItemKind = 13
 )
 
 // Enum value maps for ReviewQueueItemKind.
@@ -69,19 +71,21 @@ var (
 		9:  "REVIEW_QUEUE_ITEM_KIND_MEASURE_REVIEW",
 		11: "REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION",
 		12: "REVIEW_QUEUE_ITEM_KIND_PAYUNI_BIND_RETRY",
+		13: "REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED",
 	}
 	ReviewQueueItemKind_value = map[string]int32{
-		"REVIEW_QUEUE_ITEM_KIND_UNSPECIFIED":             0,
-		"REVIEW_QUEUE_ITEM_KIND_REPORT_TRIAGE":           1,
-		"REVIEW_QUEUE_ITEM_KIND_CASE_DECISION":           2,
-		"REVIEW_QUEUE_ITEM_KIND_CASE_INQUIRY_OVERDUE":    3,
-		"REVIEW_QUEUE_ITEM_KIND_AUTHORITY_ORDER":         5,
-		"REVIEW_QUEUE_ITEM_KIND_AUTHORITY_TARGET_NOTICE": 6,
-		"REVIEW_QUEUE_ITEM_KIND_MEASURE_APPEAL":          7,
-		"REVIEW_QUEUE_ITEM_KIND_MEASURE_LIFT_REQUEST":    8,
-		"REVIEW_QUEUE_ITEM_KIND_MEASURE_REVIEW":          9,
-		"REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION":         11,
-		"REVIEW_QUEUE_ITEM_KIND_PAYUNI_BIND_RETRY":       12,
+		"REVIEW_QUEUE_ITEM_KIND_UNSPECIFIED":                   0,
+		"REVIEW_QUEUE_ITEM_KIND_REPORT_TRIAGE":                 1,
+		"REVIEW_QUEUE_ITEM_KIND_CASE_DECISION":                 2,
+		"REVIEW_QUEUE_ITEM_KIND_CASE_INQUIRY_OVERDUE":          3,
+		"REVIEW_QUEUE_ITEM_KIND_AUTHORITY_ORDER":               5,
+		"REVIEW_QUEUE_ITEM_KIND_AUTHORITY_TARGET_NOTICE":       6,
+		"REVIEW_QUEUE_ITEM_KIND_MEASURE_APPEAL":                7,
+		"REVIEW_QUEUE_ITEM_KIND_MEASURE_LIFT_REQUEST":          8,
+		"REVIEW_QUEUE_ITEM_KIND_MEASURE_REVIEW":                9,
+		"REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION":               11,
+		"REVIEW_QUEUE_ITEM_KIND_PAYUNI_BIND_RETRY":             12,
+		"REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED": 13,
 	}
 )
 
@@ -244,6 +248,7 @@ type ReviewQueueItem struct {
 	//	*ReviewQueueItem_MeasureRequest
 	//	*ReviewQueueItem_MeasureId
 	//	*ReviewQueueItem_KycApplication
+	//	*ReviewQueueItem_PaymentAccount
 	Subject isReviewQueueItem_Subject `protobuf_oneof:"subject"`
 	// 對象所屬的店家；空字串表示這個項目沒有單一店家（例如來函）。
 	StoreId string `protobuf:"bytes,20,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
@@ -371,6 +376,15 @@ func (x *ReviewQueueItem) GetKycApplication() *KYCApplicationRef {
 	return nil
 }
 
+func (x *ReviewQueueItem) GetPaymentAccount() *PaymentAccountRef {
+	if x != nil {
+		if x, ok := x.Subject.(*ReviewQueueItem_PaymentAccount); ok {
+			return x.PaymentAccount
+		}
+	}
+	return nil
+}
+
 func (x *ReviewQueueItem) GetStoreId() string {
 	if x != nil {
 		return x.StoreId
@@ -428,6 +442,10 @@ type ReviewQueueItem_KycApplication struct {
 	KycApplication *KYCApplicationRef `protobuf:"bytes,10,opt,name=kyc_application,json=kycApplication,proto3,oneof"`
 }
 
+type ReviewQueueItem_PaymentAccount struct {
+	PaymentAccount *PaymentAccountRef `protobuf:"bytes,11,opt,name=payment_account,json=paymentAccount,proto3,oneof"`
+}
+
 func (*ReviewQueueItem_ReportId) isReviewQueueItem_Subject() {}
 
 func (*ReviewQueueItem_CaseId) isReviewQueueItem_Subject() {}
@@ -443,6 +461,8 @@ func (*ReviewQueueItem_MeasureRequest) isReviewQueueItem_Subject() {}
 func (*ReviewQueueItem_MeasureId) isReviewQueueItem_Subject() {}
 
 func (*ReviewQueueItem_KycApplication) isReviewQueueItem_Subject() {}
+
+func (*ReviewQueueItem_PaymentAccount) isReviewQueueItem_Subject() {}
 
 // CaseInquiryRef 指到案件裡的一筆詢問。
 type CaseInquiryRef struct {
@@ -613,6 +633,51 @@ func (x *MeasureRequestRef) GetRequestId() string {
 	return ""
 }
 
+// PaymentAccountRef 指到店家的收款帳戶（一店一個）。
+type PaymentAccountRef struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	StoreId       string                 `protobuf:"bytes,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PaymentAccountRef) Reset() {
+	*x = PaymentAccountRef{}
+	mi := &file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PaymentAccountRef) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PaymentAccountRef) ProtoMessage() {}
+
+func (x *PaymentAccountRef) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PaymentAccountRef.ProtoReflect.Descriptor instead.
+func (*PaymentAccountRef) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *PaymentAccountRef) GetStoreId() string {
+	if x != nil {
+		return x.StoreId
+	}
+	return ""
+}
+
 // KYCApplicationRef 指到店家的一筆商家認證申請。
 type KYCApplicationRef struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -624,7 +689,7 @@ type KYCApplicationRef struct {
 
 func (x *KYCApplicationRef) Reset() {
 	*x = KYCApplicationRef{}
-	mi := &file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_msgTypes[6]
+	mi := &file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -636,7 +701,7 @@ func (x *KYCApplicationRef) String() string {
 func (*KYCApplicationRef) ProtoMessage() {}
 
 func (x *KYCApplicationRef) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_msgTypes[6]
+	mi := &file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -649,7 +714,7 @@ func (x *KYCApplicationRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KYCApplicationRef.ProtoReflect.Descriptor instead.
 func (*KYCApplicationRef) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDescGZIP(), []int{6}
+	return file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *KYCApplicationRef) GetStoreId() string {
@@ -678,7 +743,7 @@ const file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDesc = "" +
 	"\x05kinds\x18\x03 \x03(\x0e25.hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItemKindR\x05kinds\"\x8a\x01\n" +
 	"\x17ListReviewQueueResponse\x12G\n" +
 	"\x05items\x18\x01 \x03(\v21.hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItemR\x05items\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\x89\x06\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xe9\x06\n" +
 	"\x0fReviewQueueItem\x12N\n" +
 	"\x04kind\x18\x01 \x01(\x0e25.hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItemKindB\x03\xe0A\x02R\x04kind\x12\x1d\n" +
 	"\treport_id\x18\x02 \x01(\tH\x00R\breportId\x12\x19\n" +
@@ -690,7 +755,8 @@ const file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDesc = "" +
 	"\n" +
 	"measure_id\x18\b \x01(\tH\x00R\tmeasureId\x12^\n" +
 	"\x0fkyc_application\x18\n" +
-	" \x01(\v23.hawkr.admin.reviewqueue.v1alpha1.KYCApplicationRefH\x00R\x0ekycApplication\x12\x19\n" +
+	" \x01(\v23.hawkr.admin.reviewqueue.v1alpha1.KYCApplicationRefH\x00R\x0ekycApplication\x12^\n" +
+	"\x0fpayment_account\x18\v \x01(\v23.hawkr.admin.reviewqueue.v1alpha1.PaymentAccountRefH\x00R\x0epaymentAccount\x12\x19\n" +
 	"\bstore_id\x18\x14 \x01(\tR\astoreId\x12\x1d\n" +
 	"\n" +
 	"store_name\x18\x15 \x01(\tR\tstoreName\x12@\n" +
@@ -710,10 +776,12 @@ const file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDesc = "" +
 	"\n" +
 	"measure_id\x18\x01 \x01(\tR\tmeasureId\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x02 \x01(\tR\trequestId\"U\n" +
+	"request_id\x18\x02 \x01(\tR\trequestId\".\n" +
+	"\x11PaymentAccountRef\x12\x19\n" +
+	"\bstore_id\x18\x01 \x01(\tR\astoreId\"U\n" +
 	"\x11KYCApplicationRef\x12\x19\n" +
 	"\bstore_id\x18\x01 \x01(\tR\astoreId\x12%\n" +
-	"\x0eapplication_id\x18\x02 \x01(\tR\rapplicationId*\xe3\x04\n" +
+	"\x0eapplication_id\x18\x02 \x01(\tR\rapplicationId*\x9d\x05\n" +
 	"\x13ReviewQueueItemKind\x12&\n" +
 	"\"REVIEW_QUEUE_ITEM_KIND_UNSPECIFIED\x10\x00\x12(\n" +
 	"$REVIEW_QUEUE_ITEM_KIND_REPORT_TRIAGE\x10\x01\x12(\n" +
@@ -725,7 +793,8 @@ const file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDesc = "" +
 	"+REVIEW_QUEUE_ITEM_KIND_MEASURE_LIFT_REQUEST\x10\b\x12)\n" +
 	"%REVIEW_QUEUE_ITEM_KIND_MEASURE_REVIEW\x10\t\x12*\n" +
 	"&REVIEW_QUEUE_ITEM_KIND_KYC_APPLICATION\x10\v\x12,\n" +
-	"(REVIEW_QUEUE_ITEM_KIND_PAYUNI_BIND_RETRY\x10\f\"\x04\b\x04\x10\x04\"\x04\b\n" +
+	"(REVIEW_QUEUE_ITEM_KIND_PAYUNI_BIND_RETRY\x10\f\x128\n" +
+	"4REVIEW_QUEUE_ITEM_KIND_PAYMENT_ACCOUNT_CREATE_FAILED\x10\r\"\x04\b\x04\x10\x04\"\x04\b\n" +
 	"\x10\n" +
 	"*(REVIEW_QUEUE_ITEM_KIND_CASE_FDA_REFERRAL*(REVIEW_QUEUE_ITEM_KIND_FOOD_REGISTRATION2\xa7\x01\n" +
 	"\x17ReviewQueueAdminService\x12\x8b\x01\n" +
@@ -745,7 +814,7 @@ func file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDescGZIP() []by
 }
 
 var file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_goTypes = []any{
 	(ReviewQueueItemKind)(0),        // 0: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItemKind
 	(*ListReviewQueueRequest)(nil),  // 1: hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueRequest
@@ -754,25 +823,27 @@ var file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_goTypes = []any{
 	(*CaseInquiryRef)(nil),          // 4: hawkr.admin.reviewqueue.v1alpha1.CaseInquiryRef
 	(*AuthorityTargetRef)(nil),      // 5: hawkr.admin.reviewqueue.v1alpha1.AuthorityTargetRef
 	(*MeasureRequestRef)(nil),       // 6: hawkr.admin.reviewqueue.v1alpha1.MeasureRequestRef
-	(*KYCApplicationRef)(nil),       // 7: hawkr.admin.reviewqueue.v1alpha1.KYCApplicationRef
-	(*v1alpha1.Deadline)(nil),       // 8: hawkr.common.v1alpha1.Deadline
+	(*PaymentAccountRef)(nil),       // 7: hawkr.admin.reviewqueue.v1alpha1.PaymentAccountRef
+	(*KYCApplicationRef)(nil),       // 8: hawkr.admin.reviewqueue.v1alpha1.KYCApplicationRef
+	(*v1alpha1.Deadline)(nil),       // 9: hawkr.common.v1alpha1.Deadline
 }
 var file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_depIdxs = []int32{
-	0, // 0: hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueRequest.kinds:type_name -> hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItemKind
-	3, // 1: hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueResponse.items:type_name -> hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem
-	0, // 2: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem.kind:type_name -> hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItemKind
-	4, // 3: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem.case_inquiry:type_name -> hawkr.admin.reviewqueue.v1alpha1.CaseInquiryRef
-	5, // 4: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem.authority_target:type_name -> hawkr.admin.reviewqueue.v1alpha1.AuthorityTargetRef
-	6, // 5: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem.measure_request:type_name -> hawkr.admin.reviewqueue.v1alpha1.MeasureRequestRef
-	7, // 6: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem.kyc_application:type_name -> hawkr.admin.reviewqueue.v1alpha1.KYCApplicationRef
-	8, // 7: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem.deadline:type_name -> hawkr.common.v1alpha1.Deadline
-	1, // 8: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueAdminService.ListReviewQueue:input_type -> hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueRequest
-	2, // 9: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueAdminService.ListReviewQueue:output_type -> hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueResponse
-	9, // [9:10] is the sub-list for method output_type
-	8, // [8:9] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	0,  // 0: hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueRequest.kinds:type_name -> hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItemKind
+	3,  // 1: hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueResponse.items:type_name -> hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem
+	0,  // 2: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem.kind:type_name -> hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItemKind
+	4,  // 3: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem.case_inquiry:type_name -> hawkr.admin.reviewqueue.v1alpha1.CaseInquiryRef
+	5,  // 4: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem.authority_target:type_name -> hawkr.admin.reviewqueue.v1alpha1.AuthorityTargetRef
+	6,  // 5: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem.measure_request:type_name -> hawkr.admin.reviewqueue.v1alpha1.MeasureRequestRef
+	8,  // 6: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem.kyc_application:type_name -> hawkr.admin.reviewqueue.v1alpha1.KYCApplicationRef
+	7,  // 7: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem.payment_account:type_name -> hawkr.admin.reviewqueue.v1alpha1.PaymentAccountRef
+	9,  // 8: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItem.deadline:type_name -> hawkr.common.v1alpha1.Deadline
+	1,  // 9: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueAdminService.ListReviewQueue:input_type -> hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueRequest
+	2,  // 10: hawkr.admin.reviewqueue.v1alpha1.ReviewQueueAdminService.ListReviewQueue:output_type -> hawkr.admin.reviewqueue.v1alpha1.ListReviewQueueResponse
+	10, // [10:11] is the sub-list for method output_type
+	9,  // [9:10] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_init() }
@@ -789,6 +860,7 @@ func file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_init() {
 		(*ReviewQueueItem_MeasureRequest)(nil),
 		(*ReviewQueueItem_MeasureId)(nil),
 		(*ReviewQueueItem_KycApplication)(nil),
+		(*ReviewQueueItem_PaymentAccount)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -796,7 +868,7 @@ func file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDesc), len(file_hawkr_admin_reviewqueue_v1alpha1_review_queue_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

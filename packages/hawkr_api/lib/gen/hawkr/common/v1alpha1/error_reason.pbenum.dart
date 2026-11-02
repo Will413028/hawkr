@@ -57,7 +57,7 @@ class ErrorReason extends $pb.ProtobufEnum {
 
   /// 賣家做這個操作需要的前置條件沒有滿足（搭配 failed_precondition）：身分認證未核准，或店家正在隨帳號刪除。停權不用它，
   /// 停權是 SELLER_SUSPENDED。ErrorInfo.metadata 的 missingRequirements 是缺的條件，值是
-  /// seller.v1alpha1.SellerRequirement 的值名（不加 SELLER_REQUIREMENT_ 前綴，例如 KYC_APPROVED），依列舉的數字由小到大以逗號連接。client 先看 GetMyStore 的能力狀態，這個 reason 只是
+  /// seller.v1alpha1.SellerRequirement 的值名（不加 SELLER_REQUIREMENT_ 前綴，例如 ONBOARDING_COMPLETE），依列舉的數字由小到大以逗號連接。client 先看 GetMyStore 的能力狀態，這個 reason 只是
   /// 伺服器逐方法檢查的後備：重讀 GetMyStore，依缺的條件顯示。
   static const ErrorReason SELLER_REQUIREMENT_MISSING =
       ErrorReason._(7, _omitEnumNames ? '' : 'SELLER_REQUIREMENT_MISSING');

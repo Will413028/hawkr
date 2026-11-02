@@ -22,7 +22,7 @@ function shippingStatus(
 ) {
 	const missing =
 		extra.shippingMissing ??
-		(publicMissing.includes(R.KYC_APPROVED) ? [R.KYC_APPROVED] : []);
+		(publicMissing.includes(R.ONBOARDING_COMPLETE) ? [R.ONBOARDING_COMPLETE] : []);
 	return create(CapabilityStatusSchema, {
 		capability: SellerCapability.SHIPPING_SETUP,
 		active: missing.length === 0,
@@ -37,7 +37,7 @@ function build(
 		description?: string;
 		shippingRows?: ShippingOnboarding[];
 		productCount?: number | null;
-		/** SHIPPING_SETUP 的缺項；沒給時照伺服器：PUBLIC_LISTING 缺 KYC_APPROVED 才缺它。 */
+		/** SHIPPING_SETUP 的缺項；沒給時照伺服器：PUBLIC_LISTING 缺 ONBOARDING_COMPLETE 才缺它。 */
 		shippingMissing?: SellerRequirement[];
 	} = {},
 ): OnboardingTask[] {
@@ -92,14 +92,14 @@ describe("公開前必須 follows the PUBLIC_LISTING missing requirements", () =
 	});
 
 	it("profile is complete only when none of name, logo and town are missing", () => {
-		const tasks = build([R.KYC_APPROVED]);
+		const tasks = build([R.ONBOARDING_COMPLETE]);
 		expect(task(tasks, "profile").completed).toBe(true);
 		expect(task(tasks, "cert").completed).toBe(false);
 	});
 
-	it("KYC_APPROVED keeps the cert task open and shows the flow status as its text", () => {
+	it("ONBOARDING_COMPLETE keeps the cert task open and shows the flow status as its text", () => {
 		const cert = task(
-			build([R.KYC_APPROVED], { flowStatus: F.KYC_FLOW_STATUS_UNDER_REVIEW }),
+			build([R.ONBOARDING_COMPLETE], { flowStatus: F.KYC_FLOW_STATUS_UNDER_REVIEW }),
 			"cert",
 		);
 		expect(cert.completed).toBe(false);
@@ -108,22 +108,22 @@ describe("公開前必須 follows the PUBLIC_LISTING missing requirements", () =
 	});
 
 	it("the cert task is decided by the missing requirements, not by the flow status", () => {
-		// 伺服器說沒有缺 KYC_APPROVED：就算流程狀態還顯示審核中，這一列也是完成。
+		// 伺服器說沒有缺 ONBOARDING_COMPLETE：就算流程狀態還顯示審核中，這一列也是完成。
 		expect(
 			task(build([], { flowStatus: F.KYC_FLOW_STATUS_UNDER_REVIEW }), "cert")
 				.completed,
 		).toBe(true);
-		// 伺服器說還缺 KYC_APPROVED：就算流程狀態是 APPROVED，這一列也還沒完成。
+		// 伺服器說還缺 ONBOARDING_COMPLETE：就算流程狀態是 APPROVED，這一列也還沒完成。
 		expect(
 			task(
-				build([R.KYC_APPROVED], { flowStatus: F.KYC_FLOW_STATUS_APPROVED }),
+				build([R.ONBOARDING_COMPLETE], { flowStatus: F.KYC_FLOW_STATUS_APPROVED }),
 				"cert",
 			).completed,
 		).toBe(false);
 	});
 
 	it("PayUni is folded into the KYC row: there is no separate payment task", () => {
-		const ids = build([R.KYC_APPROVED]).map((t) => t.id);
+		const ids = build([R.ONBOARDING_COMPLETE]).map((t) => t.id);
 		expect(ids).not.toContain("payuni");
 	});
 
@@ -183,22 +183,22 @@ describe("建議完成", () => {
 		expect(task(build([]), "shipping").locked).toBe(false);
 		expect(
 			task(
-				build([R.KYC_APPROVED], { flowStatus: F.KYC_FLOW_STATUS_APPROVED }),
+				build([R.ONBOARDING_COMPLETE], { flowStatus: F.KYC_FLOW_STATUS_APPROVED }),
 				"shipping",
 			).locked,
 		).toBe(true);
 		expect(
 			task(
-				build([R.KYC_APPROVED], { flowStatus: F.KYC_FLOW_STATUS_FORWARDED }),
+				build([R.ONBOARDING_COMPLETE], { flowStatus: F.KYC_FLOW_STATUS_FORWARDED }),
 				"shipping",
 			).locked,
 		).toBe(true);
 	});
 
 	it("shipping is gated by SHIPPING_SETUP, not by the PUBLIC_LISTING list", () => {
-		// PUBLIC_LISTING 說缺 KYC_APPROVED，但 SHIPPING_SETUP 啟用：不鎖。
+		// PUBLIC_LISTING 說缺 ONBOARDING_COMPLETE，但 SHIPPING_SETUP 啟用：不鎖。
 		expect(
-			task(build([R.KYC_APPROVED], { shippingMissing: [] }), "shipping").locked,
+			task(build([R.ONBOARDING_COMPLETE], { shippingMissing: [] }), "shipping").locked,
 		).toBe(false);
 		// 認證已核准（PUBLIC_LISTING 不缺 KYC），但 SHIPPING_SETUP 缺 NOT_SUSPENDED：鎖，不說需要認證。
 		const suspended = task(
@@ -207,16 +207,16 @@ describe("建議完成", () => {
 		);
 		expect(suspended.locked).toBe(true);
 		expect(suspended.statusLabel).not.toBe("需先通過認證");
-		// 缺 KYC_APPROVED：鎖，文案是需先通過認證。
-		const kyc = task(build([R.KYC_APPROVED]), "shipping");
+		// 缺 ONBOARDING_COMPLETE：鎖，文案是需先通過認證。
+		const kyc = task(build([R.ONBOARDING_COMPLETE]), "shipping");
 		expect(kyc.locked).toBe(true);
 		expect(kyc.statusLabel).toBe("需先通過認證");
 	});
 
 	it("suspended and KYC not approved: the logistics row reads 未營業, not 需先通過認證", () => {
 		const row = task(
-			build([R.KYC_APPROVED, R.NOT_SUSPENDED], {
-				shippingMissing: [R.NOT_SUSPENDED, R.KYC_APPROVED],
+			build([R.ONBOARDING_COMPLETE, R.NOT_SUSPENDED], {
+				shippingMissing: [R.NOT_SUSPENDED, R.ONBOARDING_COMPLETE],
 			}),
 			"shipping",
 		);
@@ -225,7 +225,7 @@ describe("建議完成", () => {
 	});
 
 	it("the first product is never locked behind certification", () => {
-		expect(task(build([R.KYC_APPROVED]), "product").locked).toBeFalsy();
+		expect(task(build([R.ONBOARDING_COMPLETE]), "product").locked).toBeFalsy();
 	});
 
 	it("completion follows the store and product data", () => {
@@ -239,7 +239,7 @@ describe("建議完成", () => {
 	});
 
 	it("no task asks the seller to publish a post first", () => {
-		const tasks = build([R.KYC_APPROVED, R.LOGO]);
+		const tasks = build([R.ONBOARDING_COMPLETE, R.LOGO]);
 		expect(tasks.some((t) => t.id === ("post" as OnboardingTask["id"]))).toBe(
 			false,
 		);

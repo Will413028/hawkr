@@ -227,10 +227,10 @@
       "reason_heading": "PayUni 的審核意見"
     },
     "SellerRequirement": {
-      "SELLER_REQUIREMENT_KYC_APPROVED": "商家認證已通過",
       "SELLER_REQUIREMENT_LOGO": "logo",
       "SELLER_REQUIREMENT_NOT_PENDING_DELETION": "店家未在刪除中",
       "SELLER_REQUIREMENT_NOT_SUSPENDED": "帳號未停權",
+      "SELLER_REQUIREMENT_ONBOARDING_COMPLETE": "商家認證已通過",
       "SELLER_REQUIREMENT_STORE_ACTIVE": "店家未關閉",
       "SELLER_REQUIREMENT_STORE_NAME": "店名",
       "SELLER_REQUIREMENT_TOWN_CODE": "所在地"

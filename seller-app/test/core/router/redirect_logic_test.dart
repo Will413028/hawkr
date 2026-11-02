@@ -553,7 +553,7 @@ void main() {
     });
 
     test('KYC 未核准：物流設定頁放行（主能力是 PRODUCT_MANAGE），不導去公告頁', () {
-      const kyc = SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED;
+      const kyc = SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE;
       final store = myStore(
         publicListing: publicListingMissing([kyc]),
         shippingSetup: shippingSetupMissing([kyc]),
@@ -569,7 +569,7 @@ void main() {
           capabilities: [
             CapabilityStatus(
               capability: SellerCapability.SELLER_CAPABILITY_MARKETING,
-              missing: [SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED],
+              missing: [SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE],
             ),
           ],
         ),

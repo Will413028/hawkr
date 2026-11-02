@@ -9,7 +9,7 @@ import '../../../support/my_store_fixtures.dart';
 const _name = SellerRequirement.SELLER_REQUIREMENT_STORE_NAME;
 const _logo = SellerRequirement.SELLER_REQUIREMENT_LOGO;
 const _town = SellerRequirement.SELLER_REQUIREMENT_TOWN_CODE;
-const _kyc = SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED;
+const _kyc = SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE;
 const _active = SellerRequirement.SELLER_REQUIREMENT_STORE_ACTIVE;
 const _notSuspended = SellerRequirement.SELLER_REQUIREMENT_NOT_SUSPENDED;
 
@@ -50,7 +50,7 @@ void main() {
       expect(_task(tasks, OnboardingTaskId.profile).statusLabel, '缺少：logo');
     });
 
-    test('缺 KYC_APPROVED：狀態與動作來自流程狀態', () {
+    test('缺 ONBOARDING_COMPLETE：狀態與動作來自流程狀態', () {
       final tasks = buildOnboardingTasks(
         l: UiLocale.zhTW,
         my: myStore(publicListing: publicListingMissing([_kyc])),
@@ -235,7 +235,7 @@ void main() {
       ]);
     });
 
-    test('物流設定在 SHIPPING_SETUP 缺 KYC_APPROVED 時鎖定，與流程狀態無關', () {
+    test('物流設定在 SHIPPING_SETUP 缺 ONBOARDING_COMPLETE 時鎖定，與流程狀態無關', () {
       for (final status in [
         ...KYCFlowStatus.values.where(
           (s) => s != KYCFlowStatus.KYC_FLOW_STATUS_UNSPECIFIED,

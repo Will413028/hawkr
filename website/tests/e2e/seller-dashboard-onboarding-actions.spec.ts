@@ -28,10 +28,10 @@ const BASE_STORE: MockStore = {
 /** 認證通過（含 PayUni）：公開條件齊全。 */
 const APPROVED_STORE: MockStore = { ...BASE_STORE };
 
-/** 還沒認證：伺服器的公開條件缺 KYC_APPROVED。 */
+/** 還沒認證：伺服器的公開條件缺 ONBOARDING_COMPLETE。 */
 const NOT_STARTED_STORE: MockStore = {
 	...BASE_STORE,
-	missingRequirements: ["KYC_APPROVED"],
+	missingRequirements: ["ONBOARDING_COMPLETE"],
 };
 
 interface SellerFixture {
@@ -398,7 +398,7 @@ test.describe("seller dashboard onboarding task actions", {
 	}) => {
 		test.skip(!baseURL, "Playwright baseURL is required");
 
-		const missing: MockSellerRequirement[] = ["LOGO", "KYC_APPROVED"];
+		const missing: MockSellerRequirement[] = ["LOGO", "ONBOARDING_COMPLETE"];
 		await prepareSellerPage(page, baseURL as string, {
 			store: { ...BASE_STORE, missingRequirements: missing },
 			flow: "UNDER_REVIEW",

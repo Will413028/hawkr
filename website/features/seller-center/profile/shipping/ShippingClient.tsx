@@ -53,7 +53,7 @@ import {
 /**
  * 物流與退貨設定頁。對應 mobile shipping_settings_screen.dart。
  * 三件事一頁完成：
- *   1) 物流 gate — 伺服器的 `SHIPPING_SETUP` 能力沒有啟用時擋住：缺 KYC_APPROVED 引導到
+ *   1) 物流 gate — 伺服器的 `SHIPPING_SETUP` 能力沒有啟用時擋住：缺 ONBOARDING_COMPLETE 引導到
  *      /seller-center/me/certifications 完成認證；缺停權、等待刪除顯示對應說明。
  *   2) 黑貓宅配 — 一個 onboarding row。
  *   3) 7-11 店到店 — 一個 onboarding row。

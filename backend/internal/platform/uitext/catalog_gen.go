@@ -775,7 +775,7 @@ func (t Text) SellerSellerRequirement(v string) (string, bool) {
 		return "店家未關閉", true
 	case "NOT_SUSPENDED":
 		return "帳號未停權", true
-	case "KYC_APPROVED":
+	case "ONBOARDING_COMPLETE":
 		return "商家認證已通過", true
 	case "STORE_NAME":
 		return "店名", true

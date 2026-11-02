@@ -16,6 +16,7 @@ import "hawkr/common/v1alpha1/store_card.proto";
 import "google/api/field_behavior.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/field_mask.proto";
+import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 import "google/rpc/error_details.proto";
 import "google/type/date.proto";
@@ -98,6 +99,17 @@ service SellerAppService {
 
   // CancelKYC 取消草稿或審核中的申請；取消之後可以重新建立。
   rpc CancelKYC(CancelKYCRequest) returns (CancelKYCResponse);
+
+  // GetMyPaymentAccount 回傳呼叫者店家的收款帳戶：中立的狀態（PaymentAccountStatus）、誰收身分與銀行資料、開通用的介面。
+  // 店家還沒有收款帳戶（平台審核還沒核准，或沒有設定收款開通）時回 not_found。
+  rpc GetMyPaymentAccount(GetMyPaymentAccountRequest) returns (GetMyPaymentAccountResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // CreatePaymentOnboardingSession 為呼叫者店家的收款帳戶產生開通 session：onboarding_surface 是 HOSTED 時回連結（賣家開外部瀏覽器完成後回到
+  // return_url；連結過期時回到 refresh_url 重新取得），是 EMBEDDED 時回內嵌元件的 client_secret。外部帳戶還沒有建立（狀態是 NOT_CREATED）、帳戶已被
+  // 停用（DISABLED）或沒有設定收款開通時回 failed_precondition。每次呼叫都產生新的 session，不冪等。
+  rpc CreatePaymentOnboardingSession(CreatePaymentOnboardingSessionRequest) returns (CreatePaymentOnboardingSessionResponse);
 
   // LookupBusinessRegistration 以統一編號查經濟部商業司的公開登記資料，給 KYC 表單帶入公司資料。查無這個統編不是錯誤：
   // 回應沒有 registration；資料來源暫時無法使用回 unavailable，畫面退回手動填寫。每個帳號每分鐘最多查 10 次，超過回
@@ -265,8 +277,8 @@ enum SellerRequirement {
   SELLER_REQUIREMENT_STORE_ACTIVE = 1;
   // 帳號沒有生效中的停權。
   SELLER_REQUIREMENT_NOT_SUSPENDED = 2;
-  // 商家認證（含 PayUni 審核）已核准。
-  SELLER_REQUIREMENT_KYC_APPROVED = 3;
+  // 平台審核已核准，而且收款帳戶的轉帳能力已啟用。
+  SELLER_REQUIREMENT_ONBOARDING_COMPLETE = 3;
   // 有店名。
   SELLER_REQUIREMENT_STORE_NAME = 4;
   // 有 logo。
@@ -871,6 +883,80 @@ message SaveKYCDraftRequest {
 
 message SaveKYCDraftResponse {
   KYCApplication application = 1;
+}
+
+// PaymentAccountStatus 是收款帳戶的中立狀態，由金流商的帳戶快照推導（不是金流商自己的狀態名）。
+enum PaymentAccountStatus {
+  PAYMENT_ACCOUNT_STATUS_UNSPECIFIED = 0;
+  // 平台已核准，外部帳戶還在建立（背景程序處理，失敗時進後台待辦）。
+  PAYMENT_ACCOUNT_STATUS_NOT_CREATED = 1;
+  // 外部帳戶已建立，賣家還沒送出開通資料。
+  PAYMENT_ACCOUNT_STATUS_ONBOARDING = 2;
+  // 資料已送出，轉帳能力還沒啟用，沒有待補的條件。
+  PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW = 3;
+  // 有待補或逾期的條件，賣家要重新取得開通 session 補件。
+  PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED = 4;
+  // 轉帳能力已啟用；平台審核同時核准時，店家通過開通閘門（SELLER_REQUIREMENT_ONBOARDING_COMPLETE）。
+  PAYMENT_ACCOUNT_STATUS_ENABLED = 5;
+  // 被金流商拒絕或暫停。
+  PAYMENT_ACCOUNT_STATUS_DISABLED = 6;
+}
+
+// RequirementCollection 是誰向賣家收身分與銀行資料。
+enum RequirementCollection {
+  REQUIREMENT_COLLECTION_UNSPECIFIED = 0;
+  // 金流商收件（託管頁面為預設）：平台不經手身分與銀行資料。
+  REQUIREMENT_COLLECTION_PROVIDER = 1;
+  // 平台收件（金流商的內嵌元件）：資料在網頁上由元件直接送給金流商。
+  REQUIREMENT_COLLECTION_PLATFORM = 2;
+}
+
+// OnboardingSurface 是開通用的介面。
+enum OnboardingSurface {
+  ONBOARDING_SURFACE_UNSPECIFIED = 0;
+  // 金流商託管的頁面（連結）。
+  ONBOARDING_SURFACE_HOSTED = 1;
+  // 嵌在網頁上的元件（client secret）。
+  ONBOARDING_SURFACE_EMBEDDED = 2;
+}
+
+// PaymentAccount 是賣家看到的收款帳戶。
+message PaymentAccount {
+  PaymentAccountStatus status = 1;
+  RequirementCollection requirement_collection = 2;
+  // 目前設定的 provider 用哪種介面開通；沒有設定收款開通時是 UNSPECIFIED。
+  OnboardingSurface onboarding_surface = 3;
+  // 轉帳能力是否啟用（開通閘門的輸入）。
+  bool transfers_active = 4;
+  // 撥款能力是否啟用。
+  bool payouts_active = 5;
+  // 金流商回報的待補條件原始內容（物件，內容由金流商定義）；沒有時是空物件。
+  google.protobuf.Struct requirements = 6;
+  // 最近一次向金流商讀取帳戶的時間；還沒讀過時不設。
+  google.protobuf.Timestamp fetch_time = 7;
+}
+
+message GetMyPaymentAccountRequest {}
+
+message GetMyPaymentAccountResponse {
+  PaymentAccount account = 1;
+}
+
+message CreatePaymentOnboardingSessionRequest {
+  // 賣家完成或離開開通流程後回到的網址：https，或本機開發的 http://localhost。
+  string return_url = 1 [(google.api.field_behavior) = REQUIRED];
+  // 連結過期或已使用時，金流商把賣家送回的網址，client 在那裡重新呼叫本方法；規則同 return_url。
+  string refresh_url = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message CreatePaymentOnboardingSessionResponse {
+  OnboardingSurface surface = 1;
+  // surface 是 HOSTED 時的開通連結（一次性、短效）。
+  string url = 2;
+  // surface 是 EMBEDDED 時，初始化內嵌元件用的 client secret；只給這個賣家的瀏覽器，不記錄。
+  string client_secret = 3;
+  // session 的到期時間；金流商沒有給時不設。
+  google.protobuf.Timestamp expire_time = 4;
 }
 
 message GetMyKYCRequest {}

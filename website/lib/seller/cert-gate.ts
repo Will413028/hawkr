@@ -2,7 +2,7 @@
  * Seller certification gate.
  *
  * 「已認證」是店家的公開曝光條件之一：`GetMyStore.capabilities` 中 `PUBLIC_LISTING` 缺的條件不含
- * `KYC_APPROVED`（含 PayUni 審核）。細分的狀態（審核中、補件、PayUni 審核…）來自
+ * `ONBOARDING_COMPLETE`（平台審核核准且收款帳戶啟用）。細分的狀態（審核中、補件、PayUni 審核…）來自
  * `GetMyKYC.application.flow.status`。這兩個來源只有這裡讀，頁面不自己拼。
  *
  * 認證不再是上架商品、建立優惠券與發票的前置條件（它們只看 `capabilities`）；它是公開曝光、收款的條件

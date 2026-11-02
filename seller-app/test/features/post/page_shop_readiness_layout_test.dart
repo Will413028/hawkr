@@ -52,12 +52,12 @@ class _Case {
 
 const _cases = <String, _Case>{
   '尚未認證': _Case(
-    missing: [SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED],
+    missing: [SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE],
     status: KYCFlowStatus.KYC_FLOW_STATUS_NOT_STARTED,
     expectedText: '待認證',
   ),
   '認證審核中': _Case(
-    missing: [SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED],
+    missing: [SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE],
     status: KYCFlowStatus.KYC_FLOW_STATUS_UNDER_REVIEW,
     expectedText: 'PayUni 審核中',
   ),
@@ -67,7 +67,7 @@ const _cases = <String, _Case>{
       SellerRequirement.SELLER_REQUIREMENT_LOGO,
       SellerRequirement.SELLER_REQUIREMENT_TOWN_CODE,
       SellerRequirement.SELLER_REQUIREMENT_NOT_SUSPENDED,
-      SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED,
+      SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
     ],
     status: KYCFlowStatus.KYC_FLOW_STATUS_PAYUNI_REJECTED,
     expectedText: 'PayUni 審核未通過',

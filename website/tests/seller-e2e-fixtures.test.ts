@@ -57,7 +57,7 @@ test("myStoreJson parses as a GetMyStoreResponse with every field mapped", () =>
 			address: { townCode: "66000290", addressDetail: "東關路一段 100 號" },
 			logoUriTemplate: "https://img.test/{preset}/logo.png",
 			etag: "e7",
-			missingRequirements: ["KYC_APPROVED", "LOGO"],
+			missingRequirements: ["ONBOARDING_COMPLETE", "LOGO"],
 		}),
 	);
 
@@ -75,7 +75,7 @@ test("myStoreJson parses as a GetMyStoreResponse with every field mapped", () =>
 		(status) => status.capability === SellerCapability.PUBLIC_LISTING,
 	);
 	assert.deepEqual(listing?.missing, [
-		SellerRequirement.KYC_APPROVED,
+		SellerRequirement.ONBOARDING_COMPLETE,
 		SellerRequirement.LOGO,
 	]);
 	assert.equal(listing?.active, false);
@@ -83,7 +83,7 @@ test("myStoreJson parses as a GetMyStoreResponse with every field mapped", () =>
 		(status) => status.capability === SellerCapability.SHIPPING_SETUP,
 	);
 	assert.equal(shipping?.active, false);
-	assert.deepEqual(shipping?.missing, [SellerRequirement.KYC_APPROVED]);
+	assert.deepEqual(shipping?.missing, [SellerRequirement.ONBOARDING_COMPLETE]);
 	assert.equal(message.suspended, false);
 });
 

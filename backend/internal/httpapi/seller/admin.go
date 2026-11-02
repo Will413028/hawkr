@@ -35,6 +35,9 @@ type AdminModule interface {
 	RebindPayUni(context.Context, model.RebindPayUniInput) (model.AdminPayUniRegistration, error)
 	PayUniObservations(context.Context, model.PayUniObservationListInput) (model.PayUniObservationPage, error)
 	RefreshPayUniStatus(ctx context.Context, storeID int64) error
+	PaymentAccountOf(ctx context.Context, storeID int64) (model.PaymentAccount, error)
+	RefreshPaymentAccount(ctx context.Context, storeID int64) error
+	RetryPaymentAccountCreate(ctx context.Context, storeID int64) (model.PaymentAccount, error)
 	RequeryKYCRegistration(context.Context, model.RequeryKYCRegistrationInput) (model.RegistrationCheck, error)
 }
 

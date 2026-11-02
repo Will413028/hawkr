@@ -143,7 +143,7 @@ export const PENDING_DELETION_SELLER_CAPABILITIES: readonly MockSellerCapability
 export type MockSellerRequirement =
 	| "STORE_ACTIVE"
 	| "NOT_SUSPENDED"
-	| "KYC_APPROVED"
+	| "ONBOARDING_COMPLETE"
 	| "STORE_NAME"
 	| "LOGO"
 	| "TOWN_CODE"
@@ -153,7 +153,7 @@ export type MockSellerRequirement =
 const SELLER_REQUIREMENT_ORDER: readonly MockSellerRequirement[] = [
 	"STORE_ACTIVE",
 	"NOT_SUSPENDED",
-	"KYC_APPROVED",
+	"ONBOARDING_COMPLETE",
 	"STORE_NAME",
 	"LOGO",
 	"TOWN_CODE",
@@ -189,7 +189,7 @@ export interface MockStore {
 	logoUriTemplate?: string;
 	/** 有生效中的停權措施（`GetMyStoreResponse.suspended`）；原因與期間看 `ListMyMeasures`。 */
 	suspended?: boolean;
-	/** 啟用的能力；預設是全部（物流建店在缺 KYC_APPROVED 時不啟用）。 */
+	/** 啟用的能力；預設是全部（物流建店在缺 ONBOARDING_COMPLETE 時不啟用）。 */
 	capabilities?: readonly MockSellerCapability[];
 	/** 店家狀態 PUBLIC_LISTING 還沒滿足的條件；預設沒有缺。 */
 	missingRequirements?: readonly MockSellerRequirement[];
@@ -197,7 +197,7 @@ export interface MockStore {
 
 /**
  * 沒有啟用的能力缺的條件，照伺服器的規則（backend `model.CapabilitiesOf`）：停權缺 NOT_SUSPENDED，物流建店
- * 缺 KYC_APPROVED，等待刪除缺 NOT_PENDING_DELETION；測試單獨拿掉某個能力、其他狀態都正常時，缺 NOT_SUSPENDED
+ * 缺 ONBOARDING_COMPLETE，等待刪除缺 NOT_PENDING_DELETION；測試單獨拿掉某個能力、其他狀態都正常時，缺 NOT_SUSPENDED
  * 當作代表（契約要求沒有啟用的能力至少缺一項）。
  */
 function missingOfInactive(
@@ -209,9 +209,9 @@ function missingOfInactive(
 	if (store.suspended) missing.push("NOT_SUSPENDED");
 	if (
 		capability === "SHIPPING_SETUP" &&
-		publicListingMissing.includes("KYC_APPROVED")
+		publicListingMissing.includes("ONBOARDING_COMPLETE")
 	) {
-		missing.push("KYC_APPROVED");
+		missing.push("ONBOARDING_COMPLETE");
 	}
 	if (store.status === "PENDING_DELETION") missing.push("NOT_PENDING_DELETION");
 	return inRequirementOrder(missing.length > 0 ? missing : ["NOT_SUSPENDED"]);
@@ -221,7 +221,7 @@ function missingOfInactive(
 export function myStoreJson(store: MockStore) {
 	const missing = inRequirementOrder(store.missingRequirements ?? []);
 	const granted = new Set(store.capabilities ?? ALL_SELLER_CAPABILITIES);
-	if (missing.includes("KYC_APPROVED")) granted.delete("SHIPPING_SETUP");
+	if (missing.includes("ONBOARDING_COMPLETE")) granted.delete("SHIPPING_SETUP");
 	return {
 		store: {
 			id: store.id,

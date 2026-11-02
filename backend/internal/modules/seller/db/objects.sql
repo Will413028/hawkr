@@ -10,8 +10,8 @@
 
 -- 店家與時間無關的條件，一欄一個布林（Go 的 model.Requirement 一項對一欄，Go 只讀這裡、不重算；停權與時間有關，在 effective_measures）：
 --   - active：沒有關閉；not_pending_deletion：沒有正在隨帳號刪除；
---   - kyc_approved：目前那一筆還沒取消的 KYC 申請已核准，而且 PayUni 註冊已綁定、審核結果是核准（model.DeriveKYCFlow 的 APPROVED，
---     資料集測試鎖住兩者一致；DeriveKYCFlow 只負責給賣家與後台看的流程狀態）；
+--   - onboarding_complete：平台審核已核准（目前那一筆還沒取消的 KYC 申請是 APPROVED），而且收款帳戶的轉帳能力啟用
+--     （payment_accounts.transfers_active，Stripe 計畫 D10、D20）；DeriveKYCFlow 只負責給賣家與後台看的流程狀態；
 --   - has_store_name、has_logo、has_town_code：有值。文字欄位不存空字串（stores_store_name_check、stores_images_check、stores_town_code_check），
 --     店名也不存頭尾是 Unicode 空白的值（stores_store_name_check，platform/trimtext.Check，與寫入端的 trimtext.Trim 同一個集合），所以有值就是 NOT NULL；店名只有個資清理過的列是 NULL。
 CREATE VIEW seller.store_requirement_flags AS
@@ -22,9 +22,9 @@ SELECT s.store_id,
        EXISTS (
            SELECT 1
            FROM seller.kyc_applications a
-           JOIN seller.payuni_registrations r ON r.store_id = a.store_id
-           WHERE a.store_id = s.store_id AND a.status = 'APPROVED' AND r.bind_status = 'BOUND' AND r.outcome = 'APPROVED'
-       ) AS kyc_approved,
+           JOIN seller.payment_accounts p ON p.store_id = a.store_id
+           WHERE a.store_id = s.store_id AND a.status = 'APPROVED' AND p.transfers_active
+       ) AS onboarding_complete,
        (s.store_name IS NOT NULL)::boolean AS has_store_name,
        (s.logo_key IS NOT NULL)::boolean AS has_logo,
        (s.town_code IS NOT NULL)::boolean AS has_town_code
@@ -60,7 +60,7 @@ LANGUAGE sql STABLE
 BEGIN ATOMIC
     SELECT f.store_id
     FROM seller.store_requirement_flags f
-    WHERE f.active AND f.not_pending_deletion AND f.kyc_approved AND f.has_store_name AND f.has_logo AND f.has_town_code
+    WHERE f.active AND f.not_pending_deletion AND f.onboarding_complete AND f.has_store_name AND f.has_logo AND f.has_town_code
       AND NOT EXISTS (SELECT 1 FROM seller.effective_measures(at) e WHERE e.account_id = f.account_id);
 END;
 
@@ -257,8 +257,21 @@ BEGIN ATOMIC
     WHERE r.bind_status = 'FAILED' AND r.bind_error_code = 'PAYUNI_UNAVAILABLE' AND s.status = 'ACTIVE' AND k.status = 'APPROVED';
 END;
 
+-- PAYMENT_ACCOUNT_CREATE_FAILED 建立收款帳戶失敗：EnsureAccount 的重試用完（create_failed_at 有值，還沒有外部 ID）而且店家營運中。管理員
+-- 只能「重試建立」（清空 create_failed_at 並重新排入），所以處理完待辦自然消失。item_id 是店家 ID 的文字。開始是失敗的時刻，期限 24 小時（上線前的起始值）。
+CREATE FUNCTION seller.review_payment_account_create_failed(at TIMESTAMPTZ) RETURNS SETOF seller.review_item
+LANGUAGE sql STABLE
+BEGIN ATOMIC
+    SELECT 'PAYMENT_ACCOUNT_CREATE_FAILED'::text, p.store_id::text, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::smallint, NULL::bigint,
+           NULL::uuid, NULL::uuid, NULL::uuid, p.store_id, COALESCE(s.store_name, ''),
+           p.create_failed_at, p.create_failed_at + INTERVAL '24 hours'
+    FROM seller.payment_accounts p
+    JOIN seller.stores s ON s.store_id = p.store_id
+    WHERE p.create_failed_at IS NOT NULL AND s.status = 'ACTIVE';
+END;
+
 -- 發布的讀取介面（step10e-3d-design.md §2.1）：at 這一刻營運要處理的事項，後台待辦（reviewqueue 模組）的 seller 部分。每一列是一件待辦：種類、對象的鍵、
--- 店家、開始時間與期限，欄位的意義同 review_item。10 種都有期限，due_at 一律有值（E3）。是 10 支 review_<種類>(at) 的 UNION ALL：成員的條件與時長只寫在那些
+-- 店家、開始時間與期限，欄位的意義同 review_item。11 種都有期限，due_at 一律有值（E3）。是 11 支 review_<種類>(at) 的 UNION ALL：成員的條件與時長只寫在那些
 -- 函式（規則只有一個家，E10），這裡不重寫；成員與指令用的 Go 定義一致由資料集測試鎖住。時間由呼叫方以請求的 clock 傳入，不用 now()。
 -- 消費端排序與分頁（reviewqueue 的 keyset：due_at、start_at、kind COLLATE "C"、item_id COLLATE "C"）；kind 是 UPPER_SNAKE，item_id 的位元組順序穩定。
 CREATE TYPE seller.pub_review_item AS (
@@ -300,7 +313,9 @@ BEGIN ATOMIC
     UNION ALL
     SELECT * FROM seller.review_kyc_application(at)
     UNION ALL
-    SELECT * FROM seller.review_payuni_bind_retry(at);
+    SELECT * FROM seller.review_payuni_bind_retry(at)
+    UNION ALL
+    SELECT * FROM seller.review_payment_account_create_failed(at);
 END;
 
 -- 發布的讀取介面（pub_*，形狀宣告在 db/pub.sql，契約測試比對兩者）：此刻生效中的內容下架措施的對象，一列是一個（措施，內容）。內容下架建立即生效、

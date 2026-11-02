@@ -186,7 +186,7 @@ Future<void> _pumpWallet(
       : myStore(
           publicListing: publicListingMissing([
             if (!scenario.certified)
-              SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED,
+              SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
           ]),
         );
 

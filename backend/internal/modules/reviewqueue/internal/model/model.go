@@ -11,7 +11,7 @@ import (
 // 空字串與不在 Kinds 裡的值都不是有效的種類。
 type Kind string
 
-// seller 發布的 10 種（pub_review_items）。A7-1e 加 moderation 的種類時加在這裡與 Kinds。
+// seller 發布的 11 種（pub_review_items）。A7-1e 加 moderation 的種類時加在這裡與 Kinds。
 const (
 	ReportTriage          Kind = "REPORT_TRIAGE"
 	CaseDecision          Kind = "CASE_DECISION"
@@ -23,12 +23,14 @@ const (
 	MeasureReview         Kind = "MEASURE_REVIEW"
 	KYCApplication        Kind = "KYC_APPLICATION"
 	PayUniBindRetry       Kind = "PAYUNI_BIND_RETRY"
+	// PaymentAccountCreateFailed 是建立重試用完的收款帳戶（subject 是店家）。
+	PaymentAccountCreateFailed Kind = "PAYMENT_ACCOUNT_CREATE_FAILED"
 )
 
 // Kinds 是全部有效的種類。
 var Kinds = []Kind{
 	ReportTriage, CaseDecision, CaseInquiryOverdue, AuthorityOrder, AuthorityTargetNotice,
-	MeasureAppeal, MeasureLiftRequest, MeasureReview, KYCApplication, PayUniBindRetry,
+	MeasureAppeal, MeasureLiftRequest, MeasureReview, KYCApplication, PayUniBindRetry, PaymentAccountCreateFailed,
 }
 
 // Valid 回傳 k 是不是有效的種類。

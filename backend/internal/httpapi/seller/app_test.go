@@ -278,10 +278,10 @@ func TestGetMyStoreListsEveryCapabilityStatusInProtoNumberOrder(t *testing.T) {
 	if st := byCapability(pb.SellerCapability_SELLER_CAPABILITY_STOREFRONT_WRITE); !st.GetActive() {
 		t.Fatalf("storefront write=%v", st)
 	}
-	if st := byCapability(pb.SellerCapability_SELLER_CAPABILITY_SHIPPING_SETUP); st.GetActive() || !slices.Equal(st.GetMissing(), []pb.SellerRequirement{pb.SellerRequirement_SELLER_REQUIREMENT_KYC_APPROVED}) {
+	if st := byCapability(pb.SellerCapability_SELLER_CAPABILITY_SHIPPING_SETUP); st.GetActive() || !slices.Equal(st.GetMissing(), []pb.SellerRequirement{pb.SellerRequirement_SELLER_REQUIREMENT_ONBOARDING_COMPLETE}) {
 		t.Fatalf("shipping setup=%v", st)
 	}
-	wantListing := []pb.SellerRequirement{pb.SellerRequirement_SELLER_REQUIREMENT_KYC_APPROVED, pb.SellerRequirement_SELLER_REQUIREMENT_LOGO}
+	wantListing := []pb.SellerRequirement{pb.SellerRequirement_SELLER_REQUIREMENT_ONBOARDING_COMPLETE, pb.SellerRequirement_SELLER_REQUIREMENT_LOGO}
 	if st := byCapability(pb.SellerCapability_SELLER_CAPABILITY_PUBLIC_LISTING); st.GetActive() || !slices.Equal(st.GetMissing(), wantListing) {
 		t.Fatalf("public listing=%v", st)
 	}

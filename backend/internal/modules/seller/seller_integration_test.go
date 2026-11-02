@@ -180,6 +180,7 @@ type fixture struct {
 	jobs     *queue
 	media    *images
 	payuni   *fakePayUni
+	payment  *PaymentFake
 	orders   *storeOrders
 	products *fakeProductStores
 	registry *fakeRegistry
@@ -193,7 +194,7 @@ func setup(t *testing.T) *fixture {
 	d := pg.NewDB(t, testdb.Migrations(
 		migrate.Module{Name: "identity", Dir: identity.Migrations()}, migrate.Module{Name: "seller", Dir: Migrations()},
 	))
-	f := &fixture{db: d, bus: events.NewBus(), jobs: &queue{}, media: newImages(), payuni: &fakePayUni{t: t}, orders: &storeOrders{}, products: &fakeProductStores{}, registry: &fakeRegistry{t: t}, now: time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)}
+	f := &fixture{db: d, bus: events.NewBus(), jobs: &queue{}, media: newImages(), payuni: &fakePayUni{t: t}, payment: NewPaymentFake(), orders: &storeOrders{}, products: &fakeProductStores{}, registry: &fakeRegistry{t: t}, now: time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	f.identity = identity.New(identity.Deps{DB: d, Events: f.bus, Now: func() time.Time { return f.now }, Logger: log})
 	f.module = f.newModule(t, f.payuni, f.jobs)
@@ -218,7 +219,7 @@ func (f *fixture) newModuleClock(t *testing.T, client PayUniClient, jc jobs.Repo
 	t.Helper()
 	log := slog.New(slog.NewTextHandler(&f.logs, nil))
 	return New(Deps{
-		DB: f.db, Events: f.bus, Jobs: jc, Identity: f.identity, Media: f.media, Orders: f.orders, KYCKeys: kycKeys, KYCMAC: kycMAC, PayUni: client, ProductStores: f.products, Registry: f.registry,
+		DB: f.db, Events: f.bus, Jobs: jc, Identity: f.identity, Media: f.media, Orders: f.orders, KYCKeys: kycKeys, KYCMAC: kycMAC, PayUni: client, Payment: f.payment, ProductStores: f.products, Registry: f.registry,
 		StorefrontBaseURL: "https://store.example.invalid",
 		Now:               now, Logger: log,
 		StoreCode: func(now time.Time) (int64, error) {
@@ -930,6 +931,8 @@ func TestChecksMatchGo(t *testing.T) {
 		{"prospects", "prospects_outreach_check", stringsOf(OutreachStatusValues()), true},
 		{"prospect_contacts", "prospect_contacts_kind_check", stringsOf(ContactKindValues()), true},
 		{"kyc_registration_checks", "kyc_registration_checks_outcome_check", stringsOf(RegistrationOutcomeValues()), true},
+		{"payment_accounts", "payment_accounts_status_check", stringsOf(PaymentAccountStatusValues()), true},
+		{"payment_accounts", "payment_accounts_collection_check", stringsOf(model.RequirementCollectionValues()), true},
 	} {
 		for _, v := range tt.values {
 			if tt.upperSnake && !regexp.MustCompile(`^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$`).MatchString(v) {

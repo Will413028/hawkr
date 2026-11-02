@@ -178,10 +178,10 @@ export type UiTextKey =
 	| "seller.RiskGround.RISK_GROUND_TRANSACTION"
 	| "seller.SellerPayUni.fix_fields_heading"
 	| "seller.SellerPayUni.reason_heading"
-	| "seller.SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED"
 	| "seller.SellerRequirement.SELLER_REQUIREMENT_LOGO"
 	| "seller.SellerRequirement.SELLER_REQUIREMENT_NOT_PENDING_DELETION"
 	| "seller.SellerRequirement.SELLER_REQUIREMENT_NOT_SUSPENDED"
+	| "seller.SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE"
 	| "seller.SellerRequirement.SELLER_REQUIREMENT_STORE_ACTIVE"
 	| "seller.SellerRequirement.SELLER_REQUIREMENT_STORE_NAME"
 	| "seller.SellerRequirement.SELLER_REQUIREMENT_TOWN_CODE"
@@ -699,7 +699,7 @@ export function sellerSellerPayUniReasonHeading(): UiMessage {
 const SELLER_SELLER_REQUIREMENT: Readonly<Partial<Record<number, UiTextKey>>> = {
 	1: "seller.SellerRequirement.SELLER_REQUIREMENT_STORE_ACTIVE",
 	2: "seller.SellerRequirement.SELLER_REQUIREMENT_NOT_SUSPENDED",
-	3: "seller.SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED",
+	3: "seller.SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE",
 	4: "seller.SellerRequirement.SELLER_REQUIREMENT_STORE_NAME",
 	5: "seller.SellerRequirement.SELLER_REQUIREMENT_LOGO",
 	6: "seller.SellerRequirement.SELLER_REQUIREMENT_TOWN_CODE",

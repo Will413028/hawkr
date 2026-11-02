@@ -25,6 +25,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/onboarding"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/payuni"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/profile"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/prospect"
@@ -69,6 +70,9 @@ type Deps struct {
 	KYCKeys  *seal.Keyring
 	KYCMAC   *seal.MAC
 	PayUni   PayUniClient
+	// Payment 是收款開通的 provider（port 在 internal/payment；Stripe adapter 與本機的 fake 由組裝點給）。沒有設定時給 nil：核准不建立
+	// 收款帳戶，開通相關的方法回 FailedPrecondition。
+	Payment PaymentProvider
 	// Registry 是登記資料來源（公司型申請送件時查詢並存快照；serve 與 worker 都需要，serve 排入、worker 執行），必填。
 	Registry Registry
 	// ProductStores 是商品所屬店家的 port，彙總瀏覽事件的 job 用；必填。
@@ -91,6 +95,7 @@ type Module struct {
 	measure    *measure.Service
 	kyc        *kyc.Service
 	payuni     *payuni.Service
+	payment    *payment.Service
 	purge      *purge.Service
 	prospect   *prospect.Service
 	views      *views.Service
@@ -117,8 +122,9 @@ func New(d Deps) *Module {
 	closings := closing.New(closing.Deps{
 		DB: d.DB, Events: d.Events, Jobs: d.Jobs, Identity: d.Identity, Orders: d.Orders, Exposure: exposures, Now: d.Now,
 	})
+	payments := payment.New(payment.Deps{DB: d.DB, Jobs: d.Jobs, Provider: d.Payment, Exposure: exposures, Now: d.Now, Logger: d.Logger})
 	kycService := kyc.New(kyc.Deps{
-		DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Exposure: exposures, Keys: d.KYCKeys, MAC: d.KYCMAC, Registry: d.Registry, Now: d.Now, Logger: d.Logger,
+		DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Exposure: exposures, Payment: payments, Keys: d.KYCKeys, MAC: d.KYCMAC, Registry: d.Registry, Now: d.Now, Logger: d.Logger,
 	})
 	return &Module{
 		onboarding: onboarding.New(onboarding.Deps{
@@ -142,7 +148,8 @@ func New(d Deps) *Module {
 			DB: d.DB, Events: d.Events, Jobs: d.Jobs, Client: d.PayUni, KYC: kycService, Exposure: exposures,
 			StorefrontBaseURL: d.StorefrontBaseURL, Now: d.Now, Logger: d.Logger,
 		}),
-		purge: purge.New(purge.Deps{DB: d.DB, Events: d.Events, Jobs: d.Jobs, Now: d.Now}),
+		payment: payments,
+		purge:   purge.New(purge.Deps{DB: d.DB, Events: d.Events, Jobs: d.Jobs, Now: d.Now}),
 		prospect: prospect.New(prospect.Deps{
 			DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Now: d.Now,
 		}),
@@ -229,8 +236,8 @@ const (
 	RequirementActive = model.RequirementActive
 	// RequirementNotSuspended 帳號沒有生效中的停權。
 	RequirementNotSuspended = model.RequirementNotSuspended
-	// RequirementKYCApproved KYC 流程已核准（含 PayUni 核准）。
-	RequirementKYCApproved = model.RequirementKYCApproved
+	// RequirementOnboardingComplete 平台審核已核准，而且收款帳戶的轉帳能力已啟用。
+	RequirementOnboardingComplete = model.RequirementOnboardingComplete
 	// RequirementStoreName 有店名。
 	RequirementStoreName = model.RequirementStoreName
 	// RequirementLogo 有 logo。
@@ -595,6 +602,7 @@ func (m *Module) AddWorkers(workers *river.Workers) {
 	m.measure.AddWorkers(workers)
 	m.governance.AddWorkers(workers)
 	m.payuni.AddWorkers(workers)
+	m.payment.AddWorkers(workers)
 	m.kyc.AddWorkers(workers)
 	m.purge.AddWorkers(workers)
 	m.profile.AddWorkers(workers)
@@ -612,6 +620,7 @@ func (m *Module) PeriodicJobs() []*river.PeriodicJob {
 	jobs = append(jobs, m.profile.PeriodicJobs()...)
 	jobs = append(jobs, m.views.PeriodicJobs()...)
 	jobs = append(jobs, m.payuni.PeriodicJobs()...)
+	jobs = append(jobs, m.payment.PeriodicJobs()...)
 	jobs = append(jobs, m.kyc.PeriodicJobs()...)
 	return append(jobs, mediaref.PeriodicJobs()...)
 }

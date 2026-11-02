@@ -87,6 +87,15 @@ const (
 	// SellerAdminServiceRequeryKYCRegistrationProcedure is the fully-qualified name of the
 	// SellerAdminService's RequeryKYCRegistration RPC.
 	SellerAdminServiceRequeryKYCRegistrationProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/RequeryKYCRegistration"
+	// SellerAdminServiceGetPaymentAccountProcedure is the fully-qualified name of the
+	// SellerAdminService's GetPaymentAccount RPC.
+	SellerAdminServiceGetPaymentAccountProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/GetPaymentAccount"
+	// SellerAdminServiceRefreshPaymentAccountProcedure is the fully-qualified name of the
+	// SellerAdminService's RefreshPaymentAccount RPC.
+	SellerAdminServiceRefreshPaymentAccountProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/RefreshPaymentAccount"
+	// SellerAdminServiceRetryPaymentAccountCreateProcedure is the fully-qualified name of the
+	// SellerAdminService's RetryPaymentAccountCreate RPC.
+	SellerAdminServiceRetryPaymentAccountCreateProcedure = "/hawkr.admin.seller.v1alpha1.SellerAdminService/RetryPaymentAccountCreate"
 )
 
 // SellerAdminServiceClient is a client for the hawkr.admin.seller.v1alpha1.SellerAdminService
@@ -145,6 +154,15 @@ type SellerAdminServiceClient interface {
 	// 先收掉再新增一筆，所以重送沒有「已有查詢中就什麼都不做」的情形。申請不能重新查詢（不在審核中、不是公司型、店家已關閉或等待刪除）
 	// 時回 failed_precondition，訊息是 KYCApplication.requery_registration_unavailabilities 的第一句；申請不存在或是賣家的草稿回 not_found。
 	RequeryKYCRegistration(context.Context, *connect.Request[v1alpha1.RequeryKYCRegistrationRequest]) (*connect.Response[v1alpha1.RequeryKYCRegistrationResponse], error)
+	// GetPaymentAccount 讀店家的收款帳戶（外部帳戶的本地快取：狀態、轉帳與撥款能力、待補條件的原始內容、停用原因）。店家還沒有收款帳戶
+	// （平台審核還沒核准，或沒有設定收款開通）時回 not_found。
+	GetPaymentAccount(context.Context, *connect.Request[v1alpha1.GetPaymentAccountRequest]) (*connect.Response[v1alpha1.GetPaymentAccountResponse], error)
+	// RefreshPaymentAccount 排入一次重讀外部帳戶的背景工作（營運工具；同一家店已有排隊的就合併，回應不等結果，結果從 GetPaymentAccount 看）。
+	// 沒有設定收款開通、外部帳戶還沒有建立時回 failed_precondition，店家沒有收款帳戶回 not_found。
+	RefreshPaymentAccount(context.Context, *connect.Request[v1alpha1.RefreshPaymentAccountRequest]) (*connect.Response[v1alpha1.RefreshPaymentAccountResponse], error)
+	// RetryPaymentAccountCreate 對建立失敗（重試用完，後台待辦 PAYMENT_ACCOUNT_CREATE_FAILED）的收款帳戶重新排入建立。沒有 etag，由狀態檢查保護：
+	// 帳戶不是建立失敗的狀態回 failed_precondition，店家沒有收款帳戶回 not_found。
+	RetryPaymentAccountCreate(context.Context, *connect.Request[v1alpha1.RetryPaymentAccountCreateRequest]) (*connect.Response[v1alpha1.RetryPaymentAccountCreateResponse], error)
 }
 
 // NewSellerAdminServiceClient constructs a client for the
@@ -258,26 +276,48 @@ func NewSellerAdminServiceClient(httpClient connect.HTTPClient, baseURL string, 
 			connect.WithSchema(sellerAdminServiceMethods.ByName("RequeryKYCRegistration")),
 			connect.WithClientOptions(opts...),
 		),
+		getPaymentAccount: connect.NewClient[v1alpha1.GetPaymentAccountRequest, v1alpha1.GetPaymentAccountResponse](
+			httpClient,
+			baseURL+SellerAdminServiceGetPaymentAccountProcedure,
+			connect.WithSchema(sellerAdminServiceMethods.ByName("GetPaymentAccount")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		refreshPaymentAccount: connect.NewClient[v1alpha1.RefreshPaymentAccountRequest, v1alpha1.RefreshPaymentAccountResponse](
+			httpClient,
+			baseURL+SellerAdminServiceRefreshPaymentAccountProcedure,
+			connect.WithSchema(sellerAdminServiceMethods.ByName("RefreshPaymentAccount")),
+			connect.WithClientOptions(opts...),
+		),
+		retryPaymentAccountCreate: connect.NewClient[v1alpha1.RetryPaymentAccountCreateRequest, v1alpha1.RetryPaymentAccountCreateResponse](
+			httpClient,
+			baseURL+SellerAdminServiceRetryPaymentAccountCreateProcedure,
+			connect.WithSchema(sellerAdminServiceMethods.ByName("RetryPaymentAccountCreate")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // sellerAdminServiceClient implements SellerAdminServiceClient.
 type sellerAdminServiceClient struct {
-	listStores              *connect.Client[v1alpha1.ListStoresRequest, v1alpha1.ListStoresResponse]
-	getStoreStats           *connect.Client[v1alpha1.GetStoreStatsRequest, v1alpha1.GetStoreStatsResponse]
-	getStore                *connect.Client[v1alpha1.GetStoreRequest, v1alpha1.GetStoreResponse]
-	listKYCApplications     *connect.Client[v1alpha1.ListKYCApplicationsRequest, v1alpha1.ListKYCApplicationsResponse]
-	getKYCApplication       *connect.Client[v1alpha1.GetKYCApplicationRequest, v1alpha1.GetKYCApplicationResponse]
-	listKYCReveals          *connect.Client[v1alpha1.ListKYCRevealsRequest, v1alpha1.ListKYCRevealsResponse]
-	listKYCDocumentAccesses *connect.Client[v1alpha1.ListKYCDocumentAccessesRequest, v1alpha1.ListKYCDocumentAccessesResponse]
-	approveKYC              *connect.Client[v1alpha1.ApproveKYCRequest, v1alpha1.ApproveKYCResponse]
-	rejectKYC               *connect.Client[v1alpha1.RejectKYCRequest, v1alpha1.RejectKYCResponse]
-	revealKYCSensitive      *connect.Client[v1alpha1.RevealKYCSensitiveRequest, v1alpha1.RevealKYCSensitiveResponse]
-	getPayUniRegistration   *connect.Client[v1alpha1.GetPayUniRegistrationRequest, v1alpha1.GetPayUniRegistrationResponse]
-	rebindPayUni            *connect.Client[v1alpha1.RebindPayUniRequest, v1alpha1.RebindPayUniResponse]
-	listPayUniObservations  *connect.Client[v1alpha1.ListPayUniObservationsRequest, v1alpha1.ListPayUniObservationsResponse]
-	refreshPayUniStatus     *connect.Client[v1alpha1.RefreshPayUniStatusRequest, v1alpha1.RefreshPayUniStatusResponse]
-	requeryKYCRegistration  *connect.Client[v1alpha1.RequeryKYCRegistrationRequest, v1alpha1.RequeryKYCRegistrationResponse]
+	listStores                *connect.Client[v1alpha1.ListStoresRequest, v1alpha1.ListStoresResponse]
+	getStoreStats             *connect.Client[v1alpha1.GetStoreStatsRequest, v1alpha1.GetStoreStatsResponse]
+	getStore                  *connect.Client[v1alpha1.GetStoreRequest, v1alpha1.GetStoreResponse]
+	listKYCApplications       *connect.Client[v1alpha1.ListKYCApplicationsRequest, v1alpha1.ListKYCApplicationsResponse]
+	getKYCApplication         *connect.Client[v1alpha1.GetKYCApplicationRequest, v1alpha1.GetKYCApplicationResponse]
+	listKYCReveals            *connect.Client[v1alpha1.ListKYCRevealsRequest, v1alpha1.ListKYCRevealsResponse]
+	listKYCDocumentAccesses   *connect.Client[v1alpha1.ListKYCDocumentAccessesRequest, v1alpha1.ListKYCDocumentAccessesResponse]
+	approveKYC                *connect.Client[v1alpha1.ApproveKYCRequest, v1alpha1.ApproveKYCResponse]
+	rejectKYC                 *connect.Client[v1alpha1.RejectKYCRequest, v1alpha1.RejectKYCResponse]
+	revealKYCSensitive        *connect.Client[v1alpha1.RevealKYCSensitiveRequest, v1alpha1.RevealKYCSensitiveResponse]
+	getPayUniRegistration     *connect.Client[v1alpha1.GetPayUniRegistrationRequest, v1alpha1.GetPayUniRegistrationResponse]
+	rebindPayUni              *connect.Client[v1alpha1.RebindPayUniRequest, v1alpha1.RebindPayUniResponse]
+	listPayUniObservations    *connect.Client[v1alpha1.ListPayUniObservationsRequest, v1alpha1.ListPayUniObservationsResponse]
+	refreshPayUniStatus       *connect.Client[v1alpha1.RefreshPayUniStatusRequest, v1alpha1.RefreshPayUniStatusResponse]
+	requeryKYCRegistration    *connect.Client[v1alpha1.RequeryKYCRegistrationRequest, v1alpha1.RequeryKYCRegistrationResponse]
+	getPaymentAccount         *connect.Client[v1alpha1.GetPaymentAccountRequest, v1alpha1.GetPaymentAccountResponse]
+	refreshPaymentAccount     *connect.Client[v1alpha1.RefreshPaymentAccountRequest, v1alpha1.RefreshPaymentAccountResponse]
+	retryPaymentAccountCreate *connect.Client[v1alpha1.RetryPaymentAccountCreateRequest, v1alpha1.RetryPaymentAccountCreateResponse]
 }
 
 // ListStores calls hawkr.admin.seller.v1alpha1.SellerAdminService.ListStores.
@@ -358,6 +398,22 @@ func (c *sellerAdminServiceClient) RequeryKYCRegistration(ctx context.Context, r
 	return c.requeryKYCRegistration.CallUnary(ctx, req)
 }
 
+// GetPaymentAccount calls hawkr.admin.seller.v1alpha1.SellerAdminService.GetPaymentAccount.
+func (c *sellerAdminServiceClient) GetPaymentAccount(ctx context.Context, req *connect.Request[v1alpha1.GetPaymentAccountRequest]) (*connect.Response[v1alpha1.GetPaymentAccountResponse], error) {
+	return c.getPaymentAccount.CallUnary(ctx, req)
+}
+
+// RefreshPaymentAccount calls hawkr.admin.seller.v1alpha1.SellerAdminService.RefreshPaymentAccount.
+func (c *sellerAdminServiceClient) RefreshPaymentAccount(ctx context.Context, req *connect.Request[v1alpha1.RefreshPaymentAccountRequest]) (*connect.Response[v1alpha1.RefreshPaymentAccountResponse], error) {
+	return c.refreshPaymentAccount.CallUnary(ctx, req)
+}
+
+// RetryPaymentAccountCreate calls
+// hawkr.admin.seller.v1alpha1.SellerAdminService.RetryPaymentAccountCreate.
+func (c *sellerAdminServiceClient) RetryPaymentAccountCreate(ctx context.Context, req *connect.Request[v1alpha1.RetryPaymentAccountCreateRequest]) (*connect.Response[v1alpha1.RetryPaymentAccountCreateResponse], error) {
+	return c.retryPaymentAccountCreate.CallUnary(ctx, req)
+}
+
 // SellerAdminServiceHandler is an implementation of the
 // hawkr.admin.seller.v1alpha1.SellerAdminService service.
 type SellerAdminServiceHandler interface {
@@ -414,6 +470,15 @@ type SellerAdminServiceHandler interface {
 	// 先收掉再新增一筆，所以重送沒有「已有查詢中就什麼都不做」的情形。申請不能重新查詢（不在審核中、不是公司型、店家已關閉或等待刪除）
 	// 時回 failed_precondition，訊息是 KYCApplication.requery_registration_unavailabilities 的第一句；申請不存在或是賣家的草稿回 not_found。
 	RequeryKYCRegistration(context.Context, *connect.Request[v1alpha1.RequeryKYCRegistrationRequest]) (*connect.Response[v1alpha1.RequeryKYCRegistrationResponse], error)
+	// GetPaymentAccount 讀店家的收款帳戶（外部帳戶的本地快取：狀態、轉帳與撥款能力、待補條件的原始內容、停用原因）。店家還沒有收款帳戶
+	// （平台審核還沒核准，或沒有設定收款開通）時回 not_found。
+	GetPaymentAccount(context.Context, *connect.Request[v1alpha1.GetPaymentAccountRequest]) (*connect.Response[v1alpha1.GetPaymentAccountResponse], error)
+	// RefreshPaymentAccount 排入一次重讀外部帳戶的背景工作（營運工具；同一家店已有排隊的就合併，回應不等結果，結果從 GetPaymentAccount 看）。
+	// 沒有設定收款開通、外部帳戶還沒有建立時回 failed_precondition，店家沒有收款帳戶回 not_found。
+	RefreshPaymentAccount(context.Context, *connect.Request[v1alpha1.RefreshPaymentAccountRequest]) (*connect.Response[v1alpha1.RefreshPaymentAccountResponse], error)
+	// RetryPaymentAccountCreate 對建立失敗（重試用完，後台待辦 PAYMENT_ACCOUNT_CREATE_FAILED）的收款帳戶重新排入建立。沒有 etag，由狀態檢查保護：
+	// 帳戶不是建立失敗的狀態回 failed_precondition，店家沒有收款帳戶回 not_found。
+	RetryPaymentAccountCreate(context.Context, *connect.Request[v1alpha1.RetryPaymentAccountCreateRequest]) (*connect.Response[v1alpha1.RetryPaymentAccountCreateResponse], error)
 }
 
 // NewSellerAdminServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -522,6 +587,25 @@ func NewSellerAdminServiceHandler(svc SellerAdminServiceHandler, opts ...connect
 		connect.WithSchema(sellerAdminServiceMethods.ByName("RequeryKYCRegistration")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sellerAdminServiceGetPaymentAccountHandler := connect.NewUnaryHandler(
+		SellerAdminServiceGetPaymentAccountProcedure,
+		svc.GetPaymentAccount,
+		connect.WithSchema(sellerAdminServiceMethods.ByName("GetPaymentAccount")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	sellerAdminServiceRefreshPaymentAccountHandler := connect.NewUnaryHandler(
+		SellerAdminServiceRefreshPaymentAccountProcedure,
+		svc.RefreshPaymentAccount,
+		connect.WithSchema(sellerAdminServiceMethods.ByName("RefreshPaymentAccount")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sellerAdminServiceRetryPaymentAccountCreateHandler := connect.NewUnaryHandler(
+		SellerAdminServiceRetryPaymentAccountCreateProcedure,
+		svc.RetryPaymentAccountCreate,
+		connect.WithSchema(sellerAdminServiceMethods.ByName("RetryPaymentAccountCreate")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/hawkr.admin.seller.v1alpha1.SellerAdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SellerAdminServiceListStoresProcedure:
@@ -554,6 +638,12 @@ func NewSellerAdminServiceHandler(svc SellerAdminServiceHandler, opts ...connect
 			sellerAdminServiceRefreshPayUniStatusHandler.ServeHTTP(w, r)
 		case SellerAdminServiceRequeryKYCRegistrationProcedure:
 			sellerAdminServiceRequeryKYCRegistrationHandler.ServeHTTP(w, r)
+		case SellerAdminServiceGetPaymentAccountProcedure:
+			sellerAdminServiceGetPaymentAccountHandler.ServeHTTP(w, r)
+		case SellerAdminServiceRefreshPaymentAccountProcedure:
+			sellerAdminServiceRefreshPaymentAccountHandler.ServeHTTP(w, r)
+		case SellerAdminServiceRetryPaymentAccountCreateProcedure:
+			sellerAdminServiceRetryPaymentAccountCreateHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -621,4 +711,16 @@ func (UnimplementedSellerAdminServiceHandler) RefreshPayUniStatus(context.Contex
 
 func (UnimplementedSellerAdminServiceHandler) RequeryKYCRegistration(context.Context, *connect.Request[v1alpha1.RequeryKYCRegistrationRequest]) (*connect.Response[v1alpha1.RequeryKYCRegistrationResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.RequeryKYCRegistration is not implemented"))
+}
+
+func (UnimplementedSellerAdminServiceHandler) GetPaymentAccount(context.Context, *connect.Request[v1alpha1.GetPaymentAccountRequest]) (*connect.Response[v1alpha1.GetPaymentAccountResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.GetPaymentAccount is not implemented"))
+}
+
+func (UnimplementedSellerAdminServiceHandler) RefreshPaymentAccount(context.Context, *connect.Request[v1alpha1.RefreshPaymentAccountRequest]) (*connect.Response[v1alpha1.RefreshPaymentAccountResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.RefreshPaymentAccount is not implemented"))
+}
+
+func (UnimplementedSellerAdminServiceHandler) RetryPaymentAccountCreate(context.Context, *connect.Request[v1alpha1.RetryPaymentAccountCreateRequest]) (*connect.Response[v1alpha1.RetryPaymentAccountCreateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.seller.v1alpha1.SellerAdminService.RetryPaymentAccountCreate is not implemented"))
 }

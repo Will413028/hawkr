@@ -40,7 +40,7 @@ func TestMissingExposureMapsEachConditionToItsRequirement(t *testing.T) {
 		RequirementActive:             func(s *Store) { s.Conditions.Active = false },
 		RequirementNotPendingDeletion: func(s *Store) { s.Conditions.NotPendingDeletion = false },
 		RequirementNotSuspended:       func(s *Store) { s.Sanctions = sanctionsOf(true) },
-		RequirementKYCApproved:        func(s *Store) { s.Conditions.KYCApproved = false },
+		RequirementOnboardingComplete: func(s *Store) { s.Conditions.OnboardingComplete = false },
 		RequirementStoreName:          func(s *Store) { s.Conditions.StoreName = false },
 		RequirementLogo:               func(s *Store) { s.Conditions.Logo = false },
 		RequirementTownCode:           func(s *Store) { s.Conditions.TownCode = false },

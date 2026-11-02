@@ -39,16 +39,17 @@ type (
 
 // 待辦的種類：seller 發布的 10 種。
 const (
-	ReportTriage          = model.ReportTriage
-	CaseDecision          = model.CaseDecision
-	CaseInquiryOverdue    = model.CaseInquiryOverdue
-	AuthorityOrder        = model.AuthorityOrder
-	AuthorityTargetNotice = model.AuthorityTargetNotice
-	MeasureAppeal         = model.MeasureAppeal
-	MeasureLiftRequest    = model.MeasureLiftRequest
-	MeasureReview         = model.MeasureReview
-	KYCApplication        = model.KYCApplication
-	PayUniBindRetry       = model.PayUniBindRetry
+	ReportTriage               = model.ReportTriage
+	CaseDecision               = model.CaseDecision
+	CaseInquiryOverdue         = model.CaseInquiryOverdue
+	AuthorityOrder             = model.AuthorityOrder
+	AuthorityTargetNotice      = model.AuthorityTargetNotice
+	MeasureAppeal              = model.MeasureAppeal
+	MeasureLiftRequest         = model.MeasureLiftRequest
+	MeasureReview              = model.MeasureReview
+	KYCApplication             = model.KYCApplication
+	PayUniBindRetry            = model.PayUniBindRetry
+	PaymentAccountCreateFailed = model.PaymentAccountCreateFailed
 )
 
 // Kinds 回傳全部有效的種類（新的切片，呼叫端可以改）。

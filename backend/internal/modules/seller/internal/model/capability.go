@@ -63,7 +63,7 @@ func AllCapabilities() []Capability { return append(Capabilities(), CapPublicLis
 //   - STORE_ACTIVE：每個能力都需要，關閉的店家沒有任何能力；
 //   - NOT_SUSPENDED：經營類能力需要。停權時仍授予的能力（能力檢查 ADR 的白名單）就是表裡沒有它的那些；
 //   - NOT_PENDING_DELETION：經營類能力與關店需要，等待刪除時只剩履約類；
-//   - KYC_APPROVED：物流建店需要（PayUni 以已成立的子商店建店）；
+//   - ONBOARDING_COMPLETE：物流建店需要（平台審核核准且收款帳戶的轉帳能力啟用）；
 //   - 店家狀態 CapPublicListing 需要全部條件，缺的就是 MissingExposure。
 var needs = map[Capability][]Requirement{
 	CapAccountSelfRead:  {RequirementActive},
@@ -79,9 +79,9 @@ var needs = map[Capability][]Requirement{
 	CapProductManage:    {RequirementActive, RequirementNotSuspended, RequirementNotPendingDeletion},
 	CapMarketing:        {RequirementActive, RequirementNotSuspended, RequirementNotPendingDeletion},
 	CapInvoiceManage:    {RequirementActive, RequirementNotSuspended, RequirementNotPendingDeletion},
-	CapShippingSetup:    {RequirementActive, RequirementNotSuspended, RequirementKYCApproved, RequirementNotPendingDeletion},
+	CapShippingSetup:    {RequirementActive, RequirementNotSuspended, RequirementOnboardingComplete, RequirementNotPendingDeletion},
 	CapPublicListing: {
-		RequirementActive, RequirementNotSuspended, RequirementKYCApproved, RequirementStoreName, RequirementLogo,
+		RequirementActive, RequirementNotSuspended, RequirementOnboardingComplete, RequirementStoreName, RequirementLogo,
 		RequirementTownCode, RequirementNotPendingDeletion,
 	},
 }

@@ -34,16 +34,17 @@ const (
 // 商家認證各自頁面的 list 權限；重新綁定 PayUni 的來源是 PayUni 註冊，它唯一的讀取權限是 get（沒有 list RPC，不新增沒有 RPC 的 list 權限）。
 // 新種類沒有列在這裡，TestKindsAreOneToOneWithTheContract 失敗（它逐種類寫死期望的權限）。
 var kindPermissions = map[rq.Kind]adminperm.Permission{
-	rq.ReportTriage:          adminperm.SellerReportsList,
-	rq.CaseDecision:          adminperm.SellerCasesList,
-	rq.CaseInquiryOverdue:    adminperm.SellerCaseInquiriesList,
-	rq.AuthorityOrder:        adminperm.SellerAuthorityOrdersList,
-	rq.AuthorityTargetNotice: adminperm.SellerAuthorityOrdersList,
-	rq.MeasureAppeal:         adminperm.SellerMeasuresList,
-	rq.MeasureLiftRequest:    adminperm.SellerMeasuresList,
-	rq.MeasureReview:         adminperm.SellerMeasuresList,
-	rq.KYCApplication:        adminperm.SellerKYCApplicationsList,
-	rq.PayUniBindRetry:       adminperm.SellerPayUniRegistrationsGet,
+	rq.ReportTriage:               adminperm.SellerReportsList,
+	rq.CaseDecision:               adminperm.SellerCasesList,
+	rq.CaseInquiryOverdue:         adminperm.SellerCaseInquiriesList,
+	rq.AuthorityOrder:             adminperm.SellerAuthorityOrdersList,
+	rq.AuthorityTargetNotice:      adminperm.SellerAuthorityOrdersList,
+	rq.MeasureAppeal:              adminperm.SellerMeasuresList,
+	rq.MeasureLiftRequest:         adminperm.SellerMeasuresList,
+	rq.MeasureReview:              adminperm.SellerMeasuresList,
+	rq.KYCApplication:             adminperm.SellerKYCApplicationsList,
+	rq.PayUniBindRetry:            adminperm.SellerPayUniRegistrationsGet,
+	rq.PaymentAccountCreateFailed: adminperm.SellerPaymentAccountsGet,
 }
 
 // Lister 是 handler 需要的模組方法（*reviewqueue.Module 實作它）。
@@ -217,6 +218,11 @@ func toProto(item rq.Item) (*adminpb.ReviewQueueItem, error) {
 			return nil, missing("kyc_application_id 或 store_id")
 		}
 		out.Subject = &adminpb.ReviewQueueItem_KycApplication{KycApplication: &adminpb.KYCApplicationRef{StoreId: rpc.FormatID(*item.StoreID), ApplicationId: item.KYCApplicationID.String()}}
+	case rq.PaymentAccountCreateFailed:
+		if item.StoreID == nil {
+			return nil, missing("store_id")
+		}
+		out.Subject = &adminpb.ReviewQueueItem_PaymentAccount{PaymentAccount: &adminpb.PaymentAccountRef{StoreId: rpc.FormatID(*item.StoreID)}}
 	default:
 		return nil, fmt.Errorf("httpapi/reviewqueue：不認得的種類 %q", item.Kind)
 	}

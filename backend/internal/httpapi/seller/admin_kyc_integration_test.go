@@ -465,6 +465,18 @@ func TestAdminKYCAndPayUniMethodsRejectCustomersAndVisitorsAndWriteNothing(t *te
 				_, err := c.RefreshPayUniStatus(ctx, connect.NewRequest(&adminsellerpb.RefreshPayUniStatusRequest{StoreId: sid(s.StoreID)}))
 				return err
 			},
+			"GetPaymentAccount": func() error {
+				_, err := c.GetPaymentAccount(ctx, connect.NewRequest(&adminsellerpb.GetPaymentAccountRequest{StoreId: sid(s.StoreID)}))
+				return err
+			},
+			"RefreshPaymentAccount": func() error {
+				_, err := c.RefreshPaymentAccount(ctx, connect.NewRequest(&adminsellerpb.RefreshPaymentAccountRequest{StoreId: sid(s.StoreID)}))
+				return err
+			},
+			"RetryPaymentAccountCreate": func() error {
+				_, err := c.RetryPaymentAccountCreate(ctx, connect.NewRequest(&adminsellerpb.RetryPaymentAccountCreateRequest{StoreId: sid(s.StoreID)}))
+				return err
+			},
 			"RequeryKYCRegistration": func() error {
 				_, err := c.RequeryKYCRegistration(ctx, connect.NewRequest(&adminsellerpb.RequeryKYCRegistrationRequest{Id: app.ID.String()}))
 				return err
@@ -497,6 +509,9 @@ type adminSellerClient interface {
 	RebindPayUni(context.Context, *connect.Request[adminsellerpb.RebindPayUniRequest]) (*connect.Response[adminsellerpb.RebindPayUniResponse], error)
 	ListPayUniObservations(context.Context, *connect.Request[adminsellerpb.ListPayUniObservationsRequest]) (*connect.Response[adminsellerpb.ListPayUniObservationsResponse], error)
 	RefreshPayUniStatus(context.Context, *connect.Request[adminsellerpb.RefreshPayUniStatusRequest]) (*connect.Response[adminsellerpb.RefreshPayUniStatusResponse], error)
+	GetPaymentAccount(context.Context, *connect.Request[adminsellerpb.GetPaymentAccountRequest]) (*connect.Response[adminsellerpb.GetPaymentAccountResponse], error)
+	RefreshPaymentAccount(context.Context, *connect.Request[adminsellerpb.RefreshPaymentAccountRequest]) (*connect.Response[adminsellerpb.RefreshPaymentAccountResponse], error)
+	RetryPaymentAccountCreate(context.Context, *connect.Request[adminsellerpb.RetryPaymentAccountCreateRequest]) (*connect.Response[adminsellerpb.RetryPaymentAccountCreateResponse], error)
 	RequeryKYCRegistration(context.Context, *connect.Request[adminsellerpb.RequeryKYCRegistrationRequest]) (*connect.Response[adminsellerpb.RequeryKYCRegistrationResponse], error)
 }
 

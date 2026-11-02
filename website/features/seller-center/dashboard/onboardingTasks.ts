@@ -63,7 +63,7 @@ const HANDLED_BY_NOTICE_PAGE: readonly SellerRequirement[] = [
 
 const KNOWN_REQUIREMENTS: ReadonlySet<SellerRequirement> = new Set([
 	...HANDLED_BY_NOTICE_PAGE,
-	SellerRequirement.KYC_APPROVED,
+	SellerRequirement.ONBOARDING_COMPLETE,
 	...PROFILE_REQUIREMENTS,
 ]);
 
@@ -85,7 +85,7 @@ function buildRequiredTasks(
 		ut(sellerSellerRequirement(requirement) ?? commonUnknown()),
 	);
 	const profileDone = missingProfile.length === 0;
-	const certDone = !lacks(SellerRequirement.KYC_APPROVED);
+	const certDone = !lacks(SellerRequirement.ONBOARDING_COMPLETE);
 
 	const tasks: OnboardingTask[] = [
 		{

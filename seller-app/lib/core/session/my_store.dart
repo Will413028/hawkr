@@ -5,7 +5,7 @@ import 'package:hawkr_twaddr/hawkr_twaddr.dart' as twaddr;
 import '../../shared/utils/seller_avatar_helper.dart';
 
 /// 物流設定（`SHIPPING_SETUP`）的閘門，只由伺服器回報的啟用與缺的條件決定，優先序固定：等待刪除 > 停權 > 認證。
-/// 啟用就開放；缺 `KYC_APPROVED` 是認證閘門；店家還沒讀到、伺服器沒回報這個能力、缺 `STORE_ACTIVE` 或缺項不認得，
+/// 啟用就開放；缺 `ONBOARDING_COMPLETE` 是認證閘門；店家還沒讀到、伺服器沒回報這個能力、缺 `STORE_ACTIVE` 或缺項不認得，
 /// 都是 [unknown]（不退回認證閘門）。
 enum ShippingGate { open, suspended, pendingDeletion, certification, unknown }
 
@@ -207,20 +207,20 @@ final class MyStore {
     if (missing.contains(SellerRequirement.SELLER_REQUIREMENT_NOT_SUSPENDED)) {
       return ShippingGate.suspended;
     }
-    if (missing.contains(SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED) &&
+    if (missing.contains(SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE) &&
         !missing.contains(SellerRequirement.SELLER_REQUIREMENT_STORE_ACTIVE)) {
       return ShippingGate.certification;
     }
     return ShippingGate.unknown;
   }
 
-  /// 商家認證（含 PayUni 審核）已核准：`PUBLIC_LISTING` 缺的條件不含 `KYC_APPROVED`。沒有回報 `PUBLIC_LISTING` 時不算已認證。
+  /// 商家認證與收款開通已完成：`PUBLIC_LISTING` 缺的條件不含 `ONBOARDING_COMPLETE`。沒有回報 `PUBLIC_LISTING` 時不算已認證。
   bool get isCertified {
     final missing = missingFor(
       SellerCapability.SELLER_CAPABILITY_PUBLIC_LISTING,
     );
     return missing != null &&
-        !missing.contains(SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED);
+        !missing.contains(SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE);
   }
 
   /// 商店介紹；沒有填時是 null。

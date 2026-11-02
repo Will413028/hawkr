@@ -132,6 +132,14 @@ func TestDevSeedWritesStoresThatTheModuleServesAsExposable(t *testing.T) {
 		if want := "HAWK" + strconv.FormatInt(s.StoreCode, 10); code != want {
 			t.Errorf("店 %d 的 mer_id = %s，want %s", s.StoreID, code, want)
 		}
+		var provider, paymentStatus string
+		var transfers bool
+		if err := d.Pool().QueryRow(ctx, `SELECT provider, status, transfers_active FROM seller.payment_accounts WHERE store_id = $1`, s.StoreID).Scan(&provider, &paymentStatus, &transfers); err != nil {
+			t.Fatal(err)
+		}
+		if provider != "fake" || paymentStatus != "ENABLED" || !transfers {
+			t.Errorf("店 %d 的收款帳戶 = (%s, %s, transfers_active %v)，want (fake, ENABLED, true)", s.StoreID, provider, paymentStatus, transfers)
+		}
 	}
 	if err := module.CheckKYCKeys(ctx); err != nil {
 		t.Fatalf("CheckKYCKeys：%v", err)

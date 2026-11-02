@@ -414,6 +414,13 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.seller.v1alpha1.OnboardingSurface",
+      "tsName": "OnboardingSurface",
+      "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.seller.v1alpha1.PayUniBindStatus",
       "tsName": "PayUniBindStatus",
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
@@ -428,6 +435,13 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.seller.v1alpha1.PaymentAccountStatus",
+      "tsName": "PaymentAccountStatus",
+      "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.seller.v1alpha1.RemediationUnavailableReason",
       "tsName": "RemediationUnavailableReason",
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
@@ -438,6 +452,13 @@
       "name": "hawkr.seller.v1alpha1.ReportOutcome",
       "tsName": "ReportOutcome",
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.seller.v1alpha1.RequirementCollection",
+      "tsName": "RequirementCollection",
+      "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
       "inCatalog": false,
       "serverOwned": false
     },

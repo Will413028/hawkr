@@ -109,7 +109,7 @@ class _Server {
         ? null
         : [SellerCapability.SELLER_CAPABILITY_STOREFRONT_WRITE],
     publicListing: publicListingMissing([
-      if (!certified) SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED,
+      if (!certified) SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
     ]),
   );
 

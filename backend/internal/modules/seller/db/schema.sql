@@ -1622,3 +1622,52 @@ CREATE TABLE seller.store_blocks (
     CONSTRAINT store_blocks_buyer_id_check CHECK (buyer_id > 0)
 );
 CREATE INDEX store_blocks_buyer ON seller.store_blocks (buyer_id, store_id);
+
+-- 收款帳戶：店家在金流商那邊的外部帳戶的本地快取（Stripe 計畫 D13、D19）。一店一列，關店再開沿用；只存狀態，不存個資。
+-- 核准的 transaction 先寫「建立中」的列（external_account_id 是 NULL、status 是 NOT_CREATED），EnsureAccount job 在 transaction 外
+-- 建立外部帳戶後填上外部 ID；之後的狀態由 sync job 重讀外部帳戶後整列覆寫（沒有觀測歷史，重讀即最新）。
+-- status 是中立的六個狀態，由快照推導；transfers_active 與 payouts_active 是外部帳戶的能力是否啟用（開通閘門看 transfers_active，
+-- ENABLED 等於 transfers_active）。requirements 與 disabled_reason 是快照的原始內容。create_failed_at 是建立重試用完的時刻
+-- （只有還沒有外部 ID 的列才有；後台待辦 review_payment_account_create_failed 的開始時間，重試建立時清空）。
+CREATE TABLE seller.payment_accounts (
+    store_id               BIGINT      PRIMARY KEY REFERENCES seller.stores (store_id),
+    provider               TEXT        NOT NULL,
+    external_account_id    TEXT,
+    requirement_collection TEXT        NOT NULL,
+    status                 TEXT        NOT NULL DEFAULT 'NOT_CREATED',
+    transfers_active       BOOLEAN     NOT NULL DEFAULT false,
+    payouts_active         BOOLEAN     NOT NULL DEFAULT false,
+    requirements           JSONB       NOT NULL DEFAULT '{}',
+    disabled_reason        TEXT,
+    fetched_at             TIMESTAMPTZ,
+    create_failed_at       TIMESTAMPTZ,
+    created_at             TIMESTAMPTZ NOT NULL,
+    updated_at             TIMESTAMPTZ NOT NULL,
+    CONSTRAINT payment_accounts_provider_check CHECK (provider ~ '^[a-z][a-z0-9_]{0,39}$'),
+    CONSTRAINT payment_accounts_external_id_check CHECK (external_account_id IS NULL OR char_length(external_account_id) BETWEEN 1 AND 255),
+    CONSTRAINT payment_accounts_collection_check CHECK (requirement_collection IN ('PROVIDER', 'PLATFORM')),
+    CONSTRAINT payment_accounts_status_check CHECK (status IN ('NOT_CREATED', 'ONBOARDING', 'UNDER_REVIEW', 'ACTION_REQUIRED', 'ENABLED', 'DISABLED')),
+    CONSTRAINT payment_accounts_created_check CHECK ((status = 'NOT_CREATED') = (external_account_id IS NULL)),
+    CONSTRAINT payment_accounts_enabled_check CHECK ((status = 'ENABLED') = transfers_active),
+    CONSTRAINT payment_accounts_snapshot_check CHECK (external_account_id IS NOT NULL OR (fetched_at IS NULL AND NOT payouts_active AND disabled_reason IS NULL)),
+    CONSTRAINT payment_accounts_requirements_check CHECK (jsonb_typeof(requirements) = 'object'),
+    CONSTRAINT payment_accounts_disabled_reason_check CHECK (disabled_reason IS NULL OR char_length(disabled_reason) BETWEEN 1 AND 200),
+    CONSTRAINT payment_accounts_create_failed_check CHECK (create_failed_at IS NULL OR external_account_id IS NULL)
+);
+CREATE UNIQUE INDEX payment_accounts_external ON seller.payment_accounts (provider, external_account_id) WHERE external_account_id IS NOT NULL;
+CREATE INDEX payment_accounts_poll ON seller.payment_accounts (fetched_at NULLS FIRST, store_id) WHERE status IN ('ONBOARDING', 'UNDER_REVIEW', 'ACTION_REQUIRED');
+
+-- 收款開通的 webhook inbox（單體規則 5）：金流商的事件先寫這裡再處理。(provider, event_id) 唯一，重送的事件不再排 job。
+-- processed_at 是同步 job 讀過外部帳戶、涵蓋這個事件之後記下的時間；外部帳戶 ID 對不到本地帳戶的事件只留紀錄。
+CREATE TABLE seller.payment_provider_events (
+    provider            TEXT        NOT NULL,
+    event_id            TEXT        NOT NULL,
+    external_account_id TEXT        NOT NULL,
+    received_at         TIMESTAMPTZ NOT NULL,
+    processed_at        TIMESTAMPTZ,
+    PRIMARY KEY (provider, event_id),
+    CONSTRAINT payment_provider_events_provider_check CHECK (provider ~ '^[a-z][a-z0-9_]{0,39}$'),
+    CONSTRAINT payment_provider_events_event_id_check CHECK (char_length(event_id) BETWEEN 1 AND 255),
+    CONSTRAINT payment_provider_events_account_check CHECK (char_length(external_account_id) BETWEEN 1 AND 255)
+);
+CREATE INDEX payment_provider_events_pending ON seller.payment_provider_events (provider, external_account_id) WHERE processed_at IS NULL;

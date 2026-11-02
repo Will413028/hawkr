@@ -160,10 +160,10 @@ void main() {
       response: myStoreResponse(
         publicListing: publicListingMissing([
           SellerRequirement.SELLER_REQUIREMENT_LOGO,
-          SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED,
+          SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
         ]),
         shippingSetup: shippingSetupMissing([
-          SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED,
+          SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
         ]),
       ),
     );

@@ -390,6 +390,30 @@ type SellerMediaRefSync struct {
 	UpdatedAt time.Time
 }
 
+type SellerPaymentAccount struct {
+	StoreID               int64
+	Provider              string
+	ExternalAccountID     *string
+	RequirementCollection string
+	Status                string
+	TransfersActive       bool
+	PayoutsActive         bool
+	Requirements          []byte
+	DisabledReason        *string
+	FetchedAt             *time.Time
+	CreateFailedAt        *time.Time
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+}
+
+type SellerPaymentProviderEvent struct {
+	Provider          string
+	EventID           string
+	ExternalAccountID string
+	ReceivedAt        time.Time
+	ProcessedAt       *time.Time
+}
+
 type SellerPayuniObservation struct {
 	ObservationID   uuid.UUID
 	StoreID         int64
@@ -621,7 +645,7 @@ type SellerStoreRequirementFlag struct {
 	AccountID          int64
 	Active             bool
 	NotPendingDeletion bool
-	KycApproved        bool
+	OnboardingComplete bool
 	HasStoreName       bool
 	HasLogo            bool
 	HasTownCode        bool

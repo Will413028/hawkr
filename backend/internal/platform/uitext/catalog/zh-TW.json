@@ -776,10 +776,6 @@
       "message": "PayUni 的審核意見",
       "description": "PayUni 的審核意見原文（SellerPayUni.reason）的小標題；reason 為空時整段不出現。"
     },
-    "seller.SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED": {
-      "message": "商家認證已通過",
-      "description": "商家認證（含 PayUni 審核）已核准。"
-    },
     "seller.SellerRequirement.SELLER_REQUIREMENT_LOGO": {
       "message": "logo",
       "description": "有 logo。"
@@ -791,6 +787,10 @@
     "seller.SellerRequirement.SELLER_REQUIREMENT_NOT_SUSPENDED": {
       "message": "帳號未停權",
       "description": "帳號沒有生效中的停權。"
+    },
+    "seller.SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE": {
+      "message": "商家認證已通過",
+      "description": "平台審核已核准，而且收款帳戶的轉帳能力已啟用。"
     },
     "seller.SellerRequirement.SELLER_REQUIREMENT_STORE_ACTIVE": {
       "message": "店家未關閉",

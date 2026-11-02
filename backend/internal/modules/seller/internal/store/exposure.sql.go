@@ -245,7 +245,7 @@ func (q *Queries) StampFirstExposed(ctx context.Context, arg StampFirstExposedPa
 }
 
 const storeRequirementFlags = `-- name: StoreRequirementFlags :many
-SELECT f.store_id, f.active, f.not_pending_deletion, f.kyc_approved, f.has_store_name, f.has_logo, f.has_town_code
+SELECT f.store_id, f.active, f.not_pending_deletion, f.onboarding_complete, f.has_store_name, f.has_logo, f.has_town_code
 FROM seller.store_requirement_flags f
 WHERE f.store_id = ANY($1::bigint[])
 `
@@ -254,7 +254,7 @@ type StoreRequirementFlagsRow struct {
 	StoreID            int64
 	Active             bool
 	NotPendingDeletion bool
-	KycApproved        bool
+	OnboardingComplete bool
 	HasStoreName       bool
 	HasLogo            bool
 	HasTownCode        bool
@@ -275,7 +275,7 @@ func (q *Queries) StoreRequirementFlags(ctx context.Context, storeIds []int64) (
 			&i.StoreID,
 			&i.Active,
 			&i.NotPendingDeletion,
-			&i.KycApproved,
+			&i.OnboardingComplete,
 			&i.HasStoreName,
 			&i.HasLogo,
 			&i.HasTownCode,

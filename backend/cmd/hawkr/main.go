@@ -157,6 +157,7 @@ func runServe(ctx context.Context) error {
 	idc := readIdentityConfig(verifierCtx, e)
 	kyc := readKYCKeys(e)
 	pay := readPayUni(e, log)
+	payment := readPayment(e, log)
 	registry := readGCIS(e)
 	if err := e.Err(); err != nil {
 		return err
@@ -221,7 +222,7 @@ func runServe(ctx context.Context) error {
 		Media: med, Now: time.Now, Logger: log,
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
-	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kyc, pay, registry, log)
+	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kyc, pay, payment, registry, log)
 	// 資料庫參照的金鑰（KYC 的密文、blind index、處分的身分快照）都要在設定的金鑰環裡，缺了就不啟動。
 	if err := sellerModule.CheckKYCKeys(ctx); err != nil {
 		return err
@@ -333,6 +334,7 @@ func runWorker(ctx context.Context) error {
 	idc := readIdentityConfig(verifierCtx, e)
 	kyc := readKYCKeys(e)
 	pay := readPayUni(e, log)
+	payment := readPayment(e, log)
 	registry := readGCIS(e)
 	if err := e.Err(); err != nil {
 		return err
@@ -380,7 +382,7 @@ func runWorker(ctx context.Context) error {
 		Media: med, Now: time.Now, Logger: log,
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
-	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kyc, pay, registry, log)
+	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kyc, pay, payment, registry, log)
 	// 資料庫參照的金鑰（KYC 的密文、blind index、處分的身分快照）都要在設定的金鑰環裡，缺了就不啟動。
 	if err := sellerModule.CheckKYCKeys(ctx); err != nil {
 		return err

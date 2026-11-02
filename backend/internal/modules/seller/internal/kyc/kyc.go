@@ -19,6 +19,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/exposure"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/payuni"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/stint"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
@@ -38,8 +39,10 @@ type Deps struct {
 	Media  media.Media
 	// Exposure 是可曝光的公告：申請的狀態是 KYC 流程的輸入，每個改變它的寫入在 transaction 的最後呼叫。
 	Exposure *exposure.Service
-	Keys     *seal.Keyring
-	MAC      *seal.MAC
+	// Payment 是收款帳戶：核准的 transaction 內寫「建立中」的列並排入建立 job（Stripe 計畫 D16）。
+	Payment *payment.Service
+	Keys    *seal.Keyring
+	MAC     *seal.MAC
 	// Registry 是登記資料來源（公司型申請送件時的查詢快照）；必填：公開資料，沒有「沒有設定」的情形。
 	Registry Registry
 	Now      func() time.Time
@@ -54,8 +57,8 @@ type Service struct {
 
 // New 建立服務。
 func New(d Deps) *Service {
-	if d.Registry == nil {
-		panic("kyc: Registry is required")
+	if d.Registry == nil || d.Payment == nil {
+		panic("kyc: Registry and Payment are required")
 	}
 	return &Service{d: d, p: protector{keys: d.Keys, mac: d.MAC}}
 }

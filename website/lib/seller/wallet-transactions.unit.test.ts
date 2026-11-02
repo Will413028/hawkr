@@ -29,10 +29,10 @@ describe("walletShowsTransactions", () => {
 		);
 	});
 
-	it("還缺 KYC_APPROVED、沒有 PUBLIC_LISTING、沒有 PayUni 狀態、PayUni 還不能收款（含 FIXABLE 與不認得的狀態）：都不顯示", () => {
+	it("還缺 ONBOARDING_COMPLETE、沒有 PUBLIC_LISTING、沒有 PayUni 狀態、PayUni 還不能收款（含 FIXABLE 與不認得的狀態）：都不顯示", () => {
 		const paying = flow(PayUniState.APPROVED);
 		expect(
-			walletShowsTransactions(store([SellerRequirement.KYC_APPROVED]), paying),
+			walletShowsTransactions(store([SellerRequirement.ONBOARDING_COMPLETE]), paying),
 		).toBe(false);
 		expect(walletShowsTransactions(store(undefined), paying)).toBe(false);
 		expect(walletShowsTransactions(store([]), null)).toBe(false);

@@ -169,10 +169,10 @@ func setup(t *testing.T) *fixture {
 	events.Subscribe(f.bus, f.module.OnBuyerDeletionRequested)
 	events.Subscribe(f.bus, f.module.OnBuyerDeleted)
 	events.Subscribe(f.bus, f.module.OnStoreRetired)
-	// 測試只關心 social 讀 seller 的 pub_exposable_stores：把 KYC 與 PayUni 的表放寬成可以直接寫最小的列（它們自己的規則在 seller 的測試）。
+	// 測試只關心 social 讀 seller 的 pub_exposable_stores：把 KYC 的表放寬成可以直接寫最小的列（它自己的規則在 seller 的測試）。
 	f.exec(t, `DO $$ DECLARE r record; BEGIN
 		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
-		         WHERE conrelid IN ('seller.kyc_applications'::regclass, 'seller.payuni_registrations'::regclass) AND contype = 'c'
+		         WHERE conrelid = 'seller.kyc_applications'::regclass AND contype = 'c'
 		LOOP EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.t, r.conname); END LOOP; END $$`)
 	return f
 }
@@ -204,8 +204,8 @@ func (f *fixture) exposableStore(t *testing.T) (storeID, accountID int64) {
 	storeID = f.scalar(t, "SELECT store_id FROM seller.stores WHERE account_id = $1", accountID)
 	f.exec(t, `INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, created_at, updated_at, decided_at)
 		VALUES ($3, $1, 'APPROVED', 'INDIVIDUAL', $2, $2, $2)`, storeID, f.clock(), uuid.NewV7())
-	f.exec(t, `INSERT INTO seller.payuni_registrations (store_id, mer_id, application_id, bind_status, bound_at, outcome, status_observed_at, created_at, updated_at)
-		SELECT $1::bigint, 'HAWK' || $1::bigint::text, application_id, 'BOUND', $2, 'APPROVED', $2, $2, $2 FROM seller.kyc_applications WHERE store_id = $1::bigint`, storeID, f.clock())
+	f.exec(t, `INSERT INTO seller.payment_accounts (store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active, created_at, updated_at)
+		VALUES ($1, 'fake', 'acct_' || $1::bigint::text, 'PROVIDER', 'ENABLED', true, true, $2, $2)`, storeID, f.clock())
 	return storeID, accountID
 }
 

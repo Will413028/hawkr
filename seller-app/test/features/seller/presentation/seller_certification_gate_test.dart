@@ -29,10 +29,10 @@ MyStore _certified() => myStore(publicListing: publicListingMissing());
 
 MyStore _uncertified() => myStore(
   publicListing: publicListingMissing([
-    SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED,
+    SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
   ]),
   shippingSetup: shippingSetupMissing([
-    SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED,
+    SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
   ]),
 );
 
@@ -270,7 +270,7 @@ void main() {
       loadStore: () async => myStore(
         publicListing: publicListingMissing(),
         shippingSetup: shippingSetupMissing([
-          SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED,
+          SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
         ]),
       ),
       loadKyc: () async => _kyc(KYCFlowStatus.KYC_FLOW_STATUS_SUBMITTED),
@@ -295,7 +295,7 @@ void main() {
     '缺 STORE_ACTIVE': () async => myStore(
       shippingSetup: shippingSetupMissing([
         SellerRequirement.SELLER_REQUIREMENT_STORE_ACTIVE,
-        SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED,
+        SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
       ]),
     ),
     '缺項不認得': () async => myStore(

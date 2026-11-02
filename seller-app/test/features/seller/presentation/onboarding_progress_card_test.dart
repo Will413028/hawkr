@@ -20,7 +20,7 @@ import '../../../support/my_store_fixtures.dart';
 
 const _name = SellerRequirement.SELLER_REQUIREMENT_STORE_NAME;
 const _logo = SellerRequirement.SELLER_REQUIREMENT_LOGO;
-const _kyc = SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED;
+const _kyc = SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE;
 const _notSuspended = SellerRequirement.SELLER_REQUIREMENT_NOT_SUSPENDED;
 
 class _LoggedIn extends Session {

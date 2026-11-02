@@ -208,10 +208,10 @@ class SellerRequirement extends $pb.ProtobufEnum {
       SellerRequirement._(
           2, _omitEnumNames ? '' : 'SELLER_REQUIREMENT_NOT_SUSPENDED');
 
-  /// 商家認證（含 PayUni 審核）已核准。
-  static const SellerRequirement SELLER_REQUIREMENT_KYC_APPROVED =
+  /// 平台審核已核准，而且收款帳戶的轉帳能力已啟用。
+  static const SellerRequirement SELLER_REQUIREMENT_ONBOARDING_COMPLETE =
       SellerRequirement._(
-          3, _omitEnumNames ? '' : 'SELLER_REQUIREMENT_KYC_APPROVED');
+          3, _omitEnumNames ? '' : 'SELLER_REQUIREMENT_ONBOARDING_COMPLETE');
 
   /// 有店名。
   static const SellerRequirement SELLER_REQUIREMENT_STORE_NAME =
@@ -236,7 +236,7 @@ class SellerRequirement extends $pb.ProtobufEnum {
     SELLER_REQUIREMENT_UNSPECIFIED,
     SELLER_REQUIREMENT_STORE_ACTIVE,
     SELLER_REQUIREMENT_NOT_SUSPENDED,
-    SELLER_REQUIREMENT_KYC_APPROVED,
+    SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
     SELLER_REQUIREMENT_STORE_NAME,
     SELLER_REQUIREMENT_LOGO,
     SELLER_REQUIREMENT_TOWN_CODE,
@@ -758,6 +758,120 @@ class KYCResubmitUnavailableReason extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const KYCResubmitUnavailableReason._(super.value, super.name);
+}
+
+/// PaymentAccountStatus 是收款帳戶的中立狀態，由金流商的帳戶快照推導（不是金流商自己的狀態名）。
+class PaymentAccountStatus extends $pb.ProtobufEnum {
+  static const PaymentAccountStatus PAYMENT_ACCOUNT_STATUS_UNSPECIFIED =
+      PaymentAccountStatus._(
+          0, _omitEnumNames ? '' : 'PAYMENT_ACCOUNT_STATUS_UNSPECIFIED');
+
+  /// 平台已核准，外部帳戶還在建立（背景程序處理，失敗時進後台待辦）。
+  static const PaymentAccountStatus PAYMENT_ACCOUNT_STATUS_NOT_CREATED =
+      PaymentAccountStatus._(
+          1, _omitEnumNames ? '' : 'PAYMENT_ACCOUNT_STATUS_NOT_CREATED');
+
+  /// 外部帳戶已建立，賣家還沒送出開通資料。
+  static const PaymentAccountStatus PAYMENT_ACCOUNT_STATUS_ONBOARDING =
+      PaymentAccountStatus._(
+          2, _omitEnumNames ? '' : 'PAYMENT_ACCOUNT_STATUS_ONBOARDING');
+
+  /// 資料已送出，轉帳能力還沒啟用，沒有待補的條件。
+  static const PaymentAccountStatus PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW =
+      PaymentAccountStatus._(
+          3, _omitEnumNames ? '' : 'PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW');
+
+  /// 有待補或逾期的條件，賣家要重新取得開通 session 補件。
+  static const PaymentAccountStatus PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED =
+      PaymentAccountStatus._(
+          4, _omitEnumNames ? '' : 'PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED');
+
+  /// 轉帳能力已啟用；平台審核同時核准時，店家通過開通閘門（SELLER_REQUIREMENT_ONBOARDING_COMPLETE）。
+  static const PaymentAccountStatus PAYMENT_ACCOUNT_STATUS_ENABLED =
+      PaymentAccountStatus._(
+          5, _omitEnumNames ? '' : 'PAYMENT_ACCOUNT_STATUS_ENABLED');
+
+  /// 被金流商拒絕或暫停。
+  static const PaymentAccountStatus PAYMENT_ACCOUNT_STATUS_DISABLED =
+      PaymentAccountStatus._(
+          6, _omitEnumNames ? '' : 'PAYMENT_ACCOUNT_STATUS_DISABLED');
+
+  static const $core.List<PaymentAccountStatus> values = <PaymentAccountStatus>[
+    PAYMENT_ACCOUNT_STATUS_UNSPECIFIED,
+    PAYMENT_ACCOUNT_STATUS_NOT_CREATED,
+    PAYMENT_ACCOUNT_STATUS_ONBOARDING,
+    PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW,
+    PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED,
+    PAYMENT_ACCOUNT_STATUS_ENABLED,
+    PAYMENT_ACCOUNT_STATUS_DISABLED,
+  ];
+
+  static final $core.List<PaymentAccountStatus?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 6);
+  static PaymentAccountStatus? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const PaymentAccountStatus._(super.value, super.name);
+}
+
+/// RequirementCollection 是誰向賣家收身分與銀行資料。
+class RequirementCollection extends $pb.ProtobufEnum {
+  static const RequirementCollection REQUIREMENT_COLLECTION_UNSPECIFIED =
+      RequirementCollection._(
+          0, _omitEnumNames ? '' : 'REQUIREMENT_COLLECTION_UNSPECIFIED');
+
+  /// 金流商收件（託管頁面為預設）：平台不經手身分與銀行資料。
+  static const RequirementCollection REQUIREMENT_COLLECTION_PROVIDER =
+      RequirementCollection._(
+          1, _omitEnumNames ? '' : 'REQUIREMENT_COLLECTION_PROVIDER');
+
+  /// 平台收件（金流商的內嵌元件）：資料在網頁上由元件直接送給金流商。
+  static const RequirementCollection REQUIREMENT_COLLECTION_PLATFORM =
+      RequirementCollection._(
+          2, _omitEnumNames ? '' : 'REQUIREMENT_COLLECTION_PLATFORM');
+
+  static const $core.List<RequirementCollection> values =
+      <RequirementCollection>[
+    REQUIREMENT_COLLECTION_UNSPECIFIED,
+    REQUIREMENT_COLLECTION_PROVIDER,
+    REQUIREMENT_COLLECTION_PLATFORM,
+  ];
+
+  static final $core.List<RequirementCollection?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static RequirementCollection? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const RequirementCollection._(super.value, super.name);
+}
+
+/// OnboardingSurface 是開通用的介面。
+class OnboardingSurface extends $pb.ProtobufEnum {
+  static const OnboardingSurface ONBOARDING_SURFACE_UNSPECIFIED =
+      OnboardingSurface._(
+          0, _omitEnumNames ? '' : 'ONBOARDING_SURFACE_UNSPECIFIED');
+
+  /// 金流商託管的頁面（連結）。
+  static const OnboardingSurface ONBOARDING_SURFACE_HOSTED =
+      OnboardingSurface._(1, _omitEnumNames ? '' : 'ONBOARDING_SURFACE_HOSTED');
+
+  /// 嵌在網頁上的元件（client secret）。
+  static const OnboardingSurface ONBOARDING_SURFACE_EMBEDDED =
+      OnboardingSurface._(
+          2, _omitEnumNames ? '' : 'ONBOARDING_SURFACE_EMBEDDED');
+
+  static const $core.List<OnboardingSurface> values = <OnboardingSurface>[
+    ONBOARDING_SURFACE_UNSPECIFIED,
+    ONBOARDING_SURFACE_HOSTED,
+    ONBOARDING_SURFACE_EMBEDDED,
+  ];
+
+  static final $core.List<OnboardingSurface?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static OnboardingSurface? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const OnboardingSurface._(super.value, super.name);
 }
 
 /// ViolationSeverity 是認定套用的嚴重度，也是案件的嚴重度（開案時決定，之後只經 ChangeCaseSeverity 修改）。

@@ -155,7 +155,7 @@ void main() {
             ),
             CapabilityStatus(
               capability: SellerCapability.SELLER_CAPABILITY_SHIPPING_SETUP,
-              missing: [SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED],
+              missing: [SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE],
             ),
           ],
         ),
@@ -172,7 +172,7 @@ void main() {
         store
             .capabilityStatus(SellerCapability.SELLER_CAPABILITY_SHIPPING_SETUP)
             ?.missing,
-        [SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED],
+        [SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE],
       );
       expect(
         store.capabilityStatus(SellerCapability.SELLER_CAPABILITY_MARKETING),
@@ -188,13 +188,13 @@ void main() {
       expect(myStore().isCertified, isFalse);
       final store = myStore(
         publicListing: publicListingMissing([
-          SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED,
+          SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
         ]),
       );
 
       expect(
         store.missingFor(SellerCapability.SELLER_CAPABILITY_PUBLIC_LISTING),
-        [SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED],
+        [SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE],
       );
       expect(store.isCertified, isFalse);
       expect(
@@ -204,7 +204,7 @@ void main() {
     });
 
     test('shippingGate 只讀 SHIPPING_SETUP 的啟用與缺項，不看 PUBLIC_LISTING 或 KYC', () {
-      const kyc = SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED;
+      const kyc = SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE;
       const suspended = SellerRequirement.SELLER_REQUIREMENT_NOT_SUSPENDED;
       const pending = SellerRequirement.SELLER_REQUIREMENT_NOT_PENDING_DELETION;
       expect(myStore().shippingGate, ShippingGate.open);
@@ -262,10 +262,10 @@ void main() {
       expect(
         myStore(
           shippingSetup: shippingSetupMissing([
-            SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED,
+            SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
           ]),
         ).missingFor(SellerCapability.SELLER_CAPABILITY_SHIPPING_SETUP),
-        [SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED],
+        [SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE],
       );
     });
 

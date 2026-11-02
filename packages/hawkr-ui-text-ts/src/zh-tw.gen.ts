@@ -213,7 +213,7 @@ return "生效中";
 	"seller.SellerPayUni.reason_heading": () => "PayUni 的審核意見",
 	"seller.SellerRequirement.SELLER_REQUIREMENT_STORE_ACTIVE": () => "店家未關閉",
 	"seller.SellerRequirement.SELLER_REQUIREMENT_NOT_SUSPENDED": () => "帳號未停權",
-	"seller.SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED": () => "商家認證已通過",
+	"seller.SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE": () => "商家認證已通過",
 	"seller.SellerRequirement.SELLER_REQUIREMENT_STORE_NAME": () => "店名",
 	"seller.SellerRequirement.SELLER_REQUIREMENT_LOGO": () => "logo",
 	"seller.SellerRequirement.SELLER_REQUIREMENT_TOWN_CODE": () => "所在地",

@@ -356,7 +356,7 @@ func TestApplyStoreThenGetMyStoreListsMissingExposure(t *testing.T) {
 	if got.GetStore().GetId() != created.GetId() || got.GetSuspended() {
 		t.Fatalf("got=%v", got)
 	}
-	want := []pb.SellerRequirement{pb.SellerRequirement_SELLER_REQUIREMENT_KYC_APPROVED, pb.SellerRequirement_SELLER_REQUIREMENT_LOGO}
+	want := []pb.SellerRequirement{pb.SellerRequirement_SELLER_REQUIREMENT_ONBOARDING_COMPLETE, pb.SellerRequirement_SELLER_REQUIREMENT_LOGO}
 	if listing := capabilityStatus(t, got, pb.SellerCapability_SELLER_CAPABILITY_PUBLIC_LISTING); listing.GetActive() || !slices.Equal(listing.GetMissing(), want) {
 		t.Fatalf("public listing=%v", listing)
 	}
@@ -576,7 +576,7 @@ func TestLogoAndCoverChangeThroughUpdateMyStoreTokens(t *testing.T) {
 		t.Fatalf("store=%v", cover.Msg.GetStore())
 	}
 	got := f.get(t)
-	if listing := capabilityStatus(t, got, pb.SellerCapability_SELLER_CAPABILITY_PUBLIC_LISTING); !slices.Equal(listing.GetMissing(), []pb.SellerRequirement{pb.SellerRequirement_SELLER_REQUIREMENT_KYC_APPROVED}) {
+	if listing := capabilityStatus(t, got, pb.SellerCapability_SELLER_CAPABILITY_PUBLIC_LISTING); !slices.Equal(listing.GetMissing(), []pb.SellerRequirement{pb.SellerRequirement_SELLER_REQUIREMENT_ONBOARDING_COMPLETE}) {
 		t.Fatalf("missing=%v", listing.GetMissing())
 	}
 	_, err = f.app.UpdateMyStore(ctx, connect.NewRequest(&pb.UpdateMyStoreRequest{

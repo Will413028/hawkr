@@ -81,11 +81,11 @@ function renderCard(
 		store: { id: "1", description: "介紹" },
 		capabilities: [
 			publicListingStatus(missing),
-			// 照伺服器：物流建店缺認證時才缺 KYC_APPROVED。
+			// 照伺服器：物流建店缺認證時才缺 ONBOARDING_COMPLETE。
 			create(CapabilityStatusSchema, {
 				capability: SellerCapability.SHIPPING_SETUP,
-				active: !missing.includes(R.KYC_APPROVED),
-				missing: missing.includes(R.KYC_APPROVED) ? [R.KYC_APPROVED] : [],
+				active: !missing.includes(R.ONBOARDING_COMPLETE),
+				missing: missing.includes(R.ONBOARDING_COMPLETE) ? [R.ONBOARDING_COMPLETE] : [],
 			}),
 		],
 	});
@@ -110,7 +110,7 @@ afterEach(() => {
 
 describe("OnboardingProgressCard", () => {
 	it("splits the steps into 公開前必須 and 建議完成", () => {
-		renderCard([R.KYC_APPROVED]);
+		renderCard([R.ONBOARDING_COMPLETE]);
 		expand();
 
 		const lists = screen.getAllByRole("list");
@@ -129,7 +129,7 @@ describe("OnboardingProgressCard", () => {
 	});
 
 	it("progress only counts the required group", () => {
-		renderCard([R.KYC_APPROVED]);
+		renderCard([R.ONBOARDING_COMPLETE]);
 		// 兩個必須項目完成一個；建議完成的四項不進分母。
 		expect(screen.getByText("1/2")).toBeTruthy();
 	});
@@ -141,7 +141,7 @@ describe("OnboardingProgressCard", () => {
 	});
 
 	it("selecting a required step shows its status and action", () => {
-		renderCard([R.KYC_APPROVED], KYCFlowStatus.KYC_FLOW_STATUS_PENDING_INFO);
+		renderCard([R.ONBOARDING_COMPLETE], KYCFlowStatus.KYC_FLOW_STATUS_PENDING_INFO);
 		expand();
 
 		fireEvent.click(screen.getByRole("button", { name: /^商家認證，/ }));

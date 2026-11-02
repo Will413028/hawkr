@@ -141,9 +141,11 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 	fake := media.NewFake()
 	fake.Key = func(refType, token string) string { return refType + "/" + token }
 	keys, mac := sealtest.Keys(t)
+	payments := seller.NewPaymentFake()
+	payments.AutoActive = true
 	m := seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: noJobs{}, Identity: id, Media: fake, Orders: noOrders{}, KYCKeys: keys, KYCMAC: mac,
-		PayUni: approvingPayUni{}, ProductStores: noProducts{}, Registry: noRegistry{}, StorefrontBaseURL: "https://store.example.invalid",
+		PayUni: approvingPayUni{}, Payment: payments, ProductStores: noProducts{}, Registry: noRegistry{}, StorefrontBaseURL: "https://store.example.invalid",
 		Now: func() time.Time { return now }, Logger: log,
 	})
 	account := func() int64 {
@@ -191,6 +193,9 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 		_, err = m.SyncPayUni(ctx, s.StoreID, false)
 		must(err)
 		must(m.PollPayUni(ctx, s.StoreID, seller.PayUniSourcePoll))
+		must(m.EnsurePaymentAccount(ctx, s.StoreID, false))
+		_, err = m.SyncPaymentAccount(ctx, s.StoreID)
+		must(err)
 		cur, err := m.Store(ctx, s.StoreID)
 		must(err)
 		s, err = m.UpdateProfile(ctx, seller.UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: cur.Version, LogoToken: "logo", UploaderID: accountID})

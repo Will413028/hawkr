@@ -13,7 +13,7 @@ import (
 )
 
 // makeSeededStoresExposable 讓 seedHistory 的店家（store_code > 2900000000）滿足與時間無關的曝光條件：logo、鄉鎮市區、核准的 KYC 申請、
-// 綁定且核准的 PayUni 註冊。是否可曝光只剩帳號有沒有生效中的措施。
+// 綁定且核准的 PayUni 註冊、轉帳能力啟用的收款帳戶。是否可曝光只剩帳號有沒有生效中的措施。
 func (f *fixture) makeSeededStoresExposable(t *testing.T) {
 	t.Helper()
 	ctx := context.Background()
@@ -31,6 +31,10 @@ func (f *fixture) makeSeededStoresExposable(t *testing.T) {
 			`INSERT INTO seller.payuni_registrations (store_id, mer_id, application_id, bind_status, bound_at, outcome, status_observed_at,
 					created_at, updated_at)
 				SELECT store_id, 'HAWK' || store_id, md5('kyc' || store_id)::uuid, 'BOUND', $1, 'APPROVED', $1, $1, $1
+				FROM seller.stores WHERE store_code > 2900000000`,
+			`INSERT INTO seller.payment_accounts (store_id, provider, external_account_id, requirement_collection, status, transfers_active, payouts_active,
+					fetched_at, created_at, updated_at)
+				SELECT store_id, 'fake', 'acct_' || store_id, 'PROVIDER', 'ENABLED', true, true, $1, $1, $1
 				FROM seller.stores WHERE store_code > 2900000000`,
 		} {
 			var args []any

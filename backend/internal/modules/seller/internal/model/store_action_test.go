@@ -120,7 +120,7 @@ func TestDelegateReasonsAreTheMissingStorefrontWriteRequirements(t *testing.T) {
 					want = append(want, StoreReasonStorePendingDeletion)
 				case RequirementNotSuspended:
 					want = append(want, StoreReasonAccountSuspended)
-				case RequirementKYCApproved, RequirementStoreName, RequirementLogo, RequirementTownCode:
+				case RequirementOnboardingComplete, RequirementStoreName, RequirementLogo, RequirementTownCode:
 					t.Fatalf("CapStorefrontWrite 多了條件 %s，DELEGATE 沒有對應的原因", r)
 				}
 			}

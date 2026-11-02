@@ -191,7 +191,7 @@ type Conditions struct {
 	Derived            bool
 	Active             bool
 	NotPendingDeletion bool
-	KYCApproved        bool
+	OnboardingComplete bool
 	StoreName          bool
 	Logo               bool
 	TownCode           bool

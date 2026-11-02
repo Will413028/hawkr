@@ -110,7 +110,7 @@ void main() {
     final certified = myStore(publicListing: publicListingMissing());
     final uncertified = myStore(
       publicListing: publicListingMissing([
-        SellerRequirement.SELLER_REQUIREMENT_KYC_APPROVED,
+        SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE,
       ]),
     );
     MyKyc kycWith(PayUniState? state) => MyKyc.fromApplication(
