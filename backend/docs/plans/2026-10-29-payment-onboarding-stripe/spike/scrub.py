@@ -17,7 +17,7 @@ SECRET = re.compile(r"\b(?:sk|rk|pk)" r"_(?:test|live)_[A-Za-z0-9_]+|\bwh" r"sec
 # ids: keep only acct_ and evt_
 ID = re.compile(r"\b(?!acct_|evt_|file_identity)(ba|btok|file|person|tok|req|link|acctsess|cs|pi|ch|txn|po|tr|fa|ipi|src|pm|cus|seti|si|ca|ek)_[A-Za-z0-9]{8,}")
 UUID = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b")
-CSID = re.compile(r"\b(?:client_secret|ccs)_[A-Za-z0-9_]+")
+CSID = re.compile(r"\b(?:client_secret|ccs|accs_secret)_[A-Za-z0-9_]+")
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 URLTOK = re.compile(r"(https://connect\.stripe\.com/[A-Za-z0-9_/.-]*?)/[A-Za-z0-9_-]{8,}")
 # JSON keys whose string/number values are personal data

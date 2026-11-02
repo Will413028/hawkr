@@ -1,0 +1,12 @@
+{
+  "status": 400,
+  "body": {
+    "error": {
+      "code": "url_invalid",
+      "message": "Invalid URL.",
+      "user_message": "Invalid URL.",
+      "param": "defaults.profile.business_url",
+      "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/logs/req_<MASKED:ac71>"
+    }
+  }
+}

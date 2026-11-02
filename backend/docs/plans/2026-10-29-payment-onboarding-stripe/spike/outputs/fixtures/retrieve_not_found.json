@@ -1,0 +1,16 @@
+{
+  "status": 400,
+  "body": {
+    "error": {
+      "code": "invalid_fields",
+      "message": "Some fields in the request were invalid: 'id: Provided account id acct_doesnotexist000 must be valid.'",
+      "request_log_url": "https://dashboard.stripe.com/acct_1UFxOuEWUjfmqMFC/test/logs/req_<MASKED:d4a3>",
+      "invalid_fields": [
+        {
+          "field": "id",
+          "message": "Provided account id acct_doesnotexist000 must be valid."
+        }
+      ]
+    }
+  }
+}
