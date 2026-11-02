@@ -84,6 +84,15 @@ Output: `outputs/q09_v2_recipient.txt`.
 
 Output: `outputs/q10_thin.txt` (`@accounts`), `outputs/q10b_thin_self.txt` (platform).
 
+## Q11–Q12 API version 2026-09-30.preview in test mode (step 5, measured 2026-11-03)
+
+- `2026-09-30.preview` removes `use_case.account_onboarding.configurations` from `POST /v2/core/account_links` (https://docs.stripe.com/changelog/endive/2026-09-30/removes-configurations-parameter-from-v2-core-account-links-api) and adds capability status `rejected` with `rejected_*` codes (https://docs.stripe.com/changelog/endive/2026-09-30/rejected-accounts-v2-capabilities).
+- In plain test mode (not a sandbox) the Account Link is refused: "Cannot create a v2 account link … with recipient config capabilities other than stripe_balance.stripe_transfers requested in testmode. Please switch to an account created in a sandbox". `stripe_balance.payouts` is added automatically and cannot be set (`Unknown field`). The same call worked on `2026-04-22.preview` (Q9).
+- `defaults.profile.business_url = https://example.com` is rejected as `Invalid URL`.
+- Decision: E1 revised (Will 2026-11-03), pin `2026-09-30.preview` and record in a sandbox. Fixtures in `outputs/fixtures/` are from plain test mode and are re-recorded there.
+
+Output: `outputs/q11_record.txt`, `outputs/q12_link_version.txt`, `outputs/fixtures/`.
+
 ## Cleanup
 All connected accounts were deleted with `DELETE /v1/accounts/{id}` (`cleanup.py`, `outputs/cleanup_final.txt`: 0 remaining). Webhook listener and receiver were stopped by `q05_webhook.sh`.
 
