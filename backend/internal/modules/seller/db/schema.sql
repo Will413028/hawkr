@@ -1079,6 +1079,7 @@ CREATE TABLE seller.account_identity_hashes (
     CONSTRAINT account_identity_hashes_hash_check CHECK (octet_length(hash) = 32)
 );
 CREATE INDEX account_identity_hashes_account ON seller.account_identity_hashes (account_id);
+CREATE INDEX account_identity_hashes_hash ON seller.account_identity_hashes (hash, key_id);
 
 -- 證件與文件圖片：身分證正反面、存摺封面各一張（position 0），公司文件最多 10 張。media 的引用以
 -- ref_id = application_id 登記（CERTIFICATION），存 asset ID 是同步 job 登記引用時業務列目前指著的資產。

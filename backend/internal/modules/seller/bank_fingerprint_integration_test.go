@@ -4,10 +4,13 @@ package seller_test
 
 import (
 	"context"
+	"regexp"
+	"strings"
 	"testing"
 	"time"
 
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
@@ -67,15 +70,18 @@ func TestSharedProviderBankFingerprintIsListedButNeverTerminates(t *testing.T) {
 
 // 寫入的形狀：每個 fingerprint 每把 HMAC 金鑰一列；重複同步不增加列；fingerprint 之後從快照消失，列仍保留（已掛上並經 provider 驗證的事實，只由過期刪除）；
 // 新的 fingerprint 另外加列；資料庫（兩張表）裡沒有 fingerprint 明文。
-// mutation：只用第一把金鑰寫（Sum 取代 SumAll）→ 列數少於 金鑰數 × 2；INSERT 拿掉 ON CONFLICT → 第二輪同步失敗或重複；
+// 金鑰環是兩把金鑰（輪替之後），列數斷言為 2 把 × fingerprint 數。
+// mutation：只用第一把金鑰寫（Sum 取代 SumAll）→ 列數 N 而不是 2N，斷言失敗；INSERT 拿掉 ON CONFLICT → 第二輪同步失敗或重複；
 // Sync 在 fingerprint 消失時修剪 → 保留的那一步失敗；寫入明文 → 明文檢查失敗。
 func TestBankFingerprintRowsAreIdempotentKeptAndNeverPlaintext(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
+	enc, mac := rotatedKeys(t)
+	f.module = f.newModuleWithKeys(t, f.payuni, f.jobs, enc, mac)
 	_, s := f.approvedWithFingerprints(t, idA, bankAcct, fpShared, fpOther)
 	keys := f.count(t, "SELECT count(DISTINCT key_id) FROM seller.account_identity_hashes WHERE source_store_id = $1 AND field = 'ID_CARD_NO'", s.StoreID)
-	if keys < 1 {
-		t.Fatalf("前提：至少一把金鑰：%d", keys)
+	if keys != 2 {
+		t.Fatalf("前提：金鑰環兩把金鑰：%d", keys)
 	}
 	if n := f.fingerprintRows(t, s.StoreID); n != keys*2 {
 		t.Fatalf("2 個 fingerprint × %d 把金鑰：%d", keys, n)
@@ -143,5 +149,50 @@ func TestBankFingerprintRowsExpireWithTheStint(t *testing.T) {
 	}
 	if n := f.fingerprintRows(t, s.StoreID); n != 0 {
 		t.Fatalf("關店滿 5 年要刪：%d", n)
+	}
+}
+
+// 銀行帳號 fingerprint 的關聯帳號反查不掃整張表：LinkedAccountHits 的 fingerprint 那一支以 account_identity_hashes 的 (hash, key_id) 索引與措施快照等值連接，
+// 在上萬家店的 fingerprint 列（保存 5 年的表）之上仍走索引。
+// mutation：拿掉 account_identity_hashes_hash 索引，或把連接條件改成 encode(f.hash, 'hex') = encode(mi.hash, 'hex') → 計畫出現 Seq Scan on account_identity_hashes，斷言失敗。
+func TestLinkedAccountLookupUsesTheFingerprintHashIndex(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	_, sS := f.approvedWithFingerprints(t, idA, bankAcct, fpShared)
+	accountO, _ := f.approvedWithFingerprints(t, idB, "999888777666", fpShared)
+	source := f.terminate(t, sS.StoreID, GroundFraud)
+	must(t, f.db.InTx(ctx, func(ctx context.Context) error {
+		c := f.db.Conn(ctx)
+		for _, sql := range []string{
+			`INSERT INTO seller.stores (store_code, account_id, store_name, created_at, updated_at)
+				SELECT 2800000000 + g, 500000 + g, 'x', now(), now() FROM generate_series(1, 20000) g`,
+			`INSERT INTO seller.account_identity_hashes (source_store_id, field, key_id, hash, account_id, created_at)
+				SELECT s.store_id, 'BANK_FINGERPRINT', k, decode(md5(s.store_id::text || k) || md5(k || s.store_id::text), 'hex'), s.account_id, now()
+				FROM seller.stores s, (VALUES ('test1'), ('rot2')) v(k) WHERE s.store_code > 2800000000`,
+		} {
+			if _, err := c.Exec(ctx, sql); err != nil {
+				return err
+			}
+		}
+		return nil
+	}))
+	for _, table := range []string{"stores", "account_identity_hashes", "measure_identities"} {
+		_, err := f.db.Conn(ctx).Exec(ctx, "ANALYZE seller."+table)
+		must(t, err)
+	}
+	rec := &recorder{inner: f.db.Conn(ctx)}
+	hits, err := store.New(rec).LinkedAccountHits(ctx, store.LinkedAccountHitsParams{MeasureID: source.ID, ExceptAccountID: sS.AccountID})
+	must(t, err)
+	if len(hits) != 1 || hits[0].AccountID != accountO || hits[0].Field != "BANK_FINGERPRINT" {
+		t.Fatalf("hits=%+v", hits)
+	}
+	plan := f.explain(t, rec)
+	t.Logf("LinkedAccountHits：\n%s", plan)
+	if !regexp.MustCompile(`Index (Only )?Scan using account_identity_hashes_hash on account_identity_hashes`).MatchString(plan) {
+		t.Errorf("要以 account_identity_hashes_hash 索引查找：\n%s", plan)
+	}
+	if strings.Contains(plan, "Seq Scan on account_identity_hashes") {
+		t.Errorf("不得掃描整張表：\n%s", plan)
 	}
 }
