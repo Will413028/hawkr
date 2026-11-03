@@ -942,7 +942,7 @@ func TestKYCInputValidation(t *testing.T) {
 	minimal := f.savedDraft(t, KYCDraftInput{AccountID: blank, SellerType: ptr(KYCCompany)})
 	_, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: blank, ExpectedVersion: minimal.Version})
 	var ae *apperr.Error
-	if !errors.As(err, &ae) || ae.Kind() != apperr.KindInvalidInput || len(ae.FieldViolations()) != 3 {
+	if !errors.As(err, &ae) || ae.Kind() != apperr.KindInvalidInput || len(ae.FieldViolations()) != 2 {
 		t.Fatalf("submit an empty draft: %v", err)
 	}
 }
@@ -1438,7 +1438,7 @@ func TestSubmitKYCRequiresTheStoreContactData(t *testing.T) {
 	}
 	// 申請自己的缺項先檢查：回 invalid_argument 與欄位違規，不是店家的 failed_precondition。
 	other, _ := f.open(t)
-	blank := f.savedDraft(t, KYCDraftInput{AccountID: other, SellerType: individual()})
+	blank := f.savedDraft(t, KYCDraftInput{AccountID: other, SellerType: ptr(KYCCompany)})
 	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.stores SET contact_name = NULL WHERE account_id = $1", other); err != nil {
 		t.Fatal(err)
 	}

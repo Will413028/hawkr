@@ -151,13 +151,13 @@ func TestApprovalSnapshotsTheSelfEnteredEmailWhenThereIsNoVerifiedOne(t *testing
 	}
 }
 
-// reapprove 模擬同一家店再一次核准：舊的申請已取消（唯一索引只允許一筆沒取消的申請），帳號換了聯絡信箱後賣家送出新申請並核准。
+// reapprove 模擬同一家店再一次核准：舊的申請已取消（唯一索引只允許一筆沒取消的申請），帳號換了（已驗證的）聯絡信箱後賣家送出新申請並核准。
 func (f *fixture) reapprove(t *testing.T, accountID int64, email string) {
 	t.Helper()
 	ctx := context.Background()
 	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.kyc_applications SET status = 'CANCELLED', decided_at = NULL WHERE store_id IN (SELECT store_id FROM seller.stores WHERE account_id = $1)", accountID)
 	must(t, err)
-	f.setContactEmails(t, accountID, nil, &email)
+	f.setContactEmails(t, accountID, &email, nil)
 	d := f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
 	sub, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
 	must(t, err)
