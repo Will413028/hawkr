@@ -248,6 +248,9 @@ export const queryKeys = {
 		// `GetMyPaymentAccount` 的收款帳戶（還沒有是 null）。
 		paymentAccount: (id: QueryIdentity) =>
 			["seller", ...idPrefix(id), "payment-account"] as const,
+		// identity 的 `GetContactEmail`（沒有聯絡信箱是 null）。
+		contactEmail: (id: QueryIdentity) =>
+			["seller", ...idPrefix(id), "contact-email"] as const,
 		dashboard: (id: QueryIdentity) =>
 			["seller", ...idPrefix(id), "dashboard"] as const,
 		orders: (id: QueryIdentity, params?: Record<string, unknown>) =>

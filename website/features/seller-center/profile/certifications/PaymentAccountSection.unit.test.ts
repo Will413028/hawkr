@@ -65,11 +65,19 @@ vi.mock("next/dynamic", async () => {
 	const react = await import("react");
 	return {
 		default: () =>
-			function EmbeddedStub(props: { publishableKey: string }) {
-				return react.createElement("div", {
-					"data-testid": "embedded",
-					"data-key": props.publishableKey,
-				});
+			function EmbeddedStub(props: {
+				publishableKey: string;
+				onExit: () => void;
+			}) {
+				return react.createElement(
+					"div",
+					{ "data-testid": "embedded", "data-key": props.publishableKey },
+					react.createElement(
+						"button",
+						{ type: "button", onClick: props.onExit },
+						"exit-embedded",
+					),
+				);
 			},
 	};
 });
@@ -179,6 +187,16 @@ describe("狀態文字來自目錄", () => {
 		}
 	});
 
+	it("ACTION_REQUIRED 但沒有告知開通介面：沒有按鈕", async () => {
+		mocks.account = account(PaymentAccountStatus.ACTION_REQUIRED, {
+			surface: OnboardingSurface.UNSPECIFIED,
+		});
+		await mount();
+		expect(screen.getByText("待設定")).toBeTruthy();
+		expect(screen.queryByText("前往設定收款帳戶")).toBeNull();
+		expect(screen.queryByRole("button")).toBeNull();
+	});
+
 	it("ENABLED 而撥款未啟用：多一行；沒有動作", async () => {
 		mocks.account = account(PaymentAccountStatus.ENABLED);
 		await mount();
@@ -261,6 +279,26 @@ describe("EMBEDDED：內嵌元件", () => {
 		expect(screen.getByTestId("embedded").dataset.key).toBe("pk_test_dummy");
 		expect(mocks.navigate).not.toHaveBeenCalled();
 		expect(mocks.createSession).not.toHaveBeenCalled();
+	});
+
+	it("元件的 onExit：收起元件並重讀 GetMyPaymentAccount", async () => {
+		mocks.account = account(PaymentAccountStatus.ACTION_REQUIRED, {
+			surface: OnboardingSurface.EMBEDDED,
+		});
+		mocks.fetchAccount.mockResolvedValue(
+			account(PaymentAccountStatus.UNDER_REVIEW),
+		);
+		await mount();
+		await act(async () => {
+			fireEvent.click(screen.getByText("前往設定收款帳戶"));
+		});
+		expect(mocks.fetchAccount).not.toHaveBeenCalled();
+		await act(async () => {
+			fireEvent.click(screen.getByText("exit-embedded"));
+		});
+		expect(mocks.fetchAccount).toHaveBeenCalledTimes(1);
+		expect(mocks.setQueryData).toHaveBeenCalled();
+		expect(screen.queryByTestId("embedded")).toBeNull();
 	});
 
 	it("沒有公開金鑰：一般的錯誤，不展開元件、不當掉", async () => {

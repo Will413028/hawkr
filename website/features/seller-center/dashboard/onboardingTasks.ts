@@ -14,7 +14,10 @@ import {
 import type { AppIconName } from "@/components/shared/AppIcon";
 import type { UiText } from "@/lib/i18n/ui-text";
 import { CERT_PAGE_HREF } from "@/lib/seller/cert-gate";
-import { paymentAccountCopy } from "@/lib/seller/payment-account";
+import {
+	paymentAccountCopy,
+	paymentAccountLink,
+} from "@/lib/seller/payment-account";
 import {
 	isApproved,
 	isProcessing,
@@ -97,15 +100,19 @@ function buildRequiredTasks(
 	const paymentDone = !lacks(SellerRequirement.ONBOARDING_COMPLETE);
 	const reviewDone = paymentDone || kycStatus === KYCStatus.KYC_STATUS_APPROVED;
 	// 平台審核核准而收款帳戶還沒有（外部帳戶在建立）與「準備中」同義。
-	const payment = reviewDone
-		? paymentAccountCopy(
-				ut,
-				paymentAccount ??
-					create(PaymentAccountSchema, {
-						status: PaymentAccountStatus.NOT_CREATED,
-					}),
-			)
+	const effectiveAccount = reviewDone
+		? (paymentAccount ??
+			create(PaymentAccountSchema, {
+				status: PaymentAccountStatus.NOT_CREATED,
+			}))
 		: undefined;
+	const payment = effectiveAccount
+		? paymentAccountCopy(ut, effectiveAccount)
+		: undefined;
+	const paymentLink =
+		effectiveAccount && payment
+			? paymentAccountLink(effectiveAccount.status, payment)
+			: undefined;
 
 	const tasks: OnboardingTask[] = [
 		{
@@ -149,9 +156,9 @@ function buildRequiredTasks(
 			panelTitle: "設定收款帳戶",
 			panelDescription:
 				"身分與銀行資料由金流商收集，平台不經手；收款帳戶啟用後才能正式收款。",
-			href: CERT_PAGE_HREF,
+			href: paymentLink?.href ?? CERT_PAGE_HREF,
 			// 已啟用就沒有要辦的了；平台審核還沒通過時只有灰色的提示。
-			cta: paymentDone || !reviewDone ? undefined : payment?.action,
+			cta: paymentDone || !reviewDone ? undefined : paymentLink?.label,
 			icon: "wallet",
 			completed: paymentDone,
 			locked: !reviewDone,

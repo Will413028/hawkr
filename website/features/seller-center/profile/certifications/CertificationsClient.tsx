@@ -27,6 +27,7 @@ import {
 	submitError as classifySubmitError,
 	type SubmitError,
 } from "@hawkr/api/connect/submit";
+import { IdentityAppService } from "@hawkr/api/gen/hawkr/identity/v1alpha1/identity_pb";
 import {
 	AgreementKind,
 	KYCField,
@@ -50,6 +51,7 @@ import { Input } from "@/components/ui/Input";
 import { TownFields } from "@/features/account/screens/addresses/TownFields";
 import { AgreementCheckbox } from "@/features/seller/components/AgreementCheckbox";
 import { useAuth } from "@/lib/auth/context";
+import { useContactEmail } from "@/lib/hooks/useContactEmail";
 import { useResettableError } from "@/lib/hooks/useResettableError";
 import {
 	useInvalidateSellerSelf,
@@ -74,6 +76,12 @@ import {
 	agreementUrl,
 	isAgreementOutdated,
 } from "@/lib/seller/agreements";
+import {
+	type AccountContactEmail,
+	isContactEmailRequired,
+	setContactEmail,
+	validateContactEmail,
+} from "@/lib/seller/contact-email";
 import {
 	adoptExistingApplication,
 	adoptSavedDocs,
@@ -199,6 +207,9 @@ interface ServerFieldError {
 	message: string;
 }
 
+const CONTACT_EMAIL_LABEL = "金流商聯絡信箱";
+const CONTACT_EMAIL_HINT = "金流商會用這個信箱聯絡你收款事宜";
+
 const KYC_AGREEMENT_KINDS = [AgreementKind.KYC_PRIVACY_NOTICE] as const;
 
 const VERSION_CONFLICT_NOTICE = versionConflictNotice("申請資料");
@@ -219,6 +230,26 @@ export default function CertificationsClient() {
 	const { application, loading: kycLoading, error: kycLoadError } = useMyKyc();
 	const [hydrated, setHydrated] = React.useState(false);
 	const [error, setError] = useResettableError();
+	const {
+		contact: accountContact,
+		loading: contactLoading,
+		error: contactLoadError,
+		refetch: refetchContact,
+	} = useContactEmail();
+	const [contactEmailDraft, setContactEmailDraft] = React.useState<
+		string | null
+	>(null);
+	const contactVerified = accountContact?.source === "verified";
+	const contactEmailValue = contactEmailDraft ?? accountContact?.email ?? "";
+	const contactEmailInvalid = contactVerified
+		? null
+		: contactLoading || contactLoadError
+			? "載入中"
+			: validateContactEmail(contactEmailValue);
+	const contactEmailError =
+		contactEmailDraft !== null && !contactVerified
+			? validateContactEmail(contactEmailValue)
+			: null;
 
 	const [form, setForm] = React.useState<KycForm>(EMPTY_KYC_FORM);
 	const [docs, setDocs] = React.useState<KycDocs>(EMPTY_KYC_DOCS);
@@ -804,9 +835,43 @@ export default function CertificationsClient() {
 		() => [
 			...missingItemsOf(ut, application?.missingFields ?? []),
 			...storeMissingItemsOf(ut, application?.missingStoreFields ?? []),
+			...(contactEmailInvalid === null
+				? []
+				: [{ sectionId: "confirm" as const, label: CONTACT_EMAIL_LABEL }]),
 		],
-		[ut, application],
+		[ut, application, contactEmailInvalid],
 	);
+
+	const saveContactEmail = async (): Promise<boolean> => {
+		if (contactVerified) return true;
+		const email = contactEmailValue.trim().toLowerCase();
+		if (
+			accountContact?.source === "self-entered" &&
+			accountContact.email === email
+		) {
+			return true;
+		}
+		try {
+			await setContactEmail(email);
+			await refetchContact();
+			return true;
+		} catch (e) {
+			const failure = classifySubmitError(
+				e,
+				defaults,
+				IdentityAppService.method.setContactEmail,
+			);
+			setSubmitError(
+				failure.kind === "fields"
+					? (Object.values(failure.fields)[0] ?? defaults(Code.InvalidArgument))
+					: failure.kind === "message"
+						? failure.message
+						: defaults(Code.Aborted),
+			);
+			void refetchContact();
+			return false;
+		}
+	};
 
 	const finishSubmit = React.useCallback(async () => {
 		setSubmitOk(true);
@@ -831,6 +896,13 @@ export default function CertificationsClient() {
 				setSubmitError("認證資料尚未儲存完成，請稍後再試。");
 				return;
 			}
+			if (contactEmailInvalid !== null) {
+				setSubmitError(
+					contactEmailError ?? `下列欄位尚未填寫：${CONTACT_EMAIL_LABEL}`,
+				);
+				return;
+			}
+			if (!(await saveContactEmail())) return;
 			const current = latestAppRef.current;
 			const stillMissing = [
 				...missingItemsOf(ut, current?.missingFields ?? []),
@@ -863,6 +935,13 @@ export default function CertificationsClient() {
 			if (isAgreementOutdated(e)) {
 				setNoticeRead(false);
 				setSubmitError(AGREEMENT_OUTDATED_NOTICE);
+			} else if (isContactEmailRequired(e)) {
+				void refetchContact();
+				setSubmitError(
+					failure.kind === "message"
+						? failure.message
+						: defaults(Code.FailedPrecondition),
+				);
 			} else if (failure.kind === "conflict") {
 				await resolveConflict();
 				setSubmitError(VERSION_CONFLICT_NOTICE);
@@ -1234,6 +1313,16 @@ export default function CertificationsClient() {
 								<h2>確認送出</h2>
 								<p>身分與銀行帳號會在審核通過後，由金流商收集，平台不經手。</p>
 							</header>
+							<ContactEmailField
+								contact={accountContact}
+								loading={contactLoading}
+								loadFailed={contactLoadError !== null}
+								value={contactEmailValue}
+								error={contactEmailError}
+								disabled={busy === "submit"}
+								onChange={setContactEmailDraft}
+								onRetry={() => void refetchContact()}
+							/>
 							<div className="flex flex-col gap-2">
 								<AgreementCheckbox
 									checked={noticeRead}
@@ -1686,6 +1775,61 @@ function SectionDocuments({
  *                       Atoms
  * ============================================================ */
 
+function ContactEmailField({
+	contact,
+	loading,
+	loadFailed,
+	value,
+	error,
+	disabled,
+	onChange,
+	onRetry,
+}: {
+	contact: AccountContactEmail | null;
+	loading: boolean;
+	loadFailed: boolean;
+	value: string;
+	error: string | null;
+	disabled: boolean;
+	onChange: (v: string) => void;
+	onRetry: () => void;
+}) {
+	const defaults = useDefaultErrorText();
+	if (loading) return null;
+	if (loadFailed) {
+		return (
+			<div className="seller-cert__field" role="alert">
+				<span>{CONTACT_EMAIL_LABEL}</span>
+				<small>{defaults(Code.Internal)}</small>
+				<Button variant="bordered" size="sm" onClick={onRetry}>
+					重新載入
+				</Button>
+			</div>
+		);
+	}
+	if (contact?.source === "verified") {
+		return (
+			<div className="seller-cert__field">
+				<span>{CONTACT_EMAIL_LABEL}</span>
+				<strong>{contact.email}</strong>
+				<small>{CONTACT_EMAIL_HINT}</small>
+			</div>
+		);
+	}
+	return (
+		<TextField
+			label={CONTACT_EMAIL_LABEL}
+			type="email"
+			value={value}
+			onChange={onChange}
+			hint={CONTACT_EMAIL_HINT}
+			error={error}
+			required
+			disabled={disabled}
+		/>
+	);
+}
+
 function TextField({
 	label,
 	value,
@@ -1695,6 +1839,7 @@ function TextField({
 	error,
 	required,
 	readOnly,
+	disabled,
 }: {
 	label: string;
 	value: string;
@@ -1704,6 +1849,7 @@ function TextField({
 	error?: string | null;
 	required?: boolean;
 	readOnly?: boolean;
+	disabled?: boolean;
 }) {
 	return (
 		<Input
@@ -1716,6 +1862,7 @@ function TextField({
 			onChange={(e) => onChange(e.target.value)}
 			isRequired={required}
 			readOnly={readOnly}
+			disabled={disabled}
 			isInvalid={Boolean(error)}
 			errorMessage={error || undefined}
 			description={hint && !error ? hint : undefined}

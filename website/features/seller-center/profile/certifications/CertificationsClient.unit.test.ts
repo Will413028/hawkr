@@ -61,6 +61,10 @@ const mocks = vi.hoisted(() => ({
 	fetchMyStore: vi.fn(),
 	replace: vi.fn(),
 	scrollIntoView: vi.fn(),
+	contact: null as { email: string; source: string } | null,
+	contactLoadError: null as Error | null,
+	setContactEmail: vi.fn(),
+	refetchContact: vi.fn(),
 }));
 
 vi.mock("next/navigation", async (importOriginal) => ({
@@ -101,6 +105,18 @@ vi.mock("@/lib/hooks/useSellerSelf", async () => {
 		useInvalidateSellerSelf: () => async () => {},
 	};
 });
+vi.mock("@/lib/hooks/useContactEmail", () => ({
+	useContactEmail: () => ({
+		contact: mocks.contact,
+		loading: false,
+		error: mocks.contactLoadError,
+		refetch: mocks.refetchContact,
+	}),
+}));
+vi.mock("@/lib/seller/contact-email", async (importActual) => ({
+	...(await importActual<typeof import("@/lib/seller/contact-email")>()),
+	setContactEmail: mocks.setContactEmail,
+}));
 vi.mock("./PaymentAccountSection", () => ({
 	PaymentAccountSection: ({
 		platformApproved,
@@ -324,6 +340,10 @@ beforeEach(() => {
 			} as Parameters<typeof create<typeof StoreSchema>>[1]),
 		}),
 	);
+	mocks.contact = { email: "login@example.com", source: "verified" };
+	mocks.contactLoadError = null;
+	mocks.setContactEmail.mockReset();
+	mocks.refetchContact.mockReset();
 	mocks.fetchMyStore.mockReset();
 	mocks.fetchMyKyc.mockReset();
 	mocks.fetchMyKyc.mockImplementation(async () => kycStore.get());
@@ -947,7 +967,7 @@ describe("兩區狀態頁（D15）", () => {
 });
 
 describe("D8：必填標記與伺服器一致", () => {
-	it("表單沒有身分、銀行、證件與英文名稱；收款聯絡信箱是必填", async () => {
+	it("表單沒有身分、銀行、證件與英文名稱", async () => {
 		kycStore.set(app({ subject: { case: "business", value: {} } }));
 		await mount();
 		for (const label of [
@@ -1411,5 +1431,107 @@ describe("入駐同意：送出 KYC 只要確認已閱讀告知事項", () => {
 		expect(mocks.fetchMyKyc).not.toHaveBeenCalled();
 		expect(mocks.replace).not.toHaveBeenCalled();
 		expect(mocks.submitKyc).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("金流商聯絡信箱（D23 修訂）", () => {
+	const CONTACT_LABEL = "金流商聯絡信箱";
+	const submittedApp = () =>
+		app({ etag: "e3", status: KYCStatus.KYC_STATUS_SUBMITTED });
+
+	async function clickSubmit() {
+		await acceptAgreements();
+		await act(async () => {
+			fireEvent.click(screen.getByText("送出認證"));
+		});
+	}
+
+	it("已驗證的信箱：唯讀文字，沒有輸入框，送出不呼叫 SetContactEmail", async () => {
+		kycStore.set(app({ missingFields: [] }));
+		mocks.submitKyc.mockResolvedValue(submittedApp());
+		await mount();
+		expect(screen.queryByLabelText(CONTACT_LABEL)).toBeNull();
+		expect(screen.getByText("login@example.com")).toBeTruthy();
+		expect(screen.getByText("金流商會用這個信箱聯絡你收款事宜")).toBeTruthy();
+		await clickSubmit();
+		expect(mocks.setContactEmail).not.toHaveBeenCalled();
+		expect(mocks.submitKyc).toHaveBeenCalledTimes(1);
+	});
+
+	it("自填過的信箱：帶入可編輯的輸入框", async () => {
+		mocks.contact = { email: "mine@example.com", source: "self-entered" };
+		kycStore.set(app({ missingFields: [] }));
+		await mount();
+		const input = screen.getByLabelText(CONTACT_LABEL) as HTMLInputElement;
+		expect(input.value).toBe("mine@example.com");
+		expect(input.readOnly).toBe(false);
+	});
+
+	it("沒有信箱：輸入框必填，沒填或格式不對不能送出；填了先 SetContactEmail 再 SubmitKYC", async () => {
+		mocks.contact = null;
+		kycStore.set(app({ missingFields: [] }));
+		mocks.submitKyc.mockResolvedValue(submittedApp());
+		const calls: string[] = [];
+		mocks.setContactEmail.mockImplementation(async () => {
+			calls.push("set");
+			return { email: "pay@example.com", source: "self-entered" };
+		});
+		mocks.submitKyc.mockImplementation(async () => {
+			calls.push("submit");
+			return submittedApp();
+		});
+		await mount();
+		const submit = screen.getByText("送出認證") as HTMLButtonElement;
+		expect(
+			(screen.getByLabelText(CONTACT_LABEL) as HTMLInputElement).value,
+		).toBe("");
+		await acceptAgreements();
+		expect(submit.disabled).toBe(true);
+		await typeInto(CONTACT_LABEL, "not-an-email");
+		expect(submit.disabled).toBe(true);
+		expect(document.querySelector("[data-field-error]")).toBeTruthy();
+		await typeInto(CONTACT_LABEL, " Pay@Example.com ");
+		expect(submit.disabled).toBe(false);
+		await act(async () => {
+			fireEvent.click(submit);
+		});
+		expect(mocks.setContactEmail).toHaveBeenCalledWith("pay@example.com");
+		expect(calls).toEqual(["set", "submit"]);
+	});
+
+	it("SetContactEmail 失敗：顯示伺服器對欄位的訊息，不送出申請", async () => {
+		mocks.contact = null;
+		kycStore.set(app({ missingFields: [] }));
+		mocks.setContactEmail.mockRejectedValue(
+			invalidField("email", "信箱格式不正確"),
+		);
+		await mount();
+		await typeInto(CONTACT_LABEL, "pay@example.com");
+		await clickSubmit();
+		expect(screen.getByRole("alert").textContent).toContain("信箱格式不正確");
+		expect(mocks.submitKyc).not.toHaveBeenCalled();
+	});
+
+	it("SubmitKYC 回 CONTACT_EMAIL_REQUIRED：顯示伺服器的文字並重讀聯絡信箱", async () => {
+		kycStore.set(app({ missingFields: [] }));
+		mocks.submitKyc.mockRejectedValue(
+			new ConnectError("need", Code.FailedPrecondition, undefined, [
+				{
+					desc: ErrorInfoSchema,
+					value: {
+						reason: ErrorReason[ErrorReason.CONTACT_EMAIL_REQUIRED],
+						domain: "hawkr",
+					},
+				},
+				{
+					desc: LocalizedMessageSchema,
+					value: { locale: "zh-TW", message: "請先填寫聯絡信箱" },
+				},
+			]),
+		);
+		await mount();
+		await clickSubmit();
+		expect(screen.getByRole("alert").textContent).toContain("請先填寫聯絡信箱");
+		expect(mocks.refetchContact).toHaveBeenCalled();
 	});
 });

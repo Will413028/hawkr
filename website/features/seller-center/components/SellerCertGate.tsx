@@ -10,7 +10,10 @@ import AppIcon from "@/components/shared/AppIcon";
 import Button from "@/components/ui/Button";
 import { optionalText, useUiText } from "@/lib/i18n/ui-text";
 import { CERT_PAGE_HREF } from "@/lib/seller/cert-gate";
-import { paymentAccountCopy } from "@/lib/seller/payment-account";
+import {
+	paymentAccountCopy,
+	paymentAccountLink,
+} from "@/lib/seller/payment-account";
 
 interface Props {
 	/** 申請（`useCertGate().application`）；沒有申請是 null。 */
@@ -52,7 +55,10 @@ export function SellerCertGate({
 		? payment.description
 		: `通過平台審核並啟用收款帳戶後，就能${subject}。`;
 	const status = payment?.badge ?? reviewStatus ?? "未送出";
-	const actionLabel = payment?.action ?? "前往商家認證";
+	const action =
+		payment && paymentAccount
+			? paymentAccountLink(paymentAccount.status, payment)
+			: { label: "前往商家認證", href: CERT_PAGE_HREF };
 
 	return (
 		<div
@@ -69,8 +75,8 @@ export function SellerCertGate({
 				<p className="seller-cert-gate__detail">目前狀態：{status}</p>
 				{detail ? <p className="seller-cert-gate__detail">{detail}</p> : null}
 			</div>
-			<Button href={CERT_PAGE_HREF} className="seller-cert-gate__action">
-				{actionLabel}
+			<Button href={action.href} className="seller-cert-gate__action">
+				{action.label}
 			</Button>
 		</div>
 	);

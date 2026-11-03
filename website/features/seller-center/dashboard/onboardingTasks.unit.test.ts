@@ -146,6 +146,39 @@ describe("公開前必須 follows the PUBLIC_LISTING missing requirements", () =
 		expect(payment.statusLabel).not.toMatch(/逾期|停用/);
 	});
 
+	it("the 收款帳戶 action label matches its link for every status", () => {
+		const approved = KYCStatus.KYC_STATUS_APPROVED;
+		const disabled = task(
+			build([R.ONBOARDING_COMPLETE], {
+				kycStatus: approved,
+				paymentStatus: PaymentAccountStatus.DISABLED,
+			}),
+			"payment_account",
+		);
+		expect(disabled.cta).toBe("聯絡客服");
+		expect(disabled.href).toBe("/contact");
+		for (const status of [
+			PaymentAccountStatus.NOT_CREATED,
+			PaymentAccountStatus.UNDER_REVIEW,
+			PaymentAccountStatus.ENABLED,
+		]) {
+			const t = task(
+				build([R.ONBOARDING_COMPLETE], {
+					kycStatus: approved,
+					paymentStatus: status,
+				}),
+				"payment_account",
+			);
+			expect(t.cta, String(status)).toBe("前往商家認證");
+			expect(t.href, String(status)).toBe("/seller-center/me/certifications");
+		}
+		const notCreated = task(
+			build([R.ONBOARDING_COMPLETE], { kycStatus: approved }),
+			"payment_account",
+		);
+		expect(notCreated.cta).toBe("前往商家認證");
+	});
+
 	it("approved review without an account yet reads as 準備中", () => {
 		const payment = task(
 			build([R.ONBOARDING_COMPLETE], {

@@ -71,4 +71,37 @@ describe("SellerCertGate", () => {
 		expect(screen.getByText("前往設定收款帳戶")).toBeTruthy();
 		expect(document.body.textContent).not.toMatch(/逾期|停用/);
 	});
+
+	it("收款帳戶無法啟用：動作是客服連結", () => {
+		render(
+			React.createElement(SellerCertGate, {
+				application: create(KYCApplicationSchema, {
+					status: KYCStatus.KYC_STATUS_APPROVED,
+				}),
+				paymentAccount: create(PaymentAccountSchema, {
+					status: PaymentAccountStatus.DISABLED,
+				}),
+			}),
+		);
+		expect(
+			screen.getByText("聯絡客服").closest("a")?.getAttribute("href"),
+		).toBe("/contact");
+	});
+
+	it("收款帳戶準備中：不顯示「重新整理」，動作去商家認證頁", () => {
+		render(
+			React.createElement(SellerCertGate, {
+				application: create(KYCApplicationSchema, {
+					status: KYCStatus.KYC_STATUS_APPROVED,
+				}),
+				paymentAccount: create(PaymentAccountSchema, {
+					status: PaymentAccountStatus.NOT_CREATED,
+				}),
+			}),
+		);
+		expect(screen.queryByText("重新整理")).toBeNull();
+		expect(
+			screen.getByText("前往商家認證").closest("a")?.getAttribute("href"),
+		).toBe("/seller-center/me/certifications");
+	});
 });

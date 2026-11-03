@@ -1,4 +1,6 @@
 import {
+	type KYCApplication,
+	KYCStatus,
 	type PaymentAccount,
 	PaymentAccountStatus,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
@@ -12,4 +14,11 @@ export function walletShowsTransactions(
 	return (
 		isStoreCertified(seller) && account?.status === PaymentAccountStatus.ENABLED
 	);
+}
+
+/** 平台審核已核准：這之後才有收款帳戶可讀（`GetMyPaymentAccount` 在核准之前回 not_found）。 */
+export function platformReviewApproved(
+	application: KYCApplication | null | undefined,
+): boolean {
+	return application?.status === KYCStatus.KYC_STATUS_APPROVED;
 }

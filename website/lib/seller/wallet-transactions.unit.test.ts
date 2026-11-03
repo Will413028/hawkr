@@ -1,13 +1,18 @@
 import { create } from "@bufbuild/protobuf";
 import {
 	GetMyStoreResponseSchema,
+	KYCApplicationSchema,
+	KYCStatus,
 	PaymentAccountSchema,
 	PaymentAccountStatus,
 	SellerRequirement,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { describe, expect, it } from "vitest";
 import { publicListingStatus } from "./capability-fixtures";
-import { walletShowsTransactions } from "./wallet-transactions";
+import {
+	platformReviewApproved,
+	walletShowsTransactions,
+} from "./wallet-transactions";
 
 const store = (missing: SellerRequirement[] | undefined) =>
 	create(GetMyStoreResponseSchema, {
@@ -52,5 +57,23 @@ describe("walletShowsTransactions", () => {
 				String(status),
 			).toBe(false);
 		}
+	});
+});
+
+describe("platformReviewApproved", () => {
+	it("只有 APPROVED 的申請算核准", () => {
+		const app = (status: KYCStatus) => create(KYCApplicationSchema, { status });
+		expect(platformReviewApproved(app(KYCStatus.KYC_STATUS_APPROVED))).toBe(
+			true,
+		);
+		for (const status of [
+			KYCStatus.KYC_STATUS_DRAFT,
+			KYCStatus.KYC_STATUS_SUBMITTED,
+			KYCStatus.KYC_STATUS_REJECTED,
+		]) {
+			expect(platformReviewApproved(app(status)), String(status)).toBe(false);
+		}
+		expect(platformReviewApproved(null)).toBe(false);
+		expect(platformReviewApproved(undefined)).toBe(false);
 	});
 });

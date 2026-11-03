@@ -42,6 +42,7 @@ const EXPECTED_PUBLIC_STATIC_ROUTES = [
 	"/return-policy",
 	"/search",
 	"/seller",
+	"/seller-app/payment-return",
 	"/seller-guide",
 	"/seller-terms",
 	"/seller/onboarding",
@@ -360,7 +361,7 @@ test.describe("canonical public static route browser health", {
 
 	test("public static inventory stays explicit and complete", () => {
 		expect(PUBLIC_STATIC_ROUTES).toEqual([...EXPECTED_PUBLIC_STATIC_ROUTES]);
-		expect(PUBLIC_STATIC_ROUTES).toHaveLength(22);
+		expect(PUBLIC_STATIC_ROUTES).toHaveLength(23);
 	});
 
 	// EVERY route here is `@live`, including the ones that render nothing but

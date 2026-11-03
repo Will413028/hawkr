@@ -20,3 +20,13 @@ test("Link 的錢包預取不重寫已認證判斷", () => {
 		"Link 不得以值匯入 seller 生成碼（只能 import type）",
 	);
 });
+
+test("Link 的錢包預取只在平台審核核准後讀收款帳戶", () => {
+	const source = readFileSync(
+		new URL("../components/shared/Link.tsx", import.meta.url),
+		"utf8",
+	);
+	const approved = source.indexOf("platformReviewApproved(application)");
+	const payment = source.indexOf("paymentRepo.fetchMyPaymentAccount");
+	assert.ok(approved > 0 && payment > approved);
+});

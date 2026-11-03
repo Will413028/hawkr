@@ -219,7 +219,8 @@ export function PaymentAccountSection({
 							>
 								{copy.action}
 							</Button>
-						) : (
+						) : account?.status ===
+							PaymentAccountStatus.ACTION_REQUIRED ? null : (
 							<Button
 								variant="bordered"
 								size="sm"

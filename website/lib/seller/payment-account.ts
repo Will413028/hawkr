@@ -20,6 +20,7 @@ import {
 } from "@hawkr/ui-text/keys";
 import { sellerAppClient } from "../connect/seller";
 import { optionalText, type UiText } from "../i18n/ui-text";
+import { CERT_PAGE_HREF } from "./cert-gate";
 import type { StatusBannerTone } from "./status-tone";
 
 type SellerClient = ReturnType<typeof sellerAppClient>;
@@ -115,4 +116,24 @@ export function paymentAccountCopy(
 				? ut(sellerPaymentAccountPayoutsInactiveNote())
 				: undefined,
 	};
+}
+
+const CONTACT_HREF = "/contact";
+const CERT_ACTION_LABEL = "前往商家認證";
+
+/**
+ * 把使用者帶到收款帳戶下一步的連結：文字只在連結真的是目錄那一步時才用目錄的動作（待設定去認證頁、無法啟用去客服），
+ * 其餘狀態（準備中、審核中、已啟用）的目錄動作是「重新整理」，不是連結，所以用「前往商家認證」。
+ */
+export function paymentAccountLink(
+	status: PaymentAccountStatus,
+	copy: PaymentAccountCopy,
+): { label: string; href: string } {
+	if (status === PaymentAccountStatus.DISABLED && copy.action) {
+		return { label: copy.action, href: CONTACT_HREF };
+	}
+	if (status === PaymentAccountStatus.ACTION_REQUIRED && copy.action) {
+		return { label: copy.action, href: CERT_PAGE_HREF };
+	}
+	return { label: CERT_ACTION_LABEL, href: CERT_PAGE_HREF };
 }
