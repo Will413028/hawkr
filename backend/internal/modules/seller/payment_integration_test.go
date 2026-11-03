@@ -132,7 +132,7 @@ func TestApprovalCopiesThePayoutContactEmailToTheAccountRowAndTheCreateCallSends
 func (f *fixture) reapprove(t *testing.T, accountID int64, email string) {
 	t.Helper()
 	ctx := context.Background()
-	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.kyc_applications SET status = 'CANCELLED', decided_at = NULL WHERE account_id = $1", accountID)
+	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.kyc_applications SET status = 'CANCELLED', decided_at = NULL WHERE store_id IN (SELECT store_id FROM seller.stores WHERE account_id = $1)", accountID)
 	must(t, err)
 	in := kycDraft(accountID, idA, bankAcct)
 	in.PayoutContactEmail = ptr(email)

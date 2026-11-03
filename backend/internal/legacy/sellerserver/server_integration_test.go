@@ -182,7 +182,7 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 		draft, err := m.SaveKYCDraft(ctx, seller.KYCDraftInput{
 			AccountID: accountID, SellerType: &kind, RealName: str("王小明"), BirthDate: str("1990-05-06"), IDCardNo: str(idCard),
 			EnglishName: str("Wang Farm"), BankName: str("臺灣銀行"), BankCode: str("004"), BankAccount: str(bank),
-			ProductType: str("蔬果"),
+			ProductType: str("蔬果"), PayoutContactEmail: str("seller@example.com"),
 			IDCardFront: &seller.KYCDocumentRef{StagedToken: "front"}, IDCardBack: &seller.KYCDocumentRef{StagedToken: "back"}, BankBook: &seller.KYCDocumentRef{StagedToken: "book"},
 		})
 		must(err)
