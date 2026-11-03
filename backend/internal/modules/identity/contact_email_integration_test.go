@@ -169,7 +169,7 @@ func TestInvalidVerifiedEmailIsTreatedAsAbsent(t *testing.T) {
 	if got, ok, err := f.m.ContactEmail(ctx, bad); err != nil || ok || got != (ContactEmail{}) {
 		t.Fatalf("壞的已驗證信箱且沒有自填：%+v %v %v", got, ok, err)
 	}
-	if _, err := f.db.Pool().Exec(ctx, `UPDATE identity.accounts SET self_entered_email = 'Self@Example.com' WHERE id = $1`, bad); err != nil {
+	if _, err := f.db.Pool().Exec(ctx, `UPDATE identity.accounts SET self_entered_email = 'self@example.com' WHERE id = $1`, bad); err != nil {
 		t.Fatal(err)
 	}
 	got, ok, err := f.m.ContactEmail(ctx, bad)
