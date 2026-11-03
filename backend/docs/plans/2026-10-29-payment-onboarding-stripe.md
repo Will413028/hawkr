@@ -120,6 +120,7 @@
   - 停止條件：v2 的 recipient 帳戶在 US 測試平台建不起來，或 fingerprint 讀不到，停下回報。
 
 - [x] **5c. 收款聯絡信箱（D23）**（被擋於：5b，D23）
+  - 2026-11-03：KYC 申請上的欄位被 D23 修訂取代，由 7a′ 撤掉並改用帳號層級的聯絡信箱；`payment_accounts.contact_email` 與送給 Stripe 的部分保留。
   - 範圍：KYC 申請加「收款聯絡信箱」（草稿可空，送出時必填，格式與長度同 `stores.support_email` 的規則但上限 254）；proto `KYCApplication`／`SaveKYCDraftRequest` 加欄位、`SubmitKYC` 缺值回 invalid_argument（field violation）；核准的 transaction 把它複製到 `payment_accounts.contact_email`（新 migration，NOT NULL）；`EnsureInput.ContactEmail`，Stripe `CreateAccount` 送 `contact_email`，fake adapter 同步；integration、unit 跟上。seller-app 的表單欄位（預設帶入登入信箱、可改）在步驟 7 做。
   - 消費端：`rg -n "SaveKYCDraft|SubmitKYC|InsertPaymentAccount|EnsureInput|CreateAccount\(" backend/internal seller-app/lib api --glob '!**/gen/**'`。
   - 驗收：CI 等價檢查；mutation：`CreateAccount` 不送 `contact_email` 時 client 測試失敗；送出缺信箱的申請時測試失敗；核准不複製時 integration 失敗。
@@ -152,9 +153,19 @@
     - CI 等價檢查：monolith（含 `atlas migrate validate`）、`gen:legal --check`、ui-text 生成比對、兩端 `check-enum-text`、website `test:unit` 與 `pnpm test`、seller-app 改到的測試。
     - integration：不帶身分、銀行、證件與 `PAYUNI_TERMS` 的個人與公司申請可以送出並核准；帶了 `PAYUNI_TERMS` 的送出被拒。
     - mutation：把 `real_name` 加回 `requirements`、把 `PAYUNI_TERMS` 加回 `SubmitKYCAgreements`、CHECK 改回原定義（integration），各自讓測試失敗。
-- [ ] **7b. website**（被擋於：7a）
+- [ ] **7a′. 帳號層級的聯絡信箱，撤掉 KYC 的收款聯絡信箱（D23 2026-11-03 修訂）**（被擋於：D23 修訂；7b、7c 依賴本步驟的契約）
+  - 範圍：
+    - identity：`identity.accounts` 新增自填聯絡信箱欄位（未驗證；與 provider 驗證過、作寄件地址的 `email` 分開；刪除帳號時清掉，`accounts_deleted_check` 跟上；不寫進 `account_identities`，不成為自動連結的依據）。模組對外的讀取方法：帳號的聯絡信箱與來源（已驗證的 `email` 優先，沒有才用自填的）。對外 RPC（`api/hawkr/identity`）：讀取自己的聯絡信箱與來源、設定自填信箱（只在沒有已驗證信箱時可設；格式與長度同 5c 的規則，上限 254）。
+    - seller：`SubmitKYC` 要求帳號有聯絡信箱，沒有回 failed_precondition（ErrorInfo.reason 新增）；核准的 transaction 從 identity 讀聯絡信箱寫入 `payment_accounts.contact_email`（快照，之後不自動同步）。
+    - 撤掉 `payout_contact_email`：proto（`KYCApplication`、`SaveKYCDraftRequest`）、新 migration 刪欄位並重新定義 `kyc_applications_complete_check`、`schema.sql`、kyc 模組、清理查詢、測試、種子、文案目錄的欄位鍵、`docs/modules/seller.md`；client 只做編譯所需的最小改動（website 與 seller-app 移除欄位的引用，畫面在 7b、7c）。
+    - ADR `2026-10-30-identity-self-hosted-federated-login.md` 加修訂段：賣家送審要求帳號有聯絡信箱，買家不變；A8 只寄已驗證的信箱（通知 ADR 決策 8 不變）。
+    - `make connect`、TS 與 Dart 生成、`make uitext`、`make sqlc`。
+  - 消費端：`rg -l -i "payout_contact_email|payoutContactEmail|PayoutContactEmail" --glob '!**/gen/**' --glob '!node_modules'`；`rg -n "contact_email|ContactEmail" backend/internal/modules/seller backend/internal/httpapi/seller`；identity 新 RPC 的消費端在 7b、7c。
+  - 不能動：`accounts.email` 的語意（provider 驗證過的寄件地址，登入時更新）；自動連結只看 Google 的已驗證身分；已套用的 migration；D16 核准時建立。
+  - 驗收：CI 等價檢查（monolith、`atlas migrate validate`、sqlc、三端生成與 uitext 無 drift、`buf lint`、website `tsc`、seller-app analyze）；integration（CI）：帳號沒有聯絡信箱時送出被拒（mutation：拿掉檢查，測試要失敗）；核准把 identity 的聯絡信箱寫進收款帳戶，已驗證的優先於自填（mutation：改成自填優先，測試要失敗）；有已驗證信箱時設定自填被拒；自填信箱不影響 Google 自動連結（mutation：自動連結改讀 `accounts` 的信箱，測試要失敗）；刪除帳號清掉自填信箱。
+- [ ] **7b. website**（被擋於：7a、7a′）
   - 範圍：附件第 1、2 節。
-    - 修改 `CertificationsClient.tsx` 與 `lib/seller/kyc.ts`：表單刪減，並加收款聯絡信箱。
+    - 修改 `CertificationsClient.tsx` 與 `lib/seller/kyc.ts`：表單刪減；確認步驟顯示金流商聯絡信箱（7a′ 的 identity RPC），有已驗證信箱時唯讀，沒有時才可輸入並寫回 identity（D23 修訂）。
     - 改成兩區狀態頁：平台審核讀 `KYCApplication.status`，收款讀 `GetMyPaymentAccount`。
     - 新增收款帳戶區元件：HOSTED 導頁並處理 `?payment=return|refresh`；EMBEDDED 用 `ConnectAccountOnboarding`（`@stripe/connect-js@3.4.6`、`@stripe/react-connect-js@3.4.4`，`NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`）。
     - 修改 `website/lib/security/csp.ts` 與它的測試：依 Stripe Connect 內嵌元件文件放行 `script-src`、`frame-src`、`connect-src`，附文件 URL。
@@ -170,9 +181,9 @@
     - 本機 sandbox 手動驗收：單體設 `STRIPE_REQUIREMENT_COLLECTION=platform`，建一家新店，送出並核准，然後在 website 用內嵌元件完成開通。判定同步驟 5：`transfers_active = true`、`ENABLED`、可曝光。店 1009 是金流商收件，不能用。
   - 停止條件：內嵌元件不能用 v2 帳戶與 `2026-09-30.preview` 初始化時（5b 只驗過 v1 的 `account_sessions`），停下回報，不改 API 版本或 SDK 版本。2026-11-03 實測可以初始化並進入表單（`spike/README.md` Q15），走完開通仍是本步驟的手動驗收。
   - 需要人做的事：Will 在本機環境放 sandbox 的公開金鑰（2026-11-03 完成，`NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` 放在本機個人脈絡檔記錄的位置）。
-- [ ] **7c. seller-app**（被擋於：7a、7b 的回跳頁）
+- [ ] **7c. seller-app**（被擋於：7a、7a′、7b 的回跳頁）
   - 範圍：
-    - 修改 `data/kyc_fields.dart`、`data/kyc_form.dart`、`presentation/kyc_wizard_steps.dart`：精靈刪減（個人兩步），營運資訊步驟加收款聯絡信箱（預設登入信箱、可改）。
+    - 修改 `data/kyc_fields.dart`、`data/kyc_form.dart`、`presentation/kyc_wizard_steps.dart`：精靈刪減（個人兩步），確認步驟顯示金流商聯絡信箱，規則同 7b（D23 修訂）。
     - 修改 `seller_certification_upload_screen.dart` 的 `_LockedStatusView`：改成兩區，平台審核讀 `KYCApplication.status`，收款讀 `GetMyPaymentAccount`。
     - 新增收款帳戶的 repository 與 provider。
     - HOSTED：以 `launchUrl(externalApplication)` 開外部瀏覽器，`return_url` 與 `refresh_url` 指向 7b 的回跳頁。新增 `--dart-define=HAWKR_WEB_ORIGIN`，沿用 `config/flavor.dart` 的 `resolveGatewayHost` 做法：dev 預設 `http://localhost:3000`，stage 與 prod 缺值時丟 `StateError`。同步更新 `config/dart-defines.example.json`。
@@ -183,7 +194,7 @@
   - 不能動：不新增 deep link 或依賴（D24）；不寫 `PaymentAccountStatus` 或 `KYCStatus` 的本地對照表。
   - 驗收：
     - Flutter 兩段驗證：本機跑 analyze、custom_lint、改到的測試、讀原始碼的守門測試與 `deadcode.sh`；有 `part` 生成檔改動時跑 build_runner 比對；完整測試與 coverage 待 CI。
-    - mutation：信箱不帶預設值、resumed 時不呼叫 `GetMyPaymentAccount`、從瀏覽器回來沒帶 `fresh: true`，各自讓測試失敗。
+    - mutation：有已驗證信箱時仍可輸入、resumed 時不呼叫 `GetMyPaymentAccount`、從瀏覽器回來沒帶 `fresh: true`，各自讓測試失敗。
 - [ ] **7d. admin 收款帳戶卡**（被擋於：7a）
   - 範圍：附件第 3 節。
     - 新增 `admin/src/app/admin/merchants/[id]/PaymentAccountCard.tsx` 與它的測試：`GetPaymentAccount`、`RefreshPaymentAccount`、`RetryPaymentAccountCreate`；not_found 時顯示尚未建立。
@@ -243,7 +254,7 @@
 - **D20 收款模式與閘門的能力**（已決 2026-11-02，Will；擋住：4；限定 B2）：市集用 destination charges（平台收款再轉給賣家），閘門看 `stripe_transfers`（D10 修訂）。Etsy、Shopify 同型是推論，未核出處；台灣上線前核對代理收付法規（前提段）。
 - **D21 分支**（已決 2026-11-02，Will）：步驟 4–8 在 `payment-onboarding` 分支完成才進 `main`，不在 `main` 留新舊契約並存或 shim。
 - **D22 平台自建 KYC 個資管線**（已決 2026-11-02，Will；擋住：6–8）：退場並在本波刪除。平台不再收身分證號、銀行帳號與證件；統編是市集登記資料，仍由平台收並算雜湊（2026-11-02 Will 確認）；防詐改用 fingerprint（D12）。觸發重建：決定接台灣金流商。
-- **D23 收款聯絡信箱**（已決 2026-11-03，Will）：Stripe v2 有 `configuration.recipient` 的帳戶必須帶 `contact_email`（sandbox 實測，`spike/outputs/q13_contact_email.txt`，兩種 dashboard 都是 400）。賣家在送出 KYC 申請時確認（預設帶入登入信箱、可改，送出時必填），核准時複製到收款帳戶列並用於建立外部帳戶；D16「核准時建立」不變。未採：直接用登入信箱（LINE 可能沒有信箱，且賣家無法改）；延到賣家第一次開始收款才建立（要改 D16 與步驟 4 的建立 job、輪詢、後台重試）。延後：建立後修改信箱並同步到 Stripe（觸發：賣家要求改信箱，或上線前的設定頁需求）。
+- **D23 收款聯絡信箱**（已決 2026-11-03，Will）：Stripe v2 有 `configuration.recipient` 的帳戶必須帶 `contact_email`（sandbox 實測，`spike/outputs/q13_contact_email.txt`，兩種 dashboard 都是 400）。賣家在送出 KYC 申請時確認（預設帶入登入信箱、可改，送出時必填），核准時複製到收款帳戶列並用於建立外部帳戶；D16「核准時建立」不變。未採：直接用登入信箱（LINE 可能沒有信箱，且賣家無法改）；延到賣家第一次開始收款才建立（要改 D16 與步驟 4 的建立 job、輪詢、後台重試）。延後：建立後修改信箱並同步到 Stripe（觸發：賣家要求改信箱，或上線前的設定頁需求）。（2026-11-03 修訂，Will：撤掉 KYC 申請上的獨立欄位，改用帳號層級的聯絡信箱。業界基線：平台用手上已有的使用者信箱建立帳戶（https://docs.stripe.com/connect/marketplace/quickstart），帳戶持有人在開通頁面可改預先帶入的資料（https://docs.stripe.com/connect/hosted-onboarding），v2 可事後更新 `contact_email`。identity 保留 provider 驗證過的 `email`，另存自填聯絡信箱（未驗證）；賣家送審要求帳號有其中之一；核准時把聯絡信箱快照到 `payment_accounts.contact_email`；A8 只寄已驗證的信箱。原因：client 契約拿不到登入信箱，而且同一人兩個信箱來源。未採：後端給獨立欄位的預設值（兩個來源，A8 要再補）；客服信箱（公開地址）；電話（Stripe 仍要求信箱）。延後：自填信箱以驗證碼驗證（觸發：A8 的 email 管道上線）；帳號信箱變更同步到 Stripe（觸發同上方延後）。步驟 7a′）
 - **D24 步驟 7 的畫面與流程**（已決 2026-11-03，Will，全部採建議；擋住：7）：附件 `step7-screen-drafts.md` 第 5 節。Q1 送出規則的身分、銀行、證件與 `PAYUNI_TERMS` 在 7a 先拿掉，欄位與 enum 照舊在步驟 8 刪（原計畫把規則也排在 8，表單刪減後送出會一律失敗）。Q2 公司的補充文件保留（市集審核用的公司證明，不是 D22 的證件）。Q3 seller-app 回跳到 website 的靜態頁、回到前景時重讀，不加 deep link。Q4 website 做內嵌元件，新增 `@stripe/connect-js@3.4.6`、`@stripe/react-connect-js@3.4.4`（Will 2026-11-03 同意；兩者 2026-06-23 發佈，3.5.0 未滿兩週；3.4 能否開通 v2 帳戶由 7b 的 sandbox 驗收確認）。Q5 啟用後的「管理收款帳戶」入口不做（要改 proto 加 `account_update` 連結；觸發：賣家要求改資料，或上線前的設定頁需求）。Q6 admin 徽章與賣家共用目錄文字，另顯示原始 `status_reason`。
 - **D25 內嵌元件的 Stripe 使用者驗證**（已決 2026-11-03，Will，選 A；擋住：7b）：平台收件的 Account Session 帶 `components[account_onboarding][features][disable_stripe_user_authentication]=true`。依據：預設會先彈出 Stripe 登入視窗，平台負責補件的帳戶可以用這個參數關掉，代價是平台承擔負餘額（https://docs.stripe.com/connect/get-started-connect-embedded-components?platform=web 「User authentication」）；本平台的帳戶本來就是 `losses_collector=application`，賣家已以 Google／LINE 登入，平台收件的目的就是賣家留在平台頁面完成（`spike/README.md` Q15）。未採 B：維持預設，賣家每次開通都要另外登入或註冊 Stripe。Stripe 收件（託管頁面）不受影響。
 - **E1 Stripe API 版本**（已決 2026-11-02，Will）：Accounts v2（https://docs.stripe.com/connect/accounts-v2）；只有台灣只收轉帳的帳號需要 v1，D8 用 US 碰不到。webhook 用 thin events，收到後一律重讀帳戶（https://docs.stripe.com/webhooks）。（2026-11-03 修訂，Will：釘 `Stripe-Version: 2026-09-30.preview`，capability 有 `rejected` 狀態，D13 的 DISABLED 直接用它；這一版在一般測試模式不能建 v2 Account Link（`spike/README.md` Q11、Q12），測試與錄製改在 Stripe sandbox。未採：`2026-04-22.preview` 沿用測試模式，DISABLED 要從 status_details 推斷、升級時重做）
