@@ -73,7 +73,8 @@ WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND email IS DISTINCT FROM sqlc.a
 
 
 -- name: SetSelfEnteredEmail :execrows
--- 自填聯絡信箱：只在帳號存活而且沒有已驗證的 email 時寫入（條件在 UPDATE 內，與登入時寫入 email 的更新互斥）；沒有列被更新時由呼叫方分辨原因。
+-- 自填聯絡信箱：呼叫方已在同一個 transaction 內鎖住帳號列（LockLiveAccount）並以 Go 的 validEmail 確認沒有可用的已驗證 email；
+-- 「可用」的規則只在 Go（emailaddr.Normalize），SQL 不重述它。依 id 寫入存活的帳號，受影響列數必為 1（相同值也寫入，不是 no-op）。
 UPDATE identity.accounts
 SET self_entered_email = sqlc.arg(self_entered_email), updated_at = sqlc.arg(now)::timestamptz
-WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND email IS NULL AND self_entered_email IS DISTINCT FROM sqlc.arg(self_entered_email);
+WHERE id = sqlc.arg(id) AND deleted_at IS NULL;

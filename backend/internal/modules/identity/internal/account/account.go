@@ -112,18 +112,20 @@ func (m *Service) SetSelfEnteredEmail(ctx context.Context, accountID int64, raw 
 	var out model.ContactEmail
 	err := m.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := m.q(ctx)
-		if _, err := q.SetSelfEnteredEmail(ctx, store.SetSelfEnteredEmailParams{ID: accountID, SelfEnteredEmail: &email, Now: m.d.Now()}); err != nil {
-			return fmt.Errorf("identity：設定帳號 %d 的聯絡信箱：%w", accountID, err)
-		}
-		r, err := q.GetAccount(ctx, accountID)
-		if errors.Is(err, pgx.ErrNoRows) || err == nil && r.DeletedAt != nil {
-			return errAccountNotFound(accountID)
-		}
+		// 鎖住帳號列：與登入時更新 email 的 UPDATE 互斥，驗證與寫入之間 email 不會變。
+		r, err := lockLiveAccount(ctx, q, accountID)
 		if err != nil {
-			return fmt.Errorf("identity：讀取帳號 %d：%w", accountID, err)
+			return err
 		}
 		if _, verified := validEmail(r.Email); verified {
 			return apperr.FailedPrecondition("帳號已有登入方式驗證過的信箱，不能另外填寫")
+		}
+		n, err := q.SetSelfEnteredEmail(ctx, store.SetSelfEnteredEmailParams{ID: accountID, SelfEnteredEmail: &email, Now: m.d.Now()})
+		if err != nil {
+			return fmt.Errorf("identity：設定帳號 %d 的聯絡信箱：%w", accountID, err)
+		}
+		if n != 1 {
+			return fmt.Errorf("identity：設定帳號 %d 的聯絡信箱：更新了 %d 列，預期 1", accountID, n)
 		}
 		out = model.ContactEmail{Address: email, Source: model.ContactEmailSelfEntered}
 		return nil
