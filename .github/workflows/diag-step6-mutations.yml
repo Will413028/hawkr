@@ -1,0 +1,46 @@
+name: diag step6 mutations
+
+on:
+  push:
+    branches: [diag/stripe-step6-mutations]
+
+permissions:
+  contents: read
+
+env:
+  GOWORK: 'off'
+
+jobs:
+  mutation:
+    name: mutation ${{ matrix.m.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        m:
+          - {name: baseline, test: 'TestSharedProviderBankFingerprint|TestBankFingerprint|TestMeasureSnapshotCarriesTheBankFingerprint|TestBankAccountHits'}
+          - {name: nosync, test: TestSharedProviderBankFingerprintIsListedButNeverTerminates}
+          - {name: union, test: TestSharedProviderBankFingerprintIsListedButNeverTerminates}
+          - {name: snapmap, test: TestMeasureSnapshotCarriesTheBankFingerprintAsBankAccount}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: backend/.go-version
+          cache-dependency-path: backend/go.sum
+      - name: apply mutation
+        if: matrix.m.name != 'baseline'
+        run: bash .github/diag/mutate.sh "${{ matrix.m.name }}"
+      - name: run test
+        working-directory: backend
+        run: |
+          set +e
+          go test -count=1 -tags integration -run '${{ matrix.m.test }}' ./internal/modules/seller/ -v 2>&1 | tail -60
+          rc=${PIPESTATUS[0]}
+          echo "go test exit: $rc"
+          if [ "${{ matrix.m.name }}" = baseline ]; then exit $rc; fi
+          if [ "$rc" -eq 0 ]; then echo "MUTATION SURVIVED"; exit 1; fi
+          echo "MUTATION KILLED"
