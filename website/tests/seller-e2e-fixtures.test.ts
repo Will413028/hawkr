@@ -10,6 +10,10 @@ import {
 } from "@hawkr/api/connect/errors";
 import { ErrorReason } from "@hawkr/api/gen/hawkr/common/v1alpha1/error_reason_pb";
 import {
+	ContactEmailSource,
+	GetContactEmailResponseSchema,
+} from "@hawkr/api/gen/hawkr/identity/v1alpha1/identity_pb";
+import {
 	AppealUnavailableReason,
 	GetMyKYCResponseSchema,
 	GetMyStoreResponseSchema,
@@ -145,6 +149,20 @@ test("the KYC fixture shape parses as a GetMyKYCResponse", () => {
 	});
 	assert.equal(message.application?.status, KYCStatus.KYC_STATUS_APPROVED);
 	assert.equal(message.application?.flow?.identityLocked, true);
+});
+
+test("the contact email fixture shape parses as a GetContactEmailResponse", () => {
+	const verified = fromJson(GetContactEmailResponseSchema, {
+		contactEmail: {
+			email: "seller@example.com",
+			source: "CONTACT_EMAIL_SOURCE_VERIFIED",
+		},
+	});
+	assert.equal(verified.contactEmail?.source, ContactEmailSource.VERIFIED);
+	assert.equal(
+		fromJson(GetContactEmailResponseSchema, {}).contactEmail,
+		undefined,
+	);
 });
 
 test("the version-conflict error fixture is classified as VERSION_CONFLICT", () => {

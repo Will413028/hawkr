@@ -69,6 +69,11 @@ export const GET_SESSION_URL = identityMethod(
 	"GetSession",
 );
 
+export const GET_CONTACT_EMAIL_URL = identityMethod(
+	"IdentityAppService",
+	"GetContactEmail",
+);
+
 export const LIST_LINKED_IDENTITIES_URL = identityMethod(
 	"IdentityAppService",
 	"ListLinkedIdentities",
@@ -474,6 +479,9 @@ export type MockPaymentAccountStatus =
  *
  * 收款帳戶（GetMyPaymentAccount）：申請 APPROVED 時預設是 ENABLED，其餘是 not_found（平台審核還沒核准）；
  * `paymentAccount` 可以指定狀態。
+ *
+ * 帳號的聯絡信箱（identity 的 GetContactEmail，認證頁的收款區與送審前的檢查讀它）：預設是 provider 驗證過的信箱；
+ * `contactEmail: null` 是帳號還沒有聯絡信箱（回應沒有 `contactEmail`）。
  */
 export async function mockMyKyc(
 	page: Page,
@@ -487,8 +495,29 @@ export async function mockMyKyc(
 			payoutsActive?: boolean;
 			surface?: "HOSTED" | "EMBEDDED";
 		};
+		contactEmail?: {
+			email: string;
+			source: "VERIFIED" | "SELF_ENTERED";
+		} | null;
 	},
 ): Promise<void> {
+	await page.route(GET_CONTACT_EMAIL_URL, (route) => {
+		const contact =
+			flow.contactEmail === undefined
+				? { email: "seller@example.com", source: "VERIFIED" as const }
+				: flow.contactEmail;
+		void fulfillConnect(
+			route,
+			contact
+				? {
+						contactEmail: {
+							email: contact.email,
+							source: `CONTACT_EMAIL_SOURCE_${contact.source}`,
+						},
+					}
+				: {},
+		);
+	});
 	await page.route(GET_MY_KYC_URL, (route) => {
 		if (flow.status === "NOT_STARTED") {
 			void fulfillConnectError(route, "not_found", "尚未申請");
