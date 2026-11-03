@@ -68,6 +68,8 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.SellerKYCFlowStatusGateHeading(goldenEnum(c.Value, "KYC_FLOW_STATUS_"))
 	case "seller.KYCFlowStatus.gate_message":
 		return t.SellerKYCFlowStatusGateMessage(goldenEnum(c.Value, "KYC_FLOW_STATUS_"), goldenString(c, "subject"))
+	case "seller.KYCStatus":
+		return t.SellerKYCStatus(goldenEnum(c.Value, "KYC_STATUS_"))
 	case "seller.Measure.appeal_deadline":
 		return t.SellerMeasureAppealDeadline(goldenString(c, "deadline")), true
 	case "seller.Measure.meta_kind":
@@ -114,6 +116,14 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.SellerMeasureState(goldenEnum(c.Value, "MEASURE_STATE_"), goldenEnum(goldenString(c, "kind"), "MEASURE_KIND_"))
 	case "seller.PayUniState":
 		return t.SellerPayUniState(goldenEnum(c.Value, "PAY_UNI_STATE_"))
+	case "seller.PaymentAccount.payouts_inactive_note":
+		return t.SellerPaymentAccountPayoutsInactiveNote(), true
+	case "seller.PaymentAccountStatus":
+		return t.SellerPaymentAccountStatus(goldenEnum(c.Value, "PAYMENT_ACCOUNT_STATUS_"))
+	case "seller.PaymentAccountStatus.action":
+		return t.SellerPaymentAccountStatusAction(goldenEnum(c.Value, "PAYMENT_ACCOUNT_STATUS_"))
+	case "seller.PaymentAccountStatus.description":
+		return t.SellerPaymentAccountStatusDescription(goldenEnum(c.Value, "PAYMENT_ACCOUNT_STATUS_"))
 	case "seller.RevokeReason":
 		return t.SellerRevokeReason(goldenEnum(c.Value, "REVOKE_REASON_"))
 	case "seller.RiskGround":

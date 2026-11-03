@@ -220,6 +220,27 @@ extension SellerKYCFlowStatusUiText on hawkr_seller_v1alpha1_seller.KYCFlowStatu
   String? gateMessage(UiLocale l, {required String subject}) => _sellerKYCFlowStatusGateMessage(l, value, subject);
 }
 
+String? _sellerKYCStatus(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '草稿',
+(UiLocale.en, 1) => 'Draft',
+(UiLocale.zhTW, 2) => '審核中',
+(UiLocale.en, 2) => 'Under review',
+(UiLocale.zhTW, 3) => '已通過',
+(UiLocale.en, 3) => 'Approved',
+(UiLocale.zhTW, 4) => '需修改',
+(UiLocale.en, 4) => 'Needs changes',
+(UiLocale.zhTW, 5) => '已取消',
+(UiLocale.en, 5) => 'Cancelled',
+_ => null,
+};
+}
+
+extension SellerKYCStatusUiText on hawkr_seller_v1alpha1_seller.KYCStatus {
+  /// seller.KYCStatus 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _sellerKYCStatus(l, value);
+}
+
 String? _sellerMeasureBasis(UiLocale l, int value) {
 return switch ((l, value)) {
 (UiLocale.zhTW || UiLocale.en, 1) => '違規認定',
@@ -335,6 +356,63 @@ extension SellerPayUniStateUiText on hawkr_seller_v1alpha1_seller.PayUniState {
   String? uiText(UiLocale l) => _sellerPayUniState(l, value);
 }
 
+String? _sellerPaymentAccountStatus(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '準備中',
+(UiLocale.en, 1) => 'Preparing',
+(UiLocale.zhTW, 2) => '審核中',
+(UiLocale.en, 2) => 'Under review',
+(UiLocale.zhTW, 3) => '待設定',
+(UiLocale.en, 3) => 'Setup needed',
+(UiLocale.zhTW, 4) => '已啟用',
+(UiLocale.en, 4) => 'Active',
+(UiLocale.zhTW, 5) => '無法啟用',
+(UiLocale.en, 5) => 'Unavailable',
+_ => null,
+};
+}
+
+String? _sellerPaymentAccountStatusAction(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '重新整理',
+(UiLocale.en, 1) => 'Refresh',
+(UiLocale.zhTW, 2) => '重新整理',
+(UiLocale.en, 2) => 'Refresh',
+(UiLocale.zhTW, 3) => '前往設定收款帳戶',
+(UiLocale.en, 3) => 'Go to payout account setup',
+(UiLocale.zhTW, 5) => '聯絡客服',
+(UiLocale.en, 5) => 'Contact support',
+_ => null,
+};
+}
+
+String? _sellerPaymentAccountStatusDescription(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '正在建立收款帳戶，通常幾分鐘內完成。',
+(UiLocale.en, 1) => 'We are setting up your payout account. This usually takes a few minutes.',
+(UiLocale.zhTW, 2) => '金流商正在審核你的資料，不需要額外操作。',
+(UiLocale.en, 2) => 'The payment provider is reviewing your information. No action is needed.',
+(UiLocale.zhTW, 3) => '提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。',
+(UiLocale.en, 3) => 'Provide your identity and bank details to start getting paid. The payment provider collects this information; Hawkr does not handle it.',
+(UiLocale.zhTW, 4) => '收款已啟用。',
+(UiLocale.en, 4) => 'Payments are enabled.',
+(UiLocale.zhTW, 5) => '金流商目前無法啟用你的收款帳戶，請聯絡客服。',
+(UiLocale.en, 5) => 'The payment provider cannot enable your payout account right now. Please contact support.',
+_ => null,
+};
+}
+
+extension SellerPaymentAccountStatusUiText on hawkr_seller_v1alpha1_seller.PaymentAccountStatus {
+  /// seller.PaymentAccountStatus 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _sellerPaymentAccountStatus(l, value);
+
+  /// seller.PaymentAccountStatus.action；沒有文字的值回 null。
+  String? action(UiLocale l) => _sellerPaymentAccountStatusAction(l, value);
+
+  /// seller.PaymentAccountStatus.description；沒有文字的值回 null。
+  String? description(UiLocale l) => _sellerPaymentAccountStatusDescription(l, value);
+}
+
 String? _sellerRevokeReason(UiLocale l, int value) {
 return switch ((l, value)) {
 (UiLocale.zhTW || UiLocale.en, 1) => '申覆成立',
@@ -375,7 +453,8 @@ String? _sellerSellerRequirement(UiLocale l, int value) {
 return switch ((l, value)) {
 (UiLocale.zhTW || UiLocale.en, 1) => '店家未關閉',
 (UiLocale.zhTW || UiLocale.en, 2) => '帳號未停權',
-(UiLocale.zhTW || UiLocale.en, 3) => '商家認證已通過',
+(UiLocale.zhTW, 3) => '平台審核與收款帳戶都完成',
+(UiLocale.en, 3) => 'Platform review and payout account both completed',
 (UiLocale.zhTW || UiLocale.en, 4) => '店名',
 (UiLocale.zhTW || UiLocale.en, 5) => 'logo',
 (UiLocale.zhTW || UiLocale.en, 6) => '所在地',
@@ -596,6 +675,14 @@ UiLocale.zhTW || UiLocale.en => '風險措施',
 String sellerMeasureRequestReplyNote(UiLocale l, {required String reason}) {
 return switch (l) {
 UiLocale.zhTW || UiLocale.en => '平台回覆：' + reason,
+};
+}
+
+/// seller.PaymentAccount.payouts_inactive_note
+String sellerPaymentAccountPayoutsInactiveNote(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '撥款到銀行帳戶尚未啟用，金流商可能會通知你補件。',
+UiLocale.en => 'Payouts to your bank account are not enabled yet. The payment provider may ask you for more information.',
 };
 }
 

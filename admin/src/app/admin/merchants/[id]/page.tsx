@@ -38,6 +38,7 @@ import {
 import { type ActionResult, runAction } from "@/lib/connect-action";
 import { connectErrorText } from "@/lib/error-text";
 import { formatDateTimeShort } from "@/lib/format";
+import { isKycApproved } from "@/lib/kyc-status";
 import { formatProductPriceRange } from "@/lib/product-price";
 import { getStatusMeta } from "@/lib/product-status";
 import { unavailableLabels } from "@/lib/unavailability";
@@ -252,7 +253,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 	// 沒有送出過的申請（GetStore 沒有 kyc 摘要）時不發請求，也不顯示 KYC 區塊。
 	const kycSummary = detail?.kyc;
 	// 「已通過」看 KYC 的人工決定（KYCStatus.APPROVED，與清單的「已核准」同義）；PayUni 的結果另看 PayUni 卡。
-	const isApproved = kycSummary?.status === KYCStatus.KYC_STATUS_APPROVED;
+	const isApproved = isKycApproved(kycSummary?.status);
 	// 評分統計卡：與買家看到的店面同一個來源（公開 GetStore 的 StoreStats）；讀不到（含已關閉、未公開）就沒有值，那張卡不渲染。
 	const rating = useStoreRating(store?.storeCode, isApproved);
 	const kycQuery = useKycApplication(kycSummary?.applicationId);

@@ -139,6 +139,13 @@
         "KYC_FLOW_STATUS_SUBMITTED": "你的商家認證平台審核中，通過後將自動送出至 PayUni 進行金流審核，完成後就能{subject}。"
       }
     },
+    "KYCStatus": {
+      "KYC_STATUS_APPROVED": "已通過",
+      "KYC_STATUS_CANCELLED": "已取消",
+      "KYC_STATUS_DRAFT": "草稿",
+      "KYC_STATUS_REJECTED": "需修改",
+      "KYC_STATUS_SUBMITTED": "審核中"
+    },
     "Measure": {
       "appeal_deadline": "申覆期限：{deadline}",
       "meta_kind": "措施：{kind}",
@@ -205,6 +212,29 @@
       "PAY_UNI_STATE_REVIEWING": "PayUni 審核中",
       "PAY_UNI_STATE_TERMINATED": "PayUni 收款帳戶已終止"
     },
+    "PaymentAccount": {
+      "payouts_inactive_note": "撥款到銀行帳戶尚未啟用，金流商可能會通知你補件。"
+    },
+    "PaymentAccountStatus": {
+      "PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": "待設定",
+      "PAYMENT_ACCOUNT_STATUS_DISABLED": "無法啟用",
+      "PAYMENT_ACCOUNT_STATUS_ENABLED": "已啟用",
+      "PAYMENT_ACCOUNT_STATUS_NOT_CREATED": "準備中",
+      "PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": "審核中",
+      "action": {
+        "PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": "前往設定收款帳戶",
+        "PAYMENT_ACCOUNT_STATUS_DISABLED": "聯絡客服",
+        "PAYMENT_ACCOUNT_STATUS_NOT_CREATED": "重新整理",
+        "PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": "重新整理"
+      },
+      "description": {
+        "PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": "提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。",
+        "PAYMENT_ACCOUNT_STATUS_DISABLED": "金流商目前無法啟用你的收款帳戶，請聯絡客服。",
+        "PAYMENT_ACCOUNT_STATUS_ENABLED": "收款已啟用。",
+        "PAYMENT_ACCOUNT_STATUS_NOT_CREATED": "正在建立收款帳戶，通常幾分鐘內完成。",
+        "PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": "金流商正在審核你的資料，不需要額外操作。"
+      }
+    },
     "RevokeReason": {
       "REVOKE_REASON_ADMIN_CORRECTION": "平台更正",
       "REVOKE_REASON_APPEAL_ACCEPTED": "申覆成立",
@@ -231,7 +261,7 @@
       "SELLER_REQUIREMENT_LOGO": "logo",
       "SELLER_REQUIREMENT_NOT_PENDING_DELETION": "店家未在刪除中",
       "SELLER_REQUIREMENT_NOT_SUSPENDED": "帳號未停權",
-      "SELLER_REQUIREMENT_ONBOARDING_COMPLETE": "商家認證已通過",
+      "SELLER_REQUIREMENT_ONBOARDING_COMPLETE": "平台審核與收款帳戶都完成",
       "SELLER_REQUIREMENT_STORE_ACTIVE": "店家未關閉",
       "SELLER_REQUIREMENT_STORE_NAME": "店名",
       "SELLER_REQUIREMENT_TOWN_CODE": "所在地"

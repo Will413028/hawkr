@@ -368,7 +368,7 @@
       "name": "hawkr.seller.v1alpha1.KYCStatus",
       "tsName": "KYCStatus",
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {
@@ -438,7 +438,7 @@
       "name": "hawkr.seller.v1alpha1.PaymentAccountStatus",
       "tsName": "PaymentAccountStatus",
       "tsModule": "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {

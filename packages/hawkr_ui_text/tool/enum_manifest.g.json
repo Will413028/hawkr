@@ -130,7 +130,7 @@
       "name": "hawkr.seller.v1alpha1.KYCStatus",
       "dartClass": "KYCStatus",
       "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {
@@ -200,7 +200,7 @@
       "name": "hawkr.seller.v1alpha1.PaymentAccountStatus",
       "dartClass": "PaymentAccountStatus",
       "dartLibrary": "package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {

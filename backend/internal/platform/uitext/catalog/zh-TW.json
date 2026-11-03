@@ -448,6 +448,26 @@
       },
       "description": "認證閘門卡片的說明。subject 是 client 的動作名稱，接在句尾。（值 KYC_FLOW_STATUS_SUBMITTED）"
     },
+    "seller.KYCStatus.KYC_STATUS_APPROVED": {
+      "message": "已通過",
+      "description": "管理員核准。"
+    },
+    "seller.KYCStatus.KYC_STATUS_CANCELLED": {
+      "message": "已取消",
+      "description": "賣家取消；只出現在 CancelKYC 的回應。"
+    },
+    "seller.KYCStatus.KYC_STATUS_DRAFT": {
+      "message": "草稿",
+      "description": "填寫中；被退回的申請編輯時也回到這裡。"
+    },
+    "seller.KYCStatus.KYC_STATUS_REJECTED": {
+      "message": "需修改",
+      "description": "管理員退回，可以修改後重送。"
+    },
+    "seller.KYCStatus.KYC_STATUS_SUBMITTED": {
+      "message": "審核中",
+      "description": "已送出，等待管理員審核。"
+    },
     "seller.Measure.appeal_deadline": {
       "message": "申覆期限：{deadline}",
       "params": {
@@ -716,6 +736,66 @@
       "message": "PayUni 收款帳戶已終止",
       "description": "PayUni 端的商店已是終止狀態，同一個店家無法再綁定。"
     },
+    "seller.PaymentAccount.payouts_inactive_note": {
+      "message": "撥款到銀行帳戶尚未啟用，金流商可能會通知你補件。",
+      "description": "收款已啟用但撥款（payouts_active 為 false）尚未啟用時，接在收款帳戶說明後的一行。"
+    },
+    "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
+      "message": "待設定",
+      "description": "賣家要補資料（包含新帳戶尚未開通）：重新取得開通 session 完成。"
+    },
+    "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED": {
+      "message": "無法啟用",
+      "description": "被金流商拒絕、不支援或限制，賣家補件解不開，要由平台或金流商處理。"
+    },
+    "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED": {
+      "message": "已啟用",
+      "description": "轉帳能力已啟用；平台審核同時核准時，店家通過開通閘門（SELLER_REQUIREMENT_ONBOARDING_COMPLETE）。"
+    },
+    "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_NOT_CREATED": {
+      "message": "準備中",
+      "description": "平台已核准，外部帳戶還在建立（背景程序處理，失敗時進後台待辦）。"
+    },
+    "seller.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": {
+      "message": "審核中",
+      "description": "轉帳能力還沒啟用，等金流商審核，賣家沒有要做的事。"
+    },
+    "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
+      "message": "前往設定收款帳戶",
+      "description": "收款帳戶區引導賣家做哪一步；已啟用沒有動作。（值 PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED）"
+    },
+    "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_DISABLED": {
+      "message": "聯絡客服",
+      "description": "收款帳戶區引導賣家做哪一步；已啟用沒有動作。（值 PAYMENT_ACCOUNT_STATUS_DISABLED）"
+    },
+    "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_NOT_CREATED": {
+      "message": "重新整理",
+      "description": "收款帳戶區引導賣家做哪一步；已啟用沒有動作。（值 PAYMENT_ACCOUNT_STATUS_NOT_CREATED）"
+    },
+    "seller.PaymentAccountStatus.action.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": {
+      "message": "重新整理",
+      "description": "收款帳戶區引導賣家做哪一步；已啟用沒有動作。（值 PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW）"
+    },
+    "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
+      "message": "提供身分與銀行資料後即可開始收款。資料由金流商收集，平台不經手。",
+      "description": "收款帳戶區的狀態說明。（值 PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED）"
+    },
+    "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_DISABLED": {
+      "message": "金流商目前無法啟用你的收款帳戶，請聯絡客服。",
+      "description": "收款帳戶區的狀態說明。（值 PAYMENT_ACCOUNT_STATUS_DISABLED）"
+    },
+    "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_ENABLED": {
+      "message": "收款已啟用。",
+      "description": "收款帳戶區的狀態說明。（值 PAYMENT_ACCOUNT_STATUS_ENABLED）"
+    },
+    "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_NOT_CREATED": {
+      "message": "正在建立收款帳戶，通常幾分鐘內完成。",
+      "description": "收款帳戶區的狀態說明。（值 PAYMENT_ACCOUNT_STATUS_NOT_CREATED）"
+    },
+    "seller.PaymentAccountStatus.description.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": {
+      "message": "金流商正在審核你的資料，不需要額外操作。",
+      "description": "收款帳戶區的狀態說明。（值 PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW）"
+    },
     "seller.RevokeReason.REVOKE_REASON_ADMIN_CORRECTION": {
       "message": "平台更正",
       "description": "平台更正誤判。"
@@ -793,7 +873,7 @@
       "description": "帳號沒有生效中的停權。"
     },
     "seller.SellerRequirement.SELLER_REQUIREMENT_ONBOARDING_COMPLETE": {
-      "message": "商家認證已通過",
+      "message": "平台審核與收款帳戶都完成",
       "description": "平台審核已核准，而且收款帳戶的轉帳能力已啟用。"
     },
     "seller.SellerRequirement.SELLER_REQUIREMENT_STORE_ACTIVE": {
@@ -934,6 +1014,26 @@
       "message": "PayUni 審核中",
       "description": "KYCFlowStatus 是 KYC 與 PayUni 兩條軸合成的流程狀態，給畫面顯示。（值 KYC_FLOW_STATUS_UNDER_REVIEW）\n受眾：後台員工"
     },
+    "seller.KYCStatus.KYC_STATUS_APPROVED": {
+      "message": "已核准",
+      "description": "管理員核准。\n受眾：後台員工"
+    },
+    "seller.KYCStatus.KYC_STATUS_CANCELLED": {
+      "message": "已取消",
+      "description": "賣家取消；只出現在 CancelKYC 的回應。\n受眾：後台員工"
+    },
+    "seller.KYCStatus.KYC_STATUS_DRAFT": {
+      "message": "填寫中",
+      "description": "填寫中；被退回的申請編輯時也回到這裡。\n受眾：後台員工"
+    },
+    "seller.KYCStatus.KYC_STATUS_REJECTED": {
+      "message": "已退回",
+      "description": "管理員退回，可以修改後重送。\n受眾：後台員工"
+    },
+    "seller.KYCStatus.KYC_STATUS_SUBMITTED": {
+      "message": "待審核",
+      "description": "已送出，等待管理員審核。\n受眾：後台員工"
+    },
     "seller.MeasureRequestState.MEASURE_REQUEST_STATE_ACCEPTED": {
       "message": "成立",
       "description": "MeasureRequestState 是措施上請求（申覆與解除請求）的狀態；由伺服器推導（措施已不在生效中而仍待處理的解除請求是 CLOSED，見\nMeasureRequestCloseCause）。ACCEPTED 的效果看 MeasureRequest.kind。（值 MEASURE_REQUEST_STATE_ACCEPTED）\n受眾：後台員工"
@@ -1044,6 +1144,17 @@
         "staff": []
       },
       "description": "請求的種類與狀態合成的狀態標籤。"
+    },
+    "seller.PaymentAccountStatus.action": {
+      "omit": {
+        "default": [
+          "PAYMENT_ACCOUNT_STATUS_ENABLED"
+        ]
+      },
+      "description": "收款帳戶區引導賣家做哪一步；已啟用沒有動作。"
+    },
+    "seller.PaymentAccountStatus.description": {
+      "description": "收款帳戶區的狀態說明。"
     }
   }
 }
