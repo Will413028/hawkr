@@ -580,7 +580,7 @@ func TestReconcileDeletesSnapshotsOfEndedSanctions(t *testing.T) {
 	must(t, err)
 	// 沒有目前 stint 的帳號：直接寫一筆已結束的措施與快照（模擬結束 job 遺失）。
 	var storeID int64
-	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE store_id=$1", accountID).Scan(&storeID))
+	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE account_id=$1", accountID).Scan(&storeID))
 	f.insertEndedRisk(t, storeID, accountID, true)
 	if _, err := f.module.ReconcileSuspensions(ctx); err != nil {
 		t.Fatal(err)
