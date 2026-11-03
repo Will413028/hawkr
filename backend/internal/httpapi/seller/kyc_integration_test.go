@@ -965,7 +965,7 @@ func TestSaveKYCDraftSwitchesTheSellerTypeAndValidatesTheTaxID(t *testing.T) {
 		t.Fatalf("switched=%v", switched)
 	}
 	// 個人專屬的身分證號隨型態切換清掉；共用的欄位保留。
-	if switched.GetRealName() != "王小明" || slices.Contains(missingPaths(switched), "real_name") || !slices.Contains(missingPaths(switched), "business.rep_id_card_no") {
+	if switched.GetRealName() != "王小明" || switched.GetBusiness().GetRepIdCardNoMasked() != "" || len(missingPaths(switched)) != 0 {
 		t.Fatalf("switched=%v missing=%v", switched, missingPaths(switched))
 	}
 }
