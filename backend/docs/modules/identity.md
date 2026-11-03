@@ -20,7 +20,7 @@
 - 同一個 (provider, subject) 並發的第一次登入只建一個帳號：`account_identities` 的主鍵 `(provider, subject)` 加同一個 transaction。沒有 email（LINE 使用者可以拒給）也照樣建帳。登入遇到已刪除帳號留下的墓碑身分時被拒絕，不再建帳號。
 - 建帳不授予任何業務角色。建帳的 transaction 內發布 `AccountCreated`，buyer 模組訂閱並在同一個 transaction 內建立買家（ADR `docs/adr/2026-09-30-account-created-provisions-buyer.md`）。
 - `accounts.email` 是 provider 回報的已驗證 email，每次登入更新，作通知的寄件地址，也給後台顯示與搜尋；不是識別、不唯一，沒有已驗證 email 時保持原值。
-- `accounts.self_entered_email` 是帳號自己填的聯絡信箱（D23 2026-11-03 修訂；賣家送審要有聯絡信箱）：未驗證，不是寄件地址（通知只寄已驗證的 `email`，通知 ADR 決策 8），不寫進 `account_identities`，不是自動連結的依據。`SetContactEmail`（模組 `SetSelfEnteredEmail`）只在帳號沒有已驗證 email 時可設，有的話 `FAILED_PRECONDITION`；格式同 `emailaddr.Normalize`（去空白、小寫、至多 254 字）。`GetContactEmail`（模組 `ContactEmail`）回聯絡信箱與來源：已驗證的 `email` 優先，沒有才用自填的，都沒有時不帶；兩者停權的帳號都能讀，設定是寫入（停權時 `ACCOUNT_SUSPENDED`）。刪帳清為 NULL（`accounts_deleted_check`）。守門：`TestContactEmailPrefersTheVerifiedEmail`、`TestSetSelfEnteredEmail`、`TestDeletionClearsTheSelfEnteredEmail`、`TestSelfEnteredEmailIsNotAnAutoLinkAnchor`。
+- `accounts.self_entered_email` 是帳號自己填的聯絡信箱（D23 2026-11-03 修訂；賣家送審要有聯絡信箱）：未驗證，不是寄件地址（通知只寄已驗證的 `email`，通知 ADR 決策 8），不寫進 `account_identities`，不是自動連結的依據。`SetContactEmail`（模組 `SetSelfEnteredEmail`）只在帳號沒有可用的已驗證 email 時可設，有的話 `FAILED_PRECONDITION`；已驗證的 `email` 沒有格式 CHECK，不通過 `emailaddr.Normalize` 的視為沒有（讀取、設定、送審、核准都是這一條規則，回正規化後的值）；格式同 `emailaddr.Normalize`（去空白、小寫、至多 254 字）。`GetContactEmail`（模組 `ContactEmail`）回聯絡信箱與來源：可用的已驗證 `email` 優先，沒有才用自填的，都沒有時不帶；兩者停權的帳號都能讀，設定是寫入（停權時 `ACCOUNT_SUSPENDED`）。刪帳清為 NULL（`accounts_deleted_check`）。守門：`TestContactEmailPrefersTheVerifiedEmail`、`TestSetSelfEnteredEmail`、`TestDeletionClearsTheSelfEnteredEmail`、`TestSelfEnteredEmailIsNotAnAutoLinkAnchor`、`TestInvalidVerifiedEmailIsTreatedAsAbsent`、單元 `TestContactEmailRule`。
 
 ## 3. 帳號角色
 

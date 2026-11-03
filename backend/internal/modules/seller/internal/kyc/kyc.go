@@ -27,7 +27,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/auditreason"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
-	"github.com/Will413028/hawkr/backend/internal/platform/emailaddr"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/seal"
@@ -71,19 +70,25 @@ func New(d Deps) *Service {
 	return &Service{d: d, p: protector{keys: d.Keys, mac: d.MAC}}
 }
 
-// contactEmail 回傳帳號的聯絡信箱（已驗證的優先，沒有才用自填的），正規化成收款帳戶的格式（小寫、格式與長度的檢查同 payment_accounts_contact_email_check）；
-// 沒有，或 provider 回報的值不是可用的信箱，回 failed_precondition 與 CONTACT_EMAIL_REQUIRED。在呼叫方的 transaction 內讀取。
-func (s *Service) contactEmail(ctx context.Context, accountID int64) (string, error) {
+// contactEmail 回傳帳號的聯絡信箱，identity 已依它的規則正規化並略過格式不合的值；帳號沒有可用的信箱時 ok 是 false。在呼叫方的 transaction 內讀取。
+func (s *Service) contactEmail(ctx context.Context, accountID int64) (string, bool, error) {
 	c, ok, err := s.d.Identity.ContactEmail(ctx, accountID)
+	if err != nil || !ok {
+		return "", false, err
+	}
+	return c.Address, true, nil
+}
+
+// requireContactEmail 是送審的檢查：帳號沒有聯絡信箱回 failed_precondition 與 CONTACT_EMAIL_REQUIRED。
+func (s *Service) requireContactEmail(ctx context.Context, accountID int64) (string, error) {
+	email, ok, err := s.contactEmail(ctx, accountID)
 	if err != nil {
 		return "", err
 	}
-	if ok {
-		if email, valid := emailaddr.Normalize(c.Address); valid {
-			return email, nil
-		}
+	if !ok {
+		return "", apperr.FailedPrecondition("請先填寫聯絡信箱").WithReason(apperr.ReasonContactEmailRequired)
 	}
-	return "", apperr.FailedPrecondition("請先填寫聯絡信箱").WithReason(apperr.ReasonContactEmailRequired)
+	return email, nil
 }
 
 func errVersionConflict() error { return apperr.VersionConflict("申請資料已被修改") }
@@ -408,7 +413,7 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitKYCInput) (model.KY
 		if err := complete(row); err != nil {
 			return err
 		}
-		if _, err := s.contactEmail(ctx, locked.AccountID); err != nil {
+		if _, err := s.requireContactEmail(ctx, locked.AccountID); err != nil {
 			return err
 		}
 		missingStore, err := s.missingStoreFields(ctx, q, row.StoreID)

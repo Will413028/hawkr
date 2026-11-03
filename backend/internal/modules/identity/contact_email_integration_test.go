@@ -23,7 +23,7 @@ func (f *fixture) selfEntered(t *testing.T, accountID int64) *string {
 }
 
 // 聯絡信箱：已驗證的 email 優先，沒有才用自填的，都沒有時 ok 是 false；帳號不存在回 NotFound。
-// mutation：contactEmail 改成自填優先 → 第二段失敗；只回已驗證的 → 第三段失敗。
+// mutation：contactEmail 改成自填優先 → 第一段失敗；只回已驗證的 → 第二段失敗；不正規化已驗證的值 → 第一段失敗。
 func TestContactEmailPrefersTheVerifiedEmail(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -34,7 +34,7 @@ func TestContactEmailPrefersTheVerifiedEmail(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, ok, err := f.m.ContactEmail(ctx, both)
-	if err != nil || !ok || got != (ContactEmail{Address: "Verified@Example.com", Source: ContactEmailVerified}) {
+	if err != nil || !ok || got != (ContactEmail{Address: "verified@example.com", Source: ContactEmailVerified}) {
 		t.Fatalf("兩者都有：%+v %v %v", got, ok, err)
 	}
 	onlySelf := f.account(t, "only_self")
@@ -52,7 +52,7 @@ func TestContactEmailPrefersTheVerifiedEmail(t *testing.T) {
 	wantKind(t, err, apperr.KindNotFound)
 }
 
-// 設定自填信箱：正規化後存；只在沒有已驗證 email 時可設；格式不合回 InvalidInput 指向 Email；不存在或已刪除回 NotFound；不寫進 account_identities。
+// 設定自填信箱：正規化後存；只在沒有可用的已驗證 email 時可設；格式不合回 InvalidInput 指向 Email；不存在或已刪除回 NotFound；不寫進 account_identities。
 // mutation：拿掉「有已驗證 email 就拒絕」→ 第二段失敗；SetSelfEnteredEmail 不正規化 → 第一段失敗；同時把信箱寫進 account_identities → 最後一段失敗。
 func TestSetSelfEnteredEmail(t *testing.T) {
 	t.Parallel()
@@ -153,5 +153,45 @@ func TestSelfEnteredEmailIsNotAnAutoLinkAnchor(t *testing.T) {
 	}
 	if v := f.selfEntered(t, line.AccountID); v == nil || *v != "shared@gmail.com" {
 		t.Fatalf("自填的值應保留：%v", v)
+	}
+}
+
+// 已驗證的 email 格式不合（accounts.email 沒有格式 CHECK）視為沒有：聯絡信箱改用自填的，沒有自填的時 ok 是 false；
+// 設定自填信箱不被已驗證的壞值擋住，設定之後讀到自填的；已驗證的有效 email 仍擋設定。
+// mutation：contactEmail 不檢查已驗證 email 的格式 → 第一、二段失敗；SetSelfEnteredEmail 改回只看非空 → 第三段失敗；
+// 拿掉「有效的已驗證 email 就拒絕」→ 最後一段失敗。
+func TestInvalidVerifiedEmailIsTreatedAsAbsent(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	f.emails["bad"] = "not-an-email"
+	bad := f.account(t, "bad")
+	if got, ok, err := f.m.ContactEmail(ctx, bad); err != nil || ok || got != (ContactEmail{}) {
+		t.Fatalf("壞的已驗證信箱且沒有自填：%+v %v %v", got, ok, err)
+	}
+	if _, err := f.db.Pool().Exec(ctx, `UPDATE identity.accounts SET self_entered_email = 'Self@Example.com' WHERE id = $1`, bad); err != nil {
+		t.Fatal(err)
+	}
+	got, ok, err := f.m.ContactEmail(ctx, bad)
+	if err != nil || !ok || got != (ContactEmail{Address: "self@example.com", Source: ContactEmailSelfEntered}) {
+		t.Fatalf("壞的已驗證信箱加自填：%+v %v %v", got, ok, err)
+	}
+
+	f.emails["bad2"] = "user@localhost"
+	bad2 := f.account(t, "bad2")
+	set, err := f.m.SetSelfEnteredEmail(ctx, bad2, "me@example.com")
+	if err != nil || set != (ContactEmail{Address: "me@example.com", Source: ContactEmailSelfEntered}) {
+		t.Fatalf("壞的已驗證信箱時設定：%+v %v", set, err)
+	}
+	if got, ok, err := f.m.ContactEmail(ctx, bad2); err != nil || !ok || got != set {
+		t.Fatalf("設定之後讀到：%+v %v %v", got, ok, err)
+	}
+
+	f.emails["good"] = "good@example.com"
+	good := f.account(t, "good")
+	_, err = f.m.SetSelfEnteredEmail(ctx, good, "me@example.com")
+	wantKind(t, err, apperr.KindFailedPrecondition)
+	if v := f.selfEntered(t, good); v != nil {
+		t.Fatalf("被拒絕之後不該寫入：%v", *v)
 	}
 }

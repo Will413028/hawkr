@@ -2695,8 +2695,10 @@ export const SellerAdminService: GenService<{
   /**
    * ApproveKYC 核准審核中的申請，並在同一個 transaction 寫入 PayUni 的綁定意圖（綁定由背景程序完成）。etag 必填。身分命中
    * 別的帳號生效中的處分回 failed_precondition，文案不透露欄位或帳號。申請不能核准（不在審核中、店家已關閉或等待刪除、
-   * 帳號停權中）時回 failed_precondition，訊息是 KYCApplication.approve_unavailabilities 的第一句。帳號停權時不能核准、可以退回；
+   * 帳號停權中）時回 failed_precondition，訊息是 KYCApplication.approve_unavailabilities 的第一句。
+   * 帳號停權時不能核准、可以退回；
    * 店家不是營運中或帳號停權的這段期間，申請不在後台待辦、沒有審核期限，恢復之後自動回到待辦。
+   * 收款已設定時，賣家帳號沒有可用的聯絡信箱（登入信箱與自填信箱都沒有或格式不合）也回 failed_precondition，訊息說明這點，請賣家先填寫。
    * etag 與目前的版本不符（包含核准已經生效後再帶舊 etag 送一次）一律回 aborted（VERSION_CONFLICT），不寫入。
    *
    * @generated from rpc hawkr.admin.seller.v1alpha1.SellerAdminService.ApproveKYC

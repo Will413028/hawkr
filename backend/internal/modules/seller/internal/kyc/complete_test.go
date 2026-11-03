@@ -46,25 +46,20 @@ func (f fakeIdentity) ContactEmail(context.Context, int64) (identity.ContactEmai
 	return f.email, f.ok, f.err
 }
 
-// 聯絡信箱：沒有、或 provider 回報的值不是可用的信箱，回 failed_precondition 與 CONTACT_EMAIL_REQUIRED；有的回正規化後的位址（收款帳戶的 CHECK 要小寫）。
-func TestContactEmailIsRequiredAndNormalized(t *testing.T) {
-	for name, id := range map[string]fakeIdentity{
-		"none":      {},
-		"empty":     {email: identity.ContactEmail{Address: "", Source: identity.ContactEmailVerified}, ok: true},
-		"malformed": {email: identity.ContactEmail{Address: "not-an-email", Source: identity.ContactEmailVerified}, ok: true},
-	} {
-		_, err := (&Service{d: Deps{Identity: id}}).contactEmail(context.Background(), 1)
-		var ae *apperr.Error
-		if !errors.As(err, &ae) || ae.Kind() != apperr.KindFailedPrecondition || ae.Reason != apperr.ReasonContactEmailRequired {
-			t.Errorf("%s：err=%v，預期 FailedPrecondition 與 CONTACT_EMAIL_REQUIRED", name, err)
-		}
+// 送審要求帳號有聯絡信箱：identity 說沒有（含已驗證信箱格式不合又沒自填）回 failed_precondition 與 CONTACT_EMAIL_REQUIRED；有的原樣採用 identity 給的值，seller 不再有第二份格式規則。
+// mutation：requireContactEmail 不檢查 ok → 「none」失敗；seller 又自己正規化 → 「identity 的值原樣」失敗。
+func TestContactEmailIsRequiredAndTakenFromIdentity(t *testing.T) {
+	_, err := (&Service{d: Deps{Identity: fakeIdentity{}}}).requireContactEmail(context.Background(), 1)
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || ae.Kind() != apperr.KindFailedPrecondition || ae.Reason != apperr.ReasonContactEmailRequired {
+		t.Errorf("none：err=%v，預期 FailedPrecondition 與 CONTACT_EMAIL_REQUIRED", err)
 	}
-	got, err := (&Service{d: Deps{Identity: fakeIdentity{email: identity.ContactEmail{Address: "Pay.Out@Example.COM", Source: identity.ContactEmailVerified}, ok: true}}}).contactEmail(context.Background(), 1)
+	got, err := (&Service{d: Deps{Identity: fakeIdentity{email: identity.ContactEmail{Address: "pay.out@example.com", Source: identity.ContactEmailSelfEntered}, ok: true}}}).requireContactEmail(context.Background(), 1)
 	if err != nil || got != "pay.out@example.com" {
-		t.Fatalf("contactEmail=%q, %v", got, err)
+		t.Fatalf("identity 的值原樣：%q, %v", got, err)
 	}
 	boom := errors.New("boom")
-	if _, err := (&Service{d: Deps{Identity: fakeIdentity{err: boom}}}).contactEmail(context.Background(), 1); !errors.Is(err, boom) {
+	if _, err := (&Service{d: Deps{Identity: fakeIdentity{err: boom}}}).requireContactEmail(context.Background(), 1); !errors.Is(err, boom) {
 		t.Fatalf("identity 的錯誤要原樣回傳：%v", err)
 	}
 }

@@ -66,7 +66,8 @@ func (m *Service) Accounts(ctx context.Context, ids []int64) ([]model.Account, e
 	return out, nil
 }
 
-// ContactEmail 回傳帳號的聯絡信箱：已驗證的 email 優先，沒有才用自填的；兩者都沒有（含已刪除的墓碑）時 ok 是 false。
+// ContactEmail 回傳帳號的聯絡信箱（正規化後的值）：通過 emailaddr.Normalize 的已驗證 email 優先，沒有（不存在或格式不合）才用自填的；
+// 兩者都沒有（含已刪除的墓碑）時 ok 是 false。
 // 帳號不存在回 NotFound。在呼叫方的 transaction 內呼叫時讀同一個 transaction 的狀態。
 func (m *Service) ContactEmail(ctx context.Context, accountID int64) (model.ContactEmail, bool, error) {
 	r, err := m.q(ctx).GetAccount(ctx, accountID)
@@ -81,18 +82,27 @@ func (m *Service) ContactEmail(ctx context.Context, accountID int64) (model.Cont
 }
 
 func contactEmail(r store.IdentityAccount) (model.ContactEmail, bool) {
-	switch {
-	case r.DeletedAt != nil:
+	if r.DeletedAt != nil {
 		return model.ContactEmail{}, false
-	case deref(r.Email) != "":
-		return model.ContactEmail{Address: *r.Email, Source: model.ContactEmailVerified}, true
-	case deref(r.SelfEnteredEmail) != "":
-		return model.ContactEmail{Address: *r.SelfEnteredEmail, Source: model.ContactEmailSelfEntered}, true
+	}
+	if email, ok := validEmail(r.Email); ok {
+		return model.ContactEmail{Address: email, Source: model.ContactEmailVerified}, true
+	}
+	if email, ok := validEmail(r.SelfEnteredEmail); ok {
+		return model.ContactEmail{Address: email, Source: model.ContactEmailSelfEntered}, true
 	}
 	return model.ContactEmail{}, false
 }
 
-// SetSelfEnteredEmail 設定帳號自填的聯絡信箱（正規化後存）。只在帳號沒有已驗證的 email 時可設，有的話回 FailedPrecondition；
+// validEmail 回傳通過 emailaddr.Normalize 的正規化信箱；沒有值或格式不合都視為沒有。聯絡信箱與設定自填信箱共用這一條規則。
+func validEmail(raw *string) (string, bool) {
+	if raw == nil {
+		return "", false
+	}
+	return emailaddr.Normalize(*raw)
+}
+
+// SetSelfEnteredEmail 設定帳號自填的聯絡信箱（正規化後存）。只在帳號沒有可用的已驗證 email（不存在或格式不合）時可設，有的話回 FailedPrecondition；
 // 信箱格式不合回 InvalidInput（欄位 Email）；帳號不存在或已刪除回 NotFound。回傳設定之後的聯絡信箱。
 func (m *Service) SetSelfEnteredEmail(ctx context.Context, accountID int64, raw string) (model.ContactEmail, error) {
 	email, ok := emailaddr.Normalize(raw)
@@ -112,7 +122,7 @@ func (m *Service) SetSelfEnteredEmail(ctx context.Context, accountID int64, raw 
 		if err != nil {
 			return fmt.Errorf("identity：讀取帳號 %d：%w", accountID, err)
 		}
-		if deref(r.Email) != "" {
+		if _, verified := validEmail(r.Email); verified {
 			return apperr.FailedPrecondition("帳號已有登入方式驗證過的信箱，不能另外填寫")
 		}
 		out = model.ContactEmail{Address: email, Source: model.ContactEmailSelfEntered}

@@ -471,9 +471,12 @@ func (s *Service) Approve(ctx context.Context, in model.ApproveKYCInput) (model.
 		}
 		var contact *string
 		if s.d.Payment.Configured() {
-			email, err := s.contactEmail(ctx, locked.AccountID)
+			email, ok, err := s.contactEmail(ctx, locked.AccountID)
 			if err != nil {
 				return err
+			}
+			if !ok {
+				return apperr.FailedPrecondition("賣家帳號沒有可用的聯絡信箱（登入信箱與自填信箱都沒有或格式不合），請賣家先填寫後再核准")
 			}
 			contact = &email
 		}
