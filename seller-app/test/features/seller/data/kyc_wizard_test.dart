@@ -34,10 +34,6 @@ final _acceptances = [
     kind: AgreementKind.AGREEMENT_KIND_KYC_PRIVACY_NOTICE,
     version: 'p1',
   ),
-  AgreementAcceptance(
-    kind: AgreementKind.AGREEMENT_KIND_PAYUNI_TERMS,
-    version: 'u1',
-  ),
 ];
 
 /// 一個假的伺服器：記下每個呼叫的順序與請求，回應由測試設定。
@@ -927,7 +923,7 @@ void main() {
       return wizard;
     }
 
-    test('先把店家的聯絡資料與地址寫進店家，再直接 SubmitKYC（帶 etag 與兩份同意）', () async {
+    test('先把店家的聯絡資料與地址寫進店家，再直接 SubmitKYC（帶 etag 與同意）', () async {
       await ready(missingStore: [StoreField.STORE_FIELD_CONTACT_NAME]);
       wizard.updateStore(
         (s) => s.copyWith(

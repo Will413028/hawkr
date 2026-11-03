@@ -552,12 +552,13 @@ void main() {
   group('確認送出', () {
     KYCApplication complete() => individualApplication(etag: 'v1');
 
-    Future<void> checkBoth(WidgetTester tester) async {
+    Future<void> checkNotice(WidgetTester tester) async {
       await tapKey(tester, 'kyc_privacy_checkbox');
-      await tapKey(tester, 'kyc_payuni_checkbox');
     }
 
-    testWidgets('沒有缺項時停在確認；兩個勾選都勾了才能送出，送出帶 etag 與兩份現行版本', (tester) async {
+    testWidgets('沒有缺項時停在確認；告知事項勾了才能送出，送出帶 etag 與現行版本，不帶 PAYUNI_TERMS', (
+      tester,
+    ) async {
       await pumpScreen(tester, application: complete());
 
       expect(find.text('確認送出'), findsWidgets);
@@ -566,16 +567,16 @@ void main() {
       );
       expect(submitButton().onTap, isNull);
 
-      await checkBoth(tester);
+      await checkNotice(tester);
       await tapText(tester, '送出認證');
 
       final request = server.submits.single;
       expect(request.etag, 'v1');
       expect(request.acceptedAgreements.map((a) => a.kind), [
         AgreementKind.AGREEMENT_KIND_KYC_PRIVACY_NOTICE,
-        AgreementKind.AGREEMENT_KIND_PAYUNI_TERMS,
       ]);
-      expect(request.acceptedAgreements.map((a) => a.version), ['p1', 'u1']);
+      expect(request.acceptedAgreements.map((a) => a.version), ['p1']);
+      expect(find.byKey(const Key('kyc_payuni_checkbox')), findsNothing);
       expect(find.text('已送出申請'), findsOneWidget);
       expect(find.text('送出後 PayUni 預設密碼為你的身分證字號'), findsOneWidget);
       await tester.tap(find.text('我知道了'));
@@ -588,12 +589,12 @@ void main() {
       server.onSubmit = (_) =>
           throw reasonError(Code.failedPrecondition, 'AGREEMENT_OUTDATED');
 
-      await checkBoth(tester);
+      await checkNotice(tester);
       await tapText(tester, '送出認證');
 
       expect(find.text(agreementOutdatedMessage), findsOneWidget);
       expect(agreements.reads, 2);
-      for (final key in const ['kyc_privacy_checkbox', 'kyc_payuni_checkbox']) {
+      for (final key in const ['kyc_privacy_checkbox']) {
         expect(
           tester.widget<Checkbox>(find.byKey(Key(key))).value,
           isFalse,
@@ -609,7 +610,7 @@ void main() {
         throw reasonError(Code.failedPrecondition, 'AGREEMENT_OUTDATED');
       };
 
-      await checkBoth(tester);
+      await checkNotice(tester);
       await tapText(tester, '送出認證');
 
       expect(find.text(versionReloadFailedNotice), findsOneWidget);
@@ -630,7 +631,7 @@ void main() {
         throw ConnectException(Code.failedPrecondition, '請先到店家設定補齊');
       };
 
-      await checkBoth(tester);
+      await checkNotice(tester);
       await tapText(tester, '送出認證');
 
       expect(find.text('下列欄位尚未填寫：店家地址、聯絡人姓名'), findsWidgets);
@@ -641,7 +642,7 @@ void main() {
       await pumpScreen(tester, application: complete());
       server.onSubmit = (_) => throw fieldError('english_name', '請填寫商店英文名稱');
 
-      await checkBoth(tester);
+      await checkNotice(tester);
       await tapText(tester, '送出認證');
 
       expect(find.text('下列欄位尚未填寫：英文姓名'), findsOneWidget);
@@ -797,7 +798,6 @@ void main() {
     testWidgets('送出進行中不能返回；完成後才離開', (tester) async {
       await pumpScreen(tester, application: individualApplication(etag: 'v1'));
       await tapKey(tester, 'kyc_privacy_checkbox');
-      await tapKey(tester, 'kyc_payuni_checkbox');
       server.submitGate = Completer<void>();
 
       await tester.ensureVisible(find.text('送出認證'));
@@ -858,7 +858,6 @@ void main() {
     testWidgets('送出時衝突發現申請已取消：回到選擇身分，重建後從第一步開始、勾選取消', (tester) async {
       await pumpScreen(tester, application: individualApplication(etag: 'v1'));
       await tapKey(tester, 'kyc_privacy_checkbox');
-      await tapKey(tester, 'kyc_payuni_checkbox');
       server.onSubmit = (_) {
         server.application = null;
         throw reasonError(Code.aborted, 'VERSION_CONFLICT');
@@ -877,10 +876,9 @@ void main() {
       expect(find.text('確認送出'), findsNothing);
     });
 
-    testWidgets('取消之後再回到確認頁，兩個勾選是取消的', (tester) async {
+    testWidgets('取消之後再回到確認頁，勾選是取消的', (tester) async {
       await pumpScreen(tester, application: individualApplication(etag: 'v1'));
       await tapKey(tester, 'kyc_privacy_checkbox');
-      await tapKey(tester, 'kyc_payuni_checkbox');
       server.onSubmit = (_) {
         server.application = null;
         throw reasonError(Code.aborted, 'VERSION_CONFLICT');
@@ -895,7 +893,7 @@ void main() {
       await tapText(tester, '開始填寫');
 
       expect(find.text('確認送出'), findsWidgets);
-      for (final key in const ['kyc_privacy_checkbox', 'kyc_payuni_checkbox']) {
+      for (final key in const ['kyc_privacy_checkbox']) {
         expect(tester.widget<Checkbox>(find.byKey(Key(key))).value, isFalse);
       }
     });

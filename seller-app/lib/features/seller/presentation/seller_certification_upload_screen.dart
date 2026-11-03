@@ -65,13 +65,11 @@ class SellerCertificationUploadScreen extends HookConsumerWidget {
     final wizard = ref.read(kycWizardProvider.notifier);
     final stepState = useState<KycStep?>(null);
     final privacyChecked = useState(false);
-    final payuniChecked = useState(false);
     final isProcessingOcr = useState(false);
 
     final entered = useState(false);
     void resetScreen() {
       privacyChecked.value = false;
-      payuniChecked.value = false;
       stepState.value = null;
     }
 
@@ -324,7 +322,6 @@ class SellerCertificationUploadScreen extends HookConsumerWidget {
           if (context.mounted) context.pop(true);
         case KycSubmitOutcome.agreementOutdated:
           privacyChecked.value = false;
-          payuniChecked.value = false;
         case KycSubmitOutcome.failed:
           break;
       }
@@ -505,9 +502,7 @@ class SellerCertificationUploadScreen extends HookConsumerWidget {
                             actions: actions,
                             agreements: agreements,
                             privacyChecked: privacyChecked.value,
-                            payuniChecked: payuniChecked.value,
                             onPrivacyChanged: (v) => privacyChecked.value = v,
-                            onPayuniChanged: (v) => payuniChecked.value = v,
                           ),
                         ),
                       ),

@@ -30,7 +30,6 @@ import {
 	AgreementKind,
 	KYCField,
 	KYCFlowStatus,
-	KYCStatus,
 	SellerAppService,
 	type StoreField,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
@@ -99,6 +98,7 @@ import {
 	type KycIssueMessages,
 	kycDocsOf,
 	kycDocumentNotice,
+	kycDraftDiscardable,
 	kycEditable,
 	kycFieldLabel,
 	kycFieldOfPath,
@@ -221,10 +221,7 @@ interface ServerFieldError {
 	message: string;
 }
 
-const KYC_AGREEMENT_KINDS = [
-	AgreementKind.KYC_PRIVACY_NOTICE,
-	AgreementKind.PAYUNI_TERMS,
-] as const;
+const KYC_AGREEMENT_KINDS = [AgreementKind.KYC_PRIVACY_NOTICE] as const;
 
 const VERSION_CONFLICT_NOTICE = versionConflictNotice("申請資料");
 const STORE_VERSION_CONFLICT_NOTICE = versionConflictNotice("店家資料");
@@ -277,7 +274,6 @@ export default function CertificationsClient() {
 	const [banReg, setBanReg] = React.useState<BusinessLookup | null>(null);
 	const [submitError, setSubmitError] = useResettableError();
 	const [noticeRead, setNoticeRead] = React.useState(false);
-	const [payuniAccepted, setPayuniAccepted] = React.useState(false);
 	const [submitOk, setSubmitOk] = React.useState(false);
 	const [lastSavedAt, setLastSavedAt] = React.useState<number | null>(null);
 	const [saving, setSaving] = React.useState(false);
@@ -867,8 +863,6 @@ export default function CertificationsClient() {
 		[ut, application],
 	);
 
-	const agreementsAccepted = noticeRead && payuniAccepted;
-
 	const finishSubmit = React.useCallback(async () => {
 		setSubmitOk(true);
 		void invalidateSelf();
@@ -876,7 +870,7 @@ export default function CertificationsClient() {
 	}, [invalidateSelf, router]);
 
 	const handleSubmit = async () => {
-		if (!application || !editable || !agreementsAccepted) return;
+		if (!application || !editable || !noticeRead) return;
 		setBusy("submit");
 		setSubmitError(null);
 		try {
@@ -923,7 +917,6 @@ export default function CertificationsClient() {
 			);
 			if (isAgreementOutdated(e)) {
 				setNoticeRead(false);
-				setPayuniAccepted(false);
 				setSubmitError(AGREEMENT_OUTDATED_NOTICE);
 			} else if (failure.kind === "conflict") {
 				await resolveConflict();
@@ -1139,8 +1132,7 @@ export default function CertificationsClient() {
 		ut,
 		KYCFlowStatus.KYC_FLOW_STATUS_REJECTED,
 	);
-	const canDiscard =
-		application.status === KYCStatus.KYC_STATUS_DRAFT && !identityLocked;
+	const canDiscard = kycDraftDiscardable(application, identityLocked);
 
 	return (
 		<div className="seller-cert seller-cert--shell seller-cert--form-shell">
@@ -1350,15 +1342,6 @@ export default function CertificationsClient() {
 								linkText="賣家身分認證個人資料蒐集告知事項"
 								href={agreementUrl(AgreementKind.KYC_PRIVACY_NOTICE)}
 							/>
-							<AgreementCheckbox
-								checked={payuniAccepted}
-								disabled={busy === "submit"}
-								onChange={setPayuniAccepted}
-								before="我同意"
-								linkText="PAYUNi 服務條款"
-								href={agreementUrl(AgreementKind.PAYUNI_TERMS)}
-								after="，並了解平台會為我向 PAYUNi 申請子商店與會員"
-							/>
 						</div>
 
 						{submitError && (
@@ -1430,7 +1413,7 @@ export default function CertificationsClient() {
 								busy === "submit" ||
 								discardPending ||
 								missingItems.length > 0 ||
-								!agreementsAccepted ||
+								!noticeRead ||
 								storeAddressErr !== undefined ||
 								(hasUnsaved && !saveFailed) ||
 								saving

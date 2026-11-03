@@ -5,6 +5,7 @@ import {
 	KYCField,
 	KYCFlowStatus,
 	KYCIssueCode,
+	KYCStatus,
 	SaveKYCDraftRequestSchema,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { parseDate } from "@hawkr/api/proto/date";
@@ -22,6 +23,7 @@ import {
 	type KycForm,
 	kycDocsOf,
 	kycDocumentNotice,
+	kycDraftDiscardable,
 	kycEditable,
 	kycFieldOfPath,
 	kycFormKeyOfDraftPath,
@@ -466,6 +468,21 @@ describe("版本衝突：保留輸入、顯示最新", () => {
 			stagedToken: "",
 			preview: "/dl/a1",
 		});
+	});
+});
+
+describe("放棄草稿", () => {
+	const app = (status: KYCStatus) => create(KYCApplicationSchema, { status });
+	it("只有草稿而且身分沒有鎖定時可以放棄", () => {
+		expect(kycDraftDiscardable(app(KYCStatus.KYC_STATUS_DRAFT), false)).toBe(
+			true,
+		);
+		expect(kycDraftDiscardable(app(KYCStatus.KYC_STATUS_DRAFT), true)).toBe(
+			false,
+		);
+		expect(kycDraftDiscardable(app(KYCStatus.KYC_STATUS_REJECTED), false)).toBe(
+			false,
+		);
 	});
 });
 

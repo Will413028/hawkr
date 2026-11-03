@@ -18,6 +18,7 @@ import {
 	KYCApplicationSchema,
 	KYCField,
 	KYCFlowStatus,
+	KYCStatus,
 	type SaveKYCDraftRequest,
 	SaveKYCDraftRequestSchema,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
@@ -763,6 +764,14 @@ export function kycIssueMessages(
 /** 表單可以編輯：沒有申請（要建立），或伺服器說此刻能儲存草稿與重送（`flow.can_resubmit`：草稿、被退回、PayUni 拒絕或綁定失敗而且賣家能自己修正）。 */
 export function kycEditable(app: KYCApplication | null): boolean {
 	return !app || app.flow?.canResubmit === true;
+}
+
+/** 草稿可以放棄：申請還是草稿，而且身分欄位沒有鎖定。 */
+export function kycDraftDiscardable(
+	app: KYCApplication,
+	identityLocked: boolean,
+): boolean {
+	return app.status === KYCStatus.KYC_STATUS_DRAFT && !identityLocked;
 }
 
 /**

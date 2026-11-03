@@ -30,30 +30,30 @@ SellerAgreementSet _set(List<SellerAgreement> agreements) =>
     SellerAgreementSet(agreements);
 
 void main() {
-  test('KYC 的個資告知與 PayUni 條款：版本與網址取自伺服器，同意剛好這兩份', () {
+  test('KYC 的個資告知：版本與網址取自伺服器，同意剛好這一份，伺服器多給的 PayUni 條款不送', () {
     final agreements = _set([_seller, _privacy, _payuni]).kycAgreements();
 
     expect(agreements.privacyNotice.url, 'https://www.example.test/privacy');
-    expect(agreements.payuniTerms.url, 'https://www.example.test/payuni');
     expect(agreements.acceptances.map((a) => (a.kind, a.version)), [
       (AgreementKind.AGREEMENT_KIND_KYC_PRIVACY_NOTICE, 'p1'),
-      (AgreementKind.AGREEMENT_KIND_PAYUNI_TERMS, 'u1'),
     ]);
   });
 
-  test('缺任何一份、或版本與網址是空的，丟 StateError，不送空版本', () {
-    expect(() => _set([_seller, _privacy]).kycAgreements(), throwsStateError);
+  test('缺個資告知、或版本與網址是空的，丟 StateError，不送空版本', () {
+    expect(() => _set([_seller]).kycAgreements(), throwsStateError);
     expect(
       () => _set([
-        _privacy,
-        _agreement(AgreementKind.AGREEMENT_KIND_PAYUNI_TERMS, '', 'https://x'),
+        _agreement(
+          AgreementKind.AGREEMENT_KIND_KYC_PRIVACY_NOTICE,
+          '',
+          'https://x',
+        ),
       ]).kycAgreements(),
       throwsStateError,
     );
     expect(
       () => _set([
-        _privacy,
-        _agreement(AgreementKind.AGREEMENT_KIND_PAYUNI_TERMS, 'u1', ''),
+        _agreement(AgreementKind.AGREEMENT_KIND_KYC_PRIVACY_NOTICE, 'p1', ''),
       ]).kycAgreements(),
       throwsStateError,
     );
@@ -64,7 +64,7 @@ void main() {
     expect(() => _set([_privacy]).sellerTerms(), throwsStateError);
   });
 
-  test('賣家契約與 KYC 兩份文件共用同一次 GetSellerAgreements', () async {
+  test('賣家契約與 KYC 文件共用同一次 GetSellerAgreements', () async {
     var calls = 0;
     final container = ProviderContainer(
       overrides: [

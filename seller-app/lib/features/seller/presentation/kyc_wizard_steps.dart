@@ -78,9 +78,7 @@ class KycStepCard extends StatelessWidget {
     required this.actions,
     required this.agreements,
     required this.privacyChecked,
-    required this.payuniChecked,
     required this.onPrivacyChanged,
-    required this.onPayuniChanged,
   });
 
   final KycStep step;
@@ -88,9 +86,7 @@ class KycStepCard extends StatelessWidget {
   final KycStepActions actions;
   final AsyncValue<KycAgreements> agreements;
   final bool privacyChecked;
-  final bool payuniChecked;
   final ValueChanged<bool> onPrivacyChanged;
-  final ValueChanged<bool> onPayuniChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -108,9 +104,7 @@ class KycStepCard extends StatelessWidget {
         actions: actions,
         agreements: agreements,
         privacyChecked: privacyChecked,
-        payuniChecked: payuniChecked,
         onPrivacyChanged: onPrivacyChanged,
-        onPayuniChanged: onPayuniChanged,
       ),
     };
   }
@@ -708,18 +702,14 @@ class _ConfirmStep extends StatelessWidget {
     required this.actions,
     required this.agreements,
     required this.privacyChecked,
-    required this.payuniChecked,
     required this.onPrivacyChanged,
-    required this.onPayuniChanged,
   });
 
   final KycWizard controller;
   final KycStepActions actions;
   final AsyncValue<KycAgreements> agreements;
   final bool privacyChecked;
-  final bool payuniChecked;
   final ValueChanged<bool> onPrivacyChanged;
-  final ValueChanged<bool> onPayuniChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -731,7 +721,6 @@ class _ConfirmStep extends StatelessWidget {
     final loaded = agreements.value;
     final ready =
         privacyChecked &&
-        payuniChecked &&
         loaded != null &&
         missingItemsOf(
           c.application?.missingFields ?? const [],
@@ -815,18 +804,6 @@ class _ConfirmStep extends StatelessWidget {
           checked: privacyChecked,
           enabled: !c.submitting,
           onChanged: onPrivacyChanged,
-          onRetry: actions.retryAgreements,
-        ),
-        AgreementCheckbox(
-          checkboxKey: const Key('kyc_payuni_checkbox'),
-          before: '我同意',
-          linkText: 'PAYUNi 服務條款',
-          after: '，並了解平台會為我向 PAYUNi 申請子商店與會員',
-          url: loaded?.payuniTerms.url,
-          loadFailed: agreements.hasError,
-          checked: payuniChecked,
-          enabled: !c.submitting,
-          onChanged: onPayuniChanged,
           onRetry: actions.retryAgreements,
         ),
         _gap(12),

@@ -148,12 +148,12 @@ final class SellerTermsProvider
 
 String _$sellerTermsHash() => r'b2562fd66667fad709818a6b6ccc57c3a8e5451c';
 
-/// 送出 KYC 要確認的兩份文件；取自 [sellerAgreementsProvider]。
+/// 送出 KYC 要確認的文件；取自 [sellerAgreementsProvider]。
 
 @ProviderFor(kycAgreements)
 final kycAgreementsProvider = KycAgreementsProvider._();
 
-/// 送出 KYC 要確認的兩份文件；取自 [sellerAgreementsProvider]。
+/// 送出 KYC 要確認的文件；取自 [sellerAgreementsProvider]。
 
 final class KycAgreementsProvider
     extends
@@ -163,7 +163,7 @@ final class KycAgreementsProvider
           FutureOr<KycAgreements>
         >
     with $FutureModifier<KycAgreements>, $FutureProvider<KycAgreements> {
-  /// 送出 KYC 要確認的兩份文件；取自 [sellerAgreementsProvider]。
+  /// 送出 KYC 要確認的文件；取自 [sellerAgreementsProvider]。
   KycAgreementsProvider._()
     : super(
         from: null,

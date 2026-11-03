@@ -51,7 +51,6 @@ const kycStore = vi.hoisted(() => {
 
 const SERVED = vi.hoisted(() => ({
 	notice: { version: "2031-01-03", url: "/served-notice" },
-	payuni: { version: "2031-01-04", url: "https://example.com/payuni-terms" },
 }));
 
 const mocks = vi.hoisted(() => ({
@@ -106,7 +105,6 @@ vi.mock("@/features/legal/documents/sellerAgreements.gen", () => ({
 	SELLER_AGREEMENTS: {
 		SELLER_TERMS: { version: "2031-01-02", url: "/seller-terms" },
 		KYC_PRIVACY_NOTICE: SERVED.notice,
-		PAYUNI_TERMS: SERVED.payuni,
 	},
 }));
 vi.mock("@/lib/seller/repo", () => ({
@@ -266,23 +264,16 @@ async function autosave() {
 
 const ACCEPTED_KYC = [
 	{ kind: AgreementKind.KYC_PRIVACY_NOTICE, version: SERVED.notice.version },
-	{ kind: AgreementKind.PAYUNI_TERMS, version: SERVED.payuni.version },
 ];
 
 const NOTICE_LABEL = /賣家身分認證個人資料蒐集告知事項/;
-const PAYUNI_LABEL = /PAYUNi 服務條款/;
 
 function noticeBox(): HTMLInputElement {
 	return screen.getByLabelText(NOTICE_LABEL) as HTMLInputElement;
 }
 
-function payuniBox(): HTMLInputElement {
-	return screen.getByLabelText(PAYUNI_LABEL) as HTMLInputElement;
-}
-
 async function acceptAgreements() {
 	if (!noticeBox().checked) fireEvent.click(noticeBox());
-	if (!payuniBox().checked) fireEvent.click(payuniBox());
 	await act(async () => {});
 }
 
@@ -1399,43 +1390,33 @@ describe("店家地址：以鄉鎮市區代碼寫到店家", () => {
 	});
 });
 
-describe("入駐同意：送出 KYC 要確認告知並同意 PayUni 條款", () => {
+describe("入駐同意：送出 KYC 只要確認已閱讀告知事項", () => {
 	const submitButton = () =>
 		screen.getByText("送出認證").closest("button") as HTMLButtonElement;
 
-	it("兩個都沒勾、只勾一個都不能送出，兩個都勾才能", async () => {
+	it("沒勾不能送出，勾了才能；表單上沒有 PayUni 條款的勾選", async () => {
 		kycStore.set(app({ etag: "e1", missingFields: [] }));
 		await mount();
 		expect(submitButton().disabled).toBe(true);
-
-		fireEvent.click(noticeBox());
-		expect(submitButton().disabled).toBe(true);
-
-		fireEvent.click(noticeBox());
-		fireEvent.click(payuniBox());
-		expect(submitButton().disabled).toBe(true);
+		expect(screen.queryByLabelText(/PAYUNi/)).toBeNull();
 
 		fireEvent.click(noticeBox());
 		expect(submitButton().disabled).toBe(false);
 
-		fireEvent.click(payuniBox());
+		fireEvent.click(noticeBox());
 		expect(submitButton().disabled).toBe(true);
 		expect(mocks.submitKyc).not.toHaveBeenCalled();
 	});
 
-	it("連結來自生成的常數：告知事項與 PayUni 條款，都在新分頁", async () => {
+	it("連結來自生成的常數：告知事項在新分頁", async () => {
 		kycStore.set(app({ etag: "e1", missingFields: [] }));
 		await mount();
 		const notice = screen.getByRole("link", {
 			name: "賣家身分認證個人資料蒐集告知事項",
 		});
-		const payuni = screen.getByRole("link", { name: "PAYUNi 服務條款" });
 		expect(notice.getAttribute("href")).toBe(SERVED.notice.url);
-		expect(payuni.getAttribute("href")).toBe(SERVED.payuni.url);
-		for (const link of [notice, payuni]) {
-			expect(link.getAttribute("target")).toBe("_blank");
-			expect(link.getAttribute("rel")).toContain("noopener");
-		}
+		expect(notice.getAttribute("target")).toBe("_blank");
+		expect(notice.getAttribute("rel")).toContain("noopener");
 	});
 
 	it("送出的版本是賣家看到的那一版（生成的常數）", async () => {
@@ -1454,7 +1435,7 @@ describe("入駐同意：送出 KYC 要確認告知並同意 PayUni 條款", () 
 		expect(mocks.submitKyc).toHaveBeenCalledWith("e1", ACCEPTED_KYC);
 	});
 
-	it("AGREEMENT_OUTDATED：取消兩個勾選並提示重新整理，不當成缺店家欄位", async () => {
+	it("AGREEMENT_OUTDATED：取消勾選並提示重新整理，不當成缺店家欄位", async () => {
 		kycStore.set(app({ etag: "e1", missingFields: [] }));
 		mocks.submitKyc.mockRejectedValueOnce(outdated());
 		await mount();
@@ -1467,7 +1448,6 @@ describe("入駐同意：送出 KYC 要確認告知並同意 PayUni 條款", () 
 			"條款已更新，請重新整理頁面後再勾選。",
 		);
 		expect(noticeBox().checked).toBe(false);
-		expect(payuniBox().checked).toBe(false);
 		expect(submitButton().disabled).toBe(true);
 		expect(mocks.fetchMyKyc).not.toHaveBeenCalled();
 		expect(mocks.replace).not.toHaveBeenCalled();
