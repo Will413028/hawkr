@@ -12,7 +12,7 @@
  * 已發佈清單每個介面一份，初始都是 `["zh-TW"]`：
  *   buyer   買家頁：除了賣家介面以外的所有頁面
  *   seller  賣家介面：`/seller`（含公開的招募頁 `/seller/pricing`，受眾是想開店的賣家）、`/seller-center`、
- *           `/seller-product-import-preview` 底下（見 paths.ts 的 surfaceOfPath）
+ *           `/seller-product-import-preview`、`/seller-app`（賣家 App 開通收款後回跳的頁）底下（見 paths.ts 的 surfaceOfPath）
  * 兩支 App 各有自己的清單（buyer-app、seller-app，不在這裡）；共用文案目錄 `catalog/config.json` 的
  * `locales` 必須包含這裡所有已發佈的語系（I-CI 檢查）。
  *
