@@ -287,8 +287,14 @@ type AccountSession struct {
 }
 
 // CreateAccountSession 產生 v1 Account Session（內嵌的 account_onboarding 元件）。
+// 平台收集需求並承擔損失（losses_collector=application），所以停用 Stripe 使用者驗證
+// （disable_stripe_user_authentication），內嵌表單直接顯示，不經 Stripe 登入視窗。
 func (c *Client) CreateAccountSession(ctx context.Context, accountID string) (AccountSession, error) {
-	form := url.Values{"account": {accountID}, "components[account_onboarding][enabled]": {"true"}}
+	form := url.Values{
+		"account": {accountID},
+		"components[account_onboarding][enabled]":                                      {"true"},
+		"components[account_onboarding][features][disable_stripe_user_authentication]": {"true"},
+	}
 	data, err := c.do(ctx, request{method: http.MethodPost, path: "/v1/account_sessions", body: []byte(form.Encode()), contentType: "application/x-www-form-urlencoded", version: APIVersionV1})
 	if err != nil {
 		return AccountSession{}, err

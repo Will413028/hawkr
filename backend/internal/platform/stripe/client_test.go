@@ -208,7 +208,7 @@ func TestAccountSessionIsFormEncodedAndReturnsTheClientSecret(t *testing.T) {
 	if r.Method != "POST" || r.URI != "/v1/account_sessions" || r.ContentType != "application/x-www-form-urlencoded" || r.Version != APIVersionV1 {
 		t.Errorf("請求 %+v", r)
 	}
-	if r.Body != "account=acct_1&components%5Baccount_onboarding%5D%5Benabled%5D=true" {
+	if r.Body != "account=acct_1&components%5Baccount_onboarding%5D%5Benabled%5D=true&components%5Baccount_onboarding%5D%5Bfeatures%5D%5Bdisable_stripe_user_authentication%5D=true" {
 		t.Errorf("本文 %q", r.Body)
 	}
 	if sess.ClientSecret != "<CLIENT-SECRET-MASKED>" || sess.ExpiresAt == nil || sess.ExpiresAt.Unix() != 1793661693 {
