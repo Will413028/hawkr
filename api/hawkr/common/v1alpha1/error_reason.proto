@@ -57,6 +57,9 @@ enum ErrorReason {
   // 在 15 分鐘內以 provider 驗證過。client 引導使用者重新走一次登入（web 的 /api/auth/{provider}/start、App 的 ExchangeIdToken，
   // 登入會換發新 session），再重送。
   REAUTHENTICATION_REQUIRED = 14;
+  // 帳號沒有聯絡信箱（沒有 provider 驗證過的 email，也沒有自填的），不能送出 KYC 申請（搭配 failed_precondition）：SellerAppService.SubmitKYC。
+  // client 引導使用者在 IdentityAppService.SetContactEmail 填一個，再重送。
+  CONTACT_EMAIL_REQUIRED = 15;
   // 2 是刪掉的 PHONE_CODE_EXPIRED（新帳號不驗證手機，ADR 2026-09-27-identity-clerk）。
   reserved 2;
   reserved "PHONE_CODE_EXPIRED";

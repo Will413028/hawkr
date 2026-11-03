@@ -185,4 +185,42 @@ extension type IdentityAppServiceClient (connect.Transport _transport) {
       onTrailer: onTrailer,
     );
   }
+
+  /// GetContactEmail 回傳呼叫者的帳號聯絡信箱與來源：provider 驗證過的 email 優先，沒有才用 SetContactEmail 填的自填信箱。
+  /// 兩者都沒有時回應不帶 contact_email（賣家送出 KYC 申請前要先有，ErrorReason CONTACT_EMAIL_REQUIRED）。停權的帳號也能呼叫。
+  Future<hawkridentityv1alpha1identity.GetContactEmailResponse> getContactEmail(
+    hawkridentityv1alpha1identity.GetContactEmailRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.IdentityAppService.getContactEmail,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// SetContactEmail 設定呼叫者自填的聯絡信箱（未驗證，不是通知的寄件地址）。只在帳號沒有 provider 驗證過的 email 時可設，
+  /// 有的話回 failed_precondition，什麼都不改；信箱格式不合回 invalid_argument 與欄位 email。以同一個值重送成功。
+  Future<hawkridentityv1alpha1identity.SetContactEmailResponse> setContactEmail(
+    hawkridentityv1alpha1identity.SetContactEmailRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.IdentityAppService.setContactEmail,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
 }

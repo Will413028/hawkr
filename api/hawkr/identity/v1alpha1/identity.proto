@@ -67,6 +67,18 @@ service IdentityAppService {
   // 參與者：同一個 transaction 關閉買家、店家並刪除帳號，店家有未結訂單時與買家一起等待到兩側都結清。client 不需要任何前置步驟。
   // 刪除之後 token 不再有效，所以 client 不自動重送：沒收到回應時以 GetSession 確認，unauthenticated 表示已刪除。
   rpc DeleteAccount(DeleteAccountRequest) returns (DeleteAccountResponse);
+
+  // GetContactEmail 回傳呼叫者的帳號聯絡信箱與來源：provider 驗證過的 email 優先，沒有才用 SetContactEmail 填的自填信箱。
+  // 兩者都沒有時回應不帶 contact_email（賣家送出 KYC 申請前要先有，ErrorReason CONTACT_EMAIL_REQUIRED）。停權的帳號也能呼叫。
+  rpc GetContactEmail(GetContactEmailRequest) returns (GetContactEmailResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // SetContactEmail 設定呼叫者自填的聯絡信箱（未驗證，不是通知的寄件地址）。只在帳號沒有 provider 驗證過的 email 時可設，
+  // 有的話回 failed_precondition，什麼都不改；信箱格式不合回 invalid_argument 與欄位 email。以同一個值重送成功。
+  rpc SetContactEmail(SetContactEmailRequest) returns (SetContactEmailResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
 }
 
 // Role 是帳號另外申請的角色。買家不是角色：每個帳號都是買家。
@@ -217,4 +229,36 @@ message DeleteAccountResponse {
     DELETION_STATE_PENDING_ORDERS = 2;
   }
   DeletionState state = 1;
+}
+
+// ContactEmailSource 是聯絡信箱的來源。
+enum ContactEmailSource {
+  CONTACT_EMAIL_SOURCE_UNSPECIFIED = 0;
+  // provider 回報、已驗證的 email：唯讀，隨登入更新。
+  CONTACT_EMAIL_SOURCE_VERIFIED = 1;
+  // 帳號自己填的信箱：未驗證。
+  CONTACT_EMAIL_SOURCE_SELF_ENTERED = 2;
+}
+
+// ContactEmail 是帳號的聯絡信箱：賣家的收款帳戶聯絡人用它。
+message ContactEmail {
+  string email = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  ContactEmailSource source = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message GetContactEmailRequest {}
+
+message GetContactEmailResponse {
+  // 帳號沒有任何聯絡信箱時不設。
+  ContactEmail contact_email = 1;
+}
+
+message SetContactEmailRequest {
+  // 去前後空白、轉小寫後至多 254 字，格式為 local@domain，網域要有點。
+  string email = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message SetContactEmailResponse {
+  // 設定之後的聯絡信箱（來源是 CONTACT_EMAIL_SOURCE_SELF_ENTERED）。
+  ContactEmail contact_email = 1;
 }

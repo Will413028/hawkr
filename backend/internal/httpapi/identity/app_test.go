@@ -6,12 +6,14 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 	"uuid"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
 
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
@@ -34,6 +36,10 @@ type appModule struct {
 	revoked  []uuid.UUID
 	listErr  error
 	linked   map[int64][]identity.LinkedIdentity
+
+	contacts   map[int64]identity.ContactEmail
+	contactErr error
+	setCalls   []string
 }
 
 func newAppModule() *appModule { return &appModule{nonces: map[string]bool{"nonce-1": true}} }
@@ -76,6 +82,24 @@ func (m *appModule) ListSessions(_ context.Context, accountID int64) ([]identity
 
 func (m *appModule) ListLinkedIdentities(_ context.Context, accountID int64) ([]identity.LinkedIdentity, error) {
 	return m.linked[accountID], m.listErr
+}
+
+func (m *appModule) ContactEmail(_ context.Context, accountID int64) (identity.ContactEmail, bool, error) {
+	c, ok := m.contacts[accountID]
+	return c, ok, m.contactErr
+}
+
+func (m *appModule) SetSelfEnteredEmail(_ context.Context, accountID int64, email string) (identity.ContactEmail, error) {
+	m.setCalls = append(m.setCalls, email)
+	if m.contactErr != nil {
+		return identity.ContactEmail{}, m.contactErr
+	}
+	c := identity.ContactEmail{Address: email, Source: identity.ContactEmailSelfEntered}
+	if m.contacts == nil {
+		m.contacts = map[int64]identity.ContactEmail{}
+	}
+	m.contacts[accountID] = c
+	return c, nil
 }
 
 func (m *appModule) RevokeSession(_ context.Context, accountID int64, id identity.SessionID) error {
@@ -371,6 +395,14 @@ func TestHandlersRefuseARequestWithoutASession(t *testing.T) {
 			_, err := e.app.RevokeSession(withPrincipalOnly, connect.NewRequest(&pb.RevokeSessionRequest{}))
 			return err
 		},
+		"GetContactEmail": func() error {
+			_, err := e.app.GetContactEmail(withPrincipalOnly, connect.NewRequest(&pb.GetContactEmailRequest{}))
+			return err
+		},
+		"SetContactEmail": func() error {
+			_, err := e.app.SetContactEmail(withPrincipalOnly, connect.NewRequest(&pb.SetContactEmailRequest{}))
+			return err
+		},
 	} {
 		if err := call(); err == nil || apperr.KindOf(err) != apperr.KindInternal && !strings.Contains(err.Error(), "interceptor") {
 			t.Errorf("%s：err = %v，沒有 session 是組裝錯誤", name, err)
@@ -575,6 +607,9 @@ func TestEnumsMatchTheContract(t *testing.T) {
 	if m := rpc.EnumMismatches[pb.ClientKind](identity.ClientKinds()); len(m) != 0 {
 		t.Error(m)
 	}
+	if m := rpc.EnumMismatches[pb.ContactEmailSource]([]identity.ContactEmailSource{identity.ContactEmailVerified, identity.ContactEmailSelfEntered}); len(m) != 0 {
+		t.Error(m)
+	}
 }
 
 func TestListLinkedIdentitiesReturnsOnlyTheCallersOwn(t *testing.T) {
@@ -680,5 +715,50 @@ func TestGetSessionTreatsAClosedBuyerRecordAsExpected(t *testing.T) {
 	}
 	if strings.Contains(e.logs.String(), "level=ERROR") {
 		t.Fatalf("closed buyer record logged as an error: %q", e.logs.String())
+	}
+}
+
+func TestGetContactEmailReturnsTheCallersOwnWithItsSource(t *testing.T) {
+	t.Parallel()
+	e := newAppEnv(t)
+	e.m.contacts = map[int64]identity.ContactEmail{
+		42: {Address: "v@example.com", Source: identity.ContactEmailVerified},
+		43: {Address: "s@example.com", Source: identity.ContactEmailSelfEntered},
+	}
+	for account, want := range map[int64]*pb.ContactEmail{
+		42: {Email: "v@example.com", Source: pb.ContactEmailSource_CONTACT_EMAIL_SOURCE_VERIFIED},
+		43: {Email: "s@example.com", Source: pb.ContactEmailSource_CONTACT_EMAIL_SOURCE_SELF_ENTERED},
+		99: nil,
+	} {
+		resp, err := e.app.GetContactEmail(callerContext(t, account, uuid.New(), rpc.CredentialBearer), connect.NewRequest(&pb.GetContactEmailRequest{}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := resp.Msg.GetContactEmail(); !proto.Equal(got, want) {
+			t.Errorf("帳號 %d：contact_email = %v，預期 %v", account, got, want)
+		}
+	}
+}
+
+func TestSetContactEmailPassesTheInputAndMapsTheField(t *testing.T) {
+	t.Parallel()
+	e := newAppEnv(t)
+	resp, err := e.app.SetContactEmail(callerContext(t, 42, uuid.New(), rpc.CredentialBearer), connect.NewRequest(&pb.SetContactEmailRequest{Email: "me@example.com"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := (&pb.ContactEmail{Email: "me@example.com", Source: pb.ContactEmailSource_CONTACT_EMAIL_SOURCE_SELF_ENTERED}); !proto.Equal(resp.Msg.GetContactEmail(), want) {
+		t.Errorf("contact_email = %v", resp.Msg.GetContactEmail())
+	}
+	if !slices.Equal(e.m.setCalls, []string{"me@example.com"}) {
+		t.Errorf("模組收到 %v", e.m.setCalls)
+	}
+	e.m.contactErr = apperr.InvalidInputOn([]string{"Email"}, "bad")
+	_, err = e.app.SetContactEmail(callerContext(t, 42, uuid.New(), rpc.CredentialBearer), connect.NewRequest(&pb.SetContactEmailRequest{Email: "x"}))
+	if err == nil {
+		t.Fatal("模組的錯誤要原樣回傳")
+	}
+	if missing := rpc.CheckFieldPaths((&pb.SetContactEmailRequest{}).ProtoReflect().Descriptor(), setContactEmailPaths); len(missing) > 0 {
+		t.Errorf("對應表指向不存在的請求欄位：%v", missing)
 	}
 }

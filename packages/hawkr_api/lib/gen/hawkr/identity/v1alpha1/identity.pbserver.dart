@@ -70,6 +70,10 @@ abstract class IdentityAppServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $3.RevokeSessionRequest request);
   $async.Future<$3.DeleteAccountResponse> deleteAccount(
       $pb.ServerContext ctx, $3.DeleteAccountRequest request);
+  $async.Future<$3.GetContactEmailResponse> getContactEmail(
+      $pb.ServerContext ctx, $3.GetContactEmailRequest request);
+  $async.Future<$3.SetContactEmailResponse> setContactEmail(
+      $pb.ServerContext ctx, $3.SetContactEmailRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
@@ -87,6 +91,10 @@ abstract class IdentityAppServiceBase extends $pb.GeneratedService {
         return $3.RevokeSessionRequest();
       case 'DeleteAccount':
         return $3.DeleteAccountRequest();
+      case 'GetContactEmail':
+        return $3.GetContactEmailRequest();
+      case 'SetContactEmail':
+        return $3.SetContactEmailRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -110,6 +118,10 @@ abstract class IdentityAppServiceBase extends $pb.GeneratedService {
         return revokeSession(ctx, request as $3.RevokeSessionRequest);
       case 'DeleteAccount':
         return deleteAccount(ctx, request as $3.DeleteAccountRequest);
+      case 'GetContactEmail':
+        return getContactEmail(ctx, request as $3.GetContactEmailRequest);
+      case 'SetContactEmail':
+        return setContactEmail(ctx, request as $3.SetContactEmailRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }

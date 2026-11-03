@@ -24,7 +24,7 @@ WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND suspended_at IS NOT NULL;
 -- name: DeleteAccount :execrows
 -- 留下沒有個資的墓碑（accounts_deleted_check）。已經刪除時沒有列被更新（冪等）。
 UPDATE identity.accounts
-SET deleted_at = sqlc.arg(now)::timestamptz, email = NULL, suspended_at = NULL, deletion_pending_at = NULL,
+SET deleted_at = sqlc.arg(now)::timestamptz, email = NULL, self_entered_email = NULL, suspended_at = NULL, deletion_pending_at = NULL,
     updated_at = sqlc.arg(now)::timestamptz
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 
@@ -71,3 +71,9 @@ UPDATE identity.accounts
 SET email = sqlc.arg(email), updated_at = sqlc.arg(now)::timestamptz
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND email IS DISTINCT FROM sqlc.arg(email);
 
+
+-- name: SetSelfEnteredEmail :execrows
+-- 自填聯絡信箱：只在帳號存活而且沒有已驗證的 email 時寫入（條件在 UPDATE 內，與登入時寫入 email 的更新互斥）；沒有列被更新時由呼叫方分辨原因。
+UPDATE identity.accounts
+SET self_entered_email = sqlc.arg(self_entered_email), updated_at = sqlc.arg(now)::timestamptz
+WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND email IS NULL AND self_entered_email IS DISTINCT FROM sqlc.arg(self_entered_email);

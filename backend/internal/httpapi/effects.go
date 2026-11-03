@@ -62,6 +62,8 @@ var customerEffects = map[string]Effect{
 	"/hawkr.identity.v1alpha1.IdentityAppService/ListSessions":         EffectRead,
 	"/hawkr.identity.v1alpha1.IdentityAppService/ListLinkedIdentities": EffectRead,
 	"/hawkr.identity.v1alpha1.IdentityAppService/RevokeSession":        EffectSelfService,
+	"/hawkr.identity.v1alpha1.IdentityAppService/GetContactEmail":      EffectRead,
+	"/hawkr.identity.v1alpha1.IdentityAppService/SetContactEmail":      EffectWrite,
 
 	// IdentityPublicService
 	"/hawkr.identity.v1alpha1.IdentityPublicService/IssueAppLoginNonce": EffectWrite,

@@ -79,6 +79,36 @@ class ClientKind extends $pb.ProtobufEnum {
   const ClientKind._(super.value, super.name);
 }
 
+/// ContactEmailSource 是聯絡信箱的來源。
+class ContactEmailSource extends $pb.ProtobufEnum {
+  static const ContactEmailSource CONTACT_EMAIL_SOURCE_UNSPECIFIED =
+      ContactEmailSource._(
+          0, _omitEnumNames ? '' : 'CONTACT_EMAIL_SOURCE_UNSPECIFIED');
+
+  /// provider 回報、已驗證的 email：唯讀，隨登入更新。
+  static const ContactEmailSource CONTACT_EMAIL_SOURCE_VERIFIED =
+      ContactEmailSource._(
+          1, _omitEnumNames ? '' : 'CONTACT_EMAIL_SOURCE_VERIFIED');
+
+  /// 帳號自己填的信箱：未驗證。
+  static const ContactEmailSource CONTACT_EMAIL_SOURCE_SELF_ENTERED =
+      ContactEmailSource._(
+          2, _omitEnumNames ? '' : 'CONTACT_EMAIL_SOURCE_SELF_ENTERED');
+
+  static const $core.List<ContactEmailSource> values = <ContactEmailSource>[
+    CONTACT_EMAIL_SOURCE_UNSPECIFIED,
+    CONTACT_EMAIL_SOURCE_VERIFIED,
+    CONTACT_EMAIL_SOURCE_SELF_ENTERED,
+  ];
+
+  static final $core.List<ContactEmailSource?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static ContactEmailSource? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ContactEmailSource._(super.value, super.name);
+}
+
 /// DeletionState 是申請之後帳號的狀態。
 class DeleteAccountResponse_DeletionState extends $pb.ProtobufEnum {
   static const DeleteAccountResponse_DeletionState DELETION_STATE_UNSPECIFIED =

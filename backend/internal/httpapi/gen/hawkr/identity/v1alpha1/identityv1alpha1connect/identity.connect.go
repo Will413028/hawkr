@@ -72,6 +72,12 @@ const (
 	// IdentityAppServiceDeleteAccountProcedure is the fully-qualified name of the IdentityAppService's
 	// DeleteAccount RPC.
 	IdentityAppServiceDeleteAccountProcedure = "/hawkr.identity.v1alpha1.IdentityAppService/DeleteAccount"
+	// IdentityAppServiceGetContactEmailProcedure is the fully-qualified name of the
+	// IdentityAppService's GetContactEmail RPC.
+	IdentityAppServiceGetContactEmailProcedure = "/hawkr.identity.v1alpha1.IdentityAppService/GetContactEmail"
+	// IdentityAppServiceSetContactEmailProcedure is the fully-qualified name of the
+	// IdentityAppService's SetContactEmail RPC.
+	IdentityAppServiceSetContactEmailProcedure = "/hawkr.identity.v1alpha1.IdentityAppService/SetContactEmail"
 )
 
 // IdentityPublicServiceClient is a client for the hawkr.identity.v1alpha1.IdentityPublicService
@@ -209,6 +215,12 @@ type IdentityAppServiceClient interface {
 	// 參與者：同一個 transaction 關閉買家、店家並刪除帳號，店家有未結訂單時與買家一起等待到兩側都結清。client 不需要任何前置步驟。
 	// 刪除之後 token 不再有效，所以 client 不自動重送：沒收到回應時以 GetSession 確認，unauthenticated 表示已刪除。
 	DeleteAccount(context.Context, *connect.Request[v1alpha1.DeleteAccountRequest]) (*connect.Response[v1alpha1.DeleteAccountResponse], error)
+	// GetContactEmail 回傳呼叫者的帳號聯絡信箱與來源：provider 驗證過的 email 優先，沒有才用 SetContactEmail 填的自填信箱。
+	// 兩者都沒有時回應不帶 contact_email（賣家送出 KYC 申請前要先有，ErrorReason CONTACT_EMAIL_REQUIRED）。停權的帳號也能呼叫。
+	GetContactEmail(context.Context, *connect.Request[v1alpha1.GetContactEmailRequest]) (*connect.Response[v1alpha1.GetContactEmailResponse], error)
+	// SetContactEmail 設定呼叫者自填的聯絡信箱（未驗證，不是通知的寄件地址）。只在帳號沒有 provider 驗證過的 email 時可設，
+	// 有的話回 failed_precondition，什麼都不改；信箱格式不合回 invalid_argument 與欄位 email。以同一個值重送成功。
+	SetContactEmail(context.Context, *connect.Request[v1alpha1.SetContactEmailRequest]) (*connect.Response[v1alpha1.SetContactEmailResponse], error)
 }
 
 // NewIdentityAppServiceClient constructs a client for the
@@ -267,6 +279,20 @@ func NewIdentityAppServiceClient(httpClient connect.HTTPClient, baseURL string, 
 			connect.WithSchema(identityAppServiceMethods.ByName("DeleteAccount")),
 			connect.WithClientOptions(opts...),
 		),
+		getContactEmail: connect.NewClient[v1alpha1.GetContactEmailRequest, v1alpha1.GetContactEmailResponse](
+			httpClient,
+			baseURL+IdentityAppServiceGetContactEmailProcedure,
+			connect.WithSchema(identityAppServiceMethods.ByName("GetContactEmail")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		setContactEmail: connect.NewClient[v1alpha1.SetContactEmailRequest, v1alpha1.SetContactEmailResponse](
+			httpClient,
+			baseURL+IdentityAppServiceSetContactEmailProcedure,
+			connect.WithSchema(identityAppServiceMethods.ByName("SetContactEmail")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -279,6 +305,8 @@ type identityAppServiceClient struct {
 	listLinkedIdentities *connect.Client[v1alpha1.ListLinkedIdentitiesRequest, v1alpha1.ListLinkedIdentitiesResponse]
 	revokeSession        *connect.Client[v1alpha1.RevokeSessionRequest, v1alpha1.RevokeSessionResponse]
 	deleteAccount        *connect.Client[v1alpha1.DeleteAccountRequest, v1alpha1.DeleteAccountResponse]
+	getContactEmail      *connect.Client[v1alpha1.GetContactEmailRequest, v1alpha1.GetContactEmailResponse]
+	setContactEmail      *connect.Client[v1alpha1.SetContactEmailRequest, v1alpha1.SetContactEmailResponse]
 }
 
 // GetSession calls hawkr.identity.v1alpha1.IdentityAppService.GetSession.
@@ -316,6 +344,16 @@ func (c *identityAppServiceClient) DeleteAccount(ctx context.Context, req *conne
 	return c.deleteAccount.CallUnary(ctx, req)
 }
 
+// GetContactEmail calls hawkr.identity.v1alpha1.IdentityAppService.GetContactEmail.
+func (c *identityAppServiceClient) GetContactEmail(ctx context.Context, req *connect.Request[v1alpha1.GetContactEmailRequest]) (*connect.Response[v1alpha1.GetContactEmailResponse], error) {
+	return c.getContactEmail.CallUnary(ctx, req)
+}
+
+// SetContactEmail calls hawkr.identity.v1alpha1.IdentityAppService.SetContactEmail.
+func (c *identityAppServiceClient) SetContactEmail(ctx context.Context, req *connect.Request[v1alpha1.SetContactEmailRequest]) (*connect.Response[v1alpha1.SetContactEmailResponse], error) {
+	return c.setContactEmail.CallUnary(ctx, req)
+}
+
 // IdentityAppServiceHandler is an implementation of the hawkr.identity.v1alpha1.IdentityAppService
 // service.
 type IdentityAppServiceHandler interface {
@@ -341,6 +379,12 @@ type IdentityAppServiceHandler interface {
 	// 參與者：同一個 transaction 關閉買家、店家並刪除帳號，店家有未結訂單時與買家一起等待到兩側都結清。client 不需要任何前置步驟。
 	// 刪除之後 token 不再有效，所以 client 不自動重送：沒收到回應時以 GetSession 確認，unauthenticated 表示已刪除。
 	DeleteAccount(context.Context, *connect.Request[v1alpha1.DeleteAccountRequest]) (*connect.Response[v1alpha1.DeleteAccountResponse], error)
+	// GetContactEmail 回傳呼叫者的帳號聯絡信箱與來源：provider 驗證過的 email 優先，沒有才用 SetContactEmail 填的自填信箱。
+	// 兩者都沒有時回應不帶 contact_email（賣家送出 KYC 申請前要先有，ErrorReason CONTACT_EMAIL_REQUIRED）。停權的帳號也能呼叫。
+	GetContactEmail(context.Context, *connect.Request[v1alpha1.GetContactEmailRequest]) (*connect.Response[v1alpha1.GetContactEmailResponse], error)
+	// SetContactEmail 設定呼叫者自填的聯絡信箱（未驗證，不是通知的寄件地址）。只在帳號沒有 provider 驗證過的 email 時可設，
+	// 有的話回 failed_precondition，什麼都不改；信箱格式不合回 invalid_argument 與欄位 email。以同一個值重送成功。
+	SetContactEmail(context.Context, *connect.Request[v1alpha1.SetContactEmailRequest]) (*connect.Response[v1alpha1.SetContactEmailResponse], error)
 }
 
 // NewIdentityAppServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -395,6 +439,20 @@ func NewIdentityAppServiceHandler(svc IdentityAppServiceHandler, opts ...connect
 		connect.WithSchema(identityAppServiceMethods.ByName("DeleteAccount")),
 		connect.WithHandlerOptions(opts...),
 	)
+	identityAppServiceGetContactEmailHandler := connect.NewUnaryHandler(
+		IdentityAppServiceGetContactEmailProcedure,
+		svc.GetContactEmail,
+		connect.WithSchema(identityAppServiceMethods.ByName("GetContactEmail")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityAppServiceSetContactEmailHandler := connect.NewUnaryHandler(
+		IdentityAppServiceSetContactEmailProcedure,
+		svc.SetContactEmail,
+		connect.WithSchema(identityAppServiceMethods.ByName("SetContactEmail")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/hawkr.identity.v1alpha1.IdentityAppService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case IdentityAppServiceGetSessionProcedure:
@@ -411,6 +469,10 @@ func NewIdentityAppServiceHandler(svc IdentityAppServiceHandler, opts ...connect
 			identityAppServiceRevokeSessionHandler.ServeHTTP(w, r)
 		case IdentityAppServiceDeleteAccountProcedure:
 			identityAppServiceDeleteAccountHandler.ServeHTTP(w, r)
+		case IdentityAppServiceGetContactEmailProcedure:
+			identityAppServiceGetContactEmailHandler.ServeHTTP(w, r)
+		case IdentityAppServiceSetContactEmailProcedure:
+			identityAppServiceSetContactEmailHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -446,4 +508,12 @@ func (UnimplementedIdentityAppServiceHandler) RevokeSession(context.Context, *co
 
 func (UnimplementedIdentityAppServiceHandler) DeleteAccount(context.Context, *connect.Request[v1alpha1.DeleteAccountRequest]) (*connect.Response[v1alpha1.DeleteAccountResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.identity.v1alpha1.IdentityAppService.DeleteAccount is not implemented"))
+}
+
+func (UnimplementedIdentityAppServiceHandler) GetContactEmail(context.Context, *connect.Request[v1alpha1.GetContactEmailRequest]) (*connect.Response[v1alpha1.GetContactEmailResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.identity.v1alpha1.IdentityAppService.GetContactEmail is not implemented"))
+}
+
+func (UnimplementedIdentityAppServiceHandler) SetContactEmail(context.Context, *connect.Request[v1alpha1.SetContactEmailRequest]) (*connect.Response[v1alpha1.SetContactEmailResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.identity.v1alpha1.IdentityAppService.SetContactEmail is not implemented"))
 }

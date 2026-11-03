@@ -95,6 +95,11 @@ class ErrorReason extends $pb.ProtobufEnum {
   static const ErrorReason REAUTHENTICATION_REQUIRED =
       ErrorReason._(14, _omitEnumNames ? '' : 'REAUTHENTICATION_REQUIRED');
 
+  /// 帳號沒有聯絡信箱（沒有 provider 驗證過的 email，也沒有自填的），不能送出 KYC 申請（搭配 failed_precondition）：SellerAppService.SubmitKYC。
+  /// client 引導使用者在 IdentityAppService.SetContactEmail 填一個，再重送。
+  static const ErrorReason CONTACT_EMAIL_REQUIRED =
+      ErrorReason._(15, _omitEnumNames ? '' : 'CONTACT_EMAIL_REQUIRED');
+
   static const $core.List<ErrorReason> values = <ErrorReason>[
     ERROR_REASON_UNSPECIFIED,
     VERSION_CONFLICT,
@@ -109,10 +114,11 @@ class ErrorReason extends $pb.ProtobufEnum {
     ACCOUNT_SUSPENDED,
     IDENTITY_ALREADY_LINKED,
     REAUTHENTICATION_REQUIRED,
+    CONTACT_EMAIL_REQUIRED,
   ];
 
   static final $core.List<ErrorReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 14);
+      $pb.ProtobufEnum.$_initByValueList(values, 15);
   static ErrorReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
