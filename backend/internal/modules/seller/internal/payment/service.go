@@ -33,14 +33,21 @@ const (
 	createIdle = 10 * time.Minute
 )
 
-// Deps 外部依賴；clock 由組裝點注入。Provider 為 nil 表示沒有設定收款開通：核准不寫帳戶列、不排 job，開通相關的呼叫回 FailedPrecondition。
+// Identities 是防詐比對 hash 的寫入（kyc.Fingerprints）：同步把 provider 回報的外部銀行帳號 fingerprint 在寫快取的同一個 transaction 內記下來。
+type Identities interface {
+	RecordBankFingerprints(ctx context.Context, q *store.Queries, storeID int64, provider string, fingerprints []string, now time.Time) error
+}
+
+// Deps 外部依賴；clock 由組裝點注入。Identities 必填。Provider 為 nil 表示沒有設定收款開通：核准不寫帳戶列、不排 job，開通相關的呼叫回 FailedPrecondition。
 type Deps struct {
 	DB       *db.DB
 	Jobs     jobs.Enqueuer
 	Provider Provider
 	Exposure *exposure.Service
-	Now      func() time.Time
-	Logger   *slog.Logger
+	// Identities 必填，即使沒有設定 provider：同步是唯一的寫入點。
+	Identities Identities
+	Now        func() time.Time
+	Logger     *slog.Logger
 }
 
 // Service 是收款帳戶的 use case。
@@ -48,7 +55,7 @@ type Service struct{ d Deps }
 
 // New 建立服務。
 func New(d Deps) *Service {
-	if d.DB == nil || d.Jobs == nil || d.Exposure == nil || d.Now == nil || d.Logger == nil {
+	if d.DB == nil || d.Jobs == nil || d.Exposure == nil || d.Identities == nil || d.Now == nil || d.Logger == nil {
 		panic("seller/payment: missing dependency")
 	}
 	return &Service{d: d}

@@ -614,6 +614,12 @@ func IdentityInput(kind SanctionIdentityKind, value string) []byte {
 	panic("seller: unknown identity kind " + string(kind))
 }
 
+// BankFingerprintInput 是 provider 回報的外部銀行帳號 fingerprint 的 blind index 輸入：標籤與 IdentityInput 的任何一種都不同（兩者是不同的 hash 空間，
+// 不會互相命中），值帶 provider 代碼，不同 provider 的 fingerprint 不會撞。
+func BankFingerprintInput(provider, fingerprint string) []byte {
+	return []byte("provider:bankfp:v1|" + provider + ":" + fingerprint)
+}
+
 // BankIdentityValue 是銀行帳號 blind index 的值：銀行代碼加正規化後的帳號。
 func BankIdentityValue(bankCode, account string) string { return bankCode + "|" + account }
 

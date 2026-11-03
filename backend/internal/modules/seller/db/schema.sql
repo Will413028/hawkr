@@ -1058,11 +1058,13 @@ CREATE TABLE seller.kyc_identity_hashes (
 CREATE INDEX kyc_identity_hashes_hash ON seller.kyc_identity_hashes (hash, key_id);
 
 -- 防詐用的身分比對索引（ADR 2026-10-19-seller-kyc-payuni-consolidated 的 2026-10-30 修訂，Stripe 計畫 D3）：與 KYC 個資分開保存，只有 blind index、沒有明文。
--- 寫入時機與 kyc_identity_hashes 相同（同一個 transaction、同一支 writeHashes；欄位被改掉時同步修剪），但不隨 184 天的個資清理刪除：
+-- 來源有兩種：申請的識別欄位（與 kyc_identity_hashes 同一個 transaction、同一支 writeHashes 寫入；欄位被改掉時同步修剪），以及 provider 回報的外部銀行帳號
+-- fingerprint（BANK_FINGERPRINT，收款帳戶同步在寫快取的同一個 transaction 寫入，kyc.Fingerprints；不是草稿的值，不修剪，只由過期刪除）。兩種都不隨 184 天的個資清理刪除：
 -- 停權措施建立時 SnapshotMeasureIdentities 從這裡取，所以舊 stint 的 KYC 清掉之後，之後才建立的處分仍取得到它的身分。
--- 一列是（來源 stint，種類，金鑰，hash）：field 與 kyc_identity_hashes.field 同一組值（本人與負責人的身分證號分開，進措施快照時才合成 ID_CARD）；
+-- 一列是（來源 stint，種類，金鑰，hash）：field 是 kyc_identity_hashes.field 的值加上 BANK_FINGERPRINT（本人與負責人的身分證號分開，進措施快照時才合成 ID_CARD；
+-- BANK_FINGERPRINT 進快照時是 BANK_ACCOUNT，但 hash 輸入的標籤不同，不會等於申請的銀行帳號 hash）；
 -- source_store_id 是 stint（stores 一列一個 stint）；account_id 是該 stint 所屬的帳號（stores.account_id 不會變，這裡複製是為了快照不必 join）。
--- 刪除只有兩條路：欄位被改掉的修剪（只刪已沒有任何申請持有的值），以及來源 stint 的目前這次關店滿 model.IdentityHashRetention（5 年）後由 seller 的清理 job 刪
+-- 刪除只有兩條路：欄位被改掉的修剪（只刪已沒有任何申請持有的值；不處理 BANK_FINGERPRINT），以及來源 stint 的目前這次關店滿 model.IdentityHashRetention（5 年）後由 seller 的清理 job 刪
 -- （被調取資料的保存擋下的不刪；stint 恢復營業就不算關閉）。金鑰環的舊金鑰要留到這些列被刪，CheckKYCKeys 涵蓋這張表。
 CREATE TABLE seller.account_identity_hashes (
     source_store_id BIGINT NOT NULL REFERENCES seller.stores (store_id),
@@ -1072,7 +1074,7 @@ CREATE TABLE seller.account_identity_hashes (
     account_id      BIGINT NOT NULL,
     created_at      TIMESTAMPTZ NOT NULL,
     PRIMARY KEY (source_store_id, field, key_id, hash),
-    CONSTRAINT account_identity_hashes_field_check CHECK (field IN ('ID_CARD_NO', 'REP_ID_CARD_NO', 'TAX_ID', 'BANK_ACCOUNT')),
+    CONSTRAINT account_identity_hashes_field_check CHECK (field IN ('ID_CARD_NO', 'REP_ID_CARD_NO', 'TAX_ID', 'BANK_ACCOUNT', 'BANK_FINGERPRINT')),
     CONSTRAINT account_identity_hashes_key_check CHECK (key_id <> ''),
     CONSTRAINT account_identity_hashes_hash_check CHECK (octet_length(hash) = 32)
 );

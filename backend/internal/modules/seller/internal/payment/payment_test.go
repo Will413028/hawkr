@@ -3,12 +3,18 @@ package payment
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/riverqueue/river"
+
+	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/exposure"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
 func details(ds ...StatusDetail) []StatusDetail { return ds }
@@ -119,4 +125,30 @@ func TestFakeCreatesOneAccountPerIdempotencyKeyAndRejectsUnsafeCalls(t *testing.
 	if ev, err := f.ParseEvent(h, []byte(" acct ")); err != nil || ev.ID != "evt_1" || ev.ExternalAccountID != "acct" {
 		t.Fatalf("event=%+v err=%v", ev, err)
 	}
+}
+
+type noopJobs struct{}
+
+func (noopJobs) Enqueue(context.Context, river.JobArgs, *river.InsertOpts) error { return nil }
+
+type noIdentities struct{}
+
+func (noIdentities) RecordBankFingerprints(context.Context, *store.Queries, int64, string, []string, time.Time) error {
+	return nil
+}
+
+// 組裝時缺 Identities 要在啟動就失敗，不能讓同步默默不寫 fingerprint。
+// mutation：New 不檢查 Identities → 第一段沒有 panic。
+func TestNewRequiresIdentities(t *testing.T) {
+	d := Deps{DB: &db.DB{}, Jobs: noopJobs{}, Exposure: &exposure.Service{}, Now: time.Now, Logger: slog.Default()}
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Fatal("缺 Identities 沒有 panic")
+			}
+		}()
+		New(d)
+	}()
+	d.Identities = noIdentities{}
+	New(d)
 }

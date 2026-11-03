@@ -1032,16 +1032,29 @@ func (q *Queries) KYCReviews(ctx context.Context, applicationID uuid.UUID) ([]Se
 }
 
 const linkedAccountHits = `-- name: LinkedAccountHits :many
-SELECT DISTINCT st.account_id, h.field
-FROM seller.measure_identities mi
-JOIN seller.kyc_identity_hashes h ON h.hash = mi.hash AND h.key_id = mi.key_id
-JOIN seller.kyc_applications a ON a.application_id = h.application_id
-JOIN seller.stores st ON st.store_id = a.store_id
-WHERE mi.measure_id = $1
-  AND mi.kind = CASE h.field WHEN 'TAX_ID' THEN 'TAX_ID' WHEN 'BANK_ACCOUNT' THEN 'BANK_ACCOUNT' ELSE 'ID_CARD' END
-  AND st.account_id <> $2
-  AND ($3::bigint IS NULL OR st.account_id = $3::bigint)
-ORDER BY st.account_id, h.field
+SELECT hit.account_id, hit.field
+FROM (
+    SELECT DISTINCT st.account_id, h.field
+    FROM seller.measure_identities mi
+    JOIN seller.kyc_identity_hashes h ON h.hash = mi.hash AND h.key_id = mi.key_id
+    JOIN seller.kyc_applications a ON a.application_id = h.application_id
+    JOIN seller.stores st ON st.store_id = a.store_id
+    WHERE mi.measure_id = $1
+      AND mi.kind = CASE h.field WHEN 'TAX_ID' THEN 'TAX_ID' WHEN 'BANK_ACCOUNT' THEN 'BANK_ACCOUNT' ELSE 'ID_CARD' END
+      AND st.account_id <> $2
+      AND ($3::bigint IS NULL OR st.account_id = $3::bigint)
+    UNION
+    -- provider 回報的銀行帳號 fingerprint 只在 account_identity_hashes（來源不是申請），對快照的 BANK_ACCOUNT；帳號取自來源 stint。
+    SELECT DISTINCT f.account_id, f.field
+    FROM seller.measure_identities mi
+    JOIN seller.account_identity_hashes f ON f.hash = mi.hash AND f.key_id = mi.key_id
+    WHERE mi.measure_id = $1
+      AND mi.kind = 'BANK_ACCOUNT'
+      AND f.field = 'BANK_FINGERPRINT'
+      AND f.account_id <> $2
+      AND ($3::bigint IS NULL OR f.account_id = $3::bigint)
+) hit
+ORDER BY hit.account_id, hit.field
 `
 
 type LinkedAccountHitsParams struct {
@@ -1058,6 +1071,7 @@ type LinkedAccountHitsRow struct {
 // 與這筆措施的身分快照相同的其他帳號（W9）：別的帳號的申請（跨 stint、含已取消的）裡，身分證號（本人與企業負責人）對快照的 ID_CARD、統一編號對
 // TAX_ID、銀行帳號對 BANK_ACCOUNT（Stripe 計畫 D4：銀行帳號命中只列出；能不能據以建立關聯終止由 model.LinkedIdentity.CountsAsGround 決定，不在這裡）。
 // 快照與申請都存金鑰環每一把金鑰算的 (key_id, hash)，以索引等值連接，不解密；個資清理過的申請沒有這些列，不命中。
+// 另有一支比對 provider 回報的銀行帳號 fingerprint（BANK_FINGERPRINT，只在 account_identity_hashes）對快照的 BANK_ACCOUNT，同樣只列出。
 // account_id 不為 NULL 時只看那個帳號。
 func (q *Queries) LinkedAccountHits(ctx context.Context, arg LinkedAccountHitsParams) ([]LinkedAccountHitsRow, error) {
 	rows, err := q.db.Query(ctx, linkedAccountHits, arg.MeasureID, arg.ExceptAccountID, arg.AccountID)
@@ -1420,7 +1434,7 @@ func (q *Queries) ReviewKYCApplicationByIDs(ctx context.Context, arg ReviewKYCAp
 const snapshotMeasureIdentities = `-- name: SnapshotMeasureIdentities :exec
 INSERT INTO seller.measure_identities (measure_id, kind, key_id, hash)
 SELECT $1::uuid,
-       CASE h.field WHEN 'TAX_ID' THEN 'TAX_ID' WHEN 'BANK_ACCOUNT' THEN 'BANK_ACCOUNT' ELSE 'ID_CARD' END,
+       CASE h.field WHEN 'TAX_ID' THEN 'TAX_ID' WHEN 'BANK_ACCOUNT' THEN 'BANK_ACCOUNT' WHEN 'BANK_FINGERPRINT' THEN 'BANK_ACCOUNT' ELSE 'ID_CARD' END,
        h.key_id, h.hash
 FROM seller.account_identity_hashes h
 WHERE h.account_id = $2
@@ -1434,7 +1448,8 @@ type SnapshotMeasureIdentitiesParams struct {
 
 // 停權措施建立時，複製被處分帳號全部 stint 的身分 blind index 到措施擁有的快照：每個識別欄位金鑰環裡每一把金鑰算的 hash 各一筆，之後換鑰也查得到；
 // 同一個 hash 只留一筆。來源是 account_identity_hashes（防詐保存，ADR 2026-10-19-seller-kyc-payuni-consolidated 的 2026-10-30 修訂），不是
-// kyc_identity_hashes：後者隨 184 天的個資清理刪除，舊 stint 清理之後才建立的處分取不到它的身分。身分證號與企業負責人身分證號同一種（ID_CARD）。
+// kyc_identity_hashes：後者隨 184 天的個資清理刪除，舊 stint 清理之後才建立的處分取不到它的身分。身分證號與企業負責人身分證號同一種（ID_CARD）；
+// provider 回報的銀行帳號 fingerprint（BANK_FINGERPRINT）與銀行帳號同一種（BANK_ACCOUNT），hash 空間不同，不會等於申請的銀行帳號 hash。
 func (q *Queries) SnapshotMeasureIdentities(ctx context.Context, arg SnapshotMeasureIdentitiesParams) error {
 	_, err := q.db.Exec(ctx, snapshotMeasureIdentities, arg.MeasureID, arg.AccountID)
 	return err

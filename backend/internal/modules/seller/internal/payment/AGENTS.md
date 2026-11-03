@@ -10,3 +10,4 @@
 - 輪詢也排 DISABLED 但原因碼不是 `rejected*`、`unsupported*` 的帳戶（Stripe 可以解除 restricted，掉了 webhook 時只有輪詢補得到）。守門：`TestSweepQueuesSyncForOpenAndLiftableStatusesOnly`。
 - 建立外部帳戶的冪等鍵是「建立中」列寫入時產生並保存的 UUID（`create_idempotency_key`），每次重試沿用；收件方式與開通介面取自列上的 `requirement_collection`，不取行程設定。守門：`TestApprovalQueuesOneAccountCreationAndAReplayedCreateKeepsOneExternalAccount`、`TestStripeEnsureAccountUsesTheDashboardOfTheStoredCollection`。
 - 帳戶列不存個資；一店一列，關店再開沿用。
+- 同步讀到的外部銀行帳號 fingerprint（`Snapshot.BankFingerprints`）在寫快取的同一個 transaction 內交給 `Deps.Identities`（`kyc.Fingerprints`）寫成防詐比對 hash；這個 package 不寫 `account_identity_hashes`，也不保存、不記錄明文 fingerprint。`Identities` 必填。守門：`TestSharedProviderBankFingerprintIsListedButNeverTerminates`、`TestNewRequiresIdentities`。

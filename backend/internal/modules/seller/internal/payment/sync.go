@@ -69,6 +69,9 @@ func (s *Service) Sync(ctx context.Context, storeID int64) (again bool, err erro
 		}); err != nil {
 			return err
 		}
+		if err := s.d.Identities.RecordBankFingerprints(ctx, q, storeID, before.Provider, snap.BankFingerprints, now); err != nil {
+			return err
+		}
 		if _, err := q.MarkPaymentEventsProcessed(ctx, store.MarkPaymentEventsProcessedParams{
 			Provider: before.Provider, ExternalAccountID: external, ReceivedBefore: startedAt, Now: &now,
 		}); err != nil {

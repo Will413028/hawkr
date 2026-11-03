@@ -339,3 +339,68 @@ func TestNewRejectsMissingSecretsAndBadBaseURL(t *testing.T) {
 		}
 	}
 }
+
+// ListBankAccountFingerprints 帶 v1 版本與 bank_account 篩選，回傳回應裡每個項目的 fingerprint（期望值從 fixture 讀，不寫死）。
+// mutation：版本改用 APIVersion、不帶 object=bank_account、或回傳 last4 → 本測試失敗。
+func TestListBankAccountFingerprintsReadsTheFingerprintFieldOnTheV1Version(t *testing.T) {
+	fx := loadFixture(t, "external_accounts_bank")
+	var list struct {
+		Data []struct {
+			Fingerprint string `json:"fingerprint"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(fx.Body, &list); err != nil || len(list.Data) == 0 || list.Data[0].Fingerprint == "" {
+		t.Fatalf("fixture 沒有 fingerprint：%v", err)
+	}
+	s := &stub{resp: replay(fx)}
+	got, err := newTestClient(t, s).ListBankAccountFingerprints(context.Background(), "acct_1")
+	if err != nil || len(got) != len(list.Data) || got[0] != list.Data[0].Fingerprint {
+		t.Fatalf("got=%v err=%v", got, err)
+	}
+	r := s.requests()
+	if len(r) != 1 || r[0].Method != "GET" || r[0].Version != APIVersionV1 || r[0].Body != "" ||
+		r[0].URI != "/v1/accounts/acct_1/external_accounts?limit=100&object=bank_account" {
+		t.Errorf("請求 %+v", r)
+	}
+}
+
+// 翻頁：has_more 為真時以最後一項的 id 當 starting_after 讀下一頁，沒有 fingerprint 的項目略過、不當成空字串值回傳。
+// mutation：不翻頁 → 少一個值；不略過空 fingerprint → 回傳含空字串。
+func TestListBankAccountFingerprintsFollowsPagesAndSkipsEntriesWithoutAFingerprint(t *testing.T) {
+	s := &stub{resp: func(n int) (int, string, http.Header) {
+		if n == 1 {
+			return 200, `{"object":"list","has_more":true,"data":[{"id":"ba_1","fingerprint":"fp_a"},{"id":"ba_2","fingerprint":""}]}`, nil
+		}
+		return 200, `{"object":"list","has_more":false,"data":[{"id":"ba_3","fingerprint":"fp_c"},{"id":"ba_4"}]}`, nil
+	}}
+	got, err := newTestClient(t, s).ListBankAccountFingerprints(context.Background(), "acct_1")
+	if err != nil || !jsonEqual(got, []string{"fp_a", "fp_c"}) {
+		t.Fatalf("got=%v err=%v", got, err)
+	}
+	r := s.requests()
+	if len(r) != 2 || !strings.Contains(r[1].URI, "starting_after=ba_2") || strings.Contains(r[0].URI, "starting_after") {
+		t.Errorf("請求 %+v", r)
+	}
+}
+
+func TestListBankAccountFingerprintsEmptyListIsEmptyNotAnError(t *testing.T) {
+	s := &stub{resp: func(int) (int, string, http.Header) { return 200, `{"object":"list","has_more":false,"data":[]}`, nil }}
+	got, err := newTestClient(t, s).ListBankAccountFingerprints(context.Background(), "acct_1")
+	if err != nil || len(got) != 0 {
+		t.Fatalf("got=%v err=%v", got, err)
+	}
+}
+
+// 錯誤不被吞掉：5xx 回 APIError（非永久）、has_more 但沒有可接續的項目是錯誤而不是無限翻頁。
+func TestListBankAccountFingerprintsPropagatesErrorsAndRejectsAnUnfollowablePage(t *testing.T) {
+	s := &stub{resp: func(int) (int, string, http.Header) { return 503, `{"error":{"message":"down"}}`, nil }}
+	_, err := newTestClient(t, s).ListBankAccountFingerprints(context.Background(), "acct_1")
+	var api *APIError
+	if !errors.As(err, &api) || api.Permanent() {
+		t.Fatalf("err=%v", err)
+	}
+	s = &stub{resp: func(int) (int, string, http.Header) { return 200, `{"has_more":true,"data":[]}`, nil }}
+	if _, err := newTestClient(t, s).ListBankAccountFingerprints(context.Background(), "acct_1"); err == nil || len(s.requests()) != 1 {
+		t.Fatalf("err=%v 請求=%d", err, len(s.requests()))
+	}
+}

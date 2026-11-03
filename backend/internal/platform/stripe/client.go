@@ -378,3 +378,49 @@ func (c *Client) RetrieveAccount(ctx context.Context, accountID string) (Account
 		Requirements: out.Requirements,
 	}, nil
 }
+
+const (
+	bankAccountsPageLimit = 100
+	// maxBankAccountPages 是讀外部銀行帳號時最多翻的頁數；超過視為回應異常，不無限翻頁。
+	maxBankAccountPages = 20
+)
+
+// ListBankAccountFingerprints 讀連線帳戶目前掛著的外部銀行帳號的 fingerprint（v1 external_accounts，只列 bank_account），翻頁讀完；
+// 沒有 fingerprint 的項目略過。fingerprint 是 Stripe 對同一組銀行帳號在平台內一致的識別碼（https://docs.stripe.com/api/external_account_bank_accounts/list）。
+func (c *Client) ListBankAccountFingerprints(ctx context.Context, accountID string) ([]string, error) {
+	var out []string
+	startingAfter := ""
+	for range maxBankAccountPages {
+		q := url.Values{"object": {"bank_account"}, "limit": {strconv.Itoa(bankAccountsPageLimit)}}
+		if startingAfter != "" {
+			q.Set("starting_after", startingAfter)
+		}
+		data, err := c.do(ctx, request{method: http.MethodGet, path: "/v1/accounts/" + url.PathEscape(accountID) + "/external_accounts?" + q.Encode(), version: APIVersionV1})
+		if err != nil {
+			return nil, err
+		}
+		var page struct {
+			Data []struct {
+				ID          string `json:"id"`
+				Fingerprint string `json:"fingerprint"`
+			} `json:"data"`
+			HasMore bool `json:"has_more"`
+		}
+		if err := json.Unmarshal(data, &page); err != nil {
+			return nil, fmt.Errorf("stripe：解析回應失敗：%w", err)
+		}
+		for _, ba := range page.Data {
+			if ba.Fingerprint != "" {
+				out = append(out, ba.Fingerprint)
+			}
+		}
+		if !page.HasMore {
+			return out, nil
+		}
+		if len(page.Data) == 0 || page.Data[len(page.Data)-1].ID == "" {
+			return nil, errors.New("stripe：外部銀行帳號的回應 has_more 為真但沒有可接續的項目")
+		}
+		startingAfter = page.Data[len(page.Data)-1].ID
+	}
+	return nil, fmt.Errorf("stripe：外部銀行帳號超過 %d 頁", maxBankAccountPages)
+}

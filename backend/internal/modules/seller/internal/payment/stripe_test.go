@@ -338,3 +338,37 @@ func TestStripeParseEventMapsSignatureIgnoredAndAccepted(t *testing.T) {
 		t.Errorf("沒有簽章：%v", err)
 	}
 }
+
+// FetchAccount 把外部銀行帳號的 fingerprint 放進快照；讀 fingerprint 失敗（5xx）整個呼叫失敗且是一般錯誤（job 重試），不產生沒有 fingerprint 的快照。
+// mutation：adapter 不呼叫 ListBankAccountFingerprints → 快照沒有 fingerprint；吞掉列表錯誤 → 第二段沒有錯誤；把錯誤轉成 ErrPermanent → errors.Is 檢查失敗。
+func TestStripeFetchFillsBankFingerprintsAndFailsWholeWhenTheListFails(t *testing.T) {
+	retrieve := fixtureResponder(t, "retrieve_provider_new")
+	list := fixtureResponder(t, "external_accounts_bank")
+	listStatus := 0
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/accounts/acct_1/external_accounts":
+			if listStatus != 0 {
+				w.WriteHeader(listStatus)
+				return
+			}
+			list(w, r)
+		default:
+			retrieve(w, r)
+		}
+	})
+	p := stripeProvider(t, model.CollectionProvider, h)
+	snap, err := p.FetchAccount(context.Background(), "acct_1")
+	if err != nil || len(snap.BankFingerprints) != 1 || snap.BankFingerprints[0] == "" {
+		t.Fatalf("snap=%+v err=%v", snap, err)
+	}
+	listStatus = 503
+	snap, err = p.FetchAccount(context.Background(), "acct_1")
+	if err == nil || errors.Is(err, ErrPermanent) || snap.Transfers != "" || snap.BankFingerprints != nil {
+		t.Fatalf("snap=%+v err=%v，預期一般錯誤且沒有快照", snap, err)
+	}
+	listStatus = 403
+	if _, err := p.FetchAccount(context.Background(), "acct_1"); !errors.Is(err, ErrPermanent) {
+		t.Fatalf("4xx 的列表錯誤是永久失敗：%v", err)
+	}
+}

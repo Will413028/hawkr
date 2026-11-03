@@ -80,12 +80,14 @@ type StatusDetail struct {
 
 // Snapshot 是外部帳戶某一刻的狀態，由 adapter 從 provider 的回應整理成中立的欄位。Transfers 與 Details 是轉帳能力（開通閘門）的狀態與
 // 它的限制細節；PayoutsActive 是撥款能力已啟用；Requirements 是 provider 回報的待補條件原始 JSON（物件），原樣
-// 保存給後台看。
+// 保存給後台看。BankFingerprints 是目前掛在外部帳戶上的外部銀行帳號的 provider 識別碼（同一組銀行帳號在同一個 provider 內一致；沒有掛銀行帳號時
+// 為空，不含空字串）：只供防詐比對，不是機密但不存明文。
 type Snapshot struct {
-	Transfers     CapabilityState
-	Details       []StatusDetail
-	PayoutsActive bool
-	Requirements  json.RawMessage
+	Transfers        CapabilityState
+	Details          []StatusDetail
+	PayoutsActive    bool
+	Requirements     json.RawMessage
+	BankFingerprints []string
 }
 
 // EnsureInput 是建立外部帳戶的輸入。IdempotencyKey 是「建立中」的列寫入時產生並保存的隨機 UUID：同一家店的每次重試都用它，得到同一個帳戶；
@@ -121,7 +123,7 @@ type Provider interface {
 	EnsureAccount(ctx context.Context, in EnsureInput) (externalID string, err error)
 	// CreateOnboardingSession 產生開通的連結或內嵌元件的 session。
 	CreateOnboardingSession(ctx context.Context, in SessionInput) (model.OnboardingSession, error)
-	// FetchAccount 讀外部帳戶目前的狀態。
+	// FetchAccount 讀外部帳戶目前的狀態與掛著的外部銀行帳號識別碼；任何一項讀取失敗整個呼叫失敗。
 	FetchAccount(ctx context.Context, externalID string) (Snapshot, error)
 	// ParseEvent 驗簽並取出事件 ID 與外部帳戶 ID；簽章不符或格式不合回 ErrInvalidEvent，驗過簽章但不是本平台要處理的事件回 ErrIgnoredEvent。
 	ParseEvent(header http.Header, body []byte) (Event, error)

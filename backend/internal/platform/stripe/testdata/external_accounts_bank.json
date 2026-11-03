@@ -1,0 +1,27 @@
+{
+  "status": 200,
+  "body": {
+    "object": "list",
+    "url": "/v1/accounts/acct_<MASKED>/external_accounts",
+    "has_more": false,
+    "data": [
+      {
+        "id": "ba_<MASKED>",
+        "object": "bank_account",
+        "account": "acct_<MASKED>",
+        "account_holder_name": null,
+        "account_holder_type": null,
+        "available_payout_methods": ["standard"],
+        "bank_name": "STRIPE TEST BANK",
+        "country": "US",
+        "currency": "usd",
+        "default_for_currency": true,
+        "fingerprint": "<FINGERPRINT-MASKED>",
+        "last4": "6789",
+        "metadata": {},
+        "routing_number": "110000000",
+        "status": "new"
+      }
+    ]
+  }
+}

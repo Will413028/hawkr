@@ -87,7 +87,8 @@ func (s *Stripe) CreateOnboardingSession(ctx context.Context, in SessionInput) (
 	return model.OnboardingSession{}, fmt.Errorf("%w：不支援的收件方式 %q", ErrPermanent, in.Collection)
 }
 
-// FetchAccount 實作 Provider：只取轉帳能力（狀態與細節）、撥款能力是否 active 與 requirements 原始 JSON，其餘欄位丟棄。
+// FetchAccount 實作 Provider：取轉帳能力（狀態與細節）、撥款能力是否 active、requirements 原始 JSON 與外部銀行帳號的 fingerprint，其餘欄位丟棄；
+// 讀 fingerprint 失敗整個呼叫失敗（job 重試）。
 func (s *Stripe) FetchAccount(ctx context.Context, externalID string) (Snapshot, error) {
 	if externalID == "" {
 		return Snapshot{}, fmt.Errorf("%w：缺少外部帳戶 ID", ErrPermanent)
@@ -96,10 +97,15 @@ func (s *Stripe) FetchAccount(ctx context.Context, externalID string) (Snapshot,
 	if err != nil {
 		return Snapshot{}, classify(err)
 	}
+	fingerprints, err := s.client.ListBankAccountFingerprints(ctx, externalID)
+	if err != nil {
+		return Snapshot{}, classify(err)
+	}
 	snap := Snapshot{
-		Transfers:     capabilityState(acct.Transfers),
-		PayoutsActive: capabilityState(acct.Payouts) == CapabilityActive,
-		Requirements:  requirementsObject(acct.Requirements),
+		BankFingerprints: fingerprints,
+		Transfers:        capabilityState(acct.Transfers),
+		PayoutsActive:    capabilityState(acct.Payouts) == CapabilityActive,
+		Requirements:     requirementsObject(acct.Requirements),
 	}
 	for _, d := range acct.Transfers.Details {
 		snap.Details = append(snap.Details, StatusDetail{Resolution: resolutionOf(d.Resolution), Reason: d.Code})
