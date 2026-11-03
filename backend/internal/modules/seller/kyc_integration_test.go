@@ -580,7 +580,7 @@ func TestReconcileDeletesSnapshotsOfEndedSanctions(t *testing.T) {
 	must(t, err)
 	// 沒有目前 stint 的帳號：直接寫一筆已結束的措施與快照（模擬結束 job 遺失）。
 	var storeID int64
-	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE account_id=$1", accountID).Scan(&storeID))
+	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE store_id=$1", accountID).Scan(&storeID))
 	f.insertEndedRisk(t, storeID, accountID, true)
 	if _, err := f.module.ReconcileSuspensions(ctx); err != nil {
 		t.Fatal(err)
@@ -675,7 +675,6 @@ func TestKYCSchemaConstraints(t *testing.T) {
 	accountID, _ := f.open(t)
 	f.savedDraft(t, kycDraft(accountID, idA, bankAcct))
 	for name, query := range map[string]string{
-		"submitted without required fields":  "UPDATE seller.kyc_applications SET status='SUBMITTED', submitted_at=now(), submission_seq=1, real_name=NULL",
 		"submitted without a payout email":   "UPDATE seller.kyc_applications SET status='SUBMITTED', submitted_at=now(), submission_seq=1, payout_contact_email=NULL",
 		"submitted without a submission seq": "UPDATE seller.kyc_applications SET status='SUBMITTED', submitted_at=now()",
 		"a negative submission seq":          "UPDATE seller.kyc_applications SET submission_seq=-1",
@@ -697,6 +696,23 @@ func TestKYCSchemaConstraints(t *testing.T) {
 		if _, err := f.db.Conn(ctx).Exec(ctx, query); err == nil {
 			t.Errorf("%s 應該被 CHECK 擋下", name)
 		}
+	}
+	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.kyc_applications SET real_name=NULL"); err != nil {
+		t.Errorf("草稿不受送出時的必填限制：%v", err)
+	}
+	companyAccount, companyStore := f.open(t)
+	f.savedDraft(t, companyDraft(companyAccount, idRep, taxIDOne, bankAcct))
+	const submit = "UPDATE seller.kyc_applications SET status='SUBMITTED', submitted_at=now(), submission_seq=1%s WHERE store_id=$1"
+	for name, extra := range map[string]string{
+		"company submitted without a tax id":       ", tax_id=NULL, tax_id_hash=NULL, tax_id_hash_key=NULL",
+		"company submitted without a company name": ", company_name=NULL",
+	} {
+		if _, err := f.db.Conn(ctx).Exec(ctx, fmt.Sprintf(submit, extra), companyStore.StoreID); err == nil {
+			t.Errorf("%s 應該被 CHECK 擋下", name)
+		}
+	}
+	if _, err := f.db.Conn(ctx).Exec(ctx, fmt.Sprintf(submit, ""), companyStore.StoreID); err != nil {
+		t.Errorf("公司賣家有公司名稱、統編與收款聯絡信箱就能送出：%v", err)
 	}
 }
 

@@ -159,20 +159,21 @@ func TestDevSeedWritesStoresThatTheModuleServesAsExposable(t *testing.T) {
 	}
 }
 
-// 種子店家都有入駐同意的紀錄（開店的 SELLER_TERMS 與已核准的 KYC 要求的兩份），版本是現行版本；重跑之後筆數相同，不重複。
+// 種子店家都有入駐同意的紀錄（開店的 SELLER_TERMS 與已核准的 KYC 要求的文件），版本是現行版本；重跑之後筆數相同，不重複。
 func TestDevSeedWritesTheAgreementAcceptancesTheInvariantRequires(t *testing.T) {
 	ctx := context.Background()
 	d := devSeedEnv(t)
+	want := append(seller.CurrentApplyAcceptances(), seller.CurrentKYCAcceptances()...)
 	for range 2 {
 		if err := runDevSeed(ctx, nil, new(bytes.Buffer)); err != nil {
 			t.Fatalf("dev-seed：%v", err)
 		}
 		for _, st := range devSeedStores() {
-			if n := count(t, d, `SELECT count(*) FROM seller.agreement_acceptances WHERE store_id = $1`, st.StoreID); n != 3 {
-				t.Fatalf("store %d 有 %d 筆同意紀錄，want 3", st.StoreID, n)
+			if n := count(t, d, `SELECT count(*) FROM seller.agreement_acceptances WHERE store_id = $1`, st.StoreID); n != len(want) {
+				t.Fatalf("store %d 有 %d 筆同意紀錄，want %d", st.StoreID, n, len(want))
 			}
-			for _, k := range seller.AgreementKinds() {
-				cur, _ := seller.CurrentAgreement(k)
+			for _, a := range want {
+				k, cur := a.Kind, a
 				if n := count(t, d, `SELECT count(*) FROM seller.agreement_acceptances WHERE store_id = $1 AND kind = $2 AND version = $3 AND account_id = $4`, st.StoreID, string(k), cur.Version, st.AccountID); n != 1 {
 					t.Fatalf("store %d 的 %s 紀錄 %d 筆，want 1", st.StoreID, k, n)
 				}

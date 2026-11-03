@@ -262,10 +262,10 @@ func TestSubmitKYCAgreementErrorsReachTheClient(t *testing.T) {
 	f.applyComplete(t, f.app)
 	draft := saveDraft(t, f.app, completeDraft(testID))
 	outdated := kycAgreementsPB()
-	outdated[1].Version = "2026-01-01"
+	outdated[0].Version = "2026-01-01"
 	_, err := f.app.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: draft.GetEtag(), AcceptedAgreements: outdated}))
 	wantCode(t, err, connect.CodeFailedPrecondition, "AGREEMENT_OUTDATED")
-	for name, in := range map[string][]*pb.AgreementAcceptance{"沒有": nil, "缺一種": kycAgreementsPB()[:1], "開店的種類": pbAcceptances(seller.CurrentApplyAcceptances())} {
+	for name, in := range map[string][]*pb.AgreementAcceptance{"沒有": nil, "開店的種類": pbAcceptances(seller.CurrentApplyAcceptances())} {
 		_, err = f.app.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: draft.GetEtag(), AcceptedAgreements: in}))
 		if field := wantCode(t, err, connect.CodeInvalidArgument, ""); field != "accepted_agreements" {
 			t.Fatalf("%s：field=%q", name, field)

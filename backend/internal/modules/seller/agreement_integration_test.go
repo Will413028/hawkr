@@ -252,7 +252,6 @@ func TestSubmitKYCWithBadAgreementsDoesNotSubmit(t *testing.T) {
 	}
 	for name, in := range map[string][]AgreementAcceptance{
 		"沒有":              nil,
-		"缺一種":             CurrentKYCAcceptances()[:1],
 		"開店的種類":           CurrentApplyAcceptances(),
 		"同一種兩次":           {CurrentKYCAcceptances()[0], CurrentKYCAcceptances()[0]},
 		"多出開店的種類":         append(CurrentKYCAcceptances(), CurrentApplyAcceptances()...),
